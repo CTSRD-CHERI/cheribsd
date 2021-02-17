@@ -71,8 +71,9 @@
 #include "cheribsdtest.h"
 
 #ifdef CHERIBSD_LIBCHERI_TESTS
-void
-test_sandbox_syscall(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_syscall,
+    "Invoke a system call in a libcheri sandbox",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	size_t len;
 	int old, new;
@@ -104,8 +105,7 @@ test_sandbox_syscall(const struct cheri_test *ctp __unused)
 }
 #endif
 
-void
-test_sig_dfl_neq_ign(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sig_dfl_neq_ign, "Test SIG_DFL != SIG_IGN")
 {
 	void * __capability sic = (__cheri_tocap void * __capability)SIG_IGN;
 
@@ -135,8 +135,7 @@ test_sig_dfl_ign_handler(int x)
 	(void)x;
 }
 
-void
-test_sig_dfl_ign(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sig_dfl_ign, "Test proper handling of SIG_DFL and SIG_IGN")
 {
 	int cpid;
 	int res;
@@ -200,8 +199,7 @@ test_sig_dfl_ign(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_ptrace_basic(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_ptrace_basic, "Test basic handling of ptrace functionality")
 {
 	int cpid, res;
 
@@ -245,8 +243,7 @@ test_aio_sival_handler(int sig, siginfo_t *si, void *uc __unused)
 	test_aio_sival_info = *si;
 }
 
-void
-test_aio_sival(const struct cheri_test *cpt __unused)
+CHERIBSDTEST(test_aio_sival, "Test pointer passing through AIO signals")
 {
 	char buf[128];
 	int pfd[2];
@@ -266,6 +263,7 @@ test_aio_sival(const struct cheri_test *cpt __unused)
 	res = socketpair(AF_UNIX, SOCK_STREAM, 0, pfd);
 	CHERIBSDTEST_VERIFY2(res == 0, "Could not create socketpair; errno=%d", errno);
 
+	bzero(&aiocb, sizeof(aiocb));
 	aiocb.aio_fildes = pfd[0];
 	aiocb.aio_buf = buf;
 	aiocb.aio_nbytes = sizeof(buf);

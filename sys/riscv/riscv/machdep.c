@@ -451,9 +451,6 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 		tf->tf_a[0] = (uintcap_t)imgp->auxv;
 		tf->tf_sp = stack;
-		cheri_set_mmap_capability(td, imgp,
-		    (void * __capability)tf->tf_sp);
-
 		tf->tf_sepc = (uintcap_t)cheri_exec_pcc(td, imgp);
 		td->td_proc->p_md.md_sigcode = cheri_sigcode_capability(td);
 	} else
@@ -795,9 +792,6 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct sigacts *psp;
 	struct thread *td;
 	struct proc *p;
-#if __has_feature(capabilities)
-	int cheri_is_sandboxed;
-#endif
 	int onstack;
 	int sig;
 
@@ -817,54 +811,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * than using the full capability.  Should we compare the
 	 * entire capability...?  Just pointer and bounds...?
 	 */
-	onstack = sigonstack((__cheri_addr vaddr_t)tf->tf_sp);
-
-#if __has_feature(capabilities)
-	/*
-	 * CHERI affects signal delivery in the following ways:
-	 *
-	 * (1) Additional capability state is exposed via extensions
-	 *     to the context frame placed on the stack.
-	 *
-	 * (2) If the user $pcc doesn't include CHERI_PERM_SYSCALL,
-	 *     then we consider user state to be 'sandboxed'.
-	 *
-	 * (3) If an alternative signal stack is not defined, and we
-	 *     are in a 'sandboxed' state, then we will terminate the
-	 *     process unconditionally.
-	 */
-	cheri_is_sandboxed = cheri_signal_sandboxed(td);
-
-	/*
-	 * We provide the ability to drop into the debugger in two different
-	 * circumstances: (1) if the code running is sandboxed; and (2) if the
-	 * fault is a CHERI protection fault.  Handle both here for the
-	 * non-unwind case.  Do this before we rewrite any general-purpose or
-	 * capability register state for the thread.
-	 */
-#ifdef DDB
-	if (cheri_is_sandboxed && security_cheri_debugger_on_sandbox_signal)
-		kdb_enter(KDB_WHY_CHERI, "Signal delivery to CHERI sandbox");
-	else if (sig == SIGPROT && security_cheri_debugger_on_sigprot)
-		kdb_enter(KDB_WHY_CHERI,
-		    "SIGPROT delivered outside sandbox");
-#endif
-
-	/*
-	 * If a thread is running sandboxed, we can't rely on $sp which may
-	 * not point at a valid stack in the ambient context, or even be
-	 * maliciously manipulated.  We must therefore always use the
-	 * alternative stack.  We are also therefore unable to tell whether we
-	 * are on the alternative stack, so must clear 'oonstack' here.
-	 *
-	 * XXXRW: This requires significant further thinking; however, the net
-	 * upshot is that it is not a good idea to do an object-capability
-	 * invoke() from a signal handler, as with so many other things in
-	 * life.
-	 */
-	if (cheri_is_sandboxed != 0)
-		onstack = 0;
-#endif
+	onstack = sigonstack(tf->tf_sp);
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
 	    (__cheri_addr vaddr_t)catcher, sig);
@@ -875,23 +822,6 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		fp = (struct sigframe * __capability)((uintcap_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 	} else {
-#if __has_feature(capabilities)
-		/*
-		 * Signals delivered when a CHERI sandbox is present must be
-		 * delivered on the alternative stack rather than a local one.
-		 * If an alternative stack isn't present, then terminate or
-		 * risk leaking capabilities (and control) to the sandbox (or
-		 * just crashing the sandbox).
-		 */
-		if (cheri_is_sandboxed) {
-			mtx_unlock(&psp->ps_mtx);
-			printf("pid %d, tid %d: signal in sandbox without "
-			    "alternative stack defined\n", td->td_proc->p_pid,
-			    td->td_tid);
-			sigexit(td, SIGILL);
-			/* NOTREACHED */
-		}
-#endif
 		fp = (struct sigframe * __capability)td->td_frame->tf_sp;
 	}
 

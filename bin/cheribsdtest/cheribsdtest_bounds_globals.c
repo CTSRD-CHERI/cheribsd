@@ -77,8 +77,11 @@
  * taking a pointer to the global, and using the existing pointer, return
  * offsets and sizes as desired.
  */
-#define TEST_BOUNDS(test)                                               \
-	void test_bounds_##test(const struct cheri_test *ctp __unused)  \
+#define TEST_BOUNDS(test, desc, ...)						\
+	CHERIBSDTEST(test_bounds_##test,				\
+	"Check bounds on " desc,					\
+	.ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC,		\
+	__VA_ARGS__)							\
 	{                                                               \
 		void *__capability allocation =                         \
 		    (__cheri_tocap void *__capability) & test;          \
@@ -172,14 +175,14 @@ extern void * __capability	 global_uint64p;
 void * __capability		 global_uint64p =
 		    (__cheri_tocap void * __capability)&global_uint64;
 
-TEST_BOUNDS(global_static_uint8);
-TEST_BOUNDS(global_uint8);
-TEST_BOUNDS(global_static_uint16);
-TEST_BOUNDS(global_uint16);
-TEST_BOUNDS(global_static_uint32);
-TEST_BOUNDS(global_uint32);
-TEST_BOUNDS(global_static_uint64);
-TEST_BOUNDS(global_uint64);
+TEST_BOUNDS(global_static_uint8, "global static uint8_t");
+TEST_BOUNDS(global_uint8, "global uint8_t");
+TEST_BOUNDS(global_static_uint16, "static uint16_t");
+TEST_BOUNDS(global_uint16, "global uint16_t");
+TEST_BOUNDS(global_static_uint32, "global static uint32_t");
+TEST_BOUNDS(global_uint32, "global uint32_t");
+TEST_BOUNDS(global_static_uint64, "global static uint64_t");
+TEST_BOUNDS(global_uint64, "global uint64_t");
 
 /*
  * Arrays of bytes with annoying (often prime) sizes.
@@ -228,14 +231,16 @@ extern void * __capability	 global_uint8_array65537p;
 void * __capability		 global_uint8_array65537p =
 		    (__cheri_tocap void * __capability)&global_uint8_array65537;
 
-TEST_BOUNDS(global_static_uint8_array1);
-TEST_BOUNDS(global_uint8_array1);
-TEST_BOUNDS(global_static_uint8_array3)
-TEST_BOUNDS(global_uint8_array3);
-TEST_BOUNDS(global_static_uint8_array17);
-TEST_BOUNDS(global_uint8_array17);
-TEST_BOUNDS(global_static_uint8_array65537);
-TEST_BOUNDS(global_uint8_array65537);
+TEST_BOUNDS(global_static_uint8_array1, "global static uint8_t[1]");
+TEST_BOUNDS(global_uint8_array1, "global uint8_t[1]");
+TEST_BOUNDS(global_static_uint8_array3, "global static uint8_t[3]")
+TEST_BOUNDS(global_uint8_array3, "global uint8_t[3]");
+TEST_BOUNDS(global_static_uint8_array17, "global static uint_t[17]");
+TEST_BOUNDS(global_uint8_array17, "global uint_t[17]");
+TEST_BOUNDS(global_static_uint8_array65537, "global static uint8_t[65537]",
+    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS);
+TEST_BOUNDS(global_uint8_array65537, "global uint8_t[65537]",
+    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS);
 
 /*
  * Arrays of bytes with power-of-two sizes starting with size 32.
@@ -372,30 +377,30 @@ extern void * __capability	 global_uint8_array65536p;
 void * __capability		 global_uint8_array65536p =
 		    (__cheri_tocap void * __capability)&global_uint8_array65536;
 
-TEST_BOUNDS(global_static_uint8_array32);
-TEST_BOUNDS(global_uint8_array32);
-TEST_BOUNDS(global_static_uint8_array64);
-TEST_BOUNDS(global_uint8_array64);
-TEST_BOUNDS(global_static_uint8_array128);
-TEST_BOUNDS(global_uint8_array128);
-TEST_BOUNDS(global_static_uint8_array256);
-TEST_BOUNDS(global_uint8_array256);
-TEST_BOUNDS(global_static_uint8_array512);
-TEST_BOUNDS(global_uint8_array512);
-TEST_BOUNDS(global_static_uint8_array1024);
-TEST_BOUNDS(global_uint8_array1024);
-TEST_BOUNDS(global_static_uint8_array2048);
-TEST_BOUNDS(global_uint8_array2048);
-TEST_BOUNDS(global_static_uint8_array4096);
-TEST_BOUNDS(global_uint8_array4096);
-TEST_BOUNDS(global_static_uint8_array8192);
-TEST_BOUNDS(global_uint8_array8192);
-TEST_BOUNDS(global_static_uint8_array16384);
-TEST_BOUNDS(global_uint8_array16384);
-TEST_BOUNDS(global_static_uint8_array32768);
-TEST_BOUNDS(global_uint8_array32768);
-TEST_BOUNDS(global_static_uint8_array65536);
-TEST_BOUNDS(global_uint8_array65536);
+TEST_BOUNDS(global_static_uint8_array32, "global static uint8_t[32]");
+TEST_BOUNDS(global_uint8_array32, "global uint8_t[32]");
+TEST_BOUNDS(global_static_uint8_array64, "global static uint8_t[64]");
+TEST_BOUNDS(global_uint8_array64, "global uint8_t[64]");
+TEST_BOUNDS(global_static_uint8_array128, "global static uint8_t[128]");
+TEST_BOUNDS(global_uint8_array128, "global uint8_t[128]");
+TEST_BOUNDS(global_static_uint8_array256, "global static uint8_t[256]");
+TEST_BOUNDS(global_uint8_array256, "global uint8_t[256]");
+TEST_BOUNDS(global_static_uint8_array512, "global static uint8_t[512]");
+TEST_BOUNDS(global_uint8_array512, "global uint8_t[512]");
+TEST_BOUNDS(global_static_uint8_array1024, "global static uint8_t[1024]");
+TEST_BOUNDS(global_uint8_array1024, "global uint8_t[1024]");
+TEST_BOUNDS(global_static_uint8_array2048, "global static uint8_t[2048]");
+TEST_BOUNDS(global_uint8_array2048, "global uint8_t[2048]");
+TEST_BOUNDS(global_static_uint8_array4096, "global static uint8_t[4096]");
+TEST_BOUNDS(global_uint8_array4096, "global uint8_t[4096]");
+TEST_BOUNDS(global_static_uint8_array8192, "global uint8_t[8192]");
+TEST_BOUNDS(global_uint8_array8192, "global uint8_t[8192]");
+TEST_BOUNDS(global_static_uint8_array16384, "global static uint8_t[16384]");
+TEST_BOUNDS(global_uint8_array16384, "global uint8_t[16384]");
+TEST_BOUNDS(global_static_uint8_array32768, "global static uint8_t[32768]");
+TEST_BOUNDS(global_uint8_array32768, "global uint8_t[32768]");
+TEST_BOUNDS(global_static_uint8_array65536, "global static uint8_t[65536]");
+TEST_BOUNDS(global_uint8_array65536, "global uint8_t[65536]");
 
 /*
  * Tests on globals allocated in another compilation unit.  Sometimes with
@@ -466,12 +471,11 @@ void * __capability		 extern_global_array65536p =
 /*
  * Checks against C-based types.
  */
-TEST_BOUNDS(extern_global_uint8);
-TEST_BOUNDS(extern_global_uint32);
-TEST_BOUNDS(extern_global_array7);
-TEST_BOUNDS(extern_global_array16);
-TEST_BOUNDS(extern_global_array65536);
-
+TEST_BOUNDS(extern_global_uint8, "extern global uint8_t (C size)");
+TEST_BOUNDS(extern_global_uint32, "extern global uint32_t (C size)");
+TEST_BOUNDS(extern_global_array7, "extern global uint8_t[7] (C size)");
+TEST_BOUNDS(extern_global_array16, "extern global uint8_t[16] (C size)");
+TEST_BOUNDS(extern_global_array65536, "extern global uint8_t[16] (C size)");
 /*
  * Template for a test function, which assumes there is a global (test) and
  * corresponding statically initialised pointer (testp).  Check that both
@@ -480,21 +484,24 @@ TEST_BOUNDS(extern_global_array65536);
  * from which to generate a size, whereas above we assume the C type of the
  * variable is a correct source of size information.
  */
-#define	TEST_DYNAMIC_BOUNDS(test, size)					\
-	void								\
-	test_bounds_##test(const struct cheri_test *ctp __unused)	\
+#define	TEST_DYNAMIC_BOUNDS(test, type, ...)				\
+	CHERIBSDTEST(test_bounds_##test,				\
+	"Check bounds on extern global " #type " (dynamic size)",	\
+	.ct_xfail_reason = XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN,		\
+	__VA_ARGS__)							\
 	{								\
 		void * __capability allocation =			\
 		    (__cheri_tocap void * __capability)&test;		\
-		test_bounds_impl(allocation, test##p, size);		\
+		test_bounds_impl(allocation, test##p, sizeof(type));	\
 	}
 
 /*
  * Checks to ensure we are using linker-provided size information, and not C
  * types.  Use a priori knowledge of the types to check lengths.
  */
-TEST_DYNAMIC_BOUNDS(extern_global_uint16, sizeof(uint16_t));
-TEST_DYNAMIC_BOUNDS(extern_global_uint64, sizeof(uint64_t));
-TEST_DYNAMIC_BOUNDS(extern_global_array1, sizeof(uint8_t[1]));
-TEST_DYNAMIC_BOUNDS(extern_global_array65537, sizeof(uint8_t[65537]));
-TEST_DYNAMIC_BOUNDS(extern_global_array256, sizeof(uint8_t[256]));
+TEST_DYNAMIC_BOUNDS(extern_global_uint16, uint16_t);
+TEST_DYNAMIC_BOUNDS(extern_global_uint64, uint64_t);
+TEST_DYNAMIC_BOUNDS(extern_global_array1, uint8_t[1]);
+TEST_DYNAMIC_BOUNDS(extern_global_array65537, uint8_t[65537],
+    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS);
+TEST_DYNAMIC_BOUNDS(extern_global_array256, uint8_t[256]);

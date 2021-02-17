@@ -55,6 +55,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/vfp.h>
 #endif
 
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
+
 #include <dev/psci/psci.h>
 
 /*
@@ -77,11 +81,22 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 		 * in cpu_switch, but if userland changes these then forks
 		 * this may not have happened.
 		 */
+#if __has_feature(capabilities)
+		td1->td_pcb->pcb_tpidr_el0 = READ_SPECIALREG_CAP(ctpidr_el0);
+		td1->td_pcb->pcb_tpidrro_el0 = READ_SPECIALREG_CAP(ctpidrro_el0);
+#else
 		td1->td_pcb->pcb_tpidr_el0 = READ_SPECIALREG(tpidr_el0);
 		td1->td_pcb->pcb_tpidrro_el0 = READ_SPECIALREG(tpidrro_el0);
+#endif
 #ifdef VFP
 		if ((td1->td_pcb->pcb_fpflags & PCB_FP_STARTED) != 0)
 			vfp_save_state(td1, td1->td_pcb);
+#endif
+#if __has_feature(capabilities)
+		td1->td_pcb->pcb_cid_el0 = READ_SPECIALREG_CAP(cid_el0);
+		td1->td_pcb->pcb_rcsp_el0 = READ_SPECIALREG_CAP(rcsp_el0);
+		td1->td_pcb->pcb_rddc_el0 = READ_SPECIALREG_CAP(rddc_el0);
+		td1->td_pcb->pcb_rctpidr_el0 = READ_SPECIALREG_CAP(rctpidr_el0);
 #endif
 	}
 
@@ -90,6 +105,10 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 
 	td2->td_pcb = pcb2;
 	bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
+
+#if __has_feature(capabilities)
+	p2->p_md.md_sigcode = td1->td_proc->p_md.md_sigcode;
+#endif
 
 	tf = (struct trapframe *)STACKALIGN((struct trapframe *)pcb2 - 1);
 	bcopy(td1->td_frame, tf, sizeof(*tf));
@@ -198,7 +217,15 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 		tf->tf_x[13] = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
 	else
 		tf->tf_sp = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
+
+#if __has_feature(capabilities)
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		trapframe_set_elr(tf, (uintcap_t)entry);
+	else
+		hybridabi_thread_setregs(td, (unsigned long)(uintcap_t)entry);
+#else
 	tf->tf_elr = (uintcap_t)entry;
+#endif
 	tf->tf_x[0] = (uintcap_t)arg;
 }
 
@@ -213,16 +240,26 @@ cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 	pcb = td->td_pcb;
 	if (td->td_frame->tf_spsr & PSR_M_32) {
 		/* 32bits arm stores the user TLS into tpidrro */
-		pcb->pcb_tpidrro_el0 = (__cheri_addr vaddr_t)tls_base;
-		pcb->pcb_tpidr_el0 = (__cheri_addr vaddr_t)tls_base;
+		pcb->pcb_tpidrro_el0 = (uintcap_t)tls_base;
+		pcb->pcb_tpidr_el0 = (uintcap_t)tls_base;
 		if (td == curthread) {
-			WRITE_SPECIALREG(tpidrro_el0, (__cheri_addr vaddr_t)tls_base);
-			WRITE_SPECIALREG(tpidr_el0, (__cheri_addr vaddr_t)tls_base);
+#if __has_feature(capabilities)
+			WRITE_SPECIALREG_CAP(ctpidrro_el0, tls_base);
+			WRITE_SPECIALREG_CAP(ctpidr_el0, tls_base);
+#else
+			WRITE_SPECIALREG(tpidrro_el0, tls_base);
+			WRITE_SPECIALREG(tpidr_el0, tls_base);
+#endif
 		}
 	} else {
-		pcb->pcb_tpidr_el0 = (__cheri_addr vaddr_t)tls_base;
-		if (td == curthread)
-			WRITE_SPECIALREG(tpidr_el0, (__cheri_addr vaddr_t)tls_base);
+		pcb->pcb_tpidr_el0 = (uintcap_t)tls_base;
+		if (td == curthread) {
+#if __has_feature(capabilities)
+			WRITE_SPECIALREG_CAP(ctpidr_el0, tls_base);
+#else
+			WRITE_SPECIALREG(tpidr_el0, tls_base);
+#endif
+		}
 	}
 
 	return (0);

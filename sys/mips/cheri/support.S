@@ -88,8 +88,7 @@ NESTED(copyinstr, CALLFRAME_SIZ, ra)
 
 	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 
 	clc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
 	/* Propagate v0 return value from copyinstr */
@@ -129,8 +128,7 @@ NESTED(copyoutstr, CALLFRAME_SIZ, ra)
 
 	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 
 	clc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
 	/* Propagate v0 return value from copyoutstr */
@@ -167,8 +165,7 @@ NESTED(copyin, CALLFRAME_SIZ, ra)
 
 	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1) # bcopy modified v1, so reload
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 
 	clc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
 	/* Propagate v0 return value from cheri_bcopy */
@@ -207,8 +204,7 @@ NESTED(copyincap, CALLFRAME_SIZ, ra)
 
 	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1) # bcopy modified v1, so reload
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 
 	clc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
 	/* Propagate v0 return value from cheri_bcopy */
@@ -246,8 +242,7 @@ NESTED(copyout, CALLFRAME_SIZ, ra)
 
 	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1) # bcopy modified v1, so reload
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 
 	clc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
 	/* Propagate v0 return value from cheri_bcopy */
@@ -286,8 +281,7 @@ NESTED(copyoutcap, CALLFRAME_SIZ, ra)
 
 	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1) # bcopy modified v1, so reload
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 
 	clc		$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
 	/* Propagate v0 return value from cheri_bcopy */
@@ -323,8 +317,7 @@ XLEAF(fueword)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	cld	v0, zero, 0($c3)	# fetch word
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 	csd	v0, zero, 0($c4)	# store word
 	cjr	$c17
 	li	v0, 0
@@ -343,8 +336,7 @@ LEAF(fueword32)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	clw	v0, zero, 0($c3)	# fetch word
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 	csw	v0, zero, 0($c4)	# store word
 	cjr	$c17
 	li	v0, 0
@@ -361,8 +353,7 @@ LEAF(fuesword)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	clhu	v0, zero, 0($c3)	# fetch short
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 	csh	v0, zero, 0($c4)	# store short
 	cjr	$c17
 	li	v0, 0
@@ -379,9 +370,8 @@ LEAF(fubyte)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	clbu	v0, zero, 0($c3)	# fetch byte
-	CHERI_NULL($c2)
 	cjr	$c17
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 1:
 	cjr	$c2	# fswberr
 	nop
@@ -397,8 +387,7 @@ LEAF(fuecap)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	clc	$c3, zero, 0($c3)	# fetch capability
 	csc	$c3, zero, 0($c4)	# store capability
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
 	li	v0, 0
 1:
@@ -416,8 +405,7 @@ XLEAF(suword)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csd	a0, zero, 0($c3)	# store word
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
 	move	v0, zero
 1:
@@ -435,7 +423,6 @@ LEAF(sucap)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csc	$c4, zero, 0($c3)	# store cap
-	CHERI_NULL($c2)
 	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
 	move	v0, zero
@@ -453,8 +440,7 @@ LEAF(suword32)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csw	a0, zero, 0($c3)	# store word
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
 	move	v0, zero
 1:
@@ -493,8 +479,7 @@ LEAF(casueword32)
 3:
 	li	v0, -1
 4:
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
 	csw	t1, zero, 0($c4)	# unconditionally store old word
 1:
@@ -524,8 +509,7 @@ XLEAF(casueword)
 3:
 	li	v0, -1
 4:
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
 	csd	t1, zero, 0($c4)	# unconditionally store old word
 1:
@@ -546,8 +530,7 @@ LEAF(susword)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csh	a0, zero, 0($c3)	# store short
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
 	move	v0, zero
 1:
@@ -564,8 +547,7 @@ LEAF(subyte)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csb	a0, zero, 0($c3)	# store short
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
 	move	v0, zero
 1:
@@ -593,9 +575,8 @@ LEAF(fuswintr)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	clhu	v0, zero, 0($c3)	# fetch short
-	CHERI_NULL($c2)
 	cjr	$c17
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 1:
 	cjr	$c2	# fswintrberr
 	nop
@@ -610,8 +591,7 @@ LEAF(suswintr)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csh	a0, zero, 0($c3)	# store short
-	CHERI_NULL($c2)
-	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
 	move	v0, zero
 1:
@@ -641,11 +621,11 @@ LEAF(memset)
 
 	cgetbase	t2, $c3
 	cgetoffset	t3, $c3
-	PTR_ADDU	t3, t2, t3
-	PTR_SUBU	t0, zero, t3	# compute # bytes to word align address
+	LONG_ADDU	t3, t2, t3
+	LONG_SUBU	t0, zero, t3	# compute # bytes to word align address
 	and	t0, t0, 3
 	beq	t0, zero, 1f		# skip if word aligned
-	PTR_SUBU	a1, a1, t0	# subtract from remaining count
+	LONG_SUBU	a1, a1, t0	# subtract from remaining count
 	REG_LI	t3, 0
 	cincoffset	$c2, $c1, t0
 3:
@@ -655,8 +635,8 @@ LEAF(memset)
 	csb	a0, zero, -1($c1)	# store 1, 2, or 3 bytes to align
 1:
 	and	v1, a1, 3		# compute number of whole words left
-	PTR_SUBU	t0, a1, v1
-	PTR_SUBU	a1, a1, t0
+	LONG_SUBU	t0, a1, v1
+	LONG_SUBU	a1, a1, t0
 	cincoffset	$c2, $c1, t0	# compute ending address
 2:
 	cincoffset	$c1, $c1, 4	# clear words
@@ -687,11 +667,11 @@ XLEAF(blkclr)
 
 	cgetbase	t0, $c3
 	cgetoffset	a3, $c3
-	PTR_ADDU	a3, a3, t0
-	// PTR_SUBU	a3, zero, a0
+	LONG_ADDU	a3, a3, t0
+	// LONG_SUBU	a3, zero, a0
 	and	a3, a3, 3		# compute # bytes to word align address
 	beq	a3, zero, 1f		# skip if word aligned
-	PTR_SUBU	a0, a0, a3	# subtract from remaining count
+	LONG_SUBU	a0, a0, a3	# subtract from remaining count
 
 	cincoffset	$c2, $c3, a3
 3:
@@ -701,7 +681,7 @@ XLEAF(blkclr)
 	csb	zero, zero, -1($c3)
 1:
 	and		v0, a0, 3	# compute misaligned tail
-	PTR_SUBU	a3, a0, v0	# compute number of bytes to copy
+	LONG_SUBU	a3, a0, v0	# compute number of bytes to copy
 	move	a0, v0			# a0 is the remaining tail bytes to copy
 	cincoffset	$c2, $c3, a3	# compute ending address
 2:
@@ -735,12 +715,12 @@ LEAF(bcmp)
 	cgetaddr	t1, $c4
 	xor	v0, t0, t1		# compare low two bits of addresses
 	and	v0, v0, 3
-	PTR_SUBU	a3, zero, t1		# compute # bytes to word align address
+	LONG_SUBU	a3, zero, t1		# compute # bytes to word align address
 	bne	v0, zero, smallcmp	# not possible to align addresses
 	and	a3, a3, 3
 
 	beq	a3, zero, 1f
-	PTR_SUBU	a0, a0, a3		# subtract from remaining count
+	LONG_SUBU	a0, a0, a3		# subtract from remaining count
 	move	v0, v1			# init v0,v1 so unmodified bytes match
 	/* Compare unaligned bytes, read 1, 2, or 3 bytes */
 4:
@@ -753,7 +733,7 @@ LEAF(bcmp)
 	bnez	a3, 4b
 1:
 	and	a3, a0, ~3		# compute number of whole words left
-	PTR_SUBU	a0, a0, a3		#   which has to be >= (16-3) & ~3
+	LONG_SUBU	a0, a0, a3		#   which has to be >= (16-3) & ~3
 	cincoffset	$c5, $c3, a3		# compute ending address
 2:
 	clw	v0, zero, 0($c3)		# compare words
@@ -785,7 +765,6 @@ nomatch:
 	li	v0, 1
 END(bcmp)
 
-
 /*
  * Find first bit set
  * bit = ffs(value)
@@ -804,202 +783,73 @@ LEAF(ffs)
 	nop
 END(ffs)
 
-
-#if defined(DDB) || defined(DEBUG)
-
-LEAF(kdbpeek)
-	PTR_LA	v1, ddberr
-	and	v0, a0, 3			# unaligned ?
-	GET_CPU_PCPU(t1)
-	PTR_L	t1, PC_CURPCB(t1)
-	bne	v0, zero, 1f
-	PTR_S	v1, U_PCB_ONFAULT(t1)
-
-	lw	v0, (a0)
-	jr	ra
-	PTR_S	zero, U_PCB_ONFAULT(t1)
-
-1:
-	LWHI	v0, 0(a0)
-	LWLO	v0, 3(a0)
-	jr	ra
-	PTR_S	zero, U_PCB_ONFAULT(t1)
-END(kdbpeek)
-
-LEAF(kdbpeekd)
-	PTR_LA	v1, ddberr
-	and	v0, a0, 3			# unaligned ?
-	GET_CPU_PCPU(t1)
-	PTR_L	t1, PC_CURPCB(t1)
-	bne	v0, zero, 1f
-	PTR_S	v1, U_PCB_ONFAULT(t1)
-
-	ld	v0, (a0)
-	jr	ra
-	PTR_S	zero, U_PCB_ONFAULT(t1)
-
-1:
-	REG_LHI	v0, 0(a0)
-	REG_LLO	v0, 7(a0)
-	jr	ra
-	PTR_S	zero, U_PCB_ONFAULT(t1)
-END(kdbpeekd)
-
-ddberr:
-	jr	ra
-	nop
-
-#if defined(DDB)
-LEAF(kdbpoke)
-	PTR_LA	v1, ddberr
-	and	v0, a0, 3			# unaligned ?
-	GET_CPU_PCPU(t1)
-	PTR_L	t1, PC_CURPCB(t1)
-	bne	v0, zero, 1f
-	PTR_S	v1, U_PCB_ONFAULT(t1)
-
-	sw	a1, (a0)
-	jr	ra
-	PTR_S	zero, U_PCB_ONFAULT(t1)
-
-1:
-	SWHI	a1, 0(a0)
-	SWLO	a1, 3(a0)
-	jr	ra
-	PTR_S	zero, U_PCB_ONFAULT(t1)
-END(kdbpoke)
-
-	.data
-	.globl	esym
-esym:	.word	0
-
-#endif /* DDB */
-#endif /* DDB || DEBUG */
-
 	.text
 LEAF(breakpoint)
 	break	MIPS_BREAK_SOVER_VAL
-	jr	ra
+	cjr	$c17
 	nop
 END(breakpoint)
 
 LEAF(setjmp)
 	mfc0	v0, MIPS_COP_0_STATUS	# Later the "real" spl value!
-	REG_S	s0, (SZREG * PCB_REG_S0)(a0)
-	REG_S	s1, (SZREG * PCB_REG_S1)(a0)
-	REG_S	s2, (SZREG * PCB_REG_S2)(a0)
-	REG_S	s3, (SZREG * PCB_REG_S3)(a0)
-	REG_S	s4, (SZREG * PCB_REG_S4)(a0)
-	REG_S	s5, (SZREG * PCB_REG_S5)(a0)
-	REG_S	s6, (SZREG * PCB_REG_S6)(a0)
-	REG_S	s7, (SZREG * PCB_REG_S7)(a0)
-	REG_S	s8, (SZREG * PCB_REG_S8)(a0)
-	REG_S	sp, (SZREG * PCB_REG_SP)(a0)
-	REG_S	ra, (SZREG * PCB_REG_RA)(a0)
-	REG_S	v0, (SZREG * PCB_REG_SR)(a0)
-#ifdef CPU_CHERI
-	/* XXXRW: CHERI kernel setjmp here? */
-#endif
-	jr	ra
+	csd	s0, zero, (SZREG * PCB_REG_S0)($c3)
+	csd	s1, zero, (SZREG * PCB_REG_S1)($c3)
+	csd	s2, zero, (SZREG * PCB_REG_S2)($c3)
+	csd	s3, zero, (SZREG * PCB_REG_S3)($c3)
+	csd	s4, zero, (SZREG * PCB_REG_S4)($c3)
+	csd	s5, zero, (SZREG * PCB_REG_S5)($c3)
+	csd	s6, zero, (SZREG * PCB_REG_S6)($c3)
+	csd	s7, zero, (SZREG * PCB_REG_S7)($c3)
+	csd	s8, zero, (SZREG * PCB_REG_S8)($c3)
+	csd	sp, zero, (SZREG * PCB_REG_SP)($c3)
+	csd	ra, zero, (SZREG * PCB_REG_RA)($c3)
+	csd	v0, zero, (SZREG * PCB_REG_SR)($c3)
+	REG_LI	t0, 12
+	csc	$c17, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C17)($c3)
+	csc	$c18, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C18)($c3)
+	csc	$c19, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C19)($c3)
+	csc	$c20, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C20)($c3)
+	csc	$c21, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C21)($c3)
+	csc	$c22, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C22)($c3)
+	csc	$c23, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C23)($c3)
+	csc	$c24, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C24)($c3)
+	csc	$c26, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_GPC)($c3)
+	csc	$c11, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_STC)($c3)
+
+	cjr	$c17
 	li	v0, 0			# setjmp return
 END(setjmp)
 
 LEAF(longjmp)
-	REG_L	v0, (SZREG * PCB_REG_SR)(a0)
-	REG_L	ra, (SZREG * PCB_REG_RA)(a0)
-	REG_L	s0, (SZREG * PCB_REG_S0)(a0)
-	REG_L	s1, (SZREG * PCB_REG_S1)(a0)
-	REG_L	s2, (SZREG * PCB_REG_S2)(a0)
-	REG_L	s3, (SZREG * PCB_REG_S3)(a0)
-	REG_L	s4, (SZREG * PCB_REG_S4)(a0)
-	REG_L	s5, (SZREG * PCB_REG_S5)(a0)
-	REG_L	s6, (SZREG * PCB_REG_S6)(a0)
-	REG_L	s7, (SZREG * PCB_REG_S7)(a0)
-	REG_L	s8, (SZREG * PCB_REG_S8)(a0)
-	REG_L	sp, (SZREG * PCB_REG_SP)(a0)
-#ifdef CPU_CHERI
-	/* XXXRW: CHERI kernel longjmp here? */
-#endif
+	cld	v0, zero, (SZREG * PCB_REG_SR)($c3)
+	cld	ra, zero, (SZREG * PCB_REG_RA)($c3)
+	cld	s0, zero, (SZREG * PCB_REG_S0)($c3)
+	cld	s1, zero, (SZREG * PCB_REG_S1)($c3)
+	cld	s2, zero, (SZREG * PCB_REG_S2)($c3)
+	cld	s3, zero, (SZREG * PCB_REG_S3)($c3)
+	cld	s4, zero, (SZREG * PCB_REG_S4)($c3)
+	cld	s5, zero, (SZREG * PCB_REG_S5)($c3)
+	cld	s6, zero, (SZREG * PCB_REG_S6)($c3)
+	cld	s7, zero, (SZREG * PCB_REG_S7)($c3)
+	cld	s8, zero, (SZREG * PCB_REG_S8)($c3)
+	cld	sp, zero, (SZREG * PCB_REG_SP)($c3)
+	REG_LI	t0, 12
+	clc	$c17, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C17)($c3)
+	clc	$c18, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C18)($c3)
+	clc	$c19, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C19)($c3)
+	clc	$c20, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C20)($c3)
+	clc	$c21, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C21)($c3)
+	clc	$c22, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C22)($c3)
+	clc	$c23, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C23)($c3)
+	clc	$c24, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C24)($c3)
+	clc	$c26, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_GPC)($c3)
+	clc	$c11, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_STC)($c3)
+
 	mtc0	v0, MIPS_COP_0_STATUS	# Later the "real" spl value!
 	ITLBNOPFIX
-	jr	ra
+	cjr	$c17
 	li	v0, 1			# longjmp return
 END(longjmp)
-
-LEAF(mips3_ld)
-	.set push
-	.set noreorder
-	.set mips64
-#if defined(__mips_o32)
-	mfc0	t0, MIPS_COP_0_STATUS		# turn off interrupts
-	and	t1, t0, ~(MIPS_SR_INT_IE)
-	mtc0	t1, MIPS_COP_0_STATUS
-	COP0_SYNC
-	nop
-	nop
-	nop
-
-	ld	v0, 0(a0)
-#if _BYTE_ORDER == _BIG_ENDIAN
-	dsll	v1, v0, 32
-	dsra	v1, v1, 32			# low word in v1
-	dsra	v0, v0, 32			# high word in v0
-#else
-	dsra	v1, v0, 32			# high word in v1
-	dsll	v0, v0, 32
-	dsra	v0, v0, 32			# low word in v0
-#endif
-
-	mtc0	t0, MIPS_COP_0_STATUS		# restore intr status.
-	COP0_SYNC
-	nop
-#else /* !__mips_o32 */
-	ld	v0, 0(a0)
-#endif /* !__mips_o32 */
-
-	jr	ra
-	nop
-	.set pop
-END(mips3_ld)
-
-LEAF(mips3_sd)
-	.set push
-	.set mips64
-	.set noreorder
-#if defined(__mips_o32)
-	mfc0	t0, MIPS_COP_0_STATUS		# turn off interrupts
-	and	t1, t0, ~(MIPS_SR_INT_IE)
-	mtc0	t1, MIPS_COP_0_STATUS
-	COP0_SYNC
-	nop
-	nop
-	nop
-
-	# NOTE: a1 is padding!
-
-#if _BYTE_ORDER == _BIG_ENDIAN
-	dsll	a2, a2, 32			# high word in a2
-	dsll	a3, a3, 32			# low word in a3
-	dsrl	a3, a3, 32
-#else
-	dsll	a2, a2, 32			# low word in a2
-	dsrl	a2, a2, 32
-	dsll	a3, a3, 32			# high word in a3
-#endif
-	or	a1, a2, a3
-	sd	a1, 0(a0)
-
-	mtc0	t0, MIPS_COP_0_STATUS		# restore intr status.
-	COP0_SYNC
-	nop
-#else /* !__mips_o32 */
-	sd	a1, 0(a0)
-#endif /* !__mips_o32 */
-
-	jr	ra
-	nop
-	.set pop
-END(mips3_sd)
 
 #ifdef CPU_QEMU_MALTA
 LEAF(cheri_trace_log)

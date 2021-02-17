@@ -101,8 +101,8 @@
 #define	MIPS_KSSEG_END			((intptr_t)(int32_t)0xdfffffff)
 #define	MIPS_KSEG3_START		((intptr_t)(int32_t)0xe0000000)
 #define	MIPS_KSEG3_END			((intptr_t)(int32_t)0xffffffff)
-#define MIPS_KSEG2_START		MIPS_KSSEG_START
-#define MIPS_KSEG2_END			MIPS_KSSEG_END
+#define	MIPS_KSEG2_START		MIPS_KSSEG_START
+#define	MIPS_KSEG2_END			MIPS_KSSEG_END
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
@@ -132,32 +132,32 @@ extern caddr_t kernel_data_cap;
 /*
  * Macros used to create a pointer for each address space segment
  */
-#define MIPS_XKPHYS(x)						\
+#define	MIPS_XKPHYS(x)						\
 	(mips_xkphys_cap + ((x) - MIPS_XKPHYS_START))
-#define MIPS_XKSEG(x)						\
+#define	MIPS_XKSEG(x)						\
 	(mips_xkseg_cap + ((x) - MIPS_XKSEG_START))
-#define MIPS_KSEG0(x)							\
+#define	MIPS_KSEG0(x)						\
 	(mips_kseg0_cap + ((x) - (vm_offset_t)MIPS_KSEG0_START))
-#define MIPS_KSEG1(x)							\
+#define	MIPS_KSEG1(x)						\
 	(mips_kseg1_cap + ((x) - (vm_offset_t)MIPS_KSEG1_START))
-#define MIPS_KSEG2(x)							\
+#define	MIPS_KSEG2(x)						\
 	(mips_kseg2_cap + ((x) - (vm_offset_t)MIPS_KSEG2_START))
 /* Macros used to create pointers in specific kernel address space regions */
-#define MIPS_KCODE(x)							\
+#define	MIPS_KCODE(x)						\
 	(kernel_code_cap + ((x) - (vm_offset_t)MIPS_KSEG0_START))
-#define MIPS_KDATA(x)							\
-	(kernel_data_cap +					\
+#define	MIPS_KDATA(x)						\
+	(kernel_data_cap +						\
 	((x) - __builtin_mips_cheri_get_cap_base(kernel_data_cap)))
-#define MIPS_KALL(x) ((char *)kernel_root_cap + (x))
+#define	MIPS_KALL(x) ((char *)kernel_root_cap + (x))
 #else /* ! __CHERI_PURE_CAPABILITY__ */
-#define MIPS_XKPHYS(x) ((char *)(x))
-#define MIPS_XKSEG(x) ((char *)(x))
-#define MIPS_KSEG0(x) ((char *)(x))
-#define MIPS_KSEG1(x) ((char *)(x))
-#define MIPS_KSEG2(x) ((char *)(x))
-#define MIPS_KCODE(x) ((char *)(x))
-#define MIPS_KDATA(x) ((char *)(x))
-#define MIPS_KALL(x) ((char *)(x))
+#define	MIPS_XKPHYS(x) ((char *)(x))
+#define	MIPS_XKSEG(x) ((char *)(x))
+#define	MIPS_KSEG0(x) ((char *)(x))
+#define	MIPS_KSEG1(x) ((char *)(x))
+#define	MIPS_KSEG2(x) ((char *)(x))
+#define	MIPS_KCODE(x) ((char *)(x))
+#define	MIPS_KDATA(x) ((char *)(x))
+#define	MIPS_KALL(x) ((char *)(x))
 #endif /* ! __CHERI_PURE_CAPABILITY__ */
 
 #define	MIPS_PHYS_TO_KSEG0(x)					\
@@ -272,7 +272,7 @@ extern caddr_t kernel_data_cap;
 #define	MIPS_SR_COP_USABILITY	0xf0000000
 #define	MIPS_SR_COP_0_BIT	0x10000000
 #define	MIPS_SR_COP_1_BIT	0x20000000
-#define MIPS_SR_COP_2_BIT       0x40000000
+#define	MIPS_SR_COP_2_BIT	0x40000000
 
 	/* r4k and r3k differences, see below */
 

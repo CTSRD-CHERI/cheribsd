@@ -45,8 +45,9 @@ extern "C" {
 #include "cheribsdtest.h"
 }
 
-extern "C" void
-test_sandbox_cxx_exception(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_cxx_exception,
+    "Test that failed sandbox invocations become exceptions in C++",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 #ifdef CHERIERRNO_LINKS
 	try
@@ -69,8 +70,9 @@ test_sandbox_cxx_exception(const struct cheri_test *ctp __unused)
 #endif
 }
 
-extern "C" void
-test_sandbox_cxx_no_exception(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_cxx_no_exception,
+    "Test that successful sandbox invocations don't exceptions in C++",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 #ifdef CHERIERRNO_LINKS
 	try

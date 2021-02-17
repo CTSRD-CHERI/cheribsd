@@ -39,6 +39,9 @@
 #include <sys/sysctl.h>
 #include <sys/time.h>
 
+#include <machine/frame.h>
+#include <machine/trap.h>
+
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
@@ -57,12 +60,26 @@
 /*
  * Exercises CHERI faults outside of sandboxes.
  */
+
+#if CHERI_SEAL_VIOLATION_EXCEPTION
+#define	CT_SEAL_VIOLATION_EXCEPTION					\
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,	\
+    .ct_signum = SIGPROT,						\
+    .ct_si_code = PROT_CHERI_PERM,					\
+    .ct_si_trapno = TRAPNO_CHERI
+#else
+#define	CT_SEAL_VIOLATION_EXCEPTION
+#endif
+
 #define	ARRAY_LEN	2
 static char array[ARRAY_LEN];
 static char sink;
 
-void
-test_fault_bounds(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_bounds, "Exercise capability bounds check failure",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_BOUNDS,
+    .ct_si_trapno = TRAPNO_LOAD_STORE)
 {
 	char * __capability arrayp = cheri_ptr(array, sizeof(array));
 	int i;
@@ -74,8 +91,12 @@ test_fault_bounds(const struct cheri_test *ctp __unused)
 	cheribsdtest_failure_errx("out of bounds access did not fault");
 }
 
-void
-test_fault_perm_load(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_perm_load,
+    "Exercise capability load permission failure",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_PERM,
+    .ct_si_trapno = TRAPNO_LOAD_STORE)
 {
 	char * __capability arrayp = cheri_ptrperm(array, sizeof(array), 0);
 
@@ -84,8 +105,8 @@ test_fault_perm_load(const struct cheri_test *ctp __unused)
 	cheribsdtest_failure_errx("access without required permissions did not fault");
 }
 
-void
-test_nofault_perm_load(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_nofault_perm_load,
+    "Exercise capability load permission success")
 {
 	char * __capability arrayp = cheri_ptrperm(array, sizeof(array),
 	    CHERI_PERM_LOAD);
@@ -94,8 +115,9 @@ test_nofault_perm_load(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_fault_perm_seal(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_illegal_perm_seal,
+    "Exercise capability seal permission failure",
+    CT_SEAL_VIOLATION_EXCEPTION)
 {
 	int i;
 	void * __capability ip = &i;
@@ -109,24 +131,28 @@ test_fault_perm_seal(const struct cheri_test *ctp __unused)
 		cheribsdtest_failure_err("sysctlbyname(security.cheri.sealcap)");
 	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_SEAL);
 	sealed = cheri_seal(ip, sealcap);
-	/*
-	 * Ensure that sealed is actually use, otherwise the faulting
-	 * instruction can be optimized away since it is dead.
-	 */
+#if !CHERI_SEAL_VIOLATION_EXCEPTION
+	if (!cheri_gettag(sealed))
+		cheribsdtest_success();
+#endif
 	cheribsdtest_failure_errx("cheri_seal() performed successfully "
 	    "%#lp with bad sealcap %#lp", sealed, sealcap);
 }
 
-void
-test_fault_perm_store(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_perm_store,
+    "Exercise capability store permission failure",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_PERM,
+    .ct_si_trapno = TRAPNO_LOAD_STORE)
 {
 	char * __capability arrayp = cheri_ptrperm(array, sizeof(array), 0);
 
 	arrayp[0] = sink;
 }
 
-void
-test_nofault_perm_store(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_nofault_perm_store,
+    "Exercise capability store permission success")
 {
 	char * __capability arrayp = cheri_ptrperm(array, sizeof(array),
 	    CHERI_PERM_STORE);
@@ -135,8 +161,9 @@ test_nofault_perm_store(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_fault_perm_unseal(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_illegal_perm_unseal,
+    "Exercise capability unseal permission failure",
+    CT_SEAL_VIOLATION_EXCEPTION)
 {
 	int i;
 	void * __capability ip = &i;
@@ -154,16 +181,19 @@ test_fault_perm_unseal(const struct cheri_test *ctp __unused)
 	sealed = cheri_seal(ip, sealcap);
 	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_UNSEAL);
 	unsealed = cheri_unseal(sealed, sealcap);
-	/*
-	 * Ensure that unsealed is actually use, otherwise the faulting
-	 * instruction can be optimized away since it is dead.
-	 */
+#if !CHERI_SEAL_VIOLATION_EXCEPTION
+	if (!cheri_gettag(unsealed))
+		cheribsdtest_success();
+#endif
 	cheribsdtest_failure_errx("cheri_unseal() performed successfully "
 	    "%#lp with bad unsealcap %#lp", unsealed, sealcap);
 }
 
-void
-test_fault_tag(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_tag, "Store via untagged capability",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_TAG,
+    .ct_si_trapno = TRAPNO_LOAD_STORE)
 {
 	char ch;
 	char * __capability chp = cheri_ptr(&ch, sizeof(ch));
@@ -173,8 +203,12 @@ test_fault_tag(const struct cheri_test *ctp __unused)
 }
 
 #ifdef __mips__
-void
-test_fault_ccheck_user_fail(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_ccheck_user_fail,
+    "Exercise CCheckPerm failure",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_PERM,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 	void * __capability cp;
 	char ch;
@@ -183,8 +217,8 @@ test_fault_ccheck_user_fail(const struct cheri_test *ctp __unused)
 	cheri_ccheckperm(cp, CHERI_PERM_SW0);
 }
 
-void
-test_nofault_ccheck_user_pass(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_nofault_ccheck_user_pass,
+    "Exercise CCheckPerm success")
 {
 	void * __capability cp;
 	char ch;
@@ -194,8 +228,12 @@ test_nofault_ccheck_user_pass(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_fault_cgetcause(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_cgetcause,
+    "Ensure CGetCause is unavailable in userspace",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_SYSREG,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 	register_t cause;
 
@@ -204,14 +242,22 @@ test_fault_cgetcause(const struct cheri_test *ctp __unused)
 }
 #endif
 
-void
-test_nofault_cfromptr(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_nofault_cfromptr, "Exercise CFromPtr success")
 {
 	char buf[256];
 	void * __capability cb; /* derived from here */
 	char * __capability cd; /* stored into here */
 
 	cb = cheri_ptr(buf, 256);
+#if defined(__aarch64__)
+	/*
+	 * morello-llvm emits cvtz for this intrinsic, which has an
+	 * address interpretation by default (unlike CFromPtr, which
+	 * has an offset interpretation).
+	 * https://git.morello-project.org/morello/llvm-project/-/issues/16
+	 */
+	cd = __builtin_cheri_cap_from_pointer(cb, (vaddr_t)buf + 10);
+#else
 	/*
 	 * This pragma is require to allow compiling this file both with and
 	 * without overloaded CHERI builtins.
@@ -220,41 +266,62 @@ test_nofault_cfromptr(const struct cheri_test *ctp __unused)
 	 */
 #pragma clang diagnostic ignored "-Wint-conversion"
 	cd = __builtin_cheri_cap_from_pointer(cb, 10);
+#endif
 	*cd = '\0';
 	cheribsdtest_success();
 }
 
 #ifdef __mips__
-void
-test_fault_read_kr1c(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_read_kr1c,
+    "Ensure KR1C is unavailable in userspace",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_SYSREG,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 
 	CHERI_CAP_PRINT(cheri_getkr1c());
 }
 
-void
-test_fault_read_kr2c(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_read_kr2c,
+    "Ensure KR2C is unavailable in userspace",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_SYSREG,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 
 	CHERI_CAP_PRINT(cheri_getkr2c());
 }
 
-void
-test_fault_read_kcc(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_read_kcc,
+    "Ensure KCC is unavailable in userspace",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_SYSREG,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 
 	CHERI_CAP_PRINT(cheri_getkcc());
 }
 
-void
-test_fault_read_kdc(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_read_kdc,
+    "Ensure KDC is unavailable in userspace",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_SYSREG,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 
 	CHERI_CAP_PRINT(cheri_getkdc());
 }
 
-void
-test_fault_read_epcc(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_fault_read_epcc,
+    "Ensure EPCC is unavailable in userspace",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_SYSREG,
+    .ct_si_trapno = TRAPNO_CHERI)
 {
 
 	CHERI_CAP_PRINT(cheri_getepcc());

@@ -117,8 +117,9 @@ cheribsdtest_libcheri_userfn_getstack(void)
 	return (0);
 }
 
-void
-test_sandbox_getstack(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_getstack,
+    "Exercise libcheri_stack_get()",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	void * __capability cclear;
 	register_t v;
@@ -200,8 +201,9 @@ cheribsdtest_libcheri_userfn_setstack(register_t arg)
 	return (CHERIBSDTEST_SETSTACK_CONSTANT);
 }
 
-void
-test_sandbox_setstack(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_setstack,
+    "Exercise libcheri_stack_set() to change stack",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	void * __capability cclear;
 	register_t v;
@@ -224,8 +226,9 @@ test_sandbox_setstack(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_sandbox_setstack_nop(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_setstack_nop,
+    "Exercise libcheri_stack_set() for nop rewrite",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	void * __capability cclear;
 	register_t v;
@@ -242,8 +245,11 @@ test_sandbox_setstack_nop(const struct cheri_test *ctp __unused)
  * Perform a return without a corresponding invocation, to underflow the
  * trusted stack.
  */
-void
-test_sandbox_trustedstack_underflow(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_trustedstack_underflow,
+    "Underflow trusted stack",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_TRAPNO | CT_FLAG_SANDBOX,
+    .ct_signum = SIGEMT,
+    .ct_si_trapno = T_TRAP)
 {
 	struct cheri_object returncap;
 	void * __capability codecap /* currently ignored: asm ("$c1") */;

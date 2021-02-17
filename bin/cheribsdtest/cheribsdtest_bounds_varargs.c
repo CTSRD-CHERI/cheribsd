@@ -31,8 +31,12 @@
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
+#include <sys/signal.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
+
+#include <machine/frame.h>
+#include <machine/trap.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
@@ -71,8 +75,13 @@ varargs_test_onearg(const char *fmt, ...)
 	cheribsdtest_failure_errx("va_arg() overran bounds without fault");
 }
 
-void
-test_bounds_varargs_vaarg_overflow(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_varargs_vaarg_overflow,
+    "check that va_arg() triggers a fault on overrun",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_BOUNDS,
+    .ct_si_trapno = TRAPNO_CHERI,
+    .ct_xfail_reason = XFAIL_VARARG_BOUNDS)
 {
 
 	varargs_test_onearg("%p", NULL);
@@ -89,8 +98,13 @@ test_bounds_varargs_vaarg_overflow(const struct cheri_test *ctp __unused)
  * zero-length pointer would also be fine -- if one arises in one of our ABIs,
  * the acceptable conditions may need to be updated.
  */
-void
-test_bounds_varargs_empty_pointer_null(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_varargs_empty_pointer_null,
+    "check that empty varargs gives a tag violation on load",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_TAG,
+    .ct_si_trapno = TRAPNO_CHERI,
+    .ct_xfail_reason = XFAIL_VARARG_BOUNDS)
 {
 
 #pragma clang diagnostic push
@@ -105,8 +119,13 @@ test_bounds_varargs_empty_pointer_null(const struct cheri_test *ctp __unused)
  * Check that if we overflow the varargs array with a load, we get a bounds
  * violation.
  */
-void
-test_bounds_varargs_printf_load(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_varargs_printf_load,
+    "check that load via printf varargs overflow faults",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_BOUNDS,
+    .ct_si_trapno = TRAPNO_CHERI,
+    .ct_xfail_reason = XFAIL_VARARG_BOUNDS)
 {
 
 #pragma clang diagnostic push
@@ -122,8 +141,13 @@ test_bounds_varargs_printf_load(const struct cheri_test *ctp __unused)
  * store via (%n), we get a bounds violation -- rather than, say, a tag
  * violation as a result of dereferencing that pointer.
  */
-void
-test_bounds_varargs_printf_store(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_varargs_printf_store,
+    "check that store via printf varargs overflow faults",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_BOUNDS,
+    .ct_si_trapno = TRAPNO_CHERI,
+    .ct_xfail_reason = XFAIL_VARARG_BOUNDS)
 {
 
 #pragma clang diagnostic push

@@ -210,8 +210,7 @@ cheri_bytes_remaining(const void * __capability cap)
 #define	cheri_kern_getaddress(x)	cheri_setaddress(x)
 #define	cheri_kern_andperm(x, y)	cheri_andperm(x, y)
 #else
-#define	cheri_kern_gettag(x)					\
-	(((x) == NULL || (vm_offset_t)(x) < 4096) ? 0 : 1)
+#define	cheri_kern_gettag(x)		1
 #define	cheri_kern_setbounds(x, y)	(x)
 #define	cheri_kern_setboundsexact(x, y)	(x)
 #define	cheri_kern_setaddress(x, y)	((__typeof__(x))(y))
@@ -229,41 +228,33 @@ cheri_bytes_remaining(const void * __capability cap)
 
 static inline __result_use_check size_t
 __cheri_get_low_ptr_bits(uintptr_t ptr, size_t mask) {
-  /*
-   * Note: we continue to use bitwise and on the uintcap value and silence the
-   * warning instead of using __builtin_cheri_offset_get() in case we decide
-   * to use a virtual-address instead offset interpretation of capabilities in
-   * the future.
-   */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcheri-bitwise-operations"
-  /*
-   * We mustn't return a LHS-derived capability here so we need to explicitly
-   * cast the result to a non-capability integer
-   */
-  return (size_t)(ptr & mask);
-#pragma clang diagnostic pop
+	/*
+	 * Note: we continue to use bitwise and on the uintcap value and silence
+	 * the warning instead of using __builtin_cheri_offset_get() in case
+	 * we decide to use a virtual-address instead offset interpretation of
+	 * capabilities in the future.
+	 * We mustn't return a LHS-derived capability here so we need to
+	 * explicitly cast the result to a non-capability integer
+	 */
+	return (size_t)(ptr & mask);
 }
 
 static inline __result_use_check uintptr_t
 __cheri_set_low_ptr_bits(uintptr_t ptr, size_t bits) {
-  /*
-   * We want to return a LHS-derived capability here so using the default
-   * uintcap_t semantics is fine.
-   */
-  return ptr | bits;
+	/*
+	 * We want to return a LHS-derived capability here so using the default
+	 * uintcap_t semantics is fine.
+	 */
+	return ptr | bits;
 }
 
 static inline __result_use_check uintptr_t
 __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcheri-bitwise-operations"
-  /*
-   * We want to return a LHS-derived capability here so using the default
-   * uintcap_t semantics is fine.
-   */
-  return ptr & (~bits_mask);
-#pragma clang diagnostic pop
+	/*
+	 * We want to return a LHS-derived capability here so using the default
+	 * uintcap_t semantics is fine.
+	 */
+	return ptr & (~bits_mask);
 }
 
 /* Turn on the checking by default for now (until we have fixed everything)*/
@@ -328,10 +319,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
   __cheri_set_low_ptr_bits((uintptr_t)(ptr), __runtime_assert_sensible_low_bits(bits))
 
 /*
- * Clear the bits in @p mask from the capability/pointer @p ptr. Mask must be
- * a compile-time constant less than 31
- *
- * TODO: should we allow non-constant masks?
+ * Clear the bits in @p mask from the capability/pointer @p ptr.
  *
  * @param ptr the uintptr_t that may have low bits sets
  * @param mask this is the mask for the low pointer bits, not the mask for
@@ -355,8 +343,8 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 	__builtin_cheri_representable_alignment_mask(len)
 
 /*
- * TODO: avoid using these since count leading/trailing zeroes is expensive on
- * BERI/CHERI
+ * These should be avoided on CHERI MIPS and RISCV64 since count
+ * leading/trailing zeroes is expensive.
  */
 #define	CHERI_ALIGN_SHIFT(l)	\
 	__builtin_ctzll(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))

@@ -60,7 +60,7 @@
  */
 LEAF(copystr_c)
 	li		v0, 0	/* Hopefully we succeed */
-	beqz		a0, cstr_return_toolong /* Return if zero-length. */	
+	beqz		a0, cstr_return_toolong /* Return if zero-length. */
 	li		t1, 1	/* Length we will have copied in loop */
 cstr_loop:
 	clbu		t0, t1, -1($c3)
@@ -74,11 +74,11 @@ cstr_return_toolong:
 	daddiu		t1, t1, -1	/* Count is 1 too high */
 cstr_return_nul:	/* Store length read if c5 is non-NULL */
 #ifdef __CHERI_PURE_CAPABILITY__
-        cbez            $c5, cstr_return
+	cbez		$c5, cstr_return
 #else
 	cgetdefault	$c3
 	ctoptr		t0, $c5, $c3
-	beq	 	t0, zero, cstr_return
+	beq		t0, zero, cstr_return
 #endif
 	nop
 	csd		t1, zero, 0($c5)	/* Store bytes copied */
@@ -91,7 +91,6 @@ cstr_return:
 	nop
 #endif
 END(copystr_c)
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200706,

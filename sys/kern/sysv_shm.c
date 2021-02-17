@@ -96,7 +96,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysproto.h>
 #include <sys/jail.h>
 
+#if __has_feature(capabilities)
 #include <cheri/cheric.h>
+#endif
 
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
@@ -431,8 +433,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 	struct proc *p = td->td_proc;
 	struct shmid_kernel *shmseg;
 	struct shmmap_state *shmmap_s;
-	vm_offset_t attach_va = 0, max_va;
-	vm_pointer_t attach_addr;
+	vm_pointer_t attach_va = 0, max_va;
 	vm_prot_t prot;
 	vm_size_t size;
 	int cow, error, find_space, i, rv;
@@ -516,7 +517,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 			/* As with mmap, untagged implies exclusive. */
 			if ((shmflg & SHM_REMAP) != 0)
 				return (EINVAL);
-			shmaddr = cheri_setaddress(td->td_cheri_mmap_cap,
+			shmaddr = cheri_setaddress(userspace_root_cap,
 			    attach_va);
 
 		}
@@ -525,6 +526,12 @@ kern_shmat_locked(struct thread *td, int shmid,
 			cow |= MAP_REMAP;
 		find_space = VMFS_NO_SPACE;
 	} else {
+		/*
+		 * This is just a hint to vm_map_find() about where to
+		 * put it.
+		 */
+		attach_va = round_page((vm_offset_t)p->p_vmspace->vm_daddr +
+		    lim_max(td, RLIMIT_DATA));
 #if __has_feature(capabilities)
 		if (SV_CURPROC_FLAG(SV_CHERI)) {
 			/*
@@ -538,20 +545,10 @@ kern_shmat_locked(struct thread *td, int shmid,
 			    CHERI_REPRESENTABLE_ALIGNMENT(size) < (1UL << 12) ?
 			    VMFS_OPTIMAL_SPACE :
 			    VMFS_ALIGNED_SPACE(CHERI_ALIGN_SHIFT(size));
-			shmaddr = td->td_cheri_mmap_cap;
-			attach_va = cheri_getaddress(shmaddr);
+			shmaddr = cheri_setaddress(userspace_root_cap, attach_va);
 		} else
 #endif
-		{
 			find_space = VMFS_OPTIMAL_SPACE;
-			/*
-			 * This is just a hint to vm_map_find() about where to
-			 * put it.
-			 */
-			attach_va = round_page(
-			    (vm_offset_t)p->p_vmspace->vm_daddr +
-			    lim_max(td, RLIMIT_DATA));
-		}
 	}
 #if __has_feature(capabilities)
 	reqperm = CHERI_PERM_LOAD;
@@ -564,21 +561,20 @@ kern_shmat_locked(struct thread *td, int shmid,
 	max_va = 0;
 #endif
 	vm_object_reference(shmseg->object);
-	attach_addr = attach_va;
-	rv = vm_map_find(&p->p_vmspace->vm_map, shmseg->object, 0, &attach_addr,
+	rv = vm_map_find(&p->p_vmspace->vm_map, shmseg->object, 0, &attach_va,
 	    size, max_va, find_space, prot, prot, cow);
 	if (rv != KERN_SUCCESS) {
 		vm_object_deallocate(shmseg->object);
 		return (ENOMEM);
 	}
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(attach_addr), ("Expected valid capability"));
-	KASSERT(cheri_getlen(attach_addr) == size,
+	KASSERT(cheri_gettag(attach_va), ("Expected valid capability"));
+	KASSERT(cheri_getlen(attach_va) == size,
 	    ("Inexact bounds expected %zx found %zx",
-	    (size_t)size, (size_t)cheri_getlen(attach_addr)));
+	    (size_t)size, (size_t)cheri_getlen(attach_va)));
 #endif
 
-	shmmap_s->va = attach_addr;
+	shmmap_s->va = attach_va;
 	shmmap_s->shmid = shmid;
 	shmseg->u.shm_lpid = p->p_pid;
 	shmseg->u.shm_atime = time_second;
@@ -586,13 +582,12 @@ kern_shmat_locked(struct thread *td, int shmid,
 #if __has_feature(capabilities)
 	if (SV_CURPROC_FLAG(SV_CHERI)) {
 		/*
-		 * XXX-AM: In the purecap kernel we currently do the same and
-		 * re-derive the mmapped capability from the thread mmap
-		 * capability. However we could directly return the capability
-		 * given by vm_map_find().
+		 * XXX-AM: The purecap kernel reservations should have taken care of this
+		 * and just return attach_va, as the capability will be derived from the
+		 * root map capability.
 		 */
 		shmaddr = cheri_setboundsexact(cheri_setaddress(shmaddr,
-		     attach_addr), size);
+		     attach_va), size);
 		/* Remove inappropriate permissions. */
 		shmaddr = cheri_andperm(shmaddr, ~(CHERI_PERM_EXECUTE |
 		    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
@@ -601,7 +596,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		    shmaddr);
 	} else
 #endif
-		td->td_retval[0] = attach_addr;
+		td->td_retval[0] = attach_va;
 	return (error);
 }
 

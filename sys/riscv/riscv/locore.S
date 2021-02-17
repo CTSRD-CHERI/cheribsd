@@ -140,25 +140,6 @@ _start:
 .option pop
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
-.option push
-.option nocapmode
-
-	/*
-	 * The boot loader may enter in non-capmode even though
-	 * our ELF header requests capmode.  The instructions below
-	 * should work in both modes.
-	 */
-	lla	t0, 1f
-	cspecialr ct1, pcc
-	csetaddr ct1, ct1, t0
-	li	t0, 1
-	csetflags ct1, ct1, t0
-	cjr	ct1
-1:
-.option pop
-#endif
-
 	/*
 	 * Zero a1 to indicate that we have no DTB pointer. It is already
 	 * included in the loader(8) metadata.
@@ -743,14 +724,15 @@ mpva:
 	csetaddr ct1, ct1, t0
 	cjr	ct1
 1:
+#endif
 
 	/* Setup supervisor trap vector */
+#ifdef __CHERI_PURE_CAPABILITY__
 	cllc	ct0, cpu_exception_handler
 	cspecialw stcc, ct0
 	cmove	ct1, cnull
 	cspecialw stdc, ct1
 #else
-	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler
 #if __has_feature(capabilities)
 	cspecialr ct1, pcc

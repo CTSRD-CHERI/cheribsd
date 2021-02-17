@@ -160,9 +160,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 #include <machine/sbi.h>
 
-#if __has_feature(capabilities)
 #include <cheri/cheric.h>
-#endif
 
 #define	NUL1E		(Ln_ENTRIES * Ln_ENTRIES)
 #define	NUL2E		(Ln_ENTRIES * NUL1E)
@@ -581,7 +579,7 @@ pmap_bootstrap_l3(vm_pointer_t l1pt, vm_offset_t va, vm_pointer_t l3_start)
 	}
 
 	/* Clean the L2 page table */
-	memset((void *)l3_start, 0, (vaddr_t)l3pt - (vaddr_t)l3_start);
+	memset((void *)l3_start, 0, (ptraddr_t)l3pt - (ptraddr_t)l3_start);
 
 	return (l3pt);
 }
@@ -696,7 +694,7 @@ pmap_bootstrap(vm_pointer_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 	virtual_end = VM_MAX_KERNEL_ADDRESS - L2_SIZE;
 #ifdef __CHERI_PURE_CAPABILITY__
 	virtual_avail = (vm_pointer_t)cheri_setbounds((void *)virtual_avail,
-	    (vaddr_t)virtual_end - (vaddr_t)virtual_avail);
+	    (ptraddr_t)virtual_end - (ptraddr_t)virtual_avail);
 	virtual_end = (vm_pointer_t)cheri_setaddress((void *)virtual_avail,
 	    virtual_end);
 #endif
@@ -4777,13 +4775,11 @@ SYSCTL_OID(_vm_pmap, OID_AUTO, kernel_maps,
     CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE,
     NULL, 0, sysctl_kmaps, "A",
     "Dump kernel address layout");
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer",
 //     "support",
 //     "pointer_provenance",
 //     "pointer_shape"

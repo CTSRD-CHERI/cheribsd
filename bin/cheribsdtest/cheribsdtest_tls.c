@@ -62,8 +62,7 @@ static __thread void * __capability tls_cap1;
 
 static __thread char tls_array_4k[4096] __aligned(4096);
 
-void
-test_tls_align_ptr(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_tls_align_ptr, "Test alignment of TLS pointers")
 {
 	int alignment, expected;
 
@@ -84,8 +83,7 @@ test_tls_align_ptr(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_tls_align_cap(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_tls_align_cap, "Test alignment of TLS capabilities")
 {
 	int alignment, expected;
 
@@ -106,8 +104,7 @@ test_tls_align_cap(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_tls_align_4k(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_tls_align_4k, "Test alignment of TLS 4K array")
 {
 	int alignment, expected;
 

@@ -160,6 +160,10 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	td2->td_md.md_flags |= td1->td_md.md_flags & MDTD_QTRACE;
 #endif
 
+#if __has_feature(capabilities)
+	p2->p_md.md_sigcode = td1->td_proc->p_md.md_sigcode;
+#endif
+
 	/*
 	 * Set up return-value registers as fork() libc stub expects.
 	 */
@@ -606,29 +610,14 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		struct cheri_signal *csigp;
-
 		tf->pcc = (void * __capability)entry;
 		tf->c12 = entry;
 		tf->c3 = arg;
 
 		/*
-		 * Copy the $cgp for the current thread to the new
-		 * one. This will work both if the target function is
-		 * in the current shared object (so the $cgp value
-		 * will be the same) or in a different one (in which
-		 * case it will point to a PLT stub that loads $cgp).
-		 *
-		 * XXXAR: could this break anything if sandboxes
-		 * create threads?
+		 * XXX: Static PLT ABI binaries need $idc ($cgp)
+		 * inherited from the creating thread.
 		 */
-		tf->idc = curthread->td_frame->idc;
-
-		/*
-		 * Set up CHERI-related state: register state, signal
-		 * delivery, sealing capabilities, trusted stack.
-		 */
-		cheriabi_newthread_init(td);
 
 		/*
 		 * We don't perform validation on the new pcc or stack
@@ -636,19 +625,6 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 		 * if they are bogus.
 		 */
 		tf->csp = (char * __capability)stack->ss_sp + stack->ss_size;
-
-		/*
-		 * Update privileged signal-delivery environment for
-		 * actual stack.
-		 *
-		 * XXXRW: Not entirely clear whether we want an offset
-		 * of 'stacklen' for csig_csp here.  Maybe we don't
-		 * want to use csig_csp at all?  Possibly csig_csp
-		 * should default to NULL...?
-		 */
-		csigp = &td->td_pcb->pcb_cherisignal;
-		csigp->csig_csp = td->td_frame->csp;
-		csigp->csig_default_stack = csigp->csig_csp;
 	} else
 #endif
 	{
@@ -657,9 +633,9 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 		 * For the MIPS ABI, we can derive any required CHERI state from
 		 * the completed MIPS trapframe and existing process state.
 		 */
-		hybridabi_newthread_setregs(td, (__cheri_addr vaddr_t)entry);
+		hybridabi_thread_setregs(td, (__cheri_addr vaddr_t)entry);
 #else
-		/* For CHERI $pcc is set by hybridabi_newthread_setregs() */
+		/* For CHERI $pcc is set by hybridabi_thread_setregs() */
 		TRAPF_PC_SET_ADDR(tf, (vaddr_t)(intptr_t)entry);
 #endif
 

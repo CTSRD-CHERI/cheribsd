@@ -69,7 +69,8 @@ struct image_params {
 	unsigned long start_addr; /* start of mapped image (including bss) */
 	unsigned long end_addr;   /* end of mapped image (including bss) */
 	unsigned long reloc_base; /* load address of image */
-	unsigned long interp_end; /* end address of RTLD mapping (or zero) */
+	unsigned long interp_start; /* start of RTLD mapping (or zero) */
+	unsigned long interp_end;   /* end address of RTLD mapping (or zero) */
 	char vmspace_destroyed;	/* flag - we've blown away original vm space */
 #define IMGACT_SHELL	0x1
 #define IMGACT_BINMISC	0x2
@@ -101,9 +102,6 @@ struct image_params {
 	bool textset;
 	u_int map_flags;
 	void * __capability imgact_capability;	/* copyout and mapping cap */
-#if __has_feature(capabilities)
-	void * __capability ustack_capability;	/* user stack reservation */
-#endif
 };
 
 #ifdef _KERNEL

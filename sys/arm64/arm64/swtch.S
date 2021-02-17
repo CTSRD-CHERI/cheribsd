@@ -85,11 +85,25 @@ ENTRY(cpu_throw)
 	set_step_flag w5, x6
 
 	/* Restore the registers */
+#if __has_feature(capabilities)
+	ldr	x5, [x4, #PCB_SP]
+	mov	sp, x5
+	ldp	c5, c6, [x4, #PCB_TPIDR]
+	msr	ctpidr_el0, c5
+	msr	ctpidrro_el0, c6
+	ldp	c5, c6, [x4, #PCB_CID]
+	msr	cid_el0, c5
+	msr	rcsp_el0, c6
+	ldp	c5, c6, [x4, #PCB_RDDC]
+	msr	rddc_el0, c5
+	msr	rctpidr_el0, c6
+#else
 	ldp	x5, x6, [x4, #PCB_SP]
 	mov	sp, x5
 	msr	tpidr_el0, x6
 	ldr	x6, [x4, #PCB_TPIDRRO]
 	msr	tpidrro_el0, x6
+#endif
 	ldp	x8, x9, [x4, #PCB_REGS + 8 * 8]
 	ldp	x10, x11, [x4, #PCB_REGS + 10 * 8]
 	ldp	x12, x13, [x4, #PCB_REGS + 12 * 8]
@@ -135,10 +149,23 @@ ENTRY(cpu_switch)
 	str	x30, [x4, #PCB_REGS + 30 * 8]
 	/* And the old stack pointer */
 	mov	x5, sp
+#if __has_feature(capabilities)
+	str	x5, [x4, #PCB_SP]
+	mrs	c5, ctpidr_el0
+	mrs	c6, ctpidrro_el0
+	stp	c5, c6, [x4, #PCB_TPIDR]
+	mrs	c5, cid_el0
+	mrs	c6, rcsp_el0
+	stp	c5, c6, [x4, #PCB_CID]
+	mrs	c5, rddc_el0
+	mrs	c6, rctpidr_el0
+	stp	c5, c6, [x4, #PCB_RDDC]
+#else
 	mrs	x6, tpidrro_el0
 	str	x6, [x4, #PCB_TPIDRRO]
 	mrs	x6, tpidr_el0
 	stp	x5, x6, [x4, #PCB_SP]
+#endif
 
 	/* If we were single stepping, disable it */
 	ldr	w5, [x4, #PCB_FLAGS]
@@ -182,11 +209,25 @@ ENTRY(cpu_switch)
 	set_step_flag w5, x6
 
 	/* Restore the registers */
+#if __has_feature(capabilities)
+	ldr	x5, [x4, #PCB_SP]
+	mov	sp, x5
+	ldp	c5, c6, [x4, #PCB_TPIDR]
+	msr	ctpidr_el0, c5
+	msr	ctpidrro_el0, c6
+	ldp	c5, c6, [x4, #PCB_CID]
+	msr	cid_el0, c5
+	msr	rcsp_el0, c6
+	ldp	c5, c6, [x4, #PCB_RDDC]
+	msr	rddc_el0, c5
+	msr	rctpidr_el0, c6
+#else
 	ldp	x5, x6, [x4, #PCB_SP]
 	mov	sp, x5
 	msr	tpidr_el0, x6
 	ldr	x6, [x4, #PCB_TPIDRRO]
 	msr	tpidrro_el0, x6
+#endif
 	ldp	x8, x9, [x4, #PCB_REGS + 8 * 8]
 	ldp	x10, x11, [x4, #PCB_REGS + 10 * 8]
 	ldp	x12, x13, [x4, #PCB_REGS + 12 * 8]
@@ -313,10 +354,23 @@ ENTRY(savectx)
 	str	x30, [x0, #PCB_REGS + 30 * 8]
 	/* And the old stack pointer */
 	mov	x5, sp
+#if __has_feature(capabilities)
+	str	x5, [x0, #PCB_SP]
+	mrs	c5, ctpidr_el0
+	mrs	c6, ctpidrro_el0
+	stp	c5, c6, [x0, #PCB_TPIDR]
+	mrs	c5, cid_el0
+	mrs	c6, rcsp_el0
+	stp	c5, c6, [x0, #PCB_CID]
+	mrs	c5, rddc_el0
+	mrs	c6, rctpidr_el0
+	stp	c5, c6, [x0, #PCB_RDDC]
+#else
 	mrs	x6, tpidrro_el0
 	str	x6, [x0, #PCB_TPIDRRO]
 	mrs	x6, tpidr_el0
 	stp	x5, x6, [x0, #PCB_SP]
+#endif
 
 	/* Store the VFP registers */
 #ifdef VFP

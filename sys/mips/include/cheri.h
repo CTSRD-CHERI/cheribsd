@@ -130,6 +130,7 @@ struct trapframe;
 int	cheri_capcause_to_sicode(register_t capcause);
 void	cheri_log_exception(struct trapframe *frame, int trap_type);
 void	cheri_log_exception_registers(struct trapframe *frame);
+int	cheri_signal_sandboxed(struct thread *td);
 void	cheri_trapframe_from_cheriframe(struct trapframe *frame,
 	    struct cheri_frame *cfp);
 void	_cheri_trapframe_to_cheriframe(struct trapframe *frame,
@@ -140,11 +141,10 @@ void	_cheri_trapframe_to_cheriframe(struct trapframe *frame,
 	_cheri_trapframe_to_cheriframe((tf), (cf), true)
 
 int	cheriabi_fetch_syscall_args(struct thread *td);
-void	cheriabi_newthread_init(struct thread *td);
 
-void	hybridabi_exec_setregs(struct thread *td, unsigned long entry_addr);
-void	hybridabi_newthread_setregs(struct thread *td,
-	    unsigned long entry_addr);
+void	hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr);
+void * __capability hybridabi_user_ddc(void);
+
 #endif
 
 /*
@@ -198,7 +198,6 @@ void cheri_trace_log(void *buf, size_t len, int format);
 #endif /* !_KERNEL */
 
 #endif /* _MIPS_INCLUDE_CHERI_H_ */
-
 // CHERI CHANGES START
 // {
 //   "updated": 20210112,

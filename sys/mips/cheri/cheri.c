@@ -73,17 +73,15 @@ CTASSERT(sizeof(struct cheri_frame) == (34 * CHERICAP_SIZE));
  * that work on other architectures might break alignment on CHERI.
  */
 CTASSERT(offsetof(struct trapframe, ddc) % CHERICAP_SIZE == 0);
-CTASSERT(offsetof(struct thread, td_cheri_mmap_cap) % CHERICAP_SIZE == 0);
 
 /*
  * Ensure that the compiler being used to build the kernel agrees with the
- * kernel configuration on the size of a capability, and that we are compiling
- * for the hybrid or pure ABI.
+ * kernel configuration on the size of a capability.
  */
-#ifndef __CHERI_PURE_CAPABILITY__
-CTASSERT(sizeof(void *) == 8);
-#else
+#ifdef __CHERI_PURE_CAPABILITY__
 CTASSERT(sizeof(void *) == 16);
+#else
+CTASSERT(sizeof(void *) == 8);
 #endif
 CTASSERT(sizeof(void * __capability) == 16);
 CTASSERT(sizeof(struct cheri_object) == 32);
@@ -95,13 +93,13 @@ extern char etext[], end[];
 /*
  * Global capabilities for various address-space segments.
  */
-caddr_t mips_xkphys_cap = (void *)(intcap_t)-1;
-caddr_t mips_xkseg_cap = (void *)(intcap_t)-1;
-caddr_t mips_kseg0_cap = (void *)(intcap_t)-1;
-caddr_t mips_kseg1_cap = (void *)(intcap_t)-1;
-caddr_t mips_kseg2_cap = (void *)(intcap_t)-1;
-caddr_t kernel_code_cap = (void *)(intcap_t)-1;
-caddr_t kernel_data_cap = (void *)(intcap_t)-1;
+char *mips_xkphys_cap = (char *)(intcap_t)-1;
+char *mips_xkseg_cap = (char *)(intcap_t)-1;
+char *mips_kseg0_cap = (char *)(intcap_t)-1;
+char *mips_kseg1_cap = (char *)(intcap_t)-1;
+char *mips_kseg2_cap = (char *)(intcap_t)-1;
+char *kernel_code_cap = (char *)(intcap_t)-1;
+char *kernel_data_cap = (char *)(intcap_t)-1;
 void *kernel_root_cap = (void *)(intcap_t)-1;
 
 #endif /* __CHERI_PURE_CAPABILITY__ */
@@ -129,7 +127,7 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_setaddress(kroot, CHERI_CAP_USER_DATA_BASE);
 	ctemp = cheri_setbounds(ctemp, CHERI_CAP_USER_DATA_LENGTH);
 	ctemp = cheri_andperm(ctemp, CHERI_CAP_USER_DATA_PERMS |
-	    CHERI_CAP_USER_CODE_PERMS);
+	    CHERI_CAP_USER_CODE_PERMS | CHERI_PERM_CHERIABI_VMMAP);
 	userspace_root_cap = ctemp;
 
 	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_KERNEL_BASE);

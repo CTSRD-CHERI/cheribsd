@@ -64,6 +64,16 @@
 #define	WRITE_SPECIALREG(reg, _val)					\
 	__asm __volatile("msr	" __STRING(reg) ", %0" : : "r"((uint64_t)_val))
 
+#if __has_feature(capabilities)
+#define	READ_SPECIALREG_CAP(reg)					\
+({	uintcap_t _val;							\
+	__asm __volatile("mrs	%0, " __STRING(reg) : "=&C" (_val));	\
+	_val;								\
+})
+#define	WRITE_SPECIALREG_CAP(reg, _val)					\
+	__asm __volatile("msr	" __STRING(reg) ", %0" : : "C"((uintcap_t)_val))
+#endif
+
 #define	UL(x)	UINT64_C(x)
 
 /* CNTHCTL_EL2 - Counter-timer Hypervisor Control register */
@@ -92,6 +102,15 @@
 #define	 CPACR_FPEN_TRAP_ALL2	(0x2 << 20) /* Traps from EL0 and EL1 */
 #define	 CPACR_FPEN_TRAP_NONE	(0x3 << 20) /* No traps */
 #define	CPACR_TTA		(0x1 << 28)
+
+#if __has_feature(capabilities)
+/* CCTLR_EL0 - Capability Control Register */
+#define	CCTLR_SBL_MASK		(0x1 << 7) /* Capability sealing by branch and link */
+#define	CCTLR_PERMVCT_MASK	(0x1 << 6) /* Permit access to CNTVCT w/o System */
+#define	CCTLR_ADRDPB_MASK	(0x1 << 4) /* ADRPD base selection */
+#define	CCTLR_PCCBO_MASK	(0x1 << 3) /* PCC base offset enable */
+#define	CCTLR_DDCBO_MASK	(0x1 << 2) /* PCC base offset enable */
+#endif
 
 /* CTR_EL0 - Cache Type Register */
 #define	CTR_RES1		(1 << 31)

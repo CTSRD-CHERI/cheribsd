@@ -331,9 +331,6 @@ struct thread {
 	void * __capability td_sigblock_ptr; /* (k) uptr for fast sigblock. */
 	uint32_t	td_sigblock_val;  /* (k) fast sigblock value read at
 					     td_sigblock_ptr on kern entry */
-#if __has_feature(capabilities)
-	void * __capability td_cheri_mmap_cap; /* (x) */
-#endif
 #define	td_endcopy td_pcb
 
 /*

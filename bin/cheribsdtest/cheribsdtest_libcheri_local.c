@@ -77,9 +77,9 @@
  * Test that if we pass in a global capability, the sandbox can successfully
  * store it to sandbox bss.
  */
-void
-test_sandbox_store_global_capability_in_bss(
-    const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_store_global_capability_in_bss,
+    "Try to store global capability to sandbox bss",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	void * __capability carg;
 	register_t v;
@@ -95,9 +95,13 @@ test_sandbox_store_global_capability_in_bss(
  * Test that if we pass in a global capability, the sandbox cannot store it
  * to sandbox bss.  Rely on the signal handler to unwind the stack.
  */
-void
-test_sandbox_store_local_capability_in_bss_catch(
-    const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_store_local_capability_in_bss_catch,
+    "Try to store local capability to sandbox bss; caught",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO |
+	CT_FLAG_SIGNAL_UNWIND | CT_FLAG_SANDBOX,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_STORELOCAL,
+    .ct_si_trapno = TRAPNO_CHERI },
 {
 	void * __capability carg;
 	register_t v;
@@ -114,9 +118,10 @@ test_sandbox_store_local_capability_in_bss_catch(
  * be a local capability, it cannot store it to sandbox bss.  Disable the
  * signal handler.
  */
-void
-test_sandbox_store_local_capability_in_bss_nocatch(
-    const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_store_local_capability_in_bss_nocatch,
+    "Try to store local capability to sandbox bss; uncaught",
+    .ct_flags = CT_FLAG_SIGEXIT | CT_FLAG_SANDBOX,
+    .ct_signum = SIGPROT },
 {
 	void * __capability carg;
 	register_t v;
@@ -133,9 +138,9 @@ test_sandbox_store_local_capability_in_bss_nocatch(
  * Test that if we pass in a global capability, the sandbox can successfully
  * store it to a sandbox's stack.
  */
-void
-test_sandbox_store_global_capability_in_stack(
-    const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_store_global_capability_in_stack,
+    "Try to store global capability to sandbox stack",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	void * __capability carg;
 	register_t v;
@@ -151,9 +156,9 @@ test_sandbox_store_global_capability_in_stack(
  * Test that if we pass in a global capability, and the sandbox recasts it to
  * be a local capability, it can success store it to a sandbox's stack.
  */
-void
-test_sandbox_store_local_capability_in_stack(
-    const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_store_local_capability_in_stack,
+    "Try to store local capability to sandbox stack",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	void * __capability carg;
 	register_t v;
@@ -169,8 +174,9 @@ test_sandbox_store_local_capability_in_stack(
  * Test that if we pass in a global capability, and the sandbox returns it,
  * that we get the same capability back.
  */
-void
-test_sandbox_return_global_capability(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_return_global_capability,
+    "Try to return global capability from sandbox",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	void * __capability carg;
 	void * __capability cret = NULL;
@@ -187,8 +193,9 @@ test_sandbox_return_global_capability(const struct cheri_test *ctp __unused)
  * Test that if we pass in a global capability, and the sandbox recasts it to
  * be a local capability to return it, that it is not returned.
  */
-void
-test_sandbox_return_local_capability(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_return_local_capability,
+    "Try to return a local capability from a sandbox",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	void * __capability carg;
 	void * __capability cret = NULL;
@@ -210,8 +217,9 @@ test_sandbox_return_local_capability(const struct cheri_test *ctp __unused)
  * Test that if we pass a local capability to a sandbox, CCall rejects the
  * attempt.
  */
-void
-test_sandbox_pass_local_capability_arg(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sandbox_pass_local_capability_arg,
+    "Try to pass a local capability to a sandbox",
+    .ct_flags = CT_FLAG_SANDBOX)
 {
 	void * __capability carg;
 	register_t v;

@@ -998,8 +998,8 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 	 * physical memory, so restrict bounds as much as possible
 	 * and rely on the vm_map min/max enforcement.
 	 */
-	map->map_capability = cheri_setbounds((void *)min,
-	    (vaddr_t)max - (vaddr_t)min);
+	map->map_capability = cheri_setbounds(min,
+	    (ptraddr_t)max - (ptraddr_t)min);
 	map->flags |= MAP_RESERVATIONS;
 #endif
 #ifdef DIAGNOSTIC
@@ -1761,8 +1761,8 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	if (map->flags & MAP_RESERVATIONS) {
 		/* Make sure we fit into a single reservation entry. */
 #ifdef __CHERI_PURE_CAPABILITY__
-		if (cheri_gettag((void *)start) == 0 ||
-		    cheri_getlen((void *)start) < (vaddr_t)end - (vaddr_t)start)
+		if (cheri_gettag(start) == 0 ||
+		    cheri_getlen(start) < (ptraddr_t)end - (ptraddr_t)start)
 			return (KERN_INVALID_ARGUMENT);
 #endif
 		if (vm_map_lookup_entry(map, start, &new_entry) == 0 ||
@@ -1837,7 +1837,7 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	if ((cow & MAP_ACC_CHARGED) || ((prot & VM_PROT_WRITE) &&
 	    ((protoeflags & MAP_ENTRY_NEEDS_COPY) || object == NULL))) {
 		if (!(cow & MAP_ACC_CHARGED) &&
-		    !swap_reserve((vaddr_t)end - (vaddr_t)start))
+		    !swap_reserve((ptraddr_t)end - (ptraddr_t)start))
 			return (KERN_RESOURCE_SHORTAGE);
 		KASSERT(object == NULL ||
 		    (protoeflags & MAP_ENTRY_NEEDS_COPY) != 0 ||
@@ -1972,6 +1972,11 @@ charged:
 	 */
 
 	/*
+	 * XXX-AM: this is probably useless with reservations
+	 *  as we split the reservation above
+	 */
+
+	/*
 	 * Try to coalesce the new entry with both the previous and next
 	 * entries in the list.  Previously, we only attempted to coalesce
 	 * with the previous entry when object is NULL.  Here, we handle the
@@ -1982,7 +1987,8 @@ charged:
 
 	if ((cow & (MAP_PREFAULT | MAP_PREFAULT_PARTIAL)) != 0) {
 		vm_map_pmap_enter(map, start, prot, object, OFF_TO_IDX(offset),
-		    (vaddr_t)end - (vaddr_t)start, cow & MAP_PREFAULT_PARTIAL);
+		    (ptraddr_t)end - (ptraddr_t)start,
+		    cow & MAP_PREFAULT_PARTIAL);
 	}
 
 	return (KERN_SUCCESS);
@@ -2107,13 +2113,13 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_pointer_t start, vm_size_t length, vm_prot_t prot,
     vm_prot_t max, int cow)
 {
-	vm_map_entry_t entry, next_entry;
-	vm_pointer_t end, reservation;
+	vm_pointer_t end;
+	vm_offset_t reservation_id = start;
 	int result;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(start), ("Expected valid capability"));
-	if (cheri_getlen((void *)start) < length)
+	if (cheri_getlen(start) < length)
 		return (KERN_INVALID_ARGUMENT);
 #endif
 
@@ -2131,22 +2137,10 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	 * the existing reservation.
 	 */
 	if ((map->flags & MAP_RESERVATIONS) != 0) {
-		if (vm_map_lookup_entry(map, start, &entry)) {
-			reservation = entry->reservation;
-			while (entry->end < end) {
-				next_entry = vm_map_entry_succ(entry);
-				if (entry->reservation != reservation ||
-				    next_entry->start > end) {
-					result = KERN_NO_SPACE;
-					goto out;
-				}
-				entry = next_entry;
-			}
-		}
-		else {
-			result = KERN_MEM_PROT_FAILURE;
+		result = vm_map_reservation_get(map, start, length,
+		    &reservation_id);
+		if (result != KERN_SUCCESS)
 			goto out;
-		}
 	}
 	if ((cow & MAP_CHECK_EXCL) == 0) {
 		/*
@@ -2170,7 +2164,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		    prot, max, cow);
 	} else {
 		result = vm_map_insert(map, object, offset, start, end,
-		    prot, max, cow, reservation);
+		    prot, max, cow, reservation_id);
 	}
 out:
 	vm_map_unlock(map);
@@ -2230,7 +2224,7 @@ vm_map_alignspace(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	free_addr = *addr;
 	KASSERT(free_addr == vm_map_findspace(map, free_addr, length),
 	    ("caller failed to provide space %#jx at address %p",
-	     (uintmax_t)length, (void*)(uintptr_t)free_addr));
+	    (uintmax_t)length, (void *)(uintptr_t)free_addr));
 	for (;;) {
 		/*
 		 * At the start of every iteration, the free space at address
@@ -2299,9 +2293,9 @@ vm_map_find_aligned(vm_map_t map, vm_offset_t *addr, vm_size_t length,
  *	In the purecap kernel we always promote the alignment
  *	requirements to the cheri representable alignment if the
  *	map has reservations enabled.
- *	It is currently assumed that cheri concentrate encoding does
- *	not require the addition of extra flags to request sealable
- *	and other forms of alignment.
+ *	It is currently assumed that all types of capabilities have
+ *	the same alignment requirements. This is true with the
+ *	CHERI Concentrate encoding.
  */
 int
 vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
@@ -2323,7 +2317,7 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_getlen(addr) == sizeof(void *),
 	    ("Invalid bounds for pointer-sized object %zx",
-	    (size_t)cheri_getlen(addr)));
+	    cheri_getlen(addr)));
 #endif
 
 	if (find_space == VMFS_OPTIMAL_SPACE && (object == NULL ||
@@ -2467,8 +2461,8 @@ again:
 	 * allocate for it must comply with the requested maxprot so that
 	 * it can be used to remap over the guard pages.
 	 */
-        if (cow & MAP_CREATE_GUARD)
-            prot = max = VM_PROT_NONE;
+	if (cow & MAP_CREATE_GUARD)
+		prot = max = VM_PROT_NONE;
 
 	if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
 		rv = vm_map_stack_locked(map, reservation, unpadded_length,
@@ -4385,6 +4379,7 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			if ((entry->eflags & MAP_ENTRY_UNMAPPED) == 0) {
 				if ((entry->eflags & MAP_ENTRY_GUARD) == 0)
 					map->size -= (entry->end - entry->start);
+				/* XXX-AM: How do we reset maxprot? */
 				vm_map_reservation_init_entry(entry);
 			}
 			/* Attempt to consolidate the mapping anyway? */
@@ -4719,8 +4714,8 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	    pmap_pinit);
 #else
 	vm2 = vmspace_alloc(
-	    (vm_pointer_t)cheri_setaddress(old_map->map_capability, vm_map_min(old_map)),
-	    (vm_pointer_t)cheri_setaddress(old_map->map_capability, vm_map_max(old_map)),
+	    cheri_setaddress(vm_map_rootcap(old_map), vm_map_min(old_map)),
+	    cheri_setaddress(vm_map_rootcap(old_map), vm_map_max(old_map)),
 	    pmap_pinit);
 #endif
 
@@ -4995,9 +4990,6 @@ vm_map_stack_locked(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 		init_ssize = max_ssize - sgp;
 
 	if (map->flags & MAP_RESERVATIONS) {
-#ifdef __CHERI_PURE_CAPABILITY__
-		/* TODO: Check reservation capability is valid */
-#endif
 		/* Check reservation exists */
 		if (vm_map_lookup_entry(map, addrbos, &prev_entry) == 0 ||
 		    (prev_entry->eflags & MAP_ENTRY_UNMAPPED) == 0)
@@ -5257,11 +5249,12 @@ retry:
 		} else {
 			MPASS(gap_entry->start < gap_entry->end - grow_amount);
 			vm_map_entry_resize(map, gap_entry, -grow_amount);
-			if (map->flags & MAP_RESERVATIONS)
+			if (map->flags & MAP_RESERVATIONS) {
 				tmp_entry = vm_map_reservation_insert(map,
 				    stack_entry->start - grow_amount,
 				    grow_amount, stack_entry->max_protection,
 				    stack_entry->reservation);
+			}
 			gap_deleted = false;
 		}
 		/* XXX-AM: Would be nice to just grow the object as below */
@@ -5382,9 +5375,9 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 
 	user_length = CHERI_REPRESENTABLE_LENGTH(user_length);
 	minuser_cap = (vm_pointer_t)cheri_capability_build_user_rwx(
-	    CHERI_CAP_USER_CODE_PERMS | CHERI_CAP_USER_DATA_PERMS,
-	    padded_minuser, user_length, minuser);
-	maxuser_cap = (vm_pointer_t)cheri_setaddress((void *)minuser_cap, maxuser);
+	    CHERI_CAP_USER_CODE_PERMS | CHERI_CAP_USER_DATA_PERMS |
+	    CHERI_PERMS_SWALL, padded_minuser, user_length, minuser);
+	maxuser_cap = cheri_setaddress(minuser_cap, maxuser);
 	newvmspace = vmspace_alloc(minuser_cap, maxuser_cap, pmap_pinit);
 #else
 	newvmspace = vmspace_alloc(minuser, maxuser, pmap_pinit);
@@ -5779,13 +5772,13 @@ vm_map_prot2perms(vm_prot_t prot)
 {
 	int perms = 0;
 
-	/* These should match mmap_prot2perms until they are merged */
 	if (prot & (VM_PROT_READ | VM_PROT_COPY))
-		perms |= CHERI_CAP_PERM_READ;
+		perms |= (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP);
 	if (prot & VM_PROT_WRITE)
-		perms |= CHERI_CAP_PERM_WRITE;
+		perms |= (CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+		    CHERI_PERM_STORE_LOCAL_CAP);
 	if (prot & VM_PROT_EXECUTE)
-		perms |= CHERI_CAP_PERM_EXEC;
+		perms |= CHERI_PERM_EXECUTE;
 
 	return (perms);
 }
@@ -5799,13 +5792,13 @@ vm_pointer_t
 _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
     vm_prot_t prot)
 {
-	void *retcap;
-	int perms = ~CHERI_CAP_PERM_RWX | vm_map_prot2perms(prot);
+	vm_pointer_t retcap;
+	int perms = ~MAP_CAP_PERM_MASK | vm_map_prot2perms(prot);
 
-	retcap = cheri_setbounds(cheri_setaddress(vm_map_rootcap(map),
-	    addr), length);
+	retcap = cheri_setbounds(
+	    cheri_setaddress(vm_map_rootcap(map), addr), length);
 
-	return ((vm_pointer_t)cheri_andperm(retcap, perms));
+	return (cheri_andperm(retcap, perms));
 }
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #endif /* has_feature(capabilities) */
@@ -5836,6 +5829,45 @@ vm_map_reservation_insert(vm_map_t map, vm_offset_t addr, vm_size_t length,
 }
 
 /*
+ * Check whether there is a single reservation spanning the requested range and
+ * returns it in reservp.
+ * Assumes the map to be locked and leaves the map locked.
+ * Assumes that reservations are enabled for this map.
+ *
+ * Returns KERN_NO_SPACE if the requested range is not fully contained within a
+ * reservation. KERN_MEM_PROT_FAILURE if no reservation backing the rage can be
+ * found.
+ */
+int
+vm_map_reservation_get(vm_map_t map, vm_offset_t start, vm_size_t length,
+    vm_offset_t *reservp)
+{
+	vm_map_entry_t entry, next_entry;
+	vm_offset_t reservation;
+	vm_offset_t end = start + length;
+
+	VM_MAP_ASSERT_LOCKED(map);
+	MPASS((map->flags & MAP_RESERVATIONS));
+
+	if (vm_map_lookup_entry(map, start, &entry)) {
+		reservation = entry->reservation;
+		while (entry->end < end) {
+			next_entry = vm_map_entry_succ(entry);
+			if (entry->reservation != reservation ||
+			    next_entry->start > end) {
+				return (KERN_NO_SPACE);
+			}
+			entry = next_entry;
+		}
+	} else {
+		return (KERN_MEM_PROT_FAILURE);
+	}
+	*reservp = reservation;
+
+	return (KERN_SUCCESS);
+}
+
+/*
  * Create a reservation from the hinted address [internal use only]
  * and return a capability for it.
  *
@@ -5854,7 +5886,7 @@ vm_map_reservation_create_locked(vm_map_t map, vm_pointer_t *addr,
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_getlen(addr) == sizeof(void *),
 	    ("Invalid bounds for pointer-sized object %zx",
-	    (size_t)cheri_getlen(addr)));
+	    cheri_getlen(addr)));
 #endif
 
 	if ((map->flags & MAP_RESERVATIONS) == 0) {
@@ -5887,7 +5919,7 @@ vm_map_reservation_create_locked(vm_map_t map, vm_pointer_t *addr,
 	KASSERT(cheri_gettag(*addr), ("Expected valid capability"));
 	KASSERT(cheri_getlen(*addr) == length,
 	    ("Inexact bounds expected %zx found %zx",
-	    (size_t)length, (size_t)cheri_getlen(*addr)));
+	    (size_t)length, cheri_getlen(*addr)));
 #endif
 
 	return (KERN_SUCCESS);
@@ -5929,55 +5961,6 @@ vm_map_reservation_create(vm_map_t map, vm_pointer_t *addr, vm_size_t length,
 
 	if (result == KERN_SUCCESS)
 		*addr = start;
-	return (result);
-}
-
-/*
- * Create a reservation for a chunk of address space in the given map
- * and return a capability for it, at the given address.
- *
- * This operates in the same way as vm_map_reservation_create, ensuring
- * that there is at least length bytes in the reservation past the given
- * hint address.
- */
-int
-vm_map_reservation_create_fixed(vm_map_t map, vm_pointer_t *addr, vm_size_t length,
-    vm_offset_t alignment, vm_prot_t max_prot)
-{
-	int result;
-	vm_size_t padded_length;
-	vm_offset_t hint_addr = *addr;
-	vm_offset_t hint_offset = 0;
-	vm_pointer_t rounded_addr;
-	vm_offset_t hint_align;
-
-	if ((map->flags & MAP_RESERVATIONS) == 0) {
-		*addr = vm_map_buildcap(map, *addr, length, max_prot);
-		return (KERN_SUCCESS);
-	}
-
-	hint_align = MAX(alignment, CHERI_REPRESENTABLE_ALIGNMENT(length));
-	do {
-		rounded_addr = rounddown2(hint_addr, hint_align);
-		hint_offset = hint_addr - (vm_offset_t)rounded_addr;
-		hint_align = MAX(alignment, CHERI_REPRESENTABLE_ALIGNMENT(
-		    length + hint_offset));
-	} while (rounded_addr != rounddown2(hint_addr, hint_align));
-	padded_length = CHERI_REPRESENTABLE_LENGTH(length + hint_offset);
-
-	vm_map_lock(map);
-	/*
-	 * Adjust start to make sure we are within the mapping,
-	 * only allow adjusting if start is in the first page.
-	 */
-	if (rounded_addr < vm_map_min(map) && vm_map_min(map) <= PAGE_SIZE)
-		rounded_addr = vm_map_min(map);
-	result = vm_map_reservation_create_locked(map, &rounded_addr,
-	    padded_length, max_prot);
-	vm_map_unlock(map);
-
-	if (result == KERN_SUCCESS)
-		*addr = rounded_addr + hint_offset;
 	return (result);
 }
 

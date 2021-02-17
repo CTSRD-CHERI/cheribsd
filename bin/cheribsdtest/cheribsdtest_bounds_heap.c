@@ -54,8 +54,8 @@
 #include "cheribsdtest.h"
 
 #ifdef __CHERI_PURE_CAPABILITY__
-void
-test_bounds_calloc(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_calloc,
+    "Check bounds on variously sized heap allocations")
 {
 	size_t i;
 	const size_t sizes[] = {1, 2, 4, 8, 16, 32, 64, 128, 1024, 4096, 10000};

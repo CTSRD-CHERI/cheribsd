@@ -56,11 +56,11 @@ def buildImageAndRunTests(params, String suffix) {
     }
     // No need for minimal images when running the testsuite
     if (!GlobalVars.isTestSuiteJob && (suffix.startsWith('mips64') || suffix.startsWith('riscv64'))) {
-        stage("Building minimal disk image") {
-            sh "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
-        }
         stage("Building MFS_ROOT kernels") {
-            sh "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd-mfs-root-kernel-${suffix}/build-fpga-kernels ${params.extraArgs}"
+            sh label: "Building minimal disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
+            sh label: "Building MFS_ROOT kernels", script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd-mfs-root-kernel-${suffix}/build-fpga-kernels ${params.extraArgs}"
+            // Move MFS_ROOT kernels into tarball/ so they aren't deleted
+            sh "mv -fv kernel-${suffix}* tarball/"
         }
     }
     if (suffix.startsWith("morello")) {
@@ -121,12 +121,13 @@ def maybeArchiveArtifacts(params, String suffix) {
         }
         stage("Archiving artifacts") {
             // Archive disk image
-            sh label: 'Compress kernel and images', script: '''
+            sh label: 'Compress kernel and images', script: """
 rm -fv *.img *.xz kernel*
-mv -v tarball/*.img tarball/rootfs/boot/kernel/kernel .
+mv -v tarball/rootfs/boot/kernel/kernel tarball/kernel
+mv -v tarball/*.img tarball/kernel* .
 # Use xz -T0 to speed up compression by using multiple threads
 xz -T0 *.img kernel*
-'''
+"""
             // Create sysroot archive (this is installed to cherisdk rather than the tarball)
             // Seems like some Java versions require write permissions to the .xz files:
             // java.nio.file.AccessDeniedException: /usr/local/jenkins/jobs/CheriBSD-pipeline/branches/PR-616/builds/14/archive/kernel.xz
@@ -137,9 +138,12 @@ xz -T0 *.img kernel*
             //     at java.nio.file.spi.FileSystemProvider.newOutputStream(FileSystemProvider.java:434)
             //     at java.nio.file.Files.newOutputStream(Files.java:216)
             sh label: 'Create sysroot archive', script: """
+./cheribuild/jenkins-cheri-build.py cheribsd-sysroot-${suffix} --keep-install-dir --build \
+    --cheribsd/install-dir=\${WORKSPACE}/tarball/rootfs \
+    --cheribsd-sysroot/install-dir \${WORKSPACE}/tarball/sysroot
+rm -f cheribsd-sysroot.tar.xz
+mv tarball/sysroot-${suffix}.tar.gz cheribsd-sysroot.tar.xz
 rm -rf tarball artifacts-*
-mkdir tarball && mv -f cherisdk/sysroot tarball/sysroot
-./cheribuild/jenkins-cheri-build.py --tarball cheribsd-sysroot-${suffix} --tarball-name cheribsd-sysroot.tar.xz
 chmod +w *.xz
 mkdir -p "artifacts-${suffix}"
 mv -v *.xz "artifacts-${suffix}"
@@ -163,6 +167,18 @@ selectedArchitectures.each { suffix ->
             // Enable additional debug checks when running the testsuite
             extraBuildOptions += ' -DMALLOC_DEBUG'
         }
+        // XXX: Remove once dev can build a purecap world
+        if (suffix.startsWith("morello")) {
+            def gitBranch = 'master'
+            if (env.CHANGE_ID) {
+                gitBranch = env.CHANGE_TARGET
+            } else if (env.BRANCH_NAME) {
+                gitBranch = env.BRANCH_NAME
+            }
+            if (gitBranch != 'morello-dev') {
+                extraBuildOptions += ' -DWITHOUT_COMPAT_CHERIABI'
+            }
+        }
         def cheribuildArgs = ["'--cheribsd/build-options=${extraBuildOptions}'",
                               '--keep-install-dir',
                               '--install-prefix=/rootfs',
@@ -172,18 +188,6 @@ selectedArchitectures.each { suffix ->
         } else {
             cheribuildArgs.add('--cheribsd/no-debug-info')
         }
-        // XXX: Remove once dev can build world
-        if (suffix.startsWith("morello")) {
-            def gitBranch = 'master'
-            if (env.CHANGE_ID) {
-                gitBranch = env.CHANGE_TARGET
-            } else if (env.BRANCH_NAME) {
-                gitBranch = env.BRANCH_NAME
-            }
-            if (gitBranch != 'morello-dev') {
-                cheribuildArgs.add('--skip-world')
-            }
-        }
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
                 extraArgs: cheribuildArgs.join(" "),
                 skipArchiving: true, skipTarball: true,
@@ -192,10 +196,13 @@ selectedArchitectures.each { suffix ->
                 customGitCheckoutDir: suffix.startsWith('morello') ? 'morello-cheribsd' : 'cheribsd',
                 gitHubStatusContext: GlobalVars.isTestSuiteJob ? "testsuite/${suffix}" : "ci/${suffix}",
                 // Delete stale compiler/sysroot
-                beforeBuild: { params -> dir('cherisdk') { deleteDir() } },
+                beforeBuild: { params -> 
+                    dir('cherisdk') { deleteDir() } 
+                    sh label: 'Deleting outputs from previous builds', script: 'rm -rfv artifacts-* tarball kernel*'
+                },
                 /* Custom function to run tests since --test will not work (yet) */
                 runTests: false,
-                afterBuild: { params -> if (!cheribuildArgs.contains('--skip-world')) { buildImageAndRunTests(params, suffix) } })
+                afterBuild: { params -> buildImageAndRunTests(params, suffix) })
     }
 }
 

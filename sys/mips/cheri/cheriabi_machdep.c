@@ -147,36 +147,3 @@ cheriabi_fetch_syscall_args(struct thread *td)
 
 	return (error);
 }
-
-/*
- * Common per-thread CHERI state initialisation across execve(2) and
- * additional thread creation.
- */
-void
-cheriabi_newthread_init(struct thread *td)
-{
-	struct cheri_signal *csigp;
-	struct trapframe *frame;
-
-	/*
-	 * We assume that the caller has initialised the trapframe to zeroes
-	 * and then set idc, and pcc appropriatly. We might want to check
-	 * this with a more thorough set of assertions in the future.
-	 */
-	frame = &td->td_pcb->pcb_regs;
-	KASSERT(frame->pcc != NULL, ("%s: NULL $epcc", __func__));
-
-	/*
-	 * Initialise signal-handling state; this can't yet be modified
-	 * by userspace, but the principle is that signal handlers should run
-	 * with ambient authority unless given up by the userspace runtime
-	 * explicitly.  The caller will initialise the stack fields.
-	 *
-	 * Note that some fields are overwritten later in
-	 * exec_setregs() for the initial thread.
-	 */
-	csigp = &td->td_pcb->pcb_cherisignal;
-	bzero(csigp, sizeof(*csigp));
-	/* Note: csig_{ddc,idc,pcc} are set to NULL in the pure-capability abi */
-	csigp->csig_sigcode = cheri_sigcode_capability(td);
-}

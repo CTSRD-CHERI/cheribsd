@@ -89,6 +89,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/unistd.h>
 #include <sys/user.h>
 
+#include <cheri/cheric.h>
+
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
@@ -1436,10 +1438,11 @@ shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_pointer_t *addr,
     vm_ooffset_t foff, struct thread *td)
 {
 	struct vmspace *vms;
-	vm_offset_t align, mask, vaddr;
-	int docow, error, rv, try;
+	vm_pointer_t start;
+        vm_offset_t align, mask, vaddr;
+	vm_offset_t reservation_id;
+        int docow, error, rv, try;
 	bool curmap;
-	vm_pointer_t reservation;
 	bool new_reservation;
 
 	if (shmfd->shm_lp_psind == 0)
@@ -1455,7 +1458,7 @@ shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_pointer_t *addr,
 		return (EINVAL);
 
 	vaddr = (vm_offset_t)*addr;
-	reservation = vaddr;
+	start = *addr;
 	size = CHERI_REPRESENTABLE_LENGTH(size);
 
 	vms = td->td_proc->p_vmspace;
@@ -1528,33 +1531,52 @@ again:
 			goto fail1;
 		}
 
-		reservation = vaddr;
-		rv = vm_map_reservation_create_locked(map, &reservation,
-		    size, max_prot);
+		start = vaddr;
+		rv = vm_map_reservation_create_locked(map, &start, size,
+		    max_prot);
 		if (rv != KERN_SUCCESS)
 			goto fail1;
-		rv = vm_map_insert(map, shmfd->shm_object, foff,
-		    reservation, reservation + size, prot, max_prot,
-		    docow, reservation);
+		rv = vm_map_insert(map, shmfd->shm_object, foff, start,
+		    start + size, prot, max_prot, docow, start);
 	} else {
-		/* MAP_FIXED */
+		/*
+		 * Fixed mapping: ensure that there is a single reservation
+		 * spanning the requested range. If mapping exclusively, check
+		 * that no other mapping exists unless it is marked as unmapped.
+		 */
 		if (new_reservation) {
-			rv = vm_map_reservation_create_locked(map, &reservation,
+			start = vaddr;
+			rv = vm_map_reservation_create_locked(map, &start,
 			    size, max_prot);
 			if (rv != KERN_SUCCESS)
 				goto fail1;
+			reservation_id = (vm_offset_t)start;
+		} else if ((map->flags & MAP_RESERVATIONS) != 0) {
+			rv = vm_map_reservation_get(map, vaddr, size,
+			    &reservation_id);
+			if (rv != KERN_SUCCESS)
+				goto fail1;
 		}
-		rv = vm_map_fixed(map, shmfd->shm_object, foff, reservation,
-		    size, prot, max_prot, docow);
+		if ((flags & MAP_EXCL) == 0) {
+			rv = vm_map_delete(map, start, start + size, true);
+			if (rv != KERN_SUCCESS) {
+				if (new_reservation)
+					vm_map_reservation_delete_locked(
+					    map, start);
+				goto fail1;
+			}
+		}
+		rv = vm_map_insert(map, shmfd->shm_object, foff, start,
+		    start + size, prot, max_prot, docow, reservation_id);
 		if (rv != KERN_SUCCESS && new_reservation)
-			vm_map_reservation_delete_locked(map, reservation);
+			vm_map_reservation_delete_locked(map, start);
 		if (rv == KERN_NO_SPACE && (flags & MAP_EXCL) != 0) {
 			error = ENOSPC;
 			goto fail;
 		}
 	}
 
-	*addr = reservation;
+	*addr = start;
 fail1:
 	error = vm_mmap_to_errno(rv);
 fail:

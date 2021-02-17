@@ -734,8 +734,11 @@ kmap_alloc_wait(vm_map_t map, vm_size_t size)
 
 	mapped = addr;
 	if (vm_map_reservation_create_locked(map, &mapped, padded_size,
-	    VM_PROT_RW_CAP))
+	    VM_PROT_RW_CAP)) {
+		vm_map_unlock(map);
+		swap_release(size);
 		return (0);
+	}
 	vm_map_insert(map, NULL, 0, mapped, mapped + size, VM_PROT_RW_CAP,
 	    VM_PROT_RW_CAP, MAP_ACC_CHARGED, mapped);
 	vm_map_unlock(map);
@@ -859,7 +862,7 @@ kmem_init(vm_pointer_t start, vm_pointer_t end)
 	addr = VM_MIN_KERNEL_ADDRESS;
 #endif
 
-	size = (vaddr_t)start - (vaddr_t)addr;
+	size = (ptraddr_t)start - (ptraddr_t)addr;
 	(void)vm_map_reservation_create_locked(kernel_map, &addr, size,
 	    VM_PROT_ALL);
 	(void)vm_map_insert(kernel_map, NULL, 0, addr, start, VM_PROT_ALL,

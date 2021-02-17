@@ -709,6 +709,12 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot)
 			val |= ATTR_S1_XN;
 		if ((prot & VM_PROT_WRITE) == 0)
 			val |= ATTR_S1_AP(ATTR_S1_AP_RO);
+#if __has_feature(capabilities)
+		if ((prot & VM_PROT_READ_CAP) != 0)
+			val |= ATTR_LC_ENABLED;
+		if ((prot & VM_PROT_WRITE_CAP) != 0)
+			val |= ATTR_SC;
+#endif
 	} else {
 		if ((prot & VM_PROT_WRITE) != 0)
 			val |= ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE);
@@ -716,6 +722,12 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot)
 			val |= ATTR_S2_S2AP(ATTR_S2_S2AP_READ);
 		if ((prot & VM_PROT_EXECUTE) == 0)
 			val |= ATTR_S2_XN(ATTR_S2_XN_ALL);
+#if __has_feature(capabilities)
+		if ((prot & VM_PROT_READ_CAP) != 0)
+			val |= ATTR_LC_ENABLED;
+		if ((prot & VM_PROT_WRITE_CAP) != 0)
+			val |= ATTR_SC;
+#endif
 	}
 
 	return (val);
@@ -845,6 +857,9 @@ pmap_bootstrap_dmap(vm_offset_t kern_l1, vm_paddr_t min_pa,
 				KASSERT(l2_slot != 0, ("..."));
 				pmap_store(&l2[l2_slot],
 				    (pa & ~L2_OFFSET) | ATTR_DEFAULT |
+#if __has_feature(capabilities)
+				    ATTR_CAP_RW |
+#endif
 				    ATTR_S1_XN |
 				    ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) |
 				    L2_BLOCK);
@@ -859,6 +874,9 @@ pmap_bootstrap_dmap(vm_offset_t kern_l1, vm_paddr_t min_pa,
 			l1_slot = ((va - DMAP_MIN_ADDRESS) >> L1_SHIFT);
 			pmap_store(&pagetable_dmap[l1_slot],
 			    (pa & ~L1_OFFSET) | ATTR_DEFAULT | ATTR_S1_XN |
+#if __has_feature(capabilities)
+			    ATTR_CAP_RW |
+#endif
 			    ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) | L1_BLOCK);
 		}
 
@@ -884,6 +902,9 @@ pmap_bootstrap_dmap(vm_offset_t kern_l1, vm_paddr_t min_pa,
 				l2_slot = pmap_l2_index(va);
 				pmap_store(&l2[l2_slot],
 				    (pa & ~L2_OFFSET) | ATTR_DEFAULT |
+#if __has_feature(capabilities)
+				    ATTR_CAP_RW |
+#endif
 				    ATTR_S1_XN |
 				    ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) |
 				    L2_BLOCK);
@@ -1553,6 +1574,9 @@ pmap_qenter(vm_offset_t sva, vm_page_t *ma, int count)
 
 		m = ma[i];
 		pa = VM_PAGE_TO_PHYS(m) | ATTR_DEFAULT |
+#if __has_feature(capabilities)
+		    ATTR_CAP_RW |
+#endif
 		    ATTR_S1_AP(ATTR_S1_AP_RW) | ATTR_S1_XN |
 		    ATTR_S1_IDX(m->md.pv_memattr) | L3_PAGE;
 		pte = pmap_l2_to_l3(pde, va);
@@ -4203,6 +4227,10 @@ pmap_enter_2mpage(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 		new_l2 |= ATTR_S1_UXN;
 	if (pmap != kernel_pmap)
 		new_l2 |= ATTR_S1_nG;
+#if __has_feature(capabilities)
+	if ((prot & VM_PROT_READ_CAP) != 0)
+		new_l2 |= ATTR_LC_ENABLED;
+#endif
 	return (pmap_enter_l2(pmap, va, new_l2, PMAP_ENTER_NOSLEEP |
 	    PMAP_ENTER_NOREPLACE | PMAP_ENTER_NORECLAIM, NULL, lockp) ==
 	    KERN_SUCCESS);
@@ -4511,6 +4539,10 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 		l3_val |= ATTR_S1_UXN;
 	if (pmap != kernel_pmap)
 		l3_val |= ATTR_S1_nG;
+#if __has_feature(capabilities)
+	if ((prot & VM_PROT_READ_CAP) != 0)
+		l3_val |= ATTR_LC_ENABLED;
+#endif
 
 	/*
 	 * Now validate mapping with RO protection
@@ -7201,7 +7233,6 @@ SYSCTL_OID(_vm_pmap, OID_AUTO, kernel_maps,
     CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE,
     NULL, 0, sysctl_kmaps, "A",
     "Dump kernel address layout");
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200804,

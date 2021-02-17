@@ -60,11 +60,20 @@ ASSYM(PCB_SIZE, roundup2(sizeof(struct pcb), STACKALIGNBYTES + 1));
 ASSYM(PCB_SINGLE_STEP_SHIFT, PCB_SINGLE_STEP_SHIFT);
 ASSYM(PCB_REGS, offsetof(struct pcb, pcb_x));
 ASSYM(PCB_SP, offsetof(struct pcb, pcb_sp));
+#if __has_feature(capabilities)
+ASSYM(PCB_TPIDR, offsetof(struct pcb, pcb_tpidr_el0));
+ASSYM(PCB_CID, offsetof(struct pcb, pcb_cid_el0));
+ASSYM(PCB_RDDC, offsetof(struct pcb, pcb_rddc_el0));
+#else
 ASSYM(PCB_TPIDRRO, offsetof(struct pcb, pcb_tpidrro_el0));
+#endif
 ASSYM(PCB_ONFAULT, offsetof(struct pcb, pcb_onfault));
 ASSYM(PCB_FLAGS, offsetof(struct pcb, pcb_flags));
 
 ASSYM(SF_UC, offsetof(struct sigframe, sf_uc));
+#ifdef COMPAT_FREEBSD64
+ASSYM(SF_UC64, offsetof(struct sigframe64, sf_uc));
+#endif
 
 ASSYM(TD_PROC, offsetof(struct thread, td_proc));
 ASSYM(TD_PCB, offsetof(struct thread, td_pcb));

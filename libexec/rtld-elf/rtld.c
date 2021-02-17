@@ -1825,8 +1825,8 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 		obj->vaddrbase = trunc_page(ph->p_vaddr);
 		obj->mapbase = obj->vaddrbase + obj->relocbase;
 	    } else {		/* Last load segment */
-		obj->mapsize = round_page(ph->p_vaddr + ph->p_memsz) -
-		  obj->vaddrbase;
+		obj->mapsize = rtld_max(obj->mapsize,
+		    round_page(ph->p_vaddr + ph->p_memsz) - obj->vaddrbase);
 	    }
 	    nsegs++;
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -1883,7 +1883,12 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
     }
 
 #ifdef __CHERI_PURE_CAPABILITY__
-   obj->relocbase = cheri_setbounds(obj->relocbase, obj->mapsize);
+    if (cheri_bytes_remaining(obj->relocbase) > CHERI_REPRESENTABLE_LENGTH(
+	obj->mapsize)) {
+	rtld_fatal("Kernel failed to bound relocbase(%#p) to %#zx "
+	    "(rounded=%#zx)?", obj->relocbase, obj->mapsize,
+	    CHERI_REPRESENTABLE_LENGTH(obj->mapsize));
+    }
     /*
      * Derive text_rodata cap from AT_ENTRY (but set the address to the beginning
      * of the object). Note: csetbounds is done after parsing .dynamic

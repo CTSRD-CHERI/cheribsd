@@ -95,8 +95,20 @@ _start:
 	 */
 	mrs	x2, cpacr_el1
 	bic	x2, x2, CPACR_CEN_MASK
-	orr	x2, x2, CPACR_CEN_TRAP_EL0
+	orr	x2, x2, CPACR_CEN_TRAP_NONE
 	msr	cpacr_el1, x2
+	isb
+
+	/*
+	 * Allow access to CNTVCT_EL0 without PCC System permission and enable
+	 * capability sealing for branch and link at EL0.
+	 *
+	 * XXXBFG should this be done somewhere else? Maybe eventually per-process or
+	 * compartment?
+	 */
+	mrs x2, cctlr_el0
+	orr x2, x2, #(CCTLR_PERMVCT_MASK | CCTLR_SBL_MASK)
+	msr cctlr_el0, x2
 #endif
 
 	/*
@@ -224,8 +236,20 @@ ENTRY(mpentry)
 	 */
 	mrs	x2, cpacr_el1
 	bic	x2, x2, CPACR_CEN_MASK
-	orr	x2, x2, CPACR_CEN_TRAP_EL0
+	orr	x2, x2, CPACR_CEN_TRAP_NONE
 	msr	cpacr_el1, x2
+	isb
+
+	/*
+	 * Allow access to CNTVCT_EL0 without PCC System permission and enable
+	 * capability sealing for branch and link at EL0.
+	 *
+	 * XXXBFG should this be done somewhere else? Maybe eventually per-process or
+	 * compartment?
+	 */
+	mrs x2, cctlr_el0
+	orr x2, x2, #(CCTLR_PERMVCT_MASK | CCTLR_SBL_MASK)
+	msr cctlr_el0, x2
 #endif
 
 	/* Set the context id */
@@ -652,11 +676,9 @@ build_l1_block_pagetable:
 	/* Build the L1 block entry */
 	orr	x12, x7, #L1_BLOCK
 #if __has_feature(capabilities)
-	orr	x12, x12, #(ATTR_DEFAULT_LOW)
-	orr	x12, x12, #(ATTR_DEFAULT_HIGH)
-#else
-	orr	x12, x12, #(ATTR_DEFAULT)
+	orr	x12, x12, #(ATTR_CAP_RW)
 #endif
+	orr	x12, x12, #(ATTR_DEFAULT)
 
 	/* Only use the output address bits */
 	lsr	x9, x9, #L1_SHIFT
@@ -695,11 +717,9 @@ build_l2_block_pagetable:
 	lsl	x12, x7, #2
 	orr	x12, x12, #L2_BLOCK
 #if __has_feature(capabilities)
-	orr	x12, x12, #(ATTR_DEFAULT_LOW)
-	orr	x12, x12, #(ATTR_DEFAULT_HIGH)
-#else
-	orr	x12, x12, #(ATTR_DEFAULT)
+	orr	x12, x12, #(ATTR_CAP_RW)
 #endif
+	orr	x12, x12, #(ATTR_DEFAULT)
 	orr	x12, x12, #(ATTR_S1_UXN)
 
 	/* Only use the output address bits */
@@ -804,7 +824,7 @@ mair:
 		MAIR_ATTR(MAIR_NORMAL_WT, VM_MEMATTR_WRITE_THROUGH)
 tcr:
 #if __has_feature(capabilities)
-#define	TCR_MORELLO	(TCR_HPD1 | TCR_HWU1)
+#define	TCR_MORELLO	(TCR_HPD0 | TCR_HPD1 | TCR_HWU0 | TCR_HWU1)
 #else
 #define	TCR_MORELLO	0
 #endif
@@ -866,10 +886,26 @@ initstack:
 	.space	(PAGE_SIZE * KSTACK_PAGES)
 initstack_end:
 
+/*
+ * sigcode has to be labeled as an #object type so that the symbols
+ * resolve to the correct address as a source for copies.  This also
+ * ensures that captable pointers to it will be able to read it.  This
+ * is fine as the code is never executed directly in the kernel, just
+ * copied to places for userland to execute.
+ */
+#define	SIGCODE(sym)						\
+	.text; .globl sym; .align 2; .type sym,#object; sym:
 
-ENTRY(sigcode)
+SIGCODE(sigcode)
+#if __has_feature(capabilities)
+#ifndef __CHERI_PURE_CAPABILITY__
+	.arch_extension c64
+#endif
+	add	c0, csp, #SF_UC
+#else
 	mov	x0, sp
 	add	x0, x0, #SF_UC
+#endif
 
 1:
 	mov	x8, #SYS_sigreturn
@@ -880,6 +916,12 @@ ENTRY(sigcode)
 	svc	0
 
 	b	1b
+#if __has_feature(capabilities)
+#ifndef __CHERI_PURE_CAPABILITY__
+	.arch_extension noc64
+	.arch_extension a64c
+#endif
+#endif
 END(sigcode)
 	/* This may be copied to the stack, keep it 16-byte aligned */
 	.align	3
@@ -891,7 +933,33 @@ esigcode:
 szsigcode:
 	.quad	esigcode - sigcode
 
-ENTRY(aarch32_sigcode)
+#ifdef COMPAT_FREEBSD64
+SIGCODE(freebsd64_sigcode)
+	mov	x0, sp
+	add	x0, x0, #SF_UC64
+
+1:
+	mov	x8, #SYS_sigreturn
+	svc	0
+
+	/* sigreturn failed, exit */
+	mov	x8, #SYS_exit
+	svc	0
+
+	b	1b
+END(freebsd64_sigcode)
+	/* This may be copied to the stack, keep it 16-byte aligned */
+	.align	3
+freebsd64_esigcode:
+
+	.data
+	.align	3
+	.global	freebsd64_szsigcode
+freebsd64_szsigcode:
+	.quad	freebsd64_esigcode - freebsd64_sigcode
+#endif
+
+SIGCODE(aarch32_sigcode)
 	.word 0xe1a0000d	// mov r0, sp
 	.word 0xe2800040	// add r0, r0, #SIGF_UC
 	.word 0xe59f700c	// ldr r7, [pc, #12]

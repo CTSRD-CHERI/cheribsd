@@ -41,8 +41,6 @@
 #ifndef __SYS_CHERIREG_H__
 #define	__SYS_CHERIREG_H__
 
-#if __has_feature(capabilities)
-
 #include <machine/cherireg.h>
 
 /* Machine-independent capability field values. */
@@ -90,15 +88,6 @@
 #define	CHERI_CAP_USER_DATA_LENGTH	(VM_MAXUSER_ADDRESS - VM_MINUSER_ADDRESS)
 #define	CHERI_CAP_USER_DATA_OFFSET	0x0
 
-#define	CHERI_CAP_USER_MMAP_PERMS					\
-	(CHERI_PERMS_USERSPACE_DATA | CHERI_PERMS_USERSPACE_CODE |	\
-	CHERI_PERM_CHERIABI_VMMAP)
-/* Start at 256MB to avoid low PC values in sandboxes */
-#define	CHERI_CAP_USER_MMAP_BASE	(VM_MINUSER_ADDRESS + 0x10000000)
-#define	CHERI_CAP_USER_MMAP_LENGTH					\
-    (VM_MAXUSER_ADDRESS - CHERI_CAP_USER_MMAP_BASE)
-#define	CHERI_CAP_USER_MMAP_OFFSET	0x0
-
 /*
  * Root sealing capability for all userspace object capabilities.
  */
@@ -124,7 +113,5 @@
 #define	CHERI_CAP_PERM_EXEC	(CHERI_PERM_EXECUTE)
 #define	CHERI_CAP_PERM_RWX                                              \
     (CHERI_CAP_PERM_READ | CHERI_CAP_PERM_WRITE | CHERI_CAP_PERM_EXEC)
-
-#endif /* __has_feature(capabilities) */
 
 #endif /* !__SYS_CHERIREG_H__ */

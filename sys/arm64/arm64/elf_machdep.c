@@ -66,7 +66,11 @@ static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_sendsig	= sendsig,
 	.sv_sigcode	= sigcode,
 	.sv_szsigcode	= &szsigcode,
+#if __has_feature(capabilities)
+	.sv_name	= "FreeBSD ELF64C",	/* CheriABI */
+#else
 	.sv_name	= "FreeBSD ELF64",
+#endif
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
@@ -74,14 +78,19 @@ static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
 	.sv_szpsstrings	= sizeof(struct ps_strings),
-	.sv_stackprot	= VM_PROT_READ | VM_PROT_WRITE,
+	.sv_stackprot	= VM_PROT_RW_CAP,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = exec_copyout_strings,
 	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
+#if __has_feature(capabilities)
+	.sv_flags	= SV_SHP | SV_TIMEKEEP | SV_ABI_FREEBSD | SV_LP64 |
+	    SV_RNG_SEED_VER | SV_CHERI,
+#else
 	.sv_flags	= SV_SHP | SV_TIMEKEEP | SV_ABI_FREEBSD | SV_LP64 |
 	    SV_ASLR | SV_RNG_SEED_VER,
+#endif
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = syscallnames,
@@ -102,7 +111,11 @@ static __ElfN(Brandinfo) freebsd_brand_info = {
 	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf64_freebsd_sysvec,
+#if __has_feature(capabilities)
+	.interp_newpath	= "/libexec/ld-cheri-elf.so.1",
+#else
 	.interp_newpath	= NULL,
+#endif
 	.brand_note	= &__elfN(freebsd_brandnote),
 	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
 };

@@ -4,13 +4,12 @@
 # https://git.linaro.org/toolchain/cortex-strings.git
 #
 
+.if !${MACHINE_ABI:Mpurecap}
 .PATH: ${SRCTOP}/contrib/cortex-strings/src/aarch64
 
 MDSRCS+= \
 	memchr.S \
 	memcmp.S \
-	memcpy.S \
-	memmove.S \
 	memset.S \
 	strchr.S \
 	strcmp.S \
@@ -18,3 +17,11 @@ MDSRCS+= \
 	strlen.S \
 	strncmp.S \
 	strnlen.S
+
+# Hybrid CHERI needs a tag-preserving memcpy and friends
+.if !${MACHINE_CPU:Mcheri}
+MDSRCS+= \
+	memcpy.S \
+	memmove.S
+.endif
+.endif

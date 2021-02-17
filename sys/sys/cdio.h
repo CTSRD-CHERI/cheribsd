@@ -137,7 +137,7 @@ struct ioc_read_subchannel {
 #define CD_TRACK_INFO		3
 	u_char track;
 	int	data_len;
-	struct  cd_sub_channel_info *data;
+	struct  cd_sub_channel_info * __kerncap data;
 };
 #define CDIOCREADSUBCHANNEL _IOWR('c', 3 , struct ioc_read_subchannel )
 
