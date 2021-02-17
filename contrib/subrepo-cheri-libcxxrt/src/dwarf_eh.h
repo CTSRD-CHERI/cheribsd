@@ -437,6 +437,10 @@ static bool dwarf_eh_find_callsite(struct _Unwind_Context *context,
 	result->landing_pad = 0;
 	// The current instruction pointer offset within the region
 	uint64_t ip = (char*)_Unwind_GetIP(context) - (char*)_Unwind_GetRegionStart(context);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(__aarch64__)
+	// Account for the LSB in the address returned by _Unwind_GetIP().
+	ip &= ~(uint64_t)1;
+#endif
 	unsigned char *callsite_table = static_cast<unsigned char*>(lsda->call_site_table);
 
 	while (callsite_table <= lsda->action_table)
