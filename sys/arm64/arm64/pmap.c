@@ -758,7 +758,7 @@ pmap_pte_memattr(pmap_t pmap, vm_memattr_t memattr)
 }
 
 static pt_entry_t
-pmap_pte_prot(pmap_t pmap, vm_prot_t prot)
+pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m)
 {
 	pt_entry_t val;
 
@@ -768,12 +768,6 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot)
 			val |= ATTR_S1_XN;
 		if ((prot & VM_PROT_WRITE) == 0)
 			val |= ATTR_S1_AP(ATTR_S1_AP_RO);
-#if __has_feature(capabilities)
-		if ((prot & VM_PROT_READ_CAP) != 0)
-			val |= ATTR_LC_ENABLED;
-		if ((prot & VM_PROT_WRITE_CAP) != 0)
-			val |= ATTR_SC;
-#endif
 	} else {
 		if ((prot & VM_PROT_WRITE) != 0)
 			val |= ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE);
@@ -781,13 +775,24 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot)
 			val |= ATTR_S2_S2AP(ATTR_S2_S2AP_READ);
 		if ((prot & VM_PROT_EXECUTE) == 0)
 			val |= ATTR_S2_XN(ATTR_S2_XN_ALL);
-#if __has_feature(capabilities)
-		if ((prot & VM_PROT_READ_CAP) != 0)
-			val |= ATTR_LC_ENABLED;
-		if ((prot & VM_PROT_WRITE_CAP) != 0)
-			val |= ATTR_SC;
-#endif
 	}
+
+#if __has_feature(capabilities)
+	if ((prot & VM_PROT_READ_CAP) != 0)
+		val |= ATTR_LC_ENABLED;
+
+	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
+	if ((prot & VM_PROT_WRITE_CAP) != 0)
+		/*
+		 * The page is CAPSTORE and this mapping is VM_PROT_WRITE_CAP.
+		 * Always set ATTR_CDBM. If the page is CAPDIRTY or this mapping
+		 * is created in response to a cap-write, also set ATTR_SC.
+		 *
+		 * XXX We could also conditionally set ATTR_SC if PGA_CAPDIRTY,
+		 * but it's not required.
+		 */
+		val |= (ATTR_CDBM);
+#endif
 
 	return (val);
 }
@@ -811,6 +816,38 @@ pmap_pte_dirty(pmap_t pmap, pt_entry_t pte)
 
 	return ((pte & ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE)) ==
 	    ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE));
+}
+
+#if __has_feature(capabilities)
+static inline int
+pmap_pte_capdirty(pmap_t pmap, pt_entry_t pte)
+{
+	KASSERT((pte & ATTR_SW_MANAGED) != 0, ("pte %#lx is unmanaged", pte));
+
+	KASSERT((pte & (ATTR_CDBM | ATTR_SC)) != ATTR_SC,
+	    ("pte %lx is cap-writable but missing ATTR_CDBM", pte));
+
+	return ((pte & ATTR_SC) == ATTR_SC);
+}
+#else
+static inline int
+pmap_pte_capdirty(pmap_t pmap, pt_entry_t pte)
+{
+
+	return (0);
+}
+#endif
+
+static inline void
+pmap_page_dirty(pmap_t pmap, pt_entry_t pte, vm_page_t m)
+{
+	if (pmap_pte_dirty(pmap, pte))
+		vm_page_dirty(m);
+
+#if __has_feature(capabilities)
+	if (pmap_pte_capdirty(pmap, pte))
+		vm_page_capdirty(m);
+#endif
 }
 
 static __inline void
@@ -2716,8 +2753,7 @@ reclaim_pv_chunk(pmap_t locked_pmap, struct rwlock **lockp)
 					continue;
 				tpte = pmap_load_clear(pte);
 				m = PHYS_TO_VM_PAGE(tpte & ~ATTR_MASK);
-				if (pmap_pte_dirty(pmap, tpte))
-					vm_page_dirty(m);
+				pmap_page_dirty(pmap, tpte, m);
 				if ((tpte & ATTR_AF) != 0) {
 					pmap_invalidate_page(pmap, va, true);
 					vm_page_aflag_set(m, PGA_REFERENCED);
@@ -3205,8 +3241,7 @@ pmap_remove_l2(pmap_t pmap, pt_entry_t *l2, vm_offset_t sva,
 		CHANGE_PV_LIST_LOCK_TO_PHYS(lockp, old_l2 & ~ATTR_MASK);
 		pmap_pvh_free(pvh, pmap, sva);
 		for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++) {
-			if (pmap_pte_dirty(pmap, old_l2))
-				vm_page_dirty(mt);
+			pmap_page_dirty(pmap, old_l2, mt);
 			if (old_l2 & ATTR_AF)
 				vm_page_aflag_set(mt, PGA_REFERENCED);
 			if (TAILQ_EMPTY(&mt->md.pv_list) &&
@@ -3250,8 +3285,7 @@ pmap_remove_l3(pmap_t pmap, pt_entry_t *l3, vm_offset_t va,
 	pmap_resident_count_dec(pmap, 1);
 	if (old_l3 & ATTR_SW_MANAGED) {
 		m = PHYS_TO_VM_PAGE(old_l3 & ~ATTR_MASK);
-		if (pmap_pte_dirty(pmap, old_l3))
-			vm_page_dirty(m);
+		pmap_page_dirty(pmap, old_l3, m);
 		if (old_l3 & ATTR_AF)
 			vm_page_aflag_set(m, PGA_REFERENCED);
 		CHANGE_PV_LIST_LOCK_TO_VM_PAGE(lockp, m);
@@ -3304,8 +3338,7 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 		pmap_resident_count_dec(pmap, 1);
 		if ((old_l3 & ATTR_SW_MANAGED) != 0) {
 			m = PHYS_TO_VM_PAGE(old_l3 & ~ATTR_MASK);
-			if (pmap_pte_dirty(pmap, old_l3))
-				vm_page_dirty(m);
+			pmap_page_dirty(pmap, old_l3, m);
 			if ((old_l3 & ATTR_AF) != 0)
 				vm_page_aflag_set(m, PGA_REFERENCED);
 			new_lock = PHYS_TO_PV_LIST_LOCK(VM_PAGE_TO_PHYS(m));
@@ -3544,8 +3577,7 @@ retry:
 		/*
 		 * Update the vm_page_t clean and reference bits.
 		 */
-		if (pmap_pte_dirty(pmap, tpte))
-			vm_page_dirty(m);
+		pmap_page_dirty(pmap, tpte, m);
 		pmap_unuse_pt(pmap, pv->pv_va, tpde, &free);
 		TAILQ_REMOVE(&m->md.pv_list, pv, pv_next);
 		m->md.pv_gen++;
@@ -3592,10 +3624,11 @@ pmap_protect_l2(pmap_t pmap, pt_entry_t *l2, vm_offset_t sva, pt_entry_t mask,
 	 */
 	if ((old_l2 & ATTR_SW_MANAGED) != 0 &&
 	    (nbits & ATTR_S1_AP(ATTR_S1_AP_RO)) != 0 &&
-	    pmap_pte_dirty(pmap, old_l2)) {
+	    (pmap_pte_dirty(pmap, old_l2) ||
+	    pmap_pte_capdirty(pmap, old_l2))) {
 		m = PHYS_TO_VM_PAGE(old_l2 & ~ATTR_MASK);
 		for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++)
-			vm_page_dirty(mt);
+			pmap_page_dirty(pmap, old_l2, mt);
 	}
 
 	/*
@@ -3717,8 +3750,10 @@ pmap_protect(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, vm_prot_t prot)
 			 */
 			if ((l3 & ATTR_SW_MANAGED) != 0 &&
 			    (nbits & ATTR_S1_AP(ATTR_S1_AP_RO)) != 0 &&
-			    pmap_pte_dirty(pmap, l3))
-				vm_page_dirty(PHYS_TO_VM_PAGE(l3 & ~ATTR_MASK));
+			    (pmap_pte_dirty(pmap, l3) ||
+			    pmap_pte_capdirty(pmap, l3)))
+				pmap_page_dirty(pmap, l3,
+				    PHYS_TO_VM_PAGE(l3 & ~ATTR_MASK));
 
 			if (va == va_next)
 				va = sva;
@@ -4067,7 +4102,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	pa = VM_PAGE_TO_PHYS(m);
 	new_l3 = (pt_entry_t)(pa | ATTR_DEFAULT | L3_PAGE);
 	new_l3 |= pmap_pte_memattr(pmap, m->md.pv_memattr);
-	new_l3 |= pmap_pte_prot(pmap, prot);
+	new_l3 |= pmap_pte_prot(pmap, prot, flags, m);
 
 	if ((flags & PMAP_ENTER_WIRED) != 0)
 		new_l3 |= ATTR_SW_WIRED;
@@ -4243,8 +4278,7 @@ havel3:
 			 * concurrent calls to pmap_page_test_mappings() and
 			 * pmap_ts_referenced().
 			 */
-			if (pmap_pte_dirty(pmap, orig_l3))
-				vm_page_dirty(om);
+			pmap_page_dirty(pmap, orig_l3, om);
 			if ((orig_l3 & ATTR_AF) != 0) {
 				pmap_invalidate_page(pmap, va, true);
 				vm_page_aflag_set(om, PGA_REFERENCED);
@@ -4320,9 +4354,8 @@ validate:
 			/* same PA, different attributes */
 			orig_l3 = pmap_load_store(l3, new_l3);
 			pmap_invalidate_page(pmap, va, true);
-			if ((orig_l3 & ATTR_SW_MANAGED) != 0 &&
-			    pmap_pte_dirty(pmap, orig_l3))
-				vm_page_dirty(m);
+			if ((orig_l3 & ATTR_SW_MANAGED) != 0)
+				pmap_page_dirty(pmap, orig_l3, m);
 		} else {
 			/*
 			 * orig_l3 == new_l3
@@ -5097,6 +5130,7 @@ pmap_copy_page_tags(vm_page_t msrc, vm_page_t mdst)
 	vm_pointer_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
 	vm_pointer_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
 
+	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst);
 #endif
 	pagecopy((void *)src, (void *)dst);
 }
@@ -5392,14 +5426,16 @@ pmap_remove_pages(pmap_t pmap)
 				/*
 				 * Update the vm_page_t clean/reference bits.
 				 */
-				if (pmap_pte_dirty(pmap, tpte)) {
+				if (pmap_pte_dirty(pmap, tpte) ||
+				    pmap_pte_capdirty(pmap, tpte)) {
 					switch (lvl) {
 					case 1:
 						for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++)
-							vm_page_dirty(mt);
+							pmap_page_dirty(pmap,
+							    tpte, mt);
 						break;
 					case 2:
-						vm_page_dirty(m);
+						pmap_page_dirty(pmap, tpte, m);
 						break;
 					}
 				}
@@ -5685,9 +5721,7 @@ retry:
 			while (!atomic_fcmpset_64(pte, &oldpte,
 			    (oldpte | ATTR_S1_AP_RW_BIT) & ~ATTR_SW_DBM))
 				cpu_spinwait();
-			if ((oldpte & ATTR_S1_AP_RW_BIT) ==
-			    ATTR_S1_AP(ATTR_S1_AP_RW))
-				vm_page_dirty(m);
+			pmap_page_dirty(pmap, oldpte, m);
 			pmap_invalidate_page(pmap, pv->pv_va, true);
 		}
 		PMAP_UNLOCK(pmap);
@@ -5755,14 +5789,13 @@ retry:
 		va = pv->pv_va;
 		pte = pmap_pte_exists(pmap, va, 2, __func__);
 		tpte = pmap_load(pte);
-		if (pmap_pte_dirty(pmap, tpte)) {
-			/*
-			 * Although "tpte" is mapping a 2MB page, because
-			 * this function is called at a 4KB page granularity,
-			 * we only update the 4KB page under test.
-			 */
-			vm_page_dirty(m);
-		}
+		/*
+		 * Although "tpte" is mapping a 2MB page, because
+		 * this function is called at a 4KB page granularity,
+		 * we update only the 4KB page under test.
+		 */
+		pmap_page_dirty(pmap, tpte, m);
+
 		if ((tpte & ATTR_AF) != 0) {
 			/*
 			 * Since this reference bit is shared by 512 4KB pages,
@@ -5822,8 +5855,7 @@ small_mappings:
 		}
 		pte = pmap_pte_exists(pmap, pv->pv_va, 3, __func__);
 		tpte = pmap_load(pte);
-		if (pmap_pte_dirty(pmap, tpte))
-			vm_page_dirty(m);
+		pmap_page_dirty(pmap, tpte, m);
 		if ((tpte & ATTR_AF) != 0) {
 			if ((tpte & ATTR_SW_WIRED) == 0) {
 				pmap_clear_bits(pte, ATTR_AF);
@@ -5955,7 +5987,7 @@ pmap_advise(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, int advice)
 					 * dirty now.
 					 */
 					m = PHYS_TO_VM_PAGE(oldl3 & ~ATTR_MASK);
-					vm_page_dirty(m);
+					pmap_page_dirty(pmap, oldl3, m);
 				}
 				while (!atomic_fcmpset_long(l3, &oldl3,
 				    (oldl3 & ~ATTR_AF) |
@@ -6763,6 +6795,10 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap)
 			val |= MINCORE_MODIFIED | MINCORE_MODIFIED_OTHER;
 		if ((tpte & ATTR_AF) == ATTR_AF)
 			val |= MINCORE_REFERENCED | MINCORE_REFERENCED_OTHER;
+#if __has_feature(capabilities)
+		if ((tpte & ATTR_CDBM) == ATTR_CDBM)
+			val |= MINCORE_CAPSTORE;
+#endif
 
 		pa = (tpte & ~ATTR_MASK) | (addr & mask);
 	} else {
