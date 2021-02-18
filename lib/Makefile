@@ -17,6 +17,7 @@ SUBDIR_BOOTSTRAP= \
 	libcompiler_rt \
 	${_libc_cheri} \
 	${_libcheri} \
+	${_libcheribsdtest_dynamic} \
 	${_libclang_rt} \
 	libgcc_eh \
 	libgcc_s \
@@ -173,6 +174,10 @@ SUBDIR.${MK_CHERI}+=	libsyscalls
 .if ${MK_LIBCHERI} == "yes" && ${MACHINE_ARCH} != "mips"
 _libc_cheri=	libc_cheri
 _libcheri=	libcheri
+.endif
+
+.if ${MACHINE_CPU:Mcheri}
+_libcheribsdtest_dynamic=	libcheribsdtest_dynamic
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "mips" || \
