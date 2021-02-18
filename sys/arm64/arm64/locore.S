@@ -869,7 +869,8 @@ LENTRY(build_l2_block_pagetable)
 	/* Build the L2 block entry */
 	orr	x12, x7, #L2_BLOCK
 #if __has_feature(capabilities)
-	orr	x12, x12, #(ATTR_CAP_RW)
+	orr	x12, x12, #(ATTR_LC_ENABLED)
+	orr	x12, x12, #(ATTR_CDBM)
 #endif
 	orr	x12, x12, #(ATTR_DEFAULT)
 	orr	x12, x12, #(ATTR_S1_UXN)

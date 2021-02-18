@@ -364,30 +364,27 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		panic("data abort in critical section or under mutex");
 	}
 
+	switch (ESR_ELx_EXCEPTION(esr)) {
+	case EXCP_INSN_ABORT:
+	case EXCP_INSN_ABORT_L:
+		ftype = VM_PROT_EXECUTE;
+		break;
+	default:
+		if (esr & ISS_DATA_WnR) {
+			ftype = VM_PROT_WRITE;
 #if __has_feature(capabilities)
-	if ((esr & ISS_DATA_DFSC_MASK) == ISS_DATA_DFSC_LC_SC) {
-		sig = SIGSEGV;
-		ucode = (esr & ISS_DATA_WnR) == 0 ? SEGV_LOADTAG :
-		    SEGV_STORETAG;
-		error = KERN_FAILURE;
-	} else
+			if ((esr & ISS_DATA_DFSC_MASK) ==
+				ISS_DATA_DFSC_LC_SC)
+				ftype |= VM_PROT_WRITE_CAP;
 #endif
-	{
-		switch (ESR_ELx_EXCEPTION(esr)) {
-		case EXCP_INSN_ABORT:
-		case EXCP_INSN_ABORT_L:
-			ftype = VM_PROT_EXECUTE;
-			break;
-		default:
-			ftype = (esr & ISS_DATA_WnR) == 0 ? VM_PROT_READ :
-			    VM_PROT_WRITE;
-			break;
-		}
-
-		/* Fault in the page. */
-		error = vm_fault_trap(map, far, ftype, VM_FAULT_NORMAL, &sig,
-		    &ucode);
+		} else
+			ftype = VM_PROT_READ;
+		break;
 	}
+
+	/* Fault in the page. */
+	error = vm_fault_trap(map, far, ftype, VM_FAULT_NORMAL, &sig, &ucode);
+
 	if (error != KERN_SUCCESS) {
 		if (lower) {
 			call_trapsignal(td, sig, ucode,
