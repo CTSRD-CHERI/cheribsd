@@ -17,6 +17,7 @@ _PRIVATELIBS=	\
 		atf_cxx \
 		auditd \
 		bsdstat \
+		cheribsdtest_dynamic \
 		devdctl \
 		event1 \
 		gmock \
