@@ -178,6 +178,12 @@ static const struct pmc_event_descr cortex_a76_event_table[] =
 	__PMC_EV_ARMV8()
 };
 
+static const struct pmc_event_descr rainier_event_table[] =
+{
+	__PMC_EV_ALIAS_ARMV8_RAINIER()
+	__PMC_EV_ARMV8()
+};
+
 static const struct pmc_event_descr tsc_event_table[] =
 {
 	__PMC_EV_ALIAS_TSC()
@@ -210,6 +216,7 @@ PMC_CLASS_TABLE_DESC(cortex_a9, ARMV7, cortex_a9, armv7);
 PMC_CLASS_TABLE_DESC(cortex_a53, ARMV8, cortex_a53, arm64);
 PMC_CLASS_TABLE_DESC(cortex_a57, ARMV8, cortex_a57, arm64);
 PMC_CLASS_TABLE_DESC(cortex_a76, ARMV8, cortex_a76, arm64);
+PMC_CLASS_TABLE_DESC(rainier, ARMV8, rainier, arm64);
 #endif
 #if defined(__powerpc__)
 PMC_CLASS_TABLE_DESC(ppc7450, PPC7450, ppc7450, powerpc);
@@ -763,6 +770,9 @@ static struct pmc_event_alias cortex_a57_aliases[] = {
 static struct pmc_event_alias cortex_a76_aliases[] = {
 	EV_ALIAS(NULL, NULL)
 };
+static struct pmc_event_alias rainier_aliases[] = {
+	EV_ALIAS(NULL, NULL)
+};
 static int
 arm64_allocate_pmc(enum pmc_event pe, char *ctrspec __unused,
     struct pmc_op_pmcallocate *pmc_config __unused)
@@ -1147,6 +1157,10 @@ pmc_event_names_of_class(enum pmc_class cl, const char ***eventnames,
 			ev = cortex_a76_event_table;
 			count = PMC_EVENT_TABLE_SIZE(cortex_a76);
 			break;
+		case PMC_CPU_ARMV8_RAINIER:
+			ev = rainier_event_table;
+			count = PMC_EVENT_TABLE_SIZE(rainier);
+			break;
 		}
 		break;
 	case PMC_CLASS_PPC7450:
@@ -1347,6 +1361,10 @@ pmc_init(void)
 		PMC_MDEP_INIT(cortex_a76);
 		pmc_class_table[n] = &cortex_a76_class_table_descr;
 		break;
+	case PMC_CPU_ARMV8_RAINIER:
+		PMC_MDEP_INIT(rainier);
+		pmc_class_table[n] = &rainier_class_table_descr;
+		break;
 #endif
 #if defined(__powerpc__)
 	case PMC_CPU_PPC_7450:
@@ -1470,6 +1488,10 @@ _pmc_name_of_event(enum pmc_event pe, enum pmc_cputype cpu)
 		case PMC_CPU_ARMV8_CORTEX_A76:
 			ev = cortex_a76_event_table;
 			evfence = cortex_a76_event_table + PMC_EVENT_TABLE_SIZE(cortex_a76);
+			break;
+		case PMC_CPU_ARMV8_RAINIER:
+			ev = rainier_event_table;
+			evfence = rainier_event_table + PMC_EVENT_TABLE_SIZE(rainier);
 			break;
 		default:	/* Unknown CPU type. */
 			break;

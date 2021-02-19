@@ -575,6 +575,16 @@ pmc_arm64_initialize()
 			break;
 		}
 		break;
+	case PMCR_IMP_RESEARCH:
+		switch (idcode) {
+		case PMCR_IDCODE_RAINIER:
+			pmc_mdep->pmd_cputype = PMC_CPU_ARMV8_RAINIER;
+			break;
+		default:
+			pmc_mdep->pmd_cputype = PMC_CPU_ARMV8_CORTEX_A53;
+			break;
+		}
+		break;
 	default:
 		pmc_mdep->pmd_cputype = PMC_CPU_ARMV8_CORTEX_A53;
 		break;

@@ -131,7 +131,8 @@ extern char pmc_cpuid[PMC_CPUID_LEN];
 	__PMC_CPU(ARMV7_CORTEX_A17,	0x505,	"ARMv7 Cortex A17")	\
 	__PMC_CPU(ARMV8_CORTEX_A53,	0x600,	"ARMv8 Cortex A53")	\
 	__PMC_CPU(ARMV8_CORTEX_A57,	0x601,	"ARMv8 Cortex A57")	\
-	__PMC_CPU(ARMV8_CORTEX_A76,	0x602,	"ARMv8 Cortex A76")
+	__PMC_CPU(ARMV8_CORTEX_A76,	0x602,	"ARMv8 Cortex A76")	\
+	__PMC_CPU(ARMV8_RAINIER,	0x6ff,	"ARMv8 Rainier")
 
 enum pmc_cputype {
 #undef	__PMC_CPU
