@@ -103,12 +103,6 @@ init_cap_from_fragment(void *where, void * __capability data_cap,
 		cap = cheri_setbounds(cap, len);
 	}
 
-	if (perms == MORELLO_FRAG_EXECUTABLE && addend != 0) {
-		rtld_fdprintf(STDERR_FILENO,
-		    "Warning: function relocation based on fragment at %p"
-		    " has non-zero addend, which is deprecated\n", where);
-	}
-
 	cap += addend;
 
 	if (perms == MORELLO_FRAG_EXECUTABLE) {
