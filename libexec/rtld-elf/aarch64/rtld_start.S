@@ -101,10 +101,6 @@ END(.rtld_start)
  * x17 = &_rtld_bind_start
  */
 ENTRY(_rtld_bind_start)
-#ifdef __CHERI_PURE_CAPABILITY__
-	/* Currently unused and unimplemented for pure-capability code */
-	brk #0x1
-#else /* defined(__CHERI_PURE_CAPABILITY__) */
 	.cfi_startproc
 	mov	PTR(17), PTRN(sp)
 
@@ -176,7 +172,6 @@ ENTRY(_rtld_bind_start)
 	/* Call into the correct function */
 	br	PTR(16)
 	.cfi_endproc
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_bind_start)
 
 /*

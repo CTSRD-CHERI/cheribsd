@@ -346,8 +346,8 @@ reloc_gnu_ifunc(Obj_Entry *obj __unused, int flags __unused,
 	return (0);
 }
 
-static inline Elf_Addr
-reloc_jmpslot(Elf_Addr *where __unused, Elf_Addr target, const Obj_Entry *defobj __unused,
+static inline uintptr_t
+reloc_jmpslot(uintptr_t *where __unused, uintptr_t target, const Obj_Entry *defobj __unused,
     const Obj_Entry *obj __unused, const Elf_Rel *rel __unused)
 {
 	_rtld_error("%s: not implemented!", __func__);

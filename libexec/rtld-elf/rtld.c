@@ -274,7 +274,7 @@ func_ptr_type _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp
 #else
 func_ptr_type _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp);
 #endif
-Elf_Addr _rtld_bind(Obj_Entry *obj, Elf_Size reloff);
+uintptr_t _rtld_bind(Obj_Entry *obj, Elf_Size reloff);
 
 
 int npagesizes;
@@ -990,14 +990,14 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
  * NB: MIPS uses a private version of this function (_mips_rtld_bind).
  * Changes to this function should be applied there as well.
  */
-Elf_Addr
+uintptr_t
 _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 {
     const Elf_Rel *rel;
     const Elf_Sym *def;
     const Obj_Entry *defobj;
-    Elf_Addr *where;
-    Elf_Addr target;
+    uintptr_t *where;
+    uintptr_t target;
     RtldLockState lockstate;
 
     rlock_acquire(rtld_bind_lock, &lockstate);
@@ -1008,19 +1008,23 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
     else
 	rel = (const Elf_Rel *)((const char *)obj->pltrela + reloff);
 
-    where = (Elf_Addr *)(obj->relocbase + rel->r_offset);
+    where = (uintptr_t *)(obj->relocbase + rel->r_offset);
     def = find_symdef(ELF_R_SYM(rel->r_info), obj, &defobj, SYMLOOK_IN_PLT,
 	NULL, &lockstate);
     if (def == NULL)
 	rtld_die();
     if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC)
-	target = (Elf_Addr)rtld_resolve_ifunc(defobj, def);
+	target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
     else
-	target = (Elf_Addr)(defobj->relocbase + def->st_value);
+#ifdef __CHERI_PURE_CAPABILITY__
+	target = (uintptr_t)make_function_pointer(def, defobj);
+#else
+	target = (uintptr_t)(defobj->relocbase + def->st_value);
+#endif
 
     dbg("\"%s\" in \"%s\" ==> %p in \"%s\"",
       defobj->strtab + def->st_name, basename(obj->path),
-      (void *)(uintptr_t)target, basename(defobj->path));
+      (void *)target, basename(defobj->path));
 
     /*
      * Write the new contents for the jmpslot. Note that depending on
@@ -1365,7 +1369,7 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    break;
 
 	case DT_PLTGOT:
-	    obj->pltgot = (Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr);
+	    obj->pltgot = (uintptr_t *)(obj->relocbase + dynp->d_un.d_ptr);
 	    break;
 
 	case DT_TEXTREL:
