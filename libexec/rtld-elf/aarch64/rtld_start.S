@@ -106,64 +106,75 @@ ENTRY(_rtld_bind_start)
 	brk #0x1
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	.cfi_startproc
-	mov	x17, sp
+	mov	PTR(17), PTRN(sp)
 
 	/* Save frame pointer and SP */
-	stp	x29, x30, [sp, #-16]!
-	mov	x29, sp
-	.cfi_def_cfa x29, 16
-	.cfi_offset x30, -8
-	.cfi_offset x29, -16
+	stp	PTR(29), PTR(30), [PTRN(sp), #-(PTR_WIDTH * 2)]!
+	mov	PTR(29), PTRN(sp)
+	.cfi_def_cfa PTR(29), (PTR_WIDTH * 2)
+	.cfi_offset PTR(30), -(PTR_WIDTH * 1)
+	.cfi_offset PTR(29), -(PTR_WIDTH * 2)
 
 	/* Save the arguments */
-	stp	x0, x1, [sp, #-16]!
-	stp	x2, x3, [sp, #-16]!
-	stp	x4, x5, [sp, #-16]!
-	stp	x6, x7, [sp, #-16]!
-	stp	x8, xzr, [sp, #-16]!
+	stp	CAP(0), CAP(1), [PTRN(sp), #-(CAP_WIDTH * 2)]!
+	stp	CAP(2), CAP(3), [PTRN(sp), #-(CAP_WIDTH * 2)]!
+	stp	CAP(4), CAP(5), [PTRN(sp), #-(CAP_WIDTH * 2)]!
+	stp	CAP(6), CAP(7), [PTRN(sp), #-(CAP_WIDTH * 2)]!
+	stp	CAP(8), CAP(zr), [PTRN(sp), #-(CAP_WIDTH * 2)]!
 
 	/* Save any floating-point arguments */
-	stp	q0, q1, [sp, #-32]!
-	stp	q2, q3, [sp, #-32]!
-	stp	q4, q5, [sp, #-32]!
-	stp	q6, q7, [sp, #-32]!
+	stp	q0, q1, [PTRN(sp), #-32]!
+	stp	q2, q3, [PTRN(sp), #-32]!
+	stp	q4, q5, [PTRN(sp), #-32]!
+	stp	q6, q7, [PTRN(sp), #-32]!
 
-	/* Calculate reloff */
-	ldr	x2, [x17, #0]	/* Get the address of the entry */
-	sub	x1, x2, x16	/* Find its offset */
-	sub	x1, x1, #8	/* Adjust for x16 not being at offset 0 */
-	/* Each rela item has 3 entriesso we need reloff = 3 * index */
-	lsl	x3, x1, #1	/* x3 = 2 * offset */
-	add	x1, x1, x3	/* x1 = x3 + offset = 3 * offset */
+	/*
+	 * Calculate gotoff and reloff. We have &GOT[x + 3] on the stack and
+	 * &GOT[2], which gives x = &GOT[x + 3] - &GOT[2] - 1. We do our
+	 * calculations still scaled by PTR_WIDTH and then re-scale to be
+	 * reloff. Each Elf64_Rela is 24 bytes and each .plt.got entry is a
+	 * single pointer, so we need to multiply by either 3 or 1.5 depending
+	 * on whether this is a pure-capability ABI in order to turn it into
+	 * reloff.
+	 */
+	ldr	PTR(2), [PTR(17), #0]	/* Get the address of the entry */
+	sub	x1, x2, x16		/* Find its offset from &GOT[2] */
+	sub	x1, x1, #PTR_WIDTH	/* Turn into an offset from &GOT[3] */
+#ifdef __CHERI_PURE_CAPABILITY__
+	lsr	x3, x1, #1		/* x3 = offset / 2 */
+#else
+	lsl	x3, x1, #1		/* x3 = 2 * offset */
+#endif
+	add	x1, x1, x3		/* reloff = x3 + offset = (3 or 1.5) * offset */
 
 	/* Load obj */
-	ldr	x0, [x16, #-8]
+	ldr	PTR(0), [PTR(16), #-PTR_WIDTH]
 
 	/* Call into rtld */
 	bl	_rtld_bind
 
 	/* Backup the address to branch to */
-	mov	x16, x0
+	mov	PTR(16), PTR(0)
 
 	/* restore the arguments */
-	ldp	q6, q7, [sp], #32
-	ldp	q4, q5, [sp], #32
-	ldp	q2, q3, [sp], #32
-	ldp	q0, q1, [sp], #32
-	ldp	x8, xzr, [sp], #16
-	ldp	x6, x7, [sp], #16
-	ldp	x4, x5, [sp], #16
-	ldp	x2, x3, [sp], #16
-	ldp	x0, x1, [sp], #16
+	ldp	q6, q7, [PTRN(sp)], #32
+	ldp	q4, q5, [PTRN(sp)], #32
+	ldp	q2, q3, [PTRN(sp)], #32
+	ldp	q0, q1, [PTRN(sp)], #32
+	ldp	CAP(8), CAP(zr), [PTRN(sp)], #(CAP_WIDTH * 2)
+	ldp	CAP(6), CAP(7), [PTRN(sp)], #(CAP_WIDTH * 2)
+	ldp	CAP(4), CAP(5), [PTRN(sp)], #(CAP_WIDTH * 2)
+	ldp	CAP(2), CAP(3), [PTRN(sp)], #(CAP_WIDTH * 2)
+	ldp	CAP(0), CAP(1), [PTRN(sp)], #(CAP_WIDTH * 2)
 
 	/* Restore frame pointer */
-	ldp	x29, xzr, [sp], #16
+	ldp	PTR(29), PTR(zr), [PTRN(sp)], #(PTR_WIDTH * 2)
 
 	 /* Restore link register saved by the plt code */
-	ldp	xzr, x30, [sp], #16
+	ldp	PTR(zr), PTR(30), [PTRN(sp)], #(PTR_WIDTH * 2)
 
 	/* Call into the correct function */
-	br	x16
+	br	PTR(16)
 	.cfi_endproc
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_bind_start)
