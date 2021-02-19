@@ -507,7 +507,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 {
 	const Elf_Rel *rel;
 	const Elf_Rel *rellim;
-	Elf_Addr *got = obj->pltgot;
+	Elf_Addr *got = (Elf_Addr *)obj->pltgot;
 	const Elf_Sym *sym, *def;
 	const Obj_Entry *defobj;
 	Elf_Word i;
@@ -634,7 +634,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		++got;
 	}
 
-	got = obj->pltgot;
+	got = (Elf_Addr *)obj->pltgot;
 	rellim = (const Elf_Rel *)((const char *)obj->rel + obj->relsize);
 	for (rel = obj->rel; rel < rellim; rel++) {
 		Elf_Word	r_symndx, r_type;
