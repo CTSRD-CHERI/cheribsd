@@ -233,7 +233,7 @@ typedef struct Struct_Obj_Entry {
     size_t relro_size;
 
     /* Items from the dynamic section. */
-    Elf_Addr *pltgot;		/* PLT or GOT, depending on architecture */
+    uintptr_t *pltgot;		/* PLT or GOT, depending on architecture */
     const Elf_Rel *rel;		/* Relocation entries */
     unsigned long relsize;	/* Size in bytes of relocation info */
     const Elf_Rela *rela;	/* Relocation entries with addend */
