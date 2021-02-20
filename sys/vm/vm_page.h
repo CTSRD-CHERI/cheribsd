@@ -888,6 +888,25 @@ vm_page_aflag_set(vm_page_t m, uint16_t bits)
 }
 
 /*
+ * When attempting to map the page m with permissions prot, it's possible that
+ * we need to inhibit capability stores as part of capdirty tracking.  Pages
+ * lacking PGA_CAPSTORE are known not to contain capabilities and must go
+ * through the vm fault machinery even if the permissions dictated by the entry
+ * (->protection) and object (->flags & OBJ_HASCAP) containing this page
+ * nominally authorize capability store.
+ */
+static inline vm_prot_t
+vm_page_mask_cap_prot(vm_page_t m, vm_prot_t prot)
+{
+
+	if (vm_page_astate_load(m).flags & PGA_CAPSTORE) {
+		return prot;
+	} else {
+		return prot & ~VM_PROT_WRITE_CAP;
+	}
+}
+
+/*
  *	vm_page_dirty:
  *
  *	Set all bits in the page's dirty field.
