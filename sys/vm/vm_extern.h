@@ -101,9 +101,9 @@ int vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 int vm_forkproc(struct thread *, struct proc *, struct thread *,
     struct vmspace *, int);
 void vm_waitproc(struct proc *);
-int vm_mmap(vm_map_t, vm_offset_t *, vm_size_t, vm_prot_t, vm_prot_t, int,
+int vm_mmap(vm_map_t, vm_pointer_t *, vm_size_t, vm_prot_t, vm_prot_t, int,
     objtype_t, void *, vm_ooffset_t);
-int vm_mmap_object(vm_map_t, vm_offset_t *, vm_offset_t, vm_size_t,
+int vm_mmap_object(vm_map_t, vm_pointer_t *, vm_offset_t, vm_size_t,
     vm_prot_t, vm_prot_t, int, vm_object_t, vm_ooffset_t, boolean_t,
     struct thread *);
 int vm_mmap_to_errno(int rv);
