@@ -348,7 +348,7 @@ struct ctl_scsiio {
 #ifdef _KERNEL
 		void * __kerncap _dummy0;
 #endif
-		int (*be_move_done)(union ctl_io *io); /* called by fe */
+		int (*be_move_done)(union ctl_io *io, bool samethr); /* called by fe */
 	};
 	union {
 #ifdef _KERNEL
