@@ -203,27 +203,9 @@
 #define	SAVE_U_PCB_REG(reg, offs, base)				\
 	csd	reg, zero, (U_PCB_REGS + (SZREG * offs)) (base)
 
-/*
- * Save general purpose register to PCB, with an offset that does
- * not fit the immediate in the csd instruction.
- *
- * reg: general purpose register
- * treg: temporary general purpose register
- * offs: immediate offset in the PCB
- * base: capability pointing to the PCB
- */
-#define	SAVE_U_PCB_REG_FAR(reg, treg, offs, base)		\
-	REG_LI	treg, (U_PCB_REGS + (SZREG * offs));		\
-	csd	reg, treg, 0(base)
-
 /* See SAVE_U_PCB_REG */
 #define	RESTORE_U_PCB_REG(reg, offs, base)			\
 	cld	reg, zero, (U_PCB_REGS + (SZREG * offs)) (base)
-
-/* See SAVE_U_PCB_REG_FAR */
-#define	RESTORE_U_PCB_REG_FAR(reg, treg, offs, base)		\
-	REG_LI	treg, (U_PCB_REGS + (SZREG * offs));		\
-	cld	reg, treg, 0(base)
 
 /*
  * Save general purpose capability register to PCB.
