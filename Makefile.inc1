@@ -2571,6 +2571,9 @@ ${_bt}-usr.sbin/config: ${_bt}-usr.bin/file2c ${_bt_lex_depend}
 # since "make" will usually point to GNU make there.
 _other_bootstrap_tools+=usr.bin/bmake
 
+_other_bootstrap_tools+=lib/ncurses/ncurses
+${_bt}-usr.bin/ncurses: ${_bt}-lib/ncurses/ncurses
+
 # Avoid dependency on host bz2 headers:
 _other_bootstrap_tools+=lib/libbz2
 ${_bt}-usr.bin/grep: ${_bt}-lib/libbz2
@@ -2617,6 +2620,7 @@ bootstrap-tools: ${_bt}-links .PHONY
     lib/libopenbsd \
     usr.bin/mandoc \
     usr.bin/rpcgen \
+    lib/ncurses/ncurses \
     ${_yacc} \
     ${_m4} \
     ${_lex} \
@@ -2631,6 +2635,7 @@ bootstrap-tools: ${_bt}-links .PHONY
     ${_nmtree} \
     ${_vtfontcvt} \
     ${_localedef} \
+    usr.bin/ncurses \
     ${LOCAL_BSTOOL_DIRS}
 ${_bt}-${_tool}: ${_bt}-links .PHONY .MAKE
 	${_+_}@${ECHODIR} "===> ${_tool} (obj,all,install)"; \
@@ -2652,6 +2657,9 @@ ${_bt}-usr.bin/xinstall: ${_bt}-lib/libmd
 ${_bt}-sbin/md5: ${_bt}-lib/libmd
 .endif
 
+if target(${_bt}-usr.bin/ncurses)
+${_bt}-usr.bin/ncurses: ${_bt}-lib/ncurses/ncurses
+.endif
 
 .if target(${_bt}-bin/sh)
 ${_bt}-bin/sh: ${_bt}-usr.bin/mktemp ${_bt}-usr.bin/awk ${_bt}-usr.bin/sed ${_bt}-usr.bin/grep
