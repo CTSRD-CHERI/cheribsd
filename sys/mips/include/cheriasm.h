@@ -91,33 +91,6 @@
 #define	CHERI_REG_CCALLCODE	$c1
 #define	CHERI_REG_CCALLDATA	$c2
 
-
-#ifdef __CHERI_PURE_CAPABILITY__
-
-#define	CHERI_EXCEPTION_KR2C_ENTER
-
-#define	CHERI_EXCEPTION_KR2C_RETURN
-
-#else
-
-/*
- * KR2C is used to preserve the user DDC when
- * the exception occurs in user mode.
- */
-#define	CHERI_EXCEPTION_KR2C_ENTER				\
-	/* Save user $ddc in $kr2c. */					\
-	cgetdefault	CHERI_REG_KSCRATCH;				\
-	csetkr2c	CHERI_REG_KSCRATCH;				\
-	/* Install kernel $ddc. */					\
-	cgetkdc		CHERI_REG_KSCRATCH;				\
-	csetdefault	CHERI_REG_KSCRATCH
-
-#define	CHERI_EXCEPTION_KR2C_RETURN				\
-	/* If returning to userspace, restore saved user $ddc. */	\
-	cgetkr2c	CHERI_REG_KSCRATCH;				\
-	csetdefault	CHERI_REG_KSCRATCH
-#endif
-
 /*
  * Assembly code to be used in CHERI exception handling and context switching.
  *
@@ -127,12 +100,8 @@
  * purposes of querying CP0 SR to determine whether the target is userspace or
  * the kernel.
  *
- * kr1c is clobbered.
+ * kr1c is clobbered and used to save the preempted KSCRATCH register.
  * kr2c is used to save the user ddc.
- *
- * In the pure capability kernel instead
- * kr1c is used to save the preempted KSCRATCH register.
- * KSCRATCH can be clobbered afterwards
  */
 #define	CHERI_EXCEPTION_ENTER(reg)					\
 	mfc0	reg, MIPS_COP_0_STATUS;					\
@@ -141,7 +110,12 @@
 	nop;								\
 	/* Save user $c27. */						\
 	csetkr1c	CHERI_REG_KSCRATCH;				\
-	CHERI_EXCEPTION_KR2C_ENTER;					\
+	/* Save user $ddc in $kr2c. */					\
+	cgetdefault	CHERI_REG_KSCRATCH;				\
+	csetkr2c	CHERI_REG_KSCRATCH;				\
+	/* Install kernel $ddc. */					\
+	cgetkdc		CHERI_REG_KSCRATCH;				\
+	csetdefault	CHERI_REG_KSCRATCH;				\
 	/* Restore user $c27. */					\
 	cgetkr1c	CHERI_REG_KSCRATCH;				\
 64:
@@ -161,10 +135,6 @@
  *
  * kr1c is clobbered.
  * kr2c is assumed to hold the user ddc.
- *
- * In the pure capability kernel instead
- * KSCRATCH is assumed to hold the preempted KSCRATCH register
- * kr1c is clobbered.
  */
 #define	CHERI_EXCEPTION_RETURN(reg)					\
 	/* Save $c27 in $kr1c. */					\
@@ -173,7 +143,9 @@
 	andi	reg, reg, MIPS_SR_KSU_USER;				\
 	beq	reg, $0, 65f;						\
 	nop;								\
-	CHERI_EXCEPTION_KR2C_RETURN;					\
+	/* If returning to userspace, restore saved user $ddc. */	\
+	cgetkr2c	CHERI_REG_KSCRATCH;				\
+	csetdefault	CHERI_REG_KSCRATCH;				\
 65:									\
 	/* Restore $c27. */						\
 	cgetkr1c	CHERI_REG_KSCRATCH;
@@ -242,16 +214,14 @@
 	/* c27 was saved in kr1c */					\
 	cgetkr1c	CHERI_REG_C1;					\
 	SAVE_U_PCB_CREG(CHERI_REG_C1, C27, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C1, C28, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C28, C28, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\
 	/* Save special registers after KSCRATCH regs */		\
-	/* User DDC is still installed. */				\
-	cgetdefault	CHERI_REG_C1;					\
+	/* User DDC was saved in kr2c. */				\
+	cgetkr2c	CHERI_REG_C1;					\
 	SAVE_U_PCB_CREG(CHERI_REG_C1, DDC, pcb);			\
-	csetdefault	$cnull;						\
 	cgetcause	treg;						\
 	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb);				\
 	/* EPCC is saved last so that it can be read from KSCRATCH */	\
@@ -268,7 +238,7 @@
 #define	RESTORE_CREGS_FROM_PCB(pcb, treg)				\
 	/* Restore special registers before KSCRATCH (C27) */		\
 	RESTORE_U_PCB_CREG(CHERI_REG_C1, DDC, pcb);			\
-	csetdefault	CHERI_REG_C1;					\
+	csetkr2c	CHERI_REG_C1;					\
 	RESTORE_U_PCB_CREG(CHERI_REG_C2, C2, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C3, C3, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C4, C4, pcb);			\
