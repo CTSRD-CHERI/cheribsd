@@ -153,22 +153,9 @@ VECTOR(_locore, unknown)
 	 */
 	cgetdefault	$c28
 
-	/*
-	 * Set up global pointer.
-	 */
-	ABSRELOC_LA(t0, _C_LABEL(__cap_table_start))
-	csetoffset CHERI_REG_GPC, $c28, t0
-	ABSRELOC_LA(t1, _C_LABEL(__cap_table_end))
-	LONG_SUBU t0, t1, t0
-	csetbounds CHERI_REG_GPC, CHERI_REG_GPC, t0
-	REG_LI	t0, (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
-	candperm CHERI_REG_GPC, CHERI_REG_GPC, t0
-
-	/* Preserve a copy in KDC for exception handlers. */
-	csetkdc		CHERI_REG_GPC
-
-	/* Clear DDC */
+	/* Clear DDC and KDC */
 	csetdefault	$cnull
+	csetkdc		$cnull
 
 	/*
 	 * Create a reduced PCC.
@@ -234,7 +221,7 @@ VECTOR(_locore, unknown)
 
 	/* Clear most remaining capabilities */
 	cclearlo	0xf7ff	# keep c11
-	cclearhi	0x9bff	# keep c26, c29, c30
+	cclearhi	0x9fff	# keep c29, c30
 
 	/* Call the platform-specific startup code. */
 	move a0, s0

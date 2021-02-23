@@ -72,7 +72,6 @@
 #define	CHERI_REG_C27	$c27
 #define	CHERI_REG_KSCRATCH CHERI_REG_C27 /* Kernel scratch capability. */
 #define	CHERI_REG_C28	$c28
-#define CHERI_REG_KSCRATCH2 CHERI_REG_GPC /* Second kernel scratch capability */
 #define	CHERI_REG_C29	$c29	/* Former Kernel code capability. */
 #define	CHERI_REG_C30	$c30	/* Former Kernel data capability. */
 #define	CHERI_REG_C31	$c31	/* Former Exception program counter cap. */
@@ -95,18 +94,9 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 
-/*
- * KR2C is used to preserve a second scratch register KSCRATCH2 when
- * the exception occurs in user mode.
- * Note that KSCRATCH2 is aliased to GPC so we install the kernel GP
- * here as well.
- */
-#define	CHERI_EXCEPTION_KR2C_ENTER				\
-	csetkr2c	CHERI_REG_KSCRATCH2;				\
-	cgetkdc		CHERI_REG_KSCRATCH2
+#define	CHERI_EXCEPTION_KR2C_ENTER
 
-#define	CHERI_EXCEPTION_KR2C_RETURN	\
-	cgetkr2c	CHERI_REG_KSCRATCH2
+#define	CHERI_EXCEPTION_KR2C_RETURN
 
 #else
 
@@ -141,8 +131,8 @@
  * kr2c is used to save the user ddc.
  *
  * In the pure capability kernel instead
- * kr1c is clobbered.
- * kr2c is used to save the user gpc and the kernel gpc is installed.
+ * kr1c is used to save the preempted KSCRATCH register.
+ * KSCRATCH can be clobbered afterwards
  */
 #define	CHERI_EXCEPTION_ENTER(reg)					\
 	mfc0	reg, MIPS_COP_0_STATUS;					\
@@ -173,8 +163,8 @@
  * kr2c is assumed to hold the user ddc.
  *
  * In the pure capability kernel instead
+ * KSCRATCH is assumed to hold the preempted KSCRATCH register
  * kr1c is clobbered.
- * kr2c is assumed to hold the user gpc.
  */
 #define	CHERI_EXCEPTION_RETURN(reg)					\
 	/* Save $c27 in $kr1c. */					\
@@ -218,7 +208,6 @@
  * In the purecap kernel the pcb pointer is in KSCRATCH, so we can not use
  * it as another scratch register.
  * KR1C holds the saved KSCRATCH value so we can not use it either.
- * KR2C holds the saved GPC and KSCRATCH2 holds the kernel GP.
  * We use C1 as an extra scratch register.
  * Unlike kernel context switches, we both save and restore
  * the capability cause register.
@@ -249,9 +238,7 @@
 	SAVE_U_PCB_CREG(CHERI_REG_C23, C23, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
-	/* c26 was saved in kr2c */					\
-	cgetkr2c	CHERI_REG_C1;					\
-	SAVE_U_PCB_CREG(CHERI_REG_C1, IDC, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
 	/* c27 was saved in kr1c */					\
 	cgetkr1c	CHERI_REG_C1;					\
 	SAVE_U_PCB_CREG(CHERI_REG_C1, C27, pcb);			\
@@ -273,8 +260,8 @@
 	cmove		CHERI_REG_KSCRATCH, CHERI_REG_C1
 
 /*
- * Restore state from PCB. Assume that pcb is pointed to by KSCRATCH
- * and KSCRATCH2 is the kernel GP. We use C1 as an extra scratch register.
+ * Restore state from PCB. Assume that pcb is pointed to by KSCRATCH.
+ * We use C1 as an extra scratch register.
  * pcb: capability register pointing to the pcb
  * treg: scratch register (non capability)
  */
@@ -306,9 +293,7 @@
 	RESTORE_U_PCB_CREG(CHERI_REG_C23, C23, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
-	/* Restore KSCRATCH2 value in kr2c for EXCEPTION_RETURN */	\
-	RESTORE_U_PCB_CREG(CHERI_REG_C1, IDC, pcb);			\
-	csetkr2c	CHERI_REG_C1;					\
+	RESTORE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
 	/* Restore KSCRATCH in kr1c for EXCEPTION_RETURN */		\
 	RESTORE_U_PCB_CREG(CHERI_REG_C1, C27, pcb);			\
 	csetkr1c	CHERI_REG_C1;					\
