@@ -855,8 +855,8 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	and	a1, a1, ~MIPS_SR_INT_MASK
 	or	a1, a1, a0
 	SAVE_U_PCB_REG(a1, SR, CHERI_REG_KSCRATCH)
-	/* This also sets k0 from PCB */
-	RESTORE_REGS_FROM_PCB(CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH2)
+	/* This also sets k0 from PCB, trash $c1 as temporary register */
+	RESTORE_REGS_FROM_PCB(CHERI_REG_KSCRATCH, $c1)
 	/*
 	 * Note: This does not restore EPCC, since that is restored by
 	 * RESTORE_U_PCB_PC() (inside RESTORE_REGS_FROM_PCB) above.
@@ -1095,7 +1095,7 @@ END(MipsKernIntr)
 	SAVE_U_PCB_REG(a0, SR, pcb);			\
 	SAVE_U_PCB_REG(a1, CAUSE, pcb)
 
-/* Note: this trashes KSCRATCH2 */
+/* Note: this trashes $c1, used at temporary */
 #define RESTORE_UINTR_PCB_REGS(pcb)			\
 	RESTORE_U_PCB_REG(s0, S0, pcb);			\
 	RESTORE_U_PCB_REG(s1, S1, pcb);			\
@@ -1111,7 +1111,7 @@ END(MipsKernIntr)
 	mtlo	t0;					\
 	mthi	t1;					\
 	/* set return address */			\
-	RESTORE_U_PCB_PC(CHERI_REG_KSCRATCH2, pcb);	\
+	RESTORE_U_PCB_PC($c1, pcb);			\
 	RESTORE_U_PCB_REG(v0, V0, pcb);			\
 	RESTORE_U_PCB_REG(v1, V1, pcb);			\
 	RESTORE_U_PCB_REG(a0, A0, pcb);			\
