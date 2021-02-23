@@ -443,10 +443,6 @@ SlowFault:
 #define	SAVE_CREG(creg, offs)					\
 	csc	creg, zero, (CALLFRAME_SIZ + (SZREG * offs))(CHERI_REG_STC)
 
-#define	SAVE_CAPCAUSE(reg, treg, offs)				\
-	REG_LI	treg, (CALLFRAME_SIZ + (SZREG * offs));		\
-	csd	reg, treg, 0(CHERI_REG_STC)
-
 /*
  * Note that this is used only for kernel-generated exceptions.
  *
@@ -459,7 +455,7 @@ SlowFault:
  * We save these here to keep KR1C, KR2C, KSCRATCH and
  * KSCRATCH1 usable, and to keep the trapframe consistent.
  */
-#define	SAVE_CHERI(treg0, treg1)		\
+#define	SAVE_CHERI(treg0)			\
 	SAVE_CREG(CHERI_REG_C1, C1);		\
 	SAVE_CREG(CHERI_REG_C2, C2);		\
 	SAVE_CREG(CHERI_REG_C3, C3);		\
@@ -500,7 +496,7 @@ SlowFault:
 	CGetDefault CHERI_REG_KSCRATCH;		\
 	SAVE_CREG(CHERI_REG_KSCRATCH, DDC);	\
 	cgetcause	treg0;			\
-	SAVE_CAPCAUSE(treg0, treg1, CAPCAUSE)
+	SAVE_REG(treg0, CAPCAUSE)
 
 /*
  * Save CPU and CP0 register state when taking an exception in kernel mode.
@@ -577,7 +573,7 @@ SlowFault:
 	SAVE_REG(a1, CAUSE)		;\
 	SAVE_REG(a2, BADVADDR)		;\
 	/* SAVE_CHERI saves $epcc */	;\
-	SAVE_CHERI(t0, t1)		;\
+	SAVE_CHERI(t0)			;\
 	SAVE_EPC_REG(a3, CHERI_REG_KSCRATCH);\
 	SAVE_REG(ra, RA)		;\
 	SAVE_REG(sp, SP)	/* Notice: store sp as a normal register. */;\
@@ -792,7 +788,7 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	GET_CPU_PCPU_2(CHERI_REG_KSCRATCH, k0)	# get pcpu pointer
 	clc	CHERI_REG_KSCRATCH, zero, PC_CURPCB(CHERI_REG_KSCRATCH)
 	SAVE_REGS_TO_PCB(CHERI_REG_KSCRATCH)
-	SAVE_CREGS_TO_PCB(CHERI_REG_KSCRATCH, t0, t1)
+	SAVE_CREGS_TO_PCB(CHERI_REG_KSCRATCH, t0)
 	/* Switch to kernel stack, use c3 as scratch reg */
 	GET_CPU_PCPU($c3)
 	/* get top of the stack from pcpu */
@@ -1146,7 +1142,7 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	GET_CPU_PCPU_2(CHERI_REG_KSCRATCH, k0)
 	clc CHERI_REG_KSCRATCH, zero, PC_CURPCB(CHERI_REG_KSCRATCH)
 	SAVE_UINTR_PCB_REGS(CHERI_REG_KSCRATCH)
-	SAVE_CREGS_TO_PCB(CHERI_REG_KSCRATCH, t0, t1)
+	SAVE_CREGS_TO_PCB(CHERI_REG_KSCRATCH, t0)
 	/* Switch to kernel stack from pcpu, use c3 as scratch reg */
 	GET_CPU_PCPU($c3)
 	clc CHERI_REG_STC, zero, PC_KSTACK_CAP($c3)

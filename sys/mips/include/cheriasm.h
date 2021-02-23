@@ -150,41 +150,17 @@
 	/* Restore $c27. */						\
 	cgetkr1c	CHERI_REG_KSCRATCH;
 
-#ifndef __CHERI_PURE_CAPABILITY__
-
 /*
- * Capcause access to PCB
- */
-#define	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)	\
-	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb)
-#define	RESTORE_CAPCAUSE_FROM_PCB(treg, pcb)	\
-	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb)
-
-#else /* __CHERI_PURE_CAPABILITY__ */
-
-/*
- * Capcause offset is too large for CHERI256 in this case and does not
- * fit in the csd immediate offset.
- */
-#define	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)	\
-	SAVE_U_PCB_REG_FAR(treg, treg2, CAPCAUSE, pcb)
-#define	RESTORE_CAPCAUSE_FROM_PCB(treg, pcb)		\
-	RESTORE_U_PCB_REG_FAR(treg, treg, CAPCAUSE, pcb)
-
-#endif /* __CHERI_PURE_CAPABILITY__ */
-
-#ifdef __CHERI_PURE_CAPABILITY__
-
-/*
- * Save and restore user CHERI state on an exception.
- * In the purecap kernel the pcb pointer is in KSCRATCH, so we can not use
- * it as another scratch register.
- * KR1C holds the saved KSCRATCH value so we can not use it either.
- * We use C1 as an extra scratch register.
- * Unlike kernel context switches, we both save and restore
+ * Save and restore user CHERI state on an exception.  Assumes that $ddc has
+ * already been moved to $krc2, and that if we write $krc2, it will get moved
+ * to $ddc later. Unlike kernel context switches, we both save and restore
  * the capability cause register.
+ *
+ * Note: EPCC is saved last so CHERI_REG_KSCRATCH will contain $epcc
+ *
+ * XXXRW: We should in fact also do this for the kernel version?
  */
-#define	SAVE_CREGS_TO_PCB(pcb, treg, treg2)				\
+#define	SAVE_CREGS_TO_PCB(pcb, treg)					\
 	SAVE_U_PCB_CREG(CHERI_REG_C1, C1, pcb);				\
 	SAVE_U_PCB_CREG(CHERI_REG_C2, C2, pcb);				\
 	SAVE_U_PCB_CREG(CHERI_REG_C3, C3, pcb);				\
@@ -223,9 +199,9 @@
 	cgetkr2c	CHERI_REG_C1;					\
 	SAVE_U_PCB_CREG(CHERI_REG_C1, DDC, pcb);			\
 	cgetcause	treg;						\
-	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb);				\
+	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb);				\
 	/* EPCC is saved last so that it can be read from KSCRATCH */	\
-	CGetEPCC	CHERI_REG_C1;					\
+	cgetepcc	CHERI_REG_C1;					\
 	SAVE_U_PCB_CREG(CHERI_REG_C1, PCC, pcb);			\
 	cmove		CHERI_REG_KSCRATCH, CHERI_REG_C1
 
@@ -271,104 +247,9 @@
 	RESTORE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\
-	RESTORE_CAPCAUSE_FROM_PCB(treg, pcb);				\
+	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb);				\
 	csetcause	treg;						\
 	RESTORE_U_PCB_CREG(CHERI_REG_C1, C1, pcb)
-
-#else /* ! __CHERI_PURE_CAPABILITY__ */
-
-/*
- * Save and restore user CHERI state on an exception.  Assumes that $ddc has
- * already been moved to $krc2, and that if we write $krc2, it will get moved
- * to $ddc later.  Unlike kernel context switches, we both save and restore
- * the capability cause register.
- *
- * Note: EPCC is saved last so CHERI_REG_KSCRATCH will contain $epcc
- *
- * XXXRW: We should in fact also do this for the kernel version?
- */
-#define	SAVE_CREGS_TO_PCB(pcb, treg)					\
-	SAVE_U_PCB_CREG(CHERI_REG_C1, C1, pcb);				\
-	SAVE_U_PCB_CREG(CHERI_REG_C2, C2, pcb);				\
-	SAVE_U_PCB_CREG(CHERI_REG_C3, C3, pcb);				\
-	SAVE_U_PCB_CREG(CHERI_REG_C4, C4, pcb);				\
-	SAVE_U_PCB_CREG(CHERI_REG_C5, C5, pcb);				\
-	SAVE_U_PCB_CREG(CHERI_REG_C6, C6, pcb);				\
-	SAVE_U_PCB_CREG(CHERI_REG_C7, C7, pcb);				\
-	SAVE_U_PCB_CREG(CHERI_REG_C8, C8, pcb);				\
-	SAVE_U_PCB_CREG(CHERI_REG_C9, C9, pcb);				\
-	SAVE_U_PCB_CREG(CHERI_REG_C10, C10, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_STC, STC, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C12, C12, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C13, C13, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C14, C14, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C15, C15, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C16, C16, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C17, C17, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C18, C18, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C19, C19, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C20, C20, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C21, C21, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C22, C22, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C23, C23, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C27, C27, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C28, C28, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\
-	/* Save special registers after KSCRATCH (C27) */		\
-	/* User DDC is saved in $kr2c. */				\
-	CGetKR2C	CHERI_REG_KSCRATCH;				\
-	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH, DDC, pcb);			\
-	cgetcause	treg;						\
-	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb);				\
-	/* EPCC is saved last so that it can be read from KSCRATCH */	\
-	CGetEPCC	CHERI_REG_KSCRATCH;				\
-	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb)
-
-#define	RESTORE_CREGS_FROM_PCB(pcb, treg)				\
-	/* Restore special registers before KSCRATCH (C27) */		\
-	/* User DDC is saved in $kr2c. */				\
-	RESTORE_U_PCB_CREG(CHERI_REG_KSCRATCH, DDC, pcb);		\
-	CSetKR2C	CHERI_REG_KSCRATCH;				\
-	RESTORE_U_PCB_CREG(CHERI_REG_C1, C1, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C2, C2, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C3, C3, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C4, C4, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C5, C5, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C6, C6, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C7, C7, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C8, C8, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C9, C9, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C10, C10, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_STC, STC, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C12, C12, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C13, C13, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C14, C14, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C15, C15, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C16, C16, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C17, C17, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C18, C18, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C19, C19, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C20, C20, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C21, C21, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C22, C22, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C23, C23, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C27, C27, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C28, C28, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\
-	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb);				\
-	csetcause	treg
-
-#endif /* ! __CHERI_PURE_CAPABILITY__ */
 
 /*
  * Macros saving capability state to, and restoring it from, voluntary kernel
