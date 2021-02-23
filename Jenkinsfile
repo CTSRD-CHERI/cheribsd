@@ -142,6 +142,7 @@ rm -f cheribsd-sysroot.tar.xz
 # Cheribuild prior to https://github.com/CTSRD-CHERI/cheribuild/pull/180
 # created a .tar.gz archive, newer versions create a tar.xz archive.
 # Use a glob to handle both cases.
+# XXX: Replace .* with .xz once the cheribuild PR has been merged
 mv tarball/sysroot-${suffix}.tar.* cheribsd-sysroot.tar.xz
 rm -rf tarball artifacts-*
 chmod +w *.xz
