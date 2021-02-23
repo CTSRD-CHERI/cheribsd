@@ -93,7 +93,7 @@ LEAF(fork_trampoline)
 	 */
 	cmove	$c3, $c18
 	cmove	$c4, $c19
-	CAPCALL_LOAD($c12, fork_exit)
+	CAPCALL_PCREL_LOAD($c12, t0, fork_exit)
 	cjalr	$c12, $c17
 	cmove	$c5, $c20
 
@@ -311,7 +311,7 @@ mips_sw1:
 	 * If per-thread tracing is disabled, skip this block and don't muck
 	 * with emulator state.
 	 */
-	CAPTABLE_LOAD($c2, qemu_trace_perthread)	# Load address of var
+	CAPTABLE_PCREL_LOAD($c2, t0, qemu_trace_perthread)	# Load address of var
 	clw	t2, zero, 0($c2)			# Load var value
 	beqz	t2, done_qemu_tracing			# Skip if value is 0
 	nop
@@ -340,7 +340,7 @@ done_qemu_tracing:
 #endif
 
 #if defined(SMP) && defined(SCHED_ULE)
-	CAPTABLE_LOAD($c2, blocked_lock)
+	CAPTABLE_PCREL_LOAD($c2, t0, blocked_lock)
 blocked_loop:
 	clc	$c1, zero, TD_LOCK($c4)
 	ceq	t1, $c2, $c1
@@ -451,7 +451,7 @@ sw2:
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_STC, CHERIKFRAME_OFF_STC, $c19)
 	RESTORE_U_PCB_CONTEXT(sp, PCB_REG_SP, $c19)
 	// Note we have newthr in c18
-	CAPCALL_LOAD($c12, pmap_activate)
+	CAPCALL_PCREL_LOAD($c12, t0, pmap_activate)
 	cjalr	$c12, $c17
 	cmove	$c3, $c4
 /*

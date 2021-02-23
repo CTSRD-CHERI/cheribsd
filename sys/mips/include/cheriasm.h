@@ -92,23 +92,6 @@
 #define	CHERI_REG_CCALLCODE	$c1
 #define	CHERI_REG_CCALLDATA	$c2
 
-/*
- * Macro to abstract the creation of a NULL capability
- */
-#define	CHERI_NULL(reg) cmove reg, $cnull
-
-/*
- * Macro to abstract use of cmove in kernel assembly, used as a temporary
- * workaround for cmove generating CIncBase instructions on 128-bit CHERI.
- * This will be removed once all live bitfiles and toolchain have been
- * updated.
- */
-/* #if (defined(CPU_CHERI) && !defined(CPU_CHERI128)) */
-/* #define	CHERI_ASM_CMOVE(cd, cb)		cmove cd, cb */
-/* #else */
-/* XXX-AM: remove cheri-256 support */
-#define	CHERI_ASM_CMOVE(cd, cb)		cincoffset cd, cb, zero
-/* #endif */
 
 #ifdef __CHERI_PURE_CAPABILITY__
 
@@ -576,12 +559,33 @@
 #define CHERI_CLEAR_CAPHI_C31  (1 << (31 - 16))
 
 /*
- * Load symbol from capability table
+ * Helpers to load symbols from capability table
  */
-#define	CAPTABLE_LOAD(dst, sym)			\
-	clcbi dst, %captab20(sym)(CHERI_REG_GPC)
-#define	CAPCALL_LOAD(dst, sym)			\
-	clcbi dst, %capcall20(sym)(CHERI_REG_GPC)
+#define	GET_PCREL_CAPTABLE_PTR(dst, tmp)				\
+	.set push;							\
+	.set noat;							\
+	lui	tmp, %pcrel_hi(_CHERI_CAPABILITY_TABLE_-8);		\
+	daddiu	tmp, tmp, %pcrel_lo(_CHERI_CAPABILITY_TABLE_-4);	\
+	cgetpccincoffset dst, tmp;					\
+	.set pop
+
+#define	GET_ABS_CAPTABLE_PTR(dst, tmp)					\
+	ABSRELOC_LA(tmp, _CHERI_CAPABILITY_TABLE_);			\
+	cgetpccsetaddr dst, tmp
+
+#define	CAPTABLE_LOAD(dst, tableptr, sym)		\
+	clcbi dst, %captab20(sym)(tableptr)
+
+#define	CAPCALL_LOAD(dst, tableptr, sym)		\
+	clcbi dst, %capcall20(sym)(tableptr)
+
+#define	CAPTABLE_PCREL_LOAD(dst, tmp, sym)	\
+	GET_PCREL_CAPTABLE_PTR(dst, tmp);	\
+	CAPTABLE_LOAD(dst, dst, sym)
+
+#define	CAPCALL_PCREL_LOAD(dst, tmp, sym)	\
+	GET_PCREL_CAPTABLE_PTR(dst, tmp);	\
+	CAPCALL_LOAD(dst, dst, sym)
 
 /*
  * The CCall (selector 1) branch delay slot has been removed but in order to

@@ -265,11 +265,11 @@ _C_LABEL(x):
  * Macros to panic and printf from assembly language.
  */
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	PANIC(msg)				\
-	CAPTABLE_LOAD($c3, 9f);			\
-	CAPCALL_LOAD($c12, _C_LABEL(panic));	\
-	cjalr $c12, $c17;			\
-	nop;					\
+#define	PANIC(msg)					\
+	CAPTABLE_PCREL_LOAD($c3, t0, 9f);		\
+	CAPCALL_PCREL_LOAD($c12, t0, _C_LABEL(panic));	\
+	cjalr $c12, $c17;				\
+	nop;						\
 	MSG(msg)
 #else /* ! __CHERI_PURE_CAPABILITY__ */
 #define	PANIC(msg)			\
@@ -647,9 +647,13 @@ _C_LABEL(x):
 #endif	/* __mips_n32 || __mips_n64 */
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	GET_CPU_PCPU(creg)			\
-	CAPTABLE_LOAD(creg, _C_LABEL(pcpup));	\
+#define	GET_CPU_PCPU_2(creg, tmp)				\
+	CAPTABLE_PCREL_LOAD(creg, tmp, _C_LABEL(pcpup));	\
 	clc creg, zero, 0(creg)
+/*
+ * Note: This clobbers at
+ */
+#define	GET_CPU_PCPU(creg) GET_CPU_PCPU_2(creg, AT)
 #else /* ! __CHERI_PURE_CAPABILITY__ */
 #define	GET_CPU_PCPU(reg)			\
 	PTR_L	reg, _C_LABEL(pcpup)
@@ -657,19 +661,19 @@ _C_LABEL(x):
 
 #if defined(MIPS_EXC_CNTRS)
 
-#ifndef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	INC_EXCEPTION_CNTR(name)					\
+	CAPTABLE_PCREL_LOAD(CHERI_REG_KSCRATCH, k1, _C_LABEL(pcpup));	\
+	cld		k1, zero, PC_ ##name## (CHERI_REG_KSCRATCH);	\
+	daddiu		k1, k1, 1;					\
+	csd		k1, zero, PC_ ##name## (CHERI_REG_KSCRATCH)
+#else /* ! __CHERI_PURE_CAPABILITY__ */
 #define	INC_EXCEPTION_CNTR(name)				\
 	PTR_L		k1, _C_LABEL(pcpup);			\
 	PTR_L		k0, PC_ ## name ## (k1);		\
 	PTR_ADDIU	k0, k0, 1;				\
 	PTR_S		k0, PC_ ## name ## (k1)
-#else /* __CHERI_PURE_CAPABILITY__ */
-#define	INC_EXCEPTION_CNTR(name)					\
-	CAPTABLE_LOAD(CHERI_REG_KSCRATCH, _C_LABEL(pcpup));		\
-	cld		k1, zero, PC_ ##name## (CHERI_REG_KSCRATCH);	\
-	daddiu		k1, k1, 1;					\
-	csd		k1, zero, PC_ ##name## (CHERI_REG_KSCRATCH)
-#endif /* __CHERI_PURE_CAPABILITY__ */
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 
 #else /* ! defined(MIPS_EXC_CNTRS) */
 

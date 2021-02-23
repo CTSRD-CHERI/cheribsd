@@ -148,7 +148,7 @@
 	COP0_SYNC                                   ;\
 	beq	s2, zero, 4f                        ;\
 	nop                                         ;\
-	CAPCALL_LOAD($c12, _C_LABEL(ast))	    ;\
+	CAPCALL_PCREL_LOAD($c12, t0, _C_LABEL(ast)) ;\
 	cincoffset	$c3, $c3, U_PCB_REGS        ;\
 	REG_LI	t0, TRAPFRAME_SIZE                  ;\
 	cjalr	$c12, $c17                          ;\
