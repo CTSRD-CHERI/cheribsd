@@ -998,7 +998,7 @@ are_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = ifmedia_ioctl(ifp, ifr, &sc->are_ifmedia, command);
 #endif
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		error = 0;
 		break;
 	default:

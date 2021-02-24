@@ -1306,11 +1306,11 @@ stge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		mii = device_get_softc(sc->sc_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+	case SIOCSIFCAP:
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0) {
-			if ((ifr_reqcap_get(ifr) & IFCAP_POLLING) != 0) {
+			if ((ifr->ifr_reqcap & IFCAP_POLLING) != 0) {
 				error = ether_poll_register(stge_poll, ifp);
 				if (error != 0)
 					break;

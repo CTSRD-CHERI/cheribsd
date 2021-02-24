@@ -831,7 +831,6 @@ void ifr_reqcap_set(void *ifrp, int val);
 int ifr_media_get(void *ifrp);
 int ifr_mtu_get(void *ifrp);
 void ifr_mtu_set(void *ifrp, int val);
-int ifr_reqcap_get(void *ifrp);
 u_char ifr_lan_pcp_get(void *ifrp);
 void ifr_lan_pcp_set(void *ifrp, u_char pcp);
 u_char ifr_vlan_pcp_get(void *ifrp);

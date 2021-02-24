@@ -471,7 +471,7 @@ tracer_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 	case SIOCSIFFLAGS:
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		break;
 	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:

@@ -1151,13 +1151,13 @@ sk_ioctl(ifp, command, data)
 		mii = device_get_softc(sc_if->sk_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		SK_IF_LOCK(sc_if);
 		if (sc_if->sk_softc->sk_type == SK_GENESIS) {
 			SK_IF_UNLOCK(sc_if);
 			break;
 		}
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (IFCAP_TXCSUM & ifp->if_capabilities) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;

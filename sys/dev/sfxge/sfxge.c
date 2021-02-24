@@ -440,9 +440,9 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			sfxge_mac_filter_set(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 	{
-		int reqcap = ifr_reqcap_get(ifr);
+		int reqcap = ifr->ifr_reqcap;
 		int capchg_mask;
 
 		SFXGE_ADAPTER_LOCK(sc);

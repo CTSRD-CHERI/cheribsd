@@ -525,8 +525,8 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		err = ifmedia_ioctl(ifp, ifr, &nic->if_media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = if_getcapenable(ifp) ^ ifr_reqcap_get(ifr);
+	case SIOCSIFCAP:
+		mask = if_getcapenable(ifp) ^ ifr->ifr_reqcap;
 		if (mask & IFCAP_VLAN_MTU) {
 			/* No work to do except acknowledge the change took. */
 			if_togglecapenable(ifp, IFCAP_VLAN_MTU);

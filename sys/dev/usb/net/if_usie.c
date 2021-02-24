@@ -1296,7 +1296,7 @@ usie_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 			device_printf(sc->sc_dev,
 			    "Connect to the network first.\n");

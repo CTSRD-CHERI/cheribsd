@@ -1175,12 +1175,12 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		CGEM_LOCK(sc);
-		mask = if_getcapenable(ifp) ^ ifr_reqcap_get(ifr);
+		mask = if_getcapenable(ifp) ^ ifr->ifr_reqcap;
 
 		if ((mask & IFCAP_TXCSUM) != 0) {
-			if ((ifr_reqcap_get(ifr) & IFCAP_TXCSUM) != 0) {
+			if ((ifr->ifr_reqcap & IFCAP_TXCSUM) != 0) {
 				/* Turn on TX checksumming. */
 				if_setcapenablebit(ifp, IFCAP_TXCSUM |
 				    IFCAP_TXCSUM_IPV6, 0);
@@ -1201,7 +1201,7 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			}
 		}
 		if ((mask & IFCAP_RXCSUM) != 0) {
-			if ((ifr_reqcap_get(ifr) & IFCAP_RXCSUM) != 0) {
+			if ((ifr->ifr_reqcap & IFCAP_RXCSUM) != 0) {
 				/* Turn on RX checksumming. */
 				if_setcapenablebit(ifp, IFCAP_RXCSUM |
 				    IFCAP_RXCSUM_IPV6, 0);

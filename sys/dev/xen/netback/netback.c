@@ -2248,16 +2248,16 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			}
 #endif
 			break;
-		case CASE_IOC_IFREQ(SIOCSIFCAP):
+		case SIOCSIFCAP:
 			mtx_lock(&xnb->sc_lock);
-			if (ifr_reqcap_get(ifr) & IFCAP_TXCSUM) {
+			if (ifr->ifr_reqcap & IFCAP_TXCSUM) {
 				ifp->if_capenable |= IFCAP_TXCSUM;
 				ifp->if_hwassist |= XNB_CSUM_FEATURES;
 			} else {
 				ifp->if_capenable &= ~(IFCAP_TXCSUM);
 				ifp->if_hwassist &= ~(XNB_CSUM_FEATURES);
 			}
-			if ((ifr_reqcap_get(ifr) & IFCAP_RXCSUM)) {
+			if ((ifr->ifr_reqcap & IFCAP_RXCSUM)) {
 				ifp->if_capenable |= IFCAP_RXCSUM;
 			} else {
 				ifp->if_capenable &= ~(IFCAP_RXCSUM);

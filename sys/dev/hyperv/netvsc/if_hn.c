@@ -1273,7 +1273,7 @@ hn_xpnt_vf_iocsetcaps(struct hn_softc *sc, struct ifreq *ifr)
 	 * Fix up requested capabilities w/ supported capabilities,
 	 * since the supported capabilities could have been changed.
 	 */
-	ifr_reqcap_set(ifr, ifr_reqcap_get(ifr) & ifp->if_capabilities);
+	ifr->ifr_reqcap &= ifp->if_capabilities;
 	/* Pass SIOCSIFCAP to VF. */
 	error = vf_ifp->if_ioctl(vf_ifp, SIOCSIFCAP, (caddr_t)ifr);
 
@@ -1723,7 +1723,7 @@ hn_xpnt_vf_setready(struct hn_softc *sc)
 	 */
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, vf_ifp->if_xname, sizeof(ifr.ifr_name));
-	ifr_reqcap_set(&ifr, ifp->if_capenable);
+	ifr.ifr_reqcap = ifp->if_capenable;
 	hn_xpnt_vf_iocsetcaps(sc, &ifr);
 
 	if (ifp->if_mtu != ETHERMTU) {
@@ -3854,7 +3854,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		HN_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		HN_LOCK(sc);
 
 		if (hn_xpnt_vf_isready(sc)) {
@@ -3870,7 +3870,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 * Fix up requested capabilities w/ supported capabilities,
 		 * since the supported capabilities could have been changed.
 		 */
-		mask = (ifr_reqcap_get(ifr) & ifp->if_capabilities) ^
+		mask = (ifr->ifr_reqcap & ifp->if_capabilities) ^
 		    ifp->if_capenable;
 
 		if (mask & IFCAP_TXCSUM) {

@@ -1829,12 +1829,12 @@ arge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			error = ifmedia_ioctl(ifp, ifr, &sc->arge_ifmedia,
 			    command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		/* XXX: Check other capabilities */
 #ifdef DEVICE_POLLING
-		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
+		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
 		if (mask & IFCAP_POLLING) {
-			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
+			if (ifr->ifr_reqcap & IFCAP_POLLING) {
 				ARGE_WRITE(sc, AR71XX_DMA_INTR, 0);
 				error = ether_poll_register(arge_poll, ifp);
 				if (error)

@@ -519,8 +519,8 @@ oce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 				"Update multicast address failed\n");
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		u = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+	case SIOCSIFCAP:
+		u = ifr->ifr_reqcap ^ ifp->if_capenable;
 
 		if (u & IFCAP_TXCSUM) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;

@@ -3365,15 +3365,15 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			error = ifmedia_ioctl(ifp, ifr,
 			    &adapter->media, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 	    {
 		int mask, reinit;
 
 		reinit = 0;
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0) {
-			if ((ifr_reqcap_get(ifr) & IFCAP_POLLING) != 0) {
+			if ((ifr->ifr_reqcap & IFCAP_POLLING) != 0) {
 				if (error != 0)
 					return (error);
 				ifp->if_capenable |= IFCAP_POLLING;

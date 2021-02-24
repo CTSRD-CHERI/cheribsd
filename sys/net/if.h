@@ -432,7 +432,9 @@ struct	ifreq {
 #ifndef _KERNEL
 #define	ifr_data	ifr_ifru.ifru_data	/* for use by interface */
 #endif
+#endif
 #define	ifr_reqcap	ifr_ifru.ifru_cap[0]	/* requested capabilities */
+#ifndef _KERNEL
 #define	ifr_curcap	ifr_ifru.ifru_cap[1]	/* current capabilities */
 #define	ifr_index	ifr_ifru.ifru_index	/* interface index */
 #define	ifr_fib		ifr_ifru.ifru_fib	/* interface fib */

@@ -2010,9 +2010,9 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		EVENTHANDLER_INVOKE(ifnet_event, ifp, IFNET_EVENT_PCP);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		VLAN_SLOCK();
-		ifv->ifv_capenable = ifr_reqcap_get(ifr);
+		ifv->ifv_capenable = ifr->ifr_reqcap;
 		trunk = TRUNK(ifv);
 		if (trunk != NULL) {
 			struct epoch_tracker et;

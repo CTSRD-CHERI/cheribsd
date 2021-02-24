@@ -4253,12 +4253,12 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 			    sizeof(i2c));
 		break;
 	}
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 	{
 		int mask, setmask, oldmask;
 
 		oldmask = if_getcapenable(ifp);
-		mask = ifr_reqcap_get(ifr) ^ oldmask;
+		mask = ifr->ifr_reqcap ^ oldmask;
 		mask &= ctx->ifc_softc_ctx.isc_capabilities | IFCAP_NOMAP;
 		setmask = 0;
 #ifdef TCP_OFFLOAD

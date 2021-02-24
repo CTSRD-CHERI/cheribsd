@@ -1159,8 +1159,8 @@ dwc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		mii = sc->mii_softc;
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifr_reqcap_get(ifr) ^ if_getcapenable(ifp);
+	case SIOCSIFCAP:
+		mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
 		if (mask & IFCAP_VLAN_MTU) {
 			/* No work to do except acknowledge the change took */
 			if_togglecapenable(ifp, IFCAP_VLAN_MTU);

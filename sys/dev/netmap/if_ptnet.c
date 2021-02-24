@@ -783,16 +783,16 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		PTNET_CORE_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		device_printf(dev, "SIOCSIFCAP %x %x\n",
-			      ifr_reqcap_get(ifr), ifp->if_capenable);
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+			      ifr->ifr_reqcap, ifp->if_capenable);
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
 			struct ptnet_queue *pq;
 			int i;
 
-			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
+			if (ifr->ifr_reqcap & IFCAP_POLLING) {
 				err = ether_poll_register(ptnet_poll, ifp);
 				if (err) {
 					break;
@@ -824,7 +824,7 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			}
 		}
 #endif  /* DEVICE_POLLING */
-		ifp->if_capenable = ifr_reqcap_get(ifr);
+		ifp->if_capenable = ifr->ifr_reqcap;
 		break;
 
 	case CASE_IOC_IFREQ(SIOCSIFMTU):

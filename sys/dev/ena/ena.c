@@ -2284,12 +2284,12 @@ ena_ioctl(if_t ifp, u_long command, caddr_t data)
 		rc = ifmedia_ioctl(ifp, ifr, &adapter->media, command);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		{
 			int reinit = 0;
 
-			if (ifr_reqcap_get(ifr) != ifp->if_capenable) {
-				ifp->if_capenable = ifr_reqcap_get(ifr);
+			if (ifr->ifr_reqcap != ifp->if_capenable) {
+				ifp->if_capenable = ifr->ifr_reqcap;
 				reinit = 1;
 			}
 

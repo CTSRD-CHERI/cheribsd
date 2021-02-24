@@ -381,13 +381,13 @@ fwe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			    "\tch %d dma %d\n",	fwe->stream_ch, fwe->dma_ch);
 			splx(s);
 			break;
-		case CASE_IOC_IFREQ(SIOCSIFCAP):
+		case SIOCSIFCAP:
 #ifdef DEVICE_POLLING
 		    {
 			struct ifreq *ifr = (struct ifreq *) data;
 			struct firewire_comm *fc = fwe->fd.fc;
 
-			if (ifr_reqcap_get(ifr) & IFCAP_POLLING &&
+			if (ifr->ifr_reqcap & IFCAP_POLLING &&
 			    !(ifp->if_capenable & IFCAP_POLLING)) {
 				error = ether_poll_register(fwe_poll, ifp);
 				if (error)
@@ -397,7 +397,7 @@ fwe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				ifp->if_capenable |= IFCAP_POLLING;
 				return (error);
 			}
-			if (!(ifr_reqcap_get(ifr) & IFCAP_POLLING) &&
+			if (!(ifr->ifr_reqcap & IFCAP_POLLING) &&
 			    ifp->if_capenable & IFCAP_POLLING) {
 				error = ether_poll_deregister(ifp);
 				/* Enable interrupts. */

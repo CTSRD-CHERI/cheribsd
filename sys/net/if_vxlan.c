@@ -2361,9 +2361,9 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ifp->if_mtu = ifr_mtu_get(&ifr);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		VXLAN_WLOCK(sc);
-		error = vxlan_set_reqcap(sc, ifp, ifr_reqcap_get(ifr));
+		error = vxlan_set_reqcap(sc, ifp, ifr->ifr_reqcap);
 		if (error == 0)
 			vxlan_set_hwcaps(sc);
 		VXLAN_WUNLOCK(sc);

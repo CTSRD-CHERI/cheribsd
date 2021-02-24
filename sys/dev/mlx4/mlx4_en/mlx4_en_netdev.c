@@ -1999,9 +1999,9 @@ static int mlx4_en_ioctl(struct ifnet *dev, u_long command, caddr_t data)
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(dev, ifr, &priv->media, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		mutex_lock(&mdev->state_lock);
-		mask = ifr_reqcap_get(ifr) ^ dev->if_capenable;
+		mask = ifr->ifr_reqcap ^ dev->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
 			dev->if_capenable ^= IFCAP_TXCSUM;
 			dev->if_hwassist ^= (CSUM_TCP | CSUM_UDP | CSUM_IP);

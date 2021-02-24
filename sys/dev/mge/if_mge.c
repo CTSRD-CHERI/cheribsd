@@ -1520,11 +1520,11 @@ mge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			MGE_GLOBAL_UNLOCK(sc);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
+	case SIOCSIFCAP:
+		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
 		if (mask & IFCAP_HWCSUM) {
 			ifp->if_capenable &= ~IFCAP_HWCSUM;
-			ifp->if_capenable |= IFCAP_HWCSUM & ifr_reqcap_get(ifr);
+			ifp->if_capenable |= IFCAP_HWCSUM & ifr->ifr_reqcap;
 			if (ifp->if_capenable & IFCAP_TXCSUM)
 				ifp->if_hwassist = MGE_CHECKSUM_FEATURES;
 			else
@@ -1532,7 +1532,7 @@ mge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
+			if (ifr->ifr_reqcap & IFCAP_POLLING) {
 				error = ether_poll_register(mge_poll, ifp);
 				if (error)
 					return(error);

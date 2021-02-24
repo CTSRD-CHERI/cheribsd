@@ -1372,8 +1372,8 @@ ffec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
+	case SIOCSIFCAP:
+		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
 		if (mask & IFCAP_VLAN_MTU) {
 			/* No work to do except acknowledge the change took. */
 			ifp->if_capenable ^= IFCAP_VLAN_MTU;

@@ -2104,15 +2104,14 @@ mvneta_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->mvneta_if_flags = ifp->if_flags;
 		mvneta_sc_unlock(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		if (ifp->if_mtu > sc->tx_csum_limit &&
-		    ifr_reqcap_get(ifr) & IFCAP_TXCSUM)
-			ifr_reqcap_set(ifr,
-			    ifr_reqcap_get(ifr) & ~IFCAP_TXCSUM);
-		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
+		    ifr->ifr_reqcap & IFCAP_TXCSUM)
+			ifr->ifr_reqcap &= ~IFCAP_TXCSUM;
+		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
 		if (mask & IFCAP_HWCSUM) {
 			ifp->if_capenable &= ~IFCAP_HWCSUM;
-			ifp->if_capenable |= IFCAP_HWCSUM & ifr_reqcap_get(ifr);
+			ifp->if_capenable |= IFCAP_HWCSUM & ifr->ifr_reqcap;
 			if (ifp->if_capenable & IFCAP_TXCSUM)
 				ifp->if_hwassist = CSUM_IP | CSUM_TCP |
 				    CSUM_UDP;

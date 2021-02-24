@@ -7632,8 +7632,8 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set interface capability */
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+	case SIOCSIFCAP:
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		DBPRINT(sc, BCE_INFO_MISC,
 		    "Received SIOCSIFCAP = 0x%08X\n", (u32) mask);
 

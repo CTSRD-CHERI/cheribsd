@@ -2060,12 +2060,12 @@ cxgbe_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 		end_synchronized_op(sc, 0);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		rc = begin_synchronized_op(sc, vi, SLEEP_OK | INTR_OK, "t4cap");
 		if (rc)
 			return (rc);
 
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
 			ifp->if_hwassist ^= (CSUM_TCP | CSUM_UDP | CSUM_IP);

@@ -903,9 +903,9 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ret = ifmedia_ioctl(ifp, ifr, &ha->media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 	{
-		int mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		int mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 
 		QL_DPRINT4((ha->pci_dev, "%s: SIOCSIFCAP (0x%lx)\n",
 			__func__, cmd));

@@ -3552,9 +3552,9 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		TI_LOCK(sc);
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (ifp->if_capabilities & IFCAP_TXCSUM) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;

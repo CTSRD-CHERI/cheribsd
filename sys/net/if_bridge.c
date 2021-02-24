@@ -969,7 +969,7 @@ bridge_set_ifcap(struct bridge_softc *sc, struct bridge_iflist *bif, int set)
 	int error, mask, stuck;
 
 	bzero(&ifr, sizeof(ifr));
-	ifr.ifr_ifru.ifru_cap[0] = set;	/* ifr_reqcap */
+	ifr.ifr_reqcap = set;
 
 	if (ifp->if_capenable != set) {
 		error = (*ifp->if_ioctl)(ifp, SIOCSIFCAP, (caddr_t)&ifr);

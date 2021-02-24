@@ -1046,7 +1046,7 @@ lagg_port_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		LAGG_RUNLOCK();
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		if (lp->lp_ioctl == NULL) {
 			error = EINVAL;
 			break;
@@ -1693,7 +1693,7 @@ lagg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			error = ifmedia_ioctl(ifp, ifr, &sc->sc_media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		LAGG_XLOCK(sc);
 		CK_SLIST_FOREACH(lp, &sc->sc_ports, lp_entries) {
 			if (lp->lp_ioctl != NULL)
@@ -1943,7 +1943,7 @@ lagg_setcaps(struct lagg_port *lp, int cap)
 		return (0);
 	if (lp->lp_ioctl == NULL)
 		return (ENXIO);
-	ifr.ifr_ifru.ifru_cap[0] = cap;	/* ifr_reqcap */
+	ifr.ifr_reqcap = cap;
 	return ((*lp->lp_ioctl)(lp->lp_ifp, SIOCSIFCAP, (caddr_t)&ifr));
 }
 

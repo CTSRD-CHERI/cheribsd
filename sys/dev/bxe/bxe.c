@@ -4579,9 +4579,9 @@ bxe_ioctl(if_t ifp,
 
         break;
 
-    case CASE_IOC_IFREQ(SIOCSIFCAP):
+    case SIOCSIFCAP:
         /* find out which capabilities have changed */
-        mask = (ifr_reqcap_get(ifr) ^ if_getcapenable(ifp));
+        mask = (ifr->ifr_reqcap ^ if_getcapenable(ifp));
 
         BLOGD(sc, DBG_IOCTL, "Received SIOCSIFCAP ioctl (mask=0x%08x)\n",
               mask);

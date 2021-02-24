@@ -2935,8 +2935,8 @@ ndis_ifioctl(ifp, command, data)
 	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		ifp->if_capenable = ifr_reqcap_get(ifr);
+	case SIOCSIFCAP:
+		ifp->if_capenable = ifr->ifr_reqcap;
 		if (ifp->if_capenable & IFCAP_TXCSUM)
 			ifp->if_hwassist = sc->ndis_hwassist;
 		else

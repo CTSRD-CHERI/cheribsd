@@ -2839,14 +2839,6 @@ ifr_phys_set(void *ifrp, int val)
 	ifr__int0_set(ifrp, val);
 }
 
-int
-ifr_reqcap_get(void *ifrp)
-{
-
-	/* ifr_ifru.ifru_cap[0] */
-	return (ifr__int0_get(ifrp));
-}
-
 void
 ifr_reqcap_set(void *ifrp, int val)
 {
@@ -3053,13 +3045,13 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		getmicrotime(&ifp->if_lastchange);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		error = priv_check(td, PRIV_NET_SETIFCAP);
 		if (error)
 			return (error);
 		if (ifp->if_ioctl == NULL)
 			return (EOPNOTSUPP);
-		if (ifr_reqcap_get(ifr) & ~ifp->if_capabilities)
+		if (ifr->ifr_reqcap & ~ifp->if_capabilities)
 			return (EINVAL);
 		error = (*ifp->if_ioctl)(ifp, cmd, data);
 		if (error == 0)
@@ -3484,6 +3476,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCSIFFLAGS):
 	case IFREQ64(SIOCADDMULTI):
 	case IFREQ64(SIOCDELMULTI):
+	case IFREQ64(SIOCSIFCAP):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
@@ -3495,6 +3488,9 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		case IFREQ64(SIOCADDMULTI):
 		case IFREQ64(SIOCDELMULTI):
 			thunk.ifr.ifr_addr = ifr64->ifr_addr;
+			break;
+		case IFREQ64(SIOCSIFCAP):
+			thunk.ifr.ifr_reqcap = ifr64->ifr_reqcap;
 			break;
 		}
 		saved_cmd = cmd;

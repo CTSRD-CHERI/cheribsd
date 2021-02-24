@@ -2457,14 +2457,14 @@ cas_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->sc_ifflags = ifp->if_flags;
 		CAS_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		CAS_LOCK(sc);
 		if ((sc->sc_flags & CAS_NO_CSUM) != 0) {
 			error = EINVAL;
 			CAS_UNLOCK(sc);
 			break;
 		}
-		ifp->if_capenable = ifr_reqcap_get(ifr);
+		ifp->if_capenable = ifr->ifr_reqcap;
 		if ((ifp->if_capenable & IFCAP_TXCSUM) != 0)
 			ifp->if_hwassist = CAS_CSUM_FEATURES;
 		else

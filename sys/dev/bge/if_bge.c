@@ -5820,11 +5820,11 @@ bge_ioctl(if_t ifp, u_long command, caddr_t data)
 			    &mii->mii_media, command);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifr_reqcap_get(ifr) ^ if_getcapenable(ifp);
+	case SIOCSIFCAP:
+		mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
+			if (ifr->ifr_reqcap & IFCAP_POLLING) {
 				error = ether_poll_register(bge_poll, ifp);
 				if (error)
 					return (error);

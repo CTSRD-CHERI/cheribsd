@@ -3463,15 +3463,15 @@ re_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		mii = device_get_softc(sc->rl_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 	    {
 		int mask, reinit;
 
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		reinit = 0;
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
+			if (ifr->ifr_reqcap & IFCAP_POLLING) {
 				error = ether_poll_register(re_poll, ifp);
 				if (error)
 					return (error);

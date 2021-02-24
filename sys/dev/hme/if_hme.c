@@ -1641,9 +1641,9 @@ hme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_mii->mii_media, cmd);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		HME_LOCK(sc);
-		ifp->if_capenable = ifr_reqcap_get(ifr);
+		ifp->if_capenable = ifr->ifr_reqcap;
 		if ((ifp->if_capenable & IFCAP_TXCSUM) != 0)
 			ifp->if_hwassist = sc->sc_csum_features;
 		else

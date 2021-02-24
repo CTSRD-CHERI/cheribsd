@@ -146,7 +146,7 @@ lio_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case SIOCSIFCAP:
 		{
-			int	features = ifr_reqcap_get(ifrequest) ^
+			int	features = ifrequest->ifr_reqcap ^
 					if_getcapenable(ifp);
 
 			lio_dev_dbg(lio->oct_dev, "ioctl: SIOCSIFCAP (Set Capabilities)\n");

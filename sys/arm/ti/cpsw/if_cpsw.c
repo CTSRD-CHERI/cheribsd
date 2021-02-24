@@ -1415,10 +1415,10 @@ cpswp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ifr = (struct ifreq *)data;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		changed = ifp->if_capenable ^ ifr_reqcap_get(ifr);
+	case SIOCSIFCAP:
+		changed = ifp->if_capenable ^ ifr->ifr_reqcap;
 		if (changed & IFCAP_HWCSUM) {
-			if ((ifr_reqcap_get(ifr) & changed) & IFCAP_HWCSUM)
+			if ((ifr->ifr_reqcap & changed) & IFCAP_HWCSUM)
 				ifp->if_capenable |= IFCAP_HWCSUM;
 			else
 				ifp->if_capenable &= ~IFCAP_HWCSUM;

@@ -1799,8 +1799,8 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->xn_if_flags = ifp->if_flags;
 		XN_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+	case SIOCSIFCAP:
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		reinit = 0;
 
 		if (mask & IFCAP_TXCSUM) {

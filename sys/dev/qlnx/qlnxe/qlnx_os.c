@@ -2766,9 +2766,9 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ret = ifmedia_ioctl(ifp, ifr, &ha->media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 
 		QL_DPRINT4(ha, "SIOCSIFCAP (0x%lx)\n", cmd);
 

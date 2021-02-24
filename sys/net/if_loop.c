@@ -418,8 +418,8 @@ loioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		    LINK_STATE_UP: LINK_STATE_DOWN);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
+	case SIOCSIFCAP:
+		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
 		if ((mask & IFCAP_RXCSUM) != 0)
 			ifp->if_capenable ^= IFCAP_RXCSUM;
 		if ((mask & IFCAP_TXCSUM) != 0)

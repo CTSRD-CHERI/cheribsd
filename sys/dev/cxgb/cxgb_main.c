@@ -1951,13 +1951,13 @@ fail:
 		ADAPTER_UNLOCK(sc);
 
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		ADAPTER_LOCK(sc);
 		error = IS_DOOMED(p) ? ENXIO : (IS_BUSY(sc) ? EBUSY : 0);
 		if (error)
 			goto fail;
 
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
 			ifp->if_hwassist ^= (CSUM_TCP | CSUM_UDP | CSUM_IP);

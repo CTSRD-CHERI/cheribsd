@@ -4176,9 +4176,9 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		mtx_unlock(&sc->driver_mtx);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		mtx_lock(&sc->driver_mtx);
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
 			if (IFCAP_TXCSUM & ifp->if_capenable) {
 				mask &= ~IFCAP_TSO4;
