@@ -2989,7 +2989,7 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	case SIOCSDRVSPEC:
 		error = ndis_set_info(sc, oid.oid, oidbuf, &oid.len);
 		break;
-	case CASE_IOC_IFREQ(SIOCGPRIVATE_0):
+	case SIOCGPRIVATE_0:
 		NDIS_LOCK(sc);
 		if (sc->ndis_evt[sc->ndis_evtcidx].ne_sts == 0) {
 			error = ENOENT;

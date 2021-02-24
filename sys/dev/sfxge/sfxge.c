@@ -547,7 +547,7 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 		break;
 	}
 #endif
-	case CASE_IOC_IFREQ(SIOCGPRIVATE_0):
+	case SIOCGPRIVATE_0:
 		error = priv_check(curthread, PRIV_DRIVER);
 		if (error != 0)
 			break;
