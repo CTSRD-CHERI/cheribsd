@@ -211,7 +211,7 @@ LEAF(MipsDoTLBMiss)
 	/* Save c27 for use as KSCRATCH, this can be either the user or kernel c27. */
 	csetkr1c	CHERI_REG_KSCRATCH
 	bltz		k0, 1f				#02: k0<0 -> 1f (kernel fault)
-	PTR_SRL		k0, k0, SEGSHIFT - PTRSHIFT	#03: k0=seg offset (almost)
+	LONG_SRL	k0, k0, SEGSHIFT - PTRSHIFT	#03: k0=seg offset (almost)
 	/* __CHERI_PURE_CAPABILITY__ - assumes __mips64 and ! MIPS64_NEW_PMAP */
 	GET_CPU_PCPU_2(CHERI_REG_KSCRATCH, k1)
 	clc		CHERI_REG_KSCRATCH, zero, PC_SEGBASE(CHERI_REG_KSCRATCH)
@@ -222,14 +222,14 @@ LEAF(MipsDoTLBMiss)
 	clc		CHERI_REG_KSCRATCH, zero, 0(CHERI_REG_KSCRATCH) # kr1c = seg entry
 	MFC0		k0, MIPS_COP_0_BAD_VADDR		# XXX we may use k1 and avoid to reload badVaddr
 	cbez		CHERI_REG_KSCRATCH, 2f			# == NULL no page table
-	PTR_SRL		k0, PDRSHIFT - PTRSHIFT			# k0 = shift to first level page directory
+	LONG_SRL	k0, PDRSHIFT - PTRSHIFT			# k0 = shift to first level page directory
 	andi		k0, k0, PDEPTRMASK			# k0 = pde offset
 	clc		CHERI_REG_KSCRATCH, k0, 0(CHERI_REG_KSCRATCH)	# kr1c = pde entry
 	cbez		CHERI_REG_KSCRATCH, 2f			# == NULL no page table
 	nop
 
 	MFC0		k0, MIPS_COP_0_BAD_VADDR	# k0=bad address (again)
-	PTR_SRL		k0, PAGE_SHIFT - PTESHIFT	#0b: k0=VPN (second level page table entry)
+	LONG_SRL	k0, PAGE_SHIFT - PTESHIFT	#0b: k0=VPN (second level page table entry)
 	andi		k0, k0, PTE2MASK		#0c: k0=page tab offset
 	cincoffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k0 # lo0 pte address
 	cld		k0, zero, 0(CHERI_REG_KSCRATCH)	# k0 = lo0 pte
@@ -290,11 +290,11 @@ VECTOR(MipsException, unknown)
 	sll	k0, k0, 3			# shift user bit for cause index
 	and	k1, k1, MIPS_CR_EXC_CODE	# Mask out the cause bits.
 	or	k1, k1, k0			# change index to user table
-	PTR_SLL	k1, k1, 1			# shift to get 8-byte offset
+	LONG_SLL	k1, k1, 1			# shift to get 8-byte offset
 1:
 	GET_ABS_CAPTABLE_PTR(CHERI_REG_KSCRATCH, k0)
 	CAPTABLE_LOAD(CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, _C_LABEL(machExceptionTable))
-	PTR_SLL		k1, CHERICAP_SHIFT - 3	# cause is already shifted by 3
+	LONG_SLL	k1, CHERICAP_SHIFT - 3	# cause is already shifted by 3
 	clc		CHERI_REG_KSCRATCH, k1, 0(CHERI_REG_KSCRATCH) # get function address
 	cjr		CHERI_REG_KSCRATCH	# Jump to the function
 	nop
@@ -389,7 +389,7 @@ SlowFault:
 	csetbounds	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k1;	\
 	/* go to the top of kstack */					\
 	cincoffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k1;	\
-	PTR_SUBU	k0, zero, KERN_EXC_FRAME_SIZE;			\
+	LONG_SUBU	k0, zero, KERN_EXC_FRAME_SIZE;			\
 	cincoffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k0;	\
 	/* Save the overflowed STC in KR2C for later use; */		\
 	csetkr2c	CHERI_REG_STC;					\
@@ -693,7 +693,7 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 
 	/* Save exception stc in kr1c to put on the stack later */
 	cmove	CHERI_REG_KSCRATCH, CHERI_REG_STC
-	PTR_SUBU	k0, zero, KERN_EXC_FRAME_SIZE
+	LONG_SUBU	k0, zero, KERN_EXC_FRAME_SIZE
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, k0
 	/* Adjust stack alignment if needed */
 	CHERI_ADJUST_STC(k0)
@@ -950,7 +950,7 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	cgetaddr k1, CHERI_REG_KSCRATCH
 	bne	k0, k1, 1f
 	nop
-	PTR_ADDU k1, 16			# skip over wait
+	LONG_ADDU	k1, 16			# skip over wait
 	CSetAddr	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k1
 	CSetEPCC	CHERI_REG_KSCRATCH
 1:
@@ -959,7 +959,7 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 
 	/* Save exception sp in kscratch to put on the stack later. */
 	cmove	CHERI_REG_KSCRATCH, CHERI_REG_STC
-	PTR_SUBU	k0, zero, KERN_EXC_FRAME_SIZE
+	LONG_SUBU	k0, zero, KERN_EXC_FRAME_SIZE
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, k0
 	CHERI_ADJUST_STC(k0)
 	.mask	0x80000000, (CALLFRAME_RA - KERN_EXC_FRAME_SIZE)
@@ -1262,7 +1262,7 @@ LEAF_NOPROFILE(MipsTLBInvalidException)
 
 	/* XXX-AM: Leave this check for now, we should use EPCC later */
 	MFC0		k0, MIPS_COP_0_BAD_VADDR
-	PTR_LI		k1, VM_MAXUSER_ADDRESS
+	REG_LI		k1, VM_MAXUSER_ADDRESS
 	sltu		k1, k0, k1
 	bnez		k1, 1f
 	nop
@@ -1280,7 +1280,7 @@ LEAF_NOPROFILE(MipsTLBInvalidException)
 	cbez		CHERI_REG_KSCRATCH, 3f
 	nop
 
-	PTR_SRL		k0, SEGSHIFT - PTRSHIFT		# k0=seg offset (almost)
+	LONG_SRL	k0, SEGSHIFT - PTRSHIFT		# k0=seg offset (almost)
 	andi		k0, k0, PDEPTRMASK		# k0=seg offset
 	cincoffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k0 # kr1c=seg entry address
 	clc		CHERI_REG_KSCRATCH, zero, 0(CHERI_REG_KSCRATCH) # kr1c=seg entry
@@ -1292,7 +1292,7 @@ LEAF_NOPROFILE(MipsTLBInvalidException)
 	/* Assumes __mips_n64 and ! defined(MIPS64_NEW_PMAP) */
 
 	MFC0		k0, MIPS_COP_0_BAD_VADDR
-	PTR_SRL		k0, PDRSHIFT - PTRSHIFT		# k0=pde offset (almost)
+	LONG_SRL	k0, PDRSHIFT - PTRSHIFT		# k0=pde offset (almost)
 	andi		k0, k0, PDEPTRMASK		# k0=pde offset
 	cincoffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k0 # kr1c=pde entry address
 	clc		CHERI_REG_KSCRATCH, zero, 0(CHERI_REG_KSCRATCH) # kr1c=pde entry
@@ -1302,7 +1302,7 @@ LEAF_NOPROFILE(MipsTLBInvalidException)
 	nop
 
 	MFC0		k0, MIPS_COP_0_BAD_VADDR	# k0=bad address (again)
-	PTR_SRL		k0, PAGE_SHIFT - PTESHIFT	# k0=VPN
+	LONG_SRL	k0, PAGE_SHIFT - PTESHIFT	# k0=VPN
 	andi		k0, k0, PTEMASK			# k0=page tab offset
 	cincoffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k0 # kr1c=pte address
 	cld		k0, zero, 0(CHERI_REG_KSCRATCH)	# k0=this PTE
@@ -1439,14 +1439,14 @@ LEAF_NOPROFILE(MipsTLBMissException)
 	 * the KERNEL_ADDRESS with MIPS_XKSEG() to automatically have it
 	 * derived as a capability everywhere. The implications are not obvious
 	 * to me so I'll leave it for now.
-	 * PTR_LA		k1, _C_LABEL(mips_xkseg_cap)
+	 * LONG_LA		k1, _C_LABEL(mips_xkseg_cap)
 	*/
 	CAPTABLE_PCREL_LOAD(CHERI_REG_KSCRATCH, k1,_C_LABEL(kernel_segmap)) # k1c = segbase ptr
-	PTR_LI		k1, VM_MAX_KERNEL_ADDRESS	# check fault address against
+	REG_LI		k1, VM_MAX_KERNEL_ADDRESS	# check fault address against
 	sltu		k1, k1, k0			# upper bound of kernel_segmap
 	bnez		k1, MipsKernGenException	# out of bound
 	nop
-	PTR_SRL		k0, SEGSHIFT - PTRSHIFT		# k0 = seg offset (almost)
+	LONG_SRL	k0, SEGSHIFT - PTRSHIFT		# k0 = seg offset (almost)
 	/* XXX-AM: MUST set bounds on kernel_segmap, also readonly */
 	clc		CHERI_REG_KSCRATCH, k1, 0(CHERI_REG_KSCRATCH) # kr1c = segbase
 	cbez		CHERI_REG_KSCRATCH, MipsKernGenException  # == NULL -- no seg tab
@@ -1455,13 +1455,13 @@ LEAF_NOPROFILE(MipsTLBMissException)
 	MFC0		k0, MIPS_COP_0_BAD_VADDR	# k0 = bad address (again)
 	cbez		CHERI_REG_KSCRATCH, MipsKernGenException  # === NULL -- no page table
 
-	PTR_SRL		k0, PDRSHIFT - PTRSHIFT		# k0 = VPN
+	LONG_SRL	k0, PDRSHIFT - PTRSHIFT		# k0 = VPN
 	andi		k0, k0, PDEPTRMASK		# k0=pde offset
 	clc		CHERI_REG_KSCRATCH, k0, 0(CHERI_REG_KSCRATCH) # kr1c = pde entry
 	MFC0		k0, MIPS_COP_0_BAD_VADDR	# k0 = bad address (again)
 	cbez		CHERI_REG_KSCRATCH, MipsKernGenException # == NULL -- no page table
 
-	PTR_SRL		k0, PAGE_SHIFT - PTESHIFT	# k0=VPN
+	LONG_SRL	k0, PAGE_SHIFT - PTESHIFT	# k0=VPN
 	andi		k0, k0, PTE2MASK		# k0=page tab offset
 	cincoffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k0 # kr1c = lo0 pte address
 	cld		k0, zero, 0(CHERI_REG_KSCRATCH)	# k0 = lo0 pte

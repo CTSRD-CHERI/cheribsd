@@ -236,7 +236,7 @@ NESTED(cpu_throw, CALLFRAME_SIZ, ra)
 	mfc0	tregA, MIPS_COP_0_TLB_INDEX		;\
 	HAZARD_DELAY					;\
 	bltz	tregA, 1337f				;\
-	PTR_LI	tregB, MIPS_KSEG0_START			;\
+	REG_LI	tregB, MIPS_KSEG0_START			;\
 	sll	tregA, PAGE_SHIFT + 1			;\
 	daddu	tregA, tregA, tregB			;\
 	MTC0	tregA, MIPS_COP_0_TLB_HI		;\
@@ -355,7 +355,7 @@ blocked_loop:
 	cgetbase	v0, $c1			# get kstack base
 	cgetoffset	t0, $c1			# get kstack offset
 	daddu		v0, v0, t0		# get kstack va
-	PTR_LI	s0, MIPS_XKSEG_START
+	REG_LI	s0, MIPS_XKSEG_START
 	bltu	v0, s0, sw2			# kstack in xkphys? no need to insert in TLB.
 	REG_LI	t0, TD_UPTE
 	cld	a1, t0, 0($c4)			# a1 = u. pte #0
@@ -395,7 +395,7 @@ blocked_loop:
 	REG_LI	t2, (KSTACK_SIZE >> (PAGE_SHIFT + 1)) - 1
 	move		v1, v0
 kstack_inval_loop:
-	PTR_ADDU	v1, PAGE_SIZE * 2	# advance by 2 pages and try again
+	LONG_ADDU	v1, PAGE_SIZE * 2	# advance by 2 pages and try again
 	TLB_KSTACK_INVAL(v1, t0, t1)
 	daddi	t2, t2, -1
 	bnez t2, kstack_inval_loop
@@ -474,7 +474,7 @@ sw2:
 cpu_switch_set_userlocal:
 	clc	$c3, zero, TD_MDTLS($c4)	# Get TLS pointer
 	clc	$c5, zero, TD_PROC($c4)
-	PTR_LI	t0, P_MDTLS_TCB_OFFSET
+	REG_LI	t0, P_MDTLS_TCB_OFFSET
 	cld	t0, t0, 0($c5)			# Get TLS/TCB offset
 	cincoffset $c3, $c3, t0
 	cwritehwr $c3, $chwr_userlocal
@@ -582,7 +582,7 @@ szsigcode:
 
 #if defined(__mips_n64) && defined(COMPAT_FREEBSD64)
 SIGCODE(freebsd64_sigcode)
-	PTR_ADDU	a0, sp, SIGF64_UC		# address of ucontext
+	LONG_ADDU	a0, sp, SIGF64_UC		# address of ucontext
 	li		v0, SYS_sigreturn
 # sigreturn (ucp)
 	syscall
