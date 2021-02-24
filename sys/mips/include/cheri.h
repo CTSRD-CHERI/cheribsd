@@ -111,7 +111,6 @@ struct cheri_kframe {
 #ifdef __CHERI_PURE_CAPABILITY__
 	void *			ckf_pcc;
 	void *			ckf_stc;
-	void *			ckf_gpc;
 #endif
 };
 
