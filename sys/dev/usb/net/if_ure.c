@@ -1339,7 +1339,6 @@ ure_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	default:
 		error = uether_ioctl(ifp, cmd, data);
-		break;
 	}
 
 	return (error);
