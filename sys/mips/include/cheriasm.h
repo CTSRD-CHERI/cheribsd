@@ -68,7 +68,6 @@
 #define	CHERI_REG_C25	$c25
 #define	CHERI_REG_C26	$c26	/* Invoked data capability. */
 #define	CHERI_REG_IDC	CHERI_REG_C26
-#define CHERI_REG_GPC	CHERI_REG_C26 /* Global pointer capability */
 #define	CHERI_REG_C27	$c27
 #define	CHERI_REG_KSCRATCH CHERI_REG_C27 /* Kernel scratch capability. */
 #define	CHERI_REG_C28	$c28
@@ -294,6 +293,8 @@
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C23, CHERIKFRAME_OFF_C23,	\
 	    base);							\
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C24, CHERIKFRAME_OFF_C24,	\
+	    base);					    	        \
+	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C26, CHERIKFRAME_OFF_C26,	\
 	    base)
 
 #define	RESTORE_U_PCB_CHERIKFRAME(base)					\
@@ -312,7 +313,9 @@
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C23,			\
 	    CHERIKFRAME_OFF_C23, base);					\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C24,			\
-	    CHERIKFRAME_OFF_C24, base)
+	    CHERIKFRAME_OFF_C24, base);	    	    	    	    	\
+	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C26,			\
+	    CHERIKFRAME_OFF_C26, base)
 
 #define CHERI_CLEAR_GPLO_ZR    (1 << 0)
 #define CHERI_CLEAR_GPLO_AT    (1 << 1)

@@ -108,6 +108,7 @@ struct cheri_kframe {
 	void * __capability	ckf_c22;
 	void * __capability	ckf_c23;
 	void * __capability	ckf_c24;
+	void * __capability	ckf_c26;
 #ifdef __CHERI_PURE_CAPABILITY__
 	void *			ckf_pcc;
 	void *			ckf_stc;

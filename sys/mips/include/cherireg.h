@@ -213,9 +213,10 @@
 #define	CHERIKFRAME_OFF_C22	5
 #define	CHERIKFRAME_OFF_C23	6
 #define	CHERIKFRAME_OFF_C24	7
-#define	CHERIKFRAME_OFF_PCC	8
-#define	CHERIKFRAME_OFF_STC	9
-#define	CHERIKFRAME_OFF_GPC	10
+#define	CHERIKFRAME_OFF_C26	8
+#define	CHERIKFRAME_OFF_PCC	9
+#define	CHERIKFRAME_OFF_STC	10
+
 
 /*
  * List of CHERI capability cause code constants, which are used to

@@ -204,11 +204,6 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	pcb2->pcb_cherikframe.ckf_c18 = fork_return;
 	pcb2->pcb_cherikframe.ckf_c19 = td2;
 	pcb2->pcb_cherikframe.ckf_c20 = td2->td_frame;
-	/*
-	 * Set up globals cap-table pointer. For now clone the one from this
-	 * kernel thread.
-	 */
-	pcb2->pcb_cherikframe.ckf_gpc = cheri_getidc();
 #endif /* __CHERI_PURE_CAPABILITY__ */
 	pcb2->pcb_context[PCB_REG_SR] = mips_rd_status() &
 	    (MIPS_SR_KX | MIPS_SR_UX | MIPS_SR_INT_MASK);
@@ -552,7 +547,6 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	pcb2->pcb_cherikframe.ckf_c18 = fork_return;
 	pcb2->pcb_cherikframe.ckf_c19 = td;
 	pcb2->pcb_cherikframe.ckf_c20 = td->td_frame;
-	pcb2->pcb_cherikframe.ckf_gpc = cheri_getidc();
 #endif /* __CHERI_PURE_CAPABILITY__ */
 	/* Dont set IE bit in SR. sched lock release will take care of it */
 	pcb2->pcb_context[PCB_REG_SR] = mips_rd_status() &
