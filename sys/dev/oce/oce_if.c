@@ -578,7 +578,7 @@ oce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGI2C):
+	case SIOCGI2C:
 		rc = copyin(ifr_data_get_ptr(command, ifr), &i2c, sizeof(i2c));
 		if (rc)
 			break;

@@ -2206,7 +2206,7 @@ fail:
 		ifmedia_ioctl(ifp, ifr, &pi->media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGI2C): {
+	case SIOCGI2C: {
 		struct ifi2creq i2c;
 
 		rc = copyin(ifr_data_get_ptr(cmd, ifr), &i2c, sizeof(i2c));

@@ -2068,7 +2068,7 @@ out:
 		VLAN_CAPABILITIES(dev);
 		break;
 #if __FreeBSD_version >= 1100036
-	case CASE_IOC_IFREQ(SIOCGI2C): {
+	case SIOCGI2C: {
 		struct ifi2creq i2c;
 
 		error = copyin(ifr_data_get_ptr(command, ifr), &i2c,

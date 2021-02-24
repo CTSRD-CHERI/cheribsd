@@ -99,6 +99,7 @@
 #endif /* INET6 */
 #endif /* INET || INET6 */
 
+#include <cheri/cheric.h>
 #include <security/mac/mac_framework.h>
 
 /*
@@ -3432,6 +3433,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCSIFDSTADDR):
 	case IFREQ64(SIOCGIFNETMASK):
 	case IFREQ64(SIOCSIFNETMASK):
+	case IFREQ64(SIOCGI2C):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
@@ -3452,6 +3454,11 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 			break;
 		case IFREQ64(SIOCSIFMTU):
 			thunk.ifr.ifr_mtu = ifr64->ifr_mtu;
+			break;
+		case IFREQ64(SIOCGI2C):
+			thunk.ifr.ifr_ifru.ifru_data = cheri_setbounds(
+			    ifr_data_get_ptr(cmd, ifr64),
+			    sizeof(struct ifi2creq));
 			break;
 		}
 		saved_cmd = cmd;

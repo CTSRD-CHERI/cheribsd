@@ -4232,7 +4232,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 	case SIOCGIFXMEDIA:
 		err = ifmedia_ioctl(ifp, ifr, ctx->ifc_mediap, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCGI2C):
+	case SIOCGI2C:
 	{
 		struct ifi2creq i2c;
 

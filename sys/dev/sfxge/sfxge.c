@@ -522,7 +522,7 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 		error = ifmedia_ioctl(ifp, ifr, &sc->media, command);
 		break;
 #ifdef SIOCGI2C
-	case CASE_IOC_IFREQ(SIOCGI2C):
+	case SIOCGI2C:
 	{
 		struct ifi2creq i2c;
 

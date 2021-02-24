@@ -2797,7 +2797,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 #if (__FreeBSD_version >= 1100101)
 
-	case CASE_IOC_IFREQ(SIOCGI2C):
+	case SIOCGI2C:
 	{
 		struct ifi2creq i2c;
 		struct ecore_hwfn *p_hwfn = &ha->cdev.hwfns[0];

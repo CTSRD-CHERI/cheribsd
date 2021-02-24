@@ -3431,7 +3431,7 @@ out:
 		PRIV_UNLOCK(priv);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGI2C):
+	case SIOCGI2C:
 		ifr = (struct ifreq *)data;
 
 		/*
