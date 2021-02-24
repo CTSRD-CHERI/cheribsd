@@ -255,18 +255,7 @@
  * Macros saving capability state to, and restoring it from, voluntary kernel
  * context-switch storage in pcb.pcb_cherikframe.
  */
-#ifndef __CHERI_PURE_CAPABILITY__
-#define	SAVE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)			\
-	csc		creg, base, (U_PCB_CHERIKFRAME +		\
-			    CHERICAP_SIZE * offs)($ddc)
-
-#define	RESTORE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)		\
-	clc		creg, base, (U_PCB_CHERIKFRAME +		\
-			    CHERICAP_SIZE * offs)($ddc)
-
-#define	SAVE_CHERIKFRAME_GPC(base)
-#define	RESTORE_CHERIKFRAME_GPC(base)
-#else /* __CHERI_PURE_CAPABILITY__ */
+#ifdef __CHERI_PURE_CAPABILITY__
 #define	SAVE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)			\
 	cscbi		creg, (U_PCB_CHERIKFRAME +			\
 			    CHERICAP_SIZE * offs)(base)
@@ -274,15 +263,15 @@
 #define	RESTORE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)		\
 	clcbi		creg, (U_PCB_CHERIKFRAME +			\
 			    CHERICAP_SIZE * offs)(base)
+#else /* ! __CHERI_PURE_CAPABILITY__ */
+#define	SAVE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)			\
+	csc		creg, base, (U_PCB_CHERIKFRAME +		\
+			    CHERICAP_SIZE * offs)($ddc)
 
-/* Save and restore globals pointer as well */
-#define	SAVE_CHERIKFRAME_GPC(base)				\
-	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_GPC, CHERIKFRAME_OFF_GPC, \
-				    base)
-#define	RESTORE_CHERIKFRAME_GPC(base)				\
-	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_GPC,			\
-				       CHERIKFRAME_OFF_GPC, base)
-#endif /* __CHERI_PURE_CAPABILITY__ */
+#define	RESTORE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)		\
+	clc		creg, base, (U_PCB_CHERIKFRAME +		\
+			    CHERICAP_SIZE * offs)($ddc)
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 
 /*
  * Macros to save (and restore) callee-save capability registers when
@@ -305,9 +294,7 @@
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C23, CHERIKFRAME_OFF_C23,	\
 	    base);							\
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C24, CHERIKFRAME_OFF_C24,	\
-	    base);					    	        \
-	SAVE_CHERIKFRAME_GPC(base)
-
+	    base)
 
 #define	RESTORE_U_PCB_CHERIKFRAME(base)					\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C17,			\
@@ -325,8 +312,7 @@
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C23,			\
 	    CHERIKFRAME_OFF_C23, base);					\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_C24,			\
-	    CHERIKFRAME_OFF_C24, base);	    	    	    	    	\
-	RESTORE_CHERIKFRAME_GPC(base)
+	    CHERIKFRAME_OFF_C24, base)
 
 #define CHERI_CLEAR_GPLO_ZR    (1 << 0)
 #define CHERI_CLEAR_GPLO_AT    (1 << 1)
