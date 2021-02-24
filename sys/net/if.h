@@ -434,8 +434,8 @@ struct	ifreq {
 #endif
 #endif
 #define	ifr_reqcap	ifr_ifru.ifru_cap[0]	/* requested capabilities */
-#ifndef _KERNEL
 #define	ifr_curcap	ifr_ifru.ifru_cap[1]	/* current capabilities */
+#ifndef _KERNEL
 #define	ifr_index	ifr_ifru.ifru_index	/* interface index */
 #define	ifr_fib		ifr_ifru.ifru_fib	/* interface fib */
 #define	ifr_vlan_pcp	ifr_ifru.ifru_vlan_pcp	/* VLAN priority */

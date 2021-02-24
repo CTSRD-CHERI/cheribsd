@@ -2501,25 +2501,6 @@ ifr__int0_set(void *ifrp, int val)
 }
 
 static void
-ifr__int1_set(void *ifrp, int val)
-{
-	union ifreq_union *ifrup;
-
-	ifrup = ifrp;
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		ifrup->ifr32.ifr_ifru.ifru_cap[1] = val;
-	else
-#endif
-#ifdef COMPAT_FREEBSD64
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		ifrup->ifr64.ifr_ifru.ifru_cap[1] = val;
-	else
-#endif
-		ifrup->ifr.ifr_ifru.ifru_cap[1] = val;
-}
-
-static void
 ifr__short0_set(void *ifrp, short val)
 {
 	union ifreq_union *ifrup;
@@ -2731,14 +2712,6 @@ ifr_buffer_set_length(u_long cmd, void *data, size_t len)
 	}
 }
 
-static void
-ifr_curcap_set(void *ifrp, int val)
-{
-
-	/* ifr_ifru.ifru_cap[1] */
-	ifr__int1_set(ifrp, val);
-}
-
 void * __capability
 ifr_data_get_ptr(u_long cmd, void *ifrp)
 {
@@ -2839,14 +2812,6 @@ ifr_phys_set(void *ifrp, int val)
 	ifr__int0_set(ifrp, val);
 }
 
-void
-ifr_reqcap_set(void *ifrp, int val)
-{
-
-	/* ifr_ifru.ifru_cap[0] */
-	ifr__int0_set(ifrp, val);
-}
-
 u_char
 ifr_lan_pcp_get(void *ifrp)
 {
@@ -2903,9 +2868,9 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		ifr->ifr_flagshigh = temp_flags >> 16;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFCAP):
-		ifr_reqcap_set(ifr, ifp->if_capabilities);
-		ifr_curcap_set(ifr, ifp->if_capenable);
+	case SIOCGIFCAP:
+		ifr->ifr_reqcap = ifp->if_capabilities;
+		ifr->ifr_curcap = ifp->if_capenable;
 		break;
 
 	case SIOCGIFDATA:
@@ -3476,6 +3441,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCSIFFLAGS):
 	case IFREQ64(SIOCADDMULTI):
 	case IFREQ64(SIOCDELMULTI):
+	case IFREQ64(SIOCGIFCAP):
 	case IFREQ64(SIOCSIFCAP):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
@@ -3670,6 +3636,11 @@ out_noref:
 		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_flags = thunk.ifr.ifr_flags;
 		ifr64->ifr_flagshigh = thunk.ifr.ifr_flagshigh;
+		break;
+	case IFREQ64(SIOCGIFCAP):
+		ifr64 = (struct ifreq64 *)saved_data;
+		ifr64->ifr_reqcap = thunk.ifr.ifr_reqcap;
+		ifr64->ifr_curcap = thunk.ifr.ifr_curcap;
 		break;
 #endif
 	}
