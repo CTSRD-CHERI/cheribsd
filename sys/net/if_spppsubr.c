@@ -1253,8 +1253,8 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 		break;
 #endif
 #ifdef SIOCGIFMTU
-	case CASE_IOC_IFREQ(SIOCGIFMTU):
-		ifr_mtu_set(ifr, ifp->if_mtu);
+	case SIOCGIFMTU:
+		ifr->ifr_mtu = ifp->if_mtu;
 		break;
 #endif
 #ifdef SLIOCGETMTU

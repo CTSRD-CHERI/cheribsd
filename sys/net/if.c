@@ -2784,13 +2784,6 @@ ifr_metric_set(void *ifrp, int val)
 	ifr__int0_set(ifrp, val);
 }
 
-void
-ifr_mtu_set(void *ifrp, int val)
-{
-
-	ifr__int0_set(ifrp, val);
-}
-
 static void
 ifr_phys_set(void *ifrp, int val)
 {
@@ -2882,8 +2875,8 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		ifr_metric_set(ifr, ifp->if_metric);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFMTU):
-		ifr_mtu_set(ifr, ifp->if_mtu);
+	case SIOCGIFMTU:
+		ifr->ifr_mtu = ifp->if_mtu;
 		break;
 
 	case CASE_IOC_IFREQ(SIOCGIFPHYS):
@@ -3429,6 +3422,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCGIFCAP):
 	case IFREQ64(SIOCSIFCAP):
 	case IFREQ64(SIOCSIFMEDIA):
+	case IFREQ64(SIOCGIFMTU):
 	case IFREQ64(SIOCSIFMTU):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
@@ -3634,6 +3628,10 @@ out_noref:
 		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_reqcap = thunk.ifr.ifr_reqcap;
 		ifr64->ifr_curcap = thunk.ifr.ifr_curcap;
+		break;
+	case IFREQ64(SIOCGIFMTU):
+		ifr64 = (struct ifreq64 *)saved_data;
+		ifr64->ifr_mtu = thunk.ifr.ifr_mtu;
 		break;
 #endif
 	}

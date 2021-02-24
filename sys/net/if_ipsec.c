@@ -538,7 +538,7 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifp->if_flags |= IFF_UP;
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-	case CASE_IOC_IFREQ(SIOCGIFMTU):
+	case SIOCGIFMTU:
 	case SIOCSIFFLAGS:
 		return (0);
 	case SIOCSIFMTU:

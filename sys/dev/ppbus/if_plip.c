@@ -449,8 +449,8 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ppb_unlock(ppbus);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFMTU):
-		ifr_mtu_set(ifr, sc->sc_ifp->if_mtu);
+	case SIOCGIFMTU:
+		ifr->ifr_mtu = sc->sc_ifp->if_mtu;
 		break;
 
 	case SIOCADDMULTI:

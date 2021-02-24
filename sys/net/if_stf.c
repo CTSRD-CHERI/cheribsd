@@ -741,7 +741,7 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			error = EAFNOSUPPORT;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFMTU):
+	case SIOCGIFMTU:
 		break;
 
 	case SIOCSIFMTU:
