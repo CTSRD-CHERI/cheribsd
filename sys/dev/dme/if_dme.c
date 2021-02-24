@@ -633,7 +633,7 @@ dme_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ifr = (struct ifreq *)data;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		/*
 		 * Switch interface state between "running" and
 		 * "stopped", reflecting the UP flag.

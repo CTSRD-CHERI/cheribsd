@@ -1649,7 +1649,7 @@ lagg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if_rele(tpif);
 		VLAN_CAPABILITIES(ifp);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		/* Set flags on ports too */
 		LAGG_XLOCK(sc);
 		CK_SLIST_FOREACH(lp, &sc->sc_ports, lp_entries) {

@@ -2208,7 +2208,7 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-		case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+		case SIOCSIFFLAGS:
 			mtx_lock(&xnb->sc_lock);
 			if (ifp->if_flags & IFF_UP) {
 				xnb_ifinit_locked(xnb);

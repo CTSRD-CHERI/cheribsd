@@ -1720,7 +1720,7 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			}
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		NFE_LOCK(sc);
 		if (if_getflags(ifp) & IFF_UP) {
 			/*

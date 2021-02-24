@@ -4141,7 +4141,7 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		err = mxge_change_mtu(sc, ifr_mtu_get(ifr));
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		mtx_lock(&sc->driver_mtx);
 		if (sc->dying) {
 			mtx_unlock(&sc->driver_mtx);

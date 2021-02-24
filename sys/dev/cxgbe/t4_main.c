@@ -2027,7 +2027,7 @@ cxgbe_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 		end_synchronized_op(sc, 0);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		rc = begin_synchronized_op(sc, vi, SLEEP_OK | INTR_OK, "t4flg");
 		if (rc)
 			return (rc);

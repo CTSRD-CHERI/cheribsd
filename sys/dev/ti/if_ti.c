@@ -3510,7 +3510,7 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		TI_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		TI_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			/*

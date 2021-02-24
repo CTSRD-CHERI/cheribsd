@@ -1096,7 +1096,7 @@ msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		MSK_IF_UNLOCK(sc_if);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		MSK_IF_LOCK(sc_if);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&

@@ -1906,7 +1906,7 @@ fail:
 		}
 		ADAPTER_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		ADAPTER_LOCK(sc);
 		if (IS_DOOMED(p)) {
 			error = ENXIO;

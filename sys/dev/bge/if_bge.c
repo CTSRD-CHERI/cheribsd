@@ -5772,7 +5772,7 @@ bge_ioctl(if_t ifp, u_long command, caddr_t data)
 		}
 		BGE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		BGE_LOCK(sc);
 		if (if_getflags(ifp) & IFF_UP) {
 			/*

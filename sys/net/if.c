@@ -2519,23 +2519,6 @@ ifr__int1_set(void *ifrp, int val)
 		ifrup->ifr.ifr_ifru.ifru_cap[1] = val;
 }
 
-static short
-ifr__short0_get(void *ifrp)
-{
-	union ifreq_union *ifrup;
-
-	ifrup = ifrp;
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (ifrup->ifr32.ifr_ifru.ifru_flags[0]);
-#endif
-#ifdef COMPAT_FREEBSD64
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return (ifrup->ifr64.ifr_ifru.ifru_flags[0]);
-#endif
-	return (ifrup->ifr.ifr_ifru.ifru_flags[0]);
-}
-
 static void
 ifr__short0_set(void *ifrp, short val)
 {
@@ -2553,24 +2536,6 @@ ifr__short0_set(void *ifrp, short val)
 	else
 #endif
 		ifrup->ifr.ifr_ifru.ifru_flags[0] = val;
-}
-
-static short
-ifr__short1_get(void *ifrp)
-{
-	union ifreq_union *ifrup;
-
-	ifrup = ifrp;
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (ifrup->ifr32.ifr_ifru.ifru_flags[1]);
-	else
-#endif
-#ifdef COMPAT_FREEBSD64
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return (ifrup->ifr64.ifr_ifru.ifru_flags[1]);
-#endif
-	return (ifrup->ifr.ifr_ifru.ifru_flags[1]);
 }
 
 static void
@@ -2835,25 +2800,11 @@ ifr_fib_set(void *ifrp, u_int fib)
 	ifr__int0_set(ifrp, (u_int)fib);
 }
 
-short
-ifr_flags_get(void *ifrp)
-{
-
-	return (ifr__short0_get(ifrp));
-}
-
 void
 ifr_flags_set(void *ifrp, short val)
 {
 
 	ifr__short0_set(ifrp, val);
-}
-
-static short
-ifr_flagshigh_get(void *ifrp)
-{
-
-	return (ifr__short1_get(ifrp));
 }
 
 void
@@ -3097,7 +3048,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		ifp->if_fib = ifr_fib_get(ifr);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		error = priv_check(td, PRIV_NET_SETIFFLAGS);
 		if (error)
 			return (error);
@@ -3105,8 +3056,8 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		 * Currently, no driver owned flags pass the IFF_CANTCHANGE
 		 * check, so we don't need special handling here yet.
 		 */
-		new_flags = (ifr_flags_get(ifr) & 0xffff) |
-		    (ifr_flagshigh_get(ifr) << 16);
+		new_flags = (ifr->ifr_flags & 0xffff) |
+		    (ifr->ifr_flagshigh << 16);
 		if (ifp->if_flags & IFF_UP &&
 		    (new_flags & IFF_UP) == 0) {
 			if_down(ifp);
@@ -3435,6 +3386,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		struct ifconf ifc;
 		struct ifdrv ifd;
 		struct ifmediareq ifmr;
+		struct ifreq ifr;
 	} thunk;
 	caddr_t saved_data = NULL;
 	u_long saved_cmd = 0;
@@ -3448,6 +3400,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	struct ifconf64 *ifc64;
 	struct ifdrv64 *ifd64;
 	struct ifmediareq64 *ifmr64;
+	struct ifreq64 *ifr64;
 #endif
 #endif
 	struct ifnet *ifp;
@@ -3562,6 +3515,17 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		saved_data = data;
 		data = (caddr_t)&thunk.ifmr;
 		cmd = SIOCIFGCLONERS;
+		break;
+	case IFREQ64(SIOCSIFFLAGS):
+		ifr64 = (struct ifreq64 *)data;
+		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
+		    sizeof(thunk.ifr.ifr_name));
+		thunk.ifr.ifr_flags = ifr64->ifr_flags;
+		thunk.ifr.ifr_flagshigh = ifr64->ifr_flagshigh;
+		saved_cmd = cmd;
+		saved_data = data;
+		data = (caddr_t)&thunk.ifr;
+		cmd = _IOC_NEWTYPE(cmd, struct ifreq);
 		break;
 #endif
 	}
@@ -4461,12 +4425,12 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 	if ((ifp->if_flags & IFF_UP) != 0) {
 		if (ifp->if_ioctl) {
 			ifp->if_flags &= ~IFF_UP;
-			ifr.ifr_ifru.ifru_flags[0] = ifp->if_flags & 0xffff;
-			ifr.ifr_ifru.ifru_flags[1] = ifp->if_flags >> 16;
+			ifr.ifr_flags = ifp->if_flags & 0xffff;
+			ifr.ifr_flagshigh = ifp->if_flags >> 16;
 			(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 			ifp->if_flags |= IFF_UP;
-			ifr.ifr_ifru.ifru_flags[0] = ifp->if_flags & 0xffff;
-			ifr.ifr_ifru.ifru_flags[1] = ifp->if_flags >> 16;
+			ifr.ifr_flags = ifp->if_flags & 0xffff;
+			ifr.ifr_flagshigh = ifp->if_flags >> 16;
 			(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 		}
 	}

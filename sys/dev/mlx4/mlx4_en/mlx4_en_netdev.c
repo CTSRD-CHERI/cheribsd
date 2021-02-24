@@ -1973,7 +1973,7 @@ static int mlx4_en_ioctl(struct ifnet *dev, u_long command, caddr_t data)
 	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		error = -mlx4_en_change_mtu(dev, ifr_mtu_get(ifr));
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if (dev->if_flags & IFF_UP) {
 			if ((dev->if_drv_flags & IFF_DRV_RUNNING) == 0) {
 				mutex_lock(&mdev->state_lock);

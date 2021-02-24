@@ -3321,7 +3321,7 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		al_init(adapter);
 		break;
 	}
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				if (((ifp->if_flags ^ adapter->if_flags) &

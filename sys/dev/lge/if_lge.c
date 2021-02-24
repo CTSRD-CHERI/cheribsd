@@ -1451,7 +1451,7 @@ lge_ioctl(ifp, command, data)
 			ifp->if_mtu = ifr_mtu_get(ifr);
 		LGE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		LGE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING &&

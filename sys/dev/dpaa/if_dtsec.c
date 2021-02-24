@@ -412,7 +412,7 @@ dtsec_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			error = EINVAL;
 		DTSEC_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		DTSEC_LOCK(sc);
 
 		if (sc->sc_ifnet->if_flags & IFF_UP)

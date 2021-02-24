@@ -506,7 +506,7 @@ lance_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		LE_LOCK(sc);
 		if (ifp->if_flags & IFF_PROMISC) {
 			if (!(sc->sc_flags & LE_PROMISC)) {

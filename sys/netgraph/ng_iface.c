@@ -297,12 +297,12 @@ ng_iface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set flags */
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		/*
 		 * If the interface is marked up and stopped, then start it.
 		 * If it is marked down and running, then stop it.
 		 */
-		if (ifr_flags_get(ifr) & IFF_UP) {
+		if (ifr->ifr_flags & IFF_UP) {
 			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 				ifp->if_drv_flags &= ~(IFF_DRV_OACTIVE);
 				ifp->if_drv_flags |= IFF_DRV_RUNNING;

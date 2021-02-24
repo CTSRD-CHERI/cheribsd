@@ -768,7 +768,7 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 	int mask __unused, err = 0;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		device_printf(dev, "SIOCSIFFLAGS %x\n", ifp->if_flags);
 		PTNET_CORE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {

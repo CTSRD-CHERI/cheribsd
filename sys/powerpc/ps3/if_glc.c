@@ -470,7 +470,7 @@ glc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int err = 0;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
                 mtx_lock(&sc->sc_mtx);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&

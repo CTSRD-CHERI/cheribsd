@@ -1652,7 +1652,7 @@ my_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 	int             error;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		MY_LOCK(sc);
 		if (ifp->if_flags & IFF_UP)
 			my_init_locked(sc);

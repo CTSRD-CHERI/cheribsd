@@ -478,7 +478,7 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			NICVF_CORE_UNLOCK(nic);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		NICVF_CORE_LOCK(nic);
 		flags = if_getflags(ifp);
 		if (flags & IFF_UP) {

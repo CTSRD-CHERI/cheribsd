@@ -240,7 +240,7 @@ ntb_ioctl(if_t ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 	case CASE_IOC_IFREQ(SIOCADDMULTI):
 	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;

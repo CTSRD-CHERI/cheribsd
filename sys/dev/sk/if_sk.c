@@ -1123,7 +1123,7 @@ sk_ioctl(ifp, command, data)
 			}
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		SK_IF_LOCK(sc_if);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {

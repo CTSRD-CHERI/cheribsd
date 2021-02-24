@@ -214,7 +214,7 @@ icioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		mtx_lock(&sc->ic_lock);
 		ifp->if_flags |= IFF_UP;
 		goto locked;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		mtx_lock(&sc->ic_lock);
 	locked:
 		if ((!(ifp->if_flags & IFF_UP)) &&

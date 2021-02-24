@@ -4195,7 +4195,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		STATE_UNLOCK(ctx);
 		CTX_UNLOCK(ctx);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		CTX_LOCK(ctx);
 		if (if_getflags(ifp) & IFF_UP) {
 			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {

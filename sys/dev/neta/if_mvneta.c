@@ -2079,7 +2079,7 @@ mvneta_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	sc = ifp->if_softc;
 	ifr = (struct ifreq *)data;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		mvneta_sc_lock(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {

@@ -312,7 +312,7 @@ gx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			return (error);
 		return (0);
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if (ifp->if_flags == sc->sc_flags)
 			return (0);
 		if ((ifp->if_flags & IFF_UP) != 0) {

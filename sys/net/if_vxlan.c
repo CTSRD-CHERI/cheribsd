@@ -2344,7 +2344,7 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = vxlan_ioctl_drvspec(sc, ifd, cmd == SIOCGDRVSPEC);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		error = vxlan_ioctl_ifflags(sc);
 		break;
 

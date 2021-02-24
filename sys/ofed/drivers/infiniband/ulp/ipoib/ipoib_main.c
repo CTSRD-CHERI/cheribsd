@@ -281,7 +281,7 @@ ipoib_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		return (ENXIO);
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if (ifp->if_flags & IFF_UP) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
 				error = -ipoib_open(priv);

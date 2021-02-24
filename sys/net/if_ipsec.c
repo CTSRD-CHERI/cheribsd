@@ -539,7 +539,7 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case CASE_IOC_IFREQ(SIOCADDMULTI):
 	case CASE_IOC_IFREQ(SIOCDELMULTI):
 	case CASE_IOC_IFREQ(SIOCGIFMTU):
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		return (0);
 	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) < IPSEC_MTU_MIN ||

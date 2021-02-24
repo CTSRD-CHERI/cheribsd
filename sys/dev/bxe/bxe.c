@@ -4541,7 +4541,7 @@ bxe_ioctl(if_t ifp,
         reinit = 1;
         break;
 
-    case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+    case SIOCSIFFLAGS:
         /* toggle the interface state up or down */
         BLOGD(sc, DBG_IOCTL, "Received SIOCSIFFLAGS ioctl\n");
 

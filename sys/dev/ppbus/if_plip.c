@@ -420,7 +420,7 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		ifp->if_flags |= IFF_UP;
 		/* FALLTHROUGH */
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		error = 0;
 		ppb_lock(ppbus);
 		if ((!(ifp->if_flags & IFF_UP)) &&

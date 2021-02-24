@@ -150,7 +150,7 @@ ng_eiface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set flags */
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		/*
 		 * If the interface is marked up and stopped, then start it.
 		 * If it is marked down and running, then stop it.

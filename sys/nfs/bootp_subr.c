@@ -868,7 +868,7 @@ bootpc_fakeup_interface(struct bootpc_ifcontext *ifctx, struct thread *td)
 	error = ifioctl(bootp_so, SIOCGIFFLAGS, (caddr_t)ifr, td);
 	if (error != 0)
 		panic("%s: SIOCGIFFLAGS, error=%d", __func__, error);
-	ifr->ifr_ifru.ifru_flags[0] |= IFF_UP;
+	ifr->ifr_flags |= IFF_UP;
 	error = ifioctl(bootp_so, SIOCSIFFLAGS, (caddr_t)ifr, td);
 	if (error != 0)
 		panic("%s: SIOCSIFFLAGS, error=%d", __func__, error);
@@ -904,7 +904,7 @@ bootpc_shutdown_interface(struct bootpc_ifcontext *ifctx, struct thread *td)
 	error = ifioctl(bootp_so, SIOCGIFFLAGS, (caddr_t)ifr, td);
 	if (error != 0)
 		panic("%s: SIOCGIFFLAGS, error=%d", __func__, error);
-	ifr->ifr_ifru.ifru_flags[0] &= ~IFF_UP;
+	ifr->ifr_flags &= ~IFF_UP;
 	error = ifioctl(bootp_so, SIOCSIFFLAGS, (caddr_t)ifr, td);
 	if (error != 0)
 		panic("%s: SIOCSIFFLAGS, error=%d", __func__, error);

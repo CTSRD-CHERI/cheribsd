@@ -2897,7 +2897,7 @@ ndis_ifioctl(ifp, command, data)
 	/*NDIS_LOCK(sc);*/
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if (ifp->if_flags & IFF_UP) {
 			if (sc->ndis_running &&
 			    ifp->if_flags & IFF_PROMISC &&

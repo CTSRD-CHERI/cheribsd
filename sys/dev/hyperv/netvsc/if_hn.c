@@ -1326,8 +1326,8 @@ hn_xpnt_vf_iocsetflags(struct hn_softc *sc)
 
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, vf_ifp->if_xname, sizeof(ifr.ifr_name));
-	ifr_flags_set(&ifr, vf_ifp->if_flags & 0xffff);
-	ifr_flagshigh_set(&ifr, vf_ifp->if_flags >> 16);
+	ifr.ifr_flags = vf_ifp->if_flags & 0xffff;
+	ifr.ifr_flagshigh = vf_ifp->if_flags >> 16;
 	return (vf_ifp->if_ioctl(vf_ifp, SIOCSIFFLAGS, (caddr_t)&ifr));
 }
 
@@ -3818,7 +3818,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		HN_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		HN_LOCK(sc);
 
 		if ((sc->hn_flags & HN_FLAG_SYNTH_ATTACHED) == 0) {

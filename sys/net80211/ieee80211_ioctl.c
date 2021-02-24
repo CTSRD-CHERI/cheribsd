@@ -3548,7 +3548,7 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		return (error);
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		IEEE80211_LOCK(ic);
 		if ((ifp->if_flags ^ vap->iv_ifflags) & IFF_PROMISC) {
 			/*

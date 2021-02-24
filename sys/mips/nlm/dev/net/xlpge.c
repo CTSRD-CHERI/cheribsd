@@ -760,7 +760,7 @@ nlm_xlpge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ifr = (struct ifreq *)data;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		XLPGE_LOCK(sc);
 		sc->if_flags = ifp->if_flags;
 		if (ifp->if_flags & IFF_UP) {

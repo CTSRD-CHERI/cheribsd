@@ -1327,7 +1327,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int c;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		PFSYNC_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			ifp->if_drv_flags |= IFF_DRV_RUNNING;

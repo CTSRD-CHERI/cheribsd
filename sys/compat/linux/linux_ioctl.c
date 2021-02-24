@@ -2251,7 +2251,7 @@ linux_gifflags(struct thread *td, struct ifnet *ifp, struct l_ifreq *ifr)
 
 	linux_ifflags(ifp, &flags);
 
-	return (copyout(&flags, &ifr->ifr_ifru.ifru_flags[0], sizeof(flags)));
+	return (copyout(&flags, &ifr->ifr_flags, sizeof(flags)));
 }
 
 static int

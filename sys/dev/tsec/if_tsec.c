@@ -942,7 +942,7 @@ tsec_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			error = EINVAL;
 		TSEC_GLOBAL_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		TSEC_GLOBAL_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {

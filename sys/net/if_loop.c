@@ -413,7 +413,7 @@ loioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if_link_state_change(ifp, (ifp->if_flags & IFF_UP) ?
 		    LINK_STATE_UP: LINK_STATE_DOWN);
 		break;

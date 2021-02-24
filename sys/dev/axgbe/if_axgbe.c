@@ -154,7 +154,7 @@ axgbe_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 			error = EINVAL;
 		/* TODO - change it to iflib way */ 
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		error = 0;
 		break;
 	case CASE_IOC_IFREQ(SIOCSIFMEDIA):

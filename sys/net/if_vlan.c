@@ -1953,7 +1953,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = copyout(&vlr, ifr_data_get_ptr(cmd, ifr), sizeof(vlr));
 		break;
 		
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		/*
 		 * We should propagate selected flags to the parent,
 		 * e.g., promiscuous mode.

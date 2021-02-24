@@ -3863,7 +3863,7 @@ dc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		DC_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			int need_setfilt = (ifp->if_flags ^ sc->dc_if_flags) &

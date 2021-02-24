@@ -1819,7 +1819,7 @@ rl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int			error = 0, mask;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		RL_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING &&

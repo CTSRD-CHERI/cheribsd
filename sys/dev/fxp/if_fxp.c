@@ -2841,7 +2841,7 @@ fxp_ioctl(if_t ifp, u_long command, caddr_t data)
 	int flag, mask, error = 0, reinit;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		FXP_LOCK(sc);
 		/*
 		 * If interface is marked up and not running, then start it.

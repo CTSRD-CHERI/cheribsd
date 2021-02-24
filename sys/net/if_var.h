@@ -827,7 +827,6 @@ size_t ifr_buffer_get_length(u_long cmd, void *data);
 void * __capability ifr_data_get_ptr(u_long cmd, void *ifrp);
 u_int ifr_fib_get(void *ifrp);
 void ifr_fib_set(void *ifrp, u_int fib);
-short ifr_flags_get(void *ifrp);
 void ifr_flags_set(void *ifrp, short val);
 void ifr_flagshigh_set(void *ifrp, short val);
 void ifr_reqcap_set(void *ifrp, int val);
