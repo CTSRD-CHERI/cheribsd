@@ -1177,7 +1177,7 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 	case SIOCAIFADDR:
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		/* set the interface "up" when assigning an IP address */
 		ifp->if_flags |= IFF_UP;
 		/* FALLTHROUGH */

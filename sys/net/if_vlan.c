@@ -1830,7 +1830,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifv = ifp->if_softc;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
 #ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET)

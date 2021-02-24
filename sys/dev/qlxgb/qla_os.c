@@ -798,7 +798,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ha = (qla_host_t *)ifp->if_softc;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		QL_DPRINT4((ha->pci_dev, "%s: SIOCSIFADDR (0x%lx)\n",
 			__func__, cmd));
 

@@ -260,7 +260,7 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			return (EINVAL);
 		ifp->if_mtu = ifr->ifr_mtu;
 		return (0);
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
 	case SIOCSIFFLAGS:
 	case SIOCADDMULTI:

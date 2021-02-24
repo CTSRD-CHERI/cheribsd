@@ -2675,7 +2675,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ha = (qlnx_host_t *)ifp->if_softc;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		QL_DPRINT4(ha, "SIOCSIFADDR (0x%lx)\n", cmd);
 
 		if (ifa->ifa_addr->sa_family == AF_INET) {

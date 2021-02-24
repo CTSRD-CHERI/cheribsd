@@ -143,7 +143,7 @@ ng_eiface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 #endif
 	switch (command) {
 	/* These two are mostly handled at a higher layer */
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		error = ether_ioctl(ifp, command, data);
 		break;
 	case CASE_IOC_IFREQ(SIOCGIFADDR):

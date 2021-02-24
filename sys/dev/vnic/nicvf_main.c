@@ -440,7 +440,7 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 	err = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 #ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET)
 			avoid_reset = TRUE;

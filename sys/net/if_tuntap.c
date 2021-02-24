@@ -1339,7 +1339,7 @@ tunifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ifs->ascii[0] = '\0';
 		TUN_UNLOCK(tp);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		if (l2tun)
 			error = ether_ioctl(ifp, cmd, data);
 		else
@@ -1527,7 +1527,7 @@ tunioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag,
 			TUN_UNLOCK(tp);
 
 			return (0);
-		case CASE_IOC_IFREQ(SIOCSIFADDR):	/* set MAC address of the remote side */
+		case SIOCSIFADDR:	/* set MAC address of the remote side */
 			TUN_LOCK(tp);
 			bcopy(data, &tp->tun_ether.octet,
 			    sizeof(tp->tun_ether.octet));

@@ -3647,7 +3647,7 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		else
 			ifp->if_mtu = ifr->ifr_mtu;
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		/*
 		 * XXX Handle this directly so we can suppress if_init calls.
 		 * XXX This should be done in ether_ioctl but for the moment

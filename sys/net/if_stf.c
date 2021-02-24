@@ -713,7 +713,7 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifa = (struct ifaddr *)data;
 		if (ifa == NULL || ifa->ifa_addr->sa_family != AF_INET6) {
 			error = EAFNOSUPPORT;

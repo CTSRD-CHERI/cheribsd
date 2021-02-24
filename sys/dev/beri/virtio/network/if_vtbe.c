@@ -318,7 +318,7 @@ vtbe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		pio_enable_irq(sc, 1);
 	default:
 		error = ether_ioctl(ifp, cmd, data);

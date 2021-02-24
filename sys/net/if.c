@@ -3424,6 +3424,10 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCSIFMEDIA):
 	case IFREQ64(SIOCGIFMTU):
 	case IFREQ64(SIOCSIFMTU):
+	case IFREQ64(SIOCSIFADDR):
+	case IFREQ64(SIOCSIFBRDADDR):
+	case IFREQ64(SIOCSIFDSTADDR):
+	case IFREQ64(SIOCSIFNETMASK):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
@@ -3538,10 +3542,10 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	    ifp, td));
 	if (error == EOPNOTSUPP && ifp != NULL && ifp->if_ioctl != NULL)
 		switch (cmd) {
-		case CASE_IOC_IFREQ(SIOCSIFADDR):
-		case CASE_IOC_IFREQ(SIOCSIFBRDADDR):
-		case CASE_IOC_IFREQ(SIOCSIFDSTADDR):
-		case CASE_IOC_IFREQ(SIOCSIFNETMASK):
+		case SIOCSIFADDR:
+		case SIOCSIFBRDADDR:
+		case SIOCSIFDSTADDR:
+		case SIOCSIFNETMASK:
 			break;
 		default:
 			error = (*ifp->if_ioctl)(ifp, cmd, data);

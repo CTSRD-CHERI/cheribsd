@@ -288,7 +288,7 @@ ng_iface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 #endif
 	switch (command) {
 	/* These two are mostly handled at a higher layer */
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
 		ifp->if_drv_flags |= IFF_DRV_RUNNING;
 		ifp->if_drv_flags &= ~(IFF_DRV_OACTIVE);

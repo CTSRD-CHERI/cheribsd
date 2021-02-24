@@ -253,10 +253,10 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 		error = in_aifaddr_ioctl(cmd, data, ifp, td);
 		sx_xunlock(&in_control_sx);
 		return (error);
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
-	case CASE_IOC_IFREQ(SIOCSIFBRDADDR):
-	case CASE_IOC_IFREQ(SIOCSIFDSTADDR):
-	case CASE_IOC_IFREQ(SIOCSIFNETMASK):
+	case SIOCSIFADDR:
+	case SIOCSIFBRDADDR:
+	case SIOCSIFDSTADDR:
+	case SIOCSIFNETMASK:
 		/* We no longer support that old commands. */
 		return (EINVAL);
 	default:

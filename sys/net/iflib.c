@@ -4146,7 +4146,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 	int		err = 0, reinit = 0, bits;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 #ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET)
 			avoid_reset = true;

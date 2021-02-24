@@ -2223,7 +2223,7 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			 */
 			mtx_unlock(&xnb->sc_lock);
 			break;
-		case CASE_IOC_IFREQ(SIOCSIFADDR):
+		case SIOCSIFADDR:
 #ifdef INET
 			mtx_lock(&xnb->sc_lock);
 			if (ifa->ifa_addr->sa_family == AF_INET) {

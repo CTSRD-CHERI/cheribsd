@@ -294,7 +294,7 @@ ipoib_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			queue_work(ipoib_workqueue, &priv->restart_task);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
 
 		switch (ifa->ifa_addr->sa_family) {
