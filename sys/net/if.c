@@ -3197,9 +3197,12 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 	}
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
-		error = priv_check(td, PRIV_NET_ADDMULTI);
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
+		if (cmd == SIOCADDMULTI)
+			error = priv_check(td, PRIV_NET_ADDMULTI);
+		else
+			error = priv_check(td, PRIV_NET_DELMULTI);
 		if (error)
 			return (error);
 
@@ -3208,12 +3211,10 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 			return (EOPNOTSUPP);
 
 		/* Don't let users screw up protocols' entries. */
-		if (ifr_addr_get_family(ifr) != AF_LINK)
+		if (ifr->ifr_addr.sa_family != AF_LINK)
 			return (EINVAL);
 
-		switch (cmd) {
-		case CASE_IOC_IFREQ(SIOCADDMULTI):
-		{
+		if (cmd == SIOCADDMULTI) {
 			struct epoch_tracker et;
 			struct ifmultiaddr *ifma;
 
@@ -3225,18 +3226,14 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 			 * already exists.
 			 */
 			NET_EPOCH_ENTER(et);
-			ifma = if_findmulti(ifp, ifr_addr_get_sa(ifr));
+			ifma = if_findmulti(ifp, &ifr->ifr_addr);
 			NET_EPOCH_EXIT(et);
 			if (ifma != NULL)
 				error = EADDRINUSE;
 			else
-				error = if_addmulti(ifp, ifr_addr_get_sa(ifr),
-				    &ifma);
-			break;
-		}
-		case CASE_IOC_IFREQ(SIOCDELMULTI):
-			error = if_delmulti(ifp, ifr_addr_get_sa(ifr));
-			break;
+				error = if_addmulti(ifp, &ifr->ifr_addr, &ifma);
+		} else {
+			error = if_delmulti(ifp, &ifr->ifr_addr);
 		}
 		if (error == 0)
 			getmicrotime(&ifp->if_lastchange);
@@ -3485,6 +3482,8 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		break;
 	case IFREQ64(SIOCGIFFLAGS):
 	case IFREQ64(SIOCSIFFLAGS):
+	case IFREQ64(SIOCADDMULTI):
+	case IFREQ64(SIOCDELMULTI):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
@@ -3492,6 +3491,10 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		case IFREQ64(SIOCSIFFLAGS):
 			thunk.ifr.ifr_flags = ifr64->ifr_flags;
 			thunk.ifr.ifr_flagshigh = ifr64->ifr_flagshigh;
+			break;
+		case IFREQ64(SIOCADDMULTI):
+		case IFREQ64(SIOCDELMULTI):
+			thunk.ifr.ifr_addr = ifr64->ifr_addr;
 			break;
 		}
 		saved_cmd = cmd;

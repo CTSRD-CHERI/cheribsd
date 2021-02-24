@@ -1765,8 +1765,8 @@ ste_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->ste_if_flags = ifp->if_flags;
 		STE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		STE_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			ste_rxfilter(sc);

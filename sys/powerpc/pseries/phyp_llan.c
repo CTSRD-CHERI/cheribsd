@@ -541,8 +541,8 @@ llan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct llan_softc *sc = ifp->if_softc;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		mtx_lock(&sc->io_lock);
 		if ((sc->ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			llan_set_multicast(sc);

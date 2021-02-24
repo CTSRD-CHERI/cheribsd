@@ -370,8 +370,8 @@ fwe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ifp->if_flags |= IFF_PROMISC;
 			splx(s);
 			break;
-		case CASE_IOC_IFREQ(SIOCADDMULTI):
-		case CASE_IOC_IFREQ(SIOCDELMULTI):
+		case SIOCADDMULTI:
+		case SIOCDELMULTI:
 			break;
 
 		case SIOCGIFSTATUS:

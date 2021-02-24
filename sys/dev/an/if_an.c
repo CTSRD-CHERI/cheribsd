@@ -1930,8 +1930,8 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->an_ifmedia, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		/* The Aironet has no multicast filter. */
 		error = 0;
 		break;

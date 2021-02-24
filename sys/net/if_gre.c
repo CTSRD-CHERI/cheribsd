@@ -247,8 +247,8 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
 	case SIOCSIFFLAGS:
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		return (0);
 	case CASE_IOC_IFREQ(GRESADDRS):
 	case CASE_IOC_IFREQ(GRESADDRD):

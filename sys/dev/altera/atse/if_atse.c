@@ -962,8 +962,8 @@ atse_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		ATSE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		ATSE_LOCK(sc);
 		atse_rxfilter_locked(sc);
 		ATSE_UNLOCK(sc);

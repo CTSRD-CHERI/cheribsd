@@ -877,7 +877,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case SIOCADDMULTI:
 		QL_DPRINT4((ha->pci_dev,
 			"%s: %s (0x%lx)\n", __func__, "SIOCADDMULTI", cmd));
 
@@ -886,7 +886,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCDELMULTI:
 		QL_DPRINT4((ha->pci_dev,
 			"%s: %s (0x%lx)\n", __func__, "SIOCDELMULTI", cmd));
 

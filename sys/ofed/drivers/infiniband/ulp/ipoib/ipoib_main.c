@@ -289,8 +289,8 @@ ipoib_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 				ipoib_stop(priv);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			queue_work(ipoib_workqueue, &priv->restart_task);
 		break;

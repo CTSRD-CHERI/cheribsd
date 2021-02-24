@@ -1210,8 +1210,8 @@ vte_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->vte_if_flags = ifp->if_flags;
 		VTE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		VTE_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			vte_rxfilter(sc);

@@ -4165,8 +4165,8 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		mtx_unlock(&sc->driver_mtx);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		mtx_lock(&sc->driver_mtx);
 		if (sc->dying) {
 			mtx_unlock(&sc->driver_mtx);

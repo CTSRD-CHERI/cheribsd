@@ -3541,8 +3541,8 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->ti_if_flags = ifp->if_flags;
 		TI_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		TI_LOCK(sc);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			ti_setmulti(sc);

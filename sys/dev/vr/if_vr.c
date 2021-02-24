@@ -2251,8 +2251,8 @@ vr_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->vr_if_flags = ifp->if_flags;
 		VR_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		VR_LOCK(sc);
 		vr_set_filter(sc);
 		VR_UNLOCK(sc);

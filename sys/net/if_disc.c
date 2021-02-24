@@ -216,13 +216,13 @@ discioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 * Everything else is done at a higher level.
 		 */
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (ifr == NULL) {
 			error = EAFNOSUPPORT;		/* XXX */
 			break;
 		}
-		switch (ifr_addr_get_family(ifr)) {
+		switch (ifr->ifr_addr.sa_family) {
 #ifdef INET
 		case AF_INET:
 			break;

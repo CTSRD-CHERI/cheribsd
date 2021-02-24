@@ -961,8 +961,8 @@ tsec_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->tsec_if_flags = ifp->if_flags;
 		TSEC_GLOBAL_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			TSEC_GLOBAL_LOCK(sc);
 			tsec_setup_multicast(sc);

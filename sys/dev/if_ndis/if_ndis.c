@@ -2926,8 +2926,8 @@ ndis_ifioctl(ifp, command, data)
 		sc->ndis_if_flags = ifp->if_flags;
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		ndis_setmulti(sc);
 		error = 0;
 		break;

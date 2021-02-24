@@ -1936,8 +1936,8 @@ fail:
 
 		ADAPTER_LOCK_ASSERT_NOTOWNED(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		ADAPTER_LOCK(sc);
 		error = IS_DOOMED(p) ? ENXIO : (IS_BUSY(sc) ? EBUSY : 0);
 		if (error)

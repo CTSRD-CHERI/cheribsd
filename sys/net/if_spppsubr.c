@@ -1262,8 +1262,8 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 		*(short*)data = ifp->if_mtu;
 		break;
 #endif
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		break;
 
 	case CASE_IOC_IFREQ(SIOCGIFGENERIC):

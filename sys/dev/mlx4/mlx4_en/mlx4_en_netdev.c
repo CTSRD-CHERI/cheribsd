@@ -1991,8 +1991,8 @@ static int mlx4_en_ioctl(struct ifnet *dev, u_long command, caddr_t data)
 			mutex_unlock(&mdev->state_lock);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		mlx4_en_set_rx_mode(dev);
 		break;
 	case CASE_IOC_IFREQ(SIOCSIFMEDIA):

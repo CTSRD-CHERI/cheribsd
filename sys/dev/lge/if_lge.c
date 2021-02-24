@@ -1477,8 +1477,8 @@ lge_ioctl(ifp, command, data)
 		LGE_UNLOCK(sc);
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		LGE_LOCK(sc);
 		lge_setmulti(sc);
 		LGE_UNLOCK(sc);

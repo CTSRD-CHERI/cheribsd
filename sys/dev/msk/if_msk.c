@@ -1110,8 +1110,8 @@ msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc_if->msk_if_flags = ifp->if_flags;
 		MSK_IF_UNLOCK(sc_if);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		MSK_IF_LOCK(sc_if);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			msk_rxfilter(sc_if);

@@ -511,8 +511,8 @@ oce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		rc = oce_hw_update_multicast(sc);
 		if (rc)
 			device_printf(sc->dev,

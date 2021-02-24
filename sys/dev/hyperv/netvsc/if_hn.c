@@ -3918,8 +3918,8 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		HN_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		HN_LOCK(sc);
 
 		if ((sc->hn_flags & HN_FLAG_SYNTH_ATTACHED) == 0) {

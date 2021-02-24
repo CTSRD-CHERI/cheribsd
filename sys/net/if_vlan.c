@@ -1964,8 +1964,8 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VLAN_XUNLOCK();
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		/*
 		 * If we don't have a parent, just remember the membership for
 		 * when we do.

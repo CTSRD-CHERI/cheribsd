@@ -1825,8 +1825,8 @@ sge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		SGE_UNLOCK(sc);
 		VLAN_CAPABILITIES(ifp);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		SGE_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			sge_rxfilter(sc);

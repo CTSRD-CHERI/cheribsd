@@ -241,8 +241,8 @@ ntb_ioctl(if_t ifp, u_long command, caddr_t data)
 
 	switch (command) {
 	case SIOCSIFFLAGS:
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		break;
 
 	case CASE_IOC_IFREQ(SIOCSIFMTU):

@@ -2032,8 +2032,8 @@ jme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->jme_if_flags = ifp->if_flags;
 		JME_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		JME_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			jme_set_filter(sc);

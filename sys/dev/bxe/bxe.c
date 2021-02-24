@@ -4564,8 +4564,8 @@ bxe_ioctl(if_t ifp,
 
         break;
 
-    case CASE_IOC_IFREQ(SIOCADDMULTI):
-    case CASE_IOC_IFREQ(SIOCDELMULTI):
+    case SIOCADDMULTI:
+    case SIOCDELMULTI:
         /* add/delete multicast addresses */
         BLOGD(sc, DBG_IOCTL, "Received SIOCADDMULTI/SIOCDELMULTI ioctl\n");
 

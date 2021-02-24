@@ -2471,8 +2471,8 @@ cas_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ifp->if_hwassist = 0;
 		CAS_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		CAS_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			cas_setladrf(sc);

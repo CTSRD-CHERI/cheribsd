@@ -1159,8 +1159,8 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		CGEM_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		/* Set up multi-cast filters. */
 		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
 			CGEM_LOCK(sc);

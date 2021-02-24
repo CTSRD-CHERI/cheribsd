@@ -2865,8 +2865,8 @@ fxp_ioctl(if_t ifp, u_long command, caddr_t data)
 		FXP_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		FXP_LOCK(sc);
 		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
 			if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);

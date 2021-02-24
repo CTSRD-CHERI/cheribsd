@@ -982,8 +982,8 @@ are_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		ARE_UNLOCK(sc);
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		ARE_LOCK(sc);
 		are_set_filter(sc);
 		ARE_UNLOCK(sc);

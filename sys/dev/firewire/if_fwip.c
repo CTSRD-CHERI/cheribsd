@@ -394,8 +394,8 @@ fwip_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		splx(s);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		break;
 	case CASE_IOC_IFREQ(SIOCSIFCAP):
 #ifdef DEVICE_POLLING

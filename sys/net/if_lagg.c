@@ -1675,8 +1675,8 @@ lagg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		} else
 			LAGG_XUNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		LAGG_XLOCK(sc);
 		CK_SLIST_FOREACH(lp, &sc->sc_ports, lp_entries) {
 			lagg_clrmulti(lp);

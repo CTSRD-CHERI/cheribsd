@@ -3615,8 +3615,8 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			NET_EPOCH_EXIT(et);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		ieee80211_runtask(ic, &ic->ic_mcast_task);
 		break;
 	case CASE_IOC_IFREQ(SIOCSIFMEDIA):

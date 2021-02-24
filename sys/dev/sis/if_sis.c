@@ -2145,8 +2145,8 @@ sis_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->sis_if_flags = ifp->if_flags;
 		SIS_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		SIS_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			sis_rxfilter(sc);

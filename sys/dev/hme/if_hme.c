@@ -1630,8 +1630,8 @@ hme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		HME_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		HME_LOCK(sc);
 		hme_setladrf(sc, 1);
 		HME_UNLOCK(sc);

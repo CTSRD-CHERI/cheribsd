@@ -1352,8 +1352,8 @@ tunifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		TUNDEBUG(ifp, "mtu set\n");
 		break;
 	case SIOCSIFFLAGS:
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		break;
 	case SIOCGIFMEDIA:
 		if (!l2tun) {

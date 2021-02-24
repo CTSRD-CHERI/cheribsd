@@ -534,8 +534,8 @@ uether_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		UE_UNLOCK(ue);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		UE_LOCK(ue);
 		ue_queue_command(ue, ue_setmulti_task,
 		    &ue->ue_multi_task[0].hdr, 

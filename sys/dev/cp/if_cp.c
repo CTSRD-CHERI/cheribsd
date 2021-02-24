@@ -693,8 +693,8 @@ static int cp_sioctl (struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	switch (cmd) {
 	default:	   CP_DEBUG2 (d, ("ioctl 0x%lx\n", cmd));   return 0;
-	case CASE_IOC_IFREQ(SIOCADDMULTI): CP_DEBUG2 (d, ("ioctl SIOCADDMULTI\n")); return 0;
-	case CASE_IOC_IFREQ(SIOCDELMULTI): CP_DEBUG2 (d, ("ioctl SIOCDELMULTI\n")); return 0;
+	case SIOCADDMULTI: CP_DEBUG2 (d, ("ioctl SIOCADDMULTI\n")); return 0;
+	case SIOCDELMULTI: CP_DEBUG2 (d, ("ioctl SIOCDELMULTI\n")); return 0;
 	case SIOCSIFFLAGS: CP_DEBUG2 (d, ("ioctl SIOCSIFFLAGS\n")); break;
 	case CASE_IOC_IFREQ(SIOCSIFADDR):  CP_DEBUG2 (d, ("ioctl SIOCSIFADDR\n"));  break;
 	}

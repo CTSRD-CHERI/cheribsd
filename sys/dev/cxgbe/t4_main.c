@@ -2050,8 +2050,8 @@ cxgbe_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 		end_synchronized_op(sc, 0);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		rc = begin_synchronized_op(sc, vi, SLEEP_OK | INTR_OK, "t4multi");
 		if (rc)
 			return (rc);

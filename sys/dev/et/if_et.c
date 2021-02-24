@@ -1321,8 +1321,8 @@ et_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			ET_LOCK(sc);
 			et_setmulti(sc);

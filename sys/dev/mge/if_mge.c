@@ -1512,8 +1512,8 @@ mge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->mge_if_flags = ifp->if_flags;
 		MGE_GLOBAL_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			MGE_GLOBAL_LOCK(sc);
 			mge_setup_multicast(sc);

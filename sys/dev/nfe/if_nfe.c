@@ -1742,8 +1742,8 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		NFE_UNLOCK(sc);
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
 			NFE_LOCK(sc);
 			nfe_setmulti(sc);

@@ -734,10 +734,10 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifp->if_drv_flags |= IFF_DRV_RUNNING;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		ifr = (struct ifreq *)data;
-		if (ifr == NULL || ifr_addr_get_family(ifr) != AF_INET6)
+		if (ifr == NULL || ifr->ifr_addr.sa_family != AF_INET6)
 			error = EAFNOSUPPORT;
 		break;
 

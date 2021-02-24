@@ -2218,7 +2218,7 @@ again:
 				valid_len = sbuf_len(sb);
 		}
 		if (addrs == 0) {
-			bzero(&ifr.ifr_ifru.ifru_addr, sizeof(ifr.ifr_ifru.ifru_addr));
+			bzero((caddr_t)&ifr.ifr_addr, sizeof(ifr.ifr_addr));
 			sbuf_bcat(sb, &ifr, sizeof(ifr));
 			max_len += sizeof(ifr);
 

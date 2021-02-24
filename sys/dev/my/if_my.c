@@ -1661,8 +1661,8 @@ my_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 		MY_UNLOCK(sc);
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		MY_LOCK(sc);
 		my_setmulti(sc);
 		MY_UNLOCK(sc);

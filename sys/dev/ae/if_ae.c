@@ -2130,8 +2130,8 @@ ae_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->if_flags = ifp->if_flags;
 		AE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		AE_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			ae_rxfilter(sc);

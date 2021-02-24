@@ -1294,8 +1294,8 @@ stge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->sc_if_flags = ifp->if_flags;
 		STGE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		STGE_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			stge_set_multi(sc);

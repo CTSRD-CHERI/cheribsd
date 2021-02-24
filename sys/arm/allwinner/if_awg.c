@@ -1132,8 +1132,8 @@ awg_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		sc->if_flags = if_getflags(ifp);
 		AWG_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 			AWG_LOCK(sc);
 			awg_setup_rxfilter(sc);

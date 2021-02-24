@@ -300,8 +300,8 @@ vtbe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->if_flags = ifp->if_flags;
 		VTBE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		break;
 	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:

@@ -251,11 +251,11 @@ icioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		mtx_unlock(&sc->ic_lock);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (ifr == NULL)
 			return (EAFNOSUPPORT);		/* XXX */
-		switch (ifr_addr_get_family(ifr)) {
+		switch (ifr->ifr_addr.sa_family) {
 		case AF_INET:
 			break;
 		default:

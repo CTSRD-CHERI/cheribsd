@@ -1357,8 +1357,8 @@ ffec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		FFEC_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			FFEC_LOCK(sc);
 			ffec_setup_rxfilter(sc);

@@ -3345,8 +3345,8 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		adapter->if_flags = ifp->if_flags;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 			device_printf_dbg(adapter->dev,
 			    "ioctl add/del multi before\n");

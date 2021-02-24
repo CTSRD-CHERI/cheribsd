@@ -485,8 +485,8 @@ glc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->sc_ifpflags = ifp->if_flags;
 		mtx_unlock(&sc->sc_mtx);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
                 mtx_lock(&sc->sc_mtx);
 		glc_set_multicast(sc);
                 mtx_unlock(&sc->sc_mtx);

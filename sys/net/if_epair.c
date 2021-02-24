@@ -657,8 +657,8 @@ epair_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	switch (cmd) {
 	case SIOCSIFFLAGS:
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		error = 0;
 		break;
 

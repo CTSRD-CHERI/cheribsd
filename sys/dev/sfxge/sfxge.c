@@ -435,8 +435,8 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 			}
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			sfxge_mac_filter_set(sc);
 		break;

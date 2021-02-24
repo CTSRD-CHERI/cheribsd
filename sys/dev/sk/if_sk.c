@@ -1139,8 +1139,8 @@ sk_ioctl(ifp, command, data)
 		sc_if->sk_if_flags = ifp->if_flags;
 		SK_IF_UNLOCK(sc_if);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		SK_IF_LOCK(sc_if);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			sk_rxfilter(sc_if);

@@ -7604,8 +7604,8 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Add/Delete multicast address */
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		DBPRINT(sc, BCE_VERBOSE_MISC,
 		    "Received SIOCADDMULTI/SIOCDELMULTI\n");
 

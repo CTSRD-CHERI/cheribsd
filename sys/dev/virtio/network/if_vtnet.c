@@ -1138,8 +1138,8 @@ vtnet_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VTNET_CORE_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if ((sc->vtnet_flags & VTNET_FLAG_CTRL_RX) == 0)
 			break;
 		VTNET_CORE_LOCK(sc);

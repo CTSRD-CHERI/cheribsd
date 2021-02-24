@@ -324,8 +324,8 @@ ng_iface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Stuff that's not supported */
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		error = 0;
 		break;
 	case CASE_IOC_IFREQ(SIOCSIFPHYS):

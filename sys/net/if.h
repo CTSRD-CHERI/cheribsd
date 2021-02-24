@@ -413,8 +413,8 @@ struct	ifreq {
 		u_char	ifru_vlan_pcp;
 	} ifr_ifru;
 };
-#ifndef _KERNEL
 #define	ifr_addr	ifr_ifru.ifru_addr	/* address */
+#ifndef _KERNEL
 #define	ifr_dstaddr	ifr_ifru.ifru_dstaddr	/* other end of p-to-p link */
 #define	ifr_broadaddr	ifr_ifru.ifru_broadaddr	/* broadcast address */
 #ifndef _KERNEL

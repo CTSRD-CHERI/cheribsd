@@ -1813,8 +1813,8 @@ arge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		ARGE_UNLOCK(sc);
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		/* XXX: implement SIOCDELMULTI */
 		error = 0;
 		break;

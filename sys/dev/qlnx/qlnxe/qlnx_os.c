@@ -2741,7 +2741,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		QLNX_UNLOCK(ha);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case SIOCADDMULTI:
 		QL_DPRINT4(ha, "%s (0x%lx)\n", "SIOCADDMULTI", cmd);
 
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -2750,7 +2750,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCDELMULTI:
 		QL_DPRINT4(ha, "%s (0x%lx)\n", "SIOCDELMULTI", cmd);
 
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {

@@ -508,8 +508,8 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		NICVF_CORE_UNLOCK(nic);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 #if 0
 			NICVF_CORE_LOCK(nic);
