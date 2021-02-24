@@ -4695,13 +4695,3 @@ ipfw_objhash_alloc_idx(void *n, uint16_t *pidx)
 }
 
 /* end of file */
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net",
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

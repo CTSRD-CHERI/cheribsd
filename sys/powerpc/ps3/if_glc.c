@@ -958,12 +958,3 @@ glc_media_change(struct ifnet *ifp)
 
 	return (result ? EIO : 0);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

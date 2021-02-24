@@ -506,13 +506,3 @@ ifmedia_printword(int ifmw)
 	printf("%s\n", seen_option ? ">" : "");
 }
 #endif /* IFMEDIA_DEBUG */
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net",
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

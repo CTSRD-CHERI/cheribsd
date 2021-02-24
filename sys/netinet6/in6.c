@@ -2545,13 +2545,3 @@ in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)
 	free(*nam, M_SONAME);
 	*nam = (struct sockaddr *)sin6_p;
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net",
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

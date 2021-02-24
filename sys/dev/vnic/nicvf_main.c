@@ -1622,12 +1622,3 @@ nicvf_tick_stats(void *arg)
 
 	callout_reset(&nic->stats_callout, hz, nicvf_tick_stats, nic);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

@@ -2738,12 +2738,3 @@ sysctl_hw_nge_int_holdoff(SYSCTL_HANDLER_ARGS)
 	return (sysctl_int_range(oidp, arg1, arg2, req, NGE_INT_HOLDOFF_MIN,
 	    NGE_INT_HOLDOFF_MAX));
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

@@ -1469,12 +1469,3 @@ qla_tx_done(void *context, int pending)
 	qla_hw_tx_done(ha);
 	qla_start(ha->ifp);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

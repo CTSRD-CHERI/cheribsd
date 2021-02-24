@@ -1656,12 +1656,3 @@ DRIVER_MODULE(miibus, dwc, miibus_driver, miibus_devclass, 0, 0);
 
 MODULE_DEPEND(dwc, ether, 1, 1, 1);
 MODULE_DEPEND(dwc, miibus, 1, 1, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

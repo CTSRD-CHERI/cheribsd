@@ -4142,12 +4142,3 @@ dc_check_multiport(struct dc_softc *sc)
 	}
 	return (ENOENT);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

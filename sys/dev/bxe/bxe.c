@@ -19490,12 +19490,3 @@ bxe_debugnet_poll(struct ifnet *ifp, int count)
 	return (0);
 }
 #endif /* DEBUGNET */
-// CHERI CHANGES START
-// {
-//   "updated": 20191029,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

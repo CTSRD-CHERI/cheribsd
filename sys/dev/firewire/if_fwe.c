@@ -630,12 +630,3 @@ static driver_t fwe_driver = {
 DRIVER_MODULE(fwe, firewire, fwe_driver, fwe_devclass, 0, 0);
 MODULE_VERSION(fwe, 1);
 MODULE_DEPEND(fwe, firewire, 1, 1, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

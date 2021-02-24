@@ -1502,12 +1502,3 @@ qls_error_recovery(void *context, int pending)
 
 	return;
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

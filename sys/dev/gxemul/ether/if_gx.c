@@ -398,12 +398,3 @@ gx_rx_intr(void *arg)
 	}
 	GXEMUL_ETHER_UNLOCK(sc);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

@@ -854,12 +854,3 @@ dtsec_miibus_statchg(device_t dev)
 		device_printf(sc->sc_dev, "error while adjusting MAC speed.\n");
 }
 /** @} */
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

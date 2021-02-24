@@ -1567,12 +1567,3 @@ in_domifdetach(struct ifnet *ifp, void *aux)
 	lltable_free(ii->ii_llt);
 	free(ii, M_IFADDR);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

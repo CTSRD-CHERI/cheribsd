@@ -1349,12 +1349,3 @@ smc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	return (error);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

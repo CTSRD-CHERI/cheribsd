@@ -1966,12 +1966,3 @@ sysctl_bfe_stats(SYSCTL_HANDLER_ARGS)
 
 	return (error);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

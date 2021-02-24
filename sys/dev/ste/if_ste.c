@@ -2134,12 +2134,3 @@ ste_setwol(struct ste_softc *sc)
 		pmstat |= PCIM_PSTAT_PME | PCIM_PSTAT_PMEENABLE;
 	pci_write_config(sc->ste_dev, pmc + PCIR_POWER_STATUS, pmstat, 2);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

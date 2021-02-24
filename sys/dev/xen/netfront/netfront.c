@@ -2342,12 +2342,3 @@ devclass_t netfront_devclass;
 
 DRIVER_MODULE(xe, xenbusb_front, netfront_driver, netfront_devclass, NULL,
     NULL);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

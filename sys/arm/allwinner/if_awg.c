@@ -2023,12 +2023,3 @@ MODULE_DEPEND(awg, ether, 1, 1, 1);
 MODULE_DEPEND(awg, miibus, 1, 1, 1);
 MODULE_DEPEND(awg, aw_sid, 1, 1, 1);
 SIMPLEBUS_PNP_INFO(compat_data);
-// CHERI CHANGES START
-// {
-//   "updated": 20190429,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

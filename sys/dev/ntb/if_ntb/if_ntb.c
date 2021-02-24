@@ -512,12 +512,3 @@ DRIVER_MODULE(if_ntb, ntb_transport, ntb_net_driver, ntb_net_devclass,
     NULL, NULL);
 MODULE_DEPEND(if_ntb, ntb_transport, 1, 1, 1);
 MODULE_VERSION(if_ntb, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

@@ -3925,12 +3925,3 @@ MODULE_DEPEND(ena, netmap, 1, 1, 1);
 #endif /* DEV_NETMAP */
 
 /*********************************************************************/
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

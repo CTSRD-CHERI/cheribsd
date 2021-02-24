@@ -2936,12 +2936,3 @@ vge_clrwol(struct vge_softc *sc)
 	CSR_WRITE_1(sc, VGE_WOLSR0C, 0xFF);
 	CSR_WRITE_1(sc, VGE_WOLSR1C, 0xFF);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

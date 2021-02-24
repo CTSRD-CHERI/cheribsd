@@ -569,12 +569,3 @@ i_mbufcopy(struct mbuf *mp, caddr_t dp, int len)
 	       break;
      }
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20191025,
-//   "target_type": "header",
-//   "changes": [
-//     "iovec-macros"
-//   ]
-// }
-// CHERI CHANGES END

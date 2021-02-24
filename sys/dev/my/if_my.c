@@ -1764,12 +1764,3 @@ my_shutdown(device_t dev)
 	MY_UNLOCK(sc);
 	return 0;
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

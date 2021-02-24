@@ -1756,12 +1756,3 @@ dump_status_reg(struct are_softc *sc)
 
 }
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

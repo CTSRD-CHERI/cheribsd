@@ -11411,12 +11411,3 @@ bce_breakpoint(struct bce_softc *sc)
 	breakpoint();
 }
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

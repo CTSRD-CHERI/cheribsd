@@ -3640,12 +3640,3 @@ mvneta_update_mib(struct mvneta_softc *sc)
 		}
 	}
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END
