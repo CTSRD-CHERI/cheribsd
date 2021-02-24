@@ -44,7 +44,7 @@ STATCOUNTER_ITEM(instructions, instructions, instret)
 RISCV_STATCOUNTER(time)
 /*
  * XXX THIS CURRENTLY HAS TO MATCH THE STATIC ALLOCATION IN RISCV-PK
- *     see hpm_init() in riscv-pk/machine/minit.c
+ * (see hpm_init() in riscv-pk/machine/minit.c)
  */
 STATCOUNTER_ITEM(redirect, redirect, hpmcounter3)
 STATCOUNTER_ITEM(branch, branch, hpmcounter4)
