@@ -2538,25 +2538,6 @@ ifr__short0_set(void *ifrp, short val)
 		ifrup->ifr.ifr_ifru.ifru_flags[0] = val;
 }
 
-static void
-ifr__short1_set(void *ifrp, short val)
-{
-	union ifreq_union *ifrup;
-
-	ifrup = ifrp;
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		ifrup->ifr32.ifr_ifru.ifru_flags[1] = val;
-	else
-#endif
-#ifdef COMPAT_FREEBSD64
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		ifrup->ifr64.ifr_ifru.ifru_flags[1] = val;
-	else
-#endif
-		ifrup->ifr.ifr_ifru.ifru_flags[1] = val;
-}
-
 static u_char
 ifr__u_char_get(void *ifrp)
 {
@@ -2800,20 +2781,6 @@ ifr_fib_set(void *ifrp, u_int fib)
 	ifr__int0_set(ifrp, (u_int)fib);
 }
 
-void
-ifr_flags_set(void *ifrp, short val)
-{
-
-	ifr__short0_set(ifrp, val);
-}
-
-void
-ifr_flagshigh_set(void *ifrp, short val)
-{
-
-	ifr__short1_set(ifrp, val);
-}
-
 static void
 ifr_index_set(void *ifrp, short idx)
 {
@@ -2938,10 +2905,10 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		ifr_index_set(ifr, ifp->if_index);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFFLAGS):
+	case SIOCGIFFLAGS:
 		temp_flags = ifp->if_flags | ifp->if_drv_flags;
-		ifr_flags_set(ifr, temp_flags & 0xffff);
-		ifr_flagshigh_set(ifr, temp_flags >> 16);
+		ifr->ifr_flags = temp_flags & 0xffff;
+		ifr->ifr_flagshigh = temp_flags >> 16;
 		break;
 
 	case CASE_IOC_IFREQ(SIOCGIFCAP):
@@ -3516,12 +3483,17 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		data = (caddr_t)&thunk.ifmr;
 		cmd = SIOCIFGCLONERS;
 		break;
+	case IFREQ64(SIOCGIFFLAGS):
 	case IFREQ64(SIOCSIFFLAGS):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
-		thunk.ifr.ifr_flags = ifr64->ifr_flags;
-		thunk.ifr.ifr_flagshigh = ifr64->ifr_flagshigh;
+		switch (cmd) {
+		case IFREQ64(SIOCSIFFLAGS):
+			thunk.ifr.ifr_flags = ifr64->ifr_flags;
+			thunk.ifr.ifr_flagshigh = ifr64->ifr_flagshigh;
+			break;
+		}
 		saved_cmd = cmd;
 		saved_data = data;
 		data = (caddr_t)&thunk.ifr;
@@ -3694,6 +3666,11 @@ out_noref:
 	case SIOCIFGCLONERS64:
 		ifcr64 = (struct if_clonereq64 *)saved_data;
 		ifcr64->ifcr_total = thunk.ifcr.ifcr_total;
+		break;
+	case IFREQ64(SIOCGIFFLAGS):
+		ifr64 = (struct ifreq64 *)saved_data;
+		ifr64->ifr_flags = thunk.ifr.ifr_flags;
+		ifr64->ifr_flagshigh = thunk.ifr.ifr_flagshigh;
 		break;
 #endif
 	}
