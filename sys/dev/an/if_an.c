@@ -1939,7 +1939,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = priv_check(td, PRIV_DRIVER);
 		if (error)
 			break;
-		areq = malloc_c(sizeof(*areq), M_TEMP, M_WAITOK);
+		areq = malloc(sizeof(*areq), M_TEMP, M_WAITOK);
 		error = copyin(ifr_data_get_ptr(command, ifr), areq,
 		    sizeof(*areq));
 		if (error != 0) {
