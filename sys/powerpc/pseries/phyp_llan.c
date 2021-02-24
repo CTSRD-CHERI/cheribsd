@@ -549,7 +549,7 @@ llan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		mtx_unlock(&sc->io_lock);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		err = ifmedia_ioctl(ifp, (struct ifreq *)data, &sc->media, cmd);
 		break;
 	case SIOCSIFFLAGS:

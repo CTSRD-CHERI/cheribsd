@@ -3619,7 +3619,7 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case SIOCDELMULTI:
 		ieee80211_runtask(ic, &ic->ic_mcast_task);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		ifr = (struct ifreq *)data;
 		error = ifmedia_ioctl(ifp, ifr, &vap->iv_media, cmd);

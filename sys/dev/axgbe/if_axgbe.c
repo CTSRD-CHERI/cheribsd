@@ -157,7 +157,7 @@ axgbe_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 	case SIOCSIFFLAGS:
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->media, command);
 		break;

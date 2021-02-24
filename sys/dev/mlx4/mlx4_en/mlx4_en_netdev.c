@@ -1995,7 +1995,7 @@ static int mlx4_en_ioctl(struct ifnet *dev, u_long command, caddr_t data)
 	case SIOCDELMULTI:
 		mlx4_en_set_rx_mode(dev);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(dev, ifr, &priv->media, command);
 		break;

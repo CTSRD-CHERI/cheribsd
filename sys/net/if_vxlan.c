@@ -2348,7 +2348,7 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = vxlan_ioctl_ifflags(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->vxl_media, cmd);
 		break;

@@ -1819,7 +1819,7 @@ arge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		if (sc->arge_miibus) {
 			mii = device_get_softc(sc->arge_miibus);
 			error = ifmedia_ioctl(ifp, ifr, &mii->mii_media,

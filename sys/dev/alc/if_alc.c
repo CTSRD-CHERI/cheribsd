@@ -3086,7 +3086,7 @@ alc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			alc_rxfilter(sc);
 		ALC_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->alc_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);

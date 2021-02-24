@@ -543,7 +543,7 @@ uether_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		UE_UNLOCK(ue);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		if (ue->ue_miibus != NULL) {
 			mii = device_get_softc(ue->ue_miibus);
 			error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);

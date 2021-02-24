@@ -969,7 +969,7 @@ atse_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		ATSE_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	{
 		struct mii_data *mii;
 		struct ifreq *ifr;

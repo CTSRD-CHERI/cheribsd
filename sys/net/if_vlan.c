@@ -1865,7 +1865,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VLAN_SUNLOCK();
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		error = EINVAL;
 		break;
 

@@ -1751,7 +1751,7 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			error = 0;
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->nfe_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);

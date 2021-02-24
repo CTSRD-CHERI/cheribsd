@@ -1685,7 +1685,7 @@ lagg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		LAGG_XUNLOCK(sc);
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		if (ifp->if_type == IFT_INFINIBAND)
 			error = EINVAL;

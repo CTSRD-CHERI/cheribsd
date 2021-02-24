@@ -3548,7 +3548,7 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			ti_setmulti(sc);
 		TI_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
 		break;

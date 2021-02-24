@@ -763,7 +763,7 @@ nf10bmac_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
                 NF10BMAC_UNLOCK(sc);
                 break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
                 error = ifmedia_ioctl(ifp, ifr, &sc->nf10bmac_media, command);
 		break;
 	default:

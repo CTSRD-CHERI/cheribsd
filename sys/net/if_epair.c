@@ -662,7 +662,7 @@ epair_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = 0;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		sc = ifp->if_softc;
 		error = ifmedia_ioctl(ifp, ifr, &sc->media, cmd);

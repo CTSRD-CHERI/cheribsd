@@ -3307,7 +3307,7 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case SIOCDELMULTI:
 		mlx5e_set_rx_mode(ifp);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
 		ifr = (struct ifreq *)data;

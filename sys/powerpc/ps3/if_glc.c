@@ -492,7 +492,7 @@ glc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
                 mtx_unlock(&sc->sc_mtx);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		err = ifmedia_ioctl(ifp, ifr, &sc->sc_media, cmd);
 		break;
 	default:

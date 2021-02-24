@@ -1462,7 +1462,7 @@ cpswp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		cpswp_ale_update_addresses(sc, 1);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->mii->mii_media, command);
 		break;
 	default:

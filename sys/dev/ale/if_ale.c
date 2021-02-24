@@ -2011,7 +2011,7 @@ ale_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ale_rxfilter(sc);
 		ALE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->ale_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);

@@ -1140,7 +1140,7 @@ awg_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			AWG_UNLOCK(sc);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;

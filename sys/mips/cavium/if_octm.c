@@ -478,7 +478,7 @@ octm_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		    ifr_mtu_get(ifr) + ifp->if_hdrlen);
 		return (0);
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_ifmedia, cmd);
 		if (error != 0)

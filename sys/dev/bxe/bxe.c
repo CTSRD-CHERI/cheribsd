@@ -4684,7 +4684,7 @@ bxe_ioctl(if_t ifp,
 
         break;
 
-    case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+    case SIOCSIFMEDIA:
     case SIOCGIFMEDIA:
         /* set/get interface media */
         BLOGD(sc, DBG_IOCTL,

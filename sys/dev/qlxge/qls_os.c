@@ -958,7 +958,7 @@ qls_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		QL_DPRINT4((ha->pci_dev,
 			"%s: SIOCSIFMEDIA/SIOCGIFMEDIA (0x%lx)\n",

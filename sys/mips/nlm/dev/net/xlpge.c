@@ -779,7 +779,7 @@ nlm_xlpge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		if (sc->mii_bus != NULL) {
 			mii = device_get_softc(sc->mii_bus);
 			error = ifmedia_ioctl(ifp, ifr, &mii->mii_media,

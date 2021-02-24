@@ -1796,7 +1796,7 @@ bfe_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		BFE_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		mii = device_get_softc(sc->bfe_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;

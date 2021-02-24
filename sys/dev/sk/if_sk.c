@@ -1147,7 +1147,7 @@ sk_ioctl(ifp, command, data)
 		SK_IF_UNLOCK(sc_if);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		mii = device_get_softc(sc_if->sk_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;

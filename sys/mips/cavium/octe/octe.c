@@ -469,7 +469,7 @@ octe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			return (EINVAL);
 		return (0);
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		if (priv->miibus != NULL) {
 			mii = device_get_softc(priv->miibus);

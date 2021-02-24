@@ -2875,7 +2875,7 @@ fxp_ioctl(if_t ifp, u_long command, caddr_t data)
 		FXP_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		if (sc->miibus != NULL) {
 			mii = device_get_softc(sc->miibus);

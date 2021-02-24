@@ -1485,7 +1485,7 @@ lge_ioctl(ifp, command, data)
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		mii = device_get_softc(sc->lge_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;

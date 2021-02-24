@@ -473,7 +473,7 @@ tracer_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 	case SIOCDELMULTI:
 	case SIOCSIFCAP:
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
 		sx_xlock(&t4_trace_lock);

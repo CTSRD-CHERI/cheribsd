@@ -3030,7 +3030,7 @@ xl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		XL_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		if (sc->xl_miibus != NULL)
 			mii = device_get_softc(sc->xl_miibus);
 		if (mii == NULL)

@@ -1552,23 +1552,21 @@ mge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 #endif
 		break;
 	case SIOCGIFMEDIA: /* fall through */
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		/*
 		 * Setting up media type via ioctls is *not* supported for MAC
 		 * which is connected to switch. Use etherswitchcfg.
 		 */
-		if (!sc->phy_attached) {
-			switch (command) {
-			case CASE_IOC_IFREQ(SIOCSIFMEDIA):
-				return (0);
-			}
+		if (!sc->phy_attached && (command == SIOCSIFMEDIA))
+			return (0);
+		else if (!sc->phy_attached) {
 			error = ifmedia_ioctl(ifp, ifr, &sc->mge_ifmedia,
 			    command);
 			break;
 		}
 
-		if (IFM_SUBTYPE(ifr_media_get(ifr)) == IFM_1000_T
-		    && !(ifr_media_get(ifr) & IFM_FDX)) {
+		if (IFM_SUBTYPE(ifr->ifr_media) == IFM_1000_T
+		    && !(ifr->ifr_media & IFM_FDX)) {
 			device_printf(sc->dev,
 			    "1000baseTX half-duplex unsupported\n");
 			return 0;

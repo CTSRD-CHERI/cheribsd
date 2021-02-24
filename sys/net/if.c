@@ -2770,13 +2770,6 @@ ifr_jid_get(void *ifrp)
 }
 #endif
 
-int
-ifr_media_get(void *ifrp)
-{
-	
-	return (ifr__int0_get(ifrp));
-}
-
 static int
 ifr_metric_get(void *ifrp)
 {
@@ -3201,7 +3194,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 #ifdef INET6
 	case SIOCSIFPHYADDR_IN6:
 #endif
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case CASE_IOC_IFREQ(SIOCSIFGENERIC):
 		error = priv_check(td, PRIV_NET_HWIOCTL);
 		if (error)
@@ -3443,6 +3436,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCDELMULTI):
 	case IFREQ64(SIOCGIFCAP):
 	case IFREQ64(SIOCSIFCAP):
+	case IFREQ64(SIOCSIFMEDIA):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
@@ -3457,6 +3451,9 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 			break;
 		case IFREQ64(SIOCSIFCAP):
 			thunk.ifr.ifr_reqcap = ifr64->ifr_reqcap;
+			break;
+		case IFREQ64(SIOCSIFMEDIA):
+			thunk.ifr.ifr_media = ifr64->ifr_media;
 			break;
 		}
 		saved_cmd = cmd;

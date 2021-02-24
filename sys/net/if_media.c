@@ -62,7 +62,6 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_media.h>
-#include <net/if_var.h>
 
 /*
  * Compile-time options:
@@ -219,11 +218,11 @@ ifmedia_ioctl(struct ifnet *ifp, struct ifreq *ifr, struct ifmedia *ifm,
 	/*
 	 * Set the current media.
 	 */
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case  SIOCSIFMEDIA:
 	{
 		struct ifmedia_entry *oldentry;
 		int oldmedia;
-		int newmedia = ifr_media_get(ifr);
+		int newmedia = ifr->ifr_media;
 
 		match = ifmedia_match(ifm, newmedia, ifm->ifm_mask);
 		if (match == NULL) {

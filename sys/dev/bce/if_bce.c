@@ -7617,7 +7617,7 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set/Get Interface media */
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		DBPRINT(sc, BCE_VERBOSE_MISC,
 		    "Received SIOCSIFMEDIA/SIOCGIFMEDIA\n");

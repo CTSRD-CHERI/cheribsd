@@ -1293,7 +1293,7 @@ rt_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		RT_SOFTC_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 #ifdef IF_RT_PHY_SUPPORT
 		mii = device_get_softc(sc->rt_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);

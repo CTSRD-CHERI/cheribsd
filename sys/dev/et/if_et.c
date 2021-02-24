@@ -1315,7 +1315,7 @@ et_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ET_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->sc_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);

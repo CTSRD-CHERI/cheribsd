@@ -2131,13 +2131,13 @@ mvneta_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		VLAN_CAPABILITIES(ifp);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
-		if ((IFM_SUBTYPE(ifr_media_get(ifr)) == IFM_1000_T ||
-		    IFM_SUBTYPE(ifr_media_get(ifr)) == IFM_2500_T) &&
-		    (ifr_media_get(ifr) & IFM_FDX) == 0) {
+	case SIOCSIFMEDIA:
+		if ((IFM_SUBTYPE(ifr->ifr_media) == IFM_1000_T ||
+		    IFM_SUBTYPE(ifr->ifr_media) == IFM_2500_T) &&
+		    (ifr->ifr_media & IFM_FDX) == 0) {
 			device_printf(sc->dev,
 			    "%s half-duplex unsupported\n",
-			    IFM_SUBTYPE(ifr_media_get(ifr)) == IFM_1000_T ?
+			    IFM_SUBTYPE(ifr->ifr_media) == IFM_1000_T ?
 			    "1000Base-T" :
 			    "2500Base-T");
 			error = EINVAL;

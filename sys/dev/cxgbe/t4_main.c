@@ -2200,7 +2200,7 @@ fail:
 		end_synchronized_op(sc, 0);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
 		ifmedia_ioctl(ifp, ifr, &pi->media, cmd);

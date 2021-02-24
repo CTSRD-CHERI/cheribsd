@@ -2932,7 +2932,7 @@ ndis_ifioctl(ifp, command, data)
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
 		break;
 	case SIOCSIFCAP:

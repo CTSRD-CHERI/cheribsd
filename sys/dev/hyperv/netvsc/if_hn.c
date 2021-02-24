@@ -3952,7 +3952,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		HN_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		HN_LOCK(sc);
 		if (hn_xpnt_vf_isready(sc)) {

@@ -4223,7 +4223,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 			CTX_UNLOCK(ctx);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		CTX_LOCK(ctx);
 		IFDI_MEDIA_SET(ctx);
 		CTX_UNLOCK(ctx);

@@ -1926,7 +1926,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		AN_UNLOCK(sc);
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->an_ifmedia, command);
 		break;

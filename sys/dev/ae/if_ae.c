@@ -2137,7 +2137,7 @@ ae_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ae_rxfilter(sc);
 		AE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
