@@ -2,9 +2,15 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright 2020 Alex Richardson <arichardson@FreeBSD.org>
+ * Copyright 2021 Alexandre Joannou
  *
  * This work was supported by Innovate UK project 105694, "Digital Security by
  * Design (DSbD) Technology Platform Prototype".
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
+ * DARPA SSITH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -30,13 +36,54 @@
 #endif
 
 #ifndef RISCV_STATCOUNTER
-#define RISCV_STATCOUNTER(csr) STATCOUNTER_ITEM(csr, csr, csr)
+#define RISCV_STATCOUNTER(name, csr) STATCOUNTER_ITEM(name, name, csr)
 #endif
 
-STATCOUNTER_ITEM(cycles, cycles, cycle)
-STATCOUNTER_ITEM(instructions, instructions, instret)
-RISCV_STATCOUNTER(time)
-/* TODO: add the remaining counters once we have implementations that support them. */
+#ifndef STATCOUNTERS_GROUP_END
+#define STATCOUNTERS_GROUP_END()
+#endif
+
+RISCV_STATCOUNTER(cycles, cycle)
+RISCV_STATCOUNTER(instructions, instret)
+RISCV_STATCOUNTER(time, time)
+STATCOUNTERS_GROUP_END()
+/*
+ * XXX THIS CURRENTLY HAS TO MATCH THE STATIC ALLOCATION IN RISCV-PK
+ * (see hpm_init() in riscv-pk/machine/minit.c)
+ */
+RISCV_STATCOUNTER(redirect, hpmcounter3)
+RISCV_STATCOUNTER(branch, hpmcounter4)
+RISCV_STATCOUNTER(jal, hpmcounter5)
+RISCV_STATCOUNTER(jalr, hpmcounter6)
+RISCV_STATCOUNTER(trap, hpmcounter7)
+STATCOUNTERS_GROUP_END()
+RISCV_STATCOUNTER(load_wait, hpmcounter8)
+RISCV_STATCOUNTER(cap_load_tag_set, hpmcounter9)
+RISCV_STATCOUNTER(cap_store_tag_set, hpmcounter10)
+STATCOUNTERS_GROUP_END()
+RISCV_STATCOUNTER(itlb_miss_wait, hpmcounter11)
+RISCV_STATCOUNTER(icache_load, hpmcounter12)
+RISCV_STATCOUNTER(icache_load_miss, hpmcounter13)
+RISCV_STATCOUNTER(icache_load_miss_wait, hpmcounter14)
+STATCOUNTERS_GROUP_END()
+RISCV_STATCOUNTER(dtlb_access, hpmcounter15)
+RISCV_STATCOUNTER(dtlb_miss, hpmcounter16)
+RISCV_STATCOUNTER(dtlb_miss_wait, hpmcounter17)
+RISCV_STATCOUNTER(dcache_load, hpmcounter18)
+RISCV_STATCOUNTER(dcache_load_miss, hpmcounter19)
+RISCV_STATCOUNTER(dcache_load_miss_wait, hpmcounter20)
+RISCV_STATCOUNTER(dcache_store, hpmcounter21)
+RISCV_STATCOUNTER(dcache_store_miss, hpmcounter22)
+STATCOUNTERS_GROUP_END()
+RISCV_STATCOUNTER(llcache_load_miss, hpmcounter23)
+RISCV_STATCOUNTER(llcache_load_miss_wait, hpmcounter24)
+STATCOUNTERS_GROUP_END()
+RISCV_STATCOUNTER(tagcache_load, hpmcounter25)
+RISCV_STATCOUNTER(tagcache_load_miss, hpmcounter26)
+RISCV_STATCOUNTER(tagcache_store, hpmcounter27)
+RISCV_STATCOUNTER(tagcache_store_miss, hpmcounter28)
+RISCV_STATCOUNTER(tagcache_evict, hpmcounter29)
 
 #undef RISCV_STATCOUNTER
 #undef STATCOUNTER_ITEM
+#undef STATCOUNTERS_GROUP_END
