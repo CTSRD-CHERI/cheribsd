@@ -1347,8 +1347,8 @@ tunifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (error == 0)
 		    TUNDEBUG(ifp, "address set\n");
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		ifp->if_mtu = ifr_mtu_get(ifr);
+	case SIOCSIFMTU:
+		ifp->if_mtu = ifr->ifr_mtu;
 		TUNDEBUG(ifp, "mtu set\n");
 		break;
 	case SIOCSIFFLAGS:
@@ -1626,7 +1626,7 @@ tunioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag,
 		TUN_LOCK(tp);
 		if (TUN2IFP(tp)->if_mtu != tunp->mtu) {
 			strlcpy(ifr.ifr_name, if_name(TUN2IFP(tp)), IFNAMSIZ);
-			ifr_mtu_set(&ifr, tunp->mtu);
+			ifr.ifr_mtu = tunp->mtu;
 			CURVNET_SET(TUN2IFP(tp)->if_vnet);
 			error = ifhwioctl(SIOCSIFMTU, TUN2IFP(tp),
 			    (caddr_t)&ifr, td);

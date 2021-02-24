@@ -236,8 +236,8 @@ discioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		ifp->if_mtu = ifr_mtu_get(ifr);
+	case SIOCSIFMTU:
+		ifp->if_mtu = ifr->ifr_mtu;
 		break;
 	default:
 		error = EINVAL;

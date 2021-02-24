@@ -744,9 +744,9 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case CASE_IOC_IFREQ(SIOCGIFMTU):
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		ifr = (struct ifreq *)data;
-		mtu = ifr_mtu_get(ifr);
+		mtu = ifr->ifr_mtu;
 		/* RFC 4213 3.2 ideal world MTU */
 		if (mtu < IPV6_MINMTU || mtu > IF_MAXMTU - 20)
 			return (EINVAL);

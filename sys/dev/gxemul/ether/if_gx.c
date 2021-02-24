@@ -325,8 +325,8 @@ gx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->sc_flags = ifp->if_flags;
 		return (0);
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) + ifp->if_hdrlen > GXEMUL_ETHER_DEV_MTU)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu + ifp->if_hdrlen > GXEMUL_ETHER_DEV_MTU)
 			return (ENOTSUP);
 		return (0);
 

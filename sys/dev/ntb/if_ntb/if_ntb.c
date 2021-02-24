@@ -245,14 +245,14 @@ ntb_ioctl(if_t ifp, u_long command, caddr_t data)
 	case SIOCDELMULTI:
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 	    {
-		if (ifr_mtu_get(ifr) > sc->mtu - ETHER_HDR_LEN) {
+		if (ifr->ifr_mtu > sc->mtu - ETHER_HDR_LEN) {
 			error = EINVAL;
 			break;
 		}
 
-		if_setmtu(ifp, ifr_mtu_get(ifr));
+		if_setmtu(ifp, ifr->ifr_mtu);
 		break;
 	    }
 

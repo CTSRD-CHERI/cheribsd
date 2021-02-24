@@ -1700,18 +1700,17 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 	error = 0;
 	init = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		    ifr_mtu_get(ifr) > NFE_JUMBO_MTU)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > NFE_JUMBO_MTU)
 			error = EINVAL;
-		else if (if_getmtu(ifp) != ifr_mtu_get(ifr)) {
+		else if (if_getmtu(ifp) != ifr->ifr_mtu) {
 			if ((((sc->nfe_flags & NFE_JUMBO_SUP) == 0) ||
 			    (sc->nfe_jumbo_disable != 0)) &&
-			    ifr_mtu_get(ifr) > ETHERMTU)
+			    ifr->ifr_mtu > ETHERMTU)
 				error = EINVAL;
 			else {
 				NFE_LOCK(sc);
-				if_setmtu(ifp, ifr_mtu_get(ifr));
+				if_setmtu(ifp, ifr->ifr_mtu);
 				if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 					if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 					nfe_init_locked(sc);

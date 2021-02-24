@@ -2478,12 +2478,12 @@ cas_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			cas_setladrf(sc);
 		CAS_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if ((ifr_mtu_get(ifr) < ETHERMIN) ||
-		    (ifr_mtu_get(ifr) > ETHERMTU_JUMBO))
+	case SIOCSIFMTU:
+		if ((ifr->ifr_mtu < ETHERMIN) ||
+		    (ifr->ifr_mtu > ETHERMTU_JUMBO))
 			error = EINVAL;
 		else
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 		break;
 	case SIOCGIFMEDIA:
 	case SIOCSIFMEDIA:

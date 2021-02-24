@@ -4170,9 +4170,9 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		} else
 			err = ether_ioctl(ifp, command, data);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		CTX_LOCK(ctx);
-		if (ifr_mtu_get(ifr) == if_getmtu(ifp)) {
+		if (ifr->ifr_mtu == if_getmtu(ifp)) {
 			CTX_UNLOCK(ctx);
 			break;
 		}
@@ -4180,14 +4180,14 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		/* stop the driver and free any clusters before proceeding */
 		iflib_stop(ctx);
 
-		if ((err = IFDI_MTU_SET(ctx, ifr_mtu_get(ifr))) == 0) {
+		if ((err = IFDI_MTU_SET(ctx, ifr->ifr_mtu)) == 0) {
 			STATE_LOCK(ctx);
-			if (ifr_mtu_get(ifr) > ctx->ifc_max_fl_buf_size)
+			if (ifr->ifr_mtu > ctx->ifc_max_fl_buf_size)
 				ctx->ifc_flags |= IFC_MULTISEG;
 			else
 				ctx->ifc_flags &= ~IFC_MULTISEG;
 			STATE_UNLOCK(ctx);
-			err = if_setmtu(ifp, ifr_mtu_get(ifr));
+			err = if_setmtu(ifp, ifr->ifr_mtu);
 		}
 		iflib_init_locked(ctx);
 		STATE_LOCK(ctx);

@@ -314,11 +314,11 @@ ipoib_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr), INFINIBAND_ALEN);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		/*
 		 * Set the interface MTU.
 		 */
-		error = -ipoib_change_mtu(priv, ifr_mtu_get(ifr), false);
+		error = -ipoib_change_mtu(priv, ifr->ifr_mtu, false);
 		break;
 	default:
 		error = EINVAL;

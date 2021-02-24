@@ -473,9 +473,8 @@ octm_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifp->if_capenable = ifr->ifr_reqcap;
 		return (0);
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		cvmx_mgmt_port_set_max_packet_size(sc->sc_port,
-		    ifr_mtu_get(ifr) + ifp->if_hdrlen);
+	case SIOCSIFMTU:
+		cvmx_mgmt_port_set_max_packet_size(sc->sc_port, ifr->ifr_mtu + ifp->if_hdrlen);
 		return (0);
 
 	case SIOCSIFMEDIA:

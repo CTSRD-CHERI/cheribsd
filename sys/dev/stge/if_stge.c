@@ -1262,12 +1262,11 @@ stge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		   ifr_mtu_get(ifr) > STGE_JUMBO_MTU)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > STGE_JUMBO_MTU)
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
-			ifp->if_mtu = ifr_mtu_get(ifr);
+		else if (ifp->if_mtu != ifr->ifr_mtu) {
+			ifp->if_mtu = ifr->ifr_mtu;
 			STGE_LOCK(sc);
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;

@@ -934,10 +934,10 @@ tsec_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int mask, error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		TSEC_GLOBAL_LOCK(sc);
-		if (tsec_set_mtu(sc, ifr_mtu_get(ifr)))
-			ifp->if_mtu = ifr_mtu_get(ifr);
+		if (tsec_set_mtu(sc, ifr->ifr_mtu))
+			ifp->if_mtu = ifr->ifr_mtu;
 		else
 			error = EINVAL;
 		TSEC_GLOBAL_UNLOCK(sc);

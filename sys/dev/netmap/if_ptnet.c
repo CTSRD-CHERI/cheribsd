@@ -827,14 +827,14 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		ifp->if_capenable = ifr->ifr_reqcap;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		/* We support any reasonable MTU. */
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-				ifr_mtu_get(ifr) > PTNET_MAX_PKT_SIZE) {
+		if (ifr->ifr_mtu < ETHERMIN ||
+				ifr->ifr_mtu > PTNET_MAX_PKT_SIZE) {
 			err = EINVAL;
 		} else {
 			PTNET_CORE_LOCK(sc);
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			PTNET_CORE_UNLOCK(sc);
 		}
 		break;

@@ -827,7 +827,6 @@ size_t ifr_buffer_get_length(u_long cmd, void *data);
 void * __capability ifr_data_get_ptr(u_long cmd, void *ifrp);
 u_int ifr_fib_get(void *ifrp);
 void ifr_fib_set(void *ifrp, u_int fib);
-int ifr_mtu_get(void *ifrp);
 void ifr_mtu_set(void *ifrp, int val);
 u_char ifr_lan_pcp_get(void *ifrp);
 void ifr_lan_pcp_set(void *ifrp, u_char pcp);

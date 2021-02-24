@@ -603,12 +603,12 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case CASE_IOC_IFREQ(SIOCGIFMTU):
 	case SIOCSIFFLAGS:
 		return (0);
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < GIF_MTU_MIN ||
-		    ifr_mtu_get(ifr) > GIF_MTU_MAX)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < GIF_MTU_MIN ||
+		    ifr->ifr_mtu > GIF_MTU_MAX)
 			return (EINVAL);
 		else
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 		return (0);
 	}
 	sx_xlock(&gif_ioctl_sx);

@@ -412,20 +412,20 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 		sc->if_flags = ifp->if_flags;
 		SFXGE_ADAPTER_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) == ifp->if_mtu) {
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu == ifp->if_mtu) {
 			/* Nothing to do */
 			error = 0;
-		} else if (ifr_mtu_get(ifr) > SFXGE_MAX_MTU) {
+		} else if (ifr->ifr_mtu > SFXGE_MAX_MTU) {
 			error = EINVAL;
 		} else if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			error = 0;
 		} else {
 			/* Restart required */
 			SFXGE_ADAPTER_LOCK(sc);
 			sfxge_stop(sc);
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			error = sfxge_start(sc);
 			SFXGE_ADAPTER_UNLOCK(sc);
 			if (error != 0) {

@@ -475,11 +475,11 @@ oce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		rc = ifmedia_ioctl(ifp, ifr, &sc->media, command);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) > OCE_MAX_MTU)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu > OCE_MAX_MTU)
 			rc = EINVAL;
 		else
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 		break;
 
 	case SIOCSIFFLAGS:

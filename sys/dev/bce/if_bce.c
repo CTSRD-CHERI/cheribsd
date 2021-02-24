@@ -7550,20 +7550,20 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 	switch(command) {
 	/* Set the interface MTU. */
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		/* Check that the MTU setting is supported. */
-		if ((ifr_mtu_get(ifr) < BCE_MIN_MTU) ||
-			(ifr_mtu_get(ifr) > BCE_MAX_JUMBO_MTU)) {
+		if ((ifr->ifr_mtu < BCE_MIN_MTU) ||
+			(ifr->ifr_mtu > BCE_MAX_JUMBO_MTU)) {
 			error = EINVAL;
 			break;
 		}
 
 		DBPRINT(sc, BCE_INFO_MISC,
 		    "SIOCSIFMTU: Changing MTU from %d to %d\n",
-		    (int) ifp->if_mtu, (int) ifr_mtu_get(ifr));
+		    (int) ifp->if_mtu, (int) ifr->ifr_mtu);
 
 		BCE_LOCK(sc);
-		ifp->if_mtu = ifr_mtu_get(ifr);
+		ifp->if_mtu = ifr->ifr_mtu;
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 			bce_init_locked(sc);

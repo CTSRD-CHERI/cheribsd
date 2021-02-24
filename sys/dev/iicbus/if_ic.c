@@ -241,8 +241,8 @@ icioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		mtx_unlock(&sc->ic_lock);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		ic_alloc_buffers(sc, ifr_mtu_get(ifr));
+	case SIOCSIFMTU:
+		ic_alloc_buffers(sc, ifr->ifr_mtu);
 		break;
 
 	case CASE_IOC_IFREQ(SIOCGIFMTU):

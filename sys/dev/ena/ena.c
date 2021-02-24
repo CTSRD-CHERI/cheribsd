@@ -2241,13 +2241,13 @@ ena_ioctl(if_t ifp, u_long command, caddr_t data)
 	 */
 	rc = 0;
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifp->if_mtu == ifr_mtu_get(&ifr))
+	case SIOCSIFMTU:
+		if (ifp->if_mtu == ifr->ifr_mtu)
 			break;
 		ENA_LOCK_LOCK(adapter);
 		ena_down(adapter);
 
-		ena_change_mtu(ifp, ifr_mtu_get(ifr));
+		ena_change_mtu(ifp, ifr->ifr_mtu);
 
 		rc = ena_up(adapter);
 		ENA_LOCK_UNLOCK(adapter);

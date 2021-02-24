@@ -432,10 +432,10 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ppb_unlock(ppbus);
 		return (error);
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		ppb_lock(ppbus);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
-			ptr = malloc(ifr_mtu_get(ifr) + MLPIPHDRLEN, M_DEVBUF,
+			ptr = malloc(ifr->ifr_mtu + MLPIPHDRLEN, M_DEVBUF,
 			    M_NOWAIT);
 			if (ptr == NULL) {
 				ppb_unlock(ppbus);
@@ -445,7 +445,7 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				free(sc->sc_ifbuf, M_DEVBUF);
 			sc->sc_ifbuf = ptr;
 		}
-		sc->sc_ifp->if_mtu = ifr_mtu_get(ifr);
+		sc->sc_ifp->if_mtu = ifr->ifr_mtu;
 		ppb_unlock(ppbus);
 		break;
 

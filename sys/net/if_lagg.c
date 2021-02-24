@@ -790,14 +790,14 @@ lagg_port_create(struct lagg_softc *sc, struct ifnet *ifp)
 		}
 		oldmtu = ifp->if_mtu;
 		strlcpy(ifr.ifr_name, ifp->if_xname, sizeof(ifr.ifr_name));
-		ifr_mtu_set(&ifr, sc->sc_ifp->if_mtu);
+		ifr.ifr_mtu = sc->sc_ifp->if_mtu;
 		error = (*ifp->if_ioctl)(ifp, SIOCSIFMTU, (caddr_t)&ifr);
 		if (error != 0) {
 			if_printf(sc->sc_ifp, "invalid MTU for %s\n",
 			    ifp->if_xname);
 			return (error);
 		}
-		ifr_mtu_set(&ifr, oldmtu);
+		ifr.ifr_mtu = oldmtu;
 	}
 
 	lp = malloc(sizeof(struct lagg_port), M_LAGG, M_WAITOK|M_ZERO);
@@ -1062,7 +1062,7 @@ lagg_port_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VLAN_CAPABILITIES(sc->sc_ifp);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		/* Do not allow the MTU to be changed once joined */
 		error = EINVAL;
 		break;
@@ -1705,7 +1705,7 @@ lagg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = 0;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		LAGG_XLOCK(sc);
 		CK_SLIST_FOREACH(lp, &sc->sc_ports, lp_entries) {
 			if (lp->lp_ioctl != NULL)
@@ -1716,16 +1716,15 @@ lagg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				if_printf(ifp,
 				    "failed to change MTU to %d on port %s, "
 				    "reverting all ports to original MTU (%d)\n",
-				    ifr_mtu_get(ifr), lp->lp_ifp->if_xname,
-				    ifp->if_mtu);
+				    ifr->ifr_mtu, lp->lp_ifp->if_xname, ifp->if_mtu);
 				break;
 			}
 		}
 		if (error == 0) {
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 		} else {
 			/* set every port back to the original MTU */
-			ifr_mtu_set(ifr, ifp->if_mtu);
+			ifr->ifr_mtu = ifp->if_mtu;
 			CK_SLIST_FOREACH(lp, &sc->sc_ports, lp_entries) {
 				if (lp->lp_ioctl != NULL)
 					(*lp->lp_ioctl)(lp->lp_ifp, cmd, data);

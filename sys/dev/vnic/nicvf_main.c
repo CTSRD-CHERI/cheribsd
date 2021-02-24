@@ -466,15 +466,15 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 		err = ether_ioctl(ifp, cmd, data);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < NIC_HW_MIN_FRS ||
-		    ifr_mtu_get(ifr) > NIC_HW_MAX_FRS) {
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < NIC_HW_MIN_FRS ||
+		    ifr->ifr_mtu > NIC_HW_MAX_FRS) {
 			err = EINVAL;
 		} else {
 			NICVF_CORE_LOCK(nic);
-			err = nicvf_update_hw_max_frs(nic, ifr_mtu_get(ifr));
+			err = nicvf_update_hw_max_frs(nic, ifr->ifr_mtu);
 			if (err == 0)
-				if_setmtu(ifp, ifr_mtu_get(ifr));
+				if_setmtu(ifp, ifr->ifr_mtu);
 			NICVF_CORE_UNLOCK(nic);
 		}
 		break;

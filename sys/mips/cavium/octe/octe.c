@@ -463,8 +463,8 @@ octe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifp->if_capenable = ifr->ifr_reqcap;
 		return (0);
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		error = cvm_oct_common_change_mtu(ifp, ifr_mtu_get(ifr));
+	case SIOCSIFMTU:
+		error = cvm_oct_common_change_mtu(ifp, ifr->ifr_mtu);
 		if (error != 0)
 			return (EINVAL);
 		return (0);

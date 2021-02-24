@@ -3307,9 +3307,9 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int			error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 	{
-		error = al_eth_check_mtu(adapter, ifr_mtu_get(ifr));
+		error = al_eth_check_mtu(adapter, ifr->ifr_mtu);
 		if (error != 0) {
 			device_printf(adapter->dev, "ioctl wrong mtu %u\n",
 			    adapter->netdev->if_mtu);
@@ -3317,7 +3317,7 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 
 		ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
-		adapter->netdev->if_mtu = ifr_mtu_get(ifr);
+		adapter->netdev->if_mtu = ifr->ifr_mtu;
 		al_init(adapter);
 		break;
 	}

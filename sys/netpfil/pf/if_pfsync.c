@@ -1339,12 +1339,12 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			pfsync_pointers_uninit();
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		if (!sc->sc_sync_if ||
-		    ifr_mtu_get(ifr) <= PFSYNC_MINPKT ||
-		    ifr_mtu_get(ifr) > sc->sc_sync_if->if_mtu)
+		    ifr->ifr_mtu <= PFSYNC_MINPKT ||
+		    ifr->ifr_mtu > sc->sc_sync_if->if_mtu)
 			return (EINVAL);
-		if (ifr_mtu_get(ifr) < ifp->if_mtu) {
+		if (ifr->ifr_mtu < ifp->if_mtu) {
 			for (c = 0; c < pfsync_buckets; c++) {
 				PFSYNC_BUCKET_LOCK(&sc->sc_buckets[c]);
 				if (sc->sc_buckets[c].b_len > PFSYNC_MINPKT)
@@ -1352,7 +1352,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				PFSYNC_BUCKET_UNLOCK(&sc->sc_buckets[c]);
 			}
 		}
-		ifp->if_mtu = ifr_mtu_get(ifr);
+		ifp->if_mtu = ifr->ifr_mtu;
 		break;
 	case CASE_IOC_IFREQ(SIOCGETPFSYNC):
 		bzero(&pfsyncr, sizeof(pfsyncr));

@@ -3639,13 +3639,13 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		copyout(&vap->iv_stats, ifr_data_get_ptr(cmd, ifr),
 		    sizeof (vap->iv_stats));
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		ifr = (struct ifreq *)data;
-		if (!(IEEE80211_MTU_MIN <= ifr_mtu_get(ifr) &&
-		    ifr_mtu_get(ifr) <= IEEE80211_MTU_MAX))
+		if (!(IEEE80211_MTU_MIN <= ifr->ifr_mtu &&
+		    ifr->ifr_mtu <= IEEE80211_MTU_MAX))
 			error = EINVAL;
 		else
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 		break;
 	case CASE_IOC_IFREQ(SIOCSIFADDR):
 		/*

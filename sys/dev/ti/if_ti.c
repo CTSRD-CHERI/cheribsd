@@ -3496,13 +3496,13 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int mask, error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		TI_LOCK(sc);
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		    ifr_mtu_get(ifr) > TI_JUMBO_MTU)
+		if (ifr->ifr_mtu < ETHERMIN ||
+		    ifr->ifr_mtu > TI_JUMBO_MTU)
 			error = EINVAL;
 		else {
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 				ti_init_locked(sc);

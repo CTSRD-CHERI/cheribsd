@@ -315,12 +315,12 @@ ng_iface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set the interface MTU */
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) > NG_IFACE_MTU_MAX
-		    || ifr_mtu_get(ifr) < NG_IFACE_MTU_MIN)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu > NG_IFACE_MTU_MAX
+		    || ifr->ifr_mtu < NG_IFACE_MTU_MIN)
 			error = EINVAL;
 		else
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 		break;
 
 	/* Stuff that's not supported */

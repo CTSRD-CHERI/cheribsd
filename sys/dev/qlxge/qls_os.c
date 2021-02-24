@@ -890,16 +890,16 @@ qls_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		QL_DPRINT4((ha->pci_dev, "%s: SIOCSIFMTU (0x%lx)\n",
 			__func__, cmd));
 
-		if (ifr_mtu_get(ifr) > QLA_MAX_MTU) {
+		if (ifr->ifr_mtu > QLA_MAX_MTU) {
 			ret = EINVAL;
 		} else {
 			(void) QLA_LOCK(ha, __func__, 0);
 
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			ha->max_frame_size =
 				ifp->if_mtu + ETHER_HDR_LEN + ETHER_CRC_LEN;
 

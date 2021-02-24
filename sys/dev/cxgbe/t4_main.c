@@ -2010,8 +2010,8 @@ cxgbe_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 	uint32_t mask;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		mtu = ifr_mtu_get(ifr);
+	case SIOCSIFMTU:
+		mtu = ifr->ifr_mtu;
 		if (mtu < ETHERMIN || mtu > MAX_MTU)
 			return (EINVAL);
 

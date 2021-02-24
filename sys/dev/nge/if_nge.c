@@ -2273,18 +2273,18 @@ nge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0, mask;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN || ifr_mtu_get(ifr) > NGE_JUMBO_MTU)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > NGE_JUMBO_MTU)
 			error = EINVAL;
 		else {
 			NGE_LOCK(sc);
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			/*
 			 * Workaround: if the MTU is larger than
 			 * 8152 (TX FIFO size minus 64 minus 18), turn off
 			 * TX checksum offloading.
 			 */
-			if (ifr_mtu_get(ifr) >= 8152) {
+			if (ifr->ifr_mtu >= 8152) {
 				ifp->if_capenable &= ~IFCAP_TXCSUM;
 				ifp->if_hwassist &= ~NGE_CSUM_FEATURES;
 			} else {

@@ -1105,10 +1105,10 @@ vtnet_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+	case SIOCSIFMTU:
+		if (ifp->if_mtu != ifr->ifr_mtu) {
 			VTNET_CORE_LOCK(sc);
-			error = vtnet_change_mtu(sc, ifr_mtu_get(ifr));
+			error = vtnet_change_mtu(sc, ifr->ifr_mtu);
 			VTNET_CORE_UNLOCK(sc);
 		}
 		break;

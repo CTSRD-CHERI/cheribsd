@@ -4137,8 +4137,8 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 	err = 0;
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		err = mxge_change_mtu(sc, ifr_mtu_get(ifr));
+	case SIOCSIFMTU:
+		err = mxge_change_mtu(sc, ifr->ifr_mtu);
 		break;
 
 	case SIOCSIFFLAGS:

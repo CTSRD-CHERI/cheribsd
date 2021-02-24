@@ -2267,17 +2267,16 @@ vge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0, mask;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		VGE_LOCK(sc);
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		    ifr_mtu_get(ifr) > VGE_JUMBO_MTU)
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > VGE_JUMBO_MTU)
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
-			if (ifr_mtu_get(ifr) > ETHERMTU &&
+		else if (ifp->if_mtu != ifr->ifr_mtu) {
+			if (ifr->ifr_mtu > ETHERMTU &&
 			    (sc->vge_flags & VGE_FLAG_JUMBO) == 0)
 				error = EINVAL;
 			else
-				ifp->if_mtu = ifr_mtu_get(ifr);
+				ifp->if_mtu = ifr->ifr_mtu;
 		}
 		VGE_UNLOCK(sc);
 		break;

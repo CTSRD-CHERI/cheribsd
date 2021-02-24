@@ -1869,7 +1869,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = EINVAL;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		/*
 		 * Set the interface MTU.
 		 */
@@ -1877,13 +1877,13 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		trunk = TRUNK(ifv);
 		if (trunk != NULL) {
 			TRUNK_WLOCK(trunk);
-			if (ifr_mtu_get(ifr) >
+			if (ifr->ifr_mtu >
 			     (PARENT(ifv)->if_mtu - ifv->ifv_mtufudge) ||
-			    ifr_mtu_get(ifr) <
+			    ifr->ifr_mtu <
 			     (ifv->ifv_mintu - ifv->ifv_mtufudge))
 				error = EINVAL;
 			else
-				ifp->if_mtu = ifr_mtu_get(ifr);
+				ifp->if_mtu = ifr->ifr_mtu;
 			TRUNK_WUNLOCK(trunk);
 		} else
 			error = EINVAL;

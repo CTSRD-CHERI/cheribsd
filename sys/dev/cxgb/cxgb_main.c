@@ -1886,7 +1886,7 @@ cxgb_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 	uint32_t mask;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		ADAPTER_LOCK(sc);
 		error = IS_DOOMED(p) ? ENXIO : (IS_BUSY(sc) ? EBUSY : 0);
 		if (error) {
@@ -1895,7 +1895,7 @@ fail:
 			return (error);
 		}
 
-		mtu = ifr_mtu_get(ifr);
+		mtu = ifr->ifr_mtu;
 		if ((mtu < ETHERMIN) || (mtu > ETHERMTU_JUMBO)) {
 			error = EINVAL;
 		} else {

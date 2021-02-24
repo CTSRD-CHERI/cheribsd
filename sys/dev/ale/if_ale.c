@@ -1972,14 +1972,14 @@ ale_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN || ifr_mtu_get(ifr) > ALE_JUMBO_MTU ||
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > ALE_JUMBO_MTU ||
 		    ((sc->ale_flags & ALE_FLAG_JUMBO) == 0 &&
-		    ifr_mtu_get(ifr) > ETHERMTU))
+		    ifr->ifr_mtu > ETHERMTU))
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+		else if (ifp->if_mtu != ifr->ifr_mtu) {
 			ALE_LOCK(sc);
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 				ale_init_locked(sc);

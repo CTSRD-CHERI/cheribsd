@@ -1970,8 +1970,8 @@ static int mlx4_en_ioctl(struct ifnet *dev, u_long command, caddr_t data)
 	ifr = (struct ifreq *) data;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		error = -mlx4_en_change_mtu(dev, ifr_mtu_get(ifr));
+	case SIOCSIFMTU:
+		error = -mlx4_en_change_mtu(dev, ifr->ifr_mtu);
 		break;
 	case SIOCSIFFLAGS:
 		if (dev->if_flags & IFF_UP) {

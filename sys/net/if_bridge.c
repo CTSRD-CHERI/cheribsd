@@ -892,27 +892,27 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < 576) {
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < 576) {
 			error = EINVAL;
 			break;
 		}
 		if (CK_LIST_EMPTY(&sc->sc_iflist)) {
-			sc->sc_ifp->if_mtu = ifr_mtu_get(ifr);
+			sc->sc_ifp->if_mtu = ifr->ifr_mtu;
 			break;
 		}
 		CK_LIST_FOREACH(bif, &sc->sc_iflist, bif_next) {
-			if (bif->bif_ifp->if_mtu != ifr_mtu_get(ifr)) {
+			if (bif->bif_ifp->if_mtu != ifr->ifr_mtu) {
 				log(LOG_NOTICE, "%s: invalid MTU: %u(%s)"
 				    " != %d\n", sc->sc_ifp->if_xname,
 				    bif->bif_ifp->if_mtu,
-				    bif->bif_ifp->if_xname, ifr_mtu_get(ifr));
+				    bif->bif_ifp->if_xname, ifr->ifr_mtu);
 				error = EINVAL;
 				break;
 			}
 		}
 		if (!error)
-			sc->sc_ifp->if_mtu = ifr_mtu_get(ifr);
+			sc->sc_ifp->if_mtu = ifr->ifr_mtu;
 		break;
 	default:
 		/*

@@ -5750,21 +5750,21 @@ bge_ioctl(if_t ifp, u_long command, caddr_t data)
 	int flags, mask, error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		if (BGE_IS_JUMBO_CAPABLE(sc) ||
 		    (sc->bge_flags & BGE_FLAG_JUMBO_STD)) {
-			if (ifr_mtu_get(ifr) < ETHERMIN ||
-			    ifr_mtu_get(ifr) > BGE_JUMBO_MTU) {
+			if (ifr->ifr_mtu < ETHERMIN ||
+			    ifr->ifr_mtu > BGE_JUMBO_MTU) {
 				error = EINVAL;
 				break;
 			}
-		} else if (ifr_mtu_get(ifr) < ETHERMIN || ifr_mtu_get(ifr) > ETHERMTU) {
+		} else if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > ETHERMTU) {
 			error = EINVAL;
 			break;
 		}
 		BGE_LOCK(sc);
-		if (if_getmtu(ifp) != ifr_mtu_get(ifr)) {
-			if_setmtu(ifp, ifr_mtu_get(ifr));
+		if (if_getmtu(ifp) != ifr->ifr_mtu) {
+			if_setmtu(ifp, ifr->ifr_mtu);
 			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 				if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 				bge_init_locked(sc);

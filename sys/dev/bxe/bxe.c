@@ -4519,25 +4519,30 @@ bxe_ioctl(if_t ifp,
 
     switch (command)
     {
-    case CASE_IOC_IFREQ(SIOCSIFMTU):
+    case SIOCSIFMTU:
         BLOGD(sc, DBG_IOCTL, "Received SIOCSIFMTU ioctl (mtu=%d)\n",
-              ifr_mtu_get(ifr));
+              ifr->ifr_mtu);
 
-        if (sc->mtu == ifr_mtu_get(ifr)) {
+        if (sc->mtu == ifr->ifr_mtu) {
             /* nothing to change */
             break;
         }
 
-        if ((ifr_mtu_get(ifr) < mtu_min) || (ifr_mtu_get(ifr) > mtu_max)) {
+        if ((ifr->ifr_mtu < mtu_min) || (ifr->ifr_mtu > mtu_max)) {
             BLOGE(sc, "Unsupported MTU size %d (range is %d-%d)\n",
-                  ifr_mtu_get(ifr), mtu_min, mtu_max);
+                  ifr->ifr_mtu, mtu_min, mtu_max);
             error = EINVAL;
             break;
         }
 
         atomic_store_rel_int((volatile unsigned int *)&sc->mtu,
-                             ifr_mtu_get(ifr));
-	if_setmtu(ifp, ifr_mtu_get(ifr));
+                             (unsigned long)ifr->ifr_mtu);
+	/* 
+        atomic_store_rel_long((volatile unsigned long *)&if_getmtu(ifp),
+                              (unsigned long)ifr->ifr_mtu);
+	XXX - Not sure why it needs to be atomic
+	*/
+	if_setmtu(ifp, ifr->ifr_mtu);
         reinit = 1;
         break;
 

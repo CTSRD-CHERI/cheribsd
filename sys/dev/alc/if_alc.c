@@ -3045,16 +3045,16 @@ alc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		    ifr_mtu_get(ifr) > (sc->alc_ident->max_framelen -
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN ||
+		    ifr->ifr_mtu > (sc->alc_ident->max_framelen -
 		    sizeof(struct ether_vlan_header) - ETHER_CRC_LEN) ||
 		    ((sc->alc_flags & ALC_FLAG_JUMBO) == 0 &&
-		    ifr_mtu_get(ifr) > ETHERMTU))
+		    ifr->ifr_mtu > ETHERMTU))
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+		else if (ifp->if_mtu != ifr->ifr_mtu) {
 			ALC_LOCK(sc);
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			/* AR81[3567]x has 13 bits MSS field. */
 			if (ifp->if_mtu > ALC_TSO_MTU &&
 			    (ifp->if_capenable & IFCAP_TSO4) != 0) {

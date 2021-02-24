@@ -1104,17 +1104,16 @@ sk_ioctl(ifp, command, data)
 
 	error = 0;
 	switch(command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		    ifr_mtu_get(ifr) > SK_JUMBO_MTU)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > SK_JUMBO_MTU)
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+		else if (ifp->if_mtu != ifr->ifr_mtu) {
 			if (sc_if->sk_jumbo_disable != 0 &&
-			    ifr_mtu_get(ifr) > SK_MAX_FRAMELEN)
+			    ifr->ifr_mtu > SK_MAX_FRAMELEN)
 				error = EINVAL;
 			else {
 				SK_IF_LOCK(sc_if);
-				ifp->if_mtu = ifr_mtu_get(ifr);
+				ifp->if_mtu = ifr->ifr_mtu;
 				if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 					ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 					sk_init_locked(sc_if);

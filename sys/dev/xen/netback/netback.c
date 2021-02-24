@@ -2289,8 +2289,8 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 			mtx_unlock(&xnb->sc_lock);
 			break;
-		case CASE_IOC_IFREQ(SIOCSIFMTU):
-			ifp->if_mtu = ifr_mtu_get(ifr);
+		case SIOCSIFMTU:
+			ifp->if_mtu = ifr->ifr_mtu;
 			ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 			xnb_ifinit(xnb);
 			break;

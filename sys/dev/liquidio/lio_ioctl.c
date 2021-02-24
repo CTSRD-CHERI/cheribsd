@@ -108,7 +108,7 @@ lio_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case SIOCSIFMTU:
 		lio_dev_dbg(lio->oct_dev, "ioctl: SIOCSIFMTU\n");
-		error = lio_change_mtu(ifp, ifr_mtu_get(ifrequest));
+		error = lio_change_mtu(ifp, ifrequest->ifr_mtu);
 		break;
 	case SIOCSIFFLAGS:
 		lio_dev_dbg(lio->oct_dev, "ioctl: SIOCSIFFLAGS\n");

@@ -3250,14 +3250,14 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		return (ENXIO);
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		ifr = (struct ifreq *)data;
 
 		PRIV_LOCK(priv);
 		mlx5_query_port_max_mtu(priv->mdev, &max_mtu);
 
-		if (ifr_mtu_get(ifr) >= MLX5E_MTU_MIN &&
-		    ifr_mtu_get(ifr) <= MIN(MLX5E_MTU_MAX, max_mtu)) {
+		if (ifr->ifr_mtu >= MLX5E_MTU_MIN &&
+		    ifr->ifr_mtu <= MIN(MLX5E_MTU_MAX, max_mtu)) {
 			int was_opened;
 
 			was_opened = test_bit(MLX5E_STATE_OPENED, &priv->state);
@@ -3265,7 +3265,7 @@ mlx5e_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 				mlx5e_close_locked(ifp);
 
 			/* set new MTU */
-			mlx5e_set_dev_port_mtu(ifp, ifr_mtu_get(ifr));
+			mlx5e_set_dev_port_mtu(ifp, ifr->ifr_mtu);
 
 			if (was_opened)
 				mlx5e_open_locked(ifp);

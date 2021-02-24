@@ -148,9 +148,8 @@ axgbe_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 	int error = 0;
 
 	switch(command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		    ifr_mtu_get(ifr) > ETHERMTU_JUMBO)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > ETHERMTU_JUMBO)
 			error = EINVAL;
 		/* TODO - change it to iflib way */ 
 		break;

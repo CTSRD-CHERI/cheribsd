@@ -944,7 +944,7 @@ bootpc_adjust_interface(struct bootpc_ifcontext *ifctx,
 	if (ifctx->mtu != 0) {
 		printf(" (MTU=%d%s)", ifctx->mtu, 
 		    (ifctx->mtu > 1514) ? "/JUMBO" : "");
-		ifr_mtu_set(ifr, ifctx->mtu);
+		ifr->ifr_mtu = ifctx->mtu;
 		error = ifioctl(bootp_so, SIOCSIFMTU, (caddr_t) ifr, td);
 		if (error != 0)
 			panic("%s: SIOCSIFMTU, error=%d", __func__, error);

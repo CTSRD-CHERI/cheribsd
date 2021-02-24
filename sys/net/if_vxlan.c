@@ -2353,12 +2353,11 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = ifmedia_ioctl(ifp, ifr, &sc->vxl_media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(&ifr) < ETHERMIN ||
-		    ifr_mtu_get(&ifr) > VXLAN_MAX_MTU)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > VXLAN_MAX_MTU)
 			error = EINVAL;
 		else
-			ifp->if_mtu = ifr_mtu_get(&ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 		break;
 
 	case SIOCSIFCAP:

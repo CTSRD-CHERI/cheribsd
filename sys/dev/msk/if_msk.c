@@ -1067,13 +1067,12 @@ msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	error = 0;
 
 	switch(command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		MSK_IF_LOCK(sc_if);
-		if (ifr_mtu_get(ifr) > MSK_JUMBO_MTU ||
-		    ifr_mtu_get(ifr) < ETHERMIN)
+		if (ifr->ifr_mtu > MSK_JUMBO_MTU || ifr->ifr_mtu < ETHERMIN)
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
-			if (ifr_mtu_get(ifr) > ETHERMTU) {
+		else if (ifp->if_mtu != ifr->ifr_mtu) {
+			if (ifr->ifr_mtu > ETHERMTU) {
 				if ((sc_if->msk_flags & MSK_FLAG_JUMBO) == 0) {
 					error = EINVAL;
 					MSK_IF_UNLOCK(sc_if);
@@ -1088,7 +1087,7 @@ msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 					VLAN_CAPABILITIES(ifp);
 				}
 			}
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 				msk_init_locked(sc_if);

@@ -3409,17 +3409,17 @@ re_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int			error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		    ifr_mtu_get(ifr) > sc->rl_hwrev->rl_max_mtu ||
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN ||
+		    ifr->ifr_mtu > sc->rl_hwrev->rl_max_mtu ||
 		    ((sc->rl_flags & RL_FLAG_FASTETHER) != 0 &&
-		    ifr_mtu_get(ifr) > RL_MTU)) {
+		    ifr->ifr_mtu > RL_MTU)) {
 			error = EINVAL;
 			break;
 		}
 		RL_LOCK(sc);
-		if (ifp->if_mtu != ifr_mtu_get(ifr)) {
-			ifp->if_mtu = ifr_mtu_get(ifr);
+		if (ifp->if_mtu != ifr->ifr_mtu) {
+			ifp->if_mtu = ifr->ifr_mtu;
 			if ((sc->rl_flags & RL_FLAG_JUMBOV2) != 0 &&
 			    (ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;

@@ -2152,12 +2152,12 @@ mvneta_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			error = ifmedia_ioctl(ifp, ifr, &sc->mii->mii_media,
 			    cmd);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < 68 || ifr_mtu_get(ifr) > MVNETA_MAX_FRAME -
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < 68 || ifr->ifr_mtu > MVNETA_MAX_FRAME -
 		    MVNETA_ETHER_SIZE) {
 			error = EINVAL;
 		} else {
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			mvneta_sc_lock(sc);
 			if (ifp->if_mtu + MVNETA_ETHER_SIZE <= MCLBYTES) {
 				sc->rx_frame_size = MCLBYTES;

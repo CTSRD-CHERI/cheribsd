@@ -1983,15 +1983,15 @@ jme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN || ifr_mtu_get(ifr) > JME_JUMBO_MTU ||
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > JME_JUMBO_MTU ||
 		    ((sc->jme_flags & JME_FLAG_NOJUMBO) != 0 &&
-		    ifr_mtu_get(ifr) > JME_MAX_MTU)) {
+		    ifr->ifr_mtu > JME_MAX_MTU)) {
 			error = EINVAL;
 			break;
 		}
 
-		if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+		if (ifp->if_mtu != ifr->ifr_mtu) {
 			/*
 			 * No special configuration is required when interface
 			 * MTU is changed but availability of TSO/Tx checksum
@@ -1999,14 +1999,14 @@ jme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			 * FIFO size is just 2K.
 			 */
 			JME_LOCK(sc);
-			if (ifr_mtu_get(ifr) >= JME_TX_FIFO_SIZE) {
+			if (ifr->ifr_mtu >= JME_TX_FIFO_SIZE) {
 				ifp->if_capenable &=
 				    ~(IFCAP_TXCSUM | IFCAP_TSO4);
 				ifp->if_hwassist &=
 				    ~(JME_CSUM_FEATURES | CSUM_TSO);
 				VLAN_CAPABILITIES(ifp);
 			}
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 				jme_init_locked(sc);
