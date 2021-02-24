@@ -1395,15 +1395,22 @@ _iflib_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
 	*(bus_addr_t *) arg = segs[0].ds_addr;
 }
 
+#define	DMA_WIDTH_TO_BUS_LOWADDR(width)				\
+	(((width) == 0) || (width) == flsl(BUS_SPACE_MAXADDR) ?	\
+	    BUS_SPACE_MAXADDR : (1ULL << (width)) - 1ULL)
+
 int
 iflib_dma_alloc_align(if_ctx_t ctx, int size, int align, iflib_dma_info_t dma, int mapflags)
 {
 	int err;
 	device_t dev = ctx->ifc_dev;
+	bus_addr_t lowaddr;
+
+	lowaddr = DMA_WIDTH_TO_BUS_LOWADDR(ctx->ifc_softc_ctx.isc_dma_width);
 
 	err = bus_dma_tag_create(bus_get_dma_tag(dev),	/* parent */
 				align, 0,		/* alignment, bounds */
-				BUS_SPACE_MAXADDR,	/* lowaddr */
+				lowaddr,		/* lowaddr */
 				BUS_SPACE_MAXADDR,	/* highaddr */
 				NULL, NULL,		/* filter, filterarg */
 				size,			/* maxsize */
@@ -1654,6 +1661,7 @@ iflib_txsd_alloc(iflib_txq_t txq)
 	if_softc_ctx_t scctx = &ctx->ifc_softc_ctx;
 	device_t dev = ctx->ifc_dev;
 	bus_size_t tsomaxsize;
+	bus_addr_t lowaddr;
 	int err, nsegments, ntsosegments;
 	bool tso;
 
@@ -1670,12 +1678,14 @@ iflib_txsd_alloc(iflib_txq_t txq)
 		MPASS(sctx->isc_tso_maxsize >= tsomaxsize);
 	}
 
+	lowaddr = DMA_WIDTH_TO_BUS_LOWADDR(scctx->isc_dma_width);
+
 	/*
 	 * Set up DMA tags for TX buffers.
 	 */
 	if ((err = bus_dma_tag_create(bus_get_dma_tag(dev),
 			       1, 0,			/* alignment, bounds */
-			       BUS_SPACE_MAXADDR,	/* lowaddr */
+			       lowaddr,			/* lowaddr */
 			       BUS_SPACE_MAXADDR,	/* highaddr */
 			       NULL, NULL,		/* filter, filterarg */
 			       sctx->isc_tx_maxsize,		/* maxsize */
@@ -1693,7 +1703,7 @@ iflib_txsd_alloc(iflib_txq_t txq)
 	tso = (if_getcapabilities(ctx->ifc_ifp) & IFCAP_TSO) != 0;
 	if (tso && (err = bus_dma_tag_create(bus_get_dma_tag(dev),
 			       1, 0,			/* alignment, bounds */
-			       BUS_SPACE_MAXADDR,	/* lowaddr */
+			       lowaddr,			/* lowaddr */
 			       BUS_SPACE_MAXADDR,	/* highaddr */
 			       NULL, NULL,		/* filter, filterarg */
 			       tsomaxsize,		/* maxsize */
@@ -1895,10 +1905,13 @@ iflib_rxsd_alloc(iflib_rxq_t rxq)
 	if_softc_ctx_t scctx = &ctx->ifc_softc_ctx;
 	device_t dev = ctx->ifc_dev;
 	iflib_fl_t fl;
+	bus_addr_t lowaddr;
 	int			err;
 
 	MPASS(scctx->isc_nrxd[0] > 0);
 	MPASS(scctx->isc_nrxd[rxq->ifr_fl_offset] > 0);
+
+	lowaddr = DMA_WIDTH_TO_BUS_LOWADDR(scctx->isc_dma_width);
 
 	fl = rxq->ifr_fl;
 	for (int i = 0; i <  rxq->ifr_nfl; i++, fl++) {
@@ -1906,7 +1919,7 @@ iflib_rxsd_alloc(iflib_rxq_t rxq)
 		/* Set up DMA tag for RX buffers. */
 		err = bus_dma_tag_create(bus_get_dma_tag(dev), /* parent */
 					 1, 0,			/* alignment, bounds */
-					 BUS_SPACE_MAXADDR,	/* lowaddr */
+					 lowaddr,		/* lowaddr */
 					 BUS_SPACE_MAXADDR,	/* highaddr */
 					 NULL, NULL,		/* filter, filterarg */
 					 sctx->isc_rx_maxsize,	/* maxsize */
@@ -4753,6 +4766,8 @@ iflib_device_register(device_t dev, void *sc, if_shared_ctx_t sctx, if_ctx_t *ct
 	}
 	_iflib_pre_assert(scctx);
 	ctx->ifc_txrx = *scctx->isc_txrx;
+
+	MPASS(scctx->isc_dma_width <= flsl(BUS_SPACE_MAXADDR));
 
 	if (sctx->isc_flags & IFLIB_DRIVER_MEDIA)
 		ctx->ifc_mediap = scctx->isc_media;
