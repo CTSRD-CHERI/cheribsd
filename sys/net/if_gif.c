@@ -639,15 +639,15 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 #endif
 	case SIOCGTUNFIB:
-		ifr_fib_set(ifr, sc->gif_fibnum);
+		ifr->ifr_fib = sc->gif_fibnum;
 		break;
-	case CASE_IOC_IFREQ(SIOCSTUNFIB):
+	case SIOCSTUNFIB:
 		if ((error = priv_check(curthread, PRIV_NET_GIF)) != 0)
 			break;
-		if (ifr_fib_get(ifr) >= rt_numfibs)
+		if (ifr->ifr_fib >= rt_numfibs)
 			error = EINVAL;
 		else
-			sc->gif_fibnum = ifr_fib_get(ifr);
+			sc->gif_fibnum = ifr->ifr_fib;
 		break;
 	case CASE_IOC_IFREQ(GIFGOPTS):
 		options = sc->gif_options;

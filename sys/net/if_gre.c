@@ -280,16 +280,16 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = in6_gre_ioctl(sc, cmd, data);
 		break;
 #endif
-	case CASE_IOC_IFREQ(SIOCGTUNFIB):
-		ifr_fib_set(ifr, sc->gre_fibnum);
+	case SIOCGTUNFIB:
+		ifr->ifr_fib = sc->gre_fibnum;
 		break;
-	case CASE_IOC_IFREQ(SIOCSTUNFIB):
+	case SIOCSTUNFIB:
 		if ((error = priv_check(curthread, PRIV_NET_GRE)) != 0)
 			break;
-		if (ifr_fib_get(ifr) >= rt_numfibs)
+		if (ifr->ifr_fib >= rt_numfibs)
 			error = EINVAL;
 		else
-			sc->gre_fibnum = ifr_fib_get(ifr);
+			sc->gre_fibnum = ifr->ifr_fib;
 		break;
 	case CASE_IOC_IFREQ(GRESKEY):
 	case GRESOPTS:

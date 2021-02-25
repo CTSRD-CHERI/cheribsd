@@ -2741,20 +2741,6 @@ ifr_data_get_ptr(u_long cmd, void *ifrp)
 	}
 }
 
-u_int
-ifr_fib_get(void *ifrp)
-{
-
-	return ((u_int)ifr__int0_get(ifrp));
-}
-
-void
-ifr_fib_set(void *ifrp, u_int fib)
-{
-
-	ifr__int0_set(ifrp, (u_int)fib);
-}
-
 static void
 ifr_index_set(void *ifrp, short idx)
 {
@@ -2931,18 +2917,18 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		free(odescrbuf, M_IFDESCR);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFFIB):
-		ifr_fib_set(ifr, ifp->if_fib);
+	case SIOCGIFFIB:
+		ifr->ifr_fib = ifp->if_fib;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFIB):
+	case SIOCSIFFIB:
 		error = priv_check(td, PRIV_NET_SETIFFIB);
 		if (error)
 			return (error);
-		if (ifr_fib_get(ifr) >= rt_numfibs)
+		if (ifr->ifr_fib >= rt_numfibs)
 			return (EINVAL);
 
-		ifp->if_fib = ifr_fib_get(ifr);
+		ifp->if_fib = ifr->ifr_fib;
 		break;
 
 	case SIOCSIFFLAGS:
@@ -3430,6 +3416,10 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCSIFNETMASK):
 	case IFREQ64(SIOCGI2C):
 	case IFREQ64(SIOCDIFADDR):
+	case IFREQ64(SIOCGIFFIB):
+	case IFREQ64(SIOCSIFFIB):
+	case IFREQ64(SIOCGTUNFIB):
+	case IFREQ64(SIOCSTUNFIB):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
@@ -3459,6 +3449,10 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 			thunk.ifr.ifr_ifru.ifru_data = cheri_setbounds(
 			    ifr_data_get_ptr(cmd, ifr64),
 			    sizeof(struct ifi2creq));
+			break;
+		case IFREQ64(SIOCSIFFIB):
+		case IFREQ64(SIOCSTUNFIB):
+			thunk.ifr.ifr_fib = ifr64->ifr_fib;
 			break;
 		}
 		saved_cmd = cmd;
@@ -3658,6 +3652,11 @@ out_noref:
 	case IFREQ64(SIOCGIFNETMASK):
 		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_addr = thunk.ifr.ifr_addr;
+		break;
+	case IFREQ64(SIOCGIFFIB):
+	case IFREQ64(SIOCGTUNFIB):
+		ifr64 = (struct ifreq64 *)saved_data;
+		ifr64->ifr_fib = thunk.ifr.ifr_fib;
 		break;
 #endif
 	}
