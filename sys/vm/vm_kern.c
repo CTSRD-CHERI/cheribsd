@@ -876,7 +876,8 @@ kmem_init(vm_pointer_t start, vm_pointer_t end)
 	/*
 	 * Initialize the kernel_arena.  This can grow on demand.
 	 */
-	vmem_init(kernel_arena, "kernel arena", 0, 0, PAGE_SIZE, 0, 0);
+	vmem_init(kernel_arena, "kernel arena", 0, 0, PAGE_SIZE, 0, 0,
+	    VMEM_CAPABILITY_ARENA);
 	vmem_set_import(kernel_arena, kva_import, NULL, NULL, quantum);
 
 	for (domain = 0; domain < vm_ndomains; domain++) {
@@ -887,7 +888,8 @@ kmem_init(vm_pointer_t start, vm_pointer_t end)
 		 * maximizing the potential for superpage promotion.
 		 */
 		vm_dom[domain].vmd_kernel_arena = vmem_create(
-		    "kernel arena domain", 0, 0, PAGE_SIZE, 0, M_WAITOK);
+		    "kernel arena domain", 0, 0, PAGE_SIZE, 0, M_WAITOK,
+		    VMEM_CAPABILITY_ARENA);
 		vmem_set_import(vm_dom[domain].vmd_kernel_arena,
 		    kva_import_domain, NULL, kernel_arena, quantum);
 
@@ -901,7 +903,8 @@ kmem_init(vm_pointer_t start, vm_pointer_t end)
 		 */
 #if VM_NRESERVLEVEL > 0
 		vm_dom[domain].vmd_kernel_rwx_arena = vmem_create(
-		    "kernel rwx arena domain", 0, 0, PAGE_SIZE, 0, M_WAITOK);
+		    "kernel rwx arena domain", 0, 0, PAGE_SIZE, 0, M_WAITOK,
+		    VMEM_CAPABILITY_ARENA);
 		vmem_set_import(vm_dom[domain].vmd_kernel_rwx_arena,
 		    kva_import_domain, (vmem_release_t *)vmem_xfree,
 		    kernel_arena, KVA_QUANTUM);

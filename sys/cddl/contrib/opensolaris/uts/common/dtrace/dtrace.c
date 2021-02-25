@@ -17109,10 +17109,10 @@ dtrace_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
 	dtrace_arena = vmem_create("dtrace", (void *)1, UINT32_MAX, 1,
-	    NULL, NULL, NULL, 0, VM_SLEEP | VMC_IDENTIFIER);
+	    NULL, NULL, NULL, 0, VM_SLEEP | VMC_IDENTIFIER, 0);
 	dtrace_minor = vmem_create("dtrace_minor", (void *)DTRACEMNRN_CLONE,
 	    UINT32_MAX - DTRACEMNRN_CLONE, 1, NULL, NULL, NULL, 0,
-	    VM_SLEEP | VMC_IDENTIFIER);
+	    VM_SLEEP | VMC_IDENTIFIER, 0);
 	dtrace_taskq = taskq_create("dtrace_taskq", 1, maxclsyspri,
 	    1, INT_MAX, 0);
 
