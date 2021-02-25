@@ -2785,13 +2785,6 @@ ifr_metric_set(void *ifrp, int val)
 	ifr__int0_set(ifrp, val);
 }
 
-static void
-ifr_phys_set(void *ifrp, int val)
-{
-
-	ifr__int0_set(ifrp, val);
-}
-
 u_char
 ifr_lan_pcp_get(void *ifrp)
 {
@@ -2880,9 +2873,9 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		ifr->ifr_mtu = ifp->if_mtu;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFPHYS):
+	case SIOCGIFPHYS:
 		/* XXXGL: did this ever worked? */
-		ifr_phys_set(ifr, 0);
+		ifr->ifr_phys = 0;
 		break;
 
 	case CASE_IOC_IFREQ(SIOCGIFDESCR):
@@ -3091,7 +3084,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		getmicrotime(&ifp->if_lastchange);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFPHYS):
+	case SIOCSIFPHYS:
 		error = priv_check(td, PRIV_NET_SETIFPHYS);
 		if (error)
 			return (error);
@@ -3425,6 +3418,8 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCSIFMEDIA):
 	case IFREQ64(SIOCGIFMTU):
 	case IFREQ64(SIOCSIFMTU):
+	case IFREQ64(SIOCGIFPHYS):
+	case IFREQ64(SIOCSIFPHYS):
 	case IFREQ64(SIOCGIFADDR):
 	case IFREQ64(SIOCSIFADDR):
 	case IFREQ64(SIOCGIFBRDADDR):
@@ -3456,6 +3451,9 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 			break;
 		case IFREQ64(SIOCSIFMTU):
 			thunk.ifr.ifr_mtu = ifr64->ifr_mtu;
+			break;
+		case IFREQ64(SIOCSIFPHYS):
+			thunk.ifr.ifr_phys = ifr64->ifr_phys;
 			break;
 		case IFREQ64(SIOCGI2C):
 			thunk.ifr.ifr_ifru.ifru_data = cheri_setbounds(
@@ -3649,6 +3647,10 @@ out_noref:
 	case IFREQ64(SIOCGIFMTU):
 		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_mtu = thunk.ifr.ifr_mtu;
+		break;
+	case IFREQ64(SIOCGIFPHYS):
+		ifr64 = (struct ifreq64 *)saved_data;
+		ifr64->ifr_phys = thunk.ifr.ifr_phys;
 		break;
 	case IFREQ64(SIOCGIFADDR):
 	case IFREQ64(SIOCGIFBRDADDR):

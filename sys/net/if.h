@@ -426,9 +426,7 @@ struct	ifreq {
 #define	ifr_metric	ifr_ifru.ifru_metric	/* metric */
 #endif
 #define	ifr_mtu		ifr_ifru.ifru_mtu	/* mtu */
-#ifndef _KERNEL
 #define ifr_phys	ifr_ifru.ifru_phys	/* physical wire */
-#endif
 #define ifr_media	ifr_ifru.ifru_media	/* physical media */
 #ifndef _KERNEL
 #define	ifr_data	ifr_ifru.ifru_data	/* for use by interface */

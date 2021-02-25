@@ -187,7 +187,7 @@ ng_eiface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case SIOCDELMULTI:
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFPHYS):
+	case SIOCSIFPHYS:
 		error = EOPNOTSUPP;
 		break;
 
