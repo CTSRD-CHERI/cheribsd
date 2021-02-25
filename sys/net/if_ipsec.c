@@ -653,7 +653,7 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		};
 		error = ipsec_set_addresses(ifp, src, dst);
 		break;
-	case CASE_IOC_IFREQ(SIOCDIFPHYADDR):
+	case SIOCDIFPHYADDR:
 		ipsec_delete_tunnel(sc);
 		break;
 	case SIOCGIFPSRCADDR:

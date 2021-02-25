@@ -293,7 +293,7 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = me_set_tunnel(sc, src->sin_addr.s_addr,
 		    dst->sin_addr.s_addr);
 		break;
-	case CASE_IOC_IFREQ(SIOCDIFPHYADDR):
+	case SIOCDIFPHYADDR:
 		me_delete_tunnel(sc);
 		break;
 	case SIOCGIFPSRCADDR:

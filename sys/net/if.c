@@ -3032,7 +3032,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 	case SIOCSIFPHYADDR:
-	case CASE_IOC_IFREQ(SIOCDIFPHYADDR):
+	case SIOCDIFPHYADDR:
 #ifdef INET6
 	case SIOCSIFPHYADDR_IN6:
 #endif
@@ -3306,6 +3306,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCSIFMETRIC):
 	case IFREQ64(SIOCSIFVNET):
 	case IFREQ64(SIOCSIFRVNET):
+	case IFREQ64(SIOCDIFPHYADDR):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
