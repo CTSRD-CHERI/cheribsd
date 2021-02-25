@@ -818,10 +818,6 @@ struct ifreq64 {
 #endif /* !COMPAT_FREEBSD64 */
 
 /* accessors for struct ifreq */
-char *ifr_addr_get_data(void *ifrp);
-sa_family_t ifr_addr_get_family(void *ifrp);
-unsigned char ifr_addr_get_len(void *ifrp);
-struct sockaddr *ifr_addr_get_sa(void *ifrp);
 void * __capability ifr_buffer_get_buffer(u_long cmd, void *data);
 size_t ifr_buffer_get_length(u_long cmd, void *data);
 void * __capability ifr_data_get_ptr(u_long cmd, void *ifrp);

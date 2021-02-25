@@ -2556,44 +2556,6 @@ ifr__u_char_set(void *ifrp, u_char val)
 		ifrup->ifr.ifr_ifru.ifru_vlan_pcp = val;
 }
 
-char *
-ifr_addr_get_data(void *ifrp)
-{
-
-	return (&ifr_addr_get_sa(ifrp)->sa_data[0]);
-}
-
-sa_family_t
-ifr_addr_get_family(void *ifrp)
-{
-
-	return (ifr_addr_get_sa(ifrp)->sa_family);
-}
-
-unsigned char
-ifr_addr_get_len(void *ifrp)
-{
-
-	return (ifr_addr_get_sa(ifrp)->sa_len);
-}
-
-struct sockaddr *
-ifr_addr_get_sa(void *ifrp)
-{
-	union ifreq_union *ifrup;
-
-	ifrup = ifrp;
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (&ifrup->ifr32.ifr_ifru.ifru_addr);
-#endif
-#ifdef COMPAT_FREEBSD64
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return (&ifrup->ifr64.ifr_ifru.ifru_addr);
-#endif
-	return (&ifrup->ifr.ifr_ifru.ifru_addr);
-}
-
 void * __capability
 ifr_buffer_get_buffer(u_long cmd, void *data)
 {
