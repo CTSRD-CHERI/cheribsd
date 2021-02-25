@@ -2501,25 +2501,6 @@ ifr__int0_set(void *ifrp, int val)
 		ifrup->ifr.ifr_ifru.ifru_cap[0] = val;
 }
 
-static void
-ifr__short0_set(void *ifrp, short val)
-{
-	union ifreq_union *ifrup;
-
-	ifrup = ifrp;
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		ifrup->ifr32.ifr_ifru.ifru_flags[0] = val;
-	else
-#endif
-#ifdef COMPAT_FREEBSD64
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		ifrup->ifr64.ifr_ifru.ifru_flags[0] = val;
-	else
-#endif
-		ifrup->ifr.ifr_ifru.ifru_flags[0] = val;
-}
-
 static u_char
 ifr__u_char_get(void *ifrp)
 {
@@ -2703,13 +2684,6 @@ ifr_data_get_ptr(u_long cmd, void *ifrp)
 	}
 }
 
-static void
-ifr_index_set(void *ifrp, short idx)
-{
-
-	ifr__short0_set(ifrp, idx);
-}
-
 #ifdef VIMAGE
 static int
 ifr_jid_get(void *ifrp)
@@ -2779,8 +2753,8 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 
 	ifr = (struct ifreq *)data;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCGIFINDEX):
-		ifr_index_set(ifr, ifp->if_index);
+	case SIOCGIFINDEX:
+		ifr->ifr_index = ifp->if_index;
 		break;
 
 	case SIOCGIFFLAGS:
@@ -3386,6 +3360,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCSIFLLADDR):
 	case IFREQ64(SIOCGIFPSRCADDR):
 	case IFREQ64(SIOCGIFPDSTADDR):
+	case IFREQ64(SIOCGIFINDEX):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
@@ -3627,6 +3602,10 @@ out_noref:
 	case IFREQ64(SIOCGTUNFIB):
 		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_fib = thunk.ifr.ifr_fib;
+		break;
+	case IFREQ64(SIOCGIFINDEX):
+		ifr64 = (struct ifreq64 *)saved_data;
+		ifr64->ifr_index = thunk.ifr.ifr_index;
 		break;
 #endif
 	}
