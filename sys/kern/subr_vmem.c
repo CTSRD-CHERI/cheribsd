@@ -216,7 +216,7 @@ static uma_zone_t vmem_zone;
 #define	VMEM_ALIGNUP(addr, align)	roundup2(addr, align)
 
 #define	VMEM_CROSS_P(addr1, addr2, boundary) \
-    ((((vaddr_t)(addr1) ^ (vaddr_t)(addr2)) & -(boundary)) != 0)
+    ((((ptraddr_t)(addr1) ^ (ptraddr_t)(addr2)) & -(boundary)) != 0)
 
 #define	ORDER2SIZE(order)	((order) < VMEM_OPTVALUE ? ((order) + 1) : \
     (vmem_size_t)1 << ((order) - (VMEM_OPTVALUE - VMEM_OPTORDER - 1)))
@@ -254,7 +254,8 @@ static struct vmem memguard_arena_storage;
 vmem_t *memguard_arena = &memguard_arena_storage;
 #endif
 
-static vmem_addr_t vmem_buildcap(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
+static vmem_addr_t
+vmem_buildcap(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
@@ -283,7 +284,7 @@ vmem_roundup_align(vmem_t *vm, vmem_size_t align, vmem_size_t size)
 		align = CHERI_REPRESENTABLE_ALIGNMENT(size);
 	}
 #endif
-	return align;
+	return (align);
 }
 
 static bool
@@ -479,7 +480,7 @@ bt_freehead_toalloc(vmem_t *vm, vmem_size_t size, int strat)
 /* ---- boundary tag hash */
 
 static struct vmem_hashlist *
-bt_hashhead(vmem_t *vm, vaddr_t addr)
+bt_hashhead(vmem_t *vm, ptraddr_t addr)
 {
 	struct vmem_hashlist *list;
 	unsigned int hash;
@@ -987,7 +988,7 @@ vmem_import(vmem_t *vm, vmem_size_t size, vmem_size_t align, int flags)
 		KASSERT(cheri_gettag(addr), ("Expected valid capability"));
 		KASSERT(cheri_getlen(addr) == size,
 		    ("Inexact bounds expected %zx found %zx",
-		    (size_t)size, (size_t)cheri_getlen(addr)));
+		    (size_t)size, cheri_getlen(addr)));
 	}
 #endif
 
@@ -1016,7 +1017,8 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 	/*
 	 * XXX assumption: vmem_addr_t and vmem_size_t are
 	 * unsigned integer of the same size.
-	 * CHERI breaks this assumption.
+	 * CHERI breaks this assumption, but the virtual address
+	 * size is still the same as vmem_size_t.
 	 */
 
 	start = bt->bt_start;
@@ -1037,13 +1039,13 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 		MPASS(align < nocross);
 		start = VMEM_ALIGNUP(start - phase, nocross) + phase;
 	}
-	if (start <= end && (vaddr_t)end - (vaddr_t)start >= size - 1) {
-		MPASS(((vaddr_t)start & (align - 1)) == phase);
+	if (start <= end && (ptraddr_t)end - (ptraddr_t)start >= size - 1) {
+		MPASS(((ptraddr_t)start & (align - 1)) == phase);
 		MPASS(!VMEM_CROSS_P(start, start + size - 1, nocross));
 		MPASS(minaddr <= start);
 		MPASS(maxaddr == 0 || start + size - 1 <= maxaddr);
 		MPASS(bt->bt_start <= start);
-		MPASS((vaddr_t)BT_END(bt) - (vaddr_t)start >= size - 1);
+		MPASS((ptraddr_t)BT_END(bt) - (ptraddr_t)start >= size - 1);
 		*addrp = start;
 
 		return (0);
@@ -1068,7 +1070,7 @@ vmem_clip(vmem_t *vm, bt_t *bt, vmem_addr_t start, vmem_size_t size)
 		btprev = bt_alloc(vm);
 		btprev->bt_type = BT_TYPE_FREE;
 		btprev->bt_start = bt->bt_start;
-		btprev->bt_size = (vaddr_t)start - (vaddr_t)bt->bt_start;
+		btprev->bt_size = (ptraddr_t)start - (ptraddr_t)bt->bt_start;
 		bt->bt_start = start;
 		bt->bt_size -= btprev->bt_size;
 		bt_insfree(vm, btprev);
@@ -1597,12 +1599,10 @@ vmem_free(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
 	MPASS(size > 0);
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
-		/*
-		 * XXX-AM: These should be checks, not just assertions.
-		 * What do we do on failure? panic?
-		 */
-		KASSERT(cheri_gettag(addr), ("Expected valid capability"));
-		KASSERT(!cheri_getsealed(addr), ("Expect unsealed capability"));
+		if (!cheri_gettag(addr))
+			panic("Expected valid capability");
+		if (cheri_getsealed(addr))
+			panic("Expect unsealed capability");
 	}
 #endif
 
@@ -1623,12 +1623,10 @@ vmem_xfree(vmem_t *vm, vmem_addr_t addr, vmem_size_t size __unused)
 	MPASS(size > 0);
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (vm->vm_flags & VMEM_CAPABILITY_ARENA) {
-		/*
-		 * XXX-AM: These should be checks, not just assertions.
-		 * What do we do on failure? panic?
-		 */
-		KASSERT(cheri_gettag(addr), ("Expected valid capability"));
-		KASSERT(!cheri_getsealed(addr), ("Expect unsealed capability"));
+		if (!cheri_gettag(addr))
+			panic("Expected valid capability");
+		if (cheri_getsealed(addr))
+			panic("Expect unsealed capability");
 	}
 #endif
 
@@ -1682,7 +1680,7 @@ vmem_add(vmem_t *vm, vmem_addr_t addr, vmem_size_t size, int flags)
 		KASSERT(!cheri_getsealed(addr), ("Expect unsealed capability"));
 		KASSERT(cheri_getlen(addr) == size,
 		    ("Inexact bounds expected %zx found %zx",
-		    (size_t)size, (size_t)cheri_getlen(addr)));
+		    (size_t)size, cheri_getlen(addr)));
 	}
 #endif
 	flags &= VMEM_FLAGS;
@@ -1825,7 +1823,8 @@ vmem_whatis(vmem_addr_t addr, int (*pr)(const char *, ...))
 		}
 		(*pr)("%p is %p+%zu in VMEM '%s' (%s)\n",
 		    (void *)addr, (void *)bt->bt_start,
-		    (vmem_size_t)((vaddr_t)addr - (vaddr_t)bt->bt_start), vm->vm_name,
+		    (vmem_size_t)((ptraddr_t)addr - (ptraddr_t)bt->bt_start),
+		    vm->vm_name,
 		    (bt->bt_type == BT_TYPE_BUSY) ? "allocated" : "free");
 	}
 }

@@ -276,8 +276,6 @@ again:
 //   "updated": 2020706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer",
-//     "support",
 //     "bounds_compression"
 //   ]
 // }
