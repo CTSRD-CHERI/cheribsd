@@ -656,8 +656,8 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case CASE_IOC_IFREQ(SIOCDIFPHYADDR):
 		ipsec_delete_tunnel(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
-	case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+	case SIOCGIFPSRCADDR:
+	case SIOCGIFPDSTADDR:
 #ifdef INET6
 	case SIOCGIFPSRCADDR_IN6:
 	case SIOCGIFPDSTADDR_IN6:
@@ -669,13 +669,13 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		saidx = ipsec_getsaidx(sc, IPSEC_DIR_OUTBOUND, sc->family);
 		switch (cmd) {
 #ifdef INET
-		case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
-		case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+		case SIOCGIFPSRCADDR:
+		case SIOCGIFPDSTADDR:
 			if (saidx->src.sa.sa_family != AF_INET) {
 				error = EADDRNOTAVAIL;
 				break;
 			}
-			sin = (struct sockaddr_in *)ifr_addr_get_sa(ifr);
+			sin = (struct sockaddr_in *)&ifr->ifr_addr;
 			memset(sin, 0, sizeof(*sin));
 			sin->sin_family = AF_INET;
 			sin->sin_len = sizeof(*sin);
@@ -688,7 +688,8 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				error = EADDRNOTAVAIL;
 				break;
 			}
-			sin6 = (struct sockaddr_in6 *)ifr_addr_get_sa(data);
+			sin6 = (struct sockaddr_in6 *)
+				&(((struct in6_ifreq *)data)->ifr_addr);
 			memset(sin6, 0, sizeof(*sin6));
 			sin6->sin6_family = AF_INET6;
 			sin6->sin6_len = sizeof(*sin6);
@@ -700,10 +701,10 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (error == 0) {
 			switch (cmd) {
 #ifdef INET
-			case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+			case SIOCGIFPSRCADDR:
 				sin->sin_addr = saidx->src.sin.sin_addr;
 				break;
-			case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+			case SIOCGIFPDSTADDR:
 				sin->sin_addr = saidx->dst.sin.sin_addr;
 				break;
 #endif
@@ -721,8 +722,8 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		switch (cmd) {
 #ifdef INET
-		case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
-		case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+		case SIOCGIFPSRCADDR:
+		case SIOCGIFPDSTADDR:
 			error = prison_if(curthread->td_ucred,
 			    (struct sockaddr *)sin);
 			if (error != 0)

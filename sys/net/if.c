@@ -3172,8 +3172,8 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 	case SIOCGIFSTATUS:
-	case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
-	case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+	case SIOCGIFPSRCADDR:
+	case SIOCGIFPDSTADDR:
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
 	case CASE_IOC_IFREQ(SIOCGIFGENERIC):
@@ -3422,6 +3422,8 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCSTUNFIB):
 	case IFREQ64(SIOCGHWADDR):
 	case IFREQ64(SIOCSIFLLADDR):
+	case IFREQ64(SIOCGIFPSRCADDR):
+	case IFREQ64(SIOCGIFPDSTADDR):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
@@ -3654,6 +3656,8 @@ out_noref:
 	case IFREQ64(SIOCGIFDSTADDR):
 	case IFREQ64(SIOCGIFNETMASK):
 	case IFREQ64(SIOCGHWADDR):
+	case IFREQ64(SIOCGIFPSRCADDR):
+	case IFREQ64(SIOCGIFPDSTADDR):
 		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_addr = thunk.ifr.ifr_addr;
 		break;

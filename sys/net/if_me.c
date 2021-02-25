@@ -296,21 +296,21 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case CASE_IOC_IFREQ(SIOCDIFPHYADDR):
 		me_delete_tunnel(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
-	case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+	case SIOCGIFPSRCADDR:
+	case SIOCGIFPDSTADDR:
 		if (!ME_READY(sc)) {
 			error = EADDRNOTAVAIL;
 			break;
 		}
-		src = (struct sockaddr_in *)ifr_addr_get_sa(ifr);
+		src = (struct sockaddr_in *)&ifr->ifr_addr;
 		memset(src, 0, sizeof(*src));
 		src->sin_family = AF_INET;
 		src->sin_len = sizeof(*src);
 		switch (cmd) {
-		case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+		case SIOCGIFPSRCADDR:
 			src->sin_addr = sc->me_src;
 			break;
-		case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+		case SIOCGIFPDSTADDR:
 			src->sin_addr = sc->me_dst;
 			break;
 		}

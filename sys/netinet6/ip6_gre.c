@@ -522,7 +522,7 @@ in6_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 			error = EADDRNOTAVAIL;
 			break;
 		}
-		src = (struct sockaddr_in6 *)ifr_addr_get_data(ifr);
+		src = (struct sockaddr_in6 *)&ifr->ifr_addr;
 		memset(src, 0, sizeof(*src));
 		src->sin6_family = AF_INET6;
 		src->sin6_len = sizeof(*src);

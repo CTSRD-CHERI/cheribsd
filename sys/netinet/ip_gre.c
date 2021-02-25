@@ -511,7 +511,7 @@ in_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 			error = EADDRNOTAVAIL;
 			break;
 		}
-		src = (struct sockaddr_in *)ifr_addr_get_sa(ifr);
+		src = (struct sockaddr_in *)&ifr->ifr_addr;
 		memset(src, 0, sizeof(*src));
 		src->sin_family = AF_INET;
 		src->sin_len = sizeof(*src);

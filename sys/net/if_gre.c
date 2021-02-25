@@ -268,8 +268,8 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	switch (cmd) {
 #ifdef INET
 	case CASE_IOC_IFREQ(SIOCDIFPHYADDR):
-	case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
-	case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+	case SIOCGIFPSRCADDR:
+	case SIOCGIFPDSTADDR:
 		error = in_gre_ioctl(sc, cmd, data);
 		break;
 #endif
