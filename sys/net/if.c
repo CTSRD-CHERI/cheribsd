@@ -2465,23 +2465,6 @@ ifunit(const char *name)
 	return (ifp);
 }
 
-static int
-ifr__int0_get(void *ifrp)
-{
-	union ifreq_union *ifrup;
-
-	ifrup = ifrp;
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (ifrup->ifr32.ifr_ifru.ifru_cap[0]);
-#endif
-#ifdef COMPAT_FREEBSD64
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return (ifrup->ifr64.ifr_ifru.ifru_cap[0]);
-#endif
-	return (ifrup->ifr.ifr_ifru.ifru_cap[0]);
-}
-
 static u_char
 ifr__u_char_get(void *ifrp)
 {
@@ -2664,15 +2647,6 @@ ifr_data_get_ptr(u_long cmd, void *ifrp)
 		__assert_unreachable();
 	}
 }
-
-#ifdef VIMAGE
-static int
-ifr_jid_get(void *ifrp)
-{
-	
-	return (ifr__int0_get(ifrp));
-}
-#endif
 
 u_char
 ifr_lan_pcp_get(void *ifrp)
@@ -2957,11 +2931,11 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 #ifdef VIMAGE
-	case CASE_IOC_IFREQ(SIOCSIFVNET):
+	case SIOCSIFVNET:
 		error = priv_check(td, PRIV_NET_SETIFVNET);
 		if (error)
 			return (error);
-		error = if_vmove_loan(td, ifp, ifr->ifr_name, ifr_jid_get(ifr));
+		error = if_vmove_loan(td, ifp, ifr->ifr_name, ifr->ifr_jid);
 		break;
 #endif
 
@@ -3330,6 +3304,8 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCGIFINDEX):
 	case IFREQ64(SIOCGIFMETRIC):
 	case IFREQ64(SIOCSIFMETRIC):
+	case IFREQ64(SIOCSIFVNET):
+	case IFREQ64(SIOCSIFRVNET):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
@@ -3368,6 +3344,10 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		case IFREQ64(SIOCSIFMETRIC):
 			thunk.ifr.ifr_metric = ifr64->ifr_metric;
 			break;
+		case IFREQ64(SIOCSIFVNET):
+		case IFREQ64(SIOCSIFRVNET):
+			thunk.ifr.ifr_jid = ifr64->ifr_jid;
+			break;
 		}
 		saved_cmd = cmd;
 		saved_data = data;
@@ -3387,11 +3367,11 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	ifr = (struct ifreq *)data;
 	switch (cmd) {
 #ifdef VIMAGE
-	case CASE_IOC_IFREQ(SIOCSIFRVNET):
+	case SIOCSIFRVNET:
 		error = priv_check(td, PRIV_NET_SETIFVNET);
 		if (error == 0)
 			error = if_vmove_reclaim(td, ifr->ifr_name,
-			    ifr_jid_get(ifr));
+			    ifr->ifr_jid);
 		goto out_noref;
 #endif
 	case CASE_IOC_IFREQ(SIOCIFCREATE):
