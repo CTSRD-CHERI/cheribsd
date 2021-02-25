@@ -3193,7 +3193,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		    ifr_addr_get_len(ifr));
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGHWADDR):
+	case SIOCGHWADDR:
 		error = if_gethwaddr(ifp, ifr);
 		break;
 
@@ -3420,6 +3420,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCSIFFIB):
 	case IFREQ64(SIOCGTUNFIB):
 	case IFREQ64(SIOCSTUNFIB):
+	case IFREQ64(SIOCGHWADDR):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
@@ -3650,6 +3651,7 @@ out_noref:
 	case IFREQ64(SIOCGIFBRDADDR):
 	case IFREQ64(SIOCGIFDSTADDR):
 	case IFREQ64(SIOCGIFNETMASK):
+	case IFREQ64(SIOCGHWADDR):
 		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_addr = thunk.ifr.ifr_addr;
 		break;
@@ -4493,7 +4495,7 @@ if_gethwaddr(struct ifnet *ifp, struct ifreq *ifr)
 	switch (ifp->if_type) {
 	case IFT_ETHER:
 	case IFT_IEEE8023ADLAG:
-		bcopy(ifp->if_hw_addr, ifr_addr_get_data(ifr), ifp->if_addrlen);
+		bcopy(ifp->if_hw_addr, ifr->ifr_addr.sa_data, ifp->if_addrlen);
 		return (0);
 	default:
 		return (ENODEV);
