@@ -271,7 +271,6 @@ XNESTED(cpu_switch)
 	SAVE_U_PCB_CONTEXT(sp, PCB_REG_SP, $c1)		# save old sp
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
 	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ) // XXX-AM: this is meaningless in purecap...
 	/* Do a savectx(), note SAVE_U_PCB_CONTEXT trashes t0 */
 	SAVE_U_PCB_CONTEXT(s0, PCB_REG_S0, $c1)
 	SAVE_U_PCB_CONTEXT(s1, PCB_REG_S1, $c1)
