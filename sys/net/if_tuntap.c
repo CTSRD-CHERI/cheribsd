@@ -1614,7 +1614,7 @@ tunioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag,
 	}
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(TUNGIFNAME):
+	case TUNGIFNAME:
 		ifrp = (struct ifreq *)data;
 		strlcpy(ifrp->ifr_name, TUN2IFP(tp)->if_xname, IFNAMSIZ);
 
