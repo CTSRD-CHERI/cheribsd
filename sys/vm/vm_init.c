@@ -230,7 +230,8 @@ again:
 	kmi->buffer_sva = (vm_offset_t)firstaddr;
 	kmi->buffer_eva = kmi->buffer_sva + size;
 	vmem_init(buffer_arena, "buffer arena", firstaddr, size,
-	    PAGE_SIZE, (mp_ncpus > 4) ? BKVASIZE * 8 : 0, 0);
+	    PAGE_SIZE, (mp_ncpus > 4) ? BKVASIZE * 8 : 0, 0,
+	    VMEM_CAPABILITY_ARENA);
 
 	/*
 	 * And optionally transient bio space.
@@ -249,7 +250,7 @@ again:
 		kmi->transient_sva = (vm_offset_t)firstaddr;
 		kmi->transient_eva = kmi->transient_sva + size;
 		vmem_init(transient_arena, "transient arena",
-		    firstaddr, size, PAGE_SIZE, 0, 0);
+		    firstaddr, size, PAGE_SIZE, 0, 0, VMEM_CAPABILITY_ARENA);
 	}
 
 	/*
@@ -269,3 +270,12 @@ again:
 	kmem_subinit(pipe_map, kernel_map, &minaddr, &maxaddr, maxpipekva,
 	    false);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 2020706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "bounds_compression"
+//   ]
+// }
+// CHERI CHANGES END
