@@ -3434,6 +3434,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCGIFNETMASK):
 	case IFREQ64(SIOCSIFNETMASK):
 	case IFREQ64(SIOCGI2C):
+	case IFREQ64(SIOCDIFADDR):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
@@ -3444,6 +3445,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 			break;
 		case IFREQ64(SIOCADDMULTI):
 		case IFREQ64(SIOCDELMULTI):
+		case IFREQ64(SIOCDIFADDR):
 			thunk.ifr.ifr_addr = ifr64->ifr_addr;
 			break;
 		case IFREQ64(SIOCSIFCAP):

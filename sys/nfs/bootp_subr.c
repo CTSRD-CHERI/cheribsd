@@ -909,7 +909,7 @@ bootpc_shutdown_interface(struct bootpc_ifcontext *ifctx, struct thread *td)
 	if (error != 0)
 		panic("%s: SIOCSIFFLAGS, error=%d", __func__, error);
 
-	sin = (struct sockaddr_in *)ifr_addr_get_sa(ifr);
+	sin = (struct sockaddr_in *) &ifr->ifr_addr;
 	clear_sinaddr(sin);
 	error = ifioctl(bootp_so, SIOCDIFADDR, (caddr_t) ifr, td);
 	if (error != 0)
@@ -955,7 +955,7 @@ bootpc_adjust_interface(struct bootpc_ifcontext *ifctx,
 	 * Do enough of ifconfig(8) so that the chosen interface
 	 * can talk to the servers.  (just set the address)
 	 */
-	sin = (struct sockaddr_in *)ifr_addr_get_sa(ifr);
+	sin = (struct sockaddr_in *) &ifr->ifr_addr;
 	clear_sinaddr(sin);
 	error = ifioctl(bootp_so, SIOCDIFADDR, (caddr_t) ifr, td);
 	if (error != 0)

@@ -243,7 +243,7 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 		error = in_gifaddr_ioctl(cmd, data, ifp, td);
 		sx_xunlock(&in_control_sx);
 		return (error);
-	case CASE_IOC_IFREQ(SIOCDIFADDR):
+	case SIOCDIFADDR:
 		sx_xlock(&in_control_sx);
 		error = in_difaddr_ioctl(cmd, data, ifp, td);
 		sx_xunlock(&in_control_sx);
@@ -554,8 +554,9 @@ fail1:
 static int
 in_difaddr_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp, struct thread *td)
 {
-	const struct sockaddr_in *addr = (struct sockaddr_in *)
-	    ifr_addr_get_sa(data);
+	const struct ifreq *ifr = (struct ifreq *)data;
+	const struct sockaddr_in *addr = (const struct sockaddr_in *)
+	    &ifr->ifr_addr;
 	struct ifaddr *ifa;
 	struct in_ifaddr *ia;
 	bool deleteAny, iaIsLast;
@@ -623,14 +624,8 @@ in_difaddr_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp, struct thread *td)
 	 */
 	in_ifadown(&ia->ia_ifa, 1);
 
-	if (ia->ia_ifa.ifa_carp) {
-		switch (cmd) {
-		case CASE_IOC_IFREQ(SIOCDIFADDR):
-			(*carp_detach_p)(&ia->ia_ifa, false);
-		default:
-			(*carp_detach_p)(&ia->ia_ifa, true);
-		}
-	}
+	if (ia->ia_ifa.ifa_carp)
+		(*carp_detach_p)(&ia->ia_ifa, cmd == SIOCAIFADDR);
 
 	/*
 	 * If this is the last IPv4 address configured on this
