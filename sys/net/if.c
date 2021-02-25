@@ -3185,12 +3185,12 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		error = (*ifp->if_ioctl)(ifp, cmd, data);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFLLADDR):
+	case SIOCSIFLLADDR:
 		error = priv_check(td, PRIV_NET_SETLLADDR);
 		if (error)
 			return (error);
-		error = if_setlladdr(ifp, ifr_addr_get_data(ifr),
-		    ifr_addr_get_len(ifr));
+		error = if_setlladdr(ifp,
+		    ifr->ifr_addr.sa_data, ifr->ifr_addr.sa_len);
 		break;
 
 	case SIOCGHWADDR:
@@ -3421,6 +3421,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCGTUNFIB):
 	case IFREQ64(SIOCSTUNFIB):
 	case IFREQ64(SIOCGHWADDR):
+	case IFREQ64(SIOCSIFLLADDR):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
@@ -3432,6 +3433,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		case IFREQ64(SIOCADDMULTI):
 		case IFREQ64(SIOCDELMULTI):
 		case IFREQ64(SIOCDIFADDR):
+		case IFREQ64(SIOCSIFLLADDR):
 			thunk.ifr.ifr_addr = ifr64->ifr_addr;
 			break;
 		case IFREQ64(SIOCSIFCAP):
