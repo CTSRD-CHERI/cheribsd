@@ -703,9 +703,6 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	 * we will panic if this fails.
 	 */
 	CHERI_CHECK_STC_OVERFLOW(k0)
-
-	/* XXX-AM: Can we use .mask/.frame in cheriabi? */
-	.mask	0x80000000, (CALLFRAME_RA - KERN_EXC_FRAME_SIZE)
 	/*
 	 * For __CHERI_PURE_CAPABILITY__, CHERI_REG_STC holds the location of the
 	 * trap frame, KSCRATCH holds the value of STC to save in the trap frame.
@@ -783,7 +780,6 @@ END(MipsKernGenException)
  */
 NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	.set	noat
-	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 
 	GET_CPU_PCPU_2(CHERI_REG_KSCRATCH, k0)	# get pcpu pointer
 	clc	CHERI_REG_KSCRATCH, zero, PC_CURPCB(CHERI_REG_KSCRATCH)
@@ -877,7 +873,6 @@ END(MipsUserGenException)
 	.set	noat
 NESTED(mips_wait, CALLFRAME_SIZ, ra)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
-	.mask   0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ) # XXX-AM: is this working in purecap?
 	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
 
 	mfc0	t0, MIPS_COP_0_STATUS
@@ -962,7 +957,6 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	LONG_SUBU	k0, zero, KERN_EXC_FRAME_SIZE
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, k0
 	CHERI_ADJUST_STC(k0)
-	.mask	0x80000000, (CALLFRAME_RA - KERN_EXC_FRAME_SIZE)
 
 	/*
 	 * Save CPU state, building 'frame'.  sp holds the location to save the trap
@@ -1134,7 +1128,6 @@ END(MipsKernIntr)
 
 NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	.set	noat
-	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 	/*
 	 * Save the relevant user registers into the u.u_pcb struct.
 	 * We don't need to save s0 - s8 because the compiler does it for us.
@@ -1537,7 +1530,7 @@ VECTOR_END(MipsCache)
  */
 NESTED_NOPROFILE(MipsCacheException, KERN_EXC_FRAME_SIZE, ra)
 	.set	noat
-	.mask	0x80000000, -4
+
 	CAPCALL_PCREL_LOAD(CHERI_REG_KSCRATCH, k0, _C_LABEL(panic)) # return to panic
 	CAPTABLE_PCREL_LOAD($c3, k1, 9f)	# panicstr
 	MFC0	a1, MIPS_COP_0_ERROR_PC
