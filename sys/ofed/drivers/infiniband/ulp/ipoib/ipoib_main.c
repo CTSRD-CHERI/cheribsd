@@ -310,8 +310,9 @@ ipoib_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFADDR):
-		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr), INFINIBAND_ALEN);
+	case SIOCGIFADDR:
+			bcopy(IF_LLADDR(ifp), &ifr->ifr_addr.sa_data[0],
+                            INFINIBAND_ALEN);
 		break;
 
 	case SIOCSIFMTU:

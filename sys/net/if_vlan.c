@@ -1837,8 +1837,9 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			arp_ifinit(ifp, ifa);
 #endif
 		break;
-	case CASE_IOC_IFREQ(SIOCGIFADDR):
-		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr), ifp->if_addrlen);
+	case SIOCGIFADDR:
+		bcopy(IF_LLADDR(ifp), &ifr->ifr_addr.sa_data[0],
+		    ifp->if_addrlen);
 		break;
 	case SIOCGIFMEDIA:
 		VLAN_SLOCK();

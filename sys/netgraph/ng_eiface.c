@@ -146,7 +146,7 @@ ng_eiface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case SIOCSIFADDR:
 		error = ether_ioctl(ifp, command, data);
 		break;
-	case CASE_IOC_IFREQ(SIOCGIFADDR):
+	case SIOCGIFADDR:
 		break;
 
 	/* Set flags */

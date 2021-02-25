@@ -218,7 +218,8 @@ int
 in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
     struct thread *td)
 {
-	struct sockaddr_in *addr = (struct sockaddr_in *)ifr_addr_get_sa(data);
+	struct ifreq *ifr = (struct ifreq *)data;
+	struct sockaddr_in *addr = (struct sockaddr_in *)&ifr->ifr_addr;
 	struct epoch_tracker et;
 	struct ifaddr *ifa;
 	struct in_ifaddr *ia;
@@ -232,10 +233,10 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 	 * to specific functions and ifp->if_ioctl().
 	 */
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCGIFADDR):
-	case CASE_IOC_IFREQ(SIOCGIFBRDADDR):
-	case CASE_IOC_IFREQ(SIOCGIFDSTADDR):
-	case CASE_IOC_IFREQ(SIOCGIFNETMASK):
+	case SIOCGIFADDR:
+	case SIOCGIFBRDADDR:
+	case SIOCGIFDSTADDR:
+	case SIOCGIFNETMASK:
 		break;
 	case SIOCGIFALIAS:
 		sx_xlock(&in_control_sx);
@@ -298,11 +299,11 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCGIFADDR):
+	case SIOCGIFADDR:
 		*addr = ia->ia_addr;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFBRDADDR):
+	case SIOCGIFBRDADDR:
 		if ((ifp->if_flags & IFF_BROADCAST) == 0) {
 			error = EINVAL;
 			break;
@@ -310,7 +311,7 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 		*addr = ia->ia_broadaddr;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFDSTADDR):
+	case SIOCGIFDSTADDR:
 		if ((ifp->if_flags & IFF_POINTOPOINT) == 0) {
 			error = EINVAL;
 			break;
@@ -318,7 +319,7 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 		*addr = ia->ia_dstaddr;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFNETMASK):
+	case SIOCGIFNETMASK:
 		*addr = ia->ia_sockmask;
 		break;
 	}

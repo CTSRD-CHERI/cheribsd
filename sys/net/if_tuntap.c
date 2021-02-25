@@ -1520,7 +1520,7 @@ tunioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag,
 			TUN_UNLOCK(tp);
 
 			return (0);
-		case CASE_IOC_IFREQ(SIOCGIFADDR):	/* get MAC address of the remote side */
+		case SIOCGIFADDR:	/* get MAC address of the remote side */
 			TUN_LOCK(tp);
 			bcopy(&tp->tun_ether.octet, data,
 			    sizeof(tp->tun_ether.octet));

@@ -3424,9 +3424,13 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCSIFMEDIA):
 	case IFREQ64(SIOCGIFMTU):
 	case IFREQ64(SIOCSIFMTU):
+	case IFREQ64(SIOCGIFADDR):
 	case IFREQ64(SIOCSIFADDR):
+	case IFREQ64(SIOCGIFBRDADDR):
 	case IFREQ64(SIOCSIFBRDADDR):
+	case IFREQ64(SIOCGIFDSTADDR):
 	case IFREQ64(SIOCSIFDSTADDR):
+	case IFREQ64(SIOCGIFNETMASK):
 	case IFREQ64(SIOCSIFNETMASK):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
@@ -3636,6 +3640,13 @@ out_noref:
 	case IFREQ64(SIOCGIFMTU):
 		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_mtu = thunk.ifr.ifr_mtu;
+		break;
+	case IFREQ64(SIOCGIFADDR):
+	case IFREQ64(SIOCGIFBRDADDR):
+	case IFREQ64(SIOCGIFDSTADDR):
+	case IFREQ64(SIOCGIFNETMASK):
+		ifr64 = (struct ifreq64 *)saved_data;
+		ifr64->ifr_addr = thunk.ifr.ifr_addr;
 		break;
 #endif
 	}

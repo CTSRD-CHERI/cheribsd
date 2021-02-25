@@ -293,7 +293,7 @@ ng_iface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		ifp->if_drv_flags |= IFF_DRV_RUNNING;
 		ifp->if_drv_flags &= ~(IFF_DRV_OACTIVE);
 		break;
-	case CASE_IOC_IFREQ(SIOCGIFADDR):
+	case SIOCGIFADDR:
 		break;
 
 	/* Set flags */
