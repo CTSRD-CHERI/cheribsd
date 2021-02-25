@@ -423,8 +423,8 @@ struct	ifreq {
 #define	ifr_flagshigh	ifr_ifru.ifru_flags[1]	/* flags (high 16 bits) */
 #ifndef _KERNEL
 #define	ifr_jid		ifr_ifru.ifru_jid	/* jail/vnet */
-#define	ifr_metric	ifr_ifru.ifru_metric	/* metric */
 #endif
+#define	ifr_metric	ifr_ifru.ifru_metric	/* metric */
 #define	ifr_mtu		ifr_ifru.ifru_mtu	/* mtu */
 #define ifr_phys	ifr_ifru.ifru_phys	/* physical wire */
 #define ifr_media	ifr_ifru.ifru_media	/* physical media */

@@ -2482,25 +2482,6 @@ ifr__int0_get(void *ifrp)
 	return (ifrup->ifr.ifr_ifru.ifru_cap[0]);
 }
 
-static void
-ifr__int0_set(void *ifrp, int val)
-{
-	union ifreq_union *ifrup;
-
-	ifrup = ifrp;
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		ifrup->ifr32.ifr_ifru.ifru_cap[0] = val;
-	else
-#endif
-#ifdef COMPAT_FREEBSD64
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		ifrup->ifr64.ifr_ifru.ifru_cap[0] = val;
-	else
-#endif
-		ifrup->ifr.ifr_ifru.ifru_cap[0] = val;
-}
-
 static u_char
 ifr__u_char_get(void *ifrp)
 {
@@ -2693,20 +2674,6 @@ ifr_jid_get(void *ifrp)
 }
 #endif
 
-static int
-ifr_metric_get(void *ifrp)
-{
-	
-	return (ifr__int0_get(ifrp));
-}
-
-static void
-ifr_metric_set(void *ifrp, int val)
-{
-
-	ifr__int0_set(ifrp, val);
-}
-
 u_char
 ifr_lan_pcp_get(void *ifrp)
 {
@@ -2787,8 +2754,8 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 #endif
 
-	case CASE_IOC_IFREQ(SIOCGIFMETRIC):
-		ifr_metric_set(ifr, ifp->if_metric);
+	case SIOCGIFMETRIC:
+		ifr->ifr_metric = ifp->if_metric;
 		break;
 
 	case SIOCGIFMTU:
@@ -2998,11 +2965,11 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 #endif
 
-	case CASE_IOC_IFREQ(SIOCSIFMETRIC):
+	case SIOCSIFMETRIC:
 		error = priv_check(td, PRIV_NET_SETIFMETRIC);
 		if (error)
 			return (error);
-		ifp->if_metric = ifr_metric_get(ifr);
+		ifp->if_metric = ifr->ifr_metric;
 		getmicrotime(&ifp->if_lastchange);
 		break;
 
@@ -3361,6 +3328,8 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCGIFPSRCADDR):
 	case IFREQ64(SIOCGIFPDSTADDR):
 	case IFREQ64(SIOCGIFINDEX):
+	case IFREQ64(SIOCGIFMETRIC):
+	case IFREQ64(SIOCSIFMETRIC):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
@@ -3395,6 +3364,9 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		case IFREQ64(SIOCSIFFIB):
 		case IFREQ64(SIOCSTUNFIB):
 			thunk.ifr.ifr_fib = ifr64->ifr_fib;
+			break;
+		case IFREQ64(SIOCSIFMETRIC):
+			thunk.ifr.ifr_metric = ifr64->ifr_metric;
 			break;
 		}
 		saved_cmd = cmd;
@@ -3606,6 +3578,10 @@ out_noref:
 	case IFREQ64(SIOCGIFINDEX):
 		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_index = thunk.ifr.ifr_index;
+		break;
+	case IFREQ64(SIOCGIFMETRIC):
+		ifr64 = (struct ifreq64 *)saved_data;
+		ifr64->ifr_metric = thunk.ifr.ifr_metric;
 		break;
 #endif
 	}
