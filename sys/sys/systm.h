@@ -342,7 +342,7 @@ critical_enter(void)
 
 	td = (struct thread_lite *)curthread;
 	td->td_critnest++;
-	__compiler_membar();
+	atomic_interrupt_fence();
 }
 
 static __inline void
@@ -353,9 +353,9 @@ critical_exit(void)
 	td = (struct thread_lite *)curthread;
 	KASSERT(td->td_critnest != 0,
 	    ("critical_exit: td_critnest == 0"));
-	__compiler_membar();
+	atomic_interrupt_fence();
 	td->td_critnest--;
-	__compiler_membar();
+	atomic_interrupt_fence();
 	if (__predict_false(td->td_owepreempt))
 		critical_exit_preempt();
 
