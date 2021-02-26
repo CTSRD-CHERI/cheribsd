@@ -75,14 +75,14 @@ NESTED(copyinstr, CALLFRAME_SIZ, ra)
 	bge	t0, zero, 1f
 	nop
 
-	CAPTABLE_LOAD($c12, copyerr)
+	CAPTABLE_PCREL_LOAD($c12, t0, copyerr)
 	cjr	$c12
 	nop
 1:
 	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
-	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
-	CAPCALL_LOAD($c12, copystr_c)
+	CAPTABLE_PCREL_LOAD($c2, t0, copyerr)	# prepare the onfault jump point
+	CAPCALL_PCREL_LOAD($c12, t0, copystr_c)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -115,14 +115,14 @@ NESTED(copyoutstr, CALLFRAME_SIZ, ra)
 	bge	t0, zero, 1f
 	nop
 
-	CAPTABLE_LOAD($c12, copyerr)
+	CAPTABLE_PCREL_LOAD($c12, t0, copyerr)
 	cjr	$c12
 	nop
 1:
 	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
-	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
-	CAPCALL_LOAD($c12, copystr_c)
+	CAPTABLE_PCREL_LOAD($c2, t0, copyerr)	# prepare the onfault jump point
+	CAPCALL_PCREL_LOAD($c12, t0, copystr_c)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -152,14 +152,14 @@ NESTED(copyin, CALLFRAME_SIZ, ra)
 	bge	t0, zero, 1f
 	nop
 
-	CAPTABLE_LOAD($c12, copyerr)
+	CAPTABLE_PCREL_LOAD($c12, t0, copyerr)
 	cjr	$c12
 	nop
 1:
 	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
-	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
-	CAPCALL_LOAD($c12, bcopynocap_c)
+	CAPTABLE_PCREL_LOAD($c2, t0, copyerr)	# prepare the onfault jump point
+	CAPCALL_PCREL_LOAD($c12, t0, bcopynocap_c)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -191,14 +191,14 @@ NESTED(copyincap, CALLFRAME_SIZ, ra)
 	bge	t0, zero, 1f
 	nop
 
-	CAPTABLE_LOAD($c12, copyerr)
+	CAPTABLE_PCREL_LOAD($c12, t0, copyerr)
 	cjr	$c12
 	nop
 1:
 	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
-	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
-	CAPCALL_LOAD($c12, bcopy_c)
+	CAPTABLE_PCREL_LOAD($c2, t0, copyerr)	# prepare the onfault jump point
+	CAPCALL_PCREL_LOAD($c12, t0, bcopy_c)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -229,14 +229,14 @@ NESTED(copyout, CALLFRAME_SIZ, ra)
 	bge	t0, zero, 1f
 	nop
 
-	CAPTABLE_LOAD($c12, copyerr)
+	CAPTABLE_PCREL_LOAD($c12, t0, copyerr)
 	cjr	$c12
 	nop
 1:
 	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
-	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
-	CAPCALL_LOAD($c12, bcopynocap_c)
+	CAPTABLE_PCREL_LOAD($c2, t0, copyerr)	# prepare the onfault jump point
+	CAPCALL_PCREL_LOAD($c12, t0, bcopynocap_c)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -268,14 +268,14 @@ NESTED(copyoutcap, CALLFRAME_SIZ, ra)
 	bge	t0, zero, 1f
 	nop
 
-	CAPTABLE_LOAD($c12, copyerr)
+	CAPTABLE_PCREL_LOAD($c12, t0, copyerr)
 	cjr	$c12
 	nop
 1:
 	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
-	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
-	CAPCALL_LOAD($c12, bcopy_c)
+	CAPTABLE_PCREL_LOAD($c2, t0, copyerr)	# prepare the onfault jump point
+	CAPCALL_PCREL_LOAD($c12, t0, bcopy_c)
 	cjalr	$c12, $c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
@@ -310,7 +310,7 @@ END(copyerr)
 LEAF(fueword64)
 XLEAF(fueword)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	CAPTABLE_LOAD($c2, fswberr)
+	CAPTABLE_PCREL_LOAD($c2, t1, fswberr)
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1)
@@ -329,7 +329,7 @@ END(fueword64)
 
 LEAF(fueword32)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	CAPTABLE_LOAD($c2, fswberr)
+	CAPTABLE_PCREL_LOAD($c2, t1, fswberr)
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1)
@@ -347,7 +347,7 @@ END(fueword32)
 
 LEAF(fuesword)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	CAPTABLE_LOAD($c2, fswberr)
+	CAPTABLE_PCREL_LOAD($c2, t1, fswberr)
 	blt	t0, zero, 1f
 	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
@@ -364,7 +364,7 @@ END(fuesword)
 
 LEAF(fubyte)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	CAPTABLE_LOAD($c2, fswberr)
+	CAPTABLE_PCREL_LOAD($c2, t1, fswberr)
 	blt	t0, zero, 1f
 	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
@@ -379,7 +379,7 @@ END(fubyte)
 
 LEAF(fuecap)
 	cgetaddr	t0, $c3
-	CAPTABLE_LOAD($c2, fswberr)
+	CAPTABLE_PCREL_LOAD($c2, t1, fswberr)
 	blt	t0, zero, 1f	# make sure address is in user space
 	nop
 	GET_CPU_PCPU($c1)
@@ -398,7 +398,7 @@ END(fuecap)
 LEAF(suword64)
 XLEAF(suword)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	CAPTABLE_LOAD($c2, fswberr)
+	CAPTABLE_PCREL_LOAD($c2, t1, fswberr)
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1)
@@ -415,7 +415,7 @@ XEND(suword)
 END(suword64)
 
 LEAF(sucap)
-	CAPTABLE_LOAD($c2, fswberr)
+	CAPTABLE_PCREL_LOAD($c2, t0, fswberr)
 	cgetbase	t0, $c3
 	blt	t0, zero, 1f	# make sure address is in user space
 	nop
@@ -433,7 +433,7 @@ END(sucap)
 
 LEAF(suword32)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	CAPTABLE_LOAD($c2, fswberr)
+	CAPTABLE_PCREL_LOAD($c2, t1, fswberr)
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1)
@@ -460,7 +460,7 @@ END(suword32)
  */
 LEAF(casueword32)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	CAPTABLE_LOAD($c2, fswberr)
+	CAPTABLE_PCREL_LOAD($c2, t1, fswberr)
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1)
@@ -490,7 +490,7 @@ END(casueword32)
 LEAF(casueword64)
 XLEAF(casueword)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	CAPTABLE_LOAD($c2, fswberr)
+	CAPTABLE_PCREL_LOAD($c2, t1, fswberr)
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1)
@@ -523,7 +523,7 @@ END(casueword64)
  */
 LEAF(susword)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	CAPTABLE_LOAD($c2, fswberr)
+	CAPTABLE_PCREL_LOAD($c2, t1, fswberr)
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1)
@@ -540,7 +540,7 @@ END(susword)
 
 LEAF(subyte)
 	cgetaddr t0, $c3	# make sure source is in userspace
-	CAPTABLE_LOAD($c2, fswberr)
+	CAPTABLE_PCREL_LOAD($c2, t1, fswberr)
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1)
@@ -568,7 +568,7 @@ END(fswberr)
  */
 LEAF(fuswintr)
 	cgetbase t0, $c3	# make sure source is in userspace
-	CAPTABLE_LOAD($c2, fswintrberr)
+	CAPTABLE_PCREL_LOAD($c2, t1, fswintrberr)
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1)
@@ -584,7 +584,7 @@ END(fuswintr)
 
 LEAF(suswintr)
 	cgetbase t0, $c3	# make sure source is in userspace
-	CAPTABLE_LOAD($c2, fswintrberr)
+	CAPTABLE_PCREL_LOAD($c2, t1, fswintrberr)
 	blt	t0, zero, 1f
 	nop
 	GET_CPU_PCPU($c1)
@@ -789,6 +789,67 @@ LEAF(breakpoint)
 	cjr	$c17
 	nop
 END(breakpoint)
+
+LEAF(setjmp)
+	mfc0	v0, MIPS_COP_0_STATUS	# Later the "real" spl value!
+	csd	s0, zero, (SZREG * PCB_REG_S0)($c3)
+	csd	s1, zero, (SZREG * PCB_REG_S1)($c3)
+	csd	s2, zero, (SZREG * PCB_REG_S2)($c3)
+	csd	s3, zero, (SZREG * PCB_REG_S3)($c3)
+	csd	s4, zero, (SZREG * PCB_REG_S4)($c3)
+	csd	s5, zero, (SZREG * PCB_REG_S5)($c3)
+	csd	s6, zero, (SZREG * PCB_REG_S6)($c3)
+	csd	s7, zero, (SZREG * PCB_REG_S7)($c3)
+	csd	s8, zero, (SZREG * PCB_REG_S8)($c3)
+	csd	sp, zero, (SZREG * PCB_REG_SP)($c3)
+	csd	ra, zero, (SZREG * PCB_REG_RA)($c3)
+	csd	v0, zero, (SZREG * PCB_REG_SR)($c3)
+	REG_LI	t0, 12
+	csc	$c17, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C17)($c3)
+	csc	$c18, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C18)($c3)
+	csc	$c19, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C19)($c3)
+	csc	$c20, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C20)($c3)
+	csc	$c21, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C21)($c3)
+	csc	$c22, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C22)($c3)
+	csc	$c23, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C23)($c3)
+	csc	$c24, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C24)($c3)
+	csc	$c26, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C26)($c3)
+	csc	$c11, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_STC)($c3)
+
+	cjr	$c17
+	li	v0, 0			# setjmp return
+END(setjmp)
+
+LEAF(longjmp)
+	cld	v0, zero, (SZREG * PCB_REG_SR)($c3)
+	cld	ra, zero, (SZREG * PCB_REG_RA)($c3)
+	cld	s0, zero, (SZREG * PCB_REG_S0)($c3)
+	cld	s1, zero, (SZREG * PCB_REG_S1)($c3)
+	cld	s2, zero, (SZREG * PCB_REG_S2)($c3)
+	cld	s3, zero, (SZREG * PCB_REG_S3)($c3)
+	cld	s4, zero, (SZREG * PCB_REG_S4)($c3)
+	cld	s5, zero, (SZREG * PCB_REG_S5)($c3)
+	cld	s6, zero, (SZREG * PCB_REG_S6)($c3)
+	cld	s7, zero, (SZREG * PCB_REG_S7)($c3)
+	cld	s8, zero, (SZREG * PCB_REG_S8)($c3)
+	cld	sp, zero, (SZREG * PCB_REG_SP)($c3)
+	REG_LI	t0, 12
+	clc	$c17, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C17)($c3)
+	clc	$c18, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C18)($c3)
+	clc	$c19, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C19)($c3)
+	clc	$c20, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C20)($c3)
+	clc	$c21, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C21)($c3)
+	clc	$c22, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C22)($c3)
+	clc	$c23, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C23)($c3)
+	clc	$c24, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C24)($c3)
+	clc	$c26, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_C26)($c3)
+	clc	$c11, t0, (CHERICAP_SIZE * CHERIKFRAME_OFF_STC)($c3)
+
+	mtc0	v0, MIPS_COP_0_STATUS	# Later the "real" spl value!
+	ITLBNOPFIX
+	cjr	$c17
+	li	v0, 1			# longjmp return
+END(longjmp)
 
 #ifdef CPU_QEMU_MALTA
 LEAF(cheri_trace_log)
