@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Edward Tomasz Napierala <trasz@FreeBSD.org>
+ * Copyright (c) 2020 Edward Tomasz Napierala <trasz@FreeBSD.org>
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -26,24 +26,32 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-#ifndef _MACHINE_SWITCHER_H_
-#define _MACHINE_SWITCHER_H_
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-#define	SCB_CALLER_SCB(X)	0(X)
-#define	SCB_CALLEE_SCB(X)	1*CHERICAP_SIZE(X)
-#define	SCB_TD(X)		2*CHERICAP_SIZE(X)
-#define	SCB_BORROWER_TD(X)	2*CHERICAP_SIZE+8(X)
-#define	SCB_UNSEALCAP(X)	3*CHERICAP_SIZE(X)
-#define	SCB_CSP(X)		4*CHERICAP_SIZE(X)
-#define	SCB_CRA(X)		5*CHERICAP_SIZE(X)
-#define	SCB_OUTBUF(X)		6*CHERICAP_SIZE(X)
-#define	SCB_OUTLEN(X)		7*CHERICAP_SIZE(X)
-#define	SCB_INBUF(X)		8*CHERICAP_SIZE(X)
-#define	SCB_INLEN(X)		9*CHERICAP_SIZE(X)
-#define	SCB_COOKIEP(X)		10*CHERICAP_SIZE(X)
+#include "namespace.h"
+#include <errno.h>
+#include <unistd.h>
+#include "cheri_private.h"
+#include "libc_private.h"
+#include "un-namespace.h"
 
-#endif /* !_MACHINE_SWITCHER_H_ */
+_Thread_local void * __capability _cocall_code;
+_Thread_local void * __capability _cocall_data;
+_Thread_local void * __capability _coaccept_code;
+_Thread_local void * __capability _coaccept_data;
+
+int
+cosetup(int what)
+{
+	switch (what) {
+	case COSETUP_COACCEPT:
+		return (_cosetup(what, &_coaccept_code, &_coaccept_data));
+	case COSETUP_COCALL:
+		return (_cosetup(what, &_cocall_code, &_cocall_data));
+	default:
+		return (EINVAL);
+	}
+}

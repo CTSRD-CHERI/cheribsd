@@ -44,14 +44,12 @@
 ATF_TC_WITHOUT_HEAD(cosetup_cocall);
 ATF_TC_BODY(cosetup_cocall, tc)
 {
-	void * __capability switcher_code;
-	void * __capability switcher_data;
 	pid_t pid;
 	int error;
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
+		error = cosetup(COSETUP_COCALL);
 		ATF_REQUIRE_EQ(error, 0);
 		exit(error);
 	} else {
@@ -62,14 +60,12 @@ ATF_TC_BODY(cosetup_cocall, tc)
 ATF_TC_WITHOUT_HEAD(cosetup_coaccept);
 ATF_TC_BODY(cosetup_coaccept, tc)
 {
-	void * __capability switcher_code;
-	void * __capability switcher_data;
 	pid_t pid;
 	int error;
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = cosetup(COSETUP_COACCEPT, &switcher_code, &switcher_data);
+		error = cosetup(COSETUP_COACCEPT);
 		ATF_REQUIRE_EQ(error, 0);
 		exit(error);
 	} else {

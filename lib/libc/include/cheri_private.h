@@ -46,4 +46,11 @@
 #endif
 #endif
 
+#if __has_feature(capabilities)
+extern _Thread_local void * __capability _cocall_code;
+extern _Thread_local void * __capability _cocall_data;
+extern _Thread_local void * __capability _coaccept_code;
+extern _Thread_local void * __capability _coaccept_data;
+#endif /* __has_feature(capabilities) */
+
 #endif /* __LIBC_CHERI_PRIVATE_H__ */

@@ -118,14 +118,12 @@ show_chunk(void *ptr, off_t off, int len)
 static void
 call(void)
 {
-	void * __capability switcher_code;
-	void * __capability switcher_data;
 	void * __capability lookedup;
 	char buf[8];
 	int error, i;
 
 	fprintf(stderr, "%s: setting up...\n", __func__);
-	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
+	error = cosetup(COSETUP_COCALL);
 	if (error != 0)
 		err(1, "cosetup");
 
@@ -136,9 +134,9 @@ call(void)
 
 	buf[0] = 42;
 	for (i = 0; i < 2; i++) {
-		fprintf(stderr, "%s: code %p, data %p, calling %p, buf %p, we are thread %d...\n",
-		    __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data, (__cheri_fromcap void *)lookedup, buf, pthread_getthreadid_np());
-		error = cocall(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
+		fprintf(stderr, "%s: calling %p, buf %p, we are thread %d...\n",
+		    __func__, (__cheri_fromcap void *)lookedup, buf, pthread_getthreadid_np());
+		error = cocall(lookedup, buf, sizeof(buf), buf, sizeof(buf));
 		if (error != 0)
 			fprintf(stderr, "%s: cocall: %s\n", __func__, strerror(errno));
 		fprintf(stderr, "%s: done, we are thread %d, buf %p contains %d\n",
@@ -150,8 +148,6 @@ call(void)
 static void *
 service_proc(void *dummy __unused)
 {
-	void * __capability switcher_code;
-	void * __capability switcher_data;
 	void * __capability cookie;
 	uint64_t *halfcookie;
 	char buf[8];
@@ -159,7 +155,7 @@ service_proc(void *dummy __unused)
 	int error;
 
 	fprintf(stderr, "%s: setting up...\n", __func__);
-	error = cosetup(COSETUP_COACCEPT, &switcher_code, &switcher_data);
+	error = cosetup(COSETUP_COACCEPT);
 	if (error != 0)
 		err(1, "cosetup");
 
@@ -168,10 +164,10 @@ service_proc(void *dummy __unused)
 	if (error != 0)
 		err(1, "coregister");
 
-	fprintf(stderr, "%s: code %p, data %p, buf %p, we are thread %d, accepting...\n",
-	    __func__, (__cheri_fromcap void *)switcher_code, (__cheri_fromcap void *)switcher_data, buf, pthread_getthreadid_np());
+	fprintf(stderr, "%s: buf %p, we are thread %d, accepting...\n",
+	    __func__, buf, pthread_getthreadid_np());
 	for (;;) {
-		error = coaccept(switcher_code, switcher_data, &cookie, buf, sizeof(buf));
+		error = coaccept(&cookie, buf, sizeof(buf), buf, sizeof(buf));
 		if (error != 0)
 			fprintf(stderr, "%s: coaccept: %s\n", __func__, strerror(errno));
 		error = cogetpid(&pid);

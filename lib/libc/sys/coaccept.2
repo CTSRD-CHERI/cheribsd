@@ -40,62 +40,70 @@
 .Sh SYNOPSIS
 .In unistd.h
 .Ft int
-.Fn coaccept "void * __capability code" "void * __capability data" "void * __capability * __capability cookiep" "void * __capability buf" "size_t len"
+.Fn coaccept "void * __capability * __capability cookiep" "const void * __capability outbuf" "size_t outlen" "void * __capability inbuf" "size_t inlen"
+.Fn coaccept_slow "void * __capability * __capability cookiep" "const void * __capability outbuf" "size_t outlen" "void * __capability inbuf" "size_t inlen"
 .Sh DESCRIPTION
 The
 .Fn coaccept
 function accepts a colocated call.
-Before passing the execution to the callee, at most
-.Fa len
+Before passing execution to the callee, at most
+.Fa outlen
 bytes pointed to by
-.Fa buf
-will be copied from buffer provided by the caller; before returning the data
+.Fa outbuf
+will be copied from the input buffer provided by the caller.
+Before returning to the caller,
+.Fa outlen
+bytes pointed to by
+.Fa outbuf
 will be copied back to the caller.
+Any capabilities copied will have their tag bits cleared.
+The
+.Fn coaccept_slow 2
+provides the same semantics, but implemented as a traditional system call.
 .Pp
-The
-.Ar code
-and
-.Ar data
-arguments must point to a sealed capability pair obtained from
-.Xr cosetup 2 .
-The
+If
 .Ar cookiep
-will be set to an opaque, capability-sized token that identifies the callee;
-it can be passed to
+is not NULL, the capability it points at will be set to an opaque,
+token that uniquely identifies the caller; the token can be passed to
 .Xr cogetpid 2 .
-Both the
-.Fa buf
-and the
-.Fa len
-must be 8-byte aligned.
+The
+.Fa outbuf ,
+.Fa inbuf ,
+.Fa outlen ,
+and
+.Fa inlen
+values must be 8-byte aligned.
+.Pp
+Before calling those functions for the first time, one must call
+.Xr cosetup 2
+with
+.Dv COSETUP_COACCEPT
+argument.
 .Sh RETURN VALUES
 .Rv -std coaccept
 .Sh ERRORS
 The
 .Fn coaccept
-system call
-will fail if:
+function will fail if:
 .Bl -tag -width Er
-.It Bq Er EINVAL
-The
-.Fa code or
-.Fa data
-arguments are invalid.
 .It Bq Er EFAULT
 The
-.Fa data
-argument
-points outside the process's allocated address space.
-.El
+.Fa inbuf
+or
+.Fa outbuf
+arguments point outside the process's allocated address space,
+or the
+.Fa inlen
+or
+.Fa outlen
+reach beyond the allocated memory.
 .Sh EXAMPLES
 Basic usage example:
 .Bd -literal
-	void * __capability switcher_code;
-	void * __capability switcher_data;
-	void * __capability caller_cookie;
+	void * __capability cookie;
 	uint64_t buf[MAXBSIZE];
 
-	error = cosetup(COSETUP_COACCEPT, &switcher_code, &switcher_data);
+	error = cosetup(COSETUP_COACCEPT);
 	if (error != 0)
 		err(1, "cosetup");
 
@@ -104,7 +112,7 @@ Basic usage example:
 		err(1, "coregister");
 
 	for (;;) {
-		error = coaccept(switcher_code, switcher_data, &caller_cookie, buf, sizeof(buf));
+		error = coaccept(&cookie, buf, sizeof(buf), buf, sizeof(buf));
 		if (error != 0)
 			err(1, "coaccept");
 	}

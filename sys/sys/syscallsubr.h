@@ -706,11 +706,12 @@ int	kern_colookup(struct thread *td, const char * __capability namep,
 	    void * __capability * __capability capp);
 int	kern_cogetpid(struct thread *td, pid_t * __capability pidp);
 int	kern_copark(struct thread *td);
-int	kern_cocall_slow(void * __capability code, void * __capability data,
-	    void * __capability target, void * __capability buf, size_t len);
-int	kern_coaccept_slow(void * __capability code, void * __capability data,
-	    void * __capability * __capability cookiep,
-	    void * __capability buf, size_t len);
+int	kern_cocall_slow(void * __capability target,
+	    const void * __capability outbuf, size_t outlen,
+	    void * __capability inbuf, size_t inlen);
+int	kern_coaccept_slow(void * __capability * __capability cookiep,
+	    const void * __capability outbuf, size_t outlen,
+	    void * __capability inbuf, size_t inlen);
 
 #endif /* !_SYS_SYSCALLSUBR_H_ */
 // CHERI CHANGES START

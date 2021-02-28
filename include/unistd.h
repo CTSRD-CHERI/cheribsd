@@ -594,20 +594,39 @@ extern int optreset;			/* getopt(3) external variable */
 #endif
 
 #if __has_feature(capabilities)
-int	 cocall(void * __capability, void * __capability, void * __capability, void * __capability, size_t);
-int	 coaccept(void * __capability, void * __capability, void * __capability * __capability, void * __capability, size_t);
-int	 cosetup(int, void * __capability *, void * __capability *);
+ssize_t	 write_c(int, const void * __capability, size_t);
+
+/*
+ * Colocated calls API.
+ */
+int	 coaccept(void * __capability * __capability,
+	     const void * __capability, size_t, void * __capability, size_t);
+int	 cocall(void * __capability,
+	     const void * __capability, size_t, void * __capability, size_t);
+int	 cosetup(int);
 int	 coregister(const char *, void * __capability *);
 int	 colookup(const char *, void * __capability *);
 int	 cogetpid(pid_t *pidp);
-ssize_t	 write_c(int, const void * __capability, size_t);
+
+/*
+ * This is the interface between libc and the switcher.
+ */
+int	 _coaccept(void * __capability, void * __capability,
+	    void * __capability * __capability,
+	    const void * __capability, size_t, void * __capability, size_t);
+int	 _cocall(void * __capability, void * __capability,
+	    const void * __capability,
+	    const void * __capability, size_t, void * __capability, size_t);
+int	 _cosetup(int, void * __capability *, void * __capability *);
 
 /*
  * Kernel-based replacement for cocall(2) and coaccept(2) usually
  * provided by the switcher; intended for testing purposes.
  */
-int	 cocall_slow(void * __capability, void * __capability, void * __capability, void * __capability, size_t);
-int	 coaccept_slow(void * __capability, void * __capability, void * __capability * __capability, void * __capability, size_t);
+int	 coaccept_slow(void * __capability * __capability,
+	    const void * __capability, size_t, void * __capability, size_t);
+int	 cocall_slow(void * __capability,
+	    const void * __capability, size_t, void * __capability, size_t);
 #endif /* __has_feature(capabilities) */
 #endif /* __BSD_VISIBLE */
 __END_DECLS

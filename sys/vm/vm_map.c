@@ -5839,7 +5839,7 @@ vm_map_reservation_is_unmapped(vm_map_t map, vm_offset_t reservation)
 
 #if __has_feature(capabilities)
 pid_t
-vm_get_cap_owner(struct thread *td, uintcap_t c)
+vm_get_cap_owner(struct thread *td, const uintcap_t c)
 {
 	vm_map_t map;
 	vm_map_entry_t entry;

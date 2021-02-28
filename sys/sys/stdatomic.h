@@ -217,6 +217,7 @@ typedef _Atomic(__uint_fast64_t)	atomic_uint_fast64_t;
 typedef _Atomic(__intptr_t)		atomic_intptr_t;
 typedef _Atomic(__uintptr_t)		atomic_uintptr_t;
 typedef _Atomic(__size_t)		atomic_size_t;
+typedef _Atomic(__ptraddr_t)		atomic_ptraddr_t;
 typedef _Atomic(__ptrdiff_t)		atomic_ptrdiff_t;
 typedef _Atomic(__intmax_t)		atomic_intmax_t;
 typedef _Atomic(__uintmax_t)		atomic_uintmax_t;

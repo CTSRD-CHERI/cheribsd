@@ -536,7 +536,7 @@ struct setfib_args {
 struct ntp_adjtime_args {
 	char tp_l_[PADL_(struct timex * __capability)]; struct timex * __capability tp; char tp_r_[PADR_(struct timex * __capability)];
 };
-struct cosetup_args {
+struct _cosetup_args {
 	char what_l_[PADL_(int)]; int what; char what_r_[PADR_(int)];
 	char code_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability code; char code_r_[PADR_(void * __capability __capability * __capability)];
 	char data_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability data; char data_r_[PADR_(void * __capability __capability * __capability)];
@@ -1723,18 +1723,18 @@ struct utimensat_args {
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
 struct cocall_slow_args {
-	char code_l_[PADL_(void * __capability __capability)]; void * __capability __capability code; char code_r_[PADR_(void * __capability __capability)];
-	char data_l_[PADL_(void * __capability __capability)]; void * __capability __capability data; char data_r_[PADR_(void * __capability __capability)];
 	char target_l_[PADL_(void * __capability __capability)]; void * __capability __capability target; char target_r_[PADR_(void * __capability __capability)];
-	char buf_l_[PADL_(void * __capability __capability)]; void * __capability __capability buf; char buf_r_[PADR_(void * __capability __capability)];
-	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char outbuf_l_[PADL_(const void * __capability __capability)]; const void * __capability __capability outbuf; char outbuf_r_[PADR_(const void * __capability __capability)];
+	char outlen_l_[PADL_(size_t)]; size_t outlen; char outlen_r_[PADR_(size_t)];
+	char inbuf_l_[PADL_(void * __capability __capability)]; void * __capability __capability inbuf; char inbuf_r_[PADR_(void * __capability __capability)];
+	char inlen_l_[PADL_(size_t)]; size_t inlen; char inlen_r_[PADR_(size_t)];
 };
 struct coaccept_slow_args {
-	char code_l_[PADL_(void * __capability __capability)]; void * __capability __capability code; char code_r_[PADR_(void * __capability __capability)];
-	char data_l_[PADL_(void * __capability __capability)]; void * __capability __capability data; char data_r_[PADR_(void * __capability __capability)];
 	char cookiep_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability cookiep; char cookiep_r_[PADR_(void * __capability __capability * __capability)];
-	char buf_l_[PADL_(void * __capability __capability)]; void * __capability __capability buf; char buf_r_[PADR_(void * __capability __capability)];
-	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char outbuf_l_[PADL_(const void * __capability __capability)]; const void * __capability __capability outbuf; char outbuf_r_[PADR_(const void * __capability __capability)];
+	char outlen_l_[PADL_(size_t)]; size_t outlen; char outlen_r_[PADR_(size_t)];
+	char inbuf_l_[PADL_(void * __capability __capability)]; void * __capability __capability inbuf; char inbuf_r_[PADR_(void * __capability __capability)];
+	char inlen_l_[PADL_(size_t)]; size_t inlen; char inlen_r_[PADR_(size_t)];
 };
 struct fdatasync_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -1997,7 +1997,7 @@ int	sys_msgsys(struct thread *, struct msgsys_args *);
 int	sys_shmsys(struct thread *, struct shmsys_args *);
 int	sys_setfib(struct thread *, struct setfib_args *);
 int	sys_ntp_adjtime(struct thread *, struct ntp_adjtime_args *);
-int	sys_cosetup(struct thread *, struct cosetup_args *);
+int	sys__cosetup(struct thread *, struct _cosetup_args *);
 int	sys_coregister(struct thread *, struct coregister_args *);
 int	sys_colookup(struct thread *, struct colookup_args *);
 int	sys_copark(struct thread *, struct copark_args *);
@@ -2906,7 +2906,7 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 #define	SYS_AUE_freebsd6_pwrite	AUE_PWRITE
 #define	SYS_AUE_setfib	AUE_SETFIB
 #define	SYS_AUE_ntp_adjtime	AUE_NTP_ADJTIME
-#define	SYS_AUE_cosetup	AUE_NULL
+#define	SYS_AUE__cosetup	AUE_NULL
 #define	SYS_AUE_coregister	AUE_NULL
 #define	SYS_AUE_colookup	AUE_NULL
 #define	SYS_AUE_copark	AUE_NULL

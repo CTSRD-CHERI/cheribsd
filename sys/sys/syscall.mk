@@ -117,7 +117,7 @@ MIASM =  \
 	shmsys.o \
 	setfib.o \
 	ntp_adjtime.o \
-	cosetup.o \
+	_cosetup.o \
 	coregister.o \
 	colookup.o \
 	copark.o \

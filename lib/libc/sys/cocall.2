@@ -40,42 +40,51 @@
 .Sh SYNOPSIS
 .In unistd.h
 .Ft int
-.Fn cocall "void * __capability code" "void * __capability data" "void * __capability target" "void * __capability buf" "size_t len"
+.Fn cocall "void * __capability target" "const void * __capability outbuf" "size_t outlen" "void * __capability inbuf" "size_t inlen"
+.Fn cocall_slow "void * __capability target" "const void * __capability outbuf" "size_t outlen" "void * __capability inbuf" "size_t inlen"
 .Sh DESCRIPTION
 The
 .Fn cocall
 function performs a colocated call to the callee indicated by the
 .Ar target
 argument.
-Before passing the execution to the callee, at most
-.Fa len
+Before passing execution to the callee,
+.Fa outlen
 bytes pointed to by
-.Fa buf
-will be copied to the buffer provided by the callee; before returning the data
-will be copied from the callee back to the calling side.
-.Pp
+.Fa outbuf
+will be copied to the input buffer provided by the callee.
+Before returning, at most
+.Fa inlen
+bytes will be copied from the callee's output buffer into
+.Fa inbuf .
+Any capabilities copied will have their tag bits cleared.
 The
-.Ar code
-and
-.Ar data
-arguments must point to a sealed capability pair obtained from
-.Xr cosetup 2 .
+.Fn cocall_slow 2
+provides the same semantics, but implemented as a traditional system call.
+.Pp
 The
 .Ar target
 argument is a sealed capability usually retrieved with
 .Xr colookup 2 .
-Both the
-.Fa buf
-and the
-.Fa len
-must be 8-byte aligned.
+The
+.Fa outbuf ,
+.Fa inbuf ,
+.Fa outlen ,
+and
+.Fa inlen
+values must be 8-byte aligned.
+.Pp
+Before calling those functions for the first time, one must call
+.Xr cosetup 2
+with
+.Dv COSETUP_COCALL
+argument.
 .Sh RETURN VALUES
 .Rv -std cocall
 .Sh ERRORS
 The
 .Fn cocall
-system call
-will fail if:
+function will fail if:
 .Bl -tag -width Er
 .It Bq Er EAGAIN
 The callee has not called
@@ -83,28 +92,35 @@ The callee has not called
 yet.
 .It Bq Er EPIPE
 The callee is no longer available, usually because it exited.
+.It Bq Er EPROTOTYPE
+Used
+.Fn cocall 2
+against a callee waiting on
+.Fn coaccept_slow 2 ,
+or vice versa.
 .It Bq Er EINVAL
 The
-.Fa code ,
-.Fa data ,
-or
 .Fa target
-arguments are invalid.
+argument is invalid.
 .It Bq Er EFAULT
 The
-.Fa data
-argument
-points outside the process's allocated address space.
+.Fa inbuf
+or
+.Fa outbuf
+arguments point outside the process's allocated address space,
+or the
+.Fa inlen
+or
+.Fa outlen
+reach beyond the allocated memory.
 .El
 .Sh EXAMPLES
 Basic usage example:
 .Bd -literal
-	void * __capability switcher_code;
-	void * __capability switcher_data;
 	void * __capability lookedup;
 	uint64_t buf[MAXBSIZE];
 
-	error = cosetup(COSETUP_COCALL, &switcher_code, &switcher_data);
+	error = cosetup(COSETUP_COCALL);
 	if (error != 0)
 		err(1, "cosetup");
 
@@ -112,7 +128,7 @@ Basic usage example:
 	if (error != 0)
 		err(1, "colookup");
 
-	error = cocall(switcher_code, switcher_data, lookedup, buf, sizeof(buf));
+	error = cocall(lookedup, buf, sizeof(buf), buf, sizeof(buf));
 	if (error != 0)
 		err(1, "cocall");
 .Ed

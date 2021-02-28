@@ -281,7 +281,6 @@ vm_map_range_valid(vm_map_t map, vm_offset_t start, vm_offset_t end)
 
 struct coname {
 	LIST_ENTRY(coname)	c_next;
-	struct thread		*c_td;
 	char			*c_name;
 	void * __capability	c_value;
 };
@@ -552,7 +551,7 @@ int vm_map_wire_locked(vm_map_t map, vm_offset_t start, vm_offset_t end,
     int flags);
 long vmspace_swap_count(struct vmspace *vmspace);
 void vm_map_entry_set_vnode_text(vm_map_entry_t entry, bool add);
-pid_t vm_get_cap_owner(struct thread *td, uintcap_t c);
+pid_t vm_get_cap_owner(struct thread *td, const uintcap_t c);
 #endif				/* _KERNEL */
 #endif				/* _VM_MAP_ */
 // CHERI CHANGES START
