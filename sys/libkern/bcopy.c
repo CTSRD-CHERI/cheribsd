@@ -100,12 +100,12 @@ _memcpy(void *dst0, const void *src0, size_t length, bool keeptags)
 		 */
 		t = (size_t)src;	/* only need low bits */
 
-		if ((t | (vaddr_t)dst) & wmask) {
+		if ((t | (ptraddr_t)dst) & wmask) {
 			/*
 			 * Try to align operands.  This cannot be done
 			 * unless the low bits match.
 			 */
-			if ((t ^ (vaddr_t)dst) & wmask || length < wsize) {
+			if ((t ^ (ptraddr_t)dst) & wmask || length < wsize) {
 				t = length;
 			} else {
 				t = wsize - (t & wmask);
@@ -139,8 +139,8 @@ _memcpy(void *dst0, const void *src0, size_t length, bool keeptags)
 		dst += length;
 		t = (size_t)src;
 
-		if ((t | (vaddr_t)dst) & wmask) {
-			if ((t ^ (vaddr_t)dst) & wmask || length <= wsize) {
+		if ((t | (ptraddr_t)dst) & wmask) {
+			if ((t ^ (ptraddr_t)dst) & wmask || length <= wsize) {
 				t = length;
 			} else {
 				t &= wmask;
