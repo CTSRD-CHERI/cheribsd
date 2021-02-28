@@ -172,7 +172,7 @@ extern char MipsCache[], MipsCacheEnd[];
 /* MIPS wait skip region */
 extern char MipsWaitStart[], MipsWaitEnd[];
 
-extern char edata[], end[];
+extern char end[];
 
 u_int32_t bootdev;
 struct bootinfo bootinfo;
