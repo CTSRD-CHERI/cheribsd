@@ -72,8 +72,8 @@ __FBSDID("$FreeBSD$");
 
 #if __has_feature(capabilities)
 #include <cheri/cheri.h>
-#include <cheri/cheric.h>
 #endif
+#include <cheri/cheric.h>
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -89,6 +89,41 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/user.h>
 #include <sys/mbuf.h>
+
+/*
+ * Create the PCB for the given thread.
+ * The PCB space is allocated at the bottom of the kernel stack for
+ * the given thread.
+ * Adjust the bounds of the thread kernel stack and PCB
+ * so that both the capabilities are exactly representable.
+ * There may be padding inserted between the stack and the PCB as
+ * a result of this.
+ */
+void
+mips_setup_thread_pcb(struct thread *td)
+{
+	vm_pointer_t pcb_addr;
+	size_t pcb_size, stack_size;
+
+	pcb_size = CHERI_REPRESENTABLE_LENGTH(sizeof(struct pcb));
+	pcb_addr = CHERI_REPRESENTABLE_BASE(
+	    td->td_kstack + KSTACK_PAGES * PAGE_SIZE - pcb_size,
+	    pcb_size);
+	td->td_pcb = (struct pcb *)cheri_kern_setboundsexact(
+	    pcb_addr, pcb_size);
+
+	/*
+	 * We assume that td_kstack is well aligned as the stack
+	 * must already be page or superpage aligned, so we reduce the
+	 * length to the closest representable boundary.
+	 */
+	stack_size = (ptraddr_t)pcb_addr - (ptraddr_t)td->td_kstack;
+	stack_size = rounddown2(stack_size,
+	    CHERI_REPRESENTABLE_ALIGNMENT(stack_size));
+	td->td_kstack = cheri_kern_andperm(
+	    cheri_kern_setboundsexact(td->td_kstack, stack_size),
+	    CHERI_PERMS_KERNEL_DATA);
+}
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -261,6 +296,18 @@ cpu_thread_free(struct thread *td)
 		octeon_cop2_free_ctx(td->td_md.md_ucop2);
 	td->td_md.md_cop2 = NULL;
 	td->td_md.md_ucop2 = NULL;
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * We need to recover the full capability to the stack, including the
+	 * pcb region.
+	 * XXX-AM: The ideal solution would be to avoid rederivation altogether
+	 * and make sure that the kstack cache zone can rebuild the full capability.
+	 */
+	td->td_kstack = (vm_pointer_t)cheri_ptrperm(
+	    cheri_setaddress(kernel_root_cap,
+	        cheri_getbase((void *)td->td_kstack)),
+	    td->td_kstack_pages * PAGE_SIZE, CHERI_PERMS_KERNEL_DATA);
 #endif
 }
 
