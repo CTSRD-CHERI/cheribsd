@@ -127,7 +127,6 @@ done:
 //   "updated": 20190603,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_shape",
 //     "pointer_alignment",
 //     "unsupported"
 //   ]
