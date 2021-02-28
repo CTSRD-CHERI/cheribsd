@@ -80,9 +80,18 @@ memcchr(const void *begin, int c, size_t n)
 	 */
 	lp = (const unsigned long *)rounddown2(begin, sizeof(long));
 	end = (const unsigned char *)begin + n;
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Avoid performing a load before begin */
+	if (lp < (const unsigned long *)begin) {
+		lp++;
+		for (p = begin; p < (const unsigned char *)lp;)
+			TESTBYTE;
+	}
+#else
 	if (*lp++ != word)
 		for (p = begin; p < (const unsigned char *)lp;)
 			TESTBYTE;
+#endif
 
 	/* Now compare the data one word at a time. */
 	for (; (const unsigned char *)lp < end; lp++) {
@@ -118,7 +127,9 @@ done:
 //   "updated": 20190603,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_alignment"
+//     "pointer_shape",
+//     "pointer_alignment",
+//     "unsupported"
 //   ]
 // }
 // CHERI CHANGES END
