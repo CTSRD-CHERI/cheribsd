@@ -123,8 +123,7 @@ void mips_setup_thread_pcb(struct thread *td);
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "support",
-//     "user_capabilities"
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

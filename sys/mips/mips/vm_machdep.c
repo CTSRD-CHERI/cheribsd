@@ -323,7 +323,7 @@ cpu_thread_free(struct thread *td)
 	/*
 	 * We need to recover the full capability to the stack, including the
 	 * pcb region.
-	 * XXX-AM: The ideal solution would be to avoid rederivation altogheter
+	 * XXX-AM: The ideal solution would be to avoid rederivation altogether
 	 * and make sure that the kstack cache zone can rebuild the full capability.
 	 */
 	td->td_kstack = (vm_pointer_t)cheri_ptrperm(
