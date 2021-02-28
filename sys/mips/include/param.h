@@ -225,7 +225,7 @@
 /*
  * Mach derived conversion macros
  */
-#define	round_2mpage(x)		__builtin_align_down(((x) + PDRMASK), PDRSIZE)
+#define	round_2mpage(x)		__builtin_align_up((x), PDRSIZE)
 #define	trunc_2mpage(x)		__builtin_align_down((x), PDRSIZE)
 
 #endif /* !_MIPS_INCLUDE_PARAM_H_ */
