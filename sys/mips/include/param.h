@@ -225,8 +225,8 @@
 /*
  * Mach derived conversion macros
  */
-#define	round_2mpage(x)		(((x) + PDRMASK) & ~PDRMASK)
-#define	trunc_2mpage(x)		((x) & ~PDRMASK)
+#define	round_2mpage(x)		__builtin_align_up((x), PDRSIZE)
+#define	trunc_2mpage(x)		__builtin_align_down((x), PDRSIZE)
 
 #endif /* !_MIPS_INCLUDE_PARAM_H_ */
 // CHERI CHANGES START
@@ -237,7 +237,8 @@
 //     "support"
 //   ],
 //   "changes_purecap": [
-//     "support"
+//     "support",
+//     "pointer_alignment"
 //   ],
 //   "change_comment": "MACHINE_ARCH for CheriABI and freebsd64.  purecap: kstack"
 // }
