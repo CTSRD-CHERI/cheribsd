@@ -70,6 +70,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/epoch.h>
 #endif
 
+#include <cheri/cheric.h>
+
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <vm/vm_domainset.h>
@@ -94,10 +96,6 @@ __FBSDID("$FreeBSD$");
 
 #if defined(INVARIANTS) && defined(__i386__)
 #include <machine/cpu.h>
-#endif
-
-#if __has_feature(capabilities)
-#include <cheri/cherireg.h>
 #endif
 
 #include <ddb/ddb.h>
@@ -468,6 +466,10 @@ contigmalloc(unsigned long size, struct malloc_type *type, int flags,
 	    boundary, VM_MEMATTR_DEFAULT);
 	if (ret != NULL)
 		malloc_type_allocated(type, round_page(size));
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(ret), ("Expected valid capability"));
+#endif
+
 	return (ret);
 }
 
@@ -496,7 +498,10 @@ void
 contigfree(void *addr, unsigned long size, struct malloc_type *type)
 {
 
-	kmem_free((vm_offset_t)addr, size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+#endif
+	kmem_free((vm_pointer_t)addr, size);
 	malloc_type_freed(type, round_page(size));
 }
 
@@ -571,18 +576,18 @@ malloc_dbg(caddr_t *vap, size_t *sizep, struct malloc_type *mtp,
 static inline bool
 malloc_large_slab(uma_slab_t slab)
 {
-	uintptr_t va;
+	vm_offset_t va;
 
-	va = (uintptr_t)slab;
+	va = (vm_offset_t)slab;
 	return ((va & 1) != 0);
 }
 
 static inline size_t
 malloc_large_size(uma_slab_t slab)
 {
-	uintptr_t va;
+	vm_offset_t va;
 
-	va = (uintptr_t)slab;
+	va = (vm_offset_t)slab;
 	return (va >> 1);
 }
 
@@ -590,7 +595,7 @@ static caddr_t __noinline
 malloc_large(size_t *size, struct malloc_type *mtp, struct domainset *policy,
     int flags DEBUG_REDZONE_ARG_DEF)
 {
-	vm_offset_t kva;
+	vm_pointer_t kva;
 	caddr_t va;
 	size_t sz;
 
@@ -598,9 +603,15 @@ malloc_large(size_t *size, struct malloc_type *mtp, struct domainset *policy,
 	kva = kmem_malloc_domainset(policy, sz, flags);
 	if (kva != 0) {
 		/* The low bit is unused for slab pointers. */
-		vsetzoneslab(kva, NULL, (void *)((sz << 1) | 1));
+		vsetzoneslab(kva, NULL, (void *)(uintptr_t)((sz << 1) | 1));
 		uma_total_inc(sz);
 		*size = sz;
+#ifdef __CHERI_PURE_CAPABILITY__
+		KASSERT(cheri_getlen(kva) <= CHERI_REPRESENTABLE_LENGTH(sz),
+		    ("Invalid bounds: expected %zx found %zx",
+		        (size_t)CHERI_REPRESENTABLE_LENGTH(sz),
+		        (size_t)cheri_getlen(kva)));
+#endif
 	}
 	va = (caddr_t)kva;
 	malloc_type_allocated(mtp, va == NULL ? 0 : sz);
@@ -619,7 +630,7 @@ static void
 free_large(void *addr, size_t size)
 {
 
-	kmem_free((vm_offset_t)addr, size);
+	kmem_free((vm_pointer_t)addr, size);
 	uma_total_dec(size);
 }
 
@@ -669,6 +680,12 @@ void *
 	if (va != NULL)
 		va = redzone_setup(va, osize);
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(size),
+	    ("Invalid bounds: expected %zx found %zx",
+	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
+	        (size_t)cheri_getlen(va)));
+#endif
 	return ((void *) va);
 }
 
@@ -692,6 +709,10 @@ malloc_domain(size_t *sizep, int *indxp, struct malloc_type *mtp, int domain,
 	if (va != NULL)
 		*sizep = zone->uz_size;
 	*indxp = indx;
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(va), ("Expected valid capability"));
+#endif
+
 	return ((void *)va);
 }
 
@@ -781,7 +802,11 @@ mallocarray(size_t nmemb, size_t size, struct malloc_type *type, int flags)
 static void
 free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 {
+#ifdef __CHERI_PURE_CAPABILITY__
+	ptraddr_t *mtpp = addr;
+#else
 	struct malloc_type **mtpp = addr;
+#endif
 
 	/*
 	 * Cache a pointer to the malloc_type that most recently freed
@@ -791,10 +816,19 @@ free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 	 * This code assumes that size is a multiple of 8 bytes for
 	 * 64 bit machines
 	 */
-	mtpp = (struct malloc_type **) ((unsigned long)mtpp & ~UMA_ALIGN_PTR);
-	mtpp += (size - sizeof(struct malloc_type *)) /
-	    sizeof(struct malloc_type *);
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * This is for debugging only, so we just store the va of the
+	 * malloc_type, not a capability to it.
+	 */
+	mtpp = (ptraddr_t *)roundup2(mtpp, sizeof(ptraddr_t));
+	if (cheri_getlen(mtpp) - cheri_getoffset(mtpp) >= sizeof(ptraddr_t))
+		*mtpp = (ptraddr_t)mtp;
+#else
+	mtpp = (struct malloc_type **)rounddown2(mtpp, sizeof(struct malloc_type *));
+	mtpp += (size - sizeof(struct malloc_type *)) / sizeof(struct malloc_type *);
 	*mtpp = mtp;
+#endif
 }
 #endif
 
@@ -812,6 +846,9 @@ free_dbg(void **addrp, struct malloc_type *mtp)
 	/* free(NULL, ...) does nothing */
 	if (addr == NULL)
 		return (EJUSTRETURN);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+#endif
 
 #ifdef DEBUG_MEMGUARD
 	if (is_memguard_addr(addr)) {
@@ -850,20 +887,38 @@ free(void *addr, struct malloc_type *mtp)
 	/* free(NULL, ...) does nothing */
 	if (addr == NULL)
 		return;
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+	KASSERT(!cheri_getsealed(addr), ("Expect unsealed capability"));
+	if (!cheri_gettag(addr) || cheri_getsealed(addr))
+		return;
+#endif
 
 	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
 	if (slab == NULL)
 		panic("free: address %p(%p) has not been allocated.\n",
-		    addr, (void *)((u_long)addr & (~UMA_SLAB_MASK)));
+		    addr, (void *)rounddown2(addr, UMA_SLAB_SIZE));
 
 	if (__predict_true(!malloc_large_slab(slab))) {
 		size = zone->uz_size;
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(addr) <= CHERI_REPRESENTABLE_LENGTH(size),
+	    ("Invalid bounds: expected %zx found %zx",
+	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
+	        (size_t)cheri_getlen(addr)));
+#endif
 #ifdef INVARIANTS
 		free_save_type(addr, mtp, size);
 #endif
 		uma_zfree_arg(zone, addr, slab);
 	} else {
 		size = malloc_large_size(slab);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(addr) <= CHERI_REPRESENTABLE_LENGTH(size),
+	    ("Invalid bounds: expected %zx found %zx",
+	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
+	        (size_t)cheri_getlen(addr)));
+#endif
 		free_large(addr, size);
 	}
 	malloc_type_freed(mtp, size);
@@ -894,7 +949,7 @@ zfree(void *addr, struct malloc_type *mtp)
 	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
 	if (slab == NULL)
 		panic("free: address %p(%p) has not been allocated.\n",
-		    addr, (void *)((u_long)addr & (~UMA_SLAB_MASK)));
+		    addr, (void *)rounddown2(addr, UMA_SLAB_SIZE));
 
 	if (__predict_true(!malloc_large_slab(slab))) {
 		size = zone->uz_size;
@@ -930,6 +985,9 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 	/* realloc(NULL, ...) is equivalent to malloc(...) */
 	if (addr == NULL)
 		return (malloc(size, mtp, flags));
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+#endif
 
 	/*
 	 * XXX: Should report free of old memory and alloc of new memory to
@@ -1031,7 +1089,7 @@ malloc_usable_size(const void *addr)
 	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
 	if (slab == NULL)
 		panic("malloc_usable_size: address %p(%p) is not allocated.\n",
-		    addr, (void *)((u_long)addr & (~UMA_SLAB_MASK)));
+		    addr, rounddown2(addr, UMA_SLAB_SIZE));
 
 	if (!malloc_large_slab(slab))
 		size = zone->uz_size;
@@ -1482,12 +1540,15 @@ DB_SHOW_COMMAND(multizone_matches, db_show_multizone_matches)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20200707,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance"
 //   ],
 //   "changes_purecap": [
+//     "pointer_alignment",
+//     "pointer_as_integer",
+//     "support",
 //     "kdb"
 //   ]
 // }
