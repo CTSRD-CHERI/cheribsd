@@ -3696,16 +3696,6 @@ malloc_revoke_internal(const char *reason) {
   gm->sweptBytes += gm->footprint;
 #endif // SWEEP_STATS
   mchunkptr freebin = &gm->freebufbin;
-  for (mchunkptr thePtr = freebin->fd; thePtr != freebin; thePtr = thePtr->fd) {
-#if defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__)
-    shadow_paint(thePtr, chunksize(thePtr));
-#else
-#ifdef CAPREVOKE
-    vaddr_t addr = __builtin_cheri_address_get(chunk2mem(thePtr));
-    caprev_shadow_nomap_set_raw(thePtr->pad, addr, addr + chunksize(thePtr));
-#endif
-#endif   /* defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__) */
-  }
 
 #ifdef CAPREVOKE
   if (cri == NULL) {
@@ -3714,11 +3704,25 @@ malloc_revoke_internal(const char *reason) {
         __DECONST(void **, &cri));
     assert(error == 0);
   }
+#endif
 
+  for (mchunkptr thePtr = freebin->fd; thePtr != freebin; thePtr = thePtr->fd) {
+#if defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__)
+    shadow_paint(thePtr, chunksize(thePtr));
+#else
+#ifdef CAPREVOKE
+    vaddr_t addr = __builtin_cheri_address_get(chunk2mem(thePtr));
+    caprev_shadow_nomap_set_raw(cri->base_mem_nomap, thePtr->pad, addr,
+        addr + chunksize(thePtr));
+#endif
+#endif   /* defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__) */
+  }
+
+#ifdef CAPREVOKE
   atomic_thread_fence(memory_order_acq_rel);
-  caprevoke_epoch start_epoch = cri->epoch_enqueue;
+  caprevoke_epoch start_epoch = cri->epochs.enqueue;
 
-  while (!caprevoke_epoch_clears(cri->epoch_dequeue, start_epoch)) {
+  while (!caprevoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
     caprevoke(CAPREVOKE_LAST_PASS|CAPREVOKE_LOAD_SIDE, start_epoch, NULL);
   }
 #endif
@@ -3733,7 +3737,8 @@ malloc_revoke_internal(const char *reason) {
 #else
 #ifdef CAPREVOKE
     vaddr_t addr = __builtin_cheri_address_get(chunk2mem(thePtr));
-    caprev_shadow_nomap_clear_raw(thePtr->pad, addr, addr + chunksize(thePtr));
+    caprev_shadow_nomap_clear_raw(cri->base_mem_nomap,
+        thePtr->pad, addr, addr + chunksize(thePtr));
 #endif
 #endif   /* defined(REVOKE) && !defined(__CHERI_PURE_CAPABILITY__) */
 #if CONSOLIDATE_ON_FREE == 1
