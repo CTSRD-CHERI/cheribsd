@@ -743,24 +743,17 @@ int
 kern_cogetpid(struct thread *td, pid_t * __capability pidp)
 {
 	struct switchercb scb;
-	struct thread *caller_td;
 	bool is_callee;
 	pid_t pid;
 	int error;
 
-
-	if(td->td_md.md_slow_accepting) {
-		caller_td = td->td_md.md_slow_caller_td;
-		is_callee = (caller_td != NULL);	
-	}
-	else {
-		is_callee = colocation_fetch_caller_scb(td, &scb);
-		caller_td = scb.scb_td;
-	}
-	if(!is_callee)
+	is_callee = colocation_fetch_caller_scb(td, &scb);
+	if (!is_callee)
 		return (ESRCH);
-	pid = caller_td->td_proc->p_pid;
+
+	pid = scb.scb_td->td_proc->p_pid;
 	error = copyoutcap(&pid, pidp, sizeof(pid));
+
 	return (error);
 }
 
