@@ -1951,7 +1951,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VLAN_SUNLOCK();
 		error = copyout(&vlr, ifr_data_get_ptr(cmd, ifr), sizeof(vlr));
 		break;
-		
+
 	case SIOCSIFFLAGS:
 		/*
 		 * We should propagate selected flags to the parent,
