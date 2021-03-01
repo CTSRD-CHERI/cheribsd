@@ -426,6 +426,11 @@ malloc_type_allocated(struct malloc_type *mtp, void *addr, unsigned long size)
  * amount of the bucket size.  Occurs within a critical section so that the
  * thread isn't preempted and doesn't migrate while updating per-CPU
  * statistics.
+ *
+ * XXX-AM: The reserved/unreserved size stat recording assumes the following:
+ * - kmem performs proper representability rounding
+ * - free() will be called with the same capability returned by malloc(),
+ *   spanning the whole reservation.
  */
 void
 malloc_type_freed(struct malloc_type *mtp, void *addr, unsigned long size)
@@ -475,7 +480,7 @@ contigmalloc(unsigned long size, struct malloc_type *type, int flags,
 	ret = (void *)kmem_alloc_contig(size, flags, low, high, alignment,
 	    boundary, VM_MEMATTR_DEFAULT);
 	if (ret != NULL)
-		malloc_type_allocated(type, round_page(size));
+		malloc_type_allocated(type, ret, round_page(size));
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(ret), ("Expected valid capability"));
 #endif
@@ -512,7 +517,7 @@ contigfree(void *addr, unsigned long size, struct malloc_type *type)
 	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
 #endif
 	kmem_free((vm_pointer_t)addr, size);
-	malloc_type_freed(type, round_page(size));
+	malloc_type_freed(type, addr, round_page(size));
 }
 
 #ifdef MALLOC_DEBUG

@@ -257,9 +257,9 @@ void	*malloc_domainset_exec(size_t size, struct malloc_type *type,
 	    __alloc_size(1);
 void	malloc_init(void *);
 void	malloc_type_allocated(struct malloc_type *type, void *addr,
-    unsigned long size);
+	    unsigned long size);
 void	malloc_type_freed(struct malloc_type *type, void *addr,
-    unsigned long size);
+	    unsigned long size);
 void	malloc_type_list(malloc_type_list_func_t *, void *);
 void	malloc_uninit(void *);
 size_t	malloc_size(size_t);
