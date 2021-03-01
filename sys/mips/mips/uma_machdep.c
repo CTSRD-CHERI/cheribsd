@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_dumpset.h>
 #include <vm/uma.h>
 #include <vm/uma_int.h>
+#include <cheri/cheric.h>
 
 void *
 uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
@@ -73,7 +74,7 @@ uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
 	pa = VM_PAGE_TO_PHYS(m);
 	if ((wait & M_NODUMP) == 0)
 		dump_add_page(pa);
-	va = (void *)MIPS_PHYS_TO_DIRECT(pa);
+	va = (void *)cheri_kern_setbounds(MIPS_PHYS_TO_DIRECT(pa), bytes);
 	if ((wait & M_ZERO) && (m->flags & PG_ZERO) == 0)
 		bzero(va, PAGE_SIZE);
 	return (va);
@@ -93,10 +94,15 @@ uma_small_free(void *mem, vm_size_t size, u_int8_t flags)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "platform"
+//   ],
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer",
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END
