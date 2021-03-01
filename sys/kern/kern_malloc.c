@@ -98,10 +98,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #endif
 
-#if __has_feature(capabilities)
-#include <machine/cherireg.h>
-#endif
-
 #include <ddb/ddb.h>
 
 #ifdef KDTRACE_HOOKS
@@ -479,7 +475,7 @@ contigmalloc(unsigned long size, struct malloc_type *type, int flags,
 	ret = (void *)kmem_alloc_contig(size, flags, low, high, alignment,
 	    boundary, VM_MEMATTR_DEFAULT);
 	if (ret != NULL)
-		malloc_type_allocated(type, ret, round_page(size));
+		malloc_type_allocated(type, round_page(size));
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(ret), ("Expected valid capability"));
 #endif
@@ -516,7 +512,7 @@ contigfree(void *addr, unsigned long size, struct malloc_type *type)
 	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
 #endif
 	kmem_free((vm_pointer_t)addr, size);
-	malloc_type_freed(type, addr, round_page(size));
+	malloc_type_freed(type, round_page(size));
 }
 
 #ifdef MALLOC_DEBUG
@@ -622,7 +618,7 @@ malloc_large(size_t *size, struct malloc_type *mtp, struct domainset *policy,
 		*size = sz;
 #ifdef __CHERI_PURE_CAPABILITY__
 		KASSERT(cheri_getlen(kva) <= CHERI_REPRESENTABLE_LENGTH(sz),
-		    ("Invalid bounds expected %zx found %zx",
+		    ("Invalid bounds: expected %zx found %zx",
 		        (size_t)CHERI_REPRESENTABLE_LENGTH(sz),
 		        (size_t)cheri_getlen(kva)));
 #endif
@@ -696,7 +692,7 @@ void *
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(size),
-	    ("Invalid bounds expected %zx found %zx",
+	    ("Invalid bounds: expected %zx found %zx",
 	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
 	        (size_t)cheri_getlen(va)));
 #endif
@@ -817,7 +813,7 @@ static void
 free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
-	vaddr_t *mtpp = addr;
+	ptraddr_t *mtpp = addr;
 #else
 	struct malloc_type **mtpp = addr;
 #endif
@@ -835,9 +831,9 @@ free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 	 * This is for debugging only, so we just store the va of the
 	 * malloc_type, not a capability to it.
 	 */
-	mtpp = (vaddr_t *)roundup2(mtpp, sizeof(vaddr_t));
-	if (cheri_getlen(mtpp) - cheri_getoffset(mtpp) >= sizeof(vaddr_t))
-		*mtpp = (vaddr_t)mtp;
+	mtpp = (ptraddr_t *)roundup2(mtpp, sizeof(ptraddr_t));
+	if (cheri_getlen(mtpp) - cheri_getoffset(mtpp) >= sizeof(ptraddr_t))
+		*mtpp = (ptraddr_t)mtp;
 #else
 	mtpp = (struct malloc_type **)rounddown2(mtpp, sizeof(struct malloc_type *));
 	mtpp += (size - sizeof(struct malloc_type *)) / sizeof(struct malloc_type *);
@@ -917,7 +913,7 @@ free(void *addr, struct malloc_type *mtp)
 		size = zone->uz_size;
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_getlen(addr) <= CHERI_REPRESENTABLE_LENGTH(size),
-	    ("Invalid bounds expected %zx found %zx",
+	    ("Invalid bounds: expected %zx found %zx",
 	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
 	        (size_t)cheri_getlen(addr)));
 #endif
@@ -929,7 +925,7 @@ free(void *addr, struct malloc_type *mtp)
 		size = malloc_large_size(slab);
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_getlen(addr) <= CHERI_REPRESENTABLE_LENGTH(size),
-	    ("Invalid bounds expected %zx found %zx",
+	    ("Invalid bounds: expected %zx found %zx",
 	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
 	        (size_t)cheri_getlen(addr)));
 #endif
