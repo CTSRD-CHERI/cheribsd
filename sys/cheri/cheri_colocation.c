@@ -716,7 +716,6 @@ int
 kern_cogetpid(struct thread *td, pid_t * __capability pidp)
 {
 	struct switchercb scb;
-	struct thread *caller_td;
 	bool is_callee;
 	pid_t pid;
 	int error;
@@ -727,7 +726,6 @@ kern_cogetpid(struct thread *td, pid_t * __capability pidp)
 
 	pid = scb.scb_td->td_proc->p_pid;
 	error = copyout(&pid, pidp, sizeof(pid));
-
 	return (error);
 }
 
