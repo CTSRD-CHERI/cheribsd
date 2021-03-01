@@ -185,6 +185,13 @@ void
 __paint_shadow(void *mem, size_t size)
 {
 	struct pagepool_header *pp;
+	int error;
+
+	if (cri == NULL) {
+		error = caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
+		    __DECONST(void **, &cri));
+		assert(error == 0);
+	}
 
 	pp = cheri_setoffset(mem, 0);
 	/*
@@ -195,7 +202,8 @@ __paint_shadow(void *mem, size_t size)
 		if (caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, pp,
 		    &pp->ph_shadow) != 0)
 			abort();
-	caprev_shadow_nomap_set_raw(pp->ph_shadow, (vaddr_t)mem, size);
+	caprev_shadow_nomap_set_raw(cri->base_mem_nomap, pp->ph_shadow,
+	    (vaddr_t)mem, size);
 }
 
 void
@@ -204,7 +212,8 @@ __clear_shadow(void *mem, size_t size)
 	struct pagepool_header *pp;
 
 	pp = cheri_setoffset(mem, 0);
-	caprev_shadow_nomap_clear_raw(pp->ph_shadow, (vaddr_t)mem, size);
+	caprev_shadow_nomap_clear_raw(cri->base_mem_nomap,
+	    pp->ph_shadow, (vaddr_t)mem, size);
 }
 
 void
@@ -212,14 +221,9 @@ __do_revoke(void)
 {
 	int error;
 
-	if (cri == NULL) {
-		error = caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
-		    __DECONST(void **, &cri));
-		assert(error == 0);
-	}
-
-	caprevoke_epoch start_epoch = cri->epoch_enqueue;
-	while (!caprevoke_epoch_clears(cri->epoch_dequeue, start_epoch)) {
+	atomic_thread_fence(memory_order_acq_rel);
+	caprevoke_epoch start_epoch = cri->epochs.enqueue;
+	while (!caprevoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
 		error = caprevoke(CAPREVOKE_LAST_PASS|CAPREVOKE_LOAD_SIDE,
 		    start_epoch, NULL);
 		assert(error == 0);

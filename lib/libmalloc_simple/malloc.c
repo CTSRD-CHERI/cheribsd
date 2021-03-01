@@ -195,7 +195,7 @@ try_revoke(int target_bucket)
 	 * avoid the extra syscall in the common case.
 	 */
 	if (painted_size > 0 &&
-	    caprevoke_epoch_clears(cri->epoch_dequeue, painted_epoch))
+	    caprevoke_epoch_clears(cri->epochs.dequeue, painted_epoch))
 		free_painted();
 
 	if (quarantine_size < MAX_QUARANTINE && painted_size < MAX_PAINTED)
@@ -221,7 +221,7 @@ try_revoke(int target_bucket)
 	painted_size += quarantine_size;
 	quarantine_size = 0;
 	atomic_thread_fence(memory_order_acq_rel);
-	painted_epoch = cri->epoch_enqueue;
+	painted_epoch = cri->epochs.enqueue;
 
 	/*
 	 * Don't force revocation unless we've exceeded MAX_PAINTED and
@@ -231,7 +231,7 @@ try_revoke(int target_bucket)
 	if (painted_size < MAX_PAINTED || painted_bufs[target_bucket] == NULL)
 		return;
 
-	while (!caprevoke_epoch_clears(cri->epoch_dequeue, painted_epoch)) {
+	while (!caprevoke_epoch_clears(cri->epochs.dequeue, painted_epoch)) {
 		error = caprevoke(CAPREVOKE_LAST_PASS|CAPREVOKE_LOAD_SIDE,
 		    painted_epoch, NULL);
 		assert(error == 0);
