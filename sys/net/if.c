@@ -2465,42 +2465,6 @@ ifunit(const char *name)
 	return (ifp);
 }
 
-static u_char
-ifr__u_char_get(void *ifrp)
-{
-	union ifreq_union *ifrup;
-
-	ifrup = ifrp;
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (ifrup->ifr32.ifr_ifru.ifru_vlan_pcp);
-#endif
-#ifdef COMPAT_FREEBSD64
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return (ifrup->ifr64.ifr_ifru.ifru_vlan_pcp);
-#endif
-	return (ifrup->ifr.ifr_ifru.ifru_vlan_pcp);
-}
-
-static void
-ifr__u_char_set(void *ifrp, u_char val)
-{
-	union ifreq_union *ifrup;
-
-	ifrup = ifrp;
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		ifrup->ifr32.ifr_ifru.ifru_vlan_pcp = val;
-	else
-#endif
-#ifdef COMPAT_FREEBSD64
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		ifrup->ifr64.ifr_ifru.ifru_vlan_pcp = val;
-	else
-#endif
-		ifrup->ifr.ifr_ifru.ifru_vlan_pcp = val;
-}
-
 void * __capability
 ifr_buffer_get_buffer(u_long cmd, void *data)
 {
@@ -2646,34 +2610,6 @@ ifr_data_get_ptr(u_long cmd, void *ifrp)
 	default:
 		__assert_unreachable();
 	}
-}
-
-u_char
-ifr_lan_pcp_get(void *ifrp)
-{
-
-	return (ifr__u_char_get(ifrp));
-}
-
-void
-ifr_lan_pcp_set(void *ifrp, u_char pcp)
-{
-
-	ifr__u_char_set(ifrp, pcp);
-}
-
-u_char
-ifr_vlan_pcp_get(void *ifrp)
-{
-
-	return (ifr__u_char_get(ifrp));
-}
-
-void
-ifr_vlan_pcp_set(void *ifrp, u_char pcp)
-{
-
-	ifr__u_char_set(ifrp, pcp);
 }
 
 /*
@@ -3307,6 +3243,8 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case IFREQ64(SIOCSIFVNET):
 	case IFREQ64(SIOCSIFRVNET):
 	case IFREQ64(SIOCDIFPHYADDR):
+	case IFREQ64(SIOCGLANPCP):
+	case IFREQ64(SIOCSLANPCP):
 		ifr64 = (struct ifreq64 *)data;
 		memcpy(thunk.ifr.ifr_name, ifr64->ifr_name,
 		    sizeof(thunk.ifr.ifr_name));
@@ -3348,6 +3286,9 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		case IFREQ64(SIOCSIFVNET):
 		case IFREQ64(SIOCSIFRVNET):
 			thunk.ifr.ifr_jid = ifr64->ifr_jid;
+			break;
+		case IFREQ64(SIOCSLANPCP):
+			thunk.ifr.ifr_lan_pcp = ifr64->ifr_lan_pcp;
 			break;
 		}
 		saved_cmd = cmd;
@@ -3563,6 +3504,10 @@ out_noref:
 	case IFREQ64(SIOCGIFMETRIC):
 		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_metric = thunk.ifr.ifr_metric;
+		break;
+	case IFREQ64(SIOCGLANPCP):
+		ifr64 = (struct ifreq64 *)saved_data;
+		ifr64->ifr_lan_pcp = thunk.ifr.ifr_lan_pcp;
 		break;
 #endif
 	}

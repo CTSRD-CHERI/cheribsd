@@ -433,10 +433,8 @@ struct	ifreq {
 #define	ifr_curcap	ifr_ifru.ifru_cap[1]	/* current capabilities */
 #define	ifr_index	ifr_ifru.ifru_index	/* interface index */
 #define	ifr_fib		ifr_ifru.ifru_fib	/* interface fib */
-#ifndef _KERNEL
 #define	ifr_vlan_pcp	ifr_ifru.ifru_vlan_pcp	/* VLAN priority */
 #define	ifr_lan_pcp	ifr_ifru.ifru_vlan_pcp	/* VLAN priority */
-#endif /* !defined(_KERNEL) */
 
 #define	_SIZEOF_ADDR_IFREQ(ifr) \
 	((ifr).ifr_addr.sa_len > sizeof(struct sockaddr) ? \

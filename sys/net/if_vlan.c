@@ -1979,17 +1979,17 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VLAN_XUNLOCK();
 
 		break;
-	case CASE_IOC_IFREQ(SIOCGVLANPCP):
+	case SIOCGVLANPCP:
 #ifdef VIMAGE
 		if (ifp->if_vnet != ifp->if_home_vnet) {
 			error = EPERM;
 			break;
 		}
 #endif
-		ifr_vlan_pcp_set(ifr, ifv->ifv_pcp);
+		ifr->ifr_vlan_pcp = ifv->ifv_pcp;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSVLANPCP):
+	case SIOCSVLANPCP:
 #ifdef VIMAGE
 		if (ifp->if_vnet != ifp->if_home_vnet) {
 			error = EPERM;
@@ -1999,11 +1999,11 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = priv_check(curthread, PRIV_NET_SETVLANPCP);
 		if (error)
 			break;
-		if (ifr_vlan_pcp_get(ifr) > 7) {
+		if (ifr->ifr_vlan_pcp > 7) {
 			error = EINVAL;
 			break;
 		}
-		ifv->ifv_pcp = ifr_vlan_pcp_get(ifr);
+		ifv->ifv_pcp = ifr->ifr_vlan_pcp;
 		ifp->if_pcp = ifv->ifv_pcp;
 		/* broadcast event about PCP change */
 		EVENTHANDLER_INVOKE(ifnet_event, ifp, IFNET_EVENT_PCP);
