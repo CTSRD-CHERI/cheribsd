@@ -55,7 +55,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/vfp.h>
 #endif
 
-uint32_t initial_fpcr = VFPCR_DN | VFPCR_FZ;
+uint32_t initial_fpcr = VFPCR_DN;
 
 #if __has_feature(capabilities)
 #include <cheri/cheric.h>
