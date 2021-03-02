@@ -1730,7 +1730,7 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	if ((wait & M_ZERO) != 0)
 		bzero(mem, pages * PAGE_SIZE);
 
-	return (cheri_kern_setboundsexact(mem, bytes));
+	return (mem);
 }
 
 static void
