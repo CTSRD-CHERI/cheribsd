@@ -1610,7 +1610,7 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int flags,
 
 	/* Point the slab into the allocated memory */
 	if (!(keg->uk_flags & UMA_ZFLAG_OFFPAGE))
-		slab = (uma_slab_t )(mem + keg->uk_pgoff);
+		slab = (uma_slab_t)(mem + keg->uk_pgoff);
 	else
 		slab_tohashslab(slab)->uhs_data = mem;
 
@@ -1698,10 +1698,10 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	/* Allocate KVA and indirectly advance bootmem. */
 	mem = (void *)pmap_map(&bootmem, m->phys_addr,
 	    m->phys_addr + (pages * PAGE_SIZE), VM_PROT_READ | VM_PROT_WRITE);
-        if ((wait & M_ZERO) != 0)
-                bzero(mem, pages * PAGE_SIZE);
+	if ((wait & M_ZERO) != 0)
+		bzero(mem, pages * PAGE_SIZE);
 
-        return (mem);
+	return (mem);
 }
 
 static void
