@@ -603,7 +603,7 @@ int	 coaccept(void * __capability * __capability,
 	     const void * __capability, size_t, void * __capability, size_t);
 int	 cocall(void * __capability,
 	     const void * __capability, size_t, void * __capability, size_t);
-int	 cosetup(int);
+int	 cosetup(int, void * __capability *);
 int	 coregister(const char *, void * __capability *);
 int	 colookup(const char *, void * __capability *);
 int	 cogetpid(pid_t *pidp);

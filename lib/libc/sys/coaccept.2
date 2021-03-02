@@ -103,7 +103,7 @@ Basic usage example:
 	void * __capability cookie;
 	uint64_t buf[MAXBSIZE];
 
-	error = cosetup(COSETUP_COACCEPT);
+	error = cosetup(COSETUP_COACCEPT, NULL);
 	if (error != 0)
 		err(1, "cosetup");
 

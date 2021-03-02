@@ -125,7 +125,7 @@ ATF_TC_BODY(cocall, tc)
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = cosetup(COSETUP_COACCEPT);
+		error = cosetup(COSETUP_COACCEPT, NULL);
 		ATF_REQUIRE_EQ(error, 0);
 
 		error = coregister(name, NULL);
@@ -164,7 +164,7 @@ ATF_TC_BODY(cocall_h, tc)
 	if (arg == NULL)
 		atf_tc_skip("helper testcase, not supposed to be run directly");
 
-	error = cosetup(COSETUP_COCALL);
+	error = cosetup(COSETUP_COCALL, NULL);
 	ATF_REQUIRE_EQ(error, 0);
 	wait_for_coregister();
 	error = colookup(arg, &lookedup);
@@ -188,7 +188,7 @@ ATF_TC_BODY(cocall_cookie, tc)
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = cosetup(COSETUP_COACCEPT);
+		error = cosetup(COSETUP_COACCEPT, NULL);
 		ATF_REQUIRE_EQ(error, 0);
 
 		error = coregister(name, NULL);
@@ -229,7 +229,7 @@ ATF_TC_BODY(cocall_cookie_h, tc)
 	if (arg == NULL)
 		atf_tc_skip("helper testcase, not supposed to be run directly");
 
-	error = cosetup(COSETUP_COCALL);
+	error = cosetup(COSETUP_COCALL, NULL);
 	ATF_REQUIRE_EQ(error, 0);
 	wait_for_coregister();
 	error = colookup(arg, &lookedup);
@@ -252,7 +252,7 @@ ATF_TC_BODY(cocall_eagain, tc)
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = cosetup(COSETUP_COACCEPT);
+		error = cosetup(COSETUP_COACCEPT, NULL);
 		ATF_REQUIRE_EQ(error, 0);
 
 		error = coregister(name, NULL);
@@ -287,7 +287,7 @@ ATF_TC_BODY(cocall_eagain_h, tc)
 	if (arg == NULL)
 		atf_tc_skip("helper testcase, not supposed to be run directly");
 
-	error = cosetup(COSETUP_COCALL);
+	error = cosetup(COSETUP_COCALL, NULL);
 	ATF_REQUIRE_EQ(error, 0);
 	wait_for_coregister();
 	error = colookup(arg, &lookedup);
@@ -311,7 +311,7 @@ ATF_TC_BODY(cocall_bad_caller_buf, tc)
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = cosetup(COSETUP_COACCEPT);
+		error = cosetup(COSETUP_COACCEPT, NULL);
 		ATF_REQUIRE_EQ(error, 0);
 
 		error = coregister(name, NULL);
@@ -348,7 +348,7 @@ ATF_TC_BODY(cocall_bad_caller_buf_h, tc)
 	if (arg == NULL)
 		atf_tc_skip("helper testcase, not supposed to be run directly");
 
-	error = cosetup(COSETUP_COCALL);
+	error = cosetup(COSETUP_COCALL, NULL);
 	ATF_REQUIRE_EQ(error, 0);
 	wait_for_coregister();
 	error = colookup(arg, &lookedup);
@@ -368,7 +368,7 @@ ATF_TC_BODY(cocall_bad_callee_buf, tc)
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = cosetup(COSETUP_COACCEPT);
+		error = cosetup(COSETUP_COACCEPT, NULL);
 		ATF_REQUIRE_EQ(error, 0);
 
 		error = coregister(name, NULL);
@@ -404,7 +404,7 @@ ATF_TC_BODY(cocall_bad_callee_buf_h, tc)
 	if (arg == NULL)
 		atf_tc_skip("helper testcase, not supposed to be run directly");
 
-	error = cosetup(COSETUP_COCALL);
+	error = cosetup(COSETUP_COCALL, NULL);
 	ATF_REQUIRE_EQ(error, 0);
 	wait_for_coregister();
 	error = colookup(arg, &lookedup);
@@ -427,7 +427,7 @@ ATF_TC_BODY(cocall_callee_abort, tc)
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = cosetup(COSETUP_COACCEPT);
+		error = cosetup(COSETUP_COACCEPT, NULL);
 		ATF_REQUIRE_EQ(error, 0);
 
 		error = coregister(name, NULL);
@@ -464,7 +464,7 @@ ATF_TC_BODY(cocall_callee_abort_h, tc)
 	if (arg == NULL)
 		atf_tc_skip("helper testcase, not supposed to be run directly");
 
-	error = cosetup(COSETUP_COCALL);
+	error = cosetup(COSETUP_COCALL, NULL);
 	ATF_REQUIRE_EQ(error, 0);
 	wait_for_coregister();
 	error = colookup(arg, &lookedup);
@@ -487,7 +487,7 @@ ATF_TC_BODY(cocall_callee_dead, tc)
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = cosetup(COSETUP_COACCEPT);
+		error = cosetup(COSETUP_COACCEPT, NULL);
 		ATF_REQUIRE_EQ(error, 0);
 
 		error = coregister(name, NULL);
@@ -535,7 +535,7 @@ ATF_TC_BODY(cocall_callee_dead_h, tc)
 	pid = atoi(arg2);
 	ATF_REQUIRE(pid != 0);
 
-	error = cosetup(COSETUP_COCALL);
+	error = cosetup(COSETUP_COCALL, NULL);
 	ATF_REQUIRE_EQ(error, 0);
 	wait_for_coregister();
 	error = colookup(arg, &lookedup);
@@ -573,7 +573,7 @@ ATF_TC_BODY(cocall_proxy, tc)
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = cosetup(COSETUP_COACCEPT);
+		error = cosetup(COSETUP_COACCEPT, NULL);
 		ATF_REQUIRE_EQ(error, 0);
 
 		error = coregister(name, NULL);
@@ -630,13 +630,13 @@ ATF_TC_BODY(cocall_proxy_h, tc)
 	arg2 = getenv("COCALL_TEST_HELPER_ARG2");
 	ATF_REQUIRE(arg2 != NULL);
 
-	error = cosetup(COSETUP_COACCEPT);
+	error = cosetup(COSETUP_COACCEPT, NULL);
 	ATF_REQUIRE_EQ(error, 0);
 
 	error = coregister(arg2, NULL);
 	ATF_REQUIRE_EQ(error, 0);
 
-	error = cosetup(COSETUP_COCALL);
+	error = cosetup(COSETUP_COCALL, NULL);
 	ATF_REQUIRE_EQ(error, 0);
 	wait_for_coregister();
 	error = colookup(arg, &lookedup);
@@ -673,7 +673,7 @@ ATF_TC_BODY(cocall_proxy_h2, tc)
 	if (arg == NULL)
 		atf_tc_skip("helper testcase, not supposed to be run directly");
 
-	error = cosetup(COSETUP_COCALL);
+	error = cosetup(COSETUP_COCALL, NULL);
 	ATF_REQUIRE_EQ(error, 0);
 	wait_for_coregister();
 	error = colookup(arg, &lookedup);
@@ -701,7 +701,7 @@ ATF_TC_BODY(cocall_proxy_abort, tc)
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = cosetup(COSETUP_COACCEPT);
+		error = cosetup(COSETUP_COACCEPT, NULL);
 		ATF_REQUIRE_EQ(error, 0);
 
 		error = coregister(name, NULL);
@@ -755,13 +755,13 @@ ATF_TC_BODY(cocall_proxy_abort_h, tc)
 	arg2 = getenv("COCALL_TEST_HELPER_ARG2");
 	ATF_REQUIRE(arg2 != NULL);
 
-	error = cosetup(COSETUP_COACCEPT);
+	error = cosetup(COSETUP_COACCEPT, NULL);
 	ATF_REQUIRE_EQ(error, 0);
 
 	error = coregister(arg2, NULL);
 	ATF_REQUIRE_EQ(error, 0);
 
-	error = cosetup(COSETUP_COCALL);
+	error = cosetup(COSETUP_COCALL, NULL);
 	ATF_REQUIRE_EQ(error, 0);
 	wait_for_coregister();
 	error = colookup(arg, &lookedup);
@@ -798,7 +798,7 @@ ATF_TC_BODY(cocall_proxy_abort_h2, tc)
 	if (arg == NULL)
 		atf_tc_skip("helper testcase, not supposed to be run directly");
 
-	error = cosetup(COSETUP_COCALL);
+	error = cosetup(COSETUP_COCALL, NULL);
 	ATF_REQUIRE_EQ(error, 0);
 	wait_for_coregister();
 	error = colookup(arg, &lookedup);

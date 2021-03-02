@@ -98,7 +98,7 @@ main(int argc, char **argv)
 	if (vflag)
 		fprintf(stderr, "%s: %s: setting up...\n",
 		    getprogname(), registered);
-	error = cosetup(COSETUP_COACCEPT);
+	error = cosetup(COSETUP_COACCEPT, NULL);
 	if (error != 0)
 		err(1, "cosetup");
 
@@ -109,7 +109,7 @@ main(int argc, char **argv)
 		if (vflag)
 			fprintf(stderr, "%s: %s: setting up the caller side...\n",
 			    getprogname(), registered);
-		error = cosetup(COSETUP_COCALL);
+		error = cosetup(COSETUP_COCALL, NULL);
 		if (error != 0)
 			err(1, "cosetup");
 

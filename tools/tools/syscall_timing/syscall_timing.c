@@ -254,7 +254,7 @@ test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
 	uintmax_t i;
 	int error;
 
-	error = cosetup(COSETUP_COCALL);
+	error = cosetup(COSETUP_COCALL, NULL);
 	if (error != 0)
 		err(1, "cosetup");
 
@@ -285,7 +285,7 @@ test_coping_slow(uintmax_t num, uintmax_t int_arg, const char *path)
 	uintmax_t i;
 	int error;
 
-	error = cosetup(COSETUP_COCALL);
+	error = cosetup(COSETUP_COCALL, NULL);
 	if (error != 0)
 		err(1, "cosetup");
 
