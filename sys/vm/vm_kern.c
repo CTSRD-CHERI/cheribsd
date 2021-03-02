@@ -146,7 +146,7 @@ extern void     uma_startup2(void);
 vm_offset_t
 kva_alloc(vm_size_t size)
 {
-	vm_offset_t addr;
+	vmem_addr_t addr;
 
 	size = round_page(size);
 	if (vmem_alloc(kernel_arena, size, M_BESTFIT | M_NOWAIT, &addr))
