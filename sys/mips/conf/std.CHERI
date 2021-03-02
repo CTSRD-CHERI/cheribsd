@@ -9,7 +9,6 @@ makeoptions	ARCH_FLAGS="-march=beri -mcpu=beri"
 options 	CPU_CHERI
 nooptions	COMPAT_FREEBSD32
 options 	COMPAT_FREEBSD64
-options 	BOOTVERBOSE=1
 
 options 	KSTACK_LARGE_PAGE	# Use a 16K page for kernel stack
 options 	NO_SWAPPING
