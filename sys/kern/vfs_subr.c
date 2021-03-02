@@ -6050,7 +6050,8 @@ static int
 filt_fsevent(struct knote *kn, long hint)
 {
 
-	kn->kn_fflags |= hint;
+	kn->kn_fflags |= kn->kn_sfflags & hint;
+
 	return (kn->kn_fflags != 0);
 }
 
