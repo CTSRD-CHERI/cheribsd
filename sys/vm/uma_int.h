@@ -440,7 +440,7 @@ slab_item_index(uma_slab_t slab, uma_keg_t keg, void *item)
 	uintptr_t data;
 
 	data = (uintptr_t)slab_data(slab, keg);
-	return (((vaddr_t)item - (vaddr_t)data) / keg->uk_rsize);
+	return (((ptraddr_t)item - (ptraddr_t)data) / keg->uk_rsize);
 }
 
 STAILQ_HEAD(uma_bucketlist, uma_bucket);

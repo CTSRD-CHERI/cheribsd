@@ -1730,7 +1730,7 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	if ((wait & M_ZERO) != 0)
 		bzero(mem, pages * PAGE_SIZE);
 
-	return (mem);
+	return (cheri_kern_setboundsexact(mem, bytes));
 }
 
 static void
@@ -5473,7 +5473,7 @@ uma_dbg_alloc(uma_zone_t zone, uma_slab_t slab, void *item)
 	}
 
 	keg = zone->uz_keg;
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(INVARIANTS)
 	/* Check first that item is a subset of slab capability */
 	if ((keg->uk_flags & UMA_ZFLAG_OFFPAGE) == 0 &&
 	    !cheri_is_subset(slab, item)) {
@@ -5507,12 +5507,12 @@ uma_dbg_free(uma_zone_t zone, uma_slab_t slab, void *item)
 			    item, zone->uz_name);
 	}
 	keg = zone->uz_keg;
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(INVARIANTS)
 	/* Check first that item is a subset of slab */
 	if ((keg->uk_flags & UMA_ZFLAG_OFFPAGE) == 0 &&
 	    !cheri_is_subset(slab, item))
-		panic("Item capability %p is not a subset of the"
-		    " slab capability %p.", item, slab);
+		panic("Item capability %#p is not a subset of the"
+		    " slab capability %#p.", item, slab);
 #endif
 	freei = slab_item_index(slab, keg, item);
 
