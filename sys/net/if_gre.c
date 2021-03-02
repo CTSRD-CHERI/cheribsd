@@ -266,8 +266,13 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	}
 	error = 0;
 	switch (cmd) {
-#ifdef INET
 	case SIOCDIFPHYADDR:
+		if (sc->gre_family == 0)
+			break;
+		gre_delete_tunnel(sc);
+		break;
+#ifdef INET
+	case SIOCSIFPHYADDR:
 	case SIOCGIFPSRCADDR:
 	case SIOCGIFPDSTADDR:
 		error = in_gre_ioctl(sc, cmd, data);
