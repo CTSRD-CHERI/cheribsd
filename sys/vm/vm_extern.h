@@ -48,7 +48,6 @@ struct domainset;
 
 /* These operate on kernel virtual addresses only. */
 vm_pointer_t kva_alloc(vm_size_t);
-vm_pointer_t kva_alloc_aligned(vm_size_t, vm_offset_t);
 void kva_free(vm_pointer_t, vm_size_t);
 
 /* These operate on pageable virtual addresses. */
@@ -68,7 +67,7 @@ vm_pointer_t kmem_alloc_contig_domainset(struct domainset *ds, vm_size_t size,
     vm_paddr_t boundary, vm_memattr_t memattr);
 vm_pointer_t kmem_malloc(vm_size_t size, int flags);
 vm_pointer_t kmem_malloc_domainset(struct domainset *ds, vm_size_t size,
-    int flags, vm_size_t align);
+    int flags);
 void kmem_free(vm_pointer_t addr, vm_size_t size);
 
 /* This provides memory for previously allocated address space. */

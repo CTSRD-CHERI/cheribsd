@@ -157,22 +157,6 @@ kva_alloc(vm_size_t size)
 	return (addr);
 }
 
-vm_pointer_t
-kva_alloc_aligned(vm_size_t size, vm_offset_t align)
-{
-	vmem_addr_t addr;
-
-	size = round_page(size);
-	if (vmem_xalloc(kernel_arena, size, align, 0, 0,
-			VMEM_ADDR_MIN, VMEM_ADDR_MAX,
-			M_BESTFIT | M_NOWAIT, &addr))
-		return (0);
-#ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
-#endif
-	return (addr);
-}
-
 /*
  *	kva_free:
  *
@@ -240,7 +224,7 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	vm_prot_t prot;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-        size = CHERI_REPRESENTABLE_LENGTH(size);
+	size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 	object = kernel_object;
 	size = round_page(size);
@@ -333,7 +317,7 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	int pflags;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-        size = CHERI_REPRESENTABLE_LENGTH(size);
+	size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 	object = kernel_object;
 	size = round_page(size);
@@ -447,7 +431,7 @@ kmem_subinit(vm_map_t map, vm_map_t parent, vm_pointer_t *min, vm_pointer_t *max
  *	Allocate wired-down pages in the kernel's address space.
  */
 static vm_pointer_t
-kmem_malloc_domain(int domain, vm_size_t size, int flags, vm_size_t align)
+kmem_malloc_domain(int domain, vm_size_t size, int flags)
 {
 	vmem_t *arena;
 	vm_pointer_t addr;
@@ -484,8 +468,7 @@ kmem_malloc(vm_size_t size, int flags)
 }
 
 vm_pointer_t
-kmem_malloc_domainset(struct domainset *ds, vm_size_t size, int flags,
-   vm_size_t align)
+kmem_malloc_domainset(struct domainset *ds, vm_size_t size, int flags)
 {
 	struct vm_domainset_iter di;
 	vm_pointer_t addr;
@@ -606,10 +589,10 @@ kmem_back(vm_object_t object, vm_pointer_t addr, vm_size_t size, int flags)
 			next = end;
 		}
 		rv = kmem_back_domain(domain, object, addr,
-		    (vaddr_t)next - (vaddr_t)addr, flags);
+		    (ptraddr_t)next - (ptraddr_t)addr, flags);
 		if (rv != KERN_SUCCESS) {
 			kmem_unback(object, start,
-			    (vaddr_t)addr - (vaddr_t)start);
+			    (ptraddr_t)addr - (ptraddr_t)start);
 			break;
 		}
 	}
