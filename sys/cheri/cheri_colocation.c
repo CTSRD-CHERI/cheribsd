@@ -569,6 +569,8 @@ kern_cosetup(struct thread *td, int what,
              ("%s: uninitialized switcher_sealcap", __func__));
 	KASSERT(switcher_sealcap2 != (void * __capability)-1,
              ("%s: uninitialized switcher_sealcap2", __func__));
+	KASSERT(switcher_sealcap != switcher_sealcap2,
+             ("%s: switcher_sealcap == switcher_sealcap2", __func__));
 
 	if (td->td_md.md_scb == 0) {
 		error = setup_scb(td);
