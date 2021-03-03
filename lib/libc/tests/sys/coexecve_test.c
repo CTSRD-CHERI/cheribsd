@@ -31,6 +31,8 @@
 
 #include <atf-c.h>
 
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -101,11 +103,67 @@ ATF_TC_BODY(coexecve_right_pid, tc)
 	}
 }
 
+ATF_TC_WITHOUT_HEAD(vfork_coexecve_wrong_pid);
+ATF_TC_BODY(vfork_coexecve_wrong_pid, tc)
+{
+	char *new_argv[2], *new_env[1];
+	pid_t pid;
+	int error, status;
+
+	new_argv[0] = "/usr/bin/true";
+	new_argv[1] = NULL;
+
+	new_env[0] = NULL;
+
+	pid = vfork();
+	if (pid < 0) {
+		atf_tc_fail("vfork returned %d: %s", pid, strerror(errno));
+	} else if (pid == 0) {
+		error = coexecve(99, "/usr/bin/true", new_argv, new_env);
+		ATF_REQUIRE_EQ(error, -1);
+		ATF_REQUIRE_EQ(errno, ESRCH);
+		exit(0);
+	} else {
+		pid = waitpid(pid, &status, 0);
+		if (pid <= 0)
+			atf_tc_fail("waitpid returned %d: %s", pid, strerror(errno));
+		ATF_REQUIRE_EQ(status, 0);
+	}
+}
+
+ATF_TC_WITHOUT_HEAD(vfork_coexecve_right_pid);
+ATF_TC_BODY(vfork_coexecve_right_pid, tc)
+{
+	char *new_argv[2], *new_env[1];
+	pid_t pid;
+	int error, status;
+
+	new_argv[0] = "/usr/bin/true";
+	new_argv[1] = NULL;
+
+	new_env[0] = NULL;
+
+	pid = vfork();
+	if (pid < 0) {
+		atf_tc_fail("vfork returned %d: %s", pid, strerror(errno));
+	} else if (pid == 0) {
+		error = coexecve(getpid(), "/usr/bin/true", new_argv, new_env);
+		atf_tc_fail("You're not supposed to be here");
+	} else {
+		pid = waitpid(pid, &status, 0);
+		if (pid <= 0)
+			atf_tc_fail("waitpid returned %d: %s", pid, strerror(errno));
+		ATF_REQUIRE_EQ(status, 0);
+	}
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, execve);
 	ATF_TP_ADD_TC(tp, coexecve_wrong_pid);
 	ATF_TP_ADD_TC(tp, coexecve_right_pid);
+	ATF_TP_ADD_TC(tp, vfork_coexecve_wrong_pid);
+	ATF_TP_ADD_TC(tp, vfork_coexecve_right_pid);
 
 	return atf_no_error();
 }
