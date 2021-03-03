@@ -40,7 +40,7 @@
 .Sh SYNOPSIS
 .In unistd.h
 .Ft int
-.Fn cosetup "int what" "void * __capability *targetp"
+.Fn cosetup "int what"
 .Sh DESCRIPTION
 The
 .Fn cosetup
@@ -56,15 +56,6 @@ or
 .Dv COSETUP_COACCEPT ,
 to be used with
 .Xr coaccept 2 .
-.Pp
-If
-.Ar what
-is equal to
-.Dv COSETUP_COACCEPT ,
-the capability pointed to by
-.Ar targetp
-will be set to the sealed target capability, which can be passed
-to a potential caller.
 .Sh RETURN VALUES
 .Rv -std cosetup
 .Sh ERRORS

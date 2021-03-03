@@ -120,7 +120,7 @@ Basic usage example:
 	void * __capability lookedup;
 	uint64_t buf[MAXBSIZE];
 
-	error = cosetup(COSETUP_COCALL, NULL);
+	error = cosetup(COSETUP_COCALL);
 	if (error != 0)
 		err(1, "cosetup");
 

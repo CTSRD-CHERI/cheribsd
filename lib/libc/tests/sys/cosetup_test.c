@@ -49,7 +49,7 @@ ATF_TC_BODY(cosetup_cocall, tc)
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = cosetup(COSETUP_COCALL, NULL);
+		error = cosetup(COSETUP_COCALL);
 		ATF_REQUIRE_EQ(error, 0);
 		exit(error);
 	} else {
@@ -65,7 +65,7 @@ ATF_TC_BODY(cosetup_coaccept, tc)
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = cosetup(COSETUP_COACCEPT, NULL);
+		error = cosetup(COSETUP_COACCEPT);
 		ATF_REQUIRE_EQ(error, 0);
 		exit(error);
 	} else {

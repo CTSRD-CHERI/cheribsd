@@ -123,7 +123,7 @@ call(void)
 	int error, i;
 
 	fprintf(stderr, "%s: setting up...\n", __func__);
-	error = cosetup(COSETUP_COCALL, NULL);
+	error = cosetup(COSETUP_COCALL);
 	if (error != 0)
 		err(1, "cosetup");
 
@@ -155,7 +155,7 @@ service_proc(void *dummy __unused)
 	int error;
 
 	fprintf(stderr, "%s: setting up...\n", __func__);
-	error = cosetup(COSETUP_COACCEPT, NULL);
+	error = cosetup(COSETUP_COACCEPT);
 	if (error != 0)
 		err(1, "cosetup");
 

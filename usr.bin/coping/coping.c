@@ -94,7 +94,7 @@ main(int argc, char **argv)
 
 	if (vflag)
 		fprintf(stderr, "%s: setting up...\n", getprogname());
-	error = cosetup(COSETUP_COCALL, NULL);
+	error = cosetup(COSETUP_COCALL);
 	if (error != 0)
 		err(1, "cosetup");
 
@@ -135,7 +135,7 @@ main(int argc, char **argv)
 			warn("cocall");
 
 		if (vflag)
-			printf("%s: returned from \"%s\", pid %d, out %lld, in %lld\n", getprogname(), argv[c], getpid(), out, in);
+			printf("%s: returned from \"%s\", pid %d, out: %lld, in: %lld\n", getprogname(), argv[c], getpid(), out, in);
 		else
 			printf(".");
 

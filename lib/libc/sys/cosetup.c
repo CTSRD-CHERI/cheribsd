@@ -44,16 +44,11 @@ _Thread_local void * __capability _coaccept_code;
 _Thread_local void * __capability _coaccept_data;
 
 int
-cosetup(int what, void * __capability *capp)
+cosetup(int what)
 {
-	int error;
-
 	switch (what) {
 	case COSETUP_COACCEPT:
-		error = _cosetup(what, &_coaccept_code, &_coaccept_data);
-		if (error == 0 && capp != NULL)
-			*capp = _coaccept_data;
-		return (error);
+		return (_cosetup(what, &_coaccept_code, &_coaccept_data));
 	case COSETUP_COCALL:
 		return (_cosetup(what, &_cocall_code, &_cocall_data));
 	default:
