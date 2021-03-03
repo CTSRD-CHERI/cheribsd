@@ -1356,6 +1356,7 @@ out:
 			free(mp->mnt_gjprovider, M_UFSMNT);
 			mp->mnt_gjprovider = NULL;
 		}
+		MPASS(ump->um_softdep == NULL);
 		free(ump, M_UFSMNT);
 		mp->mnt_data = NULL;
 	}
@@ -1538,6 +1539,7 @@ ffs_unmount(mp, mntflags)
 	UFS_UNLOCK(ump);
 	if (MOUNTEDSOFTDEP(mp))
 		softdep_unmount(mp);
+	MPASS(ump->um_softdep == NULL);
 	if (fs->fs_ronly == 0 || ump->um_fsckpid > 0) {
 		fs->fs_clean = fs->fs_flags & (FS_UNCLEAN|FS_NEEDSFSCK) ? 0 : 1;
 		error = ffs_sbupdate(ump, MNT_WAIT, 0);
