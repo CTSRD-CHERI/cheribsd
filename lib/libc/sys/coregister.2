@@ -29,7 +29,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd April 30, 2018
+.Dd March 3, 2021
 .Dt COREGISTER 2
 .Os
 .Sh NAME
@@ -49,12 +49,18 @@ The
 .Fn coregister
 function registers an arbitrarily named target
 .Ar name ,
-and returns the public sealed capability.
+and stores the public sealed capability into
+.Ar *target .
+It is possible to call
+.Nm
+with NULL
+.Ar name ,
+to obtain the public sealed capability to pass to the intended caller.
+.Pp
 The
 .Fn colookup
 function returns a public sealed capability registered by another process in the colocated
 address space.
-The public sealed capability can be freely passed to to other processes.
 .Sh RETURN VALUES
 .Rv -std coregister
 .Sh ERRORS

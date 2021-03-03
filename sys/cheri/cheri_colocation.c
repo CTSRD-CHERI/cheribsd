@@ -649,32 +649,33 @@ kern_coregister(struct thread *td, const char * __capability namep,
 
 	vmspace = td->td_proc->p_vmspace;
 
-	error = copyinstr(namep, name, sizeof(name), NULL);
-	if (error != 0)
-		return (error);
-
-	if (strlen(name) == 0)
-		return (EINVAL);
-
-	if (strlen(name) >= PATH_MAX)
-		return (ENAMETOOLONG);
-
 	if (td->td_md.md_scb == 0) {
 		error = setup_scb(td);
 		if (error != 0)
 			return (error);
 	}
 
-	addr = td->td_md.md_scb;
+	if (namep != NULL) {
+		error = copyinstr(namep, name, sizeof(name), NULL);
+		if (error != 0)
+			return (error);
 
-	vm_map_lock(&vmspace->vm_map);
-	LIST_FOREACH(con, &vmspace->vm_conames, c_next) {
-		if (strcmp(name, con->c_name) == 0) {
-			vm_map_unlock(&vmspace->vm_map);
-			return (EEXIST);
+		if (strlen(name) == 0)
+			return (EINVAL);
+
+		if (strlen(name) >= PATH_MAX)
+			return (ENAMETOOLONG);
+
+		vm_map_lock(&vmspace->vm_map);
+		LIST_FOREACH(con, &vmspace->vm_conames, c_next) {
+			if (strcmp(name, con->c_name) == 0) {
+				vm_map_unlock(&vmspace->vm_map);
+				return (EEXIST);
+			}
 		}
 	}
 
+	addr = td->td_md.md_scb;
 	cap = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 	    addr, PAGE_SIZE, 0);
 	cap = cheri_seal(cap, switcher_sealcap2);
@@ -687,11 +688,13 @@ kern_coregister(struct thread *td, const char * __capability namep,
 		}
 	}
 
-	con = malloc(sizeof(struct coname), M_TEMP, M_WAITOK);
-	con->c_name = strdup(name, M_TEMP);
-	con->c_value = cap;
-	LIST_INSERT_HEAD(&vmspace->vm_conames, con, c_next);
-	vm_map_unlock(&vmspace->vm_map);
+	if (namep != NULL) {
+		con = malloc(sizeof(struct coname), M_TEMP, M_WAITOK);
+		con->c_name = strdup(name, M_TEMP);
+		con->c_value = cap;
+		LIST_INSERT_HEAD(&vmspace->vm_conames, con, c_next);
+		vm_map_unlock(&vmspace->vm_map);
+	}
 
 	return (0);
 }
