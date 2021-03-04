@@ -134,11 +134,10 @@ platform_clear_bss(void *kroot)
 	 * by the linker script and have no size info.
 	 */
 	void *edata_start;
-	size_t edata_siz = (__cheri_addr size_t)(&end) -
-		(__cheri_addr size_t)(&edata);
+	ptrdiff_t edata_siz = (ptraddr_t)&end - (ptraddr_t)&edata;
 
 	edata_start = cheri_ptrperm(
-		cheri_setaddress(kroot, (__cheri_addr vaddr_t)(&edata)),
+		cheri_setaddress(kroot, (ptraddr_t)&edata),
 		edata_siz, CHERI_PERM_STORE);
 	memset(edata_start, 0, edata_siz);
 }
@@ -253,8 +252,8 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	struct bootinfo *bootinfop;
 	uint64_t platform_counter_freq;
 	int argc = a0;
-	uint64_t *argv;
-	uint64_t *envp;
+	ptraddr_t *argv;
+	ptraddr_t *envp;
 	long memsize;
 	char *boot_env;
 #ifdef FDT
@@ -270,14 +269,12 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 #endif
 	int i;
 
-	/* clear the BSS and SBSS segments */
-#ifdef __CHERI_PURE_CAPABILITY__
 	argv = beri_platform_ptr(a1);
 	envp = beri_platform_ptr(a2);
+	/* clear the BSS and SBSS segments */
+#ifdef __CHERI_PURE_CAPABILITY__
 	platform_clear_bss(kernel_data_cap);
 #else
-	argv = (uint64_t *)a1;
-	envp = (uint64_t *)a2;
 	platform_clear_bss();
 #endif
 
