@@ -355,11 +355,10 @@ platform_clear_bss(void *kroot)
 	 * by the linker script and have no size info.
 	 */
 	void *edata_start;
-	size_t edata_siz = (__cheri_addr size_t)(&end) -
-	    (__cheri_addr size_t)(&edata);
+	size_t edata_siz = (ptraddr_t)&end - (ptraddr_t)&edata;
 
 	edata_start = cheri_ptrperm(
-	    cheri_setaddress(kroot, (__cheri_addr vaddr_t)(&edata)),
+	    cheri_setaddress(kroot, (ptraddr_t)&edata),
 	    edata_siz, CHERI_PERM_STORE);
 	memset(edata_start, 0, edata_siz);
 }
@@ -368,14 +367,16 @@ static char *
 platform_argv_ptr(int32_t argv)
 {
 	char *arg;
+	size_t len;
 
 	/*
-	 * Trust that YAMON initialized the strings correctly and
-	 * do not try to get the precise string length.
+	 * YAMON uses 32bit pointers to strings so
+	 * sign-extend them to the correct type manually.
 	 */
-	arg = cheri_ptrperm(
+	arg = cheri_andperm(
 	    cheri_setaddress(mips_kseg0_cap, (vm_offset_t)(argv)),
-	    4096, CHERI_PERM_LOAD | CHERI_PERM_STORE);
+	    CHERI_PERM_LOAD | CHERI_PERM_STORE);
+	arg = cheri_setbounds(arg, strlen(arg) + 1);
 
 	return (arg);
 }
@@ -393,7 +394,11 @@ platform_clear_bss()
 static char *
 platform_argv_ptr(int32_t argv)
 {
-	return ((char*)(intptr_t)argv);
+	/*
+	 * YAMON uses 32bit pointers to strings so
+	 * sign-extend them to the correct type manually.
+	 */
+	return ((char *)(intptr_t)argv);
 }
 #endif
 
@@ -412,7 +417,7 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	/* Clear the BSS and SBSS segments */
 #ifdef __CHERI_PURE_CAPABILITY__
 	argv = cheri_ptrperm(cheri_setaddress(mips_kseg0_cap, a1),
-	    argc * sizeof(uint64_t), CHERI_PERM_LOAD);
+	    argc * sizeof(*argv), CHERI_PERM_LOAD);
 	envp = cheri_andperm(cheri_setaddress(mips_kseg0_cap, a2),
 	    CHERI_PERM_LOAD);
 	platform_clear_bss(kernel_data_cap);
@@ -434,31 +439,14 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 
 	/*
 	 * Parse kernel cmdline.
-	 * YAMON uses 32bit pointers to strings so
-	 * sign-extend them to the correct type manually.
 	 */
-	if (bootverbose)
+	if (bootverbose) {
 		printf("cmd line: ");
-	for (i = 0; i < argc; i++) {
-		char *arg = platform_argv_ptr(argv[i]);
-		if (bootverbose)
-			printf("%s ", arg);
-		while (*arg != '\0') {
-			if (*arg++ != '-')
-				continue;
-			switch (*arg) {
-			case 'a':
-				boothowto |= RB_ASKNAME;
-				break;
-			case 'v':
-				bootverbose = 1;
-				boothowto |= RB_VERBOSE;
-				break;
-			case 'C':
-				boothowto |= RB_CDROM;
-				break;
-			}
+		for (i = 0; i < argc; i++) {
+			char *arg = platform_argv_ptr(argv[i]);
+			printf("'%s' ", arg);
 		}
+		printf("\n");
 	}
 	if (bootverbose)
 		printf("\n");
@@ -490,8 +478,8 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	 * Parse the environment for things like ememsize.
 	 */
 	for (i = 0; envp[i]; i += 2) {
-		char *a = platform_argv_ptr(envp[i]);
-		char *v = platform_argv_ptr(envp[i+1]);
+		const char *a = platform_argv_ptr(envp[i]);
+		const char *v = platform_argv_ptr(envp[i+1]);
 		if (bootverbose)
 			printf("\t%s = %s\n", a, v);
 
