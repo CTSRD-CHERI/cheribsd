@@ -40,7 +40,7 @@
 	.set noreorder
 	.text
 /*
- * void _yamon_cheri_syscon_read(vaddr_t fn_addr, t_yamon_syscon_id id,
+ * void _yamon_cheri_syscon_read(ptraddr_t fn_addr, t_yamon_syscon_id id,
  * 	void *param, uint32_t size);
  */
 NESTED(_yamon_cheri_syscon_read, 32, $c17)
@@ -49,19 +49,18 @@ NESTED(_yamon_cheri_syscon_read, 32, $c17)
 	csc	$c17, zero, CHERICAP_SIZE($c11)
 	cincoffset	$c24, $c11, 0
 
-	/* Switch to an unbounded kernel PCC */
+	/* Switch to an unbounded kernel PCC and global DDC */
 	CAPTABLE_PCREL_LOAD($c12, t0, _C_LABEL(kernel_root_cap))
 	clc	$c12, zero, 0($c12)
+	REG_LI	t0, CHERI_PERMS_KERNEL_DATA
+	candperm	$c1, $c12, t0
+	csetdefault	$c1
 	REG_LI	t0, CHERI_PERMS_KERNEL_CODE
 	candperm	$c12, $c12, t0
-	cgetpcc		$c4
-	cgetaddr	t0, $c4			// 1
-	PTR_ADDIU	t0, t0, (4 * 6)		// 2
-	csetaddr	$c12, $c12, t0		// 3
-	cjr		$c12			// 4
-	nop					// 5
+	cgetpccsetaddr	$c12, $c12, yamon_pc
+	cjr		$c12
+	nop
 yamon_pc:
-	// 6 (land here)
 	/* Destroy capability in c12, just in case */
 	cmove	$c12, $cnull
 	/* The jalr is relative to current pcc base */
@@ -75,6 +74,9 @@ yamon_pc:
 	jalr t0
 	nop
 	/* return already in v0 */
+
+	/* Clear ddc again */
+	csetdefault	$cnull
 
 	clc	$c17, zero, CHERICAP_SIZE($c11)
 	clc	$c24, zero, 0($c11)
