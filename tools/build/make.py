@@ -185,8 +185,6 @@ if __name__ == "__main__":
     except ImportError:
         pass
     parsed_args, bmake_args = parser.parse_known_args()
-    if parsed_args.cross_bindir is None:
-        parsed_args.cross_bindir = default_cross_toolchain()
 
     MAKEOBJDIRPREFIX = os.getenv("MAKEOBJDIRPREFIX")
     if not MAKEOBJDIRPREFIX:
