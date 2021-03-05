@@ -1150,6 +1150,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		thread_unsuspend(p);
 		PROC_SUNLOCK(p);
 		itimer_proc_continue(p);
+		kqtimer_proc_continue(p);
 		break;
 
 	case PT_WRITE_I:
