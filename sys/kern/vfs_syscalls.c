@@ -126,6 +126,8 @@ at2cnpflags(u_int at_flags, u_int mask)
 		res |= (at_flags & AT_SYMLINK_NOFOLLOW) != 0 ? NOFOLLOW :
 		    FOLLOW;
 	}
+	if ((mask & AT_EMPTY_PATH) != 0 && (at_flags & AT_EMPTY_PATH) != 0)
+		res |= EMPTYPATH;
 	return (res);
 }
 
@@ -1585,7 +1587,8 @@ kern_linkat(struct thread *td, int fd1, int fd2,
 	struct nameidata nd;
 	int error;
 
-	if ((flag & ~(AT_SYMLINK_FOLLOW | AT_RESOLVE_BENEATH)) != 0)
+	if ((flag & ~(AT_SYMLINK_FOLLOW | AT_RESOLVE_BENEATH |
+	    AT_EMPTY_PATH)) != 0)
 		return (EINVAL);
 
 	do {
@@ -1617,6 +1620,23 @@ kern_linkat_vp(struct thread *td, struct vnode *vp, int fd,
 	    LOCKPARENT | SAVENAME | AUDITVNODE2 | NOCACHE, segflag, path, fd,
 	    &cap_linkat_target_rights, td);
 	if ((error = namei(&nd)) == 0) {
+		if ((nd.ni_resflags & NIRES_EMPTYPATH) != 0) {
+			error = priv_check(td, PRIV_VFS_FHOPEN);
+			if (error != 0) {
+				NDFREE(&nd, NDF_ONLY_PNBUF);
+				if (nd.ni_vp != NULL) {
+					if (nd.ni_dvp == nd.ni_vp)
+						vrele(nd.ni_dvp);
+					else
+						vput(nd.ni_dvp);
+					vrele(nd.ni_vp);
+				} else {
+					vput(nd.ni_dvp);
+				}
+				vrele(vp);
+				return (error);
+			}
+		}
 		if (nd.ni_vp != NULL) {
 			NDFREE(&nd, NDF_ONLY_PNBUF);
 			if (nd.ni_dvp == nd.ni_vp)
@@ -2121,7 +2141,7 @@ kern_accessat(struct thread *td, int fd, const char * __capability path,
 	struct nameidata nd;
 	int error;
 
-	if ((flag & ~(AT_EACCESS | AT_RESOLVE_BENEATH)) != 0)
+	if ((flag & ~(AT_EACCESS | AT_RESOLVE_BENEATH | AT_EMPTY_PATH)) != 0)
 		return (EINVAL);
 	if (amode != F_OK && (amode & ~(R_OK | W_OK | X_OK)) != 0)
 		return (EINVAL);
@@ -2142,8 +2162,8 @@ kern_accessat(struct thread *td, int fd, const char * __capability path,
 		usecred = cred;
 	AUDIT_ARG_VALUE(amode);
 	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF |
-	    AUDITVNODE1 | at2cnpflags(flag, AT_RESOLVE_BENEATH),
-	    pathseg, path, fd, &cap_fstat_rights, td);
+	    AUDITVNODE1 | at2cnpflags(flag, AT_RESOLVE_BENEATH |
+	    AT_EMPTY_PATH), pathseg, path, fd, &cap_fstat_rights, td);
 	if ((error = namei(&nd)) != 0)
 		goto out;
 	vp = nd.ni_vp;
@@ -2441,12 +2461,13 @@ kern_statat(struct thread *td, int flag, int fd, const char * __capability path,
 	struct nameidata nd;
 	int error;
 
-	if ((flag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH)) != 0)
+	if ((flag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH |
+	    AT_EMPTY_PATH)) != 0)
 		return (EINVAL);
 
 	NDINIT_ATRIGHTS(&nd, LOOKUP, at2cnpflags(flag, AT_RESOLVE_BENEATH |
-	    AT_SYMLINK_NOFOLLOW) | LOCKSHARED | LOCKLEAF | AUDITVNODE1,
-	    pathseg, path, fd, &cap_fstat_rights, td);
+	    AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH) | LOCKSHARED | LOCKLEAF |
+	    AUDITVNODE1, pathseg, path, fd, &cap_fstat_rights, td);
 
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -2792,13 +2813,14 @@ kern_chflagsat(struct thread *td, int fd, const char * __capability path,
 	struct nameidata nd;
 	int error;
 
-	if ((atflag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH)) != 0)
+	if ((atflag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH |
+	    AT_EMPTY_PATH)) != 0)
 		return (EINVAL);
 
 	AUDIT_ARG_FFLAGS(flags);
 	NDINIT_ATRIGHTS(&nd, LOOKUP, at2cnpflags(atflag, AT_SYMLINK_NOFOLLOW |
-	    AT_RESOLVE_BENEATH) | AUDITVNODE1, pathseg, path, fd,
-	    &cap_fchflags_rights, td);
+	    AT_RESOLVE_BENEATH | AT_EMPTY_PATH) | AUDITVNODE1, pathseg, path,
+	    fd, &cap_fchflags_rights, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	NDFREE_NOTHING(&nd);
@@ -2920,13 +2942,14 @@ kern_fchmodat(struct thread *td, int fd, const char * __capability path,
 	struct nameidata nd;
 	int error;
 
-	if ((flag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH)) != 0)
+	if ((flag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH |
+	    AT_EMPTY_PATH)) != 0)
 		return (EINVAL);
 
 	AUDIT_ARG_MODE(mode);
 	NDINIT_ATRIGHTS(&nd, LOOKUP, at2cnpflags(flag, AT_SYMLINK_NOFOLLOW |
-	    AT_RESOLVE_BENEATH) | AUDITVNODE1, pathseg, path, fd,
-	    &cap_fchmod_rights, td);
+	    AT_RESOLVE_BENEATH | AT_EMPTY_PATH) | AUDITVNODE1, pathseg, path,
+	    fd, &cap_fchmod_rights, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	NDFREE_NOTHING(&nd);
@@ -3031,13 +3054,14 @@ kern_fchownat(struct thread *td, int fd, const char * __capability path,
 	struct nameidata nd;
 	int error;
 
-	if ((flag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH)) != 0)
+	if ((flag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH |
+	    AT_EMPTY_PATH)) != 0)
 		return (EINVAL);
 
 	AUDIT_ARG_OWNER(uid, gid);
 	NDINIT_ATRIGHTS(&nd, LOOKUP, at2cnpflags(flag, AT_SYMLINK_NOFOLLOW |
-	    AT_RESOLVE_BENEATH) | AUDITVNODE1, pathseg, path, fd,
-	    &cap_fchown_rights, td);
+	    AT_RESOLVE_BENEATH | AT_EMPTY_PATH) | AUDITVNODE1, pathseg, path,
+	    fd, &cap_fchown_rights, td);
 
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -3390,13 +3414,14 @@ kern_utimensat(struct thread *td, int fd,
 	struct timespec ts[2];
 	int error, flags;
 
-	if ((flag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH)) != 0)
+	if ((flag & ~(AT_SYMLINK_NOFOLLOW | AT_RESOLVE_BENEATH |
+	    AT_EMPTY_PATH)) != 0)
 		return (EINVAL);
 
 	if ((error = getutimens(tptr, tptrseg, ts, &flags)) != 0)
 		return (error);
 	NDINIT_ATRIGHTS(&nd, LOOKUP, at2cnpflags(flag, AT_SYMLINK_NOFOLLOW |
-	    AT_RESOLVE_BENEATH) | AUDITVNODE1,
+	    AT_RESOLVE_BENEATH | AT_EMPTY_PATH) | AUDITVNODE1,
 	    pathseg, path, fd, &cap_futimes_rights, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
