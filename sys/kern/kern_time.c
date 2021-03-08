@@ -104,8 +104,8 @@ static void	realtimer_clocktime(clockid_t, struct timespec *);
 static void	realtimer_expire(void *);
 
 static int	register_posix_clock(int, const struct kclock *);
-void		itimer_fire(struct itimer *it);
-int		itimespecfix(struct timespec *ts);
+static void	itimer_fire(struct itimer *it);
+static int	itimespecfix(struct timespec *ts);
 
 #define CLOCK_CALL(clock, call, arglist)		\
 	((*posix_clocks[clock].call) arglist)
@@ -1610,7 +1610,7 @@ itimer_accept(struct proc *p, int timerid, ksiginfo_t *ksi)
 	return (EINVAL);
 }
 
-int
+static int
 itimespecfix(struct timespec *ts)
 {
 
@@ -1671,7 +1671,7 @@ realtimer_expire(void *arg)
 	}
 }
 
-void
+static void
 itimer_fire(struct itimer *it)
 {
 	struct proc *p = it->it_proc;
