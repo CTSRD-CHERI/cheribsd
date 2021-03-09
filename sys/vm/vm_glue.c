@@ -686,6 +686,7 @@ vm_cap_allows_prot(const void * __capability cap, vm_prot_t prot)
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
+//     "support",
 //     "pointer_as_integer"
 //   ]
 // }
