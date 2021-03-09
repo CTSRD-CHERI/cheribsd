@@ -43,7 +43,8 @@ mips/mips/pm_machdep.c			standard
 mips/mips/pmap.c			standard
 mips/mips/ptrace_machdep.c		standard
 mips/mips/sc_machdep.c			standard
-mips/mips/stack_machdep.c		optional	!cheri_purecap_kernel ddb | stack
+mips/mips/stack_machdep.c		optional	!cheri_purecap_kernel ddb
+mips/mips/stack_machdep.c		optional	!cheri_purecap_kernel stack
 mips/mips/stdatomic.c			standard \
 	compile-with "${NORMAL_C:N-Wmissing-prototypes}"
 mips/mips/support.S			optional	!cheri_purecap_kernel
@@ -61,6 +62,8 @@ mips/cheri/locore.S			optional	no-obj cheri_purecap_kernel
 mips/cheri/support.S			optional	cheri_purecap_kernel
 mips/cheri/swtch.S			optional	cheri_purecap_kernel
 mips/cheri/exception.S			optional	cheri_purecap_kernel
+mips/cheri/cheri_stack_machdep.c	optional	cheri_purecap_kernel ddb
+mips/cheri/cheri_stack_machdep.c	optional	cheri_purecap_kernel stack
 
 # misc opt-in bits
 kern/link_elf_obj.c			standard

@@ -46,8 +46,6 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/abi.h>
 
-#ifdef __CHERI_PURE_CAPABILITY__
-
 #define	pc_in(pc, fn)							\
 	((pc) >= (uintptr_t)cheri_getbase(fn) &&			\
 	 (pc) < (uintptr_t)cheri_gettop(fn))
@@ -76,12 +74,11 @@ stack_fetch_ra(uintptr_t sp, u_register_t stack_pos)
 	uintptr_t ra = stack_register_fetch(sp, stack_pos);
 
 	if (!ra)
-		return (ra);
+		return (NULL);
 	/* Re-derive sentry capability */
 	if (cheri_getsealed(ra)) {
-		KASSERT(cheri_gettype(ra) == CHERI_OTYPE_SENTRY,
-		    ("Return address is not a SealedEntry capability %#p",
-		    (void *)ra));
+		if (cheri_gettype(ra) != CHERI_OTYPE_SENTRY)
+			return (NULL);
 		/*
 		 * XXX-AM: The exception handlers have base=0, this should
 		 * probably change.
@@ -171,14 +168,12 @@ stack_capture(struct stack *st, struct thread *td, uintptr_t pc, uintptr_t sp)
 			    (short)insn.CIType.imm < 0) {
 				next_sp = sp + -(short)insn.CIType.imm;
 				break;
-			}
-			else if (op_is_cheri_csc(insn) &&
+			} else if (op_is_cheri_csc(insn) &&
 			    insn.CCMType.cs == OP_CHERI_RAC_REGNO &&
 			    insn.CCMType.cb == OP_CHERI_STC_REGNO) {
 				exc_saved_ra = 0;
 				ra_stack_pos = (short)insn.CCMType.offset * 16;
-			}
-			else if (op_is_cheri_csc(insn) &&
+			} else if (op_is_cheri_csc(insn) &&
 			    insn.CCMType.cs == OP_CHERI_FPC_REGNO &&
 			    insn.CCMType.cb == OP_CHERI_STC_REGNO) {
 				if (!stack_addr_ok(td, sp,
@@ -215,8 +210,7 @@ stack_capture(struct stack *st, struct thread *td, uintptr_t pc, uintptr_t sp)
 				/* eret */
 				is_exc_handler = true;
 				break;
-			}
-			else if (op_is_cheri_cjr(insn) &&
+			} else if (op_is_cheri_cjr(insn) &&
 			    insn.CBIType.cd == OP_CHERI_RAC_REGNO) {
 				/* common return sequence, not a handler */
 				break;
@@ -231,16 +225,14 @@ stack_capture(struct stack *st, struct thread *td, uintptr_t pc, uintptr_t sp)
 			if (!stack_addr_ok(td, sp, ra_stack_pos))
 				return;
 			pc = stack_fetch_ra(sp, ra_stack_pos);
-		}
-		else {
+		} else {
 			if (ra_stack_pos < 0) {
 				if (exc_saved_ra)
 					/* In leaf function where exception happened */
 					pc = exc_saved_ra;
 				else
 					break;
-			}
-			else {
+			} else {
 				if (!stack_addr_ok(td, sp, ra_stack_pos))
 					return;
 				ra = stack_fetch_ra(sp, ra_stack_pos);
@@ -265,12 +257,12 @@ stack_save_td(struct stack *st, struct thread *td)
 	    ("stack_save_td: thread %p is swapped", td));
 
 	if (TD_IS_RUNNING(td))
-                return (EOPNOTSUPP);
+		return (EOPNOTSUPP);
 
 	pc = (uintptr_t)td->td_pcb->pcb_cherikframe.ckf_pcc;
 	sp = (uintptr_t)td->td_pcb->pcb_cherikframe.ckf_stc;
 	stack_capture(st, td, pc, sp);
-        return (0);
+	return (0);
 }
 
 void
@@ -285,8 +277,6 @@ stack_save(struct stack *st)
 	sp = (uintptr_t)cheri_getstack();
 	stack_capture(st, curthread, pc, sp);
 }
-
-#endif /* __CHERI_PURE_CAPABILITY__ */
 // CHERI CHANGES START
 // {
 //   "updated": 20200708,
