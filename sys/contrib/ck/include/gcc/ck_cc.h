@@ -60,7 +60,9 @@
 /*
  * Packed attribute.
  */
+#ifndef __CHERI_PURE_CAPABILITY__
 #define CK_CC_PACKED __attribute__((packed))
+#endif
 
 /*
  * Weak reference.
