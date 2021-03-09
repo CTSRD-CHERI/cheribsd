@@ -121,6 +121,14 @@ typedef union {
 		unsigned r3: 5;
 		unsigned func: 6;
 	} CType;
+	/* Capability instruction with 11bit immediate */
+	struct {
+		unsigned op: 6;
+		unsigned fmt: 5;
+		unsigned r1: 5;
+		unsigned r2: 5;
+		int imm: 11;
+	} CIType;
 	/* BC2F format */
 	struct {
 		unsigned op: 6;
@@ -128,6 +136,15 @@ typedef union {
 		unsigned cd: 5;
 		unsigned offset: 16;
 	} BC2FType;
+	/* Indirect branch */
+	struct {
+		unsigned op: 6;
+		unsigned fmt: 5;
+		unsigned cd: 5;
+		unsigned cb: 5;
+		unsigned res1: 5;
+		unsigned res2: 6;
+	} CBIType;
 #endif /* CPU_CHERI */
 #endif
 #if BYTE_ORDER == LITTLE_ENDIAN
@@ -264,6 +281,14 @@ typedef union {
 #define	OP_SDC1		075
 #define	OP_SDC2		076
 #define	OP_SD		077
+
+#ifdef CPU_CHERI
+/* Convert regnum to machine register index */
+#define	OP_CHERI_REGNUM2REGIDX(num) ((num - CHERIBASE) / CHERIREGOFFSIZE)
+#define	OP_CHERI_STC_REGNO OP_CHERI_REGNUM2REGIDX(STC)
+#define	OP_CHERI_RAC_REGNO OP_CHERI_REGNUM2REGIDX(C17)
+#define	OP_CHERI_FPC_REGNO OP_CHERI_REGNUM2REGIDX(C24)
+#endif
 
 /*
  * Values for the 'func' field when 'op' == OP_SPECIAL.
@@ -491,3 +516,13 @@ typedef union {
 #endif
 
 #endif /* !_MACHINE_MIPS_OPCODE_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190830,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "kdb",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END
