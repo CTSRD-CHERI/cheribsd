@@ -126,7 +126,7 @@ ck_pr_stall(void)
 	CK_CC_INLINE static void			\
 	ck_pr_fence_strict_##T(void)			\
 	{						\
-		__sync_synchronize();			\
+		__atomic_thread_fence(__ATOMIC_SEQ_CST);\
 	}
 
 CK_PR_FENCE(atomic)
@@ -158,7 +158,8 @@ CK_PR_FENCE(unlock)
 	ck_pr_cas_##S(M *target, T compare, T set)				\
 	{									\
 		bool z;								\
-		z = __sync_bool_compare_and_swap((T *)target, compare, set);	\
+		z = __atomic_compare_exchange((T *)target, &compare, &set,	\
+		    false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);			\
 		return z;							\
 	}
 
@@ -183,18 +184,22 @@ CK_PR_CAS_S(8,  uint8_t)
 CK_CC_INLINE static bool
 ck_pr_cas_ptr_value(void *target, void *compare, void *set, void *v)
 {
-	set = __sync_val_compare_and_swap((void **)target, compare, set);
-	*(void **)v = set;
-	return (set == compare);
+	bool z;
+	z = __atomic_compare_exchange((void **)target, &compare, &set, false,
+	    __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+	*(void **)v = compare;
+	return z;
 }
 
 #define CK_PR_CAS_O(S, T)						\
 	CK_CC_INLINE static bool					\
 	ck_pr_cas_##S##_value(T *target, T compare, T set, T *v)	\
 	{								\
-		set = __sync_val_compare_and_swap(target, compare, set);\
-		*v = set;						\
-		return (set == compare);				\
+		bool z;							\
+		z = __atomic_compare_exchange(target, &compare, &set,	\
+		    false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);		\
+		*v = compare;						\
+		return z;						\
 	}
 
 CK_PR_CAS_O(char, char)
@@ -210,15 +215,26 @@ CK_PR_CAS_O(8,  uint8_t)
 /*
  * Atomic fetch-and-add operations.
  */
-#define CK_PR_FAA(S, M, T)					\
-	CK_CC_INLINE static T					\
-	ck_pr_faa_##S(M *target, T d)				\
-	{							\
-		d = __sync_fetch_and_add((T *)target, d);	\
-		return (d);					\
+#define CK_PR_FAA(S, M, T)						\
+	CK_CC_INLINE static T						\
+	ck_pr_faa_##S(M *target, T d)					\
+	{								\
+		d = __atomic_fetch_add((T *)target, d, __ATOMIC_SEQ_CST); \
+		return (d);						\
 	}
 
-CK_PR_FAA(ptr, void, void *)
+/*
+ * Atomic fetch-add of two pointers does not make sense.
+ * Provide instead atomic addition between pointer and long offset.
+ */
+CK_CC_INLINE static void *
+ck_pr_faa_ptr(void *target, long d)
+{
+	void *v;
+
+	v = __atomic_fetch_add((void **)target, d, __ATOMIC_SEQ_CST);
+	return (v);
+}
 
 #define CK_PR_FAA_S(S, T) CK_PR_FAA(S, T, T)
 
@@ -236,18 +252,25 @@ CK_PR_FAA_S(8,  uint8_t)
 /*
  * Atomic store-only binary operations.
  */
-#define CK_PR_BINARY(K, S, M, T)				\
-	CK_CC_INLINE static void				\
-	ck_pr_##K##_##S(M *target, T d)				\
-	{							\
-		d = __sync_fetch_and_##K((T *)target, d);	\
-		return;						\
+#define CK_PR_BINARY(K, S, M, T)					\
+	CK_CC_INLINE static void					\
+	ck_pr_##K##_##S(M *target, T d)					\
+	{								\
+		__atomic_fetch_##K((T *)target, d, __ATOMIC_SEQ_CST);	\
+		return;							\
+	}
+
+#define CK_PR_BINARY_PTR(K)						\
+	CK_CC_INLINE static void					\
+	ck_pr_##K##_ptr(void *target, long d)				\
+	{								\
+		__atomic_fetch_##K((void **)target, d, __ATOMIC_SEQ_CST); \
+		return;							\
 	}
 
 #define CK_PR_BINARY_S(K, S, T) CK_PR_BINARY(K, S, T, T)
 
 #define CK_PR_GENERATE(K)			\
-	CK_PR_BINARY(K, ptr, void, void *)	\
 	CK_PR_BINARY_S(K, char, char)		\
 	CK_PR_BINARY_S(K, int, int)		\
 	CK_PR_BINARY_S(K, uint, unsigned int)	\
@@ -256,6 +279,14 @@ CK_PR_FAA_S(8,  uint8_t)
 	CK_PR_BINARY_S(K, 16, uint16_t)		\
 	CK_PR_BINARY_S(K, 8, uint8_t)
 
+/*
+ * Atomic store-only binary operations on pointers
+ * are only supported for add and sub and only
+ * between a pointer and a long.
+ */
+CK_PR_BINARY_PTR(add)
+CK_PR_BINARY_PTR(sub)
+
 CK_PR_GENERATE(add)
 CK_PR_GENERATE(sub)
 CK_PR_GENERATE(and)
@@ -263,6 +294,7 @@ CK_PR_GENERATE(or)
 CK_PR_GENERATE(xor)
 
 #undef CK_PR_GENERATE
+#undef CK_PR_BINARY_PTR
 #undef CK_PR_BINARY_S
 #undef CK_PR_BINARY
 
@@ -282,7 +314,7 @@ CK_PR_GENERATE(xor)
 
 #define CK_PR_UNARY_S(S, M) CK_PR_UNARY(S, M, M)
 
-CK_PR_UNARY(ptr, void, void *)
+CK_PR_UNARY(ptr, void, long)
 CK_PR_UNARY_S(char, char)
 CK_PR_UNARY_S(int, int)
 CK_PR_UNARY_S(uint, unsigned int)
@@ -295,3 +327,14 @@ CK_PR_UNARY_S(8, uint8_t)
 #undef CK_PR_UNARY
 #endif /* !CK_F_PR */
 #endif /* CK_PR_GCC_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20181108,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_shape",
+//     "other"
+//   ],
+//   "change_comment": "c11 atomic"
+// }
+// CHERI CHANGES END
