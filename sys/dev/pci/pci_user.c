@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/queue.h>
 #include <sys/rwlock.h>
 #include <sys/sglist.h>
+#include <sys/abi_compat.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -127,12 +128,26 @@ struct pci_list_vpd_io64 {
 	uint64_t	plvi_data;
 };
 
+struct pci_bar_mmap64 {
+	uint64_t	pbm_map_base;	/* (void *) (sometimes IN)/OUT mmaped base */
+	uint64_t	pbm_map_length; /* (size_t) mapped length of the BAR, multiple
+					   of pages */
+	uint64_t	pbm_bar_length;	/* actual length of the BAR */
+	int		pbm_bar_off;	/* offset from the mapped base to the
+					   start of BAR */
+	struct pcisel	pbm_sel;	/* device to operate on */
+	int		pbm_reg;	/* starting address of BAR */
+	int		pbm_flags;
+	int		pbm_memattr;
+};
+
 #define	PCIOCGETCONF64	_IOC_NEWTYPE(PCIOCGETCONF, struct pci_conf_io64)
 #define	PCIOCLISTVPD64	_IOC_NEWTYPE(PCIOCLISTVPD, struct pci_list_vpd_io64)
 /*
  * We don't support PCIOCGETCONF_OLD64 because the earliest
  * COMPAT_FREEBSD64 architecture didn't exist until 9.0 (mips).
  */
+#define	PCIOCBARMMAP64	_IOC_NEWTYPE(PCIOCBARMMAP, struct pci_bar_mmap64)
 #endif
 
 /*
@@ -945,7 +960,7 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 	vm_paddr_t membase;
 	vm_paddr_t pbase;
 	vm_size_t plen;
-	vm_offset_t addr;
+	vm_pointer_t addr;
 	vm_prot_t prot;
 	int error, flags;
 
@@ -1025,6 +1040,10 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 	struct pci_match_conf *pattern_buf;
 	struct pci_map *pm;
 	struct pci_bar_mmap *pbm;
+#ifdef COMPAT_FREEBSD64
+	struct pci_bar_mmap64 *pbm64;
+	struct pci_bar_mmap pbms;
+#endif
 	size_t confsz, iolen;
 	int error, ionum, i, num_patterns;
 	union pci_conf_union pcu;
@@ -1402,7 +1421,23 @@ getconfexit:
 		break;
 
 	case PCIOCBARMMAP:
-		pbm = (struct pci_bar_mmap *)data;
+#ifdef COMPAT_FREEBSD64
+	case PCIOCBARMMAP64:
+		if (cmd == PCIOCBARMMAP64) {
+			pbm64 = (struct pci_bar_mmap64 *)data;
+			pbm = &pbms;
+			pbm->pbm_map_base = __USER_CAP(pbm64->pbm_map_base,
+			    pbm64->pbm_map_length);
+			CP(*pbm64, pbms, pbm_map_length);
+			CP(*pbm64, pbms, pbm_bar_length);
+			CP(*pbm64, pbms, pbm_bar_off);
+			CP(*pbm64, pbms, pbm_sel);
+			CP(*pbm64, pbms, pbm_reg);
+			CP(*pbm64, pbms, pbm_flags);
+			CP(*pbm64, pbms, pbm_memattr);
+		} else
+#endif
+			pbm = (struct pci_bar_mmap *)data;
 		if ((flag & FWRITE) == 0 &&
 		    (pbm->pbm_flags & PCIIO_BAR_MMAP_RW) != 0) {
 			error = EPERM;
@@ -1412,6 +1447,15 @@ getconfexit:
 		    pbm->pbm_sel.pc_bus, pbm->pbm_sel.pc_dev,
 		    pbm->pbm_sel.pc_func);
 		error = pcidev == NULL ? ENODEV : pci_bar_mmap(pcidev, pbm);
+#ifdef COMPAT_FREEBSD64
+		if (cmd == PCIOCBARMMAP64) {
+			pbm64->pbm_map_base =
+			    (__cheri_addr uint64_t)pbm->pbm_map_base;
+			CP(pbms, *pbm64, pbm_map_length);
+			CP(pbms, *pbm64, pbm_bar_length);
+			CP(pbms, *pbm64, pbm_bar_off);
+		}
+#endif
 		break;
 
 	default:
