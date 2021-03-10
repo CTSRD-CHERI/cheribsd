@@ -1143,7 +1143,6 @@ SIGCODE(aarch32_sigcode)
 	.word 0xe59f7008	// ldr r7, [pc, #8]
 	.word 0xef000000	// swi #0
 	.word 0xeafffffa	// b . - 16
-
 	.word SYS_sigreturn
 	.word SYS_exit
 	.align	3
