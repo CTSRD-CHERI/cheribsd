@@ -57,7 +57,7 @@ def buildImageAndRunTests(params, String suffix) {
     // No need for minimal images when running the testsuite
     if (!GlobalVars.isTestSuiteJob && (suffix.startsWith('mips64') || suffix.startsWith('riscv64'))) {
         stage("Building MFS_ROOT kernels") {
-            sh label: "Building minimal disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
+            sh label: "Building minimal disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-mfs-root-${suffix} ${params.extraArgs}"
             sh label: "Building MFS_ROOT kernels", script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd-mfs-root-kernel-${suffix}/build-fpga-kernels ${params.extraArgs}"
             // Move MFS_ROOT kernels into tarball/ so they aren't deleted
             sh "mv -fv kernel-${suffix}* tarball/"
