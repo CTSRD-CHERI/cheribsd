@@ -48,7 +48,7 @@ mips/mips/stdatomic.c			standard \
 	compile-with "${NORMAL_C:N-Wmissing-prototypes}"
 mips/mips/support.S			optional	!cheri_purecap_kernel
 mips/mips/swtch.S			optional	!cheri_purecap_kernel
-mips/mips/bcopy_for_copyinout.S			optional	!cheri_purecap_kernel
+mips/mips/bcopy_for_copyinout.S		optional	!cheri_purecap_kernel
 mips/mips/sys_machdep.c			standard
 mips/mips/tlb.c				standard compile-with ${NOCOV_C}
 mips/mips/trap.c			standard
@@ -61,7 +61,6 @@ mips/cheri/locore.S			optional	no-obj cheri_purecap_kernel
 mips/cheri/support.S			optional	cheri_purecap_kernel
 mips/cheri/swtch.S			optional	cheri_purecap_kernel
 mips/cheri/exception.S			optional	cheri_purecap_kernel
-mips/cheri/cheri_stack_machdep.c		optional	ddb | stack
 
 # misc opt-in bits
 kern/link_elf_obj.c			standard
