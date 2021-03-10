@@ -175,7 +175,7 @@ TAILQ_HEAD(cache_freebatch, namecache);
  * may be in the same spot suffer a little bit and enforce the
  * alignment for everyone. Note this is a nop for 64-bit platforms.
  */
-#define CACHE_ZONE_ALIGNMENT	UMA_ALIGNOF(time_t)
+#define CACHE_ZONE_ALIGNMENT	MAX(UMA_ALIGNOF(time_t), UMA_ALIGNOF(uintptr_t))
 
 /*
  * TODO: the initial value of CACHE_PATH_CUTOFF was inherited from the
@@ -190,7 +190,10 @@ TAILQ_HEAD(cache_freebatch, namecache);
  * tied to VFS SMR. Even if retaining them, the current split should be
  * re-evaluated.
  */
-#ifdef __LP64__
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	CACHE_PATH_CUTOFF	45
+#define	CACHE_LARGE_PAD		14
+#elif __SIZEOF_POINTER__ == 8
 #define	CACHE_PATH_CUTOFF	45
 #define	CACHE_LARGE_PAD		6
 #else
@@ -4769,13 +4772,14 @@ out:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "kdb"
+//     "kdb",
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END
