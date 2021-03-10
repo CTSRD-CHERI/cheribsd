@@ -733,7 +733,7 @@ user_ioctl(struct thread *td, int fd, u_long ucom,
 	if (size > 0) {
 		if (com & IOC_VOID) {
 			/* Integer argument. */
-			arg = (__cheri_addr intptr_t)udata;
+			arg = (intptr_t)(intcap_t)udata;
 			data = (void *)&arg;
 			size = 0;
 		} else {
@@ -2035,7 +2035,7 @@ kern_posix_error(struct thread *td, int error)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
