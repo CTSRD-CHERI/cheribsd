@@ -179,18 +179,18 @@ linker_file_t linker_make_file(const char* _filename, linker_class_t _cls);
  * DDB Helpers, tuned specifically for ddb/db_kld.c
  */
 int linker_ddb_lookup(const char *_symstr, c_linker_sym_t *_sym);
-int linker_ddb_search_symbol(vaddr_t _value, c_linker_sym_t *_sym,
+int linker_ddb_search_symbol(ptraddr_t _value, c_linker_sym_t *_sym,
 			     long *_diffp);
 int linker_ddb_symbol_values(c_linker_sym_t _sym, linker_symval_t *_symval);
-int linker_ddb_search_symbol_name(vaddr_t value, char *buf, u_int buflen,
+int linker_ddb_search_symbol_name(ptraddr_t value, char *buf, u_int buflen,
 				  long *offset);
 
 /*
  * stack(9) helper for situations where kernel locking is required.
  */
-int linker_search_symbol_name_flags(vaddr_t value, char *buf, u_int buflen,
+int linker_search_symbol_name_flags(ptraddr_t value, char *buf, u_int buflen,
     long *offset, int flags);
-int linker_search_symbol_name(vaddr_t value, char *buf, u_int buflen,
+int linker_search_symbol_name(ptraddr_t value, char *buf, u_int buflen,
     long *offset);
 
 /* HWPMC helper */

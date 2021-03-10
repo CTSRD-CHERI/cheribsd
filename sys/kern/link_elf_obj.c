@@ -133,7 +133,7 @@ static int	link_elf_lookup_symbol(linker_file_t, const char *,
 		    c_linker_sym_t *);
 static int	link_elf_symbol_values(linker_file_t, c_linker_sym_t,
 		    linker_symval_t *);
-static int	link_elf_search_symbol(linker_file_t, vaddr_t value,
+static int	link_elf_search_symbol(linker_file_t, ptraddr_t value,
 		    c_linker_sym_t *sym, long *diffp);
 
 static void	link_elf_unload_file(linker_file_t);
@@ -1449,7 +1449,7 @@ link_elf_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 }
 
 static int
-link_elf_search_symbol(linker_file_t lf, vaddr_t value,
+link_elf_search_symbol(linker_file_t lf, ptraddr_t value,
     c_linker_sym_t *sym, long *diffp)
 {
 	elf_file_t ef = (elf_file_t) lf;

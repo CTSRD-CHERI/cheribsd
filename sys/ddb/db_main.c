@@ -125,7 +125,7 @@ X_db_search_symbol(db_symtab_t *symtab, db_addr_t off, db_strategy_t strat,
 	db_addr_t stoffs = off;
 
 	if (symtab->private == NULL) {
-		if (!linker_ddb_search_symbol((vaddr_t)off, &lsym, &diff)) {
+		if (!linker_ddb_search_symbol((ptraddr_t)off, &lsym, &diff)) {
 			*diffp = (db_expr_t)diff;
 			return ((c_db_sym_t)lsym);
 		}
