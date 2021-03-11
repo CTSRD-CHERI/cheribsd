@@ -129,6 +129,7 @@ struct vmctx *
 vm_open(const char *name)
 {
 	struct vmctx *vm;
+	int saved_errno;
 
 	vm = malloc(sizeof(struct vmctx) + strlen(name) + 1);
 	assert(vm != NULL);
@@ -144,7 +145,9 @@ vm_open(const char *name)
 
 	return (vm);
 err:
+	saved_errno = errno;
 	free(vm);
+	errno = saved_errno;
 	return (NULL);
 }
 
