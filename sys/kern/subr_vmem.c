@@ -1448,7 +1448,7 @@ vmem_alloc(vmem_t *vm, vmem_size_t size, int flags, vmem_addr_t *addrp)
 		addr = (vmem_addr_t)uma_zalloc(qc->qc_cache,
 		    (flags & ~M_WAITOK) | M_NOWAIT);
 		if (__predict_true(addr != 0)) {
-			*addrp = vmem_buildcap(vm, *addrp, size);
+			*addrp = vmem_buildcap(vm, addr, size);
 			return (0);
 		}
 	}
