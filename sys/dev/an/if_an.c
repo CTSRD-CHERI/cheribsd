@@ -1940,7 +1940,8 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		if (error)
 			break;
 		areq = malloc_c(sizeof(*areq), M_TEMP, M_WAITOK);
-		error = copyin(ifr_data_get_ptr(ifr), areq, sizeof(*areq));
+		error = copyin(ifr_data_get_ptr(command, ifr), areq,
+		    sizeof(*areq));
 		if (error != 0) {
 			free(areq, M_TEMP);
 			break;
@@ -1972,14 +1973,15 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		memcpy(areq, &sc->areq, sizeof(*areq));
 		AN_UNLOCK(sc);
-		error = copyout(areq, ifr_data_get_ptr(ifr), sizeof(*areq));
+		error = copyout(areq, ifr_data_get_ptr(command, ifr),
+		    sizeof(*areq));
 		free(areq, M_TEMP);
 		break;
 	case SIOCSAIRONET:
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
 		AN_LOCK(sc);
-		error = copyin(ifr_data_get_ptr(ifr), &sc->areq,
+		error = copyin(ifr_data_get_ptr(command, ifr), &sc->areq,
 		    sizeof(sc->areq));
 		if (error != 0)
 			break;
@@ -1989,7 +1991,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case CASE_IOC_IFREQ(SIOCGPRIVATE_0):	/* used by Cisco client utility */
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
-		error = copyin(ifr_data_get_ptr(ifr), &l_ioctl,
+		error = copyin(ifr_data_get_ptr(command, ifr), &l_ioctl,
 		    sizeof(l_ioctl));
 		if (error)
 			goto out;
@@ -2008,14 +2010,14 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		AN_UNLOCK(sc);
 		if (!error) {
 			/* copy out the updated command info */
-			error = copyout(&l_ioctl, ifr_data_get_ptr(ifr),
-			    sizeof(l_ioctl));
+			error = copyout(&l_ioctl,
+			    ifr_data_get_ptr(command, ifr), sizeof(l_ioctl));
 		}
 		break;
 	case CASE_IOC_IFREQ(SIOCGPRIVATE_1):	/* used by Cisco client utility */
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
-		error = copyin(ifr_data_get_ptr(ifr), &l_ioctl,
+		error = copyin(ifr_data_get_ptr(command, ifr), &l_ioctl,
 		    sizeof(l_ioctl));
 		if (error)
 			goto out;

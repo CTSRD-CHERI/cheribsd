@@ -651,13 +651,13 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case CASE_IOC_IFREQ(GIFGOPTS):
 		options = sc->gif_options;
-		error = copyout(&options, ifr_data_get_ptr(ifr),
+		error = copyout(&options, ifr_data_get_ptr(cmd, ifr),
 		    sizeof(options));
 		break;
 	case CASE_IOC_IFREQ(GIFSOPTS):
 		if ((error = priv_check(curthread, PRIV_NET_GIF)) != 0)
 			break;
-		error = copyin(ifr_data_get_ptr(ifr), &options,
+		error = copyin(ifr_data_get_ptr(cmd, ifr), &options,
 		    sizeof(options));
 		if (error)
 			break;

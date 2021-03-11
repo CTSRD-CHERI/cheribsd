@@ -1905,7 +1905,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 #endif
-		error = copyin(ifr_data_get_ptr(ifr), &vlr, sizeof(vlr));
+		error = copyin(ifr_data_get_ptr(cmd, ifr), &vlr, sizeof(vlr));
 		if (error)
 			break;
 		if (vlr.vlr_parent[0] == '\0') {
@@ -1950,7 +1950,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			vlr.vlr_proto = ifv->ifv_proto;
 		}
 		VLAN_SUNLOCK();
-		error = copyout(&vlr, ifr_data_get_ptr(ifr), sizeof(vlr));
+		error = copyout(&vlr, ifr_data_get_ptr(cmd, ifr), sizeof(vlr));
 		break;
 		
 	case CASE_IOC_IFREQ(SIOCSIFFLAGS):

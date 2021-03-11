@@ -2755,22 +2755,31 @@ ifr_curcap_set(void *ifrp, int val)
 }
 
 void * __capability
-ifr_data_get_ptr(void *ifrp)
+ifr_data_get_ptr(u_long cmd, void *ifrp)
 {
 	union ifreq_union *ifrup;
 
 	ifrup = ifrp;
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (__USER_CAP_UNBOUND((void *)(uintptr_t)
-		    ifrup->ifr32.ifr_ifru.ifru_data));
-#endif
+	switch (IOCPARM_LEN(cmd)) {
 #ifdef COMPAT_FREEBSD64
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return (__USER_CAP_UNBOUND((void *)(uintptr_t)
-		    ifrup->ifr64.ifr_ifru.ifru_data));
+	case sizeof(struct ifreq64):
+#ifdef COMPAT_FREEBSD32
+		if (SV_CURPROC_FLAG(SV_ILP32))
+			return (__USER_CAP_UNBOUND(
+			    ifrup->ifr32.ifr_ifru.ifru_data));
+#endif
+		return (__USER_CAP_UNBOUND(ifrup->ifr64.ifr_ifru.ifru_data));
+#endif
+	case sizeof(struct ifreq):
+#if !__has_feature(capabilities) && defined(COMPAT_FREEBSD32)
+		if (SV_CURPROC_FLAG(SV_ILP32))
+			return ((void *)(uintptr_t)
+			    ifrup->ifr32.ifr_ifru.ifru_data);
 #endif
 		return (ifrup->ifr.ifr_ifru.ifru_data);
+	default:
+		__assert_unreachable();
+	}
 }
 
 u_int
@@ -2958,13 +2967,14 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		memset(&ifd, 0, sizeof(ifd));
 
 		if_data_copy(ifp, &ifd);
-		error = copyout(&ifd, ifr_data_get_ptr(ifr), sizeof(ifd));
+		error = copyout(&ifd, ifr_data_get_ptr(cmd, ifr), sizeof(ifd));
 		break;
 	}
 
 #ifdef MAC
 	case CASE_IOC_IFREQ(SIOCGIFMAC):
-		error = mac_ifnet_ioctl_get(td->td_ucred, ifr, ifp);
+		error = mac_ifnet_ioctl_get(td->td_ucred,
+		    ifr_data_get_ptr(cmd, ifr), ifp);
 		break;
 #endif
 
@@ -3101,7 +3111,8 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 
 #ifdef MAC
 	case CASE_IOC_IFREQ(SIOCSIFMAC):
-		error = mac_ifnet_ioctl_set(td->td_ucred, ifr, ifp);
+		error = mac_ifnet_ioctl_set(td->td_ucred,
+		    ifr_data_get_ptr(cmd, ifr), ifp);
 		break;
 #endif
 
@@ -3109,8 +3120,8 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		error = priv_check(td, PRIV_NET_SETIFNAME);
 		if (error)
 			return (error);
-		error = copyinstr(ifr_data_get_ptr(ifr), new_name, IFNAMSIZ,
-		    NULL);
+		error = copyinstr(ifr_data_get_ptr(cmd, ifr), new_name,
+		    IFNAMSIZ, NULL);
 		if (error != 0)
 			return (error);
 		if (new_name[0] == '\0')
@@ -3635,7 +3646,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		error = priv_check(td, PRIV_NET_IFCREATE);
 		if (error == 0)
 			error = if_clone_create(ifr->ifr_name,
-			    sizeof(ifr->ifr_name), ifr_data_get_ptr(ifr));
+			    sizeof(ifr->ifr_name), ifr_data_get_ptr(cmd, ifr));
 		goto out_noref;
 
 	case CASE_IOC_IFREQ(SIOCIFDESTROY):

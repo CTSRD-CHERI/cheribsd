@@ -4277,7 +4277,7 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			err = ENXIO;
 			break;
 		}
-		err = copyin(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
+		err = copyin(ifr_data_get_ptr(command, ifr), &i2c, sizeof(i2c));
 		if (err != 0)
 			break;
 		mtx_lock(&sc->driver_mtx);
@@ -4288,7 +4288,7 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		err = mxge_fetch_i2c(sc, &i2c);
 		mtx_unlock(&sc->driver_mtx);
 		if (err == 0)
-			err = copyout(&i2c, ifr_data_get_ptr(ifr),
+			err = copyout(&i2c, ifr_data_get_ptr(command, ifr),
 			    sizeof(i2c));
 		break;
 	default:

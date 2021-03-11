@@ -5053,13 +5053,14 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 	 * Check the cmd word first before attempting to fetch all the
 	 * data.
 	 */
-	rv = fueword(ifr_data_get_ptr(ifr), &subcmd);
+	rv = fueword(ifr_data_get_ptr(cmd, ifr), &subcmd);
 	if (rv == -1) {
 		rv = EFAULT;
 		goto quit;
 	}
 
-	if (copyin(ifr_data_get_ptr(ifr), spr, sizeof(struct spppreq)) != 0) {
+	if (copyin(ifr_data_get_ptr(cmd, ifr), spr,
+	    sizeof(struct spppreq)) != 0) {
 		rv = EFAULT;
 		goto quit;
 	}
@@ -5099,7 +5100,7 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 		 * setting it.
 		 */
 		spr->defs.lcp.timeout = sp->lcp.timeout * 1000 / hz;
-		rv = copyout(spr, ifr_data_get_ptr(ifr),
+		rv = copyout(spr, ifr_data_get_ptr(cmd, ifr),
 		    sizeof(struct spppreq));
 		break;
 

@@ -4744,7 +4744,7 @@ mwl_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 		 * statistics.  The alternative is to copy the data
 		 * to a local structure.
 		 */
-		return (copyout(&sc->sc_stats, ifr_data_get_ptr(ifr),
+		return (copyout(&sc->sc_stats, ifr_data_get_ptr(cmd, ifr),
 		    sizeof (sc->sc_stats)));
 #ifdef MWL_DIAGAPI
 	case SIOCGMVDIAG:
