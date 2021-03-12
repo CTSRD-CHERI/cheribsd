@@ -2,22 +2,12 @@
 
 .include <bsd.compiler.mk>
 
-# armv[67] is a bit special since we allow a soft-floating version via
-# CPUTYPE matching *soft*. This variant may not actually work though.
-.if ${MACHINE_ARCH:Marmv[67]*} != "" && \
-    (!defined(CPUTYPE) || ${CPUTYPE:M*soft*} == "")
-CRTARCH?=	armhf
-.elif ${MACHINE_ARCH:Mmips64*} != ""
-CRTARCH?=	mips64
-.else
-CRTARCH?=	${MACHINE_ARCH:C/amd64/x86_64/}
-.endif
 CRTSRC=		${SRCTOP}/contrib/subrepo-cheri-compiler-rt
+.include "compiler-rt-vars.mk"
 
 .PATH:		${CRTSRC}/lib
 
-CLANGDIR=	/usr/lib/clang/11.0.1
-LIBDIR=		${CLANGDIR}/lib/freebsd
+LIBDIR=		${SANITIZER_LIBDIR}
 SHLIBDIR=	${LIBDIR}
 
 NO_PIC=
