@@ -1882,7 +1882,7 @@ nfsrpc_writerpc(vnode_t vp, struct uio *uiop, int *iomode,
 		if (nd->nd_repstat) {
 			/*
 			 * In case the rpc gets retried, roll
-			 * the uio fileds changed by nfsm_uiombuf()
+			 * the uio fields changed by nfsm_uiombuf()
 			 * back.
 			 */
 			uiop->uio_offset -= len;
@@ -6400,7 +6400,7 @@ nfsrpc_writeds(vnode_t vp, struct uio *uiop, int *iomode, int *must_commit,
 	if (nd->nd_repstat != 0) {
 		/*
 		 * In case the rpc gets retried, roll
-		 * the uio fileds changed by nfsm_uiombuf()
+		 * the uio fields changed by nfsm_uiombuf()
 		 * back.
 		 */
 		uiop->uio_offset -= len;
