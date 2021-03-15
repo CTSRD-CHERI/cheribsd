@@ -42,7 +42,7 @@
 struct trapframe;
 
 struct pcb {
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
 	uintcap_t	pcb_ra;		/* Return address */
 	uintcap_t	pcb_sp;		/* Stack pointer */
 	uintcap_t	pcb_gp;		/* Global pointer */
