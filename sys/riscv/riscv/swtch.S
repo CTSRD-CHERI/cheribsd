@@ -337,24 +337,6 @@ ENTRY(cpu_throw)
 	clc	cs9, (PCB_S + 9 * 16)(c13)
 	clc	cs10, (PCB_S + 10 * 16)(c13)
 	clc	cs11, (PCB_S + 11 * 16)(c13)
-#elif __has_feature(capabilities)
-	/* Load registers */
-	lc	cra, (PCB_RA)(x13)
-	lc	csp, (PCB_SP)(x13)
-
-	/* s[0-11] */
-	lc	cs0, (PCB_S + 0 * 16)(x13)
-	lc	cs1, (PCB_S + 1 * 16)(x13)
-	lc	cs2, (PCB_S + 2 * 16)(x13)
-	lc	cs3, (PCB_S + 3 * 16)(x13)
-	lc	cs4, (PCB_S + 4 * 16)(x13)
-	lc	cs5, (PCB_S + 5 * 16)(x13)
-	lc	cs6, (PCB_S + 6 * 16)(x13)
-	lc	cs7, (PCB_S + 7 * 16)(x13)
-	lc	cs8, (PCB_S + 8 * 16)(x13)
-	lc	cs9, (PCB_S + 9 * 16)(x13)
-	lc	cs10, (PCB_S + 10 * 16)(x13)
-	lc	cs11, (PCB_S + 11 * 16)(x13)
 #else
 	/* Load registers */
 	ld	ra, (PCB_RA)(x13)
@@ -447,24 +429,6 @@ ENTRY(cpu_switch)
 	csc	cs9, (PCB_S + 9 * 16)(c13)
 	csc	cs10, (PCB_S + 10 * 16)(c13)
 	csc	cs11, (PCB_S + 11 * 16)(c13)
-#elif __has_feature(capabilities)
-	/* Store ra, sp and the callee-saved registers */
-	sc	cra, (PCB_RA)(x13)
-	sc	csp, (PCB_SP)(x13)
-
-	/* s[0-11] */
-	sc	cs0, (PCB_S + 0 * 16)(x13)
-	sc	cs1, (PCB_S + 1 * 16)(x13)
-	sc	cs2, (PCB_S + 2 * 16)(x13)
-	sc	cs3, (PCB_S + 3 * 16)(x13)
-	sc	cs4, (PCB_S + 4 * 16)(x13)
-	sc	cs5, (PCB_S + 5 * 16)(x13)
-	sc	cs6, (PCB_S + 6 * 16)(x13)
-	sc	cs7, (PCB_S + 7 * 16)(x13)
-	sc	cs8, (PCB_S + 8 * 16)(x13)
-	sc	cs9, (PCB_S + 9 * 16)(x13)
-	sc	cs10, (PCB_S + 10 * 16)(x13)
-	sc	cs11, (PCB_S + 11 * 16)(x13)
 #else
 	/* Store ra, sp and the callee-saved registers */
 	sd	ra, (PCB_RA)(x13)
@@ -621,24 +585,6 @@ ENTRY(cpu_switch)
 	clc	cs9, (PCB_S + 9 * 16)(c13)
 	clc	cs10, (PCB_S + 10 * 16)(c13)
 	clc	cs11, (PCB_S + 11 * 16)(c13)
-#elif __has_feature(capabilities)
-	/* Restore the registers */
-	lc	cra, (PCB_RA)(x13)
-	lc	csp, (PCB_SP)(x13)
-
-	/* s[0-11] */
-	lc	cs0, (PCB_S + 0 * 16)(x13)
-	lc	cs1, (PCB_S + 1 * 16)(x13)
-	lc	cs2, (PCB_S + 2 * 16)(x13)
-	lc	cs3, (PCB_S + 3 * 16)(x13)
-	lc	cs4, (PCB_S + 4 * 16)(x13)
-	lc	cs5, (PCB_S + 5 * 16)(x13)
-	lc	cs6, (PCB_S + 6 * 16)(x13)
-	lc	cs7, (PCB_S + 7 * 16)(x13)
-	lc	cs8, (PCB_S + 8 * 16)(x13)
-	lc	cs9, (PCB_S + 9 * 16)(x13)
-	lc	cs10, (PCB_S + 10 * 16)(x13)
-	lc	cs11, (PCB_S + 11 * 16)(x13)
 #else
 	/* Restore the registers */
 	ld	ra, (PCB_RA)(x13)
