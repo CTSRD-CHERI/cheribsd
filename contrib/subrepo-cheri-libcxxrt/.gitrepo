@@ -6,7 +6,7 @@
 [subrepo]
 	remote = https://github.com/CTSRD-CHERI/libcxxrt.git
 	branch = master
-	commit = f8e4939925f1cb9b8021cc88eed62bff9f4d2311
+	commit = 32b3a6649c57d6b88c5a31b2824dc2265185782e
 	parent = 676d7cc0dd150066f02d815aea9f697558338135
 	method = rebase
-	cmdver = 0.4.0
+	cmdver = 0.4.1
