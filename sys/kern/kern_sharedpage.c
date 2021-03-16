@@ -117,7 +117,7 @@ static void
 shared_page_init(void *dummy __unused)
 {
 	vm_page_t m;
-	vm_offset_t addr;
+	vm_pointer_t addr;
 
 	sx_init(&shared_page_alloc_sx, "shpsx");
 	shared_page_obj = vm_pager_allocate(OBJT_PHYS, 0, PAGE_SIZE,
@@ -372,3 +372,12 @@ exec_sysvec_init_secondary(struct sysentvec *sv, struct sysentvec *sv2)
 		    (sv->sv_fxrng_gen_base - sv->sv_shared_page_base);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
