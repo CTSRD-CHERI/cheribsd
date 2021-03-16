@@ -1,3 +1,7 @@
+if (NOT IS_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/../llvm")
+  message(FATAL_ERROR "libunwind now requires being built in a monorepo layout with llvm-lit available")
+endif()
+
 #===============================================================================
 # Setup Project
 #===============================================================================
@@ -21,104 +25,47 @@ if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR OR LIBUNWIND_STANDALONE_B
   project(libunwind LANGUAGES C CXX ASM)
   set(CMAKE_TRY_COMPILE_TARGET_TYPE ${_previous_CMAKE_TRY_COMPILE_TARGET_TYPE})
 
-  # Rely on llvm-config.
-  set(CONFIG_OUTPUT)
-  if(NOT LLVM_CONFIG_PATH)
-    find_program(LLVM_CONFIG_PATH "llvm-config")
-  endif()
-  if (DEFINED LLVM_PATH)
-    set(LLVM_INCLUDE_DIR ${LLVM_INCLUDE_DIR} CACHE PATH "Path to llvm/include")
-    set(LLVM_PATH ${LLVM_PATH} CACHE PATH "Path to LLVM source tree")
-    set(LLVM_MAIN_SRC_DIR ${LLVM_PATH})
-    set(LLVM_CMAKE_PATH "${LLVM_PATH}/cmake/modules")
-  elseif(LLVM_CONFIG_PATH)
-    message(STATUS "Found LLVM_CONFIG_PATH as ${LLVM_CONFIG_PATH}")
-    set(CONFIG_COMMAND ${LLVM_CONFIG_PATH} "--includedir" "--prefix" "--src-root")
-    execute_process(COMMAND ${CONFIG_COMMAND}
-                    RESULT_VARIABLE HAD_ERROR
-                    OUTPUT_VARIABLE CONFIG_OUTPUT)
-    if (NOT HAD_ERROR)
-      string(REGEX REPLACE "[ \t]*[\r\n]+[ \t]*" ";"
-             CONFIG_OUTPUT ${CONFIG_OUTPUT})
-    else()
-      string(REPLACE ";" " " CONFIG_COMMAND_STR "${CONFIG_COMMAND}")
-      message(STATUS "${CONFIG_COMMAND_STR}")
-      message(FATAL_ERROR "llvm-config failed with status ${HAD_ERROR}")
-    endif()
-
-    list(GET CONFIG_OUTPUT 0 INCLUDE_DIR)
-    list(GET CONFIG_OUTPUT 1 LLVM_OBJ_ROOT)
-    list(GET CONFIG_OUTPUT 2 MAIN_SRC_DIR)
-
-    set(LLVM_INCLUDE_DIR ${INCLUDE_DIR} CACHE PATH "Path to llvm/include")
-    set(LLVM_BINARY_DIR ${LLVM_OBJ_ROOT} CACHE PATH "Path to LLVM build tree")
-    set(LLVM_MAIN_SRC_DIR ${MAIN_SRC_DIR} CACHE PATH "Path to LLVM source tree")
-    set(LLVM_LIT_PATH "${LLVM_PATH}/utils/lit/lit.py")
-
-    # --cmakedir is supported since llvm r291218 (4.0 release)
-    execute_process(
-      COMMAND ${LLVM_CONFIG_PATH} --cmakedir
-      RESULT_VARIABLE HAD_ERROR
-      OUTPUT_VARIABLE CONFIG_OUTPUT
-      ERROR_QUIET)
-    if(NOT HAD_ERROR)
-      string(STRIP "${CONFIG_OUTPUT}" LLVM_CMAKE_PATH_FROM_LLVM_CONFIG)
-      file(TO_CMAKE_PATH "${LLVM_CMAKE_PATH_FROM_LLVM_CONFIG}" LLVM_CMAKE_PATH)
-    else()
-      file(TO_CMAKE_PATH "${LLVM_BINARY_DIR}" LLVM_BINARY_DIR_CMAKE_STYLE)
-      set(LLVM_CMAKE_PATH "${LLVM_BINARY_DIR_CMAKE_STYLE}/lib${LLVM_LIBDIR_SUFFIX}/cmake/llvm")
-    endif()
-  else()
-    message(WARNING "UNSUPPORTED LIBUNWIND CONFIGURATION DETECTED: "
-                    "llvm-config not found and LLVM_MAIN_SRC_DIR not defined. "
-                    "Reconfigure with -DLLVM_CONFIG=path/to/llvm-config "
-                    "or -DLLVM_PATH=path/to/llvm-source-root.")
-  endif()
-
-  if (EXISTS ${LLVM_CMAKE_PATH})
-    # Enable warnings, otherwise -w gets added to the cflags by HandleLLVMOptions.
-    set(LLVM_ENABLE_WARNINGS ON)
-    list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_PATH}")
-    include("${LLVM_CMAKE_PATH}/AddLLVM.cmake")
-	#include("${LLVM_CMAKE_PATH}/HandleLLVMOptions.cmake")
-  else()
-    message(WARNING "Not found: ${LLVM_CMAKE_PATH}")
-  endif()
-
   set(PACKAGE_NAME libunwind)
   set(PACKAGE_VERSION 11.0.0git)
   set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
   set(PACKAGE_BUGREPORT "llvm-bugs@lists.llvm.org")
 
-  if (EXISTS ${LLVM_MAIN_SRC_DIR}/utils/lit/lit.py)
-    set(LLVM_LIT ${LLVM_MAIN_SRC_DIR}/utils/lit/lit.py)
-  else()
-    # Seek installed Lit.
-    find_program(LLVM_LIT "lit.py" ${LLVM_MAIN_SRC_DIR}/utils/lit
-                 DOC "Path to lit.py")
+  # Find the LLVM sources and simulate LLVM CMake options.
+  if (NOT DEFINED LLVM_PATH)
+    set(LLVM_PATH ${CMAKE_CURRENT_LIST_DIR}/../llvm CACHE PATH "" FORCE)
   endif()
+  include(${LLVM_PATH}/cmake/modules/HandleStandaloneBuild.cmake)
+endif()
 
-  if (LLVM_LIT)
-    # Define the default arguments to use with 'lit', and an option for the user
-    # to override.
-    set(LIT_ARGS_DEFAULT "-sv")
-    if (MSVC OR XCODE)
-      set(LIT_ARGS_DEFAULT "${LIT_ARGS_DEFAULT} --no-progress-bar")
-    endif()
-    set(LLVM_LIT_ARGS "${LIT_ARGS_DEFAULT}" CACHE STRING "Default options for lit")
-
-    # On Win32 hosts, provide an option to specify the path to the GnuWin32 tools.
-    if (WIN32 AND NOT CYGWIN)
-      set(LLVM_LIT_TOOLS_DIR "" CACHE PATH "Path to GnuWin32 tools")
+if (LIBUNWIND_STANDALONE_BUILD)
+  if(CMAKE_VERSION VERSION_LESS 3.12)
+    include(FindPythonInterp)
+    if( NOT PYTHONINTERP_FOUND )
+      message(WARNING "Failed to find python interpreter. "
+                      "The libc++ test suite will be disabled.")
+      set(LLVM_INCLUDE_TESTS OFF)
+    else()
+      add_executable(Python3::Interpreter IMPORTED)
+      set_target_properties(Python3::Interpreter PROPERTIES
+        IMPORTED_LOCATION ${PYTHON_EXECUTABLE})
+      set(Python3_EXECUTABLE ${PYTHON_EXECUTABLE})
     endif()
   else()
-    set(LLVM_INCLUDE_TESTS OFF)
-  endif()
+    find_package(Python3 COMPONENTS Interpreter)
+    if(NOT Python3_Interpreter_FOUND)
+      message(WARNING "Python3 not found, using python2 as a fallback")
+      find_package(Python2 COMPONENTS Interpreter REQUIRED)
+      if(Python2_VERSION VERSION_LESS 2.7)
+        message(SEND_ERROR "Python 2.7 or newer is required")
+      endif()
 
-  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib${LLVM_LIBDIR_SUFFIX})
-  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib${LLVM_LIBDIR_SUFFIX})
-else()
-  set(LLVM_LIT "${CMAKE_SOURCE_DIR}/utils/lit/lit.py")
+      # Treat python2 as python3
+      add_executable(Python3::Interpreter IMPORTED)
+      set_target_properties(Python3::Interpreter PROPERTIES
+        IMPORTED_LOCATION ${Python2_EXECUTABLE})
+      set(Python3_EXECUTABLE ${Python2_EXECUTABLE})
+    endif()
+  endif()
 endif()
 
 #===============================================================================
@@ -132,24 +79,17 @@ option(LIBUNWIND_BUILD_32_BITS "Build 32 bit libunwind" ${LLVM_BUILD_32_BITS})
 option(LIBUNWIND_ENABLE_ASSERTIONS "Enable assertions independent of build mode." ON)
 option(LIBUNWIND_ENABLE_PEDANTIC "Compile with pedantic enabled." ON)
 option(LIBUNWIND_ENABLE_WERROR "Fail and stop if a warning is triggered." OFF)
-option(LIBUNWIND_ENABLE_SHARED "Build libunwind as a shared library." ON)
-option(LIBUNWIND_ENABLE_STATIC "Build libunwind as a static library." ON)
 option(LIBUNWIND_ENABLE_CROSS_UNWINDING "Enable cross-platform unwinding support." OFF)
 option(LIBUNWIND_ENABLE_ARM_WMMX "Enable unwinding support for ARM WMMX registers." OFF)
 option(LIBUNWIND_ENABLE_THREADS "Build libunwind with threading support." ON)
 option(LIBUNWIND_WEAK_PTHREAD_LIB "Use weak references to refer to pthread functions." OFF)
 option(LIBUNWIND_USE_COMPILER_RT "Use compiler-rt instead of libgcc" OFF)
 option(LIBUNWIND_INCLUDE_DOCS "Build the libunwind documentation." ${LLVM_INCLUDE_DOCS})
+option(LIBUNWIND_INCLUDE_TESTS "Build the libunwind tests." ${LLVM_INCLUDE_TESTS})
 
 set(LIBUNWIND_LIBDIR_SUFFIX "${LLVM_LIBDIR_SUFFIX}" CACHE STRING
     "Define suffix of library directory name (32/64)")
 option(LIBUNWIND_INSTALL_LIBRARY "Install the libunwind library." ON)
-cmake_dependent_option(LIBUNWIND_INSTALL_STATIC_LIBRARY
-  "Install the static libunwind library." ON
-  "LIBUNWIND_ENABLE_STATIC;LIBUNWIND_INSTALL_LIBRARY" OFF)
-cmake_dependent_option(LIBUNWIND_INSTALL_SHARED_LIBRARY
-  "Install the shared libunwind library." ON
-  "LIBUNWIND_ENABLE_SHARED;LIBUNWIND_INSTALL_LIBRARY" OFF)
 set(LIBUNWIND_TARGET_TRIPLE "" CACHE STRING "Target triple for cross compiling.")
 set(LIBUNWIND_GCC_TOOLCHAIN "" CACHE PATH "GCC toolchain for cross compiling.")
 set(LIBUNWIND_SYSROOT "" CACHE PATH "Sysroot for cross compiling.")
@@ -158,25 +98,33 @@ set(LIBUNWIND_TEST_LINKER_FLAGS "" CACHE STRING
 set(LIBUNWIND_TEST_COMPILER_FLAGS "" CACHE STRING
     "Additional compiler flags for test programs.")
 option(LIBUNWIND_TEST_ENABLE_EXCEPTIONS "Also include tests requiring C++ exceptions." ON)
+set(LIBUNWIND_TEST_CXX_ABI_LIB_PATH "" CACHE PATH "Path to the C++ ABI library to use for testing.")
+set(CXXABIS none default libcxxabi libcxxrt libstdc++ libsupc++ vcruntime)
+set(LIBUNWIND_CXX_ABI "default" CACHE STRING "Name of the C++ ABI library to use for testing.")
+set_property(CACHE LIBUNWIND_CXX_ABI PROPERTY STRINGS ;${CXXABIS})
 set(LIBUNWIND_USE_VERSION_SCRIPT "" CACHE PATH "version script to use when linking libunwind.so.")
 
+option(LIBUNWIND_ENABLE_SHARED "Build libunwind as a shared library." ON)
+option(LIBUNWIND_ENABLE_STATIC "Build libunwind as a static library." ON)
+
+cmake_dependent_option(LIBUNWIND_INSTALL_STATIC_LIBRARY
+        "Install the static libunwind library." ON
+        "LIBUNWIND_ENABLE_STATIC;LIBUNWIND_INSTALL_LIBRARY" OFF)
+cmake_dependent_option(LIBUNWIND_INSTALL_SHARED_LIBRARY
+        "Install the shared libunwind library." ON
+        "LIBUNWIND_ENABLE_SHARED;LIBUNWIND_INSTALL_LIBRARY" OFF)
 
 if (NOT LIBUNWIND_ENABLE_SHARED AND NOT LIBUNWIND_ENABLE_STATIC)
   message(FATAL_ERROR "libunwind must be built as either a shared or static library.")
 endif()
 
-# Check that we can build with 32 bits if requested.
-if (CMAKE_SIZEOF_VOID_P EQUAL 8 AND NOT WIN32)
-  if (LIBUNWIND_BUILD_32_BITS AND NOT LLVM_BUILD_32_BITS) # Don't duplicate the output from LLVM
-    message(STATUS "Building 32 bits executables and libraries.")
-  endif()
-elseif(LIBUNWIND_BUILD_32_BITS)
-  message(FATAL_ERROR "LIBUNWIND_BUILD_32_BITS=ON is not supported on this platform.")
-endif()
-
 option(LIBUNWIND_HERMETIC_STATIC_LIBRARY
   "Do not export any symbols from the static library." OFF)
 
+set(LIBUNWIND_TEST_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/test/lit.site.cfg.in" CACHE STRING
+        "The Lit testing configuration to use when running the tests.")
+set(LIBUNWIND_TEST_PARAMS "" CACHE STRING
+        "A list of parameters to run the Lit test suite with.")
 #===============================================================================
 # Configure System
 #===============================================================================
@@ -208,11 +156,21 @@ else()
   set(LIBUNWIND_INSTALL_LIBRARY_DIR lib${LIBUNWIND_LIBDIR_SUFFIX})
 endif()
 
+set(LIBUNWIND_INSTALL_PREFIX "" CACHE STRING "Define libunwind destination prefix.")
+
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${LIBUNWIND_LIBRARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${LIBUNWIND_LIBRARY_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${LIBUNWIND_LIBRARY_DIR})
 
-set(LIBUNWIND_INSTALL_PREFIX "" CACHE STRING "Define libunwind destination prefix.")
+
+# Check that we can build with 32 bits if requested.
+if (CMAKE_SIZEOF_VOID_P EQUAL 8 AND NOT WIN32)
+  if (LIBUNWIND_BUILD_32_BITS AND NOT LLVM_BUILD_32_BITS) # Don't duplicate the output from LLVM
+    message(STATUS "Building 32 bits executables and libraries.")
+  endif()
+elseif(LIBUNWIND_BUILD_32_BITS)
+  message(FATAL_ERROR "LIBUNWIND_BUILD_32_BITS=ON is not supported on this platform.")
+endif()
 
 set(LIBUNWIND_C_FLAGS "")
 set(LIBUNWIND_CXX_FLAGS "")
@@ -285,7 +243,6 @@ else()
   add_compile_flags_if_supported(-Wno-error)
   add_compile_flags_if_supported(-WX-)
 endif()
-
 if (LIBUNWIND_ENABLE_PEDANTIC)
   add_compile_flags_if_supported(-pedantic)
 endif()
@@ -351,8 +308,8 @@ else()
 endif()
 
 # Cross-unwinding
-if (NOT LIBUNWIND_ENABLE_CROSS_UNWINDING)
-  add_compile_flags(-D_LIBUNWIND_IS_NATIVE_ONLY)
+if (LIBUNWIND_ENABLE_CROSS_UNWINDING)
+  add_compile_flags(-D_LIBUNWIND_ENABLE_CROSS_UNWINDING)
 endif()
 
 # Threading-support
@@ -388,6 +345,56 @@ if (LIBUNWIND_HAS_COMMENT_LIB_PRAGMA)
   endif()
 endif()
 
+# Sanitizer flags =============================================================
+function(get_sanitizer_flags OUT_VAR USE_SANITIZER)
+    message(STATUS "get_sanitizer_flags LIBUNWIND_SANITIZER_FLAGS=${LIBUNWIND_SANITIZER_FLAGS}")
+    set(LIBUNWIND_SANITIZER_FLAGS)
+    set(USE_SANITIZER "${USE_SANITIZER}")
+    # NOTE: LLVM_USE_SANITIZER checks for a UNIX like system instead of MSVC.
+    if (USE_SANITIZER AND LLVM_ON_UNIX)
+        append_flags_if_supported(LIBUNWIND_SANITIZER_FLAGS "-fno-omit-frame-pointer")
+
+        if (NOT uppercase_CMAKE_BUILD_TYPE STREQUAL "DEBUG" AND
+            NOT uppercase_CMAKE_BUILD_TYPE STREQUAL "RELWITHDEBINFO")
+            append_flags_if_supported(LIBUNWIND_SANITIZER_FLAGS "-gline-tables-only")
+        endif()
+        if (USE_SANITIZER STREQUAL "Address")
+            append_flags(LIBUNWIND_SANITIZER_FLAGS "-fsanitize=address")
+        elseif (USE_SANITIZER MATCHES "Memory(WithOrigins)?")
+            append_flags(LIBUNWIND_SANITIZER_FLAGS -fsanitize=memory)
+            if (USE_SANITIZER STREQUAL "MemoryWithOrigins")
+                append_flags(LIBUNWIND_SANITIZER_FLAGS "-fsanitize-memory-track-origins")
+            endif()
+        elseif (USE_SANITIZER STREQUAL "Undefined")
+            append_flags(LIBUNWIND_SANITIZER_FLAGS "-fsanitize=undefined;-fno-sanitize=vptr,function;-fno-sanitize-recover=all")
+        elseif (USE_SANITIZER STREQUAL "Address;Undefined" OR
+                USE_SANITIZER STREQUAL "Undefined;Address")
+            append_flags(LIBUNWIND_SANITIZER_FLAGS "-fsanitize=address,undefined;-fno-sanitize=vptr,function;-fno-sanitize-recover=all")
+        elseif (USE_SANITIZER STREQUAL "Thread")
+            append_flags(LIBUNWIND_SANITIZER_FLAGS -fsanitize=thread)
+        elseif (USE_SANITIZER STREQUAL "DataFlow")
+            append_flags(LIBUNWIND_SANITIZER_FLAGS -fsanitize=dataflow)
+        else()
+            message(WARNING "Unsupported value of LLVM_USE_SANITIZER: ${USE_SANITIZER}")
+        endif()
+    elseif(USE_SANITIZER AND MSVC)
+        message(WARNING "LLVM_USE_SANITIZER is not supported on this platform.")
+    endif()
+    set(${OUT_VAR} "${LIBUNWIND_SANITIZER_FLAGS}" PARENT_SCOPE)
+endfunction()
+
+# Configure for sanitizers. If LIBCXX_STANDALONE_BUILD then we have to do
+# the flag translation ourselves. Othewise LLVM's CMakeList.txt will handle it.
+if (LIBUNWIND_STANDALONE_BUILD)
+    set(LLVM_USE_SANITIZER "" CACHE STRING
+        "Define the sanitizer used to build the library and tests")
+endif()
+get_sanitizer_flags(LIBUNWIND_SANITIZER_FLAGS "${LLVM_USE_SANITIZER}")
+if (LIBUNWIND_STANDALONE_BUILD AND LIBUNWIND_SANITIZER_FLAGS)
+    add_flags("${LIBUNWIND_SANITIZER_FLAGS}")
+    message(STATUS "LIBUNWIND_SANITIZER_FLAGS=${LIBUNWIND_SANITIZER_FLAGS}")
+endif()
+
 #===============================================================================
 # Setup Source Code
 #===============================================================================
@@ -400,6 +407,19 @@ if (LIBUNWIND_INCLUDE_DOCS)
   add_subdirectory(docs)
 endif()
 
-if (EXISTS ${LLVM_CMAKE_PATH})
+if (LIBUNWIND_INCLUDE_TESTS)
+  if (LIBUNWIND_STANDALONE_BUILD)
+    include(AddLLVM) # for get_llvm_lit_path
+    get_llvm_lit_path(LIT_BASE_DIR LIT_FILE_NAME)
+    set(LLVM_EXTERNAL_LIT ${LIT_BASE_DIR}/${LIT_FILE_NAME} CACHE STRING "" FORCE)
+  endif()
   add_subdirectory(test)
+  if (LIBUNWIND_STANDALONE_BUILD)
+    # Make sure the llvm-lit script is generated into the bin directory, and
+    # do it after adding all tests, since the generated script will only work
+    # correctly discovered tests against test locations from the source tree
+    # that have already been discovered.
+    add_subdirectory(${LLVM_MAIN_SRC_DIR}/utils/llvm-lit
+                     ${CMAKE_CURRENT_BINARY_DIR}/llvm-lit)
+  endif()
 endif()
