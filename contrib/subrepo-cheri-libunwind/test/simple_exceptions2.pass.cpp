@@ -1,6 +1,6 @@
 // UNSUPPORTED: libunwind-no-exceptions
 // Tell lit to add -lc++abi/-lcxxrt/-lsupc++, etc. to the linker flags:
-// LINK_CXX_ABI_LIBRARY.
+// ADDITIONAL_LINK_FLAGS: %{link_libcxxabi}
 
 #include <stdio.h>
 #include <stdlib.h>
