@@ -178,7 +178,7 @@ struct sem_undo {
  * SEMUSZ is properly aligned.
  */
 
-#define	SEM_ALIGN(bytes) roundup2(bytes, sizeof(long))
+#define	SEM_ALIGN(bytes) roundup2(bytes, sizeof(intptr_t))
 
 /* actual size of an undo structure */
 #define SEMUSZ(x)	SEM_ALIGN(offsetof(struct sem_undo, un_ent[(x)]))
@@ -2317,10 +2317,13 @@ freebsd64_semop(struct thread *td, struct freebsd64_semop_args *uap)
 #endif /* COMPAT_FREEBSD64 */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190515,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END
