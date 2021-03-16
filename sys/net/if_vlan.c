@@ -1892,7 +1892,6 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case CASE_IOC_IFREQ(SIOCSETVLAN):
-	case O_SIOCSETVLAN:
 #ifdef VIMAGE
 		/*
 		 * XXXRW/XXXBZ: The goal in these checks is to allow a VLAN
@@ -1935,7 +1934,6 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case CASE_IOC_IFREQ(SIOCGETVLAN):
-	case O_SIOCGETVLAN:
 #ifdef VIMAGE
 		if (ifp->if_vnet != ifp->if_home_vnet) {
 			error = EPERM;
