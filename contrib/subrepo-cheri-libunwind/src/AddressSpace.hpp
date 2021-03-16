@@ -682,8 +682,10 @@ static LocalAddressSpace::pint_t getPhdrCapability(uintptr_t image_base,
   // just set the address to match the vaddr
   if (&_DYNAMIC == NULL) {
     // static linking / position dependent workaround:
-    addr_t base = __builtin_cheri_base_get((void *)image_base);
-    addr_t end = base + __builtin_cheri_length_get((void *)image_base);
+    LocalAddressSpace::addr_t base =
+        __builtin_cheri_base_get((void *)image_base);
+    LocalAddressSpace::addr_t end =
+        base + __builtin_cheri_length_get((void *)image_base);
     if (phdr->p_vaddr >= base && phdr->p_vaddr < end) {
       return (uintptr_t)__builtin_cheri_address_set((void *)image_base,
                                                     phdr->p_vaddr);
