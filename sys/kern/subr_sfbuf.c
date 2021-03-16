@@ -85,7 +85,7 @@ static void
 sf_buf_init(void *arg)
 {
 	struct sf_buf *sf_bufs;
-	vm_offset_t sf_base;
+	vm_pointer_t sf_base;
 	int i;
 
 	if (PMAP_HAS_DMAP)
@@ -100,7 +100,8 @@ sf_buf_init(void *arg)
 	sf_bufs = malloc(nsfbufs * sizeof(struct sf_buf), M_TEMP,
 	    M_WAITOK | M_ZERO);
 	for (i = 0; i < nsfbufs; i++) {
-		sf_bufs[i].kva = sf_base + i * PAGE_SIZE;
+		sf_bufs[i].kva = cheri_kern_setbounds(
+		    sf_base + i * PAGE_SIZE, PAGE_SIZE);
 		TAILQ_INSERT_TAIL(&sf_buf_freelist, &sf_bufs[i], free_entry);
 	}
 	sf_buf_alloc_want = 0;
@@ -231,3 +232,13 @@ sf_buf_process_page(vm_page_t m, void (*cb)(struct sf_buf *))
 	return (FALSE);
 }
 #endif	/* SFBUF_PROCESS_PAGE */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END
