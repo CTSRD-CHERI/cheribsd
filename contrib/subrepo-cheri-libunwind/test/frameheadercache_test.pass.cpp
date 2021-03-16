@@ -37,6 +37,8 @@ int main() { return 0; }
 
 using namespace libunwind;
 
+using pc_t = LocalAddressSpace::LocalProgramCounter;
+
 int main() {
   FrameHeaderCache FHC;
   struct dl_phdr_info PInfo;
@@ -54,7 +56,7 @@ int main() {
   // Unused by the cache.
   CBData.addressSpace = nullptr;
   CBData.sects = &UIS;
-  CBData.targetAddr = kBaseAddr + 1;
+  CBData.targetAddr = pc_t((uintptr_t)kBaseAddr + 1);
 
   // Nothing present, shouldn't find.
   if (FHC.find(&PInfo, 0, &CBData))
@@ -69,7 +71,7 @@ int main() {
     abort();
 
   FHC.add(&UIS);
-  CBData.targetAddr = kBaseAddr - 1;
+  CBData.targetAddr = pc_t(kBaseAddr - 1);
   // Shouldn't find something outside of the addresses.
   if (FHC.find(&PInfo, 0, &CBData))
     abort();
@@ -78,7 +80,7 @@ int main() {
     UIS.dso_base = kBaseAddr + (kDwarfSectionLength * i);
     FHC.add(&UIS);
   }
-  CBData.targetAddr = kBaseAddr;
+  CBData.targetAddr = pc_t(kBaseAddr);
   // Should have been evicted.
   if (FHC.find(&PInfo, 0, &CBData))
     abort();

@@ -99,6 +99,8 @@ typedef struct unw_proc_info_t unw_proc_info_t;
 #ifdef __cplusplus
 extern "C" {
 #endif
+extern size_t unw_context_size(void) LIBUNWIND_AVAIL;
+extern size_t unw_cursor_size(void) LIBUNWIND_AVAIL;
 
 extern int unw_getcontext(unw_context_t *) LIBUNWIND_AVAIL;
 extern int unw_init_local(unw_cursor_t *, unw_context_t *) LIBUNWIND_AVAIL;
@@ -901,6 +903,44 @@ enum {
   UNW_SPARC_I5 = 29,
   UNW_SPARC_I6 = 30,
   UNW_SPARC_I7 = 31,
+};
+
+// Hexagon register numbers
+enum {
+  UNW_HEXAGON_R0,
+  UNW_HEXAGON_R1,
+  UNW_HEXAGON_R2,
+  UNW_HEXAGON_R3,
+  UNW_HEXAGON_R4,
+  UNW_HEXAGON_R5,
+  UNW_HEXAGON_R6,
+  UNW_HEXAGON_R7,
+  UNW_HEXAGON_R8,
+  UNW_HEXAGON_R9,
+  UNW_HEXAGON_R10,
+  UNW_HEXAGON_R11,
+  UNW_HEXAGON_R12,
+  UNW_HEXAGON_R13,
+  UNW_HEXAGON_R14,
+  UNW_HEXAGON_R15,
+  UNW_HEXAGON_R16,
+  UNW_HEXAGON_R17,
+  UNW_HEXAGON_R18,
+  UNW_HEXAGON_R19,
+  UNW_HEXAGON_R20,
+  UNW_HEXAGON_R21,
+  UNW_HEXAGON_R22,
+  UNW_HEXAGON_R23,
+  UNW_HEXAGON_R24,
+  UNW_HEXAGON_R25,
+  UNW_HEXAGON_R26,
+  UNW_HEXAGON_R27,
+  UNW_HEXAGON_R28,
+  UNW_HEXAGON_R29,
+  UNW_HEXAGON_R30,
+  UNW_HEXAGON_R31,
+  UNW_HEXAGON_P3_0,
+  UNW_HEXAGON_PC,
 };
 
 // RISC-V registers. These match the DWARF register numbers defined by section

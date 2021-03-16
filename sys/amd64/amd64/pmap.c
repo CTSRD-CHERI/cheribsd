@@ -2434,7 +2434,7 @@ pmap_init(void)
 		    lm_ents, (u_long)lm_ents * (NBPML4 / 1024 / 1024 / 1024));
 	if (lm_ents != 0) {
 		large_vmem = vmem_create("large", LARGEMAP_MIN_ADDRESS,
-		    (vmem_size_t)lm_ents * NBPML4, PAGE_SIZE, 0, M_WAITOK);
+		    (vmem_size_t)lm_ents * NBPML4, PAGE_SIZE, 0, M_WAITOK, 0);
 		if (large_vmem == NULL) {
 			printf("pmap: cannot create large map\n");
 			lm_ents = 0;

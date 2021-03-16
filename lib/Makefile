@@ -241,7 +241,7 @@ SUBDIR.${MK_PMC}+=	libipt
 SUBDIR.${MK_BHYVE}+=	libvmmapi
 .endif
 
-.if ${MACHINE_ARCH:Mmips64*}
+.if ${MACHINE_ARCH:Mmips64*} || ${MACHINE_ARCH:Mriscv*}
 _libstatcounters=	libstatcounters
 .endif
 

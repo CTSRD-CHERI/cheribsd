@@ -178,7 +178,7 @@ s10_get_memory(struct s10_svc_softc *sc)
 		return (ENXIO);
 
 	vmem = vmem_create("stratix10 vmem", 0, 0, PAGE_SIZE,
-	    PAGE_SIZE, M_BESTFIT | M_WAITOK);
+	    PAGE_SIZE, M_BESTFIT | M_WAITOK, 0);
 	if (vmem == NULL)
 		return (ENXIO);
 

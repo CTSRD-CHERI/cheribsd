@@ -3646,7 +3646,7 @@ mmu_radix_init()
 	if (error != 0)
 		panic("qframe allocation failed");
 	asid_arena = vmem_create("ASID", isa3_base_pid + 1, (1<<isa3_pid_bits),
-	    1, 1, M_WAITOK);
+	    1, 1, M_WAITOK, 0);
 }
 
 static boolean_t

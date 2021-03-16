@@ -287,7 +287,7 @@ int c4iw_pblpool_create(struct c4iw_rdev *rdev)
 	rdev->pbl_arena = vmem_create("PBL_MEM_POOL",
 					rdev->adap->vres.pbl.start,
 					rdev->adap->vres.pbl.size,
-					1, 0, M_FIRSTFIT| M_NOWAIT);
+					1, 0, M_FIRSTFIT| M_NOWAIT, 0);
 	if (!rdev->pbl_arena)
 		return -ENOMEM;
 
@@ -342,7 +342,7 @@ int c4iw_rqtpool_create(struct c4iw_rdev *rdev)
 	rdev->rqt_arena = vmem_create("RQT_MEM_POOL",
 					rdev->adap->vres.rq.start,
 					rdev->adap->vres.rq.size,
-					1, 0, M_FIRSTFIT| M_NOWAIT);
+					1, 0, M_FIRSTFIT| M_NOWAIT, 0);
 	if (!rdev->rqt_arena)
 		return -ENOMEM;
 

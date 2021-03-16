@@ -5,9 +5,9 @@ LIB=		statcounters
 SHLIB_MAJOR=	3
 SRCS+=		statcounters.c
 INCS=		statcounters.h
-.if ${MACHINE_ARCH:Mmips*}
-INCS+=	statcounters_mips.h statcounters_mips.inc
-.endif
+.PATH: ${.CURDIR}/${MACHINE_CPUARCH}
+CFLAGS+=	-I${.CURDIR}/${MACHINE_CPUARCH}
+INCS+=	statcounters_md.h statcounters_md.inc
 
 MAN=		libstatcounters.3
 

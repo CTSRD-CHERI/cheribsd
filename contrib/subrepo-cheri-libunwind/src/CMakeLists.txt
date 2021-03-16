@@ -34,6 +34,31 @@ if (MINGW OR APPLE)
                                 LANGUAGE C)
 endif()
 
+if (APPLE AND LLVM_USE_SANITIZER)
+    if (("${LLVM_USE_SANITIZER}" STREQUAL "Address") OR
+    ("${LLVM_USE_SANITIZER}" STREQUAL "Address;Undefined") OR
+    ("${LLVM_USE_SANITIZER}" STREQUAL "Undefined;Address"))
+        set(LIBFILE "libclang_rt.asan_osx_dynamic.dylib")
+    elseif("${LLVM_USE_SANITIZER}" STREQUAL "Undefined")
+        set(LIBFILE "libclang_rt.ubsan_osx_dynamic.dylib")
+    elseif("${LLVM_USE_SANITIZER}" STREQUAL "Thread")
+        set(LIBFILE "libclang_rt.tsan_osx_dynamic.dylib")
+    else()
+        message(WARNING "LLVM_USE_SANITIZER=${LLVM_USE_SANITIZER} is not supported on OS X")
+    endif()
+    if (LIBFILE)
+        find_compiler_rt_dir(LIBDIR)
+        if (NOT IS_DIRECTORY "${LIBDIR}")
+            message(FATAL_ERROR "Cannot find compiler-rt directory on OS X required for LLVM_USE_SANITIZER")
+        endif()
+        set(LIBUNWIND_SANITIZER_LIBRARY "${LIBDIR}/${LIBFILE}")
+        set(LIBUNWIND_SANITIZER_LIBRARY "${LIBUNWIND_SANITIZER_LIBRARY}" PARENT_SCOPE)
+        message(STATUS "Manually linking compiler-rt library: ${LIBUNWIND_SANITIZER_LIBRARY}")
+        add_library_flags("${LIBUNWIND_SANITIZER_LIBRARY}")
+        add_link_flags("-Wl,-rpath,${LIBDIR}")
+    endif()
+endif()
+
 set(LIBUNWIND_HEADERS
     AddressSpace.hpp
     assembly.h

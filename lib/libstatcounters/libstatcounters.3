@@ -24,23 +24,31 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd July 14, 2016
+.Dd November 27, 2020
 .Dt LIBSTATCOUNTERS 3
 .Os
 .Sh NAME
 .Nm libstatcounters
-.Nd A library to gather BERI/CHERI's statcounters.
+.Nd A library to gather basic performance counter numbers
+.Sh LIBRARY
+.Lb libstatcounters
+.Sh SYNOPSIS
+.In statcounters.h
 .Sh DESCRIPTION
+The
 .Nm
-provides an API to the BERI/CHERI statcounters. To link with
+library provides an API to access BERI/CHERI statcounters and RISC-V HPM CSRs.
+To link with
 .Nm
-, use "-lstatcounters" when compiling. When linking statically, add
+, use "-lstatcounters" when compiling.
+When linking statically, add
 .Pp
 "-Wl,--whole-archive -lstatcounters -Wl,--no-whole-archive"
 .Pp
 to the linking flags to still enable the automatic sampling of statcounters before and after
 .Fn main
-, and output of the difference (this feature is directly available when linking non static). The behaviour of the automatic sampling is controlled by the
+, and output of the difference (this feature is directly available when linking non static).
+The behaviour of the automatic sampling is controlled by the
 .Nm STATCOUNTERS_PROGNAME
 ,
 .Nm STATCOUNTERS_ARCHNAME
@@ -49,30 +57,18 @@ to the linking flags to still enable the automatic sampling of statcounters befo
 and
 .Nm STATCOUNTERS_FORMAT
 environment variables.
-.Pp
-.Nm STATCOUNTERS_PROGNAME
-.Nd Environment variable specifying the program name to output (usefull when appending entries to a csv output file)
-.Pp
-.Nm STATCOUNTERS_ARCHNAME
-.Nd Environment variable specifying the architecture name to output (usefull when appending entries to a csv output file)
-.Pp
-.Nm STATCOUNTERS_OUTPUT
-.Nd Environment variable specifying the file in which to output the statcounters'values
-.Pp
-.Nm STATCOUNTERS_FORMAT
-.Nd Environment variable specifying the desired output format. "csv" is supported, any other value will output in a human readable format
+.Sh ENVIRONMENT
+.Bl -tag -width size -offset 0
+.It Ev STATCOUNTERS_PROGNAME
+Environment variable specifying the program name to output (useful when appending entries to a csv output file)
+.It Ev STATCOUNTERS_ARCHNAME
+Environment variable specifying the architecture name to output (useful when appending entries to a csv output file)
+.It Ev STATCOUNTERS_OUTPUT
+Environment variable specifying the file in which to output the statcounters' values
+.It Ev  STATCOUNTERS_FORMAT
+Environment variable specifying the desired output format. "csv" is supported, any other value will output in a human readable format
+.El
 .Sh API
-.Pp
-.Ft void
-.Fn statcounters_reset
-.sp
-.Fn statcounters_reset
-resets the hardware statcounters. Avoid using this function and consider using
-.Fn statcounters_sample
-to populate two statcounters_bank_t and diff them using
-.Fn statcounters_diff
-instead.
-.Pp
 .Ft int
 .Fn statcounters_zero "statcounters_bank_t * const b"
 .sp
@@ -157,7 +153,7 @@ and all other arguments are set to
 .Nm NULL .
 .Pp
 .Ft int
-.Fn statcounters_dump_with_args "const statcounters_bank_t * const b" "const char * progname" "const char * phase" "const char * archname" "const FILE * const fp" "const statcounters_fmt_flag_t fmt_flg)"
+.Fn statcounters_dump_with_args "const statcounters_bank_t * const b" "const char * progname" "const char * phase" "const char * archname" "const FILE * const fp" "const statcounters_fmt_flag_t fmt_flg"
 .sp
 .Fn statcounters_dump_with_args
 dumps the statcounters_bank_t
@@ -173,7 +169,8 @@ as a suffix if it is not
 .Nm NULL
 ) and
 .Fa archname
-(usefull for csv output). The currently supported value for the
+(useful for csv output).
+The currently supported value for the
 .Fa fmt_flg
 argument are
 .Nm CSV_NOHEADER
@@ -181,7 +178,8 @@ for csv output,
 .Nm CSV_HEADER
 for csv output with a header row, and
 .Nm HUMAN_READABLE
-for human readable output. If
+for human readable output.
+If
 .Fa progname
 is
 .Nm NULL
@@ -189,13 +187,15 @@ is
 .Nm STATCOUNTERS_PROGNAME
 is used if it exists, otherwise,
 .Fn getprogname
-is used. If
+is used.
+If
 .Fa archname
 is
 .Nm NULL
 , the value in environment variable
 .Nm STATCOUNTERS_ARCHNAME
-is used if it exists, otherwise, "mips" or "cheri" is used. If
+is used if it exists, otherwise, "mips" or "cheri" is used.
+If
 .Fa fp
 is
 .Nm NULL
@@ -204,11 +204,14 @@ is
 is used as an argument to
 .Fn fopen
 if it exists, otherwise,
-.Nm stdout is used. If the
+.Nm stdout
+is used.
+If the
 .Nm STATCOUNTERS_FORMAT
 environment variable exists, it overwrites the
 .Fa fmt_flg
-argument. The function returns
+argument.
+The function returns
 .Nm 0
 on success or
 .Nm -1
@@ -218,60 +221,8 @@ or
 .Fa fp
 are
 .Nm NULL .
-.Sh API - DEPRECATED
-.Pp
-.Ft void
-.Fn reset_statcounters
-.sp
-.Fn reset_statcounters
-resets the hardware statcounters. Avoid using this function and consider using
-.Fn sample_statcounters
-to populate two statcounters_bank_t and diff them using
-.Fn diff_statcounters
-instead.
-.Pp
-.Ft void
-.Fn zero_statcounters "statcounters_bank_t * const b"
-.sp
-.Fn zero_statcounters
-zeroes the statcounters_bank_t
-.Fa b .
-.Pp
-.Ft void
-.Fn sample_statcounters "statcounters_bank_t * const b"
-.sp
-.Fn sample_statcounters
-samples the hardware statcounters into statcounters_bank_t
-.Fa b .
-.Pp
-.Ft void
-.Fn diff_statcounters "const statcounters_bank_t * const be" "const statcounters_bank_t * const bs" "statcounters_bank_t * const bd"
-.sp
-.Fn diff_statcounters
-subtracts statcounters_bank_t
-.Fa bs
-from
-.Fa be
-and stores the result in statcounters_bank_t
-.Fa bd.
-.Pp
-.Ft void
-.Fn dump_statcounters "const statcounters_bank_t * const b" "const char * const fname" "const char * const fmt"
-.sp
-.Fn dump_statcounters
-dumps the statcounters_bank_t
-.Fa b
-content in file
-.Fa fname
-according to format
-.Fa fmt .
-The
-.Fa fname
-is a string  describing the path to the desired file. The supported value for the
-.Fa fmt
-string are "csv" for csv output, or anything else for human readable output.
-.Sh LIBRARY
-.Lb libstatcounters
 .Sh AUTHORS
 .An Alexandre Joannou
 .Aq aj443@cl.cam.ac.uk
+.An Alex Richardson
+.Aq arichardson@FreeBSD.org
