@@ -50,7 +50,11 @@
 .error bsd.man.mk cannot be included directly.
 .endif
 
+.if ${MK_MANSPLITPKG} == "no"
 MINSTALL?=	${INSTALL} ${TAG_ARGS} -o ${MANOWN} -g ${MANGRP} -m ${MANMODE}
+.else
+MINSTALL?=	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},man} -o ${MANOWN} -g ${MANGRP} -m ${MANMODE}
+.endif
 
 CATDIR=		${MANDIR:H:S/$/\/cat/}
 CATEXT=		.cat
@@ -234,10 +238,19 @@ maninstall: ${MAN}
 	else \
 		rm -f ${DESTDIR}${t} ${DESTDIR}${t}${MCOMPRESS_EXT}; \
 	fi
+.if ${MK_MANSPLITPKG} == "no"
 	${INSTALL_MANLINK} -S ${TAG_ARGS} ${DESTDIR}${l}${ZEXT} ${DESTDIR}${t}${ZEXT}
 .else
+	${INSTALL_MANLINK} -S ${TAG_ARGS:D${TAG_ARGS},man} ${DESTDIR}${l}${ZEXT} ${DESTDIR}${t}${ZEXT}
+.endif
+.else
+.if ${MK_MANSPLITPKG} == "no"
 	rm -f ${DESTDIR}${t} ${DESTDIR}${t}${MCOMPRESS_EXT}; \
 	    ${INSTALL_MANLINK} ${TAG_ARGS} ${DESTDIR}${l}${ZEXT} ${DESTDIR}${t}${ZEXT}
+.else
+	rm -f ${DESTDIR}${t} ${DESTDIR}${t}${MCOMPRESS_EXT}; \
+	    ${INSTALL_MANLINK} ${TAG_ARGS:D${TAG_ARGS},man} ${DESTDIR}${l}${ZEXT} ${DESTDIR}${t}${ZEXT}
+.endif
 .endif
 .endfor
 
