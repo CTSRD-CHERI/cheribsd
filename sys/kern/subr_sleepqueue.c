@@ -102,7 +102,7 @@ __FBSDID("$FreeBSD$");
 CTASSERT(powerof2(SC_TABLESIZE));
 #define	SC_MASK		(SC_TABLESIZE - 1)
 #define	SC_SHIFT	8
-#define	SC_HASH(wc)	((((uintptr_t)(wc) >> SC_SHIFT) ^ (uintptr_t)(wc)) & \
+#define	SC_HASH(wc)	((((ptraddr_t)(wc) >> SC_SHIFT) ^ (ptraddr_t)(wc)) & \
 			    SC_MASK)
 #define	SC_LOOKUP(wc)	&sleepq_chains[SC_HASH(wc)]
 #define NR_SLEEPQS      2
@@ -1492,3 +1492,12 @@ found:
 /* Alias 'show sleepqueue' to 'show sleepq'. */
 DB_SHOW_ALIAS(sleepqueue, db_show_sleepqueue);
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "hashing"
+//   ]
+// }
+// CHERI CHANGES END
