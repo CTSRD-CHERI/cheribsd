@@ -84,8 +84,8 @@ int	copyiniov(const struct iovec * __capability iovp, u_int iovcnt,
 	    struct iovec **iov, int error);
 int	copyinuio(const struct iovec * __capability iovp, u_int iovcnt,
 	    struct uio **uiop);
-int	copyout_map(struct thread *td, vm_offset_t *addr, size_t sz);
-int	copyout_unmap(struct thread *td, vm_offset_t addr, size_t sz);
+int	copyout_map(struct thread *td, vm_pointer_t *addr, size_t sz);
+int	copyout_unmap(struct thread *td, vm_pointer_t addr, size_t sz);
 int	physcopyin(void *src, vm_paddr_t dst, size_t len);
 int	physcopyout(vm_paddr_t src, void *dst, size_t len);
 int	physcopyin_vlist(struct bus_dma_segment *src, off_t offset,
@@ -121,6 +121,9 @@ __END_DECLS
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END
