@@ -194,7 +194,7 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  */
 #define	ASSERT_ATOMIC_LOAD_PTR(var, msg)				\
 	KASSERT(sizeof(var) == sizeof(void *) &&			\
-	    ((uintptr_t)&(var) & (sizeof(void *) - 1)) == 0, msg)
+	    is_aligned(&(var), sizeof(void *)), msg)
 
 /*
  * Assert that a thread is in critical(9) section.
@@ -775,10 +775,13 @@ __NULLABILITY_PRAGMA_POP
 #endif /* !_SYS_SYSTM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_alignment"
 //   ]
 // }
 // CHERI CHANGES END
