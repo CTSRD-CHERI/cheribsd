@@ -554,7 +554,7 @@ fuword32(volatile const void * __capability addr)
 	return (rv == -1 ? -1 : val);
 }
 
-#ifdef _LP64
+#if __SIZEOF_SIZE_T__ == 8
 int64_t
 fuword64(volatile const void * __capability addr)
 {
@@ -564,7 +564,7 @@ fuword64(volatile const void * __capability addr)
 	rv = fueword64(addr, &val);
 	return (rv == -1 ? -1 : val);
 }
-#endif /* _LP64 */
+#endif /* __SIZEOF_SIZE_T == 8 */
 
 long
 fuword(volatile const void * __capability addr)
@@ -605,6 +605,7 @@ casuword(volatile u_long * __capability addr, u_long old, u_long new)
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
+//     "support",
 //     "pointer_as_integer"
 //   ]
 // }
