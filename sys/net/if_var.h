@@ -807,10 +807,11 @@ struct ifreq64 {
 	} ifr_ifru;
 };
 
-/* Helper macro for struct ifreq ioctls */
+/* Helper macros for struct ifreq ioctls */
+#define	IFREQ64(cmd)	_IOC_NEWTYPE((cmd), struct ifreq64)
 #define	CASE_IOC_IFREQ(cmd)					\
     (cmd):							\
-    case _IOC_NEWTYPE((cmd), struct ifreq64)
+    case IFREQ64(cmd)
 #else /* !COMPAT_FREEBSD64 */
 #define	CASE_IOC_IFREQ(cmd)					\
     (cmd)
