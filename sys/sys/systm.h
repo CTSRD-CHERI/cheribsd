@@ -269,7 +269,7 @@ extern const void *zero_region;	/* address space maps to a zeroed page	*/
 
 extern int unmapped_buf_allowed;
 
-#ifdef __LP64__
+#if __SIZEOF_SIZE_T__ == 8
 #define	IOSIZE_MAX		iosize_max()
 #define	DEVFS_IOSIZE_MAX	devfs_iosize_max()
 #else
@@ -686,7 +686,7 @@ struct cdev;
 dev_t dev2udev(struct cdev *x);
 const char *devtoname(struct cdev *cdev);
 
-#ifdef __LP64__
+#if __SIZEOF_SIZE_T__ == 8
 size_t	devfs_iosize_max(void);
 size_t	iosize_max(void);
 #endif
