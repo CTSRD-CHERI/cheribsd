@@ -46,7 +46,6 @@ typedef	uint32_t pt_entry_t;
  * The pointer to the second-level page table entry can is a capability
  * in the purecap kernel.
  */
-
 typedef	pt_entry_t *pd_entry_t;
 
 #ifdef _KERNEL
@@ -491,7 +490,7 @@ TLBLO_PTE_TO_PA(pt_entry_t pte)
 #if defined(CPU_CHERI) && defined(__CHERI_PURE_CAPABILITY__)
 #define	PTRSHIFT		CHERICAP_SHIFT
 #define	PDEPTRMASK		(0xfff & ~(CHERICAP_SIZE - 1))
-#else /* ! (CPU_HERI && __CHERI_PURE_CAPABILITY__) */
+#else /* ! (CPU_CHERI && __CHERI_PURE_CAPABILITY__) */
 #if defined(__mips_n64)
 #define	PTRSHIFT		3
 #define	PDEPTRMASK		0xff8

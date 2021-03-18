@@ -902,20 +902,28 @@ init_proc0(vm_pointer_t kstack)
 static void
 try_load_dtb(caddr_t kmdp)
 {
-	vm_offset_t dtbp;
+	vm_pointer_t dtbp;
 
 	dtbp = MD_FETCH(kmdp, MODINFOMD_DTBP, vm_offset_t);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (dtbp != (vm_pointer_t)NULL) {
+		dtbp = (vm_pointer_t)cheri_andperm(cheri_setaddress(
+		    kernel_root_cap, dtbp), CHERI_PERMS_KERNEL_DATA);
+		dtbp = (vm_pointer_t)cheri_setbounds((void *)dtbp,
+		    fdt_totalsize((void *)dtbp));
+	}
+#endif
 
 #if defined(FDT_DTB_STATIC)
 	/*
 	 * In case the device tree blob was not retrieved (from metadata) try
 	 * to use the statically embedded one.
 	 */
-	if (dtbp == (vm_offset_t)NULL)
-		dtbp = (vm_offset_t)&fdt_static_dtb;
+	if (dtbp == (vm_pointer_t)NULL)
+		dtbp = (vm_pointer_t)&fdt_static_dtb;
 #endif
 
-	if (dtbp == (vm_offset_t)NULL) {
+	if (dtbp == (vm_pointer_t)NULL) {
 		printf("ERROR loading DTB\n");
 		return;
 	}
@@ -979,14 +987,33 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(size_t));
 	PRELOAD_PUSH_VALUE(uint64_t, (size_t)((vm_offset_t)&end - KERNBASE));
 
+	/*
+	 * XXX: Storing a capability here is problematic due to the
+	 * layout of metadata, and the issue of needing the boot
+	 * loader to eventually pass in caps here.  However, do round
+	 * up to ensure the DTB area is a representable pointer even
+	 * if we have to rederive it later.
+	 */
+
 	/* Copy the DTB to KVA space. */
+	dtb_size = fdt_totalsize(rvbp->dtbp_virt);
+#ifdef __CHERI_PURE_CAPABILITY__
+	lastaddr = roundup2(lastaddr, CHERI_REPRESENTABLE_ALIGNMENT(dtb_size));
+#else
 	lastaddr = roundup(lastaddr, sizeof(int));
+#endif
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_METADATA | MODINFOMD_DTBP);
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(vm_offset_t));
 	PRELOAD_PUSH_VALUE(vm_offset_t, lastaddr);
-	dtb_size = fdt_totalsize(rvbp->dtbp_virt);
+#ifdef __CHERI_PURE_CAPABILITY__
+	void *dtbp = cheri_setbounds(cheri_setaddress(kernel_root_cap,
+	    lastaddr), dtb_size);
+	memmove(dtbp, (const void *)rvbp->dtbp_virt, dtb_size);
+	lastaddr = roundup(lastaddr + cheri_getlen(dtbp), sizeof(int));
+#else
 	memmove((void *)lastaddr, (const void *)rvbp->dtbp_virt, dtb_size);
 	lastaddr = roundup(lastaddr + dtb_size, sizeof(int));
+#endif
 
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_METADATA | MODINFOMD_KERNEND);
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(vm_offset_t));
@@ -1214,7 +1241,8 @@ bzero(void *buf, size_t len)
 //   "updated": 20200803,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

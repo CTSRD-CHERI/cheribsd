@@ -82,6 +82,10 @@ __FBSDID("$FreeBSD$");
 
 #include <mips/malta/maltareg.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
+
 extern int	*edata;
 extern int	*end;
 
@@ -342,22 +346,86 @@ malta_cpu_freq(void)
 	return (platform_counter_freq);
 }
 
-void
-platform_start(__register_t a0, __register_t a1,  __register_t a2, 
-    __register_t a3)
+#ifdef __CHERI_PURE_CAPABILITY__
+static void
+platform_clear_bss(void *kroot)
+{
+	/*
+	 * We need to hand-craft a capability for edata because it is defined
+	 * by the linker script and have no size info.
+	 */
+	void *edata_start;
+	size_t edata_siz = (ptraddr_t)&end - (ptraddr_t)&edata;
+
+	edata_start = cheri_ptrperm(
+	    cheri_setaddress(kroot, (ptraddr_t)&edata),
+	    edata_siz, CHERI_PERM_STORE);
+	memset(edata_start, 0, edata_siz);
+}
+
+static char *
+platform_argv_ptr(int32_t argv)
+{
+	char *arg;
+	size_t len;
+
+	/*
+	 * YAMON uses 32bit pointers to strings so
+	 * sign-extend them to the correct type manually.
+	 */
+	arg = cheri_andperm(
+	    cheri_setaddress(mips_kseg0_cap, (vm_offset_t)(argv)),
+	    CHERI_PERM_LOAD | CHERI_PERM_STORE);
+	arg = cheri_setbounds(arg, strlen(arg) + 1);
+
+	return (arg);
+}
+
+#else
+static void
+platform_clear_bss()
 {
 	vm_offset_t kernend;
+
+	kernend = (vm_offset_t)&end;
+	memset(&edata, 0, kernend - (vm_offset_t)(&edata));
+}
+
+static char *
+platform_argv_ptr(int32_t argv)
+{
+	/*
+	 * YAMON uses 32bit pointers to strings so
+	 * sign-extend them to the correct type manually.
+	 */
+	return ((char *)(intptr_t)argv);
+}
+#endif
+
+void
+platform_start(__register_t a0, __register_t a1,  __register_t a2,
+    __register_t a3)
+{
 	uint64_t platform_counter_freq;
 	int argc = a0;
-	int32_t *argv = (int32_t*)a1;
-	int32_t *envp = (int32_t*)a2;
+	int32_t *argv;
+	int32_t *envp;
 	unsigned int memsize = a3;
 	uint64_t ememsize = 0;
 	int i;
 
-	/* clear the BSS and SBSS segments */
-	kernend = (vm_offset_t)&end;
-	memset(&edata, 0, kernend - (vm_offset_t)(&edata));
+	/* Clear the BSS and SBSS segments */
+#ifdef __CHERI_PURE_CAPABILITY__
+	argv = cheri_ptrperm(cheri_setaddress(mips_kseg0_cap, a1),
+	    argc * sizeof(*argv), CHERI_PERM_LOAD);
+	envp = cheri_andperm(cheri_setaddress(mips_kseg0_cap, a2),
+	    CHERI_PERM_LOAD);
+	platform_clear_bss(kernel_data_cap);
+#else
+	argv = (int32_t *)a1;
+	envp = (int32_t *)a2;
+	platform_clear_bss();
+#endif
 
 	mips_postboot_fixup();
 
@@ -369,17 +437,15 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	cninit();
 	printf("entry: platform_start()\n");
 
-	bootverbose = 1;
-
-	/* 
-	 * YAMON uses 32bit pointers to strings so
-	 * sign-extend them to the correct type manually.
+	/*
+	 * Parse kernel cmdline.
 	 */
-
 	if (bootverbose) {
 		printf("cmd line: ");
-		for (i = 0; i < argc; i++)
-			printf("'%s' ", (char*)(intptr_t)argv[i]);
+		for (i = 0; i < argc; i++) {
+			char *arg = platform_argv_ptr(argv[i]);
+			printf("'%s' ", arg);
+		}
 		printf("\n");
 	}
 
@@ -393,14 +459,14 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	 * is not useful to have /path/to/kernel=1 in the environment.
 	 */
 	if (argc >= 2) {
-		boothowto |= boot_parse_cmdline((char*)(intptr_t)argv[1]);
+		boothowto |= boot_parse_cmdline(platform_argv_ptr(argv[1]));
 	} else {
 		panic("QEMU has changed and allows multiple -append flags?");
 	}
 #else
 	/* On non-QEMU CPUs we can parse argv normally. */
 	for (i = 0; i < argc; i++)
-		boothowto |= boot_parse_arg((char*)(intptr_t)argv[i]);
+		boothowto |= boot_parse_arg(platform_argv_ptr(argv[i]));
 #endif
 
 	if (bootverbose)
@@ -410,11 +476,8 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	 * Parse the environment for things like ememsize.
 	 */
 	for (i = 0; envp[i]; i += 2) {
-		const char *a, *v;
-
-		a = (char *)(intptr_t)envp[i];
-		v = (char *)(intptr_t)envp[i+1];
-
+		const char *a = platform_argv_ptr(envp[i]);
+		const char *v = platform_argv_ptr(envp[i+1]);
 		if (bootverbose)
 			printf("\t%s = %s\n", a, v);
 
@@ -437,7 +500,6 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 			ememsize = 2ULL * 1024 * 1024 * 1024 - PAGE_SIZE;
 #endif
 	}
-
 	/*
 	 * For <= 256MB RAM amounts, ememsize should equal memsize.
 	 * For > 256MB RAM amounts it's the total RAM available;
@@ -450,3 +512,13 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 
 	mips_timer_init_params(platform_counter_freq, -1);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190702,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

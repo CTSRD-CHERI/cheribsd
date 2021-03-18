@@ -97,6 +97,9 @@ ASSYM(PC_TLB_MISS_CNT, offsetof(struct pcpu, pc_tlb_miss_cnt));
 ASSYM(PC_TLB_INVALID_CNT, offsetof(struct pcpu, pc_tlb_invalid_cnt));
 ASSYM(PC_TLB_MOD_CNT, offsetof(struct pcpu, pc_tlb_mod_cnt));
 #endif /* defined(MIPS_EXC_CNTRS) */
+#if defined(__CHERI_PURE_CAPABILITY__)
+ASSYM(PC_KSTACK_CAP, offsetof(struct pcpu, pc_kstack_cap));
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 
 ASSYM(VM_MAX_KERNEL_ADDRESS, VM_MAX_KERNEL_ADDRESS);
 ASSYM(VM_MAXUSER_ADDRESS, VM_MAXUSER_ADDRESS);
@@ -111,6 +114,8 @@ ASSYM(SIGF64_UC, offsetof(struct sigframe64, sf_uc));
 ASSYM(SIGFPE, SIGFPE);
 ASSYM(PAGE_SHIFT, PAGE_SHIFT);
 ASSYM(PAGE_SIZE, PAGE_SIZE);
+ASSYM(KSTACK_PAGE_SIZE, KSTACK_PAGE_SIZE);
+ASSYM(KSTACK_SIZE, KSTACK_SIZE);
 ASSYM(PDRSHIFT, PDRSHIFT);
 ASSYM(SEGSHIFT, SEGSHIFT);
 ASSYM(TDF_NEEDRESCHED, TDF_NEEDRESCHED);
@@ -125,13 +130,21 @@ ASSYM(MDTD_QTRACE_USERMODE, MDTD_QTRACE_USERMODE);
 ASSYM(KSTACK_TLBMASK_MASK, KSTACK_TLBMASK_MASK);
 #endif
 
-ASSYM(MIPS_KSEG0_START, MIPS_KSEG0_START);
-ASSYM(MIPS_KSEG1_START, MIPS_KSEG1_START);
-ASSYM(MIPS_KSEG2_START, MIPS_KSEG2_START);
-ASSYM(MIPS_XKSEG_START, MIPS_XKSEG_START);
+ASSYM(MIPS_KSEG0_START, (vaddr_t)(void *)MIPS_KSEG0_START);
+ASSYM(MIPS_KSEG1_START, (vaddr_t)(void *)MIPS_KSEG1_START);
+ASSYM(MIPS_KSEG2_START, (vaddr_t)(void *)MIPS_KSEG2_START);
+ASSYM(MIPS_XKSEG_START, (vaddr_t)(void *)MIPS_XKSEG_START);
 
 #ifdef	CPU_CHERI
+ASSYM(PCPU_SIZE, sizeof(struct pcpu));
 ASSYM(U_PCB_CHERIKFRAME, offsetof(struct pcb, pcb_cherikframe));
+#ifdef __CHERI_PURE_CAPABILITY__
+ASSYM(TRAPFRAME_SIZE, sizeof(struct trapframe));
+/* XXX-AM: This is hardcoded in pmap */
+ASSYM(SEGMAP_SIZE, PAGE_SIZE);
+ASSYM(MAXCPU, MAXCPU);
+ASSYM(CHERI_KSTACK_OFFSET, (KSTACK_SIZE - sizeof(struct pcb)));
+#endif
 #endif
 
 #ifdef	CPU_CNMIPS
@@ -199,9 +212,12 @@ ASSYM(COP2_HSH_IVW2_PASS1_OFFSET, offsetof(struct octeon_cop2_state, hsh_ivw) + 
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190528,
 //   "target_type": "kernel",
 //   "changes": [
+//     "support"
+//   ],
+//   "changes_purecap": [
 //     "support"
 //   ]
 // }
