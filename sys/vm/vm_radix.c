@@ -63,8 +63,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/smr.h>
 #include <sys/smr_types.h>
 
-#include <cheri/cheric.h>
-
 #include <vm/uma.h>
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -259,7 +257,7 @@ static __inline boolean_t
 vm_radix_isleaf(struct vm_radix_node *rnode)
 {
 
-	return (cheri_get_low_ptr_bits(rnode, VM_RADIX_ISLEAF) != 0);
+	return (((uintptr_t)rnode & VM_RADIX_ISLEAF) != 0);
 }
 
 /*
@@ -268,7 +266,8 @@ vm_radix_isleaf(struct vm_radix_node *rnode)
 static __inline vm_page_t
 vm_radix_topage(struct vm_radix_node *rnode)
 {
-	return ((vm_page_t)cheri_clear_low_ptr_bits(rnode, VM_RADIX_FLAGS));
+
+	return ((vm_page_t)((uintptr_t)rnode & ~VM_RADIX_FLAGS));
 }
 
 /*
@@ -282,8 +281,7 @@ vm_radix_addpage(struct vm_radix_node *rnode, vm_pindex_t index, uint16_t clev,
 
 	slot = vm_radix_slot(index, clev);
 	vm_radix_node_store(&rnode->rn_child[slot],
-	    (struct vm_radix_node *)cheri_set_low_ptr_bits(page, VM_RADIX_ISLEAF),
-      access);
+	    (struct vm_radix_node *)((uintptr_t)page | VM_RADIX_ISLEAF), access);
 }
 
 /*
@@ -402,7 +400,7 @@ vm_radix_insert(struct vm_radix *rtree, vm_page_t page)
 	 */
 	rnode = vm_radix_root_load(rtree, LOCKED);
 	if (rnode == NULL) {
-		rtree->rt_root = cheri_set_low_ptr_bits(page, VM_RADIX_ISLEAF);
+		rtree->rt_root = (uintptr_t)page | VM_RADIX_ISLEAF;
 		return (0);
 	}
 	parentp = (smrnode_t *)&rtree->rt_root;
@@ -857,8 +855,7 @@ vm_radix_replace(struct vm_radix *rtree, vm_page_t newpage)
 		if (m->pindex != index)
 			panic("%s: original replacing root key not found",
 			    __func__);
-		rtree->rt_root = cheri_set_low_ptr_bits(newpage,
-		    VM_RADIX_ISLEAF);
+		rtree->rt_root = (uintptr_t)newpage | VM_RADIX_ISLEAF;
 		return (m);
 	}
 	for (;;) {
@@ -868,7 +865,7 @@ vm_radix_replace(struct vm_radix *rtree, vm_page_t newpage)
 			m = vm_radix_topage(tmp);
 			if (m->pindex == index) {
 				vm_radix_node_store(&rnode->rn_child[slot],
-				    (struct vm_radix_node *)cheri_set_low_ptr_bits(newpage,
+				    (struct vm_radix_node *)((uintptr_t)newpage |
 				    VM_RADIX_ISLEAF), LOCKED);
 				return (m);
 			} else
@@ -916,7 +913,6 @@ DB_SHOW_COMMAND(radixnode, db_show_radixnode)
 //   "updated": 20200127,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_bit_flags",
 //     "kdb"
 //   ]
 // }

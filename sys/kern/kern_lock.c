@@ -50,8 +50,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/systm.h>
 
-#include <cheri/cheric.h>
-
 #include <machine/cpu.h>
 
 #ifdef DDB
@@ -117,10 +115,10 @@ static bool __always_inline
 LK_CAN_SHARE(uintptr_t x, int flags, bool fp)
 {
 
-	if (cheri_get_low_ptr_bits(x, (LK_SHARE | LK_EXCLUSIVE_WAITERS |
-	    LK_EXCLUSIVE_SPINNERS)) == LK_SHARE)
+	if ((x & (LK_SHARE | LK_EXCLUSIVE_WAITERS | LK_EXCLUSIVE_SPINNERS)) ==
+	    LK_SHARE)
 		return (true);
-	if (fp || (!cheri_get_low_ptr_bits(x, LK_SHARE)))
+	if (fp || (!(x & LK_SHARE)))
 		return (false);
 	if ((curthread->td_lk_slocks != 0 && !(flags & LK_NODDLKTREAT)) ||
 	    (curthread->td_pflags & TDP_DEADLKTREAT))
@@ -137,12 +135,10 @@ LK_CAN_SHARE(uintptr_t x, int flags, bool fp)
 	(LK_TRYOP(x) ? LOP_TRYLOCK : 0)
 
 #define	lockmgr_disowned(lk)						\
-	(cheri_clear_low_ptr_bits((lk)->lk_lock, (LK_FLAGMASK & ~LK_SHARE)) == \
-	    LK_KERNPROC)
+	(((lk)->lk_lock & ~(LK_FLAGMASK & ~LK_SHARE)) == LK_KERNPROC)
 
 #define	lockmgr_xlocked_v(v)						\
-	(cheri_clear_low_ptr_bits(v, (LK_FLAGMASK & ~LK_SHARE)) ==	\
-	    (uintptr_t)curthread)
+	(((v) & ~(LK_FLAGMASK & ~LK_SHARE)) == (uintptr_t)curthread)
 
 #define	lockmgr_xlocked(lk) lockmgr_xlocked_v(lockmgr_read_value(lk))
 
@@ -257,8 +253,7 @@ lockmgr_xholder(const struct lock *lk)
 	uintptr_t x;
 
 	x = lockmgr_read_value(lk);
-	return ((cheri_get_low_ptr_bits(x, LK_SHARE)) ?
-	    NULL : (struct thread *)LK_HOLDER(x));
+	return ((x & LK_SHARE) ? NULL : (struct thread *)LK_HOLDER(x));
 }
 
 /*
@@ -331,8 +326,7 @@ wakeupshlk(struct lock *lk, const char *file, int line)
 		sleepq_lock(&lk->lock_object);
 		orig_x = lockmgr_read_value(lk);
 retry_sleepq:
-		x = cheri_get_low_ptr_bits(orig_x, LK_ALL_WAITERS |
-		    LK_EXCLUSIVE_SPINNERS);
+		x = orig_x & (LK_ALL_WAITERS | LK_EXCLUSIVE_SPINNERS);
 		v = LK_UNLOCKED;
 
 		/*
@@ -350,13 +344,11 @@ retry_sleepq:
 		 */
 		realexslp = sleepq_sleepcnt(&lk->lock_object,
 		    SQ_EXCLUSIVE_QUEUE);
-		if (cheri_get_low_ptr_bits(x, LK_EXCLUSIVE_WAITERS) != 0 &&
-		    realexslp != 0) {
+		if ((x & LK_EXCLUSIVE_WAITERS) != 0 && realexslp != 0) {
 			if (lk->lk_exslpfail < realexslp) {
 				lk->lk_exslpfail = 0;
 				queue = SQ_EXCLUSIVE_QUEUE;
-				v |= cheri_get_low_ptr_bits(x,
-				    LK_SHARED_WAITERS);
+				v |= (x & LK_SHARED_WAITERS);
 			} else {
 				lk->lk_exslpfail = 0;
 				LOCK_LOG2(lk,
@@ -370,7 +362,7 @@ retry_sleepq:
 				    SLEEPQ_LK, 0, SQ_EXCLUSIVE_QUEUE);
 				queue = SQ_SHARED_QUEUE;
 			}
-
+				
 		} else {
 			/*
 			 * Exclusive waiters sleeping with LK_SLEEPFAIL on
@@ -387,7 +379,7 @@ retry_sleepq:
 			break;
 		}
 
-		x = cheri_set_low_ptr_bits(x, LK_SHARERS_LOCK(1));
+		x |= LK_SHARERS_LOCK(1);
 		if (!atomic_fcmpset_rel_ptr(&lk->lk_lock, &x, v)) {
 			orig_x = x;
 			goto retry_sleepq;
@@ -542,8 +534,7 @@ lockmgr_sunlock_try(struct lock *lk, uintptr_t *xp)
 {
 
 	for (;;) {
-		if (LK_SHARERS(*xp) > 1 ||
-		    !cheri_get_low_ptr_bits(*xp, LK_ALL_WAITERS)) {
+		if (LK_SHARERS(*xp) > 1 || !(*xp & LK_ALL_WAITERS)) {
 			if (atomic_fcmpset_rel_ptr(&lk->lk_lock, xp,
 			    *xp - LK_ONE_SHARER))
 				return (true);
@@ -568,13 +559,13 @@ lockmgr_slock_adaptive(struct lock_delay_arg *lda, struct lock *lk, uintptr_t *x
 		MPASS(owner != curthread);
 		if (owner == (struct thread *)LK_KERNPROC)
 			return (false);
-		if (cheri_get_low_ptr_bits(x, LK_SHARE) && LK_SHARERS(x) > 0)
+		if ((x & LK_SHARE) && LK_SHARERS(x) > 0)
 			return (false);
 		if (owner == NULL)
 			return (false);
 		if (!TD_IS_RUNNING(owner))
 			return (false);
-		if (cheri_get_low_ptr_bits(x, LK_ALL_WAITERS) != 0)
+		if ((x & LK_ALL_WAITERS) != 0)
 			return (false);
 		lock_delay(lda);
 		x = lockmgr_read_value(lk);
@@ -675,9 +666,9 @@ retry_sleepq:
 		 * Try to set the LK_SHARED_WAITERS flag.  If we fail,
 		 * loop back and retry.
 		 */
-		if (cheri_get_low_ptr_bits(x, LK_SHARED_WAITERS) == 0) {
+		if ((x & LK_SHARED_WAITERS) == 0) {
 			if (!atomic_fcmpset_acq_ptr(&lk->lk_lock, &x,
-			    cheri_set_low_ptr_bits(x, LK_SHARED_WAITERS))) {
+			    x | LK_SHARED_WAITERS)) {
 				goto retry_sleepq;
 			}
 			LOCK_LOG2(lk, "%s: %p set shared waiters flag",
@@ -752,13 +743,13 @@ lockmgr_xlock_adaptive(struct lock_delay_arg *lda, struct lock *lk, uintptr_t *x
 		MPASS(owner != curthread);
 		if (owner == NULL)
 			return (false);
-		if (cheri_get_low_ptr_bits(x, LK_SHARE) && LK_SHARERS(x) > 0)
+		if ((x & LK_SHARE) && LK_SHARERS(x) > 0)
 			return (false);
 		if (owner == (struct thread *)LK_KERNPROC)
 			return (false);
 		if (!TD_IS_RUNNING(owner))
 			return (false);
-		if (cheri_get_low_ptr_bits(x, LK_ALL_WAITERS) != 0)
+		if ((x & LK_ALL_WAITERS) != 0)
 			return (false);
 		lock_delay(lda);
 		x = lockmgr_read_value(lk);
@@ -893,12 +884,11 @@ retry_sleepq:
 		 * claim lock ownership and return, preserving waiters
 		 * flags.
 		 */
-		v = cheri_get_low_ptr_bits(x, LK_ALL_WAITERS |
-		    LK_EXCLUSIVE_SPINNERS);
-		if (cheri_clear_low_ptr_bits(x, v) == LK_UNLOCKED) {
-			v = cheri_clear_low_ptr_bits(v, LK_EXCLUSIVE_SPINNERS);
+		v = x & (LK_ALL_WAITERS | LK_EXCLUSIVE_SPINNERS);
+		if ((x & ~v) == LK_UNLOCKED) {
+			v &= ~LK_EXCLUSIVE_SPINNERS;
 			if (atomic_fcmpset_acq_ptr(&lk->lk_lock, &x,
-			    cheri_set_low_ptr_bits(tid, v))) {
+			    tid | v)) {
 				sleepq_release(&lk->lock_object);
 				LOCK_LOG2(lk,
 				    "%s: %p claimed by a new writer",
@@ -912,9 +902,9 @@ retry_sleepq:
 		 * Try to set the LK_EXCLUSIVE_WAITERS flag.  If we
 		 * fail, loop back and retry.
 		 */
-		if (cheri_get_low_ptr_bits(x, LK_EXCLUSIVE_WAITERS) == 0) {
+		if ((x & LK_EXCLUSIVE_WAITERS) == 0) {
 			if (!atomic_fcmpset_ptr(&lk->lk_lock, &x,
-			    cheri_set_low_ptr_bits(x, LK_EXCLUSIVE_WAITERS))) {
+			    x | LK_EXCLUSIVE_WAITERS)) {
 				goto retry_sleepq;
 			}
 			LOCK_LOG2(lk, "%s: %p set excl waiters flag",
@@ -1006,11 +996,10 @@ lockmgr_upgrade(struct lock *lk, u_int flags, struct lock_object *ilk,
 				goto out_xlock;
 			}
 		}
-		MPASS(cheri_get_low_ptr_bits(v, ~LK_ALL_WAITERS) ==
-		    LK_SHARERS_LOCK(1));
+		MPASS((v & ~LK_ALL_WAITERS) == LK_SHARERS_LOCK(1));
 
 		setv = tid;
-		setv |= cheri_get_low_ptr_bits(v, LK_ALL_WAITERS);
+		setv |= (v & LK_ALL_WAITERS);
 
 		/*
 		 * Try to switch from one shared lock to an exclusive one.
@@ -1176,14 +1165,13 @@ lockmgr_xunlock_hard(struct lock *lk, uintptr_t x, u_int flags, struct lock_obje
 	 * lk_exslpfail might be considered an 'upper limit'
 	 * bound, including the edge cases.
 	 */
-	MPASS(cheri_get_low_ptr_bits(x, LK_EXCLUSIVE_SPINNERS) == 0);
+	MPASS((x & LK_EXCLUSIVE_SPINNERS) == 0);
 	realexslp = sleepq_sleepcnt(&lk->lock_object, SQ_EXCLUSIVE_QUEUE);
-	if (cheri_get_low_ptr_bits(x, LK_EXCLUSIVE_WAITERS) != 0 &&
-	    realexslp != 0) {
+	if ((x & LK_EXCLUSIVE_WAITERS) != 0 && realexslp != 0) {
 		if (lk->lk_exslpfail < realexslp) {
 			lk->lk_exslpfail = 0;
 			queue = SQ_EXCLUSIVE_QUEUE;
-			v |= cheri_get_low_ptr_bits(x, LK_SHARED_WAITERS);
+			v |= (x & LK_SHARED_WAITERS);
 		} else {
 			lk->lk_exslpfail = 0;
 			LOCK_LOG2(lk,
@@ -1284,7 +1272,7 @@ lockmgr_unlock(struct lock *lk)
 
 	_lockmgr_assert(lk, KA_LOCKED, file, line);
 	x = lockmgr_read_value(lk);
-	if (__predict_true(cheri_get_low_ptr_bits(x, LK_SHARE)) != 0) {
+	if (__predict_true(x & LK_SHARE) != 0) {
 		lockmgr_note_shared_release(lk, file, line);
 		if (lockmgr_sunlock_try(lk, &x)) {
 			LOCKSTAT_PROFILE_RELEASE_RWLOCK(lockmgr__release, lk, LOCKSTAT_READER);
@@ -1397,11 +1385,10 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 		 */
 		for (;;) {
 			x = lockmgr_read_value(lk);
-			MPASS(cheri_get_low_ptr_bits(x, LK_EXCLUSIVE_SPINNERS) == 0);
-			x = cheri_get_low_ptr_bits(x, LK_ALL_WAITERS);
-			if (atomic_cmpset_rel_ptr(&lk->lk_lock,
-			    cheri_set_low_ptr_bits(tid, x),
-			    cheri_set_low_ptr_bits(LK_SHARERS_LOCK(1), x)))
+			MPASS((x & LK_EXCLUSIVE_SPINNERS) == 0);
+			x &= LK_ALL_WAITERS;
+			if (atomic_cmpset_rel_ptr(&lk->lk_lock, tid | x,
+			    LK_SHARERS_LOCK(1) | x))
 				break;
 			cpu_spinwait();
 		}
@@ -1412,7 +1399,7 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 		_lockmgr_assert(lk, KA_LOCKED, file, line);
 		x = lockmgr_read_value(lk);
 
-		if (__predict_true(cheri_get_low_ptr_bits(x, LK_SHARE)) != 0) {
+		if (__predict_true(x & LK_SHARE) != 0) {
 			lockmgr_note_shared_release(lk, file, line);
 			return (lockmgr_sunlock_hard(lk, x, flags, ilk, file, line));
 		} else {
@@ -1475,11 +1462,9 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 				continue;
 			}
 
-			v = cheri_get_low_ptr_bits(x, LK_ALL_WAITERS |
-			    LK_EXCLUSIVE_SPINNERS);
-			if (cheri_clear_low_ptr_bits(x, v) == LK_UNLOCKED) {
-				v = cheri_clear_low_ptr_bits(x,
-				    LK_EXCLUSIVE_SPINNERS);
+			v = x & (LK_ALL_WAITERS | LK_EXCLUSIVE_SPINNERS);
+			if ((x & ~v) == LK_UNLOCKED) {
+				v = (x & ~LK_EXCLUSIVE_SPINNERS);
 
 				/*
 				 * If interruptible sleeps left the exclusive
@@ -1495,10 +1480,9 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 				 * an 'upper limit' bound, including the edge
 				 * cases.
 				 */
-				if (cheri_get_low_ptr_bits(v, LK_EXCLUSIVE_WAITERS)) {
+				if (v & LK_EXCLUSIVE_WAITERS) {
 					queue = SQ_EXCLUSIVE_QUEUE;
-					v = cheri_clear_low_ptr_bits(v,
-					    LK_EXCLUSIVE_WAITERS);
+					v &= ~LK_EXCLUSIVE_WAITERS;
 				} else {
 					/*
 					 * Exclusive waiters sleeping with
@@ -1507,12 +1491,10 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 					 * have left spourious lk_exslpfail
 					 * counts on, so clean it up anyway.
 					 */
-					MPASS(cheri_get_low_ptr_bits(v,
-					    LK_SHARED_WAITERS));
+					MPASS(v & LK_SHARED_WAITERS);
 					lk->lk_exslpfail = 0;
 					queue = SQ_SHARED_QUEUE;
-					v = cheri_clear_low_ptr_bits(v,
-					    LK_SHARED_WAITERS);
+					v &= ~LK_SHARED_WAITERS;
 				}
 				if (queue == SQ_EXCLUSIVE_QUEUE) {
 					realexslp =
@@ -1521,8 +1503,7 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 					if (lk->lk_exslpfail >= realexslp) {
 						lk->lk_exslpfail = 0;
 						queue = SQ_SHARED_QUEUE;
-						v = cheri_clear_low_ptr_bits(v,
-						    LK_SHARED_WAITERS);
+						v &= ~LK_SHARED_WAITERS;
 						if (realexslp != 0) {
 							LOCK_LOG2(lk,
 					"%s: %p has only LK_SLEEPFAIL sleepers",
@@ -1558,8 +1539,7 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 				 */
 				if (queue == SQ_SHARED_QUEUE) {
 					for (v = lk->lk_lock;
-					    cheri_get_low_ptr_bits(v, LK_SHARE) &&
-					        !LK_SHARERS(v);
+					    (v & LK_SHARE) && !LK_SHARERS(v);
 					    v = lk->lk_lock)
 						cpu_spinwait();
 				}
@@ -1569,9 +1549,9 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 			 * Try to set the LK_EXCLUSIVE_WAITERS flag.  If we
 			 * fail, loop back and retry.
 			 */
-			if (cheri_get_low_ptr_bits(x, LK_EXCLUSIVE_WAITERS) == 0) {
+			if ((x & LK_EXCLUSIVE_WAITERS) == 0) {
 				if (!atomic_cmpset_ptr(&lk->lk_lock, x,
-				    cheri_set_low_ptr_bits(x, LK_EXCLUSIVE_WAITERS))) {
+				    x | LK_EXCLUSIVE_WAITERS)) {
 					sleepq_release(&lk->lock_object);
 					continue;
 				}
@@ -1657,11 +1637,10 @@ _lockmgr_disown(struct lock *lk, const char *file, int line)
 	 */
 	for (;;) {
 		x = lockmgr_read_value(lk);
-		MPASS(cheri_get_low_ptr_bits(x, LK_EXCLUSIVE_SPINNERS) == 0);
-		x = cheri_get_low_ptr_bits(x, LK_ALL_WAITERS);
-		if (atomic_cmpset_rel_ptr(&lk->lk_lock,
-		    cheri_set_low_ptr_bits(tid, x),
-		    cheri_set_low_ptr_bits(LK_KERNPROC, x)))
+		MPASS((x & LK_EXCLUSIVE_SPINNERS) == 0);
+		x &= LK_ALL_WAITERS;
+		if (atomic_cmpset_rel_ptr(&lk->lk_lock, tid | x,
+		    LK_KERNPROC | x))
 			return;
 		cpu_spinwait();
 	}
@@ -1675,7 +1654,7 @@ lockmgr_printinfo(const struct lock *lk)
 
 	if (lk->lk_lock == LK_UNLOCKED)
 		printf("lock type %s: UNLOCKED\n", lk->lock_object.lo_name);
-	else if (cheri_get_low_ptr_bits(lk->lk_lock, LK_SHARE))
+	else if (lk->lk_lock & LK_SHARE)
 		printf("lock type %s: SHARED (count %ju)\n",
 		    lk->lock_object.lo_name,
 		    (uintmax_t)LK_SHARERS(lk->lk_lock));
@@ -1692,11 +1671,11 @@ lockmgr_printinfo(const struct lock *lk)
 	}
 
 	x = lk->lk_lock;
-	if (cheri_get_low_ptr_bits(x, LK_EXCLUSIVE_WAITERS))
+	if (x & LK_EXCLUSIVE_WAITERS)
 		printf(" with exclusive waiters pending\n");
-	if (cheri_get_low_ptr_bits(x, LK_SHARED_WAITERS))
+	if (x & LK_SHARED_WAITERS)
 		printf(" with shared waiters pending\n");
-	if (cheri_get_low_ptr_bits(x, LK_EXCLUSIVE_SPINNERS))
+	if (x & LK_EXCLUSIVE_SPINNERS)
 		printf(" with exclusive spinners pending\n");
 
 	STACK_PRINT(lk);
@@ -1712,7 +1691,7 @@ lockstatus(const struct lock *lk)
 	x = lockmgr_read_value(lk);
 	v = LK_HOLDER(x);
 
-	if (cheri_get_low_ptr_bits(x, LK_SHARE) == 0) {
+	if ((x & LK_SHARE) == 0) {
 		if (v == (uintptr_t)curthread || v == LK_KERNPROC)
 			ret = LK_EXCLUSIVE;
 		else
@@ -1755,19 +1734,19 @@ _lockmgr_assert(const struct lock *lk, int what, const char *file, int line)
 		 * Workaround this skipping the check if the lock is held in
 		 * exclusive mode even for the KA_LOCKED case.
 		 */
-		if (slocked || cheri_get_low_ptr_bits(lk->lk_lock, LK_SHARE)) {
+		if (slocked || (lk->lk_lock & LK_SHARE)) {
 			witness_assert(&lk->lock_object, what, file, line);
 			break;
 		}
 #endif
 		if (lk->lk_lock == LK_UNLOCKED ||
-		    (cheri_get_low_ptr_bits(lk->lk_lock, LK_SHARE) == 0 && (slocked ||
+		    ((lk->lk_lock & LK_SHARE) == 0 && (slocked ||
 		    (!lockmgr_xlocked(lk) && !lockmgr_disowned(lk)))))
 			panic("Lock %s not %slocked @ %s:%d\n",
 			    lk->lock_object.lo_name, slocked ? "share" : "",
 			    file, line);
 
-		if (cheri_get_low_ptr_bits(lk->lk_lock, LK_SHARE) == 0) {
+		if ((lk->lk_lock & LK_SHARE) == 0) {
 			if (lockmgr_recursed(lk)) {
 				if (what & KA_NOTRECURSED)
 					panic("Lock %s recursed @ %s:%d\n",
@@ -1815,7 +1794,7 @@ lockmgr_chain(struct thread *td, struct thread **ownerp)
 	if (LOCK_CLASS(&lk->lock_object) != &lock_class_lockmgr)
 		return (0);
 	db_printf("blocked on lockmgr %s", lk->lock_object.lo_name);
-	if (cheri_get_low_ptr_bits(lk->lk_lock, LK_SHARE))
+	if (lk->lk_lock & LK_SHARE)
 		db_printf("SHARED (count %ju)\n",
 		    (uintmax_t)LK_SHARERS(lk->lk_lock));
 	else
@@ -1836,7 +1815,7 @@ db_show_lockmgr(const struct lock_object *lock)
 	db_printf(" state: ");
 	if (lk->lk_lock == LK_UNLOCKED)
 		db_printf("UNLOCKED\n");
-	else if (cheri_get_low_ptr_bits(lk->lk_lock, LK_SHARE))
+	else if (lk->lk_lock & LK_SHARE)
 		db_printf("SLOCK: %ju\n", (uintmax_t)LK_SHARERS(lk->lk_lock));
 	else {
 		td = lockmgr_xholder(lk);
@@ -1850,7 +1829,7 @@ db_show_lockmgr(const struct lock_object *lock)
 			db_printf(" recursed: %d\n", lk->lk_recurse);
 	}
 	db_printf(" waiters: ");
-	switch (cheri_get_low_ptr_bits(lk->lk_lock, LK_ALL_WAITERS)) {
+	switch (lk->lk_lock & LK_ALL_WAITERS) {
 	case LK_SHARED_WAITERS:
 		db_printf("shared\n");
 		break;
@@ -1864,18 +1843,9 @@ db_show_lockmgr(const struct lock_object *lock)
 		db_printf("none\n");
 	}
 	db_printf(" spinners: ");
-	if (cheri_get_low_ptr_bits(lk->lk_lock, LK_EXCLUSIVE_SPINNERS))
+	if (lk->lk_lock & LK_EXCLUSIVE_SPINNERS)
 		db_printf("exclusive\n");
 	else
 		db_printf("none\n");
 }
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20200127,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "pointer_bit_flags"
-//   ]
-// }
-// CHERI CHANGES END

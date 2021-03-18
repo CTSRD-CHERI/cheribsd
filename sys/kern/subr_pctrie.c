@@ -59,8 +59,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/smr.h>
 #include <sys/smr_types.h>
 
-#include <cheri/cheric.h>
-
 #ifdef DDB
 #include <ddb/ddb.h>
 #endif
@@ -233,7 +231,7 @@ static __inline bool
 pctrie_isleaf(struct pctrie_node *node)
 {
 
-	return (cheri_get_low_ptr_bits(node, PCTRIE_ISLEAF) != 0);
+	return (((uintptr_t)node & PCTRIE_ISLEAF) != 0);
 }
 
 /*
@@ -243,7 +241,7 @@ static __inline uint64_t *
 pctrie_toval(struct pctrie_node *node)
 {
 
-	return ((uint64_t *)cheri_clear_low_ptr_bits(node, PCTRIE_FLAGS));
+	return ((uint64_t *)((uintptr_t)node & ~PCTRIE_FLAGS));
 }
 
 /*
@@ -257,7 +255,7 @@ pctrie_addval(struct pctrie_node *node, uint64_t index, uint16_t clev,
 
 	slot = pctrie_slot(index, clev);
 	pctrie_node_store(&node->pn_child[slot],
-	    (void *)cheri_set_low_ptr_bits(val, PCTRIE_ISLEAF), access);
+	    (void *)((uintptr_t)val | PCTRIE_ISLEAF), access);
 }
 
 /*
@@ -363,8 +361,7 @@ pctrie_insert(struct pctrie *ptree, uint64_t *val, pctrie_alloc_t allocfn)
 	 */
 	node = pctrie_root_load(ptree, NULL, PCTRIE_LOCKED);
 	if (node == NULL) {
-		ptree->pt_root =
-		    (uintptr_t)(cheri_set_low_ptr_bits(val, PCTRIE_ISLEAF));
+		ptree->pt_root = (uintptr_t)val | PCTRIE_ISLEAF;
 		return (0);
 	}
 	parentp = (smr_pctnode_t *)&ptree->pt_root;
@@ -825,7 +822,6 @@ DB_SHOW_COMMAND(pctrienode, db_show_pctrienode)
 //   "updated": 20200127,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_bit_flags",
 //     "kdb"
 //   ]
 // }
