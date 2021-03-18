@@ -1646,6 +1646,11 @@ aio_aqueue(struct thread *td, struct aiocb * __capability ujob,
 		goto err3;
 	}
 
+	if (fp != NULL && fp->f_ops == &path_fileops) {
+		error = EBADF;
+		goto err3;
+	}
+
 	job->fd_file = fp;
 
 	mtx_lock(&aio_job_mtx);
