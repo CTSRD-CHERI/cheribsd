@@ -38,8 +38,6 @@
 #include <sys/_mutex.h>
 #include <sys/_rwlock.h>
 
-#include <cheri/cheric.h>
-
 #define	LK_SHARE			0x01
 #define	LK_SHARED_WAITERS		0x02
 #define	LK_EXCLUSIVE_WAITERS		0x04
@@ -50,14 +48,13 @@
 #define	LK_FLAGMASK							\
 	(LK_SHARE | LK_ALL_WAITERS | LK_EXCLUSIVE_SPINNERS | LK_WRITER_RECURSED)
 
-#define	LK_HOLDER(x)		(cheri_clear_low_ptr_bits(x, LK_FLAGMASK))
-#define	LK_SHARERS_SHIFT	5
-#define	LK_SHARERS(x)		((vaddr_t)LK_HOLDER(x) >> LK_SHARERS_SHIFT)
-#define	LK_SHARERS_LOCK(x)	((x) << LK_SHARERS_SHIFT | LK_SHARE)
-#define	LK_ONE_SHARER		(1 << LK_SHARERS_SHIFT)
-#define	LK_UNLOCKED		LK_SHARERS_LOCK(0)
-#define	LK_KERNPROC						\
-	(cheri_clear_low_ptr_bits((uintptr_t)(-1), LK_FLAGMASK))
+#define	LK_HOLDER(x)			((x) & ~LK_FLAGMASK)
+#define	LK_SHARERS_SHIFT		5
+#define	LK_SHARERS(x)			(LK_HOLDER(x) >> LK_SHARERS_SHIFT)
+#define	LK_SHARERS_LOCK(x)		((x) << LK_SHARERS_SHIFT | LK_SHARE)
+#define	LK_ONE_SHARER			(1 << LK_SHARERS_SHIFT)
+#define	LK_UNLOCKED			LK_SHARERS_LOCK(0)
+#define	LK_KERNPROC			((uintptr_t)(-1) & ~LK_FLAGMASK)
 
 #ifdef _KERNEL
 
@@ -136,7 +133,7 @@ _lockmgr_args_rw(struct lock *lk, u_int flags, struct rwlock *ilk,
 #define	lockmgr_disown(lk)						\
 	_lockmgr_disown((lk), LOCK_FILE, LOCK_LINE)
 #define	lockmgr_recursed_v(v)						\
-	cheri_get_low_ptr_bits(v, LK_WRITER_RECURSED)
+	(v & LK_WRITER_RECURSED)
 #define	lockmgr_recursed(lk)						\
 	lockmgr_recursed_v((lk)->lk_lock)
 #define	lockmgr_rw(lk, flags, ilk)					\
@@ -212,13 +209,3 @@ _lockmgr_args_rw(struct lock *lk, u_int flags, struct rwlock *ilk,
 #endif /* _KERNEL */
 
 #endif /* !_SYS_LOCKMGR_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20200708,
-//   "target_type": "header",
-//   "changes_purecap": [
-//     "pointer_bit_flags",
-//     "uintcap_arithmetic"
-//   ]
-// }
-// CHERI CHANGES END

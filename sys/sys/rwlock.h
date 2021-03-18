@@ -34,7 +34,6 @@
 #include <sys/_rwlock.h>
 #include <sys/lock_profile.h>
 #include <sys/lockstat.h>
-#include <cheri/cheric.h>
 
 #ifdef _KERNEL
 #include <sys/pcpu.h>
@@ -66,10 +65,9 @@
 	RW_LOCK_WRITE_SPINNER | RW_LOCK_WRITER_RECURSED)
 #define	RW_LOCK_WAITERS		(RW_LOCK_READ_WAITERS | RW_LOCK_WRITE_WAITERS)
 
-#define	RW_OWNER(x)		(cheri_clear_low_ptr_bits((x), RW_LOCK_FLAGMASK))
+#define	RW_OWNER(x)		((x) & ~RW_LOCK_FLAGMASK)
 #define	RW_READERS_SHIFT	5
-#define	RW_READERS(x)							\
-	(cheri_get_low_ptr_bits(x, ~RW_LOCK_FLAGMASK) >> RW_READERS_SHIFT)
+#define	RW_READERS(x)		(RW_OWNER((x)) >> RW_READERS_SHIFT)
 #define	RW_READERS_LOCK(x)	((x) << RW_READERS_SHIFT | RW_LOCK_READ)
 #define	RW_ONE_READER		(1 << RW_READERS_SHIFT)
 
@@ -298,12 +296,3 @@ struct rw_args {
 
 #endif /* _KERNEL */
 #endif /* !_SYS_RWLOCK_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20200127,
-//   "target_type": "header",
-//   "changes_purecap": [
-//     "pointer_bit_flags"
-//   ]
-// }
-// CHERI CHANGES END
