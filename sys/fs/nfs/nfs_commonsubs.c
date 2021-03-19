@@ -2251,7 +2251,7 @@ nfsmout:
  */
 int
 nfsv4_lock(struct nfsv4lock *lp, int iwantlock, int *isleptp,
-    void *mutex, struct mount *mp)
+    struct mtx *mutex, struct mount *mp)
 {
 
 	if (isleptp)
@@ -2279,8 +2279,7 @@ nfsv4_lock(struct nfsv4lock *lp, int iwantlock, int *isleptp,
 		lp->nfslock_lock |= NFSV4LOCK_WANTED;
 		if (isleptp)
 			*isleptp = 1;
-		(void) nfsmsleep(&lp->nfslock_lock, mutex,
-		    PZERO - 1, "nfsv4lck", NULL);
+		msleep(&lp->nfslock_lock, mutex, PVFS, "nfsv4lck", hz);
 		if (iwantlock && !(lp->nfslock_lock & NFSV4LOCK_LOCK) &&
 		    lp->nfslock_usecnt == 0) {
 			lp->nfslock_lock &= ~NFSV4LOCK_LOCKWANTED;
@@ -2330,7 +2329,7 @@ nfsv4_relref(struct nfsv4lock *lp)
  * return without getting a refcnt for that case.
  */
 void
-nfsv4_getref(struct nfsv4lock *lp, int *isleptp, void *mutex,
+nfsv4_getref(struct nfsv4lock *lp, int *isleptp, struct mtx *mutex,
     struct mount *mp)
 {
 
@@ -2346,8 +2345,7 @@ nfsv4_getref(struct nfsv4lock *lp, int *isleptp, void *mutex,
 		lp->nfslock_lock |= NFSV4LOCK_WANTED;
 		if (isleptp)
 			*isleptp = 1;
-		(void) nfsmsleep(&lp->nfslock_lock, mutex,
-		    PZERO - 1, "nfsv4gr", NULL);
+		msleep(&lp->nfslock_lock, mutex, PVFS, "nfsv4gr", hz);
 	}
 	if (mp != NULL && NFSCL_FORCEDISM(mp))
 		return;
