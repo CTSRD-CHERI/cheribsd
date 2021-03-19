@@ -54,6 +54,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_page.h>
 #include <vm/vm_pager.h>
 
+#include <cheri/cheric.h>
+
 #include <sys/bus.h>
 #include <machine/bus.h>
 #include <sys/rman.h>
@@ -987,6 +989,24 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 	prot = VM_PROT_READ | (((pbm->pbm_flags & PCIIO_BAR_MMAP_RW) != 0) ?
 	    VM_PROT_WRITE : 0);
 
+	flags = MAP_SHARED;
+#if __has_feature(capabilities)
+	/* Enforce the same policy as for sys_mmap() */
+	if (cheri_gettag(pbm->pbm_map_base)) {
+		if ((pbm->pbm_flags & PCIIO_BAR_MMAP_FIXED) == 0)
+			return (EPROT);
+		if ((cheri_getperm(pbm->pbm_map_base) &
+		    CHERI_PERM_CHERIABI_VMMAP) == 0)
+			return (EACCES);
+	} else {
+		if (!cheri_is_null_derived(pbm->pbm_map_base))
+			return (EINVAL);
+		flags |= MAP_RESERVATION_CREATE;
+		if (pbm->pbm_flags & PCIIO_BAR_MMAP_FIXED)
+			pbm->pbm_flags |= PCIIO_BAR_MMAP_EXCL;
+	}
+#endif
+
 	/* Create vm structures and mmap. */
 	sg = sglist_alloc(1, M_WAITOK);
 	error = sglist_append_phys(sg, pbase, plen);
@@ -998,10 +1018,9 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 		goto out;
 	}
 	obj->memattr = pbm->pbm_memattr;
-	flags = MAP_SHARED;
 	addr = 0;
 	if ((pbm->pbm_flags & PCIIO_BAR_MMAP_FIXED) != 0) {
-		addr = (uintptr_t)pbm->pbm_map_base;
+		addr = (uintptr_t)(uintcap_t)pbm->pbm_map_base;
 		flags |= MAP_FIXED;
 	}
 	if ((pbm->pbm_flags & PCIIO_BAR_MMAP_EXCL) != 0)
@@ -1012,7 +1031,12 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 		vm_object_deallocate(obj);
 		goto out;
 	}
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+	pbm->pbm_map_base = cheri_capability_build_user_data(
+	    vm_map_prot2perms(prot), addr, plen, 0);
+#else
 	pbm->pbm_map_base = (void *)addr;
+#endif
 	pbm->pbm_map_length = plen;
 	pbm->pbm_bar_off = membase - pbase;
 	pbm->pbm_bar_length = (pci_addr_t)1 << pm->pm_size;
@@ -1469,11 +1493,14 @@ getconfexit:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END
