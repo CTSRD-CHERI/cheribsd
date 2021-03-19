@@ -887,7 +887,7 @@ NESTED(mips_wait, CALLFRAME_SIZ, ra)
 	mfc0	t0, MIPS_COP_0_STATUS
 	ori	t1, t0, MIPS_SR_INT_IE
 	.align 4
-GLOBAL(MipsWaitStart)			# this is 16 byte aligned
+XNESTED(MipsWaitStart)			# this is 16 byte aligned
 	mtc0	t1, MIPS_COP_0_STATUS
 	bnez	v0, 1f	# MipsWaitEnd
 	nop
@@ -900,6 +900,7 @@ GLOBAL(MipsWaitEnd)	# MipsWaitStart + 16
 1:
 	cjr	$c17
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
+XEND(MipsWaitEnd)
 XEND(MipsWaitStart)
 END(mips_wait)
 	.set	pop
