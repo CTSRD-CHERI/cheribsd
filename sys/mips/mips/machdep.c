@@ -173,7 +173,7 @@ extern char MipsCache[];
 extern char MipsCacheEnd[];
 
 /* MIPS wait skip region */
-extern char MipsWaitStart[];
+extern void MipsWaitStart(void);
 extern char MipsWaitEnd[];
 
 extern char end[];
@@ -352,7 +352,7 @@ mips_vector_init(void)
 	 * Make sure that the Wait region logic is not been 
 	 * changed
 	 */
-	if (MipsWaitEnd - MipsWaitStart != 16)
+	if ((ptraddr_t)MipsWaitEnd - (ptraddr_t)MipsWaitStart != 16)
 		panic("startup: MIPS wait region not correct");
 	/*
 	 * Copy down exception vector code.
