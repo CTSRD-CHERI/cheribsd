@@ -320,7 +320,8 @@ host-symlinks:
 	@echo "Linking host tools into ${DESTDIR}/bin"
 .for _tool in ${_host_tools_to_symlink}
 	# The toplevel makefile forces $PATH to only be /usr/local/bin
-	@export PATH="$${PATH}:${HOST_TOOLS_PATH_EXTRA}"; source_path=`which ${_tool} || true`; \
+	@export PATH="$${PATH}:${HOST_TOOLS_PATH_EXTRA}"; \
+	source_path=`which ${_tool} || echo /dev/null/no/such`; \
 	if [ ! -e "$${source_path}" ] ; then \
 		echo "Cannot find host tool '${_tool}' in PATH ($$PATH)." >&2; false; \
 	fi; \
