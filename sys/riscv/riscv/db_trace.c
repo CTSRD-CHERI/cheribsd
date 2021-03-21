@@ -150,10 +150,23 @@ db_trace_self(void)
 	struct unwind_state frame;
 	uintptr_t sp;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("cmove %0, csp" : "=&C" (sp));
+#else
 	__asm __volatile("mv %0, sp" : "=&r" (sp));
+#endif
 
 	frame.sp = sp;
 	frame.fp = (uintptr_t)__builtin_frame_address(0);
 	frame.pc = (uintptr_t)db_trace_self;
 	db_stack_trace_cmd(curthread, &frame);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

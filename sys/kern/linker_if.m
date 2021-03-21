@@ -48,7 +48,7 @@ METHOD int symbol_values {
 
 METHOD int search_symbol {
     linker_file_t	file;
-    caddr_t		value;
+    ptraddr_t		value;
     c_linker_sym_t*	symp;
     long*		diffp;
 };
@@ -143,3 +143,13 @@ STATICMETHOD int link_preload {
 METHOD int link_preload_finish {
     linker_file_t	file;
 };
+# CHERI CHANGES START
+# {
+#   "updated": 20200706,
+#   "target_type": "kernel",
+#   "changes_purecap": [
+#     "pointer_as_integer",
+#     "kdb"
+#   ]
+# }
+# CHERI CHANGES END
