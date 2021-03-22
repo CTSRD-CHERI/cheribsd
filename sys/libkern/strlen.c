@@ -56,7 +56,6 @@ __FBSDID("$FreeBSD$");
  * Henry S. Warren, Jr.
  */
 
-#ifndef __CHERI_PURE_CAPABILITY__
 /* Magic numbers for the algorithm */
 #if LONG_BIT == 32
 static const unsigned long mask01 = 0x01010101;
@@ -77,13 +76,11 @@ static const unsigned long mask80 = 0x8080808080808080;
 		if (p[x] == '\0')		\
 		    return (p - str + x);	\
 	} while (0)
-#endif /* !__CHERI_PURE_CAPABILITY__ */
 
 size_t
 (strlen)(const char *str)
 {
 	const char *p;
-#ifndef __CHERI_PURE_CAPABILITY__
 	const unsigned long *lp;
 	long va, vb;
 	bool byte_check;
@@ -141,19 +138,6 @@ size_t
 #endif
 		}
 	}
-#else /* __CHERI_PURE_CAPABILITY__ */
-	/*
-	 * The purecap variant of strlen can not rely on access to
-	 * word-aligned memory since some bytes may be beyond the
-	 * pointer bounds.
-	 * A more efficient implementation for long strings may be
-	 * possible.
-	 */
-	p = str;
-	while (*p != '\0')
-		p++;
-	return (p - str);
-#endif /* __CHERI_PURE_CAPABILITY__ */
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Check if we need to scan byte-by-byte at the end of the string */
