@@ -42,4 +42,13 @@
 
 #define	CHERI_SEAL_VIOLATION_EXCEPTION	1
 
+#ifndef __CHERI_PURE_CAPABILITY__
+/*
+ * The CHERI-MIPS backend currently sets bounds based on the type for
+ * pointer-to-capability casts on globals, so don't XFAIL the tests where the
+ * types are correct.
+ */
+#define	XFAIL_HYBRID_BOUNDS_GLOBALS_STATIC	NULL
+#endif
+
 #endif /* !_CHERIBSDTEST_H_ */
