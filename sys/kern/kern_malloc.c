@@ -561,7 +561,7 @@ malloc_dbg(caddr_t *vap, size_t *sizep, struct malloc_type *mtp,
 #ifdef EPOCH_TRACE
 			epoch_trace_list(curthread);
 #endif
-			KASSERT(1,
+			KASSERT(1, 
 			    ("malloc(M_WAITOK) with sleeping prohibited"));
 		}
 	}
@@ -615,7 +615,7 @@ malloc_large(size_t *size, struct malloc_type *mtp, struct domainset *policy,
 	size_t sz;
 
 	sz = roundup(*size, PAGE_SIZE);
-	kva = kmem_malloc_domainset(policy, sz, flags, 0);
+	kva = kmem_malloc_domainset(policy, sz, flags);
 	if (kva != 0) {
 		/* The low bit is unused for slab pointers. */
 		vsetzoneslab(kva, NULL, (void *)(uintptr_t)((sz << 1) | 1));
@@ -1181,7 +1181,7 @@ kmeminit(void)
 	 * kmem arena can be set statically at compile-time or manually
 	 * through the kernel environment.  However, it is still limited to
 	 * twice the physical memory size, which has been sufficient to handle
-	 * the most severe cases of external fragmentation in the kmem arena.
+	 * the most severe cases of external fragmentation in the kmem arena. 
 	 */
 	if (vm_kmem_size / 2 / PAGE_SIZE > mem_size)
 		vm_kmem_size = 2 * mem_size * PAGE_SIZE;
