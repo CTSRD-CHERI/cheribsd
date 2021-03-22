@@ -130,7 +130,6 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 	ret = get_datasegment_cap(defobj) + def->st_value;
 	/* Remove execute and seal permissions */
 	ret = cheri_clearperm(ret, DATA_PTR_REMOVE_PERMS);
-	/* TODO: can we always set bounds here or does it break compat? */
 	ret = cheri_setbounds(ret, def->st_size);
 	return ret;
 }
