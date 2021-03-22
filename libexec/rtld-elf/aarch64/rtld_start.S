@@ -30,7 +30,52 @@
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$");
 
+/*
+ * Pure-capability:
+ *
+ * void
+ * _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
+ *
+ * func_ptr_type
+ * _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
+ */
+
+/*
+ * Plain:
+ *
+ * func_ptr_type
+ * _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
+ */
+
 ENTRY(.rtld_start)
+#ifdef __CHERI_PURE_CAPABILITY__
+	mov	c19, c0				/* Put aux in a callee-saved register */
+	mov	c20, csp			/* And the stack pointer */
+
+	sub	csp, csp, #32			/* Make room for obj_main & exit proc */
+
+	adrp	c0, _DYNAMIC
+	add	c0, c0, :lo12:_DYNAMIC		/* dynp */
+	mov	c1, c19				/* aux */
+	bl	_rtld_relocate_nonplt_self	/* Relocate ourselves early */
+
+#if __CHERI_CAPABILITY_TABLE__ != 3
+#error "Only the PC-relative ABI is currently supported"
+#endif
+
+	mov	c0, c19				/* Restore aux */
+	scbnds	c1, csp, #16			/* exit_proc */
+	add	c2, csp, #16
+	scbnds	c2, c2, #16			/* obj_main */
+	bl	_rtld				/* Call the loader */
+	mov	c8, c0				/* Backup the entry point*/
+
+	ldr	c1, [csp, #0]			/* Load cleanup */
+	ldr	c2, [csp, #16]			/* Load obj_main */
+	mov	c0, c19				/* Restore aux */
+	mov	csp, c20			/* Restore the stack pointer */
+	br	c8				/* Jump to the entry point */
+#else /* defined(__CHERI_PURE_CAPABILITY__) */
 	mov	x19, x0		/* Put ps_strings in a callee-saved register */
 	mov	x20, sp		/* And the stack pointer */
 
@@ -46,6 +91,7 @@ ENTRY(.rtld_start)
 	mov	x0, x19		/* Restore ps_strings */
 	mov	sp, x20		/* Restore the stack pointer */
 	br	x8		/* Jump to the entry point */
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(.rtld_start)
 
 /*
@@ -56,64 +102,75 @@ END(.rtld_start)
  */
 ENTRY(_rtld_bind_start)
 	.cfi_startproc
-	mov	x17, sp
+	mov	PTR(17), PTRN(sp)
 
 	/* Save frame pointer and SP */
-	stp	x29, x30, [sp, #-16]!
-	mov	x29, sp
-	.cfi_def_cfa x29, 16
-	.cfi_offset x30, -8
-	.cfi_offset x29, -16
+	stp	PTR(29), PTR(30), [PTRN(sp), #-(PTR_WIDTH * 2)]!
+	mov	PTR(29), PTRN(sp)
+	.cfi_def_cfa PTR(29), (PTR_WIDTH * 2)
+	.cfi_offset PTR(30), -(PTR_WIDTH * 1)
+	.cfi_offset PTR(29), -(PTR_WIDTH * 2)
 
 	/* Save the arguments */
-	stp	x0, x1, [sp, #-16]!
-	stp	x2, x3, [sp, #-16]!
-	stp	x4, x5, [sp, #-16]!
-	stp	x6, x7, [sp, #-16]!
-	stp	x8, xzr, [sp, #-16]!
+	stp	CAP(0), CAP(1), [PTRN(sp), #-(CAP_WIDTH * 2)]!
+	stp	CAP(2), CAP(3), [PTRN(sp), #-(CAP_WIDTH * 2)]!
+	stp	CAP(4), CAP(5), [PTRN(sp), #-(CAP_WIDTH * 2)]!
+	stp	CAP(6), CAP(7), [PTRN(sp), #-(CAP_WIDTH * 2)]!
+	stp	CAP(8), CAP(zr), [PTRN(sp), #-(CAP_WIDTH * 2)]!
 
 	/* Save any floating-point arguments */
-	stp	q0, q1, [sp, #-32]!
-	stp	q2, q3, [sp, #-32]!
-	stp	q4, q5, [sp, #-32]!
-	stp	q6, q7, [sp, #-32]!
+	stp	q0, q1, [PTRN(sp), #-32]!
+	stp	q2, q3, [PTRN(sp), #-32]!
+	stp	q4, q5, [PTRN(sp), #-32]!
+	stp	q6, q7, [PTRN(sp), #-32]!
 
-	/* Calculate reloff */
-	ldr	x2, [x17, #0]	/* Get the address of the entry */
-	sub	x1, x2, x16	/* Find its offset */
-	sub	x1, x1, #8	/* Adjust for x16 not being at offset 0 */
-	/* Each rela item has 3 entriesso we need reloff = 3 * index */
-	lsl	x3, x1, #1	/* x3 = 2 * offset */
-	add	x1, x1, x3	/* x1 = x3 + offset = 3 * offset */
+	/*
+	 * Calculate gotoff and reloff. We have &GOT[x + 3] on the stack and
+	 * &GOT[2], which gives x = &GOT[x + 3] - &GOT[2] - 1. We do our
+	 * calculations still scaled by PTR_WIDTH and then re-scale to be
+	 * reloff. Each Elf64_Rela is 24 bytes and each .plt.got entry is a
+	 * single pointer, so we need to multiply by either 3 or 1.5 depending
+	 * on whether this is a pure-capability ABI in order to turn it into
+	 * reloff.
+	 */
+	ldr	PTR(2), [PTR(17), #0]	/* Get the address of the entry */
+	sub	x1, x2, x16		/* Find its offset from &GOT[2] */
+	sub	x1, x1, #PTR_WIDTH	/* Turn into an offset from &GOT[3] */
+#ifdef __CHERI_PURE_CAPABILITY__
+	lsr	x3, x1, #1		/* x3 = offset / 2 */
+#else
+	lsl	x3, x1, #1		/* x3 = 2 * offset */
+#endif
+	add	x1, x1, x3		/* reloff = x3 + offset = (3 or 1.5) * offset */
 
 	/* Load obj */
-	ldr	x0, [x16, #-8]
+	ldr	PTR(0), [PTR(16), #-PTR_WIDTH]
 
 	/* Call into rtld */
 	bl	_rtld_bind
 
 	/* Backup the address to branch to */
-	mov	x16, x0
+	mov	PTR(16), PTR(0)
 
 	/* restore the arguments */
-	ldp	q6, q7, [sp], #32
-	ldp	q4, q5, [sp], #32
-	ldp	q2, q3, [sp], #32
-	ldp	q0, q1, [sp], #32
-	ldp	x8, xzr, [sp], #16
-	ldp	x6, x7, [sp], #16
-	ldp	x4, x5, [sp], #16
-	ldp	x2, x3, [sp], #16
-	ldp	x0, x1, [sp], #16
+	ldp	q6, q7, [PTRN(sp)], #32
+	ldp	q4, q5, [PTRN(sp)], #32
+	ldp	q2, q3, [PTRN(sp)], #32
+	ldp	q0, q1, [PTRN(sp)], #32
+	ldp	CAP(8), CAP(zr), [PTRN(sp)], #(CAP_WIDTH * 2)
+	ldp	CAP(6), CAP(7), [PTRN(sp)], #(CAP_WIDTH * 2)
+	ldp	CAP(4), CAP(5), [PTRN(sp)], #(CAP_WIDTH * 2)
+	ldp	CAP(2), CAP(3), [PTRN(sp)], #(CAP_WIDTH * 2)
+	ldp	CAP(0), CAP(1), [PTRN(sp)], #(CAP_WIDTH * 2)
 
 	/* Restore frame pointer */
-	ldp	x29, xzr, [sp], #16
+	ldp	PTR(29), PTR(zr), [PTRN(sp)], #(PTR_WIDTH * 2)
 
 	 /* Restore link register saved by the plt code */
-	ldp	xzr, x30, [sp], #16
+	ldp	PTR(zr), PTR(30), [PTRN(sp)], #(PTR_WIDTH * 2)
 
 	/* Call into the correct function */
-	br	x16
+	br	PTR(16)
 	.cfi_endproc
 END(_rtld_bind_start)
 
@@ -128,10 +185,15 @@ END(_rtld_bind_start)
  * Resolver function for TLS symbols resolved at load time
  */
 ENTRY(_rtld_tlsdesc_static)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Currently unused and unimplemented for pure-capability code */
+	brk #0x1
+#else /* defined(__CHERI_PURE_CAPABILITY__) */
 	.cfi_startproc
 	ldr	x0, [x0, #8]
 	ret
 	.cfi_endproc
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_tlsdesc_static)
 
 /*
@@ -140,6 +202,10 @@ END(_rtld_tlsdesc_static)
  * Resolver function for weak and undefined TLS symbols
  */
 ENTRY(_rtld_tlsdesc_undef)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Currently unused and unimplemented for pure-capability code */
+	brk #0x1
+#else /* defined(__CHERI_PURE_CAPABILITY__) */
 	.cfi_startproc
 	str	x1, [sp, #-16]!
 	.cfi_adjust_cfa_offset	16
@@ -152,6 +218,7 @@ ENTRY(_rtld_tlsdesc_undef)
 	.cfi_adjust_cfa_offset 	-16
 	.cfi_endproc
 	ret
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_tlsdesc_undef)
 
 /*
@@ -160,6 +227,10 @@ END(_rtld_tlsdesc_undef)
  * Resolver function for TLS symbols from dlopen()
  */
 ENTRY(_rtld_tlsdesc_dynamic)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Currently unused and unimplemented for pure-capability code */
+	brk #0x1
+#else /* defined(__CHERI_PURE_CAPABILITY__) */
 	.cfi_startproc
 
 	/* Save registers used in fast path */
@@ -259,4 +330,5 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	.cfi_adjust_cfa_offset	-2 * 16
 	.cfi_endproc
 	ret
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_tlsdesc_dynamic)
