@@ -57,18 +57,38 @@
 #define	PIC_SYM(x,y)	x
 #endif
 
-/* Alias for link register x30 */
+#define	INT_WIDTH	8
+#define	INTN(n)		n
+#define	INT(n)		x ## n
+
+#if __has_feature(capabilities)
+#define	CAP_WIDTH	16
+#define	CAPN(n)		c ## n
+#define	CAP(n)		c ## n
+#else
+#define	CAP_WIDTH	INT_WIDTH
+#define	CAPN(n)		INTN(n)
+#define	CAP(n)		INT(n)
+#endif
+
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	REG_WIDTH	16
-#define	REGN(n)		c ## n
-#define	REG(n)		c ## n
+#define	PTR_WIDTH	CAP_WIDTH
+#define	PTRN(n)		CAPN(n)
+#define	PTR(n)		CAP(n)
+/* Alias for link register c30 */
 #define	clr		c30
 #else
-#define	REG_WIDTH	8
-#define	REGN(n)		n
-#define	REG(n)		x ## n
+#define	PTR_WIDTH	INT_WIDTH
+#define	PTRN(n)		INTN(n)
+#define	PTR(n)		INT(n)
+/* Alias for link register x30 */
 #define	lr		x30
 #endif
+
+/* TODO: Remove these confusing deprecated aliases. */
+#define	REG_WIDTH	PTR_WIDTH
+#define	REGN(n)		PTRN(n)
+#define	REG(n)		PTR(n)
 
 /*
  * Switch into C64 mode to use instructions only available in Morello.
