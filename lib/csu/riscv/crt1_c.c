@@ -50,11 +50,55 @@ extern int eprol;
 extern int etext;
 #endif
 
+/*
+ * For -pie executables rtld will process capability relocations, so we don't
+ * need to include the code here.
+ */
+#if __has_feature(capabilities) && !defined(PIC)
+#define SHOULD_PROCESS_CAP_RELOCS
+#endif
+
+#ifdef SHOULD_PROCESS_CAP_RELOCS
+#define DONT_EXPORT_CRT_INIT_GLOBALS
+#define CRT_INIT_GLOBALS_GDC_ONLY
+#include "crt_init_globals.c"
+#endif
+
 void __start(int argc, char **argv, char **env, void (*cleanup)(void));
 
 void
 __start(int argc, char **argv, char **env, void (*cleanup)(void))
 {
+
+#ifdef SHOULD_PROCESS_CAP_RELOCS
+	/*
+	 * Initialize __cap_relocs for static executables. The run-time linker
+	 * will initialise any for dynamic executables.
+	 */
+	if (&_DYNAMIC == NULL) {
+		const Elf_Auxinfo *auxp;
+		char **strp;
+		void *phdr = NULL;
+		long phnum = 0;
+
+		strp = env;
+		while (*strp++ != NULL)
+			;
+		auxp = (Elf_Auxinfo *)strp;
+
+		for (; auxp->a_type != AT_NULL; auxp++) {
+			if (auxp->a_type == AT_PHDR) {
+				phdr = auxp->a_un.a_ptr;
+			} else if (auxp->a_type == AT_PHNUM) {
+				phnum = auxp->a_un.a_val;
+			}
+		}
+
+		if (phdr != NULL && phnum != 0) {
+			do_crt_init_globals(phdr, phnum);
+		}
+	}
+#endif
 
 	handle_argv(argc, argv, env);
 
