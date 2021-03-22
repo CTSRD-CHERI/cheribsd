@@ -43,9 +43,6 @@ __unused static void cheri_init_globals(void);
 #error "cheri_init_globals.h is outdated. Please update LLVM"
 #endif
 
-extern bool add_cheri_plt_stub(const Obj_Entry *obj, const Obj_Entry *rtldobj,
-    Elf_Word r_symndx, void **where);
-
 /* FIXME: replace this with cheri_init_globals_impl once everyone has updated clang */
 static __attribute__((always_inline))
 void _do___caprelocs(const struct capreloc *start_relocs,

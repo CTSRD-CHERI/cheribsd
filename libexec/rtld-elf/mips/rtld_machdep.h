@@ -82,6 +82,9 @@ void *_mips_get_tls(void);
 	__CHERI_CAP_PERMISSION_PERMIT_EXECUTE__)
 
 #ifdef __CHERI_PURE_CAPABILITY__
+extern bool add_cheri_plt_stub(const Obj_Entry *obj, const Obj_Entry *rtldobj,
+    Elf_Word r_symndx, void **where);
+
 extern dlfunc_t find_external_call_thunk(const Elf_Sym* def, const Obj_Entry* defobj, size_t addend);
 
 static inline bool
