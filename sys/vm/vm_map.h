@@ -376,7 +376,6 @@ bool vm_map_range_valid_KBI(vm_map_t map, vm_offset_t start, vm_offset_t end);
 			_vm_map_lock_downgrade(map, LOCK_FILE, LOCK_LINE)
 
 long vmspace_resident_count(struct vmspace *vmspace);
-
 #endif	/* _KERNEL */
 
 /*
@@ -401,7 +400,6 @@ long vmspace_resident_count(struct vmspace *vmspace);
 #define	MAP_CREATE_STACK_GAP_UP	0x00010000
 #define	MAP_CREATE_STACK_GAP_DN	0x00020000
 #define	MAP_VN_EXEC		0x00040000
-
 /* Gap for MAP_ENTRY_SPLIT_BOUNDARY_MASK */
 
 #define	MAP_SPLIT_BOUNDARY_MASK	0x00180000

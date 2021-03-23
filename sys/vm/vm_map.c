@@ -1788,8 +1788,8 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 			return (KERN_NO_SPACE);
 	}
 
-	if ((cow & MAP_CREATE_GUARD) != 0 &&
-	    (object != NULL || max != VM_PROT_NONE))
+	if ((cow & MAP_CREATE_GUARD) != 0 && (object != NULL ||
+	    max != VM_PROT_NONE))
 		return (KERN_INVALID_ARGUMENT);
 
 	protoeflags = 0;
@@ -1965,11 +1965,6 @@ charged:
 		map->size += new_entry->end - new_entry->start;
 
 	vm_map_log("insert", new_entry);
-
-	/* 
-	 * XXX-AM: this is probably useless with reservations 
-	 *  as we split the reservation above
-	 */
 
 	/*
 	 * XXX-AM: this is probably useless with reservations
@@ -2158,7 +2153,6 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		if (result != KERN_SUCCESS)
 			goto out;
 	}
-
 	if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
 		result = vm_map_stack_locked(map, start, length, sgrowsiz,
 		    prot, max, cow);
@@ -2833,6 +2827,7 @@ vm_map_submap(
 	vm_map_lock(submap);
 	submap->flags |= MAP_IS_SUB_MAP;
 	vm_map_unlock(submap);
+
 	vm_map_lock(map);
 	VM_MAP_RANGE_CHECK(map, start, end);
 	if (vm_map_lookup_entry(map, start, &entry) && entry->end >= end &&
@@ -4306,7 +4301,6 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	 * Find the start of the region, and clip it.
 	 * Step through all entries in this region.
 	 */
-
 	rv = vm_map_lookup_clip_start(map, start, &entry, &scratch_entry);
 	if (rv != KERN_SUCCESS)
 		return (rv);
@@ -4939,9 +4933,8 @@ vm_map_stack(vm_map_t map, vm_pointer_t addrbos, vm_size_t max_ssize,
 		rv = KERN_NO_SPACE;
 		goto out;
 	}
-	rv = vm_map_stack_locked(map, addrbos, max_ssize, growsize,
-	    prot, max, cow);
-
+	rv = vm_map_stack_locked(map, addrbos, max_ssize, growsize, prot,
+	    max, cow);
 out:
 	vm_map_unlock(map);
 	return (rv);
@@ -5111,7 +5104,6 @@ retry:
 	/* If addr is not in a hole for a stack grow area, no need to grow. */
 	if (gap_entry == NULL && !vm_map_lookup_entry(map, addr, &gap_entry))
 		return (KERN_FAILURE);
-
 	if ((gap_entry->eflags & MAP_ENTRY_GUARD) == 0)
 		return (KERN_SUCCESS);
 	if ((gap_entry->eflags & MAP_ENTRY_STACK_GAP_DN) != 0) {

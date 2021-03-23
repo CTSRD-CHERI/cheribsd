@@ -1762,11 +1762,6 @@ bt_dump(const bt_t *bt, int (*pr)(const char *, ...))
 	    bt->bt_type, bt_type_string(bt->bt_type));
 }
 
-#endif /* defined(DDB) || defined(DIAGNOSTIC) */
-
-#if defined(DDB)
-#include <ddb/ddb.h>
-
 static void
 vmem_dump(const vmem_t *vm , int (*pr)(const char *, ...) __printflike(1, 2))
 {
@@ -1791,6 +1786,11 @@ vmem_dump(const vmem_t *vm , int (*pr)(const char *, ...) __printflike(1, 2))
 		}
 	}
 }
+
+#endif /* defined(DDB) || defined(DIAGNOSTIC) */
+
+#if defined(DDB)
+#include <ddb/ddb.h>
 
 static bt_t *
 vmem_whatis_lookup(vmem_t *vm, vmem_addr_t addr)
