@@ -486,11 +486,11 @@ native_start_all_aps(void)
 		mce_stack = (char *)kmem_malloc(MCE_STACK_SIZE,
 		    M_WAITOK | M_ZERO);
 		nmi_stack = (char *)kmem_malloc_domainset(
-		    DOMAINSET_PREF(domain), NMI_STACK_SIZE, M_WAITOK | M_ZERO, 0);
+		    DOMAINSET_PREF(domain), NMI_STACK_SIZE, M_WAITOK | M_ZERO);
 		dbg_stack = (char *)kmem_malloc_domainset(
-		    DOMAINSET_PREF(domain), DBG_STACK_SIZE, M_WAITOK | M_ZERO, 0);
+		    DOMAINSET_PREF(domain), DBG_STACK_SIZE, M_WAITOK | M_ZERO);
 		dpcpu = (void *)kmem_malloc_domainset(DOMAINSET_PREF(domain),
-		    DPCPU_SIZE, M_WAITOK | M_ZERO, 0);
+		    DPCPU_SIZE, M_WAITOK | M_ZERO);
 
 		bootSTK = (char *)bootstacks[cpu] +
 		    kstack_pages * PAGE_SIZE - 8;
@@ -1137,13 +1137,3 @@ invlop_handler(void)
 		    smp_tlb_addr2);
 	}
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20200612,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "support"
-//   ],
-//   "change_comment": "vm kmem_malloc alignment"
-// }
-// CHERI CHANGES END
