@@ -31,8 +31,8 @@
  */
 
 #include <machine/asm.h>
-#include <machine/cheriasm.h>
 
+#include <machine/cheriasm.h>
 #include <cheri/cherireg.h>
 
 .set noat
@@ -343,13 +343,3 @@ XEND(FUNC_PREFIX(memmovenocap_c))
 XEND(FUNC_PREFIX(memcpynocap_c))
 XEND(FUNC_PREFIX(memmove_c))
 END(FUNC_PREFIX(memcpy_c))
-
-// CHERI CHANGES START
-// {
-//   "updated": 20190517,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//	"support"
-//   ]
-// }
-// CHERI CHANGES END
