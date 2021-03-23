@@ -115,6 +115,12 @@ extern void * __capability swap_restore_cap;
 extern void * __capability kernel_sealcap;
 
 /*
+ * Capabilities used for colocation.
+ */
+extern void * __capability switcher_sealcap;
+extern void * __capability switcher_sealcap2;
+
+/*
  * Functions to create capabilities used in exec.
  */
 struct image_params;
@@ -156,6 +162,20 @@ extern u_int	security_cheri_debugger_on_sigprot;
 extern u_int	security_cheri_sandboxed_signals;
 extern u_int	security_cheri_syscall_violations;
 extern u_int	security_cheri_bound_legacy_capabilities;
+
+/*
+ * Functions exposed to machine-independent code that must interact with
+ * CHERI-specific features; e.g., ktrace.
+ */
+struct trapframe;
+void	colocation_cleanup(struct thread *td);
+void	colocation_get_peer(struct thread *td, struct thread **peertdp);
+void	colocation_thread_exit(struct thread *td);
+void	colocation_unborrow(struct thread *td);
+bool	colocation_trap_in_switcher(struct thread *td,
+	    struct trapframe *trapframe, const char *msg);
+void	colocation_update_tls(struct thread *td);
+void	db_print_scb_td(struct thread *td);
 #endif /* !_KERNEL */
 
 /*

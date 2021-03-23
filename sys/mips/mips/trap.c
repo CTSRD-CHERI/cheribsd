@@ -1032,6 +1032,7 @@ dofault:
 
 	case T_SYSCALL + T_USER:
 		{
+			colocation_unborrow(td);
 			syscallenter(td);
 
 #if !defined(SMP) && (defined(DDB) || defined(DEBUG))
@@ -1177,6 +1178,12 @@ dofault:
 
 	case T_C2E + T_USER:
 		msg = "USER_CHERI_EXCEPTION";
+		if (colocation_trap_in_switcher(td, trapframe, msg)) {
+			printf("%s: switcher trap at pc %#jx\n",
+			    __func__, (intmax_t)TRAPF_PC(trapframe));
+			TRAPF_PC_INCREMENT(trapframe, sizeof(int));
+			goto out;
+		}
 		fetch_bad_instr(trapframe);
 		if (log_user_cheri_exceptions)
 			log_c2e_exception(msg, trapframe, type);

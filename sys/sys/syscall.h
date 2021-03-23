@@ -154,6 +154,7 @@
 				/* 149 is old quota */
 				/* 150 is old getsockname */
 #define	SYS_coexecve	151
+#define	SYS_coexecvec	152
 #define	SYS_nlm_syscall	154
 #define	SYS_nfssvc	155
 				/* 156 is old getdirentries */
@@ -173,6 +174,10 @@
 				/* 174 is freebsd6 pwrite */
 #define	SYS_setfib	175
 #define	SYS_ntp_adjtime	176
+#define	SYS__cosetup	177
+#define	SYS_coregister	178
+#define	SYS_colookup	179
+#define	SYS_copark	180
 #define	SYS_setgid	181
 #define	SYS_setegid	182
 #define	SYS_seteuid	183
@@ -185,6 +190,7 @@
 #define	SYS_freebsd11_lstat	190
 #define	SYS_pathconf	191
 #define	SYS_fpathconf	192
+#define	SYS_cogetpid	193
 #define	SYS_getrlimit	194
 #define	SYS_setrlimit	195
 #define	SYS_freebsd11_getdirentries	196
@@ -486,8 +492,8 @@
 #define	SYS_ppoll	545
 #define	SYS_futimens	546
 #define	SYS_utimensat	547
-				/* 548 is obsolete numa_getaffinity */
-				/* 549 is obsolete numa_setaffinity */
+#define	SYS_cocall_slow	548
+#define	SYS_coaccept_slow	549
 #define	SYS_fdatasync	550
 #define	SYS_fstat	551
 #define	SYS_fstatat	552

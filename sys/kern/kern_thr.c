@@ -64,6 +64,10 @@ __FBSDID("$FreeBSD$");
 
 #include <security/audit/audit.h>
 
+#ifdef CPU_CHERI
+#include <cheri/cheri.h>
+#endif
+
 static SYSCTL_NODE(_kern, OID_AUTO, threads, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "thread allocation");
 
@@ -327,6 +331,10 @@ kern_thr_exit(struct thread *td)
 	struct proc *p;
 
 	p = td->td_proc;
+
+#ifdef CPU_CHERI
+	colocation_thread_exit(td);
+#endif
 
 	/*
 	 * If all of the threads in a process call this routine to

@@ -279,8 +279,16 @@ vm_map_range_valid(vm_map_t map, vm_offset_t start, vm_offset_t end)
 	return (true);
 }
 
+struct coname {
+	LIST_ENTRY(coname)	c_next;
+	char			*c_name;
+	void * __capability	c_value;
+};
+
 #endif	/* KLD_MODULE */
 #endif	/* _KERNEL */
+
+struct coname;
 
 /*
  * Shareable process virtual address space.
@@ -291,6 +299,7 @@ vm_map_range_valid(vm_map_t map, vm_offset_t start, vm_offset_t end)
 struct vmspace {
 	struct vm_map vm_map;	/* VM address map */
 	struct shmmap_state *vm_shm;	/* SYS5 shared memory private data XXX */
+	LIST_HEAD(, coname) vm_conames;
 	segsz_t vm_swrss;	/* resident set size before last swap */
 	segsz_t vm_tsize;	/* text size (pages) XXX */
 	segsz_t vm_dsize;	/* data size (pages) XXX */
@@ -542,6 +551,7 @@ int vm_map_wire_locked(vm_map_t map, vm_offset_t start, vm_offset_t end,
     int flags);
 long vmspace_swap_count(struct vmspace *vmspace);
 void vm_map_entry_set_vnode_text(vm_map_entry_t entry, bool add);
+pid_t vm_get_cap_owner(struct thread *td, const uintcap_t c);
 #endif				/* _KERNEL */
 #endif				/* _VM_MAP_ */
 // CHERI CHANGES START

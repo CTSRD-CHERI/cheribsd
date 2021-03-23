@@ -34,10 +34,87 @@
 #ifndef	_MACHINE_PROC_H_
 #define	_MACHINE_PROC_H_
 
+#ifdef CPU_CHERI
+/*
+ * When modifying this, make sure to update <machine/switcher.h>
+ */
+struct switchercb {
+	/*
+	 * Caller context: context of the thread that cocalled us.
+	 * This also serves as the callee's spinlock.  Must be first,
+	 * as the cllc instruction doesn't take an offset.
+	 *
+	 * This can also be set to a zero-length capability, with the offset
+	 * equal to errno to be returned by cocall(2).
+	 */
+	struct switchercb * __capability	scb_caller_scb;
+
+	/*
+	 * Callee context, context of the thread we're cocalling into.
+	 */
+	struct switchercb * __capability	scb_callee_scb;
+
+	/*
+	 * Thread owning the context; the same thread that called cosetup(2).
+	 */
+	struct thread				*scb_td;
+
+	/*
+	 * Thread owning the context we're lending our thread to.  When
+	 * calling cocall(), this will be the callee thread.  NULL when
+	 * not lending.
+	 */
+	struct thread				*scb_borrower_td;
+
+	/*
+	 * Capability to unseal peer context.
+	 */
+	void * __capability			scb_unsealcap;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_csp;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_cra;
+
+	/*
+	 * XXX
+	 */
+	const void * __capability		scb_outbuf;
+
+	/*
+	 * XXX
+	 */
+	size_t					scb_outlen;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_inbuf;
+
+	/*
+	 * XXX
+	 */
+	size_t					scb_inlen;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_cookiep;
+};
+#endif
+
 struct mdthread {
 	int	md_spinlock_count;	/* (k) */
 	register_t md_saved_sstatus_ie;	/* (k) */
 	int	md_flags;		/* (k) */
+#ifdef	CPU_CHERI
+	vaddr_t		md_scb;
+#endif
 };
 
 /* md_flags */

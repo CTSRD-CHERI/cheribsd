@@ -48,6 +48,75 @@
 #include <machine/octeon_cop2.h>
 #endif
 
+#ifdef CPU_CHERI
+/*
+ * When modifying this, make sure to update <machine/switcher.h>
+ */
+struct switchercb {
+	/*
+	 * Caller context: context of the thread that cocalled us.
+	 * This also serves as the callee's spinlock.  Must be first,
+	 * as the cllc instruction doesn't take an offset.
+	 *
+	 * This can also be set to a zero-length capability, with the offset
+	 * equal to errno to be returned by cocall(2).
+	 */
+	struct switchercb * __capability	scb_caller_scb;
+
+	/*
+	 * Callee context, context of the thread we're cocalling into.
+	 */
+	struct switchercb * __capability	scb_callee_scb;
+
+	/*
+	 * Thread owning the context; the same thread that called cosetup(2).
+	 */
+	struct thread				*scb_td;
+
+	/*
+	 * Thread owning the context we're lending our thread to.  When
+	 * calling cocall(), this will be the callee thread.  NULL when
+	 * not lending.
+	 */
+	struct thread				*scb_borrower_td;
+
+	/*
+	 * Capability to unseal peer context.
+	 */
+	void * __capability			scb_unsealcap;
+
+	/*
+	 * TLS pointer, to be returned by CReadHwr.
+	 */
+	void * __capability			scb_tls;
+
+	/*
+	 * $c11.
+	 */
+	void * __capability			scb_csp;
+
+	/*
+	 * $c17.
+	 */
+	void * __capability			scb_cra;
+
+	/*
+	 * $c6.
+	 */
+	void * __capability			scb_buf;
+
+	/*
+	 * $a0.
+	 */
+	size_t					scb_buflen;
+
+	/*
+	 * $c5.
+	 */
+	void * __capability			scb_cookiep;
+};
+#endif /* CPU_CHERI */
+
 /*
  * Machine-dependent part of the proc structure.
  */
@@ -73,6 +142,9 @@ struct mdthread {
 #define	COP2_OWNER_USERLAND	0x0000		/* Userland owns COP2 */
 #define	COP2_OWNER_KERNEL	0x0001		/* Kernel owns COP2 */
 	int		md_cop2owner;
+#endif
+#ifdef	CPU_CHERI
+	vaddr_t		md_scb;
 #endif
 };
 

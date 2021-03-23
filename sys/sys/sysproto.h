@@ -482,6 +482,13 @@ struct coexecve_args {
 	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
 	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
 };
+struct coexecvec_args {
+	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
+	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
+	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
+	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
+	char capv_l_[PADL_(char * __capability __capability * __capability)]; char * __capability __capability * __capability capv; char capv_r_[PADR_(char * __capability __capability * __capability)];
+};
 struct nlm_syscall_args {
 	char debug_level_l_[PADL_(int)]; int debug_level; char debug_level_r_[PADR_(int)];
 	char grace_period_l_[PADL_(int)]; int grace_period; char grace_period_r_[PADR_(int)];
@@ -536,6 +543,22 @@ struct setfib_args {
 struct ntp_adjtime_args {
 	char tp_l_[PADL_(struct timex * __capability)]; struct timex * __capability tp; char tp_r_[PADR_(struct timex * __capability)];
 };
+struct _cosetup_args {
+	char what_l_[PADL_(int)]; int what; char what_r_[PADR_(int)];
+	char code_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability code; char code_r_[PADR_(void * __capability __capability * __capability)];
+	char data_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability data; char data_r_[PADR_(void * __capability __capability * __capability)];
+};
+struct coregister_args {
+	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char cap_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability cap; char cap_r_[PADR_(void * __capability __capability * __capability)];
+};
+struct colookup_args {
+	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char cap_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability cap; char cap_r_[PADR_(void * __capability __capability * __capability)];
+};
+struct copark_args {
+	register_t dummy;
+};
 struct setgid_args {
 	char gid_l_[PADL_(gid_t)]; gid_t gid; char gid_r_[PADR_(gid_t)];
 };
@@ -552,6 +575,9 @@ struct pathconf_args {
 struct fpathconf_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
+};
+struct cogetpid_args {
+	char pidp_l_[PADL_(pid_t * __capability)]; pid_t * __capability pidp; char pidp_r_[PADR_(pid_t * __capability)];
 };
 struct __getrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
@@ -1703,6 +1729,20 @@ struct utimensat_args {
 	char times_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability times; char times_r_[PADR_(const struct timespec * __capability)];
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
 };
+struct cocall_slow_args {
+	char target_l_[PADL_(void * __capability __capability)]; void * __capability __capability target; char target_r_[PADR_(void * __capability __capability)];
+	char outbuf_l_[PADL_(const void * __capability __capability)]; const void * __capability __capability outbuf; char outbuf_r_[PADR_(const void * __capability __capability)];
+	char outlen_l_[PADL_(size_t)]; size_t outlen; char outlen_r_[PADR_(size_t)];
+	char inbuf_l_[PADL_(void * __capability __capability)]; void * __capability __capability inbuf; char inbuf_r_[PADR_(void * __capability __capability)];
+	char inlen_l_[PADL_(size_t)]; size_t inlen; char inlen_r_[PADR_(size_t)];
+};
+struct coaccept_slow_args {
+	char cookiep_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability cookiep; char cookiep_r_[PADR_(void * __capability __capability * __capability)];
+	char outbuf_l_[PADL_(const void * __capability __capability)]; const void * __capability __capability outbuf; char outbuf_r_[PADR_(const void * __capability __capability)];
+	char outlen_l_[PADL_(size_t)]; size_t outlen; char outlen_r_[PADR_(size_t)];
+	char inbuf_l_[PADL_(void * __capability __capability)]; void * __capability __capability inbuf; char inbuf_r_[PADR_(void * __capability __capability)];
+	char inlen_l_[PADL_(size_t)]; size_t inlen; char inlen_r_[PADR_(size_t)];
+};
 struct fdatasync_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 };
@@ -1953,6 +1993,7 @@ int	sys_adjtime(struct thread *, struct adjtime_args *);
 int	sys_setsid(struct thread *, struct setsid_args *);
 int	sys_quotactl(struct thread *, struct quotactl_args *);
 int	sys_coexecve(struct thread *, struct coexecve_args *);
+int	sys_coexecvec(struct thread *, struct coexecvec_args *);
 int	sys_nlm_syscall(struct thread *, struct nlm_syscall_args *);
 int	sys_nfssvc(struct thread *, struct nfssvc_args *);
 int	sys_lgetfh(struct thread *, struct lgetfh_args *);
@@ -1964,11 +2005,16 @@ int	sys_msgsys(struct thread *, struct msgsys_args *);
 int	sys_shmsys(struct thread *, struct shmsys_args *);
 int	sys_setfib(struct thread *, struct setfib_args *);
 int	sys_ntp_adjtime(struct thread *, struct ntp_adjtime_args *);
+int	sys__cosetup(struct thread *, struct _cosetup_args *);
+int	sys_coregister(struct thread *, struct coregister_args *);
+int	sys_colookup(struct thread *, struct colookup_args *);
+int	sys_copark(struct thread *, struct copark_args *);
 int	sys_setgid(struct thread *, struct setgid_args *);
 int	sys_setegid(struct thread *, struct setegid_args *);
 int	sys_seteuid(struct thread *, struct seteuid_args *);
 int	sys_pathconf(struct thread *, struct pathconf_args *);
 int	sys_fpathconf(struct thread *, struct fpathconf_args *);
+int	sys_cogetpid(struct thread *, struct cogetpid_args *);
 int	sys_getrlimit(struct thread *, struct __getrlimit_args *);
 int	sys_setrlimit(struct thread *, struct __setrlimit_args *);
 int	sys___sysctl(struct thread *, struct __sysctl_args *);
@@ -2219,6 +2265,8 @@ int	sys_procctl(struct thread *, struct procctl_args *);
 int	sys_ppoll(struct thread *, struct ppoll_args *);
 int	sys_futimens(struct thread *, struct futimens_args *);
 int	sys_utimensat(struct thread *, struct utimensat_args *);
+int	sys_cocall_slow(struct thread *, struct cocall_slow_args *);
+int	sys_coaccept_slow(struct thread *, struct coaccept_slow_args *);
 int	sys_fdatasync(struct thread *, struct fdatasync_args *);
 int	sys_fstat(struct thread *, struct fstat_args *);
 int	sys_fstatat(struct thread *, struct fstatat_args *);
@@ -2847,6 +2895,7 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 #define	SYS_AUE_oquota	AUE_O_QUOTA
 #define	SYS_AUE_ogetsockname	AUE_GETSOCKNAME
 #define	SYS_AUE_coexecve	AUE_NULL
+#define	SYS_AUE_coexecvec	AUE_NULL
 #define	SYS_AUE_nlm_syscall	AUE_NULL
 #define	SYS_AUE_nfssvc	AUE_NFS_SVC
 #define	SYS_AUE_ogetdirentries	AUE_GETDIRENTRIES
@@ -2866,6 +2915,10 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 #define	SYS_AUE_freebsd6_pwrite	AUE_PWRITE
 #define	SYS_AUE_setfib	AUE_SETFIB
 #define	SYS_AUE_ntp_adjtime	AUE_NTP_ADJTIME
+#define	SYS_AUE__cosetup	AUE_NULL
+#define	SYS_AUE_coregister	AUE_NULL
+#define	SYS_AUE_colookup	AUE_NULL
+#define	SYS_AUE_copark	AUE_NULL
 #define	SYS_AUE_setgid	AUE_SETGID
 #define	SYS_AUE_setegid	AUE_SETEGID
 #define	SYS_AUE_seteuid	AUE_SETEUID
@@ -2874,6 +2927,7 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 #define	SYS_AUE_freebsd11_lstat	AUE_LSTAT
 #define	SYS_AUE_pathconf	AUE_PATHCONF
 #define	SYS_AUE_fpathconf	AUE_FPATHCONF
+#define	SYS_AUE_cogetpid	AUE_NULL
 #define	SYS_AUE_getrlimit	AUE_GETRLIMIT
 #define	SYS_AUE_setrlimit	AUE_SETRLIMIT
 #define	SYS_AUE_freebsd11_getdirentries	AUE_GETDIRENTRIES
@@ -3153,6 +3207,8 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 #define	SYS_AUE_ppoll	AUE_POLL
 #define	SYS_AUE_futimens	AUE_FUTIMES
 #define	SYS_AUE_utimensat	AUE_FUTIMESAT
+#define	SYS_AUE_cocall_slow	AUE_NULL
+#define	SYS_AUE_coaccept_slow	AUE_NULL
 #define	SYS_AUE_fdatasync	AUE_FSYNC
 #define	SYS_AUE_fstat	AUE_FSTAT
 #define	SYS_AUE_fstatat	AUE_FSTATAT

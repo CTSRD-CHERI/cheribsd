@@ -56,6 +56,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_page.h>
 #include <vm/vm_pager.h>
 
+#include <machine/md_var.h>
+
 static struct sx shared_page_alloc_sx;
 static vm_object_t shared_page_obj;
 static int shared_page_free;
@@ -347,6 +349,14 @@ exec_sysvec_init(void *param)
 		sv->sv_fxrng_gen_base = sv->sv_shared_page_base + base;
 	}
 #endif
+	if ((sv->sv_flags & SV_CHERI) != 0) {
+		sv->sv_cocall_base = sv->sv_shared_page_base +
+		    shared_page_fill(szswitcher_cocall, 16, switcher_cocall);
+		sv->sv_cocall_len = szswitcher_cocall;
+		sv->sv_coaccept_base = sv->sv_shared_page_base +
+		    shared_page_fill(szswitcher_coaccept, 16, switcher_coaccept);
+		sv->sv_coaccept_len = szswitcher_coaccept;
+	}
 }
 
 void

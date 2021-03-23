@@ -175,6 +175,9 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 		KASSERT((td2->td_frame->sr & MIPS_SR_COP_2_BIT) != 0,
 		    ("%s: COP2 not enabled in trapframe", __func__));
 #endif
+#ifdef CPU_CHERI
+	colocation_cleanup(td2);
+#endif
 #ifdef CPU_CNMIPS
 	if (td1->td_md.md_flags & MDTD_COP2USED) {
 		if (td1->td_md.md_cop2owner == COP2_OWNER_USERLAND) {
@@ -313,6 +316,11 @@ cpu_thread_alloc(struct thread *td)
 	td->td_pcb = (struct pcb *)(td->td_kstack +
 	    td->td_kstack_pages * PAGE_SIZE) - 1;
 	td->td_frame = &td->td_pcb->pcb_regs;
+
+#ifdef CPU_CHERI
+	colocation_cleanup(td);
+#endif
+
 #ifdef KSTACK_LARGE_PAGE
 	/* Just one entry for one large kernel page. */
 	pte = pmap_pte(kernel_pmap, td->td_kstack);
@@ -640,11 +648,13 @@ cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 		 * with the '_thread' attribute).
 		 */
 #if __has_feature(capabilities)
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 			__asm __volatile ("cwritehwr %0, $chwr_userlocal"
 			    :
 			    : "C" ((char * __capability)td->td_md.md_tls +
 				td->td_proc->p_md.md_tls_tcb_offset));
+			colocation_update_tls(td);
+		}
 		else
 #endif
 		if (cpuinfo.userlocal_reg == true) {

@@ -1,0 +1,101 @@
+.\"
+.\" Copyright (c) 2018 Edward Tomasz Napierala <en322@cl.cam.ac.uk>
+.\" All rights reserved.
+.\"
+.\" This software was developed by SRI International and the University of
+.\" Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+.\" ("CTSRD"), as part of the DARPA CRASH research programme.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" $FreeBSD$
+.\"
+.Dd December 1, 2020
+.Dt COPONG 1
+.Os
+.Sh NAME
+.Nm copong
+.Nd colocated ping responder
+.Sh SYNOPSIS
+.Nm
+.Op Fl k
+.Op Fl s Ar time
+.Op Fl v
+.Op Fl x
+.Ar service-name
+.Op Ar target-name ...
+.Sh DESCRIPTION
+The
+.Nm
+utility is used to answer to colocated pings from
+.Xr coping 1
+and
+.Xr syscall_timing 1 .
+If
+.Ar target-name
+is specified, upon receiving a ping it will cocall into each of the targets
+before returning.
+.Pp
+The following options are available:
+.Bl -tag -width ".Fl v"
+.It Fl k
+Use
+.Xr coaccept_slow 2
+instead of
+.Xr coaccept 2 .
+.It Fl s Ar time
+Number of seconds to pause before calling
+.Xr coaccept 2 .
+Defaults to zero.
+.It Fl v
+Be verbose.
+.It Fl x
+Call
+.Xr abort 3
+at an unfortunate moment.
+.El
+.Sh EXIT STATUS
+The
+.Nm
+utility exits 0 on success, and >0 if an error occurs.
+.Sh EXAMPLES
+Execute in background within the address space of the current
+shell process:
+.Dl coexec Ar $$ Ar /usr/bin/copong target-name &
+.Pp
+.Sh SEE ALSO
+.Xr coexec 1 ,
+.Xr coping 1 ,
+.Xr coaccept 2
+.Sh HISTORY
+The
+.Nm
+command appeared in
+.Tn CheriBSD .
+.Sh AUTHORS
+.An -nosplit
+The
+.Nm
+utility was developed by
+.An Edward Tomasz Napierala Aq Mt trasz@FreeBSD.org
+at the University of Cambridge Computer Laboratory under DARPA/AFRL contract
+(FA8750-10-C-0237) ("CTSRD"), as part of the DARPA CRASH research programme.

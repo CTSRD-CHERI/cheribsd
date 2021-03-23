@@ -697,6 +697,22 @@ int	freebsd11_kern_getdirentries(struct thread *td, int fd,
 	    char * __capability ubuf, u_int count, long *basep,
 	    void (*func)(struct freebsd11_dirent *));
 
+int	kern_cosetup(struct thread *td, int what,
+	    void * __capability * __capability codep,
+	    void * __capability * __capability datap);
+int	kern_coregister(struct thread *td, const char * __capability namep,
+	    void * __capability * __capability capp);
+int	kern_colookup(struct thread *td, const char * __capability namep,
+	    void * __capability * __capability capp);
+int	kern_cogetpid(struct thread *td, pid_t * __capability pidp);
+int	kern_copark(struct thread *td);
+int	kern_cocall_slow(void * __capability target,
+	    const void * __capability outbuf, size_t outlen,
+	    void * __capability inbuf, size_t inlen);
+int	kern_coaccept_slow(void * __capability * __capability cookiep,
+	    const void * __capability outbuf, size_t outlen,
+	    void * __capability inbuf, size_t inlen);
+
 #endif /* !_SYS_SYSCALLSUBR_H_ */
 // CHERI CHANGES START
 // {

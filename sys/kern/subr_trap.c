@@ -201,8 +201,9 @@ userret(struct thread *td, struct trapframe *frame)
 void
 ast(struct trapframe *framep)
 {
-	struct thread *td;
+	struct thread *td, *peertd;
 	struct proc *p;
+	bool borrowing;
 	int flags, sig;
 
 	td = curthread;
@@ -309,12 +310,24 @@ ast(struct trapframe *framep)
 #endif
 
 	/*
+	 * Check if we're borrowing a thread over a cocall; if so - just
+	 * ignore the signals, we can't deliver them here.
+	 */
+	colocation_get_peer(td, &peertd);
+	if (peertd != NULL) {
+		//printf("%s: bingo, td %p, peertd %p\n", __func__, td, peertd);
+		borrowing = true;
+	} else {
+		borrowing = false;
+	}
+
+	/*
 	 * Check for signals. Unlocked reads of p_pendingcnt or
 	 * p_siglist might cause process-directed signal to be handled
 	 * later.
 	 */
-	if (flags & TDF_NEEDSIGCHK || p->p_pendingcnt > 0 ||
-	    !SIGISEMPTY(p->p_siglist)) {
+	if (!borrowing && (flags & TDF_NEEDSIGCHK || p->p_pendingcnt > 0 ||
+	    !SIGISEMPTY(p->p_siglist))) {
 		sigfastblock_fetch(td);
 		if ((td->td_pflags & TDP_SIGFASTBLOCK) != 0 &&
 		    td->td_sigblock_val != 0) {

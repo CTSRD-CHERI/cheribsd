@@ -1,0 +1,138 @@
+.\"
+.\" Copyright (c) 2018 Edward Tomasz Napierala <en322@cl.cam.ac.uk>
+.\" All rights reserved.
+.\"
+.\" This software was developed by SRI International and the University of
+.\" Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+.\" ("CTSRD"), as part of the DARPA CRASH research programme.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" $FreeBSD$
+.\"
+.Dd April 30, 2020
+.Dt COACCEPT 2
+.Os
+.Sh NAME
+.Nm COACCEPT
+.Nd accept a colocated call
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In unistd.h
+.Ft int
+.Fn coaccept "void * __capability * __capability cookiep" "const void * __capability outbuf" "size_t outlen" "void * __capability inbuf" "size_t inlen"
+.Fn coaccept_slow "void * __capability * __capability cookiep" "const void * __capability outbuf" "size_t outlen" "void * __capability inbuf" "size_t inlen"
+.Sh DESCRIPTION
+The
+.Fn coaccept
+function accepts a colocated call.
+Before passing execution to the callee, at most
+.Fa outlen
+bytes pointed to by
+.Fa outbuf
+will be copied from the input buffer provided by the caller.
+Before returning to the caller,
+.Fa outlen
+bytes pointed to by
+.Fa outbuf
+will be copied back to the caller.
+Any capabilities copied will have their tag bits cleared.
+The
+.Fn coaccept_slow 2
+provides the same semantics, but implemented as a traditional system call.
+.Pp
+If
+.Ar cookiep
+is not NULL, the capability it points at will be set to an opaque,
+token that uniquely identifies the caller; the token can be passed to
+.Xr cogetpid 2 .
+The
+.Fa outbuf ,
+.Fa inbuf ,
+.Fa outlen ,
+and
+.Fa inlen
+values must be 8-byte aligned.
+.Pp
+Before calling those functions for the first time, one must call
+.Xr cosetup 2
+with
+.Dv COSETUP_COACCEPT
+argument.
+.Sh RETURN VALUES
+.Rv -std coaccept
+.Sh ERRORS
+The
+.Fn coaccept
+function will fail if:
+.Bl -tag -width Er
+.It Bq Er EFAULT
+The
+.Fa inbuf
+or
+.Fa outbuf
+arguments point outside the process's allocated address space,
+or the
+.Fa inlen
+or
+.Fa outlen
+reach beyond the allocated memory.
+.Sh EXAMPLES
+Basic usage example:
+.Bd -literal
+	void * __capability cookie;
+	uint64_t buf[MAXBSIZE];
+
+	error = cosetup(COSETUP_COACCEPT);
+	if (error != 0)
+		err(1, "cosetup");
+
+	error = coregister("target-name", NULL);
+	if (error != 0)
+		err(1, "coregister");
+
+	for (;;) {
+		error = coaccept(&cookie, buf, sizeof(buf), buf, sizeof(buf));
+		if (error != 0)
+			err(1, "coaccept");
+	}
+.Ed
+.Sh SEE ALSO
+.Xr copong 1 ,
+.Xr cocall 2 ,
+.Xr coexec 2 ,
+.Xr cogetpid 2 ,
+.Xr colookup 2 ,
+.Xr coregister 2 ,
+.Xr cosetup 2
+.Sh HISTORY
+The
+.Fn coaccept
+system call first appeared in
+.Tn CheriBSD .
+.Sh AUTHORS
+.An -nosplit
+These functions were created by
+.An Edward Tomasz Napierala Aq Mt trasz@FreeBSD.org
+at the University of Cambridge Computer Laboratory under DARPA/AFRL contract
+(FA8750-10-C-0237) ("CTSRD"), as part of the DARPA CRASH research programme.

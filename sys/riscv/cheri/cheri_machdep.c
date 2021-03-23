@@ -64,6 +64,16 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_USERSPACE_PERMS);
 	userspace_sealcap = ctemp;
 
+	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_SWITCHER_BASE);
+	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_SWITCHER_LENGTH);
+	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_SWITCHER_PERMS);
+	switcher_sealcap = ctemp;
+
+	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_SWITCHER2_BASE);
+	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_SWITCHER2_LENGTH);
+	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_SWITCHER2_PERMS);
+	switcher_sealcap2 = ctemp;
+
 	swap_restore_cap = kroot;
 }
 

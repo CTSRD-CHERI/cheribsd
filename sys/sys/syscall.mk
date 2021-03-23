@@ -106,6 +106,7 @@ MIASM =  \
 	setsid.o \
 	quotactl.o \
 	coexecve.o \
+	coexecvec.o \
 	nlm_syscall.o \
 	nfssvc.o \
 	lgetfh.o \
@@ -117,6 +118,10 @@ MIASM =  \
 	shmsys.o \
 	setfib.o \
 	ntp_adjtime.o \
+	_cosetup.o \
+	coregister.o \
+	colookup.o \
+	copark.o \
 	setgid.o \
 	setegid.o \
 	seteuid.o \
@@ -125,6 +130,7 @@ MIASM =  \
 	freebsd11_lstat.o \
 	pathconf.o \
 	fpathconf.o \
+	cogetpid.o \
 	getrlimit.o \
 	setrlimit.o \
 	freebsd11_getdirentries.o \
@@ -394,6 +400,8 @@ MIASM =  \
 	ppoll.o \
 	futimens.o \
 	utimensat.o \
+	cocall_slow.o \
+	coaccept_slow.o \
 	fdatasync.o \
 	fstat.o \
 	fstatat.o \

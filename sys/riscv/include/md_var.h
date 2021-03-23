@@ -40,6 +40,10 @@ extern int szsigcode;
 extern char freebsd64_sigcode[];
 extern int freebsd64_szsigcode;
 #endif
+extern	char	switcher_cocall[];
+extern	int	szswitcher_cocall;
+extern	char	switcher_coaccept[];
+extern	int	szswitcher_coaccept;
 extern u_long elf_hwcap;
 extern register_t mvendorid;
 extern register_t marchid;

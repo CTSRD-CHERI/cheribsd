@@ -54,6 +54,10 @@ extern	int	szsigcode32;
 extern	char	freebsd64_sigcode[];
 extern	int	freebsd64_szsigcode;
 #endif
+extern	char	switcher_cocall[];
+extern	int	szswitcher_cocall;
+extern	char	switcher_coaccept[];
+extern	int	szswitcher_coaccept;
 
 extern vm_offset_t kstack0;
 extern vm_offset_t kernel_kseg0_end;

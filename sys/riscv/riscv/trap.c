@@ -49,6 +49,7 @@ __FBSDID("$FreeBSD$");
 #ifdef KDB
 #include <sys/kdb.h>
 #endif
+#include <ddb/ddb.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -77,7 +78,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #if __has_feature(capabilities)
-int log_user_cheri_exceptions = 0;
+int log_user_cheri_exceptions = 1;
 SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RWTUN,
     &log_user_cheri_exceptions, 0,
     "Print registers and process details on user CHERI exceptions");
@@ -94,6 +95,8 @@ extern u_int qemu_trace_buffered;
 /* Called from exception.S */
 void do_trap_supervisor(struct trapframe *);
 void do_trap_user(struct trapframe *);
+
+static void db_show_frame_td(struct thread *td);
 
 static __inline void
 call_trapsignal(struct thread *td, int sig, int code, uintcap_t addr,
@@ -197,42 +200,11 @@ cpu_fetch_syscall_args(struct thread *td)
 
 #include "../../kern/subr_syscall.c"
 
-#if __has_feature(capabilities)
-#define PRINT_REG(name, value)	\
-	printf(name " = %#.16lp\n", (void * __capability)(value));
-#define PRINT_REG_N(name, n, array)	\
-	printf(name "[%d] = %#.16lp\n", n, (void * __capability)(array)[n]);
-#else
-#define PRINT_REG(name, value)	printf(name " = 0x%016lx\n", value)
-#define PRINT_REG_N(name, n, array)	\
-	printf(name "[%d] = 0x%016lx\n", n, (array)[n])
-#endif
-
 static void
 dump_regs(struct trapframe *frame)
 {
-	u_int i;
 
-	PRINT_REG("ra", frame->tf_ra);
-	PRINT_REG("sp", frame->tf_sp);
-	PRINT_REG("gp", frame->tf_gp);
-	PRINT_REG("tp", frame->tf_tp);
-
-	for (i = 0; i < nitems(frame->tf_t); i++)
-		PRINT_REG_N("t", i, frame->tf_t);
-
-	for (i = 0; i < nitems(frame->tf_s); i++)
-		PRINT_REG_N("s", i, frame->tf_s);
-
-	for (i = 0; i < nitems(frame->tf_a); i++)
-		PRINT_REG_N("a", i, frame->tf_a);
-
-	PRINT_REG("sepc", frame->tf_sepc);
-#if __has_feature(capabilities)
-	PRINT_REG("ddc", frame->tf_ddc);
-#endif
-	printf("sstatus == 0x%016lx\n", frame->tf_sstatus);
-	printf("stval == 0x%016lx\n", frame->tf_stval);
+	db_show_frame_td(curthread);
 }
 
 #if __has_feature(capabilities)
@@ -241,6 +213,7 @@ dump_cheri_exception(struct trapframe *frame)
 {
 	struct thread *td;
 	struct proc *p;
+	uint64_t exccode;
 
 	td = curthread;
 	p = td->td_proc;
@@ -254,8 +227,9 @@ dump_cheri_exception(struct trapframe *frame)
 		printf("STORE/AMO CAP page fault");
 		break;
 	case SCAUSE_CHERI:
-		printf("CHERI fault (type %#lx), capidx %ld",
-		    TVAL_CAP_CAUSE(frame->tf_stval),
+		exccode = TVAL_CAP_CAUSE(frame->tf_stval);
+		printf("CHERI fault (type %#lx<%s>), capidx %ld",
+		    exccode, cheri_exccode_string(exccode),
 		    TVAL_CAP_IDX(frame->tf_stval));
 		break;
 	default:
@@ -355,6 +329,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
+			colocation_trap_in_switcher(td, frame, "bad page fault");
 			call_trapsignal(td, sig, ucode, stval,
 			    frame->tf_scause & SCAUSE_CODE, 0);
 		} else {
@@ -387,6 +362,7 @@ void
 do_trap_supervisor(struct trapframe *frame)
 {
 	uint64_t exception;
+	uint64_t exccode;
 
 	/* Ensure we came from supervisor mode, interrupts disabled */
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) ==
@@ -456,8 +432,9 @@ do_trap_supervisor(struct trapframe *frame)
 			    frame->tf_stval);
 			break;
 		case SCAUSE_CHERI:
-			panic("CHERI exception %#lx at 0x%016lx\n",
-			    TVAL_CAP_CAUSE(frame->tf_stval),
+			exccode = TVAL_CAP_CAUSE(frame->tf_stval);
+			panic("CHERI exception %#lx<%s> at 0x%016lx\n",
+			    exccode, cheri_exccode_string(exccode),
 			    (__cheri_addr unsigned long)frame->tf_sepc);
 			break;
 		}
@@ -501,6 +478,7 @@ do_trap_user(struct trapframe *frame)
 	case SCAUSE_LOAD_ACCESS_FAULT:
 	case SCAUSE_STORE_ACCESS_FAULT:
 	case SCAUSE_INST_ACCESS_FAULT:
+		colocation_trap_in_switcher(td, frame, "load/store fault");
 		call_trapsignal(td, SIGBUS, BUS_ADRERR, frame->tf_sepc,
 		    exception, 0);
 		userret(td, frame);
@@ -512,6 +490,7 @@ do_trap_user(struct trapframe *frame)
 		break;
 	case SCAUSE_ECALL_USER:
 		frame->tf_sepc += 4;	/* Next instruction */
+		colocation_unborrow(td);
 		ecall_handler();
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
@@ -528,11 +507,13 @@ do_trap_user(struct trapframe *frame)
 			break;
 		}
 #endif
+		colocation_trap_in_switcher(td, frame, "illegal instruction");
 		call_trapsignal(td, SIGILL, ILL_ILLTRP, frame->tf_sepc,
 		    exception, 0);
 		userret(td, frame);
 		break;
 	case SCAUSE_BREAKPOINT:
+		colocation_trap_in_switcher(td, frame, "breakpoint");
 		call_trapsignal(td, SIGTRAP, TRAP_BRKPT, frame->tf_sepc,
 		    exception, 0);
 		userret(td, frame);
@@ -541,22 +522,26 @@ do_trap_user(struct trapframe *frame)
 	/* M-mode emulates alignment of non-CHERI instructions */
 	case SCAUSE_LOAD_MISALIGNED:
 	case SCAUSE_STORE_MISALIGNED:
+		colocation_trap_in_switcher(td, frame, "misaligned load/store");
 		call_trapsignal(td, SIGBUS, BUS_ADRALN,
 		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
 	case SCAUSE_LOAD_CAP_PAGE_FAULT:
+		colocation_trap_in_switcher(td, frame, "load cap page fault");
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
 		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
 	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
+		colocation_trap_in_switcher(td, frame, "store amo cap page fault");
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
 		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
 	case SCAUSE_CHERI:
+		colocation_trap_in_switcher(td, frame, "cheri fault");
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGPROT,
@@ -570,4 +555,78 @@ do_trap_user(struct trapframe *frame)
 		panic("Unknown userland exception %lx, trap value %lx\n",
 		    exception, frame->tf_stval);
 	}
+}
+
+void
+db_print_cap(struct thread *td, const char *name, const void * __capability value)
+{
+	pid_t pid;
+	const void * __capability tmp;
+
+	tmp = (const void * __capability)value;
+	pid = vm_get_cap_owner(td, (uintcap_t)value);
+
+	if (pid >= 0) {
+		(kdb_active ? db_printf : printf)("%s%#lp (pid %d)\n",
+		    name, &tmp, pid);
+	} else {
+		(kdb_active ? db_printf : printf)("%s%#lp\n", name, &tmp);
+	}
+}
+
+static void
+db_show_frame_td(struct thread *td)
+{
+	struct trapframe *frame;
+
+	frame = td->td_frame;
+
+	db_print_cap(td, " x1/ra:  ", (void * __capability)frame->tf_ra);
+	db_print_cap(td, " x2/sp:  ", (void * __capability)frame->tf_sp);
+	db_print_cap(td, " x3/gp:  ", (void * __capability)frame->tf_gp);
+	db_print_cap(td, " x4/tp:  ", (void * __capability)frame->tf_tp);
+	db_print_cap(td, " x5/t0:  ", (void * __capability)frame->tf_t[0]);
+	db_print_cap(td, " x6/t1:  ", (void * __capability)frame->tf_t[1]);
+	db_print_cap(td, " x7/t2:  ", (void * __capability)frame->tf_t[2]);
+	db_print_cap(td, " x8/s0:  ", (void * __capability)frame->tf_s[0]);
+	db_print_cap(td, " x9/s1:  ", (void * __capability)frame->tf_s[1]);
+	db_print_cap(td, "x10/a0:  ", (void * __capability)frame->tf_a[0]);
+	db_print_cap(td, "x11/a1:  ", (void * __capability)frame->tf_a[1]);
+	db_print_cap(td, "x12/a2:  ", (void * __capability)frame->tf_a[2]);
+	db_print_cap(td, "x13/a3:  ", (void * __capability)frame->tf_a[3]);
+	db_print_cap(td, "x14/a4:  ", (void * __capability)frame->tf_a[4]);
+	db_print_cap(td, "x15/a5:  ", (void * __capability)frame->tf_a[5]);
+	db_print_cap(td, "x16/a6:  ", (void * __capability)frame->tf_a[6]);
+	db_print_cap(td, "x17/a7:  ", (void * __capability)frame->tf_a[7]);
+	db_print_cap(td, "x18/s2:  ", (void * __capability)frame->tf_s[2]);
+	db_print_cap(td, "x19/s3:  ", (void * __capability)frame->tf_s[3]);
+	db_print_cap(td, "x20/s4:  ", (void * __capability)frame->tf_s[4]);
+	db_print_cap(td, "x21/s5:  ", (void * __capability)frame->tf_s[5]);
+	db_print_cap(td, "x22/s6:  ", (void * __capability)frame->tf_s[6]);
+	db_print_cap(td, "x23/s7:  ", (void * __capability)frame->tf_s[7]);
+	db_print_cap(td, "x24/s8:  ", (void * __capability)frame->tf_s[8]);
+	db_print_cap(td, "x25/s9:  ", (void * __capability)frame->tf_s[9]);
+	db_print_cap(td, "x26/s10: ", (void * __capability)frame->tf_s[10]);
+	db_print_cap(td, "x27/s11: ", (void * __capability)frame->tf_s[11]);
+	db_print_cap(td, "x28/t3:  ", (void * __capability)frame->tf_t[3]);
+	db_print_cap(td, "x29/t4:  ", (void * __capability)frame->tf_t[4]);
+	db_print_cap(td, "x30/t5:  ", (void * __capability)frame->tf_t[5]);
+	db_print_cap(td, "x31/t6:  ", (void * __capability)frame->tf_t[6]);
+	db_print_cap(td, "  sepc:  ", (void * __capability)frame->tf_sepc);
+	db_print_cap(td, "   ddc:  ", (void * __capability)frame->tf_ddc);
+	db_print_cap(td, "sstatus: ", (void * __capability)frame->tf_sstatus);
+	db_print_cap(td, " stval:  ", (void * __capability)frame->tf_stval);
+	db_print_cap(td, "scause:  ", (void * __capability)frame->tf_scause);
+}
+
+DB_SHOW_COMMAND(frame, db_show_frame)
+{
+	struct thread *td;
+
+	if (have_addr)
+		td = db_lookup_thread(addr, true);
+	else
+		td = curthread;
+
+	db_show_frame_td(td);
 }

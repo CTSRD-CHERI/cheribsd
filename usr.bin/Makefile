@@ -26,6 +26,8 @@ SUBDIR=	alias \
 	column \
 	comm \
 	compress \
+	coping \
+	copong \
 	cpuset \
 	csplit \
 	ctlstat \
@@ -144,6 +146,7 @@ SUBDIR=	alias \
 	soelim \
 	sort \
 	split \
+	stevie \
 	stat \
 	stdbuf \
 	strings \

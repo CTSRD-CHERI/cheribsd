@@ -200,6 +200,29 @@ VECTOR(_locore, unknown)
 	csc	CHERI_REG_C27, t0, 0($ddc)
 
 	/*
+	 * Create capabilities for the colocation switcher.
+	 */
+	cmove		CHERI_REG_C27, CHERI_REG_C28
+	REG_LI	t0, CHERI_SEALCAP_SWITCHER_BASE
+	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0
+	REG_LI	t0, CHERI_SEALCAP_SWITCHER_LENGTH
+	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
+	REG_LI	t0, CHERI_SEALCAP_SWITCHER_PERMS
+	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
+	PTR_LA	t0, _C_LABEL(switcher_sealcap)
+	csc	CHERI_REG_C27, t0, 0($ddc)
+
+	cmove		CHERI_REG_C27, CHERI_REG_C28
+	REG_LI	t0, CHERI_SEALCAP_SWITCHER2_BASE
+	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0
+	REG_LI	t0, CHERI_SEALCAP_SWITCHER2_LENGTH
+	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
+	REG_LI	t0, CHERI_SEALCAP_SWITCHER2_PERMS
+	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
+	PTR_LA	t0, _C_LABEL(switcher_sealcap2)
+	csc	CHERI_REG_C27, t0, 0($ddc)
+
+	/*
 	 * Store the omnipotent capability to allow swap to be restored.
 	 */
 	PTR_LA	t0, _C_LABEL(swap_restore_cap)

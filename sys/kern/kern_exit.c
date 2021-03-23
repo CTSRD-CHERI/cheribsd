@@ -95,6 +95,10 @@ __FBSDID("$FreeBSD$");
 dtrace_execexit_func_t	dtrace_fasttrap_exit;
 #endif
 
+#ifdef CPU_CHERI
+#include <cheri/cheri.h>
+#endif
+
 SDT_PROVIDER_DECLARE(proc);
 SDT_PROBE_DEFINE1(proc, , , exit, "int");
 
@@ -363,6 +367,10 @@ exit1(struct thread *td, int rval, int signo)
 
 	umtx_thread_exit(td);
 	seltdfini(td);
+
+#ifdef CPU_CHERI
+	colocation_thread_exit(td);
+#endif
 
 	/*
 	 * Reset any sigio structures pointing to us as a result of

@@ -819,6 +819,17 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
+	/* coexecvec */
+	case 152: {
+		struct coexecvec_args *p = params;
+		iarg[0] = p->pid; /* pid_t */
+		uarg[1] = (intptr_t) p->fname; /* const char * __capability */
+		uarg[2] = (intptr_t) p->argv; /* char * __capability * __capability */
+		uarg[3] = (intptr_t) p->envv; /* char * __capability * __capability */
+		uarg[4] = (intptr_t) p->capv; /* char * __capability __capability * __capability */
+		*n_args = 5;
+		break;
+	}
 	/* nlm_syscall */
 	case 154: {
 		struct nlm_syscall_args *p = params;
@@ -917,6 +928,36 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
+	/* _cosetup */
+	case 177: {
+		struct _cosetup_args *p = params;
+		iarg[0] = p->what; /* int */
+		uarg[1] = (intptr_t) p->code; /* void * __capability __capability * __capability */
+		uarg[2] = (intptr_t) p->data; /* void * __capability __capability * __capability */
+		*n_args = 3;
+		break;
+	}
+	/* coregister */
+	case 178: {
+		struct coregister_args *p = params;
+		uarg[0] = (intptr_t) p->name; /* const char * __capability */
+		uarg[1] = (intptr_t) p->cap; /* void * __capability __capability * __capability */
+		*n_args = 2;
+		break;
+	}
+	/* colookup */
+	case 179: {
+		struct colookup_args *p = params;
+		uarg[0] = (intptr_t) p->name; /* const char * __capability */
+		uarg[1] = (intptr_t) p->cap; /* void * __capability __capability * __capability */
+		*n_args = 2;
+		break;
+	}
+	/* copark */
+	case 180: {
+		*n_args = 0;
+		break;
+	}
 	/* setgid */
 	case 181: {
 		struct setgid_args *p = params;
@@ -952,6 +993,13 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->name; /* int */
 		*n_args = 2;
+		break;
+	}
+	/* cogetpid */
+	case 193: {
+		struct cogetpid_args *p = params;
+		uarg[0] = (intptr_t) p->pidp; /* pid_t * __capability */
+		*n_args = 1;
 		break;
 	}
 	/* getrlimit */
@@ -3147,6 +3195,28 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
+	/* cocall_slow */
+	case 548: {
+		struct cocall_slow_args *p = params;
+		uarg[0] = (intptr_t) p->target; /* void * __capability __capability */
+		uarg[1] = (intptr_t) p->outbuf; /* const void * __capability __capability */
+		uarg[2] = p->outlen; /* size_t */
+		uarg[3] = (intptr_t) p->inbuf; /* void * __capability __capability */
+		uarg[4] = p->inlen; /* size_t */
+		*n_args = 5;
+		break;
+	}
+	/* coaccept_slow */
+	case 549: {
+		struct coaccept_slow_args *p = params;
+		uarg[0] = (intptr_t) p->cookiep; /* void * __capability __capability * __capability */
+		uarg[1] = (intptr_t) p->outbuf; /* const void * __capability __capability */
+		uarg[2] = p->outlen; /* size_t */
+		uarg[3] = (intptr_t) p->inbuf; /* void * __capability __capability */
+		uarg[4] = p->inlen; /* size_t */
+		*n_args = 5;
+		break;
+	}
 	/* fdatasync */
 	case 550: {
 		struct fdatasync_args *p = params;
@@ -4714,6 +4784,28 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* coexecvec */
+	case 152:
+		switch(ndx) {
+		case 0:
+			p = "pid_t";
+			break;
+		case 1:
+			p = "userland const char * __capability";
+			break;
+		case 2:
+			p = "userland char * __capability * __capability";
+			break;
+		case 3:
+			p = "userland char * __capability * __capability";
+			break;
+		case 4:
+			p = "userland char * __capability __capability * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
 	/* nlm_syscall */
 	case 154:
 		switch(ndx) {
@@ -4887,6 +4979,51 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* _cosetup */
+	case 177:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland void * __capability __capability * __capability";
+			break;
+		case 2:
+			p = "userland void * __capability __capability * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* coregister */
+	case 178:
+		switch(ndx) {
+		case 0:
+			p = "userland const char * __capability";
+			break;
+		case 1:
+			p = "userland void * __capability __capability * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* colookup */
+	case 179:
+		switch(ndx) {
+		case 0:
+			p = "userland const char * __capability";
+			break;
+		case 1:
+			p = "userland void * __capability __capability * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* copark */
+	case 180:
+		break;
 	/* setgid */
 	case 181:
 		switch(ndx) {
@@ -4938,6 +5075,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 1:
 			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cogetpid */
+	case 193:
+		switch(ndx) {
+		case 0:
+			p = "userland pid_t * __capability";
 			break;
 		default:
 			break;
@@ -8634,6 +8781,50 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* cocall_slow */
+	case 548:
+		switch(ndx) {
+		case 0:
+			p = "userland void * __capability __capability";
+			break;
+		case 1:
+			p = "userland const void * __capability __capability";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		case 3:
+			p = "userland void * __capability __capability";
+			break;
+		case 4:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* coaccept_slow */
+	case 549:
+		switch(ndx) {
+		case 0:
+			p = "userland void * __capability __capability * __capability";
+			break;
+		case 1:
+			p = "userland const void * __capability __capability";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		case 3:
+			p = "userland void * __capability __capability";
+			break;
+		case 4:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
 	/* fdatasync */
 	case 550:
 		switch(ndx) {
@@ -9585,6 +9776,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
+	/* coexecvec */
+	case 152:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
 	/* nlm_syscall */
 	case 154:
 		if (ndx == 0 || ndx == 1)
@@ -9640,6 +9836,23 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
+	/* _cosetup */
+	case 177:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* coregister */
+	case 178:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* colookup */
+	case 179:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* copark */
+	case 180:
 	/* setgid */
 	case 181:
 		if (ndx == 0 || ndx == 1)
@@ -9662,6 +9875,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* fpathconf */
 	case 192:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cogetpid */
+	case 193:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
@@ -10916,6 +11134,16 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* utimensat */
 	case 547:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cocall_slow */
+	case 548:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* coaccept_slow */
+	case 549:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

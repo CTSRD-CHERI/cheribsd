@@ -70,6 +70,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/elf.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
@@ -378,6 +379,7 @@ vmspace_alloc(vm_offset_t min, vm_offset_t max, pmap_pinit_t pinit)
 	}
 	CTR1(KTR_VM, "vmspace_alloc: %p", vm);
 	_vm_map_init(&vm->vm_map, vmspace_pmap(vm), min, max);
+	LIST_INIT(&vm->vm_conames);
 	refcount_init(&vm->vm_refcnt, 1);
 	vm->vm_shm = NULL;
 	vm->vm_swrss = 0;
@@ -408,6 +410,7 @@ vmspace_container_reset(struct proc *p)
 static inline void
 vmspace_dofree(struct vmspace *vm)
 {
+	struct coname *con, *next;
 
 	CTR1(KTR_VM, "vmspace_free: %p", vm);
 
@@ -424,6 +427,11 @@ vmspace_dofree(struct vmspace *vm)
 	 */
 	(void)vm_map_remove(&vm->vm_map, vm_map_min(&vm->vm_map),
 	    vm_map_max(&vm->vm_map));
+
+	LIST_FOREACH_SAFE(con, &vm->vm_conames, c_next, next) {
+		free(con->c_name, M_TEMP);
+		free(con, M_TEMP);
+	}
 
 	pmap_release(vmspace_pmap(vm));
 	vm->vm_map.pmap = NULL;
@@ -1802,6 +1810,59 @@ vm_map_lookup_entry(
 	/*
 	 * Since the map is only locked for read access, perform a
 	 * standard binary search tree lookup for "address".
+	 */
+	lbound = ubound = header;
+	for (;;) {
+		if (address < cur->start) {
+			ubound = cur;
+			cur = cur->left;
+			if (cur == lbound)
+				break;
+		} else if (cur->end <= address) {
+			lbound = cur;
+			cur = cur->right;
+			if (cur == ubound)
+				break;
+		} else {
+			*entry = cur;
+			return (TRUE);
+		}
+	}
+	*entry = lbound;
+	return (FALSE);
+}
+
+/*
+ * Simplified version of vm_map_trylock() that doesn't modify the splay tree,
+ * and thus can be (relatively) safely used from ddb(4).
+ */
+static boolean_t
+db_vm_map_lookup_entry(
+	vm_map_t map,
+	vm_offset_t address,
+	vm_map_entry_t *entry)	/* OUT */
+{
+	vm_map_entry_t cur, header, lbound, ubound;
+
+	KASSERT(kdb_active, ("%s: you're not supposed to be here", __func__));
+
+	/*
+	 * If the map is empty, then the map entry immediately preceding
+	 * "address" is the map's header.
+	 */
+	header = &map->header;
+	cur = map->root;
+	if (cur == NULL) {
+		*entry = header;
+		return (FALSE);
+	}
+	if (address >= cur->start && cur->end > address) {
+		*entry = cur;
+		return (TRUE);
+	}
+
+	/*
+	 * Perform a standard binary search tree lookup for "address".
 	 */
 	lbound = ubound = header;
 	for (;;) {
@@ -5775,6 +5836,42 @@ vm_map_reservation_is_unmapped(vm_map_t map, vm_offset_t reservation)
 		return (true);
 	return (false);
 }
+
+#if __has_feature(capabilities)
+pid_t
+vm_get_cap_owner(struct thread *td, const uintcap_t c)
+{
+	vm_map_t map;
+	vm_map_entry_t entry;
+	vm_offset_t addr;
+	boolean_t found;
+	pid_t pid;
+
+	if (td == NULL)
+		return (-1);
+
+	addr = __builtin_cheri_address_get(c);
+	map = &td->td_proc->p_vmspace->vm_map;
+
+	if (kdb_active) {
+		found = db_vm_map_lookup_entry(map, addr, &entry);
+		if (found)
+			pid = entry->owner;
+		else
+			pid = -1;
+	} else {
+		vm_map_lock(map);
+		found = vm_map_lookup_entry(map, addr, &entry);
+		if (found)
+			pid = entry->owner;
+		else
+			pid = -1;
+		vm_map_unlock(map);
+	}
+
+	return (pid);
+}
+#endif /* __has_feature(capabilities) */
 
 #ifdef INVARIANTS
 static void
