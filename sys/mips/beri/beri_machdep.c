@@ -134,7 +134,7 @@ platform_clear_bss(void *kroot)
 	 * by the linker script and have no size info.
 	 */
 	void *edata_start;
-	ptrdiff_t edata_siz = (ptraddr_t)&end - (ptraddr_t)&edata;
+	size_t edata_siz = (ptraddr_t)&end - (ptraddr_t)&edata;
 
 	edata_start = cheri_ptrperm(
 		cheri_setaddress(kroot, (ptraddr_t)&edata),
