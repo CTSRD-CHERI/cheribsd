@@ -96,7 +96,7 @@ ATF_TC_BODY(coexecve_right_pid, tc)
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = coexecve(getpid(), "/usr/bin/true", new_argv, new_env);
+		error = coexecve(getppid(), "/usr/bin/true", new_argv, new_env);
 		atf_tc_fail("You're not supposed to be here");
 	} else {
 		atf_utils_wait(pid, 0, "", "");
@@ -147,7 +147,7 @@ ATF_TC_BODY(vfork_coexecve_right_pid, tc)
 	if (pid < 0) {
 		atf_tc_fail("vfork returned %d: %s", pid, strerror(errno));
 	} else if (pid == 0) {
-		error = coexecve(getpid(), "/usr/bin/true", new_argv, new_env);
+		error = coexecve(getppid(), "/usr/bin/true", new_argv, new_env);
 		atf_tc_fail("You're not supposed to be here");
 	} else {
 		pid = waitpid(pid, &status, 0);
