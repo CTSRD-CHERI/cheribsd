@@ -442,11 +442,7 @@ kmem_malloc_domain(int domain, vm_size_t size, int flags)
 	else
 		arena = vm_dom[domain].vmd_kernel_rwx_arena;
 	size = round_page(size);
-
-	if (align == 0 && vmem_alloc(arena, size, flags | M_BESTFIT, &addr))
-		return (0);
-	else if (vmem_xalloc(arena, size, align, 0, 0, VMEM_ADDR_MIN, VMEM_ADDR_MAX,
-			     flags | M_BESTFIT, &addr))
+	if (vmem_alloc(arena, size, flags | M_BESTFIT, &addr))
 		return (0);
 
 	rv = kmem_back_domain(domain, kernel_object, addr, size, flags);
@@ -464,7 +460,7 @@ vm_pointer_t
 kmem_malloc(vm_size_t size, int flags)
 {
 
-	return (kmem_malloc_domainset(DOMAINSET_RR(), size, flags, 0));
+	return (kmem_malloc_domainset(DOMAINSET_RR(), size, flags));
 }
 
 vm_pointer_t
@@ -476,7 +472,7 @@ kmem_malloc_domainset(struct domainset *ds, vm_size_t size, int flags)
 
 	vm_domainset_iter_policy_init(&di, ds, &domain, &flags);
 	do {
-		addr = kmem_malloc_domain(domain, size, flags, align);
+		addr = kmem_malloc_domain(domain, size, flags);
 		if (addr != 0)
 			break;
 	} while (vm_domainset_iter_policy(&di, &domain) == 0);
