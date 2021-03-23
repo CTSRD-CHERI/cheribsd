@@ -96,6 +96,22 @@ random_string(void)
 	return (str);
 }
 
+ATF_TC_WITHOUT_HEAD(coregister_null);
+ATF_TC_BODY(coregister_null, tc)
+{
+	void * __capability registered;
+	void * __capability registered2;
+	char *name;
+	int error;
+
+	name = random_string();
+	error = coregister(name, &registered);
+	ATF_REQUIRE_EQ(error, 0);
+	error = coregister(NULL, &registered2);
+	ATF_REQUIRE_EQ(error, 0);
+	ATF_REQUIRE_EQ(registered, registered2);
+}
+
 ATF_TC_WITHOUT_HEAD(coregister_colookup);
 ATF_TC_BODY(coregister_colookup, tc)
 {
@@ -206,6 +222,7 @@ ATF_TC_BODY(coreregister_other_proc_h, tc)
 
 ATF_TP_ADD_TCS(tp)
 {
+	ATF_TP_ADD_TC(tp, coregister_null);
 	ATF_TP_ADD_TC(tp, coregister_colookup);
 	ATF_TP_ADD_TC(tp, coregister_colookup_other_proc);
 	ATF_TP_ADD_TC(tp, coregister_colookup_other_proc_h);

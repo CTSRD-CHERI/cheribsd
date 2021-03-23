@@ -92,7 +92,7 @@ static pthread_once_t aux_once = PTHREAD_ONCE_INIT;
 static int pagesize, osreldate, canary_len, ncpus, pagesizes_len, bsdflags;
 static int hwcap_present, hwcap2_present;
 static char *canary, *pagesizes, *execpath;
-static void *ps_strings, *timekeep;
+static void *ps_strings, *timekeep, *capv;
 static u_long hwcap, hwcap2;
 static void *fxrng_seed_version;
 
@@ -165,6 +165,10 @@ init_aux(void)
 
 		case AT_FXRNG:
 			fxrng_seed_version = aux->a_un.a_ptr;
+			break;
+
+		case AT_CAPV:
+			capv = aux->a_un.a_ptr;
 			break;
 #ifdef __powerpc__
 		/*
@@ -386,6 +390,16 @@ _elf_aux_info(int aux, void *buf, int buflen)
 		if (buflen == sizeof(void *)) {
 			if (fxrng_seed_version != NULL) {
 				*(void **)buf = fxrng_seed_version;
+				res = 0;
+			} else
+				res = ENOENT;
+		} else
+			res = EINVAL;
+		break;
+	case AT_CAPV:
+		if (buflen == sizeof(void *)) {
+			if (capv != NULL) {
+				*(void **)buf = capv;
 				res = 0;
 			} else
 				res = ENOENT;

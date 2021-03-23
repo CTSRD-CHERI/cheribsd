@@ -106,6 +106,7 @@ MIASM =  \
 	setsid.o \
 	quotactl.o \
 	coexecve.o \
+	coexecvec.o \
 	nlm_syscall.o \
 	nfssvc.o \
 	lgetfh.o \

@@ -819,6 +819,17 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
+	/* coexecvec */
+	case 152: {
+		struct coexecvec_args *p = params;
+		iarg[0] = p->pid; /* pid_t */
+		uarg[1] = (intptr_t) p->fname; /* const char * __capability */
+		uarg[2] = (intptr_t) p->argv; /* char * __capability * __capability */
+		uarg[3] = (intptr_t) p->envv; /* char * __capability * __capability */
+		uarg[4] = (intptr_t) p->capv; /* char * __capability __capability * __capability */
+		*n_args = 5;
+		break;
+	}
 	/* nlm_syscall */
 	case 154: {
 		struct nlm_syscall_args *p = params;
@@ -4768,6 +4779,28 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 3:
 			p = "userland char * __capability * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* coexecvec */
+	case 152:
+		switch(ndx) {
+		case 0:
+			p = "pid_t";
+			break;
+		case 1:
+			p = "userland const char * __capability";
+			break;
+		case 2:
+			p = "userland char * __capability * __capability";
+			break;
+		case 3:
+			p = "userland char * __capability * __capability";
+			break;
+		case 4:
+			p = "userland char * __capability __capability * __capability";
 			break;
 		default:
 			break;
@@ -9740,6 +9773,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* coexecve */
 	case 151:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* coexecvec */
+	case 152:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

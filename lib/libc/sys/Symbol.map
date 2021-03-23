@@ -388,6 +388,7 @@ FBSD_1.5 {
 	coaccept_slow;
 	cocall_slow;
 	coexecve;
+	coexecvec;
 	cogetpid;
 	colookup;
 	copark;

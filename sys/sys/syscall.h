@@ -154,6 +154,7 @@
 				/* 149 is old quota */
 				/* 150 is old getsockname */
 #define	SYS_coexecve	151
+#define	SYS_coexecvec	152
 #define	SYS_nlm_syscall	154
 #define	SYS_nfssvc	155
 				/* 156 is old getdirentries */
