@@ -74,11 +74,11 @@ stack_fetch_ra(uintptr_t sp, u_register_t stack_pos)
 	uintptr_t ra = stack_register_fetch(sp, stack_pos);
 
 	if (!ra)
-		return (NULL);
+		return (0);
 	/* Re-derive sentry capability */
 	if (cheri_getsealed(ra)) {
 		if (cheri_gettype(ra) != CHERI_OTYPE_SENTRY)
-			return (NULL);
+			return (0);
 		/*
 		 * XXX-AM: The exception handlers have base=0, this should
 		 * probably change.
