@@ -57,7 +57,8 @@ NESTED(_yamon_cheri_syscon_read, 32, $c17)
 	csetdefault	$c1
 	REG_LI	t0, CHERI_PERMS_KERNEL_CODE
 	candperm	$c12, $c12, t0
-	cgetpccsetaddr	$c12, $c12, yamon_pc
+	ABSRELOC_LA(t0, yamon_pc)
+	cgetpccsetaddr	$c12, t0
 	cjr		$c12
 	nop
 yamon_pc:
