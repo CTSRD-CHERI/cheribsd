@@ -100,8 +100,10 @@ statcounters_sample(statcounters_bank_t * const cnt_bank)
  */
 int statcounters_sample_sysctl(statcounters_bank_t * const cnt_bank)
 {
+#ifdef __mips__
     int err;
     size_t len;
+#endif
 
     if (cnt_bank == NULL)
         return (-1);
