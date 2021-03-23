@@ -398,6 +398,17 @@ print_uptime(void)
 	printf("%lds\n", (long)ts.tv_sec);
 }
 
+/*
+ * Set up a context that can be extracted from the dump.
+ */
+void
+dump_savectx(void)
+{
+
+	savectx(&dumppcb);
+	dumptid = curthread->td_tid;
+}
+
 int
 doadump(boolean_t textdump)
 {
@@ -410,8 +421,7 @@ doadump(boolean_t textdump)
 	if (TAILQ_EMPTY(&dumper_configs))
 		return (ENXIO);
 
-	savectx(&dumppcb);
-	dumptid = curthread->td_tid;
+	dump_savectx();
 	dumping++;
 
 	coredump = TRUE;
