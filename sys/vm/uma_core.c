@@ -177,18 +177,6 @@ static struct rwlock_padalign __exclusive_cache_line uma_rwlock;
  */
 static vm_offset_t bootstart;
 static vm_pointer_t bootmem;
-#ifdef __CHERI_PURE_CAPABILITY__
-/*
- * Boundaries of the UMA boot memory pool.
- */
-vm_offset_t uma_bootmem_start;
-vm_offset_t uma_bootmem_end;
-/*
- * Map slab to pages in the boot memory pool.
- * These do not have any vm_page to store the slab pointer in.
- */
-uma_slab_t *uma_boot_vtoslab;
-#endif
 
 static struct sx uma_reclaim_lock;
 
@@ -1649,11 +1637,10 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int flags,
 #endif
 
 	if (keg->uk_init != NULL) {
-		for (i = 0; i < keg->uk_ipers; i++) {
+		for (i = 0; i < keg->uk_ipers; i++)
 			if (keg->uk_init(slab_item(slab, keg, i),
 			    keg->uk_size, flags) != 0)
 				break;
-		}
 		if (i != keg->uk_ipers) {
 			keg_free_slab(keg, slab, i);
 			goto fail;
@@ -1697,22 +1684,14 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	void *mem;
 	int pages;
 	int i;
-	int bootmem_align;
 
 	pages = howmany(bytes, PAGE_SIZE);
 	KASSERT(pages > 0, ("%s can't reserve 0 pages", __func__));
 
 	*pflag = UMA_SLAB_BOOT;
-#ifdef UMA_SUPERPAGE_SLAB
-	/* Align bootmem to slab size */
-	bootmem_align = UMA_SLAB_SIZE;
-#else
-	bootmem_align = 1;
-#endif
 	m = vm_page_alloc_contig_domain(NULL, 0, domain,
 	    malloc2vm_flags(wait) | VM_ALLOC_NOOBJ | VM_ALLOC_WIRED, pages, 
-	    (vm_paddr_t)0, ~(vm_paddr_t)0, bootmem_align, 0,
-	    VM_MEMATTR_DEFAULT);
+	    (vm_paddr_t)0, ~(vm_paddr_t)0, 1, 0, VM_MEMATTR_DEFAULT);
 	if (m == NULL)
 		return (NULL);
 
@@ -1770,22 +1749,7 @@ page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	void *p;	/* Returned page */
 
 	*pflag = UMA_SLAB_KERNEL;
-#if defined(UMA_SUPERPAGE_SLAB) && !defined(UMA_MD_SMALL_ALLOC)
-	/*
-	 * We use page_alloc for multi-item slabs, so make sure
-	 * that we align the allocation.
-	 */
-	/* uma_keg_t keg; */
-
-	/* keg = zone_first_keg(zone); */
-	/* if (keg->uk_ipers > 1) */
-	p = (void *)kmem_malloc_domainset(DOMAINSET_FIXED(domain), bytes,
-	    wait, UMA_SLAB_SIZE);
-	/* else */
-#else
-	p = (void *)kmem_malloc_domainset(DOMAINSET_FIXED(domain), bytes,
-	    wait, 0);
-#endif
+	p = (void *)kmem_malloc_domainset(DOMAINSET_FIXED(domain), bytes, wait);
 
 	return (p);
 }
@@ -1829,11 +1793,7 @@ pcpu_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 			goto fail;
 		TAILQ_INSERT_TAIL(&alloctail, p, listq);
 	}
-#ifdef UMA_SUPERPAGE_SLAB
-	if ((addr = kva_alloc_aligned(bytes, UMA_SLAB_SIZE)) == 0)
-#else
 	if ((addr = kva_alloc(bytes)) == 0)
-#endif
 		goto fail;
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_getlen(addr) <= CHERI_REPRESENTABLE_LENGTH(bytes),
@@ -2156,25 +2116,17 @@ keg_layout(uma_keg_t keg)
 		 */
 		if ((rsize & alignsize) == 0)
 			rsize += alignsize;
-		slabsize = rsize * (UMA_SLAB_SIZE / alignsize);
+		slabsize = rsize * (PAGE_SIZE / alignsize);
 		slabsize = MIN(slabsize, rsize * SLAB_MAX_SETSIZE);
 		slabsize = MIN(slabsize, UMA_CACHESPREAD_MAX_SIZE);
-#ifdef UMA_SUPERPAGE_SLAB
-		slabsize = roundup2(keg->uk_size, UMA_SLAB_SIZE);
-#else
 		slabsize = round_page(slabsize);
-#endif
 	} else {
 		/*
 		 * Start with a slab size of as many pages as it takes to
 		 * represent a single item.  We will try to fit as many
 		 * additional items into the slab as possible.
 		 */
-#ifdef UMA_SUPERPAGE_SLAB
-		slabsize = roundup2(keg->uk_size, UMA_SLAB_SIZE);
-#else
 		slabsize = round_page(keg->uk_size);
-#endif
 	}
 
 	/* Build a list of all of the available formats for this keg. */
@@ -2208,7 +2160,7 @@ keg_layout(uma_keg_t keg)
 	 * Prefer the smallest slab size that meets the constraints.
 	 *
 	 * Start with a minimum slab size, to accommodate CACHESPREAD.  Then,
-	 * for small items (up to UMA_SLAB_SIZE), the iteration increment is one
+	 * for small items (up to PAGE_SIZE), the iteration increment is one
 	 * page; and for large items, the increment is one item.
 	 */
 	i = (slabsize + rsize - keg->uk_size) / MAX(PAGE_SIZE, rsize);
@@ -4886,17 +4838,11 @@ uma_zone_reserve_kva(uma_zone_t zone, int count)
 	pages = howmany(count, keg->uk_ipers) * keg->uk_ppera;
 
 #ifdef UMA_MD_SMALL_ALLOC
-	/* XXX-AM change ppera check */
 	if (keg->uk_ppera > 1) {
 #else
 	if (1) {
 #endif
-#ifdef UMA_SUPERPAGE_SLAB
-		kva = kva_alloc_aligned((vm_size_t)pages * PAGE_SIZE,
-		    UMA_SLAB_SIZE);
-#else
 		kva = kva_alloc((vm_size_t)pages * PAGE_SIZE);
-#endif
 		if (kva == 0)
 			return (0);
 	} else
@@ -4907,7 +4853,6 @@ uma_zone_reserve_kva(uma_zone_t zone, int count)
 	keg->uk_offset = 0;
 	zone->uz_max_items = pages * keg->uk_ipers;
 #ifdef UMA_MD_SMALL_ALLOC
-	/* XXX-AM change ppera check */
 	keg->uk_allocf = (keg->uk_ppera > 1) ? noobj_alloc : uma_small_alloc;
 #else
 	keg->uk_allocf = noobj_alloc;
