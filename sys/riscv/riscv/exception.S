@@ -42,7 +42,6 @@ __FBSDID("$FreeBSD$");
 
 .macro save_registers mode
 #if __has_feature(capabilities)
-#ifndef __CHERI_PURE_CAPABILITY__
 .option push
 #ifndef __CHERI_PURE_CAPABILITY__
 .option capmode
