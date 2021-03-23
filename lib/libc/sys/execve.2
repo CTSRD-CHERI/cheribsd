@@ -42,6 +42,8 @@
 .Ft int
 .Fn coexecve "pid_t pid" "const char *path" "char *const argv[]" "char *const envp[]"
 .Ft int
+.Fn coexecvec "pid_t pid" "const char *path" "char *const argv[]" "char *const envp[]" "char *const capv[]"
+.Ft int
 .Fn execve "const char *path" "char *const argv[]" "char *const envp[]"
 .Ft int
 .Fn fexecve "int fd" "char *const argv[]" "char *const envp[]"
@@ -243,6 +245,17 @@ is equivalent to
 except it colocates the new process in an address space shared
 with another process identified by
 .Fa pid .
+.Pp
+The
+.Fn coexecvec
+is equivalent to
+.Fn coexecve ,
+except it also takes a NULL-terminated capability vector, which
+can be retrieved in the child process using
+.Xr elf_aux_info 3
+with the
+.Dv AT_AUXV
+argument.
 .Sh RETURN VALUES
 As the
 .Fn execve
@@ -331,6 +344,20 @@ The calling process does not have permission to colocate with
 .El
 .Pp
 In addition, the
+.Fn coexecvec
+will fail and return to the calling process if:
+.Bl -tag -width Er
+.It Bq Er EPROT
+Attempt to pass the capability vector across address spaces,
+usually caused by an attempt to call
+.Fn coexecvec
+after
+.Xr fork 2
+instead of
+.Xr vfork 2 .
+.El
+.Pp
+In addition, the
 .Fn fexecve
 will fail and return to the calling process if:
 .Bl -tag -width Er
@@ -345,6 +372,7 @@ argument is not a valid file descriptor open for executing.
 .Xr _exit 2 ,
 .Xr fork 2 ,
 .Xr open 2 ,
+.Xr elf_aux_info 3 ,
 .Xr execl 3 ,
 .Xr exit 3 ,
 .Xr sysctl 3 ,

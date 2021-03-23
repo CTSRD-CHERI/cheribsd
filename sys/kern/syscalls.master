@@ -957,7 +957,15 @@
 		    _In_z_ char **envv
 		);
 	}
-152	AUE_NULL	UNIMPL	sem_wakeup (BSD/OS 2.x)
+152	AUE_NULL	STD {
+		int coexecvec(
+		    pid_t pid,
+		    _In_z_ const char *fname,
+		    _In_z_ char **argv,
+		    _In_z_ char **envv,
+		    _In_z_ char * __capability *capv,
+		);
+	}
 153	AUE_NULL	UNIMPL	asyncdaemon (BSD/OS 2.x)
 ; 154 is initialised by the NLM code, if present.
 154	AUE_NULL	NOSTD {

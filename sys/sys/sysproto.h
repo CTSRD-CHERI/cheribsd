@@ -482,6 +482,13 @@ struct coexecve_args {
 	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
 	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
 };
+struct coexecvec_args {
+	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
+	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
+	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
+	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
+	char capv_l_[PADL_(char * __capability __capability * __capability)]; char * __capability __capability * __capability capv; char capv_r_[PADR_(char * __capability __capability * __capability)];
+};
 struct nlm_syscall_args {
 	char debug_level_l_[PADL_(int)]; int debug_level; char debug_level_r_[PADR_(int)];
 	char grace_period_l_[PADL_(int)]; int grace_period; char grace_period_r_[PADR_(int)];
@@ -1986,6 +1993,7 @@ int	sys_adjtime(struct thread *, struct adjtime_args *);
 int	sys_setsid(struct thread *, struct setsid_args *);
 int	sys_quotactl(struct thread *, struct quotactl_args *);
 int	sys_coexecve(struct thread *, struct coexecve_args *);
+int	sys_coexecvec(struct thread *, struct coexecvec_args *);
 int	sys_nlm_syscall(struct thread *, struct nlm_syscall_args *);
 int	sys_nfssvc(struct thread *, struct nfssvc_args *);
 int	sys_lgetfh(struct thread *, struct lgetfh_args *);
@@ -2887,6 +2895,7 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 #define	SYS_AUE_oquota	AUE_O_QUOTA
 #define	SYS_AUE_ogetsockname	AUE_GETSOCKNAME
 #define	SYS_AUE_coexecve	AUE_NULL
+#define	SYS_AUE_coexecvec	AUE_NULL
 #define	SYS_AUE_nlm_syscall	AUE_NULL
 #define	SYS_AUE_nfssvc	AUE_NFS_SVC
 #define	SYS_AUE_ogetdirentries	AUE_GETDIRENTRIES
