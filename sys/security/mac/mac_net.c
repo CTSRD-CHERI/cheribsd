@@ -413,7 +413,7 @@ mac_ifnet_ioctl_get(struct ucred *cred, struct ifreq *ifr,
 	if (!(mac_labeled & MPC_OBJECT_IFNET))
 		return (EINVAL);
 
-	error = copyin(ifr_data_get_ptr(ifr), &mac, sizeof(mac));
+	error = copyin_mac(ifr_data_get_ptr(ifr), &mac);
 	if (error)
 		return (error);
 
@@ -456,7 +456,7 @@ mac_ifnet_ioctl_set(struct ucred *cred, struct ifreq *ifr, struct ifnet *ifp)
 	if (!(mac_labeled & MPC_OBJECT_IFNET))
 		return (EINVAL);
 
-	error = copyin(ifr_data_get_ptr(ifr), &mac, sizeof(mac));
+	error = copyin_mac(ifr_data_get_ptr(ifr), &mac);
 	if (error)
 		return (error);
 
