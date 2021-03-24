@@ -514,8 +514,7 @@ memguard_get_req_size(const void *addr)
 //   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_alignment",
-//     "pointer_as_integer"
+//     "bounds_compression"
 //   ]
 // }
 // CHERI CHANGES END

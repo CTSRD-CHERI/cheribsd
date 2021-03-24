@@ -43,6 +43,7 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 include_directories(${CMAKE_SOURCE_DIR}/sys)
 include_directories(${CMAKE_SOURCE_DIR}/contrib/libxo)
 include_directories(${CMAKE_SOURCE_DIR}/contrib/libc-vis)
+include_directories(${CMAKE_SOURCE_DIR}/lib/libstatcounters)
 
 set(TMPSYSROOT ${CMAKE_BINARY_DIR}/sysroot/usr)
 file(MAKE_DIRECTORY ${TMPSYSROOT}/include/)

@@ -250,11 +250,11 @@
  * can simply write that to $epcc.
  */
 #ifdef __CHERI_PURE_CAPABILITY__
-#define RESTORE_U_PCB_PC(tmpcreg, pcb)					\
+#define	RESTORE_U_PCB_PC(tmpcreg, pcb)				\
 	RESTORE_U_PCB_CREG(tmpcreg, PCC, pcb);				\
 	CSetEPCC tmpcreg
 #else
-#define RESTORE_U_PCB_PC(unused_pc_vaddr_tmpreg, pcb)			\
+#define	RESTORE_U_PCB_PC(unused_pc_vaddr_tmpreg, pcb)		\
 	/* EPCC is no longer a GPR so load it into C27 first. */	\
 	csetkr1c	CHERI_REG_KSCRATCH; /* Save $c27 in $kr1c. */	\
 	RESTORE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb);		\
@@ -266,7 +266,7 @@
 #endif
 #else /* ! CPU_CHERI */
 /* Non-CHERI case: just update CP0_EPC with the saved pc virtual address. */
-#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, pcb)	\
+#define	RESTORE_U_PCB_PC(pc_vaddr_tmpreg, pcb)		\
 	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);		\
 	MTC0	pc_vaddr_tmpreg, MIPS_COP_0_EXC_PC
 #endif /* ! CPU_CHERI */

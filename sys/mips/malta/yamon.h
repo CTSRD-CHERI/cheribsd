@@ -84,7 +84,7 @@ typedef int (*t_yamon_syscon_read)(t_yamon_syscon_id id, void *param,
 /* Can not call YAMON functions with purecap ABI so wrap the calls */
 
 inline int _yamon_syscon_read(t_yamon_syscon_id id, void *param, uint32_t size);
-int _yamon_cheri_syscon_read(vaddr_t fn_addr, t_yamon_syscon_id id, void *param,
+int _yamon_cheri_syscon_read(ptraddr_t fn_addr, t_yamon_syscon_id id, void *param,
 			     uint32_t size);
 
 #define YAMON_SYSCON_READ(id, param, size) _yamon_syscon_read(id, param, size)

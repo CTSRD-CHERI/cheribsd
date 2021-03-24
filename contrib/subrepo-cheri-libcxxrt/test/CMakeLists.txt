@@ -46,8 +46,14 @@ endif()
 option(NO_STATIC_TEST "Don't build the static test" ${NO_STATIC_TEST_DEFAULT})
 set(STATIC_LIB_DEPS gcc_eh)
 find_library(LIBCOMPILER_RT_STATIC libcompiler_rt.a)
+find_library(LIBGCC_STATIC libgcc.a)
 if(LIBCOMPILER_RT_STATIC)
     list(APPEND STATIC_LIB_DEPS ${LIBCOMPILER_RT_STATIC})
+elseif(LIBGCC_STATIC)
+    list(APPEND STATIC_LIB_DEPS ${LIBGCC_STATIC})
+else()
+    message(WARNING "Could not find libgcc.a or libcompiler_rt.a, not building static tests")
+    set(NO_STATIC_TEST TRUE)
 endif()
 message(STATUS "static lib deps: ${STATIC_LIB_DEPS}")
 
@@ -100,7 +106,7 @@ endif()
 # Testing with libunwind
 option(TEST_LIBUNWIND "Test libcxxrt with libunwind" OFF)
 
-if(TEST_LIBUNWIND)
+if(TEST_LIBUNWIND AND NOT NO_STATIC_TEST)
     add_executable(cxxrt-test-libunwind-allstatic ${CXXTEST_SOURCES})
     set_property(TARGET cxxrt-test-libunwind-allstatic PROPERTY LINK_FLAGS
                  "-L${LIBUNWIND_PATH} -nodefaultlibs -static")

@@ -728,7 +728,7 @@ vscsi_crq_load_cb(void *xsc, bus_dma_segment_t *segs, int nsegs, int err)
 	sc->srp_iu_queue = (uint8_t *)(sc->crq_queue);
 	sc->srp_iu_phys = segs[0].ds_addr;
 	sc->srp_iu_arena = vmem_create("VSCSI SRP IU", PAGE_SIZE,
-	    segs[0].ds_len - PAGE_SIZE, 16, 0, M_BESTFIT | M_NOWAIT);
+	    segs[0].ds_len - PAGE_SIZE, 16, 0, M_BESTFIT | M_NOWAIT, 0);
 }
 
 static void

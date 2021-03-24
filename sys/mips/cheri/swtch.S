@@ -1,5 +1,34 @@
 /*	$OpenBSD: locore.S,v 1.18 1998/09/15 10:58:53 pefo Exp $	*/
 /*-
+ * Copyright (c) 2016 Robert N. M. Watson
+ * Copyright (c) 2018 Alfredo Mazzinghi
+ * All rights reserved.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -49,9 +78,6 @@
  *	JNPR: swtch.S,v 1.6.2.1 2007/09/10 10:36:50 girish
  * $FreeBSD$
  */
-
-/* XXX-AM add CTSRD license header? Do we keep the old header? */
-
 
 /*
  * Pure capability kernel context switching routines.
@@ -270,7 +296,7 @@ XNESTED(cpu_switch)
 	/* XXX-AM: Not really using sp so we can not save it? */
 	SAVE_U_PCB_CONTEXT(sp, PCB_REG_SP, $c1)		# save old sp
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
-	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
+	csc	$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
 	/* Do a savectx(), note SAVE_U_PCB_CONTEXT trashes t0 */
 	SAVE_U_PCB_CONTEXT(s0, PCB_REG_S0, $c1)
 	SAVE_U_PCB_CONTEXT(s1, PCB_REG_S1, $c1)

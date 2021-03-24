@@ -98,10 +98,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #endif
 
-#if __has_feature(capabilities)
-#include <machine/cherireg.h>
-#endif
-
 #include <ddb/ddb.h>
 
 #ifdef KDTRACE_HOOKS
@@ -430,6 +426,11 @@ malloc_type_allocated(struct malloc_type *mtp, void *addr, unsigned long size)
  * amount of the bucket size.  Occurs within a critical section so that the
  * thread isn't preempted and doesn't migrate while updating per-CPU
  * statistics.
+ *
+ * XXX-AM: The reserved/unreserved size stat recording assumes the following:
+ * - kmem performs proper representability rounding
+ * - free() will be called with the same capability returned by malloc(),
+ *   spanning the whole reservation.
  */
 void
 malloc_type_freed(struct malloc_type *mtp, void *addr, unsigned long size)
@@ -560,7 +561,7 @@ malloc_dbg(caddr_t *vap, size_t *sizep, struct malloc_type *mtp,
 #ifdef EPOCH_TRACE
 			epoch_trace_list(curthread);
 #endif
-			KASSERT(1,
+			KASSERT(1, 
 			    ("malloc(M_WAITOK) with sleeping prohibited"));
 		}
 	}
@@ -614,7 +615,7 @@ malloc_large(size_t *size, struct malloc_type *mtp, struct domainset *policy,
 	size_t sz;
 
 	sz = roundup(*size, PAGE_SIZE);
-	kva = kmem_malloc_domainset(policy, sz, flags, 0);
+	kva = kmem_malloc_domainset(policy, sz, flags);
 	if (kva != 0) {
 		/* The low bit is unused for slab pointers. */
 		vsetzoneslab(kva, NULL, (void *)(uintptr_t)((sz << 1) | 1));
@@ -622,7 +623,7 @@ malloc_large(size_t *size, struct malloc_type *mtp, struct domainset *policy,
 		*size = sz;
 #ifdef __CHERI_PURE_CAPABILITY__
 		KASSERT(cheri_getlen(kva) <= CHERI_REPRESENTABLE_LENGTH(sz),
-		    ("Invalid bounds expected %zx found %zx",
+		    ("Invalid bounds: expected %zx found %zx",
 		        (size_t)CHERI_REPRESENTABLE_LENGTH(sz),
 		        (size_t)cheri_getlen(kva)));
 #endif
@@ -696,7 +697,7 @@ void *
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(size),
-	    ("Invalid bounds expected %zx found %zx",
+	    ("Invalid bounds: expected %zx found %zx",
 	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
 	        (size_t)cheri_getlen(va)));
 #endif
@@ -817,7 +818,7 @@ static void
 free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
-	vaddr_t *mtpp = addr;
+	ptraddr_t *mtpp = addr;
 #else
 	struct malloc_type **mtpp = addr;
 #endif
@@ -835,9 +836,9 @@ free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 	 * This is for debugging only, so we just store the va of the
 	 * malloc_type, not a capability to it.
 	 */
-	mtpp = (vaddr_t *)roundup2(mtpp, sizeof(vaddr_t));
-	if (cheri_getlen(mtpp) - cheri_getoffset(mtpp) >= sizeof(vaddr_t))
-		*mtpp = (vaddr_t)mtp;
+	mtpp = (ptraddr_t *)roundup2(mtpp, sizeof(ptraddr_t));
+	if (cheri_getlen(mtpp) - cheri_getoffset(mtpp) >= sizeof(ptraddr_t))
+		*mtpp = (ptraddr_t)mtp;
 #else
 	mtpp = (struct malloc_type **)rounddown2(mtpp, sizeof(struct malloc_type *));
 	mtpp += (size - sizeof(struct malloc_type *)) / sizeof(struct malloc_type *);
@@ -917,7 +918,7 @@ free(void *addr, struct malloc_type *mtp)
 		size = zone->uz_size;
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_getlen(addr) <= CHERI_REPRESENTABLE_LENGTH(size),
-	    ("Invalid bounds expected %zx found %zx",
+	    ("Invalid bounds: expected %zx found %zx",
 	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
 	        (size_t)cheri_getlen(addr)));
 #endif
@@ -929,7 +930,7 @@ free(void *addr, struct malloc_type *mtp)
 		size = malloc_large_size(slab);
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_getlen(addr) <= CHERI_REPRESENTABLE_LENGTH(size),
-	    ("Invalid bounds expected %zx found %zx",
+	    ("Invalid bounds: expected %zx found %zx",
 	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
 	        (size_t)cheri_getlen(addr)));
 #endif
@@ -1180,7 +1181,7 @@ kmeminit(void)
 	 * kmem arena can be set statically at compile-time or manually
 	 * through the kernel environment.  However, it is still limited to
 	 * twice the physical memory size, which has been sufficient to handle
-	 * the most severe cases of external fragmentation in the kmem arena.
+	 * the most severe cases of external fragmentation in the kmem arena. 
 	 */
 	if (vm_kmem_size / 2 / PAGE_SIZE > mem_size)
 		vm_kmem_size = 2 * mem_size * PAGE_SIZE;

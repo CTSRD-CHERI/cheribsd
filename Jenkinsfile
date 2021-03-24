@@ -51,13 +51,17 @@ setDefaultJobProperties(jobProperties)
 jobs = [:]
 
 def buildImageAndRunTests(params, String suffix) {
-    stage("Building disk image") {
-        sh "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
+    stage("Building disk images") {
+        sh label: "Building full disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
+        // No need for minimal images when running the testsuite
+        if (!GlobalVars.isTestSuiteJob) {
+            sh label: "Building minimal disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
+        }
     }
-    // No need for minimal images when running the testsuite
+    // No need for MFS_ROOT kernels when running the testsuite
     if (!GlobalVars.isTestSuiteJob && (suffix.startsWith('mips64') || suffix.startsWith('riscv64'))) {
         stage("Building MFS_ROOT kernels") {
-            sh label: "Building minimal disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
+            sh label: "Building MFS_ROOT disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-mfs-root-${suffix} ${params.extraArgs}"
             sh label: "Building MFS_ROOT kernels", script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd-mfs-root-kernel-${suffix}/build-fpga-kernels ${params.extraArgs}"
             // Move MFS_ROOT kernels into tarball/ so they aren't deleted
             sh "mv -fv kernel-${suffix}* tarball/"
@@ -142,7 +146,11 @@ xz -T0 *.img kernel*
     --cheribsd/install-dir=\${WORKSPACE}/tarball/rootfs \
     --cheribsd-sysroot/install-dir \${WORKSPACE}/tarball/sysroot
 rm -f cheribsd-sysroot.tar.xz
-mv tarball/sysroot-${suffix}.tar.gz cheribsd-sysroot.tar.xz
+# Cheribuild prior to https://github.com/CTSRD-CHERI/cheribuild/pull/180
+# created a .tar.gz archive, newer versions create a tar.xz archive.
+# Use a glob to handle both cases.
+# XXX: Replace .* with .xz once the cheribuild PR has been merged
+mv tarball/sysroot-${suffix}.tar.* cheribsd-sysroot.tar.xz
 rm -rf tarball artifacts-*
 chmod +w *.xz
 mkdir -p "artifacts-${suffix}"

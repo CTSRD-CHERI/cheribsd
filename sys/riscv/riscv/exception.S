@@ -42,8 +42,8 @@ __FBSDID("$FreeBSD$");
 
 .macro save_registers mode
 #if __has_feature(capabilities)
-#ifndef __CHERI_PURE_CAPABILITY__
 .option push
+#ifndef __CHERI_PURE_CAPABILITY__
 .option capmode
 .if \mode == 1
 	/*
@@ -146,9 +146,9 @@ __FBSDID("$FreeBSD$");
 	cllc	ct1, 1f
 	csetflags ct1, ct1, x0
 	cjr	ct1
-.option pop
 1:
 #endif
+.option pop
 #else
 	sd	t0, (TF_T + 0 * 8)(sp)
 	sd	t1, (TF_T + 1 * 8)(sp)
@@ -246,6 +246,7 @@ __FBSDID("$FreeBSD$");
 .endif
 	csrw	sstatus, t0
 
+.option push
 #if __has_feature(capabilities)
 #ifndef __CHERI_PURE_CAPABILITY__
 	/* Switch to capmode PCC. */
@@ -255,7 +256,6 @@ __FBSDID("$FreeBSD$");
 	li	t0, 1
 	csetflags ct1, ct1, t0
 	cjr	ct1
-.option push
 .option capmode
 1:
 	/*
@@ -325,9 +325,6 @@ __FBSDID("$FreeBSD$");
 	clc	ca7, (TF_A + 7 * 16)(csp)
 
 	cincoffset csp, csp, (TF_SIZE)
-#ifndef __CHERI_PURE_CAPABILITY__
-.option pop
-#endif
 #else
 	ld	t0, (TF_SEPC)(sp)
 	csrw	sepc, t0
@@ -379,6 +376,7 @@ __FBSDID("$FreeBSD$");
 
 	addi	sp, sp, (TF_SIZE)
 #endif
+.option pop
 .endm
 
 .macro	do_ast

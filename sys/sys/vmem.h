@@ -61,6 +61,7 @@ typedef void (vmem_reclaim_t)(vmem_t *, int);
  *	qcache_max	- Maximum size to quantum cache.  This creates a UMA
  *			  cache for each multiple of quantum up to qcache_max.
  *	flags		- M_* flags
+ *	arena_flags	- VMEM_*_ARENA flags
  */
 vmem_t *vmem_create(const char *name, vmem_addr_t base,
     vmem_size_t size, vmem_size_t quantum, vmem_size_t qcache_max, int flags,

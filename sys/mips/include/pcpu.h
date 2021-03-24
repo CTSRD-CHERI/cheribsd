@@ -36,9 +36,7 @@
 #include <machine/cpufunc.h>
 #include <machine/pte.h>
 
-#ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
-#endif
 
 #if defined(MIPS_EXC_CNTRS)
 #define	PCPU_MIPS_COUNTERS						\
@@ -47,7 +45,7 @@
 	register_t	pc_tlb_mod_cnt;		/* TLB modification count */ \
 #define	PCPU_NUM_EXC_CNTRS	3
 #else
-#define PCPU_MIPS_COUNTERS
+#define	PCPU_MIPS_COUNTERS
 #define	PCPU_NUM_EXC_CNTRS	0
 #endif
 
@@ -57,10 +55,10 @@
  * kernel stack capability.
  * This must be kept in sync when context switching.
  */
-#define PCPU_MD_CAPABILITY_FIELDS					\
+#define	PCPU_MD_CAPABILITY_FIELDS					\
 	void	*pc_kstack_cap;		/* cached curthread kstack capability */
 #else
-#define PCPU_MD_CAPABILITY_FIELDS
+#define	PCPU_MD_CAPABILITY_FIELDS
 #endif
 
 #define	PCPU_MD_COMMON_FIELDS						\
@@ -78,10 +76,10 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 // struct pcpu aligns to 512 bytes boundary
-#define PCPU_MD_MIPS64_PAD (112 - (PCPU_NUM_EXC_CNTRS * 8))
+#define	PCPU_MD_MIPS64_PAD (112 - (PCPU_NUM_EXC_CNTRS * 8))
 #else /* ! defined(__CHERI_PURE_CAPABILITY__) */
 // struct pcpu aligns to 512 bytes boundary
-#define PCPU_MD_MIPS64_PAD (245 - (PCPU_NUM_EXC_CNTRS * 8))
+#define	PCPU_MD_MIPS64_PAD (245 - (PCPU_NUM_EXC_CNTRS * 8))
 #endif /* ! defined(__CHERI_PURE_CAPABILITY__) */
 #define	PCPU_MD_MIPS64_FIELDS						\
 	PCPU_MD_COMMON_FIELDS						\
@@ -112,7 +110,8 @@ extern char pcpu_space[MAXCPU][PAGE_SIZE * 2];
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	PCPU_ADDR(cpu)		(struct pcpu *)(pcpu_space[(cpu)])
 #else /* __CHERI_PURE_CAPABILITY__ */
-#define PCPU_ADDR(cpu)		cheri_setbounds((struct pcpu *)(pcpu_space[(cpu)]), sizeof(struct pcpu))
+#define	PCPU_ADDR(cpu)                                                  \
+    (struct pcpu *)cheri_setboundsexact(pcpu_space[(cpu)], sizeof(struct pcpu))
 #endif /* __CHERI_PURE_CAPABILITY__*/
 
 extern struct pcpu *pcpup;
@@ -130,7 +129,7 @@ extern struct pcpu *pcpup;
 #define	PCPU_INC(member)	PCPU_ADD(member, 1)
 #define	PCPU_PTR(member)	(&PCPUP->pc_ ## member)
 #define	PCPU_SET(member,value)	(PCPUP->pc_ ## member = (value))
-#define PCPU_LAZY_INC(member)   (++PCPUP->pc_ ## member)
+#define	PCPU_LAZY_INC(member)   (++PCPUP->pc_ ## member)
 
 #ifdef SMP
 /*

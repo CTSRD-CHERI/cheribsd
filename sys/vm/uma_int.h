@@ -440,7 +440,7 @@ slab_item_index(uma_slab_t slab, uma_keg_t keg, void *item)
 	uintptr_t data;
 
 	data = (uintptr_t)slab_data(slab, keg);
-	return (((vaddr_t)item - (vaddr_t)data) / keg->uk_rsize);
+	return (((ptraddr_t)item - (ptraddr_t)data) / keg->uk_rsize);
 }
 
 STAILQ_HEAD(uma_bucketlist, uma_bucket);
@@ -630,18 +630,6 @@ vtoslab(vm_offset_t va)
 {
 	vm_page_t p;
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	int page_index;
-
-	if (va >= uma_bootmem_start && va < uma_bootmem_end) {
-		/*
-		 * Boot memory does not have vm_pages associated so
-		 * we use a custom vtoslab map for boot pages.
-		 */
-		page_index = (trunc_page(va) - uma_bootmem_start) / PAGE_SIZE;
-		return (uma_boot_vtoslab[page_index]);
-	}
-#endif
 	p = PHYS_TO_VM_PAGE(pmap_kextract(va));
 	return (p->plinks.uma.slab);
 }
@@ -651,19 +639,6 @@ vtozoneslab(vm_offset_t va, uma_zone_t *zone, uma_slab_t *slab)
 {
 	vm_page_t p;
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	int page_index;
-
-	if (va >= uma_bootmem_start && va < uma_bootmem_end) {
-		/*
-		 * Boot memory does not have vm_pages associated so
-		 * we use a custom vtoslab map for boot pages.
-		 */
-		page_index = (trunc_page(va) - uma_bootmem_start) / PAGE_SIZE;
-		uma_boot_vtoslab[page_index] = *slab;
-		return;
-	}
-#endif
 	p = PHYS_TO_VM_PAGE(pmap_kextract(va));
 	*slab = p->plinks.uma.slab;
 	*zone = p->plinks.uma.zone;
@@ -674,19 +649,6 @@ vsetzoneslab(vm_offset_t va, uma_zone_t zone, uma_slab_t slab)
 {
 	vm_page_t p;
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	int page_index;
-
-	if (va >= uma_bootmem_start && va < uma_bootmem_end) {
-		/*
-		 * Boot memory does not have vm_pages associated so
-		 * we use a custom vtoslab map for boot pages.
-		 */
-		page_index = (trunc_page(va) - uma_bootmem_start) / PAGE_SIZE;
-		uma_boot_vtoslab[page_index] = slab;
-		return;
-	}
-#endif
 	p = PHYS_TO_VM_PAGE(pmap_kextract(va));
 	p->plinks.uma.slab = slab;
 	p->plinks.uma.zone = zone;
@@ -731,11 +693,9 @@ void uma_set_limit(unsigned long limit);
 //   "updated": 20200708,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "support",
 //     "uintcap_arithmetic",
 //     "subobject_bounds",
-//     "pointer_as_integer",
-//     "monotonicity"
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

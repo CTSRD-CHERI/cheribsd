@@ -201,9 +201,9 @@ _memstat_mt_reset_stats(struct memory_type *mtp, int maxcpus)
 	mtp->mt_kegfree = 0;
 
 #if __has_feature(capabilities)
-	mtp->mt_memreserved = 0;
-	mtp->mt_memunreserved = 0;
-	mtp->mt_reserved_bytes = 0;
+        mtp->mt_memreserved = 0;
+        mtp->mt_memunreserved = 0;
+        mtp->mt_reserved_bytes = 0;
 #endif
 
 	for (i = 0; i < maxcpus; i++) {

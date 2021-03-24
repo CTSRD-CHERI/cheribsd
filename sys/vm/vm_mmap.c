@@ -333,10 +333,6 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	 * requirements, then MAP_EXCL is implied to prevent changing
 	 * page contents without permission.
 	 *
-	 * If addr is not a valid capability, it must be NULL-derived,
-	 * otherwise the syscall fails.
-	 *
-	 * XXXAM: Update this comment
 	 * XXXBD: The fact that using valid a capability to a currently
 	 * unmapped region with and without the VMMAP permission will
 	 * yield different results (and even failure modes) is potentially
@@ -366,6 +362,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 
 		if (flags & MAP_FIXED)
 			flags |= MAP_EXCL;
+
 		if (flags & MAP_CHERI_NOSETBOUNDS) {
 			SYSERRCAUSE("MAP_CHERI_NOSETBOUNDS without a valid "
 			    "addr capability");
@@ -524,7 +521,7 @@ kern_mmap(struct thread *td, struct mmap_req *mrp)
 	 */
 	if (!SV_CURPROC_FLAG(SV_CHERI))
 		flags &= ~(MAP_RESERVED0020 | MAP_RESERVED0040);
-
+	
 	/*
 	 * Enforce the constraints.
 	 * Mapping of length 0 is only allowed for old binaries.
@@ -614,14 +611,13 @@ kern_mmap(struct thread *td, struct mmap_req *mrp)
 		return (ENOMEM);
 
 	align = flags & MAP_ALIGNMENT_MASK;
-
 #if !__has_feature(capabilities)
 	/* In the non-CHERI case, remove the alignment request. */
 	if (align == MAP_ALIGNED_CHERI || align == MAP_ALIGNED_CHERI_SEAL) {
 		flags &= ~MAP_ALIGNMENT_MASK;
 		align = 0;
 	}
-#else
+#else /* __has_feature(capabilities) */
 	/*
 	 * Convert MAP_ALIGNED_CHERI(_SEAL) into explicit alignment
 	 * requests and pad lengths.  The combination of alignment (via
@@ -1418,7 +1414,7 @@ retry:
 				 * required because a concurrent pmap
 				 * operation could clear the last reference
 				 * and set PGA_REFERENCED before the call to
-				 * pmap_is_referenced().
+				 * pmap_is_referenced(). 
 				 */
 				if ((m->a.flags & PGA_REFERENCED) != 0 ||
 				    pmap_is_referenced(m) ||
@@ -1520,7 +1516,7 @@ sys_mlock(struct thread *td, struct mlock_args *uap)
 #endif
 
 	return (kern_mlock(td->td_proc, td->td_ucred,
-	    __DECONST_CAP(__cheri_addr vaddr_t, uap->addr), uap->len));
+	    (uintptr_t)__DECONST_CAP(uintcap_t, uap->addr), uap->len));
 }
 
 int
@@ -2122,7 +2118,6 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 			    MAP_ALIGNMENT_SHIFT);
 		else
 			findspace = VMFS_OPTIMAL_SPACE;
-
 		if (curmap) {
 			rv = vm_map_find_min(map, object, foff, addr, size,
 			    round_page((vm_offset_t)td->td_proc->p_vmspace->

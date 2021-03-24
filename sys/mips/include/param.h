@@ -158,10 +158,10 @@
 #endif
 
 #ifdef __mips_n64
-#ifndef __CHERI_PURE_CAPABILITY__
-#define	NPDEPGSHIFT		9               /* LOG2(NPTEPG) */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	NPDEPGSHIFT		8		/* LOG2(NPDEPG) */
 #else /* __CHERI_PURE_CAPABILITY__ */
-#define NPDEPGSHIFT		8		/* LOG2(NPDEPG) */
+#define	NPDEPGSHIFT		9               /* LOG2(NPTEPG) */
 #endif /* __CHERI_PURE_CAPABILITY__ */
 #define	SEGSHIFT		(PAGE_SHIFT + NPTEPGSHIFT + NPDEPGSHIFT)
 #define	NBSEG			(1ul << SEGSHIFT)
@@ -193,9 +193,9 @@
  * Cheri-128 uses two 16K pages for the kernel stack, without any guard pages.
  * The stack capability is bounded propery so the stack should never overflow.
  */
-#define KSTACK_PAGE_SIZE	(1 << 14)	/* Single 16K page */
+#define	KSTACK_PAGE_SIZE	(1 << 14)	/* Single 16K page */
 #define	KSTACK_SIZE		(KSTACK_PAGE_SIZE * 2)
-#define KSTACK_GUARD_PAGES	0
+#define	KSTACK_GUARD_PAGES	0
 
 #else /* ! __CHERI_PURE_CAPABILITY__ */
 
@@ -225,7 +225,7 @@
 /*
  * Mach derived conversion macros
  */
-#define	round_2mpage(x)		__builtin_align_down(((x) + PDRMASK), PDRSIZE)
+#define	round_2mpage(x)		__builtin_align_up((x), PDRSIZE)
 #define	trunc_2mpage(x)		__builtin_align_down((x), PDRSIZE)
 
 #endif /* !_MIPS_INCLUDE_PARAM_H_ */

@@ -73,7 +73,15 @@ __FBSDID("$FreeBSD$");
 
 boolean_t ofw_cpu_reg(phandle_t node, u_int, cell_t *);
 
-uint32_t __riscv_boot_ap[MAXCPU];
+/*
+ * XXX: When loading the kernel through GDB, .bss is not cleared. If BBL is
+ * used on a multi-hart system, all harts race to win the hart lottery, with
+ * the boot hart zeroing out bss once paging has been set up, but the other
+ * harts already spinning on __riscv_boot_ap[hartid]. This means the APs can
+ * end up reading before bss has been zeroed, so we must put this in .data
+ * instead.
+ */
+uint32_t __riscv_boot_ap[MAXCPU] __section(".data");
 
 static enum {
 	CPUS_UNKNOWN,
@@ -556,7 +564,6 @@ cpu_mp_setmaxid(void)
 	mp_ncpus = 1;
 	mp_maxid = 0;
 }
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,
