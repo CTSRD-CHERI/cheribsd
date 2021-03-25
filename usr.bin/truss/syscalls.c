@@ -918,7 +918,6 @@ print_mask_arg32(bool (*decoder)(FILE *, uint32_t, uint32_t *), FILE *fp,
 		fprintf(fp, "|0x%x", rem);
 }
 
-#ifndef __LP64__
 /*
  * Add argument padding to subsequent system calls after Quad
  * syscall arguments as needed.  This used to be done by hand in the
@@ -963,7 +962,6 @@ quad_fixup(struct syscall_decode *sc)
 		}
 	}
 }
-#endif
 
 static struct syscall *
 find_syscall(struct procabi *abi, u_int number)
@@ -984,10 +982,13 @@ add_syscall(struct procabi *abi, u_int number, struct syscall *sc)
 {
 	struct extra_syscall *es;
 
-#ifndef __LP64__
-	/* FIXME: should be based on syscall ABI not truss ABI */
-	quad_fixup(&sc->decode);
-#endif
+	/*
+	 * quad_fixup() is currently needed for all 32-bit ABIs.
+	 * TODO: This should probably be a function pointer inside struct
+	 *  procabi instead.
+	 */
+	if (abi->pointer_size == 4)
+		quad_fixup(&sc->decode);
 
 	if (number < nitems(abi->syscalls)) {
 		assert(abi->syscalls[number] == NULL);
@@ -1010,16 +1011,19 @@ struct syscall *
 get_syscall(struct threadinfo *t, u_int number, u_int nargs)
 {
 	struct syscall *sc;
+	struct procabi *procabi;
 	const char *sysdecode_name;
+	const char *lookup_name;
 	const char *name;
 	u_int i;
 
-	sc = find_syscall(t->proc->abi, number);
+	procabi = t->proc->abi;
+	sc = find_syscall(procabi, number);
 	if (sc != NULL)
 		return (sc);
 
 	/* Memory is not explicitly deallocated, it's released on exit(). */
-	sysdecode_name = sysdecode_syscallname(t->proc->abi->abi, number);
+	sysdecode_name = sysdecode_syscallname(procabi->abi, number);
 	if (sysdecode_name == NULL)
 		asprintf(__DECONST(char **, &name), "#%d", number);
 	else
@@ -1028,8 +1032,14 @@ get_syscall(struct threadinfo *t, u_int number, u_int nargs)
 	sc = calloc(1, sizeof(*sc));
 	sc->name = name;
 
+	/* Also decode compat syscalls arguments by stripping the prefix. */
+	lookup_name = name;
+	if (procabi->compat_prefix != NULL && strncmp(procabi->compat_prefix,
+	    name, strlen(procabi->compat_prefix)) == 0)
+		lookup_name += strlen(procabi->compat_prefix);
+
 	for (i = 0; i < nitems(decoded_syscalls); i++) {
-		if (strcmp(name, decoded_syscalls[i].name) == 0) {
+		if (strcmp(lookup_name, decoded_syscalls[i].name) == 0) {
 			sc->decode = decoded_syscalls[i];
 			add_syscall(t->proc->abi, number, sc);
 			return (sc);
@@ -1719,12 +1729,15 @@ print_arg(struct syscall_arg *sc, syscallarg_t *args, syscallarg_t *retval,
 	case StringArray: {
 		uintptr_t addr;
 		union {
-			char *strarray[0];
+			int32_t strarray32[PAGE_SIZE / sizeof(int32_t)];
+			int64_t strarray64[PAGE_SIZE / sizeof(int64_t)];
 			char buf[PAGE_SIZE];
 		} u;
 		char *string;
 		size_t len;
 		u_int first, i;
+		size_t pointer_size =
+		    trussinfo->curthread->proc->abi->pointer_size;
 
 		/*
 		 * Only parse argv[] and environment arrays from exec calls
@@ -1744,7 +1757,7 @@ print_arg(struct syscall_arg *sc, syscallarg_t *args, syscallarg_t *retval,
 		 * a partial page.
 		 */
 		addr = args[sc->offset];
-		if ((vaddr_t)addr % sizeof(char *) != 0) {
+		if (addr % pointer_size != 0) {
 			print_pointer(fp, args[sc->offset]);
 			break;
 		}
@@ -1754,22 +1767,36 @@ print_arg(struct syscall_arg *sc, syscallarg_t *args, syscallarg_t *retval,
 			print_pointer(fp, args[sc->offset]);
 			break;
 		}
+		assert(len > 0);
 
 		fputc('[', fp);
 		first = 1;
 		i = 0;
-		while (u.strarray[i] != NULL) {
-			string = get_string(pid, (uintptr_t)u.strarray[i], 0);
+		for (;;) {
+			uintptr_t straddr;
+			if (pointer_size == 4) {
+				if (u.strarray32[i] == 0)
+					break;
+				/* sign-extend 32-bit pointers */
+				straddr = (intptr_t)u.strarray32[i];
+			} else if (pointer_size == 8) {
+				if (u.strarray64[i] == 0)
+					break;
+				straddr = (intptr_t)u.strarray64[i];
+			} else {
+				errx(1, "Unsupported pointer size: %zu",
+				    pointer_size);
+			}
+			string = get_string(pid, straddr, 0);
 			fprintf(fp, "%s \"%s\"", first ? "" : ",", string);
 			free(string);
 			first = 0;
 
 			i++;
-			if (i == len / sizeof(char *)) {
+			if (i == len / pointer_size) {
 				addr += len;
 				len = PAGE_SIZE;
-				if (get_struct(pid, addr, u.buf, len) ==
-				    -1) {
+				if (get_struct(pid, addr, u.buf, len) == -1) {
 					fprintf(fp, ", <inval>");
 					break;
 				}
