@@ -36,7 +36,6 @@
  * $FreeBSD$
  */
 #pragma once
-
 #include_next <stdint.h>
 
 #ifndef _VADDR_T_DECLARED
