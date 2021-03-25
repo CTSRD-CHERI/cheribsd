@@ -33,6 +33,7 @@
 #define	_SYS_TREE_H_
 
 #include <sys/cdefs.h>
+#include "stdint.h"
 
 /*
  * This file defines data structures for different types of trees:
@@ -348,8 +349,8 @@ struct __no_subobject_bounds {						\
 #define RB_EMPTY(head)			(RB_ROOT(head) == NULL)
 
 #define RB_SET_PARENT(dst, src, field) do {				\
-	RB_BITS(dst, field) &= RB_RED_MASK;				\
-	RB_BITS(dst, field) |= (__uintptr_t)src;			\
+	RB_BITS(dst, field) = (__uintptr_t)src |			\
+	    (ptraddr_t)(RB_BITS(dst, field) & RB_RED_MASK);		\
 } while (/*CONSTCOND*/ 0)
 
 #define RB_SET(elm, parent, field) do {					\
