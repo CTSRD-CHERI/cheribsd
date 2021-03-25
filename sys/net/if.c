@@ -2667,83 +2667,122 @@ ifr_addr_get_sa(void *ifrp)
 }
 
 void * __capability
-ifr_buffer_get_buffer(void *data)
+ifr_buffer_get_buffer(u_long cmd, void *data)
 {
 	union ifreq_union *ifrup;
 
 	ifrup = data;
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (__USER_CAP((void *)(uintptr_t)
-		    ifrup->ifr32.ifr_ifru.ifru_buffer.buffer,
-		    ifrup->ifr32.ifr_ifru.ifru_buffer.length));
-	else
-#endif
+	switch (IOCPARM_LEN(cmd)) {
 #ifdef COMPAT_FREEBSD64
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return (__USER_CAP((void *)(uintptr_t)
-		    ifrup->ifr64.ifr_ifru.ifru_buffer.buffer,
+	case sizeof(struct ifreq64):
+#ifdef COMPAT_FREEBSD32
+		if (SV_CURPROC_FLAG(SV_ILP32))
+			return (__USER_CAP(
+			    ifrup->ifr32.ifr_ifru.ifru_buffer.buffer,
+			    ifrup->ifr32.ifr_ifru.ifru_buffer.length));
+#endif
+		return (__USER_CAP(ifrup->ifr64.ifr_ifru.ifru_buffer.buffer,
 		    ifrup->ifr64.ifr_ifru.ifru_buffer.length));
-	else
+#endif
+	case sizeof(struct ifreq):
+#if !__has_feature(capabilities) && defined(COMPAT_FREEBSD32)
+		if (SV_CURPROC_FLAG(SV_ILP32))
+			return ((void *)(uintptr_t)
+			    ifrup->ifr32.ifr_ifru.ifru_buffer.buffer);
 #endif
 		return (ifrup->ifr.ifr_ifru.ifru_buffer.buffer);
+	default:
+		__assert_unreachable();
+	}
 }
 
 static void
-ifr_buffer_set_buffer_null(void *data)
+ifr_buffer_set_buffer_null(u_long cmd, void *data)
 {
 	union ifreq_union *ifrup;
 
 	ifrup = data;
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		ifrup->ifr32.ifr_ifru.ifru_buffer.buffer = 0;
-	else
-#endif
+	switch (IOCPARM_LEN(cmd)) {
 #ifdef COMPAT_FREEBSD64
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		ifrup->ifr64.ifr_ifru.ifru_buffer.buffer = 0;
-	else
+	case sizeof(struct ifreq64):
+#ifdef COMPAT_FREEBSD32
+		if (SV_CURPROC_FLAG(SV_ILP32))
+			ifrup->ifr32.ifr_ifru.ifru_buffer.buffer = 0;
+		else
 #endif
-		ifrup->ifr.ifr_ifru.ifru_buffer.buffer = NULL;
+			ifrup->ifr64.ifr_ifru.ifru_buffer.buffer = 0;
+		break;
+#endif
+	case sizeof(struct ifreq):
+#if !__has_feature(capabilities) && defined(COMPAT_FREEBSD32)
+		if (SV_CURPROC_FLAG(SV_ILP32))
+			ifrup->ifr32.ifr_ifru.ifru_buffer.buffer = 0;
+		else
+#endif
+			ifrup->ifr.ifr_ifru.ifru_buffer.buffer = NULL;
+		break;
+	default:
+		__assert_unreachable();
+	}
 }
 
 size_t
-ifr_buffer_get_length(void *data)
+ifr_buffer_get_length(u_long cmd, void *data)
 {
 	union ifreq_union *ifrup;
 
 	ifrup = data;
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		return (ifrup->ifr32.ifr_ifru.ifru_buffer.length);
-	else
-#endif
+	switch (IOCPARM_LEN(cmd)) {
 #ifdef COMPAT_FREEBSD64
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		return (ifrup->ifr64.ifr_ifru.ifru_buffer.length);
-	else
+	case sizeof(struct ifreq64):
+#ifdef COMPAT_FREEBSD32
+		if (SV_CURPROC_FLAG(SV_ILP32))
+			return (ifrup->ifr32.ifr_ifru.ifru_buffer.length);
+		else
 #endif
-		return (ifrup->ifr.ifr_ifru.ifru_buffer.length);
+			return (ifrup->ifr64.ifr_ifru.ifru_buffer.length);
+#endif
+	case sizeof(struct ifreq):
+#if !__has_feature(capabilities) && defined(COMPAT_FREEBSD32)
+		if (SV_CURPROC_FLAG(SV_ILP32))
+			return (ifrup->ifr32.ifr_ifru.ifru_buffer.length);
+		else
+#endif
+			return (ifrup->ifr.ifr_ifru.ifru_buffer.length);
+		break;
+	default:
+		__assert_unreachable();
+	}
 }
 
 static void
-ifr_buffer_set_length(void *data, size_t len)
+ifr_buffer_set_length(u_long cmd, void *data, size_t len)
 {
 	union ifreq_union *ifrup;
 
 	ifrup = data;
-#ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
-		ifrup->ifr32.ifr_ifru.ifru_buffer.length = len;
-	else
-#endif
+	switch (IOCPARM_LEN(cmd)) {
 #ifdef COMPAT_FREEBSD64
-	if (!SV_CURPROC_FLAG(SV_CHERI))
-		ifrup->ifr64.ifr_ifru.ifru_buffer.length = len;
-	else
+	case sizeof(struct ifreq64):
+#ifdef COMPAT_FREEBSD32
+		if (SV_CURPROC_FLAG(SV_ILP32))
+			ifrup->ifr32.ifr_ifru.ifru_buffer.length = len;
+		else
 #endif
-		ifrup->ifr.ifr_ifru.ifru_buffer.length = len;
+			ifrup->ifr64.ifr_ifru.ifru_buffer.length = len;
+		break;
+#endif
+	case sizeof(struct ifreq):
+#if !__has_feature(capabilities) && defined(COMPAT_FREEBSD32)
+		if (SV_CURPROC_FLAG(SV_ILP32))
+			ifrup->ifr32.ifr_ifru.ifru_buffer.length = len;
+		else
+#endif
+			ifrup->ifr.ifr_ifru.ifru_buffer.length = len;
+		break;
+	default:
+		__assert_unreachable();
+	}
 }
 
 static void
@@ -2999,12 +3038,12 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		else {
 			/* space for terminating nul */
 			descrlen = strlen(ifp->if_description) + 1;
-			if (ifr_buffer_get_length(ifr) < descrlen)
-				ifr_buffer_set_buffer_null(ifr);
+			if (ifr_buffer_get_length(cmd, ifr) < descrlen)
+				ifr_buffer_set_buffer_null(cmd, ifr);
 			else
 				error = copyout(ifp->if_description,
-				    ifr_buffer_get_buffer(ifr), descrlen);
-			ifr_buffer_set_length(ifr, descrlen);
+				    ifr_buffer_get_buffer(cmd, ifr), descrlen);
+			ifr_buffer_set_length(cmd, ifr, descrlen);
 		}
 		sx_sunlock(&ifdescr_sx);
 		break;
@@ -3020,15 +3059,15 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		 * length parameter is supposed to count the
 		 * terminating nul in.
 		 */
-		if (ifr_buffer_get_length(ifr) > ifdescr_maxlen)
+		if (ifr_buffer_get_length(cmd, ifr) > ifdescr_maxlen)
 			return (ENAMETOOLONG);
-		else if (ifr_buffer_get_length(ifr) == 0)
+		else if (ifr_buffer_get_length(cmd, ifr) == 0)
 			descrbuf = NULL;
 		else {
-			descrbuf = malloc(ifr_buffer_get_length(ifr),
+			descrbuf = malloc(ifr_buffer_get_length(cmd, ifr),
 			    M_IFDESCR, M_WAITOK | M_ZERO);
-			error = copyin(ifr_buffer_get_buffer(ifr),
-			    descrbuf, ifr_buffer_get_length(ifr) - 1);
+			error = copyin(ifr_buffer_get_buffer(cmd, ifr),
+			    descrbuf, ifr_buffer_get_length(cmd, ifr) - 1);
 			if (error) {
 				free(descrbuf, M_IFDESCR);
 				break;

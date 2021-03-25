@@ -1657,8 +1657,8 @@ bnxt_priv_ioctl(if_ctx_t ctx, u_long command, caddr_t data)
 		if ((rc = priv_check(curthread, PRIV_DRIVER)) != 0)
 			goto exit;
 
-		ioh = ifr_buffer_get_buffer(ifr);
-		iol = ifr_buffer_get_length(ifr);
+		ioh = ifr_buffer_get_buffer(command, ifr);
+		iol = ifr_buffer_get_length(command, ifr);
 		if (iol > sizeof(iod_storage))
 			return (EINVAL);
 
