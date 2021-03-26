@@ -72,6 +72,8 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/link_elf.h>
 
+#include <cheri/cheric.h>
+
 #include "linker_if.h"
 
 #define MAXSEGS 4
