@@ -511,6 +511,8 @@ vm_fault_populate(struct faultstate *fs)
 		    PMAP_ENTER_LARGEPAGE, bdry_idx);
 		VM_OBJECT_WLOCK(fs->first_object);
 		vm_page_xunbusy(m);
+		if (rv != KERN_SUCCESS)
+			goto out;
 		if ((fs->fault_flags & VM_FAULT_WIRE) != 0) {
 			for (i = 0; i < atop(pagesizes[bdry_idx]); i++)
 				vm_page_wire(m + i);
@@ -593,7 +595,7 @@ vm_fault_populate(struct faultstate *fs)
 	}
 out:
 	curthread->td_ru.ru_majflt++;
-	return (KERN_SUCCESS);
+	return (rv);
 }
 
 static int prot_fault_translation;
@@ -1114,6 +1116,7 @@ vm_fault_allocate(struct faultstate *fs)
 		switch (rv) {
 		case KERN_SUCCESS:
 		case KERN_FAILURE:
+		case KERN_PROTECTION_FAILURE:
 		case KERN_RESTART:
 			return (rv);
 		case KERN_NOT_RECEIVER:
@@ -1384,6 +1387,7 @@ RetryFault:
 			goto RetryFault;
 		case KERN_SUCCESS:
 		case KERN_FAILURE:
+		case KERN_PROTECTION_FAILURE:
 		case KERN_OUT_OF_BOUNDS:
 			unlock_and_deallocate(&fs);
 			return (rv);
@@ -1451,6 +1455,7 @@ RetryFault:
 				goto RetryFault;
 			case KERN_SUCCESS:
 			case KERN_FAILURE:
+			case KERN_PROTECTION_FAILURE:
 			case KERN_OUT_OF_BOUNDS:
 				unlock_and_deallocate(&fs);
 				return (rv);
