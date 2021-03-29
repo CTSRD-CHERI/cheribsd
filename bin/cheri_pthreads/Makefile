@@ -10,6 +10,4 @@ LIBADD=	pthread
 
 NO_SHARED=	YES
 
-NO_WERROR=	YES
-
 .include <bsd.prog.mk>
