@@ -127,7 +127,7 @@ CFLAGS.gcc+=	${CFLAGS.gcc.${.IMPSRC}}
 
 .if ${MACHINE_ABI:Mpurecap}
 # Work around packed struct in cissio.h
-CFLAGS.ioctl.c+=	-Wno-error-cheri-capability-misuse
+CFLAGS.ioctl.c+=	-Wno-error=cheri-capability-misuse
 .endif
 
 DEPENDOBJS+=	tables.h
