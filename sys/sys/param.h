@@ -171,7 +171,11 @@
  * MCLBYTES must be no larger than PAGE_SIZE.
  */
 #ifndef	MSIZE
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	MSIZE		512		/* size of an mbuf */
+#else
 #define	MSIZE		256		/* size of an mbuf */
+#endif
 #endif
 
 #ifndef	MCLSHIFT
@@ -398,3 +402,13 @@ __END_DECLS
 #endif
 
 #endif	/* _SYS_PARAM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190528,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_alignment",
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END
