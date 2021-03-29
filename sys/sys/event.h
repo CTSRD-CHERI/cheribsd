@@ -81,7 +81,7 @@
 #endif
 
 struct kevent {
-	kuintcap_t	ident;		/* identifier for this event */
+	__kuintcap_t	ident;		/* identifier for this event */
 	short		filter;		/* filter for event */
 	unsigned short	flags;		/* action flags for kqueue */
 	unsigned int	fflags;		/* filter flag value */
@@ -104,7 +104,7 @@ struct g_kevent_args {
 #if defined(_WANT_FREEBSD11_KEVENT)
 /* Older structure used in FreeBSD 11.x and older. */
 struct kevent_freebsd11 {
-	kuintcap_t	ident;		/* identifier for this event */
+	__kuintcap_t	ident;		/* identifier for this event */
 	short		filter;		/* filter for event */
 	unsigned short	flags;
 	unsigned int	fflags;

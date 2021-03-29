@@ -81,6 +81,12 @@ typedef	__intptr_t	__intcap_t;
 typedef	__uintptr_t	__uintcap_t;
 #endif
 
+#ifdef _KERNEL
+typedef __uintcap_t	__kuintcap_t;
+#else
+typedef __uintptr_t	__kuintcap_t;
+#endif
+
 /*
  * Unusual type definitions.
  */
