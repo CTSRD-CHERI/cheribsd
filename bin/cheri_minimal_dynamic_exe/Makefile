@@ -29,6 +29,4 @@ CFLAGS+=	-I${SRCTOP}/lib/libc/${MACHINE_CPUARCH}
 .endif
 .endif # ${USE_LIBSYSCALLS} == "yes"
 
-NO_WERROR=	yes
-
 .include <bsd.prog.mk>

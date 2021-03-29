@@ -15,7 +15,4 @@ CFLAGS+= -include ${SRCTOP}/sys/contrib/openzfs/include/os/freebsd/spl/sys/ccomp
 # The assert macro needs `int aok` (which is in nvpair)
 LIBADD=	nvpair
 
-# missing decleration for assfail()
-NO_WERROR=
-
 .include <bsd.lib.mk>
