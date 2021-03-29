@@ -45,6 +45,7 @@
 #ifdef WITNESS
 #include <sys/lock.h>
 #endif
+#include <cheri/cheric.h>
 #endif
 
 #ifdef _KERNEL
@@ -147,7 +148,8 @@ struct m_snd_tag {
 /*
  * Record/packet header in first mbuf of chain; valid only if M_PKTHDR is set.
  * Size ILP32: 48
- *	 LP64: 56
+ *	LP64: 56
+ *	CHERI128: 96
  * Compile-time assertions in uipc_mbuf.c test these values to ensure that
  * they are correct.
  */
@@ -225,11 +227,17 @@ struct pkthdr {
  */
 #define	MBUF_PEXT_TRAIL_LEN	64
 
+/*
+ * The number of PEXT_MAX_PGS is computed so that m_ext will fit into
+ * MSIZE bytes as EXT_PGS mbufs are allocated from the mbuf_zone.
+ */
 #if defined(__LP64__)
 #define MBUF_PEXT_MAX_PGS (40 / sizeof(vm_paddr_t))
-#else
+#elif defined(__CHERI_PURE_CAPABILITY__)
+#define MBUF_PEXT_MAX_PGS (200 / sizeof(vm_paddr_t))
+#else /* ! __LP64__ */
 #define MBUF_PEXT_MAX_PGS (72 / sizeof(vm_paddr_t))
-#endif
+#endif /* ! __LP64__ */
 
 #define	MBUF_PEXT_MAX_BYTES						\
     (MBUF_PEXT_MAX_PGS * PAGE_SIZE + MBUF_PEXT_HDR_LEN + MBUF_PEXT_TRAIL_LEN)
@@ -241,7 +249,10 @@ struct socket;
  * Description of external storage mapped into mbuf; valid only if M_EXT is
  * set.
  * Size ILP32: 28
- *	 LP64: 48
+ *	LP64: 48
+ *	CHERI128: 352
+ * XXXAM: notice that we may be able to save space (padding) if we move the ext_size
+ * and ext_type/flags after ext_arg2.
  * Compile-time assertions in uipc_mbuf.c test these values to ensure that
  * they are correct.
  */
@@ -313,7 +324,8 @@ struct mbuf {
 	/*
 	 * Header present at the beginning of every mbuf.
 	 * Size ILP32: 24
-	 *      LP64: 32
+	 *	LP64: 32
+	 *	CHERI128: 64
 	 * Compile-time assertions in uipc_mbuf.c test these values to ensure
 	 * that they are correct.
 	 */
@@ -882,7 +894,7 @@ m_extaddref(struct mbuf *m, char *buf, u_int size, u_int *ref_cnt,
 
 	atomic_add_int(ref_cnt, 1);
 	m->m_flags |= M_EXT;
-	m->m_ext.ext_buf = buf;
+	m->m_ext.ext_buf = cheri_kern_setbounds(buf, size);
 	m->m_ext.ext_cnt = ref_cnt;
 	m->m_data = m->m_ext.ext_buf;
 	m->m_ext.ext_size = size;
@@ -934,7 +946,7 @@ m_init(struct mbuf *m, int how, short type, int flags)
 
 	m->m_next = NULL;
 	m->m_nextpkt = NULL;
-	m->m_data = m->m_dat;
+	m->m_data = cheri_kern_setbounds(m->m_dat, MLEN);
 	m->m_len = 0;
 	m->m_flags = flags;
 	m->m_type = type;
@@ -1016,7 +1028,7 @@ m_cljset(struct mbuf *m, void *cl, int type)
 		break;
 	}
 
-	m->m_data = m->m_ext.ext_buf = cl;
+	m->m_data = m->m_ext.ext_buf = cheri_kern_setbounds(cl, size);
 	m->m_ext.ext_free = m->m_ext.ext_arg1 = m->m_ext.ext_arg2 = NULL;
 	m->m_ext.ext_size = size;
 	m->m_ext.ext_type = type;
@@ -1621,3 +1633,13 @@ mbuf_has_tls_session(struct mbuf *m)
 
 #endif /* _KERNEL */
 #endif /* !_SYS_MBUF_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support",
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END
