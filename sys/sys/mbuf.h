@@ -231,13 +231,13 @@ struct pkthdr {
  * The number of PEXT_MAX_PGS is computed so that m_ext will fit into
  * MSIZE bytes as EXT_PGS mbufs are allocated from the mbuf_zone.
  */
-#if defined(__LP64__)
-#define MBUF_PEXT_MAX_PGS (40 / sizeof(vm_paddr_t))
-#elif defined(__CHERI_PURE_CAPABILITY__)
+#if defined(__CHERI_PURE_CAPABILITY__)
 #define MBUF_PEXT_MAX_PGS (200 / sizeof(vm_paddr_t))
-#else /* ! __LP64__ */
+#elif __SIZEOF_POINTER__ == 8
+#define MBUF_PEXT_MAX_PGS (40 / sizeof(vm_paddr_t))
+#else
 #define MBUF_PEXT_MAX_PGS (72 / sizeof(vm_paddr_t))
-#endif /* ! __LP64__ */
+#endif
 
 #define	MBUF_PEXT_MAX_BYTES						\
     (MBUF_PEXT_MAX_PGS * PAGE_SIZE + MBUF_PEXT_HDR_LEN + MBUF_PEXT_TRAIL_LEN)
@@ -343,7 +343,7 @@ struct mbuf {
 	int32_t		 m_len;		/* amount of data in this mbuf */
 	uint32_t	 m_type:8,	/* type of data in this mbuf */
 			 m_flags:24;	/* flags; see below */
-#if !defined(__LP64__)
+#if __SIZEOF_POINTER__ == 4
 	uint32_t	 m_pad;		/* pad for 64bit alignment */
 #endif
 
