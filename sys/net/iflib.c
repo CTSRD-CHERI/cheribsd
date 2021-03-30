@@ -268,7 +268,7 @@ iflib_get_sctx(if_ctx_t ctx)
 
 #define IP_ALIGNED(m) ((((uintptr_t)(m)->m_data) & 0x3) == 0x2)
 #define CACHE_PTR_INCREMENT (CACHE_LINE_SIZE/sizeof(void*))
-#define CACHE_PTR_NEXT(ptr) ((void *)(((uintptr_t)(ptr)+CACHE_LINE_SIZE-1) & (CACHE_LINE_SIZE-1)))
+#define CACHE_PTR_NEXT(ptr) ((void *)(roundup2(ptr, CACHE_LINE_SIZE)))
 
 #define LINK_ACTIVE(ctx) ((ctx)->ifc_link_state == LINK_STATE_UP)
 #define CTX_IS_VF(ctx) ((ctx)->ifc_sctx->isc_flags & IFLIB_IS_VF)
@@ -453,7 +453,11 @@ typedef struct if_rxsd {
 } *if_rxsd_t;
 
 /* multiple of word size */
-#ifdef __LP64__
+#ifdef __CHERI_PURE_CAPABILITY__
+#define PKT_INFO_SIZE 8
+#define RXD_INFO_SIZE 8
+#define PKT_TYPE uint64_t
+#elif __SIZEOF_SIZE_T__ == 8
 #define PKT_INFO_SIZE	6
 #define RXD_INFO_SIZE	5
 #define PKT_TYPE uint64_t
@@ -483,10 +487,12 @@ pkt_info_zero(if_pkt_info_t pi)
 	pi_pad = (if_pkt_info_pad_t)pi;
 	pi_pad->pkt_val[0] = 0; pi_pad->pkt_val[1] = 0; pi_pad->pkt_val[2] = 0;
 	pi_pad->pkt_val[3] = 0; pi_pad->pkt_val[4] = 0; pi_pad->pkt_val[5] = 0;
-#ifndef __LP64__
+#ifdef __CHERI_PURE_CAPABILITY__
+	pi_pad->pkt_val[6] = 0; pi_pad->pkt_val[7] = 0;
+#elif !__SIZEOF_SIZE_T__ == 8
 	pi_pad->pkt_val[6] = 0; pi_pad->pkt_val[7] = 0; pi_pad->pkt_val[8] = 0;
 	pi_pad->pkt_val[9] = 0; pi_pad->pkt_val[10] = 0;
-#endif	
+#endif
 }
 
 static device_method_t iflib_pseudo_methods[] = {
@@ -6912,11 +6918,15 @@ iflib_debugnet_poll(if_t ifp, int count)
 #endif /* DEBUGNET */
 // CHERI CHANGES START
 // {
-//   "updated": 20191029,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_shape",
+//     "pointer_alignment"
 //   ]
 // }
 // CHERI CHANGES END
