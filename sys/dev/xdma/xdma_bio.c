@@ -91,11 +91,11 @@ xdma_enqueue_bio(xdma_channel_t *xchan, struct bio **bp,
 	xr->src_width = src_width;
 	xr->dst_width = dst_width;
 	if (dir == XDMA_MEM_TO_DEV) {
-		xr->dst_addr = addr;
-		xr->src_addr = 0;
+		xr->dst.bus_addr = addr;
+		xr->src.bus_addr = 0;
 	} else {
-		xr->dst_addr = 0;
-		xr->src_addr = addr;
+		xr->dst.bus_addr = 0;
+		xr->src.bus_addr = addr;
 	}
 
 	QUEUE_IN_LOCK(xchan);
@@ -104,3 +104,13 @@ xdma_enqueue_bio(xdma_channel_t *xchan, struct bio **bp,
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ],
+//   "change_comment": "bus_addr_t"
+// }
+// CHERI CHANGES END

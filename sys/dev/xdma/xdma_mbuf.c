@@ -94,11 +94,11 @@ xdma_enqueue_mbuf(xdma_channel_t *xchan, struct mbuf **mp,
 	xr->m = *mp;
 	xr->req_type = XR_TYPE_MBUF;
 	if (dir == XDMA_MEM_TO_DEV) {
-		xr->dst_addr = addr;
-		xr->src_addr = 0;
+		xr->dst.bus_addr = addr;
+		xr->src.bus_addr = 0;
 	} else {
-		xr->src_addr = addr;
-		xr->dst_addr = 0;
+		xr->src.bus_addr = addr;
+		xr->dst.bus_addr = 0;
 	}
 	xr->src_width = src_width;
 	xr->dst_width = dst_width;
@@ -149,3 +149,13 @@ xdma_mbuf_defrag(xdma_channel_t *xchan, struct xdma_request *xr)
 
 	return (c);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ],
+//   "change_comment": "bus_addr_t"
+// }
+// CHERI CHANGES END
