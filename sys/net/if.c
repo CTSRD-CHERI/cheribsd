@@ -113,9 +113,7 @@ __read_mostly epoch_t net_epoch_preempt;
 #ifdef COMPAT_FREEBSD32
 #include <sys/mount.h>
 #include <compat/freebsd32/freebsd32.h>
-#endif
 
-#ifdef COMPAT_FREEBSD32
 struct ifreq_buffer32 {
 	uint32_t	length;		/* (size_t) */
 	uint32_t	buffer;		/* (void *) */
@@ -156,6 +154,15 @@ CTASSERT(sizeof(struct ifreq64) == sizeof(struct ifreq32));
 CTASSERT(__offsetof(struct ifreq, ifr_ifru) ==
     __offsetof(struct ifreq32, ifr_ifru));
 
+struct ifconf32 {
+	int32_t	ifc_len;
+	union {
+		uint32_t	ifcu_buf;
+		uint32_t	ifcu_req;
+	} ifc_ifcu;
+};
+#define	SIOCGIFCONF32	_IOWR('i', 36, struct ifconf32)
+
 struct ifdrv32 {
 	char		ifd_name[IFNAMSIZ];
 	uint32_t	ifd_cmd;
@@ -192,6 +199,22 @@ struct ifmediareq32 {
 #endif /* COMPAT_FREEBSD32 */
 
 #ifdef COMPAT_FREEBSD64
+struct if_clonereq64 {
+	int	ifcr_total;
+	int	ifcr_count;
+	uint64_t ifcr_buffer;
+};
+#define	SIOCIFGCLONERS64 _IOC_NEWTYPE(SIOCIFGCLONERS, struct if_clonereq64)
+
+struct ifconf64 {
+	int	ifc_len;
+	union {
+		uint64_t	ifcu_buf;
+		uint64_t	ifcu_req;
+	} ifc_ifcu;
+};
+#define	SIOCGIFCONF64	_IOC_NEWTYPE(SIOCGIFCONF, struct ifconf64)
+
 struct ifdrv64 {
 	char		ifd_name[IFNAMSIZ];
 	uint64_t	ifd_cmd;
@@ -236,15 +259,6 @@ union ifreq_union {
 	struct ifreq64	ifr64;
 #endif
 };
-
-#ifdef COMPAT_FREEBSD64
-struct if_clonereq64 {
-	int	ifcr_total;
-	int	ifcr_count;
-	uint64_t ifcr_buffer;
-};
-#define	SIOCIFGCLONERS64 _IOC_NEWTYPE(SIOCIFGCLONERS, struct if_clonereq64)
-#endif
 
 SYSCTL_NODE(_net, PF_LINK, link, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Link layers");
@@ -2995,27 +3009,6 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 	}
 	return (error);
 }
-
-#ifdef COMPAT_FREEBSD32
-struct ifconf32 {
-	int32_t	ifc_len;
-	union {
-		uint32_t	ifcu_buf;
-		uint32_t	ifcu_req;
-	} ifc_ifcu;
-};
-#define	SIOCGIFCONF32	_IOWR('i', 36, struct ifconf32)
-#endif
-#ifdef COMPAT_FREEBSD64
-struct ifconf64 {
-	int	ifc_len;
-	union {
-		uint64_t	ifcu_buf;
-		uint64_t	ifcu_req;
-	} ifc_ifcu;
-};
-#define	SIOCGIFCONF64	_IOC_NEWTYPE(SIOCGIFCONF, struct ifconf64)
-#endif
 
 /*
  * Interface ioctls.
