@@ -885,10 +885,10 @@ retry_sleepq:
 		 * flags.
 		 */
 		v = x & (LK_ALL_WAITERS | LK_EXCLUSIVE_SPINNERS);
-		if ((x & ~v) == LK_UNLOCKED) {
+		if ((x & (ptraddr_t)~v) == LK_UNLOCKED) {
 			v &= ~LK_EXCLUSIVE_SPINNERS;
 			if (atomic_fcmpset_acq_ptr(&lk->lk_lock, &x,
-			    tid | v)) {
+			    tid | (ptraddr_t)v)) {
 				sleepq_release(&lk->lock_object);
 				LOCK_LOG2(lk,
 				    "%s: %p claimed by a new writer",
@@ -1387,8 +1387,8 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 			x = lockmgr_read_value(lk);
 			MPASS((x & LK_EXCLUSIVE_SPINNERS) == 0);
 			x &= LK_ALL_WAITERS;
-			if (atomic_cmpset_rel_ptr(&lk->lk_lock, tid | x,
-			    LK_SHARERS_LOCK(1) | x))
+			if (atomic_cmpset_rel_ptr(&lk->lk_lock,
+			    tid | (ptraddr_t)x, LK_SHARERS_LOCK(1) | x))
 				break;
 			cpu_spinwait();
 		}
@@ -1463,7 +1463,7 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 			}
 
 			v = x & (LK_ALL_WAITERS | LK_EXCLUSIVE_SPINNERS);
-			if ((x & ~v) == LK_UNLOCKED) {
+			if ((x & (ptraddr_t)~v) == LK_UNLOCKED) {
 				v = (x & ~LK_EXCLUSIVE_SPINNERS);
 
 				/*
@@ -1639,7 +1639,7 @@ _lockmgr_disown(struct lock *lk, const char *file, int line)
 		x = lockmgr_read_value(lk);
 		MPASS((x & LK_EXCLUSIVE_SPINNERS) == 0);
 		x &= LK_ALL_WAITERS;
-		if (atomic_cmpset_rel_ptr(&lk->lk_lock, tid | x,
+		if (atomic_cmpset_rel_ptr(&lk->lk_lock, tid | (ptraddr_t)x,
 		    LK_KERNPROC | x))
 			return;
 		cpu_spinwait();

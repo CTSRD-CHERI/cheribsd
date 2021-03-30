@@ -426,7 +426,7 @@ int
 sx_try_upgrade_int(struct sx *sx LOCK_FILE_LINE_ARG_DEF)
 {
 	uintptr_t x;
-	uintptr_t waiters;
+	ptraddr_t waiters;
 	int success;
 
 	if (SCHEDULER_STOPPED())
@@ -791,9 +791,10 @@ retry_sleepq:
 		 * fail, restart the loop.
 		 */
 		setx = x & (SX_LOCK_WAITERS | SX_LOCK_WRITE_SPINNER);
-		if ((x & ~setx) == SX_LOCK_SHARED) {
+		if ((x & (ptraddr_t)~setx) == SX_LOCK_SHARED) {
 			setx &= ~SX_LOCK_WRITE_SPINNER;
-			if (!atomic_fcmpset_acq_ptr(&sx->sx_lock, &x, tid | setx))
+			if (!atomic_fcmpset_acq_ptr(&sx->sx_lock, &x,
+			    tid | (ptraddr_t)setx))
 				goto retry_sleepq;
 			sleepq_release(&sx->lock_object);
 			CTR2(KTR_LOCK, "%s: %p claimed by new writer",

@@ -12,7 +12,7 @@
  * Portions of this software were developed by SRI International and the
  * University of Cambridge Computer Laboratory under DARPA/AFRL contract
  * FA8750-10-C-0237 ("CTSRD"), as part of the DARPA CRASH research programme.
-
+ *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
  * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
@@ -49,9 +49,6 @@
 #include <machine/atomic.h>
 
 #if __has_feature(capabilities)
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-
 #define MORELLO_FRAG_EXECUTABLE 0x4
 #define MORELLO_FRAG_RWDATA 0x2
 #define MORELLO_FRAG_RODATA 0x1
@@ -84,35 +81,21 @@ uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
 #define	DATA_PTR_REMOVE_PERMS						\
 	(CHERI_PERM_SEAL | CHERI_PERM_EXECUTE)
 
+#ifdef __CHERI_PURE_CAPABILITY__
 /* TODO: ABIs with tight bounds */
 #define can_use_tight_pcc_bounds(obj) ((void)(obj), false)
-
-#define set_bounds_if_nonnull(ptr, size)	\
-	do { if (ptr) { ptr = cheri_setbounds(ptr, size); } } while(0)
-
-#ifdef __CHERI_PURE_CAPABILITY__
-/* TODO: we should have a separate member for .text/rodata */
-#define get_codesegment(obj) ((obj)->text_rodata_cap)
-#define get_datasegment(obj) ((obj)->relocbase)
-#else
-#define get_codesegment(obj) ((char * __capability)cheri_getdefault() + (vaddr_t)(obj)->relocbase)
-#define get_datasegment(obj) ((char * __capability)cheri_getdefault() + (vaddr_t)(obj)->relocbase)
 #endif
-
-#endif /* __has_feature(capabilities) */
-
-#if __has_feature(capabilities)
-
-typedef void (* __capability dlfunccap_t)(struct __dlfunc_arg);
 
 /*
  * Create a pointer to a function.
  */
-static inline dlfunccap_t
+static inline dlfunc_t __capability
 make_code_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
     bool tight_bounds, size_t addend)
 {
-	const void * __capability ret = get_codesegment(defobj) + def->st_value;
+	const void * __capability ret;
+
+	ret = get_codesegment_cap(defobj) + def->st_value;
 	/* Remove store and seal permissions */
 	ret = cheri_clearperm(ret, FUNC_PTR_REMOVE_PERMS);
 	if (tight_bounds) {
@@ -125,18 +108,21 @@ make_code_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
 	ret = cheri_incoffset(ret, addend);
 	/* All code pointers should be sentries: */
 	ret = __builtin_cheri_seal_entry(ret);
-	return __DECONST_CAP(dlfunccap_t, ret);
+	return __DECONST_CAP(dlfunc_t __capability, ret);
 }
 
-static inline dlfunccap_t
-make_function_cap_with_addend(
-    const Elf_Sym *def, const struct Struct_Obj_Entry *defobj, size_t addend)
+/*
+ * Create a function pointer that can be called anywhere
+ */
+static inline dlfunc_t __capability
+make_function_cap_with_addend(const Elf_Sym *def,
+    const struct Struct_Obj_Entry *defobj, size_t addend)
 {
 	/* TODO: ABIs with tight bounds */
 	return make_code_cap(def, defobj, /*tight_bounds=*/false, addend);
 }
 
-static inline dlfunccap_t
+static inline dlfunc_t __capability
 make_function_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 {
 	return make_function_cap_with_addend(def, defobj, /*addend=*/0);
@@ -145,35 +131,27 @@ make_function_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 static inline void * __capability
 make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 {
-	void * __capability ret = get_datasegment(defobj) + def->st_value;
+	void * __capability ret;
+	ret = get_datasegment_cap(defobj) + def->st_value;
 	/* Remove execute and seal permissions */
 	ret = cheri_clearperm(ret, DATA_PTR_REMOVE_PERMS);
-	/* TODO: can we always set bounds here or does it break compat? */
 	ret = cheri_setbounds(ret, def->st_size);
 	return ret;
 }
+
+#define set_bounds_if_nonnull(cap, size)	\
+	do { if (cap) { cap = cheri_setbounds(cap, size); } } while(0)
 
 #endif /* __has_feature(capabilities) */
 
 #ifdef __CHERI_PURE_CAPABILITY__
 
-#define	make_code_pointer make_code_cap
-#define	make_function_pointer_with_addend make_function_cap_with_addend
-#define	make_function_pointer make_function_cap
-#define	make_data_pointer make_data_cap
-
-#else /* __CHERI_PURE_CAPABILITY__ */
-
-#define	make_function_pointer(def, defobj) \
-	((defobj)->relocbase + (def)->st_value)
-
-#endif /* __CHERI_PURE_CAPABILITY__ */
-
-#ifdef __CHERI_PURE_CAPABILITY__
+#define make_function_pointer(def, defobj) \
+	make_function_cap(def, defobj)
 
 /* ignore _init/_fini */
 #define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
-#define call_init_pointer(obj, target) rtld_fatal("%s: _init used!", obj->path)
+#define call_init_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
 
 /* TODO: Per-function captable/PLT/FNDESC support */
 #define call_init_array_pointer(obj, target)				\
@@ -182,17 +160,18 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 #define call_fini_array_pointer(obj, target)				\
 	(((InitFunc)(target).value)())
 
-/* TODO: Not implemented for CHERI. */
-#define call_ifunc_resolver(ptr) (((Elf_Addr (*)(void))ptr)()); \
-	rtld_fatal("%s: ifuncs not supported on purecap Morello!", obj->path)
-
 #else /* __CHERI_PURE_CAPABILITY__ */
+
+#define	make_function_pointer(def, defobj) \
+	((defobj)->relocbase + (def)->st_value)
 
 #define	call_initfini_pointer(obj, target) \
 	(((InitFunc)(target))())
 
 #define	call_init_pointer(obj, target) \
 	(((InitArrFunc)(target))(main_argc, main_argv, environ))
+
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 /*
  * Pass zeros into the ifunc resolver so we can change them later. The first
@@ -202,10 +181,8 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
  * compare the argument with 0 to see if it is set.
  */
 #define	call_ifunc_resolver(ptr) \
-	(((Elf_Addr (*)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, \
+	(((uintptr_t (*)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, \
 	    uint64_t, uint64_t, uint64_t))ptr)(0, 0, 0, 0, 0, 0, 0, 0))
-
-#endif /* __CHERI_PURE_CAPABILITY__ */
 
 #define	round(size, align)				\
 	(((size) + (align) - 1) & ~((align) - 1))
@@ -242,7 +219,7 @@ _rtld_validate_target_eflags(const char *path, Elf_Ehdr *hdr, const char *main_p
 #else
 	rtld_is_cheriabi = false;
 #endif
-	hdr_is_cheriabi = hdr->e_entry & 0x1;
+	hdr_is_cheriabi = (hdr->e_entry & 0x1) != 0;
 
 	/*
 	 * TODO: restore validation when the Morello toolchain correctly

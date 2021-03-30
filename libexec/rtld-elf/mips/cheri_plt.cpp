@@ -222,12 +222,12 @@ _mips_rtld_bind(void* _plt_stub)
 		// We can use tight bounds (but can't update .captable to point
 		// to the target function directly)
 		// TODO: actually we should be able to for local calls!
-		target = make_code_pointer(
+		target = make_code_cap(
 		    def, defobj, /*tight_bounds=*/true, /*addend=*/0);
 	} else {
 		// PC-relative/legacy does not need any trampolines and uses the
 		// full DSO bounds (or full addrspace for legacy)
-		target = make_code_pointer(
+		target = make_code_cap(
 		    def, defobj, /*tight_bounds=*/false, /*addend=*/0);
 		// TODO: update .captable entry to avoid future trampoline jumps
 		// TODO: could also free the stub, but that probably just wastes time
@@ -389,7 +389,7 @@ reloc_plt_bind_now(Obj_Entry *obj, int flags, const Obj_Entry *rtldobj __unused,
 		} else {
 			// No trampoline needed for PCREL or legacy
 			// TODO: can we have any addends for plt relocations?
-			target = make_code_pointer(
+			target = make_code_cap(
 			    def, defobj, /*tight_bounds=*/false, /*addend=*/0);
 		}
 		dbg_cheri_plt_verbose("BIND_NOW: %p <-- %#p (%s)", where, target,
@@ -680,7 +680,7 @@ allocate_function_pointer_trampoline(dlfunc_t target_func, const Obj_Entry *obj)
 SimpleExternalCallTrampoline*
 SimpleExternalCallTrampoline::create(const Obj_Entry* defobj, const Elf_Sym *sym, bool tight_bounds) {
 	dlfunc_t target_func =
-	    make_code_pointer(sym, defobj, tight_bounds, /*addend=*/0);
+	    make_code_cap(sym, defobj, tight_bounds, /*addend=*/0);
 	const void *target_cgp = target_cgp_for_func(defobj, target_func);
 	return create(target_cgp, target_func);
 }

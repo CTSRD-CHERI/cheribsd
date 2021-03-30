@@ -1740,7 +1740,7 @@ getnewvnode(const char *tag, struct mount *mp, struct vop_vector *vops,
 	 * E.g., nullfs uses vfs_hash_index() on the lower vnode for
 	 * its own hashing.
 	 */
-	vp->v_hash = (uintptr_t)vp >> vnsz2log;
+	vp->v_hash = (ptraddr_t)vp >> vnsz2log;
 
 	*vpp = vp;
 	return (0);
@@ -6835,12 +6835,13 @@ vn_seqc_write_end(struct vnode *vp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "sysctl"
 //   ],
 //   "changes_purecap": [
+//     "hashing",
 //     "kdb"
 //   ]
 // }

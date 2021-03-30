@@ -220,7 +220,7 @@ bintime_off(struct bintime *bt, u_int off)
 	do {
 		th = timehands;
 		gen = atomic_load_acq_int(&th->th_generation);
-		btp = (struct bintime *)((vm_offset_t)th + off);
+		btp = (struct bintime *)((char *)th + off);
 		*bt = *btp;
 		scale = th->th_scale;
 		delta = tc_delta(th);
@@ -2172,3 +2172,12 @@ tc_fill_vdso_timehands32(struct vdso_timehands32 *vdso_th32)
 	return (enabled);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

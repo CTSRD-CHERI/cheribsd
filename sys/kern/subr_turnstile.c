@@ -1129,10 +1129,9 @@ DB_SHOW_COMMAND(turnstile, db_show_turnstile)
 	 * First, see if there is an active turnstile for the lock indicated
 	 * by the address.
 	 */
-	lock = (struct lock_object *)addr;
-	tc = TC_LOOKUP(lock);
+	tc = TC_LOOKUP(addr);
 	LIST_FOREACH(ts, &tc->tc_turnstiles, ts_hash)
-		if (ts->ts_lockobj == lock)
+		if ((ptraddr_t)ts->ts_lockobj == addr)
 			goto found;
 
 	/*
@@ -1141,11 +1140,11 @@ DB_SHOW_COMMAND(turnstile, db_show_turnstile)
 	 */
 	for (i = 0; i < TC_TABLESIZE; i++)
 		LIST_FOREACH(ts, &turnstile_chains[i].tc_turnstiles, ts_hash) {
-			if (ts == (struct turnstile *)addr)
+			if ((ptraddr_t)ts == addr)
 				goto found;
 		}
 
-	db_printf("Unable to locate a turnstile via %p\n", (void *)addr);
+	db_printf("Unable to locate a turnstile via %#lx\n", (long)addr);
 	return;
 found:
 	lock = ts->ts_lockobj;
@@ -1332,7 +1331,8 @@ DB_SHOW_COMMAND(locktree, db_show_locktree)
 //   "updated": 20200803,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "kdb"
+//     "kdb",
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

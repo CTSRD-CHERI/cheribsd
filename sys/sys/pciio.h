@@ -139,7 +139,7 @@ struct pci_list_vpd_io {
 };
 
 struct pci_bar_mmap {
-	void		*pbm_map_base;	/* (sometimes IN)/OUT mmaped base */
+	void * __kerncap pbm_map_base;	/* (sometimes IN)/OUT mmaped base */
 	size_t		pbm_map_length;	/* mapped length of the BAR, multiple
 					   of pages */
 	uint64_t	pbm_bar_length;	/* actual length of the BAR */

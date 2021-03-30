@@ -47,8 +47,11 @@ SUBDIR.${MK_LIBCHERI}+=	cheri_bench
 
 # Small cheri programs
 .if ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
+.if !${MACHINE_ARCH:Maarch64*}
+# FIXME: linker assertion when building for Morello
 SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
 SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
+.endif
 .if ${MACHINE} == "mips"
 # mips assembly
 SUBDIR.${MK_CHERI}+=	cheri_pthreads

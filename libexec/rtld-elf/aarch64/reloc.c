@@ -409,11 +409,7 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 				obj->gnu_ifunc = true;
 				continue;
 			}
-#ifdef __CHERI_PURE_CAPABILITY__
 			target = (uintptr_t)make_function_pointer(def, defobj);
-#else
-			target = (uintptr_t)(defobj->relocbase + def->st_value);
-#endif
 			reloc_jmpslot(where, target, defobj, obj,
 			    (const Elf_Rel *)rela);
 			break;

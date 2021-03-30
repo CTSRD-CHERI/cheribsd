@@ -355,3 +355,12 @@ ck_stack_init(struct ck_stack *stack)
 	     (entry) = (T))
 
 #endif /* CK_STACK_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END

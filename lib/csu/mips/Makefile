@@ -6,6 +6,10 @@
 
 CFLAGS+=	-DCRT_IRELOC_SUPPRESS
 
+.if ${MACHINE_CPU:Mcheri}
+CFLAGS+=	-I${.CURDIR:H}/common-cheri
+.endif
+
 .if ${MACHINE_ARCH:Mmips64}
 ELFCLASS=	64
 .else

@@ -54,7 +54,7 @@
 #define	LK_SHARERS_LOCK(x)		((x) << LK_SHARERS_SHIFT | LK_SHARE)
 #define	LK_ONE_SHARER			(1 << LK_SHARERS_SHIFT)
 #define	LK_UNLOCKED			LK_SHARERS_LOCK(0)
-#define	LK_KERNPROC			((uintptr_t)(-1) & ~LK_FLAGMASK)
+#define	LK_KERNPROC			((ptraddr_t)(-1) & ~LK_FLAGMASK)
 
 #ifdef _KERNEL
 

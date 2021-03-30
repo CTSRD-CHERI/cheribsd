@@ -50,10 +50,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/utsname.h>
 #include <sys/ktrace.h>
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#include <cheri/cheric.h>
-#endif
-
 #include <dlfcn.h>
 #include <err.h>
 #include <errno.h>
@@ -1511,10 +1507,12 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    unsigned abi = flags & DF_MIPS_CHERI_ABI_MASK;
 	    obj->cheri_captable_abi = abi;
 	    flags &= ~DF_MIPS_CHERI_ABI_MASK;
-	    if (flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS) {
-		flags &= ~DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
-		obj->relative_cap_relocs = true;
+	    if ((flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS) == 0) {
+		rtld_fatal("File '%s' still uses old __cap_relocs."
+		    " Please recompile it with a newer toolchain.\n",
+		    obj->path);
 	    }
+	    flags &= ~DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
 	    if ((flags & DF_MIPS_CHERI_CAPTABLE_PER_FILE) ||
 	        (flags & DF_MIPS_CHERI_CAPTABLE_PER_FUNC)) {
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
@@ -2597,9 +2595,12 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     ehdr = (Elf_Ehdr *)mapbase;
     objtmp.phdr = (Elf_Phdr *)((char *)mapbase + ehdr->e_phoff);
     objtmp.phsize = ehdr->e_phnum * sizeof(objtmp.phdr[0]);
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
     /* This was done in _rtld_do___caprelocs_self */
     objtmp.cap_relocs_processed = true;
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
     /* find the end of rodata/text: */
 
     for (int i = 0; i < ehdr->e_phnum; i++) {

@@ -35,8 +35,7 @@ if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
 def allArchitectures = [
     "aarch64", "amd64",
     "mips64", "mips64-hybrid", "mips64-purecap",
-    "morello-hybrid",
-    // XXX: Enable once kernel-toolchain can handle aarch64c: "morello-purecap",
+    "morello-hybrid", "morello-purecap",
     "riscv64", "riscv64-hybrid", "riscv64-purecap"
 ]
 // Build a subset of the architectures for morello-dev: Just check that we didn't break aarch64 (with CHERI LLVM) and *-purecap
@@ -174,18 +173,6 @@ selectedArchitectures.each { suffix ->
             // Enable additional debug checks when running the testsuite
             extraBuildOptions += ' -DMALLOC_DEBUG'
         }
-        // XXX: Remove once dev can build a purecap world
-        if (suffix.startsWith("morello")) {
-            def gitBranch = 'master'
-            if (env.CHANGE_ID) {
-                gitBranch = env.CHANGE_TARGET
-            } else if (env.BRANCH_NAME) {
-                gitBranch = env.BRANCH_NAME
-            }
-            if (gitBranch != 'morello-dev') {
-                extraBuildOptions += ' -DWITHOUT_COMPAT_CHERIABI'
-            }
-        }
         def cheribuildArgs = ["'--cheribsd/build-options=${extraBuildOptions}'",
                               '--keep-install-dir',
                               '--install-prefix=/rootfs',
@@ -199,8 +186,7 @@ selectedArchitectures.each { suffix ->
                 extraArgs: cheribuildArgs.join(" "),
                 skipArchiving: true, skipTarball: true,
                 sdkCompilerOnly: true, // We only need clang not the CheriBSD sysroot since we are building that.
-                // XXX: Remove once morello-dev is gone
-                customGitCheckoutDir: suffix.startsWith('morello') ? 'morello-cheribsd' : 'cheribsd',
+                customGitCheckoutDir: 'cheribsd',
                 gitHubStatusContext: GlobalVars.isTestSuiteJob ? "testsuite/${suffix}" : "ci/${suffix}",
                 // Delete stale compiler/sysroot
                 beforeBuild: { params -> 
