@@ -93,8 +93,8 @@ struct axidma_channel {
 	uint32_t		descs_num;
 
 	vm_size_t		mem_size;
-	vm_offset_t		mem_paddr;
-	vm_offset_t		mem_vaddr;
+	vmem_addr_t		mem_paddr;
+	vm_pointer_t		mem_vaddr;
 
 	uint32_t		descs_used_count;
 };
@@ -364,11 +364,11 @@ axidma_desc_alloc(struct axidma_softc *sc, struct xdma_channel *xchan,
 	pmap_kenter_device(chan->mem_vaddr, chan->mem_size, chan->mem_paddr);
 
 	device_printf(sc->dev, "Allocated chunk %lx %lu\n",
-	    chan->mem_paddr, chan->mem_size);
+	    (ptraddr_t)chan->mem_paddr, chan->mem_size);
 
 	for (i = 0; i < nsegments; i++) {
 		chan->descs[i] = (struct axidma_desc *)
-		    ((uint64_t)chan->mem_vaddr + desc_size * i);
+		    (chan->mem_vaddr + desc_size * i);
 		chan->descs_phys[i] = chan->mem_paddr + desc_size * i;
 	}
 
@@ -481,8 +481,8 @@ axidma_channel_submit_sg(device_t dev, struct xdma_channel *xchan,
 	tmp = 0;
 
 	for (i = 0; i < sg_n; i++) {
-		src_addr = (uint32_t)sg[i].src_addr;
-		dst_addr = (uint32_t)sg[i].dst_addr;
+		src_addr = (uint32_t)sg[i].src.bus_addr;
+		dst_addr = (uint32_t)sg[i].dst.bus_addr;
 		len = (uint32_t)sg[i].len;
 
 		dprintf("%s(%d): src %x dst %x len %d\n", __func__,
@@ -647,3 +647,13 @@ static devclass_t axidma_devclass;
 
 EARLY_DRIVER_MODULE(axidma, simplebus, axidma_driver, axidma_devclass, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ],
+//   "change_comment": "bus_addr_t"
+// }
+// CHERI CHANGES END
