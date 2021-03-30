@@ -142,13 +142,10 @@ bad:
 		if (el) {
 			if (Vflag)
 				el_set(el, EL_EDITOR, "vi");
-			else if (Eflag)
+			else if (Eflag) {
 				el_set(el, EL_EDITOR, "emacs");
-			/*
-			 * Set CTRL+R to history search for compatibility with
-			 * other operating systems' default shells.
-			 */
-			el_set(el, EL_BIND, "^R", "em-inc-search-prev", NULL);
+				el_set(el, EL_BIND, "^R", "em-inc-search-prev", NULL);
+			}
 			el_set(el, EL_BIND, "^I", "sh-complete", NULL);
 			el_source(el, NULL);
 		}
