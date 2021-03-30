@@ -114,7 +114,7 @@ struct intr_pic *intr_pic_register(device_t, intptr_t);
 int intr_pic_deregister(device_t, intptr_t);
 int intr_pic_claim_root(device_t, intptr_t, intr_irq_filter_t *, void *, u_int);
 struct intr_pic *intr_pic_add_handler(device_t, struct intr_pic *,
-    intr_child_irq_filter_t *, void *, uintptr_t, uintptr_t);
+    intr_child_irq_filter_t *, void *, uintptr_t, size_t);
 bool intr_is_per_cpu(struct resource *);
 
 extern device_t intr_irq_root_dev;
@@ -165,3 +165,12 @@ u_long * intr_ipi_setup_counters(const char *name);
 
 #endif
 #endif	/* _SYS_INTR_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20210330,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
