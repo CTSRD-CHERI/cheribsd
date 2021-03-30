@@ -12,7 +12,7 @@ INCS=	Block.h Block_private.h
 SRCS=	data.c runtime.c
 
 .if ${MACHINE_ARCH:Mmips*c*}
-CFLAGS+=	-Wno-error-mips-cheri-bugs
+CFLAGS+=	-Wno-error=mips-cheri-bugs
 .endif
 
 .include <bsd.lib.mk>
