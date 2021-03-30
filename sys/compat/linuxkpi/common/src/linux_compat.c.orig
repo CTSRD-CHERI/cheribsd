@@ -800,9 +800,9 @@ linux_dev_fdopen(struct cdev *dev, int fflags, struct thread *td,
 #define	LINUX_IOCTL_MAX_PTR (LINUX_IOCTL_MIN_PTR + IOCPARM_MAX)
 
 static inline int
-linux_remap_address(void * __capability *uaddr, size_t len)
+linux_remap_address(void **uaddr, size_t len)
 {
-	vaddr_t uaddr_val = (__cheri_addr vaddr_t)(*uaddr);
+	uintptr_t uaddr_val = (uintptr_t)(*uaddr);
 
 	if (unlikely(uaddr_val >= LINUX_IOCTL_MIN_PTR &&
 	    uaddr_val < LINUX_IOCTL_MAX_PTR)) {
@@ -823,44 +823,47 @@ linux_remap_address(void * __capability *uaddr, size_t len)
 		}
 
 		/* re-add kernel buffer address */
-		*uaddr = PTR2CAP((char *)pts->bsd_ioctl_data) + uaddr_val;
+		uaddr_val += (uintptr_t)pts->bsd_ioctl_data;
+
+		/* update address location */
+		*uaddr = (void *)uaddr_val;
 		return (1);
 	}
 	return (0);
 }
 
 int
-linux_copyin(const void * __capability uaddr, void *kaddr, size_t len)
+linux_copyin(const void *uaddr, void *kaddr, size_t len)
 {
-	if (linux_remap_address(__DECONST(void * __capability *, &uaddr), len)) {
+	if (linux_remap_address(__DECONST(void **, &uaddr), len)) {
 		if (uaddr == NULL)
 			return (-EFAULT);
-		memcpy(kaddr, (__cheri_fromcap const void *)uaddr, len);
+		memcpy(kaddr, uaddr, len);
 		return (0);
 	}
 	return (-copyin(uaddr, kaddr, len));
 }
 
 int
-linux_copyout(const void *kaddr, void * __capability uaddr, size_t len)
+linux_copyout(const void *kaddr, void *uaddr, size_t len)
 {
 	if (linux_remap_address(&uaddr, len)) {
 		if (uaddr == NULL)
 			return (-EFAULT);
-		memcpy((__cheri_fromcap void *)uaddr, kaddr, len);
+		memcpy(uaddr, kaddr, len);
 		return (0);
 	}
 	return (-copyout(kaddr, uaddr, len));
 }
 
 size_t
-linux_clear_user(void * __capability _uaddr, size_t _len)
+linux_clear_user(void *_uaddr, size_t _len)
 {
-	uint8_t * __capability uaddr = _uaddr;
+	uint8_t *uaddr = _uaddr;
 	size_t len = _len;
 
 	/* make sure uaddr is aligned before going into the fast loop */
-	while (!__builtin_is_aligned(uaddr, 8) && len > 7) {
+	while (((uintptr_t)uaddr & 7) != 0 && len > 7) {
 		if (subyte(uaddr, 0))
 			return (_len);
 		uaddr++;
@@ -893,14 +896,14 @@ linux_clear_user(void * __capability _uaddr, size_t _len)
 }
 
 int
-linux_access_ok(const void * __capability uaddr, size_t len)
+linux_access_ok(const void *uaddr, size_t len)
 {
-	vaddr_t saddr;
-	vaddr_t eaddr;
+	uintptr_t saddr;
+	uintptr_t eaddr;
 
 	/* get start and end address */
-	saddr = (__cheri_addr vaddr_t)uaddr;
-	eaddr = (__cheri_addr vaddr_t)uaddr + len;
+	saddr = (uintptr_t)uaddr;
+	eaddr = (uintptr_t)uaddr + len;
 
 	/* verify addresses are valid for userspace */
 	return ((saddr == eaddr) ||
@@ -929,7 +932,6 @@ linux_file_ioctl_sub(struct file *fp, struct linux_file *filp,
     struct thread *td)
 {
 	struct task_struct *task = current;
-	void * __capability udata;
 	unsigned size;
 	int error;
 
@@ -944,17 +946,17 @@ linux_file_ioctl_sub(struct file *fp, struct linux_file *filp,
 		 */
 		task->bsd_ioctl_data = data;
 		task->bsd_ioctl_len = size;
-		udata = (void * __capability)(uintcap_t)LINUX_IOCTL_MIN_PTR;
+		data = (void *)LINUX_IOCTL_MIN_PTR;
 	} else {
 		/* fetch user-space pointer */
-		udata = *(void * __capability *)data;
+		data = *(void **)data;
 	}
 #if defined(__amd64__)
 	if (td->td_proc->p_elf_machine == EM_386) {
 		/* try the compat IOCTL handler first */
 		if (fop->compat_ioctl != NULL) {
 			error = -OPW(fp, td, fop->compat_ioctl(filp,
-			    cmd, (uintcap_t)udata));
+			    cmd, (u_long)data));
 		} else {
 			error = ENOTTY;
 		}
@@ -962,14 +964,14 @@ linux_file_ioctl_sub(struct file *fp, struct linux_file *filp,
 		/* fallback to the regular IOCTL handler, if any */
 		if (error == ENOTTY && fop->unlocked_ioctl != NULL) {
 			error = -OPW(fp, td, fop->unlocked_ioctl(filp,
-			    cmd, (uintcap_t)udata));
+			    cmd, (u_long)data));
 		}
 	} else
 #endif
 	{
 		if (fop->unlocked_ioctl != NULL) {
 			error = -OPW(fp, td, fop->unlocked_ioctl(filp,
-			    cmd, (uintcap_t)udata));
+			    cmd, (u_long)data));
 		} else {
 			error = ENOTTY;
 		}
@@ -1399,11 +1401,12 @@ linux_file_read(struct file *file, struct uio *uio, struct ucred *active_cred,
 	linux_get_fop(filp, &fop, &ldev);
 	if (fop->read != NULL) {
 		bytes = OPW(file, td, fop->read(filp,
-		    __DECAP_CHECK(uio->uio_iov->iov_base,
-		    uio->uio_iov->iov_len),
+		    uio->uio_iov->iov_base,
 		    uio->uio_iov->iov_len, &uio->uio_offset));
 		if (bytes >= 0) {
-			IOVEC_ADVANCE(uio->uio_iov, bytes);
+			uio->uio_iov->iov_base =
+			    ((uint8_t *)uio->uio_iov->iov_base) + bytes;
+			uio->uio_iov->iov_len -= bytes;
 			uio->uio_resid -= bytes;
 		} else {
 			error = linux_get_error(current, -bytes);
@@ -1439,11 +1442,12 @@ linux_file_write(struct file *file, struct uio *uio, struct ucred *active_cred,
 	linux_get_fop(filp, &fop, &ldev);
 	if (fop->write != NULL) {
 		bytes = OPW(file, td, fop->write(filp,
-		    __DECAP_CHECK(uio->uio_iov->iov_base,
-		    uio->uio_iov->iov_len),
+		    uio->uio_iov->iov_base,
 		    uio->uio_iov->iov_len, &uio->uio_offset));
 		if (bytes >= 0) {
-			IOVEC_ADVANCE(uio->uio_iov, bytes);
+			uio->uio_iov->iov_base =
+			    ((uint8_t *)uio->uio_iov->iov_base) + bytes;
+			uio->uio_iov->iov_len -= bytes;
 			uio->uio_resid -= bytes;
 			error = 0;
 		} else {
@@ -1516,9 +1520,8 @@ linux_file_close(struct file *file, struct thread *td)
 	if (filp->f_vnode != NULL)
 		vdrop(filp->f_vnode);
 	linux_drop_fop(ldev);
-	ldev = filp->f_cdev;
-	if (ldev != NULL)
-		linux_cdev_deref(ldev);
+	if (filp->f_cdev != NULL)
+		linux_cdev_deref(filp->f_cdev);
 	kfree(filp);
 
 	return (error);
@@ -1606,9 +1609,9 @@ linux_file_mmap_sub(struct thread *td, vm_size_t objsize, vm_prot_t prot,
 }
 
 static int
-linux_file_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
-    vm_offset_t max_addr, vm_size_t size, vm_prot_t prot,
-    vm_prot_t cap_maxprot, int flags, vm_ooffset_t foff, struct thread *td)
+linux_file_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr, vm_size_t size,
+    vm_prot_t prot, vm_prot_t cap_maxprot, int flags, vm_ooffset_t foff,
+    struct thread *td)
 {
 	struct linux_file *filp;
 	const struct file_operations *fop;
@@ -1665,8 +1668,8 @@ linux_file_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
 	if (error != 0)
 		goto out;
 
-	error = vm_mmap_object(map, addr, max_addr, size, prot, maxprot,
-	    flags, object, foff, FALSE, td);
+	error = vm_mmap_object(map, addr, size, prot, maxprot, flags, object,
+	    foff, FALSE, td);
 	if (error != 0)
 		vm_object_deallocate(object);
 out:
@@ -2593,13 +2596,3 @@ SYSUNINIT(linux_compat, SI_SUB_DRIVERS, SI_ORDER_SECOND, linux_compat_uninit, NU
  * LinuxKPI may not work like expected:
  */
 CTASSERT(sizeof(unsigned long) == sizeof(uintptr_t));
-// CHERI CHANGES START
-// {
-//   "updated": 20191025,
-//   "target_type": "kernel",
-//   "changes": [
-//     "iovec-macros",
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END
