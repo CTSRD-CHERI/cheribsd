@@ -143,6 +143,7 @@ vm_mem_init(void *dummy)
 	vm_object_init();
 	vm_map_startup();
 	kmem_init(virtual_avail, virtual_end);
+	/* XXX-AM: in principle we could now destroy the virtual_avail/end capabilities */
 
 	kmem_init_zero_region();
 	pmap_init();
@@ -156,8 +157,8 @@ vm_ksubmap_init(struct kva_md_info *kmi)
 	caddr_t v;
 	vm_size_t size = 0;
 	long physmem_est;
-	vm_offset_t minaddr;
-	vm_offset_t maxaddr;
+	vm_pointer_t minaddr;
+	vm_pointer_t maxaddr;
 
 	/*
 	 * Allocate space for system data structures.
@@ -208,7 +209,7 @@ again:
 	/*
 	 * End of second pass, addresses have been assigned
 	 */
-	if ((vm_size_t)((char *)v - firstaddr) != size)
+	if ((vm_size_t)(v - firstaddr) != size)
 		panic("startup: table size inconsistency");
 
 	/*
