@@ -100,7 +100,7 @@ size_t
 	 */
 	lp = (const unsigned long *)rounddown2(str, sizeof(long));
 #ifdef __CHERI_PURE_CAPABILITY__
-	byte_check = (lp < str);
+	byte_check = ((const char *)lp < str);
 	if (byte_check)
 		lp++;
 #else
@@ -141,8 +141,8 @@ size_t
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Check if we need to scan byte-by-byte at the end of the string */
-	if (lp != cheri_gettop(lp)) {
-		for (p = lp; ; p++)
+	if ((ptraddr_t)lp != cheri_gettop(lp)) {
+		for (p = (const char *)lp; ; p++)
 			if (*p == '\0')
 				return (p - str);
 	}
