@@ -468,7 +468,17 @@ link_elf_init(void* arg)
 		ef->modptr = modptr;
 		baseptr = preload_search_info(modptr, MODINFO_ADDR);
 		if (baseptr != NULL)
+#ifndef __CHERI_PURE_CAPABILITY__
 			linker_kernel_file->address = *(caddr_t *)baseptr;
+#else
+			/*
+			 * MODINFO_ADDR is really a virtual address,
+			 * not a pointer
+			 */
+			linker_kernel_file->address = cheri_setaddress(
+			    linker_kernel_file->address,
+			    *(vm_offset_t *)baseptr);
+#endif
 		sizeptr = preload_search_info(modptr, MODINFO_SIZE);
 		if (sizeptr != NULL)
 			linker_kernel_file->size = *(size_t *)sizeptr;
@@ -477,11 +487,14 @@ link_elf_init(void* arg)
 		ctors_sizep = (Elf_Size *)preload_search_info(modptr,
 			MODINFO_METADATA | MODINFOMD_CTORS_SIZE);
 		if (ctors_addrp != NULL && ctors_sizep != NULL) {
-			linker_kernel_file->ctors_addr = ef->address +
-			    *ctors_addrp;
+			linker_kernel_file->ctors_addr = cheri_kern_setbounds(
+			    ef->address + *ctors_addrp, *ctors_sizep);
 			linker_kernel_file->ctors_size = *ctors_sizep;
 		}
 	}
+	/* Set the bounds on load address */
+	linker_kernel_file->address = cheri_kern_setbounds(
+	    linker_kernel_file->address, linker_kernel_file->size);
 	(void)link_elf_preload_parse_symbols(ef);
 
 #ifdef GDB
@@ -568,8 +581,10 @@ parse_dynamic(elf_file_t ef)
 			    (ef->address + dp->d_un.d_ptr);
 			ef->nbuckets = hashtab[0];
 			ef->nchains = hashtab[1];
-			ef->buckets = hashtab + 2;
-			ef->chains = ef->buckets + ef->nbuckets;
+			ef->buckets = cheri_kern_setbounds(hashtab + 2,
+			    ef->nbuckets * sizeof(Elf_Hashelt));
+			ef->chains = cheri_kern_setbounds(hashtab + 2 + ef->nbuckets,
+			    ef->nchains * sizeof(Elf_Hashelt));
 			break;
 		}
 		case DT_STRTAB:
