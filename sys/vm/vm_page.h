@@ -668,7 +668,7 @@ vm_page_bits_t vm_page_set_dirty(vm_page_t m);
 void vm_page_set_valid_range(vm_page_t m, int base, int size);
 int vm_page_sleep_if_busy(vm_page_t m, const char *msg);
 int vm_page_sleep_if_xbusy(vm_page_t m, const char *msg);
-vm_offset_t vm_page_startup(vm_offset_t vaddr);
+vm_pointer_t vm_page_startup(vm_pointer_t vaddr);
 void vm_page_sunbusy(vm_page_t m);
 bool vm_page_try_remove_all(vm_page_t m);
 bool vm_page_try_remove_write(vm_page_t m);
@@ -1014,3 +1014,12 @@ vm_page_domain(vm_page_t m)
 
 #endif				/* _KERNEL */
 #endif				/* !_VM_PAGE_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END
