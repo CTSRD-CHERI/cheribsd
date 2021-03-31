@@ -1598,7 +1598,7 @@ linux_file_mmap_sub(struct thread *td, vm_size_t objsize, vm_prot_t prot,
 }
 
 static int
-linux_file_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
+linux_file_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
     vm_offset_t max_addr, vm_size_t size, vm_prot_t prot,
     vm_prot_t cap_maxprot, int flags, vm_ooffset_t foff, struct thread *td)
 {
@@ -2539,14 +2539,11 @@ SYSUNINIT(linux_compat, SI_SUB_DRIVERS, SI_ORDER_SECOND, linux_compat_uninit, NU
 CTASSERT(sizeof(unsigned long) == sizeof(uintptr_t));
 // CHERI CHANGES START
 // {
-//   "updated": 20210331,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities"
-//   ],
-//   "changes_purecap": [
-//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END
