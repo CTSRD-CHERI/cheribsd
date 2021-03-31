@@ -321,10 +321,6 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		SYSERRCAUSE("MAP_32BIT not supported in CheriABI");
 		return (EINVAL);
 	}
-#ifdef __CHERI_PURE_CAPABILITY__
-		/* Needed for fixed mappings */
-		.mr_source_cap = userspace_root_cap,
-#endif
 
 	/*
 	 * Allow existing mapping to be replaced using the MAP_FIXED
@@ -1520,7 +1516,7 @@ sys_mlock(struct thread *td, struct mlock_args *uap)
 #endif
 
 	return (kern_mlock(td->td_proc, td->td_ucred,
-	    __DECONST_CAP(__cheri_addr uintptr_t, uap->addr), uap->len));
+	    (uintptr_t)__DECONST_CAP(uintcap_t, uap->addr), uap->len));
 }
 
 int
