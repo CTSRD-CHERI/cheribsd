@@ -364,8 +364,16 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 
 	ef = (elf_file_t)lf;
 	ef->preloaded = 1;
+#ifdef __CHERI_PURE_CAPABILITY__
+	ef->address = cheri_setaddress(kernel_root_cap,
+	    *(ptraddr_t *)baseptr);
+	ef->address = cheri_setbounds(ef->address, *(size_t *)sizeptr);
+	ef->address = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_CODE |
+	    CHERI_PERMS_KERNEL_DATA);
+#else
 	ef->address = *(caddr_t *)baseptr;
-	lf->address = *(caddr_t *)baseptr;
+#endif
+	lf->address = ef->address;
 	lf->size = *(size_t *)sizeptr;
 
 	if (hdr->e_ident[EI_CLASS] != ELF_TARG_CLASS ||
@@ -462,12 +470,20 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 			    (Elf_Addr)ef->address;
 	}
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	section_ptr(shdr)					       \
+	cheri_setbounds(cheri_setaddress(ef->address, (shdr).sh_addr), \
+	    (shdr).sh_size)
+#else
+#define	section_ptr(shdr)	(void *)((shdr).sh_addr)
+#endif
+
 	ef->ddbsymcnt = shdr[symtabindex].sh_size / sizeof(Elf_Sym);
-	ef->ddbsymtab = (Elf_Sym *)shdr[symtabindex].sh_addr;
+	ef->ddbsymtab = section_ptr(shdr[symtabindex]);
 	ef->ddbstrcnt = shdr[symstrindex].sh_size;
-	ef->ddbstrtab = (char *)shdr[symstrindex].sh_addr;
+	ef->ddbstrtab = section_ptr(shdr[symstrindex]);
 	ef->shstrcnt = shdr[shstrindex].sh_size;
-	ef->shstrtab = (char *)shdr[shstrindex].sh_addr;
+	ef->shstrtab = section_ptr(shdr[shstrindex]);
 
 	/* Now fill out progtab and the relocation tables. */
 	pb = 0;
@@ -482,7 +498,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 #endif
 			if (shdr[i].sh_addr == 0)
 				break;
-			ef->progtab[pb].addr = (void *)shdr[i].sh_addr;
+			ef->progtab[pb].addr = section_ptr(shdr[i]);
 			if (shdr[i].sh_type == SHT_PROGBITS)
 				ef->progtab[pb].name = "<<PROGBITS>>";
 #ifdef __amd64__
@@ -553,7 +569,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 		case SHT_REL:
 			if (shdr[shdr[i].sh_info].sh_addr == 0)
 				break;
-			ef->reltab[rl].rel = (Elf_Rel *)shdr[i].sh_addr;
+			ef->reltab[rl].rel = section_ptr(shdr[i]);
 			ef->reltab[rl].nrel = shdr[i].sh_size / sizeof(Elf_Rel);
 			ef->reltab[rl].sec = shdr[i].sh_info;
 			rl++;
@@ -561,7 +577,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 		case SHT_RELA:
 			if (shdr[shdr[i].sh_info].sh_addr == 0)
 				break;
-			ef->relatab[ra].rela = (Elf_Rela *)shdr[i].sh_addr;
+			ef->relatab[ra].rela = section_ptr(shdr[i]);
 			ef->relatab[ra].nrela =
 			    shdr[i].sh_size / sizeof(Elf_Rela);
 			ef->relatab[ra].sec = shdr[i].sh_info;
@@ -662,7 +678,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 	Elf_Shdr *shdr;
 	Elf_Sym *es;
 	int nbytes, i, j;
-	vm_offset_t mapbase;
+	vm_pointer_t mapbase;
 	size_t mapsize;
 	int error = 0;
 	ssize_t resid;
@@ -1404,12 +1420,27 @@ link_elf_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 
 	ef = (elf_file_t) lf;
 	es = (const Elf_Sym*) sym;
+#ifdef __CHERI_PURE_CAPABILITY__
+	val = cheri_setaddress(ef->address, es->st_value);
+#else
 	val = (caddr_t)es->st_value;
+#endif
 	if (es >= ef->ddbsymtab && es < (ef->ddbsymtab + ef->ddbsymcnt)) {
 		symval->name = ef->ddbstrtab + es->st_name;
-		val = (caddr_t)es->st_value;
 		if (ELF_ST_TYPE(es->st_info) == STT_GNU_IFUNC)
 			val = ((caddr_t (*)(void))val)();
+#ifdef __CHERI_PURE_CAPABILITY__
+		val = cheri_setbounds(val, es->st_size);
+		switch (ELF_ST_TYPE(es->st_info)) {
+		case STT_FUNC:
+		case STT_GNU_IFUNC:
+			val = cheri_andperm(val, CHERI_PERMS_KERNEL_CODE);
+			break;
+		default:
+			val = cheri_andperm(val, CHERI_PERMS_KERNEL_DATA);
+			break;
+		}
+#endif
 		symval->value = val;
 		symval->size = es->st_size;
 		return 0;
@@ -1560,6 +1591,7 @@ elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
 	Elf_Sym *sym;
 	const char *symbol;
 	Elf_Addr res1;
+	void *ifunc;
 
 	/* Don't even try to lookup the symbol if the index is bogus. */
 	if (symidx >= ef->ddbsymcnt) {
@@ -1572,8 +1604,13 @@ elf_obj_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
 	/* Quick answer if there is a definition included. */
 	if (sym->st_shndx != SHN_UNDEF) {
 		res1 = (Elf_Addr)sym->st_value;
+#ifdef __CHERI_PURE_CAPABILITY__
+		ifunc = cheri_setaddress(ef->address, res1);
+#else
+		ifunc = (void *)res1;
+#endif
 		if (ELF_ST_TYPE(sym->st_info) == STT_GNU_IFUNC)
-			res1 = ((Elf_Addr (*)(void))res1)();
+			res1 = ((Elf_Addr (*)(void))ifunc)();
 		*res = res1;
 		return (0);
 	}
@@ -1777,7 +1814,8 @@ link_elf_strtab_get(linker_file_t lf, caddr_t *strtab)
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "kdb"
+//     "kdb",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END
