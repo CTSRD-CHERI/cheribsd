@@ -129,20 +129,26 @@ __FBSDID("$FreeBSD$");
 	ldp	CAP(12), CAP(13), [sp, #(TF_X + 12 * CAP_WIDTH)]
 	ldp	CAP(14), CAP(15), [sp, #(TF_X + 14 * CAP_WIDTH)]
 	ldp	CAP(16), CAP(17), [sp, #(TF_X + 16 * CAP_WIDTH)]
+#if !__has_feature(capabilities) || defined(__CHERI_PURE_CAPABILITY__)
 .if \el == 0
 	/*
 	 * We only restore the callee saved registers when returning to
 	 * userland as they may have been updated by a system call or signal.
+	 * Hybrid kernels, however, won't preserve the full capability
+	 * registers so must always do this.
 	 */
+#endif
 	ldp	CAP(18), CAP(19), [sp, #(TF_X + 18 * CAP_WIDTH)]
 	ldp	CAP(20), CAP(21), [sp, #(TF_X + 20 * CAP_WIDTH)]
 	ldp	CAP(22), CAP(23), [sp, #(TF_X + 22 * CAP_WIDTH)]
 	ldp	CAP(24), CAP(25), [sp, #(TF_X + 24 * CAP_WIDTH)]
 	ldp	CAP(26), CAP(27), [sp, #(TF_X + 26 * CAP_WIDTH)]
 	ldp	CAP(28), CAP(29), [sp, #(TF_X + 28 * CAP_WIDTH)]
+#if !__has_feature(capabilities) || defined(__CHERI_PURE_CAPABILITY__)
 .else
 	ldr	         CAP(29), [sp, #(TF_X + 29 * CAP_WIDTH)]
 .endif
+#endif
 .if \el == 0
 	add	sp, sp, #(TF_SIZE + 16)
 .else
