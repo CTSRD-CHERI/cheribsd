@@ -123,6 +123,35 @@ CHERIBSDTEST(cheribsdtest_vm_tag_shm_open_anon_private,
 	cheribsdtest_success();
 }
 
+CHERIBSDTEST(cheribsdtest_vm_tag_mprotect_none_and_back,
+    "check that mmap/mprotect(NONE)/mprotect(RW) still permits cap RW")
+{
+	size_t sz = getpagesize();
+	void * __capability volatile *arena;
+
+	arena = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, sz, PROT_READ|PROT_WRITE,
+	    MAP_ANON, -1, 0));
+
+	/* store cap, implicitly testing store permission */
+	arena[0] = cheri_ptr(&arena, sizeof(arena));
+	CHERIBSDTEST_VERIFY(cheri_gettag(arena[0]));
+
+	arena[1] = cheri_ptr(&arena, sizeof(arena));
+
+	CHERIBSDTEST_CHECK_SYSCALL(mprotect(__DEVOLATILE(void *, arena), sz,
+	    PROT_NONE));
+	CHERIBSDTEST_CHECK_SYSCALL(mprotect(__DEVOLATILE(void *, arena), sz,
+	    PROT_READ|PROT_WRITE));
+
+	CHERIBSDTEST_VERIFY(cheri_gettag(arena[1]));
+
+	/* store cap, implicitly testing store permission */
+	arena[2] = cheri_ptr(&arena, sizeof(arena));
+	CHERIBSDTEST_VERIFY(cheri_gettag(arena[2]));
+
+	cheribsdtest_success();
+}
+
 /*
  * Test aliasing of SHM_ANON objects
  */
