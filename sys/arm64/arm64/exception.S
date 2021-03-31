@@ -38,32 +38,39 @@ __FBSDID("$FreeBSD$");
 	mov	x18, sp
 	sub	sp, sp, #128
 .endif
-	sub	sp, sp, #(TF_SIZE + 16)
-	stp	x29, x30, [sp, #(TF_SIZE)]
-	stp	x28, x29, [sp, #(TF_X + 28 * 8)]
-	stp	x26, x27, [sp, #(TF_X + 26 * 8)]
-	stp	x24, x25, [sp, #(TF_X + 24 * 8)]
-	stp	x22, x23, [sp, #(TF_X + 22 * 8)]
-	stp	x20, x21, [sp, #(TF_X + 20 * 8)]
-	stp	x18, x19, [sp, #(TF_X + 18 * 8)]
-	stp	x16, x17, [sp, #(TF_X + 16 * 8)]
-	stp	x14, x15, [sp, #(TF_X + 14 * 8)]
-	stp	x12, x13, [sp, #(TF_X + 12 * 8)]
-	stp	x10, x11, [sp, #(TF_X + 10 * 8)]
-	stp	x8,  x9,  [sp, #(TF_X + 8  * 8)]
-	stp	x6,  x7,  [sp, #(TF_X + 6  * 8)]
-	stp	x4,  x5,  [sp, #(TF_X + 4  * 8)]
-	stp	x2,  x3,  [sp, #(TF_X + 2  * 8)]
-	stp	x0,  x1,  [sp, #(TF_X + 0  * 8)]
-	mrs	x10, elr_el1
+	stp	x29, x30, [sp, #-16]!
+	sub	sp, sp, #(TF_SIZE)
+	stp	CAP(28), CAP(29), [sp, #(TF_X + 28 * CAP_WIDTH)]
+	stp	CAP(26), CAP(27), [sp, #(TF_X + 26 * CAP_WIDTH)]
+	stp	CAP(24), CAP(25), [sp, #(TF_X + 24 * CAP_WIDTH)]
+	stp	CAP(22), CAP(23), [sp, #(TF_X + 22 * CAP_WIDTH)]
+	stp	CAP(20), CAP(21), [sp, #(TF_X + 20 * CAP_WIDTH)]
+	stp	CAP(18), CAP(19), [sp, #(TF_X + 18 * CAP_WIDTH)]
+	stp	CAP(16), CAP(17), [sp, #(TF_X + 16 * CAP_WIDTH)]
+	stp	CAP(14), CAP(15), [sp, #(TF_X + 14 * CAP_WIDTH)]
+	stp	CAP(12), CAP(13), [sp, #(TF_X + 12 * CAP_WIDTH)]
+	stp	CAP(10), CAP(11), [sp, #(TF_X + 10 * CAP_WIDTH)]
+	stp	CAP(8),  CAP(9),  [sp, #(TF_X + 8  * CAP_WIDTH)]
+	stp	CAP(6),  CAP(7),  [sp, #(TF_X + 6  * CAP_WIDTH)]
+	stp	CAP(4),  CAP(5),  [sp, #(TF_X + 4  * CAP_WIDTH)]
+	stp	CAP(2),  CAP(3),  [sp, #(TF_X + 2  * CAP_WIDTH)]
+	stp	CAP(0),  CAP(1),  [sp, #(TF_X + 0  * CAP_WIDTH)]
+#if __has_feature(capabilities)
+	mrs	c9, ddc_el0
+#endif
+	mrs	CAP(10), CAPN(elr_el1)
 	mrs	x11, spsr_el1
 	mrs	x12, esr_el1
 .if \el == 0
-	mrs	x18, sp_el0
+	mrs	CAP(18), CAPN(sp_el0)
 .endif
+#if __has_feature(capabilities)
+	stp	c10, c9, [sp, #(TF_ELR)]
+#else
 	str	x10, [sp, #(TF_ELR)]
+#endif
 	stp	w11, w12, [sp, #(TF_SPSR)]
-	stp	x18,  lr, [sp, #(TF_SP)]
+	stp	CAP(18), CAPN(lr), [sp, #(TF_SP)]
 	mrs	x18, tpidr_el1
 	add	x29, sp, #(TF_SIZE)
 .if \el == 0
@@ -101,35 +108,40 @@ __FBSDID("$FreeBSD$");
 	blr	x1
 1:
 .endif
-	ldp	x18,  lr, [sp, #(TF_SP)]
+	ldp	CAP(18), CAPN(lr), [sp, #(TF_SP)]
+#if __has_feature(capabilities)
+	ldr	w11, [sp, #(TF_SPSR)]
+	ldp	c10, c9, [sp, #(TF_ELR)]
+#else
 	ldp	x10, x11, [sp, #(TF_ELR)]
+#endif
 .if \el == 0
-	msr	sp_el0, x18
+	msr	CAPN(sp_el0), CAP(18)
 .endif
 	msr	spsr_el1, x11
-	msr	elr_el1, x10
-	ldp	x0,  x1,  [sp, #(TF_X + 0  * 8)]
-	ldp	x2,  x3,  [sp, #(TF_X + 2  * 8)]
-	ldp	x4,  x5,  [sp, #(TF_X + 4  * 8)]
-	ldp	x6,  x7,  [sp, #(TF_X + 6  * 8)]
-	ldp	x8,  x9,  [sp, #(TF_X + 8  * 8)]
-	ldp	x10, x11, [sp, #(TF_X + 10 * 8)]
-	ldp	x12, x13, [sp, #(TF_X + 12 * 8)]
-	ldp	x14, x15, [sp, #(TF_X + 14 * 8)]
-	ldp	x16, x17, [sp, #(TF_X + 16 * 8)]
+	msr	CAPN(elr_el1), CAP(10)
+	ldp	CAP(0),  CAP(1),  [sp, #(TF_X + 0  * CAP_WIDTH)]
+	ldp	CAP(2),  CAP(3),  [sp, #(TF_X + 2  * CAP_WIDTH)]
+	ldp	CAP(4),  CAP(5),  [sp, #(TF_X + 4  * CAP_WIDTH)]
+	ldp	CAP(6),  CAP(7),  [sp, #(TF_X + 6  * CAP_WIDTH)]
+	ldp	CAP(8),  CAP(9),  [sp, #(TF_X + 8  * CAP_WIDTH)]
+	ldp	CAP(10), CAP(11), [sp, #(TF_X + 10 * CAP_WIDTH)]
+	ldp	CAP(12), CAP(13), [sp, #(TF_X + 12 * CAP_WIDTH)]
+	ldp	CAP(14), CAP(15), [sp, #(TF_X + 14 * CAP_WIDTH)]
+	ldp	CAP(16), CAP(17), [sp, #(TF_X + 16 * CAP_WIDTH)]
 .if \el == 0
 	/*
 	 * We only restore the callee saved registers when returning to
 	 * userland as they may have been updated by a system call or signal.
 	 */
-	ldp	x18, x19, [sp, #(TF_X + 18 * 8)]
-	ldp	x20, x21, [sp, #(TF_X + 20 * 8)]
-	ldp	x22, x23, [sp, #(TF_X + 22 * 8)]
-	ldp	x24, x25, [sp, #(TF_X + 24 * 8)]
-	ldp	x26, x27, [sp, #(TF_X + 26 * 8)]
-	ldp	x28, x29, [sp, #(TF_X + 28 * 8)]
+	ldp	CAP(18), CAP(19), [sp, #(TF_X + 18 * CAP_WIDTH)]
+	ldp	CAP(20), CAP(21), [sp, #(TF_X + 20 * CAP_WIDTH)]
+	ldp	CAP(22), CAP(23), [sp, #(TF_X + 22 * CAP_WIDTH)]
+	ldp	CAP(24), CAP(25), [sp, #(TF_X + 24 * CAP_WIDTH)]
+	ldp	CAP(26), CAP(27), [sp, #(TF_X + 26 * CAP_WIDTH)]
+	ldp	CAP(28), CAP(29), [sp, #(TF_X + 28 * CAP_WIDTH)]
 .else
-	ldr	     x29, [sp, #(TF_X + 29 * 8)]
+	ldr	         CAP(29), [sp, #(TF_X + 29 * CAP_WIDTH)]
 .endif
 .if \el == 0
 	add	sp, sp, #(TF_SIZE + 16)
