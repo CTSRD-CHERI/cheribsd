@@ -34,7 +34,7 @@
 
 struct ck_stack_entry {
 	struct ck_stack_entry *next;
-};
+} __subobject_use_container_bounds;
 typedef struct ck_stack_entry ck_stack_entry_t;
 
 struct ck_stack {
@@ -360,7 +360,8 @@ ck_stack_init(struct ck_stack *stack)
 //   "updated": 20190812,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "pointer_shape"
+//     "pointer_shape",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END
