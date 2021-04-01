@@ -66,8 +66,8 @@ __FBSDID("$FreeBSD$");
 
 TAILQ_HEAD (epoch_tdlist, epoch_tracker);
 typedef struct epoch_record {
-	ck_epoch_record_t er_record;
-	struct epoch_context er_drain_ctx;
+	ck_epoch_record_t er_record __subobject_use_container_bounds;
+	struct epoch_context er_drain_ctx __subobject_use_container_bounds;
 	struct epoch *er_parent;
 	volatile struct epoch_tdlist er_tdlist;
 	volatile uint32_t er_gen;
@@ -991,3 +991,12 @@ epoch_drain_callbacks(epoch_t epoch)
 
 	PICKUP_GIANT();
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
