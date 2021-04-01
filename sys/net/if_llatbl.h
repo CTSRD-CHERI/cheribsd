@@ -83,7 +83,7 @@ struct llentry {
 	struct callout		lle_timer;
 	struct rwlock		 lle_lock;
 	struct mtx		req_mtx;
-	struct epoch_context lle_epoch_ctx;
+	struct epoch_context lle_epoch_ctx __subobject_use_container_bounds;
 };
 
 #define	LLE_WLOCK(lle)		rw_wlock(&(lle)->lle_lock)
@@ -274,3 +274,12 @@ enum {
 typedef void (*lle_event_fn)(void *, struct llentry *, int);
 EVENTHANDLER_DECLARE(lle_event, lle_event_fn);
 #endif  /* _NET_IF_LLATBL_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
