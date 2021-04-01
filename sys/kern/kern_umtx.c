@@ -807,7 +807,7 @@ static inline void
 abs_timeout_update(struct abs_timeout *timo)
 {
 
-	kern_clock_gettime(curthread, timo->clockid, &timo->cur);
+	kern_clock_gettime(curthread, timo->clockid, __unbounded_addressof(timo->cur));
 }
 
 static int
@@ -5185,10 +5185,13 @@ umtx_thread_cleanup(struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END
