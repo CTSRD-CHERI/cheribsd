@@ -99,7 +99,8 @@ __FBSDID("$FreeBSD$");
 #define	PCNET_RAP	0x12
 
 struct le_isa_softc {
-	struct am7990_softc	sc_am7990;	/* glue to MI code */
+	/* glue to MI code */
+	struct am7990_softc	sc_am7990 __subobject_use_container_bounds;
 
 	bus_size_t		sc_rap;		/* offsets to LANCE... */
 	bus_size_t		sc_rdp;		/* ...registers */
@@ -497,3 +498,12 @@ DEFINE_CLASS_0(le, le_isa_driver, le_isa_methods, sizeof(struct le_isa_softc));
 DRIVER_MODULE(le, isa, le_isa_driver, le_devclass, 0, 0);
 MODULE_DEPEND(le, ether, 1, 1, 1);
 ISA_PNP_INFO(le_isa_ids);
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
