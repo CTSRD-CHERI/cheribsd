@@ -164,7 +164,7 @@ struct	namecache_ts {
 	struct	timespec nc_dotdottime;	/* dotdot timespec provided by fs */
 	int	nc_ticks;		/* ticks value when entry was added */
 	int	nc_pad;
-	struct namecache nc_nc;
+	struct namecache nc_nc __subobject_use_container_bounds;
 };
 
 TAILQ_HEAD(cache_freebatch, namecache);
@@ -4779,7 +4779,8 @@ out:
 //   ],
 //   "changes_purecap": [
 //     "kdb",
-//     "pointer_shape"
+//     "pointer_shape",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END
