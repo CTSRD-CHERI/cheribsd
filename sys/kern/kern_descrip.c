@@ -2076,7 +2076,7 @@ fdinit(struct filedesc *fdp, bool prepfiles, int *lastfile)
 		MPASS(lastfile == NULL);
 
 	newfdp0 = uma_zalloc(filedesc0_zone, M_WAITOK | M_ZERO);
-	newfdp = &newfdp0->fd_fd;
+	newfdp = __unbounded_addressof(newfdp0->fd_fd);
 
 	/* Create the file descriptor table. */
 	FILEDESC_LOCK_INIT(newfdp);
@@ -4914,12 +4914,13 @@ fildesc_drvinit(void *unused)
 SYSINIT(fildescdev, SI_SUB_DRIVERS, SI_ORDER_MIDDLE, fildesc_drvinit, NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
+//     "subobject_bounds",
 //     "kdb"
 //   ]
 // }

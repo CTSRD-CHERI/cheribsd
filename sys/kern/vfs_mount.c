@@ -1591,7 +1591,7 @@ vfs_op_exit(struct mount *mp)
 
 struct vfs_op_barrier_ipi {
 	struct mount *mp;
-	struct smp_rendezvous_cpus_retry_arg srcra;
+	struct smp_rendezvous_cpus_retry_arg srcra __subobject_use_container_bounds;
 };
 
 static void
@@ -2611,11 +2611,14 @@ resume_all_fs(void)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END
