@@ -79,7 +79,7 @@ __FBSDID("$FreeBSD$");
 #define MAXSEGS 4
 
 typedef struct elf_file {
-	struct linker_file lf;		/* Common fields */
+	struct linker_file lf __subobject_member_used_for_c_inheritance; /* Common fields */
 	int		preloaded;	/* Was file pre-loaded */
 	caddr_t		address;	/* Relocation address */
 #ifdef SPARSE_MAPPING
@@ -2144,6 +2144,7 @@ link_elf_late_ireloc(void)
 //   "changes_purecap": [
 //     "pointer_provenance",
 //     "support",
+//     "subobject_bounds",
 //     "kdb",
 //     "pointer_as_integer"
 //   ]
