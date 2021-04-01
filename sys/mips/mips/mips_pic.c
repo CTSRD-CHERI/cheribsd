@@ -84,7 +84,7 @@ static void			 cpu_establish_intr(struct mips_pic_softc *sc,
 #define	INTR_MAP_DATA_MIPS	INTR_MAP_DATA_PLAT_1
 
 struct intr_map_data_mips_pic {
-	struct intr_map_data	hdr;
+	struct intr_map_data	hdr __subobject_use_container_bounds;
 	u_int			irq;
 };
 
@@ -113,7 +113,7 @@ struct mtx mips_pic_mtx;
 MTX_SYSINIT(mips_pic_mtx, &mips_pic_mtx, "mips intr controller mutex", MTX_DEF);
 
 struct mips_pic_irqsrc {
-	struct intr_irqsrc	isrc;
+	struct intr_irqsrc	isrc __subobject_use_container_bounds;
 	u_int			irq;
 };
 
@@ -710,3 +710,12 @@ cpu_establish_softintr(const char *name, driver_filter_t *filt,
 	cpu_establish_intr(pic_sc, name, filt, handler, arg, irq, flags,
 	    cookiep);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200517,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

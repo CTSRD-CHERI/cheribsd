@@ -187,7 +187,8 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
 	sf.sf_uc.uc_mcontext.mc_tls = td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
-	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
+	bcopy(__unbounded_addressof(regs->ast),
+	    (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
 	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));
 	sf.sf_uc.uc_mcontext.mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
 #if defined(CPU_HAVEFPU)
@@ -195,7 +196,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* if FPU has current state, save it first */
 		if (td == PCPU_GET(fpcurthread))
 			MipsSaveCurFPState(td);
-		bcopy((void *)&td->td_frame->f0,
+		bcopy(__unbounded_addressof(td->td_frame->f0),
 		    (void *)sf.sf_uc.uc_mcontext.mc_fpregs,
 		    sizeof(sf.sf_uc.uc_mcontext.mc_fpregs));
 	}
@@ -509,8 +510,8 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 #endif
 		mcp->mc_onstack = sigonstack(tp->sp);
 	PROC_UNLOCK(curthread->td_proc);
-	bcopy((void *)&td->td_frame->zero, (void *)&mcp->mc_regs,
-	    sizeof(mcp->mc_regs));
+	bcopy(__unbounded_addressof(td->td_frame->ast), (void *)&mcp->mc_regs[1],
+	    sizeof(mcp->mc_regs) - sizeof(register_t));
 #if __has_feature(capabilities)
 	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs,
 	    &mcp->mc_cheriframe);
@@ -518,7 +519,8 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 
 	mcp->mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
 	if (mcp->mc_fpused) {
-		bcopy((void *)&td->td_frame->f0, (void *)&mcp->mc_fpregs,
+		bcopy(__unbounded_addressof(td->td_frame->f0),
+		    (void *)&mcp->mc_fpregs,
 		    sizeof(mcp->mc_fpregs));
 	}
 	if (flags & GET_MC_CLEAR_RET) {
@@ -758,13 +760,15 @@ ptrace_clear_single_step(struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "kernel_sig_types",
 //     "support",
 //     "user_capabilities"
 //   ],
-//   "change_comment": ""
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
 // }
 // CHERI CHANGES END
