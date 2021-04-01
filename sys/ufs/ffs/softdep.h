@@ -218,7 +218,7 @@ struct worklist {
 	int			wk_line;	/* line where added / removed */
 	LIST_ENTRY(worklist)	wk_all;		/* list of deps of this type */
 #endif
-};
+} __no_subobject_bounds;
 #define	WK_DATA(wk) ((void *)(wk))
 #define	WK_PAGEDEP(wk) ((struct pagedep *)(wk))
 #define	WK_INODEDEP(wk) ((struct inodedep *)(wk))
@@ -465,7 +465,7 @@ struct newblk {
  * and inodedep->id_pendinghd lists.
  */
 struct allocdirect {
-	struct	newblk ad_block;	/* Common block logic */
+	struct	newblk ad_block __subobject_use_container_bounds;	/* Common block logic */
 #	define	ad_list ad_block.nb_list /* block pointer worklist */
 #	define	ad_state ad_list.wk_state /* block pointer state */
 	TAILQ_ENTRY(allocdirect) ad_next; /* inodedep's list of allocdirect's */
@@ -525,7 +525,7 @@ struct indirdep {
  * can then be freed as it is no longer applicable.
  */
 struct allocindir {
-	struct	newblk ai_block;	/* Common block area */
+	struct	newblk ai_block __subobject_use_container_bounds;	/* Common block area */
 #	define	ai_state ai_block.nb_list.wk_state /* indirect pointer state */
 	LIST_ENTRY(allocindir) ai_next;	/* indirdep's list of allocindir's */
 	struct	indirdep *ai_indirdep;	/* address of associated indirdep */
@@ -1119,3 +1119,12 @@ struct mount_softdeps {
 #define	softdep_flushtd			um_softdep->sd_flushtd
 #define	softdep_curdeps			um_softdep->sd_curdeps
 #define	softdep_alldeps			um_softdep->sd_alldeps
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
