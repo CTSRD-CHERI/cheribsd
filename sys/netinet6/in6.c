@@ -2025,7 +2025,7 @@ in6_if2idlen(struct ifnet *ifp)
 }
 
 struct in6_llentry {
-	struct llentry		base;
+	struct llentry base __subobject_use_container_bounds;
 };
 
 #define	IN6_LLTBL_DEFAULT_HSIZE	32
@@ -2545,3 +2545,12 @@ in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)
 	free(*nam, M_SONAME);
 	*nam = (struct sockaddr *)sin6_p;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
