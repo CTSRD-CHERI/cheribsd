@@ -80,7 +80,7 @@ SYSCTL_INT(_net_inet_ip, OID_AUTO, grettl, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(ip_gre_ttl), 0, "Default TTL value for encapsulated packets");
 
 struct in_gre_socket {
-	struct gre_socket		base;
+	struct gre_socket		base __subobject_use_container_bounds;
 	in_addr_t			addr;
 };
 VNET_DEFINE_STATIC(struct gre_sockets *, ipv4_sockets) = NULL;
@@ -592,3 +592,12 @@ in_gre_uninit(void)
 		gre_hashdestroy((struct gre_list *)V_ipv4_sockets);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

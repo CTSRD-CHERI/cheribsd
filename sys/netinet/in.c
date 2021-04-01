@@ -1101,7 +1101,7 @@ in_purgemaddrs(struct ifnet *ifp)
 }
 
 struct in_llentry {
-	struct llentry		base;
+	struct llentry base __subobject_use_container_bounds;
 };
 
 #define	IN_LLTBL_DEFAULT_HSIZE	32
@@ -1567,3 +1567,12 @@ in_domifdetach(struct ifnet *ifp, void *aux)
 	lltable_free(ii->ii_llt);
 	free(ii, M_IFADDR);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
