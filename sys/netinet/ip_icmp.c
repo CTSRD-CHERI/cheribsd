@@ -362,7 +362,7 @@ stdreply:	icmpelen = max(8, min(V_icmp_quotelen, ntohs(oip->ip_len) -
 	 * Copy the quotation into ICMP message and
 	 * convert quoted IP header back to network representation.
 	 */
-	m_copydata(n, 0, icmplen, (caddr_t)&icp->icmp_ip);
+	m_copydata(n, 0, icmplen, (caddr_t)__unbounded_addressof(icp->icmp_ip));
 	nip = &icp->icmp_ip;
 
 	/*
@@ -569,7 +569,7 @@ icmp_input(struct mbuf **mp, int *offp, int proto)
 		ctlfunc = inetsw[ip_protox[icp->icmp_ip.ip_p]].pr_ctlinput;
 		if (ctlfunc)
 			(*ctlfunc)(code, (struct sockaddr *)&icmpsrc,
-				   (void *)&icp->icmp_ip);
+				   (void *)__unbounded_addressof(icp->icmp_ip));
 		break;
 
 	badcode:
@@ -1135,3 +1135,12 @@ badport_bandlim(int which)
 			V_icmp_rates[which].descr, (intmax_t )pps, V_icmplim);
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

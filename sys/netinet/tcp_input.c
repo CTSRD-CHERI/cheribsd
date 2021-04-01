@@ -603,7 +603,7 @@ tcp_input(struct mbuf **mp, int *offp, int proto)
 {
 	struct mbuf *m = *mp;
 	struct tcphdr *th = NULL;
-	struct ip *ip = NULL;
+	struct ip *ip __no_subobject_bounds = NULL;
 	struct inpcb *inp = NULL;
 	struct tcpcb *tp = NULL;
 	struct socket *so = NULL;
@@ -621,7 +621,7 @@ tcp_input(struct mbuf **mp, int *offp, int proto)
 	uint8_t iptos;
 	struct m_tag *fwd_tag = NULL;
 #ifdef INET6
-	struct ip6_hdr *ip6 = NULL;
+	struct ip6_hdr *ip6 __no_subobject_bounds = NULL;
 	int isipv6;
 #else
 	const void *ip6 = NULL;
@@ -837,7 +837,7 @@ findpcb:
 			 * any hardware-generated hash is ignored.
 			 */
 			inp = in6_pcblookup(&V_tcbinfo, &ip6->ip6_src,
-			    th->th_sport, &next_hop6->sin6_addr,
+			    th->th_sport, __unbounded_addressof(next_hop6->sin6_addr),
 			    next_hop6->sin6_port ? ntohs(next_hop6->sin6_port) :
 			    th->th_dport, INPLOOKUP_WILDCARD |
 			    INPLOOKUP_WLOCKPCB, m->m_pkthdr.rcvif);
@@ -3912,3 +3912,12 @@ tcp_compute_initwnd(uint32_t maxseg)
 			return (4 * maxseg);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
