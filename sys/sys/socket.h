@@ -328,7 +328,7 @@ struct accept_filter_arg {
 struct sockaddr {
 	unsigned char	sa_len;		/* total length */
 	sa_family_t	sa_family;	/* address family */
-	char		sa_data[14];	/* actually longer; address value */
+	char		sa_data[14] __subobject_variable_length;	/* actually longer; address value */
 };
 #if __BSD_VISIBLE
 #define	SOCK_MAXADDRLEN	255		/* longest possible addresses */
@@ -791,10 +791,13 @@ void so_unlock(struct socket *so);
 #endif /* !_SYS_SOCKET_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes": [
 //     "pointer_alignment"
+//   ],
+//   "changes_purecap": [
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END
