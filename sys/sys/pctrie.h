@@ -72,7 +72,7 @@ static __inline uint64_t *						\
 name##_PCTRIE_PTR2VAL(struct type *ptr)					\
 {									\
 									\
-	return &ptr->field;						\
+	return __unbounded_addressof(ptr->field);			\
 }									\
 									\
 static __inline int							\
@@ -164,3 +164,12 @@ pctrie_is_empty(struct pctrie *ptree)
 
 #endif /* _KERNEL */
 #endif /* !_SYS_PCTRIE_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
