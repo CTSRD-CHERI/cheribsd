@@ -43,7 +43,7 @@ struct devfs_dirent;
 struct devfs_mount;
 
 struct cdev_privdata {
-	struct file		*cdpd_fp;
+	struct file		*cdpd_fp __subobject_use_container_bounds;
 	void			*cdpd_data;
 	void			(*cdpd_dtr)(void *);
 	LIST_ENTRY(cdev_privdata) cdpd_list;
@@ -101,3 +101,12 @@ extern TAILQ_HEAD(cdev_priv_list, cdev_priv) cdevp_list;
 #endif /* _KERNEL */
 
 #endif /* !_FS_DEVFS_DEVFS_INT_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
