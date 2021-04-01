@@ -188,12 +188,12 @@ struct qm_trace {
  * Singly-linked List declarations.
  */
 #define	SLIST_HEAD(name, type)						\
-struct name {				\
-	struct type *slh_first;	/* first element */			\
+struct __no_subobject_bounds name {					\
+	struct type *slh_first __no_subobject_bounds_fp; /* first element */ \
 }
 
 #define	SLIST_CLASS_HEAD(name, type)					\
-struct name {				\
+struct __no_subobject_bounds name {					\
 	class type *slh_first;	/* first element */			\
 }
 
@@ -201,13 +201,13 @@ struct name {				\
 	{ NULL }
 
 #define	SLIST_ENTRY(type)						\
-struct {				\
-	struct type *sle_next;	/* next element */	\
+struct __no_subobject_bounds {						\
+	struct type *sle_next __no_subobject_bounds_fp;	/* next element */ \
 }
 
-#define	SLIST_CLASS_ENTRY(type)						\
-struct {								\
-	class type *sle_next;	/* next element */			\
+#define SLIST_CLASS_ENTRY(type)						\
+struct __no_subobject_bounds {						\
+	class type *sle_next __no_subobject_bounds_fp;	/* next element */ \
 }
 
 /*
@@ -457,13 +457,13 @@ struct __no_subobject_bounds {				\
  * List declarations.
  */
 #define	LIST_HEAD(name, type)						\
-struct __no_subobject_bounds name {				\
-	struct type *lh_first;	/* first element */			\
+struct __no_subobject_bounds name {					\
+	struct type *lh_first __no_subobject_bounds_fp;	/* first element */\
 }
 
 #define	LIST_CLASS_HEAD(name, type)					\
-struct __no_subobject_bounds name {				\
-	class type *lh_first;	/* first element */			\
+struct __no_subobject_bounds name {					\
+	class type *lh_first __no_subobject_bounds_fp;	/* first element */\
 }
 
 #define	LIST_HEAD_INITIALIZER(head)					\
@@ -888,3 +888,12 @@ struct __no_subobject_bounds {				\
 #define	TAILQ_END(head)		NULL
 
 #endif /* !_SYS_QUEUE_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

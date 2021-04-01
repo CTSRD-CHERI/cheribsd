@@ -44,7 +44,7 @@ typedef bool (*rs_pred_t)(void *ctx, void *r);
  * This structure must be embedded at the start of the rangeset element.
  */
 struct rs_el {
-	uint64_t	re_start;	/* pctrie key */
+	uint64_t	re_start __subobject_use_container_bounds; /* pctrie key */
 	uint64_t	re_end;
 };
 
@@ -86,3 +86,12 @@ int	rangeset_copy(struct rangeset *dst_rs, struct rangeset *src_rs);
 #endif
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
