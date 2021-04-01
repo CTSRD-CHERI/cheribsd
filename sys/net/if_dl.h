@@ -64,8 +64,8 @@ struct sockaddr_dl {
 	u_char	sdl_nlen;	/* interface name length, no trailing 0 reqd. */
 	u_char	sdl_alen;	/* link level address length */
 	u_char	sdl_slen;	/* link layer selector length */
-	char	sdl_data[46];	/* minimum work area, can be larger;
-				   contains both if name and ll address */
+	/* minimum work area, can be larger; contains both if name and ll address */
+	char	sdl_data[46] __subobject_variable_length;
 };
 
 #define LLADDR(s) ((caddr_t)((s)->sdl_data + (s)->sdl_nlen))
@@ -89,3 +89,12 @@ __END_DECLS
 #endif /* !_KERNEL */
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

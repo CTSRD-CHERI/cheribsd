@@ -107,7 +107,7 @@ struct bpf_d {
 	u_char		bd_compat32;	/* 32-bit stream on LP64 system */
 
 	volatile u_int	bd_refcnt;
-	struct epoch_context epoch_ctx;
+	struct epoch_context epoch_ctx __subobject_use_container_bounds;
 };
 
 /* Values for bd_state */
@@ -159,3 +159,12 @@ struct xbpf_d {
 #define BPFIF_FLAG_DYING	1	/* Reject new bpf consumers */
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
