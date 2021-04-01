@@ -385,7 +385,7 @@ struct thread {
 struct thread0_storage {
 	struct thread t0st_thread;
 	uint64_t t0st_sched[10];
-};
+} __no_subobject_bounds;
 
 struct mtx *thread_lock_block(struct thread *);
 void thread_lock_block_wait(struct thread *);
@@ -1260,7 +1260,8 @@ EVENTHANDLER_LIST_DECLARE(thread_init);
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END
