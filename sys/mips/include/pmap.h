@@ -145,9 +145,9 @@ typedef struct pv_entry {
 struct pv_chunk {
 	pmap_t			pc_pmap;
 	TAILQ_ENTRY(pv_chunk)	pc_list;
-	u_long			pc_map[_NPCM];	/* bitmap; 1 = free */
 	TAILQ_ENTRY(pv_chunk)	pc_lru;
-	struct pv_entry		pc_pventry[_NPCPV];
+	u_long			pc_map[_NPCM];	/* bitmap; 1 = free */
+	struct pv_entry		pc_pventry[_NPCPV] __subobject_use_container_bounds;
 };
 
 /*
