@@ -87,11 +87,10 @@
 #define cheri_copyaddress(dst, src)	(cheri_setaddress(dst, cheri_getaddress(src)))
 
 /* Get the top of a capability (i.e. one byte past the last accessible one) */
-static inline vaddr_t
-cheri_gettop(const void * __capability cap)
-{
-	return (cheri_getbase(cap) + cheri_getlen(cap));
-}
+#define	cheri_gettop(cap)	__extension__({			\
+	__typeof__(cap) c = (cap);				\
+	(cheri_getbase(c) + cheri_getlen(c));			\
+})
 
 /* Check if the address is between cap.base and cap.top, i.e. in bounds */
 #ifdef __cplusplus
