@@ -289,6 +289,9 @@ static struct md_page pv_dummy;
 vm_paddr_t dmap_phys_base;	/* The start of the dmap region */
 vm_paddr_t dmap_phys_max;	/* The limit of the dmap region */
 vm_offset_t dmap_max_addr;	/* The virtual address limit of the dmap */
+#ifdef __CHERI_PURE_CAPABILITY__
+void *dmap_base_cap;		/* Capability for the direct map region */
+#endif
 
 /* This code assumes all L1 DMAP entries will be used */
 CTASSERT((DMAP_MIN_ADDRESS  & ~L0_OFFSET) == DMAP_MIN_ADDRESS);
@@ -894,6 +897,14 @@ pmap_bootstrap_dmap(vm_offset_t kern_l1, vm_paddr_t min_pa,
 			dmap_max_addr = va;
 		}
 	}
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	dmap_base_cap = cheri_setaddress(kernel_root_cap, DMAP_MIN_ADDRESS);
+	dmap_base_cap = cheri_setbounds(dmap_base_cap,
+	    dmap_phys_max - dmap_phys_base);
+	dmap_base_cap = cheri_andperms(dmap_base_cap,
+	    CHERI_PERMS_KERNEL_CODE | CHERI_PERMS_KERNEL_DATA);
+#endif
 
 	cpu_tlb_flushID();
 
