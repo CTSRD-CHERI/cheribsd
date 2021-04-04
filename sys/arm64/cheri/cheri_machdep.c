@@ -41,6 +41,7 @@
 #include <machine/vmparam.h>
 
 void * __capability sentry_unsealcap;
+void *kernel_root_cap = (void *)(intcap_t)-1;
 
 void
 cheri_init_capabilities(void * __capability kroot)
@@ -69,6 +70,11 @@ cheri_init_capabilities(void * __capability kroot)
 	sentry_unsealcap = ctemp;
 
 	swap_restore_cap = kroot;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	kernel_root_cap = cheri_andperm(kroot,
+	    ~(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL));
+#endif
 }
 
 void
