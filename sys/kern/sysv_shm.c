@@ -568,10 +568,10 @@ kern_shmat_locked(struct thread *td, int shmid,
 		return (ENOMEM);
 	}
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(attach_addr), ("Expected valid capability"));
-	KASSERT(cheri_getlen(attach_addr) == size,
+	KASSERT(cheri_gettag(attach_va), ("Expected valid capability"));
+	KASSERT(cheri_getlen(attach_va) == size,
 	    ("Inexact bounds expected %zx found %zx",
-	    (size_t)size, (size_t)cheri_getlen(attach_addr)));
+	    (size_t)size, (size_t)cheri_getlen(attach_va)));
 #endif
 
 	shmmap_s->va = attach_va;
