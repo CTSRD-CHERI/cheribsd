@@ -315,7 +315,7 @@ union ehci_hub_desc {
 
 typedef struct ehci_softc {
 	struct ehci_hw_softc sc_hw;
-	struct usb_bus sc_bus;		/* base device */
+	struct usb_bus sc_bus __subobject_use_container_bounds;	/* base device */
 	struct usb_callout sc_tmo_pcd;
 	struct usb_callout sc_tmo_poll;
 	union ehci_hub_desc sc_hub_desc;
@@ -452,3 +452,12 @@ uint16_t ehci_get_port_speed_portsc(struct ehci_softc *sc, uint16_t index);
 uint16_t ehci_get_port_speed_hostc(struct ehci_softc *sc, uint16_t index);
 
 #endif					/* _EHCI_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20210404,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END
