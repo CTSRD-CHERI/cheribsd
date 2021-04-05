@@ -41,9 +41,9 @@
 #define	ENTRY(sym)						\
 	.text; .globl sym; .align 2; .type sym,#function; sym:
 #define	EENTRY(sym)						\
-	.globl	sym; sym:
+	.globl	sym; .type sym,#function; sym:
 #define	END(sym) .size sym, . - sym
-#define	EEND(sym)
+#define	EEND(sym) .size sym, . - sym
 
 #define	WEAK_REFERENCE(sym, alias)				\
 	.weak alias;						\
