@@ -122,24 +122,31 @@ static size_t libc_tls_init_align = 1;
 static void *libc_tls_init;
 #endif
 
+void *
+__libc_tls_get_addr(void *vti)
+{
+	uintptr_t **dtvp, *dtv;
+	tls_index *ti;
+
+	dtvp = _get_tp();
+	dtv = *dtvp;
+	ti = vti;
+	return ((char *)(dtv[ti->ti_module + 1] + ti->ti_offset) +
+	    TLS_DTV_OFFSET);
+}
+
 #ifdef __i386__
 
 /* GNU ABI */
 
 __attribute__((__regparm__(1)))
 void *
-___libc_tls_get_addr(void *ti __unused)
+___libc_tls_get_addr(void *vti)
 {
-	return (0);
+	return (__libc_tls_get_addr(vti));
 }
 
 #endif
-
-void *
-__libc_tls_get_addr(void *ti __unused)
-{
-	return (0);
-}
 
 #ifndef PIC
 
