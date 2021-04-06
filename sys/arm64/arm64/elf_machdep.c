@@ -297,7 +297,7 @@ elf_cpu_load_file(linker_file_t lf)
 {
 
 	if (lf->id != 1)
-		cpu_icache_sync_range((vm_offset_t)lf->address, lf->size);
+		cpu_icache_sync_range((vm_pointer_t)lf->address, lf->size);
 	return (0);
 }
 

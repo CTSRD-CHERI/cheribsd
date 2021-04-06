@@ -37,10 +37,6 @@ __FBSDID("$FreeBSD$");
 
 #include "assym.inc"
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#error TODO Port to purecap
-#endif
-
 .macro check_user_access user_arg, size_arg, bad_access_func
 #if __has_feature(capabilities)
 	gcvalue	x7, c\user_arg		/* Read the user capability value */
@@ -57,14 +53,14 @@ __FBSDID("$FreeBSD$");
 /*
  * Fault handler for the copy{in,out} functions below.
  */
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 	.arch_extension	c64
 #endif
 ENTRY(copyio_c64_fault)
 	EXIT_C64
 EENTRY(copyio_fault)
-	SET_FAULT_HANDLER(xzr, x1) /* Clear the handler */
-	EXIT_USER_ACCESS_CHECK(w0, x1)
+	SET_FAULT_HANDLER(xzr, PTR(1)) /* Clear the handler */
+	EXIT_USER_ACCESS_CHECK(w0, PTR(1))
 copyio_fault_nopcb:
 	mov	x0, #EFAULT
 	ret
@@ -80,7 +76,7 @@ ENTRY(copyout)
 	cbz	x2, 1f
 	check_user_access 1, 2, copyio_fault_nopcb
 
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 	cvtd	c0, x0			/* Store through a capability */
 	scbnds	c0, c0, x2		/* Set the bounds */
 #endif
@@ -100,7 +96,7 @@ ENTRY(copyin)
 	cbz	x2, 1f
 	check_user_access 0, 2, copyio_fault_nopcb
 
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 	cvtd	c1, x1			/* Store through a capability */
 	scbnds	c1, c1, x2		/* Set the bounds */
 #endif
@@ -123,13 +119,13 @@ ENTRY(copyinstr)
 	mov	w4, #1		/* If zero return faulure */
 	cbz	x2, 3f		/* If len == 0 then skip loop */
 
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 	cvtd	c1, x1			/* Store through a capability */
 	scbnds	c1, c1, x2		/* Set the bounds */
 #endif
 
-	adr	x6, copyio_fault /* Get the handler address */
-	SET_FAULT_HANDLER(x6, x7) /* Set the handler */
+	adr	PTR(6), copyio_fault /* Get the handler address */
+	SET_FAULT_HANDLER(PTR(6), PTR(7)) /* Set the handler */
 
 	ldr	x7, =VM_MAXUSER_ADDRESS
 	ENTER_C64
@@ -156,11 +152,11 @@ ENTRY(copyinstr)
 	cbnz	x2, 1b
 
 2:	EXIT_C64
-	SET_FAULT_HANDLER(xzr, x7) /* Clear the handler */
+	SET_FAULT_HANDLER(xzr, PTR(7)) /* Clear the handler */
 
 
 3:	cbz	x3, 4f		/* Check if done != NULL */
-	str	x5, [x3]	/* done = count */
+	str	x5, [PTR(3)]	/* done = count */
 
 4:	mov	w1, #ENAMETOOLONG /* Load ENAMETOOLONG to return if failed */
 	cmp	w4, #0		/* Check if we saved the NUL-terminator */
@@ -281,9 +277,10 @@ ENTRY(copyincap)
 	check_user_access 0, 2, copyio_fault_nopcb
 
 	/* Create a capability from kdaddr */
-	mov	x5, x1			/* Backup kaddr */
+#ifndef __CHERI_PURE_CAPABILITY__
 	cvtd	c1, x1			/* Store through a capability */
 	scbnds	c1, c1, x2		/* Set the bounds */
+#endif
 
 	/* Check the length is greater than 1 capability */
 	cmp	x2, #16
@@ -291,7 +288,7 @@ ENTRY(copyincap)
 
 	/* And the addresses will both align on a capability */
 	gcvalue	x6, c0			/* Get uaddr's address */
-	eor	x3, x5, x6		/* Compare the addresses */
+	eor	x3, x1, x6		/* Compare the addresses */
 	and	x3, x3, #0xf		/* Check the lower bits */
 	cbnz	x3, copycommon		/* If different don't copy tags */
 
@@ -312,9 +309,10 @@ ENTRY(copyoutcap)
 	check_user_access 1, 2, copyio_fault_nopcb
 
 	/* Create a capability from kaddr */
-	mov	x5, x0			/* Backup kaddr */
+#ifndef __CHERI_PURE_CAPABILITY__
 	cvtd	c0, x0			/* Store through a capability */
 	scbnds	c0, c0, x2		/* Set the bounds */
+#endif
 
 	/* Check the length is greater than 1 capability */
 	cmp	x2, #16
@@ -322,7 +320,7 @@ ENTRY(copyoutcap)
 
 	/* And the addresses will both align on a capability */
 	gcvalue	x6, c1			/* Get uaddr's address */
-	eor	x3, x5, x6		/* Compare the addresses */
+	eor	x3, x0, x6		/* Compare the addresses */
 	and	x3, x3, #0xf		/* Check the lower bits */
 	cbnz	x3, copycommon		/* If different don't copy tags */
 
@@ -351,9 +349,9 @@ END(copyoutcap)
 	.type	copycapcommon,@function
 
 copycapcommon:
-	adr	x6, copyio_fault	/* Get the handler address */
-	SET_FAULT_HANDLER(x6, x7)	/* Set the handler */
-	ENTER_USER_ACCESS(w6, x7)
+	adr	PTR(6), copyio_fault	/* Get the handler address */
+	SET_FAULT_HANDLER(PTR(6), PTR(7))	/* Set the handler */
+	ENTER_USER_ACCESS(w6, PTR(7))
 
 	mov	x5, #0			/* x5 is the offset to load/store */
 
@@ -399,7 +397,7 @@ copycap_end_bytes:
 
 copycap_done:
 	EXIT_USER_ACCESS(w6)
-	SET_FAULT_HANDLER(xzr, x7)	/* Clear the handler */
+	SET_FAULT_HANDLER(xzr, PTR(7))	/* Clear the handler */
 
 	mov	x0, xzr			/* Return 0 */
 	ret
@@ -411,9 +409,9 @@ copycap_done:
 	.type	copycommon,@function
 
 copycommon:
-	adr	x6, copyio_fault	/* Get the handler address */
-	SET_FAULT_HANDLER(x6, x7)	/* Set the handler */
-	ENTER_USER_ACCESS(w6, x7)
+	adr	PTR(6), copyio_fault	/* Get the handler address */
+	SET_FAULT_HANDLER(PTR(6), PTR(7))	/* Set the handler */
+	ENTER_USER_ACCESS(w6, PTR(7))
 
 	mov	x5, #0			/* x5 is the offset to load/store */
 
@@ -441,7 +439,7 @@ copy_end_bytes:
 
 copy_done:
 	EXIT_USER_ACCESS(w6)
-	SET_FAULT_HANDLER(xzr, x7)	/* Clear the handler */
+	SET_FAULT_HANDLER(xzr, PTR(7))	/* Clear the handler */
 
 	mov	x0, xzr			/* Return 0 */
 	ret
