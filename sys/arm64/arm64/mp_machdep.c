@@ -283,7 +283,7 @@ smp_after_idle_runnable(void *arg __unused)
 			pc = pcpu_find(cpu);
 			while (atomic_load_ptr(&pc->pc_curpcb) == NULL)
 				cpu_spinwait();
-			kmem_free((vm_offset_t)bootstacks[cpu], PAGE_SIZE);
+			kmem_free((vm_pointer_t)bootstacks[cpu], PAGE_SIZE);
 		}
 	}
 }
@@ -480,9 +480,9 @@ start_cpu(u_int id, uint64_t target_cpu)
 		    id, target_cpu, err));
 
 		pcpu_destroy(pcpup);
-		kmem_free((vm_offset_t)dpcpu[cpuid - 1], DPCPU_SIZE);
+		kmem_free((vm_pointer_t)dpcpu[cpuid - 1], DPCPU_SIZE);
 		dpcpu[cpuid - 1] = NULL;
-		kmem_free((vm_offset_t)bootstacks[cpuid], PAGE_SIZE);
+		kmem_free((vm_pointer_t)bootstacks[cpuid], PAGE_SIZE);
 		bootstacks[cpuid] = NULL;
 		mp_ncpus--;
 

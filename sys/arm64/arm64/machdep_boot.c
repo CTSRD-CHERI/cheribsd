@@ -82,12 +82,12 @@ static char linux_command_line[LBABI_MAX_COMMAND_LINE + 1];
 static vm_offset_t
 fake_preload_metadata(void *dtb_ptr, size_t dtb_size)
 {
-	vm_offset_t lastaddr;
+	vm_pointer_t lastaddr;
 	static char fake_preload[256];
 	caddr_t preload_ptr;
 	size_t size;
 
-	lastaddr = (vm_offset_t)&end;
+	lastaddr = (vm_pointer_t)&end;
 	preload_ptr = (caddr_t)&fake_preload[0];
 	size = 0;
 

@@ -1014,10 +1014,11 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 }
 
 static void
-init_proc0(vm_offset_t kstack)
+init_proc0(vm_pointer_t kstack)
 {
 	struct pcpu *pcpup = &__pcpu[0];
 
+	/* XXX-AM: We need to set bounds on pcb and kstack here as in MIPS */
 	proc_linkup0(&proc0, &thread0);
 	thread0.td_kstack = kstack;
 	thread0.td_kstack_pages = KSTACK_PAGES;
@@ -1191,7 +1192,7 @@ print_efi_map_entries(struct efi_map_header *efihdr)
 static void
 try_load_dtb(caddr_t kmdp)
 {
-	vm_offset_t dtbp;
+	vm_pointer_t dtbp;
 
 	dtbp = MD_FETCH(kmdp, MODINFOMD_DTBP, vm_offset_t);
 #if defined(FDT_DTB_STATIC)
@@ -1200,7 +1201,7 @@ try_load_dtb(caddr_t kmdp)
 	 * to use the statically embedded one.
 	 */
 	if (dtbp == 0)
-		dtbp = (vm_offset_t)&fdt_static_dtb;
+		dtbp = (vm_pointer_t)__unbounded_addressof(fdt_static_dtb);
 #endif
 
 	if (dtbp == (vm_offset_t)NULL) {
