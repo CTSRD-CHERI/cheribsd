@@ -160,7 +160,10 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 {
 #define	ARM64_ELF_RELOC_LOCAL		(1 << 0)
 #define	ARM64_ELF_RELOC_LATE_IFUNC	(1 << 1)
-	Elf_Addr *where, addr, addend, val;
+	Elf_Addr *where, addr, addend;
+#ifndef __CHERI_PURE_CAPABILITY__
+	Elf_Addr val;
+#endif
 	Elf_Word rtype, symidx;
 	const Elf_Rel *rel;
 	const Elf_Rela *rela;
@@ -234,11 +237,26 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		*where = addr + addend;
 		break;
 	case R_AARCH64_IRELATIVE:
+#ifdef __CHERI_PURE_CAPABILITY__
+		printf("kldload: AARCH64_IRELATIVE relocation should not "
+		    "exist in purecap CHERI kernel modules\n");
+		return (-1);
+#else
 		addr = (Elf_Addr)relocbase + addend;
 		val = ((Elf64_Addr (*)(void))addr)();
 		if (*where != val)
 			*where = val;
+#endif
 		break;
+#ifdef __CHERI_PURE_CAPABILITY__
+	case R_MORELLO_CAPINIT:
+	case R_MORELLO_GLOB_DAT:
+	case R_MORELLO_JUMP_SLOT:
+	case R_MORELLO_RELATIVE:
+	case R_MORELLO_IRELATIVE:
+		panic("TODO implement morello dynamic relocations");
+		break;
+#endif
 	default:
 		printf("kldload: unexpected relocation type %d, "
 		    "symbol index %d\n", rtype, symidx);
