@@ -64,8 +64,6 @@ Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
 Elf_Addr _mips_rtld_bind(struct Struct_Obj_Entry *obj, Elf_Size reloff);
 #endif
 
-void *_mips_get_tls(void);
-
 #if __has_feature(capabilities)
 
 #define FUNC_PTR_REMOVE_PERMS	(__CHERI_CAP_PERMISSION_PERMIT_SEAL__ |	\
