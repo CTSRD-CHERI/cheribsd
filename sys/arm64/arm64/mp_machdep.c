@@ -204,13 +204,7 @@ init_secondary(uint64_t cpu)
 	pmap_t pmap0;
 
 	pcpup = &__pcpu[cpu];
-	/*
-	 * Set the pcpu pointer with a backup in tpidr_el1 to be
-	 * loaded when entering the kernel from userland.
-	 */
-	__asm __volatile(
-	    "mov x18, %0 \n"
-	    "msr tpidr_el1, %0" :: "r"(pcpup));
+	init_cpu_pcpup(pcpup);
 
 	/*
 	 * Identify current CPU. This is necessary to setup
@@ -894,3 +888,12 @@ ipi_selected(cpuset_t cpus, u_int ipi)
 	CTR2(KTR_SMP, "%s: ipi: %x", __func__, ipi);
 	intr_ipi_send(cpus, ipi);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20210407,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

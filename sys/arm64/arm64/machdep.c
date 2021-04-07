@@ -1399,13 +1399,8 @@ initarm(struct arm64_bootparams *abp)
 	pcpup = &__pcpu[0];
 	pcpu_init(pcpup, 0, sizeof(struct pcpu));
 
-	/*
-	 * Set the pcpu pointer with a backup in tpidr_el1 to be
-	 * loaded when entering the kernel from userland.
-	 */
-	__asm __volatile(
-	    "mov x18, %0 \n"
-	    "msr tpidr_el1, %0" :: "r"(pcpup));
+	/* Initialize the pcpu pointer for this cpu. */
+	init_cpu_pcpup(pcpup);
 
 	PCPU_SET(curthread, &thread0);
 	PCPU_SET(midr, get_midr());
@@ -1602,3 +1597,12 @@ DB_SHOW_COMMAND(vtop, db_show_vtop)
 		db_printf("show vtop <virt_addr>\n");
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20210407,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END
