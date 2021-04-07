@@ -678,9 +678,8 @@ xgbe_an73_isr(struct xgbe_prv_data *pdata)
 }
 
 static void
-xgbe_an_isr_task(unsigned long data)
+xgbe_an_isr_task(struct xgbe_prv_data *pdata)
 {
-	struct xgbe_prv_data *pdata = (struct xgbe_prv_data *)data;
 
 	axgbe_printf(2, "AN interrupt received\n");
 
@@ -701,7 +700,7 @@ xgbe_an_isr_task(unsigned long data)
 static void
 xgbe_an_combined_isr(struct xgbe_prv_data *pdata)
 {
-	xgbe_an_isr_task((unsigned long)pdata);
+	xgbe_an_isr_task(pdata);
 }
 
 static const char *
