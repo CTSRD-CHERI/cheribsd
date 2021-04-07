@@ -196,7 +196,7 @@ pa_to_pvh(vm_paddr_t pa)
 		seg = &vm_phys_segs[segind];
 		if (pa >= seg->start && pa < seg->end)
 			return ((struct md_page *)seg->md_first +
-			    pmap_l2_pindex(pa) - pmap_l2_pindex(seg->start));
+			    (pmap_l2_pindex(pa) - pmap_l2_pindex(seg->start)));
 	}
 	panic("pa 0x%jx not within vm_phys_segs", (uintmax_t)pa);
 }
@@ -208,7 +208,7 @@ page_to_pvh(vm_page_t m)
 
 	seg = &vm_phys_segs[m->segind];
 	return ((struct md_page *)seg->md_first +
-	    pmap_l2_pindex(VM_PAGE_TO_PHYS(m)) - pmap_l2_pindex(seg->start));
+	    (pmap_l2_pindex(VM_PAGE_TO_PHYS(m)) - pmap_l2_pindex(seg->start)));
 }
 
 #define	NPV_LIST_LOCKS	MAXCPU
@@ -259,7 +259,7 @@ struct pmap kernel_pmap_store;
 /* Used for mapping ACPI memory before VM is initialized */
 #define	PMAP_PREINIT_MAPPING_COUNT	32
 #define	PMAP_PREINIT_MAPPING_SIZE	(PMAP_PREINIT_MAPPING_COUNT * L2_SIZE)
-static vm_offset_t preinit_map_va;	/* Start VA of pre-init mapping space */
+static vm_pointer_t preinit_map_va;	/* Start VA of pre-init mapping space */
 static int vm_initialized = 0;		/* No need to use pre-init maps when set */
 
 /*
@@ -273,8 +273,8 @@ static struct pmap_preinit_mapping {
 	vm_size_t	size;
 } pmap_preinit_mapping[PMAP_PREINIT_MAPPING_COUNT];
 
-vm_offset_t virtual_avail;	/* VA of first avail page (after kernel bss) */
-vm_offset_t virtual_end;	/* VA of last avail page (end of kernel AS) */
+vm_pointer_t virtual_avail;	/* VA of first avail page (after kernel bss) */
+vm_pointer_t virtual_end;	/* VA of last avail page (end of kernel AS) */
 vm_offset_t kernel_vm_end = 0;
 
 /*
@@ -777,7 +777,7 @@ pmap_resident_count_dec(pmap_t pmap, int count)
 }
 
 static vm_paddr_t
-pmap_early_vtophys(vm_offset_t l1pt, vm_offset_t va)
+pmap_early_vtophys(vm_pointer_t l1pt, vm_offset_t va)
 {
 	vm_paddr_t pa_page;
 
@@ -785,9 +785,9 @@ pmap_early_vtophys(vm_offset_t l1pt, vm_offset_t va)
 	return (pa_page | (va & PAR_LOW_MASK));
 }
 
-static vm_offset_t
-pmap_bootstrap_dmap(vm_offset_t kern_l1, vm_paddr_t min_pa,
-    vm_offset_t freemempos)
+static vm_pointer_t
+pmap_bootstrap_dmap(vm_pointer_t kern_l1, vm_paddr_t min_pa,
+    vm_pointer_t freemempos)
 {
 	pt_entry_t *l2;
 	vm_offset_t va;
@@ -902,7 +902,7 @@ pmap_bootstrap_dmap(vm_offset_t kern_l1, vm_paddr_t min_pa,
 	dmap_base_cap = cheri_setaddress(kernel_root_cap, DMAP_MIN_ADDRESS);
 	dmap_base_cap = cheri_setbounds(dmap_base_cap,
 	    dmap_phys_max - dmap_phys_base);
-	dmap_base_cap = cheri_andperms(dmap_base_cap,
+	dmap_base_cap = cheri_andperm(dmap_base_cap,
 	    CHERI_PERMS_KERNEL_CODE | CHERI_PERMS_KERNEL_DATA);
 #endif
 
@@ -911,10 +911,10 @@ pmap_bootstrap_dmap(vm_offset_t kern_l1, vm_paddr_t min_pa,
 	return (freemempos);
 }
 
-static vm_offset_t
-pmap_bootstrap_l2(vm_offset_t l1pt, vm_offset_t va, vm_offset_t l2_start)
+static vm_pointer_t
+pmap_bootstrap_l2(vm_pointer_t l1pt, vm_offset_t va, vm_pointer_t l2_start)
 {
-	vm_offset_t l2pt;
+	vm_pointer_t l2pt;
 	vm_paddr_t pa;
 	pd_entry_t *l1;
 	u_int l1_slot;
@@ -935,15 +935,15 @@ pmap_bootstrap_l2(vm_offset_t l1pt, vm_offset_t va, vm_offset_t l2_start)
 	}
 
 	/* Clean the L2 page table */
-	memset((void *)l2_start, 0, l2pt - l2_start);
+	memset((void *)l2_start, 0, (ptraddr_t)l2pt - (ptraddr_t)l2_start);
 
 	return l2pt;
 }
 
-static vm_offset_t
-pmap_bootstrap_l3(vm_offset_t l1pt, vm_offset_t va, vm_offset_t l3_start)
+static vm_pointer_t
+pmap_bootstrap_l3(vm_pointer_t l1pt, vm_offset_t va, vm_pointer_t l3_start)
 {
-	vm_offset_t l3pt;
+	vm_pointer_t l3pt;
 	vm_paddr_t pa;
 	pd_entry_t *l2;
 	u_int l2_slot;
@@ -965,7 +965,7 @@ pmap_bootstrap_l3(vm_offset_t l1pt, vm_offset_t va, vm_offset_t l3_start)
 	}
 
 	/* Clean the L2 page table */
-	memset((void *)l3_start, 0, l3pt - l3_start);
+	memset((void *)l3_start, 0, (ptraddr_t)l3pt - (ptraddr_t)l3_start);
 
 	return l3pt;
 }
@@ -974,11 +974,11 @@ pmap_bootstrap_l3(vm_offset_t l1pt, vm_offset_t va, vm_offset_t l3_start)
  *	Bootstrap the system enough to run with virtual memory.
  */
 void
-pmap_bootstrap(vm_offset_t l0pt, vm_offset_t l1pt, vm_paddr_t kernstart,
+pmap_bootstrap(vm_pointer_t l0pt, vm_pointer_t l1pt, vm_paddr_t kernstart,
     vm_size_t kernlen)
 {
-	vm_offset_t freemempos;
-	vm_offset_t dpcpu, msgbufpv;
+	vm_pointer_t freemempos;
+	vm_pointer_t dpcpu, msgbufpv;
 	vm_paddr_t start_pa, pa, min_pa;
 	uint64_t kern_delta;
 	int i;
@@ -989,8 +989,9 @@ pmap_bootstrap(vm_offset_t l0pt, vm_offset_t l1pt, vm_paddr_t kernstart,
 
 	kern_delta = KERNBASE - kernstart;
 
-	printf("pmap_bootstrap %lx %lx %lx\n", l1pt, kernstart, kernlen);
-	printf("%lx\n", l1pt);
+	printf("pmap_bootstrap %lx %lx %lx\n", (vm_offset_t)l1pt,
+	    (vm_offset_t)kernstart, kernlen);
+	printf("%lx\n", (vm_offset_t)l1pt);
 	printf("%lx\n", (KERNBASE >> L1_SHIFT) & Ln_ADDR_MASK);
 
 	/* Set this early so we can use the pagetable walking functions */
@@ -1020,8 +1021,14 @@ pmap_bootstrap(vm_offset_t l0pt, vm_offset_t l1pt, vm_paddr_t kernstart,
 			min_pa = physmap[i];
 	}
 
-	freemempos = KERNBASE + kernlen;
-	freemempos = roundup2(freemempos, PAGE_SIZE);
+	freemempos = KERNBASE;
+#ifdef __CHERI_PURE_CAPABILITY__
+	freemempos = (vm_pointer_t)cheri_setaddress(kernel_root_cap,
+	    freemempos);
+	freemempos = cheri_setbounds(freemempos,
+	    VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE - KERNBASE);
+#endif
+	freemempos = roundup2(freemempos + kernlen, PAGE_SIZE);
 
 	/* Create a direct map region early so we can use it for pa -> va */
 	freemempos = pmap_bootstrap_dmap(l1pt, min_pa, freemempos);
@@ -1058,7 +1065,8 @@ pmap_bootstrap(vm_offset_t l0pt, vm_offset_t l1pt, vm_paddr_t kernstart,
 
 	virtual_avail = preinit_map_va + PMAP_PREINIT_MAPPING_SIZE;
 	virtual_avail = roundup2(virtual_avail, L1_SIZE);
-	virtual_end = VM_MAX_KERNEL_ADDRESS - (PMAP_MAPDEV_EARLY_SIZE);
+	virtual_end = cheri_kern_setaddress(virtual_avail,
+	    VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE);
 	kernel_vm_end = virtual_avail;
 
 	pa = pmap_early_vtophys(l1pt, freemempos);
@@ -1109,6 +1117,7 @@ pmap_init(void)
 {
 	struct vm_phys_seg *seg, *next_seg;
 	struct md_page *pvh;
+	vm_size_t used_pvh;
 	vm_size_t s;
 	uint64_t mmfr1;
 	int i, pv_npg, vmid_bits;
@@ -1179,8 +1188,13 @@ pmap_init(void)
 	for (i = 0, pvh = pv_table; i < vm_phys_nsegs; i++) {
 		seg = &vm_phys_segs[i];
 		seg->md_first = pvh;
-		pvh += pmap_l2_pindex(roundup2(seg->end, L2_SIZE)) -
+		used_pvh = pmap_l2_pindex(roundup2(seg->end, L2_SIZE)) -
 		    pmap_l2_pindex(seg->start);
+		pvh += used_pvh;
+#ifdef __CHERI_PURE_CAPABILITY__
+		seg->md_first = cheri_setbounds(seg->md_first,
+		    used_pvh * sizeof(*pvh));
+#endif
 
 		/*
 		 * If there is a following segment, and the final
@@ -1576,10 +1590,15 @@ pmap_kremove_device(vm_offset_t sva, vm_size_t size)
  *	update '*virt' with the first usable address after the mapped
  *	region.
  */
-vm_offset_t
-pmap_map(vm_offset_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
+vm_pointer_t
+pmap_map(vm_pointer_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 {
+#ifdef __CHERI_PURE_CAPABILITY__
+	return cheri_andperm(cheri_setbounds(PHYS_TO_DMAP(start), end - start),
+	    vm_map_prot2perms(prot));
+#else
 	return PHYS_TO_DMAP(start);
+#endif
 }
 
 /*
@@ -2260,25 +2279,85 @@ pmap_growkernel(vm_offset_t addr)
 /***************************************************
  * page management routines.
  ***************************************************/
-
 CTASSERT(sizeof(struct pv_chunk) == PAGE_SIZE);
+#ifdef __CHERI_PURE_CAPABILITY__
+CTASSERT(_NPCM == 2);
+CTASSERT(_NPCPV == 83);
+#else
 CTASSERT(_NPCM == 3);
 CTASSERT(_NPCPV == 168);
+#endif
 
 static __inline struct pv_chunk *
 pv_to_chunk(pv_entry_t pv)
 {
 
-	return ((struct pv_chunk *)((uintptr_t)pv & ~(uintptr_t)PAGE_MASK));
+	return ((struct pv_chunk *)rounddown2(pv, PAGE_SIZE));
 }
 
 #define PV_PMAP(pv) (pv_to_chunk(pv)->pc_pmap)
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	PC_FREE0	0xfffffffffffffffful
+#define	PC_FREE1	0x000000000007fffful
+
+static const uint64_t pc_freemask[_NPCM] = { PC_FREE0, PC_FREE1 };
+
+static __inline bool
+pmap_pvchunk_empty(struct pv_chunk *pc)
+{
+	if (pc->pc_map[0] == PC_FREE0 && pc->pc_map[1] == PC_FREE1)
+		return (true);
+	return (false);
+}
+
+static __inline bool
+pmap_pvchunk_full(struct pv_chunk *pc)
+{
+	if (pc->pc_map[0] == 0 && pc->pc_map[1] == 0)
+		return (true);
+	return (false);
+}
+
+static __inline void
+pmap_pvchunk_clear_freemask(struct pv_chunk *pc)
+{
+	pc->pc_map[0] = PC_FREE0;
+	pc->pc_map[1] = PC_FREE1;
+}
+#else
 #define	PC_FREE0	0xfffffffffffffffful
 #define	PC_FREE1	0xfffffffffffffffful
 #define	PC_FREE2	0x000000fffffffffful
 
 static const uint64_t pc_freemask[_NPCM] = { PC_FREE0, PC_FREE1, PC_FREE2 };
+
+static __inline bool
+pmap_pvchunk_empty(struct pv_chunk *pc)
+{
+	if (pc->pc_map[0] == PC_FREE0 && pc->pc_map[1] == PC_FREE1 &&
+	    pc->pc_map[2] == PC_FREE2)
+		return (true);
+	return (false);
+}
+
+static __inline bool
+pmap_pvchunk_full(struct pv_chunk *pc)
+{
+	if (pc->pc_map[0] == 0 && pc->pc_map[1] == 0 &&
+	    pc->pc_map[2] == 0)
+		return (true);
+	return (false);
+}
+
+static __inline void
+pmap_pvchunk_clear_freemask(struct pv_chunk *pc)
+{
+	pc->pc_map[0] = PC_FREE0;
+	pc->pc_map[1] = PC_FREE1;
+	pc->pc_map[2] = PC_FREE2;
+}
+#endif
 
 #if 0
 #ifdef PV_STATS
@@ -2446,8 +2525,7 @@ reclaim_pv_chunk(pmap_t locked_pmap, struct rwlock **lockp)
 		PV_STAT(atomic_add_int(&pv_entry_spare, freed));
 		PV_STAT(atomic_subtract_long(&pv_entry_count, freed));
 		TAILQ_REMOVE(&pmap->pm_pvchunk, pc, pc_list);
-		if (pc->pc_map[0] == PC_FREE0 && pc->pc_map[1] == PC_FREE1 &&
-		    pc->pc_map[2] == PC_FREE2) {
+		if (pmap_pvchunk_empty(pc)) {
 			PV_STAT(atomic_subtract_int(&pv_entry_spare, _NPCPV));
 			PV_STAT(atomic_subtract_int(&pc_chunk_count, 1));
 			PV_STAT(atomic_add_int(&pc_chunk_frees, 1));
@@ -2516,8 +2594,7 @@ free_pv_entry(pmap_t pmap, pv_entry_t pv)
 	field = idx / 64;
 	bit = idx % 64;
 	pc->pc_map[field] |= 1ul << bit;
-	if (pc->pc_map[0] != PC_FREE0 || pc->pc_map[1] != PC_FREE1 ||
-	    pc->pc_map[2] != PC_FREE2) {
+	if (!pmap_pvchunk_empty(pc)) {
 		/* 98% of the time, pc is already at the head of the list. */
 		if (__predict_false(pc != TAILQ_FIRST(&pmap->pm_pvchunk))) {
 			TAILQ_REMOVE(&pmap->pm_pvchunk, pc, pc_list);
@@ -2578,8 +2655,7 @@ retry:
 			pv = &pc->pc_pventry[field * 64 + bit];
 			pc->pc_map[field] &= ~(1ul << bit);
 			/* If this was the last item, move it to tail */
-			if (pc->pc_map[0] == 0 && pc->pc_map[1] == 0 &&
-			    pc->pc_map[2] == 0) {
+			if (pmap_pvchunk_full(pc)) {
 				TAILQ_REMOVE(&pmap->pm_pvchunk, pc, pc_list);
 				TAILQ_INSERT_TAIL(&pmap->pm_pvchunk, pc,
 				    pc_list);
@@ -2606,9 +2682,8 @@ retry:
 	dump_add_page(m->phys_addr);
 	pc = (void *)PHYS_TO_DMAP(m->phys_addr);
 	pc->pc_pmap = pmap;
+	pmap_pvchunk_clear_freemask(pc);
 	pc->pc_map[0] = PC_FREE0 & ~1ul;	/* preallocated bit 0 */
-	pc->pc_map[1] = PC_FREE1;
-	pc->pc_map[2] = PC_FREE2;
 	mtx_lock(&pv_chunks_mutex);
 	TAILQ_INSERT_TAIL(&pv_chunks, pc, pc_lru);
 	mtx_unlock(&pv_chunks_mutex);
@@ -2669,9 +2744,7 @@ retry:
 		dump_add_page(m->phys_addr);
 		pc = (void *)PHYS_TO_DMAP(m->phys_addr);
 		pc->pc_pmap = pmap;
-		pc->pc_map[0] = PC_FREE0;
-		pc->pc_map[1] = PC_FREE1;
-		pc->pc_map[2] = PC_FREE2;
+		pmap_pvchunk_clear_freemask(pc);
 		TAILQ_INSERT_HEAD(&pmap->pm_pvchunk, pc, pc_list);
 		TAILQ_INSERT_TAIL(&new_tail, pc, pc_lru);
 		PV_STAT(atomic_add_int(&pv_entry_spare, _NPCPV));
@@ -2751,8 +2824,8 @@ pmap_pv_demote_l2(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	va_last = va + L2_SIZE - PAGE_SIZE;
 	for (;;) {
 		pc = TAILQ_FIRST(&pmap->pm_pvchunk);
-		KASSERT(pc->pc_map[0] != 0 || pc->pc_map[1] != 0 ||
-		    pc->pc_map[2] != 0, ("pmap_pv_demote_l2: missing spare"));
+		KASSERT(!pmap_pvchunk_full(pc),
+		    ("pmap_pv_demote_l2: missing spare"));
 		for (field = 0; field < _NPCM; field++) {
 			while (pc->pc_map[field]) {
 				bit = ffsl(pc->pc_map[field]) - 1;
@@ -2773,7 +2846,7 @@ pmap_pv_demote_l2(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 		TAILQ_INSERT_TAIL(&pmap->pm_pvchunk, pc, pc_list);
 	}
 out:
-	if (pc->pc_map[0] == 0 && pc->pc_map[1] == 0 && pc->pc_map[2] == 0) {
+	if (pmap_pvchunk_full(pc)) {
 		TAILQ_REMOVE(&pmap->pm_pvchunk, pc, pc_list);
 		TAILQ_INSERT_TAIL(&pmap->pm_pvchunk, pc, pc_list);
 	}
@@ -4888,7 +4961,7 @@ out:
 void
 pmap_zero_page(vm_page_t m)
 {
-	vm_offset_t va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+	vm_pointer_t va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 
 	pagezero((void *)va);
 }
@@ -4902,7 +4975,7 @@ pmap_zero_page(vm_page_t m)
 void
 pmap_zero_page_area(vm_page_t m, int off, int size)
 {
-	vm_offset_t va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+	vm_pointer_t va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 
 	if (off == 0 && size == PAGE_SIZE)
 		pagezero((void *)va);
@@ -4919,8 +4992,8 @@ pmap_zero_page_area(vm_page_t m, int off, int size)
 void
 pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
 {
-	vm_offset_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
-	vm_offset_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
+	vm_pointer_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
+	vm_pointer_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
 
 #if __has_feature(capabilities)
 	pagecopy_cleartags((void *)src, (void *)dst);
@@ -4929,8 +5002,8 @@ pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
 void
 pmap_copy_page_tags(vm_page_t msrc, vm_page_t mdst)
 {
-	vm_offset_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
-	vm_offset_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
+	vm_pointer_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
+	vm_pointer_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
 
 #endif
 	pagecopy((void *)src, (void *)dst);
@@ -5923,9 +5996,10 @@ void *
 pmap_mapbios(vm_paddr_t pa, vm_size_t size)
 {
 	struct pmap_preinit_mapping *ppim;
-	vm_offset_t va, offset;
+	vm_pointer_t va;
 	pd_entry_t *pde;
 	pt_entry_t *l2;
+	vm_offset_t offset;
 	int i, lvl, l2_blocks, free_l2_count, start_idx;
 
 	if (!vm_initialized) {
@@ -5988,7 +6062,7 @@ pmap_mapbios(vm_paddr_t pa, vm_size_t size)
 			pde = pmap_pde(kernel_pmap, va, &lvl);
 			KASSERT(pde != NULL,
 			    ("pmap_mapbios: Invalid page entry, va: 0x%lx",
-			    va));
+			    (vm_offset_t)va));
 			KASSERT(lvl == 1,
 			    ("pmap_mapbios: Invalid level %d", lvl));
 
@@ -6027,7 +6101,7 @@ pmap_mapbios(vm_paddr_t pa, vm_size_t size)
 }
 
 void
-pmap_unmapbios(vm_offset_t va, vm_size_t size)
+pmap_unmapbios(vm_pointer_t va, vm_size_t size)
 {
 	struct pmap_preinit_mapping *ppim;
 	vm_offset_t offset, tmpsize, va_trunc;
@@ -6037,7 +6111,8 @@ pmap_unmapbios(vm_offset_t va, vm_size_t size)
 	bool preinit_map;
 
 	l2_blocks =
-	   (roundup2(va + size, L2_SIZE) - rounddown2(va, L2_SIZE)) >> L2_SHIFT;
+	   ((ptraddr_t)roundup2(va + size, L2_SIZE) -
+	    (ptraddr_t)rounddown2(va, L2_SIZE)) >> L2_SHIFT;
 	KASSERT(l2_blocks > 0, ("pmap_unmapbios: invalid size %lx", size));
 
 	/* Remove preinit mapping */
@@ -6081,7 +6156,8 @@ pmap_unmapbios(vm_offset_t va, vm_size_t size)
 
 		pde = pmap_pde(kernel_pmap, va, &lvl);
 		KASSERT(pde != NULL,
-		    ("pmap_unmapbios: Invalid page entry, va: 0x%lx", va));
+		    ("pmap_unmapbios: Invalid page entry, va: 0x%lx",
+		    (vm_offset_t)va));
 		KASSERT(lvl == 2, ("pmap_unmapbios: Invalid level %d", lvl));
 
 		/* Unmap and invalidate the pages */
@@ -6235,7 +6311,7 @@ static pt_entry_t *
 pmap_demote_l1(pmap_t pmap, pt_entry_t *l1, vm_offset_t va)
 {
 	pt_entry_t *l2, newl2, oldl1;
-	vm_offset_t tmpl1;
+	vm_pointer_t tmpl1;
 	vm_paddr_t l2phys, phys;
 	vm_page_t ml2;
 	int i;
@@ -6328,7 +6404,7 @@ pmap_demote_l2_locked(pmap_t pmap, pt_entry_t *l2, vm_offset_t va,
     struct rwlock **lockp)
 {
 	pt_entry_t *l3, newl3, oldl2;
-	vm_offset_t tmpl2;
+	vm_pointer_t tmpl2;
 	vm_paddr_t l3phys;
 	vm_page_t ml3;
 
@@ -6996,7 +7072,7 @@ pmap_align_superpage(vm_object_t object, vm_ooffset_t offset,
  *
  */
 boolean_t
-pmap_map_io_transient(vm_page_t page[], vm_offset_t vaddr[], int count,
+pmap_map_io_transient(vm_page_t page[], vm_pointer_t vaddr[], int count,
     boolean_t can_fault)
 {
 	vm_paddr_t paddr;
@@ -7038,7 +7114,7 @@ pmap_map_io_transient(vm_page_t page[], vm_offset_t vaddr[], int count,
 }
 
 void
-pmap_unmap_io_transient(vm_page_t page[], vm_offset_t vaddr[], int count,
+pmap_unmap_io_transient(vm_page_t page[], vm_pointer_t vaddr[], int count,
     boolean_t can_fault)
 {
 	vm_paddr_t paddr;
@@ -7271,10 +7347,13 @@ SYSCTL_OID(_vm_pmap, OID_AUTO, kernel_maps,
     "Dump kernel address layout");
 // CHERI CHANGES START
 // {
-//   "updated": 20200804,
+//   "updated": 20210420,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "support"
+//     "support",
+//     "pointer_as_integer",
+//     "uintcap_arithmetic",
+//     "bounds_compression"
 //   ]
 // }
 // CHERI CHANGES END
