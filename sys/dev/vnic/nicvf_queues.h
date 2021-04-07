@@ -392,12 +392,12 @@ int nicvf_is_intr_enabled(struct nicvf *, int, int);
 int nicvf_xmit_locked(struct snd_queue *sq);
 
 /* Register access APIs */
-void nicvf_reg_write(struct nicvf *, uint64_t, uint64_t);
-uint64_t nicvf_reg_read(struct nicvf *, uint64_t);
-void nicvf_qset_reg_write(struct nicvf *, uint64_t, uint64_t);
-uint64_t nicvf_qset_reg_read(struct nicvf *, uint64_t);
-void nicvf_queue_reg_write(struct nicvf *, uint64_t, uint64_t, uint64_t);
-uint64_t nicvf_queue_reg_read(struct nicvf *, uint64_t, uint64_t);
+void nicvf_reg_write(struct nicvf *, bus_size_t, uint64_t);
+uint64_t nicvf_reg_read(struct nicvf *, bus_size_t);
+void nicvf_qset_reg_write(struct nicvf *, bus_size_t, uint64_t);
+uint64_t nicvf_qset_reg_read(struct nicvf *, bus_size_t);
+void nicvf_queue_reg_write(struct nicvf *, bus_size_t, uint64_t, uint64_t);
+uint64_t nicvf_queue_reg_read(struct nicvf *, bus_size_t, uint64_t);
 
 /* Stats */
 void nicvf_update_rq_stats(struct nicvf *, int);
