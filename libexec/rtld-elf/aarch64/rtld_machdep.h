@@ -201,6 +201,8 @@ extern void *__tls_get_addr(tls_index *ti);
 
 #define md_abi_variant_hook(x)
 
+#define	TLS_DTV_OFFSET	0
+
 #define rtld_validate_target_eflags(path, hdr, main_path)	\
 	_rtld_validate_target_eflags(path, hdr, main_path)
 static inline bool
