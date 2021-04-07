@@ -32,12 +32,14 @@
 
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/devmap.h>
 #include <sys/proc.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
 #include <machine/frame.h>
+#include <machine/pte.h>
 #include <machine/vmparam.h>
 
 void * __capability sentry_unsealcap;
@@ -72,6 +74,11 @@ cheri_init_capabilities(void * __capability kroot)
 	swap_restore_cap = kroot;
 
 #ifdef __CHERI_PURE_CAPABILITY__
+	ctemp = cheri_setaddress(kroot, VM_MAX_KERNEL_ADDRESS - L2_SIZE);
+	ctemp = cheri_setboundsexact(ctemp, L2_SIZE);
+	ctemp = cheri_andperm(ctemp, CHERI_PERMS_KERNEL_DATA);
+	devmap_init_capability(ctemp);
+
 	kernel_root_cap = cheri_andperm(kroot,
 	    ~(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL));
 #endif

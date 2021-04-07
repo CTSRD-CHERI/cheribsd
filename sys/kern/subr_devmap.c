@@ -318,8 +318,9 @@ pmap_mapdev(vm_offset_t pa, vm_size_t size)
 void *
 pmap_mapdev_attr(vm_offset_t pa, vm_size_t size, vm_memattr_t ma)
 {
-	vm_offset_t va, offset;
+	vm_pointer_t va;
 	void * rva;
+	vm_offset_t offset;
 
 	/* First look in the static mapping table. */
 	if ((rva = devmap_ptov(pa, size)) != NULL)
@@ -330,8 +331,22 @@ pmap_mapdev_attr(vm_offset_t pa, vm_size_t size, vm_memattr_t ma)
 	size = round_page(size + offset);
 
 	if (early_boot) {
+#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef INVARIANTS
+		vm_pointer_t oldva = akva_devmap_vaddr;
+#endif
+		akva_devmap_vaddr -= CHERI_REPRESENTABLE_LENGTH(size);
+		akva_devmap_vaddr = CHERI_REPRESENTABLE_BASE(akva_devmap_vaddr,
+		    size);
+		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr);
+		va = (vm_pointer_t)cheri_setbounds(cheri_setaddress(
+		    devmap_capability, akva_devmap_vaddr), size);
+		KASSERT(va + cheri_getlen((void *)va) <= oldva,
+		    ("%s: early devmap overlaps", __func__));
+#else
 		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr - size);
 		va = akva_devmap_vaddr;
+#endif
 		KASSERT(va >= (VM_MAX_KERNEL_ADDRESS - (PMAP_MAPDEV_EARLY_SIZE)),
 		    ("Too many early devmap mappings 2"));
 	} else
