@@ -684,6 +684,7 @@
 
 #define	__GLOBL1(sym)	__asm__(".globl " #sym)
 #define	__GLOBL(sym)	__GLOBL1(sym)
+#define	__WEAK(sym)	__asm__(".weak " __XSTRING(sym))
 
 #if defined(__GNUC__)
 #define	__IDSTRING(name,string)	__asm__(".ident\t\"" string "\"")
