@@ -276,6 +276,15 @@ virtdone:
 	mov	x19, x0
 
 #if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Do capability relocations */
+	mrs	c1, ddc
+	adr	c2, #0
+	/* Assume can we reach _DYNAMIC from PCC */
+	adrp	c0, _DYNAMIC
+	add	c0, c0, :lo12:_DYNAMIC
+	bl	elf_reloc_self
+#endif
 	/* Initialize capabilities. */
 	mrs	c0, ddc
 	bl	cheri_init_capabilities

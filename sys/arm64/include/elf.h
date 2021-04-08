@@ -173,4 +173,8 @@ __ElfType(Auxinfo);
 #define	HWCAP2_RNG		0x00010000
 #define	HWCAP2_BTI		0x00020000
 
+#ifdef __CHERI_PURE_CAPABILITY__
+void elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap);
+#endif
+
 #endif /* !_MACHINE_ELF_H_ */

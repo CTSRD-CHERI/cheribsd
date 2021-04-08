@@ -1070,6 +1070,12 @@ enum MipsCheriFlags {
 #define	R_MORELLO_RELATIVE	59395
 #define	R_MORELLO_IRELATIVE	59396
 
+#if __has_feature(capabilities)
+#define	MORELLO_FRAG_EXECUTABLE	0x4
+#define	MORELLO_FRAG_RWDATA	0x2
+#define	MORELLO_FRAG_RODATA	0x1
+#endif
+
 #define	R_ARM_NONE		0	/* No relocation. */
 #define	R_ARM_PC24		1
 #define	R_ARM_ABS32		2

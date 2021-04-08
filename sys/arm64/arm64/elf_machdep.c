@@ -296,11 +296,78 @@ elf_cpu_parse_dynamic(caddr_t loadbase __unused, Elf_Dyn *dynamic __unused)
 
 	return (0);
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Handle boot-time kernel relocations, this is called by locore.
+ */
+void
+elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
+{
+	const Elf_Rela *rela = NULL, *rela_end;
+	Elf_Addr *fragment;
+	uintptr_t cap;
+	Elf_Addr addr, size;
+	size_t rela_size = 0;
+	uint8_t perms;
+
+	for (; dynp->d_tag != DT_NULL; dynp++) {
+		switch (dynp->d_tag) {
+		case DT_RELA:
+			rela = (const Elf_Rela *)((const char *)data_cap +
+			    dynp->d_un.d_ptr);
+			break;
+		case DT_RELASZ:
+			rela_size = dynp->d_un.d_val;
+			break;
+		}
+	}
+
+	rela = cheri_setbounds(rela, rela_size);
+	rela_end = (const Elf_Rela *)((const char *)rela + rela_size);
+
+	for (; rela < rela_end; rela++) {
+		/* Can not panic yet */
+		if (ELF_R_TYPE(rela->r_info) != R_MORELLO_RELATIVE)
+			continue;
+
+		fragment = (Elf_Addr *)((char *)data_cap + rela->r_offset);
+		addr = fragment[0];
+		size = fragment[1] & ((1UL << (8 * sizeof(Elf_Addr) - 8)) - 1);
+		perms = fragment[1] >> (8 * sizeof(Elf_Addr) - 8);
+
+		cap = perms == MORELLO_FRAG_EXECUTABLE ?
+			(uintptr_t)code_cap : (uintptr_t)data_cap;
+		cap = cheri_setaddress(cap, addr);
+
+		if (perms == MORELLO_FRAG_EXECUTABLE ||
+		    perms == MORELLO_FRAG_RODATA) {
+			cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+			    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+			    CHERI_PERM_STORE_LOCAL_CAP);
+		}
+		if (perms == MORELLO_FRAG_RWDATA ||
+		    perms == MORELLO_FRAG_RODATA) {
+			cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+			    CHERI_PERM_EXECUTE);
+			cap = cheri_setbounds(cap, size);
+		}
+
+		cap += rela->r_addend;
+		if (perms == MORELLO_FRAG_EXECUTABLE) {
+			cap = cheri_sealentry(cap);
+		}
+
+		*((uintptr_t *)fragment) = cap;
+	}
+}
+#endif
 // CHERI CHANGES START
 // {
 //   "updated": 20200804,
 //   "target_type": "kernel",
 //   "changes_purecap": [
+//     "support",
 //     "pointer_as_integer"
 //   ]
 // }
