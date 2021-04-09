@@ -206,22 +206,11 @@ CWARNFLAGS+=	-Wno-system-headers
 CWARNFLAGS+=	-Wno-error=pass-failed
 .endif
 
-.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 100000
-# CXXWARNFLAGS+=	-Wno-deprecated-copy
-CXXWARNFLAGS+=	-Wno-error=deprecated-copy
-.endif
-
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 110000
-CWARNFLAGS+=	-Wno-error=void-pointer-to-enum-cast
+# This warning is no longer emitted by CHERI LLVM, but it does trigger with
+# the current Morello LLVM version.
+# TODO: remove this warning flag when the morello compiler has been updated.
 CXXWARNFLAGS+=	-Wno-error=non-c-typedef-for-linkage
-# The void-pointer-to-enum-cast was introduced after first post-10.0 release
-# upstream merge, so to allow compilation to succeed with a compiler based on
-# the first merge and also those based on later merges, we have to ignore the
-# "unknown warning option '-Werror=void-pointer-to-enum-cast'" error.
-# FIXME: remove this after the next compiler flag day
-.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} == 110000
-CWARNFLAGS+=	-Wno-unknown-warning-option
-.endif
 .endif
 
 # How to handle FreeBSD custom printf format specifiers.
