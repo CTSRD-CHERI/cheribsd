@@ -42,6 +42,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 
+#include <cheri/cheric.h>
+
 /*
  * Preloaded module support
  */
@@ -194,7 +196,8 @@ preload_search_info(caddr_t mod, int inf)
 	 * data.
 	 */
 	if (hdr[0] == inf)
-	    return(curp + (sizeof(uint32_t) * 2));
+	    return (cheri_kern_setbounds(curp + (sizeof(uint32_t) * 2),
+	        hdr[1]));
 
 	/* skip to next field */
 	next = sizeof(uint32_t) * 2 + hdr[1];
