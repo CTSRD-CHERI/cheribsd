@@ -2115,7 +2115,15 @@ link_elf_ireloc(caddr_t kmdp)
 #ifdef RELOCATABLE_KERNEL
 	ef->address = (caddr_t) (__startkernel - KERNBASE);
 #else
+#ifndef __CHERI_PURE_CAPABILITY__
 	ef->address = 0;
+#else /* __CHERI_PURE_CAPABILITY__ */
+	/*
+	 * It is sad that this needs to be a root capability,
+	 * as in link_elf_init().
+	 */
+	ef->address = cheri_setaddress(kernel_root_cap, 0);
+#endif /* __CHERI_PURE_CAPABILITY__ */
 #endif
 	parse_dynamic(ef);
 
