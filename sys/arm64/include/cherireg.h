@@ -124,6 +124,9 @@
 #define	CHERI_PERMS_KERNEL_SEALCAP					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
 
+#define	CHERI_PERMS_KERNEL_DATA_NOCAP					\
+	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_STORE)
+
 /*
  * The CHERI object-type space is split between userspace and kernel,
  * permitting kernel object references to be delegated to userspace (if
