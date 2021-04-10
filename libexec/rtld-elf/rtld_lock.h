@@ -34,7 +34,9 @@
 
 __BEGIN_DECLS
 
-#define	RTLI_VERSION	0x01
+#define	RTLI_VERSION_ONE	0x01
+#define	RTLI_VERSION		0x01
+
 #define	MAX_RTLD_LOCKS	8
 
 struct RtldLockInfo
