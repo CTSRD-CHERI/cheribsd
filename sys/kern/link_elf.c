@@ -542,8 +542,10 @@ static int
 link_elf_preload_parse_symbols(elf_file_t ef)
 {
 	caddr_t pointer;
-	caddr_t ssym, esym, base;
+	vm_offset_t ssym, esym;
+	caddr_t base;
 	caddr_t strtab;
+	size_t size;
 	int strcnt;
 	Elf_Sym *symtab;
 	int symcnt;
@@ -554,31 +556,34 @@ link_elf_preload_parse_symbols(elf_file_t ef)
 	    MODINFO_METADATA | MODINFOMD_SSYM);
 	if (pointer == NULL)
 		return (0);
-	ssym = *(caddr_t *)pointer;
+	ssym = *(vm_offset_t *)pointer;
 	pointer = preload_search_info(ef->modptr,
 	    MODINFO_METADATA | MODINFOMD_ESYM);
 	if (pointer == NULL)
 		return (0);
-	esym = *(caddr_t *)pointer;
+	esym = *(vm_offset_t *)pointer;
 
-	base = ssym;
+	base = cheri_kern_setbounds(cheri_kern_setaddress(ef->address, ssym),
+	    esym - ssym);
 
 	symcnt = *(long *)base;
 	base += sizeof(long);
-	symtab = (Elf_Sym *)base;
-	base += roundup(symcnt, sizeof(long));
+	size = roundup(symcnt, sizeof(long));
+	symtab = (Elf_Sym *)cheri_kern_setbounds(base, size);
+	base += size;
 
-	if (base > esym || base < ssym) {
+	if ((ptraddr_t)base > esym || (ptraddr_t)base < ssym) {
 		printf("Symbols are corrupt!\n");
 		return (EINVAL);
 	}
 
 	strcnt = *(long *)base;
 	base += sizeof(long);
-	strtab = base;
-	base += roundup(strcnt, sizeof(long));
+	size = roundup(strcnt, sizeof(long));
+	strtab = cheri_kern_setbounds(base, size);
+	base += size;
 
-	if (base > esym || base < ssym) {
+	if ((ptraddr_t)base > esym || (ptraddr_t)base < ssym) {
 		printf("Symbols are corrupt!\n");
 		return (EINVAL);
 	}
