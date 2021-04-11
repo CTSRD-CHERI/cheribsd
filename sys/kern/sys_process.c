@@ -842,13 +842,6 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	/* Keep this process around until we finish this request. */
 	_PHOLD(p);
 
-#ifdef FIX_SSTEP
-	/*
-	 * Single step fixup ala procfs
-	 */
-	FIX_SSTEP(td2);
-#endif
-
 	/*
 	 * Actually do the requests
 	 */
