@@ -125,11 +125,43 @@
 .endmacro
 
 /*
- * Relocate kernel vaddr to the boot identity mapping
+ * Helper to clear ddc and all other general-purpose capability registers,
+ * except c0.
  */
-.macro early_idmap_addr dreg, sym, delta
-	ldr	\dreg, =\sym
-	add	\dreg, \dreg, \delta
+.macro clear_capregs
+#ifdef __CHERI_PURE_CAPABILITY__
+	msr	ddc, czr
+	mov	x1, xzr
+	mov	x2, xzr
+	mov	x3, xzr
+	mov	x4, xzr
+	mov	x5, xzr
+	mov	x6, xzr
+	mov	x7, xzr
+	mov	x8, xzr
+	mov	x9, xzr
+	mov	x10, xzr
+	mov	x11, xzr
+	mov	x12, xzr
+	mov	x13, xzr
+	mov	x14, xzr
+	mov	x15, xzr
+	mov	x16, xzr
+	mov	x17, xzr
+	mov	x18, xzr
+	mov	x19, xzr
+	mov	x20, xzr
+	mov	x21, xzr
+	mov	x22, xzr
+	mov	x23, xzr
+	mov	x24, xzr
+	mov	x25, xzr
+	mov	x26, xzr
+	mov	x27, xzr
+	mov	x28, xzr
+	mov	x29, xzr
+	mov	x30, xzr
+#endif
 .endmacro
 
 /*
@@ -326,15 +358,11 @@ virtdone:
 	str	x23, [PTR(0), #BP_BOOT_EL]
 	str	x27, [PTR(0), #BP_KERN_TTBR0]
 
-	/* XXX-AM: TODO clear unused capability registers */
-
 	/* trace back starts here */
 	mov	fp, #0
 
 	/* Branch to C code */
-#ifdef __CHERI_PURE_CAPABILITY__
-	/* Clear all capabilities */
-#endif
+	clear_capregs
 	bl	initarm
 	bl	mi_startup
 
@@ -401,6 +429,8 @@ mp_virtdone:
 	tlbi	vmalle1
 	dsb	sy
 	isb
+
+	clear_capregs
 
 	b	init_secondary
 END(mpentry)
