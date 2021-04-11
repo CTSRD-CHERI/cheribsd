@@ -890,6 +890,12 @@ start_mmu:
 #if __has_feature(capabilities)
 	cvtp	c2, x2
 	msr	cvbar_el1, c2
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Enter exception handlers in C64 mode */
+	mrs	x2, cctlr_el1
+	orr	x2, x2, #(CCTLR_EL1_C64E_MASK)
+	msr	cctlr_el1, x2
+#endif
 #else
 	msr	vbar_el1, x2
 #endif
