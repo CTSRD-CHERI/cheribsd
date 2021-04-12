@@ -68,6 +68,14 @@
  */
 
 /*
+ * Relocate kernel vaddr to the boot identity mapping
+ */
+.macro early_idmap_addr dreg, sym, delta
+	ldr	\dreg, =\sym
+	add	\dreg, \dreg, \delta
+.endmacro
+
+/*
  * Initialize morello on a cpu
  */
 .macro morello_cpu_init
@@ -149,16 +157,16 @@ _start:
 
 	/*
 	 * At this point:
-	 * x27 = TTBR0 table
-	 * x26 = Kernel L1 table
-	 * x24 = TTBR1 table
+	 * x27 = TTBR0 table phys addr
+	 * x26 = Kernel L1 table phys addr
+	 * x24 = TTBR1 table phys addr
 	 */
 
 	/* Enable the mmu */
 	bl	start_mmu
 
 	/* Load the new ttbr0 pagetable */
-	adr	x27, pagetable_l0_ttbr0
+	early_idmap_addr x27, pagetable_l0_ttbr0, x29
 
 	/* Jump to the virtual address space */
 	ldr	x15, .Lvirtdone
@@ -166,7 +174,7 @@ _start:
 
 virtdone:
 	/* Set up the stack */
-	adr	x25, initstack_end
+	ldr	x25, =initstack_end
 	mov	sp, x25
 	sub	sp, sp, #PCB_SIZE
 
@@ -200,7 +208,7 @@ virtdone:
 	str	x19, [x0, #BP_MODULEP]
 	str	x26, [x0, #BP_KERN_L1PT]
 	str	x29, [x0, #BP_KERN_DELTA]
-	adr	x25, initstack
+	ldr	x25, =initstack
 	str	x25, [x0, #BP_KERN_STACK]
 	str	x24, [x0, #BP_KERN_L0PT]
 	str	x23, [x0, #BP_BOOT_EL]
@@ -243,16 +251,19 @@ ENTRY(mpentry)
 	/* Set the context id */
 	msr	contextidr_el1, xzr
 
+	/* Get the virt -> phys offset */
+	bl	get_virt_delta
+
 	/* Load the kernel page table */
-	adr	x24, pagetable_l0_ttbr1
+	early_idmap_addr x24, pagetable_l0_ttbr1, x29
 	/* Load the identity page table */
-	adr	x27, pagetable_l0_ttbr0_bootstrap
+	early_idmap_addr x27, pagetable_l0_ttbr0_bootstrap, x29
 
 	/* Enable the mmu */
 	bl	start_mmu
 
 	/* Load the new ttbr0 pagetable */
-	adr	x27, pagetable_l0_ttbr0
+	early_idmap_addr x27, pagetable_l0_ttbr0, x29
 
 	/* Jump to the virtual address space */
 	ldr	x15, =mp_virtdone
@@ -425,6 +436,12 @@ virt_map:
  *  We were loaded to an address that is on a 2MiB boundary
  *  All the memory must not cross a 1GiB boundaty
  *  x28 contains the physical address we were loaded from
+ *  x29 contains the load address delta (PA - VA)
+ *
+ * Returns:
+ *  x27 TTBR0 table phys addr
+ *  x26 Kernel L1 table phys addr
+ *  x24 TTBR1 table phys addr
  *
  * TODO: This is out of date.
  *  There are at least 5 pages before that address for the page tables
@@ -441,9 +458,16 @@ create_pagetables:
 	mov	x5, x30
 
 	/* Clean the page table */
-	adr	x6, pagetable
-	mov	x26, x6
-	adr	x27, pagetable_end
+	/*
+	 * Get pointer to the pagetable in the .init_pagetable section
+	 * We need to manually relocate the address to access it using
+	 * the boot identity map
+	 */
+	ldr	x6, =pagetable
+	add	x6, x6, x29
+	ldr	x27, =pagetable_end
+	add	x27, x27, x29
+	mov	x26, x6	/* Save start addr for later */
 1:
 	stp	xzr, xzr, [x6], #16
 	stp	xzr, xzr, [x6], #16
@@ -532,7 +556,7 @@ common:
 
 	/* Link the DMAP tables */
 	ldr	x8, =DMAP_MIN_ADDRESS
-	adr	x9, pagetable_dmap;
+	early_idmap_addr x9, pagetable_dmap, x29
 	mov	x10, #DMAP_TABLES
 	bl	link_l0_pagetable
 
@@ -819,7 +843,7 @@ ENTRY(abort)
 	b abort
 END(abort)
 
-	//.section .init_pagetable
+	.section .init_pagetable, "aw"
 	.align 12 /* 4KiB aligned */
 	/*
 	 * 6 initial tables (in the following order):
