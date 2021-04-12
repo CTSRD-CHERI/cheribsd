@@ -67,27 +67,10 @@
  *  We are loaded at a 2MiB aligned address
  */
 
-	.text
-	.globl _start
-_start:
-#if defined(LINUX_BOOT_ABI)
-	/* U-boot image header */
-	b	1f			/* code 0 */
-	.long	0			/* code 1 */
-	.quad	UBOOT_IMAGE_OFFSET	/* Image offset in 2 MiB page, LE */
-	.quad	UBOOT_IMAGE_SIZE	/* Image size, LE */
-	.quad	UBOOT_IMAGE_FLAGS	/* Flags for kernel. LE */
-	.quad 	0			/* Reserved */
-	.quad 	0			/* Reserved */
-	.quad 	0			/* Reserved */
-	.long 	0x644d5241		/* Magic  "ARM\x64", LE */
-	.long 	0			/* Reserved for PE COFF offset*/
-1:
-#endif /* defined(LINUX_BOOT_ABI) */
-
-	/* Drop to EL1 */
-	bl	drop_to_el1
-
+/*
+ * Initialize morello on a cpu
+ */
+.macro morello_cpu_init
 #if __has_feature(capabilities)
 	/*
 	 * Enable Morello instructions at EL1. We will enable them at EL0
@@ -110,6 +93,31 @@ _start:
 	orr x2, x2, #(CCTLR_PERMVCT_MASK | CCTLR_SBL_MASK)
 	msr cctlr_el0, x2
 #endif
+.endmacro
+
+	.text
+	.globl _start
+_start:
+#if defined(LINUX_BOOT_ABI)
+	/* U-boot image header */
+	b	1f			/* code 0 */
+	.long	0			/* code 1 */
+	.quad	UBOOT_IMAGE_OFFSET	/* Image offset in 2 MiB page, LE */
+	.quad	UBOOT_IMAGE_SIZE	/* Image size, LE */
+	.quad	UBOOT_IMAGE_FLAGS	/* Flags for kernel. LE */
+	.quad 	0			/* Reserved */
+	.quad 	0			/* Reserved */
+	.quad 	0			/* Reserved */
+	.long 	0x644d5241		/* Magic  "ARM\x64", LE */
+	.long 	0			/* Reserved for PE COFF offset*/
+1:
+#endif /* defined(LINUX_BOOT_ABI) */
+
+	/* Drop to EL1 */
+	bl	drop_to_el1
+
+	/* Initialize morello capability ISA and switch to C64 if needed */
+	morello_cpu_init
 
 	/*
 	 * Disable the MMU. We may have entered the kernel with it on and
@@ -229,28 +237,8 @@ ENTRY(mpentry)
 	/* Drop to EL1 */
 	bl	drop_to_el1
 
-#if __has_feature(capabilities)
-	/*
-	 * Enable Morello instructions at EL1. We will enable them at EL0
-	 * later when we know userspace is expecting to use them.
-	 */
-	mrs	x2, cpacr_el1
-	bic	x2, x2, CPACR_CEN_MASK
-	orr	x2, x2, CPACR_CEN_TRAP_NONE
-	msr	cpacr_el1, x2
-	isb
-
-	/*
-	 * Allow access to CNTVCT_EL0 without PCC System permission and enable
-	 * capability sealing for branch and link at EL0.
-	 *
-	 * XXXBFG should this be done somewhere else? Maybe eventually per-process or
-	 * compartment?
-	 */
-	mrs x2, cctlr_el0
-	orr x2, x2, #(CCTLR_PERMVCT_MASK | CCTLR_SBL_MASK)
-	msr cctlr_el0, x2
-#endif
+	/* Initialize morello capability ISA and switch to C64 if needed */
+	morello_cpu_init
 
 	/* Set the context id */
 	msr	contextidr_el1, xzr
