@@ -283,7 +283,7 @@ typedef register_t	syscallarg_t;
 
 #ifdef _KERNEL
 typedef	int		boolean_t;
-typedef	struct device	*device_t;
+typedef	struct _device	*device_t;
 typedef	__intfptr_t	intfptr_t;
 
 /*
