@@ -1150,7 +1150,7 @@ print_efi_map_entry(struct efi_md *p)
 		type = types[p->md_type];
 	else
 		type = "<INVALID>";
-	printf("%23s %012lx %12p %08lx ", type, p->md_phys,
+	printf("%23s %012lx %#12lx %08lx ", type, p->md_phys,
 	    p->md_virt, p->md_pages);
 	if (p->md_attr & EFI_MD_ATTR_UC)
 		printf("UC ");
@@ -1600,9 +1600,10 @@ DB_SHOW_COMMAND(vtop, db_show_vtop)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20210407,
+//   "updated": 20210413,
 //   "target_type": "kernel",
 //   "changes_purecap": [
+//     "pointer_as_integer",
 //     "support"
 //   ]
 // }
