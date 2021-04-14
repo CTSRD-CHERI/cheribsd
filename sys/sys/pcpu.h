@@ -53,9 +53,7 @@
 #define	DPCPU_SYMPREFIX		"pcpu_entry_"
 
 #ifdef _KERNEL
-#ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
-#endif
 
 /*
  * Define a set for pcpu data.
@@ -265,15 +263,19 @@ extern struct pcpu *cpuid_to_pcpu[];
 #endif
 
 /* Accessor to elements allocated via UMA_ZONE_PCPU zone. */
-#define zpcpu_get(base) ({								\
-	__typeof(base) _ptr = (void *)((char *)(base) + zpcpu_offset());		\
-	_ptr;										\
+#define	_zpcpu_get_obj(base, offset, size) ({				\
+	__typeof(base) _ptr = (void *)((char *)(base) + offset);	\
+	cheri_kern_setbounds(_ptr, size);				\
 })
 
-#define zpcpu_get_cpu(base, cpu) ({							\
-	__typeof(base) _ptr = (void *)((char *)(base) +	zpcpu_offset_cpu(cpu));		\
-	_ptr;										\
-})
+#define	zpcpu_get(base)							\
+	_zpcpu_get_obj(base, zpcpu_offset(), sizeof(*_ptr))
+
+#define	zpcpu_get_cpu(base, cpu)					\
+	_zpcpu_get_obj(base, zpcpu_offset_cpu(cpu), sizeof(*_ptr))
+
+#define	zpcpu_get_cpu_obj(base, cpu, size)				\
+	_zpcpu_get_obj(base, zpcpu_offset_cpu(cpu), size)
 
 /*
  * This operation is NOT atomic and does not post any barriers.
