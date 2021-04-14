@@ -3213,7 +3213,8 @@ uma_zalloc_pcpu_arg(uma_zone_t zone, void *udata, int flags)
 	if (flags & M_ZERO) {
 #ifdef SMP
 		for (i = 0; i <= mp_maxid; i++)
-			bzero(zpcpu_get_cpu(pcpu_item, i), zone->uz_size);
+			bzero(zpcpu_get_cpu_obj(pcpu_item, i, zone->uz_size),
+			    zone->uz_size);
 #else
 		bzero(item, zone->uz_size);
 #endif
@@ -3792,7 +3793,10 @@ slab_alloc_item(uma_keg_t keg, uma_slab_t slab)
 		LIST_REMOVE(slab, us_link);
 		LIST_INSERT_HEAD(&dom->ud_full_slab, slab, us_link);
 	}
-	item = cheri_kern_setboundsexact(item, keg->uk_size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if ((keg->uk_flags & UMA_ZONE_PCPU) == 0)
+		item = cheri_setboundsexact(item, keg->uk_size);
+#endif
 
 	return (item);
 }
@@ -4109,7 +4113,10 @@ zone_alloc_item(uma_zone_t zone, void *udata, int domain, int flags)
 
 	if (zone->uz_import(zone->uz_arg, &item, 1, domain, flags) != 1)
 		goto fail_cnt;
-	item = cheri_kern_setboundsexact(item, zone->uz_size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if ((zone->uz_flags & UMA_ZONE_PCPU) == 0)
+		item = cheri_setboundsexact(item, zone->uz_size);
+#endif
 
 	/*
 	 * We have to call both the zone's init (not the keg's init)
