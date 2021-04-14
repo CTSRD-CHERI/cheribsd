@@ -85,6 +85,17 @@
 	CHERI_PERM_SYSTEM_REGS | CHERI_PERM_SET_CID)
 
 /*
+ * vm_prot_t to capability permission bits
+ */
+#define	CHERI_PERMS_PROT2PERM_READ					\
+	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
+#define	CHERI_PERMS_PROT2PERM_WRITE					\
+	(CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |			\
+	 CHERI_PERM_STORE_LOCAL_CAP)
+#define	CHERI_PERMS_PROT2PERM_EXEC					\
+	(CHERI_PERM_EXECUTE | CHERI_PERMS_PROT2PERM_READ)
+
+/*
  * Basic userspace permission mask; CHERI_PERM_EXECUTE will be added for
  * executable capabilities ($pcc); CHERI_PERM_STORE, CHERI_PERM_STORE_CAP,
  * and CHERI_PERM_STORE_LOCAL_CAP will be added for data permissions ($dcc).
