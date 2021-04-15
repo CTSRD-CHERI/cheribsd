@@ -57,11 +57,7 @@ __FBSDID("$FreeBSD$");
 
 #include "paths.h"
 
-#if defined(__mips)
 #define RTLD_DIRECT_EXEC_TRACE_SUPPORTED 1
-#else
-#define RTLD_DIRECT_EXEC_TRACE_SUPPORTED 0
-#endif
 
 /*
  * 32-bit ELF data structures can only be used if the system header[s] declare
