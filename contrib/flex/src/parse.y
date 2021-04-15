@@ -32,6 +32,8 @@
 
 
 %{
+/* SPDX-License-Identifier: BSD-2-Clause */
+
 /*  Copyright (c) 1990 The Regents of the University of California. */
 /*  All rights reserved. */
 
