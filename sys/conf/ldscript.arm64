@@ -105,7 +105,7 @@ SECTIONS
   .sdata     : { *(.sdata) }
   _edata  =  .;
   PROVIDE (edata = .);
-  __bss_start = .;
+  _bss_start = .;
   .sbss      : { *(.sbss) *(.scommon) }
   .bss       :
   {

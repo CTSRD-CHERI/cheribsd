@@ -211,7 +211,7 @@ virtdone:
 .Lvirtdone:
 	.quad	virtdone
 .Lbss:
-	.quad	__bss_start
+	.quad	_bss_start
 .Lend:
 	.quad	_end
 
