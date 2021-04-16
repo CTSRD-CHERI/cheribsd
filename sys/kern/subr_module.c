@@ -260,12 +260,22 @@ preload_delete_name(const char *name)
 void *
 preload_fetch_addr(caddr_t mod)
 {
-	caddr_t *mdp;
+	vm_offset_t *mdp;
+#ifdef __CHERI_PURE_CAPABILITY__
+	size_t mod_size;
+#endif
 
-	mdp = (caddr_t *)preload_search_info(mod, MODINFO_ADDR);
+	mdp = (vm_offset_t *)preload_search_info(mod, MODINFO_ADDR);
 	if (mdp == NULL)
 		return (NULL);
-	return (*mdp + preload_addr_relocate);
+#ifdef __CHERI_PURE_CAPABILITY__
+	mod_size = preload_fetch_size(mod);
+	/* XXX-AM: Which permission do we leave? */
+	return (cheri_setbounds(cheri_setaddress(kernel_root_cap,
+	    *mdp + preload_addr_relocate), mod_size));
+#else
+	return ((void *)(*mdp + preload_addr_relocate));
+#endif
 }
 
 size_t
@@ -559,3 +569,14 @@ SYSCTL_PROC(_debug, OID_AUTO, dump_modinfo,
     CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE,
     NULL, 0, sysctl_preload_dump, "A",
     "pretty-print the bootloader metadata");
+// CHERI CHANGES START
+// {
+//   "updated": 20210416,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_provenance",
+//     "pointer_as_integer",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END
