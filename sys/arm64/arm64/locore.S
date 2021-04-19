@@ -1046,7 +1046,7 @@ initstack_end:
  * copied to places for userland to execute.
  */
 #define	SIGCODE(sym)						\
-	.text; .globl sym; .align 2; .type sym,#object; sym:
+	.section .rodata; .globl sym; .align 2; .type sym,#object; sym:
 
 SIGCODE(sigcode)
 #if __has_feature(capabilities)
