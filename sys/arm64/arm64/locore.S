@@ -1074,9 +1074,9 @@ SIGCODE(sigcode)
 	.arch_extension a64c
 #endif
 #endif
-END(sigcode)
 	/* This may be copied to the stack, keep it 16-byte aligned */
 	.align	3
+END(sigcode)
 esigcode:
 
 	.data
@@ -1101,9 +1101,9 @@ SIGCODE(freebsd64_sigcode)
 	svc	0
 
 	b	1b
-END(freebsd64_sigcode)
 	/* This may be copied to the stack, keep it 16-byte aligned */
 	.align	3
+END(freebsd64_sigcode)
 freebsd64_esigcode:
 
 	.data
@@ -1123,11 +1123,13 @@ SIGCODE(aarch32_sigcode)
 	.word 0xe59f7008	// ldr r7, [pc, #8]
 	.word 0xef000000	// swi #0
 	.word 0xeafffffa	// b . - 16
-END(aarch32_sigcode)
+
 	.word SYS_sigreturn
 	.word SYS_exit
 	.align	3
+END(aarch32_sigcode)
 aarch32_esigcode:
+
 	.data
 	.global sz_aarch32_sigcode
 	.type	sz_aarch32_sigcode,#object
