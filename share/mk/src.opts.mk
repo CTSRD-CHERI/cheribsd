@@ -420,7 +420,7 @@ BROKEN_OPTIONS+=MLX5TOOL
 BROKEN_OPTIONS+=COMPAT_CHERIABI
 .endif
 
-.if ${__C} != "cheri"
+.if ${__C} != "cheri" && ${__C} != "morello"
 BROKEN_OPTIONS+=CHERI_CAPREVOKE
 .endif
 
