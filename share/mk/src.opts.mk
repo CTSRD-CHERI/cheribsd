@@ -387,7 +387,7 @@ BROKEN_OPTIONS+=CHERI
 BROKEN_OPTIONS+=LIB64C
 .endif
 
-.if ${__C} != "cheri"
+.if ${__C} != "cheri" && ${__C} != "morello"
 BROKEN_OPTIONS+=CHERI_CAPREVOKE
 .endif
 
