@@ -72,8 +72,8 @@ __FBSDID("$FreeBSD$");
 
 #if __has_feature(capabilities)
 #include <cheri/cheri.h>
-#include <cheri/cheric.h>
 #endif
+#include <cheri/cheric.h>
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -89,6 +89,41 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/user.h>
 #include <sys/mbuf.h>
+
+/*
+ * Create the PCB for the given thread.
+ * The PCB space is allocated at the bottom of the kernel stack for
+ * the given thread.
+ * Adjust the bounds of the thread kernel stack and PCB
+ * so that both the capabilities are exactly representable.
+ * There may be padding inserted between the stack and the PCB as
+ * a result of this.
+ */
+void
+mips_setup_thread_pcb(struct thread *td)
+{
+	vm_pointer_t pcb_addr;
+	size_t pcb_size, stack_size;
+
+	pcb_size = CHERI_REPRESENTABLE_LENGTH(sizeof(struct pcb));
+	pcb_addr = CHERI_REPRESENTABLE_BASE(
+	    td->td_kstack + KSTACK_PAGES * PAGE_SIZE - pcb_size,
+	    pcb_size);
+	td->td_pcb = (struct pcb *)cheri_kern_setboundsexact(
+	    pcb_addr, pcb_size);
+
+	/*
+	 * We assume that td_kstack is well aligned as the stack
+	 * must already be page or superpage aligned, so we reduce the
+	 * length to the closest representable boundary.
+	 */
+	stack_size = (ptraddr_t)pcb_addr - (ptraddr_t)td->td_kstack;
+	stack_size = rounddown2(stack_size,
+	    CHERI_REPRESENTABLE_ALIGNMENT(stack_size));
+	td->td_kstack = cheri_kern_andperm(
+	    cheri_kern_setboundsexact(td->td_kstack, stack_size),
+	    CHERI_PERMS_KERNEL_DATA);
+}
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -141,6 +176,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 		MipsSaveCurFPState(td1);
 #endif
 
+#ifndef __CHERI_PURE_CAPABILITY__
 	pcb2->pcb_context[PCB_REG_RA] = (register_t)(intptr_t)fork_trampoline;
 	/* Make sp 64-bit aligned */
 	pcb2->pcb_context[PCB_REG_SP] = (register_t)(((vm_offset_t)td2->td_pcb &
@@ -153,6 +189,22 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	pcb2->pcb_context[PCB_REG_S0] = (register_t)(intptr_t)fork_return;
 	pcb2->pcb_context[PCB_REG_S1] = (register_t)(intptr_t)td2;
 	pcb2->pcb_context[PCB_REG_S2] = (register_t)(intptr_t)td2->td_frame;
+#else /* __CHERI_PURE_CAPABILITY__ */
+	/* Implies CPU_CHERI */
+	size_t kstack_size = td2->td_kstack_pages * PAGE_SIZE -
+	    sizeof(struct pcb);
+
+	pcb2->pcb_cherikframe.ckf_c17 = fork_trampoline;
+	/* kstack is the top of the stack, we initialise it at the bottom */
+	pcb2->pcb_cherikframe.ckf_stc = (void *)(rounddown2(
+	    td2->td_kstack + kstack_size, CHERICAP_SIZE) - CALLFRAME_SIZ);
+	/* Set up fork_trampoline arguments in the frame registers
+	 * Note that in CHERI we do not have an RA slot, we use C17.
+	 */
+	pcb2->pcb_cherikframe.ckf_c18 = fork_return;
+	pcb2->pcb_cherikframe.ckf_c19 = td2;
+	pcb2->pcb_cherikframe.ckf_c20 = td2->td_frame;
+#endif /* __CHERI_PURE_CAPABILITY__ */
 	pcb2->pcb_context[PCB_REG_SR] = mips_rd_status() &
 	    (MIPS_SR_KX | MIPS_SR_UX | MIPS_SR_INT_MASK);
 	/*
@@ -226,8 +278,13 @@ cpu_fork_kthread_handler(struct thread *td, void (*func)(void *), void *arg)
 	 * Note that the trap frame follows the args, so the function
 	 * is really called like this:	func(arg, frame);
 	 */
+#ifndef __CHERI_PURE_CAPABILITY__
 	td->td_pcb->pcb_context[PCB_REG_S0] = (register_t)(intptr_t)func;
 	td->td_pcb->pcb_context[PCB_REG_S1] = (register_t)(intptr_t)arg;
+#else
+	td->td_pcb->pcb_cherikframe.ckf_c18 = func;
+	td->td_pcb->pcb_cherikframe.ckf_c19 = arg;
+#endif
 }
 
 void
@@ -262,6 +319,18 @@ cpu_thread_free(struct thread *td)
 	td->td_md.md_cop2 = NULL;
 	td->td_md.md_ucop2 = NULL;
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * We need to recover the full capability to the stack, including the
+	 * pcb region.
+	 * XXX-AM: The ideal solution would be to avoid rederivation altogether
+	 * and make sure that the kstack cache zone can rebuild the full capability.
+	 */
+	td->td_kstack = (vm_pointer_t)cheri_ptrperm(
+	    cheri_setaddress(kernel_root_cap,
+	        cheri_getbase((void *)td->td_kstack)),
+	    td->td_kstack_pages * PAGE_SIZE, CHERI_PERMS_KERNEL_DATA);
+#endif
 }
 
 void
@@ -281,11 +350,17 @@ cpu_thread_swapin(struct thread *td)
 	 * the pcb struct and kernel stack.
 	 */
 #ifdef KSTACK_LARGE_PAGE
+#ifdef __CHERI_PURE_CAPABILITY__
+	pte = pmap_pte(kernel_pmap, td->td_kstack);
+	td->td_md.md_upte[0] = *pte & ~TLBLO_SWBITS_MASK;
+	pte = pmap_pte(kernel_pmap, td->td_kstack + KSTACK_PAGE_SIZE);
+	td->td_md.md_upte[1] = *pte & ~TLBLO_SWBITS_MASK;
+#else /* ! __CHERI_PURE_CAPABILITY__ */
 	/* Just one entry for one large kernel page. */
 	pte = pmap_pte(kernel_pmap, td->td_kstack);
 	td->td_md.md_upte[0] = PTE_G;   /* Guard Page */
 	td->td_md.md_upte[1] = *pte & ~TLBLO_SWBITS_MASK;
-
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 #else
 
 	int i;
@@ -308,21 +383,26 @@ cpu_thread_alloc(struct thread *td)
 	pt_entry_t *pte;
 
 #ifdef KSTACK_LARGE_PAGE
-	KASSERT((td->td_kstack & (KSTACK_PAGE_SIZE - 1) ) == 0,
+	KASSERT(is_aligned(td->td_kstack, KSTACK_PAGE_SIZE),
 	    ("kernel stack must be aligned to 16K boundary."));
 #else
-	KASSERT((td->td_kstack & ((KSTACK_PAGE_SIZE * 2) - 1) ) == 0,
+	KASSERT(is_aligned(td->td_kstack, KSTACK_PAGE_SIZE * 2),
 	    ("kernel stack must be aligned."));
 #endif
-	td->td_pcb = (struct pcb *)(td->td_kstack +
-	    td->td_kstack_pages * PAGE_SIZE) - 1;
+	mips_setup_thread_pcb(td);
 	td->td_frame = &td->td_pcb->pcb_regs;
 #ifdef KSTACK_LARGE_PAGE
+#if defined(__CHERI_PURE_CAPABILITY__)
+	pte = pmap_pte(kernel_pmap, td->td_kstack);
+	td->td_md.md_upte[0] = *pte & ~TLBLO_SWBITS_MASK;
+	pte = pmap_pte(kernel_pmap, td->td_kstack + KSTACK_PAGE_SIZE);
+	td->td_md.md_upte[1] = *pte & ~TLBLO_SWBITS_MASK;
+#else /* ! __CHERI_PURE_CAPABILITY__ */
 	/* Just one entry for one large kernel page. */
 	pte = pmap_pte(kernel_pmap, td->td_kstack);
 	td->td_md.md_upte[0] = PTE_G;   /* Guard Page */
 	td->td_md.md_upte[1] = *pte & ~TLBLO_SWBITS_MASK;
-
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 #else
 
 	{
@@ -443,7 +523,7 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	/*
 	 * Set registers for trampoline to user mode.
 	 */
-
+#ifndef __CHERI_PURE_CAPABILITY__
 	pcb2->pcb_context[PCB_REG_RA] = (register_t)(intptr_t)fork_trampoline;
 	/* Make sp 64-bit aligned */
 	pcb2->pcb_context[PCB_REG_SP] = (register_t)(((vm_offset_t)td->td_pcb &
@@ -456,6 +536,18 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	pcb2->pcb_context[PCB_REG_S0] = (register_t)(intptr_t)fork_return;
 	pcb2->pcb_context[PCB_REG_S1] = (register_t)(intptr_t)td;
 	pcb2->pcb_context[PCB_REG_S2] = (register_t)(intptr_t)td->td_frame;
+#else /* __CHERI_PURE_CAPABILITY__ */
+	/* Implies CPU_CHERI, see cpu_fork() */
+	size_t kstack_size = td->td_kstack_pages * PAGE_SIZE -
+	    sizeof(struct pcb);
+
+	pcb2->pcb_cherikframe.ckf_c17 = fork_trampoline;
+	pcb2->pcb_cherikframe.ckf_stc = (void *)(rounddown2(
+	    td->td_kstack + kstack_size, CHERICAP_SIZE) - CALLFRAME_SIZ);
+	pcb2->pcb_cherikframe.ckf_c18 = fork_return;
+	pcb2->pcb_cherikframe.ckf_c19 = td;
+	pcb2->pcb_cherikframe.ckf_c20 = td->td_frame;
+#endif /* __CHERI_PURE_CAPABILITY__ */
 	/* Dont set IE bit in SR. sched lock release will take care of it */
 	pcb2->pcb_context[PCB_REG_SR] = mips_rd_status() &
 	    (MIPS_SR_PX | MIPS_SR_KX | MIPS_SR_UX | MIPS_SR_INT_MASK);
@@ -762,11 +854,15 @@ DB_SHOW_COMMAND(trapframe, ddb_dump_trapframe)
 #endif	/* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"
 //   ],
-//   "change_comment": ""
+//   "changes_purecap": [
+//     "support",
+//     "pointer_alignment"
+//   ],
+//   "change_comment": "kstack size and guard page"
 // }
 // CHERI CHANGES END

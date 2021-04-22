@@ -177,7 +177,7 @@ void des_set_key_unchecked(const unsigned char *key, des_key_schedule schedule)
 	DES_LONG *k;
 	int i;
 
-	k = &schedule->ks.deslong[0];
+	k = schedule->ks.deslong;
 	in = key;
 
 	c2l(in,c);
@@ -234,3 +234,12 @@ void des_fixup_key_parity(unsigned char *key)
 {
 	des_set_odd_parity(key);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20210401,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

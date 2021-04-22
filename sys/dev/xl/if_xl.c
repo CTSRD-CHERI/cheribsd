@@ -3005,7 +3005,7 @@ xl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	struct mii_data		*mii = NULL;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		XL_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING &&
@@ -3021,8 +3021,8 @@ xl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->xl_if_flags = ifp->if_flags;
 		XL_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		/* XXX Downcall from if_addmulti() possibly with locks held. */
 		XL_LOCK(sc);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
@@ -3030,7 +3030,7 @@ xl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		XL_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		if (sc->xl_miibus != NULL)
 			mii = device_get_softc(sc->xl_miibus);
 		if (mii == NULL)
@@ -3040,8 +3040,8 @@ xl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			error = ifmedia_ioctl(ifp, ifr,
 			    &mii->mii_media, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+	case SIOCSIFCAP:
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0 &&
 		    (ifp->if_capabilities & IFCAP_POLLING) != 0) {
@@ -3297,12 +3297,3 @@ xl_setwol(struct xl_softc *sc)
 	pci_write_config(sc->xl_dev,
 	    sc->xl_pmcap + PCIR_POWER_STATUS, pmstat, 2);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

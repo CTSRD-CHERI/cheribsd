@@ -72,8 +72,6 @@ CLEANFILES+=	libcheri_invoke_hybrid.o	\
 		libcheri_classes_hybrid.o
 .endif
 
-NO_WERROR=
-
 .PATH: ${.CURDIR}/${MACHINE}
 .PATH: ${.CURDIR}/../libc/string
 .PATH: ${.CURDIR}/../libc/${MACHINE}/string

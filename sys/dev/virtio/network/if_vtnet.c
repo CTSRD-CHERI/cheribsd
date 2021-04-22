@@ -1105,15 +1105,15 @@ vtnet_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+	case SIOCSIFMTU:
+		if (ifp->if_mtu != ifr->ifr_mtu) {
 			VTNET_CORE_LOCK(sc);
-			error = vtnet_change_mtu(sc, ifr_mtu_get(ifr));
+			error = vtnet_change_mtu(sc, ifr->ifr_mtu);
 			VTNET_CORE_UNLOCK(sc);
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		VTNET_CORE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) == 0) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING)
@@ -1138,8 +1138,8 @@ vtnet_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VTNET_CORE_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if ((sc->vtnet_flags & VTNET_FLAG_CTRL_RX) == 0)
 			break;
 		VTNET_CORE_LOCK(sc);
@@ -1148,14 +1148,14 @@ vtnet_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VTNET_CORE_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->vtnet_media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		VTNET_CORE_LOCK(sc);
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 
 		if (mask & IFCAP_TXCSUM)
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -4112,12 +4112,3 @@ vtnet_debugnet_poll(struct ifnet *ifp, int count)
 	return (0);
 }
 #endif /* DEBUGNET */
-// CHERI CHANGES START
-// {
-//   "updated": 20191029,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

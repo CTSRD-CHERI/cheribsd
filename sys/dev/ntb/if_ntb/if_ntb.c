@@ -240,44 +240,44 @@ ntb_ioctl(if_t ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCSIFFLAGS:
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 	    {
-		if (ifr_mtu_get(ifr) > sc->mtu - ETHER_HDR_LEN) {
+		if (ifr->ifr_mtu > sc->mtu - ETHER_HDR_LEN) {
 			error = EINVAL;
 			break;
 		}
 
-		if_setmtu(ifp, ifr_mtu_get(ifr));
+		if_setmtu(ifp, ifr->ifr_mtu);
 		break;
 	    }
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->media, command);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		if (ifr_reqcap_get(ifr) & IFCAP_RXCSUM)
+	case SIOCSIFCAP:
+		if (ifr->ifr_reqcap & IFCAP_RXCSUM)
 			if_setcapenablebit(ifp, IFCAP_RXCSUM, 0);
 		else
 			if_setcapenablebit(ifp, 0, IFCAP_RXCSUM);
-		if (ifr_reqcap_get(ifr) & IFCAP_TXCSUM) {
+		if (ifr->ifr_reqcap & IFCAP_TXCSUM) {
 			if_setcapenablebit(ifp, IFCAP_TXCSUM, 0);
 			if_sethwassistbits(ifp, NTB_CSUM_FEATURES, 0);
 		} else {
 			if_setcapenablebit(ifp, 0, IFCAP_TXCSUM);
 			if_sethwassistbits(ifp, 0, NTB_CSUM_FEATURES);
 		}
-		if (ifr_reqcap_get(ifr) & IFCAP_RXCSUM_IPV6)
+		if (ifr->ifr_reqcap & IFCAP_RXCSUM_IPV6)
 			if_setcapenablebit(ifp, IFCAP_RXCSUM_IPV6, 0);
 		else
 			if_setcapenablebit(ifp, 0, IFCAP_RXCSUM_IPV6);
-		if (ifr_reqcap_get(ifr) & IFCAP_TXCSUM_IPV6) {
+		if (ifr->ifr_reqcap & IFCAP_TXCSUM_IPV6) {
 			if_setcapenablebit(ifp, IFCAP_TXCSUM_IPV6, 0);
 			if_sethwassistbits(ifp, NTB_CSUM_FEATURES6, 0);
 		} else {
@@ -512,12 +512,3 @@ DRIVER_MODULE(if_ntb, ntb_transport, ntb_net_driver, ntb_net_devclass,
     NULL, NULL);
 MODULE_DEPEND(if_ntb, ntb_transport, 1, 1, 1);
 MODULE_VERSION(if_ntb, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

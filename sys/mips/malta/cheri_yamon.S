@@ -1,12 +1,6 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause
- *
- * Copyright 2018-2020 Alex Richardson <arichardson@FreeBSD.org>
- *
- * This software was developed by SRI International and the University of
- * Cambridge Computer Laboratory (Department of Computer Science and
- * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
- * DARPA SSITH research programme.
+ * Copyright (c) 2019 Alfredo Mazzinghi
+ * All rights reserved.
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
@@ -32,11 +26,60 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
-#pragma once
-/* The Linux sysctl struct has a member called __unused */
-#undef __unused
-#include_next <sys/sysctl.h>
-#define __unused __attribute__((unused))
+
+#include <machine/asm.h>
+#include <machine/cpu.h>
+#include <machine/cpuregs.h>
+#include <machine/regnum.h>
+#include <machine/cheriasm.h>
+#include <machine/cherireg.h>
+
+#include "assym.inc"
+
+	.set noreorder
+	.text
+/*
+ * void _yamon_cheri_syscon_read(ptraddr_t fn_addr, t_yamon_syscon_id id,
+ * 	void *param, uint32_t size);
+ */
+NESTED(_yamon_cheri_syscon_read, 32, $c17)
+	cincoffset	$c11, $c11, -(2 * CHERICAP_SIZE)
+	csc	$c24, zero, 0($c11)
+	csc	$c17, zero, CHERICAP_SIZE($c11)
+	cincoffset	$c24, $c11, 0
+
+	/* Switch to an unbounded kernel PCC and global DDC */
+	CAPTABLE_PCREL_LOAD($c12, t0, _C_LABEL(kernel_root_cap))
+	clc	$c12, zero, 0($c12)
+	REG_LI	t0, CHERI_PERMS_KERNEL_DATA
+	candperm	$c1, $c12, t0
+	csetdefault	$c1
+	REG_LI	t0, CHERI_PERMS_KERNEL_CODE
+	candperm	$c12, $c12, t0
+	cgetpccsetaddr	$c12, $c12, yamon_pc
+	cjr		$c12
+	nop
+yamon_pc:
+	/* Destroy capability in c12, just in case */
+	cmove	$c12, $cnull
+	/* The jalr is relative to current pcc base */
+	cgetpcc		$c4
+	csetaddr	$c4, $c4, a0
+	cgetoffset	t0, $c4
+	move a0, a1	/* id */
+	cgetaddr a1, $c3 /* param */
+	/* size already in a2 */
+	/* syscon_read(id, param, size) */
+	jalr t0
+	nop
+	/* return already in v0 */
+
+	/* Clear ddc again */
+	csetdefault	$cnull
+
+	clc	$c17, zero, CHERICAP_SIZE($c11)
+	clc	$c24, zero, 0($c11)
+	cjr	$c17
+	cincoffset $c11, $c11, (2 * CHERICAP_SIZE)
+END(_yamon_cheri_syscon_read)

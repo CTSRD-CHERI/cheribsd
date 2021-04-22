@@ -3409,17 +3409,17 @@ re_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int			error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		    ifr_mtu_get(ifr) > sc->rl_hwrev->rl_max_mtu ||
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN ||
+		    ifr->ifr_mtu > sc->rl_hwrev->rl_max_mtu ||
 		    ((sc->rl_flags & RL_FLAG_FASTETHER) != 0 &&
-		    ifr_mtu_get(ifr) > RL_MTU)) {
+		    ifr->ifr_mtu > RL_MTU)) {
 			error = EINVAL;
 			break;
 		}
 		RL_LOCK(sc);
-		if (ifp->if_mtu != ifr_mtu_get(ifr)) {
-			ifp->if_mtu = ifr_mtu_get(ifr);
+		if (ifp->if_mtu != ifr->ifr_mtu) {
+			ifp->if_mtu = ifr->ifr_mtu;
 			if ((sc->rl_flags & RL_FLAG_JUMBOV2) != 0 &&
 			    (ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
@@ -3435,7 +3435,7 @@ re_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		RL_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		RL_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -3451,27 +3451,27 @@ re_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->rl_if_flags = ifp->if_flags;
 		RL_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		RL_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			re_set_rxmode(sc);
 		RL_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		mii = device_get_softc(sc->rl_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 	    {
 		int mask, reinit;
 
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		reinit = 0;
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
+			if (ifr->ifr_reqcap & IFCAP_POLLING) {
 				error = ether_poll_register(re_poll, ifp);
 				if (error)
 					return (error);
@@ -4152,12 +4152,3 @@ re_debugnet_poll(struct ifnet *ifp, int count)
 	return (0);
 }
 #endif /* DEBUGNET */
-// CHERI CHANGES START
-// {
-//   "updated": 20191029,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

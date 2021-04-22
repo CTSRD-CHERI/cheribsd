@@ -115,17 +115,17 @@ struct bpf_if {
 	struct ifnet	*bif_ifp;	/* corresponding interface */
 	struct bpf_if	**bif_bpf;	/* Pointer to pointer to us */
 	volatile u_int	bif_refcnt;
-	struct epoch_context epoch_ctx;
+	struct epoch_context epoch_ctx __subobject_use_container_bounds;
 };
 
 CTASSERT(offsetof(struct bpf_if, bif_ext) == 0);
 
 struct bpf_program_buffer {
-	struct epoch_context	epoch_ctx;
+	struct epoch_context	epoch_ctx __subobject_use_container_bounds;
 #ifdef BPF_JITTER
 	bpf_jit_filter		*func;
 #endif
-	void			*buffer[0];
+	void			*buffer[];
 };
 
 #if defined(DEV_BPF) || defined(NETGRAPH_BPF)
@@ -3113,12 +3113,13 @@ DB_SHOW_COMMAND(bpf_if, db_show_bpf_if)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc"
 //   ],
 //   "changes_purecap": [
+//     "subobject_bounds",
 //     "kdb"
 //   ]
 // }

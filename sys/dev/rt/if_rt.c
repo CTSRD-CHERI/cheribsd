@@ -1273,7 +1273,7 @@ rt_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		startall = 0;
 		RT_SOFTC_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
@@ -1293,7 +1293,7 @@ rt_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		RT_SOFTC_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 #ifdef IF_RT_PHY_SUPPORT
 		mii = device_get_softc(sc->rt_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
@@ -2964,12 +2964,3 @@ rtmdio_detach(device_t dev)
 	return(0);
 }
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

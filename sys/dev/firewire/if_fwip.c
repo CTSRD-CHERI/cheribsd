@@ -383,7 +383,7 @@ fwip_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int s, error;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		s = splimp();
 		if (ifp->if_flags & IFF_UP) {
 			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING))
@@ -394,16 +394,16 @@ fwip_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		splx(s);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 #ifdef DEVICE_POLLING
 	    {
 		struct ifreq *ifr = (struct ifreq *) data;
 		struct firewire_comm *fc = fwip->fd.fc;
 
-		if (ifr_reqcap_get(ifr) & IFCAP_POLLING &&
+		if (ifr->ifr_reqcap & IFCAP_POLLING &&
 		    !(ifp->if_capenable & IFCAP_POLLING)) {
 			error = ether_poll_register(fwip_poll, ifp);
 			if (error)
@@ -413,7 +413,7 @@ fwip_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ifp->if_capenable |= IFCAP_POLLING;
 			return (error);
 		}
-		if (!(ifr_reqcap_get(ifr) & IFCAP_POLLING) &&
+		if (!(ifr->ifr_reqcap & IFCAP_POLLING) &&
 		    ifp->if_capenable & IFCAP_POLLING) {
 			error = ether_poll_deregister(ifp);
 			/* Enable interrupts. */
@@ -934,12 +934,3 @@ static driver_t fwip_driver = {
 DRIVER_MODULE(fwip, firewire, fwip_driver, fwip_devclass, 0, 0);
 MODULE_VERSION(fwip, 1);
 MODULE_DEPEND(fwip, firewire, 1, 1, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

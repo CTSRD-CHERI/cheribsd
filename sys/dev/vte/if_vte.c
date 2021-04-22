@@ -1196,7 +1196,7 @@ vte_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		VTE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -1210,14 +1210,14 @@ vte_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->vte_if_flags = ifp->if_flags;
 		VTE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		VTE_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			vte_rxfilter(sc);
 		VTE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->vte_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
@@ -2075,12 +2075,3 @@ sysctl_hw_vte_int_mod(SYSCTL_HANDLER_ARGS)
 	return (sysctl_int_range(oidp, arg1, arg2, req,
 	    VTE_IM_BUNDLE_MIN, VTE_IM_BUNDLE_MAX));
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

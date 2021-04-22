@@ -167,7 +167,7 @@ typedef struct isc_session {
      struct i_stats	stats;
      bhs_t		bhs;
      struct uio		uio;
-     struct iovec		iov;
+     struct iovec	iov;
      /*
       | cam stuff
       */
@@ -191,7 +191,7 @@ typedef struct pduq {
      union ccb		*ccb;
 
      struct uio		uio;
-     struct iovec		iov[5];	// XXX: careful ...
+     struct iovec	iov[5];	// XXX: careful ...
      struct mbuf	*mp;
      struct bintime	ts;
      queue_t		*pduq;		
@@ -569,12 +569,3 @@ i_mbufcopy(struct mbuf *mp, caddr_t dp, int len)
 	       break;
      }
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20191025,
-//   "target_type": "header",
-//   "changes": [
-//     "iovec-macros"
-//   ]
-// }
-// CHERI CHANGES END

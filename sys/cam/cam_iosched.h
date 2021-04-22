@@ -56,16 +56,16 @@ struct bio;
 #else
 #define CAM_IOSCHED_TIME_SHIFT 8
 #endif
-static inline uintptr_t
+static inline size_t
 cam_iosched_now(void)
 {
 
 	/* Cast here is to avoid right shifting a signed value */
-	return (uintptr_t)((uint64_t)sbinuptime() >> CAM_IOSCHED_TIME_SHIFT);
+	return ((size_t)sbinuptime() >> CAM_IOSCHED_TIME_SHIFT);
 }
 
-static inline uintptr_t
-cam_iosched_delta_t(uintptr_t then)
+static inline size_t
+cam_iosched_delta_t(size_t then)
 {
 
 	/* Since the types are identical, wrapping works correctly */
@@ -73,11 +73,11 @@ cam_iosched_delta_t(uintptr_t then)
 }
 
 static inline sbintime_t
-cam_iosched_sbintime_t(uintptr_t delta)
+cam_iosched_sbintime_t(size_t delta)
 {
 
 	/* Cast here is to widen the type so the left shift doesn't lose precision */
-	return (sbintime_t)((uint64_t)delta << CAM_IOSCHED_TIME_SHIFT);
+	return (sbintime_t)(delta << CAM_IOSCHED_TIME_SHIFT);
 }
 
 typedef void (*cam_iosched_latfcn_t)(void *, sbintime_t, struct bio *);
@@ -105,3 +105,12 @@ void cam_iosched_set_trim_goal(struct cam_iosched_softc *isc, int goal);
 void cam_iosched_set_trim_ticks(struct cam_iosched_softc *isc, int ticks);
 #endif
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1754,7 +1754,7 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	dev = sc->xbdev;
 
 	switch(cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 #ifdef INET
 		XN_LOCK(sc);
 		if (ifa->ifa_addr->sa_family == AF_INET) {
@@ -1771,15 +1771,15 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 #endif
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifp->if_mtu == ifr_mtu_get(ifr))
+	case SIOCSIFMTU:
+		if (ifp->if_mtu == ifr->ifr_mtu)
 			break;
 
-		ifp->if_mtu = ifr_mtu_get(ifr);
+		ifp->if_mtu = ifr->ifr_mtu;
 		ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 		xn_ifinit(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		XN_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			/*
@@ -1799,8 +1799,8 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->xn_if_flags = ifp->if_flags;
 		XN_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+	case SIOCSIFCAP:
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		reinit = 0;
 
 		if (mask & IFCAP_TXCSUM) {
@@ -1860,10 +1860,10 @@ xn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 */
 		error = tsleep(sc, 0, "xn_rst", 30*hz);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_media, cmd);
 		break;
@@ -2342,12 +2342,3 @@ devclass_t netfront_devclass;
 
 DRIVER_MODULE(xe, xenbusb_front, netfront_driver, netfront_devclass, NULL,
     NULL);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

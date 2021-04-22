@@ -768,7 +768,7 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 	int mask __unused, err = 0;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		device_printf(dev, "SIOCSIFFLAGS %x\n", ifp->if_flags);
 		PTNET_CORE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
@@ -783,16 +783,16 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		PTNET_CORE_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		device_printf(dev, "SIOCSIFCAP %x %x\n",
-			      ifr_reqcap_get(ifr), ifp->if_capenable);
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+			      ifr->ifr_reqcap, ifp->if_capenable);
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
 			struct ptnet_queue *pq;
 			int i;
 
-			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
+			if (ifr->ifr_reqcap & IFCAP_POLLING) {
 				err = ether_poll_register(ptnet_poll, ifp);
 				if (err) {
 					break;
@@ -824,22 +824,22 @@ ptnet_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			}
 		}
 #endif  /* DEVICE_POLLING */
-		ifp->if_capenable = ifr_reqcap_get(ifr);
+		ifp->if_capenable = ifr->ifr_reqcap;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		/* We support any reasonable MTU. */
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-				ifr_mtu_get(ifr) > PTNET_MAX_PKT_SIZE) {
+		if (ifr->ifr_mtu < ETHERMIN ||
+				ifr->ifr_mtu > PTNET_MAX_PKT_SIZE) {
 			err = EINVAL;
 		} else {
 			PTNET_CORE_LOCK(sc);
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			PTNET_CORE_UNLOCK(sc);
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		err = ifmedia_ioctl(ifp, ifr, &sc->media, cmd);
 		break;
@@ -1997,12 +1997,3 @@ ptnet_poll(if_t ifp, enum poll_cmd cmd, int budget)
 }
 #endif /* DEVICE_POLLING */
 #endif /* WITH_PTNETMAP */
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

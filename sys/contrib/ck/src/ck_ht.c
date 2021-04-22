@@ -142,7 +142,7 @@ ck_ht_map_create(struct ck_ht *table, CK_HT_TYPE entries)
 {
 	struct ck_ht_map *map;
 	CK_HT_TYPE size;
-	uintptr_t prefix;
+	size_t prefix;
 	uint32_t n_entries;
 
 	n_entries = ck_internal_power_2(entries);
@@ -174,8 +174,8 @@ ck_ht_map_create(struct ck_ht *table, CK_HT_TYPE entries)
 	map->step = ck_cc_ffsll(map->capacity);
 	map->mask = map->capacity - 1;
 	map->n_entries = 0;
-	map->entries = (struct ck_ht_entry *)(((uintptr_t)&map[1] + prefix +
-	    CK_MD_CACHELINE - 1) & ~(CK_MD_CACHELINE - 1));
+	map->entries = (struct ck_ht_entry *)roundup2(
+	    (uintptr_t)(map + 1) + prefix, CK_MD_CACHELINE);
 
 	if (table->mode & CK_HT_WORKLOAD_DELETE) {
 		map->probe_bound = (CK_HT_WORD *)&map[1];
@@ -305,8 +305,8 @@ ck_ht_map_probe_wr(struct ck_ht_map *map,
 		 * the beginning of the cache line. Only when the complete cache line has
 		 * been scanned do we move on to the next row.
 		 */
-		bucket = (void *)((uintptr_t)(map->entries + offset) &
-			     ~(CK_MD_CACHELINE - 1));
+		bucket = (void *)rounddown2((uintptr_t)(map->entries + offset),
+		    CK_MD_CACHELINE);
 
 		for (j = 0; j < CK_HT_BUCKET_LENGTH; j++) {
 			uint16_t k;
@@ -520,8 +520,8 @@ retry:
 		 * the beginning of the cache line. Only when the complete cache line has
 		 * been scanned do we move on to the next row.
 		 */
-		bucket = (void *)((uintptr_t)(map->entries + offset) &
-			     ~(CK_MD_CACHELINE - 1));
+		bucket = (void *)rounddown2((uintptr_t)(map->entries + offset),
+		    CK_MD_CACHELINE);
 
 		for (j = 0; j < CK_HT_BUCKET_LENGTH; j++) {
 			uint16_t k;
@@ -706,7 +706,7 @@ restart:
 		probes = 0;
 
 		for (i = 0; i < update->probe_limit; i++) {
-			bucket = (void *)((uintptr_t)(update->entries + offset) & ~(CK_MD_CACHELINE - 1));
+			bucket = (void *)rounddown2((uintptr_t)(update->entries + offset), CK_MD_CACHELINE);
 
 			for (j = 0; j < CK_HT_BUCKET_LENGTH; j++) {
 				struct ck_ht_entry *cursor = bucket + ((j + offset) & (CK_HT_BUCKET_LENGTH - 1));
@@ -1034,3 +1034,12 @@ ck_ht_destroy(struct ck_ht *table)
 	ck_ht_map_destroy(table->m, table->map, false);
 	return;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190528,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

@@ -596,19 +596,19 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
-	case CASE_IOC_IFREQ(SIOCGIFMTU):
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
+	case SIOCGIFMTU:
+	case SIOCSIFFLAGS:
 		return (0);
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < GIF_MTU_MIN ||
-		    ifr_mtu_get(ifr) > GIF_MTU_MAX)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < GIF_MTU_MIN ||
+		    ifr->ifr_mtu > GIF_MTU_MAX)
 			return (EINVAL);
 		else
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 		return (0);
 	}
 	sx_xlock(&gif_ioctl_sx);
@@ -639,25 +639,25 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 #endif
 	case SIOCGTUNFIB:
-		ifr_fib_set(ifr, sc->gif_fibnum);
+		ifr->ifr_fib = sc->gif_fibnum;
 		break;
-	case CASE_IOC_IFREQ(SIOCSTUNFIB):
+	case SIOCSTUNFIB:
 		if ((error = priv_check(curthread, PRIV_NET_GIF)) != 0)
 			break;
-		if (ifr_fib_get(ifr) >= rt_numfibs)
+		if (ifr->ifr_fib >= rt_numfibs)
 			error = EINVAL;
 		else
-			sc->gif_fibnum = ifr_fib_get(ifr);
+			sc->gif_fibnum = ifr->ifr_fib;
 		break;
 	case CASE_IOC_IFREQ(GIFGOPTS):
 		options = sc->gif_options;
-		error = copyout(&options, ifr_data_get_ptr(ifr),
+		error = copyout(&options, ifr_data_get_ptr(cmd, ifr),
 		    sizeof(options));
 		break;
 	case CASE_IOC_IFREQ(GIFSOPTS):
 		if ((error = priv_check(curthread, PRIV_NET_GIF)) != 0)
 			break;
-		error = copyin(ifr_data_get_ptr(ifr), &options,
+		error = copyin(ifr_data_get_ptr(cmd, ifr), &options,
 		    sizeof(options));
 		if (error)
 			break;

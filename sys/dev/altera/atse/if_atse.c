@@ -943,7 +943,7 @@ atse_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ifr = (struct ifreq *)data;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		ATSE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -957,19 +957,19 @@ atse_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->atse_if_flags = ifp->if_flags;
 		ATSE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		ATSE_LOCK(sc);
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		ATSE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		ATSE_LOCK(sc);
 		atse_rxfilter_locked(sc);
 		ATSE_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	{
 		struct mii_data *mii;
 		struct ifreq *ifr;
@@ -1600,12 +1600,3 @@ atse_miibus_statchg(device_t dev)
 
 MODULE_DEPEND(atse, ether, 1, 1, 1);
 MODULE_DEPEND(atse, miibus, 1, 1, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

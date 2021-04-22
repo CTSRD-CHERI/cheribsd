@@ -11,6 +11,4 @@ PROG=	helloworld
 
 MAN=
 
-NO_WERROR=	YES
-
 .include <bsd.prog.mk>

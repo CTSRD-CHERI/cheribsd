@@ -645,7 +645,7 @@ firewire_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
 
 		switch (ifa->ifa_addr->sa_family) {
@@ -661,19 +661,19 @@ firewire_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFADDR):
-		bcopy(&IFP2FWC(ifp)->fc_hwaddr, ifr_addr_get_data(ifr),
+	case SIOCGIFADDR:
+		bcopy(&IFP2FWC(ifp)->fc_hwaddr, &ifr->ifr_addr.sa_data[0],
 		    sizeof(struct fw_hwaddr));
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		/*
 		 * Set the interface MTU.
 		 */
-		if (ifr_mtu_get(ifr) > 1500) {
+		if (ifr->ifr_mtu > 1500) {
 			error = EINVAL;
 		} else {
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 		}
 		break;
 	default:
@@ -851,12 +851,3 @@ static moduledata_t firewire_mod = {
 
 DECLARE_MODULE(if_firewire, firewire_mod, SI_SUB_INIT_IF, SI_ORDER_ANY);
 MODULE_VERSION(if_firewire, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

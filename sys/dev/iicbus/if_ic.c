@@ -208,13 +208,13 @@ icioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	switch (cmd) {
 
 	case SIOCAIFADDR:
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		if (ifa->ifa_addr->sa_family != AF_INET)
 			return (EAFNOSUPPORT);
 		mtx_lock(&sc->ic_lock);
 		ifp->if_flags |= IFF_UP;
 		goto locked;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		mtx_lock(&sc->ic_lock);
 	locked:
 		if ((!(ifp->if_flags & IFF_UP)) &&
@@ -241,21 +241,21 @@ icioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		mtx_unlock(&sc->ic_lock);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		ic_alloc_buffers(sc, ifr_mtu_get(ifr));
+	case SIOCSIFMTU:
+		ic_alloc_buffers(sc, ifr->ifr_mtu);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFMTU):
+	case SIOCGIFMTU:
 		mtx_lock(&sc->ic_lock);
-		ifr_mtu_set(ifr, sc->ic_ifp->if_mtu);
+		ifr->ifr_mtu = sc->ic_ifp->if_mtu;
 		mtx_unlock(&sc->ic_lock);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (ifr == NULL)
 			return (EAFNOSUPPORT);		/* XXX */
-		switch (ifr_addr_get_family(ifr)) {
+		switch (ifr->ifr_addr.sa_family) {
 		case AF_INET:
 			break;
 		default:
@@ -438,12 +438,3 @@ error:
 DRIVER_MODULE(ic, iicbus, ic_driver, ic_devclass, 0, 0);
 MODULE_DEPEND(ic, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 MODULE_VERSION(ic, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

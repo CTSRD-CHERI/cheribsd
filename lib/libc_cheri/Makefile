@@ -255,8 +255,6 @@ MK_PROFILE=	no
 NEED_CHERI=	sandbox
 WARNS?= 2
 
-# NO_WERROR=	yes
-
 CLEANFILES=	libcheri_invoke.o
 
 LIBC_DIR=${.CURDIR}/../libc

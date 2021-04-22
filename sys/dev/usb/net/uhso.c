@@ -1845,7 +1845,7 @@ uhso_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	sc = ifp->if_softc;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if (ifp->if_flags & IFF_UP) {
 			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 				uhso_if_init(sc);
@@ -1859,9 +1859,9 @@ uhso_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			}
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCSIFADDR:
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		break;
 	default:
 		return (EINVAL);
@@ -1934,12 +1934,3 @@ uhso_if_stop(struct uhso_softc *sc)
 	usbd_transfer_stop(sc->sc_if_xfer[UHSO_IFNET_WRITE]);
 	sc->sc_ifp->if_drv_flags &= ~(IFF_DRV_RUNNING | IFF_DRV_OACTIVE);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

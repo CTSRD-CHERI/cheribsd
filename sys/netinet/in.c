@@ -218,7 +218,8 @@ int
 in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
     struct thread *td)
 {
-	struct sockaddr_in *addr = (struct sockaddr_in *)ifr_addr_get_sa(data);
+	struct ifreq *ifr = (struct ifreq *)data;
+	struct sockaddr_in *addr = (struct sockaddr_in *)&ifr->ifr_addr;
 	struct epoch_tracker et;
 	struct ifaddr *ifa;
 	struct in_ifaddr *ia;
@@ -232,17 +233,17 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 	 * to specific functions and ifp->if_ioctl().
 	 */
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCGIFADDR):
-	case CASE_IOC_IFREQ(SIOCGIFBRDADDR):
-	case CASE_IOC_IFREQ(SIOCGIFDSTADDR):
-	case CASE_IOC_IFREQ(SIOCGIFNETMASK):
+	case SIOCGIFADDR:
+	case SIOCGIFBRDADDR:
+	case SIOCGIFDSTADDR:
+	case SIOCGIFNETMASK:
 		break;
 	case SIOCGIFALIAS:
 		sx_xlock(&in_control_sx);
 		error = in_gifaddr_ioctl(cmd, data, ifp, td);
 		sx_xunlock(&in_control_sx);
 		return (error);
-	case CASE_IOC_IFREQ(SIOCDIFADDR):
+	case SIOCDIFADDR:
 		sx_xlock(&in_control_sx);
 		error = in_difaddr_ioctl(cmd, data, ifp, td);
 		sx_xunlock(&in_control_sx);
@@ -253,10 +254,10 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 		error = in_aifaddr_ioctl(cmd, data, ifp, td);
 		sx_xunlock(&in_control_sx);
 		return (error);
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
-	case CASE_IOC_IFREQ(SIOCSIFBRDADDR):
-	case CASE_IOC_IFREQ(SIOCSIFDSTADDR):
-	case CASE_IOC_IFREQ(SIOCSIFNETMASK):
+	case SIOCSIFADDR:
+	case SIOCSIFBRDADDR:
+	case SIOCSIFDSTADDR:
+	case SIOCSIFNETMASK:
 		/* We no longer support that old commands. */
 		return (EINVAL);
 	default:
@@ -298,11 +299,11 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCGIFADDR):
+	case SIOCGIFADDR:
 		*addr = ia->ia_addr;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFBRDADDR):
+	case SIOCGIFBRDADDR:
 		if ((ifp->if_flags & IFF_BROADCAST) == 0) {
 			error = EINVAL;
 			break;
@@ -310,7 +311,7 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 		*addr = ia->ia_broadaddr;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFDSTADDR):
+	case SIOCGIFDSTADDR:
 		if ((ifp->if_flags & IFF_POINTOPOINT) == 0) {
 			error = EINVAL;
 			break;
@@ -318,7 +319,7 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 		*addr = ia->ia_dstaddr;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFNETMASK):
+	case SIOCGIFNETMASK:
 		*addr = ia->ia_sockmask;
 		break;
 	}
@@ -553,8 +554,9 @@ fail1:
 static int
 in_difaddr_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp, struct thread *td)
 {
-	const struct sockaddr_in *addr = (struct sockaddr_in *)
-	    ifr_addr_get_sa(data);
+	const struct ifreq *ifr = (struct ifreq *)data;
+	const struct sockaddr_in *addr = (const struct sockaddr_in *)
+	    &ifr->ifr_addr;
 	struct ifaddr *ifa;
 	struct in_ifaddr *ia;
 	bool deleteAny, iaIsLast;
@@ -622,14 +624,8 @@ in_difaddr_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp, struct thread *td)
 	 */
 	in_ifadown(&ia->ia_ifa, 1);
 
-	if (ia->ia_ifa.ifa_carp) {
-		switch (cmd) {
-		case CASE_IOC_IFREQ(SIOCDIFADDR):
-			(*carp_detach_p)(&ia->ia_ifa, false);
-		default:
-			(*carp_detach_p)(&ia->ia_ifa, true);
-		}
-	}
+	if (ia->ia_ifa.ifa_carp)
+		(*carp_detach_p)(&ia->ia_ifa, cmd == SIOCAIFADDR);
 
 	/*
 	 * If this is the last IPv4 address configured on this
@@ -1105,7 +1101,7 @@ in_purgemaddrs(struct ifnet *ifp)
 }
 
 struct in_llentry {
-	struct llentry		base;
+	struct llentry base __subobject_use_container_bounds;
 };
 
 #define	IN_LLTBL_DEFAULT_HSIZE	32
@@ -1573,10 +1569,10 @@ in_domifdetach(struct ifnet *ifp, void *aux)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
+//   "changes_purecap": [
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

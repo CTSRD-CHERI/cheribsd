@@ -402,7 +402,7 @@ mac_ifnet_check_transmit(struct ifnet *ifp, struct mbuf *m)
 }
 
 int
-mac_ifnet_ioctl_get(struct ucred *cred, struct ifreq *ifr,
+mac_ifnet_ioctl_get(struct ucred *cred, void * __capability ifr_data,
     struct ifnet *ifp)
 {
 	char *elements, *buffer;
@@ -413,7 +413,7 @@ mac_ifnet_ioctl_get(struct ucred *cred, struct ifreq *ifr,
 	if (!(mac_labeled & MPC_OBJECT_IFNET))
 		return (EINVAL);
 
-	error = copyin(ifr_data_get_ptr(ifr), &mac, sizeof(mac));
+	error = copyin_mac(ifr_data, &mac);
 	if (error)
 		return (error);
 
@@ -446,7 +446,8 @@ mac_ifnet_ioctl_get(struct ucred *cred, struct ifreq *ifr,
 }
 
 int
-mac_ifnet_ioctl_set(struct ucred *cred, struct ifreq *ifr, struct ifnet *ifp)
+mac_ifnet_ioctl_set(struct ucred *cred, void * __capability ifr_data,
+    struct ifnet *ifp)
 {
 	struct label *intlabel;
 	struct mac mac;
@@ -456,7 +457,7 @@ mac_ifnet_ioctl_set(struct ucred *cred, struct ifreq *ifr, struct ifnet *ifp)
 	if (!(mac_labeled & MPC_OBJECT_IFNET))
 		return (EINVAL);
 
-	error = copyin(ifr_data_get_ptr(ifr), &mac, sizeof(mac));
+	error = copyin_mac(ifr_data, &mac);
 	if (error)
 		return (error);
 

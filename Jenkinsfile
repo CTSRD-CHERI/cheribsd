@@ -35,8 +35,7 @@ if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
 def allArchitectures = [
     "aarch64", "amd64",
     "mips64", "mips64-hybrid", "mips64-purecap",
-    "morello-hybrid",
-    // XXX: Enable once kernel-toolchain can handle aarch64c: "morello-purecap",
+    "morello-hybrid", "morello-purecap",
     "riscv64", "riscv64-hybrid", "riscv64-purecap"
 ]
 jobProperties.add(parameters([text(defaultValue: allArchitectures.join('\n'),
@@ -48,13 +47,17 @@ setDefaultJobProperties(jobProperties)
 jobs = [:]
 
 def buildImageAndRunTests(params, String suffix) {
-    stage("Building disk image") {
-        sh "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
+    stage("Building disk images") {
+        sh label: "Building full disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
+        // No need for minimal images when running the testsuite
+        if (!GlobalVars.isTestSuiteJob) {
+            sh label: "Building minimal disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
+        }
     }
-    // No need for minimal images when running the testsuite
+    // No need for MFS_ROOT kernels when running the testsuite
     if (!GlobalVars.isTestSuiteJob && (suffix.startsWith('mips64') || suffix.startsWith('riscv64'))) {
         stage("Building MFS_ROOT kernels") {
-            sh label: "Building minimal disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
+            sh label: "Building MFS_ROOT disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-mfs-root-${suffix} ${params.extraArgs}"
             sh label: "Building MFS_ROOT kernels", script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd-mfs-root-kernel-${suffix}/build-fpga-kernels ${params.extraArgs}"
             // Move MFS_ROOT kernels into tarball/ so they aren't deleted
             sh "mv -fv kernel-${suffix}* tarball/"
@@ -168,18 +171,6 @@ selectedArchitectures.each { suffix ->
             // Enable additional debug checks when running the testsuite
             extraBuildOptions += ' -DMALLOC_DEBUG'
         }
-        // XXX: Remove once dev can build a purecap world
-        if (suffix.startsWith("morello")) {
-            def gitBranch = 'master'
-            if (env.CHANGE_ID) {
-                gitBranch = env.CHANGE_TARGET
-            } else if (env.BRANCH_NAME) {
-                gitBranch = env.BRANCH_NAME
-            }
-            if (gitBranch != 'morello-dev') {
-                extraBuildOptions += ' -DWITHOUT_COMPAT_CHERIABI'
-            }
-        }
         def cheribuildArgs = ["'--cheribsd/build-options=${extraBuildOptions}'",
                               '--keep-install-dir',
                               '--install-prefix=/rootfs',
@@ -193,8 +184,7 @@ selectedArchitectures.each { suffix ->
                 extraArgs: cheribuildArgs.join(" "),
                 skipArchiving: true, skipTarball: true,
                 sdkCompilerOnly: true, // We only need clang not the CheriBSD sysroot since we are building that.
-                // XXX: Remove once morello-dev is gone
-                customGitCheckoutDir: suffix.startsWith('morello') ? 'morello-cheribsd' : 'cheribsd',
+                customGitCheckoutDir: 'cheribsd',
                 gitHubStatusContext: GlobalVars.isTestSuiteJob ? "testsuite/${suffix}" : "ci/${suffix}",
                 // Delete stale compiler/sysroot
                 beforeBuild: { params -> 

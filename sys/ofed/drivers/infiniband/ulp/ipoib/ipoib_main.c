@@ -281,7 +281,7 @@ ipoib_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		return (ENXIO);
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if (ifp->if_flags & IFF_UP) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
 				error = -ipoib_open(priv);
@@ -289,12 +289,12 @@ ipoib_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 				ipoib_stop(priv);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			queue_work(ipoib_workqueue, &priv->restart_task);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
 
 		switch (ifa->ifa_addr->sa_family) {
@@ -310,15 +310,16 @@ ipoib_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFADDR):
-		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr), INFINIBAND_ALEN);
+	case SIOCGIFADDR:
+			bcopy(IF_LLADDR(ifp), &ifr->ifr_addr.sa_data[0],
+                            INFINIBAND_ALEN);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		/*
 		 * Set the interface MTU.
 		 */
-		error = -ipoib_change_mtu(priv, ifr_mtu_get(ifr), false);
+		error = -ipoib_change_mtu(priv, ifr->ifr_mtu, false);
 		break;
 	default:
 		error = EINVAL;
@@ -1434,12 +1435,3 @@ DECLARE_MODULE(ipoib, ipoib_mod, SI_SUB_LAST, SI_ORDER_ANY);
 MODULE_DEPEND(ipoib, ibcore, 1, 1, 1);
 MODULE_DEPEND(ipoib, if_infiniband, 1, 1, 1);
 MODULE_DEPEND(ipoib, linuxkpi, 1, 1, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

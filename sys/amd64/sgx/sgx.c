@@ -1100,7 +1100,7 @@ sgx_get_epc_area(struct sgx_softc *sc)
 	}
 
 	sc->vmem_epc = vmem_create("SGX EPC", sc->epc_base, sc->epc_size,
-	    PAGE_SIZE, PAGE_SIZE, M_FIRSTFIT | M_WAITOK);
+	    PAGE_SIZE, PAGE_SIZE, M_FIRSTFIT | M_WAITOK, 0);
 	if (sc->vmem_epc == NULL) {
 		printf("%s: Can't create vmem arena.\n", __func__);
 		free(sc->epc_pages, M_SGX);

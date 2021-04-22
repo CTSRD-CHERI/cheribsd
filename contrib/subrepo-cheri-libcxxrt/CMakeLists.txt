@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.0)
 
+set(_previous_CMAKE_TRY_COMPILE_TARGET_TYPE ${CMAKE_TRY_COMPILE_TARGET_TYPE})
+# Don't link the C++ standard library when detecting C++ compiler features
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+project(libcxxrt LANGUAGES C CXX)
+set(CMAKE_TRY_COMPILE_TARGET_TYPE ${_previous_CMAKE_TRY_COMPILE_TARGET_TYPE})
+
 option(CHERI_PURE "Build for CHERI Sandbox ABI (disables exceptions and RTTI)" OFF)
 option(DISABLE_EXCEPTIONS_RTTI "Disable exceptions and RTTI" OFF)
 if (DISABLE_EXCEPTIONS_RTTI)

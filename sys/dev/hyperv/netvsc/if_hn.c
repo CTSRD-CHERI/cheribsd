@@ -1273,7 +1273,7 @@ hn_xpnt_vf_iocsetcaps(struct hn_softc *sc, struct ifreq *ifr)
 	 * Fix up requested capabilities w/ supported capabilities,
 	 * since the supported capabilities could have been changed.
 	 */
-	ifr_reqcap_set(ifr, ifr_reqcap_get(ifr) & ifp->if_capabilities);
+	ifr->ifr_reqcap &= ifp->if_capabilities;
 	/* Pass SIOCSIFCAP to VF. */
 	error = vf_ifp->if_ioctl(vf_ifp, SIOCSIFCAP, (caddr_t)ifr);
 
@@ -1326,8 +1326,8 @@ hn_xpnt_vf_iocsetflags(struct hn_softc *sc)
 
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, vf_ifp->if_xname, sizeof(ifr.ifr_name));
-	ifr_flags_set(&ifr, vf_ifp->if_flags & 0xffff);
-	ifr_flagshigh_set(&ifr, vf_ifp->if_flags >> 16);
+	ifr.ifr_flags = vf_ifp->if_flags & 0xffff;
+	ifr.ifr_flagshigh = vf_ifp->if_flags >> 16;
 	return (vf_ifp->if_ioctl(vf_ifp, SIOCSIFFLAGS, (caddr_t)&ifr));
 }
 
@@ -1723,7 +1723,7 @@ hn_xpnt_vf_setready(struct hn_softc *sc)
 	 */
 	memset(&ifr, 0, sizeof(ifr));
 	strlcpy(ifr.ifr_name, vf_ifp->if_xname, sizeof(ifr.ifr_name));
-	ifr_reqcap_set(&ifr, ifp->if_capenable);
+	ifr.ifr_reqcap = ifp->if_capenable;
 	hn_xpnt_vf_iocsetcaps(sc, &ifr);
 
 	if (ifp->if_mtu != ETHERMTU) {
@@ -1734,7 +1734,7 @@ hn_xpnt_vf_setready(struct hn_softc *sc)
 		 */
 		memset(&ifr, 0, sizeof(ifr));
 		strlcpy(ifr.ifr_name, vf_ifp->if_xname, sizeof(ifr.ifr_name));
-		ifr_mtu_set(&ifr, ifp->if_mtu);
+		ifr.ifr_mtu = ifp->if_mtu;
 		error = vf_ifp->if_ioctl(vf_ifp, SIOCSIFMTU, (caddr_t)&ifr);
 		if (error) {
 			if_printf(ifp, "%s SIOCSIFMTU %u failed\n",
@@ -3708,8 +3708,8 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	uint32_t mtu;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) > HN_MTU_MAX) {
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu > HN_MTU_MAX) {
 			error = EINVAL;
 			break;
 		}
@@ -3728,7 +3728,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 
-		if (ifp->if_mtu == ifr_mtu_get(ifr)) {
+		if (ifp->if_mtu == ifr->ifr_mtu) {
 			HN_UNLOCK(sc);
 			break;
 		}
@@ -3743,7 +3743,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			if (error) {
 				HN_UNLOCK(sc);
 				if_printf(ifp, "%s SIOCSIFMTU %d failed: %d\n",
-				    vf_ifp->if_xname, ifr_mtu_get(ifr), error);
+				    vf_ifp->if_xname, ifr->ifr_mtu, error);
 				break;
 			}
 		}
@@ -3763,7 +3763,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 * Reattach the synthetic parts, i.e. NVS and RNDIS,
 		 * with the new MTU setting.
 		 */
-		error = hn_synth_attach(sc, ifr_mtu_get(ifr));
+		error = hn_synth_attach(sc, ifr->ifr_mtu);
 		if (error) {
 			HN_UNLOCK(sc);
 			break;
@@ -3771,7 +3771,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		error = hn_rndis_get_mtu(sc, &mtu);
 		if (error)
-			mtu = ifr_mtu_get(ifr);
+			mtu = ifr->ifr_mtu;
 		else if (bootverbose)
 			if_printf(ifp, "RNDIS mtu %u\n", mtu);
 
@@ -3779,11 +3779,11 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 * Commit the requested MTU, after the synthetic parts
 		 * have been successfully attached.
 		 */
-		if (mtu >= ifr_mtu_get(ifr)) {
-			mtu = ifr_mtu_get(ifr);
+		if (mtu >= ifr->ifr_mtu) {
+			mtu = ifr->ifr_mtu;
 		} else {
 			if_printf(ifp, "fixup mtu %d -> %u\n",
-			    ifr_mtu_get(ifr), mtu);
+			    ifr->ifr_mtu, mtu);
 		}
 		ifp->if_mtu = mtu;
 
@@ -3818,7 +3818,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		HN_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		HN_LOCK(sc);
 
 		if ((sc->hn_flags & HN_FLAG_SYNTH_ATTACHED) == 0) {
@@ -3854,7 +3854,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		HN_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		HN_LOCK(sc);
 
 		if (hn_xpnt_vf_isready(sc)) {
@@ -3870,7 +3870,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 * Fix up requested capabilities w/ supported capabilities,
 		 * since the supported capabilities could have been changed.
 		 */
-		mask = (ifr_reqcap_get(ifr) & ifp->if_capabilities) ^
+		mask = (ifr->ifr_reqcap & ifp->if_capabilities) ^
 		    ifp->if_capenable;
 
 		if (mask & IFCAP_TXCSUM) {
@@ -3918,8 +3918,8 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		HN_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		HN_LOCK(sc);
 
 		if ((sc->hn_flags & HN_FLAG_SYNTH_ATTACHED) == 0) {
@@ -3952,7 +3952,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		HN_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		HN_LOCK(sc);
 		if (hn_xpnt_vf_isready(sc)) {
@@ -7581,12 +7581,3 @@ hn_sysuninit(void *arg __unused)
 	counter_u64_free(hn_udpcs_fixup);
 }
 SYSUNINIT(hn_sysuninit, SI_SUB_DRIVERS, SI_ORDER_SECOND, hn_sysuninit, NULL);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

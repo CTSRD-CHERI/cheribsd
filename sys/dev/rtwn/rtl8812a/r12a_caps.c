@@ -69,22 +69,22 @@ r12a_ioctl_net(struct ieee80211com *ic, u_long cmd, void *data)
 
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 	{
 		struct ieee80211vap *vap;
 		int changed, rxmask;
 
-		rxmask = ifr_reqcap_get(ifr) & (IFCAP_RXCSUM | IFCAP_RXCSUM_IPV6);
+		rxmask = ifr->ifr_reqcap & (IFCAP_RXCSUM | IFCAP_RXCSUM_IPV6);
 
 		RTWN_LOCK(sc);
 		changed = 0;
 		if (!(rs->rs_flags & R12A_RXCKSUM_EN) ^
-		    !(ifr_reqcap_get(ifr) & IFCAP_RXCSUM)) {
+		    !(ifr->ifr_reqcap & IFCAP_RXCSUM)) {
 			rs->rs_flags ^= R12A_RXCKSUM_EN;
 			changed = 1;
 		}
 		if (!(rs->rs_flags & R12A_RXCKSUM6_EN) ^
-		    !(ifr_reqcap_get(ifr) & IFCAP_RXCSUM_IPV6)) {
+		    !(ifr->ifr_reqcap & IFCAP_RXCSUM_IPV6)) {
 			rs->rs_flags ^= R12A_RXCKSUM6_EN;
 			changed = 1;
 		}
@@ -117,12 +117,3 @@ r12a_ioctl_net(struct ieee80211com *ic, u_long cmd, void *data)
 
 	return (error);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

@@ -358,7 +358,7 @@ struct thread {
 	/* LP64 hole */
 	struct callout	td_slpcallout;	/* (h) Callout for sleep. */
 	struct trapframe *td_frame;	/* (k) */
-	vm_offset_t	td_kstack;	/* (a) Kernel VA of kstack. */
+	vm_pointer_t	td_kstack;	/* (a) Kernel kstack pointer. */
 	int		td_kstack_pages; /* (a) Size of the kstack. */
 	volatile u_int	td_critnest;	/* (k*) Critical section nest level. */
 	struct mdthread td_md;		/* (k) Any machine-dependent fields. */
@@ -385,7 +385,7 @@ struct thread {
 struct thread0_storage {
 	struct thread t0st_thread;
 	uint64_t t0st_sched[10];
-};
+} __no_subobject_bounds;
 
 struct mtx *thread_lock_block(struct thread *);
 void thread_lock_block_wait(struct thread *);
@@ -1258,11 +1258,15 @@ EVENTHANDLER_LIST_DECLARE(thread_init);
 #endif	/* !_SYS_PROC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20190812,
 //   "target_type": "header",
 //   "changes": [
 //     "kernel_sig_types",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

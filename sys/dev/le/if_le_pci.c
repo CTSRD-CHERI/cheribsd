@@ -104,7 +104,8 @@ __FBSDID("$FreeBSD$");
 #define	PCNET_PCI_BDP	0x16
 
 struct le_pci_softc {
-	struct am79900_softc	sc_am79900;	/* glue to MI code */
+	/* glue to MI code */
+	struct am79900_softc	sc_am79900 __subobject_use_container_bounds;
 
 	struct resource		*sc_rres;
 
@@ -501,3 +502,12 @@ le_pci_resume(device_t dev)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

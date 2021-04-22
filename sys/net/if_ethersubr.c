@@ -1139,7 +1139,7 @@ ether_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
 
 		switch (ifa->ifa_addr->sa_family) {
@@ -1155,19 +1155,19 @@ ether_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFADDR):
-		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr),
+	case SIOCGIFADDR:
+		bcopy(IF_LLADDR(ifp), &ifr->ifr_addr.sa_data[0],
 		    ETHER_ADDR_LEN);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		/*
 		 * Set the interface MTU.
 		 */
-		if (ifr_mtu_get(ifr) > ETHERMTU) {
+		if (ifr->ifr_mtu > ETHERMTU) {
 			error = EINVAL;
 		} else {
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 		}
 		break;
 
@@ -1175,18 +1175,18 @@ ether_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = priv_check(curthread, PRIV_NET_SETLANPCP);
 		if (error != 0)
 			break;
-		if (ifr_lan_pcp_get(ifr) > 7 &&
-		    ifr_lan_pcp_get(ifr) != IFNET_PCP_NONE) {
+		if (ifr->ifr_lan_pcp > 7 &&
+		    ifr->ifr_lan_pcp != IFNET_PCP_NONE) {
 			error = EINVAL;
 		} else {
-			ifp->if_pcp = ifr_lan_pcp_get(ifr);
+			ifp->if_pcp = ifr->ifr_lan_pcp;
 			/* broadcast event about PCP change */
 			EVENTHANDLER_INVOKE(ifnet_event, ifp, IFNET_EVENT_PCP);
 		}
 		break;
 
 	case SIOCGLANPCP:
-		ifr_lan_pcp_set(ifr, ifp->if_pcp);
+		ifr->ifr_lan_pcp = ifp->if_pcp;
 		break;
 
 	default:
@@ -1474,12 +1474,3 @@ ether_gen_addr(struct ifnet *ifp, struct ether_addr *hwaddr)
 
 DECLARE_MODULE(ether, ether_mod, SI_SUB_INIT_IF, SI_ORDER_ANY);
 MODULE_VERSION(ether, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

@@ -3863,7 +3863,7 @@ dc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		DC_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			int need_setfilt = (ifp->if_flags ^ sc->dc_if_flags) &
@@ -3883,21 +3883,21 @@ dc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->dc_if_flags = ifp->if_flags;
 		DC_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		DC_LOCK(sc);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			dc_setfilt(sc);
 		DC_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		mii = device_get_softc(sc->dc_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 #ifdef DEVICE_POLLING
-		if (ifr_reqcap_get(ifr) & IFCAP_POLLING &&
+		if (ifr->ifr_reqcap & IFCAP_POLLING &&
 		    !(ifp->if_capenable & IFCAP_POLLING)) {
 			error = ether_poll_register(dc_poll, ifp);
 			if (error)
@@ -3909,7 +3909,7 @@ dc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			DC_UNLOCK(sc);
 			return (error);
 		}
-		if (!(ifr_reqcap_get(ifr) & IFCAP_POLLING) &&
+		if (!(ifr->ifr_reqcap & IFCAP_POLLING) &&
 		    ifp->if_capenable & IFCAP_POLLING) {
 			error = ether_poll_deregister(ifp);
 			/* Enable interrupts. */
@@ -4142,12 +4142,3 @@ dc_check_multiport(struct dc_softc *sc)
 	}
 	return (ENOENT);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

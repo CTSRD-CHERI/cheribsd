@@ -50,10 +50,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/utsname.h>
 #include <sys/ktrace.h>
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#include <cheri/cheric.h>
-#endif
-
 #include <dlfcn.h>
 #include <err.h>
 #include <errno.h>
@@ -274,7 +270,7 @@ func_ptr_type _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp
 #else
 func_ptr_type _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp);
 #endif
-Elf_Addr _rtld_bind(Obj_Entry *obj, Elf_Size reloff);
+uintptr_t _rtld_bind(Obj_Entry *obj, Elf_Size reloff);
 
 
 int npagesizes;
@@ -990,14 +986,14 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
  * NB: MIPS uses a private version of this function (_mips_rtld_bind).
  * Changes to this function should be applied there as well.
  */
-Elf_Addr
+uintptr_t
 _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 {
     const Elf_Rel *rel;
     const Elf_Sym *def;
     const Obj_Entry *defobj;
-    Elf_Addr *where;
-    Elf_Addr target;
+    uintptr_t *where;
+    uintptr_t target;
     RtldLockState lockstate;
 
     rlock_acquire(rtld_bind_lock, &lockstate);
@@ -1008,19 +1004,23 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
     else
 	rel = (const Elf_Rel *)((const char *)obj->pltrela + reloff);
 
-    where = (Elf_Addr *)(obj->relocbase + rel->r_offset);
+    where = (uintptr_t *)(obj->relocbase + rel->r_offset);
     def = find_symdef(ELF_R_SYM(rel->r_info), obj, &defobj, SYMLOOK_IN_PLT,
 	NULL, &lockstate);
     if (def == NULL)
 	rtld_die();
     if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC)
-	target = (Elf_Addr)rtld_resolve_ifunc(defobj, def);
+	target = (uintptr_t)rtld_resolve_ifunc(defobj, def);
     else
-	target = (Elf_Addr)(defobj->relocbase + def->st_value);
+#ifdef __CHERI_PURE_CAPABILITY__
+	target = (uintptr_t)make_function_pointer(def, defobj);
+#else
+	target = (uintptr_t)(defobj->relocbase + def->st_value);
+#endif
 
     dbg("\"%s\" in \"%s\" ==> %p in \"%s\"",
       defobj->strtab + def->st_name, basename(obj->path),
-      (void *)(uintptr_t)target, basename(defobj->path));
+      (void *)target, basename(defobj->path));
 
     /*
      * Write the new contents for the jmpslot. Note that depending on
@@ -1365,7 +1365,7 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    break;
 
 	case DT_PLTGOT:
-	    obj->pltgot = (Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr);
+	    obj->pltgot = (uintptr_t *)(obj->relocbase + dynp->d_un.d_ptr);
 	    break;
 
 	case DT_TEXTREL:
@@ -1450,7 +1450,7 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 		    obj->static_tls = true;
 	    break;
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
+#ifdef RTLD_HAS_CAPRELOCS
 	case DT_CHERI___CAPRELOCS:
 		obj->cap_relocs = (obj->relocbase + dynp->d_un.d_ptr);
 		break;
@@ -1507,10 +1507,12 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    unsigned abi = flags & DF_MIPS_CHERI_ABI_MASK;
 	    obj->cheri_captable_abi = abi;
 	    flags &= ~DF_MIPS_CHERI_ABI_MASK;
-	    if (flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS) {
-		flags &= ~DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
-		obj->relative_cap_relocs = true;
+	    if ((flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS) == 0) {
+		rtld_fatal("File '%s' still uses old __cap_relocs."
+		    " Please recompile it with a newer toolchain.\n",
+		    obj->path);
 	    }
+	    flags &= ~DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
 	    if ((flags & DF_MIPS_CHERI_CAPTABLE_PER_FILE) ||
 	        (flags & DF_MIPS_CHERI_CAPTABLE_PER_FUNC)) {
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
@@ -1666,7 +1668,9 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	set_bounds_if_nonnull(
 	    obj->fini_array_ptr, obj->fini_array_num * sizeof(InitArrayEntry));
 
+#ifdef RTLD_HAS_CAPRELOCS
 	set_bounds_if_nonnull(obj->cap_relocs, obj->cap_relocs_size);
+#endif
 
 	/* TODO: Bring the useful ABI features to RISC-V */
 #ifdef __mips__
@@ -2591,9 +2595,12 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     ehdr = (Elf_Ehdr *)mapbase;
     objtmp.phdr = (Elf_Phdr *)((char *)mapbase + ehdr->e_phoff);
     objtmp.phsize = ehdr->e_phnum * sizeof(objtmp.phdr[0]);
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
     /* This was done in _rtld_do___caprelocs_self */
     objtmp.cap_relocs_processed = true;
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
     /* find the end of rodata/text: */
 
     for (int i = 0; i < ehdr->e_phnum; i++) {
@@ -2629,7 +2636,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     /* Initialize the object list. */
     TAILQ_INIT(&obj_list);
 
-#if defined(__CHERI_PURE_CAPABILITY__) && defined(DEBUG_VERBOSE)
+#if defined(RTLD_HAS_CAPRELOCS) && defined(DEBUG_VERBOSE)
     if (objtmp.cap_relocs) {
 	extern char __start___cap_relocs, __stop___cap_relocs;
 	size_t cap_relocs_size =
@@ -3422,7 +3429,7 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 	if (reloc_non_plt(obj, rtldobj, flags, lockstate))
 		return (-1);
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef RTLD_HAS_CAPRELOCS
 	/* Process the __cap_relocs section to initialize global capabilities */
 	if (obj->cap_relocs_size)
 		process___cap_relocs(obj);

@@ -2841,7 +2841,7 @@ fxp_ioctl(if_t ifp, u_long command, caddr_t data)
 	int flag, mask, error = 0, reinit;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		FXP_LOCK(sc);
 		/*
 		 * If interface is marked up and not running, then start it.
@@ -2865,8 +2865,8 @@ fxp_ioctl(if_t ifp, u_long command, caddr_t data)
 		FXP_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		FXP_LOCK(sc);
 		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
 			if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
@@ -2875,7 +2875,7 @@ fxp_ioctl(if_t ifp, u_long command, caddr_t data)
 		FXP_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		if (sc->miibus != NULL) {
 			mii = device_get_softc(sc->miibus);
@@ -2886,12 +2886,12 @@ fxp_ioctl(if_t ifp, u_long command, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		reinit = 0;
-		mask = if_getcapenable(ifp) ^ ifr_reqcap_get(ifr);
+		mask = if_getcapenable(ifp) ^ ifr->ifr_reqcap;
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
+			if (ifr->ifr_reqcap & IFCAP_POLLING) {
 				error = ether_poll_register(fxp_poll, ifp);
 				if (error)
 					return(error);
@@ -3272,12 +3272,3 @@ sysctl_hw_fxp_bundle_max(SYSCTL_HANDLER_ARGS)
 
 	return (sysctl_int_range(oidp, arg1, arg2, req, 1, 0xffff));
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

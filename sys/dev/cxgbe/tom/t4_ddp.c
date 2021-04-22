@@ -1224,7 +1224,7 @@ t4_init_ppod_region(struct ppod_region *pr, struct t4_range *r, u_int psz,
 	pr->pr_invalid_bit = 1 << (pr->pr_alias_shift - 1);
 
 	pr->pr_arena = vmem_create(name, 0, pr->pr_len, PPOD_SIZE, 0,
-	    M_FIRSTFIT | M_NOWAIT);
+	    M_FIRSTFIT | M_NOWAIT, 0);
 	if (pr->pr_arena == NULL)
 		return (ENOMEM);
 

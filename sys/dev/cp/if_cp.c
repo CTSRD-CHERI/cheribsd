@@ -693,10 +693,10 @@ static int cp_sioctl (struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	switch (cmd) {
 	default:	   CP_DEBUG2 (d, ("ioctl 0x%lx\n", cmd));   return 0;
-	case CASE_IOC_IFREQ(SIOCADDMULTI): CP_DEBUG2 (d, ("ioctl SIOCADDMULTI\n")); return 0;
-	case CASE_IOC_IFREQ(SIOCDELMULTI): CP_DEBUG2 (d, ("ioctl SIOCDELMULTI\n")); return 0;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS): CP_DEBUG2 (d, ("ioctl SIOCSIFFLAGS\n")); break;
-	case CASE_IOC_IFREQ(SIOCSIFADDR):  CP_DEBUG2 (d, ("ioctl SIOCSIFADDR\n"));  break;
+	case SIOCADDMULTI: CP_DEBUG2 (d, ("ioctl SIOCADDMULTI\n")); return 0;
+	case SIOCDELMULTI: CP_DEBUG2 (d, ("ioctl SIOCDELMULTI\n")); return 0;
+	case SIOCSIFFLAGS: CP_DEBUG2 (d, ("ioctl SIOCSIFFLAGS\n")); break;
+	case SIOCSIFADDR:  CP_DEBUG2 (d, ("ioctl SIOCSIFADDR\n"));  break;
 	}
 
 	/* We get here only in case of SIFFLAGS or SIFADDR. */
@@ -2267,12 +2267,3 @@ MODULE_DEPEND (cp, sppp, 1, 1, 1);
 #endif
 DRIVER_MODULE (cp, pci, cp_driver, cp_devclass, cp_modevent, NULL);
 MODULE_VERSION (cp, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

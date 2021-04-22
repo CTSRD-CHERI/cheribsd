@@ -141,6 +141,7 @@ static uma_zone_t vmspace_zone;
 static int vmspace_zinit(void *mem, int size, int flags);
 static void _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min,
     vm_pointer_t max);
+static void vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry);
 static void vm_map_entry_deallocate(vm_map_entry_t entry, boolean_t system_map);
 static void vm_map_entry_dispose(vm_map_t map, vm_map_entry_t entry);
 static void vm_map_entry_unwire(vm_map_t map, vm_map_entry_t entry);
@@ -1921,6 +1922,12 @@ charged:
 			if ((prev_entry->eflags & (MAP_ENTRY_GUARD |
 			    MAP_ENTRY_UNMAPPED)) == 0)
 				map->size += end - prev_entry->end;
+			/*
+			 * Drop the new reservation entry before extending the
+			 * previous entry into it.
+			 */
+			if ((map->flags & MAP_RESERVATIONS) != 0)
+				vm_map_entry_delete(map, new_entry);
 			vm_map_entry_resize(map, prev_entry,
 			    end - prev_entry->end);
 			vm_map_log("resize", prev_entry);

@@ -633,7 +633,7 @@ dme_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ifr = (struct ifreq *)data;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		/*
 		 * Switch interface state between "running" and
 		 * "stopped", reflecting the UP flag.
@@ -652,7 +652,7 @@ dme_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		DME_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		mii = device_get_softc(sc->dme_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
@@ -1059,12 +1059,4 @@ MODULE_DEPEND(dme, ether, 1, 1, 1);
 MODULE_DEPEND(dme, miibus, 1, 1, 1);
 DRIVER_MODULE(dme, simplebus, dme_driver, dme_devclass, 0, 0);
 DRIVER_MODULE(miibus, dme, miibus_driver, miibus_devclass, 0, 0);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END
+

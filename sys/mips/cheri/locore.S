@@ -153,22 +153,9 @@ VECTOR(_locore, unknown)
 	 */
 	cgetdefault	$c28
 
-	/*
-	 * Set up global pointer.
-	 */
-	ABSRELOC_LA(t0, _C_LABEL(__cap_table_start))
-	csetoffset CHERI_REG_GPC, $c28, t0
-	ABSRELOC_LA(t1, _C_LABEL(__cap_table_end))
-	LONG_SUBU t0, t1, t0
-	csetbounds CHERI_REG_GPC, CHERI_REG_GPC, t0
-	REG_LI	t0, (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
-	candperm CHERI_REG_GPC, CHERI_REG_GPC, t0
-
-	/* Preserve a copy in KDC for exception handlers. */
-	csetkdc		CHERI_REG_GPC
-
-	/* Clear DDC */
+	/* Clear DDC and KDC */
 	csetdefault	$cnull
+	csetkdc		$cnull
 
 	/*
 	 * Create a reduced PCC.
@@ -189,8 +176,8 @@ VECTOR(_locore, unknown)
 	csetkcc		$c27
 
 	/* Install the new PCC. */
-	LONG_LA		t0, 1f
-	csetaddress	$c27, $c27, t0
+	ABSRELOC_LA(t0, 1f)
+	csetaddr	$c27, $c27, t0
 	cjr		$c27
 	nop
 1:
@@ -228,20 +215,20 @@ VECTOR(_locore, unknown)
 
 	/* Now we can use cap-table relocations safely */
 	cmove	$c3, $c28
-	CAPCALL_LOAD($c12, _C_LABEL(cheri_init_capabilities))
+	CAPCALL_PCREL_LOAD($c12, t0, _C_LABEL(cheri_init_capabilities))
 	cjalr	$c12, $c17
 	nop
 
-	/* Clear all remaining capabilities */
+	/* Clear most remaining capabilities */
 	cclearlo	0xf7ff	# keep c11
-	cclearhi	0x9bff	# keep c26, c29, c30
+	cclearhi	0x9fff	# keep c29, c30
 
 	/* Call the platform-specific startup code. */
 	move a0, s0
 	move a1, s1
 	move a2, s2
 	move a3, s3
-	CAPCALL_LOAD($c12, _C_LABEL(platform_start))
+	CAPCALL_PCREL_LOAD($c12, t0, _C_LABEL(platform_start))
 	cjalr	$c12, $c17
 	nop
 
@@ -249,7 +236,7 @@ VECTOR(_locore, unknown)
 	 * thread0 set thread0 kstack to the bottom of the stack
 	 * region, realign thread0 kstack and start using it.
 	 */
-	CAPTABLE_LOAD($c3, _C_LABEL(thread0_st))
+	CAPTABLE_PCREL_LOAD($c3, t0, _C_LABEL(thread0_st))
 	clc	CHERI_REG_STC, zero, TD_KSTACK($c3)
 	cgetlen	a0, CHERI_REG_STC
 	REG_LI	t0, ~(CHERICAP_SIZE - 1)
@@ -262,7 +249,7 @@ VECTOR(_locore, unknown)
 	csc	$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
 #endif
 
-	CAPCALL_LOAD($c12, _C_LABEL(mi_startup))
+	CAPCALL_PCREL_LOAD($c12, t0, _C_LABEL(mi_startup))
 	cjalr	$c12, $c17
 	cmove	$c3, $cnull
 

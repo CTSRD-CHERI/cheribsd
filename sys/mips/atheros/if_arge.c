@@ -1792,7 +1792,7 @@ arge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 #endif
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		ARGE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -1813,13 +1813,13 @@ arge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		ARGE_UNLOCK(sc);
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		/* XXX: implement SIOCDELMULTI */
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		if (sc->arge_miibus) {
 			mii = device_get_softc(sc->arge_miibus);
 			error = ifmedia_ioctl(ifp, ifr, &mii->mii_media,
@@ -1829,12 +1829,12 @@ arge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			error = ifmedia_ioctl(ifp, ifr, &sc->arge_ifmedia,
 			    command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		/* XXX: Check other capabilities */
 #ifdef DEVICE_POLLING
-		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
+		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
 		if (mask & IFCAP_POLLING) {
-			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
+			if (ifr->ifr_reqcap & IFCAP_POLLING) {
 				ARGE_WRITE(sc, AR71XX_DMA_INTR, 0);
 				error = ether_poll_register(arge_poll, ifp);
 				if (error)
@@ -2794,12 +2794,3 @@ argemdio_detach(device_t dev)
 }
 
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

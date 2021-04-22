@@ -55,7 +55,11 @@
 #define YAMON_GETCHAR_OFS	(YAMON_FUNCTION_BASE + 0x50)
 #define YAMON_SYSCON_READ_OFS	(YAMON_FUNCTION_BASE + 0x54)
 
+typedef int t_yamon_syscon_id;
+
 #define YAMON_FUNC(ofs)		((long)(*(int32_t *)(MIPS_PHYS_TO_KSEG0(ofs))))
+
+#ifndef __CHERI_PURE_CAPABILITY__
 
 typedef void (*t_yamon_print_count)(uint32_t port, char *s, uint32_t count);
 #define YAMON_PRINT_COUNT(s, count) \
@@ -71,12 +75,21 @@ typedef int (*t_yamon_getchar)(uint32_t port, char *ch);
 #define YAMON_GETCHAR(ch) \
 	((t_yamon_getchar)(YAMON_FUNC(YAMON_GETCHAR_OFS)))(0, ch)
 
-typedef int t_yamon_syscon_id;
 typedef int (*t_yamon_syscon_read)(t_yamon_syscon_id id, void *param,
 				   uint32_t size);
 #define YAMON_SYSCON_READ(id, param, size)				\
 	((t_yamon_syscon_read)(YAMON_FUNC(YAMON_SYSCON_READ_OFS)))	\
 	(id, param, size)
+#else /* __CHERI_PURE_CAPABILITY__ */
+/* Can not call YAMON functions with purecap ABI so wrap the calls */
+
+inline int _yamon_syscon_read(t_yamon_syscon_id id, void *param, uint32_t size);
+int _yamon_cheri_syscon_read(ptraddr_t fn_addr, t_yamon_syscon_id id, void *param,
+			     uint32_t size);
+
+#define YAMON_SYSCON_READ(id, param, size) _yamon_syscon_read(id, param, size)
+
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 typedef struct {
 	char *name;
@@ -93,3 +106,12 @@ uint32_t	yamon_getcpufreq(void);
 extern yamon_env_t *fenvp[];
 
 #endif /* _MALTA_YAMON_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "monotonicity"
+//   ]
+// }
+// CHERI CHANGES END

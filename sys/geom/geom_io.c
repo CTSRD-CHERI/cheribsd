@@ -745,7 +745,7 @@ SYSCTL_INT(_kern_geom, OID_AUTO, inflight_transient_maps, CTLFLAG_RD,
 static int
 g_io_transient_map_bio(struct bio *bp)
 {
-	vm_offset_t addr;
+	vm_pointer_t addr;
 	long size;
 	u_int retried;
 
@@ -1078,3 +1078,12 @@ g_format_bio(struct sbuf *sb, const struct bio *bp)
 	sbuf_printf(sb, "%s[%s(offset=%jd, length=%jd)]", pname, cmd,
 	    (intmax_t)bp->bio_offset, (intmax_t)bp->bio_length);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

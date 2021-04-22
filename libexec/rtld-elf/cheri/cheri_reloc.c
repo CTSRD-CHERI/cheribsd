@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #include "debug.h"
 #include "rtld.h"
 
+#ifdef RTLD_HAS_CAPRELOCS
 void
 process___cap_relocs(Obj_Entry* obj)
 {
@@ -64,34 +65,21 @@ process___cap_relocs(Obj_Entry* obj)
 	 *
 	 * TODO: reject those binaries and suggest relinking with the right flag
 	 */
-	void *data_base = obj->relocbase;
-	const void *code_base = get_codesegment(obj);
+	void * __capability data_base = get_datasegment_cap(obj);
+	const void * __capability code_base = get_codesegment_cap(obj);
 
-	dbg("Processing %lu __cap_relocs for %s (code base = %-#p, data base = %-#p) \n",
+	dbg("Processing %lu __cap_relocs for %s (code base = %#lp, data base = %#lp)\n",
 	    (end_relocs - start_relocs), obj->path, code_base, data_base);
 
-#ifdef __mips__
-	/*
-	 * We have dynamic relocations for the cap_relocs location, unless the
-	 * binary has the DF_MIPS_CHERI_RELATIVE_CAPRELOCS flag set.
-	 * In the non-relative case we do not need to add the base address since
-	 * that value will already have been added by the relocation processing.
-	 */
-	if (!obj->relative_cap_relocs) {
-		rtld_fdprintf(STDERR_FILENO,
-		    "File '%s' still uses old __cap_relocs. Please recompile "
-		    "it with a newer toolchain.\n", obj->path);
-	}
-	// If the binary includes the RELATIVE_CAPRELOCS dynamic flag we have
-	// to add getaddr(relocbase) to every __cap_reloc location and object.
-	vaddr_t base_addr = obj->relative_cap_relocs ? cheri_getaddress(obj->relocbase) : 0;
+	ptraddr_t base_addr = (ptraddr_t)(uintptr_t)obj->relocbase;
+	bool tight_pcc_bounds;
+#ifdef __CHERI_PURE_CAPABILITY__
+	tight_pcc_bounds = can_use_tight_pcc_bounds(obj);
 #else
-	/* Newer architectures have relative __cap_relocs out of the box */
-	vaddr_t base_addr = cheri_getaddress(obj->relocbase);
+	tight_pcc_bounds = false;
 #endif
-
 	_do___caprelocs(start_relocs, end_relocs, data_base, code_base, base_addr,
-	    can_use_tight_pcc_bounds(obj));
+	    tight_pcc_bounds);
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 	// TODO: do this later
 	if (obj->per_function_captable) {
@@ -108,3 +96,4 @@ process___cap_relocs(Obj_Entry* obj)
 #endif
 	obj->cap_relocs_processed = true;
 }
+#endif

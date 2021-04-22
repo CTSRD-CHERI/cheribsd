@@ -34,7 +34,6 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/eventhandler.h>
 #include <sys/kernel.h>
 #include <sys/fnv_hash.h>
 #include <sys/jail.h>
@@ -534,19 +533,19 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
-	case CASE_IOC_IFREQ(SIOCGIFMTU):
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
+	case SIOCGIFMTU:
+	case SIOCSIFFLAGS:
 		return (0);
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < IPSEC_MTU_MIN ||
-		    ifr_mtu_get(ifr) > IPSEC_MTU_MAX)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < IPSEC_MTU_MIN ||
+		    ifr->ifr_mtu > IPSEC_MTU_MAX)
 			return (EINVAL);
 		else
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 		return (0);
 	}
 	sx_xlock(&ipsec_ioctl_sx);
@@ -653,11 +652,11 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		};
 		error = ipsec_set_addresses(ifp, src, dst);
 		break;
-	case CASE_IOC_IFREQ(SIOCDIFPHYADDR):
+	case SIOCDIFPHYADDR:
 		ipsec_delete_tunnel(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
-	case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+	case SIOCGIFPSRCADDR:
+	case SIOCGIFPDSTADDR:
 #ifdef INET6
 	case SIOCGIFPSRCADDR_IN6:
 	case SIOCGIFPDSTADDR_IN6:
@@ -669,13 +668,13 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		saidx = ipsec_getsaidx(sc, IPSEC_DIR_OUTBOUND, sc->family);
 		switch (cmd) {
 #ifdef INET
-		case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
-		case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+		case SIOCGIFPSRCADDR:
+		case SIOCGIFPDSTADDR:
 			if (saidx->src.sa.sa_family != AF_INET) {
 				error = EADDRNOTAVAIL;
 				break;
 			}
-			sin = (struct sockaddr_in *)ifr_addr_get_sa(ifr);
+			sin = (struct sockaddr_in *)&ifr->ifr_addr;
 			memset(sin, 0, sizeof(*sin));
 			sin->sin_family = AF_INET;
 			sin->sin_len = sizeof(*sin);
@@ -688,7 +687,8 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				error = EADDRNOTAVAIL;
 				break;
 			}
-			sin6 = (struct sockaddr_in6 *)ifr_addr_get_sa(data);
+			sin6 = (struct sockaddr_in6 *)
+				&(((struct in6_ifreq *)data)->ifr_addr);
 			memset(sin6, 0, sizeof(*sin6));
 			sin6->sin6_family = AF_INET6;
 			sin6->sin6_len = sizeof(*sin6);
@@ -700,10 +700,10 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (error == 0) {
 			switch (cmd) {
 #ifdef INET
-			case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+			case SIOCGIFPSRCADDR:
 				sin->sin_addr = saidx->src.sin.sin_addr;
 				break;
-			case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+			case SIOCGIFPDSTADDR:
 				sin->sin_addr = saidx->dst.sin.sin_addr;
 				break;
 #endif
@@ -721,8 +721,8 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		switch (cmd) {
 #ifdef INET
-		case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
-		case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+		case SIOCGIFPSRCADDR:
+		case SIOCGIFPDSTADDR:
 			error = prison_if(curthread->td_ucred,
 			    (struct sockaddr *)sin);
 			if (error != 0)
@@ -741,25 +741,27 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCGTUNFIB):
-		ifr_fib_set(ifr, sc->fibnum);
+	case SIOCGTUNFIB:
+		ifr->ifr_fib = sc->fibnum;
 		break;
-	case CASE_IOC_IFREQ(SIOCSTUNFIB):
+	case SIOCSTUNFIB:
 		if ((error = priv_check(curthread, PRIV_NET_SETIFFIB)) != 0)
 			break;
-		if (ifr_fib_get(ifr) >= rt_numfibs)
+		if (ifr->ifr_fib >= rt_numfibs)
 			error = EINVAL;
 		else
-			sc->fibnum = ifr_fib_get(ifr);
+			sc->fibnum = ifr->ifr_fib;
 		break;
 	case CASE_IOC_IFREQ(IPSECGREQID):
 		reqid = sc->reqid;
-		error = copyout(&reqid, ifr_data_get_ptr(ifr), sizeof(reqid));
+		error = copyout(&reqid, ifr_data_get_ptr(cmd, ifr),
+		    sizeof(reqid));
 		break;
 	case CASE_IOC_IFREQ(IPSECSREQID):
 		if ((error = priv_check(curthread, PRIV_NET_SETIFCAP)) != 0)
 			break;
-		error = copyin(ifr_data_get_ptr(ifr), &reqid, sizeof(reqid));
+		error = copyin(ifr_data_get_ptr(cmd, ifr), &reqid,
+		    sizeof(reqid));
 		if (error != 0)
 			break;
 		error = ipsec_set_reqid(sc, reqid);

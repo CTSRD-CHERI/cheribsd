@@ -10,8 +10,6 @@ WANT_CHERI=	yes
 
 NO_SHARED?=	YES
 
-NO_WERROR=	YES
-
 LIBADD+= pthread
 
 .if ${MACHINE_ABI:Mpurecap} && ${MK_LIBCHERI} == "yes"

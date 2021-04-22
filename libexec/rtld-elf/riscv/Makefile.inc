@@ -1,0 +1,5 @@
+# $FreeBSD$
+
+.if ${MACHINE_CPU:Mcheri}
+CFLAGS+=	-DRTLD_HAS_CAPRELOCS
+.endif

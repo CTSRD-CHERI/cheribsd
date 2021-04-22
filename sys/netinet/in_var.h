@@ -73,7 +73,8 @@ struct in_ifinfo {
  * of the structure and is assumed to be first.
  */
 struct in_ifaddr {
-	struct	ifaddr ia_ifa;		/* protocol-independent info */
+	struct	ifaddr ia_ifa __subobject_use_container_bounds;
+					/* protocol-independent info */
 #define	ia_ifp		ia_ifa.ifa_ifp
 #define ia_flags	ia_ifa.ifa_flags
 					/* ia_subnet{,mask} in host order */
@@ -481,3 +482,12 @@ void	in_detachhead(struct rib_head *rh);
 #include <netinet6/in6_var.h>
 
 #endif /* _NETINET_IN_VAR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190822,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

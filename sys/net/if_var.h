@@ -432,7 +432,7 @@ struct ifnet {
 	 * Debugnet (Netdump) hooks to be called while in db/panic.
 	 */
 	struct debugnet_methods *if_debugnet_methods;
-	struct epoch_context	if_epoch_ctx;
+	struct epoch_context	if_epoch_ctx __subobject_use_container_bounds;
 
 	/*
 	 * Spare fields to be added before branching a stable branch, so
@@ -569,7 +569,7 @@ struct ifaddr {
 	counter_u64_t	ifa_opackets;
 	counter_u64_t	ifa_ibytes;
 	counter_u64_t	ifa_obytes;
-	struct	epoch_context	ifa_epoch_ctx;
+	struct	epoch_context	ifa_epoch_ctx __subobject_use_container_bounds;
 };
 
 struct ifaddr *	ifa_alloc(size_t size, int flags);
@@ -590,7 +590,7 @@ struct ifmultiaddr {
 	int	ifma_flags;
 	void	*ifma_protospec;	/* protocol-specific state, if any */
 	struct	ifmultiaddr *ifma_llifma; /* pointer to ifma for ifma_lladdr */
-	struct	epoch_context	ifma_epoch_ctx;
+	struct	epoch_context	ifma_epoch_ctx __subobject_use_container_bounds;
 };
 
 extern	struct sx ifnet_sxlock;
@@ -807,37 +807,20 @@ struct ifreq64 {
 	} ifr_ifru;
 };
 
-/* Helper macro for struct ifreq ioctls */
+/* Helper macros for struct ifreq ioctls */
+#define	IFREQ64(cmd)	_IOC_NEWTYPE((cmd), struct ifreq64)
 #define	CASE_IOC_IFREQ(cmd)					\
     (cmd):							\
-    case _IOC_NEWTYPE((cmd), struct ifreq64)
+    case IFREQ64(cmd)
 #else /* !COMPAT_FREEBSD64 */
 #define	CASE_IOC_IFREQ(cmd)					\
     (cmd)
 #endif /* !COMPAT_FREEBSD64 */
 
 /* accessors for struct ifreq */
-char *ifr_addr_get_data(void *ifrp);
-sa_family_t ifr_addr_get_family(void *ifrp);
-unsigned char ifr_addr_get_len(void *ifrp);
-struct sockaddr *ifr_addr_get_sa(void *ifrp);
-void * __capability ifr_buffer_get_buffer(void *data);
-size_t ifr_buffer_get_length(void *data);
-void * __capability ifr_data_get_ptr(void *ifrp);
-u_int ifr_fib_get(void *ifrp);
-void ifr_fib_set(void *ifrp, u_int fib);
-short ifr_flags_get(void *ifrp);
-void ifr_flags_set(void *ifrp, short val);
-void ifr_flagshigh_set(void *ifrp, short val);
-void ifr_reqcap_set(void *ifrp, int val);
-int ifr_media_get(void *ifrp);
-int ifr_mtu_get(void *ifrp);
-void ifr_mtu_set(void *ifrp, int val);
-int ifr_reqcap_get(void *ifrp);
-u_char ifr_lan_pcp_get(void *ifrp);
-void ifr_lan_pcp_set(void *ifrp, u_char pcp);
-u_char ifr_vlan_pcp_get(void *ifrp);
-void ifr_vlan_pcp_set(void *ifrp, u_char pcp);
+void * __capability ifr_buffer_get_buffer(u_long cmd, void *data);
+size_t ifr_buffer_get_length(u_long cmd, void *data);
+void * __capability ifr_data_get_ptr(u_long cmd, void *ifrp);
 
 int ifhwioctl(u_long, struct ifnet *, caddr_t, struct thread *);
 
@@ -856,10 +839,13 @@ int    ether_poll_deregister(if_t ifp);
 #endif /* !_NET_IF_VAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes": [
 //     "ioctl:net"
+//   ],
+//   "changes_purecap": [
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

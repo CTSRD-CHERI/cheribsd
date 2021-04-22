@@ -326,7 +326,7 @@ xchan_seg_done(xdma_channel_t *xchan,
 	struct xdma_request *xr;
 	xdma_controller_t *xdma;
 	struct xchan_buf *b;
-	bus_addr_t addr;
+	vm_pointer_t addr;
 
 	xdma = xchan->xdma;
 
@@ -354,9 +354,9 @@ xchan_seg_done(xdma_channel_t *xchan,
 				    (void *)xr->buf.vaddr);
 		} else if (xchan->caps & XCHAN_CAP_IOMMU) {
 			if (xr->direction == XDMA_MEM_TO_DEV)
-				addr = xr->src_addr;
+				addr = xr->src.vaddr;
 			else
-				addr = xr->dst_addr;
+				addr = xr->dst.vaddr;
 			xdma_iommu_remove_entry(xchan, addr);
 		}
 		xr->status.error = st->error;
@@ -397,8 +397,9 @@ xdma_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
 
 static int
 _xdma_load_data_busdma(xdma_channel_t *xchan, struct xdma_request *xr,
-    struct bus_dma_segment *seg)
+    struct xdma_sglist *sg)
 {
+	struct bus_dma_segment seg[XDMA_MAX_SEG];
 	xdma_controller_t *xdma;
 	struct seg_load_request slr;
 	uint32_t nsegs;
@@ -413,12 +414,12 @@ _xdma_load_data_busdma(xdma_channel_t *xchan, struct xdma_request *xr,
 	switch (xr->req_type) {
 	case XR_TYPE_MBUF:
 		error = bus_dmamap_load_mbuf_sg(xchan->dma_tag_bufs,
-		    xr->buf.map, xr->m, seg, &nsegs, BUS_DMA_NOWAIT);
+		    xr->buf.map, xr->m, &seg[0], &nsegs, BUS_DMA_NOWAIT);
 		break;
 	case XR_TYPE_BIO:
 		slr.nsegs = 0;
 		slr.error = 0;
-		slr.seg = seg;
+		slr.seg = &seg[0];
 		error = bus_dmamap_load_bio(xchan->dma_tag_bufs,
 		    xr->buf.map, xr->bp, xdma_dmamap_cb, &slr, BUS_DMA_NOWAIT);
 		if (slr.error != 0) {
@@ -432,10 +433,10 @@ _xdma_load_data_busdma(xdma_channel_t *xchan, struct xdma_request *xr,
 	case XR_TYPE_VIRT:
 		switch (xr->direction) {
 		case XDMA_MEM_TO_DEV:
-			addr = (void *)xr->src_addr;
+			addr = (void *)xr->src.vaddr;
 			break;
 		case XDMA_DEV_TO_MEM:
-			addr = (void *)xr->dst_addr;
+			addr = (void *)xr->dst.vaddr;
 			break;
 		default:
 			device_printf(xdma->dma_dev,
@@ -444,7 +445,7 @@ _xdma_load_data_busdma(xdma_channel_t *xchan, struct xdma_request *xr,
 		}
 		slr.nsegs = 0;
 		slr.error = 0;
-		slr.seg = seg;
+		slr.seg = &seg[0];
 		error = bus_dmamap_load(xchan->dma_tag_bufs, xr->buf.map,
 		    addr, (xr->block_len * xr->block_num),
 		    xdma_dmamap_cb, &slr, BUS_DMA_NOWAIT);
@@ -480,19 +481,24 @@ _xdma_load_data_busdma(xdma_channel_t *xchan, struct xdma_request *xr,
 		bus_dmamap_sync(xchan->dma_tag_bufs, xr->buf.map,
 		    BUS_DMASYNC_PREREAD);
 
+	xdma_sglist_add_busdma(sg, &seg[0], nsegs, xr);
+
 	return (nsegs);
 }
 
 static int
 _xdma_load_data(xdma_channel_t *xchan, struct xdma_request *xr,
-    struct bus_dma_segment *seg)
+    struct xdma_sglist *sg)
 {
 	xdma_controller_t *xdma;
 	struct mbuf *m;
 	uint32_t nsegs;
-	vm_offset_t va, addr;
+	vm_offset_t addr;
+	vm_pointer_t va;
 	bus_addr_t pa;
 	vm_prot_t prot;
+	xdma_request_addr_t seg_addr;
+	size_t len;
 
 	xdma = xchan->xdma;
 
@@ -509,9 +515,9 @@ _xdma_load_data(xdma_channel_t *xchan, struct xdma_request *xr,
 			if (xr->direction == XDMA_MEM_TO_DEV)
 				m_copydata(m, 0, m->m_pkthdr.len,
 				    (void *)xr->buf.vaddr);
-			seg[0].ds_addr = (bus_addr_t)xr->buf.paddr;
+			seg_addr.bus_addr = (bus_addr_t)xr->buf.paddr;
 		} else if (xchan->caps & XCHAN_CAP_IOMMU) {
-			addr = mtod(m, bus_addr_t);
+			addr = mtod(m, vm_offset_t);
 			pa = vtophys(addr);
 
 			if (xr->direction == XDMA_MEM_TO_DEV)
@@ -527,13 +533,13 @@ _xdma_load_data(xdma_channel_t *xchan, struct xdma_request *xr,
 			 * after completion of this transfer.
 			 */
 			if (xr->direction == XDMA_MEM_TO_DEV)
-				xr->src_addr = va;
+				xr->src.vaddr = va;
 			else
-				xr->dst_addr = va;
-			seg[0].ds_addr = va;
+				xr->dst.vaddr = va;
+			seg_addr.vaddr = va;
 		} else
-			seg[0].ds_addr = mtod(m, bus_addr_t);
-		seg[0].ds_len = m->m_pkthdr.len;
+			seg_addr.vaddr = mtod(m, uintptr_t);
+		len = m->m_pkthdr.len;
 		break;
 	case XR_TYPE_BIO:
 	case XR_TYPE_VIRT:
@@ -541,12 +547,16 @@ _xdma_load_data(xdma_channel_t *xchan, struct xdma_request *xr,
 		panic("implement me\n");
 	}
 
+	xdma_sglist_add(sg, seg_addr, len, xr);
+	sg->first = 1;
+	sg->last = 1;
+
 	return (nsegs);
 }
 
 static int
-xdma_load_data(xdma_channel_t *xchan,
-    struct xdma_request *xr, struct bus_dma_segment *seg)
+xdma_load_data(xdma_channel_t *xchan, struct xdma_request *xr,
+    struct xdma_sglist *sg)
 {
 	xdma_controller_t *xdma;
 	int error;
@@ -558,9 +568,9 @@ xdma_load_data(xdma_channel_t *xchan,
 	nsegs = 0;
 
 	if (xchan->caps & XCHAN_CAP_BUSDMA)
-		nsegs = _xdma_load_data_busdma(xchan, xr, seg);
+		nsegs = _xdma_load_data_busdma(xchan, xr, sg);
 	else
-		nsegs = _xdma_load_data(xchan, xr, seg);
+		nsegs = _xdma_load_data(xchan, xr, sg);
 	if (nsegs == 0)
 		return (0); /* Try again later. */
 
@@ -571,10 +581,8 @@ xdma_load_data(xdma_channel_t *xchan,
 }
 
 static int
-xdma_process(xdma_channel_t *xchan,
-    struct xdma_sglist *sg)
+xdma_process(xdma_channel_t *xchan, struct xdma_sglist *sg)
 {
-	struct bus_dma_segment seg[XDMA_MAX_SEG];
 	struct xdma_request *xr;
 	struct xdma_request *xr_tmp;
 	xdma_controller_t *xdma;
@@ -624,11 +632,10 @@ xdma_process(xdma_channel_t *xchan,
 			break;
 		}
 
-		nsegs = xdma_load_data(xchan, xr, seg);
+		nsegs = xdma_load_data(xchan, xr, &sg[n]);
 		if (nsegs == 0)
 			break;
 
-		xdma_sglist_add(&sg[n], seg, nsegs, xr);
 		n += nsegs;
 
 		QUEUE_IN_LOCK(xchan);
@@ -680,3 +687,13 @@ xdma_queue_submit_sg(xdma_channel_t *xchan)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ],
+//   "change_comment": "bus_addr_t"
+// }
+// CHERI CHANGES END

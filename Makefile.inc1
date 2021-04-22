@@ -787,7 +787,7 @@ BSARGS= 	DESTDIR= \
 		SSP_CFLAGS= \
 		MK_HTML=no NO_LINT=yes MK_MAN=no MK_MAN_UTILS=yes \
 		-DNO_PIC MK_PROFILE=no -DNO_SHARED \
-		-DNO_CPU_CFLAGS MK_WARNS=no MK_CTF=no \
+		-DNO_CPU_CFLAGS MK_WERROR=no MK_CTF=no \
 		MK_CLANG_EXTRAS=no MK_CLANG_FORMAT=no MK_CLANG_FULL=no \
 		MK_LLDB=no MK_RETPOLINE=no MK_TESTS=no \
 		MK_INCLUDES=yes
@@ -808,7 +808,7 @@ TMAKE=		\
 		BWPHASE=${.TARGET:C,^_,,} \
 		SSP_CFLAGS= \
 		-DNO_LINT \
-		-DNO_CPU_CFLAGS MK_WARNS=no MK_CTF=no \
+		-DNO_CPU_CFLAGS MK_WERROR=no MK_CTF=no \
 		MK_CLANG_EXTRAS=no MK_CLANG_FORMAT=no MK_CLANG_FULL=no \
 		BUILD_TOOLS_CC="env PATH=${PATH}:/usr/bin:/bin ${COMPILER_ABSOLUTE_PATH}" \
 		MK_LLDB=no MK_RETPOLINE=no MK_TESTS=no
@@ -837,7 +837,7 @@ KTMAKE=		\
 		SSP_CFLAGS= \
 		MK_HTML=no -DNO_LINT MK_MAN=no \
 		-DNO_PIC MK_PROFILE=no -DNO_SHARED \
-		-DNO_CPU_CFLAGS MK_RETPOLINE=no MK_WARNS=no MK_CTF=no
+		-DNO_CPU_CFLAGS MK_RETPOLINE=no MK_WERROR=no MK_CTF=no
 
 # world stage
 WMAKEENV=	${CROSSENV} \
@@ -2398,11 +2398,9 @@ _crunchide=	usr.sbin/crunch/crunchide
 _bootstrap_tools_links+=crunchide
 .endif
 
-.if 1
-# TODO: enable version check once patch has been upstreamed
 # 1300115: Higher WARNS fixes
-#.if ${BOOTSTRAPPING} < 1202502 || \
-#	(${BOOTSTRAPPING} > 1300000 && ${BOOTSTRAPPING} < 1300115)
+.if ${BOOTSTRAPPING} < 1202502 || \
+	(${BOOTSTRAPPING} > 1300000 && ${BOOTSTRAPPING} < 1300131)
 _crunchgen=	usr.sbin/crunch/crunchgen
 .else
 _bootstrap_tools_links+=crunchgen
@@ -2417,6 +2415,14 @@ _kbdcontrol=	usr.sbin/kbdcontrol
 .else
 _bootstrap_tools_links+=kbdcontrol
 .endif
+.endif
+
+# 1300102: VHDX support
+.if ${BOOTSTRAPPING} < 1201520 || \
+	(${BOOTSTRAPPING} > 1300000 && ${BOOTSTRAPPING} < 1300102)
+_mkimg=	usr.bin/mkimg
+.else
+_bootstrap_tools_links+=mkimg
 .endif
 
 _yacc=		usr.bin/yacc
@@ -2594,6 +2600,7 @@ bootstrap-tools: ${_bt}-links .PHONY
     ${_flua} \
     ${_crunchide} \
     ${_crunchgen} \
+    ${_mkimg} \
     ${_nmtree} \
     ${_vtfontcvt} \
     ${_localedef} \
@@ -2878,7 +2885,7 @@ NXBMAKEARGS+= \
 	MK_SENDMAIL=no \
 	MK_SVNLITE=no \
 	MK_TESTS=no \
-	MK_WARNS=no \
+	MK_WERROR=no \
 	MK_ZFS=no
 
 .if make(native-xtools*) && \
@@ -3513,7 +3520,7 @@ XDEV_CPUTYPE?=${TARGET_CPUTYPE}
 
 NOFUN=-DNO_FSCHG MK_HTML=no -DNO_LINT \
 	MK_MAN=no MK_NLS=no MK_PROFILE=no \
-	MK_KERBEROS=no MK_RESCUE=no MK_TESTS=no MK_WARNS=no \
+	MK_KERBEROS=no MK_RESCUE=no MK_TESTS=no MK_WERROR=no \
 	TARGET=${TARGET} TARGET_ARCH=${TARGET_ARCH} \
 	CPUTYPE=${XDEV_CPUTYPE}
 

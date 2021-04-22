@@ -1286,9 +1286,9 @@ ure_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 	reinit = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		URE_LOCK(sc);
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if ((mask & IFCAP_VLAN_HWTAGGING) != 0 &&
 		    (ifp->if_capabilities & IFCAP_VLAN_HWTAGGING) != 0) {
 			ifp->if_capenable ^= IFCAP_VLAN_HWTAGGING;
@@ -1319,27 +1319,26 @@ ure_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			uether_init(ue);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		/*
 		 * in testing large MTUs "crashes" the device, it
 		 * leaves the device w/ a broken state where link
 		 * is in a bad state.
 		 */
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		    ifr_mtu_get(ifr) > (4096 - ETHER_HDR_LEN -
+		if (ifr->ifr_mtu < ETHERMIN ||
+		    ifr->ifr_mtu > (4096 - ETHER_HDR_LEN -
 		    ETHER_VLAN_ENCAP_LEN - ETHER_CRC_LEN)) {
 			error = EINVAL;
 			break;
 		}
 		URE_LOCK(sc);
-		if (if_getmtu(ifp) != ifr_mtu_get(ifr))
-			if_setmtu(ifp, ifr_mtu_get(ifr));
+		if (if_getmtu(ifp) != ifr->ifr_mtu)
+			if_setmtu(ifp, ifr->ifr_mtu);
 		URE_UNLOCK(sc);
 		break;
 
 	default:
 		error = uether_ioctl(ifp, cmd, data);
-		break;
 	}
 
 	return (error);
@@ -1818,12 +1817,3 @@ ure_txcsum(struct mbuf *m, int caps, uint32_t *regout)
 	*regout = reg;
 	return 0;
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

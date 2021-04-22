@@ -1310,7 +1310,7 @@ smc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if ((ifp->if_flags & IFF_UP) == 0 &&
 		    (ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 			SMC_LOCK(sc);
@@ -1323,8 +1323,8 @@ smc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		/* XXX
 		SMC_LOCK(sc);
 		smc_setmcast(sc);
@@ -1334,7 +1334,7 @@ smc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		if (sc->smc_mii_mediaioctl == NULL) {
 			error = EINVAL;
 			break;
@@ -1349,12 +1349,3 @@ smc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	return (error);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

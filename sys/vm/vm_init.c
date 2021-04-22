@@ -143,6 +143,7 @@ vm_mem_init(void *dummy)
 	vm_object_init();
 	vm_map_startup();
 	kmem_init(virtual_avail, virtual_end);
+	/* XXX-AM: in principle we could now destroy the virtual_avail/end capabilities */
 
 	kmem_init_zero_region();
 	pmap_init();
@@ -156,8 +157,8 @@ vm_ksubmap_init(struct kva_md_info *kmi)
 	caddr_t v;
 	vm_size_t size = 0;
 	long physmem_est;
-	vm_offset_t minaddr;
-	vm_offset_t maxaddr;
+	vm_pointer_t minaddr;
+	vm_pointer_t maxaddr;
 
 	/*
 	 * Allocate space for system data structures.
@@ -208,7 +209,7 @@ again:
 	/*
 	 * End of second pass, addresses have been assigned
 	 */
-	if ((vm_size_t)((char *)v - firstaddr) != size)
+	if ((vm_size_t)(v - firstaddr) != size)
 		panic("startup: table size inconsistency");
 
 	/*
@@ -230,7 +231,8 @@ again:
 	kmi->buffer_sva = (vm_offset_t)firstaddr;
 	kmi->buffer_eva = kmi->buffer_sva + size;
 	vmem_init(buffer_arena, "buffer arena", firstaddr, size,
-	    PAGE_SIZE, (mp_ncpus > 4) ? BKVASIZE * 8 : 0, 0);
+	    PAGE_SIZE, (mp_ncpus > 4) ? BKVASIZE * 8 : 0, 0,
+	    VMEM_CAPABILITY_ARENA);
 
 	/*
 	 * And optionally transient bio space.
@@ -249,7 +251,7 @@ again:
 		kmi->transient_sva = (vm_offset_t)firstaddr;
 		kmi->transient_eva = kmi->transient_sva + size;
 		vmem_init(transient_arena, "transient arena",
-		    firstaddr, size, PAGE_SIZE, 0, 0);
+		    firstaddr, size, PAGE_SIZE, 0, 0, VMEM_CAPABILITY_ARENA);
 	}
 
 	/*
@@ -269,3 +271,12 @@ again:
 	kmem_subinit(pipe_map, kernel_map, &minaddr, &maxaddr, maxpipekva,
 	    false);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 2020706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "bounds_compression"
+//   ]
+// }
+// CHERI CHANGES END

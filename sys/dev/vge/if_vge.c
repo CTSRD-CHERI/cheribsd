@@ -2267,21 +2267,20 @@ vge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0, mask;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		VGE_LOCK(sc);
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		    ifr_mtu_get(ifr) > VGE_JUMBO_MTU)
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > VGE_JUMBO_MTU)
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
-			if (ifr_mtu_get(ifr) > ETHERMTU &&
+		else if (ifp->if_mtu != ifr->ifr_mtu) {
+			if (ifr->ifr_mtu > ETHERMTU &&
 			    (sc->vge_flags & VGE_FLAG_JUMBO) == 0)
 				error = EINVAL;
 			else
-				ifp->if_mtu = ifr_mtu_get(ifr);
+				ifp->if_mtu = ifr->ifr_mtu;
 		}
 		VGE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		VGE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -2295,23 +2294,23 @@ vge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->vge_if_flags = ifp->if_flags;
 		VGE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		VGE_LOCK(sc);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			vge_rxfilter(sc);
 		VGE_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		mii = device_get_softc(sc->vge_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+	case SIOCSIFCAP:
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
+			if (ifr->ifr_reqcap & IFCAP_POLLING) {
 				error = ether_poll_register(vge_poll, ifp);
 				if (error)
 					return (error);
@@ -2937,12 +2936,3 @@ vge_clrwol(struct vge_softc *sc)
 	CSR_WRITE_1(sc, VGE_WOLSR0C, 0xFF);
 	CSR_WRITE_1(sc, VGE_WOLSR1C, 0xFF);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

@@ -119,7 +119,8 @@ SLIST_HEAD(in6_multi_head, in6_multi);
 MALLOC_DECLARE(M_IP6MADDR);
 
 struct	in6_ifaddr {
-	struct	ifaddr ia_ifa;		/* protocol-independent info */
+	struct	ifaddr ia_ifa __subobject_use_container_bounds;
+					/* protocol-independent info */
 #define	ia_ifp		ia_ifa.ifa_ifp
 #define ia_flags	ia_ifa.ifa_flags
 	struct	sockaddr_in6 ia_addr;	/* interface address */
@@ -921,3 +922,13 @@ struct mbuf *ip6_tryforward(struct mbuf *);
 #endif /* _KERNEL */
 
 #endif /* _NETINET6_IN6_VAR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20191205,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "user_capabilities",
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

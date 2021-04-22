@@ -108,6 +108,11 @@ struct cheri_kframe {
 	void * __capability	ckf_c22;
 	void * __capability	ckf_c23;
 	void * __capability	ckf_c24;
+	void * __capability	ckf_c26;
+#ifdef __CHERI_PURE_CAPABILITY__
+	void *			ckf_pcc;
+	void *			ckf_stc;
+#endif
 };
 
 /* Return userspace DDC and PCC of current thread. */
@@ -200,6 +205,6 @@ void cheri_trace_log(void *buf, size_t len, int format);
 //   "changes_purecap": [
 //     "support"
 //   ],
-//   "change_comment": "purecap caprelocs"
+//   "change_comment": "purecap caprelocs, kframe."
 // }
 // CHERI CHANGES END

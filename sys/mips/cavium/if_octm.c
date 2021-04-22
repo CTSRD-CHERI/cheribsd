@@ -430,7 +430,7 @@ octm_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 #ifdef INET
 		/*
 		 * Avoid reinitialization unless it's necessary.
@@ -449,7 +449,7 @@ octm_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			return (error);
 		return (0);
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if (ifp->if_flags == sc->sc_flags)
 			return (0);
 		if ((ifp->if_flags & IFF_UP) != 0) {
@@ -463,22 +463,21 @@ octm_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		sc->sc_flags = ifp->if_flags;
 		return (0);
-	
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+
+	case SIOCSIFCAP:
 		/*
 		 * Just change the capabilities in software, currently none
 		 * require reprogramming hardware, they just toggle whether we
 		 * make use of already-present facilities in software.
 		 */
-		ifp->if_capenable = ifr_reqcap_get(ifr);
+		ifp->if_capenable = ifr->ifr_reqcap;
 		return (0);
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		cvmx_mgmt_port_set_max_packet_size(sc->sc_port,
-		    ifr_mtu_get(ifr) + ifp->if_hdrlen);
+	case SIOCSIFMTU:
+		cvmx_mgmt_port_set_max_packet_size(sc->sc_port, ifr->ifr_mtu + ifp->if_hdrlen);
 		return (0);
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_ifmedia, cmd);
 		if (error != 0)
@@ -537,12 +536,3 @@ octm_rx_intr(void *arg)
 	cvmx_write_csr(CVMX_MIXX_ISR(sc->sc_port), mixx_isr.u64);
 	cvmx_read_csr(CVMX_MIXX_ISR(sc->sc_port));
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

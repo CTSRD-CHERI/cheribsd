@@ -67,8 +67,6 @@ static const unsigned long mask80 = 0x8080808080808080;
 #error Unsupported word size
 #endif
 
-#define	LONGPTR_MASK (sizeof(long) - 1)
-
 /*
  * Helper macro to return string length if we caught the zero
  * byte.
@@ -85,6 +83,7 @@ size_t
 	const char *p;
 	const unsigned long *lp;
 	long va, vb;
+	bool byte_check;
 
 	/*
 	 * Before trying the hard (unaligned byte-by-byte access) way
@@ -95,19 +94,34 @@ size_t
 	 * p and (p & ~LONGPTR_MASK) must be equally accessible since
 	 * they always fall in the same memory page, as long as page
 	 * boundaries is integral multiple of word size.
+	 *
+	 * This is not true for CHERI, so we skip directly to byte
+	 * access if not word-aligned.
 	 */
-	lp = (const unsigned long *)((uintptr_t)str & ~LONGPTR_MASK);
+	lp = (const unsigned long *)rounddown2(str, sizeof(long));
+#ifdef __CHERI_PURE_CAPABILITY__
+	byte_check = ((const char *)lp < str);
+	if (byte_check)
+		lp++;
+#else
 	va = (*lp - mask01);
 	vb = ((~*lp) & mask80);
 	lp++;
-	if (va & vb)
+	byte_check = (bool)(va & vb);
+#endif
+	if (byte_check)
 		/* Check if we have \0 in the first part */
 		for (p = str; p < (const char *)lp; p++)
 			if (*p == '\0')
 				return (p - str);
 
 	/* Scan the rest of the string using word sized operation */
-	for (; ; lp++) {
+#ifdef __CHERI_PURE_CAPABILITY__
+	for (; cheri_getlen(lp) - cheri_getoffset(lp) >= sizeof(long); lp++)
+#else
+	for (; ; lp++)
+#endif
+	{
 		va = (*lp - mask01);
 		vb = ((~*lp) & mask80);
 		if (va & vb) {
@@ -125,6 +139,25 @@ size_t
 		}
 	}
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Check if we need to scan byte-by-byte at the end of the string */
+	if ((ptraddr_t)lp != cheri_gettop(lp)) {
+		for (p = (const char *)lp; ; p++)
+			if (*p == '\0')
+				return (p - str);
+	}
+#endif
+
 	/* NOTREACHED */
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20171211,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_shape",
+//     "unsupported"
+//   ]
+// }
+// CHERI CHANGES END

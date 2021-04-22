@@ -135,7 +135,8 @@ VNET_PCPUSTAT_DECLARE(struct rtstat, rtstat);
 #define RNTORT(p)	((struct rtentry *)(p))
 
 struct rtentry {
-	struct	radix_node rt_nodes[2];	/* tree glue, and other values */
+	/* tree glue, and other values */
+	struct	radix_node rt_nodes[2] __subobject_use_container_bounds;
 	/*
 	 * XXX struct rtentry must begin with a struct radix_node (or two!)
 	 * because the code does some casts of a 'struct radix_node *'
@@ -170,7 +171,8 @@ struct rtentry {
 	u_long		rt_weight;	/* absolute weight */ 
 	u_long		rt_expire;	/* lifetime for route, e.g. redirect */
 	struct rtentry	*rt_chain;	/* pointer to next rtentry to delete */
-	struct epoch_context	rt_epoch_ctx;	/* net epoch tracker */
+	/* net epoch tracker */
+	struct epoch_context	rt_epoch_ctx __subobject_use_container_bounds;
 };
 
 /*
@@ -312,3 +314,12 @@ void nhgrp_free(struct nhgrp_object *nhg);
 extern uint8_t mpath_entropy_key[MPATH_ENTROPY_KEY_LEN];
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

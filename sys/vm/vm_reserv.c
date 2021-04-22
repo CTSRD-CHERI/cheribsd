@@ -1427,7 +1427,7 @@ vm_reserv_size(int level)
  * management system's data structures, in particular, the reservation array.
  */
 vm_paddr_t
-vm_reserv_startup(vm_offset_t *vaddr, vm_paddr_t end)
+vm_reserv_startup(vm_pointer_t *vaddr, vm_paddr_t end)
 {
 	vm_paddr_t new_end;
 	vm_pindex_t count;
@@ -1498,3 +1498,13 @@ vm_reserv_to_superpage(vm_page_t m)
 }
 
 #endif	/* VM_NRESERVLEVEL > 0 */
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

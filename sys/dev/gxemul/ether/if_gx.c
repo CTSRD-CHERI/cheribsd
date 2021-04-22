@@ -293,7 +293,7 @@ gx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 #ifdef INET
 		/*
 		 * Avoid reinitialization unless it's necessary.
@@ -312,7 +312,7 @@ gx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			return (error);
 		return (0);
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if (ifp->if_flags == sc->sc_flags)
 			return (0);
 		if ((ifp->if_flags & IFF_UP) != 0) {
@@ -325,12 +325,12 @@ gx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->sc_flags = ifp->if_flags;
 		return (0);
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) + ifp->if_hdrlen > GXEMUL_ETHER_DEV_MTU)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu + ifp->if_hdrlen > GXEMUL_ETHER_DEV_MTU)
 			return (ENOTSUP);
 		return (0);
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_ifmedia, cmd);
 		if (error != 0)
@@ -398,12 +398,3 @@ gx_rx_intr(void *arg)
 	}
 	GXEMUL_ETHER_UNLOCK(sc);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

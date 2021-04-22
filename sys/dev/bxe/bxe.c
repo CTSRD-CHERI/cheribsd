@@ -4519,29 +4519,34 @@ bxe_ioctl(if_t ifp,
 
     switch (command)
     {
-    case CASE_IOC_IFREQ(SIOCSIFMTU):
+    case SIOCSIFMTU:
         BLOGD(sc, DBG_IOCTL, "Received SIOCSIFMTU ioctl (mtu=%d)\n",
-              ifr_mtu_get(ifr));
+              ifr->ifr_mtu);
 
-        if (sc->mtu == ifr_mtu_get(ifr)) {
+        if (sc->mtu == ifr->ifr_mtu) {
             /* nothing to change */
             break;
         }
 
-        if ((ifr_mtu_get(ifr) < mtu_min) || (ifr_mtu_get(ifr) > mtu_max)) {
+        if ((ifr->ifr_mtu < mtu_min) || (ifr->ifr_mtu > mtu_max)) {
             BLOGE(sc, "Unsupported MTU size %d (range is %d-%d)\n",
-                  ifr_mtu_get(ifr), mtu_min, mtu_max);
+                  ifr->ifr_mtu, mtu_min, mtu_max);
             error = EINVAL;
             break;
         }
 
         atomic_store_rel_int((volatile unsigned int *)&sc->mtu,
-                             ifr_mtu_get(ifr));
-	if_setmtu(ifp, ifr_mtu_get(ifr));
+                             (unsigned long)ifr->ifr_mtu);
+	/* 
+        atomic_store_rel_long((volatile unsigned long *)&if_getmtu(ifp),
+                              (unsigned long)ifr->ifr_mtu);
+	XXX - Not sure why it needs to be atomic
+	*/
+	if_setmtu(ifp, ifr->ifr_mtu);
         reinit = 1;
         break;
 
-    case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+    case SIOCSIFFLAGS:
         /* toggle the interface state up or down */
         BLOGD(sc, DBG_IOCTL, "Received SIOCSIFFLAGS ioctl\n");
 
@@ -4564,8 +4569,8 @@ bxe_ioctl(if_t ifp,
 
         break;
 
-    case CASE_IOC_IFREQ(SIOCADDMULTI):
-    case CASE_IOC_IFREQ(SIOCDELMULTI):
+    case SIOCADDMULTI:
+    case SIOCDELMULTI:
         /* add/delete multicast addresses */
         BLOGD(sc, DBG_IOCTL, "Received SIOCADDMULTI/SIOCDELMULTI ioctl\n");
 
@@ -4579,9 +4584,9 @@ bxe_ioctl(if_t ifp,
 
         break;
 
-    case CASE_IOC_IFREQ(SIOCSIFCAP):
+    case SIOCSIFCAP:
         /* find out which capabilities have changed */
-        mask = (ifr_reqcap_get(ifr) ^ if_getcapenable(ifp));
+        mask = (ifr->ifr_reqcap ^ if_getcapenable(ifp));
 
         BLOGD(sc, DBG_IOCTL, "Received SIOCSIFCAP ioctl (mask=0x%08x)\n",
               mask);
@@ -4684,7 +4689,7 @@ bxe_ioctl(if_t ifp,
 
         break;
 
-    case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+    case SIOCSIFMEDIA:
     case SIOCGIFMEDIA:
         /* set/get interface media */
         BLOGD(sc, DBG_IOCTL,
@@ -19485,12 +19490,3 @@ bxe_debugnet_poll(struct ifnet *ifp, int count)
 	return (0);
 }
 #endif /* DEBUGNET */
-// CHERI CHANGES START
-// {
-//   "updated": 20191029,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

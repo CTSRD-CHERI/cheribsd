@@ -3045,16 +3045,16 @@ alc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		    ifr_mtu_get(ifr) > (sc->alc_ident->max_framelen -
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN ||
+		    ifr->ifr_mtu > (sc->alc_ident->max_framelen -
 		    sizeof(struct ether_vlan_header) - ETHER_CRC_LEN) ||
 		    ((sc->alc_flags & ALC_FLAG_JUMBO) == 0 &&
-		    ifr_mtu_get(ifr) > ETHERMTU))
+		    ifr->ifr_mtu > ETHERMTU))
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+		else if (ifp->if_mtu != ifr->ifr_mtu) {
 			ALC_LOCK(sc);
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			/* AR81[3567]x has 13 bits MSS field. */
 			if (ifp->if_mtu > ALC_TSO_MTU &&
 			    (ifp->if_capenable & IFCAP_TSO4) != 0) {
@@ -3065,7 +3065,7 @@ alc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ALC_UNLOCK(sc);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		ALC_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -3079,21 +3079,21 @@ alc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->alc_if_flags = ifp->if_flags;
 		ALC_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		ALC_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			alc_rxfilter(sc);
 		ALC_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->alc_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		ALC_LOCK(sc);
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (ifp->if_capabilities & IFCAP_TXCSUM) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -4710,12 +4710,3 @@ alc_debugnet_poll(struct ifnet *ifp, int count)
 	return (alc_rxintr(sc, count));
 }
 #endif /* DEBUGNET */
-// CHERI CHANGES START
-// {
-//   "updated": 20191029,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

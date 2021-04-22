@@ -112,9 +112,6 @@ INCS+=		libcasper.h
 # not match.
 RPCINCS+=	${SRCTOP}/sys/rpc/types.h
 
-.if ${.MAKE.OS} != "FreeBSD"
-.PATH: ${.CURDIR}/cross-build
-
 INCS+=	${SRCTOP}/include/mpool.h
 INCS+=	${SRCTOP}/include/ndbm.h
 INCS+=	${SRCTOP}/include/err.h
@@ -149,6 +146,9 @@ INCS+=	${SRCTOP}/include/nlist.h
 SYSINCS+=	${SRCTOP}/sys/sys/imgact_aout.h
 SYSINCS+=	${SRCTOP}/sys/sys/nlist_aout.h
 
+
+.if ${.MAKE.OS} != "FreeBSD"
+.PATH: ${.CURDIR}/cross-build
 # dbopen() behaves differently on Linux and FreeBSD so we ensure that we
 # bootstrap the FreeBSD db code. The cross-build headers #define dbopen() to
 # __freebsd_dbopen() so that we don't ever use the host version
@@ -164,6 +164,9 @@ INCS+=	 ${SRCTOP}/include/getopt.h
 # getcap.c is needed for cap_mkdb:
 .PATH: ${LIBC_SRCTOP}/gen
 SRCS+=	getcap.c
+# Glibc does not provide all err*/warn* functions, and for macOS we need the
+# alias with the extra underscore.
+SRCS+=	err.c
 # Add various libbc functions that are not available in glibc:
 SRCS+=	stringlist.c setmode.c
 SRCS+=	strtonum.c merge.c heapsort.c reallocf.c
@@ -178,8 +181,10 @@ SRCS+=	strlcpy.c strlcat.c strmode.c
 SRCS+=	fgetln_fallback.c fgetwln_fallback.c closefrom.c
 CFLAGS.closefrom.c+=	-DSTDC_HEADERS -DHAVE_SYS_DIR_H -DHAVE_DIRENT_H \
 	-DHAVE_DIRFD -DHAVE_SYSCONF
-# Provide warnc/errc/getprogname/setprograme
-SRCS+=	err.c progname.c
+# Provide getprogname/setprograme
+SRCS+=	progname.c
+# Stub implementations of fflagstostr/strtofflags
+SRCS+=	fflags.c
 .endif
 # Provide the same arc4random implementation on Linux/macOS
 CFLAGS.arc4random.c+=	-I${SRCTOP}/sys/crypto/chacha20 -D__isthreaded=1

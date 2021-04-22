@@ -125,8 +125,8 @@
  */
 #define	CK_SLIST_HEAD(name, type)						\
 struct name {									\
-	struct type *cslh_first;	/* first element */				\
-}
+	struct type *cslh_first;	/* first element */			\
+} __no_subobject_bounds
 
 #define	CK_SLIST_HEAD_INITIALIZER(head)						\
 	{ NULL }
@@ -134,7 +134,7 @@ struct name {									\
 #define	CK_SLIST_ENTRY(type)							\
 struct {									\
 	struct type *csle_next;	/* next element */				\
-}
+} __no_subobject_bounds
 
 /*
  * Singly-linked List functions.
@@ -231,7 +231,7 @@ struct {									\
 struct name {								\
 	struct type *cstqh_first;/* first element */			\
 	struct type **cstqh_last;/* addr of last next element */		\
-}
+} __no_subobject_bounds
 
 #define	CK_STAILQ_HEAD_INITIALIZER(head)				\
 	{ NULL, &(head).cstqh_first }
@@ -239,7 +239,7 @@ struct name {								\
 #define	CK_STAILQ_ENTRY(type)						\
 struct {								\
 	struct type *cstqe_next;	/* next element */			\
-}
+} __no_subobject_bounds
 
 /*
  * Singly-linked Tail queue functions.
@@ -354,7 +354,7 @@ struct {								\
 #define	CK_LIST_HEAD(name, type)						\
 struct name {									\
 	struct type *clh_first;	/* first element */				\
-}
+} __no_subobject_bounds
 
 #define	CK_LIST_HEAD_INITIALIZER(head)						\
 	{ NULL }
@@ -363,7 +363,7 @@ struct name {									\
 struct {									\
 	struct type *cle_next;	/* next element */				\
 	struct type **cle_prev;	/* address of previous next element */		\
-}
+} __no_subobject_bounds
 
 #define	CK_LIST_FIRST(head)		ck_pr_load_ptr(&(head)->clh_first)
 #define	CK_LIST_EMPTY(head)		(CK_LIST_FIRST(head) == NULL)
@@ -436,3 +436,12 @@ struct {									\
 } while (0)
 
 #endif /* CK_QUEUE_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

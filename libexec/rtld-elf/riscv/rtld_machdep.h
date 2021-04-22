@@ -43,11 +43,6 @@
 #include <sys/types.h>
 #include <machine/atomic.h>
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-#endif
-
 struct Struct_Obj_Entry;
 
 #ifndef __CHERI_PURE_CAPABILITY__
@@ -66,11 +61,11 @@ uint64_t set_gp(struct Struct_Obj_Entry *obj);
 })
 #endif
 
-Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
+uintptr_t reloc_jmpslot(uintptr_t *where, uintptr_t target,
     const struct Struct_Obj_Entry *defobj, const struct Struct_Obj_Entry *obj,
     const Elf_Rel *rel);
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
 
 #define	FUNC_PTR_REMOVE_PERMS						\
 	(CHERI_PERM_SEAL | CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |	\
@@ -79,22 +74,23 @@ Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
 #define	DATA_PTR_REMOVE_PERMS						\
 	(CHERI_PERM_SEAL | CHERI_PERM_EXECUTE)
 
-/* TODO: we should have a separate member for .text/rodata */
-#define get_codesegment(obj) ((obj)->text_rodata_cap)
-
+#ifdef __CHERI_PURE_CAPABILITY__
 /* TODO: ABIs with tight bounds */
 #define can_use_tight_pcc_bounds(obj) ((void)(obj), false)
+#endif
 
 /*
  * Create a pointer to a function.
  * Important: this is not necessarily callable! For ABIs with tight bounds we
  * need to load CGP first -> use make_function_pointer() instead.
  */
-static inline dlfunc_t
-make_code_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
+static inline dlfunc_t __capability
+make_code_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
     bool tight_bounds, size_t addend)
 {
-	const void *ret = get_codesegment(defobj) + def->st_value;
+	const void * __capability ret;
+
+	ret = get_codesegment_cap(defobj) + def->st_value;
 	/* Remove store and seal permissions */
 	ret = cheri_clearperm(ret, FUNC_PTR_REMOVE_PERMS);
 	if (tight_bounds) {
@@ -107,39 +103,46 @@ make_code_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
 	ret = cheri_incoffset(ret, addend);
 	/* All code pointers should be sentries: */
 	ret = __builtin_cheri_seal_entry(ret);
-	return __DECONST(dlfunc_t, ret);
+	return __DECONST_CAP(dlfunc_t __capability, ret);
 }
 
 /*
  * Create a function pointer that can be called anywhere
  */
-static inline dlfunc_t
-make_function_pointer_with_addend(
-    const Elf_Sym *def, const struct Struct_Obj_Entry *defobj, size_t addend)
+static inline dlfunc_t __capability
+make_function_cap_with_addend(const Elf_Sym *def,
+    const struct Struct_Obj_Entry *defobj, size_t addend)
 {
 	/* TODO: ABIs with tight bounds */
-	return make_code_pointer(def, defobj, /*tight_bounds=*/false, addend);
+	return make_code_cap(def, defobj, /*tight_bounds=*/false, addend);
 }
 
-static inline dlfunc_t
-make_function_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
+static inline dlfunc_t __capability
+make_function_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 {
-	return make_function_pointer_with_addend(def, defobj, /*addend=*/0);
+	return make_function_cap_with_addend(def, defobj, /*addend=*/0);
 }
 
-static inline void*
-make_data_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
+static inline void * __capability
+make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 {
-	void *ret = defobj->relocbase + def->st_value;
+	void * __capability ret;
+	ret = get_datasegment_cap(defobj) + def->st_value;
 	/* Remove execute and seal permissions */
 	ret = cheri_clearperm(ret, DATA_PTR_REMOVE_PERMS);
-	/* TODO: can we always set bounds here or does it break compat? */
 	ret = cheri_setbounds(ret, def->st_size);
 	return ret;
 }
 
-#define set_bounds_if_nonnull(ptr, size)	\
-	do { if (ptr) { ptr = cheri_setbounds(ptr, size); } } while(0)
+#define set_bounds_if_nonnull(cap, size)	\
+	do { if (cap) { cap = cheri_setbounds(cap, size); } } while(0)
+
+#endif /* __has_feature(capabilities) */
+
+#ifdef __CHERI_PURE_CAPABILITY__
+
+#define make_function_pointer(def, defobj) \
+	make_function_cap(def, defobj)
 
 /* ignore _init/_fini */
 #define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)

@@ -3,7 +3,7 @@
 ARCHS+=	rs6000
 
 DEFAULT_VECTOR=	bfd_elf64_powerpc_vec
-NO_WERROR.clang= 
+MK_WERROR.clang=no
 
 SRCS+=	cpu-powerpc.c	\
 	cpu-rs6000.c	\

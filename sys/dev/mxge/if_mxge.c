@@ -4137,11 +4137,11 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 	err = 0;
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		err = mxge_change_mtu(sc, ifr_mtu_get(ifr));
+	case SIOCSIFMTU:
+		err = mxge_change_mtu(sc, ifr->ifr_mtu);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		mtx_lock(&sc->driver_mtx);
 		if (sc->dying) {
 			mtx_unlock(&sc->driver_mtx);
@@ -4165,8 +4165,8 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		mtx_unlock(&sc->driver_mtx);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		mtx_lock(&sc->driver_mtx);
 		if (sc->dying) {
 			mtx_unlock(&sc->driver_mtx);
@@ -4176,9 +4176,9 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		mtx_unlock(&sc->driver_mtx);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		mtx_lock(&sc->driver_mtx);
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
 			if (IFCAP_TXCSUM & ifp->if_capenable) {
 				mask &= ~IFCAP_TSO4;
@@ -4277,7 +4277,7 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			err = ENXIO;
 			break;
 		}
-		err = copyin(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
+		err = copyin(ifr_data_get_ptr(command, ifr), &i2c, sizeof(i2c));
 		if (err != 0)
 			break;
 		mtx_lock(&sc->driver_mtx);
@@ -4288,7 +4288,7 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		err = mxge_fetch_i2c(sc, &i2c);
 		mtx_unlock(&sc->driver_mtx);
 		if (err == 0)
-			err = copyout(&i2c, ifr_data_get_ptr(ifr),
+			err = copyout(&i2c, ifr_data_get_ptr(command, ifr),
 			    sizeof(i2c));
 		break;
 	default:

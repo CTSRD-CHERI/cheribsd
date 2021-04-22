@@ -906,10 +906,10 @@ static int ce_sioctl (struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	switch (cmd) {
 	default:	   CE_DEBUG2 (d, ("ioctl 0x%lx\n", cmd));   return 0;
-	case CASE_IOC_IFREQ(SIOCADDMULTI): CE_DEBUG2 (d, ("ioctl SIOCADDMULTI\n")); return 0;
-	case CASE_IOC_IFREQ(SIOCDELMULTI): CE_DEBUG2 (d, ("ioctl SIOCDELMULTI\n")); return 0;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS): CE_DEBUG2 (d, ("ioctl SIOCSIFFLAGS\n")); break;
-	case CASE_IOC_IFREQ(SIOCSIFADDR):  CE_DEBUG2 (d, ("ioctl SIOCSIFADDR\n"));  break;
+	case SIOCADDMULTI: CE_DEBUG2 (d, ("ioctl SIOCADDMULTI\n")); return 0;
+	case SIOCDELMULTI: CE_DEBUG2 (d, ("ioctl SIOCDELMULTI\n")); return 0;
+	case SIOCSIFFLAGS: CE_DEBUG2 (d, ("ioctl SIOCSIFFLAGS\n")); break;
+	case SIOCSIFADDR:  CE_DEBUG2 (d, ("ioctl SIOCSIFADDR\n"));  break;
 	}
 
 	/* We get here only in case of SIFFLAGS or SIFADDR. */
@@ -2641,12 +2641,3 @@ DRIVER_MODULE (ce, pci, ce_driver, ce_devclass, ce_modevent, NULL);
 #endif
 #endif /* __FreeBSD_version < 500000 */
 #endif /* NPCI */
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

@@ -2099,12 +2099,12 @@ ae_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN || ifr_mtu_get(ifr) > ETHERMTU)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > ETHERMTU)
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+		else if (ifp->if_mtu != ifr->ifr_mtu) {
 			AE_LOCK(sc);
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 				ae_init_locked(sc);
@@ -2112,7 +2112,7 @@ ae_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			AE_UNLOCK(sc);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		AE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -2130,21 +2130,21 @@ ae_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->if_flags = ifp->if_flags;
 		AE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		AE_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			ae_rxfilter(sc);
 		AE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		AE_LOCK(sc);
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if ((mask & IFCAP_VLAN_HWTAGGING) != 0 &&
 		    (ifp->if_capabilities & IFCAP_VLAN_HWTAGGING) != 0) {
 			ifp->if_capenable ^= IFCAP_VLAN_HWTAGGING;
@@ -2257,12 +2257,3 @@ ae_update_stats_rx(uint16_t flags, ae_stats_t *stats)
 	if ((flags & AE_RXD_ALIGN) != 0)
 		stats->rx_align++;
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

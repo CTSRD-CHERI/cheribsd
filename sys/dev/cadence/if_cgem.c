@@ -1140,7 +1140,7 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 	int error = 0, mask;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		CGEM_LOCK(sc);
 		if ((if_getflags(ifp) & IFF_UP) != 0) {
 			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
@@ -1159,8 +1159,8 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		CGEM_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		/* Set up multi-cast filters. */
 		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
 			CGEM_LOCK(sc);
@@ -1169,18 +1169,18 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		CGEM_LOCK(sc);
-		mask = if_getcapenable(ifp) ^ ifr_reqcap_get(ifr);
+		mask = if_getcapenable(ifp) ^ ifr->ifr_reqcap;
 
 		if ((mask & IFCAP_TXCSUM) != 0) {
-			if ((ifr_reqcap_get(ifr) & IFCAP_TXCSUM) != 0) {
+			if ((ifr->ifr_reqcap & IFCAP_TXCSUM) != 0) {
 				/* Turn on TX checksumming. */
 				if_setcapenablebit(ifp, IFCAP_TXCSUM |
 				    IFCAP_TXCSUM_IPV6, 0);
@@ -1201,7 +1201,7 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			}
 		}
 		if ((mask & IFCAP_RXCSUM) != 0) {
-			if ((ifr_reqcap_get(ifr) & IFCAP_RXCSUM) != 0) {
+			if ((ifr->ifr_reqcap & IFCAP_RXCSUM) != 0) {
 				/* Turn on RX checksumming. */
 				if_setcapenablebit(ifp, IFCAP_RXCSUM |
 				    IFCAP_RXCSUM_IPV6, 0);
@@ -1858,12 +1858,3 @@ DRIVER_MODULE(cgem, simplebus, cgem_driver, cgem_devclass, NULL, NULL);
 DRIVER_MODULE(miibus, cgem, miibus_driver, miibus_devclass, NULL, NULL);
 MODULE_DEPEND(cgem, miibus, 1, 1, 1);
 MODULE_DEPEND(cgem, ether, 1, 1, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

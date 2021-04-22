@@ -879,7 +879,7 @@ aio_process_mlock(struct kaiocb *job)
 	    ("%s: opcode %d", __func__, job->uaiocb.aio_lio_opcode));
 
 	aio_switch_vmspace(job);
-	error = kern_mlock(job->userproc, job->cred, (__cheri_addr uintptr_t)
+	error = kern_mlock(job->userproc, job->cred, (uintptr_t)(uintcap_t)
 	__DEVOLATILE_CAP(void * __capability, cb->aio_buf), cb->aio_nbytes);
 	aio_complete(job, error != 0 ? -1 : 0, error);
 }
@@ -3629,12 +3629,16 @@ freebsd64_lio_listio(struct thread *td, struct freebsd64_lio_listio_args *uap)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kernel_sig_types",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "uintptr_interp_offset",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

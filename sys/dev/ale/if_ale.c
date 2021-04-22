@@ -1972,14 +1972,14 @@ ale_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN || ifr_mtu_get(ifr) > ALE_JUMBO_MTU ||
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > ALE_JUMBO_MTU ||
 		    ((sc->ale_flags & ALE_FLAG_JUMBO) == 0 &&
-		    ifr_mtu_get(ifr) > ETHERMTU))
+		    ifr->ifr_mtu > ETHERMTU))
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+		else if (ifp->if_mtu != ifr->ifr_mtu) {
 			ALE_LOCK(sc);
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 				ale_init_locked(sc);
@@ -1987,7 +1987,7 @@ ale_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ALE_UNLOCK(sc);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		ALE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -2004,21 +2004,21 @@ ale_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->ale_if_flags = ifp->if_flags;
 		ALE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		ALE_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			ale_rxfilter(sc);
 		ALE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->ale_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		ALE_LOCK(sc);
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (ifp->if_capabilities & IFCAP_TXCSUM) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -3077,12 +3077,3 @@ sysctl_hw_ale_int_mod(SYSCTL_HANDLER_ARGS)
 	return (sysctl_int_range(oidp, arg1, arg2, req,
 	    ALE_IM_TIMER_MIN, ALE_IM_TIMER_MAX));
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

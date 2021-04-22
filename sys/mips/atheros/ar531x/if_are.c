@@ -963,7 +963,7 @@ are_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int			error;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		ARE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -982,15 +982,15 @@ are_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		ARE_UNLOCK(sc);
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		ARE_LOCK(sc);
 		are_set_filter(sc);
 		ARE_UNLOCK(sc);
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 #ifdef ARE_MII
 		mii = device_get_softc(sc->are_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
@@ -998,7 +998,7 @@ are_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = ifmedia_ioctl(ifp, ifr, &sc->are_ifmedia, command);
 #endif
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		error = 0;
 		break;
 	default:
@@ -1756,12 +1756,3 @@ dump_status_reg(struct are_softc *sc)
 
 }
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

@@ -10,15 +10,11 @@ WARNS?=		2
 CFLAGS+=	${PICFLAG}
 CFLAGS+=	-fvisibility=hidden
 CFLAGS+=	-DVISIBILITY_HIDDEN
-.if (${MACHINE_ARCH:Mmips*} || ${MACHINE_ARCH:Mriscv*c*})
 CFLAGS+=	-I${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
-.else
-CFLAGS+=	-I${SRCTOP}/contrib/libcxxrt
-.endif
 
 # gcc has incompatible internal declarations for __divtc3 and __multc3, but has
 # no option to silence its warning, so make warnings non-fatal.
-NO_WERROR.gcc=
+MK_WERROR.gcc=	no
 
 .include "Makefile.inc"
 

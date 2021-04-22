@@ -1491,7 +1491,7 @@ mge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		MGE_GLOBAL_LOCK(sc);
 
 		if (ifp->if_flags & IFF_UP) {
@@ -1512,19 +1512,19 @@ mge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->mge_if_flags = ifp->if_flags;
 		MGE_GLOBAL_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			MGE_GLOBAL_LOCK(sc);
 			mge_setup_multicast(sc);
 			MGE_GLOBAL_UNLOCK(sc);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
+	case SIOCSIFCAP:
+		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
 		if (mask & IFCAP_HWCSUM) {
 			ifp->if_capenable &= ~IFCAP_HWCSUM;
-			ifp->if_capenable |= IFCAP_HWCSUM & ifr_reqcap_get(ifr);
+			ifp->if_capenable |= IFCAP_HWCSUM & ifr->ifr_reqcap;
 			if (ifp->if_capenable & IFCAP_TXCSUM)
 				ifp->if_hwassist = MGE_CHECKSUM_FEATURES;
 			else
@@ -1532,7 +1532,7 @@ mge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if (ifr_reqcap_get(ifr) & IFCAP_POLLING) {
+			if (ifr->ifr_reqcap & IFCAP_POLLING) {
 				error = ether_poll_register(mge_poll, ifp);
 				if (error)
 					return(error);
@@ -1552,23 +1552,21 @@ mge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 #endif
 		break;
 	case SIOCGIFMEDIA: /* fall through */
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		/*
 		 * Setting up media type via ioctls is *not* supported for MAC
 		 * which is connected to switch. Use etherswitchcfg.
 		 */
-		if (!sc->phy_attached) {
-			switch (command) {
-			case CASE_IOC_IFREQ(SIOCSIFMEDIA):
-				return (0);
-			}
+		if (!sc->phy_attached && (command == SIOCSIFMEDIA))
+			return (0);
+		else if (!sc->phy_attached) {
 			error = ifmedia_ioctl(ifp, ifr, &sc->mge_ifmedia,
 			    command);
 			break;
 		}
 
-		if (IFM_SUBTYPE(ifr_media_get(ifr)) == IFM_1000_T
-		    && !(ifr_media_get(ifr) & IFM_FDX)) {
+		if (IFM_SUBTYPE(ifr->ifr_media) == IFM_1000_T
+		    && !(ifr->ifr_media & IFM_FDX)) {
 			device_printf(sc->dev,
 			    "1000baseTX half-duplex unsupported\n");
 			return 0;

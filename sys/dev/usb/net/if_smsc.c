@@ -1495,9 +1495,8 @@ smsc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int rc;
 	int mask;
 	int reinit;
-	
-	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+
+	if (cmd == SIOCSIFCAP) {
 		sc = uether_getsc(ue);
 		ifr = (struct ifreq *)data;
 
@@ -1506,7 +1505,7 @@ smsc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		rc = 0;
 		reinit = 0;
 
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 
 		/* Modify the RX CSUM enable bits */
 		if ((mask & IFCAP_RXCSUM) != 0 &&
@@ -1522,10 +1521,9 @@ smsc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		SMSC_UNLOCK(sc);
 		if (reinit)
 			uether_init(ue);
-		break;
-	default:
+
+	} else {
 		rc = uether_ioctl(ifp, cmd, data);
-		break;
 	}
 
 	return (rc);
@@ -1770,12 +1768,3 @@ MODULE_DEPEND(smsc, ether, 1, 1, 1);
 MODULE_DEPEND(smsc, miibus, 1, 1, 1);
 MODULE_VERSION(smsc, 1);
 USB_PNP_HOST_INFO(smsc_devs);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

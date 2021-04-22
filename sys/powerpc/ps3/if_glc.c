@@ -470,7 +470,7 @@ glc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int err = 0;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
                 mtx_lock(&sc->sc_mtx);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -485,14 +485,14 @@ glc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->sc_ifpflags = ifp->if_flags;
 		mtx_unlock(&sc->sc_mtx);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
                 mtx_lock(&sc->sc_mtx);
 		glc_set_multicast(sc);
                 mtx_unlock(&sc->sc_mtx);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		err = ifmedia_ioctl(ifp, ifr, &sc->sc_media, cmd);
 		break;
 	default:
@@ -958,12 +958,3 @@ glc_media_change(struct ifnet *ifp)
 
 	return (result ? EIO : 0);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END
