@@ -632,13 +632,13 @@ CHERIBSDTEST(cheribsdtest_vm_cow_write,
  */
 CHERIBSDTEST(cheribsdtest_vm_capdirty, "verify capdirty marking and mincore")
 {
-	static const size_t npg = 2;
-	size_t sz = npg * getpagesize();
+#define CHERIBSDTEST_VM_CAPDIRTY_NPG	2
+	size_t sz = CHERIBSDTEST_VM_CAPDIRTY_NPG * getpagesize();
 	uint8_t capstore_on_alloc;
 	size_t capstore_on_alloc_sz = sizeof(capstore_on_alloc);
 
 	void * __capability *pg0;
-	unsigned char mcv[npg] = { 0 };
+	unsigned char mcv[CHERIBSDTEST_VM_CAPDIRTY_NPG] = { 0 };
 
 	CHERIBSDTEST_CHECK_SYSCALL(
 	    sysctlbyname("vm.capstore_on_alloc", &capstore_on_alloc,
@@ -685,6 +685,7 @@ CHERIBSDTEST(cheribsdtest_vm_capdirty, "verify capdirty marking and mincore")
 
 	CHERIBSDTEST_CHECK_SYSCALL(munmap(pg0, sz));
 	cheribsdtest_success();
+#undef CHERIBSDTEST_VM_CAPDIRTY_NPG
 }
 
 /*
@@ -990,7 +991,7 @@ CHERIBSDTEST(cheribsdtest_caprevoke_capdirty,
 
 CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
 {
-	static const size_t npg = 3;
+#define CHERIBSDTEST_VM_CAPREVOKE_LOADSIDE_NPG	3
 
 	void * __capability * __capability mb;
 	void * __capability sh;
@@ -998,10 +999,11 @@ CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
 	void * __capability revme;
 	struct caprevoke_syscall_info crsi;
 	uint32_t cyc_start, cyc_end;
-	unsigned char mcv[npg] = { 0 };
+	unsigned char mcv[CHERIBSDTEST_VM_CAPREVOKE_LOADSIDE_NPG] = { 0 };
+	const size_t asz = CHERIBSDTEST_VM_CAPREVOKE_LOADSIDE_NPG * PAGE_SIZE;
 
 	mb = CHERIBSDTEST_CHECK_SYSCALL(
-	    mmap(0, npg * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	    mmap(0, asz, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
 	CHERIBSDTEST_CHECK_SYSCALL(
 	    caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, mb, &sh));
 
@@ -1014,10 +1016,10 @@ CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
 
 	/* Write and clear a capability one page up */
 	size_t capsperpage = PAGE_SIZE/sizeof(void * __capability);
-	((void * __capability *)mb)[capsperpage] = revme;
+	((void * __capability volatile *)mb)[capsperpage] = revme;
 	((volatile uintptr_t *)mb)[capsperpage] = 0;
 
-	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, npg * PAGE_SIZE, &mcv[0]));
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
 	CHERIBSDTEST_VERIFY2(
 	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 1");
 	CHERIBSDTEST_VERIFY2(
@@ -1036,15 +1038,19 @@ CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
 	fprintf_caprevoke_stats(stderr, crsi, cyc_end - cyc_start);
 
 	/*
-	 * Try to induce a read fault and check that the page is not just
-	 * swept but also is no longer considered capdirty
+	 * Try to induce a read fault and check that the read result is revoked.
+	 * Unfortunately, we can't check its capdirty status, but it should
+	 * still be CAPSTORED, since not enough time has elapsed for the state
+	 * machine to declare it clean.
 	 */
 	revme = ((void * __capability *)mb)[1];
 	CHERIBSDTEST_VERIFY2(check_revoked(revme), "Fault didn't stop me!");
 
-	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, npg * PAGE_SIZE, &mcv[0]));
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
 	CHERIBSDTEST_VERIFY2(
 	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 2.0");
+	CHERIBSDTEST_VERIFY2(
+	    (mcv[1] & MINCORE_CAPSTORE) != 0, "page 1 capstore 2.0");
 
 	/*
 	 * This might redirty the 0th page, if we're keeping tags around on
@@ -1063,7 +1069,7 @@ CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
 	cyc_end = get_cyclecount();
 	fprintf_caprevoke_stats(stderr, crsi, cyc_end - cyc_start);
 
-	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, npg * PAGE_SIZE, &mcv[0]));
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
 	CHERIBSDTEST_VERIFY2(
 	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 2.1");
 	CHERIBSDTEST_VERIFY2(
@@ -1074,7 +1080,7 @@ CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
 	CHERIBSDTEST_VERIFY2(!check_revoked(revme), "Tag clear on 2nd revme?");
 	((void * __capability *)mb)[1] = revme;
 
-	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, npg * PAGE_SIZE, &mcv[0]));
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
 	CHERIBSDTEST_VERIFY2(
 	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 2.2");
 	CHERIBSDTEST_VERIFY2(
@@ -1096,7 +1102,7 @@ CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
 	CHERIBSDTEST_VERIFY2(check_revoked(mb[1]),
 	    "Revoker failure in full pass");
 
-	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, npg * PAGE_SIZE, &mcv[0]));
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
 	CHERIBSDTEST_VERIFY2(
 	    (mcv[0] & MINCORE_CAPSTORE) != 0, "page 0 capstore 3");
 	CHERIBSDTEST_VERIFY2(
@@ -1112,7 +1118,7 @@ CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
 	cyc_end = get_cyclecount();
 	fprintf_caprevoke_stats(stderr, crsi, cyc_end - cyc_start);
 
-	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, npg * PAGE_SIZE, &mcv[0]));
+	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
 	CHERIBSDTEST_VERIFY2(
 	    (mcv[0] & MINCORE_CAPSTORE) == 0, "page 0 capstore 4");
 	CHERIBSDTEST_VERIFY2(
@@ -1124,6 +1130,8 @@ CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
 	 */
 
 	cheribsdtest_success();
+
+#undef CHERIBSDTEST_VM_CAPREVOKE_LOADSIDE_NPG
 }
 
 /*

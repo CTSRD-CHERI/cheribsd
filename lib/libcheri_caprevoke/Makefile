@@ -10,6 +10,4 @@ LIB=cheri_caprevoke
 SHLIB= cheri_caprevoke
 SHLIB_MAJOR= 1
 
-NO_WERROR=
-
 .include <bsd.lib.mk>

@@ -1,0 +1,8 @@
+#NO_UNIVERSE
+
+include "CHERI-CAPREVOKE-GFE"
+include "std.NODEBUG"
+
+nooptions CAPREVOKE_STATS
+
+ident CHERI-CAPREVOKE-GFE-NODEBUG

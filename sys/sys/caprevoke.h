@@ -243,31 +243,83 @@ caprevoke_is_revoked(const void * __capability cap)
 
 /*
  * Information conveyed to userland about a given caprevoke scan.
+ *
+ * Given what's being counted here are some things possibly useful to fitting a
+ * linear regression model:
+ *
+ *  - The average time per fault is approximately fault_cycles / fault_visits.
+ *
+ *  - The average time *scanning* per page is approximately
+ *      page_scan_cycles / (fault_visits + pages_scan_ro + pages_scan_rw)
+ *
+ *  - The overhead of faulting is approximately the per fault overhead minus the
+ *    per page overhead.
+ *
+ *  - There are different iteration overheads for pages scanned by the iterator
+ *    and for pages already found scanned by the CLG fault handler.
+ *
+ *  - There is some sweeper cost associated with each pages_faulted_{ro,rw}
+ *    tick, which comes out of total time spent, not page_scan_cycles or
+ *    fault_cycles.
+ *
+ *  - There is linear sweeper overhead per pages_skip_nofill and pages_skip
+ *    tick, but pages_skip_fast has a less clear relationship with time spent.
+ *    It is likely worth excluding the latter from modeling.
  */
+
 struct caprevoke_stats {
+	/*
+	 * Total cycles spent inside MD page scan routines; inclusive of sweeps
+	 * from CLG fault handler.
+	 */
 	uint64_t	page_scan_cycles;
+	/*
+	 * Total cycles spent inside MI CLG handler; includes state machine,
+	 * pmap traversal, and page sweeps.
+	 */
 	uint64_t	fault_cycles;
 
 	uint32_t	__spare[7];
 
+	/*
+	 * Pages iterated by the VM iterator, in each of RO and RW states;
+	 * exclusive of CLG fault handler invocations.
+	 */
 	uint32_t	pages_scan_ro;
 	uint32_t	pages_scan_rw;
 
+	/*
+	 * Calls from the VM iterator to the VM fault handlers, in each of RO
+	 * and RW states.  Exclusive of CLG fault handler invocations.
+	 */
 	uint32_t	pages_faulted_ro;
 	uint32_t	pages_faulted_rw;
 
+	/*
+	 * Number of invocations of MI CLG fault handler (RO and RW pages
+	 * conflated).
+	 */
 	uint32_t	fault_visits;
 
+	/*
+	 * Various fast-out paths of the VM iterator.  _fast is synthesized from
+	 * the size of spans skipped, while _nofill and pages_skip itself are
+	 * incremented by bailing attempts to find each vm_page_t structure.
+	 */
 	uint32_t	pages_skip_fast;
 	uint32_t	pages_skip_nofill;
 	uint32_t	pages_skip;
 
+	/*
+	 * Counters incremented during sweeps, inclusive of both the VM iterator
+	 * and CLG faults
+	 */
 	uint32_t	caps_found;
-	uint32_t	caps_found_revoked;
-
-	uint32_t	caps_cleared;
-
+	uint32_t	caps_found_revoked; /* Already revoked */
+	uint32_t	caps_cleared;	/* Revoked this time */
 	uint32_t	lines_scan;
+
+	/* A holdover from Cornucopia; see vm_caprevoke_visit_ro */
 	uint32_t	pages_mark_clean;
 };
 

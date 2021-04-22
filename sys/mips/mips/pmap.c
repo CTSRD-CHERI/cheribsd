@@ -4105,6 +4105,11 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 			 * We didn't see a capability on this page; step this
 			 * PTE closer to being cap-clean or take the per-page
 			 * PGA_CAPDIRTY flag down.
+			 *
+			 * This code is simpler than the RISC-V equivalent
+			 * as we don't have PTWs that might do async updates of
+			 * the PTEs and our TLB miss handler paths are read-only
+			 * until grabbing the pmap lock, which we hold.
 			 */
 			if (!pte_test(&npte, PTE_SCI)) {
 				/* Raise PTE inhibit; CAP-DIRTY -> DIRTYABLE */
@@ -4121,6 +4126,10 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 					vm_page_aflag_clear(m, PGA_CAPDIRTY);
 				} else if (mas.flags & PGA_CAPSTORE) {
 					/* PTE CAP-CLEAN; page -?> IDLE */
+					*pte = npte;
+					if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
+						tlb_update(pmap, va, npte);
+					}
 					PMAP_UNLOCK(pmap);
 					pmap_caploadgen_test_all_clean(m);
 					goto out_unlocked;
@@ -4130,6 +4139,9 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 			/*
 			 * Page has caps; may as well mark it dirty if we're
 			 * allowed to store here.
+			 *
+			 * We could clear PGA_CAPDIRTY here, too, but it
+			 * probably doesn't get set often ough to merit.
 			 */
 			if (!pte_test(&npte, PTE_CRO)) {
 				pte_clear(&npte, PTE_SCI);

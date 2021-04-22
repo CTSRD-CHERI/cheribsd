@@ -105,7 +105,7 @@ vm_caprevoke_visit_rw(
 	VM_OBJECT_WLOCK(m->object);
 	vm_page_xunbusy(m);
 
-	*cap = hascaps & VM_CAPREVOKE_PAGE_HASCAPS;
+	*cap = !!(hascaps & VM_CAPREVOKE_PAGE_HASCAPS);
 	return VM_CAPREVOKE_VIS_DONE;
 }
 
@@ -167,7 +167,7 @@ vm_caprevoke_visit_ro(
 		return VM_CAPREVOKE_VIS_DIRTY;
 	}
 
-	*cap = hascaps & VM_CAPREVOKE_PAGE_HASCAPS;
+	*cap = !!(hascaps & VM_CAPREVOKE_PAGE_HASCAPS);
 	return VM_CAPREVOKE_VIS_DONE;
 }
 
@@ -317,7 +317,7 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 	vm_page_t m = NULL;
 	bool mwired = false;
 	bool mdidvm = false;
-	bool viscap;
+	bool viscap = false;
 
 	VM_OBJECT_ASSERT_WLOCKED(obj);
 
@@ -336,13 +336,13 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 
 		switch (pmres) {
 		case PMAP_CAPLOADGEN_OK:
+		case PMAP_CAPLOADGEN_TEARDOWN:
 			panic("Bad first return from pmap_caploadgen_update");
 		case PMAP_CAPLOADGEN_ALREADY:
 		case PMAP_CAPLOADGEN_CLEAN:
 			*ooff = ioff + (addr2 - addr);
 			return VM_CAPREVOKE_AT_OK;
 		case PMAP_CAPLOADGEN_UNABLE:
-		case PMAP_CAPLOADGEN_TEARDOWN:
 			break;
 		case PMAP_CAPLOADGEN_SCAN_RO:
 		case PMAP_CAPLOADGEN_SCAN_CLEAN_RO:
@@ -415,22 +415,12 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 			/*
 			 * The map has changed out from under us; bail and
 			 * the caller will look up the new map entry.
-			 * First, though, it's important to release the page
-			 * we're holding!
-			 *
-			 * If we're the sole wiring holder, consider this
-			 * page active because we're most likely about to
-			 * come right back.
 			 */
-			vm_page_lock(m);
-			vm_page_unwire(m, PQ_ACTIVE);
-			vm_page_unlock(m);
 			return VM_CAPREVOKE_AT_TICK;
 		}
 
 		VM_OBJECT_WLOCK(m->object);
 		mdidvm = true;
-		mwired = true;
 
 		/* vm_fault has handled it all for us */
 		goto ok;
@@ -521,9 +511,6 @@ visit_rw_fault:
 		return VM_CAPREVOKE_AT_VMERR;
 	}
 	if (last_timestamp != map->timestamp) {
-		vm_page_lock(m);
-		vm_page_unwire(m, PQ_ACTIVE);
-		vm_page_unlock(m);
 		VM_OBJECT_ASSERT_UNLOCKED(obj);
 		return VM_CAPREVOKE_AT_TICK;
 	}
@@ -531,7 +518,6 @@ visit_rw_fault:
 	KASSERT(m->object == obj, ("Bad page object after FAULT WRITE"));
 
 	mdidvm = true;
-	mwired = true;
 	VM_OBJECT_WLOCK(m->object);
 
 ok:
@@ -558,9 +544,9 @@ ok:
 			/* We lost a narrow race & visited the page twice */
 			break;
 		case PMAP_CAPLOADGEN_UNABLE:
-		case PMAP_CAPLOADGEN_TEARDOWN:
 			/* Page not installed in the pmap; that's fine */
 			break;
+		case PMAP_CAPLOADGEN_TEARDOWN:
 		case PMAP_CAPLOADGEN_SCAN_RO:
 		case PMAP_CAPLOADGEN_SCAN_CLEAN_RO:
 		case PMAP_CAPLOADGEN_SCAN_RW:

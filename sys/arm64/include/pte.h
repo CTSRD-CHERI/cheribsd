@@ -49,6 +49,7 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 #define	ATTR_LC_GEN0		(2UL << 61)
 #define	ATTR_LC_GEN1		(3UL << 61)
 #define	ATTR_SC			(1UL << 60)
+#define	ATTR_CDBM		(1UL << 59)
 #endif
 /* Bits 58:55 are reserved for software */
 #define	ATTR_SW_UNUSED2		(1UL << 58)
@@ -101,11 +102,10 @@ typedef	uint64_t	pt_entry_t;		/* page table entry */
 
 #if __has_feature(capabilities)
 /*
- * The aarch64 orr instruction cannot handle ATTR_DEFAULT |
- * ATTR_CAP_RW as a single operand, so separate orr instructions are
- * required for ATTR_CAP_RW.
+ * The aarch64 orr instruction cannot handle ATTR_CAP_RW as
+ * a single operand, so separate orr instructions are required.
  */
-#define	ATTR_CAP_RW	(ATTR_LC_ENABLED | ATTR_SC)
+#define	ATTR_CAP_RW	(ATTR_LC_ENABLED | ATTR_CDBM)
 #endif
 #define	ATTR_DEFAULT	(ATTR_AF | ATTR_SH(ATTR_SH_IS))
 

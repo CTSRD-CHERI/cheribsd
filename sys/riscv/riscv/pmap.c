@@ -2716,7 +2716,9 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va,
 static __inline uint64_t
 cheri_pte_cw(vm_page_t m, vm_prot_t prot, u_int flags)
 {
+#ifdef INVARIANTS
 	vm_page_astate_t mas = vm_page_astate_load(m);
+#endif
 
 	// XXX Probably not here?
 	KASSERT((mas.flags & PGA_CAPDIRTY) == 0 ||
@@ -3641,20 +3643,27 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 			} else if (oldpte & PTE_CW) {
 				/*
 				 * PTE CAP-DIRTYABLE -> CAP-CLEAN; this race
-				 * matters, so we have to do a swap.  Because
-				 * we hold the pmap locked, it's OK that we
-				 * might momentarily be seen as CAP-CLEAN:
-				 * there's a very narrow window in which
-				 * another CPU might fault, but we'll catch
-				 * that in software.
+				 * matters, so we have to do a swap.
+				 *
+				 * To ensure that any racing PTW traps, we
+				 * temporarily zero out the PTE in question!
+				 * While we'd like to just de-assert PTE_W, that
+				 * leaves open the possibility that PTE_A gets
+				 * set while we're racing here.  By the time
+				 * we've dropped the lock, we'll have put the
+				 * PTE back and so that other core will take the
+				 * fast path through pmap_fault_fixup.
 				 */
 				newpte &= ~PTE_CW;
-				oldpte = pmap_load_store(pte, newpte);
+				oldpte = pmap_load_store(pte, 0);
 
-				KASSERT(oldphys ==
-				    ((pte == l2) ? L2PTE_TO_PHYS(oldpte)
-				     : PTE_TO_PHYS(oldpte)),
-				    ("Swap PTE changed phys addr!"));
+				/*
+				 * Preserve accessed and dirty flags across that
+				 * swap, too.  Again, there's a chance that a
+				 * PTW might mistakenly see these bits
+				 * de-asserted, but either it will set them
+				 */
+				newpte |= (oldpte & (PTE_A | PTE_D));
 
 				/*
 				 * If what we read back indicated that a TLB may
@@ -3665,6 +3674,15 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 				if (oldpte & PTE_CD) {
 					newpte |= PTE_CD | PTE_CW;
 				}
+
+				/*
+				 * Nothing else about the PTE loaded should be
+				 * different from what we're about to store.
+				 */
+				KASSERT((oldpte & ~(PTE_CW | PTE_CRG))
+				    == (newpte & ~(PTE_CW | PTE_CRG)),
+				    ("pmap_caploadgen_update PTE swap botch"));
+
 			} else if (flags & PMAP_CAPLOADGEN_EXCLUSIVE) {
 				/* No new mappings possible */
 				vm_page_astate_t mas = vm_page_astate_load(m);
@@ -3690,6 +3708,9 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 			/*
 			 * Page has caps; may as well mark it dirty if we're
 			 * allowed to store here.
+			 *
+			 * We could clear PGA_CAPDIRTY here, too, but it
+			 * probably doesn't get set often ough to merit.
 			 */
 			if (oldpte & PTE_CW) {
 				newpte |= PTE_CD;
