@@ -570,9 +570,6 @@ LIBFIFOLOG?=	${LIBFIFOLOGDIR}/libfifolog${PIE_SUFFIX}.a
 LIBBSNMPTOOLSDIR=	${_LIB_OBJTOP}/usr.sbin/bsnmpd/tools/libbsnmptools
 LIBBSNMPTOOLS?=	${LIBBSNMPTOOLSDIR}/libbsnmptools${PIE_SUFFIX}.a
 
-LIBAMUDIR=	${_LIB_OBJTOP}/usr.sbin/amd/libamu
-LIBAMU?=	${LIBAMUDIR}/libamu${PIE_SUFFIX}.a
-
 LIBBEDIR=	${_LIB_OBJTOP}/lib/libbe
 LIBBE?=		${LIBBEDIR}/libbe${PIE_SUFFIX}.a
 
