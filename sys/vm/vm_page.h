@@ -1074,6 +1074,7 @@ vm_page_domain(vm_page_t m)
 	return (0);
 #endif
 }
+
 #endif				/* _KERNEL */
 #endif				/* !_VM_PAGE_ */
 // CHERI CHANGES START

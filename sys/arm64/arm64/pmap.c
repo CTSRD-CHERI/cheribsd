@@ -724,7 +724,7 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m)
 
 	vm_page_astate_t mas = vm_page_astate_load(m);
 
-	// XXX Probably not here?
+	/* XXX Probably not here? */
 	KASSERT((mas.flags & PGA_CAPDIRTY) == 0 ||
 	    (mas.flags & PGA_CAPSTORE) != 0,
 	    ("pmap inserting CAPDIRTY w/o CAPSTORE m=%p", m));
@@ -733,16 +733,15 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m)
 	    (prot & VM_PROT_WRITE) != 0,
 	    ("pmap inserting PROT_WRITE_CAP w/o PROT_WRITE m=%p", m));
 
-	if ((prot & VM_PROT_WRITE_CAP) != 0)
+	if ((prot & VM_PROT_WRITE_CAP) != 0) {
 		/*
 		 * The page is CAPSTORE and this mapping is VM_PROT_WRITE_CAP.
-		 * Always set ATTR_CDBM. If the page is CAPDIRTY or this mapping
-		 * is created in response to a cap-write, also set ATTR_SC.
-		 *
-		 * XXX We could also conditionally set ATTR_SC if PGA_CAPDIRTY,
-		 * but it's not required.
+		 * Always set ATTR_CDBM. If this mapping is created in response
+		 * to a cap-write, also set ATTR_SC.
 		 */
 		val |= (ATTR_CDBM);
+		if ((flags & VM_PROT_WRITE_CAP) != 0)
+			val |= (ATTR_SC);
 	}
 #endif
 
@@ -780,6 +779,13 @@ pmap_pte_capdirty(pmap_t pmap, pt_entry_t pte)
 	    ("pte %lx is cap-writable but missing ATTR_CDBM", pte));
 
 	return ((pte & ATTR_SC) == ATTR_SC);
+}
+#else
+static inline int
+pmap_pte_capdirty(pmap_t pmap, pt_entry_t pte)
+{
+
+	return (0);
 }
 #endif
 
@@ -4930,12 +4936,10 @@ pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
 void
 pmap_copy_page_tags(vm_page_t msrc, vm_page_t mdst)
 {
-
-	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst);
-
 	vm_offset_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
 	vm_offset_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
 
+	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst);
 #endif
 	pagecopy((void *)src, (void *)dst);
 }

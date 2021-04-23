@@ -466,7 +466,7 @@ vm_fault_soft_fast(struct faultstate *fs)
 
 	/*
 	 * We might be upgrading a page previously mapped VM_PROT_WRITE to one
-	 * now mapped VM_PROT_WRITE|VM_PROT_WRITE_CAP.  Flag it as such.
+	 * now mapped VM_PROT_WRITE | VM_PROT_WRITE_CAP.  Flag it as such.
 	 *
 	 * Importantly, realprot is exempt from vm_page_mask_cap_prot()!
 	 */
@@ -2292,7 +2292,7 @@ again:
 			 * See longer discussion in vm_fault_cow.
 			 */
 			if (object->flags & OBJ_HASCAP) {
-				/* Copy across CAPSTORE|CAPDIRTY state, too */
+				/* Copy across CAPSTORE | CAPDIRTY state, too */
 				vm_page_aflag_set(dst_m, src_m->a.flags &
 				    (PGA_CAPSTORE | PGA_CAPDIRTY));
 				pmap_copy_page_tags(src_m, dst_m);
@@ -2330,11 +2330,11 @@ again:
 		 * backing pages.
 		 */
 		if (vm_page_all_valid(dst_m)) {
-			vm_prot_t realprot =
-			    VM_OBJECT_MASK_CAP_PROT(dst_object, prot);
-			realprot = vm_page_mask_cap_prot(dst_m, realprot);
+			vm_prot_t realprot;
 
 			VM_OBJECT_ASSERT_CAP(dst_object, prot);
+			realprot = VM_OBJECT_MASK_CAP_PROT(dst_object, prot);
+			realprot = vm_page_mask_cap_prot(dst_m, realprot);
 
 // XXX CAPREVOKE
 			pmap_enter(dst_map->pmap, vaddr, dst_m, realprot,

@@ -3732,12 +3732,11 @@ init_pte_prot(pmap_t pmap, vm_page_t m, vm_prot_t access, vm_prot_t prot)
 		if ((prot & VM_PROT_WRITE_CAP) == 0) {
 			rw |= PTE_SCI | PTE_CRO;
 		} else {
-			/* XXX PTE_SCI from PGA_CAPDIRTY?  Not required... */
-
 			KASSERT(vm_page_astate_load(m).flags & PGA_CAPSTORE,
 			    ("pmap_enter managed WRITE_CAP w/o CAPSTORE"));
 
-			rw |= PTE_SCI;
+			if ((access & VM_PROT_WRITE_CAP) == 0)
+				rw |= PTE_SCI;
 		}
 #endif
 	} else {

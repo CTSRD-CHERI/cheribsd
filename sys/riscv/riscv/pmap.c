@@ -2720,7 +2720,7 @@ cheri_pte_cw(vm_page_t m, vm_prot_t prot, u_int flags)
 	vm_page_astate_t mas = vm_page_astate_load(m);
 #endif
 
-	// XXX Probably not here?
+	/* XXX Probably not here? */
 	KASSERT((mas.flags & PGA_CAPDIRTY) == 0 ||
 	    (mas.flags & PGA_CAPSTORE) != 0,
 	    ("pmap inserting CAPDIRTY w/o CAPSTORE m=%p", m));
@@ -2730,10 +2730,11 @@ cheri_pte_cw(vm_page_t m, vm_prot_t prot, u_int flags)
 	    ("pmap inserting PROT_WRITE_CAP w/o PROT_WRITE m=%p", m));
 
 	if ((prot & VM_PROT_WRITE_CAP) != 0) {
-		/* XXX PTE_CD from PGA_CAPDIRTY?  Not required... */
-
 		KASSERT(mas.flags & PGA_CAPSTORE,
 		    ("pmap_enter WRITE_CAP w/o CAPSTORE"));
+
+		if ((flags & VM_PROT_WRITE_CAP) != 0)
+			return (PTE_CW | PTE_CD);
 
 		return (PTE_CW);
 	}
@@ -2823,6 +2824,8 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if ((m->oflags & VPO_UNMANAGED) != 0) {
 		if (prot & VM_PROT_WRITE)
 			new_l3 |= PTE_D;
+		if (prot & VM_PROT_WRITE_CAP)
+			new_l3 |= PTE_CD;
 	} else
 		new_l3 |= PTE_SW_MANAGED;
 
@@ -3959,11 +3962,10 @@ void
 pmap_copy_page_tags(vm_page_t msrc, vm_page_t mdst)
 {
 
-	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst);
-
 	vm_pointer_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
 	vm_pointer_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
 
+	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst);
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
 	src = (vm_pointer_t)cheri_setboundsexact((void *)src, PAGE_SIZE);
