@@ -385,7 +385,48 @@ disable_user_memory_access()
 	);
 }
 
-// TODO: cloadtags stride (copy from mips)
+#ifdef CHERI_CAPREVOKE_CLOADTAGS
+uint8_t cloadtags_stride;
+SYSCTL_U8(_vm, OID_AUTO, cloadtags_stride, 0, &cloadtags_stride, 0, "XXX");
+
+static void
+measure_cloadtags_stride(void *ignored)
+{
+	(void)ignored;
+
+	/* A 256-byte cache-line is probably beyond the pale, so use that */
+	void * __capability buf[16] __attribute__((aligned(256)));
+	int i;
+
+	/* Fill with capabilities */
+	for (i = 0; i < sizeof(buf)/sizeof(buf[0]); i++) {
+		buf[i] = userspace_root_cap;
+	}
+
+	uint64_t tags = __builtin_cheri_cap_load_tags(buf);
+	switch (tags) {
+	case 0x0001:
+		cloadtags_stride = 1;
+		break;
+	case 0x0003:
+		cloadtags_stride = 2;
+		break;
+	case 0x000F:
+		cloadtags_stride = 4;
+		break;
+	case 0x00FF:
+		cloadtags_stride = 8;
+		break;
+	case 0xFFFF:
+		cloadtags_stride = 16;
+		break;
+	default:
+		panic("Bad cloadtags result 0x%" PRIx64, tags);
+	}
+}
+SYSINIT(
+    cloadtags_stride, SI_SUB_VM, SI_ORDER_ANY, measure_cloadtags_stride, NULL);
+#endif
 
 // TODO: CPREFETCH()
 
@@ -399,16 +440,68 @@ vm_caprevoke_page_iter(const struct vm_caprevoke_cookie *crc,
 		       uintcap_t * __capability mvu,
 		       vm_offset_t mve)
 {
+	CAPREVOKE_STATS_FOR(crst, crc);
 	int res = 0;
 
 	/* Load once up front, which is almost as good as const */
 	vm_caprevoke_test_fn ctp = crc->map->vm_caprev_test;
 	const uint8_t * __capability crshadow = crc->crshadow;
+#ifdef CHERI_CAPREVOKE_CLOADTAGS
+	uint8_t _cloadtags_stride = cloadtags_stride;
+	uint64_t tags, nexttags;
+#endif
 
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
 	curthread->td_pcb->pcb_onfault = (vm_offset_t)vm_caprevoke_tlb_fault;
 	enable_user_memory_access();
 #endif
+
+#ifdef CHERI_CAPREVOKE_CLOADTAGS
+	tags = __builtin_cheri_cap_load_tags(mvu);
+
+	mve -= _cloadtags_stride * sizeof(void * __capability);
+
+#ifdef CHERI_CAPREVOKE_STATS
+	if (tags) {
+		CAPREVOKE_STATS_BUMP(crst, lines_scan);
+	}
+#endif
+
+	for (; cheri_getaddress(mvu) < mve; mvu += _cloadtags_stride) {
+		uintcap_t * __capability mvt = mvu;
+
+		nexttags =
+		    __builtin_cheri_cap_load_tags(mvu + _cloadtags_stride);
+		if (nexttags != 0) {
+			/* TODO? CPREFETCH(mvu + _cloadtags_stride); */
+			CAPREVOKE_STATS_BUMP(crst, lines_scan);
+		}
+
+		for (; tags != 0; (tags >>= 1), mvt += 1) {
+			if (!(tags & 1))
+				continue;
+
+			if (cb(&res, crc, crshadow, ctp, mvt, *mvt))
+				goto out;
+		}
+
+		tags = nexttags;
+	}
+
+	/* And the last line */
+	{
+		uintcap_t * __capability mvt = mvu;
+		for (; tags != 0; (tags >>= 1), mvt += 1) {
+			if (!(tags & 1))
+				continue;
+
+			if (cb(&res, crc, crshadow, ctp, mvt, *mvt))
+				goto out;
+		}
+	}
+
+#else /* no CLOADTAGS */
+	/* TODO: lines_scan approximation for CAPREVOKE_STATS? */
 
 	for (; cheri_getaddress(mvu) < mve; mvu++) {
 		uintcap_t cut = *mvu;
@@ -417,6 +510,7 @@ vm_caprevoke_page_iter(const struct vm_caprevoke_cookie *crc,
 				goto out;
 		}
 	}
+#endif
 
 out:
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
