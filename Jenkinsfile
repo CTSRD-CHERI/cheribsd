@@ -3,6 +3,7 @@
 class GlobalVars { // "Groovy"
     public static boolean archiveArtifacts = false
     public static boolean isTestSuiteJob = false
+    public static List<String> selectedPurecapKernelArchitectures = []
 }
 
 echo("JOB_NAME='${env.JOB_NAME}', JOB_BASE_NAME='${env.JOB_BASE_NAME}'")
@@ -40,13 +41,47 @@ def allArchitectures = [
 ]
 jobProperties.add(parameters([text(defaultValue: allArchitectures.join('\n'),
         description: 'The architectures (cheribuild suffixes) to build for (one per line)',
-        name: 'architectures')]))
+        name: 'architectures'),
+        text(defaultValue: ["riscv64-hybrid", "riscv64-purecap"].join('\n'),
+        description: 'The architectures (cheribuild suffixes) to build a purecap kernel for (one per line)',
+        name: 'purecapKernelArchitectures')]))
 // Set the default job properties (work around properties() not being additive but replacing)
 setDefaultJobProperties(jobProperties)
 
 jobs = [:]
 
-def buildImageAndRunTests(params, String suffix) {
+GlobalVars.selectedPurecapKernelArchitectures = params.purecapKernelArchitectures.split('\n')
+
+def runTestStep(params, String testSuffix, String suffix, testExtraArgs, extraArgs) {
+    testExtraArgs.add("--test-output-dir=\$WORKSPACE/test-results/${testSuffix}")
+    sh label: "Run tests in QEMU", script: """
+rm -rf test-results && mkdir -p test-results/${testSuffix}
+# The test script returns 2 if the tests step is unstable, any other non-zero exit code is a fatal error
+exit_code=0
+./cheribuild/jenkins-cheri-build.py --test run-${suffix} '--test-extra-args=${testExtraArgs.join(" ")}' ${params.extraArgs} ${extraArgs.join(" ")} --test-ssh-key \$WORKSPACE/id_ed25519.pub || exit_code=\$?
+if [ \${exit_code} -eq 2 ]; then
+    echo "Test script encountered a non-fatal error - probably some of the tests failed."
+elif [ \${exit_code} -ne 0 ]; then
+    echo "Test script got fatal error: exit code \${exit_code}"
+    exit \${exit_code}
+fi
+find test-results
+"""
+    def summary = junitReturnCurrentSummary allowEmptyResults: false, keepLongStdio: true, testResults: "test-results/${testSuffix}/*.xml"
+    def testResultMessage = "Test summary: ${summary.totalCount}, Failures: ${summary.failCount}, Skipped: ${summary.skipCount}, Passed: ${summary.passCount}"
+    echo("${testSuffix}: ${testResultMessage}")
+    if (summary.passCount == 0 || summary.totalCount == 0) {
+        params.statusFailure("No tests successful? ${testResultMessage}")
+    } else if (summary.failCount != 0) {
+        // Note: Junit set should have set stage/build status to unstable already, but we still need to set
+        // the per-configuration status, since Jenkins doesn't have a build result for each parallel branch.
+        params.statusUnstable("Unstable test results: ${testResultMessage}")
+        // If there were test failures, we archive the JUnitXML file to simplify debugging
+        archiveArtifacts allowEmptyArchive: true, artifacts: "test-results/${testSuffix}/*.xml", onlyIfSuccessful: false
+    }
+}
+
+def buildImage(params, String suffix) {
     stage("Building disk images") {
         sh label: "Building full disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
         // No need for minimal images when running the testsuite
@@ -63,11 +98,25 @@ def buildImageAndRunTests(params, String suffix) {
             sh "mv -fv kernel-${suffix}* tarball/"
         }
     }
+}
+
+def runTests(params, String suffix) {
     if (suffix.startsWith("morello")) {
         echo("Can't run tests on the FVP yet!")
-        maybeArchiveArtifacts(params, suffix)
         return
     }
+
+    // TODO: run full testsuite (ideally in parallel)
+    def testExtraArgs = ['--no-timestamped-test-subdir']
+    if (GlobalVars.isTestSuiteJob) {
+        testExtraArgs += ['--kyua-tests-files', '/usr/tests/Kyuafile',
+                          '--no-run-cheribsdtest', // only run kyua tests
+        ]
+    } else {
+        // Run a small subset of tests to check that we didn't break running tests (since the full testsuite takes too long)
+        testExtraArgs += ['--kyua-tests-files', '/usr/tests/bin/cat/Kyuafile']
+    }
+
     stage("Running tests") {
         // copy qemu archive and run directly on the host
         dir("qemu-${params.buildOS}") { deleteDir() }
@@ -75,42 +124,17 @@ def buildImageAndRunTests(params, String suffix) {
         sh label: 'generate SSH key', script: 'test -e $WORKSPACE/id_ed25519 || ssh-keygen -t ed25519 -N \'\' -f $WORKSPACE/id_ed25519 < /dev/null'
 
         sh 'find qemu* && ls -lah'
-        // TODO: run full testsuite (ideally in parallel)
-        def testExtraArgs = ['--no-timestamped-test-subdir', "--test-output-dir=\$WORKSPACE/test-results/${suffix}"]
-        if (GlobalVars.isTestSuiteJob) {
-            testExtraArgs += ['--kyua-tests-files', '/usr/tests/Kyuafile',
-                              '--no-run-cheribsdtest', // only run kyua tests
-            ]
-        } else {
-            // Run a small subset of tests to check that we didn't break running tests (since the full testsuite takes too long)
-            testExtraArgs += ['--kyua-tests-files', '/usr/tests/bin/cat/Kyuafile']
-        }
-        sh label: "Run tests in QEMU", script: """
-rm -rf test-results && mkdir -p test-results/${suffix}
-# The test script returns 2 if the tests step is unstable, any other non-zero exit code is a fatal error
-exit_code=0
-./cheribuild/jenkins-cheri-build.py --test run-${suffix} '--test-extra-args=${testExtraArgs.join(" ")}' ${params.extraArgs} --test-ssh-key \$WORKSPACE/id_ed25519.pub || exit_code=\$?
-if [ \${exit_code} -eq 2 ]; then
-    echo "Test script encountered a non-fatal error - probably some of the tests failed."
-elif [ \${exit_code} -ne 0 ]; then
-    echo "Test script got fatal error: exit code \${exit_code}"
-    exit \${exit_code}
-fi
-find test-results
-"""
-        def summary = junitReturnCurrentSummary allowEmptyResults: false, keepLongStdio: true, testResults: "test-results/${suffix}/*.xml"
-        def testResultMessage = "Test summary: ${summary.totalCount}, Failures: ${summary.failCount}, Skipped: ${summary.skipCount}, Passed: ${summary.passCount}"
-        echo("${suffix}: ${testResultMessage}")
-        if (summary.passCount == 0 || summary.totalCount == 0) {
-            params.statusFailure("No tests successful? ${testResultMessage}")
-        } else if (summary.failCount != 0) {
-            // Note: Junit set should have set stage/build status to unstable already, but we still need to set
-            // the per-configuration status, since Jenkins doesn't have a build result for each parallel branch.
-            params.statusUnstable("Unstable test results: ${testResultMessage}")
-            // If there were test failures, we archive the JUnitXML file to simplify debugging
-            archiveArtifacts allowEmptyArchive: true, artifacts: "test-results/${suffix}/*.xml", onlyIfSuccessful: false
+
+        runTestStep(params, suffix, suffix, testExtraArgs, [])
+        if (GlobalVars.selectedPurecapKernelArchitectures.contains(suffix) && !GlobalVars.isTestSuiteJob) {
+            runTestStep(params, "${suffix}-purecap-kernel", suffix, testExtraArgs, ["--run-${suffix}/kernel-abi purecap"])
         }
     }
+}
+
+def buildImageAndRunTests(params, String suffix) {
+    buildImage(params, suffix)
+    runTests(params, suffix)
     maybeArchiveArtifacts(params, suffix)
 }
 
@@ -172,6 +196,7 @@ selectedArchitectures.each { suffix ->
             extraBuildOptions += ' -DMALLOC_DEBUG'
         }
         def cheribuildArgs = ["'--cheribsd/build-options=${extraBuildOptions}'",
+                              '--cheribsd/default-kernel-abi=hybrid',
                               '--keep-install-dir',
                               '--install-prefix=/rootfs',
                               '--cheribsd/build-tests',
@@ -181,6 +206,9 @@ selectedArchitectures.each { suffix ->
         } else {
             cheribuildArgs.add('--cheribsd/no-debug-info')
         }
+        if (GlobalVars.selectedPurecapKernelArchitectures.contains(suffix)) {
+            cheribuildArgs.add('--cheribsd/build-alternate-abi-kernels')
+        }
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
                 extraArgs: cheribuildArgs.join(" "),
                 skipArchiving: true, skipTarball: true,
@@ -189,7 +217,7 @@ selectedArchitectures.each { suffix ->
                 gitHubStatusContext: GlobalVars.isTestSuiteJob ? "testsuite/${suffix}" : "ci/${suffix}",
                 // Delete stale compiler/sysroot
                 beforeBuild: { params -> 
-                    dir('cherisdk') { deleteDir() } 
+                    dir('cherisdk') { deleteDir() }
                     sh label: 'Deleting outputs from previous builds', script: 'rm -rfv artifacts-* tarball kernel*'
                 },
                 /* Custom function to run tests since --test will not work (yet) */
