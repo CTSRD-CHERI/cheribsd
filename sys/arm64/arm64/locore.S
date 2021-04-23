@@ -37,6 +37,8 @@
 #include <machine/vm.h>
 #include <machine/vmparam.h>
 
+#include <machine/cherireg.h>
+
 #define	VIRT_BITS	48
 #define	DMAP_TABLES	((DMAP_MAX_ADDRESS - DMAP_MIN_ADDRESS) >> L0_SHIFT)
 
@@ -65,7 +67,62 @@
  *  D-Cache: off
  *  I-Cache: on or off
  *  We are loaded at a 2MiB aligned address
+ *
+ *  In CHERI kernels we assume that DDC is a valid root capability
+ *  covering the whole address space and PCC is a valid root
+ *  executable capability covering the whole address space.
  */
+
+/*
+ * Relocate kernel vaddr to the boot identity mapping
+ */
+.macro early_idmap_addr dreg, sym, delta
+	ldr	\dreg, =\sym
+	add	\dreg, \dreg, \delta
+.endmacro
+
+/*
+ * Build kernel pointer for the given data symbol
+ * assuming the kernel mmu mapping is enabled
+ */
+.macro buildptr dregn, sym, size
+	ldr	x\dregn, =\sym
+#ifdef __CHERI_PURE_CAPABILITY__
+	cvtd	c\dregn, x\dregn
+	scbnds	c\dregn, c\dregn, \size
+#endif
+.endmacro
+
+.macro buildptr_range sregn, eregn, start_sym, end_sym, clrperm = x
+	ldr	x\sregn, =\start_sym
+	ldr	x\eregn, =\end_sym
+#ifdef __CHERI_PURE_CAPABILITY__
+	sub	x\eregn, x\eregn, x\sregn
+	cvtd	c\sregn, x\sregn
+	scbnds	c\sregn, c\sregn, x\eregn
+	clrperm	c\sregn, c\sregn, \clrperm
+	add	c\eregn, c\sregn, x\eregn
+#endif
+.endmacro
+
+/*
+ * Jump into the kernel virtual address at the given position
+ * This also restricts the kernel PCC
+ */
+.macro enter_kern_vaddr regn, scratch1n, scratch2n, dstsym
+	ldr	x\regn, =\dstsym
+#ifdef __CHERI_PURE_CAPABILITY__
+	orr	x\regn, x\regn, #1	/* c64 mode */
+	ldr	x\scratch2n, =etext	/* XXX-AM: TODO use correct end symbol */
+	ldr	x\scratch1n, =KERNBASE
+	sub	x\scratch2n, x\scratch2n, x\scratch1n
+	cvtp	c\scratch1n, x\scratch1n
+	//scbnds	c\scratch1n, c\scratch1n, x\scratch2n /* XXX-AM: needs reordering of ELF sections */
+	scvalue	c\regn, c\scratch1n, x\regn
+	clrperm	c\regn, c\regn, w
+#endif
+	br	PTR(\regn)
+.endmacro
 
 /*
  * Relocate kernel vaddr to the boot identity mapping
@@ -100,12 +157,32 @@
 	mrs x2, cctlr_el0
 	orr x2, x2, #(CCTLR_PERMVCT_MASK | CCTLR_SBL_MASK)
 	msr cctlr_el0, x2
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * Enable capablity sealing for branch and link at EL1
+	 * Use PCC/DDC address interpretation.
+	 * Use DDC as base for adrdp.
+	 */
+	mrs	x2, cctlr_el1
+	bic	x2, x2, #(CCTLR_PCCBO_MASK | CCTLR_DDCBO_MASK | CCTLR_ADRDPB_MASK)
+	orr	x2, x2, #(CCTLR_SBL_MASK)
+	msr	cctlr_el1, x2
+
+	/* We assume that we enter here in a64 mode. */
+	bx	#4
+	.arch_extension c64
+#endif
 #endif
 .endmacro
 
 	.text
 	.globl _start
 _start:
+#ifdef __CHERI_PURE_CAPABILITY__
+	.arch_extension noc64
+	.arch_extension a64c
+#endif
 #if defined(LINUX_BOOT_ABI)
 	/* U-boot image header */
 	b	1f			/* code 0 */
@@ -121,7 +198,10 @@ _start:
 1:
 #endif /* defined(LINUX_BOOT_ABI) */
 
-	/* Drop to EL1 */
+	/*
+	 * Drop to EL1
+	 * Note: this is done while still in A64 mode.
+	 */
 	bl	drop_to_el1
 
 	/* Initialize morello capability ISA and switch to C64 if needed */
@@ -169,21 +249,27 @@ _start:
 	early_idmap_addr x27, pagetable_l0_ttbr0, x29
 
 	/* Jump to the virtual address space */
-	ldr	x15, .Lvirtdone
-	br	x15
+	enter_kern_vaddr 15, 7, 8, virtdone
 
 virtdone:
 	/* Set up the stack */
-	ldr	x25, =initstack_end
-	mov	sp, x25
-	sub	sp, sp, #PCB_SIZE
+	mov	x7, #(PAGE_SIZE * KSTACK_PAGES)
+	buildptr 25, initstack, x7
+	/* Preserve initstack in x/c25 for bootparams */
+	add	PTR(7), PTR(25), x7
+	/*
+	 * Can not yet enforce bounds between PCB and KSTACK as we have
+	 * no place to store the PCB pointer here.
+	 * XXX-AM: It could be another bootparam if needed
+	 */
+	mov	PTRN(sp), PTR(7)
+	sub	PTRN(sp), PTRN(sp), #PCB_SIZE
 
 	/* Zero the BSS */
-	ldr	x15, .Lbss
-	ldr	x14, .Lend
+	buildptr_range 15, 14, _bss_start, _end
 1:
-	str	xzr, [x15], #8
-	cmp	x15, x14
+	stp	PTR(zr), PTR(zr), [PTR(15)], #(2 * PTR_WIDTH)
+	cmp	PTR(15), PTR(14)
 	b.lo	1b
 
 	/* Backup the module pointer */
@@ -198,25 +284,48 @@ virtdone:
 	/* Make the page table base a virtual address */
 	sub	x26, x26, x29
 	sub	x24, x24, x29
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * Convert modulep into a capability
+	 * XXX-AM: can we set bounds on this?
+	 * TODO: clear perms
+	 */
+	cvtd	c19, x19
 
-	sub	sp, sp, #BOOTPARAMS_SIZE
-	mov	x0, sp
+	/* Rebuild L1PT and L0PT capabilities */
+	mov	x6, #PAGE_SIZE
+	ldr	x7, =.Lpagetable_clrperms
+	cvtd	c24, x24
+	scbnds	c24, c24, x6
+	clrperm	c24, c24, x7
+	cvtd	c26, x26
+	scbnds	c26, c26, x6
+	clrperm	c26, c26, x7
+#endif
 
-	/* Degate the delda so it is VA -> PA */
+	/* Negate the delta so it is VA -> PA */
 	neg	x29, x29
 
-	str	x19, [x0, #BP_MODULEP]
-	str	x26, [x0, #BP_KERN_L1PT]
-	str	x29, [x0, #BP_KERN_DELTA]
-	ldr	x25, =initstack
-	str	x25, [x0, #BP_KERN_STACK]
-	str	x24, [x0, #BP_KERN_L0PT]
-	str	x23, [x0, #BP_BOOT_EL]
-	str	x27, [x0, 40]	/* kern_ttbr0 */
+	sub	PTRN(sp), PTRN(sp), #BOOTPARAMS_SIZE
+	mov	PTR(0), PTRN(sp)
+
+	str	PTR(19), [PTR(0), #BP_MODULEP]
+	str	PTR(26), [PTR(0), #BP_KERN_L1PT]
+	str	x29, [PTR(0), #BP_KERN_DELTA]
+	str	PTR(25), [PTR(0), #BP_KERN_STACK]
+	str	PTR(24), [PTR(0), #BP_KERN_L0PT]
+	str	x23, [PTR(0), #BP_BOOT_EL]
+	str	x27, [PTR(0), #BP_KERN_TTBR0]
+
+	/* XXX-AM: TODO clear unused capability registers */
 
 	/* trace back starts here */
 	mov	fp, #0
+
 	/* Branch to C code */
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Clear all capabilities */
+#endif
 	bl	initarm
 	bl	mi_startup
 
@@ -224,12 +333,10 @@ virtdone:
 	brk	0
 
 	.align 3
-.Lvirtdone:
-	.quad	virtdone
-.Lbss:
-	.quad	_bss_start
-.Lend:
-	.quad	_end
+#ifdef __CHERI_PURE_CAPABILITY__
+.Lpagetable_clrperms:
+	.quad ~(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_STORE)
+#endif
 
 #ifdef SMP
 /*
@@ -239,6 +346,10 @@ virtdone:
  * The data in x0 is passed straight to init_secondary.
  */
 ENTRY(mpentry)
+#ifdef __CHERI_PURE_CAPABILITY__
+	.arch_extension noc64
+	.arch_extension a64c
+#endif
 	/* Disable interrupts */
 	msr	daifset, #2
 
@@ -266,14 +377,12 @@ ENTRY(mpentry)
 	early_idmap_addr x27, pagetable_l0_ttbr0, x29
 
 	/* Jump to the virtual address space */
-	ldr	x15, =mp_virtdone
-	br	x15
+	enter_kern_vaddr 15, 7, 8, mp_virtdone
 
 mp_virtdone:
 	/* Start using the AP boot stack */
-	ldr	x4, =bootstack
-	ldr	x4, [x4]
-	mov	sp, x4
+	LDR_LABEL(PTR(4), PTR(4), bootstack)
+	mov	PTRN(sp), PTR(4)
 
 	/* Load the kernel ttbr0 pagetable */
 	msr	ttbr0_el1, x27
@@ -293,6 +402,10 @@ END(mpentry)
  * registers and drop to EL1.
  */
 drop_to_el1:
+#ifdef __CHERI_PURE_CAPABILITY__
+	.arch_extension noc64
+	.arch_extension a64c
+#endif
 	mrs	x23, CurrentEL
 	lsr	x23, x23, #2
 	cmp	x23, #0x2
@@ -376,6 +489,9 @@ drop_to_el1:
 	isb
 
 	eret
+#ifdef __CHERI_PURE_CAPABILITY__
+	.arch_extension c64
+#endif
 
 	.align 3
 .Lsctlr_res1:
@@ -414,9 +530,9 @@ hyp_vectors:
  */
 get_virt_delta:
 	/* Load the physical address of virt_map */
-	adr	x29, virt_map
+	adr	PTR(29), virt_map
 	/* Load the virtual address of virt_map stored in virt_map */
-	ldr	x28, [x29]
+	ldr	x28, [PTR(29)]
 	/* Find PA - VA as PA' = VA' - VA + PA = VA' + (PA - VA) = VA' + x29 */
 	sub	x29, x29, x28
 	/* Find the load address for the kernel */
@@ -455,7 +571,7 @@ virt_map:
  */
 create_pagetables:
 	/* Save the Link register */
-	mov	x5, x30
+	mov	PTR(5), PTR(30)
 
 	/* Clean the page table */
 	/*
@@ -467,13 +583,21 @@ create_pagetables:
 	add	x6, x6, x29
 	ldr	x27, =pagetable_end
 	add	x27, x27, x29
-	mov	x26, x6	/* Save start addr for later */
+#ifdef __CHERI_PURE_CAPABILITY__
+	sub	x7, x27, x6
+	cvtd	c6, x6
+	scbnds	c6, c6, x7
+	ldr	x7, =.Lpagetable_clrperms
+	clrperm	c6, c6, x7
+	scvalue	c27, c6, x27
+#endif
+	mov	PTR(26), PTR(6)	/* Save start addr for later */
 1:
-	stp	xzr, xzr, [x6], #16
-	stp	xzr, xzr, [x6], #16
-	stp	xzr, xzr, [x6], #16
-	stp	xzr, xzr, [x6], #16
-	cmp	x6, x27
+	stp	xzr, xzr, [PTR(6)], #16
+	stp	xzr, xzr, [PTR(6)], #16
+	stp	xzr, xzr, [PTR(6)], #16
+	stp	xzr, xzr, [PTR(6)], #16
+	cmp	PTR(6), PTR(27)
 	b.lo	1b
 
 	/*
@@ -515,7 +639,7 @@ booti_fdt:
 booti_no_fdt:
 	/* Booted by U-Boot booti without FTD data */
 	/* Find the end - begin */
-	ldr     x7, .Lend
+	ldr     x7, =_end
 	sub     x8, x7, x6
 
 	/*
@@ -531,26 +655,26 @@ common:
 	lsr	x10, x8, #(L2_SHIFT)
 
 	/* Create the kernel space L2 table */
-	mov	x6, x26
+	mov	PTR(6), PTR(26)
 	mov	x7, #(ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK))
 	mov	x8, #(KERNBASE & L2_BLOCK_MASK)
 	mov	x9, x28
 	bl	build_l2_block_pagetable
 
 	/* Move to the l1 table */
-	add	x26, x26, #PAGE_SIZE
+	add	PTR(26), PTR(26), #PAGE_SIZE
 
 	/* Link the l1 -> l2 table */
 	mov	x9, x6
-	mov	x6, x26
+	mov	PTR(6), PTR(26)
 	bl	link_l1_pagetable
 
 	/* Move to the l0 table */
-	add	x24, x26, #PAGE_SIZE
+	add	PTR(24), PTR(26), #PAGE_SIZE
 
 	/* Link the l0 -> l1 table */
 	mov	x9, x6
-	mov	x6, x24
+	mov	PTR(6), PTR(24)
 	mov	x10, #1
 	bl	link_l0_pagetable
 
@@ -564,13 +688,13 @@ common:
 	 * Build the TTBR0 maps.  As TTBR0 maps, they must specify ATTR_S1_nG.
 	 * They are only needed early on, so the VA = PA map is uncached.
 	 */
-	add	x27, x24, #PAGE_SIZE
+	add	PTR(27), PTR(24), #PAGE_SIZE
 
-	mov	x6, x27		/* The initial page table */
+	mov	PTR(6), PTR(27)		/* The initial page table */
 
 	/* Create the VA = PA map */
 	mov	x7, #(ATTR_S1_nG | ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK))
-	adrp	x16, _start
+	adrp	PTR(16), _start
 	and	x16, x16, #(~L2_OFFSET)
 	mov	x9, x16		/* PA start */
 	mov	x8, x16		/* VA start (== PA start) */
@@ -578,6 +702,9 @@ common:
 	bl	build_l2_block_pagetable
 
 #if defined(SOCDEV_PA)
+#ifdef __CHERI_PURE_CAPABILITY__
+#error "TODO Implement for purecap kernel"
+#endif
 	/* Create a table for the UART */
 	mov	x7, #(ATTR_S1_nG | ATTR_S1_IDX(VM_MEMATTR_DEVICE))
 	add	x16, x16, #(L2_SIZE)	/* VA start */
@@ -613,30 +740,40 @@ common:
 #endif
 
 	/* Move to the l1 table */
-	add	x27, x27, #PAGE_SIZE
+	add	PTR(27), PTR(27), #PAGE_SIZE
 
 	/* Link the l1 -> l2 table */
 	mov	x9, x6
-	mov	x6, x27
+	mov	PTR(6), PTR(27)
 	bl	link_l1_pagetable
 
 	/* Move to the l0 table */
-	add	x27, x27, #PAGE_SIZE
+	add	PTR(27), PTR(27), #PAGE_SIZE
 
 	/* Link the l0 -> l1 table */
 	mov	x9, x6
-	mov	x6, x27
+	mov	PTR(6), PTR(27)
 	mov	x10, #1
 	bl	link_l0_pagetable
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * Return physical addresses instead of capabilities
+	 * into the identity-mapped early address space.
+	 */
+	gcvalue x24, c24
+	gcvalue x26, c26
+	gcvalue x27, c27
+#endif
+
 	/* Restore the Link register */
-	mov	x30, x5
+	mov	PTR(30), PTR(5)
 	ret
 
 /*
  * Builds an L0 -> L1 table descriptor
  *
- *  x6  = L0 table
+ *  x/c6  = L0 table
  *  x8  = Virtual Address
  *  x9  = L1 PA (trashed)
  *  x10 = Entry count (trashed)
@@ -658,7 +795,7 @@ link_l0_pagetable:
 1:	orr	x13, x12, x9, lsl #PAGE_SHIFT
 
 	/* Store the entry */
-	str	x13, [x6, x11, lsl #3]
+	str	x13, [PTR(6), x11, lsl #3]
 
 	sub	x10, x10, #1
 	add	x11, x11, #1
@@ -670,7 +807,7 @@ link_l0_pagetable:
 /*
  * Builds an L1 -> L2 table descriptor
  *
- *  x6  = L1 table
+ *  x/c6  = L1 table
  *  x8  = Virtual Address
  *  x9  = L2 PA (trashed)
  *  x11, x12 and x13 are trashed
@@ -691,13 +828,13 @@ link_l1_pagetable:
 	orr	x13, x12, x9, lsl #PAGE_SHIFT
 
 	/* Store the entry */
-	str	x13, [x6, x11, lsl #3]
+	str	x13, [PTR(6), x11, lsl #3]
 
 	ret
 
 /*
  * Builds count 2 MiB page table entry
- *  x6  = L2 table
+ *  x/c6  = L2 table
  *  x7  = Block attributes
  *  x8  = VA start
  *  x9  = PA start (trashed)
@@ -727,7 +864,7 @@ build_l2_block_pagetable:
 1:	orr	x13, x12, x9, lsl #L2_SHIFT
 
 	/* Store the entry */
-	str	x13, [x6, x11, lsl #3]
+	str	x13, [PTR(6), x11, lsl #3]
 
 	sub	x10, x10, #1
 	add	x11, x11, #1

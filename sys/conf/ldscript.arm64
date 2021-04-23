@@ -106,6 +106,7 @@ SECTIONS
   .sdata     : { *(.sdata) }
   _edata  =  .;
   PROVIDE (edata = .);
+  . = ALIGN(16);
   _bss_start = .;
   .sbss      : { *(.sbss) *(.scommon) }
   .bss       :
@@ -114,7 +115,7 @@ SECTIONS
    *(.bss)
    *(COMMON)
   }
-  . = ALIGN(8);
+  . = ALIGN(16);
   _end = . ;
   PROVIDE (end = .);
   /* Stabs debugging sections.  */

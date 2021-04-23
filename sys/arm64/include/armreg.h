@@ -110,6 +110,11 @@
 #define	CCTLR_ADRDPB_MASK	(0x1 << 4) /* ADRPD base selection */
 #define	CCTLR_PCCBO_MASK	(0x1 << 3) /* PCC base offset enable */
 #define	CCTLR_DDCBO_MASK	(0x1 << 2) /* PCC base offset enable */
+/*
+ * CCTLR_EL1 - Capability Control Register
+ * The rest of the fields mirror CCTLR_EL0
+ */
+#define	CCTLR_EL1_C64E_MASK	(0x1 << 5) /* Enable C64 mode upon exception */
 #endif
 
 /* CTR_EL0 - Cache Type Register */
