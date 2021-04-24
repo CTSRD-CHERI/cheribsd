@@ -30,6 +30,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/types.h>
 #include <cheri_init_globals.h>
 
 /* Invoked from locore. */
