@@ -53,6 +53,7 @@
  * Descriptor associated with each open bpf file.
  */
 struct zbuf;
+struct bpf_program_buffer;
 struct bpf_d {
 	CK_LIST_ENTRY(bpf_d) bd_next;	/* Linked list of descriptors */
 	/*
@@ -75,8 +76,8 @@ struct bpf_d {
 
 	struct bpf_if *	bd_bif;		/* interface descriptor */
 	u_long		bd_rtout;	/* Read timeout in 'ticks' */
-	struct bpf_insn *bd_rfilter; 	/* read filter code */
-	struct bpf_insn *bd_wfilter;	/* write filter code */
+	struct bpf_program_buffer *bd_rfilter; 	/* read filter code */
+	struct bpf_program_buffer *bd_wfilter;	/* write filter code */
 	void		*bd_bfilter;	/* binary filter code */
 	counter_u64_t	bd_rcount;	/* number of packets received */
 	counter_u64_t	bd_dcount;	/* number of packets dropped */
