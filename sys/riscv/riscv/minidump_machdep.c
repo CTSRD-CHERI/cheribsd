@@ -155,8 +155,8 @@ blk_write(struct dumperinfo *di, char *ptr, vm_paddr_t pa, size_t sz)
 		printf("cant have both va and pa!\n");
 		return (EINVAL);
 	}
-	if ((((uintptr_t)pa) % PAGE_SIZE) != 0) {
-		printf("address not page aligned %#lx\n", (uintptr_t)pa);
+	if ((pa % PAGE_SIZE) != 0) {
+		printf("address not page aligned %#lx\n", pa);
 		return (EINVAL);
 	}
 	if (ptr != NULL) {
