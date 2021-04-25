@@ -1608,8 +1608,8 @@ kern_linkat(struct thread *td, int fd1, int fd2,
 
 	do {
 		bwillwrite();
-		NDINIT_ATRIGHTS(&nd, LOOKUP, at2cnpflags(flag,
-		    AT_SYMLINK_FOLLOW | AT_RESOLVE_BENEATH) | AUDITVNODE1,
+		NDINIT_ATRIGHTS(&nd, LOOKUP, AUDITVNODE1 | at2cnpflags(flag,
+		    AT_SYMLINK_FOLLOW | AT_RESOLVE_BENEATH | AT_EMPTY_PATH),
 		    segflag, path1, fd1, &cap_linkat_source_rights, td);
 		if ((error = namei(&nd)) != 0)
 			return (error);
