@@ -146,7 +146,9 @@ file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "
 #include \"../cheri_builtins.h\"
 #undef __CHERI_PURE_CAPABILITY__
 #define KDB 1
-// #define COMPAT_FREEBSD11 1
+#define COMPAT_FREEBSD11 1
+#define COMPAT_FREEBSD12 1
+#define COMPAT_FREEBSD13 1
 #define COMPAT_FREEBSD32 1
 #define COMPAT_FREEBSD64 1
 #define CPU_CHERI 1
@@ -158,14 +160,20 @@ file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "
 #define YAMON 1
 #define INVARIANTS 1
 #define CPU_QEMU_RISCV 1
+#define MAC 1
+#define AUDIT 1
+#define SMP 1
+#define INET 1
+#define INET6 1
+#define DEV_NETMAP 1
+#define VFP 1
 
 struct thread_lite {
     unsigned td_pinned;
     unsigned td_critnest;
     unsigned td_owepreempt;
 };
-// #define MAC 1
-// #define AUDIT 1")
+")
 
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_capsicum.h "
 #define CAPABILITIES 1
@@ -187,11 +195,15 @@ execute_process(COMMAND ${CMAKE_C_COMPILER} -print-resource-dir OUTPUT_VARIABLE 
 message(STATUS "BUILTIN_HEADERS_DIR=${BUILTIN_HEADERS_DIR}")
 add_compile_options(-idirafter ${BUILTIN_HEADERS_DIR}/include)
 add_compile_options(-Wall -Wextra -Wcast-align)
-add_definitions(-DDEBUG)
 
 function(add_fake_targets_for_subdir _subdir)
-    cmake_parse_arguments(aftfs "LIBRARIES" "" "" ${ARGN})
+    cmake_parse_arguments(aftfs "LIBRARIES" "PREFIX" "" ${ARGN})
     file(GLOB _dirs LIST_DIRECTORIES TRUE "${_subdir}/*")
+    if (aftfs_PREFIX)
+        set(_prefix ${aftfs_PREFIX})
+    else()
+        set(_prefix ${_subdir})
+    endif()
     foreach(_dirpath ${_dirs})
         message(STATUS "Checking ${_dirpath}")
         if (IS_DIRECTORY "${_dirpath}")
@@ -200,25 +212,25 @@ function(add_fake_targets_for_subdir _subdir)
             if (NOT _fake_srcs)
                 message(STATUS "No sources found for ${_subdir}/${_dirname}. Contrib program?")
                 # Need at least one source for add_library() unless we add target_sources calls for all of them.
-                add_library(${_subdir}_${_dirname} STATIC tools/build/dummy.c)
+                add_library(${_prefix}_${_dirname} STATIC tools/build/dummy.c)
                 continue()
             endif()
             if (aftfs_LIBRARIES)
-                add_library(${_subdir}_${_dirname} STATIC ${_fake_srcs})
+                add_library(${_prefix}_${_dirname} STATIC ${_fake_srcs})
             else()
-                # TODO: add_executable(${_subdir}_${_dirname} ${_fake_srcs})
-                # target_link_libraries(${_subdir}_${_dirname} PRIVATE -fuse-ld=lld)
-                add_library(${_subdir}_${_dirname} STATIC ${_fake_srcs})
+                # TODO: add_executable(${_prefix}_${_dirname} ${_fake_srcs})
+                # target_link_libraries(${_prefix}_${_dirname} PRIVATE -fuse-ld=lld)
+                add_library(${_prefix}_${_dirname} STATIC ${_fake_srcs})
             endif()
             # Add the source dir as an include path
-            target_include_directories(${_subdir}_${_dirname} PRIVATE ${_dirpath} ${_dirpath}/include)
+            target_include_directories(${_prefix}_${_dirname} PRIVATE ${_dirpath} ${_dirpath}/include)
             # Add include paths for commonly used libraries
-            target_include_directories(${_subdir}_${_dirname} PRIVATE
+            target_include_directories(${_prefix}_${_dirname} PRIVATE
                 lib/libutil
                 contrib/libxo
                 contrib/atf  # for tests
             )
-            target_compile_options(${_subdir}_${_dirname} PRIVATE "-include${CMAKE_BINARY_DIR}/cheri_purecap.h")
+            target_compile_options(${_prefix}_${_dirname} PRIVATE "-include${CMAKE_BINARY_DIR}/cheri_purecap.h")
         endif()
     endforeach()
 endfunction()
@@ -236,6 +248,8 @@ add_fake_targets_for_subdir(bin)
 add_fake_targets_for_subdir(usr.bin)
 add_fake_targets_for_subdir(sbin)
 add_fake_targets_for_subdir(usr.sbin)
+add_fake_targets_for_subdir(tests/sys PREFIX tests_sys)
+target_include_directories(tests_sys_audit PRIVATE contrib/openbsm)
 target_include_directories(usr.bin_truss PRIVATE lib/libsysdecode)
 add_contrib_sources(usr.sbin_makefs contrib/mtree)
 add_contrib_sources(usr.sbin_makefs contrib/mknod)
@@ -273,7 +287,6 @@ endif()
 add_kernel_srcs("sys/cheri")
 add_kernel_srcs("sys/cddl")
 add_kernel_srcs("sys/ddb")
-add_kernel_srcs("sys/dev")
 add_kernel_srcs("sys/kern")
 add_kernel_srcs("sys/libkern")
 add_kernel_srcs("sys/fs")
