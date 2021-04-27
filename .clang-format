@@ -102,6 +102,8 @@ TabWidth: 8
 ColumnLimit: 80
 UseTab: Always
 SpaceAfterCStyleCast: false
+# We use "void * const *x" and not "void *const *x"
+SpaceAroundPointerQualifiers: Before
 IncludeBlocks: Regroup
 IncludeCategories:
   - Regex: '^\"opt_.*\.h\"'
