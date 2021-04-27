@@ -727,9 +727,15 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m)
 
 	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
 	if ((prot & VM_PROT_WRITE_CAP) != 0)
-		val |= ATTR_CDBM;
-	if ((flags & VM_PROT_WRITE_CAP) != 0)
-		val |= ATTR_SC;
+		/*
+		 * The page is CAPSTORE and this mapping is VM_PROT_WRITE_CAP.
+		 * Always set ATTR_CDBM. If the page is CAPDIRTY or this mapping
+		 * is created in response to a cap-write, also set ATTR_SC.
+		 *
+		 * XXX We could also conditionally set ATTR_SC if PGA_CAPDIRTY,
+		 * but it's not required.
+		 */
+		val |= (ATTR_CDBM);
 #endif
 
 	return (val);
