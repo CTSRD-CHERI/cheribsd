@@ -4745,6 +4745,101 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	return (mpte);
 }
 
+#if __has_feature(capabilities)
+/*
+ * Atomically push all the in-PTE, MD capdirty bits up to the MI layer.
+ *
+ * While this is a fairly long-running operation under the current pmap
+ * lock, it's going to be called only from single-threaded context, so there
+ * should be minimal contention (perhaps from the page daemon or updates to
+ * shared mappings) as no other cores are going to have this pmap active.
+ *
+ * XREF pmap_remove_pages
+ */
+void
+pmap_sync_capdirty(pmap_t pmap)
+{
+	pd_entry_t *pde;
+	pt_entry_t *pte, tpte;
+	vm_page_t m,mt;
+	pv_entry_t pv;
+	struct pv_chunk *pc, *npc;
+	int64_t bit;
+	uint64_t inuse, bitmask;
+	int field, idx, lvl;
+	vm_paddr_t pa;
+
+	PMAP_LOCK(pmap);
+
+	TAILQ_FOREACH_SAFE(pc, &pmap->pm_pvchunk, pc_list, npc) {
+		for (field = 0; field < _NPCM; field++) {
+			inuse = ~pc->pc_map[field] & pc_freemask[field];
+			while (inuse != 0) {
+				bit = ffsl(inuse) - 1;
+				bitmask = 1UL << bit;
+				idx = field * 64 + bit;
+				pv = &pc->pc_pventry[idx];
+				inuse &= ~bitmask;
+
+				pde = pmap_pde(pmap, pv->pv_va, &lvl);
+				KASSERT(pde != NULL,
+				    ("Attempting to sync an unmapped page"));
+
+				switch(lvl) {
+				case 1:
+					pte = pmap_l1_to_l2(pde, pv->pv_va);
+					tpte = pmap_load(pte);
+					KASSERT((tpte & ATTR_DESCR_MASK) ==
+					    L2_BLOCK,
+					    ("Attempting to sync an invalid "
+					    "block: %lx", tpte));
+					break;
+				case 2:
+					pte = pmap_l2_to_l3(pde, pv->pv_va);
+					tpte = pmap_load(pte);
+					KASSERT((tpte & ATTR_DESCR_MASK) ==
+					    L3_PAGE,
+					    ("Attempting to sync an invalid "
+					     "page: %lx", tpte));
+					break;
+				default:
+					panic(
+					    "Invalid page directory level: %d",
+					    lvl);
+				}
+
+
+				if (((tpte & ATTR_SW_MANAGED) == 0) ||
+				    !pmap_pte_capdirty(pmap, tpte))
+					continue;
+
+				pa = tpte & ~ATTR_MASK;
+				m = PHYS_TO_VM_PAGE(pa);
+				KASSERT(m->phys_addr == pa,
+				    ("vm_page_t %p phys_addr mismatch %016jx %016jx",
+				    m, (uintmax_t)m->phys_addr,
+				    (uintmax_t)tpte));
+
+				switch (lvl) {
+				case 1:
+					for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++)
+						vm_page_capdirty(mt);
+					break;
+				case 2:
+					vm_page_capdirty(m);
+					break;
+				}
+				pmap_clear_bits(pte, ATTR_SC);
+			}
+		}
+	}
+
+	pmap_invalidate_all(pmap);
+
+	PMAP_UNLOCK(pmap);
+}
+#endif
+
 /*
  * This code maps large physical mmap regions into the
  * processor address space.  Note that some shortcuts
