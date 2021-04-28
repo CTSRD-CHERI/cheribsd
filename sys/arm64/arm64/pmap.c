@@ -5372,18 +5372,17 @@ pmap_remove_pages(pmap_t pmap)
 				/*
 				 * Update the vm_page_t clean/reference bits.
 				 */
-				if (pmap_pte_dirty(pmap, tpte) ||
-				    pmap_pte_capdirty(pmap, tpte)) {
-					switch (lvl) {
-					case 1:
-						for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++)
-							pmap_page_dirty(pmap,
-							    tpte, mt);
+				switch (lvl) {
+				case 1:
+					if (!pmap_pte_dirty(pmap, tpte) &&
+					    !pmap_pte_capdirty(pmap, tpte))
 						break;
-					case 2:
-						pmap_page_dirty(pmap, tpte, m);
-						break;
-					}
+					for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++)
+						pmap_page_dirty(pmap, tpte, mt);
+					break;
+				case 2:
+					pmap_page_dirty(pmap, tpte, m);
+					break;
 				}
 
 				CHANGE_PV_LIST_LOCK_TO_VM_PAGE(&lock, m);
