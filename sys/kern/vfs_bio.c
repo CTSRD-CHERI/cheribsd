@@ -4307,7 +4307,7 @@ biodone(struct bio *bp)
 {
 	struct mtx *mtxp;
 	void (*done)(struct bio *);
-	vm_offset_t start, end;
+	vm_pointer_t start, end;
 
 	biotrack(bp, __func__);
 
@@ -4324,8 +4324,8 @@ biodone(struct bio *bp)
 	if ((bp->bio_flags & BIO_TRANSIENT_MAPPING) != 0) {
 		bp->bio_flags &= ~BIO_TRANSIENT_MAPPING;
 		bp->bio_flags |= BIO_UNMAPPED;
-		start = trunc_page((vm_offset_t)bp->bio_data);
-		end = round_page((vm_offset_t)bp->bio_data + bp->bio_length);
+		start = trunc_page((vm_pointer_t)bp->bio_data);
+		end = round_page((vm_pointer_t)bp->bio_data + bp->bio_length);
 		bp->bio_data = unmapped_buf;
 		pmap_qremove(start, atop(end - start));
 		vmem_free(transient_arena, start, end - start);
