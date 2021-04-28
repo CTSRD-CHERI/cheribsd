@@ -5509,6 +5509,32 @@ vm_page_assert_pga_capmeta_copy(vm_page_t msrc, vm_page_t mdst)
 	    == (msrca.flags & (PGA_CAPSTORE | PGA_CAPDIRTY)),
 	    ("pmap_copy_page_internal bad capdirty metadata"));
 }
+
+/*
+ * When entering a page into a pmap, ensure that
+ *
+ *   1) prot & VM_PROT_WRITE_CAP implies PGA_CAPSTORE
+ *   2) PGA_CAPDIRTY implies PGA_CAPSTORE
+ *   3) prot & VM_PROT_WRITE_CAP implies prot & VM_PROT_WRITE
+ *      (which is not strictly PGA_CAP*, but this is a convenient place)
+ */
+void
+vm_page_assert_pga_capmeta_pmap_enter(vm_page_t m, vm_prot_t prot)
+{
+	vm_page_astate_t mas = vm_page_astate_load(m);
+
+	KASSERT((prot & VM_PROT_WRITE_CAP) == 0 ||
+	    (mas.flags & PGA_CAPSTORE) != 0,
+	    ("pmap inserting VM_PROT_WRITE_CAP w/o PGA_CAPSTORE m=%p", m));
+
+	KASSERT((mas.flags & PGA_CAPDIRTY) == 0 ||
+	    (mas.flags & PGA_CAPSTORE) != 0,
+	    ("pmap inserting CAPDIRTY w/o CAPSTORE m=%p", m));
+
+	KASSERT((prot & VM_PROT_WRITE_CAP) == 0 ||
+	    (prot & VM_PROT_WRITE) != 0,
+	    ("pmap inserting VM_PROT_WRITE_CAP w/o VM_PROT_WRITE m=%p", m));
+}
 #endif
 #endif
 
