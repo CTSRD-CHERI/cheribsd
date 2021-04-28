@@ -475,10 +475,10 @@ vm_caprevoke_page_iter(const struct vm_caprevoke_cookie *crc,
 		}
 	}
 #else
-#ifdef CHERI_CAPREVOKE_STATS
-	int seentag = 0;
-#endif
 	for (; cheri_getaddress(mvu) < mve; mvu += 8) {
+#ifdef CHERI_CAPREVOKE_STATS
+		int seentag = 0;
+#endif
 		void * __capability * __capability mvt = mvu;
 
 		for (int i = 0; i < 8; i++, mvt++) {
@@ -491,12 +491,12 @@ vm_caprevoke_page_iter(const struct vm_caprevoke_cookie *crc,
 					goto out;
 			}
 		}
-	}
 #ifdef CHERI_CAPREVOKE_STATS
-	if (seentag) {
-		CAPREVOKE_STATS_BUMP(crst, lines_scan);
-	}
+		if (seentag) {
+			CAPREVOKE_STATS_BUMP(crst, lines_scan);
+		}
 #endif
+	}
 #endif
 
 out:
