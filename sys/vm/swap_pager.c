@@ -465,6 +465,8 @@ static void	swap_pager_set_writeable_dirty(vm_object_t object);
 static bool	swap_pager_mightbedirty(vm_object_t object);
 static void	swap_pager_getvp(vm_object_t object, struct vnode **vpp,
     bool *vp_heldp);
+static void	swap_pager_freespace(vm_object_t object, vm_pindex_t start,
+    vm_size_t size);
 
 struct pagerops swappagerops = {
 	.pgo_init =	swap_pager_init,	/* early system initialization of pager	*/
@@ -480,6 +482,7 @@ struct pagerops swappagerops = {
 	.pgo_set_writeable_dirty = swap_pager_set_writeable_dirty,
 	.pgo_mightbedirty = swap_pager_mightbedirty,
 	.pgo_getvp = swap_pager_getvp,
+	.pgo_freespace = swap_pager_freespace,
 };
 
 /*
@@ -975,8 +978,6 @@ sysctl_swap_fragmentation(SYSCTL_HANDLER_ARGS)
  * SWAP_PAGER_FREESPACE() -	frees swap blocks associated with a page
  *				range within an object.
  *
- *	This is a globally accessible routine.
- *
  *	This routine removes swapblk assignments from swap metadata.
  *
  *	The external callers of this routine typically have already destroyed
@@ -985,7 +986,7 @@ sysctl_swap_fragmentation(SYSCTL_HANDLER_ARGS)
  *
  *	The object must be locked.
  */
-void
+static void
 swap_pager_freespace(vm_object_t object, vm_pindex_t start, vm_size_t size)
 {
 

@@ -1279,8 +1279,8 @@ vm_object_madvise_freespace(vm_object_t object, int advice, vm_pindex_t pindex,
     vm_size_t size)
 {
 
-	if (advice == MADV_FREE && object->type == OBJT_SWAP)
-		swap_pager_freespace(object, pindex, size);
+	if (advice == MADV_FREE)
+		vm_pager_freespace(object, pindex, size);
 }
 
 /*
@@ -1800,9 +1800,7 @@ vm_object_collapse_scan(vm_object_t object)
 
 		if (p->pindex < backing_offset_index ||
 		    new_pindex >= object->size) {
-			if (backing_object->type == OBJT_SWAP)
-				swap_pager_freespace(backing_object, p->pindex,
-				    1);
+			vm_pager_freespace(backing_object, p->pindex, 1);
 
 			KASSERT(!pmap_page_is_mapped(p),
 			    ("freeing mapped page %p", p));
@@ -1851,9 +1849,7 @@ vm_object_collapse_scan(vm_object_t object)
 			 * page alone.  Destroy the original page from the
 			 * backing object.
 			 */
-			if (backing_object->type == OBJT_SWAP)
-				swap_pager_freespace(backing_object, p->pindex,
-				    1);
+			vm_pager_freespace(backing_object, p->pindex, 1);
 			KASSERT(!pmap_page_is_mapped(p),
 			    ("freeing mapped page %p", p));
 			if (vm_page_remove(p))
@@ -1877,9 +1873,8 @@ vm_object_collapse_scan(vm_object_t object)
 		}
 
 		/* Use the old pindex to free the right page. */
-		if (backing_object->type == OBJT_SWAP)
-			swap_pager_freespace(backing_object,
-			    new_pindex + backing_offset_index, 1);
+		vm_pager_freespace(backing_object, new_pindex +
+		    backing_offset_index, 1);
 
 #if VM_NRESERVLEVEL > 0
 		/*
@@ -2140,11 +2135,8 @@ wired:
 	}
 	vm_object_pip_wakeup(object);
 
-	if (object->type == OBJT_SWAP) {
-		if (end == 0)
-			end = object->size;
-		swap_pager_freespace(object, start, end - start);
-	}
+	vm_pager_freespace(object, start, (end == 0 ? object->size : end) -
+	    start);
 }
 
 /*
