@@ -106,6 +106,7 @@ enum obj_type {
 	OBJT_DEAD,
 	OBJT_SG,
 	OBJT_MGTDEVICE,
+	OBJT_SWAP_TMPFS,
 };
 typedef u_char objtype_t;
 
