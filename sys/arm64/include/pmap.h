@@ -95,6 +95,17 @@ struct pmap {
 	struct asid_set		*pm_asid_set;	/* The ASID/VMID set to use */
 	enum pmap_stage		pm_stage;
 	int			pm_levels;
+
+#if __has_feature(capabilities)
+	struct {
+		/*
+		 * Capability load generation bit.  The hardware kernel CLG
+		 * reflects this bit in the kernel_pmap, while the hardware
+		 * user CLG reflects this bit in the activated pmap.
+		 */
+		unsigned uclg:1;
+	} flags;
+#endif
 };
 typedef struct pmap *pmap_t;
 
