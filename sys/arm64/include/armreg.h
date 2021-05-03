@@ -115,6 +115,8 @@
  * The rest of the fields mirror CCTLR_EL0
  */
 #define	CCTLR_EL1_C64E_MASK	(0x1 << 5) /* Enable C64 mode upon exception */
+#define	CCTLR_EL1_TGEN1_MASK	(0x1 << 1) /* Page table CLG bit for TTBR1 */
+#define	CCTLR_EL1_TGEN0_MASK	(0x1 << 0) /* Page table CLG bit for TTBR0 */
 #endif
 
 /* CTR_EL0 - Cache Type Register */
