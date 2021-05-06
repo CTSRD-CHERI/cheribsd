@@ -514,8 +514,12 @@ contigfree(void *addr, unsigned long size, struct malloc_type *type)
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+	if (__predict_false(!cheri_gettag(addr)))
+		panic("Expect valid capability");
+	if (__predict_false(cheri_getsealed(addr)))
+		panic("Expect unsealed capability");
 #endif
+
 	kmem_free((vm_pointer_t)addr, size);
 	malloc_type_freed(type, addr, round_page(size));
 }
@@ -861,9 +865,6 @@ free_dbg(void **addrp, struct malloc_type *mtp)
 	/* free(NULL, ...) does nothing */
 	if (addr == NULL)
 		return (EJUSTRETURN);
-#ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
-#endif
 
 #ifdef DEBUG_MEMGUARD
 	if (is_memguard_addr(addr)) {
@@ -902,11 +903,12 @@ free(void *addr, struct malloc_type *mtp)
 	/* free(NULL, ...) does nothing */
 	if (addr == NULL)
 		return;
+
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
-	KASSERT(!cheri_getsealed(addr), ("Expect unsealed capability"));
-	if (!cheri_gettag(addr) || cheri_getsealed(addr))
-		return;
+	if (__predict_false(!cheri_gettag(addr)))
+		panic("Expect valid capability");
+	if (__predict_false(cheri_getsealed(addr)))
+		panic("Expect unsealed capability");
 #endif
 
 	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
@@ -917,10 +919,11 @@ free(void *addr, struct malloc_type *mtp)
 	if (__predict_true(!malloc_large_slab(slab))) {
 		size = zone->uz_size;
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_getlen(addr) <= CHERI_REPRESENTABLE_LENGTH(size),
-	    ("Invalid bounds: expected %zx found %zx",
-	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
-	        (size_t)cheri_getlen(addr)));
+		if (__predict_false(cheri_getlen(addr) !=
+		    CHERI_REPRESENTABLE_LENGTH(size)))
+			panic("Invalid bounds: expected %zx found %zx",
+			    (size_t)CHERI_REPRESENTABLE_LENGTH(size),
+			    cheri_getlen(addr));
 #endif
 #ifdef INVARIANTS
 		free_save_type(addr, mtp, size);
@@ -929,10 +932,11 @@ free(void *addr, struct malloc_type *mtp)
 	} else {
 		size = malloc_large_size(slab);
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_getlen(addr) <= CHERI_REPRESENTABLE_LENGTH(size),
-	    ("Invalid bounds: expected %zx found %zx",
-	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
-	        (size_t)cheri_getlen(addr)));
+		if (__predict_false(cheri_getlen(addr) !=
+		    CHERI_REPRESENTABLE_LENGTH(size)))
+			panic("Invalid bounds: expected %zx found %zx",
+			    (size_t)CHERI_REPRESENTABLE_LENGTH(size),
+			    cheri_getlen(addr));
 #endif
 		free_large(addr, size);
 	}
@@ -960,6 +964,13 @@ zfree(void *addr, struct malloc_type *mtp)
 	/* free(NULL, ...) does nothing */
 	if (addr == NULL)
 		return;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (__predict_false(!cheri_gettag(addr)))
+		panic("Expect valid capability");
+	if (__predict_false(cheri_getsealed(addr)))
+		panic("Expect unsealed capability");
+#endif
 
 	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
 	if (slab == NULL)
@@ -1001,7 +1012,10 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 	if (addr == NULL)
 		return (malloc(size, mtp, flags));
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+	if (__predict_false(!cheri_gettag(addr)))
+		panic("Expect valid capability");
+	if (__predict_false(cheri_getsealed(addr)))
+		panic("Expect unsealed capability");
 #endif
 
 	/*
