@@ -3605,7 +3605,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 	if (!(oldpte & PTE_CRG) == !(pmap->flags.uclg)) {
 		/* Page already scanned, just fence (maybe redundantly) */
 		if (flags & PMAP_CAPLOADGEN_UPDATETLB)
-			sfence_vma();
+			sfence_vma_page(va);
 
 		*pva = va + ((pte == l2) ? L2_SIZE : PAGE_SIZE);
 		m = NULL;
@@ -3702,7 +3702,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 					/* PTE CAP-CLEAN; page -?> IDLE */
 					pmap_store(pte, newpte);
 					if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
-						sfence_vma();
+						sfence_vma_page(va);
 					}
 					PMAP_UNLOCK(pmap);
 					pmap_caploadgen_test_all_clean(m);
@@ -3724,7 +3724,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 		}
 		pmap_store(pte, newpte);
 		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
-			sfence_vma();
+			sfence_vma_page(va);
 		}
 		m = NULL;
 	} else if (!(vm_page_astate_load(m).flags & PGA_CAPSTORE)) {
@@ -3746,7 +3746,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 		pmap_store(pte, newpte);
 
 		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
-			sfence_vma();
+			sfence_vma_page(va);
 		}
 
 		*pva = va + ((pte == l2) ? L2_SIZE : PAGE_SIZE);
