@@ -414,7 +414,6 @@ vm_object_allocate(objtype_t type, vm_pindex_t size)
 		flags = OBJ_COLORED;
 		break;
 	case OBJT_SWAP:
-	case OBJT_SWAP_TMPFS:
 		flags = OBJ_COLORED | OBJ_SWAP;
 		break;
 	case OBJT_DEVICE:
