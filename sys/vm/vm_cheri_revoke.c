@@ -225,31 +225,49 @@ vm_cheri_revoke_fault_visit(struct vmspace *uvms, vm_offset_t va)
 	struct vm_cheri_revoke_cookie crc;
 	vm_page_t m = NULL;
 	bool hascap = false;
-	pmap_t upmap = vmspace_pmap(uvms);
 
-	vres = vm_cheri_revoke_cookie_init(&uvms->vm_map, &crc);
-	KASSERT(vres == 0,
-	    ("vm_cheri_revoke_cooke_init failure in fault_visit"));
+	/*
+	 * Since faults may be spurious, avoid looking at VM data structures
+	 * unless we have to.  This seems wrong, somehow. XXX
+	 */
+	bool hascookie = false;
+
+	pmap_t upmap = vmspace_pmap(uvms);
 
 again:
 	pres = pmap_caploadgen_update(upmap, va, &m,
 	    PMAP_CAPLOADGEN_UPDATETLB | (hascap ? PMAP_CAPLOADGEN_HASCAPS : 0));
 	// printf("user VA caploadgen fault -> %lx %p %d\n", va, m, pres);
 
-	switch(pres) {
+	switch (pres) {
 	case PMAP_CAPLOADGEN_UNABLE:
 	case PMAP_CAPLOADGEN_TEARDOWN:
 		res = VM_CHERI_REVOKE_FAULT_UNRESOLVED;
-		break;
+		goto out;
 
 	case PMAP_CAPLOADGEN_ALREADY:
 	case PMAP_CAPLOADGEN_CLEAN:
 	case PMAP_CAPLOADGEN_OK:
 		res = VM_CHERI_REVOKE_FAULT_RESOLVED;
+		goto out;
+
+	case PMAP_CAPLOADGEN_SCAN_CLEAN_RO:
+	case PMAP_CAPLOADGEN_SCAN_RO:
+	case PMAP_CAPLOADGEN_SCAN_CLEAN_RW:
+	case PMAP_CAPLOADGEN_SCAN_RW:
+		/* Grab a caprevoke cookie if we need one and then visit */
 		break;
 
 	default:
 		panic("Bad pmap_caploadgen_fault_user return");
+	}
+
+	if (!hascookie) {
+		vres = vm_cheri_revoke_cookie_init(&uvms->vm_map, &crc);
+		KASSERT(vres == 0,
+		    ("vm_cheri_revoke_cooke_init failure in fault_visit"));
+		hascookie = true;
+	}
 
 	/*
 	 * The following cases have the page wired so we can inspect it.  It's
@@ -257,6 +275,10 @@ again:
 	 * drops the wiring and possibly acquires a new one) or that we call
 	 * vm_page_unwire() ourselves.
 	 */
+	switch (pres) {
+	default:
+		panic("impossible");
+
 	case PMAP_CAPLOADGEN_SCAN_CLEAN_RO:
 		/*
 		 * This is a somewhat unexpected result but might happen if the
@@ -300,6 +322,14 @@ again:
 	 * This might, very rarely, get credited to the next epoch, if we have
 	 * raced the close. (XXX?)
 	 */
+
+	if (!hascookie) {
+		vres = vm_cheri_revoke_cookie_init(&uvms->vm_map, &crc);
+		KASSERT(vres == 0,
+		    ("vm_caprevoke_cooke_init failure in fault_visit"));
+		hascookie = true;
+	}
+
 	
 	uint64_t cyc_end = get_cyclecount();
 	sx_slock(&uvms->vm_map.vm_cheri_revoke_stats_sx);
@@ -311,7 +341,9 @@ again:
 	sx_sunlock(&uvms->vm_map.vm_cheri_revoke_stats_sx);
 #endif
 
-	vm_cheri_revoke_cookie_rele(&crc);
+out:
+	if (hascookie)
+		vm_cheri_revoke_cookie_rele(&crc);
 
 	return res;
 }
