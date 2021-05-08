@@ -222,7 +222,7 @@ vm_page_init_cache_zones(void *dummy __unused)
 			pgcache->domain = domain;
 			pgcache->pool = pool;
 			pgcache->zone = uma_zcache_create("vm pgcache",
-			    PAGE_SIZE, NULL, NULL, NULL, NULL,
+			    sizeof(struct vm_page), NULL, NULL, NULL, NULL,
 			    vm_page_zone_import, vm_page_zone_release, pgcache,
 			    UMA_ZONE_VM);
 
