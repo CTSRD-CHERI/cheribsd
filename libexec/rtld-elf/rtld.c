@@ -91,6 +91,11 @@ extern struct r_debug r_debug; /* For GDB */
 extern int _thread_autoinit_dummy_decl;
 extern void (*__cleanup)(void);
 
+struct dlerror_save {
+	int seen;
+	char *msg;
+};
+
 /*
  * Function declarations.
  */
@@ -109,8 +114,8 @@ static Obj_Entry *dlopen_object(const char *name, int fd, Obj_Entry *refobj,
 static Obj_Entry *do_load_object(int, const char *, char *, struct stat *, int);
 static int do_search_info(const Obj_Entry *obj, int, struct dl_serinfo *);
 static bool donelist_check(DoneList *, const Obj_Entry *);
-static void errmsg_restore(char *);
-static char *errmsg_save(void);
+static void errmsg_restore(struct dlerror_save *);
+static struct dlerror_save *errmsg_save(void);
 static void *_fill_search_info(const char *, size_t, void *);
 /* Make this a macro to avoid updating all uses of fill_search_info */
 #define fill_search_info make_rtld_local_function_pointer(_fill_search_info)
@@ -1060,10 +1065,16 @@ _rtld_error(const char *fmt, ...)
 /*
  * Return a dynamically-allocated copy of the current error message, if any.
  */
-static char *
+static struct dlerror_save *
 errmsg_save(void)
 {
-	return (xstrdup(lockinfo.dlerror_loc()));
+	struct dlerror_save *res;
+
+	res = xmalloc(sizeof(*res));
+	res->seen = *lockinfo.dlerror_seen();
+	if (res->seen == 0)
+		res->msg = xstrdup(lockinfo.dlerror_loc());
+	return (res);
 }
 
 /*
@@ -1071,14 +1082,17 @@ errmsg_save(void)
  * by errmsg_save().  The copy is freed.
  */
 static void
-errmsg_restore(char *saved_msg)
+errmsg_restore(struct dlerror_save *saved_msg)
 {
-	if (saved_msg == NULL)
-		_rtld_error("");
-	else {
-		_rtld_error("%s", saved_msg);
-		free(saved_msg);
+	if (saved_msg == NULL || saved_msg->seen == 1) {
+		*lockinfo.dlerror_seen() = 1;
+	} else {
+		*lockinfo.dlerror_seen() = 0;
+		strlcpy(lockinfo.dlerror_loc(), saved_msg->msg,
+		    lockinfo.dlerror_loc_sz);
+		free(saved_msg->msg);
 	}
+	free(saved_msg);
 }
 
 static const char *
@@ -3145,7 +3159,7 @@ static void
 objlist_call_fini(Objlist *list, Obj_Entry *root, RtldLockState *lockstate)
 {
     Objlist_Entry *elm;
-    char *saved_msg;
+    struct dlerror_save *saved_msg;
     InitArrayEntry *fini_addr;
     int index;
 
@@ -3222,7 +3236,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 {
     Objlist_Entry *elm;
     Obj_Entry *obj;
-    char *saved_msg;
+    struct dlerror_save *saved_msg;
     InitArrayEntry *init_addr;
     void (*reg)(void (*)(void));
     int index;
