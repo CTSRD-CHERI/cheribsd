@@ -1745,6 +1745,9 @@ print_arg(struct syscall_arg *sc, syscallarg_t *args, syscallarg_t *retval,
 		union {
 			int32_t strarray32[PAGE_SIZE / sizeof(int32_t)];
 			int64_t strarray64[PAGE_SIZE / sizeof(int64_t)];
+#if __has_feature(capabilities)
+			intcap_t strarray_cap[PAGE_SIZE / sizeof(intcap_t)];
+#endif
 			char buf[PAGE_SIZE];
 		} u;
 		char *string;
@@ -1788,6 +1791,11 @@ print_arg(struct syscall_arg *sc, syscallarg_t *args, syscallarg_t *retval,
 		i = 0;
 		for (;;) {
 			psaddr_t straddr;
+#if __has_feature(capabilities)
+			if (pointer_size == sizeof(intcap_t)) {
+				straddr = (psaddr_t)u.strarray_cap[i];
+			} else
+#endif
 			if (pointer_size == 4) {
 				straddr = user_ptr32_to_psaddr(u.strarray32[i]);
 			} else if (pointer_size == 8) {

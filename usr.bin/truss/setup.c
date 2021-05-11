@@ -117,6 +117,7 @@ static struct procabi freebsd64 = {
 	.type = "FreeBSD64",
 	.abi = SYSDECODE_ABI_FREEBSD64,
 	.pointer_size = sizeof(uint64_t),
+	.compat_prefix = "freebsd64_",
 	.extra_syscalls = STAILQ_HEAD_INITIALIZER(freebsd64.extra_syscalls),
 	.syscalls = { NULL }
 };
@@ -146,6 +147,7 @@ static struct procabi_table abis[] = {
 #ifdef __CHERI_PURE_CAPABILITY__
 	{ "FreeBSD ELF64C", &freebsd },
 	{ "FreeBSD ELF64", &freebsd64 },
+	{ "FreeBSD ELF32", &freebsd32 },
 #elif __SIZEOF_POINTER__ == 4
 	{ "FreeBSD ELF32", &freebsd },
 #elif __SIZEOF_POINTER__ == 8
