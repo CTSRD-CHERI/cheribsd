@@ -3557,6 +3557,16 @@ out:
 	}
 }
 
+static inline void
+pmap_caploadgen_update_crg(pmap_t pmap, pt_entry_t *pte)
+{
+	if (pmap->flags.uclg) {
+		pmap_store_bits(pte, PTE_CRG);
+	} else {
+		pmap_clear_bits(pte, PTE_CRG);
+	}
+}
+
 int
 pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 {
@@ -3569,7 +3579,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 	PMAP_LOCK(pmap);
 
 	KASSERT(!(csr_read(sccsr) & SCCSR_UGCLG) == !(pmap->flags.uclg),
-	    ("pmap_caploadgen_update: pmap clg %d but CPU mismatch",
+	    ("pmap_caploadgen_update: pmap crg %d but CPU mismatch",
 	    (int)pmap->flags.uclg));
 
 	l2 = pmap_l2(pmap, va);
@@ -3589,7 +3599,6 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 		pte = l2;
 		oldpte = l2e;
 	}
-	newpte = oldpte;
 
 	switch (oldpte & (PTE_CR | PTE_CRM)) {
 	case 0:		// tag clearing
@@ -3627,11 +3636,16 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 		*pva = va + ((pte == l2) ? L2_SIZE : PAGE_SIZE);
 		res = PMAP_CAPLOADGEN_OK;
 
-		if (pmap->flags.uclg) {
-			newpte |= PTE_CRG;
-		} else {
-			newpte &= ~PTE_CRG;
-		}
+		/*
+		 * On the fast path, where we're just updating the CRG bit, this
+		 * is the only store to the PTE we'll do.  On slower paths,
+		 * we'll do additional atomics to update other bits.  This is
+		 * probably a better state of affairs (1 + epsilon AMOs, no
+		 * retries) than we could otherwise easily get (either 1 LL/SC
+		 * CAS + epsilon retries or 1 AMOSWAP to a zero PTE + 1 store).
+		 */
+		pmap_caploadgen_update_crg(pmap, pte);
+
 		if (!(flags & PMAP_CAPLOADGEN_HASCAPS)) {
 			/*
 			 * We didn't see a capability on this page; step this
@@ -3645,50 +3659,28 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 				 * store-release below, and so we're going to
 				 * scan the page again anyway.
 				 */
-				newpte &= ~PTE_CD;
+				pmap_clear_bits(pte, PTE_CD);
 			} else if (oldpte & PTE_CW) {
 				/*
-				 * PTE CAP-DIRTYABLE -> CAP-CLEAN; this race
-				 * matters, so we have to do a swap.
+				 * PTE CAP-DIRTYABLE -> CAP-CLEAN
 				 *
-				 * To ensure that any racing PTW traps, we
-				 * temporarily zero out the PTE in question!
-				 * While we'd like to just de-assert PTE_W, that
-				 * leaves open the possibility that PTE_A gets
-				 * set while we're racing here.  By the time
-				 * we've dropped the lock, we'll have put the
-				 * PTE back and so that other core will take the
-				 * fast path through pmap_fault_fixup.
+				 * We don't do a TLB shootdown here because
+				 * we're guaranteed that any TLB caching this
+				 * PTE_CW-but-not-PTE_CD entry will attempt a
+				 * CAS, and not just a blind AMO OR, to set
+				 * PTE_CD.  The barrier at the start of a
+				 * revocation epoch ensures that no TLB can have
+				 * a PTE_CW-and-PTE_CD entry for this mapping if
+				 * we've gotten here.
+				 *
+				 * TODO: Should we mark the page as
+				 * cap-load-faulting as a debugging aide once
+				 * Toooba is tag-dependently faulting?  (We
+				 * can't mark it as cap-load-clearing because
+				 * there might be aliases that update
+				 * asynchronously.)
 				 */
-				newpte &= ~PTE_CW;
-				oldpte = pmap_load_store(pte, 0);
-
-				/*
-				 * Preserve accessed and dirty flags across that
-				 * swap, too.  Again, there's a chance that a
-				 * PTW might mistakenly see these bits
-				 * de-asserted, but either it will set them
-				 */
-				newpte |= (oldpte & (PTE_A | PTE_D));
-
-				/*
-				 * If what we read back indicated that a TLB may
-				 * have seen a CAPDIRTY entry, go put a CAPDIRTY
-				 * entry back to the PTE, but now with the right
-				 * CLG.
-				 */
-				if (oldpte & PTE_CD) {
-					newpte |= PTE_CD | PTE_CW;
-				}
-
-				/*
-				 * Nothing else about the PTE loaded should be
-				 * different from what we're about to store.
-				 */
-				KASSERT((oldpte & ~(PTE_CW | PTE_CRG))
-				    == (newpte & ~(PTE_CW | PTE_CRG)),
-				    ("pmap_caploadgen_update PTE swap botch"));
-
+				pmap_clear_bits(pte, PTE_CW);
 			} else if (flags & PMAP_CAPLOADGEN_EXCLUSIVE) {
 				/* No new mappings possible */
 				vm_page_astate_t mas = vm_page_astate_load(m);
@@ -3698,9 +3690,8 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 					vm_page_aflag_clear(m, PGA_CAPDIRTY);
 				} else {
 					KASSERT(mas.flags & PGA_CAPSTORE,
-					    ("PTE already CAP-CLEAN?"));
+					    ("Page already CAP-CLEAN?"));
 					/* PTE CAP-CLEAN; page -?> IDLE */
-					pmap_store(pte, newpte);
 					if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
 						sfence_vma_page(va);
 					}
@@ -3719,10 +3710,18 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 			 * probably doesn't get set often ough to merit.
 			 */
 			if (oldpte & PTE_CW) {
-				newpte |= PTE_CD;
+				pmap_store_bits(pte, PTE_CD);
 			}
 		}
-		pmap_store(pte, newpte);
+
+		/*
+		 * Nothing else about the PTE loaded should be
+		 * different from what we've updated above.
+		 */
+		KASSERT((oldpte & ~(PTE_CW | PTE_CD | PTE_CRG))
+		    == (pmap_load(pte) & ~(PTE_CW | PTE_CD | PTE_CRG)),
+		    ("pmap_caploadgen_update botch"));
+
 		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
 			sfence_vma_page(va);
 		}
@@ -3738,13 +3737,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 		 * capability clean at this point, we should be OK to
 		 * arbitarily manipulate the LCLG, so appease the TLB.
 		 */
-		if (pmap->flags.uclg) {
-			newpte |= PTE_CRG;
-		} else {
-			newpte &= ~PTE_CRG;
-		}
-		pmap_store(pte, newpte);
-
+		pmap_caploadgen_update_crg(pmap, pte);
 		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
 			sfence_vma_page(va);
 		}
@@ -4880,7 +4873,7 @@ pmap_activate_sw(struct thread *td)
 	pmap = vmspace_pmap(td->td_proc->p_vmspace);
 	if (pmap == oldpmap) {
 #if __has_feature(capabilities)
-		goto update_clg;
+		goto update_crg;
 #else
 		return;
 #endif
@@ -4898,7 +4891,7 @@ pmap_activate_sw(struct thread *td)
 	PCPU_SET(curpmap, pmap);
 
 #if __has_feature(capabilities)
-update_clg:
+update_crg:
 	if (pmap->flags.uclg)
 		csr_set(sccsr, SCCSR_UGCLG);
 	else
