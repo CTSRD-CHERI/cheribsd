@@ -17,14 +17,16 @@ endif()
 
 if("${TARGET}" STREQUAL "mips")
     if("${TARGET_ARCH}" STREQUAL "mips64")
-        add_compile_options(-mabi=n64)
+        # Default to purecap compilation mode for code completion
+        add_compile_options(-mabi=purecap -msoft-float)
         set(CLANG_TRIPLE mips64-unknown-freebsd13)
     else()
         message(FATAL_ERROR "Unsupported MIPS TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
     endif()
 elseif("${TARGET}" STREQUAL "riscv")
     if("${TARGET_ARCH}" STREQUAL "riscv64")
-        add_compile_options(-mabi=lp64)
+        # Default to purecap compilation mode for code completion
+        add_compile_options(-march=rv64imafdcxcheri -mabi=l64pc128d -mno-relax)
         set(CLANG_TRIPLE riscv64-unknown-freebsd13)
     else()
         message(FATAL_ERROR "Unsupported RISC-V TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
@@ -156,15 +158,11 @@ unsigned long __builtin_cheri_round_representable_length(unsigned long);
 ")
 
 file(WRITE ${CMAKE_BINARY_DIR}/cheri_purecap.h "
-// Pretend that we have capabilities in CLion
-#define __CHERI_PURE_CAPABILITY__ 1
-#define __CHERI_CAPABILITY_TABLE__ 3
 #include \"cheri_builtins.h\"
 ")
 
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "
 #include \"../cheri_builtins.h\"
-#undef __CHERI_PURE_CAPABILITY__
 #define KDB 1
 #define COMPAT_FREEBSD11 1
 #define COMPAT_FREEBSD12 1
