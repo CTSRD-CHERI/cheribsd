@@ -87,13 +87,10 @@ ufs_root(mp, flags, vpp)
  * Do operations associated with quotas
  */
 int
-ufs_quotactl(struct mount *mp, int cmds, uid_t id, void * __capability arg)
+ufs_quotactl(struct mount *mp, int cmds, uid_t id, void * __capability arg,
+    bool *mp_busy)
 {
 #ifndef QUOTA
-	if ((cmds >> SUBCMDSHIFT) == Q_QUOTAON ||
-	    (cmds >> SUBCMDSHIFT) == Q_QUOTAOFF)
-		vfs_unbusy(mp);
-
 	return (EOPNOTSUPP);
 #else
 	struct thread *td;
@@ -113,25 +110,23 @@ ufs_quotactl(struct mount *mp, int cmds, uid_t id, void * __capability arg)
 			break;
 
 		default:
-			if (cmd == Q_QUOTAON || cmd == Q_QUOTAOFF)
-				vfs_unbusy(mp);
 			return (EINVAL);
 		}
 	}
-	if ((u_int)type >= MAXQUOTAS) {
-		if (cmd == Q_QUOTAON || cmd == Q_QUOTAOFF)
-			vfs_unbusy(mp);
+	if ((u_int)type >= MAXQUOTAS)
 		return (EINVAL);
-	}
 
 	switch (cmd) {
 	case Q_QUOTAON:
-		error = quotaon(td, mp, type, arg);
+		error = quotaon(td, mp, type, arg, mp_busy);
 		break;
 
 	case Q_QUOTAOFF:
 		vfs_ref(mp);
+		KASSERT(*mp_busy,
+		    ("%s called without busied mount", __func__));
 		vfs_unbusy(mp);
+		*mp_busy = false;
 		vn_start_write(NULL, &mp, V_WAIT | V_MNTREF);
 		error = quotaoff(td, mp, type);
 		vn_finished_write(mp);
