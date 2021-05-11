@@ -85,7 +85,11 @@ _alt_start:
 	csetaddr ct1, ct1, t0
 	li	t0, 1
 	csetflags ct1, ct1, t0
+#ifdef __riscv_xcheri_mode_dependent_jumps
+	jr.cap	ct1
+#else
 	cjr	ct1
+#endif
 1:
 .option pop
 #endif
