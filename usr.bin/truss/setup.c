@@ -126,7 +126,7 @@ static struct procabi freebsd64 = {
 static struct procabi linux = {
 	.type = "Linux",
 	.abi = SYSDECODE_ABI_LINUX,
-	.pointer_size = sizeof(void *),
+	.pointer_size = sizeof(ptraddr_t),
 	.extra_syscalls = STAILQ_HEAD_INITIALIZER(linux.extra_syscalls),
 	.syscalls = { NULL }
 };
