@@ -92,7 +92,7 @@ static struct procabi cloudabi64 = {
 static struct procabi freebsd = {
 	.type = "FreeBSD",
 	.abi = SYSDECODE_ABI_FREEBSD,
-	.pointer_size = sizeof(void *),
+	.pointer_size = sizeof(void * __capability),
 	.extra_syscalls = STAILQ_HEAD_INITIALIZER(freebsd.extra_syscalls),
 	.syscalls = { NULL }
 };
@@ -112,7 +112,8 @@ static struct procabi freebsd32 = {
 };
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
+_Static_assert(sizeof(ptraddr_t) == 8, "Missing 64-bit capability support");
 static struct procabi freebsd64 = {
 	.type = "FreeBSD64",
 	.abi = SYSDECODE_ABI_FREEBSD64,
@@ -144,15 +145,13 @@ static struct procabi linux32 = {
 static struct procabi_table abis[] = {
 	{ "CloudABI ELF32", &cloudabi32 },
 	{ "CloudABI ELF64", &cloudabi64 },
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
 	{ "FreeBSD ELF64C", &freebsd },
 	{ "FreeBSD ELF64", &freebsd64 },
 	{ "FreeBSD ELF32", &freebsd32 },
 #elif __SIZEOF_POINTER__ == 4
 	{ "FreeBSD ELF32", &freebsd },
 #elif __SIZEOF_POINTER__ == 8
-	/* This permits hybrid truss to trace CheriABI. */
-	{ "FreeBSD ELF64C", &freebsd },
 	{ "FreeBSD ELF64", &freebsd },
 	{ "FreeBSD ELF32", &freebsd32 },
 #else
@@ -173,10 +172,6 @@ static struct procabi_table abis[] = {
 #else
 	{ "Linux ELF32", &linux },
 #endif
-	/*
-	 * XXX: Temporary hack for COMPAT_CHERIABI.
-	 */
-	{ "CheriABI ELF64", &freebsd },
 };
 
 /*
