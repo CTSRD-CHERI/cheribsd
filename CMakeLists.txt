@@ -107,6 +107,7 @@ file(MAKE_DIRECTORY ${TMPSYSROOT}/kern_opt)
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_ddb.h "#define DDB 1\n")
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_ktrace.h "#define KTRACE 1\n")
 file(WRITE ${CMAKE_BINARY_DIR}/cheri_builtins.h "
+#ifdef __JETBRAINS_IDE__
 // Pretend that we have capabilities in CLion
 #define __CHERI__
 #define __has_feature(x) __fake_has_feature_##x
@@ -161,6 +162,7 @@ unsigned long __builtin_cheri_round_representable_length(unsigned long);
 #define __SIZEOF_CHERI_CAPABILITY__ 16
 #define __SIZEOF_UINTCAP__ 16
 #define __SIZEOF_INTCAP__ 16
+#endif /* __JETBRAINS_IDE__ */
 ")
 
 file(WRITE ${CMAKE_BINARY_DIR}/cheri_purecap.h "
