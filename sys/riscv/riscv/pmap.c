@@ -3753,7 +3753,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 		res = (oldpte & PTE_D) ?
 			PMAP_CAPLOADGEN_SCAN_CLEAN_RW :
 			PMAP_CAPLOADGEN_SCAN_CLEAN_RO;
-	} else if (oldpte & PTE_D) {
+	} else if (oldpte & PTE_W) {
 		res = PMAP_CAPLOADGEN_SCAN_RW;
 	} else {
 		res = PMAP_CAPLOADGEN_SCAN_RO;
