@@ -1531,6 +1531,18 @@ SYSCTL_INT(_vm_pmap, OID_AUTO, pv_entry_spare, CTLFLAG_RD, &pv_entry_spare, 0,
     "Current number of spare pv entries");
 #endif
 
+static __inline void
+pmap_page_dirty(pt_entry_t entry, vm_page_t m)
+{
+	if (pte_test(&entry, PTE_D))
+		vm_page_dirty(m);
+
+#ifdef CPU_CHERI
+	if (!pte_test(&entry, PTE_SCI))
+		vm_page_capdirty(m);
+#endif
+}
+
 /*
  * We are in a serious low memory condition.  Resort to
  * drastic measures to free some pages so we can allocate
@@ -1596,13 +1608,7 @@ pmap_pv_reclaim(pmap_t locked_pmap)
 				else
 					*pte = 0;
 				m = PHYS_TO_VM_PAGE(TLBLO_PTE_TO_PA(oldpte));
-				if (pte_test(&oldpte, PTE_D)) {
-					vm_page_dirty(m);
-#ifdef CPU_CHERI
-					if (!pte_test(&oldpte, PTE_SCI))
-						vm_page_capdirty(m);
-#endif
-				}
+				pmap_page_dirty(oldpte, m);
 				if (m->md.pv_flags & PV_TABLE_REF)
 					vm_page_aflag_set(m, PGA_REFERENCED);
 				m->md.pv_flags &= ~PV_TABLE_REF;
@@ -1895,16 +1901,10 @@ pmap_remove_pte(struct pmap *pmap, pt_entry_t *ptq, vm_offset_t va,
 	if (pte_test(&oldpte, PTE_MANAGED)) {
 		pa = TLBLO_PTE_TO_PA(oldpte);
 		m = PHYS_TO_VM_PAGE(pa);
-		if (pte_test(&oldpte, PTE_D)) {
-			KASSERT(!pte_test(&oldpte, PTE_RO),
-			    ("%s: modified page not writable: va: %#jx, pte: %#jx",
-			    __func__, va, (uintmax_t)oldpte));
-			vm_page_dirty(m);
-#ifdef CPU_CHERI
-			if (!pte_test(&oldpte, PTE_SCI))
-				vm_page_capdirty(m);
-#endif
-		}
+		KASSERT(!pte_test(&oldpte, PTE_D) || !pte_test(&oldpte, PTE_RO),
+		    ("%s: modified page not writable: va: %#jx, pte: %#jx",
+		    __func__, va, (uintmax_t)oldpte));
+		pmap_page_dirty(oldpte, m);
 		if (m->md.pv_flags & PV_TABLE_REF)
 			vm_page_aflag_set(m, PGA_REFERENCED);
 		m->md.pv_flags &= ~PV_TABLE_REF;
@@ -2104,16 +2104,10 @@ pmap_remove_all(vm_page_t m)
 		/*
 		 * Update the vm_page_t clean and reference bits.
 		 */
-		if (pte_test(&tpte, PTE_D)) {
-			KASSERT(!pte_test(&tpte, PTE_RO),
-			    ("%s: modified page not writable: va: %#jx, pte: %#jx",
-			    __func__, pv->pv_va, (uintmax_t)tpte));
-			vm_page_dirty(m);
-#ifdef CPU_CHERI
-			if (!pte_test(&tpte, PTE_SCI))
-				vm_page_capdirty(m);
-#endif
-		}
+		KASSERT(!pte_test(&tpte, PTE_D) || !pte_test(&tpte, PTE_RO),
+		    ("%s: modified page not writable: va: %#jx, pte: %#jx",
+		    __func__, pv->pv_va, (uintmax_t)tpte));
+		pmap_page_dirty(tpte, m);
 
 		if (!pmap_unuse_pt(pmap, pv->pv_va, *pde))
 			pmap_invalidate_page(pmap, pv->pv_va);
@@ -2188,22 +2182,13 @@ pmap_protect(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, vm_prot_t prot)
 				continue;
 			}
 			pte_set(&pbits, PTE_RO);
+			if (pte_test(&pbits, PTE_MANAGED)) {
+				pa = TLBLO_PTE_TO_PA(pbits);
+				m = PHYS_TO_VM_PAGE(pa);
+				pmap_page_dirty(pbits, m);
+			}
 			if (pte_test(&pbits, PTE_D)) {
 				pte_clear(&pbits, PTE_D);
-				if (pte_test(&pbits, PTE_MANAGED)) {
-					pa = TLBLO_PTE_TO_PA(pbits);
-					m = PHYS_TO_VM_PAGE(pa);
-					vm_page_dirty(m);
-
-#ifdef CPU_CHERI
-					/* Leave PTE_SCI clear, but update MI */
-					if (!pte_test(&pbits, PTE_SCI)) {
-						pa = TLBLO_PTE_TO_PA(pbits);
-						m = PHYS_TO_VM_PAGE(pa);
-						vm_page_capdirty(m);
-					}
-#endif
-				}
 				if (va == va_next)
 					va = sva;
 			} else {
@@ -2251,6 +2236,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
  	KASSERT(va <= VM_MAX_KERNEL_ADDRESS, ("pmap_enter: toobig"));
 	KASSERT((m->oflags & VPO_UNMANAGED) != 0 || !VA_IS_CLEANMAP(va),
 	    ("pmap_enter: managed mapping within the clean submap"));
+	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		VM_PAGE_OBJECT_BUSY_ASSERT(m);
 	pa = VM_PAGE_TO_PHYS(m);
@@ -2295,7 +2281,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	origpte = *pte;
 	KASSERT(!pte_test(&origpte, PTE_D | PTE_RO | PTE_V),
 	    ("pmap_enter: modified page not writable: va: %p, pte: %#jx",
-	    (void *)va, (uintmax_t)origpte));
+	    (void *)(uintptr_t)va, (uintmax_t)origpte));
 #ifdef CPU_CHERI
 	KASSERT(
 	    !pte_test(&origpte, PTE_CRO | PTE_V) || pte_test(&origpte, PTE_SCI),
@@ -2349,12 +2335,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 			pmap->pm_stats.wired_count--;
 		if (pte_test(&origpte, PTE_MANAGED)) {
 			om = PHYS_TO_VM_PAGE(opa);
-			if (pte_test(&origpte, PTE_D))
-				vm_page_dirty(om);
-#ifdef CPU_CHERI
-			if (!pte_test(&origpte, PTE_SCI))
-				vm_page_capdirty(m);
-#endif
+			pmap_page_dirty(origpte, om);
 			if ((om->md.pv_flags & PV_TABLE_REF) != 0) {
 				om->md.pv_flags &= ~PV_TABLE_REF;
 				vm_page_aflag_set(om, PGA_REFERENCED);
@@ -2416,16 +2397,8 @@ validate:
 					vm_page_aflag_set(om, PGA_REFERENCED);
 				om->md.pv_flags &= ~PV_TABLE_REF;
 			}
-			if (pte_test(&origpte, PTE_D)) {
-				if (pte_test(&origpte, PTE_MANAGED))
-					vm_page_dirty(m);
-			}
-#ifdef CPU_CHERI
-			if (!pte_test(&origpte, PTE_SCI)) {
-				if (pte_test(&origpte, PTE_MANAGED))
-					vm_page_capdirty(m);
-			}
-#endif
+			if (pte_test(&origpte, PTE_MANAGED))
+				pmap_page_dirty(origpte, m);
 			pmap_update_page(pmap, va, newpte);
 		}
 	}
@@ -3077,12 +3050,7 @@ pmap_remove_pages(pmap_t pmap)
 				/*
 				 * Update the vm_page_t clean and reference bits.
 				 */
-				if (pte_test(&tpte, PTE_D))
-					vm_page_dirty(m);
-#ifdef CPU_CHERI
-				if (!pte_test(&tpte, PTE_SCI))
-					vm_page_capdirty(m);
-#endif
+				pmap_page_dirty(tpte, m);
 
 				/* Mark free */
 				PV_STAT(pv_entry_frees++);
@@ -3192,15 +3160,9 @@ pmap_remove_write(vm_page_t m)
 		KASSERT(pte != NULL && pte_test(pte, PTE_V),
 		    ("page on pv_list has no pte"));
 		pbits = *pte;
-		if (pte_test(&pbits, PTE_D)) {
+		pmap_page_dirty(pbits, m);
+		if (pte_test(&pbits, PTE_D))
 			pte_clear(&pbits, PTE_D);
-			vm_page_dirty(m);
-		}
-#ifdef CPU_CHERI
-		/* Leave PTE_SCI clear, but update MI */
-		if (!pte_test(&pbits, PTE_SCI))
-			vm_page_capdirty(m);
-#endif
 		pte_set(&pbits, PTE_RO);
 		if (pbits != *pte) {
 			*pte = pbits;
@@ -3732,9 +3694,6 @@ init_pte_prot(pmap_t pmap, vm_page_t m, vm_prot_t access, vm_prot_t prot)
 		if ((prot & VM_PROT_WRITE_CAP) == 0) {
 			rw |= PTE_SCI | PTE_CRO;
 		} else {
-			KASSERT(vm_page_astate_load(m).flags & PGA_CAPSTORE,
-			    ("pmap_enter managed WRITE_CAP w/o CAPSTORE"));
-
 			if ((access & VM_PROT_WRITE_CAP) == 0)
 				rw |= PTE_SCI;
 		}
@@ -3746,9 +3705,6 @@ init_pte_prot(pmap_t pmap, vm_page_t m, vm_prot_t access, vm_prot_t prot)
 #ifdef CPU_CHERI
 		if ((prot & VM_PROT_WRITE_CAP) == 0)
 			rw |= PTE_SCI | PTE_CRO;
-		else
-			KASSERT(vm_page_astate_load(m).flags & PGA_CAPSTORE,
-			    ("pmap_enter UNMANAGED WRITE_CAP w/o CAPSTORE"));
 #endif
 	}
 

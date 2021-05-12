@@ -2713,35 +2713,6 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va,
 #endif
 
 #if __has_feature(capabilities)
-static __inline uint64_t
-cheri_pte_cw(vm_page_t m, vm_prot_t prot, u_int flags)
-{
-#ifdef INVARIANTS
-	vm_page_astate_t mas = vm_page_astate_load(m);
-#endif
-
-	/* XXX Probably not here? */
-	KASSERT((mas.flags & PGA_CAPDIRTY) == 0 ||
-	    (mas.flags & PGA_CAPSTORE) != 0,
-	    ("pmap inserting CAPDIRTY w/o CAPSTORE m=%p", m));
-
-	KASSERT((prot & VM_PROT_WRITE_CAP) == 0 ||
-	    (prot & VM_PROT_WRITE) != 0,
-	    ("pmap inserting PROT_WRITE_CAP w/o PROT_WRITE m=%p", m));
-
-	if ((prot & VM_PROT_WRITE_CAP) != 0) {
-		KASSERT(mas.flags & PGA_CAPSTORE,
-		    ("pmap_enter WRITE_CAP w/o CAPSTORE"));
-
-		if ((flags & VM_PROT_WRITE_CAP) != 0)
-			return (PTE_CW | PTE_CD);
-
-		return (PTE_CW);
-	}
-
-	return (0);
-}
-
 static inline uint64_t
 cheri_pte_cr(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 {
@@ -2798,6 +2769,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	va = trunc_page(va);
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		VM_PAGE_OBJECT_BUSY_ASSERT(m);
+	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
 	pa = VM_PAGE_TO_PHYS(m);
 	pn = (pa / PAGE_SIZE);
 
@@ -2811,8 +2783,13 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if (va < VM_MAX_USER_ADDRESS)
 		new_l3 |= PTE_U;
 #if __has_feature(capabilities)
+	if (prot & VM_PROT_READ_CAP)
+		new_l3 |= PTE_CR;
+	if (prot & VM_PROT_WRITE_CAP)
+		new_l3 |= PTE_CW;
+	if (flags & VM_PROT_WRITE_CAP)
+		new_l3 |= PTE_CD;
 	new_l3 |= cheri_pte_cr(pmap, va, m, prot);
-	new_l3 |= cheri_pte_cw(m, prot, flags);
 #endif
 
 	new_l3 |= (pn << PTE_PPN0_S);
@@ -2827,8 +2804,10 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if ((m->oflags & VPO_UNMANAGED) != 0) {
 		if (prot & VM_PROT_WRITE)
 			new_l3 |= PTE_D;
+#if __has_feature(capabilities)
 		if (prot & VM_PROT_WRITE_CAP)
 			new_l3 |= PTE_CD;
+#endif
 	} else
 		new_l3 |= PTE_SW_MANAGED;
 
@@ -3957,7 +3936,6 @@ pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
 void
 pmap_copy_page_tags(vm_page_t msrc, vm_page_t mdst)
 {
-
 	vm_pointer_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
 	vm_pointer_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
 

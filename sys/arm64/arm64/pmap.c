@@ -722,27 +722,11 @@ pmap_pte_prot(pmap_t pmap, vm_prot_t prot, u_int flags, vm_page_t m)
 	if ((prot & VM_PROT_READ_CAP) != 0)
 		val |= ATTR_LC_ENABLED;
 
-	vm_page_astate_t mas = vm_page_astate_load(m);
-
-	/* XXX Probably not here? */
-	KASSERT((mas.flags & PGA_CAPDIRTY) == 0 ||
-	    (mas.flags & PGA_CAPSTORE) != 0,
-	    ("pmap inserting CAPDIRTY w/o CAPSTORE m=%p", m));
-
-	KASSERT((prot & VM_PROT_WRITE_CAP) == 0 ||
-	    (prot & VM_PROT_WRITE) != 0,
-	    ("pmap inserting PROT_WRITE_CAP w/o PROT_WRITE m=%p", m));
-
-	if ((prot & VM_PROT_WRITE_CAP) != 0) {
-		/*
-		 * The page is CAPSTORE and this mapping is VM_PROT_WRITE_CAP.
-		 * Always set ATTR_CDBM. If this mapping is created in response
-		 * to a cap-write, also set ATTR_SC.
-		 */
-		val |= (ATTR_CDBM);
-		if ((flags & VM_PROT_WRITE_CAP) != 0)
-			val |= (ATTR_SC);
-	}
+	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, prot);
+	if ((prot & VM_PROT_WRITE_CAP) != 0)
+		val |= ATTR_CDBM;
+	if ((flags & VM_PROT_WRITE_CAP) != 0)
+		val |= ATTR_SC;
 #endif
 
 	return (val);
@@ -5233,18 +5217,17 @@ pmap_remove_pages(pmap_t pmap)
 				/*
 				 * Update the vm_page_t clean/reference bits.
 				 */
-				if (pmap_pte_dirty(pmap, tpte) ||
-				    pmap_pte_capdirty(pmap, tpte)) {
-					switch (lvl) {
-					case 1:
-						for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++)
-							pmap_page_dirty(pmap,
-							    tpte, mt);
+				switch (lvl) {
+				case 1:
+					if (!pmap_pte_dirty(pmap, tpte) &&
+					    !pmap_pte_capdirty(pmap, tpte))
 						break;
-					case 2:
-						pmap_page_dirty(pmap, tpte, m);
-						break;
-					}
+					for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++)
+						pmap_page_dirty(pmap, tpte, mt);
+					break;
+				case 2:
+					pmap_page_dirty(pmap, tpte, m);
+					break;
 				}
 
 				CHANGE_PV_LIST_LOCK_TO_VM_PAGE(&lock, m);
