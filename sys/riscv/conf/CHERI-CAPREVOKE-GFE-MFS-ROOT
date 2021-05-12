@@ -1,6 +1,6 @@
 #NO_UNIVERSE
 
-include "CHERI-CAPREVOKE-GFE"
-include "std.MFS-ROOT"
+include "CHERI-GFE"
+include "std.CHERI-CAPREVOKE"
 
-ident CHERI-CAPREVOKE-GFE-MFS-ROOT
+ident CHERI-CAPREVOKE-GFE

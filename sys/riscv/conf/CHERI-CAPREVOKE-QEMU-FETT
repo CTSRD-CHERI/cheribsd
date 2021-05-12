@@ -1,6 +1,0 @@
-#NO_UNIVERSE
-
-include "CHERI-CAPREVOKE-QEMU"
-makeoptions	NO_MODULES=yes
-
-ident CHERI-CAPREVOKE-QEMU-FETT
