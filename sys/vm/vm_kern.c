@@ -846,7 +846,13 @@ kmem_init(vm_pointer_t start, vm_pointer_t end)
 	addr = VM_MIN_KERNEL_ADDRESS;
 #endif
 
-	size = (ptraddr_t)start - (ptraddr_t)addr;
+	/*
+	 * We waste some virtual_avail for representability.
+	 * This might be bad because we already have reserved page tables
+	 * for that kva range.
+	 */
+	size = CHERI_REPRESENTABLE_LENGTH((ptraddr_t)start - (ptraddr_t)addr);
+	start = roundup2(start, CHERI_REPRESENTABLE_ALIGNMENT(size));
 	(void)vm_map_reservation_create_locked(kernel_map, &addr, size,
 	    VM_PROT_ALL);
 	(void)vm_map_insert(kernel_map, NULL, 0, addr, start, VM_PROT_ALL,

@@ -1405,7 +1405,7 @@ struct ccb_async {
  */
 union ccb {
 	/* For convenience */
-	struct	ccb_hdr			ccb_h __subobject_use_container_bounds;
+	struct	ccb_hdr			ccb_h;
 	struct	ccb_scsiio		csio;
 	struct	ccb_getdev		cgd;
 	struct	ccb_getdevlist		cgdl;
@@ -1440,7 +1440,7 @@ union ccb {
 	struct	ccb_async		casync;
 	struct	ccb_nvmeio		nvmeio;
 	struct	ccb_mmcio		mmcio;
-};
+} __subobject_use_container_bounds;
 
 #define CCB_CLEAR_ALL_EXCEPT_HDR(ccbp)			\
 	bzero((char *)(ccbp) + sizeof((ccbp)->ccb_h),	\

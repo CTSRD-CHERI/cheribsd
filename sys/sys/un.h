@@ -57,7 +57,8 @@ typedef	__sa_family_t	sa_family_t;
 struct sockaddr_un {
 	unsigned char	sun_len;	/* sockaddr len including null */
 	sa_family_t	sun_family;	/* AF_UNIX */
-	char	sun_path[SUNPATHLEN];	/* path name (gag) */
+	/* path name (gag) */
+	char	sun_path[SUNPATHLEN] __subobject_variable_length_maxsize(SUNPATHLEN);
 };
 
 #if __BSD_VISIBLE
@@ -84,3 +85,12 @@ struct sockaddr_un {
 #endif /* __BSD_VISIBLE */
 
 #endif /* !_SYS_UN_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20210424,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject-bounds"
+//   ]
+// }
+// CHERI CHANGES END

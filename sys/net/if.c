@@ -2970,16 +2970,14 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 	case SIOCAIFGROUP:
-	{
-		struct ifgroupreq *ifgr = (struct ifgroupreq *)data;
-
 		error = priv_check(td, PRIV_NET_ADDIFGROUP);
 		if (error)
 			return (error);
-		if ((error = if_addgroup(ifp, ifgr->ifgr_group)))
+		error = if_addgroup(ifp,
+		    ((struct ifgroupreq *)data)->ifgr_group);
+		if (error != 0)
 			return (error);
 		break;
-	}
 
 	case SIOCGIFGROUP:
 	{
@@ -2992,16 +2990,14 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 	}
 
 	case SIOCDIFGROUP:
-	{
-		struct ifgroupreq *ifgr = (struct ifgroupreq *)data;
-
 		error = priv_check(td, PRIV_NET_DELIFGROUP);
 		if (error)
 			return (error);
-		if ((error = if_delgroup(ifp, ifgr->ifgr_group)))
+		error = if_delgroup(ifp,
+		    ((struct ifgroupreq *)data)->ifgr_group);
+		if (error != 0)
 			return (error);
 		break;
-	}
 
 	default:
 		error = ENOIOCTL;
@@ -3025,8 +3021,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		struct ifmediareq ifmr;
 		struct ifreq ifr;
 	} thunk;
-	caddr_t saved_data = NULL;
-	u_long saved_cmd = 0;
+	u_long saved_cmd;
 #ifdef COMPAT_FREEBSD32
 	struct ifconf32 *ifc32;
 	struct ifdrv32 *ifd32;
@@ -3061,14 +3056,13 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 #endif
 
 #if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
+	saved_cmd = cmd;
 	switch (cmd) {
 #ifdef COMPAT_FREEBSD32
 	case SIOCGIFCONF32:
 		ifc32 = (struct ifconf32 *)data;
 		thunk.ifc.ifc_len = ifc32->ifc_len;
 		thunk.ifc.ifc_buf = __USER_CAP(ifc32->ifc_buf, ifc32->ifc_len);
-		saved_cmd = cmd;
-		saved_data = data;
 		data = (caddr_t)&thunk.ifc;
 		cmd = SIOCGIFCONF;
 		break;
@@ -3081,8 +3075,6 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		thunk.ifd.ifd_len = ifd32->ifd_len;
 		thunk.ifd.ifd_data = __USER_CAP(ifd32->ifd_data,
 		    ifd32->ifd_len);
-		saved_cmd = cmd;
-		saved_data = data;
 		data = (caddr_t)&thunk.ifd;
 		cmd = _IOC_NEWTYPE(cmd, struct ifdrv);
 		break;
@@ -3106,8 +3098,6 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 			    ifgr32->ifgr_len);
 			break;
 		}
-		saved_cmd = cmd;
-		saved_data = data;
 		data = (caddr_t)&thunk.ifgr;
 		cmd = _IOC_NEWTYPE(cmd, struct ifgroupreq);
 		break;
@@ -3123,8 +3113,6 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		thunk.ifmr.ifm_count = ifmr32->ifm_count;
 		thunk.ifmr.ifm_ulist = __USER_CAP(ifmr32->ifm_ulist,
 		    ifmr32->ifm_count * sizeof(int));
-		saved_cmd = cmd;
-		saved_data = data;
 		data = (caddr_t)&thunk.ifmr;
 		cmd = _IOC_NEWTYPE(cmd, struct ifmediareq);
 		break;
@@ -3134,8 +3122,6 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		ifc64 = (struct ifconf64 *)data;
 		thunk.ifc.ifc_len = ifc64->ifc_len;
 		thunk.ifc.ifc_buf = __USER_CAP(ifc64->ifc_buf, ifc64->ifc_len);
-		saved_cmd = cmd;
-		saved_data = data;
 		data = (caddr_t)&thunk.ifc;
 		cmd = SIOCGIFCONF;
 		break;
@@ -3148,8 +3134,6 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		thunk.ifd.ifd_len = ifd64->ifd_len;
 		thunk.ifd.ifd_data = __USER_CAP(ifd64->ifd_data,
 		    ifd64->ifd_len);
-		saved_cmd = cmd;
-		saved_data = data;
 		data = (caddr_t)&thunk.ifd;
 		cmd = _IOC_NEWTYPE(cmd, struct ifdrv);
 		break;
@@ -3173,8 +3157,6 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 			    ifgr64->ifgr_len);
 			break;
 		}
-		saved_cmd = cmd;
-		saved_data = data;
 		data = (caddr_t)&thunk.ifgr;
 		cmd = _IOC_NEWTYPE(cmd, struct ifgroupreq);
 		break;
@@ -3190,8 +3172,6 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		thunk.ifmr.ifm_count = ifmr64->ifm_count;
 		thunk.ifmr.ifm_ulist = __USER_CAP(ifmr64->ifm_ulist,
 		    ifmr64->ifm_count * sizeof(int));
-		saved_cmd = cmd;
-		saved_data = data;
 		data = (caddr_t)&thunk.ifmr;
 		cmd = _IOC_NEWTYPE(cmd, struct ifmediareq);
 		break;
@@ -3201,7 +3181,6 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 		thunk.ifcr.ifcr_count = ifcr64->ifcr_count;
 		thunk.ifcr.ifcr_buffer = __USER_CAP(ifcr64->ifcr_buffer,
 		    ifcr64->ifcr_count * IFNAMSIZ);
-		saved_data = data;
 		data = (caddr_t)&thunk.ifmr;
 		cmd = SIOCIFGCLONERS;
 		break;
@@ -3288,8 +3267,6 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 			thunk.ifr.ifr_lan_pcp = ifr64->ifr_lan_pcp;
 			break;
 		}
-		saved_cmd = cmd;
-		saved_data = data;
 		data = (caddr_t)&thunk.ifr;
 		cmd = _IOC_NEWTYPE(cmd, struct ifreq);
 		break;
@@ -3401,12 +3378,11 @@ out_ref:
 out_noref:
 	CURVNET_RESTORE();
 #if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
-	if (error)
+	if (error != 0)
 		return (error);
 	switch (saved_cmd) {
 #ifdef COMPAT_FREEBSD32
 	case SIOCGIFCONF32:
-		ifc32 = (struct ifconf32 *)saved_data;
 		ifc32->ifc_len = thunk.ifc.ifc_len;
 		break;
 	case SIOCGDRVSPEC32:
@@ -3416,19 +3392,16 @@ out_noref:
 		 * field it might make sense to update) hasn't
 		 * changed.
 		 */
-		ifd32 = (struct ifdrv32 *)saved_data;
 		KASSERT(thunk.ifd.ifd_len == ifd32->ifd_len,
 		    ("ifd_len was updated %u -> %zu", ifd32->ifd_len,
 			thunk.ifd.ifd_len));
 		break;
 	case SIOCGIFGROUP32:
 	case SIOCGIFGMEMB32:
-		ifgr32 = (struct ifgroupreq32 *)data;
 		ifgr32->ifgr_len = thunk.ifgr.ifgr_len;
 		break;
 	case SIOCGIFMEDIA32:
 	case SIOCGIFXMEDIA32:
-		ifmr32 = (struct ifmediareq32 *)saved_data;
 		ifmr32->ifm_current = thunk.ifmr.ifm_current;
 		ifmr32->ifm_mask = thunk.ifmr.ifm_mask;
 		ifmr32->ifm_status = thunk.ifmr.ifm_status;
@@ -3438,7 +3411,6 @@ out_noref:
 #endif
 #ifdef COMPAT_FREEBSD64
 	case SIOCGIFCONF64:
-		ifc64 = (struct ifconf64 *)saved_data;
 		ifc64->ifc_len = thunk.ifc.ifc_len;
 		break;
 	case SIOCGDRVSPEC64:
@@ -3448,19 +3420,16 @@ out_noref:
 		 * field it might make sense to update) hasn't
 		 * changed.
 		 */
-		ifd64 = (struct ifdrv64 *)saved_data;
 		KASSERT(thunk.ifd.ifd_len == ifd64->ifd_len,
 		    ("ifd_len was updated %lu -> %zu", ifd64->ifd_len,
 			thunk.ifd.ifd_len));
 		break;
 	case SIOCGIFGROUP64:
 	case SIOCGIFGMEMB64:
-		ifgr64 = (struct ifgroupreq64 *)data;
 		ifgr64->ifgr_len = thunk.ifgr.ifgr_len;
 		break;
 	case SIOCGIFMEDIA64:
 	case SIOCGIFXMEDIA64:
-		ifmr64 = (struct ifmediareq64 *)saved_data;
 		ifmr64->ifm_current = thunk.ifmr.ifm_current;
 		ifmr64->ifm_mask = thunk.ifmr.ifm_mask;
 		ifmr64->ifm_status = thunk.ifmr.ifm_status;
@@ -3468,25 +3437,20 @@ out_noref:
 		ifmr64->ifm_count = thunk.ifmr.ifm_count;
 		break;
 	case SIOCIFGCLONERS64:
-		ifcr64 = (struct if_clonereq64 *)saved_data;
 		ifcr64->ifcr_total = thunk.ifcr.ifcr_total;
 		break;
 	case IFREQ64(SIOCGIFFLAGS):
-		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_flags = thunk.ifr.ifr_flags;
 		ifr64->ifr_flagshigh = thunk.ifr.ifr_flagshigh;
 		break;
 	case IFREQ64(SIOCGIFCAP):
-		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_reqcap = thunk.ifr.ifr_reqcap;
 		ifr64->ifr_curcap = thunk.ifr.ifr_curcap;
 		break;
 	case IFREQ64(SIOCGIFMTU):
-		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_mtu = thunk.ifr.ifr_mtu;
 		break;
 	case IFREQ64(SIOCGIFPHYS):
-		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_phys = thunk.ifr.ifr_phys;
 		break;
 	case IFREQ64(SIOCGIFADDR):
@@ -3496,24 +3460,19 @@ out_noref:
 	case IFREQ64(SIOCGHWADDR):
 	case IFREQ64(SIOCGIFPSRCADDR):
 	case IFREQ64(SIOCGIFPDSTADDR):
-		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_addr = thunk.ifr.ifr_addr;
 		break;
 	case IFREQ64(SIOCGIFFIB):
 	case IFREQ64(SIOCGTUNFIB):
-		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_fib = thunk.ifr.ifr_fib;
 		break;
 	case IFREQ64(SIOCGIFINDEX):
-		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_index = thunk.ifr.ifr_index;
 		break;
 	case IFREQ64(SIOCGIFMETRIC):
-		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_metric = thunk.ifr.ifr_metric;
 		break;
 	case IFREQ64(SIOCGLANPCP):
-		ifr64 = (struct ifreq64 *)saved_data;
 		ifr64->ifr_lan_pcp = thunk.ifr.ifr_lan_pcp;
 		break;
 #endif

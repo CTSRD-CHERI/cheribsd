@@ -29,6 +29,12 @@ elseif("${TARGET}" STREQUAL "riscv")
     else()
         message(FATAL_ERROR "Unsupported RISC-V TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
     endif()
+elseif("${TARGET}" STREQUAL "arm64")
+    if("${TARGET_ARCH}" STREQUAL "aarch64")
+        set(CLANG_TRIPLE aarch64-unknown-freebsd13)
+    else()
+        message(FATAL_ERROR "Unsupported ARM64 TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
+    endif()
 elseif("${TARGET}" STREQUAL "amd64")
     if("${TARGET_ARCH}" STREQUAL "amd64")
         set(CLANG_TRIPLE x86_64-unknown-freebsd13)
@@ -64,6 +70,26 @@ set(_symlinked_machineincs float.h floatingpoint.h stdarg.h)
 foreach(_hdr ${_symlinked_machineincs})
     file(CREATE_LINK machine/${_hdr} ${TMPSYSROOT}/include/${_hdr} SYMBOLIC)
 endforeach()
+# math.h and fenv.h
+file(CREATE_LINK "${CMAKE_SOURCE_DIR}/lib/msun/src/math.h" ${TMPSYSROOT}/include/math.h SYMBOLIC)
+if("${TARGET}" STREQUAL "amd64")
+    file(CREATE_LINK "${CMAKE_SOURCE_DIR}/lib/msun/x86/fenv.h" ${TMPSYSROOT}/include/fenv.h SYMBOLIC)
+elseif("${TARGET}" STREQUAL "arm64")
+    file(CREATE_LINK "${CMAKE_SOURCE_DIR}/lib/msun/aarch64/fenv.h" ${TMPSYSROOT}/include/fenv.h SYMBOLIC)
+else()
+    file(CREATE_LINK "${CMAKE_SOURCE_DIR}/lib/msun/${TARGET}/fenv.h" ${TMPSYSROOT}/include/fenv.h SYMBOLIC)
+endif()
+
+# Add code completion for casper
+file(MAKE_DIRECTORY ${TMPSYSROOT}/include/casper)
+file(GLOB _casper_hdrs LIST_DIRECTORIES FALSE "lib/libcasper/services/*/*.h")
+foreach(_hdrpath ${_casper_hdrs})
+    get_filename_component(_hdrname "${_hdrpath}" NAME)
+    file(CREATE_LINK "${_hdrpath}" ${TMPSYSROOT}/include/casper/${_hdrname} SYMBOLIC)
+endforeach()
+file(CREATE_LINK "${CMAKE_SOURCE_DIR}/lib/libcapsicum/capsicum_helpers.h" ${TMPSYSROOT}/include/capsicum_helpers.h SYMBOLIC)
+file(CREATE_LINK "${CMAKE_SOURCE_DIR}/lib/libcasper/libcasper/libcasper.h" ${TMPSYSROOT}/include/libcasper.h SYMBOLIC)
+add_compile_definitions(HAVE_CASPER=1)
 
 # TODO: should only be for CHERI
 file(MAKE_DIRECTORY ${TMPSYSROOT}/include/c++)
@@ -140,7 +166,9 @@ file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "
 #include \"../cheri_builtins.h\"
 #undef __CHERI_PURE_CAPABILITY__
 #define KDB 1
-// #define COMPAT_FREEBSD11 1
+#define COMPAT_FREEBSD11 1
+#define COMPAT_FREEBSD12 1
+#define COMPAT_FREEBSD13 1
 #define COMPAT_FREEBSD32 1
 #define COMPAT_FREEBSD64 1
 #define CPU_CHERI 1
@@ -152,14 +180,20 @@ file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "
 #define YAMON 1
 #define INVARIANTS 1
 #define CPU_QEMU_RISCV 1
+#define MAC 1
+#define AUDIT 1
+#define SMP 1
+#define INET 1
+#define INET6 1
+#define DEV_NETMAP 1
+#define VFP 1
 
 struct thread_lite {
     unsigned td_pinned;
     unsigned td_critnest;
     unsigned td_owepreempt;
 };
-// #define MAC 1
-// #define AUDIT 1")
+")
 
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_capsicum.h "
 #define CAPABILITIES 1
@@ -181,11 +215,15 @@ execute_process(COMMAND ${CMAKE_C_COMPILER} -print-resource-dir OUTPUT_VARIABLE 
 message(STATUS "BUILTIN_HEADERS_DIR=${BUILTIN_HEADERS_DIR}")
 add_compile_options(-idirafter ${BUILTIN_HEADERS_DIR}/include)
 add_compile_options(-Wall -Wextra -Wcast-align)
-add_definitions(-DDEBUG)
 
 function(add_fake_targets_for_subdir _subdir)
-    cmake_parse_arguments(aftfs "LIBRARIES" "" "" ${ARGN})
+    cmake_parse_arguments(aftfs "LIBRARIES" "PREFIX" "" ${ARGN})
     file(GLOB _dirs LIST_DIRECTORIES TRUE "${_subdir}/*")
+    if (aftfs_PREFIX)
+        set(_prefix ${aftfs_PREFIX})
+    else()
+        set(_prefix ${_subdir})
+    endif()
     foreach(_dirpath ${_dirs})
         message(STATUS "Checking ${_dirpath}")
         if (IS_DIRECTORY "${_dirpath}")
@@ -194,25 +232,25 @@ function(add_fake_targets_for_subdir _subdir)
             if (NOT _fake_srcs)
                 message(STATUS "No sources found for ${_subdir}/${_dirname}. Contrib program?")
                 # Need at least one source for add_library() unless we add target_sources calls for all of them.
-                add_library(${_subdir}_${_dirname} STATIC tools/build/dummy.c)
+                add_library(${_prefix}_${_dirname} STATIC tools/build/dummy.c)
                 continue()
             endif()
             if (aftfs_LIBRARIES)
-                add_library(${_subdir}_${_dirname} STATIC ${_fake_srcs})
+                add_library(${_prefix}_${_dirname} STATIC ${_fake_srcs})
             else()
-                # TODO: add_executable(${_subdir}_${_dirname} ${_fake_srcs})
-                # target_link_libraries(${_subdir}_${_dirname} PRIVATE -fuse-ld=lld)
-                add_library(${_subdir}_${_dirname} STATIC ${_fake_srcs})
+                # TODO: add_executable(${_prefix}_${_dirname} ${_fake_srcs})
+                # target_link_libraries(${_prefix}_${_dirname} PRIVATE -fuse-ld=lld)
+                add_library(${_prefix}_${_dirname} STATIC ${_fake_srcs})
             endif()
             # Add the source dir as an include path
-            target_include_directories(${_subdir}_${_dirname} PRIVATE ${_dirpath} ${_dirpath}/include)
+            target_include_directories(${_prefix}_${_dirname} PRIVATE ${_dirpath} ${_dirpath}/include)
             # Add include paths for commonly used libraries
-            target_include_directories(${_subdir}_${_dirname} PRIVATE
+            target_include_directories(${_prefix}_${_dirname} PRIVATE
                 lib/libutil
                 contrib/libxo
                 contrib/atf  # for tests
             )
-            target_compile_options(${_subdir}_${_dirname} PRIVATE "-include${CMAKE_BINARY_DIR}/cheri_purecap.h")
+            target_compile_options(${_prefix}_${_dirname} PRIVATE "-include${CMAKE_BINARY_DIR}/cheri_purecap.h")
         endif()
     endforeach()
 endfunction()
@@ -225,11 +263,15 @@ endfunction()
 
 add_fake_targets_for_subdir(lib LIBRARIES)
 add_contrib_sources(lib_libc contrib/jemalloc)
+target_include_directories(lib_msun PRIVATE lib/msun/src)
+target_compile_definitions(lib_msun PRIVATE -DDOPRINT -DDEBUG -DDOPRINT_LD80)
 target_include_directories(lib_libsimple_printf PRIVATE lib/libc/stdio)
 add_fake_targets_for_subdir(bin)
 add_fake_targets_for_subdir(usr.bin)
 add_fake_targets_for_subdir(sbin)
 add_fake_targets_for_subdir(usr.sbin)
+add_fake_targets_for_subdir(tests/sys PREFIX tests_sys)
+target_include_directories(tests_sys_audit PRIVATE contrib/openbsm)
 target_include_directories(usr.bin_truss PRIVATE lib/libsysdecode)
 add_contrib_sources(usr.sbin_makefs contrib/mtree)
 add_contrib_sources(usr.sbin_makefs contrib/mknod)
@@ -267,7 +309,6 @@ endif()
 add_kernel_srcs("sys/cheri")
 add_kernel_srcs("sys/cddl")
 add_kernel_srcs("sys/ddb")
-add_kernel_srcs("sys/dev")
 add_kernel_srcs("sys/kern")
 add_kernel_srcs("sys/libkern")
 add_kernel_srcs("sys/fs")

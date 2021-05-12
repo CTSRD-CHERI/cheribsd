@@ -137,34 +137,54 @@ ATOMIC_FCMPSET_ACQ_REL(16);
 #define	atomic_fcmpset_acq_short	atomic_fcmpset_acq_16
 #define	atomic_fcmpset_rel_short	atomic_fcmpset_rel_16
 
-static __inline void
-atomic_add_32(volatile uint32_t *p, uint32_t val)
-{
+#define	ATOMIC_OP_IMPL(WIDTH, OP, FN, PRE)					\
+	static __inline void							\
+	atomic_##OP##_##WIDTH(volatile uint##WIDTH##_t *p, uint##WIDTH##_t val)	\
+	{									\
+		PRE;								\
+		(void)__atomic_##FN##_fetch(p, val, __ATOMIC_RELAXED);		\
+	}
 
-	(void)__atomic_add_fetch(p, val, __ATOMIC_RELAXED);
+#define	ATOMIC_SET(WIDTH) ATOMIC_OP_IMPL(WIDTH, set, or, )
+#define	ATOMIC_CLEAR(WIDTH) ATOMIC_OP_IMPL(WIDTH, clear, and, val = ~val)
+#define	ATOMIC_ADD(WIDTH) ATOMIC_OP_IMPL(WIDTH, add, add, )
+#define	ATOMIC_SUB(WIDTH) ATOMIC_OP_IMPL(WIDTH, subtract, sub, )
 
-}
+#ifdef __CHERI_PURE_CAPABILITY__
+ATOMIC_SET(8)
+ATOMIC_SET(16)
+#define	atomic_set_8	atomic_set_8
+#define	atomic_set_16	atomic_set_16
 
-static __inline void
-atomic_subtract_32(volatile uint32_t *p, uint32_t val)
-{
+ATOMIC_CLEAR(8)
+ATOMIC_CLEAR(16)
+#define	atomic_clear_8	atomic_clear_8
+#define	atomic_clear_16	atomic_clear_16
 
-	(void)__atomic_sub_fetch(p, val, __ATOMIC_RELAXED);
-}
+ATOMIC_ADD(8)
+ATOMIC_ADD(16)
+#define	atomic_add_8	atomic_add_8
+#define	atomic_add_16	atomic_add_16
 
-static __inline void
-atomic_set_32(volatile uint32_t *p, uint32_t val)
-{
+ATOMIC_SUB(8)
+ATOMIC_SUB(16)
+#define	atomic_subtract_8	atomic_subtract_8
+#define	atomic_subtract_16	atomic_subtract_16
 
-	(void)__atomic_or_fetch(p, val, __ATOMIC_RELAXED);
-}
+ATOMIC_ACQ_REL(set, 8)
+ATOMIC_ACQ_REL(set, 16)
+ATOMIC_ACQ_REL(clear, 8)
+ATOMIC_ACQ_REL(clear, 16)
+ATOMIC_ACQ_REL(add, 8)
+ATOMIC_ACQ_REL(add, 16)
+ATOMIC_ACQ_REL(subtract, 8)
+ATOMIC_ACQ_REL(subtract, 16)
+#endif
 
-static __inline void
-atomic_clear_32(volatile uint32_t *p, uint32_t val)
-{
-
-	(void)__atomic_and_fetch(p, ~val, __ATOMIC_RELAXED);
-}
+ATOMIC_ADD(32)
+ATOMIC_SUB(32)
+ATOMIC_SET(32)
+ATOMIC_CLEAR(32)
 
 static __inline uint32_t
 atomic_fetchadd_32(volatile uint32_t *p, uint32_t val)
@@ -227,34 +247,10 @@ atomic_store_rel_32(volatile uint32_t *p, uint32_t val)
 #define	atomic_subtract_rel_int	atomic_subtract_rel_32
 #define	atomic_store_rel_int	atomic_store_rel_32
 
-static __inline void
-atomic_add_64(volatile uint64_t *p, uint64_t val)
-{
-
-	(void)__atomic_add_fetch(p, val, __ATOMIC_RELAXED);
-}
-
-static __inline void
-atomic_subtract_64(volatile uint64_t *p, uint64_t val)
-{
-
-	(void)__atomic_sub_fetch(p, val, __ATOMIC_RELAXED);
-
-}
-
-static __inline void
-atomic_set_64(volatile uint64_t *p, uint64_t val)
-{
-
-	(void)__atomic_or_fetch(p, val, __ATOMIC_RELAXED);
-}
-
-static __inline void
-atomic_clear_64(volatile uint64_t *p, uint64_t val)
-{
-
-	(void)__atomic_and_fetch(p, ~val, __ATOMIC_RELAXED);
-}
+ATOMIC_ADD(64)
+ATOMIC_SUB(64)
+ATOMIC_SET(64)
+ATOMIC_CLEAR(64)
 
 static __inline uint64_t
 atomic_fetchadd_64(volatile uint64_t *p, uint64_t val)

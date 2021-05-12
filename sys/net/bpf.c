@@ -597,6 +597,7 @@ bpf_movein(struct uio *uio, int linktype, struct ifnet *ifp, struct mbuf **mp,
 	const struct ieee80211_bpf_params *p;
 	struct ether_header *eh;
 	struct mbuf *m;
+	struct bpf_insn *filter;
 	int error;
 	int len;
 	int hlen;
@@ -686,7 +687,9 @@ bpf_movein(struct uio *uio, int linktype, struct ifnet *ifp, struct mbuf **mp,
 	if (error)
 		goto bad;
 
-	slen = bpf_filter(d->bd_wfilter, mtod(m, u_char *), len, len);
+	filter = (d->bd_wfilter != NULL) ?
+	    (struct bpf_insn *)d->bd_wfilter->buffer : NULL;
+	slen = bpf_filter(filter, mtod(m, u_char *), len, len);
 	if (slen == 0) {
 		error = EPERM;
 		goto bad;
@@ -1940,6 +1943,7 @@ static int
 bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 {
 	struct bpf_program_buffer *fcode;
+	struct bpf_program_buffer *old_fcode;
 	struct bpf_insn *filter;
 #ifdef BPF_JITTER
 	bpf_jit_filter *jfunc;
@@ -1986,29 +1990,27 @@ bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 	}
 
 	track_event = false;
-	fcode = NULL;
+	old_fcode = NULL;
 
 	BPF_LOCK();
 	BPFD_LOCK(d);
 	/* Set up new filter. */
 	if (cmd == BIOCSETWF) {
 		if (d->bd_wfilter != NULL) {
-			fcode = __containerof((void *)d->bd_wfilter,
-			    struct bpf_program_buffer, buffer);
+			old_fcode = d->bd_wfilter;
 #ifdef BPF_JITTER
-			fcode->func = NULL;
+			old_fcode->func = NULL;
 #endif
 		}
-		d->bd_wfilter = filter;
+		d->bd_wfilter = fcode;
 	} else {
 		if (d->bd_rfilter != NULL) {
-			fcode = __containerof((void *)d->bd_rfilter,
-			    struct bpf_program_buffer, buffer);
+			old_fcode = d->bd_rfilter;
 #ifdef BPF_JITTER
 			fcode->func = d->bd_bfilter;
 #endif
 		}
-		d->bd_rfilter = filter;
+		d->bd_rfilter = fcode;
 #ifdef BPF_JITTER
 		d->bd_bfilter = jfunc;
 #endif
@@ -2039,7 +2041,7 @@ bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 	}
 	BPFD_UNLOCK(d);
 
-	if (fcode != NULL)
+	if (old_fcode != NULL)
 		NET_EPOCH_CALL(bpf_program_buffer_free, &fcode->epoch_ctx);
 
 	if (track_event)
@@ -2243,6 +2245,7 @@ bpf_tap(struct bpf_if *bp, u_char *pkt, u_int pktlen)
 	struct epoch_tracker et;
 	struct bintime bt;
 	struct bpf_d *d;
+	struct bpf_insn *filter;
 #ifdef BPF_JITTER
 	bpf_jit_filter *bf;
 #endif
@@ -2265,7 +2268,11 @@ bpf_tap(struct bpf_if *bp, u_char *pkt, u_int pktlen)
 			slen = (*(bf->func))(pkt, pktlen, pktlen);
 		else
 #endif
-		slen = bpf_filter(d->bd_rfilter, pkt, pktlen, pktlen);
+		{
+			filter = (d->bd_rfilter != NULL) ?
+			    (struct bpf_insn *)d->bd_rfilter->buffer : NULL;
+			slen = bpf_filter(filter, pkt, pktlen, pktlen);
+		}
 		if (slen != 0) {
 			/*
 			 * Filter matches. Let's to acquire write lock.
@@ -2300,6 +2307,7 @@ bpf_mtap(struct bpf_if *bp, struct mbuf *m)
 	struct epoch_tracker et;
 	struct bintime bt;
 	struct bpf_d *d;
+	struct bpf_insn *filter;
 #ifdef BPF_JITTER
 	bpf_jit_filter *bf;
 #endif
@@ -2328,7 +2336,11 @@ bpf_mtap(struct bpf_if *bp, struct mbuf *m)
 			    pktlen);
 		else
 #endif
-		slen = bpf_filter(d->bd_rfilter, (u_char *)m, pktlen, 0);
+		{
+			filter = (d->bd_rfilter != NULL) ?
+			    (struct bpf_insn *)d->bd_rfilter->buffer : NULL;
+			slen = bpf_filter(filter, (u_char *)m, pktlen, 0);
+		}
 		if (slen != 0) {
 			BPFD_LOCK(d);
 
@@ -2357,6 +2369,7 @@ bpf_mtap2(struct bpf_if *bp, void *data, u_int dlen, struct mbuf *m)
 	struct bintime bt;
 	struct mbuf mb;
 	struct bpf_d *d;
+	struct bpf_insn *filter;
 	u_int pktlen, slen;
 	int gottime;
 
@@ -2385,7 +2398,10 @@ bpf_mtap2(struct bpf_if *bp, void *data, u_int dlen, struct mbuf *m)
 		if (BPF_CHECK_DIRECTION(d, m->m_pkthdr.rcvif, bp->bif_ifp))
 			continue;
 		counter_u64_add(d->bd_rcount, 1);
-		slen = bpf_filter(d->bd_rfilter, (u_char *)&mb, pktlen, 0);
+
+		filter = (d->bd_rfilter != NULL) ?
+		    (struct bpf_insn *)d->bd_rfilter->buffer : NULL;
+		slen = bpf_filter(filter, (u_char *)&mb, pktlen, 0);
 		if (slen != 0) {
 			BPFD_LOCK(d);
 
@@ -2632,16 +2648,14 @@ bpfd_free(epoch_context_t ctx)
 	d = __containerof(ctx, struct bpf_d, epoch_ctx);
 	bpf_free(d);
 	if (d->bd_rfilter != NULL) {
-		p = __containerof((void *)d->bd_rfilter,
-		    struct bpf_program_buffer, buffer);
+		p = d->bd_rfilter;
 #ifdef BPF_JITTER
 		p->func = d->bd_bfilter;
 #endif
 		bpf_program_buffer_free(&p->epoch_ctx);
 	}
 	if (d->bd_wfilter != NULL) {
-		p = __containerof((void *)d->bd_wfilter,
-		    struct bpf_program_buffer, buffer);
+		p = d->bd_wfilter;
 #ifdef BPF_JITTER
 		p->func = NULL;
 #endif
