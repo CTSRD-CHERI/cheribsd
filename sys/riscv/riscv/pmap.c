@@ -3551,7 +3551,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 {
 	enum pmap_caploadgen_res res;
 	pd_entry_t *l2, l2e;
-	pt_entry_t *pte, oldpte = 0, newpte = 0;
+	pt_entry_t *pte, oldpte = 0;
 	vm_page_t m;
 	vm_offset_t va = *pva;
 
