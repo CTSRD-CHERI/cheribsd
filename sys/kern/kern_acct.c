@@ -142,7 +142,6 @@ static int		 acct_configured;
 static int		 acct_suspended;
 static struct vnode	*acct_vp;
 static struct ucred	*acct_cred;
-static struct plimit	*acct_limit;
 static int		 acct_flags;
 static struct sx	 acct_sx;
 
@@ -214,7 +213,7 @@ int
 kern_acct(struct thread *td, const char * __capability path)
 {
 	struct nameidata nd;
-	int error, flags, i, replacing;
+	int error, flags, replacing;
 
 	error = priv_check(td, PRIV_ACCT);
 	if (error)
@@ -285,15 +284,6 @@ kern_acct(struct thread *td, const char * __capability path)
 	}
 
 	/*
-	 * Create our own plimit object without limits. It will be assigned
-	 * to exiting processes.
-	 */
-	acct_limit = lim_alloc();
-	for (i = 0; i < RLIM_NLIMITS; i++)
-		acct_limit->pl_rlimit[i].rlim_cur =
-		    acct_limit->pl_rlimit[i].rlim_max = RLIM_INFINITY;
-
-	/*
 	 * Save the new accounting file vnode, and schedule the new
 	 * free space watcher.
 	 */
@@ -336,7 +326,6 @@ acct_disable(struct thread *td, int logging)
 	sx_assert(&acct_sx, SX_XLOCKED);
 	error = vn_close(acct_vp, acct_flags, acct_cred, td);
 	crfree(acct_cred);
-	lim_free(acct_limit);
 	acct_configured = 0;
 	acct_vp = NULL;
 	acct_cred = NULL;
@@ -357,7 +346,6 @@ acct_process(struct thread *td)
 {
 	struct acctv3 acct;
 	struct timeval ut, st, tmp;
-	struct plimit *oldlim;
 	struct proc *p;
 	struct rusage ru;
 	int t, ret;
@@ -382,6 +370,7 @@ acct_process(struct thread *td)
 	}
 
 	p = td->td_proc;
+	td->td_pflags2 |= TDP2_ACCT;
 
 	/*
 	 * Get process accounting information.
@@ -434,19 +423,13 @@ acct_process(struct thread *td)
 	/* (8) The boolean flags that tell how the process terminated, etc. */
 	acct.ac_flagx = p->p_acflag;
 
+	PROC_UNLOCK(p);
+
 	/* Setup ancillary structure fields. */
 	acct.ac_flagx |= ANVER;
 	acct.ac_zero = 0;
 	acct.ac_version = 3;
 	acct.ac_len = acct.ac_len2 = sizeof(acct);
-
-	/*
-	 * Eliminate rlimits (file size limit in particular).
-	 */
-	oldlim = p->p_limit;
-	p->p_limit = lim_hold(acct_limit);
-	PROC_UNLOCK(p);
-	lim_free(oldlim);
 
 	/*
 	 * Write the accounting information to the file.
@@ -455,6 +438,7 @@ acct_process(struct thread *td)
 	    (off_t)0, UIO_SYSSPACE, IO_APPEND|IO_UNIT, acct_cred, NOCRED,
 	    NULL, td);
 	sx_sunlock(&acct_sx);
+	td->td_pflags2 &= ~TDP2_ACCT;
 	return (ret);
 }
 
