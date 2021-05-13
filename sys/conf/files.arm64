@@ -419,6 +419,9 @@ arm64/cavium/thunder_pcie_common.c		optional soc_cavm_thunderx pci
 arm64/cheri/cheri_exception.c			optional cpu_cheri
 arm64/cheri/cheri_machdep.c			optional cpu_cheri
 
+# CHERI capability revocation
+arm64/arm64/vm_machdep_caprevoke.c		optional cpu_cheri cheri_caprevoke
+
 # i.MX8 Clock support
 arm64/freescale/imx/imx8mq_ccm.c		optional fdt soc_freescale_imx8
 arm64/freescale/imx/clk/imx_clk_gate.c		optional fdt soc_freescale_imx8
