@@ -256,8 +256,8 @@ prison0_init(void)
 			 * certainly a newline; skip over any whitespace or
 			 * non-printable characters to be safe.
 			 */
-			for (; size > 0 && data[size - 1] <= 0x20; size--) {
-				data[size - 1] = '\0';
+			while (size > 0 && data[size - 1] <= 0x20) {
+				size--;
 			}
 			if (validate_uuid(data, size, NULL, 0) == 0) {
 				(void)strlcpy(prison0.pr_hostuuid, data,
