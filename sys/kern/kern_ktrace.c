@@ -56,6 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/namei.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
+#include <sys/resourcevar.h>
 #include <sys/unistd.h>
 #include <sys/vnode.h>
 #include <sys/socket.h>
@@ -161,6 +162,7 @@ static struct sx ktrace_sx;
 struct ktr_io_params {
 	struct vnode	*vp;
 	struct ucred	*cr;
+	off_t		lim;
 	u_int		refs;
 };
 
@@ -478,6 +480,7 @@ ktr_io_params_alloc(struct thread *td, struct vnode *vp)
 	res = malloc(sizeof(struct ktr_io_params), M_KTRACE, M_WAITOK);
 	res->vp = vp;
 	res->cr = crhold(td->td_ucred);
+	res->lim = lim_cur(td, RLIMIT_FSIZE);
 	res->refs = 1;
 	return (res);
 }
@@ -1319,6 +1322,7 @@ ktr_writerequest(struct thread *td, struct ktr_request *req)
 	struct uio auio;
 	struct iovec aiov[3];
 	struct mount *mp;
+	off_t lim;
 	int datalen, buflen;
 	int error;
 
@@ -1346,6 +1350,7 @@ ktr_writerequest(struct thread *td, struct ktr_request *req)
 
 	vp = kiop->vp;
 	cred = kiop->cr;
+	lim = kiop->lim;
 
 	vrefact(vp);
 	KASSERT(cred != NULL, ("ktr_writerequest: cred == NULL"));
@@ -1380,6 +1385,7 @@ ktr_writerequest(struct thread *td, struct ktr_request *req)
 
 	vn_start_write(vp, &mp, V_WAIT);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+	td->td_ktr_io_lim = lim;
 #ifdef MAC
 	error = mac_vnode_check_write(cred, NOCRED, vp);
 	if (error == 0)
