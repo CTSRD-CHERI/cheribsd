@@ -75,6 +75,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/user.h>
 #include <sys/vnode.h>
 #include <sys/wait.h>
+#ifdef KTRACE
+#include <sys/ktrace.h>
+#endif
 
 #ifdef DDB
 #include <ddb/ddb.h>
@@ -1072,7 +1075,7 @@ fill_kinfo_proc_only(struct proc *p, struct kinfo_proc *kp)
 	kp->ki_args = EXPORT_KPTR(p->p_args);
 	kp->ki_textvp = EXPORT_KPTR(p->p_textvp);
 #ifdef KTRACE
-	kp->ki_tracep = EXPORT_KPTR(p->p_tracevp);
+	kp->ki_tracep = EXPORT_KPTR(ktr_get_tracevp(p, false));
 	kp->ki_traceflag = p->p_traceflag;
 #endif
 	kp->ki_fd = EXPORT_KPTR(p->p_fd);
