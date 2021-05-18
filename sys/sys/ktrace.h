@@ -311,6 +311,9 @@ void	ktrsyserrcause(const char *format, ...) __printflike(1, 2);
 #define ktrstat_error(s, error) \
 	ktrstruct_error("stat", (s), sizeof(struct stat), error)
 
+extern u_int ktr_geniosize;
+extern int ktr_filesize_limit_signal;
+
 #ifdef KTRACE
 #define SYSERRCAUSE(fmt, ...) \
         if (KTRPOINT(curthread, KTR_SYSERRCAUSE)) \
