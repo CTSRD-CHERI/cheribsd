@@ -226,3 +226,352 @@ vm_caprevoke_info_page(struct vm_map *map,
 		CHERI_PERM_GLOBAL,
 	    VM_CAPREVOKE_INFO_PAGE, PAGE_SIZE, 0);
 }
+
+/*
+ * Revocation test predicates
+ */
+
+/*
+ * Here's a wildly dangerous thing to do: we know the shadow is inside a
+ * completely valid map... so even if this faults, the usual ZFOD handling
+ * will kick in.
+ *
+ * We can therefore install this somewhat dubious function as the fault
+ * handler before we sweep a page, which we do physically, so that we can
+ * access the virtual pages of the shadow bitmap.  YIKES!
+ *
+ * Why do this?  Because it beats installing and uninstalling the
+ * ->pcb_onfault for every capability we find in the page.
+ *
+ * Why only for each page?  Because a large amount of kernel code runs
+ * between each page scanned and while, in principle, none of that should be
+ * accessing user maps... I would much rather a performance hit than
+ * accidentally leave an onfault handler registered when we went back to
+ * userland!
+ */
+static void
+vm_caprevoke_tlb_fault(void)
+{
+	panic("%s; try rebuilding without CHERI_CAPREVOKE_FAST_COPYIN",
+		__FUNCTION__);
+}
+
+/*
+ * VM internal support for revocation
+ */
+
+static int
+vm_do_caprevoke(int *res,
+		const struct vm_caprevoke_cookie *crc,
+		const uint8_t * __capability crshadow,
+		vm_caprevoke_test_fn ctp,
+		uintcap_t * __capability cutp,
+		uintcap_t cut)
+{
+	int perms = cheri_getperm(cut);
+	CAPREVOKE_STATS_FOR(crst, crc);
+
+	if (perms == 0) {
+		/* For revoked or permissionless caps, do nothing. */
+
+		/*
+		 * XXX technically, a sealed permissionless thing is a
+		 * bearer token, but that's not really something we use.  We
+		 * should probably insist that people don't; keep one sw bit
+		 * set or something.
+		 */
+
+		CAPREVOKE_STATS_BUMP(crst, caps_found_revoked);
+	} else if (cheri_gettag(cut) && ctp(crshadow, cut, perms)) {
+		void * __capability cscratch;
+		int stxr_status;
+
+		uintcap_t cutr = cheri_revoke(cut);
+
+		CAPREVOKE_STATS_BUMP(crst, caps_found);
+
+		/*
+		 * Load-link the position under test; verify that it matches
+		 * our previous load; store conditionally the revoked
+		 * version back.  If the verification fails, don't try
+		 * anything fancy, just modify the return value to flag the
+		 * page as dirty.
+		 *
+		 * It's possible that this CAS will fail because the pointer
+		 * has changed during our test.  That's fine, if this is not
+		 * a stop-the-world scan; we'll catch it in the next go
+		 * around.  However, because CAS can fail for reasons other
+		 * than an actual data failure, return an indicator that the
+		 * page should not be considered clean.
+		 *
+		 * Because revoked capabilities are still tagged, one might
+		 * worry that this would reset the capdirty bits.  That's
+		 * not true, tho', because we're storing via the direct
+		 * mapping of physical memory.
+		 */
+again:
+		/*
+		 * stxr returns 0 or 1, so use a value of 2
+		 * to indicate that it was not executed.
+		 */
+		stxr_status = 2;
+
+		__asm__ __volatile__ (
+#ifndef __CHERI_PURE_CAPABILITY__
+			"bx #4\n\t"
+			".arch_extension c64\n\t"
+#endif
+			"ldxr %[cscratch], [%[cutp]]\n\t"
+			"cmp %[cscratch], %[cut]\n\t"
+			"bne 1f\n\t"
+			"stxr %w[stxr_status], %[cutr], [%[cutp]]\n\t"
+			"1:\n\t"
+#ifndef __CHERI_PURE_CAPABILITY__
+			"bx #4\n\t"
+			".arch_extension noc64\n\t"
+			".arch_extension a64c\n\t"
+#endif
+		  : [stxr_status] "=r" (stxr_status),
+		    [cscratch] "=&C" (cscratch), [cutr] "+C" (cutr)
+		  : [cut] "C" (cut), [cutp] "C" (cutp)
+		  : "memory");
+
+		/* stxr returns 0 on success */
+		if (__builtin_expect(stxr_status == 0, 1)) {
+			CAPREVOKE_STATS_BUMP(crst, caps_cleared);
+			/* Don't count a revoked cap as HASCAPS */
+		} else if (!cheri_gettag(cscratch)) {
+			/* Data; don't sweat it */
+		} else if (caprevoke_is_revoked(cscratch)) {
+			/* Revoked cap; don't worry about it */
+		} else if (__builtin_expect(stxr_status == 1, 1)) {
+			/* stxr returns 1 on failure */
+			goto again;
+		} else {
+			/*
+			 * An unexpected capability - stxr_status was neither 0
+			 * nor 1, which means that the stxr wasn't executed and
+			 * so the capability at cutp has changed.
+			 */
+			*res |= VM_CAPREVOKE_PAGE_DIRTY
+				| VM_CAPREVOKE_PAGE_HASCAPS ;
+		}
+	} else {
+		CAPREVOKE_STATS_BUMP(crst, caps_found);
+
+		/*
+		 * Even though it might actually be un-tagged, that's a very
+		 * narrow race and this a very common case, so don't bother
+		 * testing.  We'll find it clear next time, maybe.
+		 */
+		*res |= VM_CAPREVOKE_PAGE_HASCAPS;
+	}
+
+	return 0;
+}
+
+static inline void
+enable_user_memory_access()
+{
+	/* Set PSTATE.PAN to 0 */
+	__asm __volatile("msr pan, #0");
+}
+
+static inline void
+disable_user_memory_access()
+{
+	/* Set PSTATE.PAN to 1 */
+	__asm __volatile("msr pan, #1");
+}
+
+// TODO: cloadtags stride (copy from mips)
+
+// TODO: CPREFETCH()
+
+static inline int
+vm_caprevoke_page_iter(const struct vm_caprevoke_cookie *crc,
+		       int (*cb)(int *, const struct vm_caprevoke_cookie *,
+				 const uint8_t * __capability,
+				 vm_caprevoke_test_fn,
+				 uintcap_t * __capability,
+				 uintcap_t),
+		       uintcap_t * __capability mvu,
+		       vm_offset_t mve)
+{
+	int res = 0;
+
+	/* Load once up front, which is almost as good as const */
+	vm_caprevoke_test_fn ctp = crc->map->vm_caprev_test;
+	const uint8_t * __capability crshadow = crc->crshadow;
+
+#ifdef CHERI_CAPREVOKE_FAST_COPYIN
+	curthread->td_pcb->pcb_onfault = (vm_offset_t)vm_caprevoke_tlb_fault;
+	enable_user_memory_access();
+#endif
+
+	for (; cheri_getaddress(mvu) < mve; mvu++) {
+		uintcap_t cut = *mvu;
+		if (cheri_gettag(cut)) {
+			if (cb(&res, crc, crshadow, ctp, mvu, cut))
+				goto out;
+		}
+	}
+
+out:
+#ifdef CHERI_CAPREVOKE_FAST_COPYIN
+	disable_user_memory_access();
+	curthread->td_pcb->pcb_onfault = 0;
+#endif
+	return res;
+}
+
+int
+vm_caprevoke_test(const struct vm_caprevoke_cookie *crc, uintcap_t cut)
+{
+	if (cheri_gettag(cut)) {
+		int res;
+#ifdef CHERI_CAPREVOKE_FAST_COPYIN
+		curthread->td_pcb->pcb_onfault = (vm_offset_t)vm_caprevoke_tlb_fault;
+		enable_user_memory_access();
+#endif
+		res = crc->map->vm_caprev_test(crc->crshadow, cut,
+		    cheri_getperm(cut));
+#ifdef CHERI_CAPREVOKE_FAST_COPYIN
+		disable_user_memory_access();
+		curthread->td_pcb->pcb_onfault = 0;
+#endif
+		return res;
+	}
+
+	return 0;
+}
+
+int
+vm_caprevoke_page_rw(const struct vm_caprevoke_cookie *crc, vm_page_t m)
+{
+#ifdef CHERI_CAPREVOKE_STATS
+	CAPREVOKE_STATS_FOR(crst, crc);
+	uint32_t cyc_start = get_cyclecount();
+#endif
+
+	vm_paddr_t mpa = VM_PAGE_TO_PHYS(m);
+	vm_offset_t mva;
+	vm_offset_t mve;
+	uintcap_t * __capability mvu;
+
+	/*
+	 * XXX NWF
+	 * This isn't what we really want, but we want to be able to fake up a
+	 * a capability to the DMAP area somehow.  (Right now, the kernel's
+	 * hybrid so we could use the integer+DDC-authorized capability
+	 * atomics, but probably best not.)
+	 */
+	void * __capability kdc = swap_restore_cap;
+
+	int res = 0;
+
+	/*
+	 * XXX NWF
+	 * Hopefully m being xbusy'd means it's not about to go away on us.
+	 * I don't yet understand all the interlocks in the vm subsystem.
+	 */
+	mva = PHYS_TO_DMAP(mpa);
+	mve = mva + pagesizes[m->psind];
+
+	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), pagesizes[m->psind]);
+
+	res = vm_caprevoke_page_iter(crc, vm_do_caprevoke, mvu, mve);
+
+	/*
+	 * stxr in vm_do_caprevoke is always a relaxed atomic.
+	 * Flush our store buffer before we update anything about this page
+	 */
+	wmb();
+
+#ifdef CHERI_CAPREVOKE_STATS
+	uint32_t cyc_end = get_cyclecount();
+	CAPREVOKE_STATS_INC(crst, page_scan_cycles, cyc_end - cyc_start);
+#endif
+
+	return res;
+}
+
+static inline int
+vm_caprevoke_page_ro_adapt(int *res,
+			   const struct vm_caprevoke_cookie *vmcrc,
+		           const uint8_t * __capability crshadow,
+			   vm_caprevoke_test_fn ctp,
+			   uintcap_t * __capability cutp,
+			   uintcap_t cut)
+{
+	(void)cutp;
+
+	/*
+	 * Being untagged would imply mutation, but we're visiting this page
+	 * under the assumption that it's read-only.
+	 */
+	KASSERT(cheri_gettag(cut), ("vm_caprevoke_page_ro_adapt untagged"));
+
+	/* If the thing has no permissions, we don't need to scan it later */
+	if (cheri_getperm(cut) == 0)
+		return 0;
+
+	*res |= VM_CAPREVOKE_PAGE_HASCAPS;
+
+	if (ctp(crshadow, cut, cheri_getperm(cut))) {
+		*res |= VM_CAPREVOKE_PAGE_DIRTY;
+
+		/* One dirty answer is as good as any other; stop eary */
+		return 1;
+	}
+
+	return 0;
+}
+
+/*
+ * Like vm_caprevoke_page, but does not write to the page in question
+ *
+ * VM_CAPREVOKE_PAGE_DIRTY in the result means that we would like to store
+ * back, but can't, rather than that we lost a LL/SC race.  We will return
+ * early if this becomes set: there's no reason to continue probing once we
+ * know the answer.
+ *
+ * VM_CAPREVOKE_PAGE_HASCAPS continues to mean what it meant before: we
+ * saw at least one, permission-bearing capability on this page.
+ */
+int
+vm_caprevoke_page_ro(const struct vm_caprevoke_cookie *crc, vm_page_t m)
+{
+#ifdef CHERI_CAPREVOKE_STATS
+	uint32_t cyc_start = get_cyclecount();
+	CAPREVOKE_STATS_FOR(crst, crc);
+#endif
+
+	vm_paddr_t mpa = VM_PAGE_TO_PHYS(m);
+	vm_offset_t mva;
+	vm_offset_t mve;
+	uintcap_t * __capability mvu;
+	void * __capability kdc = swap_restore_cap;
+	int res = 0;
+
+	mva = PHYS_TO_DMAP(mpa);
+	mve = mva + pagesizes[m->psind];
+
+	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), pagesizes[m->psind]);
+
+	res = vm_caprevoke_page_iter(crc, vm_caprevoke_page_ro_adapt, mvu, mve);
+
+	/*
+	 * Unlike vm_caprevoke_page, we don't need to do a fence here: either
+	 * we haven't written to the page, and so there's nothing relevant in
+	 * our store buffer, or we're bailing out to upgrade the page to
+	 * writeable status.
+	 */
+
+#ifdef CHERI_CAPREVOKE_STATS
+	uint32_t cyc_end = get_cyclecount();
+	crst->page_scan_cycles += cyc_end - cyc_start;
+#endif
+
+	return res;
+}
