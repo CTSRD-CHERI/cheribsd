@@ -390,7 +390,9 @@ cddl/dev/dtrace/aarch64/dtrace_subr.c			optional dtrace compile-with "${DTRACE_C
 cddl/dev/fbt/aarch64/fbt_isa.c				optional dtrace_fbt | dtraceall compile-with "${FBT_C}"
 
 # CHERI capability revocation
-arm64/arm64/vm_machdep_caprevoke.c	optional	cpu_cheri cheri_caprevoke
+arm64/arm64/vm_machdep_caprevoke.c		optional	cpu_cheri cheri_caprevoke
+arm64/arm64/vm_machdep_caprevoke_tests.c	optional	cpu_cheri cheri_caprevoke \
+	compile-with "${NORMAL_C} -fomit-frame-pointer"
 
 # RockChip Drivers
 arm64/rockchip/rk3399_emmcphy.c		optional fdt rk_emmcphy soc_rockchip_rk3399
