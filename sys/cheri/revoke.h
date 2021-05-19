@@ -154,7 +154,11 @@ static inline int cheri_revoke_epoch_clears(cheri_revoke_epoch now,
 static inline int
 cheri_revoke_is_revoked(const void * __capability cap)
 {
+#ifndef CHERI_CAPREVOKE_CLEARTAGS
 	return (__builtin_cheri_perms_get(cap) == 0);
+#else
+	return (__builtin_cheri_tag_get(cap) == 0);
+#endif
 }
 
 	/*
