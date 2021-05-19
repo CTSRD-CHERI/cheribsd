@@ -47,13 +47,13 @@ On systems supporting revocation,
 triggers a full revocation pass, returning when the pass is complete.
 This results in the revocation of all pointers staged for quarantine.
 Depending on their implementation, this may be a subset of pointers
-previous passed to
+previously passed to
 .Xr free 3
 or
 .Xr realloc 3 .
 Individual implementations may provide stronger guarantees (e.g., an
 allocator might guarantee that all pointers to objects freed by the
-current thread will be revoked.
+current thread will be revoked).
 .Sh SEE ALSO
 .Xr free 3 ,
 .Xr realloc 3
