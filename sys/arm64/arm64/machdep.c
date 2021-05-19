@@ -92,6 +92,10 @@ __FBSDID("$FreeBSD$");
 
 #if __has_feature(capabilities)
 #include <cheri/cheric.h>
+#ifdef CHERI_CAPREVOKE
+#include <sys/caprevoke.h>
+#include <vm/vm_caprevoke.h>
+#endif
 #endif
 
 #ifdef DEV_ACPI
@@ -1705,6 +1709,62 @@ DB_SHOW_COMMAND(vtop, db_show_vtop)
 		db_printf("EL0 physical address reg (write): 0x%016lx\n", phys);
 	} else
 		db_printf("show vtop <virt_addr>\n");
+}
+#endif
+
+#ifdef CHERI_CAPREVOKE
+void
+caprevoke_td_frame(struct thread *td, const struct vm_caprevoke_cookie *crc)
+{
+	CAPREVOKE_STATS_FOR(crst, crc);
+
+#define CAPREV_REG(r) \
+	do { if (cheri_gettag(r)) { \
+		CAPREVOKE_STATS_BUMP(crst, caps_found); \
+		if (vm_caprevoke_test(crc, r)) { \
+			r = cheri_revoke(r); \
+			CAPREVOKE_STATS_BUMP(crst, caps_cleared); \
+		} \
+	    }} while(0)
+
+	CAPREV_REG(td->td_frame->tf_sp);
+	CAPREV_REG(td->td_frame->tf_lr);
+	CAPREV_REG(td->td_frame->tf_elr);
+	CAPREV_REG(td->td_frame->tf_ddc);
+	CAPREV_REG(td->td_frame->tf_x[0]);
+	CAPREV_REG(td->td_frame->tf_x[1]);
+	CAPREV_REG(td->td_frame->tf_x[2]);
+	CAPREV_REG(td->td_frame->tf_x[3]);
+	CAPREV_REG(td->td_frame->tf_x[4]);
+	CAPREV_REG(td->td_frame->tf_x[5]);
+	CAPREV_REG(td->td_frame->tf_x[6]);
+	CAPREV_REG(td->td_frame->tf_x[7]);
+	CAPREV_REG(td->td_frame->tf_x[8]);
+	CAPREV_REG(td->td_frame->tf_x[9]);
+	CAPREV_REG(td->td_frame->tf_x[10]);
+	CAPREV_REG(td->td_frame->tf_x[11]);
+	CAPREV_REG(td->td_frame->tf_x[12]);
+	CAPREV_REG(td->td_frame->tf_x[13]);
+	CAPREV_REG(td->td_frame->tf_x[14]);
+	CAPREV_REG(td->td_frame->tf_x[15]);
+	CAPREV_REG(td->td_frame->tf_x[16]);
+	CAPREV_REG(td->td_frame->tf_x[17]);
+	CAPREV_REG(td->td_frame->tf_x[18]);
+	CAPREV_REG(td->td_frame->tf_x[19]);
+	CAPREV_REG(td->td_frame->tf_x[20]);
+	CAPREV_REG(td->td_frame->tf_x[21]);
+	CAPREV_REG(td->td_frame->tf_x[22]);
+	CAPREV_REG(td->td_frame->tf_x[23]);
+	CAPREV_REG(td->td_frame->tf_x[24]);
+	CAPREV_REG(td->td_frame->tf_x[25]);
+	CAPREV_REG(td->td_frame->tf_x[26]);
+	CAPREV_REG(td->td_frame->tf_x[27]);
+	CAPREV_REG(td->td_frame->tf_x[28]);
+	CAPREV_REG(td->td_frame->tf_x[29]);
+
+#undef CAPREV_REG
+
+	return;
 }
 #endif
 // CHERI CHANGES START
