@@ -26,6 +26,8 @@
 #else
 #include "asm/riscv_hybrid.h"
 #endif
+#elif defined(__aarch64__)
+#include "asm/morello.h"
 #else
 #error "Need libcheri_caprevoke architecture-specific header"
 #endif
