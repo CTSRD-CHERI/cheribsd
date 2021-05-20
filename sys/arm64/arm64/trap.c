@@ -422,7 +422,8 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 					return;
 			}
 #endif
-			panic("vm_fault failed: %lx", (uint64_t)frame->tf_elr);
+			panic("vm_fault failed: %lx error %d",
+			    (uint64_t)frame->tf_elr, error);
 		}
 	}
 
