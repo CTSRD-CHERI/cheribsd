@@ -328,6 +328,7 @@ static int pmap_unuse_pt(pmap_t, vm_offset_t, pd_entry_t, struct spglist *);
 #define	pmap_load(pte)			atomic_load_64(pte)
 #define	pmap_store(pte, entry)		atomic_store_64(pte, entry)
 #define	pmap_store_bits(pte, bits)	atomic_set_64(pte, bits)
+#define	pmap_fcmpset(pte, exp, des)	atomic_fcmpset_64((pte), (exp), (des))
 
 /********************/
 /* Inline functions */
@@ -3546,6 +3547,39 @@ pmap_caploadgen_update_crg(pmap_t pmap, pt_entry_t *pte)
 	}
 }
 
+static inline void
+pmap_caploadgen_update_clear_cw(pt_entry_t *pte, pt_entry_t oldpte)
+{
+	/*
+	 * We don't do a TLB shootdown here because we're guaranteed that any
+	 * TLB caching a PTE_CW-but-not-PTE_CD entry will attempt a CAS, and
+	 * not just a blind AMO OR, to set PTE_CD.  The barrier at the start of
+	 * a revocation epoch ensures that no TLB can have a PTE_CW-and-PTE_CD
+	 * entry for this mapping if we've gotten here.
+	 *
+	 * On the other hand, we do have to do this as a CAS, to ensure that we
+	 * don't end up with PTE_CD set (by a racing PTW) and no PTE_CW.
+	 * Spurious failures are fine, so we can use fcmpset here.
+	 *
+	 * TODO: Should we mark the page as cap-load-faulting as a debugging
+	 * aide once Toooba is tag-dependently faulting?  (We can't mark it as
+	 * cap-load-clearing because there might be aliases that update
+	 * asynchronously.)
+	 */
+	pt_entry_t exppte = oldpte;
+
+	if (!pmap_fcmpset(pte, &exppte, exppte & ~PTE_CW)) {
+		/*
+		 * Failure must have preserved all non-PTW-updatable bits;
+		 * notably, PTE_CW must remain set.
+		 */
+		KASSERT((exppte & ~(PTE_CD|PTE_D|PTE_A)) ==
+		    (oldpte & ~(PTE_CD|PTE_D|PTE_A)),
+		    ("pmap_caploadgen_update_clear_cw botch"));
+	}
+
+}
+
 int
 pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 {
@@ -3615,16 +3649,6 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 		*pva = va + ((pte == l2) ? L2_SIZE : PAGE_SIZE);
 		res = PMAP_CAPLOADGEN_OK;
 
-		/*
-		 * On the fast path, where we're just updating the CRG bit, this
-		 * is the only store to the PTE we'll do.  On slower paths,
-		 * we'll do additional atomics to update other bits.  This is
-		 * probably a better state of affairs (1 + epsilon AMOs, no
-		 * retries) than we could otherwise easily get (either 1 LL/SC
-		 * CAS + epsilon retries or 1 AMOSWAP to a zero PTE + 1 store).
-		 */
-		pmap_caploadgen_update_crg(pmap, pte);
-
 		if (!(flags & PMAP_CAPLOADGEN_HASCAPS)) {
 			/*
 			 * We didn't see a capability on this page; step this
@@ -3640,26 +3664,8 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 				 */
 				pmap_clear_bits(pte, PTE_CD);
 			} else if (oldpte & PTE_CW) {
-				/*
-				 * PTE CAP-DIRTYABLE -> CAP-CLEAN
-				 *
-				 * We don't do a TLB shootdown here because
-				 * we're guaranteed that any TLB caching this
-				 * PTE_CW-but-not-PTE_CD entry will attempt a
-				 * CAS, and not just a blind AMO OR, to set
-				 * PTE_CD.  The barrier at the start of a
-				 * revocation epoch ensures that no TLB can have
-				 * a PTE_CW-and-PTE_CD entry for this mapping if
-				 * we've gotten here.
-				 *
-				 * TODO: Should we mark the page as
-				 * cap-load-faulting as a debugging aide once
-				 * Toooba is tag-dependently faulting?  (We
-				 * can't mark it as cap-load-clearing because
-				 * there might be aliases that update
-				 * asynchronously.)
-				 */
-				pmap_clear_bits(pte, PTE_CW);
+				/* PTE CAP-DIRTYABLE -> CAP-CLEAN */
+				pmap_caploadgen_update_clear_cw(pte, oldpte);
 			} else if (flags & PMAP_CAPLOADGEN_EXCLUSIVE) {
 				/* No new mappings possible */
 				vm_page_astate_t mas = vm_page_astate_load(m);
@@ -3688,18 +3694,19 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 			 * We could clear PGA_CAPDIRTY here, too, but it
 			 * probably doesn't get set often ough to merit.
 			 */
-			if (oldpte & PTE_CW) {
+			if ((oldpte & PTE_CW) && !(oldpte & PTE_CD)) {
 				pmap_store_bits(pte, PTE_CD);
 			}
 		}
 
 		/*
-		 * Nothing else about the PTE loaded should be
-		 * different from what we've updated above.
+		 * On the fast path, where we're just updating the CRG bit, this
+		 * is the only store to the PTE we'll do.  This is probably a
+		 * better state of affairs (1 + epsilon AMOs, no retries) than
+		 * we could otherwise easily get (either 1 LL/SC CAS + epsilon
+		 * retries or 1 AMOSWAP to a zero PTE + 1 store).
 		 */
-		KASSERT((oldpte & ~(PTE_CW | PTE_CD | PTE_CRG))
-		    == (pmap_load(pte) & ~(PTE_CW | PTE_CD | PTE_CRG)),
-		    ("pmap_caploadgen_update botch"));
+		pmap_caploadgen_update_crg(pmap, pte);
 
 		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
 			sfence_vma_page(va);
