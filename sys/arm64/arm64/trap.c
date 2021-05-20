@@ -52,6 +52,9 @@
 
 #if __has_feature(capabilities)
 #include <cheri/cheric.h>
+#ifdef CHERI_CAPREVOKE
+#include <vm/vm_cheri_revoke.h>
+#endif
 #endif
 
 #include <machine/frame.h>
@@ -404,6 +407,15 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	}
 	pcb = td->td_pcb;
 
+#ifdef CHERI_CAPREVOKE
+	if (lower && (far < VM_MAX_USER_ADDRESS)  &&
+	    ((esr & ISS_DATA_DFSC_MASK) == ISS_DATA_DFSC_LC_SC) &&
+	    !(esr & ISS_DATA_WnR) &&
+	    (vm_cheri_revoke_fault_visit(td->td_proc->p_vmspace, far) ==
+	    VM_CHERI_REVOKE_FAULT_RESOLVED))
+		return;
+#endif
+
 	/*
 	 * Try to handle translation, access flag, and permission faults.
 	 * Translation faults may occur as a result of the required
@@ -454,14 +466,18 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		 * need read permission but will set the WnR flag when the
 		 * memory is unmapped.
 		 */
-		if ((esr & ISS_DATA_WnR) == 0 || (esr & ISS_DATA_CM) != 0)
+		if ((esr & ISS_DATA_WnR) == 0 || (esr & ISS_DATA_CM) != 0) {
 			ftype = VM_PROT_READ;
-		else {
+
+#if __has_feature(capabilities)
+			if ((esr & ISS_DATA_DFSC_MASK) == ISS_DATA_DFSC_LC_SC)
+				ftype |= VM_PROT_READ_CAP;
+#endif
+		} else {
 			ftype = VM_PROT_WRITE;
 
 #if __has_feature(capabilities)
-			if ((esr & ISS_DATA_DFSC_MASK) ==
-			    ISS_DATA_DFSC_LC_SC)
+			if ((esr & ISS_DATA_DFSC_MASK) == ISS_DATA_DFSC_LC_SC)
 				ftype |= VM_PROT_WRITE_CAP;
 #endif
 		}
