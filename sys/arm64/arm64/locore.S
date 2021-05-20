@@ -1006,10 +1006,6 @@ ENTRY(abort)
 	b abort
 END(abort)
 
-	.align 3
-init_pt_va:
-	.quad pagetable		/* XXX: Keep page tables VA */
-
 	.section .init_pagetable, "aw", %nobits
 	.align PAGE_SHIFT
 	/*
@@ -1047,8 +1043,6 @@ pagetable_end:
 el2_pagetable:
 	.space	PAGE_SIZE
 	.size	el2_pagetable, . - el2_pagetable
-
-	.globl init_pt_va
 
 	.align	4
 	.type	initstack,#object
