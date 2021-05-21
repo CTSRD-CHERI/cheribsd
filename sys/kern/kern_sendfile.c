@@ -1178,8 +1178,12 @@ prepend_header:
 			if (tls != NULL && tls->mode == TCP_TLS_MODE_SW) {
 				error = (*so->so_proto->pr_usrreqs->pru_send)
 				    (so, PRUS_NOTREADY, m, NULL, NULL, td);
-				soref(so);
-				ktls_enqueue(m, so, tls_enq_cnt);
+				if (error != 0) {
+					m_freem(m);
+				} else {
+					soref(so);
+					ktls_enqueue(m, so, tls_enq_cnt);
+				}
 			} else
 #endif
 				error = (*so->so_proto->pr_usrreqs->pru_send)
@@ -1190,11 +1194,11 @@ prepend_header:
 			soref(so);
 			error = (*so->so_proto->pr_usrreqs->pru_send)
 			    (so, PRUS_NOTREADY, m, NULL, NULL, td);
-			sendfile_iodone(sfio, NULL, 0, 0);
+			sendfile_iodone(sfio, NULL, 0, error);
 		}
 		CURVNET_RESTORE();
 
-		m = NULL;	/* pru_send always consumes */
+		m = NULL;
 		if (error)
 			goto done;
 		sbytes += space + hdrlen;
