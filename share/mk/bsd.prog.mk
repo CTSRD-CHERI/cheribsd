@@ -260,7 +260,12 @@ MAN1=	${MAN}
 .if defined(_SKIP_BUILD)
 all:
 .else
+.if target(afterbuild)
+.ORDER: ${PROG_INSTALL} afterbuild
+all: ${PROG_INSTALL} ${SCRIPTS} afterbuild
+.else
 all: ${PROG_INSTALL} ${SCRIPTS}
+.endif
 .if ${MK_MAN} != "no"
 all: all-man
 .endif
