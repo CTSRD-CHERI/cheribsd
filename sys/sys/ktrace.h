@@ -276,7 +276,16 @@ struct ktr_io_params;
 struct uio;
 struct vnode;
 
+#ifdef	KTRACE
 struct vnode *ktr_get_tracevp(struct proc *, bool);
+#else
+static inline struct vnode *
+ktr_get_tracevp(struct proc *p, bool ref)
+{
+
+	return (NULL);
+}
+#endif
 void	ktr_io_params_free(struct ktr_io_params *);
 void	ktrnamei(const char *);
 void	ktrcsw(int, int, const char *);
