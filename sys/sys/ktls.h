@@ -29,9 +29,11 @@
 #ifndef _SYS_KTLS_H_
 #define	_SYS_KTLS_H_
 
+#ifdef _KERNEL
 #include <sys/refcount.h>
 #include <sys/_iovec.h>
 #include <sys/_task.h>
+#endif
 
 struct tls_record_layer {
 	uint8_t  tls_type;
