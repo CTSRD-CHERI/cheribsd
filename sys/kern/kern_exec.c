@@ -2084,7 +2084,7 @@ exec_unregister(const struct execsw *execsw_arg)
  * Write out a core segment to the compression stream.
  */
 static int
-compress_chunk(struct coredump_params *p, char * __capability base, char *buf,
+compress_chunk(struct coredump_params *cp, char * __capability base, char *buf,
     u_int len)
 {
 	u_int chunk_len;
@@ -2100,7 +2100,7 @@ compress_chunk(struct coredump_params *p, char * __capability base, char *buf,
 		error = copyin(base, buf, chunk_len);
 		if (error != 0)
 			bzero(buf, chunk_len);
-		error = compressor_write(p->comp, buf, chunk_len);
+		error = compressor_write(cp->comp, buf, chunk_len);
 		if (error != 0)
 			break;
 		base += chunk_len;
@@ -2110,18 +2110,18 @@ compress_chunk(struct coredump_params *p, char * __capability base, char *buf,
 }
 
 int
-core_write(struct coredump_params *p, const void *base, size_t len,
+core_write(struct coredump_params *cp, const void *base, size_t len,
     off_t offset, enum uio_seg seg, size_t *resid)
 {
 
-	return (vn_rdwr_inchunks(UIO_WRITE, p->vp, __DECONST(void *, base),
+	return (vn_rdwr_inchunks(UIO_WRITE, cp->vp, __DECONST(void *, base),
 	    len, offset, seg, IO_UNIT | IO_DIRECT | IO_RANGELOCKED,
-	    p->active_cred, p->file_cred, resid, p->td));
+	    cp->active_cred, cp->file_cred, resid, cp->td));
 }
 
 int
 core_output(char * __capability base_cap, size_t len, off_t offset,
-    struct coredump_params *p, void *tmpbuf)
+    struct coredump_params *cp, void *tmpbuf)
 {
 	vm_map_t map;
 	struct mount *mp;
@@ -2133,10 +2133,10 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 	KASSERT(is_aligned(base, PAGE_SIZE),
 	    ("%s: user address %p is not page-aligned", __func__, base));
 
-	if (p->comp != NULL)
-		return (compress_chunk(p, base_cap, tmpbuf, len));
+	if (cp->comp != NULL)
+		return (compress_chunk(cp, base_cap, tmpbuf, len));
 
-	map = &p->td->td_proc->p_vmspace->vm_map;
+	map = &cp->td->td_proc->p_vmspace->vm_map;
 	for (; len > 0; base += runlen, offset += runlen, len -= runlen) {
 		/*
 		 * Attempt to page in all virtual pages in the range.  If a
@@ -2158,7 +2158,7 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 			 * NB: The hybrid kernel drops the capability here, it
 			 * will be re-derived in vn_rdwr().
 			 */
-			error = core_write(p, base, runlen, offset,
+			error = core_write(cp, base, runlen, offset,
 			    UIO_USERSPACE, &resid);
 			if (error != 0) {
 				if (error != EFAULT)
@@ -2181,13 +2181,13 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 			}
 		}
 		if (!success) {
-			error = vn_start_write(p->vp, &mp, V_WAIT);
+			error = vn_start_write(cp->vp, &mp, V_WAIT);
 			if (error != 0)
 				break;
-			vn_lock(p->vp, LK_EXCLUSIVE | LK_RETRY);
-			error = vn_truncate_locked(p->vp, offset + runlen,
-			    false, p->td->td_ucred);
-			VOP_UNLOCK(p->vp);
+			vn_lock(cp->vp, LK_EXCLUSIVE | LK_RETRY);
+			error = vn_truncate_locked(cp->vp, offset + runlen,
+			    false, cp->td->td_ucred);
+			VOP_UNLOCK(cp->vp);
 			vn_finished_write(mp);
 			if (error != 0)
 				break;
@@ -2202,10 +2202,12 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 int
 sbuf_drain_core_output(void *arg, const char *data, int len)
 {
-	struct coredump_params *p;
+	struct coredump_params *cp;
+	struct proc *p;
 	int error, locked;
 
-	p = (struct coredump_params *)arg;
+	cp = arg;
+	p = cp->td->td_proc;
 
 	/*
 	 * Some kern_proc out routines that print to this sbuf may
@@ -2215,22 +2217,21 @@ sbuf_drain_core_output(void *arg, const char *data, int len)
 	 * can safely release the lock before draining and acquire
 	 * again after.
 	 */
-	locked = PROC_LOCKED(p->td->td_proc);
+	locked = PROC_LOCKED(p);
 	if (locked)
-		PROC_UNLOCK(p->td->td_proc);
-	if (p->comp != NULL)
-		error = compressor_write(p->comp, __DECONST(char *, data), len);
+		PROC_UNLOCK(p);
+	if (cp->comp != NULL)
+		error = compressor_write(cp->comp, __DECONST(char *, data), len);
 	else
-		error = core_write(p, __DECONST(void *, data), len, p->offset,
+		error = core_write(cp, __DECONST(void *, data), len, cp->offset,
 		    UIO_SYSSPACE, NULL);
 	if (locked)
-		PROC_LOCK(p->td->td_proc);
+		PROC_LOCK(p);
 	if (error != 0)
 		return (-error);
-	p->offset += len;
+	cp->offset += len;
 	return (len);
 }
-
 // CHERI CHANGES START
 // {
 //   "updated": 20200123,
