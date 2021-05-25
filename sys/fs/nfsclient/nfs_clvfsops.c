@@ -1243,19 +1243,17 @@ nfs_mount(struct mount *mp)
 			error = EINVAL;
 			goto out;
 		}
-		error = copyin(__USER_CAP(args.fh, args.fhsize), nfh,
-		    args.fhsize);
+		error = copyin(args.user_fh, nfh, args.fhsize);
 		if (error != 0)
 			goto out;
-		error = copyinstr(__USER_CAP(args.hostname, MNAMELEN), hst,
-		    MNAMELEN - 1, &hstlen);
+		error = copyinstr(args.user_hostname, hst, MNAMELEN - 1,
+		    &hstlen);
 		if (error != 0)
 			goto out;
 		bzero(&hst[hstlen], MNAMELEN - hstlen);
 		args.hostname = hst;
 		/* getsockaddr() call must be after above copyin() calls */
-		error = getsockaddr(&nam, __USER_CAP(args.addr, args.addrlen),
-		    args.addrlen);
+		error = getsockaddr(&nam, args.user_addr, args.addrlen);
 		if (error != 0)
 			goto out;
 	} else if (nfs_mount_parse_from(mp->mnt_optnew,
