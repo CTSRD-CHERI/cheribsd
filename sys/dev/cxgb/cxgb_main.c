@@ -2867,7 +2867,7 @@ cxgb_extension_ioctl(struct cdev *dev, unsigned long cmd, caddr_t data,
 		 * Read 256 bytes at a time as len can be large and we don't
 		 * want to use huge intermediate buffers.
 		 */
-		useraddr = (uint8_t * __capability)t->buf; 
+		useraddr = (uint8_t * __capability)t->buf;
 		while (len) {
 			unsigned int chunk = min(len, sizeof(buf));
 
