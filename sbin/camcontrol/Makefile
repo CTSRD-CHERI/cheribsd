@@ -2,9 +2,6 @@
 
 .include <src.opts.mk>
 
-# Requires CAMIOCOMMAND (uses union ccb)
-WANT_CHERI=	none
-
 PACKAGE=runtime
 PROG=	camcontrol
 SRCS=	camcontrol.c util.c
