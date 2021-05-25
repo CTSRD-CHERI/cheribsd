@@ -85,8 +85,6 @@ SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RWTUN,
 
 int (*dtrace_invop_jump_addr)(struct trapframe *);
 
-extern register_t fsu_intr_fault;
-
 #ifdef CPU_QEMU_RISCV
 extern u_int qemu_trace_buffered;
 #endif
