@@ -5420,10 +5420,11 @@ sppp_null(struct sppp *unused)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "ioctl:net",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END
