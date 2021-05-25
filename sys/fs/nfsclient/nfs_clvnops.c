@@ -4290,10 +4290,10 @@ nfs_pathconf(struct vop_pathconf_args *ap)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END
