@@ -1190,6 +1190,10 @@ get_cyclecount()
 	return cheri_get_cyclecount();
 #elif defined(__riscv)
 	return __builtin_readcyclecounter();
+#elif defined(__aarch64__)
+	uint64_t count;
+	__asm __volatile("mrs %0, cntvct_el0" : "=&r" (count));
+	return count;
 #else
 	return 0;
 #endif
