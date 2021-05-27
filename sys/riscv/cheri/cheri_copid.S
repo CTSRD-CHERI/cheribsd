@@ -43,7 +43,9 @@
 .text
 .globl _C_LABEL(switcher_cogetpid)
 _C_LABEL(switcher_cogetpid):
-	cld a0, SCB_PID(idc)
+	clc	ct6, SCB_UNSEALCAP(idc)	/* Load the unsealing capability */
+	cunseal	ct6, ca2, ct6		/* Unseal the target scb */
+	clw a0, SCB_PID(ct6)
 	cmove ct6, cnull
 	li t0, 0
 	cret
@@ -56,7 +58,9 @@ _C_LABEL(eswitcher_cogetpid):
 .text
 .globl _C_LABEL(switcher_cogettid)
 _C_LABEL(switcher_cogettid):
-	cld a0, SCB_TID(idc)
+	clc	ct6, SCB_UNSEALCAP(idc)	/* Load the unsealing capability */
+	cunseal	ct6, ca2, ct6		/* Unseal the target scb */
+	clw a0, SCB_TID(ct6)
 	cmove ct6, cnull
 	li t0, 0
 	cret

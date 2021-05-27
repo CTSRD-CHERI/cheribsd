@@ -1,10 +1,11 @@
-/*-
- * Copyright (c) 2014 SRI International
+/*
+ * Copyright (c) 2021 Peter S. Blandford-Baker
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
- * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
- * ("CTSRD"), as part of the DARPA CRASH research programme.
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
+ * DARPA SSITH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,36 +29,16 @@
  * SUCH DAMAGE.
  */
 
-#ifndef __LIBC_CHERI_PRIVATE_H__
-#define __LIBC_CHERI_PRIVATE_H__
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-#ifdef CAPABILITY_VERSION
-#if !__has_feature(capabilities)
-#error	This code requires a capability aware compiler.
-#endif
-#define	__CAPSUFFIX(func)	func ## _c
-#ifndef __CAP
-#define	__CAP		__capability
-#endif
-#else
-#define	__CAPSUFFIX(func)	func
-#ifndef __CAP
-#define	__CAP
-#endif
-#endif
+#include "namespace.h"
+#include <unistd.h>
+#include "cheri_private.h"
+#include "un-namespace.h"
 
-#if __has_feature(capabilities)
-extern _Thread_local void * __capability _cocall_code;
-extern _Thread_local void * __capability _cocall_data;
-extern _Thread_local void * __capability _coaccept_code;
-extern _Thread_local void * __capability _coaccept_data;
-
-extern _Thread_local void * __capability _cogetpid2_code;
-extern _Thread_local void * __capability _cogetpid2_data;
-extern _Thread_local void * __capability _cogettid_code;
-extern _Thread_local void * __capability _cogettid_data;
-
-void _trace_cocall(ptraddr_t target, size_t outlen, size_t inlen);
-#endif /* __has_feature(capabilities) */
-
-#endif /* __LIBC_CHERI_PRIVATE_H__ */
+int
+cogetpid2(void * __capability target)
+{
+	return (_cogetpid2(_cogetpid2_code, _cogetpid2_data, target));
+}
