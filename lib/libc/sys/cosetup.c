@@ -43,6 +43,11 @@ _Thread_local void * __capability _cocall_data;
 _Thread_local void * __capability _coaccept_code;
 _Thread_local void * __capability _coaccept_data;
 
+_Thread_local void * __capability _cogetpid2_code;
+_Thread_local void * __capability _cogetpid2_data;
+_Thread_local void * __capability _cogettid_code;
+_Thread_local void * __capability _cogettid_data;
+
 int
 cosetup(int what)
 {
@@ -51,6 +56,10 @@ cosetup(int what)
 		return (_cosetup(what, &_coaccept_code, &_coaccept_data));
 	case COSETUP_COCALL:
 		return (_cosetup(what, &_cocall_code, &_cocall_data));
+	case COSETUP_COGETPID:
+		return (_cosetup(what, &_cogetpid2_code, &_cogetpid2_data));
+	case COSETUP_COGETTID:
+		return (_cosetup(what, &_cogettid_code, &_cogettid_data));
 	default:
 		return (EINVAL);
 	}

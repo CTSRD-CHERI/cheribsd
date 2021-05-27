@@ -8,6 +8,8 @@ FBSDprivate_1.0 {
 	_cocall;
 	coaccept;
 	cocall;
+	_cogetpid2;
+	_cogettid;
 	cogetpid2;
 	cogettid;
 };

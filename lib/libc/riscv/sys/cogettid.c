@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Peter S. Blandford-Baker
+ * Copyright (c) 2021 Peter S. Blandford-Baker
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -29,49 +29,16 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/errno.h>
-#include <machine/asm.h>
-#include <machine/cherireg.h>
-#include <machine/switcher.h>
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-#define	idc ct6
-.option capmode
+#include "namespace.h"
+#include <unistd.h>
+#include "cheri_private.h"
+#include "un-namespace.h"
 
-/*
- *
- */
-.text
-.globl _C_LABEL(switcher_cogetpid)
-_C_LABEL(switcher_cogetpid):
-	clc	ct6, SCB_UNSEALCAP(idc)	/* Load the unsealing capability */
-	cunseal	ct6, ca2, ct6		/* Unseal the target scb */
-	clw a0, SCB_PID(ct6)
-	cmove ct6, cnull
-	li t0, 0
-	cret
-.globl _C_LABEL(eswitcher_cogetpid)
-_C_LABEL(eswitcher_cogetpid):
-
-/*
- *
- */
-.text
-.globl _C_LABEL(switcher_cogettid)
-_C_LABEL(switcher_cogettid):
-	clc	ct6, SCB_UNSEALCAP(idc)	/* Load the unsealing capability */
-	cunseal	ct6, ca2, ct6		/* Unseal the target scb */
-	clw a0, SCB_TID(ct6)
-	cmove ct6, cnull
-	li t0, 0
-	cret
-.globl _C_LABEL(eswitcher_cogettid)
-_C_LABEL(eswitcher_cogettid):
-
-.data
-.globl szswitcher_cogetpid
-szswitcher_cogetpid:
-.long eswitcher_cogetpid-switcher_cogetpid
-
-.global szswitcher_cogettid
-szswitcher_cogettid:
-.long eswitcher_cogettid-switcher_cogettid
+int
+cogettid(void * __capability target)
+{
+	return (_cogettid(_cogettid_code, _cogettid_data, target));
+}

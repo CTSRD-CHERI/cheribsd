@@ -41,6 +41,8 @@
 .In unistd.h
 .Ft int
 .Fn cogetpid "void * __capability cookie" "pid_t *pidp"
+.Ft pid_t
+.Fn cogetpid2 "void * __capability target"
 .Sh DESCRIPTION
 The
 .Fn cogetpid

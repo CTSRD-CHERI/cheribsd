@@ -47,9 +47,9 @@ __FBSDID("$FreeBSD$");
 
 /*
  * lwpid_t 
- * cogettid(void *switcher_code, void *target_scb)
+ * _cogettid(void *switcher_code, void *target_scb)
  */
-ENTRY(cogettid)
+ENTRY(_cogettid)
 
 	cincoffsetimm	csp, csp, -CAP_FRAME_SIZE
 	csc	cs0,	(0 * CHERICAP_SIZE)(csp)
@@ -128,5 +128,5 @@ ENTRY(cogettid)
 	cret
 2:
 	ASM_LOCAL_TAILCALL(t1, cerror)
-END(cogettid)
+END(_cogettid)
 

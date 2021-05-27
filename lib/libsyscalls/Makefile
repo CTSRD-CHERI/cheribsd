@@ -25,7 +25,7 @@ MIASM=
 NOASM=
 
 .include "${LIBC_SRCTOP}/sys/Makefile.inc"
-SRCS:=	${SRCS:Nbrk.c:Nshm_open.c:Nclosefrom.c:Ncosetup.c:Ncoaccept.c:Ncocall.c:S/__vdso_gettc.c/trivial-vdso_tc.c/}
+SRCS:=	${SRCS:Nbrk.c:Nshm_open.c:Nclosefrom.c:Ncosetup.c:Ncoaccept.c:Ncocall.c:Ncogetpid2.c:Ncogettid.c:S/__vdso_gettc.c/trivial-vdso_tc.c/}
 
 .PATH:	${LIBC_SRCTOP}/gen
 # We don't really need these:
