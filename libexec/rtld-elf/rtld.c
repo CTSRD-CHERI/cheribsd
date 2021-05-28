@@ -6264,6 +6264,8 @@ parse_args(char* argv[], int argc, bool *use_pathp, int *fdp,
 				*use_pathp = true;
 			} else if (opt == 't') {
 				ld_tracing = "yes";
+			} else if (opt == 'u') {
+				trust = false;
 			} else if (opt == 'v') {
 				machine[0] = '\0';
 				mib[0] = CTL_HW;
@@ -6335,6 +6337,7 @@ print_usage(const char *argv0)
 	    "  -f <FD>   Execute <FD> instead of searching for <binary>\n"
 	    "  -p        Search in PATH for named binary\n"
 	    "  -t        Trace loaded libraries instead of executing <binary>\n"
+	    "  -u        Ignore LD_ environment variables\n"
 	    "  -v        Display identification information\n"
 	    "  --        End of RTLD options\n"
 	    "  <binary>  Name of process to execute\n"
