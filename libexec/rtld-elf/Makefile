@@ -110,7 +110,7 @@ CFLAGS+=	-I${RTLD_ELF_DIR}/cheri
 # This could be optimized to use different stubs for per-file stubs but for
 # now making it opt-in is easier.
 # TODO: add a make options for this (e.g. MK_BENCHMARK_OPTIONS)?
-.if defined(RTLD_PER_FUNCTION_CAPTABLE_SUPPORT) &&
+.if defined(RTLD_PER_FUNCTION_CAPTABLE_SUPPORT) && \
     ${MACHINE_CPUARCH} == "mips" && ${MACHINE_ABI:Mpurecap}
 CFLAGS+=	-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1
 .else
