@@ -816,7 +816,8 @@ struct inoref {
  * ultimately released when the file is freed or the link is dropped again.
  */
 struct jaddref {
-	struct	inoref	ja_ref;		/* see inoref above. */
+	/* see inoref above. */
+	struct	inoref	ja_ref __subobject_use_container_bounds;
 #	define	ja_list	ja_ref.if_list	/* Jrnl pending, id_inowait, dm_jwork.*/
 #	define	ja_state ja_ref.if_list.wk_state
 	LIST_ENTRY(jaddref) ja_bmdeps;	/* Links for bmsafemap. */
@@ -839,7 +840,8 @@ struct jaddref {
  * may proceed as normal. 
  */
 struct jremref {
-	struct	inoref	jr_ref;		/* see inoref above. */
+	/* see inoref above. */
+	struct	inoref	jr_ref __subobject_use_container_bounds;
 #	define	jr_list	jr_ref.if_list	/* Linked to softdep_journal_pending. */
 #	define	jr_state jr_ref.if_list.wk_state
 	LIST_ENTRY(jremref) jr_deps;	/* Links for dirrem. */
