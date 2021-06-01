@@ -809,11 +809,9 @@ vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 			*ucode = BUS_OBJERR;
 			break;
 		case KERN_PROTECTION_FAILURE:
-#if __has_feature(capabilities)
 			if ((fault_type & VM_PROT_WRITE_CAP) != 0)
 				segv_ucode = SEGV_STORETAG;
 			else
-#endif
 				segv_ucode = SEGV_ACCERR;
 
 			if (prot_fault_translation == 0) {

@@ -731,12 +731,12 @@ c2e_fixup_fault(struct trapframe *trapframe, bool is_kernel,
 #ifdef CHERI_CAPREVOKE
 		switch(vm_caprevoke_fault_visit(uvms, va)) {
 		case VM_CAPREVOKE_FAULT_RESOLVED:
-			return true;
+			return (true);
 		case VM_CAPREVOKE_FAULT_UNRESOLVED:
-			return false;
+			return (false);
 		case VM_CAPREVOKE_FAULT_CAPSTORE:
 			*ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
-			return false;
+			return (false);
 		}
 #else
 		panic("user VA caploadgen fault on non-revoke kernel %lx", va);
@@ -755,7 +755,7 @@ c2e_fixup_fault(struct trapframe *trapframe, bool is_kernel,
 		}
 	}
 
-	return false;
+	return (false);
 }
 #endif
 
@@ -1232,15 +1232,14 @@ dofault:
 	case T_C2E:
 		ftype = 0;
 
-		if (!c2e_fixup_fault(trapframe, true, p->p_vmspace, &ftype)) {
-			if (ftype != 0) {
-				if (KERNLAND(trapframe->badvaddr))
-					goto kernel_fault;
-				else
-					goto dofault;
-			}
-		} else {
+		if (c2e_fixup_fault(trapframe, true, p->p_vmspace, &ftype))
 			return (trapframe->pc);
+
+		if (ftype != 0) {
+			if (KERNLAND(trapframe->badvaddr))
+				goto kernel_fault;
+			else
+				goto dofault;
 		}
 
 		if (td->td_pcb->pcb_onfault != NULL) {
@@ -1260,12 +1259,11 @@ dofault:
 		msg = "USER_CHERI_EXCEPTION";
 		ftype = 0;
 
-		if (!c2e_fixup_fault(trapframe, false, p->p_vmspace, &ftype)) {
-			if (ftype != 0)
-				goto dofault;
-		} else {
+		if (c2e_fixup_fault(trapframe, false, p->p_vmspace, &ftype))
 			goto out;
-		}
+
+		if (ftype != 0)
+			goto dofault;
 
 		fetch_bad_instr(trapframe);
 		if (log_user_cheri_exceptions)

@@ -142,9 +142,6 @@ kern_caprevoke(struct thread *td, int flags, caprevoke_epoch start_epoch,
 		entryst = caprevoke_st_state(vmm->vm_caprev_st);
 		first_epoch = epoch;
 
-		// printf("XXX NWF revoker entry early: entryst=%d flags=%x\n",
-		//	entryst, flags);
-
 		if ((flags & (fast_out_flags | CAPREVOKE_LAST_PASS)) ==
 		    fast_out_flags) {
 			/* Apparently they really just wanted the time. */
@@ -326,9 +323,6 @@ fast_out:
 	vm_caprevoke_info_page(vmm, &info_page);
 	vm_caprevoke_publish_epochs(info_page, &crepochs);
 	wmb();
-
-	// printf("XXX NWF revoker entry sync'd: entryst=%d myst=%d\n",
-	//	entryst, myst);
 
 	/*
 	 * If we've already begun the load-side work and are now just going

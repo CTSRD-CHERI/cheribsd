@@ -3749,9 +3749,6 @@ out:
 	PMAP_UNLOCK(pmap);
 out_unlocked:
 
-	// printf("pcu exit pte=%016lx (%016lx) va=%016lx (%016lx) *mp=%p m=%p res=%d\n",
-	// 	oldpte, newpte, va, *pva, *mp, m, res);
-
 	if ((flags & PMAP_CAPLOADGEN_WIRE) && (*mp != NULL)) {
 		/*
 		 * Unwire any existing page we were given if we are asked to
