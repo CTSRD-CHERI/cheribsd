@@ -93,6 +93,9 @@ SRCS+=	cheribsdtest_sandbox.S
 .ifdef CHERIBSD_DYNAMIC_TESTS
 CFLAGS+=	-DCHERIBSD_DYNAMIC_TESTS
 CFLAGS+=	'-DLIBM_SONAME="libm.so.5"'
+CFLAGS+=	-I${SRCTOP}/lib/libcheribsdtest_dynamic
+LIBADD+=	cheribsdtest_dynamic
+SRCS+=		cheribsdtest_lazy_bind.c
 .else
 NO_SHARED?=	YES
 # XXX-JC: Enable unconditionally once we have a dynamic libcheri

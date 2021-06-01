@@ -21,6 +21,7 @@ jemalloc_${src}: ${SRCTOP}/contrib/jemalloc/src/${src} .NOMETA
 CFLAGS.jemalloc_${src}+=	-Werror=cheri-bitwise-operations -Werror=cheri
 .endif
 .endfor
+MISRCS+=	malloc_revoke.c
 
 MAN+=jemalloc.3
 CLEANFILES+=jemalloc.3

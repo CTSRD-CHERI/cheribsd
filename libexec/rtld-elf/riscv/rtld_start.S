@@ -104,6 +104,49 @@ ENTRY(.rtld_start)
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(.rtld_start)
 
+#define	INT_SIZE	8
+#define	INT(x)		x
+#define	LOAD_INT	PTR(ld)
+#define	STORE_INT	PTR(sd)
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	LOAD_PTR	LOAD_CAP
+#define	STORE_PTR	STORE_CAP
+#define	ADD_PTR		cincoffset
+#define	MV_PTR		cmove
+#define	PTR_SIZE	CAP_SIZE
+#define	PTR(x)		CAP(x)
+#else
+#define	LOAD_PTR	LOAD_INT
+#define	STORE_PTR	STORE_INT
+#define	ADD_PTR		add
+#define	MV_PTR		mv
+#define	PTR_SIZE	INT_SIZE
+#define	PTR(x)		INT(x)
+#endif
+
+#define	JR_PTR		PTR(jr)
+
+#if __has_feature(capabilities)
+#define	LOAD_CAP	PTR(lc)
+#define	STORE_CAP	PTR(sc)
+#define	CAP_SIZE	16
+#define	CAP(x)		c ## x
+#else
+#define	LOAD_CAP	ld
+#define	STORE_CAP	sd
+#define	CAP_SIZE	8
+#define	CAP(x)		x
+#endif
+
+#ifdef __riscv_float_abi_double
+#define	FLT_SIZE	8
+#define	LOAD_FLT	PTR(fld)
+#define	STORE_FLT	PTR(fsd)
+#else
+#define	FLT_SIZE	0
+#endif
+
 /*
  * t0 = obj pointer
  * t1 = reloc offset
@@ -113,29 +156,35 @@ ENTRY(_rtld_bind_start)
 	/* Currently unused and unimplemented for pure-capability code */
 	unimp
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
-	/* Save the arguments and ra */
-	/* We require 17 dwords, but the stack must be aligned to 16-bytes */
-	addi	sp, sp, -(8 * 18)
-	sd	a0, (8 * 0)(sp)
-	sd	a1, (8 * 1)(sp)
-	sd	a2, (8 * 2)(sp)
-	sd	a3, (8 * 3)(sp)
-	sd	a4, (8 * 4)(sp)
-	sd	a5, (8 * 5)(sp)
-	sd	a6, (8 * 6)(sp)
-	sd	a7, (8 * 7)(sp)
-	sd	ra, (8 * 8)(sp)
+	/* Save the arguments and (c)ra */
+	/*
+	 * We require 8 GP(C)Rs, 1 pointer and 8 FPRs, but the stack must be
+	 * aligned to 16-bytes.
+	 */
+#define	FLT_OFFSET	(8 * CAP_SIZE + 1 * PTR_SIZE)
+#define	FRAME_SIZE	(((FLT_OFFSET + 8 * FLT_SIZE) + 15) & ~15)
 
-#ifdef __riscv_float_abi_double
+	ADD_PTR		PTR(sp), PTR(sp), -FRAME_SIZE
+	STORE_CAP	CAP(a0), (CAP_SIZE * 0)(PTR(sp))
+	STORE_CAP	CAP(a1), (CAP_SIZE * 1)(PTR(sp))
+	STORE_CAP	CAP(a2), (CAP_SIZE * 2)(PTR(sp))
+	STORE_CAP	CAP(a3), (CAP_SIZE * 3)(PTR(sp))
+	STORE_CAP	CAP(a4), (CAP_SIZE * 4)(PTR(sp))
+	STORE_CAP	CAP(a5), (CAP_SIZE * 5)(PTR(sp))
+	STORE_CAP	CAP(a6), (CAP_SIZE * 6)(PTR(sp))
+	STORE_CAP	CAP(a7), (CAP_SIZE * 7)(PTR(sp))
+	STORE_PTR	PTR(ra), (CAP_SIZE * 8)(PTR(sp))
+
+#if FLT_SIZE != 0
 	/* Save any floating-point arguments */
-	fsd	fa0, (8 * 9)(sp)
-	fsd	fa1, (8 * 10)(sp)
-	fsd	fa2, (8 * 11)(sp)
-	fsd	fa3, (8 * 12)(sp)
-	fsd	fa4, (8 * 13)(sp)
-	fsd	fa5, (8 * 14)(sp)
-	fsd	fa6, (8 * 15)(sp)
-	fsd	fa7, (8 * 16)(sp)
+	STORE_FLT	fa0, (FLT_OFFSET + FLT_SIZE * 0)(PTR(sp))
+	STORE_FLT	fa1, (FLT_OFFSET + FLT_SIZE * 1)(PTR(sp))
+	STORE_FLT	fa2, (FLT_OFFSET + FLT_SIZE * 2)(PTR(sp))
+	STORE_FLT	fa3, (FLT_OFFSET + FLT_SIZE * 3)(PTR(sp))
+	STORE_FLT	fa4, (FLT_OFFSET + FLT_SIZE * 4)(PTR(sp))
+	STORE_FLT	fa5, (FLT_OFFSET + FLT_SIZE * 5)(PTR(sp))
+	STORE_FLT	fa6, (FLT_OFFSET + FLT_SIZE * 6)(PTR(sp))
+	STORE_FLT	fa7, (FLT_OFFSET + FLT_SIZE * 7)(PTR(sp))
 #endif
 
 	/* Reloc offset is 3x of the .got.plt offset */
@@ -143,39 +192,39 @@ ENTRY(_rtld_bind_start)
 	add	a1, a1, t1	/* Plus item */
 
 	/* Load obj */
-	mv	a0, t0
+	MV_PTR	PTR(a0), PTR(t0)
 
 	/* Call into rtld */
 	jal	_rtld_bind
 
 	/* Backup the address to branch to */
-	mv	t0, a0
+	MV_PTR	PTR(t0), PTR(a0)
 
 	/* Restore the arguments and ra */
-	ld	a0, (8 * 0)(sp)
-	ld	a1, (8 * 1)(sp)
-	ld	a2, (8 * 2)(sp)
-	ld	a3, (8 * 3)(sp)
-	ld	a4, (8 * 4)(sp)
-	ld	a5, (8 * 5)(sp)
-	ld	a6, (8 * 6)(sp)
-	ld	a7, (8 * 7)(sp)
-	ld	ra, (8 * 8)(sp)
+	LOAD_CAP	CAP(a0), (CAP_SIZE * 0)(PTR(sp))
+	LOAD_CAP	CAP(a1), (CAP_SIZE * 1)(PTR(sp))
+	LOAD_CAP	CAP(a2), (CAP_SIZE * 2)(PTR(sp))
+	LOAD_CAP	CAP(a3), (CAP_SIZE * 3)(PTR(sp))
+	LOAD_CAP	CAP(a4), (CAP_SIZE * 4)(PTR(sp))
+	LOAD_CAP	CAP(a5), (CAP_SIZE * 5)(PTR(sp))
+	LOAD_CAP	CAP(a6), (CAP_SIZE * 6)(PTR(sp))
+	LOAD_CAP	CAP(a7), (CAP_SIZE * 7)(PTR(sp))
+	LOAD_PTR	PTR(ra), (CAP_SIZE * 8)(PTR(sp))
 
-#ifdef __riscv_float_abi_double
+#if FLT_SIZE != 0
 	/* Restore floating-point arguments */
-	fld	fa0, (8 * 9)(sp)
-	fld	fa1, (8 * 10)(sp)
-	fld	fa2, (8 * 11)(sp)
-	fld	fa3, (8 * 12)(sp)
-	fld	fa4, (8 * 13)(sp)
-	fld	fa5, (8 * 14)(sp)
-	fld	fa6, (8 * 15)(sp)
-	fld	fa7, (8 * 16)(sp)
+	LOAD_FLT	fa0, (FLT_OFFSET + FLT_SIZE * 0)(PTR(sp))
+	LOAD_FLT	fa1, (FLT_OFFSET + FLT_SIZE * 1)(PTR(sp))
+	LOAD_FLT	fa2, (FLT_OFFSET + FLT_SIZE * 2)(PTR(sp))
+	LOAD_FLT	fa3, (FLT_OFFSET + FLT_SIZE * 3)(PTR(sp))
+	LOAD_FLT	fa4, (FLT_OFFSET + FLT_SIZE * 4)(PTR(sp))
+	LOAD_FLT	fa5, (FLT_OFFSET + FLT_SIZE * 5)(PTR(sp))
+	LOAD_FLT	fa6, (FLT_OFFSET + FLT_SIZE * 6)(PTR(sp))
+	LOAD_FLT	fa7, (FLT_OFFSET + FLT_SIZE * 7)(PTR(sp))
 #endif
-	addi	sp, sp, (8 * 18)
+	ADD_PTR		PTR(sp), PTR(sp), FRAME_SIZE
 
 	/* Call into the correct function */
-	jr	t0
+	JR_PTR	PTR(t0)
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_bind_start)
