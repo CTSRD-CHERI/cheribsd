@@ -470,7 +470,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd64_getgroups */
 	case 79: {
 		struct freebsd64_getgroups_args *p = params;
-		uarg[0] = p->gidsetsize; /* u_int */
+		iarg[0] = p->gidsetsize; /* int */
 		uarg[1] = (intptr_t)p->gidset; /* gid_t * */
 		*n_args = 2;
 		break;
@@ -478,7 +478,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd64_setgroups */
 	case 80: {
 		struct freebsd64_setgroups_args *p = params;
-		uarg[0] = p->gidsetsize; /* u_int */
+		iarg[0] = p->gidsetsize; /* int */
 		uarg[1] = (intptr_t)p->gidset; /* const gid_t * */
 		*n_args = 2;
 		break;
@@ -4140,7 +4140,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 79:
 		switch (ndx) {
 		case 0:
-			p = "u_int";
+			p = "int";
 			break;
 		case 1:
 			p = "userland gid_t *";
@@ -4153,7 +4153,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 80:
 		switch (ndx) {
 		case 0:
-			p = "u_int";
+			p = "int";
 			break;
 		case 1:
 			p = "userland const gid_t *";
