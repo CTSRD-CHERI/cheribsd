@@ -381,6 +381,11 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #include <machine/cheric.h>
 #endif
 
+#ifndef _KERNEL
+ssize_t	strfcap(char * __restrict buf, size_t maxsize,
+    const char * __restrict format, uintcap_t cap);
+#endif
+
 #endif /* _SYS_CHERIC_H_ */
 // CHERI CHANGES START
 // {
