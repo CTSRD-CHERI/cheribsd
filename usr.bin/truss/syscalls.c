@@ -59,6 +59,10 @@ __FBSDID("$FreeBSD$");
 #include <netinet/sctp.h>
 #include <arpa/inet.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
+
 #include <assert.h>
 #include <ctype.h>
 #include <err.h>
@@ -352,7 +356,7 @@ static struct syscall decoded_syscalls[] = {
 	  .args = { { Ptr, 0 }, { Sizet, 1 } } },
 	{ .name = "mlockall", .ret_type = 1, .nargs = 1,
 	  .args = { { Mlockall, 0 } } },
-	{ .name = "mmap", .ret_type = 1, .nargs = 6,
+	{ .name = "mmap", .ret_type = 3, .nargs = 6,
 	  .args = { { Ptr, 0 }, { Sizet, 1 }, { Mprot, 2 }, { Mmapflags, 3 },
 		    { Int, 4 }, { QuadHex, 5 } } },
 	{ .name = "modfind", .ret_type = 1, .nargs = 1,
@@ -2808,7 +2812,15 @@ print_syscall_ret(struct trussinfo *trussinfo, int error, syscallarg_t *retval)
 		    (intmax_t)off);
 	}
 #endif
-	else
+	else if (sc->ret_type == 3) {
+#ifdef __CHERI_PURE_CAPABILITY__
+		char tmp[128];
+		strfcap(tmp, sizeof(tmp), "%T%C", retval[0]);
+		fprintf(trussinfo->outfile, " = %s\n", tmp);
+#else
+		fprintf(trussinfo->outfile, " = %p\n", (void *)retval[0]);
+#endif
+	} else
 		fprintf(trussinfo->outfile, " = %jd (0x%jx)\n",
 		    (intmax_t)retval[0], (intmax_t)retval[0]);
 }
