@@ -170,6 +170,12 @@ SYSCTL_INT(_vm, OID_AUTO, pfault_oom_wait, CTLFLAG_RWTUN,
     "Number of seconds to wait for free pages before retrying "
     "the page fault handler");
 
+static bool capstore_on_alloc = 1;
+SYSCTL_BOOL(_vm, OID_AUTO, capstore_on_alloc, CTLFLAG_RW,
+    &capstore_on_alloc, 0,
+    "Mark cap-writable pages CAPSTORE on allocation; trades revoker effort for "
+    "the expense of upgrading.");
+
 static inline void
 fault_page_release(vm_page_t *mp)
 {
@@ -306,6 +312,7 @@ vm_fault_soft_fast(struct faultstate *fs)
 #endif
 	int psind, rv;
 	vm_offset_t vaddr;
+	vm_prot_t realprot;
 
 	MPASS(fs->vp == NULL);
 	vaddr = fs->vaddr;
@@ -350,8 +357,20 @@ vm_fault_soft_fast(struct faultstate *fs)
 	}
 #endif
 	VM_OBJECT_ASSERT_CAP(fs->first_object, fs->prot);
-	rv = pmap_enter(fs->map->pmap, vaddr, m_map,
-	    VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot),
+
+	realprot = VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot);
+
+	/*
+	 * We might be upgrading a page previously mapped VM_PROT_WRITE to one
+	 * now mapped VM_PROT_WRITE | VM_PROT_WRITE_CAP.  Flag it as such.
+	 *
+	 * Importantly, realprot is exempt from vm_page_mask_cap_prot()!
+	 */
+	if ((realprot & (VM_PROT_WRITE | VM_PROT_WRITE_CAP)) ==
+	    (VM_PROT_WRITE | VM_PROT_WRITE_CAP))
+		vm_page_aflag_set(m_map, PGA_CAPSTORE);
+
+	rv = pmap_enter(fs->map->pmap, vaddr, m_map, realprot,
 	    fs->fault_type |
 	    PMAP_ENTER_NOSLEEP | (fs->wired ? PMAP_ENTER_WIRED : 0), psind);
 	if (rv != KERN_SUCCESS)
@@ -507,6 +526,8 @@ vm_fault_populate(struct faultstate *fs)
 		KASSERT((VM_PAGE_TO_PHYS(m) & (pagesizes[bdry_idx] - 1)) == 0,
 		    ("unaligned superpage m %p %#jx", m,
 		    (uintmax_t)VM_PAGE_TO_PHYS(m)));
+		if (fs->prot & VM_PROT_WRITE_CAP)
+			vm_page_aflag_set(m, PGA_CAPSTORE);
 		rv = pmap_enter(fs->map->pmap, vaddr, m, fs->prot,
 		    fs->fault_type | (fs->wired ? PMAP_ENTER_WIRED : 0) |
 		    PMAP_ENTER_LARGEPAGE, bdry_idx);
@@ -561,6 +582,8 @@ vm_fault_populate(struct faultstate *fs)
 		npages = atop(pagesizes[psind]);
 		for (i = 0; i < npages; i++) {
 			vm_fault_populate_check_page(&m[i]);
+			if (prot & VM_PROT_WRITE_CAP)
+				vm_page_aflag_set(&m[i], PGA_CAPSTORE);
 			vm_fault_dirty(fs, &m[i]);
 		}
 		prot = VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot);
@@ -629,7 +652,7 @@ int
 vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
     int fault_flags, int *signo, int *ucode)
 {
-	int result;
+	int result, segv_ucode;
 
 	MPASS(signo == NULL || ucode != NULL);
 #ifdef KTRACE
@@ -664,6 +687,11 @@ vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 			*ucode = BUS_OBJERR;
 			break;
 		case KERN_PROTECTION_FAILURE:
+			if ((fault_type & VM_PROT_WRITE_CAP) != 0)
+				segv_ucode = SEGV_STORETAG;
+			else
+				segv_ucode = SEGV_ACCERR;
+
 			if (prot_fault_translation == 0) {
 				/*
 				 * Autodetect.  This check also covers
@@ -673,7 +701,7 @@ vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 				if (SV_CURPROC_ABI() == SV_ABI_FREEBSD &&
 				    curproc->p_osrel >= P_OSREL_SIGSEGV) {
 					*signo = SIGSEGV;
-					*ucode = SEGV_ACCERR;
+					*ucode = segv_ucode;
 				} else {
 					*signo = SIGBUS;
 					*ucode = UCODE_PAGEFLT;
@@ -685,7 +713,7 @@ vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 			} else {
 				/* Always SIGSEGV mode. */
 				*signo = SIGSEGV;
-				*ucode = SEGV_ACCERR;
+				*ucode = segv_ucode;
 			}
 			break;
 		default:
@@ -982,9 +1010,11 @@ vm_fault_cow(struct faultstate *fs)
 		KASSERT(fs->first_object->flags & OBJ_HASCAP,
 		    ("%s: destination object %p doesn't have OBJ_HASCAP",
 		    __func__, fs->first_object));
-		if (fs->object->flags & OBJ_HASCAP)
+		if (fs->object->flags & OBJ_HASCAP) {
+			vm_page_aflag_set(fs->first_m, fs->m->a.flags &
+			    (PGA_CAPSTORE | PGA_CAPDIRTY));
 			pmap_copy_page_tags(fs->m, fs->first_m);
-		else
+		} else
 #endif
 			pmap_copy_page(fs->m, fs->first_m);
 
@@ -1166,6 +1196,9 @@ vm_fault_allocate(struct faultstate *fs)
 		return (KERN_RESOURCE_SHORTAGE);
 	}
 	fs->oom = 0;
+
+	if (capstore_on_alloc && (fs->prot & VM_PROT_WRITE_CAP))
+		vm_page_aflag_set(fs->m, PGA_CAPSTORE);
 
 	return (KERN_NOT_RECEIVER);
 }
@@ -1604,8 +1637,15 @@ RetryFault:
 	 * won't find it (yet).
 	 */
 	VM_OBJECT_ASSERT_CAP(fs.object, fs.prot);
-	pmap_enter(fs.map->pmap, vaddr, fs.m,
-	    VM_OBJECT_MASK_CAP_PROT(fs.object, fs.prot),
+
+	/*
+	 * Modulate VM_PROT_WRITE_CAP by fs.object's OBJ_HASCAP and fs.m's
+	 * PGA_CAPSTORE.
+	 */
+	vm_prot_t realprot = VM_OBJECT_MASK_CAP_PROT(fs.object, fs.prot);
+	realprot = vm_page_mask_cap_prot(fs.m, realprot);
+
+	pmap_enter(fs.map->pmap, vaddr, fs.m, realprot,
 	    fs.fault_type | (fs.wired ? PMAP_ENTER_WIRED : 0), 0);
 	if (faultcount != 1 && (fs.fault_flags & VM_FAULT_WIRE) == 0 &&
 	    fs.wired == 0)
@@ -2064,9 +2104,12 @@ again:
 			 * Preserve tags if the source page contains tags.
 			 * See longer discussion in vm_fault_cow.
 			 */
-			if (object->flags & OBJ_HASCAP)
+			if (object->flags & OBJ_HASCAP) {
+				/* Copy across CAPSTORE | CAPDIRTY state, too */
+				vm_page_aflag_set(dst_m, src_m->a.flags &
+				    (PGA_CAPSTORE | PGA_CAPDIRTY));
 				pmap_copy_page_tags(src_m, dst_m);
-			else
+			} else
 #endif
 				pmap_copy_page(src_m, dst_m);
 			VM_OBJECT_RUNLOCK(object);
@@ -2100,9 +2143,13 @@ again:
 		 * backing pages.
 		 */
 		if (vm_page_all_valid(dst_m)) {
+			vm_prot_t realprot;
+
 			VM_OBJECT_ASSERT_CAP(dst_object, prot);
-			pmap_enter(dst_map->pmap, vaddr, dst_m,
-			    VM_OBJECT_MASK_CAP_PROT(dst_object, prot),
+			realprot = VM_OBJECT_MASK_CAP_PROT(dst_object, prot);
+			realprot = vm_page_mask_cap_prot(dst_m, realprot);
+
+			pmap_enter(dst_map->pmap, vaddr, dst_m, realprot,
 			    access | (upgrade ? PMAP_ENTER_WIRED : 0), 0);
 		}
 

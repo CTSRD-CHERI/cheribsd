@@ -5465,6 +5465,61 @@ vm_page_assert_pga_writeable(vm_page_t m, uint16_t bits)
 	if (!vm_page_xbusied(m))
 		VM_OBJECT_ASSERT_BUSY(m->object);
 }
+
+#if __has_feature(capabilities)
+void
+vm_page_assert_pga_capmeta_clear(vm_page_t m, uint16_t bits)
+{
+	if ((bits & (PGA_CAPDIRTY | PGA_CAPSTORE)) == 0)
+		return;
+
+	if (vm_page_xbusied(m)) {
+		/* If it's busy at all, it's busy by us */
+		vm_page_assert_xbusied(m);
+	} else {
+		/* If it's not busy, we hold its object's lock */
+		VM_OBJECT_ASSERT_LOCKED(m->object);
+	}
+}
+
+/* Ensure that mdst is at least as capdirty as msrc */
+void
+vm_page_assert_pga_capmeta_copy(vm_page_t msrc, vm_page_t mdst)
+{
+	vm_page_astate_t msrca = vm_page_astate_load(msrc);
+	vm_page_astate_t mdsta = vm_page_astate_load(mdst);
+	KASSERT((mdsta.flags & msrca.flags &
+	    (PGA_CAPSTORE | PGA_CAPDIRTY))
+	    == (msrca.flags & (PGA_CAPSTORE | PGA_CAPDIRTY)),
+	    ("pmap_copy_page_internal bad capdirty metadata"));
+}
+
+/*
+ * When entering a page into a pmap, ensure that
+ *
+ *   1) prot & VM_PROT_WRITE_CAP implies PGA_CAPSTORE
+ *   2) PGA_CAPDIRTY implies PGA_CAPSTORE
+ *   3) prot & VM_PROT_WRITE_CAP implies prot & VM_PROT_WRITE
+ *      (which is not strictly PGA_CAP*, but this is a convenient place)
+ */
+void
+vm_page_assert_pga_capmeta_pmap_enter(vm_page_t m, vm_prot_t prot)
+{
+	vm_page_astate_t mas = vm_page_astate_load(m);
+
+	KASSERT((prot & VM_PROT_WRITE_CAP) == 0 ||
+	    (mas.flags & PGA_CAPSTORE) != 0,
+	    ("pmap inserting VM_PROT_WRITE_CAP w/o PGA_CAPSTORE m=%p", m));
+
+	KASSERT((mas.flags & PGA_CAPDIRTY) == 0 ||
+	    (mas.flags & PGA_CAPSTORE) != 0,
+	    ("pmap inserting CAPDIRTY w/o CAPSTORE m=%p", m));
+
+	KASSERT((prot & VM_PROT_WRITE_CAP) == 0 ||
+	    (prot & VM_PROT_WRITE) != 0,
+	    ("pmap inserting VM_PROT_WRITE_CAP w/o VM_PROT_WRITE m=%p", m));
+}
+#endif
 #endif
 
 #include "opt_ddb.h"

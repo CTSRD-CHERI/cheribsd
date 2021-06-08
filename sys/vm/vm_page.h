@@ -433,6 +433,21 @@ extern struct mtx_padalign pa_lock[];
  * PGA_SWAP_FREE is used to defer freeing swap space to the pageout daemon
  * when the context that dirties the page does not have the object write lock
  * held.
+ *
+ * PGA_CAPSTORE indicates that the page might be holding capabilities and might
+ * be mapped as permitting capability stores (if PGA_WRITABLE is also set).  If
+ * clear, the page certainly bears no capabilities (and will not come to hold
+ * them without a trip through vm_fault).  Clearing this bit requires that the
+ * page be being freed (that is, going through the laundry) or that the system
+ * has verified the absense of capabilities and cap-store-permitting mappings in
+ * a race-free way.  For example, the paging code ensures that no stores to a
+ * page are possible and measures all capability tags as part of page-out; it is
+ * therefore in a position to dictate this bit's value on page-in.
+ *
+ * PGA_CAPDIRTY indicates that a capability was "recently" written to this page
+ * and the underlying mapping has been removed, reclaimed, or synchronized back
+ * to the MI layer.  The MD layer sets this bit happens without the page lock
+ * held, but clearing it requires synchronization, as with PGA_CAPSTORE.
  */
 #define	PGA_WRITEABLE	0x0001		/* page may be mapped writeable */
 #define	PGA_REFERENCED	0x0002		/* page has been referenced */
@@ -444,6 +459,8 @@ extern struct mtx_padalign pa_lock[];
 #define	PGA_NOSYNC	0x0080		/* do not collect for syncer */
 #define	PGA_SWAP_FREE	0x0100		/* page with swap space was dirtied */
 #define	PGA_SWAP_SPACE	0x0200		/* page has allocated swap space */
+#define	PGA_CAPSTORE 	0x4000		/* Fast-path capdirty */
+#define	PGA_CAPDIRTY	0x8000		/* page targeted by cap store */
 
 #define	PGA_QUEUE_OP_MASK	(PGA_DEQUEUE | PGA_REQUEUE | PGA_REQUEUE_HEAD)
 #define	PGA_QUEUE_STATE_MASK	(PGA_ENQUEUED | PGA_QUEUE_OP_MASK)
@@ -788,9 +805,29 @@ void vm_page_assert_pga_writeable(vm_page_t m, uint16_t bits);
 	} while (!atomic_cmpset_int(&(m)->busy_lock, _busy_lock,	\
 	    (_busy_lock & VPB_BIT_FLAGMASK) | VPB_CURTHREAD_EXCLUSIVE)); \
 } while (0)
+#if __has_feature(capabilities)
+void vm_page_assert_pga_capmeta_clear(vm_page_t m, uint16_t bits);
+#define	VM_PAGE_ASSERT_PGA_CAPMETA_CLEAR(m, bits)			\
+	vm_page_assert_pga_capmeta_clear(m, bits)
+
+void vm_page_assert_pga_capmeta_copy(vm_page_t msrc, vm_page_t mdst);
+#define	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst)			\
+	vm_page_assert_pga_capmeta_copy(msrc, mdst)
+
+void vm_page_assert_pga_capmeta_pmap_enter(vm_page_t m, vm_prot_t prot);
+#define VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, p)                     \
+	vm_page_assert_pga_capmeta_pmap_enter(m, p)
+#else
+#define	VM_PAGE_ASSERT_PGA_CAPMETA_CLEAR(m, bits)	(void)0
+#define	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst)	(void)0
+#define	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, p)	(void)0
+#endif
 #else
 #define	VM_PAGE_OBJECT_BUSY_ASSERT(m)	(void)0
 #define	VM_PAGE_ASSERT_PGA_WRITEABLE(m, bits)	(void)0
+#define	VM_PAGE_ASSERT_PGA_CAPMETA_CLEAR(m, bits)	(void)0
+#define	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst)	(void)0
+#define	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, p)	(void)0
 #define	vm_page_xbusy_claim(m)
 #endif
 
@@ -837,6 +874,8 @@ vm_page_aflag_clear(vm_page_t m, uint16_t bits)
 {
 	uint32_t *addr, val;
 
+	VM_PAGE_ASSERT_PGA_CAPMETA_CLEAR(m, bits);
+
 	/*
 	 * Access the whole 32-bit word containing the aflags field with an
 	 * atomic update.  Parallel non-atomic updates to the other fields
@@ -868,6 +907,25 @@ vm_page_aflag_set(vm_page_t m, uint16_t bits)
 }
 
 /*
+ * When attempting to map the page m with permissions prot, it's possible that
+ * we need to inhibit capability stores as part of capdirty tracking.  Pages
+ * lacking PGA_CAPSTORE are known not to contain capabilities and must go
+ * through the vm fault machinery even if the permissions dictated by the entry
+ * (->protection) and object (->flags & OBJ_HASCAP) containing this page
+ * nominally authorize capability store.
+ */
+static inline vm_prot_t
+vm_page_mask_cap_prot(vm_page_t m, vm_prot_t prot)
+{
+
+	if (vm_page_astate_load(m).flags & PGA_CAPSTORE) {
+		return prot;
+	} else {
+		return prot & ~VM_PROT_WRITE_CAP;
+	}
+}
+
+/*
  *	vm_page_dirty:
  *
  *	Set all bits in the page's dirty field.
@@ -887,6 +945,16 @@ vm_page_dirty(vm_page_t m)
 #else
 	m->dirty = VM_PAGE_BITS_ALL;
 #endif
+}
+
+static __inline void
+vm_page_capdirty(vm_page_t m)
+{
+
+	KASSERT(vm_page_astate_load(m).flags & PGA_CAPSTORE,
+		("vm_page_capdirty w/o PGA_CAPSTORE m=%p", m));
+
+	vm_page_aflag_set(m, PGA_CAPDIRTY);
 }
 
 /*

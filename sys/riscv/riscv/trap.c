@@ -345,6 +345,10 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		ftype = VM_PROT_WRITE;
 	} else if (frame->tf_scause == SCAUSE_INST_PAGE_FAULT) {
 		ftype = VM_PROT_EXECUTE;
+#if __has_feature(capabilities)
+	} else if (frame->tf_scause == SCAUSE_STORE_AMO_CAP_PAGE_FAULT) {
+		ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
+#endif
 	} else {
 		ftype = VM_PROT_READ;
 	}
@@ -418,6 +422,9 @@ do_trap_supervisor(struct trapframe *frame)
 	case SCAUSE_STORE_PAGE_FAULT:
 	case SCAUSE_LOAD_PAGE_FAULT:
 	case SCAUSE_INST_PAGE_FAULT:
+#if __has_feature(capabilities)
+	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
+#endif
 		page_fault_handler(frame, 0);
 		break;
 	case SCAUSE_BREAKPOINT:
@@ -440,7 +447,6 @@ do_trap_supervisor(struct trapframe *frame)
 		break;
 #if __has_feature(capabilities)
 	case SCAUSE_LOAD_CAP_PAGE_FAULT:
-	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
 	case SCAUSE_CHERI:
 		if (curthread->td_pcb->pcb_onfault != 0) {
 			frame->tf_a[0] = EPROT;
@@ -508,6 +514,9 @@ do_trap_user(struct trapframe *frame)
 	case SCAUSE_STORE_PAGE_FAULT:
 	case SCAUSE_LOAD_PAGE_FAULT:
 	case SCAUSE_INST_PAGE_FAULT:
+#if __has_feature(capabilities)
+	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
+#endif
 		page_fault_handler(frame, 1);
 		break;
 	case SCAUSE_ECALL_USER:
@@ -548,12 +557,6 @@ do_trap_user(struct trapframe *frame)
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
-		    (uintcap_t)frame->tf_stval, exception, 0);
-		break;
-	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
-		if (log_user_cheri_exceptions)
-			dump_cheri_exception(frame);
-		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
 		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
 	case SCAUSE_CHERI:
