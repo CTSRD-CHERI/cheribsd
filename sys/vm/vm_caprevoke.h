@@ -91,7 +91,6 @@ void vm_caprevoke_info_page(struct vm_map *map,
 
 enum {
 	/* Set externally, checked per page */
-	VM_CAPREVOKE_REDIRTY     = 0x02, /* capstore -> capdirty */
 	VM_CAPREVOKE_INCREMENTAL = 0x04, /* Scan capdirty, not capstore */
 	VM_CAPREVOKE_BARRIERED   = 0x08, /* world is stopped (debug) */
 	VM_CAPREVOKE_LOAD_SIDE   = 0x10, /* this is the load-side scan */

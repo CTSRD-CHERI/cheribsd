@@ -583,22 +583,6 @@ ok:
 		!(flags & VM_CAPREVOKE_BARRIERED),
 	    ("Capdirty page after visit with world stopped?"));
 
-	/*
-	 * When we are closing a revocation epoch, we transfer
-	 * PGA_CAPSTORE to PGA_CAPDIRTY so that we don't take
-	 * as many faults in the inter-epoch period.  We know that
-	 * we're going to visit all the PGA_CAPSTORE-bearing
-	 * pages when we open the next epoch anyway, so there's no
-	 * point in lazily setting their PGA_CAPDIRTY flags.
-	 *
-	 * XXX This isn't actually as useful as might be desired.
-	 * Only newly-installed PMAP entries will be so dirtied,
-	 * and it's almost surely not worth going and locking the
-	 * pmap to adjust the PTE.
-	 */
-	if ((flags & VM_CAPREVOKE_REDIRTY) && (mas.flags & PGA_CAPSTORE))
-		vm_page_capdirty(m);
-
 	*ooff = ioff + pagesizes[m->psind];
 	if (mwired)
 		vm_caprevoke_unwire_in_situ(m);

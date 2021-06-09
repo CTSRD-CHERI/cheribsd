@@ -32,11 +32,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_caprevoke.h>
 #include <sys/syscallsubr.h>
 
-static bool caprevoke_last_redirty = 1;
-SYSCTL_BOOL(_vm, OID_AUTO, caprevoke_last_redirty, CTLFLAG_RW,
-    &caprevoke_last_redirty, 0,
-    "XXX");
-
 /*
  * When revoking capabilities, we have to visit several kernel hoarders.
  *
@@ -454,8 +449,6 @@ fast_out:
 		 */
 		int crflags = VM_CAPREVOKE_SYNC_CD | VM_CAPREVOKE_BARRIERED;
 
-		crflags |= (caprevoke_last_redirty) ?  VM_CAPREVOKE_REDIRTY : 0;
-
 		/*
 		 * This pass can be incremental if we had previously done an
 		 * init pass, either just now or earlier.  In either case,
@@ -532,9 +525,6 @@ fast_out:
 				int crflags;
 ls_close_already_inited:
 				crflags = VM_CAPREVOKE_LOAD_SIDE;
-
-				crflags |= (caprevoke_last_redirty) ?
-				    VM_CAPREVOKE_REDIRTY : 0;
 
 				/* We're on the load side; walk the VM again. */
 				res = vm_caprevoke_pass(&vmcrc, crflags);
