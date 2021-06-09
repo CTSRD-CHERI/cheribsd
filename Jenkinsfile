@@ -58,7 +58,7 @@ def buildImageAndRunTests(params, String suffix) {
     if (!GlobalVars.isTestSuiteJob && (suffix.startsWith('mips64') || suffix.startsWith('riscv64'))) {
         stage("Building MFS_ROOT kernels") {
             sh label: "Building MFS_ROOT disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-mfs-root-${suffix} ${params.extraArgs}"
-            sh label: "Building MFS_ROOT kernels", script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd-mfs-root-kernel-${suffix}/build-fpga-kernels ${params.extraArgs}"
+            sh label: "Building MFS_ROOT kernels", script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd/build-bench-kernels --cheribsd/build-fpga-kernels ${params.extraArgs}"
             // Move MFS_ROOT kernels into tarball/ so they aren't deleted
             sh "mv -fv kernel-${suffix}* tarball/"
         }
@@ -174,7 +174,8 @@ selectedArchitectures.each { suffix ->
         def cheribuildArgs = ["'--cheribsd/build-options=${extraBuildOptions}'",
                               '--keep-install-dir',
                               '--install-prefix=/rootfs',
-                              '--cheribsd/build-tests',]
+                              '--cheribsd/build-tests',
+                              '--cheribsd/build-bench-kernels']
         if (GlobalVars.isTestSuiteJob) {
             cheribuildArgs.add('--cheribsd/debug-info')
         } else {
