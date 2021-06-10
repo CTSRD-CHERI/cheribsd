@@ -1509,12 +1509,13 @@ user_poll(struct thread *td, struct pollfd * __capability fds, u_int nfds,
 	return (kern_poll(td, fds, nfds, tsp, NULL));
 }
 
+/*
+ * kfds points to an array in the kernel.
+ */
 int
-kern_poll(struct thread *td, struct pollfd * __capability ufds, u_int nfds,
+kern_poll_kfds(struct thread *td, struct pollfd *kfds, u_int nfds,
     struct timespec *tsp, sigset_t *uset)
 {
-	struct pollfd *kfds;
-	struct pollfd stackfds[32];
 	sbintime_t sbt, precision, tmp;
 	time_t over;
 	struct timespec ts;
@@ -1545,28 +1546,11 @@ kern_poll(struct thread *td, struct pollfd * __capability ufds, u_int nfds,
 	} else
 		sbt = -1;
 
-	/*
-	 * This is kinda bogus.  We have fd limits, but that is not
-	 * really related to the size of the pollfd array.  Make sure
-	 * we let the process use at least FD_SETSIZE entries and at
-	 * least enough for the system-wide limits.  We want to be reasonably
-	 * safe, but not overly restrictive.
-	 */
-	if (nfds > maxfilesperproc && nfds > FD_SETSIZE) 
-		return (EINVAL);
-	if (nfds > nitems(stackfds))
-		kfds = mallocarray(nfds, sizeof(*kfds), M_TEMP, M_WAITOK);
-	else
-		kfds = stackfds;
-	error = copyin(ufds, kfds, nfds * sizeof(*kfds));
-	if (error)
-		goto done;
-
 	if (uset != NULL) {
 		error = kern_sigprocmask(td, SIG_SETMASK, uset,
 		    &td->td_oldsigmask, 0);
 		if (error)
-			goto done;
+			return (error);
 		td->td_pflags |= TDP_OLDMASK;
 		/*
 		 * Make sure that ast() is called on return to
@@ -1593,20 +1577,11 @@ kern_poll(struct thread *td, struct pollfd * __capability ufds, u_int nfds,
 	}
 	seltdclear(td);
 
-done:
 	/* poll is not restarted after signals... */
 	if (error == ERESTART)
 		error = EINTR;
 	if (error == EWOULDBLOCK)
 		error = 0;
-	if (error == 0) {
-		error = pollout(td, kfds, ufds, nfds);
-		if (error)
-			goto out;
-	}
-out:
-	if (nfds > nitems(stackfds))
-		free(kfds, M_TEMP);
 	return (error);
 }
 
@@ -1640,12 +1615,52 @@ user_ppoll(struct thread *td, struct pollfd * __capability fds, u_int nfds,
 		ssp = &set;
 	} else
 		ssp = NULL;
-	/*
-	 * fds is still a pointer to user space. kern_poll() will
-	 * take care of copyin that array to the kernel space.
-	 */
-
 	return (kern_poll(td, fds, nfds, tsp, ssp));
+}
+
+/*
+ * ufds points to an array in user space.
+ */
+int
+kern_poll(struct thread *td, struct pollfd * __capability ufds, u_int nfds,
+    struct timespec *tsp, sigset_t *set)
+{
+	struct pollfd *kfds;
+	struct pollfd stackfds[32];
+	int error;
+
+	if (kern_poll_maxfds(nfds))
+		return (EINVAL);
+	if (nfds > nitems(stackfds))
+		kfds = mallocarray(nfds, sizeof(*kfds), M_TEMP, M_WAITOK);
+	else
+		kfds = stackfds;
+	error = copyin(ufds, kfds, nfds * sizeof(*kfds));
+	if (error != 0)
+		goto out;
+
+	error = kern_poll_kfds(td, kfds, nfds, tsp, set);
+	if (error == 0)
+		error = pollout(td, kfds, ufds, nfds);
+
+out:
+	if (nfds > nitems(stackfds))
+		free(kfds, M_TEMP);
+	return (error);
+}
+
+bool
+kern_poll_maxfds(u_int nfds)
+{
+
+	/*
+	 * This is kinda bogus.  We have fd limits, but that is not
+	 * really related to the size of the pollfd array.  Make sure
+	 * we let the process use at least FD_SETSIZE entries and at
+	 * least enough for the system-wide limits.  We want to be reasonably
+	 * safe, but not overly restrictive.
+	 */
+	return (nfds > maxfilesperproc && nfds > FD_SETSIZE);
 }
 
 static int
