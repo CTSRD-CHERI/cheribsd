@@ -76,7 +76,18 @@
 #define	cheri_setbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
 #define	cheri_setboundsexact(x, y)	__builtin_cheri_bounds_set_exact((x), (y))
 
-#define	cheri_is_subset(x, y)	__builtin_cheri_subset_test(x, y)
+/*
+ * Soft implementation of cheri_subset_test().
+ * Test whether a capability is a subset of another.
+ * NOTE: This is to be replaced by LLVM intrinsic once the intrinsic and
+ * related instruction arguments are stable.
+ */
+#define	cheri_is_subset(parent, ptr)					\
+	(cheri_gettag(parent) == cheri_gettag(ptr) &&			\
+	 cheri_getbase(ptr) >= cheri_getbase(parent) &&			\
+	 cheri_gettop(ptr) <= cheri_gettop(parent) &&			\
+	 (cheri_getperm(ptr) & cheri_getperm(parent)) == cheri_getperm(ptr))
+
 #define	cheri_is_null_derived(x)					\
 	__builtin_cheri_equal_exact((uintcap_t)cheri_getaddress(x), x)
 
