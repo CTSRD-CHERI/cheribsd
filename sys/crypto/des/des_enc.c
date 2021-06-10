@@ -76,7 +76,6 @@ void des_encrypt1(DES_LONG *data, des_key_schedule ks, int enc)
 #ifndef DES_UNROLL
 	int i;
 #endif
-	DES_LONG *s;
 
 	r=data[0];
 	l=data[1];
@@ -93,7 +92,7 @@ void des_encrypt1(DES_LONG *data, des_key_schedule ks, int enc)
 	r=ROTATE(r,29)&0xffffffffL;
 	l=ROTATE(l,29)&0xffffffffL;
 
-	s=ks->ks.deslong;
+#define s(S)	ks[(S)>>1].ks.deslong[(S)&1]
 	/* I don't know if it is worth the effort of loop unrolling the
 	 * inner loop */
 	if (enc)
@@ -163,6 +162,7 @@ void des_encrypt1(DES_LONG *data, des_key_schedule ks, int enc)
 	data[0]=l;
 	data[1]=r;
 	l=r=t=u=0;
+#undef s
 }
 
 void des_encrypt2(DES_LONG *data, des_key_schedule ks, int enc)
@@ -174,7 +174,6 @@ void des_encrypt2(DES_LONG *data, des_key_schedule ks, int enc)
 #ifndef DES_UNROLL
 	int i;
 #endif
-	DES_LONG *s;
 
 	r=data[0];
 	l=data[1];
@@ -189,7 +188,7 @@ void des_encrypt2(DES_LONG *data, des_key_schedule ks, int enc)
 	r=ROTATE(r,29)&0xffffffffL;
 	l=ROTATE(l,29)&0xffffffffL;
 
-	s=ks->ks.deslong;
+#define s(S)	ks[(S)>>1].ks.deslong[(S)&1]
 	/* I don't know if it is worth the effort of loop unrolling the
 	 * inner loop */
 	if (enc)
@@ -254,6 +253,7 @@ void des_encrypt2(DES_LONG *data, des_key_schedule ks, int enc)
 	data[0]=ROTATE(l,3)&0xffffffffL;
 	data[1]=ROTATE(r,3)&0xffffffffL;
 	l=r=t=u=0;
+#undef s
 }
 
 void des_encrypt3(DES_LONG *data, des_key_schedule ks1, des_key_schedule ks2,
