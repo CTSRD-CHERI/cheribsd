@@ -59,7 +59,7 @@ GlobalVars.selectedPurecapKernelArchitectures = params.purecapKernelArchitecture
 def runTestStep(params, String testSuffix, String suffix, testExtraArgs, extraArgs) {
     testExtraArgs.add("--test-output-dir=\$WORKSPACE/test-results/${testSuffix}")
     sh label: "Run ${testSuffix} tests in QEMU", script: """
-rm -rf test-results && mkdir -p test-results/${testSuffix}
+rm -rf test-results/${testSuffix} && mkdir -p test-results/${testSuffix}
 # The test script returns 2 if the tests step is unstable, any other non-zero exit code is a fatal error
 exit_code=0
 ./cheribuild/jenkins-cheri-build.py --test run-${suffix} '--test-extra-args=${testExtraArgs.join(" ")}' ${params.extraArgs} ${extraArgs.join(" ")} --test-ssh-key \$WORKSPACE/id_ed25519.pub || exit_code=\$?
