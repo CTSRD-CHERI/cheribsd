@@ -212,8 +212,6 @@ __DEFAULT_NO_OPTIONS = \
     REPRODUCIBLE_BUILD \
     RPCBIND_WARMSTART_SUPPORT \
     SORT_THREADS \
-    SVN \
-    SVNLITE \
     ZONEINFO_LEAPSECONDS_SUPPORT \
 
 __DEFAULT_YES_OPTIONS+=	\
@@ -507,10 +505,6 @@ MK_PMC:=	no
 MK_BSDINSTALL:=	no
 .endif
 
-.if ${MK_FILE} == "no"
-MK_SVNLITE:=	no
-.endif
-
 .if ${MK_MAIL} == "no"
 MK_MAILWRAPPER:= no
 MK_SENDMAIL:=	no
@@ -533,8 +527,6 @@ MK_KERBEROS:=	no
 MK_KERBEROS_SUPPORT:=	no
 MK_LDNS:=	no
 MK_PKGBOOTSTRAP:=	no
-MK_SVN:=		no
-MK_SVNLITE:=		no
 MK_ZFS:=	no
 .endif
 
