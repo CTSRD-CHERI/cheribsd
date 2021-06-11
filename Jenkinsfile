@@ -58,7 +58,7 @@ GlobalVars.selectedPurecapKernelArchitectures = params.purecapKernelArchitecture
 
 def runTestStep(params, String testSuffix, String suffix, testExtraArgs, extraArgs) {
     testExtraArgs.add("--test-output-dir=\$WORKSPACE/test-results/${testSuffix}")
-    sh label: "Run tests in QEMU", script: """
+    sh label: "Run ${testSuffix} tests in QEMU", script: """
 rm -rf test-results && mkdir -p test-results/${testSuffix}
 # The test script returns 2 if the tests step is unstable, any other non-zero exit code is a fatal error
 exit_code=0
@@ -127,20 +127,34 @@ def runTests(params, String suffix) {
         testExtraArgs += ['--kyua-tests-files', '/usr/tests/bin/cat/Kyuafile']
     }
 
-    stage("Running tests") {
+    stage("Test setup") {
         // copy qemu archive and run directly on the host
         dir("qemu-${params.buildOS}") { deleteDir() }
         copyArtifacts projectName: "qemu/qemu-cheri", filter: "qemu-${params.buildOS}/**", target: '.',
                       fingerprintArtifacts: false
         sh label: 'generate SSH key',
            script: 'test -e $WORKSPACE/id_ed25519 || ssh-keygen -t ed25519 -N \'\' -f $WORKSPACE/id_ed25519 < /dev/null'
-
         sh 'find qemu* && ls -lah'
+    }
 
-        runTestStep(params, suffix, suffix, testExtraArgs, [])
-        if (GlobalVars.selectedPurecapKernelArchitectures.contains(suffix) && !GlobalVars.isTestSuiteJob) {
+    // Run test configurations in parallel (if there is be more than one).
+    if (GlobalVars.selectedPurecapKernelArchitectures.contains(suffix)) {
+        def testSteps = [:]
+        testSteps["Test ${suffix} hybrid kernel"] = { ->
+            runTestStep(params, "${suffix}-hybrid-kernel", suffix, testExtraArgs,
+                        ["--run-${suffix}/kernel-abi hybrid"])
+        }
+        testSteps["Test ${suffix} purecap kernel"] = { ->
             runTestStep(params, "${suffix}-purecap-kernel", suffix, testExtraArgs,
                         ["--run-${suffix}/kernel-abi purecap"])
+        }
+        testSteps.failFast = false
+        parallel testSteps
+    } else {
+        // Otherwise run it directly here in a stage() instead of parallel() to improve
+        // the Jenkins visualization.
+        stage("Test ${suffix}") {
+            runTestStep(params, "${suffix}", suffix, testExtraArgs, [])
         }
     }
 }
