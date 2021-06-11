@@ -525,7 +525,8 @@ kstack_cache_init(void *null)
 	    atop(VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS));
 	vm_object_set_flag(kstack_object, OBJ_HASCAP);
 	kstack_cache = uma_zcache_create("kstack_cache",
-	    kstack_pages * PAGE_SIZE, NULL, NULL, NULL, NULL,
+	    (kstack_pages + KSTACK_GUARD_PAGES) * PAGE_SIZE,
+	    NULL, NULL, NULL, NULL,
 	    kstack_import, kstack_release, NULL,
 	    UMA_ZONE_FIRSTTOUCH);
 	kstack_cache_size = imax(128, mp_ncpus * 4);

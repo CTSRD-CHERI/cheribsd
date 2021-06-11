@@ -1,0 +1,245 @@
+.\"-
+.\" Copyright (c) 1989, 1991, 1993
+.\"	The Regents of the University of California.  All rights reserved.
+.\" Copyright (c) 2020 SRI International
+.\"
+.\" This software was developed by SRI International and the University of
+.\" Cambridge Computer Laboratory (Department of Computer Science and
+.\" Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
+.\" DARPA SSITH research programme.
+.\"
+.\" This code is derived from software contributed to Berkeley by
+.\" the American National Standards Committee X3, on Information
+.\" Processing Systems.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the University nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd June 8, 2021
+.Dt STRFCAP 3
+.Os
+.Sh NAME
+.Nm strfcap
+.Nd format decoded CHERI capability
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In cheri/cheric.h
+.Ft ssize_t
+.Fo strfcap
+.Fa "char * restrict buf"
+.Fa "size_t maxsize"
+.Fa "const char * restrict format"
+.Fa "uintcap_t cap"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn strfcap
+function formats information from decoding
+.Fa cap
+into the buffer
+.Fa buf
+according to the string pointed to by
+.Fa format .
+.Pp
+The
+.Fa format
+string consists of zero or more conversion specifications and
+ordinary characters.
+All ordinary characters are copied directly into the buffer.
+A conversion specification consists of a percent sign
+.Dq Ql %
+followed by optional precision and flags and terminated by
+a single character conversion specifier.
+.Pp
+No more than
+.Fa maxsize
+characters will be placed into the array.
+So long as
+.Fa buf
+is a valid pointer to at least
+.Fa maxsize
+bytes of memory, it will be NUL terminated when
+.Nm
+returns.
+.Pp
+The conversion specifications are copied to the buffer after expansion
+as follows:
+.Bl -tag -width "xxxx"
+.It Cm \&%a
+is replaced by address of the capability.
+.It Cm \&%A
+is replaced by a textual representation of capablity attributes
+enclosed in parentheses.
+Zero or more of the following attributes are included:
+.Pp
+.Bl -tag -compact -width invalid
+.It invalid
+Capability's tag is clear.
+.It sentry
+Capability is a sealed entry.
+.It sealed
+Capability is sealed but not a sealed entry.
+.El
+.Pp
+If no attributes are present, the field is omitted.
+.It Cm \&%b
+is replaced by the base address of the capablity.
+.It Cm \&%B
+is replaced by the binary representation of the capability (excluding
+the tag) in hexadecimal form.
+.It Cm \&%C
+if
+.Fa cap
+is NULL-derived this is equivalent to
+.Ql %#xa .
+If
+.Fa cap
+is not NULL-derived it is equivalent to
+.Ql %#xa [%P,%#xb-%%xt]%? %A .
+This is equivalent to
+the
+.Ql %#p
+format of
+.Xr printf 3 .
+.It Cm \&%l
+is replaced by the length of the capability.
+.It Cm \&%o
+is replaced by the offset of the capability.
+.It Cm \&%p
+is replaced by the raw permissions in hexadecimal format.
+.It Cm \&%P
+is replaced by an abbreviated textual representation of permissions
+listing zero or more of the following characters:
+.Pp
+.Bl -tag -compact -width W
+.It r
+LOAD permission
+.It w
+STORE permission
+.It x
+EXECUTE permission
+.It R
+LOAD_CAP permission
+.It W
+STORE_CAP permission
+.It E
+EXECUTIVE permission (Morello only)
+.El
+.It Cm \&%s
+is replaced by the numeric type of the capability.
+.It Cm \&%S
+is replaced by the numeric type of the capability unless the capability
+is a sentry or unsealed in which case
+it is replaced by
+.Ql <sentry>
+or
+.Ql <unsealed>
+respectively.
+.It Cm \&%t
+is replaced by the top address of the capability.
+.It Cm \&%T
+is a pseudo operation causing the capability to be treated as tagged
+in future expansions and is replaced by the empty string.
+.It Cm \&%v
+is replaced by the binary value of the tag (mnemonic: valid bit).
+.It Cm \&%?
+all text between this
+.Ql %?
+and the next
+.Ql %
+expression is copied to
+.Fa buf
+if the next
+.Ql %
+expression produces non-empty output.
+.It Cm \&%%
+is replaced by
+.Ql % .
+.El
+.Pp
+When formatting plain numbers with
+.Cm a , b , l , o , s , t ,
+and
+.Cm v
+the following flags may be used:
+.Bl -tag -width "xxx"
+.It Cm \&#
+When formatting in hexadecimal,
+.Ql 0x
+(or
+.Ql OX
+for
+.Cm X
+conversions)
+is prepended to the output.
+.It Cm \&-
+When combined with a field width, padding is placed to the right of the
+field.
+.It Cm \&0
+Zero padding.
+As with the
+.Xr printf 3
+Cm 0
+flag.
+.It Cm \&x
+Print the number in hexadecimal with lowercase letters.
+.It Cm \&X
+Print the number in hexadecimal with uppercase letters.
+.El
+.Pp
+Additionally, an optional decimal string field with may be specifided as
+well as a minimum precision starting with a period
+.Cm \&.
+followed by a decimal digit string.
+Width, precision,
+.Cm # , - ,
+and
+.Cm 0
+flags apply to the
+.Cm C
+when formatting a null-derived capability.
+.Sh RETURN VALUES
+The
+.Nm
+function returns the number of characters that would have been printed
+if the
+.Fa size
+were unlimted
+(not including the trailing
+.Ql \e0
+used to end output to strings).
+This function returns a negative number if an error occurs.
+.Sh SEE ALSO
+.Xr printf 3
+.Sh AUTHORS
+This software and this manual page were
+developed by SRI International and the University of Cambridge Computer
+Laboratory (Department of Computer Science and Technology) under
+contract
+.Pq HR0011-18-C-0016
+.Pq Do ECATS Dc ,
+as part of the DARPA SSITH research programme.
+.Sh BUGS
+Not all possible erronious input patterns are detected.

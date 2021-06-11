@@ -1005,11 +1005,11 @@ vmem_import(vmem_t *vm, vmem_size_t size, vmem_size_t align, int flags)
  */
 static int
 vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
-    vmem_size_t phase, vmem_size_t nocross, vmem_addr_t minaddr,
-    vmem_addr_t maxaddr, vmem_addr_t *addrp)
+    vmem_size_t phase, vmem_size_t nocross, vmem_offset_t minaddr,
+    vmem_offset_t maxaddr, vmem_addr_t *addrp)
 {
-	vmem_addr_t start;
-	vmem_addr_t end;
+	vmem_offset_t start;
+	vmem_offset_t end;
 
 	MPASS(size > 0);
 	MPASS(bt->bt_size >= size); /* caller's responsibility */
@@ -1039,14 +1039,14 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 		MPASS(align < nocross);
 		start = VMEM_ALIGNUP(start - phase, nocross) + phase;
 	}
-	if (start <= end && (ptraddr_t)end - (ptraddr_t)start >= size - 1) {
-		MPASS(((ptraddr_t)start & (align - 1)) == phase);
+	if (start <= end && end - start >= size - 1) {
+		MPASS((start & (align - 1)) == phase);
 		MPASS(!VMEM_CROSS_P(start, start + size - 1, nocross));
 		MPASS(minaddr <= start);
 		MPASS(maxaddr == 0 || start + size - 1 <= maxaddr);
-		MPASS(bt->bt_start <= start);
-		MPASS((ptraddr_t)BT_END(bt) - (ptraddr_t)start >= size - 1);
-		*addrp = start;
+		MPASS((vmem_offset_t)bt->bt_start <= start);
+		MPASS((vmem_offset_t)BT_END(bt) - start >= size - 1);
+		*addrp = cheri_kern_setaddress(bt->bt_start, start);
 
 		return (0);
 	}
@@ -1472,7 +1472,7 @@ vmem_alloc(vmem_t *vm, vmem_size_t size, int flags, vmem_addr_t *addrp)
 int
 vmem_xalloc(vmem_t *vm, const vmem_size_t size0, vmem_size_t align,
     const vmem_size_t phase, const vmem_size_t nocross,
-    const vmem_addr_t minaddr, const vmem_addr_t maxaddr, int flags,
+    const vmem_offset_t minaddr, const vmem_offset_t maxaddr, int flags,
     vmem_addr_t *addrp)
 {
 	const vmem_size_t size = vmem_roundup_size(vm, size0);

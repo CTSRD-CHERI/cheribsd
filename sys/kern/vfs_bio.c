@@ -1171,7 +1171,7 @@ bufinit(void)
 
 	/* finally, initialize each buffer header and stick on empty q */
 	for (i = 0; i < nbuf; i++) {
-		bp = &buf[i];
+		bp = cheri_kern_setboundsexact(buf + i, sizeof(*buf));
 		bzero(bp, sizeof *bp);
 		bp->b_flags = B_INVAL;
 		bp->b_rcred = NOCRED;

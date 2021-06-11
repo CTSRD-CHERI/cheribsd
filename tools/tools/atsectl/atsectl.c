@@ -290,7 +290,8 @@ set(char *eaddrstr)
 int
 main(int argc, char **argv)
 {
-	char ch, *s;
+	char *s;
+	int ch;
 
 	s = NULL;
 	while ((ch = getopt(argc, argv, "ghlus:")) != -1) {

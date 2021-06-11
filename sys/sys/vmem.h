@@ -39,6 +39,7 @@
 typedef struct vmem vmem_t;
 
 typedef uintptr_t	vmem_addr_t;
+typedef ptraddr_t	vmem_offset_t;
 typedef size_t		vmem_size_t;
 
 #define	VMEM_ADDR_MIN		0
@@ -113,8 +114,8 @@ void vmem_free(vmem_t *vm, vmem_addr_t addr, vmem_size_t size);
  *	addrp		- result
  */
 int vmem_xalloc(vmem_t *vm, vmem_size_t size, vmem_size_t align,
-    vmem_size_t phase, vmem_size_t nocross, vmem_addr_t minaddr,
-    vmem_addr_t maxaddr, int flags, vmem_addr_t *addrp);
+    vmem_size_t phase, vmem_size_t nocross, vmem_offset_t minaddr,
+    vmem_offset_t maxaddr, int flags, vmem_addr_t *addrp);
 void vmem_xfree(vmem_t *vm, vmem_addr_t addr, vmem_size_t size);
 
 /*

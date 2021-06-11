@@ -2707,7 +2707,7 @@ pmap_pv_demote_l2(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	pvh = pa_to_pvh(pa);
 	pv = pmap_pvh_remove(pvh, pmap, va);
 	KASSERT(pv != NULL, ("pmap_pv_demote_l2: pv not found"));
-	m = PHYS_TO_VM_PAGE(pa);
+	m = PHYS_TO_VM_PAGE_UNBOUND(pa);
 	TAILQ_INSERT_TAIL(&m->md.pv_list, pv, pv_next);
 	m->md.pv_gen++;
 	/* Instantiate the remaining Ln_ENTRIES - 1 pv entries. */
@@ -2875,7 +2875,7 @@ pmap_remove_l2(pmap_t pmap, pt_entry_t *l2, vm_offset_t sva,
 		pvh = pa_to_pvh(old_l2 & ~ATTR_MASK);
 		pmap_pvh_free(pvh, pmap, sva);
 		eva = sva + L2_SIZE;
-		for (va = sva, m = PHYS_TO_VM_PAGE(old_l2 & ~ATTR_MASK);
+		for (va = sva, m = PHYS_TO_VM_PAGE_UNBOUND(old_l2 & ~ATTR_MASK);
 		    va < eva; va += PAGE_SIZE, m++) {
 			if (pmap_pte_dirty(pmap, old_l2))
 				vm_page_dirty(m);
@@ -3260,7 +3260,7 @@ retry:
 	if ((old_l2 & ATTR_SW_MANAGED) != 0 &&
 	    (nbits & ATTR_S1_AP(ATTR_S1_AP_RO)) != 0 &&
 	    pmap_pte_dirty(pmap, old_l2)) {
-		m = PHYS_TO_VM_PAGE(old_l2 & ~ATTR_MASK);
+		m = PHYS_TO_VM_PAGE_UNBOUND(old_l2 & ~ATTR_MASK);
 		for (mt = m; mt < &m[L2_SIZE / PAGE_SIZE]; mt++)
 			vm_page_dirty(mt);
 	}
@@ -3488,7 +3488,7 @@ pmap_pv_promote_l2(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	 * reclaim_pv_chunk() and that reclaim_pv_chunk() removes one of the
 	 * mappings that is being promoted.
 	 */
-	m = PHYS_TO_VM_PAGE(pa);
+	m = PHYS_TO_VM_PAGE_UNBOUND(pa);
 	va = va & ~L2_OFFSET;
 	pv = pmap_pvh_remove(&m->md, pmap, va);
 	KASSERT(pv != NULL, ("pmap_pv_promote_l2: pv not found"));
@@ -5168,7 +5168,7 @@ pmap_remove_pages(pmap_t pmap)
 
 				pa = tpte & ~ATTR_MASK;
 
-				m = PHYS_TO_VM_PAGE(pa);
+				m = PHYS_TO_VM_PAGE_UNBOUND(pa);
 				KASSERT(m->phys_addr == pa,
 				    ("vm_page_t %p phys_addr mismatch %016jx %016jx",
 				    m, (uintmax_t)m->phys_addr,
