@@ -648,11 +648,14 @@ pmap_bootstrap(vm_pointer_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 	/* Sanity check the index, KERNBASE should be the first VA */
 	KASSERT(l2_slot == 0, ("The L2 index is non-zero"));
 
-	freemempos = roundup2(KERNBASE + kernlen, PAGE_SIZE);
+	freemempos = KERNBASE;
 #ifdef __CHERI_PURE_CAPABILITY__
 	freemempos = (vm_pointer_t)cheri_setaddress(kernel_root_cap,
 	    freemempos);
+	freemempos = cheri_setbounds(freemempos,
+	    VM_MAX_KERNEL_ADDRESS - L2_SIZE - KERNBASE);
 #endif
+	freemempos = roundup2(freemempos + kernlen, PAGE_SIZE);
 
 	/* Create the l3 tables for the early devmap */
 	freemempos = pmap_bootstrap_l3(l1pt,
@@ -691,13 +694,8 @@ pmap_bootstrap(vm_pointer_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 	msgbufp = (void *)msgbufpv;
 
 	virtual_avail = roundup2(freemempos, L2_SIZE);
-	virtual_end = VM_MAX_KERNEL_ADDRESS - L2_SIZE;
-#ifdef __CHERI_PURE_CAPABILITY__
-	virtual_avail = (vm_pointer_t)cheri_setbounds((void *)virtual_avail,
-	    (ptraddr_t)virtual_end - (ptraddr_t)virtual_avail);
-	virtual_end = (vm_pointer_t)cheri_setaddress((void *)virtual_avail,
-	    virtual_end);
-#endif
+	virtual_end = cheri_kern_setaddress(virtual_avail,
+	    VM_MAX_KERNEL_ADDRESS - L2_SIZE);
 	kernel_vm_end = virtual_avail;
 
 	pa = pmap_early_vtophys(l1pt, freemempos);
