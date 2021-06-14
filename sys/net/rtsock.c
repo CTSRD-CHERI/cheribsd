@@ -1254,7 +1254,23 @@ rtsock_msg_mbuf(int type, struct rt_addrinfo *rtinfo)
 				sa = (struct sockaddr *)sin6;
 		}
 #endif
-		m_copyback(m, len, dlen, (caddr_t)sa);
+		m_copyback(m, len, sa->sa_len, (caddr_t)sa);
+		if (dlen - sa->sa_len > 0) {
+			/*
+			 * Add any padding required by SA_SIZE on the receiver
+			 * side.
+			 * Assume that mbuf is always allocated as a multiple
+			 * of the alignment enforced by SA_SIZE().
+			 * XXX-AM: This is a bit gross but avoids calling
+			 * m_copyback or m_append to copy zeroes.
+			 */
+			KASSERT(M_TRAILINGSPACE(m) >= dlen - sa->sa_len,
+			    ("No space for padding in rtsock mbuf"));
+			bzero(mtod(m, caddr_t) + len + sa->sa_len,
+			    dlen - sa->sa_len);
+			if (m->m_flags & M_PKTHDR)
+				m->m_pkthdr.len += dlen - sa->sa_len;
+		}
 		len += dlen;
 	}
 	if (m->m_pkthdr.len != len) {
@@ -1359,7 +1375,8 @@ rtsock_msg_buffer(int type, struct rt_addrinfo *rtinfo, struct walkarg *w, int *
 					sa = (struct sockaddr *)sin6;
 			}
 #endif
-			bcopy((caddr_t)sa, cp, (unsigned)dlen);
+			bcopy((caddr_t)sa, cp, sa->sa_len);
+			bzero(cp + sa->sa_len, (unsigned)dlen - sa->sa_len);
 			cp += dlen;
 			buflen -= dlen;
 		} else if (cp != NULL) {
