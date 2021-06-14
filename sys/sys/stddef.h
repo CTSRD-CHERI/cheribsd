@@ -33,7 +33,7 @@
 
 #include <sys/cdefs.h>
 #include <sys/_null.h>
-#include <machine/_types.h>
+#include <sys/_types.h>
 
 #ifndef _PTRADDR_T_DECLARED
 typedef	__ptraddr_t	ptraddr_t;
