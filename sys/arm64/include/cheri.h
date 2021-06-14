@@ -38,6 +38,17 @@
 #define	__USER_PCC	((void * __capability)curthread->td_frame->tf_elr)
 
 /*
+ * Special marker NOPs for the Morello FVP to start / stop region of interest
+ * in trace.
+ */
+#define	CHERI_START_TRACE	do {					\
+	__asm__ __volatile__("hlt 0xbeef");				\
+} while(0)
+#define	CHERI_STOP_TRACE	do {					\
+	__asm__ __volatile__("hlt 0xbeef");				\
+} while(0)
+
+/*
  * Morello specific kernel utility functions.
  */
 void		cheri_init_capabilities(void * __capability kroot);
