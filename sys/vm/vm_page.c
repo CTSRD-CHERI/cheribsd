@@ -782,8 +782,8 @@ vm_page_startup(vm_pointer_t vaddr)
 			    seg->end > phys_avail[i + 1])
 				continue;
 
+			m = seg->first_page;
 			pagecount = (u_long)atop(seg->end - seg->start);
-			m = vm_page_array_slice(seg->first_page, pagecount);
 
 			vmd = VM_DOMAIN(seg->domain);
 			vm_domain_free_lock(vmd);
@@ -1221,20 +1221,10 @@ vm_page_unhold_pages(vm_page_t *ma, int count)
 vm_page_t
 PHYS_TO_VM_PAGE(vm_paddr_t pa)
 {
-	vm_page_t m = PHYS_TO_VM_PAGE_UNBOUND(pa);
-
-	if (m != NULL)
-		m = vm_page_array_slice(m, 1);
-	return (m);
-}
-
-vm_page_t
-PHYS_TO_VM_PAGE_UNBOUND(vm_paddr_t pa)
-{
 	vm_page_t m;
 
 #ifdef VM_PHYSSEG_SPARSE
-	m = vm_phys_paddr_to_vm_page_unbound(pa);
+	m = vm_phys_paddr_to_vm_page(pa);
 	if (m == NULL)
 		m = vm_phys_fictitious_to_vm_page(pa);
 	return (m);
@@ -2201,11 +2191,6 @@ found:
 	} else
 		m->pindex = pindex;
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_getlen(m) == sizeof(*m),
-	    ("Invalid phys page descriptor bounds: expected=%zx found=%zx",
-	    sizeof(*m), cheri_getlen(m)));
-#endif
 	return (m);
 }
 
@@ -2408,12 +2393,6 @@ found:
 			pmap_page_set_memattr(m, memattr);
 		pindex++;
 	}
-
-#ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_getlen(m_ret) == npages * sizeof(*m_ret),
-	    ("Invalid phys page descriptor bounds: expected=%zx found=%zx",
-	    npages * sizeof(*m_ret), cheri_getlen(m_ret)));
-#endif
 	return (m_ret);
 }
 

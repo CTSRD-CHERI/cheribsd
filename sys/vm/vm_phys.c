@@ -697,12 +697,6 @@ vm_phys_enq_range(vm_page_t m, u_int npages, struct vm_freelist *fl, int tail)
 	    ((PAGE_SIZE << (fls(npages) - 1)) - 1)) == 0,
 	    ("vm_phys_enq_range: page %p and npages %u are misaligned",
 	    m, npages));
-#ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_getbase(m) == cheri_getbase(vm_page_array),
-	    ("Invalid freelist page range base"));
-	KASSERT(cheri_getlen(m) == cheri_getlen(vm_page_array),
-	    ("Invalid freelist page range length"));
-#endif
 	do {
 		KASSERT(m->order == VM_NFREEORDER,
 		    ("vm_phys_enq_range: page %p has unexpected order %d",
@@ -755,7 +749,7 @@ vm_phys_alloc_npages(int domain, int pool, int npages, vm_page_t ma[])
 				avail = 1 << oind;
 				need = imin(npages - i, avail);
 				for (end = i + need; i < end;)
-					ma[i++] = vm_page_array_slice(m++, 1);
+					ma[i++] = m++;
 				if (need < avail) {
 					/*
 					 * Return excess pages to fl.  Its
@@ -778,7 +772,7 @@ vm_phys_alloc_npages(int domain, int pool, int npages, vm_page_t ma[])
 					avail = 1 << oind;
 					need = imin(npages - i, avail);
 					for (end = i + need; i < end;)
-						ma[i++] = vm_page_array_slice(m++, 1);
+						ma[i++] = m++;
 					if (need < avail) {
 						/*
 						 * Return excess pages to fl.
@@ -855,7 +849,7 @@ vm_phys_alloc_freelist_pages(int domain, int freelist, int pool, int order)
 			vm_freelist_rem(fl, m, oind);
 			/* The order [order, oind) queues are empty. */
 			vm_phys_split_pages(m, oind, fl, order, 1);
-			return (vm_page_array_slice(m, 1 << order));
+			return (m);
 		}
 	}
 
@@ -874,7 +868,7 @@ vm_phys_alloc_freelist_pages(int domain, int freelist, int pool, int order)
 				vm_phys_set_pool(pool, m, oind);
 				/* The order [order, oind) queues are empty. */
 				vm_phys_split_pages(m, oind, fl, order, 1);
-				return (vm_page_array_slice(m, 1 << order));
+				return (m);
 			}
 		}
 	}
@@ -883,24 +877,9 @@ vm_phys_alloc_freelist_pages(int domain, int freelist, int pool, int order)
 
 /*
  * Find the vm_page corresponding to the given physical address.
- * Note that in CHERI kernels we return a pointer to a single page
- * descriptor entry. If a larger page_array slice is required, the
- * caller will have to explicitly re-derive the slice from the page_array.
- * The rationale for this is to avoid implicitly moving the whole page_array
- * capability.
  */
 vm_page_t
 vm_phys_paddr_to_vm_page(vm_paddr_t pa)
-{
-	vm_page_t m = vm_phys_paddr_to_vm_page_unbound(pa);
-
-	if (m != NULL)
-		m = vm_page_array_slice(m, 1);
-	return (NULL);
-}
-
-vm_page_t
-vm_phys_paddr_to_vm_page_unbound(vm_paddr_t pa)
 {
 	struct vm_phys_seg *seg;
 	int segind;
@@ -1117,7 +1096,6 @@ vm_phys_free_pages(vm_page_t m, int order)
 	    m, m->pool));
 	KASSERT(order < VM_NFREEORDER,
 	    ("vm_phys_free_pages: order %d is out of range", order));
-	m = vm_page_array_ptr(m, 1 << order);
 	seg = &vm_phys_segs[m->segind];
 	vm_domain_free_assert_locked(VM_DOMAIN(seg->domain));
 	if (order < VM_NFREEORDER - 1) {
@@ -1174,8 +1152,6 @@ vm_phys_enqueue_contig(vm_page_t m, u_long npages)
 	vm_page_t m_end;
 	int order;
 
-	m = vm_page_array_ptr(m, npages);
-
 	/*
 	 * Avoid unnecessary coalescing by freeing the pages in the largest
 	 * possible power-of-two-sized subsets.
@@ -1224,8 +1200,6 @@ vm_phys_free_contig(vm_page_t m, u_long npages)
 	vm_page_t m_start, m_end;
 
 	vm_domain_free_assert_locked(vm_pagequeue_domain(m));
-
-	m = vm_page_array_ptr(m, npages);
 
 	m_start = m;
 	order_start = max_order(m_start);
@@ -1294,7 +1268,7 @@ vm_phys_scan_contig(int domain, u_long npages, vm_paddr_t low, vm_paddr_t high,
 		m_run = vm_page_scan_contig(npages, m_start, m_end,
 		    alignment, boundary, options);
 		if (m_run != NULL)
-			return (vm_page_array_slice(m_run, npages));
+			return (m_run);
 	}
 	return (NULL);
 }
@@ -1422,11 +1396,6 @@ vm_phys_alloc_contig(int domain, u_long npages, vm_paddr_t low, vm_paddr_t high,
 		if (m_run != NULL)
 			break;
 	}
-#ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_getlen(m_run) == npages * sizeof(*m_run),
-	    ("Invalid bounds for page array slice: expected=%zx found=%zx",
-	    (size_t)(npages * sizeof(*m_run)), cheri_getlen(m_run)));
-#endif
 	return (m_run);
 }
 
@@ -1517,7 +1486,7 @@ done:
 		fl = (*seg->free_queues)[VM_FREEPOOL_DEFAULT];
 		vm_phys_enq_range(&m_ret[npages], npages_end - npages, fl, 0);
 	}
-	return (vm_page_array_slice(m_ret, npages));
+	return (m_ret);
 }
 
 /*

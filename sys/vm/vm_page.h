@@ -512,7 +512,6 @@ extern long first_page;			/* first physical page number */
  * object is returned for addresses that are not page-aligned.
  */
 vm_page_t PHYS_TO_VM_PAGE(vm_paddr_t pa);
-vm_page_t PHYS_TO_VM_PAGE_UNBOUND(vm_paddr_t pa);
 
 /*
  * Page allocation parameters for vm_page for the functions
@@ -1012,34 +1011,6 @@ vm_page_domain(vm_page_t m)
 	return (0);
 #endif
 }
-
-static inline vm_page_t
-vm_page_array_slice(vm_page_t m, int npages)
-{
-	return (cheri_kern_setbounds(m, npages * sizeof(*m)));
-}
-
-static inline vm_page_t
-vm_page_array_ptr(vm_page_t m, int npages)
-{
-#ifdef __CHERI_PURE_CAPABILITY__
-	/*
-	 * Tolerate imprecise bounds with leading and trailing space as
-	 * long as the given capability is still within the page array.
-	 */
-	size_t size = npages * sizeof(*m);
-	size_t padded_size = size +
-	    ((ptraddr_t)m - CHERI_REPRESENTABLE_BASE((ptraddr_t)m, size));
-	padded_size = CHERI_REPRESENTABLE_LENGTH(padded_size);
-
-	KASSERT(cheri_is_subset(vm_page_array, m), ("Invalid page descriptor"));
-	if (__predict_false(cheri_getlen(m) != padded_size))
-		panic("Unexpected phys page descriptor slice on free:"
-		    " expected=%zx found=%zx", padded_size, cheri_getlen(m));
-#endif
-	return (cheri_kern_setaddress(vm_page_array, (ptraddr_t)m));
-}
-
 #endif				/* _KERNEL */
 #endif				/* !_VM_PAGE_ */
 // CHERI CHANGES START
