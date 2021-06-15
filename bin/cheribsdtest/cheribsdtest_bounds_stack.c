@@ -104,7 +104,7 @@ test_bounds_precise(void * __capability c, size_t expected_len)
 	cheribsdtest_success();
 }
 
-static void
+static __noinline void
 test_bounds_stack_alloca(size_t len)
 {
 	void * __capability c = (__cheri_tocap void * __capability)alloca(len);
@@ -112,7 +112,7 @@ test_bounds_stack_alloca(size_t len)
 	test_bounds_precise(c, len);
 }
 
-static void
+static __noinline void
 test_bounds_stack_vla(size_t len)
 {
 	char vla[len];
