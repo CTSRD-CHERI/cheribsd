@@ -1755,8 +1755,7 @@ print_arg(struct syscall_args *sc, syscallarg_t *args, syscallarg_t *retval,
 			break;
 		}
 
-		len = (char *)__builtin_align_up(addr, PAGE_SIZE) -
-		    (char *)addr;
+		len = PAGE_SIZE - (addr & PAGE_MASK);
 		if (get_struct(pid, addr, u.buf, len) == -1) {
 			print_pointer(fp, args[sc->offset]);
 			break;

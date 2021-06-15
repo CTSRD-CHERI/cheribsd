@@ -17,9 +17,11 @@ if (env.JOB_NAME.contains("CheriBSD-testsuite") ||
 }
 
 // Set job properties:
-def jobProperties = [[$class: 'GithubProjectProperty', displayName: '', projectUrlStr: 'https://github.com/CTSRD-CHERI/cheribsd/'],
-                     copyArtifactPermission('*'), // Downstream jobs (may) need the kernels/disk images
-                     rateLimit]
+def jobProperties = [
+        [$class: 'GithubProjectProperty', displayName: '', projectUrlStr: 'https://github.com/CTSRD-CHERI/cheribsd/'],
+        copyArtifactPermission('*'), // Downstream jobs (may) need the kernels/disk images
+        rateLimit,
+]
 // Don't archive sysroot/disk image/kernel images for pull requests and non-default branches:
 def archiveBranches = ['master', 'dev']
 if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
@@ -34,17 +36,19 @@ if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
 }
 // Add an architecture selector for manual builds
 def allArchitectures = [
-    "aarch64", "amd64",
-    "mips64", "mips64-hybrid", "mips64-purecap",
-    "morello-hybrid", "morello-purecap",
-    "riscv64", "riscv64-hybrid", "riscv64-purecap"
+        "aarch64", "amd64",
+        "mips64", "mips64-hybrid", "mips64-purecap",
+        "morello-hybrid", "morello-purecap",
+        "riscv64", "riscv64-hybrid", "riscv64-purecap"
 ]
-jobProperties.add(parameters([text(defaultValue: allArchitectures.join('\n'),
-        description: 'The architectures (cheribuild suffixes) to build for (one per line)',
-        name: 'architectures'),
+jobProperties.add(parameters([
+        text(defaultValue: allArchitectures.join('\n'),
+             description: 'The architectures (cheribuild suffixes) to build for (one per line)',
+             name: 'architectures'),
         text(defaultValue: ["riscv64-hybrid", "riscv64-purecap"].join('\n'),
-        description: 'The architectures (cheribuild suffixes) to build a purecap kernel for (one per line)',
-        name: 'purecapKernelArchitectures')]))
+             description: 'The architectures (cheribuild suffixes) to build a purecap kernel for (one per line)',
+             name: 'purecapKernelArchitectures'),
+]))
 // Set the default job properties (work around properties() not being additive but replacing)
 setDefaultJobProperties(jobProperties)
 
@@ -54,8 +58,8 @@ GlobalVars.selectedPurecapKernelArchitectures = params.purecapKernelArchitecture
 
 def runTestStep(params, String testSuffix, String suffix, testExtraArgs, extraArgs) {
     testExtraArgs.add("--test-output-dir=\$WORKSPACE/test-results/${testSuffix}")
-    sh label: "Run tests in QEMU", script: """
-rm -rf test-results && mkdir -p test-results/${testSuffix}
+    sh label: "Run ${testSuffix} tests in QEMU", script: """
+rm -rf test-results/${testSuffix} && mkdir -p test-results/${testSuffix}
 # The test script returns 2 if the tests step is unstable, any other non-zero exit code is a fatal error
 exit_code=0
 ./cheribuild/jenkins-cheri-build.py --test run-${suffix} '--test-extra-args=${testExtraArgs.join(" ")}' ${params.extraArgs} ${extraArgs.join(" ")} --test-ssh-key \$WORKSPACE/id_ed25519.pub || exit_code=\$?
@@ -67,7 +71,8 @@ elif [ \${exit_code} -ne 0 ]; then
 fi
 find test-results
 """
-    def summary = junitReturnCurrentSummary allowEmptyResults: false, keepLongStdio: true, testResults: "test-results/${testSuffix}/*.xml"
+    def summary = junitReturnCurrentSummary allowEmptyResults: false, keepLongStdio: true,
+                                            testResults: "test-results/${testSuffix}/*.xml"
     def testResultMessage = "Test summary: ${summary.totalCount}, Failures: ${summary.failCount}, Skipped: ${summary.skipCount}, Passed: ${summary.passCount}"
     echo("${testSuffix}: ${testResultMessage}")
     if (summary.passCount == 0 || summary.totalCount == 0) {
@@ -83,17 +88,21 @@ find test-results
 
 def buildImage(params, String suffix) {
     stage("Building disk images") {
-        sh label: "Building full disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
+        sh label: "Building full disk image",
+           script: "./cheribuild/jenkins-cheri-build.py --build disk-image-${suffix} ${params.extraArgs}"
         // No need for minimal images when running the testsuite
         if (!GlobalVars.isTestSuiteJob) {
-            sh label: "Building minimal disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
+            sh label: "Building minimal disk image",
+               script: "./cheribuild/jenkins-cheri-build.py --build disk-image-minimal-${suffix} ${params.extraArgs}"
         }
     }
     // No need for MFS_ROOT kernels when running the testsuite
     if (!GlobalVars.isTestSuiteJob && (suffix.startsWith('mips64') || suffix.startsWith('riscv64'))) {
         stage("Building MFS_ROOT kernels") {
-            sh label: "Building MFS_ROOT disk image", script: "./cheribuild/jenkins-cheri-build.py --build disk-image-mfs-root-${suffix} ${params.extraArgs}"
-            sh label: "Building MFS_ROOT kernels", script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd/build-bench-kernels --cheribsd/build-fpga-kernels ${params.extraArgs}"
+            sh label: "Building MFS_ROOT disk image",
+               script: "./cheribuild/jenkins-cheri-build.py --build disk-image-mfs-root-${suffix} ${params.extraArgs}"
+            sh label: "Building MFS_ROOT kernels",
+               script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-mfs-root-kernel-${suffix} --cheribsd/build-bench-kernels --cheribsd/build-fpga-kernels ${params.extraArgs}"
             // Move MFS_ROOT kernels into tarball/ so they aren't deleted
             sh "mv -fv kernel-${suffix}* tarball/"
         }
@@ -109,25 +118,43 @@ def runTests(params, String suffix) {
     // TODO: run full testsuite (ideally in parallel)
     def testExtraArgs = ['--no-timestamped-test-subdir']
     if (GlobalVars.isTestSuiteJob) {
-        testExtraArgs += ['--kyua-tests-files', '/usr/tests/Kyuafile',
-                          '--no-run-cheribsdtest', // only run kyua tests
+        testExtraArgs += [
+                '--kyua-tests-files', '/usr/tests/Kyuafile',
+                '--no-run-cheribsdtest', // only run kyua tests
         ]
     } else {
         // Run a small subset of tests to check that we didn't break running tests (since the full testsuite takes too long)
         testExtraArgs += ['--kyua-tests-files', '/usr/tests/bin/cat/Kyuafile']
     }
 
-    stage("Running tests") {
+    stage("Test setup") {
         // copy qemu archive and run directly on the host
         dir("qemu-${params.buildOS}") { deleteDir() }
-        copyArtifacts projectName: "qemu/qemu-cheri", filter: "qemu-${params.buildOS}/**", target: '.', fingerprintArtifacts: false
-        sh label: 'generate SSH key', script: 'test -e $WORKSPACE/id_ed25519 || ssh-keygen -t ed25519 -N \'\' -f $WORKSPACE/id_ed25519 < /dev/null'
-
+        copyArtifacts projectName: "qemu/qemu-cheri", filter: "qemu-${params.buildOS}/**", target: '.',
+                      fingerprintArtifacts: false
+        sh label: 'generate SSH key',
+           script: 'test -e $WORKSPACE/id_ed25519 || ssh-keygen -t ed25519 -N \'\' -f $WORKSPACE/id_ed25519 < /dev/null'
         sh 'find qemu* && ls -lah'
+    }
 
-        runTestStep(params, suffix, suffix, testExtraArgs, [])
-        if (GlobalVars.selectedPurecapKernelArchitectures.contains(suffix) && !GlobalVars.isTestSuiteJob) {
-            runTestStep(params, "${suffix}-purecap-kernel", suffix, testExtraArgs, ["--run-${suffix}/kernel-abi purecap"])
+    // Run test configurations in parallel (if there is be more than one).
+    if (GlobalVars.selectedPurecapKernelArchitectures.contains(suffix)) {
+        def testSteps = [:]
+        testSteps["Test ${suffix} hybrid kernel"] = { ->
+            runTestStep(params, "${suffix}-hybrid-kernel", suffix, testExtraArgs,
+                        ["--run-${suffix}/kernel-abi hybrid"])
+        }
+        testSteps["Test ${suffix} purecap kernel"] = { ->
+            runTestStep(params, "${suffix}-purecap-kernel", suffix, testExtraArgs,
+                        ["--run-${suffix}/kernel-abi purecap"])
+        }
+        testSteps.failFast = false
+        parallel testSteps
+    } else {
+        // Otherwise run it directly here in a stage() instead of parallel() to improve
+        // the Jenkins visualization.
+        stage("Test ${suffix}") {
+            runTestStep(params, "${suffix}", suffix, testExtraArgs, [])
         }
     }
 }
@@ -177,7 +204,9 @@ mkdir -p "artifacts-${suffix}"
 mv -v *.xz "artifacts-${suffix}"
 ls -la "artifacts-${suffix}/"
 """
-            archiveArtifacts allowEmptyArchive: false, artifacts: "artifacts-${suffix}/cheribsd-sysroot.tar.xz, artifacts-${suffix}/*.img.xz, artifacts-${suffix}/kernel*.xz", fingerprint: true, onlyIfSuccessful: true
+            archiveArtifacts allowEmptyArchive: false,
+                             artifacts: "artifacts-${suffix}/cheribsd-sysroot.tar.xz, artifacts-${suffix}/*.img.xz, artifacts-${suffix}/kernel*.xz",
+                             fingerprint: true, onlyIfSuccessful: true
         }
     }
 }
@@ -195,12 +224,14 @@ selectedArchitectures.each { suffix ->
             // Enable additional debug checks when running the testsuite
             extraBuildOptions += ' -DMALLOC_DEBUG'
         }
-        def cheribuildArgs = ["'--cheribsd/build-options=${extraBuildOptions}'",
-                              '--cheribsd/default-kernel-abi=hybrid',
-                              '--keep-install-dir',
-                              '--install-prefix=/rootfs',
-                              '--cheribsd/build-tests',
-                              '--cheribsd/build-bench-kernels']
+        def cheribuildArgs = [
+                "'--cheribsd/build-options=${extraBuildOptions}'",
+                '--cheribsd/default-kernel-abi=hybrid',
+                '--keep-install-dir',
+                '--install-prefix=/rootfs',
+                '--cheribsd/build-tests',
+                '--cheribsd/build-bench-kernels',
+        ]
         if (GlobalVars.isTestSuiteJob) {
             cheribuildArgs.add('--cheribsd/debug-info')
         } else {
@@ -210,19 +241,21 @@ selectedArchitectures.each { suffix ->
             cheribuildArgs.add('--cheribsd/build-alternate-abi-kernels')
         }
         cheribuildProject(target: "cheribsd-${suffix}", architecture: suffix,
-                extraArgs: cheribuildArgs.join(" "),
-                skipArchiving: true, skipTarball: true,
-                sdkCompilerOnly: true, // We only need clang not the CheriBSD sysroot since we are building that.
-                customGitCheckoutDir: 'cheribsd',
-                gitHubStatusContext: GlobalVars.isTestSuiteJob ? "testsuite/${suffix}" : "ci/${suffix}",
-                // Delete stale compiler/sysroot
-                beforeBuild: { params -> 
-                    dir('cherisdk') { deleteDir() }
-                    sh label: 'Deleting outputs from previous builds', script: 'rm -rfv artifacts-* tarball kernel*'
-                },
-                /* Custom function to run tests since --test will not work (yet) */
-                runTests: false,
-                afterBuild: { params -> buildImageAndRunTests(params, suffix) })
+                          extraArgs: cheribuildArgs.join(" "),
+                          skipArchiving: true, skipTarball: true,
+                          sdkCompilerOnly: true,
+                          // We only need clang not the CheriBSD sysroot since we are building that.
+                          customGitCheckoutDir: 'cheribsd',
+                          gitHubStatusContext: GlobalVars.isTestSuiteJob ? "testsuite/${suffix}" : "ci/${suffix}",
+                          // Delete stale compiler/sysroot
+                          beforeBuild: { params ->
+                              dir('cherisdk') { deleteDir() }
+                              sh label: 'Deleting outputs from previous builds',
+                                 script: 'rm -rfv artifacts-* tarball kernel*'
+                          },
+                          /* Custom function to run tests since --test will not work (yet) */
+                          runTests: false,
+                          afterBuild: { params -> buildImageAndRunTests(params, suffix) })
     }
 }
 

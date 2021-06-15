@@ -183,11 +183,6 @@ CHERIBSDTEST(test_bounds_stack_static_cap,
 CHERIBSDTEST(test_bounds_stack_dynamic_cap,
     "Check bounds on a capability dynamic stack allocation")
 {
-	/*
-	 * XXXRW: Really, we should request a bit more space so that, on
-	 * 256-bit CHERI, we can guarantee 32-byte alignment, not the (likely)
-	 * 16-byte alignment we would naturally get back on MIPS.
-	 */
 	test_bounds_stack_alloca(sizeof(void * __capability));
 }
 
