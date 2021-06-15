@@ -627,9 +627,23 @@ init_pt_va:
 
 #ifndef SMP
 ENTRY(mpentry)
+	lla	t0, __dm_boot
 1:
 	wfi
-	j	1b
+	/* Wait the kernel to be ready */
+	lw	t1, 0(t0)
+	beqz	t1, 1b
+
+	li	t0, 0x10000100
+	li	t2, 0x61
+	sb	t2, 0(t0)
+
+	li	t0, 0x10000100
+	li	t2, 0x61
+	sb	t2, 0(t0)
+
+	li	t1, 0xf8000000
+	jr	t1
 END(mpentry)
 #else
 /*
