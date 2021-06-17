@@ -1330,8 +1330,9 @@ vm_gpa_hold(struct vm *vm, int vcpuid, vm_paddr_t gpa, size_t len, int reqprot,
 		mm = &vm->mem_maps[i];
 		if (sysmem_mapping(vm, mm) && gpa >= mm->gpa &&
 		    gpa < mm->gpa + mm->len) {
+			/* TODO: gpa should be a capability to the guest IPA */
 			count = vm_fault_quick_hold_pages(&vm->vmspace->vm_map,
-			    trunc_page(gpa), PAGE_SIZE, reqprot, &m, 1);
+			    trunc_page((void *)gpa), PAGE_SIZE, reqprot, &m, 1);
 			break;
 		}
 	}

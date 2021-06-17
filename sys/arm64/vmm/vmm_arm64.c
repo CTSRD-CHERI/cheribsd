@@ -281,7 +281,7 @@ arm_init(int ipinum)
 	pmap_stage2_invalidate_all = vmm_pmap_invalidate_all;
 
 	/* Create the vmem allocator */
-	el2_mem_alloc = vmem_create("VMM EL2", 0, 0, PAGE_SIZE, 0, M_WAITOK);
+	el2_mem_alloc = vmem_create("VMM EL2", 0, 0, PAGE_SIZE, 0, M_WAITOK, 0);
 
 	/* Create the mappings for the hypervisor translation table. */
 	hyp_code_len = roundup2(&vmm_hyp_code_end - &vmm_hyp_code, PAGE_SIZE);
