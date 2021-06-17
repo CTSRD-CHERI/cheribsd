@@ -52,8 +52,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/_iovec.h>
 #include <sys/cpuset.h>
 
+#ifdef __amd64__
 #include <x86/segments.h>
 #include <machine/specialreg.h>
+#endif
 
 #include <errno.h>
 #include <stdbool.h>
@@ -84,13 +86,18 @@ __FBSDID("$FreeBSD$");
 #define	VM_MMAP_GUARD_SIZE	(4 * MB)
 
 #define	PROT_RW		(PROT_READ | PROT_WRITE)
+#define	PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC)
+
+struct mem_region {
+	size_t base;	/* The base address */
+	size_t limit;	/* The limit of the size in this region */
+	size_t size;	/* The allocated size in this region */
+};
 
 struct vmctx {
 	int	fd;
-	uint32_t lowmem_limit;
+	struct mem_region regions[2];
 	int	memflags;
-	size_t	lowmem;
-	size_t	highmem;
 	char	*baseaddr;
 	char	*name;
 };
@@ -136,7 +143,18 @@ vm_open(const char *name)
 
 	vm->fd = -1;
 	vm->memflags = 0;
-	vm->lowmem_limit = 3 * GB;
+
+	vm->regions[0].base = 0;
+#if 0
+	vm->regions[0].limit = 3 * GB;
+#else
+	vm->regions[0].limit = 0;
+#endif
+	vm->regions[0].size = 0;
+
+	vm->regions[1].base = 4 * GB;
+	vm->regions[1].limit = SIZE_T_MAX;
+	vm->regions[1].size = 0;
 	vm->name = (char *)(vm + 1);
 	strcpy(vm->name, name);
 
@@ -200,14 +218,14 @@ uint32_t
 vm_get_lowmem_limit(struct vmctx *ctx)
 {
 
-	return (ctx->lowmem_limit);
+	return (ctx->regions[0].limit);
 }
 
 void
 vm_set_lowmem_limit(struct vmctx *ctx, uint32_t limit)
 {
 
-	ctx->lowmem_limit = limit;
+	ctx->regions[0].limit = limit;
 }
 
 void
@@ -269,11 +287,12 @@ vm_get_guestmem_from_ctx(struct vmctx *ctx, char **guest_baseaddr,
 {
 
 	*guest_baseaddr = ctx->baseaddr;
-	*lowmem_size = ctx->lowmem;
-	*highmem_size = ctx->highmem;
+	*lowmem_size = ctx->regions[0].size;
+	*highmem_size = ctx->regions[1].size;
 	return (0);
 }
 
+#if 0
 int
 vm_munmap_memseg(struct vmctx *ctx, vm_paddr_t gpa, size_t len)
 {
@@ -286,6 +305,7 @@ vm_munmap_memseg(struct vmctx *ctx, vm_paddr_t gpa, size_t len)
 	error = ioctl(ctx->fd, VM_MUNMAP_MEMSEG, &munmap);
 	return (error);
 }
+#endif
 
 int
 vm_mmap_getnext(struct vmctx *ctx, vm_paddr_t *gpa, int *segid,
@@ -394,7 +414,7 @@ setup_memory_segment(struct vmctx *ctx, vm_paddr_t gpa, size_t len, char *base)
 	int error, flags;
 
 	/* Map 'len' bytes starting at 'gpa' in the guest address space */
-	error = vm_mmap_memseg(ctx, gpa, VM_SYSMEM, gpa, len, _PROT_ALL);
+	error = vm_mmap_memseg(ctx, gpa, VM_SYSMEM, gpa, len, PROT_ALL);
 	if (error)
 		return (error);
 
@@ -413,7 +433,7 @@ setup_memory_segment(struct vmctx *ctx, vm_paddr_t gpa, size_t len, char *base)
 int
 vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 {
-	size_t objsize, len;
+	size_t objsize, len, i;
 	vm_paddr_t gpa;
 	char *baseaddr, *ptr;
 	int error;
@@ -424,15 +444,17 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 	 * If 'memsize' cannot fit entirely in the 'lowmem' segment then
 	 * create another 'highmem' segment above 4GB for the remainder.
 	 */
-	if (memsize > ctx->lowmem_limit) {
-		ctx->lowmem = ctx->lowmem_limit;
-		ctx->highmem = memsize - ctx->lowmem_limit;
-		objsize = 4*GB + ctx->highmem;
-	} else {
-		ctx->lowmem = memsize;
-		ctx->highmem = 0;
-		objsize = ctx->lowmem;
+	for (i = 0; i < nitems(ctx->regions); i++) {
+		len = ctx->regions[i].limit - ctx->regions[i].base;
+		if (len > memsize)
+			len = memsize;
+		ctx->regions[i].size = len;
+		memsize -= len;
+
+		if (len > 0)
+			objsize = ctx->regions[i].base + ctx->regions[i].size;
 	}
+	assert(memsize == 0);
 
 	error = vm_alloc_memseg(ctx, VM_SYSMEM, objsize, NULL);
 	if (error)
@@ -443,23 +465,16 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 	 * and the adjoining guard regions.
 	 */
 	len = VM_MMAP_GUARD_SIZE + objsize + VM_MMAP_GUARD_SIZE;
-	ptr = mmap(NULL, len, PROT_NONE | PROT_MAX(PROT_RW),
-	    MAP_GUARD | MAP_ALIGNED_SUPER, -1, 0);
+	ptr = mmap(NULL, len, PROT_NONE, MAP_GUARD | MAP_ALIGNED_SUPER, -1, 0);
 	if (ptr == MAP_FAILED)
 		return (-1);
 
 	baseaddr = ptr + VM_MMAP_GUARD_SIZE;
-	if (ctx->highmem > 0) {
-		gpa = 4*GB;
-		len = ctx->highmem;
-		error = setup_memory_segment(ctx, gpa, len, baseaddr);
-		if (error)
-			return (error);
-	}
-
-	if (ctx->lowmem > 0) {
-		gpa = 0;
-		len = ctx->lowmem;
+	for (i = 0; i < nitems(ctx->regions); i++) {
+		gpa = ctx->regions[i].base;
+		len = ctx->regions[i].size;
+		if (len == 0)
+			continue;
 		error = setup_memory_segment(ctx, gpa, len, baseaddr);
 		if (error)
 			return (error);
@@ -480,20 +495,13 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 void *
 vm_map_gpa(struct vmctx *ctx, vm_paddr_t gaddr, size_t len)
 {
+	size_t i;
 
-	if (ctx->lowmem > 0) {
-		if (gaddr < ctx->lowmem && len <= ctx->lowmem &&
-		    gaddr + len <= ctx->lowmem)
+	for (i = 0; i < nitems(ctx->regions); i++) {
+		if (gaddr >= ctx->regions[i].base &&
+		    len <= ctx->regions[i].size &&
+		    gaddr + len <= ctx->regions[i].base + ctx->regions[i].size)
 			return (ctx->baseaddr + gaddr);
-	}
-
-	if (ctx->highmem > 0) {
-                if (gaddr >= 4*GB) {
-			if (gaddr < 4*GB + ctx->highmem &&
-			    len <= ctx->highmem &&
-			    gaddr + len <= 4*GB + ctx->highmem)
-				return (ctx->baseaddr + gaddr);
-		}
 	}
 
 	return (NULL);
@@ -506,13 +514,11 @@ vm_rev_map_gpa(struct vmctx *ctx, void *addr)
 
 	offaddr = (char *)addr - ctx->baseaddr;
 
-	if (ctx->lowmem > 0)
-		if (offaddr <= ctx->lowmem)
-			return (offaddr);
+	if (offaddr >= ctx->regions[0].base && offaddr <= ctx->regions[0].limit)
+		return (offaddr);
 
-	if (ctx->highmem > 0)
-		if (offaddr >= 4*GB && offaddr < 4*GB + ctx->highmem)
-			return (offaddr);
+	if (offaddr >= ctx->regions[1].base && offaddr <= ctx->regions[1].limit)
+		return (offaddr);
 
 	return ((vm_paddr_t)-1);
 }
@@ -528,14 +534,21 @@ size_t
 vm_get_lowmem_size(struct vmctx *ctx)
 {
 
-	return (ctx->lowmem);
+	return (ctx->regions[0].size);
+}
+
+size_t
+vm_get_highmem_base(struct vmctx *ctx)
+{
+
+	return (ctx->regions[1].base);
 }
 
 size_t
 vm_get_highmem_size(struct vmctx *ctx)
 {
 
-	return (ctx->highmem);
+	return (ctx->regions[1].size);
 }
 
 void *
@@ -571,8 +584,8 @@ vm_create_devmem(struct vmctx *ctx, int segid, const char *name, size_t len)
 	 * adjoining guard regions.
 	 */
 	len2 = VM_MMAP_GUARD_SIZE + len + VM_MMAP_GUARD_SIZE;
-	base = mmap(NULL, len2, PROT_NONE | PROT_MAX(PROT_RW),
-	    MAP_GUARD | MAP_ALIGNED_SUPER, -1, 0);
+	base = mmap(NULL, len2, PROT_NONE, MAP_GUARD | MAP_ALIGNED_SUPER, -1,
+	    0);
 	if (base == MAP_FAILED)
 		goto done;
 
@@ -588,6 +601,7 @@ done:
 	return (ptr);
 }
 
+#ifdef __amd64__
 int
 vm_set_desc(struct vmctx *ctx, int vcpu, int reg,
 	    uint64_t base, uint32_t limit, uint32_t access)
@@ -635,6 +649,7 @@ vm_get_seg_desc(struct vmctx *ctx, int vcpu, int reg, struct seg_desc *seg_desc)
 	    &seg_desc->access);
 	return (error);
 }
+#endif
 
 int
 vm_set_register(struct vmctx *ctx, int vcpu, int reg, uint64_t val)
@@ -731,6 +746,61 @@ vm_reinit(struct vmctx *ctx)
 	return (ioctl(ctx->fd, VM_REINIT, 0));
 }
 
+#if defined(__aarch64__)
+int
+vm_attach_vgic(struct vmctx *ctx, uint64_t dist_start, size_t dist_size,
+    uint64_t redist_start, size_t redist_size)
+{
+	struct vm_attach_vgic vav;
+
+	bzero(&vav, sizeof(vav));
+	vav.dist_start = dist_start;
+	vav.dist_size = dist_size;
+	vav.redist_start = redist_start;
+	vav.redist_size = redist_size;
+
+	return (ioctl(ctx->fd, VM_ATTACH_VGIC, &vav));
+}
+
+int
+vm_assert_irq(struct vmctx *ctx, uint32_t irq)
+{
+	struct vm_irq vi;
+
+	bzero(&vi, sizeof(vi));
+	vi.irq = irq;
+
+	return (ioctl(ctx->fd, VM_ASSERT_IRQ, &vi));
+}
+
+int
+vm_deassert_irq(struct vmctx *ctx, uint32_t irq)
+{
+	struct vm_irq vi;
+
+	bzero(&vi, sizeof(vi));
+	vi.irq = irq;
+
+	return (ioctl(ctx->fd, VM_DEASSERT_IRQ, &vi));
+}
+
+int
+vm_raise_msi(struct vmctx *ctx, uint64_t addr, uint64_t msg, int bus, int slot,
+    int func)
+{
+	struct vm_msi vmsi;
+
+	bzero(&vmsi, sizeof(vmsi));
+	vmsi.addr = addr;
+	vmsi.msg = msg;
+	vmsi.bus = bus;
+	vmsi.slot = slot;
+	vmsi.func = func;
+
+	return (ioctl(ctx->fd, VM_RAISE_MSI, &vmsi));
+}
+
+#elif defined(__amd64__)
 int
 vm_inject_exception(struct vmctx *ctx, int vcpu, int vector, int errcode_valid,
     uint32_t errcode, int restart_instruction)
@@ -910,14 +980,17 @@ vm_inject_nmi(struct vmctx *ctx, int vcpu)
 
 	return (ioctl(ctx->fd, VM_INJECT_NMI, &vmnmi));
 }
+#endif
 
 static const char *capstrmap[] = {
 	[VM_CAP_HALT_EXIT]  = "hlt_exit",
 	[VM_CAP_MTRAP_EXIT] = "mtrap_exit",
 	[VM_CAP_PAUSE_EXIT] = "pause_exit",
 	[VM_CAP_UNRESTRICTED_GUEST] = "unrestricted_guest",
+#ifdef __amd64__
 	[VM_CAP_ENABLE_INVPCID] = "enable_invpcid",
 	[VM_CAP_BPT_EXIT] = "bpt_exit",
+#endif
 };
 
 int
@@ -971,6 +1044,7 @@ vm_set_capability(struct vmctx *ctx, int vcpu, enum vm_cap_type cap, int val)
 	return (ioctl(ctx->fd, VM_SET_CAPABILITY, &vmcap));
 }
 
+#ifdef __amd64__
 int
 vm_assign_pptdev(struct vmctx *ctx, int bus, int slot, int func)
 {
@@ -1079,6 +1153,7 @@ vm_disable_pptdev_msix(struct vmctx *ctx, int bus, int slot, int func)
 
 	return ioctl(ctx->fd, VM_PPTDEV_DISABLE_MSIX, &ppt);
 }
+#endif
 
 uint64_t *
 vm_get_stats(struct vmctx *ctx, int vcpu, struct timeval *ret_tv,
@@ -1138,6 +1213,7 @@ vm_get_stat_desc(struct vmctx *ctx, int index)
 		return (NULL);
 }
 
+#ifdef __amd64__
 int
 vm_get_x2apic_state(struct vmctx *ctx, int vcpu, enum x2apic_state *state)
 {
@@ -1434,11 +1510,13 @@ vm_gla2gpa_nofault(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
 	}
 	return (error);
 }
+#endif
 
 #ifndef min
 #define	min(a,b)	(((a) < (b)) ? (a) : (b))
 #endif
 
+#ifdef __amd64__
 int
 vm_copy_setup(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
     uint64_t gla, size_t len, int prot, struct iovec *iov, int iovcnt,
@@ -1476,6 +1554,7 @@ vm_copy_setup(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
 	}
 	return (0);
 }
+#endif
 
 void
 vm_copy_teardown(struct vmctx *ctx __unused, int vcpu __unused,
@@ -1597,6 +1676,7 @@ vm_resume_cpu(struct vmctx *ctx, int vcpu)
 	return (error);
 }
 
+#ifdef __amd64__
 int
 vm_get_intinfo(struct vmctx *ctx, int vcpu, uint64_t *info1, uint64_t *info2)
 {
@@ -1722,6 +1802,7 @@ vm_set_topology(struct vmctx *ctx,
 	topology.maxcpus = maxcpus;
 	return (ioctl(ctx->fd, VM_SET_TOPOLOGY, &topology));
 }
+#endif
 
 int
 vm_get_topology(struct vmctx *ctx,
@@ -1748,6 +1829,7 @@ vm_get_device_fd(struct vmctx *ctx)
 	return (ctx->fd);
 }
 
+#ifdef __amd64__
 const cap_ioctl_t *
 vm_get_ioctls(size_t *len)
 {
@@ -1786,3 +1868,4 @@ vm_get_ioctls(size_t *len)
 	*len = nitems(vm_ioctl_cmds);
 	return (NULL);
 }
+#endif

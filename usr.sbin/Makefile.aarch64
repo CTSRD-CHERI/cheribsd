@@ -4,3 +4,4 @@
 SUBDIR+=	acpi
 .endif
 SUBDIR+=	ofwdump
+SUBDIR+=	bhyve

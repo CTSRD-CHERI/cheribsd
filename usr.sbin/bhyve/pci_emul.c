@@ -85,8 +85,13 @@ struct intxinfo {
 	int	ii_ioapic_irq;
 };
 
+#ifdef __aarch64__
+#define	INTPIN_COUNT	1
+#else
+#define	INTPIN_COUNT	4
+#endif
 struct slotinfo {
-	struct intxinfo si_intpins[4];
+	struct intxinfo si_intpins[INTPIN_COUNT];
 	struct funcinfo si_funcs[MAXFUNCS];
 };
 
@@ -119,8 +124,16 @@ struct pci_bar_allocation {
 TAILQ_HEAD(pci_bar_list, pci_bar_allocation) pci_bars = TAILQ_HEAD_INITIALIZER(
     pci_bars);
 
+#if defined(__aarch64__)
+#define	PCI_EMUL_IOBASE		0x00df00000UL
+#define	PCI_EMUL_IOLIMIT	0x100000000UL
+#define	PCI_EMUL_MEMBASE32	0x0a0000000UL
+#define	PCI_EMUL_MEMBASE64	0xD000000000UL
+#elif defined(__amd64__)
 #define	PCI_EMUL_IOBASE		0x2000
+#define	PCI_EMUL_IOMASK		0xffff
 #define	PCI_EMUL_IOLIMIT	0x10000
+#endif
 
 #define PCI_EMUL_ROMSIZE 0x10000000
 
@@ -128,11 +141,13 @@ TAILQ_HEAD(pci_bar_list, pci_bar_allocation) pci_bars = TAILQ_HEAD_INITIALIZER(
 #define	PCI_EMUL_ECFG_SIZE	(MAXBUSES * 1024 * 1024)    /* 1MB per bus */
 SYSRES_MEM(PCI_EMUL_ECFG_BASE, PCI_EMUL_ECFG_SIZE);
 
+#if defined(__amd64__)
 /*
  * OVMF always uses 0xC0000000 as base address for 32 bit PCI MMIO. Don't
  * change this address without changing it in OVMF.
  */
 #define PCI_EMUL_MEMBASE32 0xC0000000
+#endif
 #define	PCI_EMUL_MEMLIMIT32	PCI_EMUL_ECFG_BASE
 #define PCI_EMUL_MEMSIZE64	(32*GB)
 
@@ -446,29 +461,55 @@ pci_msix_pba_bar(struct pci_devinst *pi)
 }
 
 static int
-pci_emul_io_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
-		    uint32_t *eax, void *arg)
+pci_emul_io(struct vmctx *ctx, struct pci_devinst *pdi, int vcpu, int dir,
+    uint64_t addr, int size, uint64_t *val)
 {
-	struct pci_devinst *pdi = arg;
 	struct pci_devemu *pe = pdi->pi_d;
 	uint64_t offset;
 	int i;
 
 	for (i = 0; i <= PCI_BARMAX; i++) {
 		if (pdi->pi_bar[i].type == PCIBAR_IO &&
-		    port >= pdi->pi_bar[i].addr &&
-		    port + bytes <= pdi->pi_bar[i].addr + pdi->pi_bar[i].size) {
-			offset = port - pdi->pi_bar[i].addr;
-			if (in)
-				*eax = (*pe->pe_barread)(ctx, vcpu, pdi, i,
-							 offset, bytes);
-			else
+		    addr >= pdi->pi_bar[i].addr &&
+		    addr + size <= pdi->pi_bar[i].addr + pdi->pi_bar[i].size) {
+			offset = addr - pdi->pi_bar[i].addr;
+			if (dir == MEM_F_WRITE) {
 				(*pe->pe_barwrite)(ctx, vcpu, pdi, i, offset,
-						   bytes, *eax);
+				    size, *val);
+			} else {
+				*val = (*pe->pe_barread)(ctx, vcpu, pdi, i,
+				    offset, size);
+			}
 			return (0);
 		}
 	}
 	return (-1);
+}
+
+static int
+pci_emul_io_mem_handler(struct vmctx *ctx, int vcpu, int dir, uint64_t addr,
+    int size, uint64_t *val, void *arg1, long arg2)
+{
+	struct pci_devinst *pdi = arg1;
+
+	return (pci_emul_io(ctx, pdi, vcpu, dir, addr, size, val));
+}
+
+static int
+pci_emul_io_handler(struct vmctx *ctx, int vcpu, int in, int port, int bytes,
+		    uint32_t *eax, void *arg)
+{
+	struct pci_devinst *pdi = arg;
+	uint64_t val;
+	int ret;
+
+	ret = pci_emul_io(ctx, pdi, vcpu, in ? MEM_F_READ : MEM_F_WRITE, port,
+	    bytes, &val);
+	if (ret != 0)
+		return (ret);
+
+	*eax = val;
+	return (0);
 }
 
 static int
@@ -541,12 +582,15 @@ modify_bar_registration(struct pci_devinst *pi, int idx, int registration)
 {
 	struct pci_devemu *pe;
 	int error;
+#if defined(__amd64__)
 	struct inout_port iop;
+#endif
 	struct mem_range mr;
 
 	pe = pi->pi_d;
 	switch (pi->pi_bar[idx].type) {
 	case PCIBAR_IO:
+#if defined(__amd64__)
 		bzero(&iop, sizeof(struct inout_port));
 		iop.name = pi->pi_name;
 		iop.port = pi->pi_bar[idx].addr;
@@ -561,6 +605,22 @@ modify_bar_registration(struct pci_devinst *pi, int idx, int registration)
 		if (pe->pe_baraddr != NULL)
 			(*pe->pe_baraddr)(pi->pi_vmctx, pi, idx, registration,
 					  pi->pi_bar[idx].addr);
+#else
+		bzero(&mr, sizeof(struct mem_range));
+		mr.name = pi->pi_name;
+		mr.base = pi->pi_bar[idx].addr;
+		mr.size = pi->pi_bar[idx].size;
+		if (registration) {
+			mr.flags = MEM_F_RW;
+			mr.handler = pci_emul_io_mem_handler;
+			mr.arg1 = pi;
+			error = register_mem(&mr);
+		} else
+			error = unregister_mem(&mr);
+		if (pe->pe_baraddr != NULL)
+			(*pe->pe_baraddr)(pi->pi_vmctx, pi, idx, registration,
+					  pi->pi_bar[idx].addr);
+#endif
 		break;
 	case PCIBAR_MEM32:
 	case PCIBAR_MEM64:
@@ -1335,11 +1395,16 @@ init_pci(struct vmctx *ctx)
 		errx(EX_OSERR, "Invalid lowmem limit");
 
 	pci_emul_iobase = PCI_EMUL_IOBASE;
+#ifdef PCI_EMUL_MEMBASE32
+	pci_emul_membase32 = PCI_EMUL_MEMBASE32;
+	pci_emul_membase64 = PCI_EMUL_MEMBASE64;
+#else
 	pci_emul_membase32 = PCI_EMUL_MEMBASE32;
 
 	pci_emul_membase64 = 4*GB + vm_get_highmem_size(ctx);
 	pci_emul_membase64 = roundup2(pci_emul_membase64, PCI_EMUL_MEMSIZE64);
 	pci_emul_memlim64 = pci_emul_membase64 + PCI_EMUL_MEMSIZE64;
+#endif
 
 	for (bus = 0; bus < MAXBUSES; bus++) {
 		snprintf(node_name, sizeof(node_name), "pci.%d", bus);
@@ -1446,7 +1511,9 @@ init_pci(struct vmctx *ctx)
 			}
 		}
 	}
+#ifdef __amd64__
 	lpc_pirq_routed();
+#endif
 
 	/*
 	 * The guest physical memory map looks like the following:
@@ -1528,7 +1595,10 @@ pci_bus_write_dsdt(int bus)
 	struct businfo *bi;
 	struct slotinfo *si;
 	struct pci_devinst *pi;
-	int count, func, slot;
+	int func, slot;
+#if defined(__amd64__)
+	int count;
+#endif
 
 	/*
 	 * If there are no devices on this 'bus' then just return.
@@ -1631,6 +1701,7 @@ pci_bus_write_dsdt(int bus)
 	dsdt_line("        ,, , AddressRangeMemory, TypeStatic)");
 	dsdt_line("    })");
 
+#if defined(__amd64__)
 	count = pci_count_lintr(bus);
 	if (count != 0) {
 		dsdt_indent(2);
@@ -1655,6 +1726,7 @@ pci_bus_write_dsdt(int bus)
 		dsdt_line("}");
 		dsdt_unindent(2);
 	}
+#endif
 
 	dsdt_indent(2);
 	for (slot = 0; slot < MAXSLOTS; slot++) {
@@ -1735,8 +1807,13 @@ pci_generate_msix(struct pci_devinst *pi, int index)
 
 	mte = &pi->pi_msix.table[index];
 	if ((mte->vector_control & PCIM_MSIX_VCTRL_MASK) == 0) {
+#if defined(__aarch64__)
+		vm_raise_msi(pi->pi_vmctx, mte->addr, mte->msg_data,
+		    pi->pi_bus, pi->pi_slot, pi->pi_func);
+#else
 		/* XXX Set PBA bit if interrupt is disabled */
 		vm_lapic_msi(pi->pi_vmctx, mte->addr, mte->msg_data);
+#endif
 	}
 }
 
@@ -1745,8 +1822,14 @@ pci_generate_msi(struct pci_devinst *pi, int index)
 {
 
 	if (pci_msi_enabled(pi) && index < pci_msi_maxmsgnum(pi)) {
+#if defined(__aarch64__)
+		vm_raise_msi(pi->pi_vmctx, pi->pi_msi.addr,
+		    pi->pi_msi.msg_data + index, pi->pi_bus, pi->pi_slot,
+		    pi->pi_func);
+#else
 		vm_lapic_msi(pi->pi_vmctx, pi->pi_msi.addr,
 			     pi->pi_msi.msg_data + index);
+#endif
 	}
 }
 
@@ -1777,7 +1860,7 @@ pci_lintr_request(struct pci_devinst *pi)
 	si = &bi->slotinfo[pi->pi_slot];
 	bestpin = 0;
 	bestcount = si->si_intpins[0].ii_count;
-	for (pin = 1; pin < 4; pin++) {
+	for (pin = 1; pin < nitems(si->si_intpins); pin++) {
 		if (si->si_intpins[pin].ii_count < bestcount) {
 			bestpin = pin;
 			bestcount = si->si_intpins[pin].ii_count;
@@ -1806,21 +1889,35 @@ pci_lintr_route(struct pci_devinst *pi)
 	 * Attempt to allocate an I/O APIC pin for this intpin if one
 	 * is not yet assigned.
 	 */
-	if (ii->ii_ioapic_irq == 0)
+	if (ii->ii_ioapic_irq == 0) {
+#ifdef __amd64__
 		ii->ii_ioapic_irq = ioapic_pci_alloc_irq(pi);
+#else
+		ii->ii_ioapic_irq = 33;
+#endif
+	}
 	assert(ii->ii_ioapic_irq > 0);
 
 	/*
 	 * Attempt to allocate a PIRQ pin for this intpin if one is
 	 * not yet assigned.
 	 */
-	if (ii->ii_pirq_pin == 0)
+	if (ii->ii_pirq_pin == 0) {
+#ifdef __amd64__
 		ii->ii_pirq_pin = pirq_alloc_pin(pi);
+#else
+		ii->ii_pirq_pin = 1;
+#endif
+	}
 	assert(ii->ii_pirq_pin > 0);
 
 	pi->pi_lintr.ioapic_irq = ii->ii_ioapic_irq;
 	pi->pi_lintr.pirq_pin = ii->ii_pirq_pin;
+#ifdef __amd64__
 	pci_set_cfgdata8(pi, PCIR_INTLINE, pirq_irq(ii->ii_pirq_pin));
+#else
+	pci_set_cfgdata8(pi, PCIR_INTLINE, 1);
+#endif
 }
 
 void
@@ -1833,7 +1930,11 @@ pci_lintr_assert(struct pci_devinst *pi)
 	if (pi->pi_lintr.state == IDLE) {
 		if (pci_lintr_permitted(pi)) {
 			pi->pi_lintr.state = ASSERTED;
+#ifdef __amd64__
 			pci_irq_assert(pi);
+#else
+			vm_assert_irq(pi->pi_vmctx, pi->pi_lintr.ioapic_irq);
+#endif
 		} else
 			pi->pi_lintr.state = PENDING;
 	}
@@ -1849,7 +1950,11 @@ pci_lintr_deassert(struct pci_devinst *pi)
 	pthread_mutex_lock(&pi->pi_lintr.lock);
 	if (pi->pi_lintr.state == ASSERTED) {
 		pi->pi_lintr.state = IDLE;
+#ifdef __amd64__
 		pci_irq_deassert(pi);
+#else
+		vm_deassert_irq(pi->pi_vmctx, pi->pi_lintr.ioapic_irq);
+#endif
 	} else if (pi->pi_lintr.state == PENDING)
 		pi->pi_lintr.state = IDLE;
 	pthread_mutex_unlock(&pi->pi_lintr.lock);
@@ -1861,11 +1966,19 @@ pci_lintr_update(struct pci_devinst *pi)
 
 	pthread_mutex_lock(&pi->pi_lintr.lock);
 	if (pi->pi_lintr.state == ASSERTED && !pci_lintr_permitted(pi)) {
+#ifdef __amd64__
 		pci_irq_deassert(pi);
+#else
+		vm_deassert_irq(pi->pi_vmctx, pi->pi_lintr.ioapic_irq);
+#endif
 		pi->pi_lintr.state = PENDING;
 	} else if (pi->pi_lintr.state == PENDING && pci_lintr_permitted(pi)) {
 		pi->pi_lintr.state = ASSERTED;
+#ifdef __amd64__
 		pci_irq_assert(pi);
+#else
+		vm_assert_irq(pi->pi_vmctx, pi->pi_lintr.ioapic_irq);
+#endif
 	}
 	pthread_mutex_unlock(&pi->pi_lintr.lock);
 }
@@ -2145,7 +2258,9 @@ pci_cfgrw(struct vmctx *ctx, int vcpu, int in, int bus, int slot, int func,
 				break;
 			case PCIBAR_IO:
 				addr = *eax & mask;
-				addr &= 0xffff;
+#if defined(PCI_EMUL_IOMASK)
+				addr &= PCI_EMUL_IOMASK;
+#endif
 				bar = addr | pi->pi_bar[idx].lobits;
 				/*
 				 * Register the new BAR value for interception

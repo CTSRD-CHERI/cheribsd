@@ -15,7 +15,6 @@ MAN=	bhyve.8 bhyve_config.5
 BHYVE_SYSDIR?=${SRCTOP}
 
 SRCS=	\
-	atkbdc.c		\
 	acpi.c			\
 	audio.c			\
 	bhyvegc.c		\
@@ -26,27 +25,17 @@ SRCS=	\
 	console.c		\
 	ctl_util.c		\
 	ctl_scsi_all.c		\
-	fwctl.c			\
-	gdb.c			\
 	hda_codec.c		\
-	inout.c			\
-	ioapic.c		\
-	kernemu_dev.c		\
 	mem.c			\
 	mevent.c		\
-	mptbl.c			\
 	net_backends.c		\
 	net_utils.c		\
 	pci_ahci.c		\
 	pci_e82545.c		\
 	pci_emul.c		\
 	pci_hda.c		\
-	pci_fbuf.c		\
 	pci_hostbridge.c	\
-	pci_irq.c		\
-	pci_lpc.c		\
 	pci_nvme.c		\
-	pci_passthru.c		\
 	pci_virtio_9p.c		\
 	pci_virtio_block.c	\
 	pci_virtio_console.c	\
@@ -56,25 +45,57 @@ SRCS=	\
 	pci_virtio_scsi.c	\
 	pci_uart.c		\
 	pci_xhci.c		\
+	post.c			\
+	smbiostbl.c		\
+	sockstream.c		\
+	uart_backend.c		\
+	usb_emul.c		\
+	usb_mouse.c		\
+	virtio.c		\
+	vmgenc.c		\
+	iov.c
+
+.if ${MACHINE_CPUARCH} == "aarch64"
+# Missing vm_get_ioctls
+CFLAGS+=	-DWITHOUT_CAPSICUM
+LIBFDTSRCDIR=	${SRCTOP}/sys/contrib/libfdt
+CFLAGS+=	-I${LIBFDTSRCDIR}
+LIBADD+=		fdt
+SRCS+=	\
+	bootcode.c		\
+	fdt.c			\
+	mmio_uart.c		\
+	pl011.c
+.endif
+
+.if ${MACHINE_CPUARCH} == "amd64"
+SRCS+=	\
+	atkbdc.c		\
+	consport.c		\
+	dbgport.c		\
+	fwctl.c			\
+	gdb.c			\
+	inout.c			\
+	ioapic.c		\
+	kernemu_dev.c		\
+	mptbl.c			\
+	pci_fbuf.c		\
+	pci_irq.c		\
+	pci_lpc.c		\
+	pci_passthru.c		\
 	pctestdev.c		\
 	pm.c			\
-	post.c			\
 	ps2kbd.c		\
 	ps2mouse.c		\
 	rfb.c			\
 	rtc.c			\
-	smbiostbl.c		\
-	sockstream.c		\
 	task_switch.c		\
 	uart_emul.c		\
-	usb_emul.c		\
-	usb_mouse.c		\
-	virtio.c		\
-	vga.c			\
-	vmgenc.c		\
 	xmsr.c			\
 	spinup_ap.c		\
-	iov.c
+	vga.c			\
+
+.endif
 
 .if ${MK_BHYVE_SNAPSHOT} != "no"
 SRCS+=	snapshot.c
@@ -82,10 +103,10 @@ SRCS+=	snapshot.c
 
 CFLAGS.kernemu_dev.c+=	-I${SRCTOP}/sys/amd64
 
-.PATH:  ${BHYVE_SYSDIR}/sys/amd64/vmm
+.PATH:  ${BHYVE_SYSDIR}/sys/${MACHINE}/vmm
 SRCS+=	vmm_instruction_emul.c
 
-LIBADD=	vmmapi md nv pthread z util sbuf cam 9p
+LIBADD+=vmmapi md nv pthread z util sbuf cam 9p
 
 .if ${MK_CASPER} != "no"
 LIBADD+=	casper

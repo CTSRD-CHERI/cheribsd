@@ -28,23 +28,19 @@
  * $FreeBSD$
  */
 
-#ifndef _UART_EMUL_H_
-#define	_UART_EMUL_H_
+#ifndef _UART_BACKEND_H_
+#define	_UART_BACKEND_H_
 
-#define	UART_IO_BAR_SIZE	8
+struct uart_backend;
 
-struct uart_softc;
-struct vm_snapshot_meta;
+struct uart_backend *uart_backend_alloc(void);
+int uart_backend_open(struct uart_backend *b, const char *device,
+    void (*func)(int, enum ev_type, void *), void *arg);
 
-typedef void (*uart_intr_func_t)(void *arg);
-struct uart_softc *uart_init(uart_intr_func_t intr_assert,
-		uart_intr_func_t intr_deassert, void *arg);
+void uart_rxfifo_reset(struct uart_backend *b, int size);
+int uart_rxfifo_getchar(struct uart_backend *b);
+int uart_rxfifo_numchars(struct uart_backend *b);
+void uart_rxfifo_drain(struct uart_backend *b, bool loopback);
+bool uart_rxfifo_write(struct uart_backend *b, bool loopback, uint8_t ch);
 
-int	uart_legacy_alloc(int unit, int *ioaddr, int *irq);
-uint32_t uart_read(struct uart_softc *sc, int offset);
-void	uart_write(struct uart_softc *sc, int offset, uint32_t value);
-int	uart_set_backend(struct uart_softc *sc, const char *device);
-#ifdef BHYVE_SNAPSHOT
-int	uart_snapshot(struct uart_softc *sc, struct vm_snapshot_meta *meta);
-#endif
 #endif
