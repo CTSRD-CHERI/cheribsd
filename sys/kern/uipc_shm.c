@@ -1454,7 +1454,8 @@ shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_pointer_t *addr,
 #ifdef MAP_32BIT
 	    MAP_32BIT |
 #endif
-	    MAP_ALIGNMENT_MASK)) != 0)
+	    MAP_ALIGNMENT_MASK |
+	    MAP_RESERVATION_CREATE)) != 0)
 		return (EINVAL);
 
 	vaddr = (vm_offset_t)*addr;
