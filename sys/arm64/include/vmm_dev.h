@@ -58,8 +58,8 @@ struct vm_register {
 struct vm_register_set {
 	int		cpuid;
 	unsigned int	count;
-	const int	*regnums;	/* enum vm_reg_name */
-	vmm_register_t	*regvals;
+	const int	* __capability regnums;	/* enum vm_reg_name */
+	vmm_register_t	* __capability regvals;
 };
 
 struct vm_run {
@@ -124,7 +124,7 @@ struct vm_activate_cpu {
 struct vm_cpuset {
 	int		which;
 	int		cpusetsize;
-	cpuset_t	*cpus;
+	cpuset_t	* __capability cpus;
 };
 #define	VM_ACTIVE_CPUS		0
 #define	VM_SUSPENDED_CPUS	1
