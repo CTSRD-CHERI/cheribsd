@@ -44,6 +44,8 @@
 
 #define	CHERI_SEAL_VIOLATION_EXCEPTION	0
 
+#define	SI_CODE_STORELOCAL	PROT_CHERI_PERM
+
 #define	FLAKY_COMPILER_BOUNDS	"Morello compiler pads excessively"
 
 #ifndef __CHERI_PURE_CAPABILITY__
