@@ -238,6 +238,7 @@
 #define	SYS_flag_captured	259
 #define	SYS_caprevoke_shadow	260
 #define	SYS_caprevoke	261
+#define	SYS_caprevoke_stack	262
 #define	SYS_freebsd11_getdents	272
 #define	SYS_lchmod	274
 				/* 275 is obsolete netbsd_lchown */

@@ -318,7 +318,7 @@ struct sysent sysent[] = {
 	{ .sy_narg = AS(flag_captured_args), .sy_call = (sy_call_t *)sys_flag_captured, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 259 = flag_captured */
 	{ .sy_narg = AS(caprevoke_shadow_args), .sy_call = (sy_call_t *)sys_caprevoke_shadow, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 260 = caprevoke_shadow */
 	{ .sy_narg = AS(caprevoke_args), .sy_call = (sy_call_t *)sys_caprevoke, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 261 = caprevoke */
-	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 262 = nosys */
+	{ .sy_narg = AS(caprevoke_stack_args), .sy_call = (sy_call_t *)sys_caprevoke_stack, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 262 = caprevoke_stack */
 	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 263 = nosys */
 	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 264 = nosys */
 	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },			/* 265 = nosys */

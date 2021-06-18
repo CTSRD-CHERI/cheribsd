@@ -1501,7 +1501,13 @@
 		    _Out_ struct caprevoke_syscall_info *crsi,
 		);
 	}
-262-271	AUE_NULL	UNIMPL	nosys
+262	AUE_NULL	STD	{
+		int *caprevoke_stack(
+		    _In_ void *frame,
+		    _In_ void *shadow
+		);
+	}
+263-271	AUE_NULL	UNIMPL	nosys
 272	AUE_O_GETDENTS	COMPAT11 {
 		int getdents(
 		    int fd,

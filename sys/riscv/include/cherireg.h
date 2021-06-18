@@ -151,7 +151,7 @@
  * User and kernel software should be written so as to not place assumptions
  * about the specific values used here, as they may change.
  */
-#define	CHERI_OTYPE_BITS	(18)
+#define	CHERI_OTYPE_BITS	(15)
 #define	CHERI_OTYPE_USER_MIN	(0)
 #define	CHERI_OTYPE_USER_MAX	((1 << (CHERI_OTYPE_BITS - 1)) - 1)
 #define	CHERI_OTYPE_KERN_MIN	(1 << (CHERI_OTYPE_BITS - 1))
@@ -199,7 +199,7 @@
 #define	CHERI_EXCCODE_CCALL_IDC		0x1a
 #define	CHERI_EXCCODE_PERM_UNSEAL	0x1b
 #define	CHERI_EXCCODE_PERM_SET_CID	0x1c
-#define	_CHERI_EXCCODE_RESERVED1d	0x1d
+#define	CHERI_EXCCODE_STACK_LIFETIME	0x1d
 #define	_CHERI_EXCCODE_RESERVED1e	0x1e
 #define	_CHERI_EXCCODE_RESERVED1f	0x1f
 

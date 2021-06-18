@@ -65,4 +65,26 @@ void	hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr);
 	__asm__ __volatile__("slti zero, zero, 0x2e");			\
 } while(0)
 
+/**
+ * Access the frame-size bits and implied lifetime of a capability.
+ */
+#define CHERI_SET_STACK_FRAME_SIZE_BITS(cap_out, cap_in, value) do {	\
+	__asm__ __volatile__(						\
+		"csfs %0, %1, %2"					\
+		: "=C" (cap_out)					\
+		: "C" (cap_in), "r" (value));				\
+} while (0)
+#define CHERI_GET_STACK_FRAME_SIZE_BITS(out, cap) do {			\
+	__asm__ __volatile__(						\
+		"cgfs %0, %1"						\
+		: "=r" (out)						\
+		: "C" (cap));						\
+} while (0)
+#define CHERI_GET_FRAME_BASE(out, cap) do {				\
+	__asm__ __volatile__(						\
+		"cgetframebase %0, %1"					\
+		: "=C" (out)						\
+		: "C" (cap));						\
+} while (0)
+
 #endif /* !_MACHINE_CHERI_H_ */

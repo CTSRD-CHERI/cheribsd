@@ -385,6 +385,7 @@ FBSD_1.4 {
 FBSD_1.5 {
 	caprevoke;
 	caprevoke_shadow;
+	caprevoke_stack;
 	clock_nanosleep;
 	fdatasync;
 	fhstat;

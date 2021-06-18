@@ -172,6 +172,7 @@ MIASM =  \
 	flag_captured.o \
 	caprevoke_shadow.o \
 	caprevoke.o \
+	caprevoke_stack.o \
 	freebsd11_getdents.o \
 	lchmod.o \
 	lutimes.o \

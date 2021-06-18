@@ -60,6 +60,7 @@ static const char *cheri_exccode_descr[] = {
 	[CHERI_EXCCODE_CCALL_IDC] = "access ccall IDC violation",
 	[CHERI_EXCCODE_PERM_UNSEAL] = "permit unseal violation",
 	[CHERI_EXCCODE_PERM_SET_CID] = "permit CSetCID violation",
+	[CHERI_EXCCODE_STACK_LIFETIME] = "stack lifetime violation",
 };
 
 const char *
@@ -121,6 +122,9 @@ cheri_stval_to_sicode(register_t stval)
 
 	case CHERI_EXCCODE_SYSTEM_REGS:
 		return (PROT_CHERI_SYSREG);
+
+	case CHERI_EXCCODE_STACK_LIFETIME:
+		return (PROT_CHERI_STACK_LIFETIME);
 
 	case CHERI_EXCCODE_NONE:
 	default:

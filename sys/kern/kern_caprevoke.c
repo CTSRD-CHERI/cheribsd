@@ -29,6 +29,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/timers.h>
 
 #include <sys/caprevoke.h>
+#include <sys/libcaprevoke.h>
 #include <vm/vm_caprevoke.h>
 #include <sys/syscallsubr.h>
 
@@ -91,6 +92,49 @@ caprevoke_fini(struct caprevoke_syscall_info * __capability crsi,
 	if (res2 != 0)
 		return res2;
 	return res3;
+}
+
+/* These three functions are copied from vm_machdep_caprevoke.c */
+
+static inline void
+enable_user_memory_access(void)
+{
+	uint64_t tmp;
+
+	__asm __volatile (
+		"li %[tmp], %[sum]\n\t"
+		"csrs sstatus, %[tmp]\n\t"
+	: // outputs
+		[tmp] "=&r" (tmp)
+	: // inputs
+		[sum] "i" (SSTATUS_SUM)
+	: // clobbers
+		"memory"
+	);
+}
+
+static inline void
+disable_user_memory_access(void)
+{
+	uint64_t tmp;
+
+	__asm __volatile (
+		"li %[tmp], %[sum]\n\t"
+		"csrc sstatus, %[tmp]\n\t"
+	: // outputs
+		[tmp] "=&r" (tmp)
+	: // inputs
+		[sum] "i" (SSTATUS_SUM)
+	: // clobbers
+		"memory"
+	);
+}
+
+static void
+vm_caprevoke_tlb_fault(void)
+{
+	panic("Page fault after enabling kernel access to userspace pointers"
+	      "in caprevoke_stack().");
 }
 
 #ifdef CHERI_CAPREVOKE_STATS
@@ -648,6 +692,88 @@ kern_caprevoke_shadow(int flags, void * __capability arena,
 	return error;
 }
 
+static int
+kern_caprevoke_stack(struct thread *td, uint64_t * __capability frame,
+    void * __capability shadow)
+{
+	int error;
+	unsigned frame_size;
+	uint64_t mask;
+	ptraddr_t start, end;
+	vaddr_t sbase;
+	struct vmspace *vm;
+	vm_map_t vmm;
+	int caprevoke_flags;
+	caprevoke_epoch start_epoch;
+	struct caprevoke_syscall_info crsi;
+
+	vm = vmspace_acquire_ref(td->td_proc);
+	vmm = &vm->vm_map;
+
+	/* Retrieve the frame size bits. */
+	CHERI_GET_STACK_FRAME_SIZE_BITS(frame_size, frame);
+
+	if (frame_size > 0) {
+		/*
+		 * This is a CDL stack capability. Revoke just the frame it
+		 * points to.
+		 */
+		mask = 0xffffffffffffffff << (5 + frame_size);
+		start = (ptraddr_t)(uintcap_t)frame & mask;
+		end = start + (1 << (frame_size + 4));
+	} else {
+		/*
+		 * This capability does not have an implied lifetime, so we
+		 * shall assume that caprevoke_stack() has been called as part
+		 * of an unconditional revocation. Revoke from the passed frame
+		 * pointer to the end of the stack. We find the end of the stack
+		 * using the bounds of the stack pointer.
+		 */
+		start = (ptraddr_t)(uintcap_t)frame;
+		end = (ptraddr_t)cheri_getbase((uintcap_t)frame);
+	}
+
+	/*
+	 * The caprevoke helper code was copy-pasted from a userspace library,
+	 * so it doesn't use things like copyout(), but will instead attempt to
+	 * dereference userspace pointers directly. As a bit of a hack, we will
+	 * enable kernel access to userspace memory, using a page fault handler
+	 * that just kernel panics. This should never actually be hit, because
+	 * the shadow map should always be resident.
+	 */
+	td->td_pcb->pcb_onfault = (vm_offset_t)vm_caprevoke_tlb_fault;
+	enable_user_memory_access();
+
+	/* Actually paint the shadow map. */
+	sbase = VM_CAPREVOKE_BM_MEM_NOMAP;
+	caprev_shadow_nomap_set_raw(sbase, shadow, start, end);
+
+	/* Disable user memory access again. */
+	disable_user_memory_access();
+	td->td_pcb->pcb_onfault = 0;
+
+	/* Determine the start epoch. */
+	vm_map_lock(vmm);
+	start_epoch = caprevoke_st_epoch(vmm->vm_caprev_st);
+	vm_map_unlock(vmm);
+
+	/* Start the revocation. */
+	caprevoke_flags = CAPREVOKE_LAST_PASS;
+	error = kern_caprevoke(td, caprevoke_flags, start_epoch, &crsi);
+
+	/* Revocation is asynchronous. We need to spin until it's complete. */
+	while (caprevoke_st_state(vmm->vm_caprev_st) != CAPREVST_NONE) {}
+
+	/* Clear the shadow map. We need user memory access again for this. */
+	enable_user_memory_access();
+	td->td_pcb->pcb_onfault = (vm_offset_t)vm_caprevoke_tlb_fault;
+	caprev_shadow_nomap_clear_raw(sbase, shadow, start, end);
+	disable_user_memory_access();
+	td->td_pcb->pcb_onfault = 0;
+
+	return (error);
+}
+
 int
 sys_caprevoke(struct thread *td, struct caprevoke_args *uap)
 {
@@ -658,6 +784,12 @@ int
 sys_caprevoke_shadow(struct thread *td, struct caprevoke_shadow_args *uap)
 {
 	return kern_caprevoke_shadow(uap->flags, uap->arena, uap->shadow);
+}
+
+int
+sys_caprevoke_stack(struct thread *td, struct caprevoke_stack_args *uap)
+{
+	return kern_caprevoke_stack(td, uap->frame, uap->shadow);
 }
 
 #else /* CHERI_CAPREVOKE */
@@ -675,6 +807,12 @@ sys_caprevoke_shadow(struct thread *td, struct caprevoke_shadow_args *uap)
 
 	copyoutcap(&cres, uap->shadow, sizeof(cres));
 
+	return (nosys(td, (struct nosys_args *)uap));
+}
+
+int
+sys_caprevoke_stack(struct thread *td, struct caprevoke_stack_args *uap)
+{
 	return (nosys(td, (struct nosys_args *)uap));
 }
 

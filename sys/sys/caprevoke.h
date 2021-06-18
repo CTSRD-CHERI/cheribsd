@@ -399,6 +399,12 @@ int caprevoke(int flags, caprevoke_epoch start_epoch,
 int caprevoke_shadow(int flags,
 	void * __capability arena,
 	void * __capability * shadow);
+
+	/*
+	 * Revoke capabilities to stack addresses.
+	 */
+int caprevoke_stack(void * __capability frame, void * __capability shadow);
+
 #endif
 
 #endif /* !__SYS_CAPREVOKE_H__ */

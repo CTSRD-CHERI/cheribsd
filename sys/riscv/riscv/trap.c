@@ -488,15 +488,67 @@ do_trap_supervisor(struct trapframe *frame)
 	}
 }
 
+static uintcap_t
+extract_violating_cap(struct trapframe *frame, unsigned violating_cap_idx)
+{
+	if (violating_cap_idx == 0) {
+		return (uintcap_t)0;
+	} else if (violating_cap_idx <= 4) {
+		return ((uintcap_t *)frame)[violating_cap_idx - 1];
+	} else if (violating_cap_idx <= 7) {
+		return frame->tf_t[violating_cap_idx - 5];
+	} else if (violating_cap_idx <= 9) {
+		return frame->tf_s[violating_cap_idx - 8];
+	} else if (violating_cap_idx <= 17) {
+		return frame->tf_a[violating_cap_idx - 10];
+	} else if (violating_cap_idx <= 27) {
+		return frame->tf_s[violating_cap_idx - 16];
+	} else {
+		return frame->tf_t[violating_cap_idx - 25];
+	}
+}
+
+static void
+mark_stack_lifetime_violation_happened(struct trapframe *frame)
+{
+	int violating_cap_idx;
+	uintcap_t violating_cap;
+	uintcap_t frame_start;
+	int * __capability flag_userspace;
+	int flag_value;
+
+	/*
+	 * Determine the position of the start of the stack frame corresponding
+	 * to the capability that needs revoking.
+	 */
+	violating_cap_idx = TVAL_CAP_IDX(frame->tf_stval);
+	violating_cap = extract_violating_cap(frame, violating_cap_idx);
+	CHERI_GET_FRAME_BASE(frame_start, violating_cap);
+
+	/*
+	 * The flag location might not be within the bounds of the capability
+	 * that caused the exception. We must use the bounds of the userspace
+	 * stack pointer to make sure we can access it.
+	 */
+	flag_userspace = (int * __capability)cheri_setaddress(
+	    frame->tf_sp, (ptraddr_t)frame_start);
+
+	/* Write a 1 to indicate that a StackLifetimeViolation happened. */
+	flag_value = 1;
+	copyout(&flag_value, flag_userspace, sizeof(int));
+}
+
 void
 do_trap_user(struct trapframe *frame)
 {
 	uint64_t exception;
 	struct thread *td;
 	struct pcb *pcb;
+	uint64_t cause;
 
 	td = curthread;
 	pcb = td->td_pcb;
+	cause = TVAL_CAP_CAUSE(frame->tf_stval);
 
 	KASSERT(td->td_frame == frame,
 	    ("%s: td_frame %p != frame %p", __func__, td->td_frame, frame));
@@ -568,11 +620,16 @@ do_trap_user(struct trapframe *frame)
 		    (uintcap_t)frame->tf_stval, exception, 0);
 		break;
 	case SCAUSE_CHERI:
-		if (log_user_cheri_exceptions)
-			dump_cheri_exception(frame);
-		call_trapsignal(td, SIGPROT,
-		    cheri_stval_to_sicode(frame->tf_stval), frame->tf_sepc,
-		    exception, TVAL_CAP_IDX(frame->tf_stval));
+		if (cause == CHERI_EXCCODE_STACK_LIFETIME) {
+			mark_stack_lifetime_violation_happened(frame);
+			frame->tf_sepc += 4;	/* Next instruction */
+		} else {
+			if (log_user_cheri_exceptions)
+				dump_cheri_exception(frame);
+			call_trapsignal(td, SIGPROT,
+			cheri_stval_to_sicode(frame->tf_stval), frame->tf_sepc,
+			    exception, TVAL_CAP_IDX(frame->tf_stval));
+		}
 		userret(td, frame);
 		break;
 #endif

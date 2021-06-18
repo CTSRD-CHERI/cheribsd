@@ -734,6 +734,10 @@ struct caprevoke_args {
 	char start_epoch_l_[PADL_(uint64_t)]; uint64_t start_epoch; char start_epoch_r_[PADR_(uint64_t)];
 	char crsi_l_[PADL_(struct caprevoke_syscall_info * __capability)]; struct caprevoke_syscall_info * __capability crsi; char crsi_r_[PADR_(struct caprevoke_syscall_info * __capability)];
 };
+struct caprevoke_stack_args {
+	char frame_l_[PADL_(void * __capability)]; void * __capability frame; char frame_r_[PADR_(void * __capability)];
+	char shadow_l_[PADL_(void * __capability)]; void * __capability shadow; char shadow_r_[PADR_(void * __capability)];
+};
 struct lchmod_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
@@ -2015,6 +2019,7 @@ int	sys_kbounce(struct thread *, struct kbounce_args *);
 int	sys_flag_captured(struct thread *, struct flag_captured_args *);
 int	sys_caprevoke_shadow(struct thread *, struct caprevoke_shadow_args *);
 int	sys_caprevoke(struct thread *, struct caprevoke_args *);
+int	sys_caprevoke_stack(struct thread *, struct caprevoke_stack_args *);
 int	sys_lchmod(struct thread *, struct lchmod_args *);
 int	sys_lutimes(struct thread *, struct lutimes_args *);
 int	sys_preadv(struct thread *, struct preadv_args *);
@@ -2929,6 +2934,7 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 #define	SYS_AUE_flag_captured	AUE_NULL
 #define	SYS_AUE_caprevoke_shadow	AUE_NULL
 #define	SYS_AUE_caprevoke	AUE_NULL
+#define	SYS_AUE_caprevoke_stack	AUE_NULL
 #define	SYS_AUE_freebsd11_getdents	AUE_O_GETDENTS
 #define	SYS_AUE_lchmod	AUE_LCHMOD
 #define	SYS_AUE_lutimes	AUE_LUTIMES

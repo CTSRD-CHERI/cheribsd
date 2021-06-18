@@ -1356,6 +1356,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
+	/* caprevoke_stack */
+	case 262: {
+		struct caprevoke_stack_args *p = params;
+		uarg[0] = (intptr_t) p->frame; /* void * __capability */
+		uarg[1] = (intptr_t) p->shadow; /* void * __capability */
+		*n_args = 2;
+		break;
+	}
 	/* lchmod */
 	case 274: {
 		struct lchmod_args *p = params;
@@ -5557,6 +5565,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 2:
 			p = "userland struct caprevoke_syscall_info * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* caprevoke_stack */
+	case 262:
+		switch(ndx) {
+		case 0:
+			p = "userland void * __capability";
+			break;
+		case 1:
+			p = "userland void * __capability";
 			break;
 		default:
 			break;
@@ -9914,6 +9935,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 261:
 		if (ndx == 0 || ndx == 1)
 			p = "void *";
+		break;
+	/* caprevoke_stack */
+	case 262:
+		if (ndx == 0 || ndx == 1)
+			p = "int *";
 		break;
 	/* lchmod */
 	case 274:
