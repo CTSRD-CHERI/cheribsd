@@ -380,7 +380,8 @@ vm_fault_caprevoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 			 */
 			return VFCR_OK;
 		} else {
-			KASSERT(vm_caprev_st != CAPREVST_SS_LAST,
+			KASSERT(caprevoke_st_state(vm_caprev_st) !=
+			    CAPREVST_SS_LAST,
 			    ("VM_CAPREVOKE_PAGE_DIRTY, writeable, store STW"));
 
 			/* We'll catch it next time around */
