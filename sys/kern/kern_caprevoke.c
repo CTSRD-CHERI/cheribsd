@@ -473,9 +473,16 @@ fast_out:
 			 * with this AS possibly cached, ensuring that
 			 * nobody continues to see a stale LCLG (from two
 			 * epochs ago) as now suddenly valid again.
+			 *
+			 * Take a write lock on the address space around this
+			 * so that we don't race any page faults from kernel
+			 * worker threads; we won't race any page faults from
+			 * userspace already since we're single-threaded.
 			 */
+			vm_map_lock(&vm->vm_map);
 			pmap_caploadgen_next(vmm->pmap);
 			pmap_activate(td);
+			vm_map_unlock(&vm->vm_map);
 		}
 		res = KERN_SUCCESS;
 		break;
