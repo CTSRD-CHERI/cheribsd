@@ -73,8 +73,10 @@ vm_caprevoke_visit_rw(
 	int hascaps;
 	CAPREVOKE_STATS_FOR(crst, crc);
 
-	if (!vm_page_tryxbusy(m))
+	if (vm_page_sleep_if_busy(m, "CHERI revoke"))
 		return VM_CAPREVOKE_VIS_BUSY;
+		
+	vm_page_xbusy(m);
 	VM_OBJECT_WUNLOCK(m->object);
 
 	CAPREVOKE_STATS_BUMP(crst, pages_scan_rw);
@@ -102,6 +104,11 @@ vm_caprevoke_visit_rw(
 		vm_page_capdirty(m);
 	}
 
+	/*
+	 * m->object cannot have changed: the busy lock protects both the page's
+	 * contents (against pageout, not concurrent mutation) but also its
+	 * identity.
+	 */
 	VM_OBJECT_WLOCK(m->object);
 	vm_page_xunbusy(m);
 
@@ -126,8 +133,9 @@ vm_caprevoke_visit_ro(
 	vm_page_astate_t mas = vm_page_astate_load(m);
 #endif
 
-	if (!vm_page_tryxbusy(m))
+	if (vm_page_sleep_if_busy(m, "CHERI revoke"))
 		return VM_CAPREVOKE_VIS_BUSY;
+	vm_page_xbusy(m);
 	VM_OBJECT_WUNLOCK(m->object);
 
 	CAPREVOKE_STATS_BUMP(crst, pages_scan_ro);
@@ -450,8 +458,7 @@ visit_rw:
 			case VM_CAPREVOKE_VIS_BUSY:
 				if (mwired)
 					vm_caprevoke_unwire_in_situ(m);
-				VM_OBJECT_WUNLOCK(m->object);
-				VM_OBJECT_ASSERT_UNLOCKED(obj);
+				VM_OBJECT_WUNLOCK(obj);
 				return VM_CAPREVOKE_AT_TICK;
 			default:
 				panic("bad result from vm_caprevoke_visit_rw");
@@ -480,8 +487,7 @@ visit_rw:
 		 */
 		if (mwired)
 			vm_caprevoke_unwire_in_situ(m);
-		VM_OBJECT_WUNLOCK(m->object);
-		VM_OBJECT_ASSERT_UNLOCKED(obj);
+		VM_OBJECT_WUNLOCK(obj);
 		return VM_CAPREVOKE_AT_TICK;
 	case VM_CAPREVOKE_VIS_DIRTY:
 		/* Dirty here means we need to upgrade to RW now */
