@@ -81,7 +81,51 @@ vm_caprevoke_visit_rw(
 
 	CAPREVOKE_STATS_BUMP(crst, pages_scan_rw);
 
+	/*
+	 * In the Cornucopia story, we want to consider the page no longer dirty
+	 * just before we visit it.  We're interlocked against ourselves here,
+	 * in that there's just one revoker thread either running concurrently
+	 * or with the world stopped, so there's no risk of two of us getting
+	 * confused.
+	 *
+	 * In the load-side story, that's less true.  If there were just one
+	 * revoker and just one alias of this page, we could safely consume
+	 * PGA_CAPDIRTY before scanning the page: any racing store would cause
+	 * the PTE to become capdirty and any reclaim would push that back up to
+	 * PGA_CAPDIRTY.  Because there are aliases, though, we risk racing CLG
+	 * faults through this or another PTE (which, recall, merely wire, and
+	 * not xbusy the page under study).  In particular, if CLG faults could
+	 * transition to IDLE, we would risk this race:
+	 *
+	 *   T1                   T2                         T3
+	 *   --------------------|--------------------------|----------------
+	 *                        wire m for CLG
+	 *                        visit page, see no caps
+	 *   hold m for bg scan
+	 *                                                   create new PTE
+	 *   xbusy
+	 *                                                   write a cap to m
+	 *                                                   evict PTE, set
+	 *                                                    PGA_CAPDIRTY
+	 *   clear PGA_CAPDIRTY
+	 *                        observe all PTEs clean,
+	 *                         and PGA_CAPDIRTY zero:
+	 *                          move to IDLE!
+	 *   visit, see cap
+	 *   bounce off PTE CLG
+	 *   xunbusy
+	 *
+	 * At this point we would have an IDLE page bearing a capability.  But
+	 * there are two ways around this: we could accept the transient of an
+	 * IDLE xbusy page as a kind of "not really IDLE" state and have the
+	 * background revoker put it back (by re-asserting PGA_CAPSTORE), or we
+	 * could restrict the transition to IDLE to the background scan.  We
+	 * choose the latter for the moment.  Thus, even though the CLG faults
+	 * might see a zero for PGA_CAPDIRTY where they shouldn't, nothing
+	 * fundamentally depends on that result, so it's fine.  (XXX yes?)
+	 */
 	vm_page_aflag_clear(m, PGA_CAPDIRTY);
+
 	hascaps = vm_caprevoke_page_rw(crc, m);
 
 	if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {

@@ -435,7 +435,7 @@ extern struct mtx_padalign pa_lock[];
  * held.
  *
  * PGA_CAPSTORE indicates that the page might be holding capabilities and might
- * be mapped as permitting capability stores (if PGA_WRITABLE is also set).  If
+ * be mapped as permitting capability stores (if PGA_WRITEABLE is also set).  If
  * clear, the page certainly bears no capabilities (and will not come to hold
  * them without a trip through vm_fault).  Clearing this bit requires that the
  * page be being freed (that is, going through the laundry) or that the system
@@ -446,8 +446,8 @@ extern struct mtx_padalign pa_lock[];
  *
  * PGA_CAPDIRTY indicates that a capability was "recently" written to this page
  * and the underlying mapping has been removed, reclaimed, or synchronized back
- * to the MI layer.  The MD layer sets this bit happens without the page lock
- * held, but clearing it requires synchronization, as with PGA_CAPSTORE.
+ * to the MI layer.  The MD layer sets this bit without locks, but clearing it
+ * requires synchronization, as with PGA_CAPSTORE.
  */
 #define	PGA_WRITEABLE	0x0001		/* page may be mapped writeable */
 #define	PGA_REFERENCED	0x0002		/* page has been referenced */

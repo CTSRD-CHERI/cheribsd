@@ -565,9 +565,8 @@ vm_caprevoke_page_rw(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 	int res = 0;
 
 	/*
-	 * XXX NWF
-	 * Hopefully m being xbusy'd means it's not about to go away on us.
-	 * I don't yet understand all the interlocks in the vm subsystem.
+	 * m is wired (or busy), which means it's not about to be reclaimed
+	 * under us.  Go sweep via the DMAP.
 	 */
 	mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 	mve = mva + pagesizes[0];
@@ -655,10 +654,10 @@ vm_caprevoke_page_ro(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 	res = vm_caprevoke_page_iter(crc, vm_caprevoke_page_ro_adapt, mvu, mve);
 
 	/*
-	 * Unlike vm_caprevoke_page, we don't need to do a fence here: either
-	 * we haven't written to the page, and so there's nothing relevant in
-	 * our store buffer, or we're bailing out to upgrade the page to
-	 * writeable status.
+	 * Unlike vm_caprevoke_page_rw, we don't need to do a fence here: we
+	 * have not written anything to the page (either because we swept it
+	 * successfully without needing to revoke anything or because we would
+	 * have and we're headed towards upgrading the page to writable status.)
 	 */
 
 #ifdef CHERI_CAPREVOKE_STATS

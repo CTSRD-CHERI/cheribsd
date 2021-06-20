@@ -3731,7 +3731,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 				 */
 				pmap_clear_bits(pte, PTE_CD);
 			} else if (oldpte & PTE_CW) {
-				/* PTE CAP-DIRTYABLE -> CAP-CLEAN */
+				/* PTE CAP-DIRTYABLE -> CAP-CLEAN? */
 				pmap_caploadgen_update_clear_cw(pte, oldpte);
 			} else if (flags & PMAP_CAPLOADGEN_EXCLUSIVE) {
 				/* No new mappings possible */
