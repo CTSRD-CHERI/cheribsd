@@ -93,7 +93,7 @@ __ElfType(Auxinfo);
 
 #define	ELF_MACHINE_OK(x) ((x) == (ELF_ARCH))
 
-#define	ELF_IS_CHERI(hdr) (((hdr)->e_entry & 1) == 1)
+#define	ELF_IS_CHERI(hdr) (((hdr)->e_flags & EF_AARCH64_CHERI_PURECAP) != 0)
 
 /* Define "machine" characteristics */
 #if __ELF_WORD_SIZE == 64
