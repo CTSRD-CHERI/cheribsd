@@ -576,7 +576,7 @@ ok:
 		!(flags & VM_CAPREVOKE_BARRIERED),
 	    ("Capdirty page after visit with world stopped?"));
 
-	*ooff = ioff + pagesizes[m->psind];
+	*ooff = ioff + pagesizes[0];
 	if (mwired)
 		vm_caprevoke_unwire_in_situ(m);
 	if (m->object != obj) {
