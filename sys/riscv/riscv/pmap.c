@@ -2642,6 +2642,24 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va,
 		return;
 	}
 
+	if ((firstl3e & (PTE_CW | PTE_CD)) == PTE_CW) {
+		/*
+		 * Prohibit superpages involving CW-set CD-clear PTEs.  The
+		 * revoker creates these without TLB shootdown, and so there
+		 * may be a CAP-DIRTY TLBE still in the system.  Thankfully,
+		 * these are ephemera: either they'll transition to CD-set
+		 * or CW-clear in the next revocation epoch.
+		 *
+		 * We need only explicitly exclude this on firstl3e, as CW and
+		 * CD are both in the PTE_PROMOTE mask used to test equivalence
+		 * below.
+		 */
+		CTR2(KTR_PMAP, "pmap_promote_l2: fail CW for va %#lx pmap %p",
+		    va, pmap);
+		atomic_add_long(&pmap_l2_p_failures, 1);
+		return;
+	}
+
 	/*
 	 * Downgrade a clean, writable mapping to read-only to ensure that the
 	 * hardware does not set PTE_D while we are comparing PTEs.
