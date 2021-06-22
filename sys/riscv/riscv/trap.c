@@ -346,10 +346,21 @@ page_fault_handler(struct trapframe *frame, int usermode)
 
 #ifdef CHERI_CAPREVOKE
 	if ((frame->tf_scause == SCAUSE_LOAD_CAP_PAGE_FAULT) &&
-	    (va < VM_MAX_USER_ADDRESS) &&
-	    (vm_caprevoke_fault_visit(p->p_vmspace, va) ==
-	     VM_CAPREVOKE_FAULT_RESOLVED))
-		goto done;
+	    (va < VM_MAX_USER_ADDRESS)) {
+		if (vm_caprevoke_fault_visit(p->p_vmspace, va) ==
+		    VM_CAPREVOKE_FAULT_RESOLVED)
+			goto done;
+		else {
+			/*
+			 * vm_caprevoke_fault_visit calls
+			 * pmap_caploadgen_update, so if it's left us
+			 * UNRESOLVED, then there's no point in trying the pmap
+			 * again.
+			 */
+			ftype = VM_PROT_READ | VM_PROT_READ_CAP;
+			goto skip_pmap;
+		}
+	}
 #endif
 
 	if (frame->tf_scause == SCAUSE_STORE_PAGE_FAULT) {
@@ -369,6 +380,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	if (pmap_fault(map->pmap, va, ftype))
 		goto done;
 
+skip_pmap:
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
