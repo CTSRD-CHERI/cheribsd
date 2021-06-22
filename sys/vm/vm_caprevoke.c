@@ -139,6 +139,14 @@ vm_caprevoke_visit_ro(
 	VM_OBJECT_WUNLOCK(m->object);
 
 	CAPREVOKE_STATS_BUMP(crst, pages_scan_ro);
+
+	/*
+	 * As above, it's safe to clear this flag here on either the load or
+	 * store side, regardless of aliasing.  On the store side, we don't
+	 * need to visit this page again and on the load side we won't IDLE the
+	 * page in any racing CLG fault handler.
+	 */
+	vm_page_aflag_clear(m, PGA_CAPDIRTY);
 	hascaps = vm_caprevoke_page_ro(crc, m);
 
 	KASSERT(!(hascaps & VM_CAPREVOKE_PAGE_HASCAPS) ||
@@ -149,27 +157,6 @@ vm_caprevoke_visit_ro(
 
 	VM_OBJECT_WLOCK(m->object);
 	vm_page_xunbusy(m);
-
-	if ((hascaps & VM_CAPREVOKE_PAGE_HASCAPS) == 0) {
-		/*
-		 * This can only be true if we scanned the entire page and
-		 * found no tagged, permission-bearing things.  In that case,
-		 * even though the page is possibly shared, it's safe to mark
-		 * it as clean for subsequent revocation passes!
-		 */
-		vm_page_aflag_clear(m, PGA_CAPDIRTY);
-		CAPREVOKE_STATS_BUMP(crst, pages_mark_clean);
-	} else if (m->a.flags & PGA_CAPDIRTY) {
-		/*
-		 * Even if we have capabilities here, it's sufficient to
-		 * visit only in the opening pass.  While RW pages would
-		 * rely on PGA_CAPDIRTY to be revisited, for RO pages,
-		 * VIS_DIRTY causes us to upgrade to RW now, so this is
-		 * a fine shuffling of capdirty bits.
-		 */
-		vm_page_aflag_set(m, PGA_CAPSTORE);
-		vm_page_aflag_clear(m, PGA_CAPDIRTY);
-	}
 
 	if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {
 		return VM_CAPREVOKE_VIS_DIRTY;
