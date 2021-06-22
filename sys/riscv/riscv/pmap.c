@@ -2096,7 +2096,16 @@ pmap_page_dirty(pt_entry_t entry, vm_page_t m)
 		vm_page_dirty(m);
 
 #if __has_feature(capabilities)
-	if ((entry & PTE_CD) != 0)
+	/*
+	 * In its quest to avoid TLB shootdowns, the revoker sweep can create
+	 * CD-clear CW-set PTEs that nevertheless have CD-set TLBEs fronting
+	 * them.  Therefore, we must consider PTE_CW alone grounds for being
+	 * capability dirty when we remove a PTE.  (PTE_CD can be set only when
+	 * PTE_CW is also set, so we ignore it here.)
+	 *
+	 * TODO This is pretty heavy-handed.  Can we do better?
+	 */
+	if ((entry & PTE_CW) != 0)
 		vm_page_capdirty(m);
 #endif
 }
