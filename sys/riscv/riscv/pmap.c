@@ -3662,16 +3662,22 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 		res = PMAP_CAPLOADGEN_UNABLE;
 		goto out;
 	}
-	if ((l2e & PTE_RWX) == 0) {
-		pte = pmap_l2_to_l3(l2, va);
-		if (pte == NULL || ((oldpte = pmap_load(pte)) & PTE_V) == 0) {
-			m = NULL;
-			res = PMAP_CAPLOADGEN_UNABLE;
-			goto out;
-		}
-	} else {
-		pte = l2;
-		oldpte = l2e;
+	if ((l2e & PTE_RWX) != 0) {
+		/*
+		 * Large page: bouncing out here means we'll take a VM fault
+		 * to find the page in question.
+		 *
+		 * XXX We'd rather just demote the L2 page right now, surely?
+		 */
+		m = NULL;
+		res = PMAP_CAPLOADGEN_UNABLE;
+		goto out;
+	}
+	pte = pmap_l2_to_l3(l2, va);
+	if (pte == NULL || ((oldpte = pmap_load(pte)) & PTE_V) == 0) {
+		m = NULL;
+		res = PMAP_CAPLOADGEN_UNABLE;
+		goto out;
 	}
 
 	switch (oldpte & (PTE_CR | PTE_CRM)) {
