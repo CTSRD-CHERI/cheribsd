@@ -29,6 +29,9 @@
 
 #include <sys/types.h>
 #include <machine/elf.h>
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
 
 #include <err.h>
 #include <errno.h>
@@ -45,15 +48,19 @@ int
 ef_reloc(struct elf_file *ef, const void *reldata, int reltype, Elf_Off relbase,
     Elf_Off dataoff, size_t len, void *dest)
 {
-	Elf_Addr *where, addend;
+	void *where;
+	Elf_Addr addend;
 	Elf_Size rtype;
 	const Elf_Rela *rela;
+#if __has_feature(capabilities)
+	Elf_Addr *fragment;
+#endif
 
 	if (reltype != EF_RELOC_RELA)
 		return (EINVAL);
 
 	rela = (const Elf_Rela *)reldata;
-	where = (Elf_Addr *) ((uintptr_t)dest - dataoff + rela->r_offset);
+	where = (void *) ((uintptr_t)dest - dataoff + rela->r_offset);
 	addend = rela->r_addend;
 	rtype = ELF_R_TYPE(rela->r_info);
 
@@ -62,10 +69,17 @@ ef_reloc(struct elf_file *ef, const void *reldata, int reltype, Elf_Off relbase,
 
 	switch(rtype) {
 	case R_AARCH64_RELATIVE:
-		*where = relbase + addend;
+		*((Elf_Addr *)where) = relbase + addend;
 		break;
 	case R_AARCH64_ABS64:
 		break;
+#if __has_feature(capabilities)
+	case R_MORELLO_RELATIVE:
+		fragment = (Elf_Addr *)where;
+		*((void * __capability *)where) = cheri_fromint(fragment[0] +
+		    relbase + addend);
+		break;
+#endif
 	default:
 		warnx("unhandled relocation type %lu", rtype);
 		break;
