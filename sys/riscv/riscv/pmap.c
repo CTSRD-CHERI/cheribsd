@@ -3388,6 +3388,8 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 /*
  * Atomically push all the in-PTE, MD capdirty bits up to the MI layer.
  *
+ * Demotes PTE_CD superpages to avoid creating PTE_CW w/o PTE_CD L2 PTEs.
+ *
  * While this is a fairly long-running operation under the current pmap
  * lock, it's going to be called only from single-threaded context, so there
  * should be minimal contention (perhaps from the page daemon or updates to
@@ -3407,6 +3409,7 @@ pmap_sync_capdirty(pmap_t pmap)
 	uint64_t inuse, bitmask;
 	int field, idx;
 
+	rw_rlock(&pvh_global_lock);
 	PMAP_LOCK(pmap);
 
 	TAILQ_FOREACH_SAFE(pc, &pmap->pm_pvchunk, pc_list, npc) {
@@ -3423,11 +3426,17 @@ pmap_sync_capdirty(pmap_t pmap)
 				ptepde = pmap_load(pte);
 				pte = pmap_l1_to_l2(pte, pv->pv_va);
 				tpte = pmap_load(pte);
-				if ((tpte & PTE_RWX) == 0) {
-					ptepde = tpte;
-					pte = pmap_l2_to_l3(pte, pv->pv_va);
-					tpte = pmap_load(pte);
+				if ((tpte & PTE_RWX) != 0) {
+					/* Superpage */
+					if ((tpte & PTE_CD) == 0) {
+						/* But all cap-clean */
+						continue;
+					}
+					pmap_demote_l2(pmap, pte, pv->pv_va);
 				}
+				ptepde = tpte;
+				pte = pmap_l2_to_l3(pte, pv->pv_va);
+				tpte = pmap_load(pte);
 
 				if ((tpte & PTE_SW_MANAGED) == 0)
 					continue;
@@ -3444,6 +3453,8 @@ pmap_sync_capdirty(pmap_t pmap)
 			}
 		}
 	}
+
+	rw_runlock(&pvh_global_lock);
 
 	pmap_invalidate_all(pmap);
 
