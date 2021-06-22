@@ -2540,7 +2540,7 @@ pmap_fault(pmap_t pmap, vm_offset_t va, vm_prot_t ftype)
 	 */
 	if ((oldpte & bits) != bits)
 		pmap_store_bits(pte, bits);
-	sfence_vma();
+	sfence_vma(); // TODO: just the one address, surely?
 	rv = 1;
 done:
 	PMAP_UNLOCK(pmap);
@@ -2783,7 +2783,19 @@ cheri_pte_cr(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 #if 0 // Toooba is not tag-dependent yet, so this doesn't work out well at all
 		return PTE_CR_TRAP;
 #endif
-		/* We'd rather trap than clear, but here we are */
+		/*
+		 * XXX NWF
+		 *
+		 * We'd rather trap than clear, but here we are.  This has
+		 * implications on the rest of the capdirty / load-side
+		 * revocation story: transitions which set PGA_CAPSTORE, and
+		 * therefore permit new capabilities in a page, must update all
+		 * of this pages' PTEs to have LCLG == GCLG.  When we can trap
+		 * instead, we can take that on lazily.
+		 *
+		 * XXX verify
+		 */
+
 		return PTE_CR_CLEAR;
 	}
 }
@@ -3682,11 +3694,18 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 
 	switch (oldpte & (PTE_CR | PTE_CRM)) {
 	case 0:		// tag clearing
-	case PTE_CR:	// always allowed; not for us to worry about?
 	case PTE_CRM:	// always trapping; not something we can fix?
+
+		// TODO This seems wrong.  I guess the good news is that we
+		// probably don't hit these cases often, but when we do it's
+		// probably for IDLE pages and we should just return m and let
+		// the system see that PGA_CAPSTORE is clear.  Yes?
+
 		m = NULL;
 		res = PMAP_CAPLOADGEN_UNABLE;
 		goto out;
+	case PTE_CR:	// always allowed; not for us to worry about?
+		panic("Unexpected PTE @ CR !CRM; revocation not optional yet");
 	case PTE_CR | PTE_CRM: // ah, here we go
 		break;
 	}
@@ -3813,6 +3832,12 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 	}
 
 out:
+#if VM_NRESERVLEVEL > 0
+	if (flags & PMAP_CAPLOADGEN_EXCLUSIVE) {
+		// TODO: if EXCLUSIVE and last-l3-in-l2, try reassembly?
+	}
+#endif
+
 	PMAP_UNLOCK(pmap);
 out_unlocked:
 

@@ -399,6 +399,7 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 			goto visit_rw;
 		}
 	}
+	// XXX else pmap_extract_and_hold?
 
 	KASSERT(m == NULL, ("Load side bad state arc"));
 	vm_page_grab_valid(&m, obj, ipi,
@@ -614,6 +615,12 @@ ok:
 		}
 	}
 #endif
+
+	/*
+	 * XXX In all the excitement for load-side, we've neglected store-side's
+	 * ability to ever clear PGA_CAPSTORE.  That needs some attention for
+	 * fair comparison!
+	 */
 
 	mas = vm_page_astate_load(m);
 	KASSERT(((mas.flags & PGA_CAPDIRTY) == 0) ||
