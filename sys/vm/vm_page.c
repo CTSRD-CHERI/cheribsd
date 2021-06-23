@@ -5363,6 +5363,13 @@ vm_page_ps_test(vm_page_t m, int flags, vm_page_t skip_m)
 		/* Always test object consistency, including "skip_m". */
 		if (m[i].object != object)
 			return (false);
+
+		// XXX CAPSTORE checks shouldn't exempt m_skip?
+		if ((flags & PS_ALL_CAPSTORE) != 0) {
+			if (!(vm_page_astate_load(&m[i]).flags & PGA_CAPSTORE))
+				return (false);
+		}
+
 		if (&m[i] == skip_m)
 			continue;
 		if ((flags & PS_NONE_BUSY) != 0 && vm_page_busied(&m[i]))

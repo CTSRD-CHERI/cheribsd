@@ -605,6 +605,7 @@ malloc2vm_flags(int malloc_flags)
 #define	PS_ALL_DIRTY	0x1
 #define	PS_ALL_VALID	0x2
 #define	PS_NONE_BUSY	0x4
+#define	PS_ALL_CAPSTORE	0x8
 
 bool vm_page_busy_acquire(vm_page_t m, int allocflags);
 void vm_page_busy_downgrade(vm_page_t m);

@@ -339,6 +339,14 @@ vm_fault_soft_fast(struct faultstate *fs)
 			if ((fs->first_object->flags & OBJ_UNMANAGED) == 0)
 				flags |= PS_ALL_DIRTY;
 		}
+		if ((fs->prot & VM_PROT_WRITE_CAP) != 0) {
+			/*
+			 * Similarly, if we're permitting capability stores,
+			 * require all pages to be tracked by the revoker
+			 * already.
+			 */
+			flags |= PS_ALL_CAPSTORE;
+		}
 		if (vm_page_ps_test(m_super, flags, m)) {
 			m_map = m_super;
 			psind = m_super->psind;
