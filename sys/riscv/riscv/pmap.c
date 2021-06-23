@@ -3832,8 +3832,12 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 
 out:
 #if VM_NRESERVLEVEL > 0
-	if (flags & PMAP_CAPLOADGEN_EXCLUSIVE) {
-		// TODO: if EXCLUSIVE and last-l3-in-l2, try reassembly?
+	if ((flags & PMAP_CAPLOADGEN_EXCLUSIVE) &&
+	    ((va & (L2_OFFSET - L3_OFFSET)) == (L2_OFFSET - L3_OFFSET))) {
+		struct rwlock *lock = NULL;
+		pmap_promote_l2(pmap, l2, va, &lock);
+		if (lock != NULL)
+			rw_wunlock(lock);
 	}
 #endif
 
