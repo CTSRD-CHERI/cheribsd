@@ -3586,7 +3586,8 @@ restart:
 		}
 		l2e = pmap_load(pmap_l2(pmap, pv->pv_va));
 		PMAP_UNLOCK(pmap);
-		if (l3e & PTE_CW) {
+
+		if (l2e & PTE_CW) {
 			rv = false;
 			goto out;
 		}
