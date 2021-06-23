@@ -3716,7 +3716,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 		if (flags & PMAP_CAPLOADGEN_UPDATETLB)
 			sfence_vma_page(va);
 
-		*pva = va + ((pte == l2) ? L2_SIZE : PAGE_SIZE);
+		*pva = va + PAGE_SIZE;
 		m = NULL;
 		res = PMAP_CAPLOADGEN_ALREADY;
 		goto out;
@@ -3724,16 +3724,14 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 
 	KASSERT(oldpte & PTE_U, ("!PTE_U w/ CLG mismatch va=%lx", va));
 
-	vm_offset_t oldphys = (pte == l2) ?
-		L2PTE_TO_PHYS(oldpte) : PTE_TO_PHYS(oldpte);
-	m = PHYS_TO_VM_PAGE(oldphys);
+	m = PHYS_TO_VM_PAGE(PTE_TO_PHYS(oldpte));
 	if (*mp == m) {
 		/*
 		 * We expected this page here (i.e., this is the page we just
 		 * scanned), so go ahead and update.  We know that the CLG bits
 		 * must still be wrong in light of the earlier test.
 		 */
-		*pva = va + ((pte == l2) ? L2_SIZE : PAGE_SIZE);
+		*pva = va + PAGE_SIZE;
 		res = PMAP_CAPLOADGEN_OK;
 
 		if (!(flags & PMAP_CAPLOADGEN_HASCAPS)) {
@@ -3815,7 +3813,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 			sfence_vma_page(va);
 		}
 
-		*pva = va + ((pte == l2) ? L2_SIZE : PAGE_SIZE);
+		*pva = va + PAGE_SIZE;
 		m = NULL;
 		res = PMAP_CAPLOADGEN_CLEAN;
 	} else if ((flags & PMAP_CAPLOADGEN_WIRE) && !vm_page_wire_mapped(m)) {
