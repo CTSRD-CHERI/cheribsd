@@ -264,6 +264,7 @@ CRUNCH_PROGS_usr.bin+= \
 		sed \
 		seq \
 		sockstat \
+		sort \
 		stat \
 		tail \
 		tar \
@@ -276,6 +277,7 @@ CRUNCH_PROGS_usr.bin+= \
 		tput \
 		tr \
 		true \
+		truss \
 		uname \
 		uudecode \
 		uuencode \
