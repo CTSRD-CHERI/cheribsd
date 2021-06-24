@@ -353,6 +353,8 @@ SYSCTL_INT(_vm_pmap_vmid, OID_AUTO, epoch, CTLFLAG_RD, &vmids.asid_epoch, 0,
 
 void (*pmap_clean_stage2_tlbi)(void);
 void (*pmap_invalidate_vpipt_icache)(void);
+void (*pmap_stage2_invalidate_page)(uint64_t, vm_offset_t, bool);
+void (*pmap_stage2_invalidate_all)(uint64_t);
 
 /*
  * A pmap's cookie encodes an ASID and epoch number.  Cookies for reserved
@@ -678,8 +680,15 @@ pmap_pte_exists(pmap_t pmap, vm_offset_t va, int level, const char *diag)
 }
 
 bool
-pmap_ps_enabled(pmap_t pmap __unused)
+pmap_ps_enabled(pmap_t pmap)
 {
+	/*
+	 * Promotion requires a hypervisor call when the kernel is running
+	 * in EL1. To stop this disable superpage support on non-stage 1
+	 * pmaps for now.
+	 */
+	if (pmap->pm_stage != PM_STAGE1)
+		return (false);
 
 	return (superpages_enabled != 0);
 }
@@ -1492,6 +1501,14 @@ pmap_invalidate_page(pmap_t pmap, vm_offset_t va, bool final_only)
 	isb();
 }
 
+static __inline void
+pmap_s2_invalidate_page(pmap_t pmap, vm_offset_t va, bool final_only)
+{
+	PMAP_ASSERT_STAGE2(pmap);
+	MPASS(pmap_stage2_invalidate_all != NULL);
+	pmap_stage2_invalidate_page(pmap_to_ttbr0(pmap), va, true);
+}
+
 /*
  * Invalidates any cached final- and optionally intermediate-level TLB entries
  * for the specified virtual address range in the given virtual address space.
@@ -1542,6 +1559,15 @@ pmap_invalidate_all(pmap_t pmap)
 	dsb(ish);
 	isb();
 }
+
+static __inline void
+pmap_s2_invalidate_all(pmap_t pmap)
+{
+	PMAP_ASSERT_STAGE2(pmap);
+	MPASS(pmap_stage2_invalidate_all != NULL);
+	pmap_stage2_invalidate_all(pmap_to_ttbr0(pmap));
+}
+
 
 /*
  *	Routine:	pmap_extract
@@ -1994,7 +2020,10 @@ _pmap_unwire_l3(pmap_t pmap, vm_offset_t va, vm_page_t m, struct spglist *free)
 		l1pg = PHYS_TO_VM_PAGE(tl0 & ~ATTR_MASK);
 		pmap_unwire_l3(pmap, va, l1pg, free);
 	}
-	pmap_invalidate_page(pmap, va, false);
+	if (pmap->pm_stage == PM_STAGE1)
+		pmap_invalidate_page(pmap, va, false);
+	else
+		pmap_s2_invalidate_page(pmap, va, false);
 
 	/*
 	 * Put page on a list so that it is released after
@@ -2109,6 +2138,14 @@ pmap_pinit(pmap_t pmap)
 {
 
 	return (pmap_pinit_stage(pmap, PM_STAGE1, 4));
+}
+
+/*
+ * This can be called before destroying a pmap so the tlb management is skipped
+ */
+void
+pmap_pre_destroy(pmap_t pmap)
+{
 }
 
 /*
@@ -3280,7 +3317,9 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 	for (l3 = pmap_l2_to_l3(&l2e, sva); sva != eva; l3++, sva += L3_SIZE) {
 		if (!pmap_l3_valid(pmap_load(l3))) {
 			if (va != eva) {
-				pmap_invalidate_range(pmap, va, sva, true);
+				if (pmap->pm_stage == PM_STAGE1)
+					pmap_invalidate_range(pmap, va, sva,
+					    true);
 				va = eva;
 			}
 			continue;
@@ -3307,8 +3346,10 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 					 * still provides access to that page. 
 					 */
 					if (va != eva) {
-						pmap_invalidate_range(pmap, va,
-						    sva, true);
+						if (pmap->pm_stage == PM_STAGE1)
+							pmap_invalidate_range(
+							    pmap, va, sva,
+							    true);
 						va = eva;
 					}
 					rw_wunlock(*lockp);
@@ -3337,8 +3378,15 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 		if (va == eva)
 			va = sva;
 	}
-	if (va != eva)
+	if (pmap->pm_stage == PM_STAGE1 && va != eva) {
 		pmap_invalidate_range(pmap, va, sva, true);
+	} else if (pmap->pm_stage == PM_STAGE2) {
+		/*
+		 * Invalidate all entries rather than as we remove them
+		 * as it may involve a call into EL2
+		 */
+		pmap_s2_invalidate_all(pmap);
+	}
 }
 
 /*
@@ -3939,6 +3987,7 @@ pmap_enter_largepage(pmap_t pmap, vm_offset_t va, pt_entry_t newpte, int flags,
 	vm_page_t mp;
 
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
+	PMAP_ASSERT_STAGE1(pmap);
 	KASSERT(psind > 0 && psind < MAXPAGESIZES,
 	    ("psind %d unexpected", psind));
 	KASSERT(((newpte & ~ATTR_MASK) & (pagesizes[psind] - 1)) == 0,
@@ -5455,7 +5504,8 @@ pmap_remove_pages(pmap_t pmap)
 	}
 	if (lock != NULL)
 		rw_wunlock(lock);
-	pmap_invalidate_all(pmap);
+	if (pmap->pm_stage == PM_STAGE1)
+		pmap_invalidate_all(pmap);
 	PMAP_UNLOCK(pmap);
 	vm_page_free_pages_toq(&free, true);
 }
@@ -5779,7 +5829,10 @@ retry:
 			    (uintptr_t)pmap) & (Ln_ENTRIES - 1)) == 0 &&
 			    (tpte & ATTR_SW_WIRED) == 0) {
 				pmap_clear_bits(pte, ATTR_AF);
-				pmap_invalidate_page(pmap, va, true);
+				if (pmap->pm_stage == PM_STAGE1)
+					pmap_invalidate_page(pmap, va, true);
+				else
+					pmap_s2_invalidate_page(pmap, va, true);
 				cleared++;
 			} else
 				not_cleared++;
@@ -5820,7 +5873,10 @@ small_mappings:
 		if ((tpte & ATTR_AF) != 0) {
 			if ((tpte & ATTR_SW_WIRED) == 0) {
 				pmap_clear_bits(pte, ATTR_AF);
-				pmap_invalidate_page(pmap, pv->pv_va, true);
+				if (pmap->pm_stage == PM_STAGE1)
+					pmap_invalidate_page(pmap, va, true);
+				else
+					pmap_s2_invalidate_page(pmap, va, true);
 				cleared++;
 			} else
 				not_cleared++;

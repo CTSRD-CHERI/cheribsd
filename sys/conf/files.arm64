@@ -59,6 +59,7 @@ arm64/arm64/gicv3_its.c				optional intrng fdt
 arm64/arm64/gic_v3.c				standard
 arm64/arm64/gic_v3_acpi.c			optional acpi
 arm64/arm64/gic_v3_fdt.c			optional fdt
+arm64/arm64/hyp_stub.S				standard
 arm64/arm64/identcpu.c				standard
 arm64/arm64/locore.S				standard no-obj
 arm64/arm64/machdep.c				standard
@@ -158,6 +159,39 @@ arm64/iommu/smmu_fdt.c				optional iommu fdt
 arm64/iommu/smmu_quirks.c			optional iommu
 dev/iommu/busdma_iommu.c			optional iommu
 dev/iommu/iommu_gas.c				optional iommu
+
+arm64/vmm/vmm.c					optional vmm
+arm64/vmm/vmm_dev.c				optional vmm
+arm64/vmm/vmm_instruction_emul.c		optional vmm
+arm64/vmm/vmm_mem.c				optional vmm
+arm64/vmm/vmm_stat.c				optional vmm
+arm64/vmm/vmm_arm64.c				optional vmm
+arm64/vmm/vmm_psci.c				optional vmm
+arm64/vmm/vmm_reset.c				optional vmm
+arm64/vmm/vmm_call.S				optional vmm
+arm64/vmm/vmm_hyp_exception.S			optional vmm		\
+	compile-with	"${NORMAL_C} -fpie"				\
+	no-obj
+arm64/vmm/vmm_hyp.c				optional vmm		\
+	compile-with	"${NORMAL_C} -fpie"				\
+	no-obj
+vmm_hyp_blob.elf.full				optional vmm		\
+	dependency	"vmm_hyp.o vmm_hyp_exception.o"			\
+	compile-with	"${CC} -o ${.TARGET} ${.ALLSRC} -fPIE -nostdlib -T ${LDSCRIPT} -Wl,--defsym=text_start='0x0'"	\
+	no-obj no-implicit-rule
+vmm_hyp_blob.elf				optional vmm		\
+	dependency	"vmm_hyp_blob.elf.full"				\
+	compile-with	"${OBJCOPY} --strip-debug ${.ALLSRC} ${.TARGET}" \
+	no-obj no-implicit-rule
+vmm_hyp_blob.bin				optional vmm		\
+	dependency	vmm_hyp_blob.elf				\
+	compile-with	"${OBJCOPY} --output-target=binary ${.ALLSRC} ${.TARGET}" \
+	no-obj no-implicit-rule
+arm64/vmm/vmm_hyp_el2.S				optional vmm		\
+	dependency	vmm_hyp_blob.bin
+arm64/vmm/vmm_mmu.c				optional vmm
+arm64/vmm/io/vgic_v3.c				optional vmm
+arm64/vmm/io/vtimer.c				optional vmm
 
 crypto/armv8/armv8_crypto.c			optional armv8crypto
 armv8_crypto_wrap.o				optional armv8crypto	\

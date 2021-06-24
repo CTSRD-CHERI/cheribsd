@@ -135,6 +135,7 @@
 #define	CPU_IMPL_TO_MIDR(val)	(((val) & 0xff) << 24)
 #define	CPU_PART_TO_MIDR(val)	(((val) & 0xfff) << 4)
 #define	CPU_VAR_TO_MIDR(val)	(((val) & 0xf) << 20)
+#define	CPU_ARCH_TO_MIDR(val)	(((val) & 0xf) << 16)
 #define	CPU_REV_TO_MIDR(val)	(((val) & 0xf) << 0)
 
 #define	CPU_IMPL_MASK	(0xff << 24)
@@ -176,6 +177,34 @@
 #define	CPU_MATCH_ERRATA_CAVIUM_THUNDERX_1_1	0
 #endif
 
+#define	MAX_CACHES	8	/* Maximum number of caches supported
+				   architecturally. */
+struct cpu_desc {
+	uint64_t	mpidr;
+	uint64_t	id_aa64afr0;
+	uint64_t	id_aa64afr1;
+	uint64_t	id_aa64dfr0;
+	uint64_t	id_aa64dfr1;
+	uint64_t	id_aa64isar0;
+	uint64_t	id_aa64isar1;
+	uint64_t	id_aa64mmfr0;
+	uint64_t	id_aa64mmfr1;
+	uint64_t	id_aa64mmfr2;
+	uint64_t	id_aa64pfr0;
+	uint64_t	id_aa64pfr1;
+	uint64_t	id_aa64zfr0;
+	uint64_t	ctr;
+#ifdef COMPAT_FREEBSD32
+	uint64_t	id_isar5;
+	uint64_t	mvfr0;
+	uint64_t	mvfr1;
+#endif
+	uint64_t	clidr;
+	uint32_t	ccsidr[MAX_CACHES][2]; /* 2 possible types. */
+	bool		have_sve;
+};
+
+
 extern char btext[];
 extern char etext[];
 
@@ -215,6 +244,7 @@ void	ptrauth_mp_start(uint64_t);
 
 /* Functions to read the sanitised view of the special registers */
 void	update_special_regs(u_int);
+void	update_cpu_desc(struct cpu_desc *desc);
 bool	extract_user_id_field(u_int, u_int, uint8_t *);
 bool	get_kernel_reg(u_int, uint64_t *);
 

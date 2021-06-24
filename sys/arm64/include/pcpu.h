@@ -53,6 +53,7 @@ struct debug_monitor_state;
 	pcpu_ssbd pc_ssbd;						\
 	struct pmap *pc_curpmap;					\
 	struct pmap *pc_curvmpmap;					\
+	void	*pc_vcpu;						\
 	u_int	pc_bcast_tlbi_workaround;				\
 	u_int	pc_mpidr;	/* stored MPIDR value */		\
 	char __pad[PCPU_MD_FIELDS_PAD]	/* Pad to factor of PAGE_SIZE */ \
