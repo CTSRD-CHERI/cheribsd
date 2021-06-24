@@ -26,6 +26,10 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 .if ${MACHINE_ABI:Mpurecap}
 SRCS+=	cheribsdtest_bounds_varargs.c					\
 	cheribsdtest_sentries.c
+.if ${MK_CXX} == "yes"
+PROG_CXX:=	${PROG}
+SRCS+=	cheribsdtest_bounds_cxx.cc
+.endif
 .endif
 
 CHERIBSDTEST_DIR:=	${.PARSEDIR}
