@@ -1448,6 +1448,8 @@ initarm(struct arm64_bootparams *abp)
 	caddr_t kmdp;
 	bool valid;
 
+	TSRAW(&thread0, TS_ENTER, __func__, NULL);
+
 	boot_el = abp->boot_el;
 
 	/* Parse loader or FDT boot parametes. Determine last used address. */
@@ -1573,6 +1575,8 @@ initarm(struct arm64_bootparams *abp)
 	}
 
 	early_boot = 0;
+
+	TSEXIT();
 }
 
 void
