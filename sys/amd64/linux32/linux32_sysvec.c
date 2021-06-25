@@ -90,6 +90,10 @@ __FBSDID("$FreeBSD$");
 
 MODULE_VERSION(linux, 1);
 
+#define	LINUX32_MAXUSER		((1ul << 32) - PAGE_SIZE)
+#define	LINUX32_SHAREDPAGE	(LINUX32_MAXUSER - PAGE_SIZE)
+#define	LINUX32_USRSTACK	LINUX32_SHAREDPAGE
+
 static int linux_szsigcode;
 static vm_object_t linux_shared_page_obj;
 static char *linux_shared_page_mapping;
