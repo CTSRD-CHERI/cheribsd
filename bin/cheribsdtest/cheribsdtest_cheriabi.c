@@ -60,13 +60,23 @@
 
 #include "cheribsdtest.h"
 
-#ifdef CHERI_BASELEN_BITS
 CHERIBSDTEST(test_cheriabi_mmap_unrepresentable,
     "Test CheriABI mmap() with unrepresentable lengths")
 {
-	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
+	int shift = 0;
+	size_t len;
 	size_t expected_len;
 	void *cap;
+
+	/*
+	 * Generate the shortest unrepresentable length, for which rounding
+	 * up to PAGE_SIZE is still unrepresentable.
+	 */
+	do {
+		len = (1 << (PAGE_SHIFT + shift)) + 1;
+		shift++;
+	} while (round_page(len) ==
+	    __builtin_cheri_round_representable_length(round_page(len)));
 
 	expected_len = __builtin_cheri_round_representable_length(len);
 	if ((cap = mmap(0, len, PROT_READ|PROT_WRITE|PROT_EXEC,
@@ -82,7 +92,6 @@ CHERIBSDTEST(test_cheriabi_mmap_unrepresentable,
 
 	cheribsdtest_success();
 }
-#endif
 
 CHERIBSDTEST(test_cheriabi_malloc_zero_size,
     "Check that zero-sized mallocs are properly bounded")
