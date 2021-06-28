@@ -116,7 +116,7 @@ static __noinline void
 test_bounds_stack_vla(size_t len)
 {
 	char vla[len];
-	void * __capability c = (__cheri_tocap void *__capability)&vla;
+	void * __capability c = (__cheri_tocap void * __capability)&vla;
 
 	test_bounds_precise(c, len);
 }
