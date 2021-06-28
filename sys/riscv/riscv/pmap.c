@@ -3832,12 +3832,37 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 
 out:
 #if VM_NRESERVLEVEL > 0
+	/*
+	 * If we...
+	 *   are on the background scan (as indicated by EXCLUSIVE),
+	 *   are writing back a PTE (m != NULL),
+	 *   have superpages enabled,
+	 *   are at the last page of an L2 entry,
+	 * then see if we can put a superpage back together.
+	 */
 	if ((flags & PMAP_CAPLOADGEN_EXCLUSIVE) &&
+	    (m != NULL) && pmap_ps_enabled(pmap) &&
 	    ((va & (L2_OFFSET - L3_OFFSET)) == (L2_OFFSET - L3_OFFSET))) {
-		struct rwlock *lock = NULL;
-		pmap_promote_l2(pmap, l2, va, &lock);
-		if (lock != NULL)
-			rw_wunlock(lock);
+
+		KASSERT((l2e & PTE_RWX) == 0,
+		    ("pmap_caploadgen_update superpage: already l2"));
+		KASSERT((m->flags & PG_FICTITIOUS) == 0,
+		    ("pmap_caploadgen_update superpage: m fictitious"));
+
+		/*
+		 * Find the page holding our L3 PTEs.  If all L3 entries exist
+		 * and the superpage would come from a fully populated
+		 * reservation, attempt promotion.
+		 */
+		vm_page_t mpte = PHYS_TO_VM_PAGE(PTE_TO_PHYS(l2e));
+		if ((mpte->ref_count == Ln_ENTRIES) &&
+		    (vm_reserv_level_iffullpop(m) == 0)) {
+
+			struct rwlock *lock = NULL;
+			pmap_promote_l2(pmap, l2, va, &lock);
+			if (lock != NULL)
+				rw_wunlock(lock);
+		}
 	}
 #endif
 
