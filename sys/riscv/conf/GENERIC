@@ -87,6 +87,7 @@ device		riscv_syscon
 
 # Bus drivers
 device		pci
+device		ahci
 
 # VirtIO support
 device		virtio			# Generic VirtIO bus (required)
