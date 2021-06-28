@@ -616,3 +616,418 @@ CHERIBSDTEST(cheribsdtest_vm_cow_write,
 	CHERIBSDTEST_CHECK_SYSCALL(close(fd));
 	cheribsdtest_success();
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+
+static int __used sink;
+
+static size_t
+get_unrepresentable_length()
+{
+	int shift = 0;
+	size_t len;
+
+	/*
+	 * Generate the shortest unrepresentable length, for which rounding
+	 * up to PAGE_SIZE is still unrepresentable.
+	 */
+	do {
+		len = (1 << (PAGE_SHIFT + shift)) + 1;
+		shift++;
+	} while (round_page(len) ==
+	    __builtin_cheri_round_representable_length(round_page(len)));
+	return (len);
+}
+
+/*
+ * Check that the padding of a reservation faults on access
+ */
+CHERIBSDTEST(cheribsdtest_vm_reservation_access_fault,
+    "check that we fault when accessing padding of a reservation",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE,
+    .ct_signum = SIGSEGV,
+    .ct_si_code = SEGV_ACCERR)
+{
+	size_t len = get_unrepresentable_length();
+	size_t expected_len;
+	void *map;
+	int *padding;
+
+	expected_len = __builtin_cheri_round_representable_length(len);
+	CHERIBSDTEST_VERIFY2(expected_len > round_page(len),
+	    "test precondition failed: padding for length (%lx) must "
+	    "exceed one page, found %lx", len, expected_len);
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len, PROT_READ | PROT_WRITE,
+	    MAP_ANON, -1, 0));
+	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0, "mmap() failed to return "
+	    "a pointer when given unrepresentable length (%zu)", len);
+	CHERIBSDTEST_VERIFY2(cheri_getlen(map) == expected_len,
+	    "mmap() returned a pointer with an unrepresentable length "
+	    "(%zu vs %zu): %#p", cheri_getlen(map), expected_len, map);
+
+	padding = (int *)((uintcap_t)map + expected_len - sizeof(int));
+	sink = *padding;
+
+	cheribsdtest_failure_errx("reservation padding access allowed");
+}
+
+/*
+ * Check that a reserved range can not be reused for another mapping,
+ * until the whole mapping is freed.
+ */
+CHERIBSDTEST(cheribsdtest_vm_reservation_reuse,
+    "check that we can not remap over a partially-unmapped reservation")
+{
+	void *map;
+	void *map2;
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE * 2,
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0, "mmap() failed to return "
+	    "a pointer");
+
+	CHERIBSDTEST_CHECK_SYSCALL(munmap((char *)map + PAGE_SIZE, PAGE_SIZE));
+	/*
+	 * XXX-AM: is this checking the right thing?
+	 * We may be failing because the reservation length is not enough.
+	 */
+	map2 = mmap((void *)(uintptr_t)((vaddr_t)map + PAGE_SIZE),
+	    PAGE_SIZE * 2, PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
+	if (map2 == MAP_FAILED) {
+		CHERIBSDTEST_VERIFY2(errno == ENOMEM,
+		    "Unexpected errno %d instead of ENOMEM", errno);
+		cheribsdtest_success();
+	}
+
+	cheribsdtest_failure_errx("mmap over reservation succeeded");
+}
+
+/*
+ * Check that alignment is promoted automatically to the first
+ * representable boundary.
+ */
+CHERIBSDTEST(cheribsdtest_vm_reservation_align,
+    "check that mmap correctly align mappings")
+{
+	void *map;
+	size_t len = get_unrepresentable_length();
+	size_t align_shift = CHERI_ALIGN_SHIFT(len);
+	size_t align_mask = CHERI_ALIGN_MASK(len);
+
+	/* No alignment */
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERIBSDTEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	    "mmap failed to align representable region for %p", map);
+
+	/* Underaligned */
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED(align_shift - 1),
+	    -1, 0));
+	CHERIBSDTEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	    "mmap failed to align representable region with requested "
+	    "alignment %lx for %p", align_shift - 1, map);
+
+	/* Overaligned */
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED(align_shift + 1),
+	    -1, 0));
+	CHERIBSDTEST_VERIFY2(
+	    ((vaddr_t)(map) & ((1 << (align_shift + 1)) - 1)) == 0,
+	    "mmap failed to align representable region with requested "
+	    "alignment %lx for %p", align_shift + 1, map);
+
+	/* Explicit cheri alignment */
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED_CHERI, -1, 0));
+	CHERIBSDTEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	    "mmap failed to align representable region with requested "
+	    "cheri alignment for %p", map);
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED_CHERI_SEAL, -1, 0));
+	CHERIBSDTEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	    "mmap failed to align representable region with requested "
+	    "cheri seal alignment for %p", map);
+
+	cheribsdtest_success();
+}
+
+/*
+ * Check that after a reservation is unmapped, it is not possible to
+ * reuse the old capability to create new fixed mappings.
+ * This is an attempt of reusing a capability before revocation, in
+ * a proper temporal-safety implementation will lead to failures so
+ * we catch these early.
+ */
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_after_free_fixed,
+    "check that an old capability can not be used to mmap with MAP_FIXED "
+    "after the reservation has been deleted")
+{
+	void *map;
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+
+	CHERIBSDTEST_CHECK_SYSCALL(munmap((char *)map, PAGE_SIZE));
+
+	map = mmap(map, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	    MAP_ANON | MAP_FIXED, -1, 0);
+	CHERIBSDTEST_VERIFY2(map == MAP_FAILED, "mmap after free succeeded");
+	CHERIBSDTEST_VERIFY2(errno == EPROT,
+	    "mmap after free failed with %d instead of EPROT", errno);
+
+	cheribsdtest_success();
+}
+
+/*
+ * Check that after a reservation is unmapped, it is not possible to
+ * reuse the old capability to create new non-fixed mappings.
+ * This is an attempt of reusing a capability before revocation, in
+ * a proper temporal-safety implementation will lead to failures so
+ * we catch these early.
+ */
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_after_free,
+    "check that an old capability can not be used to mmap after the "
+    "reservation has been deleted")
+{
+	void *map;
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+
+	CHERIBSDTEST_CHECK_SYSCALL(munmap((char *)map, PAGE_SIZE));
+
+	map = mmap(map, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	    MAP_ANON, -1, 0);
+	CHERIBSDTEST_VERIFY2(map == MAP_FAILED, "mmap after free succeeded");
+	CHERIBSDTEST_VERIFY2(errno == EPROT,
+	    "mmap after free failed with %d instead of EPROT", errno);
+	cheribsdtest_success();
+}
+
+/*
+ * Check that reservations are aligned and padded correctly for shared mappings.
+ */
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_shared,
+    "check reservation alignment and bounds for shared mappings")
+{
+	void *map;
+	size_t len = get_unrepresentable_length();
+	size_t expected_len;
+	size_t align_mask = CHERI_ALIGN_MASK(len);
+	int fd;
+
+	expected_len = __builtin_cheri_round_representable_length(len);
+	fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, len));
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
+	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+
+	CHERIBSDTEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	    "mmap failed to align shared regiont for representability");
+	CHERIBSDTEST_VERIFY2(cheri_getlen(map) == expected_len,
+	    "mmap returned pointer with unrepresentable length");
+
+	cheribsdtest_success();
+}
+
+/*
+ * Check that we require NULL-derived capabilities when mmap().
+ * Test mmap() with an invalid capability and no backing reservation.
+ */
+CHERIBSDTEST(cheribsdtest_vm_mmap_invalid_cap,
+    "check that mmap with invalid capability hint fails")
+{
+	void *invalid = cheri_cleartag(cheri_setaddress(
+	    cheri_getpcc(), 0x4300beef));
+	void *map;
+
+	map = mmap(invalid, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	    MAP_ANON, -1, 0);
+	CHERIBSDTEST_VERIFY2(map == MAP_FAILED,
+	    "mmap with invalid capability succeeded");
+	CHERIBSDTEST_VERIFY2(errno == EINVAL,
+	    "mmap with invalid capability failed with %d instead "
+	    "of EINVAL", errno);
+
+	cheribsdtest_success();
+}
+
+/*
+ * Check that we require NULL-derived capabilities when mmap().
+ * Test mmap() MAP_FIXED with an invalid capability and no backing reservation.
+ */
+CHERIBSDTEST(cheribsdtest_vm_mmap_invalid_cap_fixed,
+    "check that mmap MAP_FIXED with invalid capability hint fails")
+{
+	void *invalid = cheri_cleartag(cheri_setaddress(
+	    cheri_getpcc(), 0x4300beef));
+	void *map;
+
+	map = mmap(invalid, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	    MAP_ANON | MAP_FIXED, -1, 0);
+	CHERIBSDTEST_VERIFY2(map == MAP_FAILED,
+	    "mmap with invalid capability succeeded");
+	CHERIBSDTEST_VERIFY2(errno == EINVAL,
+	    "mmap with invalid capability failed with %d instead "
+	    "of EINVAL", errno);
+
+	cheribsdtest_success();
+}
+
+/*
+ * Check that we require NULL-derived capabilities when mmap().
+ * Test mmap() MAP_FIXED with an invalid capability and existing
+ * backing reservation.
+ */
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_invalid_cap,
+    "check that mmap over existing reservation with invalid "
+    "capability hint fails")
+{
+	void *invalid;
+	void *map;
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+
+	invalid = cheri_cleartag(map);
+
+	map = mmap(invalid, PAGE_SIZE, PROT_READ | PROT_WRITE,
+	    MAP_ANON, -1, 0);
+	CHERIBSDTEST_VERIFY2(map == MAP_FAILED,
+	    "mmap with invalid capability succeeded");
+	CHERIBSDTEST_VERIFY2(errno == EINVAL,
+	    "mmap with invalid capability failed with %d instead "
+	    "of EINVAL", errno);
+
+	cheribsdtest_success();
+}
+
+/*
+ * Check that mmap() with a null-derived hint address succeeds.
+ */
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap,
+    "check mmap with NULL-derived hint address")
+{
+	uintptr_t hint = 0x56000000;
+	void *map;
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap((void *)hint, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0,
+	    "mmap with null-derived hint failed to return valid capability");
+
+	cheribsdtest_success();
+}
+
+/*
+ * Check that mapping with a NULL-derived capability hint at a fixed
+ * address, with no existing reservation at the target region, succeeds.
+ * Check that this fails if a mapping already exists at the target address
+ * as MAP_FIXED implies MAP_EXCL in this case.
+ */
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_unreserved,
+    "check mmap MAP_FIXED with NULL-derived hint address")
+{
+	uintptr_t hint = 0x56000000;
+	void *map;
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap((void *)hint, PAGE_SIZE,
+	    PROT_MAX(PROT_READ | PROT_WRITE), MAP_ANON | MAP_FIXED, -1, 0));
+	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0,
+	    "mmap fixed with NULL-derived hint failed to return "
+	    "valid capability");
+
+	map = mmap((void *)(hint - PAGE_SIZE), 2 * PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
+	CHERIBSDTEST_VERIFY2(map == MAP_FAILED,
+	    "mmap fixed with NULL-derived hint does not imply MAP_EXCL");
+	CHERIBSDTEST_VERIFY2(errno == ENOMEM,
+	    "mmap fixed with NULL-derived hint failed with %d instead "
+	    "of ENOMEM", errno);
+
+	cheribsdtest_success();
+}
+
+/*
+ * Check that mmap at fixed address with NULL-derived hint fails if
+ * a reservation already exists at the target address.
+ */
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_insert_null_derived,
+    "check that mmap with NULL-derived hint address over existing "
+    "reservation fails")
+{
+	void *map;
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, 3 * PAGE_SIZE,
+	    PROT_MAX(PROT_READ | PROT_WRITE), MAP_GUARD, -1, 0));
+	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0,
+	    "mmap failed to return valid capability");
+
+	map = mmap((void *)(uintptr_t)(vaddr_t)map, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
+	CHERIBSDTEST_VERIFY2(map == MAP_FAILED,
+	    "mmap fixed with NULL-derived hint succeded");
+	CHERIBSDTEST_VERIFY2(errno == ENOMEM,
+	    "mmap fixed with NULL-derived hint failed with %d instead "
+	    "of ENOMEM", errno);
+
+	cheribsdtest_success();
+}
+
+/*
+ * Check that we can add a fixed mapping into an existing
+ * reservation using a VM_MAP bearing capability.
+ */
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_insert,
+    "check mmap MAP_FIXED into an existing reservation with a "
+    "VM_MAP perm capability")
+{
+	void *map;
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, 3 * PAGE_SIZE,
+	    PROT_MAX(PROT_READ | PROT_WRITE), MAP_GUARD, -1, 0));
+	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0,
+	    "mmap failed to return valid capability");
+	CHERIBSDTEST_VERIFY2(cheri_getperm(map) & CHERI_PERM_CHERIABI_VMMAP,
+	    "mmap failed to return capability with CHERIABI_VMMAP perm");
+
+	CHERIBSDTEST_CHECK_SYSCALL(mmap((char *)(map) + PAGE_SIZE, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0));
+	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0,
+	    "mmap fixed failed to return valid capability");
+
+	cheribsdtest_success();
+}
+
+/*
+ * Check that attempting to add a fixed mapping into an existing
+ * reservation using a capability without VM_MAP permission fails.
+ */
+CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_insert_noperm,
+    "check that mmap MAP_FIXED into an existing reservation "
+    "with a capability missing VM_MAP permission fails")
+{
+	void *map;
+	void *map2;
+	void *not_enough_perm;
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, 3 * PAGE_SIZE,
+	    PROT_MAX(PROT_READ | PROT_WRITE), MAP_GUARD, -1, 0));
+	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0,
+	    "mmap failed to return valid capability");
+	CHERIBSDTEST_VERIFY2(cheri_getperm(map) & CHERI_PERM_CHERIABI_VMMAP,
+	    "mmap failed to return capability with CHERIABI_VMMAP perm");
+
+	not_enough_perm = cheri_andperm(map, ~CHERI_PERM_CHERIABI_VMMAP);
+	map2 = mmap((char *)(not_enough_perm) + PAGE_SIZE, PAGE_SIZE,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
+	CHERIBSDTEST_VERIFY2(map2 == MAP_FAILED,
+	    "mmap fixed with capability missing VM_MAP perms succeeds");
+	CHERIBSDTEST_VERIFY2(errno == EACCES,
+	    "mmap fixed with capability missing VM_MAP perms failed "
+	    "with %d instead of EACCES", errno);
+
+	cheribsdtest_success();
+}
+#endif
