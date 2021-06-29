@@ -646,6 +646,7 @@ vm_fault_populate(struct faultstate *fs)
 		pager_last = map_last;
 	}
 	VM_OBJECT_ASSERT_CAP(fs->first_object, fs->prot);
+	prot = VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot);
 	for (pidx = pager_first, m = vm_page_lookup(fs->first_object, pidx);
 	    pidx <= pager_last;
 	    pidx += npages, m = vm_page_next(&m[npages - 1])) {
@@ -664,7 +665,6 @@ vm_fault_populate(struct faultstate *fs)
 				vm_page_aflag_set(&m[i], PGA_CAPSTORE);
 			vm_fault_dirty(fs, &m[i]);
 		}
-		prot = VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot);
 		VM_OBJECT_WUNLOCK(fs->first_object);
 		rv = pmap_enter(fs->map->pmap, vaddr, m, prot, fs->fault_type |
 		    (fs->wired ? PMAP_ENTER_WIRED : 0), psind);
