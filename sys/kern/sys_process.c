@@ -1043,25 +1043,29 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			case PT_TO_SCE:
 				p->p_ptevents |= PTRACE_SCE;
 				CTR4(KTR_PTRACE,
-		    "PT_TO_SCE: pid %d, events = %#x, PC = %#lx, sig = %d",
-				    p->p_pid, p->p_ptevents, (u_long)addr, data);
+		    "PT_TO_SCE: pid %d, events = %#x, PC = %lp, sig = %d",
+				    p->p_pid, p->p_ptevents,
+				    (uintcap_t)addr, data);
 				break;
 			case PT_TO_SCX:
 				p->p_ptevents |= PTRACE_SCX;
 				CTR4(KTR_PTRACE,
-		    "PT_TO_SCX: pid %d, events = %#x, PC = %#lx, sig = %d",
-				    p->p_pid, p->p_ptevents, (u_long)addr, data);
+		    "PT_TO_SCX: pid %d, events = %#x, PC = %lp, sig = %d",
+				    p->p_pid, p->p_ptevents,
+				    (uintcap_t)addr, data);
 				break;
 			case PT_SYSCALL:
 				p->p_ptevents |= PTRACE_SYSCALL;
 				CTR4(KTR_PTRACE,
-		    "PT_SYSCALL: pid %d, events = %#x, PC = %#lx, sig = %d",
-				    p->p_pid, p->p_ptevents, (u_long)addr, data);
+		    "PT_SYSCALL: pid %d, events = %#x, PC = %lp, sig = %d",
+				    p->p_pid, p->p_ptevents,
+				    (uintcap_t)addr, data);
 				break;
 			case PT_CONTINUE:
 				CTR3(KTR_PTRACE,
-				    "PT_CONTINUE: pid %d, PC = %#lx, sig = %d",
-				    p->p_pid, (u_long)addr, data);
+				    "PT_CONTINUE: pid %d, PC = %lp, sig = %d",
+				    p->p_pid,
+				    (uintcap_t)addr, data);
 				break;
 			}
 			break;
@@ -1160,8 +1164,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		    &data, sizeof(int)) != sizeof(int))
 			error = ENOMEM;
 		else
-			CTR3(KTR_PTRACE, "PT_WRITE: pid %d: %lx <= %#x",
-			    p->p_pid, (u_long)addr, data);
+			CTR3(KTR_PTRACE, "PT_WRITE: pid %d: %lp <= %#x",
+			    p->p_pid, (uintcap_t)addr, data);
 		PROC_LOCK(p);
 		break;
 
@@ -1173,8 +1177,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		    &tmp, sizeof(int)) != sizeof(int))
 			error = ENOMEM;
 		else
-			CTR3(KTR_PTRACE, "PT_READ: pid %d: %lx >= %#x",
-			    p->p_pid, (u_long)addr, tmp);
+			CTR3(KTR_PTRACE, "PT_READ: pid %d: %lp >= %#x",
+			    p->p_pid, (uintcap_t)addr, tmp);
 		td->td_retval[0] = tmp;
 		PROC_LOCK(p);
 		break;

@@ -419,8 +419,8 @@ kern_nmount(struct thread *td, struct iovec * __capability iovp, u_int iovcnt,
 	flags = flags32;
 
 	AUDIT_ARG_FFLAGS(flags);
-	CTR4(KTR_VFS, "%s: iovp %#lx with iovcnt %d and flags %d", __func__,
-	    iovp, (u_long)iovcnt, flags);
+	CTR4(KTR_VFS, "%s: iovp %lp with iovcnt %d and flags %d", __func__,
+	    (uintcap_t)iovp, iovcnt, flags);
 
 	/*
 	 * Filter out MNT_ROOTFS.  We do not want clients of nmount() in
