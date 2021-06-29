@@ -962,7 +962,7 @@ linux_file_ioctl_sub(struct file *fp, struct linux_file *filp,
 		/* fetch user-space pointer */
 		udata = *(void * __capability *)data;
 	}
-#if defined(__amd64__)
+#ifdef COMPAT_FREEBSD32
 	if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
 		/* try the compat IOCTL handler first */
 		if (fop->compat_ioctl != NULL) {
