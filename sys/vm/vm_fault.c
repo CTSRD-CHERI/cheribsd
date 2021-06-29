@@ -699,25 +699,51 @@ vm_fault_populate(struct faultstate *fs)
 			if (prot & VM_PROT_WRITE_CAP)
 				vm_page_aflag_set(&m[i], PGA_CAPSTORE);
 			vm_fault_dirty(fs, &m[i]);
-		}
-		VM_OBJECT_WUNLOCK(fs->first_object);
 
 #ifdef CHERI_CAPREVOKE
-		if (vm_fault_must_caprevoke(fs->map, prot, m)) {
-			int vmfcres;
+			if (vm_fault_must_caprevoke(fs->map, prot, &m[i])) {
+				int vmfcres;
 
-			/*
-			 * We know (because we're on the populate path) that
-			 * we're on the top object, and so we can't be in a
-			 * position that would need CoW, so just go ahead and
-			 * mutate the page returned.
-			 */
+				/*
+				 * We know (because we're on the populate path)
+				 * that we're on the top object, and so we can't
+				 * be in a position that would need CoW, so just
+				 * go ahead and mutate the page returned.
+				 */
 
-			vmfcres = vm_fault_caprevoke(fs, m, true);
-			KASSERT(vmfcres == VFCR_OK,
-				("vm_fault_populate caprevoke NEED_WRITE?"));
-		}
+				vmfcres = vm_fault_caprevoke(fs, &m[i], true);
+				switch(vmfcres) {
+				case VFCR_NEED_WRITE:
+					panic("caprevoke NEED_WRITE populate?");
+				case VFCR_OK:
+
+					/*
+					 * Having dropped the map lock, we have
+					 * to grab it again to ensure that the
+					 * mapping we're about to do is still
+					 * valid!
+					 */
+					vm_fault_restore_map_lock(fs);
+					if (fs->map->timestamp ==
+					    fs->map_generation)
+						break;
+
+					/*
+					 * Well this is awkward; unbusy and
+					 * deactivate all pages yet to be
+					 * visited.  Hopefully, we have made at
+					 * least some progress.
+					 */
+					vm_fault_populate_cleanup(
+					    fs->first_object,
+					    pidx + i, pager_last);
+					return (KERN_RESTART);
+				}
+			}
 #endif
+
+		}
+		VM_OBJECT_WUNLOCK(fs->first_object);
 
 		rv = pmap_enter(fs->map->pmap, vaddr, m, prot, fs->fault_type |
 		    (fs->wired ? PMAP_ENTER_WIRED : 0), psind);
