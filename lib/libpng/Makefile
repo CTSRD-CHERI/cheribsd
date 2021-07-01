@@ -34,8 +34,6 @@ LIBADD=	z
 
 WARNS?=	6
 
-WANT_CHERI=	yes
-
 CFLAGS+=	${CFLAGS.${.IMPSRC:T}}
 .include <bsd.lib.mk>
 

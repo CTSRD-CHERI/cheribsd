@@ -59,10 +59,6 @@ SHLIB_MAJOR=	1
 MAN=	libcheri_invoke.3		\
 	libcheri.3
 
-.if !defined(NEED_CHERI)
-NEED_CHERI=	hybrid
-.endif
-
 CLEANFILES=	libcheri_ccall_trampoline.o
 .if ${MACHINE_ABI:Mpurecap}
 CLEANFILES+=	libcheri_invoke_cabi.o		\

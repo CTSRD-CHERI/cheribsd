@@ -5,9 +5,15 @@ SRCS=	cheri_helloworld.c
 
 MAN=
 .if ${PROG} == cheri_helloworld
-NEED_CHERI=	hybrid
+.if ${MACHINE_ABI:Mpurecap}
+NEED_COMPAT=	64
+.include <bsd.compat.mk>
+.endif
 .elif ${PROG} == cheriabi_helloworld
-WANT_CHERI=	pure
+.if !${MACHINE_ABI:Mpurecap}
+NEED_COMPAT=	CHERI
+.include <bsd.compat.mk>
+.endif
 .else
 .error Unknown cheri_helloworld variant ${PROG}
 .endif

@@ -8,7 +8,6 @@
 .if defined(_CRUNCHGEN)
 .include <bsd.compat.mk>
 .endif
-.include <bsd.cheri.mk>
 
 .if defined(LIB_CXX) || defined(SHLIB_CXX)
 _LD=	${CXX}

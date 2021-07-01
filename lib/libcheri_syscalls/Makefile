@@ -1,8 +1,6 @@
 # $FreeBSD$
 #
 
-NEED_CHERI=sandbox
-
 NO_SHARED=yes
 
 LIB=		cheri_syscalls

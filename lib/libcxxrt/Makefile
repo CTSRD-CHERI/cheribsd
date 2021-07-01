@@ -3,9 +3,6 @@
 .include <src.opts.mk>
 
 PACKAGE=	clibs
-.if ${MK_CHERI} != "no"
-WANT_CHERI?=	hybrid
-.endif
 SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 SHLIB_MAJOR=	1
 SHLIBDIR?=	/lib

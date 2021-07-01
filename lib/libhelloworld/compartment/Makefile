@@ -9,7 +9,6 @@ LDFLAGS+=	-Wl,-T,${.CURDIR}/../../libc_cheri/sandbox.ld \
 
 LIBADD=	c_cheri
 
-NEED_CHERI=sandbox
 PROG=	${COMPARTMENT_NAME}.co.0
 SRCS=	${COMPARTMENT_NAME}.c
 MAN=

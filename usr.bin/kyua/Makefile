@@ -1,16 +1,16 @@
 # $FreeBSD$
 
+.include <src.opts.mk>
+
+.if ${MACHINE_ABI:Mpurecap}
+# FIXME: doesn't work as a purecap binary yet
+NEED_COMPAT=   64
+.include <bsd.compat.mk>
+.endif
+
 .include "${SRCTOP}/lib/kyua/Makefile.kyua"
 
 .PATH: ${KYUA_SRCDIR}
-
-.if ${MACHINE_ARCH} != "mips64"
-# FIXME: doesn't work as a purecap binary yet
-WANT_COMPAT=   64
-.include <bsd.compat.mk>
-.else
-WANT_CHERI=none
-.endif
 
 PROG_CXX=	kyua
 SRCS=		main.cpp

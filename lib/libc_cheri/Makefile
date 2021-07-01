@@ -252,7 +252,6 @@ INCS=
 MAN=
 .undef SHLIB_MAJOR
 MK_PROFILE=	no
-NEED_CHERI=	sandbox
 WARNS?= 2
 
 CLEANFILES=	libcheri_invoke.o

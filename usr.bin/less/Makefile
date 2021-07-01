@@ -19,12 +19,3 @@ CLEANFILES= less.1
 
 .include "Makefile.common"
 .include <bsd.prog.mk>
-
-.if defined(WANT_CHERI) && ${WANT_CHERI} == "pure"
-# Work around a combination of poorly implement const decls and apparent
-# bugs in __qualifier checking.
-CFLAGS+=	-Wno-incompatible-pointer-types \
-		-Wno-incompatible-pointer-types-discards-qualifiers
-.else
-CFLAGS+=	-Wno-error
-.endif

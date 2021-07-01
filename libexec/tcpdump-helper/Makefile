@@ -2,9 +2,12 @@
 # $FreeBSD$
 #
 
-NEED_CHERI=	sandbox
-
 .include <src.opts.mk>
+
+.if !${MACHINE_ABI:Mpurecap}
+NEED_COMPAT=	CHERI
+.include <bsd.compat.mk>
+.endif
 
 PROG=	tcpdump-helper
 SRCS=	ascii_strcasecmp.c			\

@@ -11,8 +11,6 @@ NO_SHARED=	yes
 
 INCSDIR=	${INCLUDEDIR}/cheri
 
-NEED_CHERI?=hybrid
-
 SUBDIR=	compartment
 
 .include <bsd.lib.mk>

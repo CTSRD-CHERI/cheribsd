@@ -6,8 +6,6 @@ SRCS=	libcheri_invoke_cabi.S \
 
 CFLAGS.libcheri_invoke_cabi.S+=-DHAVE_VALID_DDC
 
-NEED_CHERI=	sandbox
-
 NO_SHARED=yes
 
 LIBCHERI_DIR=${.CURDIR}/../libcheri

@@ -1,9 +1,13 @@
 # $FreeBSD$
 
-NEED_CHERI=	hybrid
 NO_SHARED=
 
 .include <src.opts.mk>
+
+.if !${MACHINE_ABI:Mpurecap}
+NEED_COMPAT=	64
+.include <bsd.compat.mk>
+.endif
 
 TCPDUMP_DISTDIR?= ${.CURDIR}/../../../contrib/tcpdump
 .PATH: ${TCPDUMP_DISTDIR}
