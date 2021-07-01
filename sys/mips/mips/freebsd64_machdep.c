@@ -128,6 +128,8 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_schedtail	= NULL,
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
+	.sv_onexec_old	= exec_onexec_old,
+	.sv_onexit	= exit_onexit,
 };
 INIT_SYSENTVEC(freebsd64_sysent, &elf_freebsd_freebsd64_sysvec);
 
