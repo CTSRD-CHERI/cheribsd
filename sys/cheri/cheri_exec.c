@@ -45,6 +45,9 @@
 #include <cheri/cheric.h>
 
 FEATURE(cheriabi, "CheriABI process support");
+#ifdef __CHERI_PURE_CAPABILITY__
+FEATURE(cheri_kernel, "Pure-capability ABI kernel");
+#endif
 
 /*
  * Helper routines to construct initial capabilities for CheriABI
