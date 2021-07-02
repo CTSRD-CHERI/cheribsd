@@ -261,6 +261,12 @@ static void end_sample(void);
 __attribute__((constructor)) static void
 start_sample(void)
 {
+	const char *no_autosample = getenv("STATCOUNTERS_NO_AUTOSAMPLE");
+
+	if (no_autosample && no_autosample[0] != '\0' &&
+	    strtol(no_autosample, NULL, 0) != 0)
+		return;
+
 	// registering exit function
 	atexit(end_sample);
 	// initial sampling
