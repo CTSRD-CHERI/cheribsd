@@ -80,7 +80,7 @@ typedef	uint64_t	pn_t;			/* page number */
 #define	PTE_CR_GEN	(PTE_CR | PTE_CRM)	/* tags gated by generation */
 
 #define	PTE_KERN_CHERI	(PTE_CR | PTE_CW | PTE_CD)
-#define	PTE_PROMOTE_CHERI (PTE_CR | PTE_CW | PTE_CD)
+#define	PTE_PROMOTE_CHERI (PTE_CR | PTE_CW | PTE_CD | PTE_CRM | PTE_CRG)
 #else
 #define	PTE_KERN_CHERI	0
 #define	PTE_PROMOTE_CHERI 0
