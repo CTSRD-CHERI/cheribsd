@@ -380,7 +380,9 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	if (pmap_fault(map->pmap, va, ftype))
 		goto done;
 
+#ifdef CHERI_CAPREVOKE
 skip_pmap:
+#endif
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
