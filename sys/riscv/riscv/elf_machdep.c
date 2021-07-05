@@ -90,8 +90,8 @@ struct sysentvec elf_freebsd_sysvec = {
 	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP | SV_ASLR |
-	    SV_RNG_SEED_VER |
+	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP | SV_TIMEKEEP |
+	    SV_ASLR | SV_RNG_SEED_VER |
 #if __has_feature(capabilities)
 	    SV_CHERI,
 #else
