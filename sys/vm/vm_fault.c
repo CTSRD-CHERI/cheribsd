@@ -370,6 +370,18 @@ vm_fault_caprevoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 
 	vm_caprevoke_cookie_rele(&crc);
 
+	/*
+	 * TODO: Well, this is kind of awkward.  We should, on the load side,
+	 * be leaving pages marked capdirty if VM_CAPREVOKE_PAGE_HASCAPS here.
+	 * While that generally takes the form of OR-ing VM_PROT_WRITE_CAP to
+	 * the flags (not prot!) passed to pmap_enter (mostly derived from
+	 * fs->fault_type, at that, even), there's more nuance here than just
+	 * that.  This routine is called while looking within superpages, and so
+	 * we can't just OR that flag in.  We should probably signal our caller
+	 * to do the right thing if it can, but it's not clear whether that's
+	 * best done via return or outparam or what.
+	 */
+
 	if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {
 		if (!canwrite) {
 			return VFCR_NEED_WRITE;
