@@ -66,12 +66,12 @@ __FBSDID("$FreeBSD$");
 
 #ifdef CHERI_CAPREVOKE
 #include <cheri/cheric.h>
-#include <sys/caprevoke.h>
+#include <cheri/revoke.h>
 #ifdef CHERI_CAPREVOKE_STATS
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 #endif
-#include <vm/vm_caprevoke.h>
+#include <vm/vm_cheri_revoke.h>
 #endif
 
 #define MAX_CLOCKS 	(CLOCK_MONOTONIC+1)
@@ -1381,11 +1381,11 @@ kern_ktimer_delete(struct thread *td, int timerid)
 
 #ifdef CHERI_CAPREVOKE
 void
-ktimer_caprevoke(struct proc *p, const struct vm_caprevoke_cookie *crc)
+ktimer_cheri_revoke(struct proc *p, const struct vm_cheri_revoke_cookie *crc)
 {
 	int i;
 
-	CAPREVOKE_STATS_FOR(crst, crc);
+	CHERI_REVOKE_STATS_FOR(crst, crc);
 
 	if (p->p_itimers == NULL)
 		return;
@@ -1401,11 +1401,11 @@ ktimer_caprevoke(struct proc *p, const struct vm_caprevoke_cookie *crc)
 		if (!cheri_gettag(v))
 			continue;
 
-		CAPREVOKE_STATS_BUMP(crst, caps_found);
-		if (vm_caprevoke_test(crc, v)) {
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
+		if (vm_cheri_revoke_test(crc, v)) {
 			it->it_sigev.sigev_value.sival_ptr =
 			    (void * __capability)cheri_revoke(v);
-			CAPREVOKE_STATS_BUMP(crst, caps_cleared);
+			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 		}
 	}
 	PROC_UNLOCK(p);
