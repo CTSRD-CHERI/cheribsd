@@ -28,38 +28,38 @@
 .\" $FreeBSD$
 .\"
 .Dd August 20, 2020
-.Dt CAPREVOKE 2
+.Dt CHERI_REVOKE 2
 .Os
 .Sh NAME
-.Nm caprevoke
-.Nm caprevoke_shadow
+.Nm cheri_revoke
+.Nm cheri_revoke_shadow
 .Nd interface to sweeping revocation of CHERI capabilities
 .Sh LIBRARY
 .Lb libc
 .Sh SYNOPSIS
-.In sys/caprevoke.h
+.In cheri/revoke.h
 .Ft int
-.Fn caprevoke_shadow "int flags" "void * __capability arena" "void * __capability * shadow"
+.Fn cheri_revoke_shadow "int flags" "void * __capability arena" "void * __capability * shadow"
 .Ft int
-.Fn caprevoke "int flags" "caprevoke_epoch start" "struct caprevoke_stats *"
+.Fn cheri_revoke "int flags" "cheri_revoke_epoch start" "struct cheri_revoke_stats *"
 .Sh DESCRIPTION
 The kernel exposes a CHERI capability revocation service,
 a mechanism to revoke capabilities to regions of the address space.
 Requests for revocation are made by setting bits
 in the shadow bitmap and
 invokving the
-.Fn caprevoke
+.Fn cheri_revoke
 system call.
 .Pp
 The
-.Fn caprevoke_shadow
+.Fn cheri_revoke_shadow
 system call is used to obtain access to segments of the shadow bitmap
 and to global revocation metadata.
 The
 .Fa flags
 argument governs the behavior of the call:
 .Bl -tag
-.It Bq CAPREVOKE_SHADOW_NOVMMAP
+.It Bq CHERI_REVOKE_SHADOW_NOVMMAP
 .Fa arena
 should be a capability bearing the
 .Dv VMMAP
@@ -77,18 +77,18 @@ corresponds to a request for revocation of capabilities lacking the
 permission and whose
 .Em base
 points to the granule corresponding to that bit.
-.It Bq CAPREVOKE_SHADOW_INFO_STRUCT
+.It Bq CHERI_REVOKE_SHADOW_INFO_STRUCT
 .Fa arena
 is ignored and
 .Fa shadow
 will be set to a pointer to the global
-.Dv caprevoke_info
+.Dv cheri_revoke_info
 structure,
 which the kernel maintains with the current epoch counters.
 .El
 .Pp
 The
-.Fn caprevoke
+.Fn cheri_revoke
 system call
 interfaces with this CHERI capability revocation service
 to advance or synchronize with
@@ -100,7 +100,7 @@ between multiple users of the revocation service.
 If the epoch clock has advanced beyond the provided value,
 the function will generally return immediately.
 The
-.Fa caprevoke_stats
+.Fa cheri_revoke_stats
 argument is provided mostly for experimentation
 and may be
 .Dv NULL .
@@ -110,7 +110,7 @@ argument is,
 for the moment,
 mostly reserved for experimentation.
 The sole value that may be of interest is
-.Dv CAPREVOKE_IGNORE_START
+.Dv CHERI_REVOKE_IGNORE_START
 which causes the
 .Fa start
 argument to be ignored
@@ -118,19 +118,19 @@ and the epoch counter
 obtained by synchronizing with the revocation service
 to be used instead.
 Callers should always pass
-.Dv CAPREVOKE_LAST_PASS
+.Dv CHERI_REVOKE_LAST_PASS
 as well unless they are engaging in multi-pass experiments;
 see the source.
 .Sh EXAMPLES
 .Pp
 At allocator startup or upon first need, obtain a capability to the global
-.Dv caprevoke_info
+.Dv cheri_revoke_info
 structure,
 and store it to an allocator local variable:
 .Bd -literal
-    static struct caprevoke_info *cri;
+    static struct cheri_revoke_info *cri;
 
-    int res = caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL, &cri);
+    int res = cheri_revoke_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL, &cri);
     assert(res == 0);
 .Ed
 .Pp
@@ -139,14 +139,14 @@ it suffices to collect
 .Fn free
 memory into quarantine and then revoke it all at once:
 .Bd -literal
-    caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, arena, &shadow);
+    cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, arena, &shadow);
     /* elided: set bits in shadow corresponding to quarantine */
 
     atomic_thread_fence(memory_order_acq_rel);
-    caprevoke_epoch epoch_start = cri->epochs.enqueue;
+    cheri_revoke_epoch epoch_start = cri->epochs.enqueue;
 
-    while(!caprevoke_epoch_clears(cri->epochs.dequeue, epoch_start)) {
-      caprevoke(CAPREVOKE_LAST_PASS, epoch_start, NULL);
+    while(!cheri_revoke_epoch_clears(cri->epochs.dequeue, epoch_start)) {
+      cheri_revoke(CHERI_REVOKE_LAST_PASS, epoch_start, NULL);
     }
 
     /* elided: clear bits in shadow corresponding to quarantine */
@@ -167,7 +167,7 @@ also obtain access to the shadow space:
     struct arena_meta *meta = // ...
     meta->ptr = mmap(/* ... */);
  
-    int res = caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, meta->ptr,
+    int res = cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, meta->ptr,
                                &meta->caprev_sh);
     assert(res == 0);
 .Ed
@@ -188,8 +188,8 @@ loop until the
 epoch counter clears the eldest chunk,
 and then return all usable chunks to service:
 .Bd -literal
-    while(!caprevoke_epoch_clears(cri->epochs.dequeue, chunk->caprev_enq)) {
-      caprevoke(CAPREVOKE_LAST_PASS, chunk->caprev_enq, NULL);
+    while(!cheri_revoke_epoch_clears(cri->epochs.dequeue, chunk->caprev_enq)) {
+      cheri_revoke(CHERI_REVOKE_LAST_PASS, chunk->caprev_enq, NULL);
     }
     more = chunk->next;
     /* This chunk is certainly reusable now */
@@ -214,14 +214,14 @@ must, as before,
 execute a release fence
 before actually reusing memory.
 .Sh ERRORS
-.Fn caprevoke_info
+.Fn cheri_revoke_info
 fails with
 .Bl -tag -width Er
 .It Bq Er EPERM
 if the
 .Fa arena
 for
-.DV CAPREVOKE_SHADOW_MEM
+.DV CHERI_REVOKE_SHADOW_MEM
 does not cary the
 .Dv VMMAP
 permission.
@@ -229,19 +229,19 @@ permission.
 if the
 .Fa arena
 for
-.Dv CAPREVOKE_SHADOW_MEM
+.Dv CHERI_REVOKE_SHADOW_MEM
 is not sufficiently aligned and sized.
 .It Bq Er EINVAL
 if the
 .Fa shadow
 parameter for either
-.Dv CAPREVOKE_SHADOW_MEM
+.Dv CHERI_REVOKE_SHADOW_MEM
 or
-.Dv CAPREVOKE_SHADOW_INFO
+.Dv CHERI_REVOKE_SHADOW_INFO
 points to an invalid address.
 .El
 .Pp
-.Fn caprevoke
+.Fn cheri_revoke
 will return 0 if the
 .Fa start
 epoch has been cleared by time of return;
@@ -259,7 +259,7 @@ have been specified
 if
 .Fa start
 does not describe an epoch and
-.Dv CAPREVOKE_START_NOW
+.Dv CHERI_REVOKE_IGNORE_START
 was not given in
 .Fa flags .
 .El
