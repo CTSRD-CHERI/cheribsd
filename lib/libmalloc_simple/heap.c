@@ -47,7 +47,7 @@ static char *rcsid = "$FreeBSD$";
 #include <sys/param.h>
 #include <sys/types.h>
 #ifdef CAPREVOKE
-#include <sys/caprevoke.h>
+#include <cheri/revoke.h>
 #endif
 #include <sys/mman.h>
 #ifdef CAPREVOKE
@@ -99,7 +99,7 @@ static struct pagepool_header	*curpp;
 static size_t _pagesz;
 
 #ifdef CAPREVOKE
-static volatile const struct caprevoke_info *cri;
+static volatile const struct cheri_revoke_info *cri;
 #endif
 
 int
@@ -188,8 +188,8 @@ __paint_shadow(void *mem, size_t size)
 	int error;
 
 	if (cri == NULL) {
-		error = caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
-		    __DECONST(void **, &cri));
+		error = cheri_revoke_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT,
+		    NULL, __DECONST(void **, &cri));
 		assert(error == 0);
 	}
 
@@ -199,7 +199,7 @@ __paint_shadow(void *mem, size_t size)
 	 * need it.
 	 */
 	if (pp->ph_shadow == NULL)
-		if (caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, pp,
+		if (cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, pp,
 		    &pp->ph_shadow) != 0)
 			abort();
 	caprev_shadow_nomap_set_raw(cri->base_mem_nomap, pp->ph_shadow,
@@ -222,9 +222,10 @@ __do_revoke(void)
 	int error;
 
 	atomic_thread_fence(memory_order_acq_rel);
-	caprevoke_epoch start_epoch = cri->epochs.enqueue;
-	while (!caprevoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
-		error = caprevoke(CAPREVOKE_LAST_PASS|CAPREVOKE_LOAD_SIDE,
+	cheri_revoke_epoch start_epoch = cri->epochs.enqueue;
+	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
+		error = cheri_revoke(
+		    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_LOAD_SIDE,
 		    start_epoch, NULL);
 		assert(error == 0);
 	}
