@@ -76,8 +76,8 @@ __FBSDID("$FreeBSD$");
 
 #ifdef CHERI_CAPREVOKE
 #include <cheri/cheric.h>
-#include <sys/caprevoke.h>
-#include <vm/vm_caprevoke.h>
+#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
 #endif
 
 /*
@@ -2657,8 +2657,8 @@ filt_lio(struct knote *kn, long hint)
  * XXX Does not yet count caps into stats
  */
 static void
-aio_caprevoke_one(
-    struct proc *p, const struct vm_caprevoke_cookie *crc, struct kaiocb *job)
+aio_cheri_revoke_one(struct proc *p,
+    const struct vm_cheri_revoke_cookie *crc, struct kaiocb *job)
 {
 	uintcap_t sival, ujob, aiobuf, kerninfo, spare2;
 	bool revsival, revujob, revaiobuf, revkerninfo, revspare2;
@@ -2675,11 +2675,11 @@ aio_caprevoke_one(
 
 	AIO_UNLOCK(ki);
 
-	revsival    = vm_caprevoke_test(crc, sival);
-	revujob     = vm_caprevoke_test(crc, ujob);
-	revaiobuf   = vm_caprevoke_test(crc, aiobuf);
-	revkerninfo = vm_caprevoke_test(crc, kerninfo);
-	revspare2   = vm_caprevoke_test(crc, spare2);
+	revsival    = vm_cheri_revoke_test(crc, sival);
+	revujob     = vm_cheri_revoke_test(crc, ujob);
+	revaiobuf   = vm_cheri_revoke_test(crc, aiobuf);
+	revkerninfo = vm_cheri_revoke_test(crc, kerninfo);
+	revspare2   = vm_cheri_revoke_test(crc, spare2);
 
 	AIO_LOCK(ki);
 
@@ -2699,7 +2699,8 @@ aio_caprevoke_one(
 	if (revujob || revaiobuf || revkerninfo || revspare2) {
 		aio_cancel_job(p, ki, job);
 		ki->kaio_flags |= KAIO_WAKEUP;
-		msleep(&p->p_aioinfo, AIO_MTX(ki), PRIBIO, "aiocaprevoke", hz);
+		msleep(&p->p_aioinfo, AIO_MTX(ki), PRIBIO, "aiocherirevoke",
+		    hz);
 	}
 
 	if (revujob)
@@ -2723,7 +2724,7 @@ aio_caprevoke_one(
 }
 
 void
-aio_caprevoke(struct proc *p, const struct vm_caprevoke_cookie *crc)
+aio_cheri_revoke(struct proc *p, const struct vm_cheri_revoke_cookie *crc)
 {
 	struct kaioinfo *ki;
 	struct kaiocb *job, *jobn;
@@ -2736,7 +2737,7 @@ aio_caprevoke(struct proc *p, const struct vm_caprevoke_cookie *crc)
 
 	/* We should not get here if this process is exiting or execing */
 	KASSERT((ki->kaio_flags & KAIO_RUNDOWN) == 0,
-	    ("aio_caprevoke while RUNDOWN"));
+	    ("aio_cheri_revoke while RUNDOWN"));
 
 restart:
 	/* Visit all pending jobs. */
@@ -2747,7 +2748,7 @@ restart:
 			continue;
 		}
 
-		aio_caprevoke_one(p, crc, job);
+		aio_cheri_revoke_one(p, crc, job);
 		goto restart;
 	}
 
