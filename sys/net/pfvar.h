@@ -1671,12 +1671,6 @@ struct pfioc_iface {
 #define DIOCNATLOOK	_IOWR('D', 23, struct pfioc_natlook)
 #define DIOCSETDEBUG	_IOWR('D', 24, u_int32_t)
 #define DIOCGETSTATES	_IOWR('D', 25, struct pfioc_states)
-#if defined(__CHERI_PURE_CAPABILITY__) ||			\
-   (defined(_KERNEL) && __has_feature(capabilities))
-#define DIOCGETSTATESNV	_IOWR('D', 24, struct pfioc_nv)
-#else
-#define DIOCGETSTATESNV	_IOWR('D', 25, struct pfioc_nv)
-#endif
 #define DIOCCHANGERULE	_IOWR('D', 26, struct pfioc_rule)
 /* XXX cut 26 - 28 */
 #define DIOCSETTIMEOUT	_IOWR('D', 29, struct pfioc_tm)
