@@ -28,8 +28,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/event.h>
 #include <sys/timers.h>
 
-#include <sys/caprevoke.h>
-#include <vm/vm_caprevoke.h>
+#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
 #include <sys/syscallsubr.h>
 
 /*
@@ -53,21 +53,22 @@ __FBSDID("$FreeBSD$");
  * and might not notice the stores.
  */
 static void
-caprevoke_hoarders(struct proc *p, struct vm_caprevoke_cookie *crc)
+cheri_revoke_hoarders(struct proc *p, struct vm_cheri_revoke_cookie *crc)
 {
 	/* aio */
-	aio_caprevoke(p, crc);
+	aio_cheri_revoke(p, crc);
 
 	/* timers */
-	ktimer_caprevoke(p, crc);
+	ktimer_cheri_revoke(p, crc);
 
 	/* kqueue: run last, because other systems might post here */
-	kqueue_caprevoke(p->p_fd, crc);
+	kqueue_cheri_revoke(p->p_fd, crc);
 }
 
 static int
-caprevoke_fini(struct caprevoke_syscall_info * __capability crsi,
-    int res, struct caprevoke_stats *crst, struct caprevoke_epochs *crepochs)
+cheri_revoke_fini(struct cheri_revoke_syscall_info * __capability crsi,
+    int res, struct cheri_revoke_stats *crst,
+    struct cheri_revoke_epochs *crepochs)
 {
 	int res2 = 0;
 	int res3 = 0;
@@ -90,28 +91,28 @@ caprevoke_fini(struct caprevoke_syscall_info * __capability crsi,
 
 #ifdef CHERI_CAPREVOKE_STATS
 /* Here seems about as good a place as any */
-_Static_assert(sizeof(struct caprevoke_stats) ==
-    sizeof(((struct vm_map *)NULL)->vm_caprev_stats),
+_Static_assert(sizeof(struct cheri_revoke_stats) ==
+    sizeof(((struct vm_map *)NULL)->vm_cheri_revoke_stats),
     "Caprevoke stats structure size mismatch");
 #endif
 
 int
-kern_caprevoke(struct thread *td, int flags, caprevoke_epoch start_epoch,
-    struct caprevoke_syscall_info * __capability crsi)
+kern_cheri_revoke(struct thread *td, int flags, cheri_revoke_epoch start_epoch,
+    struct cheri_revoke_syscall_info * __capability crsi)
 {
 	int res;
-	caprevoke_epoch epoch;
-	enum caprevoke_state entryst, myst;
-	struct caprevoke_epochs crepochs = { 0 };
+	cheri_revoke_epoch epoch;
+	enum cheri_revoke_state entryst, myst;
+	struct cheri_revoke_epochs crepochs = { 0 };
 #ifdef CHERI_CAPREVOKE_STATS
-	struct caprevoke_stats crst, *crstp;
+	struct cheri_revoke_stats crst, *crstp;
 #else
-	struct caprevoke_stats *crstp = NULL;
+	struct cheri_revoke_stats *crstp = NULL;
 #endif
 	struct vmspace *vm;
 	vm_map_t vmm;
-	struct vm_caprevoke_cookie vmcrc;
-	struct caprevoke_info_page * __capability info_page;
+	struct vm_cheri_revoke_cookie vmcrc;
+	struct cheri_revoke_info_page * __capability info_page;
 
 	vm = vmspace_acquire_ref(td->td_proc);
 	vmm = &vm->vm_map;
@@ -121,30 +122,30 @@ kern_caprevoke(struct thread *td, int flags, caprevoke_epoch start_epoch,
 	 * to be too picky about it.  This value is not reported to
 	 * userland, just used to guide the interlocking below.
 	 */
-	if ((flags & CAPREVOKE_IGNORE_START) != 0) {
-		start_epoch = caprevoke_st_epoch(vmm->vm_caprev_st);
+	if ((flags & CHERI_REVOKE_IGNORE_START) != 0) {
+		start_epoch = cheri_revoke_st_epoch(vmm->vm_cheri_revoke_st);
 	}
 
 	/* Serialize and figure out what we're supposed to do */
 	vm_map_lock(vmm);
 	{
-		static const int fast_out_flags = CAPREVOKE_NO_WAIT_OK |
-		    CAPREVOKE_IGNORE_START | CAPREVOKE_LAST_NO_EARLY;
+		static const int fast_out_flags = CHERI_REVOKE_NO_WAIT_OK |
+		    CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_LAST_NO_EARLY;
 		int ires = 0;
-		caprevoke_epoch first_epoch;
+		cheri_revoke_epoch first_epoch;
 
-		epoch = caprevoke_st_epoch(vmm->vm_caprev_st);
-		entryst = caprevoke_st_state(vmm->vm_caprev_st);
+		epoch = cheri_revoke_st_epoch(vmm->vm_cheri_revoke_st);
+		entryst = cheri_revoke_st_state(vmm->vm_cheri_revoke_st);
 		first_epoch = epoch;
 
-		if ((flags & (fast_out_flags | CAPREVOKE_LAST_PASS)) ==
+		if ((flags & (fast_out_flags | CHERI_REVOKE_LAST_PASS)) ==
 		    fast_out_flags) {
 			/* Apparently they really just wanted the time. */
 			goto fast_out;
 		}
 
 reentry:
-		if (caprevoke_epoch_clears(epoch, start_epoch)) {
+		if (cheri_revoke_epoch_clears(epoch, start_epoch)) {
 			/*
 			 * An entire epoch has come and gone since the
 			 * starting point of this request.  It is safe to
@@ -155,21 +156,24 @@ reentry:
 			 */
 fast_out:
 #ifdef CHERI_CAPREVOKE_STATS
-			if (flags & CAPREVOKE_TAKE_STATS) {
-				sx_xlock(&vmm->vm_caprev_stats_sx);
-				crst = *(struct caprevoke_stats*)&vmm->vm_caprev_stats;
-				bzero(&vmm->vm_caprev_stats, sizeof(vmm->vm_caprev_stats));
-				sx_xunlock(&vmm->vm_caprev_stats_sx);
+			if (flags & CHERI_REVOKE_TAKE_STATS) {
+				sx_xlock(&vmm->vm_cheri_revoke_stats_sx);
+				crst = *(struct cheri_revoke_stats*)
+				    &vmm->vm_cheri_revoke_stats;
+				bzero(&vmm->vm_cheri_revoke_stats,
+				    sizeof(vmm->vm_cheri_revoke_stats));
+				sx_xunlock(&vmm->vm_cheri_revoke_stats_sx);
 				crstp = &crst;
 			} else {
-				crstp = (struct caprevoke_stats*)&vmm->vm_caprev_stats;
+				crstp = (struct cheri_revoke_stats*)
+				    &vmm->vm_cheri_revoke_stats;
 			}
 #endif
 			vm_map_unlock(vmm);
-			cv_signal(&vmm->vm_caprev_cv);
+			cv_signal(&vmm->vm_cheri_revoke_cv);
 			vmspace_free(vm);
 
-			return caprevoke_fini(crsi, ires, crstp, &crepochs);
+			return cheri_revoke_fini(crsi, ires, crstp, &crepochs);
 		}
 
 		/*
@@ -177,84 +181,85 @@ fast_out:
 		 * what state we're in and what we can accomplish.
 		 */
 		switch (entryst) {
-		case CAPREVST_NONE:
+		case CHERI_REVOKE_ST_NONE:
 			KASSERT((epoch & 1) == 0, ("Odd epoch NONE"));
-			if (flags & CAPREVOKE_LOAD_SIDE) {
-				if (flags & CAPREVOKE_LAST_PASS) {
-					myst = CAPREVST_LS_CLOSING;
+			if (flags & CHERI_REVOKE_LOAD_SIDE) {
+				if (flags & CHERI_REVOKE_LAST_PASS) {
+					myst = CHERI_REVOKE_ST_LS_CLOSING;
 				} else {
-					myst = CAPREVST_LS_INITING;
+					myst = CHERI_REVOKE_ST_LS_INITING;
 				}
 			} else {
-				if (flags & CAPREVOKE_LAST_PASS) {
-					myst = CAPREVST_SS_LAST;
+				if (flags & CHERI_REVOKE_LAST_PASS) {
+					myst = CHERI_REVOKE_ST_SS_LAST;
 				} else {
-					myst = CAPREVST_SS_INITING;
+					myst = CHERI_REVOKE_ST_SS_INITING;
 				}
 			}
 			break;
-		case CAPREVST_SS_INITED:
+		case CHERI_REVOKE_ST_SS_INITED:
 			KASSERT((epoch & 1) == 1, ("Even epoch SS_INITED"));
 			/*
 			 * We could either be finishing up or doing just
 			 * a(nother) pass and (re)entering the INIT state.
 			 */
-			if (flags & CAPREVOKE_LAST_PASS) {
-				myst = CAPREVST_SS_LAST;
+			if (flags & CHERI_REVOKE_LAST_PASS) {
+				myst = CHERI_REVOKE_ST_SS_LAST;
 			} else {
-				myst = CAPREVST_SS_INITING;
+				myst = CHERI_REVOKE_ST_SS_INITING;
 			}
 			break;
-		case CAPREVST_LS_INITED:
+		case CHERI_REVOKE_ST_LS_INITED:
 			KASSERT((epoch & 1) == 1, ("Even epoch LS_INITED"));
 			/*
 			 * If a load-side epoch is already open, there's
 			 * nothing to be done other than end it.
 			 */
-			if (flags & CAPREVOKE_LAST_PASS) {
-				myst = CAPREVST_LS_CLOSING;
+			if (flags & CHERI_REVOKE_LAST_PASS) {
+				myst = CHERI_REVOKE_ST_LS_CLOSING;
 			} else {
 				goto fast_out;
 			}
 			break;
-		case CAPREVST_SS_LAST:
-		case CAPREVST_LS_CLOSING:
+		case CHERI_REVOKE_ST_SS_LAST:
+		case CHERI_REVOKE_ST_LS_CLOSING:
 			/* There is another revoker in progress.  Wait? */
-			if ((flags & CAPREVOKE_ONLY_IF_OPEN) != 0) {
+			if ((flags & CHERI_REVOKE_ONLY_IF_OPEN) != 0) {
 				goto fast_out;
 			}
 			/* FALLTHROUGH */
-		case CAPREVST_SS_INITING:
-		case CAPREVST_LS_INITING:
+		case CHERI_REVOKE_ST_SS_INITING:
+		case CHERI_REVOKE_ST_LS_INITING:
 			KASSERT(vmm->system_map == 0, ("System map?"));
 
-			if ((flags & CAPREVOKE_NO_WAIT_OK) != 0) {
+			if ((flags & CHERI_REVOKE_NO_WAIT_OK) != 0) {
 				goto fast_out;
 			}
 
 			/* There is another revoker in progress.  Wait. */
-			ires = cv_wait_sig(&vmm->vm_caprev_cv, &vmm->lock);
+			ires = cv_wait_sig(&vmm->vm_cheri_revoke_cv,
+			    &vmm->lock);
 			if (ires != 0) {
-				cv_signal(&vmm->vm_caprev_cv);
+				cv_signal(&vmm->vm_cheri_revoke_cv);
 				vmspace_free(vm);
 				return ires;
 			}
 
-			epoch = caprevoke_st_epoch(vmm->vm_caprev_st);
+			epoch = cheri_revoke_st_epoch(vmm->vm_cheri_revoke_st);
 			goto reentry;
 		}
 
-		KASSERT((entryst == CAPREVST_NONE) ||
-			(entryst == CAPREVST_SS_INITED) ||
-			(entryst == CAPREVST_LS_INITED),
+		KASSERT((entryst == CHERI_REVOKE_ST_NONE) ||
+			(entryst == CHERI_REVOKE_ST_SS_INITED) ||
+			(entryst == CHERI_REVOKE_ST_LS_INITED),
 		    ("Beginning revocation with bad entry state"));
-		KASSERT((myst == CAPREVST_SS_INITING) ||
-			(myst == CAPREVST_SS_LAST) ||
-			(myst == CAPREVST_LS_INITING) ||
-			(myst == CAPREVST_LS_CLOSING),
+		KASSERT((myst == CHERI_REVOKE_ST_SS_INITING) ||
+			(myst == CHERI_REVOKE_ST_SS_LAST) ||
+			(myst == CHERI_REVOKE_ST_LS_INITING) ||
+			(myst == CHERI_REVOKE_ST_LS_CLOSING),
 		    ("Beginning revocation with bad current state"));
 
-		if (((flags & CAPREVOKE_ONLY_IF_OPEN) != 0) &&
+		if (((flags & CHERI_REVOKE_ONLY_IF_OPEN) != 0) &&
 		    ((epoch & 1) == 0)) {
 			/*
 			 * If we're requesting work only if an epoch is open
@@ -263,7 +268,7 @@ fast_out:
 			goto fast_out;
 		}
 
-		if (entryst == CAPREVST_NONE) {
+		if (entryst == CHERI_REVOKE_ST_NONE) {
 			/*
 			 * XXX Right now, we know that there are no
 			 * coarse-grain bits getting set, nor otypes nor
@@ -275,21 +280,22 @@ fast_out:
 			 * other such to decide whether to set _NO_COARSE.
 			 * Similary for the others.
 			 */
-			vm_caprevoke_set_test(vmm,
-			    VM_CAPREVOKE_CF_NO_COARSE_MEM |
-			    VM_CAPREVOKE_CF_NO_OTYPES |
-			    VM_CAPREVOKE_CF_NO_CIDS);
+			vm_cheri_revoke_set_test(vmm,
+			    VM_CHERI_REVOKE_CF_NO_COARSE_MEM |
+			    VM_CHERI_REVOKE_CF_NO_OTYPES |
+			    VM_CHERI_REVOKE_CF_NO_CIDS);
 		}
 
 #ifdef CHERI_CAPREVOKE_STATS
-		crstp = (struct caprevoke_stats *)&vmm->vm_caprev_stats;
+		crstp = (struct cheri_revoke_stats *)
+		    &vmm->vm_cheri_revoke_stats;
 #endif
 
-		res = vm_caprevoke_cookie_init(&vm->vm_map, &vmcrc);
+		res = vm_cheri_revoke_cookie_init(&vm->vm_map, &vmcrc);
 		if (res != KERN_SUCCESS) {
 			vm_map_unlock(vmm);
 			vmspace_free(vm);
-			return caprevoke_fini(crsi, vm_mmap_to_errno(res),
+			return cheri_revoke_fini(crsi, vm_mmap_to_errno(res),
 			    crstp, &crepochs);
 		}
 
@@ -298,7 +304,7 @@ fast_out:
 		 * until we're certain it's actually open, which we can only
 		 * do below.
 		 */
-		caprevoke_st_set(&vmm->vm_caprev_st, epoch, myst);
+		cheri_revoke_st_set(&vmm->vm_cheri_revoke_st, epoch, myst);
 	}
 	vm_map_unlock(vmm);
 
@@ -308,15 +314,16 @@ fast_out:
 	 * is visible before any of our subsequent loads (we can't use
 	 * vm map lock to do this, because copyout might need the map).
 	 */
-	if ((entryst == CAPREVST_NONE) &&
-	    ((myst == CAPREVST_SS_LAST) || (myst == CAPREVST_LS_CLOSING))) {
+	if ((entryst == CHERI_REVOKE_ST_NONE) &&
+	    ((myst == CHERI_REVOKE_ST_SS_LAST) ||
+	     (myst == CHERI_REVOKE_ST_LS_CLOSING))) {
 		crepochs.enqueue = epoch + 2;
 	} else {
 		crepochs.enqueue = epoch + 1;
 	}
 	crepochs.dequeue = epoch;
-	vm_caprevoke_info_page(vmm, &info_page);
-	vm_caprevoke_publish_epochs(info_page, &crepochs);
+	vm_cheri_revoke_info_page(vmm, &info_page);
+	vm_cheri_revoke_publish_epochs(info_page, &crepochs);
 	wmb();
 
 	/*
@@ -324,28 +331,29 @@ fast_out:
 	 * to close it out, there's no need to do any thread singling, so
 	 * don't.
 	 */
-	if ((entryst == CAPREVST_LS_INITED) && (myst == CAPREVST_LS_CLOSING))
+	if ((entryst == CHERI_REVOKE_ST_LS_INITED) &&
+	    (myst == CHERI_REVOKE_ST_LS_CLOSING))
 		goto ls_close_already_inited;
 
 	/* Pre-barrier store-side work */
 	switch(myst) {
 	default:
 		panic("Bad target state in revoker");
-	case CAPREVST_SS_INITING:
-	case CAPREVST_SS_LAST:
-		if ((myst == CAPREVST_SS_INITING) ||
-		    (flags & CAPREVOKE_LAST_NO_EARLY) == 0) {
+	case CHERI_REVOKE_ST_SS_INITING:
+	case CHERI_REVOKE_ST_SS_LAST:
+		if ((myst == CHERI_REVOKE_ST_SS_INITING) ||
+		    (flags & CHERI_REVOKE_LAST_NO_EARLY) == 0) {
 			int vmcflags = 0;
 
 			    /* Userspace can ask us to avoid an IPI here */
-			vmcflags |= (flags & CAPREVOKE_EARLY_SYNC)
-					? VM_CAPREVOKE_SYNC_CD : 0;
+			vmcflags |= (flags & CHERI_REVOKE_EARLY_SYNC)
+					? VM_CHERI_REVOKE_SYNC_CD : 0;
 
 			    /* If not first pass, only recently capdirty */
-			vmcflags |= (entryst == CAPREVST_SS_INITED)
-					? VM_CAPREVOKE_INCREMENTAL : 0;
+			vmcflags |= (entryst == CHERI_REVOKE_ST_SS_INITED)
+					? VM_CHERI_REVOKE_INCREMENTAL : 0;
 
-			res = vm_caprevoke_pass(&vmcrc, vmcflags);
+			res = vm_cheri_revoke_pass(&vmcrc, vmcflags);
 
 			if (res == KERN_SUCCESS) {
 				/*
@@ -359,21 +367,21 @@ fast_out:
 				 * see it until we next publish the state
 				 * below.
 				 */
-				if (entryst == CAPREVST_NONE) {
+				if (entryst == CHERI_REVOKE_ST_NONE) {
 					epoch++;
-					entryst = CAPREVST_SS_INITED;
+					entryst = CHERI_REVOKE_ST_SS_INITED;
 				}
 			} else {
 				goto skip_last_pass;
 			}
 		}
 
-		if (myst == CAPREVST_SS_INITING)
+		if (myst == CHERI_REVOKE_ST_SS_INITING)
 			goto skip_last_pass;
 
 		break;
-	case CAPREVST_LS_INITING:
-	case CAPREVST_LS_CLOSING:
+	case CHERI_REVOKE_ST_LS_INITING:
+	case CHERI_REVOKE_ST_LS_CLOSING:
 		break;
 	}
 
@@ -388,13 +396,13 @@ fast_out:
 				PROC_UNLOCK(td->td_proc);
 
 				vm_map_lock(vmm);
-				caprevoke_st_set(&vmm->vm_caprev_st, epoch,
-				    entryst);
+				cheri_revoke_st_set(&vmm->vm_cheri_revoke_st,
+				    epoch, entryst);
 				vm_map_unlock(vmm);
 
 				/* XXX Don't signal other would-be revokers? */
 
-				vm_caprevoke_cookie_rele(&vmcrc);
+				vm_cheri_revoke_cookie_rele(&vmcrc);
 				vmspace_free(vm);
 
 				/* XXX Don't copy out the stat structure? */
@@ -418,11 +426,12 @@ fast_out:
 		 * (where it will be safe to read from the shadow bitmap) as
 		 * soon as it's on core again.  This will require a barrier
 		 * before we can increment the epoch counter or transition to
-		 * the next state in the CAPREVST state machine (i.e., from
-		 * CAPREVST_SS_LAST to CAPREV_NONE or from CAPREVST_LS_INITING
-		 * to CAPREVST_LS_INITED).  This also risks the use of ptrace()
-		 * to expose to userspace the trap frame of a stalled thread
-		 * that has not yet scanned itself.  Yick.
+		 * the next state in the CHERI_REVOKE_ST state machine (i.e.,
+		 * from CHERI_REVOKE_ST_SS_LAST to CAPREV_NONE or from
+		 * CHERI_REVOKE_ST_LS_INITING to CHERI_REVOKE_ST_LS_INITED).
+		 * This also risks the use of ptrace() to expose to userspace
+		 * the trap frame of a stalled thread that has not yet scanned
+		 * itself.  Yick.
 		 */
 
 		_PHOLD(td->td_proc);
@@ -430,39 +439,40 @@ fast_out:
 
 		/* Per-thread kernel hoarders */
 		FOREACH_THREAD_IN_PROC (td->td_proc, ptd) {
-			caprevoke_td_frame(ptd, &vmcrc);
-			sigaltstack_caprevoke(ptd, &vmcrc);
+			cheri_revoke_td_frame(ptd, &vmcrc);
+			sigaltstack_cheri_revoke(ptd, &vmcrc);
 		}
 	}
 
 	/* Per-process kernel hoarders */
-	caprevoke_hoarders(td->td_proc, &vmcrc);
+	cheri_revoke_hoarders(td->td_proc, &vmcrc);
 
 	switch(myst) {
 	default:
 		panic("impossible");
-	case CAPREVST_SS_LAST:
+	case CHERI_REVOKE_ST_SS_LAST:
 	    {
 		/*
 		 * The world is stopped; if we're on the store side path, do
 		 * another pass through the VM now.
 		 */
-		int crflags = VM_CAPREVOKE_SYNC_CD | VM_CAPREVOKE_BARRIERED;
+		int crflags = VM_CHERI_REVOKE_SYNC_CD
+		    | VM_CHERI_REVOKE_BARRIERED;
 
 		/*
 		 * This pass can be incremental if we had previously done an
 		 * init pass, either just now or earlier.  In either case,
-		 * entryst == CAPREVST_SS_INITED.
+		 * entryst == CHERI_REVOKE_ST_SS_INITED.
 		 */
-		crflags |= (entryst == CAPREVST_SS_INITED) ?
-		    VM_CAPREVOKE_INCREMENTAL : 0;
+		crflags |= (entryst == CHERI_REVOKE_ST_SS_INITED) ?
+		    VM_CHERI_REVOKE_INCREMENTAL : 0;
 
-		res = vm_caprevoke_pass(&vmcrc, crflags);
+		res = vm_cheri_revoke_pass(&vmcrc, crflags);
 		break;
 	    }
-	case CAPREVST_LS_CLOSING:
-	case CAPREVST_LS_INITING:
-		if (entryst == CAPREVST_NONE) {
+	case CHERI_REVOKE_ST_LS_CLOSING:
+	case CHERI_REVOKE_ST_LS_INITING:
+		if (entryst == CHERI_REVOKE_ST_NONE) {
 			/*
 			 * Increment the GCLG.  Immediately install for the
 			 * current thread; any others are currently off-core
@@ -500,15 +510,15 @@ fast_out:
 		PROC_UNLOCK(td->td_proc);
 
 		vm_map_lock(vmm);
-		caprevoke_st_set(&vmm->vm_caprev_st, epoch, entryst);
+		cheri_revoke_st_set(&vmm->vm_cheri_revoke_st, epoch, entryst);
 		vm_map_unlock(vmm);
 
-		cv_signal(&vmm->vm_caprev_cv);
+		cv_signal(&vmm->vm_cheri_revoke_cv);
 
-		vm_caprevoke_cookie_rele(&vmcrc);
+		vm_cheri_revoke_cookie_rele(&vmcrc);
 		vmspace_free(vm);
 
-		return caprevoke_fini(crsi, vm_mmap_to_errno(res), crstp,
+		return cheri_revoke_fini(crsi, vm_mmap_to_errno(res), crstp,
 		    &crepochs);
 	}
 	PROC_UNLOCK(td->td_proc);
@@ -517,24 +527,24 @@ fast_out:
 	 * If we came in with no epoch open, we have just opened one.
 	 * Bump the epoch count we will report to userland below.
 	 */
-	if (entryst == CAPREVST_NONE) {
+	if (entryst == CHERI_REVOKE_ST_NONE) {
 		epoch++;
 
-		if (myst == CAPREVST_SS_LAST) {
-			entryst = CAPREVST_SS_INITED;
+		if (myst == CHERI_REVOKE_ST_SS_LAST) {
+			entryst = CHERI_REVOKE_ST_SS_INITED;
 		} else {
-			KASSERT((myst == CAPREVST_LS_INITING) ||
-				(myst == CAPREVST_LS_CLOSING),
+			KASSERT((myst == CHERI_REVOKE_ST_LS_INITING) ||
+				(myst == CHERI_REVOKE_ST_LS_CLOSING),
 				("Bad myst when finishing loadside"));
-			entryst = CAPREVST_LS_INITED;
+			entryst = CHERI_REVOKE_ST_LS_INITED;
 
-			if (myst == CAPREVST_LS_CLOSING) {
+			if (myst == CHERI_REVOKE_ST_LS_CLOSING) {
 				int crflags;
 ls_close_already_inited:
-				crflags = VM_CAPREVOKE_LOAD_SIDE;
+				crflags = VM_CHERI_REVOKE_LOAD_SIDE;
 
 				/* We're on the load side; walk the VM again. */
-				res = vm_caprevoke_pass(&vmcrc, crflags);
+				res = vm_cheri_revoke_pass(&vmcrc, crflags);
 			}
 		}
 	}
@@ -542,56 +552,58 @@ ls_close_already_inited:
 skip_last_pass:
 	/* OK, that's that.  Where do we stand now? */
 	if ((res == KERN_SUCCESS) &&
-	     ((myst == CAPREVST_SS_LAST) || (myst == CAPREVST_LS_CLOSING))) {
+	     ((myst == CHERI_REVOKE_ST_SS_LAST) ||
+	      (myst == CHERI_REVOKE_ST_LS_CLOSING))) {
 
 		// XXX Assert all capdirty PTEs have LCLG equal to GCLG
 
 		/* Signal the end of this revocation epoch */
 		epoch++;
 		crepochs.dequeue = epoch;
-		vm_caprevoke_publish_epochs(info_page, &crepochs);
-		entryst = CAPREVST_NONE;
+		vm_cheri_revoke_publish_epochs(info_page, &crepochs);
+		entryst = CHERI_REVOKE_ST_NONE;
 	}
 
 	vm_map_lock(vmm);
-	caprevoke_st_set(&vmm->vm_caprev_st, epoch, entryst);
+	cheri_revoke_st_set(&vmm->vm_cheri_revoke_st, epoch, entryst);
 #ifdef CHERI_CAPREVOKE_STATS
-	if (flags & CAPREVOKE_TAKE_STATS) {
-		sx_xlock(&vmm->vm_caprev_stats_sx);
-		crst = *(struct caprevoke_stats*)&vmm->vm_caprev_stats;
+	if (flags & CHERI_REVOKE_TAKE_STATS) {
+		sx_xlock(&vmm->vm_cheri_revoke_stats_sx);
+		crst = *(struct cheri_revoke_stats*)&vmm->vm_cheri_revoke_stats;
 		crstp = &crst;
-		bzero(&vmm->vm_caprev_stats, sizeof(vmm->vm_caprev_stats));
-		sx_xunlock(&vmm->vm_caprev_stats_sx);
+		bzero(&vmm->vm_cheri_revoke_stats,
+		    sizeof(vmm->vm_cheri_revoke_stats));
+		sx_xunlock(&vmm->vm_cheri_revoke_stats_sx);
 	} else {
-		crstp = (struct caprevoke_stats*)&vmm->vm_caprev_stats;
+		crstp = (struct cheri_revoke_stats*)&vmm->vm_cheri_revoke_stats;
 	}
 #endif
 	vm_map_unlock(vmm);
 
 	/* Broadcast here: some sleepers may be able to take the fast out */
-	cv_broadcast(&vmm->vm_caprev_cv);
+	cv_broadcast(&vmm->vm_cheri_revoke_cv);
 
-	vm_caprevoke_cookie_rele(&vmcrc);
+	vm_cheri_revoke_cookie_rele(&vmcrc);
 	vmspace_free(vm);
 
-	return caprevoke_fini(crsi, 0, crstp, &crepochs);
+	return cheri_revoke_fini(crsi, 0, crstp, &crepochs);
 }
 
 static int
-kern_caprevoke_shadow(int flags, void * __capability arena,
+kern_cheri_revoke_shadow(int flags, void * __capability arena,
     void * __capability * __capability shadow)
 {
 	int arena_perms, error;
 	void * __capability cres;
 	vm_offset_t base, size;
-	int sel = flags & CAPREVOKE_SHADOW_SPACE_MASK;
+	int sel = flags & CHERI_REVOKE_SHADOW_SPACE_MASK;
 
 	if (!SV_CURPROC_FLAG(SV_CHERI)) {
 		return ENOSYS;
 	}
 
 	switch (sel) {
-	case CAPREVOKE_SHADOW_NOVMMAP:
+	case CHERI_REVOKE_SHADOW_NOVMMAP:
 
 		if (cheri_gettag(arena) == 0)
 			return EINVAL;
@@ -604,11 +616,11 @@ kern_caprevoke_shadow(int flags, void * __capability arena,
 		base = cheri_getbase(arena);
 		size = cheri_getlen(arena);
 
-		cres = vm_caprevoke_shadow_cap(sel, base, size, arena_perms);
+		cres = vm_cheri_revoke_shadow_cap(sel, base, size, arena_perms);
 
 		break;
 
-	case CAPREVOKE_SHADOW_OTYPE:
+	case CHERI_REVOKE_SHADOW_OTYPE:
 	    {
 		int reqperms;
 
@@ -625,15 +637,15 @@ kern_caprevoke_shadow(int flags, void * __capability arena,
 		base = cheri_getbase(arena);
 		size = cheri_getlen(arena);
 
-		cres = vm_caprevoke_shadow_cap(sel, base, size, 0);
+		cres = vm_cheri_revoke_shadow_cap(sel, base, size, 0);
 
 		break;
 	    }
-	case CAPREVOKE_SHADOW_INFO_STRUCT:
-	case CAPREVOKE_SHADOW_NOVMMAP_ENTIRE: // XXX
+	case CHERI_REVOKE_SHADOW_INFO_STRUCT:
+	case CHERI_REVOKE_SHADOW_NOVMMAP_ENTIRE: // XXX
 	    {
 		/* Anyone's allowed to ask, I guess; ->arena ignored. */
-		cres = vm_caprevoke_shadow_cap(sel, 0, 0, 0);
+		cres = vm_cheri_revoke_shadow_cap(sel, 0, 0, 0);
 		break;
 	    }
 	default:
@@ -646,27 +658,27 @@ kern_caprevoke_shadow(int flags, void * __capability arena,
 }
 
 int
-sys_caprevoke(struct thread *td, struct caprevoke_args *uap)
+sys_cheri_revoke(struct thread *td, struct cheri_revoke_args *uap)
 {
-	return kern_caprevoke(td, uap->flags, uap->start_epoch, uap->crsi);
+	return kern_cheri_revoke(td, uap->flags, uap->start_epoch, uap->crsi);
 }
 
 int
-sys_caprevoke_shadow(struct thread *td, struct caprevoke_shadow_args *uap)
+sys_cheri_revoke_shadow(struct thread *td, struct cheri_revoke_shadow_args *uap)
 {
-	return kern_caprevoke_shadow(uap->flags, uap->arena, uap->shadow);
+	return kern_cheri_revoke_shadow(uap->flags, uap->arena, uap->shadow);
 }
 
 #else /* CHERI_CAPREVOKE */
 
 int
-sys_caprevoke(struct thread *td, struct caprevoke_args *uap)
+sys_cheri_revoke(struct thread *td, struct cheri_revoke_args *uap)
 {
 	return (nosys(td, (struct nosys_args *)uap));
 }
 
 int
-sys_caprevoke_shadow(struct thread *td, struct caprevoke_shadow_args *uap)
+sys_cheri_revoke_shadow(struct thread *td, struct cheri_revoke_shadow_args *uap)
 {
 	void * __capability cres = NULL;
 
