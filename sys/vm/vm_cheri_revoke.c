@@ -308,13 +308,13 @@ again:
 	 */
 	
 	uint64_t cyc_end = get_cyclecount();
-	sx_slock(&uvms->vm_map.vm_caprev_stats_sx);
+	sx_slock(&uvms->vm_map.vm_cheri_revoke_stats_sx);
 	{
 		CHERI_REVOKE_STATS_FOR(crst, &crc);
 		CHERI_REVOKE_STATS_BUMP(crst, fault_visits);
 		CHERI_REVOKE_STATS_INC(crst, fault_cycles, cyc_end - cyc_start);
 	}
-	sx_sunlock(&uvms->vm_map.vm_caprev_stats_sx);
+	sx_sunlock(&uvms->vm_map.vm_cheri_revoke_stats_sx);
 #endif
 
 	vm_cheri_revoke_cookie_rele(&crc);
@@ -818,17 +818,17 @@ int
 vm_cheri_revoke_cookie_init(vm_map_t map, struct vm_cheri_revoke_cookie *crc)
 {
 	KASSERT(map == &curproc->p_vmspace->vm_map,
-	    ("caprev does not support foreign maps (yet)"));
-	KASSERT(map->vm_caprev_shva == VM_CHERI_REVOKE_BM_BASE,
-	    ("caprev shadow does not match definition"));
+	    ("cheri revoke does not support foreign maps (yet)"));
+	KASSERT(map->vm_cheri_revoke_shva == VM_CHERI_REVOKE_BM_BASE,
+	    ("cheri revoke shadow does not match definition"));
 
-	if (map->vm_caprev_sh == NULL)
+	if (map->vm_cheri_revoke_sh == NULL)
 		return KERN_INVALID_ARGUMENT;
 
 	crc->map = map;
 
 	/*
-	 * For foreign maps, we should take advantage of map->vm_caprev_sh
+	 * For foreign maps, we should take advantage of map->vm_cheri_revoke_sh
 	 * and construct a mapping in the local address space to manipulate
 	 * the remote one!
 	 */

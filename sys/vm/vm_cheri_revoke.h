@@ -153,7 +153,7 @@ enum vm_cheri_revoke_fault_res vm_cheri_revoke_fault_visit(
 #ifdef CHERI_CAPREVOKE_STATS
 #define CHERI_REVOKE_STATS_FOR(st, crc) \
 	struct cheri_revoke_stats *st = \
-	    (struct cheri_revoke_stats*)&(crc)->map->vm_caprev_stats
+	    (struct cheri_revoke_stats*)&(crc)->map->vm_cheri_revoke_stats
 #define CHERI_REVOKE_STATS_INC(st, ctr, d) \
 	do { __atomic_fetch_add(&(st)->ctr, (d), __ATOMIC_RELAXED); } while (0)
 #else

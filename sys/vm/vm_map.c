@@ -106,7 +106,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 
 #ifdef CHERI_CAPREVOKE
-#include <sys/caprevoke.h>
+#include <cheri/revoke.h>
 #endif
 
 /*
@@ -359,9 +359,9 @@ vmspace_zinit(void *mem, int size, int flags)
 	sx_init(&map->lock, "vm map (user)");
 	PMAP_LOCK_INIT(vmspace_pmap(vm));
 #ifdef CHERI_CAPREVOKE
-	cv_init(&map->vm_caprev_cv, "vmcaprev");
+	cv_init(&map->vm_cheri_revoke_cv, "vmcherirev");
 #ifdef CHERI_CAPREVOKE_STATS
-	sx_init(&map->vm_caprev_stats_sx, "vmcrstats");
+	sx_init(&map->vm_cheri_revoke_stats_sx, "vmcrstats");
 #endif
 #endif
 	return (0);
@@ -438,8 +438,8 @@ vmspace_dofree(struct vmspace *vm)
 	shmexit(vm);
 
 #ifdef CHERI_CAPREVOKE
-	/* Drop our explicit handle to the caprevoke shadow object */
-	vm->vm_map.vm_caprev_sh = NULL;
+	/* Drop our explicit handle to the cheri_revoke shadow object */
+	vm->vm_map.vm_cheri_revoke_sh = NULL;
 #endif
 
 	/*
@@ -1023,7 +1023,7 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 #endif
 
 #ifdef CHERI_CAPREVOKE
-	map->vm_caprev_st = CAPREVST_NONE; /* and epoch 0 */
+	map->vm_cheri_revoke_st = CHERI_REVOKE_ST_NONE; /* and epoch 0 */
 #endif
 }
 
@@ -2914,7 +2914,7 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	 *
 	 * XXX CAPREVOKE This could be much better in just about every way
 	 */
-	if (caprevoke_st_is_loadside(map->vm_caprev_st)) {
+	if (cheri_revoke_st_is_loadside(map->vm_cheri_revoke_st)) {
 		return;
 	}
 #endif
@@ -2923,7 +2923,8 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 		return;
 #ifdef CHERI_CAPREVOKE
 	/* This is pretty heavy-handed, but it's good enough for now */
-	if (caprevoke_st_state(map->vm_caprev_st) != CAPREVST_NONE)
+	if (cheri_revoke_st_state(map->vm_cheri_revoke_st) !=
+	    CHERI_REVOKE_ST_NONE)
 		return;
 #endif
 	if (object->type == OBJT_DEVICE || object->type == OBJT_SG) {
@@ -3041,7 +3042,8 @@ again:
 	vm_map_wait_busy(map);
 
 #ifdef CHERI_CAPREVOKE
-	if (caprevoke_st_state(map->vm_caprev_st) != CAPREVST_NONE) {
+	if (cheri_revoke_st_state(map->vm_cheri_revoke_st) !=
+	    CHERI_REVOKE_ST_NONE) {
 		if (map == &curthread->td_proc->p_vmspace->vm_map) {
 			/* Push our revocation along */
 			vm_map_unlock(map);
@@ -3051,7 +3053,7 @@ again:
 			goto again;
 		} else {
 			/* It's hard to push on another thread; wait */
-			rv = cv_wait_sig(&map->vm_caprev_cv, &map->lock);
+			rv = cv_wait_sig(&map->vm_cheri_revoke_cv, &map->lock);
 			if (rv != 0) {
 				return rv;
 			}
@@ -4798,9 +4800,9 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	 *
 	 * XXX NWF We should probably go around again to force the epoch closed.
 	 */
-	vm2->vm_map.vm_caprev_st = vm1->vm_map.vm_caprev_st;
-	vm2->vm_map.vm_caprev_sh = vm1->vm_map.vm_caprev_sh;
-	vm2->vm_map.vm_caprev_shva = vm1->vm_map.vm_caprev_shva;
+	vm2->vm_map.vm_cheri_revoke_st = vm1->vm_map.vm_cheri_revoke_st;
+	vm2->vm_map.vm_cheri_revoke_sh = vm1->vm_map.vm_cheri_revoke_sh;
+	vm2->vm_map.vm_cheri_revoke_shva = vm1->vm_map.vm_cheri_revoke_shva;
 #endif
 
 	/* XXX NWF This should copy across the CLG? */

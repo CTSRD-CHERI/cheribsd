@@ -101,8 +101,8 @@ __FBSDID("$FreeBSD$");
 #endif
 #ifdef CHERI_CAPREVOKE
 #include <cheri/cheric.h>
-#include <sys/caprevoke.h>
-#include <vm/vm_caprevoke.h>
+#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
 #endif
 
 #include <vm/vm.h>
@@ -306,46 +306,46 @@ vm_fault_dirty(struct faultstate *fs, vm_page_t m)
 
 #ifdef CHERI_CAPREVOKE
 static bool
-vm_fault_must_caprevoke(vm_map_t map, vm_prot_t prot, vm_page_t m)
+vm_fault_must_cheri_revoke(vm_map_t map, vm_prot_t prot, vm_page_t m)
 {
 
 	/*
 	 * Revocation is in progress, we are about to map with cap access, and
 	 * the page might bear capabilities.
 	 */
-	return (caprevoke_st_state(map->vm_caprev_st) != CAPREVST_NONE) &&
-		((prot & VM_PROT_READ_CAP) != 0) &&
-		((vm_page_astate_load(m).flags & PGA_CAPSTORE) != 0);
+	return (cheri_revoke_st_state(map->vm_cheri_revoke_st) !=
+	    CHERI_REVOKE_ST_NONE) && ((prot & VM_PROT_READ_CAP) != 0) &&
+	    ((vm_page_astate_load(m).flags & PGA_CAPSTORE) != 0);
 }
 
-enum vm_fault_caprevoke_res {
+enum vm_fault_cheri_revoke_res {
 	VFCR_OK         = 0,
 	VFCR_NEED_WRITE = 1,
 };
 
 static int
-vm_fault_caprevoke(struct faultstate *fs, vm_page_t m, bool canwrite)
+vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 {
 	/*
 	 * We are faulting during revocation.  This means we should
 	 * visit the page now, before it's visible to userspace.
 	 */
 	int hascaps, res;
-	struct vm_caprevoke_cookie crc;
-	uint64_t vm_caprev_st = fs->map->vm_caprev_st;
+	struct vm_cheri_revoke_cookie crc;
+	uint64_t vm_cheri_revoke_st = fs->map->vm_cheri_revoke_st;
 
-	res = vm_caprevoke_cookie_init(fs->map, &crc);
-	KASSERT(res == KERN_SUCCESS, ("caprevoke cookie init WTF"));
+	res = vm_cheri_revoke_cookie_init(fs->map, &crc);
+	KASSERT(res == KERN_SUCCESS, ("cheri revoke cookie init WTF"));
 
 	unlock_map(fs);
 
 	/*
 	 * This page being busy (or its object being locked) and being selected
-	 * by vm_fault_must_caprevoke means one of these things must be true:
+	 * by vm_fault_must_cheri_revoke means one of these things must be true:
 	 *
-	 * * The exhaustive page scan of vm_caprevoke_pass() has not yet gotten
-	 * to this page (or its address) and won't be able to end until we drop
-	 * the lock.
+	 * * The exhaustive page scan of vm_cheri_revoke_pass() has not yet
+	 * gotten to this page (or its address) and won't be able to end until
+	 * we drop the lock.
 	 *
 	 * * The exhaustive page scan is triggering this fault and so won't
 	 * progress until we're done.
@@ -363,16 +363,16 @@ vm_fault_caprevoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 
 	vm_page_aflag_clear(m, PGA_CAPDIRTY);
 	if (canwrite) {
-		hascaps = vm_caprevoke_page_rw(&crc, m);
+		hascaps = vm_cheri_revoke_page_rw(&crc, m);
 	} else {
-		hascaps = vm_caprevoke_page_ro(&crc, m);
+		hascaps = vm_cheri_revoke_page_ro(&crc, m);
 	}
 
-	vm_caprevoke_cookie_rele(&crc);
+	vm_cheri_revoke_cookie_rele(&crc);
 
 	/*
-	 * TODO: Well, this is kind of awkward.  We should, on the load side,
-	 * be leaving pages marked capdirty if VM_CAPREVOKE_PAGE_HASCAPS here.
+	 * TODO: Well, this is kind of awkward.  We should, on the load side, be
+	 * leaving pages marked capdirty if VM_CHERI_REVOKE_PAGE_HASCAPS here.
 	 * While that generally takes the form of OR-ing VM_PROT_WRITE_CAP to
 	 * the flags (not prot!) passed to pmap_enter (mostly derived from
 	 * fs->fault_type, at that, even), there's more nuance here than just
@@ -382,19 +382,19 @@ vm_fault_caprevoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 	 * best done via return or outparam or what.
 	 */
 
-	if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {
+	if (hascaps & VM_CHERI_REVOKE_PAGE_DIRTY) {
 		if (!canwrite) {
 			return VFCR_NEED_WRITE;
-		} else if (caprevoke_st_is_loadside(vm_caprev_st)) {
+		} else if (cheri_revoke_st_is_loadside(vm_cheri_revoke_st)) {
 			/*
 			 * Writable pages having lost a CAS race in the load
 			 * side revocation design are benign.
 			 */
 			return VFCR_OK;
 		} else {
-			KASSERT(caprevoke_st_state(vm_caprev_st) !=
-			    CAPREVST_SS_LAST,
-			    ("VM_CAPREVOKE_PAGE_DIRTY, writeable, store STW"));
+			KASSERT(cheri_revoke_st_state(vm_cheri_revoke_st) !=
+			    CHERI_REVOKE_ST_SS_LAST,
+			    ("VM_CHERI_REVOKE_PAGE_DIRTY & write during STW"));
 
 			/* We'll catch it next time around */
 			return VFCR_OK;
@@ -474,7 +474,7 @@ vm_fault_soft_fast(struct faultstate *fs)
 	realprot = VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot);
 
 #ifdef CHERI_CAPREVOKE
-	if (vm_fault_must_caprevoke(fs->map, realprot, m_map)) {
+	if (vm_fault_must_cheri_revoke(fs->map, realprot, m_map)) {
 		/*
 		 * Just pretend we didn't see it; it's easier than juggling
 		 * the map lock and checking.  We'll go through the full fault
@@ -713,7 +713,7 @@ vm_fault_populate(struct faultstate *fs)
 			vm_fault_dirty(fs, &m[i]);
 
 #ifdef CHERI_CAPREVOKE
-			if (vm_fault_must_caprevoke(fs->map, prot, &m[i])) {
+			if (vm_fault_must_cheri_revoke(fs->map, prot, &m[i])) {
 				int vmfcres;
 
 				/*
@@ -723,10 +723,11 @@ vm_fault_populate(struct faultstate *fs)
 				 * go ahead and mutate the page returned.
 				 */
 
-				vmfcres = vm_fault_caprevoke(fs, &m[i], true);
+				vmfcres = vm_fault_cheri_revoke(fs, &m[i],
+				    true);
 				switch(vmfcres) {
 				case VFCR_NEED_WRITE:
-					panic("caprevoke NEED_WRITE populate?");
+					panic("cheri_revoke populate R/O?");
 				case VFCR_OK:
 
 					/*
@@ -1764,29 +1765,30 @@ RetryFault:
 
 #ifdef CHERI_CAPREVOKE
 	/* XXX Is this the correct thing to do? */
-	if (vm_fault_must_caprevoke(fs.map,
+	if (vm_fault_must_cheri_revoke(fs.map,
 	    VM_OBJECT_MASK_CAP_PROT(fs.object, fs.prot), fs.m)) {
 		int vmfcres;
 
 		if ((fs.prot & VM_PROT_WRITE) ||
 		    (fs.object == fs.first_object)) {
-			vmfcres = vm_fault_caprevoke(&fs, fs.m, true);
+			vmfcres = vm_fault_cheri_revoke(&fs, fs.m, true);
 			KASSERT(vmfcres == VFCR_OK,
-				("vm_fault caprevoke NEED_WRITE?"));
+				("vm_fault cheri_revoke NEED_WRITE?"));
 		} else {
 			/* Try once without forcing CoW */
-			vmfcres = vm_fault_caprevoke(&fs, fs.m, false);
+			vmfcres = vm_fault_cheri_revoke(&fs, fs.m, false);
 
 			if (vmfcres == VFCR_NEED_WRITE) {
 				KASSERT(fs.m_cow == NULL,
-					("vm_fault caprevoke CoW already?"));
+					("vm_fault cheri revoke CoW already?"));
 
 				// XXX I'm sure we're missing some predicates here?
 
 				vm_fault_cow(&fs);
-				vmfcres = vm_fault_caprevoke(&fs, fs.m, true);
+				vmfcres = vm_fault_cheri_revoke(&fs, fs.m,
+				    true);
 				KASSERT(vmfcres == VFCR_OK,
-					("vm_fault caprevoke CoW bad res"));
+					("vm_fault cheri revoke CoW bad res"));
 			}
 		}
 	} else {
@@ -2001,7 +2003,7 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 	 *
 	 * XXX CAPREVOKE This could be much better in just about every way
 	 */
-	if (caprevoke_st_is_loadside(fs->map->vm_caprev_st)) {
+	if (cheri_revoke_st_is_loadside(fs->map->vm_cheri_revoke_st)) {
 		return;
 	}
 #endif
@@ -2061,10 +2063,10 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 		/*
 		 * This is a prefault, so simplest just to not map this page if
 		 * it might need to be updated as per revocation.  We'll catch
-		 * it in vm_caprevoke.c's invocation of vm_fault() if not
+		 * it in vm_cheri_revoke.c's invocation of vm_fault() if not
 		 * before.
 		 */
-		if (vm_fault_must_caprevoke(fs->map,
+		if (vm_fault_must_cheri_revoke(fs->map,
 		    VM_OBJECT_MASK_CAP_PROT(lobject, entry->protection), m)) {
 			if (!obj_locked || lobject != entry->object.vm_object)
 				VM_OBJECT_RUNLOCK(lobject);
