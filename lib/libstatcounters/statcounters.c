@@ -201,7 +201,7 @@ statcounters_dump_with_args(const statcounters_bank_t * const b,
 #include "statcounters_md.inc"
 		break;
 	}
-	if (!use_stdout)
+	if (!use_stdout && fileptr == NULL)
 		fclose(fp);
 	return 0;
 }
