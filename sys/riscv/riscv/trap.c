@@ -61,7 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysargmap.h>
 #include <cheri/cheric.h>
 #ifdef CHERI_CAPREVOKE
-#include <vm/vm_caprevoke.h>
+#include <vm/vm_cheri_revoke.h>
 #endif
 #endif
 
@@ -347,12 +347,12 @@ page_fault_handler(struct trapframe *frame, int usermode)
 #ifdef CHERI_CAPREVOKE
 	if ((frame->tf_scause == SCAUSE_LOAD_CAP_PAGE_FAULT) &&
 	    (va < VM_MAX_USER_ADDRESS)) {
-		if (vm_caprevoke_fault_visit(p->p_vmspace, va) ==
-		    VM_CAPREVOKE_FAULT_RESOLVED)
+		if (vm_cheri_revoke_fault_visit(p->p_vmspace, va) ==
+		    VM_CHERI_REVOKE_FAULT_RESOLVED)
 			goto done;
 		else {
 			/*
-			 * vm_caprevoke_fault_visit calls
+			 * vm_cheri_revoke_fault_visit calls
 			 * pmap_caploadgen_update, so if it's left us
 			 * UNRESOLVED, then there's no point in trying the pmap
 			 * again.

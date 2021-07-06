@@ -105,8 +105,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/cheri.h>
 #include <cheri/cheric.h>
 #ifdef CHERI_CAPREVOKE
-#include <sys/caprevoke.h>
-#include <vm/vm_caprevoke.h>
+#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
 #endif
 #endif
 
@@ -1243,54 +1243,55 @@ bzero(void *buf, size_t len)
 
 #ifdef CHERI_CAPREVOKE
 void
-caprevoke_td_frame(struct thread *td, const struct vm_caprevoke_cookie *crc)
+cheri_revoke_td_frame(struct thread *td,
+    const struct vm_cheri_revoke_cookie *crc)
 {
-	CAPREVOKE_STATS_FOR(crst, crc);
+	CHERI_REVOKE_STATS_FOR(crst, crc);
 
-#define CAPREV_REG(r) \
+#define CHERI_REVOKE_REG(r) \
 	do { if (cheri_gettag(r)) { \
-		CAPREVOKE_STATS_BUMP(crst, caps_found); \
-		if (vm_caprevoke_test(crc, r)) { \
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found); \
+		if (vm_cheri_revoke_test(crc, r)) { \
 			r = cheri_revoke(r); \
-			CAPREVOKE_STATS_BUMP(crst, caps_cleared); \
+			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared); \
 		} \
 	    }} while(0)
 
-	CAPREV_REG(td->td_frame->tf_ra);
-	CAPREV_REG(td->td_frame->tf_sp);
-	CAPREV_REG(td->td_frame->tf_gp);
-	CAPREV_REG(td->td_frame->tf_tp);
-	CAPREV_REG(td->td_frame->tf_t[0]);
-	CAPREV_REG(td->td_frame->tf_t[1]);
-	CAPREV_REG(td->td_frame->tf_t[2]);
-	CAPREV_REG(td->td_frame->tf_t[3]);
-	CAPREV_REG(td->td_frame->tf_t[4]);
-	CAPREV_REG(td->td_frame->tf_t[5]);
-	CAPREV_REG(td->td_frame->tf_t[6]);
-	CAPREV_REG(td->td_frame->tf_s[0]);
-	CAPREV_REG(td->td_frame->tf_s[1]);
-	CAPREV_REG(td->td_frame->tf_s[2]);
-	CAPREV_REG(td->td_frame->tf_s[3]);
-	CAPREV_REG(td->td_frame->tf_s[4]);
-	CAPREV_REG(td->td_frame->tf_s[5]);
-	CAPREV_REG(td->td_frame->tf_s[6]);
-	CAPREV_REG(td->td_frame->tf_s[7]);
-	CAPREV_REG(td->td_frame->tf_s[8]);
-	CAPREV_REG(td->td_frame->tf_s[9]);
-	CAPREV_REG(td->td_frame->tf_s[10]);
-	CAPREV_REG(td->td_frame->tf_s[11]);
-	CAPREV_REG(td->td_frame->tf_a[0]);
-	CAPREV_REG(td->td_frame->tf_a[1]);
-	CAPREV_REG(td->td_frame->tf_a[2]);
-	CAPREV_REG(td->td_frame->tf_a[3]);
-	CAPREV_REG(td->td_frame->tf_a[4]);
-	CAPREV_REG(td->td_frame->tf_a[5]);
-	CAPREV_REG(td->td_frame->tf_a[6]);
-	CAPREV_REG(td->td_frame->tf_a[7]);
-	CAPREV_REG(td->td_frame->tf_sepc); /* This could be real exciting! */
-	CAPREV_REG(td->td_frame->tf_ddc);
+	CHERI_REVOKE_REG(td->td_frame->tf_ra);
+	CHERI_REVOKE_REG(td->td_frame->tf_sp);
+	CHERI_REVOKE_REG(td->td_frame->tf_gp);
+	CHERI_REVOKE_REG(td->td_frame->tf_tp);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[0]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[1]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[2]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[3]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[4]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[5]);
+	CHERI_REVOKE_REG(td->td_frame->tf_t[6]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[0]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[1]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[2]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[3]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[4]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[5]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[6]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[7]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[8]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[9]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[10]);
+	CHERI_REVOKE_REG(td->td_frame->tf_s[11]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[0]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[1]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[2]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[3]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[4]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[5]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[6]);
+	CHERI_REVOKE_REG(td->td_frame->tf_a[7]);
+	CHERI_REVOKE_REG(td->td_frame->tf_sepc); /* This could be real exciting! */
+	CHERI_REVOKE_REG(td->td_frame->tf_ddc);
 
-#undef CAPREV_REG
+#undef CHERI_REVOKE_REG
 
 	return;
 }
