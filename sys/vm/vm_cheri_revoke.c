@@ -18,18 +18,18 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_page.h>
 
 #include <cheri/cheric.h>
-#include <sys/caprevoke.h>
-#include <vm/vm_caprevoke.h>
+#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
 
 // XXX This is very much a work in progress!
 
-static bool caprevoke_avoid_faults = 1;
-SYSCTL_BOOL(_vm, OID_AUTO, caprevoke_avoid_faults, CTLFLAG_RW,
-    &caprevoke_avoid_faults, 0,
+static bool cheri_revoke_avoid_faults = 1;
+SYSCTL_BOOL(_vm, OID_AUTO, cheri_revoke_avoid_faults, CTLFLAG_RW,
+    &cheri_revoke_avoid_faults, 0,
     "XXX");
 
 static inline int
-vm_caprevoke_should_visit_page(vm_page_t m, int flags)
+vm_cheri_revoke_should_visit_page(vm_page_t m, int flags)
 {
 	vm_page_astate_t mas = vm_page_astate_load(m);
 
@@ -44,7 +44,7 @@ vm_caprevoke_should_visit_page(vm_page_t m, int flags)
 	 * If this is an incremental scan, we only care about
 	 * recently-capdirty pages, so can stop here.
 	 */
-	if (flags & VM_CAPREVOKE_INCREMENTAL)
+	if (flags & VM_CHERI_REVOKE_INCREMENTAL)
 		return 0;
 
 	/*
@@ -58,28 +58,28 @@ vm_caprevoke_should_visit_page(vm_page_t m, int flags)
 }
 
 enum vm_cro_visit {
-	VM_CAPREVOKE_VIS_DONE  = 0,
-	VM_CAPREVOKE_VIS_DIRTY = 1,
-	VM_CAPREVOKE_VIS_BUSY  = 2
+	VM_CHERI_REVOKE_VIS_DONE  = 0,
+	VM_CHERI_REVOKE_VIS_DIRTY = 1,
+	VM_CHERI_REVOKE_VIS_BUSY  = 2
 };
 
 /*
  * Given a writable, wired page in a wlocked object, visit it.
  */
 static enum vm_cro_visit
-vm_caprevoke_visit_rw(
-    const struct vm_caprevoke_cookie *crc, int flags, vm_page_t m, bool *cap)
+vm_cheri_revoke_visit_rw(
+    const struct vm_cheri_revoke_cookie *crc, int flags, vm_page_t m, bool *cap)
 {
 	int hascaps;
-	CAPREVOKE_STATS_FOR(crst, crc);
+	CHERI_REVOKE_STATS_FOR(crst, crc);
 
 	if (vm_page_sleep_if_busy(m, "CHERI revoke"))
-		return VM_CAPREVOKE_VIS_BUSY;
+		return VM_CHERI_REVOKE_VIS_BUSY;
 		
 	vm_page_xbusy(m);
 	VM_OBJECT_WUNLOCK(m->object);
 
-	CAPREVOKE_STATS_BUMP(crst, pages_scan_rw);
+	CHERI_REVOKE_STATS_BUMP(crst, pages_scan_rw);
 
 	/*
 	 * In the Cornucopia story, we want to consider the page no longer dirty
@@ -126,9 +126,9 @@ vm_caprevoke_visit_rw(
 	 */
 	vm_page_aflag_clear(m, PGA_CAPDIRTY);
 
-	hascaps = vm_caprevoke_page_rw(crc, m);
+	hascaps = vm_cheri_revoke_page_rw(crc, m);
 
-	if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {
+	if (hascaps & VM_CHERI_REVOKE_PAGE_DIRTY) {
 		/*
 		 * Load-side visits might see new capabilities being written
 		 * concurrently, but by construction any such must have already
@@ -156,8 +156,8 @@ vm_caprevoke_visit_rw(
 	VM_OBJECT_WLOCK(m->object);
 	vm_page_xunbusy(m);
 
-	*cap = !!(hascaps & VM_CAPREVOKE_PAGE_HASCAPS);
-	return VM_CAPREVOKE_VIS_DONE;
+	*cap = !!(hascaps & VM_CHERI_REVOKE_PAGE_HASCAPS);
+	return VM_CHERI_REVOKE_VIS_DONE;
 }
 
 /*
@@ -167,10 +167,10 @@ vm_caprevoke_visit_rw(
  * advance and carry on.
  */
 static enum vm_cro_visit
-vm_caprevoke_visit_ro(
-    const struct vm_caprevoke_cookie *crc, int flags, vm_page_t m, bool *cap)
+vm_cheri_revoke_visit_ro(
+    const struct vm_cheri_revoke_cookie *crc, int flags, vm_page_t m, bool *cap)
 {
-	CAPREVOKE_STATS_FOR(crst, crc);
+	CHERI_REVOKE_STATS_FOR(crst, crc);
 	int hascaps;
 
 #ifdef INVARIANTS
@@ -178,11 +178,11 @@ vm_caprevoke_visit_ro(
 #endif
 
 	if (vm_page_sleep_if_busy(m, "CHERI revoke"))
-		return VM_CAPREVOKE_VIS_BUSY;
+		return VM_CHERI_REVOKE_VIS_BUSY;
 	vm_page_xbusy(m);
 	VM_OBJECT_WUNLOCK(m->object);
 
-	CAPREVOKE_STATS_BUMP(crst, pages_scan_ro);
+	CHERI_REVOKE_STATS_BUMP(crst, pages_scan_ro);
 
 	/*
 	 * As above, it's safe to clear this flag here on either the load or
@@ -191,9 +191,9 @@ vm_caprevoke_visit_ro(
 	 * page in any racing CLG fault handler.
 	 */
 	vm_page_aflag_clear(m, PGA_CAPDIRTY);
-	hascaps = vm_caprevoke_page_ro(crc, m);
+	hascaps = vm_cheri_revoke_page_ro(crc, m);
 
-	KASSERT(!(hascaps & VM_CAPREVOKE_PAGE_HASCAPS) ||
+	KASSERT(!(hascaps & VM_CHERI_REVOKE_PAGE_HASCAPS) ||
 		((mas.flags & PGA_CAPSTORE) || (mas.flags & PGA_CAPDIRTY)),
 	    ("cap-bearing RO page without h/r capdirty?"
 	     " hc=%x m=%p, m->of=%x, m->af=%x",
@@ -202,16 +202,16 @@ vm_caprevoke_visit_ro(
 	VM_OBJECT_WLOCK(m->object);
 	vm_page_xunbusy(m);
 
-	if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {
-		return VM_CAPREVOKE_VIS_DIRTY;
+	if (hascaps & VM_CHERI_REVOKE_PAGE_DIRTY) {
+		return VM_CHERI_REVOKE_VIS_DIRTY;
 	}
 
-	*cap = !!(hascaps & VM_CAPREVOKE_PAGE_HASCAPS);
-	return VM_CAPREVOKE_VIS_DONE;
+	*cap = !!(hascaps & VM_CHERI_REVOKE_PAGE_HASCAPS);
+	return VM_CHERI_REVOKE_VIS_DONE;
 }
 
 static void
-vm_caprevoke_unwire_in_situ(vm_page_t m)
+vm_cheri_revoke_unwire_in_situ(vm_page_t m)
 {
 	vm_page_lock(m);
 	vm_page_unwire(m, vm_page_active(m) ? PQ_ACTIVE : PQ_INACTIVE);
@@ -219,22 +219,23 @@ vm_caprevoke_unwire_in_situ(vm_page_t m)
 }
 
 // XXX stats
-enum vm_caprevoke_fault_res
-vm_caprevoke_fault_visit(struct vmspace *uvms, vm_offset_t va)
+enum vm_cheri_revoke_fault_res
+vm_cheri_revoke_fault_visit(struct vmspace *uvms, vm_offset_t va)
 {
 #ifdef CHERI_CAPREVOKE_STATS
 	uint64_t cyc_start = get_cyclecount();
 #endif
-	enum vm_caprevoke_fault_res res;
+	enum vm_cheri_revoke_fault_res res;
 	enum pmap_caploadgen_res pres;
 	int vres;
-	struct vm_caprevoke_cookie crc;
+	struct vm_cheri_revoke_cookie crc;
 	vm_page_t m = NULL;
 	bool hascap = false;
 	pmap_t upmap = vmspace_pmap(uvms);
 
-	vres = vm_caprevoke_cookie_init(&uvms->vm_map, &crc);
-	KASSERT(vres == 0, ("vm_caprevoke_cooke_init failure in fault_visit"));
+	vres = vm_cheri_revoke_cookie_init(&uvms->vm_map, &crc);
+	KASSERT(vres == 0,
+	    ("vm_cheri_revoke_cooke_init failure in fault_visit"));
 
 again:
 	pres = pmap_caploadgen_update(upmap, &va, &m,
@@ -244,13 +245,13 @@ again:
 	switch(pres) {
 	case PMAP_CAPLOADGEN_UNABLE:
 	case PMAP_CAPLOADGEN_TEARDOWN:
-		res = VM_CAPREVOKE_FAULT_UNRESOLVED;
+		res = VM_CHERI_REVOKE_FAULT_UNRESOLVED;
 		break;
 
 	case PMAP_CAPLOADGEN_ALREADY:
 	case PMAP_CAPLOADGEN_CLEAN:
 	case PMAP_CAPLOADGEN_OK:
-		res = VM_CAPREVOKE_FAULT_RESOLVED;
+		res = VM_CHERI_REVOKE_FAULT_RESOLVED;
 		break;
 
 	default:
@@ -271,13 +272,13 @@ again:
 
 		/* FALLTHROUGH */
 	case PMAP_CAPLOADGEN_SCAN_RO:
-		vres = vm_caprevoke_page_ro(&crc, m);
-		if (vres & VM_CAPREVOKE_PAGE_DIRTY) {
+		vres = vm_cheri_revoke_page_ro(&crc, m);
+		if (vres & VM_CHERI_REVOKE_PAGE_DIRTY) {
 			vm_page_unwire(m, PQ_ACTIVE);
-			res = VM_CAPREVOKE_FAULT_CAPSTORE;
+			res = VM_CHERI_REVOKE_FAULT_CAPSTORE;
 			break;
 		}
-		hascap = vres & VM_CAPREVOKE_PAGE_HASCAPS;
+		hascap = vres & VM_CHERI_REVOKE_PAGE_HASCAPS;
 		goto again;
 
 	case PMAP_CAPLOADGEN_SCAN_CLEAN_RW:
@@ -288,15 +289,15 @@ again:
 
 		/* FALLTHROUGH */
 	case PMAP_CAPLOADGEN_SCAN_RW:
-		vres = vm_caprevoke_page_rw(&crc, m);
+		vres = vm_cheri_revoke_page_rw(&crc, m);
 
 		/*
-		 * Discard VM_CAPREVOKE_PAGE_DIRTY: losing a load-side CAS race
-		 * is perfectly fine, as anything stored over top of it must
-		 * have already been checked.
+		 * Discard VM_CHERI_REVOKE_PAGE_DIRTY: losing a load-side CAS
+		 * race is perfectly fine, as anything stored over top of it
+		 * must have already been checked.
 		 */
 
-		hascap = vres & VM_CAPREVOKE_PAGE_HASCAPS;
+		hascap = vres & VM_CHERI_REVOKE_PAGE_HASCAPS;
 		goto again;
 	}
 
@@ -309,22 +310,22 @@ again:
 	uint64_t cyc_end = get_cyclecount();
 	sx_slock(&uvms->vm_map.vm_caprev_stats_sx);
 	{
-		CAPREVOKE_STATS_FOR(crst, &crc);
-		CAPREVOKE_STATS_BUMP(crst, fault_visits);
-		CAPREVOKE_STATS_INC(crst, fault_cycles, cyc_end - cyc_start);
+		CHERI_REVOKE_STATS_FOR(crst, &crc);
+		CHERI_REVOKE_STATS_BUMP(crst, fault_visits);
+		CHERI_REVOKE_STATS_INC(crst, fault_cycles, cyc_end - cyc_start);
 	}
 	sx_sunlock(&uvms->vm_map.vm_caprev_stats_sx);
 #endif
 
-	vm_caprevoke_cookie_rele(&crc);
+	vm_cheri_revoke_cookie_rele(&crc);
 
 	return res;
 }
 
 enum vm_cro_at {
-	VM_CAPREVOKE_AT_OK    = 0,
-	VM_CAPREVOKE_AT_TICK  = 1,
-	VM_CAPREVOKE_AT_VMERR = 2
+	VM_CHERI_REVOKE_AT_OK    = 0,
+	VM_CHERI_REVOKE_AT_TICK  = 1,
+	VM_CHERI_REVOKE_AT_VMERR = 2
 };
 
 /*
@@ -344,11 +345,11 @@ enum vm_cro_at {
  * caller should just repeat the call.  On failure, *ooff will not be modified.
  */
 static enum vm_cro_at
-vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
+vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
     vm_map_entry_t entry, vm_offset_t ioff, vm_offset_t *ooff, int *vmres)
 {
 	vm_page_astate_t mas;
-	CAPREVOKE_STATS_FOR(crst, crc);
+	CHERI_REVOKE_STATS_FOR(crst, crc);
 	vm_map_t map = crc->map;
 	vm_object_t obj = entry->object.vm_object;
 	vm_pindex_t ipi = OFF_TO_IDX(ioff);
@@ -364,10 +365,10 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 	 * If we're on the load side, we can ask the pmap to help us out.  This
 	 * is functionally equivalent to pmap_extract_and_hold, but with a fast
 	 * out if LCLG == GCLG (PMAP_CAPLOADGEN_ALREADY, i.e., if this mapping
-	 * has already been visited by vm_caprevoke_fault_visit) or if
+	 * has already been visited by vm_cheri_revoke_fault_visit) or if
 	 * m->a.flags has PGA_CAPSTORE clear (PMAP_CAPLOADGEN_CLEAN).
 	 */
-	if (flags & VM_CAPREVOKE_LOAD_SIDE) {
+	if (flags & VM_CHERI_REVOKE_LOAD_SIDE) {
 		vm_offset_t addr2 = addr;
 		int pmres;
 
@@ -380,7 +381,7 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 		case PMAP_CAPLOADGEN_ALREADY:
 		case PMAP_CAPLOADGEN_CLEAN:
 			*ooff = ioff + (addr2 - addr);
-			return VM_CAPREVOKE_AT_OK;
+			return VM_CHERI_REVOKE_AT_OK;
 		case PMAP_CAPLOADGEN_UNABLE:
 			break;
 		case PMAP_CAPLOADGEN_SCAN_RO:
@@ -406,7 +407,7 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 	    VM_ALLOC_WIRED | VM_ALLOC_NOBUSY | VM_ALLOC_NOZERO);
 
 	if (m == NULL) {
-		if (flags & VM_CAPREVOKE_QUICK_SUCCESSOR) {
+		if (flags & VM_CHERI_REVOKE_QUICK_SUCCESSOR) {
 			/* Look forward in the object map */
 			vm_page_t obj_next_pg = vm_page_find_least(obj, ipi);
 
@@ -415,7 +416,7 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 
 			if ((obj_next_pg == NULL) ||
 			    (obj_next_pg->pindex >= OFF_TO_IDX(lastoff))) {
-				CAPREVOKE_STATS_INC(crst, pages_skip_fast,
+				CHERI_REVOKE_STATS_INC(crst, pages_skip_fast,
 				    (entry->end - addr) >> PAGE_SHIFT);
 				*ooff = lastoff;
 			} else {
@@ -423,13 +424,13 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 				    ("Fast find page in bad object?"));
 
 				*ooff = IDX_TO_OFF(obj_next_pg->pindex);
-				CAPREVOKE_STATS_INC(crst, pages_skip_fast,
+				CHERI_REVOKE_STATS_INC(crst, pages_skip_fast,
 				    obj_next_pg->pindex - ipi);
 			}
-			return VM_CAPREVOKE_AT_OK;
+			return VM_CHERI_REVOKE_AT_OK;
 		}
 
-		CAPREVOKE_STATS_BUMP(crst, pages_faulted_ro);
+		CHERI_REVOKE_STATS_BUMP(crst, pages_faulted_ro);
 
 		int res;
 		unsigned int last_timestamp = map->timestamp;
@@ -442,21 +443,21 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 
 		if (res == KERN_NOT_RECEIVER) {
 			/* NOFILL did its thing */
-			CAPREVOKE_STATS_BUMP(crst, pages_skip_nofill);
+			CHERI_REVOKE_STATS_BUMP(crst, pages_skip_nofill);
 			*ooff = ioff + PAGE_SIZE;
 			VM_OBJECT_WLOCK(obj);
-			return VM_CAPREVOKE_AT_OK;
+			return VM_CHERI_REVOKE_AT_OK;
 		}
 		if (res != KERN_SUCCESS) {
 			*vmres = res;
-			return VM_CAPREVOKE_AT_VMERR;
+			return VM_CHERI_REVOKE_AT_VMERR;
 		}
 		if (last_timestamp != map->timestamp) {
 			/*
 			 * The map has changed out from under us; bail and
 			 * the caller will look up the new map entry.
 			 */
-			return VM_CAPREVOKE_AT_TICK;
+			return VM_CHERI_REVOKE_AT_TICK;
 		}
 
 		VM_OBJECT_WLOCK(m->object);
@@ -473,8 +474,8 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 	VM_OBJECT_ASSERT_WLOCKED(m->object);
 	KASSERT(vm_page_all_valid(m), ("Revocation invalid page"));
 
-	if (!vm_caprevoke_should_visit_page(m, flags)) {
-		CAPREVOKE_STATS_BUMP(crst, pages_skip);
+	if (!vm_cheri_revoke_should_visit_page(m, flags)) {
+		CHERI_REVOKE_STATS_BUMP(crst, pages_skip);
 		goto ok;
 	}
 
@@ -483,17 +484,19 @@ visit_ro:
 visit_rw:
 		if (m->object == obj) {
 			/* Visit the page RW in place */
-			switch (vm_caprevoke_visit_rw(crc, flags, m, &viscap)) {
-			case VM_CAPREVOKE_VIS_DONE:
+			switch (vm_cheri_revoke_visit_rw(crc, flags, m,
+			    &viscap)) {
+			case VM_CHERI_REVOKE_VIS_DONE:
 				goto ok;
 
-			case VM_CAPREVOKE_VIS_BUSY:
+			case VM_CHERI_REVOKE_VIS_BUSY:
 				if (mwired)
-					vm_caprevoke_unwire_in_situ(m);
+					vm_cheri_revoke_unwire_in_situ(m);
 				VM_OBJECT_WUNLOCK(obj);
-				return VM_CAPREVOKE_AT_TICK;
+				return VM_CHERI_REVOKE_AT_TICK;
 			default:
-				panic("bad result from vm_caprevoke_visit_rw");
+				panic(
+				    "bad result from vm_cheri_revoke_visit_rw");
 			}
 		}
 
@@ -506,11 +509,11 @@ visit_rw:
 		goto visit_rw_fault;
 	}
 
-	switch (vm_caprevoke_visit_ro(crc, flags, m, &viscap)) {
-	case VM_CAPREVOKE_VIS_DONE:
+	switch (vm_cheri_revoke_visit_ro(crc, flags, m, &viscap)) {
+	case VM_CHERI_REVOKE_VIS_DONE:
 		/* We were able to conclude that the page was clean */
 		goto ok;
-	case VM_CAPREVOKE_VIS_BUSY:
+	case VM_CHERI_REVOKE_VIS_BUSY:
 		/*
 		 * This is kind of awkward; the page is busy and it's
 		 * not clear by whom.  But whoever it is needs our
@@ -518,25 +521,25 @@ visit_rw:
 		 * map stepping forward.
 		 */
 		if (mwired)
-			vm_caprevoke_unwire_in_situ(m);
+			vm_cheri_revoke_unwire_in_situ(m);
 		VM_OBJECT_WUNLOCK(obj);
-		return VM_CAPREVOKE_AT_TICK;
-	case VM_CAPREVOKE_VIS_DIRTY:
+		return VM_CHERI_REVOKE_AT_TICK;
+	case VM_CHERI_REVOKE_VIS_DIRTY:
 		/* Dirty here means we need to upgrade to RW now */
 		break;
 	default:
-		panic("bad result from vm_caprevoke_visit_ro");
+		panic("bad result from vm_cheri_revoke_visit_ro");
 	}
 
 visit_rw_fault:
-	CAPREVOKE_STATS_BUMP(crst, pages_faulted_rw);
+	CHERI_REVOKE_STATS_BUMP(crst, pages_faulted_rw);
 
 	int res;
 	unsigned int last_timestamp = map->timestamp;
 
 	if (mwired) {
 		mwired = false;
-		vm_caprevoke_unwire_in_situ(m);
+		vm_cheri_revoke_unwire_in_situ(m);
 	}
 	VM_OBJECT_WUNLOCK(m->object);
 	vm_map_unlock_read(map);
@@ -546,11 +549,11 @@ visit_rw_fault:
 	if (res != KERN_SUCCESS) {
 		*vmres = res;
 		VM_OBJECT_ASSERT_UNLOCKED(obj);
-		return VM_CAPREVOKE_AT_VMERR;
+		return VM_CHERI_REVOKE_AT_VMERR;
 	}
 	if (last_timestamp != map->timestamp) {
 		VM_OBJECT_ASSERT_UNLOCKED(obj);
-		return VM_CAPREVOKE_AT_TICK;
+		return VM_CHERI_REVOKE_AT_TICK;
 	}
 
 	KASSERT(m->object == obj, ("Bad page object after FAULT WRITE"));
@@ -564,7 +567,7 @@ ok:
 	 * already be up to date (if present).  Otherwise, the load side needs
 	 * to update the LCLG bit now.
 	 */
-	if (!mdidvm && (flags & VM_CAPREVOKE_LOAD_SIDE)) {
+	if (!mdidvm && (flags & VM_CHERI_REVOKE_LOAD_SIDE)) {
 		vm_offset_t addr2 = addr;
 		vm_page_t m2 = m;
 		int pmres;
@@ -597,7 +600,7 @@ ok:
 	 * Even if the page has been replaced, it must have been by another act
 	 * of the VM, and so the CLG should be absent or up to date.
 	 */
-	if (mdidvm && (flags & VM_CAPREVOKE_LOAD_SIDE)) {
+	if (mdidvm && (flags & VM_CHERI_REVOKE_LOAD_SIDE)) {
 		int pmres;
 		vm_offset_t addr2 = addr;
 		vm_page_t m2 = NULL;
@@ -624,17 +627,17 @@ ok:
 
 	mas = vm_page_astate_load(m);
 	KASSERT(((mas.flags & PGA_CAPDIRTY) == 0) ||
-		!(flags & VM_CAPREVOKE_BARRIERED),
+		!(flags & VM_CHERI_REVOKE_BARRIERED),
 	    ("Capdirty page after visit with world stopped?"));
 
 	*ooff = ioff + pagesizes[0];
 	if (mwired)
-		vm_caprevoke_unwire_in_situ(m);
+		vm_cheri_revoke_unwire_in_situ(m);
 	if (m->object != obj) {
 		VM_OBJECT_WUNLOCK(m->object);
 		VM_OBJECT_WLOCK(obj);
 	}
-	return VM_CAPREVOKE_AT_OK;
+	return VM_CHERI_REVOKE_AT_OK;
 }
 
 /*
@@ -646,7 +649,7 @@ ok:
  * held across invocation.
  */
 static int
-vm_caprevoke_map_entry(const struct vm_caprevoke_cookie *crc, int flags,
+vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc, int flags,
     vm_map_entry_t entry, vm_offset_t *addr)
 {
 	int res;
@@ -655,7 +658,7 @@ vm_caprevoke_map_entry(const struct vm_caprevoke_cookie *crc, int flags,
 	vm_object_t objlocked = NULL;
 
 	KASSERT(!(entry->eflags & MAP_ENTRY_IS_SUB_MAP),
-	    ("caprevoke SUB_MAP"));
+	    ("cheri_revoke SUB_MAP"));
 
 	obj = entry->object.vm_object;
 
@@ -667,11 +670,11 @@ vm_caprevoke_map_entry(const struct vm_caprevoke_cookie *crc, int flags,
 	if ((entry->max_protection & VM_PROT_READ_CAP) == 0)
 		goto fini;
 
-	if (caprevoke_avoid_faults) {
+	if (cheri_revoke_avoid_faults) {
 		if ((obj->type == OBJT_DEFAULT) &&
 		    ((obj->backing_object == NULL) ||
 		     ((obj->backing_object->flags & OBJ_HASCAP) == 0)))
-			flags |= VM_CAPREVOKE_QUICK_SUCCESSOR;
+			flags |= VM_CHERI_REVOKE_QUICK_SUCCESSOR;
 
 		/* XXX How do to QUICK_SUCCESSOR for OBJT_SWAP? */
 	}
@@ -687,22 +690,22 @@ vm_caprevoke_map_entry(const struct vm_caprevoke_cookie *crc, int flags,
 		ooffset = *addr - entry->start + entry->offset;
 		oaddr = *addr;
 
-		res = vm_caprevoke_object_at(
+		res = vm_cheri_revoke_object_at(
 		    crc, flags, entry, ooffset, &ooffset, &vmres);
 
 		/* How far did we get? */
 		*addr = ooffset - entry->offset + entry->start;
 		KASSERT(*addr <= entry->end,
-		    ("vm_caprevoke post past entry end: %lx > %lx (was %lx)",
+		    ("vm_cheri_revoke post past entry end: %lx > %lx (was %lx)",
 			entry->end, *addr, oaddr));
 
 		switch (res) {
-		case VM_CAPREVOKE_AT_VMERR:
+		case VM_CHERI_REVOKE_AT_VMERR:
 			return vmres;
-		case VM_CAPREVOKE_AT_TICK:
+		case VM_CHERI_REVOKE_AT_TICK:
 			/* Have the caller retranslate the map */
 			return KERN_SUCCESS;
-		case VM_CAPREVOKE_AT_OK:
+		case VM_CHERI_REVOKE_AT_OK:
 			break;
 		}
 	}
@@ -717,13 +720,13 @@ fini:
 
 /*
  * Do a sweep through all mapped objects, hunting for revoked capabilities,
- * as defined by the machdep vm_caprevoke_page.
+ * as defined by the machdep vm_cheri_revoke_page.
  *
  * For simplicity, the proc must be held on entry and will be held
  * throughout.  XXX Would we rather do something else?
  */
 int
-vm_caprevoke_pass(const struct vm_caprevoke_cookie *crc, int flags)
+vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc, int flags)
 {
 	int res = KERN_SUCCESS;
 	const vm_map_t map = crc->map;
@@ -737,7 +740,7 @@ vm_caprevoke_pass(const struct vm_caprevoke_cookie *crc, int flags)
 	if (map->busy)
 		vm_map_wait_busy(map);
 
-	if (flags & VM_CAPREVOKE_SYNC_CD) {
+	if (flags & VM_CHERI_REVOKE_SYNC_CD) {
 		/* Flush out all the MD capdirty bits to the MI layer. */
 		pmap_sync_capdirty(map->pmap);
 	}
@@ -760,7 +763,7 @@ vm_caprevoke_pass(const struct vm_caprevoke_cookie *crc, int flags)
 		 * MPROT_QUARANTINE'd map entries to be usable again, yes?
 		 */
 
-		res = vm_caprevoke_map_entry(crc, flags, entry, &addr);
+		res = vm_cheri_revoke_map_entry(crc, flags, entry, &addr);
 
 		/*
 		 * We might be bailing out because a page fault failed for
@@ -784,7 +787,7 @@ vm_caprevoke_pass(const struct vm_caprevoke_cookie *crc, int flags)
 	 * increment the CLG for the *next* pass (while we've got the world
 	 * stopped.)
 	 *
-	if (flags & VM_CAPREVOKE_LOAD_SIDE)
+	if (flags & VM_CHERI_REVOKE_LOAD_SIDE)
 		pmap_invalidate_all(pmap);
 	 */
 
@@ -798,13 +801,13 @@ out:
 	return res;
 }
 
-_Static_assert(VM_CAPREVOKE_PAD_SIZE >=
-	(VM_CAPREVOKE_BSZ_MEM_NOMAP + VM_CAPREVOKE_BSZ_MEM_MAP +
-	    VM_CAPREVOKE_BSZ_OTYPE + PAGE_SIZE),
-    "VM_CAPREVOKE_PAD_SIZE too small");
+_Static_assert(VM_CHERI_REVOKE_PAD_SIZE >=
+	(VM_CHERI_REVOKE_BSZ_MEM_NOMAP + VM_CHERI_REVOKE_BSZ_MEM_MAP +
+	    VM_CHERI_REVOKE_BSZ_OTYPE + PAGE_SIZE),
+    "VM_CHERI_REVOKE_PAD_SIZE too small");
 _Static_assert(
-    (VM_CAPREVOKE_BM_BASE + VM_CAPREVOKE_PAD_SIZE) <= VM_MAXUSER_ADDRESS,
-    "VM_CAPREVOKE shadow exceeds max size");
+    (VM_CHERI_REVOKE_BM_BASE + VM_CHERI_REVOKE_PAD_SIZE) <= VM_MAXUSER_ADDRESS,
+    "VM_CHERI_REVOKE shadow exceeds max size");
 
 /*
  * XXX Should this encapsulate a barrier around epochs and stat collectio and
@@ -812,11 +815,11 @@ _Static_assert(
  * but maybe it'd be better to be a little more structured.
  */
 int
-vm_caprevoke_cookie_init(vm_map_t map, struct vm_caprevoke_cookie *crc)
+vm_cheri_revoke_cookie_init(vm_map_t map, struct vm_cheri_revoke_cookie *crc)
 {
 	KASSERT(map == &curproc->p_vmspace->vm_map,
 	    ("caprev does not support foreign maps (yet)"));
-	KASSERT(map->vm_caprev_shva == VM_CAPREVOKE_BM_BASE,
+	KASSERT(map->vm_caprev_shva == VM_CHERI_REVOKE_BM_BASE,
 	    ("caprev shadow does not match definition"));
 
 	if (map->vm_caprev_sh == NULL)
@@ -830,14 +833,14 @@ vm_caprevoke_cookie_init(vm_map_t map, struct vm_caprevoke_cookie *crc)
 	 * the remote one!
 	 */
 	crc->crshadow = cheri_capability_build_user_data(
-	    CHERI_PERM_LOAD | CHERI_PERM_GLOBAL, VM_CAPREVOKE_BM_BASE,
-	    VM_CAPREVOKE_PAD_SIZE, 0);
+	    CHERI_PERM_LOAD | CHERI_PERM_GLOBAL, VM_CHERI_REVOKE_BM_BASE,
+	    VM_CHERI_REVOKE_PAD_SIZE, 0);
 
 	return KERN_SUCCESS;
 }
 
 void
-vm_caprevoke_cookie_rele(struct vm_caprevoke_cookie *crc)
+vm_cheri_revoke_cookie_rele(struct vm_cheri_revoke_cookie *crc)
 {
 	(void)crc;
 	return;
