@@ -101,8 +101,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 #endif
-#include <vm/vm_caprevoke.h>
-#include <sys/caprevoke.h>
+#include <vm/vm_cheri_revoke.h>
+#include <cheri/revoke.h>
 #endif
 #endif
 
@@ -1759,16 +1759,17 @@ kern_sigaltstack(struct thread *td, stack_t *ss, stack_t *oss)
 
 #ifdef CHERI_CAPREVOKE
 void
-sigaltstack_caprevoke(struct thread *td, const struct vm_caprevoke_cookie *crc)
+sigaltstack_cheri_revoke(struct thread *td,
+    const struct vm_cheri_revoke_cookie *crc)
 {
-	CAPREVOKE_STATS_FOR(crst, crc);
+	CHERI_REVOKE_STATS_FOR(crst, crc);
 
 	uintcap_t sp = (uintcap_t)td->td_sigstk.ss_sp;
 
 	if (cheri_gettag(sp)) {
-		CAPREVOKE_STATS_BUMP(crst, caps_found);
-		if (vm_caprevoke_test(crc, sp)) {
-			CAPREVOKE_STATS_BUMP(crst, caps_cleared);
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
+		if (vm_cheri_revoke_test(crc, sp)) {
+			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 			td->td_sigstk.ss_sp =
 			    (void * __capability)cheri_revoke(sp);
 		}
