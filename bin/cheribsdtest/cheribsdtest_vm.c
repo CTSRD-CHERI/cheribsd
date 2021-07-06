@@ -47,7 +47,7 @@
 #include <sys/ucontext.h>
 #include <sys/wait.h>
 
-#include <sys/caprevoke.h>
+#include <cheri/revoke.h>
 #include <sys/event.h>
 
 #include <machine/frame.h>
@@ -692,7 +692,7 @@ CHERIBSDTEST(cheribsdtest_vm_capdirty, "verify capdirty marking and mincore")
  * Revocation tests
  */
 
-#ifdef CAPREVOKE
+#ifdef CHERI_REVOKE
 
 /* Ick */
 static inline uint64_t
@@ -747,7 +747,7 @@ check_kqueue_cap(int kq, unsigned int valid)
 }
 
 static void
-fprintf_caprevoke_stats(FILE *f, struct caprevoke_syscall_info crsi,
+fprintf_cheri_revoke_stats(FILE *f, struct cheri_revoke_syscall_info crsi,
     uint32_t cycsum)
 {
 	fprintf(f, "revoke:"
@@ -805,14 +805,14 @@ fprintf_caprevoke_stats(FILE *f, struct caprevoke_syscall_info crsi,
 		cycsum);
 }
 
-CHERIBSDTEST(cheribsdtest_caprevoke_lightly,
+CHERIBSDTEST(cheribsdtest_cheri_revoke_lightly,
     "A gentle test of capability revocation")
 {
 	void * __capability * __capability mb;
 	void * __capability sh;
-	const volatile struct caprevoke_info * __capability cri;
+	const volatile struct cheri_revoke_info * __capability cri;
 	void * __capability revme;
-	struct caprevoke_syscall_info crsi;
+	struct cheri_revoke_syscall_info crsi;
 	int kq;
 	uint32_t cyc_start, cyc_end;
 
@@ -820,10 +820,10 @@ CHERIBSDTEST(cheribsdtest_caprevoke_lightly,
 	mb = CHERIBSDTEST_CHECK_SYSCALL(
 	    mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, mb, &sh));
+	    cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, mb, &sh));
 
-	CHERIBSDTEST_CHECK_SYSCALL(caprevoke_shadow(
-	    CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_shadow(
+	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
 	    __DEQUALIFY_CAP(void * __capability *, &cri)));
 
 	/*
@@ -842,10 +842,10 @@ CHERIBSDTEST(cheribsdtest_caprevoke_lightly,
 
 	cyc_start = get_cyclecount();
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    caprevoke(CAPREVOKE_LAST_PASS | CAPREVOKE_IGNORE_START |
-	    CAPREVOKE_TAKE_STATS , 0, &crsi));
+	    cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START |
+	    CHERI_REVOKE_TAKE_STATS , 0, &crsi));
 	cyc_end = get_cyclecount();
-	fprintf_caprevoke_stats(stderr, crsi, cyc_end - cyc_start);
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
 
 	CHERIBSDTEST_VERIFY2(
 	    cri->epochs.dequeue == crsi.epochs.dequeue,
@@ -869,10 +869,10 @@ CHERIBSDTEST(cheribsdtest_caprevoke_lightly,
 	install_kqueue_cap(kq, revme);
 
 	cyc_start = get_cyclecount();
-	CHERIBSDTEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_IGNORE_START |
-	    CAPREVOKE_TAKE_STATS, 0, &crsi));
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_IGNORE_START |
+	    CHERI_REVOKE_TAKE_STATS, 0, &crsi));
 	cyc_end = get_cyclecount();
-	fprintf_caprevoke_stats(stderr, crsi, cyc_end - cyc_start);
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
 
 	CHERIBSDTEST_VERIFY2(
 	    crsi.epochs.enqueue >= crsi.epochs.dequeue + 1,
@@ -884,10 +884,10 @@ CHERIBSDTEST(cheribsdtest_caprevoke_lightly,
 
 	cyc_start = get_cyclecount();
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    caprevoke(CAPREVOKE_LAST_PASS | CAPREVOKE_TAKE_STATS,
+	    cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS,
 	    crsi.epochs.enqueue, &crsi));
 	cyc_end = get_cyclecount();
-	fprintf_caprevoke_stats(stderr, crsi, cyc_end - cyc_start);
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
 
 	CHERIBSDTEST_VERIFY2(
 	    cri->epochs.dequeue == crsi.epochs.dequeue,
@@ -903,23 +903,23 @@ CHERIBSDTEST(cheribsdtest_caprevoke_lightly,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheribsdtest_caprevoke_capdirty,
+CHERIBSDTEST(cheribsdtest_cheri_revoke_capdirty,
     "Probe the interaction of revocation and capdirty")
 {
 	void * __capability * __capability mb;
 	void * __capability sh;
-	const volatile struct caprevoke_info * __capability cri;
+	const volatile struct cheri_revoke_info * __capability cri;
 	void * __capability revme;
-	struct caprevoke_syscall_info crsi;
+	struct cheri_revoke_syscall_info crsi;
 	uint32_t cyc_start, cyc_end;
 
 	mb = CHERIBSDTEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE, PROT_READ |
 	    PROT_WRITE, MAP_ANON, -1, 0));
-	CHERIBSDTEST_CHECK_SYSCALL(caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP,
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP,
 	    mb, &sh));
 
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
+	    cheri_revoke_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
 	    __DEQUALIFY_CAP(void * __capability *,&cri)));
 
 	revme = cheri_andperm(cheri_setbounds(mb, 0x10),
@@ -930,10 +930,10 @@ CHERIBSDTEST(cheribsdtest_caprevoke_capdirty,
 	((uint8_t * __capability) sh)[0] = 1;
 
 	cyc_start = get_cyclecount();
-	CHERIBSDTEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_IGNORE_START |
-	    CAPREVOKE_TAKE_STATS, 0, &crsi));
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_IGNORE_START |
+	    CHERI_REVOKE_TAKE_STATS, 0, &crsi));
 	cyc_end = get_cyclecount();
-	fprintf_caprevoke_stats(stderr, crsi, cyc_end - cyc_start);
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
 
 	CHERIBSDTEST_VERIFY2(cri->epochs.dequeue == crsi.epochs.dequeue,
 	    "Bad shared clock");
@@ -947,10 +947,10 @@ CHERIBSDTEST(cheribsdtest_caprevoke_capdirty,
 	mb[1] = revme;
 
 	cyc_start = get_cyclecount();
-	CHERIBSDTEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_IGNORE_START |
-	    CAPREVOKE_TAKE_STATS, 0, &crsi));
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_IGNORE_START |
+	    CHERI_REVOKE_TAKE_STATS, 0, &crsi));
 	cyc_end = get_cyclecount();
-	fprintf_caprevoke_stats(stderr, crsi, cyc_end - cyc_start);
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
 
 	CHERIBSDTEST_VERIFY2(cri->epochs.dequeue == crsi.epochs.dequeue,
 	    "Bad shared clock");
@@ -965,10 +965,10 @@ CHERIBSDTEST(cheribsdtest_caprevoke_capdirty,
 	mb[2] = revme;
 
 	cyc_start = get_cyclecount();
-	CHERIBSDTEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS |
-	    CAPREVOKE_IGNORE_START | CAPREVOKE_TAKE_STATS, 0, &crsi));
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_LAST_PASS |
+	    CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_TAKE_STATS, 0, &crsi));
 	cyc_end = get_cyclecount();
-	fprintf_caprevoke_stats(stderr, crsi, cyc_end - cyc_start);
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
 
 	CHERIBSDTEST_VERIFY2(cri->epochs.dequeue == crsi.epochs.dequeue,
 	    "Bad shared clock");
@@ -989,26 +989,28 @@ CHERIBSDTEST(cheribsdtest_caprevoke_capdirty,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
+CHERIBSDTEST(cheribsdtest_cheri_revoke_loadside, "Test load-side revoker")
 {
-#define CHERIBSDTEST_VM_CAPREVOKE_LOADSIDE_NPG	3
+#define CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG	3
 
 	void * __capability * __capability mb;
 	void * __capability sh;
-	const volatile struct caprevoke_info * __capability cri;
+	const volatile struct cheri_revoke_info * __capability cri;
 	void * __capability revme;
-	struct caprevoke_syscall_info crsi;
+	struct cheri_revoke_syscall_info crsi;
 	uint32_t cyc_start, cyc_end;
-	unsigned char mcv[CHERIBSDTEST_VM_CAPREVOKE_LOADSIDE_NPG] = { 0 };
-	const size_t asz = CHERIBSDTEST_VM_CAPREVOKE_LOADSIDE_NPG * PAGE_SIZE;
+	unsigned char mcv[CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG] = { 0 };
+	const size_t asz = CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG *
+	    PAGE_SIZE;
 
 	mb = CHERIBSDTEST_CHECK_SYSCALL(
 	    mmap(0, asz, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, mb, &sh));
+	    cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, mb, &sh));
 
-	CHERIBSDTEST_CHECK_SYSCALL(caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT,
-	    NULL, __DEQUALIFY_CAP(void * __capability *, &cri)));
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_shadow(
+	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
+	    __DEQUALIFY_CAP(void * __capability *, &cri)));
 
 	revme = cheri_andperm(mb, ~CHERI_PERM_CHERIABI_VMMAP);
 	((void * __capability *)mb)[1] = revme;
@@ -1032,10 +1034,10 @@ CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
 	 * walks.
 	 */
 	cyc_start = get_cyclecount();
-	CHERIBSDTEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LOAD_SIDE |
-	    CAPREVOKE_IGNORE_START | CAPREVOKE_TAKE_STATS, 0, &crsi));
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_LOAD_SIDE |
+	    CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_TAKE_STATS, 0, &crsi));
 	cyc_end = get_cyclecount();
-	fprintf_caprevoke_stats(stderr, crsi, cyc_end - cyc_start);
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
 
 	/*
 	 * Try to induce a read fault and check that the read result is revoked.
@@ -1064,10 +1066,10 @@ CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
 	 */
 	cyc_start = get_cyclecount();
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    caprevoke(CAPREVOKE_LAST_PASS | CAPREVOKE_IGNORE_START |
-		CAPREVOKE_TAKE_STATS, 0, &crsi));
+	    cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START |
+		CHERI_REVOKE_TAKE_STATS, 0, &crsi));
 	cyc_end = get_cyclecount();
-	fprintf_caprevoke_stats(stderr, crsi, cyc_end - cyc_start);
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
 
 	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
 	CHERIBSDTEST_VERIFY2(
@@ -1094,10 +1096,10 @@ CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
 	 */
 	cyc_start = get_cyclecount();
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    caprevoke(CAPREVOKE_LOAD_SIDE | CAPREVOKE_LAST_PASS |
-	        CAPREVOKE_IGNORE_START | CAPREVOKE_TAKE_STATS, 0, &crsi));
+	    cheri_revoke(CHERI_REVOKE_LOAD_SIDE | CHERI_REVOKE_LAST_PASS |
+	        CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_TAKE_STATS, 0, &crsi));
 	cyc_end = get_cyclecount();
-	fprintf_caprevoke_stats(stderr, crsi, cyc_end - cyc_start);
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
 
 	CHERIBSDTEST_VERIFY2(check_revoked(mb[1]),
 	    "Revoker failure in full pass");
@@ -1113,10 +1115,10 @@ CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
 	 */
 	cyc_start = get_cyclecount();
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    caprevoke(CAPREVOKE_LOAD_SIDE | CAPREVOKE_LAST_PASS |
-	        CAPREVOKE_IGNORE_START | CAPREVOKE_TAKE_STATS, 0, &crsi));
+	    cheri_revoke(CHERI_REVOKE_LOAD_SIDE | CHERI_REVOKE_LAST_PASS |
+	        CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_TAKE_STATS, 0, &crsi));
 	cyc_end = get_cyclecount();
-	fprintf_caprevoke_stats(stderr, crsi, cyc_end - cyc_start);
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
 
 	CHERIBSDTEST_CHECK_SYSCALL(mincore(mb, asz, &mcv[0]));
 	CHERIBSDTEST_VERIFY2(
@@ -1131,18 +1133,18 @@ CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
 
 	cheribsdtest_success();
 
-#undef CHERIBSDTEST_VM_CAPREVOKE_LOADSIDE_NPG
+#undef CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG
 }
 
 /*
- * Repeatedly invoke libcheri_caprevoke logic.
+ * Repeatedly invoke libcheri_cheri_revoke logic.
  * Using a bump the pointer allocator, repeatedly grab rand()-omly sized
  * objects and fill them with capabilities to themselves, mark them for
  * revocation, revoke, and validate.
  *
  */
 
-#include <cheri/libcaprevoke.h>
+#include <cheri/libcheri_revoke.h>
 
 /* Just for debugging printouts */
 #ifndef CPU_CHERI
@@ -1156,11 +1158,11 @@ CHERIBSDTEST(cheribsdtest_caprevoke_loadside, "Test load-side revoker")
 #endif
 
 static void
-cheribsdtest_caprevoke_lib_init(
+cheribsdtest_cheri_revoke_lib_init(
 	size_t bigblock_caps,
 	void * __capability * __capability * obigblock,
 	void * __capability * oshadow,
-	const volatile struct caprevoke_info * __capability * ocri
+	const volatile struct cheri_revoke_info * __capability * ocri
 )
 {
 	void * __capability * __capability bigblock;
@@ -1180,10 +1182,11 @@ cheribsdtest_caprevoke_lib_init(
 	*obigblock = bigblock;
 
 	CHERIBSDTEST_CHECK_SYSCALL(
-		caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, bigblock, oshadow));
+	    cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, bigblock,
+	    oshadow));
 
 	CHERIBSDTEST_CHECK_SYSCALL(
-		caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
+		cheri_revoke_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
 			__DEQUALIFY_CAP(void * __capability *,ocri)));
 }
 
@@ -1194,23 +1197,23 @@ enum {
 };
 
 static void
-cheribsdtest_caprevoke_lib_run(
+cheribsdtest_cheri_revoke_lib_run(
 	int verbose,
 	int paranoia,
 	int mode,
 	size_t bigblock_caps,
 	void * __capability * __capability bigblock,
 	void * __capability shadow,
-	const volatile struct caprevoke_info * __capability cri
+	const volatile struct cheri_revoke_info * __capability cri
 )
 {
 	size_t bigblock_offset = 0;
 	const vaddr_t sbase = cri->base_mem_nomap;
 
-	fprintf(stderr, "test_caprevoke_lib_run mode %d\n", mode);
+	fprintf(stderr, "test_cheri_revoke_lib_run mode %d\n", mode);
 
 	while (bigblock_offset < bigblock_caps) {
-		struct caprevoke_syscall_info crsi;
+		struct cheri_revoke_syscall_info crsi;
 		uint32_t cyc_start, cyc_end;
 
 		size_t csz = rand() % 1024 + 1;
@@ -1279,28 +1282,28 @@ cheribsdtest_caprevoke_lib_run(
 		}
 
 		{
-			int crflags = CAPREVOKE_IGNORE_START |
-			    CAPREVOKE_TAKE_STATS;
+			int crflags = CHERI_REVOKE_IGNORE_START |
+			    CHERI_REVOKE_TAKE_STATS;
 
 			switch(mode) {
 			case TCLR_MODE_STORE:
-				crflags |= CAPREVOKE_LAST_PASS;
+				crflags |= CHERI_REVOKE_LAST_PASS;
 				break;
 			case TCLR_MODE_LOAD_ONCE:
-				crflags |= CAPREVOKE_LAST_PASS |
-				    CAPREVOKE_LOAD_SIDE;
+				crflags |= CHERI_REVOKE_LAST_PASS |
+				    CHERI_REVOKE_LOAD_SIDE;
 				break;
 			case TCLR_MODE_LOAD_SPLIT:
-				crflags |= CAPREVOKE_LOAD_SIDE;
+				crflags |= CHERI_REVOKE_LOAD_SIDE;
 				break;
 			}
 
 			cyc_start = get_cyclecount();
-			CHERIBSDTEST_CHECK_SYSCALL(caprevoke(crflags, 0,
+			CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(crflags, 0,
 			    &crsi));
 			cyc_end = get_cyclecount();
 			if (verbose > 2) {
-				fprintf_caprevoke_stats(stderr, crsi,
+				fprintf_cheri_revoke_stats(stderr, crsi,
 				    cyc_end - cyc_start);
 			}
 			CHERIBSDTEST_VERIFY2(cri->epochs.dequeue ==
@@ -1338,12 +1341,12 @@ cheribsdtest_caprevoke_lib_run(
 
 		if (mode == TCLR_MODE_LOAD_SPLIT) {
 			cyc_start = get_cyclecount();
-			CHERIBSDTEST_CHECK_SYSCALL(caprevoke(
-			    CAPREVOKE_LAST_PASS | CAPREVOKE_IGNORE_START |
-			    CAPREVOKE_TAKE_STATS, 0, &crsi));
+			CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(
+			    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START |
+			    CHERI_REVOKE_TAKE_STATS, 0, &crsi));
 			cyc_end = get_cyclecount();
 			if (verbose > 2) {
-				fprintf_caprevoke_stats(stderr, crsi,
+				fprintf_cheri_revoke_stats(stderr, crsi,
 				    cyc_end - cyc_start);
 			}
 			CHERIBSDTEST_VERIFY2(cri->epochs.dequeue ==
@@ -1362,7 +1365,7 @@ cheribsdtest_caprevoke_lib_run(
 	}
 }
 
-CHERIBSDTEST(cheribsdtest_caprevoke_lib, "Test libcheri_caprevoke internals")
+CHERIBSDTEST(cheribsdtest_cheri_revoke_lib, "Test libcheri_caprevoke internals")
 {
 		/* If debugging the revoker, some verbosity can help. 0 - 4. */
 	static const int verbose = 0;
@@ -1380,11 +1383,11 @@ CHERIBSDTEST(cheribsdtest_caprevoke_lib, "Test libcheri_caprevoke internals")
 
 	void * __capability * __capability bigblock;
 	void * __capability shadow;
-	const volatile struct caprevoke_info * __capability cri;
+	const volatile struct cheri_revoke_info * __capability cri;
 
 	srand(1337);
 
-	cheribsdtest_caprevoke_lib_init(bigblock_caps, &bigblock, &shadow,
+	cheribsdtest_cheri_revoke_lib_init(bigblock_caps, &bigblock, &shadow,
 	    &cri);
 
 	if (verbose > 0) {
@@ -1392,21 +1395,21 @@ CHERIBSDTEST(cheribsdtest_caprevoke_lib, "Test libcheri_caprevoke internals")
 		fprintf(stderr, "shadow: %#.16lp\n", shadow);
 	}
 
-	cheribsdtest_caprevoke_lib_run(verbose, paranoia, TCLR_MODE_STORE,
+	cheribsdtest_cheri_revoke_lib_run(verbose, paranoia, TCLR_MODE_STORE,
 	    bigblock_caps, bigblock, shadow, cri);
 
-	cheribsdtest_caprevoke_lib_run(verbose, paranoia, TCLR_MODE_LOAD_ONCE,
-	    bigblock_caps, bigblock, shadow, cri);
+	cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+	    TCLR_MODE_LOAD_ONCE, bigblock_caps, bigblock, shadow, cri);
 
-	cheribsdtest_caprevoke_lib_run(verbose, paranoia, TCLR_MODE_LOAD_SPLIT,
-	    bigblock_caps, bigblock, shadow, cri);
+	cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
+	    TCLR_MODE_LOAD_SPLIT, bigblock_caps, bigblock, shadow, cri);
 
 	munmap(bigblock, bigblock_caps * sizeof(void * __capability));
 
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheribsdtest_caprevoke_lib_fork,
+CHERIBSDTEST(cheribsdtest_cheri_revoke_lib_fork,
     "Test libcheri_caprevoke with fork")
 {
 	static const int verbose = 0;
@@ -1416,13 +1419,13 @@ CHERIBSDTEST(cheribsdtest_caprevoke_lib_fork,
 
 	void * __capability * __capability bigblock;
 	void * __capability shadow;
-	const volatile struct caprevoke_info * __capability cri;
+	const volatile struct cheri_revoke_info * __capability cri;
 
 	int pid;
 
 	srand(1337);
 
-	cheribsdtest_caprevoke_lib_init(bigblock_caps, &bigblock, &shadow,
+	cheribsdtest_cheri_revoke_lib_init(bigblock_caps, &bigblock, &shadow,
 	    &cri);
 
 	if (verbose > 0) {
@@ -1432,13 +1435,13 @@ CHERIBSDTEST(cheribsdtest_caprevoke_lib_fork,
 
 	pid = fork();
 	if (pid == 0) {
-		cheribsdtest_caprevoke_lib_run(verbose, paranoia,
+		cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
 		    TCLR_MODE_STORE, bigblock_caps, bigblock, shadow, cri);
 
-		cheribsdtest_caprevoke_lib_run(verbose, paranoia,
+		cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
 		    TCLR_MODE_LOAD_ONCE, bigblock_caps, bigblock, shadow, cri);
 
-		cheribsdtest_caprevoke_lib_run(verbose, paranoia,
+		cheribsdtest_cheri_revoke_lib_run(verbose, paranoia,
 		    TCLR_MODE_LOAD_SPLIT, bigblock_caps, bigblock, shadow, cri);
 	} else {
 		int res;
