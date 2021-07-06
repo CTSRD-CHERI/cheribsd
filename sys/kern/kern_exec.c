@@ -101,7 +101,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #ifdef CHERI_CAPREVOKE
-#include <vm/vm_caprevoke.h>
+#include <vm/vm_cheri_revoke.h>
 #endif
 
 #ifdef KDTRACE_HOOKS
@@ -1103,7 +1103,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		pmap_remove_pages(vmspace_pmap(vmspace));
 		vm_map_clear(map);
 #ifdef CHERI_CAPREVOKE
-		map->vm_caprev_sh = NULL;
+		map->vm_cheri_revoke_sh = NULL;
 #endif
 
 		/*
@@ -1263,7 +1263,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	 * see a per-sv hook here.
 	 */
 	if (sv->sv_flags & SV_CHERI) {
-		error = vm_map_install_caprevoke_shadow(map);
+		error = vm_map_install_cheri_revoke_shadow(map);
 
 		if (error != KERN_SUCCESS)
 			return (vm_mmap_to_errno(error));
