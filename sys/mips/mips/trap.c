@@ -93,7 +93,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cheri_machdep.h>
 #include <machine/cherireg.h>
 #ifdef CHERI_CAPREVOKE
-#include <vm/vm_caprevoke.h>
+#include <vm/vm_cheri_revoke.h>
 #endif
 #endif
 
@@ -729,12 +729,12 @@ c2e_fixup_fault(struct trapframe *trapframe, bool is_kernel,
 		}
 
 #ifdef CHERI_CAPREVOKE
-		switch(vm_caprevoke_fault_visit(uvms, va)) {
-		case VM_CAPREVOKE_FAULT_RESOLVED:
+		switch(vm_cheri_revoke_fault_visit(uvms, va)) {
+		case VM_CHERI_REVOKE_FAULT_RESOLVED:
 			return (true);
-		case VM_CAPREVOKE_FAULT_UNRESOLVED:
+		case VM_CHERI_REVOKE_FAULT_UNRESOLVED:
 			return (false);
-		case VM_CAPREVOKE_FAULT_CAPSTORE:
+		case VM_CHERI_REVOKE_FAULT_CAPSTORE:
 			*ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
 			return (false);
 		}

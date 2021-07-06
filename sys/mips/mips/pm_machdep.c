@@ -82,8 +82,8 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #ifdef CHERI_CAPREVOKE
-#include <sys/caprevoke.h>
-#include <vm/vm_caprevoke.h>
+#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
 #endif
 
 #include <ddb/ddb.h>
@@ -766,51 +766,53 @@ ptrace_clear_single_step(struct thread *td)
 
 #ifdef CHERI_CAPREVOKE
 static inline void
-caprev_reg(const struct vm_caprevoke_cookie *crc, void * __capability *rp)
+cheri_revoke_reg(const struct vm_cheri_revoke_cookie *crc,
+    void * __capability *rp)
 {
-	CAPREVOKE_STATS_FOR(crst, crc);
+	CHERI_REVOKE_STATS_FOR(crst, crc);
 
 	uintcap_t r = (uintcap_t)*rp;
 	if (cheri_gettag(r)) {
-		CAPREVOKE_STATS_BUMP(crst, caps_found);
-		if (vm_caprevoke_test(crc, r)) {
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
+		if (vm_cheri_revoke_test(crc, r)) {
 			*rp = (void * __capability)cheri_revoke(r);
-			CAPREVOKE_STATS_BUMP(crst, caps_cleared);
+			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 		}
 	}
 }
 
 void
-caprevoke_td_frame(struct thread *td, const struct vm_caprevoke_cookie *crc)
+cheri_revoke_td_frame(struct thread *td,
+    const struct vm_cheri_revoke_cookie *crc)
 {
-	caprev_reg(crc, &td->td_frame->ddc);
-	caprev_reg(crc, &td->td_frame->c1);
-	caprev_reg(crc, &td->td_frame->c2);
-	caprev_reg(crc, &td->td_frame->c3);
-	caprev_reg(crc, &td->td_frame->c4);
-	caprev_reg(crc, &td->td_frame->c5);
-	caprev_reg(crc, &td->td_frame->c6);
-	caprev_reg(crc, &td->td_frame->c7);
-	caprev_reg(crc, &td->td_frame->c8);
-	caprev_reg(crc, &td->td_frame->c9);
-	caprev_reg(crc, &td->td_frame->c10);
-	caprev_reg(crc, &td->td_frame->csp);
-	caprev_reg(crc, &td->td_frame->c12);
-	caprev_reg(crc, &td->td_frame->c13);
-	caprev_reg(crc, &td->td_frame->c14);
-	caprev_reg(crc, &td->td_frame->c15);
-	caprev_reg(crc, &td->td_frame->c16);
-	caprev_reg(crc, &td->td_frame->c17);
-	caprev_reg(crc, &td->td_frame->c18);
-	caprev_reg(crc, &td->td_frame->c19);
-	caprev_reg(crc, &td->td_frame->c20);
-	caprev_reg(crc, &td->td_frame->c21);
-	caprev_reg(crc, &td->td_frame->c22);
-	caprev_reg(crc, &td->td_frame->c23);
-	caprev_reg(crc, &td->td_frame->c24);
-	caprev_reg(crc, &td->td_frame->c25);
-	caprev_reg(crc, &td->td_frame->idc);
-	caprev_reg(crc, (void * __capability *)&td->td_frame->pcc);
+	cheri_revoke_reg(crc, &td->td_frame->ddc);
+	cheri_revoke_reg(crc, &td->td_frame->c1);
+	cheri_revoke_reg(crc, &td->td_frame->c2);
+	cheri_revoke_reg(crc, &td->td_frame->c3);
+	cheri_revoke_reg(crc, &td->td_frame->c4);
+	cheri_revoke_reg(crc, &td->td_frame->c5);
+	cheri_revoke_reg(crc, &td->td_frame->c6);
+	cheri_revoke_reg(crc, &td->td_frame->c7);
+	cheri_revoke_reg(crc, &td->td_frame->c8);
+	cheri_revoke_reg(crc, &td->td_frame->c9);
+	cheri_revoke_reg(crc, &td->td_frame->c10);
+	cheri_revoke_reg(crc, &td->td_frame->csp);
+	cheri_revoke_reg(crc, &td->td_frame->c12);
+	cheri_revoke_reg(crc, &td->td_frame->c13);
+	cheri_revoke_reg(crc, &td->td_frame->c14);
+	cheri_revoke_reg(crc, &td->td_frame->c15);
+	cheri_revoke_reg(crc, &td->td_frame->c16);
+	cheri_revoke_reg(crc, &td->td_frame->c17);
+	cheri_revoke_reg(crc, &td->td_frame->c18);
+	cheri_revoke_reg(crc, &td->td_frame->c19);
+	cheri_revoke_reg(crc, &td->td_frame->c20);
+	cheri_revoke_reg(crc, &td->td_frame->c21);
+	cheri_revoke_reg(crc, &td->td_frame->c22);
+	cheri_revoke_reg(crc, &td->td_frame->c23);
+	cheri_revoke_reg(crc, &td->td_frame->c24);
+	cheri_revoke_reg(crc, &td->td_frame->c25);
+	cheri_revoke_reg(crc, &td->td_frame->idc);
+	cheri_revoke_reg(crc, (void * __capability *)&td->td_frame->pcc);
 }
 #endif
 
