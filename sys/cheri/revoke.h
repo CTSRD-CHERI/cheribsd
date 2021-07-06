@@ -30,11 +30,11 @@
  * SUCH DAMAGE.
  */
 
-#ifndef __SYS_CAPREVOKE_H__
-#define	__SYS_CAPREVOKE_H__
+#ifndef __SYS_CHERI_REVOKE_H__
+#define	__SYS_CHERI_REVOKE_H__
 
-typedef uint64_t caprevoke_epoch;
-#define CAPREVST_EPOCH_WIDTH	61
+typedef uint64_t cheri_revoke_epoch;
+#define CHERI_REVOKE_ST_EPOCH_WIDTH	61
 
 #ifdef _KERNEL
 /*
@@ -75,45 +75,46 @@ typedef uint64_t caprevoke_epoch;
  * in revocation per process.
  */
 
-enum caprevoke_state {
-	CAPREVST_NONE       = 0, /* No revocation is in progress */
-	CAPREVST_SS_INITING = 1, /* "store-side" opening now */
-	CAPREVST_SS_INITED  = 2, /* "store-side" open (> 0 openings done) */
-	CAPREVST_SS_LAST    = 3, /* "store-side" closing */
-	CAPREVST_LS_INITING = 4, /* "load-side" opening now */
-	CAPREVST_LS_INITED  = 5, /* "load-side" open (= 1 openings done) */
-	CAPREVST_LS_CLOSING = 6, /* "load-side" background thread working */
+enum cheri_revoke_state {
+	CHERI_REVOKE_ST_NONE       = 0, /* No revocation is in progress */
+	CHERI_REVOKE_ST_SS_INITING = 1, /* "store-side" opening now */
+	CHERI_REVOKE_ST_SS_INITED  = 2, /* "store-side" open (> 0 opens done) */
+	CHERI_REVOKE_ST_SS_LAST    = 3, /* "store-side" closing */
+	CHERI_REVOKE_ST_LS_INITING = 4, /* "load-side" opening now */
+	CHERI_REVOKE_ST_LS_INITED  = 5, /* "load-side" open (= 1 opens done) */
+	CHERI_REVOKE_ST_LS_CLOSING = 6, /* "load-side" background working */
 };
 
-#define CAPREVST_ST_MASK	0x7
-#define CAPREVST_EPOCH_SHIFT	3
+#define CHERI_REVOKE_ST_ST_MASK	0x7
+#define CHERI_REVOKE_ST_EPOCH_SHIFT	3
 
-static inline enum caprevoke_state
-caprevoke_st_state(uint64_t st) {
-	return (st & CAPREVST_ST_MASK);
+static inline enum cheri_revoke_state
+cheri_revoke_st_state(uint64_t st) {
+	return (st & CHERI_REVOKE_ST_ST_MASK);
 }
 
 static inline uint64_t
-caprevoke_st_epoch(uint64_t st) {
-	return (st >> CAPREVST_EPOCH_SHIFT);
+cheri_revoke_st_epoch(uint64_t st) {
+	return (st >> CHERI_REVOKE_ST_EPOCH_SHIFT);
 }
 
 static inline void
-caprevoke_st_set(uint64_t *st, uint64_t epoch, enum caprevoke_state state) {
-	*st = (epoch << CAPREVST_EPOCH_SHIFT) | state;
+cheri_revoke_st_set(uint64_t *st, uint64_t epoch, enum cheri_revoke_state state)
+{
+	*st = (epoch << CHERI_REVOKE_ST_EPOCH_SHIFT) | state;
 }
 
 static inline bool
-caprevoke_st_is_loadside(uint64_t st) {
-	switch (caprevoke_st_state(st)) {
-	case CAPREVST_LS_INITING:
-	case CAPREVST_LS_INITED:
-	case CAPREVST_LS_CLOSING:
+cheri_revoke_st_is_loadside(uint64_t st) {
+	switch (cheri_revoke_st_state(st)) {
+	case CHERI_REVOKE_ST_LS_INITING:
+	case CHERI_REVOKE_ST_LS_INITED:
+	case CHERI_REVOKE_ST_LS_CLOSING:
 		return true;
-	case CAPREVST_NONE:
-	case CAPREVST_SS_INITING:
-	case CAPREVST_SS_INITED:
-	case CAPREVST_SS_LAST:
+	case CHERI_REVOKE_ST_NONE:
+	case CHERI_REVOKE_ST_SS_INITING:
+	case CHERI_REVOKE_ST_SS_INITED:
+	case CHERI_REVOKE_ST_SS_LAST:
 		return false;
 	}
 }
@@ -127,28 +128,31 @@ caprevoke_st_is_loadside(uint64_t st) {
  * apart that this is problematic.
  *
  * We could probably get away without wraparound handling, given the current
- * value of CAPREVST_EPOCH_WIDTH, but on the chance that it becomes
+ * value of CHERI_REVOKE_ST_EPOCH_WIDTH, but on the chance that it becomes
  * significantly shorter, it doesn't hurt to have this abstracted.
  *
  * XXX this almost surely belongs somewhere else.
  */
 
-static inline int caprevoke_epoch_gt(caprevoke_epoch a, caprevoke_epoch b) {
-	return ((a < b) && ((b - a) > (1ULL << (CAPREVST_EPOCH_WIDTH-1))))
-	    || ((a > b) && ((a - b) < (1ULL << (CAPREVST_EPOCH_WIDTH-1))));
+static inline int cheri_revoke_epoch_gt(cheri_revoke_epoch a,
+    cheri_revoke_epoch b) {
+	static const cheri_revoke_epoch top =
+	    1ULL << (CHERI_REVOKE_ST_EPOCH_WIDTH-1);
+	return ((a < b) && ((b - a) > top)) || ((a > b) && ((a - b) < top));
 }
-static inline int caprevoke_epoch_ge(caprevoke_epoch a, caprevoke_epoch b) {
-	return (a == b) || caprevoke_epoch_gt(a, b);
+static inline int cheri_revoke_epoch_ge(cheri_revoke_epoch a,
+    cheri_revoke_epoch b) {
+	return (a == b) || cheri_revoke_epoch_gt(a, b);
 }
 
-static inline int caprevoke_epoch_clears(caprevoke_epoch now,
-                                         caprevoke_epoch then) {
-	return caprevoke_epoch_ge(now, then + (then & 1) + 2);
+static inline int cheri_revoke_epoch_clears(cheri_revoke_epoch now,
+                                         cheri_revoke_epoch then) {
+	return cheri_revoke_epoch_ge(now, then + (then & 1) + 2);
 }
 
 /* Returns 1 if cap is revoked, 0 otherwise. */
 static inline int
-caprevoke_is_revoked(const void * __capability cap)
+cheri_revoke_is_revoked(const void * __capability cap)
 {
 	return (__builtin_cheri_perms_get(cap) == 0);
 }
@@ -162,7 +166,7 @@ caprevoke_is_revoked(const void * __capability cap)
 	 * the first (full) pass or continue an epoch by doing an
 	 * incremental pass.
 	 */
-#define CAPREVOKE_LAST_PASS	0x0001
+#define CHERI_REVOKE_LAST_PASS	0x0001
 
 	/*
 	 * If this bit is set, the kernel is free to return without making
@@ -172,18 +176,18 @@ caprevoke_is_revoked(const void * __capability cap)
 	 * as a result of this request, but not any that result due to
 	 * backgrounded work.
 	 *
-	 * If set without CAPREVOKE_IGNORE_START, the kernel may treat this
+	 * If set without CHERI_REVOKE_IGNORE_START, the kernel may treat this
 	 * as a hint that background revocation may be useful (XXX but we
 	 * don't implement that yet).
 	 *
 	 */
-#define	CAPREVOKE_NO_WAIT_OK	0x0002
+#define	CHERI_REVOKE_NO_WAIT_OK	0x0002
 
 	/*
 	 * Ignore the given epoch argument and always attempt to advance the
 	 * epoch clock relative to its value "at the time of the call".
 	 */
-#define	CAPREVOKE_IGNORE_START	0x0004
+#define	CHERI_REVOKE_IGNORE_START	0x0004
 
 	/*
 	 * Do a pass only if an epoch is open after synchronization.  This
@@ -191,10 +195,10 @@ caprevoke_is_revoked(const void * __capability cap)
 	 * quickly as possible; if we're already past the end, then we
 	 * should just stay there.
 	 */
-#define	CAPREVOKE_ONLY_IF_OPEN	0x0008
+#define	CHERI_REVOKE_ONLY_IF_OPEN	0x0008
 
 	/*
-	 * Ordinarily, caprevoke with CAPREVOKE_LAST_PASS attempts to
+	 * Ordinarily, cheri_revoke with CHERI_REVOKE_LAST_PASS attempts to
 	 * minimize the amount of work it does with the world held in
 	 * single-threaded state.  It will do up to two passes:
 	 *
@@ -203,13 +207,13 @@ caprevoke_is_revoked(const void * __capability cap)
 	 *   * a pass with the world stopped, which visits kernel hoarders
 	 *     and recently-dirty pages (since the above pass)
 	 *
-	 * The first may be disabled by passing CAPREVOKE_LAST_NO_EARLY,
+	 * The first may be disabled by passing CHERI_REVOKE_LAST_NO_EARLY,
 	 * causing more work to be pushed into the world-stopped phase.
 	 *
-	 * Setting CAPREVOKE_LAST_NO_EARLY when not setting
-	 * CAPREVOKE_LAST_PASS will cause no passes to be performed.
+	 * Setting CHERI_REVOKE_LAST_NO_EARLY when not setting
+	 * CHERI_REVOKE_LAST_PASS will cause no passes to be performed.
 	 */
-#define CAPREVOKE_LAST_NO_EARLY	0x0010
+#define CHERI_REVOKE_LAST_NO_EARLY	0x0010
 
 	/*
 	 * Force a synchronization with the PMAP before doing a non-LAST
@@ -220,9 +224,9 @@ caprevoke_is_revoked(const void * __capability cap)
 	 * This may also be useful if one were to do intermediate (i.e.,
 	 * neither opening nor closing) passes, but at present we do not.
 	 *
-	 * Meaningless if CAPREVOKE_LAST_NO_EARLY also set.
+	 * Meaningless if CHERI_REVOKE_LAST_NO_EARLY also set.
 	 */
-#define CAPREVOKE_EARLY_SYNC	0x0020
+#define CHERI_REVOKE_EARLY_SYNC	0x0020
 
 	/*
 	 * If set with LAST_PASS, transition into the load side sweep state,
@@ -234,15 +238,15 @@ caprevoke_is_revoked(const void * __capability cap)
 	 * pass beyond their essential role in gating the transition back to
 	 * idle state.
 	 */
-#define CAPREVOKE_LOAD_SIDE	0x0040
+#define CHERI_REVOKE_LOAD_SIDE	0x0040
 
 	/*
 	 * Reset the stats counters to zero "after" reporting
 	 */
-#define CAPREVOKE_TAKE_STATS	0x0080
+#define CHERI_REVOKE_TAKE_STATS	0x0080
 
 /*
- * Information conveyed to userland about a given caprevoke scan.
+ * Information conveyed to userland about a given cheri_revoke scan.
  *
  * Given what's being counted here are some things possibly useful to fitting a
  * linear regression model:
@@ -267,7 +271,7 @@ caprevoke_is_revoked(const void * __capability cap)
  *    It is likely worth excluding the latter from modeling.
  */
 
-struct caprevoke_stats {
+struct cheri_revoke_stats {
 	/*
 	 * Total cycles spent inside MD page scan routines; inclusive of sweeps
 	 * from CLG fault handler.
@@ -319,31 +323,31 @@ struct caprevoke_stats {
 	uint32_t	caps_cleared;	/* Revoked this time */
 	uint32_t	lines_scan;
 
-	/* A holdover from Cornucopia; see vm_caprevoke_visit_ro */
+	/* A holdover from Cornucopia; see vm_cheri_revoke_visit_ro */
 	uint32_t	pages_mark_clean;
 };
 
-struct caprevoke_epochs {
-	caprevoke_epoch enqueue; /* Label on entry to quarantine */
-	caprevoke_epoch dequeue; /* Gates removal from quarantine */
+struct cheri_revoke_epochs {
+	cheri_revoke_epoch enqueue; /* Label on entry to quarantine */
+	cheri_revoke_epoch dequeue; /* Gates removal from quarantine */
 };
 
-struct caprevoke_info {
+struct cheri_revoke_info {
         const vaddr_t base_mem_nomap;
         const vaddr_t base_otype;
 
-	struct caprevoke_epochs epochs;
+	struct cheri_revoke_epochs epochs;
 };
 
-struct caprevoke_syscall_info {
-	struct caprevoke_epochs epochs;
-	struct caprevoke_stats stats;
+struct cheri_revoke_syscall_info {
+	struct cheri_revoke_epochs epochs;
+	struct cheri_revoke_stats stats;
 };
 
 #ifdef _KERNEL
-struct caprevoke_info_page {
+struct cheri_revoke_info_page {
 	/* Userland will come to hold RO caps to this bit */
-	struct caprevoke_info pub;
+	struct cheri_revoke_info pub;
 
 	/*
 	 * The kernel is free to use the rest of this page for
@@ -353,8 +357,8 @@ struct caprevoke_info_page {
 };
 #endif
 
-#define	CAPREVOKE_SHADOW_NOVMMAP	0x00	/* The ordinary shadow space */
-#define CAPREVOKE_SHADOW_OTYPE		0x01	/* The otype shadow space */
+#define	CHERI_REVOKE_SHADOW_NOVMMAP	0x00	/* The ordinary shadow space */
+#define CHERI_REVOKE_SHADOW_OTYPE	0x01	/* The otype shadow space */
 /*
  * It is not possible to ask for the _MEM_MAP bitmask, as we intend that one
  * to be used by the kernel internally for munmap().  Maybe that's wrong?
@@ -363,15 +367,15 @@ struct caprevoke_info_page {
  * of vm objects that we aren't deleting?  They *can* use the NOVMMAP
  * bitmask, but it's 256 times as many bits to flip.
  */
-#define CAPREVOKE_SHADOW_INFO_STRUCT	0x03	/* R/O access to shared state */
+#define CHERI_REVOKE_SHADOW_INFO_STRUCT	0x03	/* R/O access to shared state */
 
 /*
  * XXX This should go away as soon as we have allocators w/ per-arena shadows
  * or come to depend on CHERI+MTE, whichever happens first.
  */
-#define CAPREVOKE_SHADOW_NOVMMAP_ENTIRE	0x07	/* The entire shadow region */
+#define CHERI_REVOKE_SHADOW_NOVMMAP_ENTIRE 0x07	/* The entire shadow region */
 
-#define CAPREVOKE_SHADOW_SPACE_MASK	0x07	/* Flag bits for shadow index */
+#define CHERI_REVOKE_SHADOW_SPACE_MASK	0x07	/* Flag bits for shadow index */
 
 #ifndef _KERNEL
 	/*
@@ -381,12 +385,12 @@ struct caprevoke_info_page {
 	 * start_epoch, this call returns immediately, populating
 	 * statout->epoch_{init,fini} with the current clock's value.
 	 *
-	 * XXX if caprevoke_epoch becomes more complex than a scalar type,
+	 * XXX if cheri_revoke_epoch becomes more complex than a scalar type,
 	 * this prototype will need to change or we'll need to be more
 	 * explicit about it being a hint or something.
 	 */
-int caprevoke(int flags, caprevoke_epoch start_epoch,
-		struct caprevoke_syscall_info *crsi);
+int cheri_revoke(int flags, cheri_revoke_epoch start_epoch,
+		struct cheri_revoke_syscall_info *crsi);
 
 	/*
 	 * Request a capability to the shadow bitmap state for the given
@@ -396,7 +400,7 @@ int caprevoke(int flags, caprevoke_epoch start_epoch,
 	 * This call must fail if the resulting capability would not be
 	 * representable due to alignment constraints.
 	 */
-int caprevoke_shadow(int flags,
+int cheri_revoke_shadow(int flags,
 	void * __capability arena,
 	void * __capability * shadow);
 #endif

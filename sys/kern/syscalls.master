@@ -1488,17 +1488,17 @@
 		);
 	}
 260	AUE_NULL	STD	{
-		int caprevoke_shadow(
+		int cheri_revoke_shadow(
 			int flags,
 			_In_ void *arena,
 			_Out_ void *shadow,
 		);
 	}
 261	AUE_NULL	STD	{
-		void *caprevoke(
+		void *cheri_revoke(
 		    int flags,
 		    uint64_t start_epoch,
-		    _Out_ struct caprevoke_syscall_info *crsi,
+		    _Out_ struct cheri_revoke_syscall_info *crsi,
 		);
 	}
 262-271	AUE_NULL	UNIMPL	nosys
