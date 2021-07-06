@@ -377,8 +377,9 @@ int	kqueue_del_filteropts(int filt);
 
 #ifdef CHERI_CAPREVOKE
 struct filedesc;
-struct vm_caprevoke_cookie;
-void kqueue_caprevoke(struct filedesc *, const struct vm_caprevoke_cookie *);
+struct vm_cheri_revoke_cookie;
+void kqueue_cheri_revoke(struct filedesc *,
+    const struct vm_cheri_revoke_cookie *);
 #endif
 
 #else 	/* !_KERNEL */

@@ -83,12 +83,12 @@ __FBSDID("$FreeBSD$");
 
 #ifdef CHERI_CAPREVOKE
 #include <cheri/cheric.h>
-#include <sys/caprevoke.h>
+#include <cheri/revoke.h>
 #ifdef CHERI_CAPREVOKE_STATS
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 #endif
-#include <vm/vm_caprevoke.h>
+#include <vm/vm_cheri_revoke.h>
 #endif
 
 MALLOC_DEFINE(M_KQUEUE, "kqueue", "memory for kqueue system");
@@ -131,7 +131,7 @@ static void 	kqueue_wakeup(struct kqueue *kq);
 static struct filterops *kqueue_fo_find(int filt);
 static void	kqueue_fo_release(int filt);
 #ifdef CHERI_CAPREVOKE
-static void	knote_caprevoke_epoch_next(struct knote *);
+static void	knote_cheri_revoke_epoch_next(struct knote *);
 #endif
 
 static fo_ioctl_t	kqueue_ioctl;
@@ -1595,7 +1595,7 @@ findkn:
 	if ((kev->flags & EV_KEEPUDATA) == 0) {
 		kn->kn_kevent.udata = kev->udata;
 #ifdef CHERI_CAPREVOKE
-		knote_caprevoke_epoch_next(kn);
+		knote_cheri_revoke_epoch_next(kn);
 #endif
 	}
 	KQ_UNLOCK(kq);
@@ -2321,7 +2321,7 @@ knlist_add(struct knlist *knl, struct knote *kn, int islocked)
 	kn->kn_knlist = knl;
 	kn->kn_status &= ~KN_DETACHED;
 #ifdef CHERI_CAPREVOKE
-	knote_caprevoke_epoch_next(kn);
+	knote_cheri_revoke_epoch_next(kn);
 #endif
 	KQ_UNLOCK(kn->kn_kq);
 }
@@ -2620,7 +2620,7 @@ knote_attach(struct knote *kn, struct kqueue *kq)
 	}
 	SLIST_INSERT_HEAD(list, kn, kn_link);
 #ifdef CHERI_CAPREVOKE
-	knote_caprevoke_epoch_next(kn);
+	knote_cheri_revoke_epoch_next(kn);
 #endif
 	return (0);
 }
@@ -2773,7 +2773,7 @@ noacquire:
  */
 
 static void
-knote_caprevoke_epoch_next(struct knote *kn)
+knote_cheri_revoke_epoch_next(struct knote *kn)
 {
 	if (kn->kn_kq->kq_state & KQ_CAPREV_EPOCH)
 		kn->kn_status &= ~KN_CAPREV_EPOCH;
@@ -2782,17 +2782,17 @@ knote_caprevoke_epoch_next(struct knote *kn)
 }
 
 static int
-kqueue_caprevoke_note(const struct vm_caprevoke_cookie *crc,
+kqueue_cheri_revoke_note(const struct vm_cheri_revoke_cookie *crc,
     struct kqueue *kq, struct klist *list, struct knote *kn,
     uintcap_t id, uintcap_t ud)
 {
-	CAPREVOKE_STATS_FOR(crst, crc);
+	CHERI_REVOKE_STATS_FOR(crst, crc);
 	int res = 1;
 
 	if (!cheri_gettag(id)) {
 		; /* nothing to be done */
 	} else if (__builtin_cheri_equal_exact(id, kn->kn_kevent.ident)) {
-		CAPREVOKE_STATS_BUMP(crst, caps_cleared);
+		CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 		kn->kn_kevent.ident = (kuintcap_t)cheri_revoke(id);
 	} else {
 		/*
@@ -2805,7 +2805,7 @@ kqueue_caprevoke_note(const struct vm_caprevoke_cookie *crc,
 	if (!cheri_gettag(ud)) {
 		;
 	} else if (__builtin_cheri_equal_exact(ud, kn->kn_kevent.udata)) {
-		CAPREVOKE_STATS_BUMP(crst, caps_cleared);
+		CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 		kn->kn_kevent.udata = (void * __capability)cheri_revoke(ud);
 	} else {
 		res = 0;
@@ -2815,11 +2815,11 @@ kqueue_caprevoke_note(const struct vm_caprevoke_cookie *crc,
 }
 
 static int
-kqueue_caprevoke_list(struct kqueue *kq, const struct vm_caprevoke_cookie *crc,
-    struct klist *list)
+kqueue_cheri_revoke_list(struct kqueue *kq,
+    const struct vm_cheri_revoke_cookie *crc, struct klist *list)
 {
 	struct knote *kn;
-	CAPREVOKE_STATS_FOR(crst, crc);
+	CHERI_REVOKE_STATS_FOR(crst, crc);
 
 	SLIST_FOREACH (kn, list, kn_link) {
 		/* Skip notes with matching epochs */
@@ -2839,26 +2839,26 @@ kqueue_caprevoke_list(struct kqueue *kq, const struct vm_caprevoke_cookie *crc,
 			continue;
 		} else {
 			if (cheri_gettag(id)) {
-				CAPREVOKE_STATS_BUMP(crst, caps_found);
+				CHERI_REVOKE_STATS_BUMP(crst, caps_found);
 			}
 			if (cheri_gettag(ud)) {
-				CAPREVOKE_STATS_BUMP(crst, caps_found);
+				CHERI_REVOKE_STATS_BUMP(crst, caps_found);
 			}
 		}
 
 		refcount_acquire(&kn->kn_refcount);
 		KQ_UNLOCK(kq);
 
-		if (!vm_caprevoke_test(crc, id)) {
+		if (!vm_cheri_revoke_test(crc, id)) {
 			id = 0;
 		}
 
-		if (!vm_caprevoke_test(crc, ud)) {
+		if (!vm_cheri_revoke_test(crc, ud)) {
 			ud = 0;
 		}
 
 		KQ_LOCK(kq);
-		if (kqueue_caprevoke_note(crc, kq, list, kn, id, ud) != 0) {
+		if (kqueue_cheri_revoke_note(crc, kq, list, kn, id, ud) != 0) {
 			kn->kn_status ^= KN_CAPREV_EPOCH;
 		}
 		KQ_UNLOCK(kq);
@@ -2878,7 +2878,8 @@ kqueue_caprevoke_list(struct kqueue *kq, const struct vm_caprevoke_cookie *crc,
  * kqueue_close can't complete until after us.
  */
 void
-kqueue_caprevoke(struct filedesc *fdp, const struct vm_caprevoke_cookie *crc)
+kqueue_cheri_revoke(struct filedesc *fdp,
+    const struct vm_cheri_revoke_cookie *crc)
 {
 	int ix;
 	struct kqueue *kq;
@@ -2889,11 +2890,13 @@ kqueue_caprevoke(struct filedesc *fdp, const struct vm_caprevoke_cookie *crc)
 		KQ_LOCK(kq);
 again:
 		for (ix = 0; ix < kq->kq_knlistsize; ix++) {
-			if (kqueue_caprevoke_list(kq, crc, &kq->kq_knlist[ix]))
+			if (kqueue_cheri_revoke_list(kq, crc,
+			    &kq->kq_knlist[ix]))
 				goto again;
 		}
 		for (ix = 0; ix <= kq->kq_knhashmask; ix++) {
-			if (kqueue_caprevoke_list(kq, crc, &kq->kq_knhash[ix]))
+			if (kqueue_cheri_revoke_list(kq, crc,
+			    &kq->kq_knhash[ix]))
 				goto again;
 		}
 
