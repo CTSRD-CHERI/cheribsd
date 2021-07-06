@@ -12,7 +12,7 @@
 #include <cheri/cheric.h>
 
 #include <sys/param.h>
-#include <sys/caprevoke.h>
+#include <cheri/revoke.h>
 #include <machine/cherireg.h>
 #include <machine/pte.h>
 #include <machine/vmparam.h>
@@ -44,7 +44,7 @@ static ptrdiff_t
 caprev_shadow_nomap_first_word_offset(vaddr_t base)
 {
 	return (ptrdiff_t)(
-		   base / VM_CAPREVOKE_GSZ_MEM_NOMAP / 8 / sizeof(uint64_t)) *
+	    base / VM_CHERI_REVOKE_GSZ_MEM_NOMAP / 8 / sizeof(uint64_t)) *
 	    sizeof(uint64_t);
 }
 
@@ -54,9 +54,8 @@ caprev_shadow_nomap_last_word_offset(vaddr_t base, size_t len)
 	if (len == 0)
 		return caprev_shadow_nomap_first_word_offset(base);
 
-	return (ptrdiff_t)((base + len - 1) / VM_CAPREVOKE_GSZ_MEM_NOMAP / 8 /
-		   sizeof(uint64_t)) *
-	    sizeof(uint64_t);
+	return (ptrdiff_t)((base + len - 1) / VM_CHERI_REVOKE_GSZ_MEM_NOMAP / 8
+	    / sizeof(uint64_t)) * sizeof(uint64_t);
 }
 
 /*
@@ -70,13 +69,14 @@ caprev_shadow_nomap_first_word_mask(vaddr_t base, size_t len)
 	uint64_t res;
 
 	/* What's the least significant bit's position within the word? */
-	int lsb = (base / VM_CAPREVOKE_GSZ_MEM_NOMAP) % (8 * sizeof(uint64_t));
+	int lsb = (base / VM_CHERI_REVOKE_GSZ_MEM_NOMAP) % (8 *
+	    sizeof(uint64_t));
 
 	if (caprev_shadow_nomap_first_word_offset(base) ==
 	    caprev_shadow_nomap_last_word_offset(base, len)) {
 		/* The object occupies only some bits in the first word */
 
-		int setwidth = len / VM_CAPREVOKE_GSZ_MEM_NOMAP;
+		int setwidth = len / VM_CHERI_REVOKE_GSZ_MEM_NOMAP;
 
 		if (lsb + setwidth == 64) {
 			/* Object fills this word completely, but does not spill
@@ -118,7 +118,7 @@ caprev_shadow_nomap_last_word_mask(vaddr_t base, size_t len)
 		return 0;
 	}
 
-	int msb = ((base + len - 1) / VM_CAPREVOKE_GSZ_MEM_NOMAP) %
+	int msb = ((base + len - 1) / VM_CHERI_REVOKE_GSZ_MEM_NOMAP) %
 	    (8 * sizeof(uint64_t));
 
 	if (msb == 63) {

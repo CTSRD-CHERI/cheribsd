@@ -2,7 +2,7 @@
 #define LIBCHERI_CAPREVOKE_H
 
 #include <stddef.h>
-#include <sys/caprevoke.h>
+#include <cheri/revoke.h>
 
 /*
  * The per-object interface protects against concurrent mutation and both
