@@ -44,6 +44,12 @@ __FBSDID("$FreeBSD$");
 #include <sys/uio.h>
 #include <sys/endian.h>
 
+#include <vm/vm.h>
+#include <vm/pmap.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_kern.h>
+#include <vm/vm_map.h>
+
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
@@ -52,6 +58,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #include <machine/intr.h>
 #include <machine/sbi.h>
+#include <machine/vmparam.h>
 
 struct beri_cmd {
 	int test;
@@ -94,6 +101,8 @@ struct spin_entry {
 #define	BERIPIC1_IP_CLEAR		0xff7f80a100
 #define	MIPS_XKPHYS_UNCACHED_BASE	0x9000000000000000ULL
 #define	SOFT_IRQ_N			16
+
+void mpentry(u_long hartid);
 
 static void
 dm_reset(struct berimgr_softc *sc)
@@ -144,8 +153,23 @@ dm_release(struct berimgr_softc *sc)
 #endif
 
 	addr = PHYS_TO_DMAP(0xf8000000);
-
 	cpu_dcache_wb_range((vm_offset_t)addr, sc->offs);
+
+	int error;
+	vm_paddr_t start_addr;
+	start_addr = pmap_kextract((vm_offset_t)mpentry);
+	if (PCPU_GET(hart) == 0)
+		error = sbi_hsm_hart_start(1, start_addr, 0);
+	else
+		error = sbi_hsm_hart_start(0, start_addr, 0);
+
+	printf("%s: cur hart %d error %d\n", __func__, PCPU_GET(hart), error);
+
+	DELAY(100000);
+	DELAY(100000);
+	DELAY(100000);
+	DELAY(100000);
+	DELAY(100000);
 
 	u_long mask;
 
