@@ -87,7 +87,10 @@ device		riscv_syscon
 
 # Bus drivers
 device		pci
+
+# Block devices
 device		ahci
+device		scbus
 
 # VirtIO support
 device		virtio			# Generic VirtIO bus (required)
@@ -166,6 +169,9 @@ device		bpf		# Berkeley packet filter
 
 # Flattened Device Tree
 options 	FDT
+#options 	FDT_DTB_STATIC
+#makeoptions	FDT_DTS_FILE=dm.dts
+
 makeoptions	MODULES_EXTRA+="dtb/sifive"
 
 # SiFive device drivers
