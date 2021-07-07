@@ -2200,6 +2200,7 @@ ktls_work_thread(void *ctx)
 	}
 }
 
+#if defined(INET) || defined(INET6)
 static void
 ktls_disable_ifnet_help(void *context, int pending __unused)
 {
@@ -2292,3 +2293,4 @@ ktls_disable_ifnet(void *arg)
 	TASK_INIT(&tls->disable_ifnet_task, 0, ktls_disable_ifnet_help, tls);
 	(void)taskqueue_enqueue(taskqueue_thread, &tls->disable_ifnet_task);
 }
+#endif
