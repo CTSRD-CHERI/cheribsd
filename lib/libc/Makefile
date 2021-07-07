@@ -230,8 +230,6 @@ GENDIRDEPS_FILTER+= N${RELDIR:H}/msun
 .endif
 .endif
 
-CFLAGS+=     ${CFLAGS.${.IMPSRC:T}}
-
 # Disable warnings in contributed sources.
 CWARNFLAGS:=	${.IMPSRC:Ngdtoa_*.c:C/^.+$/${CWARNFLAGS}/:C/^$/-w/}
 # Disable stack protection for SSP symbols.
