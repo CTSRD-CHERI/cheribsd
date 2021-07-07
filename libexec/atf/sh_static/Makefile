@@ -12,5 +12,6 @@ NEED_COMPAT=	64
 
 PROG=	sh_static
 NO_SHARED=	yes
+MAN=
 
 .include	"${SRCTOP}/bin/sh/Makefile"
