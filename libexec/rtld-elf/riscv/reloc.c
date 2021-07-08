@@ -502,3 +502,66 @@ __tls_get_addr(tls_index* ti)
 
 	return ((char*)p + TLS_DTV_OFFSET);
 }
+
+/*
+ * Validate that the constants defined in GDB are accurate.
+ * If any of these assertions need changing please also update GDB!
+ */
+
+/* riscv_fbsd_sigframe_init in gdb/riscv-fbsd-tdep.c */
+#include <machine/frame.h>
+#include <machine/ucontext.h>
+#ifdef __CHERI_PURE_CAPABILITY__
+_Static_assert(offsetof(struct sigframe, sf_uc) == 112,
+    "GDB's RISCV_SIGFRAME_UCONTEXT_OFFSET_PURECAP is no longer correct");
+_Static_assert(sizeof(struct capregs) == 34 * sizeof(void *),
+    "GDB's RISCV_FBSD_NUM_CAPREGS is no longer correct");
+_Static_assert(offsetof(mcontext_t, mc_fpregs) == 34 * sizeof(void *),
+    "GDB's RISCV_FBSD_NUM_CAPREGS is no longer correct");
+#else
+_Static_assert(offsetof(struct sigframe, sf_uc) == 80,
+    "GDB's RISCV_SIGFRAME_UCONTEXT_OFFSET_RV64 is no longer correct");
+_Static_assert(sizeof(struct gpregs) == 33 * sizeof(void *),
+    "GDB's RISCV_FBSD_NUM_GREGS is no longer correct");
+_Static_assert(offsetof(mcontext_t, mc_fpregs) == 33 * sizeof(void *),
+    "GDB's RISCV_FBSD_NUM_GREGS is no longer correct");
+#endif
+_Static_assert(offsetof(ucontext_t, uc_mcontext) == 16,
+    "GDB's RISCV_UCONTEXT_MCONTEXT_OFFSET is no longer correct");
+_Static_assert(offsetof(struct fpregs, fp_flags) == (32 * 16 + 8),
+    "GDB's RISCV_FBSD_SIZEOF_FPREGSET is no longer correct");
+
+/* svr4_c128_fetch_link_map_offsets in gdb/solib-svr4.c*/
+#include <sys/link_elf.h>
+_Static_assert(offsetof(struct r_debug, r_version) == 0, "");
+_Static_assert((sizeof((struct r_debug *)0)->r_version) == 4, "");
+#ifdef __CHERI_PURE_CAPABILITY__
+_Static_assert(offsetof(struct r_debug, r_map) == 16, "");
+_Static_assert(offsetof(struct r_debug, r_brk) == 32, "");
+#else
+_Static_assert(offsetof(struct r_debug, r_map) == 8, "");
+_Static_assert(offsetof(struct r_debug, r_brk) == 16, "");
+#endif
+
+/*
+ * Note: l_addr_offset actually refers to the l_base offset since GDB expects
+ * l_addr to be relocbase. The field was renamed from l_addr to l_base in
+ * https://reviews.freebsd.org/D24946
+ */
+#ifdef __CHERI_PURE_CAPABILITY__
+/* See svr4_c128_fetch_link_map_offsets() */
+_Static_assert(sizeof(struct link_map) >= 80, "");
+_Static_assert(offsetof(struct link_map, l_base) == 0, "");
+_Static_assert(offsetof(struct link_map, l_name) == 16, "");
+_Static_assert(offsetof(struct link_map, l_ld) == 32, "");
+_Static_assert(offsetof(struct link_map, l_next) == 48, "");
+_Static_assert(offsetof(struct link_map, l_prev) == 64, "");
+#else
+/* See svr4_lp64_fetch_link_map_offsets() */
+_Static_assert(sizeof(struct link_map) >= 40, "");
+_Static_assert(offsetof(struct link_map, l_base) == 0, "");
+_Static_assert(offsetof(struct link_map, l_name) == 8, "");
+_Static_assert(offsetof(struct link_map, l_ld) == 16, "");
+_Static_assert(offsetof(struct link_map, l_next) == 24, "");
+_Static_assert(offsetof(struct link_map, l_prev) == 32, "");
+#endif
