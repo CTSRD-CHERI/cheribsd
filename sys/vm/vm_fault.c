@@ -1913,9 +1913,10 @@ vm_fault_quick_hold_pages(vm_map_t map, void * __capability addr, vm_size_t len,
 	if (pmap_failed) {
 		/*
 		 * One or more pages could not be held by the pmap.  Either no
-		 * page was mapped at the specified virtual address or that
-		 * mapping had insufficient permissions.  Attempt to fault in
-		 * and hold these pages.
+		 * page was mapped at the specified virtual address, that
+		 * mapping had insufficient permissions, or the pmap held a
+		 * transparent large page.  Attempt to fault in and hold these
+		 * pages.
 		 *
 		 * If vm_fault_disable_pagefaults() was called,
 		 * i.e., TDP_NOFAULTING is set, we must not sleep nor
