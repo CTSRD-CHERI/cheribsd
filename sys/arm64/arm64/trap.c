@@ -585,6 +585,12 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 		panic("No debugger in kernel.");
 #endif
 		break;
+	case EXCP_FPAC:
+		/* We can see this if the authentication on PAC fails */
+		print_registers(frame);
+		printf(" far: %16lx\n", READ_SPECIALREG(far_el1));
+		panic("FPAC kernel exception");
+		break;
 	case EXCP_UNKNOWN:
 		if (undef_insn(1, frame))
 			break;
@@ -673,6 +679,11 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		if (!undef_insn(0, frame))
 			call_trapsignal(td, SIGILL, ILL_ILLTRP,
 			    (void * __capability)(uintcap_t)far, exception);
+		userret(td, frame);
+		break;
+	case EXCP_FPAC:
+		call_trapsignal(td, SIGILL, ILL_ILLOPN,
+		    (void * __capability)frame->tf_elr, exception);
 		userret(td, frame);
 		break;
 	case EXCP_SP_ALIGN:

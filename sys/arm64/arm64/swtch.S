@@ -71,13 +71,16 @@ ENTRY(cpu_throw)
 
 #ifdef VFP
 	/* Backup the new thread pointer around a call to C code */
-	mov	PTR(19), PTR(0)
-	mov	PTR(20), PTR(1)
+	mov	PTR(19), PTR(1)
 	bl	vfp_discard
-	mov	PTR(1), PTR(20)
 	mov	PTR(0), PTR(19)
+#else
+	mov	PTR(0), PTR(1)
 #endif
 
+	/* This returns the thread pointer so no need to save it */
+	bl	ptrauth_switch
+	/* This returns the thread pcb */
 	bl	pmap_switch
 	mov	PTR(4), PTR(0)
 
@@ -180,10 +183,14 @@ ENTRY(cpu_switch)
 	/* Load the pcb address */
 	mov	PTR(1), PTR(4)
 	bl	vfp_save_state
-	mov	PTR(1), PTR(20)
-	mov	PTR(0), PTR(19)
+	mov	PTR(0), PTR(20)
+#else
+	mov	PTR(0), PTR(1)
 #endif
 
+	/* This returns the thread pointer so no need to save it */
+	bl	ptrauth_switch
+	/* This returns the thread pcb */
 	bl	pmap_switch
 	/* Move the new pcb out of the way */
 	mov	PTR(4), PTR(0)
@@ -254,10 +261,14 @@ ENTRY(fork_trampoline)
 	bl	_C_LABEL(fork_exit)
 
 	/*
-	 * Disable interrupts to avoid
-	 * overwriting spsr_el1 and sp_el0 by an IRQ exception.
+	 * Disable interrupts as we are setting userspace specific
+	 * state that we won't handle correctly in an interrupt while
+	 * in the kernel.
 	 */
 	msr	daifset, #(DAIF_D | DAIF_INTR)
+
+	ldr	x0, [x18, #PC_CURTHREAD]
+	bl	ptrauth_enter_el0
 
 	/* Restore sp, lr, elr, and spsr */
 	ldp	CAP(18), CAPN(lr), [PTRN(sp), #TF_SP]
