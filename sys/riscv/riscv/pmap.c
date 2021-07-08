@@ -2533,7 +2533,7 @@ pmap_fault(pmap_t pmap, vm_offset_t va, vm_prot_t ftype)
 	 */
 	if ((oldpte & bits) != bits)
 		pmap_store_bits(pte, bits);
-	sfence_vma();
+	sfence_vma(); // TODO: just the one address, surely?
 	rv = 1;
 done:
 	PMAP_UNLOCK(pmap);
