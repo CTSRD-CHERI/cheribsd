@@ -1144,7 +1144,7 @@ CHERIBSDTEST(cheribsdtest_cheri_revoke_loadside, "Test load-side revoker")
  *
  */
 
-#include <cheri/libcheri_revoke.h>
+#include <cheri/libcaprevoke.h>
 
 /* Just for debugging printouts */
 #ifndef CPU_CHERI
