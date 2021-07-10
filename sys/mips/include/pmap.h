@@ -169,6 +169,8 @@ extern vm_pointer_t virtual_end;
 #define	pmap_page_get_memattr(m) (((m)->md.pv_flags & PV_MEMATTR_MASK) >> PV_MEMATTR_SHIFT)
 #define	pmap_page_is_write_mapped(m)	(((m)->a.flags & PGA_WRITEABLE) != 0)
 
+#define	pmap_vm_page_alloc_check(m)
+
 void pmap_bootstrap(void);
 void *pmap_mapdev(vm_paddr_t, vm_size_t);
 boolean_t pmap_page_is_mapped(vm_page_t m);

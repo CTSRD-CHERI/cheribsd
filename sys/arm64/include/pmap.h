@@ -174,6 +174,8 @@ extern vm_pointer_t virtual_end;
 #define	L1_MAPPABLE_P(va, pa, size)					\
 	((((va) | (pa)) & L1_OFFSET) == 0 && (size) >= L1_SIZE)
 
+#define	pmap_vm_page_alloc_check(m)
+
 void	pmap_activate_vm(pmap_t);
 void	pmap_bootstrap(vm_pointer_t, vm_pointer_t, vm_paddr_t, vm_size_t);
 int	pmap_change_attr(vm_offset_t va, vm_size_t size, int mode);
