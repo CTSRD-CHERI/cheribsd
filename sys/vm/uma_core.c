@@ -570,11 +570,12 @@ kasan_mark_item_valid(uma_zone_t zone, void *item)
 	sz = zone->uz_size;
 	rsz = roundup2(sz, KASAN_SHADOW_SCALE);
 	if ((zone->uz_flags & UMA_ZONE_PCPU) == 0) {
-		kasan_mark(item, sz, rsz, 0);
+		kasan_mark(item, sz, rsz, KASAN_GENERIC_REDZONE);
 	} else {
 		pcpu_item = zpcpu_base_to_offset(item);
 		for (i = 0; i <= mp_maxid; i++)
-			kasan_mark(zpcpu_get_cpu(pcpu_item, i), sz, rsz, 0);
+			kasan_mark(zpcpu_get_cpu(pcpu_item, i), sz, rsz,
+			    KASAN_GENERIC_REDZONE);
 	}
 }
 
@@ -594,7 +595,8 @@ kasan_mark_item_invalid(uma_zone_t zone, void *item)
 	} else {
 		pcpu_item = zpcpu_base_to_offset(item);
 		for (i = 0; i <= mp_maxid; i++)
-			kasan_mark(zpcpu_get_cpu(pcpu_item, i), 0, sz, 0);
+			kasan_mark(zpcpu_get_cpu(pcpu_item, i), 0, sz,
+			    KASAN_UMA_FREED);
 	}
 }
 
@@ -2271,6 +2273,14 @@ keg_layout(uma_keg_t keg)
 	     PRINT_UMA_ZFLAGS));
 
 	alignsize = keg->uk_align + 1;
+#ifdef KASAN
+	/*
+	 * ASAN requires that each allocation be aligned to the shadow map
+	 * scale factor.
+	 */
+	if (alignsize < KASAN_SHADOW_SCALE)
+		alignsize = KASAN_SHADOW_SCALE;
+#endif
 
 	/*
 	 * Calculate the size of each allocation (rsize) according to
