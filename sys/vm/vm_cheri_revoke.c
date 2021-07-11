@@ -8,6 +8,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/rwlock.h>
+#include <sys/sched.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -737,6 +738,9 @@ vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc, int flags)
 	if (map->busy)
 		vm_map_wait_busy(map);
 
+	/* Stay on this core for the duration */
+	sched_pin();
+
 	if (flags & VM_CHERI_REVOKE_SYNC_CD) {
 		/* Flush out all the MD capdirty bits to the MI layer. */
 		pmap_sync_capdirty(map->pmap);
@@ -790,6 +794,8 @@ vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc, int flags)
 
 out:
 	vm_map_unlock_read(map);
+
+	sched_unpin();
 
 	vm_map_lock(map);
 	vm_map_unbusy(map);
