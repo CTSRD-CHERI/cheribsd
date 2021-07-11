@@ -1137,7 +1137,7 @@ CHERIBSDTEST(cheribsdtest_cheri_revoke_loadside, "Test load-side revoker")
 }
 
 /*
- * Repeatedly invoke libcheri_cheri_revoke logic.
+ * Repeatedly invoke libcheri_caprevoke logic.
  * Using a bump the pointer allocator, repeatedly grab rand()-omly sized
  * objects and fill them with capabilities to themselves, mark them for
  * revocation, revoke, and validate.

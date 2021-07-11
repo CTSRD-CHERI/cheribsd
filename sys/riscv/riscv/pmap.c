@@ -2782,9 +2782,6 @@ cheri_pte_cr(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 		return PTE_CR_OK;
 #endif
 	} else {
-#if 0 // Toooba is not tag-dependent yet, so this doesn't work out well at all
-		return PTE_CR_TRAP;
-#endif
 		/*
 		 * XXX NWF
 		 *

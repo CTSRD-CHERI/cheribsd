@@ -427,7 +427,7 @@ fast_out:
 		 * soon as it's on core again.  This will require a barrier
 		 * before we can increment the epoch counter or transition to
 		 * the next state in the CHERI_REVOKE_ST state machine (i.e.,
-		 * from CHERI_REVOKE_ST_SS_LAST to CAPREV_NONE or from
+		 * from CHERI_REVOKE_ST_SS_LAST to CHERI_REVOKE_ST_NONE or from
 		 * CHERI_REVOKE_ST_LS_INITING to CHERI_REVOKE_ST_LS_INITED).
 		 * This also risks the use of ptrace() to expose to userspace
 		 * the trap frame of a stalled thread that has not yet scanned
@@ -456,8 +456,8 @@ fast_out:
 		 * The world is stopped; if we're on the store side path, do
 		 * another pass through the VM now.
 		 */
-		int crflags = VM_CHERI_REVOKE_SYNC_CD
-		    | VM_CHERI_REVOKE_BARRIERED;
+		int crflags = VM_CHERI_REVOKE_SYNC_CD |
+		    VM_CHERI_REVOKE_BARRIERED;
 
 		/*
 		 * This pass can be incremental if we had previously done an
