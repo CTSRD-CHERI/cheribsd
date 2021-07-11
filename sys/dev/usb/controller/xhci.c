@@ -2056,6 +2056,7 @@ xhci_setup_generic_chain(struct usb_xfer *xfer)
 			 * or equal to 2 milliseconds, which is too
 			 * much.
 			 */
+			y = 7;
 		} else {
 			/*
 			 * Subtract one millisecond, because the
