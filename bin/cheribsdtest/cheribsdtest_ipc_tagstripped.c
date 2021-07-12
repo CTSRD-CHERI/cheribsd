@@ -144,7 +144,6 @@ ipc_test_tagsend_pointer(int *fds, size_t bufferlen)
 {
 	int * __capability pointer_tosend = &pointed_to;
 	int * __capability pointer_received;
-	void *buffer;
 	ssize_t len;
 	pid_t pid;
 	int status;
@@ -157,14 +156,6 @@ ipc_test_tagsend_pointer(int *fds, size_t bufferlen)
 	/* Self check on minimum buffer size. */
 	if (bufferlen < sizeof(pointer_tosend))
 		cheribsdtest_failure_errx("buffer too small");
-
-	/* Self check on alignment of buffer. */
-	if ((((vaddr_t)&buffer) % sizeof(void *)) != 0)
-		cheribsdtest_failure_errx("buffer unaligned");
-
-	buffer = malloc(bufferlen);
-	if (buffer == NULL)
-		cheribsdtest_failure_err("malloc");
 
 	pid = CHERIBSDTEST_CHECK_SYSCALL(fork());
 	if (pid == 0) {
