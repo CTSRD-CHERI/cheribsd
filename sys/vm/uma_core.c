@@ -1811,7 +1811,7 @@ pcpu_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	KASSERT(cheri_getlen(addr) <= CHERI_REPRESENTABLE_LENGTH(bytes),
 	    ("Invalid bounds expected %zx found %zx",
 	        (size_t)CHERI_REPRESENTABLE_LENGTH(bytes),
-	        (size_t)cheri_getlen(addr)));
+	        cheri_getlen(addr)));
 #endif
 	zkva = addr;
 	TAILQ_FOREACH(p, &alloctail, listq) {
@@ -3213,7 +3213,8 @@ uma_zalloc_pcpu_arg(uma_zone_t zone, void *udata, int flags)
 	if (flags & M_ZERO) {
 #ifdef SMP
 		for (i = 0; i <= mp_maxid; i++)
-			bzero(zpcpu_get_cpu(pcpu_item, i), zone->uz_size);
+			bzero(zpcpu_get_cpu_obj(pcpu_item, i, zone->uz_size),
+			    zone->uz_size);
 #else
 		bzero(item, zone->uz_size);
 #endif
@@ -3792,7 +3793,10 @@ slab_alloc_item(uma_keg_t keg, uma_slab_t slab)
 		LIST_REMOVE(slab, us_link);
 		LIST_INSERT_HEAD(&dom->ud_full_slab, slab, us_link);
 	}
-	item = cheri_kern_setboundsexact(item, keg->uk_size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if ((keg->uk_flags & UMA_ZONE_PCPU) == 0)
+		item = cheri_setboundsexact(item, keg->uk_size);
+#endif
 
 	return (item);
 }
@@ -4109,7 +4113,10 @@ zone_alloc_item(uma_zone_t zone, void *udata, int domain, int flags)
 
 	if (zone->uz_import(zone->uz_arg, &item, 1, domain, flags) != 1)
 		goto fail_cnt;
-	item = cheri_kern_setboundsexact(item, zone->uz_size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if ((zone->uz_flags & UMA_ZONE_PCPU) == 0)
+		item = cheri_setboundsexact(item, zone->uz_size);
+#endif
 
 	/*
 	 * We have to call both the zone's init (not the keg's init)
@@ -4200,6 +4207,9 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 	uma_cache_t cache;
 	uma_cache_bucket_t bucket;
 	int itemdomain, uz_flags;
+#ifdef __CHERI_PURE_CAPABILITY__
+	size_t expected_size;
+#endif
 
 	/* Enable entropy collection for RANDOM_ENABLE_UMA kernel option */
 	random_harvest_fast_uma(&zone, sizeof(zone), RANDOM_UMA);
@@ -4215,6 +4225,25 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
         /* uma_zfree(..., NULL) does nothing, to match free(9). */
         if (item == NULL)
                 return;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (__predict_false(!cheri_gettag(item)))
+		panic("Expect valid capability");
+	if (__predict_false(cheri_getsealed(item)))
+		panic("Expect unsealed capability");
+	/*
+	 * XXX-AM: pcpu zones may legitimately free() the whole
+	 * pcpu chunk allocation or just the item for a single cpu?
+	 */
+	if ((zone->uz_flags & UMA_ZONE_PCPU) == 0)
+		expected_size = zone->uz_size;
+	else
+		expected_size = zone->uz_keg->uk_ppera * PAGE_SIZE;
+	if (__predict_false(cheri_getlen(item) != expected_size))
+		panic("UMA zone %s invalid bounds: expected %zx "
+		      "found %zx", zone->uz_name, expected_size,
+		      cheri_getlen(item));
+#endif
 
 	/*
 	 * We are accessing the per-cpu cache without a critical section to
@@ -4564,10 +4593,10 @@ zone_free_item(uma_zone_t zone, void *item, void *udata, enum zfreeskip skip)
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(item), ("Expected valid capability"));
-	KASSERT(!cheri_getsealed(item), ("Expect unsealed capability"));
-	if (!cheri_gettag(item) || cheri_getsealed(item))
-		return;
+	if (__predict_false(!cheri_gettag(item)))
+		panic("Expect valid capability");
+	if (__predict_false(cheri_getsealed(item)))
+		panic("Expect unsealed capability");
 #endif
 	/*
 	 * If a free is sent directly to an SMR zone we have to

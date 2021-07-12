@@ -76,7 +76,18 @@
 #define	cheri_setbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
 #define	cheri_setboundsexact(x, y)	__builtin_cheri_bounds_set_exact((x), (y))
 
-#define	cheri_is_subset(x, y)	__builtin_cheri_subset_test(x, y)
+/*
+ * Soft implementation of cheri_subset_test().
+ * Test whether a capability is a subset of another.
+ * NOTE: This is to be replaced by LLVM intrinsic once the intrinsic and
+ * related instruction arguments are stable.
+ */
+#define	cheri_is_subset(parent, ptr)					\
+	(cheri_gettag(parent) == cheri_gettag(ptr) &&			\
+	 cheri_getbase(ptr) >= cheri_getbase(parent) &&			\
+	 cheri_gettop(ptr) <= cheri_gettop(parent) &&			\
+	 (cheri_getperm(ptr) & cheri_getperm(parent)) == cheri_getperm(ptr))
+
 #define	cheri_is_null_derived(x)					\
 	__builtin_cheri_equal_exact((uintcap_t)cheri_getaddress(x), x)
 
@@ -87,11 +98,10 @@
 #define cheri_copyaddress(dst, src)	(cheri_setaddress(dst, cheri_getaddress(src)))
 
 /* Get the top of a capability (i.e. one byte past the last accessible one) */
-static inline vaddr_t
-cheri_gettop(const void * __capability cap)
-{
-	return (cheri_getbase(cap) + cheri_getlen(cap));
-}
+#define	cheri_gettop(cap)	__extension__({			\
+	__typeof__(cap) c = (cap);				\
+	(cheri_getbase(c) + cheri_getlen(c));			\
+})
 
 /* Check if the address is between cap.base and cap.top, i.e. in bounds */
 #ifdef __cplusplus
@@ -380,6 +390,11 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 
 #if __has_feature(capabilities)
 #include <machine/cheric.h>
+#endif
+
+#ifndef _KERNEL
+ssize_t	strfcap(char * __restrict buf, size_t maxsize,
+    const char * __restrict format, uintcap_t cap);
 #endif
 
 #endif /* _SYS_CHERIC_H_ */

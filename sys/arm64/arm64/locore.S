@@ -258,7 +258,7 @@ ENTRY(mpentry)
 	/* Load the kernel page table */
 	adr	x24, pagetable_l0_ttbr1
 	/* Load the identity page table */
-	adr	x27, pagetable_l0_ttbr0_boostrap
+	adr	x27, pagetable_l0_ttbr0_bootstrap
 
 	/* Enable the mmu */
 	bl	start_mmu
@@ -853,9 +853,9 @@ sctlr_clear:
 	.quad (SCTLR_EE | SCTLR_EOE | SCTLR_IESB | SCTLR_WXN | SCTLR_UMA | \
 	    SCTLR_ITD | SCTLR_A)
 
-	.globl abort
-abort:
+ENTRY(abort)
 	b abort
+END(abort)
 
 	//.section .init_pagetable
 	.align 12 /* 4KiB aligned */
@@ -876,27 +876,33 @@ pagetable_l0_ttbr1:
 	.space	PAGE_SIZE
 pagetable_l1_ttbr0_bootstrap:
 	.space	PAGE_SIZE
-pagetable_l0_ttbr0_boostrap:
+pagetable_l0_ttbr0_bootstrap:
 	.space	PAGE_SIZE
 pagetable_l0_ttbr0:
 	.space	PAGE_SIZE
 
-	.globl pagetable_dmap
+	.globl	pagetable_dmap
+	.type	pagetable_dmap,#object
 pagetable_dmap:
 	.space	PAGE_SIZE * DMAP_TABLES
 pagetable_end:
+	.size	pagetable_dmap, pagetable_end - pagetable_dmap
 
+	.type	el2_pagetable,#object
 el2_pagetable:
 	.space	PAGE_SIZE
+	.size	el2_pagetable, . - el2_pagetable
 
 	.globl init_pt_va
 init_pt_va:
 	.quad pagetable		/* XXX: Keep page tables VA */
 
 	.align	4
+	.type	initstack,#object
 initstack:
 	.space	(PAGE_SIZE * KSTACK_PAGES)
 initstack_end:
+	.size	initstack, initstack_end - initstack
 
 /*
  * sigcode has to be labeled as an #object type so that the symbols
@@ -942,6 +948,8 @@ esigcode:
 	.data
 	.align	3
 	.global	szsigcode
+	.type	szsigcode,#object
+	.size	szsigcode, 8
 szsigcode:
 	.quad	esigcode - sigcode
 
@@ -967,6 +975,8 @@ freebsd64_esigcode:
 	.data
 	.align	3
 	.global	freebsd64_szsigcode
+	.type	freebsd64_szsigcode,#object
+	.size	freebsd64_szsigcode, 8
 freebsd64_szsigcode:
 	.quad	freebsd64_esigcode - freebsd64_sigcode
 #endif
@@ -986,5 +996,7 @@ END(aarch32_sigcode)
 aarch32_esigcode:
 	.data
 	.global sz_aarch32_sigcode
+	.type	sz_aarch32_sigcode,#object
+	.size	sz_aarch32_sigcode, 8
 sz_aarch32_sigcode:
 	.quad aarch32_esigcode - aarch32_sigcode

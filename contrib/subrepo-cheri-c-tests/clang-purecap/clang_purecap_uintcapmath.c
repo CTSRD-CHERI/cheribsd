@@ -52,7 +52,6 @@ BEGIN_TEST(clang_purecap_uintcapmath)
  * there is no need to warn about surprising behaviour */
 #pragma clang diagnostic ignored "-Wcheri-bitwise-operations"
 #pragma clang diagnostic ignored "-Wcheri-capability-misuse"
-#pragma clang diagnostic ignored "-Wcheri-intcap-arithmetic"
 #pragma clang diagnostic ignored "-Wcheri-provenance"
 #pragma clang diagnostic ignored "-Wunknown-warning-option"
 #endif

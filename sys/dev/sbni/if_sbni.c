@@ -1250,10 +1250,11 @@ static u_int32_t crc32tab[] __aligned(8) = {
 };
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "ioctl:net",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

@@ -1639,9 +1639,8 @@ aio_aqueue(struct thread *td, struct aiocb * __capability ujob,
 	kev.ident = (__cheri_addr vaddr_t)job->ujob;
 	kev.filter = EVFILT_AIO;
 	kev.flags = EV_ADD | EV_ENABLE | EV_FLAG1 | evflags;
-	kev.data = (intptr_t)job;
 	kev.udata = job->uaiocb.aio_sigevent.sigev_value.sival_ptr;
-	error = kqfd_register(kqfd, &kev, td, M_WAITOK);
+	error = kqfd_register(kqfd, &kev, td, M_WAITOK, job);
 	if (error)
 		goto aqueue_fail;
 
@@ -2232,12 +2231,11 @@ kern_lio_listio(struct thread *td, int mode, intcap_t uacb_list,
 			kev.filter = EVFILT_LIO;
 			kev.flags = EV_ADD | EV_ENABLE | EV_FLAG1;
 			kev.ident = (uintptr_t)uacb_list; /* something unique */
-			kev.data = (intptr_t)lj;
 			/* pass user defined sigval data */
 			kev.udata = lj->lioj_signal.sigev_value.sival_ptr;
 			error = kqfd_register(
 			    lj->lioj_signal.sigev_notify_kqueue, &kev, td,
-			    M_WAITOK);
+			    M_WAITOK, lj);
 			if (error) {
 				uma_zfree(aiolio_zone, lj);
 				return (error);
@@ -2561,7 +2559,14 @@ filt_aioattach(struct knote *kn)
 {
 	struct kaiocb *job;
 
-	job = (struct kaiocb *)(uintptr_t)kn->kn_sdata;
+	job = kn->kn_ptr.p_aio;
+	/*
+	 * XXX-AM: The flag check below is somewhat not required anymore,
+	 * as the user can not manipulate this via kn_sdata anymore.
+	 * If we remove this we must check for a NULL aiocb pointer as the
+	 * user could generate this state.
+	 */
+	KASSERT(job != NULL, ("Invalid AIO knote aiocb pointer"));
 
 	/*
 	 * The job pointer must be validated before using it, so
@@ -2570,7 +2575,6 @@ filt_aioattach(struct knote *kn)
 	 */
 	if ((kn->kn_flags & EV_FLAG1) == 0)
 		return (EPERM);
-	kn->kn_ptr.p_aio = job;
 	kn->kn_flags &= ~EV_FLAG1;
 
 	knlist_add(&job->klist, kn, 0);
@@ -2611,7 +2615,9 @@ filt_lioattach(struct knote *kn)
 {
 	struct aioliojob *lj;
 
-	lj = (struct aioliojob *)(uintptr_t)kn->kn_sdata;
+	lj = kn->kn_ptr.p_lio;
+	/* XXX-AM: see aioattach */
+	KASSERT(lj != NULL, ("Invalid LIO knote aioliojob pointer"));
 
 	/*
 	 * The aioliojob pointer must be validated before using it, so
@@ -2620,7 +2626,6 @@ filt_lioattach(struct knote *kn)
 	 */
 	if ((kn->kn_flags & EV_FLAG1) == 0)
 		return (EPERM);
-	kn->kn_ptr.p_lio = lj;
 	kn->kn_flags &= ~EV_FLAG1;
 
 	knlist_add(&lj->klist, kn, 0);

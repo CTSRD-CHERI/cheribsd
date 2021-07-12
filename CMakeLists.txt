@@ -17,14 +17,16 @@ endif()
 
 if("${TARGET}" STREQUAL "mips")
     if("${TARGET_ARCH}" STREQUAL "mips64")
-        add_compile_options(-mabi=n64)
+        # Default to purecap compilation mode for code completion
+        add_compile_options(-mabi=purecap -msoft-float)
         set(CLANG_TRIPLE mips64-unknown-freebsd13)
     else()
         message(FATAL_ERROR "Unsupported MIPS TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
     endif()
 elseif("${TARGET}" STREQUAL "riscv")
     if("${TARGET_ARCH}" STREQUAL "riscv64")
-        add_compile_options(-mabi=lp64)
+        # Default to purecap compilation mode for code completion
+        add_compile_options(-march=rv64imafdcxcheri -mabi=l64pc128d -mno-relax)
         set(CLANG_TRIPLE riscv64-unknown-freebsd13)
     else()
         message(FATAL_ERROR "Unsupported RISC-V TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
@@ -41,15 +43,21 @@ elseif("${TARGET}" STREQUAL "amd64")
     else()
         message(FATAL_ERROR "Unsupported x86 TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
     endif()
+elseif("${TARGET}" STREQUAL "i386")
+    if("${TARGET_ARCH}" STREQUAL "i386")
+        set(CLANG_TRIPLE i686-unknown-freebsd13)
+    else()
+        message(FATAL_ERROR "Unsupported x86 TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
+    endif()
 else()
     message(FATAL_ERROR "Unsupported TARGET: ${TARGET}:${TARGET_ARCH}!")
 endif()
 
-include_directories(${CMAKE_SOURCE_DIR}/include)
-include_directories(${CMAKE_SOURCE_DIR}/sys)
-include_directories(${CMAKE_SOURCE_DIR}/contrib/libxo)
-include_directories(${CMAKE_SOURCE_DIR}/contrib/libc-vis)
-include_directories(${CMAKE_SOURCE_DIR}/lib/libstatcounters)
+include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/include)
+include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/sys)
+include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/contrib/libxo)
+include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/contrib/libc-vis)
+include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/lib/libstatcounters)
 
 set(TMPSYSROOT ${CMAKE_BINARY_DIR}/sysroot/usr)
 file(MAKE_DIRECTORY ${TMPSYSROOT}/include/)
@@ -58,7 +66,7 @@ file(MAKE_DIRECTORY ${TMPSYSROOT}/include/)
 set(MACHINE_HEADERS "${CMAKE_SOURCE_DIR}/sys/${TARGET}/include")
 file(CREATE_LINK ${MACHINE_HEADERS} ${TMPSYSROOT}/include/machine SYMBOLIC)
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/sys/sys ${TMPSYSROOT}/include/sys SYMBOLIC)
-if("${TARGET}" STREQUAL "amd64")
+if("${TARGET}" STREQUAL "amd64" OR "${TARGET}" STREQUAL "i386")
     file(CREATE_LINK "${CMAKE_SOURCE_DIR}/sys/x86/include" ${TMPSYSROOT}/include/x86 SYMBOLIC)
 endif()
 set(_symlinked_sysincs aio.h errno.h fcntl.h linker_set.h poll.h stdatomic.h stdint.h syslog.h ucontext.h)
@@ -99,6 +107,7 @@ file(MAKE_DIRECTORY ${TMPSYSROOT}/kern_opt)
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_ddb.h "#define DDB 1\n")
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_ktrace.h "#define KTRACE 1\n")
 file(WRITE ${CMAKE_BINARY_DIR}/cheri_builtins.h "
+#ifdef __JETBRAINS_IDE__
 // Pretend that we have capabilities in CLion
 #define __CHERI__
 #define __has_feature(x) __fake_has_feature_##x
@@ -153,18 +162,15 @@ unsigned long __builtin_cheri_round_representable_length(unsigned long);
 #define __SIZEOF_CHERI_CAPABILITY__ 16
 #define __SIZEOF_UINTCAP__ 16
 #define __SIZEOF_INTCAP__ 16
+#endif /* __JETBRAINS_IDE__ */
 ")
 
 file(WRITE ${CMAKE_BINARY_DIR}/cheri_purecap.h "
-// Pretend that we have capabilities in CLion
-#define __CHERI_PURE_CAPABILITY__ 1
-#define __CHERI_CAPABILITY_TABLE__ 3
 #include \"cheri_builtins.h\"
 ")
 
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "
 #include \"../cheri_builtins.h\"
-#undef __CHERI_PURE_CAPABILITY__
 #define KDB 1
 #define COMPAT_FREEBSD11 1
 #define COMPAT_FREEBSD12 1
@@ -215,6 +221,7 @@ execute_process(COMMAND ${CMAKE_C_COMPILER} -print-resource-dir OUTPUT_VARIABLE 
 message(STATUS "BUILTIN_HEADERS_DIR=${BUILTIN_HEADERS_DIR}")
 add_compile_options(-idirafter ${BUILTIN_HEADERS_DIR}/include)
 add_compile_options(-Wall -Wextra -Wcast-align)
+add_compile_options(-Wpedantic -Wno-zero-length-array -Wno-format-pedantic)
 
 function(add_fake_targets_for_subdir _subdir)
     cmake_parse_arguments(aftfs "LIBRARIES" "PREFIX" "" ${ARGN})
@@ -272,7 +279,7 @@ add_fake_targets_for_subdir(sbin)
 add_fake_targets_for_subdir(usr.sbin)
 add_fake_targets_for_subdir(tests/sys PREFIX tests_sys)
 target_include_directories(tests_sys_audit PRIVATE contrib/openbsm)
-target_include_directories(usr.bin_truss PRIVATE lib/libsysdecode)
+target_include_directories(usr.bin_truss SYSTEM PRIVATE lib/libsysdecode)
 add_contrib_sources(usr.sbin_makefs contrib/mtree)
 add_contrib_sources(usr.sbin_makefs contrib/mknod)
 target_include_directories(usr.sbin_makefs PRIVATE lib/libnetbsd sys/fs/cd9660 sys/ufs/ffs sys/fs/msdosfs sbin/newfs_msdos)
@@ -303,7 +310,7 @@ function(add_kernel_srcs _dir)
 endfunction()
 
 add_kernel_srcs("sys/${TARGET}")
-if("${TARGET}" STREQUAL "amd64")
+if("${TARGET}" STREQUAL "amd64" OR "${TARGET}" STREQUAL "i386")
     add_kernel_srcs("sys/x86")
 endif()
 add_kernel_srcs("sys/cheri")

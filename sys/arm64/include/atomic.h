@@ -142,6 +142,15 @@ _ATOMIC_OP(clear,    bic, clr, )
 _ATOMIC_OP(set,      orr, set, )
 _ATOMIC_OP(subtract, add, add, val = -val)
 
+#define	atomic_add_8		atomic_add_8
+#define	atomic_clear_8		atomic_clear_8
+#define	atomic_set_8		atomic_set_8
+#define	atomic_subtract_8	atomic_subtract_8
+#define	atomic_add_16		atomic_add_16
+#define	atomic_clear_16		atomic_clear_16
+#define	atomic_set_16		atomic_set_16
+#define	atomic_subtract_16	atomic_subtract_16
+
 #define	_ATOMIC_CMPSET_PROTO(t, bar, flav)				\
 static __inline int							\
 atomic_cmpset_##bar##t##flav(volatile uint##t##_t *p,			\

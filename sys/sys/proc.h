@@ -111,9 +111,11 @@ struct pgrp {
 	struct session	*pg_session;	/* (c) Pointer to session. */
 	struct sigiolst	pg_sigiolst;	/* (m) List of sigio sources. */
 	pid_t		pg_id;		/* (c) Process group id. */
-	int		pg_jobc;	/* (m) Job control process count. */
 	struct mtx	pg_mtx;		/* Mutex to protect members */
+	int		pg_flags;	/* (m) PGRP_ flags */
 };
+
+#define	PGRP_ORPHANED	0x00000001	/* Group is orphaned */
 
 /*
  * pargs, used to hold a copy of the command line, if it had a sane length.
@@ -849,7 +851,6 @@ struct proc {
 
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_PARGS);
-MALLOC_DECLARE(M_PGRP);
 MALLOC_DECLARE(M_SESSION);
 MALLOC_DECLARE(M_SUBPROC);
 #endif
@@ -1007,6 +1008,7 @@ extern struct proclist allproc;		/* List of all processes. */
 extern struct proc *initproc, *pageproc; /* Process slots for init, pager. */
 
 extern struct uma_zone *proc_zone;
+extern struct uma_zone *pgrp_zone;
 
 struct	proc *pfind(pid_t);		/* Find process by id. */
 struct	proc *pfind_any(pid_t);		/* Find (zombie) process by id. */

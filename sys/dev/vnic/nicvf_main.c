@@ -811,21 +811,21 @@ nicvf_media_change(struct ifnet *ifp __unused)
 
 /* Register read/write APIs */
 void
-nicvf_reg_write(struct nicvf *nic, bus_space_handle_t offset, uint64_t val)
+nicvf_reg_write(struct nicvf *nic, bus_size_t offset, uint64_t val)
 {
 
 	bus_write_8(nic->reg_base, offset, val);
 }
 
 uint64_t
-nicvf_reg_read(struct nicvf *nic, uint64_t offset)
+nicvf_reg_read(struct nicvf *nic, bus_size_t offset)
 {
 
 	return (bus_read_8(nic->reg_base, offset));
 }
 
 void
-nicvf_queue_reg_write(struct nicvf *nic, bus_space_handle_t offset,
+nicvf_queue_reg_write(struct nicvf *nic, bus_size_t offset,
     uint64_t qidx, uint64_t val)
 {
 
@@ -833,8 +833,7 @@ nicvf_queue_reg_write(struct nicvf *nic, bus_space_handle_t offset,
 }
 
 uint64_t
-nicvf_queue_reg_read(struct nicvf *nic, bus_space_handle_t offset,
-    uint64_t qidx)
+nicvf_queue_reg_read(struct nicvf *nic, bus_size_t offset, uint64_t qidx)
 {
 
 	return (bus_read_8(nic->reg_base, offset + (qidx << NIC_Q_NUM_SHIFT)));

@@ -120,6 +120,9 @@ __FBSDID("$FreeBSD$");
 .endif
 	msr	spsr_el1, x11
 	msr	CAPN(elr_el1), CAP(10)
+#if __has_feature(capabilities)
+	msr	ddc_el0, c9
+#endif
 	ldp	CAP(0),  CAP(1),  [sp, #(TF_X + 0  * CAP_WIDTH)]
 	ldp	CAP(2),  CAP(3),  [sp, #(TF_X + 2  * CAP_WIDTH)]
 	ldp	CAP(4),  CAP(5),  [sp, #(TF_X + 4  * CAP_WIDTH)]

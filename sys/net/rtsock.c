@@ -1203,6 +1203,7 @@ rtsock_msg_mbuf(int type, struct rt_addrinfo *rtinfo)
 	struct sockaddr_storage ss;
 	struct sockaddr_in6 *sin6;
 #endif
+	char zero_padding[sizeof(long)] = {0};
 	int len, dlen;
 
 	switch (type) {
@@ -1254,7 +1255,17 @@ rtsock_msg_mbuf(int type, struct rt_addrinfo *rtinfo)
 				sa = (struct sockaddr *)sin6;
 		}
 #endif
-		m_copyback(m, len, dlen, (caddr_t)sa);
+		m_copyback(m, len, sa->sa_len, (caddr_t)sa);
+		/*
+		 * XXX-AM: Assume that SA_SIZE aligns to a multiple of sizeof(long),
+		 * so at most we have to copy sizeof(long) bytes.
+		 */
+		if (dlen - sa->sa_len > 0) {
+			KASSERT(dlen - sa->sa_len <= sizeof(long),
+			    ("Too much padding required"));
+			m_copyback(m, len + sa->sa_len, dlen - sa->sa_len,
+			    zero_padding);
+		}
 		len += dlen;
 	}
 	if (m->m_pkthdr.len != len) {
@@ -1359,7 +1370,8 @@ rtsock_msg_buffer(int type, struct rt_addrinfo *rtinfo, struct walkarg *w, int *
 					sa = (struct sockaddr *)sin6;
 			}
 #endif
-			bcopy((caddr_t)sa, cp, (unsigned)dlen);
+			bcopy((caddr_t)sa, cp, sa->sa_len);
+			bzero(cp + sa->sa_len, (unsigned)dlen - sa->sa_len);
 			cp += dlen;
 			buflen -= dlen;
 		} else if (cp != NULL) {

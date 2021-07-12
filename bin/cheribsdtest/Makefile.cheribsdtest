@@ -11,11 +11,13 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 	cheribsdtest_fault.c						\
 	cheribsdtest_flag_captured.c					\
 	cheribsdtest_kbounce.c						\
+	cheribsdtest_local_global.c					\
 	cheribsdtest_longjmp.c						\
 	cheribsdtest_printf.c						\
 	cheribsdtest_registers.c					\
 	cheribsdtest_sealcap.c						\
 	cheribsdtest_signal.c						\
+	cheribsdtest_strfcap.c						\
 	cheribsdtest_string.c						\
 	cheribsdtest_syscall.c						\
 	cheribsdtest_tls.c						\

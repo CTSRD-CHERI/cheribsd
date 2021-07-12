@@ -58,6 +58,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/vmmeter.h>
 #include <sys/smp.h>
 
+#include <cheri/cheric.h>
+
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_object.h>
@@ -334,11 +336,12 @@ sysctl_vm_reserv_fullpop(SYSCTL_HANDLER_ARGS)
 		seg = &vm_phys_segs[segind];
 		paddr = roundup2(seg->start, VM_LEVEL_0_SIZE);
 #ifdef VM_PHYSSEG_SPARSE
-		rv = seg->first_reserv + (paddr >> VM_LEVEL_0_SHIFT) -
-		    (seg->start >> VM_LEVEL_0_SHIFT);
+		rv = seg->first_reserv + ((paddr >> VM_LEVEL_0_SHIFT) -
+		    (seg->start >> VM_LEVEL_0_SHIFT));
 #else
-		rv = &vm_reserv_array[paddr >> VM_LEVEL_0_SHIFT];
+		rv = vm_reserv_array + (paddr >> VM_LEVEL_0_SHIFT);
 #endif
+
 		while (paddr + VM_LEVEL_0_SIZE > paddr && paddr +
 		    VM_LEVEL_0_SIZE <= seg->end) {
 			fullpop += rv->popcnt == VM_LEVEL_0_NPAGES;
@@ -502,12 +505,15 @@ vm_reserv_depopulate(vm_reserv_t rv, int index)
 static __inline vm_reserv_t
 vm_reserv_from_page(vm_page_t m)
 {
+
 #ifdef VM_PHYSSEG_SPARSE
 	struct vm_phys_seg *seg;
+	struct vm_reserv *rv;
 
 	seg = &vm_phys_segs[m->segind];
-	return (seg->first_reserv + (VM_PAGE_TO_PHYS(m) >> VM_LEVEL_0_SHIFT) -
+	rv = seg->first_reserv + ((VM_PAGE_TO_PHYS(m) >> VM_LEVEL_0_SHIFT) -
 	    (seg->start >> VM_LEVEL_0_SHIFT));
+	return (cheri_kern_setboundsexact(rv, sizeof(*rv)));
 #else
 	return (&vm_reserv_array[VM_PAGE_TO_PHYS(m) >> VM_LEVEL_0_SHIFT]);
 #endif
@@ -679,7 +685,7 @@ vm_reserv_alloc_contig(vm_object_t object, vm_pindex_t pindex, int domain,
 		/* Handle reclaim race. */
 		if (rv->object != object)
 			goto out;
-		m = &rv->pages[index];
+		m = vm_page_array_slice(&rv->pages[index], npages);
 		pa = VM_PAGE_TO_PHYS(m);
 		if (pa < low || pa + size > high ||
 		    (pa & (alignment - 1)) != 0 ||
@@ -811,7 +817,7 @@ out:
 		first += VM_LEVEL_0_NPAGES;
 		allocpages -= VM_LEVEL_0_NPAGES;
 	} while (allocpages >= VM_LEVEL_0_NPAGES);
-	return (m_ret);
+	return (vm_page_array_slice(m_ret, npages));
 }
 
 /*
@@ -851,7 +857,7 @@ vm_reserv_alloc_page(vm_object_t object, vm_pindex_t pindex, int domain,
 		domain = rv->domain;
 		vmd = VM_DOMAIN(domain);
 		index = VM_RESERV_INDEX(object, pindex);
-		m = &rv->pages[index];
+		m = vm_page_array_slice(&rv->pages[index], 1);
 		vm_reserv_lock(rv);
 		/* Handle reclaim race. */
 		if (rv->object != object ||
@@ -936,7 +942,7 @@ out:
 	vm_reserv_populate(rv, index);
 	vm_reserv_unlock(rv);
 
-	return (&rv->pages[index]);
+	return (vm_page_array_slice(&rv->pages[index], 1));
 }
 
 /*
@@ -986,7 +992,9 @@ vm_reserv_break(vm_reserv_t rv)
 			else {
 				hi = NBPOPMAP * i + bitpos;
 				vm_domain_free_lock(VM_DOMAIN(rv->domain));
-				vm_phys_enqueue_contig(&rv->pages[lo], hi - lo);
+				vm_phys_enqueue_contig(
+				    vm_page_array_slice(&rv->pages[lo], hi - lo),
+				    hi - lo);
 				vm_domain_free_unlock(VM_DOMAIN(rv->domain));
 				lo = hi;
 			}
@@ -1065,8 +1073,9 @@ vm_reserv_init(void)
 {
 	vm_paddr_t paddr;
 	struct vm_phys_seg *seg;
-	struct vm_reserv *rv;
+	struct vm_reserv *rv, *rv_slice;
 	struct vm_reserv_domain *rvd;
+	vm_pindex_t nreserv;
 #ifdef VM_PHYSSEG_SPARSE
 	vm_pindex_t used;
 #endif
@@ -1081,20 +1090,23 @@ vm_reserv_init(void)
 #endif
 	for (segind = 0; segind < vm_phys_nsegs; segind++) {
 		seg = &vm_phys_segs[segind];
-#ifdef VM_PHYSSEG_SPARSE
-		seg->first_reserv = &vm_reserv_array[used];
-		used += howmany(seg->end, VM_LEVEL_0_SIZE) -
+		nreserv = howmany(seg->end, VM_LEVEL_0_SIZE) -
 		    seg->start / VM_LEVEL_0_SIZE;
+#ifdef VM_PHYSSEG_SPARSE
+		rv_slice = vm_reserv_array + used;
+		used += nreserv;
 #else
-		seg->first_reserv =
-		    &vm_reserv_array[seg->start >> VM_LEVEL_0_SHIFT];
+		rv_slice = vm_reserv_array + (seg->start >> VM_LEVEL_0_SHIFT);
 #endif
+		seg->first_reserv = cheri_kern_setbounds(rv_slice,
+		    nreserv * sizeof(*rv_slice));
 		paddr = roundup2(seg->start, VM_LEVEL_0_SIZE);
 		rv = seg->first_reserv + (paddr >> VM_LEVEL_0_SHIFT) -
 		    (seg->start >> VM_LEVEL_0_SHIFT);
 		while (paddr + VM_LEVEL_0_SIZE > paddr && paddr +
 		    VM_LEVEL_0_SIZE <= seg->end) {
-			rv->pages = PHYS_TO_VM_PAGE(paddr);
+			rv->pages = vm_page_array_slice(
+			    PHYS_TO_VM_PAGE_UNBOUND(paddr), VM_LEVEL_0_NPAGES);
 			rv->domain = seg->domain;
 			mtx_init(&rv->lock, "vm reserv", NULL, MTX_DEF);
 			paddr += VM_LEVEL_0_SIZE;
@@ -1501,10 +1513,11 @@ vm_reserv_to_superpage(vm_page_t m)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20200804,
+//   "updated": 20210415,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "subobject-bounds"
 //   ]
 // }
 // CHERI CHANGES END

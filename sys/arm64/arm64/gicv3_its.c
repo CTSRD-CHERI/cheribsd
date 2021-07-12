@@ -988,7 +988,7 @@ gicv3_its_enable_intr(device_t dev, struct intr_irqsrc *isrc)
 }
 
 static int
-gicv3_its_intr(void *arg, uintptr_t irq)
+gicv3_its_intr(void *arg, intr_irq_t irq)
 {
 	struct gicv3_its_softc *sc = arg;
 	struct gicv3_its_irqsrc *girq;

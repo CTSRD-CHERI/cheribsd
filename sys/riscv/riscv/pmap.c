@@ -655,11 +655,14 @@ pmap_bootstrap(vm_pointer_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 	/* Sanity check the index, KERNBASE should be the first VA */
 	KASSERT(l2_slot == 0, ("The L2 index is non-zero"));
 
-	freemempos = roundup2(KERNBASE + kernlen, PAGE_SIZE);
+	freemempos = KERNBASE;
 #ifdef __CHERI_PURE_CAPABILITY__
 	freemempos = (vm_pointer_t)cheri_setaddress(kernel_root_cap,
 	    freemempos);
+	freemempos = cheri_setbounds(freemempos,
+	    VM_MAX_KERNEL_ADDRESS - L2_SIZE - KERNBASE);
 #endif
+	freemempos = roundup2(freemempos + kernlen, PAGE_SIZE);
 
 	/* Create the l3 tables for the early devmap */
 	freemempos = pmap_bootstrap_l3(l1pt,
@@ -698,13 +701,8 @@ pmap_bootstrap(vm_pointer_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 	msgbufp = (void *)msgbufpv;
 
 	virtual_avail = roundup2(freemempos, L2_SIZE);
-	virtual_end = VM_MAX_KERNEL_ADDRESS - L2_SIZE;
-#ifdef __CHERI_PURE_CAPABILITY__
-	virtual_avail = (vm_pointer_t)cheri_setbounds((void *)virtual_avail,
-	    (ptraddr_t)virtual_end - (ptraddr_t)virtual_avail);
-	virtual_end = (vm_pointer_t)cheri_setaddress((void *)virtual_avail,
-	    virtual_end);
-#endif
+	virtual_end = cheri_kern_setaddress(virtual_avail,
+	    VM_MAX_KERNEL_ADDRESS - L2_SIZE);
 	kernel_vm_end = virtual_avail;
 
 	pa = pmap_early_vtophys(l1pt, freemempos);
@@ -1952,7 +1950,7 @@ pmap_pv_demote_l2(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	va &= ~L2_OFFSET;
 	pv = pmap_pvh_remove(pvh, pmap, va);
 	KASSERT(pv != NULL, ("pmap_pv_demote_l2: pv not found"));
-	m = PHYS_TO_VM_PAGE(pa);
+	m = PHYS_TO_VM_PAGE_UNBOUND(pa);
 	TAILQ_INSERT_TAIL(&m->md.pv_list, pv, pv_next);
 	m->md.pv_gen++;
 	/* Instantiate the remaining 511 pv entries. */
@@ -2013,7 +2011,7 @@ pmap_pv_promote_l2(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 
 	CHANGE_PV_LIST_LOCK_TO_PHYS(lockp, pa);
 
-	m = PHYS_TO_VM_PAGE(pa);
+	m = PHYS_TO_VM_PAGE_UNBOUND(pa);
 	pv = pmap_pvh_remove(&m->md, pmap, va);
 	KASSERT(pv != NULL, ("pmap_pv_promote_l2: pv for %#lx not found", va));
 	pvh = pa_to_pvh(pa);
@@ -2144,7 +2142,7 @@ pmap_remove_l2(pmap_t pmap, pt_entry_t *l2, vm_offset_t sva,
 		pvh = pa_to_pvh(PTE_TO_PHYS(oldl2));
 		pmap_pvh_free(pvh, pmap, sva);
 		eva = sva + L2_SIZE;
-		for (va = sva, m = PHYS_TO_VM_PAGE(PTE_TO_PHYS(oldl2));
+		for (va = sva, m = PHYS_TO_VM_PAGE_UNBOUND(PTE_TO_PHYS(oldl2));
 		    va < eva; va += PAGE_SIZE, m++) {
 			pmap_page_dirty(oldl2, m);
 			if ((oldl2 & PTE_A) != 0)
@@ -2438,7 +2436,7 @@ retryl2:
 				    (l2e & PTE_SW_MANAGED) != 0 &&
 				    (l2e & PTE_DIRTY_BITS) != 0) {
 					pa = PTE_TO_PHYS(l2e);
-					m = PHYS_TO_VM_PAGE(pa);
+					m = PHYS_TO_VM_PAGE_UNBOUND(pa);
 					for (mt = m; mt < &m[Ln_ENTRIES]; mt++)
 						pmap_page_dirty(l2e, mt);
 				}
@@ -4369,7 +4367,7 @@ pmap_remove_pages(pmap_t pmap)
 					continue;
 				}
 
-				m = PHYS_TO_VM_PAGE(PTE_TO_PHYS(tpte));
+				m = PHYS_TO_VM_PAGE_UNBOUND(PTE_TO_PHYS(tpte));
 				KASSERT((m->flags & PG_FICTITIOUS) != 0 ||
 				    m < &vm_page_array[vm_page_array_size],
 				    ("pmap_remove_pages: bad pte %#jx",

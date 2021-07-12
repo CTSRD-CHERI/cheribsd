@@ -5027,10 +5027,11 @@ mxge_shutdown(device_t dev)
 */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "pointer_alignment",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

@@ -75,6 +75,13 @@ __FBSDID("$FreeBSD$");
 #include <ddb/db_output.h>
 #endif
 
+#if __has_feature(capabilities)
+int log_user_cheri_exceptions = 0;
+SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RWTUN,
+    &log_user_cheri_exceptions, 0,
+    "Print registers and process details on user CHERI exceptions");
+#endif
+
 extern register_t fsu_intr_fault;
 
 /* Called from exception.S */
@@ -273,7 +280,18 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		print_registers(frame);
 		printf(" far: %16lx\n", far);
 		printf(" esr:         %.8lx\n", esr);
-		panic("Capability abort from kernel space!");
+		panic("Capability abort from kernel space: %s",
+		    cheri_fsc_string(esr & ISS_DATA_DFSC_MASK));
+	}
+
+	if (log_user_cheri_exceptions) {
+		printf("pid %d tid %d (%s) uid %d: capability abort, %s\n",
+		    td->td_proc->p_pid, td->td_tid, td->td_proc->p_comm,
+		    td->td_ucred->cr_uid,
+		    cheri_fsc_string(esr & ISS_DATA_DFSC_MASK));
+		print_registers(frame);
+		printf(" far: %16lx\n", far);
+		printf(" esr:         %.8lx\n", esr);
 	}
 
 	call_trapsignal(td, SIGPROT, cheri_esr_to_sicode(esr),
