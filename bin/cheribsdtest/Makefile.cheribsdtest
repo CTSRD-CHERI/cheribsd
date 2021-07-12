@@ -26,7 +26,8 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 	cheribsdtest_vm.c						\
 	cheribsdtest_zlib.c
 .if ${MACHINE_ABI:Mpurecap}
-SRCS+=	cheribsdtest_bounds_varargs.c					\
+SRCS+=	cheribsdtest_bounds_subobject.c					\
+	cheribsdtest_bounds_varargs.c					\
 	cheribsdtest_sentries.c
 .endif
 
@@ -47,6 +48,9 @@ SRCS+=	cheribsdtest_cheriabi_open.c
 #CFLAGS.cheribsdtest_vm_swap.c+=-Wno-cheri-capability-misuse
 
 .sinclude "${CHERIBSDTEST_DIR}/${MACHINE}/Makefile.cheribsdtest"
+
+# Enable sub-object bounds only in tests specifically designed for them.
+CFLAGS.cheribsdtest_bounds_subobject.c+=-cheri-bounds=subobject-safe
 
 .ifdef CHERIBSD_THREAD_TESTS
 CFLAGS+=	-DCHERIBSD_THREAD_TESTS
