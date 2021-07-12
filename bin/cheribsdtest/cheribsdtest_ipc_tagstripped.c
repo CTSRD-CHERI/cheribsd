@@ -94,9 +94,8 @@ ipc_socket_tcp_stream_create(int *fds)
 	int accept_sock, conn_sock, listen_sock;
 	socklen_t socklen;
 
-	listen_sock = socket(PF_INET, SOCK_STREAM, 0);
-	if (listen_sock < 0)
-		cheribsdtest_failure_err("socket(PF_INET, SOCK_STREAM, 0)");
+	listen_sock = CHERIBSDTEST_CHECK_SYSCALL(socket(PF_INET, SOCK_STREAM,
+	    0));
 
 	/* Bind an automatically allocated port; query and connect to it. */
 	bzero(&sin, sizeof(sin));
@@ -104,24 +103,19 @@ ipc_socket_tcp_stream_create(int *fds)
 	sin.sin_family = AF_INET;
 	sin.sin_port = 0;
 	sin.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-	if (bind(listen_sock, (struct sockaddr *)&sin, sizeof(sin)) < 0)
-		cheribsdtest_failure_err("bind()");
-	if (listen(listen_sock, -1) < 0)
-		cheribsdtest_failure_err("listen()");
+	CHERIBSDTEST_CHECK_SYSCALL(bind(listen_sock, (struct sockaddr *)&sin,
+	    sizeof(sin)));
+	CHERIBSDTEST_CHECK_SYSCALL(listen(listen_sock, -1));
 	socklen = sizeof(sin);
-	if (getsockname(listen_sock, (struct sockaddr *)&sin, &socklen) < 0)
-		cheribsdtest_failure_err("getsockname()");
-	if (socklen != sizeof(sin))
-		cheribsdtest_failure_errx("getsockname() socklen (%u)",
-		    socklen);
-	conn_sock = socket(PF_INET, SOCK_STREAM, 0);
-	if (conn_sock < 0)
-		cheribsdtest_failure_err("socket(PF_INET, SOCK_STREAM)");
-	if (connect(conn_sock, (struct sockaddr *)&sin, sizeof(sin)) < 0)
-		cheribsdtest_failure_err("connect()");
-	accept_sock = accept(listen_sock, NULL, NULL);
-	if (accept_sock < 0)
-		cheribsdtest_failure_err("accept()");
+	CHERIBSDTEST_CHECK_SYSCALL(getsockname(listen_sock,
+	    (struct sockaddr *)&sin, &socklen));
+	CHERIBSDTEST_CHECK_EQ_SIZE(socklen, sizeof(sin));
+	conn_sock = CHERIBSDTEST_CHECK_SYSCALL(socket(PF_INET, SOCK_STREAM,
+	    0));
+	CHERIBSDTEST_CHECK_SYSCALL(connect(conn_sock, (struct sockaddr *)&sin,
+	    sizeof(sin)));
+	accept_sock = CHERIBSDTEST_CHECK_SYSCALL(accept(listen_sock, NULL,
+	    NULL));
 	fds[0] = conn_sock;
 	fds[1] = accept_sock;
 	close(listen_sock);
@@ -172,19 +166,15 @@ ipc_test_tagsend_pointer(int *fds, size_t bufferlen)
 	if (buffer == NULL)
 		cheribsdtest_failure_err("malloc");
 
-	pid = fork();
-	if (pid < 0)
-		cheribsdtest_failure_err("fork");
+	pid = CHERIBSDTEST_CHECK_SYSCALL(fork());
 	if (pid == 0) {
 		/*
 		 * Child process.  Perform the write and immediately exit.
 		 * The parent will hold both pipe endpoints open.
 		 */
-		len = write(fds[0], &pointer_tosend, sizeof(pointer_tosend));
-		if (len < 0)
-			cheribsdtest_failure_err("write");
-		if (len != sizeof(pointer_tosend))
-			cheribsdtest_failure_errx("write sent %ld", len);
+		len = CHERIBSDTEST_CHECK_SYSCALL(write(fds[0],
+		    &pointer_tosend, sizeof(pointer_tosend)));
+		CHERIBSDTEST_CHECK_EQ_SIZE(len, sizeof(pointer_tosend));
 		exit(0);
 	}
 
@@ -198,8 +188,7 @@ ipc_test_tagsend_pointer(int *fds, size_t bufferlen)
 	 * we won't read until the full write has completed.  This is true in
 	 * FreeBSD, but may not universally be true.
 	 */
-	if (waitpid(pid, &status, 0) < 0)
-		cheribsdtest_failure_err("waitpid");
+	CHERIBSDTEST_CHECK_SYSCALL(waitpid(pid, &status, 0));
 	if (!WIFEXITED(status))
 		cheribsdtest_failure_errx("waitpid !WIFEXITED");
 	if (WEXITSTATUS(status) != 0)
@@ -212,11 +201,9 @@ ipc_test_tagsend_pointer(int *fds, size_t bufferlen)
 	 * For simplicity, assume arrives in a single read.  Should be true
 	 * in practice, but isn't really a correct assumption for IPC.
 	 */
-	len = read(fds[1], &pointer_received, sizeof(pointer_received));
-	if (len < 0)
-		cheribsdtest_failure_errx("read");
-	if (len != sizeof(pointer_received))
-		cheribsdtest_failure_errx("read received %ld", len);
+	len = CHERIBSDTEST_CHECK_SYSCALL(read(fds[1], &pointer_received,
+	    sizeof(pointer_received)));
+	CHERIBSDTEST_CHECK_EQ_SIZE(len, sizeof(pointer_received));
 
 	/*
 	 * Bytewise comparison of visible data.
