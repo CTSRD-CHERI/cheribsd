@@ -174,7 +174,7 @@ ipc_test_tagsend_pointer(int *fds, size_t bufferlen)
 		 */
 		len = CHERIBSDTEST_CHECK_SYSCALL(write(fds[0], buffer,
 		    bufferlen));
-		CHERIBSDTEST_CHECK_EQ_SIZE(len, sizeof(pointer_tosend));
+		CHERIBSDTEST_CHECK_EQ_SIZE(len, bufferlen);
 		exit(0);
 	}
 
@@ -201,7 +201,7 @@ ipc_test_tagsend_pointer(int *fds, size_t bufferlen)
 	 * in practice, but isn't really a correct assumption for IPC.
 	 */
 	len = CHERIBSDTEST_CHECK_SYSCALL(read(fds[1], buffer, bufferlen));
-	CHERIBSDTEST_CHECK_EQ_SIZE(len, sizeof(pointer_received));
+	CHERIBSDTEST_CHECK_EQ_SIZE(len, bufferlen);
 	pointer_received = *(void * __capability *)buffer;
 
 	/*
