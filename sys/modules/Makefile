@@ -282,7 +282,6 @@ SUBDIR=	\
 	ow \
 	${_padlock} \
 	${_padlock_rng} \
-	${_pccard} \
 	${_pchtherm} \
 	${_pcfclock} \
 	${_pf} \
@@ -663,7 +662,6 @@ _lio=		lio
 _nctgpio=	nctgpio
 _ntb=		ntb
 _ocs_fc=	ocs_fc
-_pccard=	pccard
 _qat=		qat
 _qatfw=		qatfw
 .if ${MK_OFED} != "no" || defined(ALL_MODULES)
@@ -809,7 +807,6 @@ _exca=		exca
 _ffec=		ffec
 _nvd=		nvd
 _nvme=		nvme
-_pccard=	pccard
 .endif
 
 .if ${MACHINE_ARCH:Mpowerpc64*} != ""
