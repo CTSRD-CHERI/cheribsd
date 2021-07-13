@@ -142,8 +142,10 @@ static int pointed_to;
 static void
 ipc_test_tagsend_pointer(int *fds, size_t bufferlen)
 {
-	int * __capability pointer_tosend = &pointed_to;
+	int * __capability pointer_tosend =
+	    (__cheri_tocap void * __capability)&pointed_to;
 	int * __capability pointer_received;
+	void *buffer;
 	ssize_t len;
 	pid_t pid;
 	int status;
@@ -157,14 +159,21 @@ ipc_test_tagsend_pointer(int *fds, size_t bufferlen)
 	if (bufferlen < sizeof(pointer_tosend))
 		cheribsdtest_failure_errx("buffer too small");
 
+	buffer = malloc(bufferlen);
+	if (buffer == NULL)
+		cheribsdtest_failure_err("malloc");
+	bzero(buffer, bufferlen);
+	*(void * __capability *)buffer =
+	    (__cheri_tocap void * __capability)pointer_tosend;
+
 	pid = CHERIBSDTEST_CHECK_SYSCALL(fork());
 	if (pid == 0) {
 		/*
 		 * Child process.  Perform the write and immediately exit.
 		 * The parent will hold both pipe endpoints open.
 		 */
-		len = CHERIBSDTEST_CHECK_SYSCALL(write(fds[0],
-		    &pointer_tosend, sizeof(pointer_tosend)));
+		len = CHERIBSDTEST_CHECK_SYSCALL(write(fds[0], buffer,
+		    bufferlen));
 		CHERIBSDTEST_CHECK_EQ_SIZE(len, sizeof(pointer_tosend));
 		exit(0);
 	}
@@ -188,13 +197,12 @@ ipc_test_tagsend_pointer(int *fds, size_t bufferlen)
 		    WEXITSTATUS(status));
 
 	/*
-	 *
 	 * For simplicity, assume arrives in a single read.  Should be true
 	 * in practice, but isn't really a correct assumption for IPC.
 	 */
-	len = CHERIBSDTEST_CHECK_SYSCALL(read(fds[1], &pointer_received,
-	    sizeof(pointer_received)));
+	len = CHERIBSDTEST_CHECK_SYSCALL(read(fds[1], buffer, bufferlen));
 	CHERIBSDTEST_CHECK_EQ_SIZE(len, sizeof(pointer_received));
+	pointer_received = *(void * __capability *)buffer;
 
 	/*
 	 * Bytewise comparison of visible data.
@@ -211,6 +219,7 @@ ipc_test_tagsend_pointer(int *fds, size_t bufferlen)
 
 	close(fds[0]);
 	close(fds[1]);
+	free(buffer);
 
 	/*
 	 * Tag correctly stripped by IPC transit.
