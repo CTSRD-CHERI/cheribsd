@@ -397,7 +397,10 @@ set_dbregs(struct thread *td, struct dbreg *regs)
 		addr = regs->db_breakregs[i].dbr_addr;
 		ctrl = regs->db_breakregs[i].dbr_ctrl;
 
-		/* Don't let the user set a breakpoint on a kernel address. */
+		/*
+		 * Don't let the user set a breakpoint on a kernel or
+		 * non-canonical user address.
+		 */
 		if (addr >= VM_MAXUSER_ADDRESS)
 			return (EINVAL);
 
@@ -432,7 +435,10 @@ set_dbregs(struct thread *td, struct dbreg *regs)
 		addr = regs->db_watchregs[i].dbw_addr;
 		ctrl = regs->db_watchregs[i].dbw_ctrl;
 
-		/* Don't let the user set a watchpoint on a kernel address. */
+		/*
+		 * Don't let the user set a watchpoint on a kernel or
+		 * non-canonical user address.
+		 */
 		if (addr >= VM_MAXUSER_ADDRESS)
 			return (EINVAL);
 
