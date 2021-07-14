@@ -75,6 +75,8 @@ options 	RCTL			# Resource limits
 # options 	SMP
 options 	INTRNG
 
+device		ada
+
 # RISC-V SBI console
 device		rcons
 
