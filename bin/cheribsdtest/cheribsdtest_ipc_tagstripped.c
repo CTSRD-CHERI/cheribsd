@@ -179,24 +179,6 @@ ipc_test_tagsend_pointer(int *fds, size_t bufferlen)
 	}
 
 	/*
-	 * Parent process.  Pick up the pieces from the child, who should have
-	 * written the data into the pipe, which remains fully open as we hold
-	 * references to both endpoints.
-	 *
-	 * XXXRW: Lazy.  We assume that the pipe buffer can hold our largest
-	 * test write without blocking, which would trigger a deadlock here as
-	 * we won't read until the full write has completed.  This is true in
-	 * FreeBSD, but may not universally be true.
-	 */
-	CHERIBSDTEST_CHECK_SYSCALL(waitpid(pid, &status, 0));
-	if (!WIFEXITED(status))
-		cheribsdtest_failure_errx("waitpid !WIFEXITED");
-	if (WEXITSTATUS(status) != 0)
-		cheribsdtest_failure_errx(
-		    "child returned non-zero status (%d)",
-		    WEXITSTATUS(status));
-
-	/*
 	 * For simplicity, assume arrives in a single read.  Should be true
 	 * in practice, but isn't really a correct assumption for IPC.
 	 */
@@ -220,6 +202,18 @@ ipc_test_tagsend_pointer(int *fds, size_t bufferlen)
 	close(fds[0]);
 	close(fds[1]);
 	free(buffer);
+
+	/*
+	 * Pick up the pieces from the child, which actually closes the IPC
+	 * channel on exit.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(waitpid(pid, &status, 0));
+	if (!WIFEXITED(status))
+		cheribsdtest_failure_errx("waitpid !WIFEXITED");
+	if (WEXITSTATUS(status) != 0)
+		cheribsdtest_failure_errx(
+		    "child returned non-zero status (%d)",
+		    WEXITSTATUS(status));
 
 	/*
 	 * Tag correctly stripped by IPC transit.
