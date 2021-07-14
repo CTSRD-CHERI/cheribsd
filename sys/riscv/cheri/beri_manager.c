@@ -80,12 +80,10 @@ struct berimgr_softc {
 #define	STATE_RUNNING	2
 };
 
-#if 0
 static struct resource_spec berimgr_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
 	{ -1, 0 }
 };
-#endif
 
 struct spin_entry {
 	uint64_t entry_addr;
@@ -133,28 +131,15 @@ dm_release(struct berimgr_softc *sc)
 {
 	uint64_t addr;
 
-#if 0
-	struct spin_entry *se;
-
 	if (sc->offs == 0) {
 		/* Nothing loaded */
 		return (ENXIO);
 	}
 
-	/* Release CPU 1 */
-
-	se = (struct spin_entry *)0xffffffff800fffe0;
-	bus_space_write_8(sc->bst_data, sc->bsh_data, 0x00800000, 0);
-
-	se->pir = 1;
-	mips_sync();
-	se->entry_addr = 0xffffffff90000000;
-	mips_sync();
-#endif
-
 	addr = PHYS_TO_DMAP(0xf8000000);
 	cpu_dcache_wb_range((vm_offset_t)addr, sc->offs);
 
+	/* Start secondary core. */
 	int error;
 	vm_paddr_t start_addr;
 	start_addr = pmap_kextract((vm_offset_t)mpentry);
@@ -211,31 +196,18 @@ beri_write(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	struct berimgr_softc *sc;
 	uint32_t buffer;
-	uint64_t addr;
 
 	sc = dev->si_drv1;
 
 	if (sc->state != STATE_RESET)
 		return (-1);
 
-	addr = PHYS_TO_DMAP(0xf8000000);
-
 	while (uio->uio_resid > 0) {
 		uiomove(&buffer, 4, uio);
-#if 0
 		bus_space_write_4(sc->bst_data, sc->bsh_data,
 		    sc->offs, buffer);
-#endif
-		*(volatile uint32_t *)(addr + sc->offs) = buffer;
-		wmb();
-		cpu_dcache_wbinv_range((vm_offset_t)(addr + sc->offs), 4);
 		sc->offs += 4;
 	}
-
-#if 0
-	int reg;
-	reg = bus_space_read_4(sc->bst_data, sc->bsh_data, 0);
-#endif
 
 	printf("%s: done\n", __func__);
 
@@ -298,7 +270,6 @@ berimgr_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 
-#if 0
 	if (bus_alloc_resources(dev, berimgr_spec, sc->res)) {
 		device_printf(dev, "could not allocate resources\n");
 		return (ENXIO);
@@ -307,7 +278,6 @@ berimgr_attach(device_t dev)
 	/* Memory interface */
 	sc->bst_data = rman_get_bustag(sc->res[0]);
 	sc->bsh_data = rman_get_bushandle(sc->res[0]);
-#endif
 
 	sc->mgr_cdev = make_dev(&beri_cdevsw, 0, UID_ROOT, GID_WHEEL,
 	    0600, "beri%d", device_get_unit(sc->dev));
