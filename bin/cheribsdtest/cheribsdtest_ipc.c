@@ -30,11 +30,6 @@
  */
 
 #include <sys/cdefs.h>
-
-#if !__has_feature(capabilities)
-#error "This code requires a CHERI-aware compiler"
-#endif
-
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
@@ -42,12 +37,11 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <netinet/in.h>
-
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -66,15 +60,25 @@
 
 #define	BUFFER_SIZE	8192
 
+static void
+sigalrm_handler(int signum __unused)
+{
+
+}
+
 CHERIBSDTEST(test_ipc_pipe_sleep_signal,
     "check that pipe IPC can be safely interrupted when sleeping on send")
 {
 	char buffer[BUFFER_SIZE];
+	ssize_t len;
 	int fds[2];
 
+	CHERIBSDTEST_CHECK_SYSCALL(signal(SIGALRM, sigalrm_handler));
 	CHERIBSDTEST_CHECK_SYSCALL(pipe(fds));
 	CHERIBSDTEST_CHECK_SYSCALL(alarm(1));
-	CHERIBSDTEST_CHECK_SYSCALL(write(fds[0], buffer, sizeof(buffer)));
+	len = write(fds[0], buffer, sizeof(buffer));
+	if (len < 0 && errno != EINTR)
+		cheribsdtest_failure_err("write");
 	close(fds[0]);
 	close(fds[1]);
 	cheribsdtest_success();
