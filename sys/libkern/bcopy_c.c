@@ -153,4 +153,11 @@ memcpynocap_c(void * __capability dst, const void *  __capability src,
 	return (memcpy_c(dst, cheri_andperm(src, ~CHERI_PERM_LOAD_CAP), len));
 }
 
+void
+bcopynocap_c(const void * __capability src, void * __capability dst, size_t len)
+{
+
+	memcpy_c(dst, cheri_andperm(src, ~CHERI_PERM_LOAD_CAP), len);
+}
+
 __strong_reference(memcpynocap_c, memmovenocap_c);
