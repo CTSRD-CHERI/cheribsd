@@ -460,15 +460,9 @@ struct copy_map {
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
 int	memcmp(const void *b1, const void *b2, size_t len);
 
-#if defined(KASAN)
-#define	SAN_PREFIX	kasan_
-#elif defined(KCSAN)
-#define	SAN_PREFIX	kcsan_
-#endif
-
-#ifdef SAN_PREFIX
-#define	SAN_INTERCEPTOR(func)	__CONCAT(SAN_PREFIX, func)
-
+#ifdef SAN_NEEDS_INTERCEPTORS
+#define	SAN_INTERCEPTOR(func)	\
+	__CONCAT(SAN_INTERCEPTOR_PREFIX, __CONCAT(_, func))
 void	*SAN_INTERCEPTOR(memset)(void *, int, size_t);
 void	*SAN_INTERCEPTOR(memcpy)(void *, const void *, size_t);
 void	*SAN_INTERCEPTOR(memmove)(void *, const void *, size_t);
@@ -482,15 +476,15 @@ int	SAN_INTERCEPTOR(memcmp)(const void *, const void *, size_t);
 #define memmove(dest, src, n)	SAN_INTERCEPTOR(memmove)((dest), (src), (n))
 #define memcmp(b1, b2, len)	SAN_INTERCEPTOR(memcmp)((b1), (b2), (len))
 #endif /* !SAN_RUNTIME */
-#else
-#define bcopy(from, to, len) __builtin_memmove((to), (from), (len))
-#define bzero(buf, len) __builtin_memset((buf), 0, (len))
-#define bcmp(b1, b2, len) __builtin_memcmp((b1), (b2), (len))
-#define memset(buf, c, len) __builtin_memset((buf), (c), (len))
-#define memcpy(to, from, len) __builtin_memcpy((to), (from), (len))
-#define memmove(dest, src, n) __builtin_memmove((dest), (src), (n))
-#define memcmp(b1, b2, len) __builtin_memcmp((b1), (b2), (len))
-#endif /* !SAN_PREFIX */
+#else /* !SAN_NEEDS_INTERCEPTORS */
+#define bcopy(from, to, len)	__builtin_memmove((to), (from), (len))
+#define bzero(buf, len)		__builtin_memset((buf), 0, (len))
+#define bcmp(b1, b2, len)	__builtin_memcmp((b1), (b2), (len))
+#define memset(buf, c, len)	__builtin_memset((buf), (c), (len))
+#define memcpy(to, from, len)	__builtin_memcpy((to), (from), (len))
+#define memmove(dest, src, n)	__builtin_memmove((dest), (src), (n))
+#define memcmp(b1, b2, len)	__builtin_memcmp((b1), (b2), (len))
+#endif /* SAN_NEEDS_INTERCEPTORS */
 
 void	*memset_early(void * _Nonnull buf, int c, size_t len);
 #define bzero_early(buf, len) memset_early((buf), 0, (len))
@@ -544,7 +538,7 @@ int	copyoutcap_nofault(
 #define	copyoutcap_nofault	copyout_nofault
 #endif
 
-#ifdef SAN_PREFIX
+#ifdef SAN_NEEDS_INTERCEPTORS
 int	SAN_INTERCEPTOR(copyin)(const void *, void *, size_t);
 int	SAN_INTERCEPTOR(copyinstr)(const void *, void *, size_t, size_t *);
 int	SAN_INTERCEPTOR(copyout)(const void *, void *, size_t);
@@ -553,7 +547,7 @@ int	SAN_INTERCEPTOR(copyout)(const void *, void *, size_t);
 #define	copyinstr(u, k, l, lc)	SAN_INTERCEPTOR(copyinstr)((u), (k), (l), (lc))
 #define	copyout(k, u, l)	SAN_INTERCEPTOR(copyout)((k), (u), (l))
 #endif /* !SAN_RUNTIME */
-#endif /* SAN_PREFIX */
+#endif /* SAN_NEEDS_INTERCEPTORS */
 
 int	fubyte(volatile const void * __capability base);
 long	fuword(volatile const void * __capability base);
