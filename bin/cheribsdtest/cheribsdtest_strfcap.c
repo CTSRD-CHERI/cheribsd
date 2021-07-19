@@ -105,6 +105,14 @@ test_strfcap_C_cap_one(void * __capability p, int expected_tokens,
 			    descr);
 		permsp++;
 	}
+#ifdef __aarch64__
+	if ((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) != 0) {
+		if (*permsp != 'E')
+			cheribsdtest_failure_errx("Missing 'E' permission for %s",
+			    descr);
+		permsp++;
+	}
+#endif
 	if (*permsp != '\0')
 		cheribsdtest_failure_errx("Extra permissions '%s' for %s", permsp,
 		    descr);
