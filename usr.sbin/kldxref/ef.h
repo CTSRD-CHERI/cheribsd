@@ -3,6 +3,10 @@
 #ifndef _EF_H_
 #define _EF_H_
 
+#if __has_feature(capabilities)
+#include <cheri_init_globals.h>
+#endif
+
 #define	EFT_KLD		1
 #define	EFT_KERNEL	2
 #if __has_feature(capabilities)
@@ -36,6 +40,18 @@
     (ef)->ef_ops->lookup_set((ef)->ef_ef, name, startp, stopp, countp)
 #define EF_LOOKUP_SYMBOL(ef, name, sym) \
     (ef)->ef_ops->lookup_symbol((ef)->ef_ef, name, sym)
+
+#if __has_feature(capabilities)
+#if defined(__riscv)
+#define	HAS_CAPRELOCS 1
+#define	DT_CAPRELOCS DT_RISCV_CHERI___CAPRELOCS
+#define	DT_CAPRELOCSSZ DT_RISCV_CHERI___CAPRELOCSSZ
+#elif defined(__mips__)
+#define	HAS_CAPRELOCS 1
+#define	DT_CAPRELOCS DT_MIPS_CHERI___CAPRELOCS
+#define	DT_CAPRELOCSSZ DT_MIPS_CHERI___CAPRELOCSSZ
+#endif
+#endif
 
 /* XXX, should have a different name. */
 typedef struct ef_file *elf_file_t;
@@ -71,6 +87,10 @@ int ef_open(const char *filename, struct elf_file *ef, int verbose);
 int ef_obj_open(const char *filename, struct elf_file *ef, int verbose);
 int ef_reloc(struct elf_file *ef, const void *reldata, int reltype,
     Elf_Off relbase, Elf_Off dataoff, size_t len, void *dest);
+#ifdef HAS_CAPRELOCS
+int ef_capreloc(struct elf_file *ef, const struct capreloc *cr, Elf_Off relbase,
+    Elf_Off dataoff, size_t len, void *dest);
+#endif
 __END_DECLS
 
 #endif /* _EF_H_*/
