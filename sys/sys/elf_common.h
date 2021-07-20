@@ -1395,10 +1395,6 @@ enum MipsCheriFlags {
 #define	R_RISCV_RVC_BRANCH	44
 #define	R_RISCV_RVC_JUMP	45
 #define	R_RISCV_RVC_LUI		46
-#define	R_RISCV_GPREL_I		47
-#define	R_RISCV_GPREL_S		48
-#define	R_RISCV_TPREL_I		49
-#define	R_RISCV_TPREL_S		50
 #define	R_RISCV_RELAX		51
 #define	R_RISCV_SUB6		52
 #define	R_RISCV_SET6		53
