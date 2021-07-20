@@ -287,8 +287,12 @@ typedef UINT64                          ACPI_PHYSICAL_ADDRESS;
  *
  * Note: EM64T and other X86-64 processors support misaligned transfers,
  * so there is no need to define this flag.
+ *
+ * On CHERI we also disable this as a handful of structs in acrestyp.h store
+ * pointers. If we had something more granular than this macro we could pack
+ * all the others.
  */
-#if defined (__IA64__) || defined (__ia64__)
+#if defined (__IA64__) || defined (__ia64__) || defined(__CHERI_PURE_CAPABILITY__)
 #define ACPI_MISALIGNMENT_NOT_SUPPORTED
 #endif
 

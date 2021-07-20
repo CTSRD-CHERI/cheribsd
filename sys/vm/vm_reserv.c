@@ -685,7 +685,7 @@ vm_reserv_alloc_contig(vm_object_t object, vm_pindex_t pindex, int domain,
 		/* Handle reclaim race. */
 		if (rv->object != object)
 			goto out;
-		m = vm_page_array_slice(&rv->pages[index], npages);
+		m = &rv->pages[index];
 		pa = VM_PAGE_TO_PHYS(m);
 		if (pa < low || pa + size > high ||
 		    (pa & (alignment - 1)) != 0 ||
@@ -817,7 +817,7 @@ out:
 		first += VM_LEVEL_0_NPAGES;
 		allocpages -= VM_LEVEL_0_NPAGES;
 	} while (allocpages >= VM_LEVEL_0_NPAGES);
-	return (vm_page_array_slice(m_ret, npages));
+	return (m_ret);
 }
 
 /*
@@ -857,7 +857,7 @@ vm_reserv_alloc_page(vm_object_t object, vm_pindex_t pindex, int domain,
 		domain = rv->domain;
 		vmd = VM_DOMAIN(domain);
 		index = VM_RESERV_INDEX(object, pindex);
-		m = vm_page_array_slice(&rv->pages[index], 1);
+		m = &rv->pages[index];
 		vm_reserv_lock(rv);
 		/* Handle reclaim race. */
 		if (rv->object != object ||
@@ -942,7 +942,7 @@ out:
 	vm_reserv_populate(rv, index);
 	vm_reserv_unlock(rv);
 
-	return (vm_page_array_slice(&rv->pages[index], 1));
+	return (&rv->pages[index]);
 }
 
 /*
@@ -992,9 +992,7 @@ vm_reserv_break(vm_reserv_t rv)
 			else {
 				hi = NBPOPMAP * i + bitpos;
 				vm_domain_free_lock(VM_DOMAIN(rv->domain));
-				vm_phys_enqueue_contig(
-				    vm_page_array_slice(&rv->pages[lo], hi - lo),
-				    hi - lo);
+				vm_phys_enqueue_contig(&rv->pages[lo], hi - lo);
 				vm_domain_free_unlock(VM_DOMAIN(rv->domain));
 				lo = hi;
 			}
@@ -1105,8 +1103,7 @@ vm_reserv_init(void)
 		    (seg->start >> VM_LEVEL_0_SHIFT);
 		while (paddr + VM_LEVEL_0_SIZE > paddr && paddr +
 		    VM_LEVEL_0_SIZE <= seg->end) {
-			rv->pages = vm_page_array_slice(
-			    PHYS_TO_VM_PAGE_UNBOUND(paddr), VM_LEVEL_0_NPAGES);
+			rv->pages = PHYS_TO_VM_PAGE(paddr);
 			rv->domain = seg->domain;
 			mtx_init(&rv->lock, "vm reserv", NULL, MTX_DEF);
 			paddr += VM_LEVEL_0_SIZE;

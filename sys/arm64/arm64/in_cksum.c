@@ -105,7 +105,7 @@ in_cksumdata(const void *buf, int len)
 
 	if ((offset = 3 & (long) lw) != 0) {
 		const u_int32_t *masks = in_masks + (offset << 2);
-		lw = (u_int32_t *) (((long) lw) - offset);
+		lw = (u_int32_t *) (((uintptr_t) lw) - offset);
 		sum = *lw++ & masks[len >= 3 ? 3 : len];
 		len -= 4 - offset;
 		if (len <= 0) {
@@ -239,3 +239,12 @@ u_int in_cksum_hdr(const struct ip *ip)
     REDUCE16;
     return (~sum & 0xffff);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20210407,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

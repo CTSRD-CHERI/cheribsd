@@ -116,7 +116,7 @@ static int
 fpga_write(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	struct fpgamgr_s10_softc *sc;
-	vm_offset_t addr;
+	vm_pointer_t addr;
 	int amnt;
 
 	sc = dev->si_drv1;
@@ -288,3 +288,12 @@ static devclass_t fpgamgr_s10_devclass;
 
 DRIVER_MODULE(fpgamgr_s10, simplebus, fpgamgr_s10_driver,
     fpgamgr_s10_devclass, 0, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20210407,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

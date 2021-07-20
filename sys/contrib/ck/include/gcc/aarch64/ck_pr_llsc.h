@@ -32,6 +32,8 @@
 #error Do not include this file directly, use ck_pr.h
 #endif
 
+#include <ck_md.h>
+
 CK_CC_INLINE static bool
 ck_pr_cas_64_2_value(uint64_t target[2], uint64_t compare[2], uint64_t set[2], uint64_t value[2])
 {
@@ -51,12 +53,45 @@ ck_pr_cas_64_2_value(uint64_t target[2], uint64_t compare[2], uint64_t set[2], u
                              "mov %w0, #1;"
                              "2:"
                              : "=&r" (tmp1), "=&r" (tmp2), "=&r" (value[0]), "=&r" (value[1])
-                             : "r" (target), "r" (compare[0]), "r" (compare[1]), "r" (set[0]), "r" (set[1])
+                             : CK_MD_ATOMIC_PTR_CONSTR (target),
+                              "r" (compare[0]), "r" (compare[1]), "r" (set[0]), "r" (set[1])
                              : "cc", "memory");
 
         return (tmp1);
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+CK_CC_INLINE static bool
+ck_pr_cas_ptr_2_value(void *target, void *compare, void *set, void *value)
+{
+        uintptr_t *cmpp = compare;
+        uintptr_t *setp = set;
+        uintptr_t *valuep = value;
+        void *tmp1, *tmp2;
+        int ret;
+
+        __asm__ __volatile__("1:"
+                             "ldxp %1, %2, [%5];"
+                             "mov %3, %1;"
+                             "mov %4, %2;"
+                             "mov %w0, #0;"
+                             "cmp %1, %6;"
+                             "b.ne 2f;"
+                             "cmp %2, %7;"
+                             "b.ne 2f;"
+                             "stxp %w0, %8, %9, [%5];"
+                             "cbnz %w0, 1b;"
+                             "mov %w0, #1;"
+                             "2:"
+                             : "=&r" (ret), "=&C" (tmp1), "=&C" (tmp2),
+                               "=&C" (valuep[0]), "=&C" (valuep[1])
+                             : "C" (target), "C" (cmpp[0]), "C" (cmpp[1]),
+                               "C" (setp[0]), "C" (setp[1])
+                             : "cc", "memory");
+
+        return (ret);
+}
+#else
 CK_CC_INLINE static bool
 ck_pr_cas_ptr_2_value(void *target, void *compare, void *set, void *value)
 {
@@ -65,6 +100,7 @@ ck_pr_cas_ptr_2_value(void *target, void *compare, void *set, void *value)
                                    CK_CPP_CAST(uint64_t *, set),
                                    CK_CPP_CAST(uint64_t *, value)));
 }
+#endif
 
 CK_CC_INLINE static bool
 ck_pr_cas_64_2(uint64_t target[2], uint64_t compare[2], uint64_t set[2])
@@ -83,11 +119,41 @@ ck_pr_cas_64_2(uint64_t target[2], uint64_t compare[2], uint64_t set[2])
                              "mov %w0, #1;"
                              "2:"
                              : "=&r" (tmp1), "=&r" (tmp2)
-                             : "r" (target), "r" (compare[0]), "r" (compare[1]), "r" (set[0]), "r" (set[1])
+                             : CK_MD_ATOMIC_PTR_CONSTR (target), "r" (compare[0]),
+                               "r" (compare[1]), "r" (set[0]), "r" (set[1])
                              : "cc", "memory");
 
         return (tmp1);
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+CK_CC_INLINE static bool
+ck_pr_cas_ptr_2(void *target, void *compare, void *set)
+{
+        uintptr_t *cmpp = compare;
+        uintptr_t *setp = set;
+        void *tmp1, *tmp2;
+        int ret;
+
+        __asm__ __volatile__("1:"
+                             "ldxp %1, %2, [%3];"
+                             "mov %w0, #0;"
+                             "cmp %1, %4;"
+                             "b.ne 2f;"
+                             "cmp %2, %5;"
+                             "b.ne 2f;"
+                             "stxp %w0, %6, %7, [%3];"
+                             "cbnz %w0, 1b;"
+                             "mov %w0, #1;"
+                             "2:"
+                             : "=&r" (ret), "=&C" (tmp1), "=&C" (tmp2)
+                             : "C" (target), "C" (cmpp[0]), "C" (cmpp[1]),
+                               "C" (setp[0]), "C" (setp[1])
+                             : "cc", "memory");
+
+        return (ret);
+}
+#else
 CK_CC_INLINE static bool
 ck_pr_cas_ptr_2(void *target, void *compare, void *set)
 {
@@ -95,14 +161,15 @@ ck_pr_cas_ptr_2(void *target, void *compare, void *set)
                              CK_CPP_CAST(uint64_t *, compare),
                              CK_CPP_CAST(uint64_t *, set)));
 }
+#endif
 
 
-#define CK_PR_CAS(N, M, T, W, R)					\
+#define CK_PR_CAS(N, M, T, W, R, C)					\
         CK_CC_INLINE static bool					\
         ck_pr_cas_##N##_value(M *target, T compare, T set, M *value)	\
         {								\
                 T previous;						\
-                T tmp;							\
+                int tmp;						\
                 __asm__ __volatile__("1:"				\
                                      "ldxr" W " %" R "0, [%2];"		\
                                      "cmp  %" R "0, %" R "4;"		\
@@ -110,11 +177,11 @@ ck_pr_cas_ptr_2(void *target, void *compare, void *set)
                                      "stxr" W " %w1, %" R "3, [%2];"	\
                                      "cbnz %w1, 1b;"			\
                                      "2:"				\
-                    : "=&r" (previous),					\
-                    "=&r" (tmp)						\
-                    : "r"   (target),					\
-                    "r"   (set),					\
-                    "r"   (compare)					\
+                    : "=&"C (previous),					\
+                      "=&r" (tmp)					\
+                    : CK_MD_ATOMIC_PTR_CONSTR (target),			\
+                      C (set),						\
+                      C (compare)					\
                     : "memory", "cc");					\
                 *(T *)value = previous;					\
                 return (previous == compare);				\
@@ -123,7 +190,7 @@ ck_pr_cas_ptr_2(void *target, void *compare, void *set)
         ck_pr_cas_##N(M *target, T compare, T set)			\
         {								\
                 T previous;						\
-                T tmp;							\
+                int tmp;						\
                 __asm__ __volatile__(					\
                                      "1:"				\
                                      "ldxr" W " %" R "0, [%2];"		\
@@ -132,18 +199,18 @@ ck_pr_cas_ptr_2(void *target, void *compare, void *set)
                                      "stxr" W " %w1, %" R "3, [%2];"	\
                                      "cbnz %w1, 1b;"			\
                                      "2:"				\
-                    : "=&r" (previous),					\
-                    "=&r" (tmp)						\
-                    : "r"   (target),					\
-                    "r"   (set),					\
-                    "r"   (compare)					\
+                    : "=&"C (previous),					\
+                      "=&r" (tmp)					\
+                    : CK_MD_ATOMIC_PTR_CONSTR (target),			\
+                      C (set),						\
+                      C (compare)					\
                     : "memory", "cc");					\
                 return (previous == compare);				\
         }
 
-CK_PR_CAS(ptr, void, void *, "", "")
+CK_PR_CAS(ptr, void, void *, "", "", CK_MD_ATOMIC_PTR_CONSTR)
 
-#define CK_PR_CAS_S(N, M, W, R)	CK_PR_CAS(N, M, M, W, R)
+#define CK_PR_CAS_S(N, M, W, R)	CK_PR_CAS(N, M, M, W, R, "r")
 CK_PR_CAS_S(64, uint64_t, "", "")
 #ifndef CK_PR_DISABLE_DOUBLE
 CK_PR_CAS_S(double, double, "", "")
@@ -160,66 +227,100 @@ CK_PR_CAS_S(char, char, "b", "w")
 #undef CK_PR_CAS_S
 #undef CK_PR_CAS
 
-#define CK_PR_FAS(N, M, T, W, R)				\
+#define CK_PR_FAS(N, M, T, W, R, C)				\
         CK_CC_INLINE static T					\
         ck_pr_fas_##N(M *target, T v)				\
         {							\
                 T previous;					\
-                T tmp;						\
+                int tmp;					\
                 __asm__ __volatile__("1:"			\
-                                     "ldxr" W " %" R "0, [%2];"	\
+                                     "ldxr" W " %" R "0, [%2];" \
                                      "stxr" W " %w1, %" R "3, [%2];"\
                                      "cbnz %w1, 1b;"		\
-                                        : "=&r" (previous),	\
-                                          "=&r" (tmp) 		\
-                                        : "r"   (target),	\
-                                          "r"   (v)		\
+                                        : "=&"C (previous),	\
+                                          "=&r" (tmp)		\
+                                        : CK_MD_ATOMIC_PTR_CONSTR (target),	\
+                                        C (v)			\
                                         : "memory", "cc");	\
                 return (previous);				\
         }
 
-CK_PR_FAS(64, uint64_t, uint64_t, "", "")
-CK_PR_FAS(32, uint32_t, uint32_t, "", "w")
-CK_PR_FAS(ptr, void, void *, "", "")
-CK_PR_FAS(int, int, int, "", "w")
-CK_PR_FAS(uint, unsigned int, unsigned int, "", "w")
-CK_PR_FAS(16, uint16_t, uint16_t, "h", "w")
-CK_PR_FAS(8, uint8_t, uint8_t, "b", "w")
-CK_PR_FAS(short, short, short, "h", "w")
-CK_PR_FAS(char, char, char, "b", "w")
+#define CK_PR_FAS_REG(N, M, T, W, R) CK_PR_FAS(N, M, T, W, R, "r")
 
+CK_PR_FAS_REG(64, uint64_t, uint64_t, "", "")
+CK_PR_FAS_REG(32, uint32_t, uint32_t, "", "w")
+CK_PR_FAS(ptr, void, void *, "", "", CK_MD_ATOMIC_PTR_CONSTR)
+CK_PR_FAS_REG(int, int, int, "", "w")
+CK_PR_FAS_REG(uint, unsigned int, unsigned int, "", "w")
+CK_PR_FAS_REG(16, uint16_t, uint16_t, "h", "w")
+CK_PR_FAS_REG(8, uint8_t, uint8_t, "b", "w")
+CK_PR_FAS_REG(short, short, short, "h", "w")
+CK_PR_FAS_REG(char, char, char, "b", "w")
 
+#undef CK_PR_FAS_REG
 #undef CK_PR_FAS
 
-#define CK_PR_UNARY(O, N, M, T, I, W, R)			\
+#define CK_PR_UNARY(O, N, M, T, I, W, R, C)			\
         CK_CC_INLINE static void				\
         ck_pr_##O##_##N(M *target)				\
         {							\
                 T previous = 0;					\
-                T tmp = 0;					\
+                int tmp = 0;					\
                 __asm__ __volatile__("1:"			\
                                      "ldxr" W " %" R "0, [%2];"	\
                                       I ";"			\
                                      "stxr" W " %w1, %" R "0, [%2];"	\
                                      "cbnz %w1, 1b;"		\
-                                        : "=&r" (previous),	\
+                                        : "=&"C (previous),	\
                                           "=&r" (tmp)		\
-                                        : "r"   (target)	\
+                                        : CK_MD_ATOMIC_PTR_CONSTR (target)	\
                                         : "memory", "cc");	\
                 return;						\
         }
 
-CK_PR_UNARY(inc, ptr, void, void *, "add %0, %0, #1", "", "")
-CK_PR_UNARY(dec, ptr, void, void *, "sub %0, %0, #1", "", "")
-CK_PR_UNARY(not, ptr, void, void *, "mvn %0, %0", "", "")
-CK_PR_UNARY(inc, 64, uint64_t, uint64_t, "add %0, %0, #1", "", "")
-CK_PR_UNARY(dec, 64, uint64_t, uint64_t, "sub %0, %0, #1", "", "")
-CK_PR_UNARY(not, 64, uint64_t, uint64_t, "mvn %0, %0", "", "")
+CK_PR_UNARY(inc, ptr, void, void *, "add %0, %0, #1", "", "",
+        CK_MD_ATOMIC_PTR_CONSTR)
+CK_PR_UNARY(dec, ptr, void, void *, "sub %0, %0, #1", "", "",
+        CK_MD_ATOMIC_PTR_CONSTR)
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Bitwise NOT on a pointer value is weird. This should arguably not
+ * exist. In CHERI we create a NULL-derived capability with the
+ * cursor set to the bitwise NOT of the address value.
+ */
+CK_CC_INLINE static void
+ck_pr_not_ptr(void *target)
+{
+        void *previous = NULL;
+        ptraddr_t tmp2;
+        int tmp1 = 0;
+
+        __asm__ __volatile__("1:"
+                             "ldxr %0, [%3];"
+                             "gcvalue %2, %0;"
+                             "mov %0, czr;"
+                             "mvn %2, %2;"
+                             "scvalue %0, %2;"
+                             "stxr %w1, %0, [%3];"
+                             "cbnz %w1, 1b;"
+                             : "=&C" (previous),
+                               "=&r" (tmp1),
+                               "=&r" (tmp2)
+                             : "C" (target)
+                             : "memory", "cc");
+        return;
+}
+#else
+CK_PR_UNARY(not, ptr, void, void *, "mvn %0, %0", "", "", "r")
+#endif
+CK_PR_UNARY(inc, 64, uint64_t, uint64_t, "add %0, %0, #1", "", "", "r")
+CK_PR_UNARY(dec, 64, uint64_t, uint64_t, "sub %0, %0, #1", "", "", "r")
+CK_PR_UNARY(not, 64, uint64_t, uint64_t, "mvn %0, %0", "", "", "r")
 
 #define CK_PR_UNARY_S(S, T, W)					\
-        CK_PR_UNARY(inc, S, T, T, "add %w0, %w0, #1", W, "w")	\
-        CK_PR_UNARY(dec, S, T, T, "sub %w0, %w0, #1", W, "w")	\
-        CK_PR_UNARY(not, S, T, T, "mvn %w0, %w0", W, "w")	\
+        CK_PR_UNARY(inc, S, T, T, "add %w0, %w0, #1", W, "w", "r")	\
+        CK_PR_UNARY(dec, S, T, T, "sub %w0, %w0, #1", W, "w", "r")	\
+        CK_PR_UNARY(not, S, T, T, "mvn %w0, %w0", W, "w", "r")	\
 
 CK_PR_UNARY_S(32, uint32_t, "")
 CK_PR_UNARY_S(uint, unsigned int, "")
@@ -237,7 +338,7 @@ CK_PR_UNARY_S(char, char, "b")
         ck_pr_##O##_##N(M *target, T delta)			\
         {							\
                 T previous;					\
-                T tmp;						\
+                int tmp;					\
                 __asm__ __volatile__("1:"			\
                                      "ldxr" W " %" R "0, [%2];"\
                                       I " %" R "0, %" R "0, %" R "3;"	\
@@ -245,17 +346,48 @@ CK_PR_UNARY_S(char, char, "b")
                                      "cbnz %w1, 1b;"		\
                                         : "=&r" (previous),	\
                                           "=&r" (tmp)		\
-                                        : "r"   (target),	\
-                                          "r"   (delta)		\
+                                        : CK_MD_ATOMIC_PTR_CONSTR (target),	\
+                                          "r" (delta)		\
                                         : "memory", "cc");	\
                 return;						\
         }
 
-CK_PR_BINARY(and, ptr, void, uintptr_t, "and", "", "")
-CK_PR_BINARY(add, ptr, void, uintptr_t, "add", "", "")
-CK_PR_BINARY(or, ptr, void, uintptr_t, "orr", "", "")
-CK_PR_BINARY(sub, ptr, void, uintptr_t, "sub", "", "")
-CK_PR_BINARY(xor, ptr, void, uintptr_t, "eor", "", "")
+#ifdef __CHERI_PURE_CAPABILITY__
+#define CK_PR_BINARY_PTR(O, M, T, I, W, R)			\
+        CK_CC_INLINE static void				\
+        ck_pr_##O##_ptr(void *target, uintptr_t delta)		\
+        {							\
+                uintptr_t previous;				\
+                ptraddr_t tmp1, tmp2;				\
+                int res;					\
+                __asm__ __volatile__("1:"			\
+                                     "ldxr %0, [%4];"		\
+                                     "gcvalue %2, %0;"		\
+                                     "gcvalue %3, %5;"		\
+                                     I " %2, %2, %3;"		\
+                                     "scvalue %0, %2;"		\
+                                     "stxr %w1, %0, [%4];"	\
+                                     "cbnz %w1, 1b;"		\
+                                        : "=&C" (previous),	\
+                                          "=&r" (res),		\
+                                          "=&r" (tmp1),		\
+                                          "=&r" (tmp2)		\
+                                        : "C" (target),		\
+                                          "C" (delta)		\
+                                        : "memory", "cc");	\
+                return;						\
+}
+#else
+#define CK_PR_BINARY_PTR(O, M, T, I, W, R)			\
+        CK_PR_BINARY(O, ptr, M, T, I, W, R)
+#endif
+
+CK_PR_BINARY_PTR(and, void, uintptr_t, "and", "", "")
+CK_PR_BINARY_PTR(add, void, uintptr_t, "add", "", "")
+CK_PR_BINARY_PTR(or, void, uintptr_t, "orr", "", "")
+CK_PR_BINARY_PTR(sub, void, uintptr_t, "sub", "", "")
+CK_PR_BINARY_PTR(xor, void, uintptr_t, "eor", "", "")
+
 CK_PR_BINARY(and, 64, uint64_t, uint64_t, "and", "", "")
 CK_PR_BINARY(add, 64, uint64_t, uint64_t, "add", "", "")
 CK_PR_BINARY(or, 64, uint64_t, uint64_t, "orr", "", "")
@@ -277,24 +409,26 @@ CK_PR_BINARY_S(8, uint8_t, "b")
 CK_PR_BINARY_S(short, short, "h")
 CK_PR_BINARY_S(char, char, "b")
 
+#undef CK_PR_BINARY_PTR
 #undef CK_PR_BINARY_S
 #undef CK_PR_BINARY
 
 CK_CC_INLINE static void *
 ck_pr_faa_ptr(void *target, uintptr_t delta)
 {
-        uintptr_t previous, r, tmp;
+        uintptr_t previous, r;
+        int tmp;
 
         __asm__ __volatile__("1:"
                              "ldxr %0, [%3];"
                              "add %1, %4, %0;"
                              "stxr %w2, %1, [%3];"
                              "cbnz %w2, 1b;"
-                                : "=&r" (previous),
-                                  "=&r" (r),
+                                : "=&" CK_MD_ATOMIC_PTR_CONSTR (previous),
+                                  "=&" CK_MD_ATOMIC_PTR_CONSTR (r),
                                   "=&r" (tmp)
-                                : "r"   (target),
-                                  "r"   (delta)
+                                : CK_MD_ATOMIC_PTR_CONSTR (target),
+                                  CK_MD_ATOMIC_PTR_CONSTR (delta)
                                 : "memory", "cc");
 
         return (void *)(previous);
@@ -313,7 +447,7 @@ ck_pr_faa_64(uint64_t *target, uint64_t delta)
                                 : "=&r" (previous),
                                   "=&r" (r),
                                   "=&r" (tmp)
-                                : "r"   (target),
+                                : CK_MD_ATOMIC_PTR_CONSTR (target),
                                   "r"   (delta)
                                 : "memory", "cc");
 
@@ -333,7 +467,7 @@ ck_pr_faa_64(uint64_t *target, uint64_t delta)
                                         : "=&r" (previous),		\
                                           "=&r" (r),			\
                                           "=&r" (tmp)			\
-                                        : "r"   (target),		\
+                                        : CK_MD_ATOMIC_PTR_CONSTR (target),	\
                                           "r"   (delta)			\
                                         : "memory", "cc");		\
                 return (previous);					\

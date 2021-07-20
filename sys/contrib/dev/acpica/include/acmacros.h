@@ -351,15 +351,19 @@
                                                 (((ACPI_SIZE) boundary)-1)) & \
                                                 (~(((ACPI_SIZE) boundary)-1)))
 
-/* Note: sizeof(ACPI_SIZE) evaluates to either 4 or 8 (32- vs 64-bit mode) */
+/*
+ * Note: sizeof(ACPI_UINTPTR_T) evaluates to either 4 or 8 (32- vs 64-bit mode)
+ * on non-CHERI architectures, and either 8 or 16 (32- vs 64-bit mode) on CHERI
+ * architectures.
+ */
 
 #define ACPI_ROUND_DOWN_TO_32BIT(a)         ACPI_ROUND_DOWN(a, 4)
 #define ACPI_ROUND_DOWN_TO_64BIT(a)         ACPI_ROUND_DOWN(a, 8)
-#define ACPI_ROUND_DOWN_TO_NATIVE_WORD(a)   ACPI_ROUND_DOWN(a, sizeof(ACPI_SIZE))
+#define ACPI_ROUND_DOWN_TO_NATIVE_WORD(a)   ACPI_ROUND_DOWN(a, sizeof(ACPI_UINTPTR_T))
 
 #define ACPI_ROUND_UP_TO_32BIT(a)           ACPI_ROUND_UP(a, 4)
 #define ACPI_ROUND_UP_TO_64BIT(a)           ACPI_ROUND_UP(a, 8)
-#define ACPI_ROUND_UP_TO_NATIVE_WORD(a)     ACPI_ROUND_UP(a, sizeof(ACPI_SIZE))
+#define ACPI_ROUND_UP_TO_NATIVE_WORD(a)     ACPI_ROUND_UP(a, sizeof(ACPI_UINTPTR_T))
 
 #define ACPI_ROUND_BITS_UP_TO_BYTES(a)      ACPI_DIV_8((a) + 7)
 #define ACPI_ROUND_BITS_DOWN_TO_BYTES(a)    ACPI_DIV_8((a))

@@ -45,7 +45,7 @@ jobProperties.add(parameters([
         text(defaultValue: allArchitectures.join('\n'),
              description: 'The architectures (cheribuild suffixes) to build for (one per line)',
              name: 'architectures'),
-        text(defaultValue: ["riscv64-hybrid", "riscv64-purecap"].join('\n'),
+        text(defaultValue: ["riscv64-hybrid", "riscv64-purecap", "morello-hybrid", "morello-purecap"].join('\n'),
              description: 'The architectures (cheribuild suffixes) to build a purecap kernel for (one per line)',
              name: 'purecapKernelArchitectures'),
 ]))
@@ -110,12 +110,6 @@ def buildImage(params, String suffix) {
 }
 
 def runTests(params, String suffix) {
-    if (suffix.startsWith("morello")) {
-        echo("Can't run tests on the FVP yet!")
-        return
-    }
-
-    // TODO: run full testsuite (ideally in parallel)
     def testExtraArgs = ['--no-timestamped-test-subdir']
     if (GlobalVars.isTestSuiteJob) {
         testExtraArgs += [
@@ -130,7 +124,8 @@ def runTests(params, String suffix) {
     stage("Test setup") {
         // copy qemu archive and run directly on the host
         dir("qemu-${params.buildOS}") { deleteDir() }
-        copyArtifacts projectName: "qemu/qemu-cheri", filter: "qemu-${params.buildOS}/**", target: '.',
+        def qemuProject = suffix.contains('morello') ? 'qemu/qemu-morello-merged' : 'qemu/qemu-cheri'
+        copyArtifacts projectName: qemuProject, filter: "qemu-${params.buildOS}/**", target: '.',
                       fingerprintArtifacts: false
         sh label: 'generate SSH key',
            script: 'test -e $WORKSPACE/id_ed25519 || ssh-keygen -t ed25519 -N \'\' -f $WORKSPACE/id_ed25519 < /dev/null'

@@ -43,6 +43,7 @@
  */
 
 #include <sys/types.h>
+#include <cheri/cheric.h>
 #include <machine/elf.h>
 
 #include <err.h>
@@ -109,3 +110,20 @@ ef_reloc(struct elf_file *ef, const void *reldata, int reltype, Elf_Off relbase,
 	}
 	return (0);
 }
+
+#if __has_feature(capabilities)
+int
+ef_capreloc(struct elf_file *ef, const struct capreloc *cr, Elf_Off relbase,
+    Elf_Off dataoff, size_t len, void *dest)
+{
+	void * __capability *where;
+
+	where = (void * __capability *)((char *)dest + relbase +
+	    cr->capability_location - dataoff);
+
+	if ((char *)where < (char *)dest || (char *)where >= (char *)dest + len)
+		return (0);
+	*where = cheri_fromint(relbase + cr->object + cr->offset);
+	return (0);
+}
+#endif

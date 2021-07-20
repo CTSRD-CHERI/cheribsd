@@ -4232,17 +4232,24 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 	if (__predict_false(cheri_getsealed(item)))
 		panic("Expect unsealed capability");
 	/*
-	 * XXX-AM: pcpu zones may legitimately free() the whole
-	 * pcpu chunk allocation or just the item for a single cpu?
+	 * XXX-AM: Only check non-cache zones as the caches for
+	 * vm_page_t objects have very large bounds from the
+	 * vm_page_array.
 	 */
-	if ((zone->uz_flags & UMA_ZONE_PCPU) == 0)
-		expected_size = zone->uz_size;
-	else
-		expected_size = zone->uz_keg->uk_ppera * PAGE_SIZE;
-	if (__predict_false(cheri_getlen(item) != expected_size))
-		panic("UMA zone %s invalid bounds: expected %zx "
-		      "found %zx", zone->uz_name, expected_size,
-		      cheri_getlen(item));
+	if ((zone->uz_flags & UMA_ZFLAG_CACHE) == 0) {
+		/*
+		 * XXX-AM: pcpu zones may legitimately free() the whole
+		 * pcpu chunk allocation or just the item for a single cpu?
+		 */
+		if ((zone->uz_flags & UMA_ZONE_PCPU) == 0)
+			expected_size = zone->uz_size;
+		else
+			expected_size = zone->uz_keg->uk_ppera * PAGE_SIZE;
+		if (__predict_false(cheri_getlen(item) != expected_size))
+			panic("UMA zone %s invalid bounds: expected %zx "
+			      "found %zx", zone->uz_name, expected_size,
+			      cheri_getlen(item));
+	}
 #endif
 
 	/*

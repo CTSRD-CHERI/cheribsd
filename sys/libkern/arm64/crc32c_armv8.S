@@ -27,7 +27,8 @@
 
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$");
-.arch armv8-a+crc
+
+.arch_extension crc
 
 /*
  * uint32_t
@@ -38,41 +39,41 @@ ENTRY(armv8_crc32c)
 	cbz	w2, end
 	tbz	x1, #0x0, half_word_aligned
 	sub	w2, w2, 0x1
-	ldr	w10, [x1], #0x1
+	ldr	w10, [PTR(1)], #0x1
 	crc32cb	w0, w0, w10
 half_word_aligned:
 	cmp	w2, #0x2
 	b.lo	last_byte
 	tbz	x1, #0x1, word_aligned
 	sub	w2, w2, 0x2
-	ldr	w10, [x1], #0x2
+	ldr	w10, [PTR(1)], #0x2
 	crc32ch	w0, w0, w10
 word_aligned:
 	cmp	w2, #0x4
 	b.lo	last_half_word
 	tbz	x1, #0x2, double_word_aligned
 	sub	w2, w2, 0x4
-	ldr	w10, [x1], #0x4
+	ldr	w10, [PTR(1)], #0x4
 	crc32cw	w0, w0, w10
 double_word_aligned:
 	lsr	w9, w2, #0x3
 	cbz	w9, last_word
 loop:
-	ldr	x10, [x1], #0x8
+	ldr	x10, [PTR(1)], #0x8
 	crc32cx	w0, w0, x10
 	subs	w9, w9, #1
 	b.ne	loop
 last_word:
 	tbz	w2, #0x2, last_half_word
-	ldr	w10, [x1], #0x4
+	ldr	w10, [PTR(1)], #0x4
 	crc32cw	w0, w0, w10
 last_half_word:
 	tbz	w2, #0x1, last_byte
-	ldr	w10, [x1], #0x2
+	ldr	w10, [PTR(1)], #0x2
 	crc32ch	w0, w0, w10
 last_byte:
 	tbz	w2, #0x0, end 
-	ldr	w10, [x1], #0x1
+	ldr	w10, [PTR(1)], #0x1
 	crc32cb	w0, w0, w10
 end:
 	ret

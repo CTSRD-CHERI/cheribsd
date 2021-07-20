@@ -189,7 +189,7 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 	 * Set the permissions to PROT_MAX to allow a full
 	 * range of access subject to page permissions.
 	 */
-	perms = ~MAP_CAP_PERM_MASK | vm_map_prot2perms(cap_prot);
+	perms = ~CHERI_PROT2PERM_MASK | vm_map_prot2perms(cap_prot);
 	newcap = cheri_andperm(newcap, perms);
 
 #ifndef __CHERI_PURE_CAPABILITY__
@@ -312,7 +312,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		.mr_pos = uap->pos,
 	    }));
 #else
-	int flags = uap->flags;
+	int flags = uap->flags, kern_flags = 0;
 	void * __capability source_cap;
 	register_t perms, reqperms;
 	vm_offset_t hint;
@@ -358,7 +358,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		 * When a capability is not provided, we implicitly
 		 * request the creation of a reservation.
 		 */
-		flags |= MAP_RESERVATION_CREATE;
+		kern_flags |= MAP_RESERVATION_CREATE;
 
 		if (flags & MAP_FIXED)
 			flags |= MAP_EXCL;
@@ -436,6 +436,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		.mr_len = uap->len,
 		.mr_prot = uap->prot,
 		.mr_flags = flags,
+		.mr_kern_flags = kern_flags,
 		.mr_fd = uap->fd,
 		.mr_pos = uap->pos,
 		.mr_source_cap = source_cap,
@@ -561,7 +562,7 @@ kern_mmap(struct thread *td, struct mmap_req *mrp)
 	    (flags & ~(MAP_SHARED | MAP_PRIVATE | MAP_FIXED | MAP_HASSEMAPHORE |
 	    MAP_STACK | MAP_NOSYNC | MAP_ANON | MAP_EXCL | MAP_NOCORE |
 	    MAP_PREFAULT_READ | MAP_GUARD |
-	    MAP_CHERI_NOSETBOUNDS | MAP_RESERVATION_CREATE |
+	    MAP_CHERI_NOSETBOUNDS |
 #ifdef MAP_32BIT
 	    MAP_32BIT |
 #endif
@@ -571,6 +572,7 @@ kern_mmap(struct thread *td, struct mmap_req *mrp)
 		    extra_flags);
 		return (EINVAL);
 	}
+	flags |= mrp->mr_kern_flags;
 	if ((flags & (MAP_EXCL | MAP_FIXED)) == MAP_EXCL) {
 		SYSERRCAUSE("%s: MAP_EXCL without MAP_FIXED", __func__);
 		return (EINVAL);

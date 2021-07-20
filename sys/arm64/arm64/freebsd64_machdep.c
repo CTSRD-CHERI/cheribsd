@@ -212,14 +212,14 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 static void
 freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
-	struct sigframe64 *fp, frame;
+	struct sigframe64 frame;
 	mcontext_t mc;
 	struct sysentvec *sysent;
 	struct trapframe *tf;
 	struct sigacts *psp;
 	struct thread *td;
 	struct proc *p;
-	vm_offset_t sp, capregs;
+	vm_offset_t sp, fp, capregs;
 	int onstack;
 	int sig;
 
@@ -252,9 +252,9 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	capregs = sp;
 
 	/* Make room, keeping the stack aligned */
-	sp -= sizeof(*fp);
+	sp -= sizeof(struct sigframe64);
 	sp = STACKALIGN(sp);
-	fp = (struct sigframe64 *)sp;
+	fp = sp;
 
 	/* Fill in the frame to copy out */
 	bzero(&frame, sizeof(frame));
@@ -282,16 +282,17 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyoutcap(&frame, __USER_CAP_OBJ(fp), sizeof(*fp)) != 0) {
+	if (copyoutcap(&frame, __USER_CAP(fp, sizeof(struct sigframe64)),
+	    sizeof(struct sigframe64)) != 0) {
 		/* Process has trashed its stack. Kill it. */
-		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
+		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%lx", td, fp);
 		PROC_LOCK(p);
 		sigexit(td, SIGILL);
 	}
 
 	tf->tf_x[0] = sig;
-	tf->tf_x[1] = (uintcap_t)&fp->sf_si;
-	tf->tf_x[2] = (uintcap_t)&fp->sf_uc;
+	tf->tf_x[1] = (uintcap_t)fp + offsetof(struct sigframe64, sf_si);
+	tf->tf_x[2] = (uintcap_t)fp + offsetof(struct sigframe64, sf_uc);
 
 	trapframe_set_elr(tf, (uintcap_t)catcher);
 	tf->tf_sp = (uintcap_t)fp;

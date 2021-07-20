@@ -149,7 +149,7 @@ s10_svc_allocate_memory(device_t dev, struct s10_svc_mem *mem, int size)
 
 	mem->size = size;
 	mem->fill = 0;
-	mem->vaddr = (vm_offset_t)pmap_mapdev(mem->paddr, mem->size);
+	mem->vaddr = (vm_pointer_t)pmap_mapdev(mem->paddr, mem->size);
 
 	return (0);
 }
@@ -185,8 +185,8 @@ s10_get_memory(struct s10_svc_softc *sc)
 	addr = res.a1;
 	size = res.a2;
 
-	device_printf(sc->dev, "Shared memory address 0x%lx size 0x%lx\n",
-	    addr, size);
+	device_printf(sc->dev, "Shared memory address %p size 0x%lx\n",
+	    (void *)addr, size);
 
 	vmem_add(vmem, addr, size, 0);
 
@@ -269,3 +269,12 @@ static devclass_t s10_svc_devclass;
 
 EARLY_DRIVER_MODULE(s10_svc, firmware, s10_svc_driver,
     s10_svc_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
+// CHERI CHANGES START
+// {
+//   "updated": 20210407,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

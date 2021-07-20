@@ -77,6 +77,10 @@ struct ef_file {
 	int		ef_relsz;		/* number of entries */
 	Elf_Rela	*ef_rela;		/* relocation table */
 	int		ef_relasz;		/* number of entries */
+#if __has_feature(capabilities) && defined(DT_CHERI___CAPRELOCS)
+	struct capreloc *ef_capreloc;
+	int		ef_caprelocsz;
+#endif
 };
 
 static void	ef_print_phdr(Elf_Phdr *);
@@ -296,6 +300,10 @@ ef_parse_dynamic(elf_file_t ef)
 	int rela_sz;
 	int rel_entry;
 	int rela_entry;
+#if __has_feature(capabilities) && defined(DT_CHERI___CAPRELOCS)
+	Elf_Off caprelocs_off = 0;
+	int caprelocs_sz = 0;
+#endif
 
 	rel_off = rela_off = 0;
 	rel_sz = rela_sz = 0;
@@ -365,6 +373,18 @@ ef_parse_dynamic(elf_file_t ef)
 				warnx("second DT_RELAENT entry ignored");
 			rela_entry = dp->d_un.d_val;
 			break;
+#if __has_feature(capabilities) && defined(DT_CHERI___CAPRELOCS)
+		case DT_CHERI___CAPRELOCS:
+			if (caprelocs_off != 0)
+				warnx("second DT_CAPRELOCS entry ignored");
+			caprelocs_off = dp->d_un.d_ptr;
+			break;
+		case DT_CHERI___CAPRELOCSSZ:
+			if (caprelocs_sz != 0)
+				warnx("second DT_CAPRELOCSSZ entry ignored");
+			caprelocs_sz = dp->d_un.d_val;
+			break;
+#endif
 		}
 	}
 	if (ef->ef_symoff == 0) {
@@ -438,6 +458,24 @@ ef_parse_dynamic(elf_file_t ef)
 			warnx("%s: %d RELA entries", ef->ef_name,
 			    ef->ef_relasz);
 	}
+#if __has_feature(capabilities) && defined(DT_CHERI___CAPRELOCS)
+	if (caprelocs_off != 0) {
+		if (caprelocs_sz == 0) {
+			warnx("%s: no DT_CAPRELOCSSZ for DT_CAPRELOCS", ef->ef_name);
+			return (EFTYPE);
+		}
+		if (ef_read_entry(ef, ef_get_offset(ef, caprelocs_off), caprelocs_sz,
+		    (void **)&ef->ef_capreloc) != 0) {
+			warnx("%s: cannot load DT_CAPRELOCS section",
+			    ef->ef_name);
+			return (EIO);
+		}
+		ef->ef_caprelocsz = caprelocs_sz / sizeof(struct capreloc);
+		if (ef->ef_verbose)
+			warnx("%s: %d CAPRELOC entries", ef->ef_name,
+			    ef->ef_caprelocsz);
+	}
+#endif
 	return (0);
 }
 
@@ -494,6 +532,9 @@ ef_seg_read_rel(elf_file_t ef, Elf_Off offset, size_t len, void *dest)
 	const Elf_Rela *a;
 	const Elf_Rel *r;
 	int error;
+#if __has_feature(capabilities) && defined(DT_CHERI___CAPRELOCS)
+	const struct capreloc *cr;
+#endif
 
 	ofs = ef_get_offset(ef, offset);
 	if (ofs == 0) {
@@ -517,6 +558,17 @@ ef_seg_read_rel(elf_file_t ef, Elf_Off offset, size_t len, void *dest)
 		if (error != 0)
 			return (error);
 	}
+#if __has_feature(capabilities) && defined(DT_CHERI___CAPRELOCS)
+	if (ef->ef_type & EFT_CHERI) {
+		for (cr = ef->ef_capreloc; cr < &ef->ef_capreloc[ef->ef_caprelocsz]; cr++) {
+			error = ef_capreloc(ef->ef_efile, cr, 0, offset,
+			    len, dest);
+			if (error != 0)
+				return (error);
+		}
+	}
+#endif
+
 	return (0);
 }
 

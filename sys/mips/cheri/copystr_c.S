@@ -96,7 +96,7 @@ END(copystr_c)
 //   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//	"support"
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

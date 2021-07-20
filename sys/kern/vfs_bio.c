@@ -4327,8 +4327,9 @@ biodone(struct bio *bp)
 		start = trunc_page((vm_pointer_t)bp->bio_data);
 		end = round_page((vm_pointer_t)bp->bio_data + bp->bio_length);
 		bp->bio_data = unmapped_buf;
-		pmap_qremove(start, atop(end - start));
-		vmem_free(transient_arena, start, end - start);
+		pmap_qremove(start, atop((ptraddr_t)end - (ptraddr_t)start));
+		vmem_free(transient_arena, start,
+		    (ptraddr_t)end - (ptraddr_t)start);
 		atomic_add_int(&inflight_transient_maps, -1);
 	}
 	done = bp->bio_done;

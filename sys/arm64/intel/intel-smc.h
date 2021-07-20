@@ -92,8 +92,17 @@
 #define	INTEL_SIP_SMC_RSU_UPDATE			\
     INTEL_SIP_SMC_FAST_CALL(INTEL_SIP_SMC_FUNCID_RSU_UPDATE)
 
-typedef int (*intel_smc_callfn_t)(register_t, register_t, register_t,
-    register_t, register_t, register_t, register_t, register_t,
+typedef int (*intel_smc_callfn_t)(uintptr_t, uintptr_t, uintptr_t,
+    uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
     struct arm_smccc_res *res);
 
 #endif /* _ARM64_INTEL_INTEL_SMC_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20210407,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

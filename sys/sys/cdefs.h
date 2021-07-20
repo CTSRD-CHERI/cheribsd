@@ -1094,25 +1094,24 @@
 #define	__static_assert_power_of_two(val)
 #endif
 
-/* Allow use of __builtin_is_aligned/align_up/align_down unconditionally */
+/* Alignment builtins for better type checking and improved code generation. */
+/* Provide fallback versions for other compilers (GCC/Clang < 10): */
 #if !__has_builtin(__builtin_is_aligned)
-#define __builtin_is_aligned(addr, align) \
-	({ __static_assert_power_of_two(align);			\
-	(((vaddr_t)addr & ((vaddr_t)(align) - 1)) == 0); })
+#define __builtin_is_aligned(x, align)	\
+	(((__uintptr_t)x & ((align) - 1)) == 0)
 #endif
 #if !__has_builtin(__builtin_align_up)
-#define __builtin_align_up(addr, align) \
-	({ __static_assert_power_of_two(align);					\
-	vaddr_t unaligned_bits = (vaddr_t)addr & ((align) - 1);			\
-	unaligned_bits == 0 ? addr :						\
-	    (__typeof__(addr))((uintptr_t)addr + ((align) - unaligned_bits)); })
+#define __builtin_align_up(x, align)	\
+	((__typeof__(x))(((__uintptr_t)(x)+((align)-1))&(~((align)-1))))
 #endif
 #if !__has_builtin(__builtin_align_down)
-#define __builtin_align_down(addr, align) ({					\
-	__static_assert_power_of_two(align);					\
-	vaddr_t unaligned_bits = (vaddr_t)addr & ((align) - 1);			\
-	(__typeof__(addr))((uintptr_t)addr - unaligned_bits); })
+#define __builtin_align_down(x, align)	\
+	((__typeof__(x))((x)&(~((align)-1))))
 #endif
+
+#define __align_up(x, y) __builtin_align_up(x, y)
+#define __align_down(x, y) __builtin_align_down(x, y)
+#define __is_aligned(x, y) __builtin_is_aligned(x, y)
 
 #endif /* !_SYS_CDEFS_H_ */
 // CHERI CHANGES START

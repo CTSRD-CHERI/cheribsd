@@ -307,7 +307,7 @@ ath_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

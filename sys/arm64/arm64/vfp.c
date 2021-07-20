@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 
 #include <machine/armreg.h>
+#include <machine/cheri.h>
 #include <machine/pcb.h>
 #include <machine/vfp.h>
 
@@ -124,7 +125,7 @@ vfp_store(struct vfpstate *state)
 	    "stp	q26, q27, [%2, #16 * 26]\n"
 	    "stp	q28, q29, [%2, #16 * 28]\n"
 	    "stp	q30, q31, [%2, #16 * 30]\n"
-	    : "=&r"(fpcr), "=&r"(fpsr) : "r"(vfp_state));
+	    : "=&r"(fpcr), "=&r"(fpsr) : ASM_PTR_CONSTR(vfp_state));
 
 	state->vfp_fpcr = fpcr;
 	state->vfp_fpsr = fpsr;
@@ -159,7 +160,7 @@ vfp_restore(struct vfpstate *state)
 	    "ldp	q30, q31, [%2, #16 * 30]\n"
 	    "msr	fpcr, %0		\n"
 	    "msr	fpsr, %1		\n"
-	    : : "r"(fpcr), "r"(fpsr), "r"(vfp_state));
+	    : : "r"(fpcr), "r"(fpsr), ASM_PTR_CONSTR(vfp_state));
 }
 
 void
@@ -378,3 +379,12 @@ is_fpu_kern_thread(u_int flags)
 	return ((curpcb->pcb_fpflags & PCB_FP_KERN) != 0);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20210407,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

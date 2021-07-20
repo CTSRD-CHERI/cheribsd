@@ -34,7 +34,7 @@
 // CHERI CHANGES START
 // {
 //   "updated": 20200721,
-//   "target_type": "prog"
+//   "target_type": "prog",
 //   "changes": [
 //     "other"
 //   ],

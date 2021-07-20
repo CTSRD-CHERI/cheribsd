@@ -506,7 +506,7 @@ sx_downgrade_int(struct sx *sx LOCK_FILE_LINE_ARG_DEF)
 	x = sx->sx_lock;
 	if (!(x & SX_LOCK_SHARED_WAITERS) &&
 	    atomic_cmpset_rel_ptr(&sx->sx_lock, x, SX_SHARERS_LOCK(1) |
-	    (x & SX_LOCK_EXCLUSIVE_WAITERS)))
+	    (ptraddr_t)(x & SX_LOCK_EXCLUSIVE_WAITERS)))
 		goto out;
 
 	/*
@@ -522,7 +522,7 @@ sx_downgrade_int(struct sx *sx LOCK_FILE_LINE_ARG_DEF)
 	wakeup_swapper = 0;
 	x = sx->sx_lock;
 	atomic_store_rel_ptr(&sx->sx_lock, SX_SHARERS_LOCK(1) |
-	    (x & SX_LOCK_EXCLUSIVE_WAITERS));
+	    (ptraddr_t)(x & SX_LOCK_EXCLUSIVE_WAITERS));
 	if (x & SX_LOCK_SHARED_WAITERS)
 		wakeup_swapper = sleepq_broadcast(&sx->lock_object, SLEEPQ_SX,
 		    0, SQ_SHARED_QUEUE);
@@ -790,7 +790,7 @@ retry_sleepq:
 		 * as there are other exclusive waiters still.  If we
 		 * fail, restart the loop.
 		 */
-		setx = x & (SX_LOCK_WAITERS | SX_LOCK_WRITE_SPINNER);
+		setx = (ptraddr_t)(x & (SX_LOCK_WAITERS | SX_LOCK_WRITE_SPINNER));
 		if ((x & (ptraddr_t)~setx) == SX_LOCK_SHARED) {
 			setx &= ~SX_LOCK_WRITE_SPINNER;
 			if (!atomic_fcmpset_acq_ptr(&sx->sx_lock, &x,

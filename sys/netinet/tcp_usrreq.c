@@ -2420,7 +2420,7 @@ unlock_and_done:
 			    (vm_size_t)outsbsz) - trunc_page((vm_offset_t)sbp));
 			vm_page_t ma[nheld];
 			if (vm_fault_quick_hold_pages(
-			    &curproc->p_vmspace->vm_map, (vm_offset_t)sbp,
+			    &curproc->p_vmspace->vm_map, sbp,
 			    outsbsz, VM_PROT_READ | VM_PROT_WRITE, ma,
 			    nheld) < 0) {
 				error = EFAULT;

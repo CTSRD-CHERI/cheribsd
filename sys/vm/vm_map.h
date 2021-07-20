@@ -156,14 +156,6 @@ struct vm_map_entry {
 
 #define	MAP_ENTRY_SPLIT_BOUNDARY_SHIFT	20
 
-/*
- * Mask for all the capability permission bits that are mapped to vm_prot_t.
- */
-#define	MAP_CAP_PERM_MASK					\
-	(CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_EXECUTE |	\
-	 CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |			\
-	 CHERI_PERM_STORE_LOCAL_CAP)
-
 #ifdef	_KERNEL
 static __inline u_char
 vm_map_entry_behavior(vm_map_entry_t entry)

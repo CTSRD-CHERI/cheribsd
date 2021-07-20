@@ -19,6 +19,8 @@ kern/subr_devmap.c		standard
 kern/subr_dummy_vdso_tc.c	standard
 kern/subr_intr.c		standard
 kern/subr_physmem.c		standard
+cheri/cheri_cap_relocs.c	optional cheri_purecap_kernel \
+	compile-with	"${CC} -c ${CFLAGS:N-nostdinc} ${WERROR} ${PROF} ${.IMPSRC}"
 libkern/bcmp.c			standard
 libkern/bcopy.c			standard
 libkern/bcopy_c.c		optional	cpu_cheri !cheri_purecap_kernel

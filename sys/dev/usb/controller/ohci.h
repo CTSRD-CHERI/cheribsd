@@ -224,7 +224,7 @@ union ohci_hub_desc {
 
 typedef struct ohci_softc {
 	struct ohci_hw_softc sc_hw;
-	struct usb_bus sc_bus;		/* base device */
+	struct usb_bus sc_bus __subobject_use_container_bounds;	/* base device */
 	struct usb_callout sc_tmo_rhsc;
 	union ohci_hub_desc sc_hub_desc;
 
@@ -263,3 +263,12 @@ void	ohci_detach(struct ohci_softc *sc);
 void	ohci_interrupt(ohci_softc_t *sc);
 
 #endif					/* _OHCI_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20210404,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

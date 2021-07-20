@@ -125,6 +125,12 @@ net $
 #define CK_MD_RMO
 #endif
 
+#ifndef __CHERI_PURE_CAPABILITY__
+#define	CK_MD_ATOMIC_PTR_CONSTR	"r"
+#else
+#define	CK_MD_ATOMIC_PTR_CONSTR	"C"
+#endif
+
 #define CK_VERSION "0.7.0"
 #define CK_GIT_SHA "db5db44"
 

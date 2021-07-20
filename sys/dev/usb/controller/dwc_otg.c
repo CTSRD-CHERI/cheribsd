@@ -91,7 +91,7 @@
 
 #define	DWC_OTG_BUS2SC(bus) \
    ((struct dwc_otg_softc *)(((uint8_t *)(bus)) - \
-    ((uint8_t *)&(((struct dwc_otg_softc *)0)->sc_bus))))
+   USB_P2U(&(((struct dwc_otg_softc *)0)->sc_bus))))
 
 #define	DWC_OTG_PC2UDEV(pc) \
    (USB_DMATAG_TO_XROOT((pc)->tag_parent)->udev)
@@ -5011,3 +5011,12 @@ static const struct usb_bus_methods dwc_otg_bus_methods =
 	.device_resume = &dwc_otg_device_resume,
 	.device_suspend = &dwc_otg_device_suspend,
 };
+// CHERI CHANGES START
+// {
+//   "updated": 20210404,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

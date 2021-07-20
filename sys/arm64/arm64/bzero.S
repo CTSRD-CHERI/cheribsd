@@ -35,7 +35,7 @@ __FBSDID("$FreeBSD$");
 	/*
 	 * void bzero(void *p, size_t size)
 	 *
-	 *  x0 - p
+	 *  x/c0 - p
 	 *  x1 - size
 	 */
 ENTRY(bzero)
@@ -64,8 +64,7 @@ ENTRY(bzero)
 	 * Load size of line that will be cleaned by dc zva call.
 	 * 0 means that the instruction is not allowed
 	 */
-	ldr	x7, =dczva_line_size
-	ldr	x7, [x7]
+	LDR_LABEL(x7, PTR(7), dczva_line_size)
 	cbz	x7, normal
 
 	/*
@@ -98,8 +97,8 @@ ENTRY(bzero)
 	 * by cache lines, so go normal way.
 	 */
 	cbz	x5, normal
-	/* x6 is final address to zero */
-	add	x6, x0, x1
+	/* x/c6 is final address to zero */
+	add	PTR(6), PTR(0), x1
 
 	/*
 	 * We are here because x5 is non-0 so normal will be used to
@@ -108,7 +107,7 @@ ENTRY(bzero)
 	 */
 	mov	x1, x4
 
-	/* When jumping here: x0 holds pointer, x1 holds size */
+	/* When jumping here: x/c0 holds pointer, x1 holds size */
 normal:
 	/*
 	 * Get buffer offset into 16 byte aligned address; 0 means pointer
@@ -130,7 +129,7 @@ normal:
 	 * pointer and at most "size".
 	 */
 align:
-	strb	wzr, [x0], #0x01
+	strb	wzr, [PTR(0)], #0x01
 	subs	x2, x2, #0x01
 	b.ne	align
 
@@ -142,7 +141,7 @@ align:
 	 * address and do it
 	 */
 	tbz	x0, #0x03, aligned_to_16
-	str	xzr, [x0], #0x08
+	str	xzr, [PTR(0)], #0x08
 	sub	x1, x1, #0x08
 
 	/* While jumping here: x0 is 16 byte alligned address, x1 is size */
@@ -153,7 +152,7 @@ aligned_to_16:
 
 	lsr	x2, x1, #0x04
 zero_by_16:
-	stp	xzr, xzr, [x0], #0x10
+	stp	xzr, xzr, [PTR(0)], #0x10
 	subs	x2, x2, #0x01
 	b.ne	zero_by_16
 
@@ -166,16 +165,16 @@ zero_by_16:
 	b.eq	lead_out_end
 lead_out:
 	tbz	x1, #0x03, lead_out_dword
-	str	xzr, [x0], #0x08
+	str	xzr, [PTR(0)], #0x08
 lead_out_dword:
 	tbz	x1, #0x02, lead_out_word
-	str	wzr, [x0], #0x04
+	str	wzr, [PTR(0)], #0x04
 lead_out_word:
 	tbz	x1, #0x01, lead_out_byte
-	strh	wzr, [x0], #0x02
+	strh	wzr, [PTR(0)], #0x02
 lead_out_byte:
 	tbz	x1, #0x00, lead_out_end
-	strb	wzr, [x0], #0x01
+	strb	wzr, [PTR(0)], #0x01
 
 lead_out_end:
 	/*
@@ -185,22 +184,21 @@ lead_out_end:
 	cbz	x5, ending
 
 	/*
-	 * Here x5 holds number of lines to zero; x6 is final address of
-	 * buffer. x0 is cache line aligned pointer. x7 is cache line size
+	 * Here x5 holds number of lines to zero; x/c6 is final address of
+	 * buffer. x/c0 is cache line aligned pointer. x7 is cache line size
 	 * in bytes
 	 */
 cache_line_zero:
-	dc	zva, x0
-	add	x0, x0, x7
+	dc	zva, PTR(0)
+	add	PTR(0), PTR(0), x7
 	subs	x5, x5, #0x01
 	b.ne	cache_line_zero
 
 	/* Need to zero remaining bytes? */
-	subs	x1, x6, x0
+	subs	x1, PTR(6), PTR(0)
 	b.ne	normal
 
 ending:
 	ret
 
 END(bzero)
-

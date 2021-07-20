@@ -1208,7 +1208,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	}
 
 #if __has_feature(capabilities)
-	perms = (~MAP_CAP_PERM_MASK | vm_map_prot2perms(stack_prot)) &
+	perms = (~CHERI_PROT2PERM_MASK | vm_map_prot2perms(stack_prot)) &
 	    CHERI_CAP_USER_DATA_PERMS;
 #ifdef __CHERI_PURE_CAPABILITY__
 	imgp->stack = (void *)cheri_andperm(stack_addr + ssiz, perms);

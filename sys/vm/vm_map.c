@@ -5772,12 +5772,11 @@ vm_map_prot2perms(vm_prot_t prot)
 	int perms = 0;
 
 	if (prot & (VM_PROT_READ | VM_PROT_COPY))
-		perms |= (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP);
+		perms |= CHERI_PROT2PERM_READ_PERMS;
 	if (prot & VM_PROT_WRITE)
-		perms |= (CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
-		    CHERI_PERM_STORE_LOCAL_CAP);
+		perms |= CHERI_PROT2PERM_WRITE_PERMS;
 	if (prot & VM_PROT_EXECUTE)
-		perms |= CHERI_PERM_EXECUTE;
+		perms |= CHERI_PROT2PERM_EXEC_PERMS;
 
 	return (perms);
 }
@@ -5792,7 +5791,7 @@ _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
     vm_prot_t prot)
 {
 	vm_pointer_t retcap;
-	int perms = ~MAP_CAP_PERM_MASK | vm_map_prot2perms(prot);
+	int perms = ~CHERI_PROT2PERM_MASK | vm_map_prot2perms(prot);
 
 	retcap = cheri_setbounds(
 	    cheri_setaddress(vm_map_rootcap(map), addr), length);

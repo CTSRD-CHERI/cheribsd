@@ -61,7 +61,8 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 	struct thread *td = curthread;
 	struct iovec *iov;
 	void *cp;
-	vm_offset_t page_offset, vaddr;
+	vm_pointer_t vaddr;
+	vm_offset_t page_offset;
 	size_t cnt;
 	int error = 0;
 	int save = 0;

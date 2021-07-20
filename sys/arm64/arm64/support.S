@@ -38,10 +38,6 @@ __FBSDID("$FreeBSD$");
 
 #include "assym.inc"
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#error TODO Port to purecap
-#endif
-
 .macro check_user_access user_arg, limit, bad_addr_func
 	ldr	x7, =(\limit)
 #if __has_feature(capabilities)
@@ -57,8 +53,8 @@ __FBSDID("$FreeBSD$");
  * One of the fu* or su* functions failed, return -1.
  */
 ENTRY(fsu_fault)
-	SET_FAULT_HANDLER(xzr, x1)	/* Reset the handler function */
-	EXIT_USER_ACCESS_CHECK(w0, x1)
+	SET_FAULT_HANDLER(xzr, PTR(1))	/* Reset the handler function */
+	EXIT_USER_ACCESS_CHECK(w0, PTR(1))
 fsu_fault_nopcb:
 	mov	x0, #-1
 	ret
@@ -70,10 +66,10 @@ END(fsu_fault)
  */
 ENTRY(casueword32)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
-	adr	x6, fsu_fault		/* Load the fault handler */
+	adr	PTR(6), fsu_fault	/* Load the fault handler */
 	mov	w5, #1
-	SET_FAULT_HANDLER(x6, x4)	/* And set it */
-	ENTER_USER_ACCESS(w6, x4)
+	SET_FAULT_HANDLER(PTR(6), PTR(4))	/* And set it */
+	ENTER_USER_ACCESS(w6, PTR(4))
 	ENTER_C64
 #if __has_feature(capabilities)
 	ldxr	w4, [c0]		/* Load-exclusive the data */
@@ -89,8 +85,8 @@ ENTRY(casueword32)
 #endif
 1:	EXIT_C64
 	EXIT_USER_ACCESS(w6)
-	SET_FAULT_HANDLER(xzr, x6)	/* Reset the fault handler */
-	str	w4, [x2]		/* Store the read data */
+	SET_FAULT_HANDLER(xzr, PTR(6))	/* Reset the fault handler */
+	str	w4, [PTR(2)]		/* Store the read data */
 	mov	w0, w5			/* Result same as store status */
 	ret				/* Return */
 END(casueword32)
@@ -100,10 +96,10 @@ END(casueword32)
  */
 ENTRY(casueword)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-7), fsu_fault_nopcb
-	adr	x6, fsu_fault		/* Load the fault handler */
+	adr	PTR(6), fsu_fault	/* Load the fault handler */
 	mov	w5, #1
-	SET_FAULT_HANDLER(x6, x4)	/* And set it */
-	ENTER_USER_ACCESS(w6, x4)
+	SET_FAULT_HANDLER(PTR(6), PTR(4))	/* And set it */
+	ENTER_USER_ACCESS(w6, PTR(4))
 	ENTER_C64
 #if __has_feature(capabilities)
 	ldxr	x4, [c0]		/* Load-exclusive the data */
@@ -119,15 +115,15 @@ ENTRY(casueword)
 #endif
 1:	EXIT_C64
 	EXIT_USER_ACCESS(w6)
-	SET_FAULT_HANDLER(xzr, x6)	/* Reset the fault handler */
-	str	x4, [x2]		/* Store the read data */
+	SET_FAULT_HANDLER(xzr, PTR(6))	/* Reset the fault handler */
+	str	x4, [PTR(2)]		/* Store the read data */
 	mov	w0, w5			/* Result same as store status */
 	ret				/* Return */
 END(casueword)
 
 .macro fsudata insn, ret_reg, user_arg
-	adr	x7, fsu_fault		/* Load the fault handler */
-	SET_FAULT_HANDLER(x7, x6)	/* And set it */
+	adr	PTR(7), fsu_fault	/* Load the fault handler */
+	SET_FAULT_HANDLER(PTR(7), PTR(6))	/* And set it */
 	ENTER_C64
 #if __has_feature(capabilities)
 	\insn	\ret_reg, [c\user_arg]	/* Try accessing the data */
@@ -135,7 +131,7 @@ END(casueword)
 	\insn	\ret_reg, [x\user_arg]	/* Try accessing the data */
 #endif
 	EXIT_C64
-	SET_FAULT_HANDLER(xzr, x6)	/* Reset the fault handler */
+	SET_FAULT_HANDLER(xzr, PTR(6))	/* Reset the fault handler */
 .endm
 
 /*
@@ -162,7 +158,7 @@ END(fuword16)
 ENTRY(fueword32)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-3), fsu_fault_nopcb
 	fsudata	ldtr, w0, 0
-	str	w0, [x1]		/* Save the data in kernel space */
+	str	w0, [PTR(1)]		/* Save the data in kernel space */
 	mov	w0, #0			/* Success */
 	ret				/* Return */
 END(fueword32)
@@ -175,7 +171,7 @@ ENTRY(fueword)
 EENTRY(fueword64)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-7), fsu_fault_nopcb
 	fsudata	ldtr, x0, 0
-	str	x0, [x1]		/* Save the data in kernel space */
+	str	x0, [PTR(1)]		/* Save the data in kernel space */
 	mov	x0, #0			/* Success */
 	ret				/* Return */
 EEND(fueword64)
@@ -188,7 +184,7 @@ END(fueword)
 ENTRY(fuecap)
 	check_user_access 0, (VM_MAXUSER_ADDRESS-15), fsu_fault_nopcb
 	fsudata	ldtr, c0, 0
-	str	c0, [x1]		/* Save the data in kernel space */
+	str	c0, [PTR(1)]		/* Save the data in kernel space */
 	mov	x0, #0			/* Success */
 	ret				/* Return */
 END(fuecap)
@@ -250,16 +246,16 @@ END(sucap)
 
 ENTRY(setjmp)
 	/* Store the stack pointer */
-	mov	x8, sp
-	str	x8, [x0], #8
+	mov	PTR(8), PTRN(sp)
+	str	PTR(8), [PTR(0)], #PTR_WIDTH
 
 	/* Store the general purpose registers and lr */
-	stp	x19, x20, [x0], #16
-	stp	x21, x22, [x0], #16
-	stp	x23, x24, [x0], #16
-	stp	x25, x26, [x0], #16
-	stp	x27, x28, [x0], #16
-	stp	x29, lr, [x0], #16
+	stp	PTR(19), PTR(20), [PTR(0)], #(2 * PTR_WIDTH)
+	stp	PTR(21), PTR(22), [PTR(0)], #(2 * PTR_WIDTH)
+	stp	PTR(23), PTR(24), [PTR(0)], #(2 * PTR_WIDTH)
+	stp	PTR(25), PTR(26), [PTR(0)], #(2 * PTR_WIDTH)
+	stp	PTR(27), PTR(28), [PTR(0)], #(2 * PTR_WIDTH)
+	stp	PTR(29), PTRN(lr), [PTR(0)], #(2 * PTR_WIDTH)
 
 	/* Return value */
 	mov	x0, #0
@@ -268,16 +264,16 @@ END(setjmp)
 
 ENTRY(longjmp)
 	/* Restore the stack pointer */
-	ldr	x8, [x0], #8
-	mov	sp, x8
+	ldr	PTR(8), [PTR(0)], #PTR_WIDTH
+	mov	PTRN(sp), PTR(8)
 
 	/* Restore the general purpose registers and lr */
-	ldp	x19, x20, [x0], #16
-	ldp	x21, x22, [x0], #16
-	ldp	x23, x24, [x0], #16
-	ldp	x25, x26, [x0], #16
-	ldp	x27, x28, [x0], #16
-	ldp	x29, lr, [x0], #16
+	ldp	PTR(19), PTR(20), [PTR(0)], #(2 * PTR_WIDTH)
+	ldp	PTR(21), PTR(22), [PTR(0)], #(2 * PTR_WIDTH)
+	ldp	PTR(23), PTR(24), [PTR(0)], #(2 * PTR_WIDTH)
+	ldp	PTR(25), PTR(26), [PTR(0)], #(2 * PTR_WIDTH)
+	ldp	PTR(27), PTR(28), [PTR(0)], #(2 * PTR_WIDTH)
+	ldp	PTR(29), PTRN(lr), [PTR(0)], #(2 * PTR_WIDTH)
 
 	/* Load the return value */
 	mov	x0, x1
@@ -288,14 +284,14 @@ END(longjmp)
  * pagezero, simple implementation
  */
 ENTRY(pagezero_simple)
-	add	x1, x0, #PAGE_SIZE
+	add	PTR(1), PTR(0), #PAGE_SIZE
 
 1:
-	stp	xzr, xzr, [x0], #0x10
-	stp	xzr, xzr, [x0], #0x10
-	stp	xzr, xzr, [x0], #0x10
-	stp	xzr, xzr, [x0], #0x10
-	cmp	x0, x1
+	stp	PTR(zr), PTR(zr), [PTR(0)], #(2 * PTR_WIDTH)
+	stp	PTR(zr), PTR(zr), [PTR(0)], #(2 * PTR_WIDTH)
+	stp	PTR(zr), PTR(zr), [PTR(0)], #(2 * PTR_WIDTH)
+	stp	PTR(zr), PTR(zr), [PTR(0)], #(2 * PTR_WIDTH)
+	cmp	PTR(0), PTR(1)
 	b.ne	1b
 	ret
 
@@ -305,16 +301,24 @@ END(pagezero_simple)
  * pagezero, cache assisted
  */
 ENTRY(pagezero_cache)
-	add	x1, x0, #PAGE_SIZE
+	add	PTR(1), PTR(0), #PAGE_SIZE
 
-	ldr	x2, =dczva_line_size
-	ldr	x2, [x2]
+	LDR_LABEL(x2, PTR(2), dczva_line_size)
 
 1:
-	dc	zva, x0
-	add	x0, x0, x2
-	cmp	x0, x1
+	dc	zva, PTR(0)
+	add	PTR(0), PTR(0), x2
+	cmp	PTR(0), PTR(1)
 	b.ne	1b
 	ret
 
 END(pagezero_cache)
+// CHERI CHANGES START
+// {
+//   "updated": 20210407,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

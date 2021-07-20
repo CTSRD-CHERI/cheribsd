@@ -158,7 +158,7 @@ struct its_dev {
 	/* List of assigned LPIs */
 	struct lpi_chunk	lpis;
 	/* Virtual address of ITT */
-	vm_offset_t		itt;
+	vm_pointer_t		itt;
 	size_t			itt_size;
 };
 
@@ -1173,7 +1173,7 @@ its_device_get(device_t dev, device_t child, u_int nvecs)
 	 * PA has to be 256 B aligned. At least two entries for device.
 	 */
 	its_dev->itt_size = roundup2(MAX(nvecs, 2) * esize, 256);
-	its_dev->itt = (vm_offset_t)contigmalloc(its_dev->itt_size,
+	its_dev->itt = (vm_pointer_t)contigmalloc(its_dev->itt_size,
 	    M_GICV3_ITS, M_NOWAIT | M_ZERO, 0, LPI_INT_TRANS_TAB_MAX_ADDR,
 	    LPI_INT_TRANS_TAB_ALIGN, 0);
 	if (its_dev->itt == 0) {
@@ -2011,3 +2011,12 @@ gicv3_its_acpi_attach(device_t dev)
 	return (0);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20210427,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer-as-integer"
+//   ]
+// }
+// CHERI CHANGES END

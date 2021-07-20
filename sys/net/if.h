@@ -620,10 +620,10 @@ __END_DECLS
 #endif /* !_NET_IF_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20210525,
 //   "target_type": "header",
 //   "changes": [
-//     "ioctl:net"
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

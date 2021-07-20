@@ -917,7 +917,7 @@ typedef struct acpi_pci_routing_table
     UINT32                          Pin;
     UINT64                          Address;        /* here for 64-bit alignment */
     UINT32                          SourceIndex;
-    char                            Source[4];      /* pad to 64 bits so sizeof() works in all cases */
+    char                            Source[4] __subobject_use_remaining_size;      /* pad to 64 bits so sizeof() works in all cases */
 
 } ACPI_PCI_ROUTING_TABLE;
 

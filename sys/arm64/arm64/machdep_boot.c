@@ -51,6 +51,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/fdt/fdt_common.h>
 #endif
 
+#include <cheri/cheric.h>
+
 extern int *end;
 static char *loader_envp;
 static char static_kenv[4096];
@@ -82,12 +84,19 @@ static char linux_command_line[LBABI_MAX_COMMAND_LINE + 1];
 static vm_offset_t
 fake_preload_metadata(void *dtb_ptr, size_t dtb_size)
 {
-	vm_offset_t lastaddr;
+	vm_pointer_t lastaddr;
 	static char fake_preload[256];
 	caddr_t preload_ptr;
 	size_t size;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	lastaddr = (vm_pointer_t)cheri_setaddress(
+	    cheri_andperm(kernel_root_cap,
+		CHERI_PERMS_KERNEL_DATA_NOCAP),
+	    (vm_offset_t)&end);
+#else
 	lastaddr = (vm_offset_t)&end;
+#endif
 	preload_ptr = (caddr_t)&fake_preload[0];
 	size = 0;
 
@@ -187,9 +196,10 @@ freebsd_parse_boot_param(struct arm64_bootparams *abp)
 	vm_offset_t lastaddr = 0;
 	void *kmdp;
 #ifdef DDB
-	vm_offset_t ksym_start;
-	vm_offset_t ksym_end;
+	vm_pointer_t ksym_start;
+	vm_pointer_t ksym_end;
 #endif
+	vm_pointer_t env_addr;
 
 	if (abp->modulep == 0)
 		return (0);
@@ -200,12 +210,33 @@ freebsd_parse_boot_param(struct arm64_bootparams *abp)
 		return (0);
 
 	boothowto = MD_FETCH(kmdp, MODINFOMD_HOWTO, int);
-	loader_envp = MD_FETCH(kmdp, MODINFOMD_ENVP, char *);
+	/*
+	 * XXX-AM: Sadly we don't have bounds for this. We need the
+	 * loader to support passing capabilities here.
+	 */
+	env_addr = MD_FETCH(kmdp, MODINFOMD_ENVP, vm_offset_t);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (env_addr != 0) {
+		env_addr = (vm_pointer_t)cheri_setaddress(kernel_root_cap,
+		    env_addr);
+		env_addr = cheri_andperm(env_addr,
+		    CHERI_PERMS_KERNEL_DATA_NOCAP);
+	}
+#endif
+	loader_envp = (char *)env_addr;
 	init_static_kenv(loader_envp, 0);
 	lastaddr = MD_FETCH(kmdp, MODINFOMD_KERNEND, vm_offset_t);
 #ifdef DDB
-	ksym_start = MD_FETCH(kmdp, MODINFOMD_SSYM, uintptr_t);
-	ksym_end = MD_FETCH(kmdp, MODINFOMD_ESYM, uintptr_t);
+	ksym_start = MD_FETCH(kmdp, MODINFOMD_SSYM, vm_offset_t);
+	ksym_end = MD_FETCH(kmdp, MODINFOMD_ESYM, vm_offset_t);
+#ifdef __CHERI_PURECAP_KERNEL__
+	ksym_start = cheri_setaddress(kernel_root_cap, ksym_start);
+	ksym_start = cheri_setbounds(ksym_start,
+	    (ptraddr_t)ksym_end - (ptraddr_t)ksym_start);
+	ksym_start = cheri_andperm(ksym_start,
+	    CHERI_PERMS_KERNEL_DATA_NOCAP);
+	ksym_end = cheri_setaddress(ksym_start, ksym_end);
+#endif
 	db_fetch_ksymtab(ksym_start, ksym_end, 0);
 #endif
 	return (lastaddr);

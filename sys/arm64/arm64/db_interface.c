@@ -126,7 +126,7 @@ db_read_bytes(vm_offset_t addr, size_t size, char *data)
 	ret = setjmp(jb);
 
 	if (ret == 0) {
-		src = (const char *)addr;
+		src = DB_DATA_PTR_LEN(addr, const char, size);
 		if (size == 8 && (addr & 7) == 0) {
 			tmp64 = *((const int *)src);
 			src = (const char *)&tmp64;
@@ -153,7 +153,7 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 {
 	jmp_buf jb;
 	void *prev_jb;
-	char *dst;
+	char *dst, *kaddr;
 	int ret;
 	uint64_t tmp64;
 	uint32_t tmp32;
@@ -162,25 +162,25 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 	prev_jb = kdb_jmpbuf(jb);
 	ret = setjmp(jb);
 	if (ret == 0) {
+		kaddr = DB_DATA_PTR_LEN(addr, char, size);
 		if (size == 8 && (addr & 7) == 0) {
 			dst = (char *)&tmp64;
 			while (size-- > 0)
 				*dst++ = *data++;
-			*((uint64_t *)addr) = tmp64;
+			*((uint64_t *)kaddr) = tmp64;
 		} else if (size == 4 && (addr & 3) == 0) {
 			dst = (char *)&tmp32;
 			while (size-- > 0)
 				*dst++ = *data++;
-			*((uint32_t *)addr) = tmp32;
+			*((uint32_t *)kaddr) = tmp32;
 		} else if (size == 2 && (addr & 1) == 0) {
 			dst = (char *)&tmp16;
 			while (size-- > 0)
 				*dst++ = *data++;
-			*((uint32_t *)addr) = tmp16;
+			*((uint32_t *)kaddr) = tmp16;
 		} else {
-			dst = (char *)addr;
 			while (size-- > 0)
-				*dst++ = *data++;
+				*kaddr++ = *data++;
 		}
 		dsb(ish);
 
@@ -192,3 +192,12 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 
 	return (ret);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20210406,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

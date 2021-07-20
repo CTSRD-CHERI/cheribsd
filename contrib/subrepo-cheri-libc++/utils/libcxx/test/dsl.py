@@ -6,22 +6,38 @@
 #
 #===----------------------------------------------------------------------===##
 
-import libcxx.test.format
-import lit
-import lit.util
 import os
+import pickle
 import pipes
 import platform
 import re
 import tempfile
 
-def _memoize(f):
-  cache = dict()
-  def memoized(x):
-    if x not in cache:
-      cache[x] = f(x)
-    return cache[x]
-  return memoized
+import libcxx.test.format
+import lit
+import lit.LitConfig
+import lit.Test
+import lit.TestRunner
+import lit.util
+
+
+def _memoizeExpensiveOperation(extractCacheKey):
+  """
+  Allows memoizing a very expensive operation.
+
+  We pickle the cache key to make sure we store an immutable representation
+  of it. If we stored an object and the object was referenced elsewhere, it
+  could be changed from under our feet, which would break the cache.
+  """
+  def decorator(function):
+    cache = {}
+    def f(*args, **kwargs):
+      cacheKey = pickle.dumps(extractCacheKey(*args, **kwargs))
+      if cacheKey not in cache:
+        cache[cacheKey] = function(*args, **kwargs)
+      return cache[cacheKey]
+    return f
+  return decorator
 
 def _executeScriptInternal(test, commands):
   """
@@ -52,7 +68,7 @@ def _executeScriptInternal(test, commands):
     res = ('', '', 127, None)
   return res
 
-def _makeConfigTest(config, testPrefix=None):
+def _makeConfigTest(config, testPrefix=''):
   sourceRoot = os.path.join(config.test_exec_root, '__config_src__')
   execRoot = os.path.join(config.test_exec_root, '__config_exec__')
   suite = lit.Test.TestSuite('__config__', sourceRoot, execRoot, config)
@@ -67,6 +83,7 @@ def _makeConfigTest(config, testPrefix=None):
     def __exit__(self, *args): os.remove(tmp.name)
   return TestWrapper(suite, pathInSuite, config)
 
+@_memoizeExpensiveOperation(lambda c, s: (c.substitutions, c.environment, s))
 def sourceBuilds(config, source):
   """
   Return whether the program in the given string builds successfully.
@@ -83,7 +100,8 @@ def sourceBuilds(config, source):
     _executeScriptInternal(test, ['rm %t.exe'])
     return exitCode == 0
 
-def programOutput(config, program, args=[], testPrefix=None):
+@_memoizeExpensiveOperation(lambda c, p, args=None, testPrefix='': (c.substitutions, c.environment, p, args))
+def programOutput(config, program, args=None, testPrefix=''):
   """
   Compiles a program for the test target, run it on the test target and return
   the output.
@@ -92,6 +110,8 @@ def programOutput(config, program, args=[], testPrefix=None):
   execution of the program is done through the %{exec} substitution, which means
   that the program may be run on a remote host depending on what %{exec} does.
   """
+  if args is None:
+    args = []
   with _makeConfigTest(config, testPrefix=testPrefix) as test:
     with open(test.getSourcePath(), 'w') as source:
       source.write(program)
@@ -115,6 +135,7 @@ def programOutput(config, program, args=[], testPrefix=None):
     finally:
       _executeScriptInternal(test, ['rm %t.exe'])
 
+@_memoizeExpensiveOperation(lambda c, f: (c.substitutions, c.environment, f))
 def hasCompileFlag(config, flag):
   """
   Return whether the compiler in the configuration supports a given compiler flag.
@@ -128,24 +149,42 @@ def hasCompileFlag(config, flag):
     ])
     return exitCode == 0
 
-def hasLocale(config, locale):
+@_memoizeExpensiveOperation(lambda c, l: (c.substitutions, c.environment, l))
+def hasAnyLocale(config, locales):
   """
   Return whether the runtime execution environment supports a given locale.
+  Different systems may use different names for a locale, so this function checks
+  whether any of the passed locale names is supported by setlocale() and returns
+  true if one of them works.
 
   This is done by executing a program that tries to set the given locale using
   %{exec} -- this means that the command may be executed on a remote host
   depending on the %{exec} substitution.
   """
+  # Avoid the (potentially) slow checks for locale support if the library
+  # under test doesn't care about localizatin (e.g. libunwind). This can speed
+  # up the test suite significantly when running it on an emulator over SSH.
+  if not getattr(config, "test_localization", True):
+    return False
   program = """
     #include <locale.h>
-    int main(int, char** argv) {
-      if (::setlocale(LC_ALL, argv[1]) != NULL) return 0;
-      else                                      return 1;
+    #include <stdio.h>
+    int main(int argc, char** argv) {
+      // For debugging purposes print which locales are (not) supported.
+      for (int i = 1; i < argc; i++) {
+        if (::setlocale(LC_ALL, argv[i]) != NULL) {
+          printf("%s is supported.\\n", argv[i]);
+          return 0;
+        }
+        printf("%s is not supported.\\n", argv[i]);
+      }
+      return 1;
     }
   """
-  return programOutput(config, program, args=[pipes.quote(locale)],
-                       testPrefix="check_locale_" + locale) is not None
+  return programOutput(config, program, args=[pipes.quote(l) for l in locales],
+                       testPrefix="check_locale_" + locales[0]) is not None
 
+@_memoizeExpensiveOperation(lambda c, flags='': (c.substitutions, c.environment, flags))
 def compilerMacros(config, flags=''):
   """
   Return a dictionary of predefined compiler macros.
@@ -235,6 +274,19 @@ class Feature(object):
       self.__cachedIsSupported[config] = result
     return result
 
+  def getName(self, config):
+    """
+    Return the name of the feature.
+
+    It is an error to call `f.getName(cfg)` if the feature `f` is not supported.
+    """
+    assert self.isSupported(config), \
+      "Trying to get the name of a feature that is not supported in the given configuration"
+    name = self._name(config) if callable(self._name) else self._name
+    if not isinstance(name, str):
+      raise ValueError("Feature did not resolve to a name that's a string, got {}".format(name))
+    return name
+
   def enableIn(self, config):
     """
     Enable a feature in a TestingConfig.
@@ -257,11 +309,7 @@ class Feature(object):
     if self._linkFlag:
       linkFlag = self._linkFlag(config) if callable(self._linkFlag) else self._linkFlag
       config.substitutions = addTo(config.substitutions, '%{link_flags}', linkFlag)
-
-    name = self._name(config) if callable(self._name) else self._name
-    if not isinstance(name, str):
-      raise ValueError("Feature did not resolve to a name that's a string, got {}".format(name))
-    config.available_features.add(name)
+    config.available_features.add(self.getName(config))
 
 
 def _str_to_bool(s):

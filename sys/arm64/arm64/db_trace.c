@@ -89,10 +89,10 @@ db_stack_trace_cmd(struct thread *td, struct unwind_state *frame)
 		db_printsym(frame->pc, DB_STGY_PROC);
 		db_printf("\n");
 
-		db_printf("\t pc = 0x%016lx  lr = 0x%016lx\n", pc,
-		    frame->pc);
-		db_printf("\t sp = 0x%016lx  fp = 0x%016lx\n", frame->sp,
-		    frame->fp);
+		db_printf("\t pc = 0x%016lx  lr = 0x%016lx\n", (ptraddr_t)pc,
+		    (ptraddr_t)frame->pc);
+		db_printf("\t sp = 0x%016lx  fp = 0x%016lx\n",
+		    (ptraddr_t)frame->sp, (ptraddr_t)frame->fp);
 		/* TODO: Show some more registers */
 		db_printf("\n");
 	}
@@ -122,7 +122,11 @@ db_trace_self(void)
 	struct unwind_state frame;
 	uintptr_t sp;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("mov %0, csp" : "=&C" (sp));
+#else
 	__asm __volatile("mov %0, sp" : "=&r" (sp));
+#endif
 
 	frame.sp = sp;
 	frame.fp = (uintptr_t)__builtin_frame_address(0);

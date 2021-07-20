@@ -344,6 +344,7 @@ typedef struct {
 #define	EF_ARM_ABI_FLOAT_HARD	0x00000400
 #define	EF_ARM_VFP_FLOAT	EF_ARM_ABI_FLOAT_HARD /* Pre-V5 ABI name */
 #define	EF_ARM_MAVERICK_FLOAT	0x00000800
+#define	EF_AARCH64_CHERI_PURECAP	0x00010000
 
 #define	EF_MIPS_NOREORDER	0x00000001
 #define	EF_MIPS_PIC		0x00000002	/* Contains PIC code */
@@ -1069,6 +1070,12 @@ enum MipsCheriFlags {
 #define	R_MORELLO_JUMP_SLOT	59394
 #define	R_MORELLO_RELATIVE	59395
 #define	R_MORELLO_IRELATIVE	59396
+
+#if __has_feature(capabilities)
+#define	MORELLO_FRAG_EXECUTABLE	0x4
+#define	MORELLO_FRAG_RWDATA	0x2
+#define	MORELLO_FRAG_RODATA	0x1
+#endif
 
 #define	R_ARM_NONE		0	/* No relocation. */
 #define	R_ARM_PC24		1

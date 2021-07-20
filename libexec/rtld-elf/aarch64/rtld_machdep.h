@@ -48,12 +48,6 @@
 #include <sys/types.h>
 #include <machine/atomic.h>
 
-#if __has_feature(capabilities)
-#define MORELLO_FRAG_EXECUTABLE 0x4
-#define MORELLO_FRAG_RWDATA 0x2
-#define MORELLO_FRAG_RODATA 0x1
-#endif
-
 struct Struct_Obj_Entry;
 
 /* Return the address of the .dynamic section in the dynamic linker. */

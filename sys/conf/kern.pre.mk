@@ -142,6 +142,13 @@ CFLAGS+=	${GCOV_CFLAGS}
 # can override the others.
 CFLAGS+=	${CONF_CFLAGS}
 
+# XXX-AM: This is a workaround for not having full eflag support in morello lld.
+# should be removed as soon as the linker can link in capability mode based on
+# input files eflags instead.
+.if ${MACHINE_ARCH:Maarch64*c*}
+LDFLAGS+=	--morello-c64-plt
+.endif
+
 .if defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mbuild-id}
 LDFLAGS+=	--build-id=sha1
 .endif
