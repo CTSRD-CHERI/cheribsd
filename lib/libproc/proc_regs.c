@@ -35,13 +35,31 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #define	_WANT_MIPS_REGNUM
 #include <sys/ptrace.h>
-
+#ifdef __mips__
+#include <machine/regnum.h>
+#endif
 #include <err.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
 
 #include "_libproc.h"
+
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#include <cheri/cheri.h>
+
+static void * __capability
+get_pcc(struct proc_handle *phdl)
+{
+	struct capreg capregs;
+
+	if (ptrace(PT_GETCAPREGS, proc_getpid(phdl), (caddr_t)&capregs, 0) < 0)
+		return NULL;
+
+	return ((struct cheri_frame *)&capregs)->cf_pcc;
+}
+#endif
 
 int
 proc_regget(struct proc_handle *phdl, proc_reg_t reg, unsigned long *regvalue)
@@ -53,11 +71,22 @@ proc_regget(struct proc_handle *phdl, proc_reg_t reg, unsigned long *regvalue)
 		errno = ENOENT;
 		return (-1);
 	}
+
+#if __has_feature(capabilities) && defined(__mips__)
+	if (reg == REG_PC) {
+		void *__capability pcc = get_pcc(phdl);
+		if (pcc == NULL)
+			return -1;
+		*regvalue = (__cheri_addr vaddr_t)pcc;
+		return 0;
+	}
+#endif
+
 	memset(&regs, 0, sizeof(regs));
 	if (ptrace(PT_GETREGS, proc_getpid(phdl), (caddr_t)&regs, 0) < 0)
 		return (-1);
 	switch (reg) {
-	case REG_PC:
+	case REG_PC: {
 #if defined(__aarch64__)
 		*regvalue = regs.elr;
 #elif defined(__amd64__)
@@ -74,6 +103,7 @@ proc_regget(struct proc_handle *phdl, proc_reg_t reg, unsigned long *regvalue)
 		*regvalue = regs.sepc;
 #endif
 		break;
+	}
 	case REG_SP:
 #if defined(__aarch64__)
 		*regvalue = regs.sp;
@@ -112,7 +142,7 @@ proc_regset(struct proc_handle *phdl, proc_reg_t reg, unsigned long regvalue)
 	if (ptrace(PT_GETREGS, proc_getpid(phdl), (caddr_t)&regs, 0) < 0)
 		return (-1);
 	switch (reg) {
-	case REG_PC:
+	case REG_PC: {
 #if defined(__aarch64__)
 		regs.elr = regvalue;
 #elif defined(__amd64__)
@@ -123,12 +153,19 @@ proc_regset(struct proc_handle *phdl, proc_reg_t reg, unsigned long regvalue)
 		regs.r_eip = regvalue;
 #elif defined(__mips__)
 		regs.r_regs[PC] = regvalue;
+#if __has_feature(capabilities)
+		void * __capability pcc = get_pcc(phdl);
+		if (pcc == NULL)
+			return -1;
+		regs.r_regs[PC] -= cheri_getbase(pcc);
+#endif
 #elif defined(__powerpc__)
 		regs.pc = regvalue;
 #elif defined(__riscv)
 		regs.sepc = regvalue;
 #endif
 		break;
+	}
 	case REG_SP:
 #if defined(__aarch64__)
 		regs.sp = regvalue;
