@@ -68,11 +68,11 @@ END(malta_cpu_configure)
 
 /*
  * Called on APs to wait until they are told to launch.
+ *
+ * v0 should contain the result of platform_processor_id, above.
+ * Preserve s0.
  */
 LEAF(malta_ap_wait)
-	jal	platform_processor_id
-	nop
-
 	PTR_LA	t1, malta_ap_boot
 
 1:
@@ -86,7 +86,7 @@ LEAF(malta_ap_wait)
 	beqz	t0, 1b
 	nop
 
-	j	mpentry
+	jr	ra
 	nop
 END(malta_ap_wait)
 #endif

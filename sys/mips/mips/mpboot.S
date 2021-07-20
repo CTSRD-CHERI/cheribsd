@@ -97,10 +97,20 @@ GLOBAL(mpentry)
 	cmove CHERI_REG_C28, $cnull
 #endif
 
+#if defined(CPU_MALTA)
+	jal     malta_cpu_configure
+	nop
+#endif
+
 	PTR_LA	t9, platform_processor_id	/* get the processor number */
 	jalr	t9
 	nop
 	move	s0, v0
+
+#if defined(CPU_MALTA)
+	jal	malta_ap_wait
+	nop
+#endif
 
 	/*
 	 * Initialize stack and call machine startup
