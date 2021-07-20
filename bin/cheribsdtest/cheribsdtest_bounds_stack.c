@@ -76,13 +76,7 @@ test_bounds_precise(void * __capability c, size_t expected_len)
 	len = cheri_getlen(c);
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	/* Confirm precise lower bound: offset of zero. */
-	CHERIBSDTEST_VERIFY2(offset == 0,
-	    "offset (%jd) not zero: %#lp", offset, c);
-
-	/* Confirm precise upper bound: length of expected size for type. */
-	CHERIBSDTEST_VERIFY2(len == expected_len,
-	    "length (%jd) not expected %jd: %#lp", len, expected_len, c);
+	CHERIBSDTEST_CHECK_CAP_BOUNDS_PRECISE(c, expected_len);
 #else
 	/*
 	 * In hybrid mode we don't increase alignment of allocations to ensure
