@@ -93,7 +93,14 @@ __ElfType(Auxinfo);
 
 #define	ELF_MACHINE_OK(x) ((x) == (ELF_ARCH))
 
-#define	ELF_IS_CHERI(hdr) (((hdr)->e_flags & EF_AARCH64_CHERI_PURECAP) != 0)
+/*
+ * TODO: Remove old e_entry check. This is deprecated, but needed to support
+ * binaries built with a compiler and linker that predate setting the ELF flag
+ * appropriately.
+ */
+#define	ELF_IS_CHERI(hdr) \
+    ((((hdr)->e_flags & EF_AARCH64_CHERI_PURECAP) != 0) || \
+     (((hdr)->e_entry & 1) == 1))
 
 /* Define "machine" characteristics */
 #if __ELF_WORD_SIZE == 64
