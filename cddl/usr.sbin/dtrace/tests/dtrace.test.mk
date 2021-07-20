@@ -13,7 +13,8 @@ ${TESTGROUP}EXEPACKAGE=	${PACKAGE}
 
 TESTWRAPPER=	t_dtrace_contrib
 ATF_TESTS_SH+=	${TESTWRAPPER}
-TEST_METADATA.t_dtrace_contrib+= required_files="/usr/local/bin/ksh"
+# When ksh is not available, sh is used.
+# TEST_METADATA.t_dtrace_contrib+= required_files="/usr/local/bin/ksh"
 TEST_METADATA.t_dtrace_contrib+= required_user="root"
 
 GENTEST?=	${.CURDIR:H:H}/tools/gentest.sh

@@ -31,7 +31,6 @@ TESTS_SUBDIRS+= aggs \
 		io \
 		ip \
 		java_api \
-		json \
 		lexer \
 		llquantize \
 		mdb \
@@ -80,10 +79,16 @@ TESTS_SUBDIRS+= aggs \
 		types \
 		uctf \
 		union \
-		usdt \
 		ustack \
 		vars \
 		version \
+
+# A few tests how did not compile in CHERI have been removed from here.
+# The problems were missing dependencies.
+.if !${TARGET_ARCH:M*cheri*}
+TESTS_SUBDIRS += json \
+		usdt
+.endif
 
 .PATH:		${.CURDIR:H:H:H:H:H}/tests
 KYUAFILE=	YES

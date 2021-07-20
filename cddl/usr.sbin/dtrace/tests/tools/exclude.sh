@@ -206,3 +206,5 @@ exclude EXFAIL common/usdt/tst.user.ksh
 
 # Triggers a lock assertion by using the raise() action from a profile probe.
 exclude SKIP common/ustack/tst.spin.ksh
+
+. $(dirname "$0")/exclude_cheri.sh
