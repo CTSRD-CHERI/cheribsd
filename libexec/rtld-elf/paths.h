@@ -41,7 +41,7 @@
 #define	_PATH_ELF_HINTS		"/var/run/ld-cheri-elf.so.hints"
 #define	_PATH_LIBMAP_CONF	"/etc/libmap-cheri.conf"
 #define	_BASENAME_RTLD		_CHERIABI_BASENAME_RTLD
-#define	STANDARD_LIBRARY_PATH	"/libcheri:/usr/libcheri"
+#define	STANDARD_LIBRARY_PATH	"/lib64c:/usr/lib64c"
 #define	LD_			"LD_CHERI_"
 #endif
 

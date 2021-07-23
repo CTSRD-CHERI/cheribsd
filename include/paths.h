@@ -68,7 +68,7 @@
 #define	_PATH_GELI	"/sbin/geli"
 #define	_PATH_HALT	"/sbin/halt"
 #if defined(COMPAT_CHERI)
-#define	_PATH_I18NMODULE	"/usr/libcheri/i18n"
+#define	_PATH_I18NMODULE	"/usr/lib64c/i18n"
 #elif defined(COMPAT_32BIT)
 #define	_PATH_I18NMODULE	"/usr/lib32/i18n"
 #elif defined(COMPAT_64BIT)

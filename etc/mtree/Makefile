@@ -9,7 +9,7 @@ FILES=	\
 	BSD.root.dist \
 	${_BSD.lib32.dist} \
 	${_BSD.lib64.dist} \
-	${_BSD.libcheri.dist} \
+	${_BSD.lib64c.dist} \
 	${_BSD.libsoft.dist} \
 	${_BSD.sendmail.dist} \
 	${_BSD.tests.dist} \
@@ -17,7 +17,7 @@ FILES=	\
 	BSD.var.dist
 
 .if ${MK_COMPAT_CHERIABI} != "no"
-_BSD.libcheri.dist=	BSD.libcheri.dist
+_BSD.lib64c.dist=	BSD.lib64c.dist
 .endif
 .if ${MK_LIB32} != "no"
 _BSD.lib32.dist=	BSD.lib32.dist
