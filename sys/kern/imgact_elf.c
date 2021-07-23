@@ -1552,7 +1552,7 @@ ret:
 	return (error);
 }
 
-#define	suword __CONCAT(suword, __ELF_WORD_SIZE)
+#define	elf_suword __CONCAT(suword, __ELF_WORD_SIZE)
 
 #ifdef __ELF_CHERI
 static void * __capability
@@ -1759,7 +1759,7 @@ __elfN(freebsd_fixup)(uintcap_t *stack_base, struct image_params *imgp)
 
 	base = (Elf_Addr * __capability)*stack_base;
 	base--;
-	if (suword(base, imgp->args->argc) == -1)
+	if (elf_suword(base, imgp->args->argc) == -1)
 		return (EFAULT);
 	*stack_base = (uintcap_t)base;
 #else
