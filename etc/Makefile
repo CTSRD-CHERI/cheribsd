@@ -104,8 +104,8 @@ MTREES=		mtree/BSD.root.dist		/		\
 		mtree/BSD.include.dist		/usr/include	\
 		mtree/BSD.debug.dist		/usr/lib
 .if ${MK_COMPAT_CHERIABI} != "no"
-MTREES+=	mtree/BSD.libcheri.dist		/usr
-MTREES+=	mtree/BSD.libcheri.dist		/usr/lib/debug/usr
+MTREES+=	mtree/BSD.lib64c.dist		/usr
+MTREES+=	mtree/BSD.lib64c.dist		/usr/lib/debug/usr
 .endif
 .if ${MK_LIB32} != "no"
 MTREES+=	mtree/BSD.lib32.dist		/usr

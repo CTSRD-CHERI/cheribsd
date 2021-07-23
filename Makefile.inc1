@@ -894,11 +894,11 @@ XCFLAGS+=	${BFLAGS}
 .endif
 
 .if ${MK_COMPAT_CHERIABI} == "yes"
-_LIBCOMPAT=CHERI
+_LIBCOMPAT= 64C
 .elif ${MK_LIB32} == "yes"
 _LIBCOMPAT= 32
 .elif ${MK_LIB64} == "yes"
-_LIBCOMPAT=64
+_LIBCOMPAT= 64
 .elif ${MK_LIBSOFT} == "yes"
 _LIBCOMPAT= SOFT
 .endif
@@ -1653,9 +1653,9 @@ restage reinstall reinstallsysroot: .MAKE .PHONY
 	@echo ">>> Adding symlinks for native ABI libdir: ${MACHINE_ABI}"
 	@echo "--------------------------------------------------------------"
 .if ${MACHINE_ABI:Mpurecap}
-	@echo "Purecap ABI: creating libcheri links"
-	ln -sfnv lib ${DESTDIR}/libcheri
-	ln -sfnv lib ${DESTDIR}/usr/libcheri
+	@echo "Purecap ABI: creating lib64c links"
+	ln -sfnv lib ${DESTDIR}/lib64c
+	ln -sfnv lib ${DESTDIR}/usr/lib64c
 .elif ${MACHINE_ABI:Mptr64}
 	@echo "64-bit ABI: creating lib64 links"
 	ln -sfnv lib ${DESTDIR}/lib64
@@ -1666,6 +1666,14 @@ restage reinstall reinstallsysroot: .MAKE .PHONY
 	ln -sfnv lib ${DESTDIR}/usr/lib32
 .else
 .error "MACHINE_ABI incorrect? ${MACHINE_ABI}"
+.endif
+.if ${MACHINE_ABI:Mpurecap}
+	@echo "Purecap ABI: creating libcheri links"
+	ln -sfnv lib ${DESTDIR}/libcheri
+	ln -sfnv lib ${DESTDIR}/usr/libcheri
+.elif ${MK_COMPAT_CHERIABI} == "yes"
+	@echo "Hybrid ABI: creating libcheri links"
+	ln -sfnv lib64c ${DESTDIR}/usr/libcheri
 .endif
 .if make(reinstallsysroot)
 	@echo "Removing $$(find ${DESTDIR} -type d -empty -print | wc -l) empty directories from ${DESTDIR}"

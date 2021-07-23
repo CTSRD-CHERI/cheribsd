@@ -36,7 +36,7 @@
 #define	LIBSTDBUF	"/usr/lib/libstdbuf.so"
 #define	LIBSTDBUF32	"/usr/lib32/libstdbuf.so"
 #define	LIBSTDBUF64	"/usr/lib64/libstdbuf.so"
-#define	LIBSTDBUFCHERI	"/usr/libcheri/libstdbuf.so"
+#define	LIBSTDBUFCHERI	"/usr/lib64c/libstdbuf.so"
 
 extern char *__progname;
 
