@@ -289,7 +289,7 @@ vm_do_cheri_revoke(int *res, const struct vm_cheri_revoke_cookie *crc,
 		void * __capability cscratch;
 		int ok;
 
-		uintcap_t cutr = cheri_revoke(cut);
+		uintcap_t cutr = cheri_revoke_cap(cut);
 
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
 

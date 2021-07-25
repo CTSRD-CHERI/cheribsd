@@ -290,7 +290,7 @@ vm_do_cheri_revoke(int *res,
 		void * __capability cscratch;
 		int ok;
 
-		uintcap_t cutr = cheri_revoke(cut);
+		uintcap_t cutr = cheri_revoke_cap(cut);
 
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
 

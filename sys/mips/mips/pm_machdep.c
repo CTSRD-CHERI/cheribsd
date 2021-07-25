@@ -775,7 +775,7 @@ cheri_revoke_reg(const struct vm_cheri_revoke_cookie *crc,
 	if (cheri_gettag(r)) {
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
 		if (vm_cheri_revoke_test(crc, r)) {
-			*rp = (void * __capability)cheri_revoke(r);
+			*rp = (void * __capability)cheri_revoke_cap(r);
 			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 		}
 	}

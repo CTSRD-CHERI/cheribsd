@@ -1252,7 +1252,7 @@ cheri_revoke_td_frame(struct thread *td,
 	do { if (cheri_gettag(r)) { \
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found); \
 		if (vm_cheri_revoke_test(crc, r)) { \
-			r = cheri_revoke(r); \
+			r = cheri_revoke_cap(r); \
 			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared); \
 		} \
 	    }} while(0)

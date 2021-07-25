@@ -2699,7 +2699,7 @@ aio_cheri_revoke_one(struct proc *p,
 
 	if (revsival)
 		job->uaiocb.aio_sigevent.sigev_value.sival_ptr =
-		    (void * __capability)cheri_revoke(sival);
+		    (void * __capability)cheri_revoke_cap(sival);
 
 	if (revujob || revaiobuf || revkerninfo || revspare2) {
 		aio_cancel_job(p, ki, job);
@@ -2709,18 +2709,19 @@ aio_cheri_revoke_one(struct proc *p,
 	}
 
 	if (revujob)
-		job->ujob = (void * __capability)cheri_revoke(ujob);
+		job->ujob = (void * __capability)cheri_revoke_cap(ujob);
 
 	if (revaiobuf)
-		job->uaiocb.aio_buf = (void * __capability)cheri_revoke(aiobuf);
+		job->uaiocb.aio_buf =
+		    (void * __capability)cheri_revoke_cap(aiobuf);
 
 	if (revkerninfo)
 		job->uaiocb._aiocb_private.kernelinfo =
-		    (void * __capability)cheri_revoke(kerninfo);
+		    (void * __capability)cheri_revoke_cap(kerninfo);
 
 	if (revspare2)
 		job->uaiocb.__spare2__ =
-		    (void * __capability)cheri_revoke(spare2);
+		    (void * __capability)cheri_revoke_cap(spare2);
 
 	job->jobflags ^= KAIOCB_CAPREV_EPOCH;
 

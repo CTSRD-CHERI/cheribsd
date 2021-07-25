@@ -1404,7 +1404,7 @@ ktimer_cheri_revoke(struct proc *p, const struct vm_cheri_revoke_cookie *crc)
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
 		if (vm_cheri_revoke_test(crc, v)) {
 			it->it_sigev.sigev_value.sival_ptr =
-			    (void * __capability)cheri_revoke(v);
+			    (void * __capability)cheri_revoke_cap(v);
 			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 		}
 	}

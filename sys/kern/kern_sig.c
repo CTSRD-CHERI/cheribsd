@@ -1771,7 +1771,7 @@ sigaltstack_cheri_revoke(struct thread *td,
 		if (vm_cheri_revoke_test(crc, sp)) {
 			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 			td->td_sigstk.ss_sp =
-			    (void * __capability)cheri_revoke(sp);
+			    (void * __capability)cheri_revoke_cap(sp);
 		}
 	}
 }
