@@ -574,9 +574,9 @@ vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 	 * under us.  Go sweep via the DMAP.
 	 */
 	mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-	mve = mva + pagesizes[0];
+	mve = mva + PAGE_SIZE;
 
-	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), pagesizes[0]);
+	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), PAGE_SIZE);
 
 	res = vm_cheri_revoke_page_iter(crc, vm_do_cheri_revoke, mvu, mve);
 
@@ -652,9 +652,9 @@ vm_cheri_revoke_page_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 	int res = 0;
 
 	mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-	mve = mva + pagesizes[0];
+	mve = mva + PAGE_SIZE;
 
-	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), pagesizes[0]);
+	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), PAGE_SIZE);
 
 	res = vm_cheri_revoke_page_iter(crc, vm_cheri_revoke_page_ro_adapt, mvu,
 	    mve);

@@ -546,9 +546,9 @@ vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 	KASSERT(
 	    MIPS_DIRECT_MAPPABLE(mpa), ("Revoke not directly map swept page?"));
 	mva = (uintcap_t * __capability)MIPS_PHYS_TO_DIRECT(mpa);
-	mve = (__cheri_addr vm_pointer_t)mva + pagesizes[m->psind];
+	mve = (__cheri_addr vm_pointer_t)mva + PAGE_SIZE;
 
-	mva = cheri_setbounds(mva, pagesizes[m->psind]);
+	mva = cheri_setbounds(mva, PAGE_SIZE);
 
 	res = vm_cheri_revoke_page_iter(crc, vm_do_cheri_revoke, mva, mve);
 
@@ -617,9 +617,9 @@ vm_cheri_revoke_page_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 	KASSERT(
 	    MIPS_DIRECT_MAPPABLE(mpa), ("Revoke not directly map swept page?"));
 	mva = (uintcap_t * __capability)MIPS_PHYS_TO_DIRECT(mpa);
-	mve = (__cheri_addr vm_pointer_t)mva + pagesizes[m->psind];
+	mve = (__cheri_addr vm_pointer_t)mva + PAGE_SIZE;
 
-	mva = cheri_setbounds(mva, pagesizes[m->psind]);
+	mva = cheri_setbounds(mva, PAGE_SIZE);
 
 	res = vm_cheri_revoke_page_iter(crc, vm_cheri_revoke_page_ro_adapt, mva,
 	    mve);
