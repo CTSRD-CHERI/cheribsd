@@ -239,7 +239,7 @@ vm_cheri_revoke_fault_visit(struct vmspace *uvms, vm_offset_t va)
 	    ("vm_cheri_revoke_cooke_init failure in fault_visit"));
 
 again:
-	pres = pmap_caploadgen_update(upmap, &va, &m,
+	pres = pmap_caploadgen_update(upmap, va, &m,
 	    PMAP_CAPLOADGEN_UPDATETLB | PMAP_CAPLOADGEN_WIRE |
 	    (hascap ? PMAP_CAPLOADGEN_HASCAPS : 0));
 
@@ -370,10 +370,9 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 	 * m->a.flags has PGA_CAPSTORE clear (PMAP_CAPLOADGEN_CLEAN).
 	 */
 	if (flags & VM_CHERI_REVOKE_LOAD_SIDE) {
-		vm_offset_t addr2 = addr;
 		int pmres;
 
-		pmres = pmap_caploadgen_update(crc->map->pmap, &addr2, &m, 0);
+		pmres = pmap_caploadgen_update(crc->map->pmap, addr, &m, 0);
 
 		switch (pmres) {
 		case PMAP_CAPLOADGEN_OK:
@@ -381,7 +380,7 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 			panic("Bad first return from pmap_caploadgen_update");
 		case PMAP_CAPLOADGEN_ALREADY:
 		case PMAP_CAPLOADGEN_CLEAN:
-			*ooff = ioff + (addr2 - addr);
+			*ooff = ioff + PAGE_SIZE;
 			return VM_CHERI_REVOKE_AT_OK;
 		case PMAP_CAPLOADGEN_UNABLE:
 			break;
@@ -569,11 +568,10 @@ ok:
 	 * to update the LCLG bit now.
 	 */
 	if (!mdidvm && (flags & VM_CHERI_REVOKE_LOAD_SIDE)) {
-		vm_offset_t addr2 = addr;
 		vm_page_t m2 = m;
 		int pmres;
 
-		pmres = pmap_caploadgen_update(crc->map->pmap, &addr2, &m2,
+		pmres = pmap_caploadgen_update(crc->map->pmap, addr, &m2,
 		    PMAP_CAPLOADGEN_EXCLUSIVE /* object locked */ |
 		    (viscap ? PMAP_CAPLOADGEN_HASCAPS : 0));
 
@@ -603,10 +601,9 @@ ok:
 	 */
 	if (mdidvm && (flags & VM_CHERI_REVOKE_LOAD_SIDE)) {
 		int pmres;
-		vm_offset_t addr2 = addr;
 		vm_page_t m2 = NULL;
 
-		pmres = pmap_caploadgen_update(crc->map->pmap, &addr2, &m2,
+		pmres = pmap_caploadgen_update(crc->map->pmap, addr, &m2,
 		    PMAP_CAPLOADGEN_EXCLUSIVE /* object locked */ |
 		    (viscap ? PMAP_CAPLOADGEN_HASCAPS : 0));
 		switch(pmres) {
@@ -631,7 +628,7 @@ ok:
 		!(flags & VM_CHERI_REVOKE_BARRIERED),
 	    ("Capdirty page after visit with world stopped?"));
 
-	*ooff = ioff + pagesizes[0];
+	*ooff = ioff + PAGE_SIZE;
 	if (mwired)
 		vm_cheri_revoke_unwire_in_situ(m);
 	if (m->object != obj) {

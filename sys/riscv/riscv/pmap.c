@@ -3652,13 +3652,12 @@ pmap_caploadgen_update_clear_cw(pt_entry_t *pte, pt_entry_t oldpte)
 }
 
 int
-pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
+pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 {
 	enum pmap_caploadgen_res res;
 	pd_entry_t *l2, l2e;
 	pt_entry_t *pte, oldpte = 0;
 	vm_page_t m;
-	vm_offset_t va = *pva;
 
 	PMAP_LOCK(pmap);
 
@@ -3713,7 +3712,6 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 		if (flags & PMAP_CAPLOADGEN_UPDATETLB)
 			sfence_vma_page(va);
 
-		*pva = va + PAGE_SIZE;
 		m = NULL;
 		res = PMAP_CAPLOADGEN_ALREADY;
 		goto out;
@@ -3728,7 +3726,6 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 		 * scanned), so go ahead and update.  We know that the CLG bits
 		 * must still be wrong in light of the earlier test.
 		 */
-		*pva = va + PAGE_SIZE;
 		res = PMAP_CAPLOADGEN_OK;
 
 		if (!(flags & PMAP_CAPLOADGEN_HASCAPS)) {
@@ -3810,7 +3807,6 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 			sfence_vma_page(va);
 		}
 
-		*pva = va + PAGE_SIZE;
 		m = NULL;
 		res = PMAP_CAPLOADGEN_CLEAN;
 	} else if ((flags & PMAP_CAPLOADGEN_WIRE) && !vm_page_wire_mapped(m)) {

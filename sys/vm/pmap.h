@@ -140,7 +140,7 @@ enum pmap_caploadgen_res {
 	PMAP_CAPLOADGEN_SCAN_CLEAN_RO = 8, /* scan, thinks itself clean & RO */
 	PMAP_CAPLOADGEN_SCAN_CLEAN_RW = 9, /* scan, thinks itself clean & RW */
 };
-int		 pmap_caploadgen_update(pmap_t, vm_offset_t *, vm_page_t *,
+int		 pmap_caploadgen_update(pmap_t, vm_offset_t, vm_page_t *,
 		    int flags);
 void		 pmap_caploadgen_next(pmap_t pmap);
 #endif
