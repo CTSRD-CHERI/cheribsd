@@ -2767,6 +2767,18 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va,
 static inline uint64_t
 cheri_pte_cr(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 {
+
+	/*
+	 * XXX NWF
+	 *
+	 * We'd like to take m having clear PGA_CAPSTORE as grounds to set
+	 * PTE_CR_TRAP, but we don't promise data dependence (well, tag
+	 * dependence) of capload faults, and there's no great way to let just
+	 * the one operation through, and trap-and-emulate is slow anyway.  For
+	 * the moment, just leave it be, but this merits more investigation.
+	 * See also pmap_caploadgen_test_all_clean.
+	 */
+
 	if (prot & VM_PROT_READ_CAP) {
 #ifdef CHERI_CAPREVOKE
 		if (va < VM_MAX_USER_ADDRESS) {
@@ -2780,19 +2792,6 @@ cheri_pte_cr(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot)
 		return PTE_CR_OK;
 #endif
 	} else {
-		/*
-		 * XXX NWF
-		 *
-		 * We'd rather trap than clear, but here we are.  This has
-		 * implications on the rest of the capdirty / load-side
-		 * revocation story: transitions which set PGA_CAPSTORE, and
-		 * therefore permit new capabilities in a page, must update all
-		 * of this pages' PTEs to have LCLG == GCLG.  When we can trap
-		 * instead, we can take that on lazily.
-		 *
-		 * XXX verify
-		 */
-
 		return PTE_CR_CLEAR;
 	}
 }
@@ -3523,6 +3522,21 @@ pmap_caploadgen_next(pmap_t pmap)
 }
 
 /* XREF pmap_page_test_mappings */
+/*
+ * XXX NWF
+ *
+ * This leaves all mappings with their PTEs configured for generation behavior,
+ * which isn't really what we want.  For cores that can do the data-dependent
+ * trap dance, it's OK, in that we shouldn't trap (there shouldn't be any
+ * capabilities here), but if we have made a mistake with capdirty tracking, we
+ * won't necessarily notice, in that we'll only trap in half of the epochs.
+ *
+ * We'd rather kick all the PTEs over to always trapping on cap loads, but that
+ * only really works if data-dependent traps are mandatory, and right now they
+ * aren't. (Toooba in particular doesn't yet do that.)  If we ever get here,
+ * update the bits of pmap_caploadgen_update and cheri_pte_cr that refers to
+ * this note, too.
+ */
 static void
 pmap_caploadgen_test_all_clean(vm_page_t m)
 {
@@ -3795,12 +3809,26 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 		KASSERT(!(oldpte & PTE_CW), ("!PGA_CAPSTORE but CW?"));
 		KASSERT(!(oldpte & PTE_CD), ("!PGA_CAPSTORE but CD?"));
 
+#ifdef INVARIANTS
 		/*
-		 * For tag-independent faults, we might still raise a
-		 * fault for !PGA_CAPSTORE pages if the TLB is holding
-		 * a stale LCLG.  Since the page really ought to be
-		 * capability clean at this point, we should be OK to
-		 * arbitarily manipulate the LCLG, so appease the TLB.
+		 * We think there aren't any capabilities on this page.  Make
+		 * sure we're not loading one.
+		 */
+		vm_offset_t mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+		mva += va & L3_OFFSET;
+		KASSERT(cheri_gettag(*(void * __capability *)mva) == 0,
+		    ("Cap on !PGA_CAPSTORE m=%p va=%lx", m, va));
+#endif
+
+		/*
+		 * For tag-independent faults, we might still raise a fault for
+		 * !PGA_CAPSTORE pages if the TLB is holding a stale LCLG.
+		 * Since the page really ought to be capability clean at this
+		 * point, we should be OK to arbitarily manipulate the LCLG, so
+		 * appease the TLB.
+		 *
+		 * See the note on pmap_caploadgen_test_all_clean for what we'd
+		 * rather do, though.
 		 */
 		pmap_caploadgen_update_crg(pmap, pte);
 		if (flags & PMAP_CAPLOADGEN_UPDATETLB) {
