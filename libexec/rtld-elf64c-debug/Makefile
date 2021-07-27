@@ -3,9 +3,9 @@
 NEED_COMPAT=	CHERI
 .include <bsd.compat.mk>
 
-PROG=	ld-cheri-elf-debug.so.1
+PROG=	ld-elf64c-debug.so.1
 MAN=
-MLINKS=	rtld.1 ld-cheri-elf-debug.so.1.1
+MLINKS=	rtld.1 ld-elf64c-debug.so.1.1
 
 RTLD_DEBUG_VERBOSE?=	3
 BUILD_RTLD_DEBUG:=	yes

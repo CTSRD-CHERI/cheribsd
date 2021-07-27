@@ -112,7 +112,7 @@ static __ElfN(Brandinfo) freebsd_brand_info = {
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf64_freebsd_sysvec,
 #if __has_feature(capabilities)
-	.interp_newpath	= "/libexec/ld-cheri-elf.so.1",
+	.interp_newpath	= "/libexec/ld-elf64c.so.1",
 #else
 	.interp_newpath	= NULL,
 #endif
