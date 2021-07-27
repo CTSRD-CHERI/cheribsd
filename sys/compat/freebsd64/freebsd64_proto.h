@@ -1907,6 +1907,14 @@ int	freebsd7_freebsd64_shmctl(struct thread *, struct freebsd7_freebsd64_shmctl_
 
 #ifdef COMPAT_FREEBSD10
 
+struct freebsd10_freebsd64__umtx_lock_args {
+	char umtx_l_[PADL_(struct umtx *)]; struct umtx * umtx; char umtx_r_[PADR_(struct umtx *)];
+};
+struct freebsd10_freebsd64__umtx_unlock_args {
+	char umtx_l_[PADL_(struct umtx *)]; struct umtx * umtx; char umtx_r_[PADR_(struct umtx *)];
+};
+int	freebsd10_freebsd64__umtx_lock(struct thread *, struct freebsd10_freebsd64__umtx_lock_args *);
+int	freebsd10_freebsd64__umtx_unlock(struct thread *, struct freebsd10_freebsd64__umtx_unlock_args *);
 
 #endif /* COMPAT_FREEBSD10 */
 
@@ -2241,6 +2249,8 @@ int	freebsd12_freebsd64_shm_open(struct thread *, struct freebsd12_freebsd64_shm
 #define	FREEBSD64_SYS_AUE_freebsd64_thr_create	AUE_THR_CREATE
 #define	FREEBSD64_SYS_AUE_freebsd64_thr_exit	AUE_THR_EXIT
 #define	FREEBSD64_SYS_AUE_freebsd64_thr_self	AUE_NULL
+#define	FREEBSD64_SYS_AUE_freebsd10_freebsd64__umtx_lock	AUE_NULL
+#define	FREEBSD64_SYS_AUE_freebsd10_freebsd64__umtx_unlock	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_extattr_list_fd	AUE_EXTATTR_LIST_FD
 #define	FREEBSD64_SYS_AUE_freebsd64_extattr_list_file	AUE_EXTATTR_LIST_FILE
 #define	FREEBSD64_SYS_AUE_freebsd64_extattr_list_link	AUE_EXTATTR_LIST_LINK

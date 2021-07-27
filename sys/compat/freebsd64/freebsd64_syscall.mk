@@ -288,6 +288,8 @@ MIASM =  \
 	freebsd64_thr_exit.o \
 	freebsd64_thr_self.o \
 	thr_kill.o \
+	freebsd10_freebsd64__umtx_lock.o \
+	freebsd10_freebsd64__umtx_unlock.o \
 	jail_attach.o \
 	freebsd64_extattr_list_fd.o \
 	freebsd64_extattr_list_file.o \

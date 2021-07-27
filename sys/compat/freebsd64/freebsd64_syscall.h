@@ -378,6 +378,8 @@
 #define	FREEBSD64_SYS_freebsd64_thr_exit	431
 #define	FREEBSD64_SYS_freebsd64_thr_self	432
 #define	FREEBSD64_SYS_thr_kill	433
+#define	FREEBSD64_SYS_freebsd10_freebsd64__umtx_lock	434
+#define	FREEBSD64_SYS_freebsd10_freebsd64__umtx_unlock	435
 #define	FREEBSD64_SYS_jail_attach	436
 #define	FREEBSD64_SYS_freebsd64_extattr_list_fd	437
 #define	FREEBSD64_SYS_freebsd64_extattr_list_file	438
