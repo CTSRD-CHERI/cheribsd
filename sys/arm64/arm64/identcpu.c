@@ -196,6 +196,7 @@ static const struct cpu_parts cpu_parts_research[] = {
 
 /* ARM Ltd. */
 static const struct cpu_parts cpu_parts_arm[] = {
+	{ CPU_PART_AEM_V8, "AEMv8" },
 	{ CPU_PART_FOUNDATION, "Foundation-Model" },
 	{ CPU_PART_CORTEX_A35, "Cortex-A35" },
 	{ CPU_PART_CORTEX_A53, "Cortex-A53" },
