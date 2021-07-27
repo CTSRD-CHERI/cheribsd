@@ -739,7 +739,7 @@ get_fpcontext(struct thread *td, mcontext_t *mcp)
 		KASSERT((curpcb->pcb_fpflags & ~PCB_FP_USERMASK) == 0,
 		    ("Non-userspace FPU flags set in get_fpcontext"));
 		memcpy(mcp->mc_fpregs.fp_q, curpcb->pcb_fpustate.vfp_regs,
-		    sizeof(mcp->mc_fpregs));
+		    sizeof(mcp->mc_fpregs.fp_q));
 		mcp->mc_fpregs.fp_cr = curpcb->pcb_fpustate.vfp_fpcr;
 		mcp->mc_fpregs.fp_sr = curpcb->pcb_fpustate.vfp_fpsr;
 		mcp->mc_fpregs.fp_flags = curpcb->pcb_fpflags;
@@ -770,7 +770,7 @@ set_fpcontext(struct thread *td, mcontext_t *mcp)
 		KASSERT(curpcb->pcb_fpusaved == &curpcb->pcb_fpustate,
 		    ("Called set_fpcontext while the kernel is using the VFP"));
 		memcpy(curpcb->pcb_fpustate.vfp_regs, mcp->mc_fpregs.fp_q,
-		    sizeof(mcp->mc_fpregs));
+		    sizeof(mcp->mc_fpregs.fp_q));
 		curpcb->pcb_fpustate.vfp_fpcr = mcp->mc_fpregs.fp_cr;
 		curpcb->pcb_fpustate.vfp_fpsr = mcp->mc_fpregs.fp_sr;
 		curpcb->pcb_fpflags = mcp->mc_fpregs.fp_flags & PCB_FP_USERMASK;
@@ -1014,10 +1014,11 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 }
 
 static void
-init_proc0(vm_offset_t kstack)
+init_proc0(vm_pointer_t kstack)
 {
 	struct pcpu *pcpup = &__pcpu[0];
 
+	/* XXX-AM: We need to set bounds on pcb and kstack here as in MIPS */
 	proc_linkup0(&proc0, &thread0);
 	thread0.td_kstack = kstack;
 	thread0.td_kstack_pages = KSTACK_PAGES;
@@ -1149,7 +1150,7 @@ print_efi_map_entry(struct efi_md *p)
 		type = types[p->md_type];
 	else
 		type = "<INVALID>";
-	printf("%23s %012lx %12p %08lx ", type, p->md_phys,
+	printf("%23s %012lx %#12lx %08lx ", type, p->md_phys,
 	    p->md_virt, p->md_pages);
 	if (p->md_attr & EFI_MD_ATTR_UC)
 		printf("UC ");
@@ -1191,7 +1192,7 @@ print_efi_map_entries(struct efi_map_header *efihdr)
 static void
 try_load_dtb(caddr_t kmdp)
 {
-	vm_offset_t dtbp;
+	vm_pointer_t dtbp;
 
 	dtbp = MD_FETCH(kmdp, MODINFOMD_DTBP, vm_offset_t);
 #if defined(FDT_DTB_STATIC)
@@ -1200,7 +1201,7 @@ try_load_dtb(caddr_t kmdp)
 	 * to use the statically embedded one.
 	 */
 	if (dtbp == 0)
-		dtbp = (vm_offset_t)&fdt_static_dtb;
+		dtbp = (vm_pointer_t)__unbounded_addressof(fdt_static_dtb);
 #endif
 
 	if (dtbp == (vm_offset_t)NULL) {
@@ -1399,13 +1400,8 @@ initarm(struct arm64_bootparams *abp)
 	pcpup = &__pcpu[0];
 	pcpu_init(pcpup, 0, sizeof(struct pcpu));
 
-	/*
-	 * Set the pcpu pointer with a backup in tpidr_el1 to be
-	 * loaded when entering the kernel from userland.
-	 */
-	__asm __volatile(
-	    "mov x18, %0 \n"
-	    "msr tpidr_el1, %0" :: "r"(pcpup));
+	/* Initialize the pcpu pointer for this cpu. */
+	init_cpu_pcpup(pcpup);
 
 	PCPU_SET(curthread, &thread0);
 	PCPU_SET(midr, get_midr());
@@ -1602,3 +1598,13 @@ DB_SHOW_COMMAND(vtop, db_show_vtop)
 		db_printf("show vtop <virt_addr>\n");
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20210413,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

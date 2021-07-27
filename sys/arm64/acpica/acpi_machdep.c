@@ -66,16 +66,16 @@ static void *
 map_table(vm_paddr_t pa, const char *sig)
 {
 	ACPI_TABLE_HEADER *header;
-	vm_offset_t length;
+	vm_size_t length;
 	void *table;
 
 	header = pmap_mapbios(pa, sizeof(ACPI_TABLE_HEADER));
 	if (strncmp(header->Signature, sig, ACPI_NAMESEG_SIZE) != 0) {
-		pmap_unmapbios((vm_offset_t)header, sizeof(ACPI_TABLE_HEADER));
+		pmap_unmapbios((vm_pointer_t)header, sizeof(ACPI_TABLE_HEADER));
 		return (NULL);
 	}
 	length = header->Length;
-	pmap_unmapbios((vm_offset_t)header, sizeof(ACPI_TABLE_HEADER));
+	pmap_unmapbios((vm_pointer_t)header, sizeof(ACPI_TABLE_HEADER));
 
 	table = pmap_mapbios(pa, length);
 	if (ACPI_FAILURE(AcpiTbChecksum(table, length))) {
@@ -107,10 +107,10 @@ probe_table(vm_paddr_t address, const char *sig)
 	}
 
 	if (strncmp(table->Signature, sig, ACPI_NAMESEG_SIZE) != 0) {
-		pmap_unmapbios((vm_offset_t)table, sizeof(ACPI_TABLE_HEADER));
+		pmap_unmapbios((vm_pointer_t)table, sizeof(ACPI_TABLE_HEADER));
 		return (0);
 	}
-	pmap_unmapbios((vm_offset_t)table, sizeof(ACPI_TABLE_HEADER));
+	pmap_unmapbios((vm_pointer_t)table, sizeof(ACPI_TABLE_HEADER));
 	return (1);
 }
 
@@ -121,7 +121,7 @@ acpi_unmap_table(void *table)
 	ACPI_TABLE_HEADER *header;
 
 	header = (ACPI_TABLE_HEADER *)table;
-	pmap_unmapbios((vm_offset_t)table, header->Length);
+	pmap_unmapbios((vm_pointer_t)table, header->Length);
 }
 
 /*
@@ -182,7 +182,7 @@ acpi_find_table(const char *sig)
 		if (xsdt == NULL) {
 			if (bootverbose)
 				printf("ACPI: Failed to map XSDT\n");
-			pmap_unmapbios((vm_offset_t)rsdp,
+			pmap_unmapbios((vm_pointer_t)rsdp,
 			    sizeof(ACPI_TABLE_RSDP));
 			return (0);
 		}
@@ -195,7 +195,7 @@ acpi_find_table(const char *sig)
 			}
 		acpi_unmap_table(xsdt);
 	}
-	pmap_unmapbios((vm_offset_t)rsdp, sizeof(ACPI_TABLE_RSDP));
+	pmap_unmapbios((vm_pointer_t)rsdp, sizeof(ACPI_TABLE_RSDP));
 
 	if (addr == 0)
 		return (0);

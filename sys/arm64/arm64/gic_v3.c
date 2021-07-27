@@ -145,7 +145,7 @@ enum gic_v3_xdist {
 };
 
 struct gic_v3_irqsrc {
-	struct intr_irqsrc	gi_isrc;
+	struct intr_irqsrc	gi_isrc __subobject_use_container_bounds;
 	uint32_t		gi_irq;
 	enum intr_polarity	gi_pol;
 	enum intr_trigger	gi_trig;
@@ -1269,3 +1269,12 @@ gic_v3_redist_init(struct gic_v3_softc *sc)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20210427,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject-bounds"
+//   ]
+// }
+// CHERI CHANGES END

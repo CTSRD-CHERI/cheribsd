@@ -33,9 +33,28 @@
 #ifndef _MACHINE_CHERI_H_
 #define _MACHINE_CHERI_H_
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	ASM_PTR_CONSTR "C"
+#else
+#define	ASM_PTR_CONSTR "r"
+#endif
+
 #ifdef _KERNEL
 #define	__USER_DDC	((void * __capability)curthread->td_frame->tf_ddc)
 #define	__USER_PCC	((void * __capability)curthread->td_frame->tf_elr)
+
+/*
+ * Special marker NOPs for the Morello FVP to start / stop region of interest
+ * in trace.
+ */
+#define	CHERI_START_TRACE	do {					\
+	__asm__ __volatile__("hlt 0xbeef");				\
+} while(0)
+#define	CHERI_STOP_TRACE	do {					\
+	__asm__ __volatile__("hlt 0xbeef");				\
+} while(0)
+
+struct thread;
 
 /*
  * Morello specific kernel utility functions.

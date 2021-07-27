@@ -389,9 +389,6 @@ BROKEN_OPTIONS+=CDDL ZFS
 .if ${__T:Mriscv*c*}
 # Crash in ZFS code. TODO: investigate
 BROKEN_OPTIONS+=CDDL
-
-# Some compilation failure: TODO: investigate
-BROKEN_OPTIONS+=SVN SVNLITE
 .endif
 
 # libcheri is MIPS-specific and requires CHERI

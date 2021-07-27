@@ -164,10 +164,18 @@
  * Note: The object is optimized to be aligned and will not work if it is
  * byte-packed.
  */
+#ifdef __CHERI_PURE_CAPABILITY__
+#if ACPI_MACHINE_WIDTH == 64
+#pragma pack(16)
+#else
+#pragma pack(8)
+#endif
+#else
 #if ACPI_MACHINE_WIDTH == 64
 #pragma pack(8)
 #else
 #pragma pack(4)
+#endif
 #endif
 
 /*******************************************************************************

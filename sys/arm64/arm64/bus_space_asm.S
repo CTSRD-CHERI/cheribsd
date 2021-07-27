@@ -29,22 +29,22 @@
 __FBSDID("$FreeBSD$");
 
 ENTRY(generic_bs_r_1)
-	ldrb	w0, [x1, x2]
+	ldrb	w0, [PTR(1), x2]
 	ret
 END(generic_bs_r_1)
 
 ENTRY(generic_bs_r_2)
-	ldrh	w0, [x1, x2]
+	ldrh	w0, [PTR(1), x2]
 	ret
 END(generic_bs_r_2)
 
 ENTRY(generic_bs_r_4)
-	ldr	w0, [x1, x2]
+	ldr	w0, [PTR(1), x2]
 	ret
 END(generic_bs_r_4)
 
 ENTRY(generic_bs_r_8)
-	ldr	x0, [x1, x2]
+	ldr	x0, [PTR(1), x2]
 	ret
 END(generic_bs_r_8)
 
@@ -55,14 +55,14 @@ ENTRY(generic_bs_rm_1)
 	/* Calculate the device address. */
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
 	 * x4 = Count
 	 */
 
 	/* Read the data. */
-1:	ldrb	w1, [x0]
-	strb	w1, [x3], #1
+1:	ldrb	w1, [PTR(0)]
+	strb	w1, [PTR(3)], #1
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -76,14 +76,14 @@ ENTRY(generic_bs_rm_2)
 	/* Calculate the device address. */
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
 	 * x4 = Count
 	 */
 
 	/* Read the data. */
-1:	ldrh	w1, [x0]
-	strh	w1, [x3], #2
+1:	ldrh	w1, [PTR(0)]
+	strh	w1, [PTR(3)], #2
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -97,14 +97,14 @@ ENTRY(generic_bs_rm_4)
 	/* Calculate the device address. */
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
 	 * x4 = Count
 	 */
 
 	/* Read the data. */
-1:	ldr	w1, [x0]
-	str	w1, [x3], #4
+1:	ldr	w1, [PTR(0)]
+	str	w1, [PTR(3)], #4
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -118,14 +118,14 @@ ENTRY(generic_bs_rm_8)
 	/* Calculate the device address. */
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
 	 * x4 = Count
 	 */
 
 	/* Read the data. */
-1:	ldr	x1, [x0]
-	str	x1, [x3], #8
+1:	ldr	x1, [PTR(0)]
+	str	x1, [PTR(3)], #8
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -139,14 +139,14 @@ ENTRY(generic_bs_rr_1)
 	/* Calculate the device address. */
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
-	 * x4 = Count
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
+	 * x/c4 = Count
 	 */
 
 	/* Read the data. */
-1:	ldrb	w1, [x0], #1
-	strb	w1, [x3], #1
+1:	ldrb	w1, [PTR(0)], #1
+	strb	w1, [PTR(3)], #1
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -160,14 +160,14 @@ ENTRY(generic_bs_rr_2)
 	/* Calculate the device address. */
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
 	 * x4 = Count
 	 */
 
 	/* Read the data. */
-1:	ldrh	w1, [x0], #2
-	strh	w1, [x3], #2
+1:	ldrh	w1, [PTR(0)], #2
+	strh	w1, [PTR(3)], #2
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -181,14 +181,14 @@ ENTRY(generic_bs_rr_4)
 	/* Calculate the device address. */
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
 	 * x4 = Count
 	 */
 
 	/* Read the data. */
-1:	ldr	w1, [x0], #4
-	str	w1, [x3], #4
+1:	ldr	w1, [PTR(0)], #4
+	str	w1, [PTR(3)], #4
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -202,14 +202,14 @@ ENTRY(generic_bs_rr_8)
 	/* Calculate the device address. */
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
 	 * x4 = Count
 	 */
 
 	/* Read the data. */
-1:	ldr	x1, [x0], #8
-	str	x1, [x3], #8
+1:	ldr	x1, [PTR(0)], #8
+	str	x1, [PTR(3)], #8
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -218,22 +218,22 @@ END(generic_bs_rr_8)
 
 
 ENTRY(generic_bs_w_1)
-	strb	w3, [x1, x2]
+	strb	w3, [PTR(1), x2]
 	ret
 END(generic_bs_w_1)
 
 ENTRY(generic_bs_w_2)
-	strh	w3, [x1, x2]
+	strh	w3, [PTR(1), x2]
 	ret
 END(generic_bs_w_2)
 
 ENTRY(generic_bs_w_4)
-	str	w3, [x1, x2]
+	str	w3, [PTR(1), x2]
 	ret
 END(generic_bs_w_4)
 
 ENTRY(generic_bs_w_8)
-	str	x3, [x1, x2]
+	str	x3, [PTR(1), x2]
 	ret
 END(generic_bs_w_8)
 
@@ -243,14 +243,14 @@ ENTRY(generic_bs_wm_1)
 
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
 	 * x4 = Count
 	 */
 
 	/* Write the data */
-1:	ldrb	w1, [x3], #1
-	strb	w1, [x0]
+1:	ldrb	w1, [PTR(3)], #1
+	strb	w1, [PTR(0)]
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -263,14 +263,14 @@ ENTRY(generic_bs_wm_2)
 
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
 	 * x4 = Count
 	 */
 
 	/* Write the data */
-1:	ldrh	w1, [x3], #2
-	strh	w1, [x0]
+1:	ldrh	w1, [PTR(3)], #2
+	strh	w1, [PTR(0)]
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -283,14 +283,14 @@ ENTRY(generic_bs_wm_4)
 
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
 	 * x4 = Count
 	 */
 
 	/* Write the data */
-1:	ldr	w1, [x3], #4
-	str	w1, [x0]
+1:	ldr	w1, [PTR(3)], #4
+	str	w1, [PTR(0)]
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -303,14 +303,14 @@ ENTRY(generic_bs_wm_8)
 
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
 	 * x4 = Count
 	 */
 
 	/* Write the data */
-1:	ldr	x1, [x3], #8
-	str	x1, [x0]
+1:	ldr	x1, [PTR(3)], #8
+	str	x1, [PTR(0)]
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -323,14 +323,14 @@ ENTRY(generic_bs_wr_1)
 	
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
 	 * x4 = Count
 	 */
 
 	/* Write the data */
-1:	ldrb	w1, [x3], #1
-	strb	w1, [x0], #1
+1:	ldrb	w1, [PTR(3)], #1
+	strb	w1, [PTR(0)], #1
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -343,14 +343,14 @@ ENTRY(generic_bs_wr_2)
 	
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
 	 * x4 = Count
 	 */
 
 	/* Write the data */
-1:	ldrh	w1, [x3], #2
-	strh	w1, [x0], #2
+1:	ldrh	w1, [PTR(3)], #2
+	strh	w1, [PTR(0)], #2
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -363,14 +363,14 @@ ENTRY(generic_bs_wr_4)
 	
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
 	 * x4 = Count
 	 */
 
 	/* Write the data */
-1:	ldr	w1, [x3], #4
-	str	w1, [x0], #4
+1:	ldr	w1, [PTR(3)], #4
+	str	w1, [PTR(0)], #4
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -383,14 +383,14 @@ ENTRY(generic_bs_wr_8)
 	
 	add	x0, x1, x2
 	/*
-	 * x0 = The device address.
-	 * x3 = The kernel address.
+	 * x/c0 = The device address.
+	 * x/c3 = The kernel address.
 	 * x4 = Count
 	 */
 
 	/* Write the data */
-1:	ldr	x1, [x3], #8
-	str	x1, [x0], #8
+1:	ldr	x1, [PTR(3)], #8
+	str	x1, [PTR(0)], #8
 	subs	x4, x4, #1
 	b.ne	1b
 
@@ -400,24 +400,29 @@ END(generic_bs_wr_8)
 ENTRY(generic_bs_fault)
 	mov	x0, #-1
 	ret
-END(bus_fault)
+END(generic_bs_fault)
 
 ENTRY(generic_bs_peek_1)
 	.globl	generic_bs_peek_1f
 generic_bs_peek_1f:
-	ldrb	w0, [x1, x2]	/* Checked instruction */
+	ldrb	w0, [PTR(1), x2]	/* Checked instruction */
 	dsb	sy
-	strb	w0,[x3]
+	strb	w0,[PTR(3)]
 	mov	x0, #0
 	ret
 END(generic_bs_peek_1)
 
+	.section .rodata
+	.globl generic_bs_peek_1_fault
+generic_bs_peek_1_fault:
+	.quad	generic_bs_peek_1f
+
 ENTRY(generic_bs_peek_2)
 	.globl	generic_bs_peek_2f
 generic_bs_peek_2f:
-	ldrh	w0, [x1, x2]	/* Checked instruction */
+	ldrh	w0, [PTR(1), x2]	/* Checked instruction */
 	dsb	sy
-	strh	w0,[x3]
+	strh	w0,[PTR(3)]
 	mov	x0, #0
 	ret
 END(generic_bs_peek_2)
@@ -425,9 +430,9 @@ END(generic_bs_peek_2)
 ENTRY(generic_bs_peek_4)
 	.globl	generic_bs_peek_4f
 generic_bs_peek_4f:
-	ldr	w0, [x1, x2]	/* Checked instruction */
+	ldr	w0, [PTR(1), x2]	/* Checked instruction */
 	dsb	sy
-	str	w0,[x3]
+	str	w0,[PTR(3)]
 	mov	x0, #0
 	ret
 END(generic_bs_peek_4)
@@ -435,9 +440,9 @@ END(generic_bs_peek_4)
 ENTRY(generic_bs_peek_8)
 	.globl	generic_bs_peek_8f
 generic_bs_peek_8f:
-	ldr	x0, [x1, x2]	/* Checked instruction */
+	ldr	x0, [PTR(1), x2]	/* Checked instruction */
 	dsb	sy
-	str	x0,[x3]
+	str	x0,[PTR(3)]
 	mov	x0, #0
 	ret
 END(generic_bs_peek_8)
@@ -445,7 +450,7 @@ END(generic_bs_peek_8)
 ENTRY(generic_bs_poke_1)
 	.globl	generic_bs_poke_1f
 generic_bs_poke_1f:
-	strb	w3, [x1, x2]	/* Checked instruction */
+	strb	w3, [PTR(1), x2]	/* Checked instruction */
 	dsb	sy
 	mov	x0, #0
 	ret
@@ -454,7 +459,7 @@ END(generic_bs_poke_1)
 ENTRY(generic_bs_poke_2)
 	.globl	generic_bs_poke_2f
 generic_bs_poke_2f:
-	strh	w3, [x1, x2]	/* Checked instruction */
+	strh	w3, [PTR(1), x2]	/* Checked instruction */
 	dsb	sy
 	mov	x0, #0
 	ret
@@ -463,7 +468,7 @@ END(generic_bs_poke_2)
 ENTRY(generic_bs_poke_4)
 	.globl	generic_bs_poke_4f
 generic_bs_poke_4f:
-	str	w3, [x1, x2]	/* Checked instruction */
+	str	w3, [PTR(1), x2]	/* Checked instruction */
 	dsb	sy
 	mov	x0, #0
 	ret
@@ -472,7 +477,7 @@ END(generic_bs_poke_4)
 ENTRY(generic_bs_poke_8)
 	.globl	generic_bs_poke_8f
 generic_bs_poke_8f:
-	str	x3, [x1, x2]	/* Checked instruction */
+	str	x3, [PTR(1), x2]	/* Checked instruction */
 	dsb	sy
 	mov	x0, #0
 	ret

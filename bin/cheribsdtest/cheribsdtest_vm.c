@@ -52,6 +52,7 @@
 
 #include <machine/frame.h>
 #include <machine/trap.h>
+#include <machine/vmparam.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
@@ -1031,7 +1032,79 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_insert_noperm,
 
 	cheribsdtest_success();
 }
-#endif
+
+#if PMAP_HAS_LARGEPAGES
+static int
+get_pagesizes(size_t ps[static MAXPAGESIZES])
+{
+	int count;
+
+	count = getpagesizes(ps, MAXPAGESIZES);
+	CHERIBSDTEST_VERIFY2(count != -1, "failed to get pagesizes");
+	CHERIBSDTEST_VERIFY2(ps[0] == PAGE_SIZE, "psind 0 is not PAGE_SIZE");
+	return (count);
+}
+
+/*
+ * Builds on FreeBSD testsuite posixshm_test:largepage_basic.
+ */
+CHERIBSDTEST(cheribsdtest_vm_shm_largepage_basic,
+    "Test basic largepage SHM mapping setup and teardown")
+{
+	void *addr;
+	size_t ps[MAXPAGESIZES];
+	int psind, psmax;
+	int fd;
+	unsigned int perms = (CHERI_PERM_LOAD | CHERI_PERM_STORE);
+	void * volatile *map_buffer;
+	int v;
+
+	psmax = get_pagesizes(ps);
+	for (psind = 1; psind < psmax; psind++) {
+		/* Skip very large pagesizes */
+		if (ps[psind] >= (1 << 30))
+			continue;
+
+		fd = shm_create_largepage(SHM_ANON, O_CREAT | O_RDWR, psind,
+		    SHM_LARGEPAGE_ALLOC_DEFAULT, /*mode*/0);
+		CHERIBSDTEST_VERIFY2(fd >= 0, "Failed to create largepage SHM fd "
+		    "psind=%d errno=%d", psind, errno);
+		CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, ps[psind]));
+		addr = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, ps[psind],
+		    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+
+		/* Verify mmap output */
+		CHERIBSDTEST_VERIFY2(cheri_gettag(addr) != 0,
+		    "mmap invalid capability for psind=%d", psind);
+		CHERIBSDTEST_VERIFY2(cheri_getlen(addr) == ps[psind],
+		    "mmap wrong capability length for psind=%d "
+		    "expected %jx found %jx",
+		    psind, ps[psind], cheri_getlen(addr));
+		CHERIBSDTEST_VERIFY2((cheri_getperm(addr) & perms) == perms,
+		    "mmap missing permission expected %jx found %jx",
+		    (uintmax_t)perms, (uintmax_t)cheri_getperm(addr));
+
+		/* Try to store capabilities in the SHM region */
+		map_buffer = (void * volatile *)addr;
+		*map_buffer = &v;
+		CHERIBSDTEST_VERIFY2(cheri_gettag(*map_buffer) != 0, "tag lost");
+
+		map_buffer = (void * volatile *)((uintptr_t)addr +
+		    ps[psind] / 2);
+		*map_buffer = &v;
+		CHERIBSDTEST_VERIFY2(cheri_gettag(*map_buffer) != 0, "tag lost");
+
+		map_buffer = (void * volatile *)((uintptr_t)addr +
+		    ps[psind] - PAGE_SIZE);
+		*map_buffer = &v;
+		CHERIBSDTEST_VERIFY2(cheri_gettag(*map_buffer) != 0, "tag lost");
+
+		CHERIBSDTEST_CHECK_SYSCALL(munmap(addr, ps[psind]));
+		CHERIBSDTEST_CHECK_SYSCALL(close(fd));
+	}
+	cheribsdtest_success();
+}
+#endif /* PMAP_HAS_LARGEPAGES */
 
 /*
  * Store a cap to a page and check that mincore reports it CAPSTORE.
@@ -1875,3 +1948,4 @@ CHERIBSDTEST(cheribsdtest_cheri_revoke_lib_fork,
 	cheribsdtest_success();
 }
 #endif
+#endif /* __CHERI_PURE_CAPABILITY__ */

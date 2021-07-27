@@ -43,6 +43,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <vm/vm_page.h>
 
+#include <cheri/cheric.h>
+
 struct mem_range_softc mem_range_softc;
 
 int
@@ -77,12 +79,18 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 		case CDEV_MINOR_KMEM:
 			/* If the address is in the DMAP just copy it */
 			if (VIRT_IN_DMAP(v)) {
+#ifdef __CHERI_PURE_CAPABILITY__
+				error = uiomove(cheri_setbounds(
+				    cheri_setaddress(dmap_base_cap, v), cnt),
+				    cnt, uio);
+#else
 				error = uiomove((void *)v, cnt, uio);
+#endif
 				break;
 			}
 
-			if (!kernacc((void *)v, cnt, uio->uio_rw == UIO_READ ?
-			    VM_PROT_READ : VM_PROT_WRITE)) {
+			if (!kernacc((void *)(uintptr_t)v, cnt, uio->uio_rw ==
+			    UIO_READ ? VM_PROT_READ : VM_PROT_WRITE)) {
 				error = EFAULT;
 				break;
 			}
@@ -98,8 +106,8 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 		case CDEV_MINOR_MEM:
 			/* If within the DMAP use this to copy from */
 			if (PHYS_IN_DMAP(v)) {
-				v = PHYS_TO_DMAP(v);
-				error = uiomove((void *)v, cnt, uio);
+				error = uiomove((void *)cheri_kern_setbounds(
+				    PHYS_TO_DMAP(v), cnt), cnt, uio);
 				break;
 			}
 

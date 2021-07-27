@@ -34,6 +34,7 @@
 .data
 .ascii "Device Tree Blob STARTS here"
 .global fdt_static_dtb
+.type	fdt_static_dtb, %object
 
 /*
  * The device tree blob must be aligned at 8-bytes boundary. Use
@@ -44,4 +45,5 @@
 .balign 8
 fdt_static_dtb:
 .incbin FDT_DTB_FILE
+.size	fdt_static_dtb, . - fdt_static_dtb
 .ascii "Device Tree Blob STOPS here"

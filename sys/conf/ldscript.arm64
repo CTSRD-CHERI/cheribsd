@@ -77,6 +77,7 @@ SECTIONS
   /* Adjust the address for the data segment.  We want to adjust up to
      the same address within the page on the next page up.  */
   . = ALIGN(0x1000) + (. & (0x1000 - 1)) ; 
+  .init_pagetable : { *(.init_pagetable) }
   .data    :
   {
     *(.data)
@@ -105,7 +106,8 @@ SECTIONS
   .sdata     : { *(.sdata) }
   _edata  =  .;
   PROVIDE (edata = .);
-  __bss_start = .;
+  . = ALIGN(16);
+  _bss_start = .;
   .sbss      : { *(.sbss) *(.scommon) }
   .bss       :
   {
@@ -113,7 +115,7 @@ SECTIONS
    *(.bss)
    *(COMMON)
   }
-  . = ALIGN(8);
+  . = ALIGN(16);
   _end = . ;
   PROVIDE (end = .);
   /* Stabs debugging sections.  */

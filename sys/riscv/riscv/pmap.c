@@ -1950,7 +1950,7 @@ pmap_pv_demote_l2(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	va &= ~L2_OFFSET;
 	pv = pmap_pvh_remove(pvh, pmap, va);
 	KASSERT(pv != NULL, ("pmap_pv_demote_l2: pv not found"));
-	m = PHYS_TO_VM_PAGE_UNBOUND(pa);
+	m = PHYS_TO_VM_PAGE(pa);
 	TAILQ_INSERT_TAIL(&m->md.pv_list, pv, pv_next);
 	m->md.pv_gen++;
 	/* Instantiate the remaining 511 pv entries. */
@@ -2011,7 +2011,7 @@ pmap_pv_promote_l2(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 
 	CHANGE_PV_LIST_LOCK_TO_PHYS(lockp, pa);
 
-	m = PHYS_TO_VM_PAGE_UNBOUND(pa);
+	m = PHYS_TO_VM_PAGE(pa);
 	pv = pmap_pvh_remove(&m->md, pmap, va);
 	KASSERT(pv != NULL, ("pmap_pv_promote_l2: pv for %#lx not found", va));
 	pvh = pa_to_pvh(pa);
@@ -2142,7 +2142,7 @@ pmap_remove_l2(pmap_t pmap, pt_entry_t *l2, vm_offset_t sva,
 		pvh = pa_to_pvh(PTE_TO_PHYS(oldl2));
 		pmap_pvh_free(pvh, pmap, sva);
 		eva = sva + L2_SIZE;
-		for (va = sva, m = PHYS_TO_VM_PAGE_UNBOUND(PTE_TO_PHYS(oldl2));
+		for (va = sva, m = PHYS_TO_VM_PAGE(PTE_TO_PHYS(oldl2));
 		    va < eva; va += PAGE_SIZE, m++) {
 			pmap_page_dirty(oldl2, m);
 			if ((oldl2 & PTE_A) != 0)
@@ -2436,7 +2436,7 @@ retryl2:
 				    (l2e & PTE_SW_MANAGED) != 0 &&
 				    (l2e & PTE_DIRTY_BITS) != 0) {
 					pa = PTE_TO_PHYS(l2e);
-					m = PHYS_TO_VM_PAGE_UNBOUND(pa);
+					m = PHYS_TO_VM_PAGE(pa);
 					for (mt = m; mt < &m[Ln_ENTRIES]; mt++)
 						pmap_page_dirty(l2e, mt);
 				}
@@ -4391,7 +4391,7 @@ pmap_remove_pages(pmap_t pmap)
 					continue;
 				}
 
-				m = PHYS_TO_VM_PAGE_UNBOUND(PTE_TO_PHYS(tpte));
+				m = PHYS_TO_VM_PAGE(PTE_TO_PHYS(tpte));
 				KASSERT((m->flags & PG_FICTITIOUS) != 0 ||
 				    m < &vm_page_array[vm_page_array_size],
 				    ("pmap_remove_pages: bad pte %#jx",

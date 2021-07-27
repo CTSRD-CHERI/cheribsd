@@ -150,6 +150,47 @@ reloc_instr_imm(Elf32_Addr *where, Elf_Addr val, u_int msb, u_int lsb)
 	return (0);
 }
 
+#if __has_feature(capabilities)
+static uintcap_t
+build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase,
+    Elf_Addr offset, void * __capability data_cap,
+    const void * __capability code_cap)
+{
+	Elf_Addr addr, size;
+	uint8_t perms;
+	uintcap_t cap;
+
+	addr = fragment[0];
+	size = fragment[1] & ((1UL << (8 * sizeof(Elf_Addr) - 8)) - 1);
+	perms = fragment[1] >> (8 * sizeof(Elf_Addr) - 8);
+
+	cap = perms == MORELLO_FRAG_EXECUTABLE ?
+	    (uintcap_t)code_cap : (uintcap_t)data_cap;
+	cap = cheri_setaddress(cap, relocbase + addr);
+
+	if (perms == MORELLO_FRAG_EXECUTABLE ||
+	    perms == MORELLO_FRAG_RODATA) {
+		cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+		    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+		    CHERI_PERM_STORE_LOCAL_CAP);
+	}
+	if (perms == MORELLO_FRAG_RWDATA ||
+	    perms == MORELLO_FRAG_RODATA) {
+		cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+		    CHERI_PERM_EXECUTE);
+		cap = cheri_setbounds(cap, size);
+	}
+	cap += offset;
+	if (perms == MORELLO_FRAG_EXECUTABLE) {
+		cap = cheri_sealentry(cap);
+	}
+	KASSERT(cheri_gettag(cap) != 0,
+	    ("Relocation produce invalid capability %#lp",
+	    (void * __capability)cap));
+	return (cap);
+}
+#endif
+
 /*
  * Process a relocation.  Support for some static relocations is required
  * in order for the -zifunc-noplt optimization to work.
@@ -160,7 +201,13 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 {
 #define	ARM64_ELF_RELOC_LOCAL		(1 << 0)
 #define	ARM64_ELF_RELOC_LATE_IFUNC	(1 << 1)
-	Elf_Addr *where, addr, addend, val;
+	Elf_Addr *where, addr, addend;
+#if __has_feature(capabilities)
+	uintcap_t cap;
+#endif
+#ifndef __CHERI_PURE_CAPABILITY__
+	Elf_Addr val;
+#endif
 	Elf_Word rtype, symidx;
 	const Elf_Rel *rel;
 	const Elf_Rela *rela;
@@ -195,6 +242,15 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 	if ((flags & ARM64_ELF_RELOC_LOCAL) != 0) {
 		if (rtype == R_AARCH64_RELATIVE)
 			*where = elf_relocaddr(lf, (Elf_Addr)relocbase + addend);
+#if __has_feature(capabilities)
+		else if (rtype == R_MORELLO_RELATIVE) {
+			cap = build_cap_from_fragment(where,
+			    (Elf_Addr)relocbase, addend,
+			    (__cheri_tocap void * __capability)relocbase,
+			    (__cheri_tocap void * __capability)relocbase);
+			*(uintcap_t *)(void *)where = cap;
+		}
+#endif
 		return (0);
 	}
 
@@ -234,11 +290,43 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		*where = addr + addend;
 		break;
 	case R_AARCH64_IRELATIVE:
+#ifdef __CHERI_PURE_CAPABILITY__
+		printf("kldload: AARCH64_IRELATIVE relocation should not "
+		    "exist in purecap CHERI kernel modules\n");
+		return (-1);
+#else
 		addr = (Elf_Addr)relocbase + addend;
 		val = ((Elf64_Addr (*)(void))addr)();
 		if (*where != val)
 			*where = val;
+#endif
 		break;
+#if __has_feature(capabilities)
+	case R_MORELLO_RELATIVE:
+		break;
+#ifdef __CHERI_PURE_CAPABILITY__
+	case R_MORELLO_CAPINIT:
+	case R_MORELLO_GLOB_DAT:
+		error = LINKER_SYMIDX_CAPABILITY(lf, symidx, 1, &cap);
+		if (error != 0)
+			return (-1);
+		cap += addend;
+		*(uintcap_t *)where = cap;
+		break;
+	case R_MORELLO_JUMP_SLOT:
+		error = LINKER_SYMIDX_CAPABILITY(lf, symidx, 1, &cap);
+		if (error != 0)
+			return (-1);
+		cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+		    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+		    CHERI_PERM_STORE_LOCAL_CAP);
+		*(uintcap_t *)where = cheri_sealentry(cap);
+		break;
+	case R_MORELLO_IRELATIVE:
+		panic("TODO implement R_MORELLO_IRELATIVE relocation");
+		break;
+#endif
+#endif
 	default:
 		printf("kldload: unexpected relocation type %d, "
 		    "symbol index %d\n", rtype, symidx);
@@ -279,7 +367,7 @@ elf_cpu_load_file(linker_file_t lf)
 {
 
 	if (lf->id != 1)
-		cpu_icache_sync_range((vm_offset_t)lf->address, lf->size);
+		cpu_icache_sync_range((vm_pointer_t)lf->address, lf->size);
 	return (0);
 }
 
@@ -296,11 +384,52 @@ elf_cpu_parse_dynamic(caddr_t loadbase __unused, Elf_Dyn *dynamic __unused)
 
 	return (0);
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Handle boot-time kernel relocations, this is called by locore.
+ */
+void
+elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
+{
+	const Elf_Rela *rela = NULL, *rela_end;
+	Elf_Addr *fragment;
+	uintptr_t cap;
+	size_t rela_size = 0;
+
+	for (; dynp->d_tag != DT_NULL; dynp++) {
+		switch (dynp->d_tag) {
+		case DT_RELA:
+			rela = (const Elf_Rela *)((const char *)data_cap +
+			    dynp->d_un.d_ptr);
+			break;
+		case DT_RELASZ:
+			rela_size = dynp->d_un.d_val;
+			break;
+		}
+	}
+
+	rela = cheri_setbounds(rela, rela_size);
+	rela_end = (const Elf_Rela *)((const char *)rela + rela_size);
+
+	for (; rela < rela_end; rela++) {
+		/* Can not panic yet */
+		if (ELF_R_TYPE(rela->r_info) != R_MORELLO_RELATIVE)
+			continue;
+
+		fragment = (Elf_Addr *)((char *)data_cap + rela->r_offset);
+		cap = build_cap_from_fragment(fragment, 0, rela->r_addend,
+		    data_cap, code_cap);
+		*((uintptr_t *)fragment) = cap;
+	}
+}
+#endif
 // CHERI CHANGES START
 // {
 //   "updated": 20200804,
 //   "target_type": "kernel",
 //   "changes_purecap": [
+//     "support",
 //     "pointer_as_integer"
 //   ]
 // }

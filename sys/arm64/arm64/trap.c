@@ -191,7 +191,6 @@ extern uint32_t generic_bs_poke_4f, generic_bs_poke_8f;
 static bool
 test_bs_fault(uintcap_t addr)
 {
-	/* TODO: Will need fixing for a purecap kernel */
 	return (addr == (uintcap_t)&generic_bs_peek_1f ||
 	    addr == (uintcap_t)&generic_bs_peek_2f ||
 	    addr == (uintcap_t)&generic_bs_peek_4f ||

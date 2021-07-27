@@ -29,6 +29,8 @@
 #ifndef	_MACHINE_ATOMIC_H_
 #define	_MACHINE_ATOMIC_H_
 
+#include <machine/cheri.h>
+
 #define	isb()		__asm __volatile("isb" : : : "memory")
 
 /*
@@ -71,12 +73,6 @@ extern bool lse_supported;
 #define	_ATOMIC_LSE_SUPPORTED	0
 #endif
 
-#ifndef __CHERI_PURE_CAPABILITY__
-#define	_ATOMIC_PTR_CONSTR	"r"
-#else
-#define	_ATOMIC_PTR_CONSTR	"C"
-#endif
-
 #define	_ATOMIC_OP_PROTO(t, op, bar, flav)				\
 static __inline void							\
 atomic_##op##_##bar##t##flav(volatile uint##t##_t *p, uint##t##_t val)
@@ -94,7 +90,7 @@ _ATOMIC_OP_PROTO(t, op, bar, _llsc)					\
 	    "   st"#l"xr"#s"	%w1, %"#w"0, [%2]\n"			\
 	    "   cbnz		%w1, 1b\n"				\
 	    : "=&r"(tmp), "=&r"(res)					\
-	    : _ATOMIC_PTR_CONSTR (p), "r" (val)				\
+	    : ASM_PTR_CONSTR (p), "r" (val)				\
 	    : "memory"							\
 	);								\
 }									\
@@ -109,7 +105,7 @@ _ATOMIC_OP_PROTO(t, op, bar, _lse)					\
 	    "ld"#lse_asm_op#a#l#s"	%"#w"2, %"#w"0, [%1]\n"		\
 	    ".arch_extension nolse\n"					\
 	    : "=r" (tmp)						\
-	    : _ATOMIC_PTR_CONSTR (p), "r" (val)				\
+	    : ASM_PTR_CONSTR (p), "r" (val)				\
 	    : "memory"							\
 	);								\
 }									\
@@ -176,7 +172,7 @@ _ATOMIC_CMPSET_PROTO(t, bar, _llsc)					\
 	    "   cbnz		%w1, 1b\n"				\
 	    "2:"							\
 	    : "=&r"(tmp), "=&r"(res)					\
-	    : _ATOMIC_PTR_CONSTR (p), "r" (cmpval), "r" (newval)	\
+	    : ASM_PTR_CONSTR (p), "r" (cmpval), "r" (newval)		\
 	    : "cc", "memory"						\
 	);								\
 									\
@@ -196,7 +192,7 @@ _ATOMIC_CMPSET_PROTO(t, bar, _lse)					\
 	    "cset		%w0, eq\n"				\
 	    ".arch_extension nolse\n"					\
 	    : "=r" (res), "+&r" (cmpval)				\
-	    : "r" (oldval), _ATOMIC_PTR_CONSTR (p), "r" (newval)	\
+	    : "r" (oldval), ASM_PTR_CONSTR (p), "r" (newval)		\
 	    : "cc", "memory"						\
 	);								\
 									\
@@ -227,7 +223,7 @@ _ATOMIC_FCMPSET_PROTO(t, bar, _llsc)					\
 	    "   st"#l"xr"#s"	%w1, %"#w"4, [%2]\n"			\
 	    "1:"							\
 	    : "=&r"(tmp), "=&r"(res)					\
-	    : _ATOMIC_PTR_CONSTR (p), "r" (_cmpval), "r" (newval)	\
+	    : ASM_PTR_CONSTR (p), "r" (_cmpval), "r" (newval)		\
 	    : "cc", "memory"						\
 	);								\
 	*cmpval = tmp;							\
@@ -248,7 +244,7 @@ _ATOMIC_FCMPSET_PROTO(t, bar, _lse)					\
 	    "cset		%w0, eq\n"				\
 	    ".arch_extension nolse\n"					\
 	    : "=r" (res), "+&r" (tmp)					\
-	    : "r" (_cmpval), _ATOMIC_PTR_CONSTR (p), "r" (newval)	\
+	    : "r" (_cmpval), ASM_PTR_CONSTR (p), "r" (newval)	\
 	    : "cc", "memory"						\
 	);								\
 	*cmpval = tmp;							\
@@ -297,7 +293,7 @@ _ATOMIC_FETCHADD_PROTO(t, _llsc)					\
 	    "   stxr	%w1, %"#w"0, [%3]\n"				\
             "   cbnz	%w1, 1b\n"					\
 	    : "=&r" (tmp), "=&r" (res), "=&r" (ret)			\
-	    : _ATOMIC_PTR_CONSTR (p), "r" (val)				\
+	    : ASM_PTR_CONSTR (p), "r" (val)				\
 	    : "memory"							\
 	);								\
 									\
@@ -313,7 +309,7 @@ _ATOMIC_FETCHADD_PROTO(t, _lse)						\
 	    "ldadd	%"#w"2, %"#w"0, [%1]\n"				\
 	    ".arch_extension nolse\n"					\
 	    : "=r" (ret)						\
-	    : _ATOMIC_PTR_CONSTR (p), "r" (val)				\
+	    : ASM_PTR_CONSTR (p), "r" (val)				\
 	    : "memory"							\
 	);								\
 									\
@@ -350,7 +346,7 @@ _ATOMIC_SWAP_PROTO(t, _llsc)						\
 	    "   stxr	%w0, %"#w"3, [%2]\n"				\
             "   cbnz	%w0, 1b\n"					\
 	    : "=&r" (res), "=&r" (ret)					\
-	    : _ATOMIC_PTR_CONSTR (p), "r" (val)				\
+	    : ASM_PTR_CONSTR (p), "r" (val)				\
 	    : "memory"							\
 	);								\
 									\
@@ -366,7 +362,7 @@ _ATOMIC_SWAP_PROTO(t, _lse)						\
 	    "swp	%"#w"2, %"#w"0, [%1]\n"				\
 	    ".arch_extension nolse\n"					\
 	    : "=r" (ret)						\
-	    : _ATOMIC_PTR_CONSTR (p), "r" (val)				\
+	    : ASM_PTR_CONSTR (p), "r" (val)				\
 	    : "memory"							\
 	);								\
 									\
@@ -391,7 +387,7 @@ _ATOMIC_READANDCLEAR_PROTO(t, _llsc)					\
 	    "   stxr	%w0, "#zreg", [%2]\n"				\
 	    "   cbnz	%w0, 1b\n"					\
 	    : "=&r" (res), "=&r" (ret)					\
-	    : _ATOMIC_PTR_CONSTR (p)					\
+	    : ASM_PTR_CONSTR (p)					\
 	    : "memory"							\
 	);								\
 									\
@@ -431,7 +427,7 @@ _ATOMIC_TEST_OP_PROTO(t, op, _llsc)					\
 	    "   stxr		%w1, %"#w"0, [%3]\n"			\
 	    "   cbnz		%w1, 1b\n"				\
 	    : "=&r" (tmp), "=&r" (res), "=&r" (old)			\
-	    : _ATOMIC_PTR_CONSTR (p), "r" (mask)			\
+	    : ASM_PTR_CONSTR (p), "r" (mask)				\
 	    : "memory"							\
 	);								\
 									\
@@ -448,7 +444,7 @@ _ATOMIC_TEST_OP_PROTO(t, op, _lse)					\
 	    "ld"#lse_asm_op"	%"#w"2, %"#w"0, [%1]\n"			\
 	    ".arch_extension nolse\n"					\
 	    : "=r" (old)						\
-	    : _ATOMIC_PTR_CONSTR (p), "r" (mask)			\
+	    : ASM_PTR_CONSTR (p), "r" (mask)			\
 	    : "memory"							\
 	);								\
 									\
@@ -479,7 +475,7 @@ atomic_load_acq_##t(volatile uint##t##_t *p)				\
 	__asm __volatile(						\
 	    "ldar"#s"	%"#w"0, [%1]\n"					\
 	    : "=&r" (ret)						\
-	    : _ATOMIC_PTR_CONSTR (p)					\
+	    : ASM_PTR_CONSTR (p)					\
 	    : "memory");						\
 									\
 	return (ret);							\
@@ -499,7 +495,7 @@ atomic_store_rel_##t(volatile uint##t##_t *p, uint##t##_t val)		\
 	__asm __volatile(						\
 	    "stlr"#s"	%"#w"0, [%1]\n"					\
 	    :								\
-	    : "r" (val), _ATOMIC_PTR_CONSTR (p)				\
+	    : "r" (val), ASM_PTR_CONSTR (p)				\
 	    : "memory");						\
 }
 
@@ -548,6 +544,7 @@ _ATOMIC_STORE_REL_IMPL(64,  ,  )
 #define	atomic_testandclear_long	atomic_testandclear_64
 #define	atomic_testandset_long		atomic_testandset_64
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	atomic_add_ptr			atomic_add_64
 #define	atomic_fcmpset_ptr		atomic_fcmpset_64
 #define	atomic_clear_ptr		atomic_clear_64
@@ -557,6 +554,7 @@ _ATOMIC_STORE_REL_IMPL(64,  ,  )
 #define	atomic_set_ptr			atomic_set_64
 #define	atomic_swap_ptr			atomic_swap_64
 #define	atomic_subtract_ptr		atomic_subtract_64
+#endif
 
 #define	atomic_add_acq_long		atomic_add_acq_64
 #define	atomic_fcmpset_acq_long		atomic_fcmpset_acq_64
@@ -566,6 +564,7 @@ _ATOMIC_STORE_REL_IMPL(64,  ,  )
 #define	atomic_set_acq_long		atomic_set_acq_64
 #define	atomic_subtract_acq_long	atomic_subtract_acq_64
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	atomic_add_acq_ptr		atomic_add_acq_64
 #define	atomic_fcmpset_acq_ptr		atomic_fcmpset_acq_64
 #define	atomic_clear_acq_ptr		atomic_clear_acq_64
@@ -573,6 +572,7 @@ _ATOMIC_STORE_REL_IMPL(64,  ,  )
 #define	atomic_load_acq_ptr		atomic_load_acq_64
 #define	atomic_set_acq_ptr		atomic_set_acq_64
 #define	atomic_subtract_acq_ptr		atomic_subtract_acq_64
+#endif
 
 #define	atomic_add_rel_long		atomic_add_rel_64
 #define	atomic_fcmpset_rel_long		atomic_fcmpset_rel_64
@@ -582,6 +582,7 @@ _ATOMIC_STORE_REL_IMPL(64,  ,  )
 #define	atomic_subtract_rel_long	atomic_subtract_rel_64
 #define	atomic_store_rel_long		atomic_store_rel_64
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	atomic_add_rel_ptr		atomic_add_rel_64
 #define	atomic_fcmpset_rel_ptr		atomic_fcmpset_rel_64
 #define	atomic_clear_rel_ptr		atomic_clear_rel_64
@@ -589,6 +590,143 @@ _ATOMIC_STORE_REL_IMPL(64,  ,  )
 #define	atomic_set_rel_ptr		atomic_set_rel_64
 #define	atomic_subtract_rel_ptr		atomic_subtract_rel_64
 #define	atomic_store_rel_ptr		atomic_store_rel_64
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+
+#define	_ATOMIC_OP_PTR_IMPL(op, asm_op, bar, a, l)			\
+static __inline void							\
+atomic_##op##_##bar##ptr(volatile uintptr_t *p, uintptr_t val)		\
+{									\
+	uintptr_t previous;						\
+	ptraddr_t tmp1, tmp2;						\
+	int res;							\
+									\
+	__asm __volatile(						\
+		"1:"							\
+		"ld" #a "xr %0, [%4]\n"					\
+		"gcvalue %2, %0\n"					\
+		"gcvalue %3, %5\n"					\
+		"" #asm_op " %2, %2, %3\n"				\
+		"scvalue %0, %0, %2\n"					\
+		"st" #l "xr %w1, %0, [%4]\n"				\
+		"cbnz %w1, 1b"						\
+		: "=&C" (previous), "=&r" (res), "=&r" (tmp1),		\
+		"=&r" (tmp2)						\
+		: "C" (p), "C" (val)					\
+		: "memory", "cc");					\
+}
+
+#define	_ATOMIC_OP_PTR(op, asm_op)			\
+	_ATOMIC_OP_PTR_IMPL(op, asm_op, , , )		\
+	_ATOMIC_OP_PTR_IMPL(op, asm_op, acq_, a, )	\
+	_ATOMIC_OP_PTR_IMPL(op, asm_op, rel_, , l)	\
+
+_ATOMIC_OP_PTR(add, add)
+_ATOMIC_OP_PTR(subtract, sub)
+_ATOMIC_OP_PTR(clear, bic)
+_ATOMIC_OP_PTR(set, orr)
+
+static __inline uintptr_t
+atomic_load_acq_ptr(volatile uintptr_t *p)
+{
+	return (__atomic_load_n(p, __ATOMIC_ACQUIRE));
+}
+
+static __inline void
+atomic_store_rel_ptr(volatile uintptr_t *p, uintptr_t val)
+{
+	return (__atomic_store_n(p, val, __ATOMIC_RELEASE));
+}
+
+/*
+ * XXX-AM: Do not use CAS in order to implement tag+VA comparison semantic
+ * instead of bitwise capability equality.
+ * The equality requirements for capability CAS require consistent
+ * hi register bits clearing in locking code that is currently missing.
+ */
+#ifdef NOTYET
+#define _ATOMIC_CMPSET_PTR_IMPL(bar, a, l, order)			\
+_ATOMIC_CMPSET_PROTO(ptr, bar, )					\
+{									\
+	return (__atomic_compare_exchange_n(p, &cmpval, newval, 0,	\
+	    order, order));						\
+}									\
+									\
+_ATOMIC_FCMPSET_PROTO(ptr, bar, )					\
+{									\
+	return (__atomic_compare_exchange_n(p, cmpval, newval, 1,	\
+	    order, order));						\
+}
+#else
+#define _ATOMIC_CMPSET_PTR_IMPL(bar, a, l, _unused)			\
+_ATOMIC_CMPSET_PROTO(ptr, bar, )					\
+{									\
+	uintptr_t tmp;							\
+	int res;							\
+									\
+	__asm __volatile(						\
+	    "1: mov		%w1, #1\n"				\
+	    "   ld"#a"xr	%0, [%2]\n"				\
+	    "   cmp		%0, %3\n"				\
+	    "   b.ne		2f\n"					\
+	    "   st"#l"xr	%w1, %4, [%2]\n"			\
+	    "   cbnz		%w1, 1b\n"				\
+	    "2:"							\
+	    : "=&C"(tmp), "=&r"(res)					\
+	    : "C" (p), "C" (cmpval), "C" (newval)			\
+	    : "cc", "memory"						\
+	);								\
+									\
+	return (!res);							\
+}									\
+									\
+_ATOMIC_FCMPSET_PROTO(ptr, bar, )					\
+{									\
+	uintptr_t _cmpval, tmp;						\
+	int res;							\
+									\
+	_cmpval = *cmpval;						\
+	__asm __volatile(						\
+	    "   mov		%w1, #1\n"				\
+	    "   ld"#a"xr	%0, [%2]\n"				\
+	    "   cmp		%0, %3\n"				\
+	    "   b.ne		1f\n"					\
+	    "   st"#l"xr	%w1, %4, [%2]\n"			\
+	    "1:"							\
+	    : "=&C"(tmp), "=&r"(res)					\
+	    : "C" (p), "C" (_cmpval), "C" (newval)			\
+	    : "cc", "memory"						\
+	);								\
+	*cmpval = tmp;							\
+									\
+	return (!res);							\
+}
+#endif
+
+_ATOMIC_CMPSET_PTR_IMPL( , , , __ATOMIC_RELAXED)
+_ATOMIC_CMPSET_PTR_IMPL(acq_, a, , __ATOMIC_ACQUIRE)
+_ATOMIC_CMPSET_PTR_IMPL(rel_, , l, __ATOMIC_RELEASE)
+
+static __inline uintptr_t
+atomic_swap_ptr(volatile uintptr_t *p, uintptr_t val)
+{
+
+	return (__atomic_exchange_n(p, val, __ATOMIC_RELAXED));
+}
+
+static __inline uintptr_t
+atomic_readandclear_ptr(volatile uintptr_t *p)
+{
+	return (__atomic_exchange_n(p, 0, __ATOMIC_RELAXED));
+}
+
+static __inline uintptr_t
+atomic_fetchadd_ptr(volatile uintptr_t *p, uintptr_t val)
+{
+	return (__atomic_fetch_add(p, val, __ATOMIC_RELAXED));
+}
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 static __inline void
 atomic_thread_fence_acq(void)

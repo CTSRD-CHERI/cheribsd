@@ -85,6 +85,17 @@
 	CHERI_PERM_SYSTEM_REGS | CHERI_PERM_SET_CID)
 
 /*
+ * vm_prot_t to capability permission bits
+ */
+#define	CHERI_PERMS_PROT2PERM_READ					\
+	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
+#define	CHERI_PERMS_PROT2PERM_WRITE					\
+	(CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |			\
+	 CHERI_PERM_STORE_LOCAL_CAP)
+#define	CHERI_PERMS_PROT2PERM_EXEC					\
+	(CHERI_PERM_EXECUTE | CHERI_PERMS_PROT2PERM_READ)
+
+/*
  * Hardware defines a kind of tripartite taxonomy: memory, type, and CID.
  * They're all squished together in the permission bits, so define masks
  * that give us a kind of "kind" for capabilities.  A capability may belong

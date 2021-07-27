@@ -257,7 +257,7 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	long memsize;
 	char *boot_env;
 #ifdef FDT
-	char *dtbp = 0;
+	char *dtbp = NULL;
 	void *kmdp;
 	int dtb_needs_swap = 0; /* error */
 	size_t dtb_size = 0;
@@ -371,7 +371,7 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	 * to use the statically embedded one.
 	 */
 	if (dtbp == NULL) {
-		dtbp = &fdt_static_dtb;
+		dtbp = fdt_static_dtb;
 		fdt_source = FDT_SOURCE_STATIC;
 	}
 #endif
