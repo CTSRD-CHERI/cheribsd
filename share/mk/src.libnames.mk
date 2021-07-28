@@ -137,7 +137,6 @@ _LIBRARIES=	\
 		ipsec \
 		ipt \
 		jail \
-		jpeg \
 		kadm5clnt \
 		kadm5srv \
 		kafs5 \
