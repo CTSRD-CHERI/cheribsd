@@ -780,13 +780,6 @@ void
 dhcp6_print(netdissect_options *ndo,
             const u_char *cp, u_int length)
 {
-	INVOKE_DISSECTOR(_dhcp6_print, ndo, cp, length);
-}
-
-void
-_dhcp6_print(netdissect_options *ndo,
-            const u_char *cp, u_int length)
-{
 	const struct dhcp6 *dh6;
 	const struct dhcp6_relay *dh6relay;
 	const u_char *ep;

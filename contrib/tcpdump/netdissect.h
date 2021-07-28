@@ -34,10 +34,6 @@
 #define __attribute__(x)
 #endif
 
-#if __has_feature(capabilities) && defined(CHERI_TCPDUMP)
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-#endif
 /*
  * Data types corresponding to multi-byte integral values within data
  * structures.  These are defined as arrays of octets, so that they're
@@ -143,9 +139,6 @@ typedef struct netdissect_options netdissect_options;
 
 typedef u_int (*if_printer) IF_PRINTER_ARGS;
 
-#if __has_feature(capabilities) && defined(CHERI_TCPDUMP)
-#pragma pointer_interpretation capability
-#endif
 struct netdissect_options {
   int ndo_bflag;		/* print 4 byte ASes in ASDOT notation */
   int ndo_eflag;		/* print ethernet header */
@@ -215,9 +208,6 @@ struct netdissect_options {
 #endif
 		     ;
 };
-#if __has_feature(capabilities) && defined(CHERI_TCPDUMP)
-#pragma pointer_interpretation default
-#endif
 
 #define PT_VAT		1	/* Visual Audio Tool */
 #define PT_WB		2	/* distributed White Board */
@@ -473,7 +463,7 @@ struct lladdr_info {
 /* The printer routines. */
 
 extern void aarp_print(netdissect_options *, const u_char *, u_int);
-extern void ah_print(netdissect_options *, register const u_char *);
+extern int ah_print(netdissect_options *, register const u_char *);
 extern void ahcp_print(netdissect_options *, const u_char *, const u_int);
 extern void aodv_print(netdissect_options *, const u_char *, u_int, int);
 extern void aoe_print(netdissect_options *, const u_char *, const u_int);
@@ -491,30 +481,30 @@ extern void calm_fast_print(netdissect_options *, const u_char *, u_int, const s
 extern void carp_print(netdissect_options *, const u_char *, u_int, int);
 extern void cdp_print(netdissect_options *, const u_char *, u_int, u_int);
 extern void cfm_print(netdissect_options *, const u_char *, u_int);
-extern void chdlc_print(netdissect_options *, register const u_char *, u_int);
+extern u_int chdlc_print(netdissect_options *, register const u_char *, u_int);
 extern void cisco_autorp_print(netdissect_options *, const u_char *, u_int);
 extern void cnfp_print(netdissect_options *, const u_char *);
 extern void dccp_print(netdissect_options *, const u_char *, const u_char *, u_int);
 extern void decnet_print(netdissect_options *, const u_char *, u_int, u_int);
 extern void dhcp6_print(netdissect_options *, const u_char *, u_int);
-extern void dstopt_print(netdissect_options *, const u_char *);
+extern int dstopt_print(netdissect_options *, const u_char *);
 extern void dtp_print(netdissect_options *, const u_char *, u_int);
 extern void dvmrp_print(netdissect_options *, const u_char *, u_int);
 extern void eap_print(netdissect_options *, const u_char *, u_int);
 extern void egp_print(netdissect_options *, const u_char *, u_int);
 extern void eigrp_print(netdissect_options *, const u_char *, u_int);
-extern void esp_print(netdissect_options *, const u_char *, const int, const u_char *, int *, int *);
+extern int esp_print(netdissect_options *, const u_char *, const int, const u_char *, int *, int *);
 extern u_int ether_print(netdissect_options *, const u_char *, u_int, u_int, void (*)(netdissect_options *, const u_char *), const u_char *);
-extern void ethertype_print(netdissect_options *, u_short, const u_char *, u_int, u_int, const struct lladdr_info *, const struct lladdr_info *);
-extern void fddi_print(netdissect_options *, const u_char *, u_int, u_int);
+extern int ethertype_print(netdissect_options *, u_short, const u_char *, u_int, u_int, const struct lladdr_info *, const struct lladdr_info *);
+extern u_int fddi_print(netdissect_options *, const u_char *, u_int, u_int);
 extern void forces_print(netdissect_options *, const u_char *, u_int);
-extern void fr_print(netdissect_options *, register const u_char *, u_int);
+extern u_int fr_print(netdissect_options *, register const u_char *, u_int);
 extern int frag6_print(netdissect_options *, const u_char *, const u_char *);
 extern void ftp_print(netdissect_options *, const u_char *, u_int);
 extern void geneve_print(netdissect_options *, const u_char *, u_int);
 extern void geonet_print(netdissect_options *, const u_char *, u_int, const struct lladdr_info *);
 extern void gre_print(netdissect_options *, const u_char *, u_int);
-extern void hbhopt_print(netdissect_options *, const u_char *);
+extern int hbhopt_print(netdissect_options *, const u_char *);
 extern void hex_and_ascii_print(netdissect_options *, const char *, const u_char *, u_int);
 extern void hex_and_ascii_print_with_offset(netdissect_options *, const char *, const u_char *, u_int, u_int);
 extern void hex_print(netdissect_options *, const char *ident, const u_char *cp, u_int);
@@ -542,8 +532,8 @@ extern void l2tp_print(netdissect_options *, const u_char *, u_int);
 extern void lane_print(netdissect_options *, const u_char *, u_int, u_int);
 extern void ldp_print(netdissect_options *, const u_char *, u_int);
 extern void lisp_print(netdissect_options *, const u_char *, u_int);
-extern void llap_print(netdissect_options *, const u_char *, u_int);
-extern void llc_print(netdissect_options *, const u_char *, u_int, u_int, const struct lladdr_info *, const struct lladdr_info *);
+extern u_int llap_print(netdissect_options *, const u_char *, u_int);
+extern int llc_print(netdissect_options *, const u_char *, u_int, u_int, const struct lladdr_info *, const struct lladdr_info *);
 extern void lldp_print(netdissect_options *, const u_char *, u_int);
 extern void lmp_print(netdissect_options *, const u_char *, u_int);
 extern void loopback_print(netdissect_options *, const u_char *, const u_int);
@@ -553,12 +543,12 @@ extern void lwapp_data_print(netdissect_options *, const u_char *, u_int);
 extern void lwres_print(netdissect_options *, const u_char *, u_int);
 extern void m3ua_print(netdissect_options *, const u_char *, const u_int);
 extern void medsa_print(netdissect_options *, const u_char *, u_int, u_int, const struct lladdr_info *, const struct lladdr_info *);
-extern void mfr_print(netdissect_options *, register const u_char *, u_int);
+extern u_int mfr_print(netdissect_options *, register const u_char *, u_int);
 extern void mobile_print(netdissect_options *, const u_char *, u_int);
-extern void mobility_print(netdissect_options *, const u_char *, const u_char *);
+extern int mobility_print(netdissect_options *, const u_char *, const u_char *);
 extern void mpcp_print(netdissect_options *, const u_char *, u_int);
 extern void mpls_print(netdissect_options *, const u_char *, u_int);
-extern void mptcp_print(netdissect_options *, const u_char *, u_int, u_char);
+extern int mptcp_print(netdissect_options *, const u_char *, u_int, u_char);
 extern void msdp_print(netdissect_options *, const u_char *, u_int);
 extern void msnlb_print(netdissect_options *, const u_char *);
 extern void nbt_tcp_print(netdissect_options *, const u_char *, int);
@@ -584,8 +574,8 @@ extern void pfsync_ip_print(netdissect_options *, const u_char *, u_int);
 extern void pgm_print(netdissect_options *, const u_char *, u_int, const u_char *);
 extern void pim_print(netdissect_options *, const u_char *, u_int, const u_char *);
 extern void pimv1_print(netdissect_options *, const u_char *, u_int);
-extern void ppp_print(netdissect_options *, register const u_char *, u_int);
-extern void pppoe_print(netdissect_options *, const u_char *, u_int);
+extern u_int ppp_print(netdissect_options *, register const u_char *, u_int);
+extern u_int pppoe_print(netdissect_options *, const u_char *, u_int);
 extern void pptp_print(netdissect_options *, const u_char *);
 extern int print_unknown_data(netdissect_options *, const u_char *, const char *, int);
 extern char *q922_string(netdissect_options *, const u_char *, u_int);
@@ -597,7 +587,7 @@ extern void ripng_print(netdissect_options *, const u_char *, unsigned int);
 extern void rpki_rtr_print(netdissect_options *, const u_char *, u_int);
 extern void rrcp_print(netdissect_options *, const u_char *, u_int, const struct lladdr_info *, const struct lladdr_info *);
 extern void rsvp_print(netdissect_options *, const u_char *, u_int);
-extern void rt6_print(netdissect_options *, const u_char *, const u_char *);
+extern int rt6_print(netdissect_options *, const u_char *, const u_char *);
 extern void rtsp_print(netdissect_options *, const u_char *, u_int);
 extern void rx_print(netdissect_options *, register const u_char *, int, int, int, const u_char *);
 extern void sctp_print(netdissect_options *, const u_char *, const u_char *, u_int);
@@ -607,7 +597,7 @@ extern void slow_print(netdissect_options *, const u_char *, u_int);
 extern void smb_print_data(netdissect_options *, const unsigned char *, int);
 extern void smb_tcp_print(netdissect_options *, const u_char *, int);
 extern void smtp_print(netdissect_options *, const u_char *, u_int);
-extern void snap_print(netdissect_options *, const u_char *, u_int, u_int, const struct lladdr_info *, const struct lladdr_info *, u_int);
+extern int snap_print(netdissect_options *, const u_char *, u_int, u_int, const struct lladdr_info *, const struct lladdr_info *, u_int);
 extern void snmp_print(netdissect_options *, const u_char *, u_int);
 extern void stp_print(netdissect_options *, const u_char *, u_int);
 extern void sunrpcrequest_print(netdissect_options *, const u_char *, u_int, const u_char *);
@@ -617,10 +607,10 @@ extern void telnet_print(netdissect_options *, const u_char *, u_int);
 extern void tftp_print(netdissect_options *, const u_char *, u_int);
 extern void timed_print(netdissect_options *, const u_char *);
 extern void tipc_print(netdissect_options *, const u_char *, u_int, u_int);
-extern void token_print(netdissect_options *, const u_char *, u_int, u_int);
+extern u_int token_print(netdissect_options *, const u_char *, u_int, u_int);
 extern void udld_print(netdissect_options *, const u_char *, u_int);
 extern void udp_print(netdissect_options *, const u_char *, u_int, const u_char *, int);
-extern void vjc_print(netdissect_options *, register const char *, u_short);
+extern int vjc_print(netdissect_options *, register const char *, u_short);
 extern void vqp_print(netdissect_options *, register const u_char *, register u_int);
 extern void vrrp_print(netdissect_options *, const u_char *, u_int, const u_char *, int);
 extern void vtp_print(netdissect_options *, const u_char *, u_int);
@@ -630,347 +620,6 @@ extern void wb_print(netdissect_options *, const void *, u_int);
 extern void zephyr_print(netdissect_options *, const u_char *, int);
 extern void zmtp1_print(netdissect_options *, const u_char *, u_int);
 extern void zmtp1_print_datagram(netdissect_options *, const u_char *, const u_int);
-
-#ifdef CHERI_TCPDUMP
-#if !__has_feature(capabilities)
-#error cheri_tcpdump requires a CHERI aware compiler
-#endif
-extern struct cheri_object cheri_tcpdump;
-extern struct cheri_object g_next_object;
-#ifdef CHERI_TCPDUMP_INTERNAL
-#define CHERI_TCPDUMP_CCALL					\
-    __attribute__((cheri_ccallee))				\
-    __attribute__((cheri_method_suffix("_cap")))		\
-    __attribute__((cheri_method_class(cheri_tcpdump)))
-#else
-#define CHERI_TCPDUMP_CCALL					\
-    __attribute__((cheri_ccall))				\
-    __attribute__((cheri_method_suffix("_cap")))		\
-    __attribute__((cheri_method_class(cheri_tcpdump)))
-#endif
-#define INVOKE_DISSECTOR(name, ...) 				\
-	if (!CHERI_OBJECT_ISNULL(g_next_object))		\
-		name##_cap(g_next_object, __VA_ARGS__);		\
-	else							\
-		name(__VA_ARGS__)
-#else
-#define CHERI_TCPDUMP_CCALL
-#define	INVOKE_DISSECTOR(name, ...)				\
-	name(__VA_ARGS__)
-#endif
-
-CHERI_TCPDUMP_CCALL
-extern void _aarp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern int _ah_print(netdissect_options *, register const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _ahcp_print(netdissect_options *, const u_char *, const u_int);
-CHERI_TCPDUMP_CCALL
-extern void _aodv_print(netdissect_options *, const u_char *, u_int, int);
-CHERI_TCPDUMP_CCALL
-extern void _aoe_print(netdissect_options *, const u_char *, const u_int);
-CHERI_TCPDUMP_CCALL
-extern void _arp_print(netdissect_options *, const u_char *, u_int, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _ascii_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _atalk_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _atm_print(netdissect_options *, u_int, u_int, u_int, const u_char *, u_int, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _babel_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _beep_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _bfd_print(netdissect_options *, const u_char *, u_int, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _bgp_print(netdissect_options *, const u_char *, int);
-CHERI_TCPDUMP_CCALL
-extern void _bootp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _calm_fast_print(netdissect_options *, const u_char *, u_int, const struct lladdr_info *);
-CHERI_TCPDUMP_CCALL
-extern void _carp_print(netdissect_options *, const u_char *, u_int, int);
-CHERI_TCPDUMP_CCALL
-extern void _cdp_print(netdissect_options *, const u_char *, u_int, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _cfm_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern u_int _chdlc_print(netdissect_options *, register const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _cisco_autorp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _cnfp_print(netdissect_options *, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _dccp_print(netdissect_options *, const u_char *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _decnet_print(netdissect_options *, const u_char *, u_int, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _dhcp6_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern int _dstopt_print(netdissect_options *, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _dtp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _dvmrp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _eap_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _egp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _eigrp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern int _esp_print(netdissect_options *, const u_char *, const int, const u_char *, int *, int *);
-CHERI_TCPDUMP_CCALL
-extern u_int _ether_print(netdissect_options *, const u_char *, u_int, u_int, void (*)(netdissect_options *, const u_char *), const u_char *);
-CHERI_TCPDUMP_CCALL
-extern int _ethertype_print(netdissect_options *, u_short, const u_char *, u_int, u_int, const struct lladdr_info *, const struct lladdr_info *);
-CHERI_TCPDUMP_CCALL
-extern u_int _fddi_print(netdissect_options *, const u_char *, u_int, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _forces_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern u_int _fr_print(netdissect_options *, register const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern int _frag6_print(netdissect_options *, const u_char *, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _ftp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _geneve_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _geonet_print(netdissect_options *, const u_char *, u_int, const struct lladdr_info *);
-CHERI_TCPDUMP_CCALL
-extern void _gre_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern int _hbhopt_print(netdissect_options *, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _hex_and_ascii_print(netdissect_options *, const char *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _hex_and_ascii_print_with_offset(netdissect_options *, const char *, const u_char *, u_int, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _hex_print(netdissect_options *, const char *ident, const u_char *cp, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _hex_print_with_offset(netdissect_options *, const char *ident, const u_char *cp, u_int, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _hncp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _hsrp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _http_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _icmp6_print(netdissect_options *, const u_char *, u_int, const u_char *, int);
-CHERI_TCPDUMP_CCALL
-extern void _icmp_print(netdissect_options *, const u_char *, u_int, const u_char *, int);
-CHERI_TCPDUMP_CCALL
-extern void _igmp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _igrp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _ip6_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _ipN_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _ip_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _ip_print_inner(netdissect_options *, const u_char *, u_int, u_int nh, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _ipcomp_print(netdissect_options *, register const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _ipx_netbios_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _ipx_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _isakmp_print(netdissect_options *, const u_char *, u_int, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _isakmp_rfc3948_print(netdissect_options *, const u_char *, u_int, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _isoclns_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _krb_print(netdissect_options *, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _l2tp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _lane_print(netdissect_options *, const u_char *, u_int, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _ldp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _lisp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern u_int _llap_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern int _llc_print(netdissect_options *, const u_char *, u_int, u_int, const struct lladdr_info *, const struct lladdr_info *);
-CHERI_TCPDUMP_CCALL
-extern void _lldp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _lmp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _loopback_print(netdissect_options *, const u_char *, const u_int);
-CHERI_TCPDUMP_CCALL
-extern void _lspping_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _lwapp_control_print(netdissect_options *, const u_char *, u_int, int);
-CHERI_TCPDUMP_CCALL
-extern void _lwapp_data_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _lwres_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _m3ua_print(netdissect_options *, const u_char *, const u_int);
-CHERI_TCPDUMP_CCALL
-extern void _medsa_print(netdissect_options *, const u_char *, u_int, u_int, const struct lladdr_info *, const struct lladdr_info *);
-CHERI_TCPDUMP_CCALL
-extern u_int _mfr_print(netdissect_options *, register const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _mobile_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern int _mobility_print(netdissect_options *, const u_char *, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _mpcp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _mpls_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern int _mptcp_print(netdissect_options *, const u_char *, u_int, u_char);
-CHERI_TCPDUMP_CCALL
-extern void _msdp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _msnlb_print(netdissect_options *, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _nbt_tcp_print(netdissect_options *, const u_char *, int);
-CHERI_TCPDUMP_CCALL
-extern void _nbt_udp137_print(netdissect_options *, const u_char *, int);
-CHERI_TCPDUMP_CCALL
-extern void _nbt_udp138_print(netdissect_options *, const u_char *, int);
-CHERI_TCPDUMP_CCALL
-extern void _netbeui_print(netdissect_options *, u_short, const u_char *, int);
-CHERI_TCPDUMP_CCALL
-extern void _nfsreply_print(netdissect_options *, const u_char *, u_int, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _nfsreply_print_noaddr(netdissect_options *, const u_char *, u_int, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _nfsreq_print_noaddr(netdissect_options *, const u_char *, u_int, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern const u_char *_ns_nprint (netdissect_options *, register const u_char *, register const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _ns_print(netdissect_options *, const u_char *, u_int, int);
-CHERI_TCPDUMP_CCALL
-extern void _nsh_print(netdissect_options *ndo, const u_char *bp, u_int len);
-CHERI_TCPDUMP_CCALL
-extern void _ntp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _oam_print(netdissect_options *, const u_char *, u_int, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _olsr_print(netdissect_options *, const u_char *, u_int, int);
-CHERI_TCPDUMP_CCALL
-extern void _openflow_print(netdissect_options *, const u_char *, const u_int);
-CHERI_TCPDUMP_CCALL
-extern void _ospf6_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _ospf_print(netdissect_options *, const u_char *, u_int, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern int _ospf_print_grace_lsa(netdissect_options *, const uint8_t *, u_int);
-CHERI_TCPDUMP_CCALL
-extern int _ospf_print_te_lsa(netdissect_options *, const uint8_t *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _otv_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _pfsync_ip_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _pgm_print(netdissect_options *, const u_char *, u_int, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _pim_print(netdissect_options *, const u_char *, u_int, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _pimv1_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern u_int _ppp_print(netdissect_options *, register const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern u_int _pppoe_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _pptp_print(netdissect_options *, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern int _print_unknown_data(netdissect_options *, const u_char *, const char *, int);
-CHERI_TCPDUMP_CCALL
-extern char *_q922_string(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _q933_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _radius_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _resp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _rip_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _ripng_print(netdissect_options *, const u_char *, unsigned int);
-CHERI_TCPDUMP_CCALL
-extern void _rpki_rtr_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _rrcp_print(netdissect_options *, const u_char *, u_int, const struct lladdr_info *, const struct lladdr_info *);
-CHERI_TCPDUMP_CCALL
-extern void _rsvp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern int _rt6_print(netdissect_options *, const u_char *, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _rtsp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _rx_print(netdissect_options *, register const u_char *, int, int, int, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _sctp_print(netdissect_options *, const u_char *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _sflow_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _sip_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _slow_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _smb_print_data(netdissect_options *, const unsigned char *, int);
-CHERI_TCPDUMP_CCALL
-extern void _smb_tcp_print(netdissect_options *, const u_char *, int);
-CHERI_TCPDUMP_CCALL
-extern void _smtp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern int _snap_print(netdissect_options *, const u_char *, u_int, u_int, const struct lladdr_info *, const struct lladdr_info *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _snmp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _stp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _sunrpcrequest_print(netdissect_options *, const u_char *, u_int, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _syslog_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _tcp_print(netdissect_options *, const u_char *, u_int, const u_char *, int);
-CHERI_TCPDUMP_CCALL
-extern void _telnet_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _tftp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _timed_print(netdissect_options *, const u_char *);
-CHERI_TCPDUMP_CCALL
-extern void _tipc_print(netdissect_options *, const u_char *, u_int, u_int);
-CHERI_TCPDUMP_CCALL
-extern u_int _token_print(netdissect_options *, const u_char *, u_int, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _udld_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _udp_print(netdissect_options *, const u_char *, u_int, const u_char *, int);
-CHERI_TCPDUMP_CCALL
-extern int _vjc_print(netdissect_options *, register const char *, u_short);
-CHERI_TCPDUMP_CCALL
-extern void _vqp_print(netdissect_options *, register const u_char *, register u_int);
-CHERI_TCPDUMP_CCALL
-extern void _vrrp_print(netdissect_options *, const u_char *, u_int, const u_char *, int);
-CHERI_TCPDUMP_CCALL
-extern void _vtp_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _vxlan_gpe_print(netdissect_options *ndo, const u_char *bp, u_int len);
-CHERI_TCPDUMP_CCALL
-extern void _vxlan_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _wb_print(netdissect_options *, const void *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _zephyr_print(netdissect_options *, const u_char *, int);
-CHERI_TCPDUMP_CCALL
-extern void _zmtp1_print(netdissect_options *, const u_char *, u_int);
-CHERI_TCPDUMP_CCALL
-extern void _zmtp1_print_datagram(netdissect_options *, const u_char *, const u_int);
 
 /* checksum routines */
 extern void init_checksum(void);

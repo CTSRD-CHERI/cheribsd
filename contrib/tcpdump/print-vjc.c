@@ -82,14 +82,8 @@
  * the packets were munged by the networking stack before being handed
  * to the packet capture mechanism.
  */
-void
-vjc_print(netdissect_options *ndo, register const char *bp, u_short proto)
-{
-	INVOKE_DISSECTOR(_vjc_print, ndo, bp, proto);
-}
-
 int
-_vjc_print(netdissect_options *ndo, register const char *bp, u_short proto _U_)
+vjc_print(netdissect_options *ndo, register const char *bp, u_short proto _U_)
 {
 	int i;
 

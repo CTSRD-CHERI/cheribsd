@@ -48,12 +48,6 @@ static const struct tok nsh_flags [] = {
 void
 nsh_print(netdissect_options *ndo, const u_char *bp, u_int len)
 {
-	INVOKE_DISSECTOR(_nsh_print, ndo, bp, len);
-}
-
-void
-_nsh_print(netdissect_options *ndo, const u_char *bp, u_int len)
-{
     int n, vn;
     uint8_t ver;
     uint8_t flags;

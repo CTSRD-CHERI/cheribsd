@@ -224,7 +224,7 @@ fr_if_print(netdissect_options *ndo,
 
         ND_TCHECK2(*p, 4); /* minimum frame header length */
 
-        if ((length = _fr_print(ndo, p, length)) == 0)
+        if ((length = fr_print(ndo, p, length)) == 0)
             return (0);
         else
             return length;
@@ -233,15 +233,8 @@ fr_if_print(netdissect_options *ndo,
         return caplen;
 }
 
-void
-fr_print(netdissect_options *ndo,
-         register const u_char *p, u_int length)
-{
-	INVOKE_DISSECTOR(_fr_print, ndo, p, length);
-}
-
 u_int
-_fr_print(netdissect_options *ndo,
+fr_print(netdissect_options *ndo,
          register const u_char *p, u_int length)
 {
 	int ret;
@@ -280,7 +273,7 @@ _fr_print(netdissect_options *ndo,
                                 fr_hdr_print(ndo, length, addr_len, dlci,
                                     flags, extracted_ethertype);
 
-                        if (_ethertype_print(ndo, extracted_ethertype,
+                        if (ethertype_print(ndo, extracted_ethertype,
                                             p+addr_len+ETHERTYPE_LEN,
                                             length-addr_len-ETHERTYPE_LEN,
                                             ndo->ndo_snapend-p-addr_len-ETHERTYPE_LEN,
@@ -340,7 +333,7 @@ _fr_print(netdissect_options *ndo,
 		break;
 
 	case NLPID_SNAP:
-		if (_snap_print(ndo, p, length, ndo->ndo_snapend - p, NULL, NULL, 0) == 0) {
+		if (snap_print(ndo, p, length, ndo->ndo_snapend - p, NULL, NULL, 0) == 0) {
 			/* ether_type not known, print raw packet */
                         if (!ndo->ndo_eflag)
                             fr_hdr_print(ndo, length + hdr_len, hdr_len,
@@ -387,7 +380,7 @@ mfr_if_print(netdissect_options *ndo,
 
         ND_TCHECK2(*p, 2); /* minimum frame header length */
 
-        if ((length = _mfr_print(ndo, p, length)) == 0)
+        if ((length = mfr_print(ndo, p, length)) == 0)
             return (0);
         else
             return length;
@@ -440,15 +433,8 @@ struct ie_tlv_header_t {
     uint8_t ie_len;
 };
 
-void
-mfr_print(netdissect_options *ndo,
-          register const u_char *p, u_int length)
-{
-	INVOKE_DISSECTOR(_mfr_print, ndo, p, length);
-}
-
 u_int
-_mfr_print(netdissect_options *ndo,
+mfr_print(netdissect_options *ndo,
           register const u_char *p, u_int length)
 {
     u_int tlen,idx,hdr_len = 0;
@@ -808,13 +794,6 @@ static const codeset_pr_func_t fr_q933_print_ie_codeset[] = {
  */
 void
 q933_print(netdissect_options *ndo,
-           const u_char *p, u_int length)
-{
-	INVOKE_DISSECTOR(_q933_print, ndo, p, length);
-}
-
-void
-_q933_print(netdissect_options *ndo,
            const u_char *p, u_int length)
 {
 	u_int olen;

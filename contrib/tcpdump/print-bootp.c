@@ -283,13 +283,6 @@ void
 bootp_print(netdissect_options *ndo,
 	    register const u_char *cp, u_int length)
 {
-	INVOKE_DISSECTOR(_bootp_print, ndo, cp, length);
-}
-
-void
-_bootp_print(netdissect_options *ndo,
-            register const u_char *cp, u_int length)
-{
 	register const struct bootp *bp;
 	static const u_char vm_cmu[4] = VM_CMU;
 	static const u_char vm_rfc1048[4] = VM_RFC1048;

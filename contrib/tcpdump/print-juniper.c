@@ -764,7 +764,7 @@ juniper_pppoe_atm_print(netdissect_options *ndo,
         extracted_ethertype = EXTRACT_16BITS(p);
         /* this DLT contains nothing but raw PPPoE frames,
          * prepended with a type field*/
-        if (_ethertype_print(ndo, extracted_ethertype,
+        if (ethertype_print(ndo, extracted_ethertype,
                               p+ETHERTYPE_LEN,
                               l2info.length-ETHERTYPE_LEN,
                               l2info.caplen-ETHERTYPE_LEN,
@@ -969,7 +969,7 @@ juniper_atm1_print(netdissect_options *ndo,
         if (EXTRACT_24BITS(p) == 0xfefe03 || /* NLPID encaps ? */
             EXTRACT_24BITS(p) == 0xaaaa03) { /* SNAP encaps ? */
 
-            llc_hdrlen = _llc_print(ndo, p, l2info.length, l2info.caplen, NULL, NULL);
+            llc_hdrlen = llc_print(ndo, p, l2info.length, l2info.caplen, NULL, NULL);
             if (llc_hdrlen > 0)
                 return l2info.header_len;
         }
@@ -1023,7 +1023,7 @@ juniper_atm2_print(netdissect_options *ndo,
         if (EXTRACT_24BITS(p) == 0xfefe03 || /* NLPID encaps ? */
             EXTRACT_24BITS(p) == 0xaaaa03) { /* SNAP encaps ? */
 
-            llc_hdrlen = _llc_print(ndo, p, l2info.length, l2info.caplen, NULL, NULL);
+            llc_hdrlen = llc_print(ndo, p, l2info.length, l2info.caplen, NULL, NULL);
             if (llc_hdrlen > 0)
                 return l2info.header_len;
         }

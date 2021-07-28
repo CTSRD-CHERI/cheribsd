@@ -83,12 +83,6 @@ lane_hdr_print(netdissect_options *ndo, const u_char *bp)
 void
 lane_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen)
 {
-	INVOKE_DISSECTOR(_lane_print, ndo, p, length, caplen);
-}
-
-void
-_lane_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen)
-{
 	const struct lane_controlhdr *lec;
 
 	if (caplen < sizeof(struct lane_controlhdr)) {

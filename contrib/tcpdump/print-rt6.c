@@ -35,14 +35,8 @@
 
 #include "ip6.h"
 
-void
-rt6_print(netdissect_options *ndo, register const u_char *bp, const u_char *bp2 _U_)
-{
-	INVOKE_DISSECTOR(_rt6_print, ndo, bp, bp2);
-}
-
 int
-_rt6_print(netdissect_options *ndo, register const u_char *bp, const u_char *bp2 _U_)
+rt6_print(netdissect_options *ndo, register const u_char *bp, const u_char *bp2 _U_)
 {
 	register const struct ip6_rthdr *dp;
 	register const struct ip6_rthdr0 *dp0;

@@ -1,6 +1,6 @@
 #	@(#)Makefile.inc	5.1 (Berkeley) 5/11/90
 # $FreeBSD$
 
-WARNS?=		3
+BINDIR?=	/usr/sbin
 
-.include "../Makefile.inc"
+WARNS?=		3

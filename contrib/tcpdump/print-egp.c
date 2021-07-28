@@ -230,13 +230,6 @@ void
 egp_print(netdissect_options *ndo,
           register const uint8_t *bp, register u_int length)
 {
-	INVOKE_DISSECTOR(_egp_print, ndo, bp, length);
-}
-
-void
-_egp_print(netdissect_options *ndo,
-          register const uint8_t *bp, register u_int length)
-{
 	register const struct egp_packet *egp;
 	register int status;
 	register int code;

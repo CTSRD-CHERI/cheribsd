@@ -165,13 +165,6 @@ void
 lwapp_control_print(netdissect_options *ndo,
                     const u_char *pptr, u_int len, int has_ap_ident)
 {
-	INVOKE_DISSECTOR(_lwapp_control_print, ndo, pptr, len, has_ap_ident);
-}
-
-void
-_lwapp_control_print(netdissect_options *ndo,
-                     const u_char *pptr, u_int len, int has_ap_ident)
-{
     const struct lwapp_transport_header *lwapp_trans_header;
     const struct lwapp_control_header *lwapp_control_header;
     const u_char *tptr;
@@ -294,13 +287,6 @@ _lwapp_control_print(netdissect_options *ndo,
 void
 lwapp_data_print(netdissect_options *ndo,
                  const u_char *pptr, u_int len)
-{
-	INVOKE_DISSECTOR(_lwapp_data_print, ndo, pptr, len);
-}
-
-void
-_lwapp_data_print(netdissect_options *ndo,
-                  const u_char *pptr, u_int len)
 {
     const struct lwapp_transport_header *lwapp_trans_header;
     const u_char *tptr;

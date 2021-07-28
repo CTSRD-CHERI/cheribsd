@@ -146,15 +146,8 @@ static const struct oui_tok oui_to_tok[] = {
  * header with an unknown OUI/PID combination), returns the *negative*
  * of that value.
  */
-void
-llc_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen,
-	  const struct lladdr_info *src, const struct lladdr_info *dst)
-{
-	INVOKE_DISSECTOR(_llc_print, ndo, p, length, caplen, src, dst);
-}
-
 int
-_llc_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen,
+llc_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen,
 	  const struct lladdr_info *src, const struct lladdr_info *dst)
 {
 	uint8_t dsap_field, dsap, ssap_field, ssap;
@@ -269,7 +262,7 @@ _llc_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen,
 		 * Does anybody ever bridge one form of LAN traffic
 		 * over a networking type that uses 802.2 LLC?
 		 */
-		if (!_snap_print(ndo, p, length, caplen, src, dst, 2)) {
+		if (!snap_print(ndo, p, length, caplen, src, dst, 2)) {
 			/*
 			 * Unknown packet type; tell our caller, by
 			 * returning a negative value, so they
@@ -423,17 +416,8 @@ oui_to_struct_tok(uint32_t orgcode)
 	return (tok);
 }
 
-void
-snap_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen,
-	const struct lladdr_info *src, const struct lladdr_info *dst,
-	u_int bridge_pad)
-{
-	INVOKE_DISSECTOR(_snap_print, ndo, p, length, caplen, src, dst,
-	    bridge_pad);
-}
-
 int
-_snap_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen,
+snap_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen,
 	const struct lladdr_info *src, const struct lladdr_info *dst,
 	u_int bridge_pad)
 {
@@ -473,7 +457,7 @@ _snap_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen
 		 * Cisco hardware; the protocol ID is
 		 * an Ethernet protocol type.
 		 */
-		ret = _ethertype_print(ndo, et, p, length, caplen, src, dst);
+		ret = ethertype_print(ndo, et, p, length, caplen, src, dst);
 		if (ret)
 			return (ret);
 		break;
@@ -488,7 +472,7 @@ _snap_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen
 			 * but used 0x000000 and an Ethernet
 			 * packet type for AARP packets.
 			 */
-			ret = _ethertype_print(ndo, et, p, length, caplen, src, dst);
+			ret = ethertype_print(ndo, et, p, length, caplen, src, dst);
 			if (ret)
 				return (ret);
 		}

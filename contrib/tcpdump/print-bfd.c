@@ -289,13 +289,6 @@ void
 bfd_print(netdissect_options *ndo, register const u_char *pptr,
           register u_int len, register u_int port)
 {
-	INVOKE_DISSECTOR(_bfd_print, ndo, pptr, len, port);
-}
-
-void
-_bfd_print(netdissect_options *ndo, register const u_char *pptr,
-          register u_int len, register u_int port)
-{
         if (port == BFD_CONTROL_PORT) {
             /*
              * Control packet.

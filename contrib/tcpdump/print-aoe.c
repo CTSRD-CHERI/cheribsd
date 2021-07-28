@@ -385,7 +385,7 @@ aoev1_print(netdissect_options *ndo,
 		command == AOEV1_CMD_QUERY_CONFIG_INFORMATION ? aoev1_query_print :
 		command == AOEV1_CMD_MAC_MASK_LIST            ? aoev1_mac_print :
 		command == AOEV1_CMD_RESERVE_RELEASE          ? aoev1_reserve_print :
-		(void (*)(netdissect_options *, const u_char *, const u_int))NULL;
+		NULL;
 	if (cmd_decoder != NULL)
 		cmd_decoder(ndo, cp, len - AOEV1_COMMON_HDR_LEN);
 	return;
@@ -400,13 +400,6 @@ trunc:
 
 void
 aoe_print(netdissect_options *ndo,
-          const u_char *cp, const u_int len)
-{
-	INVOKE_DISSECTOR(_aoe_print, ndo, cp, len);
-}
-
-void
-_aoe_print(netdissect_options *ndo,
           const u_char *cp, const u_int len)
 {
 	const u_char *ep = cp + len;

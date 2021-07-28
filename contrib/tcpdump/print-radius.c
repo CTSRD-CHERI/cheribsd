@@ -949,13 +949,6 @@ void
 radius_print(netdissect_options *ndo,
              const u_char *dat, u_int length)
 {
-	INVOKE_DISSECTOR(_radius_print, ndo, dat, length);
-}
-
-void
-_radius_print(netdissect_options *ndo,
-             const u_char *dat, u_int length)
-{
    register const struct radius_hdr *rad;
    u_int len, auth_idx;
 

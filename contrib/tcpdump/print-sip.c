@@ -50,11 +50,5 @@ static const char *sipcmds[] = {
 void
 sip_print(netdissect_options *ndo, const u_char *pptr, u_int len)
 {
-	INVOKE_DISSECTOR(_sip_print, ndo, pptr, len);
-}
-
-void
-_sip_print(netdissect_options *ndo, const u_char *pptr, u_int len)
-{
 	txtproto_print(ndo, pptr, len, "sip", sipcmds, RESP_CODE_SECOND_TOKEN);
 }

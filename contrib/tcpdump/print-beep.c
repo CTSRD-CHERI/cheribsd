@@ -48,12 +48,6 @@ l_strnstart(netdissect_options *ndo, const char *tstr1, u_int tl1,
 void
 beep_print(netdissect_options *ndo, const u_char *bp, u_int length)
 {
-	INVOKE_DISSECTOR(_beep_print, ndo, bp, length);
-}
-
-void
-_beep_print(netdissect_options *ndo, const u_char *bp, u_int length)
-{
 
 	if (l_strnstart(ndo, "MSG", 4, (const char *)bp, length)) /* A REQuest */
 		ND_PRINT((ndo, " BEEP MSG"));

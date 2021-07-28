@@ -955,13 +955,6 @@ void
 ospf6_print(netdissect_options *ndo,
             register const u_char *bp, register u_int length)
 {
-	INVOKE_DISSECTOR(_ospf6_print, ndo, bp, length);
-}
-
-void
-_ospf6_print(netdissect_options *ndo,
-            register const u_char *bp, register u_int length)
-{
 	register const struct ospf6hdr *op;
 	register const u_char *dataend;
 	register const char *cp;

@@ -28,11 +28,5 @@
 void
 smtp_print(netdissect_options *ndo, const u_char *pptr, u_int len)
 {
-	INVOKE_DISSECTOR(_smtp_print, ndo, pptr, len);
-}
-
-void
-_smtp_print(netdissect_options *ndo, const u_char *pptr, u_int len)
-{
 	txtproto_print(ndo, pptr, len, "smtp", NULL, 0);
 }
