@@ -68,7 +68,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libifconfig \
 	libipsec \
 	libjail \
-	libjpeg \
 	libkiconv \
 	libkvm \
 	liblua \
