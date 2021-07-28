@@ -85,7 +85,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libpathconv \
 	libpcap \
 	libpjdlog \
-	libpng \
 	libproc \
 	libprocstat \
 	libregex \
@@ -247,6 +246,11 @@ SUBDIR.${MK_BHYVE}+=	libvmmapi
 
 .if ${MACHINE_ARCH:Mmips64*} || ${MACHINE_ARCH:Mriscv*}
 _libstatcounters=	libstatcounters
+.endif
+
+.if ${MACHINE_ARCH:Mmips64*}
+# Used by ctsrd/lib/libterasic_mtl
+SUBDIR+=	libpng
 .endif
 
 .if ${MACHINE_ARCH} != "powerpc"

@@ -33,8 +33,6 @@ _PRIVATELIBS=	\
 		unbound \
 		zstd
 
-_PRIVATELIBS+=	png
-
 _INTERNALLIBS=	\
 		amu \
 		c_nossp_pic \
@@ -64,6 +62,8 @@ _INTERNALLIBS=	\
 .if ${MK_BSNMP} == "yes"
 _INTERNALLIBS+=	bsnmptools
 .endif
+
+_INTERNALLIBS+=	png
 
 _LIBRARIES=	\
 		${_PRIVATELIBS} \
@@ -581,6 +581,9 @@ LIBBE?=		${LIBBEDIR}/libbe${PIE_SUFFIX}.a
 
 LIBPMCSTATDIR=	${_LIB_OBJTOP}/lib/libpmcstat
 LIBPMCSTAT?=	${LIBPMCSTATDIR}/libpmcstat${PIE_SUFFIX}.a
+
+LIBPNGDIR=	${_LIB_OBJTOP}/lib/libpng
+LIBPNG?=	${LIBPNGDIR}/libpng${PIE_SUFFIX}.a
 
 LIBC_NOSSP_PICDIR=	${_LIB_OBJTOP}/lib/libc
 LIBC_NOSSP_PIC?=	${LIBC_NOSSP_PICDIR}/libc_nossp_pic${PIE_SUFFIX}.a
