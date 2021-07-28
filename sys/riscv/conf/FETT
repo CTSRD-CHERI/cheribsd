@@ -4,6 +4,8 @@ include "GENERIC"
 
 ident FETT
 
+include "std.CHERI-CAPREVOKE"
+
 device		virtio_random	# VirtIO Entropy device
 
 options 	HZ=100
