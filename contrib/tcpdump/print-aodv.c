@@ -476,13 +476,6 @@ void
 aodv_print(netdissect_options *ndo,
            const u_char *dat, u_int length, int is_ip6)
 {
-	INVOKE_DISSECTOR(_aodv_print, ndo, dat, length, is_ip6);
-}
-
-void
-_aodv_print(netdissect_options *ndo,
-           const u_char *dat, u_int length, int is_ip6)
-{
 	uint8_t msg_type;
 
 	/*

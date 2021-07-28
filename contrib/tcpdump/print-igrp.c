@@ -104,12 +104,6 @@ static const struct tok op2str[] = {
 void
 igrp_print(netdissect_options *ndo, register const u_char *bp, u_int length)
 {
-	INVOKE_DISSECTOR(_igrp_print, ndo, bp, length);
-}
-
-void
-_igrp_print(netdissect_options *ndo, register const u_char *bp, u_int length)
-{
 	register const struct igrphdr *hdr;
 	register const u_char *cp;
 	u_int nint, nsys, next;

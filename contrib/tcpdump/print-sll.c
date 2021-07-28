@@ -261,7 +261,7 @@ recurse:
 			 * 802.2.
 			 * Try to print the LLC-layer header & higher layers.
 			 */
-			llc_hdrlen = _llc_print(ndo, p, length, caplen, NULL, NULL);
+			llc_hdrlen = llc_print(ndo, p, length, caplen, NULL, NULL);
 			if (llc_hdrlen < 0)
 				goto unknown;	/* unknown LLC type */
 			hdrlen += llc_hdrlen;
@@ -308,7 +308,7 @@ recurse:
 		hdrlen += 4;
 		goto recurse;
 	} else {
-		if (_ethertype_print(ndo, ether_type, p, length, caplen, NULL, NULL) == 0) {
+		if (ethertype_print(ndo, ether_type, p, length, caplen, NULL, NULL) == 0) {
 			/* ether_type not known, print raw packet */
 			if (!ndo->ndo_eflag)
 				sll_print(ndo, sllp, length + SLL_HDR_LEN);

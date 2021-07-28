@@ -649,19 +649,11 @@ void esp_print_decodesecret(netdissect_options *ndo)
 
 #endif
 
-void
-esp_print(netdissect_options *ndo,
-	  const u_char *bp, const int length, const u_char *bp2,
-	  int *nhdr, int *padlen)
-{
-	INVOKE_DISSECTOR(_esp_print, ndo, bp, length, bp2, nhdr, padlen);
-}
-
 #ifdef HAVE_LIBCRYPTO
 USES_APPLE_DEPRECATED_API
 #endif
 int
-_esp_print(netdissect_options *ndo,
+esp_print(netdissect_options *ndo,
 	  const u_char *bp, const int length, const u_char *bp2
 #ifndef HAVE_LIBCRYPTO
 	_U_

@@ -34,14 +34,8 @@
 #include "netdissect.h"
 #include "extract.h"
 
-void
-ah_print(netdissect_options *ndo, register const u_char *bp)
-{
-	INVOKE_DISSECTOR(_ah_print, ndo, bp);
-}
-
 int
-_ah_print(netdissect_options *ndo, register const u_char *bp)
+ah_print(netdissect_options *ndo, register const u_char *bp)
 {
 	register const struct ah *ah;
 	int sumlen;

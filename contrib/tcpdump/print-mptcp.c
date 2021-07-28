@@ -428,13 +428,8 @@ static const struct {
         { "unknown",    dummy_print },
 };
 
-void
-mptcp_print(netdissect_options *ndo,
-            const u_char *cp, u_int len, u_char flags) {
-	INVOKE_DISSECTOR(_mptcp_print, ndo, cp, len, flags);
-}
 int
-_mptcp_print(netdissect_options *ndo,
+mptcp_print(netdissect_options *ndo,
             const u_char *cp, u_int len, u_char flags)
 {
         const struct mptcp_option *opt;

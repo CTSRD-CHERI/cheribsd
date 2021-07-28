@@ -2801,13 +2801,6 @@ void
 bgp_print(netdissect_options *ndo,
           const u_char *dat, int length)
 {
-	INVOKE_DISSECTOR(_bgp_print, ndo, dat, length);
-}
-
-void
-_bgp_print(netdissect_options *ndo,
-          const u_char *dat, int length)
-{
 	const u_char *p;
 	const u_char *ep;
 	const u_char *start;

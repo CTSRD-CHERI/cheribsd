@@ -81,7 +81,7 @@ cip_if_print(netdissect_options *ndo, const struct pcap_pkthdr *h, const u_char 
 		/*
 		 * LLC header is present.  Try to print it & higher layers.
 		 */
-		llc_hdrlen = _llc_print(ndo, p, length, caplen, NULL, NULL);
+		llc_hdrlen = llc_print(ndo, p, length, caplen, NULL, NULL);
 		if (llc_hdrlen < 0) {
 			/* packet type not known, print raw packet */
 			if (!ndo->ndo_suppress_default_print)

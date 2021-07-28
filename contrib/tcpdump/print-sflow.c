@@ -870,13 +870,6 @@ void
 sflow_print(netdissect_options *ndo,
             const u_char *pptr, u_int len)
 {
-	INVOKE_DISSECTOR(_sflow_print, ndo, pptr, len);
-}
-
-void
-_sflow_print(netdissect_options *ndo,
-            const u_char *pptr, u_int len)
-{
     const struct sflow_datagram_t *sflow_datagram;
     const struct sflow_sample_header *sflow_sample;
 

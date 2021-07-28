@@ -1876,13 +1876,6 @@ void
 snmp_print(netdissect_options *ndo,
            const u_char *np, u_int length)
 {
-	INVOKE_DISSECTOR(_snmp_print, ndo, np, length);
-}
-
-void
-_snmp_print(netdissect_options *ndo,
-           const u_char *np, u_int length)
-{
 	struct be elem;
 	int count = 0;
 	int version = 0;

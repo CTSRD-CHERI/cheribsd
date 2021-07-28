@@ -87,17 +87,11 @@ static const struct tok pppoetag2str[] = {
 u_int
 pppoe_if_print(netdissect_options *ndo, const struct pcap_pkthdr *h, register const u_char *p)
 {
-	return (_pppoe_print(ndo, p, h->len));
-}
-
-void
-pppoe_print(netdissect_options *ndo, register const u_char *bp, u_int length)
-{
-	INVOKE_DISSECTOR(_pppoe_print, ndo, bp, length);
+	return (pppoe_print(ndo, p, h->len));
 }
 
 u_int
-_pppoe_print(netdissect_options *ndo, register const u_char *bp, u_int length)
+pppoe_print(netdissect_options *ndo, register const u_char *bp, u_int length)
 {
 	uint16_t pppoe_ver, pppoe_type, pppoe_code, pppoe_sessionid;
 	u_int pppoe_length;
@@ -198,7 +192,7 @@ _pppoe_print(netdissect_options *ndo, register const u_char *bp, u_int length)
 	} else {
 		/* PPPoE data */
 		ND_PRINT((ndo, " "));
-		return (PPPOE_HDRLEN + _ppp_print(ndo, pppoe_payload, pppoe_length));
+		return (PPPOE_HDRLEN + ppp_print(ndo, pppoe_payload, pppoe_length));
 	}
 
 trunc:

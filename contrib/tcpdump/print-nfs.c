@@ -323,14 +323,6 @@ nfsreply_print(netdissect_options *ndo,
                register const u_char *bp, u_int length,
                register const u_char *bp2)
 {
-	INVOKE_DISSECTOR(_nfsreply_print, ndo, bp, length, bp2);
-}
-
-void
-_nfsreply_print(netdissect_options *ndo,
-               register const u_char *bp, u_int length,
-               register const u_char *bp2)
-{
 	register const struct sunrpc_msg *rp;
 	char srcid[20], dstid[20];	/*fits 32bit*/
 
@@ -492,22 +484,16 @@ parsefn(netdissect_options *ndo,
 	len = *dp++;
 	NTOHL(len);
 
-#ifndef CHERI_TCPDUMP_VULNERABILITY
 	ND_TCHECK2(*dp, ((len + 3) & ~3));
-#endif
 
 	cp = (const u_char *)dp;
 	/* Update 32-bit pointer (NFS filenames padded to 32-bit boundaries) */
 	dp += ((len + 3) & ~3) / sizeof(*dp);
 	ND_PRINT((ndo, "\""));
-#ifdef CHERI_TCPDUMP_VULNERABILITY
-	(void) fn_printn(ndo, cp, len, NULL);
-#else
 	if (fn_printn(ndo, cp, len, ndo->ndo_snapend)) {
 		ND_PRINT((ndo, "\""));
 		goto trunc;
 	}
-#endif
 	ND_PRINT((ndo, "\""));
 
 	return (dp);
@@ -533,14 +519,6 @@ parsefhn(netdissect_options *ndo,
 
 void
 nfsreq_print_noaddr(netdissect_options *ndo,
-                    register const u_char *bp, u_int length,
-                    register const u_char *bp2)
-{
-	INVOKE_DISSECTOR(_nfsreq_print_noaddr, ndo, bp, length, bp2);
-}
-
-void
-_nfsreq_print_noaddr(netdissect_options *ndo,
                     register const u_char *bp, u_int length,
                     register const u_char *bp2)
 {

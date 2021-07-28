@@ -226,13 +226,6 @@ void
 krb_print(netdissect_options *ndo,
           const u_char *dat)
 {
-	INVOKE_DISSECTOR(_krb_print, ndo, dat);
-}
-
-void
-_krb_print(netdissect_options *ndo,
-          const u_char *dat)
-{
 	register const struct krb *kp;
 
 	kp = (const struct krb *)dat;

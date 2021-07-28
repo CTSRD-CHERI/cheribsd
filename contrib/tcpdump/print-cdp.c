@@ -94,13 +94,6 @@ void
 cdp_print(netdissect_options *ndo,
           const u_char *pptr, u_int length, u_int caplen)
 {
-	INVOKE_DISSECTOR(_cdp_print, ndo, pptr, length, caplen);
-}
-
-void
-_cdp_print(netdissect_options *ndo,
-          const u_char *pptr, u_int length, u_int caplen)
-{
 	int type, len, i, j;
 	const u_char *tptr;
 
