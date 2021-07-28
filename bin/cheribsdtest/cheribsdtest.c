@@ -49,18 +49,9 @@
 #include <machine/frame.h>
 #include <machine/trap.h>
 
-#ifdef CHERIBSD_LIBCHERI_TESTS
-#include <cheri/libcheri_fd.h>
-#include <cheri/libcheri_stack.h>
-#include <cheri/libcheri_sandbox.h>
-#endif
-
 #include <machine/sysarch.h>
 
 #include <assert.h>
-#ifdef CHERIBSD_LIBCHERI_TESTS
-#include <cheribsdtest-helper.h>
-#endif
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -98,7 +89,6 @@ static int fast_tests_only;
 static int qtrace;
 static int qtrace_user_mode_only;
 static int sleep_after_test;
-static int unsandboxed_tests_only;
 static int verbose;
 static int coredump_enabled;
 static int debugger_enabled;
@@ -121,7 +111,6 @@ usage(void)
 "    -s  -- Sleep one second after each test\n"
 "    -q  -- Enable qemu tracing in test process\n"
 "    -Q  -- Enable qemu tracing in test process (user-mode only)\n"
-"    -u  -- Only include unsandboxed tests\n"
 "    -v  -- Increase verbosity\n"
 "    -x  -- Output JUnit XML format\n"
 	     );
@@ -140,8 +129,6 @@ list_tests(void)
 	SET_FOREACH(ctp, cheri_tests_set) {
 		ct = *ctp;
 		if (fast_tests_only && (ct->ct_flags & CT_FLAG_SLOW))
-			continue;
-		if (unsandboxed_tests_only && (ct->ct_flags & CT_FLAG_SANDBOX))
 			continue;
 		xo_open_instance("testcase");
 		if (verbose)
@@ -176,10 +163,6 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 	struct cheri_frame *cfp;
 #endif
 	ucontext_t *uap;
-#ifdef CHERIBSD_LIBCHERI_TESTS
-	u_int numframes;
-	int ret;
-#endif
 
 	uap = (ucontext_t *)vuap;
 #ifdef __mips__
@@ -207,39 +190,6 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 	ccsp->ccs_cp2_cause = cfp->cf_capcause;
 #endif
 
-#ifdef CHERIBSD_LIBCHERI_TESTS
-	/*
-	 * The cheribsdtest signal handler must decide between two courses of
-	 * action: if we're executing in a sandbox, perform an unwind and
-	 * return CHERIBSDTEST_SANDBOX_UNWOUND from the preempted
-	 * CHERIBSDTEST_SANDBOX_UNWOUND, or if we are not executing in a sandbox,
-	 * terminate the test, returning signal information to the parent.
-	 */
-	ret = libcheri_stack_numframes(&numframes);
-	if (ret < 0) {
-		ccsp->ccs_signum = -1;
-		fprintf(stderr, "%s: libcheri_stack_numframes failed\n",
-		    __func__);
-		_exit(EX_SOFTWARE);
-	}
-
-	if (numframes) {
-		/*
-		 * Sandboxed code is executing, even if we're not in a
-		 * sandbox.
-		 */
-		ret = libcheri_stack_unwind(uap, CHERIBSDTEST_SANDBOX_UNWOUND,
-		    LIBCHERI_STACK_UNWIND_OP_ALL, 0);
-		if (ret < 0) {
-			ccsp->ccs_signum = -1;
-			fprintf(stderr, "%s: libcheri_stack_unwind failed\n",
-			    __func__);
-			_exit(EX_SOFTWARE);
-		}
-		ccsp->ccs_unwound = 1;
-		return;
-	}
-#endif
 	/*
 	 * Signal delivered outside of a sandbox; catch but terminate
 	 * test.  Use EX_SOFTWARE as the parent handler will recognise
@@ -309,8 +259,6 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 	visreason[0] = '\0';
 
 	if (fast_tests_only && (ctp->ct_flags & CT_FLAG_SLOW))
-		return;
-	if (unsandboxed_tests_only && (ctp->ct_flags & CT_FLAG_SANDBOX))
 		return;
 
 	if (ctp->ct_check_xfail != NULL)
@@ -427,10 +375,8 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 
 	/*
 	 * First, check for errors from the test framework: successful process
-	 * termination, signal disposition/exception codes/etc.  Handle the
-	 * special case in which the kernel terminates a process with prejudice
-	 * if an alternate signal stack is not present when a sandbox receives
-	 * a signal.  Analyse child's signal state returned via shared memory.
+	 * termination, signal disposition/exception codes/etc.  Analyse
+	 * child's signal state returned via shared memory.
 	 */
 	if (ctp->ct_flags & CT_FLAG_SIGEXIT) {
 		if (!WIFSIGNALED(status)) {
@@ -466,7 +412,7 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		    "Child returned negative signal %d", ccsp->ccs_signum);
 		goto fail;
 	}
-	if (ctp->ct_flags & (CT_FLAG_SIGNAL | CT_FLAG_SIGNAL_UNWIND) &&
+	if ((ctp->ct_flags & CT_FLAG_SIGNAL) &&
 	    ccsp->ccs_signum != ctp->ct_signum) {
 		snprintf(reason, sizeof(reason), "Expected signal %d, got %d",
 		    ctp->ct_signum, ccsp->ccs_signum);
@@ -476,16 +422,6 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 	    ccsp->ccs_si_code != ctp->ct_si_code) {
 		snprintf(reason, sizeof(reason), "Expected si_code %d, got %d",
 		    ctp->ct_si_code, ccsp->ccs_si_code);
-		goto fail;
-	}
-	if ((ctp->ct_flags & CT_FLAG_SIGNAL_UNWIND) && !ccsp->ccs_unwound) {
-		snprintf(reason, sizeof(reason), "Expected trusted stack "
-		   "unwind, but none seen");
-		goto fail;
-	}
-	if (!(ctp->ct_flags & CT_FLAG_SIGNAL_UNWIND) && ccsp->ccs_unwound) {
-		snprintf(reason, sizeof(reason), "Unexpected trusted stack "
-		    "unwind");
 		goto fail;
 	}
 	if ((ctp->ct_flags & CT_FLAG_SI_TRAPNO) &&
@@ -721,9 +657,6 @@ main(int argc, char *argv[])
 		case 's':
 			sleep_after_test = 1;
 			break;
-		case 'u':
-			unsandboxed_tests_only = 1;
-			break;
 		case 'v':
 			verbose++;
 			break;
@@ -769,8 +702,7 @@ main(int argc, char *argv[])
 	 * Allocate an alternative stack, required to safely process signals in
 	 * sandboxes.
 	 *
-	 * XXXRW: It is unclear if this should be done by libcheri rather than
-	 * the main program?
+	 * XXX: Is this still needed now we no longer have libcheri sandboxes?
 	 */
 	stack.ss_size = MAX(getpagesize(), SIGSTKSZ);
 	stack.ss_sp = mmap(NULL, stack.ss_size, PROT_READ | PROT_WRITE,
@@ -802,27 +734,10 @@ main(int argc, char *argv[])
 			err(EX_OSERR, "setrlimit");
 	}
 
-	/*
-	 * Initialise the libcheri sandboxing library.
-	 */
-#ifdef CHERIBSD_LIBCHERI_TESTS
-	if (!unsandboxed_tests_only)
-		libcheri_init();
-#endif
-
 	cheri_failed_tests = sl_init();
 	cheri_xfailed_tests = sl_init();
 	cheri_xpassed_tests = sl_init();
 	/* Run the actual tests. */
-#ifdef CHERIBSD_LIBCHERI_TESTS
-#if 0
-	cheribsdtest_ccall_setup();
-#endif
-	if (!unsandboxed_tests_only) {
-		if (cheribsdtest_libcheri_setup() < 0)
-			err(EX_SOFTWARE, "cheribsdtest_libcheri_setup");
-	}
-#endif
 	xo_open_container("testsuites");
 	xo_attr("name", "%s", PROG);
 	xo_open_container("testsuite");
@@ -889,11 +804,6 @@ main(int argc, char *argv[])
 	}
 	xo_finish();
 
-
-#ifdef CHERIBSD_LIBCHERI_TESTS
-	if (!unsandboxed_tests_only)
-		cheribsdtest_libcheri_destroy();
-#endif
 	if (tests_failed > 0)
 		exit(-1);
 	exit(EX_OK);

@@ -42,7 +42,6 @@ SUBDIR= cat \
 
 .if ${TARGET} == "mips"
 SUBDIR+=	shmem_bench
-SUBDIR.${MK_LIBCHERI}+=	cheri_bench
 .endif
 
 # Small cheri programs
@@ -58,10 +57,6 @@ SUBDIR.${MK_CHERI}+=	helloworld
 SUBDIR.${MK_CHERI}+=	helloworld_cxx
 .endif
 SUBDIR.${MK_CHERI}+=	helloworld_static
-
-# Consumers of libhelloworld
-SUBDIR.${MK_LIBCHERI}+=	cheri_helloworld
-SUBDIR.${MK_LIBCHERI}+=	cheriabi_helloworld
 
 SUBDIR.${MK_CHERI}+=	cheribsdtest
 .endif  # ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"

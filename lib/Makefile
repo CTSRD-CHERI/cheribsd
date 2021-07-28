@@ -15,8 +15,6 @@ SUBDIR_BOOTSTRAP= \
 	libc \
 	libc_nonshared \
 	libcompiler_rt \
-	${_libc_cheri} \
-	${_libcheri} \
 	${_libcheribsdtest_dynamic} \
 	${_libclang_rt} \
 	libgcc_eh \
@@ -166,13 +164,7 @@ SUBDIR.${MK_BLACKLIST}+=libblacklist
 SUBDIR.${MK_BLUETOOTH}+=libbluetooth libsdp
 SUBDIR.${MK_BSNMP}+=	libbsnmp
 
-SUBDIR.${MK_LIBCHERI}+=	libhelloworld
 SUBDIR.${MK_CHERI}+=	libsyscalls
-
-.if ${MK_LIBCHERI} == "yes" && ${MACHINE_ARCH} != "mips"
-_libc_cheri=	libc_cheri
-_libcheri=	libcheri
-.endif
 
 .if ${MACHINE_CPU:Mcheri}
 _libcheribsdtest_dynamic=	libcheribsdtest_dynamic
@@ -281,10 +273,6 @@ SUBDIR:=	${SUBDIR:Nlibc++experimental}
 
 .if ${MACHINE_ABI:Mpurecap}
 SUBDIR+=	libmalloc_simple
-.endif
-.if ${MK_LIBCHERI} == "yes"
-SUBDIR.${MK_LIBCHERI}+=	libcheri_syscalls
-SUBDIR.${MK_LIBCHERI}+=	libcheri_support
 .endif
 
 .include <bsd.subdir.mk>
