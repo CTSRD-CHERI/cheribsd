@@ -363,9 +363,6 @@ CFLAGS+=	-cheri
 LDFLAGS+=	-fuse-ld=lld
 
 CFLAGS+=	-Werror=cheri-bitwise-operations
-# Don't remove CHERI symbols from the symbol table
-STRIP_FLAGS+=	-w --keep-symbol=__cheri_callee_method.\* \
-		--keep-symbol=__cheri_method.\*
 .endif
 . if ${MACHINE_ARCH:Mmips*hf}
 CFLAGS += -mhard-float

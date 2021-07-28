@@ -45,10 +45,6 @@ _blacklistd-helper+=	blacklistd-helper
 SUBDIR+=	bootpd
 .endif
 
-SUBDIR.${MK_LIBCHERI}+=	cheri_bench-helper
-SUBDIR.${MK_LIBCHERI}+=	cheribsdtest-helper
-SUBDIR.${MK_LIBCHERI}+=	tcpdump-helper
-
 .if ${MK_FINGER} != "no"
 SUBDIR+=	fingerd
 .endif

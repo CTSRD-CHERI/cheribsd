@@ -44,15 +44,15 @@ NEED_CHERI=	pure
 .if ${MK_CHERI} == "no"
 .error NEED_CHERI defined, but CHERI is not enabled (MACHINE_ARCH=${MACHINE_ARCH})
 .endif
-.if ${NEED_CHERI} != "hybrid" && ${NEED_CHERI} != "pure" && ${NEED_CHERI} != "sandbox"
-.error NEED_CHERI must be 'hybrid', 'pure', or 'sandbox'
+.if ${NEED_CHERI} != "hybrid" && ${NEED_CHERI} != "pure"
+.error NEED_CHERI must be 'hybrid' or 'pure'
 .endif
 WANT_CHERI:= ${NEED_CHERI}
 .endif
 
 .if ${MK_CHERI} != "no" && defined(WANT_CHERI) && ${WANT_CHERI} != "none"
 
-.if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
+.if ${WANT_CHERI} == "pure"
 MIPS_ABI:=	purecap
 STATIC_CFLAGS+=	-ftls-model=local-exec
 
@@ -65,14 +65,6 @@ CFLAGS+=-Werror=implicit-function-declaration
 STATIC_CFLAGS+= -ftls-model=local-exec # MIPS/hybrid case
 .endif
 
-.if ${WANT_CHERI} == "sandbox"
-# Force position-dependent sandboxes; PIEs aren't supported
-NO_SHARED=	yes
-.endif
-
-# Don't remove CHERI symbols from the symbol table
-STRIP_FLAGS+=	-w --keep-symbol=__cheri_callee_method.\* \
-		--keep-symbol=__cheri_method.\*
 .endif
 .endif
 .endif

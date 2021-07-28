@@ -5,8 +5,4 @@
 
 SUBDIR=	tcpdump
 
-.if ${MK_LIBCHERI} != "no"
-SUBDIR+=	cheri_tcpdump
-.endif
-
 .include <bsd.subdir.mk>
