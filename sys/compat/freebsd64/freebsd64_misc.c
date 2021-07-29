@@ -94,7 +94,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/unistd.h>
 #include <sys/ucontext.h>
 #include <sys/user.h>
-#include <sys/umtx.h>
+#include <sys/umtxvar.h>
 #include <sys/uuid.h>
 #include <sys/vnode.h>
 #include <sys/vdso.h>
