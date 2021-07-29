@@ -77,7 +77,7 @@ _Read_RuneMagi(const char *fname)
 #ifdef FORCE_C_LOCALE
 	return (NULL);
 #else
-	if ((fd = _open(fname, O_RDONLY)) < 0) {
+	if ((fd = _open(fname, O_RDONLY | O_CLOEXEC)) < 0) {
 		errno = EINVAL;
 		return (NULL);
 	}
