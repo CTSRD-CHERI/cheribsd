@@ -398,18 +398,23 @@ vm_fault_soft_fast(struct faultstate *fs)
 	    (VM_PROT_WRITE | VM_PROT_WRITE_CAP))
 		vm_page_aflag_set(m_map, PGA_CAPSTORE);
 
-	if (pmap_enter(fs->map->pmap, vaddr, m_map, realprot,
-	    fs->fault_type |
-	    PMAP_ENTER_NOSLEEP | (fs->wired ? PMAP_ENTER_WIRED : 0), psind) !=
-	    KERN_SUCCESS) {
-		res = FAULT_FAILURE;
-		goto out;
+	if (fs->fault_flags & VM_FAULT_NOPMAP) {
+		res = KERN_SUCCESS;
+	} else {
+		res = pmap_enter(fs->map->pmap, vaddr, m_map, realprot,
+		    fs->fault_type |
+		    PMAP_ENTER_NOSLEEP | (fs->wired ? PMAP_ENTER_WIRED : 0),
+		    psind);
+		if (res != KERN_SUCCESS) {
+			res = FAULT_FAILURE;
+			goto out;
+		}
 	}
 	if (fs->m_hold != NULL) {
 		(*fs->m_hold) = m;
 		vm_page_wire(m);
 	}
-	if (psind == 0 && !fs->wired)
+	if (psind == 0 && !fs->wired && !(fs->fault_flags & VM_FAULT_NOPMAP))
 		vm_fault_prefault(fs, vaddr, PFBAK, PFFOR, true);
 	VM_OBJECT_RUNLOCK(fs->first_object);
 	vm_fault_dirty(fs, m);
@@ -561,9 +566,14 @@ vm_fault_populate(struct faultstate *fs)
 		    (uintmax_t)VM_PAGE_TO_PHYS(m)));
 		if (fs->prot & VM_PROT_WRITE_CAP)
 			vm_page_aflag_set(m, PGA_CAPSTORE);
+		if (fs->fault_flags & VM_FAULT_NOPMAP) {
+			rv = KERN_SUCCESS;
+			goto skip_pmap_bdry;
+		}
 		rv = pmap_enter(fs->map->pmap, vaddr, m, fs->prot,
 		    fs->fault_type | (fs->wired ? PMAP_ENTER_WIRED : 0) |
 		    PMAP_ENTER_LARGEPAGE, bdry_idx);
+skip_pmap_bdry:
 		VM_OBJECT_WLOCK(fs->first_object);
 		vm_page_xunbusy(m);
 		if (rv != KERN_SUCCESS) {
@@ -621,6 +631,10 @@ vm_fault_populate(struct faultstate *fs)
 			vm_fault_dirty(fs, &m[i]);
 		}
 		VM_OBJECT_WUNLOCK(fs->first_object);
+
+		if (fs->fault_flags & VM_FAULT_NOPMAP)
+			goto skip_pmap;
+
 		rv = pmap_enter(fs->map->pmap, vaddr, m, prot, fs->fault_type |
 		    (fs->wired ? PMAP_ENTER_WIRED : 0), psind);
 
@@ -642,7 +656,7 @@ vm_fault_populate(struct faultstate *fs)
 				MPASS(rv == KERN_SUCCESS);
 			}
 		}
-
+skip_pmap:
 		VM_OBJECT_WLOCK(fs->first_object);
 		for (i = 0; i < npages; i++) {
 			if ((fs->fault_flags & VM_FAULT_WIRE) != 0 &&
@@ -1756,7 +1770,8 @@ found:
 
 	pmap_enter(fs.map->pmap, vaddr, fs.m, realprot,
 	    fs.fault_type | (fs.wired ? PMAP_ENTER_WIRED : 0), 0);
-	if (faultcount != 1 && (fs.fault_flags & VM_FAULT_WIRE) == 0 &&
+	if (faultcount != 1 &&
+	    (fs.fault_flags & (VM_FAULT_WIRE | VM_FAULT_NOPMAP)) == 0 &&
 	    fs.wired == 0)
 		vm_fault_prefault(&fs, vaddr,
 		    faultcount > 0 ? behind : PFBAK,
