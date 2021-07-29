@@ -306,16 +306,28 @@ vm_fault_dirty(struct faultstate *fs, vm_page_t m)
 
 #ifdef CHERI_CAPREVOKE
 static bool
-vm_fault_must_cheri_revoke(vm_map_t map, vm_prot_t prot, vm_page_t m)
+vm_fault_must_cheri_revoke(vm_map_t map, vm_prot_t prot, vm_page_t m,
+    int fault_flags)
 {
 
-	/*
-	 * Revocation is in progress, we are about to map with cap access, and
-	 * the page might bear capabilities.
-	 */
-	return (cheri_revoke_st_state(map->vm_cheri_revoke_st) !=
-	    CHERI_REVOKE_ST_NONE) && ((prot & VM_PROT_READ_CAP) != 0) &&
-	    ((vm_page_astate_load(m).flags & PGA_CAPSTORE) != 0);
+	/* If revocation isn't in progress, no need to interpose */
+	if (cheri_revoke_st_state(map->vm_cheri_revoke_st) ==
+	    CHERI_REVOKE_ST_NONE)
+		return false;
+
+	/* Or we're not mapping with capability read access */
+	if ((prot & VM_PROT_READ_CAP) == 0)
+		return false;
+
+	/* Or the page is known to not have capabilities */
+	if ((vm_page_astate_load(m).flags & PGA_CAPSTORE) == 0)
+		return false;
+
+	/* Or we aren't exposing the page via the pmap */
+	if ((fault_flags & VM_FAULT_NOPMAP) != 0)
+		return false;
+
+	return true;
 }
 
 enum vm_fault_cheri_revoke_res {
