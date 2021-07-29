@@ -810,8 +810,10 @@ vm_cheri_revoke_pass(const struct vm_cheri_revoke_cookie *crc, int flags)
 		 * We might be bailing out because a page fault failed for
 		 * catastrophic reasons (or polite ones like ptrace()).
 		 */
-		if (res != KERN_SUCCESS)
+		if (res != KERN_SUCCESS) {
+			printf("CHERI revoke bail va=%lx res=%d\n", addr, res);
 			goto out;
+		}
 
 		if (!vm_map_lookup_entry(map, addr, &entry)) {
 			entry = vm_map_entry_succ(entry);
