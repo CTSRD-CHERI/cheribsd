@@ -486,7 +486,8 @@ vm_fault_soft_fast(struct faultstate *fs)
 	realprot = VM_OBJECT_MASK_CAP_PROT(fs->first_object, fs->prot);
 
 #ifdef CHERI_CAPREVOKE
-	if (vm_fault_must_cheri_revoke(fs->map, realprot, m_map)) {
+	if (vm_fault_must_cheri_revoke(fs->map, realprot, m_map,
+	    fs->fault_flags)) {
 		/*
 		 * Just pretend we didn't see it; it's easier than juggling
 		 * the map lock and checking.  We'll go through the full fault
@@ -735,7 +736,8 @@ skip_pmap_bdry:
 			vm_fault_dirty(fs, &m[i]);
 
 #ifdef CHERI_CAPREVOKE
-			if (vm_fault_must_cheri_revoke(fs->map, prot, &m[i])) {
+			if (vm_fault_must_cheri_revoke(fs->map, prot, &m[i],
+			    fs->fault_flags)) {
 				int vmfcres;
 
 				/*
@@ -1792,7 +1794,8 @@ RetryFault:
 #ifdef CHERI_CAPREVOKE
 	/* XXX Is this the correct thing to do? */
 	if (vm_fault_must_cheri_revoke(fs.map,
-	    VM_OBJECT_MASK_CAP_PROT(fs.object, fs.prot), fs.m)) {
+	    VM_OBJECT_MASK_CAP_PROT(fs.object, fs.prot), fs.m,
+	    fs.fault_flags)) {
 		int vmfcres;
 
 		if ((fs.prot & VM_PROT_WRITE) ||
@@ -2094,7 +2097,8 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 		 * before.
 		 */
 		if (vm_fault_must_cheri_revoke(fs->map,
-		    VM_OBJECT_MASK_CAP_PROT(lobject, entry->protection), m)) {
+		    VM_OBJECT_MASK_CAP_PROT(lobject, entry->protection), m,
+		    fs->fault_flags)) {
 			if (!obj_locked || lobject != entry->object.vm_object)
 				VM_OBJECT_RUNLOCK(lobject);
 			continue;
