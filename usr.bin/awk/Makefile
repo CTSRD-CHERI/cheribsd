@@ -22,7 +22,7 @@ CLEANFILES= maketab proctab.c awkgram.tab.h
 awkgram.tab.h: awkgram.h
 	ln -sf ${.ALLSRC:M*.h} ${.TARGET}
 
-proctab.c: maketab
+proctab.c: maketab awkgram.h
 	${BTOOLSPATH:U.}/maketab awkgram.h > proctab.c
 
 DEPENDOBJS+= maketab
