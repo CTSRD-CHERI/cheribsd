@@ -174,6 +174,55 @@ AcpiAhGetTableInfo (
 
 /* These tables map a subtable type to a description string */
 
+static const char           *AcpiDmAestResourceNames[] =
+{
+    "Cache Resource",
+    "TLB Resource",
+    "Generic Resource",
+    "Unknown Resource Type"         /* Reserved */
+};
+
+static const char           *AcpiDmAestSubnames[] =
+{
+    "Processor Error Node",
+    "Memory Error Node",
+    "SMMU Error Node",
+    "Vendor-defined Error Node",
+    "GIC Error Node",
+    "Unknown Subtable Type"         /* Reserved */
+};
+
+static const char           *AcpiDmAestCacheNames[] =
+{
+    "Data Cache",
+    "Instruction Cache",
+    "Unified Cache",
+    "Unknown Cache Type"            /* Reserved */
+};
+
+static const char           *AcpiDmAestGicNames[] =
+{
+    "GIC CPU",
+    "GIC Distributor",
+    "GIC Redistributor",
+    "GIC ITS",
+    "Unknown GIC Interface Type"    /* Reserved */
+};
+
+static const char           *AcpiDmAestXfaceNames[] =
+{
+    "System Register Interface",
+    "Memory Mapped Interface",
+    "Unknown Interface Type"        /* Reserved */
+};
+
+static const char           *AcpiDmAestXruptNames[] =
+{
+    "Fault Handling Interrupt",
+    "Error Recovery Interrupt",
+    "Unknown Interrupt Type"        /* Reserved */
+};
+
 static const char           *AcpiDmAsfSubnames[] =
 {
     "ASF Information",
@@ -533,6 +582,7 @@ static const char           *AcpiDmGasAccessWidth[] =
 
 const ACPI_DMTABLE_DATA     AcpiDmTableData[] =
 {
+    {ACPI_SIG_AEST, NULL,                   AcpiDmDumpAest, DtCompileAest,  TemplateAest},
     {ACPI_SIG_ASF,  NULL,                   AcpiDmDumpAsf,  DtCompileAsf,   TemplateAsf},
     {ACPI_SIG_BDAT, AcpiDmTableInfoBdat,    NULL,           NULL,           TemplateBdat},
     {ACPI_SIG_BERT, AcpiDmTableInfoBert,    NULL,           NULL,           TemplateBert},
@@ -1007,6 +1057,10 @@ AcpiDmDumpTable (
         case ACPI_DMT_RGRT:
         case ACPI_DMT_SDEV:
         case ACPI_DMT_SRAT:
+        case ACPI_DMT_AEST:
+        case ACPI_DMT_AEST_RES:
+        case ACPI_DMT_AEST_XFACE:
+        case ACPI_DMT_AEST_XRUPT:
         case ACPI_DMT_ASF:
         case ACPI_DMT_HESTNTYP:
         case ACPI_DMT_FADTPM:
@@ -1036,6 +1090,8 @@ AcpiDmDumpTable (
             break;
 
         case ACPI_DMT_UINT32:
+        case ACPI_DMT_AEST_CACHE:
+        case ACPI_DMT_AEST_GIC:
         case ACPI_DMT_NAME4:
         case ACPI_DMT_SIG:
         case ACPI_DMT_LPIT:
@@ -1086,6 +1142,12 @@ AcpiDmDumpTable (
         case ACPI_DMT_BUF128:
 
             ByteLength = 128;
+            break;
+
+        case ACPI_DMT_WPBT_UNICODE:
+
+            ByteLength = SubtableLength;
+            CurrentOffset = sizeof (ACPI_TABLE_WPBT);
             break;
 
         case ACPI_DMT_UNICODE:
@@ -1419,6 +1481,90 @@ AcpiDmDumpTable (
             LastOutputBlankLine = TRUE;
             break;
 
+        case ACPI_DMT_AEST:
+
+            /* AEST subtable types */
+
+            Temp8 = *Target;
+            if (Temp8 > ACPI_AEST_NODE_TYPE_RESERVED)
+            {
+                Temp8 = ACPI_AEST_NODE_TYPE_RESERVED;
+            }
+
+            AcpiOsPrintf (UINT8_FORMAT, *Target,
+                AcpiDmAestSubnames[Temp8]);
+            break;
+
+        case ACPI_DMT_AEST_CACHE:
+
+            /* AEST cache resource subtable */
+
+            Temp32 = *Target;
+            if (Temp32 > ACPI_AEST_CACHE_RESERVED)
+            {
+                Temp32 = ACPI_AEST_CACHE_RESERVED;
+            }
+
+            AcpiOsPrintf (UINT32_FORMAT, *Target,
+                AcpiDmAestCacheNames[Temp32]);
+            break;
+
+        case ACPI_DMT_AEST_GIC:
+
+            /* AEST GIC error subtable */
+
+            Temp32 = *Target;
+            if (Temp32 > ACPI_AEST_GIC_RESERVED)
+            {
+                Temp32 = ACPI_AEST_GIC_RESERVED;
+            }
+
+            AcpiOsPrintf (UINT32_FORMAT, *Target,
+                AcpiDmAestGicNames[Temp32]);
+            break;
+
+        case ACPI_DMT_AEST_RES:
+
+            /* AEST resource type subtable */
+
+            Temp8 = *Target;
+            if (Temp8 > ACPI_AEST_RESOURCE_RESERVED)
+            {
+                Temp8 = ACPI_AEST_RESOURCE_RESERVED;
+            }
+
+            AcpiOsPrintf (UINT8_FORMAT, *Target,
+                AcpiDmAestResourceNames[Temp8]);
+            break;
+
+        case ACPI_DMT_AEST_XFACE:
+
+            /* AEST interface structure types */
+
+            Temp8 = *Target;
+            if (Temp8 > ACPI_AEST_XFACE_RESERVED)
+            {
+                Temp8 = ACPI_AEST_XFACE_RESERVED;
+            }
+
+            AcpiOsPrintf (UINT8_FORMAT, *Target,
+                AcpiDmAestXfaceNames[Temp8]);
+            break;
+
+        case ACPI_DMT_AEST_XRUPT:
+
+            /* AEST interrupt structure types */
+
+            Temp8 = *Target;
+            if (Temp8 > ACPI_AEST_XRUPT_RESERVED)
+            {
+                Temp8 = ACPI_AEST_XRUPT_RESERVED;
+            }
+
+            AcpiOsPrintf (UINT8_FORMAT, *Target,
+                AcpiDmAestXruptNames[Temp8]);
+            break;
+
         case ACPI_DMT_ASF:
 
             /* ASF subtable types */
@@ -1705,6 +1851,7 @@ AcpiDmDumpTable (
             break;
 
         case ACPI_DMT_UNICODE:
+        case ACPI_DMT_WPBT_UNICODE:
 
             if (ByteLength == 0)
             {
