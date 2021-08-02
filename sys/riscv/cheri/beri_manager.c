@@ -209,7 +209,9 @@ beri_write(struct cdev *dev, struct uio *uio, int ioflag)
 		sc->offs += 4;
 	}
 
+#if 0
 	printf("%s: done\n", __func__);
+#endif
 
 	return (0);
 }
