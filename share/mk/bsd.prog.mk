@@ -98,6 +98,8 @@ LDFLAGS+=	-Wl,--fatal-warnings
 .endif
 .endif
 
+.include "bsd.sanitizer.mk"
+
 .if ${MACHINE_CPUARCH} == "riscv" && ${LINKER_FEATURES:Mriscv-relaxations} == ""
 CFLAGS += -mno-relax
 .endif
