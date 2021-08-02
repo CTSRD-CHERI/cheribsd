@@ -31,8 +31,7 @@ maketab: maketab.c awkgram.tab.h ${BUILD_TOOLS_META}
 	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} -I. ${BUILD_TOOLS_LDFLAGS} \
 	    ${.ALLSRC:[1]} -o ${.TARGET}
 
-# awk needs some work before we can connect these tests to the build
-#HAS_TESTS=
-#SUBDIR.${MK_TESTS}+= tests
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.prog.mk>
