@@ -90,6 +90,11 @@ device		riscv_syscon
 # Bus drivers
 device		pci
 
+# PCI/PCI-X/PCIe Ethernet NICs that use iflib infrastructure
+device		iflib
+device		em		# Intel PRO/1000 Gigabit Ethernet Family
+device		ix		# Intel 10Gb Ethernet Family
+
 # Block devices
 device		ahci
 device		scbus
@@ -97,7 +102,7 @@ device		scbus
 # VirtIO support
 device		virtio			# Generic VirtIO bus (required)
 device		virtio_pci		# VirtIO PCI device
-device		vtnet			# VirtIO Ethernet device
+#device		vtnet			# VirtIO Ethernet device
 device		virtio_blk		# VirtIO Block device
 device		virtio_mmio		# VirtIO MMIO bus
 
