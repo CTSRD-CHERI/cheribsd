@@ -34,6 +34,7 @@
 #include "opt_sched.h"
 
 #include <machine/asm.h>
+#include <machine/armreg.h>
 
 __FBSDID("$FreeBSD$");
 
@@ -258,7 +259,7 @@ ENTRY(fork_trampoline)
 	 * Disable interrupts to avoid
 	 * overwriting spsr_el1 and sp_el0 by an IRQ exception.
 	 */
-	msr	daifset, #10
+	msr	daifset, #(DAIF_D | DAIF_INTR)
 
 	/* Restore sp, lr, elr, and spsr */
 	ldp	CAP(18), CAPN(lr), [PTRN(sp), #TF_SP]

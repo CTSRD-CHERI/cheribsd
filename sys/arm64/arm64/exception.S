@@ -83,7 +83,7 @@ __FBSDID("$FreeBSD$");
 
 	ldr	PTR(0), [PTR(18), #(PC_CURTHREAD)]
 	bl	dbg_monitor_enter
-	msr	daifclr, #8	/* Enable the debug exception */
+	msr	daifclr, #DAIF_D	/* Enable the debug exception */
 .endif
 	/*
 	 * For EL1, debug exceptions are conditionally unmasked in
@@ -98,7 +98,7 @@ __FBSDID("$FreeBSD$");
 	 * interrupt exception handler.  For EL0 exceptions, do_ast already
 	 * did this.
 	 */
-	msr	daifset, #10
+	msr	daifset, #(DAIF_D | DAIF_INTR)
 .endif
 .if \el == 0
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
@@ -170,7 +170,7 @@ __FBSDID("$FreeBSD$");
 	bic	x19, x19, #PSR_I
 1:
 	/* Disable interrupts */
-	msr	daifset, #10
+	msr	daifset, #(DAIF_D | DAIF_INTR)
 
 	/* Read the current thread flags */
 	ldr	PTR(1), [PTR(18), #PC_CURTHREAD]	/* Load curthread */
