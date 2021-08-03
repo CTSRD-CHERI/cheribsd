@@ -98,7 +98,8 @@ LDFLAGS+=	-Wl,--fatal-warnings
 .endif
 .endif
 
-.include "bsd.sanitizer.mk"
+# bsd.sanitizer.mk is not installed, so don't require it (e.g. for ports).
+.sinclude "bsd.sanitizer.mk"
 
 .if ${MACHINE_CPUARCH} == "riscv" && ${LINKER_FEATURES:Mriscv-relaxations} == ""
 CFLAGS += -mno-relax
