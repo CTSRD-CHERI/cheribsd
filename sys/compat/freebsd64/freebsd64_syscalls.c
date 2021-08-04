@@ -586,4 +586,5 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64___specialfd",			/* 577 = freebsd64___specialfd */
 	"freebsd64_aio_writev",			/* 578 = freebsd64_aio_writev */
 	"freebsd64_aio_readv",			/* 579 = freebsd64_aio_readv */
+	"freebsd64_fspacectl",			/* 580 = freebsd64_fspacectl */
 };

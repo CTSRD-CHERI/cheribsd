@@ -519,4 +519,5 @@
 #define	FREEBSD64_SYS_freebsd64___specialfd	577
 #define	FREEBSD64_SYS_freebsd64_aio_writev	578
 #define	FREEBSD64_SYS_freebsd64_aio_readv	579
-#define	FREEBSD64_SYS_MAXSYSCALL	580
+#define	FREEBSD64_SYS_freebsd64_fspacectl	580
+#define	FREEBSD64_SYS_MAXSYSCALL	581

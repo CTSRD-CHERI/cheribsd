@@ -3417,6 +3417,17 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
+	/* fspacectl */
+	case 580: {
+		struct fspacectl_args *p = params;
+		iarg[0] = p->fd; /* int */
+		iarg[1] = p->cmd; /* int */
+		uarg[2] = (intptr_t)p->rqsr; /* const struct spacectl_range * __capability */
+		iarg[3] = p->flags; /* int */
+		uarg[4] = (intptr_t)p->rmsr; /* struct spacectl_range * __capability */
+		*n_args = 5;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -9138,6 +9149,28 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* fspacectl */
+	case 580:
+		switch (ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "userland const struct spacectl_range * __capability";
+			break;
+		case 3:
+			p = "int";
+			break;
+		case 4:
+			p = "userland struct spacectl_range * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -11091,6 +11124,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* aio_readv */
 	case 579:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fspacectl */
+	case 580:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

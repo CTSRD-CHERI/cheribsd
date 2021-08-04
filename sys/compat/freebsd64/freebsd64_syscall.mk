@@ -424,4 +424,5 @@ MIASM =  \
 	freebsd64_rpctls_syscall.o \
 	freebsd64___specialfd.o \
 	freebsd64_aio_writev.o \
-	freebsd64_aio_readv.o
+	freebsd64_aio_readv.o \
+	freebsd64_fspacectl.o
