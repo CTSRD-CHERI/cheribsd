@@ -166,6 +166,7 @@ TGTS=	all all-man buildenv buildenvvars buildkernel buildsysroot buildworld \
 	build64 distribute64 install64 \
 	buildsoft distributesoft installsoft \
 	build64c distribute64c \
+	libcheribuildenv libcheribuildenvvars \
 	lib64cbuildenv lib64cbuildenvvars \
 	lib64buildenv lib64buildenvvars lib32buildenv lib32buildenvvars \
 	builddtb xdev xdev-build xdev-install \
