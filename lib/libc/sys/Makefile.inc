@@ -204,6 +204,7 @@ MAN+=	abort2.2 \
 	flag_captured.2 \
 	flock.2 \
 	fork.2 \
+	fspacectl.2 \
 	fsync.2 \
 	getdirentries.2 \
 	getdtablesize.2 \

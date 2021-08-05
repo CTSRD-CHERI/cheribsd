@@ -406,6 +406,7 @@ MAN=	accept_filter.9 \
 	vm_page_wire.9 \
 	vm_set_page_size.9 \
 	vmem.9 \
+	vn_deallocate.9 \
 	vn_fullpath.9 \
 	vn_isdisk.9 \
 	vnet.9 \
@@ -422,6 +423,7 @@ MAN=	accept_filter.9 \
 	VOP_BWRITE.9 \
 	VOP_COPY_FILE_RANGE.9 \
 	VOP_CREATE.9 \
+	VOP_DEALLOCATE.9 \
 	VOP_FSYNC.9 \
 	VOP_GETACL.9 \
 	VOP_GETEXTATTR.9 \
