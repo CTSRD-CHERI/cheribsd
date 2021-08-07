@@ -255,7 +255,14 @@ ${X_}COMPILER_FEATURES+=		c++11 c++14
 ${X_}COMPILER_FEATURES+=	c++17
 .endif
 .if ${${X_}COMPILER_TYPE} == "clang"
-${X_}COMPILER_FEATURES+=	compressed-debug retpoline init-all
+${X_}COMPILER_FEATURES+=	retpoline init-all
+# PR257638 lld fails with BE compressed debug.  Fixed in main but external tool
+# chains will initially not have the fix.  For now limit the feature to LE
+# targets.
+.include <bsd.endian.mk>
+.if ${TARGET_ENDIANNESS} == "1234"
+${X_}COMPILER_FEATURES+=	compressed-debug
+.endif
 # Detect certain supported warning flags to allow building with clang versions
 # built from git between releases. For example this affects all CHERI LLVM
 # versions that include the April 2021 upstream merge but not the September one.
