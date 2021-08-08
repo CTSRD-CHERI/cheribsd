@@ -244,8 +244,6 @@ ENTRY(cpu_switch)
 
 	str	PTR(zr), [PTR(4), #PCB_REGS + 18 * PTR_WIDTH]
 	ret
-.Lcpu_switch_panic_str:
-	.asciz "cpu_switch: %p\0"
 END(cpu_switch)
 
 ENTRY(fork_trampoline)
