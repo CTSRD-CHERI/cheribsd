@@ -254,7 +254,32 @@ ENTRY(fork_trampoline)
 	mov	fp, #0	/* Stack traceback stops here. */
 	bl	_C_LABEL(fork_exit)
 
-	/* Restore the registers other than x0 and x1 */
+	/*
+	 * Disable interrupts to avoid
+	 * overwriting spsr_el1 and sp_el0 by an IRQ exception.
+	 */
+	msr	daifset, #10
+
+	/* Restore sp, lr, elr, and spsr */
+	ldp	CAP(18), CAPN(lr), [PTRN(sp), #TF_SP]
+#if __has_feature(capabilities)
+	ldr	CAP(10), [PTRN(sp), #TF_ELR]
+	ldr	x11, [PTRN(sp), #TF_SPSR]
+#else
+	ldp	CAP(10), CAP(11), [sp, #TF_ELR]
+#endif
+	msr	CAPN(sp_el0), CAP(18)
+	msr	spsr_el1, x11
+	msr	CAPN(elr_el1), CAP(10)
+
+	/* Restore ddc */
+#if __has_feature(capabilities)
+	ldr	c0, [PTRN(sp), #TF_DDC]
+	msr	ddc_el0, c0
+#endif
+
+	/* Restore the CPU registers */
+	ldp	CAP(0), CAP(1), [PTRN(sp), #TF_X + 0 * CAP_WIDTH]
 	ldp	CAP(2), CAP(3), [PTRN(sp), #TF_X + 2 * CAP_WIDTH]
 	ldp	CAP(4), CAP(5), [PTRN(sp), #TF_X + 4 * CAP_WIDTH]
 	ldp	CAP(6), CAP(7), [PTRN(sp), #TF_X + 6 * CAP_WIDTH]
@@ -263,39 +288,12 @@ ENTRY(fork_trampoline)
 	ldp	CAP(12), CAP(13), [PTRN(sp), #TF_X + 12 * CAP_WIDTH]
 	ldp	CAP(14), CAP(15), [PTRN(sp), #TF_X + 14 * CAP_WIDTH]
 	ldp	CAP(16), CAP(17), [PTRN(sp), #TF_X + 16 * CAP_WIDTH]
-	ldr		 CAP(19), [PTRN(sp), #TF_X + 19 * CAP_WIDTH]
+	ldp	CAP(18), CAP(19), [PTRN(sp), #TF_X + 18 * CAP_WIDTH]
 	ldp	CAP(20), CAP(21), [PTRN(sp), #TF_X + 20 * CAP_WIDTH]
 	ldp	CAP(22), CAP(23), [PTRN(sp), #TF_X + 22 * CAP_WIDTH]
 	ldp	CAP(24), CAP(25), [PTRN(sp), #TF_X + 24 * CAP_WIDTH]
 	ldp	CAP(26), CAP(27), [PTRN(sp), #TF_X + 26 * CAP_WIDTH]
 	ldp	CAP(28), CAP(29), [PTRN(sp), #TF_X + 28 * CAP_WIDTH]
-
-	/*
-	 * Disable interrupts to avoid
-	 * overwriting spsr_el1 and sp_el0 by an IRQ exception.
-	 */
-	msr	daifset, #2
-
-	/* Restore sp and lr */
-	ldp	CAP(0), CAP(1), [PTRN(sp), #TF_SP]
-	msr	CAPN(sp_el0), CAP(0)
-	mov	CAPN(lr), CAP(1)
-
-	/* Restore elr and spsr */
-	ldr	CAP(0), [PTRN(sp), #TF_ELR]
-	ldr	x1, [PTRN(sp), #TF_SPSR]
-	msr	CAPN(elr_el1), CAP(0)
-	msr	spsr_el1, x1
-
-	/* Restore ddc */
-#if __has_feature(capabilities)
-	ldr	c0, [PTRN(sp), #TF_DDC]
-	msr	ddc_el0, c0
-#endif
-
-	/* Finally x0 and x1 */
-	ldp	CAP(0), CAP(1), [PTRN(sp), #TF_X + 0 * CAP_WIDTH]
-	ldr	CAP(18), [PTRN(sp), #TF_X + 18 * CAP_WIDTH]
 
 	/*
 	 * No need for interrupts reenabling since PSR
