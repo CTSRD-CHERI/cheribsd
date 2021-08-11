@@ -1629,7 +1629,7 @@ sysctl_intrnames(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_hw, OID_AUTO, intrnames,
-    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_NEEDGIANT, NULL, 0,
+    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
     sysctl_intrnames, "",
     "Interrupt Names");
 
@@ -1658,7 +1658,7 @@ sysctl_intrcnt(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_hw, OID_AUTO, intrcnt,
-    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_NEEDGIANT, NULL, 0,
+    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
     sysctl_intrcnt, "",
     "Interrupt Counts");
 
