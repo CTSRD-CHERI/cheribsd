@@ -40,6 +40,7 @@
 
 #ifndef LOCORE
 
+#include <sys/cdefs.h>
 #include <sys/queue.h>
 #include <sys/_lock.h>
 #include <sys/_mutex.h>
@@ -106,8 +107,19 @@ typedef struct pv_entry {
  * pv_entries are allocated in chunks per-process.  This avoids the
  * need to track per-pmap assignments.
  */
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * XXX-AM: The packing of pv_chunks in the purecap kernel is sub-optimal,
+ * leading to wasted padding space. It seems that the TAILQ in
+ * pv_entry can just be a STAILQ saving a pointer for each entry.
+ * This would both allow more entries and also perfectly pack into PAGE_SIZE.
+ */
+#define	_NPCM	2
+#define	_NPCPV	83
+#else
 #define	_NPCM	3
 #define	_NPCPV	168
+#endif
 #define	PV_CHUNK_HEADER							\
 	pmap_t			pc_pmap;				\
 	TAILQ_ENTRY(pv_chunk)	pc_list;				\
@@ -120,8 +132,8 @@ struct pv_chunk_header {
 
 struct pv_chunk {
 	PV_CHUNK_HEADER
-	struct pv_entry		pc_pventry[_NPCPV];
-};
+	struct pv_entry		pc_pventry[_NPCPV] __no_subobject_bounds;
+} __aligned(PAGE_SIZE);
 
 struct thread;
 
@@ -152,8 +164,8 @@ extern struct pmap	kernel_pmap_store;
 	(uint64_t)(asid) << ASID_TO_OPERAND_SHIFT;			\
 })
 
-extern vm_offset_t virtual_avail;
-extern vm_offset_t virtual_end;
+extern vm_pointer_t virtual_avail;
+extern vm_pointer_t virtual_end;
 
 /*
  * Macros to test if a mapping is mappable with an L1 Section mapping
@@ -163,10 +175,11 @@ extern vm_offset_t virtual_end;
 	((((va) | (pa)) & L1_OFFSET) == 0 && (size) >= L1_SIZE)
 
 void	pmap_activate_vm(pmap_t);
-void	pmap_bootstrap(vm_offset_t, vm_offset_t, vm_paddr_t, vm_size_t);
+void	pmap_bootstrap(vm_pointer_t, vm_pointer_t, vm_paddr_t, vm_size_t);
 int	pmap_change_attr(vm_offset_t va, vm_size_t size, int mode);
 void	pmap_kenter(vm_offset_t sva, vm_size_t size, vm_paddr_t pa, int mode);
 void	pmap_kenter_device(vm_offset_t, vm_size_t, vm_paddr_t);
+bool	pmap_klookup(vm_offset_t va, vm_paddr_t *pa);
 vm_paddr_t pmap_kextract(vm_offset_t va);
 void	pmap_kremove(vm_offset_t);
 void	pmap_kremove_device(vm_offset_t, vm_size_t);
@@ -178,11 +191,11 @@ uint64_t pmap_to_ttbr0(pmap_t pmap);
 
 void	*pmap_mapdev(vm_offset_t, vm_size_t);
 void	*pmap_mapbios(vm_paddr_t, vm_size_t);
-void	pmap_unmapdev(vm_offset_t, vm_size_t);
-void	pmap_unmapbios(vm_offset_t, vm_size_t);
+void	pmap_unmapdev(vm_pointer_t, vm_size_t);
+void	pmap_unmapbios(vm_pointer_t, vm_size_t);
 
-boolean_t pmap_map_io_transient(vm_page_t *, vm_offset_t *, int, boolean_t);
-void	pmap_unmap_io_transient(vm_page_t *, vm_offset_t *, int, boolean_t);
+boolean_t pmap_map_io_transient(vm_page_t *, vm_pointer_t *, int, boolean_t);
+void	pmap_unmap_io_transient(vm_page_t *, vm_pointer_t *, int, boolean_t);
 
 bool	pmap_get_tables(pmap_t, vm_offset_t, pd_entry_t **, pd_entry_t **,
     pd_entry_t **, pt_entry_t **);
@@ -212,3 +225,14 @@ pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 #endif	/* !LOCORE */
 
 #endif	/* !_MACHINE_PMAP_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20210420,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer",
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

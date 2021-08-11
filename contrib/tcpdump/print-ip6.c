@@ -294,13 +294,13 @@ ip6_print(netdissect_options *ndo, const u_char *bp, u_int length)
 
 		switch (nh) {
 		case IPPROTO_HOPOPTS:
-			advance = _hbhopt_print(ndo, cp);
+			advance = hbhopt_print(ndo, cp);
 			if (advance < 0)
 				return;
 			nh = *cp;
 			break;
 		case IPPROTO_DSTOPTS:
-			advance = _dstopt_print(ndo, cp);
+			advance = dstopt_print(ndo, cp);
 			if (advance < 0)
 				return;
 			nh = *cp;
@@ -323,14 +323,14 @@ ip6_print(netdissect_options *ndo, const u_char *bp, u_int length)
 			 * which payload can be piggybacked atop a
 			 * mobility header.
 			 */
-			advance = _mobility_print(ndo, cp, (const u_char *)ip6);
+			advance = mobility_print(ndo, cp, (const u_char *)ip6);
 			if (advance < 0)
 				return;
 			nh = *cp;
 			return;
 		case IPPROTO_ROUTING:
 			ND_TCHECK(*cp);
-			advance = _rt6_print(ndo, cp, (const u_char *)ip6);
+			advance = rt6_print(ndo, cp, (const u_char *)ip6);
 			if (advance < 0)
 				return;
 			nh = *cp;
@@ -351,7 +351,7 @@ ip6_print(netdissect_options *ndo, const u_char *bp, u_int length)
 			icmp6_print(ndo, cp, len, (const u_char *)ip6, fragmented);
 			return;
 		case IPPROTO_AH:
-			advance = _ah_print(ndo, cp);
+			advance = ah_print(ndo, cp);
 			if (advance < 0)
 				return;
 			nh = *cp;
@@ -359,7 +359,7 @@ ip6_print(netdissect_options *ndo, const u_char *bp, u_int length)
 		case IPPROTO_ESP:
 		    {
 			int enh, padlen;
-			advance = _esp_print(ndo, cp, len, (const u_char *)ip6, &enh, &padlen);
+			advance = esp_print(ndo, cp, len, (const u_char *)ip6, &enh, &padlen);
 			if (advance < 0)
 				return;
 			nh = enh & 0xff;

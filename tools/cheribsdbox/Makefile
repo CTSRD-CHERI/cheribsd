@@ -16,8 +16,7 @@ BINDIR?=${CHERIBSDBOX_DIR}
 # is too large to link.
 .if ${MACHINE_ARCH:Mmips64*} && ${MK_LIB64} == "yes"
 NEED_COMPAT=	64
-WANT_CHERI=		none
-CRUNCH_BUILDOPTS+=	WANT_CHERI=none NEED_COMPAT=64
+CRUNCH_BUILDOPTS+=	NEED_COMPAT=64
 CRUNCH_OBJTOP=		${OBJTOP}/obj-lib64
 .endif
 CRUNCH_OBJTOP?=		${OBJTOP}
@@ -92,9 +91,8 @@ CRUNCH_LIBS+=	-llzma
 CRUNCH_LIBS+=	-larchive -lprivatezstd
 CRUNCH_SHLIBS+=	-pthread
 
-# ktrace:
+# ktrace/truss:
 CRUNCH_LIBS+=	-lsysdecode
-CRUNCH_LIBS+= -lprocstat -lelf
 
 # needed by ifconfig
 CRUNCH_LIBS+=	-l80211
@@ -110,7 +108,8 @@ CRUNCH_LIBS+= -lusb
 .endif
 
 # netstat needs libkvm (which needs libelf)
-CRUNCH_LIBS+= -lkvm -lelf -lmemstat
+CRUNCH_SHLIBS+=	-lkvm -lelf -lprocstat
+CRUNCH_LIBS+=	-lmemstat
 # avoid depending on -lnetgraph
 CRUNCH_BUILDOPTS_netstat+=MK_NETGRAPH_SUPPORT=no -j1
 
@@ -264,6 +263,7 @@ CRUNCH_PROGS_usr.bin+= \
 		sed \
 		seq \
 		sockstat \
+		sort \
 		stat \
 		tail \
 		tar \
@@ -276,6 +276,7 @@ CRUNCH_PROGS_usr.bin+= \
 		tput \
 		tr \
 		true \
+		truss \
 		uname \
 		uudecode \
 		uuencode \
@@ -402,7 +403,6 @@ CRUNCH_PROGS_libexec+=	getty
 
 CRUNCH_SRCDIRS+= secure/usr.sbin
 CRUNCH_PROGS_secure/usr.sbin+=	sshd
-# TODO: should we link libssh static and use ${LIBSSH}?
 CRUNCH_SHLIBS+=	-lpam -lutil
 
 CRUNCH_SRCDIRS+= secure/usr.bin
@@ -503,9 +503,6 @@ CRUNCH_LIBS:=${CRUNCH_LIBS} ${CRUNCH_SHLIBS} -Wl,--verbose -v
 # TODO: CRUNCH_BUILDOPTS+=-DNO_SHARED
 .endif
 
-# Build PAM with only minimal modules support
-CRUNCH_CUSTOM_LIBS+=lib/libpam
-CRUNCH_BUILDOPTS_lib/libpam+=-DPAM_MINIMAL
 # Also build a version of libssh without optional deps
 CRUNCH_CUSTOM_LIBS+=secure/lib/libssh
 CRUNCH_BUILDOPTS_secure/lib/libssh+="SSHDIR=${SRCTOP}/crypto/openssh"

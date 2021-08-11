@@ -75,7 +75,6 @@ void vm_phys_free_contig(vm_page_t m, u_long npages);
 void vm_phys_free_pages(vm_page_t m, int order);
 void vm_phys_init(void);
 vm_page_t vm_phys_paddr_to_vm_page(vm_paddr_t pa);
-vm_page_t vm_phys_paddr_to_vm_page_unbound(vm_paddr_t pa);
 void vm_phys_register_domains(int ndomains, struct mem_affinity *affinity,
     int *locality);
 vm_page_t vm_phys_scan_contig(int domain, u_long npages, vm_paddr_t low,

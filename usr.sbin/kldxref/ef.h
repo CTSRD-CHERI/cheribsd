@@ -3,6 +3,11 @@
 #ifndef _EF_H_
 #define _EF_H_
 
+#if __has_feature(capabilities)
+#include <cheri_init_globals.h>
+#include <machine/elf.h>
+#endif
+
 #define	EFT_KLD		1
 #define	EFT_KERNEL	2
 #if __has_feature(capabilities)
@@ -71,6 +76,10 @@ int ef_open(const char *filename, struct elf_file *ef, int verbose);
 int ef_obj_open(const char *filename, struct elf_file *ef, int verbose);
 int ef_reloc(struct elf_file *ef, const void *reldata, int reltype,
     Elf_Off relbase, Elf_Off dataoff, size_t len, void *dest);
+#if __has_feature(capabilities) && defined(DT_CHERI___CAPRELOCS)
+int ef_capreloc(struct elf_file *ef, const struct capreloc *cr, Elf_Off relbase,
+    Elf_Off dataoff, size_t len, void *dest);
+#endif
 __END_DECLS
 
 #endif /* _EF_H_*/

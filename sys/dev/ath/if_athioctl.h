@@ -457,10 +457,10 @@ struct ath_tx_radiotap_header {
 #endif /* _DEV_ATH_ATHIOCTL_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20210525,
 //   "target_type": "header",
 //   "changes": [
-//     "ioctl:net"
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

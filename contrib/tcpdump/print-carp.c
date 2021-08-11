@@ -48,12 +48,6 @@
 void
 carp_print(netdissect_options *ndo, register const u_char *bp, register u_int len, int ttl)
 {
-	INVOKE_DISSECTOR(_carp_print, ndo, bp, len, ttl);
-}
-
-void
-_carp_print(netdissect_options *ndo, register const u_char *bp, register u_int len, int ttl)
-{
 	int version, type;
 	const char *type_s;
 

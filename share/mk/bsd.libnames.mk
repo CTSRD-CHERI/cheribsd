@@ -176,14 +176,7 @@ LIBZPOOL?=	${LIBDESTDIR}${LIBDIR_BASE}/libzpool.a
 LIBZUTIL?=	${LIBDESTDIR}${LIBDIR_BASE}/libzutil.a
 
 LIBC_NOSYSCALLS?=	${DESTDIR}${LIBDIR_BASE}/libc_nosyscalls.a
-LIBCHERI?=	${DESTDIR}${LIBDIR_BASE}/libcheri.a
-LIBCHERI_SUPPORT?=	${DESTDIR}${LIBDIR_BASE}/libcheri_support.a
-LIBCHERI_SYSCALLS?=	${DESTDIR}${LIBDIR_BASE}/libcheri_syscalls.a
-LIBC_CHERI?=	${DESTDIR}${LIBDIR_BASE}/libc_cheri.a
-LIBHELLOWORLD?=	${DESTDIR}${LIBDIR_BASE}/libhelloworld.a
-LIBJPEG?=	${DESTDIR}${LIBDIR_BASE}/libjpeg.a
 LIBMALLOC_SIMPLE=	${DESTDIR}${LIBDIR_BASE}/libmalloc_simple.a
-LIBPNG?=	${DESTDIR}${LIBDIR_BASE}/libpng.a
 LIBSYSCALLS?=	${DESTDIR}${LIBDIR_BASE}/libsyscalls.a
 
 # enforce that -lcheri, -lpthread, and -lc to always be the last in that

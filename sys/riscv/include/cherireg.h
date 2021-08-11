@@ -85,6 +85,17 @@
 	CHERI_PERM_SYSTEM_REGS | CHERI_PERM_SET_CID)
 
 /*
+ * vm_prot_t to capability permission bits
+ */
+#define	CHERI_PERMS_PROT2PERM_READ					\
+	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
+#define	CHERI_PERMS_PROT2PERM_WRITE					\
+	(CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |			\
+	 CHERI_PERM_STORE_LOCAL_CAP)
+#define	CHERI_PERMS_PROT2PERM_EXEC					\
+	(CHERI_PERM_EXECUTE | CHERI_PERMS_PROT2PERM_READ)
+
+/*
  * Basic userspace permission mask; CHERI_PERM_EXECUTE will be added for
  * executable capabilities ($pcc); CHERI_PERM_STORE, CHERI_PERM_STORE_CAP,
  * and CHERI_PERM_STORE_LOCAL_CAP will be added for data permissions ($dcc).
@@ -191,14 +202,5 @@
  * User-defined CHERI exception codes are numbered 128...255.
  */
 #define	CHERI_EXCCODE_SW_BASE		0x80
-
-/*
- * CHERI_BASELEN_BITS is used in cheribsdtest_cheriabi.c.  The others are
- * unused.
- */
-#define	CHERI_BASELEN_BITS	10
-#define	CHERI_SEAL_BASELEN_BITS	5
-#define	CHERI_ADDR_BITS		64
-#define	CHERI_SEAL_MIN_ALIGN	12
 
 #endif /* !_MACHINE_CHERIREG_H_ */

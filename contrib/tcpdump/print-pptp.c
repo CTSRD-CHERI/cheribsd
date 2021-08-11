@@ -901,13 +901,6 @@ void
 pptp_print(netdissect_options *ndo,
            const u_char *dat)
 {
-	INVOKE_DISSECTOR(_pptp_print, ndo, dat);
-}
-
-void
-_pptp_print(netdissect_options *ndo,
-           const u_char *dat)
-{
 	const struct pptp_hdr *hdr;
 	uint32_t mc;
 	uint16_t ctrl_msg_type;

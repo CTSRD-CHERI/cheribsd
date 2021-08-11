@@ -30,6 +30,10 @@
 # src/tests/usr.bin/make/t_make.sh.
 #
 
+# we use these below but we might be an older make
+.MAKE.OS?= ${uname -s:L:sh}
+.MAKE.UID?= ${id -u:L:sh}
+
 # Each test is in a sub-makefile.
 # Keep the list sorted.
 # Any test that is commented out must be ignored in
@@ -188,7 +192,9 @@ TESTS+=		modmatch
 TESTS+=		modmisc
 TESTS+=		modts
 TESTS+=		modword
+.if ${.MAKE.UID} > 0
 TESTS+=		objdir-writable
+.endif
 TESTS+=		opt
 TESTS+=		opt-backwards
 TESTS+=		opt-chdir
@@ -308,7 +314,8 @@ TESTS+=		varmod-hash
 TESTS+=		varmod-head
 TESTS+=		varmod-ifelse
 TESTS+=		varmod-l-name-to-value
-TESTS+=		varmod-localtime
+# Broken until bmake-20210110 update
+# TESTS+=		varmod-localtime
 TESTS+=		varmod-loop
 TESTS+=		varmod-match
 TESTS+=		varmod-match-escape

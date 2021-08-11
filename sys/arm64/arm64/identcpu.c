@@ -74,7 +74,7 @@ static void check_cpu_regs(u_int cpu);
  * The default implementation of I-cache sync assumes we have an
  * aliasing cache until we know otherwise.
  */
-void (*arm64_icache_sync_range)(vm_offset_t, vm_size_t) =
+void (*arm64_icache_sync_range)(vm_pointer_t, vm_size_t) =
     &arm64_aliasing_icache_sync_range;
 
 static int
@@ -174,6 +174,12 @@ struct cpu_implementers {
 /*
  * Per-implementer table of (PartNum, CPU Name) pairs.
  */
+/* Research */
+static const struct cpu_parts cpu_parts_research[] = {
+	{ CPU_PART_MORELLO, "Morello SoC" },
+	CPU_PART_NONE,
+};
+
 /* ARM Ltd. */
 static const struct cpu_parts cpu_parts_arm[] = {
 	{ CPU_PART_FOUNDATION, "Foundation-Model" },
@@ -214,6 +220,7 @@ static const struct cpu_parts cpu_parts_none[] = {
  * Implementers table.
  */
 const struct cpu_implementers cpu_implementers[] = {
+	{ CPU_IMPL_RESEARCH,	"Research",	cpu_parts_research },
 	{ CPU_IMPL_ARM,		"ARM",		cpu_parts_arm },
 	{ CPU_IMPL_BROADCOM,	"Broadcom",	cpu_parts_none },
 	{ CPU_IMPL_CAVIUM,	"Cavium",	cpu_parts_cavium },

@@ -34,7 +34,7 @@
 
 #include <sys/cdefs.h>
 
-	.section mfs, "a", %progbits
+	.section mfs, "aw", %progbits
 	.globl	mfs_root
 	.type	mfs_root, %object
 mfs_root:

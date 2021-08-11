@@ -91,13 +91,6 @@ void
 tftp_print(netdissect_options *ndo,
            register const u_char *bp, u_int length)
 {
-	INVOKE_DISSECTOR(_tftp_print, ndo, bp, length);
-}
-
-void
-_tftp_print(netdissect_options *ndo,
-           register const u_char *bp, u_int length)
-{
 	register const char *cp;
 	register int opcode;
 	u_int ui;

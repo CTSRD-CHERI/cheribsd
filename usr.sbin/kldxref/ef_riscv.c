@@ -35,9 +35,13 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <machine/elf.h>
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
 
 #include <err.h>
 #include <errno.h>
+#include <stdlib.h>
 
 #include "ef.h"
 
@@ -71,8 +75,28 @@ ef_reloc(struct elf_file *ef, const void *reldata, int reltype, Elf_Off relbase,
 		val = addr;
 		*where = val;
 		break;
+	case R_RISCV_CHERI_CAPABILITY:
+		warnx("unhandled R_RISCV_CHERI_CAPABILITY relocation");
+		break;
 	default:
 		warnx("unhandled relocation type %d", (int)rtype);
 	}
 	return (0);
 }
+
+#if __has_feature(capabilities)
+int
+ef_capreloc(struct elf_file *ef, const struct capreloc *cr, Elf_Off relbase,
+    Elf_Off dataoff, size_t len, void *dest)
+{
+	void * __capability *where;
+
+	where = (void * __capability *)((char *)dest + relbase +
+	    cr->capability_location - dataoff);
+
+	if ((char *)where < (char *)dest || (char *)where >= (char *)dest + len)
+		return (0);
+	*where = cheri_fromint(relbase + cr->object + cr->offset);
+	return (0);
+}
+#endif

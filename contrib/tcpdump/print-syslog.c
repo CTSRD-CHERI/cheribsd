@@ -80,13 +80,6 @@ void
 syslog_print(netdissect_options *ndo,
              register const u_char *pptr, register u_int len)
 {
-	INVOKE_DISSECTOR(_syslog_print, ndo, pptr, len);
-}
-
-void
-_syslog_print(netdissect_options *ndo,
-             register const u_char *pptr, register u_int len)
-{
     uint16_t msg_off = 0;
     uint16_t pri = 0;
     uint16_t facility,severity;

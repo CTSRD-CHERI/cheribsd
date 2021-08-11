@@ -58,10 +58,10 @@
 #define	SMCCC_VENDOR_HYP_SERVICE_CALLS	6
 
 struct arm_smccc_res {
-	register_t a0;
-	register_t a1;
-	register_t a2;
-	register_t a3;
+	uintptr_t a0;
+	uintptr_t a1;
+	uintptr_t a2;
+	uintptr_t a3;
 };
 
 /*
@@ -86,9 +86,18 @@ int32_t smccc_arch_features(uint32_t);
 int smccc_arch_workaround_1(void);
 int smccc_arch_workaround_2(int);
 
-int arm_smccc_smc(register_t, register_t, register_t, register_t, register_t,
-    register_t, register_t, register_t, struct arm_smccc_res *res);
-int arm_smccc_hvc(register_t, register_t, register_t, register_t, register_t,
-    register_t, register_t, register_t, struct arm_smccc_res *res);
+int arm_smccc_smc(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
+    uintptr_t, uintptr_t, uintptr_t, struct arm_smccc_res *res);
+int arm_smccc_hvc(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t,
+    uintptr_t, uintptr_t, uintptr_t, struct arm_smccc_res *res);
 
 #endif /* _PSCI_SMCCC_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20210407,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

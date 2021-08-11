@@ -360,8 +360,6 @@ contrib/openzfs/module/zfs/zvol.c		optional zfs compile-with "${ZFS_C}"
 
 # CHERI and CHERI-compat related files
 cheri/cheri_asserts.c			optional cpu_cheri
-cheri/cheri_cap_relocs.c			optional cheri_purecap_kernel \
-	compile-with	"${CC} -c ${CFLAGS:N-nostdinc} ${WERROR} ${PROF} ${.IMPSRC}"
 cheri/cheri_exec.c			optional cpu_cheri
 cheri/cheri_sysctl.c			optional cpu_cheri
 cheri/cheri_otype.c			optional cpu_cheri

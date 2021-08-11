@@ -288,13 +288,17 @@ uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
 			break;
 
 		case UIO_SYSSPACE:
-			if (uio->uio_rw == UIO_READ)
-				bcopy(cp,
-				    (__cheri_fromcap void *)iov->iov_base,
-				    cnt);
+			if (preserve_tags) {
+				if (uio->uio_rw == UIO_READ)
+					bcopy_c(PTR2CAP(cp), iov->iov_base,
+					    cnt);
+				else
+					bcopy_c(iov->iov_base, PTR2CAP(cp),
+					    cnt);
+			} else if (uio->uio_rw == UIO_READ)
+				bcopynocap_c(PTR2CAP(cp), iov->iov_base, cnt);
 			else
-				bcopy((__cheri_fromcap void *)iov->iov_base,
-				    cp, cnt);
+				bcopynocap_c(iov->iov_base, PTR2CAP(cp), cnt);
 			break;
 		case UIO_NOCOPY:
 			break;

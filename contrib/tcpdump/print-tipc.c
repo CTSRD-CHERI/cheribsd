@@ -335,14 +335,7 @@ trunc:
 }
 
 void
-tipc_print(netdissect_options *ndo, const u_char *bp, u_int length,
-    u_int caplen)
-{
-	INVOKE_DISSECTOR(_tipc_print, ndo, bp, length, caplen);
-}
-
-void
-_tipc_print(netdissect_options *ndo, const u_char *bp, u_int length _U_,
+tipc_print(netdissect_options *ndo, const u_char *bp, u_int length _U_,
     u_int caplen _U_)
 {
 	const struct tipc_pkthdr *ap;

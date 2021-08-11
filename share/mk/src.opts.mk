@@ -224,9 +224,6 @@ __DEFAULT_NO_OPTIONS = \
     SVN \
     ZONEINFO_LEAPSECONDS_SUPPORT \
 
-__DEFAULT_NO_OPTIONS+= \
-    LIBCHERI
-
 __DEFAULT_YES_OPTIONS+=	\
 	COMPAT_CHERIABI \
 	CHERIBSDBOX
@@ -388,14 +385,6 @@ BROKEN_OPTIONS+=CDDL ZFS
 .if ${__T:Mriscv*c*}
 # Crash in ZFS code. TODO: investigate
 BROKEN_OPTIONS+=CDDL
-
-# Some compilation failure: TODO: investigate
-BROKEN_OPTIONS+=SVN SVNLITE
-.endif
-
-# libcheri is MIPS-specific and requires CHERI
-.if !${__T:Mmips64*} || (${__C} != "cheri" && !${__T:Mmips64*c*})
-BROKEN_OPTIONS+=LIBCHERI
 .endif
 
 # EFI doesn't exist on mips or powerpc.

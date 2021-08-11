@@ -128,8 +128,8 @@ static int psci_attach(device_t, psci_initfn_t, int);
 static void psci_shutdown(void *, int);
 
 static int psci_find_callfn(psci_callfn_t *);
-static int psci_def_callfn(register_t, register_t, register_t, register_t,
-	register_t, register_t, register_t, register_t,
+static int psci_def_callfn(uintptr_t, uintptr_t, uintptr_t, uintptr_t,
+	uintptr_t, uintptr_t, uintptr_t, uintptr_t,
 	struct arm_smccc_res *res);
 
 psci_callfn_t psci_callfn = psci_def_callfn;
@@ -150,10 +150,10 @@ psci_init(void *dummy)
 SYSINIT(psci_start, SI_SUB_CPU, SI_ORDER_FIRST, psci_init, NULL);
 
 static int
-psci_def_callfn(register_t a __unused, register_t b __unused,
-    register_t c __unused, register_t d __unused,
-    register_t e __unused, register_t f __unused,
-    register_t g __unused, register_t h __unused,
+psci_def_callfn(uintptr_t a __unused, uintptr_t b __unused,
+    uintptr_t c __unused, uintptr_t d __unused,
+    uintptr_t e __unused, uintptr_t f __unused,
+    uintptr_t g __unused, uintptr_t h __unused,
     struct arm_smccc_res *res __unused)
 {
 
@@ -588,3 +588,12 @@ psci_v0_2_init(device_t dev, int default_version)
 	device_printf(dev, "PSCI version number mismatched with DT\n");
 	return (1);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20210407,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

@@ -34,16 +34,53 @@
 __FBSDID("$FreeBSD$");
 
 /*
+ * XXX-AM: Wrap HVC and SMC calls to save caller-save capability registers.
+ * This is needed until we have purecap support in TF-A, BHYVE (or other
+ * hypervisors) and QEMU.
+ */
+#ifdef __CHERI_PURE_CAPABILITY__
+.macro save_registers
+	sub	csp, csp, #(15 * PTR_WIDTH)
+	stp	c16, c17, [csp]
+	stp	c18, c19, [csp, #(2 * PTR_WIDTH)]
+	stp	c20, c21, [csp, #(4 * PTR_WIDTH)]
+	stp	c22, c23, [csp, #(6 * PTR_WIDTH)]
+	stp	c24, c25, [csp, #(8 * PTR_WIDTH)]
+	stp	c26, c27, [csp, #(10 * PTR_WIDTH)]
+	stp	c28, c29, [csp, #(12 * PTR_WIDTH)]
+	str	c30, [csp, #(14 * PTR_WIDTH)]
+.endmacro
+
+.macro restore_registers
+	ldp	c16, c17, [csp]
+	ldp	c18, c19, [csp, #(2 * PTR_WIDTH)]
+	ldp	c20, c21, [csp, #(4 * PTR_WIDTH)]
+	ldp	c22, c23, [csp, #(6 * PTR_WIDTH)]
+	ldp	c24, c25, [csp, #(8 * PTR_WIDTH)]
+	ldp	c26, c27, [csp, #(10 * PTR_WIDTH)]
+	ldp	c28, c29, [csp, #(12 * PTR_WIDTH)]
+	ldr	c30, [csp, #(14 * PTR_WIDTH)]
+	add	csp, csp, #(15 * PTR_WIDTH)
+.endmacro
+#endif
+
+/*
  * int arm_smccc_hvc(register_t, register_t, register_t, register_t,
  *     register_t, register_t, register_t, register_t,
  *     struct arm_smccc_res *res)
  */
 ENTRY(arm_smccc_hvc)
+#ifdef __CHERI_PURE_CAPABILITY__
+	save_registers
+#endif
 	hvc	#0
-	ldr	x4, [sp]
+#ifdef __CHERI_PURE_CAPABILITY__
+	restore_registers
+#endif
+	ldr	x4, [PTRN(sp)]
 	cbz	x4, 1f
-	stp	x0, x1, [x4, #16 * 0]
-	stp	x2, x3, [x4, #16 * 1]
+	stp	x0, x1, [PTR(4), #16 * 0]
+	stp	x2, x3, [PTR(4), #16 * 1]
 1:	ret
 END(arm_smccc_hvc)
 
@@ -53,10 +90,25 @@ END(arm_smccc_hvc)
  *     struct arm_smccc_res *res)
  */
 ENTRY(arm_smccc_smc)
+#ifdef __CHERI_PURE_CAPABILITY__
+	save_registers
+#endif
 	smc	#0
-	ldr	x4, [sp]
+#ifdef __CHERI_PURE_CAPABILITY__
+	restore_registers
+#endif
+	ldr	x4, [PTRN(sp)]
 	cbz	x4, 1f
-	stp	x0, x1, [x4, #16 * 0]
-	stp	x2, x3, [x4, #16 * 1]
+	stp	x0, x1, [PTR(4), #16 * 0]
+	stp	x2, x3, [PTR(4), #16 * 1]
 1:	ret
 END(arm_smccc_smc)
+// CHERI CHANGES START
+// {
+//   "updated": 20210407,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

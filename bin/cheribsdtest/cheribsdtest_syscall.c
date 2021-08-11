@@ -48,14 +48,6 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#ifdef CHERIBSD_LIBCHERI_TESTS
-#include <cheri/libcheri_enter.h>
-#include <cheri/libcheri_fd.h>
-#include <cheri/libcheri_sandbox.h>
-
-#include <cheribsdtest-helper.h>
-#endif
-
 #include <assert.h>
 #include <err.h>
 #include <errno.h>
@@ -69,41 +61,6 @@
 #include <unistd.h>
 
 #include "cheribsdtest.h"
-
-#ifdef CHERIBSD_LIBCHERI_TESTS
-CHERIBSDTEST(test_sandbox_syscall,
-    "Invoke a system call in a libcheri sandbox",
-    .ct_flags = CT_FLAG_SANDBOX)
-{
-	size_t len;
-	int old, new;
-
-	/*
-	 * Track whether or not the number of system-call violations increases
-	 * as a result of triggering a system call in a sandbox.  Note that
-	 * this isn't really authoritative (nor in the strictest sense
-	 * correct), as we can race with other threads that trigger
-	 * violations, but it's still a useful test case.
-	 */
-	len = sizeof(old);
-	if (sysctlbyname("security.cheri.syscall_violations", &old, &len,
-	    NULL, 0) < 0)
-		cheribsdtest_failure_errx(
-		    "security.cheri.syscall_violations sysctl read (%d)",
-		    errno);
-	invoke_syscall();
-	len = sizeof(new);
-	if (sysctlbyname("security.cheri.syscall_violations", &new, &len,
-	    NULL, 0) < 0)
-		cheribsdtest_failure_errx(
-		    "security.cheri.syscall_violations sysctl read (%d)",
-		    errno);
-	if (new <= old)
-		cheribsdtest_failure_errx(
-		    "security.cheri.syscall_violations unchanged");
-	cheribsdtest_success();
-}
-#endif
 
 CHERIBSDTEST(test_sig_dfl_neq_ign, "Test SIG_DFL != SIG_IGN")
 {

@@ -59,12 +59,6 @@ enum mpls_packet_type {
 void
 mpls_print(netdissect_options *ndo, const u_char *bp, u_int length)
 {
-	INVOKE_DISSECTOR(_mpls_print, ndo, bp, length);
-}
-
-void
-_mpls_print(netdissect_options *ndo, const u_char *bp, u_int length)
-{
 	const u_char *p;
 	uint32_t label_entry;
 	uint16_t label_stack_depth = 0;

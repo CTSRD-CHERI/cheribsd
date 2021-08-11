@@ -229,7 +229,7 @@ uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
 	VM_OBJECT_WUNLOCK(obj);
 
 found:
-	error = uiomove_fromphys(&m, offset, tlen, uio);
+	error = uiomove_fromphys_cap(&m, offset, tlen, uio);
 	if (uio->uio_rw == UIO_WRITE && error == 0)
 		vm_page_set_dirty(m);
 	vm_page_activate(m);
@@ -1454,7 +1454,8 @@ shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_pointer_t *addr,
 #ifdef MAP_32BIT
 	    MAP_32BIT |
 #endif
-	    MAP_ALIGNMENT_MASK)) != 0)
+	    MAP_ALIGNMENT_MASK |
+	    MAP_RESERVATION_CREATE)) != 0)
 		return (EINVAL);
 
 	vaddr = (vm_offset_t)*addr;
@@ -1538,6 +1539,10 @@ again:
 			goto fail1;
 		rv = vm_map_insert(map, shmfd->shm_object, foff, start,
 		    start + size, prot, max_prot, docow, start);
+		if (rv != KERN_SUCCESS) {
+			vm_map_reservation_delete_locked(map, start);
+			goto fail1;
+		}
 	} else {
 		/*
 		 * Fixed mapping: ensure that there is a single reservation

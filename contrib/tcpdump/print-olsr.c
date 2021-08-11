@@ -310,13 +310,6 @@ void
 olsr_print(netdissect_options *ndo,
            const u_char *pptr, u_int length, int is_ipv6)
 {
-	INVOKE_DISSECTOR(_olsr_print, ndo, pptr, length, is_ipv6);
-}
-
-void
-_olsr_print(netdissect_options *ndo,
-           const u_char *pptr, u_int length, int is_ipv6)
-{
     union {
         const struct olsr_common *common;
         const struct olsr_msg4 *msg4;

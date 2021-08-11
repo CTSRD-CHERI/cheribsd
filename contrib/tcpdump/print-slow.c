@@ -245,13 +245,6 @@ void
 slow_print(netdissect_options *ndo,
            register const u_char *pptr, register u_int len)
 {
-	INVOKE_DISSECTOR(_slow_print, ndo, pptr, len);
-}
-
-void
-_slow_print(netdissect_options *ndo,
-            register const u_char *pptr, register u_int len)
-{
     int print_version;
     u_int subtype;
 

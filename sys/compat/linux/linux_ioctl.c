@@ -3804,12 +3804,3 @@ linux32_ioctl_unregister_handler(struct linux_ioctl_handler *h)
 	return (EINVAL);
 }
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20181112,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

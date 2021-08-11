@@ -80,7 +80,6 @@ struct cheribsdtest_child_state {
 #ifdef __mips__
 	register_t	ccs_cp2_cause;
 #endif
-	int		ccs_unwound;  /* If any trusted-stack frames unwound. */
 
 	/* Fields filled in by the test itself. */
 	int		ccs_testresult;
@@ -109,16 +108,9 @@ extern struct cheribsdtest_child_state *ccsp;
 					       but not checkable */
 #define CT_FLAG_SLOW		0x00000040  /* Test is expected to take a 
 					       long time to run */
-#define	CT_FLAG_SIGNAL_UNWIND	0x00000080  /* Should fault and unwind
-					       trusted stack; checks signum
-					       and result. */
-#define	CT_FLAG_SANDBOX		0x00000100  /* Test requires that a libcheri
-					     * sandbox be created. */
 #define	CT_FLAG_SI_CODE		0x00000200  /* Check signal si_code. */
 #define	CT_FLAG_SIGEXIT		0x00000400  /* Exits with uncaught signal;
 					       checks status signum. */
-
-#define	CHERIBSDTEST_SANDBOX_UNWOUND	0x123456789ULL
 
 /*
  * Macros defined in one or more cheribsdtest_md.h to indicate the
@@ -127,6 +119,10 @@ extern struct cheribsdtest_child_state *ccsp;
  */
 #ifndef FLAKY_COMPILER_BOUNDS
 #define	FLAKY_COMPILER_BOUNDS	NULL
+#endif
+
+#ifndef	SI_CODE_STORELOCAL
+#define	SI_CODE_STORELOCAL	PROT_CHERI_STORELOCAL
 #endif
 
 #ifndef	XFAIL_HYBRID_BOUNDS_GLOBALS
@@ -295,27 +291,6 @@ _cheribsdtest_check_errno(const char *context, int actual, int expected)
 		    #call " unexpectedly returned %d", __ret);			\
 		_cheribsdtest_check_errno(#call, call_errno, expected_errno);	\
 	} while (0)
-
-/* cheribsdtest_ccall.c */
-void	cheribsdtest_ccall_setup(void);
-
-/* cheribsdtest_fd.c */
-extern int			 zero_fd;
-
-extern struct sandbox_object	*sbop_stdin;
-extern struct sandbox_object	*sbop_stdout;
-extern struct sandbox_object	*sbop_zero;
-
-/* cheribsdtest_libcheri.c */
-extern struct sandbox_class	*cheribsdtest_classp;
-extern struct sandbox_object	*cheribsdtest_objectp;
-
-int	cheribsdtest_libcheri_setup(void);
-void	cheribsdtest_libcheri_destroy(void);
-
-/* cheribsdtest_libcheri_trustedstack.c */
-register_t	cheribsdtest_libcheri_userfn_getstack(void);
-register_t	cheribsdtest_libcheri_userfn_setstack(register_t arg);
 
 /* For libc_memcpy and libc_memset tests and the unaligned copy tests: */
 extern void *cheribsdtest_memcpy(void *dst, const void *src, size_t n);

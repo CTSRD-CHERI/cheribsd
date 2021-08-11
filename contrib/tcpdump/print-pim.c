@@ -251,13 +251,6 @@ void
 pimv1_print(netdissect_options *ndo,
             register const u_char *bp, register u_int len)
 {
-	INVOKE_DISSECTOR(_pimv1_print, ndo, bp, len);
-}
-
-void
-_pimv1_print(netdissect_options *ndo,
-            register const u_char *bp, register u_int len)
-{
 	register u_char type;
 
 	ND_TCHECK(bp[1]);
@@ -350,13 +343,6 @@ trunc:
  */
 void
 cisco_autorp_print(netdissect_options *ndo,
-                   register const u_char *bp, register u_int len)
-{
-	INVOKE_DISSECTOR(_cisco_autorp_print, ndo, bp, len);
-}
-
-void
-_cisco_autorp_print(netdissect_options *ndo,
                    register const u_char *bp, register u_int len)
 {
 	int type;
@@ -467,13 +453,6 @@ trunc:
 
 void
 pim_print(netdissect_options *ndo,
-          register const u_char *bp, register u_int len, const u_char *bp2)
-{
-	INVOKE_DISSECTOR(_pim_print, ndo, bp, len, bp2);
-}
-
-void
-_pim_print(netdissect_options *ndo,
           register const u_char *bp, register u_int len, const u_char *bp2)
 {
 	register const struct pim *pim = (const struct pim *)bp;

@@ -462,7 +462,7 @@ typedef int (xhci_port_route_t)(device_t, uint32_t, uint32_t);
 struct xhci_softc {
 	struct xhci_hw_softc	sc_hw;
 	/* base device */
-	struct usb_bus		sc_bus;
+	struct usb_bus		sc_bus __subobject_use_container_bounds;
 	/* configure message */
 	struct usb_bus_msg	sc_config_msg[2];
 
@@ -549,3 +549,12 @@ int	xhci_pci_attach(device_t);
 DECLARE_CLASS(xhci_pci_driver);
 
 #endif					/* _XHCI_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20210404,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

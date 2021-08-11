@@ -204,13 +204,7 @@ init_secondary(uint64_t cpu)
 	pmap_t pmap0;
 
 	pcpup = &__pcpu[cpu];
-	/*
-	 * Set the pcpu pointer with a backup in tpidr_el1 to be
-	 * loaded when entering the kernel from userland.
-	 */
-	__asm __volatile(
-	    "mov x18, %0 \n"
-	    "msr tpidr_el1, %0" :: "r"(pcpup));
+	init_cpu_pcpup(pcpup);
 
 	/*
 	 * Identify current CPU. This is necessary to setup
@@ -289,7 +283,7 @@ smp_after_idle_runnable(void *arg __unused)
 			pc = pcpu_find(cpu);
 			while (atomic_load_ptr(&pc->pc_curpcb) == NULL)
 				cpu_spinwait();
-			kmem_free((vm_offset_t)bootstacks[cpu], PAGE_SIZE);
+			kmem_free((vm_pointer_t)bootstacks[cpu], PAGE_SIZE);
 		}
 	}
 }
@@ -486,9 +480,9 @@ start_cpu(u_int id, uint64_t target_cpu)
 		    id, target_cpu, err));
 
 		pcpu_destroy(pcpup);
-		kmem_free((vm_offset_t)dpcpu[cpuid - 1], DPCPU_SIZE);
+		kmem_free((vm_pointer_t)dpcpu[cpuid - 1], DPCPU_SIZE);
 		dpcpu[cpuid - 1] = NULL;
-		kmem_free((vm_offset_t)bootstacks[cpuid], PAGE_SIZE);
+		kmem_free((vm_pointer_t)bootstacks[cpuid], PAGE_SIZE);
 		bootstacks[cpuid] = NULL;
 		mp_ncpus--;
 
@@ -894,3 +888,12 @@ ipi_selected(cpuset_t cpus, u_int ipi)
 	CTR2(KTR_SMP, "%s: ipi: %x", __func__, ipi);
 	intr_ipi_send(cpus, ipi);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20210407,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

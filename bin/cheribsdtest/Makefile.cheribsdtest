@@ -11,6 +11,8 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 	cheribsdtest_fault.c						\
 	cheribsdtest_flag_captured.c					\
 	cheribsdtest_kbounce.c						\
+	cheribsdtest_ipc.c						\
+	cheribsdtest_local_global.c					\
 	cheribsdtest_longjmp.c						\
 	cheribsdtest_printf.c						\
 	cheribsdtest_registers.c					\
@@ -87,10 +89,6 @@ MAN=
 LIBADD= 	z
 LIBADD+=	xo util
 
-.if ${MK_LIBCHERI} == "yes"
-SRCS+=	cheribsdtest_sandbox.S
-.endif
-
 .ifdef CHERIBSD_DYNAMIC_TESTS
 CFLAGS+=	-DCHERIBSD_DYNAMIC_TESTS
 CFLAGS+=	'-DLIBM_SONAME="libm.so.5"'
@@ -99,30 +97,11 @@ LIBADD+=	cheribsdtest_dynamic
 SRCS+=		cheribsdtest_lazy_bind.c
 .else
 NO_SHARED?=	YES
-# XXX-JC: Enable unconditionally once we have a dynamic libcheri
-.if ${MK_LIBCHERI} == "yes"
-CFLAGS+=	-DCHERIBSD_LIBCHERI_TESTS
-LIBADD+=	cheri
-SRCS+=		cheribsdtest_ccall.c					\
-		cheribsdtest_fd.c					\
-		cheribsdtest_libcheri.c					\
-		cheribsdtest_libcheri_cxx.cc				\
-		cheribsdtest_libcheri_fault.c				\
-		cheribsdtest_libcheri_local.c				\
-		cheribsdtest_libcheri_trustedstack.c			\
-		cheribsdtest_libcheri_var.c
-.endif
 .endif
 
 .ifdef CHERIBSD_THREAD_TESTS
 LIBADD+=	pthread
 SRCS+=		cheribsdtest_tls_threads.c
-# XXX-JC: Enable unconditionally once we have a dynamic libcheri
-.ifndef CHERIBSD_DYNAMIC_TESTS
-.if ${MK_LIBCHERI} == "yes"
-SRCS+=		cheribsdtest_libcheri_pthreads.c
-.endif
-.endif
 .endif
 
 .include <bsd.prog.mk>

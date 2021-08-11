@@ -127,19 +127,6 @@ The Regents of the University of California.  All rights reserved.\n";
 
 #include "print.h"
 
-#if __has_feature(capabilities) && defined(CHERI_TCPDUMP)
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-#define cheri_string(str)	cheri_ptr((str), strlen(str) + 1)
-#define	cheri_ptrperm(ptr, len, perm)	(ptr)
-#else
-#define cheri_string(str)	(str)
-#define	cheri_ptrperm(ptr, len, perm)	(ptr)
-#if !__has_feature(capabilities)
-#define __capability
-#endif
-#endif
-
 #ifndef PATH_MAX
 #define PATH_MAX 1024
 #endif
@@ -1185,14 +1172,6 @@ main(int argc, char **argv)
 	cap_rights_t rights;
 	int cansandbox;
 #endif	/* HAVE_CAPSICUM */
-#ifdef TCPDUMP_BENCHMARKING
-	struct timespec entry, initdone, packetsdone, init_time, packet_time;
-#endif
-
-#ifdef TCPDUMP_BENCHMARKING
-	if (clock_gettime(CLOCK_REALTIME_PRECISE, &entry) == -1)
-		error("%s: clock_gettime", __func__);
-#endif
 	int Oflag = 1;			/* run filter code optimizer */
 	int yflag_dlt = -1;
 	const char *yflag_dlt_name = NULL;
@@ -1219,10 +1198,9 @@ main(int argc, char **argv)
 	WFileName = NULL;
 	dlt = -1;
 	if ((cp = strrchr(argv[0], '/')) != NULL)
-		program_name = cp + 1;
+		ndo->program_name = program_name = cp + 1;
 	else
-		program_name = argv[0];
-	ndo->program_name = cheri_string(program_name);
+		ndo->program_name = program_name = argv[0];
 
 #ifdef _WIN32
 	if (pcap_wsockinit() != 0)
@@ -1295,7 +1273,7 @@ main(int argc, char **argv)
 #ifndef HAVE_LIBCRYPTO
 			warning("crypto code not compiled in");
 #endif
-			ndo->ndo_espsecret = cheri_string(optarg);
+			ndo->ndo_espsecret = optarg;
 			break;
 
 		case 'f':
@@ -1393,7 +1371,7 @@ main(int argc, char **argv)
 #ifndef HAVE_LIBCRYPTO
 			warning("crypto code not compiled in");
 #endif
-			ndo->ndo_sigsecret = cheri_string(optarg);
+			ndo->ndo_sigsecret = optarg;
 			break;
 
 		case 'n':
@@ -2011,7 +1989,7 @@ main(int argc, char **argv)
 #endif
 	} else {
 		dlt = pcap_datalink(pd);
-		ndo_set_if_printer(ndo, dlt);
+		ndo->ndo_if_printer = get_if_printer(ndo, dlt);
 		callback = print_packet;
 		pcap_userdata = (u_char *)ndo;
 	}
@@ -2081,10 +2059,6 @@ main(int argc, char **argv)
 		error("unable to enter the capability mode");
 #endif	/* HAVE_CAPSICUM */
 
-#ifdef TCPDUMP_BENCHMARKING
-	if (clock_gettime(CLOCK_REALTIME_PRECISE, &initdone) == -1)
-		error("%s: clock_gettime", __func__);
-#endif
 	do {
 		status = pcap_loop(pd, cnt, callback, pcap_userdata);
 		if (WFileName == NULL) {
@@ -2171,7 +2145,7 @@ main(int argc, char **argv)
 					 * the new DLT.
 					 */
 					dlt = new_dlt;
-					ndo_set_if_printer(ndo, dlt);
+					ndo->ndo_if_printer = get_if_printer(ndo, dlt);
 					if (pcap_compile(pd, &fcode, cmdbuf, Oflag, netmask) < 0)
 						error("%s", pcap_geterr(pd));
 				}
@@ -2199,29 +2173,6 @@ main(int argc, char **argv)
 		}
 	}
 	while (ret != NULL);
-
-#ifdef TCPDUMP_BENCHMARKING
-	/* timespecsub from sys/sys/time.h, also under UCB license */
-#define timespecsub(vvp, uvp)						\
-	do {								\
-		(vvp)->tv_sec -= (uvp)->tv_sec;				\
-		(vvp)->tv_nsec -= (uvp)->tv_nsec;			\
-		if ((vvp)->tv_nsec < 0) {				\
-			(vvp)->tv_sec--;				\
-			(vvp)->tv_nsec += 1000000000;			\
-		}							\
-	} while (0)
-
-	if (clock_gettime(CLOCK_REALTIME_PRECISE, &packetsdone) == -1)
-		error("%s: clock_gettime", __func__);
-	init_time = initdone;
-	timespecsub(&init_time, &entry);
-	packet_time = packetsdone;
-	timespecsub(&packet_time, &initdone);
-	fprintf(stderr, "init: %ld.%09ld packet-processing: %ld.%09ld\n",
-	    init_time.tv_sec, init_time.tv_nsec, packet_time.tv_sec,
-	    packet_time.tv_nsec);
-#endif
 
 	free(cmdbuf);
 	pcap_freecode(&fcode);
@@ -2602,15 +2553,11 @@ dump_packet(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 static void
 print_packet(u_char *user, const struct pcap_pkthdr *h, const u_char *sp)
 {
-	struct netdissect_options *ndo = (netdissect_options *)user;
-
 	++packets_captured;
 
 	++infodelay;
 
-	pretty_print_packet(ndo, h,
-	    cheri_ptrperm(sp, ndo->ndo_snaplen, CHERI_PERM_LOAD),
-	    packets_captured);
+	pretty_print_packet((netdissect_options *)user, h, sp, packets_captured);
 
 	--infodelay;
 	if (infoprint)

@@ -577,13 +577,6 @@ void
 ns_print(netdissect_options *ndo,
          register const u_char *bp, u_int length, int is_mdns)
 {
-	INVOKE_DISSECTOR(_ns_print, ndo, bp, length, is_mdns);
-}
-
-void
-_ns_print(netdissect_options *ndo,
-         register const u_char *bp, u_int length, int is_mdns)
-{
 	register const HEADER *np;
 	register int qdcount, ancount, nscount, arcount;
 	register const u_char *cp;

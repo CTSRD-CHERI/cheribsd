@@ -83,7 +83,7 @@ struct mmap_req {
 	int			mr_prot;
 	int			mr_flags;
 	int			mr_fd;
-	int			_int_pad;
+	int			mr_kern_flags;
 	off_t			mr_pos;
 	mmap_check_fp_fn	mr_check_fp_fn;
 #if __has_feature(capabilities)

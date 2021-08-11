@@ -170,14 +170,8 @@ trunc:
     ND_PRINT((ndo, "[trunc] "));
 }
 
-void
-hbhopt_print(netdissect_options *ndo, register const u_char *bp)
-{
-    INVOKE_DISSECTOR(_hbhopt_print, ndo, bp);
-}
-
 int
-_hbhopt_print(netdissect_options *ndo, register const u_char *bp)
+hbhopt_print(netdissect_options *ndo, register const u_char *bp)
 {
     const struct ip6_hbh *dp = (const struct ip6_hbh *)bp;
     int hbhlen = 0;
@@ -196,14 +190,8 @@ _hbhopt_print(netdissect_options *ndo, register const u_char *bp)
     return(-1);
 }
 
-void
-dstopt_print(netdissect_options *ndo, register const u_char *bp)
-{
-    INVOKE_DISSECTOR(_dstopt_print, ndo, bp);
-}
-
 int
-_dstopt_print(netdissect_options *ndo, register const u_char *bp)
+dstopt_print(netdissect_options *ndo, register const u_char *bp)
 {
     const struct ip6_dest *dp = (const struct ip6_dest *)bp;
     int dstoptlen = 0;

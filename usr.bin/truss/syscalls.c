@@ -46,8 +46,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/ioccom.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
+#include <sys/poll.h>
+#include <sys/procfs.h>
 #include <sys/ptrace.h>
 #include <sys/resource.h>
+#include <sys/sched.h>
 #include <sys/socket.h>
 #define _WANT_FREEBSD11_STAT
 #include <sys/stat.h>
@@ -69,8 +72,6 @@ __FBSDID("$FreeBSD$");
 #define _WANT_KERNEL_ERRNO
 #include <errno.h>
 #include <fcntl.h>
-#include <poll.h>
-#include <sched.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -88,8 +89,13 @@ __FBSDID("$FreeBSD$");
 
 /*
  * This should probably be in its own file, sorted alphabetically.
+ *
+ * Note: We only scan this table on the initial syscall number to calling
+ * convention lookup, i.e. once each time a new syscall is encountered. This
+ * is unlikely to be a performance issue, but if it is we could sort this array
+ * and use a binary search instead.
  */
-static struct syscall decoded_syscalls[] = {
+static const struct syscall_decode decoded_syscalls[] = {
 	/* Native ABI */
 	{ .name = "__acl_aclcheck_fd", .ret_type = 1, .nargs = 3,
 	  .args = { { Int, 0 }, { Acltype, 1 }, { Ptr, 2 } } },
@@ -684,10 +690,8 @@ static struct syscall decoded_syscalls[] = {
 	{ .name = "cloudabi_sys_thread_exit", .ret_type = 1, .nargs = 2,
 	  .args = { { Ptr, 0 }, { CloudABIMFlags, 1 } } },
 	{ .name = "cloudabi_sys_thread_yield", .ret_type = 1, .nargs = 0 },
-
-	{ .name = 0 },
 };
-static STAILQ_HEAD(, syscall) syscalls;
+static STAILQ_HEAD(, syscall) seen_syscalls;
 
 /* Xlat idea taken from strace */
 struct xlat {
@@ -819,18 +823,17 @@ lookup(struct xlat *xlat, int val, int base)
 		if (xlat->val == val)
 			return (xlat->str);
 	switch (base) {
-		case 8:
-			sprintf(tmp, "0%o", val);
-			break;
-		case 16:
-			sprintf(tmp, "0x%x", val);
-			break;
-		case 10:
-			sprintf(tmp, "%u", val);
-			break;
-		default:
-			errx(1,"Unknown lookup base");
-			break;
+	case 8:
+		sprintf(tmp, "0%o", val);
+		break;
+	case 16:
+		sprintf(tmp, "0x%x", val);
+		break;
+	case 10:
+		sprintf(tmp, "%u", val);
+		break;
+	default:
+		errx(1, "Unknown lookup base");
 	}
 	return (tmp);
 }
@@ -915,7 +918,6 @@ print_mask_arg32(bool (*decoder)(FILE *, uint32_t, uint32_t *), FILE *fp,
 		fprintf(fp, "|0x%x", rem);
 }
 
-#ifndef __LP64__
 /*
  * Add argument padding to subsequent system calls after Quad
  * syscall arguments as needed.  This used to be done by hand in the
@@ -924,7 +926,7 @@ print_mask_arg32(bool (*decoder)(FILE *, uint32_t, uint32_t *), FILE *fp,
  * decoding arguments.
  */
 static void
-quad_fixup(struct syscall *sc)
+quad_fixup(struct syscall_decode *sc)
 {
 	int offset, prev;
 	u_int i;
@@ -960,21 +962,6 @@ quad_fixup(struct syscall *sc)
 		}
 	}
 }
-#endif
-
-void
-init_syscalls(void)
-{
-	struct syscall *sc;
-
-	STAILQ_INIT(&syscalls);
-	for (sc = decoded_syscalls; sc->name != NULL; sc++) {
-#ifndef __LP64__
-		quad_fixup(sc);
-#endif
-		STAILQ_INSERT_HEAD(&syscalls, sc, entries);
-	}
-}
 
 static struct syscall *
 find_syscall(struct procabi *abi, u_int number)
@@ -995,6 +982,14 @@ add_syscall(struct procabi *abi, u_int number, struct syscall *sc)
 {
 	struct extra_syscall *es;
 
+	/*
+	 * quad_fixup() is currently needed for all 32-bit ABIs.
+	 * TODO: This should probably be a function pointer inside struct
+	 *  procabi instead.
+	 */
+	if (abi->pointer_size == 4)
+		quad_fixup(&sc->decode);
+
 	if (number < nitems(abi->syscalls)) {
 		assert(abi->syscalls[number] == NULL);
 		abi->syscalls[number] = sc;
@@ -1004,6 +999,8 @@ add_syscall(struct procabi *abi, u_int number, struct syscall *sc)
 		es->number = number;
 		STAILQ_INSERT_TAIL(&abi->extra_syscalls, es, entries);
 	}
+
+	STAILQ_INSERT_HEAD(&seen_syscalls, sc, entries);
 }
 
 /*
@@ -1014,24 +1011,37 @@ struct syscall *
 get_syscall(struct threadinfo *t, u_int number, u_int nargs)
 {
 	struct syscall *sc;
+	struct procabi *procabi;
+	const char *sysdecode_name;
+	const char *lookup_name;
 	const char *name;
-	char *new_name;
 	u_int i;
 
-	sc = find_syscall(t->proc->abi, number);
+	procabi = t->proc->abi;
+	sc = find_syscall(procabi, number);
 	if (sc != NULL)
 		return (sc);
 
-	name = sysdecode_syscallname(t->proc->abi->abi, number);
-	if (name == NULL) {
-		asprintf(&new_name, "#%d", number);
-		name = new_name;
-	} else
-		new_name = NULL;
-	STAILQ_FOREACH(sc, &syscalls, entries) {
-		if (strcmp(name, sc->name) == 0) {
+	/* Memory is not explicitly deallocated, it's released on exit(). */
+	sysdecode_name = sysdecode_syscallname(procabi->abi, number);
+	if (sysdecode_name == NULL)
+		asprintf(__DECONST(char **, &name), "#%d", number);
+	else
+		name = sysdecode_name;
+
+	sc = calloc(1, sizeof(*sc));
+	sc->name = name;
+
+	/* Also decode compat syscalls arguments by stripping the prefix. */
+	lookup_name = name;
+	if (procabi->compat_prefix != NULL && strncmp(procabi->compat_prefix,
+	    name, strlen(procabi->compat_prefix)) == 0)
+		lookup_name += strlen(procabi->compat_prefix);
+
+	for (i = 0; i < nitems(decoded_syscalls); i++) {
+		if (strcmp(lookup_name, decoded_syscalls[i].name) == 0) {
+			sc->decode = decoded_syscalls[i];
 			add_syscall(t->proc->abi, number, sc);
-			free(new_name);
 			return (sc);
 		}
 	}
@@ -1041,21 +1051,15 @@ get_syscall(struct threadinfo *t, u_int number, u_int nargs)
 	fprintf(stderr, "unknown syscall %s -- setting args to %d\n", name,
 	    nargs);
 #endif
-
-	sc = calloc(1, sizeof(struct syscall));
-	sc->name = name;
-	if (new_name != NULL)
-		sc->unknown = true;
-	sc->ret_type = 1;
-	sc->nargs = nargs;
+	sc->unknown = sysdecode_name == NULL;
+	sc->decode.ret_type = 1; /* Assume 1 return value. */
+	sc->decode.nargs = nargs;
 	for (i = 0; i < nargs; i++) {
-		sc->args[i].offset = i;
+		sc->decode.args[i].offset = i;
 		/* Treat all unknown arguments as LongHex. */
-		sc->args[i].type = LongHex;
+		sc->decode.args[i].type = LongHex;
 	}
-	STAILQ_INSERT_HEAD(&syscalls, sc, entries);
 	add_syscall(t->proc->abi, number, sc);
-
 	return (sc);
 }
 
@@ -1063,12 +1067,12 @@ get_syscall(struct threadinfo *t, u_int number, u_int nargs)
  * Copy a fixed amount of bytes from the process.
  */
 static int
-get_struct(pid_t pid, uintptr_t offset, void *buf, int len)
+get_struct(pid_t pid, psaddr_t offset, void *buf, size_t len)
 {
 	struct ptrace_io_desc iorequest;
 
 	iorequest.piod_op = PIOD_READ_D;
-	iorequest.piod_offs = (void *)offset;
+	iorequest.piod_offs = (void *)(uintptr_t)offset;
 	iorequest.piod_addr = buf;
 	iorequest.piod_len = len;
 	if (ptrace(PT_IO, pid, (caddr_t)&iorequest, 0) < 0)
@@ -1084,7 +1088,7 @@ get_struct(pid_t pid, uintptr_t offset, void *buf, int len)
  * only get that much.
  */
 static char *
-get_string(pid_t pid, uintptr_t addr, int max)
+get_string(pid_t pid, psaddr_t addr, int max)
 {
 	struct ptrace_io_desc iorequest;
 	char *buf, *nbuf;
@@ -1095,7 +1099,7 @@ get_string(pid_t pid, uintptr_t addr, int max)
 		size = max + 1;
 	else {
 		/* Read up to the end of the current page. */
-		size = PAGE_SIZE - ((vaddr_t)addr % PAGE_SIZE);
+		size = PAGE_SIZE - (addr % PAGE_SIZE);
 		if (size > MAXSIZE)
 			size = MAXSIZE;
 	}
@@ -1105,7 +1109,7 @@ get_string(pid_t pid, uintptr_t addr, int max)
 		return (NULL);
 	for (;;) {
 		iorequest.piod_op = PIOD_READ_D;
-		iorequest.piod_offs = (void *)(addr + offset);
+		iorequest.piod_offs = (void *)((uintptr_t)addr + offset);
 		iorequest.piod_addr = buf + offset;
 		iorequest.piod_len = size;
 		if (ptrace(PT_IO, pid, (caddr_t)&iorequest, 0) < 0) {
@@ -1613,13 +1617,27 @@ print_sysctl(FILE *fp, int *oid, size_t len)
 }
 
 /*
+ * Convert a 32-bit user-space pointer to psaddr_t. Currently, this
+ * sign-extends on MIPS and zero-extends on all other architectures.
+ */
+static psaddr_t
+user_ptr32_to_psaddr(int32_t user_pointer)
+{
+#if defined(__mips__)
+	return ((psaddr_t)(intptr_t)user_pointer);
+#else
+	return ((psaddr_t)(uintptr_t)user_pointer);
+#endif
+}
+
+/*
  * Converts a syscall argument into a string.  Said string is
  * allocated via malloc(), so needs to be free()'d.  sc is
  * a pointer to the syscall description (see above); args is
  * an array of all of the system call arguments.
  */
 char *
-print_arg(struct syscall_args *sc, syscallarg_t *args, syscallarg_t *retval,
+print_arg(struct syscall_arg *sc, syscallarg_t *args, syscallarg_t *retval,
     struct trussinfo *trussinfo)
 {
 	FILE *fp;
@@ -1723,14 +1741,20 @@ print_arg(struct syscall_args *sc, syscallarg_t *args, syscallarg_t *retval,
 	case ExecArgs:
 	case ExecEnv:
 	case StringArray: {
-		uintptr_t addr;
+		psaddr_t addr;
 		union {
-			char *strarray[0];
+			int32_t strarray32[PAGE_SIZE / sizeof(int32_t)];
+			int64_t strarray64[PAGE_SIZE / sizeof(int64_t)];
+#if __has_feature(capabilities)
+			intcap_t strarray_cap[PAGE_SIZE / sizeof(intcap_t)];
+#endif
 			char buf[PAGE_SIZE];
 		} u;
 		char *string;
 		size_t len;
 		u_int first, i;
+		size_t pointer_size =
+		    trussinfo->curthread->proc->abi->pointer_size;
 
 		/*
 		 * Only parse argv[] and environment arrays from exec calls
@@ -1750,7 +1774,7 @@ print_arg(struct syscall_args *sc, syscallarg_t *args, syscallarg_t *retval,
 		 * a partial page.
 		 */
 		addr = args[sc->offset];
-		if ((vaddr_t)addr % sizeof(char *) != 0) {
+		if (!__is_aligned(addr, pointer_size)) {
 			print_pointer(fp, args[sc->offset]);
 			break;
 		}
@@ -1760,22 +1784,40 @@ print_arg(struct syscall_args *sc, syscallarg_t *args, syscallarg_t *retval,
 			print_pointer(fp, args[sc->offset]);
 			break;
 		}
+		assert(len > 0);
 
 		fputc('[', fp);
 		first = 1;
 		i = 0;
-		while (u.strarray[i] != NULL) {
-			string = get_string(pid, (uintptr_t)u.strarray[i], 0);
+		for (;;) {
+			psaddr_t straddr;
+#if __has_feature(capabilities)
+			if (pointer_size == sizeof(intcap_t)) {
+				straddr = (psaddr_t)u.strarray_cap[i];
+			} else
+#endif
+			if (pointer_size == 4) {
+				straddr = user_ptr32_to_psaddr(u.strarray32[i]);
+			} else if (pointer_size == 8) {
+				straddr = (psaddr_t)u.strarray64[i];
+			} else {
+				errx(1, "Unsupported pointer size: %zu",
+				    pointer_size);
+			}
+
+			/* Stop once we read the first NULL pointer. */
+			if (straddr == 0)
+				break;
+			string = get_string(pid, straddr, 0);
 			fprintf(fp, "%s \"%s\"", first ? "" : ",", string);
 			free(string);
 			first = 0;
 
 			i++;
-			if (i == len / sizeof(char *)) {
+			if (i == len / pointer_size) {
 				addr += len;
 				len = PAGE_SIZE;
-				if (get_struct(pid, addr, u.buf, len) ==
-				    -1) {
+				if (get_struct(pid, addr, u.buf, len) == -1) {
 					fprintf(fp, ", <inval>");
 					break;
 				}
@@ -1785,32 +1827,29 @@ print_arg(struct syscall_args *sc, syscallarg_t *args, syscallarg_t *retval,
 		fputs(" ]", fp);
 		break;
 	}
-#ifdef __LP64__
-	case Quad:
-		fprintf(fp, "%ld", (long)args[sc->offset]);
-		break;
-	case QuadHex:
-		fprintf(fp, "0x%lx", (unsigned long)args[sc->offset]);
-		break;
-#else
 	case Quad:
 	case QuadHex: {
-		unsigned long long ll;
+		uint64_t value;
+		size_t pointer_size =
+		    trussinfo->curthread->proc->abi->pointer_size;
 
+		if (pointer_size == 4) {
 #if _BYTE_ORDER == _LITTLE_ENDIAN
-		ll = (unsigned long long)args[sc->offset + 1] << 32 |
-		    args[sc->offset];
+			value = (uint64_t)args[sc->offset + 1] << 32 |
+			    args[sc->offset];
 #else
-		ll = (unsigned long long)args[sc->offset] << 32 |
-		    args[sc->offset + 1];
+			value = (uint64_t)args[sc->offset] << 32 |
+			    args[sc->offset + 1];
 #endif
+		} else {
+			value = (uint64_t)args[sc->offset];
+		}
 		if ((sc->type & ARG_MASK) == Quad)
-			fprintf(fp, "%lld", ll);
+			fprintf(fp, "%jd", (intmax_t)value);
 		else
-			fprintf(fp, "0x%llx", ll);
+			fprintf(fp, "0x%jx", (intmax_t)value);
 		break;
 	}
-#endif
 	case PQuadHex: {
 		uint64_t val;
 
@@ -2797,11 +2836,9 @@ print_syscall_ret(struct trussinfo *trussinfo, int error, syscallarg_t *retval)
 		fprintf(trussinfo->outfile, " ERR#%d '%s'\n",
 		    sysdecode_freebsd_to_abi_errno(t->proc->abi->abi, error),
 		    strerror(error));
-	}
-#ifndef __LP64__
-	else if (sc->ret_type == 2) {
+	} else if (sc->decode.ret_type == 2 &&
+	    t->proc->abi->pointer_size == 4) {
 		off_t off;
-
 #if _BYTE_ORDER == _LITTLE_ENDIAN
 		off = (off_t)retval[1] << 32 | retval[0];
 #else
@@ -2809,9 +2846,7 @@ print_syscall_ret(struct trussinfo *trussinfo, int error, syscallarg_t *retval)
 #endif
 		fprintf(trussinfo->outfile, " = %jd (0x%jx)\n", (intmax_t)off,
 		    (intmax_t)off);
-	}
-#endif
-	else if (sc->ret_type == 3) {
+	} else if (sc->decode.ret_type == 3) {
 #ifdef __CHERI_PURE_CAPABILITY__
 		char tmp[128];
 		strfcap(tmp, sizeof(tmp), "%T%C", retval[0]);
@@ -2819,9 +2854,10 @@ print_syscall_ret(struct trussinfo *trussinfo, int error, syscallarg_t *retval)
 #else
 		fprintf(trussinfo->outfile, " = %p\n", (void *)retval[0]);
 #endif
-	} else
+	} else {
 		fprintf(trussinfo->outfile, " = %jd (0x%jx)\n",
 		    (intmax_t)retval[0], (intmax_t)retval[0]);
+	}
 }
 
 void
@@ -2834,7 +2870,7 @@ print_summary(struct trussinfo *trussinfo)
 	fprintf(trussinfo->outfile, "%-20s%15s%8s%8s\n",
 	    "syscall", "seconds", "calls", "errors");
 	ncall = nerror = 0;
-	STAILQ_FOREACH(sc, &syscalls, entries)
+	STAILQ_FOREACH(sc, &seen_syscalls, entries) {
 		if (sc->ncalls) {
 			fprintf(trussinfo->outfile, "%-20s%5jd.%09ld%8d%8d\n",
 			    sc->name, (intmax_t)sc->time.tv_sec,
@@ -2843,6 +2879,7 @@ print_summary(struct trussinfo *trussinfo)
 			ncall += sc->ncalls;
 			nerror += sc->nerror;
 		}
+	}
 	fprintf(trussinfo->outfile, "%20s%15s%8s%8s\n",
 	    "", "-------------", "-------", "-------");
 	fprintf(trussinfo->outfile, "%-20s%5jd.%09ld%8d%8d\n",
