@@ -126,7 +126,6 @@ void riscv_nullop(void);
 
 #endif	/* _KERNEL */
 
-#ifdef CPU_QEMU_RISCV
 #define	QEMU_SET_TRACE_BUFFERED_MODE	do {				\
 	__asm__ __volatile__("slti zero, zero, 0x01");			\
 } while(0)
@@ -138,8 +137,6 @@ void riscv_nullop(void);
 #define	QEMU_FLUSH_TRACE_BUFFER	do {					\
 	__asm__ __volatile__("slti zero, zero, 0x03");                  \
 } while(0)
-#endif
-
 #endif	/* _MACHINE_CPUFUNC_H_ */
 // CHERI CHANGES START
 // {
