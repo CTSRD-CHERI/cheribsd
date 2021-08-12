@@ -1188,10 +1188,9 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 #if __has_feature(capabilities)
 	p->p_usrstack = CHERI_REPRESENTABLE_BASE(p->p_usrstack, ssiz);
 #endif
-	p->p_psstrings = p->p_usrstack - sv->sv_szpsstrings;
 
 	/* We reserve the whole max stack size with restricted permission */
-	stack_addr =  p->p_usrstack - ssiz;
+	stack_addr = p->p_usrstack - ssiz;
 	stack_prot = (obj != NULL && imgp->stack_prot != 0) ? imgp->stack_prot :
 	    sv->sv_stackprot;
 	imgp->stack_sz = ssiz;
