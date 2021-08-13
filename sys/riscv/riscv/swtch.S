@@ -525,6 +525,24 @@ ENTRY(cpu_switch)
 #endif
 
 #ifdef CPU_QEMU_RISCV
+	/* Log context switch */
+	li	a0, 0x1 // LOG_EVENT_CTX_SWITCH
+#ifdef __CHERI_PURE_CAPABILITY__
+	clc	ca1, TD_PROC(cs1)
+	cld	a1, P_PID(ca1)
+	cld	a2, TD_TID(cs1)
+#else
+	ld	a1, TD_PROC(s1)
+	ld	a1, P_PID(a1)
+	ld	a2, TD_TID(s1)
+#endif
+	li	a3, -1 // ignore compartment ID for now
+	slti	zero, zero, 0x30
+#ifdef __CHERI_PURE_CAPABILITY__
+	cmove	ca1, cs1
+#else
+	mv	a1, s1
+#endif
 	/*
 	 * Check if per-thread tracing is enabled, if so pause/resume
 	 * QEMU instruction tracing to reflect the new thread tracing
