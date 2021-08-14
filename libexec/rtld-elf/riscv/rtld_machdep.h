@@ -190,6 +190,7 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 /*
  * TLS
  */
+#define	TLS_VARIANT_I	1
 #define	TLS_TP_OFFSET	0x0
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	TLS_DTV_OFFSET	0
@@ -204,7 +205,6 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
     TLS_TCB_SIZE
 #define calculate_tls_offset(prev_offset, prev_size, size, align, offset) \
     round(prev_offset + prev_size, align)
-#define calculate_tls_end(off, size)    ((off) + (size))
 #define calculate_tls_post_size(align)  0
 
 typedef struct {

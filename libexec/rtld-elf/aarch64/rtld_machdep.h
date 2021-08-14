@@ -186,7 +186,6 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 	round(TLS_TCB_SIZE, align)
 #define	calculate_tls_offset(prev_offset, prev_size, size, align, offset) \
 	round(prev_offset + prev_size, align)
-#define	calculate_tls_end(off, size) 	((off) + (size))
 #define calculate_tls_post_size(align) \
 	round(TLS_TCB_SIZE, align) - TLS_TCB_SIZE
 
@@ -202,6 +201,7 @@ extern void *__tls_get_addr(tls_index *ti);
 
 #define md_abi_variant_hook(x)
 
+#define	TLS_VARIANT_I	1
 #define	TLS_DTV_OFFSET	0
 
 #define rtld_validate_target_eflags(path, hdr, main_path)	\
