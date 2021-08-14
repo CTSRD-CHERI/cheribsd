@@ -287,7 +287,7 @@ extern caddr_t kernel_data_cap;
 #define MIPS_SR_INT_MASK	0x0000ff00
 
 /*
- * R4000 status register bit definitons,
+ * R4000 status register bit definitions,
  * where different from r2000/r3000.
  */
 #define	MIPS_SR_XX		0x80000000
