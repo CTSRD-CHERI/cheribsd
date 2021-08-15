@@ -360,31 +360,129 @@ ld_utrace_log(int event, void *handle, void *mapbase, size_t mapsize,
 	utrace(&ut, sizeof(ut));
 }
 
-#ifdef RTLD_VARIANT_ENV_NAMES
-/*
- * construct the env variable based on the type of binary that's
- * running.
- */
-static inline const char *
-_LD(const char *var)
-{
-	static char buffer[128];
+enum {
+	LD_BIND_NOW = 0,
+	LD_PRELOAD,
+	LD_LIBMAP,
+	LD_LIBRARY_PATH,
+	LD_LIBRARY_PATH_FDS,
+	LD_LIBMAP_DISABLE,
+	LD_BIND_NOT,
+	LD_DEBUG,
+	LD_DEBUG_VERBOSE,
+	LD_DEBUG_CHERI,
+	LD_DEBUG_STATS,
+	LD_DEBUG_CATEGORIES,
+	LD_ELF_HINTS_PATH,
+	LD_LOADFLTR,
+	LD_LIBRARY_PATH_RPATH,
+	LD_PRELOAD_FDS,
+	LD_DYNAMIC_WEAK,
+	LD_TRACE_LOADED_OBJECTS,
+	LD_UTRACE,
+	LD_DUMP_REL_PRE,
+	LD_DUMP_REL_POST,
+	LD_TRACE_LOADED_OBJECTS_PROGNAME,
+	LD_TRACE_LOADED_OBJECTS_FMT1,
+	LD_TRACE_LOADED_OBJECTS_FMT2,
+	LD_TRACE_LOADED_OBJECTS_ALL,
+	LD_SKIP_INIT_FUNCS,
+};
 
-	strlcpy(buffer, ld_env_prefix, sizeof(buffer));
-	strlcat(buffer, var, sizeof(buffer));
-	return (buffer);
+struct ld_env_var_desc {
+	char n[64];
+	bool unsecure;
+};
+
+static struct ld_env_var_desc ld_env_vars[] = {
+	[LD_BIND_NOW] =
+	    { .n = "BIND_NOW", .unsecure = false },
+	[LD_PRELOAD] =
+	    { .n = "PRELOAD", .unsecure = true },
+	[LD_LIBMAP] =
+	    { .n = "LIBMAP", .unsecure = true },
+	[LD_LIBRARY_PATH] =
+	    { .n = "LIBRARY_PATH", .unsecure = true },
+	[LD_LIBRARY_PATH_FDS] =
+	    { .n = "LIBRARY_PATH_FDS", .unsecure = true },
+	[LD_LIBMAP_DISABLE] =
+	    { .n = "LIBMAP_DISABLE", .unsecure = true },
+	[LD_BIND_NOT] =
+	    { .n = "BIND_NOT", .unsecure = true },
+	[LD_DEBUG] =
+	    { .n = "DEBUG", .unsecure = true },
+	[LD_DEBUG_VERBOSE] =
+	    { .n = "DEBUG_VERBOSE", .unsecure = true },
+	[LD_DEBUG_CHERI] =
+	    { .n = "DEBUG_CHERI", .unsecure = true },
+	[LD_DEBUG_STATS] =
+	    { .n = "DEBUG_STATS", .unsecure = true },
+	[LD_DEBUG_CATEGORIES] =
+	    { .n = "DEBUG_CATEGORIES", .unsecure = true },
+	[LD_ELF_HINTS_PATH] =
+	    { .n = "ELF_HINTS_PATH", .unsecure = true },
+	[LD_LOADFLTR] =
+	    { .n = "LOADFLTR", .unsecure = true },
+	[LD_LIBRARY_PATH_RPATH] =
+	    { .n = "LIBRARY_PATH_RPATH", .unsecure = true },
+	[LD_PRELOAD_FDS] =
+	    { .n = "PRELOAD_FDS", .unsecure = true },
+	[LD_DYNAMIC_WEAK] =
+	    { .n = "DYNAMIC_WEAK", .unsecure = true },
+	[LD_TRACE_LOADED_OBJECTS] =
+	    { .n = "TRACE_LOADED_OBJECTS", .unsecure = false },
+	[LD_UTRACE] =
+	    { .n = "UTRACE", .unsecure = false },
+	[LD_DUMP_REL_PRE] =
+	    { .n = "DUMP_REL_PRE", .unsecure = false },
+	[LD_DUMP_REL_POST] =
+	    { .n = "DUMP_REL_POST", .unsecure = false },
+	[LD_TRACE_LOADED_OBJECTS_PROGNAME] =
+	    { .n = "TRACE_LOADED_OBJECTS_PROGNAME", .unsecure = false},
+	[LD_TRACE_LOADED_OBJECTS_FMT1] =
+	    { .n = "TRACE_LOADED_OBJECTS_FMT1", .unsecure = false},
+	[LD_TRACE_LOADED_OBJECTS_FMT2] =
+	    { .n = "TRACE_LOADED_OBJECTS_FMT2", .unsecure = false},
+	[LD_TRACE_LOADED_OBJECTS_ALL] =
+	    { .n = "TRACE_LOADED_OBJECTS_ALL", .unsecure = false},
+	[LD_SKIP_INIT_FUNCS] =
+	    { .n = "SKIP_INIT_FUNCS", .unsecure = true},
+};
+
+static const char *
+ld_var(int idx)
+{
+	return (ld_env_vars[idx].n);
 }
-#else
-#define _LD(x)	LD_ x
-#endif
+
+static char *
+ld_get_env_var(int idx)
+{
+	return (getenv(ld_var(idx)));
+}
+
+static void
+rtld_init_env_vars(void)
+{
+	struct ld_env_var_desc *lvd;
+	size_t sz;
+	int i;
+
+	sz = strlen(ld_env_prefix);
+	for (i = 0; i < (int)nitems(ld_env_vars); i++) {
+		lvd = &ld_env_vars[i];
+		memmove(lvd->n + sz, lvd->n, strlen(lvd->n) + 1);
+		memcpy(lvd->n, ld_env_prefix, sz);
+	}
+}
 
 #ifdef DEBUG
 static inline
-bool is_env_var_set(const char* varname)
+bool is_env_var_set(int idx)
 {
 	char *env_var;
 
-	env_var = getenv(varname);
+	env_var = ld_get_env_var(idx);
 
 	/* return true if the variable is nonnull and not equal to "0" */
 	return (env_var != NULL && *env_var != '\0' &&
@@ -431,6 +529,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     Elf_Addr *argcp;
     char **argv, **env, *kexecpath, *library_path_rpath;
     const char *argv0, *binpath;
+    struct ld_env_var_desc *lvd;
 #ifndef __CHERI_PURE_CAPABILITY__
     char **envp;
 #endif
@@ -518,6 +617,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     direct_exec = false;
 
     md_abi_variant_hook(aux_info);
+    rtld_init_env_vars();
 
     fd = -1;
     if (aux_info[AT_EXECFD] != NULL) {
@@ -628,7 +728,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	}
     }
 
-    ld_bind_now = getenv(_LD("BIND_NOW"));
+    ld_bind_now = ld_get_env_var(LD_BIND_NOW);
 
     /*
      * If the process is tainted, then we un-set the dangerous environment
@@ -637,30 +737,26 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
      * future processes to honor the potentially un-safe variables.
      */
     if (!trust) {
-	if (unsetenv(_LD("PRELOAD")) || unsetenv(_LD("LIBMAP")) ||
-	    unsetenv(_LD("LIBRARY_PATH")) || unsetenv(_LD("LIBRARY_PATH_FDS")) ||
-	    unsetenv(_LD("LIBMAP_DISABLE")) || unsetenv(_LD("BIND_NOT")) ||
-	    unsetenv(_LD("DEBUG")) || unsetenv(_LD("ELF_HINTS_PATH")) ||
-	    unsetenv(_LD("SKIP_INIT_FUNCS")) ||
-	    unsetenv(_LD("LOADFLTR")) || unsetenv(_LD("LIBRARY_PATH_RPATH")) ||
-	    unsetenv(_LD("PRELOAD_FDS")) || unsetenv(_LD("DYNAMIC_WEAK"))) {
-		rtld_fatal("environment corrupt; aborting");
-	}
+	    for (i = 0; i < (int)nitems(ld_env_vars); i++) {
+		    lvd = &ld_env_vars[i];
+		    if (lvd->unsecure && unsetenv(lvd->n)) {
+			    rtld_fatal("environment corrupt; aborting");
+		    }
+	    }
     }
     if (ld_bind_now == NULL)
-	    ld_bind_not = getenv(_LD("BIND_NOT")) != NULL;
-    ld_dynamic_weak = getenv(_LD("DYNAMIC_WEAK")) == NULL;
-    libmap_disable = getenv(_LD("LIBMAP_DISABLE")) != NULL;
-    libmap_override = getenv(_LD("LIBMAP"));
-    ld_library_path = getenv(_LD("LIBRARY_PATH"));
-    ld_library_dirs = getenv(_LD("LIBRARY_PATH_FDS"));
-    ld_preload = getenv(_LD("PRELOAD"));
-    ld_preload_fds = getenv(_LD("PRELOAD_FDS"));
-    ld_elf_hints_path = getenv(_LD("ELF_HINTS_PATH"));
-    ld_loadfltr = getenv(_LD("LOADFLTR")) != NULL;
-    library_path_rpath = getenv(_LD("LIBRARY_PATH_RPATH"));
-    ld_skip_init_funcs = getenv(_LD("SKIP_INIT_FUNCS")) != NULL;
-    library_path_rpath = getenv(_LD("LIBRARY_PATH_RPATH"));
+	    ld_bind_not = ld_get_env_var(LD_BIND_NOT) != NULL;
+    ld_dynamic_weak = ld_get_env_var(LD_DYNAMIC_WEAK) == NULL;
+    libmap_disable = ld_get_env_var(LD_LIBMAP_DISABLE) != NULL;
+    libmap_override = ld_get_env_var(LD_LIBMAP);
+    ld_library_path = ld_get_env_var(LD_LIBRARY_PATH);
+    ld_library_dirs = ld_get_env_var(LD_LIBRARY_PATH_FDS);
+    ld_preload = ld_get_env_var(LD_PRELOAD);
+    ld_preload_fds = ld_get_env_var(LD_PRELOAD_FDS);
+    ld_elf_hints_path = ld_get_env_var(LD_ELF_HINTS_PATH);
+    ld_loadfltr = ld_get_env_var(LD_LOADFLTR) != NULL;
+    ld_skip_init_funcs = ld_get_env_var(LD_SKIP_INIT_FUNCS) != NULL;
+    library_path_rpath = ld_get_env_var(LD_LIBRARY_PATH_RPATH);
     if (library_path_rpath != NULL) {
 	    if (library_path_rpath[0] == 'y' ||
 		library_path_rpath[0] == 'Y' ||
@@ -669,27 +765,28 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	    else
 		    ld_library_path_rpath = false;
     }
-    dangerous_ld_env = libmap_disable || (libmap_override != NULL) ||
-	(ld_library_path != NULL) || (ld_preload != NULL) ||
-	(ld_elf_hints_path != NULL) || ld_loadfltr || ld_dynamic_weak;
+
+    dangerous_ld_env = libmap_disable || libmap_override != NULL ||
+	ld_library_path != NULL || ld_preload != NULL ||
+	ld_elf_hints_path != NULL || ld_loadfltr || ld_dynamic_weak;
     if (!ld_tracing)
-	ld_tracing = getenv(_LD("TRACE_LOADED_OBJECTS"));
-    ld_utrace = getenv(_LD("UTRACE"));
+	ld_tracing = ld_get_env_var(LD_TRACE_LOADED_OBJECTS);
+    ld_utrace = ld_get_env_var(LD_UTRACE);
 
     if ((ld_elf_hints_path == NULL) || strlen(ld_elf_hints_path) == 0)
 	ld_elf_hints_path = ld_elf_hints_default;
 
 #ifdef DEBUG
-    if (is_env_var_set(_LD("DEBUG")))
+    if (is_env_var_set(LD_DEBUG))
 	debug = RTLD_DBG_NO_CATEGORY;
-    if (is_env_var_set(_LD("DEBUG_VERBOSE")))
+    if (is_env_var_set(LD_DEBUG_VERBOSE))
 	debug = RTLD_DBG_ALL;
-    if (is_env_var_set(_LD("DEBUG_CHERI")))
+    if (is_env_var_set(LD_DEBUG_CHERI))
 	debug |= RTLD_DBG_CHERI_PLT | RTLD_DBG_CHERI | RTLD_DBG_CHERI_PLT_VERBOSE;
-    if (is_env_var_set(_LD("DEBUG_STATS")))
+    if (is_env_var_set(LD_DEBUG_STATS))
 	debug |= RTLD_DBG_RELOC_STATS;
-    if (getenv(_LD("DEBUG_CATEGORIES")))
-	debug |= parse_integer(getenv(_LD("DEBUG_CATEGORIES")));
+    if (ld_get_env_var(LD_DEBUG_CATEGORIES))
+	debug |= parse_integer(ld_get_env_var(LD_DEBUG_CATEGORIES));
 #endif
     dbg("%s is initialized, base address = " PTR_FMT, __progname,
 	(caddr_t) aux_info[AT_BASE]->a_un.a_ptr);
@@ -834,7 +931,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	exit(0);
     }
 
-    if (getenv(_LD("DUMP_REL_PRE")) != NULL) {
+    if (ld_get_env_var(LD_DUMP_REL_PRE) != NULL) {
        dump_relocations(obj_main);
        exit (0);
     }
@@ -865,7 +962,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	rtld_die();
 #endif
 
-    if (getenv(_LD("DUMP_REL_POST")) != NULL) {
+    if (ld_get_env_var(LD_DUMP_REL_POST) != NULL) {
        dump_relocations(obj_main);
        exit (0);
     }
@@ -5181,16 +5278,17 @@ trace_loaded_objects(Obj_Entry *obj)
     const char *fmt1, *fmt2, *fmt, *main_local, *list_containers;
     int c;
 
-    if ((main_local = getenv(_LD("TRACE_LOADED_OBJECTS_PROGNAME"))) == NULL)
+    if ((main_local = ld_get_env_var(LD_TRACE_LOADED_OBJECTS_PROGNAME)) ==
+      NULL)
 	main_local = "";
 
-    if ((fmt1 = getenv(_LD("TRACE_LOADED_OBJECTS_FMT1"))) == NULL)
+    if ((fmt1 = ld_get_env_var(LD_TRACE_LOADED_OBJECTS_FMT1)) == NULL)
 	fmt1 = "\t%o => %p (%x)\n";
 
-    if ((fmt2 = getenv(_LD("TRACE_LOADED_OBJECTS_FMT2"))) == NULL)
+    if ((fmt2 = ld_get_env_var(LD_TRACE_LOADED_OBJECTS_FMT2)) == NULL)
 	fmt2 = "\t%o (%x)\n";
 
-    list_containers = getenv(_LD("TRACE_LOADED_OBJECTS_ALL"));
+    list_containers = ld_get_env_var(LD_TRACE_LOADED_OBJECTS_ALL);
 
     for (; obj != NULL; obj = TAILQ_NEXT(obj, next)) {
 	Needed_Entry *needed;
