@@ -4,6 +4,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_compat.h"
 
 #include <sys/param.h>
+#include <sys/proc.h>
 #include <sys/systm.h>
 #include <sys/signal.h>
 #include <sys/sysproto.h>
@@ -15,7 +16,6 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/lock.h>
 #include <sys/mutex.h>
-#include <sys/proc.h>
 #include <sys/sysent.h>
 
 #include <vm/vm.h>
@@ -674,6 +674,8 @@ sys_cheri_revoke_shadow(struct thread *td, struct cheri_revoke_shadow_args *uap)
 int
 sys_cheri_revoke(struct thread *td, struct cheri_revoke_args *uap)
 {
+	printf("pid %d (%s) trying unsupported CHERI revocation\n",
+	    td->td_proc->p_pid, td->td_name);
 	return (nosys(td, (struct nosys_args *)uap));
 }
 
@@ -684,6 +686,8 @@ sys_cheri_revoke_shadow(struct thread *td, struct cheri_revoke_shadow_args *uap)
 
 	copyoutcap(&cres, uap->shadow, sizeof(cres));
 
+	printf("pid %d (%s) asking for unsupported CHERI revocation info\n",
+	    td->td_proc->p_pid, td->td_name);
 	return (nosys(td, (struct nosys_args *)uap));
 }
 
