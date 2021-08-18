@@ -3814,7 +3814,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 		 * We think there aren't any capabilities on this page.  Make
 		 * sure we're not loading one.
 		 */
-		vm_offset_t mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+		vm_pointer_t mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
 		mva += va & L3_OFFSET;
 		KASSERT(cheri_gettag(*(void * __capability *)mva) == 0,
 		    ("Cap on !PGA_CAPSTORE m=%p va=%lx", m, va));
