@@ -1,7 +1,0 @@
-#NO_UNIVERSE
-
-include "QEMU"
-include "std.CHERI"
-include "std.CHERI-CAPREVOKE"
-
-ident CHERI-CAPREVOKE-QEMU

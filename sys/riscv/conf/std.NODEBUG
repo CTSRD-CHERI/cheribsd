@@ -10,3 +10,6 @@ nooptions       FULL_BUF_TRACKING
 nooptions	COVERAGE
 nooptions	KCOV
 nooptions	MALLOC_DEBUG_MAXZONES
+
+# Not exactly debugging, but mostly so.
+nooptions	CHERI_CAPREVOKE_STATS
