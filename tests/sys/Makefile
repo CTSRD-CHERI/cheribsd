@@ -33,6 +33,7 @@ TESTS_SUBDIRS+=		posixshm
 TESTS_SUBDIRS+=		sys
 TESTS_SUBDIRS+=		vfs
 TESTS_SUBDIRS+=		vm
+TESTS_SUBDIRS+=		vmm
 
 
 # XXXAR: the audit tests are flaky when running on QEMU CHERI and often time out
