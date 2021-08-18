@@ -1,6 +1,0 @@
-#NO_UNIVERSE
-
-include "CHERI-GFE"
-include "std.CHERI-CAPREVOKE"
-
-ident CHERI-CAPREVOKE-GFE
