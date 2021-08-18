@@ -229,7 +229,6 @@ __DEFAULT_NO_OPTIONS+= \
 
 __DEFAULT_YES_OPTIONS+=	\
 	COMPAT_CHERIABI \
-	CHERI_CAPREVOKE \
 	CHERIBSDBOX
 
 # LEFT/RIGHT. Left options which default to "yes" unless their corresponding
