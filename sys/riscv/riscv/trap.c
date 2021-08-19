@@ -370,9 +370,9 @@ page_fault_handler(struct trapframe *frame, int usermode)
 #if __has_feature(capabilities)
 	} else if (frame->tf_scause == SCAUSE_STORE_AMO_CAP_PAGE_FAULT) {
 		ftype = VM_PROT_WRITE | VM_PROT_WRITE_CAP;
-#endif
 	} else if (frame->tf_scause == SCAUSE_LOAD_CAP_PAGE_FAULT) {
 		ftype = VM_PROT_READ | VM_PROT_READ_CAP;
+#endif
 	} else {
 		ftype = VM_PROT_READ;
 	}
