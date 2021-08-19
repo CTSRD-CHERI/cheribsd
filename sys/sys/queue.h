@@ -91,6 +91,7 @@
  * _CLASS_ENTRY			+	+	+	+
  * _INIT			+	+	+	+
  * _EMPTY			+	+	+	+
+ * _END				+	+	+	+
  * _FIRST			+	+	+	+
  * _NEXT			+	+	+	+
  * _PREV			-	+	-	+
@@ -187,12 +188,12 @@ struct qm_trace {
  * Singly-linked List declarations.
  */
 #define	SLIST_HEAD(name, type)						\
-struct name {				\
-	struct type *slh_first;	/* first element */			\
+struct __no_subobject_bounds name {					\
+	struct type *slh_first __no_subobject_bounds_fp; /* first element */ \
 }
 
 #define	SLIST_CLASS_HEAD(name, type)					\
-struct name {				\
+struct __no_subobject_bounds name {					\
 	class type *slh_first;	/* first element */			\
 }
 
@@ -200,13 +201,13 @@ struct name {				\
 	{ NULL }
 
 #define	SLIST_ENTRY(type)						\
-struct {				\
-	struct type *sle_next;	/* next element */	\
+struct __no_subobject_bounds {						\
+	struct type *sle_next __no_subobject_bounds_fp;	/* next element */ \
 }
 
-#define	SLIST_CLASS_ENTRY(type)						\
-struct {								\
-	class type *sle_next;	/* next element */			\
+#define SLIST_CLASS_ENTRY(type)						\
+struct __no_subobject_bounds {						\
+	class type *sle_next __no_subobject_bounds_fp;	/* next element */ \
 }
 
 /*
@@ -314,6 +315,8 @@ struct {								\
 	SLIST_FIRST(head1) = SLIST_FIRST(head2);			\
 	SLIST_FIRST(head2) = swap_first;				\
 } while (0)
+
+#define	SLIST_END(head)		NULL
 
 /*
  * Singly-linked Tail queue declarations.
@@ -447,17 +450,20 @@ struct __no_subobject_bounds {				\
 		(head2)->stqh_last = &STAILQ_FIRST(head2);		\
 } while (0)
 
+#define	STAILQ_END(head)	NULL
+
+
 /*
  * List declarations.
  */
 #define	LIST_HEAD(name, type)						\
-struct __no_subobject_bounds name {				\
-	struct type *lh_first;	/* first element */			\
+struct __no_subobject_bounds name {					\
+	struct type *lh_first __no_subobject_bounds_fp;	/* first element */\
 }
 
 #define	LIST_CLASS_HEAD(name, type)					\
-struct __no_subobject_bounds name {				\
-	class type *lh_first;	/* first element */			\
+struct __no_subobject_bounds name {					\
+	class type *lh_first __no_subobject_bounds_fp;	/* first element */\
 }
 
 #define	LIST_HEAD_INITIALIZER(head)					\
@@ -620,6 +626,8 @@ struct __no_subobject_bounds {				\
 	if ((swap_tmp = LIST_FIRST((head2))) != NULL)			\
 		swap_tmp->field.le_prev = &LIST_FIRST((head2));		\
 } while (0)
+
+#define	LIST_END(head)	NULL
 
 /*
  * Tail queue declarations.
@@ -877,4 +885,15 @@ struct __no_subobject_bounds {				\
 		(head2)->tqh_last = &(head2)->tqh_first;		\
 } while (0)
 
+#define	TAILQ_END(head)		NULL
+
 #endif /* !_SYS_QUEUE_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

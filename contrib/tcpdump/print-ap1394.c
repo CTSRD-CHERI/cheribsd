@@ -112,7 +112,7 @@ ap1394_if_print(netdissect_options *ndo, const struct pcap_pkthdr *h, const u_ch
 	src.addr_string = fwaddr_string;
 	dst.addr = fp->firewire_dhost;
 	dst.addr_string = fwaddr_string;
-	if (_ethertype_print(ndo, ether_type, p, length, caplen, &src, &dst) == 0) {
+	if (ethertype_print(ndo, ether_type, p, length, caplen, &src, &dst) == 0) {
 		/* ether_type not known, print raw packet */
 		if (!ndo->ndo_eflag)
 			ap1394_hdr_print(ndo, (const u_char *)fp, length + FIREWIRE_HDRLEN);

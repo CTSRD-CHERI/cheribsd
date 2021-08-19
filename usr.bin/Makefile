@@ -193,8 +193,8 @@ SUBDIR=	alias \
 	yes \
 	zstd
 
-.if ${MACHINE_ARCH:Mmips64*}
-SUBDIR+=	beri_count_stats
+.if ${MACHINE_ARCH:Mmips64*} || ${MACHINE_ARCH:Mriscv64*}
+SUBDIR+=	minimal_count_stats
 .endif
 
 # NB: keep these sorted by MK_* knobs
@@ -299,8 +299,6 @@ SUBDIR.${MK_UTMPX}+=	last
 SUBDIR.${MK_UTMPX}+=	users
 .endif
 SUBDIR.${MK_UTMPX}+=	who
-SUBDIR.${MK_SVN}+=	svn
-SUBDIR.${MK_SVNLITE}+=	svn
 SUBDIR.${MK_OFED}+=	ofed
 
 # These are normally only handled for build-tools.

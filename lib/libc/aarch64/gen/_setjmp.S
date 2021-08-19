@@ -37,23 +37,23 @@ __FBSDID("$FreeBSD$");
 ENTRY(_setjmp)
 	/* Store the magic value and stack pointer */
 	ldr	x8, .Lmagic
-	mov	x9, sp
-	stp	x8, x9, [x0], #16
+	mov	REG(9), REGN(sp)
+	stp	REG(8), REG(9), [REG(0)], #(REG_WIDTH * 2)
 
 	/* Store the general purpose registers and lr */
-	stp	x19, x20, [x0], #16
-	stp	x21, x22, [x0], #16
-	stp	x23, x24, [x0], #16
-	stp	x25, x26, [x0], #16
-	stp	x27, x28, [x0], #16
-	stp	x29, lr, [x0], #16
+	stp	REG(19), REG(20), [REG(0)], #(REG_WIDTH * 2)
+	stp	REG(21), REG(22), [REG(0)], #(REG_WIDTH * 2)
+	stp	REG(23), REG(24), [REG(0)], #(REG_WIDTH * 2)
+	stp	REG(25), REG(26), [REG(0)], #(REG_WIDTH * 2)
+	stp	REG(27), REG(28), [REG(0)], #(REG_WIDTH * 2)
+	stp	REG(29), REGN(lr), [REG(0)], #(REG_WIDTH * 2)
 
 #ifndef _STANDALONE
 	/* Store the vfp registers */
-	stp	d8, d9, [x0], #16
-	stp	d10, d11, [x0], #16
-	stp	d12, d13, [x0], #16
-	stp	d14, d15, [x0]
+	stp	d8, d9, [REG(0)], #16
+	stp	d10, d11, [REG(0)], #16
+	stp	d12, d13, [REG(0)], #16
+	stp	d14, d15, [REG(0)]
 #endif
 
 	/* Return value */
@@ -66,29 +66,29 @@ END(_setjmp)
 
 ENTRY(_longjmp)
 	/* Check the magic value */
-	ldr	x8, [x0], #8
+	ldr	REG(8), [REG(0)], #(REG_WIDTH)
 	ldr	x9, .Lmagic
 	cmp	x8, x9
 	b.ne	botch
 
 	/* Restore the stack pointer */
-	ldr	x8, [x0], #8
-	mov	sp, x8
+	ldr	REG(8), [REG(0)], #(REG_WIDTH)
+	mov	REGN(sp), REG(8)
 
 	/* Restore the general purpose registers and lr */
-	ldp	x19, x20, [x0], #16
-	ldp	x21, x22, [x0], #16
-	ldp	x23, x24, [x0], #16
-	ldp	x25, x26, [x0], #16
-	ldp	x27, x28, [x0], #16
-	ldp	x29, lr, [x0], #16
+	ldp	REG(19), REG(20), [REG(0)], #(REG_WIDTH * 2)
+	ldp	REG(21), REG(22), [REG(0)], #(REG_WIDTH * 2)
+	ldp	REG(23), REG(24), [REG(0)], #(REG_WIDTH * 2)
+	ldp	REG(25), REG(26), [REG(0)], #(REG_WIDTH * 2)
+	ldp	REG(27), REG(28), [REG(0)], #(REG_WIDTH * 2)
+	ldp	REG(29), REGN(lr), [REG(0)], #(REG_WIDTH * 2)
 
 #ifndef _STANDALONE
 	/* Restore the vfp registers */
-	ldp	d8, d9, [x0], #16
-	ldp	d10, d11, [x0], #16
-	ldp	d12, d13, [x0], #16
-	ldp	d14, d15, [x0]
+	ldp	d8, d9, [REG(0)], #16
+	ldp	d10, d11, [REG(0)], #16
+	ldp	d12, d13, [REG(0)], #16
+	ldp	d14, d15, [REG(0)]
 #endif
 
 	/* Load the return value */

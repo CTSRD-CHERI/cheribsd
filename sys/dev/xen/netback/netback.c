@@ -2208,7 +2208,7 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-		case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+		case SIOCSIFFLAGS:
 			mtx_lock(&xnb->sc_lock);
 			if (ifp->if_flags & IFF_UP) {
 				xnb_ifinit_locked(xnb);
@@ -2223,7 +2223,7 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			 */
 			mtx_unlock(&xnb->sc_lock);
 			break;
-		case CASE_IOC_IFREQ(SIOCSIFADDR):
+		case SIOCSIFADDR:
 #ifdef INET
 			mtx_lock(&xnb->sc_lock);
 			if (ifa->ifa_addr->sa_family == AF_INET) {
@@ -2248,16 +2248,16 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			}
 #endif
 			break;
-		case CASE_IOC_IFREQ(SIOCSIFCAP):
+		case SIOCSIFCAP:
 			mtx_lock(&xnb->sc_lock);
-			if (ifr_reqcap_get(ifr) & IFCAP_TXCSUM) {
+			if (ifr->ifr_reqcap & IFCAP_TXCSUM) {
 				ifp->if_capenable |= IFCAP_TXCSUM;
 				ifp->if_hwassist |= XNB_CSUM_FEATURES;
 			} else {
 				ifp->if_capenable &= ~(IFCAP_TXCSUM);
 				ifp->if_hwassist &= ~(XNB_CSUM_FEATURES);
 			}
-			if ((ifr_reqcap_get(ifr) & IFCAP_RXCSUM)) {
+			if ((ifr->ifr_reqcap & IFCAP_RXCSUM)) {
 				ifp->if_capenable |= IFCAP_RXCSUM;
 			} else {
 				ifp->if_capenable &= ~(IFCAP_RXCSUM);
@@ -2289,14 +2289,14 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 			mtx_unlock(&xnb->sc_lock);
 			break;
-		case CASE_IOC_IFREQ(SIOCSIFMTU):
-			ifp->if_mtu = ifr_mtu_get(ifr);
+		case SIOCSIFMTU:
+			ifp->if_mtu = ifr->ifr_mtu;
 			ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 			xnb_ifinit(xnb);
 			break;
-		case CASE_IOC_IFREQ(SIOCADDMULTI):
-		case CASE_IOC_IFREQ(SIOCDELMULTI):
-		case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+		case SIOCADDMULTI:
+		case SIOCDELMULTI:
+		case SIOCSIFMEDIA:
 		case SIOCGIFMEDIA:
 			error = ifmedia_ioctl(ifp, ifr, &xnb->sc_media, cmd);
 			break;
@@ -2502,12 +2502,3 @@ DRIVER_MODULE(xnb, xenbusb_back, xnb_driver, xnb_devclass, 0, 0);
 #ifdef XNB_DEBUG
 #include "netback_unit_tests.c"
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

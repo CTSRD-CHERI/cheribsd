@@ -413,7 +413,6 @@ struct	ifreq {
 		u_char	ifru_vlan_pcp;
 	} ifr_ifru;
 };
-#ifndef _KERNEL
 #define	ifr_addr	ifr_ifru.ifru_addr	/* address */
 #define	ifr_dstaddr	ifr_ifru.ifru_dstaddr	/* other end of p-to-p link */
 #define	ifr_broadaddr	ifr_ifru.ifru_broadaddr	/* broadcast address */
@@ -436,7 +435,6 @@ struct	ifreq {
 #define	ifr_fib		ifr_ifru.ifru_fib	/* interface fib */
 #define	ifr_vlan_pcp	ifr_ifru.ifru_vlan_pcp	/* VLAN priority */
 #define	ifr_lan_pcp	ifr_ifru.ifru_vlan_pcp	/* VLAN priority */
-#endif /* !defined(_KERNEL) */
 
 #define	_SIZEOF_ADDR_IFREQ(ifr) \
 	((ifr).ifr_addr.sa_len > sizeof(struct sockaddr) ? \
@@ -532,10 +530,8 @@ struct ifgroupreq {
 		char	ifgru_group[IFNAMSIZ];
 		struct ifg_req * __kerncap ifgru_groups;
 	} ifgr_ifgru;
-#ifndef _KERNEL
 #define ifgr_group	ifgr_ifgru.ifgru_group
 #define ifgr_groups	ifgr_ifgru.ifgru_groups
-#endif
 };
 
 /*
@@ -624,10 +620,10 @@ __END_DECLS
 #endif /* !_NET_IF_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20210525,
 //   "target_type": "header",
 //   "changes": [
-//     "ioctl:net"
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

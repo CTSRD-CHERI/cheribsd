@@ -65,7 +65,7 @@ opal_init_async_tokens(int count)
 		return (EINVAL);
 
 	async_token_pool = vmem_create("OPAL Async", 0, count, 1, 1,
-	    M_WAITOK | M_FIRSTFIT);
+	    M_WAITOK | M_FIRSTFIT, 0);
 	completions = malloc(count * sizeof(struct async_completion),
 	    M_DEVBUF, M_WAITOK | M_ZERO);
 

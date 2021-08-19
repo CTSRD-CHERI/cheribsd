@@ -2568,7 +2568,7 @@ vn_fill_kinfo_vnode(struct vnode *vp, struct kinfo_file *kif)
 }
 
 int
-vn_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
+vn_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
     vm_offset_t max_addr, vm_size_t size, vm_prot_t prot,
     vm_prot_t cap_maxprot, int flags, vm_ooffset_t foff,
     struct thread *td)
@@ -3433,6 +3433,9 @@ vn_lock_pair(struct vnode *vp1, bool vp1_locked, struct vnode *vp2,
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

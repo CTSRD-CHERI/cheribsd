@@ -4,7 +4,6 @@
 __BSD_PROG_MK=yes
 
 .include <bsd.init.mk>
-.include <bsd.cheri.mk>
 .include <bsd.compiler.mk>
 .include <bsd.linker.mk>
 .if defined(_CRUNCHGEN)
@@ -21,12 +20,17 @@ CFLAGS+=${COPTS}
 
 .if ${MK_ASSERT_DEBUG} == "no"
 CFLAGS+= -DNDEBUG
-NO_WERROR=
+# XXX: shouldn't we ensure that !asserts marks potentially unused variables as
+# __unused instead of disabling -Werror globally?
+MK_WERROR=	no
 .endif
 
 .if defined(DEBUG_FLAGS)
 CFLAGS+=${DEBUG_FLAGS}
 CXXFLAGS+=${DEBUG_FLAGS}
+.if ${LINKER_FEATURES:Mgdb-index}
+LDFLAGS+=	-Wl,--gdb-index
+.endif
 
 .if ${MK_CTF} != "no" && ${DEBUG_FLAGS:M-g} != ""
 CTFFLAGS+= -g
@@ -135,7 +139,7 @@ PROG_FULL=${PROG}.full
     ${BINDIR} == "/bin" ||\
     ${BINDIR:C%/libexec(/.*)?%/libexec%} == "/libexec" ||\
     ${BINDIR} == "/sbin" ||\
-    ${BINDIR:C%/usr/(bin|bsdinstall|libcheri|libexec|lpr|sendmail|sm.bin|sbin|tests)(/.*)?%/usr/bin%} == "/usr/bin" ||\
+    ${BINDIR:C%/usr/(bin|bsdinstall|libexec|lpr|sendmail|sm.bin|sbin|tests)(/.*)?%/usr/bin%} == "/usr/bin" ||\
     ${BINDIR} == "/usr/lib" \
      )
 DEBUGFILEDIR=	${DEBUGDIR}${BINDIR}

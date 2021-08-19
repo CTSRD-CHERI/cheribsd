@@ -86,7 +86,7 @@ struct pfil_link {
 	void			*link_ruleset;
 	int			 link_flags;
 	struct pfil_hook	*link_hook;
-	struct epoch_context	 link_epoch_ctx;
+	struct epoch_context	 link_epoch_ctx __subobject_use_container_bounds;
 };
 
 typedef CK_STAILQ_HEAD(pfil_chain, pfil_link)	pfil_chain_t;
@@ -673,3 +673,12 @@ pfilioc_link(struct pfilioc_link *req)
 
 	return (pfil_link(&args));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

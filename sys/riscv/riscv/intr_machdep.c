@@ -64,7 +64,7 @@ __FBSDID("$FreeBSD$");
 void intr_irq_handler(struct trapframe *tf);
 
 struct intc_irqsrc {
-	struct intr_irqsrc	isrc;
+	struct intr_irqsrc	isrc __subobject_use_container_bounds;
 	u_int			irq;
 };
 
@@ -272,3 +272,13 @@ intc_init(void *dummy __unused)
 }
 
 SYSINIT(intc_init, SI_SUB_INTR, SI_ORDER_MIDDLE, intc_init, NULL);
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

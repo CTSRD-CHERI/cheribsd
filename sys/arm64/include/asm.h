@@ -41,9 +41,9 @@
 #define	ENTRY(sym)						\
 	.text; .globl sym; .align 2; .type sym,#function; sym:
 #define	EENTRY(sym)						\
-	.globl	sym; sym:
+	.globl	sym; .type sym,#function; sym:
 #define	END(sym) .size sym, . - sym
-#define	EEND(sym)
+#define	EEND(sym) .size sym, . - sym
 
 #define	WEAK_REFERENCE(sym, alias)				\
 	.weak alias;						\
@@ -57,8 +57,69 @@
 #define	PIC_SYM(x,y)	x
 #endif
 
+#define	INT_WIDTH	8
+#define	INTN(n)		n
+#define	INT(n)		x ## n
+
+#if __has_feature(capabilities)
+#define	CAP_WIDTH	16
+#define	CAPN(n)		c ## n
+#define	CAP(n)		c ## n
+#else
+#define	CAP_WIDTH	INT_WIDTH
+#define	CAPN(n)		INTN(n)
+#define	CAP(n)		INT(n)
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	PTR_WIDTH	CAP_WIDTH
+#define	PTRN(n)		CAPN(n)
+#define	PTR(n)		CAP(n)
+/* Alias for link register c30 */
+#define	clr		c30
+#else
+#define	PTR_WIDTH	INT_WIDTH
+#define	PTRN(n)		INTN(n)
+#define	PTR(n)		INT(n)
 /* Alias for link register x30 */
 #define	lr		x30
+#endif
+
+/* TODO: Remove these confusing deprecated aliases. */
+#define	REG_WIDTH	PTR_WIDTH
+#define	REGN(n)		PTRN(n)
+#define	REG(n)		PTR(n)
+
+/*
+ * Switch into C64 mode to use instructions only available in Morello.
+ */
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+#define	ENTER_C64		\
+	bx #4;			\
+	.arch_extension	c64
+#define	EXIT_C64		\
+	bx #4;			\
+	.arch_extension	noc64;	\
+	.arch_extension	a64c
+#else
+#define	ENTER_C64
+#define	EXIT_C64
+#endif
+
+/*
+ * Helper to load addresses that can be in the literal pool in the hybrid
+ * kernel but must be loaded from GOT in purecap.
+ */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	LDR_LABEL(reg, tmpptr, label)			\
+	adrp	tmpptr, :got:##label;			\
+	ldr	tmpptr, [tmpptr, :got_lo12:##label];	\
+	ldr	reg, [tmpptr]
+#else
+#define	LDR_LABEL(reg, tmpptr, label)			\
+	ldr	tmpptr, =##label;			\
+	ldr	reg, [tmpptr]
+#endif
 
 /*
  * Sets the trap fault handler. The exception handler will return to the
@@ -66,14 +127,13 @@
  * clear the handler. The tmp parameter should be a register able to hold
  * the temporary data.
  */
-#define	SET_FAULT_HANDLER(handler, tmp)					\
-	ldr	tmp, [x18, #PC_CURTHREAD];	/* Load curthread */	\
-	ldr	tmp, [tmp, #TD_PCB];		/* Load the pcb */	\
-	str	handler, [tmp, #PCB_ONFAULT]	/* Set the handler */
+#define	SET_FAULT_HANDLER(handler, ptmp)				\
+	ldr	ptmp, [PTR(18), #PC_CURTHREAD];	/* Load curthread */	\
+	ldr	ptmp, [ptmp, #TD_PCB];		/* Load the pcb */	\
+	str	handler, [ptmp, #PCB_ONFAULT]	/* Set the handler */
 
-#define	ENTER_USER_ACCESS(reg, tmp)					\
-	ldr	tmp, =has_pan;			/* Get the addr of has_pan */ \
-	ldr	reg, [tmp];			/* Read it */		\
+#define	ENTER_USER_ACCESS(reg, ptmp)					\
+	LDR_LABEL(reg, ptmp, has_pan);		/* Get has_pan */	\
 	cbz	reg, 997f;			/* If no PAN skip */	\
 	.inst	0xd500409f | (0 << 8);		/* Clear PAN */		\
 	997:
@@ -83,9 +143,8 @@
 	.inst	0xd500409f | (1 << 8);		/* Set PAN */		\
 	998:
 
-#define	EXIT_USER_ACCESS_CHECK(reg, tmp)				\
-	ldr	tmp, =has_pan;			/* Get the addr of has_pan */ \
-	ldr	reg, [tmp];			/* Read it */		\
+#define	EXIT_USER_ACCESS_CHECK(reg, ptmp)				\
+	LDR_LABEL(reg, ptmp, has_pan);		/* Get has_pan */	\
 	cbz	reg, 999f;			/* If no PAN skip */	\
 	.inst	0xd500409f | (1 << 8);		/* Set PAN */		\
 	999:

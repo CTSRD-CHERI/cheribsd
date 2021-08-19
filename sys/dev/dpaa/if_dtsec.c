@@ -404,15 +404,15 @@ dtsec_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 	/* Basic functionality to achieve media status reports */
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		DTSEC_LOCK(sc);
-		if (dtsec_set_mtu(sc, ifr_mtu_get(ifr)))
-			ifp->if_mtu = ifr_mtu_get(ifr);
+		if (dtsec_set_mtu(sc, ifr->ifr_mtu))
+			ifp->if_mtu = ifr->ifr_mtu;
 		else
 			error = EINVAL;
 		DTSEC_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		DTSEC_LOCK(sc);
 
 		if (sc->sc_ifnet->if_flags & IFF_UP)
@@ -424,7 +424,7 @@ dtsec_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_mii->mii_media,
 		    command);
 		break;
@@ -854,12 +854,3 @@ dtsec_miibus_statchg(device_t dev)
 		device_printf(sc->sc_dev, "error while adjusting MAC speed.\n");
 }
 /** @} */
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

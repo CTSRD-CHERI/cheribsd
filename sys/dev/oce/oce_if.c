@@ -176,7 +176,7 @@ static void oce_add_vlan(void *arg, struct ifnet *ifp, uint16_t vtag);
 static void oce_del_vlan(void *arg, struct ifnet *ifp, uint16_t vtag);
 static int  oce_vid_config(POCE_SOFTC sc);
 static void oce_mac_addr_set(POCE_SOFTC sc);
-static int  oce_handle_passthrough(struct ifnet *ifp, caddr_t data);
+static int  oce_handle_passthrough(struct ifnet *ifp, u_long command, caddr_t data);
 static void oce_local_timer(void *arg);
 static void oce_if_deactivate(POCE_SOFTC sc);
 static void oce_if_activate(POCE_SOFTC sc);
@@ -475,14 +475,14 @@ oce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		rc = ifmedia_ioctl(ifp, ifr, &sc->media, command);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) > OCE_MAX_MTU)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu > OCE_MAX_MTU)
 			rc = EINVAL;
 		else
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if (ifp->if_flags & IFF_UP) {
 			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 				sc->ifp->if_drv_flags |= IFF_DRV_RUNNING;	
@@ -511,16 +511,16 @@ oce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		rc = oce_hw_update_multicast(sc);
 		if (rc)
 			device_printf(sc->dev,
 				"Update multicast address failed\n");
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		u = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+	case SIOCSIFCAP:
+		u = ifr->ifr_reqcap ^ ifp->if_capenable;
 
 		if (u & IFCAP_TXCSUM) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -578,8 +578,8 @@ oce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGI2C):
-		rc = copyin(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
+	case SIOCGI2C:
+		rc = copyin(ifr_data_get_ptr(command, ifr), &i2c, sizeof(i2c));
 		if (rc)
 			break;
 
@@ -606,14 +606,14 @@ oce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 		memcpy(&i2c.data[0], &sfp_vpd_dump_buffer[offset], i2c.len);
 
-		rc = copyout(&i2c, ifr_data_get_ptr(ifr), sizeof(i2c));
+		rc = copyout(&i2c, ifr_data_get_ptr(command, ifr), sizeof(i2c));
 		break;
 
 	case CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 		rc = priv_check(curthread, PRIV_DRIVER);
 		if (rc != 0)
 			break;
-		rc = oce_handle_passthrough(ifp, data);
+		rc = oce_handle_passthrough(ifp, command, data);
 		break;
 	default:
 		rc = ether_ioctl(ifp, command, data);
@@ -2238,13 +2238,13 @@ oce_mac_addr_set(POCE_SOFTC sc)
 }
 
 static int
-oce_handle_passthrough(struct ifnet *ifp, caddr_t data)
+oce_handle_passthrough(struct ifnet *ifp, u_long command, caddr_t data)
 {
 	POCE_SOFTC sc = ifp->if_softc;
 	struct ifreq *ifr = (struct ifreq *)data;
 	int rc = ENXIO;
 	char cookie[32] = {0};
-	void * __capability priv_data = ifr_data_get_ptr(ifr);
+	void * __capability priv_data = ifr_data_get_ptr(command, ifr);
 	void * __capability ioctl_ptr;
 	uint32_t req_size;
 	struct mbx_hdr req;

@@ -90,9 +90,9 @@ __END_DECLS
 #define trace()		msg(_MYNAME ": " __XSTRING(__LINE__) "\n")
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	PTR_FMT	"%-#p"
+#define PTR_FMT "%#p"
 #else
-#define	PTR_FMT	"%-p"
+#define PTR_FMT "%p"
 #endif
 
 #endif /* DEBUG_H */

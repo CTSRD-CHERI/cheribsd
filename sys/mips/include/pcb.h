@@ -96,6 +96,7 @@
  *
  * XXX Do we really need to disable interrupts?
  */
+#ifndef __CHERI_PURE_CAPABILITY__
 #define DO_AST				             \
 44:				                     \
 	mfc0	t0, MIPS_COP_0_STATUS               ;\
@@ -118,45 +119,51 @@
 	PTR_LA	t9, _C_LABEL(ast)                   ;\
 	jalr	t9                                  ;\
 	PTR_ADDU a0, s3, U_PCB_REGS                 ;\
-	j	44b		                    ;\
-        nop                                         ;\
+	j	44b                                 ;\
+	nop                                         ;\
 4:
+#else /* __CHERI_PURE_CAPABILITY__ */
+/*
+ * Note: we are forced to load some constants in
+ * temporary registers because they do not fit in
+ * the offset fields.
+ */
+#define DO_AST				             \
+44:				                     \
+	mfc0	t0, MIPS_COP_0_STATUS               ;\
+	and	a0, t0, MIPS_SR_INT_IE              ;\
+	xor	t0, a0, t0                          ;\
+	mtc0	t0, MIPS_COP_0_STATUS               ;\
+	COP0_SYNC                                   ;\
+	GET_CPU_PCPU($c4)			    ;\
+	clc	$c3, zero, PC_CURPCB($c4)           ;\
+	REG_LI	s2, TD_FLAGS                        ;\
+	clc	$c4, zero, PC_CURTHREAD($c4)        ;\
+	clw	s2, s2, 0($c4)                      ;\
+	li	s0, TDF_ASTPENDING | TDF_NEEDRESCHED;\
+	and	s2, s0                              ;\
+	mfc0	t0, MIPS_COP_0_STATUS               ;\
+	or	t0, a0, t0                          ;\
+	mtc0	t0, MIPS_COP_0_STATUS               ;\
+	COP0_SYNC                                   ;\
+	beq	s2, zero, 4f                        ;\
+	nop                                         ;\
+	CAPCALL_PCREL_LOAD($c12, t0, _C_LABEL(ast)) ;\
+	cincoffset	$c3, $c3, U_PCB_REGS        ;\
+	REG_LI	t0, TRAPFRAME_SIZE                  ;\
+	cjalr	$c12, $c17                          ;\
+	csetbounds	$c3, $c3, t0                ;\
+	j	44b                                 ;\
+	nop                                         ;\
+4:
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	SAVE_U_PCB_REG(reg, offs, base) \
 	REG_S	reg, (U_PCB_REGS + (SZREG * offs)) (base)
 
 #define	RESTORE_U_PCB_REG(reg, offs, base) \
 	REG_L	reg, (U_PCB_REGS + (SZREG * offs)) (base)
-
-#ifdef CPU_CHERI
-#define	SAVE_U_PCB_CREG(creg, offs, base) \
-	csc	creg, base, (U_PCB_REGS + (SZREG * offs)) ($ddc)
-
-#define	RESTORE_U_PCB_CREG(creg, offs, base) \
-	clc	creg, base, (U_PCB_REGS + (SZREG * offs)) ($ddc)
-
-/*
- * Note: Updating EPCC will also update CP0_EPC. Therefore we should not be
- * setting CP0_EPC to the value of PC (which is an absolute pc address).
- * The kernel has been adjusted to use $pcc instead of $pc everywhere so we
- * can simply write that to $epcc.
- */
-#define RESTORE_U_PCB_PC(unused_pc_vaddr_tmpreg, pcb)			\
-	/* EPCC is no longer a GPR so load it into C27 first. */	\
-	csetkr1c	CHERI_REG_KSCRATCH; /* Save $c27 in $kr1c. */	\
-	RESTORE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb);		\
-	CSetEPCC CHERI_REG_KSCRATCH;					\
-	/* Restore $c27 since we clobbered it to set EPCC */		\
-	cgetkr1c	CHERI_REG_KSCRATCH;				\
-	/* Clear kr1c again */						\
-	csetkr1c	$cnull
-
-#else
-/* Non-CHERI case: just update CP0_EPC with the saved pc virtual address. */
-#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, pcb)	\
-	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);		\
-	MTC0	pc_vaddr_tmpreg, MIPS_COP_0_EXC_PC
-#endif
 
 #define	SAVE_U_PCB_FPREG(reg, offs, base) \
 	FP_S	reg, (U_PCB_FPREGS + (SZFPREG * offs)) (base)
@@ -170,11 +177,99 @@
 #define	RESTORE_U_PCB_FPSR(reg, offs, base) \
 	REG_L	reg, (U_PCB_FPREGS + (SZFPREG * offs)) (base)
 
-#define	SAVE_U_PCB_CONTEXT(reg, offs, base) \
+#ifdef CPU_CHERI
+#define	SAVE_U_PCB_CREG(creg, offs, base) \
+	csc	creg, base, (U_PCB_REGS + (SZREG * offs)) ($ddc)
+
+#define	RESTORE_U_PCB_CREG(creg, offs, base) \
+	clc	creg, base, (U_PCB_REGS + (SZREG * offs)) ($ddc)
+#endif
+
+#define	SAVE_U_PCB_CONTEXT(reg, offs, base)			\
 	REG_S	reg, (U_PCB_CONTEXT + (SZREG * offs)) (base)
 
-#define	RESTORE_U_PCB_CONTEXT(reg, offs, base) \
+#define	RESTORE_U_PCB_CONTEXT(reg, offs, base)			\
 	REG_L	reg, (U_PCB_CONTEXT + (SZREG * offs)) (base)
+
+#else /* __CHERI_PURE_CAPABILITY__ */
+
+/*
+ * Save general purpose register to PCB.
+ *
+ * reg: general purpose register
+ * offs: immediate offset in the PCB
+ * base: capability pointing to the PCB
+ */
+#define	SAVE_U_PCB_REG(reg, offs, base)				\
+	csd	reg, zero, (U_PCB_REGS + (SZREG * offs)) (base)
+
+/* See SAVE_U_PCB_REG */
+#define	RESTORE_U_PCB_REG(reg, offs, base)			\
+	cld	reg, zero, (U_PCB_REGS + (SZREG * offs)) (base)
+
+/*
+ * Save general purpose capability register to PCB.
+ *
+ * creg: general purpose capability register
+ * offs: immediate offset in the PCB
+ * base: capability pointing to the PCB
+ */
+#define	SAVE_U_PCB_CREG(creg, offs, base) \
+	cscbi	creg, (U_PCB_REGS + (SZREG * offs)) (base)
+
+/* See SAVE_U_PCB_CREG */
+#define	RESTORE_U_PCB_CREG(creg, offs, base)			\
+	clcbi	creg, (U_PCB_REGS + (SZREG * offs)) (base)
+
+#define	SAVE_U_PCB_CONTEXT(reg, offs, base)			\
+	REG_LI	t0, (U_PCB_CONTEXT + (SZREG * offs));		\
+	csd	reg, t0, 0(base)
+
+#define	RESTORE_U_PCB_CONTEXT(reg, offs, base)			\
+	REG_LI	t0, (U_PCB_CONTEXT + (SZREG * offs));		\
+	cld	reg, t0, 0(base)
+
+/*
+ * XXX-AM: CHERI-MIPS does not support hardfloats, so I undefine
+ * these just in case someone tries to use them.
+ *
+ * #define	SAVE_U_PCB_FPREG(reg, offs, base, treg)
+ * #define	RESTORE_U_PCB_FPREG(reg, offs, base, treg)
+ * #define	SAVE_U_PCB_FPSR(reg, offs, base, treg)
+ * #define	RESTORE_U_PCB_FPSR(reg, offs, base, treg)
+ */
+
+#endif /* __CHERI_PURE_CAPABILITY__ */
+
+#ifdef CPU_CHERI
+/*
+ * Note: Updating EPCC will also update CP0_EPC. Therefore we should not be
+ * setting CP0_EPC to the value of PC (which is an absolute pc address).
+ *
+ * The kernel has been adjusted to use $pcc instead of $pc everywhere so we
+ * can simply write that to $epcc.
+ */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	RESTORE_U_PCB_PC(tmpcreg, pcb)				\
+	RESTORE_U_PCB_CREG(tmpcreg, PCC, pcb);				\
+	CSetEPCC tmpcreg
+#else
+#define	RESTORE_U_PCB_PC(unused_pc_vaddr_tmpreg, pcb)		\
+	/* EPCC is no longer a GPR so load it into C27 first. */	\
+	csetkr1c	CHERI_REG_KSCRATCH; /* Save $c27 in $kr1c. */	\
+	RESTORE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb);		\
+	CSetEPCC CHERI_REG_KSCRATCH;					\
+	/* Restore $c27 since we clobbered it to set EPCC */		\
+	cgetkr1c	CHERI_REG_KSCRATCH;				\
+	/* Clear kr1c again */						\
+	csetkr1c	$cnull
+#endif
+#else /* ! CPU_CHERI */
+/* Non-CHERI case: just update CP0_EPC with the saved pc virtual address. */
+#define	RESTORE_U_PCB_PC(pc_vaddr_tmpreg, pcb)		\
+	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);		\
+	MTC0	pc_vaddr_tmpreg, MIPS_COP_0_EXC_PC
+#endif /* ! CPU_CHERI */
 
 #ifndef LOCORE
 #include <machine/frame.h>
@@ -192,7 +287,6 @@ struct pcb
 	void *pcb_onfault;		/* for copyin/copyout faults */
 	trapf_pc_t pcb_tpc;
 #ifdef CPU_CHERI
-	struct cheri_signal pcb_cherisignal;	/* CHERI signal-related state. */
 	struct cheri_kframe pcb_cherikframe;	/* kernel caller-save state. */
 #endif
 };
@@ -209,9 +303,12 @@ int savectx(struct pcb *) __returns_twice;
 #endif	/* !_MACHINE_PCB_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190702,
 //   "target_type": "header",
 //   "changes": [
+//     "support"
+//   ],
+//   "changes_purecap": [
 //     "support"
 //   ]
 // }

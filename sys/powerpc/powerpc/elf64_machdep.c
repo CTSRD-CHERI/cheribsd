@@ -74,7 +74,7 @@ struct sysentvec elf64_freebsd_sysvec_v1 = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_auxargs = __elfN(powerpc_copyout_auxargs),
 	.sv_copyout_strings = exec_copyout_strings,
@@ -110,7 +110,7 @@ struct sysentvec elf64_freebsd_sysvec_v2 = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_auxargs = __elfN(powerpc_copyout_auxargs),
 	.sv_copyout_strings = exec_copyout_strings,
@@ -131,10 +131,10 @@ struct sysentvec elf64_freebsd_sysvec_v2 = {
 	.sv_hwcap2	= &cpu_features2,
 };
 
-static boolean_t ppc64_elfv1_header_match(struct image_params *params,
-    int32_t *, uint32_t *);
-static boolean_t ppc64_elfv2_header_match(struct image_params *params,
-    int32_t *, uint32_t *);
+static bool ppc64_elfv1_header_match(const struct image_params *params,
+    const int32_t *, const uint32_t *);
+static bool ppc64_elfv2_header_match(const struct image_params *params,
+    const int32_t *, const uint32_t *);
 
 static Elf64_Brandinfo freebsd_brand_info_elfv1 = {
 	.brand		= ELFOSABI_FREEBSD,
@@ -209,9 +209,9 @@ ppc64_init_sysvecs(void *arg)
 }
 SYSINIT(elf64_sysvec, SI_SUB_EXEC, SI_ORDER_ANY, ppc64_init_sysvecs, NULL);
 
-static boolean_t
-ppc64_elfv1_header_match(struct image_params *params, int32_t *osrel __unused,
-    uint32_t *fctl0 __unused)
+static bool
+ppc64_elfv1_header_match(const struct image_params *params,
+    const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
 {
 	const Elf64_Ehdr *hdr = (const Elf64_Ehdr *)params->image_header;
 	int abi = (hdr->e_flags & 3);
@@ -219,9 +219,9 @@ ppc64_elfv1_header_match(struct image_params *params, int32_t *osrel __unused,
 	return (abi == 0 || abi == 1);
 }
 
-static boolean_t
-ppc64_elfv2_header_match(struct image_params *params, int32_t *osrel __unused,
-    uint32_t *fctl0 __unused)
+static bool
+ppc64_elfv2_header_match(const struct image_params *params,
+    const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
 {
 	const Elf64_Ehdr *hdr = (const Elf64_Ehdr *)params->image_header;
 	int abi = (hdr->e_flags & 3);

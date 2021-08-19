@@ -79,9 +79,11 @@ static int		 dotest(int force_pageout);
 static void		 init_patterns(void);
 static void		 mix_patterns(void);
 static uint64_t		 quickhash(uint64_t v);
+static const char	*xfail_swap_required(const char *name __unused)
 
-void
-cheribsdtest_vm_swap(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(cheribsdtest_vm_swap,
+    "check tags are swapped out by swap pager",
+    .ct_check_xfail = xfail_swap_required})
 {
 
 	if (cheri_getdefault() == NULL)
@@ -354,7 +356,7 @@ dotest(int force_pageout)
 	return (0);
 }
 
-const char *
+static const char *
 xfail_swap_required(const char *name __unused)
 {
 	size_t swap_total_len;

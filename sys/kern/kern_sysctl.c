@@ -1746,6 +1746,15 @@ sysctl_handle_string(SYSCTL_HANDLER_ARGS)
 		sx_xlock(&sysctlstringlock);
 		((char *)arg1)[0] = '\0';
 		sx_xunlock(&sysctlstringlock);
+	} else if (req->newfunc == sysctl_new_kernel) {
+		arg2 = req->newlen - req->newidx;
+		sx_xlock(&sysctlstringlock);
+		error = SYSCTL_IN(req, arg1, arg2);
+		if (error == 0) {
+			((char *)arg1)[arg2] = '\0';
+			req->newidx += arg2;
+		}
+		sx_xunlock(&sysctlstringlock);
 	} else {
 		arg2 = req->newlen - req->newidx;
 		tmparg = malloc(arg2, M_SYSCTLTMP, M_WAITOK);
@@ -2245,8 +2254,10 @@ sysctl_root(SYSCTL_HANDLER_ARGS)
 		goto out;
 #endif
 #ifdef VIMAGE
-	if ((oid->oid_kind & CTLFLAG_VNET) && arg1 != NULL)
-		arg1 = (void *)(curvnet->vnet_data_base + (uintptr_t)arg1);
+	if ((oid->oid_kind & CTLFLAG_VNET) && arg1 != NULL) {
+		arg1 = (void *)(curvnet->vnet_data_base - VNET_BIAS +
+		    ((ptraddr_t)arg1 - (ptraddr_t)VNET_START));
+	}
 #endif
 	error = sysctl_root_handler_locked(oid, arg1, arg2, req, &tracker);
 
@@ -2999,6 +3010,9 @@ out:
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

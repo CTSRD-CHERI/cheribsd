@@ -1097,9 +1097,10 @@ retry_ts:
 		 * ownership and maintain the pending queue.
 		 */
 		setv = v & (RW_LOCK_WAITERS | RW_LOCK_WRITE_SPINNER);
-		if ((v & ~setv) == RW_UNLOCKED) {
+		if ((v & (ptraddr_t)~setv) == RW_UNLOCKED) {
 			setv &= ~RW_LOCK_WRITE_SPINNER;
-			if (atomic_fcmpset_acq_ptr(&rw->rw_lock, &v, tid | setv)) {
+			if (atomic_fcmpset_acq_ptr(&rw->rw_lock, &v,
+			    tid | (ptraddr_t)setv)) {
 				if (setv)
 					turnstile_claim(ts);
 				else
@@ -1325,7 +1326,7 @@ retry_ts:
 		 * If we obtain the lock with the flags set, then claim
 		 * ownership of the turnstile.
 		 */
-		setv = tid | (v & RW_LOCK_WAITERS);
+		setv = tid | ((ptraddr_t)v & RW_LOCK_WAITERS);
 		success = atomic_fcmpset_ptr(&rw->rw_lock, &v, setv);
 		if (success) {
 			if (v & RW_LOCK_WAITERS)

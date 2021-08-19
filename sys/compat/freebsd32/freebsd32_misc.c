@@ -431,8 +431,15 @@ freebsd32_mmap(struct thread *td, struct freebsd32_mmap_args *uap)
 		prot |= PROT_EXEC;
 #endif
 
-	return (kern_mmap(td, (uintptr_t)uap->addr,
-	    uap->len, prot, uap->flags, uap->fd, PAIR32TO64(off_t, uap->pos)));
+	return (kern_mmap(td,
+	    &(struct mmap_req){
+		.mr_hint = (uintptr_t)uap->addr,
+		.mr_len = uap->len,
+		.mr_prot = prot,
+		.mr_flags = uap->flags,
+		.mr_fd = uap->fd,
+		.mr_pos = PAIR32TO64(off_t, uap->pos),
+	    }));
 }
 
 #ifdef COMPAT_FREEBSD6
@@ -448,9 +455,15 @@ freebsd6_freebsd32_mmap(struct thread *td,
 		prot |= PROT_EXEC;
 #endif
 
-	return (kern_mmap(td, (uintptr_t)uap->addr, uap->len,
-	    PROT_MAX(_PROT_ALL) | prot, uap->flags, uap->fd,
-	    PAIR32TO64(off_t, uap->pos)));
+	return (kern_mmap(td,
+	    &(struct mmap_req){
+		.mr_hint = (uintptr_t)uap->addr,
+		.mr_len = uap->len,
+		.mr_prot = PROT_MAX(_PROT_ALL) | prot,
+		.mr_flags = uap->flags,
+		.mr_fd = uap->fd,
+		.mr_pos = PAIR32TO64(off_t, uap->pos),
+	    }));
 }
 #endif
 
@@ -3174,8 +3187,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		execpath_len = strlen(imgp->execpath) + 1;
 	else
 		execpath_len = 0;
-	arginfo = (struct freebsd32_ps_strings *)curproc->p_sysent->
-	    sv_psstrings;
+	arginfo = (struct freebsd32_ps_strings *)curproc->p_psstrings;
 	imgp->ps_strings = arginfo;
 	if (imgp->proc->p_sysent->sv_sigcode_base == 0)
 		szsigcode = *(imgp->proc->p_sysent->sv_szsigcode);

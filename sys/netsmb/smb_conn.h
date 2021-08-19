@@ -306,10 +306,10 @@ struct smb_share {
 #define	ss_flags	obj.co_flags
 
 #define CPTOVC(cp)	((struct smb_vc*)(cp))
-#define VCTOCP(vcp)	(&(vcp)->obj)
+#define VCTOCP(vcp)	(__unbounded_addressof((vcp)->obj))
 #define CPTOSS(cp)	((struct smb_share*)(cp))
 #define	SSTOVC(ssp)	CPTOVC(((ssp)->obj.co_parent))
-#define SSTOCP(ssp)	(&(ssp)->obj)
+#define SSTOCP(ssp)	(__unbounded_addressof((ssp)->obj))
 
 struct smb_vcspec {
 	char *		srvname;
@@ -465,3 +465,12 @@ int  smb_iod_waitrq(struct smb_rq *rqp);
 int  smb_iod_removerq(struct smb_rq *rqp);
 
 #endif /* _KERNEL */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

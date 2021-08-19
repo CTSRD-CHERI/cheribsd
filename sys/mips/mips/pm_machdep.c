@@ -140,32 +140,23 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 *     extensions to the context frame placed on the stack.
 	 *
 	 * (2) If the user $pcc doesn't include CHERI_PERM_SYSCALL, then we
-	 *     consider user state to be 'sandboxed' and therefore to require
-	 *     special delivery handling which includes a domain-switch to the
-	 *     thread's context-switch domain.  (This is done by
-	 *     hybridabi_sendsig()).
+	 *     consider user state to be 'sandboxed'.
 	 *
 	 * (3) If an alternative signal stack is not defined, and we are in a
-	 *     'sandboxed' state, then we have two choices: (a) if the signal
-	 *     is of type SA_SANDBOX_UNWIND, we will automatically unwind the
-	 *     trusted stack by one frame; (b) otherwise, we will terminate
-	 *     the process unconditionally.
+	 *     'sandboxed' state, then we terminate the process
+	 *     unconditionally.
 	 */
 	cheri_is_sandboxed = cheri_signal_sandboxed(td);
 
 	/*
-	 * We provide the ability to drop into the debugger in two different
-	 * circumstances: (1) if the code running is sandboxed; and (2) if the
-	 * fault is a CHERI protection fault.  Handle both here for the
-	 * non-unwind case.  Do this before we rewrite any general-purpose or
-	 * capability register state for the thread.
+	 * We provide the ability to drop into the debugger if the
+	 * code running is sandboxed.  Do this before we rewrite any
+	 * general-purpose or capability register state for the
+	 * thread.
 	 */
 #ifdef DDB
 	if (cheri_is_sandboxed && security_cheri_debugger_on_sandbox_signal)
 		kdb_enter(KDB_WHY_CHERI, "Signal delivery to CHERI sandbox");
-	else if (sig == SIGPROT && security_cheri_debugger_on_sigprot)
-		kdb_enter(KDB_WHY_CHERI,
-		    "SIGPROT delivered outside sandbox");
 #endif
 
 	/*
@@ -196,7 +187,8 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
 	sf.sf_uc.uc_mcontext.mc_tls = td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
-	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
+	bcopy(__unbounded_addressof(regs->ast),
+	    (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
 	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));
 	sf.sf_uc.uc_mcontext.mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
 #if defined(CPU_HAVEFPU)
@@ -204,7 +196,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* if FPU has current state, save it first */
 		if (td == PCPU_GET(fpcurthread))
 			MipsSaveCurFPState(td);
-		bcopy((void *)&td->td_frame->f0,
+		bcopy(__unbounded_addressof(td->td_frame->f0),
 		    (void *)sf.sf_uc.uc_mcontext.mc_fpregs,
 		    sizeof(sf.sf_uc.uc_mcontext.mc_fpregs));
 	}
@@ -310,18 +302,16 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	regs->pc = (trapf_pc_t)catcher;
 	regs->c12 = regs->pc;
 	regs->csp = sfp;
-	regs->c17 = td->td_pcb->pcb_cherisignal.csig_sigcode;
+	regs->c17 = p->p_md.md_sigcode;
 
 	/*
-	 * For now only change IDC if we were sandboxed. This makes cap-table
-	 * binaries work as expected (since they need cgp to remain the same).
+	 * Clear $ddc and $idc.
 	 *
-	 * TODO: remove csigp->csig_idc
+	 * XXX: Static binaries using the PLT ABI would need $idc
+	 * ($cgp) preserved.
 	 */
-	if (cheri_is_sandboxed) {
-		regs->ddc = td->td_pcb->pcb_cherisignal.csig_ddc;
-		regs->idc = td->td_pcb->pcb_cherisignal.csig_idc;
-	}
+	regs->ddc = NULL;
+	regs->idc = NULL;
 #else
 	regs->pc = (trapf_pc_t)catcher;
 	regs->t9 = (register_t)(intptr_t)catcher;
@@ -332,7 +322,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	} else {
 		/* Signal trampoline code is at base of user stack. */
 		/* XXX: GC this code path once shared page is stable */
-		regs->ra = (register_t)(intptr_t)PS_STRINGS -
+		regs->ra = (register_t)p->p_psstrings -
 		    *(p->p_sysent->sv_szsigcode);
 	}
 #endif
@@ -520,8 +510,8 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 #endif
 		mcp->mc_onstack = sigonstack(tp->sp);
 	PROC_UNLOCK(curthread->td_proc);
-	bcopy((void *)&td->td_frame->zero, (void *)&mcp->mc_regs,
-	    sizeof(mcp->mc_regs));
+	bcopy(__unbounded_addressof(td->td_frame->ast), (void *)&mcp->mc_regs[1],
+	    sizeof(mcp->mc_regs) - sizeof(register_t));
 #if __has_feature(capabilities)
 	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs,
 	    &mcp->mc_cheriframe);
@@ -529,7 +519,8 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 
 	mcp->mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
 	if (mcp->mc_fpused) {
-		bcopy((void *)&td->td_frame->f0, (void *)&mcp->mc_fpregs,
+		bcopy(__unbounded_addressof(td->td_frame->f0),
+		    (void *)&mcp->mc_fpregs,
 		    sizeof(mcp->mc_fpregs));
 	}
 	if (flags & GET_MC_CLEAR_RET) {
@@ -635,60 +626,15 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		struct cheri_signal *csigp;
-
-		td->td_frame->csp = cheri_exec_stack_pointer(imgp, stack);
-		cheri_set_mmap_capability(td, imgp, td->td_frame->csp);
+		td->td_frame->csp = (void * __capability)stack;
 		td->td_frame->pcc = cheri_exec_pcc(td, imgp);
 		td->td_frame->c12 = td->td_frame->pc;
-
-		/*
-		 * Set up CHERI-related state: most register state,
-		 * signal delivery, sealing capabilities, trusted
-		 * stack.
-		 */
-		cheriabi_newthread_init(td);
+		td->td_proc->p_md.md_sigcode = cheri_sigcode_capability(td);
 
 		/*
 		 * Pass a pointer to the ELF auxiliary argument vector.
 		 */
-		td->td_frame->c3 = cheri_auxv_capability(imgp, stack);
-
-		/*
-		 * Load relocbase for RTLD into $c4 so that rtld has a
-		 * capability with the correct bounds available on
-		 * startup
-		 *
-		 * XXXAR: this should not be necessary since it should
-		 * be the same as auxv[AT_BASE] but trying to load
-		 * that from $c3 crashes...
-		 *
-		 * TODO: load the AT_BASE value instead of using
-		 * duplicated code!
-		 */
-		if (imgp->reloc_base) {
-			vaddr_t rtld_base = imgp->reloc_base;
-			vaddr_t rtld_end = imgp->interp_end ? imgp->interp_end : imgp->end_addr;
-			vaddr_t rtld_len = rtld_end - rtld_base;
-			rtld_base = CHERI_REPRESENTABLE_BASE(rtld_base,
-			    rtld_len);
-			rtld_len = CHERI_REPRESENTABLE_LENGTH(rtld_len);
-			td->td_frame->c4 = cheri_capability_build_user_data(
-			    CHERI_CAP_USER_DATA_PERMS, rtld_base, rtld_len, 0);
-		}
-
-		/*
-		 * Update privileged signal-delivery environment for
-		 * actual stack.
-		 *
-		 * XXXRW: Not entirely clear whether we want an offset
-		 * of 'stacklen' for csig_csp here.  Maybe we don't
-		 * want to use csig_csp at all?  Possibly csig_csp
-		 * should default to NULL...?
-		 */
-		csigp = &td->td_pcb->pcb_cherisignal;
-		csigp->csig_csp = td->td_frame->csp;
-		csigp->csig_default_stack = csigp->csig_csp;
+		td->td_frame->c3 = imgp->auxv;
 	} else
 #endif
 	{
@@ -718,7 +664,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 		td->td_frame->t9 = imgp->entry_addr & ~3; /* abicall req */
 #if __has_feature(capabilities)
-		hybridabi_exec_setregs(td, imgp->entry_addr & ~3);
+		hybridabi_thread_setregs(td, imgp->entry_addr & ~3);
 #else
 		/* For CHERI $pcc is set by hybridabi_exec_setregs() */
 		td->td_frame->pc = (trapf_pc_t)(uintptr_t)(imgp->entry_addr & ~3);
@@ -814,13 +760,15 @@ ptrace_clear_single_step(struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "kernel_sig_types",
 //     "support",
 //     "user_capabilities"
 //   ],
-//   "change_comment": ""
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
 // }
 // CHERI CHANGES END

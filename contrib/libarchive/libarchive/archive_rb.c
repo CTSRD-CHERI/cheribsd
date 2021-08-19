@@ -88,7 +88,7 @@
 #define	RB_RED_P(rb) 		(!RB_SENTINEL_P(rb) && __get_bits((rb)->rb_info, RB_FLAG_RED) != 0)
 #define	RB_BLACK_P(rb) 		(RB_SENTINEL_P(rb) || __get_bits((rb)->rb_info, RB_FLAG_RED) == 0)
 #define	RB_MARK_RED(rb) 	((void)((rb)->rb_info |= RB_FLAG_RED))
-#define	RB_MARK_BLACK(rb) 	((void)(__clear_bits((rb)->rb_info, RB_FLAG_RED)))
+#define	RB_MARK_BLACK(rb) 	((void)((rb)->rb_info = __clear_bits((rb)->rb_info, RB_FLAG_RED)))
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	RB_INVERT_COLOR(rb) 	((void)((rb)->rb_info ^= RB_FLAG_RED))
 #endif

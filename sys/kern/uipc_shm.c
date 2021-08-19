@@ -89,6 +89,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/unistd.h>
 #include <sys/user.h>
 
+#include <cheri/cheric.h>
+
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
@@ -227,7 +229,7 @@ uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
 	VM_OBJECT_WUNLOCK(obj);
 
 found:
-	error = uiomove_fromphys(&m, offset, tlen, uio);
+	error = uiomove_fromphys_cap(&m, offset, tlen, uio);
 	if (uio->uio_rw == UIO_WRITE && error == 0)
 		vm_page_set_dirty(m);
 	vm_page_activate(m);
@@ -1430,16 +1432,18 @@ out:
 }
 
 static int
-shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_offset_t *addr,
+shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_pointer_t *addr,
     vm_offset_t maxaddr,
     vm_size_t size, vm_prot_t prot, vm_prot_t max_prot, int flags,
     vm_ooffset_t foff, struct thread *td)
 {
 	struct vmspace *vms;
-	vm_map_entry_t next_entry, prev_entry;
-	vm_offset_t align, mask;
-	int docow, error, rv, try;
+	vm_pointer_t start;
+        vm_offset_t align, mask, vaddr;
+	vm_offset_t reservation_id;
+        int docow, error, rv, try;
 	bool curmap;
+	bool new_reservation;
 
 	if (shmfd->shm_lp_psind == 0)
 		return (EINVAL);
@@ -1450,8 +1454,13 @@ shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_offset_t *addr,
 #ifdef MAP_32BIT
 	    MAP_32BIT |
 #endif
-	    MAP_ALIGNMENT_MASK)) != 0)
+	    MAP_ALIGNMENT_MASK |
+	    MAP_RESERVATION_CREATE)) != 0)
 		return (EINVAL);
+
+	vaddr = (vm_offset_t)*addr;
+	start = *addr;
+	size = CHERI_REPRESENTABLE_LENGTH(size);
 
 	vms = td->td_proc->p_vmspace;
 	curmap = map == &vms->vm_map;
@@ -1461,10 +1470,17 @@ shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_offset_t *addr,
 			return (error);
 	}
 
+	if ((flags & MAP_RESERVATION_CREATE) != 0)
+		new_reservation = true;
+	else
+		new_reservation = false;
+
 	docow = shmfd->shm_lp_psind << MAP_SPLIT_BOUNDARY_SHIFT;
 	docow |= MAP_INHERIT_SHARE;
 	if ((flags & MAP_NOCORE) != 0)
 		docow |= MAP_DISABLE_COREDUMP;
+	if ((flags & MAP_EXCL) != 0)
+		docow |= MAP_CHECK_EXCL;
 
 	mask = pagesizes[shmfd->shm_lp_psind] - 1;
 	if ((foff & mask) != 0)
@@ -1472,8 +1488,8 @@ shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_offset_t *addr,
         if (maxaddr == 0)
 		maxaddr = vm_map_max(map);
 	if (size == 0 || (size & mask) != 0 ||
-	    (*addr != 0 && ((*addr & mask) != 0 ||
-	    *addr + size < *addr || *addr + size > maxaddr)))
+	    (vaddr != 0 && ((vaddr & mask) != 0 ||
+	    vaddr + size < vaddr || vaddr + size > maxaddr)))
 		return (EINVAL);
 
 	align = flags & MAP_ALIGNMENT_MASK;
@@ -1490,45 +1506,82 @@ shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_offset_t *addr,
 		if (align < pagesizes[shmfd->shm_lp_psind])
 			return (EINVAL);
 	}
+	align = MAX(align, CHERI_REPRESENTABLE_ALIGNMENT(size));
 
 	vm_map_lock(map);
 	if ((flags & MAP_FIXED) == 0) {
 		try = 1;
-		if (curmap && (*addr == 0 ||
-		    (*addr >= round_page((vm_offset_t)vms->vm_taddr) &&
-		    *addr < round_page((vm_offset_t)vms->vm_daddr +
+		if (curmap && (vaddr == 0 ||
+		    (vaddr >= round_page((vm_offset_t)vms->vm_taddr) &&
+		    vaddr < round_page((vm_offset_t)vms->vm_daddr +
 		    lim_max(td, RLIMIT_DATA))))) {
-			*addr = roundup2((vm_offset_t)vms->vm_daddr +
+			vaddr = roundup2((vm_offset_t)vms->vm_daddr +
 			    lim_max(td, RLIMIT_DATA),
 			    pagesizes[shmfd->shm_lp_psind]);
 		}
 again:
-		rv = vm_map_find_aligned(map, addr, size, maxaddr, align);
+		rv = vm_map_find_aligned(map, &vaddr, size, maxaddr, align);
 		if (rv != KERN_SUCCESS) {
 			if (try == 1) {
 				try = 2;
-				*addr = vm_map_min(map);
-				if ((*addr & mask) != 0)
-					*addr = (*addr + mask) & mask;
+				vaddr = vm_map_min(map);
+				if ((vaddr & mask) != 0)
+					vaddr = (vaddr + mask) & mask;
 				goto again;
 			}
 			goto fail1;
 		}
-	} else if ((flags & MAP_EXCL) == 0) {
-		rv = vm_map_delete(map, *addr, *addr + size);
+
+		start = vaddr;
+		rv = vm_map_reservation_create_locked(map, &start, size,
+		    max_prot);
 		if (rv != KERN_SUCCESS)
 			goto fail1;
+		rv = vm_map_insert(map, shmfd->shm_object, foff, start,
+		    start + size, prot, max_prot, docow, start);
+		if (rv != KERN_SUCCESS) {
+			vm_map_reservation_delete_locked(map, start);
+			goto fail1;
+		}
 	} else {
-		error = ENOSPC;
-		if (vm_map_lookup_entry(map, *addr, &prev_entry))
+		/*
+		 * Fixed mapping: ensure that there is a single reservation
+		 * spanning the requested range. If mapping exclusively, check
+		 * that no other mapping exists unless it is marked as unmapped.
+		 */
+		if (new_reservation) {
+			start = vaddr;
+			rv = vm_map_reservation_create_locked(map, &start,
+			    size, max_prot);
+			if (rv != KERN_SUCCESS)
+				goto fail1;
+			reservation_id = (vm_offset_t)start;
+		} else if ((map->flags & MAP_RESERVATIONS) != 0) {
+			rv = vm_map_reservation_get(map, vaddr, size,
+			    &reservation_id);
+			if (rv != KERN_SUCCESS)
+				goto fail1;
+		}
+		if ((flags & MAP_EXCL) == 0) {
+			rv = vm_map_delete(map, start, start + size, true);
+			if (rv != KERN_SUCCESS) {
+				if (new_reservation)
+					vm_map_reservation_delete_locked(
+					    map, start);
+				goto fail1;
+			}
+		}
+		rv = vm_map_insert(map, shmfd->shm_object, foff, start,
+		    start + size, prot, max_prot, docow, reservation_id);
+		if (rv != KERN_SUCCESS && new_reservation)
+			vm_map_reservation_delete_locked(map, start);
+		if (rv == KERN_NO_SPACE && (flags & MAP_EXCL) != 0) {
+			error = ENOSPC;
 			goto fail;
-		next_entry = vm_map_entry_succ(prev_entry);
-		if (next_entry->start < *addr + size)
-			goto fail;
+		}
 	}
 
-	rv = vm_map_insert(map, shmfd->shm_object, foff, *addr, *addr + size,
-	    prot, max_prot, docow, *addr);
+	*addr = start;
 fail1:
 	error = vm_mmap_to_errno(rv);
 fail:
@@ -1537,7 +1590,7 @@ fail:
 }
 
 int
-shm_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
+shm_mmap(struct file *fp, vm_map_t map, vm_pointer_t *addr,
     vm_offset_t max_addr, vm_size_t objsize,
     vm_prot_t prot, vm_prot_t cap_maxprot, int flags,
     vm_ooffset_t foff, struct thread *td)
@@ -1700,7 +1753,8 @@ int
 shm_map(struct file *fp, size_t size, off_t offset, void **memp)
 {
 	struct shmfd *shmfd;
-	vm_offset_t kva, ofs;
+	vm_pointer_t kva;
+	vm_offset_t ofs;
 	vm_object_t obj;
 	int rv;
 
@@ -1997,10 +2051,13 @@ sys_shm_open2(struct thread *td, struct shm_open2_args *uap)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191022,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

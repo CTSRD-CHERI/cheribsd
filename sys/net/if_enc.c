@@ -197,12 +197,8 @@ static int
 enc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 
-	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
-		break;
-	default:
+	if (cmd != SIOCSIFFLAGS)
 		return (EINVAL);
-	}
 	if (ifp->if_flags & IFF_UP)
 		ifp->if_drv_flags |= IFF_DRV_RUNNING;
 	else
@@ -453,10 +449,9 @@ DECLARE_MODULE(if_enc, enc_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 MODULE_VERSION(if_enc, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net",
 //     "user_capabilities"
 //   ]
 // }

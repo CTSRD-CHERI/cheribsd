@@ -178,13 +178,6 @@ void
 rip_print(netdissect_options *ndo,
           const u_char *dat, u_int length)
 {
-	INVOKE_DISSECTOR(_rip_print, ndo, dat, length);
-}
-
-void
-_rip_print(netdissect_options *ndo,
-          const u_char *dat, u_int length)
-{
 	register const struct rip *rp;
 	register const struct rip_netinfo *ni;
 	register u_int i, j;

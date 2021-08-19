@@ -71,7 +71,7 @@ struct rib_subscription {
 	rib_subscription_cb_t			*func;
 	void					*arg;
 	enum rib_subscription_type		type;
-	struct epoch_context			epoch_ctx;
+	struct epoch_context			epoch_ctx __subobject_use_container_bounds;
 };
 
 static int add_route(struct rib_head *rnh, struct rt_addrinfo *info,
@@ -1348,3 +1348,12 @@ rib_destroy_subscriptions(struct rib_head *rnh)
 	RIB_WUNLOCK(rnh);
 	NET_EPOCH_EXIT(et);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20210401,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

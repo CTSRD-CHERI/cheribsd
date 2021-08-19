@@ -414,13 +414,13 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	switch (cmd) {
 	case SIOCAIFADDR:
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		if (ifa->ifa_addr->sa_family != AF_INET)
 			return (EAFNOSUPPORT);
 
 		ifp->if_flags |= IFF_UP;
 		/* FALLTHROUGH */
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		error = 0;
 		ppb_lock(ppbus);
 		if ((!(ifp->if_flags & IFF_UP)) &&
@@ -432,10 +432,10 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ppb_unlock(ppbus);
 		return (error);
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		ppb_lock(ppbus);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
-			ptr = malloc(ifr_mtu_get(ifr) + MLPIPHDRLEN, M_DEVBUF,
+			ptr = malloc(ifr->ifr_mtu + MLPIPHDRLEN, M_DEVBUF,
 			    M_NOWAIT);
 			if (ptr == NULL) {
 				ppb_unlock(ppbus);
@@ -445,20 +445,20 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				free(sc->sc_ifbuf, M_DEVBUF);
 			sc->sc_ifbuf = ptr;
 		}
-		sc->sc_ifp->if_mtu = ifr_mtu_get(ifr);
+		sc->sc_ifp->if_mtu = ifr->ifr_mtu;
 		ppb_unlock(ppbus);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFMTU):
-		ifr_mtu_set(ifr, sc->sc_ifp->if_mtu);
+	case SIOCGIFMTU:
+		ifr->ifr_mtu = sc->sc_ifp->if_mtu;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (ifr == NULL) {
 			return (EAFNOSUPPORT);		/* XXX */
 		}
-		switch (ifr_addr_get_family(ifr)) {
+		switch (ifr->ifr_addr.sa_family) {
 		case AF_INET:
 			break;
 		default:
@@ -851,12 +851,3 @@ static driver_t lp_driver = {
 
 DRIVER_MODULE(plip, ppbus, lp_driver, lp_devclass, lp_module_handler, 0);
 MODULE_DEPEND(plip, ppbus, 1, 1, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

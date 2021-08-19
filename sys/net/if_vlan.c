@@ -178,7 +178,7 @@ mst_to_vst(struct m_snd_tag *mst)
 struct vlan_mc_entry {
 	struct sockaddr_dl		mc_addr;
 	CK_SLIST_ENTRY(vlan_mc_entry)	mc_entries;
-	struct epoch_context		mc_epoch_ctx;
+	struct epoch_context		mc_epoch_ctx __subobject_use_container_bounds;
 };
 
 struct ifvlan {
@@ -1830,15 +1830,16 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifv = ifp->if_softc;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
 #ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET)
 			arp_ifinit(ifp, ifa);
 #endif
 		break;
-	case CASE_IOC_IFREQ(SIOCGIFADDR):
-		bcopy(IF_LLADDR(ifp), ifr_addr_get_data(ifr), ifp->if_addrlen);
+	case SIOCGIFADDR:
+		bcopy(IF_LLADDR(ifp), &ifr->ifr_addr.sa_data[0],
+		    ifp->if_addrlen);
 		break;
 	case SIOCGIFMEDIA:
 		VLAN_SLOCK();
@@ -1865,11 +1866,11 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VLAN_SUNLOCK();
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		error = EINVAL;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		/*
 		 * Set the interface MTU.
 		 */
@@ -1877,13 +1878,13 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		trunk = TRUNK(ifv);
 		if (trunk != NULL) {
 			TRUNK_WLOCK(trunk);
-			if (ifr_mtu_get(ifr) >
+			if (ifr->ifr_mtu >
 			     (PARENT(ifv)->if_mtu - ifv->ifv_mtufudge) ||
-			    ifr_mtu_get(ifr) <
+			    ifr->ifr_mtu <
 			     (ifv->ifv_mintu - ifv->ifv_mtufudge))
 				error = EINVAL;
 			else
-				ifp->if_mtu = ifr_mtu_get(ifr);
+				ifp->if_mtu = ifr->ifr_mtu;
 			TRUNK_WUNLOCK(trunk);
 		} else
 			error = EINVAL;
@@ -1891,7 +1892,6 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case CASE_IOC_IFREQ(SIOCSETVLAN):
-	case O_SIOCSETVLAN:
 #ifdef VIMAGE
 		/*
 		 * XXXRW/XXXBZ: The goal in these checks is to allow a VLAN
@@ -1905,7 +1905,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 #endif
-		error = copyin(ifr_data_get_ptr(ifr), &vlr, sizeof(vlr));
+		error = copyin(ifr_data_get_ptr(cmd, ifr), &vlr, sizeof(vlr));
 		if (error)
 			break;
 		if (vlr.vlr_parent[0] == '\0') {
@@ -1934,7 +1934,6 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case CASE_IOC_IFREQ(SIOCGETVLAN):
-	case O_SIOCGETVLAN:
 #ifdef VIMAGE
 		if (ifp->if_vnet != ifp->if_home_vnet) {
 			error = EPERM;
@@ -1950,10 +1949,10 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			vlr.vlr_proto = ifv->ifv_proto;
 		}
 		VLAN_SUNLOCK();
-		error = copyout(&vlr, ifr_data_get_ptr(ifr), sizeof(vlr));
+		error = copyout(&vlr, ifr_data_get_ptr(cmd, ifr), sizeof(vlr));
 		break;
-		
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+
+	case SIOCSIFFLAGS:
 		/*
 		 * We should propagate selected flags to the parent,
 		 * e.g., promiscuous mode.
@@ -1964,8 +1963,8 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VLAN_XUNLOCK();
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		/*
 		 * If we don't have a parent, just remember the membership for
 		 * when we do.
@@ -1980,17 +1979,17 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VLAN_XUNLOCK();
 
 		break;
-	case CASE_IOC_IFREQ(SIOCGVLANPCP):
+	case SIOCGVLANPCP:
 #ifdef VIMAGE
 		if (ifp->if_vnet != ifp->if_home_vnet) {
 			error = EPERM;
 			break;
 		}
 #endif
-		ifr_vlan_pcp_set(ifr, ifv->ifv_pcp);
+		ifr->ifr_vlan_pcp = ifv->ifv_pcp;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSVLANPCP):
+	case SIOCSVLANPCP:
 #ifdef VIMAGE
 		if (ifp->if_vnet != ifp->if_home_vnet) {
 			error = EPERM;
@@ -2000,19 +1999,19 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = priv_check(curthread, PRIV_NET_SETVLANPCP);
 		if (error)
 			break;
-		if (ifr_vlan_pcp_get(ifr) > 7) {
+		if (ifr->ifr_vlan_pcp > 7) {
 			error = EINVAL;
 			break;
 		}
-		ifv->ifv_pcp = ifr_vlan_pcp_get(ifr);
+		ifv->ifv_pcp = ifr->ifr_vlan_pcp;
 		ifp->if_pcp = ifv->ifv_pcp;
 		/* broadcast event about PCP change */
 		EVENTHANDLER_INVOKE(ifnet_event, ifp, IFNET_EVENT_PCP);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		VLAN_SLOCK();
-		ifv->ifv_capenable = ifr_reqcap_get(ifr);
+		ifv->ifv_capenable = ifr->ifr_reqcap;
 		trunk = TRUNK(ifv);
 		if (trunk != NULL) {
 			struct epoch_tracker et;
@@ -2113,6 +2112,9 @@ vlan_snd_tag_free(struct m_snd_tag *mst)
 //   "changes": [
 //     "ioctl:net",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

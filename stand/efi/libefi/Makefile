@@ -27,8 +27,13 @@ SRCS+=  teken.c
 
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
 SRCS+=	time.c
-.elif ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "arm" || \
-    ${MACHINE_CPUARCH} == "riscv"
+.elif ${MACHINE_CPUARCH} == "aarch64"
+# XXX: Both time.c and time_event.c behave poorly on the FVP. The former counts
+# down far too quickly, jumping from 10 seconds to a huge negative, but
+# time_event.c takes hours to count down so is even less usable. Thus we use
+# time.c as the lesser of two evils.
+SRCS+=	time.c
+.elif ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "riscv"
 SRCS+=	time_event.c
 .endif
 

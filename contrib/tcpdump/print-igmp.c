@@ -260,13 +260,6 @@ void
 igmp_print(netdissect_options *ndo,
            register const u_char *bp, register u_int len)
 {
-	INVOKE_DISSECTOR(_igmp_print, ndo, bp, len);
-}
-
-void
-_igmp_print(netdissect_options *ndo,
-           register const u_char *bp, register u_int len)
-{
     struct cksum_vec vec[1];
 
     if (ndo->ndo_qflag) {

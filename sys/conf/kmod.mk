@@ -154,6 +154,13 @@ CFLAGS+=	-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
 CFLAGS+=	-fPIC
 .endif
 
+# XXX-AM: This is a workaround for not having full eflag support in morello lld.
+# should be removed as soon as the linker can link in capability mode based on
+# input files eflags instead.
+.if ${MACHINE_ARCH:Maarch64*c*}
+LDFLAGS+=	--morello-c64-plt
+.endif
+
 # Temporary workaround for PR 196407, which contains the fascinating details.
 # Don't allow clang to use fpu instructions or registers in kernel modules.
 .if ${MACHINE_CPUARCH} == arm
@@ -188,19 +195,13 @@ SRCS+=	${KMOD:S/$/.c/}
 CLEANFILES+=	${KMOD:S/$/.c/}
 
 .for _firmw in ${FIRMWS}
-${_firmw:C/\:.*$/.fwo/:T}:	${_firmw:C/\:.*$//}
+${_firmw:C/\:.*$/.fwo/:T}:	${_firmw:C/\:.*$//} ${SYSDIR}/kern/firmw.S
 	@${ECHO} ${_firmw:C/\:.*$//} ${.ALLSRC:M*${_firmw:C/\:.*$//}}
-	@if [ -e ${_firmw:C/\:.*$//} ]; then			\
-		${LD} -b binary --no-warn-mismatch ${_LDFLAGS}	\
-		    -m ${LD_EMULATION} -r -d			\
-		    -o ${.TARGET} ${_firmw:C/\:.*$//};		\
-	else							\
-		ln -s ${.ALLSRC:M*${_firmw:C/\:.*$//}} ${_firmw:C/\:.*$//}; \
-		${LD} -b binary --no-warn-mismatch ${_LDFLAGS}	\
-		    -m ${LD_EMULATION} -r -d			\
-		    -o ${.TARGET} ${_firmw:C/\:.*$//};		\
-		rm ${_firmw:C/\:.*$//};				\
-	fi
+	${CC:N${CCACHE_BIN}} -c -x assembler-with-cpp -DLOCORE 	\
+	    ${CFLAGS} ${WERROR} 				\
+	    -DFIRMW_FILE="${.ALLSRC:M*${_firmw:C/\:.*$//}}" 	\
+	    -DFIRMW_SYMBOL="${_firmw:C/\:.*$//:C/[-.\/]/_/g}"	\
+	    ${SYSDIR}/kern/firmw.S -o ${.TARGET}
 
 OBJS+=	${_firmw:C/\:.*$/.fwo/:T}
 .endfor

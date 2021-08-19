@@ -127,7 +127,6 @@ SUBDIR.${MK_BSNMP}+=	bsnmpd
 .if ${MK_CAROOT} != "no"
 SUBDIR.${MK_OPENSSL}+=	certctl
 .endif
-SUBDIR.${MK_CHERI}+=	cheri_tcpdump_control
 SUBDIR.${MK_CXGBETOOL}+=	cxgbetool
 SUBDIR.${MK_DIALOG}+=	bsdconfig
 SUBDIR.${MK_EFI}+=	efivar efidp efibootmgr

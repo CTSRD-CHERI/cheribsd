@@ -125,8 +125,8 @@
 
 #define LOAD_DATA_tmp(a,b,c,d,e,f) LOAD_DATA(a,b,c,d,e,f,g)
 #define LOAD_DATA(R,S,u,t,E0,E1,tmp) \
-	u=R^s[S  ]; \
-	t=R^s[S+1]
+	u=R^s(S  ); \
+	t=R^s(S+1);
 
 /* The changes to this macro may help or hinder, depending on the
  * compiler and the achitecture.  gcc2 always seems to do well :-).

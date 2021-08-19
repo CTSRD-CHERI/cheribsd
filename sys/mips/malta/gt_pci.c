@@ -304,18 +304,12 @@ gt_pci_attach(device_t dev)
 	/*
 	 * Map the PIC/ELCR registers.
 	 */
-#if 0
-	if (bus_space_map(sc->sc_st, 0x4d0, 2, 0, &sc->sc_ioh_elcr) != 0)
+	if (bus_space_map(sc->sc_st, sc->sc_io + 0x4d0, 2, 0, &sc->sc_ioh_elcr) != 0)
 		device_printf(dev, "unable to map ELCR registers\n");
-	if (bus_space_map(sc->sc_st, IO_ICU1, 2, 0, &sc->sc_ioh_icu1) != 0)
+	if (bus_space_map(sc->sc_st, sc->sc_io + IO_ICU1, 2, 0, &sc->sc_ioh_icu1) != 0)
 		device_printf(dev, "unable to map ICU1 registers\n");
-	if (bus_space_map(sc->sc_st, IO_ICU2, 2, 0, &sc->sc_ioh_icu2) != 0)
+	if (bus_space_map(sc->sc_st, sc->sc_io + IO_ICU2, 2, 0, &sc->sc_ioh_icu2) != 0)
 		device_printf(dev, "unable to map ICU2 registers\n");
-#else
-	sc->sc_ioh_elcr = MIPS_PHYS_TO_KSEG1(sc->sc_io + 0x4d0);
-	sc->sc_ioh_icu1 = MIPS_PHYS_TO_KSEG1(sc->sc_io + IO_ICU1);
-	sc->sc_ioh_icu2 = MIPS_PHYS_TO_KSEG1(sc->sc_io + IO_ICU2);
-#endif	
 
 	/* All interrupts default to "masked off". */
 	sc->sc_imask = 0xffff;
@@ -773,3 +767,12 @@ static driver_t gt_pci_driver = {
 static devclass_t gt_pci_devclass;
 
 DRIVER_MODULE(gt_pci, gt, gt_pci_driver, gt_pci_devclass, 0, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20180613,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

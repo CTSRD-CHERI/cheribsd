@@ -1,7 +1,7 @@
 // Check that we can unwind threads without asserting
 // This was not the case on CheriBSD
 // We need to explicitly link with -pthreads:
-// LINK_PTHREADS_LIBRARY.
+// ADDITIONAL_LINK_FLAGS: -pthreads -lpthread
 #include <dlfcn.h>
 #include <err.h>
 #include <pthread.h>
@@ -20,10 +20,15 @@ void thread_unwind_cleanup(_Unwind_Reason_Code code,
   abort();
 }
 
-_Unwind_Reason_Code thread_unwind_callback(
-    int version __unused, _Unwind_Action actions, uint64_t exc_class __unused,
-    struct _Unwind_Exception *exc_obj __unused, struct _Unwind_Context *context,
-    void *stop_parameter __unused) {
+_Unwind_Reason_Code thread_unwind_callback(int version, _Unwind_Action actions,
+                                           uint64_t exc_class,
+                                           struct _Unwind_Exception *exc_obj,
+                                           struct _Unwind_Context *context,
+                                           void *stop_parameter) {
+  (void)version;
+  (void)exc_class;
+  (void)exc_obj;
+  (void)stop_parameter;
   void *cfa = (void *)_Unwind_GetCFA(context);
   void *ip = (void *)_Unwind_GetIP(context);
   fprintf(stderr, "%s: actions=0x%x, cfa=%p, ip=%p\n", __func__, actions, cfa,
@@ -84,7 +89,7 @@ int main() {
   void *result = nullptr;
   int err = pthread_join(thr, &result);
   if (err != 0) {
-    errc(EX_OSERR, err, "pthread_join");
+    errx(EX_OSERR, "pthread_join=%s", strerror(err));
   }
   if ((uintptr_t)result != (uintptr_t)0x1234) {
     fprintf(stderr, "Incorrect return value: %p\n", result);

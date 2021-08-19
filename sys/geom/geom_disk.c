@@ -328,8 +328,8 @@ static void
 g_disk_seg_limit(bus_dma_segment_t *seg, off_t *poffset,
     off_t *plength, int *ppages)
 {
-	uintptr_t seg_page_base;
-	uintptr_t seg_page_end;
+	ptraddr_t seg_page_base;
+	ptraddr_t seg_page_end;
 	off_t offset;
 	off_t length;
 	int seg_pages;
@@ -340,14 +340,14 @@ g_disk_seg_limit(bus_dma_segment_t *seg, off_t *poffset,
 	if (length > seg->ds_len - offset)
 		length = seg->ds_len - offset;
 
-	seg_page_base = trunc_page(seg->ds_addr + offset);
-	seg_page_end  = round_page(seg->ds_addr + offset + length);
+	seg_page_base = trunc_page((ptraddr_t)seg->ds_vaddr + offset);
+	seg_page_end  = round_page((ptraddr_t)seg->ds_vaddr + offset + length);
 	seg_pages = (seg_page_end - seg_page_base) >> PAGE_SHIFT;
 
 	if (seg_pages > *ppages) {
 		seg_pages = *ppages;
 		length = (seg_page_base + (seg_pages << PAGE_SHIFT)) -
-		    (seg->ds_addr + offset);
+		    ((ptraddr_t)seg->ds_vaddr + offset);
 	}
 
 	*poffset = 0;
@@ -1083,3 +1083,14 @@ sysctl_disks(SYSCTL_HANDLER_ARGS)
 SYSCTL_PROC(_kern, OID_AUTO, disks,
     CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
     sysctl_disks, "A", "names of available disks");
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200708,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "uintcap_arithmetic"
+//   ]
+// }
+// CHERI CHANGES END

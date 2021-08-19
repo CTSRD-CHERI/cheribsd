@@ -343,7 +343,8 @@ typedef struct {
 } ccb_qos_area;
 
 struct ccb_hdr {
-	cam_pinfo	pinfo;		/* Info for priority scheduling */
+	/* Info for priority scheduling */
+	cam_pinfo	pinfo __no_subobject_bounds;
 	camq_entry	xpt_links;	/* For chaining in the XPT layer */
 	camq_entry	sim_links;	/* For chaining in the SIM layer */
 	camq_entry	periph_links;	/* For chaining in the type driver */
@@ -1403,7 +1404,8 @@ struct ccb_async {
  * and the argument to xpt_ccb_free.
  */
 union ccb {
-	struct	ccb_hdr			ccb_h;	/* For convenience */
+	/* For convenience */
+	struct	ccb_hdr			ccb_h;
 	struct	ccb_scsiio		csio;
 	struct	ccb_getdev		cgd;
 	struct	ccb_getdevlist		cgdl;
@@ -1438,7 +1440,7 @@ union ccb {
 	struct	ccb_async		casync;
 	struct	ccb_nvmeio		nvmeio;
 	struct	ccb_mmcio		mmcio;
-};
+} __subobject_use_container_bounds;
 
 #define CCB_CLEAR_ALL_EXCEPT_HDR(ccbp)			\
 	bzero((char *)(ccbp) + sizeof((ccbp)->ccb_h),	\
@@ -1653,3 +1655,12 @@ cam_fill_nvmeadmin(struct ccb_nvmeio *nvmeio, u_int32_t retries,
 __END_DECLS
 
 #endif /* _CAM_CAM_CCB_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

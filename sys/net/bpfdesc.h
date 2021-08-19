@@ -53,6 +53,7 @@
  * Descriptor associated with each open bpf file.
  */
 struct zbuf;
+struct bpf_program_buffer;
 struct bpf_d {
 	CK_LIST_ENTRY(bpf_d) bd_next;	/* Linked list of descriptors */
 	/*
@@ -75,8 +76,8 @@ struct bpf_d {
 
 	struct bpf_if *	bd_bif;		/* interface descriptor */
 	u_long		bd_rtout;	/* Read timeout in 'ticks' */
-	struct bpf_insn *bd_rfilter; 	/* read filter code */
-	struct bpf_insn *bd_wfilter;	/* write filter code */
+	struct bpf_program_buffer *bd_rfilter; 	/* read filter code */
+	struct bpf_program_buffer *bd_wfilter;	/* write filter code */
 	void		*bd_bfilter;	/* binary filter code */
 	counter_u64_t	bd_rcount;	/* number of packets received */
 	counter_u64_t	bd_dcount;	/* number of packets dropped */
@@ -107,7 +108,7 @@ struct bpf_d {
 	u_char		bd_compat32;	/* 32-bit stream on LP64 system */
 
 	volatile u_int	bd_refcnt;
-	struct epoch_context epoch_ctx;
+	struct epoch_context epoch_ctx __subobject_use_container_bounds;
 };
 
 /* Values for bd_state */
@@ -159,3 +160,12 @@ struct xbpf_d {
 #define BPFIF_FLAG_DYING	1	/* Reject new bpf consumers */
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

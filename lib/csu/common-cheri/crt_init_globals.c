@@ -51,13 +51,14 @@
 #ifndef CRT_INIT_GLOBALS_GDC_ONLY
 CRT_INIT_GLOBALS_STATIC void crt_init_globals(void) __hidden;
 #endif
-CRT_INIT_GLOBALS_STATIC void crt_init_globals_3(
-    void *, const void *, const void *) __hidden;
+CRT_INIT_GLOBALS_STATIC void crt_init_globals_3(void * __capability,
+    const void * __capability, const void * __capability) __hidden;
 
 __attribute__((weak)) extern int _DYNAMIC __no_subobject_bounds;
 
 CRT_INIT_GLOBALS_STATIC void
-crt_init_globals_3(void *data_cap, const void *code_cap, const void *rodata_cap)
+crt_init_globals_3(void * __capability data_cap,
+    const void * __capability code_cap, const void * __capability rodata_cap)
 {
 	/* Otherwise we need to initialize globals manually */
 	cheri_init_globals_3(data_cap, code_cap, rodata_cap);
@@ -74,7 +75,7 @@ crt_init_globals(void)
 }
 #endif /* !CRT_INIT_GLOBALS_GDC_ONLY */
 
-#ifndef POSITION_INDEPENDENT_STARTUP
+#ifndef PIC
 /* This is __always_inline since it is called before globals have been set up */
 static __always_inline void
 do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
@@ -86,10 +87,12 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 	Elf_Addr readonly_end = 0;
 	Elf_Addr writable_start = (Elf_Addr)-1l;
 	Elf_Addr writable_end = 0;
-
 	bool have_rodata_segment = false;
 	bool have_text_segment = false;
 	bool have_data_segment = false;
+	void * __capability data_cap;
+	const void * __capability code_cap;
+	const void * __capability rodata_cap;
 
 	/* Attempt to bound the data capability to only the writable segment */
 	for (const Elf_Phdr *ph = phdr; ph < phlimit; ph++) {
@@ -134,8 +137,6 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 		/* No text segment??? Must be an error somewhere else. */
 		__builtin_trap();
 	}
-	const void *code_cap = cheri_getpcc();
-	const void *rodata_cap = NULL;
 	if (!have_rodata_segment) {
 		/*
 		 * Note: If we don't have a separate rodata segment we also
@@ -146,14 +147,6 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 		readonly_start = text_start;
 		readonly_end = text_end;
 	}
-	rodata_cap = cheri_clearperm(phdr,
-	    CHERI_PERM_EXECUTE | CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
-	    CHERI_PERM_STORE_LOCAL_CAP);
-	rodata_cap = cheri_setaddress(rodata_cap, readonly_start);
-	rodata_cap =
-	    cheri_setbounds(rodata_cap, readonly_end - readonly_start);
-
-	void *data_cap = NULL;
 	if (!have_data_segment) {
 		/*
 		 * There cannot be any capabilities to initialize if there
@@ -161,27 +154,43 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 		 *
 		 * Note: RELRO segment will be part of a R/W PT_LOAD.
 		 */
-		rodata_cap = NULL;
 		code_cap = NULL;
+		data_cap = NULL;
+		rodata_cap = NULL;
 	} else {
 		/* Check that ranges are well-formed */
 		if (writable_end < writable_start ||
 		    readonly_end < readonly_start ||
 		    text_end < text_start)
 			__builtin_trap();
+
 		/* Abort if text and writeable overlap: */
-		if (MAX(writable_start, text_start) <=
+		if (MAX(writable_start, text_start) <
 		    MIN(writable_end, text_end)) {
 			/* TODO: should we allow a single RWX segment? */
 			__builtin_trap();
 		}
-		data_cap =
-		    cheri_setaddress(__DECONST(void *, phdr), writable_start);
-		/* Bound the result and clear execute permissions. */
+
+#ifdef __CHERI_PURE_CAPABILITY__
+		data_cap = __DECONST(void *, phdr);
+#else
+		data_cap = cheri_getdefault();
+#endif
 		data_cap = cheri_clearperm(data_cap, CHERI_PERM_EXECUTE);
+
+		code_cap = cheri_getpcc();
+		rodata_cap = cheri_clearperm(data_cap,
+		    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+		    CHERI_PERM_STORE_LOCAL_CAP);
+
+		data_cap = cheri_setaddress(data_cap, writable_start);
+		rodata_cap = cheri_setaddress(rodata_cap, readonly_start);
+
 		/* TODO: should we use exact setbounds? */
 		data_cap =
 		    cheri_setbounds(data_cap, writable_end - writable_start);
+		rodata_cap =
+		    cheri_setbounds(rodata_cap, readonly_end - readonly_start);
 
 		if (!cheri_gettag(data_cap))
 			__builtin_trap();
@@ -192,4 +201,4 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 	}
 	crt_init_globals_3(data_cap, code_cap, rodata_cap);
 }
-#endif /* !defined(POSITION_INDEPENDENT_STARTUP) */
+#endif /* !defined(PIC) */

@@ -83,7 +83,9 @@ int	DB_CALL(db_expr_t, db_expr_t *, int, db_expr_t[]);
  * Most users should use db_fetch_symtab in order to set them from the
  * boot loader provided values.
  */
-extern vm_offset_t ksymtab, kstrtab, ksymtab_size, ksymtab_relbase;
+extern vm_pointer_t ksymtab, kstrtab;
+extern vm_size_t ksymtab_size;
+extern vm_offset_t ksymtab_relbase;
 
 /*
  * There are three "command tables":
@@ -228,8 +230,13 @@ bool		db_value_of_name_vnet(const char *name, db_expr_t *valuep);
 int		db_write_bytes(vm_offset_t addr, size_t size, char *data);
 void		db_command_register(struct command_table *, struct command *);
 void		db_command_unregister(struct command_table *, struct command *);
-int		db_fetch_ksymtab(vm_offset_t ksym_start, vm_offset_t ksym_end,
+int		db_fetch_ksymtab(vm_pointer_t ksym_start, vm_pointer_t ksym_end,
 		    vm_offset_t relbase);
+#ifdef __CHERI_PURE_CAPABILITY__
+void		*db_code_ptr(db_addr_t addr);
+void		*db_data_ptr_unbound(db_addr_t addr);
+void		*db_data_ptr(db_addr_t addr, size_t len);
+#endif
 
 db_cmdfcn_t	db_breakpoint_cmd;
 db_cmdfcn_t	db_capture_cmd;
@@ -297,4 +304,28 @@ int	textdump_writenextblock(struct dumperinfo *di, char *buffer);
 extern int	textdump_pending;	/* Call textdump_dumpsys() instead. */
 void	textdump_dumpsys(struct dumperinfo *di);
 
+/*
+ * Macros to construct valid pointers from addresses.
+ */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	DB_CODE_PTR(addr)			db_code_ptr((addr))
+#define	DB_DATA_PTR_LEN(addr, type, len)	((type *)db_data_ptr((addr), (len)))
+#define	DB_DATA_PTR_UNBOUND(addr, type)		((type *)db_data_ptr_unbound((addr)))
+#else
+#define	DB_CODE_PTR(addr)			((void *)(addr))
+#define	DB_DATA_PTR_LEN(addr, type, len)	((type *)(addr))
+#define	DB_DATA_PTR_UNBOUND(addr, type)		((type *)(addr))
+#endif
+#define	DB_DATA_PTR(addr, type)			DB_DATA_PTR_LEN(addr, type, sizeof(type))
+
 #endif /* !_DDB_DDB_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

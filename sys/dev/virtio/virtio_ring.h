@@ -154,8 +154,7 @@ vring_init(struct vring *vr, unsigned int num, uint8_t *p,
         vr->desc = (struct vring_desc *) p;
         vr->avail = (struct vring_avail *) (p +
 	    num * sizeof(struct vring_desc));
-        vr->used = (void *)
-	    (((unsigned long) &vr->avail->ring[num] + align-1) & ~(align-1));
+        vr->used = (void *)roundup2(&vr->avail->ring[num], align);
 }
 
 /*
@@ -172,3 +171,12 @@ vring_need_event(uint16_t event_idx, uint16_t new_idx, uint16_t old)
 	return (uint16_t)(new_idx - event_idx - 1) < (uint16_t)(new_idx - old);
 }
 #endif /* VIRTIO_RING_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

@@ -249,10 +249,10 @@ SYSCTL_PROC(_kern, OID_AUTO, randompid,
     sysctl_kern_randompid, "I",
     "Random PID modulus. Special values: 0: disable, 1: choose random value");
 
-extern bitstr_t proc_id_pidmap;
-extern bitstr_t proc_id_grpidmap;
-extern bitstr_t proc_id_sessidmap;
-extern bitstr_t proc_id_reapmap;
+extern bitstr_t proc_id_pidmap __no_subobject_bounds;
+extern bitstr_t proc_id_grpidmap __no_subobject_bounds;
+extern bitstr_t proc_id_sessidmap __no_subobject_bounds;
+extern bitstr_t proc_id_reapmap __no_subobject_bounds;
 
 /*
  * Find an unused process ID
@@ -380,12 +380,14 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	p1 = td->td_proc;
 
 	PROC_LOCK(p1);
-	bcopy(&p1->p_startcopy, &p2->p_startcopy,
+
+	bcopy(__unbounded_addressof(p1->p_startcopy),
+	    __unbounded_addressof(p2->p_startcopy),
 	    __rangeof(struct proc, p_startcopy, p_endcopy));
 	pargs_hold(p2->p_args);
 	PROC_UNLOCK(p1);
 
-	bzero(&p2->p_startzero,
+	bzero(__unbounded_addressof(p2->p_startzero),
 	    __rangeof(struct proc, p_startzero, p_endzero));
 
 	/* Tell the prison that we exist. */
@@ -464,10 +466,11 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	PROC_LOCK(p2);
 	PROC_LOCK(p1);
 
-	bzero(&td2->td_startzero,
+	bzero(__unbounded_addressof(td2->td_startzero),
 	    __rangeof(struct thread, td_startzero, td_endzero));
 
-	bcopy(&td->td_startcopy, &td2->td_startcopy,
+	bcopy(__unbounded_addressof(td->td_startcopy),
+	    __unbounded_addressof(td2->td_startcopy),
 	    __rangeof(struct thread, td_startcopy, td_endcopy));
 
 	bcopy(&p2->p_comm, &td2->td_name, sizeof(td2->td_name));
@@ -1143,10 +1146,13 @@ fork_return(struct thread *td, struct trapframe *frame)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20190812,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

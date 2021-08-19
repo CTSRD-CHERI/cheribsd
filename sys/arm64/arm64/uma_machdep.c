@@ -37,6 +37,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma_int.h>
 #include <machine/machdep.h>
 
+#include <cheri/cheric.h>
+
 void *
 uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
     int wait)
@@ -54,6 +56,11 @@ uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
 	if ((wait & M_NODUMP) == 0)
 		dump_add_page(pa);
 	va = (void *)PHYS_TO_DMAP(pa);
+#ifdef __CHERI_PURE_CAPABILITY__
+	va = cheri_setbounds(va, bytes);
+	va = cheri_andperm(va, CHERI_PERMS_KERNEL_DATA |
+	    CHERI_PERMS_KERNEL_CODE);
+#endif
 	if ((wait & M_ZERO) && (m->flags & PG_ZERO) == 0)
 		pagezero(va);
 	return (va);
@@ -65,6 +72,12 @@ uma_small_free(void *mem, vm_size_t size, u_int8_t flags)
 	vm_page_t m;
 	vm_paddr_t pa;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(!cheri_getsealed(mem),
+	    ("uma_small_free: Unexpected sealed capability %#p", mem));
+	KASSERT(cheri_gettag(mem),
+	    ("uma_small_free: Attempt to free invalid capability %#p", mem));
+#endif
 	pa = DMAP_TO_PHYS((vm_offset_t)mem);
 	dump_drop_page(pa);
 	m = PHYS_TO_VM_PAGE(pa);

@@ -357,13 +357,6 @@ void
 arp_print(netdissect_options *ndo,
 	  const u_char *bp, u_int length, u_int caplen)
 {
-	INVOKE_DISSECTOR(_arp_print, ndo, bp, length, caplen);
-}
-
-void
-_arp_print(netdissect_options *ndo,
-	  const u_char *bp, u_int length, u_int caplen)
-{
 	const struct arp_pkthdr *ap;
 	u_short pro, hrd, op, linkaddr;
 

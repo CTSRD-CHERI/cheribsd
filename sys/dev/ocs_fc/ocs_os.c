@@ -254,7 +254,8 @@ ocs_malloc(ocs_os_handle_t os, size_t size, int32_t flags)
 	long offset = 0;
 	void *addr = malloc(size, M_OCS, flags);
 
-	linker_ddb_search_symbol_name(__builtin_return_address(1), nameb, sizeof(nameb), &offset);
+	linker_ddb_search_symbol_name((ptraddr_t)__builtin_return_address(1),
+	    nameb, sizeof(nameb), &offset);
 	printf("A: %p %ld @ %s+%#lx\n", addr, size, nameb, offset);
 
 	return addr;

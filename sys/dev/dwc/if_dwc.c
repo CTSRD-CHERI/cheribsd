@@ -1128,7 +1128,7 @@ dwc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		DWC_LOCK(sc);
 		if (if_getflags(ifp) & IFF_UP) {
 			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
@@ -1146,21 +1146,21 @@ dwc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->if_flags = if_getflags(ifp);
 		DWC_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
-		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
+		if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 			DWC_LOCK(sc);
 			dwc_setup_rxfilter(sc);
 			DWC_UNLOCK(sc);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		mii = sc->mii_softc;
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifr_reqcap_get(ifr) ^ if_getcapenable(ifp);
+	case SIOCSIFCAP:
+		mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
 		if (mask & IFCAP_VLAN_MTU) {
 			/* No work to do except acknowledge the change took */
 			if_togglecapenable(ifp, IFCAP_VLAN_MTU);
@@ -1656,12 +1656,3 @@ DRIVER_MODULE(miibus, dwc, miibus_driver, miibus_devclass, 0, 0);
 
 MODULE_DEPEND(dwc, ether, 1, 1, 1);
 MODULE_DEPEND(dwc, miibus, 1, 1, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

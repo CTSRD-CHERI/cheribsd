@@ -291,8 +291,8 @@ struct PPPoE {
 typedef struct PPPoE *priv_p;
 
 union uniq {
-	char bytes[sizeof(void *)];
-	void *pointer;
+	char bytes[sizeof(ptraddr_t)];
+	ptraddr_t pointer;
 };
 
 #define	LEAVE(x) do { error = x; goto quit; } while(0)
@@ -631,16 +631,17 @@ pppoe_findcookie(node_p node, const struct pppoe_tag *tag)
 	hook_p	hook = NULL;
 	union uniq cookie;
 
-	bcopy(tag + 1, cookie.bytes, sizeof(void *));
+	bcopy(tag + 1, cookie.bytes, sizeof(ptraddr_t));
 	/* Cycle through all known hooks. */
 	LIST_FOREACH(hook, &node->nd_hooks, hk_hooks) {
 		/* Skip any nonsession hook. */
 		if (NG_HOOK_PRIVATE(hook) == NULL)
 			continue;
-		if (cookie.pointer == NG_HOOK_PRIVATE(hook))
+		if (cookie.pointer == (ptraddr_t)(uintptr_t)NG_HOOK_PRIVATE(hook))
 			break;
 	}
-	CTR3(KTR_NET, "%20s: matched %p for %p", __func__, hook, cookie.pointer);
+	CTR3(KTR_NET, "%20s: matched %p for %p", __func__, hook,
+	    (void *)(uintptr_t)cookie.pointer);
 
 	return (hook);
 }
@@ -947,10 +948,13 @@ ng_pppoe_rcvmsg(node_p node, item_p item, hook_p lasthook)
 
 			neg->host_uniq.hdr.tag_type = PTT_HOST_UNIQ;
 			if (hulen == 0) {
+				ptraddr_t addr;
+
 				/* Not provided, generate one */
-				neg->host_uniq.hdr.tag_len = htons(sizeof(sp));
-				bcopy(&sp, neg->host_uniq.data, sizeof(sp));
-				neg->host_uniq_len = sizeof(sp);
+				addr = (ptraddr_t)(uintptr_t)sp;
+				neg->host_uniq.hdr.tag_len = htons(sizeof(addr));
+				bcopy(&addr, neg->host_uniq.data, sizeof(addr));
+				neg->host_uniq_len = sizeof(addr);
 			} else if (hulen > 2 && ourmsg->data[hupos] == '0' &&
 			  ourmsg->data[hupos + 1] == 'x' && hulen % 2 == 0) {
 				/* Hex encoded */
@@ -1504,8 +1508,8 @@ ng_pppoe_rcvdata(hook_p hook, item_p item)
 		 * Start working out the tags to respond with.
 		 */
 		uniqtag.hdr.tag_type = PTT_AC_COOKIE;
-		uniqtag.hdr.tag_len = htons((u_int16_t)sizeof(sp));
-		uniqtag.data.pointer = sp;
+		uniqtag.hdr.tag_len = htons((u_int16_t)sizeof(uniqtag.data.pointer));
+		uniqtag.data.pointer = (ptraddr_t)(uintptr_t)sp;
 		init_tags(sp);
 		insert_tag(sp, &neg->ac_name.hdr); /* AC_NAME */
 		if ((tag = get_tag(ph, PTT_SRV_NAME)))

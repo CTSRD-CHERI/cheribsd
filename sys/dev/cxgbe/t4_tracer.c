@@ -467,13 +467,13 @@ tracer_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 	struct ifreq *ifr = (struct ifreq *)data;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFMTU:
+	case SIOCSIFFLAGS:
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
+	case SIOCSIFCAP:
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
 		sx_xlock(&t4_trace_lock);
@@ -523,10 +523,10 @@ tracer_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

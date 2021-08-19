@@ -100,6 +100,8 @@ __FBSDID("$FreeBSD$");
 #include <ddb/ddb.h>
 #include <ddb/db_sym.h>
 
+#include <cheri/cheric.h>
+
 void mi_startup(void);				/* Should be elsewhere */
 
 /* Components of the first process -- never freed. */
@@ -428,7 +430,7 @@ struct sysentvec null_sysvec = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_strings	= NULL,
 	.sv_setregs	= NULL,
@@ -610,8 +612,25 @@ proc0_init(void *dummy __unused)
 	 * proc0 is not expected to enter usermode, so there is no special
 	 * handling for sv_minuser here, like is done for exec_new_vmspace().
 	 */
+#ifndef __CHERI_PURE_CAPABILITY__
 	vm_map_init(&vmspace0.vm_map, vmspace_pmap(&vmspace0),
 	    p->p_sysent->sv_minuser, p->p_sysent->sv_maxuser);
+#else
+	/*
+	 * We provide dummy userspace capabilities for the map, note that
+	 * we strip all access permission because proc0 is not
+	 * expected to enter usermode.
+	 */
+	caddr_t minuser_cap = cheri_setaddress(userspace_root_cap,
+	    p->p_sysent->sv_minuser);
+	minuser_cap = cheri_setbounds(minuser_cap,
+	    p->p_sysent->sv_maxuser - p->p_sysent->sv_minuser);
+	minuser_cap = cheri_andperm(minuser_cap, 0);
+
+	vm_map_init(&vmspace0.vm_map, vmspace_pmap(&vmspace0),
+	    (vm_pointer_t)minuser_cap,
+	    (vm_pointer_t)minuser_cap + cheri_getlen(minuser_cap));
+#endif
 
 	/*
 	 * Call the init and ctor for the new thread and proc.  We wait
@@ -909,6 +928,10 @@ DB_SHOW_COMMAND(sysinit, db_show_sysinit)
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

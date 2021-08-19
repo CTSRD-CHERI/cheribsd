@@ -39,7 +39,7 @@ const char* ltoa_unsafe(long n, int base) {
 	}
 	static const char digits[] = "0123456789abcdef";
 	// worst case (binary): 8 chars per byte + null + sign + 2 bytes prefix
-	const int BUFFER_SIZE = sizeof(long) * 8 + 1 + 1 + 2;
+#define BUFFER_SIZE (sizeof(long) * 8 + 1 + 1 + 2)
 	static char buf[BUFFER_SIZE];
 	char *start = buf + BUFFER_SIZE - 1;
 	bool negative = n < 0;

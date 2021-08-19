@@ -83,7 +83,7 @@ struct mmap_req {
 	int			mr_prot;
 	int			mr_flags;
 	int			mr_fd;
-	int			_int_pad;
+	int			mr_kern_flags;
 	off_t			mr_pos;
 	mmap_check_fp_fn	mr_check_fp_fn;
 #if __has_feature(capabilities)
@@ -345,12 +345,10 @@ int	kern_mknodat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, int mode, dev_t dev);
 int	kern_mlock(struct proc *proc, struct ucred *cred, uintptr_t addr,
 	    size_t len);
-int	kern_mmap(struct thread *td, uintptr_t addr, size_t len, int prot,
-	    int flags, int fd, off_t pos);
+int	kern_mmap(struct thread *td, struct mmap_req *mrp);
 int	kern_mmap_maxprot(struct proc *p, int prot);
 int	kern_mmap_racct_check(struct thread *td, struct vm_map *map,
 	    vm_size_t size);
-int	kern_mmap_req(struct thread *td, struct mmap_req *mrp);
 int	kern_modfind(struct thread *td, const char * __capability uname);
 int	kern_modstat(struct thread *td, int modid,
 	    struct module_stat * __capability stat);

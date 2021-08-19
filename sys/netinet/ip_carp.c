@@ -1728,7 +1728,7 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 	struct carp_softc *sc = NULL;
 	int error = 0, locked = 0;
 
-	if ((error = copyin(ifr_data_get_ptr(ifr), &carpr, sizeof carpr)))
+	if ((error = copyin(ifr_data_get_ptr(cmd, ifr), &carpr, sizeof carpr)))
 		return (error);
 
 	ifp = ifunit_ref(ifr->ifr_name);
@@ -1843,7 +1843,7 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 				break;
 			}
 			carp_carprcp(&carpr, sc, priveleged);
-			error = copyout(&carpr, ifr_data_get_ptr(ifr),
+			error = copyout(&carpr, ifr_data_get_ptr(cmd, ifr),
 			    sizeof(carpr));
 		} else  {
 			int i, count;
@@ -1863,7 +1863,8 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 				carp_carprcp(&carpr, sc, priveleged);
 				carpr.carpr_count = count;
 				error = copyout(&carpr,
-				    (char * __capability)ifr_data_get_ptr(ifr) +
+				    (char * __capability)ifr_data_get_ptr(cmd,
+				    ifr) +
 				    (i * sizeof(carpr)), sizeof(carpr));
 				if (error) {
 					CIF_UNLOCK(ifp->if_carp);
@@ -2316,7 +2317,7 @@ static moduledata_t carp_mod = {
 DECLARE_MODULE(carp, carp_mod, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

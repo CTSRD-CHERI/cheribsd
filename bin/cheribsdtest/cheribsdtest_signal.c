@@ -54,8 +54,8 @@ handler_func(int signum)
 	handler_signum = signum;
 }
 
-void
-test_signal_handler_usr1(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_signal_handler_usr1,
+    "Install a signal handler (sa_handler) for SIGUSR1 and check it works")
 {
 	struct sigaction sa;
 	sa.sa_handler = handler_func;
@@ -88,8 +88,8 @@ sigaction_func(int signum, siginfo_t *siginfo, void *context __unused)
 	sigaction_info_si_code = siginfo->si_code;
 }
 
-void
-test_signal_sigaction_usr1(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_signal_sigaction_usr1,
+    "Install a signal handler (sa_sigaction) for SIGUSR1 and check it works")
 {
 	struct sigaction sa;
 	sa.sa_sigaction = sigaction_func;
@@ -127,8 +127,8 @@ sigaltstack_func(int signum __unused)
 	sigaltstack_local_addr = (__cheri_addr size_t)&x;
 }
 
-void
-test_signal_sigaltstack(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_signal_sigaltstack,
+    "Check signal handlers use the alternate stack when enabled")
 {
 	stack_t sigstk;
 	struct sigaction sa;
@@ -179,8 +179,8 @@ sigaltstack_disable_func(int signum __unused)
 	sigaltstack_disable_local_addr = (__cheri_addr size_t)&x;
 }
 
-void
-test_signal_sigaltstack_disable(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_signal_sigaltstack_disable,
+    "Check signal handlers don't use a given alternate stack when re-disabled")
 {
 	stack_t sigstk;
 	struct sigaction sa;
@@ -234,8 +234,8 @@ returncap_func(int signum __unused)
 	handler_returncap = __builtin_return_address(0);
 }
 
-void
-test_signal_returncap(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_signal_returncap,
+    "Test value of signal handler return capability")
 {
 	struct sigaction sa;
 	uintmax_t v;

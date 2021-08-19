@@ -47,7 +47,7 @@
 
 struct obio_softc {
 	bus_space_tag_t oba_st;		/* bus space tag */
-	bus_addr_t oba_addr;		/* address of device */
+	bus_space_handle_t oba_addr;	/* address of device */
 	bus_size_t oba_size;		/* size of device */
 	int oba_width;			/* bus width */
 	int oba_irq;			/* XINT interrupt bit # */
@@ -58,3 +58,12 @@ struct obio_softc {
 extern struct bus_space obio_bs_tag;
 
 #endif /* _MALTA_OBIOVAR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180613,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

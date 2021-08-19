@@ -48,10 +48,19 @@
  */
 struct am7990_softc {
 	struct lance_softc lsc;
-};
+} __no_subobject_bounds;
 
 int	am7990_config(struct am7990_softc *, const char*, int);
 void	am7990_detach(struct am7990_softc *);
 void	am7990_intr(void *);
 
 #endif /* !_DEV_LE_AM7990VAR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

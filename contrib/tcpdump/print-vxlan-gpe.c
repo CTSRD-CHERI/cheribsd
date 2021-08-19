@@ -60,12 +60,6 @@ static const struct tok vxlan_gpe_flags [] = {
 void
 vxlan_gpe_print(netdissect_options *ndo, const u_char *bp, u_int len)
 {
-    INVOKE_DISSECTOR(_vxlan_gpe_print, ndo, bp, len);
-}
-
-void
-_vxlan_gpe_print(netdissect_options *ndo, const u_char *bp, u_int len)
-{
     uint8_t flags;
     uint8_t next_protocol;
     uint32_t vni;

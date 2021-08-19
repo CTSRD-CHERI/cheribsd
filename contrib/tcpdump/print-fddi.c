@@ -273,14 +273,8 @@ fddi_smt_print(netdissect_options *ndo, const u_char *p _U_, u_int length _U_)
 	ND_PRINT((ndo, "<SMT printer not yet implemented>"));
 }
 
-void
-fddi_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen)
-{
-	INVOKE_DISSECTOR(_fddi_print, ndo, p, length, caplen);
-}
-
 u_int
-_fddi_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen)
+fddi_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen)
 {
 	const struct fddi_header *fddip = (const struct fddi_header *)p;
 	struct ether_header ehdr;
@@ -313,7 +307,7 @@ _fddi_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen
 	/* Frame Control field determines interpretation of packet */
 	if ((fddip->fddi_fc & FDDIFC_CLFF) == FDDIFC_LLC_ASYNC) {
 		/* Try to print the LLC-layer header & higher layers */
-		llc_hdrlen = _llc_print(ndo, p, length, caplen, &src, &dst);
+		llc_hdrlen = llc_print(ndo, p, length, caplen, &src, &dst);
 		if (llc_hdrlen < 0) {
 			/*
 			 * Some kinds of LLC packet we cannot
@@ -347,5 +341,5 @@ _fddi_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen
 u_int
 fddi_if_print(netdissect_options *ndo, const struct pcap_pkthdr *h, register const u_char *p)
 {
-	return (_fddi_print(ndo, p, h->len, h->caplen));
+	return (fddi_print(ndo, p, h->len, h->caplen));
 }

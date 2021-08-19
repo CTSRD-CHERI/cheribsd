@@ -1177,12 +1177,12 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 	case SIOCAIFADDR:
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		/* set the interface "up" when assigning an IP address */
 		ifp->if_flags |= IFF_UP;
 		/* FALLTHROUGH */
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		going_up = ifp->if_flags & IFF_UP &&
 			(ifp->if_drv_flags & IFF_DRV_RUNNING) == 0;
 		going_down = (ifp->if_flags & IFF_UP) == 0 &&
@@ -1239,10 +1239,10 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 #ifndef ifr_mtu
 #define ifr_mtu ifr_metric
 #endif
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < 128 || ifr_mtu_get(ifr) > sp->lcp.their_mru)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < 128 || ifr->ifr_mtu > sp->lcp.their_mru)
 			return (EINVAL);
-		ifp->if_mtu = ifr_mtu_get(ifr);
+		ifp->if_mtu = ifr->ifr_mtu;
 		break;
 #endif
 #ifdef SLIOCSETMTU
@@ -1253,8 +1253,8 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 		break;
 #endif
 #ifdef SIOCGIFMTU
-	case CASE_IOC_IFREQ(SIOCGIFMTU):
-		ifr_mtu_set(ifr, ifp->if_mtu);
+	case SIOCGIFMTU:
+		ifr->ifr_mtu = ifp->if_mtu;
 		break;
 #endif
 #ifdef SLIOCGETMTU
@@ -1262,8 +1262,8 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 		*(short*)data = ifp->if_mtu;
 		break;
 #endif
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		break;
 
 	case CASE_IOC_IFREQ(SIOCGIFGENERIC):
@@ -5053,13 +5053,14 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 	 * Check the cmd word first before attempting to fetch all the
 	 * data.
 	 */
-	rv = fueword(ifr_data_get_ptr(ifr), &subcmd);
+	rv = fueword(ifr_data_get_ptr(cmd, ifr), &subcmd);
 	if (rv == -1) {
 		rv = EFAULT;
 		goto quit;
 	}
 
-	if (copyin(ifr_data_get_ptr(ifr), spr, sizeof(struct spppreq)) != 0) {
+	if (copyin(ifr_data_get_ptr(cmd, ifr), spr,
+	    sizeof(struct spppreq)) != 0) {
 		rv = EFAULT;
 		goto quit;
 	}
@@ -5099,7 +5100,7 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 		 * setting it.
 		 */
 		spr->defs.lcp.timeout = sp->lcp.timeout * 1000 / hz;
-		rv = copyout(spr, ifr_data_get_ptr(ifr),
+		rv = copyout(spr, ifr_data_get_ptr(cmd, ifr),
 		    sizeof(struct spppreq));
 		break;
 
@@ -5419,10 +5420,11 @@ sppp_null(struct sppp *unused)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "ioctl:net",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

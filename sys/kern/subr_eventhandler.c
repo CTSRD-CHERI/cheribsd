@@ -48,7 +48,7 @@ static struct mtx			eventhandler_mutex;
 
 struct eventhandler_entry_generic 
 {
-    struct eventhandler_entry	ee;
+    struct eventhandler_entry	ee __subobject_use_container_bounds;
     void			(* func)(void);
 };
 
@@ -317,3 +317,12 @@ eventhandler_create_list(const char *name)
 
 	return (list);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

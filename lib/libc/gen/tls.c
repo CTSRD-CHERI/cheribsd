@@ -117,7 +117,7 @@ void __libc_free_tls(void *tls, size_t tcbsize, size_t tcbalign);
 
 static size_t tls_static_space;
 static size_t tls_init_size;
-static size_t tls_init_align;
+static size_t tls_init_align = 1;
 static void *tls_init;
 #endif
 

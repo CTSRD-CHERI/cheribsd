@@ -875,13 +875,6 @@ void
 icmp6_print(netdissect_options *ndo,
             const u_char *bp, u_int length, const u_char *bp2, int fragmented)
 {
-	INVOKE_DISSECTOR(_icmp6_print, ndo, bp, length, bp2, fragmented);
-}
-
-void
-_icmp6_print(netdissect_options *ndo,
-            const u_char *bp, u_int length, const u_char *bp2, int fragmented)
-{
 	const struct icmp6_hdr *dp;
 	const struct ip6_hdr *ip;
 	const struct ip6_hdr *oip;

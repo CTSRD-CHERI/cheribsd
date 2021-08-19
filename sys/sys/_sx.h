@@ -37,8 +37,17 @@
  * Shared/exclusive lock main structure definition.
  */
 struct sx {
-	struct lock_object	lock_object;
+	struct lock_object	lock_object __subobject_use_container_bounds;
 	volatile uintptr_t	sx_lock;
 };
 
 #endif	/* !_SYS__SX_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

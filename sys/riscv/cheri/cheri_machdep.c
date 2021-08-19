@@ -32,16 +32,18 @@
 
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/devmap.h>
 #include <sys/proc.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
 #include <machine/frame.h>
+#include <machine/pte.h>
 #include <machine/riscvreg.h>
 #include <machine/vmparam.h>
 
-void *cheri_kall_capability = (void *)(intcap_t)-1;
+void *kernel_root_cap = (void *)(intcap_t)-1;
 
 void
 cheri_init_capabilities(void * __capability kroot)
@@ -51,20 +53,30 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_KERNEL_BASE);
 	ctemp = cheri_setbounds(kroot, CHERI_SEALCAP_KERNEL_LENGTH);
 	ctemp = cheri_andperm(kroot, CHERI_SEALCAP_KERNEL_PERMS);
-	kernel_sealcap = ctemp;
+	kernel_root_sealcap = ctemp;
 
 	ctemp = cheri_setaddress(kroot, CHERI_CAP_USER_DATA_BASE);
 	ctemp = cheri_setbounds(ctemp, CHERI_CAP_USER_DATA_LENGTH);
 	ctemp = cheri_andperm(ctemp, CHERI_CAP_USER_DATA_PERMS |
-	    CHERI_CAP_USER_CODE_PERMS);
-	userspace_cap = ctemp;
+	    CHERI_CAP_USER_CODE_PERMS | CHERI_PERM_CHERIABI_VMMAP);
+	userspace_root_cap = ctemp;
 
 	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_USERSPACE_BASE);
 	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_USERSPACE_LENGTH);
 	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_USERSPACE_PERMS);
-	userspace_sealcap = ctemp;
+	userspace_root_sealcap = ctemp;
 
 	swap_restore_cap = kroot;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	ctemp = cheri_setaddress(kroot, VM_MAX_KERNEL_ADDRESS - L2_SIZE);
+	ctemp = cheri_setboundsexact(ctemp, L2_SIZE);
+	ctemp = cheri_andperm(ctemp, CHERI_PERMS_KERNEL_DATA);
+	devmap_init_capability(ctemp);
+
+	kernel_root_cap = cheri_andperm(kroot,
+	    ~(CHERI_PERM_SEAL | CHERI_PERM_UNSEAL));
+#endif
 }
 
 void
@@ -75,33 +87,22 @@ hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 	tf = td->td_frame;
 
 	/* Set DDC to full user privilege. */
-	tf->tf_ddc = (uintcap_t)cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
-	    CHERI_CAP_USER_DATA_LENGTH, CHERI_CAP_USER_DATA_OFFSET);
+	tf->tf_ddc = (uintcap_t)cheri_capability_build_user_rwx(
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_CHERIABI_VMMAP,
+	    CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
+	    CHERI_CAP_USER_DATA_OFFSET);
 
 	/* Use 'entry_addr' as offset of PCC. */
 	tf->tf_sepc = (uintcap_t)cheri_capability_build_user_code(
 	    td, CHERI_CAP_USER_CODE_PERMS, CHERI_CAP_USER_CODE_BASE,
 	    CHERI_CAP_USER_CODE_LENGTH, entry_addr);
 }
-
-/*
- * As with system calls, handling signal delivery connotes special authority
- * in the runtime environment.  In the signal delivery code, we need to
- * determine whether to trust the executing thread to have valid stack state,
- * and use this function to query whether the execution environment is
- * suitable for direct handler execution, or if (in effect) a security-domain
- * transition is required first.
- */
-int
-cheri_signal_sandboxed(struct thread *td)
-{
-	uintmax_t c_perms;
-
-	c_perms = cheri_getperm(td->td_frame->tf_sepc);
-	if ((c_perms & CHERI_PERM_SYSCALL) == 0) {
-		atomic_add_int(&security_cheri_sandboxed_signals, 1);
-		return (ECAPMODE);
-	}
-	return (0);
-}
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

@@ -74,7 +74,7 @@ struct efi_md {
 #define	EFI_MD_TYPE_PERSISTENT	14	/* Persistent memory. */
 	uint32_t	__pad;
 	uint64_t	md_phys;
-	void		*md_virt;
+	uint64_t	md_virt;
 	uint64_t	md_pages;
 	uint64_t	md_attr;
 #define	EFI_MD_ATTR_UC		0x0000000000000001UL
@@ -196,3 +196,12 @@ int efi_var_set(uint16_t *name, struct uuid *vendor, uint32_t attrib,
 #endif	/* _KERNEL */
 
 #endif /* _SYS_EFI_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20210413,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

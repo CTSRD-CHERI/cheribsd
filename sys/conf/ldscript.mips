@@ -51,6 +51,10 @@ SECTIONS
   {
     KEEP (*(.fini))
   } =0x1000000
+  .fill1     :
+  {
+    . = ALIGN(0x100000);
+  } =0x00
   PROVIDE (__etext = .);
   PROVIDE (_etext = .);
   PROVIDE (etext = .);
@@ -258,9 +262,9 @@ SECTIONS
    /* Align here to ensure that the .bss section occupies space up to
       _end.  Align after .bss to ensure correct alignment even if the
       .bss section disappears because there are no input sections.  */
-   . = ALIGN(64 / 8);
+   . = ALIGN(0x100000);
   }
-  . = ALIGN(64 / 8);
+  . = ALIGN(0x100000);
   _end = .;
   PROVIDE (end = .);
   /* Stabs debugging sections.  */

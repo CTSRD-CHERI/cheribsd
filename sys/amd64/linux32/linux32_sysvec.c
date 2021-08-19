@@ -739,6 +739,7 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	char *stringp;
 	uintptr_t destp, ustringp;
 	struct linux32_ps_strings *arginfo;
+	struct proc *p;
 	char canary[LINUX_AT_RANDOM_LEN];
 	size_t execpath_len;
 
@@ -747,8 +748,9 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		execpath_len = strlen(imgp->execpath) + 1;
 	else
 		execpath_len = 0;
+	p = imgp->proc;
 
-	arginfo = (struct linux32_ps_strings *)LINUX32_PS_STRINGS;
+	arginfo = (struct linux32_ps_strings *)p->p_psstrings;
 	destp = (uintptr_t)arginfo;
 
 	if (execpath_len != 0) {
@@ -909,7 +911,7 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= LINUX32_MAXUSER,
 	.sv_usrstack	= LINUX32_USRSTACK,
-	.sv_psstrings	= LINUX32_PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct linux32_ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_auxargs = linux_copyout_auxargs,
 	.sv_copyout_strings = linux_copyout_strings,

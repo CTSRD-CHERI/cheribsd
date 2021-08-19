@@ -234,7 +234,7 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		execpath_len = 0;
 
 	p = imgp->proc;
-	arginfo = (struct ps_strings *)p->p_sysent->sv_psstrings;
+	arginfo = (struct ps_strings *)p->p_psstrings;
 	destp = (uintptr_t)arginfo;
 
 	if (execpath_len != 0) {
@@ -403,7 +403,7 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= PS_STRINGS, /* XXX */
+	.sv_szpsstrings	= sizeof(struct ps_strings), /* XXX */
 	.sv_stackprot	= VM_PROT_READ | VM_PROT_WRITE,
 	.sv_copyout_auxargs = linux_copyout_auxargs,
 	.sv_copyout_strings = linux_copyout_strings,

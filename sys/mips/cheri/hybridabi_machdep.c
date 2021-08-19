@@ -30,84 +30,26 @@
 
 #include <sys/param.h>
 #include <sys/proc.h>
-#include <sys/sysent.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <machine/pcb.h>
-#include <machine/proc.h>
-#include <machine/vmparam.h>
-
-static void	hybridabi_capability_set_user_ddc(void * __capability *);
-static void	hybridabi_capability_set_user_csp(void * __capability *);
-static void	hybridabi_capability_set_user_pcc(struct thread *td,
-		    void * __capability *);
-static void	hybridabi_capability_set_user_entry(struct thread *td,
-		    void * __capability *, unsigned long);
-static void	hybridabi_thread_init(struct thread *td, unsigned long);
-
-static void
-hybridabi_capability_set_user_ddc(void * __capability *cp)
+void * __capability
+hybridabi_user_ddc(void)
 {
-
-	*cp = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
+	return (cheri_capability_build_user_rwx(
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_CHERIABI_VMMAP,
 	    CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
-	    CHERI_CAP_USER_DATA_OFFSET);
-}
-
-static void
-hybridabi_capability_set_user_csp(void * __capability *cp)
-{
-
-	/*
-	 * For now, initialise stack as ambient with identical rights as $ddc.
-	 * In the future, we will may want to change this to be local
-	 * (non-global).
-	 */
-	hybridabi_capability_set_user_ddc(cp);
-}
-
-static void
-hybridabi_capability_set_user_idc(void * __capability *cp)
-{
-
-	/*
-	 * The default invoked data capability is also identical to $ddc.
-	 */
-	hybridabi_capability_set_user_ddc(cp);
-}
-
-static void
-hybridabi_capability_set_user_pcc(struct thread *td, void * __capability *cp)
-{
-
-	*cp = cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
-	    CHERI_CAP_USER_CODE_BASE, CHERI_CAP_USER_CODE_LENGTH,
-	    CHERI_CAP_USER_CODE_OFFSET);
-}
-
-static void
-hybridabi_capability_set_user_entry(struct thread *td,
-    void * __capability *cp, unsigned long entry_addr)
-{
-
-	/*
-	 * Set the jump target register for the pure capability calling
-	 * convention.
-	 */
-	*cp = cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
-	    CHERI_CAP_USER_CODE_BASE, CHERI_CAP_USER_CODE_LENGTH, entry_addr);
+	    CHERI_CAP_USER_DATA_OFFSET));
 }
 
 /*
  * Common per-thread CHERI state initialisation across execve(2) and
  * additional thread creation.
  */
-static void
-hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
+void
+hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
 {
-	struct cheri_signal *csigp;
 	struct trapframe *frame;
 
 	/*
@@ -123,77 +65,12 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	    __func__));
 
 	/*
-	 * XXXRW: Experimental CheriABI initialises $ddc with full user
-	 * privilege, and all other user-accessible capability registers with
-	 * no rights at all.  The runtime linker/compiler/application can
-	 * propagate around rights as required.
+	 * Hybrid processes use $ddc and $pcc with full user
+	 * privilege, and all other user-accessible capability
+	 * registers with no rights at all.
 	 */
-	hybridabi_capability_set_user_ddc(&frame->ddc);
-	hybridabi_capability_set_user_csp(&frame->csp);
-	hybridabi_capability_set_user_idc(&frame->idc);
-	hybridabi_capability_set_user_entry(td, (void * __capability *)&frame->pc, entry_addr);
-	hybridabi_capability_set_user_entry(td, &frame->c12, entry_addr);
-
-	/*
-	 * Initialise signal-handling state; this can't yet be modified
-	 * by userspace, but the principle is that signal handlers should run
-	 * with ambient authority unless given up by the userspace runtime
-	 * explicitly.
-	 */
-	csigp = &td->td_pcb->pcb_cherisignal;
-	bzero(csigp, sizeof(*csigp));
-	hybridabi_capability_set_user_ddc(&csigp->csig_ddc);
-	hybridabi_capability_set_user_csp(&csigp->csig_csp);
-	hybridabi_capability_set_user_csp(&csigp->csig_default_stack);
-	hybridabi_capability_set_user_idc(&csigp->csig_idc);
-	hybridabi_capability_set_user_pcc(td, &csigp->csig_pcc);
-	csigp->csig_sigcode = cheri_sigcode_capability(td);
-}
-
-/*
- * Set per-thread CHERI register state for MIPS ABI processes.  In
- * particular, we need to set up the CHERI register state for MIPS ABI
- * processes with suitable capabilities.
- *
- * XXX: I also wonder if we should be inheriting signal-handling state...?
- */
-void
-hybridabi_newthread_setregs(struct thread *td, unsigned long entry_addr)
-{
-
-	hybridabi_thread_init(td, entry_addr);
-}
-
-/*
- * Set per-process CHERI state for MIPS ABI processes after exec.
- * Initializes process-wide state as well as per-thread state for the
- * process' initial thread.
- */
-void
-hybridabi_exec_setregs(struct thread *td, unsigned long entry_addr)
-{
-
-	hybridabi_thread_init(td, entry_addr);
-}
-
-/*
- * Configure CHERI register state for a thread about to resume in a signal
- * handler.  Eventually, csigp should contain configurable values, but for
- * now, this ensures handlers run with ambient authority in a useful way.
- * Note that this doesn't touch the already copied-out CHERI register frame
- * (see sendsig()), and hence when sigreturn() is called, the previous CHERI
- * state will be restored by default.
- */
-void
-hybridabi_sendsig(struct thread *td)
-{
-	struct trapframe *frame;
-	struct cheri_signal *csigp;
-
-	frame = &td->td_pcb->pcb_regs;
-	csigp = &td->td_pcb->pcb_cherisignal;
-	frame->ddc = csigp->csig_ddc;
-	frame->csp = csigp->csig_csp;
-	frame->idc = csigp->csig_idc;
-	frame->pcc = csigp->csig_pcc;
+	frame->ddc = hybridabi_user_ddc();
+	frame->pc = (trapf_pc_t)cheri_capability_build_user_code(td,
+	    CHERI_CAP_USER_CODE_PERMS, CHERI_CAP_USER_CODE_BASE,
+	    CHERI_CAP_USER_CODE_LENGTH, entry_addr);
 }

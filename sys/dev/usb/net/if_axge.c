@@ -913,10 +913,9 @@ axge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	reinit = 0;
-	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	if (cmd == SIOCSIFCAP) {
 		AXGE_LOCK(sc);
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (ifp->if_capabilities & IFCAP_TXCSUM) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -938,11 +937,8 @@ axge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		AXGE_UNLOCK(sc);
 		if (reinit > 0)
 			uether_init(ue);
-		break;
-	default:
+	} else
 		error = uether_ioctl(ifp, cmd, data);
-		break;
-	}
 
 	return (error);
 }
@@ -1070,12 +1066,3 @@ axge_csum_cfg(struct usb_ether *ue)
 		csum |= CRCR_IP | CRCR_TCP | CRCR_UDP;
 	axge_write_cmd_1(sc, AXGE_ACCESS_MAC, AXGE_CRCR, csum);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

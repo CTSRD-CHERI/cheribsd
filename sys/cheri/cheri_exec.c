@@ -50,92 +50,6 @@ FEATURE(cheriabi, "CheriABI process support");
  * programs.
  */
 
-/*
- * Construct a capability stack pointer for the main thread.
- */
-void * __capability
-cheri_exec_stack_pointer(struct image_params *imgp, uintcap_t stack)
-{
-	vm_offset_t stackbase, stacktop;
-	size_t stacklen;
-	char * __capability csp;
-
-	KASSERT(__builtin_is_aligned(stack, sizeof(void * __capability)),
-	    ("CheriABI stack pointer not properly aligned"));
-
-	/*
-	 * Restrict the stack capability to the maximum region allowed
-	 * for this process and adjust csp accordingly.
-	 */
-	stackbase = (vaddr_t)imgp->proc->p_vmspace->vm_maxsaddr;
-	stacktop = (__cheri_addr vaddr_t)stack;
-	KASSERT(stacktop > stackbase,
-	    ("top of stack 0x%lx is below stack base 0x%lx", stacktop,
-	    stackbase));
-	stacklen = stacktop - stackbase;
-
-	/*
-	 * Round the stack down as required to make it representable.
-	 */
-	stacklen = rounddown2(stacklen,
-	    CHERI_REPRESENTABLE_ALIGNMENT(stacklen));
-	KASSERT(stackbase == CHERI_REPRESENTABLE_BASE(stackbase, stacklen),
-	    ("%s: rounded base (0x%zx) != base (0x%zx)", __func__,
-		CHERI_REPRESENTABLE_BASE(stackbase, stacklen), stackbase));
-	csp = cheri_setaddress((void * __capability)stack, stackbase);
-	csp = cheri_setbounds(csp, stacklen);
-	return (csp + stacklen);
-}
-
-/*
- * Build a capability to describe the MMAP'able space from the end of
- * the program's heap to the bottom of the stack.
- *
- * XXX: We could probably use looser bounds and rely on the VM system
- * to manage the address space via vm_map instead of the more complex
- * calculations here.
- */
-void
-cheri_set_mmap_capability(struct thread *td, struct image_params *imgp,
-	void * __capability csp)
-{
-	vm_offset_t map_base, stack_base, text_end;
-	size_t map_length;
-
-	stack_base = cheri_getbase(csp);
-	text_end = roundup2(imgp->end_addr,
-	    CHERI_SEALABLE_ALIGNMENT(imgp->end_addr - imgp->start_addr));
-
-	/*
-	 * Less confusing rounded up to a page and 256-bit
-	 * requires no other rounding.
-	 */
-	text_end = roundup2(text_end, PAGE_SIZE);
-	KASSERT(text_end <= stack_base,
-	    ("text_end 0x%zx > stack_base 0x%lx", text_end, stack_base));
-
-	map_base = (text_end == stack_base) ?
-	    CHERI_CAP_USER_MMAP_BASE :
-	    roundup2(text_end,
-		CHERI_REPRESENTABLE_ALIGNMENT(stack_base - text_end));
-	KASSERT(map_base < stack_base,
-	    ("map_base 0x%zx >= stack_base 0x%lx", map_base, stack_base));
-	map_length = stack_base - map_base;
-	map_length = rounddown2(map_length,
-	    CHERI_REPRESENTABLE_ALIGNMENT(map_length));
-
-	/*
-	 * Use cheri_capability_build_user_rwx so mmap() can return
-	 * appropriate permissions derived from a single capability.
-	 */
-	td->td_cheri_mmap_cap = cheri_capability_build_user_rwx(
-	    CHERI_CAP_USER_MMAP_PERMS, map_base, map_length,
-	    CHERI_CAP_USER_MMAP_OFFSET);
-	KASSERT(cheri_getperm(td->td_cheri_mmap_cap) &
-	    CHERI_PERM_CHERIABI_VMMAP,
-	    ("%s: mmap() cap lacks CHERI_PERM_CHERIABI_VMMAP", __func__));
-}
-
 void * __capability
 cheri_exec_pcc(struct thread *td, struct image_params *imgp)
 {
@@ -149,19 +63,18 @@ cheri_exec_pcc(struct thread *td, struct image_params *imgp)
 	 * use end_addr to find the end of the rtld mapping.
 	 */
 	if (imgp->interp_end != 0) {
-		code_start = imgp->reloc_base;
+		code_start = imgp->interp_start;
 		code_end = imgp->interp_end;
 	} else {
 		code_start = imgp->start_addr;
 		code_end = imgp->end_addr;
 	}
 
-	/* Ensure CHERI128 representability */
 	code_length = code_end - code_start;
-	code_start = CHERI_REPRESENTABLE_BASE(code_start, code_length);
-	code_length = CHERI_REPRESENTABLE_LENGTH(code_length);
-	KASSERT(code_start + code_length >= code_end,
-	    ("%s: truncated PCC", __func__));
+	/* Check that imgact_elf enforced capability representability. */
+	MPASS(code_start == CHERI_REPRESENTABLE_BASE(code_start, code_length));
+	MPASS(code_length == CHERI_REPRESENTABLE_LENGTH(code_length));
+	KASSERT(code_start < code_end, ("%s: truncated PCC", __func__));
 	return (cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
 	    code_start, code_length, imgp->entry_addr - code_start));
 }
@@ -176,14 +89,4 @@ cheri_sigcode_capability(struct thread *td)
 	    ("CheriABI requires shared page for sigcode"));
 	return (cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
 	    sv->sv_sigcode_base, *sv->sv_szsigcode, 0));
-}
-
-void * __capability
-cheri_auxv_capability(struct image_params *imgp, uintcap_t stack)
-{
-	void * __capability auxv;
-
-	auxv = ((void * __capability * __capability)stack +
-	    imgp->args->argc + 1 + imgp->args->envc + 1);
-	return (cheri_setbounds(auxv, AT_COUNT * sizeof(Elf_Auxinfo)));
 }

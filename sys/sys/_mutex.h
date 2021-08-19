@@ -47,7 +47,7 @@
 struct mtx {
 	struct lock_object	lock_object;	/* Common lock properties. */
 	volatile uintptr_t	mtx_lock;	/* Owner and flags. */
-};
+} __no_subobject_bounds;
 
 /*
  * Members of struct mtx_padalign must mirror members of struct mtx.
@@ -61,6 +61,15 @@ struct mtx {
 struct mtx_padalign {
 	struct lock_object	lock_object;	/* Common lock properties. */
 	volatile uintptr_t	mtx_lock;	/* Owner and flags. */
-} __aligned(CACHE_LINE_SIZE);
+} __aligned(CACHE_LINE_SIZE) __no_subobject_bounds;
 
 #endif /* !_SYS__MUTEX_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

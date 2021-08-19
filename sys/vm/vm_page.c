@@ -222,7 +222,7 @@ vm_page_init_cache_zones(void *dummy __unused)
 			pgcache->domain = domain;
 			pgcache->pool = pool;
 			pgcache->zone = uma_zcache_create("vm pgcache",
-			    PAGE_SIZE, NULL, NULL, NULL, NULL,
+			    sizeof(struct vm_page), NULL, NULL, NULL, NULL,
 			    vm_page_zone_import, vm_page_zone_release, pgcache,
 			    UMA_ZONE_VM);
 
@@ -517,7 +517,7 @@ vm_page_init_page(vm_page_t m, vm_paddr_t pa, int segind)
 
 #ifndef PMAP_HAS_PAGE_ARRAY
 static vm_paddr_t
-vm_page_array_alloc(vm_offset_t *vaddr, vm_paddr_t end, vm_paddr_t page_range)
+vm_page_array_alloc(vm_pointer_t *vaddr, vm_paddr_t end, vm_paddr_t page_range)
 {
 	vm_paddr_t new_end;
 
@@ -548,8 +548,8 @@ vm_page_array_alloc(vm_offset_t *vaddr, vm_paddr_t end, vm_paddr_t page_range)
  *	physical pages.  Initializes these structures, and populates the free
  *	page queues.
  */
-vm_offset_t
-vm_page_startup(vm_offset_t vaddr)
+vm_pointer_t
+vm_page_startup(vm_pointer_t vaddr)
 {
 	struct vm_phys_seg *seg;
 	vm_page_t m;
@@ -563,7 +563,7 @@ vm_page_startup(vm_offset_t vaddr)
 #endif
 	int biggestone, i, segind;
 #ifdef WITNESS
-	vm_offset_t mapped;
+	vm_pointer_t mapped;
 	int witness_size;
 #endif
 #if defined(__i386__) && defined(VM_PHYSSEG_DENSE)
@@ -584,7 +584,6 @@ vm_page_startup(vm_offset_t vaddr)
 		mtx_init(&pa_lock[i], "vm page", NULL, MTX_DEF);
 	for (i = 0; i < vm_ndomains; i++)
 		vm_page_domain_init(i);
-
 	new_end = end;
 #ifdef WITNESS
 	witness_size = round_page(witness_startup_count());
@@ -4913,7 +4912,7 @@ vm_page_bits_set(vm_page_t m, vm_page_bits_t *bits, vm_page_bits_t set)
 #else
 	shift *= NBBY;
 #endif
-	addr &= ~(sizeof(uint32_t) - 1);
+	addr = rounddown2(addr, sizeof(uint32_t));
 	atomic_set_32((uint32_t *)addr, set << shift);
 #endif		/* PAGE_SIZE */
 }
@@ -4946,7 +4945,7 @@ vm_page_bits_clear(vm_page_t m, vm_page_bits_t *bits, vm_page_bits_t clear)
 #else
 	shift *= NBBY;
 #endif
-	addr &= ~(sizeof(uint32_t) - 1);
+	addr = rounddown2(addr, sizeof(uint32_t));
 	atomic_clear_32((uint32_t *)addr, clear << shift);
 #endif		/* PAGE_SIZE */
 }
@@ -4995,7 +4994,7 @@ vm_page_bits_swap(vm_page_t m, vm_page_bits_t *bits, vm_page_bits_t newbits)
 #else
 	shift *= NBBY;
 #endif
-	addr &= ~(sizeof(uint32_t) - 1);
+	addr = rounddown2(addr, sizeof(uint32_t));
 	mask = VM_PAGE_BITS_ALL << shift;
 
 	old = *bits;
@@ -5523,7 +5522,7 @@ DB_SHOW_COMMAND(pginfo, vm_page_print_pginfo)
 	else if (phys)
 		m = PHYS_TO_VM_PAGE(addr);
 	else
-		m = (vm_page_t)addr;
+		m = DB_DATA_PTR(addr, struct vm_page);
 	db_printf(
     "page %p obj %p pidx 0x%jx phys 0x%jx q %d ref 0x%x\n"
     "  af 0x%x of 0x%x f 0x%x act %d busy %x valid 0x%x dirty 0x%x\n",
@@ -5532,3 +5531,14 @@ DB_SHOW_COMMAND(pginfo, vm_page_print_pginfo)
 	    m->flags, m->a.act_count, m->busy_lock, m->valid, m->dirty);
 }
 #endif /* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_alignment",
+//     "pointer_as_integer",
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

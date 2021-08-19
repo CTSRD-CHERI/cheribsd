@@ -53,6 +53,41 @@ __FBSDID("$FreeBSD$");
 
 	/* Store registers */
 	frcsr	t0
+#ifdef __CHERI_PURE_CAPABILITY__
+	csd	t0, (PCB_FCSR)(\p)
+	cfsd	f0, (PCB_X + 0 * 16)(\p)
+	cfsd	f1, (PCB_X + 1 * 16)(\p)
+	cfsd	f2, (PCB_X + 2 * 16)(\p)
+	cfsd	f3, (PCB_X + 3 * 16)(\p)
+	cfsd	f4, (PCB_X + 4 * 16)(\p)
+	cfsd	f5, (PCB_X + 5 * 16)(\p)
+	cfsd	f6, (PCB_X + 6 * 16)(\p)
+	cfsd	f7, (PCB_X + 7 * 16)(\p)
+	cfsd	f8, (PCB_X + 8 * 16)(\p)
+	cfsd	f9, (PCB_X + 9 * 16)(\p)
+	cfsd	f10, (PCB_X + 10 * 16)(\p)
+	cfsd	f11, (PCB_X + 11 * 16)(\p)
+	cfsd	f12, (PCB_X + 12 * 16)(\p)
+	cfsd	f13, (PCB_X + 13 * 16)(\p)
+	cfsd	f14, (PCB_X + 14 * 16)(\p)
+	cfsd	f15, (PCB_X + 15 * 16)(\p)
+	cfsd	f16, (PCB_X + 16 * 16)(\p)
+	cfsd	f17, (PCB_X + 17 * 16)(\p)
+	cfsd	f18, (PCB_X + 18 * 16)(\p)
+	cfsd	f19, (PCB_X + 19 * 16)(\p)
+	cfsd	f20, (PCB_X + 20 * 16)(\p)
+	cfsd	f21, (PCB_X + 21 * 16)(\p)
+	cfsd	f22, (PCB_X + 22 * 16)(\p)
+	cfsd	f23, (PCB_X + 23 * 16)(\p)
+	cfsd	f24, (PCB_X + 24 * 16)(\p)
+	cfsd	f25, (PCB_X + 25 * 16)(\p)
+	cfsd	f26, (PCB_X + 26 * 16)(\p)
+	cfsd	f27, (PCB_X + 27 * 16)(\p)
+	cfsd	f28, (PCB_X + 28 * 16)(\p)
+	cfsd	f29, (PCB_X + 29 * 16)(\p)
+	cfsd	f30, (PCB_X + 30 * 16)(\p)
+	cfsd	f31, (PCB_X + 31 * 16)(\p)
+#else
 	sd	t0, (PCB_FCSR)(\p)
 	fsd	f0, (PCB_X + 0 * 16)(\p)
 	fsd	f1, (PCB_X + 1 * 16)(\p)
@@ -86,6 +121,7 @@ __FBSDID("$FreeBSD$");
 	fsd	f29, (PCB_X + 29 * 16)(\p)
 	fsd	f30, (PCB_X + 30 * 16)(\p)
 	fsd	f31, (PCB_X + 31 * 16)(\p)
+#endif
 
 	/* Disable FPE usage in supervisor mode. */
 	li	t0, SSTATUS_FS_MASK
@@ -101,8 +137,46 @@ __FBSDID("$FreeBSD$");
 	csrs	sstatus, t0
 
 	/* Restore registers */
+#ifdef __CHERI_PURE_CAPABILITY__
+	cld	t0, (PCB_FCSR)(\p)
+#else
 	ld	t0, (PCB_FCSR)(\p)
+#endif
 	fscsr	t0
+#ifdef __CHERI_PURE_CAPABILITY__
+	cfld	f0, (PCB_X + 0 * 16)(\p)
+	cfld	f1, (PCB_X + 1 * 16)(\p)
+	cfld	f2, (PCB_X + 2 * 16)(\p)
+	cfld	f3, (PCB_X + 3 * 16)(\p)
+	cfld	f4, (PCB_X + 4 * 16)(\p)
+	cfld	f5, (PCB_X + 5 * 16)(\p)
+	cfld	f6, (PCB_X + 6 * 16)(\p)
+	cfld	f7, (PCB_X + 7 * 16)(\p)
+	cfld	f8, (PCB_X + 8 * 16)(\p)
+	cfld	f9, (PCB_X + 9 * 16)(\p)
+	cfld	f10, (PCB_X + 10 * 16)(\p)
+	cfld	f11, (PCB_X + 11 * 16)(\p)
+	cfld	f12, (PCB_X + 12 * 16)(\p)
+	cfld	f13, (PCB_X + 13 * 16)(\p)
+	cfld	f14, (PCB_X + 14 * 16)(\p)
+	cfld	f15, (PCB_X + 15 * 16)(\p)
+	cfld	f16, (PCB_X + 16 * 16)(\p)
+	cfld	f17, (PCB_X + 17 * 16)(\p)
+	cfld	f18, (PCB_X + 18 * 16)(\p)
+	cfld	f19, (PCB_X + 19 * 16)(\p)
+	cfld	f20, (PCB_X + 20 * 16)(\p)
+	cfld	f21, (PCB_X + 21 * 16)(\p)
+	cfld	f22, (PCB_X + 22 * 16)(\p)
+	cfld	f23, (PCB_X + 23 * 16)(\p)
+	cfld	f24, (PCB_X + 24 * 16)(\p)
+	cfld	f25, (PCB_X + 25 * 16)(\p)
+	cfld	f26, (PCB_X + 26 * 16)(\p)
+	cfld	f27, (PCB_X + 27 * 16)(\p)
+	cfld	f28, (PCB_X + 28 * 16)(\p)
+	cfld	f29, (PCB_X + 29 * 16)(\p)
+	cfld	f30, (PCB_X + 30 * 16)(\p)
+	cfld	f31, (PCB_X + 31 * 16)(\p)
+#else
 	fld	f0, (PCB_X + 0 * 16)(\p)
 	fld	f1, (PCB_X + 1 * 16)(\p)
 	fld	f2, (PCB_X + 2 * 16)(\p)
@@ -135,6 +209,7 @@ __FBSDID("$FreeBSD$");
 	fld	f29, (PCB_X + 29 * 16)(\p)
 	fld	f30, (PCB_X + 30 * 16)(\p)
 	fld	f31, (PCB_X + 31 * 16)(\p)
+#endif
 
 	/* Disable FPE usage in supervisor mode. */
 	li	t0, SSTATUS_FS_MASK
@@ -146,10 +221,17 @@ __FBSDID("$FreeBSD$");
  * fpe_state_save(struct thread *td)
  */
 ENTRY(fpe_state_save)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Get pointer to PCB */
+	clc	ca0, TD_PCB(ca0)
+	__fpe_state_save ca0
+	cret
+#else
 	/* Get pointer to PCB */
 	ld	a0, TD_PCB(a0)
 	__fpe_state_save a0
 	ret
+#endif
 END(fpe_state_save)
 
 /*
@@ -202,7 +284,7 @@ ENTRY(fpe_state_clear)
 	li	t0, SSTATUS_FS_MASK
 	csrc	sstatus, t0
 
-	ret
+	RETURN
 END(fpe_state_clear)
 #endif /* FPE */
 	
@@ -210,6 +292,20 @@ END(fpe_state_clear)
  * void cpu_throw(struct thread *old __unused, struct thread *new)
  */
 ENTRY(cpu_throw)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Activate the new thread's pmap. */
+	cmove	cs0, ca1
+	cmove	ca0, ca1
+	clgc	cra, _C_LABEL(pmap_activate_sw)
+	cjalr	cra
+	cmove	ca0, cs0
+
+	/* Store the new curthread */
+	csc	ca0, PC_CURTHREAD(ctp)
+	/* And the new pcb */
+	clc	c13, TD_PCB(ca0)
+	csc	c13, PC_CURPCB(ctp)
+#else
 	/* Activate the new thread's pmap. */
 	mv	s0, a1
 	mv	a0, a1
@@ -221,25 +317,26 @@ ENTRY(cpu_throw)
 	/* And the new pcb */
 	ld	x13, TD_PCB(a0)
 	sd	x13, PC_CURPCB(tp)
+#endif
 
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
 	/* Load registers */
-	lc	cra, (PCB_RA)(x13)
-	lc	csp, (PCB_SP)(x13)
+	clc	cra, (PCB_RA)(c13)
+	clc	csp, (PCB_SP)(c13)
 
 	/* s[0-11] */
-	lc	cs0, (PCB_S + 0 * 16)(x13)
-	lc	cs1, (PCB_S + 1 * 16)(x13)
-	lc	cs2, (PCB_S + 2 * 16)(x13)
-	lc	cs3, (PCB_S + 3 * 16)(x13)
-	lc	cs4, (PCB_S + 4 * 16)(x13)
-	lc	cs5, (PCB_S + 5 * 16)(x13)
-	lc	cs6, (PCB_S + 6 * 16)(x13)
-	lc	cs7, (PCB_S + 7 * 16)(x13)
-	lc	cs8, (PCB_S + 8 * 16)(x13)
-	lc	cs9, (PCB_S + 9 * 16)(x13)
-	lc	cs10, (PCB_S + 10 * 16)(x13)
-	lc	cs11, (PCB_S + 11 * 16)(x13)
+	clc	cs0, (PCB_S + 0 * 16)(c13)
+	clc	cs1, (PCB_S + 1 * 16)(c13)
+	clc	cs2, (PCB_S + 2 * 16)(c13)
+	clc	cs3, (PCB_S + 3 * 16)(c13)
+	clc	cs4, (PCB_S + 4 * 16)(c13)
+	clc	cs5, (PCB_S + 5 * 16)(c13)
+	clc	cs6, (PCB_S + 6 * 16)(c13)
+	clc	cs7, (PCB_S + 7 * 16)(c13)
+	clc	cs8, (PCB_S + 8 * 16)(c13)
+	clc	cs9, (PCB_S + 9 * 16)(c13)
+	clc	cs10, (PCB_S + 10 * 16)(c13)
+	clc	cs11, (PCB_S + 11 * 16)(c13)
 #else
 	/* Load registers */
 	ld	ra, (PCB_RA)(x13)
@@ -262,18 +359,27 @@ ENTRY(cpu_throw)
 
 #ifdef FPE
 	/* Is FPE enabled for new thread? */
+#ifdef __CHERI_PURE_CAPABILITY__
+	clc	ct0, TD_FRAME(ca0)
+	cld	t1, (TF_SSTATUS)(ct0)
+#else
 	ld	t0, TD_FRAME(a0)
 	ld	t1, (TF_SSTATUS)(t0)
+#endif
 	li	t2, SSTATUS_FS_MASK
 	and	t3, t1, t2
 	beqz	t3, 1f		/* No, skip. */
 
 	/* Restore registers. */
+#ifdef __CHERI_PURE_CAPABILITY__
+	__fpe_state_load c13
+#else
 	__fpe_state_load x13
+#endif
 1:
 #endif
 
-	ret
+	RETURN
 END(cpu_throw)
 
 /*
@@ -285,6 +391,16 @@ END(cpu_throw)
  * x3 to x7, x16 and x17 are caller saved
  */
 ENTRY(cpu_switch)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Store the new curthread */
+	csc	ca1, PC_CURTHREAD(ctp)
+	/* And the new pcb */
+	clc	c13, TD_PCB(ca1)
+	csc	c13, PC_CURPCB(ctp)
+
+	/* Save the old context. */
+	clc	c13, TD_PCB(ca0)
+#else
 	/* Store the new curthread */
 	sd	a1, PC_CURTHREAD(tp)
 	/* And the new pcb */
@@ -293,25 +409,26 @@ ENTRY(cpu_switch)
 
 	/* Save the old context. */
 	ld	x13, TD_PCB(a0)
+#endif
 
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
 	/* Store ra, sp and the callee-saved registers */
-	sc	cra, (PCB_RA)(x13)
-	sc	csp, (PCB_SP)(x13)
+	csc	cra, (PCB_RA)(c13)
+	csc	csp, (PCB_SP)(c13)
 
 	/* s[0-11] */
-	sc	cs0, (PCB_S + 0 * 16)(x13)
-	sc	cs1, (PCB_S + 1 * 16)(x13)
-	sc	cs2, (PCB_S + 2 * 16)(x13)
-	sc	cs3, (PCB_S + 3 * 16)(x13)
-	sc	cs4, (PCB_S + 4 * 16)(x13)
-	sc	cs5, (PCB_S + 5 * 16)(x13)
-	sc	cs6, (PCB_S + 6 * 16)(x13)
-	sc	cs7, (PCB_S + 7 * 16)(x13)
-	sc	cs8, (PCB_S + 8 * 16)(x13)
-	sc	cs9, (PCB_S + 9 * 16)(x13)
-	sc	cs10, (PCB_S + 10 * 16)(x13)
-	sc	cs11, (PCB_S + 11 * 16)(x13)
+	csc	cs0, (PCB_S + 0 * 16)(c13)
+	csc	cs1, (PCB_S + 1 * 16)(c13)
+	csc	cs2, (PCB_S + 2 * 16)(c13)
+	csc	cs3, (PCB_S + 3 * 16)(c13)
+	csc	cs4, (PCB_S + 4 * 16)(c13)
+	csc	cs5, (PCB_S + 5 * 16)(c13)
+	csc	cs6, (PCB_S + 6 * 16)(c13)
+	csc	cs7, (PCB_S + 7 * 16)(c13)
+	csc	cs8, (PCB_S + 8 * 16)(c13)
+	csc	cs9, (PCB_S + 9 * 16)(c13)
+	csc	cs10, (PCB_S + 10 * 16)(c13)
+	csc	cs11, (PCB_S + 11 * 16)(c13)
 #else
 	/* Store ra, sp and the callee-saved registers */
 	sd	ra, (PCB_RA)(x13)
@@ -337,8 +454,13 @@ ENTRY(cpu_switch)
 	 * Is FPE enabled and is it in dirty state
 	 * for the old thread?
 	 */
+#ifdef __CHERI_PURE_CAPABILITY__
+	clc	ct0, TD_FRAME(ca0)
+	cld	t1, (TF_SSTATUS)(ct0)
+#else
 	ld	t0, TD_FRAME(a0)
 	ld	t1, (TF_SSTATUS)(t0)
+#endif
 	li	t2, SSTATUS_FS_MASK
 	and	t3, t1, t2
 	li	t2, SSTATUS_FS_DIRTY
@@ -349,28 +471,57 @@ ENTRY(cpu_switch)
 	and	t3, t1, t2
 	li	t2, SSTATUS_FS_CLEAN
 	or	t3, t3, t2
+#ifdef __CHERI_PURE_CAPABILITY__
+	csd	t3, (TF_SSTATUS)(ct0)
+#else
 	sd	t3, (TF_SSTATUS)(t0)
+#endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	__fpe_state_save c13
+#else
 	__fpe_state_save x13
+#endif
 1:
 #endif
 
 	/* Activate the new thread's pmap */
+#ifdef __CHERI_PURE_CAPABILITY__
+	cmove	cs0, ca0
+	cmove	cs1, ca1
+	cmove	cs2, ca2
+	cmove	ca0, ca1
+	clgc	cra, _C_LABEL(pmap_activate_sw)
+	cjalr	cra
+	cmove	ca1, cs1
+#else
 	mv	s0, a0
 	mv	s1, a1
 	mv	s2, a2
 	mv	a0, a1
 	call	_C_LABEL(pmap_activate_sw)
 	mv	a1, s1
+#endif
 
 	/* Release the old thread */
+#ifdef __CHERI_PURE_CAPABILITY__
+	csc	cs2, TD_LOCK(cs0)
+#else
 	sd	s2, TD_LOCK(s0)
+#endif
 #if defined(SCHED_ULE) && defined(SMP)
 	/* Spin if TD_LOCK points to a blocked_lock */
+#ifdef __CHERI_PURE_CAPABILITY__
+	clgc	cs2, _C_LABEL(blocked_lock)
+1:
+	clc	ct0, TD_LOCK(ca1)
+	beq	t0, s2, 1b
+#else
 	la	s2, _C_LABEL(blocked_lock)
 1:
 	ld	t0, TD_LOCK(a1)
 	beq	t0, s2, 1b
+#endif
 #endif
 
 #ifdef CPU_QEMU_RISCV
@@ -379,10 +530,19 @@ ENTRY(cpu_switch)
 	 * QEMU instruction tracing to reflect the new thread tracing
 	 * flag.
 	 */
+#ifdef __CHERI_PURE_CAPABILITY__
+	clgc	ct0, _C_LABEL(qemu_trace_perthread)
+	clw	t0, (ct0)
+#else
 	lw	t0, _C_LABEL(qemu_trace_perthread)
+#endif
 	beqz	t0, .Lout_qemu_tracing
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	clw	t0, TD_MDFLAGS(ca1)
+#else
 	lw	t0, TD_MDFLAGS(a1)
+#endif
 	andi	t1, t0, MDTD_QTRACE
 	beqz	t1, .Ldisable_qemu_tracing
 	andi	t0, t0, MDTD_QTRACE_USERMODE
@@ -401,26 +561,30 @@ ENTRY(cpu_switch)
 	/*
 	 * Restore the saved context.
 	 */
+#ifdef __CHERI_PURE_CAPABILITY__
+	clc	c13, TD_PCB(ca1)
+#else
 	ld	x13, TD_PCB(a1)
+#endif
 
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
 	/* Restore the registers */
-	lc	cra, (PCB_RA)(x13)
-	lc	csp, (PCB_SP)(x13)
+	clc	cra, (PCB_RA)(c13)
+	clc	csp, (PCB_SP)(c13)
 
 	/* s[0-11] */
-	lc	cs0, (PCB_S + 0 * 16)(x13)
-	lc	cs1, (PCB_S + 1 * 16)(x13)
-	lc	cs2, (PCB_S + 2 * 16)(x13)
-	lc	cs3, (PCB_S + 3 * 16)(x13)
-	lc	cs4, (PCB_S + 4 * 16)(x13)
-	lc	cs5, (PCB_S + 5 * 16)(x13)
-	lc	cs6, (PCB_S + 6 * 16)(x13)
-	lc	cs7, (PCB_S + 7 * 16)(x13)
-	lc	cs8, (PCB_S + 8 * 16)(x13)
-	lc	cs9, (PCB_S + 9 * 16)(x13)
-	lc	cs10, (PCB_S + 10 * 16)(x13)
-	lc	cs11, (PCB_S + 11 * 16)(x13)
+	clc	cs0, (PCB_S + 0 * 16)(c13)
+	clc	cs1, (PCB_S + 1 * 16)(c13)
+	clc	cs2, (PCB_S + 2 * 16)(c13)
+	clc	cs3, (PCB_S + 3 * 16)(c13)
+	clc	cs4, (PCB_S + 4 * 16)(c13)
+	clc	cs5, (PCB_S + 5 * 16)(c13)
+	clc	cs6, (PCB_S + 6 * 16)(c13)
+	clc	cs7, (PCB_S + 7 * 16)(c13)
+	clc	cs8, (PCB_S + 8 * 16)(c13)
+	clc	cs9, (PCB_S + 9 * 16)(c13)
+	clc	cs10, (PCB_S + 10 * 16)(c13)
+	clc	cs11, (PCB_S + 11 * 16)(c13)
 #else
 	/* Restore the registers */
 	ld	ra, (PCB_RA)(x13)
@@ -443,18 +607,27 @@ ENTRY(cpu_switch)
 
 #ifdef FPE
 	/* Is FPE enabled for new thread? */
+#ifdef __CHERI_PURE_CAPABILITY__
+	clc	ct0, TD_FRAME(ca1)
+	cld	t1, (TF_SSTATUS)(ct0)
+#else
 	ld	t0, TD_FRAME(a1)
 	ld	t1, (TF_SSTATUS)(t0)
+#endif
 	li	t2, SSTATUS_FS_MASK
 	and	t3, t1, t2
 	beqz	t3, 1f		/* No, skip. */
 
 	/* Restore registers. */
+#ifdef __CHERI_PURE_CAPABILITY__
+	__fpe_state_load c13
+#else
 	__fpe_state_load x13
+#endif
 1:
 #endif
 
-	ret
+	RETURN
 .Lcpu_switch_panic_str:
 	.asciz "cpu_switch: %p\0"
 END(cpu_switch)
@@ -465,26 +638,43 @@ END(cpu_switch)
  */
 
 ENTRY(fork_trampoline)
+#ifdef __CHERI_PURE_CAPABILITY__
+	cmove	ca0, cs0
+	cmove	ca1, cs1
+	cmove	ca2, csp
+	clgc	cra, _C_LABEL(fork_exit)
+	cjalr	cra
+#else
 	mv	a0, s0
 	mv	a1, s1
 	mv	a2, sp
 	call	_C_LABEL(fork_exit)
+#endif
 
 	/* Restore sstatus */
+#ifdef __CHERI_PURE_CAPABILITY__
+	cld	t0, (TF_SSTATUS)(csp)
+#else
 	ld	t0, (TF_SSTATUS)(sp)
+#endif
 	/* Ensure interrupts disabled */
 	li	t1, ~SSTATUS_SIE
 	and	t0, t0, t1
 	csrw	sstatus, t0
 
 #if __has_feature(capabilities)
+#ifndef __CHERI_PURE_CAPABILITY__
 	/* Switch to capmode PCC. */
 	lla	t0, 1f
 	cspecialr ct1, pcc
 	csetaddr ct1, ct1, t0
 	li	t0, 1
 	csetflags ct1, ct1, t0
+#ifdef __riscv_xcheri_mode_dependent_jumps
+	jr.cap	ct1
+#else
 	cjr	ct1
+#endif
 .option push
 .option capmode
 1:
@@ -498,6 +688,7 @@ ENTRY(fork_trampoline)
 	cspecialr ct0, ddc
 	csetaddr ct0, ct0, sp
 	cmove	csp, ct0
+#endif
 
 	/*
 	 * Switch to user DDC.  After this point, all stack accesses
@@ -558,7 +749,9 @@ ENTRY(fork_trampoline)
 
 	/* Load user stack */
 	clc	csp, (TF_SP - TF_SIZE)(csp)
+#ifndef __CHERI_PURE_CAPABILITY__
 .option pop
+#endif
 #else
 	/* Restore exception program counter */
 	ld	t0, (TF_SEPC)(sp)
@@ -618,7 +811,27 @@ ENTRY(fork_trampoline)
 END(fork_trampoline)
 
 ENTRY(savectx)
-#if __has_feature(capabilities)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Store ra, sp and the callee-saved registers */
+	csc	cra, (PCB_RA)(ca0)
+	csc	csp, (PCB_SP)(ca0)
+	csc	ctp, (PCB_TP)(ca0)
+	csc	cgp, (PCB_GP)(ca0)
+
+	/* s[0-11] */
+	csc	cs0, (PCB_S + 0 * 16)(ca0)
+	csc	cs1, (PCB_S + 1 * 16)(ca0)
+	csc	cs2, (PCB_S + 2 * 16)(ca0)
+	csc	cs3, (PCB_S + 3 * 16)(ca0)
+	csc	cs4, (PCB_S + 4 * 16)(ca0)
+	csc	cs5, (PCB_S + 5 * 16)(ca0)
+	csc	cs6, (PCB_S + 6 * 16)(ca0)
+	csc	cs7, (PCB_S + 7 * 16)(ca0)
+	csc	cs8, (PCB_S + 8 * 16)(ca0)
+	csc	cs9, (PCB_S + 9 * 16)(ca0)
+	csc	cs10, (PCB_S + 10 * 16)(ca0)
+	csc	cs11, (PCB_S + 11 * 16)(ca0)
+#elif __has_feature(capabilities)
 	/* Store ra, sp and the callee-saved registers */
 	sc	cra, (PCB_RA)(a0)
 	sc	csp, (PCB_SP)(a0)
@@ -661,7 +874,23 @@ ENTRY(savectx)
 #endif
 
 #ifdef FPE
+#ifdef __CHERI_PURE_CAPABILITY__
+	__fpe_state_save ca0
+#else
 	__fpe_state_save a0
 #endif
-	ret
+#endif
+	RETURN
 END(savectx)
+
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20200804,
+ *   "target_type": "kernel",
+ *   "changes_purecap": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

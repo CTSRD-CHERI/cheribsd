@@ -1286,7 +1286,7 @@ usie_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct ifmediareq *ifmr;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if (ifp->if_flags & IFF_UP) {
 			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING))
 				usie_if_init(sc);
@@ -1296,7 +1296,7 @@ usie_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 			device_printf(sc->sc_dev,
 			    "Connect to the network first.\n");
@@ -1332,7 +1332,7 @@ usie_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		DPRINTF("media\n");
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		break;
 
 	default:
@@ -1616,10 +1616,10 @@ usie_driver_loaded(struct module *mod, int what, void *arg)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

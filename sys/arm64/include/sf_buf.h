@@ -29,17 +29,20 @@
 #ifndef _MACHINE_SF_BUF_H_
 #define	_MACHINE_SF_BUF_H_
 
+#include <cheri/cheric.h>
+
 /*
  * On this machine, the only purpose for which sf_buf is used is to implement
  * an opaque pointer required by the machine-independent parts of the kernel.
  * That pointer references the vm_page that is "mapped" by the sf_buf.  The
  * actual mapping is provided by the direct virtual-to-physical mapping.  
  */
-static inline vm_offset_t
+static inline vm_pointer_t
 sf_buf_kva(struct sf_buf *sf)
 {
 
-	return (PHYS_TO_DMAP(VM_PAGE_TO_PHYS((vm_page_t)sf)));
+	return (cheri_kern_setbounds(
+	    PHYS_TO_DMAP(VM_PAGE_TO_PHYS((vm_page_t)sf)), PAGE_SIZE));
 }
 
 static inline vm_page_t

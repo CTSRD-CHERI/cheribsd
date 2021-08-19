@@ -3654,7 +3654,7 @@ __CONCAT(PMTYPE, enter)(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	    ("pmap_enter: invalid to pmap_enter into trampoline (va: 0x%x)",
 	    va));
 	KASSERT(pmap != kernel_pmap || (m->oflags & VPO_UNMANAGED) != 0 ||
-	    va < kmi.clean_sva || va >= kmi.clean_eva,
+	    !VA_IS_CLEANMAP(va),
 	    ("pmap_enter: managed mapping within the clean submap"));
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		VM_PAGE_OBJECT_BUSY_ASSERT(m);
@@ -4108,8 +4108,8 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 {
 	pt_entry_t newpte, *pte;
 
-	KASSERT(pmap != kernel_pmap || va < kmi.clean_sva ||
-	    va >= kmi.clean_eva || (m->oflags & VPO_UNMANAGED) != 0,
+	KASSERT(pmap != kernel_pmap || !VA_IS_CLEANMAP(va) ||
+	    (m->oflags & VPO_UNMANAGED) != 0,
 	    ("pmap_enter_quick_locked: managed mapping within the clean submap"));
 	rw_assert(&pvh_global_lock, RA_WLOCKED);
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
@@ -5929,7 +5929,7 @@ pmap_init_trm(void)
 	TUNABLE_INT_FETCH("machdep.trm_guard", &trm_guard);
 	if ((trm_guard & PAGE_MASK) != 0)
 		trm_guard = 0;
-	pmap_trm_arena = vmem_create("i386trampoline", 0, 0, 1, 0, M_WAITOK);
+	pmap_trm_arena = vmem_create("i386trampoline", 0, 0, 1, 0, M_WAITOK, 0);
 	vmem_set_import(pmap_trm_arena, pmap_trm_import, NULL, NULL, PAGE_SIZE);
 	pd_m = vm_page_alloc(NULL, 0, VM_ALLOC_NOOBJ | VM_ALLOC_NOBUSY |
 	    VM_ALLOC_NORMAL | VM_ALLOC_WIRED | VM_ALLOC_WAITOK | VM_ALLOC_ZERO);

@@ -814,7 +814,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   blr
 
 
-#elif defined(__arm64__) || defined(__aarch64__)
+#elif defined(__aarch64__)
 
 //
 // extern int __unw_getcontext(unw_context_t* thread_state)
@@ -824,6 +824,48 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 //
   .p2align 2
 DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
+#ifdef __CHERI_PURE_CAPABILITY__
+  stp    c0, c1,  [c0, #0x000]
+  stp    c2, c3,  [c0, #0x020]
+  stp    c4, c5,  [c0, #0x040]
+  stp    c6, c7,  [c0, #0x060]
+  stp    c8, c9,  [c0, #0x080]
+  stp    c10,c11, [c0, #0x0a0]
+  stp    c12,c13, [c0, #0x0c0]
+  stp    c14,c15, [c0, #0x0e0]
+  stp    c16,c17, [c0, #0x100]
+  stp    c18,c19, [c0, #0x120]
+  stp    c20,c21, [c0, #0x140]
+  stp    c22,c23, [c0, #0x160]
+  stp    c24,c25, [c0, #0x180]
+  stp    c26,c27, [c0, #0x1a0]
+  stp    c28,c29, [c0, #0x1c0]
+  str    c30,     [c0, #0x1e0]
+  mov    c1,csp
+  str    c1,      [c0, #0x1f0]
+  str    c30,     [c0, #0x200]    // store return address as pcc
+  // skip cpsr
+  add    c0, c0, #0x220
+  stp    d0, d1,  [c0, #0x000]
+  stp    d2, d3,  [c0, #0x010]
+  stp    d4, d5,  [c0, #0x020]
+  stp    d6, d7,  [c0, #0x030]
+  stp    d8, d9,  [c0, #0x040]
+  stp    d10,d11, [c0, #0x050]
+  stp    d12,d13, [c0, #0x060]
+  stp    d14,d15, [c0, #0x070]
+  stp    d16,d17, [c0, #0x080]
+  stp    d18,d19, [c0, #0x090]
+  stp    d20,d21, [c0, #0x0a0]
+  stp    d22,d23, [c0, #0x0b0]
+  stp    d24,d25, [c0, #0x0c0]
+  stp    d26,d27, [c0, #0x0d0]
+  stp    d28,d29, [c0, #0x0e0]
+  str    d30,     [c0, #0x0f0]
+  str    d31,     [c0, #0x0f8]
+  mov    x0, #0                   // return UNW_ESUCCESS
+  ret
+#else
   stp    x0, x1,  [x0, #0x000]
   stp    x2, x3,  [x0, #0x010]
   stp    x4, x5,  [x0, #0x020]
@@ -863,6 +905,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   str    d31,     [x0, #0x208]
   mov    x0, #0                   // return UNW_ESUCCESS
   ret
+#endif
 
 #elif defined(__arm__) && !defined(__APPLE__)
 
@@ -1062,6 +1105,52 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   # zero epcr
   l.sw     132(r3), r0
 
+#elif defined(__hexagon__)
+#
+# extern int unw_getcontext(unw_context_t* thread_state)
+#
+# On entry:
+#  thread_state pointer is in r0
+#
+#define OFFSET(offset) (offset/4)
+DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
+  memw(r0+#32) = r8
+  memw(r0+#36) = r9
+  memw(r0+#40) = r10
+  memw(r0+#44) = r11
+
+  memw(r0+#48) = r12
+  memw(r0+#52) = r13
+  memw(r0+#56) = r14
+  memw(r0+#60) = r15
+
+  memw(r0+#64) = r16
+  memw(r0+#68) = r17
+  memw(r0+#72) = r18
+  memw(r0+#76) = r19
+
+  memw(r0+#80) = r20
+  memw(r0+#84) = r21
+  memw(r0+#88) = r22
+  memw(r0+#92) = r23
+
+  memw(r0+#96) = r24
+  memw(r0+#100) = r25
+  memw(r0+#104) = r26
+  memw(r0+#108) = r27
+
+  memw(r0+#112) = r28
+  memw(r0+#116) = r29
+  memw(r0+#120) = r30
+  memw(r0+#124) = r31
+  r1 = c4   // Predicate register
+  memw(r0+#128) = r1
+  r1 = memw(r30)           // *FP == Saved FP
+  r1 = r31
+  memw(r0+#132) = r1
+
+  jumpr r31
+
 #elif defined(__sparc__)
 
 #
@@ -1117,7 +1206,12 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 #  thread_state pointer is in a0
 #
 DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
-  // x0 is zero
+  // x0 is zero (index 0 is used for PC)
+#ifdef __CHERI_PURE_CAPABILITY__
+  csc   c1, (__SIZEOF_CHERI_CAPABILITY__ * 0)(ca0) // store ra as pc
+#else
+  sd    x1, (8 * 0)(a0) // store ra as pc
+#endif
   save_gpr 1
   save_gpr 2
   save_gpr 3

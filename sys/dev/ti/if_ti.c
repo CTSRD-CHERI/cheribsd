@@ -3496,13 +3496,12 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int mask, error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		TI_LOCK(sc);
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		    ifr_mtu_get(ifr) > TI_JUMBO_MTU)
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > TI_JUMBO_MTU)
 			error = EINVAL;
 		else {
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 				ti_init_locked(sc);
@@ -3510,7 +3509,7 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		TI_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		TI_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			/*
@@ -3541,20 +3540,20 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->ti_if_flags = ifp->if_flags;
 		TI_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		TI_LOCK(sc);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			ti_setmulti(sc);
 		TI_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		TI_LOCK(sc);
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (ifp->if_capabilities & IFCAP_TXCSUM) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -4039,10 +4038,10 @@ ti_sysctl_node(struct ti_softc *sc)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

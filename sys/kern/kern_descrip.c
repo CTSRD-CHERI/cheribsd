@@ -2076,7 +2076,7 @@ fdinit(struct filedesc *fdp, bool prepfiles, int *lastfile)
 		MPASS(lastfile == NULL);
 
 	newfdp0 = uma_zalloc(filedesc0_zone, M_WAITOK | M_ZERO);
-	newfdp = &newfdp0->fd_fd;
+	newfdp = __unbounded_addressof(newfdp0->fd_fd);
 
 	/* Create the file descriptor table. */
 	FILEDESC_LOCK_INIT(newfdp);
@@ -4635,7 +4635,7 @@ DB_SHOW_COMMAND(file, db_show_file)
 		db_printf("usage: show file <addr>\n");
 		return;
 	}
-	fp = (struct file *)addr;
+	fp = DB_DATA_PTR(addr, struct file);
 	db_print_file(fp, 1);
 }
 
@@ -4914,10 +4914,14 @@ fildesc_drvinit(void *unused)
 SYSINIT(fildescdev, SI_SUB_DRIVERS, SI_ORDER_MIDDLE, fildesc_drvinit, NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "subobject_bounds",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

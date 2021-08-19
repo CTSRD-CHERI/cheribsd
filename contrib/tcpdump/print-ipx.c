@@ -71,12 +71,6 @@ static void ipx_rip_print(netdissect_options *, const u_short *, u_int);
 void
 ipx_print(netdissect_options *ndo, const u_char *p, u_int length)
 {
-	INVOKE_DISSECTOR(_ipx_print, ndo, p, length);
-}
-
-void
-_ipx_print(netdissect_options *ndo, const u_char *p, u_int length)
-{
 	const struct ipxHdr *ipx = (const struct ipxHdr *)p;
 
 	if (!ndo->ndo_eflag)

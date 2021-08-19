@@ -203,7 +203,7 @@ struct uhci_hw_softc {
 
 typedef struct uhci_softc {
 	struct uhci_hw_softc sc_hw;
-	struct usb_bus sc_bus;		/* base device */
+	struct usb_bus sc_bus __subobject_use_container_bounds;	/* base device */
 	union uhci_hub_desc sc_hub_desc;
 	struct usb_callout sc_root_intr;
 
@@ -249,3 +249,12 @@ void	uhci_reset(uhci_softc_t *sc);
 void	uhci_interrupt(uhci_softc_t *sc);
 
 #endif					/* _UHCI_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20210404,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

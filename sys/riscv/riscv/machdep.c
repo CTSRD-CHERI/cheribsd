@@ -449,11 +449,8 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 #if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
-		tf->tf_a[0] = (uintcap_t)cheri_auxv_capability(imgp, stack);
-		tf->tf_sp = (uintcap_t)cheri_exec_stack_pointer(imgp, stack);
-		cheri_set_mmap_capability(td, imgp,
-		    (void * __capability)tf->tf_sp);
-
+		tf->tf_a[0] = (uintcap_t)imgp->auxv;
+		tf->tf_sp = stack;
 		tf->tf_sepc = (uintcap_t)cheri_exec_pcc(td, imgp);
 		td->td_proc->p_md.md_sigcode = cheri_sigcode_capability(td);
 	} else
@@ -795,9 +792,6 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct sigacts *psp;
 	struct thread *td;
 	struct proc *p;
-#if __has_feature(capabilities)
-	int cheri_is_sandboxed;
-#endif
 	int onstack;
 	int sig;
 
@@ -817,54 +811,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * than using the full capability.  Should we compare the
 	 * entire capability...?  Just pointer and bounds...?
 	 */
-	onstack = sigonstack((__cheri_addr vaddr_t)tf->tf_sp);
-
-#if __has_feature(capabilities)
-	/*
-	 * CHERI affects signal delivery in the following ways:
-	 *
-	 * (1) Additional capability state is exposed via extensions
-	 *     to the context frame placed on the stack.
-	 *
-	 * (2) If the user $pcc doesn't include CHERI_PERM_SYSCALL,
-	 *     then we consider user state to be 'sandboxed'.
-	 *
-	 * (3) If an alternative signal stack is not defined, and we
-	 *     are in a 'sandboxed' state, then we will terminate the
-	 *     process unconditionally.
-	 */
-	cheri_is_sandboxed = cheri_signal_sandboxed(td);
-
-	/*
-	 * We provide the ability to drop into the debugger in two different
-	 * circumstances: (1) if the code running is sandboxed; and (2) if the
-	 * fault is a CHERI protection fault.  Handle both here for the
-	 * non-unwind case.  Do this before we rewrite any general-purpose or
-	 * capability register state for the thread.
-	 */
-#ifdef DDB
-	if (cheri_is_sandboxed && security_cheri_debugger_on_sandbox_signal)
-		kdb_enter(KDB_WHY_CHERI, "Signal delivery to CHERI sandbox");
-	else if (sig == SIGPROT && security_cheri_debugger_on_sigprot)
-		kdb_enter(KDB_WHY_CHERI,
-		    "SIGPROT delivered outside sandbox");
-#endif
-
-	/*
-	 * If a thread is running sandboxed, we can't rely on $sp which may
-	 * not point at a valid stack in the ambient context, or even be
-	 * maliciously manipulated.  We must therefore always use the
-	 * alternative stack.  We are also therefore unable to tell whether we
-	 * are on the alternative stack, so must clear 'oonstack' here.
-	 *
-	 * XXXRW: This requires significant further thinking; however, the net
-	 * upshot is that it is not a good idea to do an object-capability
-	 * invoke() from a signal handler, as with so many other things in
-	 * life.
-	 */
-	if (cheri_is_sandboxed != 0)
-		onstack = 0;
-#endif
+	onstack = sigonstack(tf->tf_sp);
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
 	    (__cheri_addr vaddr_t)catcher, sig);
@@ -875,23 +822,6 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		fp = (struct sigframe * __capability)((uintcap_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 	} else {
-#if __has_feature(capabilities)
-		/*
-		 * Signals delivered when a CHERI sandbox is present must be
-		 * delivered on the alternative stack rather than a local one.
-		 * If an alternative stack isn't present, then terminate or
-		 * risk leaking capabilities (and control) to the sandbox (or
-		 * just crashing the sandbox).
-		 */
-		if (cheri_is_sandboxed) {
-			mtx_unlock(&psp->ps_mtx);
-			printf("pid %d, tid %d: signal in sandbox without "
-			    "alternative stack defined\n", td->td_proc->p_pid,
-			    td->td_tid);
-			sigexit(td, SIGILL);
-			/* NOTREACHED */
-		}
-#endif
 		fp = (struct sigframe * __capability)td->td_frame->tf_sp;
 	}
 
@@ -940,7 +870,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_ra = (register_t)sysent->sv_sigcode_base;
 	else
-		tf->tf_ra = (register_t)(sysent->sv_psstrings -
+		tf->tf_ra = (register_t)(p->p_psstrings -
 		    *(sysent->sv_szsigcode));
 #endif
 
@@ -952,7 +882,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 }
 
 static void
-init_proc0(vm_offset_t kstack)
+init_proc0(vm_pointer_t kstack)
 {
 	struct pcpu *pcpup;
 
@@ -972,20 +902,28 @@ init_proc0(vm_offset_t kstack)
 static void
 try_load_dtb(caddr_t kmdp)
 {
-	vm_offset_t dtbp;
+	vm_pointer_t dtbp;
 
 	dtbp = MD_FETCH(kmdp, MODINFOMD_DTBP, vm_offset_t);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (dtbp != (vm_pointer_t)NULL) {
+		dtbp = (vm_pointer_t)cheri_andperm(cheri_setaddress(
+		    kernel_root_cap, dtbp), CHERI_PERMS_KERNEL_DATA);
+		dtbp = (vm_pointer_t)cheri_setbounds((void *)dtbp,
+		    fdt_totalsize((void *)dtbp));
+	}
+#endif
 
 #if defined(FDT_DTB_STATIC)
 	/*
 	 * In case the device tree blob was not retrieved (from metadata) try
 	 * to use the statically embedded one.
 	 */
-	if (dtbp == (vm_offset_t)NULL)
-		dtbp = (vm_offset_t)&fdt_static_dtb;
+	if (dtbp == (vm_pointer_t)NULL)
+		dtbp = (vm_pointer_t)&fdt_static_dtb;
 #endif
 
-	if (dtbp == (vm_offset_t)NULL) {
+	if (dtbp == (vm_pointer_t)NULL) {
 		printf("ERROR loading DTB\n");
 		return;
 	}
@@ -1049,14 +987,33 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(size_t));
 	PRELOAD_PUSH_VALUE(uint64_t, (size_t)((vm_offset_t)&end - KERNBASE));
 
+	/*
+	 * XXX: Storing a capability here is problematic due to the
+	 * layout of metadata, and the issue of needing the boot
+	 * loader to eventually pass in caps here.  However, do round
+	 * up to ensure the DTB area is a representable pointer even
+	 * if we have to rederive it later.
+	 */
+
 	/* Copy the DTB to KVA space. */
+	dtb_size = fdt_totalsize(rvbp->dtbp_virt);
+#ifdef __CHERI_PURE_CAPABILITY__
+	lastaddr = roundup2(lastaddr, CHERI_REPRESENTABLE_ALIGNMENT(dtb_size));
+#else
 	lastaddr = roundup(lastaddr, sizeof(int));
+#endif
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_METADATA | MODINFOMD_DTBP);
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(vm_offset_t));
 	PRELOAD_PUSH_VALUE(vm_offset_t, lastaddr);
-	dtb_size = fdt_totalsize(rvbp->dtbp_virt);
+#ifdef __CHERI_PURE_CAPABILITY__
+	void *dtbp = cheri_setbounds(cheri_setaddress(kernel_root_cap,
+	    lastaddr), dtb_size);
+	memmove(dtbp, (const void *)rvbp->dtbp_virt, dtb_size);
+	lastaddr = roundup(lastaddr + cheri_getlen(dtbp), sizeof(int));
+#else
 	memmove((void *)lastaddr, (const void *)rvbp->dtbp_virt, dtb_size);
 	lastaddr = roundup(lastaddr + dtb_size, sizeof(int));
+#endif
 
 	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_METADATA | MODINFOMD_KERNEND);
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(vm_offset_t));
@@ -1105,7 +1062,7 @@ parse_metadata(void)
 	caddr_t kmdp;
 	vm_offset_t lastaddr;
 #ifdef DDB
-	vm_offset_t ksym_start, ksym_end;
+	vm_pointer_t ksym_start, ksym_end;
 #endif
 	char *kern_envp;
 
@@ -1159,7 +1116,11 @@ initriscv(struct riscv_bootparams *rvbp)
 	pcpu_init(pcpup, 0, sizeof(struct pcpu));
 
 	/* Set the pcpu pointer */
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("cmove ctp, %0" :: "C"(pcpup));
+#else
 	__asm __volatile("mv tp, %0" :: "r"(pcpup));
+#endif
 
 	PCPU_SET(curthread, &thread0);
 
@@ -1275,3 +1236,13 @@ bzero(void *buf, size_t len)
 	while(len-- > 0)
 		*p++ = 0;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "pointer_provenance"
+//   ]
+// }
+// CHERI CHANGES END

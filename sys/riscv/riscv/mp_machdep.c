@@ -73,7 +73,15 @@ __FBSDID("$FreeBSD$");
 
 boolean_t ofw_cpu_reg(phandle_t node, u_int, cell_t *);
 
-uint32_t __riscv_boot_ap[MAXCPU];
+/*
+ * XXX: When loading the kernel through GDB, .bss is not cleared. If BBL is
+ * used on a multi-hart system, all harts race to win the hart lottery, with
+ * the boot hart zeroing out bss once paging has been set up, but the other
+ * harts already spinning on __riscv_boot_ap[hartid]. This means the APs can
+ * end up reading before bss has been zeroed, so we must put this in .data
+ * instead.
+ */
+uint32_t __riscv_boot_ap[MAXCPU] __section(".data");
 
 static enum {
 	CPUS_UNKNOWN,
@@ -234,7 +242,11 @@ init_secondary(uint64_t hart)
 
 	/* Setup the pcpu pointer */
 	pcpup = &__pcpu[cpuid];
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("cmove ctp, %0" :: "C"(pcpup));
+#else
 	__asm __volatile("mv tp, %0" :: "r"(pcpup));
+#endif
 
 	/* Workaround: make sure wfi doesn't halt the hart */
 	csr_set(sie, SIE_SSIE);
@@ -307,7 +319,7 @@ smp_after_idle_runnable(void *arg __unused)
 			pc = pcpu_find(cpu);
 			while (atomic_load_ptr(&pc->pc_curpcb) == NULL)
 				cpu_spinwait();
-			kmem_free((vm_offset_t)bootstacks[cpu], PAGE_SIZE);
+			kmem_free((vm_pointer_t)bootstacks[cpu], PAGE_SIZE);
 		}
 	}
 }
@@ -552,3 +564,13 @@ cpu_mp_setmaxid(void)
 	mp_ncpus = 1;
 	mp_maxid = 0;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

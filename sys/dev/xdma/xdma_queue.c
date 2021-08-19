@@ -92,8 +92,8 @@ xdma_enqueue(xdma_channel_t *xchan, uintptr_t src, uintptr_t dst,
 	xr->block_num = 1;
 	xr->block_len = len;
 	xr->req_type = XR_TYPE_VIRT;
-	xr->src_addr = src;
-	xr->dst_addr = dst;
+	xr->src.vaddr = src;
+	xr->dst.vaddr = dst;
 	xr->src_width = src_width;
 	xr->dst_width = dst_width;
 
@@ -124,3 +124,13 @@ xdma_queue_submit(xdma_channel_t *xchan)
 
 	return (ret);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ],
+//   "change_comment": "bus_addr_t"
+// }
+// CHERI CHANGES END

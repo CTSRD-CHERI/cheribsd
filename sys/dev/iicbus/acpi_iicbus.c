@@ -68,7 +68,7 @@ struct gsb_buffer {
 
 struct acpi_iicbus_softc {
 	struct iicbus_softc	super_sc;
-	ACPI_CONNECTION_INFO	space_handler_info;
+	ACPI_CONNECTION_INFO	space_handler_info __subobject_use_container_bounds;
 	bool			space_handler_installed;
 };
 

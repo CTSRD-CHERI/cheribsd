@@ -33,12 +33,6 @@
 void
 msdp_print(netdissect_options *ndo, const u_char *sp, u_int length)
 {
-	INVOKE_DISSECTOR(_msdp_print, ndo, sp, length);
-}
-
-void
-_msdp_print(netdissect_options *ndo, const u_char *sp, u_int length)
-{
 	unsigned int type, len;
 
 	ND_TCHECK2(*sp, 3);

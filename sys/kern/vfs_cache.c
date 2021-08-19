@@ -164,7 +164,7 @@ struct	namecache_ts {
 	struct	timespec nc_dotdottime;	/* dotdot timespec provided by fs */
 	int	nc_ticks;		/* ticks value when entry was added */
 	int	nc_pad;
-	struct namecache nc_nc;
+	struct namecache nc_nc __subobject_use_container_bounds;
 };
 
 TAILQ_HEAD(cache_freebatch, namecache);
@@ -175,7 +175,7 @@ TAILQ_HEAD(cache_freebatch, namecache);
  * may be in the same spot suffer a little bit and enforce the
  * alignment for everyone. Note this is a nop for 64-bit platforms.
  */
-#define CACHE_ZONE_ALIGNMENT	UMA_ALIGNOF(time_t)
+#define CACHE_ZONE_ALIGNMENT	MAX(UMA_ALIGNOF(time_t), UMA_ALIGNOF(uintptr_t))
 
 /*
  * TODO: the initial value of CACHE_PATH_CUTOFF was inherited from the
@@ -190,7 +190,10 @@ TAILQ_HEAD(cache_freebatch, namecache);
  * tied to VFS SMR. Even if retaining them, the current split should be
  * re-evaluated.
  */
-#ifdef __LP64__
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	CACHE_PATH_CUTOFF	45
+#define	CACHE_LARGE_PAD		14
+#elif __SIZEOF_POINTER__ == 8
 #define	CACHE_PATH_CUTOFF	45
 #define	CACHE_LARGE_PAD		6
 #else
@@ -3551,7 +3554,7 @@ DB_SHOW_COMMAND(vpath, db_show_vpath)
 		return;
 	}
 
-	vp = (struct vnode *)addr;
+	vp = DB_DATA_PTR(addr, struct vnode);
 	db_print_vpath(vp);
 }
 
@@ -4769,10 +4772,15 @@ out:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "kdb",
+//     "pointer_shape",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

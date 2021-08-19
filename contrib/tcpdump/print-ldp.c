@@ -555,13 +555,6 @@ void
 ldp_print(netdissect_options *ndo,
           register const u_char *pptr, register u_int len)
 {
-	INVOKE_DISSECTOR(_ldp_print, ndo, pptr, len);
-}
-
-void
-_ldp_print(netdissect_options *ndo,
-          register const u_char *pptr, register u_int len)
-{
     u_int processed;
     while (len > (sizeof(struct ldp_common_header) + sizeof(struct ldp_msg_header))) {
         processed = ldp_pdu_print(ndo, pptr);

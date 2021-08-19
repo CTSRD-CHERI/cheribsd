@@ -621,8 +621,8 @@ netdump_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t addr,
 			}
 			encryptedkey = malloc(conf->kda_encryptedkeysize,
 			    M_TEMP, M_WAITOK);
-			error = copyin(conf->kda_encryptedkey, encryptedkey,
-			    conf->kda_encryptedkeysize);
+			error = copyin(conf->kda_user_encryptedkey,
+			    encryptedkey, conf->kda_encryptedkeysize);
 			if (error != 0) {
 				free(encryptedkey, M_TEMP);
 				break;

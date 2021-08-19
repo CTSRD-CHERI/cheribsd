@@ -1956,7 +1956,7 @@ devfs_write_f(struct file *fp, struct uio *uio, struct ucred *cred,
 }
 
 static int
-devfs_mmap_f(struct file *fp, vm_map_t map, vm_offset_t *addr,
+devfs_mmap_f(struct file *fp, vm_map_t map, vm_pointer_t *addr,
     vm_offset_t max_addr, vm_size_t size, vm_prot_t prot,
     vm_prot_t cap_maxprot, int flags, vm_ooffset_t foff,
     struct thread *td)
@@ -2137,11 +2137,14 @@ CTASSERT(O_NONBLOCK == IO_NDELAY);
 CTASSERT(O_FSYNC == IO_SYNC);
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",
 //     "support"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

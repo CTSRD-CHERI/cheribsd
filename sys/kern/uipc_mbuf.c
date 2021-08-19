@@ -55,6 +55,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_pageout.h>
 #include <vm/vm_page.h>
 
+#include <cheri/cheric.h>
+
 SDT_PROBE_DEFINE5_XLATE(sdt, , , m__init,
     "struct mbuf *", "mbufinfo_t *",
     "uint32_t", "uint32_t",
@@ -167,7 +169,11 @@ CTASSERT(offsetof(struct mbuf, m_pktdat) % 8 == 0);
  * NB: Possibly they should be documented there via #define's and not just
  * comments.
  */
-#if defined(__LP64__)
+#if defined(__CHERI_PURE_CAPABILITY__)
+CTASSERT(offsetof(struct mbuf, m_dat) == 64);
+CTASSERT(sizeof(struct pkthdr) == 96);
+CTASSERT(sizeof(struct m_ext) == 352);
+#elif __SIZEOF_POINTER__ == 8
 CTASSERT(offsetof(struct mbuf, m_dat) == 32);
 CTASSERT(sizeof(struct pkthdr) == 56);
 CTASSERT(sizeof(struct m_ext) == 160);
@@ -367,7 +373,7 @@ m_pkthdr_init(struct mbuf *m, int how)
 #ifdef MAC
 	int error;
 #endif
-	m->m_data = m->m_pktdat;
+	m->m_data = cheri_kern_setbounds(m->m_pktdat, MHLEN);
 	bzero(&m->m_pkthdr, sizeof(m->m_pkthdr));
 #ifdef NUMA
 	m->m_pkthdr.numa_domain = M_NODOM;
@@ -407,7 +413,7 @@ m_move_pkthdr(struct mbuf *to, struct mbuf *from)
 	to->m_flags = (from->m_flags & M_COPYFLAGS) |
 	    (to->m_flags & (M_EXT | M_EXTPG));
 	if ((to->m_flags & M_EXT) == 0)
-		to->m_data = to->m_pktdat;
+		to->m_data = cheri_kern_setbounds(to->m_pktdat, MHLEN);
 	to->m_pkthdr = from->m_pkthdr;		/* especially tags */
 	SLIST_INIT(&from->m_pkthdr.tags);	/* purge tags from src */
 	from->m_flags &= ~M_PKTHDR;
@@ -446,7 +452,7 @@ m_dup_pkthdr(struct mbuf *to, const struct mbuf *from, int how)
 	to->m_flags = (from->m_flags & M_COPYFLAGS) |
 	    (to->m_flags & (M_EXT | M_EXTPG));
 	if ((to->m_flags & M_EXT) == 0)
-		to->m_data = to->m_pktdat;
+		to->m_data = cheri_kern_setbounds(to->m_pktdat, MHLEN);
 	to->m_pkthdr = from->m_pkthdr;
 	if (from->m_pkthdr.csum_flags & CSUM_SND_TAG)
 		m_snd_tag_ref(from->m_pkthdr.snd_tag);
@@ -580,7 +586,8 @@ m_copypacket(struct mbuf *m, int how)
 		n->m_data = m->m_data;
 		mb_dupcl(n, m);
 	} else {
-		n->m_data = n->m_pktdat + (m->m_data - m->m_pktdat );
+		n->m_data = cheri_kern_setbounds(n->m_pktdat, MHLEN) +
+		    (m->m_data - m->m_pktdat);
 		bcopy(mtod(m, char *), mtod(n, char *), n->m_len);
 	}
 
@@ -2154,3 +2161,13 @@ SYSCTL_PROC(_kern_ipc, OID_AUTO, mbufprofileclr,
     mbprof_clr_handler, "I",
     "clear mbuf profiling statistics");
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 202000706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support",
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END

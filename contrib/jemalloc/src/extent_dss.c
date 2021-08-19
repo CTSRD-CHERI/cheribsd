@@ -39,7 +39,7 @@ static atomic_p_t	dss_max;
 /******************************************************************************/
 
 static void *
-extent_dss_sbrk(intptr_t increment) {
+extent_dss_sbrk(size_t increment) {
 #ifdef JEMALLOC_DSS
 	return sbrk(increment);
 #else
@@ -172,7 +172,7 @@ extent_alloc_dss(tsdn_t *tsdn, arena_t *arena, void *new_addr, size_t size,
 			void *gap_addr_subpage = max_cur;
 			size_t gap_size_subpage = (const char*)ret -
 			    (const char*)gap_addr_subpage;
-			intptr_t incr = gap_size_subpage + size;
+			size_t incr = gap_size_subpage + size;
 
 			assert((uintptr_t)max_cur + incr == (uintptr_t)ret +
 			    size);

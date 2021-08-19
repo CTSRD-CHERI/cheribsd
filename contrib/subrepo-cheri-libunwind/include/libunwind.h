@@ -99,6 +99,8 @@ typedef struct unw_proc_info_t unw_proc_info_t;
 #ifdef __cplusplus
 extern "C" {
 #endif
+extern size_t unw_context_size(void) LIBUNWIND_AVAIL;
+extern size_t unw_cursor_size(void) LIBUNWIND_AVAIL;
 
 extern int unw_getcontext(unw_context_t *) LIBUNWIND_AVAIL;
 extern int unw_init_local(unw_cursor_t *, unw_context_t *) LIBUNWIND_AVAIL;
@@ -558,6 +560,43 @@ enum {
   UNW_ARM64_D29 = 93,
   UNW_ARM64_D30 = 94,
   UNW_ARM64_D31 = 95,
+  // reserved block
+  // Morello registers
+  UNW_ARM64_C0 = 198,
+  UNW_ARM64_C1 = 199,
+  UNW_ARM64_C2 = 200,
+  UNW_ARM64_C3 = 201,
+  UNW_ARM64_C4 = 202,
+  UNW_ARM64_C5 = 203,
+  UNW_ARM64_C6 = 204,
+  UNW_ARM64_C7 = 205,
+  UNW_ARM64_C8 = 206,
+  UNW_ARM64_C9 = 207,
+  UNW_ARM64_C10 = 208,
+  UNW_ARM64_C11 = 209,
+  UNW_ARM64_C12 = 210,
+  UNW_ARM64_C13 = 211,
+  UNW_ARM64_C14 = 212,
+  UNW_ARM64_C15 = 213,
+  UNW_ARM64_C16 = 214,
+  UNW_ARM64_C17 = 215,
+  UNW_ARM64_C18 = 216,
+  UNW_ARM64_C19 = 217,
+  UNW_ARM64_C20 = 218,
+  UNW_ARM64_C21 = 219,
+  UNW_ARM64_C22 = 220,
+  UNW_ARM64_C23 = 221,
+  UNW_ARM64_C24 = 222,
+  UNW_ARM64_C25 = 223,
+  UNW_ARM64_C26 = 224,
+  UNW_ARM64_C27 = 225,
+  UNW_ARM64_C28 = 226,
+  UNW_ARM64_C29 = 227,
+  UNW_ARM64_CFP = 227,
+  UNW_ARM64_C30 = 228,
+  UNW_ARM64_CLR = 228,
+  UNW_ARM64_C31 = 229,
+  UNW_ARM64_CSP = 229
 };
 
 // 32-bit ARM registers. Numbers match DWARF for ARM spec #3.1 Table 1.
@@ -864,6 +903,44 @@ enum {
   UNW_SPARC_I5 = 29,
   UNW_SPARC_I6 = 30,
   UNW_SPARC_I7 = 31,
+};
+
+// Hexagon register numbers
+enum {
+  UNW_HEXAGON_R0,
+  UNW_HEXAGON_R1,
+  UNW_HEXAGON_R2,
+  UNW_HEXAGON_R3,
+  UNW_HEXAGON_R4,
+  UNW_HEXAGON_R5,
+  UNW_HEXAGON_R6,
+  UNW_HEXAGON_R7,
+  UNW_HEXAGON_R8,
+  UNW_HEXAGON_R9,
+  UNW_HEXAGON_R10,
+  UNW_HEXAGON_R11,
+  UNW_HEXAGON_R12,
+  UNW_HEXAGON_R13,
+  UNW_HEXAGON_R14,
+  UNW_HEXAGON_R15,
+  UNW_HEXAGON_R16,
+  UNW_HEXAGON_R17,
+  UNW_HEXAGON_R18,
+  UNW_HEXAGON_R19,
+  UNW_HEXAGON_R20,
+  UNW_HEXAGON_R21,
+  UNW_HEXAGON_R22,
+  UNW_HEXAGON_R23,
+  UNW_HEXAGON_R24,
+  UNW_HEXAGON_R25,
+  UNW_HEXAGON_R26,
+  UNW_HEXAGON_R27,
+  UNW_HEXAGON_R28,
+  UNW_HEXAGON_R29,
+  UNW_HEXAGON_R30,
+  UNW_HEXAGON_R31,
+  UNW_HEXAGON_P3_0,
+  UNW_HEXAGON_PC,
 };
 
 // RISC-V registers. These match the DWARF register numbers defined by section

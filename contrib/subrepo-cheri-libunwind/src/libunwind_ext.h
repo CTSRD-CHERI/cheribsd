@@ -23,6 +23,8 @@
 extern "C" {
 #endif
 
+extern size_t __unw_context_size(void);
+extern size_t __unw_cursor_size(void);
 extern int __unw_getcontext(unw_context_t *);
 extern int __unw_init_local(unw_cursor_t *, unw_context_t *);
 extern int __unw_step(unw_cursor_t *);

@@ -454,14 +454,8 @@ config_init(void)
 	}
 
 	/* Read LOCALBASE/etc/pkg.conf first. */
-	if (getenv("PKG_BOOTSTRAP_CONFIG_FILE")) {
-		strlcpy(confpath, getenv("PKG_BOOTSTRAP_CONFIG_FILE"),
-		    sizeof(confpath));
-	} else {
-		localbase = getlocalbase();
-		snprintf(confpath, sizeof(confpath), "%s/etc/pkg.conf",
-		    localbase);
-	}
+	localbase = getlocalbase();
+	snprintf(confpath, sizeof(confpath), "%s/etc/pkg.conf", localbase);
 
 	if (access(confpath, F_OK) == 0 && read_conf_file(confpath,
 	    CONFFILE_PKG))

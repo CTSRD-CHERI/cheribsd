@@ -36,6 +36,8 @@
 #include <machine/cpufunc.h>
 #include <machine/pte.h>
 
+#include <cheri/cheric.h>
+
 #if defined(MIPS_EXC_CNTRS)
 #define	PCPU_MIPS_COUNTERS						\
 	register_t	pc_tlb_miss_cnt;	/* TLB miss count */    \
@@ -43,8 +45,20 @@
 	register_t	pc_tlb_mod_cnt;		/* TLB modification count */ \
 #define	PCPU_NUM_EXC_CNTRS	3
 #else
-#define PCPU_MIPS_COUNTERS
+#define	PCPU_MIPS_COUNTERS
 #define	PCPU_NUM_EXC_CNTRS	0
+#endif
+
+#if defined(__CHERI_PURE_CAPABILITY__)
+/*
+ * Add an extra MD PCPU field for a cached copy of the current thread
+ * kernel stack capability.
+ * This must be kept in sync when context switching.
+ */
+#define	PCPU_MD_CAPABILITY_FIELDS					\
+	void	*pc_kstack_cap;		/* cached curthread kstack capability */
+#else
+#define	PCPU_MD_CAPABILITY_FIELDS
 #endif
 
 #define	PCPU_MD_COMMON_FIELDS						\
@@ -54,13 +68,25 @@
 	u_int32_t	pc_next_asid;		/* next ASID to alloc */ \
 	u_int32_t	pc_asid_generation;	/* current ASID generation */ \
 	u_int		pc_pending_ipis;	/* IPIs pending to this CPU */ \
-	struct	pcpu	*pc_self;		/* globally-uniqe self pointer */
+  u_int		pc_kern_unaligned_emul; /* currently emulating an unaligned load/store in the kernel? */ \
+	struct	pcpu	*pc_self;		/* globally-uniqe self pointer */\
+	PCPU_MD_CAPABILITY_FIELDS
 
 #ifdef	__mips_n64
+
+#ifdef __CHERI_PURE_CAPABILITY__
+// struct pcpu aligns to 512 bytes boundary
+#define	PCPU_MD_MIPS64_PAD (112 - (PCPU_NUM_EXC_CNTRS * 8))
+#else /* ! defined(__CHERI_PURE_CAPABILITY__) */
+// struct pcpu aligns to 512 bytes boundary
+#define	PCPU_MD_MIPS64_PAD (245 - (PCPU_NUM_EXC_CNTRS * 8))
+#endif /* ! defined(__CHERI_PURE_CAPABILITY__) */
 #define	PCPU_MD_MIPS64_FIELDS						\
 	PCPU_MD_COMMON_FIELDS						\
-	char		__pad[(245 - (PCPU_NUM_EXC_CNTRS * 8))]
-#else
+	char		__pad[PCPU_MD_MIPS64_PAD]
+
+#else /* ! defined(__mips_n64) */
+
 #define	PCPU_MD_MIPS32_FIELDS						\
 	PCPU_MD_COMMON_FIELDS						\
 	pt_entry_t	*pc_cmap1_ptep;		/* PTE for copy window 1 KVA */ \
@@ -69,8 +95,8 @@
 	vm_offset_t	pc_cmap2_addr;		/* KVA page for copy window 2 */ \
 	vm_offset_t	pc_qmap_addr;		/* KVA page for temporary mappings */ \
 	pt_entry_t	*pc_qmap_ptep;		/* PTE for temporary mapping KVA */ \
-	char		__pad[(97 - (PCPU_NUM_EXC_CNTRS * 4))]
-#endif
+	char		__pad[(101 - (PCPU_NUM_EXC_CNTRS * 4))]
+#endif /* ! defined(__mips_n64) */
 
 #ifdef	__mips_n64
 #define	PCPU_MD_FIELDS	PCPU_MD_MIPS64_FIELDS
@@ -81,7 +107,12 @@
 #ifdef _KERNEL
 
 extern char pcpu_space[MAXCPU][PAGE_SIZE * 2];
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	PCPU_ADDR(cpu)		(struct pcpu *)(pcpu_space[(cpu)])
+#else /* __CHERI_PURE_CAPABILITY__ */
+#define	PCPU_ADDR(cpu)                                                  \
+    (struct pcpu *)cheri_setboundsexact(pcpu_space[(cpu)], sizeof(struct pcpu))
+#endif /* __CHERI_PURE_CAPABILITY__*/
 
 extern struct pcpu *pcpup;
 #define	PCPUP	pcpup
@@ -98,7 +129,7 @@ extern struct pcpu *pcpup;
 #define	PCPU_INC(member)	PCPU_ADD(member, 1)
 #define	PCPU_PTR(member)	(&PCPUP->pc_ ## member)
 #define	PCPU_SET(member,value)	(PCPUP->pc_ ## member = (value))
-#define PCPU_LAZY_INC(member)   (++PCPUP->pc_ ## member)
+#define	PCPU_LAZY_INC(member)   (++PCPUP->pc_ ## member)
 
 #ifdef SMP
 /*
@@ -110,3 +141,14 @@ void	mips_pcpu_tlb_init(struct pcpu *pcpu);
 #endif	/* _KERNEL */
 
 #endif	/* !_MACHINE_PCPU_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_shape",
+//     "support"
+//   ],
+//   "changes_comment": "pcpu_addr, kstack"
+// }
+// CHERI CHANGES END

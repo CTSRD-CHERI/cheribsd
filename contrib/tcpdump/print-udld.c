@@ -96,12 +96,6 @@ static const struct tok udld_flags_values[] = {
 void
 udld_print (netdissect_options *ndo, const u_char *pptr, u_int length)
 {
-	INVOKE_DISSECTOR(_udld_print, ndo, pptr, length);
-}
-
-void
-_udld_print (netdissect_options *ndo, const u_char *pptr, u_int length)
-{
     int code, type, len;
     const u_char *tptr;
 

@@ -44,6 +44,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 #include <machine/setjmp.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
+
 #include <ddb/ddb.h>
 #include <ddb/db_command.h>
 #include <ddb/db_sym.h>
@@ -72,8 +76,15 @@ KDB_BACKEND(ddb, db_init, db_trace_self_wrapper, db_trace_thread_wrapper,
  * the symtab and strtab in memory. This is used when loaded from
  * boot loaders different than the native one (like Xen).
  */
-vm_offset_t ksymtab, kstrtab, ksymtab_size, ksymtab_relbase;
+vm_pointer_t ksymtab, kstrtab;
+vm_size_t ksymtab_size;
+vm_offset_t ksymtab_relbase;
 static struct db_private ksymtab_private;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+void *db_code_cap;
+void *db_data_cap;
+#endif
 
 bool
 X_db_line_at_pc(db_symtab_t *symtab, c_db_sym_t sym, char **file, int *line,
@@ -114,7 +125,7 @@ X_db_search_symbol(db_symtab_t *symtab, db_addr_t off, db_strategy_t strat,
 	db_addr_t stoffs = off;
 
 	if (symtab->private == NULL) {
-		if (!linker_ddb_search_symbol((caddr_t)off, &lsym, &diff)) {
+		if (!linker_ddb_search_symbol((ptraddr_t)off, &lsym, &diff)) {
 			*diffp = (db_expr_t)diff;
 			return ((c_db_sym_t)lsym);
 		}
@@ -191,7 +202,7 @@ X_db_symbol_values(db_symtab_t *symtab, c_db_sym_t sym, const char **namep,
 }
 
 int
-db_fetch_ksymtab(vm_offset_t ksym_start, vm_offset_t ksym_end,
+db_fetch_ksymtab(vm_pointer_t ksym_start, vm_pointer_t ksym_end,
     vm_offset_t relbase)
 {
 	Elf_Size strsz;
@@ -208,6 +219,11 @@ db_fetch_ksymtab(vm_offset_t ksym_start, vm_offset_t ksym_end,
 			/* Sizes doesn't match, unset everything. */
 			ksymtab = ksymtab_size = kstrtab = ksymtab_relbase
 			    = 0;
+		} else {
+#ifdef __CHERI_PURE_CAPABILITY__
+			ksymtab = cheri_setbounds(ksymtab, ksymtab_size);
+			kstrtab = cheri_setbounds(kstrtab, strsz);
+#endif
 		}
 	}
 
@@ -230,6 +246,10 @@ db_init(void)
 		    (char *)(ksymtab + ksymtab_size), "elf", (char *)&ksymtab_private);
 	}
 	db_add_symbol_table(NULL, NULL, "kld", NULL);
+#ifdef __CHERI_PURE_CAPABILITY__
+	db_code_cap = cheri_andperm(kernel_root_cap, CHERI_PERMS_KERNEL_CODE);
+	db_data_cap = cheri_andperm(kernel_root_cap, CHERI_PERMS_KERNEL_DATA);
+#endif
 	return (1);	/* We're the default debugger. */
 }
 
@@ -299,3 +319,33 @@ db_trace_thread_wrapper(struct thread *td)
 		db_trace_thread(td, -1);
 	(void)kdb_jmpbuf(prev_jb);
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+void *
+db_code_ptr(db_addr_t addr)
+{
+	return (cheri_setaddress(db_code_cap, addr));
+}
+
+void *
+db_data_ptr_unbound(db_addr_t addr)
+{
+	return (cheri_setaddress(db_data_cap, addr));
+}
+
+void *
+db_data_ptr(db_addr_t addr, size_t len)
+{
+	return (cheri_setbounds(db_data_ptr_unbound(addr), len));
+}
+#endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

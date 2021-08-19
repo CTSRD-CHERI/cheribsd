@@ -97,6 +97,7 @@ __FBSDID("$FreeBSD$");
 #if __has_feature(capabilities)
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+#include <cheri/cherireg.h>
 #endif
 
 #ifdef KDTRACE_HOOKS
@@ -1173,9 +1174,16 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	struct thread *td = curthread;
 	vm_object_t obj;
 	struct rlimit rlim_stack;
-	vm_offset_t sv_minuser, stack_addr;
+	vm_offset_t sv_minuser;
+	vm_pointer_t stack_addr;
+#if __has_feature(capabilities)
+	vm_pointer_t strings_addr;
+	register_t perms;
+#endif
 	vm_map_t map;
 	u_long ssiz;
+	vm_pointer_t shared_page_addr;
+	vm_prot_t stack_prot;
 
 	imgp->vmspace_destroyed = 1;
 	imgp->sysent = sv;
@@ -1205,7 +1213,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	    imgp->cop == NULL) {
 		shmexit(vmspace);
 		pmap_remove_pages(vmspace_pmap(vmspace));
-		vm_map_remove(map, vm_map_min(map), vm_map_max(map));
+		vm_map_clear(map);
 		/*
 		 * An exec terminates mlockall(MCL_FUTURE), ASLR state
 		 * must be re-evaluated.
@@ -1247,12 +1255,25 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	obj = sv->sv_shared_page_obj;
 	if (obj != NULL && imgp->cop == NULL) {
 		vm_object_reference(obj);
+		shared_page_addr = sv->sv_shared_page_base;
+#if __has_feature(capabilities)
+		error = vm_map_reservation_create(map, &shared_page_addr,
+		    sv->sv_shared_page_len, PAGE_SIZE,
+		    VM_PROT_READ | VM_PROT_EXECUTE);
+		if (error != KERN_SUCCESS) {
+			vm_object_deallocate(obj);
+			return (vm_mmap_to_errno(error));
+		}
+#endif
 		error = vm_map_fixed(map, obj, 0,
-		    sv->sv_shared_page_base, sv->sv_shared_page_len,
+		    shared_page_addr, sv->sv_shared_page_len,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE);
 		if (error != KERN_SUCCESS) {
+#if __has_feature(capabilities)
+			vm_map_reservation_delete(map, shared_page_addr);
+#endif
 			vm_object_deallocate(obj);
 			return (vm_mmap_to_errno(error));
 		}
@@ -1275,20 +1296,35 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	} else {
 		ssiz = maxssiz;
 	}
-
+#if __has_feature(capabilities)
+	/*
+	 * NB: This may cause the stack to exceed the administrator-
+	 * configured stack size limit.
+	 */
+	ssiz = CHERI_REPRESENTABLE_LENGTH(ssiz);
+#endif
 	imgp->eff_stack_sz = lim_cur(curthread, RLIMIT_STACK);
 	if (ssiz < imgp->eff_stack_sz)
 		imgp->eff_stack_sz = ssiz;
-
 	p->p_usrstack = sv->sv_usrstack;
+#if __has_feature(capabilities)
+	p->p_usrstack = CHERI_REPRESENTABLE_BASE(p->p_usrstack, ssiz);
+#endif
 	if (imgp->cop != NULL) {
 		vm_offset_t dummy;
 
 		/*
 		 * XXX: Using linear search here is rather silly.
+		 * Would be nice to have a variant of
+		 * vm_map_findspace() that searched down instead of
+		 * up.
 		 */
 		do {
 			p->p_usrstack -= MAXSSIZ;
+#if __has_feature(capabilities)
+			p->p_usrstack = CHERI_REPRESENTABLE_BASE(p->p_usrstack,
+			    ssiz);
+#endif
 			stack_addr = p->p_usrstack - ssiz;
 			if (stack_addr < VM_MINUSER_ADDRESS ||
 			    stack_addr > VM_MAXUSER_ADDRESS) {
@@ -1303,22 +1339,70 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 			dummy = vm_map_findspace(map, stack_addr, ssiz);
 			vm_map_unlock(map);
 		} while (dummy == vm_map_max(map) - ssiz + 1);
-	} else {
-		stack_addr = p->p_usrstack - ssiz;
 	}
 
-	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz,
-	    obj != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
-	    sv->sv_stackprot, VM_PROT_ALL, MAP_STACK_GROWS_DOWN);
+	/* We reserve the whole max stack size with restricted permission */
+	stack_addr =  p->p_usrstack - ssiz;
+	stack_prot = (obj != NULL && imgp->stack_prot != 0) ? imgp->stack_prot :
+	    sv->sv_stackprot;
+	imgp->stack_sz = ssiz;
+	error = vm_map_reservation_create(map, &stack_addr, ssiz,
+	    PAGE_SIZE, stack_prot);
 	if (error != KERN_SUCCESS)
 		return (vm_mmap_to_errno(error));
+
+	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz, stack_prot,
+	    stack_prot, MAP_STACK_GROWS_DOWN);
+	if (error != KERN_SUCCESS) {
+		vm_map_reservation_delete(map, stack_addr);
+		return (vm_mmap_to_errno(error));
+	}
+
+#if __has_feature(capabilities)
+	perms = (~CHERI_PROT2PERM_MASK | vm_map_prot2perms(stack_prot)) &
+	    CHERI_CAP_USER_DATA_PERMS;
+#ifdef __CHERI_PURE_CAPABILITY__
+	imgp->stack = (void *)cheri_andperm(stack_addr + ssiz, perms);
+#else
+	imgp->stack = cheri_capability_build_user_data(perms, stack_addr,
+	    ssiz, ssiz);
+#endif
+
+	if (sv->sv_flags & SV_CHERI) {
+		/*
+		 * Map a seperate space for strings outside the stack.
+		 * We currently place it just just below the stack as
+		 * this avoides collisions with init which is linked
+		 * near the bottom of the address space.
+		 */
+		strings_addr =
+		    CHERI_REPRESENTABLE_BASE(stack_addr - ARG_MAX, ARG_MAX);
+		error = vm_mmap_object(map, &strings_addr, 0, ARG_MAX,
+		    VM_PROT_RW_CAP, VM_PROT_RW_CAP, MAP_ANON | MAP_FIXED |
+		    MAP_RESERVATION_CREATE, NULL, 0, FALSE, td);
+		if (error != KERN_SUCCESS)
+			return (vm_mmap_to_errno(error));
+#ifdef __CHERI_PURE_CAPABILITY__
+		imgp->strings = (void *)strings_addr;
+#else
+		imgp->strings = cheri_capability_build_user_data(
+		    CHERI_CAP_USER_DATA_PERMS, strings_addr, ARG_MAX, ARG_MAX);
+#endif
+	} else
+		imgp->strings = imgp->stack;
+
+	if (sv->sv_flags & SV_CHERI)
+		p->p_psstrings = strings_addr + ARG_MAX - sv->sv_szpsstrings;
+	else
+#endif
+		p->p_psstrings = p->p_usrstack - sv->sv_szpsstrings;
 
 	/*
 	 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they
 	 * are still used to enforce the stack rlimit on the process stack.
 	 */
 	vmspace->vm_ssize = sgrowsiz >> PAGE_SHIFT;
-	vmspace->vm_maxsaddr = (char *)stack_addr;
+	vmspace->vm_maxsaddr = stack_addr;
 
 	return (0);
 }
@@ -1498,7 +1582,7 @@ err_exit:
 }
 
 struct exec_args_kva {
-	vm_offset_t addr;
+	vm_pointer_t addr;
 	u_int gen;
 	SLIST_ENTRY(exec_args_kva) next;
 };
@@ -1526,7 +1610,7 @@ exec_prealloc_args_kva(void *arg __unused)
 }
 SYSINIT(exec_args_kva, SI_SUB_EXEC, SI_ORDER_ANY, exec_prealloc_args_kva, NULL);
 
-static vm_offset_t
+static vm_pointer_t
 exec_alloc_args_kva(void **cookie)
 {
 	struct exec_args_kva *argkva;
@@ -1773,16 +1857,13 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	int argc, envc;
 	char * __capability * __capability vectp;
 	char *stringp;
-#if __has_feature(capabilities)
-	vaddr_t rounded_stack_vaddr, stack_vaddr, stack_offset;
-	size_t ssiz;
-#endif
 	uintcap_t destp, ustringp;
 	struct ps_strings * __capability arginfo;
 	struct proc *p;
 	size_t execpath_len, len;
 	int error, szsigcode, szps;
 	char canary[sizeof(long) * 8];
+	bool strings_on_stack;
 
 	szps = sizeof(pagesizes[0]) * MAXPAGESIZES;
 	/*
@@ -1796,36 +1877,17 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	p = imgp->proc;
 	szsigcode = 0;
 
-	p->p_psstrings = p->p_sysent->sv_psstrings;
-	if (imgp->cop != NULL)
-		p->p_psstrings -= p->p_sysent->sv_usrstack - p->p_usrstack;
-
+	strings_on_stack = true;
 #if __has_feature(capabilities)
-	/*
-	 * destp must cover all of the smaller buffers copied out
-	 * onto the stack, so roundup the length to be representable
-	 * even if it means the capability extends beyond the stack
-	 * bounds.
-	 */
-	// XXX: This is likely not correct with colocation.
-	stack_vaddr = (vaddr_t)p->p_vmspace->vm_maxsaddr;
-	ssiz = p->p_sysent->sv_usrstack - stack_vaddr;
-	stack_offset = 0;
-	do {
-		rounded_stack_vaddr = CHERI_REPRESENTABLE_BASE(stack_vaddr,
-		    ssiz + stack_offset);
-		stack_offset = stack_vaddr - rounded_stack_vaddr;
-	} while (rounded_stack_vaddr != CHERI_REPRESENTABLE_BASE(stack_vaddr,
-	    ssiz + stack_offset));
-	destp = (uintcap_t)cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
-	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
+	if (imgp->stack != imgp->strings)
+		strings_on_stack = false;
+	destp = (uintcap_t)imgp->strings;
 	destp = cheri_setaddress(destp, p->p_psstrings);
 	arginfo = (struct ps_strings * __capability)cheri_setboundsexact(destp,
 	    sizeof(*arginfo));
 #else
-	arginfo = (struct ps_strings *)p->p_psstrings;
-	destp = (uintptr_t)arginfo;
+	destp = (uintptr_t)p->p_psstrings;
+	arginfo = (struct ps_strings *)destp;
 #endif
 	imgp->ps_strings = arginfo;
 	if (p->p_sysent->sv_sigcode_base == 0) {
@@ -1925,10 +1987,14 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	vectp -= imgp->args->argc + 1 + imgp->args->envc + 1;
 
-	/*
-	 * vectp also becomes our initial stack base
-	 */
-	*stack_base = (uintcap_t)vectp;
+	if (!strings_on_stack) {
+		*stack_base = (uintcap_t)imgp->stack;
+	} else {
+		/*
+		 * vectp also becomes our initial stack base
+		 */
+		*stack_base = (uintcap_t)vectp;
+	}
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -2005,13 +2071,13 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 
 	if (imgp->auxargs) {
 		vectp++;
-		error = imgp->sysent->sv_copyout_auxargs(imgp,
 #if __has_feature(capabilities)
-		    (uintcap_t)cheri_setbounds(vectp,
-		    AT_COUNT * sizeof(Elf_Auxinfo)));
+		imgp->auxv = cheri_setbounds(vectp,
+		    AT_COUNT * sizeof(Elf_Auxinfo));
 #else
-		    (uintptr_t)vectp);
+		imgp->auxv = vectp;
 #endif
+		error = imgp->sysent->sv_copyout_auxargs(imgp, (uintcap_t)imgp->auxv);
 		if (error != 0)
 			return (error);
 	}
@@ -2152,11 +2218,14 @@ exec_unregister(const struct execsw *execsw_arg)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

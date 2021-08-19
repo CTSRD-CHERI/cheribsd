@@ -86,6 +86,9 @@ struct mdthread {
 
 struct mdproc {
 	size_t		md_tls_tcb_offset;	/* TCB offset */
+#if __has_feature(capabilities)
+	void * __capability md_sigcode;
+#endif
 };
 
 #define	MAXARGS		8
@@ -100,22 +103,27 @@ struct syscall_args {
 #if __has_feature(capabilities)
 #define	KINFO_PROC_SIZE 1248
 #define	KINFO_PROC64_SIZE 1088
-#else
+#else /* !__has_feature(capabilities) */
 #define	KINFO_PROC_SIZE 1088
-#endif
+#endif /* !__has_feature(capabilities) */
 #define	KINFO_PROC32_SIZE 816
-#else
+#else /* !__mips_n64 */
 #define	KINFO_PROC_SIZE 816
-#endif
+#endif /* !__mips_n64 */
+
+void mips_setup_thread_pcb(struct thread *td);
 
 #endif	/* !_MACHINE_PROC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes": [
 //     "support",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

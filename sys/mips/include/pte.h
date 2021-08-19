@@ -33,6 +33,8 @@
 
 #ifndef _LOCORE
 #include <machine/param.h>
+#include <machine/cherireg.h>
+#include <cheri/cheric.h>
 
 #if defined(__mips_n64) || defined(__mips_n32) /*  PHYSADDR_64_BIT */
 typedef	uint64_t pt_entry_t;
@@ -40,16 +42,30 @@ typedef	uint64_t pt_entry_t;
 typedef	uint32_t pt_entry_t;
 #endif
 
-#if defined(_KERNEL) && !defined(__CHERI_PURE_CAPABILITY__)
-typedef	pt_entry_t *pd_entry_t;
-#else
 /*
- * XXX: used in the kernel to set VM system paramaters.  Only used for
- * the parameter macros (which use its size) in usespace.
+ * The pointer to the second-level page table entry can is a capability
+ * in the purecap kernel.
  */
-typedef uint64_t pd_entry_t;
-#endif
-#endif
+typedef	pt_entry_t *pd_entry_t;
+
+#ifdef _KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Create a CHERI bounded pointer to a page table page.
+ */
+static inline pd_entry_t
+pde_page_bound(vm_pointer_t ptr)
+{
+	pd_entry_t pde = cheri_setbounds((pd_entry_t)ptr, PAGE_SIZE);
+	return cheri_andperm(pde, (CHERI_PERM_LOAD | CHERI_PERM_STORE |
+	    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |
+	    CHERI_PERM_STORE_LOCAL_CAP));
+}
+#else /* !__CHERI_PURECAP_KERNEL__ */
+#define	pde_page_bound(ptr) (pd_entry_t)(ptr)
+#endif /* !__CHERI_PURECAP_KERNEL__ */
+#endif /* _KERNEL */
+#endif /* !_LOCORE */
 
 /*
  * TLB and PTE management.  Most things operate within the context of
@@ -292,21 +308,18 @@ pte_test(pt_entry_t *pte, pt_entry_t bit)
 static __inline void
 pde_clear(pd_entry_t *pde, pt_entry_t bit)
 {
-
 	*(pt_entry_t *)pde &= (~bit);
 }
 
 static __inline void
 pde_set(pd_entry_t *pde, pt_entry_t bit)
 {
-
 	*(pt_entry_t *)pde |= bit;
 }
 
 static __inline int
 pde_test(pd_entry_t *pde, pt_entry_t bit)
 {
-
 	return ((*(pt_entry_t *)pde & bit) == bit);
 }
 
@@ -463,7 +476,7 @@ TLBLO_PTE_TO_PA(pt_entry_t pte)
 #define	PTE_MTC0		dmtc0
 #define	CLEAR_PTE_SWBITS(r)
 #define	IF_VALID_SET_REFBIT(r0, r1, offset, unique)
-#else
+#else /* ! defined(__mips_n64) || defined(__mips_n32) */
 #define	PTESHIFT		2
 #define	PTE2MASK		0xff8	/* for the 2-page lo0/lo1 */
 #define	PTEMASK			0xffc
@@ -472,8 +485,12 @@ TLBLO_PTE_TO_PA(pt_entry_t pte)
 #define	PTE_S			sw
 #define	PTE_MTC0		mtc0
 #define	CLEAR_PTE_SWBITS(r)	LONG_SLL r, TLBLO_SWBITS_CLEAR_SHIFT; LONG_SRL r, TLBLO_SWBITS_CLEAR_SHIFT /* remove swbits */
-#endif /* defined(__mips_n64) || defined(__mips_n32) */
+#endif /* ! defined(__mips_n64) || defined(__mips_n32) */
 
+#if defined(CPU_CHERI) && defined(__CHERI_PURE_CAPABILITY__)
+#define	PTRSHIFT		CHERICAP_SHIFT
+#define	PDEPTRMASK		(0xfff & ~(CHERICAP_SIZE - 1))
+#else /* ! (CPU_CHERI && __CHERI_PURE_CAPABILITY__) */
 #if defined(__mips_n64)
 #define	PTRSHIFT		3
 #define	PDEPTRMASK		0xff8
@@ -481,6 +498,7 @@ TLBLO_PTE_TO_PA(pt_entry_t pte)
 #define	PTRSHIFT		2
 #define	PDEPTRMASK		0xffc
 #endif
+#endif /* ! (CPU_CHERI && __CHERI_PURE_CAPABILITY__) */
 
 #endif /* LOCORE */
 
@@ -497,3 +515,12 @@ TLBLO_PTE_TO_PA(pt_entry_t pte)
 #define	MIPS3_PGMASK_256M	0x1fffe000
 
 #endif /* !_MACHINE_PTE_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

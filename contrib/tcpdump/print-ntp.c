@@ -204,13 +204,6 @@ void
 ntp_print(netdissect_options *ndo,
           register const u_char *cp, u_int length)
 {
-	INVOKE_DISSECTOR(_ntp_print, ndo, cp, length);
-}
-
-void
-_ntp_print(netdissect_options *ndo,
-          register const u_char *cp, u_int length)
-{
 	register const struct ntpdata *bp;
 	int mode, version, leapind;
 

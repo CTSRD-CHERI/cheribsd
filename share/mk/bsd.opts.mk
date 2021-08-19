@@ -66,7 +66,8 @@ __DEFAULT_YES_OPTIONS = \
     SSP \
     TESTS \
     TOOLCHAIN \
-    WARNS
+    WARNS \
+    WERROR
 
 __DEFAULT_NO_OPTIONS = \
     BIND_NOW \
@@ -139,7 +140,8 @@ MK_CLANG:=	no
     INSTALLLIB \
     MAN \
     PROFILE \
-    WARNS
+    WARNS \
+    WERROR
 .if defined(NO_${var})
 .error "NO_${var} is defined, but deprecated. Please use MK_${var}=no instead."
 MK_${var}:=no

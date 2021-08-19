@@ -1949,3 +1949,4 @@ ixv_init_device_features(struct adapter *adapter)
 	if (adapter->feat_cap & IXGBE_FEATURE_NEEDS_CTXD)
 		adapter->feat_en |= IXGBE_FEATURE_NEEDS_CTXD;
 } /* ixv_init_device_features */
+

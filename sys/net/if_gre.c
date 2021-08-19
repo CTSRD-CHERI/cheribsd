@@ -238,17 +238,17 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		 /* XXX: */
-		if (ifr_mtu_get(ifr) < 576)
+		if (ifr->ifr_mtu < 576)
 			return (EINVAL);
-		ifp->if_mtu = ifr_mtu_get(ifr);
+		ifp->if_mtu = ifr->ifr_mtu;
 		return (0);
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCSIFFLAGS:
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		return (0);
 	case CASE_IOC_IFREQ(GRESADDRS):
 	case CASE_IOC_IFREQ(GRESADDRD):
@@ -266,10 +266,15 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	}
 	error = 0;
 	switch (cmd) {
+	case SIOCDIFPHYADDR:
+		if (sc->gre_family == 0)
+			break;
+		gre_delete_tunnel(sc);
+		break;
 #ifdef INET
-	case CASE_IOC_IFREQ(SIOCDIFPHYADDR):
-	case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
-	case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+	case SIOCSIFPHYADDR:
+	case SIOCGIFPSRCADDR:
+	case SIOCGIFPDSTADDR:
 		error = in_gre_ioctl(sc, cmd, data);
 		break;
 #endif
@@ -280,23 +285,23 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = in6_gre_ioctl(sc, cmd, data);
 		break;
 #endif
-	case CASE_IOC_IFREQ(SIOCGTUNFIB):
-		ifr_fib_set(ifr, sc->gre_fibnum);
+	case SIOCGTUNFIB:
+		ifr->ifr_fib = sc->gre_fibnum;
 		break;
-	case CASE_IOC_IFREQ(SIOCSTUNFIB):
+	case SIOCSTUNFIB:
 		if ((error = priv_check(curthread, PRIV_NET_GRE)) != 0)
 			break;
-		if (ifr_fib_get(ifr) >= rt_numfibs)
+		if (ifr->ifr_fib >= rt_numfibs)
 			error = EINVAL;
 		else
-			sc->gre_fibnum = ifr_fib_get(ifr);
+			sc->gre_fibnum = ifr->ifr_fib;
 		break;
 	case CASE_IOC_IFREQ(GRESKEY):
 	case GRESOPTS:
 	case GRESPORT:
 		if ((error = priv_check(curthread, PRIV_NET_GRE)) != 0)
 			break;
-		if ((error = copyin(ifr_data_get_ptr(ifr), &opt,
+		if ((error = copyin(ifr_data_get_ptr(cmd, ifr), &opt,
 		    sizeof(opt))) != 0)
 			break;
 		if (cmd == GRESKEY) {
@@ -356,15 +361,15 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 */
 		break;
 	case CASE_IOC_IFREQ(GREGKEY):
-		error = copyout(&sc->gre_key, ifr_data_get_ptr(ifr),
+		error = copyout(&sc->gre_key, ifr_data_get_ptr(cmd, ifr),
 		    sizeof(sc->gre_key));
 		break;
 	case CASE_IOC_IFREQ(GREGOPTS):
-		error = copyout(&sc->gre_options, ifr_data_get_ptr(ifr),
+		error = copyout(&sc->gre_options, ifr_data_get_ptr(cmd, ifr),
 		    sizeof(sc->gre_options));
 		break;
 	case GREGPORT:
-		error = copyout(&sc->gre_port, ifr_data_get_ptr(ifr),
+		error = copyout(&sc->gre_port, ifr_data_get_ptr(cmd, ifr),
 		    sizeof(sc->gre_port));
 		break;
 	default:
@@ -836,7 +841,7 @@ DECLARE_MODULE(if_gre, gre_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 MODULE_VERSION(if_gre, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

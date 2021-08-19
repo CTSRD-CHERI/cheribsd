@@ -379,12 +379,12 @@ in6_control(struct socket *so, u_long cmd, caddr_t data,
 	case SIOCGIFALIFETIME_IN6:
 	case SIOCGIFSTAT_IN6:
 	case SIOCGIFSTAT_ICMP6:
-		sa6 = (struct sockaddr_in6 *)ifr_addr_get_sa(ifr);
+		sa6 = &ifr->ifr_addr;
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
-	case CASE_IOC_IFREQ(SIOCSIFBRDADDR):
-	case CASE_IOC_IFREQ(SIOCSIFDSTADDR):
-	case CASE_IOC_IFREQ(SIOCSIFNETMASK):
+	case SIOCSIFADDR:
+	case SIOCSIFBRDADDR:
+	case SIOCSIFDSTADDR:
+	case SIOCSIFNETMASK:
 		/*
 		 * Although we should pass any non-INET6 ioctl requests
 		 * down to driver, we filter some legacy INET requests.
@@ -479,9 +479,8 @@ in6_control(struct socket *so, u_long cmd, caddr_t data,
 
 	switch (cmd) {
 	case SIOCGIFADDR_IN6:
-		sa6 = (struct sockaddr_in6 *)ifr_addr_get_sa(ifr);
-		*sa6 = ia->ia_addr;
-		if ((error = sa6_recoverscope(sa6)) != 0)
+		ifr->ifr_addr = ia->ia_addr;
+		if ((error = sa6_recoverscope(&ifr->ifr_addr)) != 0)
 			goto out;
 		break;
 
@@ -490,15 +489,13 @@ in6_control(struct socket *so, u_long cmd, caddr_t data,
 			error = EINVAL;
 			goto out;
 		}
-		sa6 = (struct sockaddr_in6 *)ifr_addr_get_sa(ifr);
-		*sa6 = ia->ia_dstaddr;
-		if ((error = sa6_recoverscope(sa6)) != 0)
+		ifr->ifr_dstaddr = ia->ia_dstaddr;
+		if ((error = sa6_recoverscope(&ifr->ifr_dstaddr)) != 0)
 			goto out;
 		break;
 
 	case SIOCGIFNETMASK_IN6:
-		sa6 = (struct sockaddr_in6 *)ifr_addr_get_sa(ifr);
-		*sa6 = ia->ia_prefixmask;
+		ifr->ifr_addr = ia->ia_prefixmask;
 		break;
 
 	case SIOCGIFAFLAG_IN6:
@@ -2028,7 +2025,7 @@ in6_if2idlen(struct ifnet *ifp)
 }
 
 struct in6_llentry {
-	struct llentry		base;
+	struct llentry base __subobject_use_container_bounds;
 };
 
 #define	IN6_LLTBL_DEFAULT_HSIZE	32
@@ -2550,11 +2547,10 @@ in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net",
-//     "user_capabilities"
+//   "changes_purecap": [
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

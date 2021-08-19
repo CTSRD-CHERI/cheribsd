@@ -98,7 +98,7 @@ SET_DECLARE(cam_xpt_proto_set, struct xpt_proto);
  * cam_ed structure for each device on the bus.
  */
 struct cam_ed {
-	cam_pinfo	 devq_entry;
+	cam_pinfo	 devq_entry __subobject_use_container_bounds;
 	TAILQ_ENTRY(cam_ed) links;
 	struct	cam_et	 *target;
 	struct	cam_sim  *sim;
@@ -216,3 +216,12 @@ void			xpt_stop_tags(struct cam_path *path);
 MALLOC_DECLARE(M_CAMXPT);
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

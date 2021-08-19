@@ -98,13 +98,6 @@ void
 timed_print(netdissect_options *ndo,
             register const u_char *bp)
 {
-	INVOKE_DISSECTOR(_timed_print, ndo, bp);
-}
-
-void
-_timed_print(netdissect_options *ndo,
-            register const u_char *bp)
-{
 	const struct tsp *tsp = (const struct tsp *)bp;
 	long sec, usec;
 

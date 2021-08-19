@@ -235,8 +235,8 @@ xdmatest_test(struct xdmatest_softc *sc)
 
 	sc->req.type = XR_TYPE_PHYS_ADDR;
 	sc->req.direction = XDMA_MEM_TO_MEM;
-	sc->req.src_addr = sc->src_phys;
-	sc->req.dst_addr = sc->dst_phys;
+	sc->req.src.bus_addr = sc->src_phys;
+	sc->req.dst.bus_addr = sc->dst_phys;
 	sc->req.src_width = 4;
 	sc->req.dst_width = 4;
 	sc->req.block_len = sc->len;
@@ -429,3 +429,13 @@ static driver_t xdmatest_driver = {
 static devclass_t xdmatest_devclass;
 
 DRIVER_MODULE(xdmatest, simplebus, xdmatest_driver, xdmatest_devclass, 0, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ],
+//   "change_comment": "bus_addr_t"
+// }
+// CHERI CHANGES END

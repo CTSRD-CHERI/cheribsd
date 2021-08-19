@@ -80,8 +80,8 @@
 #endif
 
 static spinlock_t tls_malloc_lock = _SPINLOCK_INITIALIZER;
-#define	TLS_MALLOC_LOCK		_SPINLOCK(&tls_malloc_lock)
-#define	TLS_MALLOC_UNLOCK	_SPINUNLOCK(&tls_malloc_lock)
+#define	TLS_MALLOC_LOCK		if (__isthreaded) _SPINLOCK(&tls_malloc_lock)
+#define	TLS_MALLOC_UNLOCK	if (__isthreaded) _SPINUNLOCK(&tls_malloc_lock)
 union overhead;
 static void morecore(int);
 static void *__tls_malloc_aligned(size_t size, size_t align);
@@ -204,8 +204,10 @@ __rederive_pointer(void *ptr)
 	TLS_MALLOC_LOCK;
 	for (i = 0; i < n_pagepools; i++) {
 		char *pool = pagepool_list[i];
-		if (cheri_is_address_inbounds(pool, addr))
+		if (cheri_is_address_inbounds(pool, addr)) {
+			TLS_MALLOC_UNLOCK;
 			return (cheri_setaddress(pool, addr));
+		}
 	}
 	TLS_MALLOC_UNLOCK;
 
@@ -253,8 +255,10 @@ __tls_malloc(size_t nbytes)
 	TLS_MALLOC_LOCK;
 	if ((op = nextf[bucket]) == NULL) {
 		morecore(bucket);
-		if ((op = nextf[bucket]) == NULL)
+		if ((op = nextf[bucket]) == NULL) {
+			TLS_MALLOC_UNLOCK;
 			return (NULL);
+		}
 	}
 	/* remove from linked list */
 	nextf[bucket] = op->ov_next;

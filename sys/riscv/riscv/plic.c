@@ -83,7 +83,7 @@ static pic_pre_ithread_t	plic_pre_ithread;
 static pic_bind_intr_t		plic_bind_intr;
 
 struct plic_irqsrc {
-	struct intr_irqsrc	isrc;
+	struct intr_irqsrc	isrc __subobject_use_container_bounds;
 	u_int			irq;
 };
 
@@ -477,3 +477,13 @@ static devclass_t plic_devclass;
 
 EARLY_DRIVER_MODULE(plic, simplebus, plic_driver, plic_devclass,
     0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

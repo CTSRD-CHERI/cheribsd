@@ -157,7 +157,6 @@ struct vm_map_entry {
 
 #define	MAP_ENTRY_SPLIT_BOUNDARY_SHIFT	20
 
-
 #ifdef	_KERNEL
 static __inline u_char
 vm_map_entry_behavior(vm_map_entry_t entry)
@@ -219,6 +218,9 @@ struct vm_map {
 	pmap_t pmap;			/* (c) Physical map */
 	vm_offset_t anon_loc;
 	int busy;
+#ifdef __CHERI_PURE_CAPABILITY__
+	vm_pointer_t map_capability;	/* Capability spanning the whole map */
+#endif
 #ifdef DIAGNOSTIC
 	int nupdates;
 #endif
@@ -280,6 +282,13 @@ vm_map_range_valid(vm_map_t map, vm_offset_t start, vm_offset_t end)
 }
 
 #endif	/* KLD_MODULE */
+#ifdef __CHERI_PURE_CAPABILITY__
+static __inline vm_pointer_t
+vm_map_rootcap(vm_map_t map)
+{
+	return (map->map_capability);
+}
+#endif
 #endif	/* _KERNEL */
 
 /*
@@ -297,7 +306,7 @@ struct vmspace {
 	segsz_t vm_ssize;	/* stack size (pages) */
 	caddr_t vm_taddr;	/* (c) user virtual address of text */
 	caddr_t vm_daddr;	/* (c) user virtual address of data */
-	caddr_t vm_maxsaddr;	/* user VA at max stack growth */
+	vm_offset_t vm_maxsaddr;	/* user VA at max stack growth */
 	u_int vm_refcnt;	/* number of references */
 	/*
 	 * Keep the PMAP last, so that CPU-specific variations of that
@@ -385,7 +394,6 @@ long vmspace_resident_count(struct vmspace *vmspace);
 #define	MAP_CREATE_STACK_GAP_DN	0x00020000
 #define	MAP_VN_EXEC		0x00040000
 /* Gap for MAP_ENTRY_SPLIT_BOUNDARY_MASK */
-#define MAP_CREATE_UNMAPPED	0x00200000
 
 #define	MAP_SPLIT_BOUNDARY_MASK	0x00180000
 
@@ -475,21 +483,22 @@ vm_map_entry_read_succ(void *token, struct vm_map_entry *const clone,
 int vm_map_check_owner_proc(vm_map_t map, vm_offset_t start, vm_offset_t end, struct proc *p);
 int vm_map_check_owner(vm_map_t map, vm_offset_t start, vm_offset_t end);
 boolean_t vm_map_check_protection (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t);
-int vm_map_abandon_and_delete(vm_map_t, vm_offset_t, vm_offset_t);
-int vm_map_delete(vm_map_t, vm_offset_t, vm_offset_t);
-int vm_map_find(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t *, vm_size_t,
+int vm_map_delete(vm_map_t, vm_offset_t, vm_offset_t, bool);
+int vm_map_find(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t *, vm_size_t,
     vm_offset_t, int, vm_prot_t, vm_prot_t, int);
-int vm_map_find_min(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t *,
+int vm_map_find_min(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t *,
     vm_size_t, vm_offset_t, vm_offset_t, int, vm_prot_t, vm_prot_t, int);
 int vm_map_find_aligned(vm_map_t map, vm_offset_t *addr, vm_size_t length,
     vm_offset_t max_addr, vm_offset_t alignment);
-int vm_map_fixed(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t, vm_size_t,
+int vm_map_fixed(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t, vm_size_t,
     vm_prot_t, vm_prot_t, int);
 vm_offset_t vm_map_findspace(vm_map_t, vm_offset_t, vm_size_t);
+int vm_map_alignspace(vm_map_t, vm_object_t, vm_ooffset_t,
+    vm_offset_t *, vm_size_t, vm_offset_t, vm_offset_t);
 int vm_map_inherit (vm_map_t, vm_offset_t, vm_offset_t, vm_inherit_t);
-void vm_map_init(vm_map_t, pmap_t, vm_offset_t, vm_offset_t);
-int vm_map_insert (vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t,
-    vm_offset_t, vm_prot_t, vm_prot_t, int, vm_offset_t);
+void vm_map_init(vm_map_t, pmap_t, vm_pointer_t, vm_pointer_t);
+int vm_map_insert (vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t,
+    vm_pointer_t, vm_prot_t, vm_prot_t, int, vm_offset_t);
 int vm_map_lookup (vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, vm_object_t *,
     vm_pindex_t *, vm_prot_t *, boolean_t *);
 int vm_map_lookup_locked(vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, vm_object_t *,
@@ -498,6 +507,22 @@ void vm_map_lookup_done (vm_map_t, vm_map_entry_t);
 boolean_t vm_map_lookup_entry (vm_map_t, vm_offset_t, vm_map_entry_t *);
 bool vm_map_reservation_is_unmapped(vm_map_t, vm_offset_t);
 int vm_map_reservation_delete(vm_map_t, vm_offset_t);
+int vm_map_reservation_delete_locked(vm_map_t, vm_offset_t);
+int vm_map_reservation_create(vm_map_t, vm_pointer_t *, vm_size_t, vm_offset_t,
+    vm_prot_t);
+int vm_map_reservation_create_locked(vm_map_t, vm_pointer_t *, vm_size_t, vm_prot_t);
+int vm_map_reservation_get(vm_map_t, vm_offset_t, vm_size_t, vm_offset_t *);
+#if __has_feature(capabilities)
+int vm_map_prot2perms(vm_prot_t prot);
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+vm_pointer_t _vm_map_buildcap(vm_map_t map, vm_offset_t addr, vm_size_t length,
+    vm_prot_t prot);
+#define	vm_map_buildcap(map, addr, length, prot)	\
+    _vm_map_buildcap(map, addr, length, prot)
+#else
+#define	vm_map_buildcap(map, addr, length, prot) (addr)
+#endif
 
 static inline vm_map_entry_t
 vm_map_entry_first(vm_map_t map)
@@ -526,15 +551,18 @@ vm_map_entry_succ(vm_map_entry_t entry)
 	    (it) = vm_map_entry_succ(it))
 int vm_map_protect (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t, boolean_t,
     boolean_t);
+int vm_map_abandon_locked(vm_map_t, vm_offset_t, vm_offset_t);
+int vm_map_remove_locked(vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_remove (vm_map_t, vm_offset_t, vm_offset_t);
+int vm_map_clear(vm_map_t);
 void vm_map_try_merge_entries(vm_map_t map, vm_map_entry_t prev,
     vm_map_entry_t entry);
 void vm_map_startup (void);
-int vm_map_submap (vm_map_t, vm_offset_t, vm_offset_t, vm_map_t);
+int vm_map_submap (vm_map_t, vm_pointer_t, vm_pointer_t, vm_map_t);
 int vm_map_sync(vm_map_t, vm_offset_t, vm_offset_t, boolean_t, boolean_t,
     boolean_t);
 int vm_map_madvise (vm_map_t, vm_offset_t, vm_offset_t, int);
-int vm_map_stack (vm_map_t, vm_offset_t, vm_size_t, vm_prot_t, vm_prot_t, int);
+int vm_map_stack (vm_map_t, vm_pointer_t, vm_size_t, vm_prot_t, vm_prot_t, int);
 int vm_map_unwire(vm_map_t map, vm_offset_t start, vm_offset_t end,
     int flags);
 int vm_map_wire(vm_map_t map, vm_offset_t start, vm_offset_t end, int flags);
@@ -546,10 +574,14 @@ void vm_map_entry_set_vnode_text(vm_map_entry_t entry, bool add);
 #endif				/* _VM_MAP_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes": [
 //     "support"
+//   ],
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer"
 //   ],
 //   "change_comment": ""
 // }

@@ -212,12 +212,6 @@ static int resp_get_length(netdissect_options *, register const u_char *, int, c
 void
 resp_print(netdissect_options *ndo, const u_char *bp, u_int length)
 {
-	INVOKE_DISSECTOR(_resp_print, ndo, bp, length);
-}
-
-void
-_resp_print(netdissect_options *ndo, const u_char *bp, u_int length)
-{
     int ret_len = 0, length_cur = length;
 
     if(!bp || length <= 0)

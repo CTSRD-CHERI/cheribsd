@@ -2420,7 +2420,7 @@ unlock_and_done:
 			    (vm_size_t)outsbsz) - trunc_page((vm_offset_t)sbp));
 			vm_page_t ma[nheld];
 			if (vm_fault_quick_hold_pages(
-			    &curproc->p_vmspace->vm_map, (vm_offset_t)sbp,
+			    &curproc->p_vmspace->vm_map, sbp,
 			    outsbsz, VM_PROT_READ | VM_PROT_WRITE, ma,
 			    nheld) < 0) {
 				error = EFAULT;
@@ -2954,7 +2954,7 @@ DB_SHOW_COMMAND(tcpcb, db_show_tcpcb)
 		db_printf("usage: show tcpcb <addr>\n");
 		return;
 	}
-	tp = (struct tcpcb *)addr;
+	tp = DB_DATA_PTR(addr, struct tcpcb);
 
 	db_print_tcpcb(tp, "tcpcb", 0);
 }
@@ -2964,7 +2964,8 @@ DB_SHOW_COMMAND(tcpcb, db_show_tcpcb)
 //   "updated": 20191104,
 //   "target_type": "kernel",
 //   "changes": [
-//     "user_capabilities"
+//     "user_capabilities",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

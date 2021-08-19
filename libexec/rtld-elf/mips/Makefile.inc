@@ -5,6 +5,10 @@ CFLAGS.reloc.c+=-fno-jump-tables
 # XXX-MAYBE-OBE: Added in 46fa9656e6167f41a3de4dc9faed3722f4124440
 RTLD_ENTRY=	rtld_start
 
+.if ${MACHINE_CPU:Mcheri}
+CFLAGS+=	-DRTLD_HAS_CAPRELOCS
+.endif
+
 .if ${MACHINE_ABI:Mpurecap}
 CLEANFILES+=	cheri_plt_code.dump cheri_plt_code.text cheri_plt_code.inc
 

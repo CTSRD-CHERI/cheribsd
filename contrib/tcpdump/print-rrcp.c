@@ -77,16 +77,6 @@ rrcp_print(netdissect_options *ndo,
 	  const struct lladdr_info *src,
 	  const struct lladdr_info *dst)
 {
-	INVOKE_DISSECTOR(_rrcp_print, ndo, cp, length, src, dst);
-}
-
-void
-_rrcp_print(netdissect_options *ndo,
-	  const u_char *cp,
-	  u_int length _U_,
-	  const struct lladdr_info *src,
-	  const struct lladdr_info *dst)
-{
 	uint8_t rrcp_proto;
 	uint8_t rrcp_opcode;
 

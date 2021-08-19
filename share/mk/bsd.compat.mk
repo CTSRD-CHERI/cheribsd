@@ -104,6 +104,18 @@ LIB32_MACHINE_ABI=	${MACHINE_ABI}
 # -------------------------------------------------------------------
 # 64 bit world
 .if ${MK_LIB64} != "no"
+.if ${COMPAT_ARCH:Maarch64*c*}
+HAS_COMPAT=64
+LIB64_MACHINE=	arm64
+LIB64_MACHINE_ARCH=aarch64
+LIB64WMAKEENV=	MACHINE_CPU="arm64 cheri"
+LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=morello
+# XXX: clang specific
+LIB64CPUFLAGS=	-target aarch64-unknown-freebsd13.0
+# XXX: Drop -fno-emulated-tls once bsd.cpu.mk no longer enables it
+LIB64CPUFLAGS+=	-march=morello -mabi=aapcs -fno-emulated-tls
+.endif
+
 .if ${COMPAT_ARCH:Mmips64*c*}
 HAS_COMPAT=64
 # XXX: clang specific
@@ -151,7 +163,14 @@ LIB64_MACHINE_ABI=	${MACHINE_ABI:Npurecap}
 # -------------------------------------------------------------------
 # CHERI world
 .if ${MK_COMPAT_CHERIABI} != "no"
-.if ${COMPAT_ARCH:Mmips64*} && !${COMPAT_ARCH:Mmips64*c*}
+.if ${COMPAT_ARCH} == "aarch64"
+HAS_COMPAT+=CHERI
+LIBCHERI_MACHINE=	arm64
+LIBCHERI_MACHINE_ARCH=	aarch64c
+LIBCHERICPUFLAGS=	-target aarch64-unknown-freebsd13.0
+# XXX: Drop -femulated-tls once bsd.cpu.mk no longer passes it
+LIBCHERICPUFLAGS+=	-march=morello+c64 -mabi=purecap -femulated-tls
+.elif ${COMPAT_ARCH:Mmips64*} && !${COMPAT_ARCH:Mmips64*c*}
 .if ${COMPAT_ARCH:Mmips*el*}
 .error No little endian CHERI
 .endif

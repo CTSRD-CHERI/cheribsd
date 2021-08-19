@@ -69,13 +69,6 @@ void
 dvmrp_print(netdissect_options *ndo,
             register const u_char *bp, register u_int len)
 {
-	INVOKE_DISSECTOR(_dvmrp_print, ndo, bp, len);
-}
-
-void
-_dvmrp_print(netdissect_options *ndo,
-            register const u_char *bp, register u_int len)
-{
 	register const u_char *ep;
 	register u_char type;
 	uint8_t major_version, minor_version;

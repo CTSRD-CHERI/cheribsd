@@ -89,8 +89,8 @@ typedef struct {
 	const char *interp_newpath;
 	int flags;
 	Elf_Brandnote *brand_note;
-	boolean_t	(*header_supported)(struct image_params *,
-	    int32_t *, uint32_t *);
+	bool (*header_supported)(const struct image_params *, const int32_t *,
+	    const uint32_t *);
 #define	BI_CAN_EXEC_DYN		0x0001
 #define	BI_BRAND_NOTE		0x0002	/* May have note.ABI-tag section. */
 #define	BI_BRAND_NOTE_MANDATORY	0x0004	/* Must have note.ABI-tag section. */
@@ -102,7 +102,7 @@ __ElfType(Brandinfo);
 
 #define	MAX_BRANDS	8
 
-int	__elfN(brand_inuse)(Elf_Brandinfo *entry);
+bool	__elfN(brand_inuse)(Elf_Brandinfo *entry);
 int	__elfN(insert_brand_entry)(Elf_Brandinfo *entry);
 int	__elfN(remove_brand_entry)(Elf_Brandinfo *entry);
 int	__elfN(freebsd_fixup)(uintcap_t *, struct image_params *);

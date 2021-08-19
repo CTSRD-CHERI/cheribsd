@@ -75,6 +75,8 @@ static int exponent(CHAR *, int, CHAR);
 static CHAR	*__ujtoa(uintmax_t, CHAR *, int, int, const char *);
 static CHAR	*__ultoa(u_long, CHAR *, int, int, const char *);
 
+#ifndef IN_LIBSIMPLE_PRINTF
+
 #define NIOV 8
 struct io_state {
 	FILE *fp;
@@ -167,6 +169,8 @@ io_flush(struct io_state *iop, locale_t locale)
 
 	return (__sprint(iop->fp, &iop->uio, locale));
 }
+
+#endif /* !defined(IN_LIBSIMPLE_PRINTF) */
 
 /*
  * Convert an unsigned long to ASCII for printf purposes, returning
@@ -303,7 +307,7 @@ __cheri_ptr_alt(void * __capability pointer, CHAR *cp, const char *xdigs,
 {
 	uintmax_t ujval;
 	CHAR *scp;
-	char *p;
+	const char *p;
 	int padding, size;
 
 	/* Skip attributes if NULL-derived. */

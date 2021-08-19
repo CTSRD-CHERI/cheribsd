@@ -222,7 +222,7 @@ atm_llc_print(netdissect_options *ndo,
 {
 	int llc_hdrlen;
 
-	llc_hdrlen = _llc_print(ndo, p, length, caplen, NULL, NULL);
+	llc_hdrlen = llc_print(ndo, p, length, caplen, NULL, NULL);
 	if (llc_hdrlen < 0) {
 		/* packet not known, print raw packet */
 		if (!ndo->ndo_suppress_default_print)
@@ -386,14 +386,6 @@ atm_print(netdissect_options *ndo,
           u_int vpi, u_int vci, u_int traftype, const u_char *p, u_int length,
           u_int caplen)
 {
-	INVOKE_DISSECTOR(_atm_print, ndo, vpi, vci, traftype, p, length, caplen);
-}
-
-void
-_atm_print(netdissect_options *ndo,
-          u_int vpi, u_int vci, u_int traftype, const u_char *p, u_int length,
-          u_int caplen)
-{
 	if (ndo->ndo_eflag)
 		ND_PRINT((ndo, "VPI:%u VCI:%u ", vpi, vci));
 
@@ -456,13 +448,6 @@ struct oam_fm_ais_rdi_t {
 
 void
 oam_print (netdissect_options *ndo,
-           const u_char *p, u_int length, u_int hec)
-{
-	INVOKE_DISSECTOR(_oam_print, ndo, p, length, hec);
-}
-
-void
-_oam_print (netdissect_options *ndo,
            const u_char *p, u_int length, u_int hec)
 {
     uint32_t cell_header;

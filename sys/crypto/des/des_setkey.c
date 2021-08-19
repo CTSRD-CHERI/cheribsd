@@ -174,10 +174,8 @@ void des_set_key_unchecked(const unsigned char *key, des_key_schedule schedule)
 	static int shifts2[16]={0,0,1,1,1,1,1,1,0,1,1,1,1,1,1,0};
 	DES_LONG c,d,t,s,t2;
 	const unsigned char *in;
-	DES_LONG *k;
 	int i;
 
-	k = &schedule->ks.deslong[0];
 	in = key;
 
 	c2l(in,c);
@@ -218,10 +216,10 @@ void des_set_key_unchecked(const unsigned char *key, des_key_schedule schedule)
 
 		/* table contained 0213 4657 */
 		t2=((t<<16L)|(s&0x0000ffffL))&0xffffffffL;
-		*(k++)=ROTATE(t2,30)&0xffffffffL;
+		schedule[i].ks.deslong[0]=ROTATE(t2,30)&0xffffffffL;
 
 		t2=((s>>16L)|(t&0xffff0000L));
-		*(k++)=ROTATE(t2,26)&0xffffffffL;
+		schedule[i].ks.deslong[1]=ROTATE(t2,26)&0xffffffffL;
 	}
 }
 
@@ -234,3 +232,12 @@ void des_fixup_key_parity(unsigned char *key)
 {
 	des_set_odd_parity(key);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20210401,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

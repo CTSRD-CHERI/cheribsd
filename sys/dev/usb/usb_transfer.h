@@ -153,9 +153,7 @@ struct usb_done_msg {
 };
 
 #define	USB_DMATAG_TO_XROOT(dpt)				\
-  ((struct usb_xfer_root *)(					\
-   ((uint8_t *)(dpt)) -						\
-   ((uint8_t *)&((struct usb_xfer_root *)0)->dma_parent_tag)))
+	__containerof(dpt, struct usb_xfer_root, dma_parent_tag)
 
 /*
  * The following structure is used to keep information about memory
@@ -163,7 +161,7 @@ struct usb_done_msg {
  * have been freed.
  */
 struct usb_xfer_root {
-	struct usb_dma_parent_tag dma_parent_tag;
+	struct usb_dma_parent_tag dma_parent_tag __subobject_use_container_bounds;
 #if USB_HAVE_BUSDMA
 	struct usb_xfer_queue dma_q;
 #endif
@@ -254,3 +252,12 @@ usb_timeout_t usbd_get_dma_delay(struct usb_device *udev);
 void	usbd_transfer_power_ref(struct usb_xfer *xfer, int val);
 
 #endif					/* _USB_TRANSFER_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20210404,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

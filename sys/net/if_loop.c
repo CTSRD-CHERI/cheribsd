@@ -335,7 +335,7 @@ if_simloop(struct ifnet *ifp, struct mbuf *m, int af, int hlen)
 		if (mtod(m, vm_offset_t) & 3) {
 			KASSERT(hlen >= 3, ("if_simloop: hlen too small"));
 			bcopy(m->m_data,
-			    (char *)(mtod(m, vm_offset_t)
+			    (char *)(mtod(m, vm_pointer_t)
 				- (mtod(m, vm_offset_t) & 3)),
 			    m->m_len);
 			m->m_data -= (mtod(m,vm_offset_t) & 3);
@@ -378,7 +378,7 @@ loioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0, mask;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
 		ifp->if_drv_flags |= IFF_DRV_RUNNING;
 		if_link_state_change(ifp, LINK_STATE_UP);
@@ -387,13 +387,13 @@ loioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 */
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (ifr == NULL) {
 			error = EAFNOSUPPORT;		/* XXX */
 			break;
 		}
-		switch (ifr_addr_get_family(ifr)) {
+		switch (ifr->ifr_addr.sa_family) {
 #ifdef INET
 		case AF_INET:
 			break;
@@ -409,17 +409,17 @@ loioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		ifp->if_mtu = ifr_mtu_get(ifr);
+	case SIOCSIFMTU:
+		ifp->if_mtu = ifr->ifr_mtu;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if_link_state_change(ifp, (ifp->if_flags & IFF_UP) ?
 		    LINK_STATE_UP: LINK_STATE_DOWN);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
+	case SIOCSIFCAP:
+		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
 		if ((mask & IFCAP_RXCSUM) != 0)
 			ifp->if_capenable ^= IFCAP_RXCSUM;
 		if ((mask & IFCAP_TXCSUM) != 0)
@@ -456,11 +456,13 @@ loioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

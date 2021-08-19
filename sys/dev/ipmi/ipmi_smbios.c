@@ -195,10 +195,10 @@ ipmi_smbios_probe(struct ipmi_get_info *info)
 	 */
 	header = pmap_mapbios(addr, sizeof(struct smbios_eps));
 	table = pmap_mapbios(addr, header->length);
-	pmap_unmapbios((vm_offset_t)header, sizeof(struct smbios_eps));
+	pmap_unmapbios((vm_pointer_t)header, sizeof(struct smbios_eps));
 	header = table;
 	if (smbios_cksum(header) != 0) {
-		pmap_unmapbios((vm_offset_t)header, header->length);
+		pmap_unmapbios((vm_pointer_t)header, header->length);
 		return;
 	}
 
@@ -209,8 +209,8 @@ ipmi_smbios_probe(struct ipmi_get_info *info)
 	    info);
 
 	/* Unmap everything. */
-	pmap_unmapbios((vm_offset_t)table, header->structure_table_length);
-	pmap_unmapbios((vm_offset_t)header, header->length);
+	pmap_unmapbios((vm_pointer_t)table, header->structure_table_length);
+	pmap_unmapbios((vm_pointer_t)header, header->length);
 }
 
 /*

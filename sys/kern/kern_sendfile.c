@@ -65,6 +65,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
 
+#include <cheri/cheric.h>
+
 static MALLOC_DEFINE(M_SENDFILE, "sendfile", "sendfile dynamic memory");
 
 #define	EXT_FLAG_SYNC		EXT_FLAG_VENDOR1
@@ -1052,7 +1054,8 @@ retry_space:
 			}
 
 			m0 = m_get(M_WAITOK, MT_DATA);
-			m0->m_ext.ext_buf = (char *)sf_buf_kva(sf);
+			m0->m_ext.ext_buf = (char *)cheri_kern_setbounds(
+			    sf_buf_kva(sf), PAGE_SIZE);
 			m0->m_ext.ext_size = PAGE_SIZE;
 			m0->m_ext.ext_arg1 = sf;
 			m0->m_ext.ext_type = EXT_SFBUF;
@@ -1340,10 +1343,13 @@ freebsd4_sendfile(struct thread *td, struct freebsd4_sendfile_args *uap)
 #endif /* COMPAT_FREEBSD4 */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

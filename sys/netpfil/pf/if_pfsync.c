@@ -1327,7 +1327,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int c;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		PFSYNC_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			ifp->if_drv_flags |= IFF_DRV_RUNNING;
@@ -1339,12 +1339,12 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			pfsync_pointers_uninit();
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		if (!sc->sc_sync_if ||
-		    ifr_mtu_get(ifr) <= PFSYNC_MINPKT ||
-		    ifr_mtu_get(ifr) > sc->sc_sync_if->if_mtu)
+		    ifr->ifr_mtu <= PFSYNC_MINPKT ||
+		    ifr->ifr_mtu > sc->sc_sync_if->if_mtu)
 			return (EINVAL);
-		if (ifr_mtu_get(ifr) < ifp->if_mtu) {
+		if (ifr->ifr_mtu < ifp->if_mtu) {
 			for (c = 0; c < pfsync_buckets; c++) {
 				PFSYNC_BUCKET_LOCK(&sc->sc_buckets[c]);
 				if (sc->sc_buckets[c].b_len > PFSYNC_MINPKT)
@@ -1352,7 +1352,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				PFSYNC_BUCKET_UNLOCK(&sc->sc_buckets[c]);
 			}
 		}
-		ifp->if_mtu = ifr_mtu_get(ifr);
+		ifp->if_mtu = ifr->ifr_mtu;
 		break;
 	case CASE_IOC_IFREQ(SIOCGETPFSYNC):
 		bzero(&pfsyncr, sizeof(pfsyncr));
@@ -1366,7 +1366,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		pfsyncr.pfsyncr_defer = (PFSYNCF_DEFER ==
 		    (sc->sc_flags & PFSYNCF_DEFER));
 		PFSYNC_UNLOCK(sc);
-		return (copyout(&pfsyncr, ifr_data_get_ptr(ifr),
+		return (copyout(&pfsyncr, ifr_data_get_ptr(cmd, ifr),
 		    sizeof(pfsyncr)));
 
 	case CASE_IOC_IFREQ(SIOCSETPFSYNC):
@@ -1377,7 +1377,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		if ((error = priv_check(curthread, PRIV_NETINET_PF)) != 0)
 			return (error);
-		if ((error = copyin(ifr_data_get_ptr(ifr), &pfsyncr,
+		if ((error = copyin(ifr_data_get_ptr(cmd, ifr), &pfsyncr,
 		    sizeof(pfsyncr))))
 			return (error);
 

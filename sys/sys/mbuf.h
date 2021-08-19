@@ -45,6 +45,7 @@
 #ifdef WITNESS
 #include <sys/lock.h>
 #endif
+#include <cheri/cheric.h>
 #endif
 
 #ifdef _KERNEL
@@ -147,7 +148,8 @@ struct m_snd_tag {
 /*
  * Record/packet header in first mbuf of chain; valid only if M_PKTHDR is set.
  * Size ILP32: 48
- *	 LP64: 56
+ *	LP64: 56
+ *	CHERI128: 96
  * Compile-time assertions in uipc_mbuf.c test these values to ensure that
  * they are correct.
  */
@@ -225,7 +227,13 @@ struct pkthdr {
  */
 #define	MBUF_PEXT_TRAIL_LEN	64
 
-#if defined(__LP64__)
+/*
+ * The number of PEXT_MAX_PGS is computed so that m_ext will fit into
+ * MSIZE bytes as EXT_PGS mbufs are allocated from the mbuf_zone.
+ */
+#if defined(__CHERI_PURE_CAPABILITY__)
+#define MBUF_PEXT_MAX_PGS (200 / sizeof(vm_paddr_t))
+#elif __SIZEOF_POINTER__ == 8
 #define MBUF_PEXT_MAX_PGS (40 / sizeof(vm_paddr_t))
 #else
 #define MBUF_PEXT_MAX_PGS (72 / sizeof(vm_paddr_t))
@@ -241,7 +249,10 @@ struct socket;
  * Description of external storage mapped into mbuf; valid only if M_EXT is
  * set.
  * Size ILP32: 28
- *	 LP64: 48
+ *	LP64: 48
+ *	CHERI128: 352
+ * XXXAM: notice that we may be able to save space (padding) if we move the ext_size
+ * and ext_type/flags after ext_arg2.
  * Compile-time assertions in uipc_mbuf.c test these values to ensure that
  * they are correct.
  */
@@ -256,8 +267,8 @@ struct m_ext {
 		 * and its arguments.  They aren't copied into shadows in
 		 * mb_dupcl() to avoid dereferencing next cachelines.
 		 */
-		volatile u_int	 ext_count;
-		volatile u_int	*ext_cnt;
+		volatile u_int	 ext_count __no_subobject_bounds;
+		volatile u_int	*ext_cnt __no_subobject_bounds;
 	};
 	uint32_t	 ext_size;	/* size of buffer, for ext_free */
 	uint32_t	 ext_type:8,	/* type of external storage */
@@ -313,7 +324,8 @@ struct mbuf {
 	/*
 	 * Header present at the beginning of every mbuf.
 	 * Size ILP32: 24
-	 *      LP64: 32
+	 *	LP64: 32
+	 *	CHERI128: 64
 	 * Compile-time assertions in uipc_mbuf.c test these values to ensure
 	 * that they are correct.
 	 */
@@ -331,7 +343,7 @@ struct mbuf {
 	int32_t		 m_len;		/* amount of data in this mbuf */
 	uint32_t	 m_type:8,	/* type of data in this mbuf */
 			 m_flags:24;	/* flags; see below */
-#if !defined(__LP64__)
+#if __SIZEOF_POINTER__ == 4
 	uint32_t	 m_pad;		/* pad for 64bit alignment */
 #endif
 
@@ -389,7 +401,7 @@ struct mbuf {
 				char		m_pktdat[0];
 			};
 		};
-		char	m_dat[0];			/* !M_PKTHDR, !M_EXT */
+		char	m_dat[0] __no_subobject_bounds;	/* !M_PKTHDR, !M_EXT */
 	};
 };
 
@@ -882,7 +894,7 @@ m_extaddref(struct mbuf *m, char *buf, u_int size, u_int *ref_cnt,
 
 	atomic_add_int(ref_cnt, 1);
 	m->m_flags |= M_EXT;
-	m->m_ext.ext_buf = buf;
+	m->m_ext.ext_buf = cheri_kern_setbounds(buf, size);
 	m->m_ext.ext_cnt = ref_cnt;
 	m->m_data = m->m_ext.ext_buf;
 	m->m_ext.ext_size = size;
@@ -934,7 +946,7 @@ m_init(struct mbuf *m, int how, short type, int flags)
 
 	m->m_next = NULL;
 	m->m_nextpkt = NULL;
-	m->m_data = m->m_dat;
+	m->m_data = cheri_kern_setbounds(m->m_dat, MLEN);
 	m->m_len = 0;
 	m->m_flags = flags;
 	m->m_type = type;
@@ -1016,7 +1028,7 @@ m_cljset(struct mbuf *m, void *cl, int type)
 		break;
 	}
 
-	m->m_data = m->m_ext.ext_buf = cl;
+	m->m_data = m->m_ext.ext_buf = cheri_kern_setbounds(cl, size);
 	m->m_ext.ext_free = m->m_ext.ext_arg1 = m->m_ext.ext_arg2 = NULL;
 	m->m_ext.ext_size = size;
 	m->m_ext.ext_type = type;
@@ -1621,3 +1633,14 @@ mbuf_has_tls_session(struct mbuf *m)
 
 #endif /* _KERNEL */
 #endif /* !_SYS_MBUF_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support",
+//     "pointer_shape",
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

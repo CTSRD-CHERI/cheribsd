@@ -890,7 +890,7 @@ sume_if_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 		break;
 
 	case SUME_IOCTL_CMD_WRITE_REG:
-		error = copyin(ifr_data_get_ptr(ifr), &sifr, sizeof(sifr));
+		error = copyin(ifr_data_get_ptr(cmd, ifr), &sifr, sizeof(sifr));
 		if (error) {
 			error = EINVAL;
 			break;
@@ -899,7 +899,7 @@ sume_if_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 		break;
 
 	case SUME_IOCTL_CMD_READ_REG:
-		error = copyin(ifr_data_get_ptr(ifr), &sifr, sizeof(sifr));
+		error = copyin(ifr_data_get_ptr(cmd, ifr), &sifr, sizeof(sifr));
 		if (error) {
 			error = EINVAL;
 			break;
@@ -909,7 +909,8 @@ sume_if_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 		if (error)
 			break;
 
-		error = copyout(&sifr, ifr_data_get_ptr(ifr), sizeof(sifr));
+		error = copyout(&sifr, ifr_data_get_ptr(cmd, ifr),
+		    sizeof(sifr));
 		if (error)
 			error = EINVAL;
 

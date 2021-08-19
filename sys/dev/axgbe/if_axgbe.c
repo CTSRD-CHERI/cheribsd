@@ -148,16 +148,15 @@ axgbe_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 	int error = 0;
 
 	switch(command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		    ifr_mtu_get(ifr) > ETHERMTU_JUMBO)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > ETHERMTU_JUMBO)
 			error = EINVAL;
 		/* TODO - change it to iflib way */ 
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->media, command);
 		break;
@@ -621,12 +620,3 @@ static devclass_t axgbephy_devclass;
 DEFINE_CLASS_0(axgbephy, axgbephy_driver, axgbephy_methods, 0);
 EARLY_DRIVER_MODULE(axgbephy, simplebus, axgbephy_driver, axgbephy_devclass,
     0, 0, BUS_PASS_RESOURCE + BUS_PASS_ORDER_MIDDLE);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

@@ -194,7 +194,7 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  */
 #define	ASSERT_ATOMIC_LOAD_PTR(var, msg)				\
 	KASSERT(sizeof(var) == sizeof(void *) &&			\
-	    ((uintptr_t)&(var) & (sizeof(void *) - 1)) == 0, msg)
+	    is_aligned(&(var), sizeof(void *)), msg)
 
 /*
  * Assert that a thread is in critical(9) section.
@@ -269,7 +269,7 @@ extern const void *zero_region;	/* address space maps to a zeroed page	*/
 
 extern int unmapped_buf_allowed;
 
-#ifdef __LP64__
+#if __SIZEOF_SIZE_T__ == 8
 #define	IOSIZE_MAX		iosize_max()
 #define	DEVFS_IOSIZE_MAX	devfs_iosize_max()
 #else
@@ -686,7 +686,7 @@ struct cdev;
 dev_t dev2udev(struct cdev *x);
 const char *devtoname(struct cdev *cdev);
 
-#ifdef __LP64__
+#if __SIZEOF_SIZE_T__ == 8
 size_t	devfs_iosize_max(void);
 size_t	iosize_max(void);
 #endif
@@ -775,10 +775,13 @@ __NULLABILITY_PRAGMA_POP
 #endif /* !_SYS_SYSTM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_alignment"
 //   ]
 // }
 // CHERI CHANGES END

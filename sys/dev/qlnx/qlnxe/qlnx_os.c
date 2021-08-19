@@ -2675,7 +2675,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ha = (qlnx_host_t *)ifp->if_softc;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		QL_DPRINT4(ha, "SIOCSIFADDR (0x%lx)\n", cmd);
 
 		if (ifa->ifa_addr->sa_family == AF_INET) {
@@ -2694,14 +2694,14 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		QL_DPRINT4(ha, "SIOCSIFMTU (0x%lx)\n", cmd);
 
-		if (ifr_mtu_get(ifr) > QLNX_MAX_MTU) {
+		if (ifr->ifr_mtu > QLNX_MAX_MTU) {
 			ret = EINVAL;
 		} else {
 			QLNX_LOCK(ha);
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			ha->max_frame_size =
 				ifp->if_mtu + ETHER_HDR_LEN + ETHER_CRC_LEN;
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -2713,7 +2713,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		QL_DPRINT4(ha, "SIOCSIFFLAGS (0x%lx)\n", cmd);
 
 		QLNX_LOCK(ha);
@@ -2741,7 +2741,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		QLNX_UNLOCK(ha);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case SIOCADDMULTI:
 		QL_DPRINT4(ha, "%s (0x%lx)\n", "SIOCADDMULTI", cmd);
 
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -2750,7 +2750,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCDELMULTI:
 		QL_DPRINT4(ha, "%s (0x%lx)\n", "SIOCDELMULTI", cmd);
 
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -2759,16 +2759,16 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		QL_DPRINT4(ha, "SIOCSIFMEDIA/SIOCGIFMEDIA (0x%lx)\n", cmd);
 
 		ret = ifmedia_ioctl(ifp, ifr, &ha->media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 
 		QL_DPRINT4(ha, "SIOCSIFCAP (0x%lx)\n", cmd);
 
@@ -2797,13 +2797,13 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 #if (__FreeBSD_version >= 1100101)
 
-	case CASE_IOC_IFREQ(SIOCGI2C):
+	case SIOCGI2C:
 	{
 		struct ifi2creq i2c;
 		struct ecore_hwfn *p_hwfn = &ha->cdev.hwfns[0];
 		struct ecore_ptt *p_ptt;
 
-		ret = copyin(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
+		ret = copyin(ifr_data_get_ptr(cmd, ifr), &i2c, sizeof(i2c));
 
 		if (ret)
 			break;
@@ -2833,7 +2833,7 @@ qlnx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 
-		ret = copyout(&i2c, ifr_data_get_ptr(ifr), sizeof(i2c));
+		ret = copyout(&i2c, ifr_data_get_ptr(cmd, ifr), sizeof(i2c));
 
 		QL_DPRINT8(ha, "SIOCGI2C copyout ret = %d \
 			 len = %d addr = 0x%02x offset = 0x%04x \
@@ -8490,10 +8490,10 @@ qlnx_inform_vf_link_state(struct ecore_hwfn *p_hwfn, qlnx_host_t *ha)
 #endif /* #ifdef CONFIG_ECORE_SRIOV */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

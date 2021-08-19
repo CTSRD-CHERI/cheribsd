@@ -107,14 +107,6 @@ vrrp_print(netdissect_options *ndo,
            register const u_char *bp, register u_int len,
            register const u_char *bp2, int ttl)
 {
-	INVOKE_DISSECTOR(_vrrp_print, ndo, bp, len, bp2, ttl);
-}
-
-void
-_vrrp_print(netdissect_options *ndo,
-           register const u_char *bp, register u_int len,
-           register const u_char *bp2, int ttl)
-{
 	int version, type, auth_type = VRRP_AUTH_NONE; /* keep compiler happy */
 	const char *type_s;
 

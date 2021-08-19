@@ -54,22 +54,6 @@ struct cheri_object {
     ((co).co_codecap == NULL && (co).co_datacap == NULL)
 #endif
 
-/*
- * Data structure describing CHERI's sigaltstack-like extensions to signal
- * delivery.  In the event that a thread takes a signal when $pcc doesn't hold
- * CHERI_PERM_SYSCALL, we will need to install new $pcc, $ddc, $csp, and $idc
- * state, and move execution to the per-thread alternative stack, whose
- * pointer should (presumably) be relative to the $ddc/$csp defined here.
- */
-struct cheri_signal {
-	void * __capability	csig_pcc;
-	void * __capability	csig_ddc;
-	void * __capability	csig_csp;
-	void * __capability	csig_idc;
-	void * __capability	csig_default_stack;
-	void * __capability	csig_sigcode;
-};
-
 #ifdef _KERNEL
 /*
  * Functions to construct userspace capabilities.
@@ -98,10 +82,10 @@ void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
  */
 
 /* Root of all unsealed userspace capabilities. */
-extern void * __capability userspace_cap;
+extern void * __capability userspace_root_cap;
 
 /* Root of all sealed userspace capabilities. */
-extern void * __capability userspace_sealcap;
+extern void * __capability userspace_root_sealcap;
 
 /*
  * Omnipotent capability for restoring swapped capabilities.
@@ -111,22 +95,21 @@ extern void * __capability userspace_sealcap;
  */
 extern void * __capability swap_restore_cap;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/* Root kernel capability */
+extern void * __capability kernel_root_cap;
+#endif
+
 /* Root of all sealed kernel capabilities. */
-extern void * __capability kernel_sealcap;
+extern void * __capability kernel_root_sealcap;
 
 /*
  * Functions to create capabilities used in exec.
  */
 struct image_params;
 struct thread;
-void * __capability cheri_auxv_capability(struct image_params *imgp,
-	    uintcap_t stack);
 void * __capability cheri_exec_pcc(struct thread *td,
 	    struct image_params *imgp);
-void * __capability cheri_exec_stack_pointer(struct image_params *imgp,
-	    uintcap_t stack);
-void	cheri_set_mmap_capability(struct thread *td, struct image_params *imgp,
-	    void * __capability csp);
 void * __capability cheri_sigcode_capability(struct thread *td);
 
 /*
@@ -135,8 +118,6 @@ void * __capability cheri_sigcode_capability(struct thread *td);
 const char	*cheri_exccode_string(uint8_t exccode);
 int	cheri_syscall_authorize(struct thread *td, u_int code,
 	    int nargs, syscallarg_t *args);
-int	cheri_signal_sandboxed(struct thread *td);
-void	hybridabi_sendsig(struct thread *td);
 
 /*
  * Functions to manage object types.
@@ -152,10 +133,17 @@ SYSCTL_DECL(_security_cheri_stats);
 extern u_int	security_cheri_debugger_on_sandbox_signal;
 extern u_int	security_cheri_debugger_on_sandbox_syscall;
 extern u_int	security_cheri_debugger_on_sandbox_unwind;
-extern u_int	security_cheri_debugger_on_sigprot;
 extern u_int	security_cheri_sandboxed_signals;
 extern u_int	security_cheri_syscall_violations;
 extern u_int	security_cheri_bound_legacy_capabilities;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Used by the kernel linker to handle caprelocs in modules.
+ */
+void	init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
+	    void *data_cap, void *code_cap, ptraddr_t base_addr);
+#endif
 #endif /* !_KERNEL */
 
 /*
@@ -164,3 +152,12 @@ extern u_int	security_cheri_bound_legacy_capabilities;
 #include <machine/cheri.h>
 
 #endif /* _SYS_CHERI_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

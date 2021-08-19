@@ -989,8 +989,7 @@ vtscsi_sg_append_scsi_buf(struct vtscsi_softc *sc, struct sglist *sg,
 	case CAM_DATA_SG:
 		for (i = 0; i < csio->sglist_cnt && error == 0; i++) {
 			dseg = &((struct bus_dma_segment *)csio->data_ptr)[i];
-			error = sglist_append(sg,
-			    (void *)(vm_offset_t) dseg->ds_addr, dseg->ds_len);
+			error = sglist_append(sg, dseg->ds_vaddr, dseg->ds_len);
 		}
 		break;
 	case CAM_DATA_SG_PADDR:

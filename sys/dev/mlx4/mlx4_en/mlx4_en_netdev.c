@@ -1970,10 +1970,10 @@ static int mlx4_en_ioctl(struct ifnet *dev, u_long command, caddr_t data)
 	ifr = (struct ifreq *) data;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		error = -mlx4_en_change_mtu(dev, ifr_mtu_get(ifr));
+	case SIOCSIFMTU:
+		error = -mlx4_en_change_mtu(dev, ifr->ifr_mtu);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if (dev->if_flags & IFF_UP) {
 			if ((dev->if_drv_flags & IFF_DRV_RUNNING) == 0) {
 				mutex_lock(&mdev->state_lock);
@@ -1991,17 +1991,17 @@ static int mlx4_en_ioctl(struct ifnet *dev, u_long command, caddr_t data)
 			mutex_unlock(&mdev->state_lock);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		mlx4_en_set_rx_mode(dev);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(dev, ifr, &priv->media, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		mutex_lock(&mdev->state_lock);
-		mask = ifr_reqcap_get(ifr) ^ dev->if_capenable;
+		mask = ifr->ifr_reqcap ^ dev->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
 			dev->if_capenable ^= IFCAP_TXCSUM;
 			dev->if_hwassist ^= (CSUM_TCP | CSUM_UDP | CSUM_IP);
@@ -2068,10 +2068,11 @@ out:
 		VLAN_CAPABILITIES(dev);
 		break;
 #if __FreeBSD_version >= 1100036
-	case CASE_IOC_IFREQ(SIOCGI2C): {
+	case SIOCGI2C: {
 		struct ifi2creq i2c;
 
-		error = copyin(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
+		error = copyin(ifr_data_get_ptr(command, ifr), &i2c,
+		    sizeof(i2c));
 		if (error)
 			break;
 		if (i2c.len > sizeof(i2c.data)) {
@@ -2088,7 +2089,8 @@ out:
 			error = -error;
 			break;
 		}
-		error = copyout(&i2c, ifr_data_get_ptr(ifr), sizeof(i2c));
+		error = copyout(&i2c, ifr_data_get_ptr(command, ifr),
+		    sizeof(i2c));
 		break;
 	}
 #endif
@@ -2946,10 +2948,10 @@ mlx4_en_debugnet_poll(struct ifnet *dev, int count)
 #endif /* DEBUGNET */
 // CHERI CHANGES START
 // {
-//   "updated": 20191029,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

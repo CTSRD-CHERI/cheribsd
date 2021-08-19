@@ -1339,7 +1339,7 @@ tunifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ifs->ascii[0] = '\0';
 		TUN_UNLOCK(tp);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		if (l2tun)
 			error = ether_ioctl(ifp, cmd, data);
 		else
@@ -1347,13 +1347,13 @@ tunifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (error == 0)
 		    TUNDEBUG(ifp, "address set\n");
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		ifp->if_mtu = ifr_mtu_get(ifr);
+	case SIOCSIFMTU:
+		ifp->if_mtu = ifr->ifr_mtu;
 		TUNDEBUG(ifp, "mtu set\n");
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCSIFFLAGS:
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		break;
 	case SIOCGIFMEDIA:
 		if (!l2tun) {
@@ -1376,7 +1376,7 @@ tunifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case SIOCSIFCAP:
 		TUN_LOCK(tp);
-		ifp->if_capenable = ifr_reqcap_get(ifr);
+		ifp->if_capenable = ifr->ifr_reqcap;
 		tun_caps_changed(ifp);
 		TUN_UNLOCK(tp);
 		VLAN_CAPABILITIES(ifp);
@@ -1520,14 +1520,14 @@ tunioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag,
 			TUN_UNLOCK(tp);
 
 			return (0);
-		case CASE_IOC_IFREQ(SIOCGIFADDR):	/* get MAC address of the remote side */
+		case SIOCGIFADDR:	/* get MAC address of the remote side */
 			TUN_LOCK(tp);
 			bcopy(&tp->tun_ether.octet, data,
 			    sizeof(tp->tun_ether.octet));
 			TUN_UNLOCK(tp);
 
 			return (0);
-		case CASE_IOC_IFREQ(SIOCSIFADDR):	/* set MAC address of the remote side */
+		case SIOCSIFADDR:	/* set MAC address of the remote side */
 			TUN_LOCK(tp);
 			bcopy(data, &tp->tun_ether.octet,
 			    sizeof(tp->tun_ether.octet));
@@ -1614,7 +1614,7 @@ tunioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag,
 	}
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(TUNGIFNAME):
+	case TUNGIFNAME:
 		ifrp = (struct ifreq *)data;
 		strlcpy(ifrp->ifr_name, TUN2IFP(tp)->if_xname, IFNAMSIZ);
 
@@ -1626,7 +1626,7 @@ tunioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag,
 		TUN_LOCK(tp);
 		if (TUN2IFP(tp)->if_mtu != tunp->mtu) {
 			strlcpy(ifr.ifr_name, if_name(TUN2IFP(tp)), IFNAMSIZ);
-			ifr_mtu_set(&ifr, tunp->mtu);
+			ifr.ifr_mtu = tunp->mtu;
 			CURVNET_SET(TUN2IFP(tp)->if_vnet);
 			error = ifhwioctl(SIOCSIFMTU, TUN2IFP(tp),
 			    (caddr_t)&ifr, td);

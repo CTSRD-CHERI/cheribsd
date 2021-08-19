@@ -179,18 +179,18 @@ linker_file_t linker_make_file(const char* _filename, linker_class_t _cls);
  * DDB Helpers, tuned specifically for ddb/db_kld.c
  */
 int linker_ddb_lookup(const char *_symstr, c_linker_sym_t *_sym);
-int linker_ddb_search_symbol(caddr_t _value, c_linker_sym_t *_sym,
+int linker_ddb_search_symbol(ptraddr_t _value, c_linker_sym_t *_sym,
 			     long *_diffp);
 int linker_ddb_symbol_values(c_linker_sym_t _sym, linker_symval_t *_symval);
-int linker_ddb_search_symbol_name(caddr_t value, char *buf, u_int buflen,
+int linker_ddb_search_symbol_name(ptraddr_t value, char *buf, u_int buflen,
 				  long *offset);
 
 /*
  * stack(9) helper for situations where kernel locking is required.
  */
-int linker_search_symbol_name_flags(caddr_t value, char *buf, u_int buflen,
+int linker_search_symbol_name_flags(ptraddr_t value, char *buf, u_int buflen,
     long *offset, int flags);
-int linker_search_symbol_name(caddr_t value, char *buf, u_int buflen,
+int linker_search_symbol_name(ptraddr_t value, char *buf, u_int buflen,
     long *offset);
 
 /* HWPMC helper */
@@ -280,9 +280,9 @@ typedef int elf_lookup_fn(linker_file_t, Elf_Size, int, Elf_Addr *);
 
 /* Support functions */
 bool	elf_is_ifunc_reloc(Elf_Size r_info);
-int	elf_reloc(linker_file_t _lf, Elf_Addr base, const void *_rel,
+int	elf_reloc(linker_file_t _lf, char *base, const void *_rel,
 	    int _type, elf_lookup_fn _lu);
-int	elf_reloc_local(linker_file_t _lf, Elf_Addr base, const void *_rel,
+int	elf_reloc_local(linker_file_t _lf, char *base, const void *_rel,
 	    int _type, elf_lookup_fn _lu);
 Elf_Addr elf_relocaddr(linker_file_t _lf, Elf_Addr addr);
 const Elf_Sym *elf_get_sym(linker_file_t _lf, Elf_Size _symidx);
@@ -290,7 +290,7 @@ const char *elf_get_symname(linker_file_t _lf, Elf_Size _symidx);
 void	link_elf_ireloc(caddr_t kmdp);
 
 #if defined(__aarch64__) || defined(__amd64__)
-int	elf_reloc_late(linker_file_t _lf, Elf_Addr base, const void *_rel,
+int	elf_reloc_late(linker_file_t _lf, char *base, const void *_rel,
 	    int _type, elf_lookup_fn _lu);
 void	link_elf_late_ireloc(void);
 #endif
@@ -375,10 +375,14 @@ __END_DECLS
 #endif /* !_SYS_LINKER_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes": [
 //     "pointer_shape"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

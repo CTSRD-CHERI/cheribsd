@@ -88,15 +88,6 @@
 #define	CHERI_CAP_USER_DATA_LENGTH	(VM_MAXUSER_ADDRESS - VM_MINUSER_ADDRESS)
 #define	CHERI_CAP_USER_DATA_OFFSET	0x0
 
-#define	CHERI_CAP_USER_MMAP_PERMS					\
-	(CHERI_PERMS_USERSPACE_DATA | CHERI_PERMS_USERSPACE_CODE |	\
-	CHERI_PERM_CHERIABI_VMMAP)
-/* Start at 256MB to avoid low PC values in sandboxes */
-#define	CHERI_CAP_USER_MMAP_BASE	(VM_MINUSER_ADDRESS + 0x10000000)
-#define	CHERI_CAP_USER_MMAP_LENGTH					\
-    (VM_MAXUSER_ADDRESS - CHERI_CAP_USER_MMAP_BASE)
-#define	CHERI_CAP_USER_MMAP_OFFSET	0x0
-
 /*
  * Root sealing capability for all userspace object capabilities.
  */
@@ -107,6 +98,16 @@
 #define	CHERI_SEALCAP_USERSPACE_OFFSET	0x0
 
 /*
+ * Definition for mapping vm_prot_t to capability permission
+ */
+#define	CHERI_PROT2PERM_READ_PERMS	CHERI_PERMS_PROT2PERM_READ
+#define	CHERI_PROT2PERM_WRITE_PERMS	CHERI_PERMS_PROT2PERM_WRITE
+#define	CHERI_PROT2PERM_EXEC_PERMS	CHERI_PERMS_PROT2PERM_EXEC
+#define	CHERI_PROT2PERM_MASK						\
+    (CHERI_PROT2PERM_READ_PERMS | CHERI_PROT2PERM_WRITE_PERMS |		\
+    CHERI_PROT2PERM_EXEC_PERMS)
+
+/*
  * Root sealing capability for kernel managed objects.
  */
 #define	CHERI_SEALCAP_KERNEL_PERMS	CHERI_PERMS_KERNEL_SEALCAP
@@ -114,46 +115,5 @@
 #define	CHERI_SEALCAP_KERNEL_LENGTH	\
     (CHERI_OTYPE_KERN_MAX - CHERI_OTYPE_KERN_MIN + 1)
 #define	CHERI_SEALCAP_KERNEL_OFFSET	0x0
-
-/* Reserved CHERI object types: */
-#define	CHERI_OTYPE_UNSEALED	(-1l)
-#define	CHERI_OTYPE_SENTRY	(-2l)
-
-#define	CHERI_REPRESENTABLE_LENGTH(len) \
-	__builtin_cheri_round_representable_length(len)
-#define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) \
-	__builtin_cheri_representable_alignment_mask(len)
-
-/* Provide macros to make it easier to work with the raw CRAM/CRRL results: */
-#define	CHERI_REPRESENTABLE_ALIGNMENT(len) \
-	(~CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) + 1)
-#define	CHERI_REPRESENTABLE_BASE(base, len) \
-	((base) & CHERI_REPRESENTABLE_ALIGNMENT_MASK(len))
-
-/*
- * In the current encoding sealed and unsealed capabilities have the same
- * alignment constraints.
- */
-#define	CHERI_SEALABLE_LENGTH(len)	\
-	CHERI_REPRESENTABLE_LENGTH(len)
-#define	CHERI_SEALABLE_ALIGNMENT_MASK(len)	\
-	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len)
-#define	CHERI_SEALABLE_ALIGNMENT(len)	\
-	CHERI_REPRESENTABLE_ALIGNMENT(len)
-#define	CHERI_SEALABLE_BASE(base, len)	\
-	CHERI_REPRESENTABLE_BASE(base, len)
-
-/* A mask for the lower bits, i.e. the negated alignment mask */
-#define	CHERI_SEAL_ALIGN_MASK(l)	~(CHERI_SEALABLE_ALIGNMENT_MASK(l))
-#define	CHERI_ALIGN_MASK(l)		~(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
-
-/*
- * TODO: avoid using these since count leading/trailing zeroes is expensive on
- * BERI/CHERI
- */
-#define	CHERI_ALIGN_SHIFT(l)	\
-	__builtin_ctzll(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
-#define	CHERI_SEAL_ALIGN_SHIFT(l)	\
-	__builtin_ctzll(CHERI_SEALABLE_ALIGNMENT_MASK(l))
 
 #endif /* !__SYS_CHERIREG_H__ */

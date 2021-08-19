@@ -228,6 +228,9 @@ int
 fill_regs(struct thread *td, struct reg *regs)
 {
 	struct trapframe *frame;
+#if __has_feature(capabilities)
+	int i;
+#endif
 
 	frame = td->td_frame;
 	regs->sp = frame->tf_sp;
@@ -235,7 +238,12 @@ fill_regs(struct thread *td, struct reg *regs)
 	regs->elr = frame->tf_elr;
 	regs->spsr = frame->tf_spsr;
 
+#if __has_feature(capabilities)
+	for (i = 0; i < nitems(frame->tf_x); i++)
+		regs->x[i] = frame->tf_x[i];
+#else
 	memcpy(regs->x, frame->tf_x, sizeof(regs->x));
+#endif
 
 #ifdef COMPAT_FREEBSD32
 	/*
@@ -254,6 +262,9 @@ int
 set_regs(struct thread *td, struct reg *regs)
 {
 	struct trapframe *frame;
+#if __has_feature(capabilities)
+	int i;
+#endif
 
 	frame = td->td_frame;
 	frame->tf_sp = regs->sp;
@@ -262,7 +273,12 @@ set_regs(struct thread *td, struct reg *regs)
 	frame->tf_spsr &= ~PSR_FLAGS;
 	frame->tf_spsr |= regs->spsr & PSR_FLAGS;
 
+#if __has_feature(capabilities)
+	for (i = 0; i < nitems(frame->tf_x); i++)
+		frame->tf_x[i] = regs->x[i];
+#else
 	memcpy(frame->tf_x, regs->x, sizeof(frame->tf_x));
+#endif
 
 #ifdef COMPAT_FREEBSD32
 	if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
@@ -462,6 +478,12 @@ fill_capregs(struct thread *td, struct capreg *regs)
 	regs->clr = frame->tf_lr;
 	regs->celr = frame->tf_elr;
 	regs->ddc = frame->tf_ddc;
+	regs->ctpidr = td->td_pcb->pcb_tpidr_el0;
+	regs->ctpidrro = td->td_pcb->pcb_tpidrro_el0;
+	regs->cid = td->td_pcb->pcb_cid_el0;
+	regs->rcsp = td->td_pcb->pcb_rcsp_el0;
+	regs->rddc = td->td_pcb->pcb_rddc_el0;
+	regs->rctpidr = td->td_pcb->pcb_rctpidr_el0;
 
 	for (i = 0; i < nitems(frame->tf_x); i++) {
 		regs->c[i] = frame->tf_x[i];
@@ -478,6 +500,24 @@ fill_capregs(struct thread *td, struct capreg *regs)
 		regs->tagmask |= (uint64_t)1 << i;
 	i++;
 	if (cheri_gettag((void * __capability)frame->tf_ddc))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->ctpidr))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->ctpidrro))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->cid))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->rcsp))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->rddc))
+		regs->tagmask |= (uint64_t)1 << i;
+	i++;
+	if (cheri_gettag((void * __capability)regs->rctpidr))
 		regs->tagmask |= (uint64_t)1 << i;
 
 	return (0);
@@ -524,18 +564,111 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 	memset(tf, 0, sizeof(struct trapframe));
 
-	tf->tf_x[0] = stack;
-	tf->tf_sp = STACKALIGN(stack);
-	tf->tf_lr = imgp->entry_addr;
-	tf->tf_elr = imgp->entry_addr;
+#if __has_feature(capabilities)
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+		tf->tf_x[0] = (uintcap_t)imgp->auxv;
+		tf->tf_sp = stack;
+		tf->tf_lr = (uintcap_t)cheri_exec_pcc(td, imgp);
+		trapframe_set_elr(tf, tf->tf_lr);
+		td->td_proc->p_md.md_sigcode = cheri_sigcode_capability(td);
+	} else
+#endif
+	{
+		tf->tf_x[0] = (register_t)stack;
+		tf->tf_sp = STACKALIGN((register_t)stack);
+		tf->tf_lr = imgp->entry_addr;
+#if __has_feature(capabilities)
+		hybridabi_thread_setregs(td, imgp->entry_addr);
+#else
+		tf->tf_elr = imgp->entry_addr;
+#endif
+	}
+
+	td->td_pcb->pcb_tpidr_el0 = 0;
+	td->td_pcb->pcb_tpidrro_el0 = 0;
+#if __has_feature(capabilities)
+	WRITE_SPECIALREG_CAP(ctpidrro_el0, 0);
+	WRITE_SPECIALREG_CAP(ctpidr_el0, 0);
+#else
+	WRITE_SPECIALREG(tpidrro_el0, 0);
+	WRITE_SPECIALREG(tpidr_el0, 0);
+#endif
+#if __has_feature(capabilities)
+	td->td_pcb->pcb_cid_el0 = 0;
+	td->td_pcb->pcb_rcsp_el0 = 0;
+	td->td_pcb->pcb_rddc_el0 = 0;
+	td->td_pcb->pcb_rctpidr_el0 = 0;
+	WRITE_SPECIALREG_CAP(cid_el0, 0);
+	WRITE_SPECIALREG_CAP(rcsp_el0, 0);
+	WRITE_SPECIALREG_CAP(rddc_el0, 0);
+	WRITE_SPECIALREG_CAP(rctpidr_el0, 0);
+#endif
 }
 
 /* Sanity check these are the same size, they will be memcpy'd to and fro */
+#if __has_feature(capabilities)
+CTASSERT(sizeof(((struct trapframe *)0)->tf_x) ==
+    sizeof((struct capregs *)0)->cap_x);
+CTASSERT(sizeof(((struct trapframe *)0)->tf_x) ==
+    sizeof((struct capreg *)0)->c);
+#else
 CTASSERT(sizeof(((struct trapframe *)0)->tf_x) ==
     sizeof((struct gpregs *)0)->gp_x);
 CTASSERT(sizeof(((struct trapframe *)0)->tf_x) ==
     sizeof((struct reg *)0)->x);
+#endif
 
+#if __has_feature(capabilities)
+int
+get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
+{
+	struct trapframe *tf = td->td_frame;
+
+	if (clear_ret & GET_MC_CLEAR_RET) {
+		mcp->mc_capregs.cap_x[0] = 0;
+		mcp->mc_spsr = tf->tf_spsr & ~PSR_C;
+	} else {
+		mcp->mc_capregs.cap_x[0] = tf->tf_x[0];
+		mcp->mc_spsr = tf->tf_spsr;
+	}
+
+	memcpy(&mcp->mc_capregs.cap_x[1], &tf->tf_x[1],
+	    sizeof(mcp->mc_capregs.cap_x[1]) *
+	    (nitems(mcp->mc_capregs.cap_x) - 1));
+
+	mcp->mc_capregs.cap_sp = tf->tf_sp;
+	mcp->mc_capregs.cap_lr = tf->tf_lr;
+	mcp->mc_capregs.cap_elr = tf->tf_elr;
+	mcp->mc_capregs.cap_ddc = tf->tf_ddc;
+	get_fpcontext(td, mcp);
+
+	return (0);
+}
+
+int
+set_mcontext(struct thread *td, mcontext_t *mcp)
+{
+	struct trapframe *tf = td->td_frame;
+	uint32_t spsr;
+
+	spsr = mcp->mc_spsr;
+	if ((spsr & PSR_M_MASK) != PSR_M_EL0t ||
+	    (spsr & PSR_AARCH32) != 0 ||
+	    (spsr & PSR_DAIF) != (td->td_frame->tf_spsr & PSR_DAIF))
+		return (EINVAL);
+
+	memcpy(tf->tf_x, mcp->mc_capregs.cap_x, sizeof(tf->tf_x));
+
+	tf->tf_sp = mcp->mc_capregs.cap_sp;
+	tf->tf_lr = mcp->mc_capregs.cap_lr;
+	tf->tf_elr = mcp->mc_capregs.cap_elr;
+	tf->tf_ddc = mcp->mc_capregs.cap_ddc;
+	tf->tf_spsr = mcp->mc_spsr;
+	set_fpcontext(td, mcp);
+
+	return (0);
+}
+#else
 int
 get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 {
@@ -582,6 +715,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 
 	return (0);
 }
+#endif
 
 static void
 get_fpcontext(struct thread *td, mcontext_t *mcp)
@@ -605,7 +739,7 @@ get_fpcontext(struct thread *td, mcontext_t *mcp)
 		KASSERT((curpcb->pcb_fpflags & ~PCB_FP_USERMASK) == 0,
 		    ("Non-userspace FPU flags set in get_fpcontext"));
 		memcpy(mcp->mc_fpregs.fp_q, curpcb->pcb_fpustate.vfp_regs,
-		    sizeof(mcp->mc_fpregs));
+		    sizeof(mcp->mc_fpregs.fp_q));
 		mcp->mc_fpregs.fp_cr = curpcb->pcb_fpustate.vfp_fpcr;
 		mcp->mc_fpregs.fp_sr = curpcb->pcb_fpustate.vfp_fpsr;
 		mcp->mc_fpregs.fp_flags = curpcb->pcb_fpflags;
@@ -636,7 +770,7 @@ set_fpcontext(struct thread *td, mcontext_t *mcp)
 		KASSERT(curpcb->pcb_fpusaved == &curpcb->pcb_fpustate,
 		    ("Called set_fpcontext while the kernel is using the VFP"));
 		memcpy(curpcb->pcb_fpustate.vfp_regs, mcp->mc_fpregs.fp_q,
-		    sizeof(mcp->mc_fpregs));
+		    sizeof(mcp->mc_fpregs.fp_q));
 		curpcb->pcb_fpustate.vfp_fpcr = mcp->mc_fpregs.fp_cr;
 		curpcb->pcb_fpustate.vfp_fpsr = mcp->mc_fpregs.fp_sr;
 		curpcb->pcb_fpflags = mcp->mc_fpregs.fp_flags & PCB_FP_USERMASK;
@@ -751,7 +885,7 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 	ucontext_t uc;
 	int error;
 
-	if (copyin(uap->sigcntxp, &uc, sizeof(uc)))
+	if (copyincap(uap->sigcntxp, &uc, sizeof(uc)))
 		return (EFAULT);
 
 	error = set_mcontext(td, &uc.uc_mcontext);
@@ -837,7 +971,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_UNLOCK(td->td_proc);
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyout(&frame, fp, sizeof(*fp)) != 0) {
+	if (copyoutcap(&frame, fp, sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
 		PROC_LOCK(p);
@@ -855,14 +989,22 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_x[2] = (register_t)&fp->sf_uc;
 #endif
 
+#if __has_feature(capabilities)
+	trapframe_set_elr(tf, (uintcap_t)catcher);
+#else
 	tf->tf_elr = (uintcap_t)catcher;
+#endif
 	tf->tf_sp = (uintcap_t)fp;
 	sysent = p->p_sysent;
+#if __has_feature(capabilities)
+	tf->tf_lr = (uintcap_t)p->p_md.md_sigcode;
+#else
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_lr = (register_t)sysent->sv_sigcode_base;
 	else
-		tf->tf_lr = (register_t)(sysent->sv_psstrings -
+		tf->tf_lr = (register_t)(p->p_psstrings -
 		    *(sysent->sv_szsigcode));
+#endif
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_elr,
 	    tf->tf_sp);
@@ -872,10 +1014,11 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 }
 
 static void
-init_proc0(vm_offset_t kstack)
+init_proc0(vm_pointer_t kstack)
 {
 	struct pcpu *pcpup = &__pcpu[0];
 
+	/* XXX-AM: We need to set bounds on pcb and kstack here as in MIPS */
 	proc_linkup0(&proc0, &thread0);
 	thread0.td_kstack = kstack;
 	thread0.td_kstack_pages = KSTACK_PAGES;
@@ -1007,7 +1150,7 @@ print_efi_map_entry(struct efi_md *p)
 		type = types[p->md_type];
 	else
 		type = "<INVALID>";
-	printf("%23s %012lx %12p %08lx ", type, p->md_phys,
+	printf("%23s %012lx %#12lx %08lx ", type, p->md_phys,
 	    p->md_virt, p->md_pages);
 	if (p->md_attr & EFI_MD_ATTR_UC)
 		printf("UC ");
@@ -1049,7 +1192,7 @@ print_efi_map_entries(struct efi_map_header *efihdr)
 static void
 try_load_dtb(caddr_t kmdp)
 {
-	vm_offset_t dtbp;
+	vm_pointer_t dtbp;
 
 	dtbp = MD_FETCH(kmdp, MODINFOMD_DTBP, vm_offset_t);
 #if defined(FDT_DTB_STATIC)
@@ -1058,7 +1201,7 @@ try_load_dtb(caddr_t kmdp)
 	 * to use the statically embedded one.
 	 */
 	if (dtbp == 0)
-		dtbp = (vm_offset_t)&fdt_static_dtb;
+		dtbp = (vm_pointer_t)__unbounded_addressof(fdt_static_dtb);
 #endif
 
 	if (dtbp == (vm_offset_t)NULL) {
@@ -1257,13 +1400,8 @@ initarm(struct arm64_bootparams *abp)
 	pcpup = &__pcpu[0];
 	pcpu_init(pcpup, 0, sizeof(struct pcpu));
 
-	/*
-	 * Set the pcpu pointer with a backup in tpidr_el1 to be
-	 * loaded when entering the kernel from userland.
-	 */
-	__asm __volatile(
-	    "mov x18, %0 \n"
-	    "msr tpidr_el1, %0" :: "r"(pcpup));
+	/* Initialize the pcpu pointer for this cpu. */
+	init_cpu_pcpup(pcpup);
 
 	PCPU_SET(curthread, &thread0);
 	PCPU_SET(midr, get_midr());
@@ -1347,12 +1485,23 @@ DB_SHOW_COMMAND(specialregs, db_show_spregs)
 #define	PRINT_REG(reg)	\
     db_printf(__STRING(reg) " = %#016lx\n", READ_SPECIALREG(reg))
 
+#if __has_feature(capabilities)
+#define	PRINT_REG_CAP(reg)						\
+do {									\
+    void * __capability _tmp = (void * __capability)READ_SPECIALREG_CAP(reg); \
+    db_printf(__STRING(reg) " = %#.16lp\n", _tmp);				\
+} while (0)
+#endif
+
 	PRINT_REG(actlr_el1);
 	PRINT_REG(afsr0_el1);
 	PRINT_REG(afsr1_el1);
 	PRINT_REG(aidr_el1);
 	PRINT_REG(amair_el1);
 	PRINT_REG(ccsidr_el1);
+#if __has_feature(capabilities)
+	PRINT_REG(cctlr_el0);
+#endif
 	PRINT_REG(clidr_el1);
 	PRINT_REG(contextidr_el1);
 	PRINT_REG(cpacr_el1);
@@ -1408,13 +1557,28 @@ DB_SHOW_COMMAND(specialregs, db_show_spregs)
 	PRINT_REG(spsel);
 	PRINT_REG(spsr_el1);
 	PRINT_REG(tcr_el1);
+#if __has_feature(capabilities)
+	PRINT_REG_CAP(ctpidr_el0);
+#else
 	PRINT_REG(tpidr_el0);
+#endif
 	PRINT_REG(tpidr_el1);
+#if __has_feature(capabilities)
+	PRINT_REG_CAP(ctpidrro_el0);
+#else
 	PRINT_REG(tpidrro_el0);
+#endif
 	PRINT_REG(ttbr0_el1);
 	PRINT_REG(ttbr1_el1);
+#if __has_feature(capabilities)
+	PRINT_REG_CAP(cvbar_el1);
+#else
 	PRINT_REG(vbar_el1);
+#endif
 #undef PRINT_REG
+#if __has_feature(capabilities)
+#undef PRINT_REG_CAP
+#endif
 }
 
 DB_SHOW_COMMAND(vtop, db_show_vtop)
@@ -1434,3 +1598,13 @@ DB_SHOW_COMMAND(vtop, db_show_vtop)
 		db_printf("show vtop <virt_addr>\n");
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20210413,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

@@ -143,12 +143,6 @@ trunc:
 void
 zmtp1_print(netdissect_options *ndo, const u_char *cp, u_int len)
 {
-	INVOKE_DISSECTOR(_zmtp1_print, ndo, cp, len);
-}
-
-void
-_zmtp1_print(netdissect_options *ndo, const u_char *cp, u_int len)
-{
 	const u_char *ep = min(ndo->ndo_snapend, cp + len);
 
 	ND_PRINT((ndo, ": ZMTP/1.0"));

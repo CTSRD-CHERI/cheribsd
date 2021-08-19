@@ -494,7 +494,7 @@ DB_SHOW_COMMAND(socket, db_show_socket)
 		db_printf("usage: show socket <addr>\n");
 		return;
 	}
-	so = (struct socket *)addr;
+	so = DB_DATA_PTR(addr, struct socket);
 
 	db_print_socket(so, "socket", 0);
 }
@@ -507,7 +507,7 @@ DB_SHOW_COMMAND(sockbuf, db_show_sockbuf)
 		db_printf("usage: show sockbuf <addr>\n");
 		return;
 	}
-	sb = (struct sockbuf *)addr;
+	sb = DB_DATA_PTR(addr, struct sockbuf);
 
 	db_print_sockbuf(sb, "sockbuf", 0);
 }
@@ -520,7 +520,7 @@ DB_SHOW_COMMAND(protosw, db_show_protosw)
 		db_printf("usage: show protosw <addr>\n");
 		return;
 	}
-	pr = (struct protosw *)addr;
+	pr = DB_DATA_PTR(addr, struct protosw);
 
 	db_print_protosw(pr, "protosw", 0);
 }
@@ -533,8 +533,17 @@ DB_SHOW_COMMAND(domain, db_show_domain)
 		db_printf("usage: show protosw <addr>\n");
 		return;
 	}
-	d = (struct domain *)addr;
+	d = DB_DATA_PTR(addr, struct domain);
 
 	db_print_domain(d, "domain", 0);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

@@ -64,7 +64,7 @@ struct sysentvec elf64_freebsd_sysvec_la48 = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS_LA48,
 	.sv_usrstack	= USRSTACK_LA48,
-	.sv_psstrings	= PS_STRINGS_LA48,
+	.sv_szpsstrings	= sizeof(struct ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings	= exec_copyout_strings,
@@ -99,7 +99,7 @@ struct sysentvec elf64_freebsd_sysvec_la57 = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS_LA57,
 	.sv_usrstack	= USRSTACK_LA57,
-	.sv_psstrings	= PS_STRINGS_LA57,
+	.sv_szpsstrings	= sizeof(struct ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings	= exec_copyout_strings,
@@ -140,21 +140,20 @@ amd64_lower_shared_page(struct sysentvec *sv)
 		sv->sv_maxuser -= PAGE_SIZE;
 		sv->sv_shared_page_base -= PAGE_SIZE;
 		sv->sv_usrstack -= PAGE_SIZE;
-		sv->sv_psstrings -= PAGE_SIZE;
 	}
 }
 
-static boolean_t
-freebsd_brand_info_la57_img_compat(struct image_params *imgp,
-    int32_t *osrel __unused, uint32_t *fctl0)
+static bool
+freebsd_brand_info_la57_img_compat(const struct image_params *imgp,
+    const int32_t *osrel __unused, const uint32_t *fctl0)
 {
 	if ((imgp->proc->p_md.md_flags & P_MD_LA57) != 0)
-		return (TRUE);
+		return (true);
 	if (fctl0 == NULL || (*fctl0 & NT_FREEBSD_FCTL_LA48) != 0)
-		return (FALSE);
+		return (false);
 	if ((imgp->proc->p_md.md_flags & P_MD_LA48) != 0)
-		return (FALSE);
-	return (TRUE);
+		return (false);
+	return (true);
 }
 
 static Elf64_Brandinfo freebsd_brand_info_la48 = {
@@ -257,7 +256,7 @@ elf_is_ifunc_reloc(Elf_Size r_info)
 
 /* Process one elf relocation with addend. */
 static int
-elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
     int type, bool late_ifunc, elf_lookup_fn lookup)
 {
 	Elf64_Addr *where, val;
@@ -359,14 +358,14 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 			break;
 
 		case R_X86_64_RELATIVE:	/* B + A */
-			addr = elf_relocaddr(lf, relocbase + addend);
+			addr = elf_relocaddr(lf, (Elf_Addr)relocbase + addend);
 			val = addr;
 			if (*where != val)
 				*where = val;
 			break;
 
 		case R_X86_64_IRELATIVE:
-			addr = relocbase + addend;
+			addr = (Elf_Addr)relocbase + addend;
 			val = ((Elf64_Addr (*)(void))addr)();
 			if (*where != val)
 				*where = val;
@@ -381,7 +380,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 }
 
 int
-elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
+elf_reloc(linker_file_t lf, char *relocbase, const void *data, int type,
     elf_lookup_fn lookup)
 {
 
@@ -389,7 +388,7 @@ elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
 }
 
 int
-elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_local(linker_file_t lf, char *relocbase, const void *data,
     int type, elf_lookup_fn lookup)
 {
 
@@ -397,7 +396,7 @@ elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
 }
 
 int
-elf_reloc_late(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_late(linker_file_t lf, char *relocbase, const void *data,
     int type, elf_lookup_fn lookup)
 {
 
@@ -424,3 +423,12 @@ elf_cpu_parse_dynamic(caddr_t loadbase __unused, Elf_Dyn *dynamic __unused)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

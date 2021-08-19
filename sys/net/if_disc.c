@@ -209,20 +209,20 @@ discioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
 
 		/*
 		 * Everything else is done at a higher level.
 		 */
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (ifr == NULL) {
 			error = EAFNOSUPPORT;		/* XXX */
 			break;
 		}
-		switch (ifr_addr_get_family(ifr)) {
+		switch (ifr->ifr_addr.sa_family) {
 #ifdef INET
 		case AF_INET:
 			break;
@@ -236,8 +236,8 @@ discioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		ifp->if_mtu = ifr_mtu_get(ifr);
+	case SIOCSIFMTU:
+		ifp->if_mtu = ifr->ifr_mtu;
 		break;
 	default:
 		error = EINVAL;
@@ -246,10 +246,9 @@ discioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net",
 //     "user_capabilities"
 //   ]
 // }

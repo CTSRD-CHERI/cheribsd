@@ -97,14 +97,23 @@ typedef struct pv_entry {
  * pv_entries are allocated in chunks per-process.  This avoids the
  * need to track per-pmap assignments.
  */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	_NPCM	2
+#define	_NPCPV	83
+#else
 #define	_NPCM	3
 #define	_NPCPV	168
+#endif
 struct pv_chunk {
 	struct pmap *		pc_pmap;
 	TAILQ_ENTRY(pv_chunk)	pc_list;
 	uint64_t		pc_map[_NPCM];  /* bitmap; 1 = free */
 	TAILQ_ENTRY(pv_chunk)	pc_lru;
-	struct pv_entry		pc_pventry[_NPCPV];
+	struct pv_entry		pc_pventry[_NPCPV] __subobject_use_container_bounds;
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Ensure pv_chunk is a page. */
+	char			pc_pad[16];
+#endif
 };
 
 typedef struct pmap *pmap_t;
@@ -127,8 +136,8 @@ extern struct pmap	kernel_pmap_store;
 #define	PMAP_TRYLOCK(pmap)	mtx_trylock(&(pmap)->pm_mtx)
 #define	PMAP_UNLOCK(pmap)	mtx_unlock(&(pmap)->pm_mtx)
 
-extern vm_offset_t virtual_avail;
-extern vm_offset_t virtual_end;
+extern vm_pointer_t virtual_avail;
+extern vm_pointer_t virtual_end;
 
 /*
  * Macros to test if a mapping is mappable with an L1 Section mapping
@@ -141,7 +150,7 @@ struct thread;
 
 void	pmap_activate_boot(pmap_t);
 void	pmap_activate_sw(struct thread *);
-void	pmap_bootstrap(vm_offset_t, vm_paddr_t, vm_size_t);
+void	pmap_bootstrap(vm_pointer_t, vm_paddr_t, vm_size_t);
 void	pmap_kenter_device(vm_offset_t, vm_size_t, vm_paddr_t);
 vm_paddr_t pmap_kextract(vm_offset_t va);
 void	pmap_kremove(vm_offset_t);
@@ -151,11 +160,11 @@ bool	pmap_ps_enabled(pmap_t);
 
 void	*pmap_mapdev(vm_offset_t, vm_size_t);
 void	*pmap_mapbios(vm_paddr_t, vm_size_t);
-void	pmap_unmapdev(vm_offset_t, vm_size_t);
-void	pmap_unmapbios(vm_offset_t, vm_size_t);
+void	pmap_unmapdev(vm_pointer_t, vm_size_t);
+void	pmap_unmapbios(vm_pointer_t, vm_size_t);
 
-boolean_t pmap_map_io_transient(vm_page_t *, vm_offset_t *, int, boolean_t);
-void	pmap_unmap_io_transient(vm_page_t *, vm_offset_t *, int, boolean_t);
+boolean_t pmap_map_io_transient(vm_page_t *, vm_pointer_t *, int, boolean_t);
+void	pmap_unmap_io_transient(vm_page_t *, vm_pointer_t *, int, boolean_t);
 
 bool	pmap_get_tables(pmap_t, vm_offset_t, pd_entry_t **, pd_entry_t **,
     pt_entry_t **);
@@ -174,3 +183,14 @@ pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 #endif	/* !LOCORE */
 
 #endif	/* !_MACHINE_PMAP_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "pointer_shape",
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

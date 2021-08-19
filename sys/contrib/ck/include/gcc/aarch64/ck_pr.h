@@ -94,7 +94,7 @@ CK_PR_FENCE(unlock, CK_DMB_SY)
 		long r = 0;					\
 		__asm__ __volatile__(I " %w0, [%1];"		\
 					: "=r" (r)		\
-					: "r"  (target)		\
+					: CK_MD_ATOMIC_PTR_CONSTR (target)	\
 					: "memory");		\
 		return ((T)r);					\
 	}
@@ -105,13 +105,26 @@ CK_PR_FENCE(unlock, CK_DMB_SY)
 		long r = 0;					\
 		__asm__ __volatile__(I " %0, [%1];"		\
 					: "=r" (r)		\
-					: "r"  (target)		\
+					: CK_MD_ATOMIC_PTR_CONSTR (target)	\
 					: "memory");		\
 		return ((T)r);					\
 	}
 
 
+#ifdef __CHERI_PURE_CAPABILITY__
+CK_CC_INLINE static void *
+ck_pr_md_load_ptr(const void *target)
+{
+	void *r = NULL;
+	__asm__ __volatile__("ldr %0, [%1]"
+				: "=C" (r)
+				: "C" (target)
+				: "memory");
+	return (r);
+}
+#else
 CK_PR_LOAD_64(ptr, void, void *, "ldr")
+#endif
 
 #define CK_PR_LOAD_S(S, T, I) CK_PR_LOAD(S, T, T, I)
 #define CK_PR_LOAD_S_64(S, T, I) CK_PR_LOAD_64(S, T, T, I)
@@ -139,7 +152,7 @@ CK_PR_LOAD_S_64(double, double, "ldr")
 	{							\
 		__asm__ __volatile__(I " %w1, [%0]"		\
 					:			\
-					: "r" (target),		\
+					: CK_MD_ATOMIC_PTR_CONSTR (target),	\
 					  "r" (v)		\
 					: "memory");		\
 		return;						\
@@ -150,13 +163,25 @@ CK_PR_LOAD_S_64(double, double, "ldr")
 	{							\
 		__asm__ __volatile__(I " %1, [%0]"		\
 					:			\
-					: "r" (target),		\
+					: CK_MD_ATOMIC_PTR_CONSTR (target),	\
 					  "r" (v)		\
 					: "memory");		\
 		return;						\
 	}
 
+#ifdef __CHERI_PURE_CAPABILITY__
+CK_CC_INLINE static void
+ck_pr_md_store_ptr(void *target, const void *v)
+{
+	__asm__ __volatile__("str %1, [%0]"
+				:
+				: "C" (target),
+				  "C" (v)
+				: "memory");
+}
+#else
 CK_PR_STORE_64(ptr, void, const void *, "str")
+#endif
 
 #define CK_PR_STORE_S(S, T, I) CK_PR_STORE(S, T, T, I)
 #define CK_PR_STORE_S_64(S, T, I) CK_PR_STORE_64(S, T, T, I)
@@ -201,12 +226,42 @@ CK_PR_STORE_S_64(double, double, "str")
                                      "cbnz %w1, 1b;"		\
                                         : "=&r" (previous),	\
                                           "=&r" (tmp)		\
-                                        : "r"   (target)	\
+                                        : CK_MD_ATOMIC_PTR_CONSTR (target)	\
                                         : "memory", "cc");	\
                 return;						\
         }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Negating a pointer value is weird. This should arguably not
+ * exist. In CHERI we create a NULL-derived capability with the
+ * cursor set to the negated the address value.
+ */
+CK_CC_INLINE static void
+ck_pr_neg_ptr(void *target)
+{
+        void *previous = NULL;
+        ptraddr_t tmp2;
+        int tmp1 = 0;
+
+        __asm__ __volatile__("1:"
+                             "ldxr %0, [%3];"
+                             "gcvalue %2, %0;"
+                             "mov %0, czr;"
+                             "neg %2, %2;"
+                             "scvalue %0, %2;"
+                             "stxr %w1, %0, [%3];"
+                             "cbnz %w1, 1b;"
+                             : "=&C" (previous),
+                               "=&r" (tmp1),
+                               "=&r" (tmp2)
+                             : "C" (target)
+                             : "memory", "cc");
+        return;
+}
+#else
 CK_PR_NEG(ptr, void, void *, "", "")
+#endif
 CK_PR_NEG(64, uint64_t, uint64_t, "", "")
 
 #define CK_PR_NEG_S(S, T, W)					\

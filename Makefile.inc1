@@ -153,12 +153,13 @@ TARGET_ABI=	gnueabi
 .endif
 .endif
 _MACHINE_ABI?=	unknown
-MACHINE_MACHINE=${MACHINE_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/mips64/:S/riscv64c/riscv64/}
+MACHINE_MACHINE=${MACHINE_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/mips64/:S/riscv64c/riscv64/}
 MACHINE_TRIPLE?=${MACHINE_MACHINE}-${_MACHINE_ABI}-freebsd13.0
 TARGET_ABI?=	unknown
-TARGET_MACHINE=	${TARGET_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/mips64/:S/riscv64c/riscv64/}
+TARGET_MACHINE=	${TARGET_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/mips64/:S/riscv64c/riscv64/}
 TARGET_TRIPLE?=	${TARGET_MACHINE}-${TARGET_ABI}-freebsd13.0
 KNOWN_ARCHES?=	aarch64/arm64 \
+		aarch64c/arm64 \
 		amd64 \
 		armv6/arm \
 		armv7/arm \
@@ -786,7 +787,7 @@ BSARGS= 	DESTDIR= \
 		SSP_CFLAGS= \
 		MK_HTML=no NO_LINT=yes MK_MAN=no MK_MAN_UTILS=yes \
 		-DNO_PIC MK_PROFILE=no -DNO_SHARED \
-		-DNO_CPU_CFLAGS MK_WARNS=no MK_CTF=no \
+		-DNO_CPU_CFLAGS MK_WERROR=no MK_CTF=no \
 		MK_CLANG_EXTRAS=no MK_CLANG_FORMAT=no MK_CLANG_FULL=no \
 		MK_LLDB=no MK_RETPOLINE=no MK_TESTS=no \
 		MK_INCLUDES=yes
@@ -807,7 +808,7 @@ TMAKE=		\
 		BWPHASE=${.TARGET:C,^_,,} \
 		SSP_CFLAGS= \
 		-DNO_LINT \
-		-DNO_CPU_CFLAGS MK_WARNS=no MK_CTF=no \
+		-DNO_CPU_CFLAGS MK_WERROR=no MK_CTF=no \
 		MK_CLANG_EXTRAS=no MK_CLANG_FORMAT=no MK_CLANG_FULL=no \
 		BUILD_TOOLS_CC="env PATH=${PATH}:/usr/bin:/bin ${COMPILER_ABSOLUTE_PATH}" \
 		MK_LLDB=no MK_RETPOLINE=no MK_TESTS=no
@@ -836,7 +837,7 @@ KTMAKE=		\
 		SSP_CFLAGS= \
 		MK_HTML=no -DNO_LINT MK_MAN=no \
 		-DNO_PIC MK_PROFILE=no -DNO_SHARED \
-		-DNO_CPU_CFLAGS MK_RETPOLINE=no MK_WARNS=no MK_CTF=no
+		-DNO_CPU_CFLAGS MK_RETPOLINE=no MK_WERROR=no MK_CTF=no
 
 # world stage
 WMAKEENV=	${CROSSENV} \
@@ -2397,11 +2398,9 @@ _crunchide=	usr.sbin/crunch/crunchide
 _bootstrap_tools_links+=crunchide
 .endif
 
-.if 1
-# TODO: enable version check once patch has been upstreamed
 # 1300115: Higher WARNS fixes
-#.if ${BOOTSTRAPPING} < 1202502 || \
-#	(${BOOTSTRAPPING} > 1300000 && ${BOOTSTRAPPING} < 1300115)
+.if ${BOOTSTRAPPING} < 1202502 || \
+	(${BOOTSTRAPPING} > 1300000 && ${BOOTSTRAPPING} < 1300131)
 _crunchgen=	usr.sbin/crunch/crunchgen
 .else
 _bootstrap_tools_links+=crunchgen
@@ -2416,6 +2415,14 @@ _kbdcontrol=	usr.sbin/kbdcontrol
 .else
 _bootstrap_tools_links+=kbdcontrol
 .endif
+.endif
+
+# 1300102: VHDX support
+.if ${BOOTSTRAPPING} < 1201520 || \
+	(${BOOTSTRAPPING} > 1300000 && ${BOOTSTRAPPING} < 1300102)
+_mkimg=	usr.bin/mkimg
+.else
+_bootstrap_tools_links+=mkimg
 .endif
 
 _yacc=		usr.bin/yacc
@@ -2593,6 +2600,7 @@ bootstrap-tools: ${_bt}-links .PHONY
     ${_flua} \
     ${_crunchide} \
     ${_crunchgen} \
+    ${_mkimg} \
     ${_nmtree} \
     ${_vtfontcvt} \
     ${_localedef} \
@@ -2642,7 +2650,7 @@ _libmagic=lib/libmagic
 .endif
 
 .if ${MK_PMC} != "no" && \
-    (${TARGET_ARCH} == "aarch64" || ${TARGET_ARCH} == "amd64" || \
+    (${TARGET_ARCH} == "amd64" || ${TARGET} == "arm64" || \
     ${TARGET_ARCH} == "i386")
 _jevents=lib/libpmc/pmu-events
 .endif
@@ -2656,6 +2664,7 @@ _bt_clean=	${CLEANDIR}
 .for _tool in \
     ${_tcsh} \
     bin/sh \
+    libexec/atf/sh_static \
     ${LOCAL_TOOL_DIRS} \
     ${_jevents} \
     lib/ncurses/ncurses \
@@ -2876,7 +2885,7 @@ NXBMAKEARGS+= \
 	MK_SENDMAIL=no \
 	MK_SVNLITE=no \
 	MK_TESTS=no \
-	MK_WARNS=no \
+	MK_WERROR=no \
 	MK_ZFS=no
 
 .if make(native-xtools*) && \
@@ -2974,9 +2983,6 @@ _prereq_libs+= lib/libssp_nonshared
 # all shared libraries for ELF.
 #
 _startup_libs=	lib/csu
-.if ${MK_LIBCHERI} != "no"
-_startup_libs+= lib/libc_cheri
-.endif
 _startup_libs+=	lib/libc
 _startup_libs+=	lib/libc_nonshared
 .if ${MK_LIBCPLUSPLUS} != "no"
@@ -3028,9 +3034,6 @@ _prebuild_libs=	${_kerberos5_lib_libasn1} \
 		${_secure_lib_libcrypto} ${_secure_lib_libssl} \
 		${_lib_libldns} ${_secure_lib_libssh}
 
-.if ${MK_LIBCHERI} != "no"
-_prebuild_libs+=	lib/libcheri
-.endif
 .if ${MK_CHERI} != "no"
 _prebuild_libs+=	lib/libpng
 lib/libpng__L: lib/libz__L
@@ -3511,7 +3514,7 @@ XDEV_CPUTYPE?=${TARGET_CPUTYPE}
 
 NOFUN=-DNO_FSCHG MK_HTML=no -DNO_LINT \
 	MK_MAN=no MK_NLS=no MK_PROFILE=no \
-	MK_KERBEROS=no MK_RESCUE=no MK_TESTS=no MK_WARNS=no \
+	MK_KERBEROS=no MK_RESCUE=no MK_TESTS=no MK_WERROR=no \
 	TARGET=${TARGET} TARGET_ARCH=${TARGET_ARCH} \
 	CPUTYPE=${XDEV_CPUTYPE}
 

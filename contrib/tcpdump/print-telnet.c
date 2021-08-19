@@ -508,12 +508,6 @@ pktend:
 void
 telnet_print(netdissect_options *ndo, const u_char *sp, u_int length)
 {
-	INVOKE_DISSECTOR(_telnet_print, ndo, sp, length);
-}
-
-void
-_telnet_print(netdissect_options *ndo, const u_char *sp, u_int length)
-{
 	int first = 1;
 	const u_char *osp;
 	int l;

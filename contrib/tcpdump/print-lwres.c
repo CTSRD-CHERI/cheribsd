@@ -292,13 +292,6 @@ void
 lwres_print(netdissect_options *ndo,
             register const u_char *bp, u_int length)
 {
-	INVOKE_DISSECTOR(_lwres_print, ndo, bp, length);
-}
-
-void
-_lwres_print(netdissect_options *ndo,
-            register const u_char *bp, u_int length)
-{
 	const struct lwres_lwpacket *np;
 	uint32_t v;
 	const char *s;

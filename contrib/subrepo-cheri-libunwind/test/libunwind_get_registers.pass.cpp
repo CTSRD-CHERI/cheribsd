@@ -31,25 +31,9 @@ static void check_reg(unw_cursor_t *cursor, const char *name,
 
 #define CHECK_REG(num, expected) check_reg(cursor, #num, num, expected)
 
-// unwind_context_t size should be the size of the CHERI256 context for all
-// archictectures
-static constexpr size_t expected_context_size = 68 * 8 + 33 * 32;
-// This helper gives better static assert error messages for older versions of
-// clang
-template <unsigned A, unsigned B> void check_size() {
-  static_assert(A == B, "Building against wrong libunwind.h header?");
-}
-
 int main() {
   unw_context_t context;
   unw_cursor_t cursor;
-  // Sizeof unw_context_t must be a multiple of sizeof(void*)
-  check_size<sizeof(unw_context_t) % sizeof(void *), 0>();
-  check_size<sizeof(unw_context_t), expected_context_size>();
-  check_size<sizeof(unw_context_t) / sizeof(uint64_t),
-             _LIBUNWIND_CONTEXT_SIZE>();
-  check_size<sizeof(unw_context_t) / sizeof(uint64_t),
-             expected_context_size / 8>();
 
   // Call unw_getcontext() once to avoid registers being clobbered by lazy
   // binding resolvers in RTLD.
@@ -85,25 +69,41 @@ int main() {
                    : [ hi_value ] "r"(expected_hi),                            \
                      [ lo_value ] "r"(expected_lo) /* inputs */                \
                    : "lo", "hi" /* clobbers */)
+#elif defined(__riscv)
+  size_t expected_s10 = 0x12345678;
+  size_t expected_s11 = 0x87654321;
+  auto check_reg_values = [=](unw_context_t *context, unw_cursor_t *cursor) {
+    CHECK_REG(UNW_RISCV_X26, expected_s10);
+    CHECK_REG(UNW_RISCV_X27, expected_s11);
+    // The address of context should have been captured as the argument passed
+    // to unw_getcontext (in a0/x10):
+    CHECK_REG(UNW_RISCV_X10, (uintptr_t)context);
+#ifdef __CHERI_PURE_CAPABILITY__
+    CHECK_REG(UNW_RISCV_DDC, (uintptr_t)NULL);
+#else
+#endif
+  };
+#define ASM_SETUP_CONTEXT()                                                    \
+  __asm__ volatile("mv s10, %0\n\t"                                            \
+                   "mv s11, %1"                                                \
+                   :                                                           \
+                   : "r"(expected_s10), "r"(expected_s11)                      \
+                   : "s10", "s11")
 #elif defined(__x86_64__)
-  // Check the values of r14 + r15 since they will almost certainly not be
+  // Check the value of r14 since they will almost certainly not be
   // clobbered between the asm volatile and the call to unw_init_local()
   size_t expected_r14 = 0x87654321;
-  size_t expected_r15 = 0x12345678;
   auto check_reg_values = [=](unw_context_t *context, unw_cursor_t *cursor) {
     (void)context;
     CHECK_REG(UNW_X86_64_R14, expected_r14);
-    CHECK_REG(UNW_X86_64_R15, expected_r15);
   };
   // Setup some registers that we can compare to the values stored in the
   // unw_cursor
 #define ASM_SETUP_CONTEXT()                                                    \
   __asm__ volatile("movq %[r14_value], %%r14\n\t"                              \
-                   "movq %[r15_value], %%r15\n\t"                              \
-                   : /* no outputs */                                          \
-                   : [ r14_value ] "X"(expected_r14),                          \
-                     [ r15_value ] "X"(expected_r15) /* inputs */              \
-                   : "r14", "r15" /* clobbers */)
+                   :                               /* no outputs */            \
+                   : [r14_value] "X"(expected_r14) /* inputs */                \
+                   : "r14" /* clobbers */)
 #else
 #warning "Test not implemented for this architecture"
   auto check_reg_values = [](unw_context_t *context, unw_cursor_t *cursor) {
@@ -111,10 +111,10 @@ int main() {
   };
 #define ASM_SETUP_CONTEXT() (void)0
 #endif
-  // This line should immediately follow the inline assembly to ensure that
-  // the compiler doesn't insert additional register moves
   fprintf(stderr, "Setting up register values for unw_getcontext()\n");
   ASM_SETUP_CONTEXT();
+  // This line should immediately follow the inline assembly to ensure that
+  // the compiler doesn't insert additional register moves
   ret = unw_getcontext(&context);
   if (ret != UNW_ESUCCESS)
     fatal("unw_getcontext failed with error code %d", ret);

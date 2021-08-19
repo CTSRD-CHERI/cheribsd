@@ -894,7 +894,7 @@ DB_SHOW_COMMAND(radixnode, db_show_radixnode)
 
         if (!have_addr)
                 return;
-	rnode = (struct vm_radix_node *)addr;
+	rnode = DB_DATA_PTR(addr, struct vm_radix_node);
 	db_printf("radixnode %p, owner %jx, children count %u, level %u:\n",
 	    (void *)rnode, (uintmax_t)rnode->rn_owner, rnode->rn_count,
 	    rnode->rn_clev);
@@ -908,3 +908,12 @@ DB_SHOW_COMMAND(radixnode, db_show_radixnode)
 	}
 }
 #endif /* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20200127,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

@@ -3,6 +3,7 @@
  * Copyright 1996-1998 John D. Polstra.
  * Copyright 2014 Andrew Turner.
  * Copyright 2014-2015 The FreeBSD Foundation.
+ * Copyright 2020 Brett F. Gutstein.
  * All rights reserved.
  *
  * Portions of this software were developed by Andrew Turner
@@ -32,6 +33,9 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <sys/types.h>
+
+#include <stdbool.h>
 #include <stdlib.h>
 
 #include "libc_private.h"
@@ -46,12 +50,57 @@ extern int etext;
 
 extern long * _end;
 
+/*
+ * For -pie executables rtld will process capability relocations, so we don't
+ * need to include the code here.
+ */
+#if __has_feature(capabilities) && !defined(PIC)
+#define SHOULD_PROCESS_CAP_RELOCS
+#endif
+
+#ifdef SHOULD_PROCESS_CAP_RELOCS
+#define DONT_EXPORT_CRT_INIT_GLOBALS
+#define CRT_INIT_GLOBALS_GDC_ONLY
+#include "crt_init_globals.c"
+#endif
+
 void __start(int, char **, char **, void (*)(void));
 
 /* The entry function. */
 void
 __start(int argc, char *argv[], char *env[], void (*cleanup)(void))
 {
+
+#ifdef SHOULD_PROCESS_CAP_RELOCS
+	/*
+	 * Initialize __cap_relocs for static executables.  Dynamic
+	 * executables should not have any, and the runtime linker
+	 * would initialize them if they did.
+	 */
+	if (&_DYNAMIC == NULL) {
+		const Elf_Auxinfo *auxp;
+		char **strp;
+		void *phdr = NULL;
+		long phnum = 0;
+
+		strp = env;
+		while (*strp++ != NULL)
+			;
+		auxp = (Elf_Auxinfo *)strp;
+
+		for (; auxp->a_type != AT_NULL; auxp++) {
+			if (auxp->a_type == AT_PHDR) {
+				phdr = auxp->a_un.a_ptr;
+			} else if (auxp->a_type == AT_PHNUM) {
+				phnum = auxp->a_un.a_val;
+			}
+		}
+
+		if (phdr != NULL && phnum != 0) {
+			do_crt_init_globals(phdr, phnum);
+		}
+	}
+#endif
 
 	handle_argv(argc, argv, env);
 

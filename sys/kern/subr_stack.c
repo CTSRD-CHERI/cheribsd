@@ -103,7 +103,7 @@ stack_print(const struct stack *st)
 	for (i = 0; i < st->depth; i++) {
 		(void)stack_symbol(st->pcs[i], namebuf, sizeof(namebuf),
 		    &offset, M_WAITOK);
-		printf("#%d %p at %s+%#lx\n", i, (void *)st->pcs[i],
+		printf("#%d %p at %s+%#lx\n", i, (void *)(uintptr_t)st->pcs[i],
 		    namebuf, offset);
 	}
 }
@@ -123,7 +123,7 @@ stack_print_short(const struct stack *st)
 		    &offset, M_WAITOK) == 0)
 			printf("%s+%#lx", namebuf, offset);
 		else
-			printf("%p", (void *)st->pcs[i]);
+			printf("%p", (void *)(uintptr_t)st->pcs[i]);
 	}
 	printf("\n");
 }
@@ -138,7 +138,7 @@ stack_print_ddb(const struct stack *st)
 	KASSERT(st->depth <= STACK_MAX, ("bogus stack"));
 	for (i = 0; i < st->depth; i++) {
 		stack_symbol_ddb(st->pcs[i], &name, &offset);
-		printf("#%d %p at %s+%#lx\n", i, (void *)st->pcs[i],
+		printf("#%d %p at %s+%#lx\n", i, (void *)(uintptr_t)st->pcs[i],
 		    name, offset);
 	}
 }
@@ -158,7 +158,7 @@ stack_print_short_ddb(const struct stack *st)
 		if (stack_symbol_ddb(st->pcs[i], &name, &offset) == 0)
 			printf("%s+%#lx", name, offset);
 		else
-			printf("%p", (void *)st->pcs[i]);
+			printf("%p", (void *)(uintptr_t)st->pcs[i]);
 	}
 	printf("\n");
 }
@@ -186,7 +186,7 @@ stack_sbuf_print_flags(struct sbuf *sb, const struct stack *st, int flags,
 		switch (format) {
 		case STACK_SBUF_FMT_LONG:
 			sbuf_printf(sb, "#%d %p at %s+%#lx\n", i,
-			    (void *)st->pcs[i], namebuf, offset);
+			    (void *)(uintptr_t)st->pcs[i], namebuf, offset);
 			break;
 		case STACK_SBUF_FMT_COMPACT:
 			sbuf_printf(sb, "%s+%#lx ", namebuf, offset);
@@ -217,7 +217,7 @@ stack_sbuf_print_ddb(struct sbuf *sb, const struct stack *st)
 	KASSERT(st->depth <= STACK_MAX, ("bogus stack"));
 	for (i = 0; i < st->depth; i++) {
 		(void)stack_symbol_ddb(st->pcs[i], &name, &offset);
-		sbuf_printf(sb, "#%d %p at %s+%#lx\n", i, (void *)st->pcs[i],
+		sbuf_printf(sb, "#%d %p at %s+%#lx\n", i, (void *)(uintptr_t)st->pcs[i],
 		    name, offset);
 	}
 }
@@ -257,7 +257,7 @@ stack_symbol(vm_offset_t pc, char *namebuf, u_int buflen, long *offset,
 {
 	int error;
 
-	error = linker_search_symbol_name_flags((caddr_t)pc, namebuf, buflen,
+	error = linker_search_symbol_name_flags(pc, namebuf, buflen,
 	    offset, flags);
 	if (error == 0 || error == EWOULDBLOCK)
 		return (error);
@@ -273,7 +273,7 @@ stack_symbol_ddb(vm_offset_t pc, const char **name, long *offset)
 	linker_symval_t symval;
 	c_linker_sym_t sym;
 
-	if (linker_ddb_search_symbol((caddr_t)pc, &sym, offset) != 0)
+	if (linker_ddb_search_symbol(pc, &sym, offset) != 0)
 		goto out;
 	if (linker_ddb_symbol_values(sym, &symval) != 0)
 		goto out;
@@ -286,3 +286,12 @@ stack_symbol_ddb(vm_offset_t pc, const char **name, long *offset)
 	*name = "??";
 	return (ENOENT);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200708,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

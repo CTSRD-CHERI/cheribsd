@@ -104,6 +104,7 @@ char	*getenv(const char *);
 long	 labs(long) __pure2;
 ldiv_t	 ldiv(long, long) __pure2;
 void	*malloc(size_t) __malloc_like __result_use_check __alloc_size(1);
+void	 malloc_revoke(void);
 int	 mblen(const char *, size_t);
 size_t	 mbstowcs(wchar_t * __restrict , const char * __restrict, size_t);
 int	 mbtowc(wchar_t * __restrict, const char * __restrict, size_t);

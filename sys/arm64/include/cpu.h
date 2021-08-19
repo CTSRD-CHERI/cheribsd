@@ -67,6 +67,7 @@
 
 #ifdef _KERNEL
 
+#define	CPU_IMPL_RESEARCH	0x3F
 #define	CPU_IMPL_ARM		0x41
 #define	CPU_IMPL_BROADCOM	0x42
 #define	CPU_IMPL_CAVIUM		0x43
@@ -78,6 +79,9 @@
 #define	CPU_IMPL_QUALCOMM	0x51
 #define	CPU_IMPL_MARVELL	0x56
 #define	CPU_IMPL_INTEL		0x69
+
+/* Research part numbers */
+#define	CPU_PART_MORELLO	0x412
 
 /* ARM Part numbers */
 #define	CPU_PART_FOUNDATION	0xD00

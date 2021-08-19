@@ -99,6 +99,7 @@ __FBSDID("$FreeBSD$");
 
 #ifdef CPU_CHERI
 #include <cheri/cheri.h>
+#include <cheri/cheric.h>
 #endif
 
 #include <sys/random.h>
@@ -123,7 +124,7 @@ SYSCTL_INT(_hw, OID_AUTO, clockrate, CTLFLAG_RD,
     &cpu_clock, 0, "CPU instruction clock rate");
 int clocks_running = 0;
 
-vm_offset_t kstack0;
+vm_pointer_t kstack0;
 
 /*
  * Each entry in the pcpu_space[] array is laid out in the following manner:
@@ -171,7 +172,7 @@ extern char MipsCache[], MipsCacheEnd[];
 /* MIPS wait skip region */
 extern char MipsWaitStart[], MipsWaitEnd[];
 
-extern char edata[], end[];
+extern char end[];
 
 u_int32_t bootdev;
 struct bootinfo bootinfo;
@@ -289,28 +290,31 @@ mips_proc0_init(void)
 		panic("BSP must be processor number 0");
 #endif
 	proc_linkup0(&proc0, &thread0);
-
-	KASSERT((kstack0 & ((KSTACK_PAGE_SIZE * 2) - 1)) == 0,
+	KASSERT(is_aligned(kstack0, KSTACK_PAGE_SIZE * 2),
 		("kstack0 is not aligned on a page (0x%0lx) boundary: 0x%0lx",
 		(long)(KSTACK_PAGE_SIZE * 2), (long)kstack0));
+
+	thread0.td_kstack = kstack0;
 #ifdef KSTACK_LARGE_PAGE
 	/*
 	 * For 16K page size the stack uses the odd page
 	 * and kstack0 was allocated on the 32K boundary.
 	 * So we bump up the address to the odd page boundary.
+	 * For cheri we use both pages, so do not bump the
+	 * address.
 	 */
-	thread0.td_kstack = kstack0 + KSTACK_PAGE_SIZE;
-#else
-	thread0.td_kstack = kstack0;
+#ifndef __CHERI_PURE_CAPABILITY__
+	thread0.td_kstack += KSTACK_PAGE_SIZE;
 #endif
+#endif /* KSTACK_LARGE_PAGE */
 	thread0.td_kstack_pages = KSTACK_PAGES;
 	/* 
 	 * Do not use cpu_thread_alloc to initialize these fields 
 	 * thread0 is the only thread that has kstack located in KSEG0 
 	 * while cpu_thread_alloc handles kstack allocated in KSEG2.
 	 */
-	thread0.td_pcb = (struct pcb *)(thread0.td_kstack +
-	    thread0.td_kstack_pages * PAGE_SIZE) - 1;
+	mips_setup_thread_pcb(&thread0);
+
 	thread0.td_frame = &thread0.td_pcb->pcb_regs;
 
 	/* Steal memory for the dynamic per-cpu area. */
@@ -459,8 +463,8 @@ mips_postboot_fixup(void)
 #ifdef DDB
 	Elf_Size *trampoline_data = (Elf_Size*)kernel_kseg0_end;
 	Elf_Size symtabsize = 0;
-	vm_offset_t ksym_start;
-	vm_offset_t ksym_end;
+	vm_pointer_t ksym_start;
+	vm_pointer_t ksym_end;
 
 	if (trampoline_data[0] == SYMTAB_MAGIC) {
 		symtabsize = trampoline_data[1];
@@ -692,3 +696,15 @@ mips_exc_cntrs_sysctl_register(void *arg)
 
 SYSINIT(sysctl, SI_SUB_KMEM, SI_ORDER_ANY, mips_exc_cntrs_sysctl_register, 0);
 #endif /* defined((MIPS_EXC_CNTRS) */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support",
+//     "pointer_alignment",
+//     "subobject_bounds",
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

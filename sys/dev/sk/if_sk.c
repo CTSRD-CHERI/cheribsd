@@ -1104,17 +1104,16 @@ sk_ioctl(ifp, command, data)
 
 	error = 0;
 	switch(command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		    ifr_mtu_get(ifr) > SK_JUMBO_MTU)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > SK_JUMBO_MTU)
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
+		else if (ifp->if_mtu != ifr->ifr_mtu) {
 			if (sc_if->sk_jumbo_disable != 0 &&
-			    ifr_mtu_get(ifr) > SK_MAX_FRAMELEN)
+			    ifr->ifr_mtu > SK_MAX_FRAMELEN)
 				error = EINVAL;
 			else {
 				SK_IF_LOCK(sc_if);
-				ifp->if_mtu = ifr_mtu_get(ifr);
+				ifp->if_mtu = ifr->ifr_mtu;
 				if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 					ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 					sk_init_locked(sc_if);
@@ -1123,7 +1122,7 @@ sk_ioctl(ifp, command, data)
 			}
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		SK_IF_LOCK(sc_if);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1139,25 +1138,25 @@ sk_ioctl(ifp, command, data)
 		sc_if->sk_if_flags = ifp->if_flags;
 		SK_IF_UNLOCK(sc_if);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		SK_IF_LOCK(sc_if);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			sk_rxfilter(sc_if);
 		SK_IF_UNLOCK(sc_if);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		mii = device_get_softc(sc_if->sk_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		SK_IF_LOCK(sc_if);
 		if (sc_if->sk_softc->sk_type == SK_GENESIS) {
 			SK_IF_UNLOCK(sc_if);
 			break;
 		}
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (IFCAP_TXCSUM & ifp->if_capabilities) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -3843,12 +3842,3 @@ sysctl_hw_sk_int_mod(SYSCTL_HANDLER_ARGS)
 {
 	return (sysctl_int_range(oidp, arg1, arg2, req, SK_IM_MIN, SK_IM_MAX));
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

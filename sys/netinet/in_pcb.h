@@ -325,7 +325,7 @@ struct inpcb {
 	CK_LIST_ENTRY(inpcb) inp_list;	/* (p/l) list for all PCBs for proto */
 	                                /* (e[r]) for list iteration */
 	                                /* (p[w]/l) for addition/removal */
-	struct epoch_context inp_epoch_ctx;
+	struct epoch_context inp_epoch_ctx __subobject_use_container_bounds;
 };
 #endif	/* _KERNEL */
 
@@ -399,7 +399,7 @@ void	in_pcbtoxinpcb(const struct inpcb *, struct xinpcb *);
 #endif /* _SYS_SOCKETVAR_H_ */
 
 struct inpcbport {
-	struct epoch_context phd_epoch_ctx;
+	struct epoch_context phd_epoch_ctx __subobject_use_container_bounds;
 	CK_LIST_ENTRY(inpcbport) phd_hash;
 	struct inpcbhead phd_pcblist;
 	u_short phd_port;
@@ -407,7 +407,7 @@ struct inpcbport {
 
 struct in_pcblist {
 	int il_count;
-	struct epoch_context il_epoch_ctx;
+	struct epoch_context il_epoch_ctx __subobject_use_container_bounds;
 	struct inpcbinfo *il_pcbinfo;
 	struct inpcb *il_inp_list[0];
 };
@@ -562,7 +562,7 @@ struct inpcbgroup {
  */
 struct inpcblbgroup {
 	CK_LIST_ENTRY(inpcblbgroup) il_list;
-	struct epoch_context il_epoch_ctx;
+	struct epoch_context il_epoch_ctx __subobject_use_container_bounds;
 	uint16_t	il_lport;			/* (c) */
 	u_char		il_vflag;			/* (c) */
 	u_char		il_pad;
@@ -896,10 +896,13 @@ void	in_pcboutput_eagain(struct inpcb *);
 #endif /* !_NETINET_IN_PCB_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20200706,
 //   "target_type": "header",
 //   "changes": [
 //     "integer_provenance"
+//   ],
+//   "changes_purecap": [
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

@@ -111,9 +111,11 @@ struct pgrp {
 	struct session	*pg_session;	/* (c) Pointer to session. */
 	struct sigiolst	pg_sigiolst;	/* (m) List of sigio sources. */
 	pid_t		pg_id;		/* (c) Process group id. */
-	int		pg_jobc;	/* (m) Job control process count. */
 	struct mtx	pg_mtx;		/* Mutex to protect members */
+	int		pg_flags;	/* (m) PGRP_ flags */
 };
+
+#define	PGRP_ORPHANED	0x00000001	/* Group is orphaned */
 
 /*
  * pargs, used to hold a copy of the command line, if it had a sane length.
@@ -331,9 +333,6 @@ struct thread {
 	void * __capability td_sigblock_ptr; /* (k) uptr for fast sigblock. */
 	uint32_t	td_sigblock_val;  /* (k) fast sigblock value read at
 					     td_sigblock_ptr on kern entry */
-#if __has_feature(capabilities)
-	void * __capability td_cheri_mmap_cap; /* (x) */
-#endif
 #define	td_endcopy td_pcb
 
 /*
@@ -361,7 +360,7 @@ struct thread {
 	/* LP64 hole */
 	struct callout	td_slpcallout;	/* (h) Callout for sleep. */
 	struct trapframe *td_frame;	/* (k) */
-	vm_offset_t	td_kstack;	/* (a) Kernel VA of kstack. */
+	vm_pointer_t	td_kstack;	/* (a) Kernel kstack pointer. */
 	int		td_kstack_pages; /* (a) Size of the kstack. */
 	volatile u_int	td_critnest;	/* (k*) Critical section nest level. */
 	struct mdthread td_md;		/* (k) Any machine-dependent fields. */
@@ -388,7 +387,7 @@ struct thread {
 struct thread0_storage {
 	struct thread t0st_thread;
 	uint64_t t0st_sched[10];
-};
+} __no_subobject_bounds;
 
 struct mtx *thread_lock_block(struct thread *);
 void thread_lock_block_wait(struct thread *);
@@ -852,7 +851,6 @@ struct proc {
 
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_PARGS);
-MALLOC_DECLARE(M_PGRP);
 MALLOC_DECLARE(M_SESSION);
 MALLOC_DECLARE(M_SUBPROC);
 #endif
@@ -1010,6 +1008,7 @@ extern struct proclist allproc;		/* List of all processes. */
 extern struct proc *initproc, *pageproc; /* Process slots for init, pager. */
 
 extern struct uma_zone *proc_zone;
+extern struct uma_zone *pgrp_zone;
 
 struct	proc *pfind(pid_t);		/* Find process by id. */
 struct	proc *pfind_any(pid_t);		/* Find (zombie) process by id. */
@@ -1258,11 +1257,15 @@ EVENTHANDLER_LIST_DECLARE(thread_init);
 #endif	/* !_SYS_PROC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20190812,
 //   "target_type": "header",
 //   "changes": [
 //     "kernel_sig_types",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

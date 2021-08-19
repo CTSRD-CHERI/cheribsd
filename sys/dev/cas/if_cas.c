@@ -2443,7 +2443,7 @@ cas_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		CAS_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -2457,36 +2457,36 @@ cas_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->sc_ifflags = ifp->if_flags;
 		CAS_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		CAS_LOCK(sc);
 		if ((sc->sc_flags & CAS_NO_CSUM) != 0) {
 			error = EINVAL;
 			CAS_UNLOCK(sc);
 			break;
 		}
-		ifp->if_capenable = ifr_reqcap_get(ifr);
+		ifp->if_capenable = ifr->ifr_reqcap;
 		if ((ifp->if_capenable & IFCAP_TXCSUM) != 0)
 			ifp->if_hwassist = CAS_CSUM_FEATURES;
 		else
 			ifp->if_hwassist = 0;
 		CAS_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		CAS_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			cas_setladrf(sc);
 		CAS_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if ((ifr_mtu_get(ifr) < ETHERMIN) ||
-		    (ifr_mtu_get(ifr) > ETHERMTU_JUMBO))
+	case SIOCSIFMTU:
+		if ((ifr->ifr_mtu < ETHERMIN) ||
+		    (ifr->ifr_mtu > ETHERMTU_JUMBO))
 			error = EINVAL;
 		else
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_mii->mii_media, cmd);
 		break;
 	default:
@@ -2918,12 +2918,3 @@ cas_pci_resume(device_t dev)
 	cas_resume(device_get_softc(dev));
 	return (0);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

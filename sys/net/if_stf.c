@@ -713,7 +713,7 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifa = (struct ifaddr *)data;
 		if (ifa == NULL || ifa->ifa_addr->sa_family != AF_INET6) {
 			error = EAFNOSUPPORT;
@@ -734,19 +734,19 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifp->if_drv_flags |= IFF_DRV_RUNNING;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		ifr = (struct ifreq *)data;
-		if (ifr == NULL || ifr_addr_get_family(ifr) != AF_INET6)
+		if (ifr == NULL || ifr->ifr_addr.sa_family != AF_INET6)
 			error = EAFNOSUPPORT;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGIFMTU):
+	case SIOCGIFMTU:
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		ifr = (struct ifreq *)data;
-		mtu = ifr_mtu_get(ifr);
+		mtu = ifr->ifr_mtu;
 		/* RFC 4213 3.2 ideal world MTU */
 		if (mtu < IPV6_MINMTU || mtu > IF_MAXMTU - 20)
 			return (EINVAL);
@@ -762,10 +762,9 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net",
 //     "user_capabilities"
 //   ]
 // }

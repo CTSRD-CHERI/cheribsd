@@ -187,7 +187,7 @@ static int
 pflogioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if (ifp->if_flags & IFF_UP)
 			ifp->if_drv_flags |= IFF_DRV_RUNNING;
 		else
@@ -320,10 +320,9 @@ MODULE_VERSION(pflog, PFLOG_MODVER);
 MODULE_DEPEND(pflog, pf, PF_MODVER, PF_MODVER, PF_MODVER);
 // CHERI CHANGES START
 // {
-//   "updated": 20181115,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net",
 //     "user_capabilities"
 //   ]
 // }

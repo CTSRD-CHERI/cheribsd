@@ -66,9 +66,19 @@ bool		vm_reserv_reclaim_inactive(int domain);
 void		vm_reserv_rename(vm_page_t m, vm_object_t new_object,
 		    vm_object_t old_object, vm_pindex_t old_object_offset);
 int		vm_reserv_size(int level);
-vm_paddr_t	vm_reserv_startup(vm_offset_t *vaddr, vm_paddr_t end);
+vm_paddr_t	vm_reserv_startup(vm_pointer_t *vaddr, vm_paddr_t end);
 vm_page_t	vm_reserv_to_superpage(vm_page_t m);
 
 #endif	/* VM_NRESERVLEVEL > 0 */
 #endif	/* _KERNEL */
 #endif	/* !_VM_RESERV_H_ */
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1886,7 +1886,7 @@ cxgb_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 	uint32_t mask;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		ADAPTER_LOCK(sc);
 		error = IS_DOOMED(p) ? ENXIO : (IS_BUSY(sc) ? EBUSY : 0);
 		if (error) {
@@ -1895,7 +1895,7 @@ fail:
 			return (error);
 		}
 
-		mtu = ifr_mtu_get(ifr);
+		mtu = ifr->ifr_mtu;
 		if ((mtu < ETHERMIN) || (mtu > ETHERMTU_JUMBO)) {
 			error = EINVAL;
 		} else {
@@ -1906,7 +1906,7 @@ fail:
 		}
 		ADAPTER_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		ADAPTER_LOCK(sc);
 		if (IS_DOOMED(p)) {
 			error = ENXIO;
@@ -1936,8 +1936,8 @@ fail:
 
 		ADAPTER_LOCK_ASSERT_NOTOWNED(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		ADAPTER_LOCK(sc);
 		error = IS_DOOMED(p) ? ENXIO : (IS_BUSY(sc) ? EBUSY : 0);
 		if (error)
@@ -1951,13 +1951,13 @@ fail:
 		ADAPTER_UNLOCK(sc);
 
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		ADAPTER_LOCK(sc);
 		error = IS_DOOMED(p) ? ENXIO : (IS_BUSY(sc) ? EBUSY : 0);
 		if (error)
 			goto fail;
 
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
 			ifp->if_hwassist ^= (CSUM_TCP | CSUM_UDP | CSUM_IP);
@@ -2052,7 +2052,7 @@ fail:
 #endif
 		ADAPTER_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &p->media, command);
 		break;
@@ -2867,7 +2867,7 @@ cxgb_extension_ioctl(struct cdev *dev, unsigned long cmd, caddr_t data,
 		 * Read 256 bytes at a time as len can be large and we don't
 		 * want to use huge intermediate buffers.
 		 */
-		useraddr = (uint8_t * __capability)t->buf; 
+		useraddr = (uint8_t * __capability)t->buf;
 		while (len) {
 			unsigned int chunk = min(len, sizeof(buf));
 
@@ -3663,10 +3663,10 @@ cxgb_debugnet_poll(struct ifnet *ifp, int count)
 #endif /* DEBUGNET */
 // CHERI CHANGES START
 // {
-//   "updated": 20191029,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

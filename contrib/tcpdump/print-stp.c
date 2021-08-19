@@ -401,12 +401,6 @@ trunc:
 void
 stp_print(netdissect_options *ndo, const u_char *p, u_int length)
 {
-	INVOKE_DISSECTOR(_stp_print, ndo, p, length);
-}
-
-void
-_stp_print(netdissect_options *ndo, const u_char *p, u_int length)
-{
     const struct stp_bpdu_ *stp_bpdu;
     u_int                  mstp_len;
     u_int                  spb_len;

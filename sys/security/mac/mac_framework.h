@@ -150,9 +150,9 @@ void	mac_ifnet_create(struct ifnet *ifp);
 void	mac_ifnet_create_mbuf(struct ifnet *ifp, struct mbuf *m);
 void	mac_ifnet_destroy(struct ifnet *);
 void	mac_ifnet_init(struct ifnet *);
-int	mac_ifnet_ioctl_get(struct ucred *cred, struct ifreq *ifr,
+int	mac_ifnet_ioctl_get(struct ucred *cred, void * __capability ifr_data,
 	    struct ifnet *ifp);
-int	mac_ifnet_ioctl_set(struct ucred *cred, struct ifreq *ifr,
+int	mac_ifnet_ioctl_set(struct ucred *cred, void * __capability ifr_data,
 	    struct ifnet *ifp);
 
 int	mac_inpcb_check_deliver(struct inpcb *inp, struct mbuf *m);

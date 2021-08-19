@@ -482,8 +482,8 @@ msgdma_channel_submit_sg(device_t dev, struct xdma_channel *xchan,
 	chan = (struct msgdma_channel *)xchan->chan;
 
 	for (i = 0; i < sg_n; i++) {
-		src_addr_lo = sg[i].src_addr;
-		dst_addr_lo = sg[i].dst_addr;
+		src_addr_lo = sg[i].src.bus_addr;
+		dst_addr_lo = sg[i].dst.bus_addr;
 		len = (uint32_t)sg[i].len;
 
 		dprintf("%s: src %x dst %x len %d\n", __func__,
@@ -644,3 +644,13 @@ static devclass_t msgdma_devclass;
 
 EARLY_DRIVER_MODULE(msgdma, simplebus, msgdma_driver, msgdma_devclass, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ],
+//   "change_comment": "bus_addr_t"
+// }
+// CHERI CHANGES END
