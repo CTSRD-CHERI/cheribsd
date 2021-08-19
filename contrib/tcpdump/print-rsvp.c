@@ -1849,13 +1849,6 @@ void
 rsvp_print(netdissect_options *ndo,
            register const u_char *pptr, register u_int len)
 {
-	INVOKE_DISSECTOR(_rsvp_print, ndo, pptr, len);
-}
-
-void
-_rsvp_print(netdissect_options *ndo,
-            register const u_char *pptr, register u_int len)
-{
     const struct rsvp_common_header *rsvp_com_header;
     const u_char *tptr;
     u_short plen, tlen;

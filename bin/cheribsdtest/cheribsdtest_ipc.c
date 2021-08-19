@@ -1,11 +1,11 @@
 /*-
- * Copyright (c) 2012-2016 Robert N. M. Watson
- * Copyright (c) 2014 SRI International
+ * Copyright (c) 2021 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
- * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
- * ("CTSRD"), as part of the DARPA CRASH research programme.
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
+ * DARPA SSITH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,61 +36,55 @@
 #endif
 
 #include <sys/types.h>
+#include <sys/sysctl.h>
+#include <sys/time.h>
 
 #include <cheri/cheri.h>
+#include <cheri/cheric.h>
 
-#include <cheribsdtest-helper.h>
+#include <netinet/in.h>
 
-extern "C" {
+#include <err.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sysexits.h>
+#include <unistd.h>
+
 #include "cheribsdtest.h"
-}
 
-CHERIBSDTEST(test_sandbox_cxx_exception,
-    "Test that failed sandbox invocations become exceptions in C++",
-    .ct_flags = CT_FLAG_SANDBOX)
-{
-#ifdef CHERIERRNO_LINKS
-	try
-	{
-		invoke_clock_gettime();
-	}
-	catch (cheri::sandbox_invoke_failure &e)
-	{
-		cheribsdtest_success();
-		return;
-	}
-	catch (...)
-	{
-		cheribsdtest_failure_errx("Sandbox failure threw the wrong kind of exception\n");
-		return;
-	}
-	cheribsdtest_failure_errx("Sandbox failure didn't throw an exception\n");
-#else
-	cheribsdtest_success();
-#endif
-}
+/*
+ * As a regression test, block the current thread in a pipe write using a
+ * large write of a buffer containing a capability, and trigger a timer signal
+ * to interrupt that write.
+ *
+ * This would previously panic the kernel with a fatal capability page fault as
+ * uiomove_fromphys called from pipe_clone_write_buffer would use a plain bcopy
+ * and so not strip tags, but the kernel buffer was allocated without
+ * VM_PROT_WRITE_CAP.
+ */
 
-CHERIBSDTEST(test_sandbox_cxx_no_exception,
-    "Test that successful sandbox invocations don't exceptions in C++",
-    .ct_flags = CT_FLAG_SANDBOX)
+#define	BUFFER_SIZE	8192
+
+CHERIBSDTEST(test_ipc_pipe_sleep_signal,
+    "check that direct write pipe IPC of a capability can be interrupted",
+    .ct_flags = CT_FLAG_SIGNAL,
+    .ct_signum = SIGALRM)
 {
-#ifdef CHERIERRNO_LINKS
-	try
-	{
-		invoke_cheri_system_putchar();
-	}
-	catch (cheri::sandbox_invoke_failure &e)
-	{
-		cheribsdtest_failure_errx("Sandbox success threw a cheri exception\n");
-		return;
-	}
-	catch (...)
-	{
-		cheribsdtest_failure_errx("Sandbox success threw an exception\n");
-		return;
-	}
-	cheribsdtest_success();
-#else
-	cheribsdtest_success();
-#endif
+	void * __capability buffer[BUFFER_SIZE / sizeof(void * __capability)];
+	int fds[2];
+
+	memset(buffer, 0, sizeof(buffer));
+	buffer[0] = (__cheri_tocap void * __capability)buffer;
+
+	CHERIBSDTEST_CHECK_SYSCALL(pipe(fds));
+	CHERIBSDTEST_CHECK_SYSCALL(alarm(1));
+	CHERIBSDTEST_CHECK_SYSCALL(write(fds[0], buffer, sizeof(buffer)));
+	close(fds[0]);
+	close(fds[1]);
+	cheribsdtest_failure_errx("write didn't block");
 }

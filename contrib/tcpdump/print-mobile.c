@@ -65,12 +65,6 @@ struct mobile_ip {
 void
 mobile_print(netdissect_options *ndo, const u_char *bp, u_int length)
 {
-	INVOKE_DISSECTOR(_mobile_print, ndo, bp, length);
-}
-
-void
-_mobile_print(netdissect_options *ndo, const u_char *bp, u_int length)
-{
 	const struct mobile_ip *mob;
 	struct cksum_vec vec[1];
 	u_short proto,crc;

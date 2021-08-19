@@ -147,14 +147,6 @@ pgm_print(netdissect_options *ndo,
           register const u_char *bp, register u_int length,
           register const u_char *bp2)
 {
-	INVOKE_DISSECTOR(_pgm_print, ndo, bp, length, bp2);
-}
-
-void
-_pgm_print(netdissect_options *ndo,
-          register const u_char *bp, register u_int length,
-          register const u_char *bp2)
-{
 	register const struct pgm_header *pgm;
 	register const struct ip *ip;
 	register char ch;

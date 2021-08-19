@@ -932,13 +932,6 @@ void
 nbt_tcp_print(netdissect_options *ndo,
               const u_char *data, int length)
 {
-	INVOKE_DISSECTOR(_nbt_tcp_print, ndo, data, length);
-}
-
-void
-_nbt_tcp_print(netdissect_options *ndo,
-              const u_char *data, int length)
-{
     int caplen;
     int type;
     u_int nbt_len;
@@ -1114,13 +1107,6 @@ void
 nbt_udp137_print(netdissect_options *ndo,
                  const u_char *data, int length)
 {
-	INVOKE_DISSECTOR(_nbt_udp137_print, ndo, data, length);
-}
-
-void
-_nbt_udp137_print(netdissect_options *ndo,
-                 const u_char *data, int length)
-{
     const u_char *maxbuf = data + length;
     int name_trn_id, response, opcode, nm_flags, rcode;
     int qdcount, ancount, nscount, arcount;
@@ -1259,13 +1245,6 @@ void
 smb_tcp_print(netdissect_options *ndo,
               const u_char * data, int length)
 {
-	INVOKE_DISSECTOR(_smb_tcp_print, ndo, data, length);
-}
-
-void
-_smb_tcp_print(netdissect_options *ndo,
-              const u_char * data, int length)
-{
     int caplen;
     u_int smb_len;
     const u_char *maxbuf;
@@ -1307,13 +1286,6 @@ trunc:
  */
 void
 nbt_udp138_print(netdissect_options *ndo,
-                 const u_char *data, int length)
-{
-	INVOKE_DISSECTOR(_nbt_udp138_print, ndo, data, length);
-}
-
-void
-_nbt_udp138_print(netdissect_options *ndo,
                  const u_char *data, int length)
 {
     const u_char *maxbuf = data + length;
@@ -1406,13 +1378,6 @@ static struct nbf_strings {
 
 void
 netbeui_print(netdissect_options *ndo,
-              u_short control, const u_char *data, int length)
-{
-	INVOKE_DISSECTOR(_netbeui_print, ndo, control, data, length);
-}
-
-void
-_netbeui_print(netdissect_options *ndo,
               u_short control, const u_char *data, int length)
 {
     const u_char *maxbuf = data + length;
@@ -1511,13 +1476,6 @@ trunc:
  */
 void
 ipx_netbios_print(netdissect_options *ndo,
-                  const u_char *data, u_int length)
-{
-	INVOKE_DISSECTOR(_ipx_netbios_print, ndo, data, length);
-}
-
-void
-_ipx_netbios_print(netdissect_options *ndo,
                   const u_char *data, u_int length)
 {
     /*

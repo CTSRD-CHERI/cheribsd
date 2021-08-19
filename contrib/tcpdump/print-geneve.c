@@ -145,12 +145,6 @@ geneve_opts_print(netdissect_options *ndo, const u_char *bp, u_int len)
 void
 geneve_print(netdissect_options *ndo, const u_char *bp, u_int len)
 {
-	INVOKE_DISSECTOR(_geneve_print, ndo, bp, len);
-}
-
-void
-_geneve_print(netdissect_options *ndo, const u_char *bp, u_int len)
-{
     uint8_t ver_opt;
     u_int version;
     uint8_t flags;
@@ -229,7 +223,7 @@ _geneve_print(netdissect_options *ndo, const u_char *bp, u_int len)
     else
         ND_PRINT((ndo, "\n\t"));
 
-    if (_ethertype_print(ndo, prot, bp, len, ndo->ndo_snapend - bp, NULL, NULL) == 0) {
+    if (ethertype_print(ndo, prot, bp, len, ndo->ndo_snapend - bp, NULL, NULL) == 0) {
         if (prot == ETHERTYPE_TEB)
             ether_print(ndo, bp, len, ndo->ndo_snapend - bp, NULL, NULL);
         else

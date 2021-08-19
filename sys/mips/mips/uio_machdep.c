@@ -64,8 +64,9 @@ __FBSDID("$FreeBSD$");
  * of the direct mapping and sf_bufs to reduce the creation and
  * destruction of ephemeral mappings.  
  */
-int
-uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
+static int
+uiomove_fromphys_flags(vm_page_t ma[], vm_offset_t offset, int n,
+    struct uio *uio, bool preserve_tags)
 {
 	struct sf_buf *sf;
 	struct thread *td = curthread;
@@ -114,7 +115,14 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 		switch (uio->uio_segflg) {
 		case UIO_USERSPACE:
 			maybe_yield();
-			if (uio->uio_rw == UIO_READ)
+			if (preserve_tags) {
+				if (uio->uio_rw == UIO_READ)
+					error = copyoutcap(cp, iov->iov_base,
+					    cnt);
+				else
+					error = copyincap(iov->iov_base, cp,
+					    cnt);
+			} else if (uio->uio_rw == UIO_READ)
 				error = copyout(cp, iov->iov_base, cnt);
 			else
 				error = copyin(iov->iov_base, cp, cnt);
@@ -125,13 +133,17 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			}
 			break;
 		case UIO_SYSSPACE:
-			if (uio->uio_rw == UIO_READ)
-				bcopy(cp,
-				    (__cheri_fromcap void *)iov->iov_base,
-				    cnt);
+			if (preserve_tags) {
+				if (uio->uio_rw == UIO_READ)
+					bcopy_c(PTR2CAP(cp), iov->iov_base,
+					    cnt);
+				else
+					bcopy_c(iov->iov_base, PTR2CAP(cp),
+					    cnt);
+			} else if (uio->uio_rw == UIO_READ)
+				bcopynocap_c(PTR2CAP(cp), iov->iov_base, cnt);
 			else
-				bcopy((__cheri_fromcap void *)iov->iov_base,
-				    cp, cnt);
+				bcopynocap_c(iov->iov_base, PTR2CAP(cp), cnt);
 			break;
 		case UIO_NOCOPY:
 			break;
@@ -151,6 +163,20 @@ out:
 		td->td_pflags &= ~TDP_DEADLKTREAT;
 	return (error);
 }
+
+int
+uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
+{
+	return (uiomove_fromphys_flags(ma, offset, n, uio, false));
+}
+
+#if __has_feature(capabilities)
+int
+uiomove_fromphys_cap(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
+{
+	return (uiomove_fromphys_flags(ma, offset, n, uio, true));
+}
+#endif
 // CHERI CHANGES START
 // {
 //   "updated": 20191025,

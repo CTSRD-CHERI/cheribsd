@@ -119,13 +119,6 @@ void
 vtp_print (netdissect_options *ndo,
            const u_char *pptr, u_int length)
 {
-	INVOKE_DISSECTOR(_vtp_print, ndo, pptr, length);
-}
-
-void
-_vtp_print (netdissect_options *ndo,
-           const u_char *pptr, u_int length)
-{
     int type, len, tlv_len, tlv_value, mgmtd_len;
     const u_char *tptr;
     const struct vtp_vlan_ *vtp_vlan;

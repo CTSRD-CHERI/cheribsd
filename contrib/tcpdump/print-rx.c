@@ -526,14 +526,6 @@ rx_print(netdissect_options *ndo,
          register const u_char *bp, int length, int sport, int dport,
          const u_char *bp2)
 {
-	INVOKE_DISSECTOR(_rx_print, ndo, bp, length, sport, dport, bp2);
-}
-
-void
-_rx_print(netdissect_options *ndo,
-         register const u_char *bp, int length, int sport, int dport,
-         const u_char *bp2)
-{
 	register const struct rx_header *rxh;
 	int i;
 	int32_t opcode;

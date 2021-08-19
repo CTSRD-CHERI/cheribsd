@@ -175,7 +175,7 @@ recurse:
 	 */
 	if (length_type <= ETHERMTU) {
 		/* Try to print the LLC-layer header & higher layers */
-		llc_hdrlen = _llc_print(ndo, p, length, caplen, &src, &dst);
+		llc_hdrlen = llc_print(ndo, p, length, caplen, &src, &dst);
 		if (llc_hdrlen < 0) {
 			/* packet type not known, print raw packet */
 			if (!ndo->ndo_suppress_default_print)
@@ -224,7 +224,7 @@ recurse:
 		 * there's an LLC header and payload.
 		 */
 		/* Try to print the LLC-layer header & higher layers */
-		llc_hdrlen = _llc_print(ndo, p, length, caplen, &src, &dst);
+		llc_hdrlen = llc_print(ndo, p, length, caplen, &src, &dst);
 		if (llc_hdrlen < 0) {
 			/* packet type not known, print raw packet */
 			if (!ndo->ndo_suppress_default_print)
@@ -233,7 +233,7 @@ recurse:
 		}
 		hdrlen += llc_hdrlen;
 	} else {
-		if (_ethertype_print(ndo, length_type, p, length, caplen, &src, &dst) == 0) {
+		if (ethertype_print(ndo, length_type, p, length, caplen, &src, &dst) == 0) {
 			/* type not known, print raw packet */
 			if (!ndo->ndo_eflag) {
 				if (print_encap_header != NULL)
@@ -321,18 +321,8 @@ netanalyzer_transparent_if_print(netdissect_options *ndo,
  * Returns non-zero if it can do so, zero if the ethertype is unknown.
  */
 
-void
-ethertype_print(netdissect_options *ndo,
-                u_short ether_type, const u_char *p,
-                u_int length, u_int caplen,
-                const struct lladdr_info *src, const struct lladdr_info *dst)
-{
-	INVOKE_DISSECTOR(_ethertype_print, ndo, ether_type, p, length,
-	    caplen, src, dst);
-}
-
 int
-_ethertype_print(netdissect_options *ndo,
+ethertype_print(netdissect_options *ndo,
                 u_short ether_type, const u_char *p,
                 u_int length, u_int caplen,
                 const struct lladdr_info *src, const struct lladdr_info *dst)

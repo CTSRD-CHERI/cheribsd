@@ -487,14 +487,6 @@ decnet_print(netdissect_options *ndo,
              register const u_char *ap, register u_int length,
              register u_int caplen)
 {
-	INVOKE_DISSECTOR(_decnet_print, ndo, ap, length, caplen);
-}
-
-void
-_decnet_print(netdissect_options *ndo,
-             register const u_char *ap, register u_int length,
-             register u_int caplen)
-{
 	register const union routehdr *rhp;
 	register int mflags;
 	int dst, src, hops;

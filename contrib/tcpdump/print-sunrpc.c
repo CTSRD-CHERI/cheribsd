@@ -168,13 +168,6 @@ void
 sunrpcrequest_print(netdissect_options *ndo, register const u_char *bp,
                     register u_int length, register const u_char *bp2)
 {
-	INVOKE_DISSECTOR(_sunrpcrequest_print, ndo, bp, length, bp2);
-}
-
-void
-_sunrpcrequest_print(netdissect_options *ndo, register const u_char *bp,
-                    register u_int length, register const u_char *bp2)
-{
 	register const struct sunrpc_msg *rp;
 	register const struct ip *ip;
 	register const struct ip6_hdr *ip6;

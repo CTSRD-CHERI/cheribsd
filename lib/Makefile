@@ -15,8 +15,6 @@ SUBDIR_BOOTSTRAP= \
 	libc \
 	libc_nonshared \
 	libcompiler_rt \
-	${_libc_cheri} \
-	${_libcheri} \
 	${_libcheribsdtest_dynamic} \
 	${_libclang_rt} \
 	libgcc_eh \
@@ -68,7 +66,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libifconfig \
 	libipsec \
 	libjail \
-	libjpeg \
 	libkiconv \
 	libkvm \
 	liblua \
@@ -86,7 +83,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libpathconv \
 	libpcap \
 	libpjdlog \
-	libpng \
 	libproc \
 	libprocstat \
 	libregex \
@@ -168,17 +164,11 @@ SUBDIR.${MK_BLACKLIST}+=libblacklist
 SUBDIR.${MK_BLUETOOTH}+=libbluetooth libsdp
 SUBDIR.${MK_BSNMP}+=	libbsnmp
 
-SUBDIR.${MK_LIBCHERI}+=	libhelloworld
 SUBDIR.${MK_CHERI}+=	libsyscalls
 
 # We could make this MK_CHERI_CAPREVOKE, but it doesn't hurt to always build it
 # even if the tree isn't configured to engage in revocation.
 SUBDIR.${MK_CHERI}+=	libcheri_caprevoke
-
-.if ${MK_LIBCHERI} == "yes" && ${MACHINE_ARCH} != "mips"
-_libc_cheri=	libc_cheri
-_libcheri=	libcheri
-.endif
 
 .if ${MACHINE_CPU:Mcheri}
 _libcheribsdtest_dynamic=	libcheribsdtest_dynamic
@@ -254,6 +244,11 @@ SUBDIR.${MK_BHYVE}+=	libvmmapi
 _libstatcounters=	libstatcounters
 .endif
 
+.if ${MACHINE_ARCH:Mmips64*}
+# Used by ctsrd/lib/libterasic_mtl
+SUBDIR+=	libpng
+.endif
+
 .if ${MACHINE_ARCH} != "powerpc"
 SUBDIR.${MK_OPENMP}+=	libomp
 .endif
@@ -282,10 +277,6 @@ SUBDIR:=	${SUBDIR:Nlibc++experimental}
 
 .if ${MACHINE_ABI:Mpurecap}
 SUBDIR+=	libmalloc_simple
-.endif
-.if ${MK_LIBCHERI} == "yes"
-SUBDIR.${MK_LIBCHERI}+=	libcheri_syscalls
-SUBDIR.${MK_LIBCHERI}+=	libcheri_support
 .endif
 
 .include <bsd.subdir.mk>

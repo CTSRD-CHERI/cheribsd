@@ -144,12 +144,6 @@ str_to_lower(const char *string)
 void
 zephyr_print(netdissect_options *ndo, const u_char *cp, int length)
 {
-	INVOKE_DISSECTOR(_zephyr_print, ndo, cp, length);
-}
-
-void
-_zephyr_print(netdissect_options *ndo, const u_char *cp, int length)
-{
     struct z_packet z;
     const char *parse = (const char *) cp;
     int parselen = length;

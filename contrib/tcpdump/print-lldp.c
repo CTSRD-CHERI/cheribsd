@@ -1420,13 +1420,6 @@ void
 lldp_print(netdissect_options *ndo,
            register const u_char *pptr, register u_int len)
 {
-	INVOKE_DISSECTOR(_lldp_print, ndo, pptr, len);
-}
-
-void
-_lldp_print(netdissect_options *ndo,
-           register const u_char *pptr, register u_int len)
-{
     uint8_t subtype;
     uint16_t tlv, cap, ena_cap;
     u_int oui, tlen, hexdump, tlv_type, tlv_len;

@@ -198,15 +198,8 @@ trunc:
 /*
  * Mobility Header
  */
-void
-mobility_print(netdissect_options *ndo,
-               const u_char *bp, const u_char *bp2)
-{
-	INVOKE_DISSECTOR(_mobility_print, ndo, bp, bp2);
-}
-
 int
-_mobility_print(netdissect_options *ndo,
+mobility_print(netdissect_options *ndo,
                const u_char *bp, const u_char *bp2 _U_)
 {
 	const struct ip6_mobility *mh;

@@ -161,14 +161,6 @@ tcp_print(netdissect_options *ndo,
           register const u_char *bp, register u_int length,
           register const u_char *bp2, int fragmented)
 {
-	INVOKE_DISSECTOR(_tcp_print, ndo, bp, length, bp2, fragmented);
-}
-
-void
-_tcp_print(netdissect_options *ndo,
-          register const u_char *bp, register u_int length,
-          register const u_char *bp2, int fragmented)
-{
         register const struct tcphdr *tp;
         register const struct ip *ip;
         register u_char flags;
@@ -600,7 +592,7 @@ _tcp_print(netdissect_options *ndo,
                         case TCPOPT_MPTCP:
                                 datalen = len - 2;
                                 LENCHECK(datalen);
-                                if (!_mptcp_print(ndo, cp-2, len, flags))
+                                if (!mptcp_print(ndo, cp-2, len, flags))
                                         goto bad;
                                 break;
 

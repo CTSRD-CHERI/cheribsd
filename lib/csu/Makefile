@@ -11,8 +11,4 @@ SUBDIR+= ${MACHINE_CPUARCH}
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 
-.if ${MK_LIBCHERI} == "yes"
-SUBDIR+=	libcheri
-.endif
-
 .include <bsd.subdir.mk>

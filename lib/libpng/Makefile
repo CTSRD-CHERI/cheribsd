@@ -2,10 +2,7 @@
 
 LIB?=	png
 SHLIB_MAJOR= 15
-PNG_PRIVATE?=yes
-.if ${PNG_PRIVATE} == "yes"
-PRIVATELIB=
-.endif
+INTERNALLIB=
 
 BUILDDIR?=	${.CURDIR}
 SRCDIR?=	${SRCTOP}/contrib/libpng
@@ -33,8 +30,6 @@ SRCS+=	\
 LIBADD=	z
 
 WARNS?=	6
-
-WANT_CHERI=	yes
 
 CFLAGS+=	${CFLAGS.${.IMPSRC:T}}
 .include <bsd.lib.mk>

@@ -3,9 +3,6 @@
 .include <src.opts.mk>
 
 PACKAGE=	clibs
-.if ${MK_CHERI} != "no"
-WANT_CHERI?=	hybrid
-.endif
 LIBCXX_VERSION=10
 _LIBCXXRTDIR=   ${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 HDRDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/include

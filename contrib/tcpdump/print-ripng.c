@@ -108,12 +108,6 @@ rip6_entry_print(netdissect_options *ndo, register const struct netinfo6 *ni, in
 void
 ripng_print(netdissect_options *ndo, const u_char *dat, unsigned int length)
 {
-	INVOKE_DISSECTOR(_ripng_print, ndo, dat, length);
-}
-
-void
-_ripng_print(netdissect_options *ndo, const u_char *dat, unsigned int length)
-{
 	register const struct rip6 *rp = (const struct rip6 *)dat;
 	register const struct netinfo6 *ni;
 	unsigned int length_left;

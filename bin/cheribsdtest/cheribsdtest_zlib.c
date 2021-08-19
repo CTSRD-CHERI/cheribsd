@@ -36,32 +36,9 @@
 #endif
 
 #include <sys/types.h>
-#if 0
-#include <sys/signal.h>
-#include <sys/sysctl.h>
-#include <sys/time.h>
-
-#include <machine/cpuregs.h>
-#include <machine/sysarch.h>
-
-#include <cheri/libcheri_enter.h>
-#include <cheri/libcheri_fd.h>
-
-#include <err.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <sysexits.h>
-#include <unistd.h>
-#endif
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#ifdef CHERIBSD_LIBCHERI_TESTS
-#include <cheri/libcheri_sandbox.h>
-#include <cheribsdtest-helper.h>
-#include <cheribsdtest-helper-internal.h>
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -183,46 +160,3 @@ CHERIBSDTEST(test_inflate_zeroes, "Inflate a compressed buffer of zeroes")
 	free(outbuf);
 	cheribsdtest_success();
 }
-
-
-#ifdef CHERIBSD_LIBCHERI_TESTS
-CHERIBSDTEST(test_sandbox_inflate_zeroes,
-    "Inflate a compressed buffer of zeroes -- in a sandbox",
-    .ct_flags = CT_FLAG_SANDBOX)
-{
-	register_t v;
-	struct zstream_proxy zsp;
-	uint8_t *outbuf;
-	z_stream zs;
-
-	if ((outbuf = malloc(uncompressed_zeroes_len)) == NULL)
-		cheribsdtest_failure_err("malloc outbuf");
-	memset(&zs, 0, sizeof(zs));
-	zs.zalloc = Z_NULL;
-	zs.zfree = Z_NULL;
-	zs.next_in = compressed_zeroes;
-	zs.avail_in = compressed_zeroes_len;
-	zs.next_out = outbuf;
-	zs.avail_out = uncompressed_zeroes_len;
-
-	/* Forward arguments into sandbox. */
-	memset(&zsp, 0, sizeof(zsp));
-	zsp.next_in = cheri_ptr(zs.next_in, zs.avail_in); /* XXX perm */
-	zsp.avail_in = zs.avail_in;
-	zsp.next_out = cheri_ptr(zs.next_out, zs.avail_out);
-	zsp.avail_out = zs.avail_out;
-	v = invoke_inflate(cheri_ptr(&zsp, sizeof(struct zstream_proxy)));
-	if (v == -1)
-		cheribsdtest_failure_errx("sandbox error");
-
-	/* Forward return values out. */
-	zs.total_in = zsp.total_in;
-	zs.total_out = zsp.total_out;
-	if (zs.total_in != compressed_zeroes_len)
-		cheribsdtest_failure_errx("expected to consume %zu bytes, got %zu",
-		    compressed_zeroes_len, zs.total_in);
-	check_uncompressed_data(outbuf, zs.total_out);
-	free(outbuf);
-	cheribsdtest_success();
-}
-#endif

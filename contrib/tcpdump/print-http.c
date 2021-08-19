@@ -73,11 +73,5 @@ static const char *httpcmds[] = {
 void
 http_print(netdissect_options *ndo, const u_char *pptr, u_int len)
 {
-	INVOKE_DISSECTOR(_http_print, ndo, pptr, len);
-}
-
-void
-_http_print(netdissect_options *ndo, const u_char *pptr, u_int len)
-{
 	txtproto_print(ndo, pptr, len, "http", httpcmds, RESP_CODE_SECOND_TOKEN);
 }

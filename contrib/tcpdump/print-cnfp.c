@@ -441,12 +441,6 @@ trunc:
 void
 cnfp_print(netdissect_options *ndo, const u_char *cp)
 {
-	INVOKE_DISSECTOR(_cnfp_print, ndo, cp);
-}
-
-void
-_cnfp_print(netdissect_options *ndo, const u_char *cp)
-{
 	int ver;
 
 	/*

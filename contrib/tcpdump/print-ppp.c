@@ -1510,15 +1510,8 @@ handle_ppp(netdissect_options *ndo,
 }
 
 /* Standard PPP printer */
-void
-ppp_print(netdissect_options *ndo,
-          register const u_char *p, u_int length)
-{
-	INVOKE_DISSECTOR(_ppp_print, ndo, p, length);
-}
-
 u_int
-_ppp_print(netdissect_options *ndo,
+ppp_print(netdissect_options *ndo,
           register const u_char *p, u_int length)
 {
 	u_int proto,ppp_header;

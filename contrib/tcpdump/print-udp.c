@@ -370,13 +370,6 @@ void
 udp_print(netdissect_options *ndo, register const u_char *bp, u_int length,
 	  register const u_char *bp2, int fragmented)
 {
-	INVOKE_DISSECTOR(_udp_print, ndo, bp, length, bp2, fragmented);
-}
-
-void
-_udp_print(netdissect_options *ndo, register const u_char *bp, u_int length,
-	  register const u_char *bp2, int fragmented)
-{
 	register const struct udphdr *up;
 	register const struct ip *ip;
 	register const u_char *cp;
