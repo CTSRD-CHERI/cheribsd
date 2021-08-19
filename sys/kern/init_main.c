@@ -393,10 +393,14 @@ SYSINIT(diagwarn2, SI_SUB_LAST, SI_ORDER_FIFTH,
 #if __has_feature(capabilities)
 static char cheri_notice[] =
 #ifdef __CHERI_PURE_CAPABILITY__
-    "CHERI pure-capability kernel.\n";
+    "CHERI pure-capability kernel"
 #else
-    "CHERI hybrid kernel.\n";
+    "CHERI hybrid kernel"
 #endif
+#ifdef CHERI_CAPREVOKE
+    " with revocation support"
+#endif
+    "\n";
 SYSINIT(cherinotice, SI_SUB_COPYRIGHT, SI_ORDER_ANY, print_caddr_t,
     cheri_notice);
 #endif
