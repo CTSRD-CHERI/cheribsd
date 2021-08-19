@@ -774,8 +774,8 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_after_free_fixed,
 	map = mmap(map, PAGE_SIZE, PROT_READ | PROT_WRITE,
 	    MAP_ANON | MAP_FIXED, -1, 0);
 	CHERIBSDTEST_VERIFY2(map == MAP_FAILED, "mmap after free succeeded");
-	CHERIBSDTEST_VERIFY2(errno == EPROT,
-	    "mmap after free failed with %d instead of EPROT", errno);
+	CHERIBSDTEST_VERIFY2(errno == EPROT || errno == EACCES,
+	    "mmap after free failed with %d instead of EPROT / EACCES", errno);
 
 	cheribsdtest_success();
 }
