@@ -132,7 +132,7 @@ ACFLAGS+= -DELF -Wa,--noexecstack
 .if ${MACHINE_CPUARCH} == "aarch64" && !${MACHINE_ABI:Mpurecap}
 SRCS+=	sha256c_arm64.c
 CFLAGS_CRYPTO:=	${CFLAGS:M-march=*:S/^$/-march=armv8-a/W:[-1]}+crypto
-CFLAGS+= -DARM64_SHA2
+SHARED_CFLAGS+= -DARM64_SHA2
 CFLAGS.sha256c_arm64.c+= ${CFLAGS_CRYPTO}
 .endif
 .endif # ${USE_ASM_SOURCES} != 0
