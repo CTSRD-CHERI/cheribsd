@@ -97,7 +97,7 @@ vm_map_install_cheri_revoke_shadow(vm_map_t map)
 
 	cow = cheri_revoke_core_shadow ? 0 : MAP_DISABLE_COREDUMP;
 
-	error = vm_map_insert(map, vmo, 0, start_addr, end_addr,
+	error = vm_map_insert(map, vmo, 0, start, end_addr,
 				VM_PROT_READ | VM_PROT_WRITE,
 				VM_PROT_READ | VM_PROT_WRITE,
 				cow, start_addr);
