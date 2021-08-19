@@ -105,6 +105,30 @@ CHERIBSDTEST(test_cheriabi_malloc_zero_size,
 	cheribsdtest_success();
 }
 
+static const char *
+xfail_need_unabandoned_mmap(const char *name __unused)
+{
+	static const char *reason = NULL;
+	static int checked = 0;
+	size_t len;
+	int abandon_on_munmap;
+
+	if (checked)
+		return (reason);
+
+	checked = 1;
+	len = sizeof(abandon_on_munmap);
+	if (sysctlbyname("debug.abandon_on_munmap", &abandon_on_munmap, &len,
+	    NULL, 0) != 0)
+		return (NULL);
+
+	if (abandon_on_munmap == 0)
+		return (NULL);
+
+	reason = "debug.abandon_on_munmap is enabled";
+	return (reason);
+}
+
 struct adjacent_mappings {
 	char *first;
 	char *middle;
@@ -176,7 +200,8 @@ free_adjacent_mappings(struct adjacent_mappings *mappings)
 }
 
 CHERIBSDTEST(test_cheriabi_munmap_invalid_ptr,
-    "Check that munmap() rejects invalid pointer arguments")
+    "Check that munmap() rejects invalid pointer arguments",
+    .ct_check_xfail = xfail_need_unabandoned_mmap)
 {
 	struct adjacent_mappings mappings;
 
@@ -209,7 +234,8 @@ CHERIBSDTEST(test_cheriabi_munmap_invalid_ptr,
 }
 
 CHERIBSDTEST(test_cheriabi_mprotect_invalid_ptr,
-    "Check that mprotect() rejects invalid pointer arguments")
+    "Check that mprotect() rejects invalid pointer arguments",
+    .ct_check_xfail = xfail_need_unabandoned_mmap)
 {
 	struct adjacent_mappings mappings;
 
@@ -248,7 +274,8 @@ CHERIBSDTEST(test_cheriabi_mprotect_invalid_ptr,
 }
 
 CHERIBSDTEST(test_cheriabi_minherit_invalid_ptr,
-    "Check that minherit() rejects invalid pointer arguments")
+    "Check that minherit() rejects invalid pointer arguments",
+    .ct_check_xfail = xfail_need_unabandoned_mmap)
 {
 	struct adjacent_mappings mappings;
 
@@ -329,7 +356,8 @@ free_adjacent_mappings_shm(struct adjacent_mappings *mappings)
 }
 
 CHERIBSDTEST(test_cheriabi_shmdt_invalid_ptr,
-    "Check that shmdt() rejects invalid pointer arguments")
+    "Check that shmdt() rejects invalid pointer arguments",
+    .ct_check_xfail = xfail_need_unabandoned_mmap)
 {
 	struct adjacent_mappings mappings;
 
