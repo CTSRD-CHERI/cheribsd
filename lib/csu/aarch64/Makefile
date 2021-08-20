@@ -4,7 +4,8 @@
 
 .include <src.opts.mk>
 
-CFLAGS+=	-DCRT_IRELOC_SUPPRESS
+CFLAGS+=	-I${.CURDIR}
+CFLAGS+=	-DCRT_IRELOC_RELA
 
 .if ${MACHINE_CPU:Mcheri}
 CFLAGS+=	-I${.CURDIR:H}/common-cheri
