@@ -570,7 +570,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 		uprintf("Warning: Attempted to load position-dependent "
 		    "executable with non-representable base: %s\n",
 		    imgp->execpath);
-		return (KERN_FAILURE); /* XXX: EPRECISION or similar? */
+		return (EINVAL); /* XXX: EPRECISION or similar? */
 	}
 
 	/*
@@ -604,14 +604,14 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 		    alignment);
 		if (result != KERN_SUCCESS) {
 			vm_map_unlock(map);
-			return (KERN_NO_SPACE);
+			return (ENOMEM);
 		}
 	}
 	result = vm_map_reservation_create_locked(map, &reservation, size,
 	    VM_PROT_ALL);
 	vm_map_unlock(map);
 	if (result != KERN_SUCCESS)
-		return (result);
+		return (vm_mmap_to_errno(result));
 
 	*preferred_rbase = reservation - start;
 
@@ -623,7 +623,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 #endif
 	*imgact_cap = cheri_andperm(reservation_cap, perm);
 
-	return (KERN_SUCCESS);
+	return (0);
 }
 #endif
 
