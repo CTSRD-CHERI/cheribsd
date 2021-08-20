@@ -584,7 +584,7 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	vm_map_log("abandon", entry);
 
 	/*
-	 * We need to call it again after setting the owner to 0.
+	 * We need to call it again after setting the owner to NO_PID.
 	 */
 	vm_map_try_merge_entries(map, prev, entry);
 	vm_map_try_merge_entries(map, entry, next);
@@ -663,7 +663,7 @@ again:
 					 */
 					goto again;
 				} else {
-					entry->owner = 0;
+					entry->owner = NO_PID;
 				}
 			}
 		}
@@ -5197,13 +5197,13 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 		// 	are not owned by us.  This, however, breaks certain
 		// 	things, for reasons yet unknown.
 		if (new_entry != NULL && old_entry->owner != curproc->p_pid &&
-		    old_entry->owner != 0 &&
+		    old_entry->owner != NO_PID &&
 		    (old_entry->object.vm_object == NULL ||
 		    old_entry->object.vm_object->type != OBJT_PHYS)) {
 			if (coexecve_cleanup_on_fork != 0) {
 				vm_map_entry_abandon(new_map, new_entry);
 			} else {
-				new_entry->owner = 0;
+				new_entry->owner = NO_PID;
 			}
 		}
 	}
