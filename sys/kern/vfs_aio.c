@@ -1425,6 +1425,8 @@ aiocb_copyin(void * __capability ujob, struct kaiocb *kjob, int type)
 	error = copyincap(ujob, kcb, sizeof(struct aiocb));
 	if (error)
 		return (error);
+	if (type == LIO_NOP)
+		type = kcb->aio_lio_opcode;
 	if (type & LIO_VECTORED) {
 		/* malloc a uio and copy in the iovec */
 		error = copyinuio(
@@ -1584,8 +1586,10 @@ aio_aqueue(struct thread *td, struct aiocb * __capability ujob,
 	if (type == LIO_NOP) {
 		switch (job->uaiocb.aio_lio_opcode) {
 		case LIO_WRITE:
+		case LIO_WRITEV:
 		case LIO_NOP:
 		case LIO_READ:
+		case LIO_READV:
 			opcode = job->uaiocb.aio_lio_opcode;
 			break;
 		default:
