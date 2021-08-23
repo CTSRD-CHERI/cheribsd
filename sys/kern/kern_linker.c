@@ -1377,7 +1377,7 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 	struct kld_sym_lookup lookup;
 	int error;
 
-	error = copyin(uap->data, &lookup, sizeof(lookup));
+	error = copyincap(uap->data, &lookup, sizeof(lookup));
 	if (error != 0)
 		return (error);
 	if (lookup.version != sizeof(lookup) ||
@@ -1387,7 +1387,9 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 	    lookup.symname, &lookup.symvalue, &lookup.symsize);
 	if (error != 0)
 		return (error);
-	error = copyout(&lookup, uap->data, sizeof(lookup));
+	error = copyout(&lookup.symvalue, (char * __capability)uap->data +
+	    offsetof(struct kld_sym_lookup, symvalue), sizeof(lookup) -
+	    offsetof(struct kld_sym_lookup, symvalue));
 
 	return (error);
 }
