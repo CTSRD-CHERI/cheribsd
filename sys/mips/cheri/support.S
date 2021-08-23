@@ -658,10 +658,9 @@ memsetsmallclr:
 END(memset)
 
 /*
- * bzero(<c3>s1, <a0>n)
+ * blkclr(<c3>s1, <a0>n)
  */
-LEAF(bzero)
-XLEAF(blkclr)
+LEAF(blkclr)
 	blt	a0, 12, smallclr	# small amount to clear?
 	nop
 
@@ -700,7 +699,7 @@ smallclr:
 2:
 	cjr	$c17
 	nop
-END(bzero)
+END(blkclr)
 
 /*
  * Find first bit set
