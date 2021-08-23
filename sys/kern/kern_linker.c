@@ -1373,11 +1373,12 @@ sys_kldfirstmod(struct thread *td, struct kldfirstmod_args *uap)
 int
 sys_kldsym(struct thread *td, struct kldsym_args *uap)
 {
-
 	struct kld_sym_lookup lookup;
+	struct kld_sym_lookup * __capability user_lookup;
 	int error;
 
-	error = copyin(uap->data, &lookup, sizeof(lookup));
+	user_lookup = uap->data;
+	error = copyincap(user_lookup, &lookup, sizeof(lookup));
 	if (error != 0)
 		return (error);
 	if (lookup.version != sizeof(lookup) ||
@@ -1387,7 +1388,9 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 	    lookup.symname, &lookup.symvalue, &lookup.symsize);
 	if (error != 0)
 		return (error);
-	error = copyout(&lookup, uap->data, sizeof(lookup));
+	error = suword(&user_lookup->symvalue, lookup.symvalue);
+	if (error == 0)
+		error = suword(&user_lookup->symsize, lookup.symsize);
 
 	return (error);
 }
