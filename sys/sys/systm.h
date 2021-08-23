@@ -416,7 +416,6 @@ void	bcopynocap(const void *src0, void *dst0, size_t length);
 #endif
 void	bzero(void * _Nonnull buf, size_t len);
 void	explicit_bzero(void * _Nonnull, size_t);
-int	bcmp(const void *b1, const void *b2, size_t len);
 
 void	*memset(void * _Nonnull buf, int c, size_t len);
 void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
