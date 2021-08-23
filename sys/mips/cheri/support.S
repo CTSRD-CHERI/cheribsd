@@ -703,69 +703,6 @@ smallclr:
 END(bzero)
 
 /*
- * Compare byte string
- * bcmp(s1, s2, n)
- * c3: s1
- * c4: s2
- * a0: n
- */
-LEAF(bcmp)
-	blt	a0, 16, smallcmp	# is it worth any trouble?
-	cgetaddr	t0, $c3
-	cgetaddr	t1, $c4
-	xor	v0, t0, t1		# compare low two bits of addresses
-	and	v0, v0, 3
-	LONG_SUBU	a3, zero, t1		# compute # bytes to word align address
-	bne	v0, zero, smallcmp	# not possible to align addresses
-	and	a3, a3, 3
-
-	beq	a3, zero, 1f
-	LONG_SUBU	a0, a0, a3		# subtract from remaining count
-	move	v0, v1			# init v0,v1 so unmodified bytes match
-	/* Compare unaligned bytes, read 1, 2, or 3 bytes */
-4:
-	clb	v0, zero, 0($c3)
-	clb	v1, zero, 0($c4)
-	cincoffset	$c3, $c3, 1
-	bne	v0, v1, nomatch
-	cincoffset	$c4, $c4, 1
-	daddi	a3, a3, -1
-	bnez	a3, 4b
-1:
-	and	a3, a0, ~3		# compute number of whole words left
-	LONG_SUBU	a0, a0, a3		#   which has to be >= (16-3) & ~3
-	cincoffset	$c5, $c3, a3		# compute ending address
-2:
-	clw	v0, zero, 0($c3)		# compare words
-	clw	v1, zero, 0($c4)
-	cincoffset	$c3, $c3, 4
-	bne	v0, v1, nomatch
-	cincoffset	$c4, $c4, 4
-	cne	v0, $c3, $c5
-	bnez	v0, 2b
-	nop
-	/* Fall through, finish remainder */
-smallcmp:
-	ble	a0, zero, match
-	cincoffset $c5, $c3, a0		# compute ending address
-1:
-	clb	v0, zero, 0($c3)
-	clb	v1, zero, 0($c4)
-	cincoffset	$c3, $c3, 1
-	bne	v0, v1, nomatch
-	cincoffset	$c4, $c4, 1
-	ceq	v0, $c5, $c3
-	beqz	v0, 1b
-	nop
-match:
-	cjr	$c17
-	move	v0, zero
-nomatch:
-	cjr	$c17
-	li	v0, 1
-END(bcmp)
-
-/*
  * Find first bit set
  * bit = ffs(value)
  * a0: value
