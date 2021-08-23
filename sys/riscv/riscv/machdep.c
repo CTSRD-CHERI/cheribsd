@@ -1225,17 +1225,6 @@ initriscv(struct riscv_bootparams *rvbp)
 
 	TSEXIT();
 }
-
-#undef bzero
-void
-bzero(void *buf, size_t len)
-{
-	uint8_t *p;
-
-	p = buf;
-	while(len-- > 0)
-		*p++ = 0;
-}
 // CHERI CHANGES START
 // {
 //   "updated": 20200803,
