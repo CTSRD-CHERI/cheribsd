@@ -337,7 +337,7 @@ nopgrp:
 		kp->ki_swrss = vmspace.vm_swrss;
 		kp->ki_tsize = vmspace.vm_tsize;
 		kp->ki_dsize = vmspace.vm_dsize;
-		kp->ki_ssize = vmspace.vm_ssize;
+		kp->ki_ssize = proc.p_vm_ssize;
 
 		switch (what & ~KERN_PROC_INC_THREAD) {
 

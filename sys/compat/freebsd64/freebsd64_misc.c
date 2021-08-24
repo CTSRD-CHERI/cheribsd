@@ -642,7 +642,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * resulting stack as the capability will not be handed out
 	 * to userspace.
 	 */
-	stack_vaddr = (vm_offset_t)p->p_vmspace->vm_maxsaddr;
+	stack_vaddr = (vm_offset_t)p->p_vm_maxsaddr;
 	ssiz = p->p_usrstack - stack_vaddr;
 	destp = (uintcap_t)cheri_capability_build_user_data(
 	    CHERI_CAP_USER_DATA_PERMS, stack_vaddr, ssiz, ssiz);

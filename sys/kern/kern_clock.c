@@ -693,7 +693,7 @@ statclock(int cnt, int usermode)
 	ru = &td->td_ru;
 	ru->ru_ixrss += pgtok(vm->vm_tsize) * cnt;
 	ru->ru_idrss += pgtok(vm->vm_dsize) * cnt;
-	ru->ru_isrss += pgtok(vm->vm_ssize) * cnt;
+	ru->ru_isrss += pgtok(p->p_vm_ssize) * cnt;
 	rss = pgtok(vmspace_resident_count(vm));
 	if (ru->ru_maxrss < rss)
 		ru->ru_maxrss = rss;

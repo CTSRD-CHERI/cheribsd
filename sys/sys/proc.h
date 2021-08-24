@@ -691,6 +691,8 @@ struct proc {
 	uint64_t	p_elf_flags;	/* (x) ELF flags */
 	vm_offset_t	p_usrstack;
 	vm_offset_t	p_psstrings;
+	vm_offset_t	p_vm_maxsaddr;	/* user VA at max stack growth */
+	segsz_t		p_vm_ssize;	/* stack size (pages) */
 /* End area that is copied on creation. */
 #define	p_endcopy	p_xexit
 

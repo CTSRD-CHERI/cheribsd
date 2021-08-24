@@ -1133,7 +1133,7 @@ fill_kinfo_proc_only(struct proc *p, struct kinfo_proc *kp)
 		kp->ki_swrss = vm->vm_swrss;
 		kp->ki_tsize = vm->vm_tsize;
 		kp->ki_dsize = vm->vm_dsize;
-		kp->ki_ssize = vm->vm_ssize;
+		kp->ki_ssize = p->p_vm_ssize;
 	} else if (p->p_state == PRS_ZOMBIE)
 		kp->ki_stat = SZOMB;
 	if (kp->ki_flag & P_INMEM)

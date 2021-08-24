@@ -396,10 +396,8 @@ vmspace_alloc(vm_pointer_t min, vm_pointer_t max, pmap_pinit_t pinit)
 	vm->vm_swrss = 0;
 	vm->vm_tsize = 0;
 	vm->vm_dsize = 0;
-	vm->vm_ssize = 0;
 	vm->vm_taddr = 0;
 	vm->vm_daddr = 0;
-	vm->vm_maxsaddr = 0;
 	return (vm);
 }
 
@@ -4957,9 +4955,7 @@ vmspace_map_entry_forked(const struct vmspace *vm1, struct vmspace *vm2,
 		return;
 	entrysize = entry->end - entry->start;
 	vm2->vm_map.size += entrysize;
-	if (entry->eflags & (MAP_ENTRY_GROWS_DOWN | MAP_ENTRY_GROWS_UP)) {
-		vm2->vm_ssize += btoc(entrysize);
-	} else if (entry->start >= (vm_offset_t)vm1->vm_daddr &&
+	if (entry->start >= (vm_offset_t)vm1->vm_daddr &&
 	    entry->start < (vm_offset_t)vm1->vm_daddr + ctob(vm1->vm_dsize)) {
 		newend = MIN(entry->end,
 		    (vm_offset_t)vm1->vm_daddr + ctob(vm1->vm_dsize));
@@ -5010,7 +5006,6 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 	vm2->vm_taddr = vm1->vm_taddr;
 	vm2->vm_daddr = vm1->vm_daddr;
-	vm2->vm_maxsaddr = vm1->vm_maxsaddr;
 	vm_map_lock(old_map);
 	if (old_map->busy)
 		vm_map_wait_busy(old_map);
@@ -5445,16 +5440,16 @@ retry:
 	 * If this is the main process stack, see if we're over the stack
 	 * limit.
 	 */
-	is_procstack = addr >= vm->vm_maxsaddr &&
+	is_procstack = addr >= p->p_vm_maxsaddr &&
 	    addr < (vm_offset_t)p->p_usrstack;
-	if (is_procstack && (ctob(vm->vm_ssize) + grow_amount > stacklim))
+	if (is_procstack && (ctob(p->p_vm_ssize) + grow_amount > stacklim))
 		return (KERN_NO_SPACE);
 
 #ifdef RACCT
 	if (racct_enable) {
 		PROC_LOCK(p);
 		if (is_procstack && racct_set(p, RACCT_STACK,
-		    ctob(vm->vm_ssize) + grow_amount)) {
+		    ctob(p->p_vm_ssize) + grow_amount)) {
 			PROC_UNLOCK(p);
 			return (KERN_NO_SPACE);
 		}
@@ -5465,17 +5460,17 @@ retry:
 	grow_amount = roundup(grow_amount, sgrowsiz);
 	if (grow_amount > max_grow)
 		grow_amount = max_grow;
-	if (is_procstack && (ctob(vm->vm_ssize) + grow_amount > stacklim)) {
+	if (is_procstack && (ctob(p->p_vm_ssize) + grow_amount > stacklim)) {
 		grow_amount = trunc_page((vm_size_t)stacklim) -
-		    ctob(vm->vm_ssize);
+		    ctob(p->p_vm_ssize);
 	}
 
 #ifdef notyet
 	PROC_LOCK(p);
 	limit = racct_get_available(p, RACCT_STACK);
 	PROC_UNLOCK(p);
-	if (is_procstack && (ctob(vm->vm_ssize) + grow_amount > limit))
-		grow_amount = limit - ctob(vm->vm_ssize);
+	if (is_procstack && (ctob(p->p_vm_ssize) + grow_amount > limit))
+		grow_amount = limit - ctob(p->p_vm_ssize);
 #endif
 
 	if (!old_mlock && (map->flags & MAP_WIREFUTURE) != 0) {
@@ -5607,7 +5602,7 @@ retry:
 			rv = KERN_FAILURE;
 	}
 	if (rv == KERN_SUCCESS && is_procstack)
-		vm->vm_ssize += btoc(grow_amount);
+		p->p_vm_ssize += btoc(grow_amount);
 
 	/*
 	 * Heed the MAP_WIREFUTURE flag if it was set for this process.
@@ -5630,7 +5625,7 @@ out:
 			    ptoa(pmap_wired_count(map->pmap)));
 			KASSERT(error == 0, ("decreasing RACCT_MEMLOCK failed"));
 		}
-	    	error = racct_set(p, RACCT_STACK, ctob(vm->vm_ssize));
+	    	error = racct_set(p, RACCT_STACK, ctob(p->p_vm_ssize));
 		KASSERT(error == 0, ("decreasing RACCT_STACK failed"));
 		PROC_UNLOCK(p);
 	}

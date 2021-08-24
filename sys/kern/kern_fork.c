@@ -660,19 +660,19 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	if (fr->fr_flags == (RFFDG | RFPROC)) {
 		VM_CNT_INC(v_forks);
 		VM_CNT_ADD(v_forkpages, p2->p_vmspace->vm_dsize +
-		    p2->p_vmspace->vm_ssize);
+		    p2->p_vm_ssize);
 	} else if (fr->fr_flags == (RFFDG | RFPROC | RFPPWAIT | RFMEM)) {
 		VM_CNT_INC(v_vforks);
 		VM_CNT_ADD(v_vforkpages, p2->p_vmspace->vm_dsize +
-		    p2->p_vmspace->vm_ssize);
+		    p2->p_vm_ssize);
 	} else if (p1 == &proc0) {
 		VM_CNT_INC(v_kthreads);
 		VM_CNT_ADD(v_kthreadpages, p2->p_vmspace->vm_dsize +
-		    p2->p_vmspace->vm_ssize);
+		    p2->p_vm_ssize);
 	} else {
 		VM_CNT_INC(v_rforks);
 		VM_CNT_ADD(v_rforkpages, p2->p_vmspace->vm_dsize +
-		    p2->p_vmspace->vm_ssize);
+		    p2->p_vm_ssize);
 	}
 
 	/*

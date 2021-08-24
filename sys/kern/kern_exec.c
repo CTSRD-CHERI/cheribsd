@@ -1401,8 +1401,8 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they
 	 * are still used to enforce the stack rlimit on the process stack.
 	 */
-	vmspace->vm_ssize = sgrowsiz >> PAGE_SHIFT;
-	vmspace->vm_maxsaddr = stack_addr;
+	p->p_vm_ssize = sgrowsiz >> PAGE_SHIFT;
+	p->p_vm_maxsaddr = stack_addr;
 
 	return (0);
 }
