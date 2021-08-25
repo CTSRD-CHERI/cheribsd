@@ -1152,6 +1152,7 @@ vop_stddeallocate(struct vop_deallocate_args *ap)
 			/*
 			 * No more data region to be filled
 			 */
+			offset += len;
 			len = 0;
 			error = 0;
 			break;
@@ -1181,10 +1182,8 @@ vop_stddeallocate(struct vop_deallocate_args *ap)
 			break;
 	}
 	/* Handle the case when offset is beyond EOF */
-	if (len < 0) {
-		offset += len;
+	if (len < 0)
 		len = 0;
-	}
 out:
 	*ap->a_offset = offset;
 	*ap->a_len = len;
