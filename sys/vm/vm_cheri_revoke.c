@@ -214,9 +214,7 @@ vm_cheri_revoke_visit_ro(
 static void
 vm_cheri_revoke_unwire_in_situ(vm_page_t m)
 {
-	vm_page_lock(m);
 	vm_page_unwire(m, vm_page_active(m) ? PQ_ACTIVE : PQ_INACTIVE);
-	vm_page_unlock(m);
 }
 
 // XXX stats
