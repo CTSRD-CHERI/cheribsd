@@ -549,7 +549,6 @@ vm_map_entry_succ(vm_map_entry_t entry)
 	    (it) = vm_map_entry_succ(it))
 int vm_map_protect (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t, boolean_t,
     boolean_t);
-int vm_map_abandon_locked(vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_remove_locked(vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_remove (vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_clear(vm_map_t);

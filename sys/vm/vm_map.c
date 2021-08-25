@@ -480,6 +480,9 @@ static int coexecve_cleanup_margin_down = MAXSSIZ;
 SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_margin_down, CTLFLAG_RWTUN,
     &coexecve_cleanup_margin_down, 0,
     "Maximum hole size for segments growing down when cleaning up after colocated processes");
+static int abandon_on_munmap = 1;
+SYSCTL_INT(_debug, OID_AUTO, abandon_on_munmap, CTLFLAG_RWTUN, &abandon_on_munmap, 0,
+    "Add abandoned vm entries on munmap(2)/shmdt(2)");
 
 static bool
 vm_map_entry_abandoned(vm_map_entry_t entry)
@@ -4646,13 +4649,13 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 
 #include <sys/kdb.h>
 
-static int
-_vm_map_remove_locked(vm_map_t map, vm_offset_t start, vm_offset_t end,
-    bool abandon)
+int
+vm_map_remove_locked(vm_map_t map, vm_offset_t start, vm_offset_t end)
 {
 	int result;
 	vm_offset_t reservation = 0;
 	vm_map_entry_t entry;
+	bool abandon = false;
 
 	VM_MAP_ASSERT_LOCKED(map);
 
@@ -4663,6 +4666,16 @@ _vm_map_remove_locked(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			    __func__, result);
 			return (result);
 		}
+
+		/*
+		 * XXX: This is suboptimal; it makes it impossible for
+		 *	the application to reuse the address range it
+		 *	just munmapped.
+		 *
+		 * XXX-JHB: Maybe only do this for purecap?
+		 */
+		if (abandon_on_munmap)
+			abandon = true;
 	} else {
 		KASSERT(map == pipe_map || map == exec_map || map == kernel_map,
 		    ("%s: invalid map %p", __func__, map));
@@ -4691,18 +4704,6 @@ _vm_map_remove_locked(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	}
 
 	return (result);
-}
-
-int
-vm_map_abandon_locked(vm_map_t map, vm_offset_t start, vm_offset_t end)
-{
-	return (_vm_map_remove_locked(map, start, end, true));
-}
-
-int
-vm_map_remove_locked(vm_map_t map, vm_offset_t start, vm_offset_t end)
-{
-	return (_vm_map_remove_locked(map, start, end, false));
 }
 
 /*

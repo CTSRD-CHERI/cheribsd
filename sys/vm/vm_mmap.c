@@ -126,9 +126,6 @@ SYSCTL_INT(_vm, OID_AUTO, imply_prot_max, CTLFLAG_RWTUN, &imply_prot_max, 0,
 static int log_wxrequests = 0;
 SYSCTL_INT(_vm, OID_AUTO, log_wxrequests, CTLFLAG_RWTUN, &log_wxrequests, 0,
     "Log requests for PROT_WRITE and PROT_EXEC");
-static int abandon_on_munmap = 1;
-SYSCTL_INT(_debug, OID_AUTO, abandon_on_munmap, CTLFLAG_RWTUN, &abandon_on_munmap, 0,
-    "Add abandoned vm entries on munmap(2)");
 
 #ifdef MAP_32BIT
 #define	MAP_32BIT_MAX_ADDR	((vm_offset_t)1 << 31)
@@ -1039,18 +1036,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 		}
 	}
 #endif
-	/*
-	 * XXX: This is suboptimal; it makes it impossible for the application
-	 *	to reuse the address range it just munmapped.
-	 *
-	 * XXX-JHB: Maybe only do this if we have coprocesses in the address
-	 * space?  Or at least only for purecap?  Possibly push this down into
-	 * vm_map_remove_locked instead.
-	 */
-	if (abandon_on_munmap)
-		rv = vm_map_abandon_locked(map, addr, addr + size);
-	else
-		rv = vm_map_remove_locked(map, addr, addr + size);
+	rv = vm_map_remove_locked(map, addr, addr + size);
 
 #ifdef HWPMC_HOOKS
 	if (rv == KERN_SUCCESS && __predict_false(pmc_handled)) {
