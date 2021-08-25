@@ -248,6 +248,7 @@ fast_out:
 			ires = cv_wait_sig(&vmm->vm_cheri_revoke_cv,
 			    &vmm->lock);
 			if (ires != 0) {
+				vm_map_unlock(vmm);
 				cv_signal(&vmm->vm_cheri_revoke_cv);
 				vmspace_free(vm);
 				return ires;
