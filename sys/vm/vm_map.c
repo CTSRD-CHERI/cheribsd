@@ -2091,21 +2091,30 @@ vm_map_findspace(vm_map_t map, vm_offset_t start, vm_size_t length)
 }
 
 /*
- * Map an object into an existing reservation for the given map.
- * The start address must be a valid capability for the reservation (or a
- * subset of it). We do not care about exact representability of this mapping.
+ * Map an object at a fixed address in the given map, optionally creating a
+ * reservation which covers the mapping.  If not creating a reservation, the
+ * start address must be a valid capability for a pre-existing reservation (or a
+ * subset of it).  We do not care about exact representability of this mapping.
+ *
+ * A reservation is created only if reservp is not NULL, in which case a
+ * capability for the new mapping, encompassing the requested range, is returned
+ * in *reservp.  If the map does not have reservations enabled, i.e., the
+ * process uses a non-CHERI ABI, then the requested start address is
+ * (redundantly) returned in *reservp.
  */
 int
 vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-    vm_pointer_t start, vm_size_t length, vm_prot_t prot,
-    vm_prot_t max, int cow)
+    vm_pointer_t start, vm_pointer_t *reservp /* OUT */, vm_size_t length,
+    vm_prot_t prot, vm_prot_t max, int cow)
 {
 	vm_pointer_t end;
 	vm_offset_t reservation_id = start;
 	int result;
+	bool reservation_created = false;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(cheri_gettag(start), ("Expected valid capability"));
+	KASSERT(reservp != NULL || cheri_gettag(start),
+	    ("Expected valid capability"));
 	if (cheri_getlen(start) < length)
 		return (KERN_INVALID_ARGUMENT);
 #endif
@@ -2118,17 +2127,28 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	VM_MAP_RANGE_CHECK(map, start, end);
 
 	/*
-	 * Ensure that there is a single reservation spanning the requested
-	 * range. If mapping exclusively, check that no other mapping exists
-	 * unless it is marked as unmapped, then punch a hole in
-	 * the existing reservation.
+	 * If the caller requested creation of a new reservation, do so here.
+	 * Otherwise, ensure that there is a single reservation spanning the
+	 * requested range.
+	 *
+	 * If mapping exclusively, check that no other mapping exists unless it
+	 * is marked as unmapped, then punch a hole in the existing reservation.
 	 */
 	if ((map->flags & MAP_RESERVATIONS) != 0) {
-		result = vm_map_reservation_get(map, start, length,
-		    &reservation_id);
-		if (result != KERN_SUCCESS)
-			goto out;
+		if (reservp != NULL) {
+			result = vm_map_reservation_create_locked(map, &start,
+			    length, max);
+			if (result != KERN_SUCCESS)
+				goto err;
+			reservation_created = true;
+		} else {
+			result = vm_map_reservation_get(map, start, length,
+			    &reservation_id);
+			if (result != KERN_SUCCESS)
+				goto err;
+		}
 	}
+
 	if ((cow & MAP_CHECK_EXCL) == 0) {
 		/*
 		 * If mapping exclusively with reservations, we know that
@@ -2143,7 +2163,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		 */
 		result = vm_map_delete(map, start, end, true);
 		if (result != KERN_SUCCESS)
-			goto out;
+			goto err;
 	}
 	if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
 		result = vm_map_stack_locked(map, start, length, sgrowsiz,
@@ -2152,7 +2172,16 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		result = vm_map_insert(map, object, offset, start, end,
 		    prot, max, cow, reservation_id);
 	}
-out:
+	if (result != KERN_SUCCESS)
+		goto err;
+	vm_map_unlock(map);
+	if (reservp != NULL)
+		*reservp = start;
+	return (KERN_SUCCESS);
+
+err:
+	if (reservation_created)
+		vm_map_reservation_delete_locked(map, reservation_id);
 	vm_map_unlock(map);
 	return (result);
 }
