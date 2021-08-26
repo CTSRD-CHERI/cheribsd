@@ -4520,10 +4520,6 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 	 * vm_page_array.
 	 */
 	if ((zone->uz_flags & UMA_ZFLAG_CACHE) == 0) {
-		/*
-		 * XXX-AM: pcpu zones may legitimately free() the whole
-		 * pcpu chunk allocation or just the item for a single cpu?
-		 */
 		if ((zone->uz_flags & UMA_ZONE_PCPU) == 0)
 			expected_size = zone->uz_size;
 		else
