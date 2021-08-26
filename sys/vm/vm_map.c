@@ -4164,6 +4164,10 @@ vm_map_sync(vm_map_t map, vm_offset_t start, vm_offset_t end,
 		} else {
 			object = entry->object.vm_object;
 		}
+		if (object == NULL) {
+			entry = vm_map_entry_succ(entry);
+			continue;
+		}
 		vm_object_reference(object);
 		last_timestamp = map->timestamp;
 		if (pageout) {
