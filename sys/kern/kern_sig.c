@@ -2086,7 +2086,7 @@ trapsignal(struct thread *td, ksiginfo_t *ksi)
 {
 	struct sigacts *ps;
 	struct proc *p;
-	struct thread *peertd;
+	struct thread *origtd, *peertd;
 	sigset_t sigmask;
 	bool borrowing;
 	int code, sig;
@@ -2096,6 +2096,7 @@ trapsignal(struct thread *td, ksiginfo_t *ksi)
 	 * out which thread/process we're actually executing, and queue the
 	 * signal to them.
 	 */
+	origtd = td;
 	colocation_get_peer(td, &peertd);
 	if (peertd != NULL) {
 		//printf("%s: bingo, td %p, peertd %p\n", __func__, td, peertd);
@@ -2105,6 +2106,7 @@ trapsignal(struct thread *td, ksiginfo_t *ksi)
 		borrowing = false;
 	}
 
+retry:
 	p = td->td_proc;
 	sig = ksi->ksi_signo;
 	code = ksi->ksi_code;
@@ -2112,6 +2114,20 @@ trapsignal(struct thread *td, ksiginfo_t *ksi)
 
 	sigfastblock_fetch(td);
 	PROC_LOCK(p);
+
+	/*
+	 * XXX-JHB: If the peer process has exited, then deliver the
+	 * signal to the original thread.  We can't just ignore the
+	 * signal as the current thread will just keep looping
+	 * retrying the faulting instruction.
+	 */
+	if (borrowing && p->p_state != PRS_NORMAL) {
+		PROC_UNLOCK(p);
+		td = origtd;
+		borrowing = false;
+		goto retry;
+	}
+
 	ps = p->p_sigacts;
 	mtx_lock(&ps->ps_mtx);
 
