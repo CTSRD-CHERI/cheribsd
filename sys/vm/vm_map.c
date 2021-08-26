@@ -2014,6 +2014,9 @@ vm_map_findspace(vm_map_t map, vm_offset_t start, vm_size_t length)
 	vm_offset_t gap_end;
 
 	VM_MAP_ASSERT_LOCKED(map);
+	KASSERT((map->flags & MAP_RESERVATIONS) == 0 ||
+	    length == CHERI_REPRESENTABLE_LENGTH(length),
+	    ("%s: imprecise length %#lx", __func__, length));
 
 	/*
 	 * Request must fit within min/max VM address and must avoid
