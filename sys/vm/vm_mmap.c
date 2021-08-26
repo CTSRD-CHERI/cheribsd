@@ -2048,10 +2048,10 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
     vm_prot_t maxprot, int flags, vm_object_t object, vm_ooffset_t foff,
     boolean_t writecounted, struct thread *td)
 {
+	vm_pointer_t *reservp;
 	int docow, error, findspace, rv;
-	bool curmap, fitit, new_reservation;
+	bool curmap, fitit;
 	vm_size_t padded_size;
-	vm_pointer_t reservation;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_getlen(addr) == sizeof(void *),
@@ -2086,11 +2086,6 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 			return (EINVAL);
 		fitit = FALSE;
 	}
-
-	if (flags & MAP_RESERVATION_CREATE)
-		new_reservation = true;
-	else
-		new_reservation = false;
 
 	if (flags & MAP_ANON) {
 		if (object != NULL || foff != 0)
@@ -2144,20 +2139,12 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 			return (ENOMEM);
 		if (docow & MAP_GUARD)
 			maxprot = PROT_NONE;
-		reservation = *addr;
-		if (new_reservation) {
-			rv = vm_map_reservation_create(map, &reservation,
-			    size, PAGE_SIZE, maxprot);
-			if (rv != KERN_SUCCESS)
-				return (vm_mmap_to_errno(rv));
-		}
-
-		rv = vm_map_fixed(map, object, foff, reservation, size,
-		    prot, maxprot, docow);
-		if (rv != KERN_SUCCESS && new_reservation)
-			vm_map_reservation_delete(map, reservation);
+		if ((flags & MAP_RESERVATION_CREATE) != 0)
+			reservp = addr;
 		else
-			*addr = reservation;
+			reservp = NULL;
+		rv = vm_map_fixed(map, object, foff, *addr, reservp, size,
+		    prot, maxprot, docow);
 	}
 
 	if (rv == KERN_SUCCESS) {

@@ -1205,25 +1205,13 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	obj = sv->sv_shared_page_obj;
 	if (obj != NULL) {
 		vm_object_reference(obj);
-		shared_page_addr = sv->sv_shared_page_base;
-#if __has_feature(capabilities)
-		error = vm_map_reservation_create(map, &shared_page_addr,
-		    sv->sv_shared_page_len, PAGE_SIZE,
-		    VM_PROT_READ | VM_PROT_EXECUTE);
-		if (error != KERN_SUCCESS) {
-			vm_object_deallocate(obj);
-			return (vm_mmap_to_errno(error));
-		}
-#endif
 		error = vm_map_fixed(map, obj, 0,
-		    shared_page_addr, sv->sv_shared_page_len,
+		    sv->sv_shared_page_base, &shared_page_addr,
+		    sv->sv_shared_page_len,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE);
 		if (error != KERN_SUCCESS) {
-#if __has_feature(capabilities)
-			vm_map_reservation_delete(map, shared_page_addr);
-#endif
 			vm_object_deallocate(obj);
 			return (vm_mmap_to_errno(error));
 		}

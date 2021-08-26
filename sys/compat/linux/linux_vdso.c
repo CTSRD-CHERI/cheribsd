@@ -162,6 +162,7 @@ linux_map_vdso(struct proc *p, vm_object_t obj, vm_offset_t base,
 {
 	struct vmspace *vmspace;
 	vm_map_t map;
+	vm_pointer_t addr;
 	int error;
 
 	MPASS((imgp->sysent->sv_flags & SV_ABI_MASK) == SV_ABI_LINUX);
@@ -171,7 +172,7 @@ linux_map_vdso(struct proc *p, vm_object_t obj, vm_offset_t base,
 	map = &vmspace->vm_map;
 
 	vm_object_reference(obj);
-	error = vm_map_fixed(map, obj, 0, base, size,
+	error = vm_map_fixed(map, obj, 0, base, &addr, size,
 	    VM_PROT_READ | VM_PROT_EXECUTE,
 	    VM_PROT_READ | VM_PROT_EXECUTE,
 	    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE);

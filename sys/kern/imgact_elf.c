@@ -636,7 +636,7 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	/*
 	 * Create the page if it doesn't exist yet. Ignore errors.
 	 */
-	vm_map_fixed(map, NULL, 0, trunc_page(start),
+	vm_map_fixed(map, NULL, 0, trunc_page(start), NULL,
 	    (ptraddr_t)round_page(end) - (ptraddr_t)trunc_page(start),
 	    prot, prot /* XXX: or VM_PROT_ALL? */, MAP_CHECK_EXCL);
 
@@ -691,7 +691,7 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 		 * The mapping is not page aligned.  This means that we have
 		 * to copy the data.
 		 */
-		rv = vm_map_fixed(map, NULL, 0, start,
+		rv = vm_map_fixed(map, NULL, 0, start, NULL,
 		    (ptraddr_t)end - (ptraddr_t)start,
 		    prot | VM_PROT_WRITE, VM_PROT_ALL,
 		    MAP_CHECK_EXCL);
@@ -717,7 +717,7 @@ __elfN(map_insert)(const struct image_params *imgp, vm_map_t map,
 		}
 	} else {
 		vm_object_reference(object);
-		rv = vm_map_fixed(map, object, offset, start,
+		rv = vm_map_fixed(map, object, offset, start, NULL,
 		    (ptraddr_t)end - (ptraddr_t)start,
 		    prot, VM_PROT_ALL, cow | MAP_CHECK_EXCL |
 		    (object != NULL ? MAP_VN_EXEC : 0));
