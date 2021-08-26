@@ -90,7 +90,7 @@ __FBSDID("$FreeBSD$");
 #define	SYS_IOCTL_SMALL_SIZE	128	/* bytes */
 #define	SYS_IOCTL_SMALL_ALIGN	MAX(sizeof(void * __capability), 8)	/* bytes */
 
-#ifdef __LP64__
+#if __SIZEOF_SIZE_T__ == 8
 static int iosize_max_clamp = 0;
 SYSCTL_INT(_debug, OID_AUTO, iosize_max_clamp, CTLFLAG_RW,
     &iosize_max_clamp, 0, "Clamp max i/o size to INT_MAX");
@@ -161,7 +161,7 @@ struct selfd {
 MALLOC_DEFINE(M_SELFD, "selfd", "selfd");
 static struct mtx_pool *mtxpool_select;
 
-#ifdef __LP64__
+#if __SIZEOF_SIZE_T__ == 8
 size_t
 devfs_iosize_max(void)
 {
@@ -733,7 +733,7 @@ user_ioctl(struct thread *td, int fd, u_long ucom,
 	if (size > 0) {
 		if (com & IOC_VOID) {
 			/* Integer argument. */
-			arg = (__cheri_addr intptr_t)udata;
+			arg = (intptr_t)(intcap_t)udata;
 			data = (void *)&arg;
 			size = 0;
 		} else {
@@ -2035,11 +2035,14 @@ kern_posix_error(struct thread *td, int error)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

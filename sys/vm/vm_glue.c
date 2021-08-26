@@ -305,11 +305,11 @@ SYSCTL_PROC(_vm, OID_AUTO, kstack_cache_size,
 /*
  * Create the kernel stack (including pcb for i386) for a new thread.
  */
-static vm_offset_t
+static vm_pointer_t
 vm_thread_stack_create(struct domainset *ds, int pages)
 {
 	vm_page_t ma[KSTACK_MAX_PAGES];
-	vm_offset_t ks;
+	vm_pointer_t ks;
 	int i;
 
 	/*
@@ -350,7 +350,7 @@ vm_thread_stack_create(struct domainset *ds, int pages)
 }
 
 static void
-vm_thread_stack_dispose(vm_offset_t ks, int pages)
+vm_thread_stack_dispose(vm_pointer_t ks, int pages)
 {
 	vm_page_t m;
 	vm_pindex_t pindex;
@@ -379,7 +379,7 @@ vm_thread_stack_dispose(vm_offset_t ks, int pages)
 int
 vm_thread_new(struct thread *td, int pages)
 {
-	vm_offset_t ks;
+	vm_pointer_t ks;
 
 	/* Bounds check */
 	if (pages <= 1)
@@ -389,7 +389,7 @@ vm_thread_new(struct thread *td, int pages)
 
 	ks = 0;
 	if (pages == kstack_pages && kstack_cache != NULL)
-		ks = (vm_offset_t)uma_zalloc(kstack_cache, M_NOWAIT);
+		ks = (vm_pointer_t)uma_zalloc(kstack_cache, M_NOWAIT);
 
 	/*
 	 * Ensure that kstack objects can draw pages from any memory
@@ -412,7 +412,7 @@ vm_thread_new(struct thread *td, int pages)
 void
 vm_thread_dispose(struct thread *td)
 {
-	vm_offset_t ks;
+	vm_pointer_t ks;
 	int pages;
 
 	pages = td->td_kstack_pages;
@@ -453,22 +453,22 @@ vm_thread_stack_back(struct domainset *ds, vm_offset_t ks, vm_page_t ma[],
 	 */
 #error "KSTACK_LARGE_PAGE requires NO_SWAPPING"
 #endif
-	KASSERT(npages == atop(KSTACK_PAGE_SIZE),
-	    ("%s: request for %d pages != KSTACK_PAGE_SIZE", __func__, npages));
+	KASSERT(npages == atop(KSTACK_SIZE),
+	    ("%s: request for %d pages != KSTACK_SIZE", __func__, npages));
 
 	for (;;) {
 		m = vm_page_alloc_contig(kstack_object, pindex, req_class |
-		    VM_ALLOC_WIRED | VM_ALLOC_NOWAIT, atop(KSTACK_PAGE_SIZE),
+		    VM_ALLOC_WIRED | VM_ALLOC_NOWAIT, atop(KSTACK_SIZE),
 		    0ul, ~0ul, KSTACK_PAGE_SIZE, 0, VM_MEMATTR_DEFAULT);
 		if (m != NULL)
 			break;
 		VM_OBJECT_WUNLOCK(kstack_object);
 		if (!vm_page_reclaim_contig(req_class,
-		    atop(KSTACK_PAGE_SIZE), 0ul, ~0ul, KSTACK_PAGE_SIZE, 0))
+		    atop(KSTACK_SIZE), 0ul, ~0ul, KSTACK_PAGE_SIZE, 0))
 			vm_wait(kstack_object);
 		VM_OBJECT_WLOCK(kstack_object);
 	}
-	for (n = 0; n < atop(KSTACK_PAGE_SIZE); m++, n++)
+	for (n = 0; n < atop(KSTACK_SIZE); m++, n++)
 		ma[n] = m;
 #else
 	for (n = 0; n < npages;) {
@@ -509,11 +509,11 @@ kstack_import(void *arg, void **store, int cnt, int domain, int flags)
 static void
 kstack_release(void *arg, void **store, int cnt)
 {
-	vm_offset_t ks;
+	vm_pointer_t ks;
 	int i;
 
 	for (i = 0; i < cnt; i++) {
-		ks = (vm_offset_t)store[i];
+		ks = (vm_pointer_t)store[i];
 		vm_thread_stack_dispose(ks, kstack_pages);
 	}
 }
@@ -525,7 +525,8 @@ kstack_cache_init(void *null)
 	    atop(VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS));
 	vm_object_set_flag(kstack_object, OBJ_HASCAP);
 	kstack_cache = uma_zcache_create("kstack_cache",
-	    kstack_pages * PAGE_SIZE, NULL, NULL, NULL, NULL,
+	    (kstack_pages + KSTACK_GUARD_PAGES) * PAGE_SIZE,
+	    NULL, NULL, NULL, NULL,
 	    kstack_import, kstack_release, NULL,
 	    UMA_ZONE_FIRSTTOUCH);
 	kstack_cache_size = imax(128, mp_ncpus * 4);
@@ -691,11 +692,15 @@ vm_cap_allows_prot(const void * __capability cap, vm_prot_t prot)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

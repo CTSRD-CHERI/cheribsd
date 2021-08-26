@@ -916,14 +916,14 @@ linker_debug_lookup(const char *symstr, c_linker_sym_t *sym)
 #endif
 
 static int
-linker_debug_search_symbol(caddr_t value, c_linker_sym_t *sym, long *diffp)
+linker_debug_search_symbol(ptraddr_t value, c_linker_sym_t *sym, long *diffp)
 {
 	linker_file_t lf;
 	c_linker_sym_t best, es;
 	u_long diff, bestdiff, off;
 
 	best = 0;
-	off = (uintptr_t)value;
+	off = value;
 	bestdiff = off;
 	TAILQ_FOREACH(lf, &linker_files, link) {
 		if (LINKER_SEARCH_SYMBOL(lf, value, &es, &diff) != 0)
@@ -959,7 +959,7 @@ linker_debug_symbol_values(c_linker_sym_t sym, linker_symval_t *symval)
 }
 
 static int
-linker_debug_search_symbol_name(caddr_t value, char *buf, u_int buflen,
+linker_debug_search_symbol_name(ptraddr_t value, char *buf, u_int buflen,
     long *offset)
 {
 	linker_symval_t symval;
@@ -995,7 +995,7 @@ linker_ddb_lookup(const char *symstr, c_linker_sym_t *sym)
 #endif
 
 int
-linker_ddb_search_symbol(caddr_t value, c_linker_sym_t *sym, long *diffp)
+linker_ddb_search_symbol(ptraddr_t value, c_linker_sym_t *sym, long *diffp)
 {
 
 	return (linker_debug_search_symbol(value, sym, diffp));
@@ -1009,7 +1009,7 @@ linker_ddb_symbol_values(c_linker_sym_t sym, linker_symval_t *symval)
 }
 
 int
-linker_ddb_search_symbol_name(caddr_t value, char *buf, u_int buflen,
+linker_ddb_search_symbol_name(ptraddr_t value, char *buf, u_int buflen,
     long *offset)
 {
 
@@ -1021,7 +1021,7 @@ linker_ddb_search_symbol_name(caddr_t value, char *buf, u_int buflen,
  * obey locking protocols, and offer a significantly less complex interface.
  */
 int
-linker_search_symbol_name_flags(caddr_t value, char *buf, u_int buflen,
+linker_search_symbol_name_flags(ptraddr_t value, char *buf, u_int buflen,
     long *offset, int flags)
 {
 	int error;
@@ -1042,7 +1042,7 @@ linker_search_symbol_name_flags(caddr_t value, char *buf, u_int buflen,
 }
 
 int
-linker_search_symbol_name(caddr_t value, char *buf, u_int buflen,
+linker_search_symbol_name(ptraddr_t value, char *buf, u_int buflen,
     long *offset)
 {
 
@@ -1377,7 +1377,7 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 	struct kld_sym_lookup lookup;
 	int error;
 
-	error = copyin(uap->data, &lookup, sizeof(lookup));
+	error = copyincap(uap->data, &lookup, sizeof(lookup));
 	if (error != 0)
 		return (error);
 	if (lookup.version != sizeof(lookup) ||
@@ -1387,7 +1387,9 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 	    lookup.symname, &lookup.symvalue, &lookup.symsize);
 	if (error != 0)
 		return (error);
-	error = copyout(&lookup, uap->data, sizeof(lookup));
+	error = copyout(&lookup.symvalue, (char * __capability)uap->data +
+	    offsetof(struct kld_sym_lookup, symvalue), sizeof(lookup) -
+	    offsetof(struct kld_sym_lookup, symvalue));
 
 	return (error);
 }
@@ -2307,10 +2309,14 @@ SYSCTL_PROC(_kern, OID_AUTO, function_list,
     "kernel function list");
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

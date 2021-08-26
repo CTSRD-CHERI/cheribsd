@@ -58,6 +58,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/elf.h>
 #include <machine/md_var.h>
 
+#include "linker_if.h"
+
 static const char *riscv_machine_arch(struct proc *p);
 
 u_long elf_hwcap;
@@ -81,15 +83,15 @@ struct sysentvec elf_freebsd_sysvec = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct ps_strings),
 	.sv_stackprot	= VM_PROT_RW_CAP,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings	= exec_copyout_strings,
 	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP | SV_ASLR |
-	    SV_RNG_SEED_VER |
+	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP | SV_TIMEKEEP |
+	    SV_ASLR | SV_RNG_SEED_VER |
 #if __has_feature(capabilities)
 	    SV_CHERI,
 #else
@@ -255,6 +257,9 @@ static const struct type2str_ent t2s[] = {
 	{ R_RISCV_HI20,		"R_RISCV_HI20"		},
 	{ R_RISCV_LO12_I,	"R_RISCV_LO12_I"	},
 	{ R_RISCV_LO12_S,	"R_RISCV_LO12_S"	},
+#ifdef __CHERI_PURE_CAPABILITY__
+	{ R_RISCV_CHERI_CAPABILITY, "R_RISCV_CHERI_CAPABILITY" },
+#endif
 };
 
 static const char *
@@ -287,12 +292,15 @@ elf_is_ifunc_reloc(Elf_Size r_info __unused)
  * FIXME: only RISCV64 is supported.
  */
 static int
-elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
     int type, int local, elf_lookup_fn lookup)
 {
 	Elf_Size rtype, symidx;
 	const Elf_Rela *rela;
 	Elf_Addr val, addr;
+#ifdef __CHERI_PURE_CAPABILITY__
+	uintcap_t beforecap, cap;
+#endif
 	Elf64_Addr *where;
 	Elf_Addr addend;
 	uint32_t before32_1;
@@ -339,7 +347,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 
 	case R_RISCV_RELATIVE:
 		before64 = *where;
-		*where = elf_relocaddr(lf, relocbase + addend);
+		*where = elf_relocaddr(lf, (Elf_Addr)relocbase + addend);
 		if (debug_kld)
 			printf("%p %c %-24s %016lx -> %016lx\n", where,
 			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
@@ -492,6 +500,22 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 			    before32, *insn32p);
 		break;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	case R_RISCV_CHERI_CAPABILITY:
+		error = LINKER_SYMIDX_CAPABILITY(lf, symidx, 1, &cap);
+		if (error != 0)
+			return (-1);
+
+		cap += addend;
+		beforecap = *(uintcap_t *)where;
+		*(uintcap_t *)where = cap;
+		if (debug_kld)
+			printf("%p %c %-24s %#lp -> %#lp\n", where,
+			    (local ? 'l' : 'g'), reloctype_to_str(rtype),
+			    (void * __capability)beforecap,
+			    (void * __capability)cap);
+		break;
+#endif
 	default:
 		printf("kldload: unexpected relocation type %ld, "
 		    "symbol index %ld\n", rtype, symidx);
@@ -502,7 +526,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 }
 
 int
-elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
+elf_reloc(linker_file_t lf, char *relocbase, const void *data, int type,
     elf_lookup_fn lookup)
 {
 
@@ -510,7 +534,7 @@ elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
 }
 
 int
-elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_local(linker_file_t lf, char *relocbase, const void *data,
     int type, elf_lookup_fn lookup)
 {
 
@@ -537,3 +561,12 @@ elf_cpu_parse_dynamic(caddr_t loadbase __unused, Elf_Dyn *dynamic __unused)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

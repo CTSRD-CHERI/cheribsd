@@ -39,5 +39,9 @@ void
 _set_tp(void *tp)
 {
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	asm volatile("msr	ctpidr_el0, %0" : : "C"(tp));
+#else
 	asm volatile("msr	tpidr_el0, %0" : : "r"(tp));
+#endif
 }

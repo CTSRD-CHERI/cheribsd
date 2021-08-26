@@ -678,14 +678,13 @@ static const char *npstr[] = {
 };
 
 /* isakmp->np */
-typedef const u_char *npfunc_t(netdissect_options *ndo, u_char tpay,
+static const u_char *(*npfunc[])(netdissect_options *ndo, u_char tpay,
 				 const struct isakmp_gen *ext,
 				 u_int item_len,
 				 const u_char *end_pointer,
 				 uint32_t phase,
 				 uint32_t doi0,
-				 uint32_t proto0, int depth);
-static npfunc_t *npfunc[]= {
+				 uint32_t proto0, int depth) = {
 	NULL,
 	ikev1_sa_print,
 	ikev1_p_print,
@@ -749,7 +748,7 @@ static const char *etypestr[] = {
 
 #define NPFUNC(x) \
 	(((x) < sizeof(npfunc)/sizeof(npfunc[0]) && npfunc[(x)]) \
-		? npfunc[(x)] : (npfunc_t *)NULL)
+		? npfunc[(x)] : NULL)
 
 static int
 iszero(const u_char *p, size_t l)
@@ -863,7 +862,7 @@ hexprint(netdissect_options *ndo, const uint8_t *loc, size_t len)
 static int
 rawprint(netdissect_options *ndo, const uint8_t *loc, size_t len)
 {
-	ND_TCHECK2(*(const u_char *)loc, len);
+	ND_TCHECK2(*loc, len);
 
 	hexprint(ndo, loc, len);
 	return 1;
@@ -3035,14 +3034,6 @@ isakmp_print(netdissect_options *ndo,
 	     const u_char *bp, u_int length,
 	     const u_char *bp2)
 {
-	INVOKE_DISSECTOR(_isakmp_print, ndo, bp, length, bp2);
-}
-
-void
-_isakmp_print(netdissect_options *ndo,
-	     const u_char *bp, u_int length,
-	     const u_char *bp2)
-{
 	const struct isakmp *p;
 	struct isakmp base;
 	const u_char *ep;
@@ -3105,17 +3096,6 @@ isakmp_rfc3948_print(netdissect_options *ndo,
 		     const u_char *bp, u_int length,
 		     const u_char *bp2)
 {
-	INVOKE_DISSECTOR(_isakmp_rfc3948_print, ndo, bp, length, bp2);
-}
-
-void
-_isakmp_rfc3948_print(netdissect_options *ndo,
-		     const u_char *bp, u_int length,
-		     const u_char *bp2)
-{
-	const u_char *ep;
-	ep = ndo->ndo_snapend;
-
 	ND_TCHECK(bp[0]);
 	if(length == 1 && bp[0]==0xff) {
 		ND_PRINT((ndo, "isakmp-nat-keep-alive"));
@@ -3143,7 +3123,7 @@ _isakmp_rfc3948_print(netdissect_options *ndo,
 
 		ND_PRINT((ndo, "UDP-encap: "));
 
-		advance = _esp_print(ndo, bp, length, bp2, &enh, &padlen);
+		advance = esp_print(ndo, bp, length, bp2, &enh, &padlen);
 		if(advance <= 0)
 			return;
 

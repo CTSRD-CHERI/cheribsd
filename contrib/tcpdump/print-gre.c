@@ -87,12 +87,6 @@ static int gre_sre_asn_print(netdissect_options *, uint8_t, uint8_t, const u_cha
 void
 gre_print(netdissect_options *ndo, const u_char *bp, u_int length)
 {
-	INVOKE_DISSECTOR(_gre_print, ndo, bp, length);
-}
-
-void
-_gre_print(netdissect_options *ndo, const u_char *bp, u_int length)
-{
 	u_int len = length, vers;
 
 	ND_TCHECK2(*bp, 2);

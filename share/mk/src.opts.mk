@@ -224,9 +224,6 @@ __DEFAULT_NO_OPTIONS = \
     SVN \
     ZONEINFO_LEAPSECONDS_SUPPORT \
 
-__DEFAULT_NO_OPTIONS+= \
-    LIBCHERI
-
 __DEFAULT_YES_OPTIONS+=	\
 	COMPAT_CHERIABI \
 	CHERIBSDBOX
@@ -291,7 +288,7 @@ __LLVM_TARGET_FILT=	C/(amd64|i386)/x86/:C/powerpc.*/powerpc/:C/armv[67]/arm/:C/r
 .if ${__T:${__LLVM_TARGET_FILT}} == ${__llt}
 __DEFAULT_YES_OPTIONS+=	LLVM_TARGET_${__llt:${__LLVM_TARGET_FILT}:tu}
 # aarch64 needs arm for -m32 support.
-.elif ${__T} == "aarch64" && ${__llt:Marm*} != ""
+.elif ${__T:Maarch64*} && ${__llt:Marm*} != ""
 __DEFAULT_DEPENDENT_OPTIONS+=	LLVM_TARGET_ARM/LLVM_TARGET_AARCH64
 # Default the rest of the LLVM_TARGETs to the value of MK_LLVM_TARGET_ALL.
 .else
@@ -327,7 +324,7 @@ BROKEN_OPTIONS+=OFED
 .endif
 
 # In-tree gdb is an older versions without modern architecture support.
-.if ${__T} == "aarch64" || ${__T:Mriscv*} != ""
+.if ${__T:Maarch64*} || ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=GDB
 .endif
 .if ${__T:Mriscv*} != ""
@@ -344,8 +341,8 @@ __DEFAULT_YES_OPTIONS+=LIB32
 .else
 BROKEN_OPTIONS+=LIB32
 .endif
-# LIB64 on mips64*c* and riscv64*c*
-.if ${__T:Mmips64*c*} || ${__T:Mriscv64*c*}
+# LIB64 is supported on aarch64*c*, mips64*c* and riscv64*c*
+.if ${__T:Maarch64*c*} || ${__T:Mmips64*c*} || ${__T:Mriscv64*c*}
 __DEFAULT_YES_OPTIONS+=LIB64
 # In principle, LIB32 could work on architectures where it's supported, but
 # Makefile.libcompat only supports one compat layer.
@@ -356,6 +353,12 @@ BROKEN_OPTIONS+=LIB64
 # Only doing soft float API stuff on armv6 and armv7
 .if ${__T} != "armv6" && ${__T} != "armv7"
 BROKEN_OPTIONS+=LIBSOFT
+.endif
+# XXX: Fails to link due to old broken C++ mangling; remove once
+# https://git.morello-project.org/morello/llvm-project/-/merge_requests/23
+# has been merged.
+.if ${__T:Maarch64*c*}
+BROKEN_OPTIONS+=GOOGLETEST
 .endif
 .if ${__T:Mmips*}
 # GOOGLETEST cannot currently be compiled on mips due to external circumstances.
@@ -372,7 +375,9 @@ BROKEN_OPTIONS+=GOOGLETEST SSP
 BROKEN_OPTIONS+=NS_CACHING
 .endif
 
-.if ${__C} == "cheri" || ${__T:Mmips64*c*} || ${__T:Mriscv*c*} || ${.MAKE.OS} == "Linux"
+.if ${__C} == "cheri" || ${__C} == "morello" || \
+    ${__T:Maarch64*c*} || ${__T:Mmips64*c*} || ${__T:Mriscv*c*} || \
+    ${.MAKE.OS} == "Linux"
 # Broken post OpenZFS import
 BROKEN_OPTIONS+=CDDL ZFS
 .endif
@@ -380,19 +385,10 @@ BROKEN_OPTIONS+=CDDL ZFS
 .if ${__T:Mriscv*c*}
 # Crash in ZFS code. TODO: investigate
 BROKEN_OPTIONS+=CDDL
-
-# Some compilation failure: TODO: investigate
-BROKEN_OPTIONS+=SVN SVNLITE
-.endif
-
-# libcheri is MIPS-specific and requires CHERI
-.if !${__T:Mmips64*} || (${__C} != "cheri" && !${__T:Mmips64*c*})
-BROKEN_OPTIONS+=LIBCHERI
 .endif
 
 # EFI doesn't exist on mips or powerpc.
-# It's also broken on purecap.
-.if ${__T:Mmips*} || ${__T:Mpowerpc*} || ${__T:Mriscv64*c*}
+.if ${__T:Mmips*} || ${__T:Mpowerpc*}
 BROKEN_OPTIONS+=EFI
 .endif
 # OFW is only for powerpc, exclude others
@@ -415,7 +411,7 @@ BROKEN_OPTIONS+=LOADER_GELI LOADER_LUA
 # profiling won't work on MIPS64 because there is only assembly for o32
 BROKEN_OPTIONS+=PROFILE
 .endif
-.if ${__T} != "aarch64" && ${__T} != "amd64" && ${__T} != "i386" && \
+.if !${__T:Maarch64*} && ${__T} != "amd64" && ${__T} != "i386" && \
     ${__T} != "powerpc64"
 BROKEN_OPTIONS+=CXGBETOOL
 BROKEN_OPTIONS+=MLX5TOOL
@@ -424,7 +420,8 @@ BROKEN_OPTIONS+=MLX5TOOL
 # We'd really like this to be:
 #    !${MACHINE_CPU:Mcheri} || ${MACHINE_ABI:Mpurecap}
 # but that logic doesn't work in Makefile.inc1...
-.if ${__C} != "cheri" || (${__T:Mmips64*c*} || ${__T:Mriscv64*c*})
+.if (${__C} != "cheri" && ${__C} != "morello") || \
+    (${__T:Maarch64*c*} || ${__T:Mmips64*c*} || ${__T:Mriscv64*c*})
 BROKEN_OPTIONS+=COMPAT_CHERIABI
 .endif
 
@@ -438,8 +435,8 @@ BROKEN_OPTIONS+=CLANG LLD
 BROKEN_OPTIONS+=HYPERV
 .endif
 
-# NVME is only aarch64, x86 and powerpc64*
-.if ${__T} != "aarch64" && ${__T} != "amd64" && ${__T} != "i386" && \
+# NVME is only aarch64*, x86 and powerpc64*
+.if !${__T:Maarch64*} && ${__T} != "amd64" && ${__T} != "i386" && \
     ${__T:Mpowerpc64*} == ""
 BROKEN_OPTIONS+=NVME
 .endif
@@ -449,6 +446,7 @@ BROKEN_OPTIONS+=NVME
 BROKEN_OPTIONS+=GOOGLETEST
 .endif
 
+# XXX: Does not yet build for aarch64c
 .if ${__T} == "aarch64" || ${__T} == "amd64" || ${__T} == "i386" || \
     ${__T:Mpowerpc64*} != ""
 __DEFAULT_YES_OPTIONS+=OPENMP

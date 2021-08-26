@@ -61,7 +61,7 @@ ATF_TC_BODY(dlopen_hybrid_fail, tc)
 	snprintf(error_msg, sizeof(error_msg),
 	    "%s/%s: cannot load %s/../%s since it is not CheriABI (e_flags=0x30%x0007)",
 	    exedir, "dlopen-purecap", exedir, "libbasic_hybrid.so.0", GOOD_CHERI_MACH);
-#elif defined(__riscv)
+#elif defined(__riscv) || defined(__aarch64__)
 	snprintf(error_msg, sizeof(error_msg),
 	    "%s/%s: cannot load %s/../%s since it is not CheriABI",
 	    exedir, "dlopen-purecap", exedir, "libbasic_hybrid.so.0");
@@ -109,7 +109,7 @@ ATF_TC_BODY(dlopen_nocheri_fail, tc)
 	snprintf(error_msg, sizeof(error_msg),
 	    "%s/%s: cannot load %s/../%s since it is not CHERI-" __XSTRING(_MIPS_SZCAP)
 	    " (e_flags=0x30000007)", exedir, "dlopen-purecap", exedir, "libbasic_nocheri.so.0");
-#elif defined(__riscv)
+#elif defined(__riscv) || (__aarch64__)
 	/*
 	 * RISC-V has no CHERI vs non-CHERI distinction in its flags (just like all
 	 * extensions other than C, which influences linker relaxation). We

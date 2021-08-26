@@ -105,16 +105,14 @@ static inline pfil_packet_t
 pfil_packet_align(pfil_packet_t p)
 {
 
-	return ((pfil_packet_t ) (((uintptr_t)(p).mem +
-	    (_Alignof(void *) - 1)) & - _Alignof(void *)));
+	return ((pfil_packet_t) roundup2((p).mem, _Alignof(void *)));
 }
 
 static inline struct mbuf *
 pfil_mem2mbuf(void *v)
 {
 
-	return (*(struct mbuf **) (((uintptr_t)(v) +
-	    (_Alignof(void *) - 1)) & - _Alignof(void *)));
+	return (*(struct mbuf **) roundup2(v, _Alignof(void *)));
 }
 
 typedef enum {
@@ -212,3 +210,12 @@ int	pfil_realloc(pfil_packet_t *, int, struct ifnet *);
 
 #endif /* _KERNEL */
 #endif /* _NET_PFIL_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190603,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

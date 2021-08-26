@@ -271,13 +271,6 @@ void
 cfm_print(netdissect_options *ndo,
           register const u_char *pptr, register u_int length)
 {
-	INVOKE_DISSECTOR(_cfm_print, ndo, pptr, length);
-}
-
-void
-_cfm_print(netdissect_options *ndo,
-          register const u_char *pptr, register u_int length)
-{
     const struct cfm_common_header_t *cfm_common_header;
     const struct cfm_tlv_header_t *cfm_tlv_header;
     const uint8_t *tptr, *tlv_ptr;

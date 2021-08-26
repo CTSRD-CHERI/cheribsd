@@ -1676,13 +1676,6 @@ void
 forces_print(netdissect_options *ndo,
              register const u_char * pptr, register u_int len)
 {
-	INVOKE_DISSECTOR(_forces_print, ndo, pptr, len);
-}
-
-void
-_forces_print(netdissect_options *ndo,
-             register const u_char * pptr, register u_int len)
-{
 	const struct forcesh *fhdr;
 	u_int mlen;
 	uint32_t flg_raw;

@@ -212,20 +212,20 @@ edsc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct ifreq		*ifr = (struct ifreq *)data;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 #if 1
 		/*
 		 * Just turn on any capabilities requested.
 		 * The generic ifioctl() function has already made sure
 		 * that they are supported, i.e., set in if_capabilities.
 		 */
-		ifp->if_capenable = ifr_reqcap_get(ifr);
+		ifp->if_capenable = ifr->ifr_reqcap;
 #else
 		/*
 		 * A h/w driver would need to analyze the requested
 		 * bits and program the hardware, e.g.:
 		 */
-		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
+		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
 
 		if (mask & IFCAP_VLAN_HWTAGGING) {
 			ifp->if_capenable ^= IFCAP_VLAN_HWTAGGING;
@@ -375,10 +375,9 @@ static moduledata_t edsc_mod = {
 DECLARE_MODULE(if_edsc, edsc_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net",
 //     "user_capabilities"
 //   ]
 // }

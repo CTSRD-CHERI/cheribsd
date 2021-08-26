@@ -182,8 +182,6 @@ do_copy_relocations(Obj_Entry *dstobj)
 }
 #endif  /* !defined(__CHERI_PURE_CAPABILITY) */
 
-void _rtld_relocate_nonplt_self(Elf_Dyn *, caddr_t);
-
 /*
  * It is possible for the compiler to emit relocations for unaligned data.
  * We handle this situation with these inlines.
@@ -235,9 +233,24 @@ store_ptr(void *where, Elf_Sxword val, size_t len)
 #endif
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+void _rtld_relocate_nonplt_self(Elf_Auxinfo *auxv, Elf_Dyn *dynp);
+void
+_rtld_relocate_nonplt_self(Elf_Auxinfo *auxv, Elf_Dyn *dynp)
+{
+	caddr_t relocbase = NULL;
+	for (Elf_Auxinfo *auxp = auxv; auxp->a_type != AT_NULL; auxp++) {
+		if (auxp->a_type == AT_BASE) {
+			relocbase = auxp->a_un.a_ptr;
+			break;
+		}
+	}
+#else
+void _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase);
 void
 _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 {
+#endif
 	/*
 	 * Warning: global capabilities have not been initialized yet so we
 	 * can't call any functions here (only ones with __always_inline)
@@ -494,7 +507,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 {
 	const Elf_Rel *rel;
 	const Elf_Rel *rellim;
-	Elf_Addr *got = obj->pltgot;
+	Elf_Addr *got = (Elf_Addr *)obj->pltgot;
 	const Elf_Sym *sym, *def;
 	const Obj_Entry *defobj;
 	Elf_Word i;
@@ -621,7 +634,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		++got;
 	}
 
-	got = obj->pltgot;
+	got = (Elf_Addr *)obj->pltgot;
 	rellim = (const Elf_Rel *)((const char *)obj->rel + obj->relsize);
 	for (rel = obj->rel; rel < rellim; rel++) {
 		Elf_Word	r_symndx, r_type;

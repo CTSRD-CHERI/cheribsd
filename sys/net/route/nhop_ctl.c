@@ -94,8 +94,10 @@ static void print_nhop(const char *prefix, const struct nhop_object *nh);
 
 _Static_assert(__offsetof(struct nhop_object, nh_ifp) == 32,
     "nhop_object: wrong nh_ifp offset");
+#ifndef __CHERI_PURE_CAPABILITY__
 _Static_assert(sizeof(struct nhop_object) <= 128,
     "nhop_object: size exceeds 128 bytes");
+#endif
 
 static uma_zone_t nhops_zone;	/* Global zone for each and every nexthop */
 
@@ -874,3 +876,13 @@ nhops_dump_sysctl(struct rib_head *rh, struct sysctl_req *w)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "unsupported"
+//   ],
+//   "change_comment": "nhop struct grows above the limit"
+// }
+// CHERI CHANGES END

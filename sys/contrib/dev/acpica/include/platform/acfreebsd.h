@@ -155,7 +155,9 @@
 
 #include <sys/types.h>
 
-#ifdef __LP64__
+#ifdef __PTRADDR_WIDTH__
+#define ACPI_MACHINE_WIDTH      __PTRADDR_WIDTH__
+#elif defined(__LP64__)
 #define ACPI_MACHINE_WIDTH      64
 #else
 #define ACPI_MACHINE_WIDTH      32

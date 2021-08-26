@@ -506,7 +506,7 @@ lance_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		LE_LOCK(sc);
 		if (ifp->if_flags & IFF_PROMISC) {
 			if (!(sc->sc_flags & LE_PROMISC)) {
@@ -552,8 +552,8 @@ lance_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		LE_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		/*
 		 * Multicast list has changed; set the hardware filter
 		 * accordingly.
@@ -565,7 +565,7 @@ lance_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_media, cmd);
 		break;
 
@@ -823,12 +823,3 @@ lance_zerobuf_gap16(struct lance_softc *sc, int boff, int len)
 	}
 }
 #endif /* Example only */
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

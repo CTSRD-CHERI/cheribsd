@@ -76,7 +76,7 @@ sys_break(struct thread *td, struct break_args *uap)
 	uintptr_t addr;
 	int error;
 
-	addr = (__cheri_addr uintptr_t)uap->nsize;
+	addr = (uintptr_t)(uintcap_t)uap->nsize;
 	error = kern_break(td, &addr);
 	if (error == 0)
 		td->td_retval[0] = addr;
@@ -188,7 +188,7 @@ kern_break(struct thread *td, uintptr_t *addr)
 			rv = vm_map_wire_locked(map, old, new,
 			    VM_MAP_WIRE_USER | VM_MAP_WIRE_NOHOLES);
 			if (rv != KERN_SUCCESS)
-				(void)vm_map_delete(map, old, new);
+				(void)vm_map_delete(map, old, new, false);
 		}
 		if (rv != KERN_SUCCESS) {
 #ifdef RACCT
@@ -218,7 +218,7 @@ kern_break(struct thread *td, uintptr_t *addr)
 			error = ENOMEM;
 			goto done;
 		}
-		rv = vm_map_delete(map, new, old);
+		rv = vm_map_delete(map, new, old, false);
 		if (rv != KERN_SUCCESS) {
 			error = ENOMEM;
 			goto done;

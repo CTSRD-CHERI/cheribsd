@@ -159,7 +159,7 @@ static const int linux_errtbl[ELAST + 1] = {
 	[EPROT] = -LINUX_EINVAL,	/* XXX */
 };
 
-_Static_assert(ELAST == 99,
+_Static_assert(ELAST == 98,
     "missing errno entries in linux_errtbl");
 
 static const int linux_to_bsd_errtbl[LINUX_ELAST + 1] = {

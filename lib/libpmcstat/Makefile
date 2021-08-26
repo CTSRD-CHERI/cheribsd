@@ -1,7 +1,7 @@
 # $FreeBSD$
 
 # XXX: not at all purecap clean, but we need the headers...
-NO_WERROR=
+MK_WERROR=	no
 
 PACKAGE=lib${LIB}
 LIB=	pmcstat

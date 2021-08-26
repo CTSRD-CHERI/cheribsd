@@ -72,7 +72,8 @@ struct image_params {
 	unsigned long start_addr; /* start of mapped image (including bss) */
 	unsigned long end_addr;   /* end of mapped image (including bss) */
 	unsigned long reloc_base; /* load address of image */
-	unsigned long interp_end; /* end address of RTLD mapping (or zero) */
+	unsigned long interp_start; /* start of RTLD mapping (or zero) */
+	unsigned long interp_end;   /* end address of RTLD mapping (or zero) */
 	char vmspace_destroyed;	/* flag - we've blown away original vm space */
 #define IMGACT_SHELL	0x1
 #define IMGACT_BINMISC	0x2
@@ -81,11 +82,13 @@ struct image_params {
 	char *interpreter_name;	/* name of the interpreter */
 	void *auxargs;		/* ELF Auxinfo structure pointer */
 	struct sf_buf *firstpage;	/* first page that we mapped */
+	void * __capability strings;	/* pointer to string space (user) */
 	void * __capability ps_strings;	/* pointer to ps_string (user space) */
 	struct image_args *args;	/* system call arguments */
 	struct sysentvec *sysent;	/* system entry vector */
 	void * __capability argv;	/* pointer to argv (user space) */
 	void * __capability envv;	/* pointer to envv (user space) */
+	void * __capability auxv;	/* pointer to auxv (user space) */
 	char *execpath;
 	void * __capability execpathp;
 	char *freepath;
@@ -94,6 +97,7 @@ struct image_params {
 	void * __capability pagesizes;
 	int pagesizeslen;
 	void * __capability capv;	/* pointer to capv (user space) */
+	void * __capability stack;
 	vm_prot_t stack_prot;
 	u_long stack_sz;
 	u_long eff_stack_sz;
@@ -101,6 +105,7 @@ struct image_params {
 	bool credential_setid;		/* true if becoming setid */
 	bool textset;
 	u_int map_flags;
+	void * __capability imgact_capability;	/* copyout and mapping cap */
 };
 
 #ifdef _KERNEL

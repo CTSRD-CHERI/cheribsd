@@ -56,6 +56,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/kenv.h>
 #include <sys/limits.h>
 
+#include <cheri/cheric.h>
+
 #include <security/mac/mac_framework.h>
 
 static char *_getenv_dynamic_locked(const char *name, int *idx);
@@ -306,6 +308,11 @@ init_static_kenv(char *buf, size_t len)
 	if (!getenv_is_true("loader_env.disabled")) {
 		md_envp = buf;
 		md_env_len = len;
+#ifdef __CHERI_PURE_CAPABILITY__
+		if (len != 0)
+			KASSERT(cheri_getlen(md_envp) == len,
+			    ("unbounded static kenv"));
+#endif
 		md_env_pos = 0;
 
 		if (getenv_is_true("static_env.disabled")) {
@@ -454,7 +461,7 @@ _getenv_static_from(char *chkenv, const char *name)
 		len = ep - cp;
 		ep++;
 		if (!strncmp(name, cp, len) && name[len] == 0)
-			return (ep);
+			return (cheri_kern_setbounds(ep, strlen(ep) + 1));
 	}
 	return (NULL);
 }

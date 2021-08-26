@@ -489,13 +489,6 @@ void
 lspping_print(netdissect_options *ndo,
               register const u_char *pptr, register u_int len)
 {
-	INVOKE_DISSECTOR(_lspping_print, ndo, pptr, len);
-}
-
-void
-_lspping_print(netdissect_options *ndo,
-              register const u_char *pptr, register u_int len)
-{
     const struct lspping_common_header *lspping_com_header;
     const struct lspping_tlv_header *lspping_tlv_header;
     const struct lspping_tlv_header *lspping_subtlv_header;

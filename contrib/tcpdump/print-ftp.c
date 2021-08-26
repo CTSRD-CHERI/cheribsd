@@ -28,11 +28,5 @@
 void
 ftp_print(netdissect_options *ndo, const u_char *pptr, u_int len)
 {
-	INVOKE_DISSECTOR(_ftp_print, ndo, pptr, len);
-}
-
-void
-_ftp_print(netdissect_options *ndo, const u_char *pptr, u_int len)
-{
 	txtproto_print(ndo, pptr, len, "ftp", NULL, 0);
 }

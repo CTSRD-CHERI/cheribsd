@@ -2024,8 +2024,7 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 				data->header.data_len[1] +
 				sizeof(struct cd_sub_channel_header)));
 			cam_periph_unlock(periph);
-			error = copyout(data, __USER_CAP_UNBOUND(args->data),
-			    len);
+			error = copyout(data, args->data, len);
 			free(data, M_SCSICD);
 		}
 		break;

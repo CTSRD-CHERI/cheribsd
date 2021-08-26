@@ -70,6 +70,7 @@ struct nfsv3_diskless {
 	char		my_hostnam[MAXHOSTNAMELEN]; /* Client host name */
 };
 
+#ifdef _KERNEL
 /*
  * Old arguments to mount NFS
  */
@@ -92,6 +93,7 @@ struct onfs_args {
 	int		deadthresh;	/* Retrans threshold */
 	char		*hostname;	/* server's name */
 };
+#endif
 
 struct nfs_diskless {
 	struct ifaliasreq myif;			/* Default interface */

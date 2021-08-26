@@ -29,6 +29,10 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Exercise CHERI functions without an expectation of a signal.
+ */
+
 #include <sys/cdefs.h>
 
 #if !__has_feature(capabilities)
@@ -59,8 +63,7 @@
 #include "cheribsdtest.h"
 
 #ifdef __mips__
-void
-test_copyregs(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_copyregs, "Exercise CP2 register assignments")
 {
 
 	__asm__ __volatile__(
@@ -77,8 +80,8 @@ test_copyregs(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_listregs(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_listregs, "Print out a list of CP2 registers and values",
+    .ct_flags = CT_FLAG_STDOUT_IGNORE)
 {
 
 	/*
@@ -167,7 +170,7 @@ check_initreg_code(void * __capability c)
 	/* Offset. */
 	CHERIBSDTEST_VERIFY(cheri_getoffset(c) == 0);
 
-	/* Type -- should be (-1) for an unsealed capability. */
+	/* Type -- should have unsealed type. */
 	v = cheri_gettype(c);
 	if (v != (uintmax_t)CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
@@ -225,7 +228,8 @@ check_initreg_code(void * __capability c)
 
 	if ((v & CHERI_PERMS_SWALL) !=
 	    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
-		cheribsdtest_failure_errx("perms %jx (expected swperms %x)", v,
+		cheribsdtest_failure_errx("swperms %jx (expected swperms %x)",
+		    v & CHERI_PERMS_SWALL,
 		    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP));
 
 	/* Check that the raw permission bits match the kernel header: */
@@ -260,17 +264,18 @@ check_initreg_data_full_addrspace(void * __capability c)
 		cheribsdtest_failure_errx("offset %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_CAP_USER_DATA_OFFSET);
 
-	/* Type -- should be (-1) for an unsealed capability. */
+	/* Type -- should have unsealed type. */
 	v = cheri_gettype(c);
-	if (v != 0xffffffffffffffff)
+	if (v != (uintmax_t)CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)0xffffffffffffffff);
+		    (uintmax_t)CHERI_OTYPE_UNSEALED);
 
 	/* Permissions. */
 	v = cheri_getperm(c);
-	if (v != CHERI_CAP_USER_DATA_PERMS)
+	if (v != (CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_CHERIABI_VMMAP))
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
-		    (uintmax_t)CHERI_CAP_USER_DATA_PERMS);
+		    (uintmax_t)CHERI_CAP_USER_DATA_PERMS |
+		    CHERI_PERM_CHERIABI_VMMAP);
 
 	/*
 	 * More overt tests for permissions that should -- or should not -- be
@@ -311,8 +316,8 @@ check_initreg_data_full_addrspace(void * __capability c)
 		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
 
 	if ((v & CHERI_PERMS_SWALL) != CHERI_PERMS_SWALL)
-		cheribsdtest_failure_errx("perms %jx (expected swperms %x)", v,
-		    CHERI_PERMS_SWALL);
+		cheribsdtest_failure_errx("swperms %jx (expected swperms %x)",
+		    v & CHERI_PERMS_SWALL, CHERI_PERMS_SWALL);
 
 	/* Sealed bit. */
 	v = cheri_getsealed(c);
@@ -327,8 +332,7 @@ check_initreg_data_full_addrspace(void * __capability c)
 }
 #endif
 
-void
-test_initregs_default(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_initregs_default, "Test initial value of default capability")
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -362,24 +366,22 @@ test_initregs_default(const struct cheri_test *ctp __unused)
 
 #define	CHERI_STACK_USE_MAX	(256 * 1024)
 
-void
-test_initregs_stack_user_perms(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_initregs_stack_user_perms,
+    "Test user permissions of stack capability")
 {
 	register_t v;
 
-	/*
-	 * Note: this test is an expected failure since we set VMMAP
-	 * TODO: move this into test_initregs_stack once it passes
-	 */
 	v = cheri_getperm(cheri_getstack());
 	if ((v & CHERI_PERMS_SWALL) !=
 	    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
-		cheribsdtest_failure_errx("perms %jx (expected swperms %x)", v,
+		cheribsdtest_failure_errx("swperms %jx (expected swperms %x)",
+		    v & CHERI_PERMS_SWALL,
 		    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP));
+	cheribsdtest_success();
 }
 
-void
-test_initregs_stack(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_initregs_stack,
+    "Test initial value of stack capability")
 {
 	void * __capability c = cheri_getstack();
 	register_t v;
@@ -402,10 +404,10 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 		    "(0x%jx)", (intmax_t)CHERI_STACK_USE_MAX,
 		    cheri_getlen(c) - cheri_getoffset(c));
 
-	/* Type -- should be zero for an unsealed capability. */
-	if (cheri_gettype(c) != -1)
+	/* Type -- should have unsealed type. */
+	if (cheri_gettype(c) != CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype 0x%jx (expected 0x%jx)",
-		    cheri_gettype(c), (uintmax_t)0);
+		    cheri_gettype(c), (uintmax_t)CHERI_OTYPE_UNSEALED);
 
 	/* Permissions. */
 	v = cheri_getperm(c);
@@ -450,7 +452,7 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 
 	if (v != CHERI_CAP_USER_DATA_PERMS)
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
-		    (uintmax_t)CHERI_CAP_USER_DATA_PERMS);
+		    (uintmax_t)(CHERI_CAP_USER_DATA_PERMS));
 
 	/* Sealed bit. */
 	v = cheri_getsealed(c);
@@ -464,8 +466,7 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_initregs_returncap(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_initregs_returncap, "Test value of return capability")
 {
 	void *c;
 	uintmax_t v;
@@ -497,12 +498,12 @@ test_initregs_returncap(const struct cheri_test *ctp __unused)
 #endif
 
 #ifdef __mips__
-void
-test_initregs_idc(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_initregs_idc,
+    "Test initial value of invoked data capability")
 {
 
 #ifndef __CHERI_PURE_CAPABILITY__
-	check_initreg_data_full_addrspace(cheri_getidc());
+	CHERIBSDTEST_CHECK_EQ_CAP(cheri_getidc(), NULL);
 #else
 	void* __capability cgp = __builtin_mips_cheri_get_captable();
 	uintmax_t perms = cheri_getperm(cgp);
@@ -540,8 +541,8 @@ test_initregs_idc(const struct cheri_test *ctp __unused)
 }
 #endif
 
-void
-test_initregs_pcc(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_initregs_pcc,
+    "Test initial value of program-counter capability")
 {
 	void * __capability c;
 
@@ -550,3 +551,41 @@ test_initregs_pcc(const struct cheri_test *ctp __unused)
 	c = cheri_setoffset(c, 0);
 	check_initreg_code(c);
 }
+
+#ifdef __aarch64__
+CHERIBSDTEST(test_initregs_restricted_default,
+    "Test initial value of restricted default capability")
+{
+	void * __capability c;
+
+	/* XXX: There don't seem to be intrisics; use once they exist */
+	__asm__ ("mrs %0, rddc_el0" : "=C"(c));
+	CHERIBSDTEST_CHECK_EQ_CAP(c, NULL);
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(test_initregs_restricted_stack,
+    "Test initial value of restricted stack capability")
+{
+	void * __capability c;
+
+	/* XXX: There don't seem to be intrisics; use once they exist */
+	__asm__ ("mrs %0, rcsp_el0" : "=C"(c));
+	CHERIBSDTEST_CHECK_EQ_CAP(c, NULL);
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(test_initregs_restricted_thread,
+    "Test initial value of restricted thread capability")
+{
+	void * __capability c;
+
+	/* XXX: There don't seem to be intrisics; use once they exist */
+	__asm__ ("mrs %0, rctpidr_el0" : "=C"(c));
+	CHERIBSDTEST_CHECK_EQ_CAP(c, NULL);
+
+	cheribsdtest_success();
+}
+#endif

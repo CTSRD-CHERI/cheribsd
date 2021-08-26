@@ -733,7 +733,7 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	 */
 	RESTORE_CREGS_FROM_PCB(k1, t0)
 #endif
-	RESTORE_REGS_FROM_PCB(k1)
+	RESTORE_REGS_FROM_PCB(k1, t0)
 
 	mtc0	k0, MIPS_COP_0_STATUS	# still exception level
 	ITLBNOPFIX

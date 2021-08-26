@@ -75,11 +75,6 @@ SYSCTL_UINT(_security_cheri, OID_AUTO, debugger_on_sandbox_unwind, CTLFLAG_RW,
     &security_cheri_debugger_on_sandbox_unwind, 0,
     "Enter KDB when a sandbox is auto-unwound due to a signal");
 
-u_int	security_cheri_debugger_on_sigprot;
-SYSCTL_UINT(_security_cheri, OID_AUTO, debugger_on_sigprot, CTLFLAG_RW,
-    &security_cheri_debugger_on_sigprot, 0,
-    "Enter KDB when SIGPROT is delivered to an unsandboxed thread");
-
 u_int	security_cheri_abort_on_memcpy_tag_loss;
 SYSCTL_UINT(_security_cheri, OID_AUTO, abort_on_memcpy_tag_loss,
     CTLFLAG_RW, &security_cheri_abort_on_memcpy_tag_loss, 0,

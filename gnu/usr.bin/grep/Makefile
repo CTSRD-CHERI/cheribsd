@@ -2,10 +2,6 @@
 
 .include <src.opts.mk>
 
-.if ${MK_CHERI_PURE} == "yes"
-WANT_CHERI=	pure
-.endif
-
 GREP_LIBZ=YES
 
 .if ${MK_BSD_GREP} != "yes"

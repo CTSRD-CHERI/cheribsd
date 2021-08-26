@@ -60,171 +60,23 @@
 
 #include "cheribsdtest.h"
 
-#define	PERM_READ	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
-#define	PERM_WRITE	(CHERI_PERM_STORE | CHERI_PERM_STORE_CAP | \
-			    CHERI_PERM_STORE_LOCAL_CAP)
-#define	PERM_EXEC	CHERI_PERM_EXECUTE
-#define	PERM_RWX	(PERM_READ|PERM_WRITE|PERM_EXEC)
-
-#ifdef CHERI_MMAP_SETBOUNDS
-void
-test_cheriabi_mmap_nospace(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_mmap_unrepresentable,
+    "Test CheriABI mmap() with unrepresentable lengths")
 {
+	int shift = 0;
 	size_t len;
-	void *cap;
-
-	/* Remove all space from the default mmap capability. */
-	len = 0;
-	if (sysarch(CHERI_MMAP_SETBOUNDS, &len) != 0)
-		cheribsdtest_failure_err(
-		    "sysarch(CHERI_MMAP_SETBOUNDS, 0) failed");
-	if ((cap = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
-	    MAP_ANON, -1, 0)) != MAP_FAILED)
-		cheribsdtest_failure_err(
-		    "mmap() returned a a pointer when it should have failed");
-
-	cheribsdtest_success();
-}
-#endif
-
-#ifdef CHERI_MMAP_GETPERM
-void
-test_cheriabi_mmap_perms(const struct cheri_test *ctp __unused)
-{
-	uint64_t perms, operms;
-	void *cap, *tmpcap;
-
-	if (sysarch(CHERI_MMAP_GETPERM, &perms) != 0)
-		cheribsdtest_failure_err("sysarch(CHERI_MMAP_GETPERM) failed");
-
-	/*
-	 * Make sure perms we are going to try removing are there...
-	 */
-	if (!(perms & CHERI_PERM_SW0))
-		cheribsdtest_failure_errx(
-		    "no CHERI_PERM_SW0 in default perms (0x%lx)", perms);
-	if (!(perms & CHERI_PERM_SW2))
-		cheribsdtest_failure_errx(
-		    "no CHERI_PERM_SW2 in default perms (0x%lx)", perms);
-
-	if ((cap = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
-	    MAP_ANON, -1, 0)) == MAP_FAILED)
-		cheribsdtest_failure_err("mmap() failed");
-
-	if (cheri_getperm(cap) != perms)
-		cheribsdtest_failure_errx("mmap() returned with perms 0x%lx "
-		    "instead of expected 0x%lx", cheri_getperm(cap), perms);
-
-	if (munmap(cap, PAGE_SIZE) != 0)
-		cheribsdtest_failure_err("munmap() failed");
-
-	operms = perms;
-	perms = ~CHERI_PERM_SW2;
-	if (sysarch(CHERI_MMAP_ANDPERM, &perms) != 0)
-		cheribsdtest_failure_err("sysarch(CHERI_MMAP_ANDPERM) failed");
-	if (perms != (operms & ~CHERI_PERM_SW2))
-		cheribsdtest_failure_errx("sysarch(CHERI_MMAP_ANDPERM) did not "
-		    "just remove CHERI_PERM_SW2.  Got 0x%lx but "
-		    "expected 0x%lx", perms,
-		    operms & ~CHERI_PERM_SW2);
-	if (sysarch(CHERI_MMAP_GETPERM, &perms) != 0)
-		cheribsdtest_failure_err("sysarch(CHERI_MMAP_GETPERM) failed");
-	if (perms & CHERI_PERM_SW2)
-		cheribsdtest_failure_errx("sysarch(CHERI_MMAP_ANDPERM) failed "
-		    "to remove CHERI_PERM_SW2.  Got 0x%lx.", perms);
-
-	if ((cap = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
-	    MAP_ANON, -1, 0)) == MAP_FAILED)
-		cheribsdtest_failure_err("mmap() failed");
-
-	if (cheri_getperm(cap) & CHERI_PERM_SW2)
-		cheribsdtest_failure_errx("mmap() returned with "
-		    "CHERI_PERM_SW2 after restriction (0x%lx)",
-		    cheri_getperm(cap));
-
-	cap = cheri_andperm(cap, ~CHERI_PERM_SW0);
-	if ((cap = mmap(cap, PAGE_SIZE, PROT_READ,
-	    MAP_ANON|MAP_FIXED, -1, 0)) == MAP_FAILED)
-		cheribsdtest_failure_err("mmap(MAP_FIXED) failed");
-	if (cheri_getperm(cap) & CHERI_PERM_SW0)
-		cheribsdtest_failure_errx(
-		    "mmap(MAP_FIXED) returned with CHERI_PERM_SW0 in perms "
-		    "without it in addr (perms 0x%lx)", cheri_getperm(cap));
-
-	if (munmap(cap, PAGE_SIZE) != 0)
-		cheribsdtest_failure_err("munmap() failed");
-
-	if ((cap = mmap(0, PAGE_SIZE, PROT_NONE, MAP_ANON, -1, 0)) ==
-	    MAP_FAILED)
-		cheribsdtest_failure_err("mmap() failed");
-	if (cheri_getperm(cap) & PERM_RWX)
-		cheribsdtest_failure_errx("mmap(PROT_NONE) returned unrequested "
-		    "permissions (0x%lx)", cheri_getperm(cap));
-
-	if (munmap(cap, PAGE_SIZE) != 0)
-		cheribsdtest_failure_err("munmap() failed");
-
-	/* Attempt to unmap without CHERI_PERM_CHERIABI_VMMAP */
-	if ((cap = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
-	    MAP_ANON, -1, 0)) == MAP_FAILED)
-		cheribsdtest_failure_err("mmap() failed");
-	tmpcap = cheri_andperm(cap, ~CHERI_PERM_CHERIABI_VMMAP);
-	if (munmap(tmpcap, PAGE_SIZE) == 0)
-		cheribsdtest_failure_errx(
-		    "munmap() unmapped without CHERI_PERM_CHERIABI_VMMAP");
-
-	/*
-	 * Try to map over the previous mapping to check that it is still
-	 * there.
-	 */
-	if ((tmpcap = mmap(cap, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
-	    MAP_ANON|MAP_FIXED|MAP_EXCL, -1, 0)) != MAP_FAILED)
-		cheribsdtest_failure_err("mmap(%#p, MAP_FIXED|MAP_EXCL) "
-		    "succeeded when page should have been mapped", cap);
-
-	if (munmap(cap, PAGE_SIZE) != 0)
-		cheribsdtest_failure_err("munmap() failed after overlap check");
-
-	/*
-	 * Attempt to MAP_FIXED though a valid capability without
-	 * CHERI_PERM_CHERIABI_VMMAP.
-	 */
-	if ((cap = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
-	    MAP_ANON, -1, 0)) == MAP_FAILED)
-		cheribsdtest_failure_err("mmap() failed");
-	tmpcap = cheri_andperm(cap, ~CHERI_PERM_CHERIABI_VMMAP);
-
-	if ((tmpcap = mmap(tmpcap, PAGE_SIZE, PROT_NONE, MAP_ANON|MAP_FIXED, -1, 0)) !=
-	    MAP_FAILED)
-		cheribsdtest_failure_errx(
-		    "mmap(MAP_FIXED) succeeded through a cap without"
-		    " CHERI_PERM_CHERIABI_VMMAP (original %#p, new %#p)",
-		    cap, tmpcap);
-
-	if (munmap(cap, PAGE_SIZE) != 0)
-		cheribsdtest_failure_err("munmap() failed after MAP_FIXED "
-		    "without permission");
-
-	/* Disallow executable pages */
-	perms = ~PERM_EXEC;
-	if (sysarch(CHERI_MMAP_ANDPERM, &perms) != 0)
-		cheribsdtest_failure_err("sysarch(CHERI_MMAP_ANDPERM) failed");
-	if ((cap = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
-	    MAP_ANON, -1, 0)) != MAP_FAILED)
-		cheribsdtest_failure_err("mmap(PROT_READ|PROT_WRITE|PROT_EXEC) "
-		    "succeeded after removing PROT_EXEC from default cap");
-
-	cheribsdtest_success();
-}
-#endif	/* CHERI_MMAP_GETPERM */
-
-#ifdef CHERI_BASELEN_BITS
-void
-test_cheriabi_mmap_unrepresentable(const struct cheri_test *ctp __unused)
-{
-	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
 	size_t expected_len;
 	void *cap;
+
+	/*
+	 * Generate the shortest unrepresentable length, for which rounding
+	 * up to PAGE_SIZE is still unrepresentable.
+	 */
+	do {
+		len = (1 << (PAGE_SHIFT + shift)) + 1;
+		shift++;
+	} while (round_page(len) ==
+	    __builtin_cheri_round_representable_length(round_page(len)));
 
 	expected_len = __builtin_cheri_round_representable_length(len);
 	if ((cap = mmap(0, len, PROT_READ|PROT_WRITE|PROT_EXEC,
@@ -240,10 +92,9 @@ test_cheriabi_mmap_unrepresentable(const struct cheri_test *ctp __unused)
 
 	cheribsdtest_success();
 }
-#endif
 
-void
-test_cheriabi_malloc_zero_size(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_malloc_zero_size,
+    "Check that zero-sized mallocs are properly bounded")
 {
 	void *cap;
 
@@ -254,12 +105,54 @@ test_cheriabi_malloc_zero_size(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
+static const char *
+xfail_need_unabandoned_mmap(const char *name __unused)
+{
+	static const char *reason = NULL;
+	static int checked = 0;
+	size_t len;
+	int abandon_on_munmap;
+
+	if (checked)
+		return (reason);
+
+	checked = 1;
+	len = sizeof(abandon_on_munmap);
+	if (sysctlbyname("debug.abandon_on_munmap", &abandon_on_munmap, &len,
+	    NULL, 0) != 0)
+		return (NULL);
+
+	if (abandon_on_munmap == 0)
+		return (NULL);
+
+	reason = "debug.abandon_on_munmap is enabled";
+	return (reason);
+}
+
 struct adjacent_mappings {
 	char *first;
 	char *middle;
 	char *last;
 	size_t maplen;
 };
+
+/*
+ * "Reserve" a chunk of address space by mapping pages, unmapping them,
+ * and returning the base address.  This is necessary because small
+ * mappings (e.g. 2 pages) might land between other mappings and thus
+ * the next N pages might not be free.
+ */
+static ptraddr_t
+reserve_address_space(size_t len)
+{
+	void *addr;
+
+	addr = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(0, len, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERIBSDTEST_CHECK_SYSCALL(munmap(addr, len));
+	/* XXX: With temporal safety we will need to force revocation here. */
+	return ((ptraddr_t)addr);
+}
 
 /*
  * Create three adjacent memory mappings that be used to check that the memory
@@ -273,8 +166,10 @@ create_adjacent_mappings(struct adjacent_mappings *mappings)
 	size_t len;
 
 	len = getpagesize() * 2;
-	mappings->first = CHERIBSDTEST_CHECK_SYSCALL(
-	    mmap(0, len, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	memset(mappings, 0, sizeof(*mappings));
+	requested_addr = (void *)(uintcap_t)reserve_address_space(len * 3);
+	mappings->first = CHERIBSDTEST_CHECK_SYSCALL(mmap(requested_addr, len,
+	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0));
 	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->first));
 	/* Try to create a mapping immediately following the latest one. */
 	requested_addr =
@@ -304,8 +199,9 @@ free_adjacent_mappings(struct adjacent_mappings *mappings)
 	CHERIBSDTEST_CHECK_SYSCALL(munmap(mappings->last, mappings->maplen));
 }
 
-void
-test_cheriabi_munmap_invalid_ptr(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_munmap_invalid_ptr,
+    "Check that munmap() rejects invalid pointer arguments",
+    .ct_check_xfail = xfail_need_unabandoned_mmap)
 {
 	struct adjacent_mappings mappings;
 
@@ -337,8 +233,9 @@ test_cheriabi_munmap_invalid_ptr(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_cheriabi_mprotect_invalid_ptr(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_mprotect_invalid_ptr,
+    "Check that mprotect() rejects invalid pointer arguments",
+    .ct_check_xfail = xfail_need_unabandoned_mmap)
 {
 	struct adjacent_mappings mappings;
 
@@ -376,8 +273,9 @@ test_cheriabi_mprotect_invalid_ptr(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_cheriabi_minherit_invalid_ptr(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_minherit_invalid_ptr,
+    "Check that minherit() rejects invalid pointer arguments",
+    .ct_check_xfail = xfail_need_unabandoned_mmap)
 {
 	struct adjacent_mappings mappings;
 
@@ -423,8 +321,11 @@ create_adjacent_mappings_shm(struct adjacent_mappings *mappings)
 	int shmid;
 
 	len = getpagesize() * 2;
+	memset(mappings, 0, sizeof(*mappings));
 	shmid = CHERIBSDTEST_CHECK_SYSCALL(shmget(IPC_PRIVATE, len, 0600));
-	mappings->first = CHERIBSDTEST_CHECK_SYSCALL(shmat(shmid, NULL, 0));
+	requested_addr = (void *)(uintcap_t)reserve_address_space(len * 3);
+	mappings->first = CHERIBSDTEST_CHECK_SYSCALL(shmat(shmid,
+	    requested_addr, 0));
 	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->first));
 	/* Try to create a mapping immediately following the latest one. */
 	requested_addr =
@@ -454,8 +355,9 @@ free_adjacent_mappings_shm(struct adjacent_mappings *mappings)
 	CHERIBSDTEST_CHECK_SYSCALL(shmdt(mappings->last));
 }
 
-void
-test_cheriabi_shmdt_invalid_ptr(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_cheriabi_shmdt_invalid_ptr,
+    "Check that shmdt() rejects invalid pointer arguments",
+    .ct_check_xfail = xfail_need_unabandoned_mmap)
 {
 	struct adjacent_mappings mappings;
 

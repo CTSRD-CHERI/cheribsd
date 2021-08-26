@@ -50,16 +50,11 @@ are:
   sync with the [LLVM master] branch.  Outside consumers likely wish to follow
   this branch.
 
-To aid comparison with upstream FreeBSD we maintain a couple of branches of stock
+To aid comparison with upstream FreeBSD we maintain a branch of stock
 FreeBSD:
 
 * [freebsd-head] - FreeBSD HEAD (from [freebsd/freebsd]) as merged to
   [dev].  We update it using fast-forward so commit hashes match upstream.
-
-* [freebsd-crossbuild] - FreeBSD HEAD with a roll up of not-yet-merged
-  cross-building changes required to build on a macOS or Linux system.
-  We currently merge on top of the existing changes.  This branch
-  will eventually go away.
 
 Numerous other branches exist ranging from pull-request branches to long-term
 feature development and checkpoints of abandoned work.  We generally delete
@@ -77,8 +72,7 @@ state we merge weekly, but delay and batch updates if we need extra
 platform stability and the [master] branch isn't appropriate.
 
 Each merge from upstream FreeBSD to [dev] is accompanied by a tag of the form
-`freebsd-head-YYYYMMDD`, and updates to [freebsd-head] and
-[freebsd-crossbuild].
+`freebsd-head-YYYYMMDD`, and updates to [freebsd-head].
 
 ### Updating [master]
 

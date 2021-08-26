@@ -102,6 +102,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/tlb.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <machine/cherireg.h>
+#include <cheri/cheric.h>
+#endif
+
 #undef PMAP_DEBUG
 
 #if !defined(DIAGNOSTIC)
@@ -137,8 +142,8 @@ __FBSDID("$FreeBSD$");
 struct pmap kernel_pmap_store;
 pd_entry_t *kernel_segmap;
 
-vm_offset_t virtual_avail;	/* VA of first avail page (after kernel bss) */
-vm_offset_t virtual_end;	/* VA of last avail page (end of kernel AS) */
+vm_pointer_t virtual_avail;	/* VA of first avail page (after kernel bss) */
+vm_pointer_t virtual_end;	/* VA of last avail page (end of kernel AS) */
 
 static int need_local_mappings;
 
@@ -258,7 +263,7 @@ pmap_lmem_map1(vm_paddr_t phys)
 	return (PCPU_GET(cmap1_addr));
 }
 
-static __inline vm_offset_t
+static __inline vm_pointer_t
 pmap_lmem_map2(vm_paddr_t phys1, vm_paddr_t phys2)
 {
 	critical_enter();
@@ -288,21 +293,21 @@ pmap_alloc_lmem_map(void)
 {
 }
 
-static __inline vm_offset_t
+static __inline vm_pointer_t
 pmap_lmem_map1(vm_paddr_t phys)
 {
 
 	return (0);
 }
 
-static __inline vm_offset_t
+static __inline vm_pointer_t
 pmap_lmem_map2(vm_paddr_t phys1, vm_paddr_t phys2)
 {
 
 	return (0);
 }
 
-static __inline vm_offset_t
+static __inline vm_pointer_t
 pmap_lmem_unmap(void)
 {
 
@@ -393,11 +398,11 @@ pmap_pte(pmap_t pmap, vm_offset_t va)
 	return (pmap_pde_to_pte(pde, va));
 }
 
-vm_offset_t
+vm_pointer_t
 pmap_steal_memory(vm_size_t size)
 {
 	vm_paddr_t bank_size, pa;
-	vm_offset_t va;
+	caddr_t va;
 
 	size = round_page(size);
 	bank_size = phys_avail[1] - phys_avail[0];
@@ -419,9 +424,12 @@ pmap_steal_memory(vm_size_t size)
 	phys_avail[0] += size;
 	if (MIPS_DIRECT_MAPPABLE(pa) == 0)
 		panic("Out of memory below 512Meg?");
-	va = MIPS_PHYS_TO_DIRECT(pa);
-	bzero((caddr_t)va, size);
-	return (va);
+	va = (caddr_t)MIPS_PHYS_TO_DIRECT(pa);
+#ifdef __CHERI_PURE_CAPABILITY__
+	va = cheri_setbounds(va, size);
+#endif
+	bzero(va, size);
+	return ((vm_pointer_t)va);
 }
 
 /*
@@ -432,11 +440,11 @@ static void
 pmap_create_kernel_pagetable(void)
 {
 	int i, j;
-	vm_offset_t ptaddr;
+	vm_pointer_t ptaddr;
 	pt_entry_t *pte;
 #ifdef __mips_n64
 	pd_entry_t *pde;
-	vm_offset_t pdaddr;
+	vm_pointer_t pdaddr;
 	int npt, npde;
 #endif
 
@@ -467,11 +475,11 @@ pmap_create_kernel_pagetable(void)
 
 #ifdef __mips_n64
 	for (i = 0,  npt = nkpt; npt > 0; i++) {
-		kernel_segmap[i] = (pd_entry_t)(pdaddr + i * PAGE_SIZE);
+		kernel_segmap[i] = pde_page_bound(pdaddr + i * PAGE_SIZE);
 		pde = (pd_entry_t *)kernel_segmap[i];
 
 		for (j = 0; j < NPDEPG && npt > 0; j++, npt--)
-			pde[j] = (pd_entry_t)(ptaddr + (i * NPDEPG + j) * PAGE_SIZE);
+			pde[j] = pde_page_bound(ptaddr + (i * NPDEPG + j) * PAGE_SIZE);
 	}
 #else
 	for (i = 0, j = pmap_seg_index(VM_MIN_KERNEL_ADDRESS); i < nkpt; i++, j++)
@@ -571,10 +579,16 @@ again:
 #endif
 	kstack0 = roundup2(kstack0, (KSTACK_PAGE_SIZE * 2));
 
-
-
-	virtual_avail = VM_MIN_KERNEL_ADDRESS;
-	virtual_end = VM_MAX_KERNEL_ADDRESS;
+	/*
+	 * The kernel virtual address space lies within the XKSEG segment,
+	 * the base capability for XKSEG is used to generate a valid
+	 * kernel-space capability for the kernel VM initialization.
+	 * The max kernel address bound is not set because the kernel page
+	 * table is allowed to grow.
+	 * XXX-AM: Assume CHERI is always on top of mips64
+	 */
+	virtual_avail = (vm_pointer_t)MIPS_XKSEG(VM_MIN_KERNEL_ADDRESS);
+	virtual_end = (vm_pointer_t)MIPS_XKSEG(VM_MAX_KERNEL_ADDRESS);
 
 #ifdef SMP
 	/*
@@ -928,14 +942,40 @@ pmap_kremove(vm_offset_t va)
  *	region.
  *
  *	Use XKPHYS for 64 bit, and KSEG0 where possible for 32 bit.
+ *
+ * XXX-AM: It is a good idea to expand prot to be more precise in the type of
+ * permissions the memory mapping should have to make full use of the granularity
+ * of permissions in CHERI.
+ * If kernel pointers are marked as LOCAL, a VM_PROT_KERN for kernel-only mappings may be useful.
+ * VM_PROT_READ/WRITE_PTR for capability access restrictions may also be useful.
+ * Being able to have a different CCALL and EXECUTE permissions may also be useful.
  */
-vm_offset_t
-pmap_map(vm_offset_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
+vm_pointer_t
+pmap_map(vm_pointer_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 {
-	vm_offset_t va, sva;
+	vm_pointer_t sva, va;
 
-	if (MIPS_DIRECT_MAPPABLE(end - 1))
-		return (MIPS_PHYS_TO_DIRECT(start));
+	if (MIPS_DIRECT_MAPPABLE(end - 1)) {
+#ifndef __CHERI_PURE_CAPABILITY__
+		return ((vm_pointer_t)MIPS_PHYS_TO_DIRECT(start));
+#else /* __CHERI_PURE_CAPABILITY__ */
+		caddr_t map_addr;
+
+		map_addr = MIPS_PHYS_TO_DIRECT(start);
+		map_addr = cheri_setbounds(map_addr, end - start);
+		if (!(prot & VM_PROT_READ))
+		  map_addr = cheri_andperm(map_addr,
+			 ~(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP));
+		if (!(prot & VM_PROT_WRITE))
+		  map_addr = cheri_andperm(map_addr,
+			~(CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+			  CHERI_PERM_STORE_LOCAL_CAP));
+		if (!(prot & VM_PROT_EXECUTE))
+		  map_addr = cheri_andperm(map_addr,
+			~(CHERI_PERM_EXECUTE | CHERI_PERM_CCALL));
+		return (vm_pointer_t)map_addr;
+#endif
+	}
 
 	va = sva = *virt;
 	while (start < end) {
@@ -1143,7 +1183,6 @@ pmap_alloc_direct_page(unsigned int index, int req)
 int
 pmap_pinit(pmap_t pmap)
 {
-	vm_offset_t ptdva;
 	vm_page_t ptdpg;
 	int i, req_class;
 
@@ -1155,8 +1194,8 @@ pmap_pinit(pmap_t pmap)
 	    NULL)
 		pmap_grow_direct_page(req_class);
 
-	ptdva = MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(ptdpg));
-	pmap->pm_segtab = (pd_entry_t *)ptdva;
+	pmap->pm_segtab = (pd_entry_t *)
+	    MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(ptdpg));
 	CPU_ZERO(&pmap->pm_active);
 	for (i = 0; i < MAXCPU; i++) {
 		pmap->pm_asid[i].asid = PMAP_ASID_RESERVED;
@@ -1175,7 +1214,7 @@ pmap_pinit(pmap_t pmap)
 static vm_page_t
 _pmap_allocpte(pmap_t pmap, unsigned ptepindex, u_int flags)
 {
-	vm_offset_t pageva;
+	vm_pointer_t pageva;
 	vm_page_t m;
 	int req_class;
 
@@ -1203,11 +1242,11 @@ _pmap_allocpte(pmap_t pmap, unsigned ptepindex, u_int flags)
 	 * Map the pagetable page into the process address space, if it
 	 * isn't already there.
 	 */
-	pageva = MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m));
+	pageva = (vm_pointer_t)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m));
 
 #ifdef __mips_n64
 	if (ptepindex >= NUPDE) {
-		pmap->pm_segtab[ptepindex - NUPDE] = (pd_entry_t)pageva;
+		pmap->pm_segtab[ptepindex - NUPDE] = pde_page_bound(pageva);
 	} else {
 		pd_entry_t *pdep, *pde;
 		int segindex = ptepindex >> (SEGSHIFT - PDRSHIFT);
@@ -1230,7 +1269,7 @@ _pmap_allocpte(pmap_t pmap, unsigned ptepindex, u_int flags)
 		}
 		/* Next level entry */
 		pde = (pd_entry_t *)*pdep;
-		pde[pdeindex] = (pd_entry_t)pageva;
+		pde[pdeindex] = pde_page_bound(pageva);
 	}
 #else
 	pmap->pm_segtab[ptepindex] = (pd_entry_t)pageva;
@@ -1325,6 +1364,10 @@ pmap_growkernel(vm_offset_t addr)
 			nkpg = pmap_alloc_direct_page(nkpt, req_class);
 			if (nkpg == NULL)
 				panic("pmap_growkernel: no memory to grow kernel");
+			/*
+			 * XXX-AM: this rederives the pointer, not good! pmap_alloc
+			 * should return a valid capability already.
+			 */
 			*pdpe = (pd_entry_t)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(nkpg));
 			continue; /* try again */
 		}
@@ -1377,26 +1420,33 @@ pmap_growkernel(vm_offset_t addr)
  ***************************************************/
 
 CTASSERT(sizeof(struct pv_chunk) == PAGE_SIZE);
-#ifdef __mips_n64
+#ifdef __CHERI_PURE_CAPABILITY__
+CTASSERT(_NPCM == 2);
+CTASSERT(_NPCPV == 83);
+#elif defined(__mips_n64)
 CTASSERT(_NPCM == 3);
 CTASSERT(_NPCPV == 168);
-#else
+#else /* n32 */
 CTASSERT(_NPCM == 11);
 CTASSERT(_NPCPV == 336);
-#endif
+#endif /* n32 */
 
 static __inline struct pv_chunk *
 pv_to_chunk(pv_entry_t pv)
 {
 
-	return ((struct pv_chunk *)((uintptr_t)pv & ~(uintptr_t)PAGE_MASK));
+	return ((struct pv_chunk *)trunc_page(pv));
 }
 
 #define PV_PMAP(pv) (pv_to_chunk(pv)->pc_pmap)
 
 #ifdef __mips_n64
 #define	PC_FREE0_1	0xfffffffffffffffful
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	PC_FREE2	0x000000000007fffful
+#else
 #define	PC_FREE2	0x000000fffffffffful
+#endif
 #else
 #define	PC_FREE0_9	0xfffffffful	/* Free values for index 0 through 9 */
 #define	PC_FREE10	0x0000fffful	/* Free values for index 10 */
@@ -1404,7 +1454,11 @@ pv_to_chunk(pv_entry_t pv)
 
 static const u_long pc_freemask[_NPCM] = {
 #ifdef __mips_n64
+#ifdef __CHERI_PURE_CAPABILITY__
+	PC_FREE0_1, PC_FREE2
+#else  /* ! __CHERI_PURE_CAPABILITY__ */
 	PC_FREE0_1, PC_FREE0_1, PC_FREE2
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 #else
 	PC_FREE0_9, PC_FREE0_9, PC_FREE0_9,
 	PC_FREE0_9, PC_FREE0_9, PC_FREE0_9,
@@ -1803,8 +1857,8 @@ pmap_remove_pte(struct pmap *pmap, pt_entry_t *ptq, vm_offset_t va,
 		m = PHYS_TO_VM_PAGE(pa);
 		if (pte_test(&oldpte, PTE_D)) {
 			KASSERT(!pte_test(&oldpte, PTE_RO),
-			    ("%s: modified page not writable: va: %p, pte: %#jx",
-			    __func__, (void *)va, (uintmax_t)oldpte));
+			    ("%s: modified page not writable: va: %#jx, pte: %#jx",
+			    __func__, va, (uintmax_t)oldpte));
 			vm_page_dirty(m);
 		}
 		if (m->md.pv_flags & PV_TABLE_REF)
@@ -2008,8 +2062,8 @@ pmap_remove_all(vm_page_t m)
 		 */
 		if (pte_test(&tpte, PTE_D)) {
 			KASSERT(!pte_test(&tpte, PTE_RO),
-			    ("%s: modified page not writable: va: %p, pte: %#jx",
-			    __func__, (void *)pv->pv_va, (uintmax_t)tpte));
+			    ("%s: modified page not writable: va: %#jx, pte: %#jx",
+			    __func__, pv->pv_va, (uintmax_t)tpte));
 			vm_page_dirty(m);
 		}
 
@@ -2138,8 +2192,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 
 	va &= ~PAGE_MASK;
  	KASSERT(va <= VM_MAX_KERNEL_ADDRESS, ("pmap_enter: toobig"));
-	KASSERT((m->oflags & VPO_UNMANAGED) != 0 || va < kmi.clean_sva ||
-	    va >= kmi.clean_eva,
+	KASSERT((m->oflags & VPO_UNMANAGED) != 0 || !VA_IS_CLEANMAP(va),
 	    ("pmap_enter: managed mapping within the clean submap"));
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		VM_PAGE_OBJECT_BUSY_ASSERT(m);
@@ -2178,14 +2231,14 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	 * Page Directory table entry not valid, we need a new PT page
 	 */
 	if (pte == NULL) {
-		panic("pmap_enter: invalid page directory, pdir=%p, va=%p",
-		    (void *)pmap->pm_segtab, (void *)va);
+		panic("pmap_enter: invalid page directory, pdir=%p, va=%#jx",
+		    (void *)pmap->pm_segtab, va);
 	}
 
 	origpte = *pte;
 	KASSERT(!pte_test(&origpte, PTE_D | PTE_RO | PTE_V),
 	    ("pmap_enter: modified page not writable: va: %p, pte: %#jx",
-	    (void *)va, (uintmax_t)origpte));
+	    (void *)(uintptr_t)va, (uintmax_t)origpte));
 	opa = TLBLO_PTE_TO_PA(origpte);
 
 	/*
@@ -2252,7 +2305,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 			mpte->ref_count--;
 			KASSERT(mpte->ref_count > 0,
 			    ("pmap_enter: missing reference to page table page,"
-			    " va: %p", (void *)va));
+			    " va: %#jx", va));
 		}
 	} else
 		pmap->pm_stats.resident_count++;
@@ -2346,7 +2399,7 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	pt_entry_t *pte, npte;
 	vm_paddr_t pa;
 
-	KASSERT(va < kmi.clean_sva || va >= kmi.clean_eva ||
+	KASSERT(!VA_IS_CLEANMAP(va) ||
 	    (m->oflags & VPO_UNMANAGED) != 0,
 	    ("pmap_enter_quick_locked: managed mapping within the clean submap"));
 	rw_assert(&pvh_global_lock, RA_WLOCKED);
@@ -2459,19 +2512,19 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 void *
 pmap_kenter_temporary(vm_paddr_t pa, int i)
 {
-	vm_offset_t va;
+	vm_pointer_t va;
 
 	if (i != 0)
 		printf("%s: ERROR!!! More than one page of virtual address mapping not supported\n",
 		    __func__);
 
 	if (MIPS_DIRECT_MAPPABLE(pa)) {
-		va = MIPS_PHYS_TO_DIRECT(pa);
+		va = (vm_pointer_t)MIPS_PHYS_TO_DIRECT(pa);
 	} else {
 #ifndef __mips_n64    /* XXX : to be converted to new style */
 		pt_entry_t *pte, npte;
 
-		pte = pmap_pte(kernel_pmap, crashdumpva); 
+		pte = pmap_pte(kernel_pmap, crashdumpva);
 
 		/* Since this is for the debugger, no locks or any other fun */
 		npte = TLBLO_PA_TO_PFN(pa) | PTE_C_CACHE | PTE_D | PTE_V |
@@ -2622,11 +2675,11 @@ pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vm_offset_t dst_addr,
 void
 pmap_zero_page(vm_page_t m)
 {
-	vm_offset_t va;
+	vm_pointer_t va;
 	vm_paddr_t phys = VM_PAGE_TO_PHYS(m);
 
 	if (MIPS_DIRECT_MAPPABLE(phys)) {
-		va = MIPS_PHYS_TO_DIRECT(phys);
+		va = (vm_pointer_t)MIPS_PHYS_TO_DIRECT(phys);
 		bzero((caddr_t)va, PAGE_SIZE);
 		mips_dcache_wbinv_range(va, PAGE_SIZE);
 	} else {
@@ -2646,12 +2699,12 @@ pmap_zero_page(vm_page_t m)
 void
 pmap_zero_page_area(vm_page_t m, int off, int size)
 {
-	vm_offset_t va;
+	vm_pointer_t va;
 	vm_paddr_t phys = VM_PAGE_TO_PHYS(m);
 
 	if (MIPS_DIRECT_MAPPABLE(phys)) {
-		va = MIPS_PHYS_TO_DIRECT(phys);
-		bzero((char *)(caddr_t)va + off, size);
+		va = (vm_pointer_t)MIPS_PHYS_TO_DIRECT(phys);
+		bzero((char *)va + off, size);
 		mips_dcache_wbinv_range(va + off, size);
 	} else {
 		va = pmap_lmem_map1(phys);
@@ -2673,7 +2726,7 @@ pmap_zero_page_area(vm_page_t m, int off, int size)
 static void
 pmap_copy_page_internal(vm_page_t src, vm_page_t dst, int flags)
 {
-	vm_offset_t va_src, va_dst;
+	vm_pointer_t va_src, va_dst;
 	vm_paddr_t phys_src = VM_PAGE_TO_PHYS(src);
 	vm_paddr_t phys_dst = VM_PAGE_TO_PHYS(dst);
 
@@ -2685,9 +2738,9 @@ pmap_copy_page_internal(vm_page_t src, vm_page_t dst, int flags)
 		 */
 		pmap_flush_pvcache(src);
 		mips_dcache_wbinv_range_index(
-		    MIPS_PHYS_TO_DIRECT(phys_dst), PAGE_SIZE);
-		va_src = MIPS_PHYS_TO_DIRECT(phys_src);
-		va_dst = MIPS_PHYS_TO_DIRECT(phys_dst);
+		    (vm_offset_t)MIPS_PHYS_TO_DIRECT(phys_dst), PAGE_SIZE);
+		va_src = (vm_pointer_t)MIPS_PHYS_TO_DIRECT(phys_src);
+		va_dst = (vm_pointer_t)MIPS_PHYS_TO_DIRECT(phys_dst);
 #if __has_feature(capabilities)
 		if ((flags & PMAP_COPY_TAGS) == 0)
 			bcopynocap((caddr_t)va_src, (caddr_t)va_dst, PAGE_SIZE);
@@ -2760,7 +2813,8 @@ pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 		    MIPS_DIRECT_MAPPABLE(b_phys)) {
 			pmap_flush_pvcache(a_m);
 			mips_dcache_wbinv_range_index(
-			    MIPS_PHYS_TO_DIRECT(b_phys), PAGE_SIZE);
+			    (vm_offset_t)MIPS_PHYS_TO_DIRECT(b_phys),
+			    PAGE_SIZE);
 			a_cp = (char *)MIPS_PHYS_TO_DIRECT(a_phys) +
 			    a_pg_offset;
 			b_cp = (char *)MIPS_PHYS_TO_DIRECT(b_phys) +
@@ -2782,11 +2836,13 @@ pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 	}
 }
 
-vm_offset_t
+
+
+vm_pointer_t
 pmap_quick_enter_page(vm_page_t m)
 {
 #if defined(__mips_n64)
-	return MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m));
+	return (vm_pointer_t)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m));
 #else
 	vm_offset_t qaddr;
 	vm_paddr_t pa;
@@ -3287,24 +3343,33 @@ pmap_is_referenced(vm_page_t m)
 void *
 pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 {
-        vm_offset_t va, tmpva, offset;
+	vm_offset_t offset;
+	caddr_t tmpva, va;
 
 	/*
 	 * KSEG1 maps only first 512M of phys address space. For
 	 * pa > 0x20000000 we should make proper mapping * using pmap_kenter.
 	 */
-	if (MIPS_DIRECT_MAPPABLE(pa + size - 1) && ma == VM_MEMATTR_UNCACHEABLE)
-		return ((void *)MIPS_PHYS_TO_DIRECT_UNCACHED(pa));
+	if (MIPS_DIRECT_MAPPABLE(pa + size - 1) && ma == VM_MEMATTR_UNCACHEABLE) {
+		va = (caddr_t)MIPS_PHYS_TO_DIRECT_UNCACHED(pa);
+#ifdef __CHERI_PURE_CAPABILITY__
+		/* Device memory should never contain capabilities (for now) */
+		va = cheri_setbounds(va, size);
+		va = cheri_andperm(va, ~(CHERI_PERM_LOAD_CAP |
+		    CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP));
+#endif
+		return va;
+	}
 	else {
 		offset = pa & PAGE_MASK;
 		size = roundup(size + offset, PAGE_SIZE);
 
-		va = kva_alloc(size);
+		va = (void *)kva_alloc(size);
 		if (!va)
 			panic("pmap_mapdev: Couldn't alloc kernel virtual memory");
 		pa = trunc_page(pa);
 		for (tmpva = va; size > 0;) {
-			pmap_kenter_attr(tmpva, pa, ma);
+			pmap_kenter_attr((vm_offset_t)tmpva, pa, ma);
 			size -= PAGE_SIZE;
 			tmpva += PAGE_SIZE;
 			pa += PAGE_SIZE;
@@ -3712,7 +3777,7 @@ pmap_kextract(vm_offset_t va)
 		return (0);
 	}
 
-	panic("%s for unknown address space %p.", __func__, (void *)va);
+	panic("%s for unknown address space %#jx.", __func__, va);
 }
 
 void
@@ -3842,10 +3907,15 @@ pmap_is_valid_memattr(pmap_t pmap __unused, vm_memattr_t mode)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"
+//   ],
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer",
+//     "pointer_alignment"
 //   ]
 // }
 // CHERI CHANGES END

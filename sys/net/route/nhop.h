@@ -119,6 +119,8 @@ struct nhop_priv;
  * Note: struct nhop_object fields are ordered in a way that
  *  supports memcmp-based comparisons.
  *
+ * XXX-AM: In CHERI-128 variants nhop_object becomes larger than 128 bytes.
+ * This is probably bad for performance.
  */
 #define	NHOP_END_CMP	(__offsetof(struct nhop_object, nh_pksent))
 
@@ -136,7 +138,7 @@ struct nhop_object {
 	struct ifaddr		*nh_ifa;	/* interface address to use. Always != NULL */
 	struct ifnet		*nh_aifp;	/* ifnet of the source address. Always != NULL */
 	counter_u64_t		nh_pksent;	/* packets sent using this nhop */
-	/* 32 bytes + 4xPTR == 64(amd64) / 48(i386)  */
+	/* 32 bytes + 4xPTR == 64(amd64) / 48(i386) / 80(cheri128) */
 	uint8_t			nh_prepend_len;	/* length of prepend data */
 	uint8_t			spare[3];
 	uint32_t		spare1;		/* alignment */

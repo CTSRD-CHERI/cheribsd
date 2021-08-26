@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD$");
 .macro save_registers mode
 #if __has_feature(capabilities)
 .option push
+#ifndef __CHERI_PURE_CAPABILITY__
 .option capmode
 .if \mode == 1
 	/*
@@ -59,6 +60,7 @@ __FBSDID("$FreeBSD$");
 	cmove	csp, ct0
 	cspecialr ct0, sscratchc
 .endif
+#endif
 	cincoffset csp, csp, -(TF_SIZE)
 
 	csc	cra, (TF_RA)(csp)
@@ -131,15 +133,22 @@ __FBSDID("$FreeBSD$");
 	csc	ct0, (TF_SEPC)(csp)
 	cspecialr ct0, ddc
 	csc	ct0, (TF_DDC)(csp)
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	cmove	ct0, cnull
+#else
 	cspecialr ct0, stdc
+#endif
 	cspecialw ddc, ct0
 
+#ifndef __CHERI_PURE_CAPABILITY__
 	/* Switch to non-capmode PCC. */
 	cllc	ct1, 1f
 	csetflags ct1, ct1, x0
 	cjr	ct1
-.option pop
 1:
+#endif
+.option pop
 #else
 	sd	t0, (TF_T + 0 * 8)(sp)
 	sd	t1, (TF_T + 1 * 8)(sp)
@@ -186,24 +195,42 @@ __FBSDID("$FreeBSD$");
 	csrr	t0, sepc
 	sd	t0, (TF_SEPC)(sp)
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	csrr	t0, sstatus
+	csd	t0, (TF_SSTATUS)(csp)
+	csrr	t0, stval
+	csd	t0, (TF_STVAL)(csp)
+	csrr	t0, scause
+	csd	t0, (TF_SCAUSE)(csp)
+#else
 	csrr	t0, sstatus
 	sd	t0, (TF_SSTATUS)(sp)
 	csrr	t0, stval
 	sd	t0, (TF_STVAL)(sp)
 	csrr	t0, scause
 	sd	t0, (TF_SCAUSE)(sp)
+#endif
 
 .if \mode == 0
+#ifdef __CHERI_PURE_CAPABILITY__
+	cspecialr ct0, stdc
+	cmove	cgp, ct0
+#else
 .option push
 .option norelax
 	/* Load the kernel's global pointer */
 	lla	gp, __global_pointer$
 .option pop
+#endif
 .endif
 .endm
 
 .macro load_registers mode
+#ifdef __CHERI_PURE_CAPABILITY__
+	cld	t0, (TF_SSTATUS)(csp)
+#else
 	ld	t0, (TF_SSTATUS)(sp)
+#endif
 .if \mode == 0
 	/* Ensure user interrupts will be enabled on eret */
 	li	t1, SSTATUS_SPIE
@@ -219,15 +246,20 @@ __FBSDID("$FreeBSD$");
 .endif
 	csrw	sstatus, t0
 
+.option push
 #if __has_feature(capabilities)
+#ifndef __CHERI_PURE_CAPABILITY__
 	/* Switch to capmode PCC. */
 	lla	t0, 1f
 	cspecialr ct1, pcc
 	csetaddr ct1, ct1, t0
 	li	t0, 1
 	csetflags ct1, ct1, t0
+#ifdef __riscv_xcheri_mode_dependent_jumps
+	jr.cap	ct1
+#else
 	cjr	ct1
-.option push
+#endif
 .option capmode
 1:
 	/*
@@ -240,6 +272,7 @@ __FBSDID("$FreeBSD$");
 	cspecialr ct0, ddc
 	csetaddr ct0, ct0, sp
 	cmove	csp, ct0
+#endif
 
 	/*
 	 * Switch to user DDC.  After this point, all stack accesses
@@ -296,7 +329,6 @@ __FBSDID("$FreeBSD$");
 	clc	ca7, (TF_A + 7 * 16)(csp)
 
 	cincoffset csp, csp, (TF_SIZE)
-.option pop
 #else
 	ld	t0, (TF_SEPC)(sp)
 	csrw	sepc, t0
@@ -348,6 +380,7 @@ __FBSDID("$FreeBSD$");
 
 	addi	sp, sp, (TF_SIZE)
 #endif
+.option pop
 .endm
 
 .macro	do_ast
@@ -356,8 +389,13 @@ __FBSDID("$FreeBSD$");
 1:
 	csrci	sstatus, (SSTATUS_SIE)
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	clc	ca1, PC_CURTHREAD(ctp)
+	clw	a2, TD_FLAGS(ca1)
+#else
 	ld	a1, PC_CURTHREAD(tp)
 	lw	a2, TD_FLAGS(a1)
+#endif
 
 	li	a3, (TDF_ASTPENDING|TDF_NEEDRESCHED)
 	and	a2, a2, a3
@@ -368,8 +406,14 @@ __FBSDID("$FreeBSD$");
 	csrs	sstatus, a4
 
 	/* Handle the ast */
+#ifdef __CHERI_PURE_CAPABILITY__
+	cmove	ca0, csp
+	clgc	cra, _C_LABEL(ast)
+	cjalr	cra
+#else
 	mv	a0, sp
 	call	_C_LABEL(ast)
+#endif
 
 	/* Re-check for new ast scheduled */
 	j	1b
@@ -397,16 +441,28 @@ END(cpu_exception_handler)
 
 ENTRY(cpu_exception_handler_supervisor)
 	save_registers 1
+#ifdef __CHERI_PURE_CAPABILITY__
+	cmove	ca0, csp
+	clgc	cra, _C_LABEL(do_trap_supervisor)
+	cjalr	cra
+#else
 	mv	a0, sp
 	call	_C_LABEL(do_trap_supervisor)
+#endif
 	load_registers 1
 	sret
 END(cpu_exception_handler_supervisor)
 
 ENTRY(cpu_exception_handler_user)
 	save_registers 0
+#ifdef __CHERI_PURE_CAPABILITY__
+	cmove	ca0, csp
+	clgc	cra, _C_LABEL(do_trap_user)
+	cjalr	cra
+#else
 	mv	a0, sp
 	call	_C_LABEL(do_trap_user)
+#endif
 	do_ast
 	load_registers 0
 #if __has_feature(capabilities)
@@ -416,3 +472,15 @@ ENTRY(cpu_exception_handler_user)
 #endif
 	sret
 END(cpu_exception_handler_user)
+
+/*-
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20200804,
+ *   "target_type": "kernel",
+ *   "changes_purecap": [
+ *     "support"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */

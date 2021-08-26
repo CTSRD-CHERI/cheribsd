@@ -15,8 +15,7 @@ SUBDIR_BOOTSTRAP= \
 	libc \
 	libc_nonshared \
 	libcompiler_rt \
-	${_libc_cheri} \
-	${_libcheri} \
+	${_libcheribsdtest_dynamic} \
 	${_libclang_rt} \
 	libgcc_eh \
 	libgcc_s \
@@ -67,7 +66,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libifconfig \
 	libipsec \
 	libjail \
-	libjpeg \
 	libkiconv \
 	libkvm \
 	liblua \
@@ -85,7 +83,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libpathconv \
 	libpcap \
 	libpjdlog \
-	libpng \
 	libproc \
 	libprocstat \
 	libregex \
@@ -167,15 +164,14 @@ SUBDIR.${MK_BLACKLIST}+=libblacklist
 SUBDIR.${MK_BLUETOOTH}+=libbluetooth libsdp
 SUBDIR.${MK_BSNMP}+=	libbsnmp
 
-SUBDIR.${MK_LIBCHERI}+=	libhelloworld
 SUBDIR.${MK_CHERI}+=	libsyscalls
 
-.if ${MK_LIBCHERI} == "yes" && ${MACHINE_ARCH} != "mips"
-_libc_cheri=	libc_cheri
-_libcheri=	libcheri
+.if ${MACHINE_CPU:Mcheri}
+_libcheribsdtest_dynamic=	libcheribsdtest_dynamic
 .endif
 
-.if ${MACHINE_CPUARCH} == "mips" || ${MACHINE_CPUARCH} == "riscv"
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "mips" || \
+    ${MACHINE_CPUARCH} == "riscv"
 .if !${MACHINE_ABI:Mptr32}
 SUBDIR+= libsimple_printf
 .endif
@@ -240,8 +236,13 @@ SUBDIR.${MK_PMC}+=	libipt
 SUBDIR.${MK_BHYVE}+=	libvmmapi
 .endif
 
-.if ${MACHINE_ARCH:Mmips64*}
+.if ${MACHINE_ARCH:Mmips64*} || ${MACHINE_ARCH:Mriscv*}
 _libstatcounters=	libstatcounters
+.endif
+
+.if ${MACHINE_ARCH:Mmips64*}
+# Used by ctsrd/lib/libterasic_mtl
+SUBDIR+=	libpng
 .endif
 
 .if ${MACHINE_ARCH} != "powerpc"
@@ -253,7 +254,6 @@ SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
 SUBDIR.${MK_SENDMAIL}+=	libmilter libsm libsmdb libsmutil
 SUBDIR.${MK_TELNET}+=	libtelnet
 SUBDIR.${MK_TESTS_SUPPORT}+=	atf
-SUBDIR.${MK_TESTS_SUPPORT}.${MK_CXX}+=	kyua
 SUBDIR.${MK_TESTS_SUPPORT}.${MK_CXX}+=	liblutok
 SUBDIR.${MK_TESTS}+=	tests
 SUBDIR.${MK_UNBOUND}+=	libunbound
@@ -273,10 +273,6 @@ SUBDIR:=	${SUBDIR:Nlibc++experimental}
 
 .if ${MACHINE_ABI:Mpurecap}
 SUBDIR+=	libmalloc_simple
-.endif
-.if ${MK_LIBCHERI} == "yes"
-SUBDIR.${MK_LIBCHERI}+=	libcheri_syscalls
-SUBDIR.${MK_LIBCHERI}+=	libcheri_support
 .endif
 
 .include <bsd.subdir.mk>

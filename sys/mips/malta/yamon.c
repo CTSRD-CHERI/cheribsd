@@ -35,6 +35,21 @@ __FBSDID("$FreeBSD$");
 
 #include <mips/malta/yamon.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+
+/* Wrappers to call into non-purecap ABI YAMON routines */
+
+int
+_yamon_syscon_read(t_yamon_syscon_id id, void *param, uint32_t size)
+{
+	ptraddr_t yamon_syscon_read = YAMON_FUNC(YAMON_SYSCON_READ_OFS);
+
+        /* Call into wrapper that builds PCC/DDC and calls yamon. */
+	return _yamon_cheri_syscon_read(yamon_syscon_read, id, param, size);
+}
+#endif
+
 char *
 yamon_getenv(char *name)
 {
@@ -66,3 +81,12 @@ yamon_getcpufreq(void)
 
 	return (freq);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "monotonicity"
+//   ]
+// }
+// CHERI CHANGES END

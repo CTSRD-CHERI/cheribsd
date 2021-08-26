@@ -49,13 +49,6 @@ void
 babel_print(netdissect_options *ndo,
             const u_char *cp, u_int length)
 {
-	INVOKE_DISSECTOR(_babel_print, ndo, cp, length);
-}
-
-void
-_babel_print(netdissect_options *ndo,
-            const u_char *cp, u_int length)
-{
     ND_PRINT((ndo, "babel"));
 
     ND_TCHECK2(*cp, 4);

@@ -189,7 +189,7 @@ struct cdeque {
 	uint16_t end_pos;
 	uint16_t cap_mask;
 	uint16_t size;
-	size_t* arr;
+	void** arr;
 };
 
 struct decode_table {
@@ -410,7 +410,7 @@ static size_t cdeque_size(struct cdeque* d) {
  * doesn't perform any bounds checking. If you need bounds checking, use
  * `cdeque_front()` function instead. */
 static void cdeque_front_fast(struct cdeque* d, void** value) {
-	*value = (void*)(intptr_t) d->arr[d->beg_pos];
+	*value = d->arr[d->beg_pos];
 }
 
 /* Returns the first element of current circular deque. This function
@@ -432,7 +432,7 @@ static int cdeque_push_back(struct cdeque* d, void* item) {
 	if(d->size == d->cap_mask + 1)
 		return CDE_OUT_OF_BOUNDS;
 
-	d->arr[d->end_pos] = (size_t) item;
+	d->arr[d->end_pos] = item;
 	d->end_pos = (d->end_pos + 1) & d->cap_mask;
 	d->size++;
 
@@ -442,7 +442,7 @@ static int cdeque_push_back(struct cdeque* d, void* item) {
 /* Pops a front element of this circular deque object and returns its value.
  * This function doesn't perform any bounds checking. */
 static void cdeque_pop_front_fast(struct cdeque* d, void** value) {
-	*value = (void*)(intptr_t) d->arr[d->beg_pos];
+	*value = d->arr[d->beg_pos];
 	d->beg_pos = (d->beg_pos + 1) & d->cap_mask;
 	d->size--;
 }

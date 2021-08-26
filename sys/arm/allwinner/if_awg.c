@@ -1116,7 +1116,7 @@ awg_ioctl(if_t ifp, u_long cmd, caddr_t data)
 	error = 0;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		AWG_LOCK(sc);
 		if (if_getflags(ifp) & IFF_UP) {
 			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
@@ -1132,23 +1132,23 @@ awg_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		sc->if_flags = if_getflags(ifp);
 		AWG_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 			AWG_LOCK(sc);
 			awg_setup_rxfilter(sc);
 			AWG_UNLOCK(sc);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifr_reqcap_get(ifr) ^ if_getcapenable(ifp);
+	case SIOCSIFCAP:
+		mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
 #ifdef DEVICE_POLLING
 		if (mask & IFCAP_POLLING) {
-			if ((ifr_reqcap_get(ifr) & IFCAP_POLLING) != 0) {
+			if ((ifr->ifr_reqcap & IFCAP_POLLING) != 0) {
 				error = ether_poll_register(awg_poll, ifp);
 				if (error != 0)
 					break;
@@ -2023,12 +2023,3 @@ MODULE_DEPEND(awg, ether, 1, 1, 1);
 MODULE_DEPEND(awg, miibus, 1, 1, 1);
 MODULE_DEPEND(awg, aw_sid, 1, 1, 1);
 SIMPLEBUS_PNP_INFO(compat_data);
-// CHERI CHANGES START
-// {
-//   "updated": 20190429,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

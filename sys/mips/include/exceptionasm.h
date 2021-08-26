@@ -88,6 +88,17 @@
 #endif
 
 /*
+ * Note: The kernel stack is allocated below the pcb
+ */
+#ifndef __CHERI_PURE_CAPABILITY__
+#define SWITCH_TO_KERNEL_STACK(pcb)		\
+	PTR_SUBU	sp, pcb, CALLFRAME_SIZ
+#else /* __CHERI_PURE_CAPABILITY__ */
+/* Skip this in purecap kernel, we will do it after saving REG_STC */
+#define SWITCH_TO_KERNEL_STACK(pcb)
+#endif /* __CHERI_PURE_CAPABILITY__ */
+
+/*
  * Save all of the registers except for the kernel temporaries in u.u_pcb.
  */
 #define	SAVE_REGS_TO_PCB(pcb)			\
@@ -125,7 +136,7 @@
 	SAVE_U_PCB_REG(gp, GP, pcb)		; \
 	SAVE_U_PCB_REG(sp, SP, pcb)		; \
 	SAVE_U_PCB_REG(s8, S8, pcb)		; \
-	PTR_SUBU	sp, pcb, CALLFRAME_SIZ	; \
+	SWITCH_TO_KERNEL_STACK(pcb)		; \
 	SAVE_U_PCB_REG(ra, RA, pcb)		; \
 	SAVE_U_PCB_REG(v0, MULLO, pcb)		; \
 	SAVE_U_PCB_REG(v1, MULHI, pcb)		; \
@@ -134,12 +145,16 @@
 	SAVE_U_PCB_REG(a2, BADVADDR, pcb)	; \
 	SAVE_U_PCB_EPC(a3, pcb)
 
-#define	RESTORE_REGS_FROM_PCB(pcb)		\
+/*
+ * Note: tmpcreg must be a temporary capability register.
+ * This sets k0 to the restored status register.
+ */
+#define	RESTORE_REGS_FROM_PCB(pcb, tmpcreg)	  \
 	RESTORE_U_PCB_REG(t0, MULLO, pcb)	; \
 	RESTORE_U_PCB_REG(t1, MULHI, pcb)	; \
 	mtlo	t0				; \
 	mthi	t1				; \
-	RESTORE_U_PCB_PC(t0, pcb)		; \
+	RESTORE_U_PCB_PC(tmpcreg, pcb)		; \
 	RESTORE_U_PCB_REG(v0, V0, pcb)		; \
 	RESTORE_U_PCB_REG(v1, V1, pcb)		; \
 	RESTORE_U_PCB_REG(a0, A0, pcb)		; \
@@ -173,3 +188,12 @@
 	RESTORE_U_PCB_REG(AT, AST, pcb)
 
 #endif /* _MIPS_INCLUDE_EXCEPTIONASM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190620,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

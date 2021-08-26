@@ -142,6 +142,19 @@ atf_init_test_cases()
 {
     local B F G S nm
 
+    # Note: These tests take 30 seconds each on purecap CHERI-RISC-V (i.e. 90
+    # minutes for all of them, or approximately 40% of the total test runtime),
+    # so unless the include_slow_tests option is set, we reduce the
+    # configuration matrix to run only one per file format.
+    # TODO: the majority of the time is spent in hexdump, so we could massively
+    # speed up the test if we used sparse files for the partition data and
+    # added SEEK_HOLE/SEEK_DATA support to hexdump.
+    if [ "$(atf_config_get include_slow_tests false)" != "true" ]; then
+	mkimg_blksz_list="4096"
+	mkimg_geom_list="63x255"
+	mkimg_scheme_list="mbr"
+    fi
+
     for G in $mkimg_geom_list; do
 	for B in $mkimg_blksz_list; do
 	    for S in $mkimg_scheme_list; do

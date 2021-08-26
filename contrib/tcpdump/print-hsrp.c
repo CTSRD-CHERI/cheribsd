@@ -95,12 +95,6 @@ struct hsrp {
 void
 hsrp_print(netdissect_options *ndo, register const uint8_t *bp, register u_int len)
 {
-	INVOKE_DISSECTOR(_hsrp_print, ndo, bp, len);
-}
-
-void
-_hsrp_print(netdissect_options *ndo, register const uint8_t *bp, register u_int len)
-{
 	const struct hsrp *hp = (const struct hsrp *) bp;
 
 	ND_TCHECK(hp->hsrp_version);

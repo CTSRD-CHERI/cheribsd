@@ -51,17 +51,24 @@
 #define	END(sym) .cfi_endproc; .size sym, . - sym
 
 #define	EENTRY(sym)						\
-	.globl	sym; sym:
-#define	EEND(sym)
+	.globl	sym; .type sym,@function; sym:
+#define	EEND(sym) .size sym, . - sym
 
 #define	WEAK_REFERENCE(sym, alias)				\
 	.weak alias;						\
 	.set alias,sym
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	SET_FAULT_HANDLER(handler, tmp)					\
+	clc	tmp, PC_CURTHREAD(ctp);					\
+	clc	tmp, TD_PCB(tmp);		/* Load the pcb */	\
+	csc	handler, PCB_ONFAULT(tmp)	/* Set the handler */
+#else
 #define	SET_FAULT_HANDLER(handler, tmp)					\
 	ld	tmp, PC_CURTHREAD(tp);					\
 	ld	tmp, TD_PCB(tmp);		/* Load the pcb */	\
 	sd	handler, PCB_ONFAULT(tmp)	/* Set the handler */
+#endif
 
 #define	ENTER_USER_ACCESS(tmp)						\
 	li	tmp, SSTATUS_SUM;					\
@@ -81,3 +88,12 @@
 #endif
 
 #endif /* _MACHINE_ASM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

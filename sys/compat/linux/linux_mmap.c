@@ -160,7 +160,7 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 		 * fixed size of (STACK_SIZE - GUARD_SIZE).
 		 */
 
-		if ((caddr_t)addr + len > vms->vm_maxsaddr) {
+		if (addr + len > vms->vm_maxsaddr) {
 			/*
 			 * Some Linux apps will attempt to mmap
 			 * thread stacks near the top of their
@@ -178,7 +178,7 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 			 * mmap's return value.
 			 */
 			PROC_LOCK(p);
-			vms->vm_maxsaddr = (char *)p->p_sysent->sv_usrstack -
+			vms->vm_maxsaddr = p->p_usrstack -
 			    lim_cur_proc(p, RLIMIT_STACK);
 			PROC_UNLOCK(p);
 		}
@@ -217,12 +217,12 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 	    (bsd_flags & MAP_EXCL) == 0) {
 		mr_fixed = mr;
 		mr_fixed.mr_flags |= MAP_FIXED | MAP_EXCL;
-		error = kern_mmap_req(td, &mr_fixed);
+		error = kern_mmap(td, &mr_fixed);
 		if (error == 0)
 			goto out;
 	}
 
-	error = kern_mmap_req(td, &mr);
+	error = kern_mmap(td, &mr);
 out:
 	LINUX_CTR2(mmap2, "return: %d (%p)", error, td->td_retval[0]);
 
@@ -426,10 +426,13 @@ linux_fixup_prot(struct thread *td, int *prot)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ],
 //   "change_comment": "PROT_MAX"
 // }

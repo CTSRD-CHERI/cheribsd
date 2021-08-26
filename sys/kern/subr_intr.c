@@ -106,8 +106,8 @@ struct intr_pic_child {
 	struct intr_pic			*pc_pic;
 	intr_child_irq_filter_t		*pc_filter;
 	void				*pc_filter_arg;
-	uintptr_t			 pc_start;
-	uintptr_t			 pc_length;
+	intr_irq_t			 pc_start;
+	size_t				 pc_length;
 };
 
 /* Interrupt controller definition. */
@@ -321,7 +321,7 @@ intr_irq_handler(struct trapframe *tf)
 }
 
 int
-intr_child_irq_handler(struct intr_pic *parent, uintptr_t irq)
+intr_child_irq_handler(struct intr_pic *parent, intr_irq_t irq)
 {
 	struct intr_pic_child *child;
 	bool found;
@@ -877,8 +877,8 @@ intr_pic_claim_root(device_t dev, intptr_t xref, intr_irq_filter_t *filter,
  */
 struct intr_pic *
 intr_pic_add_handler(device_t parent, struct intr_pic *pic,
-    intr_child_irq_filter_t *filter, void *arg, uintptr_t start,
-    uintptr_t length)
+    intr_child_irq_filter_t *filter, void *arg, intr_irq_t start,
+    size_t length)
 {
 	struct intr_pic *parent_pic;
 	struct intr_pic_child *newchild;
@@ -1714,3 +1714,12 @@ intr_map_init(void *dummy __unused)
 	mtx_init(&irq_map_lock, "intr map table", NULL, MTX_DEF);
 }
 SYSINIT(intr_map_init, SI_SUB_INTR, SI_ORDER_FIRST, intr_map_init, NULL);
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

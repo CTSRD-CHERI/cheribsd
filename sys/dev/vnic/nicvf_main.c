@@ -440,7 +440,7 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 	err = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 #ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET)
 			avoid_reset = TRUE;
@@ -466,19 +466,19 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 		err = ether_ioctl(ifp, cmd, data);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < NIC_HW_MIN_FRS ||
-		    ifr_mtu_get(ifr) > NIC_HW_MAX_FRS) {
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < NIC_HW_MIN_FRS ||
+		    ifr->ifr_mtu > NIC_HW_MAX_FRS) {
 			err = EINVAL;
 		} else {
 			NICVF_CORE_LOCK(nic);
-			err = nicvf_update_hw_max_frs(nic, ifr_mtu_get(ifr));
+			err = nicvf_update_hw_max_frs(nic, ifr->ifr_mtu);
 			if (err == 0)
-				if_setmtu(ifp, ifr_mtu_get(ifr));
+				if_setmtu(ifp, ifr->ifr_mtu);
 			NICVF_CORE_UNLOCK(nic);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		NICVF_CORE_LOCK(nic);
 		flags = if_getflags(ifp);
 		if (flags & IFF_UP) {
@@ -508,8 +508,8 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		NICVF_CORE_UNLOCK(nic);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 #if 0
 			NICVF_CORE_LOCK(nic);
@@ -520,13 +520,13 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		err = ifmedia_ioctl(ifp, ifr, &nic->if_media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = if_getcapenable(ifp) ^ ifr_reqcap_get(ifr);
+	case SIOCSIFCAP:
+		mask = if_getcapenable(ifp) ^ ifr->ifr_reqcap;
 		if (mask & IFCAP_VLAN_MTU) {
 			/* No work to do except acknowledge the change took. */
 			if_togglecapenable(ifp, IFCAP_VLAN_MTU);
@@ -811,21 +811,21 @@ nicvf_media_change(struct ifnet *ifp __unused)
 
 /* Register read/write APIs */
 void
-nicvf_reg_write(struct nicvf *nic, bus_space_handle_t offset, uint64_t val)
+nicvf_reg_write(struct nicvf *nic, bus_size_t offset, uint64_t val)
 {
 
 	bus_write_8(nic->reg_base, offset, val);
 }
 
 uint64_t
-nicvf_reg_read(struct nicvf *nic, uint64_t offset)
+nicvf_reg_read(struct nicvf *nic, bus_size_t offset)
 {
 
 	return (bus_read_8(nic->reg_base, offset));
 }
 
 void
-nicvf_queue_reg_write(struct nicvf *nic, bus_space_handle_t offset,
+nicvf_queue_reg_write(struct nicvf *nic, bus_size_t offset,
     uint64_t qidx, uint64_t val)
 {
 
@@ -833,8 +833,7 @@ nicvf_queue_reg_write(struct nicvf *nic, bus_space_handle_t offset,
 }
 
 uint64_t
-nicvf_queue_reg_read(struct nicvf *nic, bus_space_handle_t offset,
-    uint64_t qidx)
+nicvf_queue_reg_read(struct nicvf *nic, bus_size_t offset, uint64_t qidx)
 {
 
 	return (bus_read_8(nic->reg_base, offset + (qidx << NIC_Q_NUM_SHIFT)));
@@ -1622,12 +1621,3 @@ nicvf_tick_stats(void *arg)
 
 	callout_reset(&nic->stats_callout, hz, nicvf_tick_stats, nic);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

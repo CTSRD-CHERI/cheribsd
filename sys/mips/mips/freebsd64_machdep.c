@@ -105,7 +105,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= FREEBSD64_PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct freebsd64_ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = freebsd64_copyout_strings,
@@ -132,7 +132,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 INIT_SYSENTVEC(freebsd64_sysent, &elf_freebsd_freebsd64_sysvec);
 
 #ifdef CPU_CHERI
-static __inline boolean_t
+static __inline bool
 mips_hybrid_check_cap_size(uint32_t bits, const char *execpath)
 {
 	static struct timeval lastfail;
@@ -140,23 +140,23 @@ mips_hybrid_check_cap_size(uint32_t bits, const char *execpath)
 	const uint32_t expected = CHERICAP_SIZE * 8;
 
 	if (bits == expected)
-		return TRUE;
+		return true;
 	if (ppsratecheck(&lastfail, &curfail, 1))
 		printf("warning: attempting to execute %d-bit hybrid binary "
 		    "'%s' on a %d-bit kernel\n", bits, execpath, expected);
-	return FALSE;
+	return false;
 }
 
-static boolean_t
-mips_elf_header_supported(struct image_params * imgp, int32_t *osrel __unused,
-    uint32_t *fctl0 __unused)
+static bool
+mips_elf_header_supported(const struct image_params *imgp,
+    const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
 {
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 	if ((hdr->e_flags & EF_MIPS_MACH) == EF_MIPS_MACH_CHERI128)
 		return mips_hybrid_check_cap_size(128, imgp->execpath);
 	if ((hdr->e_flags & EF_MIPS_MACH) == EF_MIPS_MACH_CHERI256)
 		return mips_hybrid_check_cap_size(256, imgp->execpath);
-	return TRUE;
+	return true;
 }
 #endif
 
@@ -305,32 +305,23 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 *     extensions to the context frame placed on the stack.
 	 *
 	 * (2) If the user $pcc doesn't include CHERI_PERM_SYSCALL, then we
-	 *     consider user state to be 'sandboxed' and therefore to require
-	 *     special delivery handling which includes a domain-switch to the
-	 *     thread's context-switch domain.  (This is done by
-	 *     hybridabi_sendsig()).
+	 *     consider user state to be 'sandboxed'.
 	 *
 	 * (3) If an alternative signal stack is not defined, and we are in a
-	 *     'sandboxed' state, then we have two choices: (a) if the signal
-	 *     is of type SA_SANDBOX_UNWIND, we will automatically unwind the
-	 *     trusted stack by one frame; (b) otherwise, we will terminate
-	 *     the process unconditionally.
+	 *     'sandboxed' state, then we terminate the process
+	 *     unconditionally.
 	 */
 	cheri_is_sandboxed = cheri_signal_sandboxed(td);
 
 	/*
-	 * We provide the ability to drop into the debugger in two different
-	 * circumstances: (1) if the code running is sandboxed; and (2) if the
-	 * fault is a CHERI protection fault.  Handle both here for the
-	 * non-unwind case.  Do this before we rewrite any general-purpose or
-	 * capability register state for the thread.
+	 * We provide the ability to drop into the debugger if the
+	 * code running is sandboxed.  Do this before we rewrite any
+	 * general-purpose or capability register state for the
+	 * thread.
 	 */
 #ifdef DDB
 	if (cheri_is_sandboxed && security_cheri_debugger_on_sandbox_signal)
 		kdb_enter(KDB_WHY_CHERI, "Signal delivery to CHERI sandbox");
-	else if (sig == SIGPROT && security_cheri_debugger_on_sigprot)
-		kdb_enter(KDB_WHY_CHERI,
-		    "SIGPROT delivered outside sandbox");
 #endif
 
 	/*
@@ -361,7 +352,8 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
 	sf.sf_uc.uc_mcontext.mc_tls = (__cheri_addr uint64_t)td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
-	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
+	bcopy(__unbounded_addressof(regs->ast),
+	    (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
 	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));
 	sf.sf_uc.uc_mcontext.mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
 #if defined(CPU_HAVEFPU)
@@ -369,7 +361,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* if FPU has current state, save it first */
 		if (td == PCPU_GET(fpcurthread))
 			MipsSaveCurFPState(td);
-		bcopy((void *)&td->td_frame->f0,
+		bcopy(__unbounded_addressof(td->td_frame->f0),
 		    (void *)sf.sf_uc.uc_mcontext.mc_fpregs,
 		    sizeof(sf.sf_uc.uc_mcontext.mc_fpregs));
 	}
@@ -466,11 +458,9 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 #ifdef CPU_CHERI
 	/*
-	 * Install CHERI signal-delivery register state for handler to run
-	 * in.  As we don't install this in the CHERI frame on the user stack,
-	 * it will be (genrally) be removed automatically on sigreturn().
+	 * Always run the signal handler with the default hybrid DDC.
 	 */
-	hybridabi_sendsig(td);
+	regs->ddc = hybridabi_user_ddc();
 #endif
 
 	regs->pc = (trapf_pc_t)catcher;
@@ -482,7 +472,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	} else {
 		/* Signal trampoline code is at base of user stack. */
 		/* XXX: GC this code path once shared page is stable */
-		regs->ra = (register_t)(intptr_t)FREEBSD64_PS_STRINGS -
+		regs->ra = (register_t)p->p_psstrings -
 		    *(p->p_sysent->sv_szsigcode);
 	}
 	PROC_LOCK(p);
@@ -560,3 +550,12 @@ elf64_dump_thread(struct thread *td __unused, void *dst __unused,
     size_t *off __unused)
 {
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

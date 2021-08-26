@@ -1067,13 +1067,12 @@ msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	error = 0;
 
 	switch(command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		MSK_IF_LOCK(sc_if);
-		if (ifr_mtu_get(ifr) > MSK_JUMBO_MTU ||
-		    ifr_mtu_get(ifr) < ETHERMIN)
+		if (ifr->ifr_mtu > MSK_JUMBO_MTU || ifr->ifr_mtu < ETHERMIN)
 			error = EINVAL;
-		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
-			if (ifr_mtu_get(ifr) > ETHERMTU) {
+		else if (ifp->if_mtu != ifr->ifr_mtu) {
+			if (ifr->ifr_mtu > ETHERMTU) {
 				if ((sc_if->msk_flags & MSK_FLAG_JUMBO) == 0) {
 					error = EINVAL;
 					MSK_IF_UNLOCK(sc_if);
@@ -1088,7 +1087,7 @@ msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 					VLAN_CAPABILITIES(ifp);
 				}
 			}
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 				msk_init_locked(sc_if);
@@ -1096,7 +1095,7 @@ msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		MSK_IF_UNLOCK(sc_if);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		MSK_IF_LOCK(sc_if);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -1110,22 +1109,22 @@ msk_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc_if->msk_if_flags = ifp->if_flags;
 		MSK_IF_UNLOCK(sc_if);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		MSK_IF_LOCK(sc_if);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			msk_rxfilter(sc_if);
 		MSK_IF_UNLOCK(sc_if);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		mii = device_get_softc(sc_if->msk_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		reinit = 0;
 		MSK_IF_LOCK(sc_if);
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
 		    (IFCAP_TXCSUM & ifp->if_capabilities) != 0) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
@@ -4612,12 +4611,3 @@ sysctl_hw_msk_proc_limit(SYSCTL_HANDLER_ARGS)
 	return (sysctl_int_range(oidp, arg1, arg2, req, MSK_PROC_MIN,
 	    MSK_PROC_MAX));
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

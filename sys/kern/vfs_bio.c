@@ -89,6 +89,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_map.h>
 #include <vm/swap_pager.h>
 
+#include <cheri/cheric.h>
+
 static MALLOC_DEFINE(M_BIOBUF, "biobuf", "BIO buffer");
 
 struct	bio_ops bioops;		/* I/O operation notification */
@@ -1080,6 +1082,11 @@ kern_vfs_bio_buffer_alloc(caddr_t v, long physmem_est)
 		nbuf = maxbuf;
 	}
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Account for CHERI rounding when estimating usage. */
+	nbuf = CHERI_REPRESENTABLE_LENGTH((long)nbuf * BKVASIZE) / BKVASIZE;
+#endif
+
 	/*
 	 * Ideal allocation size for the transient bio submap is 10%
 	 * of the maximal space buffer map.  This roughly corresponds
@@ -1135,9 +1142,12 @@ kern_vfs_bio_buffer_alloc(caddr_t v, long physmem_est)
 
 	/*
 	 * Reserve space for the buffer cache buffers
+	 * When we are called the first time, the capability is invalid
+	 * so we can not set bounds.
 	 */
-	buf = (void *)v;
-	v = (caddr_t)(buf + nbuf);
+	if (cheri_kern_gettag(v))
+		buf = (void *)cheri_kern_setbounds(v, nbuf * sizeof(*buf));
+	v = v + nbuf * sizeof(*buf);
 
 	return(v);
 }
@@ -1161,7 +1171,7 @@ bufinit(void)
 
 	/* finally, initialize each buffer header and stick on empty q */
 	for (i = 0; i < nbuf; i++) {
-		bp = &buf[i];
+		bp = cheri_kern_setboundsexact(buf + i, sizeof(*buf));
 		bzero(bp, sizeof *bp);
 		bp->b_flags = B_INVAL;
 		bp->b_rcred = NOCRED;
@@ -1445,9 +1455,9 @@ bpmap_qenter(struct buf *bp)
 	 * bp->b_data is relative to bp->b_offset, but
 	 * bp->b_offset may be offset into the first page.
 	 */
-	bp->b_data = (caddr_t)trunc_page((vm_offset_t)bp->b_data);
+	bp->b_data = (caddr_t)trunc_page((vm_pointer_t)bp->b_data);
 	pmap_qenter((vm_offset_t)bp->b_data, bp->b_pages, bp->b_npages);
-	bp->b_data = (caddr_t)((vm_offset_t)bp->b_data |
+	bp->b_data = (caddr_t)((vm_pointer_t)bp->b_data |
 	    (vm_offset_t)(bp->b_offset & PAGE_MASK));
 }
 
@@ -1998,7 +2008,7 @@ bufkva_free(struct buf *bp)
 	if (bp->b_kvasize == 0)
 		return;
 
-	vmem_free(buffer_arena, (vm_offset_t)bp->b_kvabase, bp->b_kvasize);
+	vmem_free(buffer_arena, (vmem_addr_t)bp->b_kvabase, bp->b_kvasize);
 	counter_u64_add(bufkvaspace, -bp->b_kvasize);
 	counter_u64_add(buffreekvacnt, 1);
 	bp->b_data = bp->b_kvabase = unmapped_buf;
@@ -2013,7 +2023,7 @@ bufkva_free(struct buf *bp)
 static int
 bufkva_alloc(struct buf *bp, int maxsize, int gbflags)
 {
-	vm_offset_t addr;
+	vm_pointer_t addr;
 	int error;
 
 	KASSERT((gbflags & GB_UNMAPPED) == 0 || (gbflags & GB_KVAALLOC) != 0,
@@ -4297,7 +4307,7 @@ biodone(struct bio *bp)
 {
 	struct mtx *mtxp;
 	void (*done)(struct bio *);
-	vm_offset_t start, end;
+	vm_pointer_t start, end;
 
 	biotrack(bp, __func__);
 
@@ -4314,11 +4324,12 @@ biodone(struct bio *bp)
 	if ((bp->bio_flags & BIO_TRANSIENT_MAPPING) != 0) {
 		bp->bio_flags &= ~BIO_TRANSIENT_MAPPING;
 		bp->bio_flags |= BIO_UNMAPPED;
-		start = trunc_page((vm_offset_t)bp->bio_data);
-		end = round_page((vm_offset_t)bp->bio_data + bp->bio_length);
+		start = trunc_page((vm_pointer_t)bp->bio_data);
+		end = round_page((vm_pointer_t)bp->bio_data + bp->bio_length);
 		bp->bio_data = unmapped_buf;
-		pmap_qremove(start, atop(end - start));
-		vmem_free(transient_arena, start, end - start);
+		pmap_qremove(start, atop((ptraddr_t)end - (ptraddr_t)start));
+		vmem_free(transient_arena, start,
+		    (ptraddr_t)end - (ptraddr_t)start);
 		atomic_add_int(&inflight_transient_maps, -1);
 	}
 	done = bp->bio_done;
@@ -5292,7 +5303,7 @@ end_pages:
 DB_SHOW_COMMAND(buffer, db_show_buffer)
 {
 	/* get args */
-	struct buf *bp = (struct buf *)addr;
+	struct buf *bp;
 #ifdef FULL_BUF_TRACKING
 	uint32_t i, j;
 #endif
@@ -5302,6 +5313,7 @@ DB_SHOW_COMMAND(buffer, db_show_buffer)
 		return;
 	}
 
+	bp = DB_DATA_PTR(addr, struct buf);
 	db_printf("buf at %p\n", bp);
 	db_printf("b_flags = 0x%b, b_xflags=0x%b\n",
 	    (u_int)bp->b_flags, PRINT_BUF_FLAGS,
@@ -5439,7 +5451,7 @@ DB_SHOW_COMMAND(vnodebufs, db_show_vnodebufs)
 		db_printf("usage: show vnodebufs <addr>\n");
 		return;
 	}
-	vp = (struct vnode *)addr;
+	vp = DB_DATA_PTR(addr, struct vnode);
 	db_printf("Clean buffers:\n");
 	TAILQ_FOREACH(bp, &vp->v_bufobj.bo_clean.bv_hd, b_bobufs) {
 		db_show_buffer((uintptr_t)bp, 1, 0, NULL);
@@ -5475,3 +5487,14 @@ DB_COMMAND(countfreebufs, db_coundfreebufs)
 	db_printf("numfreebuffers is %d\n", numfreebuffers);
 }
 #endif /* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20190517,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer",
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

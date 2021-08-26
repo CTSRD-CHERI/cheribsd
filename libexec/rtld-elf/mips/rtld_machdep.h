@@ -38,11 +38,6 @@
 
 #include <stdlib.h>
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-#endif
-
 #ifdef IN_RTLD
 /* Don't pull this in when building libthr */
 #include "debug.h"
@@ -71,7 +66,7 @@ Elf_Addr _mips_rtld_bind(struct Struct_Obj_Entry *obj, Elf_Size reloff);
 
 void *_mips_get_tls(void);
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
 
 #define FUNC_PTR_REMOVE_PERMS	(__CHERI_CAP_PERMISSION_PERMIT_SEAL__ |	\
 	__CHERI_CAP_PERMISSION_PERMIT_STORE__ |				\
@@ -86,13 +81,9 @@ void *_mips_get_tls(void);
 #define DATA_PTR_REMOVE_PERMS	(__CHERI_CAP_PERMISSION_PERMIT_SEAL__ |	\
 	__CHERI_CAP_PERMISSION_PERMIT_EXECUTE__)
 
-static inline const char*
-get_codesegment(const struct Struct_Obj_Entry *obj) {
-	/* TODO: we should have a separate member for .text/rodata */
-	dbg_assert(cheri_getperm(obj->text_rodata_cap) & __CHERI_CAP_PERMISSION_PERMIT_EXECUTE__);
-	dbg_assert(!(cheri_getperm(obj->text_rodata_cap) & __CHERI_CAP_PERMISSION_PERMIT_STORE__));
-	return obj->text_rodata_cap;
-}
+#ifdef __CHERI_PURE_CAPABILITY__
+extern bool add_cheri_plt_stub(const Obj_Entry *obj, const Obj_Entry *rtldobj,
+    Elf_Word r_symndx, void **where);
 
 extern dlfunc_t find_external_call_thunk(const Elf_Sym* def, const Obj_Entry* defobj, size_t addend);
 
@@ -111,6 +102,82 @@ can_use_tight_pcc_bounds(const struct Struct_Obj_Entry *defobj)
 		__builtin_trap();
 	}
 }
+#endif
+
+/*
+ * Create a pointer to a function.
+ * Important: this is not necessarily callable! For the PLT ABI we need a
+ * to load $cgp first -> use make_function_pointer() instead.
+ */
+static inline dlfunc_t __capability
+make_code_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
+    bool tight_bounds, size_t addend)
+{
+	const void * __capability ret;
+
+	ret = get_codesegment_cap(defobj) + def->st_value;
+	/* Remove store and seal permissions */
+	ret = cheri_clearperm(ret, FUNC_PTR_REMOVE_PERMS);
+#ifdef __CHERI_PURE_CAPABILITY__
+	dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_LEGACY);
+	dbg_assert(tight_bounds ==
+	    (defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_PCREL));
+#endif
+	if (tight_bounds) {
+		ret = cheri_setbounds(ret, def->st_size);
+	}
+	/*
+	 * Note: The addend is required for C++ exceptions since capabilities
+	 * for catch blocks point to the middle of a function.
+	 */
+	ret = cheri_incoffset(ret, addend);
+	/* All code pointers should be sentries: */
+	ret = __builtin_cheri_seal_entry(ret);
+	return __DECONST_CAP(dlfunc_t __capability, ret);
+}
+
+/*
+ * Create a function pointer that can be called anywhere (i.e. for the PLT ABI
+ * this will be a pointer to a trampoline that loads the correct $cgp).
+ */
+
+static inline dlfunc_t __capability
+make_function_cap_with_addend(const Elf_Sym *def,
+    const struct Struct_Obj_Entry *defobj, size_t addend)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	// Add a trampoline if the target ABI is not PCREL
+	if (can_use_tight_pcc_bounds(defobj)) {
+		return find_external_call_thunk(def, defobj, addend);
+	}
+#endif
+	/* No need for a function pointer trampoline in the legacy/pcrel ABI */
+	return make_code_cap(def, defobj, /*tight_bounds=*/false, addend);
+}
+
+static inline dlfunc_t __capability
+make_function_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
+{
+	return make_function_cap_with_addend(def, defobj, /*addend=*/0);
+}
+
+static inline void * __capability
+make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
+{
+	void * __capability ret;
+	ret = get_datasegment_cap(defobj) + def->st_value;
+	/* Remove execute and seal permissions */
+	ret = cheri_clearperm(ret, DATA_PTR_REMOVE_PERMS);
+	ret = cheri_setbounds(ret, def->st_size);
+	return ret;
+}
+
+#define set_bounds_if_nonnull(cap, size)	\
+	do { if (cap) { cap = cheri_setbounds(cap, size); } } while(0)
+
+#endif /* __has_feature(capabilities) */
+
+#ifdef __CHERI_PURE_CAPABILITY__
 
 /* Create a callable function pointer (needed for PLT ABI)  */
 extern dlfunc_t
@@ -156,71 +223,6 @@ _make_rtld_function_pointer(dlfunc_t target_func) {
 #define make_rtld_local_function_pointer(target_func)	\
 	(__typeof__(&target_func))_make_local_only_fn_pointer(target_func)
 
-/*
- * Create a pointer to a function.
- * Important: this is not necessarily callable! For the PLT ABI we need a
- * to load $cgp first -> use make_function_pointer() instead.
- */
-static inline dlfunc_t
-make_code_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
-    bool tight_bounds, size_t addend)
-{
-	const void *ret = get_codesegment(defobj) + def->st_value;
-	/* Remove store and seal permissions */
-	ret = cheri_clearperm(ret, FUNC_PTR_REMOVE_PERMS);
-	dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_LEGACY);
-	if (tight_bounds) {
-		dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_PCREL);
-		ret = cheri_setbounds(ret, def->st_size);
-	} else {
-		/* PC-relative ABI needs full DSO bounds */
-		dbg_assert(defobj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL);
-	}
-	/*
-	 * Note: The addend is required for C++ exceptions since capabilities
-	 * for catch blocks point to the middle of a function.
-	 */
-	ret = cheri_incoffset(ret, addend);
-	/* All code pointers should be sentries: */
-	ret = __builtin_cheri_seal_entry(ret);
-	return __DECONST(dlfunc_t, ret);
-}
-
-/*
- * Create a function pointer that can be called anywhere (i.e. for the PLT ABI
- * this will be a pointer to a trampoline that loads the correct $cgp).
- */
-
-static inline dlfunc_t
-make_function_pointer_with_addend(
-    const Elf_Sym *def, const struct Struct_Obj_Entry *defobj, size_t addend)
-{
-	// Add a trampoline if the target ABI is not PCREL
-	if (can_use_tight_pcc_bounds(defobj)) {
-		return find_external_call_thunk(def, defobj, addend);
-	} else {
-		/* No need for a function pointer trampoline in the legacy/pcrel ABI */
-		return make_code_pointer(def, defobj, /*tight_bounds=*/false, addend);
-	}
-}
-
-static inline dlfunc_t
-make_function_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
-{
-	return make_function_pointer_with_addend(def, defobj, /*addend=*/0);
-}
-
-static inline void*
-make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
-{
-	void* ret = defobj->relocbase + def->st_value;
-	/* Remove execute and seal permissions */
-	ret = cheri_clearperm(ret, DATA_PTR_REMOVE_PERMS);
-	/* TODO: can we always set bounds here or does it break compat? */
-	ret = cheri_setbounds(ret, def->st_size);
-	return ret;
-}
-
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 /* Implemented as a C++ function to use std::lower_bound */
 const void* find_per_function_cgp(const struct Struct_Obj_Entry *obj, const void* func);
@@ -238,8 +240,8 @@ static inline const void* target_cgp_for_func(const struct Struct_Obj_Entry *obj
 	return obj->_target_cgp;
 }
 
-#define set_bounds_if_nonnull(ptr, size)	\
-	do { if (ptr) { ptr = cheri_setbounds(ptr, size); } } while(0)
+#define make_function_pointer(def, defobj) \
+	make_function_cap(def, defobj)
 
 // ignore _init/_fini
 #define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
@@ -346,8 +348,8 @@ reloc_gnu_ifunc(Obj_Entry *obj __unused, int flags __unused,
 	return (0);
 }
 
-static inline Elf_Addr
-reloc_jmpslot(Elf_Addr *where __unused, Elf_Addr target, const Obj_Entry *defobj __unused,
+static inline uintptr_t
+reloc_jmpslot(uintptr_t *where __unused, uintptr_t target, const Obj_Entry *defobj __unused,
     const Obj_Entry *obj __unused, const Elf_Rel *rel __unused)
 {
 	_rtld_error("%s: not implemented!", __func__);

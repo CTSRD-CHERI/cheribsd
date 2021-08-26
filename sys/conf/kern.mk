@@ -3,7 +3,7 @@
 #
 # Warning flags for compiling the kernel and components of the kernel:
 #
-CWARNFLAGS?=	-Wall -Wredundant-decls -Wnested-externs -Wstrict-prototypes \
+CWARNFLAGS=	-Wall -Wredundant-decls -Wnested-externs -Wstrict-prototypes \
 		-Wmissing-prototypes -Wpointer-arith -Wcast-qual \
 		-Wundef -Wno-pointer-sign ${FORMAT_EXTENSIONS} \
 		-Wmissing-include-dirs -fdiagnostics-show-option \
@@ -17,21 +17,21 @@ CWARNFLAGS?=	-Wall -Wredundant-decls -Wnested-externs -Wstrict-prototypes \
 # kernel where fixing them is more trouble than it is worth, or where there is
 # a false positive.
 .if ${COMPILER_TYPE} == "clang"
-NO_WCONSTANT_CONVERSION=	-Wno-error-constant-conversion
+NO_WCONSTANT_CONVERSION=	-Wno-error=constant-conversion
 NO_WSHIFT_COUNT_NEGATIVE=	-Wno-shift-count-negative
 NO_WSHIFT_COUNT_OVERFLOW=	-Wno-shift-count-overflow
 NO_WSELF_ASSIGN=		-Wno-self-assign
-NO_WUNNEEDED_INTERNAL_DECL=	-Wno-error-unneeded-internal-declaration
-NO_WSOMETIMES_UNINITIALIZED=	-Wno-error-sometimes-uninitialized
-NO_WCAST_QUAL=			-Wno-error-cast-qual
+NO_WUNNEEDED_INTERNAL_DECL=	-Wno-error=unneeded-internal-declaration
+NO_WSOMETIMES_UNINITIALIZED=	-Wno-error=sometimes-uninitialized
+NO_WCAST_QUAL=			-Wno-error=cast-qual
 NO_WTAUTOLOGICAL_POINTER_COMPARE= -Wno-tautological-pointer-compare
 # Several other warnings which might be useful in some cases, but not severe
 # enough to error out the whole kernel build.  Display them anyway, so there is
 # some incentive to fix them eventually.
-CWARNEXTRA?=	-Wno-error-tautological-compare -Wno-error-empty-body \
-		-Wno-error-parentheses-equality -Wno-error-unused-function \
-		-Wno-error-pointer-sign
-CWARNEXTRA+=	-Wno-error-shift-negative-value
+CWARNEXTRA?=	-Wno-error=tautological-compare -Wno-error=empty-body \
+		-Wno-error=parentheses-equality -Wno-error=unused-function \
+		-Wno-error=pointer-sign
+CWARNEXTRA+=	-Wno-error=shift-negative-value
 CWARNEXTRA+=	-Wno-address-of-packed-member
 .if ${COMPILER_VERSION} >= 100000
 NO_WMISLEADING_INDENTATION=	-Wno-misleading-indentation
@@ -120,6 +120,15 @@ CFLAGS += -mgeneral-regs-only
 # Reserve x18 for pcpu data
 CFLAGS += -ffixed-x18
 INLINE_LIMIT?=	8000
+
+.if ${MACHINE_CPU:Mcheri}
+AARCH64_MARCH=	morello
+.if ${MACHINE_ARCH:Maarch*c*}
+CFLAGS+=	-march=morello+c64 -mabi=purecap
+.else
+CFLAGS+=	-march=morello
+.endif
+.endif
 .endif
 
 #
@@ -269,6 +278,15 @@ CFLAGS+=	-gdwarf-2
 # CHERI purecap kernel flags
 #
 .if ${MACHINE_ABI:Mpurecap}
+CWARNFLAGS+=	-Werror=implicit-function-declaration
+
+.if defined(CHERI_USE_CAP_TABLE)
+CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
+.endif
+
+.if defined(CHERI_SUBOBJECT_BOUNDS)
+CFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
+.endif
 
 .if defined(CHERI_SUBOBJECT_BOUNDS_STATS)
 CHERI_SUBOBJECT_BOUNDS_STATS_FILE?=kernel-subobject-bounds-stats.csv
@@ -328,6 +346,10 @@ CCLDFLAGS+=	-fuse-ld=${LD:[1]:S/^ld.//1W}
 
 # Set target-specific linker emulation name.
 LD_EMULATION_aarch64=aarch64elf
+# XXX-AM: This is a workaround for not having full eflag support in morello lld.
+# should be removed as soon as the linker can link in capability mode based on
+# input files eflags instead.
+LD_EMULATION_aarch64c=aarch64elf_cheri
 LD_EMULATION_amd64=elf_x86_64_fbsd
 LD_EMULATION_arm=armelf_fbsd
 LD_EMULATION_armv6=armelf_fbsd
@@ -336,6 +358,7 @@ LD_EMULATION_i386=elf_i386_fbsd
 LD_EMULATION_mips= elf32btsmip_fbsd
 LD_EMULATION_mipshf= elf32btsmip_fbsd
 LD_EMULATION_mips64= elf64btsmip_fbsd
+LD_EMULATION_mips64c128= elf64btsmip_fbsd
 LD_EMULATION_mips64hf= elf64btsmip_fbsd
 LD_EMULATION_mipsel= elf32ltsmip_fbsd
 LD_EMULATION_mipselhf= elf32ltsmip_fbsd
@@ -348,5 +371,6 @@ LD_EMULATION_powerpcspe= elf32ppc_fbsd
 LD_EMULATION_powerpc64= elf64ppc_fbsd
 LD_EMULATION_powerpc64le= elf64lppc_fbsd
 LD_EMULATION_riscv64= elf64lriscv
+LD_EMULATION_riscv64c= elf64lriscv
 LD_EMULATION_riscv64sf= elf64lriscv
 LD_EMULATION=${LD_EMULATION_${MACHINE_ARCH}}

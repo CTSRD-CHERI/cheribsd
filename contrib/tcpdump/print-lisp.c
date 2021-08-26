@@ -231,11 +231,6 @@ static void loc_hdr_flag(netdissect_options *, uint16_t);
 
 void lisp_print(netdissect_options *ndo, const u_char *bp, u_int length)
 {
-	INVOKE_DISSECTOR(_lisp_print, ndo, bp, length);
-}
-
-void _lisp_print(netdissect_options *ndo, const u_char *bp, u_int length)
-{
 	uint8_t type;
 	uint8_t mask_len;
 	uint8_t loc_count;

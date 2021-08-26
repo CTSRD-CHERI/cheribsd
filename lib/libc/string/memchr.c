@@ -25,6 +25,12 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <sys/param.h>
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
+
 #include <limits.h>
 #include <stdint.h>
 #include <string.h>
@@ -39,8 +45,16 @@ memchr(const void *src, int c, size_t n)
 {
 	const unsigned char *s = src;
 	c = (unsigned char)c;
-// XXX-BD: this path produces out of bounds cld's on CHERI-mips.
-#if defined(__GNUC__) && !defined(__CHERI_PURE_CAPABILITY__) && !defined(CAPABILITY_VERSION)
+#if defined(__GNUC__)
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * Make sure the word-wise reads don't walk off the end
+	 * of caps with weakly-aligned ends.
+	 */
+	size_t space = cheri_bytes_remaining(src);
+	size_t excess = n - MIN(n, space);
+	n = MIN(n, space);
+#endif
 	for (; !__builtin_is_aligned(s, SS) && n && *s != c; s++, n--)
 		;
 	if (n && *s != c) {
@@ -52,6 +66,10 @@ memchr(const void *src, int c, size_t n)
 			;
 		s = (const void *)w;
 	}
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Restore excess length so the byte-wise reads trap if appropriate. */
+	n += excess;
+#endif
 #endif
 	for (; n && *s != c; s++, n--)
 		;

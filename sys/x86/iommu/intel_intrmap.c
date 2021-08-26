@@ -351,7 +351,7 @@ dmar_init_irt(struct dmar_unit *unit)
 		return (ENOMEM);
 	unit->irt_phys = pmap_kextract((vm_offset_t)unit->irt);
 	unit->irtids = vmem_create("dmarirt", 0, unit->irte_cnt, 1, 0,
-	    M_FIRSTFIT | M_NOWAIT);
+	    M_FIRSTFIT | M_NOWAIT, 0);
 	DMAR_LOCK(unit);
 	dmar_load_irt_ptr(unit);
 	dmar_qi_invalidate_iec_glob(unit);

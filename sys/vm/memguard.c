@@ -212,7 +212,7 @@ memguard_init(vmem_t *parent)
 
 	vmem_alloc(parent, memguard_mapsize, M_BESTFIT | M_WAITOK, &base);
 	vmem_init(memguard_arena, "memguard arena", base, memguard_mapsize,
-	    PAGE_SIZE, 0, M_WAITOK);
+	    PAGE_SIZE, 0, M_WAITOK, VMEM_CAPABILITY_ARENA);
 	memguard_base = base;
 
 	printf("MEMGUARD DEBUGGING ALLOCATOR INITIALIZED:\n");
@@ -509,3 +509,12 @@ memguard_get_req_size(const void *addr)
 {
 	return (*v2sizep(trunc_page((uintptr_t)addr)));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "bounds_compression"
+//   ]
+// }
+// CHERI CHANGES END

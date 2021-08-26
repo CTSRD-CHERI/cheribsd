@@ -76,6 +76,21 @@
 #define	cheri_setbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
 #define	cheri_setboundsexact(x, y)	__builtin_cheri_bounds_set_exact((x), (y))
 
+/*
+ * Soft implementation of cheri_subset_test().
+ * Test whether a capability is a subset of another.
+ * NOTE: This is to be replaced by LLVM intrinsic once the intrinsic and
+ * related instruction arguments are stable.
+ */
+#define	cheri_is_subset(parent, ptr)					\
+	(cheri_gettag(parent) == cheri_gettag(ptr) &&			\
+	 cheri_getbase(ptr) >= cheri_getbase(parent) &&			\
+	 cheri_gettop(ptr) <= cheri_gettop(parent) &&			\
+	 (cheri_getperm(ptr) & cheri_getperm(parent)) == cheri_getperm(ptr))
+
+#define	cheri_is_null_derived(x)					\
+	__builtin_cheri_equal_exact((uintcap_t)cheri_getaddress(x), x)
+
 /* Create an untagged capability from an integer */
 #define cheri_fromint(x)	cheri_incoffset(NULL, x)
 
@@ -83,11 +98,10 @@
 #define cheri_copyaddress(dst, src)	(cheri_setaddress(dst, cheri_getaddress(src)))
 
 /* Get the top of a capability (i.e. one byte past the last accessible one) */
-static inline vaddr_t
-cheri_gettop(const void * __capability cap)
-{
-	return (cheri_getbase(cap) + cheri_getlen(cap));
-}
+#define	cheri_gettop(cap)	__extension__({			\
+	__typeof__(cap) c = (cap);				\
+	(cheri_getbase(c) + cheri_getlen(c));			\
+})
 
 /* Check if the address is between cap.base and cap.top, i.e. in bounds */
 #ifdef __cplusplus
@@ -98,17 +112,6 @@ static inline _Bool
 cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
 {
 	return (addr >= cheri_getbase(cap) && addr < cheri_gettop(cap));
-}
-
-#ifdef __cplusplus
-static __always_inline inline bool
-#else
-static __always_inline inline _Bool
-#endif
-cheri_is_null_derived(const void * __capability cap)
-{
-	return (__builtin_cheri_equal_exact((uintcap_t)cheri_getaddress(cap),
-	    cap));
 }
 
 /*
@@ -208,6 +211,22 @@ cheri_bytes_remaining(const void * __capability cap)
 
 #endif	/* __has_feature(capabilities) */
 
+#if defined(_KERNEL) && defined(__CHERI_PURE_CAPABILITY__)
+#define	cheri_kern_gettag(x)		cheri_gettag(x)
+#define	cheri_kern_setbounds(x, y)	cheri_setbounds(x, y)
+#define	cheri_kern_setboundsexact(x, y)	cheri_setboundsexact(x, y)
+#define	cheri_kern_setaddress(x, y)	cheri_setaddress(x, y)
+#define	cheri_kern_getaddress(x)	cheri_setaddress(x)
+#define	cheri_kern_andperm(x, y)	cheri_andperm(x, y)
+#else
+#define	cheri_kern_gettag(x)		1
+#define	cheri_kern_setbounds(x, y)	(x)
+#define	cheri_kern_setboundsexact(x, y)	(x)
+#define	cheri_kern_setaddress(x, y)	((__typeof__(x))(y))
+#define	cheri_kern_getaddress(x)	((uintptr_t)(x))
+#define	cheri_kern_andperm(x, y)	(x)
+#endif
+
 /*
  * The cheri_{get,set,clear}_low_pointer_bits() functions work both with and
  * without CHERI support so can be used unconditionally to fix
@@ -218,41 +237,33 @@ cheri_bytes_remaining(const void * __capability cap)
 
 static inline __result_use_check size_t
 __cheri_get_low_ptr_bits(uintptr_t ptr, size_t mask) {
-  /*
-   * Note: we continue to use bitwise and on the uintcap value and silence the
-   * warning instead of using __builtin_cheri_offset_get() in case we decide
-   * to use a virtual-address instead offset interpretation of capabilities in
-   * the future.
-   */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcheri-bitwise-operations"
-  /*
-   * We mustn't return a LHS-derived capability here so we need to explicitly
-   * cast the result to a non-capability integer
-   */
-  return (size_t)(ptr & mask);
-#pragma clang diagnostic pop
+	/*
+	 * Note: we continue to use bitwise and on the uintcap value and silence
+	 * the warning instead of using __builtin_cheri_offset_get() in case
+	 * we decide to use a virtual-address instead offset interpretation of
+	 * capabilities in the future.
+	 * We mustn't return a LHS-derived capability here so we need to
+	 * explicitly cast the result to a non-capability integer
+	 */
+	return (size_t)(ptr & mask);
 }
 
 static inline __result_use_check uintptr_t
 __cheri_set_low_ptr_bits(uintptr_t ptr, size_t bits) {
-  /*
-   * We want to return a LHS-derived capability here so using the default
-   * uintcap_t semantics is fine.
-   */
-  return ptr | bits;
+	/*
+	 * We want to return a LHS-derived capability here so using the default
+	 * uintcap_t semantics is fine.
+	 */
+	return ptr | bits;
 }
 
 static inline __result_use_check uintptr_t
 __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcheri-bitwise-operations"
-  /*
-   * We want to return a LHS-derived capability here so using the default
-   * uintcap_t semantics is fine.
-   */
-  return ptr & (~bits_mask);
-#pragma clang diagnostic pop
+	/*
+	 * We want to return a LHS-derived capability here so using the default
+	 * uintcap_t semantics is fine.
+	 */
+	return ptr & (~bits_mask);
 }
 
 /* Turn on the checking by default for now (until we have fixed everything)*/
@@ -266,7 +277,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #endif
 #define __runtime_assert_sensible_low_bits(bits)                               \
   __extension__({                                                              \
-    _cheri_bits_assert(bits < 32 && "Should only use the low 5 pointer bits"); \
+    _cheri_bits_assert((bits) < 32 && "Should only use the low 5 pointer bits"); \
     bits;                                                                      \
   })
 #else
@@ -274,7 +285,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #endif
 #define __static_assert_sensible_low_bits(bits)                                \
   __extension__({                                                              \
-    _Static_assert(bits < 32, "Should only use the low 5 pointer bits");       \
+    _Static_assert((bits) < 32, "Should only use the low 5 pointer bits");     \
     bits;                                                                      \
   })
 
@@ -317,10 +328,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
   __cheri_set_low_ptr_bits((uintptr_t)(ptr), __runtime_assert_sensible_low_bits(bits))
 
 /*
- * Clear the bits in @p mask from the capability/pointer @p ptr. Mask must be
- * a compile-time constant less than 31
- *
- * TODO: should we allow non-constant masks?
+ * Clear the bits in @p mask from the capability/pointer @p ptr.
  *
  * @param ptr the uintptr_t that may have low bits sets
  * @param mask this is the mask for the low pointer bits, not the mask for
@@ -335,8 +343,67 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
  *
  */
 #define cheri_clear_low_ptr_bits(ptr, mask)                                    \
-  __cheri_clear_low_ptr_bits((uintptr_t)(ptr), __static_assert_sensible_low_bits(mask))
+  __cheri_clear_low_ptr_bits((uintptr_t)(ptr), __runtime_assert_sensible_low_bits(mask))
 
+#if __has_feature(capabilities)
+#define	CHERI_REPRESENTABLE_LENGTH(len) \
+	__builtin_cheri_round_representable_length(len)
+#define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) \
+	__builtin_cheri_representable_alignment_mask(len)
+
+/*
+ * These should be avoided on CHERI MIPS and RISCV64 since count
+ * leading/trailing zeroes is expensive.
+ */
+#define	CHERI_ALIGN_SHIFT(l)	\
+	__builtin_ctzll(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
+#define	CHERI_SEAL_ALIGN_SHIFT(l)	\
+	__builtin_ctzll(CHERI_SEALABLE_ALIGNMENT_MASK(l))
+
+#else /* !__has_feature(capabilities) */
+#define	CHERI_REPRESENTABLE_LENGTH(len) (len)
+#define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) UINT64_MAX
+#endif /* !__has_feature(capabilities) */
+
+/* Provide macros to make it easier to work with the raw CRAM/CRRL results: */
+#define	CHERI_REPRESENTABLE_ALIGNMENT(len) \
+	(~CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) + 1)
+#define	CHERI_REPRESENTABLE_BASE(base, len) \
+	((base) & CHERI_REPRESENTABLE_ALIGNMENT_MASK(len))
+
+/*
+ * In the current encoding sealed and unsealed capabilities have the same
+ * alignment constraints.
+ */
+#define	CHERI_SEALABLE_LENGTH(len)	\
+	CHERI_REPRESENTABLE_LENGTH(len)
+#define	CHERI_SEALABLE_ALIGNMENT_MASK(len)	\
+	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len)
+#define	CHERI_SEALABLE_ALIGNMENT(len)	\
+	CHERI_REPRESENTABLE_ALIGNMENT(len)
+#define	CHERI_SEALABLE_BASE(base, len)	\
+	CHERI_REPRESENTABLE_BASE(base, len)
+
+/* A mask for the lower bits, i.e. the negated alignment mask */
+#define	CHERI_SEAL_ALIGN_MASK(l)	~(CHERI_SEALABLE_ALIGNMENT_MASK(l))
+#define	CHERI_ALIGN_MASK(l)		~(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
+
+#if __has_feature(capabilities)
 #include <machine/cheric.h>
+#endif
+
+#ifndef _KERNEL
+ssize_t	strfcap(char * __restrict buf, size_t maxsize,
+    const char * __restrict format, uintcap_t cap);
+#endif
 
 #endif /* _SYS_CHERIC_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190531,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

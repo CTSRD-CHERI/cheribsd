@@ -1,10 +1,15 @@
 /*-
- * Copyright (c) 2015-2016 Robert N. M. Watson
+ * Copyright (c) 2015-2016, 2021 Robert N. M. Watson
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
  * ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory (Department of Computer Science and
+ * Technology) under DARPA contract HR0011-18-C-0016 ("ECATS"), as part of the
+ * DARPA SSITH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -58,8 +63,9 @@
 /*
  * Check for high-precision bounds for a variety of small object sizes,
  * allocated from the stack.  These should be precise regardless of capability
- * compression, as the allocator promises to align things suitably.  Test both
- * static and dynamic allocation.
+ * compression, as the allocator promises to align things suitably.  Test
+ * statically sized allocation, explicitly alloca()'d arrays, and also C
+ * variable-length arrays (VLAs).
  */
 static void
 test_bounds_precise(void * __capability c, size_t expected_len)
@@ -98,7 +104,7 @@ test_bounds_precise(void * __capability c, size_t expected_len)
 	cheribsdtest_success();
 }
 
-static void
+static __noinline void
 test_bounds_stack_alloca(size_t len)
 {
 	void * __capability c = (__cheri_tocap void * __capability)alloca(len);
@@ -106,8 +112,17 @@ test_bounds_stack_alloca(size_t len)
 	test_bounds_precise(c, len);
 }
 
-void
-test_bounds_stack_static_uint8(const struct cheri_test *ctp __unused)
+static __noinline void
+test_bounds_stack_vla(size_t len)
+{
+	char vla[len];
+	void * __capability c = (__cheri_tocap void * __capability)&vla;
+
+	test_bounds_precise(c, len);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_uint8,
+    "Check bounds on 8-bit static stack allocation")
 {
 	uint8_t u8;
 	uint8_t * __capability u8p = (__cheri_tocap uint8_t * __capability)&u8;
@@ -115,15 +130,22 @@ test_bounds_stack_static_uint8(const struct cheri_test *ctp __unused)
 	test_bounds_precise(u8p, sizeof(*u8p));
 }
 
-void
-test_bounds_stack_dynamic_uint8(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_uint8,
+    "Check bounds on 8-bit alloca stack allocation",
+    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
 {
-
 	test_bounds_stack_alloca(sizeof(uint8_t));
 }
 
-void
-test_bounds_stack_static_uint16(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_uint8,
+    "Check bounds on 8-bit VLA stack allocation",
+    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
+{
+	test_bounds_stack_vla(sizeof(uint8_t));
+}
+
+CHERIBSDTEST(test_bounds_stack_static_uint16,
+    "Check bounds on 16-bit static stack allocation")
 {
 	uint16_t u16;
 	uint16_t * __capability u16p = (__cheri_tocap uint16_t * __capability)&u16;
@@ -131,15 +153,22 @@ test_bounds_stack_static_uint16(const struct cheri_test *ctp __unused)
 	test_bounds_precise(u16p, sizeof(*u16p));
 }
 
-void
-test_bounds_stack_dynamic_uint16(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_uint16,
+    "Check bounds on 16-bit alloca stack allocation",
+    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
 {
-
 	test_bounds_stack_alloca(sizeof(uint16_t));
 }
 
-void
-test_bounds_stack_static_uint32(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_uint16,
+    "Check bounds on 16-bit VLA stack allocation",
+    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
+{
+	test_bounds_stack_vla(sizeof(uint16_t));
+}
+
+CHERIBSDTEST(test_bounds_stack_static_uint32,
+    "Check bounds 32-bit static stack allocation")
 {
 	uint32_t u32;
 	uint32_t * __capability u32p = (__cheri_tocap uint32_t * __capability)&u32;
@@ -147,15 +176,22 @@ test_bounds_stack_static_uint32(const struct cheri_test *ctp __unused)
 	test_bounds_precise(u32p, sizeof(*u32p));
 }
 
-void
-test_bounds_stack_dynamic_uint32(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_uint32,
+    "Check bounds 32-bit alloca stack allocation",
+    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
 {
-
 	test_bounds_stack_alloca(sizeof(uint32_t));
 }
 
-void
-test_bounds_stack_static_uint64(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_uint32,
+    "Check bounds 32-bit VLA stack allocation",
+    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
+{
+	test_bounds_stack_vla(sizeof(uint32_t));
+}
+
+CHERIBSDTEST(test_bounds_stack_static_uint64,
+    "Check bounds on 64-bit static stack allocation")
 {
 	uint64_t u64;
 	uint64_t * __capability u64p = (__cheri_tocap uint64_t * __capability)&u64;
@@ -163,15 +199,22 @@ test_bounds_stack_static_uint64(const struct cheri_test *ctp __unused)
 	test_bounds_precise(u64p, sizeof(*u64p));
 }
 
-void
-test_bounds_stack_dynamic_uint64(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_uint64,
+    "Check bounds on 64-bit alloca stack allocation",
+    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
 {
-
 	test_bounds_stack_alloca(sizeof(uint64_t));
 }
 
-void
-test_bounds_stack_static_cap(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_uint64,
+    "Check bounds on 64-bit VLA stack allocation",
+    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
+{
+	test_bounds_stack_vla(sizeof(uint64_t));
+}
+
+CHERIBSDTEST(test_bounds_stack_static_cap,
+    "Check bounds on a capability static stack allocation")
 {
 	void * __capability c;
 	void * __capability * __capability cp =
@@ -180,20 +223,20 @@ test_bounds_stack_static_cap(const struct cheri_test *ctp __unused)
 	test_bounds_precise(cp, sizeof(*cp));
 }
 
-void
-test_bounds_stack_dynamic_cap(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_cap,
+    "Check bounds on a capability alloca stack allocation")
 {
-
-	/*
-	 * XXXRW: Really, we should request a bit more space so that, on
-	 * 256-bit CHERI, we can guarantee 32-byte alignment, not the (likely)
-	 * 16-byte alignment we would naturally get back on MIPS.
-	 */
 	test_bounds_stack_alloca(sizeof(void * __capability));
 }
 
-void
-test_bounds_stack_static_16(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_cap,
+    "Check bounds on a capability VLA stack allocation")
+{
+	test_bounds_stack_vla(sizeof(void * __capability));
+}
+
+CHERIBSDTEST(test_bounds_stack_static_16,
+    "Check bounds on a 16-byte static stack allocation")
 {
 	uint8_t array[16];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -201,15 +244,20 @@ test_bounds_stack_static_16(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_16(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_16,
+    "Check bounds on a 16-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(16);
 }
 
-void
-test_bounds_stack_static_32(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_16,
+    "Check bounds on a 16-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(16);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_32,
+    "Check bounds on a 32-byte static stack allocation")
 {
 	uint8_t array[32];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -217,15 +265,20 @@ test_bounds_stack_static_32(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_32(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_32,
+    "Check bounds on a 32-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(32);
 }
 
-void
-test_bounds_stack_static_64(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_32,
+    "Check bounds on a 32-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(32);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_64,
+    "Check bounds on a 64-byte static stack allocation")
 {
 	uint8_t array[64];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -233,15 +286,20 @@ test_bounds_stack_static_64(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_64(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_64,
+    "Check bounds on a 64-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(64);
 }
 
-void
-test_bounds_stack_static_128(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_64,
+    "Check bounds on a 64-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(64);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_128,
+    "Check bounds on a 128-byte static stack allocation")
 {
 	uint8_t array[128];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -249,15 +307,20 @@ test_bounds_stack_static_128(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_128(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_128,
+    "Check bounds on a 128-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(128);
 }
 
-void
-test_bounds_stack_static_256(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_128,
+    "Check bounds on a 128-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(128);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_256,
+    "Check bounds on a 256-byte static stack allocation")
 {
 	uint8_t array[256];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -265,15 +328,20 @@ test_bounds_stack_static_256(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_256(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_256,
+    "Check bounds on a 256-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(256);
 }
 
-void
-test_bounds_stack_static_512(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_256,
+    "Check bounds on a 256-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(256);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_512,
+    "Check bounds on a 512-byte static stack allocation")
 {
 	uint8_t array[512];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -281,15 +349,20 @@ test_bounds_stack_static_512(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_512(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_512,
+    "Check bounds on a 512-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(512);
 }
 
-void
-test_bounds_stack_static_1024(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_512,
+    "Check bounds on a 512-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(512);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_1024,
+    "Check bounds on a 1,024-byte static stack allocation")
 {
 	uint8_t array[1024];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -297,15 +370,20 @@ test_bounds_stack_static_1024(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_1024(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_1024,
+    "Check bounds on a 1,024-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(1024);
 }
 
-void
-test_bounds_stack_static_2048(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_1024,
+    "Check bounds on a 1,024-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(1024);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_2048,
+    "Check bounds on a 2,048-byte static stack allocation")
 {
 	uint8_t array[2048];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -313,15 +391,20 @@ test_bounds_stack_static_2048(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_2048(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_2048,
+    "Check bounds on a 2,048-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(2048);
 }
 
-void
-test_bounds_stack_static_4096(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_2048,
+    "Check bounds on a 2,048-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(2048);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_4096,
+    "Check bounds on a 4,096-byte static stack allocation")
 {
 	uint8_t array[4096];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -329,15 +412,20 @@ test_bounds_stack_static_4096(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_4096(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_4096,
+    "Check bounds on a 4,096-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(4096);
 }
 
-void
-test_bounds_stack_static_8192(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_4096,
+    "Check bounds on a 4,096-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(4096);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_8192,
+    "Check bounds on a 8,192-byte static stack allocation")
 {
 	uint8_t array[8192];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -345,15 +433,20 @@ test_bounds_stack_static_8192(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_8192(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_8192,
+    "Check bounds on a 8,192-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(8192);
 }
 
-void
-test_bounds_stack_static_16384(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_8192,
+    "Check bounds on a 8,192-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(8192);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_16384,
+    "Check bounds on a 16,384-byte static stack allocation")
 {
 	uint8_t array[16384];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -361,15 +454,20 @@ test_bounds_stack_static_16384(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_16384(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_16384,
+    "Check bounds on a 16,384-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(16384);
 }
 
-void
-test_bounds_stack_static_32768(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_16384,
+    "Check bounds on a 16,384-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(16384);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_32768,
+    "Check bounds on a 32,768-byte static stack allocation")
 {
 	uint8_t array[32768];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -377,15 +475,20 @@ test_bounds_stack_static_32768(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_32768(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_32768,
+    "Check bounds on a 32,768-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(32768);
 }
 
-void
-test_bounds_stack_static_65536(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_32768,
+    "Check bounds on a 32,768-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(32768);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_65536,
+    "Check bounds on a 65,536-byte static stack allocation")
 {
 	uint8_t array[65536];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -393,15 +496,20 @@ test_bounds_stack_static_65536(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_65536(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_65536,
+    "Check bounds on a 65,536-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(65536);
 }
 
-void
-test_bounds_stack_static_131072(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_65536,
+    "Check bounds on a 65,536-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(65536);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_131072,
+    "Check bounds on a 131,072-byte static stack allocation")
 {
 	uint8_t array[131072];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -409,15 +517,20 @@ test_bounds_stack_static_131072(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_131072(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_131072,
+    "Check bounds on a 131,072-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(131072);
 }
 
-void
-test_bounds_stack_static_262144(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_131072,
+    "Check bounds on a 131,072-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(131072);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_262144,
+    "Check bounds on a 262,144-byte static stack allocation")
 {
 	uint8_t array[262144];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -425,15 +538,20 @@ test_bounds_stack_static_262144(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_262144(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_262144,
+    "Check bounds on a 262,144-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(262144);
 }
 
-void
-test_bounds_stack_static_524288(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_262144,
+    "Check bounds on a 262,144-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(262144);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_524288,
+    "Check bounds on a 524,288-byte static stack allocation")
 {
 	uint8_t array[524288];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -441,15 +559,20 @@ test_bounds_stack_static_524288(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_524288(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_524288,
+    "Check bounds on a 524,288-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(524288);
 }
 
-void
-test_bounds_stack_static_1048576(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_vla_524288,
+    "Check bounds on a 524,288-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(524288);
+}
+
+CHERIBSDTEST(test_bounds_stack_static_1048576,
+    "Check bounds on a 1,048,576-byte static stack allocation")
 {
 	uint8_t array[1048576];
 	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
@@ -457,9 +580,14 @@ test_bounds_stack_static_1048576(const struct cheri_test *ctp __unused)
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-void
-test_bounds_stack_dynamic_1048576(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_bounds_stack_alloca_1048576,
+    "Check bounds on a 1,048,576-byte alloca stack allocation")
 {
-
 	test_bounds_stack_alloca(1048576);
+}
+
+CHERIBSDTEST(test_bounds_stack_vla_1048576,
+    "Check bounds on a 1,048,576-byte VLA stack allocation")
+{
+	test_bounds_stack_vla(1048576);
 }

@@ -1,13 +1,20 @@
 # $FreeBSD$
 
-SUBDIR=	hybrid \
-	hybrid-dynamic \
-	hybrid-dynamic-mt \
-	hybrid-mt \
-	purecap \
-	purecap-dynamic \
-	purecap-dynamic-mt \
-	purecap-mt
+.include <src.opts.mk>
+
+.if !${MACHINE_ABI:Mpurecap} || ${MK_LIB64} == "yes"
+SUBDIR+=	hybrid \
+		hybrid-dynamic \
+		hybrid-dynamic-mt \
+		hybrid-mt
+.endif
+
+.if ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
+SUBDIR+=	purecap \
+		purecap-dynamic \
+		purecap-dynamic-mt \
+		purecap-mt
+.endif
 
 SUBDIR_PARALLEL=
 

@@ -760,7 +760,7 @@ nlm_xlpge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ifr = (struct ifreq *)data;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		XLPGE_LOCK(sc);
 		sc->if_flags = ifp->if_flags;
 		if (ifp->if_flags & IFF_UP) {
@@ -779,7 +779,7 @@ nlm_xlpge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		if (sc->mii_bus != NULL) {
 			mii = device_get_softc(sc->mii_bus);
 			error = ifmedia_ioctl(ifp, ifr, &mii->mii_media,
@@ -1540,12 +1540,3 @@ nlm_xlpge_msgring_handler(int vc, int size, int code, int src_id,
 		nlm_xlpge_submit_rx_free_desc(xlpge_sc, 1);
 	}
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

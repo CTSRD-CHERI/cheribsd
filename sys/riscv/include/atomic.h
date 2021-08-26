@@ -104,10 +104,24 @@ atomic_fcmpset##SUFFIX##WIDTH(__volatile uint##WIDTH##_t *p,		\
 	ATOMIC_FCMPSET_ORDER(WIDTH, _, __ATOMIC_RELAXED)		\
 	ATOMIC_FCMPSET_ACQ_REL(WIDTH)					\
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * In a purecap kernel we cannot use the generic sub-word implementation.
+ */
+ATOMIC_CMPSET(8);
+ATOMIC_FCMPSET(8);
+ATOMIC_CMPSET(16);
+ATOMIC_FCMPSET(16);
+#define	atomic_cmpset_8		atomic_cmpset_8
+#define	atomic_fcmpset_8		atomic_fcmpset_8
+#define	atomic_cmpset_16		atomic_cmpset_16
+#define	atomic_fcmpset_16		atomic_fcmpset_16
+#else
 ATOMIC_CMPSET_ACQ_REL(8);
 ATOMIC_FCMPSET_ACQ_REL(8);
 ATOMIC_CMPSET_ACQ_REL(16);
 ATOMIC_FCMPSET_ACQ_REL(16);
+#endif
 
 #define	atomic_cmpset_char		atomic_cmpset_8
 #define	atomic_cmpset_acq_char		atomic_cmpset_acq_8
@@ -123,34 +137,54 @@ ATOMIC_FCMPSET_ACQ_REL(16);
 #define	atomic_fcmpset_acq_short	atomic_fcmpset_acq_16
 #define	atomic_fcmpset_rel_short	atomic_fcmpset_rel_16
 
-static __inline void
-atomic_add_32(volatile uint32_t *p, uint32_t val)
-{
+#define	ATOMIC_OP_IMPL(WIDTH, OP, FN, PRE)					\
+	static __inline void							\
+	atomic_##OP##_##WIDTH(volatile uint##WIDTH##_t *p, uint##WIDTH##_t val)	\
+	{									\
+		PRE;								\
+		(void)__atomic_##FN##_fetch(p, val, __ATOMIC_RELAXED);		\
+	}
 
-	(void)__atomic_add_fetch(p, val, __ATOMIC_RELAXED);
+#define	ATOMIC_SET(WIDTH) ATOMIC_OP_IMPL(WIDTH, set, or, )
+#define	ATOMIC_CLEAR(WIDTH) ATOMIC_OP_IMPL(WIDTH, clear, and, val = ~val)
+#define	ATOMIC_ADD(WIDTH) ATOMIC_OP_IMPL(WIDTH, add, add, )
+#define	ATOMIC_SUB(WIDTH) ATOMIC_OP_IMPL(WIDTH, subtract, sub, )
 
-}
+#ifdef __CHERI_PURE_CAPABILITY__
+ATOMIC_SET(8)
+ATOMIC_SET(16)
+#define	atomic_set_8	atomic_set_8
+#define	atomic_set_16	atomic_set_16
 
-static __inline void
-atomic_subtract_32(volatile uint32_t *p, uint32_t val)
-{
+ATOMIC_CLEAR(8)
+ATOMIC_CLEAR(16)
+#define	atomic_clear_8	atomic_clear_8
+#define	atomic_clear_16	atomic_clear_16
 
-	(void)__atomic_sub_fetch(p, val, __ATOMIC_RELAXED);
-}
+ATOMIC_ADD(8)
+ATOMIC_ADD(16)
+#define	atomic_add_8	atomic_add_8
+#define	atomic_add_16	atomic_add_16
 
-static __inline void
-atomic_set_32(volatile uint32_t *p, uint32_t val)
-{
+ATOMIC_SUB(8)
+ATOMIC_SUB(16)
+#define	atomic_subtract_8	atomic_subtract_8
+#define	atomic_subtract_16	atomic_subtract_16
 
-	(void)__atomic_or_fetch(p, val, __ATOMIC_RELAXED);
-}
+ATOMIC_ACQ_REL(set, 8)
+ATOMIC_ACQ_REL(set, 16)
+ATOMIC_ACQ_REL(clear, 8)
+ATOMIC_ACQ_REL(clear, 16)
+ATOMIC_ACQ_REL(add, 8)
+ATOMIC_ACQ_REL(add, 16)
+ATOMIC_ACQ_REL(subtract, 8)
+ATOMIC_ACQ_REL(subtract, 16)
+#endif
 
-static __inline void
-atomic_clear_32(volatile uint32_t *p, uint32_t val)
-{
-
-	(void)__atomic_and_fetch(p, ~val, __ATOMIC_RELAXED);
-}
+ATOMIC_ADD(32)
+ATOMIC_SUB(32)
+ATOMIC_SET(32)
+ATOMIC_CLEAR(32)
 
 static __inline uint32_t
 atomic_fetchadd_32(volatile uint32_t *p, uint32_t val)
@@ -213,34 +247,10 @@ atomic_store_rel_32(volatile uint32_t *p, uint32_t val)
 #define	atomic_subtract_rel_int	atomic_subtract_rel_32
 #define	atomic_store_rel_int	atomic_store_rel_32
 
-static __inline void
-atomic_add_64(volatile uint64_t *p, uint64_t val)
-{
-
-	(void)__atomic_add_fetch(p, val, __ATOMIC_RELAXED);
-}
-
-static __inline void
-atomic_subtract_64(volatile uint64_t *p, uint64_t val)
-{
-
-	(void)__atomic_sub_fetch(p, val, __ATOMIC_RELAXED);
-
-}
-
-static __inline void
-atomic_set_64(volatile uint64_t *p, uint64_t val)
-{
-
-	(void)__atomic_or_fetch(p, val, __ATOMIC_RELAXED);
-}
-
-static __inline void
-atomic_clear_64(volatile uint64_t *p, uint64_t val)
-{
-
-	(void)__atomic_and_fetch(p, ~val, __ATOMIC_RELAXED);
-}
+ATOMIC_ADD(64)
+ATOMIC_SUB(64)
+ATOMIC_SET(64)
+ATOMIC_CLEAR(64)
 
 static __inline uint64_t
 atomic_fetchadd_64(volatile uint64_t *p, uint64_t val)
@@ -270,6 +280,15 @@ atomic_swap_64(volatile uint64_t *p, uint64_t val)
 	return (__atomic_exchange_n(p, val, __ATOMIC_RELAXED));
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static __inline uintptr_t
+atomic_swap_ptr(volatile uintptr_t *p, uintptr_t val)
+{
+
+	return (__atomic_exchange_n(p, val, __ATOMIC_RELAXED));
+}
+#endif
+
 #define	atomic_swap_int			atomic_swap_32
 
 #define	atomic_add_long			atomic_add_64
@@ -282,6 +301,7 @@ atomic_swap_64(volatile uint64_t *p, uint64_t val)
 #define	atomic_subtract_long		atomic_subtract_64
 #define	atomic_swap_long		atomic_swap_64
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	atomic_add_ptr			atomic_add_64
 #define	atomic_clear_ptr		atomic_clear_64
 #define	atomic_cmpset_ptr		atomic_cmpset_64
@@ -291,6 +311,7 @@ atomic_swap_64(volatile uint64_t *p, uint64_t val)
 #define	atomic_set_ptr			atomic_set_64
 #define	atomic_subtract_ptr		atomic_subtract_64
 #define	atomic_swap_ptr			atomic_swap_64
+#endif
 
 ATOMIC_ACQ_REL(set, 64)
 ATOMIC_ACQ_REL(clear, 64)
@@ -322,6 +343,7 @@ atomic_store_rel_64(volatile uint64_t *p, uint64_t val)
 #define	atomic_set_acq_long		atomic_set_acq_64
 #define	atomic_subtract_acq_long	atomic_subtract_acq_64
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	atomic_add_acq_ptr		atomic_add_acq_64
 #define	atomic_clear_acq_ptr		atomic_add_acq_64
 #define	atomic_cmpset_acq_ptr		atomic_cmpset_acq_64
@@ -329,6 +351,106 @@ atomic_store_rel_64(volatile uint64_t *p, uint64_t val)
 #define	atomic_load_acq_ptr		atomic_load_acq_64
 #define	atomic_set_acq_ptr		atomic_set_acq_64
 #define	atomic_subtract_acq_ptr		atomic_subtract_acq_64
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+static __inline void
+atomic_add_ptr(volatile uintptr_t *p, uintptr_t val)
+{
+
+	(void)__atomic_add_fetch(p, val, __ATOMIC_RELAXED);
+}
+
+static __inline void
+atomic_subtract_ptr(volatile uintptr_t *p, uintptr_t val)
+{
+
+	(void)__atomic_sub_fetch(p, val, __ATOMIC_RELAXED);
+
+}
+
+static __inline void
+atomic_set_ptr(volatile uintptr_t *p, uintptr_t val)
+{
+
+#ifdef notyet
+	(void)__atomic_or_fetch(p, val, __ATOMIC_RELAXED);
+#else
+	uintptr_t temp1;
+	u_long temp2;
+
+	__asm __volatile(
+		"1:	clr.c	%1, %0\n"
+		"	cgetaddr %2, %1\n"
+		"	or	%2, %2, %3\n"
+		"	csetaddr %1, %1, %2\n"
+		"	csc.c	%2, %1, %0\n"
+		"	bnez	%2, 1b\n"
+		: "+A" (*p), "=&C" (temp1), "=&r" (temp2)
+		: "r" ((ptraddr_t)val)
+		: "memory");
+#endif
+}
+
+static __inline void
+atomic_clear_ptr(volatile uintptr_t *p, uintptr_t val)
+{
+
+#ifdef notyet
+	(void)__atomic_and_fetch(p, ~val, __ATOMIC_RELAXED);
+#else
+	uintptr_t temp1;
+	u_long temp2;
+
+	__asm __volatile(
+		"1:	clr.c	%1, %0\n"
+		"	cgetaddr %2, %1\n"
+		"	and	%2, %2, %3\n"
+		"	csetaddr %1, %1, %2\n"
+		"	csc.c	%2, %1, %0\n"
+		"	bnez	%2, 1b\n"
+		: "+A" (*p), "=&C" (temp1), "=&r" (temp2)
+		: "r" (~(ptraddr_t)val)
+		: "memory");
+#endif
+}
+
+static __inline uintptr_t
+atomic_fetchadd_ptr(volatile uintptr_t *p, uintptr_t val)
+{
+
+	return (__atomic_fetch_add(p, val, __ATOMIC_RELAXED));
+}
+
+static __inline uintptr_t
+atomic_readandclear_ptr(volatile uintptr_t *p)
+{
+
+	return (__atomic_exchange_n(p, 0, __ATOMIC_RELAXED));
+}
+
+ATOMIC_ACQ_REL(set, ptr);
+ATOMIC_ACQ_REL(clear, ptr);
+ATOMIC_ACQ_REL(add, ptr);
+ATOMIC_ACQ_REL(subtract, ptr);
+
+ATOMIC_CMPSET(ptr);
+ATOMIC_FCMPSET(ptr);
+
+static __inline uintptr_t
+atomic_load_acq_ptr(volatile uintptr_t *p)
+{
+
+	return (__atomic_load_n(p, __ATOMIC_ACQUIRE));
+}
+
+static __inline void
+atomic_store_rel_ptr(volatile uintptr_t *p, uintptr_t val)
+{
+
+	__atomic_store_n(p, val, __ATOMIC_RELEASE);
+}
+#endif
 
 #undef ATOMIC_ACQ_REL
 
@@ -371,6 +493,7 @@ atomic_thread_fence_seq_cst(void)
 #define	atomic_subtract_rel_long	atomic_subtract_rel_64
 #define	atomic_store_rel_long		atomic_store_rel_64
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #define	atomic_add_rel_ptr		atomic_add_rel_64
 #define	atomic_clear_rel_ptr		atomic_clear_rel_64
 #define	atomic_cmpset_rel_ptr		atomic_cmpset_rel_64
@@ -378,7 +501,17 @@ atomic_thread_fence_seq_cst(void)
 #define	atomic_set_rel_ptr		atomic_set_rel_64
 #define	atomic_subtract_rel_ptr		atomic_subtract_rel_64
 #define	atomic_store_rel_ptr		atomic_store_rel_64
+#endif
 
 #include <sys/_atomic_subword.h>
 
 #endif /* _MACHINE_ATOMIC_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

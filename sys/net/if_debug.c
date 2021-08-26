@@ -110,7 +110,7 @@ DB_SHOW_COMMAND(ifnet, db_show_ifnet)
 		return;
 	}
 
-	if_show_ifnet((struct ifnet *)addr);
+	if_show_ifnet(DB_DATA_PTR(addr, struct ifnet));
 }
 
 DB_SHOW_ALL_COMMAND(ifnets, db_show_all_ifnets)
@@ -136,3 +136,12 @@ DB_SHOW_ALL_COMMAND(ifnets, db_show_all_ifnets)
 	}
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

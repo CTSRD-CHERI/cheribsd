@@ -84,6 +84,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/pmap.h>
 #include <machine/trap.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
+
 #define	FDT_SOURCE_NONE		0
 #define	FDT_SOURCE_LOADER	1
 #define	FDT_SOURCE_ROM		2
@@ -95,6 +99,69 @@ __FBSDID("$FreeBSD$");
 
 extern int	*edata;
 extern int	*end;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * XXX-AM: Create a pointer for the platform-specific data structures.
+ * Currently we do not set bounds of these as it is hard to determine
+ * correct bounds. Only load permission are handed out.
+ */
+static void *
+beri_platform_ptr(vm_offset_t vaddr)
+{
+	if (vaddr == 0)
+		return (NULL);
+
+	void *cap = cheri_setaddress(kernel_root_cap, vaddr);
+	cap = cheri_andperm(cap, CHERI_PERM_LOAD);
+
+	return (cap);
+}
+
+static void *
+beri_platform_ptrbounds(vm_offset_t vaddr, size_t len)
+{
+	if (vaddr == 0)
+		return (NULL);
+	return (cheri_setbounds(beri_platform_ptr(vaddr), len));
+}
+
+static void
+platform_clear_bss(void *kroot)
+{
+	/*
+	 * We need to hand-craft a capability for edata because it is defined
+	 * by the linker script and have no size info.
+	 */
+	void *edata_start;
+	ptrdiff_t edata_siz = (ptraddr_t)&end - (ptraddr_t)&edata;
+
+	edata_start = cheri_ptrperm(
+		cheri_setaddress(kroot, (ptraddr_t)&edata),
+		edata_siz, CHERI_PERM_STORE);
+	memset(edata_start, 0, edata_siz);
+}
+#else /* __CHERI_PURE_CAPABILITY__ */
+static void *
+beri_platform_ptr(vm_offset_t vaddr)
+{
+	return ((void *)vaddr);
+}
+
+static void *
+beri_platform_ptrbounds(vm_offset_t vaddr, size_t len)
+{
+	return ((void *)vaddr);
+}
+
+static void
+platform_clear_bss()
+{
+	vm_offset_t kernend = (vm_offset_t)&end;
+
+	memset(&edata, 0, kernend - (vm_offset_t)(&edata));
+}
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
 void
 platform_cpu_init()
@@ -179,18 +246,18 @@ platform_reset(void)
 }
 
 void
-platform_start(__register_t a0, __register_t a1,  __register_t a2, 
+platform_start(__register_t a0, __register_t a1,  __register_t a2,
     __register_t a3)
 {
 	struct bootinfo *bootinfop;
-	vm_offset_t kernend;
 	uint64_t platform_counter_freq;
 	int argc = a0;
-	char **argv = (char **)a1;
-	char **envp = (char **)a2;
+	ptraddr_t *argv;
+	ptraddr_t *envp;
 	long memsize;
+	char *boot_env;
 #ifdef FDT
-	vm_offset_t dtbp = 0;
+	char *dtbp = NULL;
 	void *kmdp;
 	int dtb_needs_swap = 0; /* error */
 	size_t dtb_size = 0;
@@ -202,9 +269,14 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 #endif
 	int i;
 
+	argv = beri_platform_ptr(a1);
+	envp = beri_platform_ptr(a2);
 	/* clear the BSS and SBSS segments */
-	kernend = (vm_offset_t)&end;
-	memset(&edata, 0, kernend - (vm_offset_t)(&edata));
+#ifdef __CHERI_PURE_CAPABILITY__
+	platform_clear_bss(kernel_data_cap);
+#else
+	platform_clear_bss();
+#endif
 
 	mips_postboot_fixup();
 
@@ -221,9 +293,10 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	 * module information.
 	 */
 	if (a3 >= 0x9800000000000000ULL) {
-		bootinfop = (void *)a3;
+		bootinfop = beri_platform_ptrbounds(
+		    a3, sizeof(struct bootinfo));
+		preload_metadata = beri_platform_ptr(bootinfop->bi_modulep);
 		memsize = bootinfop->bi_memsize;
-		preload_metadata = (caddr_t)bootinfop->bi_modulep;
 	} else {
 		bootinfop = NULL;
 		memsize = a3;
@@ -245,7 +318,9 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	 * Configure more boot-time parameters passed in by loader.
 	 */
 	boothowto = MD_FETCH(kmdp, MODINFOMD_HOWTO, int);
-	init_static_kenv(MD_FETCH(kmdp, MODINFOMD_ENVP, char *), 0);
+	boot_env = beri_platform_ptr(
+	    MD_FETCH(kmdp, MODINFOMD_ENVP, vm_offset_t));
+	init_static_kenv(boot_env, 0);
 
 
 #ifdef FDT
@@ -256,16 +331,16 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	 * Prefer a dtb provided as a module to one from bootinfo as we may
 	 * have loaded an alternative one or created a modified version.
 	 */
-	dtbp = MD_FETCH(kmdp, MODINFOMD_DTBP, vm_offset_t);
-	if (dtbp == (vm_offset_t)NULL &&
+	dtbp = beri_platform_ptr(MD_FETCH(kmdp, MODINFOMD_DTBP, vm_offset_t));
+	if (dtbp == NULL &&
 	    bootinfop != NULL && bootinfop->bi_dtb != (bi_ptr_t)NULL) {
-		dtbp = bootinfop->bi_dtb;
+		dtbp = beri_platform_ptr(bootinfop->bi_dtb);
 		fdt_source = FDT_SOURCE_LOADER;
 	}
 
 	/* Try to find an FDT directly in the hardware */
-	if (dtbp == (vm_offset_t)NULL) {
-		dtb_rom = (void*)(intptr_t)0x900000007f010000;
+	if (dtbp == NULL) {
+		dtb_rom = beri_platform_ptr(0x900000007f010000);
 		if (dtb_rom->magic == FDT_MAGIC) {
 			dtb_needs_swap = 0;
 			dtb_size = dtb_rom->totalsize;
@@ -275,7 +350,7 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 		}
 		if (dtb_size != 0) {
 			/* Steal a bit of memory... */
-			dtb = (void *)kernel_kseg0_end;
+			dtb = beri_platform_ptr(kernel_kseg0_end);
 			/* Round alignment from linker script. */
 			kernel_kseg0_end += roundup2(dtb_size, 64 / 8);
 			memcpy(dtb, dtb_rom, dtb_size);
@@ -284,7 +359,7 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 				    swapptr < (uint32_t *)dtb + (dtb_size/sizeof(*dtb));
 				    swapptr++)
 					*swapptr = bswap32(*swapptr);
-			dtbp = (vm_offset_t)dtb;
+			dtbp = (char *)dtb;
 			fdt_source = FDT_SOURCE_ROM;
 		}
 	}
@@ -295,8 +370,8 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	 * In case the device tree blob was not retrieved (from metadata) try
 	 * to use the statically embedded one.
 	 */
-	if (dtbp == (vm_offset_t)NULL) {
-		dtbp = (vm_offset_t)&fdt_static_dtb;
+	if (dtbp == NULL) {
+		dtbp = fdt_static_dtb;
 		fdt_source = FDT_SOURCE_STATIC;
 	}
 #endif
@@ -323,7 +398,7 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	printf("entry: platform_start()\n");
 
 #ifdef FDT
-	if (dtbp != (vm_offset_t)NULL) {
+	if (dtbp != NULL) {
 		printf("Using FDT at %p from ", (void *)dtbp);
 		switch (fdt_source) {
 		case FDT_SOURCE_LOADER:
@@ -348,13 +423,18 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	bootverbose = 1;
 	if (bootverbose) {
 		printf("cmd line: ");
-		for (i = 0; i < argc; i++)
-			printf("%s ", argv[i]);
+		for (i = 0; i < argc; i++) {
+			char *argv_value = beri_platform_ptr(argv[i]);
+			printf("%s ", argv_value);
+		}
 		printf("\n");
 
 		printf("envp:\n");
-		for (i = 0; envp[i]; i += 2)
-			printf("\t%s = %s\n", envp[i], envp[i+1]);
+		for (i = 0; envp[i]; i += 2) {
+			char *envp_name = beri_platform_ptr(envp[i]);
+			char *envp_value = beri_platform_ptr(envp[i+1]);
+			printf("\t%s = %s\n", envp_name, envp_value);
+		}
 
 		if (bootinfop != NULL) {
 			printf("bootinfo found at %p, "
@@ -363,7 +443,7 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 			hexdump(bootinfop, sizeof(*bootinfop), "Bootinfo:", 0);
 		}
 
-		printf("memsize = %p\n", (void *)memsize);
+		printf("memsize = %p\n", (void *)(uintptr_t)memsize);
 	}
 
 	realmem = btoc(memsize);
@@ -371,3 +451,12 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 
 	mips_timer_init_params(platform_counter_freq, 0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200528,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

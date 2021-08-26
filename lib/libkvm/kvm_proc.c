@@ -273,7 +273,7 @@ kvm_proclist(kvm_t *kd, int what, int arg, struct proc *p,
 			return (-1);
 		}
 		kp->ki_pgid = pgrp.pg_id;
-		kp->ki_jobc = pgrp.pg_jobc;
+		kp->ki_jobc = -1;	/* Or calculate?  Arguably not. */
 		if (KREAD(kd, (u_long)pgrp.pg_session, &sess)) {
 			_kvm_err(kd, kd->program, "can't read session at %p",
 				pgrp.pg_session);
@@ -337,7 +337,7 @@ nopgrp:
 		kp->ki_swrss = vmspace.vm_swrss;
 		kp->ki_tsize = vmspace.vm_tsize;
 		kp->ki_dsize = vmspace.vm_dsize;
-		kp->ki_ssize = vmspace.vm_ssize;
+		kp->ki_ssize = proc.p_vm_ssize;
 
 		switch (what & ~KERN_PROC_INC_THREAD) {
 

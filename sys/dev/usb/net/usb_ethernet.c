@@ -516,7 +516,7 @@ uether_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		UE_LOCK(ue);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING)
@@ -534,8 +534,8 @@ uether_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		UE_UNLOCK(ue);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		UE_LOCK(ue);
 		ue_queue_command(ue, ue_setmulti_task,
 		    &ue->ue_multi_task[0].hdr, 
@@ -543,7 +543,7 @@ uether_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		UE_UNLOCK(ue);
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		if (ue->ue_miibus != NULL) {
 			mii = device_get_softc(ue->ue_miibus);
 			error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
@@ -667,12 +667,3 @@ uether_rxflush(struct usb_ether *ue)
  */
 DECLARE_MODULE(uether, uether_mod, SI_SUB_DRIVERS, SI_ORDER_ANY);
 MODULE_VERSION(uether, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

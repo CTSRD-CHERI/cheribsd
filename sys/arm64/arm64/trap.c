@@ -49,6 +49,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 #include <vm/vm_extern.h>
 
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
+
 #include <machine/frame.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
@@ -71,6 +75,13 @@ __FBSDID("$FreeBSD$");
 #include <ddb/db_output.h>
 #endif
 
+#if __has_feature(capabilities)
+int log_user_cheri_exceptions = 0;
+SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RWTUN,
+    &log_user_cheri_exceptions, 0,
+    "Print registers and process details on user CHERI exceptions");
+#endif
+
 extern register_t fsu_intr_fault;
 
 /* Called from exception.S */
@@ -88,6 +99,9 @@ typedef void (abort_handler)(struct thread *, struct trapframe *, uint64_t,
     uint64_t, int);
 
 static abort_handler align_abort;
+#if __has_feature(capabilities)
+static abort_handler cap_abort;
+#endif
 static abort_handler data_abort;
 static abort_handler external_abort;
 
@@ -104,6 +118,13 @@ static abort_handler *abort_handlers[] = {
 	[ISS_DATA_DFSC_PF_L3] = data_abort,
 	[ISS_DATA_DFSC_ALIGN] = align_abort,
 	[ISS_DATA_DFSC_EXT] =  external_abort,
+#if __has_feature(capabilities)
+	[ISS_DATA_DFSC_CAP_TAG] = cap_abort,
+	[ISS_DATA_DFSC_CAP_SEALED] = cap_abort,
+	[ISS_DATA_DFSC_CAP_BOUND] = cap_abort,
+	[ISS_DATA_DFSC_CAP_PERM] = cap_abort,
+	[ISS_DATA_DFSC_LC_SC] = data_abort,
+#endif
 };
 
 static __inline void
@@ -168,16 +189,16 @@ extern uint32_t generic_bs_poke_1f, generic_bs_poke_2f;
 extern uint32_t generic_bs_poke_4f, generic_bs_poke_8f;
 
 static bool
-test_bs_fault(void *addr)
+test_bs_fault(uintcap_t addr)
 {
-	return (addr == &generic_bs_peek_1f ||
-	    addr == &generic_bs_peek_2f ||
-	    addr == &generic_bs_peek_4f ||
-	    addr == &generic_bs_peek_8f ||
-	    addr == &generic_bs_poke_1f ||
-	    addr == &generic_bs_poke_2f ||
-	    addr == &generic_bs_poke_4f ||
-	    addr == &generic_bs_poke_8f);
+	return (addr == (uintcap_t)&generic_bs_peek_1f ||
+	    addr == (uintcap_t)&generic_bs_peek_2f ||
+	    addr == (uintcap_t)&generic_bs_peek_4f ||
+	    addr == (uintcap_t)&generic_bs_peek_8f ||
+	    addr == (uintcap_t)&generic_bs_poke_1f ||
+	    addr == (uintcap_t)&generic_bs_poke_2f ||
+	    addr == (uintcap_t)&generic_bs_poke_4f ||
+	    addr == (uintcap_t)&generic_bs_poke_8f);
 }
 
 static void
@@ -222,8 +243,14 @@ external_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	 * Try to handle synchronous external aborts caused by
 	 * bus_space_peek() and/or bus_space_poke() functions.
 	 */
-	if (!lower && test_bs_fault((void *)frame->tf_elr)) {
+	if (!lower && test_bs_fault((uintcap_t)frame->tf_elr)) {
+#if __has_feature(capabilities)
+		trapframe_set_elr(frame,
+		    (uintcap_t)cheri_setaddress(cheri_getpcc(),
+		    (uint64_t)generic_bs_fault));
+#else
 		frame->tf_elr = (uint64_t)generic_bs_fault;
+#endif
 		return;
 	}
 
@@ -231,6 +258,46 @@ external_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	printf(" far: %16lx\n", far);
 	panic("Unhandled EL%d external data abort", lower ? 0: 1);
 }
+
+#if __has_feature(capabilities)
+static void
+cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
+    uint64_t far, int lower)
+{
+	struct pcb *pcb;
+
+	pcb = td->td_pcb;
+	if (!lower) {
+		if (td->td_intr_nesting_level == 0 &&
+		    pcb->pcb_onfault != 0) {
+			frame->tf_x[0] = EPROT;
+			trapframe_set_elr(frame,
+			    (uintcap_t)cheri_setaddress(cheri_getpcc(),
+			    pcb->pcb_onfault));
+			return;
+		}
+		print_registers(frame);
+		printf(" far: %16lx\n", far);
+		printf(" esr:         %.8lx\n", esr);
+		panic("Capability abort from kernel space: %s",
+		    cheri_fsc_string(esr & ISS_DATA_DFSC_MASK));
+	}
+
+	if (log_user_cheri_exceptions) {
+		printf("pid %d tid %d (%s) uid %d: capability abort, %s\n",
+		    td->td_proc->p_pid, td->td_tid, td->td_proc->p_comm,
+		    td->td_ucred->cr_uid,
+		    cheri_fsc_string(esr & ISS_DATA_DFSC_MASK));
+		print_registers(frame);
+		printf(" far: %16lx\n", far);
+		printf(" esr:         %.8lx\n", esr);
+	}
+
+	call_trapsignal(td, SIGPROT, cheri_esr_to_sicode(esr),
+	    (void * __capability)frame->tf_elr, ESR_ELx_EXCEPTION(esr));
+	userret(td, frame);
+}
+#endif
 
 static void
 data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
@@ -297,19 +364,30 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		panic("data abort in critical section or under mutex");
 	}
 
-	switch (ESR_ELx_EXCEPTION(esr)) {
-	case EXCP_INSN_ABORT:
-	case EXCP_INSN_ABORT_L:
-		ftype = VM_PROT_EXECUTE;
-		break;
-	default:
-		ftype = (esr & ISS_DATA_WnR) == 0 ? VM_PROT_READ :
-		    VM_PROT_WRITE;
-		break;
-	}
+#if __has_feature(capabilities)
+	if ((esr & ISS_DATA_DFSC_MASK) == ISS_DATA_DFSC_LC_SC) {
+		sig = SIGSEGV;
+		ucode = (esr & ISS_DATA_WnR) == 0 ? SEGV_LOADTAG :
+		    SEGV_STORETAG;
+		error = KERN_FAILURE;
+	} else
+#endif
+	{
+		switch (ESR_ELx_EXCEPTION(esr)) {
+		case EXCP_INSN_ABORT:
+		case EXCP_INSN_ABORT_L:
+			ftype = VM_PROT_EXECUTE;
+			break;
+		default:
+			ftype = (esr & ISS_DATA_WnR) == 0 ? VM_PROT_READ :
+			    VM_PROT_WRITE;
+			break;
+		}
 
-	/* Fault in the page. */
-	error = vm_fault_trap(map, far, ftype, VM_FAULT_NORMAL, &sig, &ucode);
+		/* Fault in the page. */
+		error = vm_fault_trap(map, far, ftype, VM_FAULT_NORMAL, &sig,
+		    &ucode);
+	}
 	if (error != KERN_SUCCESS) {
 		if (lower) {
 			call_trapsignal(td, sig, ucode,
@@ -319,7 +397,13 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 			if (td->td_intr_nesting_level == 0 &&
 			    pcb->pcb_onfault != 0) {
 				frame->tf_x[0] = error;
+#if __has_feature(capabilities)
+				trapframe_set_elr(frame,
+				    (uintcap_t)cheri_setaddress(cheri_getpcc(),
+				    pcb->pcb_onfault));
+#else
 				frame->tf_elr = pcb->pcb_onfault;
+#endif
 				return;
 			}
 
@@ -346,22 +430,33 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		userret(td, frame);
 }
 
+#if __has_feature(capabilities)
+#define PRINT_REG(name, value)					\
+	printf(name ": %#.16lp\n", (void * __capability)(value))
+#define PRINT_REG_N(array, n)					\
+	printf(" %sc%d: %#.16lp\n",				\
+	    ((n) < 10) ? " " : "", n, (void * __capability)(array)[n])
+#else
+#define PRINT_REG(name, value)	printf(name ": %16lx\n", value)
+#define PRINT_REG_N(array, n)					\
+	printf(" %sx%d: %16lx\n",				\
+	    ((n) < 10) ? " " : "", n, (array)[n])
+#endif
+
 static void
 print_registers(struct trapframe *frame)
 {
 	u_int reg;
 
-	/*
-	 * TODO: We use uint64_t to be compatible with aarch64, but should
-	 * use the macros to print the full capability.
-	 */
 	for (reg = 0; reg < nitems(frame->tf_x); reg++) {
-		printf(" %sx%d: %16lx\n", (reg < 10) ? " " : "", reg,
-		    (uint64_t)frame->tf_x[reg]);
+		PRINT_REG_N(frame->tf_x, reg);
 	}
-	printf("  sp: %16lx\n", (uint64_t)frame->tf_sp);
-	printf("  lr: %16lx\n", (uint64_t)frame->tf_lr);
-	printf(" elr: %16lx\n", (uint64_t)frame->tf_elr);
+#if __has_feature(capabilities)
+	PRINT_REG(" ddc", frame->tf_ddc);
+#endif
+	PRINT_REG("  sp", frame->tf_sp);
+	PRINT_REG("  lr", frame->tf_lr);
+	PRINT_REG(" elr", frame->tf_elr);
 	printf("spsr:         %8x\n", frame->tf_spsr);
 }
 

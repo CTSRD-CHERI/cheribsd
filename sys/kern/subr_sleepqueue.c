@@ -102,7 +102,7 @@ __FBSDID("$FreeBSD$");
 CTASSERT(powerof2(SC_TABLESIZE));
 #define	SC_MASK		(SC_TABLESIZE - 1)
 #define	SC_SHIFT	8
-#define	SC_HASH(wc)	((((uintptr_t)(wc) >> SC_SHIFT) ^ (uintptr_t)(wc)) & \
+#define	SC_HASH(wc)	((((ptraddr_t)(wc) >> SC_SHIFT) ^ (ptraddr_t)(wc)) & \
 			    SC_MASK)
 #define	SC_LOOKUP(wc)	&sleepq_chains[SC_HASH(wc)]
 #define NR_SLEEPQS      2
@@ -441,12 +441,10 @@ sleepq_check_ast_sc_locked(struct thread *td, struct sleepqueue_chain *sc)
 
 	mtx_assert(&sc->sc_lock, MA_OWNED);
 
-	ret = 0;
 	if ((td->td_pflags & TDP_WAKEUP) != 0) {
 		td->td_pflags &= ~TDP_WAKEUP;
-		ret = EINTR;
 		thread_lock(td);
-		return (0);
+		return (EINTR);
 	}
 
 	/*
@@ -1447,7 +1445,7 @@ DB_SHOW_COMMAND(sleepq, db_show_sleepqueue)
 	 * First, see if there is an active sleep queue for the wait channel
 	 * indicated by the address.
 	 */
-	wchan = (void *)addr;
+	wchan = (void *)(uintptr_t)addr;
 	sc = SC_LOOKUP(wchan);
 	LIST_FOREACH(sq, &sc->sc_queues, sq_hash)
 		if (sq->sq_wchan == wchan)
@@ -1459,11 +1457,11 @@ DB_SHOW_COMMAND(sleepq, db_show_sleepqueue)
 	 */
 	for (i = 0; i < SC_TABLESIZE; i++)
 		LIST_FOREACH(sq, &sleepq_chains[i].sc_queues, sq_hash) {
-			if (sq == (struct sleepqueue *)addr)
+			if ((ptraddr_t)sq == addr)
 				goto found;
 		}
 
-	db_printf("Unable to locate a sleep queue via %p\n", (void *)addr);
+	db_printf("Unable to locate a sleep queue via %p\n", wchan);
 	return;
 found:
 	db_printf("Wait channel: %p\n", sq->sq_wchan);
@@ -1494,3 +1492,14 @@ found:
 /* Alias 'show sleepqueue' to 'show sleepq'. */
 DB_SHOW_ALIAS(sleepqueue, db_show_sleepqueue);
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "hashing",
+//     "pointer_provenance",
+//     "kdb"
+//   ]
+// }
+// CHERI CHANGES END

@@ -419,8 +419,8 @@ kern_nmount(struct thread *td, struct iovec * __capability iovp, u_int iovcnt,
 	flags = flags32;
 
 	AUDIT_ARG_FFLAGS(flags);
-	CTR4(KTR_VFS, "%s: iovp %p with iovcnt %d and flags %d", __func__,
-	    (void *)(__cheri_addr intptr_t)iovp, iovcnt, flags);
+	CTR4(KTR_VFS, "%s: iovp %#lx with iovcnt %d and flags %d", __func__,
+	    iovp, (u_long)iovcnt, flags);
 
 	/*
 	 * Filter out MNT_ROOTFS.  We do not want clients of nmount() in
@@ -1591,7 +1591,7 @@ vfs_op_exit(struct mount *mp)
 
 struct vfs_op_barrier_ipi {
 	struct mount *mp;
-	struct smp_rendezvous_cpus_retry_arg srcra;
+	struct smp_rendezvous_cpus_retry_arg srcra __subobject_use_container_bounds;
 };
 
 static void
@@ -2611,11 +2611,14 @@ resume_all_fs(void)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20200708,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

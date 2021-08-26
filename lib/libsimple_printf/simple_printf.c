@@ -44,8 +44,42 @@
 #include <unistd.h>
 #include "simple_printf.h"
 
+#ifdef SIMPLE_PRINTF_AVOID_LIBC_FUNCTIONS
+/* We need to define strlen+memcpy to avoid dependencies on libc. */
+static inline size_t
+simple_strlen(const char *s)
+{
+	size_t result = 0;
+	while (*s++)
+		result++;
+	return result;
+}
+#define strlen(s) simple_strlen(s)
+
+#if __has_feature(capabilities)
+/* __cheri_ptr_alt needs memcpy() */
+static inline void *
+simple_memcpy(void *dst, const void *src, size_t n)
+{
+	for (size_t i = 0; i < n; i++) {
+		((char*)dst)[i] = ((const char*)src)[i];
+	}
+	return dst;
+}
+#define memcpy(d, s, n) simple_memcpy(d, s, n)
+#endif
+#else
+#define SIMPLE_PRINTF_WRITE_FUNC __sys_write
+#endif
+
 #if __has_feature(capabilities)
 #include <cheri/cheric.h>
+#define NO_FLOATING_POINT
+#define CHAR char
+/* Avoid abort() dependency from printfcommon.h (not needed in RTLD, etc.). */
+#define abort() __builtin_trap()
+#define to_char(n) ((n) + '0')
+#include "printfcommon.h"
 #endif
 
 #ifndef SIMPLE_PRINTF_WRITE_FUNC
@@ -53,21 +87,12 @@
 #endif
 extern ssize_t SIMPLE_PRINTF_WRITE_FUNC(int fd, const void *buf, size_t count);
 
-
 #define MAXNBUF	(sizeof(intmax_t) * NBBY + 1)
 
 #define	PRINT_METHOD_SNPRINTF	1
 #define	PRINT_METHOD_WRITE	2
 
-static size_t	 simple_strlen(const char *) __pure;
 
-/* We need to define strlen to avoid dependencies on libc */
-static inline size_t simple_strlen(const char* s) {
-	size_t result = 0;
-	while (*s++)
-		result++;
-	return result;
-}
 
 struct snprintf_arg {
 	int	method;
@@ -145,7 +170,9 @@ kvprintf(char const *fmt, struct snprintf_arg *arg, int radix, va_list ap)
 #define PCHAR(c) snprintf_func((c), arg)
 	char nbuf[MAXNBUF];
 	const char *p, *percent, *q;
-	void *ptr;
+#if __has_feature(capabilities)
+	void * __capability cap;
+#endif
 	u_char *up;
 	int ch, n;
 	uintmax_t num;
@@ -302,110 +329,41 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			base = 8;
 			goto handle_nosign;
 		case 'p':
-			ptr = va_arg(ap, void *);
-#ifdef __CHERI_PURE_CAPABILITY__
-			if (sharpflag) {
-				_Bool sealed = cheri_getsealed(ptr);
-				uintmax_t perms = cheri_getperm(ptr);
-				/* v:0 */
-				PCHAR('v'); PCHAR(':');
-				cheri_gettag(ptr) ? PCHAR('1') : PCHAR('0');
-				PCHAR(' ');
-
-				/* s:0 */
-				PCHAR('s'); PCHAR(':');
-				sealed ? PCHAR('1') : PCHAR('0');
-				PCHAR(' ');
-
+#if __has_feature(capabilities)
+			if (lflag) {
+				/* %lp: Always read a cap (even in hybrid). */
+				cap = va_arg(ap, void * __capability);
+			} else {
 				/*
-				 * p:00000000 or p:GxrwRWL+7fff8100
-				 * XXXAR: we abuse the left adjust flag (-) to
-				 * print character representation for the perms
-				 * instead of a hex value
+				 * %p: Read a native pointer and cast it to a
+				 * (possibly null-derived) capability.
 				 */
-				PCHAR('p'); PCHAR(':');
-				if (ladjust) {
-#define PRINT_PERM(flag, c)	do {				\
-	if (perms & (__CHERI_CAP_PERMISSION_ ## flag ## __)) {	\
-		PCHAR(c);					\
-	} else {						\
-		PCHAR('-');					\
-	}							\
-	/* remove printed perm to print remainder */		\
-	perms &= ~(__CHERI_CAP_PERMISSION_ ## flag ## __);	\
-} while(0)
-					PRINT_PERM(GLOBAL, 'G');
-					PRINT_PERM(PERMIT_EXECUTE, 'x');
-					PRINT_PERM(PERMIT_LOAD, 'r');
-					PRINT_PERM(PERMIT_STORE, 'w');
-					PRINT_PERM(PERMIT_LOAD_CAPABILITY, 'R');
-					PRINT_PERM(PERMIT_STORE_CAPABILITY, 'W');
-					PRINT_PERM(PERMIT_STORE_LOCAL, 'L');
-					PRINT_PERM(PERMIT_SEAL, 'S');
-#undef PRINT_PERM
-					/*
-					 * If any permissions were not printed
-					 * yet add them as a hex number now
-					 */
-					if (perms != 0)
-						PCHAR('+');
-				}
-				if (!ladjust || perms != 0) {
-					q = ksprintn(nbuf, perms, 16, &n, 0);
-					for (width = 8 - n; width > 0; width--)
-						PCHAR('0');
-					while (*q)
-						PCHAR(*q--);
-				}
-				PCHAR(' ');
-
-				/* b:0000000000000000 */
-				PCHAR('b'); PCHAR(':');
-				q = ksprintn(nbuf, cheri_getbase(ptr), 16,
-				    &n, 0);
-				for (width = 16 - n; width > 0; width--)
-					PCHAR('0');
-				while (*q)
-					PCHAR(*q--);
-				PCHAR(' ');
-
-				/* l:0000000000000000 */
-				PCHAR('l'); PCHAR(':');
-				q = ksprintn(nbuf, cheri_getlen(ptr), 16,
-				    &n, 0);
-				for (width = 16 - n; width > 0; width--)
-					PCHAR('0');
-				while (*q)
-					PCHAR(*q--);
-				PCHAR(' ');
-
-				/* o:0 */
-				PCHAR('o'); PCHAR(':');
-				q = ksprintn(nbuf, cheri_getoffset(ptr), 16,
-				    &n, 0);
-				for (width = 16 - n; width > 0; width--)
-					PCHAR('0');
-				while (*q)
-					PCHAR(*q--);
-				PCHAR(' ');
-
-				/* t:0 (print -1 if not sealed) */
-				PCHAR('t'); PCHAR(':');
-				if (!sealed) {
-					PCHAR('-'); PCHAR('1');
-				} else {
-					q = ksprintn(nbuf, cheri_gettype(ptr),
-					    16, NULL, 0);
-					while (*q)
-						PCHAR(*q--);
-				}
-				break;
+#ifdef __CHERI_PURE_CAPABILITY__
+				cap = va_arg(ap, void *);
+#else
+				cap = (void * __capability)(uintcap_t)
+				    (uintptr_t)va_arg(ap, void *);
+#endif
 			}
-#endif	/* defined(__CHERI__) */
+			if (sharpflag) {
+				/* Large enough to print a full capability. */
+				char cap_buf[128];
+				/* We need to pass a pointer to the end here. */
+				char *cap_repr = __cheri_ptr_alt(cap,
+				    cap_buf + sizeof(cap_buf), hex2ascii_lower,
+				    dwidth);
+				while (cap_repr < cap_buf + sizeof(cap_buf))
+					PCHAR(*cap_repr++);
+				break;
+			} else {
+				num = cheri_getaddress(cap);
+			}
+#else
+			num = (uintmax_t)(uintptr_t)va_arg(ap, void *);
+#endif /* __has_feature(capabilities) */
 			base = 16;
 			sharpflag = (width == 0);
 			sign = 0;
-			num = (vaddr_t)ptr;
 			goto number;
 		case 'q':
 			qflag = 1;
@@ -420,7 +378,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			if (p == NULL)
 				p = "(null)";
 			if (!dot)
-				n = simple_strlen(p);
+				n = strlen(p);
 			else
 				for (n = 0; n < dwidth && p[n]; n++)
 					continue;
@@ -630,7 +588,7 @@ void
 SIMPLE_PRINTF_FN(fdputstr)(int fd, const char *str)
 {
 
-	SIMPLE_PRINTF_WRITE_FUNC(fd, str, simple_strlen(str));
+	SIMPLE_PRINTF_WRITE_FUNC(fd, str, strlen(str));
 }
 
 void

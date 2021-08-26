@@ -59,8 +59,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/kdb.h>
 #endif
 
-extern void * __capability	userspace_cap;
-
 /*
  * Capability used to seal capability pairs returned by cosetup(2).
  */
@@ -131,7 +129,7 @@ colocation_copyin_scb_at(const void *addr, struct switchercb *scbp)
 {
 
 	return (colocation_copyin_scb_atcap(
-	    ___USER_CFROMPTR(addr, userspace_cap), scbp));
+	    ___USER_CFROMPTR(addr, userspace_root_cap), scbp));
 }
 
 static bool
@@ -169,7 +167,7 @@ colocation_copyout_scb_at(void *addr, const struct switchercb *scbp)
 {
 
 	return (colocation_copyout_scb_atcap(
-	    ___USER_CFROMPTR(addr, userspace_cap), scbp));
+	    ___USER_CFROMPTR(addr, userspace_root_cap), scbp));
 }
 
 static void
@@ -515,6 +513,14 @@ setup_scb(struct thread *td)
 		return (ENOMEM);
 	}
 
+	rv = vm_map_reservation_create_locked(map, &addr, PAGE_SIZE,
+	    VM_PROT_RW_CAP);
+	if (rv != KERN_SUCCESS) {
+		COLOCATION_DEBUG("vm_map_reservation_create_locked() failed with rv %d", rv);
+		vm_map_unlock(map);
+		return (ENOMEM);
+	}
+
 	rv = vm_map_insert(map, NULL, 0, addr, addr + PAGE_SIZE,
 	    VM_PROT_READ | VM_PROT_WRITE | VM_PROT_READ_CAP | VM_PROT_WRITE_CAP,
 	    VM_PROT_READ | VM_PROT_WRITE | VM_PROT_READ_CAP | VM_PROT_WRITE_CAP,
@@ -528,7 +534,7 @@ setup_scb(struct thread *td)
 	found = vm_map_lookup_entry(map, addr, &entry);
 	KASSERT(found == TRUE,
 	    ("%s: vm_map_lookup_entry() returned false\n", __func__));
-	entry->owner = 0;
+	entry->owner = 0;  /* XXX: This isn't abandoned, so !NO_PID. */
 
 	vm_map_unlock(map);
 
@@ -1248,7 +1254,7 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 	bool have_scb, shown_borrowertd;
 
 	if (have_addr) {
-		error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_cap),
+		error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_root_cap),
 		    &scb, sizeof(scb));
 		if (error != 0) {
 			db_printf("%s: copyincap failed, error %d\n", __func__, error);

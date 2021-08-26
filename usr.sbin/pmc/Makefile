@@ -3,7 +3,7 @@
 #
 
 # XXX: not at all purecap clean
-NO_WERROR=
+MK_WERROR=	no
 
 .include <src.opts.mk>
 PROG_CXX=	pmc

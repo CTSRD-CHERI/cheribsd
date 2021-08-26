@@ -288,21 +288,21 @@ ng_iface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 #endif
 	switch (command) {
 	/* These two are mostly handled at a higher layer */
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
 		ifp->if_drv_flags |= IFF_DRV_RUNNING;
 		ifp->if_drv_flags &= ~(IFF_DRV_OACTIVE);
 		break;
-	case CASE_IOC_IFREQ(SIOCGIFADDR):
+	case SIOCGIFADDR:
 		break;
 
 	/* Set flags */
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		/*
 		 * If the interface is marked up and stopped, then start it.
 		 * If it is marked down and running, then stop it.
 		 */
-		if (ifr_flags_get(ifr) & IFF_UP) {
+		if (ifr->ifr_flags & IFF_UP) {
 			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 				ifp->if_drv_flags &= ~(IFF_DRV_OACTIVE);
 				ifp->if_drv_flags |= IFF_DRV_RUNNING;
@@ -315,20 +315,20 @@ ng_iface_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set the interface MTU */
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) > NG_IFACE_MTU_MAX
-		    || ifr_mtu_get(ifr) < NG_IFACE_MTU_MIN)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu > NG_IFACE_MTU_MAX
+		    || ifr->ifr_mtu < NG_IFACE_MTU_MIN)
 			error = EINVAL;
 		else
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 		break;
 
 	/* Stuff that's not supported */
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFPHYS):
+	case SIOCSIFPHYS:
 		error = EOPNOTSUPP;
 		break;
 
@@ -816,12 +816,3 @@ vnet_ng_iface_uninit(const void *unused)
 }
 VNET_SYSUNINIT(vnet_ng_iface_uninit, SI_SUB_INIT_IF, SI_ORDER_ANY,
     vnet_ng_iface_uninit, NULL);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

@@ -798,7 +798,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ha = (qla_host_t *)ifp->if_softc;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		QL_DPRINT4((ha->pci_dev, "%s: SIOCSIFADDR (0x%lx)\n",
 			__func__, cmd));
 
@@ -823,15 +823,15 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		QL_DPRINT4((ha->pci_dev, "%s: SIOCSIFMTU (0x%lx)\n",
 			__func__, cmd));
 
-		if (ifr_mtu_get(ifr) > QLA_MAX_FRAME_SIZE - ETHER_HDR_LEN) {
+		if (ifr->ifr_mtu > QLA_MAX_FRAME_SIZE - ETHER_HDR_LEN) {
 			ret = EINVAL;
 		} else {
 			QLA_LOCK(ha, __func__);
-			ifp->if_mtu = ifr_mtu_get(ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 			ha->max_frame_size =
 				ifp->if_mtu + ETHER_HDR_LEN + ETHER_CRC_LEN;
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING)) {
@@ -846,7 +846,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		QL_DPRINT4((ha->pci_dev, "%s: SIOCSIFFLAGS (0x%lx)\n",
 			__func__, cmd));
 
@@ -877,7 +877,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case SIOCADDMULTI:
 		QL_DPRINT4((ha->pci_dev,
 			"%s: %s (0x%lx)\n", __func__, "SIOCADDMULTI", cmd));
 
@@ -886,7 +886,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCDELMULTI:
 		QL_DPRINT4((ha->pci_dev,
 			"%s: %s (0x%lx)\n", __func__, "SIOCDELMULTI", cmd));
 
@@ -895,7 +895,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		QL_DPRINT4((ha->pci_dev,
 			"%s: SIOCSIFMEDIA/SIOCGIFMEDIA (0x%lx)\n",
@@ -903,9 +903,9 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ret = ifmedia_ioctl(ifp, ifr, &ha->media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 	{
-		int mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		int mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 
 		QL_DPRINT4((ha->pci_dev, "%s: SIOCSIFCAP (0x%lx)\n",
 			__func__, cmd));
@@ -1469,12 +1469,3 @@ qla_tx_done(void *context, int pending)
 	qla_hw_tx_done(ha);
 	qla_start(ha->ifp);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

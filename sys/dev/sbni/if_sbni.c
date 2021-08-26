@@ -1078,7 +1078,7 @@ sbni_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	error = 0;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		/*
 		 * If the interface is marked up and stopped, then start it.
 		 * If it is marked down and running, then stop it.
@@ -1095,8 +1095,8 @@ sbni_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		SBNI_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		/*
 		 * Multicast list has changed; set the hardware filter
 		 * accordingly.
@@ -1126,7 +1126,7 @@ sbni_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		SBNI_LOCK(sc);
 		bcopy(&sc->in_stats, in_stats, sizeof(struct sbni_in_stats));
 		SBNI_UNLOCK(sc);
-		error = copyout(in_stats, ifr_data_get_ptr(ifr),
+		error = copyout(in_stats, ifr_data_get_ptr(command, ifr),
 		    sizeof(struct sbni_in_stats));
 		free(in_stats, M_DEVBUF);
 		break;
@@ -1250,10 +1250,11 @@ static u_int32_t crc32tab[] __aligned(8) = {
 };
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "ioctl:net",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

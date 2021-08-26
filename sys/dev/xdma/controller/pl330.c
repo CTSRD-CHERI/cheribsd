@@ -517,8 +517,8 @@ pl330_channel_submit_sg(device_t dev, struct xdma_channel *xchan,
 
 		offs += emit_mov(&chan->ibuf[offs], R_CCR, reg);
 
-		src_addr_lo = (uint32_t)sg[i].src_addr;
-		dst_addr_lo = (uint32_t)sg[i].dst_addr;
+		src_addr_lo = (uint32_t)sg[i].src.bus_addr;
+		dst_addr_lo = (uint32_t)sg[i].dst.bus_addr;
 		len = (uint32_t)sg[i].len;
 
 		dprintf("%s: src %x dst %x len %d periph_id %d\n", __func__,
@@ -661,3 +661,13 @@ static devclass_t pl330_devclass;
 
 EARLY_DRIVER_MODULE(pl330, simplebus, pl330_driver, pl330_devclass, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ],
+//   "change_comment": "bus_addr_t"
+// }
+// CHERI CHANGES END

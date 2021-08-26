@@ -150,16 +150,16 @@ struct sem_undo {
  * Configuration parameters
  */
 #ifndef SEMMNI
-#define SEMMNI	500		/* # of semaphore identifiers */
+#define SEMMNI	50		/* # of semaphore identifiers */
 #endif
 #ifndef SEMMNS
-#define SEMMNS	3400		/* # of semaphores in system */
+#define SEMMNS	340		/* # of semaphores in system */
 #endif
 #ifndef SEMUME
-#define SEMUME	500		/* max # of undo entries per process */
+#define SEMUME	50		/* max # of undo entries per process */
 #endif
 #ifndef SEMMNU
-#define SEMMNU	1500		/* # of undo structures in system */
+#define SEMMNU	150		/* # of undo structures in system */
 #endif
 
 /* shouldn't need tuning */
@@ -167,18 +167,18 @@ struct sem_undo {
 #define SEMMSL	SEMMNS		/* max # of semaphores per id */
 #endif
 #ifndef SEMOPM
-#define SEMOPM	1000		/* max # of operations per semop call */
+#define SEMOPM	100		/* max # of operations per semop call */
 #endif
 
-#define SEMVMX	327670		/* semaphore maximum value */
-#define SEMAEM	163840		/* adjust on exit max value */
+#define SEMVMX	32767		/* semaphore maximum value */
+#define SEMAEM	16384		/* adjust on exit max value */
 
 /*
  * Due to the way semaphore memory is allocated, we have to ensure that
  * SEMUSZ is properly aligned.
  */
 
-#define	SEM_ALIGN(bytes) roundup2(bytes, sizeof(long))
+#define	SEM_ALIGN(bytes) roundup2(bytes, sizeof(intptr_t))
 
 /* actual size of an undo structure */
 #define SEMUSZ(x)	SEM_ALIGN(offsetof(struct sem_undo, un_ent[(x)]))
@@ -805,7 +805,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 	u_short usval, count;
 	int semidx;
 
-	DPRINTF(("call to semctl(%d, %d, %d, 0x%p)\n",
+	DPRINTF(("call to semctl(%d, %d, %d, %p)\n",
 	    semid, semnum, cmd, arg));
 
 	AUDIT_ARG_SVIPC_CMD(cmd);
@@ -1168,9 +1168,9 @@ sys_semget(struct thread *td, struct semget_args *uap)
 		sema[semid].u.sem_otime = 0;
 		sema[semid].u.sem_ctime = time_second;
 		sema[semid].u.__sem_base = &sem[semtot];
-		semtot += nsems;
 		bzero(&sem[semtot],
 		    sizeof(sema[semid].u.__sem_base[0])*nsems);
+		semtot += nsems;
 #ifdef MAC
 		mac_sysvsem_create(cred, &sema[semid]);
 #endif
@@ -1186,6 +1186,10 @@ sys_semget(struct thread *td, struct semget_args *uap)
 
 found:
 	td->td_retval[0] = IXSEQ_TO_IPCID(semid, sema[semid].u.sem_perm);
+	KASSERT(IPCID_TO_IX(td->td_retval[0]) == semid,
+	    ("Semid overflowed: %x", semid));
+	KASSERT(IPCID_TO_SEQ(td->td_retval[0]) == sema[semid].u.sem_perm.seq,
+	    ("Sem seq overflowed: %x", sema[semid].u.sem_perm.seq));
 done2:
 	mtx_unlock(&sem_mtx);
 	return (error);
@@ -1227,7 +1231,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 #ifdef SEM_DEBUG
 	sops = NULL;
 #endif
-	DPRINTF(("call to semop(%d, %p, %u)\n", usemid, sops, nsops));
+	DPRINTF(("call to semop(%d, %p, %zu)\n", usemid, sops, nsops));
 
 	AUDIT_ARG_SVIPC_ID(usemid);
 
@@ -1244,7 +1248,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 	if (nsops <= SMALL_SOPS)
 		sops = small_sops;
 	else if (nsops > seminfo.semopm) {
-		DPRINTF(("too many sops (max=%d, nsops=%d)\n", seminfo.semopm,
+		DPRINTF(("too many sops (max=%d, nsops=%zd)\n", seminfo.semopm,
 		    nsops));
 		return (E2BIG);
 	} else {
@@ -1263,7 +1267,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 		sops = malloc(nsops * sizeof(*sops), M_TEMP, M_WAITOK);
 	}
 	if ((error = copyin(usops, sops, nsops * sizeof(sops[0]))) != 0) {
-		DPRINTF(("error = %d from copyin(%p, %p, %d)\n", error,
+		DPRINTF(("error = %d from copyin(%p, %p, %zd)\n", error,
 		    (__cheri_fromcap struct sembuf *)usops, sops,
 		    nsops * sizeof(sops[0])));
 		if (sops != small_sops)
@@ -1373,7 +1377,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 		/*
 		 * No ... rollback anything that we've already done
 		 */
-		DPRINTF(("semop:  rollback 0 through %d\n", i-1));
+		DPRINTF(("semop:  rollback 0 through %ld\n", i-1));
 		for (j = 0; j < i; j++)
 			semakptr->u.__sem_base[sops[j].sem_num].semval -=
 			    sops[j].sem_op;
@@ -2313,10 +2317,13 @@ freebsd64_semop(struct thread *td, struct freebsd64_semop_args *uap)
 #endif /* COMPAT_FREEBSD64 */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190515,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

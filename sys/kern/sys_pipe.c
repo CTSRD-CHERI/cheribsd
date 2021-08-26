@@ -544,7 +544,7 @@ kern_pipe2(struct thread *td, int * __capability ufildes, int flags)
 static int
 pipespace_new(struct pipe *cpipe, int size)
 {
-	caddr_t buffer;
+	vm_pointer_t buffer;
 	int error, cnt, firstseg;
 	static int curfail = 0;
 	static struct timeval lastfail;
@@ -558,9 +558,9 @@ retry:
 		size = cnt;
 
 	size = round_page(size);
-	buffer = (caddr_t) vm_map_min(pipe_map);
+	buffer = vm_map_min(pipe_map);
 
-	error = vm_map_find(pipe_map, NULL, 0, (vm_offset_t *)&buffer, size, 0,
+	error = vm_map_find(pipe_map, NULL, 0, &buffer, size, 0,
 	    VMFS_ANY_SPACE, VM_PROT_RW, VM_PROT_RW, 0);
 	if (error != KERN_SUCCESS) {
 		if (cpipe->pipe_buffer.buffer == NULL &&
@@ -584,17 +584,18 @@ retry:
 		if (cpipe->pipe_buffer.in <= cpipe->pipe_buffer.out) {
 			firstseg = cpipe->pipe_buffer.size - cpipe->pipe_buffer.out;
 			bcopy(&cpipe->pipe_buffer.buffer[cpipe->pipe_buffer.out],
-				buffer, firstseg);
+			    (void *)buffer, firstseg);
 			if ((cnt - firstseg) > 0)
-				bcopy(cpipe->pipe_buffer.buffer, &buffer[firstseg],
-					cpipe->pipe_buffer.in);
+				bcopy(cpipe->pipe_buffer.buffer,
+				    (void *)(buffer + firstseg),
+				    cpipe->pipe_buffer.in);
 		} else {
 			bcopy(&cpipe->pipe_buffer.buffer[cpipe->pipe_buffer.out],
-				buffer, cnt);
+			    (void *)buffer, cnt);
 		}
 	}
 	pipe_free_kmem(cpipe);
-	cpipe->pipe_buffer.buffer = buffer;
+	cpipe->pipe_buffer.buffer = (caddr_t)buffer;
 	cpipe->pipe_buffer.size = size;
 	cpipe->pipe_buffer.in = cnt;
 	cpipe->pipe_buffer.out = 0;
@@ -1821,6 +1822,9 @@ filt_pipenotsup(struct knote *kn, long hint)
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

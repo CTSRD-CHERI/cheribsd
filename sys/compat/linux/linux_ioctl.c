@@ -2205,10 +2205,9 @@ again:
 			struct sockaddr *sa = ifa->ifa_addr;
 
 			if (sa->sa_family == AF_INET) {
-				ifr_addr_get_sa(&ifr)->sa_family =
-				    LINUX_AF_INET;
-				memcpy(ifr_addr_get_data(&ifr), sa->sa_data,
-				    sizeof(sa->sa_data));
+				ifr.ifr_addr.sa_family = LINUX_AF_INET;
+				memcpy(ifr.ifr_addr.sa_data, sa->sa_data,
+				    sizeof(ifr.ifr_addr.sa_data));
 				sbuf_bcat(sb, &ifr, sizeof(ifr));
 				max_len += sizeof(ifr);
 				addrs++;
@@ -2218,7 +2217,7 @@ again:
 				valid_len = sbuf_len(sb);
 		}
 		if (addrs == 0) {
-			bzero(&ifr.ifr_ifru.ifru_addr, sizeof(ifr.ifr_ifru.ifru_addr));
+			bzero((caddr_t)&ifr.ifr_addr, sizeof(ifr.ifr_addr));
 			sbuf_bcat(sb, &ifr, sizeof(ifr));
 			max_len += sizeof(ifr);
 
@@ -2251,7 +2250,7 @@ linux_gifflags(struct thread *td, struct ifnet *ifp, struct l_ifreq *ifr)
 
 	linux_ifflags(ifp, &flags);
 
-	return (copyout(&flags, &ifr->ifr_ifru.ifru_flags[0], sizeof(flags)));
+	return (copyout(&flags, &ifr->ifr_flags, sizeof(flags)));
 }
 
 static int
@@ -2280,7 +2279,7 @@ bsd_to_linux_ifreq(struct ifreq *arg)
 	if ((error = copyin(arg, &ifr, ifr_len)))
 		return (error);
 
-	*(u_short *)ifr_addr_get_sa(&ifr) = ifr_addr_get_family(&ifr);
+	*(u_short *)&ifr.ifr_addr = ifr.ifr_addr.sa_family;
 
 	error = copyout(&ifr, arg, ifr_len);
 
@@ -3805,12 +3804,3 @@ linux32_ioctl_unregister_handler(struct linux_ioctl_handler *h)
 	return (EINVAL);
 }
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20181112,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

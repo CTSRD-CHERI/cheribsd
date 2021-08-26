@@ -36,6 +36,16 @@ LocalAddressSpace LocalAddressSpace::sThisAddressSpace;
 _LIBUNWIND_EXPORT unw_addr_space_t unw_local_addr_space =
     (unw_addr_space_t)&LocalAddressSpace::sThisAddressSpace;
 
+_LIBUNWIND_HIDDEN size_t __unw_context_size(void) {
+  return sizeof(unw_context_t);
+}
+_LIBUNWIND_WEAK_ALIAS(__unw_context_size, unw_context_size)
+
+_LIBUNWIND_HIDDEN size_t __unw_cursor_size(void) {
+  return sizeof(unw_cursor_t);
+}
+_LIBUNWIND_WEAK_ALIAS(__unw_cursor_size, unw_cursor_size)
+
 /// Create a cursor of a thread in this process given 'context' recorded by
 /// __unw_getcontext().
 _LIBUNWIND_HIDDEN int __unw_init_local(unw_cursor_t *cursor,
@@ -59,6 +69,8 @@ _LIBUNWIND_HIDDEN int __unw_init_local(unw_cursor_t *cursor,
 # define REGISTER_KIND Registers_arm
 #elif defined(__or1k__)
 # define REGISTER_KIND Registers_or1k
+#elif defined(__hexagon__)
+# define REGISTER_KIND Registers_hexagon
 #elif defined(__mips__) && defined(__CHERI_PURE_CAPABILITY__)
 # define REGISTER_KIND Registers_mips_cheri
 #elif defined(__mips__) && defined(_ABIO32) && _MIPS_SIM == _ABIO32

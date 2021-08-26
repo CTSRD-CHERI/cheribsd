@@ -111,8 +111,7 @@ invalidate(struct Test *t1)
 }
 
 #ifdef __mips__
-void
-test_string_memcpy_c(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_string_memcpy_c, "Test explicit capability memcpy")
 {
 	int i;
 	void * __capability cpy;
@@ -214,8 +213,7 @@ test_string_memcpy_c(const struct cheri_test *ctp __unused)
 }
 #endif	/* __mips__ */
 
-void
-test_string_memcpy(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_string_memcpy, "Test implicit capability memcpy")
 {
 	int i;
 	void *copy;
@@ -276,8 +274,7 @@ test_string_memcpy(const struct cheri_test *ctp __unused)
 }
 
 #ifdef __mips__
-void
-test_string_memmove_c(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_string_memmove_c, "Test explicit capability memmove")
 {
 	int i;
 	void * __capability cpy;
@@ -378,8 +375,7 @@ test_string_memmove_c(const struct cheri_test *ctp __unused)
 }
 #endif	/* __mips__ */
 
-void
-test_string_memmove(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_string_memmove, "Test implicit capability memmove")
 {
 	int i;
 	void *copy;
@@ -446,8 +442,9 @@ test_string_memmove(const struct cheri_test *ctp __unused)
  * can't replace it with an inline loop. We could also use -fno-builtin but that
  * could interfere with the other tests.
  */
-void
-test_unaligned_capability_copy_memcpy(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_unaligned_capability_copy_memcpy,
+    "Check that a memcpy() of valid capabilities to an unaligned destination "
+    "strips tags")
 {
 	/* Copying a tagged capability to an unaligned destination should trap. */
 	void * __capability src_buffer[2];
@@ -467,7 +464,7 @@ test_unaligned_capability_copy_memcpy(const struct cheri_test *ctp __unused)
 	/* TODO: verify the contents of the buffer? */
 
 	/* Even if we have a valid cap and operate misaligned, we should not fault. */
-	src_buffer[1] = (__cheri_tocap void* __capability)&strcpy;
+	src_buffer[1] = (__cheri_tocap void* __capability)&expected_y;
 	CHERIBSDTEST_VERIFY(!cheri_gettag(src_buffer[0]));
 	CHERIBSDTEST_VERIFY(cheri_gettag(src_buffer[1]));
 
@@ -479,8 +476,9 @@ test_unaligned_capability_copy_memcpy(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_unaligned_capability_copy_memmove(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_unaligned_capability_copy_memmove,
+    "Check that a memmove() of valid capabilities to an unaligned destination "
+    "strips tags")
 {
 	/* Copying a tagged capability to an unaligned destination should trap. */
 	void * __capability src_buffer[2];
@@ -500,7 +498,7 @@ test_unaligned_capability_copy_memmove(const struct cheri_test *ctp __unused)
 	/* TODO: verify the contents of the buffer? */
 
 	/* Even if we have a valid cap and operate misaligned, we should not fault. */
-	src_buffer[1] =  (__cheri_tocap void* __capability)&strcpy;
+	src_buffer[1] = (__cheri_tocap void* __capability)&expected_y;
 	CHERIBSDTEST_VERIFY(!cheri_gettag(src_buffer[0]));
 	CHERIBSDTEST_VERIFY(cheri_gettag(src_buffer[1]));
 
@@ -513,8 +511,8 @@ test_unaligned_capability_copy_memmove(const struct cheri_test *ctp __unused)
 }
 
 #ifdef KERNEL_MEMCPY_TESTS
-void
-test_string_kern_memcpy_c(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_string_kern_memcpy_c,
+    "Test explicit capability memcpy (kernel version)")
 {
 	int i;
 	void * __capability cpy;
@@ -602,8 +600,8 @@ test_string_kern_memcpy_c(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_string_kern_memmove_c(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_string_kern_memmove_c,
+    "Test explicit capability memmove (kernel version)")
 {
 	int i;
 	void * __capability cpy;

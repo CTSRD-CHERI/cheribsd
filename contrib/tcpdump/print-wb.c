@@ -398,13 +398,6 @@ void
 wb_print(netdissect_options *ndo,
          register const void *hdr, register u_int len)
 {
-	INVOKE_DISSECTOR(_wb_print, ndo, hdr, len);
-}
-
-void
-_wb_print(netdissect_options *ndo,
-         register const void *hdr, register u_int len)
-{
 	register const struct pkt_hdr *ph;
 
 	ph = (const struct pkt_hdr *)hdr;

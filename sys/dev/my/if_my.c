@@ -1652,7 +1652,7 @@ my_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 	int             error;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		MY_LOCK(sc);
 		if (ifp->if_flags & IFF_UP)
 			my_init_locked(sc);
@@ -1661,15 +1661,15 @@ my_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 		MY_UNLOCK(sc);
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		MY_LOCK(sc);
 		my_setmulti(sc);
 		MY_UNLOCK(sc);
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
 		break;
 	default:
@@ -1764,12 +1764,3 @@ my_shutdown(device_t dev)
 	MY_UNLOCK(sc);
 	return 0;
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

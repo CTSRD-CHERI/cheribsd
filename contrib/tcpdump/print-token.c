@@ -145,14 +145,8 @@ static const char *largest_frame[] = {
 	"??"
 };
 
-void
-token_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen)
-{
-	INVOKE_DISSECTOR(_token_print, ndo, p, length, caplen);
-}
-
 u_int
-_token_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen)
+token_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caplen)
 {
 	const struct token_header *trp;
 	int llc_hdrlen;
@@ -223,7 +217,7 @@ _token_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caple
 	/* Frame Control field determines interpretation of packet */
 	if (FRAME_TYPE(trp) == TOKEN_FC_LLC) {
 		/* Try to print the LLC-layer header & higher layers */
-		llc_hdrlen = _llc_print(ndo, p, length, caplen, &src, &dst);
+		llc_hdrlen = llc_print(ndo, p, length, caplen, &src, &dst);
 		if (llc_hdrlen < 0) {
 			/* packet type not known, print raw packet */
 			if (!ndo->ndo_suppress_default_print)
@@ -252,5 +246,5 @@ _token_print(netdissect_options *ndo, const u_char *p, u_int length, u_int caple
 u_int
 token_if_print(netdissect_options *ndo, const struct pcap_pkthdr *h, const u_char *p)
 {
-	return (_token_print(ndo, p, h->len, h->caplen));
+	return (token_print(ndo, p, h->len, h->caplen));
 }

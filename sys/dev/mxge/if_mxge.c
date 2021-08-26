@@ -772,7 +772,7 @@ mxge_dummy_rdma(mxge_softc_t *sc, int enable)
 	uint32_t *buf, dma_low, dma_high;
 	int i;
 
-	buf = (uint32_t *)((unsigned long)(buf_bytes + 7) & ~7UL);
+	buf = (uint32_t *)((uintptr_t)(buf_bytes + 7) & ~7UL);
 
 	/* clear confirmation addr */
 	confirm = (volatile uint32_t *)sc->cmd;
@@ -825,7 +825,7 @@ mxge_send_cmd(mxge_softc_t *sc, uint32_t cmd, mxge_cmd_t *data)
 	int err, sleep_total = 0;
 
 	/* ensure buf is aligned to 8 bytes */
-	buf = (mcp_cmd_t *)((unsigned long)(buf_bytes + 7) & ~7UL);
+	buf = (mcp_cmd_t *)((uintptr_t)(buf_bytes + 7) & ~7UL);
 
 	buf->data0 = htobe32(data->data0);
 	buf->data1 = htobe32(data->data1);
@@ -944,7 +944,7 @@ mxge_load_firmware(mxge_softc_t *sc, int adopt)
 	uint32_t *buf, size, dma_low, dma_high;
 	int status, i;
 
-	buf = (uint32_t *)((unsigned long)(buf_bytes + 7) & ~7UL);
+	buf = (uint32_t *)((uintptr_t)(buf_bytes + 7) & ~7UL);
 
 	size = sc->sram_size;
 	status = mxge_load_firmware_helper(sc, &size);
@@ -3373,7 +3373,7 @@ mxge_alloc_slice_rings(struct mxge_slice_state *ss, int rx_ring_entries,
 	ss->tx.req_bytes = malloc(bytes, M_DEVBUF, M_WAITOK);
 	/* ensure req_list entries are aligned to 8 bytes */
 	ss->tx.req_list = (mcp_kreq_ether_send_t *)
-		((unsigned long)(ss->tx.req_bytes + 7) & ~7UL);
+		((uintptr_t)(ss->tx.req_bytes + 7) & ~7UL);
 
 	/* allocate the tx busdma segment list */
 	bytes = sizeof (*ss->tx.seg_list) * ss->tx.max_desc;
@@ -4137,11 +4137,11 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 	err = 0;
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		err = mxge_change_mtu(sc, ifr_mtu_get(ifr));
+	case SIOCSIFMTU:
+		err = mxge_change_mtu(sc, ifr->ifr_mtu);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		mtx_lock(&sc->driver_mtx);
 		if (sc->dying) {
 			mtx_unlock(&sc->driver_mtx);
@@ -4165,8 +4165,8 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		mtx_unlock(&sc->driver_mtx);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		mtx_lock(&sc->driver_mtx);
 		if (sc->dying) {
 			mtx_unlock(&sc->driver_mtx);
@@ -4176,9 +4176,9 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		mtx_unlock(&sc->driver_mtx);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		mtx_lock(&sc->driver_mtx);
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
 			if (IFCAP_TXCSUM & ifp->if_capenable) {
 				mask &= ~IFCAP_TSO4;
@@ -4277,7 +4277,7 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			err = ENXIO;
 			break;
 		}
-		err = copyin(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
+		err = copyin(ifr_data_get_ptr(command, ifr), &i2c, sizeof(i2c));
 		if (err != 0)
 			break;
 		mtx_lock(&sc->driver_mtx);
@@ -4288,7 +4288,7 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		err = mxge_fetch_i2c(sc, &i2c);
 		mtx_unlock(&sc->driver_mtx);
 		if (err == 0)
-			err = copyout(&i2c, ifr_data_get_ptr(ifr),
+			err = copyout(&i2c, ifr_data_get_ptr(command, ifr),
 			    sizeof(i2c));
 		break;
 	default:
@@ -5027,10 +5027,11 @@ mxge_shutdown(device_t dev)
 */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "pointer_alignment",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

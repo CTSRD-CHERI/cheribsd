@@ -81,7 +81,7 @@
 #endif
 
 struct kevent {
-	kuintcap_t	ident;		/* identifier for this event */
+	__kuintcap_t	ident;		/* identifier for this event */
 	short		filter;		/* filter for event */
 	unsigned short	flags;		/* action flags for kqueue */
 	unsigned int	fflags;		/* filter flag value */
@@ -104,7 +104,7 @@ struct g_kevent_args {
 #if defined(_WANT_FREEBSD11_KEVENT)
 /* Older structure used in FreeBSD 11.x and older. */
 struct kevent_freebsd11 {
-	kuintcap_t	ident;		/* identifier for this event */
+	__kuintcap_t	ident;		/* identifier for this event */
 	short		filter;		/* filter for event */
 	unsigned short	flags;
 	unsigned int	fflags;
@@ -369,7 +369,7 @@ void	knlist_cleardel(struct knlist *knl, struct thread *td,
 	knlist_cleardel((knl), (td), (islocked), 1)
 void	knote_fdclose(struct thread *p, int fd);
 int 	kqfd_register(int fd, struct kevent *kev, struct thread *p,
-	    int mflag);
+	    int mflag, void *kn_ptr_data);
 int	kqueue_add_filteropts(int filt, struct filterops *filtops);
 int	kqueue_del_filteropts(int filt);
 

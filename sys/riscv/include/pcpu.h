@@ -44,11 +44,17 @@
 
 #define	ALT_STACK_SIZE	128
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	__PCPU_PAD	168
+#else
+#define	__PCPU_PAD	56
+#endif
+
 #define	PCPU_MD_FIELDS							\
 	struct pmap *pc_curpmap;	/* Currently active pmap */	\
 	uint32_t pc_pending_ipis;	/* IPIs pending to this CPU */	\
 	uint32_t pc_hart;		/* Hart ID */			\
-	char __pad[56]			/* Pad to factor of PAGE_SIZE */
+	char __pad[__PCPU_PAD]		/* Pad to factor of PAGE_SIZE */
 
 #ifdef _KERNEL
 
@@ -60,7 +66,11 @@ get_pcpu(void)
 {
 	struct pcpu *pcpu;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("cmove %0, ctp" : "=&C"(pcpu));
+#else
 	__asm __volatile("mv %0, tp" : "=&r"(pcpu));
+#endif
 
 	return (pcpu);
 }
@@ -70,7 +80,11 @@ get_curthread(void)
 {
 	struct thread *td;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm __volatile("clc %0, 0(ctp)" : "=&C"(td));
+#else
 	__asm __volatile("ld %0, 0(tp)" : "=&r"(td));
+#endif
 
 	return (td);
 }
@@ -86,3 +100,12 @@ get_curthread(void)
 #endif	/* _KERNEL */
 
 #endif	/* !_MACHINE_PCPU_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

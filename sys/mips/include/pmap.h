@@ -132,19 +132,22 @@ typedef struct pv_entry {
  * pv_entries are allocated in chunks per-process.  This avoids the
  * need to track per-pmap assignments.
  */
-#ifdef __mips_n64
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	_NPCM	2
+#define	_NPCPV	83
+#elif defined(__mips_n64)
 #define	_NPCM	3
 #define	_NPCPV	168
-#else
+#else /* n32 */
 #define	_NPCM	11
 #define	_NPCPV	336
-#endif
+#endif /* n32 */
 struct pv_chunk {
 	pmap_t			pc_pmap;
 	TAILQ_ENTRY(pv_chunk)	pc_list;
-	u_long			pc_map[_NPCM];	/* bitmap; 1 = free */
 	TAILQ_ENTRY(pv_chunk)	pc_lru;
-	struct pv_entry		pc_pventry[_NPCPV];
+	u_long			pc_map[_NPCM];	/* bitmap; 1 = free */
+	struct pv_entry		pc_pventry[_NPCPV] __subobject_use_container_bounds;
 };
 
 /*
@@ -160,8 +163,8 @@ struct pv_chunk {
  */
 extern vm_paddr_t physmem_desc[PHYS_AVAIL_COUNT];
 
-extern vm_offset_t virtual_avail;
-extern vm_offset_t virtual_end;
+extern vm_pointer_t virtual_avail;
+extern vm_pointer_t virtual_end;
 
 #define	pmap_page_get_memattr(m) (((m)->md.pv_flags & PV_MEMATTR_MASK) >> PV_MEMATTR_SHIFT)
 #define	pmap_page_is_write_mapped(m)	(((m)->a.flags & PGA_WRITEABLE) != 0)
@@ -171,7 +174,7 @@ void *pmap_mapdev(vm_paddr_t, vm_size_t);
 boolean_t pmap_page_is_mapped(vm_page_t m);
 void *pmap_mapdev_attr(vm_paddr_t, vm_size_t, vm_memattr_t);
 void pmap_unmapdev(vm_offset_t, vm_size_t);
-vm_offset_t pmap_steal_memory(vm_size_t size);
+vm_pointer_t pmap_steal_memory(vm_size_t size);
 void pmap_kenter(vm_offset_t va, vm_paddr_t pa);
 void pmap_kenter_attr(vm_offset_t va, vm_paddr_t pa, vm_memattr_t attr);
 void pmap_kenter_device(vm_offset_t, vm_size_t, vm_paddr_t);
@@ -196,3 +199,14 @@ pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 #endif				/* !LOCORE */
 
 #endif				/* !_MACHINE_PMAP_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_shape",
+//     "pointer_as_integer",
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

@@ -255,16 +255,16 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < 576)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < 576)
 			return (EINVAL);
-		ifp->if_mtu = ifr_mtu_get(ifr);
+		ifp->if_mtu = ifr->ifr_mtu;
 		return (0);
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCSIFFLAGS:
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		return (0);
 	}
 	sx_xlock(&me_ioctl_sx);
@@ -293,24 +293,24 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = me_set_tunnel(sc, src->sin_addr.s_addr,
 		    dst->sin_addr.s_addr);
 		break;
-	case CASE_IOC_IFREQ(SIOCDIFPHYADDR):
+	case SIOCDIFPHYADDR:
 		me_delete_tunnel(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
-	case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+	case SIOCGIFPSRCADDR:
+	case SIOCGIFPDSTADDR:
 		if (!ME_READY(sc)) {
 			error = EADDRNOTAVAIL;
 			break;
 		}
-		src = (struct sockaddr_in *)ifr_addr_get_sa(ifr);
+		src = (struct sockaddr_in *)&ifr->ifr_addr;
 		memset(src, 0, sizeof(*src));
 		src->sin_family = AF_INET;
 		src->sin_len = sizeof(*src);
 		switch (cmd) {
-		case CASE_IOC_IFREQ(SIOCGIFPSRCADDR):
+		case SIOCGIFPSRCADDR:
 			src->sin_addr = sc->me_src;
 			break;
-		case CASE_IOC_IFREQ(SIOCGIFPDSTADDR):
+		case SIOCGIFPDSTADDR:
 			src->sin_addr = sc->me_dst;
 			break;
 		}
@@ -318,16 +318,16 @@ me_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (error != 0)
 			memset(src, 0, sizeof(*src));
 		break;
-	case CASE_IOC_IFREQ(SIOCGTUNFIB):
-		ifr_fib_set(ifr, sc->me_fibnum);
+	case SIOCGTUNFIB:
+		ifr->ifr_fib = sc->me_fibnum;
 		break;
-	case CASE_IOC_IFREQ(SIOCSTUNFIB):
+	case SIOCSTUNFIB:
 		if ((error = priv_check(curthread, PRIV_NET_GRE)) != 0)
 			break;
-		if (ifr_fib_get(ifr) >= rt_numfibs)
+		if (ifr->ifr_fib >= rt_numfibs)
 			error = EINVAL;
 		else
-			sc->me_fibnum = ifr_fib_get(ifr);
+			sc->me_fibnum = ifr->ifr_fib;
 		break;
 	default:
 		error = EINVAL;
@@ -686,10 +686,9 @@ DECLARE_MODULE(if_me, me_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 MODULE_VERSION(if_me, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net",
 //     "user_capabilities"
 //   ]
 // }

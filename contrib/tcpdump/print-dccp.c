@@ -268,12 +268,6 @@ static int dccp_print_option(netdissect_options *, const u_char *, u_int);
 void dccp_print(netdissect_options *ndo, const u_char *bp, const u_char *data2,
 		u_int len)
 {
-	INVOKE_DISSECTOR(_dccp_print, ndo, bp, data2, len);
-}
-
-void _dccp_print(netdissect_options *ndo, const u_char *bp, const u_char *data2,
-		 u_int len)
-{
 	const struct dccp_hdr *dh;
 	const struct ip *ip;
 	const struct ip6_hdr *ip6;

@@ -77,22 +77,21 @@ u_int
 ltalk_if_print(netdissect_options *ndo,
                const struct pcap_pkthdr *h, const u_char *p)
 {
-	return (_llap_print(ndo, p, h->caplen));
+	u_int hdrlen;
+
+	hdrlen = llap_print(ndo, p, h->len);
+	if (hdrlen == 0) {
+		/* Cut short by the snapshot length. */
+		return (h->caplen);
+	}
+	return (hdrlen);
 }
 
 /*
  * Print AppleTalk LLAP packets.
  */
-void
-llap_print(netdissect_options *ndo,
-           register const u_char *bp, u_int length)
-{
-
-	INVOKE_DISSECTOR(_llap_print, ndo, bp, length);
-}
-
 u_int
-_llap_print(netdissect_options *ndo,
+llap_print(netdissect_options *ndo,
            register const u_char *bp, u_int length)
 {
 	register const struct LAP *lp;
@@ -180,13 +179,6 @@ void
 atalk_print(netdissect_options *ndo,
             register const u_char *bp, u_int length)
 {
-	INVOKE_DISSECTOR(_atalk_print, ndo, bp, length);
-}
-
-void
-_atalk_print(netdissect_options *ndo,
-            register const u_char *bp, u_int length)
-{
 	register const struct atDDP *dp;
 	u_short snet;
 
@@ -216,13 +208,6 @@ _atalk_print(netdissect_options *ndo,
 /* XXX should probably pass in the snap header and do checks like arp_print() */
 void
 aarp_print(netdissect_options *ndo,
-           register const u_char *bp, u_int length)
-{
-	INVOKE_DISSECTOR(_aarp_print, ndo, bp, length);
-}
-
-void
-_aarp_print(netdissect_options *ndo,
            register const u_char *bp, u_int length)
 {
 	register const struct aarp *ap;

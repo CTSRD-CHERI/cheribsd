@@ -43,11 +43,5 @@ static const char *rtspcmds[] = {
 void
 rtsp_print(netdissect_options *ndo, const u_char *pptr, u_int len)
 {
-	INVOKE_DISSECTOR(_rtsp_print, ndo, pptr, len);
-}
-
-void
-_rtsp_print(netdissect_options *ndo, const u_char *pptr, u_int len)
-{
 	txtproto_print(ndo, pptr, len, "rtsp", rtspcmds, RESP_CODE_SECOND_TOKEN);
 }

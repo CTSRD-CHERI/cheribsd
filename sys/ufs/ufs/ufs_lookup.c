@@ -1365,6 +1365,7 @@ ufs_dirempty(ip, parentino, cred)
 	struct direct *dp = (struct direct *)&dbuf;
 	int error, namlen;
 	ssize_t count;
+	char *dp_name;
 #define	MINDIRSIZ (sizeof (struct dirtemplate) / 2)
 
 	for (off = 0; off < ip->i_size; off += dp->d_reclen) {
@@ -1394,7 +1395,8 @@ ufs_dirempty(ip, parentino, cred)
 #		endif
 		if (namlen > 2)
 			return (0);
-		if (dp->d_name[0] != '.')
+		dp_name = (char *)__bounded_addressof(dp->d_name, 4);
+		if (dp_name[0] != '.')
 			return (0);
 		/*
 		 * At this point namlen must be 1 or 2.
@@ -1403,7 +1405,7 @@ ufs_dirempty(ip, parentino, cred)
 		 */
 		if (namlen == 1 && dp->d_ino == ip->i_number)
 			continue;
-		if (dp->d_name[1] == '.' && dp->d_ino == parentino)
+		if (dp_name[1] == '.' && dp->d_ino == parentino)
 			continue;
 		return (0);
 	}
@@ -1623,3 +1625,12 @@ ufs_set_i_endoff(struct inode *ip, doff_t off, const char *file, int line)
 }
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

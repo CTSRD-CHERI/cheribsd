@@ -672,12 +672,6 @@ struct isis_tlv_lsp {
 void
 isoclns_print(netdissect_options *ndo, const uint8_t *p, u_int length)
 {
-	INVOKE_DISSECTOR(_isoclns_print, ndo, p, length);
-}
-
-void
-_isoclns_print(netdissect_options *ndo, const uint8_t *p, u_int length)
-{
 	if (!ND_TTEST(*p)) { /* enough bytes on the wire ? */
 		ND_PRINT((ndo, "|OSI"));
 		return;

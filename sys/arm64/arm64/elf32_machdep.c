@@ -69,8 +69,8 @@ static void freebsd32_setregs(struct thread *td, struct image_params *imgp,
     u_long stack);
 static void freebsd32_set_syscall_retval(struct thread *, int);
 
-static boolean_t elf32_arm_abi_supported(struct image_params *, int32_t *,
-    uint32_t *);
+static bool elf32_arm_abi_supported(const struct image_params *,
+    const int32_t *, const uint32_t *);
 
 extern void freebsd32_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask);
 
@@ -89,7 +89,7 @@ static struct sysentvec elf32_freebsd_sysvec = {
 	.sv_minuser	= FREEBSD32_MINUSER,
 	.sv_maxuser	= FREEBSD32_MAXUSER,
 	.sv_usrstack	= FREEBSD32_USRSTACK,
-	.sv_psstrings	= FREEBSD32_PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct freebsd32_ps_strings),
 	.sv_stackprot	= VM_PROT_READ | VM_PROT_WRITE,
 	.sv_copyout_auxargs = elf32_freebsd_copyout_auxargs,
 	.sv_copyout_strings = freebsd32_copyout_strings,
@@ -125,9 +125,9 @@ static Elf32_Brandinfo freebsd32_brand_info = {
 SYSINIT(elf32, SI_SUB_EXEC, SI_ORDER_FIRST,
     (sysinit_cfunc_t)elf32_insert_brand_entry, &freebsd32_brand_info);
 
-static boolean_t
-elf32_arm_abi_supported(struct image_params *imgp, int32_t *osrel __unused,
-    uint32_t *fctl0 __unused)
+static bool
+elf32_arm_abi_supported(const struct image_params *imgp,
+    const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
 {
 	const Elf32_Ehdr *hdr;
 

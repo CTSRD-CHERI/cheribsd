@@ -38,15 +38,21 @@ struct trapframe;
 
 #define	PCB_LR		30
 struct pcb {
-	uint64_t	pcb_x[31];
-	uint64_t	pcb_pc;
+	uintptr_t	pcb_x[31];
+	uintptr_t	pcb_pc;
 	/* These two need to be in order as we access them together */
-	uint64_t	pcb_sp;
-	uint64_t	pcb_tpidr_el0;
-	uint64_t	pcb_tpidrro_el0;
+	uintptr_t	pcb_sp;
+	uintcap_t	pcb_tpidr_el0;
+	uintcap_t	pcb_tpidrro_el0;
+#if __has_feature(capabilities)
+	uintcap_t	pcb_cid_el0;
+	uintcap_t	pcb_rcsp_el0;
+	uintcap_t	pcb_rddc_el0;
+	uintcap_t	pcb_rctpidr_el0;
+#endif
 
 	/* Fault handler, the error value is passed in x0 */
-	vm_offset_t	pcb_onfault;
+	vm_pointer_t	pcb_onfault;
 
 	u_int		pcb_flags;
 #define	PCB_SINGLE_STEP_SHIFT	0
@@ -79,3 +85,12 @@ int	savectx(struct pcb *pcb) __returns_twice;
 #endif /* !LOCORE */
 
 #endif /* !_MACHINE_PCB_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20210407,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

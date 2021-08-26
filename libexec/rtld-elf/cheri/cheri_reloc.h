@@ -36,26 +36,25 @@
 #include "debug.h"
 #include "rtld.h"
 
+#ifdef RTLD_HAS_CAPRELOCS
 /* The clang-provided header is not warning-clean: */
 __unused static void cheri_init_globals(void);
 #include <cheri_init_globals.h>
-#if !defined(CHERI_INIT_GLOBALS_VERSION) || CHERI_INIT_GLOBALS_VERSION < 4
+#if !defined(CHERI_INIT_GLOBALS_VERSION) || CHERI_INIT_GLOBALS_VERSION < 5
 #error "cheri_init_globals.h is outdated. Please update LLVM"
 #endif
-
-extern bool add_cheri_plt_stub(const Obj_Entry *obj, const Obj_Entry *rtldobj,
-    Elf_Word r_symndx, void **where);
 
 /* FIXME: replace this with cheri_init_globals_impl once everyone has updated clang */
 static __attribute__((always_inline))
 void _do___caprelocs(const struct capreloc *start_relocs,
-    const struct capreloc * stop_relocs, void* gdc, const void* pcc,
-    vaddr_t base_addr, bool tight_pcc_bounds)
+    const struct capreloc *stop_relocs, void * __capability gdc,
+    const void * __capability pcc, vaddr_t base_addr, bool tight_pcc_bounds)
 {
 	cheri_init_globals_impl(start_relocs, stop_relocs, /*data_cap=*/gdc,
 	    /*code_cap=*/pcc, /*rodata_cap=*/pcc,
 	    /*tight_code_bounds=*/tight_pcc_bounds, base_addr);
 }
+#endif
 
 static inline int
 process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
@@ -76,7 +75,7 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 	assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
 	    "IFUNC not implemented!");
 
-	const void *symval = NULL;
+	const void * __capability symval = NULL;
 	bool is_undef_weak = false;
 	if (def->st_shndx == SHN_UNDEF) {
 		/* Verify that we are resolving a weak symbol */
@@ -110,12 +109,13 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 			nonzero_addend_warnings++;
 			if (nonzero_addend_warnings >= 10) {
 				rtld_fdprintf(STDERR_FILENO,
-				    "Note: reached warning limit, will not warn"
-				    "about further bad function relocations\n");
+				    "Note: reached warning limit, will not "
+				    "warn about further bad function "
+				    "relocations\n");
 			}
 		}
 		/* Remove write permissions and set bounds */
-		symval = make_function_pointer_with_addend(def, defobj, addend);
+		symval = make_function_cap_with_addend(def, defobj, addend);
 		if (__predict_false(symval == NULL)) {
 			_rtld_error("Could not create function pointer for %s "
 				    "(in %s)\n",
@@ -124,7 +124,7 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		}
 	} else {
 		/* Remove execute permissions and set bounds */
-		symval = cheri_incoffset(make_data_pointer(def, defobj), addend);
+		symval = cheri_incoffset(make_data_cap(def, defobj), addend);
 	}
 #ifdef DEBUG
 	// FIXME: this warning breaks some tests that expect clean stdout/stderr
@@ -134,20 +134,21 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 	if (__predict_false(symval != NULL && cheri_getlen(symval) <= 0)) {
 		rtld_fdprintf(STDERR_FILENO,
 		    "Warning: created zero length "
-		    "capability for %s (in %s): %-#p\n",
+		    "capability for %s (in %s): %#lp\n",
 		    symname(obj, r_symndx), obj->path, symval);
 	}
 #endif
 	if (__predict_false(!cheri_gettag(symval) && !is_undef_weak)) {
-		_rtld_error("%s: constructed invalid capability for %s: %#p",
+		_rtld_error("%s: constructed invalid capability for %s: %#lp",
 		    obj->path, symname(obj, r_symndx), symval);
 		return -1;
 	}
-	*((const void **)where) = symval;
+	*((const void * __capability *)where) = symval;
 #if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE >= 2
-	dbg("CAP(%p/0x%lx) %s in %s --> %-#p in %s", where,
+	dbg("CAP(%p/0x%lx) %s in %s --> %#lp in %s", where,
 	    (const char *)where - (const char *)obj->relocbase,
-	    symname(obj, r_symndx), obj->path, *((void **)where), defobj->path);
+	    symname(obj, r_symndx), obj->path,
+	    *((void * __capability *)where), defobj->path);
 #endif
 	return 0;
 }

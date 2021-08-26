@@ -45,8 +45,7 @@
 
 #include "cheribsdtest.h"
 
-void
-test_sealcap_sysctl(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sealcap_sysctl, "Retrieve sealcap using sysctl(3)")
 {
 	void * __capability sealcap;
 	size_t sealcap_size;
@@ -75,11 +74,11 @@ test_sealcap_sysctl(const struct cheri_test *ctp __unused)
 		cheribsdtest_failure_errx("offset %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_SEALCAP_USERSPACE_OFFSET);
 
-	/* Type -- should be (-1) for an unsealed capability. */
+	/* Type -- should have unsealed type. */
 	v = cheri_gettype(sealcap);
-	if (v != 0xffffffffffffffff)
+	if (v != (u_register_t)CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)0xffffffffffffffff);
+		    (uintmax_t)CHERI_OTYPE_UNSEALED);
 
 	/* Permissions. */
 	v = cheri_getperm(sealcap);
@@ -125,6 +124,14 @@ test_sealcap_sysctl(const struct cheri_test *ctp __unused)
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
 
+#ifdef __aarch64__
+	if ((v & CHERI_PERM_EXECUTIVE) != 0)
+		cheribsdtest_failure_errx("perms %jx (executive present)", v);
+
+	if ((v & CHERI_PERM_MUTABLE_LOAD) != 0)
+		cheribsdtest_failure_errx("perms %jx (mutable_load present)", v);
+#endif
+
 	if ((v & CHERI_PERMS_SWALL) != 0)
 		cheribsdtest_failure_errx("perms %jx (swperms present)", v);
 
@@ -142,8 +149,7 @@ test_sealcap_sysctl(const struct cheri_test *ctp __unused)
 
 static uint8_t sealdata[4096] __attribute__ ((aligned(4096)));
 
-void
-test_sealcap_seal(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sealcap_seal, "Use sealcap to seal a capability")
 {
 	void * __capability sealdatap;
 	void * __capability sealcap;
@@ -202,8 +208,8 @@ test_sealcap_seal(const struct cheri_test *ctp __unused)
 	cheribsdtest_success();
 }
 
-void
-test_sealcap_seal_unseal(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sealcap_seal_unseal,
+    "Use sealcap to seal and unseal a capability")
 {
 	void * __capability sealdatap;
 	void * __capability sealcap;
@@ -239,11 +245,11 @@ test_sealcap_seal_unseal(const struct cheri_test *ctp __unused)
 		cheribsdtest_failure_errx("offset %jx (expected %jx)", v,
 		    (uintmax_t)cheri_getoffset(sealdatap));
 
-	/* Type -- should be (-1) for an unsealed capability. */
+	/* Type -- should have unsealed type. */
 	v = cheri_gettype(unsealed);
-	if (v != 0xffffffffffffffff)
+	if (v != (u_register_t)CHERI_OTYPE_UNSEALED)
 		cheribsdtest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)0xffffffffffffffff);
+		    (uintmax_t)CHERI_OTYPE_UNSEALED);
 
 	/* Sealed bit. */
 	v = cheri_getsealed(unsealed);

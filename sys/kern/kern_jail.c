@@ -241,8 +241,8 @@ prison0_init(void)
 			 * certainly a newline; skip over any whitespace or
 			 * non-printable characters to be safe.
 			 */
-			while (size > 0 && data[size - 1] <= 0x20) {
-				data[size--] = '\0';
+			for (; size > 0 && data[size - 1] <= 0x20; size--) {
+				data[size - 1] = '\0';
 			}
 			if (validate_uuid(data, size, NULL, 0) == 0) {
 				(void)strlcpy(prison0.pr_hostuuid, data,
@@ -4272,7 +4272,7 @@ DB_SHOW_COMMAND(prison, db_show_prison_command)
 					break;
 		if (pr == NULL)
 			/* Assume address points to a valid prison. */
-			pr = (struct prison *)addr;
+			pr = DB_DATA_PTR(addr, struct prison);
 	}
 	db_show_prison(pr);
 }
@@ -4285,6 +4285,9 @@ DB_SHOW_COMMAND(prison, db_show_prison_command)
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

@@ -39,6 +39,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <machine/vmparam.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
+
 static const struct devmap_entry *devmap_table;
 static boolean_t devmap_bootstrap_done = false;
 
@@ -55,6 +59,9 @@ static vm_offset_t		akva_devmap_vaddr = DEVMAP_MAX_VADDR;
 
 #if defined(__aarch64__) || defined(__riscv)
 extern int early_boot;
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+static void * __capability devmap_capability;
 #endif
 
 /*
@@ -218,7 +225,13 @@ devmap_ptov(vm_paddr_t pa, vm_size_t size)
 
 	for (pd = devmap_table; pd->pd_size != 0; ++pd) {
 		if (pa >= pd->pd_pa && pa + size <= pd->pd_pa + pd->pd_size)
+#ifdef __CHERI_PURE_CAPABILITY__
+			return (cheri_setbounds(cheri_setaddress(
+			    devmap_capability, pd->pd_va + (pa - pd->pd_pa)),
+			    size));
+#else
 			return ((void *)(pd->pd_va + (pa - pd->pd_pa)));
+#endif
 	}
 
 	return (NULL);
@@ -229,15 +242,13 @@ devmap_ptov(vm_paddr_t pa, vm_size_t size)
  * corresponding physical address, or DEVMAP_PADDR_NOTFOUND if not found.
  */
 vm_paddr_t
-devmap_vtop(void * vpva, vm_size_t size)
+devmap_vtop(vm_pointer_t va, vm_size_t size)
 {
 	const struct devmap_entry *pd;
-	vm_offset_t va;
 
 	if (devmap_table == NULL)
 		return (DEVMAP_PADDR_NOTFOUND);
 
-	va = (vm_offset_t)vpva;
 	for (pd = devmap_table; pd->pd_size != 0; ++pd) {
 		if (va >= pd->pd_va && va + size <= pd->pd_va + pd->pd_size)
 			return ((vm_paddr_t)(pd->pd_pa + (va - pd->pd_va)));
@@ -260,7 +271,8 @@ devmap_vtop(void * vpva, vm_size_t size)
 void *
 pmap_mapdev(vm_offset_t pa, vm_size_t size)
 {
-	vm_offset_t va, offset;
+	vm_pointer_t va;
+	vm_offset_t offset;
 	void * rva;
 
 	/* First look in the static mapping table. */
@@ -273,8 +285,22 @@ pmap_mapdev(vm_offset_t pa, vm_size_t size)
 
 #if defined(__aarch64__) || defined(__riscv)
 	if (early_boot) {
+#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef INVARIANTS
+		vm_pointer_t oldva = akva_devmap_vaddr;
+#endif
+		akva_devmap_vaddr -= CHERI_REPRESENTABLE_LENGTH(size);
+		akva_devmap_vaddr = CHERI_REPRESENTABLE_BASE(akva_devmap_vaddr,
+		    size);
+		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr);
+		va = (vm_pointer_t)cheri_setbounds(cheri_setaddress(
+		    devmap_capability, akva_devmap_vaddr), size);
+		KASSERT(va + cheri_getlen((void *)va) <= oldva,
+		    ("%s: early devmap overlaps", __func__));
+#else
 		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr - size);
 		va = akva_devmap_vaddr;
+#endif
 		KASSERT(va >= VM_MAX_KERNEL_ADDRESS - L2_SIZE,
 		    ("Too many early devmap mappings"));
 	} else
@@ -283,7 +309,7 @@ pmap_mapdev(vm_offset_t pa, vm_size_t size)
 	if (!va)
 		panic("pmap_mapdev: Couldn't alloc kernel virtual memory");
 
-	pmap_kenter_device(va, size, pa);
+	pmap_kenter_device((vm_offset_t)va, size, pa);
 
 	return ((void *)(va + offset));
 }
@@ -292,8 +318,9 @@ pmap_mapdev(vm_offset_t pa, vm_size_t size)
 void *
 pmap_mapdev_attr(vm_offset_t pa, vm_size_t size, vm_memattr_t ma)
 {
-	vm_offset_t va, offset;
+	vm_pointer_t va;
 	void * rva;
+	vm_offset_t offset;
 
 	/* First look in the static mapping table. */
 	if ((rva = devmap_ptov(pa, size)) != NULL)
@@ -304,8 +331,22 @@ pmap_mapdev_attr(vm_offset_t pa, vm_size_t size, vm_memattr_t ma)
 	size = round_page(size + offset);
 
 	if (early_boot) {
+#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef INVARIANTS
+		vm_pointer_t oldva = akva_devmap_vaddr;
+#endif
+		akva_devmap_vaddr -= CHERI_REPRESENTABLE_LENGTH(size);
+		akva_devmap_vaddr = CHERI_REPRESENTABLE_BASE(akva_devmap_vaddr,
+		    size);
+		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr);
+		va = (vm_pointer_t)cheri_setbounds(cheri_setaddress(
+		    devmap_capability, akva_devmap_vaddr), size);
+		KASSERT(va + cheri_getlen((void *)va) <= oldva,
+		    ("%s: early devmap overlaps", __func__));
+#else
 		akva_devmap_vaddr = trunc_page(akva_devmap_vaddr - size);
 		va = akva_devmap_vaddr;
+#endif
 		KASSERT(va >= (VM_MAX_KERNEL_ADDRESS - (PMAP_MAPDEV_EARLY_SIZE)),
 		    ("Too many early devmap mappings 2"));
 	} else
@@ -323,12 +364,12 @@ pmap_mapdev_attr(vm_offset_t pa, vm_size_t size, vm_memattr_t ma)
  * Unmap device memory and free the kva space.
  */
 void
-pmap_unmapdev(vm_offset_t va, vm_size_t size)
+pmap_unmapdev(vm_pointer_t va, vm_size_t size)
 {
 	vm_offset_t offset;
 
 	/* Nothing to do if we find the mapping in the static table. */
-	if (devmap_vtop((void*)va, size) != DEVMAP_PADDR_NOTFOUND)
+	if (devmap_vtop(va, size) != DEVMAP_PADDR_NOTFOUND)
 		return;
 
 	offset = va & PAGE_MASK;
@@ -339,6 +380,18 @@ pmap_unmapdev(vm_offset_t va, vm_size_t size)
 	kva_free(va, size);
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+void
+devmap_init_capability(void * __capability cap)
+{
+	devmap_capability = cap;
+
+	/* XXX: Too early to panic? */
+	KASSERT(cheri_gettop(cap) == DEVMAP_MAX_VADDR,
+	    ("devmap capability end doesn't match DEVMAP_MAX_VADDR"));
+}
+#endif
+
 #ifdef DDB
 #include <ddb/ddb.h>
 
@@ -348,3 +401,14 @@ DB_SHOW_COMMAND(devmap, db_show_devmap)
 }
 
 #endif /* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_provenance",
+//     "support",
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

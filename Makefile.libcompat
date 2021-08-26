@@ -73,7 +73,7 @@ LIBCOMPATIMAKE+=	${LIBCOMPATWMAKE:NINSTALL=*:NDESTDIR=*} \
 .if ${MK_FILE} != "no"
 _libmagic=	lib/libmagic
 .endif
-.if ${MK_PMC} != "no" && ${TARGET_ARCH} == "amd64"
+.if ${MK_PMC} != "no" && (${TARGET_ARCH} == "amd64" || ${TARGET} == "arm64")
 _jevents=	lib/libpmc/pmu-events
 .endif
 
@@ -101,7 +101,7 @@ build${libcompat}: .PHONY
 	    OBJROOT='$${OBJTOP}/' \
 	    MAKEOBJDIRPREFIX= \
 	    DIRPRFX=${_dir}/ -DNO_LINT -DNO_CPU_CFLAGS \
-	    MK_CTF=no MK_RETPOLINE=no MK_WARNS=no \
+	    MK_CTF=no MK_RETPOLINE=no MK_WERROR=no \
 	    ${_t}
 .endfor
 .endfor

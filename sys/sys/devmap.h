@@ -79,6 +79,14 @@ void devmap_register_table(const struct devmap_entry * _table);
 void devmap_bootstrap(vm_offset_t _l1pt,
     const struct devmap_entry *_table);
 
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Provide a capability mapping the devmap region.
+ */
+void devmap_init_capability(void * __capability _cap);
+#endif
+
 /*
  * Translate between virtual and physical addresses within a region that is
  * static-mapped by the devmap code.  If the given address range isn't
@@ -91,9 +99,19 @@ void devmap_bootstrap(vm_offset_t _l1pt,
 #define	DEVMAP_PADDR_NOTFOUND	((vm_paddr_t)(-1))
 
 void *     devmap_ptov(vm_paddr_t _pa, vm_size_t _sz);
-vm_paddr_t devmap_vtop(void * _va, vm_size_t _sz);
+vm_paddr_t devmap_vtop(vm_pointer_t _va, vm_size_t _sz);
 
 /* Print the static mapping table; used for bootverbose output. */
 void devmap_print_table(void);
 
 #endif /* !_SYS_DEVMAP_H_ */
+
+// CHERI CHANGES START
+// {
+//   "updated": 20200804,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

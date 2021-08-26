@@ -141,14 +141,6 @@ medsa_print(netdissect_options *ndo,
 	    const u_char *bp, u_int length, u_int caplen,
 	    const struct lladdr_info *src, const struct lladdr_info *dst)
 {
-	INVOKE_DISSECTOR(_medsa_print, ndo, bp, length, caplen, src, dst);
-}
-
-void
-_medsa_print(netdissect_options *ndo,
-	    const u_char *bp, u_int length, u_int caplen,
-	    const struct lladdr_info *src, const struct lladdr_info *dst)
-{
 	const struct medsa_pkthdr *medsa;
 	u_short ether_type;
 
@@ -168,7 +160,7 @@ _medsa_print(netdissect_options *ndo,
 	ether_type = EXTRACT_16BITS(&medsa->ether_type);
 	if (ether_type <= ETHERMTU) {
 		/* Try to print the LLC-layer header & higher layers */
-		if (_llc_print(ndo, bp, length, caplen, src, dst) < 0) {
+		if (llc_print(ndo, bp, length, caplen, src, dst) < 0) {
 			/* packet type not known, print raw packet */
 			if (!ndo->ndo_suppress_default_print)
 				ND_DEFAULTPRINT(bp, caplen);
@@ -179,7 +171,7 @@ _medsa_print(netdissect_options *ndo,
 				  tok2str(ethertype_values, "Unknown",
 					  ether_type),
 				  ether_type));
-		if (_ethertype_print(ndo, ether_type, bp, length, caplen, src, dst) == 0) {
+		if (ethertype_print(ndo, ether_type, bp, length, caplen, src, dst) == 0) {
 			/* ether_type not known, print raw packet */
 			if (!ndo->ndo_eflag)
 				ND_PRINT((ndo, "ethertype %s (0x%04x) ",

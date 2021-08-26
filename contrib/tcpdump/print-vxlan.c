@@ -47,12 +47,6 @@ static const char tstr[] = " [|VXLAN]";
 void
 vxlan_print(netdissect_options *ndo, const u_char *bp, u_int len)
 {
-	INVOKE_DISSECTOR(_vxlan_print, ndo, bp, len);
-}
-
-void
-_vxlan_print(netdissect_options *ndo, const u_char *bp, u_int len)
-{
     uint8_t flags;
     uint32_t vni;
 

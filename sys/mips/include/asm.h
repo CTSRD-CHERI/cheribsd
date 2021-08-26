@@ -133,7 +133,7 @@
 	alias = sym
 
 #define	GLOBAL(sym)						\
-	.globl sym; sym:
+	.globl sym; .type sym,@object; sym:
 
 #define	ENTRY(sym)						\
 	.text; .globl sym; .ent sym; sym:
@@ -224,6 +224,7 @@ _C_LABEL(x):
  *	Mark end of a procedure.
  */
 #define	END(x)			\
+	.size _C_LABEL(x), . - _C_LABEL(x);\
 	.end _C_LABEL(x)
 
 /*
@@ -245,6 +246,7 @@ _C_LABEL(x):
  */
 #define	EXPORT(x)		\
 	.globl	_C_LABEL(x);	\
+	.type _C_LABEL(x),@object;	\
 _C_LABEL(x):
 
 /*
@@ -253,22 +255,30 @@ _C_LABEL(x):
  *	XXX: regmask should be used to generate .mask
  */
 #define	VECTOR(x, regmask)	\
-	.ent	_C_LABEL(x);	\
-	EXPORT(x);		\
+	EXPORT(x);
 
-#define	VECTOR_END(x)		\
-	EXPORT(x ## End);	\
-	END(x)
+#define	VECTOR_END(x)				\
+	EXPORT(x ## End);			\
+	.size _C_LABEL(x), . - _C_LABEL(x)
 
 /*
  * Macros to panic and printf from assembly language.
  */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	PANIC(msg)					\
+	CAPTABLE_PCREL_LOAD($c3, t0, 9f);		\
+	CAPCALL_PCREL_LOAD($c12, t0, _C_LABEL(panic));	\
+	cjalr $c12, $c17;				\
+	nop;						\
+	MSG(msg)
+#else /* ! __CHERI_PURE_CAPABILITY__ */
 #define	PANIC(msg)			\
 	PTR_LA	a0, 9f;			\
 	PTR_LA	t9, _C_LABEL(panic);	\
 	jalr	t9;			\
 	nop;				\
 	MSG(msg)
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 
 #define	PANIC_KSEG0(msg, reg)	PANIC(msg)
 
@@ -636,16 +646,34 @@ _C_LABEL(x):
 #define	USE_ALT_CP(a)		.cplocal a
 #endif	/* __mips_n32 || __mips_n64 */
 
-#define	GET_CPU_PCPU(reg)		\
-	PTR_L	reg, _C_LABEL(pcpup);
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	GET_CPU_PCPU_2(creg, tmp)				\
+	CAPTABLE_PCREL_LOAD(creg, tmp, _C_LABEL(pcpup));	\
+	clc creg, zero, 0(creg)
+/*
+ * Note: This clobbers at
+ */
+#define	GET_CPU_PCPU(creg) GET_CPU_PCPU_2(creg, AT)
+#else /* ! __CHERI_PURE_CAPABILITY__ */
+#define	GET_CPU_PCPU(reg)			\
+	PTR_L	reg, _C_LABEL(pcpup)
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 
 #if defined(MIPS_EXC_CNTRS)
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	INC_EXCEPTION_CNTR(name)					\
+	CAPTABLE_PCREL_LOAD(CHERI_REG_KSCRATCH, k1, _C_LABEL(pcpup));	\
+	cld		k1, zero, PC_ ##name## (CHERI_REG_KSCRATCH);	\
+	daddiu		k1, k1, 1;					\
+	csd		k1, zero, PC_ ##name## (CHERI_REG_KSCRATCH)
+#else /* ! __CHERI_PURE_CAPABILITY__ */
 #define	INC_EXCEPTION_CNTR(name)				\
 	PTR_L		k1, _C_LABEL(pcpup);			\
 	PTR_L		k0, PC_ ## name ## (k1);		\
 	PTR_ADDIU	k0, k0, 1;				\
 	PTR_S		k0, PC_ ## name ## (k1)
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
 
 #else /* ! defined(MIPS_EXC_CNTRS) */
 
@@ -777,12 +805,24 @@ _C_LABEL(x):
 #define	HAZARD_DELAY	nop;nop;nop;nop;sll $0,$0,3;
 #endif
 
+/* Force an absolute relocation for the given symbol */
+#define ABSRELOC_LA(dst, sym)				\
+	lui	dst, %highest(sym);			\
+	daddiu	dst, dst, %higher(sym);			\
+	dsll	dst, dst, 16;				\
+	daddiu	dst, dst, %hi(sym);			\
+	dsll	dst, dst, 16;				\
+	daddiu	dst, dst, %lo(sym)
+
 #endif /* !_MACHINE_ASM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190712,
 //   "target_type": "header",
 //   "changes": [
+//     "support"
+//   ],
+//   "changes_purecap": [
 //     "support"
 //   ],
 //   "change_comment": "jmpbuf, call frame, etc"

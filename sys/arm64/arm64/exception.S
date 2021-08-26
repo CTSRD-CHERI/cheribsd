@@ -35,46 +35,53 @@ __FBSDID("$FreeBSD$");
 
 .macro	save_registers el
 .if \el == 1
-	mov	x18, sp
-	sub	sp, sp, #128
+	mov	PTR(18), PTRN(sp)
+	sub	PTRN(sp), PTRN(sp), #128
 .endif
-	sub	sp, sp, #(TF_SIZE + 16)
-	stp	x29, x30, [sp, #(TF_SIZE)]
-	stp	x28, x29, [sp, #(TF_X + 28 * 8)]
-	stp	x26, x27, [sp, #(TF_X + 26 * 8)]
-	stp	x24, x25, [sp, #(TF_X + 24 * 8)]
-	stp	x22, x23, [sp, #(TF_X + 22 * 8)]
-	stp	x20, x21, [sp, #(TF_X + 20 * 8)]
-	stp	x18, x19, [sp, #(TF_X + 18 * 8)]
-	stp	x16, x17, [sp, #(TF_X + 16 * 8)]
-	stp	x14, x15, [sp, #(TF_X + 14 * 8)]
-	stp	x12, x13, [sp, #(TF_X + 12 * 8)]
-	stp	x10, x11, [sp, #(TF_X + 10 * 8)]
-	stp	x8,  x9,  [sp, #(TF_X + 8  * 8)]
-	stp	x6,  x7,  [sp, #(TF_X + 6  * 8)]
-	stp	x4,  x5,  [sp, #(TF_X + 4  * 8)]
-	stp	x2,  x3,  [sp, #(TF_X + 2  * 8)]
-	stp	x0,  x1,  [sp, #(TF_X + 0  * 8)]
-	mrs	x10, elr_el1
+	stp	PTR(29), PTR(30), [PTRN(sp), #(-2 * PTR_WIDTH)]!
+	sub	PTRN(sp), PTRN(sp), #(TF_SIZE)
+	stp	CAP(28), CAP(29), [PTRN(sp), #(TF_X + 28 * CAP_WIDTH)]
+	stp	CAP(26), CAP(27), [PTRN(sp), #(TF_X + 26 * CAP_WIDTH)]
+	stp	CAP(24), CAP(25), [PTRN(sp), #(TF_X + 24 * CAP_WIDTH)]
+	stp	CAP(22), CAP(23), [PTRN(sp), #(TF_X + 22 * CAP_WIDTH)]
+	stp	CAP(20), CAP(21), [PTRN(sp), #(TF_X + 20 * CAP_WIDTH)]
+	stp	CAP(18), CAP(19), [PTRN(sp), #(TF_X + 18 * CAP_WIDTH)]
+	stp	CAP(16), CAP(17), [PTRN(sp), #(TF_X + 16 * CAP_WIDTH)]
+	stp	CAP(14), CAP(15), [PTRN(sp), #(TF_X + 14 * CAP_WIDTH)]
+	stp	CAP(12), CAP(13), [PTRN(sp), #(TF_X + 12 * CAP_WIDTH)]
+	stp	CAP(10), CAP(11), [PTRN(sp), #(TF_X + 10 * CAP_WIDTH)]
+	stp	CAP(8),  CAP(9),  [PTRN(sp), #(TF_X + 8  * CAP_WIDTH)]
+	stp	CAP(6),  CAP(7),  [PTRN(sp), #(TF_X + 6  * CAP_WIDTH)]
+	stp	CAP(4),  CAP(5),  [PTRN(sp), #(TF_X + 4  * CAP_WIDTH)]
+	stp	CAP(2),  CAP(3),  [PTRN(sp), #(TF_X + 2  * CAP_WIDTH)]
+	stp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X + 0  * CAP_WIDTH)]
+#if __has_feature(capabilities)
+	mrs	c9, ddc_el0
+#endif
+	mrs	CAP(10), CAPN(elr_el1)
 	mrs	x11, spsr_el1
 	mrs	x12, esr_el1
 .if \el == 0
-	mrs	x18, sp_el0
+	mrs	CAP(18), CAPN(sp_el0)
 .endif
+#if __has_feature(capabilities)
+	stp	c10, c9, [PTRN(sp), #(TF_ELR)]
+#else
 	str	x10, [sp, #(TF_ELR)]
-	stp	w11, w12, [sp, #(TF_SPSR)]
-	stp	x18,  lr, [sp, #(TF_SP)]
-	mrs	x18, tpidr_el1
-	add	x29, sp, #(TF_SIZE)
+#endif
+	stp	w11, w12, [PTRN(sp), #(TF_SPSR)]
+	stp	CAP(18), CAPN(lr), [PTRN(sp), #(TF_SP)]
+	mrs	PTR(18), PTRN(tpidr_el1)
+	add	PTR(29), PTRN(sp), #(TF_SIZE)
 .if \el == 0
 	/* Apply the SSBD (CVE-2018-3639) workaround if needed */
-	ldr	x1, [x18, #PC_SSBD]
+	ldr	PTR(1), [PTR(18), #PC_SSBD]
 	cbz	x1, 1f
 	mov	w0, #1
-	blr	x1
+	blr	PTR(1)
 1:
 
-	ldr	x0, [x18, #(PC_CURTHREAD)]
+	ldr	PTR(0), [PTR(18), #(PC_CURTHREAD)]
 	bl	dbg_monitor_enter
 .endif
 	msr	daifclr, #8	/* Enable the debug exception */
@@ -90,52 +97,66 @@ __FBSDID("$FreeBSD$");
 	msr	daifset, #10
 .endif
 .if \el == 0
-	ldr	x0, [x18, #PC_CURTHREAD]
-	mov	x1, sp
+	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
+	mov	PTR(1), PTRN(sp)
 	bl	dbg_monitor_exit
 
 	/* Remove the SSBD (CVE-2018-3639) workaround if needed */
-	ldr	x1, [x18, #PC_SSBD]
+	ldr	PTR(1), [PTR(18), #PC_SSBD]
 	cbz	x1, 1f
 	mov	w0, #0
-	blr	x1
+	blr	PTR(1)
 1:
 .endif
-	ldp	x18,  lr, [sp, #(TF_SP)]
+	ldp	CAP(18), CAPN(lr), [PTRN(sp), #(TF_SP)]
+#if __has_feature(capabilities)
+	ldr	w11, [PTRN(sp), #(TF_SPSR)]
+	ldp	c10, c9, [PTRN(sp), #(TF_ELR)]
+#else
 	ldp	x10, x11, [sp, #(TF_ELR)]
+#endif
 .if \el == 0
-	msr	sp_el0, x18
+	msr	CAPN(sp_el0), CAP(18)
 .endif
 	msr	spsr_el1, x11
-	msr	elr_el1, x10
-	ldp	x0,  x1,  [sp, #(TF_X + 0  * 8)]
-	ldp	x2,  x3,  [sp, #(TF_X + 2  * 8)]
-	ldp	x4,  x5,  [sp, #(TF_X + 4  * 8)]
-	ldp	x6,  x7,  [sp, #(TF_X + 6  * 8)]
-	ldp	x8,  x9,  [sp, #(TF_X + 8  * 8)]
-	ldp	x10, x11, [sp, #(TF_X + 10 * 8)]
-	ldp	x12, x13, [sp, #(TF_X + 12 * 8)]
-	ldp	x14, x15, [sp, #(TF_X + 14 * 8)]
-	ldp	x16, x17, [sp, #(TF_X + 16 * 8)]
+	msr	CAPN(elr_el1), CAP(10)
+#if __has_feature(capabilities)
+	msr	ddc_el0, c9
+#endif
+	ldp	CAP(0),  CAP(1),  [PTRN(sp), #(TF_X + 0  * CAP_WIDTH)]
+	ldp	CAP(2),  CAP(3),  [PTRN(sp), #(TF_X + 2  * CAP_WIDTH)]
+	ldp	CAP(4),  CAP(5),  [PTRN(sp), #(TF_X + 4  * CAP_WIDTH)]
+	ldp	CAP(6),  CAP(7),  [PTRN(sp), #(TF_X + 6  * CAP_WIDTH)]
+	ldp	CAP(8),  CAP(9),  [PTRN(sp), #(TF_X + 8  * CAP_WIDTH)]
+	ldp	CAP(10), CAP(11), [PTRN(sp), #(TF_X + 10 * CAP_WIDTH)]
+	ldp	CAP(12), CAP(13), [PTRN(sp), #(TF_X + 12 * CAP_WIDTH)]
+	ldp	CAP(14), CAP(15), [PTRN(sp), #(TF_X + 14 * CAP_WIDTH)]
+	ldp	CAP(16), CAP(17), [PTRN(sp), #(TF_X + 16 * CAP_WIDTH)]
+#if !__has_feature(capabilities) || defined(__CHERI_PURE_CAPABILITY__)
 .if \el == 0
 	/*
 	 * We only restore the callee saved registers when returning to
 	 * userland as they may have been updated by a system call or signal.
+	 * Hybrid kernels, however, won't preserve the full capability
+	 * registers so must always do this.
 	 */
-	ldp	x18, x19, [sp, #(TF_X + 18 * 8)]
-	ldp	x20, x21, [sp, #(TF_X + 20 * 8)]
-	ldp	x22, x23, [sp, #(TF_X + 22 * 8)]
-	ldp	x24, x25, [sp, #(TF_X + 24 * 8)]
-	ldp	x26, x27, [sp, #(TF_X + 26 * 8)]
-	ldp	x28, x29, [sp, #(TF_X + 28 * 8)]
+#endif
+	ldp	CAP(18), CAP(19), [PTRN(sp), #(TF_X + 18 * CAP_WIDTH)]
+	ldp	CAP(20), CAP(21), [PTRN(sp), #(TF_X + 20 * CAP_WIDTH)]
+	ldp	CAP(22), CAP(23), [PTRN(sp), #(TF_X + 22 * CAP_WIDTH)]
+	ldp	CAP(24), CAP(25), [PTRN(sp), #(TF_X + 24 * CAP_WIDTH)]
+	ldp	CAP(26), CAP(27), [PTRN(sp), #(TF_X + 26 * CAP_WIDTH)]
+	ldp	CAP(28), CAP(29), [PTRN(sp), #(TF_X + 28 * CAP_WIDTH)]
+#if !__has_feature(capabilities) || defined(__CHERI_PURE_CAPABILITY__)
 .else
-	ldr	     x29, [sp, #(TF_X + 29 * 8)]
+	ldr	         CAP(29), [PTRN(sp), #(TF_X + 29 * CAP_WIDTH)]
 .endif
+#endif
 .if \el == 0
-	add	sp, sp, #(TF_SIZE + 16)
+	add	PTRN(sp), PTRN(sp), #(TF_SIZE + 2 * PTR_WIDTH)
 .else
-	mov	sp, x18
-	mrs	x18, tpidr_el1
+	mov	PTRN(sp), PTR(18)
+	mrs	PTR(18), PTRN(tpidr_el1)
 .endif
 .endm
 
@@ -148,8 +169,8 @@ __FBSDID("$FreeBSD$");
 	msr	daifset, #10
 
 	/* Read the current thread flags */
-	ldr	x1, [x18, #PC_CURTHREAD]	/* Load curthread */
-	ldr	x2, [x1, #TD_FLAGS]
+	ldr	PTR(1), [PTR(18), #PC_CURTHREAD]	/* Load curthread */
+	ldr	w2, [PTR(1), #TD_FLAGS]
 
 	/* Check if we have either bits set */
 	mov	x3, #((TDF_ASTPENDING|TDF_NEEDRESCHED) >> 8)
@@ -161,7 +182,7 @@ __FBSDID("$FreeBSD$");
 	msr	daif, x19
 
 	/* handle the ast */
-	mov	x0, sp
+	mov	PTR(0), PTRN(sp)
 	bl	_C_LABEL(ast)
 
 	/* Re-check for new ast scheduled */
@@ -171,8 +192,8 @@ __FBSDID("$FreeBSD$");
 
 ENTRY(handle_el1h_sync)
 	save_registers 1
-	ldr	x0, [x18, #PC_CURTHREAD]
-	mov	x1, sp
+	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
+	mov	PTR(1), PTRN(sp)
 	bl	do_el1h_sync
 	restore_registers 1
 	ERET
@@ -180,7 +201,7 @@ END(handle_el1h_sync)
 
 ENTRY(handle_el1h_irq)
 	save_registers 1
-	mov	x0, sp
+	mov	PTR(0), PTRN(sp)
 	bl	intr_irq_handler
 	restore_registers 1
 	ERET
@@ -188,9 +209,9 @@ END(handle_el1h_irq)
 
 ENTRY(handle_el0_sync)
 	save_registers 0
-	ldr	x0, [x18, #PC_CURTHREAD]
-	mov	x1, sp
-	str	x1, [x0, #TD_FRAME]
+	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
+	mov	PTR(1), PTRN(sp)
+	str	PTR(1), [PTR(0), #TD_FRAME]
 	bl	do_el0_sync
 	do_ast
 	restore_registers 0
@@ -199,7 +220,7 @@ END(handle_el0_sync)
 
 ENTRY(handle_el0_irq)
 	save_registers 0
-	mov	x0, sp
+	mov	PTR(0), PTRN(sp)
 	bl	intr_irq_handler
 	do_ast
 	restore_registers 0
@@ -208,14 +229,14 @@ END(handle_el0_irq)
 
 ENTRY(handle_serror)
 	save_registers 0
-	mov	x0, sp
+	mov	PTR(0), PTRN(sp)
 1:	bl	do_serror
 	b	1b
 END(handle_serror)
 
 ENTRY(handle_empty_exception)
 	save_registers 0
-	mov	x0, sp
+	mov	PTR(0), PTRN(sp)
 1:	bl	unhandled_exception
 	b	1b
 END(handle_unhandled_exception)

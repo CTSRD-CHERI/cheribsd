@@ -3134,8 +3134,7 @@ do_l2b_alloc:
 				} else
 					m->md.pv_kva = va;
 			} else {
-				KASSERT(va < kmi.clean_sva ||
-				    va >= kmi.clean_eva,
+				KASSERT(!VA_IS_CLEANMAP(va),
 		("pmap_enter: managed mapping within the clean submap"));
  				KASSERT(pve != NULL, ("No pv"));
  				pmap_enter_pv(m, pve, pmap, va, nflags);

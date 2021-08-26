@@ -389,12 +389,6 @@ trunc:
 void
 rpki_rtr_print(netdissect_options *ndo, register const u_char *pptr, register u_int len)
 {
-	INVOKE_DISSECTOR(_rpki_rtr_print, ndo, pptr, len);
-}
-
-void
-_rpki_rtr_print(netdissect_options *ndo, register const u_char *pptr, register u_int len)
-{
     if (!ndo->ndo_vflag) {
 	ND_PRINT((ndo, ", RPKI-RTR"));
 	return;

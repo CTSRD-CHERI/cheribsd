@@ -112,10 +112,6 @@ CLEANFILES= ioctl.c ioctl.c.tmp tables.h
 CPP+=	-m32
 .endif
 
-.if ${MK_CHERI} != "no"
-NEED_CHERI?=	hybrid
-.endif
-
 .if ${MK_PF} != "no"
 CFLAGS+=-DPF
 .endif
@@ -127,7 +123,7 @@ CFLAGS.gcc+=	${CFLAGS.gcc.${.IMPSRC}}
 
 .if ${MACHINE_ABI:Mpurecap}
 # Work around packed struct in cissio.h
-CFLAGS.ioctl.c+=	-Wno-error-cheri-capability-misuse
+CFLAGS.ioctl.c+=	-Wno-error=cheri-capability-misuse
 .endif
 
 DEPENDOBJS+=	tables.h

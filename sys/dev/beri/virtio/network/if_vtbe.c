@@ -282,7 +282,7 @@ vtbe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		VTBE_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			pio_enable_irq(sc, 1);
@@ -300,10 +300,10 @@ vtbe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->if_flags = ifp->if_flags;
 		VTBE_UNLOCK(sc);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		ifmr = (struct ifmediareq *)data;
 		ifmr->ifm_count = 1;
@@ -311,14 +311,14 @@ vtbe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifmr->ifm_active = (IFM_ETHER | IFM_10G_T | IFM_FDX);
 		ifmr->ifm_current = ifmr->ifm_active;
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
+	case SIOCSIFCAP:
+		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
 		if (mask & IFCAP_VLAN_MTU) {
 			ifp->if_capenable ^= IFCAP_VLAN_MTU;
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 		pio_enable_irq(sc, 1);
 	default:
 		error = ether_ioctl(ifp, cmd, data);
@@ -648,12 +648,3 @@ static devclass_t vtbe_devclass;
 
 DRIVER_MODULE(vtbe, simplebus, vtbe_driver, vtbe_devclass, 0, 0);
 MODULE_DEPEND(vtbe, ether, 1, 1, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20191025,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

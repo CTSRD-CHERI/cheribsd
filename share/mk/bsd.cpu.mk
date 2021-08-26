@@ -7,7 +7,10 @@
 .if !defined(CPUTYPE) || empty(CPUTYPE)
 _CPUCFLAGS =
 . if ${MACHINE_CPUARCH} == "aarch64"
-MACHINE_CPU = arm64
+.  if ${MACHINE_ARCH:Maarch64*c*}
+MACHINE_CPU = cheri morello
+.  endif
+MACHINE_CPU += arm64
 . elif ${MACHINE_CPUARCH} == "amd64"
 MACHINE_CPU = amd64 sse2 sse mmx
 . elif ${MACHINE_CPUARCH} == "arm"
@@ -153,9 +156,13 @@ _CPUCFLAGS = -cheri=128
 _CPUCFLAGS = -march=${CPUTYPE:S/^mips//}
 . endif
 . elif ${MACHINE_CPUARCH} == "aarch64"
-.  if ${CPUTYPE:Marmv*} != "" || ${CPUTYPE:Mmorello*} != ""
+.  if ${CPUTYPE:Marmv*} != ""
 # Use -march when the CPU type is an architecture value, e.g. armv8.1-a
 _CPUCFLAGS = -march=${CPUTYPE}
+.  elif ${CPUTYPE} == "morello"
+# Don't use -march; we will add -march=morello or -march=morello+c64 later but
+# adding -march=morello here would override that as _CPUCFLAGS is added late.
+# It is also not a valid value for -mcpu.
 .  else
 # Otherwise assume we have a CPU type
 _CPUCFLAGS = -mcpu=${CPUTYPE}
@@ -287,8 +294,8 @@ MACHINE_CPU = sse3
 MACHINE_CPU += amd64 sse2 sse mmx
 ########## arm64
 . elif ${MACHINE_CPUARCH} == "aarch64"
-.  if ${CPUTYPE} == "cheri"
-MACHINE_CPU = cheri
+.  if ${CPUTYPE} == "morello"
+MACHINE_CPU = cheri morello
 .  endif
 MACHINE_CPU += arm64
 ########## Mips
@@ -308,6 +315,19 @@ MACHINE_CPU = booke softfp
 MACHINE_CPU = cheri
 .  endif
 MACHINE_CPU += riscv
+. endif
+.endif
+
+.if ${MACHINE_CPUARCH} == "aarch64"
+. if ${MACHINE_ARCH:Maarch64*c*}
+# XXX: Stop using emulated TLS once purecap TLSDESC is properly specified (and
+# CheriBSD implements the resolvers) or the Morello toolchain implements a
+# pure-capability traditional TLS like MIPS or RISC-V.
+CFLAGS+=	-march=morello+c64 -mabi=purecap -femulated-tls
+LDFLAGS+=	-march=morello+c64 -mabi=purecap
+. elif defined(CPUTYPE) && ${CPUTYPE} == "morello"
+CFLAGS+=	-march=morello -mabi=aapcs
+LDFLAGS+=	-march=morello -mabi=aapcs
 . endif
 .endif
 
@@ -343,9 +363,6 @@ CFLAGS+=	-cheri
 LDFLAGS+=	-fuse-ld=lld
 
 CFLAGS+=	-Werror=cheri-bitwise-operations
-# Don't remove CHERI symbols from the symbol table
-STRIP_FLAGS+=	-w --keep-symbol=__cheri_callee_method.\* \
-		--keep-symbol=__cheri_method.\*
 .endif
 . if ${MACHINE_ARCH:Mmips*hf}
 CFLAGS += -mhard-float
@@ -456,7 +473,7 @@ MACHINE_ABI+=	soft-float
 .else
 MACHINE_ABI+=	hard-float
 .endif
-.if (${MACHINE_ARCH:Mmips*c*} || ${MACHINE_ARCH:Mriscv*c*})
+.if (${MACHINE_ARCH:Maarch64*c*} || ${MACHINE_ARCH:Mmips*c*} || ${MACHINE_ARCH:Mriscv*c*})
 MACHINE_ABI+=	purecap
 .endif
 # Currently all 64-bit architectures include 64 in their name (see arch(7)).

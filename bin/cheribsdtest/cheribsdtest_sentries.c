@@ -72,8 +72,8 @@ check_fptr(uintptr_t fptr)
 }
 
 #ifdef CHERIBSD_DYNAMIC_TESTS
-void
-test_sentry_dlsym(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sentry_dlsym,
+    "Check that a function pointer obtaine dfrom via dlsym is a sentry")
 {
 	unsigned int (*fptr)(unsigned int seconds);
 	void *handle;
@@ -93,16 +93,16 @@ test_sentry_dlsym(const struct cheri_test *ctp __unused)
 }
 #endif
 
-void
-test_sentry_libc(const struct cheri_test *ctp __unused)
+CHERIBSDTEST(test_sentry_libc,
+    "Check that a function pointer from libc is a sentry")
 {
 	unsigned int (*fptr)(unsigned int seconds) = sleep;
 
 	check_fptr((uintptr_t)fptr);
 }
 
-void
-test_sentry_static(const struct cheri_test *ctp)
+CHERIBSDTEST(test_sentry_static,
+    "Check that a statically initialized function pointer is a sentry")
 {
 
 	check_fptr((uintptr_t)ctp->ct_func);

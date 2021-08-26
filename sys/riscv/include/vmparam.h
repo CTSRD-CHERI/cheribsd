@@ -160,10 +160,32 @@
 #define	PHYS_IN_DMAP(pa)	((pa) >= DMAP_MIN_PHYSADDR && \
     (pa) < DMAP_MAX_PHYSADDR)
 /* True if va is in the dmap range */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	VIRT_IN_DMAP(va)						\
+	cheri_is_address_inbounds(dmap_capability, (va))
+#else
 #define	VIRT_IN_DMAP(va)	((va) >= DMAP_MIN_ADDRESS && \
     (va) < (dmap_max_addr))
+#endif
 
 #define	PMAP_HAS_DMAP	1
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	PHYS_TO_DMAP(pa)						\
+({									\
+	KASSERT(PHYS_IN_DMAP(pa),					\
+	    ("%s: PA out of range, PA: 0x%lx", __func__,		\
+	    (vm_paddr_t)(pa)));						\
+	(vm_pointer_t)dmap_capability + ((pa) - dmap_phys_base);	\
+})
+
+#define	DMAP_TO_PHYS(va)						\
+({									\
+	KASSERT(VIRT_IN_DMAP(va),					\
+	    ("%s: VA out of range, VA: 0x%lx", __func__,		\
+	    (vm_offset_t)(va)));					\
+	dmap_phys_base + ((vm_offset_t)(va) - (ptraddr_t)dmap_capability); \
+})
+#else
 #define	PHYS_TO_DMAP(pa)						\
 ({									\
 	KASSERT(PHYS_IN_DMAP(pa),					\
@@ -179,6 +201,7 @@
 	    (vm_offset_t)(va)));					\
 	((va) - DMAP_MIN_ADDRESS) + dmap_phys_base;			\
 })
+#endif
 
 #define	VM_MIN_USER_ADDRESS	(0x0000000000000000UL)
 #define	VM_MAX_USER_ADDRESS	(0x0000004000000000UL)
@@ -188,16 +211,7 @@
 
 #define	KERNBASE		(VM_MIN_KERNEL_ADDRESS)
 #define	SHAREDPAGE		(VM_MAXUSER_ADDRESS - PAGE_SIZE)
-
-#if __has_feature(capabilities)
-/*
- * To ensure that the stack base address that is sufficiently aligned to create
- * a precisely bounded capability we must round down by 256 pages (0x3ffff00000).
- */
-#define	USRSTACK		(SHAREDPAGE - (255 * PAGE_SIZE))
-#else
 #define	USRSTACK		SHAREDPAGE
-#endif
 
 #define	VM_EARLY_DTB_ADDRESS	(VM_MAX_KERNEL_ADDRESS - (2 * L2_SIZE))
 
@@ -236,9 +250,13 @@
 #ifndef LOCORE
 extern vm_paddr_t dmap_phys_base;
 extern vm_paddr_t dmap_phys_max;
+#ifdef __CHERI_PURE_CAPABILITY__
+extern void *dmap_capability;
+#else
 extern vm_offset_t dmap_max_addr;
+#endif
 extern vm_offset_t vm_max_kernel_address;
-extern vm_offset_t init_pt_va;
+extern void *init_pt_va;
 #endif
 
 #define	ZERO_REGION_SIZE	(64 * 1024)	/* 64KB */
@@ -256,3 +274,13 @@ extern vm_offset_t init_pt_va;
 #define MINIDUMP_PAGE_TRACKING	1
 
 #endif /* !_MACHINE_VMPARAM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20200803,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

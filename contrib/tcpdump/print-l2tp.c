@@ -736,12 +736,6 @@ l2tp_avp_print(netdissect_options *ndo, const u_char *dat, u_int length)
 void
 l2tp_print(netdissect_options *ndo, const u_char *dat, u_int length)
 {
-	INVOKE_DISSECTOR(_l2tp_print, ndo, dat, length);
-}
-
-void
-_l2tp_print(netdissect_options *ndo, const u_char *dat, u_int length)
-{
 	const u_char *ptr = dat;
 	u_int cnt = 0;			/* total octets consumed */
 	uint16_t pad;

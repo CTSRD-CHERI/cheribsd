@@ -84,6 +84,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/vmem.h>
 #include <sys/vmmeter.h>
 
+#include <cheri/cheric.h>
+
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_kern.h>
@@ -141,6 +143,7 @@ vm_mem_init(void *dummy)
 	vm_object_init();
 	vm_map_startup();
 	kmem_init(virtual_avail, virtual_end);
+	/* XXX-AM: in principle we could now destroy the virtual_avail/end capabilities */
 
 	kmem_init_zero_region();
 	pmap_init();
@@ -150,12 +153,12 @@ vm_mem_init(void *dummy)
 void
 vm_ksubmap_init(struct kva_md_info *kmi)
 {
-	vm_offset_t firstaddr;
+	vm_pointer_t firstaddr;
 	caddr_t v;
 	vm_size_t size = 0;
 	long physmem_est;
-	vm_offset_t minaddr;
-	vm_offset_t maxaddr;
+	vm_pointer_t minaddr;
+	vm_pointer_t maxaddr;
 
 	/*
 	 * Allocate space for system data structures.
@@ -206,15 +209,8 @@ again:
 	/*
 	 * End of second pass, addresses have been assigned
 	 */
-	if ((vm_size_t)((char *)v - firstaddr) != size)
+	if ((vm_size_t)(v - firstaddr) != size)
 		panic("startup: table size inconsistency");
-
-	/*
-	 * Allocate the clean map to hold all of I/O virtual memory.
-	 */
-	size = (long)nbuf * BKVASIZE + (long)bio_transient_maxcnt * MAXPHYS;
-	kmi->clean_sva = firstaddr = kva_alloc(size);
-	kmi->clean_eva = firstaddr + size;
 
 	/*
 	 * Allocate the buffer arena.
@@ -223,23 +219,40 @@ again:
 	 * avoids lock contention at the expense of some fragmentation.
 	 */
 	size = (long)nbuf * BKVASIZE;
-	kmi->buffer_sva = firstaddr;
+#ifdef __CHERI_PURE_CAPABILITY__
+	size = CHERI_REPRESENTABLE_LENGTH(size);
+#endif
+	firstaddr = kva_alloc(size);
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(firstaddr) == size,
+	    ("Inexact bounds expected %zx found %zx",
+	    (size_t)size, (size_t)cheri_getlen(firstaddr)));
+#endif
+	kmi->buffer_sva = (vm_offset_t)firstaddr;
 	kmi->buffer_eva = kmi->buffer_sva + size;
-	vmem_init(buffer_arena, "buffer arena", kmi->buffer_sva, size,
-	    PAGE_SIZE, (mp_ncpus > 4) ? BKVASIZE * 8 : 0, 0);
-	firstaddr += size;
+	vmem_init(buffer_arena, "buffer arena", firstaddr, size,
+	    PAGE_SIZE, (mp_ncpus > 4) ? BKVASIZE * 8 : 0, 0,
+	    VMEM_CAPABILITY_ARENA);
 
 	/*
 	 * And optionally transient bio space.
 	 */
 	if (bio_transient_maxcnt != 0) {
 		size = (long)bio_transient_maxcnt * MAXPHYS;
+#ifdef __CHERI_PURE_CAPABILITY__
+		size = CHERI_REPRESENTABLE_LENGTH(size);
+#endif
+		firstaddr = kva_alloc(size);
+#ifdef __CHERI_PURE_CAPABILITY__
+		KASSERT(cheri_getlen(firstaddr) == size,
+		    ("Inexact bounds expected %zx found %zx",
+		    (size_t)size, (size_t)cheri_getlen(firstaddr)));
+#endif
+		kmi->transient_sva = (vm_offset_t)firstaddr;
+		kmi->transient_eva = kmi->transient_sva + size;
 		vmem_init(transient_arena, "transient arena",
-		    firstaddr, size, PAGE_SIZE, 0, 0);
-		firstaddr += size;
+		    firstaddr, size, PAGE_SIZE, 0, 0, VMEM_CAPABILITY_ARENA);
 	}
-	if (firstaddr != kmi->clean_eva)
-		panic("Clean map calculation incorrect");
 
 	/*
 	 * Allocate the pageable submaps.  We may cache an exec map entry per
@@ -258,3 +271,12 @@ again:
 	kmem_subinit(pipe_map, kernel_map, &minaddr, &maxaddr, maxpipekva,
 	    false);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 2020706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "bounds_compression"
+//   ]
+// }
+// CHERI CHANGES END

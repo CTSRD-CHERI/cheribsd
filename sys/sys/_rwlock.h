@@ -44,7 +44,7 @@
 struct rwlock {
 	struct lock_object	lock_object;
 	volatile uintptr_t	rw_lock;
-};
+} __no_subobject_bounds;
 
 /*
  * Members of struct rwlock_padalign must mirror members of struct rwlock.
@@ -58,6 +58,15 @@ struct rwlock {
 struct rwlock_padalign {
 	struct lock_object	lock_object;
 	volatile uintptr_t	rw_lock;
-} __aligned(CACHE_LINE_SIZE);
+} __aligned(CACHE_LINE_SIZE) __no_subobject_bounds;
 
 #endif /* !_SYS__RWLOCK_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

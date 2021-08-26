@@ -1653,12 +1653,12 @@ bnxt_priv_ioctl(if_ctx_t ctx, u_long command, caddr_t data)
 	struct bnxt_ioctl_data iod_storage, *iod = &iod_storage;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCGPRIVATE_0):
+	case SIOCGPRIVATE_0:
 		if ((rc = priv_check(curthread, PRIV_DRIVER)) != 0)
 			goto exit;
 
-		ioh = ifr_buffer_get_buffer(ifr);
-		iol = ifr_buffer_get_length(ifr);
+		ioh = ifr_buffer_get_buffer(command, ifr);
+		iol = ifr_buffer_get_length(command, ifr);
 		if (iol > sizeof(iod_storage))
 			return (EINVAL);
 
@@ -2507,10 +2507,10 @@ bnxt_get_wol_settings(struct bnxt_softc *softc)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

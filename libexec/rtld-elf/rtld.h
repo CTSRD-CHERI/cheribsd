@@ -55,6 +55,11 @@
 #include <setjmp.h>
 #include <stddef.h>
 
+#if __has_feature(capabilities)
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+#endif
+
 #include "rtld_lock.h"
 
 __BEGIN_DECLS
@@ -228,7 +233,7 @@ typedef struct Struct_Obj_Entry {
     size_t relro_size;
 
     /* Items from the dynamic section. */
-    Elf_Addr *pltgot;		/* PLT or GOT, depending on architecture */
+    uintptr_t *pltgot;		/* PLT or GOT, depending on architecture */
     const Elf_Rel *rel;		/* Relocation entries */
     unsigned long relsize;	/* Size in bytes of relocation info */
     const Elf_Rela *rela;	/* Relocation entries with addend */
@@ -240,7 +245,7 @@ typedef struct Struct_Obj_Entry {
     const Elf_Sym *symtab;	/* Symbol table */
     const char *strtab;		/* String table */
     unsigned long strsize;	/* Size in bytes of string table */
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef RTLD_HAS_CAPRELOCS
     caddr_t cap_relocs;		/* start of the __cap_relocs section */
     size_t cap_relocs_size;	/* size of the __cap_relocs section */
 #endif
@@ -353,9 +358,10 @@ typedef struct Struct_Obj_Entry {
     bool marker : 1;		/* marker on the global obj list */
     bool unholdfree : 1;	/* unmap upon last unhold */
     bool doomed : 1;		/* Object cannot be referenced */
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
     bool cap_relocs_processed : 1; /* __cap_relocs section has been processed */
-    bool relative_cap_relocs : 1; /* __cap_relocs section has been processed */
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
     unsigned cheri_captable_abi : 3;
     /*
      * If we linked the DSO with the per-file or per-function captable flag we
@@ -475,6 +481,23 @@ void dump_obj_relocations(Obj_Entry *);
 void dump_Elf_Rel(Obj_Entry *, const Elf_Rel *, u_long);
 void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/* TODO: we should have a separate member for .text/rodata */
+#define get_codesegment_cap(obj) ((obj)->text_rodata_cap)
+#define get_datasegment_cap(obj) ((obj)->relocbase)
+#elif __has_feature(capabilities)
+#define get_codesegment_cap(obj)				\
+	(const char * __capability)cheri_setbounds(		\
+	    cheri_setaddress(cheri_getpcc(),			\
+	        (ptraddr_t)(uintptr_t)obj->mapbase),		\
+	    obj->mapsize)
+#define get_datasegment_cap(obj)				\
+	(char * __capability)cheri_setbounds(			\
+	    cheri_setaddress(cheri_getdefault(),		\
+	        (ptraddr_t)(uintptr_t)obj->mapbase),		\
+	    obj->mapsize)
+#endif
+
 __END_DECLS
 
 /* rtld_machdep.h depends on struct Obj_Entry and _rtld_error() */
@@ -496,8 +519,9 @@ __END_DECLS
 #define make_rtld_local_function_pointer(target_func)	(&target_func)
 #endif
 
-#ifndef __CHERI_PURE_CAPABILITY__
-/* For CHERI we also set bounds (see rtld_machdep.h) */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define make_data_pointer(def, defobj)	make_data_cap(def, defobj)
+#else
 #define make_data_pointer(def, defobj)	(defobj->relocbase + def->st_value)
 #endif
 
@@ -554,7 +578,7 @@ void __crt_free(void *cp);
 void *__crt_malloc(size_t nbytes);
 void *__crt_realloc(void *cp, size_t nbytes);
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
 void process___cap_relocs(Obj_Entry*);
 #endif
 

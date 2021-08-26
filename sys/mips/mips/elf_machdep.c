@@ -80,7 +80,7 @@ static struct sysentvec elf_freebsd_sysvec = {
 #endif
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct ps_strings),
 #if __has_feature(capabilities)
 	.sv_stackprot	= VM_PROT_RW_CAP,
 #else
@@ -122,9 +122,9 @@ static struct sysentvec elf_freebsd_sysvec = {
 INIT_SYSENTVEC(elf_sysvec, &elf_freebsd_sysvec);
 
 #if __has_feature(capabilities)
-static boolean_t
-mips_elf_header_supported(struct image_params * imgp, int32_t *osrel __unused,
-    uint32_t *fctl0 __unused)
+static bool
+mips_elf_header_supported(const struct image_params *imgp,
+    const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
 {
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 	const uint32_t machine = hdr->e_flags & EF_MIPS_MACH;
@@ -137,10 +137,10 @@ mips_elf_header_supported(struct image_params * imgp, int32_t *osrel __unused,
 			printf(
 	    "warning: attempting to execute 256-bit CheriABI binary '%s'\n",
 			    imgp->execpath);
-		return FALSE;
+		return false;
 	}
 
-	return TRUE;
+	return true;
 }
 #endif
 
@@ -311,7 +311,7 @@ elf_is_ifunc_reloc(Elf_Size r_info __unused)
 
 /* Process one elf relocation with addend. */
 static int
-elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
     int type, int local, elf_lookup_fn lookup)
 {
 	Elf32_Addr *where = (Elf32_Addr *)NULL;
@@ -523,7 +523,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 }
 
 int
-elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
+elf_reloc(linker_file_t lf, char *relocbase, const void *data, int type,
     elf_lookup_fn lookup)
 {
 
@@ -531,7 +531,7 @@ elf_reloc(linker_file_t lf, Elf_Addr relocbase, const void *data, int type,
 }
 
 int
-elf_reloc_local(linker_file_t lf, Elf_Addr relocbase, const void *data,
+elf_reloc_local(linker_file_t lf, char *relocbase, const void *data,
     int type, elf_lookup_fn lookup)
 {
 
@@ -571,7 +571,8 @@ elf_cpu_parse_dynamic(caddr_t loadbase __unused, Elf_Dyn *dynamic __unused)
 //   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
-//     "support"
+//     "support",
+//     "pointer_as_integer"
 //   ],
 //   "change_comment": "shared page"
 // }

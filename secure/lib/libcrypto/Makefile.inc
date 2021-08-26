@@ -23,7 +23,9 @@ CFLAGS+=	-DB_ENDIAN
 
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "i386"
+.if !${MACHINE_ARCH:Maarch64*c*}
 ASM_${MACHINE_CPUARCH}=
+.endif
 .endif
 
 .if defined(ASM_${MACHINE_CPUARCH})

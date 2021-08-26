@@ -25,14 +25,6 @@
  *	Seth Webster <swebster@sst.ll.mit.edu>
  */
 
-#include <sys/cdefs.h>
-
-#ifdef CHERI_TCPDUMP
-#define	__cap	__capability
-#else
-#define	__cap
-#endif
-
 #ifndef print_h
 #define print_h
 
@@ -41,10 +33,10 @@ void	init_print(netdissect_options *ndo, uint32_t localnet, uint32_t mask,
 
 int	has_printer(int type);
 
-void	ndo_set_if_printer(netdissect_options *ndo, int type);
+if_printer get_if_printer(netdissect_options *ndo, int type);
 
 void	pretty_print_packet(netdissect_options *ndo,
-	    const struct pcap_pkthdr *h, const u_char * __cap sp,
+	    const struct pcap_pkthdr *h, const u_char *sp,
 	    u_int packets_captured);
 
 void	ndo_set_function_pointers(netdissect_options *ndo);

@@ -140,7 +140,7 @@ phyp_iommu_set_dma_tag(device_t bus, device_t dev, bus_dma_tag_t tag)
 		 */
 		window->map->vmem = vmem_create("IOMMU mappings", PAGE_SIZE,
 		    trunc_page(VMEM_ADDR_MAX) - PAGE_SIZE, PAGE_SIZE, 0,
-		    M_BESTFIT | M_NOWAIT);
+		    M_BESTFIT | M_NOWAIT, 0);
 		SLIST_INSERT_HEAD(&iommu_map_head, window->map, entries);
 	}
 

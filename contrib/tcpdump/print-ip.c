@@ -350,7 +350,7 @@ again:
 			break;
 		}
 		ipds->nh = *ipds->cp;
-		ipds->advance = _ah_print(ndo, ipds->cp);
+		ipds->advance = ah_print(ndo, ipds->cp);
 		if (ipds->advance <= 0)
 			break;
 		ipds->cp += ipds->advance;
@@ -360,7 +360,7 @@ again:
 	case IPPROTO_ESP:
 	{
 		int enh, padlen;
-		ipds->advance = _esp_print(ndo, ipds->cp, ipds->len,
+		ipds->advance = esp_print(ndo, ipds->cp, ipds->len,
 				    (const u_char *)ipds->ip,
 				    &enh, &padlen);
 		if (ipds->advance <= 0)
@@ -520,16 +520,6 @@ ip_print_inner(netdissect_options *ndo,
 	       u_int length, u_int nh,
 	       const u_char *bp2)
 {
-
-	INVOKE_DISSECTOR(_ip_print_inner, ndo, bp, length, nh, bp2);
-}
-
-void
-_ip_print_inner(netdissect_options *ndo,
-	       const u_char *bp,
-	       u_int length, u_int nh,
-	       const u_char *bp2)
-{
 	struct ip_print_demux_state  ipd;
 
 	ipd.ip = (const struct ip *)bp2;
@@ -548,15 +538,6 @@ _ip_print_inner(netdissect_options *ndo,
  */
 void
 ip_print(netdissect_options *ndo,
-	 const u_char *bp,
-	 u_int length)
-{
-
-	INVOKE_DISSECTOR(_ip_print, ndo, bp, length);
-}
-
-void
-_ip_print(netdissect_options *ndo,
 	 const u_char *bp,
 	 u_int length)
 {

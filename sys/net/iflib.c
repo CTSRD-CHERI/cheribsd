@@ -268,7 +268,7 @@ iflib_get_sctx(if_ctx_t ctx)
 
 #define IP_ALIGNED(m) ((((uintptr_t)(m)->m_data) & 0x3) == 0x2)
 #define CACHE_PTR_INCREMENT (CACHE_LINE_SIZE/sizeof(void*))
-#define CACHE_PTR_NEXT(ptr) ((void *)(((uintptr_t)(ptr)+CACHE_LINE_SIZE-1) & (CACHE_LINE_SIZE-1)))
+#define CACHE_PTR_NEXT(ptr) ((void *)(roundup2(ptr, CACHE_LINE_SIZE)))
 
 #define LINK_ACTIVE(ctx) ((ctx)->ifc_link_state == LINK_STATE_UP)
 #define CTX_IS_VF(ctx) ((ctx)->ifc_sctx->isc_flags & IFLIB_IS_VF)
@@ -453,7 +453,11 @@ typedef struct if_rxsd {
 } *if_rxsd_t;
 
 /* multiple of word size */
-#ifdef __LP64__
+#ifdef __CHERI_PURE_CAPABILITY__
+#define PKT_INFO_SIZE 8
+#define RXD_INFO_SIZE 8
+#define PKT_TYPE uint64_t
+#elif __SIZEOF_SIZE_T__ == 8
 #define PKT_INFO_SIZE	6
 #define RXD_INFO_SIZE	5
 #define PKT_TYPE uint64_t
@@ -483,10 +487,12 @@ pkt_info_zero(if_pkt_info_t pi)
 	pi_pad = (if_pkt_info_pad_t)pi;
 	pi_pad->pkt_val[0] = 0; pi_pad->pkt_val[1] = 0; pi_pad->pkt_val[2] = 0;
 	pi_pad->pkt_val[3] = 0; pi_pad->pkt_val[4] = 0; pi_pad->pkt_val[5] = 0;
-#ifndef __LP64__
+#ifdef __CHERI_PURE_CAPABILITY__
+	pi_pad->pkt_val[6] = 0; pi_pad->pkt_val[7] = 0;
+#elif !__SIZEOF_SIZE_T__ == 8
 	pi_pad->pkt_val[6] = 0; pi_pad->pkt_val[7] = 0; pi_pad->pkt_val[8] = 0;
 	pi_pad->pkt_val[9] = 0; pi_pad->pkt_val[10] = 0;
-#endif	
+#endif
 }
 
 static device_method_t iflib_pseudo_methods[] = {
@@ -4146,7 +4152,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 	int		err = 0, reinit = 0, bits;
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case SIOCSIFADDR:
 #ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET)
 			avoid_reset = true;
@@ -4170,9 +4176,9 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		} else
 			err = ether_ioctl(ifp, command, data);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
+	case SIOCSIFMTU:
 		CTX_LOCK(ctx);
-		if (ifr_mtu_get(ifr) == if_getmtu(ifp)) {
+		if (ifr->ifr_mtu == if_getmtu(ifp)) {
 			CTX_UNLOCK(ctx);
 			break;
 		}
@@ -4180,14 +4186,14 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		/* stop the driver and free any clusters before proceeding */
 		iflib_stop(ctx);
 
-		if ((err = IFDI_MTU_SET(ctx, ifr_mtu_get(ifr))) == 0) {
+		if ((err = IFDI_MTU_SET(ctx, ifr->ifr_mtu)) == 0) {
 			STATE_LOCK(ctx);
-			if (ifr_mtu_get(ifr) > ctx->ifc_max_fl_buf_size)
+			if (ifr->ifr_mtu > ctx->ifc_max_fl_buf_size)
 				ctx->ifc_flags |= IFC_MULTISEG;
 			else
 				ctx->ifc_flags &= ~IFC_MULTISEG;
 			STATE_UNLOCK(ctx);
-			err = if_setmtu(ifp, ifr_mtu_get(ifr));
+			err = if_setmtu(ifp, ifr->ifr_mtu);
 		}
 		iflib_init_locked(ctx);
 		STATE_LOCK(ctx);
@@ -4195,7 +4201,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		STATE_UNLOCK(ctx);
 		CTX_UNLOCK(ctx);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		CTX_LOCK(ctx);
 		if (if_getflags(ifp) & IFF_UP) {
 			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
@@ -4213,8 +4219,8 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		ctx->ifc_if_flags = if_getflags(ifp);
 		CTX_UNLOCK(ctx);
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 			CTX_LOCK(ctx);
 			IFDI_INTR_DISABLE(ctx);
@@ -4223,7 +4229,7 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 			CTX_UNLOCK(ctx);
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		CTX_LOCK(ctx);
 		IFDI_MEDIA_SET(ctx);
 		CTX_UNLOCK(ctx);
@@ -4232,11 +4238,11 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 	case SIOCGIFXMEDIA:
 		err = ifmedia_ioctl(ifp, ifr, ctx->ifc_mediap, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCGI2C):
+	case SIOCGI2C:
 	{
 		struct ifi2creq i2c;
 
-		err = copyin(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
+		err = copyin(ifr_data_get_ptr(command, ifr), &i2c, sizeof(i2c));
 		if (err != 0)
 			break;
 		if (i2c.dev_addr != 0xA0 && i2c.dev_addr != 0xA2) {
@@ -4249,16 +4255,16 @@ iflib_if_ioctl(if_t ifp, u_long command, caddr_t data)
 		}
 
 		if ((err = IFDI_I2C_REQ(ctx, &i2c)) == 0)
-			err = copyout(&i2c, ifr_data_get_ptr(ifr),
+			err = copyout(&i2c, ifr_data_get_ptr(command, ifr),
 			    sizeof(i2c));
 		break;
 	}
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 	{
 		int mask, setmask, oldmask;
 
 		oldmask = if_getcapenable(ifp);
-		mask = ifr_reqcap_get(ifr) ^ oldmask;
+		mask = ifr->ifr_reqcap ^ oldmask;
 		mask &= ctx->ifc_softc_ctx.isc_capabilities | IFCAP_NOMAP;
 		setmask = 0;
 #ifdef TCP_OFFLOAD
@@ -6912,11 +6918,15 @@ iflib_debugnet_poll(if_t ifp, int count)
 #endif /* DEBUGNET */
 // CHERI CHANGES START
 // {
-//   "updated": 20191029,
+//   "updated": 20200706,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_shape",
+//     "pointer_alignment"
 //   ]
 // }
 // CHERI CHANGES END

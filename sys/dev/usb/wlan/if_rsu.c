@@ -3007,12 +3007,12 @@ rsu_ioctl_net(struct ieee80211com *ic, u_long cmd, void *data)
 
 	error = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 	{
 		struct ieee80211vap *vap;
 		int rxmask;
 
-		rxmask = ifr_reqcap_get(ifr) & (IFCAP_RXCSUM | IFCAP_RXCSUM_IPV6);
+		rxmask = ifr->ifr_reqcap & (IFCAP_RXCSUM | IFCAP_RXCSUM_IPV6);
 
 		RSU_LOCK(sc);
 		/* Both RXCSUM bits must be set (or unset). */
@@ -3764,12 +3764,3 @@ rsu_ms_delay(struct rsu_softc *sc, int ms)
 	//usb_pause_mtx(&sc->sc_mtx, hz / 1000);
 	DELAY(ms * 1000);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

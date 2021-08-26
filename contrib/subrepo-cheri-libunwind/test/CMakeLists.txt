@@ -7,19 +7,35 @@ macro(pythonize_bool var)
   endif()
 endmacro()
 
-
-if(NOT LIBUNWIND_TEST_CXX_ABI_LIB)
-  if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    set(LIBUNWIND_TEST_CXX_ABI_LIB "-lsupc++")
-  elseif (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
-    set(LIBUNWIND_TEST_CXX_ABI_LIB "-lcxxrt")
-  elseif(APPLE)
-    set(LIBUNWIND_TEST_CXX_ABI_LIB "-lc++abi")
+# Setup the default options if LIBCXX_CXX_ABI is not specified.
+set(_cxx_abi_link_flag "${LIBUNWIND_TEST_CXX_ABI_LIB_PATH}")
+if(NOT _cxx_abi_link_flag)
+  if ("${LIBUNWIND_CXX_ABI}" STREQUAL "default")
+    if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+      set(_cxx_abi_link_flag "libsupc++")
+    elseif (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD")
+      set(_cxx_abi_link_flag "-lcxxrt")
+    elseif(APPLE)
+      set(_cxx_abi_link_flag "-lc++abi")
+    endif()
+  elseif ("${LIBUNWIND_CXX_ABI}" STREQUAL "libsupc++")
+    set(_cxx_abi_link_flag "-lsupc++")
+  elseif ("${LIBUNWIND_CXX_ABI}" STREQUAL "libstd++")
+    set(_cxx_abi_link_flag "-lsupc++")
+  elseif ("${LIBUNWIND_CXX_ABI}" STREQUAL "libcxxrt")
+    set(_cxx_abi_link_flag "libcxxabi")
+  elseif ("${LIBUNWIND_CXX_ABI}" STREQUAL "libcxxabi")
+    set(_cxx_abi_link_flag "-lc++abi")
   else()
     message(WARNING "Set LIBUNWIND_TEST_CXX_ABI_LIB to build the exceptions tests")
   endif()
 endif()
-set(_LIBUNWIND_TESTS alignment libunwind_01 libunwind_02 unw_getcontext libunwind_get_registers)
+if (NOT _cxx_abi_link_flag)
+  message(WARNING "Set LIBUNWIND_TEST_CXX_ABI_LIB to build the exceptions tests")
+  set(LIBUNWIND_TEST_ENABLE_EXCEPTIONS OFF)
+endif()
+
+set(_LIBUNWIND_TESTS alignment libunwind_01 libunwind_02 libunwind_size unw_getcontext libunwind_get_registers frameheadercache_test)
 if (LIBUNWIND_TEST_CXX_ABI_LIB)
   list(APPEND _LIBUNWIND_TESTS thread_unwind simple_exceptions simple_exceptions2)
 endif()
@@ -31,7 +47,7 @@ foreach(_opt "" -O0 -O1 -O2 -O3)
   foreach(_test ${_LIBUNWIND_TESTS})
     string(REGEX MATCH ".*exceptions.*" _has_exceptions ${_test})
     if (_has_exceptions)
-      set(_common_libs ${LIBUNWIND_TEST_CXX_ABI_LIB} -lpthread -lc -lpthread -ldl)
+      set(_common_libs ${_cxx_abi_link_flag} -lpthread -lc -lpthread -ldl)
       set(_common_flags -fexceptions)
     else()
       set(_common_libs -lpthread -lc -lpthread -ldl)
@@ -40,30 +56,28 @@ foreach(_opt "" -O0 -O1 -O2 -O3)
     # message(STATUS "NAME=test-${_test}-shared${_suffix}")
     if (LIBUNWIND_ENABLE_SHARED)
       add_executable(test-${_test}-shared${_suffix} EXCLUDE_FROM_ALL ${_test}.pass.cpp)
-      target_link_libraries(test-${_test}-shared${_suffix} -nostdlib++ $<TARGET_FILE:unwind_shared> ${_common_libs})
+      target_link_libraries(test-${_test}-shared${_suffix} -nostdlib++ $<TARGET_FILE:unwind_shared> ${_common_libs} ${LIBUNWIND_LINK_FLAGS})
       target_compile_features(test-${_test}-shared${_suffix} PUBLIC cxx_std_11)
-      target_compile_options(test-${_test}-shared${_suffix} PUBLIC ${LIBUNWIND_CXX_FLAGS} ${_common_flags})
+      target_compile_options(test-${_test}-shared${_suffix} PUBLIC ${_common_flags} ${LIBUNWIND_COMPILE_FLAGS})
       list(APPEND _LIBUNWIND_TEST_BINARIES test-${_test}-shared${_suffix})
       # Add all symbols to dynsymtab to improve test debugging
-      set_target_properties(test-${_test}-shared${_suffix} PROPERTIES
-          ENABLE_EXPORTS ON
-          INSTALL_RPATH "$ORIGIN/../lib"
-          BUILD_WITH_INSTALL_RPATH ON)
+      set_target_properties(test-${_test}-shared${_suffix} PROPERTIES ENABLE_EXPORTS ON
+                            BUILD_WITH_INSTALL_RPATH ON INSTALL_RPATH "$ORIGIN/../lib")
     endif()
     if (LIBUNWIND_ENABLE_STATIC)
       add_executable(test-${_test}-static${_suffix} EXCLUDE_FROM_ALL ${_test}.pass.cpp)
-      target_link_libraries(test-${_test}-static${_suffix} -nostdlib++ $<TARGET_FILE:unwind_static> ${_common_libs})
+      target_link_libraries(test-${_test}-static${_suffix} -nostdlib++ $<TARGET_FILE:unwind_static> ${_common_libs} ${LIBUNWIND_LINK_FLAGS})
       target_compile_features(test-${_test}-static${_suffix} PUBLIC cxx_std_11)
-      target_compile_options(test-${_test}-static${_suffix} PUBLIC ${LIBUNWIND_CXX_FLAGS} ${_common_flags})
+      target_compile_options(test-${_test}-static${_suffix} PUBLIC ${_common_flags} ${LIBUNWIND_COMPILE_FLAGS})
       list(APPEND _LIBUNWIND_TEST_BINARIES test-${_test}-static${_suffix})
       # Add all symbols to dynsymtab to improve test debugging
       set_target_properties(test-${_test}-static${_suffix} PROPERTIES ENABLE_EXPORTS ON)
     endif()
     if (NOT APPLE AND NOT WIN32 AND LIBUINWIND_BUILD_STATIC_TEST_BINARIES)
       add_executable(test-${_test}-allstatic${_suffix} EXCLUDE_FROM_ALL ${_test}.pass.cpp)
-      target_link_libraries(test-${_test}-allstatic${_suffix} -nostdlib++ -static $<TARGET_FILE:unwind_static> ${_common_libs})
+      target_link_libraries(test-${_test}-allstatic${_suffix} -nostdlib++ -static $<TARGET_FILE:unwind_static> ${_common_libs} ${LIBUNWIND_COMPILE_FLAGS})
       target_compile_features(test-${_test}-allstatic${_suffix} PUBLIC cxx_std_11)
-      target_compile_options(test-${_test}-allstatic${_suffix} PUBLIC ${LIBUNWIND_CXX_FLAGS} ${_common_flags} -static)
+      target_compile_options(test-${_test}-allstatic${_suffix} PUBLIC ${_common_flags} ${LIBUNWIND_LINK_FLAGS} -static)
       list(APPEND _LIBUNWIND_TEST_BINARIES test-${_test}-allstatic${_suffix})
       # Add all symbols to dynsymtab to improve test debugging
       set_target_properties(test-${_test}-allstatic${_suffix} PROPERTIES ENABLE_EXPORTS ON)
@@ -89,16 +103,18 @@ pythonize_bool(LIBUNWIND_USE_COMPILER_RT)
 pythonize_bool(LIBUNWIND_BUILD_EXTERNAL_THREAD_LIBRARY)
 set(LIBUNWIND_TARGET_INFO "libcxx.test.target_info.LocalTI" CACHE STRING
     "TargetInfo to use when setting up test environment.")
-set(LIBUNWIND_EXECUTOR "None" CACHE STRING
+set(LIBUNWIND_LIBCXX_PATH "${CMAKE_CURRENT_LIST_DIR}/../../libcxx")
+set(LIBUNWIND_EXECUTOR "${Python3_EXECUTABLE} ${LIBUNWIND_LIBCXX_PATH}/utils/run.py" CACHE STRING
     "Executor to use when running tests.")
 
 set(AUTO_GEN_COMMENT "## Autogenerated by libunwind configuration.\n# Do not edit!")
-configure_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in
+configure_lit_site_cfg(
+  "${LIBUNWIND_TEST_CONFIG}"
   ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg
-  @ONLY)
+  MAIN_CONFIG "${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py")
 
 add_lit_testsuite(check-unwind "Running libunwind tests"
   ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${LIBUNWIND_TEST_DEPS}
+  PARAMS "${LIBUNWIND_TEST_PARAMS}"
   )

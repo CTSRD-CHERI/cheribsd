@@ -45,10 +45,6 @@ _blacklistd-helper+=	blacklistd-helper
 SUBDIR+=	bootpd
 .endif
 
-SUBDIR.${MK_LIBCHERI}+=	cheri_bench-helper
-SUBDIR.${MK_LIBCHERI}+=	cheribsdtest-helper
-SUBDIR.${MK_LIBCHERI}+=	tcpdump-helper
-
 .if ${MK_FINGER} != "no"
 SUBDIR+=	fingerd
 .endif
@@ -87,6 +83,13 @@ _rtld-elf=	rtld-elf rtld-elf-debug
 SUBDIR.${MK_LIB32}+=	rtld-elf32
 SUBDIR.${MK_LIB64}+=	rtld-elf64
 SUBDIR.${MK_COMPAT_CHERIABI}+=	rtld-cheri-elf rtld-cheri-elf-debug
+# rtld.1 needs to be installed before the cross-dir MLINKS can work.
+SUBDIR_INSTALL_USE_DEPENDS=
+SUBDIR_DEPEND_rtld-elf-debug=	rtld-elf
+SUBDIR_DEPEND_rtld-cheri-elf-debug=	rtld-elf
+SUBDIR_DEPEND_rtld-cheri-elf=	rtld-elf
+SUBDIR_DEPEND_rtld-elf32=	rtld-elf
+SUBDIR_DEPEND_rtld-elf64=	rtld-elf
 .endif
 
 .if ${MK_RBOOTD} != "no"

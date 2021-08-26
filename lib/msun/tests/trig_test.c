@@ -165,8 +165,8 @@ ATF_TC_BODY(reduction, tc)
 	unsigned i;
 
 #if defined(__amd64__) && defined(__clang__) && __clang_major__ >= 7 && \
-    __FreeBSD_cc_version < 1300002
-	atf_tc_expect_fail("test fails with clang 7+ - bug 234040");
+    __clang_major__ < 10 && __FreeBSD_cc_version < 1300002
+	atf_tc_expect_fail("test fails with clang 7-9 - bug 234040");
 #endif
 
 	for (i = 0; i < nitems(f_pi_odd); i++) {

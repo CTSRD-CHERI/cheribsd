@@ -636,8 +636,8 @@ hme_meminit(struct hme_softc *sc)
 	 * We have reserved descriptor space until the next 2048 byte
 	 * boundary.
 	 */
-	dma = (bus_addr_t)roundup((u_long)dma, 2048);
-	p = (caddr_t)roundup((u_long)p, 2048);
+	dma = roundup2(dma, 2048);
+	p = (caddr_t)roundup2((uintptr_t)p, 2048);
 
 	/*
 	 * Allocate receive descriptors
@@ -647,8 +647,8 @@ hme_meminit(struct hme_softc *sc)
 	p += HME_NRXDESC * HME_XD_SIZE;
 	dma += HME_NRXDESC * HME_XD_SIZE;
 	/* Again move forward to the next 2048 byte boundary.*/
-	dma = (bus_addr_t)roundup((u_long)dma, 2048);
-	p = (caddr_t)roundup((u_long)p, 2048);
+	dma = roundup2(dma, 2048);
+	p = (caddr_t)roundup2((uintptr_t)p, 2048);
 
 	/*
 	 * Initialize transmit buffer descriptors
@@ -1609,7 +1609,7 @@ hme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		HME_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -1630,20 +1630,20 @@ hme_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		HME_UNLOCK(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		HME_LOCK(sc);
 		hme_setladrf(sc, 1);
 		HME_UNLOCK(sc);
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_mii->mii_media, cmd);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		HME_LOCK(sc);
-		ifp->if_capenable = ifr_reqcap_get(ifr);
+		ifp->if_capenable = ifr->ifr_reqcap;
 		if ((ifp->if_capenable & IFCAP_TXCSUM) != 0)
 			ifp->if_hwassist = sc->sc_csum_features;
 		else
@@ -1750,10 +1750,10 @@ chipit:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "pointer_alignment"
 //   ]
 // }
 // CHERI CHANGES END

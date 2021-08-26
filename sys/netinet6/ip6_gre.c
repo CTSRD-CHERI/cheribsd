@@ -71,7 +71,7 @@ SYSCTL_INT(_net_inet6_ip6, OID_AUTO, grehlim, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(ip6_gre_hlim), 0, "Default hop limit for encapsulated packets");
 
 struct in6_gre_socket {
-	struct gre_socket	base;
+	struct gre_socket	base __subobject_use_container_bounds;
 	struct in6_addr		addr; /* scope zone id is embedded */
 };
 VNET_DEFINE_STATIC(struct gre_sockets *, ipv6_sockets) = NULL;
@@ -522,7 +522,7 @@ in6_gre_ioctl(struct gre_softc *sc, u_long cmd, caddr_t data)
 			error = EADDRNOTAVAIL;
 			break;
 		}
-		src = (struct sockaddr_in6 *)ifr_addr_get_data(ifr);
+		src = (struct sockaddr_in6 *)&ifr->ifr_addr;
 		memset(src, 0, sizeof(*src));
 		src->sin6_family = AF_INET6;
 		src->sin6_len = sizeof(*src);
@@ -592,3 +592,12 @@ in6_gre_uninit(void)
 		gre_hashdestroy((struct gre_list *)V_ipv6_sockets);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

@@ -152,7 +152,8 @@ struct vnode {
 	 */
 	TAILQ_ENTRY(vnode) v_vnodelist;		/* l vnode lists */
 	TAILQ_ENTRY(vnode) v_lazylist;		/* l vnode lazy list */
-	struct bufobj	v_bufobj;		/* * Buffer cache object */
+	/* * Buffer cache object */
+	struct bufobj	v_bufobj __subobject_use_container_bounds;
 
 	/*
 	 * Hooks for various subsystems and features.
@@ -1097,3 +1098,12 @@ int vn_dir_check_exec(struct vnode *vp, struct componentname *cnp);
 #endif /* _KERNEL */
 
 #endif /* !_SYS_VNODE_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

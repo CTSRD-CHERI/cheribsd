@@ -283,8 +283,8 @@ reloc_gnu_ifunc(Obj_Entry *obj __unused, int flags __unused,
 	return (0);
 }
 
-Elf_Addr
-reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
+uintptr_t
+reloc_jmpslot(uintptr_t *where, uintptr_t target,
     const Obj_Entry *defobj __unused, const Obj_Entry *obj __unused,
     const Elf_Rel *rel)
 {

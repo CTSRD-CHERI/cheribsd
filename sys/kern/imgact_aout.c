@@ -71,8 +71,6 @@ static int	aout_fixup(uintptr_t *stack_base, struct image_params *imgp);
 
 #if defined(__i386__)
 
-#define	AOUT32_PS_STRINGS	(AOUT32_USRSTACK - sizeof(struct ps_strings))
-
 struct sysentvec aout_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
@@ -88,7 +86,7 @@ struct sysentvec aout_sysvec = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= AOUT32_USRSTACK,
 	.sv_usrstack	= AOUT32_USRSTACK,
-	.sv_psstrings	= AOUT32_PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_strings	= exec_copyout_strings,
 	.sv_setregs	= exec_setregs,
@@ -105,8 +103,6 @@ struct sysentvec aout_sysvec = {
 
 #elif defined(__amd64__)
 
-#define	AOUT32_PS_STRINGS \
-    (AOUT32_USRSTACK - sizeof(struct freebsd32_ps_strings))
 #define	AOUT32_MINUSER		FREEBSD32_MINUSER
 
 extern const char *freebsd32_syscallnames[];
@@ -127,7 +123,7 @@ struct sysentvec aout_sysvec = {
 	.sv_minuser	= AOUT32_MINUSER,
 	.sv_maxuser	= AOUT32_USRSTACK,
 	.sv_usrstack	= AOUT32_USRSTACK,
-	.sv_psstrings	= AOUT32_PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct freebsd32_ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_strings	= freebsd32_copyout_strings,
 	.sv_setregs	= ia32_setregs,
@@ -159,11 +155,13 @@ exec_aout_imgact(struct image_params *imgp)
 	struct vmspace *vmspace;
 	vm_map_t map;
 	vm_object_t object;
-	vm_offset_t text_end, data_end;
+	vm_pointer_t text_end, data_end;
 	unsigned long virtual_offset;
 	unsigned long file_offset;
 	unsigned long bss_size;
 	int error;
+	vm_pointer_t reservation;
+	vm_size_t reserv_size;
 
 	/*
 	 * Linux and *BSD binaries look very much alike,
@@ -200,7 +198,8 @@ exec_aout_imgact(struct image_params *imgp)
 		 * exec_copyout_strings.
 		 */
 		if (N_GETMID(*a_out) == MID_ZERO)
-			imgp->ps_strings = (void *)aout_sysvec.sv_psstrings;
+			imgp->ps_strings = (void *)(aout_sysvec.sv_usrstack -
+			    aout_sysvec.sv_szpsstrings);
 		break;
 	default:
 		/* NetBSD compatibility */
@@ -280,13 +279,24 @@ exec_aout_imgact(struct image_params *imgp)
 
 	object = imgp->object;
 	map = &vmspace->vm_map;
+	reservation = virtual_offset;
+	reserv_size = a_out->a_text + a_out->a_data + bss_size;
+
 	vm_map_lock(map);
 	vm_object_reference(object);
 
-	text_end = virtual_offset + a_out->a_text;
+	error = vm_map_reservation_create_locked(map, &reservation,
+	    reserv_size, VM_PROT_ALL);
+	if (error) {
+		vm_map_unlock(map);
+		vm_object_deallocate(object);
+		return (error);
+	}
+
+	text_end = reservation + a_out->a_text;
 	error = vm_map_insert(map, object,
 		file_offset,
-		virtual_offset, text_end,
+		reservation, text_end,
 		VM_PROT_READ | VM_PROT_EXECUTE, VM_PROT_ALL,
 		MAP_COPY_ON_WRITE | MAP_PREFAULT | MAP_VN_EXEC,
 		virtual_offset);

@@ -84,8 +84,8 @@ int	copyiniov(const struct iovec * __capability iovp, u_int iovcnt,
 	    struct iovec **iov, int error);
 int	copyinuio(const struct iovec * __capability iovp, u_int iovcnt,
 	    struct uio **uiop);
-int	copyout_map(struct thread *td, vm_offset_t *addr, size_t sz);
-int	copyout_unmap(struct thread *td, vm_offset_t addr, size_t sz);
+int	copyout_map(struct thread *td, vm_pointer_t *addr, size_t sz);
+int	copyout_unmap(struct thread *td, vm_pointer_t addr, size_t sz);
 int	physcopyin(void *src, vm_paddr_t dst, size_t len);
 int	physcopyout(vm_paddr_t src, void *dst, size_t len);
 int	physcopyin_vlist(struct bus_dma_segment *src, off_t offset,
@@ -97,6 +97,12 @@ int	uiomove_cap(void *cp, int n, struct uio *uio);
 int	uiomove_frombuf(void *buf, int buflen, struct uio *uio);
 int	uiomove_fromphys(struct vm_page *ma[], vm_offset_t offset, int n,
 	    struct uio *uio);
+#if __has_feature(capabilities)
+int	uiomove_fromphys_cap(struct vm_page *ma[], vm_offset_t offset, int n,
+	    struct uio *uio);
+#else
+#define	uiomove_fromphys_cap	uiomove_fromphys
+#endif
 int	uiomove_nofault(void *cp, int n, struct uio *uio);
 int	uiomove_object(struct vm_object *obj, off_t obj_size, struct uio *uio);
 int	updateiov(const struct uio *uiop, struct iovec * __capability iovp);
@@ -121,6 +127,9 @@ __END_DECLS
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

@@ -570,11 +570,7 @@ DwarfInstructions<A, R>::evaluateExpression(pint_t expression, A &addressSpace,
 
     case DW_OP_minus:
       value = *sp--;
-#ifndef __CHERI_PURE_CAPABILITY__
-      *sp = *sp - value;
-#else
-      *sp = *sp - (vaddr_t)(void*)value;
-#endif
+      *sp = *sp - _pint_to_addr(value);
       if (log)
         fprintf(stderr, "minus\n");
       break;

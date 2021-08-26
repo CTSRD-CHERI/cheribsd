@@ -2897,7 +2897,7 @@ ndis_ifioctl(ifp, command, data)
 	/*NDIS_LOCK(sc);*/
 
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if (ifp->if_flags & IFF_UP) {
 			if (sc->ndis_running &&
 			    ifp->if_flags & IFF_PROMISC &&
@@ -2926,17 +2926,17 @@ ndis_ifioctl(ifp, command, data)
 		sc->ndis_if_flags = ifp->if_flags;
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		ndis_setmulti(sc);
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		ifp->if_capenable = ifr_reqcap_get(ifr);
+	case SIOCSIFCAP:
+		ifp->if_capenable = ifr->ifr_reqcap;
 		if (ifp->if_capenable & IFCAP_TXCSUM)
 			ifp->if_hwassist = sc->ndis_hwassist;
 		else
@@ -2969,11 +2969,11 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	switch (cmd) {
 	case SIOCGDRVSPEC:
 	case SIOCSDRVSPEC:
-		error = copyin(ifr_data_get_ptr(ifr), &oid, sizeof(oid));
+		error = copyin(ifr_data_get_ptr(cmd, ifr), &oid, sizeof(oid));
 		if (error)
 			break;
 		oidbuf = malloc(oid.len, M_TEMP, M_WAITOK | M_ZERO);
-		error = copyin((char * __capability)ifr_data_get_ptr(ifr) +
+		error = copyin((char * __capability)ifr_data_get_ptr(cmd, ifr) +
 		    sizeof(oid), oidbuf, oid.len);
 	}
 
@@ -2989,14 +2989,14 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	case SIOCSDRVSPEC:
 		error = ndis_set_info(sc, oid.oid, oidbuf, &oid.len);
 		break;
-	case CASE_IOC_IFREQ(SIOCGPRIVATE_0):
+	case SIOCGPRIVATE_0:
 		NDIS_LOCK(sc);
 		if (sc->ndis_evt[sc->ndis_evtcidx].ne_sts == 0) {
 			error = ENOENT;
 			NDIS_UNLOCK(sc);
 			break;
 		}
-		error = copyin(ifr_data_get_ptr(ifr), &evt, sizeof(evt));
+		error = copyin(ifr_data_get_ptr(cmd, ifr), &evt, sizeof(evt));
 		if (error) {
 			NDIS_UNLOCK(sc);
 			break;
@@ -3007,14 +3007,14 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 			break;
 		}
 		error = copyout(&sc->ndis_evt[sc->ndis_evtcidx],
-		    ifr_data_get_ptr(ifr), sizeof(uint32_t) * 2);
+		    ifr_data_get_ptr(cmd, ifr), sizeof(uint32_t) * 2);
 		if (error) {
 			NDIS_UNLOCK(sc);
 			break;
 		}
 		if (sc->ndis_evt[sc->ndis_evtcidx].ne_len) {
 			error = copyout(sc->ndis_evt[sc->ndis_evtcidx].ne_buf,
-			    (char * __capability)ifr_data_get_ptr(ifr) +
+			    (char * __capability)ifr_data_get_ptr(cmd, ifr) +
 			    (sizeof(uint32_t) * 2),
 			    sc->ndis_evt[sc->ndis_evtcidx].ne_len);
 			if (error) {
@@ -3037,12 +3037,12 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	switch (cmd) {
 	case SIOCGDRVSPEC:
 	case SIOCSDRVSPEC:
-		error = copyout(&oid, ifr_data_get_ptr(ifr), sizeof(oid));
+		error = copyout(&oid, ifr_data_get_ptr(cmd, ifr), sizeof(oid));
 		if (error)
 			break;
 		error = copyout(oidbuf,
-		    (char * __capability)ifr_data_get_ptr(ifr) + sizeof(oid),
-		    oid.len);
+		    (char * __capability)ifr_data_get_ptr(cmd, ifr) +
+		    sizeof(oid), oid.len);
 	}
 
 	free(oidbuf, M_TEMP);
@@ -3424,10 +3424,9 @@ ndis_scan_end(struct ieee80211com *ic)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net",
 //     "user_capabilities"
 //   ]
 // }

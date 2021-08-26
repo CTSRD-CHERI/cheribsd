@@ -15,3 +15,7 @@ SRCS+=	_ctx_start.S \
 	setjmp.S \
 	sigsetjmp.S \
 	trivial-getcontextx.c
+
+.if ${MACHINE_ABI:Mpurecap}
+SRCS+=	emutls.c
+.endif

@@ -2335,8 +2335,8 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		break;
 
 	case SIOCGDRVSPEC:
@@ -2344,26 +2344,25 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = vxlan_ioctl_drvspec(sc, ifd, cmd == SIOCGDRVSPEC);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		error = vxlan_ioctl_ifflags(sc);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->vxl_media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(&ifr) < ETHERMIN ||
-		    ifr_mtu_get(&ifr) > VXLAN_MAX_MTU)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > VXLAN_MAX_MTU)
 			error = EINVAL;
 		else
-			ifp->if_mtu = ifr_mtu_get(&ifr);
+			ifp->if_mtu = ifr->ifr_mtu;
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		VXLAN_WLOCK(sc);
-		error = vxlan_set_reqcap(sc, ifp, ifr_reqcap_get(ifr));
+		error = vxlan_set_reqcap(sc, ifp, ifr->ifr_reqcap);
 		if (error == 0)
 			vxlan_set_hwcaps(sc);
 		VXLAN_WUNLOCK(sc);
@@ -3642,10 +3641,9 @@ DECLARE_MODULE(if_vxlan, vxlan_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 MODULE_VERSION(if_vxlan, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net",
 //     "user_capabilities"
 //   ]
 // }

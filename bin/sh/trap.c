@@ -274,12 +274,8 @@ setsignal(int signo)
 			break;
 		case SIGQUIT:
 #ifdef DEBUG
-			{
-			extern int debug;
-
 			if (debug)
 				break;
-			}
 #endif
 			action = S_CATCH;
 			break;
@@ -539,6 +535,9 @@ exitshell_savedstatus(void)
 		flushall();
 #if JOBS
 		setjobctl(0);
+#endif
+#ifndef NO_HISTORY
+		histsave();
 #endif
 	}
 	if (sig != 0 && sig != SIGSTOP && sig != SIGTSTP && sig != SIGTTIN &&

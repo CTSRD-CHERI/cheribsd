@@ -1700,18 +1700,17 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 	error = 0;
 	init = 0;
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < ETHERMIN ||
-		    ifr_mtu_get(ifr) > NFE_JUMBO_MTU)
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > NFE_JUMBO_MTU)
 			error = EINVAL;
-		else if (if_getmtu(ifp) != ifr_mtu_get(ifr)) {
+		else if (if_getmtu(ifp) != ifr->ifr_mtu) {
 			if ((((sc->nfe_flags & NFE_JUMBO_SUP) == 0) ||
 			    (sc->nfe_jumbo_disable != 0)) &&
-			    ifr_mtu_get(ifr) > ETHERMTU)
+			    ifr->ifr_mtu > ETHERMTU)
 				error = EINVAL;
 			else {
 				NFE_LOCK(sc);
-				if_setmtu(ifp, ifr_mtu_get(ifr));
+				if_setmtu(ifp, ifr->ifr_mtu);
 				if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 					if_setdrvflagbits(ifp, 0, IFF_DRV_RUNNING);
 					nfe_init_locked(sc);
@@ -1720,7 +1719,7 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			}
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		NFE_LOCK(sc);
 		if (if_getflags(ifp) & IFF_UP) {
 			/*
@@ -1742,8 +1741,8 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		NFE_UNLOCK(sc);
 		error = 0;
 		break;
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
 			NFE_LOCK(sc);
 			nfe_setmulti(sc);
@@ -1751,16 +1750,16 @@ nfe_ioctl(if_t ifp, u_long cmd, caddr_t data)
 			error = 0;
 		}
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->nfe_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
-		mask = ifr_reqcap_get(ifr) ^ if_getcapenable(ifp);
+	case SIOCSIFCAP:
+		mask = ifr->ifr_reqcap ^ if_getcapenable(ifp);
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0) {
-			if ((ifr_reqcap_get(ifr) & IFCAP_POLLING) != 0) {
+			if ((ifr->ifr_reqcap & IFCAP_POLLING) != 0) {
 				error = ether_poll_register(nfe_poll, ifp);
 				if (error)
 					break;
@@ -3356,12 +3355,3 @@ nfe_set_wol(struct nfe_softc *sc)
 		pmstat |= PCIM_PSTAT_PME | PCIM_PSTAT_PMEENABLE;
 	pci_write_config(sc->nfe_dev, pmc + PCIR_POWER_STATUS, pmstat, 2);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

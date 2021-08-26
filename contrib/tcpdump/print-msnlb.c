@@ -50,12 +50,6 @@ struct msnlb_heartbeat_pkt {
 void
 msnlb_print(netdissect_options *ndo, const u_char *bp)
 {
-	INVOKE_DISSECTOR(_msnlb_print, ndo, bp);
-}
-
-void
-_msnlb_print(netdissect_options *ndo, const u_char *bp)
-{
 	const struct msnlb_heartbeat_pkt *hb;
 
 	hb = (const struct msnlb_heartbeat_pkt *)bp;

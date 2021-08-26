@@ -56,8 +56,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_global.h"         /* for OPT_KDTRACE_HOOKS */
 #include "opt_stack.h"          /* for OPT_STACK */
 
-static boolean_t elf32_arm_abi_supported(struct image_params *, int32_t *,
-    uint32_t *);
+static bool elf32_arm_abi_supported(const struct image_params *,
+    const int32_t *, const uint32_t *);
 
 u_long elf_hwcap;
 u_long elf_hwcap2;
@@ -77,7 +77,7 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= PS_STRINGS,
+	.sv_szpsstrings	= sizeof(struct ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = exec_copyout_strings,
@@ -119,9 +119,9 @@ SYSINIT(elf32, SI_SUB_EXEC, SI_ORDER_FIRST,
 	(sysinit_cfunc_t) elf32_insert_brand_entry,
 	&freebsd_brand_info);
 
-static boolean_t
-elf32_arm_abi_supported(struct image_params *imgp, int32_t *osrel __unused,
-    uint32_t *fctl0 __unused)
+static bool
+elf32_arm_abi_supported(const struct image_params *imgp,
+    const int32_t *osrel __unused, const uint32_t *fctl0 __unused)
 {
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 
@@ -132,9 +132,9 @@ elf32_arm_abi_supported(struct image_params *imgp, int32_t *osrel __unused,
 		if (bootverbose)
 			uprintf("Attempting to execute non EABI binary (rev %d) image %s",
 			    EF_ARM_EABI_VERSION(hdr->e_flags), imgp->args->fname);
-		return (FALSE);
+		return (false);
 	}
-	return (TRUE);
+	return (true);
 }
 
 void

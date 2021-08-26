@@ -2241,19 +2241,19 @@ ena_ioctl(if_t ifp, u_long command, caddr_t data)
 	 */
 	rc = 0;
 	switch (command) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifp->if_mtu == ifr_mtu_get(&ifr))
+	case SIOCSIFMTU:
+		if (ifp->if_mtu == ifr->ifr_mtu)
 			break;
 		ENA_LOCK_LOCK(adapter);
 		ena_down(adapter);
 
-		ena_change_mtu(ifp, ifr_mtu_get(ifr));
+		ena_change_mtu(ifp, ifr->ifr_mtu);
 
 		rc = ena_up(adapter);
 		ENA_LOCK_UNLOCK(adapter);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
 				if ((ifp->if_flags & (IFF_PROMISC |
@@ -2275,21 +2275,21 @@ ena_ioctl(if_t ifp, u_long command, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		rc = ifmedia_ioctl(ifp, ifr, &adapter->media, command);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		{
 			int reinit = 0;
 
-			if (ifr_reqcap_get(ifr) != ifp->if_capenable) {
-				ifp->if_capenable = ifr_reqcap_get(ifr);
+			if (ifr->ifr_reqcap != ifp->if_capenable) {
+				ifp->if_capenable = ifr->ifr_reqcap;
 				reinit = 1;
 			}
 
@@ -3925,12 +3925,3 @@ MODULE_DEPEND(ena, netmap, 1, 1, 1);
 #endif /* DEV_NETMAP */
 
 /*********************************************************************/
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

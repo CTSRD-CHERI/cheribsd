@@ -104,11 +104,11 @@
 #define	MAP_EXCL	 0x00004000 /* for MAP_FIXED, fail if address is used */
 #define	MAP_NOCORE	 0x00020000 /* dont include these pages in a coredump */
 #define	MAP_PREFAULT_READ 0x00040000 /* prefault mapping for reading */
-#ifdef __LP64__
+#if defined(__LP64__) || defined(__CHERI_PURE_CAPABILITY__)
 #define	MAP_32BIT	 0x00080000 /* map in the low 2GB of address space */
 #endif
 #ifdef _KERNEL
-#define	MAP_UNMAPPED	 0x00100000
+#define	MAP_RESERVATION_CREATE	 0x00100000
 #endif
 
 /*
@@ -386,6 +386,9 @@ __END_DECLS
 //   "changes": [
 //     "support",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "support"
 //   ],
 //   "change_comment": ""
 // }

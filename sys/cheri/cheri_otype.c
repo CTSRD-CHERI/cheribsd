@@ -43,7 +43,7 @@ __FBSDID("$FreeBSD$");
 static struct mtx cheri_otype_lock;
 static struct unrhdr *cheri_otypes;
 /* Initialized in _start() */
-void * __capability kernel_sealcap;
+void * __capability kernel_root_sealcap;
 
 static void
 cheri_otype_init(void *dummy __unused)
@@ -63,7 +63,7 @@ cheri_otype_alloc(void)
 	type = alloc_unr(cheri_otypes);
 	if (type == -1)
 		return (NULL);
-	return (cheri_maketype(kernel_sealcap,
+	return (cheri_maketype(kernel_root_sealcap,
 	    type - CHERI_SEALCAP_KERNEL_BASE));
 }
 

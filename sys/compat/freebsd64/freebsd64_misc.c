@@ -624,7 +624,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	int error, szsigcode, szps;
 	char canary[sizeof(long) * 8];
 	size_t ssiz;
-	vm_offset_t stack_vaddr, rounded_stack_vaddr, stack_offset;
+	vm_offset_t stack_vaddr;
 
 	szps = sizeof(pagesizes[0]) * MAXPAGESIZES;
 	/*
@@ -643,19 +643,11 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 * resulting stack as the capability will not be handed out
 	 * to userspace.
 	 */
-	stack_vaddr = (vm_offset_t)p->p_vmspace->vm_maxsaddr;
-	ssiz = p->p_sysent->sv_usrstack - stack_vaddr;
-	stack_offset = 0;
-	do {
-		rounded_stack_vaddr = CHERI_REPRESENTABLE_BASE(stack_vaddr,
-		    ssiz + stack_offset);
-		stack_offset = stack_vaddr - rounded_stack_vaddr;
-	} while (rounded_stack_vaddr != CHERI_REPRESENTABLE_BASE(stack_vaddr,
-	    ssiz + stack_offset));
+	stack_vaddr = (vm_offset_t)p->p_vm_maxsaddr;
+	ssiz = p->p_usrstack - stack_vaddr;
 	destp = (uintcap_t)cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
-	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
-	destp = cheri_setaddress(destp, p->p_sysent->sv_psstrings);
+	    CHERI_CAP_USER_DATA_PERMS, stack_vaddr, ssiz, ssiz);
+	destp = cheri_setaddress(destp, p->p_psstrings);
 	arginfo = (struct freebsd64_ps_strings * __capability)
 	    cheri_setboundsexact(destp, sizeof(*arginfo));
 	imgp->ps_strings = arginfo;
@@ -1128,28 +1120,28 @@ freebsd64_kldfind(struct thread *td, struct freebsd64_kldfind_args *uap)
 int
 freebsd64_kldstat(struct thread *td, struct freebsd64_kldstat_args *uap)
 {
-        struct kld_file_stat stat;
-        struct kld_file_stat64 stat64;
-        int error, version;
+	struct kld_file_stat stat;
+	struct kld_file_stat64 stat64, * __capability stat64p;
+	int error, version;
 
-        error = copyin(__USER_CAP_OBJ(&uap->stat->version), &version,
-	    sizeof(version));
+	stat64p = __USER_CAP_OBJ(uap->stat);
+	error = copyin(&stat64p->version, &version, sizeof(version));
 	if (error != 0)
-                return (error);
-        if (version != sizeof(struct kld_file_stat64))
-                return (EINVAL);
+		return (error);
+	if (version != sizeof(struct kld_file_stat64))
+		return (EINVAL);
 
-        error = kern_kldstat(td, uap->fileid, &stat);
-        if (error != 0)
-                return (error);
+	error = kern_kldstat(td, uap->fileid, &stat);
+	if (error != 0)
+		return (error);
 
-        bcopy(&stat.name[0], &stat64.name[0], sizeof(stat.name));
-        CP(stat, stat64, refs);
-        CP(stat, stat64, id);
+	bcopy(&stat.name[0], &stat64.name[0], sizeof(stat.name));
+	CP(stat, stat64, refs);
+	CP(stat, stat64, id);
 	stat64.address = (__cheri_addr uint64_t)stat.address;
-        CP(stat, stat64, size);
-        bcopy(&stat.pathname[0], &stat64.pathname[0], sizeof(stat.pathname));
-        return (copyout(&stat64, __USER_CAP_OBJ(uap->stat), version));
+	CP(stat, stat64, size);
+	bcopy(&stat.pathname[0], &stat64.pathname[0], sizeof(stat.pathname));
+	return (copyout(&stat64, __USER_CAP(uap->stat, version), version));
 }
 
 int

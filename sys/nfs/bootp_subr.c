@@ -868,7 +868,7 @@ bootpc_fakeup_interface(struct bootpc_ifcontext *ifctx, struct thread *td)
 	error = ifioctl(bootp_so, SIOCGIFFLAGS, (caddr_t)ifr, td);
 	if (error != 0)
 		panic("%s: SIOCGIFFLAGS, error=%d", __func__, error);
-	ifr->ifr_ifru.ifru_flags[0] |= IFF_UP;
+	ifr->ifr_flags |= IFF_UP;
 	error = ifioctl(bootp_so, SIOCSIFFLAGS, (caddr_t)ifr, td);
 	if (error != 0)
 		panic("%s: SIOCSIFFLAGS, error=%d", __func__, error);
@@ -904,12 +904,12 @@ bootpc_shutdown_interface(struct bootpc_ifcontext *ifctx, struct thread *td)
 	error = ifioctl(bootp_so, SIOCGIFFLAGS, (caddr_t)ifr, td);
 	if (error != 0)
 		panic("%s: SIOCGIFFLAGS, error=%d", __func__, error);
-	ifr->ifr_ifru.ifru_flags[0] &= ~IFF_UP;
+	ifr->ifr_flags &= ~IFF_UP;
 	error = ifioctl(bootp_so, SIOCSIFFLAGS, (caddr_t)ifr, td);
 	if (error != 0)
 		panic("%s: SIOCSIFFLAGS, error=%d", __func__, error);
 
-	sin = (struct sockaddr_in *)ifr_addr_get_sa(ifr);
+	sin = (struct sockaddr_in *) &ifr->ifr_addr;
 	clear_sinaddr(sin);
 	error = ifioctl(bootp_so, SIOCDIFADDR, (caddr_t) ifr, td);
 	if (error != 0)
@@ -944,7 +944,7 @@ bootpc_adjust_interface(struct bootpc_ifcontext *ifctx,
 	if (ifctx->mtu != 0) {
 		printf(" (MTU=%d%s)", ifctx->mtu, 
 		    (ifctx->mtu > 1514) ? "/JUMBO" : "");
-		ifr_mtu_set(ifr, ifctx->mtu);
+		ifr->ifr_mtu = ifctx->mtu;
 		error = ifioctl(bootp_so, SIOCSIFMTU, (caddr_t) ifr, td);
 		if (error != 0)
 			panic("%s: SIOCSIFMTU, error=%d", __func__, error);
@@ -955,7 +955,7 @@ bootpc_adjust_interface(struct bootpc_ifcontext *ifctx,
 	 * Do enough of ifconfig(8) so that the chosen interface
 	 * can talk to the servers.  (just set the address)
 	 */
-	sin = (struct sockaddr_in *)ifr_addr_get_sa(ifr);
+	sin = (struct sockaddr_in *) &ifr->ifr_addr;
 	clear_sinaddr(sin);
 	error = ifioctl(bootp_so, SIOCDIFADDR, (caddr_t) ifr, td);
 	if (error != 0)

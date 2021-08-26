@@ -1387,7 +1387,7 @@ t4_attach(device_t dev)
 #endif
 	if (sc->vres.key.size != 0)
 		sc->key_map = vmem_create("T4TLS key map", sc->vres.key.start,
-		    sc->vres.key.size, 32, 0, M_FIRSTFIT | M_WAITOK);
+		    sc->vres.key.size, 32, 0, M_FIRSTFIT | M_WAITOK, 0);
 
 	/*
 	 * Second pass over the ports.  This time we know the number of rx and
@@ -2010,8 +2010,8 @@ cxgbe_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 	uint32_t mask;
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		mtu = ifr_mtu_get(ifr);
+	case SIOCSIFMTU:
+		mtu = ifr->ifr_mtu;
 		if (mtu < ETHERMIN || mtu > MAX_MTU)
 			return (EINVAL);
 
@@ -2027,7 +2027,7 @@ cxgbe_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 		end_synchronized_op(sc, 0);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		rc = begin_synchronized_op(sc, vi, SLEEP_OK | INTR_OK, "t4flg");
 		if (rc)
 			return (rc);
@@ -2050,8 +2050,8 @@ cxgbe_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 		end_synchronized_op(sc, 0);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		rc = begin_synchronized_op(sc, vi, SLEEP_OK | INTR_OK, "t4multi");
 		if (rc)
 			return (rc);
@@ -2060,12 +2060,12 @@ cxgbe_ioctl(struct ifnet *ifp, unsigned long cmd, caddr_t data)
 		end_synchronized_op(sc, 0);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFCAP):
+	case SIOCSIFCAP:
 		rc = begin_synchronized_op(sc, vi, SLEEP_OK | INTR_OK, "t4cap");
 		if (rc)
 			return (rc);
 
-		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
 			ifp->if_capenable ^= IFCAP_TXCSUM;
 			ifp->if_hwassist ^= (CSUM_TCP | CSUM_UDP | CSUM_IP);
@@ -2200,16 +2200,16 @@ fail:
 		end_synchronized_op(sc, 0);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 	case SIOCGIFXMEDIA:
 		ifmedia_ioctl(ifp, ifr, &pi->media, cmd);
 		break;
 
-	case CASE_IOC_IFREQ(SIOCGI2C): {
+	case SIOCGI2C: {
 		struct ifi2creq i2c;
 
-		rc = copyin(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
+		rc = copyin(ifr_data_get_ptr(cmd, ifr), &i2c, sizeof(i2c));
 		if (rc != 0)
 			break;
 		if (i2c.dev_addr != 0xA0 && i2c.dev_addr != 0xA2) {
@@ -2227,7 +2227,7 @@ fail:
 		    i2c.offset, i2c.len, &i2c.data[0]);
 		end_synchronized_op(sc, 0);
 		if (rc == 0)
-			rc = copyout(&i2c, ifr_data_get_ptr(ifr),
+			rc = copyout(&i2c, ifr_data_get_ptr(cmd, ifr),
 			    sizeof(i2c));
 		break;
 	}
@@ -10324,7 +10324,8 @@ cudbg_dump(struct adapter *sc, struct t4_cudbg_dump *dump)
 
 #ifndef notyet
 	device_printf(sc->dev, "%s: wr_flash %u, len %u, data %p.\n",
-	    __func__, dump->wr_flash, dump->len, dump->data);
+	    __func__, dump->wr_flash, dump->len,
+	    (__cheri_fromcap void *)dump->data);
 #endif
 
 	if (dump->wr_flash)
@@ -10368,7 +10369,7 @@ set_offload_policy(struct adapter *sc, struct t4_offload_policy *uop)
 	struct bpf_program *bf;
 	const struct offload_settings *s;
 	struct offload_rule *r;
-	void *u;
+	void * __capability u;
 
 	if (!is_offload(sc))
 		return (ENODEV);
@@ -10386,7 +10387,7 @@ set_offload_policy(struct adapter *sc, struct t4_offload_policy *uop)
 	op->nrules = uop->nrules;
 	len = op->nrules * sizeof(struct offload_rule);
 	op->rule = malloc(len, M_CXGBE, M_ZERO | M_WAITOK);
-	rc = copyin(uop->rule, op->rule, len);
+	rc = copyin(uop->user_rule, op->rule, len);
 	if (rc) {
 		free(op->rule, M_CXGBE);
 		free(op, M_CXGBE);
@@ -10423,13 +10424,13 @@ error:
 		}
 
 		bf = &r->bpf_prog;
-		u = bf->bf_insns;	/* userspace ptr */
-		bf->bf_insns = NULL;
+		u = bf->bf_user_insns;	/* userspace ptr */
+		bf->bf_user_insns = NULL;
 		if (bf->bf_len == 0) {
 			/* legal, matches everything */
 			continue;
 		}
-		len = bf->bf_len * sizeof(*bf->bf_insns);
+		len = bf->bf_len * sizeof(*bf->bf_user_insns);
 		bf->bf_insns = malloc(len, M_CXGBE, M_ZERO | M_WAITOK);
 		rc = copyin(u, bf->bf_insns, len);
 		if (rc != 0)
@@ -10457,7 +10458,7 @@ read_card_mem(struct adapter *sc, int win, struct t4_mem_range *mr)
 	uint32_t addr, remaining, n;
 	uint32_t *buf;
 	int rc;
-	uint8_t *dst;
+	uint8_t * __capability dst;
 
 	rc = validate_mem_range(sc, mr->addr, mr->len);
 	if (rc != 0)
@@ -10466,7 +10467,7 @@ read_card_mem(struct adapter *sc, int win, struct t4_mem_range *mr)
 	buf = malloc(min(mr->len, MAX_READ_BUF_SIZE), M_CXGBE, M_WAITOK);
 	addr = mr->addr;
 	remaining = mr->len;
-	dst = (void *)mr->data;
+	dst = (void * __capability)mr->data;
 
 	while (remaining) {
 		n = min(remaining, MAX_READ_BUF_SIZE);
@@ -11687,10 +11688,9 @@ DRIVER_MODULE(vcc, cc, vcc_driver, vcc_devclass, 0, 0);
 MODULE_VERSION(vcc, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net",
 //     "user_capabilities"
 //   ]
 // }

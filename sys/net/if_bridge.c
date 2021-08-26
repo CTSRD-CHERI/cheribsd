@@ -809,8 +809,8 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	BRIDGE_LOCK(sc);
 
 	switch (cmd) {
-	case CASE_IOC_IFREQ(SIOCADDMULTI):
-	case CASE_IOC_IFREQ(SIOCDELMULTI):
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
 		break;
 
 	case SIOCGDRVSPEC:
@@ -872,7 +872,7 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case SIOCSIFFLAGS:
 		if (!(ifp->if_flags & IFF_UP) &&
 		    (ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 			/*
@@ -892,27 +892,27 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case CASE_IOC_IFREQ(SIOCSIFMTU):
-		if (ifr_mtu_get(ifr) < 576) {
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu < 576) {
 			error = EINVAL;
 			break;
 		}
 		if (CK_LIST_EMPTY(&sc->sc_iflist)) {
-			sc->sc_ifp->if_mtu = ifr_mtu_get(ifr);
+			sc->sc_ifp->if_mtu = ifr->ifr_mtu;
 			break;
 		}
 		CK_LIST_FOREACH(bif, &sc->sc_iflist, bif_next) {
-			if (bif->bif_ifp->if_mtu != ifr_mtu_get(ifr)) {
+			if (bif->bif_ifp->if_mtu != ifr->ifr_mtu) {
 				log(LOG_NOTICE, "%s: invalid MTU: %u(%s)"
 				    " != %d\n", sc->sc_ifp->if_xname,
 				    bif->bif_ifp->if_mtu,
-				    bif->bif_ifp->if_xname, ifr_mtu_get(ifr));
+				    bif->bif_ifp->if_xname, ifr->ifr_mtu);
 				error = EINVAL;
 				break;
 			}
 		}
 		if (!error)
-			sc->sc_ifp->if_mtu = ifr_mtu_get(ifr);
+			sc->sc_ifp->if_mtu = ifr->ifr_mtu;
 		break;
 	default:
 		/*
@@ -969,7 +969,7 @@ bridge_set_ifcap(struct bridge_softc *sc, struct bridge_iflist *bif, int set)
 	int error, mask, stuck;
 
 	bzero(&ifr, sizeof(ifr));
-	ifr.ifr_ifru.ifru_cap[0] = set;	/* ifr_reqcap */
+	ifr.ifr_reqcap = set;
 
 	if (ifp->if_capenable != set) {
 		error = (*ifp->if_ioctl)(ifp, SIOCSIFCAP, (caddr_t)&ifr);
@@ -3680,10 +3680,9 @@ bridge_linkcheck(struct bridge_softc *sc)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20210525,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net",
 //     "user_capabilities"
 //   ]
 // }

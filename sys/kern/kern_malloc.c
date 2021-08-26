@@ -70,6 +70,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/epoch.h>
 #endif
 
+#include <cheri/cheric.h>
+
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <vm/vm_domainset.h>
@@ -94,10 +96,6 @@ __FBSDID("$FreeBSD$");
 
 #if defined(INVARIANTS) && defined(__i386__)
 #include <machine/cpu.h>
-#endif
-
-#if __has_feature(capabilities)
-#include <cheri/cherireg.h>
 #endif
 
 #include <ddb/ddb.h>
@@ -381,8 +379,8 @@ mtp_get_subzone(struct malloc_type *mtp)
  * statistics.
  */
 static void
-malloc_type_zone_allocated(struct malloc_type *mtp, unsigned long size,
-    int zindx)
+malloc_type_zone_allocated(struct malloc_type *mtp, void *addr,
+    unsigned long size, int zindx)
 {
 	struct malloc_type_internal *mtip;
 	struct malloc_type_stats *mtsp;
@@ -393,6 +391,11 @@ malloc_type_zone_allocated(struct malloc_type *mtp, unsigned long size,
 	if (size > 0) {
 		mtsp->mts_memalloced += size;
 		mtsp->mts_numallocs++;
+#ifdef __CHERI_PURE_CAPABILITY__
+		mtsp->mts_memreserved += cheri_getlen(addr);
+#elif __has_feature(capabilities)
+		mtsp->mts_memreserved += size;
+#endif
 	}
 	if (zindx != -1)
 		mtsp->mts_size |= 1 << zindx;
@@ -411,11 +414,11 @@ malloc_type_zone_allocated(struct malloc_type *mtp, unsigned long size,
 }
 
 void
-malloc_type_allocated(struct malloc_type *mtp, unsigned long size)
+malloc_type_allocated(struct malloc_type *mtp, void *addr, unsigned long size)
 {
 
 	if (size > 0)
-		malloc_type_zone_allocated(mtp, size, -1);
+		malloc_type_zone_allocated(mtp, addr, size, -1);
 }
 
 /*
@@ -423,9 +426,14 @@ malloc_type_allocated(struct malloc_type *mtp, unsigned long size)
  * amount of the bucket size.  Occurs within a critical section so that the
  * thread isn't preempted and doesn't migrate while updating per-CPU
  * statistics.
+ *
+ * XXX-AM: The reserved/unreserved size stat recording assumes the following:
+ * - kmem performs proper representability rounding
+ * - free() will be called with the same capability returned by malloc(),
+ *   spanning the whole reservation.
  */
 void
-malloc_type_freed(struct malloc_type *mtp, unsigned long size)
+malloc_type_freed(struct malloc_type *mtp, void *addr, unsigned long size)
 {
 	struct malloc_type_internal *mtip;
 	struct malloc_type_stats *mtsp;
@@ -435,6 +443,11 @@ malloc_type_freed(struct malloc_type *mtp, unsigned long size)
 	mtsp = zpcpu_get(mtip->mti_stats);
 	mtsp->mts_memfreed += size;
 	mtsp->mts_numfrees++;
+#ifdef __CHERI_PURE_CAPABILITY__
+	mtsp->mts_memunreserved += cheri_getlen(addr);
+#elif __has_feature(capabilities)
+	mtsp->mts_memunreserved += size;
+#endif
 
 #ifdef KDTRACE_HOOKS
 	if (__predict_false(dtrace_malloc_enabled)) {
@@ -467,7 +480,11 @@ contigmalloc(unsigned long size, struct malloc_type *type, int flags,
 	ret = (void *)kmem_alloc_contig(size, flags, low, high, alignment,
 	    boundary, VM_MEMATTR_DEFAULT);
 	if (ret != NULL)
-		malloc_type_allocated(type, round_page(size));
+		malloc_type_allocated(type, ret, round_page(size));
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(ret), ("Expected valid capability"));
+#endif
+
 	return (ret);
 }
 
@@ -481,7 +498,7 @@ contigmalloc_domainset(unsigned long size, struct malloc_type *type,
 	ret = (void *)kmem_alloc_contig_domainset(ds, size, flags, low, high,
 	    alignment, boundary, VM_MEMATTR_DEFAULT);
 	if (ret != NULL)
-		malloc_type_allocated(type, round_page(size));
+		malloc_type_allocated(type, ret, round_page(size));
 	return (ret);
 }
 
@@ -496,8 +513,15 @@ void
 contigfree(void *addr, unsigned long size, struct malloc_type *type)
 {
 
-	kmem_free((vm_offset_t)addr, size);
-	malloc_type_freed(type, round_page(size));
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (__predict_false(!cheri_gettag(addr)))
+		panic("Expect valid capability");
+	if (__predict_false(cheri_getsealed(addr)))
+		panic("Expect unsealed capability");
+#endif
+
+	kmem_free((vm_pointer_t)addr, size);
+	malloc_type_freed(type, addr, round_page(size));
 }
 
 #ifdef MALLOC_DEBUG
@@ -571,18 +595,18 @@ malloc_dbg(caddr_t *vap, size_t *sizep, struct malloc_type *mtp,
 static inline bool
 malloc_large_slab(uma_slab_t slab)
 {
-	uintptr_t va;
+	vm_offset_t va;
 
-	va = (uintptr_t)slab;
+	va = (vm_offset_t)slab;
 	return ((va & 1) != 0);
 }
 
 static inline size_t
 malloc_large_size(uma_slab_t slab)
 {
-	uintptr_t va;
+	vm_offset_t va;
 
-	va = (uintptr_t)slab;
+	va = (vm_offset_t)slab;
 	return (va >> 1);
 }
 
@@ -590,7 +614,7 @@ static caddr_t __noinline
 malloc_large(size_t *size, struct malloc_type *mtp, struct domainset *policy,
     int flags DEBUG_REDZONE_ARG_DEF)
 {
-	vm_offset_t kva;
+	vm_pointer_t kva;
 	caddr_t va;
 	size_t sz;
 
@@ -598,12 +622,18 @@ malloc_large(size_t *size, struct malloc_type *mtp, struct domainset *policy,
 	kva = kmem_malloc_domainset(policy, sz, flags);
 	if (kva != 0) {
 		/* The low bit is unused for slab pointers. */
-		vsetzoneslab(kva, NULL, (void *)((sz << 1) | 1));
+		vsetzoneslab(kva, NULL, (void *)(uintptr_t)((sz << 1) | 1));
 		uma_total_inc(sz);
 		*size = sz;
+#ifdef __CHERI_PURE_CAPABILITY__
+		KASSERT(cheri_getlen(kva) <= CHERI_REPRESENTABLE_LENGTH(sz),
+		    ("Invalid bounds: expected %zx found %zx",
+		        (size_t)CHERI_REPRESENTABLE_LENGTH(sz),
+		        (size_t)cheri_getlen(kva)));
+#endif
 	}
 	va = (caddr_t)kva;
-	malloc_type_allocated(mtp, va == NULL ? 0 : sz);
+	malloc_type_allocated(mtp, va, va == NULL ? 0 : sz);
 	if (__predict_false(va == NULL)) {
 		KASSERT((flags & M_WAITOK) == 0,
 		    ("malloc(M_WAITOK) returned NULL"));
@@ -619,7 +649,7 @@ static void
 free_large(void *addr, size_t size)
 {
 
-	kmem_free((vm_offset_t)addr, size);
+	kmem_free((vm_pointer_t)addr, size);
 	uma_total_dec(size);
 }
 
@@ -660,7 +690,7 @@ void *
 	va = uma_zalloc(zone, flags);
 	if (va != NULL)
 		size = zone->uz_size;
-	malloc_type_zone_allocated(mtp, va == NULL ? 0 : size, indx);
+	malloc_type_zone_allocated(mtp, va, va == NULL ? 0 : size, indx);
 	if (__predict_false(va == NULL)) {
 		KASSERT((flags & M_WAITOK) == 0,
 		    ("malloc(M_WAITOK) returned NULL"));
@@ -668,6 +698,12 @@ void *
 #ifdef DEBUG_REDZONE
 	if (va != NULL)
 		va = redzone_setup(va, osize);
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(size),
+	    ("Invalid bounds: expected %zx found %zx",
+	        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
+	        (size_t)cheri_getlen(va)));
 #endif
 	return ((void *) va);
 }
@@ -692,6 +728,10 @@ malloc_domain(size_t *sizep, int *indxp, struct malloc_type *mtp, int domain,
 	if (va != NULL)
 		*sizep = zone->uz_size;
 	*indxp = indx;
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(cheri_gettag(va), ("Expected valid capability"));
+#endif
+
 	return ((void *)va);
 }
 
@@ -723,7 +763,7 @@ malloc_domainset(size_t size, struct malloc_type *mtp, struct domainset *ds,
 	do {
 		va = malloc_domain(&size, &indx, mtp, domain, flags);
 	} while (va == NULL && vm_domainset_iter_policy(&di, &domain) == 0);
-	malloc_type_zone_allocated(mtp, va == NULL ? 0 : size, indx);
+	malloc_type_zone_allocated(mtp, va, va == NULL ? 0 : size, indx);
 	if (__predict_false(va == NULL)) {
 		KASSERT((flags & M_WAITOK) == 0,
 		    ("malloc(M_WAITOK) returned NULL"));
@@ -781,7 +821,11 @@ mallocarray(size_t nmemb, size_t size, struct malloc_type *type, int flags)
 static void
 free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 {
+#ifdef __CHERI_PURE_CAPABILITY__
+	ptraddr_t *mtpp = addr;
+#else
 	struct malloc_type **mtpp = addr;
+#endif
 
 	/*
 	 * Cache a pointer to the malloc_type that most recently freed
@@ -791,10 +835,19 @@ free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 	 * This code assumes that size is a multiple of 8 bytes for
 	 * 64 bit machines
 	 */
-	mtpp = (struct malloc_type **) ((unsigned long)mtpp & ~UMA_ALIGN_PTR);
-	mtpp += (size - sizeof(struct malloc_type *)) /
-	    sizeof(struct malloc_type *);
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * This is for debugging only, so we just store the va of the
+	 * malloc_type, not a capability to it.
+	 */
+	mtpp = (ptraddr_t *)roundup2(mtpp, sizeof(ptraddr_t));
+	if (cheri_getlen(mtpp) - cheri_getoffset(mtpp) >= sizeof(ptraddr_t))
+		*mtpp = (ptraddr_t)mtp;
+#else
+	mtpp = (struct malloc_type **)rounddown2(mtpp, sizeof(struct malloc_type *));
+	mtpp += (size - sizeof(struct malloc_type *)) / sizeof(struct malloc_type *);
 	*mtpp = mtp;
+#endif
 }
 #endif
 
@@ -851,22 +904,43 @@ free(void *addr, struct malloc_type *mtp)
 	if (addr == NULL)
 		return;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (__predict_false(!cheri_gettag(addr)))
+		panic("Expect valid capability");
+	if (__predict_false(cheri_getsealed(addr)))
+		panic("Expect unsealed capability");
+#endif
+
 	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
 	if (slab == NULL)
 		panic("free: address %p(%p) has not been allocated.\n",
-		    addr, (void *)((u_long)addr & (~UMA_SLAB_MASK)));
+		    addr, (void *)rounddown2(addr, UMA_SLAB_SIZE));
 
 	if (__predict_true(!malloc_large_slab(slab))) {
 		size = zone->uz_size;
+#ifdef __CHERI_PURE_CAPABILITY__
+		if (__predict_false(cheri_getlen(addr) !=
+		    CHERI_REPRESENTABLE_LENGTH(size)))
+			panic("Invalid bounds: expected %zx found %zx",
+			    (size_t)CHERI_REPRESENTABLE_LENGTH(size),
+			    cheri_getlen(addr));
+#endif
 #ifdef INVARIANTS
 		free_save_type(addr, mtp, size);
 #endif
 		uma_zfree_arg(zone, addr, slab);
 	} else {
 		size = malloc_large_size(slab);
+#ifdef __CHERI_PURE_CAPABILITY__
+		if (__predict_false(cheri_getlen(addr) !=
+		    CHERI_REPRESENTABLE_LENGTH(size)))
+			panic("Invalid bounds: expected %zx found %zx",
+			    (size_t)CHERI_REPRESENTABLE_LENGTH(size),
+			    cheri_getlen(addr));
+#endif
 		free_large(addr, size);
 	}
-	malloc_type_freed(mtp, size);
+	malloc_type_freed(mtp, addr, size);
 }
 
 /*
@@ -891,10 +965,17 @@ zfree(void *addr, struct malloc_type *mtp)
 	if (addr == NULL)
 		return;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (__predict_false(!cheri_gettag(addr)))
+		panic("Expect valid capability");
+	if (__predict_false(cheri_getsealed(addr)))
+		panic("Expect unsealed capability");
+#endif
+
 	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
 	if (slab == NULL)
 		panic("free: address %p(%p) has not been allocated.\n",
-		    addr, (void *)((u_long)addr & (~UMA_SLAB_MASK)));
+		    addr, (void *)rounddown2(addr, UMA_SLAB_SIZE));
 
 	if (__predict_true(!malloc_large_slab(slab))) {
 		size = zone->uz_size;
@@ -908,7 +989,7 @@ zfree(void *addr, struct malloc_type *mtp)
 		explicit_bzero(addr, size);
 		free_large(addr, size);
 	}
-	malloc_type_freed(mtp, size);
+	malloc_type_freed(mtp, addr, size);
 }
 
 /*
@@ -930,6 +1011,12 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 	/* realloc(NULL, ...) is equivalent to malloc(...) */
 	if (addr == NULL)
 		return (malloc(size, mtp, flags));
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (__predict_false(!cheri_gettag(addr)))
+		panic("Expect valid capability");
+	if (__predict_false(cheri_getsealed(addr)))
+		panic("Expect unsealed capability");
+#endif
 
 	/*
 	 * XXX: Should report free of old memory and alloc of new memory to
@@ -1031,7 +1118,7 @@ malloc_usable_size(const void *addr)
 	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
 	if (slab == NULL)
 		panic("malloc_usable_size: address %p(%p) is not allocated.\n",
-		    addr, (void *)((u_long)addr & (~UMA_SLAB_MASK)));
+		    addr, rounddown2(addr, UMA_SLAB_SIZE));
 
 	if (!malloc_large_slab(slab))
 		size = zone->uz_size;
@@ -1459,7 +1546,7 @@ DB_SHOW_COMMAND(multizone_matches, db_show_multizone_matches)
 		db_printf("Usage: show multizone_matches <malloc type/addr>\n");
 		return;
 	}
-	mtp = (void *)addr;
+	mtp = DB_DATA_PTR(addr, struct malloc_type);
 	if (mtp->ks_version != M_VERSION) {
 		db_printf("Version %lx does not match expected %x\n",
 		    mtp->ks_version, M_VERSION);
@@ -1482,10 +1569,16 @@ DB_SHOW_COMMAND(multizone_matches, db_show_multizone_matches)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20200707,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance"
+//   ],
+//   "changes_purecap": [
+//     "pointer_alignment",
+//     "pointer_as_integer",
+//     "support",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

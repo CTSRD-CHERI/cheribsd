@@ -48,9 +48,43 @@ METHOD int symbol_values {
 
 METHOD int search_symbol {
     linker_file_t	file;
-    caddr_t		value;
+    ptraddr_t		value;
     c_linker_sym_t*	symp;
     long*		diffp;
+};
+
+#
+# Lookup a symbol by index rather than name.  If the symbol is not
+# found then return ENOENT, otherwise zero.
+#
+# Useful for processing relocations.
+#
+METHOD int symidx_address {
+	linker_file_t	file;
+	unsigned long	index;
+	int		deps;
+	ptraddr_t	*address;
+};
+
+CODE {
+	#ifdef __CHERI_PURE_CAPABILITY__
+};
+HEADER {
+	#ifdef __CHERI_PURE_CAPABILITY__
+};
+
+METHOD int symidx_capability {
+	linker_file_t	file;
+	unsigned long	index;
+	int		deps;
+	uintcap_t	*cap;
+};
+
+CODE {
+	#endif
+};
+HEADER {
+	#endif
 };
 
 #
@@ -143,3 +177,13 @@ STATICMETHOD int link_preload {
 METHOD int link_preload_finish {
     linker_file_t	file;
 };
+# CHERI CHANGES START
+# {
+#   "updated": 20200706,
+#   "target_type": "kernel",
+#   "changes_purecap": [
+#     "pointer_as_integer",
+#     "kdb"
+#   ]
+# }
+# CHERI CHANGES END

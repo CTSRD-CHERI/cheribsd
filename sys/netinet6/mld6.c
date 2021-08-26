@@ -3293,7 +3293,7 @@ mld_init(void *unused __unused)
 
 	ip6_initpktopts(&mld_po);
 	mld_po.ip6po_hlim = 1;
-	mld_po.ip6po_hbh = &mld_ra.hbh;
+	mld_po.ip6po_hbh = __bounded_addressof(mld_ra.hbh, sizeof(mld_ra));
 	mld_po.ip6po_prefer_tempaddr = IP6PO_TEMPADDR_NOTPREFER;
 	mld_po.ip6po_flags = IP6PO_DONTFRAG;
 }
@@ -3349,3 +3349,12 @@ static moduledata_t mld_mod = {
     0
 };
 DECLARE_MODULE(mld, mld_mod, SI_SUB_PROTO_MC, SI_ORDER_ANY);
+// CHERI CHANGES START
+// {
+//   "updated": 20200706,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

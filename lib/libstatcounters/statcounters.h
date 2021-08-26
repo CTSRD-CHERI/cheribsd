@@ -31,90 +31,39 @@
 #ifndef STATCOUNTERS_H
 #define STATCOUNTERS_H
 
-#ifndef __has_extension
-#define __has_extension(x) 0
-#endif
-#if __has_extension(attribute_deprecated_with_message)
-#define DEPRECATED(x) __attribute__((deprecated(x)))
-#else
-#define DEPRECATED(x) __attribute__((deprecated))
-#endif
-
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 
-// counters bank
-#define STATCOUNTERS_MAX_MOD_CNT 12
-typedef struct statcounters_bank
-{
-    uint64_t itlb_miss;
-    uint64_t dtlb_miss;
-    uint64_t cycle;
-    uint64_t inst;
-    uint64_t inst_user;
-    uint64_t inst_kernel;
-    uint64_t imprecise_setbounds;
-    uint64_t unrepresentable_caps;
-    uint64_t icache[STATCOUNTERS_MAX_MOD_CNT];
-    uint64_t dcache[STATCOUNTERS_MAX_MOD_CNT];
-    uint64_t l2cache[STATCOUNTERS_MAX_MOD_CNT];
-    uint64_t mipsmem[STATCOUNTERS_MAX_MOD_CNT];
-    uint64_t tagcache[STATCOUNTERS_MAX_MOD_CNT];
-    uint64_t l2cachemaster[STATCOUNTERS_MAX_MOD_CNT];
-    uint64_t tagcachemaster[STATCOUNTERS_MAX_MOD_CNT];
-} statcounters_bank_t;
+#include "statcounters_md.h"
 
 // format flags
-typedef enum
-{
-    HUMAN_READABLE,
-    CSV_HEADER,
-    CSV_NOHEADER
+typedef enum {
+	HUMAN_READABLE,
+	CSV_HEADER,
+	CSV_NOHEADER
 } statcounters_fmt_flag_t;
 
 __BEGIN_DECLS
 
-// reset statcounters XXX this literally resets the hardware counters (allowed
-// from user space for convenience but need not to be abused to be usefull)
-void reset_statcounters (void) DEPRECATED("use statcounters_reset instead");
-void statcounters_reset (void);
 // zero a statcounters_bank
-void zero_statcounters (statcounters_bank_t * const cnt_bank) DEPRECATED("use statcounters_zero instead");
-int statcounters_zero (statcounters_bank_t * const cnt_bank);
+int statcounters_zero(statcounters_bank_t * const cnt_bank);
 // sample hardware counters in a statcounters_bank
-void sample_statcounters (statcounters_bank_t * const cnt_bank) DEPRECATED("use statcounters_sample instead");
-int statcounters_sample (statcounters_bank_t * const cnt_bank);
+int statcounters_sample(statcounters_bank_t * const cnt_bank);
 // diff two statcounters_banks into a third one
-void diff_statcounters (
-    const statcounters_bank_t * const be,
-    const statcounters_bank_t * const bs,
-    statcounters_bank_t * const bd) DEPRECATED("use statcounters_diff instead -- arguments order changed");
-int statcounters_diff (
-    statcounters_bank_t * const bd,
-    const statcounters_bank_t * const be,
-    const statcounters_bank_t * const bs);
+int statcounters_diff(statcounters_bank_t * const bd,
+    const statcounters_bank_t * const be, const statcounters_bank_t * const bs);
 // dump a statcounters_bank in a file (csv or human readable)
-void dump_statcounters (
-    const statcounters_bank_t * const b,
-    const char * const fname,
-    const char * const fmt) DEPRECATED("use statcounters_dump instead -- arguments changed");
-int statcounters_dump (const statcounters_bank_t * const b);
-int statcounters_dump_with_phase (
-    const statcounters_bank_t * const b,
-    const char * phase);
-int statcounters_dump_with_args (
-    const statcounters_bank_t * const b,
-    const char * progname,
-    const char * phase,
-    const char * archname,
-    FILE * const fp,
-    const statcounters_fmt_flag_t fmt_flg);
+int statcounters_dump(const statcounters_bank_t * const b);
+int statcounters_dump_with_phase(const statcounters_bank_t * const b,
+    const char *phase);
+int statcounters_dump_with_args(const statcounters_bank_t * const b,
+    const char *progname, const char *phase, const char *archname,
+    FILE * const fp, const statcounters_fmt_flag_t fmt_flg);
 
-const char *statcounters_get_next_name (const char *name);
-int statcounters_id_from_name (const char *name);
-uint64_t statcounters_sample_by_id (int id);
+const char *statcounters_get_next_name(const char *name);
+int statcounters_id_from_name(const char *name);
+uint64_t statcounters_sample_by_id(int id);
 
 __END_DECLS
-
 
 #endif
