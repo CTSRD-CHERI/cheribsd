@@ -1890,9 +1890,11 @@ charged:
 			KASSERT((prev_entry->eflags & MAP_ENTRY_USER_WIRED) ==
 			    0, ("prev_entry %p has incoherent wiring",
 			    prev_entry));
-			if ((prev_entry->eflags & (MAP_ENTRY_GUARD |
-			    MAP_ENTRY_UNMAPPED)) == 0)
+			KASSERT((prev_entry->eflags & MAP_ENTRY_UNMAPPED) == 0,
+			    ("prev_entry %p is unmapped", prev_entry));
+			if ((prev_entry->eflags & MAP_ENTRY_GUARD) == 0)
 				map->size += end - prev_entry->end;
+
 			/*
 			 * Drop the new reservation entry before extending the
 			 * previous entry into it.
@@ -1957,8 +1959,9 @@ charged:
 	 */
 	if ((map->flags & MAP_RESERVATIONS) == 0)
 		vm_map_entry_link(map, new_entry);
-
-	if ((new_entry->eflags & (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) == 0)
+	KASSERT((new_entry->eflags & MAP_ENTRY_UNMAPPED) == 0,
+	    ("vm_map_insert: new entry %p is unmapped", new_entry));
+	if ((new_entry->eflags & MAP_ENTRY_GUARD) == 0)
 		map->size += new_entry->end - new_entry->start;
 
 	vm_map_log("insert", new_entry);
