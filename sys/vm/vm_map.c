@@ -4890,6 +4890,7 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 			new_entry->start = old_entry->start;
 			new_entry->end = old_entry->end;
+			new_entry->reservation = old_entry->reservation;
 			new_entry->eflags = old_entry->eflags &
 			    ~(MAP_ENTRY_USER_WIRED | MAP_ENTRY_IN_TRANSITION |
 			    MAP_ENTRY_WRITECNT | MAP_ENTRY_VN_EXEC |
