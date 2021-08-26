@@ -1720,6 +1720,7 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	vm_inherit_t inheritance;
 	u_long bdry;
 	u_int bidx;
+	int error;
 
 	VM_MAP_ASSERT_LOCKED(map);
 	KASSERT(object != kernel_object ||
@@ -1839,9 +1840,13 @@ charged:
 
 	/* Cut a hole in the reservation entry if needed */
 	if (map->flags & MAP_RESERVATIONS) {
-		vm_map_clip_start(map, new_entry, start);
+		error = vm_map_clip_start(map, new_entry, start);
+		KASSERT(error == KERN_SUCCESS,
+		    ("vm_map_insert: reservation clip failed: %d", error));
 		prev_entry = vm_map_entry_pred(new_entry);
-		vm_map_clip_end(map, new_entry, end);
+		error = vm_map_clip_end(map, new_entry, end);
+		KASSERT(error == KERN_SUCCESS,
+		    ("vm_map_insert: reservation clip failed: %d", error));
 		next_entry = vm_map_entry_succ(new_entry);
 	}
 
