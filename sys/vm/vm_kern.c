@@ -682,10 +682,8 @@ kmem_free(vm_pointer_t addr, vm_size_t size)
 vm_pointer_t
 kmap_alloc_wait(vm_map_t map, vm_size_t size)
 {
-	int error;
 	vm_size_t padded_size;
-	vm_offset_t alignment;
-	vm_offset_t addr;
+	vm_offset_t addr, alignment;
 	vm_pointer_t mapped;
 
 	size = round_page(size);
@@ -700,18 +698,12 @@ kmap_alloc_wait(vm_map_t map, vm_size_t size)
 		 * to lock out sleepers/wakers.
 		 */
 		vm_map_lock(map);
-		addr = vm_map_findspace(map, vm_map_min(map), padded_size);
-		if (addr + padded_size <= vm_map_max(map) && alignment == 0)
+		addr = vm_map_min(map);
+		if (vm_map_find_aligned(map, &addr, padded_size,
+		    vm_map_max(map), alignment) == KERN_SUCCESS)
 			break;
-		if (alignment > 0) {
-			error = vm_map_alignspace(map, NULL, 0, &addr,
-			    padded_size, vm_map_max(map), alignment);
-			if (error == KERN_SUCCESS)
-				break;
-		}
-
 		/* no space now; see if we can ever get space */
-		if (vm_map_max(map) - vm_map_min(map) < size) {
+		if (vm_map_max(map) - vm_map_min(map) < padded_size) {
 			vm_map_unlock(map);
 			swap_release(size);
 			return (0);
