@@ -320,7 +320,7 @@ ATF_TC_BODY(cocall_bad_caller_buf, tc)
 		buf = 42;
 		for (;;) {
 			error = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
-			ATF_REQUIRE_EQ(error, 0);
+			ATF_REQUIRE_EQ(error, EFAULT);
 			ATF_REQUIRE_EQ(buf, 42);
 		}
 		atf_tc_fail("You're not supposed to be here");
@@ -354,7 +354,7 @@ ATF_TC_BODY(cocall_bad_caller_buf_h, tc)
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 	error = cocall(lookedup, (void *)13, 8, (void *)42, 8);
-	ATF_REQUIRE(error != 0);
+	ATF_REQUIRE(error == 0);
 }
 
 ATF_TC_WITHOUT_HEAD(cocall_bad_callee_buf);
