@@ -243,26 +243,38 @@ static void *
 kmapent_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
     int wait)
 {
-	vm_offset_t addr;
+	vm_offset_t addr, alignment;
+	vm_pointer_t mapping;
 	int error, locked;
 
 	*pflag = UMA_SLAB_PRIV;
 
+	bytes = CHERI_REPRESENTABLE_LENGTH(bytes);
+	alignment = CHERI_REPRESENTABLE_ALIGNMENT(bytes);
+
 	if (!(locked = vm_map_locked(kernel_map)))
 		vm_map_lock(kernel_map);
-	addr = vm_map_findspace(kernel_map, vm_map_min(kernel_map), bytes);
-	if (addr + bytes < addr || addr + bytes > vm_map_max(kernel_map))
-		panic("%s: kernel map is exhausted", __func__);
-	error = vm_map_insert(kernel_map, NULL, 0, addr, addr + bytes,
-	    VM_PROT_RW, VM_PROT_RW, MAP_NOFAULT, addr);
+	addr = vm_map_min(kernel_map);
+	error = vm_map_find_aligned(kernel_map, &addr, bytes,
+	    vm_map_max(kernel_map), alignment);
+	if (error != KERN_SUCCESS)
+		panic("%s: vm_map_find_aligned failed: %d", __func__, error);
+	mapping = addr;
+	error = vm_map_reservation_create_locked(kernel_map, &mapping, bytes,
+	    VM_PROT_RW_CAP);
+	if (error != 0)
+		panic("%s: vm_map_reservation_create_locked failed: %d",
+		    __func__, error);
+	error = vm_map_insert(kernel_map, NULL, 0, mapping, mapping + bytes,
+	    VM_PROT_RW_CAP, VM_PROT_RW_CAP, MAP_NOFAULT, addr);
 	if (error != KERN_SUCCESS)
 		panic("%s: vm_map_insert() failed: %d", __func__, error);
 	if (!locked)
 		vm_map_unlock(kernel_map);
-	error = kmem_back_domain(domain, kernel_object, addr, bytes, M_NOWAIT |
-	    M_USE_RESERVE | (wait & M_ZERO));
+	error = kmem_back_domain(domain, kernel_object, mapping, bytes,
+	    M_NOWAIT | M_USE_RESERVE | (wait & M_ZERO));
 	if (error == KERN_SUCCESS) {
-		return ((void *)addr);
+		return ((void *)mapping);
 	} else {
 		if (!locked)
 			vm_map_lock(kernel_map);
