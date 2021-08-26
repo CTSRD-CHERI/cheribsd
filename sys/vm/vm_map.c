@@ -6074,6 +6074,10 @@ _vm_map_assert_consistent(vm_map_t map, int check)
 		KASSERT(entry->start < entry->end,
 		    ("map %p start = %jx, end = %jx", map,
 		    (uintmax_t)entry->start, (uintmax_t)entry->end));
+		KASSERT(prev->reservation <= entry->reservation,
+		    ("map %p prev->reservation = %jx, reservation = %jx", map,
+		    (uintmax_t)prev->reservation,
+		    (uintmax_t)entry->reservation));
 		KASSERT(entry->left == header ||
 		    entry->left->start < entry->start,
 		    ("map %p left->start = %jx, start = %jx", map,
