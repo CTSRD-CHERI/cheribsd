@@ -1,10 +1,15 @@
 /*-
- * Copyright (c) 2014 Andrew Turner
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
+ * Copyright (C) 2014,2019 Andrew Turner
  * Copyright (c) 2014-2015 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Andrew Turner under
  * sponsorship from the FreeBSD Foundation.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory under DARPA/AFRL contract FA8750-10-C-0237
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,75 +35,38 @@
  * $FreeBSD$
  */
 
-#ifndef	_MACHINE_REG_H_
-#define	_MACHINE_REG_H_
+#ifndef	_SYS_REG_H_
+#define	_SYS_REG_H_
 
-struct reg {
-	uint64_t x[30];
-	uint64_t lr;
-	uint64_t sp;
-	uint64_t elr;
-	uint32_t spsr;
-};
+#include <machine/reg.h>
 
-struct reg32 {
-	unsigned int r[13];
-	unsigned int r_sp;
-	unsigned int r_lr;
-	unsigned int r_pc;
-	unsigned int r_cpsr;
-};
-
-struct fpreg {
-	__uint128_t	fp_q[32];
-	uint32_t	fp_sr;
-	uint32_t	fp_cr;
-};
-
-struct fpreg32 {
-	int dummy;
-};
-
-struct dbreg {
-	uint8_t		db_debug_ver;
-	uint8_t		db_nbkpts;
-	uint8_t		db_nwtpts;
-	uint8_t		db_pad[5];
-
-	struct {
-		uint64_t dbr_addr;
-		uint32_t dbr_ctrl;
-		uint32_t dbr_pad;
-	} db_breakregs[16];
-	struct {
-		uint64_t dbw_addr;
-		uint32_t dbw_ctrl;
-		uint32_t dbw_pad;
-	} db_watchregs[16];
-};
-
-struct dbreg32 {
-	int dummy;
-};
-
+#ifdef _KERNEL
+int	fill_regs(struct thread *, struct reg *);
+int	set_regs(struct thread *, struct reg *);
+int	fill_fpregs(struct thread *, struct fpreg *);
+int	set_fpregs(struct thread *, struct fpreg *);
+int	fill_dbregs(struct thread *, struct dbreg *);
+int	set_dbregs(struct thread *, struct dbreg *);
 #if __has_feature(capabilities)
-struct capreg {
-	uintcap_t c[30];
-	uintcap_t clr;
-	uintcap_t csp;
-	uintcap_t celr;
-	uintcap_t ddc;
-	uintcap_t ctpidr;
-	uintcap_t ctpidrro;
-	uintcap_t cid;
-	uintcap_t rcsp;
-	uintcap_t rddc;
-	uintcap_t rctpidr;
-	uint64_t tagmask;
-	uint64_t pad;
-};
+int	fill_capregs(struct thread *, struct capreg *);
+int	set_capregs(struct thread *, struct capreg *);
+#endif
+#ifdef COMPAT_FREEBSD32
+int	fill_regs32(struct thread *, struct reg32 *);
+int	set_regs32(struct thread *, struct reg32 *);
+#ifndef fill_fpregs32
+int	fill_fpregs32(struct thread *, struct fpreg32 *);
+#endif
+#ifndef set_fpregs32
+int	set_fpregs32(struct thread *, struct fpreg32 *);
+#endif
+#ifndef fill_dbregs32
+int	fill_dbregs32(struct thread *, struct dbreg32 *);
+#endif
+#ifndef set_dbregs32
+int	set_dbregs32(struct thread *, struct dbreg32 *);
+#endif
+#endif
 #endif
 
-#define	__HAVE_REG32
-
-#endif /* !_MACHINE_REG_H_ */
+#endif

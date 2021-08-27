@@ -91,27 +91,7 @@ struct dbreg32 {
 #define __HAVE_REG32
 #endif
 
-#ifdef _KERNEL
-int	fill_fpregs(struct thread *, struct fpreg *);
-int	fill_regs(struct thread *, struct reg *);
-int	set_fpregs(struct thread *, struct fpreg *);
-int	set_regs(struct thread *, struct reg *);
-int	fill_dbregs(struct thread *, struct dbreg *);
-int	set_dbregs(struct thread *, struct dbreg *);
-#if __has_feature(capabilities)
-int	fill_capregs(struct thread *, struct capreg *);
-int	set_capregs(struct thread *, struct capreg *);
-#endif
-#endif
-
 #ifdef COMPAT_FREEBSD32
-struct image_params;
-
-int	fill_regs32(struct thread *, struct reg32 *);
-int	set_regs32(struct thread *, struct reg32 *);
-int	fill_fpregs32(struct thread *, struct fpreg32 *);
-int	set_fpregs32(struct thread *, struct fpreg32 *);
-
 #define	fill_dbregs32(td, reg)	0
 #define	set_dbregs32(td, reg)	0
 #endif

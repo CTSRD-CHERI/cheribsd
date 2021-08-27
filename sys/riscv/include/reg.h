@@ -74,20 +74,4 @@ struct capreg {
 };
 #endif
 
-#ifdef _KERNEL
-/*
- * XXX these interfaces are MI, so they should be declared in a MI place.
- */
-int	fill_regs(struct thread *, struct reg *);
-int	set_regs(struct thread *, struct reg *);
-int	fill_fpregs(struct thread *, struct fpreg *);
-int	set_fpregs(struct thread *, struct fpreg *);
-int	fill_dbregs(struct thread *, struct dbreg *);
-int	set_dbregs(struct thread *, struct dbreg *);
-#if __has_feature(capabilities)
-int	fill_capregs(struct thread *, struct capreg *);
-int	set_capregs(struct thread *, struct capreg *);
-#endif
-#endif
-
 #endif /* !_MACHINE_REG_H_ */
