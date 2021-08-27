@@ -444,7 +444,9 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 		       uintcap_t * __capability mvu,
 		       vm_offset_t mve)
 {
+#ifdef CHERI_CAPREVOKE_CLOADTAGS
 	CHERI_REVOKE_STATS_FOR(crst, crc);
+#endif
 	int res = 0;
 
 	/* Load once up front, which is almost as good as const */
