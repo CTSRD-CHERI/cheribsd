@@ -124,7 +124,7 @@ trace_rtld_direct_exec(pid_t * child, const char *rtld, const char *file)
 #define	_PATH_LDD32	"/usr/bin/ldd32"
 
 static int
-execldd32(char *file, char *fmt1, char *fmt2, int aflag, int vflag)
+execldd32(char *file, char *fmt1, char *fmt2, int aflag)
 {
 	char *argv[9];
 	int i, rval, status;
@@ -135,8 +135,6 @@ execldd32(char *file, char *fmt1, char *fmt2, int aflag, int vflag)
 	argv[i++] = strdup(_PATH_LDD32);
 	if (aflag)
 		argv[i++] = strdup("-a");
-	if (vflag)
-		argv[i++] = strdup("-v");
 	if (fmt1 != NULL) {
 		argv[i++] = strdup("-f");
 		argv[i++] = strdup(fmt1);
@@ -178,12 +176,12 @@ int
 main(int argc, char *argv[])
 {
 	char *fmt1, *fmt2;
-	int rval, c, aflag, vflag;
+	int rval, c, aflag;
 
-	aflag = vflag = 0;
+	aflag = 0;
 	fmt1 = fmt2 = NULL;
 
-	while ((c = getopt(argc, argv, "af:v")) != -1) {
+	while ((c = getopt(argc, argv, "af:")) != -1) {
 		switch (c) {
 		case 'a':
 			aflag++;
@@ -196,9 +194,6 @@ main(int argc, char *argv[])
 			} else
 				fmt1 = optarg;
 			break;
-		case 'v':
-			vflag++;
-			break;
 		default:
 			usage();
 			/* NOTREACHED */
@@ -206,9 +201,6 @@ main(int argc, char *argv[])
 	}
 	argc -= optind;
 	argv += optind;
-
-	if (vflag && fmt1 != NULL)
-		errx(1, "-v may not be used with -f");
 
 	if (argc <= 0) {
 		usage();
@@ -240,7 +232,7 @@ main(int argc, char *argv[])
 #if RTLD_DIRECT_EXEC_TRACE_SUPPORTED == 1
 			break;
 #else
-			rval |= execldd32(*argv, fmt1, fmt2, aflag, vflag);
+			rval |= execldd32(*argv, fmt1, fmt2, aflag);
 			continue;
 #endif
 #endif
@@ -325,7 +317,7 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: ldd [-a] [-v] [-f format] program ...\n");
+	fprintf(stderr, "usage: ldd [-a] [-f format] program ...\n");
 	exit(1);
 }
 
