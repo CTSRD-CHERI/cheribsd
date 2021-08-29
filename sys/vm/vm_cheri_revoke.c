@@ -462,11 +462,13 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 			*vmres = res;
 			return VM_CHERI_REVOKE_AT_VMERR;
 		}
+		mwired = true;
 		if (last_timestamp != map->timestamp) {
 			/*
 			 * The map has changed out from under us; bail and
 			 * the caller will look up the new map entry.
 			 */
+			vm_page_unwire(m, PQ_INACTIVE);
 			return VM_CHERI_REVOKE_AT_TICK;
 		}
 
@@ -580,7 +582,9 @@ visit_rw_fault:
 		VM_OBJECT_ASSERT_UNLOCKED(obj);
 		return VM_CHERI_REVOKE_AT_VMERR;
 	}
+	mwired = true;
 	if (last_timestamp != map->timestamp) {
+		vm_page_unwire(m, PQ_INACTIVE);
 		VM_OBJECT_ASSERT_UNLOCKED(obj);
 		return VM_CHERI_REVOKE_AT_TICK;
 	}
