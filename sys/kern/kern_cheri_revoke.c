@@ -603,7 +603,7 @@ skip_last_pass:
 	vm_cheri_revoke_cookie_rele(&vmcrc);
 	vmspace_free(vm);
 
-	return cheri_revoke_fini(crsi, 0, crstp, &crepochs);
+	return cheri_revoke_fini(crsi, vm_mmap_to_errno(res), crstp, &crepochs);
 }
 
 static int
