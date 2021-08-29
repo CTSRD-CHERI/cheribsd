@@ -3435,6 +3435,12 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
  * shared mappings) as no other cores are going to have this pmap active.
  *
  * XREF pmap_remove_pages
+ *
+ * XXXMJ the algorithm used here only visits "managed" mappings, i.e., those for
+ * which we maintain reverse mapping info by linking a PV entry with the
+ * physical page.  While most unmanaged mappings refer to device memory, this is
+ * not required.  In particular, OBJT_PHYS objects are unmanaged and back
+ * largepage POSIX shared memory objects (which may contain capabilities).
  */
 void
 pmap_sync_capdirty(pmap_t pmap)
@@ -3476,9 +3482,9 @@ pmap_sync_capdirty(pmap_t pmap)
 				ptepde = tpte;
 				pte = pmap_l2_to_l3(pte, pv->pv_va);
 				tpte = pmap_load(pte);
-
-				if ((tpte & PTE_SW_MANAGED) == 0)
-					continue;
+				KASSERT((tpte & PTE_SW_MANAGED) != 0,
+				    ("%s: unmanaged pte %#jx in pv lists", __func__,
+				    (uintmax_t)tpte));
 
 				if ((tpte & PTE_CD) != 0) {
 					m = PHYS_TO_VM_PAGE(PTE_TO_PHYS(tpte));
@@ -3536,6 +3542,8 @@ pmap_caploadgen_next(pmap_t pmap)
  * aren't. (Toooba in particular doesn't yet do that.)  If we ever get here,
  * update the bits of pmap_caploadgen_update and cheri_pte_cr that refers to
  * this note, too.
+ *
+ * XXXMJ as with pmap_sync_capdirty(), this only traverses managed mappings.
  */
 static void
 pmap_caploadgen_test_all_clean(vm_page_t m)
@@ -3774,6 +3782,11 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 						sfence_vma_page(va);
 					}
 					PMAP_UNLOCK(pmap);
+					/*
+					 * XXXMJ don't we need to hold a
+					 * reference to m?  What prevents
+					 * concurrent reclamation?
+					 */
 					pmap_caploadgen_test_all_clean(m);
 					m = NULL;
 					goto out_unlocked;
@@ -3895,6 +3908,8 @@ out_unlocked:
 		 * Unwire any existing page we were given if we are asked to
 		 * wire the returned page.
 		 */
+		KASSERT(*mp != m,
+		    ("pmap_caploadgen_update: bogus unwire %p", m));
 		vm_page_unwire(*mp, PQ_INACTIVE);
 	}
 	*mp = m;
