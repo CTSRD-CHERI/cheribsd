@@ -496,6 +496,14 @@ fast_out:
 			 * so that we don't race any page faults from kernel
 			 * worker threads; we won't race any page faults from
 			 * userspace already since we're single-threaded.
+			 *
+			 * XXXMJ this statement is not quite true.  The map lock
+			 * is acquired during page fault handing but may be
+			 * dropped (and re-acquired) around calls into the
+			 * pager.  In other words, it appears to be possible to
+			 * increment the GCLG after a (kernel) thread has
+			 * faulted but before it has installed a PTE for the new
+			 * mapping.
 			 */
 			vm_map_lock(&vm->vm_map);
 			pmap_caploadgen_next(vmm->pmap);

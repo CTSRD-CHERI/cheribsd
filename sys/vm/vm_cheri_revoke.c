@@ -372,6 +372,12 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 	if (flags & VM_CHERI_REVOKE_LOAD_SIDE) {
 		int pmres;
 
+		/*
+		 * XXXMJ this needs to wire the page.  There is no guarantee
+		 * that m->object == obj, and if not then there's nothing
+		 * preventing the page from being freed while we're trying to
+		 * lock the right object.
+		 */
 		pmres = pmap_caploadgen_update(crc->map->pmap, addr, &m, 0);
 
 		switch (pmres) {
@@ -403,7 +409,11 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 	// XXX else pmap_extract_and_hold?
 
 	KASSERT(m == NULL, ("Load side bad state arc"));
-	vm_page_grab_valid(&m, obj, ipi,
+	/*
+	 * XXXMJ as VM_ALLOC_NOZERO is currently implemented, this can return an
+	 * invalid page, and in this case we fail to check the shadow chain.
+	 */
+	(void)vm_page_grab_valid(&m, obj, ipi,
 	    VM_ALLOC_WIRED | VM_ALLOC_NOBUSY | VM_ALLOC_NOZERO);
 
 	if (m == NULL) {
@@ -460,6 +470,21 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 			return VM_CHERI_REVOKE_AT_TICK;
 		}
 
+		/*
+		 * XXXMJ while the page reference prevents it from being freed,
+		 * it may still be removed from its object (or migrated to a
+		 * different object, for example during shadow chain collapse).
+		 * We need something like this, unfortunately:
+		 *
+		 * obj = atomic_load_ptr(&m->object);
+		 * if (obj != NULL) {
+		 *     VM_OBJECT_WLOCK(obj);
+		 *     if (m->object != obj)
+		 *         ???
+		 * } else {
+		 *     ???
+		 * }
+		 */
 		VM_OBJECT_WLOCK(m->object);
 		mdidvm = true;
 
@@ -480,6 +505,10 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 	}
 
 visit_ro:
+	/*
+	 * XXXMJ I think the page needs to be busy for PGA_WRITEABLE to be
+	 * stable.
+	 */
 	if (pmap_page_is_write_mapped(m)) {
 visit_rw:
 		if (m->object == obj) {
@@ -517,8 +546,8 @@ visit_rw:
 		/*
 		 * This is kind of awkward; the page is busy and it's
 		 * not clear by whom.  But whoever it is needs our
-		 * object lock to unbusy.  So handle this like the
-		 * map stepping forward.
+		 * object lock to unbusy.  (XXXMJ this is not generally
+		 * true.)  So handle this like the map stepping forward.
 		 */
 		if (mwired)
 			vm_cheri_revoke_unwire_in_situ(m);
@@ -674,7 +703,12 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc, int flags,
 		     ((obj->backing_object->flags & OBJ_HASCAP) == 0)))
 			flags |= VM_CHERI_REVOKE_QUICK_SUCCESSOR;
 
-		/* XXX How do to QUICK_SUCCESSOR for OBJT_SWAP? */
+		/*
+		 * XXX How do to QUICK_SUCCESSOR for OBJT_SWAP?
+		 * MJ: this could be extended to swap objects by additionally
+		 * querying the pager for a copy of non-resident pages.
+		 * swap_pager_find_least() would be the main vehicle for that.
+		 */
 	}
 
 	objlocked = obj;
