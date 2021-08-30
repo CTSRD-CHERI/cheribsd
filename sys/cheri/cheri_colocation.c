@@ -441,13 +441,7 @@ colocation_trap_in_switcher(struct thread *td, struct trapframe *trapframe,
 	vm_offset_t addr;
 
 	sv = td->td_proc->p_sysent;
-#if defined(__mips__)
-	addr = (__cheri_addr vaddr_t)trapframe->pc;
-#elif defined(__riscv)
-	addr = (__cheri_addr vaddr_t)trapframe->tf_sepc;
-#else
-#error "what architecture is this?"
-#endif
+	addr = TRAPF_PC(trapframe);
 
 	if (addr >= sv->sv_cocall_base && addr < sv->sv_cocall_base + sv->sv_cocall_len)
 		goto trap;
