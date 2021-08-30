@@ -83,6 +83,11 @@ struct dbreg32 {
 	int dummy;
 };
 
+struct arm64_addr_mask {
+	__uint64_t	code;
+	__uint64_t	data;
+};
+
 #if __has_feature(capabilities)
 struct capreg {
 	__uintcap_t c[30];
