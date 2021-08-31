@@ -1304,7 +1304,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		    shared_page_addr, sv->sv_shared_page_len,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
 		    VM_PROT_READ | VM_PROT_EXECUTE,
-		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE);
+		    MAP_INHERIT_SHARE | MAP_ACC_NO_CHARGE | MAP_KERNEL_OWNER);
 		if (error != KERN_SUCCESS) {
 #if __has_feature(capabilities)
 			vm_map_reservation_delete(map, shared_page_addr);

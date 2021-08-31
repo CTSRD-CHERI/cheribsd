@@ -2171,6 +2171,9 @@ charged:
 	}
 	new_entry->cred = NULL;
 
+	if (cow & MAP_KERNEL_OWNER)
+		new_entry->owner = 0;
+
 	new_entry->eflags = protoeflags;
 	new_entry->object.vm_object = object;
 	new_entry->offset = offset;
