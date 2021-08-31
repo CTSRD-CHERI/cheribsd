@@ -543,18 +543,21 @@ do_trap_user(struct trapframe *frame)
 	case SCAUSE_STORE_MISALIGNED:
 		call_trapsignal(td, SIGBUS, BUS_ADRALN,
 		    (uintcap_t)frame->tf_stval, exception, 0);
+		userret(td, frame);
 		break;
 	case SCAUSE_LOAD_CAP_PAGE_FAULT:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
 		    (uintcap_t)frame->tf_stval, exception, 0);
+		userret(td, frame);
 		break;
 	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
 		    (uintcap_t)frame->tf_stval, exception, 0);
+		userret(td, frame);
 		break;
 	case SCAUSE_CHERI:
 		if (log_user_cheri_exceptions)
