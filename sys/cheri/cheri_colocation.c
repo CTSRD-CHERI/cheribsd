@@ -489,48 +489,21 @@ setup_scb(struct thread *td)
 {
 	struct switchercb scb;
 	vm_map_t map;
-	vm_map_entry_t entry;
-	vm_offset_t addr;
-	boolean_t found;
+	vm_pointer_t addr;
 	int rv;
 
 	KASSERT(td->td_md.md_scb == 0, ("%s: already initialized\n", __func__));
 
 	map = &td->td_proc->p_vmspace->vm_map;
 
-	vm_map_lock(map);
-
-	addr = vm_map_findspace(map, vm_map_min(map), PAGE_SIZE);
-	if (addr + PAGE_SIZE > vm_map_max(map)) {
-		COLOCATION_DEBUG("vm_map_findspace() failed");
-		vm_map_unlock(map);
-		return (ENOMEM);
-	}
-
-	rv = vm_map_reservation_create_locked(map, &addr, PAGE_SIZE,
-	    VM_PROT_RW_CAP);
+	addr = vm_map_min(map);
+	rv = vm_map_find(map, NULL, 0, &addr, PAGE_SIZE, 0, VMFS_OPTIMAL_SPACE,
+	    VM_PROT_RW_CAP, VM_PROT_RW_CAP, MAP_DISABLE_COREDUMP |
+	    MAP_KERNEL_OWNER);
 	if (rv != KERN_SUCCESS) {
-		COLOCATION_DEBUG("vm_map_reservation_create_locked() failed with rv %d", rv);
-		vm_map_unlock(map);
+		COLOCATION_DEBUG("vm_map_find() failed with rv %d", rv);
 		return (ENOMEM);
 	}
-
-	rv = vm_map_insert(map, NULL, 0, addr, addr + PAGE_SIZE,
-	    VM_PROT_READ | VM_PROT_WRITE | VM_PROT_READ_CAP | VM_PROT_WRITE_CAP,
-	    VM_PROT_READ | VM_PROT_WRITE | VM_PROT_READ_CAP | VM_PROT_WRITE_CAP,
-	    MAP_DISABLE_COREDUMP, addr);
-	if (rv != KERN_SUCCESS) {
-		COLOCATION_DEBUG("vm_map_insert() failed with rv %d", rv);
-		vm_map_unlock(map);
-		return (ENOMEM);
-	}
-
-	found = vm_map_lookup_entry(map, addr, &entry);
-	KASSERT(found == TRUE,
-	    ("%s: vm_map_lookup_entry() returned false\n", __func__));
-	entry->owner = 0;  /* XXX: This isn't abandoned, so !NO_PID. */
-
-	vm_map_unlock(map);
 
 	td->td_md.md_scb = addr;
 
