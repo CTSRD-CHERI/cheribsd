@@ -354,7 +354,7 @@ ATF_TC_BODY(cocall_bad_caller_buf_h, tc)
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 	error = cocall(lookedup, (void *)13, 8, (void *)42, 8);
-	ATF_REQUIRE(error == 0);
+	ATF_REQUIRE(error == 0 || (error == -1 && errno == EPROT));
 }
 
 ATF_TC_WITHOUT_HEAD(cocall_bad_callee_buf);
@@ -411,7 +411,7 @@ ATF_TC_BODY(cocall_bad_callee_buf_h, tc)
 	ATF_REQUIRE_EQ(error, 0);
 	buf = 1;
 	error = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
-	ATF_REQUIRE_EQ(error, 0);
+	ATF_REQUIRE(error == 0 || (error == -1 && errno == EPROT));
 	ATF_REQUIRE_EQ(buf, 1);
 }
 

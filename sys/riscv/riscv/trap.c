@@ -67,6 +67,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/fpe.h>
 #endif
 #include <machine/frame.h>
+#include <machine/md_var.h>
 #include <machine/pcb.h>
 #include <machine/pcpu.h>
 
@@ -76,6 +77,8 @@ __FBSDID("$FreeBSD$");
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
 #endif
+
+#define	COCALL_OFFSET(x)	((x) - switcher_cocall)
 
 #if __has_feature(capabilities)
 int log_user_cheri_exceptions = 1;
@@ -97,6 +100,39 @@ void do_trap_supervisor(struct trapframe *);
 void do_trap_user(struct trapframe *);
 
 static void db_show_frame_td(struct thread *td);
+
+static bool
+switcher_onfault(struct thread *td, struct trapframe *tf, const char *msg,
+    int error)
+{
+#if __has_feature(capabilities)
+	const struct sysentvec *sv;
+	vm_offset_t addr, offset;
+	int onfault;
+
+	if (!colocation_trap_in_switcher(td, tf, msg))
+		return (false);
+
+	sv = td->td_proc->p_sysent;
+	addr = TRAPF_PC(tf);
+	onfault = -1;
+
+	if (addr >= sv->sv_cocall_base && addr < sv->sv_cocall_base +
+	    szswitcher_cocall) {
+		offset = addr - sv->sv_cocall_base;
+		if (offset >= COCALL_OFFSET(switcher_cocall_copy_start) &&
+		    offset < COCALL_OFFSET(switcher_cocall_copy_end))
+			onfault = COCALL_OFFSET(switcher_cocall_copy_onfault);
+	}
+
+	if (onfault != -1) {
+		tf->tf_sepc = tf->tf_sepc - offset + onfault;
+		tf->tf_a[0] = error;
+		return (true);
+	}
+#endif
+	return (false);
+}
 
 static __inline void
 call_trapsignal(struct thread *td, int sig, int code, uintcap_t addr,
@@ -329,9 +365,10 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (usermode) {
-			colocation_trap_in_switcher(td, frame, "bad page fault");
-			call_trapsignal(td, sig, ucode, stval,
-			    frame->tf_scause & SCAUSE_CODE, 0);
+			if (!switcher_onfault(td, frame, "bad page fault",
+			    EFAULT))
+				call_trapsignal(td, sig, ucode, stval,
+				    frame->tf_scause & SCAUSE_CODE, 0);
 		} else {
 			if (pcb->pcb_onfault != 0) {
 				frame->tf_a[0] = error;
@@ -478,9 +515,9 @@ do_trap_user(struct trapframe *frame)
 	case SCAUSE_LOAD_ACCESS_FAULT:
 	case SCAUSE_STORE_ACCESS_FAULT:
 	case SCAUSE_INST_ACCESS_FAULT:
-		colocation_trap_in_switcher(td, frame, "load/store fault");
-		call_trapsignal(td, SIGBUS, BUS_ADRERR, frame->tf_sepc,
-		    exception, 0);
+		if (!switcher_onfault(td, frame, "load/store fault", EFAULT))
+			call_trapsignal(td, SIGBUS, BUS_ADRERR, frame->tf_sepc,
+			    exception, 0);
 		userret(td, frame);
 		break;
 	case SCAUSE_STORE_PAGE_FAULT:
@@ -522,31 +559,37 @@ do_trap_user(struct trapframe *frame)
 	/* M-mode emulates alignment of non-CHERI instructions */
 	case SCAUSE_LOAD_MISALIGNED:
 	case SCAUSE_STORE_MISALIGNED:
-		colocation_trap_in_switcher(td, frame, "misaligned load/store");
-		call_trapsignal(td, SIGBUS, BUS_ADRALN,
-		    (uintcap_t)frame->tf_stval, exception, 0);
+		if (!switcher_onfault(td, frame, "misaligned load/store",
+		    EFAULT))
+			call_trapsignal(td, SIGBUS, BUS_ADRALN,
+			    (uintcap_t)frame->tf_stval, exception, 0);
+		userret(td, frame);
 		break;
 	case SCAUSE_LOAD_CAP_PAGE_FAULT:
-		colocation_trap_in_switcher(td, frame, "load cap page fault");
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
-		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
-		    (uintcap_t)frame->tf_stval, exception, 0);
+		if (!switcher_onfault(td, frame, "load cap page fault", EFAULT))
+			call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
+			    (uintcap_t)frame->tf_stval, exception, 0);
+		userret(td, frame);
 		break;
 	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
-		colocation_trap_in_switcher(td, frame, "store amo cap page fault");
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
-		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
-		    (uintcap_t)frame->tf_stval, exception, 0);
+		if (!switcher_onfault(td, frame, "store amo cap page fault",
+		    EFAULT))
+			call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
+			    (uintcap_t)frame->tf_stval, exception, 0);
+		userret(td, frame);
 		break;
 	case SCAUSE_CHERI:
-		colocation_trap_in_switcher(td, frame, "cheri fault");
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
-		call_trapsignal(td, SIGPROT,
-		    cheri_stval_to_sicode(frame->tf_stval), frame->tf_sepc,
-		    exception, TVAL_CAP_IDX(frame->tf_stval));
+		if (!switcher_onfault(td, frame, "cheri fault", EPROT))
+			call_trapsignal(td, SIGPROT,
+			    cheri_stval_to_sicode(frame->tf_stval),
+			    frame->tf_sepc, exception,
+			    TVAL_CAP_IDX(frame->tf_stval));
 		userret(td, frame);
 		break;
 #endif

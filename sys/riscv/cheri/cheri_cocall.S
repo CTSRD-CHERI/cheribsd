@@ -41,9 +41,6 @@
  * Register usage: we save and restore csp and cra.  The rest gets zeroed;
  * the libc wrappers are responsible for saving and restoring the context.
  *
- * Note that this code executes while ignoring all the signals - a trapping
- * instruction will just get skipped over.
- *
  * Layout of struct switchercb, pointed to by idc (caller)
  * and, later on, ct0 (callee):
  *
@@ -61,9 +58,13 @@
  * scb_cookiep (ca2):	10*CHERICAP_SIZE(idc)
  */
 
-.text
-.globl _C_LABEL(switcher_cocall)
-_C_LABEL(switcher_cocall):
+#define	SIGCODE(sym)						\
+	.text; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc
+
+#define CSYM(x)							\
+	.globl x; .type x,@object; x:
+
+SIGCODE(switcher_cocall)
 	/*
 	 * Save the caller's stack pointer and return address (PCC)
 	 * in the caller's control block.
@@ -85,7 +86,7 @@ _C_LABEL(switcher_cocall):
 	 * Unseal the callee's control block.
 	 */
 	clc	ct0, SCB_UNSEALCAP(idc)	/* Load the unsealing capability */
-	cunseal	ct0, ca2, ct0		/* Unseal the calee control block */
+	cunseal	ct0, ca2, ct0		/* Unseal the callee control block */
 
 	/*
 	 * Save the capability to the callee's control block in the caller
@@ -149,6 +150,7 @@ _C_LABEL(switcher_cocall):
 	bgez	t3, 3f
 	addi	t5, a4, 0
 
+CSYM(switcher_cocall_copy_start)
 3:
 	cld	t3, 0(ca3)
 	csd	t3, 0(ct4)
@@ -156,6 +158,7 @@ _C_LABEL(switcher_cocall):
 	cincoffset ct4, ct4, 8
 	addi	t5, t5, -8
 	bgtz	t5, 3b
+CSYM(switcher_cocall_copy_end)
 
 	li	t0, 0
 	li	a0, 0
@@ -219,10 +222,34 @@ _C_LABEL(switcher_cocall):
 	li	t0, 1
 	j	4b
 
-.globl _C_LABEL(eswitcher_cocall)
-_C_LABEL(eswitcher_cocall):
+CSYM(switcher_cocall_copy_onfault)
+	/* Assumes a0 holds errno and that 'idc' points to caller's scb. */
 
-.data
-.globl szswitcher_cocall
+	/* Clear state in the callee's scb. */
+	clc	ct1, SCB_CALLEE_SCB(idc)
+	clc	ct2, SCB_COOKIEP(ct1)
+	beq	t2, zero, 5f
+	csc	cnull, (ct2)
+5:
+	csc	cnull, SCB_CALLER_SCB(ct1)
+
+	/* Clear state in the caller's scb. */
+	csd	zero, SCB_BORROWER_TD(idc)
+	csc	cnull, SCB_CALLEE_SCB(idc)
+
+	clc	csp, SCB_CSP(idc)
+	clc	cra, SCB_CRA(idc)
+
+	li	t0, 1
+	j	4b
+
+END(switcher_cocall)
+eswitcher_cocall:
+
+	.data
+	.align	3
+	.globl szswitcher_cocall
+	.type szswitcher_cocall,@object
 szswitcher_cocall:
-.long eswitcher_cocall-switcher_cocall
+	.long eswitcher_cocall - switcher_cocall
+	.size szswitcher_cocall, . - szswitcher_cocall
