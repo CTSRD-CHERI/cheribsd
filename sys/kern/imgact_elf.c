@@ -2241,6 +2241,7 @@ each_dumpable_segment(struct thread *td, segment_callback func, void *closure)
 {
 	struct proc *p = td->td_proc;
 	vm_map_t map = &p->p_vmspace->vm_map;
+	const struct sysentvec *sv = p->p_sysent;
 	vm_map_entry_t entry;
 	vm_object_t backing_object, object;
 	bool ignore_entry;
@@ -2272,13 +2273,15 @@ each_dumpable_segment(struct thread *td, segment_callback func, void *closure)
 		if (entry->eflags & (MAP_ENTRY_NOCOREDUMP|MAP_ENTRY_IS_SUB_MAP))
 			continue;
 
-		/*
-		 * Don't dump map entries owned by another colocated process.
-		 */
-		if (entry->owner != p->p_pid)
+		if ((object = entry->object.vm_object) == NULL)
 			continue;
 
-		if ((object = entry->object.vm_object) == NULL)
+		/*
+		 * Don't dump map entries owned by another colocated process,
+		 * but always include the shared page.
+		 */
+		if (entry->owner != p->p_pid &&
+		    !(sv->sv_shared_page_obj == object))
 			continue;
 
 		/* Ignore memory-mapped devices and such things. */
