@@ -108,11 +108,11 @@ SYSINIT(colocation_startup, SI_SUB_CPU, SI_ORDER_FIRST, colocation_startup,
 void
 colocation_cleanup(struct thread *td)
 {
-	td->td_md.md_scb = 0;
+	td->td_scb = 0;
 }
 
 static void
-colocation_copyin_scb_atcap(const void * __capability cap,
+colocation_copyin_scb(const void * __capability cap,
     struct switchercb *scbp)
 {
 	int error;
@@ -124,34 +124,23 @@ colocation_copyin_scb_atcap(const void * __capability cap,
 	    __func__, cap, error));
 }
 
-static void
-colocation_copyin_scb_at(const void *addr, struct switchercb *scbp)
-{
-
-	return (colocation_copyin_scb_atcap(
-	    ___USER_CFROMPTR(addr, userspace_root_cap), scbp));
-}
-
 static bool
 colocation_fetch_scb(struct thread *td, struct switchercb *scbp)
 {
-	vaddr_t addr;
-
-	addr = td->td_md.md_scb;
-	if (addr == 0) {
+	if (td->td_scb == NULL) {
 		/*
 		 * We've never called cosetup(2).
 		 */
 		return (false);
 	}
 
-	colocation_copyin_scb_at((const void *)addr, scbp);
+	colocation_copyin_scb(td->td_scb, scbp);
 
 	return (true);
 }
 
 static void
-colocation_copyout_scb_atcap(void * __capability cap, const struct switchercb *scbp)
+colocation_copyout_scb(void * __capability cap, const struct switchercb *scbp)
 {
 	int error;
 
@@ -163,34 +152,23 @@ colocation_copyout_scb_atcap(void * __capability cap, const struct switchercb *s
 }
 
 static void
-colocation_copyout_scb_at(void *addr, const struct switchercb *scbp)
+colocation_store_scb(struct thread *td, struct switchercb *scbp)
 {
 
-	return (colocation_copyout_scb_atcap(
-	    ___USER_CFROMPTR(addr, userspace_root_cap), scbp));
-}
-
-static void
-colocation_copyout_scb(struct thread *td, struct switchercb *scbp)
-{
-
-	colocation_copyout_scb_at((void *)td->td_md.md_scb, scbp);
+	colocation_copyout_scb(td->td_scb, scbp);
 }
 
 static bool
 colocation_fetch_caller_scb(struct thread *td, struct switchercb *scbp)
 {
-	vaddr_t addr;
-
-	addr = td->td_md.md_scb;
-	if (addr == 0) {
+	if (td->td_scb == NULL) {
 		/*
 		 * We've never called cosetup(2).
 		 */
 		return (false);
 	}
 
-	colocation_copyin_scb_at((void *)addr, scbp);
+	colocation_copyin_scb(td->td_scb, scbp);
 
 	if (cheri_gettag(scbp->scb_caller_scb) == 0 ||
 	    cheri_getlen(scbp->scb_caller_scb) == 0) {
@@ -200,7 +178,7 @@ colocation_fetch_caller_scb(struct thread *td, struct switchercb *scbp)
 		return (false);
 	}
 
-	colocation_copyin_scb_atcap(scbp->scb_caller_scb, scbp);
+	colocation_copyin_scb(scbp->scb_caller_scb, scbp);
 
 	return (true);
 }
@@ -208,17 +186,14 @@ colocation_fetch_caller_scb(struct thread *td, struct switchercb *scbp)
 static bool
 colocation_fetch_callee_scb(struct thread *td, struct switchercb *scbp)
 {
-	vaddr_t addr;
-
-	addr = td->td_md.md_scb;
-	if (addr == 0) {
+	if (td->td_scb == NULL) {
 		/*
 		 * We've never called cosetup(2).
 		 */
 		return (false);
 	}
 
-	colocation_copyin_scb_at((const void *)addr, scbp);
+	colocation_copyin_scb(td->td_scb, scbp);
 
 	if (cheri_gettag(scbp->scb_callee_scb) == 0 ||
 	    cheri_getlen(scbp->scb_callee_scb) == 0) {
@@ -228,7 +203,7 @@ colocation_fetch_callee_scb(struct thread *td, struct switchercb *scbp)
 		return (false);
 	}
 
-	colocation_copyin_scb_atcap(scbp->scb_callee_scb, scbp);
+	colocation_copyin_scb(scbp->scb_callee_scb, scbp);
 
 	return (true);
 }
@@ -252,7 +227,7 @@ wakeupself(void)
 {
 	const void *chan;
 
-	chan = (const void *)curthread->td_md.md_scb;
+	chan = (__cheri_fromcap const void *)curthread->td_scb;
 
 	COLOCATION_DEBUG("waking up scb %p", chan);
 	wakeup(chan);
@@ -278,7 +253,7 @@ colocation_thread_exit(struct thread *td)
 {
 	struct vmspace *vmspace;
 	struct coname *con, *con_temp;
-	struct mdthread *md;
+	void * __capability scb_cap;
 	struct switchercb scb;
 	bool have_scb;
 
@@ -287,12 +262,14 @@ colocation_thread_exit(struct thread *td)
 		return;
 
 	if (counregister_on_exit) {
+		scb_cap = cheri_seal(td->td_scb, switcher_sealcap2);
+
 		vmspace = td->td_proc->p_vmspace;
 
 		vm_map_lock(&vmspace->vm_map);
 
 		LIST_FOREACH_SAFE(con, &vmspace->vm_conames, c_next, con_temp) {
-			if (cheri_getaddress(con->c_value) == td->td_md.md_scb) {
+			if (con->c_value == scb_cap) {
 				LIST_REMOVE(con, c_next);
 				free(con, M_TEMP);
 			}
@@ -301,15 +278,13 @@ colocation_thread_exit(struct thread *td)
 		vm_map_unlock(&vmspace->vm_map);
 	}
 
-	md = &td->td_md;
-
 	/*
 	 * Wake up any thread waiting on cocall_slow(2).
 	 */
 	wakeupself();
 
-	COLOCATION_DEBUG("terminating thread %p, scb %p",
-	    td, (void *)td->td_md.md_scb);
+	COLOCATION_DEBUG("terminating thread %p, scb %lp",
+	    td, td->td_scb);
 
 	/*
 	 * Set scb_caller_scb to a special "null" capability, so that cocall(2)
@@ -319,8 +294,8 @@ colocation_thread_exit(struct thread *td)
 	scb.scb_td = NULL;
 	scb.scb_borrower_td = NULL;
 
-	colocation_copyout_scb(td, &scb);
-	td->td_md.md_scb = 0;
+	colocation_store_scb(td, &scb);
+	td->td_scb = NULL;
 }
 
 /*
@@ -360,19 +335,19 @@ colocation_unborrow(struct thread *td)
 	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
 #ifdef __mips__
-	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %#lx, "
+	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %lp, "
 	    "md_tls %p, md_tls_tcb_offset %zd, "
-	    "with td %p, pid %d (%s), switchercb %#lx, "
+	    "with td %p, pid %d (%s), switchercb %lp, "
 	    "md_tls %p, md_tls_tcb_offset %zd",
-	    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_md.md_scb,
+	    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_scb,
 	    (__cheri_fromcap void *)td->td_md.md_tls, td->td_proc->p_md.md_tls_tcb_offset,
-	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_md.md_scb,
+	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_scb,
 	    (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_proc->p_md.md_tls_tcb_offset);
 #else
-	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %#lx, "
-	    "with td %p, pid %d (%s), switchercb %#lx",
-	    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_md.md_scb,
-	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_md.md_scb);
+	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %lp, "
+	    "with td %p, pid %d (%s), switchercb %lp",
+	    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_scb,
+	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_scb);
 #endif
 
 #ifdef DDB
@@ -406,7 +381,7 @@ colocation_unborrow(struct thread *td)
 	 * refetch its args from the updated trapframe, and then execute
 	 * whatever syscall we've just entered.
 	 */
-	wakeup(&peertd->td_md.md_scb);
+	wakeup(&peertd->td_scb);
 
 	/*
 	 * Continue as usual, but calling copark(2) instead of whatever
@@ -430,7 +405,7 @@ colocation_unborrow(struct thread *td)
 #endif
 
 	scb.scb_borrower_td = NULL;
-	colocation_copyout_scb(td, &scb);
+	colocation_store_scb(td, &scb);
 }
 
 bool
@@ -461,23 +436,21 @@ trap:
 void
 colocation_update_tls(struct thread *td)
 {
-	vaddr_t addr;
 	struct switchercb scb;
 
-	addr = td->td_md.md_scb;
-	if (addr == 0) {
+	if (td->td_scb == NULL) {
 		/*
 		 * We've never called cosetup(2).
 		 */
 		return;
 	}
 
-	colocation_copyin_scb_at((void *)addr, &scb);
+	colocation_copyin_scb(td->td_scb, &scb);
 	COLOCATION_DEBUG("changing TLS from %p to %p",
 	    (__cheri_fromcap void *)scb.scb_tls,
 	    (__cheri_fromcap void *)((char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset));
 	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset;
-	colocation_copyout_scb_at((void *)addr, &scb);
+	colocation_copyout_scb(td->td_scb, &scb);
 }
 #endif
 
@@ -492,7 +465,7 @@ setup_scb(struct thread *td)
 	vm_pointer_t addr;
 	int rv;
 
-	KASSERT(td->td_md.md_scb == 0, ("%s: already initialized\n", __func__));
+	KASSERT(td->td_scb == NULL, ("%s: already initialized\n", __func__));
 
 	map = &td->td_proc->p_vmspace->vm_map;
 
@@ -505,7 +478,12 @@ setup_scb(struct thread *td)
 		return (ENOMEM);
 	}
 
-	td->td_md.md_scb = addr;
+#ifdef __CHERI_PURE_CAPABILITY__
+	td->td_scb = addr;
+#else
+	td->td_scb = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
+	    addr, PAGE_SIZE, 0);
+#endif
 
 	//printf("%s: scb at %p, td %p\n", __func__, (void *)addr, td);
 	memset(&scb, 0, sizeof(scb));
@@ -516,7 +494,7 @@ setup_scb(struct thread *td)
 #ifdef __mips__
 	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset;
 #endif
-	colocation_copyout_scb(td, &scb);
+	colocation_store_scb(td, &scb);
 
 	return (0);
 }
@@ -535,7 +513,6 @@ kern_cosetup(struct thread *td, int what,
 {
 	void * __capability codecap;
 	void * __capability datacap;
-	vaddr_t addr;
 	int error;
 
 	KASSERT(switcher_sealcap != (void * __capability)-1,
@@ -545,13 +522,11 @@ kern_cosetup(struct thread *td, int what,
 	KASSERT(switcher_sealcap != switcher_sealcap2,
              ("%s: switcher_sealcap == switcher_sealcap2", __func__));
 
-	if (td->td_md.md_scb == 0) {
+	if (td->td_scb == NULL) {
 		error = setup_scb(td);
 		if (error != 0)
 			return (error);
 	}
-
-	addr = td->td_md.md_scb;
 
 	switch (what) {
 	case COSETUP_COCALL:
@@ -572,9 +547,7 @@ kern_cosetup(struct thread *td, int what,
 		if (error != 0)
 			return (error);
 
-		datacap = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
-		    addr, PAGE_SIZE, 0);
-		datacap = cheri_seal(datacap, switcher_sealcap);
+		datacap = cheri_seal(td->td_scb, switcher_sealcap);
 		error = copyoutcap(&datacap, datap, sizeof(datacap));
 		return (0);
 
@@ -591,9 +564,7 @@ kern_cosetup(struct thread *td, int what,
 		if (error != 0)
 			return (error);
 
-		datacap = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
-		    addr, PAGE_SIZE, 0);
-		datacap = cheri_seal(datacap, switcher_sealcap);
+		datacap = cheri_seal(td->td_scb, switcher_sealcap);
 		error = copyoutcap(&datacap, datap, sizeof(datacap));
 		return (0);
 
@@ -617,12 +588,11 @@ kern_coregister(struct thread *td, const char * __capability namep,
 	struct coname *con;
 	char name[PATH_MAX];
 	void * __capability cap;
-	vaddr_t addr;
 	int error;
 
 	vmspace = td->td_proc->p_vmspace;
 
-	if (td->td_md.md_scb == 0) {
+	if (td->td_scb == NULL) {
 		error = setup_scb(td);
 		if (error != 0)
 			return (error);
@@ -648,10 +618,7 @@ kern_coregister(struct thread *td, const char * __capability namep,
 		}
 	}
 
-	addr = td->td_md.md_scb;
-	cap = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
-	    addr, PAGE_SIZE, 0);
-	cap = cheri_seal(cap, switcher_sealcap2);
+	cap = cheri_seal(td->td_scb, switcher_sealcap2);
 
 	if (capp != NULL) {
 		error = copyoutcap(&cap, capp, sizeof(cap));
@@ -748,7 +715,7 @@ kern_copark(struct thread *td)
 	int error;
 
 	SWITCHER_LOCK();
-	error = msleep(&td->td_md.md_scb, &switcher_lock,
+	error = msleep(&td->td_scb, &switcher_lock,
 	    PPAUSE | PCATCH, "copark", 0);
 	SWITCHER_UNLOCK();
 
@@ -826,7 +793,7 @@ kern_cocall_slow(void * __capability target,
 
 	SWITCHER_LOCK();
 again:
-	colocation_copyin_scb_atcap(target, &calleescb);
+	colocation_copyin_scb(target, &calleescb);
 
 	/*
 	 * The protocol here is slightly different from the one used
@@ -869,15 +836,13 @@ again:
 		return (error);
 	}
 
-	calleescb.scb_caller_scb =
-	    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
-	    curthread->td_md.md_scb, PAGE_SIZE, 0);
+	calleescb.scb_caller_scb = curthread->td_scb;
 
 	/*
 	 * XXX: We should be using a capability-sized atomic store
 	 *      for scb_caller_scb.
 	 */
-	colocation_copyout_scb_atcap(target, &calleescb);
+	colocation_copyout_scb(target, &calleescb);
 
 	scb.scb_callee_scb = target;
 	scb.scb_outbuf = outbuf;
@@ -888,7 +853,7 @@ again:
 	 * We don't need atomics here; nobody else could have modified
 	 * our (caller's) SCB.
 	 */
-	colocation_copyout_scb(curthread, &scb);
+	colocation_store_scb(curthread, &scb);
 
 	calleetd = calleescb.scb_td;
 	KASSERT(calleetd != NULL, ("%s: NULL calleetd?\n", __func__));
@@ -912,13 +877,13 @@ again:
 	}
 
 out:
-	colocation_copyin_scb_atcap(target, &calleescb);
+	colocation_copyin_scb(target, &calleescb);
 	calleescb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EPROTOTYPE);
 	/*
 	 * Here we don't need atomics either; nobody else could have modified
 	 * callee's SCB.
 	 */
-	colocation_copyout_scb_atcap(target, &calleescb);
+	colocation_copyout_scb(target, &calleescb);
 
 	/*
 	 * Wake up other callers that might be waiting in kern_cocall_slow().
@@ -980,11 +945,8 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 {
 	struct switchercb scb, callerscb;
 	void * __capability cookie;
-	struct mdthread *md, *callermd;
 	int error;
 	bool have_scb, is_callee;
-
-	md = &curthread->td_md;
 
 	if (outbuf == NULL) {
 		if (outlen != 0) {
@@ -1039,7 +1001,7 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 		 * couldn't have raced with coaccept(2), because a thread cannot
 		 * call coaccept_slow(2) and coaccept(2) at the same time.
 		 */
-		colocation_copyout_scb(curthread, &scb);
+		colocation_store_scb(curthread, &scb);
 	} else {
 		/*
 		 * There's a caller waiting for us, get them their data
@@ -1053,10 +1015,9 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 		 */
 		error = copyinout(outbuf, callerscb.scb_inbuf,
 		    MIN(outlen, callerscb.scb_inlen), false);
-		callermd = &callerscb.scb_td->td_md;
 		if (error != 0) {
-			COLOCATION_DEBUG("copyinout error %d, waking up %p",
-			    error, (const void *)callermd->md_scb);
+			COLOCATION_DEBUG("copyinout error %d, waking up %lp",
+			    error, callerscb.scb_td->td_scb);
 			wakeupself();
 			return (error);
 		}
@@ -1069,9 +1030,8 @@ again:
 	/*
 	 * Wait for new caller.
 	 */
-	COLOCATION_DEBUG("waiting on %p",
-	    (const void *)curthread->td_md.md_scb);
-	error = msleep((const void *)curthread->td_md.md_scb,
+	COLOCATION_DEBUG("waiting on %lp", curthread->td_scb);
+	error = msleep((__cheri_fromcap const void *)curthread->td_scb,
 	    &switcher_lock, PCATCH, "coaccept", 0);
 	if (error != 0) {
 		SWITCHER_UNLOCK();
@@ -1236,8 +1196,8 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 			db_printf("    no scb\n");
 			return;
 		}
-		db_printf(" switcher control block %p for curthread %p, pid %d (%s), stack owned by %d:\n",
-		    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
+		db_printf(" switcher control block %#lp for curthread %p, pid %d (%s), stack owned by %d:\n",
+		    td->td_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 		db_print_scb_td(td);
 
 		borrowertd = scb.scb_borrower_td;
@@ -1248,13 +1208,13 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 			if (borrowertd != scb.scb_td) {
 				td = scb.scb_td;
 				p = td->td_proc;
-				db_printf(" caller's SCB %p owned by thread %p, pid %d (%s), stack owned by %d:\n",
-				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
+				db_printf(" caller's SCB %#lp owned by thread %p, pid %d (%s), stack owned by %d:\n",
+				    td->td_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 			} else {
 				td = borrowertd;
 				p = td->td_proc;
-				db_printf(" caller's SCB %p for borrowing thread %p, pid %d (%s), stack owned by %d:\n",
-				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
+				db_printf(" caller's SCB %#lp for borrowing thread %p, pid %d (%s), stack owned by %d:\n",
+				    td->td_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 				shown_borrowertd = true;
 			}
 			db_print_scb(td, &scb);
@@ -1266,13 +1226,13 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 			if (borrowertd != scb.scb_td) {
 				td = scb.scb_td;
 				p = td->td_proc;
-				db_printf(" callee's SCB %p owned by thread %p, pid %d (%s), stack owned by %d:\n",
-				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
+				db_printf(" callee's SCB %#lp owned by thread %p, pid %d (%s), stack owned by %d:\n",
+				    td->td_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 			} else {
 				td = borrowertd;
 				p = td->td_proc;
-				db_printf(" callee's SCB %p for borrowing thread %p, pid %d (%s), stack owned by %d:\n",
-				    (void *)td->td_md.md_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
+				db_printf(" callee's SCB %#lp for borrowing thread %p, pid %d (%s), stack owned by %d:\n",
+				    td->td_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 				shown_borrowertd = true;
 			}
 			db_print_scb(td, &scb);

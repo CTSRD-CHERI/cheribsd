@@ -112,9 +112,6 @@ struct mdthread {
 	int	md_spinlock_count;	/* (k) */
 	register_t md_saved_sstatus_ie;	/* (k) */
 	int	md_flags;		/* (k) */
-#ifdef	CPU_CHERI
-	vaddr_t		md_scb;
-#endif
 };
 
 /* md_flags */

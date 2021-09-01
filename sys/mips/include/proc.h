@@ -143,9 +143,6 @@ struct mdthread {
 #define	COP2_OWNER_KERNEL	0x0001		/* Kernel owns COP2 */
 	int		md_cop2owner;
 #endif
-#ifdef	CPU_CHERI
-	vaddr_t		md_scb;
-#endif
 };
 
 /* md_flags */
