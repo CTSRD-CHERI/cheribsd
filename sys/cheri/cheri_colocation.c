@@ -506,6 +506,24 @@ sys__cosetup(struct thread *td, struct _cosetup_args *uap)
 	return (kern_cosetup(td, uap->what, uap->code, uap->data));
 }
 
+static void * __capability
+switcher_code_cap(struct thread *td, ptraddr_t base, size_t length)
+{
+	void * __capability codecap;
+
+	/*
+	 * This cannot use cheri_capability_build_user_code() as that
+	 * function seals the resulting capability as a sentry.  This
+	 * needs to seal the capability via the switcher_sealcap
+	 * instead.
+	 */
+	codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
+	    base, length, 0);
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		codecap = cheri_capmode(codecap);
+	return (cheri_seal(codecap, switcher_sealcap));
+}
+
 int
 kern_cosetup(struct thread *td, int what,
     void * __capability * __capability codep,
@@ -530,19 +548,9 @@ kern_cosetup(struct thread *td, int what,
 
 	switch (what) {
 	case COSETUP_COCALL:
-		/*
-		 * XXX: This should should use cheri_capability_build_user_code()
-		 *      instead.  It fails to seal, though; I guess there's something
-		 *      wrong with perms.
-		 */
-		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
+		codecap = switcher_code_cap(td,
 		    td->td_proc->p_sysent->sv_cocall_base,
-		    td->td_proc->p_sysent->sv_cocall_len, 0);
-#ifdef CHERI_FLAGS_CAP_MODE
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-			codecap = cheri_setflags(codecap, CHERI_FLAGS_CAP_MODE);
-#endif
-		codecap = cheri_seal(codecap, switcher_sealcap);
+		    td->td_proc->p_sysent->sv_cocall_len);
 		error = copyoutcap(&codecap, codep, sizeof(codecap));
 		if (error != 0)
 			return (error);
@@ -552,14 +560,9 @@ kern_cosetup(struct thread *td, int what,
 		return (0);
 
 	case COSETUP_COACCEPT:
-		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
+		codecap = switcher_code_cap(td,
 		    td->td_proc->p_sysent->sv_coaccept_base,
-		    td->td_proc->p_sysent->sv_coaccept_len, 0);
-#ifdef CHERI_FLAGS_CAP_MODE
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-			codecap = cheri_setflags(codecap, CHERI_FLAGS_CAP_MODE);
-#endif
-		codecap = cheri_seal(codecap, switcher_sealcap);
+		    td->td_proc->p_sysent->sv_coaccept_len);
 		error = copyoutcap(&codecap, codep, sizeof(codecap));
 		if (error != 0)
 			return (error);
