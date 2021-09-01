@@ -3,7 +3,6 @@
 #
 # Makefile for init_sysent
 
-SRCS+=		capabilities.conf
 GENERATED=	init_sysent.c			\
 		syscalls.c			\
 		systrace_args.c			\
