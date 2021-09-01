@@ -139,6 +139,7 @@ dm_release(struct berimgr_softc *sc)
 	addr = PHYS_TO_DMAP(0xf8000000);
 	cpu_dcache_wb_range((vm_offset_t)addr, sc->offs);
 
+#if 0
 	/* Start secondary core. */
 	int error;
 	vm_paddr_t start_addr;
@@ -149,6 +150,10 @@ dm_release(struct berimgr_softc *sc)
 		error = sbi_hsm_hart_start(0, start_addr, 0);
 
 	printf("%s: cur hart %d error %d\n", __func__, PCPU_GET(hart), error);
+#else
+	printf("%s: cheribsd hart %d cpuid %d\n", __func__,
+	    PCPU_GET(hart), PCPU_GET(cpuid));
+#endif
 
 	DELAY(100000);
 	DELAY(100000);
