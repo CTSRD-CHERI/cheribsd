@@ -943,7 +943,6 @@
 		    _Inout_ __socklen_t *alen
 		);
 	} getsockname getsockname_args int
-
 151-153	AUE_NULL	RESERVED
 ; 154 is initialised by the NLM code, if present.
 154	AUE_NULL	NOSTD {
