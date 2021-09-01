@@ -18,6 +18,7 @@
 ;		NODEF, NOARGS, NOPROTO, NOSTD
 ;		The COMPAT* options may be combined with one or more NO*
 ;		options separated by '|' with no spaces (e.g. COMPAT|NOARGS)
+;		The CAPENABLED option may be ORed into a type.
 ;	name	pseudo-prototype of syscall routine
 ;		If one of the following alts is different, then all appear:
 ;	altname	name of system call if different
@@ -48,6 +49,7 @@
 ;		function prototype in sys/sysproto.h.  Does add a
 ;		definition to syscall.h besides adding a sysent.
 ;	NOTSTATIC syscall is loadable
+;	CAPENABLED syscall is allowed in capability mode
 ;	VARARG	last argument is passed with a variadic calling convention.
 ;	VARARG#	last # args are passed with a variadic calling convention.
 
