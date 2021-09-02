@@ -35,7 +35,6 @@ CONFS=	DAEMON \
 	geli2 \
 	gptboot \
 	growfs \
-	gssd \
 	hostid \
 	hostid_save \
 	hostname \
@@ -190,6 +189,12 @@ CONFS+=		ccd
 
 .if ${MK_FTP} != "no"
 CONFS+=		ftpd
+.endif
+
+.if ${MK_GSSAPI} != "no"
+CONFGROUPS+=	gssd
+GSSD=		gssd
+GSSDPACKAGE=	kerberos
 .endif
 
 .if ${MK_HAST} != "no"

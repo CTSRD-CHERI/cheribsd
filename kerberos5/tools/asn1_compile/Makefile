@@ -1,5 +1,7 @@
 # $FreeBSD$
 
+PACKAGE=	kerberos
+
 PROG=	asn1_compile
 MAN=
 LIBROKEN_A=	${_LIB_OBJTOP}/kerberos5/lib/libroken/libroken.a
