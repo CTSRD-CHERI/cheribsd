@@ -131,6 +131,9 @@ CHACHA20INCS+=	${SRCTOP}/sys/crypto/chacha20/_chacha.h \
 # bmake on Linux/mac often prints x86_64 instead of amd64 and we place the
 # AArch64 headers in an arm64 directory.
 _host_sysincsdir=${MACHINE:S/x86_64/amd64/:S/aarch64/arm64/}
+.if ${_host_sysincsdir:Mppc*}
+_host_sysincsdir=powerpc
+.endif
 .if ${_host_sysincsdir} == "unknown"
 # HACK: If MACHINE is unknown, assume we are building on x86
 _host_sysincsdir=amd64
