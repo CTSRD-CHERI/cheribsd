@@ -179,7 +179,10 @@ SUBDIR+= libsimple_printf
 .endif
 
 .if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !defined(COMPAT_SOFTFP) && !defined(COMPAT_CHERI)
-SUBDIR.${MK_CLANG}+=	clang
+.if ${MK_CLANG} != "no" || ${MK_LLD} != "no" || \
+    ${MK_LLDB} != "no" || ${MK_LLVM_BINUTILS} != "no"
+SUBDIR+=	clang
+.endif
 .endif
 
 SUBDIR.${MK_CUSE}+= 	libcuse
