@@ -128,7 +128,6 @@ void		 pmap_align_superpage(vm_object_t, vm_ooffset_t, vm_offset_t *,
 static const int PMAP_CAPLOADGEN_HASCAPS   = 0x1;
 static const int PMAP_CAPLOADGEN_EXCLUSIVE = 0x2;
 static const int PMAP_CAPLOADGEN_UPDATETLB = 0x4;
-static const int PMAP_CAPLOADGEN_WIRE      = 0x8;
 enum pmap_caploadgen_res {
 	PMAP_CAPLOADGEN_OK            = 0, /* Update done */
 	PMAP_CAPLOADGEN_ALREADY       = 1, /* Update already applied */
