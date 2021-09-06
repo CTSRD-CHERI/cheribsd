@@ -211,12 +211,6 @@ vm_cheri_revoke_visit_ro(
 	return VM_CHERI_REVOKE_VIS_DONE;
 }
 
-static void
-vm_cheri_revoke_unwire_in_situ(vm_page_t m)
-{
-	vm_page_unwire(m, vm_page_active(m) ? PQ_ACTIVE : PQ_INACTIVE);
-}
-
 // XXX stats
 enum vm_cheri_revoke_fault_res
 vm_cheri_revoke_fault_visit(struct vmspace *uvms, vm_offset_t va)
@@ -238,8 +232,8 @@ vm_cheri_revoke_fault_visit(struct vmspace *uvms, vm_offset_t va)
 
 again:
 	pres = pmap_caploadgen_update(upmap, va, &m,
-	    PMAP_CAPLOADGEN_UPDATETLB | PMAP_CAPLOADGEN_WIRE |
-	    (hascap ? PMAP_CAPLOADGEN_HASCAPS : 0));
+	    PMAP_CAPLOADGEN_UPDATETLB | (hascap ? PMAP_CAPLOADGEN_HASCAPS : 0));
+	// printf("user VA caploadgen fault -> %lx %p %d\n", va, m, pres);
 
 	switch(pres) {
 	case PMAP_CAPLOADGEN_UNABLE:
@@ -370,12 +364,6 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 	if (flags & VM_CHERI_REVOKE_LOAD_SIDE) {
 		int pmres;
 
-		/*
-		 * XXXMJ this needs to wire the page.  There is no guarantee
-		 * that m->object == obj, and if not then there's nothing
-		 * preventing the page from being freed while we're trying to
-		 * lock the right object.
-		 */
 		pmres = pmap_caploadgen_update(crc->map->pmap, addr, &m, 0);
 
 		switch (pmres) {
@@ -390,6 +378,7 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 			break;
 		case PMAP_CAPLOADGEN_SCAN_RO:
 		case PMAP_CAPLOADGEN_SCAN_CLEAN_RO:
+			mwired = true;
 			if (m->object != obj) {
 				VM_OBJECT_WUNLOCK(obj);
 				VM_OBJECT_WLOCK(m->object);
@@ -397,6 +386,7 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 			goto visit_ro;
 		case PMAP_CAPLOADGEN_SCAN_RW:
 		case PMAP_CAPLOADGEN_SCAN_CLEAN_RW:
+			mwired = true;
 			if (m->object != obj) {
 				VM_OBJECT_WUNLOCK(obj);
 				VM_OBJECT_WLOCK(m->object);
@@ -520,7 +510,7 @@ visit_rw:
 
 			case VM_CHERI_REVOKE_VIS_BUSY:
 				if (mwired)
-					vm_cheri_revoke_unwire_in_situ(m);
+					vm_page_unwire_in_situ(m);
 				VM_OBJECT_WUNLOCK(obj);
 				return VM_CHERI_REVOKE_AT_TICK;
 			default:
@@ -550,7 +540,7 @@ visit_rw:
 		 * true.)  So handle this like the map stepping forward.
 		 */
 		if (mwired)
-			vm_cheri_revoke_unwire_in_situ(m);
+			vm_page_unwire_in_situ(m);
 		VM_OBJECT_WUNLOCK(obj);
 		return VM_CHERI_REVOKE_AT_TICK;
 	case VM_CHERI_REVOKE_VIS_DIRTY:
@@ -568,7 +558,7 @@ visit_rw_fault:
 
 	if (mwired) {
 		mwired = false;
-		vm_cheri_revoke_unwire_in_situ(m);
+		vm_page_unwire_in_situ(m);
 	}
 	VM_OBJECT_WUNLOCK(m->object);
 	vm_map_unlock_read(map);
@@ -593,14 +583,18 @@ visit_rw_fault:
 	VM_OBJECT_WLOCK(m->object);
 
 ok:
+	VM_OBJECT_ASSERT_WLOCKED(m->object);
+
 	/*
 	 * If this is the load side and we hit the VM, then the LCLG bit should
-	 * already be up to date (if present).  Otherwise, the load side needs
-	 * to update the LCLG bit now.
+	 * already be up to date (if present; see the above INVARIANTS test).
+	 * Otherwise, the load side needs to update the LCLG bit now.
 	 */
 	if (!mdidvm && (flags & VM_CHERI_REVOKE_LOAD_SIDE)) {
 		vm_page_t m2 = m;
 		int pmres;
+
+		KASSERT(mwired, ("LS !didvm !wired?"));
 
 		pmres = pmap_caploadgen_update(crc->map->pmap, addr, &m2,
 		    PMAP_CAPLOADGEN_EXCLUSIVE /* object locked */ |
@@ -624,6 +618,10 @@ ok:
 		case PMAP_CAPLOADGEN_SCAN_CLEAN_RW:
 			panic("Bad second return from pmap_caploadgen_update");
 		}
+
+		/* pmap_caploadgen_page will have unwired for us */
+		KASSERT(m2 == NULL, ("LS !didvm upd !NULL?"));
+		mwired = false;
 	}
 #ifdef INVARIANTS
 	/*
@@ -632,7 +630,9 @@ ok:
 	 */
 	if (mdidvm && (flags & VM_CHERI_REVOKE_LOAD_SIDE)) {
 		int pmres;
-		vm_page_t m2 = NULL;
+		vm_page_t m2 = m;
+
+		KASSERT(mwired, ("LS didvm !wired?"));
 
 		pmres = pmap_caploadgen_update(crc->map->pmap, addr, &m2,
 		    PMAP_CAPLOADGEN_EXCLUSIVE /* object locked */ |
@@ -645,6 +645,10 @@ ok:
 			panic("Bad return from didvm caploadgen update: %d",
 			    pmres);
 		}
+
+		/* pmap_caploadgen_page will have unwired for us */
+		KASSERT(m2 == NULL, ("LS didvm upd !NULL?"));
+		mwired = false;
 	}
 #endif
 
@@ -661,7 +665,7 @@ ok:
 
 	*ooff = ioff + PAGE_SIZE;
 	if (mwired)
-		vm_cheri_revoke_unwire_in_situ(m);
+		vm_page_unwire_in_situ(m);
 	if (m->object != obj) {
 		VM_OBJECT_WUNLOCK(m->object);
 		VM_OBJECT_WLOCK(obj);

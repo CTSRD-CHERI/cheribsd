@@ -1081,6 +1081,12 @@ vm_page_domain(vm_page_t m)
 	return (0);
 #endif
 }
+
+static inline void
+vm_page_unwire_in_situ(vm_page_t m)
+{
+	vm_page_unwire(m, vm_page_active(m) ? PQ_ACTIVE : PQ_INACTIVE);
+}
 #endif				/* _KERNEL */
 #endif				/* !_VM_PAGE_ */
 // CHERI CHANGES START

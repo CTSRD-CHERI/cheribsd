@@ -4124,7 +4124,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 
 		m = NULL;
 		res = PMAP_CAPLOADGEN_CLEAN;
-	} else if ((flags & PMAP_CAPLOADGEN_WIRE) && !vm_page_wire_mapped(m)) {
+	} else if (!vm_page_wire_mapped(m)) {
 		/* Can't wire this one; give up */
 		m = NULL;
 		res = PMAP_CAPLOADGEN_TEARDOWN;
@@ -4144,12 +4144,8 @@ out:
 	PMAP_UNLOCK(pmap);
 out_unlocked:
 
-	if ((flags & PMAP_CAPLOADGEN_WIRE) && (*mp != NULL)) {
-		/*
-		 * Unwire any existing page we were given if we are asked to
-		 * wire the returned page.
-		 */
-		vm_page_unwire(*mp, PQ_INACTIVE);
+	if (*mp != NULL) {
+		vm_page_unwire_in_situ(*mp);
 	}
 	*mp = m;
 
