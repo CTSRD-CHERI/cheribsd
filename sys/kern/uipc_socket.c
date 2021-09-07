@@ -1353,10 +1353,6 @@ soconnectat(int fd, struct socket *so, struct sockaddr *nam, struct thread *td)
 {
 	int error;
 
-	/* XXXMJ racy */
-	if (SOLISTENING(so))
-		return (EOPNOTSUPP);
-
 	CURVNET_SET(so->so_vnet);
 	/*
 	 * If protocol is connection-based, can only connect once.
@@ -1842,14 +1838,8 @@ sosend(struct socket *so, struct sockaddr *addr, struct uio *uio,
 	int error;
 
 	CURVNET_SET(so->so_vnet);
-	if (!SOLISTENING(so))
-		error = so->so_proto->pr_usrreqs->pru_sosend(so, addr, uio,
-		    top, control, flags, td);
-	else {
-		m_freem(top);
-		m_freem(control);
-		error = ENOTCONN;
-	}
+	error = so->so_proto->pr_usrreqs->pru_sosend(so, addr, uio,
+	    top, control, flags, td);
 	CURVNET_RESTORE();
 	return (error);
 }
@@ -2844,11 +2834,8 @@ soreceive(struct socket *so, struct sockaddr **psa, struct uio *uio,
 	int error;
 
 	CURVNET_SET(so->so_vnet);
-	if (!SOLISTENING(so))
-		error = (so->so_proto->pr_usrreqs->pru_soreceive(so, psa, uio,
-		    mp0, controlp, flagsp));
-	else
-		error = ENOTCONN;
+	error = (so->so_proto->pr_usrreqs->pru_soreceive(so, psa, uio,
+	    mp0, controlp, flagsp));
 	CURVNET_RESTORE();
 	return (error);
 }
