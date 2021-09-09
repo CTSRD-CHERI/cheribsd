@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
+#include <dev/ofw/ofw_subr.h>
 
 #include <machine/bus.h>
 #include <machine/cpu.h>
@@ -124,7 +125,7 @@ dm_reset(struct berimgr_softc *sc)
 	sc->offs = 0;
 }
 
-extern uint32_t __dm_boot[1];
+extern vm_offset_t __dm_boot[1];
 
 static int
 dm_release(struct berimgr_softc *sc)
@@ -162,14 +163,20 @@ dm_release(struct berimgr_softc *sc)
 	DELAY(100000);
 
 	u_long mask;
+	void *dtbp;
 
-	__dm_boot[0] = 0xf8000000;
+	dtbp = ofw_fdtp();
+
+	/* Note DM starts at 0xf8000000. */
+
+	__dm_boot[0] = (vm_offset_t)pmap_kextract((vm_offset_t)dtbp);
 	if (PCPU_GET(hart) == 0)
 		mask = 1 << 1;
 	else
 		mask = 1 << 0;
 	sbi_send_ipi(&mask);
-	printf("%s: cpu released, mask %lx\n", __func__, mask);
+	printf("%s: cpu released, mask %lx, dtbp %lx\n", __func__, mask,
+	    __dm_boot[0]);
 
 	return (0);
 }
