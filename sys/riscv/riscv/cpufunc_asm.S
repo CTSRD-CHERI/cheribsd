@@ -39,5 +39,5 @@ __FBSDID("$FreeBSD$");
 	.align	2
 
 ENTRY(riscv_nullop)
-	ret
+	RETURN
 END(riscv_nullop)
