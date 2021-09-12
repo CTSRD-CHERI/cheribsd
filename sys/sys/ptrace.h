@@ -86,6 +86,10 @@
 #define	PT_VM_TIMESTAMP	40	/* Get VM version (timestamp) */
 #define	PT_VM_ENTRY	41	/* Get VM map (entry) */
 
+#ifdef _KERNEL
+#define	PT_GET_SC_ARGS_ALL	42	/* Used by linux(4) */
+#endif
+
 #define	PT_GETCAPREGS	50	/* get capability registers */
 #define	PT_SETCAPREGS	51	/* set capability registers */
 

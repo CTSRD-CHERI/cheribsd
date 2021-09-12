@@ -271,6 +271,9 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 			error = copyin(__USER_CAP(uap->addr, uap->data), &r.pc,
 			    uap->data);
 		break;
+	case PT_GET_SC_ARGS_ALL:
+		error = EINVAL;
+		break;
 	default:
 		addr = __USER_CAP_UNBOUND(uap->addr);
 		break;
