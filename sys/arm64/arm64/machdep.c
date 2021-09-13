@@ -269,9 +269,7 @@ set_regs(struct thread *td, struct reg *regs)
 	frame = td->td_frame;
 	frame->tf_sp = regs->sp;
 	frame->tf_lr = regs->lr;
-	frame->tf_elr = regs->elr;
 	frame->tf_spsr &= ~PSR_FLAGS;
-	frame->tf_spsr |= regs->spsr & PSR_FLAGS;
 
 #if __has_feature(capabilities)
 	for (i = 0; i < nitems(frame->tf_x); i++)
@@ -288,9 +286,13 @@ set_regs(struct thread *td, struct reg *regs)
 		 * it put it.
 		 */
 		frame->tf_elr = regs->x[15];
-		frame->tf_spsr = regs->x[16] & PSR_FLAGS;
-	}
+		frame->tf_spsr |= regs->x[16] & PSR_FLAGS;
+	} else
 #endif
+	{
+		frame->tf_elr = regs->elr;
+		frame->tf_spsr |= regs->spsr & PSR_FLAGS;
+	}
 	return (0);
 }
 
@@ -510,7 +512,8 @@ set_regs32(struct thread *td, struct reg32 *regs)
 	tf->tf_x[13] = regs->r_sp;
 	tf->tf_x[14] = regs->r_lr;
 	tf->tf_elr = regs->r_pc;
-	tf->tf_spsr = regs->r_cpsr;
+	tf->tf_spsr &= ~PSR_FLAGS;
+	tf->tf_spsr |= regs->r_cpsr & PSR_FLAGS;
 
 	return (0);
 }
