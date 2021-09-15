@@ -1,0 +1,11 @@
+name: clang-format checks
+on: [pull_request]
+jobs:
+  check-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: arichardson/clang-format-checker@v3
+        with:
+          target-ref: "${{ github.base_ref }}" # required, merge target
+          clang-version: 12     # optional, default: 12
