@@ -789,7 +789,16 @@ pmap_page_dirty(pmap_t pmap, pt_entry_t pte, vm_page_t m)
 		vm_page_dirty(m);
 
 #if __has_feature(capabilities)
-	if (pmap_pte_capdirty(pmap, pte))
+	/*
+	 * In its quest to avoid TLB shootdowns, the revoker sweep can create
+	 * SC-clear CDBM-set PTEs that nevertheless have SC-set TLBEs fronting
+	 * them.  Therefore, we must consider CDBM alone grounds for being
+	 * capability dirty when we remove a PTE.  (SC can be set only when
+	 * CDBM is also set, so we ignore it here.)
+	 *
+	 * TODO This is pretty heavy-handed.  Can we do better?
+	 */
+	if ((pte & (ATTR_CDBM)) == ATTR_CDBM)
 		vm_page_capdirty(m);
 #endif
 }
