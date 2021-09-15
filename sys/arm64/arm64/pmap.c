@@ -3687,6 +3687,22 @@ setl2:
 		return;
 	}
 
+#if __has_feature(capabilities)
+		/*
+		 * Prohibit superpages involving CDBM-set SC-clear PTEs.  The
+		 * revoker creates these without TLB shootdown, and so there
+		 * may be a SC-set TLBE still in the system.  Thankfully,
+		 * these are ephemera: either they'll transition to CD-set
+		 * or CW-clear in the next revocation epoch.
+		 */
+		if ((newl2 & (ATTR_CDBM | ATTR_SC)) == ATTR_CDBM) {
+			atomic_add_long(&pmap_l2_p_failures, 1);
+			CTR2(KTR_PMAP, "pmap_promote_l2: CDBM failure for va "
+			    "%#lx in pmap %p", va, pmap);
+			return;
+		}
+#endif
+
 	if ((newl2 & (ATTR_S1_AP_RW_BIT | ATTR_SW_DBM)) ==
 	    (ATTR_S1_AP(ATTR_S1_AP_RO) | ATTR_SW_DBM)) {
 		if (!atomic_fcmpset_64(l2, &newl2, newl2 & ~ATTR_SW_DBM))
@@ -3711,6 +3727,21 @@ setl3:
 			    " in pmap %p", va, pmap);
 			return;
 		}
+#if __has_feature(capabilities)
+		/*
+		 * Prohibit superpages involving CDBM-set SC-clear PTEs.  The
+		 * revoker creates these without TLB shootdown, and so there
+		 * may be a SC-set TLBE still in the system.  Thankfully,
+		 * these are ephemera: either they'll transition to CD-set
+		 * or CW-clear in the next revocation epoch.
+		 */
+		if ((oldl3 & (ATTR_CDBM | ATTR_SC)) == ATTR_CDBM) {
+			atomic_add_long(&pmap_l2_p_failures, 1);
+			CTR2(KTR_PMAP, "pmap_promote_l2: CDBM failure for va "
+			    "%#lx in pmap %p", va, pmap);
+			return;
+		}
+#endif
 		pa -= PAGE_SIZE;
 	}
 
