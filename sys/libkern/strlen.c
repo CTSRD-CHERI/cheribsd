@@ -98,7 +98,7 @@ size_t
 		lp++;
 #else
 	va = (*lp - mask01);
-	vb = ((~*lp) & mask80);
+	vb = ((~*lp)&mask80);
 	lp++;
 	byte_check = (bool)(va & vb);
 #endif
@@ -124,8 +124,7 @@ size_t
 			testbyte(2);
 			testbyte(3);
 #if (LONG_BIT >= 64)
-			testbyte(4);
-			testbyte(5);
+			testbyte(4); testbyte(5);
 			testbyte(6);
 			testbyte(7);
 #endif
