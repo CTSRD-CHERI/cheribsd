@@ -1337,21 +1337,17 @@ int
 freebsd32_recvmsg(struct thread *td, struct freebsd32_recvmsg_args *uap)
 {
 	struct msghdr msg;
-	struct msghdr32 m32;
 	struct iovec *uiov, *iov;
 	struct mbuf *control = NULL;
 	struct mbuf **controlp;
-
 	int error;
-	error = copyin(uap->msg, &m32, sizeof(m32));
-	if (error)
-		return (error);
+
 	error = freebsd32_copyinmsghdr(uap->msg, &msg);
 	if (error)
 		return (error);
-	error = freebsd32_copyiniov((struct iovec * __capability)__USER_CAP(
-	    PTRIN(m32.msg_iov), m32.msg_iovlen * sizeof(struct iovec32)),
-	    m32.msg_iovlen, &iov, EMSGSIZE);
+	error = freebsd32_copyiniov(__USER_CAP(msg.msg_iov,
+	    msg.msg_iovlen * sizeof(struct iovec32)), msg.msg_iovlen, &iov,
+	    EMSGSIZE);
 	if (error)
 		return (error);
 	msg.msg_flags = uap->flags;
@@ -1483,21 +1479,17 @@ int
 freebsd32_sendmsg(struct thread *td, struct freebsd32_sendmsg_args *uap)
 {
 	struct msghdr msg;
-	struct msghdr32 m32;
 	struct iovec *iov;
 	struct mbuf *control = NULL;
 	struct sockaddr *to = NULL;
 	int error;
 
-	error = copyin(uap->msg, &m32, sizeof(m32));
-	if (error)
-		return (error);
 	error = freebsd32_copyinmsghdr(uap->msg, &msg);
 	if (error)
 		return (error);
-	error = freebsd32_copyiniov((struct iovec * __capability)__USER_CAP(
-	    PTRIN(m32.msg_iov), m32.msg_iovlen * sizeof(struct iovec32)),
-	    m32.msg_iovlen, &iov, EMSGSIZE);
+	error = freebsd32_copyiniov(__USER_CAP(msg.msg_iov,
+	    msg.msg_iovlen * sizeof(struct iovec32)), msg.msg_iovlen, &iov,
+	    EMSGSIZE);
 	if (error)
 		return (error);
 	msg.msg_iov = iov;
