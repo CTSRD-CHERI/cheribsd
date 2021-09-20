@@ -5094,6 +5094,9 @@ int
 pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 {
 	enum pmap_caploadgen_res res;
+#if VM_NRESERVLEVEL > 0
+	pd_entry_t *l2, l2e;
+#endif
 	pt_entry_t *pte, tpte, exppte;
 	vm_page_t m;
 	vm_offset_t next = 0, va = *pva;
