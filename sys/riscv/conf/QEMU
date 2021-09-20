@@ -15,5 +15,3 @@ options 	SMBFS
 options 	NETSMB			# Seems to be needed by SMBFS
 options 	LIBMCHAIN		# Also seems to be needed by SMBFS
 options 	LIBICONV		# Also seems to be needed by SMBFS
-
-options		E1000_DESC_CAP

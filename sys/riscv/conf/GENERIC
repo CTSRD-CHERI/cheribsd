@@ -95,6 +95,9 @@ device		iflib
 device		em		# Intel PRO/1000 Gigabit Ethernet Family
 device		ix		# Intel 10Gb Ethernet Family
 
+# Pass capabilities in em(4) descriptor rings
+options		E1000_DESC_CAP
+
 # Block devices
 device		ahci
 device		scbus
