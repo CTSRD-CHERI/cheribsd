@@ -72,6 +72,13 @@ __FBSDID("$FreeBSD$");
 #define _RANDOM_HARVEST_UMA_OFF (1u << RANDOM_UMA)
 #endif
 
+/*
+ * Note that random_sources_feed() will also use this to try and split up
+ * entropy into a subset of pools per iteration with the goal of feeding
+ * HARVESTSIZE into every pool at least once per second.
+ */
+#define	RANDOM_KTHREAD_HZ	10
+
 static void random_kthread(void);
 static void random_sources_feed(void);
 
@@ -199,18 +206,8 @@ random_kthread(void)
 			}
 		}
 		/* XXX: FIX!! This is a *great* place to pass hardware/live entropy to random(9) */
-#if defined(CPU_QEMU_MALTA) || defined(CPU_CHERI) || defined(CPU_BERI)
-		/*
-		 * XXXAR: reading randomness from virtio 10 times per second is way too much when
-		 * runnning under QEMU CHERI. Also we don't need that much so just stop after the
-		 * initial seeding has completed.
-		 *
-		 * XXXJHB: After read_rate() was axed, this never resumes.
-		 */
-		kproc_suspend(harvest_context.hc_kthread_proc, 0);
-#else
-		tsleep_sbt(&harvest_context.hc_kthread_proc, 0, "-", SBT_1S/10, 0, C_PREL(1));
-#endif
+		tsleep_sbt(&harvest_context.hc_kthread_proc, 0, "-",
+		    SBT_1S/RANDOM_KTHREAD_HZ, 0, C_PREL(1));
 	}
 	random_kthread_control = -1;
 	wakeup(&harvest_context.hc_kthread_proc);
@@ -240,10 +237,22 @@ random_sources_feed(void)
 	uint32_t entropy[HARVESTSIZE];
 	struct epoch_tracker et;
 	struct random_sources *rrs;
-	u_int i, n;
+	u_int i, n, npools;
 	bool rse_warm;
 
 	rse_warm = epoch_inited;
+
+	/*
+	 * Evenly-ish distribute pool population across the second based on how
+	 * frequently random_kthread iterates.
+	 *
+	 * For Fortuna, the math currently works out as such:
+	 *
+	 * 64 bits * 4 pools = 256 bits per iteration
+	 * 256 bits * 10 Hz = 2560 bits per second, 320 B/s
+	 *
+	 */
+	npools = howmany(p_random_alg_context->ra_poolcount, RANDOM_KTHREAD_HZ);
 
 	/*
 	 * Step over all of live entropy sources, and feed their output
@@ -252,7 +261,7 @@ random_sources_feed(void)
 	if (rse_warm)
 		epoch_enter_preempt(rs_epoch, &et);
 	CK_LIST_FOREACH(rrs, &source_list, rrs_entries) {
-		for (i = 0; i < p_random_alg_context->ra_poolcount; i++) {
+		for (i = 0; i < npools; i++) {
 			n = rrs->rrs_source->rs_read(entropy, sizeof(entropy));
 			KASSERT((n <= sizeof(entropy)), ("%s: rs_read returned too much data (%u > %zu)", __func__, n, sizeof(entropy)));
 			/*
