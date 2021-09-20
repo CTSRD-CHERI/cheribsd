@@ -5047,12 +5047,24 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 	}
 
 	switch(lvl) {
+		/*
+		 * case 1:
+		 *	next = va + L1_SIZE;
+		 *	break;
+		 *case 2:
+		 *	next = va + L2_SIZE;
+		 *	break;
+		 *
+		 * Large page: bouncing out here means we'll take a VM fault to
+		 * find the page in question.
+		 *
+		 * XXX We'd rather just demote the pages right now, surely?
+		 */
 		case 1:
-			next = va + L1_SIZE;
-			break;
 		case 2:
-			next = va + L2_SIZE;
-			break;
+			m = NULL;
+			res = PMAP_CAPLOADGEN_UNABLE;
+			goto out;
 		case 3:
 			next = va + L3_SIZE;
 			break;
