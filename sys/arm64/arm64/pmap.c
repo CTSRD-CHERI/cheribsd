@@ -4805,6 +4805,9 @@ pmap_update_pte_clg(pmap_t pmap, pt_entry_t *pte)
 /*
  * Atomically push all the in-PTE, MD capdirty bits up to the MI layer.
  *
+ * Demotes ATTR_SC superpages to avoid creating L2 PTEs with ATTR_CDBM set and
+ * and ATTR_SC unset.
+ *
  * While this is a fairly long-running operation under the current pmap
  * lock, it's going to be called only from single-threaded context, so there
  * should be minimal contention (perhaps from the page daemon or updates to
@@ -4849,6 +4852,14 @@ pmap_sync_capdirty(pmap_t pmap)
 					    L2_BLOCK,
 					    ("Attempting to sync an invalid "
 					    "block: %lx", tpte));
+
+					if (pmap_pte_capdirty(pmap, tpte)) {
+						pmap_demote_l2(pmap, pte,
+						    pv->pv_va);
+						pte = pmap_l2_to_l3(pde,
+						    pv->pv_va);
+						tpte = pmap_load(pte);
+					}
 					break;
 				case 2:
 					pte = pmap_l2_to_l3(pde, pv->pv_va);
