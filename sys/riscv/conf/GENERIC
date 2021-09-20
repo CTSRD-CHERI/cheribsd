@@ -89,6 +89,7 @@ device		riscv_syscon
 
 # Bus drivers
 device		pci
+options		IOMMU
 
 # PCI/PCI-X/PCIe Ethernet NICs that use iflib infrastructure
 device		iflib
