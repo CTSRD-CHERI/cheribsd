@@ -454,7 +454,6 @@ vm_caprevoke_page_rw(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 	uint32_t cyc_start = get_cyclecount();
 #endif
 
-	vm_paddr_t mpa = VM_PAGE_TO_PHYS(m);
 	vm_offset_t mva;
 	vm_offset_t mve;
 	uintcap_t * __capability mvu;
@@ -475,10 +474,10 @@ vm_caprevoke_page_rw(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 	 * Hopefully m being xbusy'd means it's not about to go away on us.
 	 * I don't yet understand all the interlocks in the vm subsystem.
 	 */
-	mva = PHYS_TO_DMAP(mpa);
-	mve = mva + pagesizes[m->psind];
+	mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+	mve = mva + pagesizes[0];
 
-	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), pagesizes[m->psind]);
+	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), pagesizes[0]);
 
 	res = vm_caprevoke_page_iter(crc, vm_do_caprevoke, mvu, mve);
 
@@ -547,17 +546,16 @@ vm_caprevoke_page_ro(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 	CAPREVOKE_STATS_FOR(crst, crc);
 #endif
 
-	vm_paddr_t mpa = VM_PAGE_TO_PHYS(m);
 	vm_offset_t mva;
 	vm_offset_t mve;
 	uintcap_t * __capability mvu;
 	void * __capability kdc = swap_restore_cap;
 	int res = 0;
 
-	mva = PHYS_TO_DMAP(mpa);
-	mve = mva + pagesizes[m->psind];
+	mva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+	mve = mva + pagesizes[0];
 
-	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), pagesizes[m->psind]);
+	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), pagesizes[0]);
 
 	res = vm_caprevoke_page_iter(crc, vm_caprevoke_page_ro_adapt, mvu, mve);
 
