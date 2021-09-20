@@ -512,7 +512,7 @@ vm_caprevoke_page_ro_adapt(int *res,
 	KASSERT(cheri_gettag(cut), ("vm_caprevoke_page_ro_adapt untagged"));
 
 	/* If the thing has no permissions, we don't need to scan it later */
-	if (cheri_getperm(cut) == 0)
+	if ((cheri_gettag(cut) == 0) || (cheri_getperm(cut) == 0))
 		return 0;
 
 	*res |= VM_CAPREVOKE_PAGE_HASCAPS;
