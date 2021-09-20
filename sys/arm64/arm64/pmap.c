@@ -5014,6 +5014,9 @@ int
 pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 {
 	enum pmap_caploadgen_res res;
+#if VM_NRESERVLEVEL > 0
+	pd_entry_t *l2, l2e;
+#endif
 	pt_entry_t *pte, tpte, exppte;
 	vm_page_t m;
 	vm_offset_t next = 0, va = *pva;
@@ -5214,6 +5217,43 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 	}
 
 out:
+#if VM_NRESERVLEVEL > 0
+	/*
+	 * If we...
+	 *   are on the background scan (as indicated by EXCLUSIVE),
+	 *   are writing back a PTE (m != NULL),
+	 *   have superpages enabled,
+	 *   are at the last page of an L2 entry,
+	 * then see if we can put a superpage back together.
+	 */
+	if ((flags & PMAP_CAPLOADGEN_EXCLUSIVE) &&
+	    (m != NULL) && pmap_ps_enabled(pmap) &&
+	    ((va & (L2_OFFSET - L3_OFFSET)) == (L2_OFFSET - L3_OFFSET))) {
+
+		KASSERT(lvl == 3,
+		    ("pmap_caploadgen_update superpage: lvl != 3"));
+		KASSERT((m->flags & PG_FICTITIOUS) == 0,
+		    ("pmap_caploadgen_update superpage: m fictitious"));
+
+		/*
+		 * Find the page holding our L3 PTEs.  If all L3 entries exist
+		 * and the superpage would come from a fully populated
+		 * reservation, attempt promotion.
+		 */
+		l2 = pmap_l2(pmap, va);
+		l2e = pmap_load(l2);
+		vm_page_t mpte = PHYS_TO_VM_PAGE(l2e & ~ATTR_MASK);
+		if ((mpte->ref_count == Ln_ENTRIES) &&
+		    (vm_reserv_level_iffullpop(m) == 0)) {
+
+			struct rwlock *lock = NULL;
+			pmap_promote_l2(pmap, l2, va, &lock);
+			if (lock != NULL)
+				rw_wunlock(lock);
+		}
+	}
+#endif
+
 	PMAP_UNLOCK(pmap);
 out_unlocked:
 
