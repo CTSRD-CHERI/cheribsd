@@ -349,10 +349,20 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 #ifdef CHERI_CAPREVOKE
 	if (lower && (far < VM_MAX_USER_ADDRESS)  &&
 	    ((esr & ISS_DATA_DFSC_MASK) == ISS_DATA_DFSC_LC_SC) &&
-	    !(esr & ISS_DATA_WnR) &&
-	    (vm_caprevoke_fault_visit(p->p_vmspace, far) ==
-	    VM_CAPREVOKE_FAULT_RESOLVED))
-		return;
+	    !(esr & ISS_DATA_WnR)) {
+		if (vm_caprevoke_fault_visit(p->p_vmspace, far) ==
+		    VM_CAPREVOKE_FAULT_RESOLVED)
+			return;
+		else {
+			/*
+			 * vm_caprevoke_fault_visit calls
+			 * pmap_caploadgen_update, so if it's left us
+			 * UNRESOLVED, then there's no point in trying the pmap
+			 * again.
+			 */
+			goto skip_pmap;
+		}
+	}
 #endif
 
 	/*
@@ -366,6 +376,9 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	    pmap_fault(map->pmap, esr, far) == KERN_SUCCESS)
 		return;
 
+#ifdef CHERI_CAPREVOKE
+skip_pmap:
+#endif
 	KASSERT(td->td_md.md_spinlock_count == 0,
 	    ("data abort with spinlock held"));
 	if (td->td_critnest != 0 || WITNESS_CHECK(WARN_SLEEPOK |
