@@ -75,8 +75,6 @@ __FBSDID("$FreeBSD$");
 static void random_kthread(void);
 static void random_sources_feed(void);
 
-static u_int read_rate;
-
 /*
  * Random must initialize much earlier than epoch, but we can initialize the
  * epoch code before SMP starts.  Prior to SMP, we can safely bypass
@@ -206,6 +204,8 @@ random_kthread(void)
 		 * XXXAR: reading randomness from virtio 10 times per second is way too much when
 		 * runnning under QEMU CHERI. Also we don't need that much so just stop after the
 		 * initial seeding has completed.
+		 *
+		 * XXXJHB: After read_rate() was axed, this never resumes.
 		 */
 		kproc_suspend(harvest_context.hc_kthread_proc, 0);
 #else
@@ -240,7 +240,7 @@ random_sources_feed(void)
 	uint32_t entropy[HARVESTSIZE];
 	struct epoch_tracker et;
 	struct random_sources *rrs;
-	u_int i, n, local_read_rate;
+	u_int i, n;
 	bool rse_warm;
 
 	rse_warm = epoch_inited;
@@ -249,15 +249,10 @@ random_sources_feed(void)
 	 * Step over all of live entropy sources, and feed their output
 	 * to the system-wide RNG.
 	 */
-	local_read_rate = atomic_readandclear_32(&read_rate);
-	/* Perform at least one read per round */
-	local_read_rate = MAX(local_read_rate, 1);
-	/* But not exceeding RANDOM_KEYSIZE_WORDS */
-	local_read_rate = MIN(local_read_rate, RANDOM_KEYSIZE_WORDS);
 	if (rse_warm)
 		epoch_enter_preempt(rs_epoch, &et);
 	CK_LIST_FOREACH(rrs, &source_list, rrs_entries) {
-		for (i = 0; i < p_random_alg_context->ra_poolcount*local_read_rate; i++) {
+		for (i = 0; i < p_random_alg_context->ra_poolcount; i++) {
 			n = rrs->rrs_source->rs_read(entropy, sizeof(entropy));
 			KASSERT((n <= sizeof(entropy)), ("%s: rs_read returned too much data (%u > %zu)", __func__, n, sizeof(entropy)));
 			/*
@@ -279,17 +274,6 @@ random_sources_feed(void)
 	if (rse_warm)
 		epoch_exit_preempt(rs_epoch, &et);
 	explicit_bzero(entropy, sizeof(entropy));
-}
-
-void
-read_rate_increment(u_int chunk)
-{
-
-	atomic_add_32(&read_rate, chunk);
-#if defined(CPU_QEMU_MALTA) || defined(CPU_CHERI) || defined(CPU_BERI)
-	if (harvest_context.hc_kthread_proc)
-		kproc_resume(harvest_context.hc_kthread_proc);
-#endif
 }
 
 /* ARGSUSED */
