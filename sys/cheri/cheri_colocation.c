@@ -108,7 +108,7 @@ SYSINIT(colocation_startup, SI_SUB_CPU, SI_ORDER_FIRST, colocation_startup,
 void
 colocation_cleanup(struct thread *td)
 {
-	td->td_scb = 0;
+	td->td_scb = NULL;
 }
 
 static void
@@ -818,7 +818,7 @@ again:
 		/*
 		 * Non-zero length means there's already a cocall in progress.
 		 */
-		COLOCATION_DEBUG("callee is busy, waiting on %#lp", target);
+		COLOCATION_DEBUG("callee is busy, waiting on %lp", target);
 		error = msleep((__cheri_fromcap const void *)target,
 		    &switcher_lock, PCATCH, "cobusy", 0);
 		if (error != 0) {
@@ -867,20 +867,18 @@ again:
 
 	/*
 	 * Wake up the callee and wait for them to copy the buffer,
-	 * return from cocall_slow(2), call cocall_slow(2) again,
+	 * return from coaccept_slow(2), call coaccept_slow(2) again,
 	 * and copy the buffer back.
 	 */
 	wakeupcap(target, "callee");
-	COLOCATION_DEBUG("waiting on scb %#lp", target);
+	COLOCATION_DEBUG("waiting on scb %lp", target);
 	error = msleep((__cheri_fromcap const void *)target,
 	    &switcher_lock, PCATCH, "cocall", 0);
 	// XXX: Are we sure we are done once we wake up?
 	if (error != 0 && error != ERESTART) {
 		COLOCATION_DEBUG("msleep failed with error %d", error);
-		goto out;
 	}
 
-out:
 	colocation_copyin_scb(target, &calleescb);
 	calleescb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EPROTOTYPE);
 	/*
@@ -998,7 +996,7 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 	    scb.scb_caller_scb, curthread->td_scb);
 	if (cheri_getlen(scb.scb_caller_scb) == 0) {
 		/*
-		 * Offset-encoded EPROTOTYPE means there's a cocall_slow(2)
+		 * Offset-encoded EPROTOTYPE means there's a coaccept_slow(2)
 		 * waiting.
 		 */
 		 scb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EPROTOTYPE);
