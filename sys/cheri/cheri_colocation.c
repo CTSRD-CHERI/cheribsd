@@ -795,6 +795,7 @@ kern_cocall_slow(void * __capability target,
 	target = cheri_unseal(target, switcher_sealcap2);
 
 	SWITCHER_LOCK();
+	COLOCATION_DEBUG("starting with target %#lp", targetscb);
 again:
 	colocation_copyin_scb(target, &calleescb);
 
@@ -991,6 +992,8 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 		return (EINVAL);
 	}
 
+	COLOCATION_DEBUG("read scb_caller_scb %#lp from scb %#lp",
+	    scb.scb_caller_scb, curthread->td_scb);
 	if (cheri_getlen(scb.scb_caller_scb) == 0) {
 		/*
 		 * Offset-encoded EPROTOTYPE means there's a cocall_slow(2)
