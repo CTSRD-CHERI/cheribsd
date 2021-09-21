@@ -986,8 +986,10 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 		}
 	}
 
+	SWITCHER_LOCK();
 	have_scb = colocation_fetch_scb(curthread, &scb);
 	if (!have_scb) {
+		SWITCHER_UNLOCK();
 		COLOCATION_DEBUG("no scb, returning EINVAL");
 		return (EINVAL);
 	}
@@ -1022,6 +1024,7 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 		error = copyinout(outbuf, callerscb.scb_inbuf,
 		    MIN(outlen, callerscb.scb_inlen), false);
 		if (error != 0) {
+			SWITCHER_UNLOCK();
 			COLOCATION_DEBUG("copyinout error %d, waking up %lp",
 			    error, callerscb.scb_td->td_scb);
 			wakeupself();
@@ -1031,7 +1034,6 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 		wakeupself();
 	}
 
-	SWITCHER_LOCK();
 again:
 	/*
 	 * Wait for new caller.
