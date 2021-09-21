@@ -38,6 +38,7 @@ riscv/cheri/beri_manager.c	standard
 riscv/cheri/cheri_debug.c	optional	cpu_cheri ddb
 riscv/cheri/cheri_exception.c	optional	cpu_cheri
 riscv/cheri/cheri_machdep.c	optional	cpu_cheri
+riscv/iommu/dm_iommu.c		optional iommu
 riscv/iommu/iommu.c		optional iommu
 riscv/iommu/iommu_if.m		optional iommu
 riscv/riscv/autoconf.c		standard
