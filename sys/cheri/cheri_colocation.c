@@ -158,6 +158,17 @@ colocation_store_scb(struct thread *td, struct switchercb *scbp)
 	colocation_copyout_scb(td->td_scb, scbp);
 }
 
+static void
+colocation_store_caller_scb(struct switchercb * __capability user_scbp,
+    struct switchercb * __capability caller_scb)
+{
+	int error;
+
+	error = sucap(&user_scbp->scb_caller_scb, (intcap_t)caller_scb);
+	KASSERT(error == 0, ("%s: sucap to %#lp failed with error %d",
+	    __func__, user_scbp, error));
+}
+
 static bool
 colocation_fetch_caller_scb(struct thread *td, struct switchercb *scbp)
 {
@@ -841,13 +852,7 @@ again:
 		return (error);
 	}
 
-	calleescb.scb_caller_scb = curthread->td_scb;
-
-	/*
-	 * XXX: We should be using a capability-sized atomic store
-	 *      for scb_caller_scb.
-	 */
-	colocation_copyout_scb(targetscb, &calleescb);
+	colocation_store_caller_scb(targetscb, curthread->td_scb);
 
 	scb.scb_callee_scb = targetscb;
 	scb.scb_outbuf = outbuf;
@@ -880,13 +885,8 @@ again:
 		COLOCATION_DEBUG("msleep failed with error %d", error);
 	}
 
-	colocation_copyin_scb(targetscb, &calleescb);
-	calleescb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EPROTOTYPE);
-	/*
-	 * Here we don't need atomics either; nobody else could have modified
-	 * callee's SCB.
-	 */
-	colocation_copyout_scb(targetscb, &calleescb);
+	colocation_store_caller_scb(targetscb,
+	    cheri_capability_build_user_data(0, 0, 0, EPROTOTYPE));
 
 	/*
 	 * Wake up other callers that might be waiting in kern_cocall_slow().
@@ -999,16 +999,14 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 		/*
 		 * Offset-encoded EPROTOTYPE means there's a coaccept_slow(2)
 		 * waiting.
-		 */
-		 scb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EPROTOTYPE);
-
-		/*
+		 *
 		 * No atomics needed here; couldn't have raced with cocall(2),
 		 * as it would bounce due to scb_caller_scb not being NULL;
 		 * couldn't have raced with coaccept(2), because a thread cannot
 		 * call coaccept_slow(2) and coaccept(2) at the same time.
 		 */
-		colocation_store_scb(curthread, &scb);
+		colocation_store_caller_scb(curthread->td_scb,
+		    cheri_capability_build_user_data(0, 0, 0, EPROTOTYPE));
 	} else {
 		/*
 		 * There's a caller waiting for us, get them their data
@@ -1074,9 +1072,9 @@ again:
 	 */
 	if (cookiep != NULL) {
 		cookie = cheri_cleartag(scb.scb_caller_scb);
-		error = copyoutcap(&cookie, cookiep, sizeof(cookie));
+		error = sucap(cookiep, (intcap_t)cookie);
 		if (error != 0) {
-			COLOCATION_DEBUG("copyinout error %d", error);
+			COLOCATION_DEBUG("sucap error %d", error);
 			wakeupself();
 			return (error);
 		}
