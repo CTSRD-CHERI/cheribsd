@@ -7068,6 +7068,23 @@ pmap_fault(pmap_t pmap, uint64_t esr, uint64_t far)
 		}
 		PMAP_UNLOCK(pmap);
 		break;
+#if __has_feature(capabilities)
+	case ISS_DATA_DFSC_LC_SC:
+		if ((esr & ISS_DATA_WnR) == 0)
+			return (rv);
+		PMAP_LOCK(pmap);
+		ptep = pmap_pte(pmap, far, &lvl);
+		if (ptep != NULL &&
+		    ((pte = pmap_load(ptep)) & ATTR_CDBM) != 0) {
+			if ((pte & ATTR_SC) == 0) {
+				pmap_set_bits(ptep, ATTR_SC);
+				pmap_invalidate_page(pmap, far);
+			}
+			rv = KERN_SUCCESS;
+		}
+		PMAP_UNLOCK(pmap);
+		break;
+#endif
 	case ISS_DATA_DFSC_TF_L0:
 	case ISS_DATA_DFSC_TF_L1:
 	case ISS_DATA_DFSC_TF_L2:
