@@ -219,9 +219,11 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 	struct trapframe *tf = td->td_frame;
 
 	/* 32bits processes use r13 for sp */
-	if (td->td_frame->tf_spsr & PSR_M_32)
+	if (td->td_frame->tf_spsr & PSR_M_32) {
 		tf->tf_x[13] = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
-	else
+		if ((uintcap_t)entry & 1)
+			tf->tf_spsr |= PSR_T;
+	} else
 		tf->tf_sp = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
 
 #if __has_feature(capabilities)
