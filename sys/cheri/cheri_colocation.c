@@ -112,14 +112,14 @@ colocation_cleanup(struct thread *td)
 }
 
 static void
-colocation_copyin_scb(const void * __capability cap,
+colocation_copyin_scb(const struct switchercb * __capability cap,
     struct switchercb *scbp)
 {
 	int error;
 
 	KASSERT(cap != NULL, ("%s: NULL addr", __func__));
 
-	error = copyincap(cap, &(*scbp), sizeof(*scbp));
+	error = copyincap(cap, scbp, sizeof(*scbp));
 	KASSERT(error == 0, ("%s: copyincap from %#lp failed with error %d\n",
 	    __func__, cap, error));
 }
@@ -743,6 +743,7 @@ kern_cocall_slow(void * __capability target,
     void * __capability inbuf, size_t inlen)
 {
 	struct switchercb scb, calleescb;
+	struct switchercb * __capability targetscb;
 	struct thread *calleetd;
 	int error;
 	bool have_scb;
@@ -792,12 +793,12 @@ kern_cocall_slow(void * __capability target,
 	 *
 	 * XXX: How to detect unsealing failure?  Would it trap?
 	 */
-	target = cheri_unseal(target, switcher_sealcap2);
+	targetscb = cheri_unseal(target, switcher_sealcap2);
 
 	SWITCHER_LOCK();
 	COLOCATION_DEBUG("starting with target %#lp", targetscb);
 again:
-	colocation_copyin_scb(target, &calleescb);
+	colocation_copyin_scb(targetscb, &calleescb);
 
 	/*
 	 * The protocol here is slightly different from the one used
@@ -809,7 +810,7 @@ again:
 	 */
 
 	if (cheri_gettag(calleescb.scb_caller_scb) == 0) {
-		COLOCATION_DEBUG("callee scb %#lp is waiting on switcher cocall", target);
+		COLOCATION_DEBUG("callee scb %#lp is waiting on switcher cocall", targetscb);
 		SWITCHER_UNLOCK();
 		return (EPROTOTYPE);
 	}
@@ -818,8 +819,8 @@ again:
 		/*
 		 * Non-zero length means there's already a cocall in progress.
 		 */
-		COLOCATION_DEBUG("callee is busy, waiting on %lp", target);
-		error = msleep((__cheri_fromcap const void *)target,
+		COLOCATION_DEBUG("callee is busy, waiting on %lp", targetscb);
+		error = msleep((__cheri_fromcap const void *)targetscb,
 		    &switcher_lock, PCATCH, "cobusy", 0);
 		if (error != 0) {
 			COLOCATION_DEBUG("cobusy msleep failed with error %d",
@@ -846,9 +847,9 @@ again:
 	 * XXX: We should be using a capability-sized atomic store
 	 *      for scb_caller_scb.
 	 */
-	colocation_copyout_scb(target, &calleescb);
+	colocation_copyout_scb(targetscb, &calleescb);
 
-	scb.scb_callee_scb = target;
+	scb.scb_callee_scb = targetscb;
 	scb.scb_outbuf = outbuf;
 	scb.scb_outlen = outlen;
 	scb.scb_inbuf = inbuf;
@@ -870,27 +871,27 @@ again:
 	 * return from coaccept_slow(2), call coaccept_slow(2) again,
 	 * and copy the buffer back.
 	 */
-	wakeupcap(target, "callee");
-	COLOCATION_DEBUG("waiting on scb %lp", target);
-	error = msleep((__cheri_fromcap const void *)target,
+	wakeupcap(targetscb, "callee");
+	COLOCATION_DEBUG("waiting on scb %lp", targetscb);
+	error = msleep((__cheri_fromcap const void *)targetscb,
 	    &switcher_lock, PCATCH, "cocall", 0);
 	// XXX: Are we sure we are done once we wake up?
 	if (error != 0 && error != ERESTART) {
 		COLOCATION_DEBUG("msleep failed with error %d", error);
 	}
 
-	colocation_copyin_scb(target, &calleescb);
+	colocation_copyin_scb(targetscb, &calleescb);
 	calleescb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EPROTOTYPE);
 	/*
 	 * Here we don't need atomics either; nobody else could have modified
 	 * callee's SCB.
 	 */
-	colocation_copyout_scb(target, &calleescb);
+	colocation_copyout_scb(targetscb, &calleescb);
 
 	/*
 	 * Wake up other callers that might be waiting in kern_cocall_slow().
 	 */
-	wakeupcap(target, "callers sleeping on callee scb");
+	wakeupcap(targetscb, "callers sleeping on callee");
 	SWITCHER_UNLOCK();
 
 	/*
