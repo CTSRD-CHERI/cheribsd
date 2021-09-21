@@ -38,8 +38,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/malloc.h>
 #include <sys/rman.h>
+#include <sys/taskqueue.h>
 #include <sys/timeet.h>
 #include <sys/timetc.h>
+#include <sys/tree.h>
 #include <sys/conf.h>
 #include <sys/uio.h>
 #include <sys/endian.h>
@@ -50,18 +52,24 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_kern.h>
 #include <vm/vm_map.h>
 
-#include <dev/ofw/openfirm.h>
-#include <dev/ofw/ofw_bus.h>
-#include <dev/ofw/ofw_bus_subr.h>
-#include <dev/ofw/ofw_subr.h>
-
 #include <machine/bus.h>
 #include <machine/cpu.h>
 #include <machine/intr.h>
 #include <machine/sbi.h>
 #include <machine/vmparam.h>
 
+#include <dev/ofw/openfirm.h>
+#include <dev/ofw/ofw_bus.h>
+#include <dev/ofw/ofw_bus_subr.h>
+#include <dev/ofw/ofw_subr.h>
+
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/iommu/iommu.h>
+#include <riscv/iommu/iommu.h>
+
 struct dm_iommu_softc {
+	struct iommu_unit	iommu;
 	struct resource		*res[3];
 	device_t		dev;
 	bus_space_tag_t		bst_data;
@@ -92,6 +100,8 @@ static int
 dm_iommu_attach(device_t dev)
 {
 	struct dm_iommu_softc *sc;
+	struct iommu_unit *iommu;
+	int err;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -105,12 +115,49 @@ dm_iommu_attach(device_t dev)
 	sc->bst_data = rman_get_bustag(sc->res[0]);
 	sc->bsh_data = rman_get_bushandle(sc->res[0]);
 
+	iommu = &sc->iommu;
+	iommu->dev = dev;
+
+	err = iommu_register(iommu);
+	if (err) {
+		device_printf(dev, "Failed to register IOMMU.\n");
+		return (ENXIO);
+	}
+
 	return (0);
+}
+
+static int
+dm_iommu_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
+{
+	struct dm_iommu_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	device_printf(sc->dev, "%s\n", __func__);
+
+	return (ENOENT);
 }
 
 static device_method_t dm_iommu_methods[] = {
 	DEVMETHOD(device_probe,		dm_iommu_probe),
 	DEVMETHOD(device_attach,	dm_iommu_attach),
+
+#if 0
+	/* SMMU interface */
+	DEVMETHOD(iommu_find,		dm_iommu_find),
+	DEVMETHOD(iommu_map,		dm_iommu_map),
+	DEVMETHOD(iommu_unmap,		dm_iommu_unmap),
+	DEVMETHOD(iommu_domain_alloc,	dm_iommu_domain_alloc),
+	DEVMETHOD(iommu_domain_free,	dm_iommu_domain_free),
+	DEVMETHOD(iommu_ctx_alloc,	dm_iommu_ctx_alloc),
+	DEVMETHOD(iommu_ctx_free,	dm_iommu_ctx_free),
+	DEVMETHOD(iommu_ctx_lookup,	dm_iommu_ctx_lookup),
+#endif
+
+	/* Bus interface */
+	DEVMETHOD(bus_read_ivar,	dm_iommu_read_ivar),
+
 	{ 0, 0 }
 };
 
