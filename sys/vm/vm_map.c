@@ -4386,7 +4386,7 @@ vm_map_sync(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	if (result != KERN_SUCCESS) {
 		printf("%s: vm_map_check_owner returned %d\n",
 		    __func__, result);
-		vm_map_unlock(map);
+		vm_map_unlock_read(map);
 		return (result);
 	}
 	VM_MAP_RANGE_CHECK(map, start, end);
