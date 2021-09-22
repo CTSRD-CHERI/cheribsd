@@ -71,8 +71,33 @@ __FBSDID("$FreeBSD$");
 #include "iommu.h"
 #include "iommu_if.h"
 
+struct dm_iommu_unit {
+	struct iommu_unit		iommu;
+	LIST_HEAD(, dm_iommu_domain)	domain_list;
+	LIST_ENTRY(dm_iommu_unit)	next;
+	device_t			dev;
+};
+
+struct dm_iommu_domain {
+	struct iommu_domain		iodom;
+	LIST_HEAD(, dm_iommu_ctx)	ctx_list;
+	LIST_ENTRY(dm_iommu_domain)	next;
+	u_int				entries_cnt;
+	struct pmap			p;
+};
+
+struct dm_iommu_ctx {
+	struct iommu_ctx		ioctx;
+	struct dm_iommu_domain		*domain;
+	device_t			dev;
+	bool				bypass;
+	int				sid;
+	uint16_t			vendor;
+	uint16_t			device;
+};
+
 struct dm_iommu_softc {
-	struct iommu_unit	iommu;
+	struct dm_iommu_unit	unit;
 	struct resource		*res[3];
 	device_t		dev;
 	bus_space_tag_t		bst_data;
@@ -102,6 +127,69 @@ dm_iommu_find(device_t dev, device_t child)
 }
 
 static int
+dm_iommu_map(device_t dev, struct iommu_domain *iodom,
+    vm_offset_t va, vm_page_t *ma, vm_size_t size,
+    vm_prot_t prot)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static int
+dm_iommu_unmap(device_t dev, struct iommu_domain *iodom,
+    vm_offset_t va, bus_size_t size)
+{
+
+	printf("%s\n", __func__);
+
+	return (0);
+}
+
+static struct iommu_domain *
+dm_iommu_domain_alloc(device_t dev, struct iommu_unit *iommu)
+{
+
+	printf("%s\n", __func__);
+
+	return (NULL);
+}
+
+static void
+dm_iommu_domain_free(device_t dev, struct iommu_domain *iodom)
+{
+
+	printf("%s\n", __func__);
+}
+
+static struct iommu_ctx *
+dm_iommu_ctx_alloc(device_t dev, struct iommu_domain *iodom, device_t child,
+    bool disabled)
+{
+
+	printf("%s\n", __func__);
+
+	return (NULL);
+}
+
+static void
+dm_iommu_ctx_free(device_t dev, struct iommu_ctx *ioctx)
+{
+
+	printf("%s\n", __func__);
+}
+
+static struct iommu_ctx *
+dm_iommu_ctx_lookup(device_t dev, device_t child)
+{
+
+	printf("%s\n", __func__);
+
+	return (NULL);
+}
+
+static int
 dm_iommu_probe(device_t dev)
 {
 
@@ -120,6 +208,7 @@ static int
 dm_iommu_attach(device_t dev)
 {
 	struct dm_iommu_softc *sc;
+	struct dm_iommu_unit *unit;
 	struct iommu_unit *iommu;
 	int err;
 
@@ -135,8 +224,13 @@ dm_iommu_attach(device_t dev)
 	sc->bst_data = rman_get_bustag(sc->res[0]);
 	sc->bsh_data = rman_get_bushandle(sc->res[0]);
 
-	iommu = &sc->iommu;
+	unit = &sc->unit;
+	unit->dev = dev;
+
+	iommu = &unit->iommu;
 	iommu->dev = dev;
+
+	LIST_INIT(&unit->domain_list);
 
 	err = iommu_register(iommu);
 	if (err) {
@@ -163,10 +257,8 @@ static device_method_t dm_iommu_methods[] = {
 	DEVMETHOD(device_probe,		dm_iommu_probe),
 	DEVMETHOD(device_attach,	dm_iommu_attach),
 
-	/* SMMU interface */
+	/* RISC-V IOMMU interface. */
 	DEVMETHOD(iommu_find,		dm_iommu_find),
-
-#if 0
 	DEVMETHOD(iommu_map,		dm_iommu_map),
 	DEVMETHOD(iommu_unmap,		dm_iommu_unmap),
 	DEVMETHOD(iommu_domain_alloc,	dm_iommu_domain_alloc),
@@ -174,9 +266,8 @@ static device_method_t dm_iommu_methods[] = {
 	DEVMETHOD(iommu_ctx_alloc,	dm_iommu_ctx_alloc),
 	DEVMETHOD(iommu_ctx_free,	dm_iommu_ctx_free),
 	DEVMETHOD(iommu_ctx_lookup,	dm_iommu_ctx_lookup),
-#endif
 
-	/* Bus interface */
+	/* Bus interface. */
 	DEVMETHOD(bus_read_ivar,	dm_iommu_read_ivar),
 
 	{ 0, 0 }
