@@ -159,7 +159,7 @@ SIGCODE(switcher_cocall)
 	 */
 	sub	t3, a4, t5
 	bgez	t3, 3f
-	addi	t5, a4, 0
+	mv	t5, a4
 
 CSYM(switcher_cocall_copy_start)
 3:

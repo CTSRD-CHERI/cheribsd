@@ -152,7 +152,7 @@ _C_LABEL(switcher_coaccept):
 	 */
 	sub	t3, a4, t5
 	bgez	t3, 2f
-	addi	t5, a4, 0
+	mv	t5, a4
 
 2:
 	cld	t3, 0(ca3)
