@@ -38,11 +38,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/unistd.h>
 #include <sys/proc.h>
-#include <sys/caprevoke.h>
 
 #include <machine/_inttypes.h>
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+#include <cheri/revoke.h>
 #include <machine/pcb.h>
 
 #include <vm/vm.h>
@@ -53,31 +53,31 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_param.h>
-#include <vm/vm_caprevoke.h>
+#include <vm/vm_cheri_revoke.h>
 
-static bool caprevoke_core_shadow = 0;
-SYSCTL_BOOL(_vm, OID_AUTO, caprevoke_core_shadow, CTLFLAG_RW,
-    &caprevoke_core_shadow, 0,
-    "Include the caprevoke shadow in core dumps");
+static bool cheri_revoke_core_shadow = 0;
+SYSCTL_BOOL(_vm, OID_AUTO, cheri_revoke_core_shadow, CTLFLAG_RW,
+    &cheri_revoke_core_shadow, 0,
+    "Include the cheri_revoke shadow in core dumps");
 
 /*
  * Map a capability revocation shadow
  */
 int
-vm_map_install_caprevoke_shadow(vm_map_t map)
+vm_map_install_cheri_revoke_shadow(vm_map_t map)
 {
 	int cow;
 	int error = KERN_SUCCESS;
 	vm_object_t vmo;
 	vm_pointer_t start;
-	vm_offset_t start_addr = VM_CAPREVOKE_BM_BASE;
-	vm_offset_t end_addr = VM_CAPREVOKE_BM_TOP;
+	vm_offset_t start_addr = VM_CHERI_REVOKE_BM_BASE;
+	vm_offset_t end_addr = VM_CHERI_REVOKE_BM_TOP;
 
 	vmo = vm_object_allocate(OBJT_DEFAULT, end_addr - start_addr);
 
 	vm_map_lock(map);
 
-	if (map->vm_caprev_sh != NULL) {
+	if (map->vm_cheri_revoke_sh != NULL) {
 		error = KERN_PROTECTION_FAILURE;
 		goto out;
 	}
@@ -95,7 +95,7 @@ vm_map_install_caprevoke_shadow(vm_map_t map)
 		goto out;
 	}
 
-	cow = caprevoke_core_shadow ? 0 : MAP_DISABLE_COREDUMP;
+	cow = cheri_revoke_core_shadow ? 0 : MAP_DISABLE_COREDUMP;
 
 	error = vm_map_insert(map, vmo, 0, start_addr, end_addr,
 				VM_PROT_READ | VM_PROT_WRITE,
@@ -107,31 +107,31 @@ vm_map_install_caprevoke_shadow(vm_map_t map)
 
 		error2 = vm_map_reservation_delete_locked(map, start);
 		KASSERT(error2 == KERN_SUCCESS,
-			("vm_map_install_caprevoke_shadow failed twice!"));
+			("vm_map_install_cheri_revoke_shadow failed twice!"));
 
 		goto out;
 	}
 
-	map->vm_caprev_sh = vmo;
-	map->vm_caprev_shva = start;
-	/* XXX NWF That might want to be vm_caprev_shcap? */
+	map->vm_cheri_revoke_sh = vmo;
+	map->vm_cheri_revoke_shva = start;
+	/* XXX NWF That might want to be vm_cheri_revoke_shcap? */
 
 out:
 	vm_map_unlock(map);
 
 	if (error == KERN_SUCCESS) {
-		/* Initialize caprevoke info (map unlocked for copyout) */
-		struct caprevoke_info initinfo = {
-			.base_mem_nomap = VM_CAPREVOKE_BM_MEM_NOMAP,
-			.base_otype = VM_CAPREVOKE_BM_OTYPE,
+		/* Initialize cheri_revoke info (map unlocked for copyout) */
+		struct cheri_revoke_info initinfo = {
+			.base_mem_nomap = VM_CHERI_REVOKE_BM_MEM_NOMAP,
+			.base_otype = VM_CHERI_REVOKE_BM_OTYPE,
 			{0, 0}
 		};
-		struct caprevoke_info_page * __capability infopage;
-		vm_caprevoke_info_page(map, &infopage);
+		struct cheri_revoke_info_page * __capability infopage;
+		vm_cheri_revoke_info_page(map, &infopage);
 
 		error = copyout(&initinfo, infopage, sizeof(initinfo));
 		KASSERT(error == 0,
-			("vm_map_install_caprevoke_shadow copyout"));
+			("vm_map_install_cheri_revoke_shadow copyout"));
 	} else {
 		vm_object_deallocate(vmo);
 	}
@@ -139,12 +139,12 @@ out:
 }
 
 void
-vm_caprevoke_publish_epochs(struct caprevoke_info_page * __capability info_page,
-    const struct caprevoke_epochs *ip)
+vm_cheri_revoke_publish_epochs(struct cheri_revoke_info_page * __capability info_page,
+    const struct cheri_revoke_epochs *ip)
 {
-	struct caprevoke_epochs * __capability target = &info_page->pub.epochs;
+	struct cheri_revoke_epochs * __capability target = &info_page->pub.epochs;
 	int res = copyoutcap(ip, target, sizeof(*target));
-	KASSERT(res == 0, ("vm_caprevoke_publish: bad copyout %d\n", res));
+	KASSERT(res == 0, ("vm_cheri_revoke_publish: bad copyout %d\n", res));
 	(void)res;
 }
 
@@ -152,61 +152,61 @@ vm_caprevoke_publish_epochs(struct caprevoke_info_page * __capability info_page,
  * Grant access to a capability shadow
  */
 void * __capability
-vm_caprevoke_shadow_cap(int sel, vm_offset_t base, vm_offset_t size, int pmask)
+vm_cheri_revoke_shadow_cap(int sel, vm_offset_t base, vm_offset_t size, int pmask)
 {
 	switch(sel) {
 	/* Accessible to userspace */
-	case CAPREVOKE_SHADOW_NOVMMAP: {
+	case CHERI_REVOKE_SHADOW_NOVMMAP: {
 		vm_offset_t shadow_base, shadow_size;
 
 		/* Require at least byte granularity in the shadow space */
-		if ((base & ((VM_CAPREVOKE_GSZ_MEM_NOMAP * 8) - 1)) != 0)
+		if ((base & ((VM_CHERI_REVOKE_GSZ_MEM_NOMAP * 8) - 1)) != 0)
 			return (void * __capability)(uintptr_t)EINVAL;
-		if ((size & ((VM_CAPREVOKE_GSZ_MEM_NOMAP * 8) - 1)) != 0)
+		if ((size & ((VM_CHERI_REVOKE_GSZ_MEM_NOMAP * 8) - 1)) != 0)
 			return (void * __capability)(uintptr_t)EINVAL;
 
-		shadow_base = VM_CAPREVOKE_BM_MEM_NOMAP
-		            + (base / VM_CAPREVOKE_GSZ_MEM_NOMAP / 8);
-		shadow_size = size / VM_CAPREVOKE_GSZ_MEM_NOMAP / 8;
+		shadow_base = VM_CHERI_REVOKE_BM_MEM_NOMAP
+		            + (base / VM_CHERI_REVOKE_GSZ_MEM_NOMAP / 8);
+		shadow_size = size / VM_CHERI_REVOKE_GSZ_MEM_NOMAP / 8;
 
 		return cheri_capability_build_user_data(
 			(pmask & (CHERI_PERM_LOAD | CHERI_PERM_STORE)) |
 			    CHERI_PERM_GLOBAL,
 			shadow_base, shadow_size, 0);
 	}
-	case CAPREVOKE_SHADOW_OTYPE: {
+	case CHERI_REVOKE_SHADOW_OTYPE: {
 		vm_offset_t shadow_base, shadow_size;
 
-		shadow_base = VM_CAPREVOKE_BM_OTYPE
-		            + (base / VM_CAPREVOKE_GSZ_OTYPE / 8);
-		shadow_size = size / VM_CAPREVOKE_GSZ_OTYPE / 8;
+		shadow_base = VM_CHERI_REVOKE_BM_OTYPE
+		            + (base / VM_CHERI_REVOKE_GSZ_OTYPE / 8);
+		shadow_size = size / VM_CHERI_REVOKE_GSZ_OTYPE / 8;
 
 		/* Require at least byte granularity in the shadow space */
-		if ((base & ((VM_CAPREVOKE_GSZ_OTYPE * 8) - 1)) != 0)
+		if ((base & ((VM_CHERI_REVOKE_GSZ_OTYPE * 8) - 1)) != 0)
 			return (void * __capability)(uintptr_t)EINVAL;
-		if ((size & ((VM_CAPREVOKE_GSZ_OTYPE * 8) - 1)) != 0)
+		if ((size & ((VM_CHERI_REVOKE_GSZ_OTYPE * 8) - 1)) != 0)
 			return (void * __capability)(uintptr_t)EINVAL;
 
 		return cheri_capability_build_user_data(
 			CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_GLOBAL,
 			shadow_base, shadow_size, 0);
 	}
-	case CAPREVOKE_SHADOW_INFO_STRUCT: {
+	case CHERI_REVOKE_SHADOW_INFO_STRUCT: {
 		return cheri_capability_build_user_data(
 			CHERI_PERM_LOAD
 			| CHERI_PERM_LOAD_CAP
 			| CHERI_PERM_GLOBAL,
-			VM_CAPREVOKE_INFO_PAGE,
-			sizeof(struct caprevoke_info),
+			VM_CHERI_REVOKE_INFO_PAGE,
+			sizeof(struct cheri_revoke_info),
 			0);
 	}
-	case CAPREVOKE_SHADOW_NOVMMAP_ENTIRE: {
+	case CHERI_REVOKE_SHADOW_NOVMMAP_ENTIRE: {
 		return cheri_capability_build_user_data(
 		    CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_GLOBAL,
-		    VM_CAPREVOKE_BM_MEM_NOMAP, VM_CAPREVOKE_BSZ_MEM_NOMAP, 0);
+		    VM_CHERI_REVOKE_BM_MEM_NOMAP, VM_CHERI_REVOKE_BSZ_MEM_NOMAP, 0);
 	}
 	/* Kernel-only */
-	// XXX CAPREVOKE_SHADOW_MAP:
+	// XXX CHERI_REVOKE_SHADOW_MAP:
 	//
 	default:
 		return (void * __capability)(uintptr_t)EINVAL;
@@ -214,17 +214,17 @@ vm_caprevoke_shadow_cap(int sel, vm_offset_t base, vm_offset_t size, int pmask)
 }
 
 void
-vm_caprevoke_info_page(struct vm_map *map,
-    struct caprevoke_info_page * __capability *ifp)
+vm_cheri_revoke_info_page(struct vm_map *map,
+    struct cheri_revoke_info_page * __capability *ifp)
 {
 	/* XXX In prinicple, it could work cross-process, but not yet */
 	KASSERT(map == &curthread->td_proc->p_vmspace->vm_map,
-		("vm_caprevoke_page_info req. intraprocess work right now"));
+		("vm_cheri_revoke_page_info req. intraprocess work right now"));
 
 	*ifp = cheri_capability_build_user_data(CHERI_PERM_LOAD |
 		CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
 		CHERI_PERM_GLOBAL,
-	    VM_CAPREVOKE_INFO_PAGE, PAGE_SIZE, 0);
+	    VM_CHERI_REVOKE_INFO_PAGE, PAGE_SIZE, 0);
 }
 
 /*
@@ -250,9 +250,9 @@ vm_caprevoke_info_page(struct vm_map *map,
  * userland!
  */
 static void
-vm_caprevoke_tlb_fault(void)
+vm_cheri_revoke_tlb_fault(void)
 {
-	panic("%s; try rebuilding without CHERI_CAPREVOKE_FAST_COPYIN",
+	panic("%s; try rebuilding without CHERI_cheri_revoke_FAST_COPYIN",
 		__FUNCTION__);
 }
 
@@ -261,15 +261,15 @@ vm_caprevoke_tlb_fault(void)
  */
 
 static int
-vm_do_caprevoke(int *res,
-		const struct vm_caprevoke_cookie *crc,
+vm_do_cheri_revoke(int *res,
+		const struct vm_cheri_revoke_cookie *crc,
 		const uint8_t * __capability crshadow,
-		vm_caprevoke_test_fn ctp,
+		vm_cheri_revoke_test_fn ctp,
 		uintcap_t * __capability cutp,
 		uintcap_t cut)
 {
 	int perms = cheri_getperm(cut);
-	CAPREVOKE_STATS_FOR(crst, crc);
+	CHERI_REVOKE_STATS_FOR(crst, crc);
 
 	if (perms == 0) {
 		/* For revoked or permissionless caps, do nothing. */
@@ -281,14 +281,14 @@ vm_do_caprevoke(int *res,
 		 * set or something.
 		 */
 
-		CAPREVOKE_STATS_BUMP(crst, caps_found_revoked);
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found_revoked);
 	} else if (cheri_gettag(cut) && ctp(crshadow, cut, perms)) {
 		void * __capability cscratch;
 		int stxr_status;
 
-		uintcap_t cutr = cheri_revoke(cut);
+		uintcap_t cutr = cheri_revoke_cap(cut);
 
-		CAPREVOKE_STATS_BUMP(crst, caps_found);
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
 
 		/*
 		 * Load-link the position under test; verify that it matches
@@ -338,11 +338,11 @@ again:
 
 		/* stxr returns 0 on success */
 		if (__builtin_expect(stxr_status == 0, 1)) {
-			CAPREVOKE_STATS_BUMP(crst, caps_cleared);
+			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 			/* Don't count a revoked cap as HASCAPS */
 		} else if (!cheri_gettag(cscratch)) {
 			/* Data; don't sweat it */
-		} else if (caprevoke_is_revoked(cscratch)) {
+		} else if (cheri_revoke_is_revoked(cscratch)) {
 			/* Revoked cap; don't worry about it */
 		} else if (__builtin_expect(stxr_status == 1, 1)) {
 			/* stxr returns 1 on failure */
@@ -353,18 +353,18 @@ again:
 			 * nor 1, which means that the stxr wasn't executed and
 			 * so the capability at cutp has changed.
 			 */
-			*res |= VM_CAPREVOKE_PAGE_DIRTY
-				| VM_CAPREVOKE_PAGE_HASCAPS ;
+			*res |= VM_CHERI_REVOKE_PAGE_DIRTY
+				| VM_CHERI_REVOKE_PAGE_HASCAPS ;
 		}
 	} else {
-		CAPREVOKE_STATS_BUMP(crst, caps_found);
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
 
 		/*
 		 * Even though it might actually be un-tagged, that's a very
 		 * narrow race and this a very common case, so don't bother
 		 * testing.  We'll find it clear next time, maybe.
 		 */
-		*res |= VM_CAPREVOKE_PAGE_HASCAPS;
+		*res |= VM_CHERI_REVOKE_PAGE_HASCAPS;
 	}
 
 	return 0;
@@ -389,10 +389,10 @@ disable_user_memory_access()
 // TODO: CPREFETCH()
 
 static inline int
-vm_caprevoke_page_iter(const struct vm_caprevoke_cookie *crc,
-		       int (*cb)(int *, const struct vm_caprevoke_cookie *,
+vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
+		       int (*cb)(int *, const struct vm_cheri_revoke_cookie *,
 				 const uint8_t * __capability,
-				 vm_caprevoke_test_fn,
+				 vm_cheri_revoke_test_fn,
 				 uintcap_t * __capability,
 				 uintcap_t),
 		       uintcap_t * __capability mvu,
@@ -401,11 +401,11 @@ vm_caprevoke_page_iter(const struct vm_caprevoke_cookie *crc,
 	int res = 0;
 
 	/* Load once up front, which is almost as good as const */
-	vm_caprevoke_test_fn ctp = crc->map->vm_caprev_test;
+	vm_cheri_revoke_test_fn ctp = crc->map->vm_cheri_revoke_test;
 	const uint8_t * __capability crshadow = crc->crshadow;
 
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
-	curthread->td_pcb->pcb_onfault = (vm_offset_t)vm_caprevoke_tlb_fault;
+	curthread->td_pcb->pcb_onfault = (vm_offset_t)vm_cheri_revoke_tlb_fault;
 	enable_user_memory_access();
 #endif
 
@@ -426,15 +426,16 @@ out:
 }
 
 int
-vm_caprevoke_test(const struct vm_caprevoke_cookie *crc, uintcap_t cut)
+vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintcap_t cut)
 {
 	if (cheri_gettag(cut)) {
 		int res;
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
-		curthread->td_pcb->pcb_onfault = (vm_offset_t)vm_caprevoke_tlb_fault;
+		curthread->td_pcb->pcb_onfault =
+		    (vm_offset_t)vm_cheri_revoke_tlb_fault;
 		enable_user_memory_access();
 #endif
-		res = crc->map->vm_caprev_test(crc->crshadow, cut,
+		res = crc->map->vm_cheri_revoke_test(crc->crshadow, cut,
 		    cheri_getperm(cut));
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
 		disable_user_memory_access();
@@ -447,10 +448,10 @@ vm_caprevoke_test(const struct vm_caprevoke_cookie *crc, uintcap_t cut)
 }
 
 int
-vm_caprevoke_page_rw(const struct vm_caprevoke_cookie *crc, vm_page_t m)
+vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 {
 #ifdef CHERI_CAPREVOKE_STATS
-	CAPREVOKE_STATS_FOR(crst, crc);
+	CHERI_REVOKE_STATS_FOR(crst, crc);
 	uint32_t cyc_start = get_cyclecount();
 #endif
 
@@ -479,27 +480,27 @@ vm_caprevoke_page_rw(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 
 	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), pagesizes[0]);
 
-	res = vm_caprevoke_page_iter(crc, vm_do_caprevoke, mvu, mve);
+	res = vm_cheri_revoke_page_iter(crc, vm_do_cheri_revoke, mvu, mve);
 
 	/*
-	 * stxr in vm_do_caprevoke is always a relaxed atomic.
+	 * stxr in vm_do_cheri_revoke is always a relaxed atomic.
 	 * Flush our store buffer before we update anything about this page
 	 */
 	wmb();
 
 #ifdef CHERI_CAPREVOKE_STATS
 	uint32_t cyc_end = get_cyclecount();
-	CAPREVOKE_STATS_INC(crst, page_scan_cycles, cyc_end - cyc_start);
+	CHERI_REVOKE_STATS_INC(crst, page_scan_cycles, cyc_end - cyc_start);
 #endif
 
 	return res;
 }
 
 static inline int
-vm_caprevoke_page_ro_adapt(int *res,
-			   const struct vm_caprevoke_cookie *vmcrc,
+vm_cheri_revoke_page_ro_adapt(int *res,
+			   const struct vm_cheri_revoke_cookie *vmcrc,
 		           const uint8_t * __capability crshadow,
-			   vm_caprevoke_test_fn ctp,
+			   vm_cheri_revoke_test_fn ctp,
 			   uintcap_t * __capability cutp,
 			   uintcap_t cut)
 {
@@ -509,16 +510,16 @@ vm_caprevoke_page_ro_adapt(int *res,
 	 * Being untagged would imply mutation, but we're visiting this page
 	 * under the assumption that it's read-only.
 	 */
-	KASSERT(cheri_gettag(cut), ("vm_caprevoke_page_ro_adapt untagged"));
+	KASSERT(cheri_gettag(cut), ("vm_cheri_revoke_page_ro_adapt untagged"));
 
 	/* If the thing has no permissions, we don't need to scan it later */
 	if ((cheri_gettag(cut) == 0) || (cheri_getperm(cut) == 0))
 		return 0;
 
-	*res |= VM_CAPREVOKE_PAGE_HASCAPS;
+	*res |= VM_CHERI_REVOKE_PAGE_HASCAPS;
 
 	if (ctp(crshadow, cut, cheri_getperm(cut))) {
-		*res |= VM_CAPREVOKE_PAGE_DIRTY;
+		*res |= VM_CHERI_REVOKE_PAGE_DIRTY;
 
 		/* One dirty answer is as good as any other; stop eary */
 		return 1;
@@ -528,22 +529,22 @@ vm_caprevoke_page_ro_adapt(int *res,
 }
 
 /*
- * Like vm_caprevoke_page, but does not write to the page in question
+ * Like vm_cheri_revoke_page, but does not write to the page in question
  *
- * VM_CAPREVOKE_PAGE_DIRTY in the result means that we would like to store
+ * VM_CHERI_REVOKE_PAGE_DIRTY in the result means that we would like to store
  * back, but can't, rather than that we lost a LL/SC race.  We will return
  * early if this becomes set: there's no reason to continue probing once we
  * know the answer.
  *
- * VM_CAPREVOKE_PAGE_HASCAPS continues to mean what it meant before: we
+ * VM_CHERI_REVOKE_PAGE_HASCAPS continues to mean what it meant before: we
  * saw at least one, permission-bearing capability on this page.
  */
 int
-vm_caprevoke_page_ro(const struct vm_caprevoke_cookie *crc, vm_page_t m)
+vm_cheri_revoke_page_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 {
 #ifdef CHERI_CAPREVOKE_STATS
 	uint32_t cyc_start = get_cyclecount();
-	CAPREVOKE_STATS_FOR(crst, crc);
+	CHERI_REVOKE_STATS_FOR(crst, crc);
 #endif
 
 	vm_offset_t mva;
@@ -557,10 +558,11 @@ vm_caprevoke_page_ro(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 
 	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), pagesizes[0]);
 
-	res = vm_caprevoke_page_iter(crc, vm_caprevoke_page_ro_adapt, mvu, mve);
+	res = vm_cheri_revoke_page_iter(crc, vm_cheri_revoke_page_ro_adapt, mvu,
+	    mve);
 
 	/*
-	 * Unlike vm_caprevoke_page, we don't need to do a fence here: either
+	 * Unlike vm_cheri_revoke_page, we don't need to do a fence here: either
 	 * we haven't written to the page, and so there's nothing relevant in
 	 * our store buffer, or we're bailing out to upgrade the page to
 	 * writeable status.

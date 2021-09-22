@@ -420,8 +420,8 @@ arm64/cheri/cheri_exception.c			optional cpu_cheri
 arm64/cheri/cheri_machdep.c			optional cpu_cheri
 
 # CHERI capability revocation
-arm64/arm64/vm_machdep_caprevoke.c		optional cpu_cheri cheri_caprevoke
-arm64/arm64/vm_machdep_caprevoke_tests.c	optional cpu_cheri cheri_caprevoke \
+arm64/arm64/cheri_revoke_machdep.c		optional cpu_cheri cheri_caprevoke
+arm64/arm64/cheri_revoke_machdep_tests.c	optional cpu_cheri cheri_caprevoke \
 	compile-with "${NORMAL_C} -fomit-frame-pointer"
 
 # i.MX8 Clock support
