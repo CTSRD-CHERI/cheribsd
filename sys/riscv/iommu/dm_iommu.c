@@ -68,6 +68,9 @@ __FBSDID("$FreeBSD$");
 #include <dev/iommu/iommu.h>
 #include <riscv/iommu/iommu.h>
 
+#include "iommu.h"
+#include "iommu_if.h"
+
 struct dm_iommu_softc {
 	struct iommu_unit	iommu;
 	struct resource		*res[3];
@@ -80,6 +83,23 @@ static struct resource_spec dm_iommu_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
 	{ -1, 0 }
 };
+
+static int
+dm_iommu_find(device_t dev, device_t child)
+{
+	struct dm_iommu_softc *sc;
+	uint16_t rid;
+	int seg;
+
+	sc = device_get_softc(dev);
+
+	rid = pci_get_rid(child);
+	seg = pci_get_domain(child);
+
+	printf("%s: rid %d seg %d\n", __func__, rid, seg);
+
+	return (0);
+}
 
 static int
 dm_iommu_probe(device_t dev)
@@ -143,9 +163,10 @@ static device_method_t dm_iommu_methods[] = {
 	DEVMETHOD(device_probe,		dm_iommu_probe),
 	DEVMETHOD(device_attach,	dm_iommu_attach),
 
-#if 0
 	/* SMMU interface */
 	DEVMETHOD(iommu_find,		dm_iommu_find),
+
+#if 0
 	DEVMETHOD(iommu_map,		dm_iommu_map),
 	DEVMETHOD(iommu_unmap,		dm_iommu_unmap),
 	DEVMETHOD(iommu_domain_alloc,	dm_iommu_domain_alloc),
