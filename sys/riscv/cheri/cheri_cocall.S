@@ -101,16 +101,16 @@ SIGCODE(switcher_cocall)
 	 */
 	clr.c	ct1, (ct0)
 	cgettag	t2, ct1
-	bne	t2, zero, 10f
+	bnez	t2, 10f
 	csc.c	t3, idc, (ct0)
-	beq	t3, zero, 1b
+	beqz	t3, 1b
 #else
 	/*
 	 * Implement a trivial almost-spinlock.
 	 */
 	clc	ct1, SCB_CALLER_SCB(ct0)
 	cgettag	t2, ct1
-	bne	t2, zero, 10f
+	bnez	t2, 10f
 	csc	idc, SCB_CALLER_SCB(ct0)
 #endif
 
@@ -137,7 +137,7 @@ SIGCODE(switcher_cocall)
 	 * stripped off) where the callee wants it.
 	 */
 	clc	ct5, SCB_COOKIEP(ct0)
-	beq	t5, zero, 2f		// XXX: Right opcode?
+	beqz	t5, 2f
 	ccleartag	ca1, ca1
 	csc	ca1, 0(ct5)
 2:
@@ -222,7 +222,7 @@ CSYM(switcher_cocall_copy_end)
 	/*
 	 * It is, go around.
 	 */
-	bne	t2, zero, 1b
+	bnez	t2, 1b
 	nop
 
 	/*
@@ -239,7 +239,7 @@ CSYM(switcher_cocall_copy_onfault)
 	/* Clear state in the callee's scb. */
 	clc	ct1, SCB_CALLEE_SCB(idc)
 	clc	ct2, SCB_COOKIEP(ct1)
-	beq	t2, zero, 5f
+	beqz	t2, 5f
 	csc	cnull, (ct2)
 5:
 	csc	cnull, SCB_CALLER_SCB(ct1)
