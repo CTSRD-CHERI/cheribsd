@@ -612,6 +612,14 @@ kern_coregister(struct thread *td, const char * __capability namep,
 			return (error);
 	}
 
+	cap = cheri_seal(td->td_scb, switcher_sealcap2);
+
+	if (capp != NULL) {
+		error = sucap(capp, (intcap_t)cap);
+		if (error != 0)
+			return (error);
+	}
+
 	if (namep != NULL) {
 		error = copyinstr(namep, name, sizeof(name), NULL);
 		if (error != 0)
@@ -630,19 +638,7 @@ kern_coregister(struct thread *td, const char * __capability namep,
 				return (EEXIST);
 			}
 		}
-	}
 
-	cap = cheri_seal(td->td_scb, switcher_sealcap2);
-
-	if (capp != NULL) {
-		error = sucap(capp, (intcap_t)cap);
-		if (error != 0) {
-			vm_map_unlock(&vmspace->vm_map);
-			return (error);
-		}
-	}
-
-	if (namep != NULL) {
 		con = malloc(sizeof(struct coname), M_TEMP, M_WAITOK);
 		con->c_name = strdup(name, M_TEMP);
 		con->c_value = cap;
@@ -666,6 +662,7 @@ kern_colookup(struct thread *td, const char * __capability namep,
 {
 	struct vmspace *vmspace;
 	const struct coname *con;
+	intcap_t cap;
 	char name[PATH_MAX];
 	int error;
 
@@ -686,8 +683,9 @@ kern_colookup(struct thread *td, const char * __capability namep,
 		return (ESRCH);
 	}
 
-	error = sucap(capp, (intcap_t)con->c_value);
+	cap = (intcap_t)con->c_value;
 	vm_map_unlock_read(&vmspace->vm_map);
+	error = sucap(capp, cap);
 	return (error);
 }
 
