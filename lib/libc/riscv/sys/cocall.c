@@ -42,6 +42,7 @@ cocall(void * __capability target,
     void * __capability inbuf, size_t inlen)
 {
 
+	_trace_cocall((ptraddr_t)target, outlen, inlen);
 	return (_cocall(_cocall_code, _cocall_data, target,
 	    outbuf, outlen, inbuf, inlen));
 }

@@ -42,6 +42,7 @@ coaccept(void * __capability * __capability cookiep,
     void * __capability inbuf, size_t inlen)
 {
 
+	_trace_cocall(0, outlen, inlen);
 	return (_coaccept(_coaccept_code, _coaccept_data, cookiep,
 	    outbuf, outlen, inbuf, inlen));
 }

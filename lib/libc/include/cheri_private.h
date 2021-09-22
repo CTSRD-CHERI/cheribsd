@@ -51,6 +51,8 @@ extern _Thread_local void * __capability _cocall_code;
 extern _Thread_local void * __capability _cocall_data;
 extern _Thread_local void * __capability _coaccept_code;
 extern _Thread_local void * __capability _coaccept_data;
+
+void _trace_cocall(ptraddr_t target, size_t outlen, size_t inlen);
 #endif /* __has_feature(capabilities) */
 
 #endif /* __LIBC_CHERI_PRIVATE_H__ */

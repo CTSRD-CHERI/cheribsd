@@ -199,6 +199,28 @@ print_utrace_malloc(FILE *fp, void *p)
 		fprintf(fp, "%p = realloc(%p, %zu)", ut->r, ut->p, ut->s);
 }
 
+#if __has_feature(capabilities)
+struct utrace_cocall {
+	char	sig[6];
+	ptraddr_t target;
+	size_t	outlen;
+	size_t	inlen;
+};
+
+static void
+print_utrace_cocall(FILE *fp, void *p)
+{
+	struct utrace_cocall *uc = p;
+
+	if (uc->target == 0)
+		fprintf(fp, "coaccept:");
+	else
+		fprintf(fp, "cocall: target=%p", (void *)(uintptr_t)uc->target);
+	fprintf(fp, " outlen=%zu inlen=%zu", uc->outlen, uc->inlen);
+}
+#endif
+
+
 int
 sysdecode_utrace(FILE *fp, void *p, size_t len)
 {
@@ -225,6 +247,14 @@ sysdecode_utrace(FILE *fp, void *p, size_t len)
 		print_utrace_malloc(fp, p);
 		return (1);
 	}
+
+#if __has_feature(capabilities)
+	if (len == sizeof(struct utrace_cocall) && bcmp(p, "COCALL",
+	    strlen("COCALL")) == 0) {
+		print_utrace_cocall(fp, p);
+		return (1);
+	}
+#endif
 
 #ifdef __LP64__
 	if (len == sizeof(struct utrace_rtld32) && bcmp(p, rtld_utrace_sig,

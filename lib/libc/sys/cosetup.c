@@ -32,16 +32,55 @@
 __FBSDID("$FreeBSD$");
 
 #include "namespace.h"
+#include <sys/param.h>
+#include <sys/uio.h>
+#include <sys/ktrace.h>
 #include <errno.h>
+#include <pthread.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include "cheri_private.h"
 #include "libc_private.h"
 #include "un-namespace.h"
 
+struct utrace_cocall {
+	char	sig[6];	/* 'COCALL' */
+	ptraddr_t target;
+	size_t	outlen;
+	size_t	inlen;
+};
+
 _Thread_local void * __capability _cocall_code;
 _Thread_local void * __capability _cocall_data;
 _Thread_local void * __capability _coaccept_code;
 _Thread_local void * __capability _coaccept_data;
+
+static bool trace_cocalls;
+static pthread_once_t once_control = PTHREAD_ONCE_INIT;
+
+static void
+check_trace_cocalls(void)
+{
+	trace_cocalls = (getenv("COCALL_UTRACE") != NULL);
+}
+
+void
+_trace_cocall(ptraddr_t target, size_t outlen, size_t inlen)
+{
+	struct utrace_cocall uc;
+
+	_once(&once_control, check_trace_cocalls);
+
+	if (!trace_cocalls)
+		return;
+	memcpy(uc.sig, "COCALL", sizeof(uc.sig));
+	uc.target = target;
+	uc.outlen = outlen;
+	uc.inlen = inlen;
+	utrace(&uc, sizeof(uc));
+}
 
 int
 cosetup(int what)
