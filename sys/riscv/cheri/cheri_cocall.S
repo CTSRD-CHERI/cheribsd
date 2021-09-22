@@ -228,7 +228,6 @@ CSYM(switcher_cocall_copy_end)
 	/*
 	 * Nope - length zero means we need to return error encoded as offset.
 	 */
-	clc	ct2, SCB_CRA(idc)
 	cgetoffset	a0, ct1
 	li	t0, 1
 	j	4b
