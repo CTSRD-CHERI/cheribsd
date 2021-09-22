@@ -52,7 +52,7 @@ __FBSDID("$FreeBSD$");
 #if __has_feature(capabilities)
 #include <cheri/cheric.h>
 #ifdef CHERI_CAPREVOKE
-#include <vm/vm_caprevoke.h>
+#include <vm/vm_cheri_revoke.h>
 #endif
 #endif
 
@@ -350,12 +350,12 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	if (lower && (far < VM_MAX_USER_ADDRESS)  &&
 	    ((esr & ISS_DATA_DFSC_MASK) == ISS_DATA_DFSC_LC_SC) &&
 	    !(esr & ISS_DATA_WnR)) {
-		if (vm_caprevoke_fault_visit(p->p_vmspace, far) ==
-		    VM_CAPREVOKE_FAULT_RESOLVED)
+		if (vm_cheri_revoke_fault_visit(p->p_vmspace, far) ==
+		    VM_CHERI_REVOKE_FAULT_RESOLVED)
 			return;
 		else {
 			/*
-			 * vm_caprevoke_fault_visit calls
+			 * vm_cheri_revoke_fault_visit calls
 			 * pmap_caploadgen_update, so if it's left us
 			 * UNRESOLVED, then there's no point in trying the pmap
 			 * again.
