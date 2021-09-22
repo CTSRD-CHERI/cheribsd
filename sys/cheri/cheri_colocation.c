@@ -340,6 +340,22 @@ colocation_unborrow(struct thread *td)
 		return;
 	}
 
+#ifdef __mips__
+	KASSERT(td->td_frame->v0 != SYS_copark,
+	    ("%s: unborrowing for copark(); peer td_sa.code %ld; td %p, pid %d (%s); peer td %p, peer pid %d (%s)\n",
+	    __func__, (long)peertd->td_frame->v0,
+	    td, td->td_proc->p_pid, td->td_proc->p_comm,
+	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm));
+#elif defined(__riscv)
+	KASSERT(td->td_frame->tf_t[0] != SYS_copark,
+	    ("%s: unborrowing for copark(); peer td_sa.code %ld; td %p, pid %d (%s); peer td %p, peer pid %d (%s)\n",
+	    __func__, (long)peertd->td_frame->tf_t[0],
+	    td, td->td_proc->p_pid, td->td_proc->p_comm,
+	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm));
+#else
+#error "what architecture is this?"
+#endif
+
 	KASSERT(td == scb.scb_td,
 	    ("%s: td %p != scb_td %p\n", __func__, td, scb.scb_td));
 	KASSERT(peertd != td,
