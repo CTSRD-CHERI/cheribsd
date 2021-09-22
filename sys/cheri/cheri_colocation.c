@@ -562,25 +562,25 @@ kern_cosetup(struct thread *td, int what,
 		codecap = switcher_code_cap(td,
 		    td->td_proc->p_sysent->sv_cocall_base,
 		    td->td_proc->p_sysent->sv_cocall_len);
-		error = copyoutcap(&codecap, codep, sizeof(codecap));
+		error = sucap(codep, (intcap_t)codecap);
 		if (error != 0)
 			return (error);
 
 		datacap = cheri_seal(td->td_scb, switcher_sealcap);
-		error = copyoutcap(&datacap, datap, sizeof(datacap));
-		return (0);
+		error = sucap(datap, (intcap_t)datacap);
+		return (error);
 
 	case COSETUP_COACCEPT:
 		codecap = switcher_code_cap(td,
 		    td->td_proc->p_sysent->sv_coaccept_base,
 		    td->td_proc->p_sysent->sv_coaccept_len);
-		error = copyoutcap(&codecap, codep, sizeof(codecap));
+		error = sucap(codep, (intcap_t)codecap);
 		if (error != 0)
 			return (error);
 
 		datacap = cheri_seal(td->td_scb, switcher_sealcap);
-		error = copyoutcap(&datacap, datap, sizeof(datacap));
-		return (0);
+		error = sucap(datap, (intcap_t)datacap);
+		return (error);
 
 	default:
 		return (EINVAL);
@@ -635,7 +635,7 @@ kern_coregister(struct thread *td, const char * __capability namep,
 	cap = cheri_seal(td->td_scb, switcher_sealcap2);
 
 	if (capp != NULL) {
-		error = copyoutcap(&cap, capp, sizeof(cap));
+		error = sucap(capp, (intcap_t)cap);
 		if (error != 0) {
 			vm_map_unlock(&vmspace->vm_map);
 			return (error);
@@ -686,7 +686,7 @@ kern_colookup(struct thread *td, const char * __capability namep,
 		return (ESRCH);
 	}
 
-	error = copyoutcap(&con->c_value, capp, sizeof(con->c_value));
+	error = sucap(capp, (intcap_t)con->c_value);
 	vm_map_unlock_read(&vmspace->vm_map);
 	return (error);
 }
@@ -711,7 +711,7 @@ kern_cogetpid(struct thread *td, pid_t * __capability pidp)
 		return (ESRCH);
 
 	pid = scb.scb_td->td_proc->p_pid;
-	error = copyoutcap(&pid, pidp, sizeof(pid));
+	error = copyout(&pid, pidp, sizeof(pid));
 
 	return (error);
 }
