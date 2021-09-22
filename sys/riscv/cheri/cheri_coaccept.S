@@ -102,8 +102,7 @@ _C_LABEL(switcher_coaccept):
 	 */
 	cgetlen	t1, ct0
 	bnez	t1, 1f
-	ccleartag ct2, cnull
-	csc	ct2, SCB_CALLER_SCB(idc)
+	csc	cnull, SCB_CALLER_SCB(idc)
 	li	t0, SYS_copark
 	ecall
 
@@ -155,8 +154,8 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Zero out the scb_peer_scb variables, releasing the spinlock.
 	 */
-	csd	zero, SCB_CALLEE_SCB(ct0)
-	csd	zero, SCB_CALLER_SCB(idc)
+	csc	cnull, SCB_CALLEE_SCB(ct0)
+	csc	cnull, SCB_CALLER_SCB(idc)
 
 	li	t0, 0
 	li	a0, 0
