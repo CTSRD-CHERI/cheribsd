@@ -73,6 +73,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libmemstat \
 	${_libstatcounters} \
 	libmd \
+	libmixer \
 	libmt \
 	lib80211 \
 	${_libnetmap} \
