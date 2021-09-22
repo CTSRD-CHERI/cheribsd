@@ -5091,7 +5091,7 @@ out:
 }
 
 int
-pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
+pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 {
 	enum pmap_caploadgen_res res;
 #if VM_NRESERVLEVEL > 0
@@ -5099,7 +5099,6 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 #endif
 	pt_entry_t *pte, tpte, exppte;
 	vm_page_t m;
-	vm_offset_t next = 0, va = *pva;
 	int lvl;
 
 	PMAP_ASSERT_STAGE1(pmap);
@@ -5131,13 +5130,6 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 
 	switch(lvl) {
 		/*
-		 * case 1:
-		 *	next = va + L1_SIZE;
-		 *	break;
-		 *case 2:
-		 *	next = va + L2_SIZE;
-		 *	break;
-		 *
 		 * Large page: bouncing out here means we'll take a VM fault to
 		 * find the page in question.
 		 *
@@ -5149,7 +5141,6 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 			res = PMAP_CAPLOADGEN_UNABLE;
 			goto out;
 		case 3:
-			next = va + L3_SIZE;
 			break;
 	}
 
@@ -5159,7 +5150,6 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 			pmap_invalidate_page(pmap, va, true);
 		}
 
-		*pva = next;
 		m = NULL;
 		res = PMAP_CAPLOADGEN_ALREADY;
 		goto out;
@@ -5172,7 +5162,6 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 		 * scanned), so go ahead and update.  We know that the CLG bits
 		 * must still be wrong in light of the earlier test.
 		 */
-		*pva = next;
 		res = PMAP_CAPLOADGEN_OK;
 
 		if (!(flags & PMAP_CAPLOADGEN_HASCAPS)) {
@@ -5283,7 +5272,6 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t *pva, vm_page_t *mp, int flags)
 			pmap_invalidate_page(pmap, va, true);
 		}
 
-		*pva = next;
 		m = NULL;
 		res = PMAP_CAPLOADGEN_CLEAN;
 	} else if (vm_page_tryxbusy(m)) {
