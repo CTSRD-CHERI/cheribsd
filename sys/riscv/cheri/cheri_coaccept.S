@@ -115,11 +115,22 @@ _C_LABEL(switcher_coaccept):
 
 1:
 	/*
-	 * Save the pointer to the caller's kernel in the callee control
-	 * block.  This is used by kernel to look up the real thread.
+	 * If scb_borrower_td in the caller's scb is NULL, then
+	 * the current thread is the callee thread and is going
+	 * to borrow the caller thread.  Set scb_borrower_td in
+	 * the callee's scb to the caller thread.  However, if
+	 * scb_borrower_td is not NULL, then the caller's thread
+	 * is returning to the caller and scb_borrower_thread
+	 * needs to be set to NULL in the caller's scb.
 	 */
+	cld	t1, SCB_BORROWER_TD(ct0)
+	bnez	t1, 4f
 	cld	t3, SCB_TD(ct0)
 	csd	t3, SCB_BORROWER_TD(idc)
+	j	5f
+4:
+	csd	zero, SCB_BORROWER_TD(ct0)
+5:
 
 	/*
 	 * Restore the caller's context.

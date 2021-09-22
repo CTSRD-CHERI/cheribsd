@@ -115,11 +115,22 @@ SIGCODE(switcher_cocall)
 #endif
 
 	/*
-	 * Save the pointer to the callee's kernel thread in the caller
-	 * context.  This is used by kernel to look up the real thread.
+	 * If scb_borrower_td in the callee's scb is NULL, then
+	 * the current thread is the caller thread and is going
+	 * to borrow the callee thread.  Set scb_borrower_td in
+	 * the caller's scb to the callee thread.  However, if
+	 * scb_borrower_td is not NULL, then the callee's thread
+	 * is returning to the callee and scb_borrower_thread
+	 * needs to be set to NULL in the callee's scb.
 	 */
+	cld	t1, SCB_BORROWER_TD(ct0)
+	bnez	t1, 5f
 	cld	t4, SCB_TD(ct0)
 	csd	t4, SCB_BORROWER_TD(idc)
+	j	6f
+5:
+	csd	zero, SCB_BORROWER_TD(ct0)
+6:
 
 	/*
 	 * Put the caller cookie (caller's data capability with the tag
