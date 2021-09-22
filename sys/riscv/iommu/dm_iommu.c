@@ -71,6 +71,8 @@ __FBSDID("$FreeBSD$");
 #include "iommu.h"
 #include "iommu_if.h"
 
+MALLOC_DEFINE(M_DM_IOMMU, "DM_IOMMU", "Device-Model IOMMU");
+
 struct dm_iommu_unit {
 	struct iommu_unit		iommu;
 	LIST_HEAD(, dm_iommu_domain)	domain_list;
@@ -89,6 +91,7 @@ struct dm_iommu_domain {
 struct dm_iommu_ctx {
 	struct iommu_ctx		ioctx;
 	struct dm_iommu_domain		*domain;
+	LIST_ENTRY(dm_iommu_ctx)	next;
 	device_t			dev;
 	bool				bypass;
 	int				sid;
@@ -150,41 +153,199 @@ dm_iommu_unmap(device_t dev, struct iommu_domain *iodom,
 static struct iommu_domain *
 dm_iommu_domain_alloc(device_t dev, struct iommu_unit *iommu)
 {
+	struct dm_iommu_domain *domain;
+	struct dm_iommu_unit *unit;
+	struct dm_iommu_softc *sc;
+
+	sc = device_get_softc(dev);
 
 	printf("%s\n", __func__);
 
-	return (NULL);
+	unit = (struct dm_iommu_unit *)iommu;
+
+	domain = malloc(sizeof(*domain), M_DM_IOMMU, M_WAITOK | M_ZERO);
+
+#if 0
+	int error;
+	int new_asid;
+	error = dm_iommu_asid_alloc(sc, &new_asid);
+	if (error) {
+		free(domain, M_DM_IOMMU);
+		device_printf(sc->dev,
+		    "Could not allocate ASID for a new domain.\n");
+		return (NULL);
+	}
+
+	domain->asid = (uint16_t)new_asid;
+#endif
+
+	pmap_pinit(&domain->p);
+	PMAP_LOCK_INIT(&domain->p);
+
+#if 0
+	error = dm_iommu_init_cd(sc, domain);
+	if (error) {
+		free(domain, M_DM_IOMMU);
+		device_printf(sc->dev, "Could not initialize CD\n");
+		return (NULL);
+	}
+
+	dm_iommu_tlbi_asid(sc, domain->asid);
+#endif
+
+	LIST_INIT(&domain->ctx_list);
+
+	IOMMU_LOCK(iommu);
+	LIST_INSERT_HEAD(&unit->domain_list, domain, next);
+	IOMMU_UNLOCK(iommu);
+
+	return (&domain->iodom);
 }
 
 static void
 dm_iommu_domain_free(device_t dev, struct iommu_domain *iodom)
 {
+	struct dm_iommu_domain *domain;
+	struct dm_iommu_softc *sc;
+	//struct dm_iommu_cd *cd;
+
+	sc = device_get_softc(dev);
 
 	printf("%s\n", __func__);
+
+	domain = (struct dm_iommu_domain *)iodom;
+
+	LIST_REMOVE(domain, next);
+
+	//cd = domain->cd;
+
+	//pmap_sremove_pages(&domain->p);
+	pmap_release(&domain->p);
+
+#if 0
+	dm_iommu_tlbi_asid(sc, domain->asid);
+	dm_iommu_asid_free(sc, domain->asid);
+
+	contigfree(cd->vaddr, cd->size, M_DM_IOMMU);
+	free(cd, M_DM_IOMMU);
+#endif
+
+	free(domain, M_DM_IOMMU);
 }
 
 static struct iommu_ctx *
 dm_iommu_ctx_alloc(device_t dev, struct iommu_domain *iodom, device_t child,
     bool disabled)
 {
+	struct dm_iommu_domain *domain;
+	struct dm_iommu_softc *sc;
+	struct dm_iommu_ctx *ctx;
+	uint16_t rid;
+#if 0
+	u_int xref, sid;
+	int err;
+#endif
+	int seg;
 
-	printf("%s\n", __func__);
+	sc = device_get_softc(dev);
+	domain = (struct dm_iommu_domain *)iodom;
 
-	return (NULL);
+	seg = pci_get_domain(child);
+	rid = pci_get_rid(child);
+
+#if 0
+	err = acpi_iort_map_pci_dm_iommuv3(seg, rid, &xref, &sid);
+	if (err)
+		return (NULL);
+
+	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE) {
+		err = dm_iommu_init_l1_entry(sc, sid);
+		if (err)
+			return (NULL);
+	}
+#endif
+
+	ctx = malloc(sizeof(struct dm_iommu_ctx), M_DM_IOMMU,
+	    M_WAITOK | M_ZERO);
+	ctx->vendor = pci_get_vendor(child);
+	ctx->device = pci_get_device(child);
+	ctx->dev = child;
+#if 0
+	ctx->sid = sid;
+#endif
+	ctx->domain = domain;
+	if (disabled)
+		ctx->bypass = true;
+
+#if 0
+	/*
+	 * Neoverse N1 SDP:
+	 * 0x800 xhci
+	 * 0x700 re
+	 * 0x600 sata
+	 */
+
+	dm_iommu_init_ste(sc, domain->cd, ctx->sid, ctx->bypass);
+
+	if (iommu_is_buswide_ctx(iodom->iommu, pci_get_bus(ctx->dev)))
+		dm_iommu_set_buswide(dev, domain, ctx);
+#endif
+
+	IOMMU_DOMAIN_LOCK(iodom);
+	LIST_INSERT_HEAD(&domain->ctx_list, ctx, next);
+	IOMMU_DOMAIN_UNLOCK(iodom);
+
+	return (&ctx->ioctx);
 }
 
 static void
 dm_iommu_ctx_free(device_t dev, struct iommu_ctx *ioctx)
 {
+	struct dm_iommu_softc *sc;
+	struct dm_iommu_ctx *ctx;
+
+	IOMMU_ASSERT_LOCKED(ioctx->domain->iommu);
 
 	printf("%s\n", __func__);
+
+	sc = device_get_softc(dev);
+	ctx = (struct dm_iommu_ctx *)ioctx;
+
+	//dm_iommu_deinit_l1_entry(sc, ctx->sid);
+
+	LIST_REMOVE(ctx, next);
+
+	free(ctx, M_DM_IOMMU);
 }
 
 static struct iommu_ctx *
 dm_iommu_ctx_lookup(device_t dev, device_t child)
 {
+	struct iommu_unit *iommu;
+	struct dm_iommu_softc *sc;
+	struct dm_iommu_domain *domain;
+	struct dm_iommu_unit *unit;
+	struct dm_iommu_ctx *ctx;
+
+	sc = device_get_softc(dev);
 
 	printf("%s\n", __func__);
+
+	unit = &sc->unit;
+	iommu = &unit->iommu;
+
+	IOMMU_ASSERT_LOCKED(iommu);
+
+	LIST_FOREACH(domain, &unit->domain_list, next) {
+		IOMMU_DOMAIN_LOCK(&domain->iodom);
+		LIST_FOREACH(ctx, &domain->ctx_list, next) {
+			if (ctx->dev == child) {
+				IOMMU_DOMAIN_UNLOCK(&domain->iodom);
+				return (&ctx->ioctx);
+			}
+		}
+		IOMMU_DOMAIN_UNLOCK(&domain->iodom);
+	}
 
 	return (NULL);
 }
