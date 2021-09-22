@@ -157,15 +157,19 @@ pan_enable(void)
 {
 
 	/*
+	 * The LLVM integrated assembler doesn't understand the PAN
+	 * PSTATE field. Because of this we need to manually create
+	 * the instruction in an asm block. This is equivalent to:
+	 * msr pan, #1
+	 *
 	 * This sets the PAN bit, stopping the kernel from accessing
 	 * memory when userspace can also access it unless the kernel
-	 * uses the userspace load/store instructions. It also ensures
-	 * that the PAN bit is set when an exception to EL1 is taken.
+	 * uses the userspace load/store instructions.
 	 */
 	if (has_pan) {
 		WRITE_SPECIALREG(sctlr_el1,
 		    READ_SPECIALREG(sctlr_el1) & ~SCTLR_SPAN);
-		__asm __volatile("msr pan, #1");
+		__asm __volatile(".inst 0xd500409f | (0x1 << 8)");
 	}
 }
 
