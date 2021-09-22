@@ -38,11 +38,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/unistd.h>
 #include <sys/proc.h>
-#include <sys/caprevoke.h>
 
 #include <machine/_inttypes.h>
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+#include <cheri/revoke.h>
 #include <machine/pcb.h>
 
 #include <vm/vm.h>
@@ -53,7 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_param.h>
-#include <vm/vm_caprevoke.h>
+#include <vm/vm_cheri_revoke.h>
 
 /*
  * Revocation test predicates
@@ -78,9 +78,9 @@ __FBSDID("$FreeBSD$");
  * userland!
  */
 static void
-vm_caprevoke_tlb_fault(void)
+vm_cheri_revoke_tlb_fault(void)
 {
-	panic("%s; try rebuilding without CHERI_CAPREVOKE_FAST_COPYIN",
+	panic("%s; try rebuilding without CHERI_cheri_revoke_FAST_COPYIN",
 		__FUNCTION__);
 }
 
@@ -89,15 +89,15 @@ vm_caprevoke_tlb_fault(void)
  */
 
 static int
-vm_do_caprevoke(int *res,
-		const struct vm_caprevoke_cookie *crc,
+vm_do_cheri_revoke(int *res,
+		const struct vm_cheri_revoke_cookie *crc,
 		const uint8_t * __capability crshadow,
-		vm_caprevoke_test_fn ctp,
+		vm_cheri_revoke_test_fn ctp,
 		uintcap_t * __capability cutp,
 		uintcap_t cut)
 {
 	int perms = cheri_getperm(cut);
-	CAPREVOKE_STATS_FOR(crst, crc);
+	CHERI_REVOKE_STATS_FOR(crst, crc);
 
 	if (perms == 0) {
 		/* For revoked or permissionless caps, do nothing. */
@@ -109,14 +109,14 @@ vm_do_caprevoke(int *res,
 		 * set or something.
 		 */
 
-		CAPREVOKE_STATS_BUMP(crst, caps_found_revoked);
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found_revoked);
 	} else if (cheri_gettag(cut) && ctp(crshadow, cut, perms)) {
 		void * __capability cscratch;
 		int stxr_status;
 
-		uintcap_t cutr = cheri_revoke(cut);
+		uintcap_t cutr = cheri_revoke_cap(cut);
 
-		CAPREVOKE_STATS_BUMP(crst, caps_found);
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
 
 		/*
 		 * Load-link the position under test; verify that it matches
@@ -166,11 +166,11 @@ again:
 
 		/* stxr returns 0 on success */
 		if (__builtin_expect(stxr_status == 0, 1)) {
-			CAPREVOKE_STATS_BUMP(crst, caps_cleared);
+			CHERI_REVOKE_STATS_BUMP(crst, caps_cleared);
 			/* Don't count a revoked cap as HASCAPS */
 		} else if (!cheri_gettag(cscratch)) {
 			/* Data; don't sweat it */
-		} else if (caprevoke_is_revoked(cscratch)) {
+		} else if (cheri_revoke_is_revoked(cscratch)) {
 			/* Revoked cap; don't worry about it */
 		} else if (__builtin_expect(stxr_status == 1, 1)) {
 			/* stxr returns 1 on failure */
@@ -181,18 +181,18 @@ again:
 			 * nor 1, which means that the stxr wasn't executed and
 			 * so the capability at cutp has changed.
 			 */
-			*res |= VM_CAPREVOKE_PAGE_DIRTY
-				| VM_CAPREVOKE_PAGE_HASCAPS ;
+			*res |= VM_CHERI_REVOKE_PAGE_DIRTY
+				| VM_CHERI_REVOKE_PAGE_HASCAPS ;
 		}
 	} else {
-		CAPREVOKE_STATS_BUMP(crst, caps_found);
+		CHERI_REVOKE_STATS_BUMP(crst, caps_found);
 
 		/*
 		 * Even though it might actually be un-tagged, that's a very
 		 * narrow race and this a very common case, so don't bother
 		 * testing.  We'll find it clear next time, maybe.
 		 */
-		*res |= VM_CAPREVOKE_PAGE_HASCAPS;
+		*res |= VM_CHERI_REVOKE_PAGE_HASCAPS;
 	}
 
 	return 0;
@@ -217,10 +217,10 @@ disable_user_memory_access()
 // TODO: CPREFETCH()
 
 static inline int
-vm_caprevoke_page_iter(const struct vm_caprevoke_cookie *crc,
-		       int (*cb)(int *, const struct vm_caprevoke_cookie *,
+vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
+		       int (*cb)(int *, const struct vm_cheri_revoke_cookie *,
 				 const uint8_t * __capability,
-				 vm_caprevoke_test_fn,
+				 vm_cheri_revoke_test_fn,
 				 uintcap_t * __capability,
 				 uintcap_t),
 		       uintcap_t * __capability mvu,
@@ -229,11 +229,11 @@ vm_caprevoke_page_iter(const struct vm_caprevoke_cookie *crc,
 	int res = 0;
 
 	/* Load once up front, which is almost as good as const */
-	vm_caprevoke_test_fn ctp = crc->map->vm_caprev_test;
+	vm_cheri_revoke_test_fn ctp = crc->map->vm_cheri_revoke_test;
 	const uint8_t * __capability crshadow = crc->crshadow;
 
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
-	curthread->td_pcb->pcb_onfault = (vm_offset_t)vm_caprevoke_tlb_fault;
+	curthread->td_pcb->pcb_onfault = (vm_offset_t)vm_cheri_revoke_tlb_fault;
 	enable_user_memory_access();
 #endif
 
@@ -254,15 +254,16 @@ out:
 }
 
 int
-vm_caprevoke_test(const struct vm_caprevoke_cookie *crc, uintcap_t cut)
+vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintcap_t cut)
 {
 	if (cheri_gettag(cut)) {
 		int res;
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
-		curthread->td_pcb->pcb_onfault = (vm_offset_t)vm_caprevoke_tlb_fault;
+		curthread->td_pcb->pcb_onfault =
+		    (vm_offset_t)vm_cheri_revoke_tlb_fault;
 		enable_user_memory_access();
 #endif
-		res = crc->map->vm_caprev_test(crc->crshadow, cut,
+		res = crc->map->vm_cheri_revoke_test(crc->crshadow, cut,
 		    cheri_getperm(cut));
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
 		disable_user_memory_access();
@@ -275,10 +276,10 @@ vm_caprevoke_test(const struct vm_caprevoke_cookie *crc, uintcap_t cut)
 }
 
 int
-vm_caprevoke_page_rw(const struct vm_caprevoke_cookie *crc, vm_page_t m)
+vm_cheri_revoke_page_rw(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 {
 #ifdef CHERI_CAPREVOKE_STATS
-	CAPREVOKE_STATS_FOR(crst, crc);
+	CHERI_REVOKE_STATS_FOR(crst, crc);
 	uint32_t cyc_start = get_cyclecount();
 #endif
 
@@ -307,27 +308,27 @@ vm_caprevoke_page_rw(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 
 	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), pagesizes[0]);
 
-	res = vm_caprevoke_page_iter(crc, vm_do_caprevoke, mvu, mve);
+	res = vm_cheri_revoke_page_iter(crc, vm_do_cheri_revoke, mvu, mve);
 
 	/*
-	 * stxr in vm_do_caprevoke is always a relaxed atomic.
+	 * stxr in vm_do_cheri_revoke is always a relaxed atomic.
 	 * Flush our store buffer before we update anything about this page
 	 */
 	wmb();
 
 #ifdef CHERI_CAPREVOKE_STATS
 	uint32_t cyc_end = get_cyclecount();
-	CAPREVOKE_STATS_INC(crst, page_scan_cycles, cyc_end - cyc_start);
+	CHERI_REVOKE_STATS_INC(crst, page_scan_cycles, cyc_end - cyc_start);
 #endif
 
 	return res;
 }
 
 static inline int
-vm_caprevoke_page_ro_adapt(int *res,
-			   const struct vm_caprevoke_cookie *vmcrc,
+vm_cheri_revoke_page_ro_adapt(int *res,
+			   const struct vm_cheri_revoke_cookie *vmcrc,
 		           const uint8_t * __capability crshadow,
-			   vm_caprevoke_test_fn ctp,
+			   vm_cheri_revoke_test_fn ctp,
 			   uintcap_t * __capability cutp,
 			   uintcap_t cut)
 {
@@ -337,16 +338,16 @@ vm_caprevoke_page_ro_adapt(int *res,
 	 * Being untagged would imply mutation, but we're visiting this page
 	 * under the assumption that it's read-only.
 	 */
-	KASSERT(cheri_gettag(cut), ("vm_caprevoke_page_ro_adapt untagged"));
+	KASSERT(cheri_gettag(cut), ("vm_cheri_revoke_page_ro_adapt untagged"));
 
 	/* If the thing has no permissions, we don't need to scan it later */
 	if ((cheri_gettag(cut) == 0) || (cheri_getperm(cut) == 0))
 		return 0;
 
-	*res |= VM_CAPREVOKE_PAGE_HASCAPS;
+	*res |= VM_CHERI_REVOKE_PAGE_HASCAPS;
 
 	if (ctp(crshadow, cut, cheri_getperm(cut))) {
-		*res |= VM_CAPREVOKE_PAGE_DIRTY;
+		*res |= VM_CHERI_REVOKE_PAGE_DIRTY;
 
 		/* One dirty answer is as good as any other; stop eary */
 		return 1;
@@ -356,22 +357,22 @@ vm_caprevoke_page_ro_adapt(int *res,
 }
 
 /*
- * Like vm_caprevoke_page, but does not write to the page in question
+ * Like vm_cheri_revoke_page, but does not write to the page in question
  *
- * VM_CAPREVOKE_PAGE_DIRTY in the result means that we would like to store
+ * VM_CHERI_REVOKE_PAGE_DIRTY in the result means that we would like to store
  * back, but can't, rather than that we lost a LL/SC race.  We will return
  * early if this becomes set: there's no reason to continue probing once we
  * know the answer.
  *
- * VM_CAPREVOKE_PAGE_HASCAPS continues to mean what it meant before: we
+ * VM_CHERI_REVOKE_PAGE_HASCAPS continues to mean what it meant before: we
  * saw at least one, permission-bearing capability on this page.
  */
 int
-vm_caprevoke_page_ro(const struct vm_caprevoke_cookie *crc, vm_page_t m)
+vm_cheri_revoke_page_ro(const struct vm_cheri_revoke_cookie *crc, vm_page_t m)
 {
 #ifdef CHERI_CAPREVOKE_STATS
 	uint32_t cyc_start = get_cyclecount();
-	CAPREVOKE_STATS_FOR(crst, crc);
+	CHERI_REVOKE_STATS_FOR(crst, crc);
 #endif
 
 	vm_offset_t mva;
@@ -385,10 +386,11 @@ vm_caprevoke_page_ro(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 
 	mvu = cheri_setbounds(cheri_setaddress(kdc, mva), pagesizes[0]);
 
-	res = vm_caprevoke_page_iter(crc, vm_caprevoke_page_ro_adapt, mvu, mve);
+	res = vm_cheri_revoke_page_iter(crc, vm_cheri_revoke_page_ro_adapt, mvu,
+	    mve);
 
 	/*
-	 * Unlike vm_caprevoke_page, we don't need to do a fence here: either
+	 * Unlike vm_cheri_revoke_page, we don't need to do a fence here: either
 	 * we haven't written to the page, and so there's nothing relevant in
 	 * our store buffer, or we're bailing out to upgrade the page to
 	 * writeable status.

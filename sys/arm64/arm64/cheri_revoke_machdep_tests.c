@@ -46,11 +46,11 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_param.h>
 #include <vm/vm_map.h>
-#include <vm/vm_caprevoke.h>
+#include <vm/vm_cheri_revoke.h>
 
 /* Check the coarse-grained MAP bitmap */
 static inline unsigned long
-vm_caprevoke_test_mem_map(const uint8_t * __capability crshadow,
+vm_cheri_revoke_test_mem_map(const uint8_t * __capability crshadow,
 			  uintcap_t cut)
 {
 	uint8_t bmbits;
@@ -84,12 +84,12 @@ vm_caprevoke_test_mem_map(const uint8_t * __capability crshadow,
 		return 0;
 	}
 
-	return bmbits & (1 << ((va / VM_CAPREVOKE_GSZ_MEM_MAP) % 8));
+	return bmbits & (1 << ((va / VM_CHERI_REVOKE_GSZ_MEM_MAP) % 8));
 }
 
 /* Check the fine-grained NOMAP bitmap */
 static inline unsigned long
-vm_caprevoke_test_mem_nomap(const uint8_t * __capability crshadow,
+vm_cheri_revoke_test_mem_nomap(const uint8_t * __capability crshadow,
 			    uintcap_t cut)
 {
 	uint8_t bmbits;
@@ -119,30 +119,30 @@ vm_caprevoke_test_mem_nomap(const uint8_t * __capability crshadow,
 		return 0;
 	}
 
-	return bmbits & (1 << ((va / VM_CAPREVOKE_GSZ_MEM_NOMAP) % 8));
+	return bmbits & (1 << ((va / VM_CHERI_REVOKE_GSZ_MEM_NOMAP) % 8));
 }
 
 // TODO: if ((perms & CHERI_PERMS_HWALL_OTYPE) != 0)
 // TODO: if ((perms & CHERI_PERMS_HWALL_CID) != 0)
 
 static unsigned long
-vm_caprevoke_test_just_mem(const uint8_t * __capability crshadow,
+vm_cheri_revoke_test_just_mem(const uint8_t * __capability crshadow,
 		      uintcap_t cut, unsigned long perms)
 {
 	if ((perms & (CHERI_PERMS_HWALL_MEMORY
 		     | CHERI_PERM_SW_VMEM)) != 0) {
-		if (vm_caprevoke_test_mem_map(crshadow, cut))
+		if (vm_cheri_revoke_test_mem_map(crshadow, cut))
 			return 1;
 
 		if ((perms & CHERI_PERM_SW_VMEM) == 0) {
-			return vm_caprevoke_test_mem_nomap(crshadow, cut);
+			return vm_cheri_revoke_test_mem_nomap(crshadow, cut);
 		}
 	}
 	return 0;
 }
 
 static unsigned long
-vm_caprevoke_test_just_mem_fine(const uint8_t * __capability crshadow,
+vm_cheri_revoke_test_just_mem_fine(const uint8_t * __capability crshadow,
 		      uintcap_t cut, unsigned long perms)
 {
 	/*
@@ -151,7 +151,7 @@ vm_caprevoke_test_just_mem_fine(const uint8_t * __capability crshadow,
 	 * first and only then do the permissions checks.
 	 */
 
-	if (vm_caprevoke_test_mem_nomap(crshadow, cut)) {
+	if (vm_cheri_revoke_test_mem_nomap(crshadow, cut)) {
 		if (__builtin_expect(perms & CHERI_PERM_SW_VMEM,0)) {
 			return 0;
 		}
@@ -166,20 +166,20 @@ vm_caprevoke_test_just_mem_fine(const uint8_t * __capability crshadow,
  *
  */
 void
-vm_caprevoke_set_test(vm_map_t map, int flags)
+vm_cheri_revoke_set_test(vm_map_t map, int flags)
 {
 	switch(flags) {
-	case VM_CAPREVOKE_CF_NO_COARSE_MEM
-		| VM_CAPREVOKE_CF_NO_OTYPES
-		| VM_CAPREVOKE_CF_NO_CIDS :
+	case VM_CHERI_REVOKE_CF_NO_COARSE_MEM
+		| VM_CHERI_REVOKE_CF_NO_OTYPES
+		| VM_CHERI_REVOKE_CF_NO_CIDS :
 
-		map->vm_caprev_test = vm_caprevoke_test_just_mem_fine;
+		map->vm_cheri_revoke_test = vm_cheri_revoke_test_just_mem_fine;
 		break;
 
-	case VM_CAPREVOKE_CF_NO_OTYPES
-		| VM_CAPREVOKE_CF_NO_CIDS :
+	case VM_CHERI_REVOKE_CF_NO_OTYPES
+		| VM_CHERI_REVOKE_CF_NO_CIDS :
 
-		map->vm_caprev_test = vm_caprevoke_test_just_mem;
+		map->vm_cheri_revoke_test = vm_cheri_revoke_test_just_mem;
 		break;
 
 	default:

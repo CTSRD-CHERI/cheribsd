@@ -54,7 +54,7 @@ __FBSDID("$FreeBSD$");
 #if __has_feature(capabilities)
 #include <cheri/cheric.h>
 #ifdef CHERI_CAPREVOKE
-#include <vm/vm_caprevoke.h>
+#include <vm/vm_cheri_revoke.h>
 #endif
 #endif
 
