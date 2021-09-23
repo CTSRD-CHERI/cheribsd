@@ -161,8 +161,13 @@ static int
 dm_iommu_unmap(device_t dev, struct iommu_domain *iodom,
     vm_offset_t va, bus_size_t size)
 {
+	struct dm_iommu_domain *domain;
 
-	printf("%s\n", __func__);
+	domain = (struct dm_iommu_domain *)iodom;
+
+	printf("%s: va %lx size %lx\n", __func__, va, size);
+
+	pmap_remove(&domain->p, va, va + size);
 
 	return (0);
 }
@@ -173,6 +178,7 @@ dm_iommu_domain_alloc(device_t dev, struct iommu_unit *iommu)
 	struct dm_iommu_domain *domain;
 	struct dm_iommu_unit *unit;
 	struct dm_iommu_softc *sc;
+	struct pmap *p;
 
 	sc = device_get_softc(dev);
 
@@ -196,11 +202,22 @@ dm_iommu_domain_alloc(device_t dev, struct iommu_unit *iommu)
 	domain->asid = (uint16_t)new_asid;
 #endif
 
-	struct pmap *p;
+	uint32_t satp;
+	uint32_t addr;
+
+	satp = bus_read_4(sc->res[0], 0x00);
+
+	addr = satp & SATP_PPN_M;
+	addr <<= PAGE_SHIFT;
+
+	printf("%s: satp is %x, addr %x\n", __func__, satp, addr);
 
 	p = &domain->p;
-
+	p->pm_l1 = (pd_entry_t *)PHYS_TO_DMAP(addr);
+	p->pm_satp = satp;
 	p->pm_iommu = true;
+
+	//printf("%s: pm_l1 is %#lp\n", __func__, p->pm_l1);
 
 	pmap_pinit(p);
 	PMAP_LOCK_INIT(p);
