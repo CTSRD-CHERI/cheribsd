@@ -1269,9 +1269,11 @@ pmap_pinit(pmap_t pmap)
 	memcpy(pmap->pm_l1, kernel_pmap->pm_l1, PAGE_SIZE);
 
 	/* Add to the list of all user pmaps */
-	mtx_lock(&allpmaps_lock);
-	LIST_INSERT_HEAD(&allpmaps, pmap, pm_list);
-	mtx_unlock(&allpmaps_lock);
+	if (pmap->pm_iommu == false) {
+		mtx_lock(&allpmaps_lock);
+		LIST_INSERT_HEAD(&allpmaps, pmap, pm_list);
+		mtx_unlock(&allpmaps_lock);
+	}
 
 	vm_radix_init(&pmap->pm_root);
 

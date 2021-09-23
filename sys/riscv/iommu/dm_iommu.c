@@ -51,6 +51,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_map.h>
+#include <vm/vm_page.h>
 
 #include <machine/bus.h>
 #include <machine/cpu.h>
@@ -134,8 +135,24 @@ dm_iommu_map(device_t dev, struct iommu_domain *iodom,
     vm_offset_t va, vm_page_t *ma, vm_size_t size,
     vm_prot_t prot)
 {
+	struct dm_iommu_domain *domain;
+	vm_paddr_t pa;
+	int error;
+	int i;
+
+	domain = (struct dm_iommu_domain *)iodom;
 
 	printf("%s\n", __func__);
+
+	for (i = 0; size > 0; size -= PAGE_SIZE, i++) {
+		pa = VM_PAGE_TO_PHYS(ma[i]);
+		printf("%s: %lx -> %lx\n", __func__, va, pa);
+		error = pmap_enter(&domain->p, va, ma[i], prot,
+		    prot | PMAP_ENTER_WIRED, 0);
+		if (error)
+			return (error);
+		va += PAGE_SIZE;
+	}
 
 	return (0);
 }
@@ -179,8 +196,14 @@ dm_iommu_domain_alloc(device_t dev, struct iommu_unit *iommu)
 	domain->asid = (uint16_t)new_asid;
 #endif
 
-	pmap_pinit(&domain->p);
-	PMAP_LOCK_INIT(&domain->p);
+	struct pmap *p;
+
+	p = &domain->p;
+
+	p->pm_iommu = true;
+
+	pmap_pinit(p);
+	PMAP_LOCK_INIT(p);
 
 #if 0
 	error = dm_iommu_init_cd(sc, domain);
