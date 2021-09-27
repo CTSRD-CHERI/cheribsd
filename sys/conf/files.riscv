@@ -41,6 +41,7 @@ riscv/cheri/cheri_machdep.c	optional	cpu_cheri
 riscv/iommu/dm_iommu.c		optional iommu
 riscv/iommu/iommu.c		optional iommu
 riscv/iommu/iommu_if.m		optional iommu
+riscv/iommu/iommu_pmap.c	optional iommu
 riscv/riscv/autoconf.c		standard
 riscv/riscv/bus_machdep.c	standard
 riscv/riscv/bus_space_asm.S	standard
