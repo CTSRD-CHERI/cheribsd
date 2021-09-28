@@ -68,11 +68,21 @@ __FBSDID("$FreeBSD$");
 #include <dev/pci/pcivar.h>
 #include <dev/iommu/iommu.h>
 #include <riscv/iommu/iommu.h>
+#include <riscv/iommu/iommu_pmap.h>
 
 #include "iommu.h"
 #include "iommu_if.h"
 
 MALLOC_DEFINE(M_DM_IOMMU, "DM_IOMMU", "Device-Model IOMMU");
+
+#define	DM_DEBUG
+#undef	DM_DEBUG
+
+#ifdef	DM_DEBUG
+#define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
+#else
+#define	dprintf(fmt, ...)
+#endif
 
 struct dm_iommu_unit {
 	struct iommu_unit		iommu;
@@ -142,13 +152,18 @@ dm_iommu_map(device_t dev, struct iommu_domain *iodom,
 
 	domain = (struct dm_iommu_domain *)iodom;
 
-	printf("%s\n", __func__);
+	dprintf("%s\n", __func__);
+
+	if (prot & VM_PROT_READ)
+		prot |= VM_PROT_READ_CAP;
+
+	if (prot & VM_PROT_WRITE)
+		prot |= VM_PROT_WRITE_CAP;
 
 	for (i = 0; size > 0; size -= PAGE_SIZE, i++) {
 		pa = VM_PAGE_TO_PHYS(ma[i]);
-		printf("%s: %lx -> %lx\n", __func__, va, pa);
-		error = pmap_enter(&domain->p, va, ma[i], prot,
-		    prot | PMAP_ENTER_WIRED, 0);
+		dprintf("%s: %lx -> %lx\n", __func__, va, pa);
+		error = pmap_dm_enter(&domain->p, va, pa, prot, 0);
 		if (error)
 			return (error);
 		va += PAGE_SIZE;
@@ -165,7 +180,9 @@ dm_iommu_unmap(device_t dev, struct iommu_domain *iodom,
 
 	domain = (struct dm_iommu_domain *)iodom;
 
-	printf("%s: va %lx size %lx\n", __func__, va, size);
+	dprintf("%s: va %lx size %lx\n", __func__, va, size);
+
+	return (0);
 
 	pmap_remove(&domain->p, va, va + size);
 
@@ -185,6 +202,11 @@ dm_iommu_domain_alloc(device_t dev, struct iommu_unit *iommu)
 	printf("%s\n", __func__);
 
 	unit = (struct dm_iommu_unit *)iommu;
+
+	/* TODO. Hack: use the same domain for all devices. */
+	LIST_FOREACH(domain, &unit->domain_list, next) {
+		return (&domain->iodom);
+	}
 
 	domain = malloc(sizeof(*domain), M_DM_IOMMU, M_WAITOK | M_ZERO);
 
@@ -210,14 +232,15 @@ dm_iommu_domain_alloc(device_t dev, struct iommu_unit *iommu)
 	addr = satp & SATP_PPN_M;
 	addr <<= PAGE_SHIFT;
 
-	printf("%s: satp is %x, addr %x\n", __func__, satp, addr);
+	printf("%s: satp is %x, addr %lx\n", __func__, satp,
+	    PHYS_TO_DMAP(addr));
 
 	p = &domain->p;
 	p->pm_l1 = (pd_entry_t *)PHYS_TO_DMAP(addr);
 	p->pm_satp = satp;
 	p->pm_iommu = true;
 
-	//printf("%s: pm_l1 is %#lp\n", __func__, p->pm_l1);
+	dprintf("%s: pm_l1 is %#lp\n", __func__, p->pm_l1);
 
 	pmap_pinit(p);
 	PMAP_LOCK_INIT(p);
