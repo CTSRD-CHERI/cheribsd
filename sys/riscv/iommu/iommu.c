@@ -124,15 +124,18 @@ static struct iommu_domain *
 iommu_domain_alloc(struct iommu_unit *iommu)
 {
 	struct iommu_domain *iodom;
+	bool new;
 
-	iodom = IOMMU_DOMAIN_ALLOC(iommu->dev, iommu);
+	iodom = IOMMU_DOMAIN_ALLOC(iommu->dev, iommu, &new);
 	if (iodom == NULL)
 		return (NULL);
 
-	iommu_domain_init(iommu, iodom, &domain_map_ops);
-	iodom->end = VM_MAXUSER_ADDRESS;
-	iodom->iommu = iommu;
-	iommu_gas_init_domain(iodom);
+	if (new) {
+		iommu_domain_init(iommu, iodom, &domain_map_ops);
+		iodom->end = VM_MAXUSER_ADDRESS;
+		iodom->iommu = iommu;
+		iommu_gas_init_domain(iodom);
+	}
 
 	return (iodom);
 }

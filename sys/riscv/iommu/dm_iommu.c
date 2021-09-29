@@ -190,7 +190,7 @@ dm_iommu_unmap(device_t dev, struct iommu_domain *iodom,
 }
 
 static struct iommu_domain *
-dm_iommu_domain_alloc(device_t dev, struct iommu_unit *iommu)
+dm_iommu_domain_alloc(device_t dev, struct iommu_unit *iommu, bool *new)
 {
 	struct dm_iommu_domain *domain;
 	struct dm_iommu_unit *unit;
@@ -205,10 +205,12 @@ dm_iommu_domain_alloc(device_t dev, struct iommu_unit *iommu)
 
 	/* TODO. Hack: use the same domain for all devices. */
 	LIST_FOREACH(domain, &unit->domain_list, next) {
+		*new = false;
 		return (&domain->iodom);
 	}
 
 	domain = malloc(sizeof(*domain), M_DM_IOMMU, M_WAITOK | M_ZERO);
+	*new = true;
 
 #if 0
 	int error;
