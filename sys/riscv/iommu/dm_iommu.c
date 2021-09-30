@@ -163,7 +163,7 @@ dm_iommu_map(device_t dev, struct iommu_domain *iodom,
 	for (i = 0; size > 0; size -= PAGE_SIZE, i++) {
 		pa = VM_PAGE_TO_PHYS(ma[i]);
 		dprintf("%s: %lx -> %lx\n", __func__, va, pa);
-		error = pmap_dm_enter(&domain->p, va, pa, prot, 0);
+		error = pmap_dm_enter(&domain->p, va, pa, prot);
 		if (error)
 			return (error);
 		va += PAGE_SIZE;

@@ -221,47 +221,8 @@ iommu_pmap_pinit(pmap_t pmap)
 
 	bzero(&pmap->pm_stats, sizeof(pmap->pm_stats));
 
-#if 0
-	CPU_ZERO(&pmap->pm_active);
-
-	/* Install kernel pagetables */
-	memcpy(pmap->pm_l1, kernel_pmap->pm_l1, PAGE_SIZE);
-
-	/* Add to the list of all user pmaps */
-	mtx_lock(&allpmaps_lock);
-	LIST_INSERT_HEAD(&allpmaps, pmap, pm_list);
-	mtx_unlock(&allpmaps_lock);
-
-	vm_radix_init(&pmap->pm_root);
-#endif
-
 	return (1);
 }
-
-#if 0
-static vm_page_t
-pmap_alloc_l2(pmap_t pmap, vm_offset_t va, struct rwlock **lockp)
-{
-	pd_entry_t *l1;
-	vm_page_t l2pg;
-	vm_pindex_t l2pindex;
-
-retry:
-	l1 = pmap_l1(pmap, va);
-	if (l1 != NULL && (pmap_load(l1) & PTE_RWX) == 0) {
-		/* Add a reference to the L2 page. */
-		l2pg = PHYS_TO_VM_PAGE(PTE_TO_PHYS(pmap_load(l1)));
-		l2pg->ref_count++;
-	} else {
-		/* Allocate a L2 page. */
-		l2pindex = pmap_l2_pindex(va) >> Ln_ENTRIES_SHIFT;
-		l2pg = _pmap_alloc_l3(pmap, NUL2E + l2pindex);
-		if (l2pg == NULL && lockp != NULL)
-			goto retry;
-	}
-	return (l2pg);
-}
-#endif
 
 /*
  * This routine is called if the desired page table page does not exist.
@@ -315,7 +276,6 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 		entry = (PTE_V);
 		entry |= (pn << PTE_PPN0_S);
 		pmap_store(l1, entry);
-		//pmap_distribute_l1(pmap, l1index, entry);
 	} else {
 		vm_pindex_t l1index;
 		pd_entry_t *l1, *l2;
@@ -354,8 +314,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
  * Add a single DM entry. This function does not sleep.
  */
 int
-pmap_dm_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
-    vm_prot_t prot, u_int flags)
+pmap_dm_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa, vm_prot_t prot)
 {
 	pd_entry_t *l1, *l2; // l2e;
 	pt_entry_t new_l3; // orig_l3;
@@ -371,8 +330,6 @@ pmap_dm_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	new_l3 = PTE_V | PTE_R | PTE_A;
 	if (prot & VM_PROT_EXECUTE)
 		new_l3 |= PTE_X;
-	if (flags & VM_PROT_WRITE)
-		new_l3 |= PTE_D;
 	if (prot & VM_PROT_WRITE)
 		new_l3 |= PTE_W;
 	if (va < VM_MAX_USER_ADDRESS)
