@@ -53,14 +53,12 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/machdep.h>
 
-#include <cheri/cheric.h>
-
 #include <riscv/iommu/iommu_pmap.h>
 #if 0
 #include <riscv/iommu/iommu_pte.h>
-#endif
-
+#else
 #include <machine/pte.h>
+#endif
 
 #define	IOMMU_PAGE_SIZE		4096
 
@@ -68,20 +66,6 @@ __FBSDID("$FreeBSD$");
 #define	NUL2E		(Ln_ENTRIES * NUL1E)
 
 #define	pmap_l2_pindex(v)	((v) >> L2_SHIFT)
-
-extern cpuset_t all_harts;
-
-/*
- * Internal flags for pmap_enter()'s helper functions.
- */
-#define	PMAP_ENTER_NORECLAIM	0x1000000	/* Don't reclaim PV entries. */
-#define	PMAP_ENTER_NOREPLACE	0x2000000	/* Don't replace mappings. */
-
-static vm_page_t _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex);
-
-static void _pmap_unwire_ptp(pmap_t pmap, vm_offset_t va, vm_page_t m,
-    struct spglist *free);
-static int pmap_unuse_pt(pmap_t, vm_offset_t, pd_entry_t, struct spglist *);
 
 #define	pmap_clear(pte)			pmap_store(pte, 0)
 #define	pmap_clear_bits(pte, bits)	atomic_clear_64(pte, bits)
@@ -189,6 +173,13 @@ pmap_resident_count_dec(pmap_t pmap, int count)
 	    ("pmap %p resident count underflow %ld %d", pmap,
 	    pmap->pm_stats.resident_count, count));
 	pmap->pm_stats.resident_count -= count;
+}
+
+static __inline int
+pmap_l3_valid(pt_entry_t l3)
+{
+
+	return ((l3 & PTE_V) != 0);
 }
 
 /***************************************************
@@ -316,9 +307,8 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 int
 pmap_dm_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa, vm_prot_t prot)
 {
-	pd_entry_t *l1, *l2; // l2e;
-	pt_entry_t new_l3; // orig_l3;
-	pt_entry_t *l3;
+	pd_entry_t *l2, *l3;
+	pt_entry_t new_l3, orig_l3;
 	pn_t pn;
 	int rv;
 	vm_pindex_t l2pindex;
@@ -345,23 +335,16 @@ pmap_dm_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa, vm_prot_t prot)
 
 	CTR2(KTR_PMAP, "pmap_dm_enter: %.16lx -> %.16lx", va, pa);
 
-	//printf("%s: pmap_dm_enter: %.16lx -> %.16lx\n", __func__, va, pa);
-
 	PMAP_LOCK(pmap);
 
 retry:
-	l1 = pmap_l1(pmap, va);
-	//printf("%s: l1 is %p\n", __func__, l1);
-	//printf("%s: pm_l1_index %ld\n", __func__, pmap_l1_index(va));
-
 	l2 = pmap_l2(pmap, va);
 	if (l2 != NULL && pmap_load(l2) != 0) {
 		l3 = pmap_l2_to_l3(l2, va);
 	} else {
 		/* Allocate a L2 page. */
-		l2pindex = pmap_l2_pindex(va) >> Ln_ENTRIES_SHIFT;
 		l2pindex = pmap_l2_pindex(va);
-		l2pg = _pmap_alloc_l3(pmap, l2pindex); //NUL2E + l2pindex);
+		l2pg = _pmap_alloc_l3(pmap, l2pindex);
 		if (l2pg == NULL) {
 			CTR0(KTR_PMAP, "pmap_enter: l2pg == NULL");
 			rv = KERN_RESOURCE_SHORTAGE;
@@ -370,8 +353,8 @@ retry:
 		goto retry;
 	}
 
-	//orig_l3 = pmap_load(l3);
-	//KASSERT(!pmap_l3_valid(orig_l3), ("l3 is valid"));
+	orig_l3 = pmap_load(l3);
+	KASSERT(!pmap_l3_valid(orig_l3), ("l3 is valid"));
 
 	/* New mapping */
 	pmap_store(l3, new_l3);
