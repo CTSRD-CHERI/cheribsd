@@ -42,5 +42,6 @@ int iommu_pmap_pinit(pmap_t pmap);
 
 /* Device-model. */
 int pmap_dm_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa, vm_prot_t prot);
+int pmap_dm_remove(pmap_t pmap, vm_offset_t va);
 
 #endif /* !_RISCV_IOMMU_IOMMU_PMAP_H_ */

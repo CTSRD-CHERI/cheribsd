@@ -366,3 +366,27 @@ out:
 
 	return (rv);
 }
+
+/*
+ * Remove a single DM entry.
+ */
+int
+pmap_dm_remove(pmap_t pmap, vm_offset_t va)
+{
+	pd_entry_t *l3;
+	int rv;
+
+	PMAP_LOCK(pmap);
+
+	l3 = pmap_l3(pmap, va);
+	if (l3 != NULL) {
+		pmap_resident_count_dec(pmap, 1);
+		pmap_clear(l3);
+		rv = KERN_SUCCESS;
+	} else
+		rv = KERN_FAILURE;
+
+	PMAP_UNLOCK(pmap);
+
+	return (rv);
+}

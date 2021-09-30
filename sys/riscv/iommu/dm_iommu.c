@@ -177,16 +177,24 @@ dm_iommu_unmap(device_t dev, struct iommu_domain *iodom,
     vm_offset_t va, bus_size_t size)
 {
 	struct dm_iommu_domain *domain;
+	int error;
+	int i;
 
 	domain = (struct dm_iommu_domain *)iodom;
 
 	dprintf("%s: va %lx size %lx\n", __func__, va, size);
 
-	return (0);
+	error = 0;
 
-	pmap_remove(&domain->p, va, va + size);
+	for (i = 0; i < size; i += PAGE_SIZE) {
+		if (pmap_dm_remove(&domain->p, va) != 0) {
+			error = ENOENT;
+			break;
+		}
+		va += PAGE_SIZE;
+	}
 
-	return (0);
+	return (error);
 }
 
 static struct iommu_domain *
