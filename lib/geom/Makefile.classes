@@ -5,7 +5,7 @@ GEOM_CLASS_DIR?=/usr/lib32/geom
 .elif defined(COMPAT_64BIT)
 GEOM_CLASS_DIR?=/usr/lib64/geom
 .elif defined(COMPAT_CHERI)
-GEOM_CLASS_DIR?=/usr/libcheri/geom
+GEOM_CLASS_DIR?=/usr/lib64c/geom
 .else
 GEOM_CLASS_DIR?=/lib/geom
 .endif
