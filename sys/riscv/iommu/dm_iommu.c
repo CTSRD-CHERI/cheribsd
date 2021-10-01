@@ -245,26 +245,14 @@ dm_iommu_domain_alloc(device_t dev, struct iommu_unit *iommu, bool *new)
 	printf("%s: satp is %x, addr %lx\n", __func__, satp,
 	    PHYS_TO_DMAP(addr));
 
+	/* Initialize pmap. */
 	p = &domain->p;
 	p->pm_l1 = (pd_entry_t *)PHYS_TO_DMAP(addr);
 	p->pm_satp = satp;
 	p->pm_iommu = true;
-
+	bzero(&p->pm_stats, sizeof(p->pm_stats));
 	dprintf("%s: pm_l1 is %#lp\n", __func__, p->pm_l1);
-
-	pmap_pinit(p);
 	PMAP_LOCK_INIT(p);
-
-#if 0
-	error = dm_iommu_init_cd(sc, domain);
-	if (error) {
-		free(domain, M_DM_IOMMU);
-		device_printf(sc->dev, "Could not initialize CD\n");
-		return (NULL);
-	}
-
-	dm_iommu_tlbi_asid(sc, domain->asid);
-#endif
 
 	LIST_INIT(&domain->ctx_list);
 
@@ -280,7 +268,6 @@ dm_iommu_domain_free(device_t dev, struct iommu_domain *iodom)
 {
 	struct dm_iommu_domain *domain;
 	struct dm_iommu_softc *sc;
-	//struct dm_iommu_cd *cd;
 
 	sc = device_get_softc(dev);
 
@@ -290,18 +277,8 @@ dm_iommu_domain_free(device_t dev, struct iommu_domain *iodom)
 
 	LIST_REMOVE(domain, next);
 
-	//cd = domain->cd;
-
-	//pmap_sremove_pages(&domain->p);
-	pmap_release(&domain->p);
-
-#if 0
-	dm_iommu_tlbi_asid(sc, domain->asid);
-	dm_iommu_asid_free(sc, domain->asid);
-
-	contigfree(cd->vaddr, cd->size, M_DM_IOMMU);
-	free(cd, M_DM_IOMMU);
-#endif
+	iommu_pmap_remove_pages(&domain->p);
+	iommu_pmap_release(&domain->p);
 
 	free(domain, M_DM_IOMMU);
 }

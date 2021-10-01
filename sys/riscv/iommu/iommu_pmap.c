@@ -187,6 +187,21 @@ pmap_l3_valid(pt_entry_t l3)
  ***************************************************/
 
 /***************************************************
+ * Pmap allocation/deallocation routines.
+ ***************************************************/
+
+/*
+ * Release any resources held by the given physical map.
+ * Called when a pmap initialized by pmap_pinit is being released.
+ * Should only be called if the map contains no valid mappings.
+ */
+void
+iommu_pmap_release(pmap_t pmap)
+{
+	/* TODO */
+}
+
+/***************************************************
  * Page table page management routines.....
  ***************************************************/
 
@@ -389,4 +404,74 @@ pmap_dm_remove(pmap_t pmap, vm_offset_t va)
 	PMAP_UNLOCK(pmap);
 
 	return (rv);
+}
+
+/*
+ * Remove all the allocated L1, L2 pages from iommu pmap.
+ * All the L3 entires must be cleared in advance, otherwise
+ * this function panics.
+ */
+void
+iommu_pmap_remove_pages(pmap_t pmap)
+{
+	pd_entry_t l1e, *l2, l2e;
+	pt_entry_t *l3, l3e;
+	vm_page_t m, m1;
+	vm_offset_t sva;
+	vm_paddr_t pa;
+	vm_paddr_t pa1;
+	int i, j, k;
+
+	PMAP_LOCK(pmap);
+
+	for (sva = VM_MINUSER_ADDRESS, i = pmap_l1_index(sva);
+	    (i < Ln_ENTRIES && sva < VM_MAXUSER_ADDRESS); i++) {
+		l1e = pmap->pm_l1[i];
+		if ((l1e & PTE_V) == 0) {
+			sva += L1_SIZE;
+			continue;
+		}
+		if ((l1e & PTE_RWX) != 0) {
+			sva += L1_SIZE;
+			continue;
+		}
+		pa1 = PTE_TO_PHYS(l1e);
+		m1 = PHYS_TO_VM_PAGE(pa1);
+		l2 = (pd_entry_t *)PHYS_TO_DMAP(pa);
+
+		for (j = pmap_l2_index(sva); j < Ln_ENTRIES; j++) {
+			l2e = l2[j];
+			if ((l2e & PTE_V) == 0) {
+				sva += L2_SIZE;
+				continue;
+			}
+			pa = PTE_TO_PHYS(l2e);
+			m = PHYS_TO_VM_PAGE(pa);
+			l3 = (pd_entry_t *)PHYS_TO_DMAP(pa);
+
+			for (k = pmap_l3_index(sva); k < Ln_ENTRIES; k++,
+			    sva += L3_SIZE) {
+				l3e = l3[k];
+				if ((l3e & PTE_V) == 0)
+					continue;
+				panic("%s: l3e found for va %jx\n",
+				    __func__, sva);
+			}
+
+			vm_page_unwire_noq(m1);
+			vm_page_unwire_noq(m);
+			pmap_resident_count_dec(pmap, 1);
+			vm_page_free(m);
+			pmap_clear(&l2[j]);
+		}
+
+		pmap_resident_count_dec(pmap, 1);
+		vm_page_free(m1);
+		pmap_clear(&pmap->pm_l1[i]);
+	}
+
+	KASSERT(pmap->pm_stats.resident_count == 0,
+	    ("Invalid resident count %jd", pmap->pm_stats.resident_count));
+
+	PMAP_UNLOCK(pmap);
 }
