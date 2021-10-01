@@ -2100,9 +2100,9 @@ exec_unregister(const struct execsw *execsw_arg)
  */
 static int
 compress_chunk(struct coredump_params *cp, char * __capability base, char *buf,
-    u_int len)
+    size_t len)
 {
-	u_int chunk_len;
+	size_t chunk_len;
 	int error;
 
 	while (len > 0) {
