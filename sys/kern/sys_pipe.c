@@ -1521,8 +1521,7 @@ locked_error:
  * be a natural race.
  */
 static int
-pipe_stat(struct file *fp, struct stat *ub, struct ucred *active_cred,
-    struct thread *td)
+pipe_stat(struct file *fp, struct stat *ub, struct ucred *active_cred)
 {
 	struct pipe *pipe;
 #ifdef MAC
@@ -1543,7 +1542,7 @@ pipe_stat(struct file *fp, struct stat *ub, struct ucred *active_cred,
 
 	/* For named pipes ask the underlying filesystem. */
 	if (pipe->pipe_type & PIPE_TYPE_NAMED) {
-		return (vnops.fo_stat(fp, ub, active_cred, td));
+		return (vnops.fo_stat(fp, ub, active_cred));
 	}
 
 	bzero(ub, sizeof(*ub));
