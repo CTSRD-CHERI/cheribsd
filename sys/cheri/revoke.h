@@ -233,21 +233,21 @@ cheri_revoke_is_revoked(const void * __capability cap)
 #define CHERI_REVOKE_EARLY_SYNC	0x0020
 
 	/*
-	 * If set with LAST_PASS, transition into the load side sweep state,
-	 * rather than finishing the store side.  If NO_WAIT_OK also set, then
-	 * do not run the background scan, just the barrier phase.
-	 *
-	 * At the moment there is no utility in running an incremental pass
-	 * store-side; the capdirty bits are not consulted on the load-side
-	 * pass beyond their essential role in gating the transition back to
-	 * idle state.
+         * If opening a new revocation epoch, ignore the default mode and run
+         * this one using the load-side algorithm.
 	 */
-#define CHERI_REVOKE_LOAD_SIDE	0x0040
+#define CHERI_REVOKE_FORCE_LOAD_SIDE	0x0040
+
+	/*
+         * If opening a new revocation epoch, ignore the default mode and run
+         * this one using the store-side algorithm.
+	 */
+#define CHERI_REVOKE_FORCE_STORE_SIDE	0x0080
 
 	/*
 	 * Reset the stats counters to zero "after" reporting
 	 */
-#define CHERI_REVOKE_TAKE_STATS	0x0080
+#define CHERI_REVOKE_TAKE_STATS	0x1000
 
 /*
  * Information conveyed to userland about a given cheri_revoke scan.
