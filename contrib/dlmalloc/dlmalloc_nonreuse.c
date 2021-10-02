@@ -3705,6 +3705,7 @@ malloc_revoke_internal(const char *reason) {
     error = cheri_revoke_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
         __DECONST(void **, &cri));
     assert(error == 0);
+    (void)error; // silence unused warning if asserts are disabled
   }
 #endif
 
@@ -3725,8 +3726,7 @@ malloc_revoke_internal(const char *reason) {
   cheri_revoke_epoch start_epoch = cri->epochs.enqueue;
 
   while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
-    cheri_revoke(CHERI_REVOKE_LAST_PASS|CHERI_REVOKE_LOAD_SIDE, start_epoch,
-        NULL);
+    cheri_revoke(CHERI_REVOKE_LAST_PASS, start_epoch, NULL);
   }
 #endif
 
