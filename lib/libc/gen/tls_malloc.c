@@ -517,9 +517,7 @@ do_revoke(void)
 	atomic_thread_fence(memory_order_acq_rel);
 	cheri_revoke_epoch start_epoch = cri->epochs.enqueue;
 	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
-		error = cheri_revoke(
-		    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_LOAD_SIDE,
-		    start_epoch, NULL);
+		error = cheri_revoke(CHERI_REVOKE_LAST_PASS, start_epoch, NULL);
 		assert(error == 0);
 	}
 }
