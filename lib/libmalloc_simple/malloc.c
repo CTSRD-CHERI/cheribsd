@@ -232,9 +232,8 @@ try_revoke(int target_bucket)
 		return;
 
 	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, painted_epoch)) {
-		error = cheri_revoke(
-		    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_LOAD_SIDE,
-		    painted_epoch, NULL);
+		error = cheri_revoke(CHERI_REVOKE_LAST_PASS, painted_epoch,
+		    NULL);
 		assert(error == 0);
 	}
 
