@@ -1421,9 +1421,18 @@ CHERIBSDTEST(cheribsdtest_cheri_revoke_capdirty,
 	/* Mark the start of the arena as subject to revocation */
 	((uint8_t * __capability) sh)[0] = 1;
 
+	/*
+	 * Begin revocation; because we swing capabilities around and expect
+	 * them to be unrevoked, this test only really works on the store side.
+	 * We need to specify the side only at the beginning; it will "stick"
+	 * until the end of the epoch.
+	 *
+	 * TODO: perhaps it should be rewritten or should probe at capdirty
+	 * effects that are common to load-/store-side revocation.
+	 */
 	cyc_start = get_cyclecount();
-	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_IGNORE_START |
-	    CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_FORCE_STORE_SIDE |
+	    CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_TAKE_STATS, 0, &crsi));
 	cyc_end = get_cyclecount();
 	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
 
@@ -1526,7 +1535,7 @@ CHERIBSDTEST(cheribsdtest_cheri_revoke_loadside, "Test load-side revoker")
 	 * walks.
 	 */
 	cyc_start = get_cyclecount();
-	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_LOAD_SIDE |
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_FORCE_LOAD_SIDE |
 	    CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_TAKE_STATS, 0, &crsi));
 	cyc_end = get_cyclecount();
 	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
@@ -1588,7 +1597,7 @@ CHERIBSDTEST(cheribsdtest_cheri_revoke_loadside, "Test load-side revoker")
 	 */
 	cyc_start = get_cyclecount();
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    cheri_revoke(CHERI_REVOKE_LOAD_SIDE | CHERI_REVOKE_LAST_PASS |
+	    cheri_revoke(CHERI_REVOKE_FORCE_LOAD_SIDE | CHERI_REVOKE_LAST_PASS |
 	        CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_TAKE_STATS, 0, &crsi));
 	cyc_end = get_cyclecount();
 	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
@@ -1607,7 +1616,7 @@ CHERIBSDTEST(cheribsdtest_cheri_revoke_loadside, "Test load-side revoker")
 	 */
 	cyc_start = get_cyclecount();
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    cheri_revoke(CHERI_REVOKE_LOAD_SIDE | CHERI_REVOKE_LAST_PASS |
+	    cheri_revoke(CHERI_REVOKE_FORCE_LOAD_SIDE | CHERI_REVOKE_LAST_PASS |
 	        CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_TAKE_STATS, 0, &crsi));
 	cyc_end = get_cyclecount();
 	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
@@ -1779,14 +1788,15 @@ cheribsdtest_cheri_revoke_lib_run(
 
 			switch(mode) {
 			case TCLR_MODE_STORE:
-				crflags |= CHERI_REVOKE_LAST_PASS;
+				crflags |= CHERI_REVOKE_LAST_PASS |
+				    CHERI_REVOKE_FORCE_STORE_SIDE;
 				break;
 			case TCLR_MODE_LOAD_ONCE:
 				crflags |= CHERI_REVOKE_LAST_PASS |
-				    CHERI_REVOKE_LOAD_SIDE;
+				    CHERI_REVOKE_FORCE_LOAD_SIDE;
 				break;
 			case TCLR_MODE_LOAD_SPLIT:
-				crflags |= CHERI_REVOKE_LOAD_SIDE;
+				crflags |= CHERI_REVOKE_FORCE_LOAD_SIDE;
 				break;
 			}
 
