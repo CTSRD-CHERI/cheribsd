@@ -72,6 +72,11 @@ __FBSDID("$FreeBSD$");
 #define	pmap_store(pte, entry)		atomic_store_64(pte, entry)
 #define	pmap_store_bits(pte, bits)	atomic_set_64(pte, bits)
 
+#define	PTE_TO_PHYS(pte) \
+    ((((pte) & ~PTE_HI_MASK) >> PTE_PPN0_S) * IOMMU_PAGE_SIZE)
+#define	L2PTE_TO_PHYS(l2) \
+    ((((l2) & ~PTE_HI_MASK) >> PTE_PPN1_S) << IOMMU_L2_SHIFT)
+
 /********************/
 /* Inline functions */
 /********************/
@@ -82,11 +87,6 @@ pagezero(void *p)
 
 	bzero(p, IOMMU_PAGE_SIZE);
 }
-
-#define	PTE_TO_PHYS(pte) \
-    ((((pte) & ~PTE_HI_MASK) >> PTE_PPN0_S) * IOMMU_PAGE_SIZE)
-#define	L2PTE_TO_PHYS(l2) \
-    ((((l2) & ~PTE_HI_MASK) >> PTE_PPN1_S) << IOMMU_L2_SHIFT)
 
 static __inline pd_entry_t *
 pmap_l1(pmap_t pmap, vm_offset_t va)
@@ -176,10 +176,6 @@ pmap_l3_valid(pt_entry_t l3)
 }
 
 /***************************************************
- * Low level mapping routines.....
- ***************************************************/
-
-/***************************************************
  * Pmap allocation/deallocation routines.
  ***************************************************/
 
@@ -191,12 +187,16 @@ pmap_l3_valid(pt_entry_t l3)
 void
 iommu_pmap_release(pmap_t pmap)
 {
-	/* TODO */
-}
+	vm_page_t m;
 
-/***************************************************
- * Page table page management routines.....
- ***************************************************/
+	KASSERT(pmap->pm_stats.resident_count == 0,
+	    ("pmap_release: pmap resident count %ld != 0",
+	    pmap->pm_stats.resident_count));
+
+	m = PHYS_TO_VM_PAGE(DMAP_TO_PHYS((vm_offset_t)pmap->pm_l1));
+	vm_page_unwire_noq(m);
+	vm_page_free(m);
+}
 
 int
 iommu_pmap_pinit(pmap_t pmap)
@@ -222,6 +222,10 @@ iommu_pmap_pinit(pmap_t pmap)
 
 	return (1);
 }
+
+/***************************************************
+ * Page table page management routines.....
+ ***************************************************/
 
 /*
  * This routine is called if the desired page table page does not exist.
