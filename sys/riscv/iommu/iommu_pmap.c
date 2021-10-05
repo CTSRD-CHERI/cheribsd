@@ -310,7 +310,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 }
 
 /*
- * Add a single DM entry. This function does not sleep.
+ * Add a single Device-Model entry. This function does not sleep.
  */
 int
 pmap_dm_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa, vm_prot_t prot)
@@ -376,7 +376,7 @@ out:
 }
 
 /*
- * Remove a single DM entry.
+ * Remove a single Device-Model entry.
  */
 int
 pmap_dm_remove(pmap_t pmap, vm_offset_t va)
