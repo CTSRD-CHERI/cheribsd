@@ -60,6 +60,8 @@
 #define	IOMMU_Ln_ENTRIES	(1 << Ln_ENTRIES_SHIFT)
 #define	IOMMU_Ln_ADDR_MASK	(Ln_ENTRIES - 1)
 
-#define	pmap_l2_pindex(v)	((v) >> IOMMU_L2_SHIFT)
+#define	iommu_l1_index(va)	(((va) >> IOMMU_L1_SHIFT) & IOMMU_Ln_ADDR_MASK)
+#define	iommu_l2_index(va)	(((va) >> IOMMU_L2_SHIFT) & IOMMU_Ln_ADDR_MASK)
+#define	iommu_l3_index(va)	(((va) >> IOMMU_L3_SHIFT) & IOMMU_Ln_ADDR_MASK)
 
 #endif /* !_IOMMU_PTE_H_ */

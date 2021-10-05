@@ -57,9 +57,12 @@ __FBSDID("$FreeBSD$");
 #include <riscv/iommu/iommu_pte.h>
 
 #define	IOMMU_PAGE_SIZE		4096
+#define	IOMMU_PAGE_SHIFT	12
 
 #define	NUL1E		(IOMMU_Ln_ENTRIES * IOMMU_Ln_ENTRIES)
 #define	NUL2E		(IOMMU_Ln_ENTRIES * NUL1E)
+
+#define	pmap_l2_pindex(v)	((v) >> IOMMU_L2_SHIFT)
 
 #define	pmap_clear(pte)			pmap_store(pte, 0)
 #define	pmap_clear_bits(pte, bits)	atomic_clear_64(pte, bits)
@@ -80,10 +83,6 @@ pagezero(void *p)
 	bzero(p, IOMMU_PAGE_SIZE);
 }
 
-#define	pmap_l1_index(va)	(((va) >> IOMMU_L1_SHIFT) & Ln_ADDR_MASK)
-#define	pmap_l2_index(va)	(((va) >> IOMMU_L2_SHIFT) & Ln_ADDR_MASK)
-#define	pmap_l3_index(va)	(((va) >> IOMMU_L3_SHIFT) & Ln_ADDR_MASK)
-
 #define	PTE_TO_PHYS(pte) \
     ((((pte) & ~PTE_HI_MASK) >> PTE_PPN0_S) * IOMMU_PAGE_SIZE)
 #define	L2PTE_TO_PHYS(l2) \
@@ -93,7 +92,7 @@ static __inline pd_entry_t *
 pmap_l1(pmap_t pmap, vm_offset_t va)
 {
 
-	return (&pmap->pm_l1[pmap_l1_index(va)]);
+	return (&pmap->pm_l1[iommu_l1_index(va)]);
 }
 
 static __inline pd_entry_t *
@@ -105,7 +104,7 @@ pmap_l1_to_l2(pd_entry_t *l1, vm_offset_t va)
 	phys = PTE_TO_PHYS(pmap_load(l1));
 	l2 = (pd_entry_t *)PHYS_TO_DMAP(phys);
 
-	return (&l2[pmap_l2_index(va)]);
+	return (&l2[iommu_l2_index(va)]);
 }
 
 static __inline pd_entry_t *
@@ -131,7 +130,7 @@ pmap_l2_to_l3(pd_entry_t *l2, vm_offset_t va)
 	phys = PTE_TO_PHYS(pmap_load(l2));
 	l3 = (pd_entry_t *)PHYS_TO_DMAP(phys);
 
-	return (&l3[pmap_l3_index(va)]);
+	return (&l3[iommu_l3_index(va)]);
 }
 
 static __inline pt_entry_t *
@@ -214,7 +213,7 @@ iommu_pmap_pinit(pmap_t pmap)
 
 	l1phys = VM_PAGE_TO_PHYS(l1pt);
 	pmap->pm_l1 = (pd_entry_t *)PHYS_TO_DMAP(l1phys);
-	pmap->pm_satp = SATP_MODE_SV39 | (l1phys >> PAGE_SHIFT);
+	pmap->pm_satp = SATP_MODE_SV39 | (l1phys >> IOMMU_PAGE_SHIFT);
 
 	if ((l1pt->flags & PG_ZERO) == 0)
 		pagezero(pmap->pm_l1);
@@ -418,7 +417,7 @@ iommu_pmap_remove_pages(pmap_t pmap)
 
 	PMAP_LOCK(pmap);
 
-	for (sva = VM_MINUSER_ADDRESS, i = pmap_l1_index(sva);
+	for (sva = VM_MINUSER_ADDRESS, i = iommu_l1_index(sva);
 	    (i < IOMMU_Ln_ENTRIES && sva < VM_MAXUSER_ADDRESS); i++) {
 		l1e = pmap->pm_l1[i];
 		if ((l1e & PTE_V) == 0) {
@@ -433,7 +432,7 @@ iommu_pmap_remove_pages(pmap_t pmap)
 		m1 = PHYS_TO_VM_PAGE(pa1);
 		l2 = (pd_entry_t *)PHYS_TO_DMAP(pa);
 
-		for (j = pmap_l2_index(sva); j < IOMMU_Ln_ENTRIES; j++) {
+		for (j = iommu_l2_index(sva); j < IOMMU_Ln_ENTRIES; j++) {
 			l2e = l2[j];
 			if ((l2e & PTE_V) == 0) {
 				sva += IOMMU_L2_SIZE;
@@ -443,7 +442,7 @@ iommu_pmap_remove_pages(pmap_t pmap)
 			m = PHYS_TO_VM_PAGE(pa);
 			l3 = (pd_entry_t *)PHYS_TO_DMAP(pa);
 
-			for (k = pmap_l3_index(sva); k < IOMMU_Ln_ENTRIES; k++,
+			for (k = iommu_l3_index(sva); k < IOMMU_Ln_ENTRIES; k++,
 			    sva += IOMMU_L3_SIZE) {
 				l3e = l3[k];
 				if ((l3e & PTE_V) == 0)
