@@ -43,18 +43,18 @@
 
 /* Level 1 table, 1GiB per entry */
 #define	IOMMU_L1_SHIFT		30
-#define	IOMMU_L1_SIZE 		(1 << L1_SHIFT)
-#define	IOMMU_L1_OFFSET 	(L1_SIZE - 1)
+#define	IOMMU_L1_SIZE 		(1 << IOMMU_L1_SHIFT)
+#define	IOMMU_L1_OFFSET 	(IOMMU_L1_SIZE - 1)
 
 /* Level 2 table, 2MiB per entry */
 #define	IOMMU_L2_SHIFT		21
-#define	IOMMU_L2_SIZE 		(1 << L2_SHIFT)
-#define	IOMMU_L2_OFFSET 	(L2_SIZE - 1)
+#define	IOMMU_L2_SIZE 		(1 << IOMMU_L2_SHIFT)
+#define	IOMMU_L2_OFFSET 	(IOMMU_L2_SIZE - 1)
 
 /* Level 3 table, 4KiB per entry */
 #define	IOMMU_L3_SHIFT		12
-#define	IOMMU_L3_SIZE 		(1 << L3_SHIFT)
-#define	IOMMU_L3_OFFSET 	(L3_SIZE - 1)
+#define	IOMMU_L3_SIZE 		(1 << IOMMU_L3_SHIFT)
+#define	IOMMU_L3_OFFSET 	(IOMMU_L3_SIZE - 1)
 
 #define	IOMMU_Ln_ENTRIES_SHIFT	9
 #define	IOMMU_Ln_ENTRIES	(1 << IOMMU_Ln_ENTRIES_SHIFT)
