@@ -54,18 +54,12 @@ __FBSDID("$FreeBSD$");
 #include <machine/machdep.h>
 
 #include <riscv/iommu/iommu_pmap.h>
-#if 0
 #include <riscv/iommu/iommu_pte.h>
-#else
-#include <machine/pte.h>
-#endif
 
 #define	IOMMU_PAGE_SIZE		4096
 
-#define	NUL1E		(Ln_ENTRIES * Ln_ENTRIES)
-#define	NUL2E		(Ln_ENTRIES * NUL1E)
-
-#define	pmap_l2_pindex(v)	((v) >> L2_SHIFT)
+#define	NUL1E		(IOMMU_Ln_ENTRIES * IOMMU_Ln_ENTRIES)
+#define	NUL2E		(IOMMU_Ln_ENTRIES * NUL1E)
 
 #define	pmap_clear(pte)			pmap_store(pte, 0)
 #define	pmap_clear_bits(pte, bits)	atomic_clear_64(pte, bits)
@@ -83,17 +77,17 @@ static __inline void
 pagezero(void *p)
 {
 
-	bzero(p, PAGE_SIZE);
+	bzero(p, IOMMU_PAGE_SIZE);
 }
 
-#define	pmap_l1_index(va)	(((va) >> L1_SHIFT) & Ln_ADDR_MASK)
-#define	pmap_l2_index(va)	(((va) >> L2_SHIFT) & Ln_ADDR_MASK)
-#define	pmap_l3_index(va)	(((va) >> L3_SHIFT) & Ln_ADDR_MASK)
+#define	pmap_l1_index(va)	(((va) >> IOMMU_L1_SHIFT) & Ln_ADDR_MASK)
+#define	pmap_l2_index(va)	(((va) >> IOMMU_L2_SHIFT) & Ln_ADDR_MASK)
+#define	pmap_l3_index(va)	(((va) >> IOMMU_L3_SHIFT) & Ln_ADDR_MASK)
 
 #define	PTE_TO_PHYS(pte) \
-    ((((pte) & ~PTE_HI_MASK) >> PTE_PPN0_S) * PAGE_SIZE)
+    ((((pte) & ~PTE_HI_MASK) >> PTE_PPN0_S) * IOMMU_PAGE_SIZE)
 #define	L2PTE_TO_PHYS(l2) \
-    ((((l2) & ~PTE_HI_MASK) >> PTE_PPN1_S) << L2_SHIFT)
+    ((((l2) & ~PTE_HI_MASK) >> PTE_PPN1_S) << IOMMU_L2_SHIFT)
 
 static __inline pd_entry_t *
 pmap_l1(pmap_t pmap, vm_offset_t va)
@@ -278,7 +272,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 		l1index = ptepindex - NUL1E;
 		l1 = &pmap->pm_l1[l1index];
 
-		pn = (VM_PAGE_TO_PHYS(m) / PAGE_SIZE);
+		pn = (VM_PAGE_TO_PHYS(m) / IOMMU_PAGE_SIZE);
 		entry = (PTE_V);
 		entry |= (pn << PTE_PPN0_S);
 		pmap_store(l1, entry);
@@ -286,7 +280,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 		vm_pindex_t l1index;
 		pd_entry_t *l1, *l2;
 
-		l1index = ptepindex >> (L1_SHIFT - L2_SHIFT);
+		l1index = ptepindex >> (IOMMU_L1_SHIFT - IOMMU_L2_SHIFT);
 		l1 = &pmap->pm_l1[l1index];
 		if (pmap_load(l1) == 0) {
 			/* recurse for allocating page dir */
@@ -303,9 +297,9 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 
 		phys = PTE_TO_PHYS(pmap_load(l1));
 		l2 = (pd_entry_t *)PHYS_TO_DMAP(phys);
-		l2 = &l2[ptepindex & Ln_ADDR_MASK];
+		l2 = &l2[ptepindex & IOMMU_Ln_ADDR_MASK];
 
-		pn = (VM_PAGE_TO_PHYS(m) / PAGE_SIZE);
+		pn = (VM_PAGE_TO_PHYS(m) / IOMMU_PAGE_SIZE);
 		entry = (PTE_V);
 		entry |= (pn << PTE_PPN0_S);
 		pmap_store(l2, entry);
@@ -330,7 +324,7 @@ pmap_dm_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa, vm_prot_t prot)
 	vm_page_t l2pg;
 
 	va = trunc_page(va);
-	pn = (pa / PAGE_SIZE);
+	pn = (pa / IOMMU_PAGE_SIZE);
 
 	new_l3 = PTE_V | PTE_R | PTE_A;
 	if (prot & VM_PROT_EXECUTE)
@@ -425,32 +419,32 @@ iommu_pmap_remove_pages(pmap_t pmap)
 	PMAP_LOCK(pmap);
 
 	for (sva = VM_MINUSER_ADDRESS, i = pmap_l1_index(sva);
-	    (i < Ln_ENTRIES && sva < VM_MAXUSER_ADDRESS); i++) {
+	    (i < IOMMU_Ln_ENTRIES && sva < VM_MAXUSER_ADDRESS); i++) {
 		l1e = pmap->pm_l1[i];
 		if ((l1e & PTE_V) == 0) {
-			sva += L1_SIZE;
+			sva += IOMMU_L1_SIZE;
 			continue;
 		}
 		if ((l1e & PTE_RWX) != 0) {
-			sva += L1_SIZE;
+			sva += IOMMU_L1_SIZE;
 			continue;
 		}
 		pa1 = PTE_TO_PHYS(l1e);
 		m1 = PHYS_TO_VM_PAGE(pa1);
 		l2 = (pd_entry_t *)PHYS_TO_DMAP(pa);
 
-		for (j = pmap_l2_index(sva); j < Ln_ENTRIES; j++) {
+		for (j = pmap_l2_index(sva); j < IOMMU_Ln_ENTRIES; j++) {
 			l2e = l2[j];
 			if ((l2e & PTE_V) == 0) {
-				sva += L2_SIZE;
+				sva += IOMMU_L2_SIZE;
 				continue;
 			}
 			pa = PTE_TO_PHYS(l2e);
 			m = PHYS_TO_VM_PAGE(pa);
 			l3 = (pd_entry_t *)PHYS_TO_DMAP(pa);
 
-			for (k = pmap_l3_index(sva); k < Ln_ENTRIES; k++,
-			    sva += L3_SIZE) {
+			for (k = pmap_l3_index(sva); k < IOMMU_Ln_ENTRIES; k++,
+			    sva += IOMMU_L3_SIZE) {
 				l3e = l3[k];
 				if ((l3e & PTE_V) == 0)
 					continue;
