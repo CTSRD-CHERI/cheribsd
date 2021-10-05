@@ -357,7 +357,6 @@ extern struct mtx	sigio_lock;
 #define	SIGPROP_TTYSTOP		0x08	/* ditto, from tty */
 #define	SIGPROP_IGNORE		0x10	/* ignore by default */
 #define	SIGPROP_CONT		0x20	/* continue if suspended */
-#define	SIGPROP_CANTMASK	0x40	/* non-maskable, catchable */
 #define	SIGPROP_SBUNWIND	0x80	/* sandbox unwind if not caught */
 
 /*
