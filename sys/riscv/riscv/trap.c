@@ -99,7 +99,7 @@ extern u_int qemu_trace_buffered;
 void do_trap_supervisor(struct trapframe *);
 void do_trap_user(struct trapframe *);
 
-static void db_show_frame_td(struct thread *td);
+static void db_show_frame_td(struct thread *, struct trapframe *);
 
 static bool
 switcher_onfault(struct thread *td, struct trapframe *tf, const char *msg,
@@ -240,7 +240,7 @@ static void
 dump_regs(struct trapframe *frame)
 {
 
-	db_show_frame_td(curthread);
+	db_show_frame_td(curthread, frame);
 }
 
 #if __has_feature(capabilities)
@@ -618,12 +618,8 @@ db_print_cap(struct thread *td, const char *name, const void * __capability valu
 }
 
 static void
-db_show_frame_td(struct thread *td)
+db_show_frame_td(struct thread *td, struct trapframe *frame)
 {
-	struct trapframe *frame;
-
-	frame = td->td_frame;
-
 	db_print_cap(td, " x1/ra:  ", (void * __capability)frame->tf_ra);
 	db_print_cap(td, " x2/sp:  ", (void * __capability)frame->tf_sp);
 	db_print_cap(td, " x3/gp:  ", (void * __capability)frame->tf_gp);
@@ -671,5 +667,5 @@ DB_SHOW_COMMAND(frame, db_show_frame)
 	else
 		td = curthread;
 
-	db_show_frame_td(td);
+	db_show_frame_td(td, td->td_frame);
 }
