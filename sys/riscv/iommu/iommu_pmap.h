@@ -42,7 +42,7 @@ int iommu_pmap_pinit(pmap_t pmap);
 void iommu_pmap_remove_pages(pmap_t pmap);
 void iommu_pmap_release(pmap_t pmap);
 
-/* CHERI Device-Model. */
+/* CHERI Device-Model (Example map/unmap routines). */
 int pmap_dm_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa, vm_prot_t prot);
 int pmap_dm_remove(pmap_t pmap, vm_offset_t va);
 
