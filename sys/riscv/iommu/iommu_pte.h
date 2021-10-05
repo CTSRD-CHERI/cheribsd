@@ -57,8 +57,8 @@
 #define	IOMMU_L3_OFFSET 	(L3_SIZE - 1)
 
 #define	IOMMU_Ln_ENTRIES_SHIFT	9
-#define	IOMMU_Ln_ENTRIES	(1 << Ln_ENTRIES_SHIFT)
-#define	IOMMU_Ln_ADDR_MASK	(Ln_ENTRIES - 1)
+#define	IOMMU_Ln_ENTRIES	(1 << IOMMU_Ln_ENTRIES_SHIFT)
+#define	IOMMU_Ln_ADDR_MASK	(IOMMU_Ln_ENTRIES - 1)
 
 #define	iommu_l1_index(va)	(((va) >> IOMMU_L1_SHIFT) & IOMMU_Ln_ADDR_MASK)
 #define	iommu_l2_index(va)	(((va) >> IOMMU_L2_SHIFT) & IOMMU_Ln_ADDR_MASK)
