@@ -59,6 +59,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/kdb.h>
 #endif
 
+/* XXX: Would not need this with a real 'copyuser(9)'. */
+#define	MAX_BUFFER_SIZE		16 * 1024 * 1024
+
 /*
  * Capability used to seal capability pairs returned by cosetup(2).
  */
@@ -784,8 +787,8 @@ kern_cocall_slow(void * __capability target,
 			return (EINVAL);
 		}
 
-		if (outlen > MAXBSIZE) {
-			COLOCATION_DEBUG("outlen %zd > %d, returning EMSGSIZE", outlen, MAXBSIZE);
+		if (outlen > MAX_BUFFER_SIZE) {
+			COLOCATION_DEBUG("outlen %zd > %d, returning EMSGSIZE", outlen, MAX_BUFFER_SIZE);
 			return (EMSGSIZE);
 		}
 	}
@@ -801,8 +804,8 @@ kern_cocall_slow(void * __capability target,
 			return (EINVAL);
 		}
 
-		if (inlen > MAXBSIZE) {
-			COLOCATION_DEBUG("inlen %zd > %d, returning EMSGSIZE", inlen, MAXBSIZE);
+		if (inlen > MAX_BUFFER_SIZE) {
+			COLOCATION_DEBUG("inlen %zd > %d, returning EMSGSIZE", inlen, MAX_BUFFER_SIZE);
 			return (EMSGSIZE);
 		}
 	}
@@ -976,8 +979,8 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 			return (EINVAL);
 		}
 
-		if (outlen > MAXBSIZE) {
-			COLOCATION_DEBUG("outlen %zd > %d, returning EMSGSIZE", outlen, MAXBSIZE);
+		if (outlen > MAX_BUFFER_SIZE) {
+			COLOCATION_DEBUG("outlen %zd > %d, returning EMSGSIZE", outlen, MAX_BUFFER_SIZE);
 			return (EMSGSIZE);
 		}
 	}
@@ -993,8 +996,8 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 			return (EINVAL);
 		}
 
-		if (inlen > MAXBSIZE) {
-			COLOCATION_DEBUG("inlen %zd > %d, returning EMSGSIZE", inlen, MAXBSIZE);
+		if (inlen > MAX_BUFFER_SIZE) {
+			COLOCATION_DEBUG("inlen %zd > %d, returning EMSGSIZE", inlen, MAX_BUFFER_SIZE);
 			return (EMSGSIZE);
 		}
 	}
