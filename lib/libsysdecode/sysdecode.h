@@ -114,6 +114,7 @@ const char *sysdecode_sigfpe_code(int _si_code);
 const char *sysdecode_sigill_code(int _si_code);
 const char *sysdecode_signal(int _sig);
 const char *sysdecode_sigprocmask_how(int _how);
+const char *sysdecode_sigprot_code(int _si_code);
 const char *sysdecode_sigsegv_code(int _si_code);
 const char *sysdecode_sigtrap_code(int _si_code);
 const char *sysdecode_sockaddr_family(int _sa_family);

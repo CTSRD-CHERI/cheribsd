@@ -131,6 +131,7 @@ gen_table "sigchldcode"     "CLD_[A-Z]+[[:space:]]+[0-9]+"                 "sys/
 gen_table "sigfpecode"      "FPE_[A-Z]+[[:space:]]+[0-9]+"                 "sys/signal.h"
 gen_table "sigprocmaskhow"  "SIG_[A-Z]+[[:space:]]+[0-9]+"                 "sys/signal.h"
 gen_table "sigillcode"      "ILL_[A-Z]+[[:space:]]+[0-9]+"                 "sys/signal.h"
+gen_table "sigprotcode"     "PROT_[A-Z_]+[[:space:]]+[0-9]+"               "sys/signal.h"
 gen_table "sigsegvcode"     "SEGV_[A-Z]+[[:space:]]+[0-9]+"                "sys/signal.h"
 gen_table "sigtrapcode"     "TRAP_[A-Z]+[[:space:]]+[0-9]+"                "sys/signal.h"
 gen_table "sockdomain"      "PF_[[:alnum:]]+[[:space:]]+"                  "sys/socket.h"
