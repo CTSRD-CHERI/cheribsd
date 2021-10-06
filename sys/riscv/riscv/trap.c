@@ -258,6 +258,9 @@ dump_cheri_exception(struct trapframe *frame)
 		    TVAL_CAP_CAUSE(frame->tf_stval),
 		    TVAL_CAP_IDX(frame->tf_stval));
 		break;
+	case SCAUSE_CHERI_VERSION:
+		printf("CHERI version fault");
+		break;
 	default:
 		printf("fault %ld", frame->tf_scause & SCAUSE_CODE);
 		break;
@@ -457,6 +460,7 @@ do_trap_supervisor(struct trapframe *frame)
 	case SCAUSE_LOAD_CAP_PAGE_FAULT:
 	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
 	case SCAUSE_CHERI:
+	case SCAUSE_CHERI_VERSION:
 		if (curthread->td_pcb->pcb_onfault != 0) {
 			frame->tf_a[0] = EPROT;
 			frame->tf_sepc = (uintcap_t)cheri_setaddress(
@@ -474,6 +478,11 @@ do_trap_supervisor(struct trapframe *frame)
 			panic("CHERI exception %#lx at 0x%016lx\n",
 			    TVAL_CAP_CAUSE(frame->tf_stval),
 			    (__cheri_addr unsigned long)frame->tf_sepc);
+			break;
+		case SCAUSE_CHERI_VERSION:
+			panic("Fatal capability version fault %#lx: %#016lx",
+			    (__cheri_addr unsigned long)frame->tf_sepc,
+			    frame->tf_stval);
 			break;
 		}
 #endif
@@ -583,6 +592,13 @@ do_trap_user(struct trapframe *frame)
 		call_trapsignal(td, SIGPROT,
 		    cheri_stval_to_sicode(frame->tf_stval), frame->tf_sepc,
 		    exception, TVAL_CAP_IDX(frame->tf_stval));
+		userret(td, frame);
+		break;
+	case SCAUSE_CHERI_VERSION:
+		if (log_user_cheri_exceptions)
+			dump_cheri_exception(frame);
+		call_trapsignal(td, SIGPROT, PROT_CHERI_VERSION,
+		    (uintcap_t)frame->tf_stval, exception, 0);
 		userret(td, frame);
 		break;
 #endif
