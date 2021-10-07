@@ -892,6 +892,12 @@ struct proc {
 						   external thread_single() is
 						   permitted */
 #define	P2_REAPKILLED		0x00080000
+#define	P2_MEMBAR_PRIVE		0x00100000	/* membar private expedited
+						   registered */
+#define	P2_MEMBAR_PRIVE_SYNCORE	0x00200000	/* membar private expedited
+						   sync core registered */
+#define	P2_MEMBAR_GLOBE		0x00400000	/* membar global expedited
+						   registered */
 
 #define	P2_CHERI_REVOKE_ENABLE	0x40000000	/* Force enable revocation */
 #define	P2_CHERI_REVOKE_DISABLE	0x80000000	/* Force disable revocation */
