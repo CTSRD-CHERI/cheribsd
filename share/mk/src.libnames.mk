@@ -17,6 +17,7 @@ _PRIVATELIBS=	\
 		atf_cxx \
 		auditd \
 		bsdstat \
+		cbor \
 		cheribsdtest_dynamic \
 		devdctl \
 		event1 \
@@ -712,6 +713,7 @@ LIBCAP_GRPDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_grp
 LIBCAP_PWDDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_pwd
 LIBCAP_SYSCTLDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_sysctl
 LIBCAP_SYSLOGDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_syslog
+LIBCBORDIR=	${_LIB_OBJTOP}/lib/libcbor
 LIBBSDXMLDIR=	${_LIB_OBJTOP}/lib/libexpat
 LIBKVMDIR=	${_LIB_OBJTOP}/lib/libkvm
 LIBPTHREADDIR=	${_LIB_OBJTOP}/lib/libthr
