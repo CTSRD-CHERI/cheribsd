@@ -141,6 +141,8 @@ extern struct pmap	kernel_pmap_store;
 	(uint64_t)(asid) << TTBR_ASID_SHIFT;			\
 })
 
+#define	PMAP_WANT_ACTIVE_CPUS_NAIVE
+
 extern vm_pointer_t virtual_avail;
 extern vm_pointer_t virtual_end;
 
