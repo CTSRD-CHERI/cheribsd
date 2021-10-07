@@ -21,6 +21,7 @@ _PRIVATELIBS=	\
 		cheribsdtest_dynamic \
 		devdctl \
 		event1 \
+		fido2 \
 		gmock \
 		gtest \
 		gmock_main \
@@ -356,6 +357,7 @@ _DP_pam=	radius tacplus opie md util
 _DP_pam+=	krb5
 .endif
 .if ${MK_OPENSSH} != "no"
+_DP_fido2+=	crypto z
 _DP_pam+=	ssh
 .endif
 .if ${MK_NIS} != "no"
@@ -710,11 +712,13 @@ LIBBSNMPDIR=	${_LIB_OBJTOP}/lib/libbsnmp/libbsnmp
 LIBCASPERDIR=	${_LIB_OBJTOP}/lib/libcasper/libcasper
 LIBCAP_DNSDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_dns
 LIBCAP_GRPDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_grp
+LIBCAP_NETDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_net
 LIBCAP_PWDDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_pwd
 LIBCAP_SYSCTLDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_sysctl
 LIBCAP_SYSLOGDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_syslog
 LIBCBORDIR=	${_LIB_OBJTOP}/lib/libcbor
 LIBBSDXMLDIR=	${_LIB_OBJTOP}/lib/libexpat
+LIBFIDO2DIR=	${_LIB_OBJTOP}/lib/libfido2
 LIBKVMDIR=	${_LIB_OBJTOP}/lib/libkvm
 LIBPTHREADDIR=	${_LIB_OBJTOP}/lib/libthr
 LIBMDIR=	${_LIB_OBJTOP}/lib/msun
