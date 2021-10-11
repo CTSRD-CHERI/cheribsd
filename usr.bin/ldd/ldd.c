@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
 #include <fcntl.h>
 #include <gelf.h>
 #include <libelf.h>
+#include <rtld_paths.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -54,8 +55,6 @@ __FBSDID("$FreeBSD$");
 #include <sysexits.h>
 #include <unistd.h>
 #include <spawn.h>
-
-#include "rtld_paths.h"
 
 #define RTLD_DIRECT_EXEC_TRACE_SUPPORTED 1
 
@@ -175,8 +174,8 @@ execldd32(char *file, char *fmt1, char *fmt2, int aflag)
 int
 main(int argc, char *argv[])
 {
-	const char* rtld;
 	char *fmt1, *fmt2;
+	const char *rtld;
 	int aflag, c, fd, rval, status, is_shlib, rv, type;
 
 	aflag = 0;
@@ -276,13 +275,18 @@ main(int argc, char *argv[])
 				    "instead", *argv);
 #endif
 			child = fork();
-			switch(child) {
+			switch (child) {
 			case -1:
 				err(1, "fork");
 				break;
 			case 0:
-				dlopen(*argv, RTLD_TRACE);
-				warnx("%s: %s", *argv, dlerror());
+				if (fmt1 == NULL && fmt2 == NULL) {
+					dlopen(*argv, RTLD_TRACE);
+					warnx("%s: %s", *argv, dlerror());
+				} else {
+					execl(rtld, rtld, "-d", "--",
+					    *argv, (char *)NULL);
+				}
 				_exit(1);
 			default:
 				break;
