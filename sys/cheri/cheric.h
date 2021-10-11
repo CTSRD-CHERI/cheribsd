@@ -80,6 +80,26 @@
 /* Compare capabilities including bounds and perms etc. */
 #define cheri_equal_exact(x, y) __builtin_cheri_equal_exact(x, y)
 
+/* XXX temporary static inline function until compiler builtin exists */
+static inline void * __capability _cheri_setversion(void * __capability c, int v) {
+	__asm__ __volatile__ ("csetversion %0, %1, %2":"=C"(c):"C"(c),"r"(v));
+	return c;
+}
+#define cheri_setversion(x, y) _cheri_setversion(x, y)
+
+/* XXX temporary static inline function until compiler builtin exists */
+static inline int _cheri_loadversion(void * __capability c) {
+	int v;
+	__asm__ __volatile__ ("cloadversion %0, (%1)": "=r"(v) : "C"(c));
+	return v;
+}
+#define cheri_loadversion(x) _cheri_loadversion(x)
+
+/* XXX temporary static inline function until compiler builtin exists */
+static inline void _cheri_storeversion(void * __capability c, int v) {
+	__asm__ __volatile ("cstoreversion %0, (%1)" :: "r" (v), "C" (c) : "memory");
+}
+#define cheri_storeversion(x, y) _cheri_storeversion(x, y)
 /*
  * Return whether the two pointers are equal, including capability metadata if
  * in purecap mode.

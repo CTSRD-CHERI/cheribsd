@@ -124,6 +124,12 @@
 #define	KSTACK_GUARD_PAGES	1	/* pages of kstack guard; 0 disables */
 #define	PCPU_PAGES		1
 
+
+/* XXX find proper place to put this
+   Size of version granule in bytes*/
+#define VERSION_GRANULE_SIZE    16
+#define VERSION_GRANULE_MASK  (VERSION_GRANULE_SIZE - 1)
+
 /*
  * Mach derived conversion macros
  */

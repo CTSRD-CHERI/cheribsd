@@ -35,6 +35,7 @@ CHERIBSDTEST_DIR:=	${.PARSEDIR}
 CFLAGS+=	-I${CHERIBSDTEST_DIR}/${MACHINE}
 
 CFLAGS+=	'-DPROG="${PROG}"'
+CFLAGS+=	-Xclang -target-feature -Xclang +xcherimemversion
 
 .if ${MACHINE_ABI:Mpurecap}
 SRCS+=	cheribsdtest_cheriabi.c

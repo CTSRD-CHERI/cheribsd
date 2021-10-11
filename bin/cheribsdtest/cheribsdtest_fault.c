@@ -54,6 +54,7 @@
 #include <string.h>
 #include <sysexits.h>
 #include <unistd.h>
+#include <sys/mman.h>
 
 #include "cheribsdtest.h"
 
@@ -74,6 +75,12 @@
 #define	ARRAY_LEN	2
 static char array[ARRAY_LEN];
 static char sink;
+
+/* 
+ * Test data for cap version tests. A capability is handy because it is one
+ * version granule.
+ */
+static void * __capability vp;
 
 CHERIBSDTEST(test_fault_bounds, "Exercise capability bounds check failure",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
@@ -200,6 +207,88 @@ CHERIBSDTEST(test_fault_tag, "Store via untagged capability",
 
 	chp = cheri_cleartag(chp);
 	*chp = '\0';
+}
+
+CHERIBSDTEST(test_fault_setversion, "Attempt to set version twice.",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_VERSION,
+    .ct_si_trapno = TRAPNO_CHERI)
+{
+	char ch;
+	char * __capability chp = cheri_ptr(&ch, sizeof(ch));
+	chp = cheri_setversion(chp, 3);
+	/* Attempt to set version again on versioned cap: */
+	chp = cheri_setversion(chp, 0); /* fault */
+}
+
+CHERIBSDTEST(test_fault_wrong_version, "Store to unversioned memory via versioned cap",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_VERSION,
+    .ct_si_trapno = TRAPNO_VERSION)
+{
+	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(&vp));
+	void * __capability * __capability cvpp = cheri_ptr(&vp, sizeof(vp));
+	cvpp = cheri_setversion(cvpp, 3);
+	*cvpp = NULL; /* should fault due to incorrect version */
+}
+
+CHERIBSDTEST(test_fault_storeversion, "Attempt to store version on memory without CWV",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_VERSION,
+    .ct_si_trapno = TRAPNO_VERSION)
+{
+	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(&vp));
+	void * __capability * __capability cvpp = cheri_ptr(&vp, sizeof(vp));
+	int v = cheri_loadversion(cvpp);
+	if (v != 0)
+		cheribsdtest_failure_errx("Unexpected initial version: %d", v);
+	cheri_storeversion(cvpp, 3); /* fault due to absent PTE bit */
+}
+
+CHERIBSDTEST(test_fault_storeversion_mmap, "Attempt to store version on MAP_ANON memory without CWV",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_VERSION,
+    .ct_si_trapno = TRAPNO_VERSION)
+{
+	int *p = CHERIBSDTEST_CHECK_SYSCALL(
+		mmap(NULL, getpagesize(), PROT_READ|PROT_WRITE,	MAP_ANON, -1, 0)
+	);
+	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(p));
+	void * __capability cp = cheri_ptr(p, getpagesize());
+	int v = cheri_loadversion(cp);
+	if (v != 0)
+		cheribsdtest_failure_errx("Unexpected initial version: %d", v);
+	cheri_storeversion(cp, 3); /* fault due to absent PTE bit */
+
+	/* *p leaked here! */
+}
+
+CHERIBSDTEST(test_storeversion_mmap, "Attempt to store version on MAP_ANON PROT_MTE memory")
+{
+	int  page_sz = getpagesize(); 
+	int *p = CHERIBSDTEST_CHECK_SYSCALL(
+		mmap(NULL, page_sz, PROT_READ|PROT_WRITE|PROT_MTE, MAP_ANON, -1, 0)
+	);
+	int * __capability cp = cheri_ptr(p, page_sz);
+	int v = cheri_loadversion(cp);
+	if (v != 0)
+		cheribsdtest_failure_errx("Unexpected initial version: %d", v);
+	cheri_storeversion(cp, 3);
+	v = cheri_loadversion(cp);
+	if (v != 3)
+		cheribsdtest_failure_errx("Unexpected version after storeversion: %d", v);
+	cp = cheri_setversion(cp, 3);
+	/* Cast to volatile so that store / load do not get optimised away. */
+	volatile int * __capability vcp = cp;
+	*vcp = 1;
+	if (*vcp != 1)
+		cheribsdtest_failure_errx("Failed to store to versioned memory.");
+	CHERIBSDTEST_CHECK_SYSCALL(munmap(p, page_sz));
+	cheribsdtest_success();
 }
 
 #ifdef __mips__

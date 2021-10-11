@@ -55,8 +55,13 @@
 #define	PROT_READ	0x01	/* pages can be read */
 #define	PROT_WRITE	0x02	/* pages can be written */
 #define	PROT_EXEC	0x04	/* pages can be executed */
+
+/* NB chosen to match value in vm.h */
+#define	PROT_MTE	0x80	/* pages permit MTE tag / version stores */
+
 #if __BSD_VISIBLE
-#define	_PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC)
+/* XXX not sure whether to include PROT_MTE in _PROT_ALL ... */
+#define	_PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC | PROT_MTE)
 #define	PROT_EXTRACT(prot)	((prot) & _PROT_ALL)
 
 #define	_PROT_MAX_SHIFT	16

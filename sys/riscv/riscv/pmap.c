@@ -330,7 +330,17 @@ static int pmap_unuse_pt(pmap_t, vm_offset_t, pd_entry_t, struct spglist *);
 static __inline void
 pagecopy(void *s, void *d)
 {
-
+	char * __capability cd = (char * __capability) d;
+	char * __capability cs = (char * __capability) s;
+	u_int i;
+	for (i = 0; i < PAGE_SIZE; i += VERSION_GRANULE_SIZE)
+	{
+		int v = cheri_loadversion(cs);
+		cheri_storeversion(cd, v);
+		cs += VERSION_GRANULE_SIZE;
+		cd += VERSION_GRANULE_SIZE;
+	}
+	
 	memcpy(d, s, PAGE_SIZE);
 }
 
@@ -338,14 +348,17 @@ pagecopy(void *s, void *d)
 static __inline void
 pagecopy_cleartags(void *s, void *d)
 {
-	void * __capability *dst;
+	void * __capability * __capability dst;
 	void * __capability *src;
 	u_int i;
 
-	dst = d;
+	dst = (void * __capability * __capability) d;
 	src = s;
 	for (i = 0; i < PAGE_SIZE / sizeof(*dst); i++)
+	{
+		cheri_storeversion(dst, 0);
 		*dst++ = cheri_cleartag(*src++);
+	}
 }
 #endif
 
@@ -2754,6 +2767,8 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 		new_l3 |= PTE_CR;
 	if (prot & VM_PROT_WRITE_CAP)
 		new_l3 |= PTE_CW | PTE_CD;
+	if (prot & VM_PROT_WRITE_MTE)
+		new_l3 |= PTE_CWV;
 #endif
 
 	new_l3 |= (pn << PTE_PPN0_S);
@@ -3447,10 +3462,13 @@ void
 pmap_zero_page(vm_page_t m)
 {
 	vm_pointer_t va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-
 #ifdef __CHERI_PURE_CAPABILITY__
 	va = (vm_pointer_t)cheri_setboundsexact((void *)va, PAGE_SIZE);
 #endif
+	/* clear MTE tags */
+	char * __capability dst = (char * __capability) va;
+	for (u_int i = 0; i < PAGE_SIZE / VERSION_GRANULE_SIZE; i++)
+		cheri_storeversion(dst + i * VERSION_GRANULE_SIZE, 0);
 	pagezero((void *)va);
 }
 
@@ -3468,6 +3486,16 @@ pmap_zero_page_area(vm_page_t m, int off, int size)
 #ifdef __CHERI_PURE_CAPABILITY__
 	va = (vm_pointer_t)cheri_setboundsexact((void *)va, PAGE_SIZE);
 #endif
+	
+	/* XXX I don't think these assertions are true -- deal with this */
+	MPASS(((va + off) & (VERSION_GRANULE_MASK - 1)) == 0);
+	MPASS(((va + off + size) & (VERSION_GRANULE_MASK - 1)) == 0);
+
+	/* clear MTE tags */
+	char * __capability vac = (char * __capability) va + off;
+	for (char * __capability gp = vac; gp < vac + size; gp += VERSION_GRANULE_SIZE)
+		cheri_storeversion(gp, 0);
+
 	if (off == 0 && size == PAGE_SIZE)
 		pagezero((void *)va);
 	else

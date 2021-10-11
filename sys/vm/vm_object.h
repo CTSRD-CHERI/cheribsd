@@ -209,6 +209,7 @@ struct vm_object {
 #define	OBJ_SHADOWLIST	0x4000		/* Object is on the shadow list. */
 #define	OBJ_TMPFS	0x8000		/* has tmpfs vnode allocated */
 #define	OBJ_HASCAP	0x10000		/* object can store capabilities */
+#define	OBJ_HASMTE	OBJ_HASCAP	/* XXX for now same as HASCAP */
 
 /*
  * Helpers to perform conversion between vm_object page indexes and offsets.

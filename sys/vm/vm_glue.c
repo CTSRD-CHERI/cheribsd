@@ -676,6 +676,7 @@ vm_cap_allows_prot(const void * __capability cap, vm_prot_t prot)
 		reqperm |= CHERI_PERM_STORE_CAP;
 	if (prot & VM_PROT_EXECUTE)
 		reqperm |= CHERI_PERM_EXECUTE;
+	/* xxx extend for version? */
 	if ((cheri_getperm(cap) & reqperm) != reqperm)
 		return (false);
 	return (true);
