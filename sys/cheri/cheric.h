@@ -76,6 +76,13 @@
 #define	cheri_setbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
 #define	cheri_setboundsexact(x, y)	__builtin_cheri_bounds_set_exact((x), (y))
 
+/* XXX temporary static inline function until compiler builtin exists */
+static inline void * __capability _cheri_setversion(void * __capability c, int v) {
+	__asm__ __volatile__ ("csetversion %0, %1, %2":"=C"(c):"C"(c),"r"(v));
+	return c;
+}
+#define cheri_setversion(x, y) _cheri_setversion(x, y)
+
 /*
  * Soft implementation of cheri_subset_test().
  * Test whether a capability is a subset of another.

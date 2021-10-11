@@ -74,6 +74,11 @@
 #define	ARRAY_LEN	2
 static char array[ARRAY_LEN];
 static char sink;
+/* 
+ * Test data for cap version tests. A pointer is handy because it is one
+ * version granule.
+ */
+static void *vp;
 
 CHERIBSDTEST(test_fault_bounds, "Exercise capability bounds check failure",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
@@ -201,6 +206,32 @@ CHERIBSDTEST(test_fault_tag, "Store via untagged capability",
 	chp = cheri_cleartag(chp);
 	*chp = '\0';
 }
+
+CHERIBSDTEST(test_fault_setversion, "Attempt to set version twice.",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_VERSION,
+    .ct_si_trapno = TRAPNO_CHERI)
+{
+	char ch;
+	char * __capability chp = cheri_ptr(&ch, sizeof(ch));
+	chp = cheri_setversion(chp, 3);
+	/* Attempt to set version again on versioned cap: */
+	chp = cheri_setversion(chp, 0); /* fault */
+}
+
+CHERIBSDTEST(test_fault_wrong_version, "Store via cap with wrong version",
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
+    .ct_signum = SIGPROT,
+    .ct_si_code = PROT_CHERI_VERSION,
+    .ct_si_trapno = TRAPNO_VERSION,
+    .ct_si_addr = &vp)
+{
+	void ** __capability cvpp = cheri_ptr(&vp, sizeof(vp));
+	cvpp = cheri_setversion(cvpp, 3);
+	*cvpp = NULL; /* should fault due to incorrect version */
+}
+
 
 #ifdef __mips__
 CHERIBSDTEST(test_fault_ccheck_user_fail,
