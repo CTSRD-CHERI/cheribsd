@@ -47,10 +47,13 @@ __FBSDID("$FreeBSD$");
 
 /*
  * pid_t 
- * _cogetpid2(void *switcher_code, void *own_scb, void *target_scb)
+ * _cogetpid2(void *switcher_code, void *scb)
+ */
+/*
+ * NOTE-PBB: This might be excessive for what we're doing in cogetpid2
  */
 ENTRY(_cogetpid2)
-
+	
 	cincoffsetimm	csp, csp, -CAP_FRAME_SIZE
 	csc	cs0,	(0 * CHERICAP_SIZE)(csp)
 	csc	cs1,	(1 * CHERICAP_SIZE)(csp)

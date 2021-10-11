@@ -619,8 +619,8 @@ int	 _cocall(void * __capability, void * __capability,
 	    const void * __capability,
 	    const void * __capability, size_t, void * __capability, size_t);
 int	 _cosetup(int, void * __capability *, void * __capability *);
-pid_t	 _cogetpid2(void * __capability, void * __capability, void * __capability);
-lwpid_t	 _cogettid(void * __capability, void * __capability, void * __capability);
+pid_t	 _cogetpid2(void * __capability, void * __capability);
+lwpid_t	 _cogettid(void * __capability, void * __capability);
 
 /*
  * Kernel-based replacement for cocall(2) and coaccept(2) usually
@@ -633,8 +633,8 @@ int	 cocall_slow(void * __capability,
 /*
  * Switcher-based methods for inspecting pid and tid of switchercb subject
  */
-pid_t	 cogetpid2(void * __capability);
-lwpid_t	 cogettid(void * __capability);
+pid_t	 cogetpid2(void);
+lwpid_t	 cogettid(void);
 #endif /* __has_feature(capabilities) */
 #endif /* __BSD_VISIBLE */
 __END_DECLS

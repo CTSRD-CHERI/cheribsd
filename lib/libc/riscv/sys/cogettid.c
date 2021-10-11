@@ -38,7 +38,7 @@ __FBSDID("$FreeBSD$");
 #include "un-namespace.h"
 
 int
-cogettid(void * __capability target)
+cogettid(void)
 {
-	return (_cogettid(_cogettid_code, _cogettid_data, target));
+	return (_cogettid(_cogettid_code, _cogettid_data));
 }

@@ -38,7 +38,7 @@ __FBSDID("$FreeBSD$");
 #include "un-namespace.h"
 
 int
-cogetpid2(void * __capability target)
+cogetpid2(void)
 {
-	return (_cogetpid2(_cogetpid2_code, _cogetpid2_data, target));
+	return (_cogetpid2(_cogetpid2_code, _cogetpid2_data));
 }

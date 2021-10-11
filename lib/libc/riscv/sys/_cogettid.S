@@ -47,10 +47,12 @@ __FBSDID("$FreeBSD$");
 
 /*
  * lwpid_t 
- * _cogettid(void *switcher_code, void *target_scb)
+ * _cogettid(void *switcher_code, void *scb)
+ */
+/*
+ * NOTE-PBB: This might be excessive for what we're doing in cogettid
  */
 ENTRY(_cogettid)
-
 	cincoffsetimm	csp, csp, -CAP_FRAME_SIZE
 	csc	cs0,	(0 * CHERICAP_SIZE)(csp)
 	csc	cs1,	(1 * CHERICAP_SIZE)(csp)
