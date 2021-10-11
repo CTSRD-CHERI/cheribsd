@@ -526,18 +526,19 @@ ENTRY(cpu_switch)
 
 #ifdef CPU_QEMU_RISCV
 	/* Log context switch */
-	li	a0, 0x1 // LOG_EVENT_CTX_SWITCH
+	li	a0, 0x1 // LOG_EVENT_CTX_UPDATE
+	li	a1, 0x1 // LOG_EVENT_CTX_OP_SWITCH
 #ifdef __CHERI_PURE_CAPABILITY__
-	clc	ca1, TD_PROC(cs1)
-	cld	a1, P_PID(ca1)
-	cld	a2, TD_TID(cs1)
+	clc	ca2, TD_PROC(cs1)
+	cld	a2, P_PID(ca2)
+	cld	a3, TD_TID(cs1)
 #else
-	ld	a1, TD_PROC(s1)
-	ld	a1, P_PID(a1)
-	ld	a2, TD_TID(s1)
+	ld	a2, TD_PROC(s1)
+	ld	a2, P_PID(a2)
+	ld	a3, TD_TID(s1)
 #endif
-	li	a3, -1 // ignore compartment ID for now
-	slti	zero, zero, 0x30
+	li	a4, -1 // ignore compartment ID for now
+	slti	zero, zero, 0x30 // event logging NOP
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	ca1, cs1
 #else
