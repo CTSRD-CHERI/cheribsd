@@ -186,6 +186,7 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 	ccsp->ccs_signum = signum;
 	ccsp->ccs_si_code = info->si_code;
 	ccsp->ccs_si_trapno = info->si_trapno;
+	ccsp->ccs_si_addr = info->si_addr;
 #ifdef __mips__
 	ccsp->ccs_cp2_cause = cfp->cf_capcause;
 #endif
@@ -429,6 +430,12 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		snprintf(reason, sizeof(reason),
 		    "Expected si_trapno %d, got %d", ctp->ct_si_trapno,
 		    ccsp->ccs_si_trapno);
+		goto fail;
+	}
+	if ((ctp->ct_flags & CT_FLAG_SI_ADDR) &&
+	    ccsp->ccs_si_addr != ctp->ct_si_addr) {
+		snprintf(reason, sizeof(reason), "Expected si_addr %p, got %p",
+		    ctp->ct_si_addr, ccsp->ccs_si_addr);
 		goto fail;
 	}
 

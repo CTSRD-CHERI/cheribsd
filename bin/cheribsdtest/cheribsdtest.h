@@ -77,6 +77,7 @@ struct cheribsdtest_child_state {
 	int		ccs_signum;
 	int		ccs_si_code;
 	int		ccs_si_trapno;
+	void		*ccs_si_addr;
 #ifdef __mips__
 	register_t	ccs_cp2_cause;
 #endif
@@ -111,6 +112,7 @@ extern struct cheribsdtest_child_state *ccsp;
 #define	CT_FLAG_SI_CODE		0x00000200  /* Check signal si_code. */
 #define	CT_FLAG_SIGEXIT		0x00000400  /* Exits with uncaught signal;
 					       checks status signum. */
+#define CT_FLAG_SI_ADDR		0x00000800  /* Check signal si_addr. */
 
 /*
  * Macros defined in one or more cheribsdtest_md.h to indicate the
@@ -165,6 +167,7 @@ struct cheri_test {
 	int		 ct_signum;
 	int		 ct_si_code;
 	int		 ct_si_trapno;
+	void		*ct_si_addr;
 	const char	*ct_stdin_string;
 	const char	*ct_stdout_string;
 	const char	*ct_xfail_reason;
