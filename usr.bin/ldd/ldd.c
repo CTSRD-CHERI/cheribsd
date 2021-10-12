@@ -175,8 +175,9 @@ execldd32(char *file, char *fmt1, char *fmt2, int aflag)
 int
 main(int argc, char *argv[])
 {
+	const char* rtld;
 	char *fmt1, *fmt2;
-	int rval, c, aflag;
+	int aflag, c, fd, rval, status, is_shlib, rv, type;
 
 	aflag = 0;
 	fmt1 = fmt2 = NULL;
@@ -209,9 +210,6 @@ main(int argc, char *argv[])
 
 	rval = 0;
 	for (; argc > 0; argc--, argv++) {
-		int fd, status, is_shlib, rv, type;
-		const char* rtld = NULL;
-
 		if ((fd = open(*argv, O_RDONLY, 0)) < 0) {
 			warn("%s", *argv);
 			rval |= 1;
@@ -310,7 +308,7 @@ wait_for_child:
 		}
 	}
 
-	return rval;
+	return (rval);
 }
 
 static void
