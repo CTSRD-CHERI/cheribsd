@@ -59,9 +59,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/kdb.h>
 #endif
 
-/* XXX: Would not need this with a real 'copyuser(9)'. */
-#define	MAX_BUFFER_SIZE		16 * 1024 * 1024
-
 /*
  * Capability used to seal capability pairs returned by cosetup(2).
  */
@@ -786,11 +783,6 @@ kern_cocall_slow(void * __capability target,
 			COLOCATION_DEBUG("outbuf != NULL, but outlen == 0, returning EINVAL");
 			return (EINVAL);
 		}
-
-		if (outlen > MAX_BUFFER_SIZE) {
-			COLOCATION_DEBUG("outlen %zd > %d, returning EMSGSIZE", outlen, MAX_BUFFER_SIZE);
-			return (EMSGSIZE);
-		}
 	}
 
 	if (inbuf == NULL) {
@@ -802,11 +794,6 @@ kern_cocall_slow(void * __capability target,
 		if (inlen == 0) {
 			COLOCATION_DEBUG("inbuf != NULL, but inlen == 0, returning EINVAL");
 			return (EINVAL);
-		}
-
-		if (inlen > MAX_BUFFER_SIZE) {
-			COLOCATION_DEBUG("inlen %zd > %d, returning EMSGSIZE", inlen, MAX_BUFFER_SIZE);
-			return (EMSGSIZE);
 		}
 	}
 
@@ -913,7 +900,7 @@ again:
 
 	/*
 	 * XXX: There is currently no way to return an error to the caller,
-	 *      should the copyinout() fail.
+	 *      should the copyuser() fail.
 	 */
 
 	return (error);
@@ -925,37 +912,6 @@ sys_cocall_slow(struct thread *td, struct cocall_slow_args *uap)
 
 	return (kern_cocall_slow(uap->target,
 	    uap->outbuf, uap->outlen, uap->inbuf, uap->inlen));
-}
-
-static int
-copyinout(const void * __capability src, void * __capability dst,
-    size_t len, bool from_caller)
-{
-	void *tmpbuf;
-	int error;
-
-	if (len == 0)
-		return (0);
-
-	KASSERT(src != NULL, ("%s: NULL src", __func__));
-	KASSERT(dst != NULL, ("%s: NULL dst", __func__));
-
-	tmpbuf = malloc(len, M_TEMP, M_WAITOK);
-	error = copyincap(src, tmpbuf, len);
-	if (error != 0) {
-		COLOCATION_DEBUG("copyin from %s failed with error %d",
-		    from_caller ? "caller" : "callee", error);
-		goto out;
-	}
-	error = copyoutcap(tmpbuf, dst, len);
-	if (error != 0) {
-		COLOCATION_DEBUG("copyout to %s failed with error %d",
-		    from_caller ? "callee" : "caller", error);
-		goto out;
-	}
-out:
-	free(tmpbuf, M_TEMP);
-	return (error);
 }
 
 int
@@ -978,11 +934,6 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 			COLOCATION_DEBUG("outbuf != NULL, but outlen == 0, returning EINVAL");
 			return (EINVAL);
 		}
-
-		if (outlen > MAX_BUFFER_SIZE) {
-			COLOCATION_DEBUG("outlen %zd > %d, returning EMSGSIZE", outlen, MAX_BUFFER_SIZE);
-			return (EMSGSIZE);
-		}
 	}
 
 	if (inbuf == NULL) {
@@ -994,11 +945,6 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 		if (inlen == 0) {
 			COLOCATION_DEBUG("inbuf != NULL, but inlen == 0, returning EINVAL");
 			return (EINVAL);
-		}
-
-		if (inlen > MAX_BUFFER_SIZE) {
-			COLOCATION_DEBUG("inlen %zd > %d, returning EMSGSIZE", inlen, MAX_BUFFER_SIZE);
-			return (EMSGSIZE);
 		}
 	}
 
@@ -1035,11 +981,11 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 		/*
 		 * Move data from callee to caller.
 		 */
-		error = copyinout(outbuf, callerscb.scb_inbuf,
-		    MIN(outlen, callerscb.scb_inlen), false);
+		error = copyuser(outbuf, callerscb.scb_inbuf,
+		    MIN(outlen, callerscb.scb_inlen));
 		if (error != 0) {
 			SWITCHER_UNLOCK();
-			COLOCATION_DEBUG("copyinout error %d, waking up %lp",
+			COLOCATION_DEBUG("copyuser error %d, waking up %lp",
 			    error, callerscb.scb_td->td_scb);
 			wakeupself();
 			return (error);
@@ -1076,10 +1022,10 @@ again:
 	/*
 	 * Move data from caller to callee.
 	 */
-	error = copyinout(callerscb.scb_outbuf, inbuf,
-	    MIN(inlen, callerscb.scb_outlen), true);
+	error = copyuser(callerscb.scb_outbuf, inbuf,
+	    MIN(inlen, callerscb.scb_outlen));
 	if (error != 0) {
-		COLOCATION_DEBUG("copyinout error %d", error);
+		COLOCATION_DEBUG("copyuser error %d", error);
 		wakeupself();
 		return (error);
 	}
