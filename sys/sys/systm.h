@@ -531,6 +531,8 @@ int	copyoutcap_nofault(
 #else
 #define	copyoutcap_nofault	copyout_nofault
 #endif
+int	copyuser(const void * __restrict __capability usrc,
+	    void * __restrict __capability udst, size_t len);
 
 #ifdef KCSAN
 int	kcsan_copyin(const void *, void *, size_t);
