@@ -55,7 +55,7 @@ __FBSDID("$FreeBSD$");
 #include <unistd.h>
 #include <spawn.h>
 
-#include "paths.h"
+#include "rtld_paths.h"
 
 #define RTLD_DIRECT_EXEC_TRACE_SUPPORTED 1
 

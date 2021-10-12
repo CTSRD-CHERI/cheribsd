@@ -26,16 +26,21 @@
  * $FreeBSD$
  */
 
-#ifndef PATHS_H
-#define PATHS_H
+#ifndef _RTLD_PATHS_H
+#define _RTLD_PATHS_H
 
 #undef _PATH_ELF_HINTS
 
 #define	_DEFAULT_BASENAME_RTLD		"ld-elf.so.1"
+#ifndef	_CHERIABI_BASENAME_RTLD
 #define	_CHERIABI_BASENAME_RTLD		"ld-elf64c.so.1"
+#endif
+#ifndef	_COMPAT32_BASENAME_RTLD
 #define	_COMPAT32_BASENAME_RTLD		"ld-elf32.so.1"
+#endif
+#ifndef	_COMPAT64_BASENAME_RTLD
 #define	_COMPAT64_BASENAME_RTLD		"ld-elf64.so.1"
-
+#endif
 
 #ifdef COMPAT_CHERI
 #define	_PATH_ELF_HINTS		"/var/run/ld-elf64c.so.hints"
@@ -78,10 +83,18 @@
 #endif
 
 /* Provide these constants for /usr/bin/ldd32 */
-#define _DEFAULT_PATH_RTLD "/libexec/" _DEFAULT_BASENAME_RTLD
-#define _CHERIABI_PATH_RTLD "/libexec/" _CHERIABI_BASENAME_RTLD
-#define _COMPAT32_PATH_RTLD "/libexec/" _COMPAT32_BASENAME_RTLD
-#define _COMPAT64_PATH_RTLD "/libexec/" _COMPAT64_BASENAME_RTLD
+#ifndef _DEFAULT_PATH_RTLD
+#define	_DEFAULT_PATH_RTLD	"/libexec/" _DEFAULT_BASENAME_RTLD
+#endif
+#ifndef _CHERIABI_PATH_RTLD
+#define	_CHERIABI_PATH_RTLD	"/libexec/" _CHERIABI_BASENAME_RTLD
+#endif
+#ifndef _COMPAT32_PATH_RTLD
+#define	_COMPAT32_PATH_RTLD	"/libexec/" _COMPAT32_BASENAME_RTLD
+#endif
+#ifndef _COMPAT64_PATH_RTLD
+#define	_COMPAT64_PATH_RTLD	"/libexec/" _COMPAT64_BASENAME_RTLD
+#endif
 
 #ifndef STANDARD_LIBRARY_PATH
 #define	STANDARD_LIBRARY_PATH	"/lib/casper:/lib:/usr/lib"
@@ -101,10 +114,12 @@
 #define	LD_SOFT_		"LD_SOFT_"
 #endif
 
+#ifdef IN_RTLD
 extern const char *ld_elf_hints_default;
 extern const char *ld_path_libmap_conf;
 extern const char *ld_path_rtld;
 extern const char *ld_standard_library_path;
 extern const char *ld_env_prefix;
+#endif
 
-#endif /* PATHS_H */
+#endif /* _RTLD_PATHS_H */
