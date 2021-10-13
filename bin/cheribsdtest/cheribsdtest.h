@@ -114,13 +114,9 @@ extern struct cheribsdtest_child_state *ccsp;
 
 /*
  * Macros defined in one or more cheribsdtest_md.h to indicate the
- * reason for failure or flaky behavior.  Define to NULL here to
+ * reason for failure or flaky behavior.  Provide defaults here to
  * reduce the size of MD headers.
  */
-#ifndef FLAKY_COMPILER_BOUNDS
-#define	FLAKY_COMPILER_BOUNDS	NULL
-#endif
-
 #ifndef	SI_CODE_STORELOCAL
 #define	SI_CODE_STORELOCAL	PROT_CHERI_STORELOCAL
 #endif

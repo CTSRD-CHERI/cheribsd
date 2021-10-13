@@ -237,10 +237,8 @@ TEST_BOUNDS(global_static_uint8_array3, "global static uint8_t[3]")
 TEST_BOUNDS(global_uint8_array3, "global uint8_t[3]");
 TEST_BOUNDS(global_static_uint8_array17, "global static uint_t[17]");
 TEST_BOUNDS(global_uint8_array17, "global uint_t[17]");
-TEST_BOUNDS(global_static_uint8_array65537, "global static uint8_t[65537]",
-    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS);
-TEST_BOUNDS(global_uint8_array65537, "global uint8_t[65537]",
-    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS);
+TEST_BOUNDS(global_static_uint8_array65537, "global static uint8_t[65537]");
+TEST_BOUNDS(global_uint8_array65537, "global uint8_t[65537]");
 
 /*
  * Arrays of bytes with power-of-two sizes starting with size 32.
@@ -502,6 +500,5 @@ TEST_BOUNDS(extern_global_array65536, "extern global uint8_t[16] (C size)");
 TEST_DYNAMIC_BOUNDS(extern_global_uint16, uint16_t);
 TEST_DYNAMIC_BOUNDS(extern_global_uint64, uint64_t);
 TEST_DYNAMIC_BOUNDS(extern_global_array1, uint8_t[1]);
-TEST_DYNAMIC_BOUNDS(extern_global_array65537, uint8_t[65537],
-    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS);
+TEST_DYNAMIC_BOUNDS(extern_global_array65537, uint8_t[65537]);
 TEST_DYNAMIC_BOUNDS(extern_global_array256, uint8_t[256]);
