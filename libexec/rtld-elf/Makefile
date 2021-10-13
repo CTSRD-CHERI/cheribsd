@@ -28,7 +28,9 @@ MK_ASAN=	no
 MK_SSP=		no
 MK_UBSAN=	no
 
+.if !defined(NEED_COMPAT)
 CONFS=		libmap.conf
+.endif
 PROG?=		ld-elf.so.1
 .if (${PROG:M*ld-elf32*} != "")
 TAGS+=		lib32
