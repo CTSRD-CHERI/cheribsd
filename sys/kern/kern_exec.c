@@ -1219,6 +1219,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		vm_map_reservation_delete(map, stack_addr);
 		return (vm_mmap_to_errno(error));
 	}
+	vmspace->vm_stkgap = 0;
 
 #if __has_feature(capabilities)
 	perms = (~CHERI_PROT2PERM_MASK | vm_map_prot2perms(stack_prot)) &
@@ -1646,12 +1647,16 @@ exec_args_get_begin_envv(struct image_args *args)
 void
 exec_stackgap(struct image_params *imgp, uintcap_t *dp)
 {
+	struct proc *p = imgp->proc;
+
 	if (imgp->sysent->sv_stackgap == NULL ||
-	    (imgp->proc->p_fctl0 & (NT_FREEBSD_FCTL_ASLR_DISABLE |
+	    (p->p_fctl0 & (NT_FREEBSD_FCTL_ASLR_DISABLE |
 	    NT_FREEBSD_FCTL_ASG_DISABLE)) != 0 ||
-	    (imgp->map_flags & MAP_ASLR) == 0)
+	    (imgp->map_flags & MAP_ASLR) == 0) {
+		p->p_vmspace->vm_stkgap = 0;
 		return;
-	imgp->sysent->sv_stackgap(imgp, dp);
+	}
+	p->p_vmspace->vm_stkgap = imgp->sysent->sv_stackgap(imgp, dp);
 }
 
 /*
