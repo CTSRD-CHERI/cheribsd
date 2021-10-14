@@ -496,7 +496,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	prot = PROT_EXTRACT(prot);
 	if (max_prot != 0 && (max_prot & prot) != prot) {
 		SYSERRCAUSE(
-		    "%s: requested page permissions exceed requesed maximum",
+		    "%s: requested page permissions exceed requested maximum",
 		    __func__);
 		return (ENOTSUP);
 	}
