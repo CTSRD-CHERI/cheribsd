@@ -495,7 +495,8 @@ drop_to_el1:
 	msr	cntvoff_el2, xzr
 
 	/* Hypervisor trap functions */
-	adr	x2, hyp_vectors
+	adrp	x2, hyp_vectors
+	add	x2, x2, :lo12:hyp_vectors
 #if __has_feature(capabilities)
 	cvtp	c2, x2
 	msr	cvbar_el2, c2
@@ -571,7 +572,8 @@ hyp_vectors:
  */
 get_virt_delta:
 	/* Load the physical address of virt_map */
-	adr	PTR(29), virt_map
+	adrp	PTR(29), virt_map
+	add	PTR(29), PTR(29), :lo12:virt_map
 	/* Load the virtual address of virt_map stored in virt_map */
 	ldr	x28, [PTR(29)]
 	/* Find PA - VA as PA' = VA' - VA + PA = VA' + (PA - VA) = VA' + x29 */
