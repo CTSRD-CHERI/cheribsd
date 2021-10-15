@@ -577,7 +577,7 @@ typedef struct usb_endpoint_ss_comp_descriptor
 struct usb_string_descriptor {
 	uByte	bLength;
 	uByte	bDescriptorType;
-	uWord	bString[126];
+	uWord	bString[126] __subobject_variable_length_maxsize(126 * sizeof(uWord));
 	uByte	bUnused;
 } __packed;
 typedef struct usb_string_descriptor usb_string_descriptor_t;
