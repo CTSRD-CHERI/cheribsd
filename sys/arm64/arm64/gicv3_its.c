@@ -223,7 +223,7 @@ struct its_cmd {
 
 /* An ITS private table */
 struct its_ptable {
-	vm_offset_t	ptab_vaddr;
+	vm_pointer_t	ptab_vaddr;
 	unsigned long	ptab_size;
 };
 
@@ -258,7 +258,7 @@ struct gicv3_its_softc {
 	 * single copy of each across the interrupt controller.
 	 */
 	uint8_t		*sc_conf_base;
-	vm_offset_t sc_pend_base[MAXCPU];
+	vm_pointer_t sc_pend_base[MAXCPU];
 
 	/* Command handling */
 	struct mtx sc_its_cmd_lock;
@@ -430,7 +430,7 @@ gicv3_its_cmdq_init(struct gicv3_its_softc *sc)
 static int
 gicv3_its_table_init(device_t dev, struct gicv3_its_softc *sc)
 {
-	vm_offset_t table;
+	vm_pointer_t table;
 	vm_paddr_t paddr;
 	uint64_t cache, reg, share, tmp, type;
 	size_t esize, its_tbl_size, nidents, nitspages, npages;
@@ -489,7 +489,7 @@ gicv3_its_table_init(device_t dev, struct gicv3_its_softc *sc)
 		npages = howmany(its_tbl_size, PAGE_SIZE);
 
 		/* Allocate the table */
-		table = (vm_offset_t)contigmalloc_domainset(npages * PAGE_SIZE,
+		table = (vm_pointer_t)contigmalloc_domainset(npages * PAGE_SIZE,
 		    M_GICV3_ITS, sc->sc_ds, M_WAITOK | M_ZERO, 0,
 		    (1ul << 48) - 1, PAGE_SIZE_64K, 0);
 
@@ -594,7 +594,7 @@ gicv3_its_conftable_init(struct gicv3_its_softc *sc)
 	    LPI_CONFTAB_SIZE);
 
 	/* Flush the table to memory */
-	cpu_dcache_wb_range((vm_offset_t)sc->sc_conf_base, LPI_CONFTAB_SIZE);
+	cpu_dcache_wb_range((vm_pointer_t)sc->sc_conf_base, LPI_CONFTAB_SIZE);
 }
 
 static void
@@ -606,13 +606,12 @@ gicv3_its_pendtables_init(struct gicv3_its_softc *sc)
 		if (CPU_ISSET(i, &sc->sc_cpus) == 0)
 			continue;
 
-		sc->sc_pend_base[i] = (vm_offset_t)contigmalloc(
+		sc->sc_pend_base[i] = (vm_pointer_t)contigmalloc(
 		    LPI_PENDTAB_SIZE, M_GICV3_ITS, M_WAITOK | M_ZERO,
 		    0, LPI_PENDTAB_MAX_ADDR, LPI_PENDTAB_ALIGN, 0);
 
 		/* Flush so the ITS can see the memory */
-		cpu_dcache_wb_range((vm_offset_t)sc->sc_pend_base[i],
-		    LPI_PENDTAB_SIZE);
+		cpu_dcache_wb_range(sc->sc_pend_base[i], LPI_PENDTAB_SIZE);
 	}
 }
 
@@ -971,7 +970,7 @@ gicv3_its_disable_intr(device_t dev, struct intr_irqsrc *isrc)
 
 	if ((sc->sc_its_flags & ITS_FLAGS_LPI_CONF_FLUSH) != 0) {
 		/* Clean D-cache under command. */
-		cpu_dcache_wb_range((vm_offset_t)&conf[girq->gi_lpi], 1);
+		cpu_dcache_wb_range((vm_pointer_t)&conf[girq->gi_lpi], 1);
 	} else {
 		/* DSB inner shareable, store */
 		dsb(ishst);
@@ -995,7 +994,7 @@ gicv3_its_enable_intr(device_t dev, struct intr_irqsrc *isrc)
 
 	if ((sc->sc_its_flags & ITS_FLAGS_LPI_CONF_FLUSH) != 0) {
 		/* Clean D-cache under command. */
-		cpu_dcache_wb_range((vm_offset_t)&conf[girq->gi_lpi], 1);
+		cpu_dcache_wb_range((vm_pointer_t)&conf[girq->gi_lpi], 1);
 	} else {
 		/* DSB inner shareable, store */
 		dsb(ishst);
@@ -1591,7 +1590,7 @@ its_cmd_sync(struct gicv3_its_softc *sc, struct its_cmd *cmd)
 
 	if ((sc->sc_its_flags & ITS_FLAGS_CMDQ_FLUSH) != 0) {
 		/* Clean D-cache under command. */
-		cpu_dcache_wb_range((vm_offset_t)cmd, sizeof(*cmd));
+		cpu_dcache_wb_range((vm_pointer_t)cmd, sizeof(*cmd));
 	} else {
 		/* DSB inner shareable, store */
 		dsb(ishst);
