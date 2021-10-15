@@ -234,7 +234,7 @@ struct its_col {
 };
 
 struct gicv3_its_irqsrc {
-	struct intr_irqsrc	gi_isrc;
+	struct intr_irqsrc	gi_isrc __subobject_member_used_for_c_inheritance;
 	u_int			gi_id;
 	u_int			gi_lpi;
 	struct its_dev		*gi_its_dev;
