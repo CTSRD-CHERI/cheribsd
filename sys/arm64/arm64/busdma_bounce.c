@@ -1047,9 +1047,9 @@ dma_preread_safe(vm_offset_t va, vm_size_t size)
 	 * Write back any partial cachelines immediately before and
 	 * after the DMA region.
 	 */
-	if (is_aligned(va, dcache_line_size))
+	if (!is_aligned(va, dcache_line_size))
 		cpu_dcache_wb_range(va, 1);
-	if (is_aligned(va + size, dcache_line_size))
+	if (!is_aligned(va + size, dcache_line_size))
 		cpu_dcache_wb_range(va + size, 1);
 
 	cpu_dcache_inv_range(va, size);
