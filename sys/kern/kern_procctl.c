@@ -760,7 +760,7 @@ static const struct procctl_cmd_info procctl_cmds_info[] = {
 	[PROC_TRACE_CTL] =
 	    { .lock_tree = SA_SLOCKED, .one_proc = false,
 	      .esrch_is_einval = false, .no_nonnull_data = false,
-	      .need_candebug = false,
+	      .need_candebug = true,
 	      .copyin_sz = sizeof(int), .copyout_sz = 0,
 	      .exec = trace_ctl, .copyout_on_error = false, },
 	[PROC_TRACE_STATUS] =
@@ -772,7 +772,7 @@ static const struct procctl_cmd_info procctl_cmds_info[] = {
 	[PROC_TRAPCAP_CTL] =
 	    { .lock_tree = SA_SLOCKED, .one_proc = false,
 	      .esrch_is_einval = false, .no_nonnull_data = false,
-	      .need_candebug = false,
+	      .need_candebug = true,
 	      .copyin_sz = sizeof(int), .copyout_sz = 0,
 	      .exec = trapcap_ctl, .copyout_on_error = false, },
 	[PROC_TRAPCAP_STATUS] =
@@ -796,7 +796,7 @@ static const struct procctl_cmd_info procctl_cmds_info[] = {
 	[PROC_ASLR_CTL] =
 	    { .lock_tree = SA_UNLOCKED, .one_proc = true,
 	      .esrch_is_einval = false, .no_nonnull_data = false,
-	      .need_candebug = false,
+	      .need_candebug = true,
 	      .copyin_sz = sizeof(int), .copyout_sz = 0,
 	      .exec = aslr_ctl, .copyout_on_error = false, },
 	[PROC_ASLR_STATUS] =
@@ -808,7 +808,7 @@ static const struct procctl_cmd_info procctl_cmds_info[] = {
 	[PROC_PROTMAX_CTL] =
 	    { .lock_tree = SA_UNLOCKED, .one_proc = true,
 	      .esrch_is_einval = false, .no_nonnull_data = false,
-	      .need_candebug = false,
+	      .need_candebug = true,
 	      .copyin_sz = sizeof(int), .copyout_sz = 0,
 	      .exec = protmax_ctl, .copyout_on_error = false, },
 	[PROC_PROTMAX_STATUS] =
@@ -820,7 +820,7 @@ static const struct procctl_cmd_info procctl_cmds_info[] = {
 	[PROC_STACKGAP_CTL] =
 	    { .lock_tree = SA_UNLOCKED, .one_proc = true,
 	      .esrch_is_einval = false, .no_nonnull_data = false,
-	      .need_candebug = false,
+	      .need_candebug = true,
 	      .copyin_sz = sizeof(int), .copyout_sz = 0,
 	      .exec = stackgap_ctl, .copyout_on_error = false, },
 	[PROC_STACKGAP_STATUS] =
@@ -832,7 +832,7 @@ static const struct procctl_cmd_info procctl_cmds_info[] = {
 	[PROC_NO_NEW_PRIVS_CTL] =
 	    { .lock_tree = SA_SLOCKED, .one_proc = true,
 	      .esrch_is_einval = false, .no_nonnull_data = false,
-	      .need_candebug = false,
+	      .need_candebug = true,
 	      .copyin_sz = sizeof(int), .copyout_sz = 0,
 	      .exec = no_new_privs_ctl, .copyout_on_error = false, },
 	[PROC_NO_NEW_PRIVS_STATUS] =
@@ -844,7 +844,7 @@ static const struct procctl_cmd_info procctl_cmds_info[] = {
 	[PROC_WXMAP_CTL] =
 	    { .lock_tree = SA_UNLOCKED, .one_proc = true,
 	      .esrch_is_einval = false, .no_nonnull_data = false,
-	      .need_candebug = false,
+	      .need_candebug = true,
 	      .copyin_sz = sizeof(int), .copyout_sz = 0,
 	      .exec = wxmap_ctl, .copyout_on_error = false, },
 	[PROC_WXMAP_STATUS] =
