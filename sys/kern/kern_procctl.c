@@ -172,7 +172,6 @@ reap_status(struct thread *td, struct proc *p, void *data)
 
 	rs = data;
 	sx_assert(&proctree_lock, SX_LOCKED);
-	bzero(rs, sizeof(*rs));
 	if ((p->p_treeflag & P_TREE_REAPER) == 0) {
 		reap = p->p_reaper;
 	} else {
@@ -851,6 +850,8 @@ sys_procctl(struct thread *td, struct procctl_args *uap)
 	if (uap->com == 0 || uap->com >= nitems(procctl_cmds_info))
 		return (EINVAL);
 	cmd_info = &procctl_cmds_info[uap->com];
+	bzero(&x, sizeof(x));
+
 	if (cmd_info->copyin_sz > 0) {
 		if (cmd_info->copyincap)
 			error = copyincap(uap->data, &x, cmd_info->copyin_sz);
