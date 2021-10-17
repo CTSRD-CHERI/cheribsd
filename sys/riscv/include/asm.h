@@ -87,6 +87,11 @@
 #define RETURN	ret
 #endif
 
+#ifdef FSU_MAGIC_HINT
+/* XREF FSU_MAGIC_HINT_INT */
+#define FSU_MAGIC_HINT_ASM	slti x0, t6, 0xF5U
+#endif
+
 #endif /* _MACHINE_ASM_H_ */
 // CHERI CHANGES START
 // {

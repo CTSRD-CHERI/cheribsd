@@ -292,6 +292,46 @@ ecall_handler(void)
 	syscallret(td);
 }
 
+static vm_offset_t
+page_fault_pcb_onfault(struct pcb *pcb, uintptr_t tf_sepc)
+{
+	/* This reads from sepc, so must be in kernel .text */
+	KASSERT(tf_sepc >= VM_MAX_USER_ADDRESS,
+		("pcb_onfault considered from non-kernel sepc?"));
+
+#ifdef FSU_MAGIC_HINT
+	/* XREF FSU_MAGIC_HINT_ASM */
+	static const uint32_t FSU_MAGIC_HINT_INT = 0x0f5fa013;
+	uint32_t next;
+	uint16_t * __capability sepc = cheri_setaddress(cheri_getpcc(), tf_sepc);
+
+	if ((*sepc & 0x3) != 0x3) {
+		/* The faulting instruction is compressed. */
+		next = *(sepc + 2);
+		next <<= 16;
+		next |= *(sepc + 1);
+	} else {
+		KASSERT((*sepc & 0x001C) != 0x1C, ("Overlong instruction?"));
+		next = *(sepc + 3);
+		next <<= 16;
+		next |= *(sepc + 2);
+	}
+
+	if (next == FSU_MAGIC_HINT_INT)
+	{
+		extern void fsu_fault_magic_hint(int);
+		return (vm_offset_t)fsu_fault_magic_hint;
+	}
+#endif
+
+	// XXX do this first, but I'm lazy and want to debug the above
+	vm_offset_t onfault = pcb->pcb_onfault;
+	if (onfault != 0)
+		return onfault;
+
+	return 0;
+}
+
 static void
 page_fault_handler(struct trapframe *frame, int usermode)
 {
@@ -301,8 +341,9 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	struct pcb *pcb;
 	vm_prot_t ftype;
 	vm_offset_t va;
-	struct proc *p;
+	// struct proc *p;
 	int error, sig, ucode;
+	vm_offset_t onfault;
 #ifdef KDB
 	bool handled;
 #endif
@@ -315,7 +356,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 #endif
 
 	td = curthread;
-	p = td->td_proc;
+	// p = td->td_proc;
 	pcb = td->td_pcb;
 	stval = frame->tf_stval;
 
@@ -336,7 +377,8 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		if (stval >= VM_MAX_USER_ADDRESS) {
 			map = kernel_map;
 		} else {
-			if (pcb->pcb_onfault == 0)
+			onfault = page_fault_pcb_onfault(pcb, frame->tf_sepc);
+			if (onfault == 0)
 				goto fatal;
 			map = &td->td_proc->p_vmspace->vm_map;
 		}
@@ -361,13 +403,13 @@ page_fault_handler(struct trapframe *frame, int usermode)
 			call_trapsignal(td, sig, ucode, stval,
 			    frame->tf_scause & SCAUSE_CODE, 0);
 		} else {
-			if (pcb->pcb_onfault != 0) {
+			if (onfault != 0) {
 				frame->tf_a[0] = error;
 #if __has_feature(capabilities)
 				frame->tf_sepc = (uintcap_t)cheri_setaddress(
-				    cheri_getpcc(), pcb->pcb_onfault);
+				    cheri_getpcc(), onfault);
 #else
-				frame->tf_sepc = pcb->pcb_onfault;
+				frame->tf_sepc = onfault;
 #endif
 				return;
 			}
@@ -399,6 +441,7 @@ void
 do_trap_supervisor(struct trapframe *frame)
 {
 	uint64_t exception;
+	vm_offset_t onfault;
 
 	/* Ensure we came from supervisor mode, interrupts disabled */
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) ==
@@ -454,10 +497,11 @@ do_trap_supervisor(struct trapframe *frame)
 	case SCAUSE_LOAD_CAP_PAGE_FAULT:
 	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
 	case SCAUSE_CHERI:
-		if (curthread->td_pcb->pcb_onfault != 0) {
+		onfault = page_fault_pcb_onfault(curthread->td_pcb, frame->tf_sepc);
+		if (onfault != 0) {
 			frame->tf_a[0] = EPROT;
 			frame->tf_sepc = (uintcap_t)cheri_setaddress(
-			    cheri_getpcc(), curthread->td_pcb->pcb_onfault);
+			    cheri_getpcc(), onfault);
 			break;
 		}
 		dump_regs(frame);

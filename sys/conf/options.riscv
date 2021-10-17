@@ -7,4 +7,6 @@ INTRNG				opt_global.h
 # Build for QEMU platform
 CPU_QEMU_RISCV			opt_global.h
 
+FSU_MAGIC_HINT		opt_global.h
+
 COMPAT_FREEBSD64	opt_global.h
