@@ -137,7 +137,7 @@ reap_acquire(struct thread *td, struct proc *p, void *data __unused)
 {
 
 	sx_assert(&proctree_lock, SX_XLOCKED);
-	if (p != curproc)
+	if (p != td->td_proc)
 		return (EPERM);
 	if ((p->p_treeflag & P_TREE_REAPER) != 0)
 		return (EBUSY);
@@ -154,7 +154,7 @@ reap_release(struct thread *td, struct proc *p, void *data __unused)
 {
 
 	sx_assert(&proctree_lock, SX_XLOCKED);
-	if (p != curproc)
+	if (p != td->td_proc)
 		return (EPERM);
 	if (p == initproc)
 		return (EINVAL);
