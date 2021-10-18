@@ -91,8 +91,8 @@ struct efuse_soc tegra210_efuse_soc = {
 };
 
 static struct ofw_compat_data compat_data[] = {
-	{"nvidia,tegra124-efuse", (intptr_t)&tegra124_efuse_soc},
-	{"nvidia,tegra210-efuse", (intptr_t)&tegra210_efuse_soc},
+	{"nvidia,tegra124-efuse", (uintptr_t)&tegra124_efuse_soc},
+	{"nvidia,tegra210-efuse", (uintptr_t)&tegra210_efuse_soc},
 	{NULL,			0}
 };
 

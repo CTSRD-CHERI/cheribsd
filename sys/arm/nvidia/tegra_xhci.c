@@ -744,7 +744,7 @@ load_fw(struct tegra_xhci_softc *sc)
 	const struct firmware *fw;
 	const struct tegra_xusb_fw_hdr *fw_hdr;
 	vm_paddr_t fw_paddr, fw_base;
-	vm_offset_t fw_vaddr;
+	vm_pointer_t fw_vaddr;
 	vm_size_t fw_size;
 	uint32_t code_tags, code_size;
 	struct clocktime fw_clock;

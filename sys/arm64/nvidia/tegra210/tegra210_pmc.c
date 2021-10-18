@@ -196,7 +196,7 @@ WR4(struct tegra210_pmc_softc *sc, bus_size_t r, uint32_t v)
 		arm_smccc_smc(PMC_SMC, PMC_SMC_WRITE, r, v, 0, 0, 0, 0, &res);
 		if (res.a0 != 0)
 			device_printf(sc->dev," PMC SMC write failed: %lu\n",
-			    res.a0);
+			    (unsigned long)res.a0);
 	}
 
 	bus_write_4(sc->mem_res, r, v);
@@ -211,7 +211,7 @@ RD4(struct tegra210_pmc_softc *sc, bus_size_t r)
 		arm_smccc_smc(PMC_SMC, PMC_SMC_READ, r, 0, 0, 0, 0, 0, &res);
 		if (res.a0 != 0)
 			device_printf(sc->dev," PMC SMC write failed: %lu\n",
-			    res.a0);
+			    (unsigned long)res.a0);
 		return((uint32_t)res.a1);
 	}
 
