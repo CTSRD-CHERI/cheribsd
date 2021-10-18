@@ -3401,9 +3401,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* __specialfd */
+	/* freebsd32___specialfd */
 	case 577: {
-		struct __specialfd_args *p = params;
+		struct freebsd32___specialfd_args *p = params;
 		iarg[0] = p->type; /* int */
 		uarg[1] = (intptr_t) p->req; /* const void * */
 		uarg[2] = p->len; /* size_t */
@@ -9179,7 +9179,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* __specialfd */
+	/* freebsd32___specialfd */
 	case 577:
 		switch(ndx) {
 		case 0:
@@ -11109,7 +11109,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* __specialfd */
+	/* freebsd32___specialfd */
 	case 577:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
