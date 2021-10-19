@@ -523,7 +523,9 @@ _mthca=		mthca
 _mlx4ib=	mlx4ib
 _mlx5ib=	mlx5ib
 .endif
+.if !${MACHINE_ABI:Mpurecap}
 _ossl=		ossl
+.endif
 _vmware=	vmware
 .endif
 
