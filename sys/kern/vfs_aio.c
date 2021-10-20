@@ -1425,7 +1425,7 @@ aiocb_copyin(void * __capability ujob, struct kaiocb *kjob, int type)
 	struct aiocb *kcb = &kjob->uaiocb;
 	int error;
 
-	error = copyincap(ujob, kjob, sizeof(struct aiocb));
+	error = copyincap(ujob, kcb, sizeof(struct aiocb));
 	if (error)
 		return (error);
 	if (type == LIO_READV || type == LIO_WRITEV) {
