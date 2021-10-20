@@ -1168,10 +1168,6 @@ pmap_alloc_direct_page(unsigned int index, int req)
 	    VM_ALLOC_ZERO);
 	if (m == NULL)
 		return (NULL);
-
-	if ((m->flags & PG_ZERO) == 0)
-		pmap_zero_page(m);
-
 	m->pindex = index;
 	return (m);
 }

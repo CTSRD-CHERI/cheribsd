@@ -1839,15 +1839,10 @@ pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage, int levels)
 	/*
 	 * allocate the l0 page
 	 */
-	while ((m = vm_page_alloc(NULL, 0, VM_ALLOC_NORMAL |
-	    VM_ALLOC_NOOBJ | VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL)
-		vm_wait(NULL);
-
+	m = vm_page_alloc_noobj(VM_ALLOC_WAITOK | VM_ALLOC_WIRED |
+	    VM_ALLOC_ZERO);
 	pmap->pm_l0_paddr = VM_PAGE_TO_PHYS(m);
 	pmap->pm_l0 = (pd_entry_t *)PHYS_TO_DMAP(pmap->pm_l0_paddr);
-
-	if ((m->flags & PG_ZERO) == 0)
-		pagezero(pmap->pm_l0);
 
 	pmap->pm_root.rt_root = 0;
 	bzero(&pmap->pm_stats, sizeof(pmap->pm_stats));
@@ -1914,8 +1909,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
 	/*
 	 * Allocate a page table page.
 	 */
-	if ((m = vm_page_alloc(NULL, ptepindex, VM_ALLOC_NOOBJ |
-	    VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL) {
+	if ((m = vm_page_alloc_noobj(VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL) {
 		if (lockp != NULL) {
 			RELEASE_PV_LIST_LOCK(lockp);
 			PMAP_UNLOCK(pmap);
@@ -1929,8 +1923,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
 		 */
 		return (NULL);
 	}
-	if ((m->flags & PG_ZERO) == 0)
-		pmap_zero_page(m);
+	m->pindex = ptepindex;
 
 	/*
 	 * Because of AArch64's weak memory consistency model, we must have a
@@ -2264,13 +2257,11 @@ pmap_growkernel(vm_offset_t addr)
 		l1 = pmap_l0_to_l1(l0, kernel_vm_end);
 		if (pmap_load(l1) == 0) {
 			/* We need a new PDP entry */
-			nkpg = vm_page_alloc(NULL, kernel_vm_end >> L1_SHIFT,
-			    VM_ALLOC_INTERRUPT | VM_ALLOC_NOOBJ |
+			nkpg = vm_page_alloc_noobj(VM_ALLOC_INTERRUPT |
 			    VM_ALLOC_WIRED | VM_ALLOC_ZERO);
 			if (nkpg == NULL)
 				panic("pmap_growkernel: no memory to grow kernel");
-			if ((nkpg->flags & PG_ZERO) == 0)
-				pmap_zero_page(nkpg);
+			nkpg->pindex = kernel_vm_end >> L1_SHIFT;
 			/* See the dmb() in _pmap_alloc_l3(). */
 			dmb(ishst);
 			paddr = VM_PAGE_TO_PHYS(nkpg);
@@ -2287,13 +2278,11 @@ pmap_growkernel(vm_offset_t addr)
 			continue;
 		}
 
-		nkpg = vm_page_alloc(NULL, kernel_vm_end >> L2_SHIFT,
-		    VM_ALLOC_INTERRUPT | VM_ALLOC_NOOBJ | VM_ALLOC_WIRED |
+		nkpg = vm_page_alloc_noobj(VM_ALLOC_INTERRUPT | VM_ALLOC_WIRED |
 		    VM_ALLOC_ZERO);
 		if (nkpg == NULL)
 			panic("pmap_growkernel: no memory to grow kernel");
-		if ((nkpg->flags & PG_ZERO) == 0)
-			pmap_zero_page(nkpg);
+		nkpg->pindex = kernel_vm_end >> L2_SHIFT;
 		/* See the dmb() in _pmap_alloc_l3(). */
 		dmb(ishst);
 		paddr = VM_PAGE_TO_PHYS(nkpg);
@@ -2695,8 +2684,7 @@ retry:
 		}
 	}
 	/* No free items, allocate another chunk */
-	m = vm_page_alloc(NULL, 0, VM_ALLOC_NORMAL | VM_ALLOC_NOOBJ |
-	    VM_ALLOC_WIRED);
+	m = vm_page_alloc_noobj(VM_ALLOC_WIRED);
 	if (m == NULL) {
 		if (lockp == NULL) {
 			PV_STAT(pc_chunk_tryfail++);
@@ -2760,8 +2748,7 @@ retry:
 			break;
 	}
 	for (reclaimed = false; avail < needed; avail += _NPCPV) {
-		m = vm_page_alloc(NULL, 0, VM_ALLOC_NORMAL | VM_ALLOC_NOOBJ |
-		    VM_ALLOC_WIRED);
+		m = vm_page_alloc_noobj(VM_ALLOC_WIRED);
 		if (m == NULL) {
 			m = reclaim_pv_chunk(pmap, lockp);
 			if (m == NULL)
@@ -6297,8 +6284,8 @@ pmap_demote_l1(pmap_t pmap, pt_entry_t *l1, vm_offset_t va)
 			return (NULL);
 	}
 
-	if ((ml2 = vm_page_alloc(NULL, 0, VM_ALLOC_INTERRUPT |
-	    VM_ALLOC_NOOBJ | VM_ALLOC_WIRED)) == NULL) {
+	if ((ml2 = vm_page_alloc_noobj(VM_ALLOC_INTERRUPT | VM_ALLOC_WIRED)) ==
+	    NULL) {
 		CTR2(KTR_PMAP, "pmap_demote_l1: failure for va %#lx"
 		    " in pmap %p", va, pmap);
 		l2 = NULL;
@@ -6431,9 +6418,9 @@ pmap_demote_l2_locked(pmap_t pmap, pt_entry_t *l2, vm_offset_t va,
 		 * priority (VM_ALLOC_INTERRUPT).  Otherwise, the
 		 * priority is normal.
 		 */
-		ml3 = vm_page_alloc(NULL, pmap_l2_pindex(va),
-		    (VIRT_IN_DMAP(va) ? VM_ALLOC_INTERRUPT : VM_ALLOC_NORMAL) |
-		    VM_ALLOC_NOOBJ | VM_ALLOC_WIRED);
+		ml3 = vm_page_alloc_noobj(
+		    (VIRT_IN_DMAP(va) ? VM_ALLOC_INTERRUPT : 0) |
+		    VM_ALLOC_WIRED);
 
 		/*
 		 * If the allocation of the new page table page fails,
@@ -6445,6 +6432,7 @@ pmap_demote_l2_locked(pmap_t pmap, pt_entry_t *l2, vm_offset_t va,
 			    " in pmap %p", va, pmap);
 			goto fail;
 		}
+		ml3->pindex = pmap_l2_pindex(va);
 
 		if (!ADDR_IS_KERNEL(va)) {
 			ml3->ref_count = NL3PG;
