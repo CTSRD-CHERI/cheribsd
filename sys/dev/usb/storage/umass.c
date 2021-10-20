@@ -2501,7 +2501,8 @@ umass_cam_cb(struct umass_softc *sc, union ccb *ccb, uint32_t residue,
 		DPRINTF(sc, UDMASS_SCSI, "Fetching %d bytes of "
 		    "sense data\n", ccb->csio.sense_len);
 
-		if (umass_std_transform(sc, ccb, &sc->cam_scsi_sense.opcode,
+		if (umass_std_transform(sc, ccb,
+		    (uint8_t *)&sc->cam_scsi_sense,
 		    sizeof(sc->cam_scsi_sense))) {
 			if ((sc->sc_quirks & FORCE_SHORT_INQUIRY) &&
 			    (sc->sc_transfer.cmd_data[0] == INQUIRY)) {
@@ -2597,7 +2598,7 @@ umass_cam_sense_cb(struct umass_softc *sc, union ccb *ccb, uint32_t residue,
 			/* the rest of the command was filled in at attach */
 
 			if ((sc->sc_transform)(sc,
-			    &sc->cam_scsi_test_unit_ready.opcode,
+			    (uint8_t *)&sc->cam_scsi_test_unit_ready,
 			    sizeof(sc->cam_scsi_test_unit_ready)) == 1) {
 				umass_command_start(sc, DIR_NONE, NULL, 0,
 				    ccb->ccb_h.timeout,
