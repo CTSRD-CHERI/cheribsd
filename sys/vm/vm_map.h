@@ -547,8 +547,8 @@ vm_map_entry_succ(vm_map_entry_t entry)
 	for ((it) = vm_map_entry_first(map);	\
 	    (it) != &(map)->header;		\
 	    (it) = vm_map_entry_succ(it))
-int vm_map_protect (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t, boolean_t,
-    boolean_t);
+int vm_map_protect (vm_map_t map, vm_offset_t start, vm_offset_t end,
+    vm_prot_t new_prot, boolean_t set_max, boolean_t keep_cap);
 int vm_map_remove_locked(vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_remove (vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_clear(vm_map_t);
