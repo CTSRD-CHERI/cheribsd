@@ -59,21 +59,6 @@ static int intrcnt_index;
 static cpu_intr_mask_t		hardintr_mask_func;
 static cpu_intr_unmask_t	hardintr_unmask_func;
 
-#ifndef INTRNG
-/*
- * Reasonable limit
- */
-#define	INTRCNT_COUNT	256
-
-/*
- * Count and names for statistics
- */
-char intrnames[INTRCNT_COUNT * (MAXCOMLEN + 1) * 2];
-size_t sintrnames = INTRCNT_COUNT * (MAXCOMLEN + 1) * 2;
-unsigned long intrcnt[INTRCNT_COUNT * 2];
-size_t sintrcnt = INTRCNT_COUNT * sizeof(long) * 2;
-#endif
-
 mips_intrcnt_t
 mips_intrcnt_create(const char* name)
 {
