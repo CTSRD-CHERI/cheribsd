@@ -121,6 +121,8 @@ SRCS+=	__getosreldate.c \
 	rewinddir.c \
 	scandir.c \
 	scandir_b.c \
+	sched_getaffinity.c \
+	sched_setaffinity.c \
 	seed48.c \
 	seekdir.c \
 	semctl.c \
