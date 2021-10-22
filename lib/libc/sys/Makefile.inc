@@ -36,6 +36,8 @@ SRCS+=	\
 
 SRCS+= getdents.c lstat.c mknod.c stat.c
 
+PSEUDO+= _sched_getcpu.o
+
 .if !${MACHINE_ABI:Mpurecap}
 SRCS+= brk.c
 .endif
