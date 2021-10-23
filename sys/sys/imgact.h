@@ -58,25 +58,20 @@ struct image_args {
 };
 
 struct image_params {
-	struct proc *proc;	/* our process struct */
+	struct proc *proc;		/* our process */
 	struct label *execlabel;	/* optional exec label */
-	struct vnode *vp;	/* pointer to vnode of file to exec */
+	struct vnode *vp;		/* pointer to vnode of file to exec */
 	struct vm_object *object;	/* The vm object for this vp */
-	struct vattr *attr;	/* attributes of file */
-	const char *image_header; /* head of file to exec */
-	unsigned long entry_addr; /* entry address of target executable */
-	unsigned long start_addr; /* start of mapped image (including bss) */
-	unsigned long end_addr;   /* end of mapped image (including bss) */
-	unsigned long reloc_base; /* load address of image */
-	unsigned long interp_start; /* start of RTLD mapping (or zero) */
-	unsigned long interp_end;   /* end address of RTLD mapping (or zero) */
-	char vmspace_destroyed;	/* flag - we've blown away original vm space */
-#define IMGACT_SHELL	0x1
-#define IMGACT_BINMISC	0x2
-	unsigned char interpreted;	/* mask of interpreters that have run */
-	char opened;		/* flag - we have opened executable vnode */
-	char *interpreter_name;	/* name of the interpreter */
-	void *auxargs;		/* ELF Auxinfo structure pointer */
+	struct vattr *attr;		/* attributes of file */
+	const char *image_header;	/* header of file to exec */
+	unsigned long entry_addr;	/* entry address of target executable */
+	unsigned long start_addr;	/* start of mapped image (including bss) */
+	unsigned long end_addr;		/* end of mapped image (including bss) */
+	unsigned long reloc_base;	/* load address of image */
+	unsigned long interp_start;	/* start of RTLD mapping (or zero) */
+	unsigned long interp_end;	/* end of RTLD mapping (or zero) */
+	char *interpreter_name;		/* name of the interpreter */
+	void *auxargs;			/* ELF Auxinfo structure pointer */
 	struct sf_buf *firstpage;	/* first page that we mapped */
 	void * __capability strings;	/* pointer to string space (user) */
 	void * __capability ps_strings;	/* pointer to ps_string (user space) */
@@ -97,7 +92,12 @@ struct image_params {
 	u_long stack_sz;
 	u_long eff_stack_sz;
 	struct ucred *newcred;		/* new credentials if changing */
+#define IMGACT_SHELL	0x1
+#define IMGACT_BINMISC	0x2
+	unsigned char interpreted;	/* mask of interpreters that have run */
 	bool credential_setid;		/* true if becoming setid */
+	bool vmspace_destroyed;		/* we've blown away original vm space */
+	bool opened;			/* we have opened executable vnode */
 	bool textset;
 	u_int map_flags;
 	void * __capability imgact_capability;	/* copyout and mapping cap */

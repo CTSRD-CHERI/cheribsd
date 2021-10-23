@@ -704,7 +704,7 @@ interpret:
 #endif
 		if (imgp->opened) {
 			VOP_CLOSE(newtextvp, FREAD, td->td_ucred, td);
-			imgp->opened = 0;
+			imgp->opened = false;
 		}
 		vput(newtextvp);
 		vm_object_deallocate(imgp->object);
@@ -1115,7 +1115,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	u_long ssiz;
 	vm_pointer_t shared_page_addr;
 
-	imgp->vmspace_destroyed = 1;
+	imgp->vmspace_destroyed = true;
 	imgp->sysent = sv;
 
 	if (p->p_sysent->sv_onexec_old != NULL)
@@ -2006,7 +2006,7 @@ exec_check_permissions(struct image_params *imgp)
 	 */
 	error = VOP_OPEN(vp, FREAD, td->td_ucred, td, NULL);
 	if (error == 0)
-		imgp->opened = 1;
+		imgp->opened = true;
 	return (error);
 }
 
