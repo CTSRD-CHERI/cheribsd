@@ -540,7 +540,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	    CHERI_PERM_STORE_CAP;
 	vm_offset_t start = (vm_offset_t)-1;
 	vm_offset_t end = 0;
-	vm_offset_t alignment, seg_addr;
+	vm_offset_t alignment, load_addr, seg_addr;
 	vm_size_t seg_size, size;
 	int i, result;
 	vm_pointer_t reservation;
@@ -593,20 +593,21 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	 */
 	alignment = MAX(CHERI_REPRESENTABLE_ALIGNMENT(end - start), PAGE_SIZE);
 	size = CHERI_REPRESENTABLE_LENGTH(end - start);
-	reservation = roundup2(start + rbase, alignment);
+	load_addr = roundup2(start + rbase, alignment);
 	vm_map_lock(map);
 	if (imgp->cop != NULL) {
 		/*
 		 * For binaries in coprocesses, find an available load
 		 * address.
 		 */
-		result = vm_map_find_aligned(map, &reservation, size, 0,
+		result = vm_map_find_aligned(map, &load_addr, size, 0,
 		    alignment);
 		if (result != KERN_SUCCESS) {
 			vm_map_unlock(map);
 			return (ENOMEM);
 		}
 	}
+	reservation = load_addr;
 	result = vm_map_reservation_create_locked(map, &reservation, size,
 	    VM_PROT_ALL);
 	vm_map_unlock(map);
