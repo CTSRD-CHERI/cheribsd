@@ -508,6 +508,13 @@ bool is_env_var_set(int idx)
 }
 #endif
 
+static void
+set_ld_elf_hints_path(void)
+{
+	if (ld_elf_hints_path == NULL || strlen(ld_elf_hints_path) == 0)
+		ld_elf_hints_path = ld_elf_hints_default;
+}
+
 /*
  * Main entry point for dynamic linking.
  *
@@ -792,9 +799,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	ld_tracing = ld_get_env_var(LD_TRACE_LOADED_OBJECTS);
     ld_utrace = ld_get_env_var(LD_UTRACE);
 
-    if ((ld_elf_hints_path == NULL) || strlen(ld_elf_hints_path) == 0)
-	ld_elf_hints_path = ld_elf_hints_default;
-
+    set_ld_elf_hints_path();
 #ifdef DEBUG
     if (is_env_var_set(LD_DEBUG))
 	debug = RTLD_DBG_NO_CATEGORY;
@@ -6452,16 +6457,23 @@ parse_args(char* argv[], int argc, bool *use_pathp, int *fdp,
 				mib[1] = HW_MACHINE;
 				sz = sizeof(machine);
 				sysctl(mib, nitems(mib), machine, &sz, NULL, 0);
+				ld_elf_hints_path = ld_get_env_var(
+				    LD_ELF_HINTS_PATH);
+				set_ld_elf_hints_path();
 				rtld_printf(
 				    "FreeBSD ld-elf.so.1 %s\n"
 				    "FreeBSD_version %d\n"
 				    "Default lib path %s\n"
+				    "Hints lib path %s\n"
 				    "Env prefix %s\n"
+				    "Default hint file %s\n"
 				    "Hint file %s\n"
 				    "libmap file %s\n",
 				    machine,
 				    __FreeBSD_version, ld_standard_library_path,
+				    gethints(false),
 				    ld_env_prefix, ld_elf_hints_default,
+				    ld_elf_hints_path,
 				    ld_path_libmap_conf);
 				_exit(0);
 			} else {
