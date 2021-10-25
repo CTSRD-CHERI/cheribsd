@@ -25,6 +25,9 @@ NO_WUNNEEDED_INTERNAL_DECL=	-Wno-error=unneeded-internal-declaration
 NO_WSOMETIMES_UNINITIALIZED=	-Wno-error=sometimes-uninitialized
 NO_WCAST_QUAL=			-Wno-error=cast-qual
 NO_WTAUTOLOGICAL_POINTER_COMPARE= -Wno-tautological-pointer-compare
+.if ${COMPILER_VERSION} >= 100000
+NO_WMISLEADING_INDENTATION=	-Wno-misleading-indentation
+.endif
 # Several other warnings which might be useful in some cases, but not severe
 # enough to error out the whole kernel build.  Display them anyway, so there is
 # some incentive to fix them eventually.
@@ -33,8 +36,8 @@ CWARNEXTRA?=	-Wno-error=tautological-compare -Wno-error=empty-body \
 		-Wno-error=pointer-sign
 CWARNEXTRA+=	-Wno-error=shift-negative-value
 CWARNEXTRA+=	-Wno-address-of-packed-member
-.if ${COMPILER_VERSION} >= 100000
-NO_WMISLEADING_INDENTATION=	-Wno-misleading-indentation
+.if ${COMPILER_FEATURES:MWunused-but-set-variable}
+CWARNFLAGS+=	-Wno-error=unused-but-set-variable
 .endif
 .endif	# clang
 
@@ -104,7 +107,7 @@ FORMAT_EXTENSIONS=	-fformat-extensions
 # Setting -mno-sse implies -mno-sse2, -mno-sse3, -mno-ssse3, -mno-sse41 and -mno-sse42
 #
 .if ${MACHINE_CPUARCH} == "i386"
-CFLAGS.gcc+=	-mno-align-long-strings -mpreferred-stack-boundary=2
+CFLAGS.gcc+=	-mpreferred-stack-boundary=2
 CFLAGS.clang+=	-mno-aes -mno-avx
 CFLAGS+=	-mno-mmx -mno-sse -msoft-float
 INLINE_LIMIT?=	8000
@@ -261,17 +264,6 @@ CFLAGS+= -ftrivial-auto-var-init=pattern
 .else
 .warning InitAll (pattern) requested but not support by compiler
 .endif
-.endif
-
-#
-# Add -gdwarf-2 when compiling -g. The default starting in clang v3.4
-# and gcc 4.8 is to generate DWARF version 4. However, our tools don't
-# cope well with DWARF 4, so force it to genereate DWARF2, which they
-# understand. Do this unconditionally as it is harmless when not needed,
-# but critical for these newer versions.
-#
-.if ${CFLAGS:M-g} != "" && ${CFLAGS:M-gdwarf*} == ""
-CFLAGS+=	-gdwarf-2
 .endif
 
 #

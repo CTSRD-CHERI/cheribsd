@@ -4349,7 +4349,7 @@ sigfastblock_setpend1(struct thread *td)
 	int res;
 	uint32_t oldval;
 
-	if ((td->td_pflags & TDP_SIGFASTBLOCK) == 0)
+	if ((td->td_pflags & TDP_SIGFASTPENDING) == 0)
 		return;
 	res = fueword32(td->td_sigblock_ptr, &oldval);
 	if (res == -1) {

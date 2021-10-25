@@ -676,7 +676,7 @@ timer2sbintime(int64_t data, int flags)
 			if (secs > (SBT_MAX / SBT_1S))
 				return (SBT_MAX);
 #endif
-			return (secs << 32 | US_TO_SBT(data % 1000000000));
+			return (secs << 32 | NS_TO_SBT(data % 1000000000));
 		}
 		return (NS_TO_SBT(data));
 	default:
@@ -2742,7 +2742,8 @@ kqfd_register(int fd, struct kevent *kev, struct thread *td, int mflag,
 	cap_rights_t rights;
 	int error;
 
-	error = fget(td, fd, cap_rights_init(&rights, CAP_KQUEUE_CHANGE), &fp);
+	error = fget(td, fd, cap_rights_init_one(&rights, CAP_KQUEUE_CHANGE),
+	    &fp);
 	if (error != 0)
 		return (error);
 	if ((error = kqueue_acquire(fp, &kq)) != 0)

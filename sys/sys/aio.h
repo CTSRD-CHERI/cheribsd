@@ -27,6 +27,7 @@
 #include <sys/queue.h>
 #include <sys/event.h>
 #include <sys/signalvar.h>
+#include <sys/uio.h>
 #endif
 
 /*
@@ -42,9 +43,13 @@
 #define	LIO_NOP			0x0
 #define LIO_WRITE		0x1
 #define	LIO_READ		0x2
-#ifdef _KERNEL
-#define	LIO_SYNC		0x3
-#define	LIO_MLOCK		0x4
+#if defined(_KERNEL) || defined(_WANT_ALL_LIO_OPCODES)
+#define	LIO_VECTORED		0x4
+#define	LIO_WRITEV		(LIO_WRITE | LIO_VECTORED)
+#define	LIO_READV		(LIO_READ | LIO_VECTORED)
+#define	LIO_SYNC		0x8
+#define	LIO_DSYNC		(0x10 | LIO_SYNC)
+#define	LIO_MLOCK		0x20
 #endif
 
 /*
@@ -102,6 +107,9 @@ typedef struct aiocb {
 	struct	sigevent aio_sigevent;	/* Signal to deliver */
 } aiocb_t;
 
+#define	aio_iov	aio_buf			/* I/O scatter/gather list */
+#define	aio_iovcnt	aio_nbytes	/* Length of aio_iov */
+
 #ifdef _KERNEL
 typedef void aio_cancel_fn_t(struct kaiocb *);
 typedef void aio_handle_fn_t(struct kaiocb *);
@@ -132,6 +140,9 @@ struct kaiocb {
 	intcap_t	ujobptr;
 	struct	knlist klist;		/* (a) list of knotes */
 	struct	aiocb uaiocb;		/* (*) copy of user I/O control block */
+	struct	uio uio;		/* (*) storage for non-vectored uio */
+	struct	iovec iov[1];		/* (*) storage for non-vectored uio */
+	struct	uio *uiop;		/* (*) Possibly malloced uio */
 	ksiginfo_t ksi;			/* (a) realtime signal info */
 	uint64_t seqno;			/* (*) job number */
 	aio_cancel_fn_t *cancel_fn;	/* (a) backend cancel function */
@@ -139,17 +150,15 @@ struct kaiocb {
 	volatile u_int refcount;
 	union {				/* Backend-specific data fields */
 		struct {		/* BIO backend */
-			struct bio *bp;	/* (*) BIO pointer */
-			struct buf *pbuf; /* (*) buffer pointer */
-			struct vm_page *pages[btoc(MAXPHYS)+1]; /* (*) */
-			int	npages;	/* (*) number of pages */
+			int	nbio;	/* Number of remaining bios */
+			int	error;	/* Worst error of all bios */
+			long	nbytes;	/* Bytes completed so far */
 		};
 		struct {		/* fsync() requests */
 			int	pending; /* (a) number of pending I/O */
 		};
-		struct {
+		struct {		/* socket backend */
 			void	*backend1;
-			void	*backend2;
 			long	backend3;
 			int	backend4;
 		};
@@ -215,11 +224,17 @@ __BEGIN_DECLS
  * Asynchronously read from a file
  */
 int	aio_read(struct aiocb *);
+#if __BSD_VISIBLE
+int	aio_readv(struct aiocb *);
+#endif
 
 /*
  * Asynchronously write to file
  */
 int	aio_write(struct aiocb *);
+#if __BSD_VISIBLE
+int	aio_writev(struct aiocb *);
+#endif
 
 /*
  * List I/O Asynchronously/synchronously read/write to/from file

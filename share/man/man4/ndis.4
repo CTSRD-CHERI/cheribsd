@@ -105,9 +105,8 @@ file.
 The
 .Nm
 driver is designed to support mainly Ethernet and wireless
-network devices with PCI, PCMCIA and USB bus attachments.
-(Cardbus
-devices are also supported as a subset of PCI.)
+network devices with PCI and USB bus attachments.
+(Cardbus devices are also supported as PCI.)
 It can
 support many different media types and speeds.
 One limitation
@@ -121,8 +120,8 @@ which can be configured via the
 .Xr sysctl 8
 command.
 .Sh DEPRECATION NOTICE
-The PC Card attachment of this driver is scheduled for removal prior to the release of
-.Fx 13.0
+This driver is scheduled for removal prior to the release of
+.Fx 14.0
 .Sh DIAGNOSTICS
 .Bl -diag
 .It "ndis%d: watchdog timeout"

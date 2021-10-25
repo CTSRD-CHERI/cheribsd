@@ -65,10 +65,6 @@
 #include <net/route/nhop.h>
 #include <net/vnet.h>
 
-#ifdef RADIX_MPATH
-#include <net/radix_mpath.h>
-#endif
-
 #include <netinet/in.h>
 #include <netinet/ip_mroute.h>
 
@@ -154,6 +150,14 @@ rt_freeentry(struct radix_node *rn, void *arg)
 void
 rt_table_destroy(struct rib_head *rh)
 {
+
+	RIB_WLOCK(rh);
+	rh->rib_dying = true;
+	RIB_WUNLOCK(rh);
+
+#ifdef FIB_ALGO
+	fib_destroy_rib(rh);
+#endif
 
 	tmproutes_destroy(rh);
 
@@ -677,87 +681,6 @@ rt_print(char *buf, int buflen, struct rtentry *rt)
 }
 #endif
 
-#ifdef RADIX_MPATH
-/*
- * Deletes key for single-path routes, unlinks rtentry with
- * gateway specified in @info from multi-path routes.
- *
- * Returnes unlinked entry. In case of failure, returns NULL
- * and sets @perror to ESRCH.
- */
-struct radix_node *
-rt_mpath_unlink(struct rib_head *rnh, struct rt_addrinfo *info,
-    struct rtentry *rto, int *perror)
-{
-	/*
-	 * if we got multipath routes, we require users to specify
-	 * a matching RTAX_GATEWAY.
-	 */
-	struct rtentry *rt; // *rto = NULL;
-	struct radix_node *rn;
-	struct sockaddr *gw;
-
-	gw = info->rti_info[RTAX_GATEWAY];
-	rt = rt_mpath_matchgate(rto, gw);
-	if (rt == NULL) {
-		*perror = ESRCH;
-		return (NULL);
-	}
-
-	/*
-	 * this is the first entry in the chain
-	 */
-	if (rto == rt) {
-		rn = rn_mpath_next((struct radix_node *)rt);
-		/*
-		 * there is another entry, now it's active
-		 */
-		if (rn) {
-			rto = RNTORT(rn);
-			rto->rte_flags |= RTF_UP;
-		} else if (rt->rte_flags & RTF_GATEWAY) {
-			/*
-			 * For gateway routes, we need to 
-			 * make sure that we we are deleting
-			 * the correct gateway. 
-			 * rt_mpath_matchgate() does not 
-			 * check the case when there is only
-			 * one route in the chain.  
-			 */
-			if (gw &&
-			    (rt->rt_nhop->gw_sa.sa_len != gw->sa_len ||
-				memcmp(&rt->rt_nhop->gw_sa, gw, gw->sa_len))) {
-				*perror = ESRCH;
-				return (NULL);
-			}
-		}
-
-		/*
-		 * use the normal delete code to remove
-		 * the first entry
-		 */
-		rn = rnh->rnh_deladdr(info->rti_info[RTAX_DST],
-					info->rti_info[RTAX_NETMASK],
-					&rnh->head);
-		if (rn != NULL) {
-			*perror = 0;
-		} else {
-			*perror = ESRCH;
-		}
-		return (rn);
-	}
-		
-	/*
-	 * if the entry is 2nd and on up
-	 */
-	if (rt_mpath_deldup(rto, rt) == 0)
-		panic ("rtrequest1: rt_mpath_deldup");
-	*perror = 0;
-	rn = (struct radix_node *)rt;
-	return (rn);
-}
-#endif
-
 void
 rt_maskedcopy(struct sockaddr *src, struct sockaddr *dst, struct sockaddr *netmask)
 {
@@ -787,10 +710,13 @@ rt_addrmsg(int cmd, struct ifaddr *ifa, int fibnum)
 
 	KASSERT(cmd == RTM_ADD || cmd == RTM_DELETE,
 	    ("unexpected cmd %d", cmd));
-	KASSERT(fibnum == RT_ALL_FIBS || (fibnum >= 0 && fibnum < rt_numfibs),
+	KASSERT((fibnum >= 0 && fibnum < rt_numfibs),
 	    ("%s: fib out of range 0 <=%d<%d", __func__, fibnum, rt_numfibs));
 
 	EVENTHANDLER_DIRECT_INVOKE(rt_addrmsg, ifa, cmd);
+
+	if (V_rt_add_addr_allfibs)
+		fibnum = RT_ALL_FIBS;
 	return (rtsock_addrmsg(cmd, ifa, fibnum));
 }
 
@@ -798,13 +724,13 @@ rt_addrmsg(int cmd, struct ifaddr *ifa, int fibnum)
  * Announce kernel-originated route addition/removal to rtsock based on @rt data.
  * cmd: RTM_ cmd
  * @rt: valid rtentry
- * @ifp: target route interface
+ * @nh: nhop object to announce
  * @fibnum: fib id or RT_ALL_FIBS
  *
  * Returns 0 on success.
  */
 int
-rt_routemsg(int cmd, struct rtentry *rt, struct ifnet *ifp, int rti_addrs,
+rt_routemsg(int cmd, struct rtentry *rt, struct nhop_object *nh,
     int fibnum)
 {
 
@@ -816,7 +742,7 @@ rt_routemsg(int cmd, struct rtentry *rt, struct ifnet *ifp, int rti_addrs,
 
 	KASSERT(rt_key(rt) != NULL, (":%s: rt_key must be supplied", __func__));
 
-	return (rtsock_routemsg(cmd, rt, ifp, 0, fibnum));
+	return (rtsock_routemsg(cmd, rt, nh, fibnum));
 }
 
 /*
@@ -840,28 +766,4 @@ rt_routemsg_info(int cmd, struct rt_addrinfo *info, int fibnum)
 	KASSERT(info->rti_info[RTAX_DST] != NULL, (":%s: RTAX_DST must be supplied", __func__));
 
 	return (rtsock_routemsg_info(cmd, info, fibnum));
-}
-
-/*
- * This is called to generate messages from the routing socket
- * indicating a network interface has had addresses associated with it.
- */
-void
-rt_newaddrmsg_fib(int cmd, struct ifaddr *ifa, struct rtentry *rt, int fibnum)
-{
-
-	KASSERT(cmd == RTM_ADD || cmd == RTM_DELETE,
-		("unexpected cmd %u", cmd));
-	KASSERT(fibnum == RT_ALL_FIBS || (fibnum >= 0 && fibnum < rt_numfibs),
-	    ("%s: fib out of range 0 <=%d<%d", __func__, fibnum, rt_numfibs));
-
-	if (cmd == RTM_ADD) {
-		rt_addrmsg(cmd, ifa, fibnum);
-		if (rt != NULL)
-			rt_routemsg(cmd, rt, ifa->ifa_ifp, 0, fibnum);
-	} else {
-		if (rt != NULL)
-			rt_routemsg(cmd, rt, ifa->ifa_ifp, 0, fibnum);
-		rt_addrmsg(cmd, ifa, fibnum);
-	}
 }

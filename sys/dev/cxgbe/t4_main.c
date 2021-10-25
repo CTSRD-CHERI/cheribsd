@@ -403,6 +403,11 @@ SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 14, CTLFLAG_RDTUN,
     &t4_toe_rexmt_backoff[14], 0, "");
 SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 15, CTLFLAG_RDTUN,
     &t4_toe_rexmt_backoff[15], 0, "");
+
+static int t4_toe_tls_rx_timeout = 5;
+SYSCTL_INT(_hw_cxgbe_toe, OID_AUTO, tls_rx_timeout, CTLFLAG_RDTUN,
+    &t4_toe_tls_rx_timeout, 0,
+    "Timeout in seconds to downgrade TLS sockets to plain TOE");
 #endif
 
 #ifdef DEV_NETMAP
@@ -761,6 +766,7 @@ static int sysctl_cim_pif_la(SYSCTL_HANDLER_ARGS);
 static int sysctl_cim_qcfg(SYSCTL_HANDLER_ARGS);
 static int sysctl_cpl_stats(SYSCTL_HANDLER_ARGS);
 static int sysctl_ddp_stats(SYSCTL_HANDLER_ARGS);
+static int sysctl_tid_stats(SYSCTL_HANDLER_ARGS);
 static int sysctl_devlog(SYSCTL_HANDLER_ARGS);
 static int sysctl_fcoe_stats(SYSCTL_HANDLER_ARGS);
 static int sysctl_hw_sched(SYSCTL_HANDLER_ARGS);
@@ -775,6 +781,7 @@ static int sysctl_rdma_stats(SYSCTL_HANDLER_ARGS);
 static int sysctl_tcp_stats(SYSCTL_HANDLER_ARGS);
 static int sysctl_tids(SYSCTL_HANDLER_ARGS);
 static int sysctl_tp_err_stats(SYSCTL_HANDLER_ARGS);
+static int sysctl_tnl_stats(SYSCTL_HANDLER_ARGS);
 static int sysctl_tp_la_mask(SYSCTL_HANDLER_ARGS);
 static int sysctl_tp_la(SYSCTL_HANDLER_ARGS);
 static int sysctl_tx_rate(SYSCTL_HANDLER_ARGS);
@@ -784,6 +791,7 @@ static int sysctl_cpus(SYSCTL_HANDLER_ARGS);
 #ifdef TCP_OFFLOAD
 static int sysctl_tls(SYSCTL_HANDLER_ARGS);
 static int sysctl_tls_rx_ports(SYSCTL_HANDLER_ARGS);
+static int sysctl_tls_rx_timeout(SYSCTL_HANDLER_ARGS);
 static int sysctl_tp_tick(SYSCTL_HANDLER_ARGS);
 static int sysctl_tp_dack_timer(SYSCTL_HANDLER_ARGS);
 static int sysctl_tp_timer(SYSCTL_HANDLER_ARGS);
@@ -4918,9 +4926,22 @@ set_params__post_init(struct adapter *sc)
 #endif
 
 #ifdef KERN_TLS
-	if (t4_kern_tls != 0 && sc->cryptocaps & FW_CAPS_CONFIG_TLSKEYS &&
-	    sc->toecaps & FW_CAPS_CONFIG_TOE)
-		t4_enable_kern_tls(sc);
+	if (sc->cryptocaps & FW_CAPS_CONFIG_TLSKEYS &&
+	    sc->toecaps & FW_CAPS_CONFIG_TOE) {
+		if (t4_kern_tls != 0)
+			t4_enable_kern_tls(sc);
+		else {
+			/*
+			 * Limit TOE connections to 2 reassembly
+			 * "islands".  This is required for TOE TLS
+			 * connections to downgrade to plain TOE
+			 * connections if an unsupported TLS version
+			 * or ciphersuite is used.
+			 */
+			t4_tp_wr_bits_indirect(sc, A_TP_FRAG_CONFIG,
+			    V_PASSMODE(M_PASSMODE), V_PASSMODE(2));
+		}
+	}
 #endif
 	return (0);
 }
@@ -6621,6 +6642,10 @@ t4_sysctls(struct adapter *sc)
 	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, 0,
 	    sysctl_ddp_stats, "A", "non-TCP DDP statistics");
 
+	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "tid_stats",
+	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, 0,
+	    sysctl_tid_stats, "A", "tid stats");
+
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "devlog",
 	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, 0,
 	    sysctl_devlog, "A", "firmware's device log");
@@ -6683,6 +6708,10 @@ t4_sysctls(struct adapter *sc)
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "tp_err_stats",
 	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, 0,
 	    sysctl_tp_err_stats, "A", "TP error statistics");
+
+	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "tnl_stats",
+	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, 0,
+	    sysctl_tnl_stats, "A", "TP tunnel statistics");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "tp_la_mask",
 	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, sc, 0,
@@ -6766,6 +6795,12 @@ t4_sysctls(struct adapter *sc)
 		    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, sc, 0,
 		    sysctl_tls_rx_ports, "I",
 		    "TCP ports that use inline TLS+TOE RX");
+
+		sc->tt.tls_rx_timeout = t4_toe_tls_rx_timeout;
+		SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "tls_rx_timeout",
+		    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, sc, 0,
+		    sysctl_tls_rx_timeout, "I",
+		    "Timeout in seconds to downgrade TLS sockets to plain TOE");
 
 		sc->tt.tx_align = -1;
 		SYSCTL_ADD_INT(ctx, children, OID_AUTO, "tx_align",
@@ -8247,13 +8282,13 @@ sysctl_cpl_stats(SYSCTL_HANDLER_ARGS)
 		    "  channel 2  channel 3");
 		sbuf_printf(sb, "\nCPL requests:   %10u %10u %10u %10u",
 		    stats.req[0], stats.req[1], stats.req[2], stats.req[3]);
-		sbuf_printf(sb, "\nCPL responses:   %10u %10u %10u %10u",
+		sbuf_printf(sb, "\nCPL responses:  %10u %10u %10u %10u",
 		    stats.rsp[0], stats.rsp[1], stats.rsp[2], stats.rsp[3]);
 	} else {
 		sbuf_printf(sb, "                 channel 0  channel 1");
 		sbuf_printf(sb, "\nCPL requests:   %10u %10u",
 		    stats.req[0], stats.req[1]);
-		sbuf_printf(sb, "\nCPL responses:   %10u %10u",
+		sbuf_printf(sb, "\nCPL responses:  %10u %10u",
 		    stats.rsp[0], stats.rsp[1]);
 	}
 
@@ -8279,11 +8314,44 @@ sysctl_ddp_stats(SYSCTL_HANDLER_ARGS)
 	if (sb == NULL)
 		return (ENOMEM);
 
+	mtx_lock(&sc->reg_lock);
 	t4_get_usm_stats(sc, &stats, 1);
+	mtx_unlock(&sc->reg_lock);
 
 	sbuf_printf(sb, "Frames: %u\n", stats.frames);
 	sbuf_printf(sb, "Octets: %ju\n", stats.octets);
 	sbuf_printf(sb, "Drops:  %u", stats.drops);
+
+	rc = sbuf_finish(sb);
+	sbuf_delete(sb);
+
+	return (rc);
+}
+
+static int
+sysctl_tid_stats(SYSCTL_HANDLER_ARGS)
+{
+	struct adapter *sc = arg1;
+	struct sbuf *sb;
+	int rc;
+	struct tp_tid_stats stats;
+
+	rc = sysctl_wire_old_buffer(req, 0);
+	if (rc != 0)
+		return(rc);
+
+	sb = sbuf_new_for_sysctl(NULL, NULL, 256, req);
+	if (sb == NULL)
+		return (ENOMEM);
+
+	mtx_lock(&sc->reg_lock);
+	t4_tp_get_tid_stats(sc, &stats, 1);
+	mtx_unlock(&sc->reg_lock);
+
+	sbuf_printf(sb, "Delete:     %u\n", stats.del);
+	sbuf_printf(sb, "Invalidate: %u\n", stats.inv);
+	sbuf_printf(sb, "Active:     %u\n", stats.act);
+	sbuf_printf(sb, "Passive:    %u", stats.pas);
 
 	rc = sbuf_finish(sb);
 	sbuf_delete(sb);
@@ -8453,8 +8521,10 @@ sysctl_fcoe_stats(SYSCTL_HANDLER_ARGS)
 	if (sb == NULL)
 		return (ENOMEM);
 
+	mtx_lock(&sc->reg_lock);
 	for (i = 0; i < nchan; i++)
 		t4_get_fcoe_stats(sc, i, &stats[i], 1);
+	mtx_unlock(&sc->reg_lock);
 
 	if (nchan > 2) {
 		sbuf_printf(sb, "                   channel 0        channel 1"
@@ -9451,6 +9521,49 @@ sysctl_tp_err_stats(SYSCTL_HANDLER_ARGS)
 }
 
 static int
+sysctl_tnl_stats(SYSCTL_HANDLER_ARGS)
+{
+	struct adapter *sc = arg1;
+	struct sbuf *sb;
+	int rc;
+	struct tp_tnl_stats stats;
+
+	rc = sysctl_wire_old_buffer(req, 0);
+	if (rc != 0)
+		return(rc);
+
+	sb = sbuf_new_for_sysctl(NULL, NULL, 256, req);
+	if (sb == NULL)
+		return (ENOMEM);
+
+	mtx_lock(&sc->reg_lock);
+	t4_tp_get_tnl_stats(sc, &stats, 1);
+	mtx_unlock(&sc->reg_lock);
+
+	if (sc->chip_params->nchan > 2) {
+		sbuf_printf(sb, "           channel 0  channel 1"
+		    "  channel 2  channel 3\n");
+		sbuf_printf(sb, "OutPkts:  %10u %10u %10u %10u\n",
+		    stats.out_pkt[0], stats.out_pkt[1],
+		    stats.out_pkt[2], stats.out_pkt[3]);
+		sbuf_printf(sb, "InPkts:   %10u %10u %10u %10u",
+		    stats.in_pkt[0], stats.in_pkt[1],
+		    stats.in_pkt[2], stats.in_pkt[3]);
+	} else {
+		sbuf_printf(sb, "           channel 0  channel 1\n");
+		sbuf_printf(sb, "OutPkts:  %10u %10u\n",
+		    stats.out_pkt[0], stats.out_pkt[1]);
+		sbuf_printf(sb, "InPkts:   %10u %10u",
+		    stats.in_pkt[0], stats.in_pkt[1]);
+	}
+
+	rc = sbuf_finish(sb);
+	sbuf_delete(sb);
+
+	return (rc);
+}
+
+static int
 sysctl_tp_la_mask(SYSCTL_HANDLER_ARGS)
 {
 	struct adapter *sc = arg1;
@@ -9944,6 +10057,29 @@ sysctl_tls_rx_ports(SYSCTL_HANDLER_ARGS)
 	}
 	end_synchronized_op(sc, 0);
 	return (rc);
+}
+
+static int
+sysctl_tls_rx_timeout(SYSCTL_HANDLER_ARGS)
+{
+	struct adapter *sc = arg1;
+	int v, rc;
+
+	v = sc->tt.tls_rx_timeout;
+	rc = sysctl_handle_int(oidp, &v, 0, req);
+	if (rc != 0 || req->newptr == NULL)
+		return (rc);
+
+	if (v < 0)
+		return (EINVAL);
+
+	if (v != 0 && !(sc->cryptocaps & FW_CAPS_CONFIG_TLSKEYS))
+		return (ENOTSUP);
+
+	sc->tt.tls_rx_timeout = v;
+
+	return (0);
+
 }
 
 static void
@@ -11188,6 +11324,9 @@ tweak_tunables(void)
 
 	if (t4_pktc_idx_ofld < -1 || t4_pktc_idx_ofld >= SGE_NCOUNTERS)
 		t4_pktc_idx_ofld = PKTC_IDX_OFLD;
+
+	if (t4_toe_tls_rx_timeout < 0)
+		t4_toe_tls_rx_timeout = 0;
 #else
 	if (t4_rdmacaps_allowed == -1)
 		t4_rdmacaps_allowed = 0;

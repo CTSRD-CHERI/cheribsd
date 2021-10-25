@@ -216,6 +216,11 @@ SYSCTL_INT(ELF_NODE_OID, OID_AUTO, sigfastblock,
     CTLFLAG_RWTUN, &__elfN(sigfastblock), 0,
     "enable sigfastblock for new processes");
 
+static bool __elfN(allow_wx) = true;
+SYSCTL_BOOL(ELF_NODE_OID, OID_AUTO, allow_wx, CTLFLAG_RWTUN,
+    &__elfN(allow_wx), 0,
+    "Allow pages to be mapped simultaneously writable and executable");
+
 static Elf_Brandinfo *elf_brand_list[MAX_BRANDS];
 
 #define	aligned(a, t)	(rounddown2((u_long)(a), sizeof(t)) == (u_long)(a))
@@ -570,7 +575,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 		uprintf("Warning: Attempted to load position-dependent "
 		    "executable with non-representable base: %s\n",
 		    imgp->execpath);
-		return (KERN_FAILURE); /* XXX: EPRECISION or similar? */
+		return (EINVAL); /* XXX: EPRECISION or similar? */
 	}
 
 	/*
@@ -584,7 +589,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	result = vm_map_reservation_create(map, &reservation, end - start,
 	    PAGE_SIZE, VM_PROT_ALL);
 	if (result != KERN_SUCCESS)
-		return (result);
+		return (vm_mmap_to_errno(result));
 
 	*preferred_rbase = reservation - start;
 
@@ -596,7 +601,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 #endif
 	*imgact_cap = cheri_andperm(reservation_cap, perm);
 
-	return (KERN_SUCCESS);
+	return (0);
 }
 #endif
 
@@ -815,7 +820,7 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 	 */
 	if ((prot & VM_PROT_WRITE) == 0)
 		vm_map_protect(map, trunc_page(map_addr), round_page(map_addr +
-		    map_len), prot, FALSE, FALSE);
+		    map_len), prot, 0, VM_MAP_PROTECT_SET_PROT);
 
 	return (0);
 }
@@ -1430,6 +1435,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		    (imgp->proc->p_flag2 & P2_ASLR_IGNSTART) != 0)
 			imgp->map_flags |= MAP_ASLR_IGNSTART;
 	}
+
+	if (!__elfN(allow_wx) && (fctl0 & NT_FREEBSD_FCTL_WXNEEDED) == 0)
+		imgp->map_flags |= MAP_WXORX;
 
 	error = exec_new_vmspace(imgp, sv);
 	vmspace = imgp->proc->p_vmspace;
@@ -3225,8 +3233,6 @@ __elfN(stackgap)(struct image_params *imgp, uintcap_t *stack_base)
 	vm_offset_t range, gap;
 	int pct;
 
-	if ((imgp->map_flags & MAP_ASLR) == 0)
-		return;
 	pct = __elfN(aslr_stack_gap);
 	if (pct == 0)
 		return;

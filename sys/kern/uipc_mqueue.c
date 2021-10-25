@@ -1441,6 +1441,7 @@ mqfs_readdir(struct vop_readdir_args *ap)
 		if (!pn->mn_fileno)
 			mqfs_fileno_alloc(mi, pn);
 		entry.d_fileno = pn->mn_fileno;
+		entry.d_off = offset + entry.d_reclen;
 		for (i = 0; i < MQFS_NAMELEN - 1 && pn->mn_name[i] != '\0'; ++i)
 			entry.d_name[i] = pn->mn_name[i];
 		entry.d_namlen = i;
@@ -1577,14 +1578,17 @@ static int
 mqfs_prison_remove(void *obj, void *data __unused)
 {
 	const struct prison *pr = obj;
-	const struct prison *tpr;
+	struct prison *tpr;
 	struct mqfs_node *pn, *tpn;
 	int found;
 
 	found = 0;
 	TAILQ_FOREACH(tpr, &allprison, pr_list) {
-		if (tpr->pr_root == pr->pr_root && tpr != pr && tpr->pr_ref > 0)
+		prison_lock(tpr);
+		if (tpr != pr && prison_isvalid(tpr) &&
+		    tpr->pr_root == pr->pr_root)
 			found = 1;
+		prison_unlock(tpr);
 	}
 	if (!found) {
 		/*

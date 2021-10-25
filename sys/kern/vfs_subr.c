@@ -108,6 +108,8 @@ static int	flushbuflist(struct bufv *bufv, int flags, struct bufobj *bo,
 static void	syncer_shutdown(void *arg, int howto);
 static int	vtryrecycle(struct vnode *vp);
 static void	v_init_counters(struct vnode *);
+static void	vn_seqc_init(struct vnode *);
+static void	vn_seqc_write_end_free(struct vnode *vp);
 static void	vgonel(struct vnode *);
 static bool	vhold_recycle_free(struct vnode *);
 static void	vfs_knllock(void *arg);
@@ -1717,7 +1719,9 @@ getnewvnode(const char *tag, struct mount *mp, struct vop_vector *vops,
 	KASSERT(vp->v_pollinfo == NULL, ("stale v_pollinfo %p", vp));
 	vp->v_type = VNON;
 	vp->v_op = vops;
+	vp->v_irflag = 0;
 	v_init_counters(vp);
+	vn_seqc_init(vp);
 	vp->v_bufobj.bo_ops = &buf_ops_bio;
 #ifdef DIAGNOSTIC
 	if (mp == NULL && vops != &dead_vnodeops)
@@ -1786,8 +1790,7 @@ freevnode(struct vnode *vp)
 	/*
 	 * Paired with vgone.
 	 */
-	vn_seqc_write_end_locked(vp);
-	VNPASS(vp->v_seqc_users == 0, vp);
+	vn_seqc_write_end_free(vp);
 
 	bo = &vp->v_bufobj;
 	VNASSERT(vp->v_data == NULL, vp, ("cleaned vnode isn't"));
@@ -1816,16 +1819,11 @@ freevnode(struct vnode *vp)
 		destroy_vpollinfo(vp->v_pollinfo);
 		vp->v_pollinfo = NULL;
 	}
-#ifdef INVARIANTS
-	/* XXX Elsewhere we detect an already freed vnode via NULL v_op. */
-	vp->v_op = NULL;
-#endif
 	vp->v_mountedhere = NULL;
 	vp->v_unpcb = NULL;
 	vp->v_rdev = NULL;
 	vp->v_fifoinfo = NULL;
 	vp->v_lasta = vp->v_clen = vp->v_cstart = vp->v_lastw = 0;
-	vp->v_irflag = 0;
 	vp->v_iflag = 0;
 	vp->v_vflag = 0;
 	bo->bo_flag = 0;
@@ -3458,8 +3456,6 @@ vdrop_deactivate(struct vnode *vp)
 	 */
 	VNASSERT(!VN_IS_DOOMED(vp), vp,
 	    ("vdrop: returning doomed vnode"));
-	VNASSERT(vp->v_op != NULL, vp,
-	    ("vdrop: vnode already reclaimed."));
 	VNASSERT((vp->v_iflag & VI_OWEINACT) == 0, vp,
 	    ("vnode with VI_OWEINACT set"));
 	VNASSERT((vp->v_iflag & VI_DEFINACT) == 0, vp,
@@ -3874,14 +3870,14 @@ vgonel(struct vnode *vp)
 	/*
 	 * Don't vgonel if we're already doomed.
 	 */
-	if (vp->v_irflag & VIRF_DOOMED)
+	if (VN_IS_DOOMED(vp))
 		return;
 	/*
 	 * Paired with freevnode.
 	 */
 	vn_seqc_write_begin_locked(vp);
 	vunlazy_gone(vp);
-	vp->v_irflag |= VIRF_DOOMED;
+	vn_irflag_set_locked(vp, VIRF_DOOMED);
 
 	/*
 	 * Check to see if the vnode is in use.  If so, we have to
@@ -4007,6 +4003,7 @@ vn_printf(struct vnode *vp, const char *fmt, ...)
 	char buf[256], buf2[16];
 	u_long flags;
 	u_int holdcnt;
+	short irflag;
 
 	va_start(ap, fmt);
 	vprintf(fmt, ap);
@@ -4042,11 +4039,14 @@ vn_printf(struct vnode *vp, const char *fmt, ...)
 
 	buf[0] = '\0';
 	buf[1] = '\0';
-	if (vp->v_irflag & VIRF_DOOMED)
+	irflag = vn_irflag_read(vp);
+	if (irflag & VIRF_DOOMED)
 		strlcat(buf, "|VIRF_DOOMED", sizeof(buf));
-	if (vp->v_irflag & VIRF_PGREAD)
+	if (irflag & VIRF_PGREAD)
 		strlcat(buf, "|VIRF_PGREAD", sizeof(buf));
-	flags = vp->v_irflag & ~(VIRF_DOOMED | VIRF_PGREAD);
+	if (irflag & VIRF_MOUNTPOINT)
+		strlcat(buf, "|VIRF_MOUNTPOINT", sizeof(buf));
+	flags = irflag & ~(VIRF_DOOMED | VIRF_PGREAD | VIRF_MOUNTPOINT);
 	if (flags != 0) {
 		snprintf(buf2, sizeof(buf2), "|VIRF(0x%lx)", flags);
 		strlcat(buf, buf2, sizeof(buf));
@@ -6831,6 +6831,91 @@ vn_seqc_write_end(struct vnode *vp)
 
 	VI_LOCK(vp);
 	vn_seqc_write_end_locked(vp);
+	VI_UNLOCK(vp);
+}
+
+/*
+ * Special case handling for allocating and freeing vnodes.
+ *
+ * The counter remains unchanged on free so that a doomed vnode will
+ * keep testing as in modify as long as it is accessible with SMR.
+ */
+static void
+vn_seqc_init(struct vnode *vp)
+{
+
+	vp->v_seqc = 0;
+	vp->v_seqc_users = 0;
+}
+
+static void
+vn_seqc_write_end_free(struct vnode *vp)
+{
+
+	VNPASS(seqc_in_modify(vp->v_seqc), vp);
+	VNPASS(vp->v_seqc_users == 1, vp);
+}
+
+void
+vn_irflag_set_locked(struct vnode *vp, short toset)
+{
+	short flags;
+
+	ASSERT_VI_LOCKED(vp, __func__);
+	flags = vn_irflag_read(vp);
+	VNASSERT((flags & toset) == 0, vp,
+	    ("%s: some of the passed flags already set (have %d, passed %d)\n",
+	    __func__, flags, toset));
+	atomic_store_short(&vp->v_irflag, flags | toset);
+}
+
+void
+vn_irflag_set(struct vnode *vp, short toset)
+{
+
+	VI_LOCK(vp);
+	vn_irflag_set_locked(vp, toset);
+	VI_UNLOCK(vp);
+}
+
+void
+vn_irflag_set_cond_locked(struct vnode *vp, short toset)
+{
+	short flags;
+
+	ASSERT_VI_LOCKED(vp, __func__);
+	flags = vn_irflag_read(vp);
+	atomic_store_short(&vp->v_irflag, flags | toset);
+}
+
+void
+vn_irflag_set_cond(struct vnode *vp, short toset)
+{
+
+	VI_LOCK(vp);
+	vn_irflag_set_cond_locked(vp, toset);
+	VI_UNLOCK(vp);
+}
+
+void
+vn_irflag_unset_locked(struct vnode *vp, short tounset)
+{
+	short flags;
+
+	ASSERT_VI_LOCKED(vp, __func__);
+	flags = vn_irflag_read(vp);
+	VNASSERT((flags & tounset) == tounset, vp,
+	    ("%s: some of the passed flags not set (have %d, passed %d)\n",
+	    __func__, flags, tounset));
+	atomic_store_short(&vp->v_irflag, flags & ~tounset);
+}
+
+void
+vn_irflag_unset(struct vnode *vp, short tounset)
+{
+
+	VI_LOCK(vp);
+	vn_irflag_unset_locked(vp, tounset);
 	VI_UNLOCK(vp);
 }
 // CHERI CHANGES START

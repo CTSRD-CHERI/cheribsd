@@ -53,10 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <net/route/nhop.h>
 #include <net/route/nhop_var.h>
 #include <netinet/in.h>
-
-#ifdef RADIX_MPATH
-#include <net/radix_mpath.h>
-#endif
+#include <netinet6/scope6_var.h>
 
 #include <vm/uma.h>
 
@@ -70,6 +67,7 @@ struct rib_subscription {
 	CK_STAILQ_ENTRY(rib_subscription)	next;
 	rib_subscription_cb_t			*func;
 	void					*arg;
+	struct rib_head				*rnh;
 	enum rib_subscription_type		type;
 	struct epoch_context			epoch_ctx __subobject_use_container_bounds;
 };
@@ -238,6 +236,142 @@ get_info_weight(const struct rt_addrinfo *info, uint32_t default_weight)
 
 	return (weight);
 }
+
+bool
+rt_is_host(const struct rtentry *rt)
+{
+
+	return (rt->rte_flags & RTF_HOST);
+}
+
+sa_family_t
+rt_get_family(const struct rtentry *rt)
+{
+	const struct sockaddr *dst;
+
+	dst = (const struct sockaddr *)rt_key_const(rt);
+
+	return (dst->sa_family);
+}
+
+/*
+ * Returns pointer to nexthop or nexthop group
+ * associated with @rt
+ */
+struct nhop_object *
+rt_get_raw_nhop(const struct rtentry *rt)
+{
+
+	return (rt->rt_nhop);
+}
+
+#ifdef INET
+/*
+ * Stores IPv4 address and prefix length of @rt inside
+ *  @paddr and @plen.
+ * @pscopeid is currently always set to 0.
+ */
+void
+rt_get_inet_prefix_plen(const struct rtentry *rt, struct in_addr *paddr,
+    int *plen, uint32_t *pscopeid)
+{
+	const struct sockaddr_in *dst;
+
+	dst = (const struct sockaddr_in *)rt_key_const(rt);
+	KASSERT((dst->sin_family == AF_INET),
+	    ("rt family is %d, not inet", dst->sin_family));
+	*paddr = dst->sin_addr;
+	dst = (const struct sockaddr_in *)rt_mask_const(rt);
+	if (dst == NULL)
+		*plen = 32;
+	else
+		*plen = bitcount32(dst->sin_addr.s_addr);
+	*pscopeid = 0;
+}
+
+/*
+ * Stores IPv4 address and prefix mask of @rt inside
+ *  @paddr and @pmask. Sets mask to INADDR_ANY for host routes.
+ * @pscopeid is currently always set to 0.
+ */
+void
+rt_get_inet_prefix_pmask(const struct rtentry *rt, struct in_addr *paddr,
+    struct in_addr *pmask, uint32_t *pscopeid)
+{
+	const struct sockaddr_in *dst;
+
+	dst = (const struct sockaddr_in *)rt_key_const(rt);
+	KASSERT((dst->sin_family == AF_INET),
+	    ("rt family is %d, not inet", dst->sin_family));
+	*paddr = dst->sin_addr;
+	dst = (const struct sockaddr_in *)rt_mask_const(rt);
+	if (dst == NULL)
+		pmask->s_addr = INADDR_BROADCAST;
+	else
+		*pmask = dst->sin_addr;
+	*pscopeid = 0;
+}
+#endif
+
+#ifdef INET6
+static int
+inet6_get_plen(const struct in6_addr *addr)
+{
+
+	return (bitcount32(addr->s6_addr32[0]) + bitcount32(addr->s6_addr32[1]) +
+	    bitcount32(addr->s6_addr32[2]) + bitcount32(addr->s6_addr32[3]));
+}
+
+/*
+ * Stores IPv6 address and prefix length of @rt inside
+ *  @paddr and @plen. Addresses are returned in de-embedded form.
+ * Scopeid is set to 0 for non-LL addresses.
+ */
+void
+rt_get_inet6_prefix_plen(const struct rtentry *rt, struct in6_addr *paddr,
+    int *plen, uint32_t *pscopeid)
+{
+	const struct sockaddr_in6 *dst;
+
+	dst = (const struct sockaddr_in6 *)rt_key_const(rt);
+	KASSERT((dst->sin6_family == AF_INET6),
+	    ("rt family is %d, not inet6", dst->sin6_family));
+	if (IN6_IS_SCOPE_LINKLOCAL(&dst->sin6_addr))
+		in6_splitscope(&dst->sin6_addr, paddr, pscopeid);
+	else
+		*paddr = dst->sin6_addr;
+	dst = (const struct sockaddr_in6 *)rt_mask_const(rt);
+	if (dst == NULL)
+		*plen = 128;
+	else
+		*plen = inet6_get_plen(&dst->sin6_addr);
+}
+
+/*
+ * Stores IPv6 address and prefix mask of @rt inside
+ *  @paddr and @pmask. Addresses are returned in de-embedded form.
+ * Scopeid is set to 0 for non-LL addresses.
+ */
+void
+rt_get_inet6_prefix_pmask(const struct rtentry *rt, struct in6_addr *paddr,
+    struct in6_addr *pmask, uint32_t *pscopeid)
+{
+	const struct sockaddr_in6 *dst;
+
+	dst = (const struct sockaddr_in6 *)rt_key_const(rt);
+	KASSERT((dst->sin6_family == AF_INET6),
+	    ("rt family is %d, not inet", dst->sin6_family));
+	if (IN6_IS_SCOPE_LINKLOCAL(&dst->sin6_addr))
+		in6_splitscope(&dst->sin6_addr, paddr, pscopeid);
+	else
+		*paddr = dst->sin6_addr;
+	dst = (const struct sockaddr_in6 *)rt_mask_const(rt);
+	if (dst == NULL)
+		memset(pmask, 0xFF, sizeof(struct in6_addr));
+	else
+		*pmask = dst->sin6_addr;
+}
+#endif
 
 static void
 rt_set_expire_info(struct rtentry *rt, const struct rt_addrinfo *info)
@@ -669,6 +803,8 @@ rt_unlinkrte(struct rib_head *rnh, struct rt_addrinfo *info, struct rib_cmd_info
 
 	/* Finalize notification */
 	rnh->rnh_gen++;
+	rnh->rnh_prefixes--;
+
 	rc->rc_cmd = RTM_DELETE;
 	rc->rc_rt = rt;
 	rc->rc_nh_old = rt->rt_nhop;
@@ -929,6 +1065,7 @@ add_route_nhop(struct rib_head *rnh, struct rtentry *rt,
 
 		/* Finalize notification */
 		rnh->rnh_gen++;
+		rnh->rnh_prefixes++;
 
 		rc->rc_cmd = RTM_ADD;
 		rc->rc_rt = rt;
@@ -984,6 +1121,8 @@ change_route_nhop(struct rib_head *rnh, struct rtentry *rt,
 
 	/* Finalize notification */
 	rnh->rnh_gen++;
+	if (rnd->rnd_nhop == NULL)
+		rnh->rnh_prefixes--;
 
 	rc->rc_cmd = (rnd->rnd_nhop != NULL) ? RTM_CHANGE : RTM_DELETE;
 	rc->rc_rt = rt;
@@ -1193,11 +1332,10 @@ rib_walk_del(u_int fibnum, int family, rib_filter_f_t *filter_f, void *arg, bool
 				nhg = (struct nhgrp_object *)nh;
 				wn = nhgrp_get_nhops(nhg, &num_nhops);
 				for (int i = 0; i < num_nhops; i++)
-					rt_routemsg(RTM_DELETE, rt,
-					    wn[i].nh->nh_ifp, 0, fibnum);
+					rt_routemsg(RTM_DELETE, rt, wn[i].nh, fibnum);
 			} else
 #endif
-			rt_routemsg(RTM_DELETE, rt, nh->nh_ifp, 0, fibnum);
+			rt_routemsg(RTM_DELETE, rt, nh, fibnum);
 		}
 		rtfree(rt);
 	}
@@ -1222,7 +1360,7 @@ allocate_subscription(rib_subscription_cb_t *f, void *arg,
     enum rib_subscription_type type, bool waitok)
 {
 	struct rib_subscription *rs;
-	int flags = M_ZERO | (waitok ? M_WAITOK : 0);
+	int flags = M_ZERO | (waitok ? M_WAITOK : M_NOWAIT);
 
 	rs = malloc(sizeof(struct rib_subscription), M_RTABLE, flags);
 	if (rs == NULL)
@@ -1246,22 +1384,14 @@ rib_subscribe(uint32_t fibnum, int family, rib_subscription_cb_t *f, void *arg,
     enum rib_subscription_type type, bool waitok)
 {
 	struct rib_head *rnh;
-	struct rib_subscription *rs;
 	struct epoch_tracker et;
-
-	if ((rs = allocate_subscription(f, arg, type, waitok)) == NULL)
-		return (NULL);
 
 	NET_EPOCH_ENTER(et);
 	KASSERT((fibnum < rt_numfibs), ("%s: bad fibnum", __func__));
 	rnh = rt_tables_get_rnh(fibnum, family);
-
-	RIB_WLOCK(rnh);
-	CK_STAILQ_INSERT_TAIL(&rnh->rnh_subscribers, rs, next);
-	RIB_WUNLOCK(rnh);
 	NET_EPOCH_EXIT(et);
 
-	return (rs);
+	return (rib_subscribe_internal(rnh, f, arg, type, waitok));
 }
 
 struct rib_subscription *
@@ -1273,6 +1403,7 @@ rib_subscribe_internal(struct rib_head *rnh, rib_subscription_cb_t *f, void *arg
 
 	if ((rs = allocate_subscription(f, arg, type, waitok)) == NULL)
 		return (NULL);
+	rs->rnh = rnh;
 
 	NET_EPOCH_ENTER(et);
 	RIB_WLOCK(rnh);
@@ -1284,23 +1415,15 @@ rib_subscribe_internal(struct rib_head *rnh, rib_subscription_cb_t *f, void *arg
 }
 
 /*
- * Remove rtable subscription @rs from the table specified by @fibnum
- *  and @family.
+ * Remove rtable subscription @rs from the routing table.
  * Needs to be run in network epoch.
- *
- * Returns 0 on success.
  */
-int
-rib_unsibscribe(uint32_t fibnum, int family, struct rib_subscription *rs)
+void
+rib_unsibscribe(struct rib_subscription *rs)
 {
-	struct rib_head *rnh;
+	struct rib_head *rnh = rs->rnh;
 
 	NET_EPOCH_ASSERT();
-	KASSERT((fibnum < rt_numfibs), ("%s: bad fibnum", __func__));
-	rnh = rt_tables_get_rnh(fibnum, family);
-
-	if (rnh == NULL)
-		return (ENOENT);
 
 	RIB_WLOCK(rnh);
 	CK_STAILQ_REMOVE(&rnh->rnh_subscribers, rs, rib_subscription, next);
@@ -1308,8 +1431,6 @@ rib_unsibscribe(uint32_t fibnum, int family, struct rib_subscription *rs)
 
 	epoch_call(net_epoch_preempt, destroy_subscription_epoch,
 	    &rs->epoch_ctx);
-
-	return (0);
 }
 
 /*

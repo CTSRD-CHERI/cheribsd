@@ -5387,6 +5387,7 @@ void auth_xfer_transfer_lookup_callback(void* arg, int rcode, sldns_buffer* buf,
 				verbose(VERB_ALGO, "auth zone %s host %s type %s transfer lookup has no answer", zname, xfr->task_transfer->lookup_target->host, (xfr->task_transfer->lookup_aaaa?"AAAA":"A"));
 			}
 		}
+		regional_free_all(temp);
 	} else {
 		if(verbosity >= VERB_ALGO) {
 			char zname[255+1];
@@ -6092,7 +6093,7 @@ xfr_probe_send_probe(struct auth_xfer* xfr, struct module_env* env,
 
 	/* send udp packet */
 	if(!comm_point_send_udp_msg(xfr->task_probe->cp, env->scratch_buffer,
-		(struct sockaddr*)&addr, addrlen)) {
+		(struct sockaddr*)&addr, addrlen, 0)) {
 		char zname[255+1], as[256];
 		dname_str(xfr->name, zname);
 		addr_to_str(&addr, addrlen, as, sizeof(as));
@@ -6444,6 +6445,7 @@ void auth_xfer_probe_lookup_callback(void* arg, int rcode, sldns_buffer* buf,
 				verbose(VERB_ALGO, "auth zone %s host %s type %s probe lookup has no address", zname, xfr->task_probe->lookup_target->host, (xfr->task_probe->lookup_aaaa?"AAAA":"A"));
 			}
 		}
+		regional_free_all(temp);
 	} else {
 		if(verbosity >= VERB_ALGO) {
 			char zname[255+1];

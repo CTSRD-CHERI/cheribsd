@@ -46,8 +46,6 @@
 
 #define	SI_CODE_STORELOCAL	PROT_CHERI_PERM
 
-#define	FLAKY_COMPILER_BOUNDS	"Morello compiler pads excessively"
-
 #ifndef __CHERI_PURE_CAPABILITY__
 /* The Morello compiler currently sets bounds on globals. */
 #define	XFAIL_HYBRID_BOUNDS_GLOBALS	NULL

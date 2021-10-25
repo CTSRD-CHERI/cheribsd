@@ -250,7 +250,6 @@ uma_zone_t uma_zcache_create(const char *name, int size, uma_ctor ctor,
 #define	UMA_ZONE_SECONDARY	0x0200	/* Zone is a Secondary Zone */
 #define	UMA_ZONE_NOBUCKET	0x0400	/* Do not use buckets. */
 #define	UMA_ZONE_MAXBUCKET	0x0800	/* Use largest buckets. */
-#define	UMA_ZONE_MINBUCKET	0x1000	/* Use smallest buckets. */
 #define	UMA_ZONE_CACHESPREAD	0x2000	/*
 					 * Spread memory start locations across
 					 * all possible cache lines.  May
@@ -493,7 +492,7 @@ void uma_zone_reserve(uma_zone_t zone, int nitems);
 int uma_zone_reserve_kva(uma_zone_t zone, int nitems);
 
 /*
- * Sets a high limit on the number of items allowed in a zone
+ * Sets an upper limit on the number of items allocated from a zone
  *
  * Arguments:
  *	zone  The zone to limit
@@ -505,7 +504,7 @@ int uma_zone_reserve_kva(uma_zone_t zone, int nitems);
 int uma_zone_set_max(uma_zone_t zone, int nitems);
 
 /*
- * Sets a high limit on the number of items allowed in zone's bucket cache
+ * Sets an upper limit on the number of items allowed in zone's caches
  *
  * Arguments:
  *      zone  The zone to limit

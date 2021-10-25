@@ -384,11 +384,11 @@ SES_ENABLE_PASSTHROUGH	opt_ses.h
 
 # Options used in dev/sym/ (Symbios SCSI driver).
 SYM_SETUP_SCSI_DIFF	opt_sym.h	#-HVD support for 825a, 875, 885
-					# disabled:0 (default), enabled:1
+				# disabled:0 (default), enabled:1
 SYM_SETUP_PCI_PARITY	opt_sym.h	#-PCI parity checking
-					# disabled:0, enabled:1 (default)
+				# disabled:0, enabled:1 (default)
 SYM_SETUP_MAX_LUN	opt_sym.h	#-Number of LUNs supported
-					# default:8, range:[1..64]
+				# default:8, range:[1..64]
 
 # Options used only in dev/isp/*
 ISP_TARGET_MODE		opt_isp.h
@@ -455,9 +455,9 @@ MROUTING		opt_mrouting.h
 NFSLOCKD
 PCBGROUP		opt_pcbgroup.h
 PF_DEFAULT_TO_DROP	opt_pf.h
-RADIX_MPATH		opt_mpath.h
 ROUTE_MPATH		opt_route.h
 ROUTETABLES		opt_route.h
+FIB_ALGO		opt_route.h
 RSS			opt_rss.h
 SLIP_IFF_OPTS		opt_slip.h
 TCPDEBUG
@@ -605,7 +605,7 @@ INVARIANTS		opt_global.h
 KASSERT_PANIC_OPTIONAL	opt_global.h
 MAXCPU			opt_global.h
 MAXMEMDOM		opt_global.h
-MAXPHYS			opt_global.h
+MAXPHYS			opt_maxphys.h
 MCLSHIFT		opt_global.h
 MUTEX_NOINLINE		opt_global.h
 LOCK_PROFILING		opt_global.h
@@ -1016,6 +1016,13 @@ AMDSBWD_DEBUG	opt_amdsbwd.h
 # gcov support
 GCOV		opt_global.h
 LINDEBUGFS
+
+# options for HID support
+HID_DEBUG	opt_hid.h
+IICHID_DEBUG	opt_hid.h
+IICHID_SAMPLING	opt_hid.h
+HKBD_DFLT_KEYMAP	opt_hkbd.h
+HIDRAW_MAKE_UHID_ALIAS	opt_hid.h
 
 # CHERI
 CPU_CHERI	opt_global.h

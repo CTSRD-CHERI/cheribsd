@@ -1,8 +1,9 @@
 # $FreeBSD$
 
-PROG=	ktrdump
+PROG?=	ktrdump
+SRCS=	ktrdump.c
 LIBADD=	kvm
-MAN=	ktrdump.8
+MAN?=	ktrdump.8
 
 WARNS?=	2
 

@@ -278,7 +278,8 @@ struct vm_map {
 #define	MAP_ASLR		0x08	/* enabled ASLR */
 #define	MAP_ASLR_IGNSTART	0x10
 #define	MAP_REPLENISH		0x20
-#define	MAP_RESERVATIONS	0x40	/* Don't merge reservations */
+#define	MAP_WXORX		0x40	/* enforce W^X */
+#define	MAP_RESERVATIONS	0x80	/* Don't merge reservations */
 
 #ifdef	_KERNEL
 #if defined(KLD_MODULE) && !defined(KLD_TIED)
@@ -457,7 +458,7 @@ long vmspace_resident_count(struct vmspace *vmspace);
  */
 #define	VM_FAULT_READ_AHEAD_MIN		7
 #define	VM_FAULT_READ_AHEAD_INIT	15
-#define	VM_FAULT_READ_AHEAD_MAX		min(atop(MAXPHYS) - 1, UINT8_MAX)
+#define	VM_FAULT_READ_AHEAD_MAX		min(atop(maxphys) - 1, UINT8_MAX)
 
 /*
  * The following "find_space" options are supported by vm_map_find().
@@ -591,8 +592,13 @@ vm_map_entry_succ(vm_map_entry_t entry)
 	for ((it) = vm_map_entry_first(map);	\
 	    (it) != &(map)->header;		\
 	    (it) = vm_map_entry_succ(it))
-int vm_map_protect (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t, boolean_t,
-    boolean_t);
+
+#define	VM_MAP_PROTECT_SET_PROT		0x0001
+#define	VM_MAP_PROTECT_SET_MAXPROT	0x0002
+#define	VM_MAP_PROTECT_KEEP_CAP		0x0004
+
+int vm_map_protect(vm_map_t map, vm_offset_t start, vm_offset_t end,
+    vm_prot_t new_prot, vm_prot_t new_maxprot, int flags);
 int vm_map_remove_locked(vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_remove (vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_clear(vm_map_t);

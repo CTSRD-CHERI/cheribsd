@@ -70,6 +70,9 @@ struct rib_head {
 	u_int			rib_fibnum;	/* fib number */
 	struct callout		expire_callout;	/* Callout for expiring dynamic routes */
 	time_t			next_expire;	/* Next expire run ts */
+	uint32_t		rnh_prefixes;	/* Number of prefixes */
+	uint32_t		rib_dying:1;	/* rib is detaching */
+	uint32_t		rib_algo_fixed:1;/* fixed algorithm */
 	struct nh_control	*nh_control;	/* nexthop subsystem data */
 	CK_STAILQ_HEAD(, rib_subscription)	rnh_subscribers;/* notification subscribers */
 };
@@ -206,14 +209,7 @@ void tmproutes_init(struct rib_head *rh);
 void tmproutes_destroy(struct rib_head *rh);
 
 /* route_ctl.c */
-struct route_nhop_data {
-	union {
-		struct nhop_object *rnd_nhop;
-		struct nhgrp_object *rnd_nhgrp;
-	};
-	uint32_t rnd_weight;
-};
-
+struct route_nhop_data;
 int change_route_nhop(struct rib_head *rnh, struct rtentry *rt,
     struct rt_addrinfo *info, struct route_nhop_data *rnd,
     struct rib_cmd_info *rc);
@@ -243,6 +239,7 @@ int nhops_init_rib(struct rib_head *rh);
 void nhops_destroy_rib(struct rib_head *rh);
 void nhop_ref_object(struct nhop_object *nh);
 int nhop_try_ref_object(struct nhop_object *nh);
+void nhop_ref_any(struct nhop_object *nh);
 void nhop_free_any(struct nhop_object *nh);
 
 void nhop_set_type(struct nhop_object *nh, enum nhop_type nh_type);
@@ -307,7 +304,23 @@ int nhgrp_get_addition_group(struct rib_head *rnh,
     struct route_nhop_data *rnd_orig, struct route_nhop_data *rnd_add,
     struct route_nhop_data *rnd_new);
 
+void nhgrp_ref_object(struct nhgrp_object *nhg);
+uint32_t nhgrp_get_idx(const struct nhgrp_object *nhg);
 void nhgrp_free(struct nhgrp_object *nhg);
+
+/* rtsock */
+int rtsock_routemsg(int cmd, struct rtentry *rt, struct nhop_object *nh,
+    int fibnum);
+int rtsock_routemsg_info(int cmd, struct rt_addrinfo *info, int fibnum);
+int rtsock_addrmsg(int cmd, struct ifaddr *ifa, int fibnum);
+
+
+/* lookup_framework.c */
+void fib_grow_rtables(uint32_t new_num_tables);
+int fib_select_algo_initial(struct rib_head *rh);
+void fib_destroy_rib(struct rib_head *rh);
+void vnet_fib_init(void);
+void vnet_fib_destroy(void);
 
 /* Entropy data used for outbound hashing */
 #define MPATH_ENTROPY_KEY_LEN	40

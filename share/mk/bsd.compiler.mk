@@ -245,6 +245,19 @@ ${X_}COMPILER_FEATURES+=	c++17
 .endif
 .if ${${X_}COMPILER_TYPE} == "clang"
 ${X_}COMPILER_FEATURES+=	retpoline init-all
+# Detect certain supported warning flags to allow building with clang versions
+# built from git between releases. For example this affects all CHERI LLVM
+# versions that include the April 2021 upstream merge but not the September one.
+# Without this check we get the following build failure:
+# error: unknown warning option '-Werror=unused-but-set-variable'
+_check_flag=${${cc}:N${CCACHE_BIN}} -Werror=unknown-warning-option -fsyntax-only -xc /dev/null
+_warning_flags_to_check=unused-but-set-variable
+.for _flag in ${_warning_flags_to_check}
+_flag_supported!=	${_check_flag} -Werror=${_flag} 2>/dev/null && echo "yes" || echo "no"
+.if ${_flag_supported} == "yes"
+${X_}COMPILER_FEATURES+= W${_flag}
+.endif
+.endfor
 .endif
 
 .if ${${cc}:N${CCACHE_BIN}:[1]:M/*} && exists(${${cc}:N${CCACHE_BIN}:[1]})

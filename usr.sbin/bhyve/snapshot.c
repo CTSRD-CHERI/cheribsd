@@ -80,7 +80,6 @@ __FBSDID("$FreeBSD$");
 #include "acpi.h"
 #include "atkbdc.h"
 #include "inout.h"
-#include "dbgport.h"
 #include "fwctl.h"
 #include "ioapic.h"
 #include "mem.h"
@@ -147,13 +146,14 @@ const struct vm_snapshot_dev_info snapshot_devs[] = {
 	{ "atkbdc",	atkbdc_snapshot,	NULL,		NULL		},
 	{ "virtio-net",	pci_snapshot,		pci_pause,	pci_resume	},
 	{ "virtio-blk",	pci_snapshot,		pci_pause,	pci_resume	},
+	{ "virtio-rnd",	pci_snapshot,		NULL,		NULL		},
 	{ "lpc",	pci_snapshot,		NULL,		NULL		},
 	{ "fbuf",	pci_snapshot,		NULL,		NULL		},
 	{ "xhci",	pci_snapshot,		NULL,		NULL		},
 	{ "e1000",	pci_snapshot,		NULL,		NULL		},
 	{ "ahci",	pci_snapshot,		pci_pause,	pci_resume	},
 	{ "ahci-hd",	pci_snapshot,		pci_pause,	pci_resume	},
-	{ "ahci-cd",	pci_snapshot,		NULL,		NULL		},
+	{ "ahci-cd",	pci_snapshot,		pci_pause,	pci_resume	},
 };
 
 const struct vm_snapshot_kern_info snapshot_kern_structs[] = {

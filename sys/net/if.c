@@ -381,6 +381,9 @@ VNET_DEFINE(struct ifnet **, ifindex_table);
 struct sx ifnet_sxlock;
 SX_SYSINIT_FLAGS(ifnet_sx, &ifnet_sxlock, "ifnet_sx", SX_RECURSE);
 
+struct sx ifnet_detach_sxlock;
+SX_SYSINIT(ifnet_detach, &ifnet_detach_sxlock, "ifnet_detach_sx");
+
 /*
  * The allocation of network interfaces is a rather non-atomic affair; we
  * need to select an index before we are ready to expose the interface for
@@ -610,7 +613,9 @@ vnet_if_return(const void *unused __unused)
 	IFNET_WUNLOCK();
 
 	for (int j = 0; j < i; j++) {
+		sx_xlock(&ifnet_detach_sxlock);
 		if_vmove(pending[j], pending[j]->if_home_vnet);
+		sx_xunlock(&ifnet_detach_sxlock);
 	}
 
 	free(pending, M_IFNET);
@@ -1139,7 +1144,7 @@ if_purgeaddrs(struct ifnet *ifp)
 #endif /* INET */
 #ifdef INET6
 		if (ifa->ifa_addr->sa_family == AF_INET6) {
-			in6_purgeaddr(ifa);
+			in6_purgeifaddr((struct in6_ifaddr *)ifa);
 			/* ifp_addrhead is already updated */
 			continue;
 		}
@@ -1185,8 +1190,11 @@ if_detach(struct ifnet *ifp)
 
 	CURVNET_SET_QUIET(ifp->if_vnet);
 	found = if_unlink_ifnet(ifp, false);
-	if (found)
+	if (found) {
+		sx_slock(&ifnet_detach_sxlock);
 		if_detach_internal(ifp, 0, NULL);
+		sx_sunlock(&ifnet_detach_sxlock);
+	}
 	CURVNET_RESTORE();
 }
 
@@ -1396,11 +1404,6 @@ if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 	IFNET_WLOCK();
 	ifindex_free_locked(ifp->if_index);
 	IFNET_WUNLOCK();
-
-
-	/* Don't re-attach DYING interfaces. */
-	if (ifp->if_flags & IFF_DYING)
-		return (0);
 
 	/*
 	 * Perform interface-specific reassignment tasks, if provided by
@@ -3306,8 +3309,12 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 
 	case CASE_IOC_IFREQ(SIOCIFDESTROY):
 		error = priv_check(td, PRIV_NET_IFDESTROY);
-		if (error == 0)
+
+		if (error == 0) {
+			sx_slock(&ifnet_detach_sxlock);
 			error = if_clone_destroy(ifr->ifr_name);
+			sx_sunlock(&ifnet_detach_sxlock);
+		}
 		goto out_noref;
 
 	case SIOCIFGCLONERS:
@@ -3592,8 +3599,8 @@ ifconf(u_long cmd, struct ifconf *ifc)
 	struct sbuf *sb;
 	int error, full = 0, valid_len, max_len;
 
-	/* Limit initial buffer size to MAXPHYS to avoid DoS from userspace. */
-	max_len = MAXPHYS - 1;
+	/* Limit initial buffer size to maxphys to avoid DoS from userspace. */
+	max_len = maxphys - 1;
 
 	/* Prevent hostile input from being able to crash the system */
 	if (ifc->ifc_len <= 0)

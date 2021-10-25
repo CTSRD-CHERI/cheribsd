@@ -40,11 +40,16 @@ __FBSDID("$FreeBSD$");
 #include <efipciio.h>
 #include <machine/metadata.h>
 
+#include "bootstrap.h"
 #include "framebuffer.h"
 
-static EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
+static EFI_GUID conout_guid = EFI_CONSOLE_OUT_DEVICE_GUID;
+EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
 static EFI_GUID pciio_guid = EFI_PCI_IO_PROTOCOL_GUID;
 static EFI_GUID uga_guid = EFI_UGA_DRAW_PROTOCOL_GUID;
+
+static EFI_GRAPHICS_OUTPUT *gop;
+static EFI_UGA_DRAW_PROTOCOL *uga;
 
 static struct named_resolution {
 	const char *name;
@@ -104,6 +109,7 @@ efifb_mask_from_pixfmt(struct efi_fb *efifb, EFI_GRAPHICS_PIXEL_FORMAT pixfmt,
 	result = 0;
 	switch (pixfmt) {
 	case PixelRedGreenBlueReserved8BitPerColor:
+	case PixelBltOnly:
 		efifb->fb_mask_red = 0x000000ff;
 		efifb->fb_mask_green = 0x0000ff00;
 		efifb->fb_mask_blue = 0x00ff0000;
@@ -302,7 +308,7 @@ efifb_uga_locate_framebuffer(EFI_PCI_IO_PROTOCOL *pciio, uint64_t *addrp,
 }
 
 static int
-efifb_from_uga(struct efi_fb *efifb, EFI_UGA_DRAW_PROTOCOL *uga)
+efifb_from_uga(struct efi_fb *efifb)
 {
 	EFI_PCI_IO_PROTOCOL *pciio;
 	char *ev, *p;
@@ -462,21 +468,90 @@ efifb_from_uga(struct efi_fb *efifb, EFI_UGA_DRAW_PROTOCOL *uga)
 }
 
 int
-efi_find_framebuffer(struct efi_fb *efifb)
+efi_find_framebuffer(teken_gfx_t *gfx_state)
 {
-	EFI_GRAPHICS_OUTPUT *gop;
-	EFI_UGA_DRAW_PROTOCOL *uga;
+	EFI_HANDLE h, *hlist;
+	UINTN nhandles, i, hsize;
+	struct efi_fb efifb;
 	EFI_STATUS status;
+	int rv;
 
-	status = BS->LocateProtocol(&gop_guid, NULL, (VOID **)&gop);
-	if (status == EFI_SUCCESS)
-		return (efifb_from_gop(efifb, gop->Mode, gop->Mode->Info));
+	gfx_state->tg_fb_type = FB_TEXT;
 
-	status = BS->LocateProtocol(&uga_guid, NULL, (VOID **)&uga);
-	if (status == EFI_SUCCESS)
-		return (efifb_from_uga(efifb, uga));
+	hsize = 0;
+	hlist = NULL;
+	status = BS->LocateHandle(ByProtocol, &gop_guid, NULL, &hsize, hlist);
+	if (status == EFI_BUFFER_TOO_SMALL) {
+		hlist = malloc(hsize);
+		if (hlist == NULL)
+			return (ENOMEM);
+		status = BS->LocateHandle(ByProtocol, &gop_guid, NULL, &hsize,
+		    hlist);
+		if (EFI_ERROR(status))
+			free(hlist);
+	}
+	if (EFI_ERROR(status))
+		return (efi_status_to_errno(status));
 
-	return (1);
+	nhandles = hsize / sizeof(*hlist);
+
+	/*
+	 * Search for ConOut protocol, if not found, use first handle.
+	 */
+	h = *hlist;
+	for (i = 0; i < nhandles; i++) {
+		void *dummy = NULL;
+
+		status = OpenProtocolByHandle(hlist[i], &conout_guid, &dummy);
+		if (status == EFI_SUCCESS) {
+			h = hlist[i];
+			break;
+		}
+	}
+
+	status = OpenProtocolByHandle(h, &gop_guid, (void **)&gop);
+	free(hlist);
+
+	if (status == EFI_SUCCESS) {
+		gfx_state->tg_fb_type = FB_GOP;
+		gfx_state->tg_private = gop;
+	} else {
+		status = BS->LocateProtocol(&uga_guid, NULL, (VOID **)&uga);
+		if (status == EFI_SUCCESS) {
+			gfx_state->tg_fb_type = FB_UGA;
+			gfx_state->tg_private = uga;
+		} else {
+			return (1);
+		}
+	}
+
+	switch (gfx_state->tg_fb_type) {
+	case FB_GOP:
+		rv = efifb_from_gop(&efifb, gop->Mode, gop->Mode->Info);
+		break;
+
+	case FB_UGA:
+		rv = efifb_from_uga(&efifb);
+		break;
+
+	default:
+		return (1);
+	}
+
+	gfx_state->tg_fb.fb_addr = efifb.fb_addr;
+	gfx_state->tg_fb.fb_size = efifb.fb_size;
+	gfx_state->tg_fb.fb_height = efifb.fb_height;
+	gfx_state->tg_fb.fb_width = efifb.fb_width;
+	gfx_state->tg_fb.fb_stride = efifb.fb_stride;
+	gfx_state->tg_fb.fb_mask_red = efifb.fb_mask_red;
+	gfx_state->tg_fb.fb_mask_green = efifb.fb_mask_green;
+	gfx_state->tg_fb.fb_mask_blue = efifb.fb_mask_blue;
+	gfx_state->tg_fb.fb_mask_reserved = efifb.fb_mask_reserved;
+
+	gfx_state->tg_fb.fb_bpp = fls(efifb.fb_mask_red | efifb.fb_mask_green |
+	    efifb.fb_mask_blue | efifb.fb_mask_reserved);
+
+	return (0);
 }
 
 static void
@@ -550,7 +625,7 @@ efi_get_max_resolution(int *width, int *height)
 }
 
 static int
-gop_autoresize(EFI_GRAPHICS_OUTPUT *gop)
+gop_autoresize(void)
 {
 	struct efi_fb efifb;
 	EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info;
@@ -586,7 +661,7 @@ gop_autoresize(EFI_GRAPHICS_OUTPUT *gop)
 			    mode, EFI_ERROR_CODE(status));
 			return (CMD_ERROR);
 		}
-		(void) efi_cons_update_mode();
+		(void) cons_update_mode(true);
 	}
 	return (CMD_OK);
 }
@@ -611,12 +686,12 @@ text_autoresize()
 	}
 	if (max_dim > 0)
 		conout->SetMode(conout, best_mode);
-	(void) efi_cons_update_mode();
+	(void) cons_update_mode(true);
 	return (CMD_OK);
 }
 
 static int
-uga_autoresize(EFI_UGA_DRAW_PROTOCOL *uga)
+uga_autoresize(void)
 {
 
 	return (text_autoresize());
@@ -627,26 +702,18 @@ COMMAND_SET(efi_autoresize, "efi-autoresizecons", "EFI Auto-resize Console", com
 static int
 command_autoresize(int argc, char *argv[])
 {
-	EFI_GRAPHICS_OUTPUT *gop;
-	EFI_UGA_DRAW_PROTOCOL *uga;
 	char *textmode;
-	EFI_STATUS status;
-	u_int mode;
 
 	textmode = getenv("hw.vga.textmode");
 	/* If it's set and non-zero, we'll select a console mode instead */
 	if (textmode != NULL && strcmp(textmode, "0") != 0)
 		return (text_autoresize());
 
-	gop = NULL;
-	uga = NULL;
-	status = BS->LocateProtocol(&gop_guid, NULL, (VOID **)&gop);
-	if (EFI_ERROR(status) == 0)
-		return (gop_autoresize(gop));
+	if (gop != NULL)
+		return (gop_autoresize());
 
-	status = BS->LocateProtocol(&uga_guid, NULL, (VOID **)&uga);
-	if (EFI_ERROR(status) == 0)
-		return (uga_autoresize(uga));
+	if (uga != NULL)
+		return (uga_autoresize());
 
 	snprintf(command_errbuf, sizeof(command_errbuf),
 	    "%s: Neither Graphics Output Protocol nor Universal Graphics Adapter present",
@@ -667,15 +734,12 @@ static int
 command_gop(int argc, char *argv[])
 {
 	struct efi_fb efifb;
-	EFI_GRAPHICS_OUTPUT *gop;
 	EFI_STATUS status;
 	u_int mode;
 
-	status = BS->LocateProtocol(&gop_guid, NULL, (VOID **)&gop);
-	if (EFI_ERROR(status)) {
+	if (gop == NULL) {
 		snprintf(command_errbuf, sizeof(command_errbuf),
-		    "%s: Graphics Output Protocol not present (error=%lu)",
-		    argv[0], EFI_ERROR_CODE(status));
+		    "%s: Graphics Output Protocol not present", argv[0]);
 		return (CMD_ERROR);
 	}
 
@@ -699,8 +763,10 @@ command_gop(int argc, char *argv[])
 			    argv[0], mode, EFI_ERROR_CODE(status));
 			return (CMD_ERROR);
 		}
-		(void) efi_cons_update_mode();
-	} else if (!strcmp(argv[1], "get")) {
+		(void) cons_update_mode(true);
+	} else if (strcmp(argv[1], "off") == 0) {
+		(void) cons_update_mode(false);
+	} else if (strcmp(argv[1], "get") == 0) {
 		if (argc != 2)
 			goto usage;
 		efifb_from_gop(&efifb, gop->Mode, gop->Mode->Info);
@@ -728,7 +794,7 @@ command_gop(int argc, char *argv[])
 
  usage:
 	snprintf(command_errbuf, sizeof(command_errbuf),
-	    "usage: %s [list | get | set <mode>]", argv[0]);
+	    "usage: %s [list | get | set <mode> | off]", argv[0]);
 	return (CMD_ERROR);
 }
 
@@ -738,21 +804,17 @@ static int
 command_uga(int argc, char *argv[])
 {
 	struct efi_fb efifb;
-	EFI_UGA_DRAW_PROTOCOL *uga;
-	EFI_STATUS status;
 
-	status = BS->LocateProtocol(&uga_guid, NULL, (VOID **)&uga);
-	if (EFI_ERROR(status)) {
+	if (uga == NULL) {
 		snprintf(command_errbuf, sizeof(command_errbuf),
-		    "%s: UGA Protocol not present (error=%lu)",
-		    argv[0], EFI_ERROR_CODE(status));
+		    "%s: UGA Protocol not present", argv[0]);
 		return (CMD_ERROR);
 	}
 
 	if (argc != 1)
 		goto usage;
 
-	if (efifb_from_uga(&efifb, uga) != CMD_OK) {
+	if (efifb_from_uga(&efifb) != CMD_OK) {
 		snprintf(command_errbuf, sizeof(command_errbuf),
 		    "%s: Unable to get UGA information", argv[0]);
 		return (CMD_ERROR);

@@ -726,7 +726,7 @@ sys_ksem_post(struct thread *td, struct ksem_post_args *uap)
 
 	AUDIT_ARG_FD(uap->id);
 	error = ksem_get(td, uap->id,
-	    cap_rights_init(&rights, CAP_SEM_POST), &fp);
+	    cap_rights_init_one(&rights, CAP_SEM_POST), &fp);
 	if (error)
 		return (error);
 	ks = fp->f_data;
@@ -818,7 +818,8 @@ kern_sem_wait(struct thread *td, semid_t id, int tryflag,
 
 	DP((">>> kern_sem_wait entered! pid=%d\n", (int)td->td_proc->p_pid));
 	AUDIT_ARG_FD(id);
-	error = ksem_get(td, id, cap_rights_init(&rights, CAP_SEM_WAIT), &fp);
+	error = ksem_get(td, id, cap_rights_init_one(&rights, CAP_SEM_WAIT),
+	    &fp);
 	if (error)
 		return (error);
 	ks = fp->f_data;
@@ -887,7 +888,7 @@ sys_ksem_getvalue(struct thread *td, struct ksem_getvalue_args *uap)
 
 	AUDIT_ARG_FD(uap->id);
 	error = ksem_get(td, uap->id,
-	    cap_rights_init(&rights, CAP_SEM_GETVALUE), &fp);
+	    cap_rights_init_one(&rights, CAP_SEM_GETVALUE), &fp);
 	if (error)
 		return (error);
 	ks = fp->f_data;

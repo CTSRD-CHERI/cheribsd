@@ -262,7 +262,6 @@ struct uma_bucket_zone {
     (((sizeof(void *) * (n)) - sizeof(struct uma_bucket)) / sizeof(void *))
 
 #define	BUCKET_MAX	BUCKET_SIZE(256)
-#define	BUCKET_MIN	2
 
 struct uma_bucket_zone bucket_zones[] = {
 	/* Literal bucket sizes. */
@@ -453,27 +452,6 @@ bucket_zone_lookup(int entries)
 	return (ubz);
 }
 
-static struct uma_bucket_zone *
-bucket_zone_max(uma_zone_t zone, int nitems)
-{
-	struct uma_bucket_zone *ubz;
-	int bpcpu;
-
-	bpcpu = 2;
-	if ((zone->uz_flags & UMA_ZONE_FIRSTTOUCH) != 0)
-		/* Count the cross-domain bucket. */
-		bpcpu++;
-
-	for (ubz = &bucket_zones[0]; ubz->ubz_entries != 0; ubz++)
-		if (ubz->ubz_entries * bpcpu * mp_ncpus > nitems)
-			break;
-	if (ubz == &bucket_zones[0])
-		ubz = NULL;
-	else
-		ubz--;
-	return (ubz);
-}
-
 static int
 bucket_select(int size)
 {
@@ -521,7 +499,7 @@ bucket_alloc(uma_zone_t zone, void *udata, int flags)
 	}
 	if (((uintptr_t)udata & UMA_ZONE_VM) != 0)
 		flags |= M_NOVM;
-	ubz = bucket_zone_lookup(zone->uz_bucket_size);
+	ubz = bucket_zone_lookup(atomic_load_16(&zone->uz_bucket_size));
 	if (ubz->ubz_zone == zone && (ubz + 1)->ubz_entries != 0)
 		ubz++;
 	bucket = uma_zalloc_arg(ubz->ubz_zone, udata, flags);
@@ -530,7 +508,8 @@ bucket_alloc(uma_zone_t zone, void *udata, int flags)
 		bzero(bucket->ub_bucket, sizeof(void *) * ubz->ubz_entries);
 #endif
 		bucket->ub_cnt = 0;
-		bucket->ub_entries = ubz->ubz_entries;
+		bucket->ub_entries = min(ubz->ubz_entries,
+		    zone->uz_bucket_size_max);
 		bucket->ub_seq = SMR_SEQ_INVALID;
 		CTR3(KTR_UMA, "bucket_alloc: zone %s(%p) allocated bucket %p",
 		    zone->uz_name, zone, bucket);
@@ -1732,7 +1711,13 @@ startup_free(void *mem, vm_size_t bytes)
 
 	va = (vm_offset_t)mem;
 	m = PHYS_TO_VM_PAGE(pmap_kextract(va));
-	pmap_remove(kernel_pmap, va, va + bytes);
+
+	/*
+	 * startup_alloc() returns direct-mapped slabs on some platforms.  Avoid
+	 * unmapping ranges of the direct map.
+	 */
+	if (va >= bootstart && va + bytes <= bootmem)
+		pmap_remove(kernel_pmap, va, va + bytes);
 	for (; bytes != 0; bytes -= PAGE_SIZE, m++) {
 #if defined(__aarch64__) || defined(__amd64__) || defined(__mips__) || \
     defined(__riscv) || defined(__powerpc64__)
@@ -2515,10 +2500,10 @@ zone_alloc_sysctl(uma_zone_t zone, void *unused)
 	SYSCTL_ADD_PROC(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
 	    "items", CTLFLAG_RD | CTLTYPE_U64 | CTLFLAG_MPSAFE,
 	    zone, 0, sysctl_handle_uma_zone_items, "QU",
-	    "current number of allocated items if limit is set");
+	    "Current number of allocated items if limit is set");
 	SYSCTL_ADD_U64(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
 	    "max_items", CTLFLAG_RD, &zone->uz_max_items, 0,
-	    "Maximum number of cached items");
+	    "Maximum number of allocated and cached items");
 	SYSCTL_ADD_U32(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
 	    "sleepers", CTLFLAG_RD, &zone->uz_sleepers, 0,
 	    "Number of threads sleeping at limit");
@@ -2765,8 +2750,6 @@ out:
 		zone->uz_bucket_size_max = zone->uz_bucket_size = 0;
 	if ((arg->flags & UMA_ZONE_MAXBUCKET) != 0)
 		zone->uz_bucket_size = BUCKET_MAX;
-	else if ((arg->flags & UMA_ZONE_MINBUCKET) != 0)
-		zone->uz_bucket_size_max = zone->uz_bucket_size = BUCKET_MIN;
 	else if ((arg->flags & UMA_ZONE_NOBUCKET) != 0)
 		zone->uz_bucket_size = 0;
 	else
@@ -4268,7 +4251,7 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 	 * a little longer for the limits to be reset.
 	 */
 	if (__predict_false(uz_flags & UMA_ZFLAG_LIMIT)) {
-		if (zone->uz_sleepers > 0)
+		if (atomic_load_32(&zone->uz_sleepers) > 0)
 			goto zfree_item;
 	}
 
@@ -4332,7 +4315,7 @@ zfree_item:
 static void
 zone_free_cross(uma_zone_t zone, uma_bucket_t bucket, void *udata)
 {
-	struct uma_bucketlist fullbuckets;
+	struct uma_bucketlist emptybuckets, fullbuckets;
 	uma_zone_domain_t zdom;
 	uma_bucket_t b;
 	smr_seq_t seq;
@@ -4356,31 +4339,57 @@ zone_free_cross(uma_zone_t zone, uma_bucket_t bucket, void *udata)
 	 * lock on the current crossfree bucket.  A full matrix with
 	 * per-domain locking could be used if necessary.
 	 */
+	STAILQ_INIT(&emptybuckets);
 	STAILQ_INIT(&fullbuckets);
 	ZONE_CROSS_LOCK(zone);
-	while (bucket->ub_cnt > 0) {
+	for (; bucket->ub_cnt > 0; bucket->ub_cnt--) {
 		item = bucket->ub_bucket[bucket->ub_cnt - 1];
 		domain = item_domain(item);
 		zdom = ZDOM_GET(zone, domain);
 		if (zdom->uzd_cross == NULL) {
-			zdom->uzd_cross = bucket_alloc(zone, udata, M_NOWAIT);
-			if (zdom->uzd_cross == NULL)
-				break;
+			if ((b = STAILQ_FIRST(&emptybuckets)) != NULL) {
+				STAILQ_REMOVE_HEAD(&emptybuckets, ub_link);
+				zdom->uzd_cross = b;
+			} else {
+				/*
+				 * Avoid allocating a bucket with the cross lock
+				 * held, since allocation can trigger a
+				 * cross-domain free and bucket zones may
+				 * allocate from each other.
+				 */
+				ZONE_CROSS_UNLOCK(zone);
+				b = bucket_alloc(zone, udata, M_NOWAIT);
+				if (b == NULL)
+					goto out;
+				ZONE_CROSS_LOCK(zone);
+				if (zdom->uzd_cross != NULL) {
+					STAILQ_INSERT_HEAD(&emptybuckets, b,
+					    ub_link);
+				} else {
+					zdom->uzd_cross = b;
+				}
+			}
 		}
 		b = zdom->uzd_cross;
 		b->ub_bucket[b->ub_cnt++] = item;
 		b->ub_seq = seq;
 		if (b->ub_cnt == b->ub_entries) {
 			STAILQ_INSERT_HEAD(&fullbuckets, b, ub_link);
-			zdom->uzd_cross = NULL;
+			if ((b = STAILQ_FIRST(&emptybuckets)) != NULL)
+				STAILQ_REMOVE_HEAD(&emptybuckets, ub_link);
+			zdom->uzd_cross = b;
 		}
-		bucket->ub_cnt--;
 	}
 	ZONE_CROSS_UNLOCK(zone);
+out:
 	if (bucket->ub_cnt == 0)
 		bucket->ub_seq = SMR_SEQ_INVALID;
 	bucket_free(zone, bucket, udata);
 
+	while ((b = STAILQ_FIRST(&emptybuckets)) != NULL) {
+		STAILQ_REMOVE_HEAD(&emptybuckets, ub_link);
+		bucket_free(zone, b, udata);
+	}
 	while ((b = STAILQ_FIRST(&fullbuckets)) != NULL) {
 		STAILQ_REMOVE_HEAD(&fullbuckets, ub_link);
 		domain = item_domain(b->ub_bucket[0]);
@@ -4634,8 +4643,12 @@ zone_free_item(uma_zone_t zone, void *item, void *udata, enum zfreeskip skip)
 int
 uma_zone_set_max(uma_zone_t zone, int nitems)
 {
-	struct uma_bucket_zone *ubz;
-	int count;
+
+	/*
+	 * If the limit is small, we may need to constrain the maximum per-CPU
+	 * cache size, or disable caching entirely.
+	 */
+	uma_zone_set_maxcache(zone, nitems);
 
 	/*
 	 * XXX This can misbehave if the zone has any allocations with
@@ -4643,11 +4656,6 @@ uma_zone_set_max(uma_zone_t zone, int nitems)
 	 * way to clear a limit.
 	 */
 	ZONE_LOCK(zone);
-	ubz = bucket_zone_max(zone, nitems);
-	count = ubz != NULL ? ubz->ubz_entries : 0;
-	zone->uz_bucket_size_max = zone->uz_bucket_size = count;
-	if (zone->uz_bucket_size_min > zone->uz_bucket_size_max)
-		zone->uz_bucket_size_min = zone->uz_bucket_size_max;
 	zone->uz_max_items = nitems;
 	zone->uz_flags |= UMA_ZFLAG_LIMIT;
 	zone_update_caches(zone);
@@ -4662,24 +4670,35 @@ uma_zone_set_max(uma_zone_t zone, int nitems)
 void
 uma_zone_set_maxcache(uma_zone_t zone, int nitems)
 {
-	struct uma_bucket_zone *ubz;
-	int bpcpu;
+	int bpcpu, bpdom, bsize, nb;
 
 	ZONE_LOCK(zone);
-	ubz = bucket_zone_max(zone, nitems);
-	if (ubz != NULL) {
-		bpcpu = 2;
-		if ((zone->uz_flags & UMA_ZONE_FIRSTTOUCH) != 0)
-			/* Count the cross-domain bucket. */
-			bpcpu++;
-		nitems -= ubz->ubz_entries * bpcpu * mp_ncpus;
-		zone->uz_bucket_size_max = ubz->ubz_entries;
-	} else {
-		zone->uz_bucket_size_max = zone->uz_bucket_size = 0;
+
+	/*
+	 * Compute a lower bound on the number of items that may be cached in
+	 * the zone.  Each CPU gets at least two buckets, and for cross-domain
+	 * frees we use an additional bucket per CPU and per domain.  Select the
+	 * largest bucket size that does not exceed half of the requested limit,
+	 * with the left over space given to the full bucket cache.
+	 */
+	bpdom = 0;
+	bpcpu = 2;
+#ifdef NUMA
+	if ((zone->uz_flags & UMA_ZONE_FIRSTTOUCH) != 0 && vm_ndomains > 1) {
+		bpcpu++;
+		bpdom++;
 	}
+#endif
+	nb = bpcpu * mp_ncpus + bpdom * vm_ndomains;
+	bsize = nitems / nb / 2;
+	if (bsize > BUCKET_MAX)
+		bsize = BUCKET_MAX;
+	else if (bsize == 0 && nitems / nb > 0)
+		bsize = 1;
+	zone->uz_bucket_size_max = zone->uz_bucket_size = bsize;
 	if (zone->uz_bucket_size_min > zone->uz_bucket_size_max)
 		zone->uz_bucket_size_min = zone->uz_bucket_size_max;
-	zone->uz_bucket_max = nitems / vm_ndomains;
+	zone->uz_bucket_max = nitems - nb * bsize;
 	ZONE_UNLOCK(zone);
 }
 
@@ -5476,10 +5495,10 @@ uma_dbg_alloc(uma_zone_t zone, uma_slab_t slab, void *item)
 #endif
 	freei = slab_item_index(slab, keg, item);
 
-	if (BIT_ISSET(keg->uk_ipers, freei, slab_dbg_bits(slab, keg)))
+	if (BIT_TEST_SET_ATOMIC(keg->uk_ipers, freei,
+	    slab_dbg_bits(slab, keg)))
 		panic("Duplicate alloc of %p from zone %p(%s) slab %p(%d)",
 		    item, zone, zone->uz_name, slab, freei);
-	BIT_SET_ATOMIC(keg->uk_ipers, freei, slab_dbg_bits(slab, keg));
 }
 
 /*
@@ -5517,11 +5536,10 @@ uma_dbg_free(uma_zone_t zone, uma_slab_t slab, void *item)
 		panic("Unaligned free of %p from zone %p(%s) slab %p(%d)",
 		    item, zone, zone->uz_name, slab, freei);
 
-	if (!BIT_ISSET(keg->uk_ipers, freei, slab_dbg_bits(slab, keg)))
+	if (!BIT_TEST_CLR_ATOMIC(keg->uk_ipers, freei,
+	    slab_dbg_bits(slab, keg)))
 		panic("Duplicate free of %p from zone %p(%s) slab %p(%d)",
 		    item, zone, zone->uz_name, slab, freei);
-
-	BIT_CLR_ATOMIC(keg->uk_ipers, freei, slab_dbg_bits(slab, keg));
 }
 #endif /* INVARIANTS */
 

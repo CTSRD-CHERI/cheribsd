@@ -181,6 +181,8 @@ CRUNCH_SRCDIRS+= sbin
 CRUNCH_LIBS+= -lalias -lcam -lcursesw -ldevstat -lipsec
 # Don't forget this - ifconfig, etc -adrian
 CRUNCH_LIBS+= -lgeom -lbsdxml -ljail -lkiconv -lmd -lsbuf -lufs
+# Needed for wireguard support in ifconfig
+CRUNCH_LIBS+= -lnv
 
 
 CRUNCH_PROGS_sbin+= dhclient \

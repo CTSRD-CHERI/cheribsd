@@ -53,6 +53,7 @@ SRCS+=	__getosreldate.c \
 	err.c \
 	errlst.c \
 	errno.c \
+	eventfd.c \
 	exec.c \
 	exect.c \
 	fdevname.c \
@@ -317,6 +318,7 @@ MAN+=	alarm.3 \
 	syslog.3 \
 	tcgetpgrp.3 \
 	tcgetsid.3 \
+	tcgetwinsize.3 \
 	tcsendbreak.3 \
 	tcsetattr.3 \
 	tcsetpgrp.3 \
@@ -532,6 +534,7 @@ MLINKS+=syslog.3 closelog.3 \
 	syslog.3 openlog.3 \
 	syslog.3 setlogmask.3 \
 	syslog.3 vsyslog.3
+MLINKS+=tcgetwinsize.3 tcsetwinsize.3
 MLINKS+=tcsendbreak.3 tcdrain.3 \
 	tcsendbreak.3 tcflow.3 \
 	tcsendbreak.3 tcflush.3

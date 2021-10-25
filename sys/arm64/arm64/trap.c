@@ -489,7 +489,6 @@ print_registers(struct trapframe *frame)
 void
 do_el1h_sync(struct thread *td, struct trapframe *frame)
 {
-	struct trapframe *oframe;
 	uint32_t exception;
 	uint64_t esr, far;
 	int dfsc;
@@ -506,18 +505,6 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 	CTR4(KTR_TRAP,
 	    "do_el1_sync: curthread: %p, esr %lx, elr: %lx, frame: %p", td,
 	    esr, frame->tf_elr, frame);
-
-	oframe = td->td_frame;
-
-	switch (exception) {
-	case EXCP_BRK:
-	case EXCP_WATCHPT_EL1:
-	case EXCP_SOFTSTP_EL1:
-		break;
-	default:
-		td->td_frame = frame;
-		break;
-	}
 
 	switch (exception) {
 	case EXCP_FP_SIMD:
@@ -558,18 +545,15 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 		}
 #endif
 #ifdef KDB
-		kdb_trap(exception, 0,
-		    (td->td_frame != NULL) ? td->td_frame : frame);
+		kdb_trap(exception, 0, frame);
 #else
 		panic("No debugger in kernel.\n");
 #endif
-		frame->tf_elr += 4;
 		break;
 	case EXCP_WATCHPT_EL1:
 	case EXCP_SOFTSTP_EL1:
 #ifdef KDB
-		kdb_trap(exception, 0,
-		    (td->td_frame != NULL) ? td->td_frame : frame);
+		kdb_trap(exception, 0, frame);
 #else
 		panic("No debugger in kernel.\n");
 #endif
@@ -584,8 +568,6 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 		panic("Unknown kernel exception %x esr_el1 %lx\n", exception,
 		    esr);
 	}
-
-	td->td_frame = oframe;
 }
 
 void
@@ -682,8 +664,14 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		userret(td, frame);
 		break;
 	case EXCP_MSR:
-		call_trapsignal(td, SIGILL, ILL_PRVOPC,
-		    (void * __capability)frame->tf_elr, exception); 
+		/*
+		 * The CPU can raise EXCP_MSR when userspace executes an mrs
+		 * instruction to access a special register userspace doesn't
+		 * have access to.
+		 */
+		if (!undef_insn(0, frame))
+			call_trapsignal(td, SIGILL, ILL_PRVOPC,
+			    (void * __capability)frame->tf_elr, exception); 
 		userret(td, frame);
 		break;
 	case EXCP_SOFTSTP_EL0:

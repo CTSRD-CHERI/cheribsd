@@ -382,7 +382,7 @@ unp_pcb_lock_peer(struct unpcb *unp)
 
 	UNP_PCB_LOCK_ASSERT(unp);
 	unp2 = unp->unp_conn;
-	if (__predict_false(unp2 == NULL))
+	if (unp2 == NULL)
 		return (NULL);
 	if (__predict_false(unp == unp2))
 		return (unp);
@@ -637,7 +637,7 @@ uipc_bindat(int fd, struct socket *so, struct sockaddr *nam, struct thread *td)
 restart:
 	NDINIT_ATRIGHTS(&nd, CREATE, NOFOLLOW | LOCKPARENT | SAVENAME | NOCACHE,
 	    UIO_SYSSPACE, PTR2CAP(buf), fd,
-	    cap_rights_init(&rights, CAP_BINDAT), td);
+	    cap_rights_init_one(&rights, CAP_BINDAT), td);
 /* SHOULD BE ABLE TO ADOPT EXISTING AND wakeup() ALA FIFO's */
 	error = namei(&nd);
 	if (error)
@@ -1560,14 +1560,15 @@ unp_connectat(int fd, struct socket *so, struct sockaddr *nam,
 	else
 		sa = NULL;
 	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF,
-	    UIO_SYSSPACE, buf, fd, cap_rights_init(&rights, CAP_CONNECTAT), td);
+	    UIO_SYSSPACE, buf, fd, cap_rights_init_one(&rights, CAP_CONNECTAT),
+	    td);
 	error = namei(&nd);
 	if (error)
 		vp = NULL;
 	else
 		vp = nd.ni_vp;
 	ASSERT_VOP_LOCKED(vp, "unp_connect");
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_NOTHING(&nd);
 	if (error)
 		goto bad;
 
@@ -2485,7 +2486,7 @@ unp_discard(struct file *fp)
 		atomic_add_int(&unp_defers_count, 1);
 		taskqueue_enqueue(taskqueue_thread, &unp_defer_task);
 	} else
-		(void) closef(fp, (struct thread *)NULL);
+		closef_nothread(fp);
 }
 
 static void
@@ -2507,7 +2508,7 @@ unp_process_defers(void *arg __unused, int pending)
 		count = 0;
 		while ((dr = SLIST_FIRST(&drl)) != NULL) {
 			SLIST_REMOVE_HEAD(&drl, ud_link);
-			closef(dr->ud_fp, NULL);
+			closef_nothread(dr->ud_fp);
 			free(dr, M_TEMP);
 			count++;
 		}

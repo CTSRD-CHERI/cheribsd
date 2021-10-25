@@ -17,6 +17,7 @@ SRCS=	linux_compat.c \
 	linux_seq_file.c \
 	linux_schedule.c \
 	linux_shmemfs.c \
+	linux_shrinker.c \
 	linux_slab.c \
 	linux_tasklet.c \
 	linux_usb.c \
@@ -25,7 +26,7 @@ SRCS=	linux_compat.c \
 
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "i386"
-SRCS+=	opt_acpi.h acpi_if.h linux_acpi.c
+SRCS+=	opt_acpi.h acpi_if.h linux_acpi.c linux_fpu.c
 .endif
 
 SRCS+=	${LINUXKPI_GENSRCS}

@@ -124,7 +124,6 @@ _LIBRARIES=	\
 		fetch \
 		figpar \
 		geom \
-		gnuregex \
 		gpio \
 		gssapi \
 		gssapi_krb5 \
@@ -154,7 +153,6 @@ _LIBRARIES=	\
 		memstat \
 		mp \
 		mt \
-		ncurses \
 		ncursesw \
 		netgraph \
 		netmap \
@@ -194,7 +192,6 @@ _LIBRARIES=	\
 		syscalls \
 		sysdecode \
 		tacplus \
-		termcap \
 		termcapw \
 		tpool \
 		ufs \
@@ -385,7 +382,6 @@ _DP_c_nosyscalls+=		ssp_nonshared
 _DP_stats=	sbuf pthread
 _DP_stdthreads=	pthread
 _DP_tacplus=	md
-_DP_panel=	ncurses
 _DP_panelw=	ncursesw
 _DP_rpcsec_gss=	gssapi
 _DP_smb=	kiconv
@@ -621,7 +617,6 @@ LIBOPENSMDIR=	${_LIB_OBJTOP}/lib/ofed/libopensm
 LIBOSMVENDORDIR=${_LIB_OBJTOP}/lib/ofed/libvendor
 
 LIBDIALOGDIR=	${_LIB_OBJTOP}/gnu/lib/libdialog
-LIBGNUREGEXDIR=	${_LIB_OBJTOP}/gnu/lib/libregex
 LIBSSPDIR=	${_LIB_OBJTOP}/lib/libssp
 LIBSSP_NONSHAREDDIR=	${_LIB_OBJTOP}/lib/libssp_nonshared
 LIBASN1DIR=	${_LIB_OBJTOP}/kerberos5/lib/libasn1
@@ -661,14 +656,10 @@ LIBBSDXMLDIR=	${_LIB_OBJTOP}/lib/libexpat
 LIBKVMDIR=	${_LIB_OBJTOP}/lib/libkvm
 LIBPTHREADDIR=	${_LIB_OBJTOP}/lib/libthr
 LIBMDIR=	${_LIB_OBJTOP}/lib/msun
-LIBFORMDIR=	${_LIB_OBJTOP}/lib/ncurses/form
-LIBFORMLIBWDIR=	${_LIB_OBJTOP}/lib/ncurses/formw
-LIBMENUDIR=	${_LIB_OBJTOP}/lib/ncurses/menu
-LIBMENULIBWDIR=	${_LIB_OBJTOP}/lib/ncurses/menuw
-LIBNCURSESDIR=	${_LIB_OBJTOP}/lib/ncurses/ncurses
-LIBNCURSESWDIR=	${_LIB_OBJTOP}/lib/ncurses/ncursesw
-LIBPANELDIR=	${_LIB_OBJTOP}/lib/ncurses/panel
-LIBPANELWDIR=	${_LIB_OBJTOP}/lib/ncurses/panelw
+LIBFORMWDIR=	${_LIB_OBJTOP}/lib/ncurses/form
+LIBMENUWDIR=	${_LIB_OBJTOP}/lib/ncurses/menu
+LIBNCURSESWDIR=	${_LIB_OBJTOP}/lib/ncurses/ncurses
+LIBPANELWDIR=	${_LIB_OBJTOP}/lib/ncurses/panel
 LIBCRYPTODIR=	${_LIB_OBJTOP}/secure/lib/libcrypto
 LIBSPLDIR=	${_LIB_OBJTOP}/cddl/lib/libspl
 LIBSSHDIR=	${_LIB_OBJTOP}/secure/lib/libssh
@@ -677,7 +668,6 @@ LIBTEKENDIR=	${_LIB_OBJTOP}/sys/teken/libteken
 LIBEGACYDIR=	${_LIB_OBJTOP}/tools/build
 LIBLNDIR=	${_LIB_OBJTOP}/usr.bin/lex/lib
 
-LIBTERMCAPDIR=	${LIBNCURSESDIR}
 LIBTERMCAPWDIR=	${LIBNCURSESWDIR}
 
 # Default other library directories to lib/libNAME.

@@ -143,9 +143,10 @@ static MALLOC_DEFINE(M_XENBLOCKBACK, "xbbd", "Xen Block Back Driver Data");
 /**
  * The maximum mapped region size per request we will allow in a negotiated
  * block-front/back communication channel.
+ * Use old default of MAXPHYS == 128K.
  */
 #define	XBB_MAX_REQUEST_SIZE					\
-	MIN(MAXPHYS, BLKIF_MAX_SEGMENTS_PER_REQUEST * PAGE_SIZE)
+	MIN(128 * 1024, BLKIF_MAX_SEGMENTS_PER_REQUEST * PAGE_SIZE)
 
 /**
  * The maximum number of segments (within a request header and accompanying
@@ -3745,6 +3746,12 @@ xbb_attach(device_t dev)
 	xbb->hotplug_watch.callback = xbb_attach_disk;
 	KASSERT(xbb->hotplug_watch.node == NULL, ("watch node already setup"));
 	xbb->hotplug_watch.node = strdup(sbuf_data(watch_path), M_XENBLOCKBACK);
+	/*
+	 * We don't care about the path updated, just about the value changes
+	 * on that single node, hence there's no need to queue more that one
+	 * event.
+	 */
+	xbb->hotplug_watch.max_pending = 1;
 	sbuf_delete(watch_path);
 	error = xs_register_watch(&xbb->hotplug_watch);
 	if (error != 0) {

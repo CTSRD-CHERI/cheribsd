@@ -1,6 +1,6 @@
 #NO_UNIVERSE
 
 include "QEMU-MFS-ROOT"
-include "std.NODEBUG"
+include "../../conf/std.nodebug"
 
 ident QEMU-MFS-ROOT-NODEBUG

@@ -76,7 +76,8 @@ __FBSDID("$FreeBSD$");
 SDT_PROVIDER_DEFINE(vfs);
 SDT_PROBE_DEFINE4(vfs, namei, lookup, entry, "struct vnode *", "char *",
     "unsigned long", "bool");
-SDT_PROBE_DEFINE3(vfs, namei, lookup, return, "int", "struct vnode *", "bool");
+SDT_PROBE_DEFINE4(vfs, namei, lookup, return, "int", "struct vnode *", "bool",
+    "struct nameidata");
 
 /* Allocation zone for namei. */
 uma_zone_t namei_zone;
@@ -464,6 +465,44 @@ namei_setup(struct nameidata *ndp, struct vnode **dpp, struct pwd **pwdp)
 	return (0);
 }
 
+static int
+namei_getpath(struct nameidata *ndp)
+{
+	struct componentname *cnp;
+	int error;
+
+	cnp = &ndp->ni_cnd;
+
+	/*
+	 * Get a buffer for the name to be translated, and copy the
+	 * name into the buffer.
+	 */
+	cnp->cn_pnbuf = uma_zalloc(namei_zone, M_WAITOK);
+	if (ndp->ni_segflg == UIO_SYSSPACE) {
+		error = copystr((__cheri_fromcap const char *)ndp->ni_dirp,
+		    cnp->cn_pnbuf, MAXPATHLEN, &ndp->ni_pathlen);
+	} else {
+		error = copyinstr(ndp->ni_dirp, cnp->cn_pnbuf, MAXPATHLEN,
+		    &ndp->ni_pathlen);
+	}
+
+	if (__predict_false(error != 0)) {
+		namei_cleanup_cnp(cnp);
+		return (error);
+	}
+
+	/*
+	 * Don't allow empty pathnames.
+	 */
+	if (__predict_false(*cnp->cn_pnbuf == '\0')) {
+		namei_cleanup_cnp(cnp);
+		return (ENOENT);
+	}
+
+	cnp->cn_nameptr = cnp->cn_pnbuf;
+	return (0);
+}
+
 /*
  * Convert a pathname into a pointer to a locked vnode.
  *
@@ -507,6 +546,16 @@ namei(struct nameidata *ndp)
 	ndp->ni_debugflags |= NAMEI_DBG_CALLED;
 	if (ndp->ni_startdir != NULL)
 		ndp->ni_debugflags |= NAMEI_DBG_HADSTARTDIR;
+	if (cnp->cn_flags & FAILIFEXISTS) {
+		KASSERT(cnp->cn_nameiop == CREATE,
+		    ("%s: FAILIFEXISTS passed for op %d", __func__, cnp->cn_nameiop));
+		/*
+		 * The limitation below is to restrict hairy corner cases.
+		 */
+		KASSERT((cnp->cn_flags & (LOCKPARENT | LOCKLEAF)) == LOCKPARENT,
+		    ("%s: FAILIFEXISTS must be passed with LOCKPARENT and without LOCKLEAF",
+		    __func__));
+	}
 	/*
 	 * For NDVALIDATE.
 	 *
@@ -531,29 +580,9 @@ namei(struct nameidata *ndp)
 	ndp->ni_lcf = 0;
 	ndp->ni_vp = NULL;
 
-	/*
-	 * Get a buffer for the name to be translated, and copy the
-	 * name into the buffer.
-	 */
-	cnp->cn_pnbuf = uma_zalloc(namei_zone, M_WAITOK);
-	if (ndp->ni_segflg == UIO_SYSSPACE)
-		error = copystr((__cheri_fromcap const char *)ndp->ni_dirp,
-		    cnp->cn_pnbuf, MAXPATHLEN, &ndp->ni_pathlen);
-	else
-		error = copyinstr(ndp->ni_dirp, cnp->cn_pnbuf, MAXPATHLEN,
-		    &ndp->ni_pathlen);
-
+	error = namei_getpath(ndp);
 	if (__predict_false(error != 0)) {
-		namei_cleanup_cnp(cnp);
 		return (error);
-	}
-
-	/*
-	 * Don't allow empty pathnames.
-	 */
-	if (__predict_false(*cnp->cn_pnbuf == '\0')) {
-		namei_cleanup_cnp(cnp);
-		return (ENOENT);
 	}
 
 #ifdef KTRACE
@@ -563,8 +592,6 @@ namei(struct nameidata *ndp)
 		ktrnamei(cnp->cn_pnbuf);
 	}
 #endif
-
-	cnp->cn_nameptr = cnp->cn_pnbuf;
 
 	/*
 	 * First try looking up the target without locking any vnodes.
@@ -617,6 +644,8 @@ namei(struct nameidata *ndp)
 		 * If not a symbolic link, we're done.
 		 */
 		if ((cnp->cn_flags & ISSYMLINK) == 0) {
+			SDT_PROBE4(vfs, namei, lookup, return, error,
+			    (error == 0 ? ndp->ni_vp : NULL), false, ndp);
 			if ((cnp->cn_flags & (SAVENAME | SAVESTART)) == 0) {
 				namei_cleanup_cnp(cnp);
 			} else
@@ -627,8 +656,6 @@ namei(struct nameidata *ndp)
 				error = ENOTCAPABLE;
 			}
 			nameicap_cleanup(ndp, true);
-			SDT_PROBE3(vfs, namei, lookup, return, error,
-			    (error == 0 ? ndp->ni_vp : NULL), false);
 			pwd_drop(pwd);
 			if (error == 0)
 				NDVALIDATE(ndp);
@@ -702,9 +729,9 @@ namei(struct nameidata *ndp)
 	vrele(ndp->ni_dvp);
 out:
 	MPASS(error != 0);
+	SDT_PROBE4(vfs, namei, lookup, return, error, NULL, false, ndp);
 	namei_cleanup_cnp(cnp);
 	nameicap_cleanup(ndp, true);
-	SDT_PROBE3(vfs, namei, lookup, return, error, NULL, false);
 	pwd_drop(pwd);
 	return (error);
 }
@@ -1278,8 +1305,11 @@ success:
 			goto bad2;
 		}
 	}
-	if (ndp->ni_vp != NULL && ndp->ni_vp->v_type == VDIR)
+	if (ndp->ni_vp != NULL) {
 		nameicap_tracker_add(ndp, ndp->ni_vp);
+		if ((cnp->cn_flags & (FAILIFEXISTS | ISSYMLINK)) == FAILIFEXISTS)
+			goto bad_eexist;
+	}
 	return (0);
 
 bad2:
@@ -1294,6 +1324,24 @@ bad:
 		vput(dp);
 	ndp->ni_vp = NULL;
 	return (error);
+bad_eexist:
+	/*
+	 * FAILIFEXISTS handling.
+	 *
+	 * XXX namei called with LOCKPARENT but not LOCKLEAF has the strange
+	 * behaviour of leaving the vnode unlocked if the target is the same
+	 * vnode as the parent.
+	 */
+	MPASS((cnp->cn_flags & ISSYMLINK) == 0);
+	if (ndp->ni_vp == ndp->ni_dvp)
+		vrele(ndp->ni_dvp);
+	else
+		vput(ndp->ni_dvp);
+	vrele(ndp->ni_vp);
+	ndp->ni_dvp = NULL;
+	ndp->ni_vp = NULL;
+	NDFREE(ndp, NDF_ONLY_PNBUF);
+	return (EEXIST);
 }
 
 /*
@@ -1438,6 +1486,33 @@ NDFREE_PNBUF(struct nameidata *ndp)
 		ndp->ni_cnd.cn_flags &= ~HASBUF;
 	}
 }
+
+/*
+ * NDFREE_PNBUF replacement for callers that know there is no buffer.
+ *
+ * This is a hack. Preferably the VFS layer would not produce anything more
+ * than it was asked to do. Unfortunately several non-LOOKUP cases can add the
+ * HASBUF flag to the result. Even then an interface could be implemented where
+ * the caller specifies what they expected to see in the result and what they
+ * are going to take care of.
+ *
+ * In the meantime provide this kludge as a trivial replacement for NDFREE_PNBUF
+ * calls scattered throughout the kernel where we know for a fact the flag must not
+ * be seen.
+ */
+#ifdef INVARIANTS
+void
+NDFREE_NOTHING(struct nameidata *ndp)
+{
+	struct componentname *cnp;
+
+	cnp = &ndp->ni_cnd;
+	KASSERT(cnp->cn_nameiop == LOOKUP, ("%s: got non-LOOKUP op %d\n",
+	    __func__, cnp->cn_nameiop));
+	KASSERT((cnp->cn_flags & (SAVENAME | HASBUF)) == 0,
+	    ("%s: bad flags \%" PRIx64 "\n", __func__, cnp->cn_flags));
+}
+#endif
 
 void
 (NDFREE)(struct nameidata *ndp, const u_int flags)

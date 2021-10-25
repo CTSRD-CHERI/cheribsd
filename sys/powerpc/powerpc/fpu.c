@@ -79,7 +79,7 @@ save_fpu_int(struct thread *td)
 	#undef SFP
 	} else {
 	#define SFP(n)   __asm ("stfd " #n ", 0(%0)" \
-			:: "b"(&pcb->pcb_fpu.fpr[n]));
+			:: "b"(&pcb->pcb_fpu.fpr[n].fpr));
 		SFP(0);		SFP(1);		SFP(2);		SFP(3);
 		SFP(4);		SFP(5);		SFP(6);		SFP(7);
 		SFP(8);		SFP(9);		SFP(10);	SFP(11);
@@ -164,7 +164,7 @@ enable_fpu(struct thread *td)
 	#undef LFP
 	} else {
 	#define LFP(n)   __asm ("lfd " #n ", 0(%0)" \
-			:: "b"(&pcb->pcb_fpu.fpr[n]));
+			:: "b"(&pcb->pcb_fpu.fpr[n].fpr));
 		LFP(0);		LFP(1);		LFP(2);		LFP(3);
 		LFP(4);		LFP(5);		LFP(6);		LFP(7);
 		LFP(8);		LFP(9);		LFP(10);	LFP(11);
@@ -209,7 +209,6 @@ save_fpu_nodrop(struct thread *td)
 		save_fpu_int(td);
 }
 
-
 /*
  * Clear Floating-Point Status and Control Register
  */
@@ -217,19 +216,18 @@ void
 cleanup_fpscr()
 {
 	register_t msr;
-	msr = mfmsr();
-	mtmsr(msr | PSL_FP | PSL_VSX);
 
+	msr = mfmsr();
+	mtmsr(msr | PSL_FP);
 	mtfsf(0);
 
 	isync();
 	mtmsr(msr);
 }
 
-
 /*
- *  * Returns the current fp exception
- *   */
+ * Get the current fp exception
+ */
 u_int
 get_fpu_exception(struct thread *td)
 {

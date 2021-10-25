@@ -415,12 +415,13 @@ out_with_ref:
  */
 static int
 sendfile_swapin(vm_object_t obj, struct sf_io *sfio, int *nios, off_t off,
-    off_t len, int npages, int rhpages, int flags)
+    off_t len, int rhpages, int flags)
 {
 	vm_page_t *pa;
-	int a, count, count1, grabbed, i, j, rv;
+	int a, count, count1, grabbed, i, j, npages, rv;
 
 	pa = sfio->pa;
+	npages = sfio->npages;
 	*nios = 0;
 	flags = (flags & SF_NODISKIO) ? VM_ALLOC_NOWAIT : 0;
 	sfio->pindex0 = OFF_TO_IDX(off);
@@ -541,6 +542,7 @@ sendfile_swapin(vm_object_t obj, struct sf_io *sfio, int *nios, off_t off,
 				    ("%s: page %p[%d] I/O recovery failure",
 				    __func__, pa, j));
 				vm_page_unwire(pa[j], PQ_INACTIVE);
+				pa[j] = NULL;
 			}
 			return (EIO);
 		}
@@ -887,7 +889,7 @@ retry_space:
 		 * do any heuristics and use exactly the value supplied by
 		 * application.  Otherwise, we allow readahead up to "rem".
 		 * If application wants more, let it be, but there is no
-		 * reason to go above MAXPHYS.  Also check against "obj_size",
+		 * reason to go above maxphys.  Also check against "obj_size",
 		 * since vm_pager_has_page() can hint beyond EOF.
 		 */
 		if (flags & SF_USER_READAHEAD) {
@@ -897,7 +899,7 @@ retry_space:
 			    npages;
 			rhpages += SF_READAHEAD(flags);
 		}
-		rhpages = min(howmany(MAXPHYS, PAGE_SIZE), rhpages);
+		rhpages = min(howmany(maxphys, PAGE_SIZE), rhpages);
 		rhpages = min(howmany(obj_size - trunc_page(off), PAGE_SIZE) -
 		    npages, rhpages);
 
@@ -907,6 +909,7 @@ retry_space:
 		sfio->obj = obj;
 		sfio->error = 0;
 		sfio->m = NULL;
+		sfio->npages = npages;
 #ifdef KERN_TLS
 		/*
 		 * This doesn't use ktls_hold() because sfio->m will
@@ -916,8 +919,8 @@ retry_space:
 		sfio->tls = tls;
 #endif
 		vm_object_pip_add(obj, 1);
-		error = sendfile_swapin(obj, sfio, &nios, off, space, npages,
-		    rhpages, flags);
+		error = sendfile_swapin(obj, sfio, &nios, off, space, rhpages,
+		    flags);
 		if (error != 0) {
 			if (vp != NULL)
 				VOP_UNLOCK(vp);
@@ -965,7 +968,7 @@ retry_space:
 			if (pa[i] == NULL) {
 				SFSTAT_INC(sf_busy);
 				fixspace(npages, i, off, &space);
-				npages = i;
+				sfio->npages = i;
 				softerr = EBUSY;
 				break;
 			}
@@ -1044,12 +1047,14 @@ retry_space:
 			if (sf == NULL) {
 				SFSTAT_INC(sf_allocfail);
 				sendfile_iowait(sfio, "sfnosf");
-				for (int j = i; j < npages; j++)
+				for (int j = i; j < npages; j++) {
 					vm_page_unwire(pa[j], PQ_INACTIVE);
+					pa[j] = NULL;
+				}
 				if (m == NULL)
 					softerr = ENOBUFS;
 				fixspace(npages, i, off, &space);
-				npages = i;
+				sfio->npages = i;
 				break;
 			}
 
@@ -1155,7 +1160,6 @@ prepend_header:
 		} else {
 			sfio->so = so;
 			sfio->m = m0;
-			sfio->npages = npages;
 			soref(so);
 			error = (*so->so_proto->pr_usrreqs->pru_send)
 			    (so, PRUS_NOTREADY, m, NULL, NULL, td);

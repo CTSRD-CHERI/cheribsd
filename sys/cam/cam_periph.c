@@ -772,7 +772,7 @@ camperiphfree(struct cam_periph *periph)
  * Map user virtual pointers into kernel virtual address space, so we can
  * access the memory.  This is now a generic function that centralizes most
  * of the sanity checks on the data flags, if any.
- * This also only works for up to MAXPHYS memory.  Since we use
+ * This also only works for up to maxphys memory.  Since we use
  * buffers to map stuff in and out, we're limited to the buffer size.
  */
 int
@@ -783,13 +783,12 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 	u_int8_t * __capability *data_ptrs[CAM_PERIPH_MAXMAPS];
 	u_int32_t lengths[CAM_PERIPH_MAXMAPS];
 	u_int32_t dirs[CAM_PERIPH_MAXMAPS];
-	bool misaligned[CAM_PERIPH_MAXMAPS];
 
 	bzero(mapinfo, sizeof(*mapinfo));
 	if (maxmap == 0)
 		maxmap = DFLTPHYS;	/* traditional default */
-	else if (maxmap > MAXPHYS)
-		maxmap = MAXPHYS;	/* for safety */
+	else if (maxmap > maxphys)
+		maxmap = maxphys;	/* for safety */
 	switch(ccb->ccb_h.func_code) {
 	case XPT_DEV_MATCH:
 		if (ccb->cdm.match_buf_len == 0) {
@@ -813,9 +812,9 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 		}
 		/*
 		 * This request will not go to the hardware, no reason
-		 * to be so strict. vmapbuf() is able to map up to MAXPHYS.
+		 * to be so strict. vmapbuf() is able to map up to maxphys.
 		 */
-		maxmap = MAXPHYS;
+		maxmap = maxphys;
 		break;
 	case XPT_SCSI_IO:
 	case XPT_CONT_TARGET_IO:
@@ -889,9 +888,9 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 
 		/*
 		 * This request will not go to the hardware, no reason
-		 * to be so strict. vmapbuf() is able to map up to MAXPHYS.
+		 * to be so strict. vmapbuf() is able to map up to maxphys.
 		 */
-		maxmap = MAXPHYS;
+		maxmap = maxphys;
 		break;
 	default:
 		return(EINVAL);
@@ -909,17 +908,6 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 			       (long)(lengths[i]), (u_long)maxmap);
 			return (E2BIG);
 		}
-
-		/*
-		 * The userland data pointer passed in may not be page
-		 * aligned.  vmapbuf() truncates the address to a page
-		 * boundary, so if the address isn't page aligned, we'll
-		 * need enough space for the given transfer length, plus
-		 * whatever extra space is necessary to make it to the page
-		 * boundary.
-		 */
-		misaligned[i] = (lengths[i] +
-		    (((__cheri_addr vm_offset_t)(*data_ptrs[i])) & PAGE_MASK) > MAXPHYS);
 	}
 
 	/*
@@ -942,7 +930,7 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo,
 		 * small allocations malloc is backed by UMA, and so much
 		 * cheaper on SMP systems.
 		 */
-		if ((lengths[i] <= periph_mapmem_thresh || misaligned[i]) &&
+		if (lengths[i] <= periph_mapmem_thresh &&
 		    ccb->ccb_h.func_code != XPT_MMC_IO) {
 			void *buf;
 

@@ -39,6 +39,7 @@ local env_changed = {}
 -- Values to restore env to (nil to unset)
 local env_restore = {}
 
+local MSG_FAILDIR = "Failed to load conf dir '%s': not a directory"
 local MSG_FAILEXEC = "Failed to exec '%s'"
 local MSG_FAILSETENV = "Failed to '%s' with value: %s"
 local MSG_FAILOPENCFG = "Failed to open config: '%s'"
@@ -312,7 +313,7 @@ local function loadModule(mod, silent)
 	for k, v in pairs(mod) do
 		if v.load ~= nil and v.load:lower() == "yes" then
 			local module_name = v.name or k
-			if blacklist[module_name] ~= nil then
+			if not v.force and blacklist[module_name] ~= nil then
 				if not silent then
 					print(MSG_MODBLACKLIST:format(module_name))
 				end
@@ -506,6 +507,8 @@ function config.readConf(file, loaded_files)
 		return
 	end
 
+	-- We'll process loader_conf_dirs at the top-level readConf
+	local load_conf_dirs = next(loaded_files) == nil
 	print("Loading " .. file)
 
 	-- The final value of loader_conf_files is not important, so just
@@ -527,6 +530,27 @@ function config.readConf(file, loaded_files)
 	if loader_conf_files ~= nil then
 		for name in loader_conf_files:gmatch("[%w%p]+") do
 			config.readConf(name, loaded_files)
+		end
+	end
+
+	if load_conf_dirs then
+		local loader_conf_dirs = getEnv("loader_conf_dirs")
+		if loader_conf_dirs ~= nil then
+			for name in loader_conf_dirs:gmatch("[%w%p]+") do
+				if lfs.attributes(name, "mode") ~= "directory" then
+					print(MSG_FAILDIR:format(name))
+					goto nextdir
+				end
+				for cfile in lfs.dir(name) do
+					if cfile:match(".conf$") then
+						local fpath = name .. "/" .. cfile
+						if lfs.attributes(fpath, "mode") == "file" then
+							config.readConf(fpath, loaded_files)
+						end
+					end
+				end
+				::nextdir::
+			end
 		end
 	end
 end
@@ -680,6 +704,52 @@ function config.loadelf()
 	status = loadModule(modules, not config.verbose)
 	hook.runAll("modules.loaded")
 	return status
+end
+
+function config.enableModule(modname)
+	if modules[modname] == nil then
+		modules[modname] = {}
+	elseif modules[modname].load == "YES" then
+		modules[modname].force = true
+		return true
+	end
+
+	modules[modname].load = "YES"
+	modules[modname].force = true
+	return true
+end
+
+function config.disableModule(modname)
+	if modules[modname] == nil then
+		return false
+	elseif modules[modname].load ~= "YES" then
+		return true
+	end
+
+	modules[modname].load = "NO"
+	modules[modname].force = nil
+	return true
+end
+
+function config.isModuleEnabled(modname)
+	local mod = modules[modname]
+	if not mod or mod.load ~= "YES" then
+		return false
+	end
+
+	if mod.force then
+		return true
+	end
+
+	local blacklist = getBlacklist()
+	return not blacklist[modname]
+end
+
+function config.getModuleInfo()
+	return {
+		modules = modules,
+		blacklist = getBlacklist()
+	}
 end
 
 hook.registerType("config.loaded")

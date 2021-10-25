@@ -69,6 +69,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/priv.h>
 
+#include <dev/hid/hid.h>
+
 #include "usbdevs.h"
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -6145,7 +6147,7 @@ uaudio_hid_probe(struct uaudio_softc *sc,
 	}
 
 	/* check if there is an ID byte */
-	hid_report_size(d_ptr, d_len, hid_input, &id);
+	hid_report_size_max(d_ptr, d_len, hid_input, &id);
 
 	if (id != 0)
 		sc->sc_hid.flags |= UAUDIO_HID_HAS_ID;
@@ -6210,6 +6212,7 @@ uaudio_hid_detach(struct uaudio_softc *sc)
 DRIVER_MODULE_ORDERED(uaudio, uhub, uaudio_driver, uaudio_devclass, NULL, 0, SI_ORDER_ANY);
 MODULE_DEPEND(uaudio, usb, 1, 1, 1);
 MODULE_DEPEND(uaudio, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
+MODULE_DEPEND(uaudio, hid, 1, 1, 1);
 MODULE_VERSION(uaudio, 1);
 USB_PNP_HOST_INFO(uaudio_devs);
 USB_PNP_HOST_INFO(uaudio_vendor_midi);

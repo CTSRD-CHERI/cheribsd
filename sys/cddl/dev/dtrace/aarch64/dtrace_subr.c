@@ -49,6 +49,7 @@ __FBSDID("$FreeBSD$");
 extern dtrace_id_t	dtrace_probeid_error;
 extern int (*dtrace_invop_jump_addr)(struct trapframe *);
 extern void dtrace_getnanotime(struct timespec *tsp);
+extern void dtrace_getnanouptime(struct timespec *tsp);
 
 int dtrace_invop(uintptr_t, struct trapframe *, uintptr_t);
 void dtrace_invop_init(void);
@@ -163,7 +164,7 @@ dtrace_gethrtime()
 {
 	struct timespec curtime;
 
-	nanouptime(&curtime);
+	dtrace_getnanouptime(&curtime);
 
 	return (curtime.tv_sec * 1000000000UL + curtime.tv_nsec);
 
@@ -300,6 +301,12 @@ dtrace_invop_start(struct trapframe *frame)
 
 		/* Update the stack pointer and program counter to continue */
 		frame->tf_sp = (register_t)sp;
+		frame->tf_elr += INSN_SIZE;
+		return (0);
+	}
+
+	if ((invop & SUB_MASK) == SUB_INSTR) {
+		frame->tf_sp -= (invop >> SUB_IMM_SHIFT) & SUB_IMM_MASK;
 		frame->tf_elr += INSN_SIZE;
 		return (0);
 	}

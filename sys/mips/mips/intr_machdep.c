@@ -50,6 +50,19 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/trap.h>
 
+#ifndef INTRNG
+#define INTRCNT_COUNT	256
+#define	INTRNAME_LEN	(2*MAXCOMLEN + 1)
+
+MALLOC_DECLARE(M_MIPSINTR);
+MALLOC_DEFINE(M_MIPSINTR, "mipsintr", "MIPS interrupt handling");
+
+u_long *intrcnt;
+char *intrnames;
+size_t sintrcnt;
+size_t sintrnames;
+#endif
+
 static struct intr_event *hardintr_events[NHARD_IRQS];
 static struct intr_event *softintr_events[NSOFT_IRQS];
 static mips_intrcnt_t mips_intr_counters[NSOFT_IRQS + NHARD_IRQS];
@@ -58,21 +71,6 @@ static int intrcnt_index;
 
 static cpu_intr_mask_t		hardintr_mask_func;
 static cpu_intr_unmask_t	hardintr_unmask_func;
-
-#ifndef INTRNG
-/*
- * Reasonable limit
- */
-#define	INTRCNT_COUNT	256
-
-/*
- * Count and names for statistics
- */
-char intrnames[INTRCNT_COUNT * (MAXCOMLEN + 1) * 2];
-size_t sintrnames = INTRCNT_COUNT * (MAXCOMLEN + 1) * 2;
-unsigned long intrcnt[INTRCNT_COUNT * 2];
-size_t sintrcnt = INTRCNT_COUNT * sizeof(long) * 2;
-#endif
 
 mips_intrcnt_t
 mips_intrcnt_create(const char* name)
@@ -135,6 +133,15 @@ cpu_init_interrupts()
 {
 	int i;
 	char name[MAXCOMLEN + 1];
+
+#ifndef INTRNG
+	intrcnt = mallocarray(INTRCNT_COUNT, sizeof(u_long), M_MIPSINTR,
+	    M_WAITOK | M_ZERO);
+	intrnames = mallocarray(INTRCNT_COUNT, INTRNAME_LEN, M_MIPSINTR,
+	    M_WAITOK | M_ZERO);
+	sintrcnt = INTRCNT_COUNT * sizeof(u_long);
+	sintrnames = INTRCNT_COUNT * INTRNAME_LEN;
+#endif
 
 	/*
 	 * Initialize all available vectors so spare IRQ

@@ -6169,6 +6169,25 @@ void t4_tp_get_err_stats(struct adapter *adap, struct tp_err_stats *st,
 }
 
 /**
+ *	t4_tp_get_err_stats - read TP's error MIB counters
+ *	@adap: the adapter
+ *	@st: holds the counter values
+ * 	@sleep_ok: if true we may sleep while awaiting command completion
+ *
+ *	Returns the values of TP's error counters.
+ */
+void t4_tp_get_tnl_stats(struct adapter *adap, struct tp_tnl_stats *st,
+			 bool sleep_ok)
+{
+	int nchan = adap->chip_params->nchan;
+
+	t4_tp_mib_read(adap, st->out_pkt, nchan, A_TP_MIB_TNL_OUT_PKT_0,
+		       sleep_ok);
+	t4_tp_mib_read(adap, st->in_pkt, nchan, A_TP_MIB_TNL_IN_PKT_0,
+		       sleep_ok);
+}
+
+/**
  *	t4_tp_get_proxy_stats - read TP's proxy MIB counters
  *	@adap: the adapter
  *	@st: holds the counter values
@@ -6259,6 +6278,21 @@ void t4_get_usm_stats(struct adapter *adap, struct tp_usm_stats *st,
 	st->frames = val[0];
 	st->drops = val[1];
 	st->octets = ((u64)val[2] << 32) | val[3];
+}
+
+/**
+ *	t4_tp_get_tid_stats - read TP's tid MIB counters.
+ *	@adap: the adapter
+ *	@st: holds the counter values
+ * 	@sleep_ok: if true we may sleep while awaiting command completion
+ *
+ *	Returns the values of TP's counters for tids.
+ */
+void t4_tp_get_tid_stats(struct adapter *adap, struct tp_tid_stats *st,
+		      bool sleep_ok)
+{
+
+	t4_tp_mib_read(adap, &st->del, 4, A_TP_MIB_TID_DEL, sleep_ok);
 }
 
 /**
@@ -8616,6 +8650,32 @@ int t4_iq_free(struct adapter *adap, unsigned int mbox, unsigned int pf,
 	c.iqid = cpu_to_be16(iqid);
 	c.fl0id = cpu_to_be16(fl0id);
 	c.fl1id = cpu_to_be16(fl1id);
+	return t4_wr_mbox(adap, mbox, &c, sizeof(c), NULL);
+}
+
+/**
+ *	t4_eth_eq_stop - stop an Ethernet egress queue
+ *	@adap: the adapter
+ *	@mbox: mailbox to use for the FW command
+ *	@pf: the PF owning the queues
+ *	@vf: the VF owning the queues
+ *	@eqid: egress queue id
+ *
+ *	Stops an Ethernet egress queue.  The queue can be reinitialized or
+ *	freed but is not otherwise functional after this call.
+ */
+int t4_eth_eq_stop(struct adapter *adap, unsigned int mbox, unsigned int pf,
+                   unsigned int vf, unsigned int eqid)
+{
+	struct fw_eq_eth_cmd c;
+
+	memset(&c, 0, sizeof(c));
+	c.op_to_vfn = cpu_to_be32(V_FW_CMD_OP(FW_EQ_ETH_CMD) |
+				  F_FW_CMD_REQUEST | F_FW_CMD_EXEC |
+				  V_FW_EQ_ETH_CMD_PFN(pf) |
+				  V_FW_EQ_ETH_CMD_VFN(vf));
+	c.alloc_to_len16 = cpu_to_be32(F_FW_EQ_ETH_CMD_EQSTOP | FW_LEN16(c));
+	c.eqid_pkd = cpu_to_be32(V_FW_EQ_ETH_CMD_EQID(eqid));
 	return t4_wr_mbox(adap, mbox, &c, sizeof(c), NULL);
 }
 

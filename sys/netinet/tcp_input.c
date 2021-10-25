@@ -153,6 +153,16 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, drop_synfin, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(drop_synfin), 0,
     "Drop TCP packets with SYN+FIN set");
 
+VNET_DEFINE(int, tcp_do_prr_conservative) = 0;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, do_prr_conservative, CTLFLAG_VNET | CTLFLAG_RW,
+    &VNET_NAME(tcp_do_prr_conservative), 0,
+    "Do conservative Proportional Rate Reduction");
+
+VNET_DEFINE(int, tcp_do_prr) = 1;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, do_prr, CTLFLAG_VNET | CTLFLAG_RW,
+    &VNET_NAME(tcp_do_prr), 1,
+    "Enable Proportional Rate Reduction per RFC 6937");
+
 VNET_DEFINE(int, tcp_do_newcwv) = 0;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, newcwv, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(tcp_do_newcwv), 0,
@@ -500,6 +510,7 @@ cc_post_recovery(struct tcpcb *tp, struct tcphdr *th)
 	}
 	/* XXXLAS: EXIT_RECOVERY ? */
 	tp->t_bytes_acked = 0;
+	tp->sackhint.recover_fs = 0;
 }
 
 /*
@@ -1682,16 +1693,26 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	/*
 	 * If timestamps were negotiated during SYN/ACK and a
 	 * segment without a timestamp is received, silently drop
-	 * the segment.
+	 * the segment, unless it is a RST segment or missing timestamps are
+	 * tolerated.
 	 * See section 3.2 of RFC 7323.
 	 */
 	if ((tp->t_flags & TF_RCVD_TSTMP) && !(to.to_flags & TOF_TS)) {
-		if ((s = tcp_log_addrs(inc, th, NULL, NULL))) {
-			log(LOG_DEBUG, "%s; %s: Timestamp missing, "
-			    "segment silently dropped\n", s, __func__);
-			free(s, M_TCPLOG);
+		if (((thflags & TH_RST) != 0) || V_tcp_tolerate_missing_ts) {
+			if ((s = tcp_log_addrs(inc, th, NULL, NULL))) {
+				log(LOG_DEBUG, "%s; %s: Timestamp missing, "
+				    "segment processed normally\n",
+				    s, __func__);
+				free(s, M_TCPLOG);
+			}
+		} else {
+			if ((s = tcp_log_addrs(inc, th, NULL, NULL))) {
+				log(LOG_DEBUG, "%s; %s: Timestamp missing, "
+				    "segment silently dropped\n", s, __func__);
+				free(s, M_TCPLOG);
+			}
+			goto drop;
 		}
-		goto drop;
 	}
 	/*
 	 * If timestamps were not negotiated during SYN/ACK and a
@@ -2554,7 +2575,58 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 				     IN_FASTRECOVERY(tp->t_flags)) {
 					cc_ack_received(tp, th, nsegs,
 					    CC_DUPACK);
-					if ((tp->t_flags & TF_SACK_PERMIT) &&
+					if (V_tcp_do_prr &&
+					    IN_FASTRECOVERY(tp->t_flags) &&
+					    (tp->t_flags & TF_SACK_PERMIT)) {
+						long snd_cnt = 0, limit = 0;
+						long del_data = 0, pipe = 0;
+						/*
+						 * In a duplicate ACK del_data is only the
+						 * diff_in_sack. If no SACK is used del_data
+						 * will be 0. Pipe is the amount of data we
+						 * estimate to be in the network.
+						 */
+						del_data = tp->sackhint.delivered_data;
+						pipe = (tp->snd_nxt - tp->snd_fack) +
+							tp->sackhint.sack_bytes_rexmit;
+						tp->sackhint.prr_delivered += del_data;
+						if (pipe > tp->snd_ssthresh) {
+							if (tp->sackhint.recover_fs == 0)
+								tp->sackhint.recover_fs =
+								    max(1, tp->snd_nxt - tp->snd_una);
+							snd_cnt = (tp->sackhint.prr_delivered *
+							    tp->snd_ssthresh /
+							    tp->sackhint.recover_fs) +
+							    1 - tp->sackhint.sack_bytes_rexmit;
+						} else {
+							if (V_tcp_do_prr_conservative)
+								limit = tp->sackhint.prr_delivered -
+									tp->sackhint.sack_bytes_rexmit;
+							else
+								if ((tp->sackhint.prr_delivered -
+								    tp->sackhint.sack_bytes_rexmit) >
+								    del_data)
+									limit = tp->sackhint.prr_delivered -
+									    tp->sackhint.sack_bytes_rexmit +
+									    maxseg;
+								else
+									limit = del_data + maxseg;
+							if ((tp->snd_ssthresh - pipe) < limit)
+								snd_cnt = tp->snd_ssthresh - pipe;
+							else
+								snd_cnt = limit;
+						}
+						snd_cnt = max((snd_cnt / maxseg), 0);
+						/*
+						 * Send snd_cnt new data into the network in
+						 * response to this ACK. If there is a going
+						 * to be a SACK retransmission, adjust snd_cwnd
+						 * accordingly.
+						 */
+						tp->snd_cwnd = tp->snd_nxt - tp->snd_recover +
+						    tp->sackhint.sack_bytes_rexmit +
+						    (snd_cnt * maxseg);
+					} else if ((tp->t_flags & TF_SACK_PERMIT) &&
 					    IN_FASTRECOVERY(tp->t_flags)) {
 						int awnd;
 
@@ -2583,13 +2655,14 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 					tcp_seq onxt = tp->snd_nxt;
 
 					/*
-					 * If we're doing sack, check to
-					 * see if we're already in sack
+					 * If we're doing sack, or prr, check
+					 * to see if we're already in sack
 					 * recovery. If we're not doing sack,
 					 * check to see if we're in newreno
 					 * recovery.
 					 */
-					if (tp->t_flags & TF_SACK_PERMIT) {
+					if (V_tcp_do_prr ||
+					    (tp->t_flags & TF_SACK_PERMIT)) {
 						if (IN_FASTRECOVERY(tp->t_flags)) {
 							tp->t_dupacks = 0;
 							break;
@@ -2607,6 +2680,16 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 					    CC_DUPACK);
 					tcp_timer_activate(tp, TT_REXMT, 0);
 					tp->t_rtttime = 0;
+					if (V_tcp_do_prr) {
+						/*
+						 * snd_ssthresh is already updated by
+						 * cc_cong_signal.
+						 */
+						tp->sackhint.prr_delivered = 0;
+						tp->sackhint.sack_bytes_rexmit = 0;
+						tp->sackhint.recover_fs = max(1,
+						    tp->snd_nxt - tp->snd_una);
+					}
 					if (tp->t_flags & TF_SACK_PERMIT) {
 						TCPSTAT_INC(
 						    tcps_sack_recovery_episode);
@@ -2713,7 +2796,10 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		if (IN_FASTRECOVERY(tp->t_flags)) {
 			if (SEQ_LT(th->th_ack, tp->snd_recover)) {
 				if (tp->t_flags & TF_SACK_PERMIT)
-					tcp_sack_partialack(tp, th);
+					if (V_tcp_do_prr)
+						tcp_prr_partialack(tp, th);
+					else
+						tcp_sack_partialack(tp, th);
 				else
 					tcp_newreno_partial_ack(tp, th);
 			} else
@@ -3837,6 +3923,54 @@ tcp_mssopt(struct in_conninfo *inc)
 		mss = max(maxmtu, thcmtu) - min_protoh;
 
 	return (mss);
+}
+
+void
+tcp_prr_partialack(struct tcpcb *tp, struct tcphdr *th)
+{
+	long snd_cnt = 0, limit = 0, del_data = 0, pipe = 0;
+	int maxseg = tcp_maxseg(tp);
+
+	INP_WLOCK_ASSERT(tp->t_inpcb);
+
+	tcp_timer_activate(tp, TT_REXMT, 0);
+	tp->t_rtttime = 0;
+	/*
+	 * Compute the amount of data that this ACK is indicating
+	 * (del_data) and an estimate of how many bytes are in the
+	 * network.
+	 */
+	if (SEQ_GEQ(th->th_ack, tp->snd_una))
+		del_data = BYTES_THIS_ACK(tp, th);
+	del_data += tp->sackhint.delivered_data;
+	pipe = (tp->snd_nxt - tp->snd_fack) + tp->sackhint.sack_bytes_rexmit;
+	tp->sackhint.prr_delivered += del_data;
+	/*
+	 * Proportional Rate Reduction
+	 */
+	if (pipe > tp->snd_ssthresh)
+		snd_cnt = (tp->sackhint.prr_delivered * tp->snd_ssthresh / tp->sackhint.recover_fs) -
+		    tp->sackhint.sack_bytes_rexmit;
+	else {
+		if (V_tcp_do_prr_conservative)
+			limit = tp->sackhint.prr_delivered - tp->sackhint.sack_bytes_rexmit;
+		else
+			if ((tp->sackhint.prr_delivered - tp->sackhint.sack_bytes_rexmit) > del_data)
+				limit = tp->sackhint.prr_delivered - tp->sackhint.sack_bytes_rexmit + maxseg;
+			else
+				limit = del_data + maxseg;
+		snd_cnt = min((tp->snd_ssthresh - pipe), limit);
+	}
+	snd_cnt = max((snd_cnt / maxseg), 0);
+	/*
+	 * Send snd_cnt new data into the network in response to this ack.
+	 * If there is going to be a SACK retransmission, adjust snd_cwnd
+	 * accordingly.
+	 */
+	tp->snd_cwnd = tp->snd_nxt - tp->snd_recover +
+		tp->sackhint.sack_bytes_rexmit + (snd_cnt * maxseg);
+	tp->t_flags |= TF_ACKNOW;
+	(void) tcp_output(tp);
 }
 
 /*

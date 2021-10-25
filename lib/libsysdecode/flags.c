@@ -851,6 +851,13 @@ sysdecode_sigill_code(int si_code)
 }
 
 const char *
+sysdecode_sigprot_code(int si_code)
+{
+
+	return (lookup_value(sigprotcode, si_code));
+}
+
+const char *
 sysdecode_sigsegv_code(int si_code)
 {
 
@@ -939,6 +946,20 @@ sysdecode_umtx_op(int op)
 {
 
 	return (lookup_value(umtxop, op));
+}
+
+bool
+sysdecode_umtx_op_flags(FILE *fp, int op, int *rem)
+{
+	uintmax_t val;
+	bool printed;
+
+	printed = false;
+	val = (unsigned)op;
+	print_mask_part(fp, umtxopflags, &val, &printed);
+	if (rem != NULL)
+		*rem = val;
+	return (printed);
 }
 
 const char *
@@ -1115,6 +1136,8 @@ sysdecode_sigcode(int sig, int si_code)
 		return (sysdecode_sigbus_code(si_code));
 	case SIGSEGV:
 		return (sysdecode_sigsegv_code(si_code));
+	case SIGPROT:
+		return (sysdecode_sigprot_code(si_code));
 	case SIGFPE:
 		return (sysdecode_sigfpe_code(si_code));
 	case SIGTRAP:

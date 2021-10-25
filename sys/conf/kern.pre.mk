@@ -155,7 +155,8 @@ LDFLAGS+=	--build-id=sha1
 
 .if (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "i386" || ${MACHINE} == "powerpc") && \
-    defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mifunc} == ""
+    defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mifunc} == "" && \
+    !make(install)
 .error amd64/arm64/i386/ppc* kernel requires linker ifunc support
 .endif
 .if ${MACHINE_CPUARCH} == "amd64"
@@ -196,7 +197,11 @@ NORMAL_FWO= ${CC:N${CCACHE_BIN}} -c ${ASM_CFLAGS} ${WERROR} -o ${.TARGET} \
 	-DFIRMW_SYMBOL="${.ALLSRC:M*.fw:C/[-.\/]/_/g}"
 
 # for ZSTD in the kernel (include zstd/lib/freebsd before other CFLAGS)
-ZSTD_C= ${CC} -c -DZSTD_HEAPMODE=1 -I$S/contrib/zstd/lib/freebsd ${CFLAGS} -I$S/contrib/zstd/lib -I$S/contrib/zstd/lib/common ${WERROR} -Wno-inline -Wno-missing-prototypes ${PROF} -U__BMI__ ${.IMPSRC}
+ZSTD_C= ${CC} -c -DZSTD_HEAPMODE=1 -I$S/contrib/zstd/lib/freebsd ${CFLAGS} \
+	-I$S/contrib/zstd/lib -I$S/contrib/zstd/lib/common ${WERROR} \
+	-Wno-inline -Wno-missing-prototypes ${PROF} -U__BMI__ \
+	-DZSTD_NO_INTRINSICS \
+	${.IMPSRC}
 # https://github.com/facebook/zstd/commit/812e8f2a [zstd 1.4.1]
 # "Note that [GCC] autovectorization still does not do a good job on the
 # optimized version, so it's turned off via attribute and flag.  I found
@@ -216,29 +221,27 @@ CDDL_CFLAGS=	\
 	-nostdinc \
 	-include $S/modules/zfs/static_ccompile.h \
 	-I${ZINCDIR} \
-	-I${ZINCDIR}/spl \
 	-I${ZINCDIR}/os/freebsd \
 	-I${ZINCDIR}/os/freebsd/spl \
 	-I${ZINCDIR}/os/freebsd/zfs  \
 	-I$S/modules/zfs \
 	-I$S/contrib/openzfs/module/zstd/include \
-	-I$S/contrib/openzfs/module/zstd/lib/freebsd/ \
 	${CFLAGS} \
-	-Wno-unknown-pragmas \
-	-Wno-missing-prototypes \
-	-Wno-undef \
-	-Wno-strict-prototypes \
 	-Wno-cast-qual \
-	-Wno-parentheses \
-	-Wno-redundant-decls \
-	-Wno-missing-braces \
-	-Wno-uninitialized \
-	-Wno-unused \
-	-Wno-inline \
-	-Wno-switch \
-	-Wno-pointer-arith \
-	-Wno-unknown-pragmas \
 	-Wno-duplicate-decl-specifier \
+	-Wno-inline \
+	-Wno-missing-braces \
+	-Wno-missing-prototypes \
+	-Wno-nested-externs \
+	-Wno-parentheses \
+	-Wno-pointer-arith \
+	-Wno-redundant-decls \
+	-Wno-strict-prototypes \
+	-Wno-switch \
+	-Wno-undef \
+	-Wno-uninitialized \
+	-Wno-unknown-pragmas \
+	-Wno-unused \
 	-include ${ZINCDIR}/os/freebsd/spl/sys/ccompile.h \
 	-I$S/cddl/contrib/opensolaris/uts/common \
 	-I$S -I$S/cddl/compat/opensolaris

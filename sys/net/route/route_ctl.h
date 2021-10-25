@@ -52,6 +52,7 @@ int rib_change_route(uint32_t fibnum, struct rt_addrinfo *info,
   struct rib_cmd_info *rc);
 int rib_action(uint32_t fibnum, int action, struct rt_addrinfo *info,
   struct rib_cmd_info *rc);
+int rib_handle_ifaddr_info(uint32_t fibnum, int cmd, struct rt_addrinfo *info);
 
 typedef void route_notification_t(struct rib_cmd_info *rc, void *);
 void rib_decompose_notification(struct rib_cmd_info *rc,
@@ -67,33 +68,67 @@ enum rib_walk_hook {
 };
 typedef int rib_walktree_f_t(struct rtentry *, void *);
 typedef void rib_walk_hook_f_t(struct rib_head *rnh, enum rib_walk_hook stage,
-  void *arg);
+    void *arg);
 void rib_walk(uint32_t fibnum, int af, bool wlock, rib_walktree_f_t *wa_f,
-  void *arg);
+    void *arg);
 void rib_walk_ext(uint32_t fibnum, int af, bool wlock, rib_walktree_f_t *wa_f,
-  rib_walk_hook_f_t *hook_f, void *arg);
+    rib_walk_hook_f_t *hook_f, void *arg);
+void rib_walk_ext_internal(struct rib_head *rnh, bool wlock,
+    rib_walktree_f_t *wa_f, rib_walk_hook_f_t *hook_f, void *arg);
 
 void rib_walk_del(u_int fibnum, int family, rib_filter_f_t *filter_f,
-  void *arg, bool report);
+    void *arg, bool report);
 
 void rib_foreach_table_walk(int family, bool wlock, rib_walktree_f_t *wa_f,
-  rib_walk_hook_f_t *hook_f, void *arg);
+    rib_walk_hook_f_t *hook_f, void *arg);
 void rib_foreach_table_walk_del(int family, rib_filter_f_t *filter_f, void *arg);
 
-struct route_nhop_data;
+struct nhop_object;
+struct nhgrp_object;
+struct route_nhop_data {
+	union {
+		struct nhop_object *rnd_nhop;
+		struct nhgrp_object *rnd_nhgrp;
+	};
+	uint32_t rnd_weight;
+};
+
 const struct rtentry *rib_lookup_prefix(uint32_t fibnum, int family,
     const struct sockaddr *dst, const struct sockaddr *netmask,
     struct route_nhop_data *rnd);
 const struct rtentry *rib_lookup_lpm(uint32_t fibnum, int family,
     const struct sockaddr *dst, struct route_nhop_data *rnd);
 
+/* rtentry accessors */
+bool rt_is_host(const struct rtentry *rt);
+sa_family_t rt_get_family(const struct rtentry *);
+struct nhop_object *rt_get_raw_nhop(const struct rtentry *rt);
+#ifdef INET
+struct in_addr;
+void rt_get_inet_prefix_plen(const struct rtentry *rt, struct in_addr *paddr,
+    int *plen, uint32_t *pscopeid);
+void rt_get_inet_prefix_pmask(const struct rtentry *rt, struct in_addr *paddr,
+    struct in_addr *pmask, uint32_t *pscopeid);
+#endif
+#ifdef INET6
+struct in6_addr;
+void rt_get_inet6_prefix_plen(const struct rtentry *rt, struct in6_addr *paddr,
+    int *plen, uint32_t *pscopeid);
+void rt_get_inet6_prefix_pmask(const struct rtentry *rt, struct in6_addr *paddr,
+    struct in6_addr *pmask, uint32_t *pscopeid);
+#endif
+
+/* Nexthops */
+uint32_t nhops_get_count(struct rib_head *rh);
+
 /* Multipath */
-struct nhgrp_object;
 struct weightened_nhop;
 
 struct weightened_nhop *nhgrp_get_nhops(struct nhgrp_object *nhg,
     uint32_t *pnum_nhops);
+uint32_t nhgrp_get_count(struct rib_head *rh);
 
+/* Route subscriptions */
 enum rib_subscription_type {
 	RIB_NOTIFY_IMMEDIATE,
 	RIB_NOTIFY_DELAYED
@@ -109,6 +144,6 @@ struct rib_subscription *rib_subscribe(uint32_t fibnum, int family,
 struct rib_subscription *rib_subscribe_internal(struct rib_head *rnh,
     rib_subscription_cb_t *f, void *arg, enum rib_subscription_type type,
     bool waitok);
-int rib_unsibscribe(uint32_t fibnum, int family, struct rib_subscription *rs);
+void rib_unsibscribe(struct rib_subscription *rs);
 
 #endif

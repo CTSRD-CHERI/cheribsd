@@ -181,8 +181,8 @@ SRCS+=	strlcpy.c strlcat.c strmode.c
 SRCS+=	fgetln_fallback.c fgetwln_fallback.c closefrom.c
 CFLAGS.closefrom.c+=	-DSTDC_HEADERS -DHAVE_SYS_DIR_H -DHAVE_DIRENT_H \
 	-DHAVE_DIRFD -DHAVE_SYSCONF
-# Provide getprogname/setprograme
-SRCS+=	progname.c
+# Provide warnc/errc/getprogname/setprograme
+SRCS+=	err.c progname.c
 # Stub implementations of fflagstostr/strtofflags
 SRCS+=	fflags.c
 .endif
@@ -211,6 +211,7 @@ CLEANFILES+=	subr_capability.c
 .endif
 
 CASPERINC+=	${SRCTOP}/lib/libcasper/services/cap_fileargs/cap_fileargs.h
+CASPERINC+=	${SRCTOP}/lib/libcasper/services/cap_net/cap_net.h
 
 .if empty(SRCS)
 SRCS=		dummy.c

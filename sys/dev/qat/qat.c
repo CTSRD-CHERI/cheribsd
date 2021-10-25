@@ -357,6 +357,7 @@ qat_attach(device_t dev)
 
 	sc->sc_dev = dev;
 	sc->sc_rev = pci_get_revid(dev);
+	sc->sc_crypto.qcy_cid = -1;
 
 	qatp = qat_lookup(dev);
 	memcpy(&sc->sc_hw, qatp->qatp_hw, sizeof(struct qat_hw));
@@ -1595,6 +1596,10 @@ qat_crypto_init(struct qat_softc *sc)
 	SYSCTL_ADD_COUNTER_U64(ctx, children, OID_AUTO, "ring_full",
 	    CTLFLAG_RD, &sc->sc_ring_full_restarts,
 	    "Requests deferred due to in-flight max reached");
+	sc->sc_sym_alloc_failures = counter_u64_alloc(M_WAITOK);
+	SYSCTL_ADD_COUNTER_U64(ctx, children, OID_AUTO, "sym_alloc_failures",
+	    CTLFLAG_RD, &sc->sc_sym_alloc_failures,
+	    "Request allocation failures");
 
 	return 0;
 }
@@ -1605,6 +1610,11 @@ qat_crypto_deinit(struct qat_softc *sc)
 	struct qat_crypto *qcy = &sc->sc_crypto;
 	struct qat_crypto_bank *qcb;
 	int bank;
+
+	counter_u64_free(sc->sc_sym_alloc_failures);
+	counter_u64_free(sc->sc_ring_full_restarts);
+	counter_u64_free(sc->sc_gcm_aad_updates);
+	counter_u64_free(sc->sc_gcm_aad_restarts);
 
 	if (qcy->qcy_banks != NULL) {
 		for (bank = 0; bank < qcy->qcy_num_banks; bank++) {
@@ -2068,6 +2078,7 @@ qat_process(device_t dev, struct cryptop *crp, int hint)
 
 	qsc = qat_crypto_alloc_sym_cookie(qcb);
 	if (qsc == NULL) {
+		counter_u64_add(sc->sc_sym_alloc_failures, 1);
 		error = ENOBUFS;
 		goto fail2;
 	}

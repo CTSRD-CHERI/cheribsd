@@ -53,7 +53,7 @@
 #
 
 TYPE="FreeBSD"
-REVISION="13.0"
+REVISION="14.0"
 BRANCH="CURRENT"
 if [ -n "${BRANCH_OVERRIDE}" ]; then
 	BRANCH=${BRANCH_OVERRIDE}
@@ -162,7 +162,7 @@ findvcs()
 
 git_tree_modified()
 {
-	$git_cmd "--work-tree=${VCSTOP}" -c core.checkStat=minimal -c core.fileMode=off diff --quiet
+	! $git_cmd "--work-tree=${VCSTOP}" -c core.checkStat=minimal -c core.fileMode=off diff --quiet
 }
 
 LC_ALL=C; export LC_ALL
@@ -219,6 +219,10 @@ if findvcs .git; then
 	done
 fi
 
+if findvcs .gituprevision; then
+	gituprevision="${VCSTOP}/.gituprevision"
+fi
+
 if findvcs .hg; then
 	for dir in /usr/bin /usr/local/bin; do
 		if [ -x "${dir}/hg" ] ; then
@@ -246,42 +250,25 @@ fi
 
 if [ -n "$git_cmd" ] ; then
 	git=$($git_cmd rev-parse --verify --short HEAD 2>/dev/null)
-	gitsvn=$($git_cmd svn find-rev $git 2>/dev/null)
-	if [ -n "$gitsvn" ] ; then
-		svn=" r${gitsvn}"
-		git="=${git}"
-	else
-#		Log searches are limited to 10k commits to speed up failures.
-#		We assume that if a tree is more than 10k commits out-of-sync
-#		with FreeBSD, it has forked the the OS and the SVN rev no
-#		longer matters.
-		gitsvn=$($git_cmd log -n 10000 |
-		    grep '^    git-svn-id:' | head -1 | \
-		    sed -n 's/^.*@\([0-9][0-9]*\).*$/\1/p')
-		if [ -z "$gitsvn" ] ; then
-			gitsvn=$($git_cmd log -n 10000 --format='format:%N' | \
-			     grep '^svn ' | head -1 | \
-			     sed -n 's/^.*revision=\([0-9][0-9]*\).*$/\1/p')
+	if [ "$($git_cmd rev-parse --is-shallow-repository)" = false ] ; then
+		git_cnt=$($git_cmd rev-list --count HEAD 2>/dev/null)
+		if [ -n "$git_cnt" ] ; then
+			git="c${git_cnt}-g${git}"
 		fi
-		if [ -n "$gitsvn" ] ; then
-			svn=" r${gitsvn}"
-			git="+${git}"
-		else
-			git=" ${git}"
-		fi
-	fi
-	git_cnt=$($git_cmd rev-list --count HEAD 2>/dev/null)
-	if [ -n "$git_cnt" ] ; then
-		git="${git}-c${git_cnt}"
 	fi
 	git_b=$($git_cmd rev-parse --abbrev-ref HEAD)
-	if [ -n "$git_b" ] ; then
-		git="${git}(${git_b})"
+	if [ -n "$git_b" -a "$git_b" != "HEAD" ] ; then
+		git="${git_b}-${git}"
 	fi
 	if git_tree_modified; then
 		git="${git}-dirty"
 		modified=yes
 	fi
+	git=" ${git}"
+fi
+
+if [ -n "$gituprevision" ] ; then
+	gitup=" $(awk -F: '{print $2}' $gituprevision)"
 fi
 
 if [ -n "$hg_cmd" ] ; then
@@ -298,10 +285,10 @@ fi
 
 [ ${include_metadata} = "if-modified" -a ${modified} = "yes" ] && include_metadata=yes
 if [ ${include_metadata} != "yes" ]; then
-	VERINFO="${VERSION}${svn}${git}${hg} ${i}"
+	VERINFO="${VERSION}${svn}${git}${gitup}${hg} ${i}"
 	VERSTR="${VERINFO}\\n"
 else
-	VERINFO="${VERSION} #${v}${svn}${git}${hg}: ${t}"
+	VERINFO="${VERSION} #${v}${svn}${git}${gitup}${hg}: ${t}"
 	VERSTR="${VERINFO}\\n    ${u}@${h}:${d}\\n"
 fi
 

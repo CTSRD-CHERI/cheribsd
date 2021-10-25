@@ -613,6 +613,7 @@ MLINKS+=bitset.9 BITSET_DEFINE.9 \
 	bitset.9 BIT_EMPTY.9 \
 	bitset.9 BIT_ISFULLSET.9 \
 	bitset.9 BIT_FFS.9 \
+	bitset.9 BIT_FFS_AT.9 \
 	bitset.9 BIT_FLS.9 \
 	bitset.9 BIT_COUNT.9 \
 	bitset.9 BIT_SUBSET.9 \
@@ -629,6 +630,8 @@ MLINKS+=bitset.9 BITSET_DEFINE.9 \
 	bitset.9 BIT_CLR_ATOMIC.9 \
 	bitset.9 BIT_SET_ATOMIC.9 \
 	bitset.9 BIT_SET_ATOMIC_ACQ.9 \
+	bitset.9 BIT_TEST_SET_ATOMIC.9 \
+	bitset.9 BIT_TEST_CLR_ATOMIC.9 \
 	bitset.9 BIT_AND_ATOMIC.9 \
 	bitset.9 BIT_OR_ATOMIC.9 \
 	bitset.9 BIT_COPY_STORE_REL.9
@@ -1780,8 +1783,13 @@ MLINKS+=random_harvest.9 random_harvest_direct.9 \
 	random_harvest.9 random_harvest_queue.9
 MLINKS+=ratecheck.9 ppsratecheck.9
 MLINKS+=refcount.9 refcount_acquire.9 \
+	refcount.9 refcount_acquire_checked.9 \
+	refcount.9 refcount_acquire_if_not_zero.9 \
 	refcount.9 refcount_init.9 \
-	refcount.9 refcount_release.9
+	refcount.9 refcount_load.9 \
+	refcount.9 refcount_release.9 \
+	refcount.9 refcount_release_if_last.9 \
+	refcount.9 refcount_release_if_not_last.9
 MLINKS+=resource_int_value.9 resource_long_value.9 \
 	resource_int_value.9 resource_string_value.9
 MLINKS+=rman.9 rman_activate_resource.9 \

@@ -44,6 +44,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/poll.h>
 #include <sys/sysctl.h>
 
+#include <dev/hid/hid.h>
+
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
@@ -733,7 +735,8 @@ wsp_attach(device_t dev)
 
 	if (err == USB_ERR_NORMAL_COMPLETION) {
 		/* Get HID report descriptor length */
-		sc->tp_datalen = hid_report_size(d_ptr, d_len, hid_input, NULL);
+		sc->tp_datalen = hid_report_size_max(d_ptr, d_len, hid_input,
+		    NULL);
 		free(d_ptr, M_TEMP);
 
 		if (sc->tp_datalen <= 0 || sc->tp_datalen > WSP_BUFFER_MAX) {
@@ -1403,5 +1406,6 @@ static devclass_t wsp_devclass;
 
 DRIVER_MODULE(wsp, uhub, wsp_driver, wsp_devclass, NULL, 0);
 MODULE_DEPEND(wsp, usb, 1, 1, 1);
+MODULE_DEPEND(wsp, hid, 1, 1, 1);
 MODULE_VERSION(wsp, 1);
 USB_PNP_HOST_INFO(wsp_devs);

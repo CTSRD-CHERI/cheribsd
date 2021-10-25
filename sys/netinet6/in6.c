@@ -91,6 +91,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_var.h>
 #include <net/if_types.h>
 #include <net/route.h>
+#include <net/route/route_ctl.h>
 #include <net/route/nhop.h>
 #include <net/if_dl.h>
 #include <net/vnet.h>
@@ -186,7 +187,7 @@ in6_newaddrmsg(struct in6_ifaddr *ia, int cmd)
 	if (cmd != RTM_DELETE)
 		info.rti_ifp = V_loif;
 
-	fibnum = V_rt_add_addr_allfibs ? RT_ALL_FIBS : ia62ifa(ia)->ifa_ifp->if_fib;
+	fibnum = ia62ifa(ia)->ifa_ifp->if_fib;
 
 	if (cmd == RTM_ADD) {
 		rt_addrmsg(cmd, &ia->ia_ifa, fibnum);
@@ -695,31 +696,10 @@ aifaddr_out:
 	}
 
 	case SIOCDIFADDR_IN6:
-	{
-		struct nd_prefix *pr;
-
-		/*
-		 * If the address being deleted is the only one that owns
-		 * the corresponding prefix, expire the prefix as well.
-		 * XXX: theoretically, we don't have to worry about such
-		 * relationship, since we separate the address management
-		 * and the prefix management.  We do this, however, to provide
-		 * as much backward compatibility as possible in terms of
-		 * the ioctl operation.
-		 * Note that in6_purgeaddr() will decrement ndpr_addrcnt.
-		 */
-		pr = ia->ia6_ndpr;
-		in6_purgeaddr(&ia->ia_ifa);
-		if (pr != NULL && pr->ndpr_addrcnt == 0) {
-			ND6_WLOCK();
-			nd6_prefix_unlink(pr, NULL);
-			ND6_WUNLOCK();
-			nd6_prefix_del(pr);
-		}
+		in6_purgeifaddr(ia);
 		EVENTHANDLER_INVOKE(ifaddr_event_ext, ifp, &ia->ia_ifa,
 		    IFADDR_EVENT_DEL);
 		break;
-	}
 
 	default:
 		if (ifp->if_ioctl == NULL) {
@@ -1272,6 +1252,48 @@ in6_broadcast_ifa(struct ifnet *ifp, struct in6_aliasreq *ifra,
 	return (error);
 }
 
+/*
+ * Adds or deletes interface route for p2p ifa.
+ * Returns 0 on success or errno.
+ */
+static int
+in6_handle_dstaddr_rtrequest(int cmd, struct in6_ifaddr *ia)
+{
+	struct epoch_tracker et;
+	struct ifaddr *ifa = &ia->ia_ifa;
+	int error;
+
+	/* Prepare gateway */
+	struct sockaddr_dl_short sdl = {
+		.sdl_family = AF_LINK,
+		.sdl_len = sizeof(struct sockaddr_dl_short),
+		.sdl_type = ifa->ifa_ifp->if_type,
+		.sdl_index = ifa->ifa_ifp->if_index,
+	};
+
+	struct sockaddr_in6 dst = {
+		.sin6_family = AF_INET6,
+		.sin6_len = sizeof(struct sockaddr_in6),
+		.sin6_addr = ia->ia_dstaddr.sin6_addr,
+	};
+
+	struct rt_addrinfo info = {
+		.rti_ifa = ifa,
+		.rti_flags = RTF_PINNED | RTF_HOST,
+		.rti_info = {
+			[RTAX_DST] = (struct sockaddr *)&dst,
+			[RTAX_GATEWAY] = (struct sockaddr *)&sdl,
+		},
+	};
+	/* Don't set additional per-gw filters on removal */
+
+	NET_EPOCH_ENTER(et);
+	error = rib_handle_ifaddr_info(ifa->ifa_ifp->if_fib, cmd, &info);
+	NET_EPOCH_EXIT(et);
+
+	return (error);
+}
+
 void
 in6_purgeaddr(struct ifaddr *ifa)
 {
@@ -1305,10 +1327,12 @@ in6_purgeaddr(struct ifaddr *ifa)
 			in6_leavegroup(imm->i6mm_maddr, NULL);
 		free(imm, M_IP6MADDR);
 	}
+	/* Check if we need to remove p2p route */
 	plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr, NULL); /* XXX */
+	if (ia->ia_dstaddr.sin6_family != AF_INET6)
+		plen = 0;
 	if ((ia->ia_flags & IFA_ROUTE) && plen == 128) {
-		error = rtinit(&(ia->ia_ifa), RTM_DELETE, ia->ia_flags |
-		    (ia->ia_dstaddr.sin6_family == AF_INET6 ? RTF_HOST : 0));
+		error = in6_handle_dstaddr_rtrequest(RTM_DELETE, ia);
 		if (error != 0)
 			log(LOG_INFO, "%s: err=%d, destination address delete "
 			    "failed\n", __func__, error);
@@ -1318,6 +1342,36 @@ in6_purgeaddr(struct ifaddr *ifa)
 	in6_newaddrmsg(ia, RTM_DELETE);
 	in6_unlink_ifa(ia, ifp);
 }
+
+/*
+ * Removes @ia from the corresponding interfaces and unlinks corresponding
+ *  prefix if no addresses are using it anymore.
+ */
+void
+in6_purgeifaddr(struct in6_ifaddr *ia)
+{
+	struct nd_prefix *pr;
+
+	/*
+	 * If the address being deleted is the only one that owns
+	 * the corresponding prefix, expire the prefix as well.
+	 * XXX: theoretically, we don't have to worry about such
+	 * relationship, since we separate the address management
+	 * and the prefix management.  We do this, however, to provide
+	 * as much backward compatibility as possible in terms of
+	 * the ioctl operation.
+	 * Note that in6_purgeaddr() will decrement ndpr_addrcnt.
+	 */
+	pr = ia->ia6_ndpr;
+	in6_purgeaddr(&ia->ia_ifa);
+	if (pr != NULL && pr->ndpr_addrcnt == 0) {
+		ND6_WLOCK();
+		nd6_prefix_unlink(pr, NULL);
+		ND6_WUNLOCK();
+		nd6_prefix_del(pr);
+	}
+}
+
 
 static void
 in6_unlink_ifa(struct in6_ifaddr *ia, struct ifnet *ifp)
@@ -1416,7 +1470,7 @@ in6_notify_ifa(struct ifnet *ifp, struct in6_ifaddr *ia,
 	if (pdst->sin6_family == AF_INET6 &&
 	    !IN6_ARE_ADDR_EQUAL(&pdst->sin6_addr, &ia->ia_dstaddr.sin6_addr)) {
 		if ((ia->ia_flags & IFA_ROUTE) != 0 &&
-		    (rtinit(&(ia->ia_ifa), (int)RTM_DELETE, RTF_HOST) != 0)) {
+		    (in6_handle_dstaddr_rtrequest(RTM_DELETE, ia) != 0)) {
 			nd6log((LOG_ERR, "in6_update_ifa_internal: failed to "
 			    "remove a route to the old destination: %s\n",
 			    ip6_sprintf(ip6buf, &ia->ia_addr.sin6_addr)));
@@ -1436,13 +1490,12 @@ in6_notify_ifa(struct ifnet *ifp, struct in6_ifaddr *ia,
 	plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr, NULL); /* XXX */
 	if (!(ia->ia_flags & IFA_ROUTE) && plen == 128 &&
 	    ia->ia_dstaddr.sin6_family == AF_INET6) {
-		int rtflags = RTF_UP | RTF_HOST;
 		/*
 		 * Handle the case for ::1 .
 		 */
 		if (ifp->if_flags & IFF_LOOPBACK)
 			ia->ia_flags |= IFA_RTSELF;
-		error = rtinit(&ia->ia_ifa, RTM_ADD, ia->ia_flags | rtflags);
+		error = in6_handle_dstaddr_rtrequest(RTM_ADD, ia);
 		if (error)
 			goto done;
 		ia->ia_flags |= IFA_ROUTE;

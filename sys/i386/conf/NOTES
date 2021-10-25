@@ -423,6 +423,7 @@ options 	VGA_DEBUG
 
 # vt(4) drivers.
 device		vt_vga
+device		vt_vbefb
 
 # Linear framebuffer driver for S3 VESA 1.2 cards. Works on top of VESA.
 device		s3pci
@@ -859,7 +860,13 @@ options 	PMAP_SHPGPERPROC=201
 #
 options 	NKPT=31
 
-
+#
+# HID-over-I2C support
+#
+device		iichid		# HID-over-I2C support
+options 	IICHID_DEBUG	# Enable HID-over-I2C debug messages
+options 	IICHID_SAMPLING	# Workaround missing GPIO INTR support
+
 #####################################################################
 # ABI Emulation
 

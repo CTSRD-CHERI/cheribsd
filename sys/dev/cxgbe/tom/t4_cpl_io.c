@@ -392,6 +392,9 @@ make_established(struct toepcb *toep, uint32_t iss, uint32_t irs, uint16_t opt)
 	send_flowc_wr(toep, tp);
 
 	soisconnected(so);
+
+	if (ulp_mode(toep) == ULP_MODE_TLS)
+		tls_establish(toep);
 }
 
 int
@@ -721,6 +724,8 @@ t4_push_frames(struct adapter *sc, struct toepcb *toep, int drop)
 		for (m = sndptr; m != NULL; m = m->m_next) {
 			int n;
 
+			if ((m->m_flags & M_NOTAVAIL) != 0)
+				break;
 			if (m->m_flags & M_EXTPG) {
 #ifdef KERN_TLS
 				if (m->m_epg_tls != NULL) {
@@ -803,8 +808,9 @@ t4_push_frames(struct adapter *sc, struct toepcb *toep, int drop)
 
 		/* nothing to send */
 		if (plen == 0) {
-			KASSERT(m == NULL,
-			    ("%s: nothing to send, but m != NULL", __func__));
+			KASSERT(m == NULL || (m->m_flags & M_NOTAVAIL) != 0,
+			    ("%s: nothing to send, but m != NULL is ready",
+			    __func__));
 			break;
 		}
 
@@ -892,7 +898,7 @@ t4_push_frames(struct adapter *sc, struct toepcb *toep, int drop)
 		toep->txsd_avail--;
 
 		t4_l2t_send(sc, wr, toep->l2te);
-	} while (m != NULL);
+	} while (m != NULL && (m->m_flags & M_NOTAVAIL) == 0);
 
 	/* Send a FIN if requested, but only if there's no more data to send */
 	if (m == NULL && toep->flags & TPF_SEND_FIN)

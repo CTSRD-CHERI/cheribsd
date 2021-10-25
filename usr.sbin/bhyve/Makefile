@@ -23,10 +23,8 @@ SRCS=	\
 	block_if.c		\
 	bootrom.c		\
 	console.c		\
-	consport.c		\
 	ctl_util.c		\
 	ctl_scsi_all.c		\
-	dbgport.c		\
 	fwctl.c			\
 	gdb.c			\
 	hda_codec.c		\
@@ -85,7 +83,16 @@ CFLAGS.kernemu_dev.c+=	-I${SRCTOP}/sys/amd64
 .PATH:  ${BHYVE_SYSDIR}/sys/amd64/vmm
 SRCS+=	vmm_instruction_emul.c
 
-LIBADD=	vmmapi md pthread z util sbuf cam 9p casper cap_pwd cap_grp
+LIBADD=	vmmapi md pthread z util sbuf cam 9p
+
+.if ${MK_CASPER} != "no"
+LIBADD+=	casper
+LIBADD+=	cap_pwd
+LIBADD+=	cap_grp
+# Temporary disable capsicum, until we integrate checkpoint code with it.
+#CFLAGS+=-DWITH_CASPER
+.endif
+
 .if ${MK_BHYVE_SNAPSHOT} != "no"
 LIBADD+= ucl xo
 .endif

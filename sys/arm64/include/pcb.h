@@ -36,10 +36,10 @@
 
 struct trapframe;
 
-#define	PCB_LR		30
 struct pcb {
-	uintptr_t	pcb_x[31];
-	uintptr_t	pcb_pc;
+	uintptr_t	pcb_x[30];
+	uintptr_t	pcb_lr;
+	uintptr_t	_reserved;	/* Was pcb_pc */
 	/* These two need to be in order as we access them together */
 	uintptr_t	pcb_sp;
 	uintcap_t	pcb_tpidr_el0;

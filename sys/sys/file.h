@@ -69,7 +69,7 @@ struct nameidata;
 #define	DTYPE_PTS	10	/* pseudo teletype master device */
 #define	DTYPE_DEV	11	/* Device specific fd type */
 #define	DTYPE_PROCDESC	12	/* process descriptor */
-#define	DTYPE_LINUXEFD	13	/* emulation eventfd type */
+#define	DTYPE_EVENTFD	13	/* eventfd */
 #define	DTYPE_LINUXTFD	14	/* emulation timerfd type */
 
 #ifdef _KERNEL
@@ -296,6 +296,17 @@ fhold(struct file *fp)
 	_error = 0;						\
 	_fp = (fp);						\
 	if (__predict_false(refcount_release(&_fp->f_count)))	\
+		_error = _fdrop(_fp, td);			\
+	_error;							\
+})
+
+#define	fdrop_close(fp, td)		({			\
+	struct file *_fp;					\
+	int _error;						\
+								\
+	_error = 0;						\
+	_fp = (fp);						\
+	if (__predict_true(refcount_release(&_fp->f_count)))	\
 		_error = _fdrop(_fp, td);			\
 	_error;							\
 })

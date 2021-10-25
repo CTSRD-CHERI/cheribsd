@@ -2703,8 +2703,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			savuid = p->p_cred->p_ruid;
 			p->p_cred->p_ruid = cred->cr_uid;
 			if (!VFS_QUOTACTL(mp, QCMD(Q_GETQUOTA,USRQUOTA),
-			    cred->cr_uid,
-			    (struct dqblk * __capability)&dqb))
+			    cred->cr_uid, (struct dqblk * __capability)&dqb))
 			    freenum = min(dqb.dqb_isoftlimit-dqb.dqb_curinodes,
 				freenum);
 			p->p_cred->p_ruid = savuid;
@@ -2811,8 +2810,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			savuid = p->p_cred->p_ruid;
 			p->p_cred->p_ruid = cred->cr_uid;
 			if (!VFS_QUOTACTL(mp, QCMD(Q_GETQUOTA,USRQUOTA),
-			    cred->cr_uid,
-			    (struct dqblk * __capability)&dqb))
+			    cred->cr_uid, (struct dqblk * __capability)&dqb))
 			    freenum = min(dqb.dqb_bhardlimit, freenum);
 			p->p_cred->p_ruid = savuid;
 #endif	/* QUOTA */
@@ -2836,8 +2834,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			savuid = p->p_cred->p_ruid;
 			p->p_cred->p_ruid = cred->cr_uid;
 			if (!VFS_QUOTACTL(mp, QCMD(Q_GETQUOTA,USRQUOTA),
-			    cred->cr_uid,
-			    (struct dqblk * __capability)&dqb))
+			    cred->cr_uid, (struct dqblk * __capability)&dqb))
 			    freenum = min(dqb.dqb_bsoftlimit, freenum);
 			p->p_cred->p_ruid = savuid;
 #endif	/* QUOTA */
@@ -2858,8 +2855,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			savuid = p->p_cred->p_ruid;
 			p->p_cred->p_ruid = cred->cr_uid;
 			if (!VFS_QUOTACTL(mp, QCMD(Q_GETQUOTA,USRQUOTA),
-			    cred->cr_uid,
-			    (struct dqblk * __capability)&dqb))
+			    cred->cr_uid, (struct dqblk * __capability)&dqb))
 			    freenum = dqb.dqb_curblocks;
 			p->p_cred->p_ruid = savuid;
 #endif	/* QUOTA */

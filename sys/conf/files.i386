@@ -52,7 +52,6 @@ cddl/dev/dtrace/i386/dtrace_asm.S			optional dtrace compile-with "${DTRACE_S}"
 cddl/dev/dtrace/i386/dtrace_subr.c			optional dtrace compile-with "${DTRACE_C}"
 compat/linprocfs/linprocfs.c	optional linprocfs
 compat/linsysfs/linsysfs.c	optional linsysfs
-compat/linux/linux_common.c	optional compat_linux
 compat/linux/linux_dummy.c	optional compat_linux
 compat/linux/linux_event.c	optional compat_linux
 compat/linux/linux_emul.c	optional compat_linux
@@ -227,11 +226,6 @@ libkern/umoddi3.c		standard
 # x86 real mode BIOS support, required by dpms/pci/vesa
 #
 compat/x86bios/x86bios.c	optional x86bios | dpms | pci | vesa
-#
-# bvm console
-#
-dev/bvm/bvm_console.c		optional	bvmconsole
-dev/bvm/bvm_dbg.c		optional	bvmdebug
 # Common files where we currently configure the system differently, but perhaps shouldn't
 # config(8) doesn't have a way to force standard options, so we've been inconsistent
 # about marking non-optional things 'standard'.
@@ -247,3 +241,6 @@ x86/x86/local_apic.c		optional apic
 x86/x86/mptable.c		optional apic
 x86/x86/mptable_pci.c		optional apic pci
 x86/x86/msi.c			optional apic pci
+
+compat/linuxkpi/common/src/linux_fpu.c		optional compat_linuxkpi \
+	compile-with "${LINUXKPI_C}"

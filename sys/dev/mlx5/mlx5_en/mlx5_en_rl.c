@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2016 Mellanox Technologies. All rights reserved.
+ * Copyright (c) 2016-2020 Mellanox Technologies. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -116,7 +116,7 @@ mlx5e_rl_create_sq(struct mlx5e_priv *priv, struct mlx5e_sq *sq,
 		goto done;
 
 	/* use shared UAR */
-	sq->uar = priv->rl.sq_uar;
+	sq->uar_map = priv->bfreg.map;
 
 	err = mlx5_wq_cyc_create(mdev, &param->wq, sqc_wq, &sq->wq,
 	    &sq->wq_ctrl);
@@ -124,11 +124,6 @@ mlx5e_rl_create_sq(struct mlx5e_priv *priv, struct mlx5e_sq *sq,
 		goto err_free_dma_tag;
 
 	sq->wq.db = &sq->wq.db[MLX5_SND_DBR];
-	/*
-	 * The sq->bf_buf_size variable is intentionally left zero so
-	 * that the doorbell writes will occur at the same memory
-	 * location.
-	 */
 
 	err = mlx5e_alloc_sq_db(sq);
 	if (err)
@@ -751,15 +746,10 @@ mlx5e_rl_init(struct mlx5e_priv *priv)
 
 	sx_init(&rl->rl_sxlock, "ratelimit-sxlock");
 
-	/* allocate shared UAR for SQs */
-	error = mlx5_alloc_map_uar(priv->mdev, &rl->sq_uar);
-	if (error)
-		goto done;
-
 	/* open own TIS domain for ratelimit SQs */
 	error = mlx5e_rl_open_tis(priv);
 	if (error)
-		goto err_uar;
+		goto done;
 
 	/* setup default value for parameters */
 	mlx5e_rl_set_default_params(&rl->param, priv->mdev);
@@ -861,8 +851,6 @@ mlx5e_rl_init(struct mlx5e_priv *priv)
 
 	return (0);
 
-err_uar:
-	mlx5_unmap_free_uar(priv->mdev, &rl->sq_uar);
 done:
 	sysctl_ctx_free(&rl->ctx);
 	sx_destroy(&rl->rl_sxlock);
@@ -973,9 +961,6 @@ mlx5e_rl_cleanup(struct mlx5e_priv *priv)
 	PRIV_UNLOCK(priv);
 
 	mlx5e_rl_reset_rates(rl);
-
-	/* free shared UAR for SQs */
-	mlx5_unmap_free_uar(priv->mdev, &rl->sq_uar);
 
 	/* close TIS domain */
 	mlx5e_rl_close_tis(priv);

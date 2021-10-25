@@ -224,9 +224,7 @@ SUBDIR.${MK_GAMES}+=	number
 SUBDIR.${MK_GAMES}+=	pom
 SUBDIR.${MK_GAMES}+=	primes
 SUBDIR.${MK_GAMES}+=	random
-.if ${COMPILER_FEATURES:Mc++11}
 SUBDIR.${MK_CXX}+=	dtc
-.endif
 .if ${MK_GH_BC} == "yes"
 SUBDIR+=		gh-bc
 .else
@@ -244,6 +242,7 @@ SUBDIR.${MK_KERBEROS_SUPPORT}+=	compile_et
 SUBDIR.${MK_LDNS_UTILS}+=	drill
 SUBDIR.${MK_LDNS_UTILS}+=	host
 SUBDIR.${MK_LIB32}+=	ldd32
+SUBDIR.${MK_LIB64}+=	ktrdump64
 SUBDIR.${MK_LIB64}+=	ldd64
 SUBDIR.${MK_LOCATE}+=	locate
 # XXX msgs?

@@ -162,10 +162,8 @@ SUBDIR.${MK_LEGACY_CONSOLE}+=	kbdcontrol
 SUBDIR.${MK_LEGACY_CONSOLE}+=	kbdmap
 SUBDIR.${MK_LEGACY_CONSOLE}+=	moused
 SUBDIR.${MK_LEGACY_CONSOLE}+=	vidcontrol
-.if ${MK_LIBTHR} != "no" || ${MK_LIBPTHREAD} != "no"
 SUBDIR.${MK_PPP}+=	pppctl
 SUBDIR.${MK_NS_CACHING}+=	nscd
-.endif
 SUBDIR.${MK_LPR}+=	lpr
 SUBDIR.${MK_MAN_UTILS}+=	manctl
 SUBDIR.${MK_MLX5TOOL}+=	mlx5tool
@@ -186,10 +184,7 @@ SUBDIR.${MK_NTP}+=	ntp
 SUBDIR.${MK_OPENSSL}+=	keyserv
 SUBDIR.${MK_PF}+=	ftp-proxy
 SUBDIR.${MK_PKGBOOTSTRAP}+=	pkg
-.if ${COMPILER_FEATURES:Mc++11}
-SUBDIR.${MK_PMC}+=	pmc
-.endif
-SUBDIR.${MK_PMC}+=	pmcannotate pmccontrol pmcstat pmcstudy
+SUBDIR.${MK_PMC}+=	pmc pmcannotate pmccontrol pmcstat pmcstudy
 SUBDIR.${MK_PORTSNAP}+=	portsnap
 SUBDIR.${MK_PPP}+=	ppp
 SUBDIR.${MK_QUOTAS}+=	edquota

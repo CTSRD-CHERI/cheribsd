@@ -240,8 +240,11 @@ restart:
 		/*
 		 * Set NOCACHE to avoid flushing the cache when
 		 * rolling in many files at once.
-		*/
-		ndp->ni_cnd.cn_flags |= LOCKPARENT | NOCACHE;
+		 *
+		 * Set NC_KEEPPOSENTRY to keep positive entries if they already
+		 * exist despite NOCACHE.
+		 */
+		ndp->ni_cnd.cn_flags |= LOCKPARENT | NOCACHE | NC_KEEPPOSENTRY;
 		if ((fmode & O_EXCL) == 0 && (fmode & O_NOFOLLOW) == 0)
 			ndp->ni_cnd.cn_flags |= FOLLOW;
 		if ((vn_open_flags & VN_OPEN_INVFS) == 0)
@@ -590,6 +593,8 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base, int len, off_t offset,
 			if (rw == UIO_READ) {
 				rl_cookie = vn_rangelock_rlock(vp, offset,
 				    offset + len);
+			} else if ((ioflg & IO_APPEND) != 0) {
+				rl_cookie = vn_rangelock_wlock(vp, 0, OFF_MAX);
 			} else {
 				rl_cookie = vn_rangelock_wlock(vp, offset,
 				    offset + len);
@@ -997,7 +1002,7 @@ vn_read(struct file *fp, struct uio *uio, struct ucred *active_cred, int flags,
 	 * allows us to avoid unneeded work outright.
 	 */
 	if (vn_io_pgcache_read_enable && !mac_vnode_check_read_enabled() &&
-	    (vp->v_irflag & (VIRF_DOOMED | VIRF_PGREAD)) == VIRF_PGREAD) {
+	    (vn_irflag_read(vp) & (VIRF_DOOMED | VIRF_PGREAD)) == VIRF_PGREAD) {
 		error = VOP_READ_PGCACHE(vp, uio, ioflag, fp->f_cred);
 		if (error == 0) {
 			fp->f_nextoff[UIO_READ] = uio->uio_offset;
@@ -1070,6 +1075,13 @@ vn_write(struct file *fp, struct uio *uio, struct ucred *active_cred, int flags,
 	if ((fp->f_flag & O_FSYNC) ||
 	    (vp->v_mount && (vp->v_mount->mnt_flag & MNT_SYNCHRONOUS)))
 		ioflag |= IO_SYNC;
+	/*
+	 * For O_DSYNC we set both IO_SYNC and IO_DATASYNC, so that VOP_WRITE()
+	 * implementations that don't understand IO_DATASYNC fall back to full
+	 * O_SYNC behavior.
+	 */
+	if (fp->f_flag & O_DSYNC)
+		ioflag |= IO_SYNC | IO_DATASYNC;
 	mp = NULL;
 	if (vp->v_type != VCHR &&
 	    (error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) != 0)

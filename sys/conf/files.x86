@@ -53,10 +53,7 @@ intel_sha256.o			optional	aesni			\
 	compile-with	"${CC} -c ${CFLAGS:C/^-O2$/-O3/:N-nostdinc} ${WERROR} ${PROF} -mmmx -msse -msse4 -msha ${.IMPSRC}" \
 	no-implicit-rule						\
 	clean		"intel_sha256.o"
-crypto/openssl/ossl.c		optional ossl
-crypto/openssl/ossl_sha1.c	optional ossl
-crypto/openssl/ossl_sha256.c	optional ossl
-crypto/openssl/ossl_sha512.c	optional ossl
+crypto/openssl/ossl_x86.c	optional ossl
 crypto/via/padlock.c		optional padlock
 crypto/via/padlock_cipher.c	optional padlock
 crypto/via/padlock_hash.c	optional padlock
@@ -98,7 +95,6 @@ dev/fb/vga.c			optional	vga
 dev/fdc/fdc.c			optional	fdc
 dev/fdc/fdc_acpi.c		optional	fdc
 dev/fdc/fdc_isa.c		optional	fdc isa
-dev/fdc/fdc_pccard.c		optional	fdc pccard
 dev/gpio/bytgpio.c		optional	bytgpio
 dev/gpio/chvgpio.c		optional	chvgpio
 dev/hpt27xx/hpt27xx_os_bsd.c	optional	hpt27xx
@@ -162,7 +158,6 @@ dev/hyperv/vmbus/vmbus_res.c				optional	hyperv
 dev/hyperv/vmbus/vmbus_xact.c				optional	hyperv
 dev/ichwd/ichwd.c		optional	ichwd
 dev/if_ndis/if_ndis.c		optional	ndis
-dev/if_ndis/if_ndis_pccard.c	optional	ndis pccard
 dev/if_ndis/if_ndis_pci.c	optional	ndis cardbus | ndis pci
 dev/if_ndis/if_ndis_usb.c	optional	ndis usb
 dev/imcsmb/imcsmb.c		optional	imcsmb

@@ -80,6 +80,9 @@ CWARNFLAGS+=	-Wno-pointer-sign
 .if ${WARNS} <= 6
 CWARNFLAGS.clang+=	-Wno-empty-body -Wno-string-plus-int
 CWARNFLAGS.clang+=	-Wno-unused-const-variable
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_FEATURES:MWunused-but-set-variable}
+CWARNFLAGS.clang+=	-Wno-error=unused-but-set-variable
+.endif
 .endif # WARNS <= 6
 .if ${WARNS} <= 3
 CWARNFLAGS.clang+=	-Wno-tautological-compare -Wno-unused-value\
@@ -213,6 +216,11 @@ CWARNFLAGS+=	-Wno-error=pass-failed
 CXXWARNFLAGS+=	-Wno-error=non-c-typedef-for-linkage
 .endif
 
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 130000
+# Work around c++/v1/__bit_reference warning until we update subrepocheri-libc++
+CXXWARNFLAGS+=  -Wno-error=deprecated-copy
+.endif
+
 # How to handle FreeBSD custom printf format specifiers.
 .if ${COMPILER_TYPE} == "clang"
 FORMAT_EXTENSIONS=	-D__printf__=__freebsd_kprintf__
@@ -242,8 +250,10 @@ CFLAGS+=-nobuiltininc -idirafter ${COMPILER_RESOURCE_DIR}/include
 .endif
 .endif
 
-CLANG_OPT_SMALL= -mstack-alignment=8 -mllvm -inline-threshold=3\
-		 -mllvm -simplifycfg-dup-ret
+CLANG_OPT_SMALL= -mstack-alignment=8 -mllvm -inline-threshold=3
+.if ${COMPILER_VERSION} < 130000
+CLANG_OPT_SMALL+= -mllvm -simplifycfg-dup-ret
+.endif
 CLANG_OPT_SMALL+= -mllvm -enable-load-pre=false
 CFLAGS.clang+=	 -Qunused-arguments
 # The libc++ headers use c++11 extensions.  These are normally silenced because

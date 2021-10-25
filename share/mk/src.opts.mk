@@ -105,10 +105,8 @@ __DEFAULT_YES_OPTIONS = \
     FREEBSD_UPDATE \
     FTP \
     GAMES \
-    GDB \
     GH_BC \
     GNU_DIFF \
-    GNU_GREP \
     GOOGLETEST \
     GPIO \
     HAST \
@@ -128,8 +126,6 @@ __DEFAULT_YES_OPTIONS = \
     LDNS_UTILS \
     LEGACY_CONSOLE \
     LIBCPLUSPLUS \
-    LIBPTHREAD \
-    LIBTHR \
     LLD \
     LLD_BOOTSTRAP \
     LLD_IS_LD \
@@ -204,12 +200,10 @@ __DEFAULT_YES_OPTIONS = \
 __DEFAULT_NO_OPTIONS = \
     BEARSSL \
     BHYVE_SNAPSHOT \
-    BSD_GREP \
     CLANG_EXTRAS \
     CLANG_FORMAT \
     DTRACE_TESTS \
     EXPERIMENTAL \
-    GNU_GREP_COMPAT \
     HESIOD \
     LIBSOFT \
     LOADER_FIREWIRE \
@@ -323,10 +317,6 @@ BROKEN_OPTIONS+=LIB32
 BROKEN_OPTIONS+=OFED
 .endif
 
-# In-tree gdb is an older versions without modern architecture support.
-.if ${__T:Maarch64*} || ${__T:Mriscv*} != ""
-BROKEN_OPTIONS+=GDB
-.endif
 .if ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=OFED
 .endif
@@ -487,10 +477,6 @@ MK_GCC_BOOTSTRAP:=no
 MK_CASPER:=	no
 .endif
 
-.if ${MK_LIBPTHREAD} == "no"
-MK_LIBTHR:=	no
-.endif
-
 .if ${MK_SOURCELESS} == "no"
 MK_SOURCELESS_HOST:=	no
 MK_SOURCELESS_UCODE:= no
@@ -548,7 +534,6 @@ MK_LDNS:=	no
 MK_PKGBOOTSTRAP:=	no
 MK_SVN:=		no
 MK_SVNLITE:=		no
-MK_WIRELESS:=		no
 .endif
 
 .if ${MK_LDNS} == "no"
@@ -584,7 +569,6 @@ MK_LLD_BOOTSTRAP:= no
 
 .if ${MK_TOOLCHAIN} == "no"
 MK_CLANG:=	no
-MK_GDB:=	no
 MK_INCLUDES:=	no
 MK_LLD:=	no
 MK_LLDB:=	no

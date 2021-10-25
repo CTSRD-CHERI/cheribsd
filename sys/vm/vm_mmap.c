@@ -1080,6 +1080,7 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
 	vm_offset_t addr;
 	vm_size_t pageoff;
 	int vm_error, max_prot;
+	int flags;
 
 	addr = addr0;
 	if ((prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))) != 0)
@@ -1103,16 +1104,15 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
 	    (vm_error = vm_wxcheck(td->td_proc, "mprotect")))
 		goto out;
 
-	vm_error = KERN_SUCCESS;
+	flags = VM_MAP_PROTECT_SET_PROT | VM_MAP_PROTECT_KEEP_CAP;
 	if (max_prot != 0) {
 		if ((max_prot & prot) != prot)
 			return (ENOTSUP);
-		vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
-		    addr, addr + size, max_prot, TRUE, TRUE);
+		flags |= VM_MAP_PROTECT_SET_MAXPROT;
 	}
 	if (vm_error == KERN_SUCCESS)
 		vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
-		    addr, addr + size, prot, FALSE, TRUE);
+		    addr, addr + size, prot, max_prot, flags);
 
 out:
 	switch (vm_error) {
@@ -1122,6 +1122,8 @@ out:
 		return (EACCES);
 	case KERN_RESOURCE_SHORTAGE:
 		return (ENOMEM);
+	case KERN_OUT_OF_BOUNDS:
+		return (ENOTSUP);
 	}
 	return (EINVAL);
 }

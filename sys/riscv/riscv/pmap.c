@@ -4242,7 +4242,10 @@ restart:
 				goto restart;
 			}
 		}
-		l3 = pmap_l3(pmap, pv->pv_va);
+		l2 = pmap_l2(pmap, pv->pv_va);
+		KASSERT((pmap_load(l2) & PTE_RWX) == 0,
+		    ("%s: found a 2mpage in page %p's pv list", __func__, m));
+		l3 = pmap_l2_to_l3(l2, pv->pv_va);
 		if ((pmap_load(l3) & PTE_SW_WIRED) != 0)
 			count++;
 		PMAP_UNLOCK(pmap);
@@ -4490,7 +4493,10 @@ restart:
 				goto restart;
 			}
 		}
-		l3 = pmap_l3(pmap, pv->pv_va);
+		l2 = pmap_l2(pmap, pv->pv_va);
+		KASSERT((pmap_load(l2) & PTE_RWX) == 0,
+		    ("%s: found a 2mpage in page %p's pv list", __func__, m));
+		l3 = pmap_l2_to_l3(l2, pv->pv_va);
 		rv = (pmap_load(l3) & mask) == mask;
 		PMAP_UNLOCK(pmap);
 		if (rv)
@@ -4646,7 +4652,10 @@ retry_pv_loop:
 				goto retry_pv_loop;
 			}
 		}
-		l3 = pmap_l3(pmap, pv->pv_va);
+		l2 = pmap_l2(pmap, pv->pv_va);
+		KASSERT((pmap_load(l2) & PTE_RWX) == 0,
+		    ("%s: found a 2mpage in page %p's pv list", __func__, m));
+		l3 = pmap_l2_to_l3(l2, pv->pv_va);
 		oldl3 = pmap_load(l3);
 retry:
 		if ((oldl3 & PTE_W) != 0) {
@@ -4915,8 +4924,7 @@ restart:
 		}
 		l2 = pmap_l2(pmap, pv->pv_va);
 		KASSERT((pmap_load(l2) & PTE_RWX) == 0,
-		    ("pmap_clear_modify: found a 2mpage in page %p's pv list",
-		    m));
+		    ("%s: found a 2mpage in page %p's pv list", __func__, m));
 		l3 = pmap_l2_to_l3(l2, pv->pv_va);
 		if ((pmap_load(l3) & (PTE_D | PTE_W)) == (PTE_D | PTE_W)) {
 			pmap_clear_bits(l3, PTE_D | PTE_W);
@@ -5402,7 +5410,7 @@ sysctl_kmaps(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 SYSCTL_OID(_vm_pmap, OID_AUTO, kernel_maps,
-    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE,
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE | CTLFLAG_SKIP,
     NULL, 0, sysctl_kmaps, "A",
     "Dump kernel address layout");
 // CHERI CHANGES START

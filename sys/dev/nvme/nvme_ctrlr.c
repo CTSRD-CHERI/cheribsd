@@ -1053,15 +1053,15 @@ nvme_ctrlr_start(void *ctrlr_arg, bool resetting)
 	 *  the number of I/O queues supported, so cannot reset
 	 *  the adminq again here.
 	 */
-	if (resetting)
+	if (resetting) {
 		nvme_qpair_reset(&ctrlr->adminq);
+		nvme_admin_qpair_enable(&ctrlr->adminq);
+	}
 
 	if (ctrlr->ioq != NULL) {
 		for (i = 0; i < ctrlr->num_io_queues; i++)
 			nvme_qpair_reset(&ctrlr->ioq[i]);
 	}
-
-	nvme_admin_qpair_enable(&ctrlr->adminq);
 
 	/*
 	 * If it was a reset on initialization command timeout, just
@@ -1070,7 +1070,7 @@ nvme_ctrlr_start(void *ctrlr_arg, bool resetting)
 	if (resetting && !ctrlr->is_initialized)
 		return;
 
-	if (nvme_ctrlr_identify(ctrlr) != 0) {
+	if (resetting && nvme_ctrlr_identify(ctrlr) != 0) {
 		nvme_ctrlr_fail(ctrlr);
 		return;
 	}
@@ -1145,7 +1145,8 @@ fail:
 	nvme_qpair_reset(&ctrlr->adminq);
 	nvme_admin_qpair_enable(&ctrlr->adminq);
 
-	if (nvme_ctrlr_set_num_qpairs(ctrlr) == 0 &&
+	if (nvme_ctrlr_identify(ctrlr) == 0 &&
+	    nvme_ctrlr_set_num_qpairs(ctrlr) == 0 &&
 	    nvme_ctrlr_construct_io_qpairs(ctrlr) == 0)
 		nvme_ctrlr_start(ctrlr, false);
 	else
@@ -1243,20 +1244,8 @@ nvme_ctrlr_passthrough_cmd(struct nvme_controller *ctrlr,
 	struct mtx		*mtx;
 	struct buf		*buf = NULL;
 	int			ret = 0;
-	vm_offset_t		addr, end;
 
 	if (pt->len > 0) {
-		/*
-		 * vmapbuf calls vm_fault_quick_hold_pages which only maps full
-		 * pages. Ensure this request has fewer than MAXPHYS bytes when
-		 * extended to full pages.
-		 */
-		addr = (__cheri_addr vm_offset_t)pt->buf;
-		end = round_page(addr + pt->len);
-		addr = trunc_page(addr);
-		if (end - addr > MAXPHYS)
-			return EIO;
-
 		if (pt->len > ctrlr->max_xfer_size) {
 			nvme_printf(ctrlr, "pt->len (%d) "
 			    "exceeds max_xfer_size (%d)\n", pt->len,

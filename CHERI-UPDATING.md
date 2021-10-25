@@ -53,7 +53,7 @@ are:
 To aid comparison with upstream FreeBSD we maintain a branch of stock
 FreeBSD:
 
-* [freebsd-head] - FreeBSD HEAD (from [freebsd/freebsd]) as merged to
+* [freebsd-main] - FreeBSD main (from [freebsd/freebsd-src]) as merged to
   [dev].  We update it using fast-forward so commit hashes match upstream.
 
 Numerous other branches exist ranging from pull-request branches to long-term
@@ -72,7 +72,7 @@ state we merge weekly, but delay and batch updates if we need extra
 platform stability and the [master] branch isn't appropriate.
 
 Each merge from upstream FreeBSD to [dev] is accompanied by a tag of the form
-`freebsd-head-YYYYMMDD`, and updates to [freebsd-head].
+`freebsd-main-YYYYMMDD`, and updates to [freebsd-main].
 
 ### Updating [master]
 
@@ -81,9 +81,9 @@ apart.
 
 [cheribuild]: https://github.com/CTSRD-CHERI/cheribuild
 [dev]: https://github.com/CTSRD-CHERI/cheribsd/tree/dev
-[freebsd-head]: https://github.com/CTSRD-CHERI/cheribsd/tree/freebsd-head
+[freebsd-main]: https://github.com/CTSRD-CHERI/cheribsd/tree/freebsd-main
 [freebsd-crossbuild]: https://github.com/CTSRD-CHERI/cheribsd/tree/freebsd-crossbuild
-[freebsd/freebsd]: https://github.com/freebsd/freebsd
+[freebsd/freebsd-src]: https://github.com/freebsd/freebsd-src
 [LLVM dev]: https://github.com/CTSRD-CHERI/llvm-project/tree/dev
 [LLVM master]: https://github.com/CTSRD-CHERI/llvm-project/tree/master
 [master]: https://github.com/CTSRD-CHERI/cheribsd/tree/master
