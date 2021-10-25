@@ -136,11 +136,9 @@ kern_cheri_revoke(struct thread *td, int flags, cheri_revoke_epoch start_epoch,
 		static const int fast_out_flags = CHERI_REVOKE_NO_WAIT_OK |
 		    CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_LAST_NO_EARLY;
 		int ires = 0;
-		cheri_revoke_epoch first_epoch;
 
 		epoch = cheri_revoke_st_epoch(vmm->vm_cheri_revoke_st);
 		entryst = cheri_revoke_st_state(vmm->vm_cheri_revoke_st);
-		first_epoch = epoch;
 
 		if ((flags & (fast_out_flags | CHERI_REVOKE_LAST_PASS)) ==
 		    fast_out_flags) {
