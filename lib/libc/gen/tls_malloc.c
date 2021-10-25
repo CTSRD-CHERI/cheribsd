@@ -255,7 +255,7 @@ static void
 try_revoke(int target_bucket)
 {
 	int bucket;
-	union overhead *op, *next_op;
+	union overhead *op;
 
 	/*
 	 * Don't revoke unless there is enough in quarantine and some of
@@ -284,7 +284,6 @@ try_revoke(int target_bucket)
 	for (bucket = 0; bucket < NBUCKETS; bucket++) {
 		op = quarantine_bufs[bucket];
 		while (op != NULL) {
-			next_op = op->ov_next;
 			op->ov_next = nextf[bucket];
 			nextf[bucket] = op;
 		}
