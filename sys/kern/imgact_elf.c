@@ -1512,16 +1512,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	if (error != 0)
 		goto ret;
 
-#if 0
-	/*
-	 * XXX: For some reason imgp->start_addr is changed from ~0UL to 0 so due
-	 * to computing the minimum we were always getting a start_addr of 0.
-	 */
-	/* KASSERT(imgp->start_addr != 0,
-	 *   ("Should be ULONG_MAX and not 0x%lx", imgp->start_addr)); */
-	imgp->start_addr = ~0UL;
-#endif
-
 #if __has_feature(capabilities)
 	error = __elfN(build_imgact_capability)(imgp, &imgp->imgact_capability,
 	    hdr, phdr, &et_dyn_addr);
