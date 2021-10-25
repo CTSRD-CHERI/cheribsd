@@ -2045,10 +2045,9 @@ ktls_encrypt(struct mbuf *top)
 		off = m->m_epg_1st_off;
 		for (i = 0; i < m->m_epg_npgs; i++, off = 0) {
 			len = m_epg_pagelen(m, i, off);
-			src_iov[i].iov_len = len;
-			src_iov[i].iov_base =
-			    (char *)(void *)PHYS_TO_DMAP(m->m_epg_pa[i]) +
-				off;
+			IOVEC_INIT(&src_iov[i],
+			    (char *)(void *)PHYS_TO_DMAP(m->m_epg_pa[i]) + off,
+			    len);
 
 			if (is_anon) {
 				dst_iov[i].iov_base = src_iov[i].iov_base;
@@ -2063,9 +2062,8 @@ retry_page:
 				goto retry_page;
 			}
 			parray[i] = VM_PAGE_TO_PHYS(pg);
-			dst_iov[i].iov_base =
-			    (char *)(void *)PHYS_TO_DMAP(parray[i]) + off;
-			dst_iov[i].iov_len = len;
+			IOVEC_INIT(&dst_iov[i],
+			    (char *)(void *)PHYS_TO_DMAP(parray[i]) + off, len);
 		}
 
 		if (__predict_false(m->m_epg_npgs == 0)) {

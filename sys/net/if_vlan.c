@@ -116,7 +116,7 @@ struct ifvlantrunk {
 
 #if defined(KERN_TLS) || defined(RATELIMIT)
 struct vlan_snd_tag {
-	struct m_snd_tag com;
+	struct m_snd_tag com __subobject_use_container_bounds;
 	struct m_snd_tag *tag;
 };
 

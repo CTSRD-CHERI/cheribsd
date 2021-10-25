@@ -102,9 +102,9 @@ struct tls_mac_data {
 /* For TCP_TXTLS_ENABLE and TCP_RXTLS_ENABLE. */
 #ifdef _KERNEL
 struct tls_enable_v0 {
-	const uint8_t *cipher_key;
-	const uint8_t *iv;		/* Implicit IV. */
-	const uint8_t *auth_key;
+	const uint8_t * __kerncap cipher_key;
+	const uint8_t * __kerncap iv;		/* Implicit IV. */
+	const uint8_t * __kerncap auth_key;
 	int	cipher_algorithm;	/* e.g. CRYPTO_AES_CBC */
 	int	cipher_key_len;
 	int	iv_len;
@@ -117,9 +117,9 @@ struct tls_enable_v0 {
 #endif
 
 struct tls_enable {
-	const uint8_t *cipher_key;
-	const uint8_t *iv;		/* Implicit IV. */
-	const uint8_t *auth_key;
+	const uint8_t * __kerncap cipher_key;
+	const uint8_t * __kerncap iv;		/* Implicit IV. */
+	const uint8_t * __kerncap auth_key;
 	int	cipher_algorithm;	/* e.g. CRYPTO_AES_CBC */
 	int	cipher_key_len;
 	int	iv_len;
