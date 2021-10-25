@@ -168,22 +168,14 @@ cheri_revoke_is_revoked(const void * __capability cap)
 	 *
 	 * If this flag is not given, then either start an epoch by doing
 	 * the first (full) pass or continue an epoch by doing an
-	 * incremental pass.
+	 * incremental pass.  (For the load side algorithm, incremental passes
+	 * except the opening one are essentially no-ops.)
 	 */
 #define CHERI_REVOKE_LAST_PASS	0x0001
 
 	/*
 	 * If this bit is set, the kernel is free to return without making
 	 * progress.
-	 *
-	 * The returned statistics describe any transitions that take place
-	 * as a result of this request, but not any that result due to
-	 * backgrounded work.
-	 *
-	 * If set without CHERI_REVOKE_IGNORE_START, the kernel may treat this
-	 * as a hint that background revocation may be useful (XXX but we
-	 * don't implement that yet).
-	 *
 	 */
 #define	CHERI_REVOKE_NO_WAIT_OK	0x0002
 
@@ -194,10 +186,9 @@ cheri_revoke_is_revoked(const void * __capability cap)
 #define	CHERI_REVOKE_IGNORE_START	0x0004
 
 	/*
-	 * Do a pass only if an epoch is open after synchronization.  This
-	 * is most useful when we want to get to the end of an epoch as
-	 * quickly as possible; if we're already past the end, then we
-	 * should just stay there.
+	 * Do a pass only if an epoch is open after synchronization.
+	 *
+	 * XXX This has probably lost any utility it may ever have had.
 	 */
 #define	CHERI_REVOKE_ONLY_IF_OPEN	0x0008
 
