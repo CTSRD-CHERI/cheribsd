@@ -1395,20 +1395,19 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	sv = brand_info->sysvec;
 
 	/*
-	 * Check if colocation is allowed.  We can only do it after we know
-	 * if the binary is for CheriABI or not.  We also check the proccess
-	 * to colocate with.
+	 * Check if colocation is allowed.  We require both processes
+	 * to be CheriABI.
 	 */
 	if (imgp->cop != NULL) {
-		/* XXX-JHB: This check is equivalent to #ifndef ELF_CHERI. */
-		if ((sv->sv_flags & SV_CHERI) == 0) {
-			error = EPERM;
-			goto ret;
-		}
+#ifdef ELF_CHERI
 		if (SV_PROC_FLAG(imgp->cop, SV_CHERI) == 0) {
 			error = EPERM;
 			goto ret;
 		}
+#else
+		error = EPERM;
+		goto ret;
+#endif
 	}
 
 	et_dyn_addr = 0;
