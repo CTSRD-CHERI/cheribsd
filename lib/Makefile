@@ -254,7 +254,7 @@ SUBDIR+=	libpng
 .if ${MACHINE_ARCH} != "powerpc"
 SUBDIR.${MK_OPENMP}+=	libomp
 .endif
-.if !defined(COMPAT_32BIT)
+.if !defined(COMPAT_32BIT) && ${MK_USB} != "no"
 SUBDIR.${MK_OPENSSH}+=	libcbor libfido2
 .endif
 SUBDIR.${MK_OPENSSL}+=	libmp
