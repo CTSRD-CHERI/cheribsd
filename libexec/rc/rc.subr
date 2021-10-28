@@ -2184,20 +2184,6 @@ _echoonce()
 	esac
 }
 
-read_fixed_rcorder()
-{
-	local _files _file
-
-	_files=""
-	while read _file; do
-		if [ -r ${_file} ]; then
-			_files="${_files} ${_file}"
-		fi
-	done < $1
-
-	echo ${_files}
-}
-
 # If the loader env variable rc.debug is set, turn on debugging. rc.conf will
 # still override this, but /etc/defaults/rc.conf can't unconditionally set this
 # since it would undo what we've done here.
