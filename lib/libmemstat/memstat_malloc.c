@@ -221,6 +221,7 @@ retry:
 #if __has_feature(capabilities)
 			mtp->mt_memreserved += mtsp->mts_memreserved;
 			mtp->mt_memunreserved += mtsp->mts_memunreserved;
+                        mtp->mt_large_malloc_count += mtsp->mts_numlarge;
 #endif
 
 			/*
@@ -241,6 +242,8 @@ retry:
 			    mtsp->mts_memreserved;
 			mtp->mt_percpu_alloc[j].mtp_memunreserved =
 			    mtsp->mts_memunreserved;
+                        mtp->mt_percpu_alloc[j].mtp_large_malloc_count =
+			    mtsp->mts_numlarge;
 #endif
 		}
 
@@ -429,6 +432,7 @@ memstat_kvm_malloc(struct memory_type_list *list, void *kvm_handle)
 #if __has_feature(capabilities)
 			mtp->mt_memreserved += mts.mts_memreserved;
 			mtp->mt_memunreserved += mts.mts_memunreserved;
+                        mtp->mt_large_malloc_count += mts.mts_numlarge;
 #endif
 			mtp->mt_numallocs += mts.mts_numallocs;
 			mtp->mt_numfrees += mts.mts_numfrees;
@@ -443,6 +447,8 @@ memstat_kvm_malloc(struct memory_type_list *list, void *kvm_handle)
 			    mts.mts_memreserved;
 			mtp->mt_percpu_alloc[j].mtp_memunreserved =
 			    mts.mts_memunreserved;
+			mtp->mt_percpu_alloc[j].mtp_large_malloc_count =
+                                mts.mts_numlarge;
 #endif
 			mtp->mt_percpu_alloc[j].mtp_numallocs =
 			    mts.mts_numallocs;

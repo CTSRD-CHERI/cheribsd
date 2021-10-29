@@ -399,8 +399,12 @@ malloc_type_zone_allocated(struct malloc_type *mtp, void *addr,
 		mtsp->mts_memreserved += size;
 #endif
 	}
-	if (zindx != -1)
+	if (zindx != -1) {
 		mtsp->mts_size |= 1 << zindx;
+#if __has_feature(capabilities)
+                mtsp->mts_numlarge += 1;
+#endif
+        }
 
 #ifdef KDTRACE_HOOKS
 	if (__predict_false(dtrace_malloc_enabled)) {

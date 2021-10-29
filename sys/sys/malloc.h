@@ -91,11 +91,12 @@ struct malloc_type_stats {
 #if __has_feature(capabilities)
 	uint64_t	mts_memreserved; /* Bytes reserved on CPU */
 	uint64_t	mts_memunreserved; /* Reservation bytes released on CPU */
+	uint64_t	mts_numlarge;	/* Number of large allocations (not fitting into UMA) */
 #else
 	uint64_t	_mts_reserved1;	/* Reserved field. */
 	uint64_t	_mts_reserved2;	/* Reserved field. */
-#endif
 	uint64_t	_mts_reserved3;	/* Reserved field. */
+#endif
 };
 
 _Static_assert(sizeof(struct malloc_type_stats) == 64,

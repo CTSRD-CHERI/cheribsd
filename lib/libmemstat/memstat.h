@@ -140,6 +140,7 @@ uint64_t	 memstat_get_memfreed(const struct memory_type *mtp);
 uint64_t	 memstat_get_memreserved(const struct memory_type *mtp);
 uint64_t	 memstat_get_memunreserved(const struct memory_type *mtp);
 uint64_t	 memstat_get_reserved_bytes(const struct memory_type *mtp);
+uint64_t	 memstat_get_large_malloc_count(const struct memory_type *mtp);
 #endif
 uint64_t	 memstat_get_numallocs(const struct memory_type *mtp);
 uint64_t	 memstat_get_numfrees(const struct memory_type *mtp);

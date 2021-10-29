@@ -480,4 +480,11 @@ memstat_get_memunreserved(const struct memory_type *mtp)
 
 	return (mtp->mt_memunreserved);
 }
+
+uint64_t
+memstat_get_large_malloc_count(const struct memory_type *mtp)
+{
+
+    return (mtp->mt_large_malloc_count);
+}
 #endif
