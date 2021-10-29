@@ -59,13 +59,6 @@ dhclient_FIXED: ../../sbin/dhclient/dhclient-script
 	sed '1s/\/bin\//\${CHERIBSDBOX_DIR}\//' ${.ALLSRC} > ${.TARGET}
 CLEANFILES+= dhclient_FIXED
 
-# XXXAR: do we really need clear?
-SCRIPTS+= clear_FIXED
-SCRIPTSNAME_clear_FIXED= clear
-clear_FIXED: ../../usr.bin/tput/clear.sh
-	sed '1s/\/bin\//\${CHERIBSDBOX_DIR}\//' ${.ALLSRC} > ${.TARGET}
-CLEANFILES+= clear_FIXED
-
 # Similarly for nextboot:
 SCRIPTS= nextboot_FIXED
 SCRIPTSNAME_nextboot_FIXED= nextboot
@@ -275,7 +268,6 @@ CRUNCH_PROGS_usr.bin+= \
 		timeout \
 		top \
 		touch \
-		tput \
 		tr \
 		true \
 		truss \
