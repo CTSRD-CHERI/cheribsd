@@ -137,6 +137,39 @@ void riscv_nullop(void);
 #define	QEMU_FLUSH_TRACE_BUFFER	do {					\
 	__asm__ __volatile__("slti zero, zero, 0x03");                  \
 } while(0)
+
+/*
+ * Update qemu notion of the current context
+ * pid: current pid
+ * tid: current thread id
+ * cid: compartment id
+ */
+#define QEMU_EVENT_CONTEXT_UPDATE(pid, tid, cid)        \
+	__asm__ __volatile__(				\
+		"li a0, 0x1\n"				\
+		"li a1, 0x1\n"				\
+		"mv a2, %0\n"				\
+		"mv a3, %1\n"				\
+		"mv a4, %2\n"				\
+		"slti zero, zero, 0x30\n"		\
+		:: "r" (pid), "r" (tid), "r" (cid)	\
+		: "a0", "a1", "a2", "a3", "a4")
+
+/*
+ * Initialize qemu notion of the current context.
+ * Note: this is equivalent to QEMU_EVENT_CONTEXT_UPDATE but
+ * can be used before tracing is started.
+ */
+#define QEMU_EVENT_CONTEXT_SETUP(pid, tid, cid)         \
+	__asm__ __volatile__(				\
+		"li a0, 0x1\n"				\
+		"li a1, 0x2\n"				\
+		"mv a2, %0\n"				\
+		"mv a3, %1\n"				\
+		"mv a4, %2\n"				\
+		"slti zero, zero, 0x30\n"		\
+		:: "r" (pid), "r" (tid), "r" (cid)	\
+		: "a0", "a1", "a2", "a3", "a4")
 #endif	/* _MACHINE_CPUFUNC_H_ */
 // CHERI CHANGES START
 // {
