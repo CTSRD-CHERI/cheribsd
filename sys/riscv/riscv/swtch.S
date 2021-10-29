@@ -525,6 +525,42 @@ ENTRY(cpu_switch)
 #endif
 
 #ifdef CPU_QEMU_RISCV
+	/*
+	 * Check if per-thread tracing is enabled, if so pause/resume
+	 * QEMU instruction tracing to reflect the new thread tracing
+	 * flag.
+	 */
+#ifdef __CHERI_PURE_CAPABILITY__
+	clgc	ct0, _C_LABEL(qemu_trace_perthread)
+	clw	t0, (ct0)
+#else
+	lw	t0, _C_LABEL(qemu_trace_perthread)
+#endif
+	beqz	t0, .Lout_qemu_tracing
+
+	/*
+	 * When pausing/resuming, take care that the context switch
+	 * event is observed.
+	 */
+#ifdef __CHERI_PURE_CAPABILITY__
+	clw	t0, TD_MDFLAGS(cs1)
+#else
+	lw	t0, TD_MDFLAGS(s1)
+#endif
+	andi	t1, t0, MDTD_QTRACE
+	andi	t0, t0, MDTD_QTRACE_USERMODE
+	/* Note: user tracing takes precedence if both have been requested. */
+.Ltry_enable_qemu_user_tracing:
+	beqz	t0, .Ltry_enable_qemu_tracing
+	slti	x0, x0, 0x2b
+	/* don't even try to trace context switch as user mode will never see it */
+	j	.Lout_qemu_tracing
+.Ltry_enable_qemu_tracing:
+	beqz	t1, .Lqemu_ctx_switch_event
+	slti	x0, x0, 0x1b
+	/* fall through */
+.Lqemu_ctx_switch_event:
+	/* Expect: t1 = enable tracing; t0 = enable user tracing; */
 	/* Log context switch */
 	li	a0, 0x1 // LOG_EVENT_CTX_UPDATE
 	li	a1, 0x1 // LOG_EVENT_CTX_OP_SWITCH
@@ -539,42 +575,16 @@ ENTRY(cpu_switch)
 #endif
 	li	a4, -1 // ignore compartment ID for now
 	slti	zero, zero, 0x30 // event logging NOP
+	/* Check if we need to disable tracing for next thread */
+	or	t0, t0, t1
+	bnez	t0, .Lout_qemu_tracing
+	slti	x0, x0, 0x1e
+.Lout_qemu_tracing:
 #ifdef __CHERI_PURE_CAPABILITY__
 	cmove	ca1, cs1
 #else
 	mv	a1, s1
 #endif
-	/*
-	 * Check if per-thread tracing is enabled, if so pause/resume
-	 * QEMU instruction tracing to reflect the new thread tracing
-	 * flag.
-	 */
-#ifdef __CHERI_PURE_CAPABILITY__
-	clgc	ct0, _C_LABEL(qemu_trace_perthread)
-	clw	t0, (ct0)
-#else
-	lw	t0, _C_LABEL(qemu_trace_perthread)
-#endif
-	beqz	t0, .Lout_qemu_tracing
-
-#ifdef __CHERI_PURE_CAPABILITY__
-	clw	t0, TD_MDFLAGS(ca1)
-#else
-	lw	t0, TD_MDFLAGS(a1)
-#endif
-	andi	t1, t0, MDTD_QTRACE
-	beqz	t1, .Ldisable_qemu_tracing
-	andi	t0, t0, MDTD_QTRACE_USERMODE
-	bnez	t0, .Lenable_qemu_user_tracing
-.Lenable_qemu_tracing:
-	slti	x0, x0, 0x1b
-	j	.Lout_qemu_tracing
-.Lenable_qemu_user_tracing:
-	slti	x0, x0, 0x2b
-	j	.Lout_qemu_tracing
-.Ldisable_qemu_tracing:
-	slti	x0, x0, 0x1e
-.Lout_qemu_tracing:
 #endif
 
 	/*
