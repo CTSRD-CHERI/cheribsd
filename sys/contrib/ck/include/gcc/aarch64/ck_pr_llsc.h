@@ -40,17 +40,17 @@ ck_pr_cas_64_2_value(uint64_t target[2], uint64_t compare[2], uint64_t set[2], u
         uint64_t tmp1, tmp2;
 
         __asm__ __volatile__("1:"
-                             "ldxp %0, %1, [%4];"
-                             "mov %2, %0;"
-                             "mov %3, %1;"
-                             "eor %0, %0, %5;"
-                             "eor %1, %1, %6;"
-                             "orr %1, %0, %1;"
-                             "mov %w0, #0;"
-                             "cbnz %1, 2f;"
-                             "stxp %w0, %7, %8, [%4];"
-                             "cbnz %w0, 1b;"
-                             "mov %w0, #1;"
+                             "ldxp %0, %1, [%4]\n"
+                             "mov %2, %0\n"
+                             "mov %3, %1\n"
+                             "eor %0, %0, %5\n"
+                             "eor %1, %1, %6\n"
+                             "orr %1, %0, %1\n"
+                             "mov %w0, #0\n"
+                             "cbnz %1, 2f\n"
+                             "stxp %w0, %7, %8, [%4]\n"
+                             "cbnz %w0, 1b\n"
+                             "mov %w0, #1\n"
                              "2:"
                              : "=&r" (tmp1), "=&r" (tmp2), "=&r" (value[0]), "=&r" (value[1])
                              : CK_MD_ATOMIC_PTR_CONSTR (target),
@@ -108,15 +108,15 @@ ck_pr_cas_64_2(uint64_t target[2], uint64_t compare[2], uint64_t set[2])
         uint64_t tmp1, tmp2;
 
         __asm__ __volatile__("1:"
-                             "ldxp %0, %1, [%2];"
-                             "eor %0, %0, %3;"
-                             "eor %1, %1, %4;"
-                             "orr %1, %0, %1;"
-                             "mov %w0, #0;"
-                             "cbnz %1, 2f;"
-                             "stxp %w0, %5, %6, [%2];"
-                             "cbnz %w0, 1b;"
-                             "mov %w0, #1;"
+                             "ldxp %0, %1, [%2]\n"
+                             "eor %0, %0, %3\n"
+                             "eor %1, %1, %4\n"
+                             "orr %1, %0, %1\n"
+                             "mov %w0, #0\n"
+                             "cbnz %1, 2f\n"
+                             "stxp %w0, %5, %6, [%2]\n"
+                             "cbnz %w0, 1b\n"
+                             "mov %w0, #1\n"
                              "2:"
                              : "=&r" (tmp1), "=&r" (tmp2)
                              : CK_MD_ATOMIC_PTR_CONSTR (target), "r" (compare[0]),
@@ -170,12 +170,12 @@ ck_pr_cas_ptr_2(void *target, void *compare, void *set)
         {								\
                 T previous;						\
                 int tmp;						\
-                __asm__ __volatile__("1:"				\
-                                     "ldxr" W " %" R "0, [%2];"		\
-                                     "cmp  %" R "0, %" R "4;"		\
-                                     "b.ne 2f;"				\
-                                     "stxr" W " %w1, %" R "3, [%2];"	\
-                                     "cbnz %w1, 1b;"			\
+                __asm__ __volatile__("1:\n"				\
+                                     "ldxr" W " %" R "0, [%2]\n"	\
+                                     "cmp  %" R "0, %" R "4\n"		\
+                                     "b.ne 2f\n"			\
+                                     "stxr" W " %w1, %" R "3, [%2]\n"	\
+                                     "cbnz %w1, 1b\n"			\
                                      "2:"				\
                     : "=&"C (previous),					\
                       "=&r" (tmp)					\
@@ -193,11 +193,11 @@ ck_pr_cas_ptr_2(void *target, void *compare, void *set)
                 int tmp;						\
                 __asm__ __volatile__(					\
                                      "1:"				\
-                                     "ldxr" W " %" R "0, [%2];"		\
-                                     "cmp  %" R "0, %" R "4;"		\
-                                     "b.ne 2f;"				\
-                                     "stxr" W " %w1, %" R "3, [%2];"	\
-                                     "cbnz %w1, 1b;"			\
+                                     "ldxr" W " %" R "0, [%2]\n"	\
+                                     "cmp  %" R "0, %" R "4\n"		\
+                                     "b.ne 2f\n"			\
+                                     "stxr" W " %w1, %" R "3, [%2]\n"	\
+                                     "cbnz %w1, 1b\n"			\
                                      "2:"				\
                     : "=&"C (previous),					\
                       "=&r" (tmp)					\
@@ -234,13 +234,13 @@ CK_PR_CAS_S(char, char, "b", "w")
                 T previous;					\
                 int tmp;					\
                 __asm__ __volatile__("1:"			\
-                                     "ldxr" W " %" R "0, [%2];" \
-                                     "stxr" W " %w1, %" R "3, [%2];"\
-                                     "cbnz %w1, 1b;"		\
+                                     "ldxr" W " %" R "0, [%2]\n"\
+                                     "stxr" W " %w1, %" R "3, [%2]\n"\
+                                     "cbnz %w1, 1b\n"		\
                                         : "=&"C (previous),	\
                                           "=&r" (tmp)		\
                                         : CK_MD_ATOMIC_PTR_CONSTR (target),	\
-                                        C (v)			\
+                                          C     (v)		\
                                         : "memory", "cc");	\
                 return (previous);				\
         }
@@ -267,10 +267,10 @@ CK_PR_FAS_REG(char, char, char, "b", "w")
                 T previous = 0;					\
                 int tmp = 0;					\
                 __asm__ __volatile__("1:"			\
-                                     "ldxr" W " %" R "0, [%2];"	\
-                                      I ";"			\
-                                     "stxr" W " %w1, %" R "0, [%2];"	\
-                                     "cbnz %w1, 1b;"		\
+                                     "ldxr" W " %" R "0, [%2]\n"\
+                                      I "\n"			\
+                                     "stxr" W " %w1, %" R "0, [%2]\n"	\
+                                     "cbnz %w1, 1b\n"		\
                                         : "=&"C (previous),	\
                                           "=&r" (tmp)		\
                                         : CK_MD_ATOMIC_PTR_CONSTR (target)	\
@@ -340,10 +340,10 @@ CK_PR_UNARY_S(char, char, "b")
                 T previous;					\
                 int tmp;					\
                 __asm__ __volatile__("1:"			\
-                                     "ldxr" W " %" R "0, [%2];"\
-                                      I " %" R "0, %" R "0, %" R "3;"	\
-                                     "stxr" W " %w1, %" R "0, [%2];"	\
-                                     "cbnz %w1, 1b;"		\
+                                     "ldxr" W " %" R "0, [%2]\n"\
+                                      I " %" R "0, %" R "0, %" R "3\n"	\
+                                     "stxr" W " %w1, %" R "0, [%2]\n"	\
+                                     "cbnz %w1, 1b\n"		\
                                         : "=&r" (previous),	\
                                           "=&r" (tmp)		\
                                         : CK_MD_ATOMIC_PTR_CONSTR (target),	\
@@ -420,10 +420,10 @@ ck_pr_faa_ptr(void *target, uintptr_t delta)
         int tmp;
 
         __asm__ __volatile__("1:"
-                             "ldxr %0, [%3];"
-                             "add %1, %4, %0;"
-                             "stxr %w2, %1, [%3];"
-                             "cbnz %w2, 1b;"
+                             "ldxr %0, [%3]\n"
+                             "add %1, %4, %0\n"
+                             "stxr %w2, %1, [%3]\n"
+                             "cbnz %w2, 1b\n"
                                 : "=&" CK_MD_ATOMIC_PTR_CONSTR (previous),
                                   "=&" CK_MD_ATOMIC_PTR_CONSTR (r),
                                   "=&r" (tmp)
@@ -440,9 +440,9 @@ ck_pr_faa_64(uint64_t *target, uint64_t delta)
         uint64_t previous, r, tmp;
 
         __asm__ __volatile__("1:"
-                             "ldxr %0, [%3];"
-                             "add %1, %4, %0;"
-                             "stxr %w2, %1, [%3];"
+                             "ldxr %0, [%3]\n"
+                             "add %1, %4, %0\n"
+                             "stxr %w2, %1, [%3]\n"
                              "cbnz %w2, 1b;"
                                 : "=&r" (previous),
                                   "=&r" (r),
@@ -460,10 +460,10 @@ ck_pr_faa_64(uint64_t *target, uint64_t delta)
         {								\
                 T previous, r, tmp;					\
                 __asm__ __volatile__("1:"				\
-                                     "ldxr" W " %w0, [%3];"		\
-                                     "add %w1, %w4, %w0;"		\
-                                     "stxr" W " %w2, %w1, [%3];"	\
-                                     "cbnz %w2, 1b;"			\
+                                     "ldxr" W " %w0, [%3]\n"		\
+                                     "add %w1, %w4, %w0\n"		\
+                                     "stxr" W " %w2, %w1, [%3]\n"	\
+                                     "cbnz %w2, 1b\n"			\
                                         : "=&r" (previous),		\
                                           "=&r" (r),			\
                                           "=&r" (tmp)			\
