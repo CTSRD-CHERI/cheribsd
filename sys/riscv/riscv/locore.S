@@ -627,6 +627,8 @@ init_pt_va:
 
 #ifndef SMP
 ENTRY(mpentry)
+.option push
+.option nocapmode
 	lla	t0, __dm_boot
 1:
 	wfi
@@ -645,6 +647,7 @@ ENTRY(mpentry)
 	mv	a1,	t1	/* dtbp */
 	li	t1, 0xf8000000
 	jr	t1
+.option pop
 END(mpentry)
 #else
 /*

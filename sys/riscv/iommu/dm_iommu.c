@@ -243,7 +243,7 @@ dm_iommu_domain_alloc(device_t dev, struct iommu_unit *iommu, bool *new)
 	addr <<= PAGE_SHIFT;
 
 	printf("%s: satp is %x, addr %lx\n", __func__, satp,
-	    PHYS_TO_DMAP(addr));
+	    (uint64_t)PHYS_TO_DMAP(addr));
 
 	/* Initialize pmap. */
 	p = &domain->p;
