@@ -271,7 +271,7 @@ db_value_of_name_vnet(const char *name, db_expr_t *valuep)
 	db_symbol_values(sym, &name, &value);
 	if (value < VNET_START || value >= VNET_STOP)
 		return (false);
-	*valuep = (db_expr_t)((uintptr_t)vnet->vnet_data_mem +
+	*valuep = (db_expr_t)((uintptr_t)vnet->vnet_data_base - VNET_BIAS +
 	    ((ptraddr_t)value - (ptraddr_t)VNET_START));
 	return (true);
 #else
