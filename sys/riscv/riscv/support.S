@@ -41,10 +41,25 @@ __FBSDID("$FreeBSD$");
 #include "assym.inc"
 
 /*
- * Hybrid kernels use .cap loads and stores whereas purecap kernels use
- * capmode loads and stores.
+ * Convenience macros for CHERI.
  */
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
+#if defined(FSU_CHERI_AS_USER)
+// If so configured, use the as-user .u.cap loads and stores
+#define	CLR_W		lr.w.u.cap
+#define	CLR_D		lr.d.u.cap
+#define	CLBU		lbu.u.cap
+#define	CLHU		lhu.u.cap
+#define	CLW		lw.u.cap
+#define	CLD		ld.u.cap
+#define	CLC		lc.u.cap
+#define	CSB		sb.u.cap
+#define	CSH		sh.u.cap
+#define	CSW		sw.u.cap
+#define	CSD		sd.u.cap
+#define	CSC		sc.u.cap
+#elif defined(__CHERI_PURE_CAPABILITY__)
+// Otherwise, pure-cap kernels use capmode loads and stores
 #define	CLR_W		clr.w
 #define	CLR_D		clr.d
 #define	CLBU		clbu
@@ -58,6 +73,7 @@ __FBSDID("$FreeBSD$");
 #define	CSD		csd
 #define	CSC		csc
 #else
+// Otherwise, hybrid kernels use .cap loads and stores
 #define	CLR_W		lr.w.cap
 #define	CLR_D		lr.d.cap
 #define	CLBU		lbu.cap
@@ -71,6 +87,7 @@ __FBSDID("$FreeBSD$");
 #define	CSD		sd.cap
 #define	CSC		sc.cap
 #endif
+#endif
 
 /*
  * One of the fu* or su* functions failed, return -1.
@@ -81,7 +98,9 @@ ENTRY(fsu_fault)
 #else
 	SET_FAULT_HANDLER(x0, a1)	/* Reset the handler function */
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	EXIT_USER_ACCESS(a1)
+#endif
 fsu_fault_nopcb:
 	li	a0, -1
 	RETURN
@@ -96,7 +115,9 @@ END(fsu_fault)
  */
 #ifdef FSU_MAGIC_HINT
 ENTRY(fsu_fault_magic_hint)
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	EXIT_USER_ACCESS(a1)
+#endif
 	li	a0, -1
 	RETURN
 END(fsu_fault_fast_copy)
@@ -106,8 +127,10 @@ END(fsu_fault_fast_copy)
  * int casueword32(volatile uint32_t * __capability, uint32_t, uint32_t *, uint32_t)
  */
 ENTRY(casueword32)
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	li	a4, (VM_MAXUSER_ADDRESS-3)
 	bgt	a0, a4, fsu_fault_nopcb
+#endif
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
@@ -117,7 +140,9 @@ ENTRY(casueword32)
 	SET_FAULT_HANDLER(a6, a4)	/* And set it */
 #endif
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	ENTER_USER_ACCESS(a4)
+#endif
 
 #if __has_feature(capabilities)
 	CLR_W	a4, 0(ca0)		/* Load-exclusive the data */
@@ -130,12 +155,21 @@ ENTRY(casueword32)
 
 	bne	a4, a1, 1f		/* If not equal then exit */
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
+#if defined(FSU_CHERI_AS_USER)
+	// as-user cap-authorized form
+	move	a5, a3
+	sc.w.u.cap a5, 0(ca0)		/* Store the new data */
+#elif defined(__CHERI_PURE_CAPABILITY__)
+	// capmode
 	csc.w	a5, a3, 0(ca0)		/* Store the new data */
-#elif __has_feature(capabilities)
+#else
+	// explicit cap form
 	move	a5, a3
 	sc.w.cap a5, 0(ca0)		/* Store the new data */
+#endif
 #else
+	// no caps
 	sc.w	a5, a3, 0(a0)		/* Store the new data */
 #endif
 #ifdef FSU_MAGIC_HINT
@@ -144,7 +178,11 @@ ENTRY(casueword32)
 
 	beqz	a5, 2f			/* Success */
 1:	li	a5, 1			/* Normalize failure result */
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 2:	EXIT_USER_ACCESS(a6)
+#else
+2:
+#endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #ifndef FSU_MAGIC_HINT
@@ -165,8 +203,10 @@ END(casueword32)
  * int casueword(volatile u_long * __capability, u_long, u_long *, u_long)
  */
 ENTRY(casueword)
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	li	a4, (VM_MAXUSER_ADDRESS-7)
 	bgt	a0, a4, fsu_fault_nopcb
+#endif
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
@@ -189,12 +229,21 @@ ENTRY(casueword)
 
 	bne	a4, a1, 1f		/* If not equal then exit */
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if __has_feature(capabilities)
+#if defined(FSU_CHERI_AS_USER)
+	// as-user cap-authorized form
+	move	a5, a3
+	sc.d.u.cap a5, 0(ca0)		/* Store the new data */
+#elif defined(__CHERI_PURE_CAPABILITY__)
+	// capmode
 	csc.d	a5, a3, 0(ca0)		/* Store the new data */
-#elif __has_feature(capabilities)
+#else
+	// explicit cap form
 	move	a5, a3
 	sc.d.cap a5, 0(ca0)		/* Store the new data */
+#endif
 #else
+	// no caps
 	sc.d	a5, a3, 0(a0)		/* Store the new data */
 #endif
 #ifdef FSU_MAGIC_HINT
@@ -203,7 +252,11 @@ ENTRY(casueword)
 
 	beqz	a5, 2f			/* Success */
 1:	li	a5, 1			/* Normalize failure result */
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 2:	EXIT_USER_ACCESS(a6)
+#else
+2:
+#endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #ifndef FSU_MAGIC_HINT
@@ -224,8 +277,10 @@ END(casueword)
  * int fubyte(volatile const void * __capability)
  */
 ENTRY(fubyte)
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	li	a1, VM_MAXUSER_ADDRESS
 	bgt	a0, a1, fsu_fault_nopcb
+#endif
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
@@ -235,7 +290,9 @@ ENTRY(fubyte)
 	SET_FAULT_HANDLER(a6, a1)	/* And set it */
 #endif
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	ENTER_USER_ACCESS(a1)
+#endif
 
 #if __has_feature(capabilities)
 	CLBU	a0, 0(ca0)		/* Try loading the data */
@@ -245,7 +302,9 @@ ENTRY(fubyte)
 #ifdef FSU_MAGIC_HINT
 	FSU_MAGIC_HINT_ASM
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	EXIT_USER_ACCESS(a1)
+#endif
 
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -261,8 +320,10 @@ END(fubyte)
  * int fuword16(volatile const void * __capability)
  */
 ENTRY(fuword16)
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	li	a1, (VM_MAXUSER_ADDRESS-1)
 	bgt	a0, a1, fsu_fault_nopcb
+#endif
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
@@ -272,7 +333,9 @@ ENTRY(fuword16)
 	SET_FAULT_HANDLER(a6, a1)	/* And set it */
 #endif
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	ENTER_USER_ACCESS(a1)
+#endif
 
 #if __has_feature(capabilities)
 	CLHU	a0, 0(ca0)		/* Try loading the data */
@@ -282,7 +345,9 @@ ENTRY(fuword16)
 #ifdef FSU_MAGIC_HINT
 	FSU_MAGIC_HINT_ASM
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	EXIT_USER_ACCESS(a1)
+#endif
 
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -298,8 +363,10 @@ END(fuword16)
  * int32_t fueword32(volatile const void * __capability, int32_t *)
  */
 ENTRY(fueword32)
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
 	bgt	a0, a2, fsu_fault_nopcb
+#endif
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
@@ -309,7 +376,9 @@ ENTRY(fueword32)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	ENTER_USER_ACCESS(a2)
+#endif
 
 #if __has_feature(capabilities)
 	CLW	a0, 0(ca0)		/* Try loading the data */
@@ -319,7 +388,9 @@ ENTRY(fueword32)
 #ifdef FSU_MAGIC_HINT
 	FSU_MAGIC_HINT_ASM
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	EXIT_USER_ACCESS(a2)
+#endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #ifndef FSU_MAGIC_HINT
@@ -342,8 +413,10 @@ END(fueword32)
  */
 ENTRY(fueword)
 EENTRY(fueword64)
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	li	a2, (VM_MAXUSER_ADDRESS-7)
 	bgt	a0, a2, fsu_fault_nopcb
+#endif
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
@@ -353,7 +426,9 @@ EENTRY(fueword64)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	ENTER_USER_ACCESS(a2)
+#endif
 
 #if __has_feature(capabilities)
 	CLD	a0, 0(ca0)		/* Try loading the data */
@@ -363,7 +438,9 @@ EENTRY(fueword64)
 #ifdef FSU_MAGIC_HINT
 	FSU_MAGIC_HINT_ASM
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	EXIT_USER_ACCESS(a2)
+#endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #ifndef FSU_MAGIC_HINT
@@ -386,8 +463,10 @@ END(fueword)
  * int fuecap(volatile const void __capability *, intcap_t *)
  */
 ENTRY(fuecap)
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	li	a2, (VM_MAXUSER_ADDRESS-7)
 	bgt	a0, a2, fsu_fault_nopcb
+#endif
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
@@ -397,13 +476,17 @@ ENTRY(fuecap)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	ENTER_USER_ACCESS(a2)
+#endif
 
 	CLC	ca0, 0(ca0)		/* Try loading the data */
 #ifdef FSU_MAGIC_HINT
 	FSU_MAGIC_HINT_ASM
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	EXIT_USER_ACCESS(a2)
+#endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #ifndef FSU_MAGIC_HINT
@@ -425,8 +508,10 @@ END(fuecap)
  * int subyte(volatile void * __capability, int)
  */
 ENTRY(subyte)
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	li	a2, VM_MAXUSER_ADDRESS
 	bgt	a0, a2, fsu_fault_nopcb
+#endif
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
@@ -436,7 +521,9 @@ ENTRY(subyte)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	ENTER_USER_ACCESS(a2)
+#endif
 
 #if __has_feature(capabilities)
 	CSB	a1, 0(ca0)		/* Try storing the data */
@@ -446,7 +533,9 @@ ENTRY(subyte)
 #ifdef FSU_MAGIC_HINT
 	FSU_MAGIC_HINT_ASM
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	EXIT_USER_ACCESS(a2)
+#endif
 
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -463,8 +552,10 @@ END(subyte)
  * int suword16(volatile void * __capability, int)
  */
 ENTRY(suword16)
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	li	a2, (VM_MAXUSER_ADDRESS-1)
 	bgt	a0, a2, fsu_fault_nopcb
+#endif
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
@@ -474,7 +565,9 @@ ENTRY(suword16)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	ENTER_USER_ACCESS(a2)
+#endif
 
 #if __has_feature(capabilities)
 	CSH	a1, 0(ca0)		/* Try storing the data */
@@ -484,7 +577,9 @@ ENTRY(suword16)
 #ifdef FSU_MAGIC_HINT
 	FSU_MAGIC_HINT_ASM
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	EXIT_USER_ACCESS(a2)
+#endif
 
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -501,8 +596,10 @@ END(suword16)
  * int suword32(volatile void * __capability, int)
  */
 ENTRY(suword32)
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
 	bgt	a0, a2, fsu_fault_nopcb
+#endif
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
@@ -512,7 +609,9 @@ ENTRY(suword32)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	ENTER_USER_ACCESS(a2)
+#endif
 
 #if __has_feature(capabilities)
 	CSW	a1, 0(ca0)		/* Try storing the data */
@@ -522,7 +621,9 @@ ENTRY(suword32)
 #ifdef FSU_MAGIC_HINT
 	FSU_MAGIC_HINT_ASM
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	EXIT_USER_ACCESS(a2)
+#endif
 
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -540,8 +641,10 @@ END(suword32)
  */
 ENTRY(suword)
 EENTRY(suword64)
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	li	a2, (VM_MAXUSER_ADDRESS-7)
 	bgt	a0, a2, fsu_fault_nopcb
+#endif
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
@@ -551,7 +654,9 @@ EENTRY(suword64)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	ENTER_USER_ACCESS(a2)
+#endif
 
 #if __has_feature(capabilities)
 	CSD	a1, 0(ca0)		/* Try storing the data */
@@ -561,7 +666,9 @@ EENTRY(suword64)
 #ifdef FSU_MAGIC_HINT
 	FSU_MAGIC_HINT_ASM
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	EXIT_USER_ACCESS(a2)
+#endif
 
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -580,8 +687,10 @@ END(suword)
  * int sucap(volatile void * __capability, intcap_t)
  */
 ENTRY(sucap)
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
 	bgt	a0, a2, fsu_fault_nopcb
+#endif
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
@@ -591,13 +700,17 @@ ENTRY(sucap)
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	ENTER_USER_ACCESS(a2)
+#endif
 
 	CSC	ca1, 0(ca0)		/* Try storing the data */
 #ifdef FSU_MAGIC_HINT
 	FSU_MAGIC_HINT_ASM
 #endif
+#if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)
 	EXIT_USER_ACCESS(a2)
+#endif
 
 #ifndef FSU_MAGIC_HINT
 #ifdef __CHERI_PURE_CAPABILITY__

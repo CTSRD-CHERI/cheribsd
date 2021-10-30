@@ -8,5 +8,6 @@ INTRNG				opt_global.h
 CPU_QEMU_RISCV			opt_global.h
 
 FSU_MAGIC_HINT		opt_global.h
+FSU_CHERI_AS_USER	opt_global.h
 
 COMPAT_FREEBSD64	opt_global.h

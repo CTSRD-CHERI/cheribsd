@@ -6,3 +6,4 @@ options 	COMPAT_FREEBSD64
 nooptions 	KDTRACE_HOOKS		# Kernel DTrace hooks
 
 options		FSU_MAGIC_HINT
+options		FSU_CHERI_AS_USER
