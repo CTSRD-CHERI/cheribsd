@@ -1013,6 +1013,7 @@ nfs_setattr(struct vop_setattr_args *ap)
 	struct vattr *vap = ap->a_vap;
 	int error = 0;
 	u_quad_t tsize;
+	struct timespec ts;
 
 #ifndef nolint
 	tsize = (u_quad_t)0;
@@ -1107,11 +1108,18 @@ nfs_setattr(struct vop_setattr_args *ap)
 			NFSUNLOCKNODE(np);
 	}
 	error = nfs_setattrrpc(vp, vap, ap->a_cred, td);
-	if (error && vap->va_size != VNOVAL) {
-		NFSLOCKNODE(np);
-		np->n_size = np->n_vattr.na_size = tsize;
-		vnode_pager_setsize(vp, tsize);
-		NFSUNLOCKNODE(np);
+	if (vap->va_size != VNOVAL) {
+		if (error == 0) {
+			nanouptime(&ts);
+			NFSLOCKNODE(np);
+			np->n_localmodtime = ts;
+			NFSUNLOCKNODE(np);
+		} else {
+			NFSLOCKNODE(np);
+			np->n_size = np->n_vattr.na_size = tsize;
+			vnode_pager_setsize(vp, tsize);
+			NFSUNLOCKNODE(np);
+		}
 	}
 	return (error);
 }
@@ -1168,7 +1176,7 @@ nfs_lookup(struct vop_lookup_args *ap)
 	struct nfsfh *nfhp;
 	struct nfsvattr dnfsva, nfsva;
 	struct vattr vattr;
-	struct timespec nctime;
+	struct timespec nctime, ts;
 	uint32_t openmode;
 
 	*vpp = NULLVP;
@@ -1292,6 +1300,7 @@ nfs_lookup(struct vop_lookup_args *ap)
 
 	newvp = NULLVP;
 	NFSINCRGLOBAL(nfsstatsv1.lookupcache_misses);
+	nanouptime(&ts);
 	error = nfsrpc_lookup(dvp, cnp->cn_nameptr, cnp->cn_namelen,
 	    cnp->cn_cred, td, &dnfsva, &nfsva, &nfhp, &attrflag, &dattrflag,
 	    NULL, openmode);
@@ -1358,6 +1367,22 @@ nfs_lookup(struct vop_lookup_args *ap)
 		if (error)
 			return (error);
 		newvp = NFSTOV(np);
+		/*
+		 * If n_localmodtime >= time before RPC, then
+		 * a file modification operation, such as
+		 * VOP_SETATTR() of size, has occurred while
+		 * the Lookup RPC and acquisition of the vnode
+		 * happened.  As such, the attributes might
+		 * be stale, with possibly an incorrect size.
+		 */
+		NFSLOCKNODE(np);
+		if (timespecisset(&np->n_localmodtime) &&
+		    timespeccmp(&np->n_localmodtime, &ts, >=)) {
+			NFSCL_DEBUG(4, "nfs_lookup: rename localmod "
+			    "stale attributes\n");
+			attrflag = 0;
+		}
+		NFSUNLOCKNODE(np);
 		if (attrflag)
 			(void) nfscl_loadattrcache(&newvp, &nfsva, NULL, NULL,
 			    0, 1);
@@ -1417,6 +1442,22 @@ nfs_lookup(struct vop_lookup_args *ap)
 		if (error)
 			return (error);
 		newvp = NFSTOV(np);
+		/*
+		 * If n_localmodtime >= time before RPC, then
+		 * a file modification operation, such as
+		 * VOP_SETATTR() of size, has occurred while
+		 * the Lookup RPC and acquisition of the vnode
+		 * happened.  As such, the attributes might
+		 * be stale, with possibly an incorrect size.
+		 */
+		NFSLOCKNODE(np);
+		if (timespecisset(&np->n_localmodtime) &&
+		    timespeccmp(&np->n_localmodtime, &ts, >=)) {
+			NFSCL_DEBUG(4, "nfs_lookup: localmod "
+			    "stale attributes\n");
+			attrflag = 0;
+		}
+		NFSUNLOCKNODE(np);
 		if (attrflag)
 			(void) nfscl_loadattrcache(&newvp, &nfsva, NULL, NULL,
 			    0, 1);
@@ -2634,7 +2675,9 @@ nfs_lookitup(struct vnode *dvp, char *name, int len, struct ucred *cred,
 	struct componentname cn;
 	int error = 0, attrflag, dattrflag;
 	u_int hash;
+	struct timespec ts;
 
+	nanouptime(&ts);
 	error = nfsrpc_lookup(dvp, name, len, cred, td, &dnfsva, &nfsva,
 	    &nfhp, &attrflag, &dattrflag, NULL, 0);
 	if (dattrflag)
@@ -2695,6 +2738,22 @@ printf("replace=%s\n",nnn);
 		    if (error)
 			return (error);
 		    newvp = NFSTOV(np);
+		    /*
+		     * If n_localmodtime >= time before RPC, then
+		     * a file modification operation, such as
+		     * VOP_SETATTR() of size, has occurred while
+		     * the Lookup RPC and acquisition of the vnode
+		     * happened.  As such, the attributes might
+		     * be stale, with possibly an incorrect size.
+		     */
+		    NFSLOCKNODE(np);
+		    if (timespecisset(&np->n_localmodtime) &&
+			timespeccmp(&np->n_localmodtime, &ts, >=)) {
+			NFSCL_DEBUG(4, "nfs_lookitup: localmod "
+			    "stale attributes\n");
+			attrflag = 0;
+		    }
+		    NFSUNLOCKNODE(np);
 		}
 		if (!attrflag && *npp == NULL) {
 			if (newvp == dvp)
@@ -3642,11 +3701,14 @@ nfs_allocate(struct vop_allocate_args *ap)
 	struct thread *td = curthread;
 	struct nfsvattr nfsva;
 	struct nfsmount *nmp;
+	struct nfsnode *np;
 	off_t alen;
 	int attrflag, error, ret;
+	struct timespec ts;
 
 	attrflag = 0;
 	nmp = VFSTONFS(vp->v_mount);
+	np = VTONFS(vp);
 	mtx_lock(&nmp->nm_mtx);
 	if (NFSHASNFSV4(nmp) && nmp->nm_minorvers >= NFSV42_MINORVERSION &&
 	    (nmp->nm_privflag & NFSMNTP_NOALLOCATE) == 0) {
@@ -3666,6 +3728,10 @@ nfs_allocate(struct vop_allocate_args *ap)
 		if (error == 0) {
 			*ap->a_offset += alen;
 			*ap->a_len -= alen;
+			nanouptime(&ts);
+			NFSLOCKNODE(np);
+			np->n_localmodtime = ts;
+			NFSUNLOCKNODE(np);
 		} else if (error == NFSERR_NOTSUPP) {
 			mtx_lock(&nmp->nm_mtx);
 			nmp->nm_privflag |= NFSMNTP_NOALLOCATE;
