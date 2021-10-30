@@ -466,8 +466,8 @@ vnet_data_copy(void *start, int size)
 
 	VNET_LIST_RLOCK();
 	LIST_FOREACH(vnet, &vnet_head, vnet_le)
-		memcpy((void *)((uintptr_t)vnet->vnet_data_base +
-		    (ptraddr_t)start), start, size);
+		memcpy((void *)((uintptr_t)vnet->vnet_data_base - VNET_BIAS +
+		    ((ptraddr_t)start - (ptraddr_t)VNET_START)), start, size);
 	VNET_LIST_RUNLOCK();
 }
 
