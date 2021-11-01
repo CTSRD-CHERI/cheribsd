@@ -501,7 +501,7 @@ print_registers(struct trapframe *frame)
 #endif
 	PRINT_REG(" sp", frame->tf_sp);
 	print_gp_register(" lr", frame->tf_lr);
-	print_gp_register("elr", frame->tf_lr);
+	print_gp_register("elr", frame->tf_elr);
 	printf("spsr:         %8x\n", frame->tf_spsr);
 }
 
