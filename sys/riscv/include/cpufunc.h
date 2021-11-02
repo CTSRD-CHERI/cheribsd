@@ -131,6 +131,35 @@ load_satp(uint64_t val)
 
 void riscv_nullop(void);
 
+#if defined(FSU_MAGIC_HINT) && defined(FSU_CHERI_AS_USER)
+/*
+ * With both optimisations available to us, we need no prologue or epilogue to
+ * probe userspace memory, so long as we expect the answer in a particular
+ * register (a0), and so we can avoid even the overheads of call and return.
+ * This may still vector to fsu_fault_magic_hint on fault, but that will just
+ * write to a0 and return, just as we would on the success path.
+ *
+ * TODO: If we really felt like going overboard, we could use computed-goto
+ * labels and encode the jump distance into one of the HINT ranges, though
+ * heaven help us if the basic blocks wander apart from each other.  It's a
+ * shame we don't have predicated jumps or something.
+ */
+static __inline int
+fubyte_inline(volatile const void * __capability base)
+{
+	register int ret __asm__("a0"); // XREF fsu_fault_magic_hint
+
+	__asm__ __volatile(
+		"lb.u.cap %0, 0(%1)"
+		__STRING(FSU_MAGIC_HINT_ASM)
+		: "=r" (ret)
+		: "r" (base)
+	);
+
+	return ret;
+}
+#endif
+
 #endif	/* _KERNEL */
 
 #ifdef CPU_QEMU_RISCV
