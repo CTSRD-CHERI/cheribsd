@@ -67,3 +67,48 @@ CHERIBSDTEST(test_cheriabi_libc_memchr,
 
 	cheribsdtest_success();
 }
+
+CHERIBSDTEST(test_cheriabi_libc_strchr,
+    "Check that strchr() works as required")
+{
+	_Alignas(16) char string[] = "0123456789abcdefghij";
+
+	/* Full length, aligned end */
+	CHERIBSDTEST_CHECK_EQ_INT(*(char *)strchr(string, 'e'), 'e');
+	/* String that does not include char */
+	CHERIBSDTEST_VERIFY(strchr(string, 'z') == NULL);
+
+	/*
+	 * char in bounds, but last word not fully in bounds
+	 *
+	 * As with memchr, the implementation must avoid raising a
+	 * spurious exception if the character is in bounds even if
+	 * the containing word is not in bounds.
+	 */
+	CHERIBSDTEST_CHECK_EQ_INT(*(char *)strchr(string, 'g'), 'g');
+
+	cheribsdtest_success();
+}
+
+
+CHERIBSDTEST(test_cheriabi_libc_strchrnul,
+    "Check that strchrnul() works as required")
+{
+	_Alignas(16) char string[] = "0123456789abcdefghij";
+
+	/* Full length, aligned end */
+	CHERIBSDTEST_CHECK_EQ_INT(*(char *)strchrnul(string, 'e'), 'e');
+	/* String that does not include char */
+	CHERIBSDTEST_CHECK_EQ_INT(*(char *)strchrnul(string, 'z'), '\0');
+
+	/*
+	 * char in bounds, but last word not fully in bounds
+	 *
+	 * As with memchr, the implementation must avoid raising a
+	 * spurious exception if the character is in bounds even if
+	 * the containing word is not in bounds.
+	 */
+	CHERIBSDTEST_CHECK_EQ_INT(*(char *)strchrnul(string, 'g'), 'g');
+
+	cheribsdtest_success();
+}
