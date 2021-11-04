@@ -25,6 +25,13 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <sys/param.h>
+#undef ALIGN
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
+
 #include <limits.h>
 #include <stdint.h>
 #include <string.h>
@@ -43,8 +50,6 @@ __strchrnul(const char *s, int c)
 	if (!c)
 		return (char *)s + strlen(s);
 
-#ifndef __CHERI_PURE_CAPABILITY__
-	/* TODO: Use the word optimization while in bounds. */
 #ifdef __GNUC__
 	typedef size_t __attribute__((__may_alias__)) word;
 	const word *w;
@@ -52,10 +57,15 @@ __strchrnul(const char *s, int c)
 		if (!*s || *(unsigned char *)s == c)
 			return (char *)s;
 	size_t k = ONES * c;
+#ifdef __CHERI_PURE_CAPABILITY__
+	size_t space = rounddown2(cheri_bytes_remaining(s), ALIGN);
+	const word *end = (const void *)(s + space);
+	for (w = (void *)s; w < end && !HASZERO(*w) && !HASZERO(*w ^ k); w++)
+#else
 	for (w = (void *)s; !HASZERO(*w) && !HASZERO(*w ^ k); w++)
+#endif
 		;
 	s = (void *)w;
-#endif
 #endif
 	for (; *s && *(unsigned char *)s != c; s++)
 		;
