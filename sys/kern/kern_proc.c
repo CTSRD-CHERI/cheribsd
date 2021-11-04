@@ -2521,7 +2521,7 @@ proc_get_binpath(struct proc *p, char *binname, char **retbuf,
 			 * which case we should not report old name.
 			 */
 			NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE,
-			    PTR2CAP(*retbuf), req->td);
+			    PTR2CAP(*retbuf), curthread);
 			error = namei(&nd);
 			if (error == 0) {
 				if (nd.ni_vp == vp)
