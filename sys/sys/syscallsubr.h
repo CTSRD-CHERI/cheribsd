@@ -311,7 +311,7 @@ int	kern_ktrace(struct thread *td, const char * __capability fname,
 	    int uops, int ufacs, int pid);
 int	kern_linkat(struct thread *td, int fd1, int fd2,
 	    const char * __capability path1, const char * __capability path2,
-	    enum uio_seg segflg, int follow);
+	    enum uio_seg segflg, int flag);
 int	kern_listen(struct thread *td, int s, int backlog);
 int	kern_lseek(struct thread *td, int fd, off_t offset, int whence);
 int	kern_lutimes(struct thread *td,
@@ -551,7 +551,7 @@ int	kern_utimesat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg tptrseg);
 int	kern_utimensat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, const struct timespec * __capability tptr,
-	    enum uio_seg tptrseg, int follow);
+	    enum uio_seg tptrseg, int flag);
 int	kern_utrace(struct thread *td, const void * __capability addr,
 	    size_t len);
 int	kern_wait(struct thread *td, pid_t pid, int *status, int options,

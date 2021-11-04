@@ -1518,7 +1518,7 @@ sys_link(struct thread *td, struct link_args *uap)
 {
 
 	return (kern_linkat(td, AT_FDCWD, AT_FDCWD, uap->path, uap->to,
-	    UIO_USERSPACE, FOLLOW));
+	    UIO_USERSPACE, AT_SYMLINK_FOLLOW));
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -1533,15 +1533,12 @@ struct linkat_args {
 int
 sys_linkat(struct thread *td, struct linkat_args *uap)
 {
-	int flag;
 
-	flag = uap->flag;
-	if ((flag & ~(AT_SYMLINK_FOLLOW | AT_RESOLVE_BENEATH)) != 0)
+	if ((uap->flag & ~(AT_SYMLINK_FOLLOW | AT_RESOLVE_BENEATH)) != 0)
 		return (EINVAL);
 
 	return (kern_linkat(td, uap->fd1, uap->fd2, uap->path1, uap->path2,
-	    UIO_USERSPACE, at2cnpflags(flag, AT_SYMLINK_FOLLOW |
-	    AT_RESOLVE_BENEATH)));
+	    UIO_USERSPACE, uap->flag));
 }
 
 int hardlink_check_uid = 0;
@@ -1586,15 +1583,16 @@ can_hardlink(struct vnode *vp, struct ucred *cred)
 int
 kern_linkat(struct thread *td, int fd1, int fd2,
     const char * __capability path1, const char * __capability path2,
-    enum uio_seg segflag, int follow)
+    enum uio_seg segflag, int flag)
 {
 	struct nameidata nd;
 	int error;
 
 	do {
 		bwillwrite();
-		NDINIT_ATRIGHTS(&nd, LOOKUP, follow | AUDITVNODE1, segflag,
-		    path1, fd1, &cap_linkat_source_rights, td);
+		NDINIT_ATRIGHTS(&nd, LOOKUP, at2cnpflags(flag,
+		    AT_SYMLINK_FOLLOW | AT_RESOLVE_BENEATH) | AUDITVNODE1,
+		    segflag, path1, fd1, &cap_linkat_source_rights, td);
 		if ((error = namei(&nd)) != 0)
 			return (error);
 		NDFREE(&nd, NDF_ONLY_PNBUF);
