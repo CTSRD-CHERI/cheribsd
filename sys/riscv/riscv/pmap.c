@@ -1247,35 +1247,31 @@ pmap_pinit(pmap_t pmap)
 	vm_paddr_t l1phys;
 	vm_page_t l1pt;
 
-	if (pmap->pm_iommu == false) {
-		/*
-		 * allocate the l1 page
-		 */
-		while ((l1pt = vm_page_alloc(NULL, 0xdeadbeef, VM_ALLOC_NORMAL |
-		    VM_ALLOC_NOOBJ | VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL)
-			vm_wait(NULL);
+	/*
+	 * allocate the l1 page
+	 */
+	while ((l1pt = vm_page_alloc(NULL, 0xdeadbeef, VM_ALLOC_NORMAL |
+	    VM_ALLOC_NOOBJ | VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL)
+		vm_wait(NULL);
 
-		l1phys = VM_PAGE_TO_PHYS(l1pt);
-		pmap->pm_l1 = (pd_entry_t *)PHYS_TO_DMAP(l1phys);
-		pmap->pm_satp = SATP_MODE_SV39 | (l1phys >> PAGE_SHIFT);
+	l1phys = VM_PAGE_TO_PHYS(l1pt);
+	pmap->pm_l1 = (pd_entry_t *)PHYS_TO_DMAP(l1phys);
+	pmap->pm_satp = SATP_MODE_SV39 | (l1phys >> PAGE_SHIFT);
 
-		if ((l1pt->flags & PG_ZERO) == 0)
-			pagezero(pmap->pm_l1);
-	}
+	if ((l1pt->flags & PG_ZERO) == 0)
+		pagezero(pmap->pm_l1);
 
 	bzero(&pmap->pm_stats, sizeof(pmap->pm_stats));
 
 	CPU_ZERO(&pmap->pm_active);
 
-	if (pmap->pm_iommu == false) {
-		/* Install kernel pagetables */
-		memcpy(pmap->pm_l1, kernel_pmap->pm_l1, PAGE_SIZE);
+	/* Install kernel pagetables */
+	memcpy(pmap->pm_l1, kernel_pmap->pm_l1, PAGE_SIZE);
 
-		/* Add to the list of all user pmaps */
-		mtx_lock(&allpmaps_lock);
-		LIST_INSERT_HEAD(&allpmaps, pmap, pm_list);
-		mtx_unlock(&allpmaps_lock);
-	}
+	/* Add to the list of all user pmaps */
+	mtx_lock(&allpmaps_lock);
+	LIST_INSERT_HEAD(&allpmaps, pmap, pm_list);
+	mtx_unlock(&allpmaps_lock);
 
 	vm_radix_init(&pmap->pm_root);
 

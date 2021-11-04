@@ -86,7 +86,6 @@ struct pmap {
 	TAILQ_HEAD(,pv_chunk)	pm_pvchunk;	/* list of mappings in pmap */
 	LIST_ENTRY(pmap)	pm_list;	/* List of all pmaps */
 	struct vm_radix		pm_root;
-	bool			pm_iommu;	/* IOMMU flag. */
 };
 
 typedef struct pv_entry {

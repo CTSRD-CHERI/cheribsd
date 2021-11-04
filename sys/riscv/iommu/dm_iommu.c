@@ -249,7 +249,6 @@ dm_iommu_domain_alloc(device_t dev, struct iommu_unit *iommu, bool *new)
 	p = &domain->p;
 	p->pm_l1 = (pd_entry_t *)PHYS_TO_DMAP(addr);
 	p->pm_satp = satp;
-	p->pm_iommu = true;
 	bzero(&p->pm_stats, sizeof(p->pm_stats));
 	dprintf("%s: pm_l1 is %#lp\n", __func__, p->pm_l1);
 	PMAP_LOCK_INIT(p);
