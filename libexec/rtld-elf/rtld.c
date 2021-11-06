@@ -1093,7 +1093,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
      */
     __asm__ volatile("cmove $cgp, %0" :: "C"(entry_cgp): "$c26", "memory");
 #endif
-    return (func_ptr_type) obj_main->entry;
+    return ((func_ptr_type)obj_main->entry);
 }
 
 void *
@@ -1158,7 +1158,7 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
      */
     target = reloc_jmpslot(where, target, defobj, obj, rel);
     lock_release(rtld_bind_lock, &lockstate);
-    return target;
+    return (target);
 }
 
 /*
@@ -1215,8 +1215,10 @@ errmsg_restore(struct dlerror_save *saved_msg)
 static const char *
 basename(const char *name)
 {
-    const char *p = strrchr(name, '/');
-    return p != NULL ? p + 1 : name;
+	const char *p;
+
+	p = strrchr(name, '/');
+	return (p != NULL ? p + 1 : name);
 }
 
 static struct utsname uts;
@@ -2032,7 +2034,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
     }
     if (nsegs < 1) {
 	_rtld_error("%s: too few PT_LOAD segments", path);
-	return NULL;
+	return (NULL);
     }
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -2051,7 +2053,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 #endif
 
     obj->entry = entry;
-    return obj;
+    return (obj);
 }
 
 void
@@ -2112,9 +2114,9 @@ dlcheck(void *handle)
 
     if (obj == NULL || obj->refcount == 0 || obj->dl_refcount == 0) {
 	_rtld_error("Invalid shared object handle %p", handle);
-	return NULL;
+	return (NULL);
     }
-    return obj;
+    return (obj);
 }
 
 /*
@@ -2128,7 +2130,7 @@ donelist_check(DoneList *dlp, const Obj_Entry *obj)
 
     for (i = 0;  i < dlp->num_used;  i++)
 	if (dlp->objs[i] == obj)
-	    return true;
+	    return (true);
     /*
      * Our donelist allocation should always be sufficient.  But if
      * our threads locking isn't working properly, more shared objects
@@ -2137,7 +2139,7 @@ donelist_check(DoneList *dlp, const Obj_Entry *obj)
      */
     if (dlp->num_used < dlp->num_alloc)
 	dlp->objs[dlp->num_used++] = obj;
-    return false;
+    return (false);
 }
 
 /*
@@ -2157,7 +2159,7 @@ elf_hash(const char *name)
 	    h ^= g >> 24;
 	h &= ~g;
     }
-    return h;
+    return (h);
 }
 
 /*
@@ -2326,10 +2328,10 @@ find_symdef(unsigned long symnum, const Obj_Entry *refobj,
      * the cache.
      */
     if (symnum >= refobj->dynsymcount)
-	return NULL;	/* Bad object */
+	return (NULL);	/* Bad object */
     if (cache != NULL && cache[symnum].sym != NULL) {
 	*defobj_out = cache[symnum].obj;
-	return cache[symnum].sym;
+	return (cache[symnum].sym);
     }
 
     ref = refobj->symtab + symnum;
@@ -2386,7 +2388,7 @@ find_symdef(unsigned long symnum, const Obj_Entry *refobj,
 	    _rtld_error("%s: Undefined symbol \"%s%s%s\"", refobj->path, name,
 	      ve != NULL ? "@" : "", ve != NULL ? ve->name : "");
     }
-    return def;
+    return (def);
 }
 
 /*
@@ -3145,7 +3147,7 @@ load_object(const char *name, int fd_u, const Obj_Entry *refobj, int flags)
 	_rtld_error("Cannot fstat \"%s\"", printable_path(path));
 	close(fd);
 	free(path);
-	return NULL;
+	return (NULL);
     }
     TAILQ_FOREACH(obj, &obj_list, next) {
 	if (obj->marker || obj->doomed)
@@ -3157,7 +3159,7 @@ load_object(const char *name, int fd_u, const Obj_Entry *refobj, int flags)
 	object_add_name(obj, name);
 	free(path);
 	close(fd);
-	return obj;
+	return (obj);
     }
     if (flags & RTLD_LO_NOLOAD) {
 	free(path);
@@ -3171,7 +3173,7 @@ load_object(const char *name, int fd_u, const Obj_Entry *refobj, int flags)
 	free(path);
     close(fd);
 
-    return obj;
+    return (obj);
 }
 
 static Obj_Entry *
@@ -3199,7 +3201,7 @@ do_load_object(int fd, const char *name, char *path, struct stat *sbp,
 	main_path = obj_main->path;
     obj = map_object(fd, printable_path(path), sbp, printable_path(main_path));
     if (obj == NULL)
-        return NULL;
+        return (NULL);
 
     /*
      * If DT_SONAME is present in the object, digest_dynamic2 already
@@ -3259,7 +3261,7 @@ obj_from_addr(const void *addr)
 	if (addr < (void *)(obj->mapbase + obj->mapsize))
 	    return obj;
     }
-    return NULL;
+    return (NULL);
 }
 
 static void
@@ -3465,7 +3467,7 @@ objlist_find(Objlist *list, const Obj_Entry *obj)
     STAILQ_FOREACH(elm, list, link)
 	if (elm->obj == obj)
 	    return elm;
-    return NULL;
+    return (NULL);
 }
 
 static void
@@ -3859,7 +3861,7 @@ search_library_path(const char *name, const char *path,
     struct try_library_args arg;
 
     if (path == NULL)
-	return NULL;
+	return (NULL);
 
     arg.name = name;
     arg.namelen = strlen(name);
@@ -3961,7 +3963,7 @@ dlclose_locked(void *handle, RtldLockState *lockstate)
 
     root = dlcheck(handle);
     if (root == NULL)
-	return -1;
+	return (-1);
     LD_UTRACE(UTRACE_DLCLOSE_START, handle, NULL, 0, root->dl_refcount,
 	root->path);
 
@@ -3985,7 +3987,7 @@ dlclose_locked(void *handle, RtldLockState *lockstate)
 	unref_dag(root);
 
     LD_UTRACE(UTRACE_DLCLOSE_STOP, handle, NULL, 0, 0, NULL);
-    return 0;
+    return (0);
 }
 
 char *
@@ -4203,7 +4205,7 @@ dlopen_object(const char *name, int fd, Obj_Entry *refobj, int lo_flags,
     objlist_clear(&initlist);
     if (lockstate == &mlockstate)
 	lock_release(rtld_bind_lock, lockstate);
-    return obj;
+    return (obj);
 trace:
     trace_loaded_objects(obj);
     if (lockstate == &mlockstate)
@@ -4242,7 +4244,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    _rtld_error("Cannot determine caller's shared object");
 	    lock_release(rtld_bind_lock, &lockstate);
 	    LD_UTRACE(UTRACE_DLSYM_STOP, handle, NULL, 0, 0, name);
-	    return NULL;
+	    return (NULL);
 	}
 	if (handle == NULL) {	/* Just the caller's shared object. */
 	    res = symlook_obj(&req, obj);
@@ -4295,7 +4297,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	if ((obj = dlcheck(handle)) == NULL) {
 	    lock_release(rtld_bind_lock, &lockstate);
 	    LD_UTRACE(UTRACE_DLSYM_STOP, handle, NULL, 0, 0, name);
-	    return NULL;
+	    return (NULL);
 	}
 
 	donelist_init(&donelist);
@@ -4369,14 +4371,14 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
       ve != NULL ? ve->name : "");
     lock_release(rtld_bind_lock, &lockstate);
     LD_UTRACE(UTRACE_DLSYM_STOP, handle, NULL, 0, 0, name);
-    return NULL;
+    return (NULL);
 }
 
 void *
 dlsym(void *handle, const char *name)
 {
-	return do_dlsym(handle, name, __builtin_return_address(0), NULL,
-	    SYMLOOK_DLSYM);
+	return (do_dlsym(handle, name, __builtin_return_address(0), NULL,
+	    SYMLOOK_DLSYM));
 }
 
 dlfunc_t
@@ -4401,8 +4403,8 @@ dlvsym(void *handle, const char *name, const char *version)
 	ventry.file = NULL;
 	ventry.hash = elf_hash(version);
 	ventry.flags= 0;
-	return do_dlsym(handle, name, __builtin_return_address(0), &ventry,
-	    SYMLOOK_DLSYM);
+	return (do_dlsym(handle, name, __builtin_return_address(0), &ventry,
+	    SYMLOOK_DLSYM));
 }
 
 int
@@ -4437,7 +4439,7 @@ dladdr(const void *addr, Dl_info *info)
     if (obj == NULL) {
         _rtld_error("No shared object contains address");
 	lock_release(rtld_bind_lock, &lockstate);
-        return 0;
+        return (0);
     }
     info->dli_fname = obj->path;
     info->dli_fbase = obj->mapbase;
@@ -4493,7 +4495,7 @@ dladdr(const void *addr, Dl_info *info)
         }
     }
     lock_release(rtld_bind_lock, &lockstate);
-    return 1;
+    return (1);
 }
 
 int
@@ -5727,8 +5729,8 @@ allocate_tls(Obj_Entry *objs, void *oldtls, size_t tcbsize, size_t tcbalign)
     dtv = xcalloc(tls_max_index + 2, sizeof(Elf_Addr));
 
     segbase = (Elf_Addr)(tls + roundup(tls_static_space, ralign));
-    ((Elf_Addr*)segbase)[0] = segbase;
-    ((Elf_Addr*)segbase)[1] = (Elf_Addr) dtv;
+    ((Elf_Addr *)segbase)[0] = segbase;
+    ((Elf_Addr *)segbase)[1] = (Elf_Addr) dtv;
 
     dtv[0] = tls_dtv_generation;
     dtv[1] = tls_max_index;
@@ -5739,18 +5741,19 @@ allocate_tls(Obj_Entry *objs, void *oldtls, size_t tcbsize, size_t tcbalign)
 	 */
 	oldsegbase = (Elf_Addr) oldtls;
 	memcpy((void *)(segbase - tls_static_space),
-	       (const void *)(oldsegbase - tls_static_space),
-	       tls_static_space);
+	   (const void *)(oldsegbase - tls_static_space),
+	   tls_static_space);
 
 	/*
 	 * If any dynamic TLS blocks have been created tls_get_addr(),
 	 * move them over.
 	 */
-	olddtv = ((Elf_Addr**)oldsegbase)[1];
+	olddtv = ((Elf_Addr **)oldsegbase)[1];
 	for (i = 0; i < olddtv[1]; i++) {
-	    if (olddtv[i+2] < oldsegbase - size || olddtv[i+2] > oldsegbase) {
-		dtv[i+2] = olddtv[i+2];
-		olddtv[i+2] = 0;
+	    if (olddtv[i + 2] < oldsegbase - size ||
+		olddtv[i + 2] > oldsegbase) {
+		    dtv[i + 2] = olddtv[i + 2];
+		    olddtv[i + 2] = 0;
 	    }
 	}
 
@@ -5758,23 +5761,23 @@ allocate_tls(Obj_Entry *objs, void *oldtls, size_t tcbsize, size_t tcbalign)
 	 * We assume that this block was the one we created with
 	 * allocate_initial_tls().
 	 */
-	free_tls(oldtls, 2*sizeof(Elf_Addr), sizeof(Elf_Addr));
+	free_tls(oldtls, 2 * sizeof(Elf_Addr), sizeof(Elf_Addr));
     } else {
 	for (obj = objs; obj != NULL; obj = TAILQ_NEXT(obj, next)) {
 		if (obj->marker || obj->tlsoffset == 0)
 			continue;
 		addr = segbase - obj->tlsoffset;
-		memset((void*)(addr + obj->tlsinitsize),
-		       0, obj->tlssize - obj->tlsinitsize);
+		memset((void *)(addr + obj->tlsinitsize),
+		    0, obj->tlssize - obj->tlsinitsize);
 		if (obj->tlsinit) {
-		    memcpy((void*) addr, obj->tlsinit, obj->tlsinitsize);
-		    obj->static_tls_copied = true;
+			memcpy((void *)addr, obj->tlsinit, obj->tlsinitsize);
+			obj->static_tls_copied = true;
 		}
 		dtv[obj->tlsindex + 1] = addr;
 	}
     }
 
-    return (void*) segbase;
+    return ((void *)segbase);
 }
 
 void
@@ -5794,18 +5797,19 @@ free_tls(void *tls, size_t tcbsize  __unused, size_t tcbalign)
 	    ralign = tls_static_max_align;
     size = roundup(tls_static_space, ralign);
 
-    dtv = ((Elf_Addr**)tls)[1];
+    dtv = ((Elf_Addr **)tls)[1];
     dtvsize = dtv[1];
-    tlsend = (Elf_Addr) tls;
+    tlsend = (Elf_Addr)tls;
     tlsstart = tlsend - size;
     for (i = 0; i < dtvsize; i++) {
-	if (dtv[i + 2] != 0 && (dtv[i + 2] < tlsstart || dtv[i + 2] > tlsend)) {
-		free_aligned((void *)dtv[i + 2]);
+	    if (dtv[i + 2] != 0 && (dtv[i + 2] < tlsstart ||
+	        dtv[i + 2] > tlsend)) {
+		    free_aligned((void *)dtv[i + 2]);
 	}
     }
 
     free_aligned((void *)tlsstart);
-    free((void*) dtv);
+    free((void *)dtv);
 }
 
 #endif	/* TLS_VARIANT_II */
@@ -5842,11 +5846,11 @@ allocate_tls_offset(Obj_Entry *obj)
     size_t off;
 
     if (obj->tls_done)
-	return true;
+	return (true);
 
     if (obj->tlssize == 0) {
 	obj->tls_done = true;
-	return true;
+	return (true);
     }
 
     if (tls_last_offset == 0)
@@ -5869,7 +5873,7 @@ allocate_tls_offset(Obj_Entry *obj)
      */
     if (tls_static_space != 0) {
 	if (off > tls_static_space)
-	    return false;
+	    return (false);
     } else if (obj->tlsalign > tls_static_max_align) {
 	    tls_static_max_align = obj->tlsalign;
     }
@@ -5878,7 +5882,7 @@ allocate_tls_offset(Obj_Entry *obj)
     tls_last_size = obj->tlssize;
     obj->tls_done = true;
 
-    return true;
+    return (true);
 }
 
 void
@@ -5959,7 +5963,7 @@ locate_dependency(const Obj_Entry *obj, const char *name)
 
     STAILQ_FOREACH(entry, &list_main, link) {
 	if (object_match_name(entry->obj, name))
-	    return entry->obj;
+	    return (entry->obj);
     }
 
     for (needed = obj->needed;  needed != NULL;  needed = needed->next) {
@@ -6123,7 +6127,7 @@ rtld_verify_object_versions(Obj_Entry *obj)
 	    break;
 	vn = (const Elf_Verneed *)((const char *)vn + vn->vn_next);
     }
-    return 0;
+    return (0);
 }
 
 static int
@@ -6148,7 +6152,7 @@ rtld_verify_versions(const Objlist *objlist)
     }
     if (rc == 0 || ld_tracing != NULL)
     	rc = rtld_verify_object_versions(&obj_rtld);
-    return rc;
+    return (rc);
 }
 
 const Ver_Entry *
@@ -6162,10 +6166,10 @@ fetch_ventry(const Obj_Entry *obj, unsigned long symnum)
 	    _rtld_error("%s: symbol %s has wrong verneed value %d",
 		obj->path, obj->strtab + symnum, vernum);
 	} else if (obj->vertab[vernum].hash != 0) {
-	    return &obj->vertab[vernum];
+	    return (&obj->vertab[vernum]);
 	}
     }
-    return NULL;
+    return (NULL);
 }
 
 int
