@@ -41,7 +41,7 @@
 #include <sys/nv.h>
 #include <sys/dnv.h>
 #include <sys/sx.h>
-#ifdef COMPAT_FREEBSD32
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 #include <sys/sysent.h>
 #endif
 
@@ -634,7 +634,8 @@ done:
 }
 
 static int
-sndstat_unpack_user_nvlbuf(const void *unvlbuf, size_t nbytes, nvlist_t **nvl)
+sndstat_unpack_user_nvlbuf(const void * __capability unvlbuf, size_t nbytes,
+    nvlist_t **nvl)
 {
 	void *nvlbuf;
 	int err;
@@ -837,6 +838,46 @@ compat_sndstat_add_user_devs32(struct sndstat_file *pf, caddr_t data)
 }
 #endif
 
+#ifdef COMPAT_FREEBSD64
+static int
+compat_sndstat_get_devs64(struct sndstat_file *pf, caddr_t data)
+{
+	struct sndstat_nvlbuf_arg64 *arg64 = (struct sndstat_nvlbuf_arg64 *)data;
+	struct sndstat_nvlbuf_arg arg;
+	int err;
+
+	arg.buf = __USER_CAP(arg64->buf, arg64->nbytes);
+	arg.nbytes = arg64->nbytes;
+
+	err = sndstat_get_devs(pf, (caddr_t)&arg);
+	if (err == 0) {
+		arg64->buf = (__cheri_addr uint64_t)arg.buf;
+		arg64->nbytes = arg.nbytes;
+	}
+
+	return (err);
+}
+
+static int
+compat_sndstat_add_user_devs64(struct sndstat_file *pf, caddr_t data)
+{
+	struct sndstat_nvlbuf_arg64 *arg64 = (struct sndstat_nvlbuf_arg64 *)data;
+	struct sndstat_nvlbuf_arg arg;
+	int err;
+
+	arg.buf = __USER_CAP(arg64->buf, arg64->nbytes);
+	arg.nbytes = arg64->nbytes;
+
+	err = sndstat_add_user_devs(pf, (caddr_t)&arg);
+	if (err == 0) {
+		arg64->buf = (__cheri_addr uint64_t)arg.buf;
+		arg64->nbytes = arg.nbytes;
+	}
+
+	return (err);
+}
+#endif
+
 static int
 sndstat_ioctl(
     struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
@@ -861,6 +902,15 @@ sndstat_ioctl(
 		err = compat_sndstat_get_devs32(pf, data);
 		break;
 #endif
+#ifdef COMPAT_FREEBSD64
+	case SNDSTAT_GET_DEVS64:
+		if (SV_CURPROC_FLAG(SV_LP64 | SV_CHERI) != SV_LP64) {
+			err = ENODEV;
+			break;
+		}
+		err = compat_sndstat_get_devs64(pf, data);
+		break;
+#endif
 	case SNDSTAT_ADD_USER_DEVS:
 		err = sndstat_add_user_devs(pf, data);
 		break;
@@ -871,6 +921,15 @@ sndstat_ioctl(
 			break;
 		}
 		err = compat_sndstat_add_user_devs32(pf, data);
+		break;
+#endif
+#ifdef COMPAT_FREEBSD64
+	case SNDSTAT_ADD_USER_DEVS64:
+		if (SV_CURPROC_FLAG(SV_LP64 | SV_CHERI) != SV_LP64) {
+			err = ENODEV;
+			break;
+		}
+		err = compat_sndstat_add_user_devs64(pf, data);
 		break;
 #endif
 	case SNDSTAT_REFRESH_DEVS:

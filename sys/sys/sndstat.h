@@ -40,7 +40,7 @@
 
 struct sndstat_nvlbuf_arg {
 	size_t nbytes;	/* [IN/OUT] buffer size/number of bytes filled */
-	void *buf;	/* [OUT] buffer holding a packed nvlist */
+	void * __kerncap buf;	/* [OUT] buffer holding a packed nvlist */
 };
 
 /*
@@ -90,6 +90,21 @@ struct sndstat_nvlbuf_arg32 {
 	_IOC_NEWTYPE(SNDSTAT_ADD_USER_DEVS, struct sndstat_nvlbuf_arg32)
 
 #endif
+
+#ifdef COMPAT_FREEBSD64
+
+struct sndstat_nvlbuf_arg64 {
+	uint64_t nbytes;
+	uint64_t buf;
+};
+
+#define SNDSTAT_GET_DEVS64 \
+	_IOC_NEWTYPE(SNDSTAT_GET_DEVS, struct sndstat_nvlbuf_arg64)
+#define SNDSTAT_ADD_USER_DEVS64 \
+	_IOC_NEWTYPE(SNDSTAT_ADD_USER_DEVS, struct sndstat_nvlbuf_arg64)
+
+#endif
+
 #endif
 
 #endif /* !_SYS_SNDSTAT_H_ */
