@@ -1732,12 +1732,12 @@ static int
 link_elf_search_symbol(linker_file_t lf, ptraddr_t value,
     c_linker_sym_t *sym, long *diffp)
 {
-	elf_file_t ef = (elf_file_t) lf;
+	elf_file_t ef = (elf_file_t)lf;
 	u_long off = value;
 	u_long diff = off;
 	u_long st_value;
-	const Elf_Sym* es;
-	const Elf_Sym* best = NULL;
+	const Elf_Sym *es;
+	const Elf_Sym *best = NULL;
 	int i;
 
 	for (i = 0, es = ef->ddbsymtab; i < ef->ddbsymcnt; i++, es++) {
@@ -1847,7 +1847,7 @@ link_elf_each_function_nameval(linker_file_t file,
 {
 	linker_symval_t symval;
 	elf_file_t ef = (elf_file_t)file;
-	const Elf_Sym* symp;
+	const Elf_Sym *symp;
 	int i, error;
 
 	/* Exhaustive search */
