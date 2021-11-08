@@ -43,6 +43,7 @@ local generated_tag = "@" .. "generated"
 -- optionally specified.
 local config = {
 	os_id_keyword = "FreeBSD",
+	abi_arg_prefix = "",
 	abi_func_prefix = "",
 	sysargmap = "/dev/null",
 	sysargmap_h = "_SYS_SYSARGMAP_H_",
@@ -64,6 +65,8 @@ local config = {
 	abi_flags_mask = 0,
 	abi_headers = "",
 	abi_intptr_t = "intptr_t",
+	abi_ptr_t = "",
+	abi_syscallarg_t = "syscallarg_t",
 	ptr_intptr_t_cast = "intptr_t",
 	ptr_qualified="*",
 	ptrmaskname = "sysargmask",
@@ -636,7 +639,12 @@ local function process_args(args)
 			goto out
 		end
 
-		argtype = argtype:gsub("intptr_t", config["abi_intptr_t"])
+		if isptrtype(arg) and config["abi_ptr_t"] ~= "" then
+			argtype = config["abi_ptr_t"]
+		else
+			argtype = argtype:gsub("intptr_t",
+			    config["abi_intptr_t"])
+		end
 
 		-- XX TODO: Forward declarations? See: sysstubfwd in CheriBSD
 		if abi_change then
@@ -1166,6 +1174,7 @@ process_syscall_def = function(line)
 	elseif argalias ~= nil then
 		argalias = argprefix .. argalias
 	end
+	argalias = config['abi_arg_prefix'] .. argalias
 
 	local ncompatflags = get_mask({"STD", "NODEF", "NOARGS", "NOPROTO",
 	    "NOSTD"})
@@ -1298,8 +1307,8 @@ struct proc;
 
 struct thread;
 
-#define	PAD_(t)	(sizeof(syscallarg_t) <= sizeof(t) ? \
-		0 : sizeof(syscallarg_t) - sizeof(t))
+#define	PAD_(t)	(sizeof(%s) <= sizeof(t) ? \
+		0 : sizeof(%s) - sizeof(t))
 
 #if BYTE_ORDER == LITTLE_ENDIAN
 #define	PADL_(t)	0
@@ -1310,7 +1319,8 @@ struct thread;
 #endif
 
 ]], generated_tag, config['os_id_keyword'], config['sysproto_h'],
-    config['sysproto_h']))
+    config['sysproto_h'], config['abi_syscallarg_t'],
+    config['abi_syscallarg_t']))
 for _, v in pairs(compat_options) do
 	write_line(v["tmp"], string.format("\n#ifdef %s\n\n", v["definition"]))
 end
@@ -1388,7 +1398,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 process_sysfile(sysfile)
 
 write_line("sysinc",
-    "\n#define AS(name) (sizeof(struct name) / sizeof(syscallarg_t))\n")
+    "\n#define AS(name) (sizeof(struct name) / sizeof(%s))\n",
+    config['abi_syscallarg_t'])
 
 for _, v in pairs(compat_options) do
 	if v["count"] > 0 then
