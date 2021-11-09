@@ -2077,7 +2077,6 @@ deref:
 	SOCKBUF_UNLOCK_ASSERT(sb);
 
 	CURVNET_SET(so->so_vnet);
-	SOCK_LOCK(so);
 	sorele(so);
 	CURVNET_RESTORE();
 }
@@ -2424,7 +2423,6 @@ ktls_encrypt(struct ktls_wq *wq, struct mbuf *top)
 		mb_free_notready(top, total_pages);
 	}
 
-	SOCK_LOCK(so);
 	sorele(so);
 	CURVNET_RESTORE();
 }
@@ -2469,7 +2467,6 @@ ktls_encrypt_cb(struct ktls_ocf_encrypt_state *state, int error)
 		mb_free_notready(m, npages);
 	}
 
-	SOCK_LOCK(so);
 	sorele(so);
 	CURVNET_RESTORE();
 }
@@ -2520,7 +2517,6 @@ ktls_encrypt_async(struct ktls_wq *wq, struct mbuf *top)
 			counter_u64_add(ktls_offload_failed_crypto, 1);
 			free(state, M_KTLS);
 			CURVNET_SET(so->so_vnet);
-			SOCK_LOCK(so);
 			sorele(so);
 			CURVNET_RESTORE();
 			break;
@@ -2536,7 +2532,6 @@ ktls_encrypt_async(struct ktls_wq *wq, struct mbuf *top)
 		mb_free_notready(m, total_pages - npages);
 	}
 
-	SOCK_LOCK(so);
 	sorele(so);
 	CURVNET_RESTORE();
 }
@@ -2729,7 +2724,6 @@ ktls_disable_ifnet_help(void *context, int pending __unused)
 	}
 
 out:
-	SOCK_LOCK(so);
 	sorele(so);
 	if (!in_pcbrele_wlocked(inp))
 		INP_WUNLOCK(inp);

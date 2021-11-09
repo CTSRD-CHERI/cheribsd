@@ -339,11 +339,11 @@ struct socket {
  */
 #define	soref(so)	refcount_acquire(&(so)->so_count)
 #define	sorele(so) do {							\
-	SOCK_LOCK_ASSERT(so);						\
-	if (refcount_release(&(so)->so_count))				\
-		sofree(so);						\
-	else								\
-		SOCK_UNLOCK(so);					\
+	SOCK_UNLOCK_ASSERT(so);						\
+	if (!refcount_release_if_not_last(&(so)->so_count)) {		\
+		SOCK_LOCK(so);						\
+		sorele_locked(so);					\
+	}								\
 } while (0)
 
 /*
@@ -508,6 +508,7 @@ int	soreceive_dgram(struct socket *so, struct sockaddr **paddr,
 int	soreceive_generic(struct socket *so, struct sockaddr **paddr,
 	    struct uio *uio, struct mbuf **mp0, struct mbuf **controlp,
 	    int *flagsp);
+void	sorele_locked(struct socket *so);
 int	soreserve(struct socket *so, u_long sndcc, u_long rcvcc);
 void	sorflush(struct socket *so);
 int	sosend(struct socket *so, struct sockaddr *addr, struct uio *uio,
