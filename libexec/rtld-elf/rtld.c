@@ -592,7 +592,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		for (;; auxp++, auxpf++) {
 		    *auxp = *auxpf;
 		    if (auxp->a_type == AT_NULL)
-			break;
+			    break;
 		}
 		/* Since the auxiliary vector has moved, redigest it. */
 		for (i = 0;  i < AT_COUNT;  i++)
