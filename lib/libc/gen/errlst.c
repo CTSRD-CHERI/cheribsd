@@ -36,7 +36,7 @@
  *   "changes": [
  *     "support"
  *   ],
- *   "change_comment": "EPROT, ENOMETHOD"
+ *   "change_comment": "EPROT"
  * }
  * CHERI CHANGES END
  */
@@ -172,13 +172,13 @@ const char *const sys_errlist[] = {
 	"Previous owner died",			/* 96 - EOWNERDEAD */
 	"Integrity check failed",		/* 97 - EINTEGRITY */
 	"Memory protection violation",		/* 98 - EPROT */
-	"Object-capability method not defined",	/* 99 - ENOMETHOD */
 
 #ifndef __CHERI_PURE_CAPABILITY__
 /*
  * Reserved space in sys_errlist, take the next slot for a next error code.
  * Reserve prevents the array size from changing for some time.
  */
+	__uprefix,				/* 99 */
 	__uprefix,				/* 100 */
 	__uprefix,				/* 101 */
 	__uprefix,				/* 102 */
