@@ -2,6 +2,7 @@
 
 .include <src.opts.mk>
 
+SUBDIR=		tls_dso
 
 TESTS_SUBDIRS=	c063
 TESTS_SUBDIRS+=	db
@@ -20,10 +21,9 @@ TESTS_SUBDIRS+=	string
 TESTS_SUBDIRS+=	sys
 TESTS_SUBDIRS+=	termios
 TESTS_SUBDIRS+=	time
+TESTS_SUBDIRS+=	tls
 TESTS_SUBDIRS+=	ttyio
 
-SUBDIR=		tls_dso
-TESTS_SUBDIRS+=	tls
 SUBDIR_DEPEND_tls= tls_dso
 
 .if ${MK_ICONV} != "no"
