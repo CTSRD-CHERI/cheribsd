@@ -401,10 +401,11 @@ malloc_type_zone_allocated(struct malloc_type *mtp, void *addr,
 	}
 	if (zindx != -1) {
 		mtsp->mts_size |= 1 << zindx;
+	} else {
 #if __has_feature(capabilities)
-                mtsp->mts_numlarge += 1;
+		mtsp->mts_numlarge += 1;
 #endif
-        }
+	}
 
 #ifdef KDTRACE_HOOKS
 	if (__predict_false(dtrace_malloc_enabled)) {
@@ -693,6 +694,7 @@ void *
 	indx = kmemsize[size >> KMEM_ZSHIFT];
 	zone = kmemzones[indx].kz_zone[mtp_get_subzone(mtp)];
 	va = uma_zalloc(zone, flags);
+	// XXX-AM: record fragmentation metric for zone-based kernel malloc
 	if (va != NULL) {
 		size = zone->uz_size;
 		if ((flags & M_ZERO) == 0) {
