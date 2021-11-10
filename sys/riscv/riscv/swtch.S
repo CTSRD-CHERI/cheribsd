@@ -536,7 +536,14 @@ ENTRY(cpu_switch)
 #else
 	lw	t0, _C_LABEL(qemu_trace_perthread)
 #endif
-	beqz	t0, .Lout_qemu_tracing
+	/*
+	 * Set t1 to ensure that tracing is not disabled after the ctx_switch
+	 * event. This register is used below to cache the MDTD_QTRACE flag of
+	 * the next thread, if we are not tracing perthread assume that we
+	 * are tracing everything and tracing might be active.
+	 */
+	li	t1, 0x1
+	beqz	t0, .Lqemu_ctx_switch_event
 
 	/*
 	 * When pausing/resuming, take care that the context switch
