@@ -1621,7 +1621,6 @@ _sysent_dirs+=	sys/compat/freebsd32
 _sysent_dirs+=	sys/compat/freebsd64
 _sysent_dirs+=	sys/amd64/linux		\
 		sys/amd64/linux32	\
-		sys/arm/linux		\
 		sys/arm64/linux		\
 		sys/i386/linux
 
