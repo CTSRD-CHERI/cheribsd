@@ -218,13 +218,6 @@ __libc_free_tls(void *tcb, size_t tcbsize, size_t tcbalign __unused)
 {
 	intptr_t *dtv;
 	intptr_t **tls;
-	size_t tcbextra, tcbshift;
-
-	assert(tcbalign >= TLS_TCB_ALIGN);
-	assert(tcbsize >= TLS_TCB_SIZE);
-	tcbextra = tcbsize - TLS_TCB_SIZE;
-	tcbshift = roundup2(TLS_TCB_SIZE + tcbextra, tcbalign) -
-	    (TLS_TCB_SIZE + tcbextra);
 
 	tls_free_aligned(tcb);
 	tls = (intptr_t **)tcb;
