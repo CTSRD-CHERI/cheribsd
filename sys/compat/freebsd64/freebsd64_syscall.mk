@@ -425,4 +425,5 @@ MIASM =  \
 	freebsd64___specialfd.o \
 	freebsd64_aio_writev.o \
 	freebsd64_aio_readv.o \
-	freebsd64_fspacectl.o
+	freebsd64_fspacectl.o \
+	sched_getcpu.o

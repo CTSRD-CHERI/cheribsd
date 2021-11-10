@@ -587,4 +587,5 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_aio_writev",			/* 578 = freebsd64_aio_writev */
 	"freebsd64_aio_readv",			/* 579 = freebsd64_aio_readv */
 	"freebsd64_fspacectl",			/* 580 = freebsd64_fspacectl */
+	"sched_getcpu",			/* 581 = sched_getcpu */
 };

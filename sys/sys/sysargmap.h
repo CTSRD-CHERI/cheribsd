@@ -406,6 +406,7 @@ static int sysargmask[] = {
 	[SYS_aio_writev] = (0x0 | 0x1),
 	[SYS_aio_readv] = (0x0 | 0x1),
 	[SYS_fspacectl] = (0x0 | 0x4 | 0x10),
+	[SYS_sched_getcpu] = (0x0),
 };
 
 #endif /* !_SYSARGMAP_H_ */

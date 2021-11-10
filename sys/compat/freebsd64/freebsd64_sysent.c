@@ -625,4 +625,5 @@ struct sysent freebsd64_sysent[] = {
 	{ .sy_narg = AS(freebsd64_aio_writev_args), .sy_call = (sy_call_t *)freebsd64_aio_writev, .sy_auevent = AUE_AIO_WRITEV, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 578 = freebsd64_aio_writev */
 	{ .sy_narg = AS(freebsd64_aio_readv_args), .sy_call = (sy_call_t *)freebsd64_aio_readv, .sy_auevent = AUE_AIO_READV, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 579 = freebsd64_aio_readv */
 	{ .sy_narg = AS(freebsd64_fspacectl_args), .sy_call = (sy_call_t *)freebsd64_fspacectl, .sy_auevent = AUE_FSPACECTL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 580 = freebsd64_fspacectl */
+	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_sched_getcpu, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 581 = sched_getcpu */
 };

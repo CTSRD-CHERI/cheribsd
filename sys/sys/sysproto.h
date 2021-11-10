@@ -1864,6 +1864,9 @@ struct fspacectl_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 	char rmsr_l_[PADL_(struct spacectl_range * __capability)]; struct spacectl_range * __capability rmsr; char rmsr_r_[PADR_(struct spacectl_range * __capability)];
 };
+struct sched_getcpu_args {
+	register_t dummy;
+};
 int	nosys(struct thread *, struct nosys_args *);
 void	sys_sys_exit(struct thread *, struct sys_exit_args *);
 int	sys_fork(struct thread *, struct fork_args *);
@@ -2261,6 +2264,7 @@ int	sys___specialfd(struct thread *, struct __specialfd_args *);
 int	sys_aio_writev(struct thread *, struct aio_writev_args *);
 int	sys_aio_readv(struct thread *, struct aio_readv_args *);
 int	sys_fspacectl(struct thread *, struct fspacectl_args *);
+int	sys_sched_getcpu(struct thread *, struct sched_getcpu_args *);
 
 #ifdef COMPAT_43
 
@@ -3208,6 +3212,7 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 #define	SYS_AUE_aio_writev	AUE_AIO_WRITEV
 #define	SYS_AUE_aio_readv	AUE_AIO_READV
 #define	SYS_AUE_fspacectl	AUE_FSPACECTL
+#define	SYS_AUE_sched_getcpu	AUE_NULL
 
 #undef PAD_
 #undef PADL_
