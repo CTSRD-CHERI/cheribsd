@@ -219,7 +219,6 @@ __libc_free_tls(void *tcb, size_t tcbsize, size_t tcbalign __unused)
 	intptr_t *dtv;
 	intptr_t **tls;
 
-	tls_free_aligned(tcb);
 	tls = (intptr_t **)tcb;
 	dtv = tls[0];
 	tls_free(dtv);
