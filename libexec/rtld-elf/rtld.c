@@ -6577,6 +6577,7 @@ static const struct auxfmt {
 	AUXFMT(AT_ENVV, "%p"),
 	AUXFMT(AT_PS_STRINGS, "%p"),
 	AUXFMT(AT_FXRNG, "%p"),
+	AUXFMT(AT_KPRELOAD, "%p"),
 };
 
 static bool
