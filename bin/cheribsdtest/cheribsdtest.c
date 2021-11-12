@@ -374,6 +374,23 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 
 	(void)waitpid(childpid, &status, 0);
 
+	/**
+	 * If the test explicitly signalled failure for some reason, report
+	 * this first.
+	 */
+	if (ccsp->ccs_testresult == TESTRESULT_FAILURE) {
+		/*
+		 * Ensure string is nul-terminated, as we will print
+		 * it in due course, and a failed test might have left
+		 * a corrupted string.
+		 */
+		ccsp->ccs_testresult_str[sizeof(ccsp->ccs_testresult_str) - 1] =
+		    '\0';
+		memcpy(reason, ccsp->ccs_testresult_str,
+		    sizeof(ccsp->ccs_testresult_str));
+		goto fail;
+	}
+
 	/*
 	 * First, check for errors from the test framework: successful process
 	 * termination, signal disposition/exception codes/etc.  Analyse
@@ -450,18 +467,6 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		if (ccsp->ccs_testresult == TESTRESULT_UNKNOWN) {
 			snprintf(reason, sizeof(reason),
 			    "Test failed to set a success/failure status");
-			goto fail;
-		}
-		if (ccsp->ccs_testresult == TESTRESULT_FAILURE) {
-			/*
-			 * Ensure string is nul-terminated, as we will print
-			 * it in due course, and a failed test might have left
-			 * a corrupted string.
-			 */
-			ccsp->ccs_testresult_str[
-			    sizeof(ccsp->ccs_testresult_str) - 1] = '\0';
-			memcpy(reason, ccsp->ccs_testresult_str,
-			    sizeof(ccsp->ccs_testresult_str));
 			goto fail;
 		}
 		if (ccsp->ccs_testresult != TESTRESULT_SUCCESS) {
