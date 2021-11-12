@@ -506,12 +506,34 @@ kern_mmap(struct thread *td, struct mmap_req *mrp)
 	    (error = vm_wxcheck(p, "mmap")))
 		return (error);
 
+#if 0
+	/* XXX we could give an error for PROT_MTE on non-MAP_ANON mappings
+		but we'd have to fix all uses of PROT_ALL so for now we just clear
+		PROT_MTE below if MAP_ANON is not set */
+	/* Only allow PROT_MTE on MAP_ANON mappings (at least for now). */
+	if (((prot & PROT_MTE) != 0 || (max_prot & PROT_MTE) != 0)
+		&& (flags & MAP_ANON) == 0) {
+		SYSERRCAUSE("%s: PROT_MTE requested for non-MAP_ANON mapping",
+		    __func__);
+		return (ENOTSUP);
+	}
+#endif
+
 	/*
 	 * Always honor PROT_MAX if set.  If not, default to all
 	 * permissions unless we're implying maximum permissions.
 	 */
 	if (max_prot == 0)
 		max_prot = kern_mmap_maxprot(p, prot);
+
+	/* 
+	 * Clear PROT_MTE for non-MAP_ANON mappings (may be included in max_prot
+	 * from kern_mmap_maxprot).
+	 */
+	if ((flags & MAP_ANON) == 0) {
+		prot &= ~PROT_MTE;
+		max_prot &= ~PROT_MTE;
+	}
 
 	vms = p->p_vmspace;
 	fp = NULL;
@@ -582,9 +604,9 @@ kern_mmap(struct thread *td, struct mmap_req *mrp)
 		return (EINVAL);
 	}
 	if (prot != PROT_NONE &&
-	    (prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC)) != 0) {
+	    (prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC | PROT_MTE)) != 0) {
 		SYSERRCAUSE("%s: Unexpected protections 0x%x", __func__,
-		    (prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC)));
+		    (prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC | PROT_MTE)));
 		return (EINVAL);
 	}
 	if ((flags & MAP_GUARD) != 0 && (prot != PROT_NONE || fd != -1 ||
@@ -776,6 +798,7 @@ kern_mmap(struct thread *td, struct mmap_req *mrp)
 		}
 		if (max_prot & PROT_EXEC)
 			cap_rights_set_one(&rights, CAP_MMAP_X);
+		/* NB returned cap_maxprot excludes PROT_MTE, which is fine. */
 		error = fget_mmap(td, fd, &rights, &cap_maxprot, &fp);
 		if (error != 0)
 			goto done;

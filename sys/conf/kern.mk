@@ -150,6 +150,8 @@ CFLAGS+=	-march=morello
 RISCV_MARCH=	rv64imafdc
 .if ${MACHINE_CPU:Mcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
+# XXX find a good place for this
+CFLAGS+=	-Xclang -target-feature -Xclang +xcherimemversion
 .endif
 
 RISCV_ABI=	lp64

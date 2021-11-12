@@ -83,6 +83,19 @@ static inline void * __capability _cheri_setversion(void * __capability c, int v
 }
 #define cheri_setversion(x, y) _cheri_setversion(x, y)
 
+/* XXX temporary static inline function until compiler builtin exists */
+static inline int _cheri_loadversion(void * __capability c) {
+	int v;
+	__asm__ __volatile__ ("cloadversion %0, (%1)": "=r"(v) : "C"(c));
+	return v;
+}
+#define cheri_loadversion(x) _cheri_loadversion(x)
+
+/* XXX temporary static inline function until compiler builtin exists */
+static inline void _cheri_storeversion(void * __capability c, int v) {
+	__asm__ __volatile ("cstoreversion %0, (%1)" :: "r" (v), "C" (c) : "memory");
+}
+#define cheri_storeversion(x, y) _cheri_storeversion(x, y)
 /*
  * Soft implementation of cheri_subset_test().
  * Test whether a capability is a subset of another.
