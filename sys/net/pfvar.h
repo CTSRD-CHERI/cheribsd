@@ -1305,7 +1305,9 @@ struct pfioc_iface {
 #define	DIOCSETIFFLAG	_IOWR('D', 89, struct pfioc_iface)
 #define	DIOCCLRIFFLAG	_IOWR('D', 90, struct pfioc_iface)
 #define	DIOCKILLSRCNODES	_IOWR('D', 91, struct pfioc_src_node_kill)
-#define	DIOCKEEPCOUNTERS	_IOWR('D', 92, struct pfioc_nv)
+#define	DIOCGIFSPEEDV0	_IOWR('D', 92, struct pf_ifspeed_v0)
+#define	DIOCGIFSPEEDV1	_IOWR('D', 92, struct pf_ifspeed_v1)
+#define	DIOCKEEPCOUNTERS	_IOWR('D', 96, struct pfioc_nv)
 
 struct pf_ifspeed_v0 {
 	char			ifname[IFNAMSIZ];
@@ -1321,9 +1323,6 @@ struct pf_ifspeed_v1 {
 
 /* Latest version of struct pf_ifspeed_vX */
 #define PF_IFSPEED_VERSION	1
-
-#define	DIOCGIFSPEEDV0	_IOWR('D', 92, struct pf_ifspeed_v0)
-#define	DIOCGIFSPEEDV1	_IOWR('D', 92, struct pf_ifspeed_v1)
 
 /*
  * Compatibility and convenience macros
