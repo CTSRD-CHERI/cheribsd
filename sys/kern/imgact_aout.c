@@ -106,10 +106,18 @@ struct sysentvec aout_sysvec = {
 
 #elif defined(__amd64__)
 
+#include "vdso_ia32_offsets.h"
+
+extern const char _binary_elf_vdso32_so_1_start[];
+extern const char _binary_elf_vdso32_so_1_end[];
+extern char _binary_elf_vdso32_so_1_size;
+
 #define	AOUT32_MINUSER		FREEBSD32_MINUSER
 
 extern const char *freebsd32_syscallnames[];
 extern u_long ia32_maxssiz;
+
+static int aout_szsigcode;
 
 struct sysentvec aout_sysvec = {
 	.sv_size	= FREEBSD32_SYS_MAXSYSCALL,
@@ -117,8 +125,8 @@ struct sysentvec aout_sysvec = {
 	.sv_transtrap	= NULL,
 	.sv_fixup	= aout_fixup,
 	.sv_sendsig	= ia32_sendsig,
-	.sv_sigcode	= ia32_sigcode,
-	.sv_szsigcode	= &sz_ia32_sigcode,
+	.sv_sigcode	= _binary_elf_vdso32_so_1_start,
+	.sv_szsigcode	= &aout_szsigcode,
 	.sv_name	= "FreeBSD a.out",
 	.sv_coredump	= NULL,
 	.sv_imgact_try	= NULL,
@@ -140,6 +148,13 @@ struct sysentvec aout_sysvec = {
 	.sv_onexit	= exit_onexit,
 	.sv_set_fork_retval = x86_set_fork_retval,
 };
+
+static void
+aout_sysent(void *arg __unused)
+{
+	aout_szsigcode = (int)(uintptr_t)&_binary_elf_vdso32_so_1_size;
+}
+SYSINIT(aout_sysent, SI_SUB_EXEC, SI_ORDER_ANY, aout_sysent, NULL);
 #else
 #error "Only ia32 arch is supported"
 #endif
