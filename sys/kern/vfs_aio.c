@@ -769,7 +769,6 @@ aio_process_rw(struct kaiocb *job)
 {
 	struct ucred *td_savedcred;
 	struct thread *td;
-	struct aiocb *cb;
 	struct file *fp;
 	ssize_t cnt;
 	long msgsnd_st, msgsnd_end;
@@ -789,7 +788,6 @@ aio_process_rw(struct kaiocb *job)
 	td_savedcred = td->td_ucred;
 	td->td_ucred = job->cred;
 	job->uiop->uio_td = td;
-	cb = &job->uaiocb;
 	fp = job->fd_file;
 
 	opcode = job->uaiocb.aio_lio_opcode;
@@ -2527,7 +2525,7 @@ aio_biowakeup(struct bio *bp)
 	size_t nbytes;
 	long bcount = bp->bio_bcount;
 	long resid = bp->bio_resid;
-	int error, opcode, nblks;
+	int opcode, nblks;
 	int bio_error = bp->bio_error;
 	uint16_t flags = bp->bio_flags;
 
@@ -2538,7 +2536,6 @@ aio_biowakeup(struct bio *bp)
 	nbytes =bcount - resid;
 	atomic_add_acq_long(&job->nbytes, nbytes);
 	nblks = btodb(nbytes);
-	error = 0;
 	/*
 	 * If multiple bios experienced an error, the job will reflect the
 	 * error of whichever failed bio completed last.
