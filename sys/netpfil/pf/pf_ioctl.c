@@ -4665,6 +4665,15 @@ DIOCCHANGEADDR_error:
 		pf_kill_srcnodes((struct pfioc_src_node_kill *)addr);
 		break;
 
+#ifdef COMPAT_FREEBSD13
+#if !__has_feature(capabilities)
+	/*
+	 * The FreeBSD 13 value clashes with DIOCGIFSPEEDV0 for the
+	 * purecap ABI.
+	 */
+	case DIOCKEEPCOUNTERS_FREEBSD13:
+#endif
+#endif
 	case DIOCKEEPCOUNTERS:
 		error = pf_keepcounters((struct pfioc_nv *)addr);
 		break;
