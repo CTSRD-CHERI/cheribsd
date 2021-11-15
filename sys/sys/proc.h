@@ -396,9 +396,15 @@ struct thread {
 #endif
 };
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	T0ST_SCHED_SIZE 11
+#else
+#define	T0ST_SCHED_SIZE 10
+#endif
+
 struct thread0_storage {
 	struct thread t0st_thread;
-	uint64_t t0st_sched[10];
+	uint64_t t0st_sched[T0ST_SCHED_SIZE];
 } __no_subobject_bounds;
 
 struct mtx *thread_lock_block(struct thread *);
