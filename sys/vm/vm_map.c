@@ -3976,7 +3976,7 @@ retry:
 			ret = FALSE;
 			continue;
 		}
-		if (vm_page_sleep_if_busy(m, "mpgout")) {
+		if (vm_page_busy_sleep(m, "mpgout", 0)) {
 			VM_OBJECT_WUNLOCK(object);
 			goto retry;
 		}

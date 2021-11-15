@@ -1399,7 +1399,8 @@ next_page:
 				 */
 				vm_page_aflag_set(tm, PGA_REFERENCED);
 			}
-			vm_page_busy_sleep(tm, "madvpo", false);
+			if (!vm_page_busy_sleep(tm, "madvpo", 0))
+				VM_OBJECT_WUNLOCK(tobject);
   			goto relookup;
 		}
 		vm_page_advise(tm, advice);
@@ -1583,7 +1584,8 @@ retry:
 		 */
 		if (vm_page_tryxbusy(m) == 0) {
 			VM_OBJECT_WUNLOCK(new_object);
-			vm_page_sleep_if_busy(m, "spltwt");
+			if (vm_page_busy_sleep(m, "spltwt", 0))
+				VM_OBJECT_WLOCK(orig_object);
 			VM_OBJECT_WLOCK(new_object);
 			goto retry;
 		}
@@ -1669,14 +1671,17 @@ vm_object_collapse_scan_wait(vm_object_t object, vm_page_t p)
 		VM_OBJECT_WUNLOCK(object);
 		VM_OBJECT_WUNLOCK(backing_object);
 		vm_radix_wait();
+		VM_OBJECT_WLOCK(object);
+	} else if (p->object == object) {
+		VM_OBJECT_WUNLOCK(backing_object);
+		if (vm_page_busy_sleep(p, "vmocol", 0))
+			VM_OBJECT_WLOCK(object);
 	} else {
-		if (p->object == object)
+		VM_OBJECT_WUNLOCK(object);
+		if (!vm_page_busy_sleep(p, "vmocol", 0))
 			VM_OBJECT_WUNLOCK(backing_object);
-		else
-			VM_OBJECT_WUNLOCK(object);
-		vm_page_busy_sleep(p, "vmocol", false);
+		VM_OBJECT_WLOCK(object);
 	}
-	VM_OBJECT_WLOCK(object);
 	VM_OBJECT_WLOCK(backing_object);
 	return (TAILQ_FIRST(&backing_object->memq));
 }
@@ -2105,7 +2110,8 @@ again:
 		 * not specified.
 		 */
 		if (vm_page_tryxbusy(p) == 0) {
-			vm_page_sleep_if_busy(p, "vmopar");
+			if (vm_page_busy_sleep(p, "vmopar", 0))
+				VM_OBJECT_WLOCK(object);
 			goto again;
 		}
 		if (vm_page_wired(p)) {
@@ -2409,7 +2415,10 @@ again:
 					VM_OBJECT_RUNLOCK(tobject);
 				tobject = t1object;
 			}
-			vm_page_busy_sleep(tm, "unwbo", true);
+			tobject = tm->object;
+			if (!vm_page_busy_sleep(tm, "unwbo",
+			    VM_ALLOC_IGN_SBUSY))
+				VM_OBJECT_RUNLOCK(tobject);
 			goto again;
 		}
 		vm_page_unwire(tm, queue);
