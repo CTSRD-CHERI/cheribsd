@@ -294,7 +294,7 @@ freebsd64_kevent(struct thread *td, struct freebsd64_kevent_args *uap)
 }
 
 #ifdef COMPAT_FREEBSD11
-struct kevent_freebsd1164 {
+struct freebsd11_kevent64 {
 	uint64_t	ident;	/* (uintptr_t) identifier for this event */
 	short		filter;	/* filter for event */
 	unsigned short	flags;
@@ -307,7 +307,7 @@ static int
 kevent11_freebsd64_copyout(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd11_freebsd64_kevent_args *uap;
-	struct kevent_freebsd1164 kev11;
+	struct freebsd11_kevent64 kev11;
 	int error, i;
 
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
@@ -337,7 +337,7 @@ static int
 kevent11_freebsd64_copyin(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd11_freebsd64_kevent_args *uap;
-	struct kevent_freebsd1164 kev11;
+	struct freebsd11_kevent64 kev11;
 	int error, i;
 
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
@@ -369,7 +369,7 @@ freebsd11_freebsd64_kevent(struct thread *td,
 		.arg = uap,
 		.k_copyout = kevent11_freebsd64_copyout,
 		.k_copyin = kevent11_freebsd64_copyin,
-		.kevent_size = sizeof(struct kevent_freebsd1164),
+		.kevent_size = sizeof(struct freebsd11_kevent64),
 	};
 	struct g_kevent_args gk_args = {
 		.fd = uap->fd,
@@ -381,7 +381,7 @@ freebsd11_freebsd64_kevent(struct thread *td,
 	};
 
 	return (kern_kevent_generic(td, &gk_args, &k_ops,
-	    "kevent_freebsd1164"));
+	    "freebsd11_kevent64"));
 }
 #endif
 

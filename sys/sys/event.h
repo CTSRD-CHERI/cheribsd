@@ -104,7 +104,7 @@ struct g_kevent_args {
 
 #if defined(_WANT_FREEBSD11_KEVENT)
 /* Older structure used in FreeBSD 11.x and older. */
-struct kevent_freebsd11 {
+struct freebsd11_kevent {
 	__kuintcap_t	ident;		/* identifier for this event */
 	short		filter;		/* filter for event */
 	unsigned short	flags;
@@ -132,7 +132,7 @@ struct kevent32 {
 };
 
 #ifdef _WANT_FREEBSD11_KEVENT
-struct kevent32_freebsd11 {
+struct freebsd11_kevent32 {
 	u_int32_t	ident;		/* identifier for this event */
 	short		filter;		/* filter for event */
 	u_short		flags;
