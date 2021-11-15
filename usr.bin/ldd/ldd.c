@@ -280,7 +280,7 @@ main(int argc, char *argv[])
 				err(1, "fork");
 				break;
 			case 0:
-				if (fmt1 == NULL && fmt2 == NULL) {
+				if (fmt1 == NULL && fmt2 == NULL && !aflag) {
 					dlopen(*argv, RTLD_TRACE);
 					warnx("%s: %s", *argv, dlerror());
 				} else {
