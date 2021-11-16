@@ -72,6 +72,8 @@ cheri_revoke_cap(uintcap_t c)
 #else
 	/* No need to handle sealed things specially */
 	return cheri_cleartag(c);
+
+	/* TODO: Also replace-with-NULL */
 #endif
 }
 
