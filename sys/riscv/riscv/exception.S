@@ -205,16 +205,16 @@ __FBSDID("$FreeBSD$");
 #else
 	csrr	t0, sstatus
 	sd	t0, (TF_SSTATUS)(sp)
-.if \mode == 1
-	/* Disable user address access for supervisor mode exceptions. */
-	li	t0, SSTATUS_SUM
-	csrc	sstatus, t0
-.endif
 	csrr	t0, stval
 	sd	t0, (TF_STVAL)(sp)
 	csrr	t0, scause
 	sd	t0, (TF_SCAUSE)(sp)
 #endif
+.if \mode == 1
+	/* Disable user address access for supervisor mode exceptions. */
+	li	t0, SSTATUS_SUM
+	csrc	sstatus, t0
+.endif
 
 .if \mode == 0
 #ifdef __CHERI_PURE_CAPABILITY__
