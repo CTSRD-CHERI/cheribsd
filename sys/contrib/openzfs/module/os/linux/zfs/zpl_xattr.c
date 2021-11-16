@@ -306,15 +306,15 @@ zpl_xattr_get_dir(struct inode *ip, const char *name, void *value,
 	iov.iov_base = (void *)value;
 	iov.iov_len = size;
 
-	uio_t uio;
-	uio_iovec_init(&uio, &iov, 1, 0, UIO_SYSSPACE, size, 0);
+	zfs_uio_t uio;
+	zfs_uio_iovec_init(&uio, &iov, 1, 0, UIO_SYSSPACE, size, 0);
 
 	cookie = spl_fstrans_mark();
 	error = -zfs_read(ITOZ(xip), &uio, 0, cr);
 	spl_fstrans_unmark(cookie);
 
 	if (error == 0)
-		error = size - uio_resid(&uio);
+		error = size - zfs_uio_resid(&uio);
 out:
 	if (xzp)
 		zrele(xzp);
@@ -1233,7 +1233,7 @@ __zpl_xattr_acl_set_access(struct inode *ip, const char *name,
 	if (ITOZSB(ip)->z_acl_type != ZFS_ACLTYPE_POSIX)
 		return (-EOPNOTSUPP);
 
-	if (!inode_owner_or_capable(ip))
+	if (!zpl_inode_owner_or_capable(kcred->user_ns, ip))
 		return (-EPERM);
 
 	if (value) {
@@ -1273,7 +1273,7 @@ __zpl_xattr_acl_set_default(struct inode *ip, const char *name,
 	if (ITOZSB(ip)->z_acl_type != ZFS_ACLTYPE_POSIX)
 		return (-EOPNOTSUPP);
 
-	if (!inode_owner_or_capable(ip))
+	if (!zpl_inode_owner_or_capable(kcred->user_ns, ip))
 		return (-EPERM);
 
 	if (value) {

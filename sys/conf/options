@@ -229,6 +229,7 @@ ZSTDIO		opt_zstdio.h
 
 # Sanitizers
 COVERAGE	opt_global.h
+KASAN		opt_global.h
 KCOV
 KCSAN		opt_global.h
 KUBSAN		opt_global.h
@@ -573,7 +574,6 @@ TI_JUMBO_HDRSPLIT	opt_ti.h
 # Misc debug flags.  Most of these should probably be replaced with
 # 'DEBUG', and then let people recompile just the interesting modules
 # with 'make CC="cc -DDEBUG"'.
-CLUSTERDEBUG		opt_debug_cluster.h
 DEBUG_1284		opt_ppb_1284.h
 LPT_DEBUG		opt_lpt.h
 PLIP_DEBUG		opt_plip.h
@@ -708,6 +708,7 @@ ACPI_DEBUG		opt_acpi.h
 ACPI_MAX_TASKS		opt_acpi.h
 ACPI_MAX_THREADS	opt_acpi.h
 DEV_ACPI		opt_acpi.h
+ACPI_EARLY_EPYC_WAR	opt_acpi.h
 
 # options for IOMMU support
 IOMMU			opt_iommu.h

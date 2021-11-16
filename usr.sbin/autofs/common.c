@@ -140,7 +140,7 @@ create_directory(const char *path)
 	 */
 	copy = tofree = checked_strdup(path + 1);
 
-	partial = checked_strdup("");
+	partial = checked_strdup("/");
 	for (;;) {
 		component = strsep(&copy, "/");
 		if (component == NULL)
@@ -1202,6 +1202,19 @@ lesser_daemon(void)
 		/* Bloody hell. */
 		log_warn("close");
 	}
+}
+
+/*
+ * Applicable to NFSv3 only, see rpc.umntall(8).
+ */
+void
+rpc_umntall(void)
+{
+	FILE *f;
+
+	f = auto_popen("rpc.umntall", "-k", NULL);
+	assert(f != NULL);
+	auto_pclose(f);
 }
 
 int

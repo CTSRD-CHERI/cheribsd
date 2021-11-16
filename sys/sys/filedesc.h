@@ -177,6 +177,11 @@ struct filedesc_to_leader {
 					    SX_NOTRECURSED)
 #define	FILEDESC_UNLOCK_ASSERT(fdp)	sx_assert(&(fdp)->fd_sx, SX_UNLOCKED)
 
+#define	FILEDESC_IS_ONLY_USER(fdp)	({					\
+	struct filedesc *_fdp = (fdp);						\
+	MPASS(curproc->p_fd == _fdp);						\
+	(curproc->p_numthreads == 1 && refcount_load(&_fdp->fd_refcnt) == 1);	\
+})
 #else
 
 /*
@@ -260,6 +265,8 @@ struct filedesc_to_leader *
 	    struct filedesc *fdp, struct proc *leader);
 int	getvnode(struct thread *td, int fd, cap_rights_t *rightsp,
 	    struct file **fpp);
+int	getvnode_path(struct thread *td, int fd, cap_rights_t *rightsp,
+	    struct file **fpp);
 void	mountcheckdirs(struct vnode *olddp, struct vnode *newdp);
 
 int	fget_cap_locked(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
@@ -272,6 +279,13 @@ int	fget_unlocked_seq(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
 	    struct file **fpp, seqc_t *seqp);
 int	fget_unlocked(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
 	    struct file **fpp);
+/* Return a file pointer without a ref. FILEDESC_IS_ONLY_USER must be true.  */
+int	fget_only_user(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
+	    struct file **fpp);
+#define	fput_only_user(fdp, fp)	({					\
+	MPASS(FILEDESC_IS_ONLY_USER(fdp));				\
+	MPASS(refcount_load(&fp->f_count) > 0);				\
+})
 
 /* Requires a FILEDESC_{S,X}LOCK held and returns without a ref. */
 static __inline struct file *
@@ -321,6 +335,7 @@ void	pdunshare(struct thread *td);
 
 void	pwd_chdir(struct thread *td, struct vnode *vp);
 int	pwd_chroot(struct thread *td, struct vnode *vp);
+int	pwd_chroot_chdir(struct thread *td, struct vnode *vp);
 void	pwd_ensure_dirs(void);
 void	pwd_set_rootvnode(void);
 

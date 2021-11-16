@@ -88,9 +88,11 @@ struct xprison {
 };
 #define	XPRISON_VERSION		3
 
-#define	PRISON_STATE_INVALID	0
-#define	PRISON_STATE_ALIVE	1
-#define	PRISON_STATE_DYING	2
+enum prison_state {
+    PRISON_STATE_INVALID = 0,	/* New prison, not ready to be seen */
+    PRISON_STATE_ALIVE,		/* Current prison, visible to all */
+    PRISON_STATE_DYING		/* Removed but holding resources, */
+};				/* optionally visible. */
 
 /*
  * Flags for jail_set and jail_get.
@@ -155,7 +157,9 @@ struct prison_racct;
  *   (m) locked by pr_mtx
  *   (p) locked by pr_mtx, and also at least shared allprison_lock required
  *       to update
- *   (r) atomic via refcount(9), pr_mtx required to decrement to zero
+ *   (q) locked by both pr_mtx and allprison_lock
+ *   (r) atomic via refcount(9), pr_mtx and allprison_lock required to
+ *       decrement to zero
  */
 struct prison {
 	TAILQ_ENTRY(prison) pr_list;			/* (a) all prisons */
@@ -184,7 +188,8 @@ struct prison {
 	int		 pr_securelevel;		/* (p) securelevel */
 	int		 pr_enforce_statfs;		/* (p) statfs permission */
 	int		 pr_devfs_rsnum;		/* (p) devfs ruleset */
-	int		 pr_spare[3];
+	enum prison_state pr_state;			/* (q) state in life cycle */
+	int		 pr_spare[2];
 	int		 pr_osreldate;			/* (c) kern.osreldate value */
 	unsigned long	 pr_hostid;			/* (p) jail hostid */
 	char		 pr_name[MAXHOSTNAMELEN];	/* (p) admin jail name */
@@ -216,10 +221,13 @@ struct prison_racct {
 					/* primary jail address. */
 
 /* Internal flag bits */
+#define	PR_REMOVE	0x01000000	/* In process of being removed */
 #define	PR_IP4		0x02000000	/* IPv4 restricted or disabled */
 					/* by this jail or an ancestor */
 #define	PR_IP6		0x04000000	/* IPv6 restricted or disabled */
 					/* by this jail or an ancestor */
+#define PR_COMPLETE_PROC 0x08000000	/* prison_complete called from */
+					/* prison_proc_free, releases uref */
 
 /*
  * Flags for pr_allow
@@ -332,6 +340,19 @@ prison_unlock(struct prison *pr)
 		if ((descend) ? (prison_lock(cpr), 0) : 1)		\
 			;						\
 		else
+
+/*
+ * Traverse a prison's descendants, visiting both preorder and postorder.
+ */
+#define FOREACH_PRISON_DESCENDANT_PRE_POST(ppr, cpr, descend)		\
+	for ((cpr) = (ppr), (descend) = 1;				\
+	     ((cpr) = (descend)						\
+	      ? ((descend) = !LIST_EMPTY(&(cpr)->pr_children))		\
+		? LIST_FIRST(&(cpr)->pr_children)			\
+		: (cpr)							\
+	      : ((descend) = LIST_NEXT(cpr, pr_sibling) != NULL)	\
+		? LIST_NEXT(cpr, pr_sibling)				\
+		: cpr->pr_parent) != (ppr);)
 
 /*
  * Attributes of the physical system, and the root of the jail tree.

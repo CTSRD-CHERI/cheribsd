@@ -26,7 +26,6 @@
  *
  * $FreeBSD$
  */
-#define RTDEBUG
 #include "opt_inet.h"
 #include "opt_route.h"
 
@@ -489,7 +488,9 @@ get_nhgrp(struct nh_control *ctl, struct weightened_nhop *wn, int num_nhops,
 		if (link_nhgrp(ctl, key) == 0) {
 			/* Unable to allocate index? */
 			*perror = EAGAIN;
-			destroy_nhgrp(key);
+			free_nhgrp_nhops(key);
+			destroy_nhgrp_int(key);
+			return (NULL);
 		}
 		*perror = 0;
 		return (key);
@@ -645,7 +646,7 @@ nhgrp_get_addition_group(struct rib_head *rh, struct route_nhop_data *rnd_orig,
 {
 	struct nh_control *ctl = rh->nh_control;
 	struct nhgrp_priv *nhg_priv;
-	struct weightened_nhop wn[2];
+	struct weightened_nhop wn[2] = {};
 	int error;
 
 	if (rnd_orig->rnd_nhop == NULL) {
@@ -805,7 +806,9 @@ nhgrp_dump_sysctl(struct rib_head *rh, struct sysctl_req *w)
 	sz = sizeof(struct rt_msghdr) + sizeof(struct nhgrp_external);
 	sz += 2 * sizeof(struct nhgrp_container);
 	sz += 2 * sizeof(struct nhgrp_nhop_external) * RIB_MAX_MPATH_WIDTH;
-	buffer = malloc(sz, M_TEMP, M_WAITOK);
+	buffer = malloc(sz, M_TEMP, M_NOWAIT);
+	if (buffer == NULL)
+		return (ENOMEM);
 
 	NET_EPOCH_ENTER(et);
 	NHOPS_RLOCK(ctl);

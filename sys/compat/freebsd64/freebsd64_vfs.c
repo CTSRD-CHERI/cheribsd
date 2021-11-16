@@ -916,21 +916,15 @@ freebsd64_link(struct thread *td, struct freebsd64_link_args *uap)
 {
 
 	return (kern_linkat(td, AT_FDCWD, AT_FDCWD, __USER_CAP_STR(uap->path),
-	    __USER_CAP_STR(uap->to), UIO_USERSPACE, FOLLOW));
+	    __USER_CAP_STR(uap->to), UIO_USERSPACE, AT_SYMLINK_FOLLOW));
 }
 
 int
 freebsd64_linkat(struct thread *td, struct freebsd64_linkat_args *uap)
 {
-	int flag;
-
-	flag = uap->flag;
-	if (flag & ~AT_SYMLINK_FOLLOW)
-		return (EINVAL);
 
 	return (kern_linkat(td, uap->fd1, uap->fd2, __USER_CAP_STR(uap->path1),
-	    __USER_CAP_STR(uap->path2), UIO_USERSPACE,
-	    (flag & AT_SYMLINK_FOLLOW) ? FOLLOW : NOFOLLOW));
+	    __USER_CAP_STR(uap->path2), UIO_USERSPACE, uap->flag));
 }
 
 int
@@ -1068,9 +1062,6 @@ int
 freebsd64_chflagsat(struct thread *td, struct freebsd64_chflagsat_args *uap)
 {
 
-	if (uap->atflag & ~AT_SYMLINK_NOFOLLOW)
-		return (EINVAL);
-
 	return (kern_chflagsat(td, uap->fd, __USER_CAP_STR(uap->path),
 	    UIO_USERSPACE, uap->flags, uap->atflag));
 }
@@ -1094,9 +1085,6 @@ freebsd64_chmod(struct thread *td, struct freebsd64_chmod_args *uap)
 int
 freebsd64_fchmodat(struct thread *td, struct freebsd64_fchmodat_args *uap)
 {
-
-	if (uap->flag & ~AT_SYMLINK_NOFOLLOW)
-		return (EINVAL);
 
 	return (kern_fchmodat(td, uap->fd, __USER_CAP_STR(uap->path),
 	    UIO_USERSPACE, uap->mode, uap->flag));
@@ -1287,8 +1275,6 @@ int
 freebsd64_getfhat(struct thread *td, struct freebsd64_getfhat_args *uap)
 {
 
-	if ((uap->flags & ~(AT_SYMLINK_NOFOLLOW | AT_BENEATH)) != 0)
-		return (EINVAL);
 	return (kern_getfhat(td, uap->flags, uap->fd,
 	    __USER_CAP_STR(uap->path), UIO_SYSSPACE,
 	    __USER_CAP_OBJ(uap->fhp), UIO_USERSPACE));

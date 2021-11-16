@@ -392,8 +392,6 @@ static struct if_shared_ctx ixgbe_sctx_init = {
 	.isc_ntxd_default = {DEFAULT_TXD},
 };
 
-if_shared_ctx_t ixgbe_sctx = &ixgbe_sctx_init;
-
 /************************************************************************
  * ixgbe_if_tx_queues_alloc
  ************************************************************************/
@@ -855,7 +853,7 @@ ixgbe_initialize_transmit_units(if_ctx_t ctx)
 static void *
 ixgbe_register(device_t dev)
 {
-	return (ixgbe_sctx);
+	return (&ixgbe_sctx_init);
 } /* ixgbe_register */
 
 /************************************************************************
@@ -1531,7 +1529,22 @@ ixgbe_update_stats_counters(struct adapter *adapter)
 	IXGBE_SET_OMCASTS(adapter, stats->mptc);
 	IXGBE_SET_COLLISIONS(adapter, 0);
 	IXGBE_SET_IQDROPS(adapter, total_missed_rx);
-	IXGBE_SET_IERRORS(adapter, stats->crcerrs + stats->rlec);
+
+	/*
+	 * Aggregate following types of errors as RX errors:
+	 * - CRC error count,
+	 * - illegal byte error count,
+	 * - checksum error count,
+	 * - missed packets count,
+	 * - length error count,
+	 * - undersized packets count,
+	 * - fragmented packets count,
+	 * - oversized packets count,
+	 * - jabber count.
+	 */
+	IXGBE_SET_IERRORS(adapter, stats->crcerrs + stats->illerrc + stats->xec +
+	    stats->mpc[0] + stats->rlec + stats->ruc + stats->rfc + stats->roc +
+	    stats->rjc);
 } /* ixgbe_update_stats_counters */
 
 /************************************************************************
@@ -1621,6 +1634,8 @@ ixgbe_add_hw_stats(struct adapter *adapter)
 	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "MAC Statistics");
 	stat_list = SYSCTL_CHILDREN(stat_node);
 
+	SYSCTL_ADD_UQUAD(ctx, stat_list, OID_AUTO, "rx_errs",
+	    CTLFLAG_RD, &adapter->ierrors, IXGBE_SYSCTL_DESC_RX_ERRS);
 	SYSCTL_ADD_UQUAD(ctx, stat_list, OID_AUTO, "crc_errs",
 	    CTLFLAG_RD, &stats->crcerrs, "CRC Errors");
 	SYSCTL_ADD_UQUAD(ctx, stat_list, OID_AUTO, "ill_errs",
@@ -3247,15 +3262,15 @@ ixgbe_config_delay_values(struct adapter *adapter)
  *   Called whenever multicast address list is updated.
  ************************************************************************/
 static u_int
-ixgbe_mc_filter_apply(void *arg, struct sockaddr_dl *sdl, u_int count)
+ixgbe_mc_filter_apply(void *arg, struct sockaddr_dl *sdl, u_int idx)
 {
 	struct adapter *adapter = arg;
 	struct ixgbe_mc_addr *mta = adapter->mta;
 
-	if (count == MAX_NUM_MULTICAST_ADDRESSES)
+	if (idx == MAX_NUM_MULTICAST_ADDRESSES)
 		return (0);
-	bcopy(LLADDR(sdl), mta[count].addr, IXGBE_ETH_LENGTH_OF_ADDRESS);
-	mta[count].vmdq = adapter->pool;
+	bcopy(LLADDR(sdl), mta[idx].addr, IXGBE_ETH_LENGTH_OF_ADDRESS);
+	mta[idx].vmdq = adapter->pool;
 
 	return (1);
 } /* ixgbe_mc_filter_apply */

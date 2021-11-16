@@ -24,13 +24,16 @@ This `bc` is Free and Open Source Software (FOSS). It is offered under the BSD
 
 ## Prerequisites
 
-This `bc` only requires a C99-compatible compiler and a (mostly) POSIX
-2008-compatible system with the XSI (X/Open System Interfaces) option group.
+This `bc` only requires either:
+
+1.	Windows 10 or later, or
+2.	A C99-compatible compiler and a (mostly) POSIX 2008-compatible system with
+	the XSI (X/Open System Interfaces) option group.
 
 Since POSIX 2008 with XSI requires the existence of a C99 compiler as `c99`, any
 POSIX and XSI-compatible system will have everything needed.
 
-Systems that are known to work:
+POSIX-compatible systems that are known to work:
 
 * Linux
 * FreeBSD
@@ -39,25 +42,70 @@ Systems that are known to work:
 * Mac OSX
 * Solaris* (as long as the Solaris version supports POSIX 2008)
 * AIX
+* HP-UX* (except for history)
+
+In addition, there is compatibility code to make this `bc` work on Windows.
 
 Please submit bug reports if this `bc` does not build out of the box on any
-system besides Windows. If Windows binaries are needed, they can be found at
-[xstatic][6].
+system.
 
 ## Build
 
-This `bc` should build unmodified on any POSIX-compliant system.
+### Windows
+
+There is no guarantee that this `bc` will work on any version of Windows earlier
+than Windows 10 (I cannot test on earlier versions), but it is guaranteed to
+work on Windows 10 at least.
+
+Also, if building with MSBuild, the MSBuild bundled with Visual Studio is
+required.
+
+**Note**: Unlike the POSIX-compatible platforms, only one build configuration is
+supported on Windows: extra math and prompt enabled, history and NLS (locale
+support) disabled, with both calculators built.
+
+#### `bc`
+
+To build `bc`, you can open the `bc.sln` file in Visual Studio, select the
+configuration, and build.
+
+You can also build using MSBuild with the following from the root directory:
+
+```
+msbuild -property:Configuration=<config> bc.sln
+```
+
+where `<config>` is either one of `Debug` or `Release`.
+
+#### `bcl` (Library)
+
+To build the library, you can open the `bcl.sln` file in Visual Studio, select
+the configuration, and build.
+
+You can also build using MSBuild with the following from the root directory:
+
+```
+msbuild -property:Configuration=<config> bcl.sln
+```
+
+where `<config>` is either one of `Debug` or `Release`.
+
+### POSIX-Compatible Systems
+
+This `bc` should build unmodified on any POSIX-compliant system or on Windows
+starting with Windows 10 (though earlier versions may work).
 
 For more complex build requirements than the ones below, see the
 [build manual][5].
 
-### Pre-built Binaries
+On POSIX-compatible systems, `bc` is built as `bin/bc` and `dc` is built as
+`bin/dc` by default. On Windows, they are built as `Release/bc/bc.exe` and
+`Release/bc/dc.exe`.
 
-It is possible to download pre-compiled binaries for a wide list of platforms,
-including Linux- and Windows-based systems, from [xstatic][6]. This link always
-points to the latest release of `bc`.
+**Note**: On Windows, `dc.exe` is just copied from `bc.exe`; it is not linked.
+Patches are welcome for a way to do that.
 
-### Default
+#### Default
 
 For the default build with optimization, use the following commands in the root
 directory:
@@ -67,7 +115,7 @@ directory:
 make
 ```
 
-### One Calculator
+#### One Calculator
 
 To only build `bc`, use the following commands:
 
@@ -83,7 +131,7 @@ To only build `dc`, use the following commands:
 make
 ```
 
-### Debug
+#### Debug
 
 For debug builds, use the following commands in the root directory:
 
@@ -92,7 +140,7 @@ For debug builds, use the following commands in the root directory:
 make
 ```
 
-### Install
+#### Install
 
 To install, use the following command:
 
@@ -105,7 +153,7 @@ other locations, use the `PREFIX` environment variable when running
 `configure.sh` or pass the `--prefix=<prefix>` option to `configure.sh`. See the
 [build manual][5], or run `./configure.sh --help`, for more details.
 
-### Library
+#### Library
 
 This `bc` does provide a way to build a math library with C bindings. This is
 done by the `-a` or `--library` options to `configure.sh`:
@@ -120,11 +168,12 @@ see the [build manual][5].
 The library API can be found in [`manuals/bcl.3.md`][26] or `man bcl` once the
 library is installed.
 
-The library is built as `bin/libbcl.a`.
+The library is built as `bin/libbcl.a` on POSIX-compatible systems or as
+`Release/bcl/bcl.lib` on Windows.
 
-### Package and Distro Maintainers
+#### Package and Distro Maintainers
 
-#### Recommended Compiler
+##### Recommended Compiler
 
 When I ran benchmarks with my `bc` compiled under `clang`, it performed much
 better than when compiled under `gcc`. I recommend compiling this `bc` with
@@ -133,7 +182,7 @@ better than when compiled under `gcc`. I recommend compiling this `bc` with
 I also recommend building this `bc` with C11 if you can because `bc` will detect
 a C11 compiler and add `_Noreturn` to any relevant function(s).
 
-#### Recommended Optimizations
+##### Recommended Optimizations
 
 I wrote this `bc` with Separation of Concerns, which means that there are many
 small functions that could be inlined. However, they are often called across
@@ -160,12 +209,12 @@ However, I recommend ***NOT*** using `-march=native`. Doing so will reduce this
 `bc`'s performance, at least when building with link-time optimization. See the
 [benchmarks][19] for more details.
 
-#### Stripping Binaries
+##### Stripping Binaries
 
 By default, non-debug binaries are stripped, but stripping can be disabled with
 the `-T` option to `configure.sh`.
 
-#### Using This `bc` as an Alternative
+##### Using This `bc` as an Alternative
 
 If this `bc` is packaged as an alternative to an already existing `bc` package,
 it is possible to rename it in the build to prevent name collision. To prepend
@@ -187,7 +236,7 @@ allowed.
 **Note**: The suggested name (and package name) when `bc` is not available is
 `bc-gh`.
 
-#### Karatsuba Number
+##### Karatsuba Number
 
 Package and distro maintainers have one tool at their disposal to build this
 `bc` in the optimal configuration: `karatsuba.py`.
@@ -223,6 +272,7 @@ translations will also be added as they are provided.
 
 This `bc` compares favorably to GNU `bc`.
 
+* This `bc` builds natively on Windows.
 * It has more extensions, which make this `bc` more useful for scripting.
 * This `bc` is a bit more POSIX compliant.
 * It has a much less buggy parser. The GNU `bc` will give parse errors for what
@@ -252,7 +302,9 @@ To see what algorithms this `bc` uses, see the [algorithms manual][7].
 
 ## Locales
 
-Currently, this `bc` only has support for English (and US English), French,
+Currently, there is no locale support on Windows.
+
+Additionally, this `bc` only has support for English (and US English), French,
 German, Portuguese, Dutch, Polish, Russian, Japanese, and Chinese locales.
 Patches are welcome for translations; use the existing `*.msg` files in
 `locales/` as a starting point.
@@ -282,7 +334,8 @@ Other projects based on this bc are:
 
 ## Language
 
-This `bc` is written in pure ISO C99, using POSIX 2008 APIs.
+This `bc` is written in pure ISO C99, using POSIX 2008 APIs with custom Windows
+compatibility code.
 
 ## Commit Messages
 
@@ -300,6 +353,13 @@ tarballs.
 Files:
 
 	.gitignore           The git ignore file (maintainer use only).
+	.gitattributes       The git attributes file (maintainer use only).
+	bc.sln               The Visual Studio solution file for bc.
+	bc.vcxproj           The Visual Studio project file for bc.
+	bc.vcxproj.filters   The Visual Studio filters file for bc.
+	bcl.sln              The Visual Studio solution file for bcl.
+	bcl.vcxproj          The Visual Studio project file for bcl.
+	bcl.vcxproj.filters  The Visual Studio filters file for bcl.
 	configure            A symlink to configure.sh to make packaging easier.
 	configure.sh         The configure script.
 	functions.sh         A script with functions used by other scripts.
@@ -310,7 +370,8 @@ Files:
 	locale_install.sh    A script to install locales, if desired.
 	locale_uninstall.sh  A script to uninstall locales.
 	Makefile.in          The Makefile template.
-	manpage.sh           Script to generate man pages from markdown files.
+	manpage.sh           Script to generate man pages from markdown files
+	                     (maintainer use only).
 	NOTICE.md            List of contributors and copyright owners.
 	RELEASE.md           A checklist for making a release (maintainer use only).
 	release.sh           A script to test for release (maintainer use only).
@@ -328,7 +389,6 @@ Folders:
 [1]: https://www.gnu.org/software/bc/
 [4]: ./LICENSE.md
 [5]: ./manuals/build.md
-[6]: https://pkg.musl.cc/bc/
 [7]: ./manuals/algorithms.md
 [8]: https://git.busybox.net/busybox/tree/miscutils/bc.c
 [9]: https://github.com/landley/toybox/blob/master/toys/pending/bc.c
@@ -341,7 +401,7 @@ Folders:
 [20]: https://git.yzena.com/gavin/bc
 [21]: https://gavinhoward.com/2020/04/i-am-moving-away-from-github/
 [22]: https://www.deepl.com/translator
-[23]: https://svnweb.freebsd.org/base/head/contrib/bc/
+[23]: https://cgit.freebsd.org/src/tree/contrib/bc
 [24]: https://bugs.freebsd.org/
 [25]: https://reviews.freebsd.org/
 [26]: ./manuals/bcl.3.md

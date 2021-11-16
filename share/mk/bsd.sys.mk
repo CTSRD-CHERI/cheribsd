@@ -60,7 +60,7 @@ CWARNFLAGS+=	-Wcast-align
 .endif # !NO_WCAST_ALIGN !NO_WCAST_ALIGN.${COMPILER_TYPE}
 .endif # WARNS >= 4
 .if ${WARNS} >= 6
-CWARNFLAGS+=	-Wchar-subscripts -Winline -Wnested-externs -Wredundant-decls\
+CWARNFLAGS+=	-Wchar-subscripts -Wnested-externs -Wredundant-decls\
 		-Wold-style-definition
 .if !defined(NO_WMISSING_VARIABLE_DECLARATIONS)
 CWARNFLAGS.clang+=	-Wmissing-variable-declarations
@@ -150,7 +150,6 @@ CWARNFLAGS+=	-Wno-error=address			\
 		-Wno-error=deprecated-declarations	\
 		-Wno-error=enum-compare			\
 		-Wno-error=extra			\
-		-Wno-error=inline			\
 		-Wno-error=logical-not-parentheses	\
 		-Wno-error=strict-aliasing		\
 		-Wno-error=uninitialized		\
@@ -329,7 +328,11 @@ LDFLAGS+=	-fuse-ld=${LD:[1]:S/^ld.//1W}
 .else
 # GCC does not support an absolute path for -fuse-ld so we just print this
 # warning instead and let the user add the required symlinks.
+# However, we can avoid this warning if -B is set appropriately (e.g. for
+# CROSS_TOOLCHAIN=...-gcc).
+.if !(${LD:[1]:T} == "ld" && ${CC:tw:M-B${LD:[1]:H}/})
 .warning LD (${LD}) is not the default linker for ${CC} but -fuse-ld= is not supported
+.endif
 .endif
 .endif
 

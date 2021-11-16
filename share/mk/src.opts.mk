@@ -99,7 +99,6 @@ __DEFAULT_YES_OPTIONS = \
     FILE \
     FINGER \
     FLOPPY \
-    FMTREE \
     FORTH \
     FP_LIBC \
     FREEBSD_UPDATE \
@@ -125,7 +124,6 @@ __DEFAULT_YES_OPTIONS = \
     LDNS \
     LDNS_UTILS \
     LEGACY_CONSOLE \
-    LIBCPLUSPLUS \
     LLD \
     LLD_BOOTSTRAP \
     LLD_IS_LD \
@@ -397,6 +395,13 @@ BROKEN_OPTIONS+=LOADER_UBOOT
 BROKEN_OPTIONS+=LOADER_GELI LOADER_LUA
 .endif
 
+# Kernel TLS is enabled by default on amd64 and aarch64
+.if ${__T:Maarch64*} || ${__T} == "amd64"
+__DEFAULT_YES_OPTIONS+=OPENSSL_KTLS
+.else
+__DEFAULT_NO_OPTIONS+=OPENSSL_KTLS
+.endif
+
 .if ${__T:Mmips64*}
 # profiling won't work on MIPS64 because there is only assembly for o32
 BROKEN_OPTIONS+=PROFILE
@@ -534,6 +539,7 @@ MK_LDNS:=	no
 MK_PKGBOOTSTRAP:=	no
 MK_SVN:=		no
 MK_SVNLITE:=		no
+MK_ZFS:=	no
 .endif
 
 .if ${MK_LDNS} == "no"

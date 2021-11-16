@@ -978,6 +978,7 @@ gfx_fb_fill(void *arg, const teken_rect_t *r, teken_char_t c,
 static void
 gfx_fb_cursor_draw(teken_gfx_t *state, const teken_pos_t *p, bool on)
 {
+	unsigned x, y, width, height;
 	const uint8_t *glyph;
 	int idx;
 
@@ -985,10 +986,47 @@ gfx_fb_cursor_draw(teken_gfx_t *state, const teken_pos_t *p, bool on)
 	if (idx >= state->tg_tp.tp_col * state->tg_tp.tp_row)
 		return;
 
+	width = state->tg_font.vf_width;
+	height = state->tg_font.vf_height;
+	x = state->tg_origin.tp_col + p->tp_col * width;
+	y = state->tg_origin.tp_row + p->tp_row * height;
+
+	/*
+	 * Save original display content to preserve image data.
+	 */
+	if (on) {
+		if (state->tg_cursor_image == NULL ||
+		    state->tg_cursor_size != width * height * 4) {
+			free(state->tg_cursor_image);
+			state->tg_cursor_size = width * height * 4;
+			state->tg_cursor_image = malloc(state->tg_cursor_size);
+		}
+		if (state->tg_cursor_image != NULL) {
+			if (gfxfb_blt(state->tg_cursor_image,
+			    GfxFbBltVideoToBltBuffer, x, y, 0, 0,
+			    width, height, 0) != 0) {
+				free(state->tg_cursor_image);
+				state->tg_cursor_image = NULL;
+			}
+		}
+	} else {
+		/*
+		 * Restore display from tg_cursor_image.
+		 * If there is no image, restore char from screen_buffer.
+		 */
+		if (state->tg_cursor_image != NULL &&
+		    gfxfb_blt(state->tg_cursor_image, GfxFbBltBufferToVideo,
+		    0, 0, x, y, width, height, 0) == 0) {
+			state->tg_cursor = *p;
+			return;
+		}
+	}
+
 	glyph = font_lookup(&state->tg_font, screen_buffer[idx].c,
 	    &screen_buffer[idx].a);
 	gfx_bitblt_bitmap(state, glyph, &screen_buffer[idx].a, 0xff, on);
 	gfx_fb_printchar(state, p);
+
 	state->tg_cursor = *p;
 }
 
@@ -1863,6 +1901,113 @@ reset_font_flags(void)
 	}
 }
 
+/* Return  w^2 + h^2 or 0, if the dimensions are unknown */
+static unsigned
+edid_diagonal_squared(void)
+{
+	unsigned w, h;
+
+	if (edid_info == NULL)
+		return (0);
+
+	w = edid_info->display.max_horizontal_image_size;
+	h = edid_info->display.max_vertical_image_size;
+
+	/* If either one is 0, we have aspect ratio, not size */
+	if (w == 0 || h == 0)
+		return (0);
+
+	/*
+	 * some monitors encode the aspect ratio instead of the physical size.
+	 */
+	if ((w == 16 && h == 9) || (w == 16 && h == 10) ||
+	    (w == 4 && h == 3) || (w == 5 && h == 4))
+		return (0);
+
+	/*
+	 * translate cm to inch, note we scale by 100 here.
+	 */
+	w = w * 100 / 254;
+	h = h * 100 / 254;
+
+	/* Return w^2 + h^2 */
+	return (w * w + h * h);
+}
+
+/*
+ * calculate pixels per inch.
+ */
+static unsigned
+gfx_get_ppi(void)
+{
+	unsigned dp, di;
+
+	di = edid_diagonal_squared();
+	if (di == 0)
+		return (0);
+
+	dp = gfx_state.tg_fb.fb_width *
+	    gfx_state.tg_fb.fb_width +
+	    gfx_state.tg_fb.fb_height *
+	    gfx_state.tg_fb.fb_height;
+
+	return (isqrt(dp / di));
+}
+
+/*
+ * Calculate font size from density independent pixels (dp):
+ * ((16dp * ppi) / 160) * display_factor.
+ * Here we are using fixed constants: 1dp == 160 ppi and
+ * display_factor 2.
+ *
+ * We are rounding font size up and are searching for font which is
+ * not smaller than calculated size value.
+ */
+static vt_font_bitmap_data_t *
+gfx_get_font(void)
+{
+	unsigned ppi, size;
+	vt_font_bitmap_data_t *font = NULL;
+	struct fontlist *fl, *next;
+
+	/* Text mode is not supported here. */
+	if (gfx_state.tg_fb_type == FB_TEXT)
+		return (NULL);
+
+	ppi = gfx_get_ppi();
+	if (ppi == 0)
+		return (NULL);
+
+	/*
+	 * We will search for 16dp font.
+	 * We are using scale up by 10 for roundup.
+	 */
+	size = (16 * ppi * 10) / 160;
+	/* Apply display factor 2.  */
+	size = roundup(size * 2, 10) / 10;
+
+	STAILQ_FOREACH(fl, &fonts, font_next) {
+		next = STAILQ_NEXT(fl, font_next);
+
+		/*
+		 * If this is last font or, if next font is smaller,
+		 * we have our font. Make sure, it actually is loaded.
+		 */
+		if (next == NULL || next->font_data->vfbd_height < size) {
+			font = fl->font_data;
+			if (font->vfbd_font == NULL ||
+			    fl->font_flags == FONT_RELOAD) {
+				if (fl->font_load != NULL &&
+				    fl->font_name != NULL)
+					font = fl->font_load(fl->font_name);
+			}
+			break;
+		}
+	}
+
+	return (font);
+}
+
 static vt_font_bitmap_data_t *
 set_font(teken_unit_t *rows, teken_unit_t *cols, teken_unit_t h, teken_unit_t w)
 {
@@ -1887,26 +2032,28 @@ set_font(teken_unit_t *rows, teken_unit_t *cols, teken_unit_t h, teken_unit_t w)
 		}
 	}
 
+	if (font == NULL)
+		font = gfx_get_font();
+
 	if (font != NULL) {
-		*rows = (height - BORDER_PIXELS) / font->vfbd_height;
-		*cols = (width - BORDER_PIXELS) / font->vfbd_width;
+		*rows = height / font->vfbd_height;
+		*cols = width / font->vfbd_width;
 		return (font);
 	}
 
 	/*
-	 * Find best font for these dimensions, or use default
-	 *
-	 * A 1 pixel border is the absolute minimum we could have
-	 * as a border around the text window (BORDER_PIXELS = 2),
-	 * however a slightly larger border not only looks better
-	 * but for the fonts currently statically built into the
-	 * emulator causes much better font selection for the
-	 * normal range of screen resolutions.
+	 * Find best font for these dimensions, or use default.
+	 * If height >= VT_FB_MAX_HEIGHT and width >= VT_FB_MAX_WIDTH,
+	 * do not use smaller font than our DEFAULT_FONT_DATA.
 	 */
 	STAILQ_FOREACH(fl, &fonts, font_next) {
 		font = fl->font_data;
-		if ((((*rows * font->vfbd_height) + BORDER_PIXELS) <= height) &&
-		    (((*cols * font->vfbd_width) + BORDER_PIXELS) <= width)) {
+		if ((*rows * font->vfbd_height <= height &&
+		    *cols * font->vfbd_width <= width) ||
+		    (height >= VT_FB_MAX_HEIGHT &&
+		    width >= VT_FB_MAX_WIDTH &&
+		    font->vfbd_height == DEFAULT_FONT_DATA.vfbd_height &&
+		    font->vfbd_width == DEFAULT_FONT_DATA.vfbd_width)) {
 			if (font->vfbd_font == NULL ||
 			    fl->font_flags == FONT_RELOAD) {
 				if (fl->font_load != NULL &&
@@ -1916,8 +2063,8 @@ set_font(teken_unit_t *rows, teken_unit_t *cols, teken_unit_t h, teken_unit_t w)
 				if (font == NULL)
 					continue;
 			}
-			*rows = (height - BORDER_PIXELS) / font->vfbd_height;
-			*cols = (width - BORDER_PIXELS) / font->vfbd_width;
+			*rows = height / font->vfbd_height;
+			*cols = width / font->vfbd_width;
 			break;
 		}
 		font = NULL;
@@ -1936,8 +2083,8 @@ set_font(teken_unit_t *rows, teken_unit_t *cols, teken_unit_t h, teken_unit_t w)
 		if (font == NULL)
 			font = &DEFAULT_FONT_DATA;
 
-		*rows = (height - BORDER_PIXELS) / font->vfbd_height;
-		*cols = (width - BORDER_PIXELS) / font->vfbd_width;
+		*rows = height / font->vfbd_height;
+		*cols = width / font->vfbd_width;
 	}
 
 	return (font);

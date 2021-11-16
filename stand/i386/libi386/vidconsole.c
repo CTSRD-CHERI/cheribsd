@@ -53,7 +53,7 @@ static int	vidc_getchar(void);
 static int	vidc_ischar(void);
 static void	cons_draw_frame(teken_attr_t *);
 
-static int	vidc_started;
+static bool	vidc_started;
 static uint16_t	*vgatext;
 
 static tf_bell_t	vidc_cons_bell;
@@ -877,6 +877,10 @@ cons_update_mode(bool use_gfx_mode)
 	char env[10], *ptr;
 	int format, roff, goff, boff;
 
+	/* vidc_init() is not called yet. */
+	if (!vidc_started)
+		return (false);
+
 	gfx_state.tg_tp.tp_row = TEXT_ROWS;
 	gfx_state.tg_tp.tp_col = TEXT_COLS;
 
@@ -908,8 +912,8 @@ cons_update_mode(bool use_gfx_mode)
 	} else {
 		/* Trigger loading of 8x16 font. */
 		setup_font(&gfx_state,
-		    16 * gfx_state.tg_fb.fb_height + BORDER_PIXELS,
-		    8 * gfx_state.tg_fb.fb_width + BORDER_PIXELS);
+		    16 * gfx_state.tg_fb.fb_height,
+		    8 * gfx_state.tg_fb.fb_width);
 		gfx_state.tg_functions = &tf;
 		/* ensure the following are not set for text mode */
 		unsetenv("screen.height");
@@ -996,7 +1000,7 @@ vidc_init(int arg)
 	if (vidc_started && arg == 0)
 		return (0);
 
-	vidc_started = 1;
+	vidc_started = true;
 	vbe_init();
 
 	/*

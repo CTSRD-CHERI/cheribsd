@@ -46,7 +46,6 @@ KERNEL_C = \
 	zfs_fletcher_superscalar4.c \
 	zfs_namecheck.c \
 	zfs_prop.c \
-	zfs_uio.c \
 	zfs_zstd.c \
 	zpool_prop.c \
 	zprop_common.c \
@@ -163,6 +162,7 @@ KERNEL_C = \
 	zfs_fuid.c \
 	zfs_sa.c \
 	zfs_znode.c \
+	zfs_racct.c \
 	zfs_ratelimit.c \
 	zfs_rlock.c \
 	zil.c \

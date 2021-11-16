@@ -216,6 +216,7 @@ SRCS+=	\
 	obsolete.c \
 	parse_entry.c \
 	read_entry.c \
+	read_termcap.c \
 	strings.c \
 	trim_sgr0.c \
 	write_entry.c
@@ -270,14 +271,10 @@ DBGSRCS= \
 	trace_xnames.c \
 	varargs.c
 
-# From our old libtermcap.
-# Used instead of the hideous read_termcap.c abomination.
-SRCS+=	termcap.c
-
 CLEANFILES=	${GENSRCS} ${GENHDRS} keys.list make_hash term.h.new \
 		make_keys MKterm.h.awk comp_captab.c curses.head
 
-CFLAGS+=	-DFREEBSD_NATIVE -DTERMIOS
+CFLAGS+=	-DTERMIOS
 
 # Installed
 HEADERS=	curses.h term.h termcap.h unctrl.h
@@ -365,7 +362,7 @@ fallback.c: MKfallback.sh
 	    mv -f ${.TARGET}.tmp ${.TARGET}
 
 comp_userdefs.c: MKuserdefs.sh Caps Caps-ncurses make_hash
-	env PATH=${BTOOLSPATH:U.}:${PATH} sh -x ${NCURSES_DIR}/ncurses/tinfo/MKuserdefs.sh "${AWK}" \
+	env PATH=${BTOOLSPATH:U.}:${PATH} sh ${NCURSES_DIR}/ncurses/tinfo/MKuserdefs.sh "${AWK}" \
 	    ${USE_BIG_STRINGS} ${NCURSES_DIR}/include/Caps ${NCURSES_DIR}/include/Caps-ncurses > ${.TARGET}
 
 # Generated headers
@@ -419,7 +416,7 @@ make_hash: make_hash.c hashsize.h ncurses_def.h ${HEADERS} ${SRCHDRS} ${BUILD_TO
 MKterm.h.awk: MKterm.h.awk.in
 	sed <${NCURSES_DIR}/include/MKterm.h.awk.in >$@ \
 	    -e "/@BROKEN_LINKER@/s%%${BROKEN_LINKER}%" \
-	    -e "s%@NCURSES_USE_DATABASE@%0%g" \
+	    -e "s%@NCURSES_USE_DATABASE@%1%g" \
 	    -e "s%@NCURSES_USE_TERMCAP@%1%g" \
 	    -e "/@NCURSES_MAJOR@/s%%${NCURSES_MAJOR}%" \
 	    -e "/@NCURSES_MINOR@/s%%${NCURSES_MINOR}%" \
@@ -431,7 +428,9 @@ MKterm.h.awk: MKterm.h.awk.in
 	    -e "/@HAVE_TERMIOS_H@/s%%${HAVE_TERMIOS_H}%" \
 	    -e "/@HAVE_TERMIO_H@/s%%${HAVE_TERMIO_H}%" \
 	    -e "/@HAVE_TCGETATTR@/s%%${HAVE_TCGETATTR}%" \
-	    -e "s%@cf_cv_enable_reentrant@%${ENABLE_REENTRANT}%g"
+	    -e "s%@cf_cv_enable_reentrant@%${ENABLE_REENTRANT}%g" \
+	    -e "s%@NCURSES_SP_FUNCS@%1%" \
+	    -e "s%@NCURSES_PATCH@%${NCURSES_PATCH}%"
 
 termcap.h: termcap.h.in
 	sed <${NCURSES_DIR}/include/termcap.h.in >$@ \

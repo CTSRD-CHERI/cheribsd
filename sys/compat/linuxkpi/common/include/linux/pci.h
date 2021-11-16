@@ -54,6 +54,7 @@
 #include <linux/errno.h>
 #include <asm/atomic.h>
 #include <linux/device.h>
+#include <linux/pci_ids.h>
 
 struct pci_device_id {
 	uint32_t	vendor;
@@ -67,35 +68,7 @@ struct pci_device_id {
 
 #define	MODULE_DEVICE_TABLE(bus, table)
 
-#define	PCI_BASE_CLASS_DISPLAY		0x03
-#define	PCI_CLASS_DISPLAY_VGA		0x0300
-#define	PCI_CLASS_DISPLAY_OTHER		0x0380
-#define	PCI_BASE_CLASS_BRIDGE		0x06
-#define	PCI_CLASS_BRIDGE_ISA		0x0601
-
 #define	PCI_ANY_ID			-1U
-#define	PCI_VENDOR_ID_APPLE		0x106b
-#define	PCI_VENDOR_ID_ASUSTEK		0x1043
-#define	PCI_VENDOR_ID_ATI		0x1002
-#define	PCI_VENDOR_ID_DELL		0x1028
-#define	PCI_VENDOR_ID_HP		0x103c
-#define	PCI_VENDOR_ID_IBM		0x1014
-#define	PCI_VENDOR_ID_INTEL		0x8086
-#define	PCI_VENDOR_ID_MELLANOX			0x15b3
-#define	PCI_VENDOR_ID_REDHAT_QUMRANET	0x1af4
-#define	PCI_VENDOR_ID_SERVERWORKS	0x1166
-#define	PCI_VENDOR_ID_SONY		0x104d
-#define	PCI_VENDOR_ID_TOPSPIN			0x1867
-#define	PCI_VENDOR_ID_VIA		0x1106
-#define	PCI_SUBVENDOR_ID_REDHAT_QUMRANET	0x1af4
-#define	PCI_DEVICE_ID_ATI_RADEON_QY	0x5159
-#define	PCI_DEVICE_ID_MELLANOX_TAVOR		0x5a44
-#define	PCI_DEVICE_ID_MELLANOX_TAVOR_BRIDGE	0x5a46
-#define	PCI_DEVICE_ID_MELLANOX_ARBEL_COMPAT	0x6278
-#define	PCI_DEVICE_ID_MELLANOX_ARBEL		0x6282
-#define	PCI_DEVICE_ID_MELLANOX_SINAI_OLD	0x5e8c
-#define	PCI_DEVICE_ID_MELLANOX_SINAI		0x6274
-#define	PCI_SUBDEVICE_ID_QEMU		0x1100
 
 #define PCI_DEVFN(slot, func)   ((((slot) & 0x1f) << 3) | ((func) & 0x07))
 #define PCI_SLOT(devfn)		(((devfn) >> 3) & 0x1f)
@@ -336,6 +309,14 @@ pci_set_drvdata(struct pci_dev *pdev, void *data)
 {
 
 	dev_set_drvdata(&pdev->dev, data);
+}
+
+static __inline void
+pci_dev_put(struct pci_dev *pdev)
+{
+
+	if (pdev != NULL)
+		put_device(&pdev->dev);
 }
 
 static inline int
@@ -728,7 +709,7 @@ lkpi_pci_restore_state(struct pci_dev *pdev)
 /* XXX This should not be necessary. */
 #define	pcix_set_mmrbc(d, v)	0
 #define	pcix_get_max_mmrbc(d)	0
-#define	pcie_set_readrq(d, v)	pci_set_max_read_req(&(d)->dev, (v))
+#define	pcie_set_readrq(d, v)	pci_set_max_read_req((d)->dev.bsddev, (v))
 
 #define	PCI_DMA_BIDIRECTIONAL	0
 #define	PCI_DMA_TODEVICE	1
@@ -1094,7 +1075,7 @@ static inline int
 pci_domain_nr(struct pci_bus *pbus)
 {
 
-	return (pci_get_domain(pbus->self->dev.bsddev));
+	return (pbus->domain);
 }
 
 static inline int

@@ -731,8 +731,8 @@ int	inp_so_options(const struct inpcb *inp);
 /*
  * Flags for inp_flags2.
  */
-#define	INP_2UNUSED1		0x00000001
-#define	INP_2UNUSED2		0x00000002
+#define	INP_MBUF_L_ACKS		0x00000001 /* We need large mbufs for ack compression */
+#define	INP_MBUF_ACKCMP		0x00000002 /* TCP mbuf ack compression ok */
 #define	INP_PCBGROUPWILD	0x00000004 /* in pcbgroup wildcard list */
 #define	INP_REUSEPORT		0x00000008 /* SO_REUSEPORT option is set */
 #define	INP_FREED		0x00000010 /* inp itself is not valid */
@@ -761,9 +761,10 @@ int	inp_so_options(const struct inpcb *inp);
 #define	INPLOOKUP_WILDCARD	0x00000001	/* Allow wildcard sockets. */
 #define	INPLOOKUP_RLOCKPCB	0x00000002	/* Return inpcb read-locked. */
 #define	INPLOOKUP_WLOCKPCB	0x00000004	/* Return inpcb write-locked. */
+#define	INPLOOKUP_RLOCKLISTEN	0x00000008	/* Rlock if listening, W if !.*/
 
 #define	INPLOOKUP_MASK	(INPLOOKUP_WILDCARD | INPLOOKUP_RLOCKPCB | \
-			    INPLOOKUP_WLOCKPCB)
+	    INPLOOKUP_WLOCKPCB | INPLOOKUP_RLOCKLISTEN)
 
 #define	sotoinpcb(so)	((struct inpcb *)(so)->so_pcb)
 

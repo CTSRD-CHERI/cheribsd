@@ -122,7 +122,7 @@ armv8_crypto_probe(device_t dev)
 	default:
 		break;
 	case ID_AA64ISAR0_AES_NONE:
-		device_printf(dev, "CPU lacks AES instructions");
+		device_printf(dev, "CPU lacks AES instructions\n");
 		break;
 	}
 
@@ -304,6 +304,9 @@ armv8_crypto_cipher_setup(struct armv8_crypto_session *ses,
 	    (csp->csp_cipher_alg == CRYPTO_AES_CBC))
 		aes_v8_set_decrypt_key(key,
 		    keylen * 8, &ses->dec_schedule);
+
+	if (csp->csp_cipher_alg == CRYPTO_AES_XTS)
+		aes_v8_set_encrypt_key(key + keylen, keylen * 8, &ses->xts_schedule);
 
 	if (csp->csp_cipher_alg == CRYPTO_AES_NIST_GCM_16) {
 		memset(H.c, 0, sizeof(H.c));

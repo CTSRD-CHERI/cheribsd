@@ -306,6 +306,7 @@ static struct pool_opts {
 	int			 type;
 	int			 staticport;
 	struct pf_poolhashkey	*key;
+	struct pf_mape_portset	 mape;
 
 } pool_opts;
 
@@ -317,10 +318,10 @@ static struct node_state_opt	*keep_state_defaults = NULL;
 int		 disallow_table(struct node_host *, const char *);
 int		 disallow_urpf_failed(struct node_host *, const char *);
 int		 disallow_alias(struct node_host *, const char *);
-int		 rule_consistent(struct pf_rule *, int);
-int		 filter_consistent(struct pf_rule *, int);
-int		 nat_consistent(struct pf_rule *);
-int		 rdr_consistent(struct pf_rule *);
+int		 rule_consistent(struct pfctl_rule *, int);
+int		 filter_consistent(struct pfctl_rule *, int);
+int		 nat_consistent(struct pfctl_rule *);
+int		 rdr_consistent(struct pfctl_rule *);
 int		 process_tabledef(char *, struct table_opts *);
 void		 expand_label_str(char *, size_t, const char *, const char *);
 void		 expand_label_if(const char *, char *, size_t, const char *);
@@ -333,7 +334,7 @@ void		 expand_label_nr(const char *, char *, size_t);
 void		 expand_label(char *, size_t, const char *, u_int8_t,
 		    struct node_host *, struct node_port *, struct node_host *,
 		    struct node_port *, u_int8_t);
-void		 expand_rule(struct pf_rule *, struct node_if *,
+void		 expand_rule(struct pfctl_rule *, struct node_if *,
 		    struct node_host *, struct node_proto *, struct node_os *,
 		    struct node_host *, struct node_port *, struct node_host *,
 		    struct node_port *, struct node_uid *, struct node_gid *,
@@ -348,10 +349,10 @@ int		 expand_skip_interface(struct node_if *);
 
 int	 check_rulestate(int);
 int	 getservice(char *);
-int	 rule_label(struct pf_rule *, char *);
+int	 rule_label(struct pfctl_rule *, char *);
 int	 rt_tableid_max(void);
 
-void	 mv_rules(struct pf_ruleset *, struct pf_ruleset *);
+void	 mv_rules(struct pfctl_ruleset *, struct pfctl_ruleset *);
 void	 decide_address_family(struct node_host *, sa_family_t *);
 void	 remove_invalid_hosts(struct node_host **, sa_family_t *);
 int	 invalid_redirect(struct node_host *, sa_family_t);
@@ -461,7 +462,7 @@ int	parseport(char *, struct range *r, int);
 %token	SET OPTIMIZATION TIMEOUT LIMIT LOGINTERFACE BLOCKPOLICY FAILPOLICY
 %token	RANDOMID REQUIREORDER SYNPROXY FINGERPRINTS NOSYNC DEBUG SKIP HOSTID
 %token	ANTISPOOF FOR INCLUDE
-%token	BITMASK RANDOM SOURCEHASH ROUNDROBIN STATICPORT PROBABILITY
+%token	BITMASK RANDOM SOURCEHASH ROUNDROBIN STATICPORT PROBABILITY MAPEPORTSET
 %token	ALTQ CBQ CODEL PRIQ HFSC FAIRQ BANDWIDTH TBRSIZE LINKSHARE REALTIME
 %token	UPPERLIMIT QUEUE PRIORITY QLIMIT HOGS BUCKETS RTABLE TARGET INTERVAL
 %token	LOAD RULESET_OPTIMIZATION PRIO
@@ -788,7 +789,7 @@ pfa_anchorlist	: /* empty */
 pfa_anchor	: '{'
 		{
 			char ta[PF_ANCHOR_NAME_SIZE];
-			struct pf_ruleset *rs;
+			struct pfctl_ruleset *rs;
 
 			/* steping into a brace anchor */
 			pf->asd++;
@@ -814,7 +815,7 @@ pfa_anchor	: '{'
 anchorrule	: ANCHOR anchorname dir quick interface af proto fromto
 		    filter_opts pfa_anchor
 		{
-			struct pf_rule	r;
+			struct pfctl_rule	r;
 			struct node_proto	*proto;
 
 			if (check_rulestate(PFCTL_STATE_FILTER)) {
@@ -833,7 +834,7 @@ anchorrule	: ANCHOR anchorname dir quick interface af proto fromto
 			memset(&r, 0, sizeof(r));
 			if (pf->astack[pf->asd + 1]) {
 				/* move inline rules into relative location */
-				pf_anchor_setup(&r,
+				pfctl_anchor_setup(&r,
 				    &pf->astack[pf->asd]->ruleset,
 				    $2 ? $2 : pf->alast->name);
 		
@@ -946,7 +947,7 @@ anchorrule	: ANCHOR anchorname dir quick interface af proto fromto
 			pf->astack[pf->asd + 1] = NULL;
 		}
 		| NATANCHOR string interface af proto fromto rtable {
-			struct pf_rule	r;
+			struct pfctl_rule	r;
 
 			if (check_rulestate(PFCTL_STATE_NAT)) {
 				free($2);
@@ -967,7 +968,7 @@ anchorrule	: ANCHOR anchorname dir quick interface af proto fromto
 			free($2);
 		}
 		| RDRANCHOR string interface af proto fromto rtable {
-			struct pf_rule	r;
+			struct pfctl_rule	r;
 
 			if (check_rulestate(PFCTL_STATE_NAT)) {
 				free($2);
@@ -1009,7 +1010,7 @@ anchorrule	: ANCHOR anchorname dir quick interface af proto fromto
 			free($2);
 		}
 		| BINATANCHOR string interface af proto fromto rtable {
-			struct pf_rule	r;
+			struct pfctl_rule	r;
 
 			if (check_rulestate(PFCTL_STATE_NAT)) {
 				free($2);
@@ -1040,7 +1041,7 @@ anchorrule	: ANCHOR anchorname dir quick interface af proto fromto
 			decide_address_family($6.src.host, &r.af);
 			decide_address_family($6.dst.host, &r.af);
 
-			pfctl_add_rule(pf, &r, $2);
+			pfctl_append_rule(pf, &r, $2);
 			free($2);
 		}
 		;
@@ -1087,7 +1088,7 @@ scrubaction	: no SCRUB {
 
 scrubrule	: scrubaction dir logquick interface af proto fromto scrub_opts
 		{
-			struct pf_rule	r;
+			struct pfctl_rule	r;
 
 			if (check_rulestate(PFCTL_STATE_SCRUB))
 				YYERROR;
@@ -1247,7 +1248,7 @@ fragcache	: FRAGMENT REASSEMBLE	{ $$ = 0; /* default */ }
 		;
 
 antispoof	: ANTISPOOF logquick antispoof_ifspc af antispoof_opts {
-			struct pf_rule		 r;
+			struct pfctl_rule	 r;
 			struct node_host	*h = NULL, *hh;
 			struct node_if		*i, *j;
 
@@ -2022,7 +2023,7 @@ qassign_item	: STRING			{
 pfrule		: action dir logquick interface route af proto fromto
 		    filter_opts
 		{
-			struct pf_rule		 r;
+			struct pfctl_rule	 r;
 			struct node_state_opt	*o;
 			struct node_proto	*proto;
 			int			 srctrack = 0;
@@ -4015,6 +4016,36 @@ pool_opt	: BITMASK	{
 			pool_opts.marker |= POM_STICKYADDRESS;
 			pool_opts.opts |= PF_POOL_STICKYADDR;
 		}
+		| MAPEPORTSET number '/' number '/' number {
+			if (pool_opts.mape.offset) {
+				yyerror("map-e-portset cannot be redefined");
+				YYERROR;
+			}
+			if (pool_opts.type) {
+				yyerror("map-e-portset cannot be used with "
+					"address pools");
+				YYERROR;
+			}
+			if ($2 <= 0 || $2 >= 16) {
+				yyerror("MAP-E PSID offset must be 1-15");
+				YYERROR;
+			}
+			if ($4 < 0 || $4 >= 16 || $2 + $4 > 16) {
+				yyerror("Invalid MAP-E PSID length");
+				YYERROR;
+			} else if ($4 == 0) {
+				yyerror("PSID Length = 0: this means"
+				    " you do not need MAP-E");
+				YYERROR;
+			}
+			if ($6 < 0 || $6 > 65535) {
+				yyerror("Invalid MAP-E PSID");
+				YYERROR;
+			}
+			pool_opts.mape.offset = $2;
+			pool_opts.mape.psidlen = $4;
+			pool_opts.mape.psid = $6;
+		}
 		;
 
 redirection	: /* empty */			{ $$ = NULL; }
@@ -4071,7 +4102,7 @@ nataction	: no NAT natpasslog {
 natrule		: nataction interface af proto fromto tag tagged rtable
 		    redirpool pool_opts
 		{
-			struct pf_rule	r;
+			struct pfctl_rule	r;
 
 			if (check_rulestate(PFCTL_STATE_NAT))
 				YYERROR;
@@ -4220,6 +4251,29 @@ natrule		: nataction interface af proto fromto tag tagged rtable
 				r.rpool.proxy_port[1] = 0;
 			}
 
+			if ($10.mape.offset) {
+				if (r.action != PF_NAT) {
+					yyerror("the 'map-e-portset' option is"
+					    " only valid with nat rules");
+					YYERROR;
+				}
+				if ($10.staticport) {
+					yyerror("the 'map-e-portset' option"
+					    " can't be used 'static-port'");
+					YYERROR;
+				}
+				if (r.rpool.proxy_port[0] !=
+				    PF_NAT_PROXY_PORT_LOW &&
+				    r.rpool.proxy_port[1] !=
+				    PF_NAT_PROXY_PORT_HIGH) {
+					yyerror("the 'map-e-portset' option"
+					    " can't be used when specifying"
+					    " a port range");
+					YYERROR;
+				}
+				r.rpool.mape = $10.mape;
+			}
+
 			expand_rule(&r, $2, $9 == NULL ? NULL : $9->host, $4,
 			    $5.src_os, $5.src.host, $5.src.port, $5.dst.host,
 			    $5.dst.port, 0, 0, 0, "");
@@ -4230,7 +4284,7 @@ natrule		: nataction interface af proto fromto tag tagged rtable
 binatrule	: no BINAT natpasslog interface af proto FROM ipspec toipspec tag
 		    tagged rtable redirection
 		{
-			struct pf_rule		binat;
+			struct pfctl_rule	binat;
 			struct pf_pooladdr	*pa;
 
 			if (check_rulestate(PFCTL_STATE_NAT))
@@ -4390,7 +4444,7 @@ binatrule	: no BINAT natpasslog interface af proto FROM ipspec toipspec tag
 				free($13);
 			}
 
-			pfctl_add_rule(pf, &binat, "");
+			pfctl_append_rule(pf, &binat, "");
 		}
 		;
 
@@ -4615,7 +4669,7 @@ disallow_alias(struct node_host *h, const char *fmt)
 }
 
 int
-rule_consistent(struct pf_rule *r, int anchor_call)
+rule_consistent(struct pfctl_rule *r, int anchor_call)
 {
 	int	problems = 0;
 
@@ -4643,7 +4697,7 @@ rule_consistent(struct pf_rule *r, int anchor_call)
 }
 
 int
-filter_consistent(struct pf_rule *r, int anchor_call)
+filter_consistent(struct pfctl_rule *r, int anchor_call)
 {
 	int	problems = 0;
 
@@ -4706,13 +4760,13 @@ filter_consistent(struct pf_rule *r, int anchor_call)
 }
 
 int
-nat_consistent(struct pf_rule *r)
+nat_consistent(struct pfctl_rule *r)
 {
 	return (0);	/* yeah! */
 }
 
 int
-rdr_consistent(struct pf_rule *r)
+rdr_consistent(struct pfctl_rule *r)
 {
 	int			 problems = 0;
 
@@ -5248,7 +5302,7 @@ expand_queue(struct pf_altq *a, struct node_if *interfaces,
 }
 
 void
-expand_rule(struct pf_rule *r,
+expand_rule(struct pfctl_rule *r,
     struct node_if *interfaces, struct node_host *rpool_hosts,
     struct node_proto *protos, struct node_os *src_oses,
     struct node_host *src_hosts, struct node_port *src_ports,
@@ -5407,7 +5461,7 @@ expand_rule(struct pf_rule *r,
 			yyerror("skipping rule due to errors");
 		else {
 			r->nr = pf->astack[pf->asd]->match++;
-			pfctl_add_rule(pf, r, anchor_call);
+			pfctl_append_rule(pf, r, anchor_call);
 			added++;
 		}
 
@@ -5545,6 +5599,7 @@ lookup(char *s)
 		{ "load",		LOAD},
 		{ "log",		LOG},
 		{ "loginterface",	LOGINTERFACE},
+		{ "map-e-portset",	MAPEPORTSET},
 		{ "max",		MAXIMUM},
 		{ "max-mss",		MAXMSS},
 		{ "max-src-conn",	MAXSRCCONN},
@@ -6080,10 +6135,10 @@ symget(const char *nam)
 }
 
 void
-mv_rules(struct pf_ruleset *src, struct pf_ruleset *dst)
+mv_rules(struct pfctl_ruleset *src, struct pfctl_ruleset *dst)
 {
 	int i;
-	struct pf_rule *r;
+	struct pfctl_rule *r;
 
 	for (i = 0; i < PF_RULESET_MAX; ++i) {
 		while ((r = TAILQ_FIRST(src->rules[i].active.ptr))
@@ -6214,7 +6269,7 @@ getservice(char *n)
 }
 
 int
-rule_label(struct pf_rule *r, char *s)
+rule_label(struct pfctl_rule *r, char *s)
 {
 	if (s) {
 		if (strlcpy(r->label, s, sizeof(r->label)) >=
@@ -6342,7 +6397,8 @@ map_tos(char *s, int *val)
 		{ "lowdelay",		IPTOS_LOWDELAY },
 		{ "netcontrol",		IPTOS_PREC_NETCONTROL },
 		{ "reliability",	IPTOS_RELIABILITY },
-		{ "throughput",		IPTOS_THROUGHPUT }
+		{ "throughput",		IPTOS_THROUGHPUT },
+		{ "va",			IPTOS_DSCP_VA }
 	};
 	const struct keywords	*p;
 

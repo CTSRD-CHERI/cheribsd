@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# Copyright (c) 2018-2020 Gavin D. Howard and contributors.
+# Copyright (c) 2018-2021 Gavin D. Howard and contributors.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -30,6 +30,7 @@
 usage() {
 	printf 'usage: %s [run_tests] [generate_tests] [test_with_clang] [test_with_gcc] \n' "$script"
 	printf '          [run_sanitizers] [run_valgrind] [run_64_bit] [run_gen_script]\n'
+	printf '          [test_c11] [test_128_bit]\n'
 	exit 1
 }
 
@@ -47,7 +48,7 @@ header() {
 }
 
 do_make() {
-	make -j4 "$@"
+	make -j16 "$@"
 }
 
 configure() {
@@ -216,8 +217,10 @@ runconfigseries() {
 
 	if [ "$run_64_bit" -ne 0 ]; then
 
-		runconfigtests "$_runconfigseries_CFLAGS" "$_runconfigseries_CC" \
-			"$_runconfigseries_configure_flags" 1 64 "$_runconfigseries_run_tests"
+		if [ "$test_128_bit" -ne 0 ]; then
+			runconfigtests "$_runconfigseries_CFLAGS" "$_runconfigseries_CC" \
+				"$_runconfigseries_configure_flags" 1 64 "$_runconfigseries_run_tests"
+		fi
 
 		if [ "$run_gen_script" -ne 0 ]; then
 			runconfigtests "$_runconfigseries_CFLAGS" "$_runconfigseries_CC" \
@@ -307,7 +310,10 @@ runtests() {
 	shift
 
 	runtestseries "-std=c99 $_runtests_CFLAGS" "$_runtests_CC" "$_runtests_configure_flags" "$_runtests_run_tests"
-	runtestseries "-std=c11 $_runtests_CFLAGS" "$_runtests_CC" "$_runtests_configure_flags" "$_runtests_run_tests"
+
+	if [ "$test_c11" -ne 0 ]; then
+		runtestseries "-std=c11 $_runtests_CFLAGS" "$_runtests_CC" "$_runtests_configure_flags" "$_runtests_run_tests"
+	fi
 }
 
 karatsuba() {
@@ -326,18 +332,18 @@ vg() {
 		_vg_bits=32
 	fi
 
-	build "$debug" "gcc" "-O0 -g" "1" "$_vg_bits"
-	runtest valgrind
+	build "$debug" "gcc" "-O0 -gv" "1" "$_vg_bits"
+	runtest test
 
 	do_make clean_config
 
-	build "$debug" "gcc" "-O0 -gb" "1" "$_vg_bits"
-	runtest valgrind
+	build "$debug" "gcc" "-O0 -gvb" "1" "$_vg_bits"
+	runtest test
 
 	do_make clean_config
 
-	build "$debug" "gcc" "-O0 -gd" "1" "$_vg_bits"
-	runtest valgrind
+	build "$debug" "gcc" "-O0 -gvd" "1" "$_vg_bits"
+	runtest test
 
 	do_make clean_config
 }
@@ -498,6 +504,20 @@ else
 	run_gen_script=0
 fi
 
+if [ "$#" -gt 0 ]; then
+	test_c11="$1"
+	shift
+else
+	test_c11=0
+fi
+
+if [ "$#" -gt 0 ]; then
+	test_128_bit="$1"
+	shift
+else
+	test_128_bit=0
+fi
+
 if [ "$run_64_bit" -ne 0 ]; then
 	bits=64
 else
@@ -514,7 +534,7 @@ else
 	defcc="c99"
 fi
 
-export ASAN_OPTIONS="abort_on_error=1"
+export ASAN_OPTIONS="abort_on_error=1,allocator_may_return_null=1"
 export UBSAN_OPTIONS="print_stack_trace=1,silence_unsigned_overflow=1"
 
 build "$debug" "$defcc" "-g" "1" "$bits"
@@ -522,8 +542,6 @@ build "$debug" "$defcc" "-g" "1" "$bits"
 header "Running math library under --standard"
 
 printf 'quit\n' | bin/bc -ls
-
-version=$(make version)
 
 do_make clean_tests
 
@@ -573,9 +591,10 @@ if [ "$run_tests" -ne 0 ]; then
 		printf '\n'
 		printf 'Then run the GitHub release script as follows:\n'
 		printf '\n'
-		printf '    <github_release> %s release.sh RELEASE.md\\\n' "$version"
-		printf '    tests/afl.py tests/radamsa.sh tests/radamsa.txt tests/randmath.py \\\n'
-		printf '    tests/bc/scripts/timeconst.bc\n'
+		printf '    <github_release> <version> .gitignore .gitattributes\\\n'
+		printf '    manpage.sh release.sh RELEASE.md tests/afl.py\\\n'
+		printf '    tests/radamsa.sh tests/radamsa.txt tests/randmath.py\\\n'
+		printf '    tests/fuzzing/ tests/bc/scripts/timeconst.bc\n'
 
 	fi
 

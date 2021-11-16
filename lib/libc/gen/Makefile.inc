@@ -188,6 +188,9 @@ SRCS+=	libcheri_caprevoke.c
 
 CFLAGS.arc4random.c= -I${SRCTOP}/sys -I${SRCTOP}/sys/crypto/chacha20
 
+CFLAGS.dlfcn.c= ${RTLD_HDRS}
+CFLAGS.tls.c= ${RTLD_HDRS}
+
 .PATH: ${SRCTOP}/contrib/libc-pwcache
 SRCS+=	pwcache.c pwcache.h
 

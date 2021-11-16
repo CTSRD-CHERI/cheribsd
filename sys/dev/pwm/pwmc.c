@@ -52,6 +52,9 @@ static struct ofw_compat_data compat_data[] = {
 	{"freebsd,pwmc", true},
 	{NULL,           false},
 };
+
+PWMBUS_FDT_PNP_INFO(compat_data);
+
 #endif
 
 struct pwmc_softc {
@@ -77,9 +80,16 @@ pwm_ioctl(struct cdev *dev, u_long cmd, caddr_t data,
 		bcopy(data, &state, sizeof(state));
 		rv = PWMBUS_CHANNEL_CONFIG(bus, sc->chan,
 		    state.period, state.duty);
-		if (rv == 0)
-			rv = PWMBUS_CHANNEL_ENABLE(bus, sc->chan,
-			    state.enable);
+		if (rv != 0)
+			return (rv);
+
+		rv = PWMBUS_CHANNEL_SET_FLAGS(bus,
+		    sc->chan, state.flags);
+		if (rv != 0 && rv != EOPNOTSUPP)
+			return (rv);
+
+		rv = PWMBUS_CHANNEL_ENABLE(bus, sc->chan,
+		    state.enable);
 		break;
 	case PWMGETSTATE:
 		bcopy(data, &state, sizeof(state));
@@ -87,6 +97,12 @@ pwm_ioctl(struct cdev *dev, u_long cmd, caddr_t data,
 		    &state.period, &state.duty);
 		if (rv != 0)
 			return (rv);
+
+		rv = PWMBUS_CHANNEL_GET_FLAGS(bus, sc->chan,
+		    &state.flags);
+		if (rv != 0)
+			return (rv);
+
 		rv = PWMBUS_CHANNEL_IS_ENABLED(bus, sc->chan,
 		    &state.enable);
 		if (rv != 0)
@@ -203,8 +219,5 @@ static driver_t pwmc_driver = {
 static devclass_t pwmc_devclass;
 
 DRIVER_MODULE(pwmc, pwmbus, pwmc_driver, pwmc_devclass, 0, 0);
-#ifdef FDT
-PWMBUS_FDT_PNP_INFO(compat_data);
-#endif
 MODULE_DEPEND(pwmc, pwmbus, 1, 1, 1);
 MODULE_VERSION(pwmc, 1);

@@ -32,7 +32,7 @@
 #endif
 
 #undef __FreeBSD_version
-#define	__FreeBSD_version 1300000
+#define	__FreeBSD_version 1400000
 
 #include <sys/cdefs.h>
 #include <sys/queue.h>
@@ -241,6 +241,8 @@ typedef unsigned long size_t;
 typedef signed long ssize_t;
 #define	_OFF_T_DECLARED
 typedef unsigned long off_t;
+
+typedef int64_t sbintime_t;
 
 typedef unsigned char   u_char;
 typedef unsigned short  u_short;

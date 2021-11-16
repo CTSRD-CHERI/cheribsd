@@ -24,7 +24,9 @@ TESTS_SUBDIRS+=		netgraph
 TESTS_SUBDIRS+=		netinet
 TESTS_SUBDIRS+=		netinet6
 TESTS_SUBDIRS+=		netipsec
+.if !${MACHINE_ABI:Mpurecap}
 TESTS_SUBDIRS+=		netmap
+.endif
 TESTS_SUBDIRS+=		netpfil
 TESTS_SUBDIRS+=		opencrypto
 TESTS_SUBDIRS+=		posixshm

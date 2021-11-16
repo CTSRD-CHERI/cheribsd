@@ -110,8 +110,7 @@ cloudabi_sys_mem_map(struct thread *td, struct cloudabi_sys_mem_map_args *uap)
 	if (error != 0)
 		return (error);
 
-	return (kern_mmap(td,
-	    &(struct mmap_req){
+	return (kern_mmap(td, &(struct mmap_req){
 		.mr_hint = (uintptr_t)uap->addr,
 		.mr_len = uap->len,
 		.mr_prot = prot,

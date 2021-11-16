@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
  * HID spec: http://www.usb.org/developers/devclass_docs/HID1_11.pdf
  */
 
+#include "opt_hid.h"
 #include "opt_kbd.h"
 #include "opt_hkbd.h"
 #include "opt_evdev.h"
@@ -715,11 +716,16 @@ hkbd_intr_callback(void *context, void *data, hid_size_t len)
 				uint32_t key =
 				    hid_get_data(buf + offset, len - offset,
 				    &sc->sc_loc_key[i]);
+				if (key == KEY_ERROR) {
+					DPRINTF("KEY_ERROR\n");
+					sc->sc_ndata = sc->sc_odata;
+					return;	/* ignore */
+				}
 				if (modifiers & MOD_FN)
 					key = hkbd_apple_fn(key);
 				if (sc->sc_flags & HKBD_FLAG_APPLE_SWAP)
 					key = hkbd_apple_swap(key);
-				if (key == KEY_NONE || key == KEY_ERROR || key >= HKBD_NKEYCODE)
+				if (key == KEY_NONE || key >= HKBD_NKEYCODE)
 					continue;
 				/* set key in bitmap */
 				sc->sc_ndata.bitmap[key / 64] |= 1ULL << (key % 64);

@@ -516,7 +516,7 @@ proc0_init(void *dummy __unused)
 	p->p_nice = NZERO;
 	td->td_tid = THREAD0_TID;
 	tidhash_add(td);
-	td->td_state = TDS_RUNNING;
+	TD_SET_STATE(td, TDS_RUNNING);
 	td->td_pri_class = PRI_TIMESHARE;
 	td->td_user_pri = PUSER;
 	td->td_base_user_pri = PUSER;
@@ -541,6 +541,7 @@ proc0_init(void *dummy __unused)
 	callout_init_mtx(&p->p_itcallout, &p->p_mtx, 0);
 	callout_init_mtx(&p->p_limco, &p->p_mtx, 0);
 	callout_init(&td->td_slpcallout, 1);
+	TAILQ_INIT(&p->p_kqtim_stop);
 
 	/* Create credentials. */
 	newcred = crget();

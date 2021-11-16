@@ -45,6 +45,7 @@ struct tls_record_layer {
 #define	TLS_MAX_PARAM_SIZE	1024	/* Max key/mac/iv in sockopt */
 #define	TLS_AEAD_GCM_LEN	4
 #define	TLS_1_3_GCM_IV_LEN	12
+#define	TLS_CHACHA20_IV_LEN	12
 #define	TLS_CBC_IMPLICIT_IV_LEN	16
 
 /* Type values for the record layer */
@@ -102,9 +103,9 @@ struct tls_mac_data {
 /* For TCP_TXTLS_ENABLE and TCP_RXTLS_ENABLE. */
 #ifdef _KERNEL
 struct tls_enable_v0 {
-	const uint8_t *cipher_key;
-	const uint8_t *iv;		/* Implicit IV. */
-	const uint8_t *auth_key;
+	const uint8_t * __kerncap cipher_key;
+	const uint8_t * __kerncap iv;		/* Implicit IV. */
+	const uint8_t * __kerncap auth_key;
 	int	cipher_algorithm;	/* e.g. CRYPTO_AES_CBC */
 	int	cipher_key_len;
 	int	iv_len;
@@ -117,9 +118,9 @@ struct tls_enable_v0 {
 #endif
 
 struct tls_enable {
-	const uint8_t *cipher_key;
-	const uint8_t *iv;		/* Implicit IV. */
-	const uint8_t *auth_key;
+	const uint8_t * __kerncap cipher_key;
+	const uint8_t * __kerncap iv;		/* Implicit IV. */
+	const uint8_t * __kerncap auth_key;
 	int	cipher_algorithm;	/* e.g. CRYPTO_AES_CBC */
 	int	cipher_key_len;
 	int	iv_len;
@@ -164,7 +165,7 @@ struct tls_session_params {
 #define	KTLS_TX		1
 #define	KTLS_RX		2
 
-#define	KTLS_API_VERSION 7
+#define	KTLS_API_VERSION 8
 
 struct ktls_session;
 struct m_snd_tag;
@@ -185,8 +186,8 @@ struct ktls_session {
 	union {
 		int	(*sw_encrypt)(struct ktls_session *tls,
 		    const struct tls_record_layer *hdr, uint8_t *trailer,
-		    struct iovec *src, struct iovec *dst, int iovcnt,
-		    uint64_t seqno, uint8_t record_type);
+		    struct iovec *src, struct iovec *dst, int srciovcnt,
+		    int dstiovcnt, uint64_t seqno, uint8_t record_type);
 		int	(*sw_decrypt)(struct ktls_session *tls,
 		    const struct tls_record_layer *hdr, struct mbuf *m,
 		    uint64_t seqno, int *trailer_len);

@@ -269,6 +269,10 @@ ${X_}COMPILER_ABSOLUTE_PATH!=	which ${${cc}:N${CCACHE_BIN}:[1]}
 .error Could not find $$CC (${${cc}:N${CCACHE_BIN}:[1]}) in $$PATH. \
 	Please pass an absolute path to CC instead.
 .endif
+.if ${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 100000 || \
+	(${${X_}COMPILER_TYPE} == "gcc" && ${${X_}COMPILER_VERSION} >= 80100)
+${X_}COMPILER_FEATURES+=	fileprefixmap
+.endif
 
 .else
 # Use CC's values

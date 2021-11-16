@@ -40,6 +40,7 @@
 #include <sys/counter.h>
 #include <sys/cpuset.h>
 #include <sys/malloc.h>
+#include <sys/nv.h>
 #include <sys/refcount.h>
 #include <sys/sysctl.h>
 #include <sys/lock.h>
@@ -308,6 +309,7 @@ struct pf_kpool {
 	struct pf_kpooladdr	*cur;
 	struct pf_poolhashkey	 key;
 	struct pf_addr		 counter;
+	struct pf_mape_portset	 mape;
 	int			 tblidx;
 	u_int16_t		 proxy_port[2];
 	u_int8_t		 opts;
@@ -356,7 +358,6 @@ struct pf_krule {
 	}			 max_src_conn_rate;
 	u_int32_t		 qid;
 	u_int32_t		 pqid;
-	u_int32_t		 rt_listid;
 	u_int32_t		 nr;
 	u_int32_t		 prob;
 	uid_t			 cuid;
@@ -893,6 +894,7 @@ struct pfi_kkif {
 #define	PFI_IFLAG_REFS		0x0001	/* has state references */
 #define PFI_IFLAG_SKIP		0x0100	/* skip filtering on interface */
 
+#ifdef _KERNEL
 struct pf_pdesc {
 	struct {
 		int	 done;
@@ -932,6 +934,7 @@ struct pf_pdesc {
 	u_int8_t	 sidx;		/* key index for source */
 	u_int8_t	 didx;		/* key index for destination */
 };
+#endif
 
 /* flags for RDR options */
 #define PF_DPORT_RANGE	0x01		/* Dest port uses range */
@@ -1229,8 +1232,10 @@ struct pfioc_iface {
 #define DIOCSTART	_IO  ('D',  1)
 #define DIOCSTOP	_IO  ('D',  2)
 #define DIOCADDRULE	_IOWR('D',  4, struct pfioc_rule)
+#define DIOCADDRULENV	_IOWR('D',  4, struct pfioc_nv)
 #define DIOCGETRULES	_IOWR('D',  6, struct pfioc_rule)
 #define DIOCGETRULE	_IOWR('D',  7, struct pfioc_rule)
+#define DIOCGETRULENV	_IOWR('D',  7, struct pfioc_nv)
 /* XXX cut 8 - 17 */
 #define DIOCCLRSTATES	_IOWR('D', 18, struct pfioc_state_kill)
 #define DIOCGETSTATE	_IOWR('D', 19, struct pfioc_state)
@@ -1388,6 +1393,8 @@ VNET_DECLARE(struct pf_srchash *, pf_srchash);
 
 VNET_DECLARE(void *, pf_swi_cookie);
 #define V_pf_swi_cookie	VNET(pf_swi_cookie)
+VNET_DECLARE(struct intr_event *, pf_swi_ie);
+#define	V_pf_swi_ie	VNET(pf_swi_ie)
 
 VNET_DECLARE(uint64_t, pf_stateid[MAXCPU]);
 #define	V_pf_stateid	VNET(pf_stateid)
@@ -1632,6 +1639,8 @@ VNET_DECLARE(struct pf_kanchor,			 pf_main_anchor);
 void			 pf_init_kruleset(struct pf_kruleset *);
 int			 pf_kanchor_setup(struct pf_krule *,
 			    const struct pf_kruleset *, const char *);
+int			 pf_kanchor_nvcopyout(const struct pf_kruleset *,
+			    const struct pf_krule *, nvlist_t *);
 int			 pf_kanchor_copyout(const struct pf_kruleset *,
 			    const struct pf_krule *, struct pfioc_rule *);
 void			 pf_kanchor_remove(struct pf_krule *);
@@ -1639,6 +1648,8 @@ void			 pf_remove_if_empty_kruleset(struct pf_kruleset *);
 struct pf_kruleset	*pf_find_kruleset(const char *);
 struct pf_kruleset	*pf_find_or_create_kruleset(const char *);
 void			 pf_rs_initialize(void);
+
+void			 pf_krule_free(struct pf_krule *);
 #endif
 
 /* The fingerprint functions can be linked into userland programs (tcpdump) */

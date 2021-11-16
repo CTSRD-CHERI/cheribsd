@@ -59,7 +59,6 @@ int	 ufs_bmap(struct vop_bmap_args *);
 int	 ufs_bmaparray(struct vnode *, ufs2_daddr_t, ufs2_daddr_t *,
 	    struct buf *, int *, int *);
 int	 ufs_bmap_seekdata(struct vnode *, off_t *);
-int	 ufs_fhtovp(struct mount *, struct ufid *, int, struct vnode **);
 int	 ufs_checkpath(ino_t, ino_t, struct inode *, struct ucred *, ino_t *);
 void	 ufs_dirbad(struct inode *, doff_t, char *);
 int	 ufs_dirbadentry(struct vnode *, struct direct *, int);
@@ -69,7 +68,7 @@ int	 ufs_extwrite(struct vop_write_args *);
 void	 ufs_makedirentry(struct inode *, struct componentname *,
 	    struct direct *);
 int	 ufs_direnter(struct vnode *, struct vnode *, struct direct *,
-	    struct componentname *, struct buf *, int);
+	    struct componentname *, struct buf *);
 int	 ufs_dirremove(struct vnode *, struct inode *, int, int);
 int	 ufs_dirrewrite(struct inode *, struct inode *, ino_t, int, int);
 int	 ufs_lookup_ino(struct vnode *, struct vnode **, struct componentname *,

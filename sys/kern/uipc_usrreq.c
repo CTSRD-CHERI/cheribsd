@@ -428,14 +428,15 @@ static struct protosw localsw[] = {
 {
 	.pr_type =		SOCK_STREAM,
 	.pr_domain =		&localdomain,
-	.pr_flags =		PR_CONNREQUIRED|PR_WANTRCVD|PR_RIGHTS,
+	.pr_flags =		PR_CONNREQUIRED|PR_WANTRCVD|PR_RIGHTS|
+				    PR_CAPATTACH,
 	.pr_ctloutput =		&uipc_ctloutput,
 	.pr_usrreqs =		&uipc_usrreqs_stream
 },
 {
 	.pr_type =		SOCK_DGRAM,
 	.pr_domain =		&localdomain,
-	.pr_flags =		PR_ATOMIC|PR_ADDR|PR_RIGHTS,
+	.pr_flags =		PR_ATOMIC|PR_ADDR|PR_RIGHTS|PR_CAPATTACH,
 	.pr_ctloutput =		&uipc_ctloutput,
 	.pr_usrreqs =		&uipc_usrreqs_dgram
 },
@@ -448,8 +449,8 @@ static struct protosw localsw[] = {
 	 * due to our use of sbappendaddr.  A new sbappend variants is needed
 	 * that supports both atomic record writes and control data.
 	 */
-	.pr_flags =		PR_ADDR|PR_ATOMIC|PR_CONNREQUIRED|PR_WANTRCVD|
-				    PR_RIGHTS,
+	.pr_flags =		PR_ADDR|PR_ATOMIC|PR_CONNREQUIRED|
+				    PR_WANTRCVD|PR_RIGHTS|PR_CAPATTACH,
 	.pr_ctloutput =		&uipc_ctloutput,
 	.pr_usrreqs =		&uipc_usrreqs_seqpacket,
 },
@@ -669,8 +670,8 @@ restart:
 	if (error == 0)
 		error = VOP_CREATE(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd, &vattr);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
-	vput(nd.ni_dvp);
 	if (error) {
+		VOP_VPUT_PAIR(nd.ni_dvp, NULL, true);
 		vn_finished_write(mp);
 		if (error == ERELOOKUP)
 			goto restart;
@@ -686,7 +687,8 @@ restart:
 	unp->unp_addr = soun;
 	unp->unp_flags &= ~UNP_BINDING;
 	UNP_PCB_UNLOCK(unp);
-	VOP_UNLOCK(vp);
+	vref(vp);
+	VOP_VPUT_PAIR(nd.ni_dvp, &vp, true);
 	vn_finished_write(mp);
 	free(buf, M_TEMP);
 	return (0);
@@ -2066,7 +2068,7 @@ unp_externalize(struct mbuf *control, struct mbuf **controlp, int flags)
 			}
 			for (i = 0; i < newfds; i++, fdp++) {
 				_finstall(fdesc, fdep[i]->fde_file, *fdp,
-				    (flags & MSG_CMSG_CLOEXEC) != 0 ? UF_EXCLOSE : 0,
+				    (flags & MSG_CMSG_CLOEXEC) != 0 ? O_CLOEXEC : 0,
 				    &fdep[i]->fde_caps);
 				unp_externalize_fp(fdep[i]->fde_file);
 			}

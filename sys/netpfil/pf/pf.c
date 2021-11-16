@@ -59,6 +59,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/md5.h>
 #include <sys/random.h>
 #include <sys/refcount.h>
+#include <sys/sdt.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/taskqueue.h>
@@ -111,6 +112,15 @@ __FBSDID("$FreeBSD$");
 #include <security/mac/mac_framework.h>
 
 #define	DPFPRINTF(n, x)	if (V_pf_status.debug >= (n)) printf x
+
+SDT_PROVIDER_DEFINE(pf);
+SDT_PROBE_DEFINE4(pf, ip, test, done, "int", "int", "struct pf_krule *",
+    "struct pf_state *");
+SDT_PROBE_DEFINE4(pf, ip, test6, done, "int", "int", "struct pf_krule *",
+    "struct pf_state *");
+SDT_PROBE_DEFINE5(pf, ip, state, lookup, "struct pfi_kkif *",
+    "struct pf_state_key_cmp *", "int", "struct pf_pdesc *",
+    "struct pf_state *");
 
 /*
  * Global variables
@@ -326,15 +336,14 @@ VNET_DEFINE(struct pf_limit, pf_limits[PF_LIMIT_MAX]);
 #define	STATE_LOOKUP(i, k, d, s, pd)					\
 	do {								\
 		(s) = pf_find_state((i), (k), (d));			\
+		SDT_PROBE5(pf, ip, state, lookup, i, k, d, pd, (s));	\
 		if ((s) == NULL)					\
 			return (PF_DROP);				\
 		if (PACKET_LOOPED(pd))					\
 			return (PF_PASS);				\
 		if ((d) == PF_OUT &&					\
-		    (((s)->rule.ptr->rt == PF_ROUTETO &&		\
-		    (s)->rule.ptr->direction == PF_OUT) ||		\
-		    ((s)->rule.ptr->rt == PF_REPLYTO &&			\
-		    (s)->rule.ptr->direction == PF_IN)) &&		\
+		    (s)->rule.ptr->rt == PF_ROUTETO &&			\
+		    (s)->rule.ptr->direction == PF_OUT &&		\
 		    (s)->rt_kif != NULL &&				\
 		    (s)->rt_kif != (i))					\
 			return (PF_PASS);				\
@@ -388,6 +397,7 @@ SYSCTL_ULONG(_net_pf, OID_AUTO, request_maxcount, CTLFLAG_RWTUN,
     &pf_ioctl_maxcount, 0, "Maximum number of tables, addresses, ... in a single ioctl() call");
 
 VNET_DEFINE(void *, pf_swi_cookie);
+VNET_DEFINE(struct intr_event *, pf_swi_ie);
 
 VNET_DEFINE(uint32_t, pf_hashseed);
 #define	V_pf_hashseed	VNET(pf_hashseed)
@@ -707,10 +717,8 @@ pf_free_src_node(struct pf_ksrc_node *sn)
 {
 
 	for (int i = 0; i < 2; i++) {
-		if (sn->bytes[i])
-			counter_u64_free(sn->bytes[i]);
-		if (sn->packets[i])
-			counter_u64_free(sn->packets[i]);
+		counter_u64_free(sn->bytes[i]);
+		counter_u64_free(sn->packets[i]);
 	}
 	uma_zfree(V_pf_sources_z, sn);
 }
@@ -1739,10 +1747,8 @@ pf_free_state(struct pf_state *cur)
 	    cur->timeout));
 
 	for (int i = 0; i < 2; i++) {
-		if (cur->bytes[i] != NULL)
-			counter_u64_free(cur->bytes[i]);
-		if (cur->packets[i] != NULL)
-			counter_u64_free(cur->packets[i]);
+		counter_u64_free(cur->bytes[i]);
+		counter_u64_free(cur->packets[i]);
 	}
 
 	pf_normalize_tcp_cleanup(cur);
@@ -5488,10 +5494,29 @@ pf_route(struct mbuf **m, struct pf_krule *r, int dir, struct ifnet *oifp,
 	}
 
 	if (r->rt == PF_DUPTO) {
-		if ((m0 = m_dup(*m, M_NOWAIT)) == NULL) {
-			if (s)
+		if ((pd->pf_mtag->flags & PF_DUPLICATED)) {
+			if (s == NULL) {
+				ifp = r->rpool.cur->kif ?
+				    r->rpool.cur->kif->pfik_ifp : NULL;
+			} else {
+				ifp = s->rt_kif ? s->rt_kif->pfik_ifp : NULL;
 				PF_STATE_UNLOCK(s);
-			return;
+			}
+			if (ifp == oifp) {
+				/* When the 2nd interface is not skipped */
+				return;
+			} else {
+				m0 = *m;
+				*m = NULL;
+				goto bad;
+			}
+		} else {
+			pd->pf_mtag->flags |= PF_DUPLICATED;
+			if (((m0 = m_dup(*m, M_NOWAIT)) == NULL)) {
+				if (s)
+					PF_STATE_UNLOCK(s);
+				return;
+			}
 		}
 	} else {
 		if ((r->rt == PF_REPLYTO) == (r->direction == dir)) {
@@ -5533,7 +5558,7 @@ pf_route(struct mbuf **m, struct pf_krule *r, int dir, struct ifnet *oifp,
 	if (ifp == NULL)
 		goto bad;
 
-	if (oifp != ifp) {
+	if (dir == PF_IN) {
 		if (pf_test(PF_OUT, 0, ifp, &m0, inp) != PF_PASS)
 			goto bad;
 		else if (m0 == NULL)
@@ -5555,11 +5580,17 @@ pf_route(struct mbuf **m, struct pf_krule *r, int dir, struct ifnet *oifp,
 	/* Copied from FreeBSD 10.0-CURRENT ip_output. */
 	m0->m_pkthdr.csum_flags |= CSUM_IP;
 	if (m0->m_pkthdr.csum_flags & CSUM_DELAY_DATA & ~ifp->if_hwassist) {
+		m0 = mb_unmapped_to_ext(m0);
+		if (m0 == NULL)
+			goto done;
 		in_delayed_cksum(m0);
 		m0->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA;
 	}
 #if defined(SCTP) || defined(SCTP_SUPPORT)
 	if (m0->m_pkthdr.csum_flags & CSUM_SCTP & ~ifp->if_hwassist) {
+		m0 = mb_unmapped_to_ext(m0);
+		if (m0 == NULL)
+			goto done;
 		sctp_delayed_cksum(m0, (uint32_t)(ip->ip_hl << 2));
 		m0->m_pkthdr.csum_flags &= ~CSUM_SCTP;
 	}
@@ -5649,10 +5680,29 @@ pf_route6(struct mbuf **m, struct pf_krule *r, int dir, struct ifnet *oifp,
 	}
 
 	if (r->rt == PF_DUPTO) {
-		if ((m0 = m_dup(*m, M_NOWAIT)) == NULL) {
-			if (s)
+		if ((pd->pf_mtag->flags & PF_DUPLICATED)) {
+			if (s == NULL) {
+				ifp = r->rpool.cur->kif ?
+				    r->rpool.cur->kif->pfik_ifp : NULL;
+			} else {
+				ifp = s->rt_kif ? s->rt_kif->pfik_ifp : NULL;
 				PF_STATE_UNLOCK(s);
-			return;
+			}
+			if (ifp == oifp) {
+				/* When the 2nd interface is not skipped */
+				return;
+			} else {
+				m0 = *m;
+				*m = NULL;
+				goto bad;
+			}
+		} else {
+			pd->pf_mtag->flags |= PF_DUPLICATED;
+			if (((m0 = m_dup(*m, M_NOWAIT)) == NULL)) {
+				if (s)
+					PF_STATE_UNLOCK(s);
+				return;
+			}
 		}
 	} else {
 		if ((r->rt == PF_REPLYTO) == (r->direction == dir)) {
@@ -5697,7 +5747,7 @@ pf_route6(struct mbuf **m, struct pf_krule *r, int dir, struct ifnet *oifp,
 	if (ifp == NULL)
 		goto bad;
 
-	if (oifp != ifp) {
+	if (dir == PF_IN) {
 		if (pf_test6(PF_OUT, PFIL_FWD, ifp, &m0, inp) != PF_PASS)
 			goto bad;
 		else if (m0 == NULL)
@@ -5717,6 +5767,9 @@ pf_route6(struct mbuf **m, struct pf_krule *r, int dir, struct ifnet *oifp,
 	if (m0->m_pkthdr.csum_flags & CSUM_DELAY_DATA_IPV6 &
 	    ~ifp->if_hwassist) {
 		uint32_t plen = m0->m_pkthdr.len - sizeof(*ip6);
+		m0 = mb_unmapped_to_ext(m0);
+		if (m0 == NULL)
+			goto done;
 		in6_delayed_cksum(m0, plen, sizeof(struct ip6_hdr));
 		m0->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA_IPV6;
 	}
@@ -5753,7 +5806,7 @@ bad:
 
 /*
  * FreeBSD supports cksum offloads for the following drivers.
- *  em(4), fxp(4), lge(4), ndis(4), nge(4), re(4), ti(4), txp(4), xl(4)
+ *  em(4), fxp(4), lge(4), nge(4), re(4), ti(4), txp(4), xl(4)
  *
  * CSUM_DATA_VALID | CSUM_PSEUDO_HDR :
  *  network driver performed cksum including pseudo header, need to verify
@@ -6274,6 +6327,8 @@ done:
 	if (s)
 		PF_STATE_UNLOCK(s);
 
+	SDT_PROBE4(pf, ip, test, done, action, reason, r, s);
+
 	return (action);
 }
 #endif /* INET */
@@ -6346,7 +6401,7 @@ pf_test6(int dir, int pflags, struct ifnet *ifp, struct mbuf **m0, struct inpcb 
 	pd.sidx = (dir == PF_IN) ? 0 : 1;
 	pd.didx = (dir == PF_IN) ? 1 : 0;
 	pd.af = AF_INET6;
-	pd.tos = 0;
+	pd.tos = IPV6_DSCP(h);
 	pd.tot_len = ntohs(h->ip6_plen) + sizeof(struct ip6_hdr);
 
 	off = ((caddr_t)h - m->m_data) + sizeof(struct ip6_hdr);
@@ -6681,6 +6736,8 @@ done:
 	if (action == PF_PASS && *m0 && (pflags & PFIL_FWD) &&
 	    (mtag = m_tag_find(m, PF_REASSEMBLED, NULL)) != NULL)
 		action = pf_refragment6(ifp, m0, mtag);
+
+	SDT_PROBE4(pf, ip, test6, done, action, reason, r, s);
 
 	return (action);
 }

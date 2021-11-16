@@ -175,11 +175,16 @@ arm_install_base() {
 	if [ "${PART_SCHEME}" == "MBR" ]; then
 		chroot ${CHROOTDIR} mount /dev/${mddev}s2a ${DESTDIR}
 	fi
+	_OSVERSION=$(chroot ${CHROOTDIR} /usr/bin/uname -U)
+	REVISION=$(chroot ${CHROOTDIR} make -C /usr/src/release -V REVISION)
+	BRANCH=$(chroot ${CHROOTDIR} make -C /usr/src/release -V BRANCH)
+	export UNAME_r=${REVISION}-${BRANCH}
 	eval chroot ${CHROOTDIR} make -C ${WORLDDIR} \
 		TARGET=${EMBEDDED_TARGET} \
 		TARGET_ARCH=${EMBEDDED_TARGET_ARCH} \
 		DESTDIR=${DESTDIR} KERNCONF=${KERNEL} \
 		${CONF_FILES} installworld installkernel distribution
+	chroot ${CHROOTDIR} mkdir -p ${DESTDIR}/boot/efi
 	chroot ${CHROOTDIR} mkdir -p ${DESTDIR}/boot/msdos
 
 	arm_create_user
@@ -192,18 +197,18 @@ arm_install_base() {
 	echo '# Custom /etc/fstab for FreeBSD embedded images' \
 		> ${CHROOTDIR}/${DESTDIR}/etc/fstab
 	if [ "${PART_SCHEME}" == "GPT" ]; then
-		echo "/dev/ufs/rootfs   /       ufs     rw      1       1" \
+		echo "/dev/ufs/rootfs		/		ufs	rw		1	1" \
 			>> ${CHROOTDIR}/${DESTDIR}/etc/fstab
-		echo "/dev/msdosfs/EFI /boot/efi msdosfs rw,noatime 0 0" \
+		echo "/dev/msdosfs/EFI		/boot/efi	msdosfs	rw,noatime	0	0" \
 			>> ${CHROOTDIR}/${DESTDIR}/etc/fstab
 	fi
 	if [ "${PART_SCHEME}" == "MBR" ]; then
-		echo "/dev/ufs/rootfs   /       ufs     rw      1       1" \
+		echo "/dev/ufs/rootfs		/		ufs	rw		1	1" \
 			>> ${CHROOTDIR}/${DESTDIR}/etc/fstab
-		echo "/dev/msdosfs/MSDOSBOOT /boot/msdos msdosfs rw,noatime 0 0" \
+		echo "/dev/msdosfs/MSDOSBOOT	/boot/msdos 	msdosfs	rw,noatime	0	0" \
 			>> ${CHROOTDIR}/${DESTDIR}/etc/fstab
 	fi
-	echo "tmpfs /tmp tmpfs rw,mode=1777,size=50m 0 0" \
+	echo "tmpfs			/tmp		tmpfs	rw,mode=1777	0	0" \
 		>> ${CHROOTDIR}/${DESTDIR}/etc/fstab
 
 	local hostname

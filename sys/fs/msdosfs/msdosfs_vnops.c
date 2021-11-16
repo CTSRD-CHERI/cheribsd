@@ -796,8 +796,8 @@ msdosfs_write(struct vop_write_args *ap)
 			bawrite(bp);
 		else if (n + croffset == pmp->pm_bpcluster) {
 			if ((vp->v_mount->mnt_flag & MNT_NOCLUSTERW) == 0)
-				cluster_write(vp, bp, dep->de_FileSize,
-				    seqcount, 0);
+				cluster_write(vp, &dep->de_clusterw, bp,
+				    dep->de_FileSize, seqcount, 0);
 			else
 				bawrite(bp);
 		} else
@@ -1122,6 +1122,14 @@ abortit:
 			VOP_UNLOCK(tdvp);
 		vrele(tdvp);
 		vrele(ap->a_fvp);
+		/*
+		 * fdvp may be locked and has a reference. We need to
+		 * release the lock and reference, unless to and from
+		 * directories are the same.  In that case it is already
+		 * unlocked.
+		 */
+		if (tdvp != fdvp)
+			vput(fdvp);
 		return 0;
 	}
 	xp = VTODE(fvp);
@@ -1139,7 +1147,6 @@ abortit:
 	if (xp != ip) {
 		if (doingdirectory)
 			panic("rename: lost dir entry");
-		VOP_UNLOCK(fvp);
 		if (newparent)
 			VOP_UNLOCK(fdvp);
 		vrele(ap->a_fvp);

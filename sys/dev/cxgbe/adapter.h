@@ -163,8 +163,7 @@ enum {
 	ADAP_ERR	= (1 << 5),
 	BUF_PACKING_OK	= (1 << 6),
 	IS_VF		= (1 << 7),
-	KERN_TLS_OK	= (1 << 8),
-
+	KERN_TLS_ON	= (1 << 8),	/* HW is configured for KERN_TLS */
 	CXGBE_BUSY	= (1 << 9),
 
 	/* port flags */
@@ -238,8 +237,9 @@ struct vi_info {
 
 	struct timeval last_refreshed;
 	struct fw_vi_stats_vf stats;
-
+	struct mtx tick_mtx;
 	struct callout tick;
+
 	struct sysctl_ctx_list ctx;	/* from ifconfig up to driver detach */
 
 	uint8_t hw_addr[ETHER_ADDR_LEN]; /* factory MAC address, won't change */
@@ -306,6 +306,7 @@ struct port_info {
 	uint8_t  tx_chan;
 	uint8_t  mps_bg_map;	/* rx MPS buffer group bitmap */
 	uint8_t  rx_e_chan_map;	/* rx TP e-channel bitmap */
+	uint8_t  rx_c_chan;	/* rx TP c-channel */
 
 	struct link_config link_cfg;
 	struct ifmedia media;
@@ -316,12 +317,6 @@ struct port_info {
 	u_int tx_parse_error;
 	int fcs_reg;
 	uint64_t fcs_base;
-	u_long	tx_toe_tls_records;
-	u_long	tx_toe_tls_octets;
-	u_long	rx_toe_tls_records;
-	u_long	rx_toe_tls_octets;
-
-	struct callout tick;
 };
 
 #define	IS_MAIN_VI(vi)		((vi) == &((vi)->pi->vi[0]))
@@ -561,7 +556,7 @@ struct txpkts {
 	uint8_t wr_type;	/* type 0 or type 1 */
 	uint8_t npkt;		/* # of packets in this work request */
 	uint8_t len16;		/* # of 16B pieces used by this work request */
-	uint8_t score;		/* 1-10. coalescing attempted if score > 3 */
+	uint8_t score;
 	uint8_t max_npkt;	/* maximum number of packets allowed */
 	uint16_t plen;		/* total payload (sum of all packets) */
 
@@ -584,6 +579,7 @@ struct sge_txq {
 	struct sglist *gl;
 	__be32 cpl_ctrl0;	/* for convenience */
 	int tc_idx;		/* traffic class */
+	uint64_t last_tx;	/* cycle count when eth_tx was last called */
 	struct txpkts txp;
 
 	struct task tx_reclaim_task;
@@ -599,6 +595,7 @@ struct sge_txq {
 	uint64_t txpkts1_wrs;	/* # of type1 coalesced tx work requests */
 	uint64_t txpkts0_pkts;	/* # of frames in type0 coalesced tx WRs */
 	uint64_t txpkts1_pkts;	/* # of frames in type1 coalesced tx WRs */
+	uint64_t txpkts_flush;	/* # of times txp had to be sent by tx_update */
 	uint64_t raw_wrs;	/* # of raw work requests (alloc_wr_mbuf) */
 	uint64_t vxlan_tso_wrs;	/* # of VXLAN TSO work requests */
 	uint64_t vxlan_txcsum;
@@ -652,6 +649,8 @@ iq_to_rxq(struct sge_iq *iq)
 struct sge_ofld_rxq {
 	struct sge_iq iq;	/* MUST be first */
 	struct sge_fl fl;	/* MUST follow iq */
+	u_long	rx_toe_tls_records;
+	u_long	rx_toe_tls_octets;
 } __aligned(CACHE_LINE_SIZE);
 
 static inline struct sge_ofld_rxq *
@@ -675,8 +674,8 @@ struct wrq_cookie {
 };
 
 /*
- * wrq: SGE egress queue that is given prebuilt work requests.  Both the control
- * and offload tx queues are of this type.
+ * wrq: SGE egress queue that is given prebuilt work requests.  Control queues
+ * are of this type.
  */
 struct sge_wrq {
 	struct sge_eq eq;	/* MUST be first */
@@ -708,6 +707,15 @@ struct sge_wrq {
 	uint16_t ss_len;
 	uint8_t ss[SGE_MAX_WR_LEN];
 
+} __aligned(CACHE_LINE_SIZE);
+
+/* ofld_txq: SGE egress queue + miscellaneous items */
+struct sge_ofld_txq {
+	struct sge_wrq wrq;
+	counter_u64_t tx_iscsi_pdus;
+	counter_u64_t tx_iscsi_octets;
+	counter_u64_t tx_toe_tls_records;
+	counter_u64_t tx_toe_tls_octets;
 } __aligned(CACHE_LINE_SIZE);
 
 #define INVALID_NM_RXQ_CNTXT_ID ((uint16_t)(-1))
@@ -790,7 +798,7 @@ struct sge {
 	struct sge_wrq *ctrlq;	/* Control queues */
 	struct sge_txq *txq;	/* NIC tx queues */
 	struct sge_rxq *rxq;	/* NIC rx queues */
-	struct sge_wrq *ofld_txq;	/* TOE tx queues */
+	struct sge_ofld_txq *ofld_txq;	/* TOE tx queues */
 	struct sge_ofld_rxq *ofld_rxq;	/* TOE rx queues */
 	struct sge_nm_txq *nm_txq;	/* netmap tx queues */
 	struct sge_nm_rxq *nm_rxq;	/* netmap rx queues */
@@ -1260,7 +1268,8 @@ void t4_sge_modload(void);
 void t4_sge_modunload(void);
 uint64_t t4_sge_extfree_refs(void);
 void t4_tweak_chip_settings(struct adapter *);
-int t4_read_chip_settings(struct adapter *);
+int t4_verify_chip_settings(struct adapter *);
+void t4_init_rx_buf_info(struct adapter *);
 int t4_create_dma_tag(struct adapter *);
 void t4_sge_sysctls(struct adapter *, struct sysctl_ctx_list *,
     struct sysctl_oid_list *);
@@ -1269,7 +1278,6 @@ int alloc_ring(struct adapter *, size_t, bus_dma_tag_t *, bus_dmamap_t *,
     bus_addr_t *, void **);
 int free_ring(struct adapter *, bus_dma_tag_t, bus_dmamap_t, bus_addr_t,
     void *);
-int sysctl_uint16(SYSCTL_HANDLER_ARGS);
 int t4_setup_adapter_queues(struct adapter *);
 int t4_teardown_adapter_queues(struct adapter *);
 int t4_setup_vi_queues(struct vi_info *);
@@ -1334,6 +1342,7 @@ void cxgbe_ratelimit_query(struct ifnet *, struct if_ratelimit_query_results *);
 /* t4_filter.c */
 int get_filter_mode(struct adapter *, uint32_t *);
 int set_filter_mode(struct adapter *, uint32_t);
+int set_filter_mask(struct adapter *, uint32_t);
 int get_filter(struct adapter *, struct t4_filter *);
 int set_filter(struct adapter *, struct t4_filter *);
 int del_filter(struct adapter *, struct t4_filter *);

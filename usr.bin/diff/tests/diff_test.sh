@@ -15,6 +15,8 @@ atf_test_case Nflag
 atf_test_case tabsize
 atf_test_case conflicting_format
 atf_test_case label
+atf_test_case report_identical
+atf_test_case non_regular_file
 
 simple_body()
 {
@@ -226,6 +228,33 @@ label_body()
 		-s exit:1 diff --label hello --label world `which diff` `which ls`
 }
 
+report_identical_head()
+{
+	atf_set "require.config" unprivileged_user
+}
+report_identical_body()
+{
+	UNPRIVILEGED_USER=$(atf_config_get unprivileged_user)
+	printf "\tA\n" > A
+	printf "\tB\n" > B
+	chmod -r B
+	atf_check -s exit:2 -e inline:"diff: B: Permission denied\n" \
+		-o empty su -m "$UNPRIVILEGED_USER" -c 'diff -s A B'
+}
+
+non_regular_file_body()
+{
+	printf "\tA\n" > A
+	mkfifo B
+	printf "\tA\n" > B &
+
+	atf_check diff A B
+	printf "\tB\n" > B &
+	atf_check -s exit:1 \
+		-o inline:"--- A\n+++ B\n@@ -1 +1 @@\n-\tA\n+\tB\n" \
+		diff --label A --label B -u A B
+}
+
 atf_init_test_cases()
 {
 	atf_add_test_case simple
@@ -243,4 +272,6 @@ atf_init_test_cases()
 	atf_add_test_case tabsize
 	atf_add_test_case conflicting_format
 	atf_add_test_case label
+	atf_add_test_case report_identical
+	atf_add_test_case non_regular_file
 }

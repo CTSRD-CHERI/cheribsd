@@ -224,6 +224,8 @@ SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, randomtime,
 	"allocation before switching to a random one");
 
 #ifdef RATELIMIT
+counter_u64_t rate_limit_new;
+counter_u64_t rate_limit_chg;
 counter_u64_t rate_limit_active;
 counter_u64_t rate_limit_alloc_fail;
 counter_u64_t rate_limit_set_ok;
@@ -236,6 +238,11 @@ SYSCTL_COUNTER_U64(_net_inet_ip_rl, OID_AUTO, alloc_fail, CTLFLAG_RD,
    &rate_limit_alloc_fail, "Rate limited connection failures");
 SYSCTL_COUNTER_U64(_net_inet_ip_rl, OID_AUTO, set_ok, CTLFLAG_RD,
    &rate_limit_set_ok, "Rate limited setting succeeded");
+SYSCTL_COUNTER_U64(_net_inet_ip_rl, OID_AUTO, newrl, CTLFLAG_RD,
+   &rate_limit_new, "Total Rate limit new attempts");
+SYSCTL_COUNTER_U64(_net_inet_ip_rl, OID_AUTO, chgrl, CTLFLAG_RD,
+   &rate_limit_chg, "Total Rate limited change attempts");
+
 #endif /* RATELIMIT */
 
 #endif /* INET */
@@ -2511,31 +2518,24 @@ in_pcblookup_hash(struct inpcbinfo *pcbinfo, struct in_addr faddr,
 	struct inpcb *inp;
 
 	inp = in_pcblookup_hash_locked(pcbinfo, faddr, fport, laddr, lport,
-	    (lookupflags & ~(INPLOOKUP_RLOCKPCB | INPLOOKUP_WLOCKPCB)), ifp,
-	    numa_domain);
+	    lookupflags & INPLOOKUP_WILDCARD, ifp, numa_domain);
 	if (inp != NULL) {
 		if (lookupflags & INPLOOKUP_WLOCKPCB) {
 			INP_WLOCK(inp);
-			if (__predict_false(inp->inp_flags2 & INP_FREED)) {
-				INP_WUNLOCK(inp);
-				inp = NULL;
-			}
 		} else if (lookupflags & INPLOOKUP_RLOCKPCB) {
 			INP_RLOCK(inp);
-			if (__predict_false(inp->inp_flags2 & INP_FREED)) {
-				INP_RUNLOCK(inp);
-				inp = NULL;
-			}
+		} else if (lookupflags & INPLOOKUP_RLOCKLISTEN) {
+			if (inp->inp_socket != NULL &&
+			    SOLISTENING(inp->inp_socket))
+				INP_RLOCK(inp);
+			else
+				INP_WLOCK(inp);
 		} else
 			panic("%s: locking bug", __func__);
-#ifdef INVARIANTS
-		if (inp != NULL) {
-			if (lookupflags & INPLOOKUP_WLOCKPCB)
-				INP_WLOCK_ASSERT(inp);
-			else
-				INP_RLOCK_ASSERT(inp);
+		if (__predict_false(inp->inp_flags2 & INP_FREED)) {
+			INP_UNLOCK(inp);
+			inp = NULL;
 		}
-#endif
 	}
 
 	return (inp);
@@ -2557,8 +2557,8 @@ in_pcblookup(struct inpcbinfo *pcbinfo, struct in_addr faddr, u_int fport,
 
 	KASSERT((lookupflags & ~INPLOOKUP_MASK) == 0,
 	    ("%s: invalid lookup flags %d", __func__, lookupflags));
-	KASSERT((lookupflags & (INPLOOKUP_RLOCKPCB | INPLOOKUP_WLOCKPCB)) != 0,
-	    ("%s: LOCKPCB not set", __func__));
+	KASSERT((lookupflags & (INPLOOKUP_RLOCKPCB | INPLOOKUP_WLOCKPCB |
+	    INPLOOKUP_RLOCKLISTEN)) != 0, ("%s: LOCKPCB not set", __func__));
 
 	/*
 	 * When not using RSS, use connection groups in preference to the
@@ -2593,8 +2593,8 @@ in_pcblookup_mbuf(struct inpcbinfo *pcbinfo, struct in_addr faddr,
 
 	KASSERT((lookupflags & ~INPLOOKUP_MASK) == 0,
 	    ("%s: invalid lookup flags %d", __func__, lookupflags));
-	KASSERT((lookupflags & (INPLOOKUP_RLOCKPCB | INPLOOKUP_WLOCKPCB)) != 0,
-	    ("%s: LOCKPCB not set", __func__));
+	KASSERT((lookupflags & (INPLOOKUP_RLOCKPCB | INPLOOKUP_WLOCKPCB |
+	    INPLOOKUP_RLOCKLISTEN)) != 0, ("%s: LOCKPCB not set", __func__));
 
 #ifdef PCBGROUP
 	/*
@@ -3399,7 +3399,12 @@ in_pcbattach_txrtlmt(struct inpcb *inp, struct ifnet *ifp,
 
 	INP_WLOCK_ASSERT(inp);
 
-	if (*st != NULL)
+	/*
+	 * If there is already a send tag, or the INP is being torn
+	 * down, allocating a new send tag is not allowed. Else send
+	 * tags may leak.
+	 */
+	if (*st != NULL || (inp->inp_flags & (INP_TIMEWAIT | INP_DROPPED)) != 0)
 		return (EINVAL);
 
 	error = m_snd_tag_alloc(ifp, &params, st);
@@ -3441,6 +3446,9 @@ in_pcbdetach_txrtlmt(struct inpcb *inp)
 		return;
 
 	m_snd_tag_rele(mst);
+#ifdef INET
+	counter_u64_add(rate_limit_active, -1);
+#endif
 }
 
 int
@@ -3583,6 +3591,8 @@ in_pcboutput_eagain(struct inpcb *inp)
 static void
 rl_init(void *st)
 {
+	rate_limit_new = counter_u64_alloc(M_WAITOK);
+	rate_limit_chg = counter_u64_alloc(M_WAITOK);
 	rate_limit_active = counter_u64_alloc(M_WAITOK);
 	rate_limit_alloc_fail = counter_u64_alloc(M_WAITOK);
 	rate_limit_set_ok = counter_u64_alloc(M_WAITOK);

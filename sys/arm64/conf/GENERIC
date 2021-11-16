@@ -36,6 +36,7 @@ options 	TCP_OFFLOAD		# TCP offload
 options 	TCP_HHOOK		# hhook(9) framework for TCP
 options		TCP_RFC7413		# TCP Fast Open
 options 	SCTP_SUPPORT		# Allow kldload of SCTP
+options		KERN_TLS		# TLS transmit & receive offload
 options 	FFS			# Berkeley Fast Filesystem
 options 	SOFTUPDATES		# Enable FFS soft updates support
 options 	UFS_ACL			# Support for access control lists
@@ -124,6 +125,7 @@ options 	SOC_HISI_HI6220
 options 	SOC_INTEL_STRATIX10
 options 	SOC_BRCM_BCM2837
 options 	SOC_BRCM_BCM2838
+options 	SOC_BRCM_NS2
 options 	SOC_MARVELL_8K
 options 	SOC_NVIDIA_TEGRA210
 options		SOC_NXP_LS
@@ -158,6 +160,7 @@ options 	PCI_IOV		# PCI SR-IOV support
 device		ahci
 device		scbus
 device		da
+device		pvscsi			# VMware PVSCSI
 
 # ATA/SCSI peripherals
 device		cd		# CD
@@ -179,7 +182,6 @@ device		gpio
 device		gpioled
 device		fdt_pinctrl
 device		gpioregulator
-device		ls1046_gpio	# LS1046A GPIO controller
 device		mv_gpio		# Marvell GPIO controller
 device		mvebu_pinctrl	# Marvell Pinmux Controller
 device		pl061		# Arm PL061 GPIO controller
@@ -271,6 +273,7 @@ device		pl011
 device		iflib
 device		em			# Intel PRO/1000 Gigabit Ethernet Family
 device		ix			# Intel 10Gb Ethernet Family
+device		vmx			# VMware VMXNET3 Ethernet
 
 # Ethernet NICs
 device		mdio

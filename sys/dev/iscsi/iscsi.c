@@ -171,7 +171,6 @@ static void	iscsi_pdu_handle_reject(struct icl_pdu *response);
 static void	iscsi_session_reconnect(struct iscsi_session *is);
 static void	iscsi_session_terminate(struct iscsi_session *is);
 static void	iscsi_action(struct cam_sim *sim, union ccb *ccb);
-static void	iscsi_poll(struct cam_sim *sim);
 static struct iscsi_outstanding	*iscsi_outstanding_find(struct iscsi_session *is,
 		    uint32_t initiator_task_tag);
 static struct iscsi_outstanding	*iscsi_outstanding_add(struct iscsi_session *is,
@@ -1018,7 +1017,7 @@ iscsi_pdu_handle_task_response(struct icl_pdu *response)
 		ISCSI_SESSION_WARN(is, "task response 0x%x",
 		    bhstmr->bhstmr_response);
 	} else {
-		aio = iscsi_outstanding_find(is, io->io_datasn);
+		aio = iscsi_outstanding_find(is, io->io_referenced_task_tag);
 		if (aio != NULL && aio->io_ccb != NULL)
 			iscsi_session_terminate_task(is, aio, CAM_REQ_ABORTED);
 	}
@@ -1157,6 +1156,7 @@ iscsi_pdu_handle_r2t(struct icl_pdu *response)
 	struct ccb_scsiio *csio;
 	size_t off, len, total_len;
 	int error;
+	uint32_t datasn = 0;
 
 	is = PDU_SESSION(response);
 
@@ -1182,8 +1182,6 @@ iscsi_pdu_handle_r2t(struct icl_pdu *response)
 	/*
 	 * XXX: Verify R2TSN.
 	 */
-
-	io->io_datasn = 0;
 
 	off = ntohl(bhsr2t->bhsr2t_buffer_offset);
 	if (off > csio->dxfer_len) {
@@ -1234,7 +1232,7 @@ iscsi_pdu_handle_r2t(struct icl_pdu *response)
 		    bhsr2t->bhsr2t_initiator_task_tag;
 		bhsdo->bhsdo_target_transfer_tag =
 		    bhsr2t->bhsr2t_target_transfer_tag;
-		bhsdo->bhsdo_datasn = htonl(io->io_datasn++);
+		bhsdo->bhsdo_datasn = htonl(datasn++);
 		bhsdo->bhsdo_buffer_offset = htonl(off);
 		error = icl_pdu_append_data(request, csio->data_ptr + off, len,
 		    M_NOWAIT);
@@ -1335,6 +1333,11 @@ iscsi_ioctl_daemon_wait(struct iscsi_softc *sc,
 		}
 
 		if (is == NULL) {
+			if (sc->sc_unloading) {
+				sx_sunlock(&sc->sc_lock);
+				return (ENXIO);
+			}
+
 			/*
 			 * No session requires attention from iscsid(8); wait.
 			 */
@@ -1492,7 +1495,7 @@ iscsi_ioctl_daemon_handoff(struct iscsi_softc *sc,
 			return (ENOMEM);
 		}
 
-		is->is_sim = cam_sim_alloc(iscsi_action, iscsi_poll, "iscsi",
+		is->is_sim = cam_sim_alloc(iscsi_action, NULL, "iscsi",
 		    is, is->is_id /* unit */, &is->is_lock,
 		    1, ic->ic_maxtags, is->is_devq);
 		if (is->is_sim == NULL) {
@@ -2196,6 +2199,8 @@ iscsi_action_abort(struct iscsi_session *is, union ccb *ccb)
 	}
 
 	initiator_task_tag = is->is_initiator_task_tag++;
+	if (initiator_task_tag == 0xffffffff)
+		initiator_task_tag = is->is_initiator_task_tag++;
 
 	io = iscsi_outstanding_add(is, request, NULL, &initiator_task_tag);
 	if (io == NULL) {
@@ -2204,7 +2209,7 @@ iscsi_action_abort(struct iscsi_session *is, union ccb *ccb)
 		xpt_done(ccb);
 		return;
 	}
-	io->io_datasn = aio->io_initiator_task_tag;
+	io->io_referenced_task_tag = aio->io_initiator_task_tag;
 
 	bhstmr = (struct iscsi_bhs_task_management_request *)request->ip_bhs;
 	bhstmr->bhstmr_opcode = ISCSI_BHS_OPCODE_TASK_REQUEST;
@@ -2256,6 +2261,9 @@ iscsi_action_scsiio(struct iscsi_session *is, union ccb *ccb)
 	}
 
 	initiator_task_tag = is->is_initiator_task_tag++;
+	if (initiator_task_tag == 0xffffffff)
+		initiator_task_tag = is->is_initiator_task_tag++;
+
 	io = iscsi_outstanding_add(is, request, ccb, &initiator_task_tag);
 	if (io == NULL) {
 		icl_pdu_free(request);
@@ -2461,13 +2469,6 @@ iscsi_action(struct cam_sim *sim, union ccb *ccb)
 }
 
 static void
-iscsi_poll(struct cam_sim *sim)
-{
-
-	KASSERT(0, ("%s: you're not supposed to be here", __func__));
-}
-
-static void
 iscsi_terminate_sessions(struct iscsi_softc *sc)
 {
 	struct iscsi_session *is;
@@ -2565,6 +2566,12 @@ iscsi_load(void)
 static int
 iscsi_unload(void)
 {
+
+	/* Awaken any threads asleep in iscsi_ioctl(). */
+	sx_xlock(&sc->sc_lock);
+	sc->sc_unloading = true;
+	cv_signal(&sc->sc_cv);
+	sx_xunlock(&sc->sc_lock);
 
 	if (sc->sc_cdev != NULL) {
 		ISCSI_DEBUG("removing device node");

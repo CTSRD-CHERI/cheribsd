@@ -181,8 +181,8 @@ SRCS+=	strlcpy.c strlcat.c strmode.c
 SRCS+=	fgetln_fallback.c fgetwln_fallback.c closefrom.c
 CFLAGS.closefrom.c+=	-DSTDC_HEADERS -DHAVE_SYS_DIR_H -DHAVE_DIRENT_H \
 	-DHAVE_DIRFD -DHAVE_SYSCONF
-# Provide warnc/errc/getprogname/setprograme
-SRCS+=	err.c progname.c
+# Provide getprogname/setprograme
+SRCS+=	progname.c
 # Stub implementations of fflagstostr/strtofflags
 SRCS+=	fflags.c
 .endif
@@ -288,8 +288,10 @@ _host_abs_tools_to_symlink=	${_make_abs}:make ${_make_abs}:bmake
 # Note: we could create links if we don't intend to update the current machine.
 _COPY_HOST_TOOL=cp -pf
 .else
-# However, this is not necessary on Linux/macOS (and may even be the root cause
-# for the build problems on macOS since Big Sur).
+# However, this is not necessary on Linux/macOS. Additionally, copying the host
+# tools to another directory with cp -p results in freezes on macOS Big Sur for
+# some unknown reason. It can also break building inside docker containers if
+# there are ACLs on shared volumes.
 _COPY_HOST_TOOL=ln -sfn
 _make_abs!=	which "${MAKE}"
 _host_abs_tools_to_symlink+=	${_make_abs}:make ${_make_abs}:bmake
@@ -318,7 +320,8 @@ host-symlinks:
 	@echo "Linking host tools into ${DESTDIR}/bin"
 .for _tool in ${_host_tools_to_symlink}
 	# The toplevel makefile forces $PATH to only be /usr/local/bin
-	@export PATH="$${PATH}:${HOST_TOOLS_PATH_EXTRA}"; source_path=`which ${_tool} || true`; \
+	@export PATH="$${PATH}:${HOST_TOOLS_PATH_EXTRA}"; \
+	source_path=`which ${_tool} || echo /dev/null/no/such`; \
 	if [ ! -e "$${source_path}" ] ; then \
 		echo "Cannot find host tool '${_tool}' in PATH ($$PATH)." >&2; false; \
 	fi; \

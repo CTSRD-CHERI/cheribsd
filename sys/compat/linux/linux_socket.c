@@ -82,6 +82,8 @@ __FBSDID("$FreeBSD$");
 #include <compat/linux/linux_timer.h>
 #include <compat/linux/linux_util.h>
 
+#define	SECURITY_CONTEXT_STRING	"unconfined"
+
 static int linux_sendmsg_common(struct thread *, l_int, struct l_msghdr *,
 					l_uint);
 static int linux_recvmsg_common(struct thread *, l_int, struct l_msghdr *,
@@ -1177,7 +1179,7 @@ linux_send(struct thread *td, struct linux_send_args *args)
 	bsd_args.s = args->s;
 	bsd_args.buf = (caddr_t)PTRIN(args->msg);
 	bsd_args.len = args->len;
-	bsd_args.flags = args->flags;
+	bsd_args.flags = linux_to_bsd_msg_flags(args->flags);
 	bsd_args.to = NULL;
 	bsd_args.tolen = 0;
 	error = sys_sendto(td, &bsd_args);
@@ -1858,6 +1860,65 @@ linux_setsockopt(struct thread *td, struct linux_setsockopt_args *args)
 	return (error);
 }
 
+static int
+linux_getsockopt_so_peergroups(struct thread *td,
+    struct linux_getsockopt_args *args)
+{
+	struct xucred xu;
+	socklen_t xulen, len;
+	int error, i;
+
+	xulen = sizeof(xu);
+	error = kern_getsockopt(td, args->s, 0,
+	    LOCAL_PEERCRED, &xu, UIO_SYSSPACE, &xulen);
+	if (error != 0)
+		return (error);
+
+	len = xu.cr_ngroups * sizeof(l_gid_t);
+	if (args->optlen < len) {
+		error = copyout(&len, PTRIN(args->optlen), sizeof(len));
+		if (error == 0)
+			error = ERANGE;
+		return (error);
+	}
+
+	/*
+	 * "- 1" to skip the primary group.
+	 */
+	for (i = 0; i < xu.cr_ngroups - 1; i++) {
+		error = copyout(xu.cr_groups + i + 1,
+		    (void *)(args->optval + i * sizeof(l_gid_t)),
+		    sizeof(l_gid_t));
+		if (error != 0)
+			return (error);
+	}
+
+	error = copyout(&len, PTRIN(args->optlen), sizeof(len));
+	return (error);
+}
+
+static int
+linux_getsockopt_so_peersec(struct thread *td,
+    struct linux_getsockopt_args *args)
+{
+	socklen_t len;
+	int error;
+
+	len = sizeof(SECURITY_CONTEXT_STRING);
+	if (args->optlen < len) {
+		error = copyout(&len, PTRIN(args->optlen), sizeof(len));
+		if (error == 0)
+			error = ERANGE;
+		return (error);
+	}
+
+	error = copyout(SECURITY_CONTEXT_STRING,
+	    PTRIN(args->optval), sizeof(SECURITY_CONTEXT_STRING));
+	if (error == 0)
+		error = copyout(&len, PTRIN(args->optlen), sizeof(len));
+	return (error);
+}
+
 int
 linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 {
@@ -1872,6 +1933,15 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 	level = linux_to_bsd_sockopt_level(args->level);
 	switch (level) {
 	case SOL_SOCKET:
+		switch (args->optname) {
+		case LINUX_SO_PEERGROUPS:
+			return (linux_getsockopt_so_peergroups(td, args));
+		case LINUX_SO_PEERSEC:
+			return (linux_getsockopt_so_peersec(td, args));
+		default:
+			break;
+		}
+
 		name = linux_to_bsd_so_sockopt(args->optname);
 		switch (name) {
 		case LOCAL_CREDS_PERSISTENT:

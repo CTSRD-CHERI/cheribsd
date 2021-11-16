@@ -1,4 +1,4 @@
-# Copyright 1999-2020 The OpenSSL Project Authors. All Rights Reserved.
+# Copyright 1999-2021 The OpenSSL Project Authors. All Rights Reserved.
 #
 # Licensed under the OpenSSL license (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy
@@ -1318,6 +1318,7 @@ SSL_F_SSL_RENEGOTIATE:516:SSL_renegotiate
 SSL_F_SSL_RENEGOTIATE_ABBREVIATED:546:SSL_renegotiate_abbreviated
 SSL_F_SSL_SCAN_CLIENTHELLO_TLSEXT:320:*
 SSL_F_SSL_SCAN_SERVERHELLO_TLSEXT:321:*
+SSL_F_SSL_SENDFILE:639:SSL_sendfile
 SSL_F_SSL_SESSION_DUP:348:ssl_session_dup
 SSL_F_SSL_SESSION_NEW:189:SSL_SESSION_new
 SSL_F_SSL_SESSION_PRINT_FP:190:SSL_SESSION_print_fp
@@ -2283,6 +2284,7 @@ EVP_R_ONLY_ONESHOT_SUPPORTED:177:only oneshot supported
 EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE:150:\
 	operation not supported for this keytype
 EVP_R_OPERATON_NOT_INITIALIZED:151:operaton not initialized
+EVP_R_OUTPUT_WOULD_OVERFLOW:184:output would overflow
 EVP_R_PARTIALLY_OVERLAPPING:162:partially overlapping buffers
 EVP_R_PBKDF2_ERROR:181:pbkdf2 error
 EVP_R_PKEY_APPLICATION_ASN1_METHOD_ALREADY_REGISTERED:179:\

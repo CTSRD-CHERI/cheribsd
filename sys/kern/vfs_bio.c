@@ -49,6 +49,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/asan.h>
 #include <sys/bio.h>
 #include <sys/bitset.h>
 #include <sys/conf.h>
@@ -1045,6 +1046,15 @@ kern_vfs_bio_buffer_alloc(caddr_t v, long physmem_est)
 {
 	int tuned_nbuf;
 	long maxbuf, maxbuf_sz, buf_sz,	biotmap_sz;
+
+#ifdef KASAN
+	/*
+	 * With KASAN enabled, the kernel map is shadowed.  Account for this
+	 * when sizing maps based on the amount of physical memory available.
+	 */
+	physmem_est = (physmem_est * KASAN_SHADOW_SCALE) /
+	    (KASAN_SHADOW_SCALE + 1);
+#endif
 
 	/*
 	 * physmem_est is in pages.  Convert it to kilobytes (assumes
@@ -2335,11 +2345,13 @@ void
 bufbdflush(struct bufobj *bo, struct buf *bp)
 {
 	struct buf *nbp;
+	struct bufdomain *bd;
 
-	if (bo->bo_dirty.bv_cnt > dirtybufthresh + 10) {
+	bd = &bdomain[bo->bo_domain];
+	if (bo->bo_dirty.bv_cnt > bd->bd_dirtybufthresh + 10) {
 		(void) VOP_FSYNC(bp->b_vp, MNT_NOWAIT, curthread);
 		altbufferflushes++;
-	} else if (bo->bo_dirty.bv_cnt > dirtybufthresh) {
+	} else if (bo->bo_dirty.bv_cnt > bd->bd_dirtybufthresh) {
 		BO_LOCK(bo);
 		/*
 		 * Try to find a buffer to flush.
@@ -2649,6 +2661,13 @@ brelse(struct buf *bp)
 		return;
 	}
 
+	if (LIST_EMPTY(&bp->b_dep)) {
+		bp->b_flags &= ~B_IOSTARTED;
+	} else {
+		KASSERT((bp->b_flags & B_IOSTARTED) == 0,
+		    ("brelse: SU io not finished bp %p", bp));
+	}
+
 	if ((bp->b_vflags & (BV_BKGRDINPROG | BV_BKGRDERR)) == BV_BKGRDERR) {
 		BO_LOCK(bp->b_bufobj);
 		bp->b_vflags &= ~BV_BKGRDERR;
@@ -2835,6 +2854,13 @@ bqrelse(struct buf *bp)
 	}
 	bp->b_flags &= ~(B_ASYNC | B_NOCACHE | B_AGE | B_RELBUF);
 	bp->b_xflags &= ~(BX_CVTENXIO);
+
+	if (LIST_EMPTY(&bp->b_dep)) {
+		bp->b_flags &= ~B_IOSTARTED;
+	} else {
+		KASSERT((bp->b_flags & B_IOSTARTED) == 0,
+		    ("bqrelse: SU io not finished bp %p", bp));
+	}
 
 	if (bp->b_flags & B_MANAGED) {
 		if (bp->b_flags & B_REMFREE)
@@ -3898,8 +3924,15 @@ getblkx(struct vnode *vp, daddr_t blkno, daddr_t dblkno, int size, int slpflag,
 
 	/* Attempt lockless lookup first. */
 	bp = gbincore_unlocked(bo, blkno);
-	if (bp == NULL)
+	if (bp == NULL) {
+		/*
+		 * With GB_NOCREAT we must be sure about not finding the buffer
+		 * as it may have been reassigned during unlocked lookup.
+		 */
+		if ((flags & GB_NOCREAT) != 0)
+			goto loop;
 		goto newbuf_unlocked;
+	}
 
 	error = BUF_TIMELOCK(bp, LK_EXCLUSIVE | LK_NOWAIT, NULL, "getblku", 0,
 	    0);

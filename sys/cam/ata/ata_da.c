@@ -1327,6 +1327,7 @@ adaasync(void *callback_arg, u_int32_t code,
 	case AC_GETDEV_CHANGED:
 	{
 		softc = (struct ada_softc *)periph->softc;
+		memset(&cgd, 0, sizeof(cgd));
 		xpt_setup_ccb(&cgd.ccb_h, periph->path, CAM_PRIORITY_NORMAL);
 		cgd.ccb_h.func_code = XPT_GDEV_TYPE;
 		xpt_action((union ccb *)&cgd);
@@ -1362,6 +1363,7 @@ adaasync(void *callback_arg, u_int32_t code,
 		cam_periph_async(periph, code, path, arg);
 		if (softc->state != ADA_STATE_NORMAL)
 			break;
+		memset(&cgd, 0, sizeof(cgd));
 		xpt_setup_ccb(&cgd.ccb_h, periph->path, CAM_PRIORITY_NORMAL);
 		cgd.ccb_h.func_code = XPT_GDEV_TYPE;
 		xpt_action((union ccb *)&cgd);
@@ -1880,7 +1882,8 @@ adaregister(struct cam_periph *periph, void *arg)
 	softc->disk->d_close = adaclose;
 	softc->disk->d_strategy = adastrategy;
 	softc->disk->d_getattr = adagetattr;
-	softc->disk->d_dump = adadump;
+	if (cam_sim_pollable(periph->sim))
+		softc->disk->d_dump = adadump;
 	softc->disk->d_gone = adadiskgonecb;
 	softc->disk->d_name = "ada";
 	softc->disk->d_drv1 = periph;

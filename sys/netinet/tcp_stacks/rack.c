@@ -1928,7 +1928,7 @@ rack_log_type_hrdwtso(struct tcpcb *tp, struct tcp_rack *rack, int len, int mod,
 		TCP_LOG_EVENTP(tp, NULL,
 		    &tp->t_inpcb->inp_socket->so_rcv,
 		    &tp->t_inpcb->inp_socket->so_snd,
-		    TCP_HDWR_TLS, 0,
+		    TCP_HDWR_PACE_SIZE, 0,
 		    0, &log, false, &tv);
 	}
 }
@@ -8683,7 +8683,9 @@ rack_process_data(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			thflags = tcp_reass(tp, th, &temp, &tlen, m);
 			tp->t_flags |= TF_ACKNOW;
 		}
-                if ((tp->t_flags & TF_SACK_PERMIT) && (save_tlen > 0)) {
+		if ((tp->t_flags & TF_SACK_PERMIT) &&
+		    (save_tlen > 0) &&
+		    TCPS_HAVEESTABLISHED(tp->t_state)) {
                         if ((tlen == 0) && (SEQ_LT(save_start, save_rnxt))) {
                                 /*
                                  * DSACK actually handled in the fastpath
@@ -10289,7 +10291,7 @@ rack_set_pace_segments(struct tcpcb *tp, struct tcp_rack *rack, uint32_t line)
 			segsiz = min(ctf_fixed_maxseg(tp),
 				     rack->r_ctl.rc_pace_min_segs);
 			rack->r_ctl.rc_pace_max_segs = tcp_get_pacing_burst_size(
-				                           bw_est, segsiz, 0,
+				                           tp, bw_est, segsiz, 0,
 							   rack->r_ctl.crte, NULL);
 		}
 	} else if (rack->rc_always_pace) {
@@ -11348,7 +11350,7 @@ rack_get_pacing_len(struct tcp_rack *rack, uint64_t bw, uint32_t mss)
 		/* Use the user mss since we are not exactly matched */
 		return (user_max);
 	}
-	new_tso = tcp_get_pacing_burst_size(bw, mss, rack_pace_one_seg, rack->r_ctl.crte, NULL);
+	new_tso = tcp_get_pacing_burst_size(rack->rc_tp, bw, mss, rack_pace_one_seg, rack->r_ctl.crte, NULL);
 	if (new_tso > user_max)
 		new_tso = user_max;
 	return(new_tso);
@@ -11575,10 +11577,10 @@ rack_get_pacing_delay(struct tcp_rack *rack, struct tcpcb *tp, uint32_t len, str
 								       rack->rc_inp->inp_route.ro_nh->nh_ifp,
 								       rate_wanted,
 								       RS_PACING_GEQ,
-								       &err);
+								       &err, NULL);
 				if (rack->r_ctl.crte) {
 					rack->rack_hdrw_pacing = 1;
-					rack->r_ctl.rc_pace_max_segs = tcp_get_pacing_burst_size(rate_wanted, segsiz,
+					rack->r_ctl.rc_pace_max_segs = tcp_get_pacing_burst_size(rack->rc_tp, rate_wanted, segsiz,
 												 0, rack->r_ctl.crte,
 												 NULL);
 					rack_log_hdwr_pacing(rack, rack->rc_inp->inp_route.ro_nh->nh_ifp,
@@ -11595,14 +11597,14 @@ rack_get_pacing_delay(struct tcp_rack *rack, struct tcpcb *tp, uint32_t len, str
 							   rack->rc_inp->inp_route.ro_nh->nh_ifp,
 							   rate_wanted,
 							   RS_PACING_GEQ,
-							   &err);
+							   &err, NULL);
 				if (nrte == NULL) {
 					/* Lost the rate */
 					rack->rack_hdrw_pacing = 0;
 					rack_set_pace_segments(rack->rc_tp, rack, __LINE__);
 				} else if (nrte != rack->r_ctl.crte) {
 					rack->r_ctl.crte = nrte;
-					rack->r_ctl.rc_pace_max_segs = tcp_get_pacing_burst_size(rate_wanted,
+					rack->r_ctl.rc_pace_max_segs = tcp_get_pacing_burst_size(rack->rc_tp, rate_wanted,
 												 segsiz, 0,
 												 rack->r_ctl.crte,
 												 NULL);
@@ -12297,7 +12299,8 @@ again:
 	 * If sack_rxmit is true we are retransmitting from the scoreboard
 	 * in which case len is already set.
 	 */
-	if ((sack_rxmit == 0) && TCPS_HAVEESTABLISHED(tp->t_state)) {
+	if ((sack_rxmit == 0) &&
+	    (TCPS_HAVEESTABLISHED(tp->t_state) || IS_FASTOPEN(tp->t_flags))) {
 		uint32_t avail;
 
 		avail = sbavail(sb);
@@ -12305,7 +12308,7 @@ again:
 			sb_offset = tp->snd_nxt - tp->snd_una;
 		else
 			sb_offset = 0;
-		if ((IN_RECOVERY(tp->t_flags) == 0) || rack->rack_no_prr) {
+		if ((IN_FASTRECOVERY(tp->t_flags) == 0) || rack->rack_no_prr) {
 			if (rack->r_ctl.rc_tlp_new_data) {
 				/* TLP is forcing out new data */
 				if (rack->r_ctl.rc_tlp_new_data > (uint32_t) (avail - sb_offset)) {
@@ -12319,7 +12322,7 @@ again:
 				new_data_tlp = doing_tlp = 1;
 			}  else
 				len = rack_what_can_we_send(tp, rack, cwnd_to_use, avail, sb_offset);
-			if (IN_RECOVERY(tp->t_flags) && (len > segsiz)) {
+			if (IN_FASTRECOVERY(tp->t_flags) && (len > segsiz)) {
 				/*
 				 * For prr=off, we need to send only 1 MSS
 				 * at a time. We do this because another sack could
@@ -14057,7 +14060,7 @@ enobufs:
 	} else if ((slot == 0) && (sendalot == 0) && tot_len_this_send) {
 		/*
 		 * Get our pacing rate, if an error
-		 * occured in sending (ENOBUF) we would
+		 * occurred in sending (ENOBUF) we would
 		 * hit the else if with slot preset. Other
 		 * errors return.
 		 */

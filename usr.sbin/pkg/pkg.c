@@ -84,6 +84,12 @@ struct fingerprint {
 	STAILQ_ENTRY(fingerprint) next;
 };
 
+static const char *bootstrap_names []  = {
+	"pkg.pkg",
+	"pkg.txz",
+	NULL
+};
+
 STAILQ_HEAD(fingerprint_list, fingerprint);
 
 static int
@@ -434,9 +440,7 @@ sha256_fd(int fd, char out[SHA256_DIGEST_LENGTH * 2 + 1])
 	int ret;
 	SHA256_CTX sha256;
 
-	my_fd = -1;
 	fp = NULL;
-	r = 0;
 	ret = 1;
 
 	out[0] = '\0';
@@ -627,7 +631,6 @@ parse_cert(int fd) {
 	ssize_t linelen;
 
 	buf = NULL;
-	my_fd = -1;
 	sc = NULL;
 	line = NULL;
 	linecap = 0;
@@ -839,6 +842,7 @@ bootstrap_pkg(bool force, const char *fetchOpts)
 	const char *packagesite;
 	const char *signature_type;
 	char pkgstatic[MAXPATHLEN];
+	const char *bootstrap_name;
 
 	fd_sig = -1;
 	ret = -1;
@@ -861,22 +865,29 @@ bootstrap_pkg(bool force, const char *fetchOpts)
 	if (strncmp(URL_SCHEME_PREFIX, packagesite,
 	    strlen(URL_SCHEME_PREFIX)) == 0)
 		packagesite += strlen(URL_SCHEME_PREFIX);
-	snprintf(url, MAXPATHLEN, "%s/Latest/pkg.txz", packagesite);
+	for (int j = 0; bootstrap_names[j] != NULL; j++) {
+		bootstrap_name = bootstrap_names[j];
 
-	snprintf(tmppkg, MAXPATHLEN, "%s/pkg.txz.XXXXXX",
-	    getenv("TMPDIR") ? getenv("TMPDIR") : _PATH_TMP);
-
-	if ((fd_pkg = fetch_to_fd(url, tmppkg, fetchOpts)) == -1)
+		snprintf(url, MAXPATHLEN, "%s/Latest/%s", packagesite, bootstrap_name);
+		snprintf(tmppkg, MAXPATHLEN, "%s/%s.XXXXXX",
+		    getenv("TMPDIR") ? getenv("TMPDIR") : _PATH_TMP,
+		    bootstrap_name);
+		if ((fd_pkg = fetch_to_fd(url, tmppkg, fetchOpts)) != -1)
+			break;
+		bootstrap_name = NULL;
+	}
+	if (bootstrap_name == NULL)
 		goto fetchfail;
 
 	if (signature_type != NULL &&
 	    strcasecmp(signature_type, "NONE") != 0) {
 		if (strcasecmp(signature_type, "FINGERPRINTS") == 0) {
 
-			snprintf(tmpsig, MAXPATHLEN, "%s/pkg.txz.sig.XXXXXX",
-			    getenv("TMPDIR") ? getenv("TMPDIR") : _PATH_TMP);
-			snprintf(url, MAXPATHLEN, "%s/Latest/pkg.txz.sig",
-			    packagesite);
+			snprintf(tmpsig, MAXPATHLEN, "%s/%s.sig.XXXXXX",
+			    getenv("TMPDIR") ? getenv("TMPDIR") : _PATH_TMP,
+			    bootstrap_name);
+			snprintf(url, MAXPATHLEN, "%s/Latest/%s.sig",
+			    packagesite, bootstrap_name);
 
 			if ((fd_sig = fetch_to_fd(url, tmpsig, fetchOpts)) == -1) {
 				fprintf(stderr, "Signature for pkg not "
@@ -889,10 +900,11 @@ bootstrap_pkg(bool force, const char *fetchOpts)
 		} else if (strcasecmp(signature_type, "PUBKEY") == 0) {
 
 			snprintf(tmpsig, MAXPATHLEN,
-			    "%s/pkg.txz.pubkeysig.XXXXXX",
-			    getenv("TMPDIR") ? getenv("TMPDIR") : _PATH_TMP);
-			snprintf(url, MAXPATHLEN, "%s/Latest/pkg.txz.pubkeysig",
-			    packagesite);
+			    "%s/%s.pubkeysig.XXXXXX",
+			    getenv("TMPDIR") ? getenv("TMPDIR") : _PATH_TMP,
+			    bootstrap_name);
+			snprintf(url, MAXPATHLEN, "%s/Latest/%s.pubkeysig",
+			    packagesite, bootstrap_name);
 
 			if ((fd_sig = fetch_to_fd(url, tmpsig, fetchOpts)) == -1) {
 				fprintf(stderr, "Signature for pkg not "
@@ -1045,7 +1057,7 @@ int
 main(int argc, char *argv[])
 {
 	char pkgpath[MAXPATHLEN];
-	const char *pkgarg;
+	const char *pkgarg, *repo_name;
 	bool activation_test, add_pkg, bootstrap_only, force, yes;
 	signed char ch;
 	const char *fetchOpts;
@@ -1058,6 +1070,7 @@ main(int argc, char *argv[])
 	fetchOpts = "";
 	force = false;
 	pkgarg = NULL;
+	repo_name = NULL;
 	yes = false;
 
 	struct option longopts[] = {
@@ -1070,7 +1083,7 @@ main(int argc, char *argv[])
 
 	snprintf(pkgpath, MAXPATHLEN, "%s/sbin/pkg", getlocalbase());
 
-	while ((ch = getopt_long(argc, argv, "-:fyN46", longopts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "-:fr::yN46", longopts, NULL)) != -1) {
 		switch (ch) {
 		case 'f':
 			force = true;
@@ -1086,6 +1099,46 @@ main(int argc, char *argv[])
 			break;
 		case '6':
 			fetchOpts = "6";
+			break;
+		case 'r':
+			/*
+			 * The repository can only be specified for an explicit
+			 * bootstrap request at this time, so that we don't
+			 * confuse the user if they're trying to use a verb that
+			 * has some other conflicting meaning but we need to
+			 * bootstrap.
+			 *
+			 * For that reason, we specify that -r has an optional
+			 * argument above and process the next index ourselves.
+			 * This is mostly significant because getopt(3) will
+			 * otherwise eat the next argument, which could be
+			 * something we need to try and make sense of.
+			 *
+			 * At worst this gets us false positives that we ignore
+			 * in other contexts, and we have to do a little fudging
+			 * in order to support separating -r from the reponame
+			 * with a space since it's not actually optional in
+			 * the bootstrap/add sense.
+			 */
+			if (add_pkg || bootstrap_only) {
+				if (optarg != NULL) {
+					repo_name = optarg;
+				} else if (optind < argc) {
+					repo_name = argv[optind];
+				}
+
+				if (repo_name == NULL || *repo_name == '\0') {
+					fprintf(stderr,
+					    "Must specify a repository with -r!\n");
+					exit(EXIT_FAILURE);
+				}
+
+				if (optarg == NULL) {
+					/* Advance past repo name. */
+					optreset = 1;
+					optind++;
+				}
+			}
 			break;
 		case 1:
 			// Non-option arguments, first one is the command
@@ -1126,7 +1179,7 @@ main(int argc, char *argv[])
 		if (activation_test)
 			errx(EXIT_FAILURE, "pkg is not installed");
 
-		config_init();
+		config_init(repo_name);
 
 		if (add_pkg) {
 			if (pkgarg == NULL) {

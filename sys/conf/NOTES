@@ -824,8 +824,6 @@ options 	NGATM_SSCFU
 options 	NGATM_UNI
 options 	NGATM_CCATM
 
-device		mn	# Munich32x/Falc54 Nx64kbit/sec cards.
-
 # Network stack virtualization.
 options	VIMAGE
 options	VNET_DEBUG	# debug for VIMAGE
@@ -2731,9 +2729,6 @@ options 	NSWBUF_MIN=120
 # Note that documenting these is not considered an affront.
 
 options 	CAM_DEBUG_DELAY
-
-# VFS cluster debugging.
-options 	CLUSTERDEBUG
 
 options 	DEBUG
 

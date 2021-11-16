@@ -271,8 +271,9 @@ void	 tls_free_aligned(void *ptr);
 int _once(pthread_once_t *, void (*)(void));
 
 /*
- * Set the TLS thread pointer
+ * Get/set the TLS thread pointer
  */
+void *_get_tp(void);
 void _set_tp(void *tp);
 
 /*

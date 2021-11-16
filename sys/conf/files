@@ -217,6 +217,7 @@ contrib/openzfs/module/os/freebsd/zfs/zfs_dir.c		optional zfs compile-with "${ZF
 contrib/openzfs/module/os/freebsd/zfs/zfs_file_os.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/os/freebsd/zfs/zfs_ioctl_compat.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/os/freebsd/zfs/zfs_ioctl_os.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/zfs_racct.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/os/freebsd/zfs/zfs_vfsops.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/os/freebsd/zfs/zfs_vnops_os.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/os/freebsd/zfs/zfs_znode.c		optional zfs compile-with "${ZFS_C}"
@@ -764,6 +765,8 @@ crypto/chacha20/chacha-sw.c	optional crypto | ipsec | ipsec_support
 crypto/des/des_ecb.c		optional netsmb
 crypto/des/des_setkey.c		optional netsmb
 crypto/openssl/ossl.c		optional ossl
+crypto/openssl/ossl_chacha20.c	optional ossl
+crypto/openssl/ossl_poly1305.c	optional ossl
 crypto/openssl/ossl_sha1.c	optional ossl
 crypto/openssl/ossl_sha256.c	optional ossl
 crypto/openssl/ossl_sha512.c	optional ossl
@@ -878,43 +881,43 @@ dev/aic7xxx/aic7xxx_pci.c	optional ahc pci
 dev/aic7xxx/aic7xxx_reg_print.c	optional ahc ahc_reg_pretty_print
 dev/al_eth/al_eth.c				optional al_eth	fdt	\
 	no-depend	\
-	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${PROF} ${.IMPSRC}"
+	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${.IMPSRC}"
 dev/al_eth/al_init_eth_lm.c			optional al_eth	fdt	\
 	no-depend	\
-	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${PROF} ${.IMPSRC}"
+	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${.IMPSRC}"
 dev/al_eth/al_init_eth_kr.c			optional al_eth	fdt	\
 	no-depend	\
-	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${PROF} ${.IMPSRC}"
+	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${.IMPSRC}"
 contrib/alpine-hal/al_hal_iofic.c		optional al_iofic	\
 	no-depend	\
-	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${PROF} ${.IMPSRC}"
+	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${.IMPSRC}"
 contrib/alpine-hal/al_hal_serdes_25g.c		optional al_serdes	\
 	no-depend	\
-	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${PROF} ${.IMPSRC}"
+	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${.IMPSRC}"
 contrib/alpine-hal/al_hal_serdes_hssp.c		optional al_serdes	\
 	no-depend	\
-	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${PROF} ${.IMPSRC}"
+	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${.IMPSRC}"
 contrib/alpine-hal/al_hal_udma_config.c		optional al_udma	\
 	no-depend	\
-	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${PROF} ${.IMPSRC}"
+	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${.IMPSRC}"
 contrib/alpine-hal/al_hal_udma_debug.c		optional al_udma	\
 	no-depend	\
-	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${PROF} ${.IMPSRC}"
+	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${.IMPSRC}"
 contrib/alpine-hal/al_hal_udma_iofic.c		optional al_udma	\
 	no-depend	\
-	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${PROF} ${.IMPSRC}"
+	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${.IMPSRC}"
 contrib/alpine-hal/al_hal_udma_main.c		optional al_udma	\
 	no-depend	\
-	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${PROF} ${.IMPSRC}"
+	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${.IMPSRC}"
 contrib/alpine-hal/al_serdes.c			optional al_serdes	\
 	no-depend	\
-	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${PROF} ${.IMPSRC}"
+	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${.IMPSRC}"
 contrib/alpine-hal/eth/al_hal_eth_kr.c		optional al_eth		\
 	no-depend	\
-	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${PROF} ${.IMPSRC}"
+	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${.IMPSRC}"
 contrib/alpine-hal/eth/al_hal_eth_main.c	optional al_eth		\
 	no-depend	\
-	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${PROF} ${.IMPSRC}"
+	compile-with "${CC} -c -o ${.TARGET} ${CFLAGS} -I$S/contrib/alpine-hal -I$S/contrib/alpine-hal/eth ${.IMPSRC}"
 dev/alc/if_alc.c		optional alc pci
 dev/ale/if_ale.c		optional ale pci
 dev/alpm/alpm.c			optional alpm pci
@@ -2500,7 +2503,6 @@ dev/mmc/mmcbus_if.m		standard
 dev/mmc/mmcsd.c			optional mmcsd !mmccam
 dev/mmc/mmc_fdt_helpers.c	optional mmc fdt | mmccam fdt
 dev/mmcnull/mmcnull.c		optional mmcnull
-dev/mn/if_mn.c			optional mn pci
 dev/mpr/mpr.c			optional mpr
 dev/mpr/mpr_config.c		optional mpr
 # XXX Work around clang warning, until maintainer approves fix.
@@ -3123,6 +3125,7 @@ dev/sge/if_sge.c		optional sge pci
 dev/siis/siis.c			optional siis pci
 dev/sis/if_sis.c		optional sis pci
 dev/sk/if_sk.c			optional sk pci
+dev/smbios/smbios.c		optional smbios
 dev/smbus/smb.c			optional smb
 dev/smbus/smbconf.c		optional smbus
 dev/smbus/smbus.c		optional smbus
@@ -3478,7 +3481,7 @@ dev/videomode/videomode.c		optional videomode
 dev/videomode/edid.c			optional videomode
 dev/videomode/pickmode.c		optional videomode
 dev/videomode/vesagtf.c			optional videomode
-dev/veriexec/verified_exec.c	optional veriexec mac_veriexec
+dev/veriexec/verified_exec.c	optional mac_veriexec
 dev/vge/if_vge.c		optional vge
 dev/viapm/viapm.c		optional viapm pci
 dev/virtio/virtio.c			optional	virtio
@@ -3562,6 +3565,7 @@ dev/xen/blkfront/blkfront.c	optional xenhvm
 dev/xen/blkback/blkback.c	optional xenhvm
 dev/xen/console/xen_console.c	optional xenhvm
 dev/xen/control/control.c	optional xenhvm
+dev/xen/efi/pvefi.c		optional xenhvm efirt
 dev/xen/grant_table/grant_table.c	optional xenhvm
 dev/xen/netback/netback.c	optional xenhvm
 dev/xen/netfront/netfront.c	optional xenhvm
@@ -3912,6 +3916,8 @@ kern/stack_protector.c		standard \
 	compile-with "${NORMAL_C:N-fstack-protector*}"
 kern/subr_acl_nfs4.c		optional ufs_acl | zfs
 kern/subr_acl_posix1e.c		optional ufs_acl
+kern/subr_asan.c		optional kasan \
+	compile-with "${NORMAL_C:N-fsanitize*}"
 kern/subr_autoconf.c		standard
 kern/subr_blist.c		standard
 kern/subr_boot.c		standard
@@ -4097,7 +4103,6 @@ libkern/inet_ntop.c		standard
 libkern/inet_pton.c		standard
 libkern/jenkins_hash.c		standard
 libkern/murmur3_32.c		standard
-libkern/mcount.c		optional profiling-routine
 libkern/memcchr.c		standard
 libkern/memchr.c		standard
 libkern/memmem.c		optional gdb
@@ -4117,7 +4122,6 @@ libkern/strdup.c		standard
 libkern/strndup.c		standard
 libkern/strlcat.c		standard
 libkern/strlcpy.c		standard
-libkern/strlen.c		standard
 libkern/strncat.c		standard
 libkern/strncmp.c		standard
 libkern/strncpy.c		standard
@@ -4363,6 +4367,7 @@ netgraph/ng_tee.c		optional netgraph_tee
 netgraph/ng_tty.c		optional netgraph_tty
 netgraph/ng_vjc.c		optional netgraph_vjc
 netgraph/ng_vlan.c		optional netgraph_vlan
+netgraph/ng_vlan_rotate.c	optional netgraph_vlan_rotate
 netinet/accf_data.c		optional accept_filter_data inet
 netinet/accf_dns.c		optional accept_filter_dns inet
 netinet/accf_http.c		optional accept_filter_http inet
@@ -4554,6 +4559,7 @@ netpfil/pf/pf_if.c		optional pf inet
 netpfil/pf/pf_ioctl.c		optional pf inet
 netpfil/pf/pf_lb.c		optional pf inet
 netpfil/pf/pf_norm.c		optional pf inet
+netpfil/pf/pf_nv.c		optional pf inet
 netpfil/pf/pf_osfp.c		optional pf inet
 netpfil/pf/pf_ruleset.c		optional pf inet
 netpfil/pf/pf_table.c		optional pf inet
@@ -4588,7 +4594,13 @@ compat/linuxkpi/common/src/linux_compat.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_current.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
+compat/linuxkpi/common/src/linux_devres.c	optional compat_linuxkpi \
+	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_dmi.c		optional compat_linuxkpi \
+	compile-with "${LINUXKPI_C}"
+compat/linuxkpi/common/src/linux_domain.c	optional compat_linuxkpi \
+	compile-with "${LINUXKPI_C}"
+compat/linuxkpi/common/src/linux_firmware.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/linux_hrtimer.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
@@ -4952,6 +4964,8 @@ opencrypto/gfmult.c		optional crypto | ipsec | ipsec_support
 opencrypto/rmd160.c		optional crypto | ipsec | ipsec_support
 opencrypto/xform.c		optional crypto | ipsec | ipsec_support
 opencrypto/xform_cbc_mac.c	optional crypto
+opencrypto/xform_chacha20_poly1305.c	optional crypto \
+	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include -I$S/crypto/libsodium"
 opencrypto/xform_poly1305.c	optional crypto \
 	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include -I$S/crypto/libsodium"
 contrib/libsodium/src/libsodium/crypto_onetimeauth/poly1305/onetimeauth_poly1305.c \

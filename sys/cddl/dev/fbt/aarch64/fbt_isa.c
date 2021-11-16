@@ -44,6 +44,7 @@
 #define	FBT_PATCHVAL		(AARCH64_BRK | AARCH64_BRK_IMM16_VAL)
 #define	FBT_ENTRY	"entry"
 #define	FBT_RETURN	"return"
+#define	FBT_AFRAMES	4
 
 int
 fbt_invop(uintptr_t addr, struct trapframe *frame, uintptr_t rval)
@@ -110,28 +111,41 @@ fbt_provide_module_function(linker_file_t lf, int symindx,
 
 	/* Look for stp (pre-indexed) operation */
 	found = false;
-	for (; instr < limit; instr++) {
-		/* Some functions start with "stp xt1, xt2, [xn, <const>]!" */
-		if ((*instr & LDP_STP_MASK) == STP_64) {
+	/*
+	 * If the first instruction is a nop it's a specially marked
+	 * asm function. We only support a nop first as it's not a normal
+	 * part of the function prologue.
+	 */
+	if (*instr == NOP_INSTR)
+		found = true;
+	if (!found) {
+		for (; instr < limit; instr++) {
 			/*
-			 * Assume any other store of this type means we
-			 * are past the function prolog.
+			 * Some functions start with
+			 * "stp xt1, xt2, [xn, <const>]!"
 			 */
-			if (((*instr >> ADDR_SHIFT) & ADDR_MASK) == 31)
-				found = true;
-			break;
-		}
+			if ((*instr & LDP_STP_MASK) == STP_64) {
+				/*
+				 * Assume any other store of this type means we
+				 * are past the function prolog.
+				 */
+				if (((*instr >> ADDR_SHIFT) & ADDR_MASK) == 31)
+					found = true;
+				break;
+			}
 
-		/*
-		 * Some functions start with a "sub sp, sp, <const>"
-		 * Sometimes the compiler will have a sub instruction that
-		 * is not of the above type so don't stop if we see one.
-		 */
-		if ((*instr & SUB_MASK) == SUB_INSTR &&
-		    ((*instr >> SUB_RD_SHIFT) & SUB_R_MASK) == 31 &&
-		    ((*instr >> SUB_RN_SHIFT) & SUB_R_MASK) == 31) {
-			found = true;
-			break;
+			/*
+			 * Some functions start with a "sub sp, sp, <const>"
+			 * Sometimes the compiler will have a sub instruction
+			 * that is not of the above type so don't stop if we
+			 * see one.
+			 */
+			if ((*instr & SUB_MASK) == SUB_INSTR &&
+			    ((*instr >> SUB_RD_SHIFT) & SUB_R_MASK) == 31 &&
+			    ((*instr >> SUB_RN_SHIFT) & SUB_R_MASK) == 31) {
+				found = true;
+				break;
+			}
 		}
 	}
 
@@ -141,7 +155,7 @@ fbt_provide_module_function(linker_file_t lf, int symindx,
 	fbt = malloc(sizeof (fbt_probe_t), M_FBT, M_WAITOK | M_ZERO);
 	fbt->fbtp_name = name;
 	fbt->fbtp_id = dtrace_probe_create(fbt_id, modname,
-	    name, FBT_ENTRY, 3, fbt);
+	    name, FBT_ENTRY, FBT_AFRAMES, fbt);
 	fbt->fbtp_patchpoint = instr;
 	fbt->fbtp_ctl = lf;
 	fbt->fbtp_loadcnt = lf->loadcnt;
@@ -183,7 +197,7 @@ again:
 	fbt->fbtp_name = name;
 	if (retfbt == NULL) {
 		fbt->fbtp_id = dtrace_probe_create(fbt_id, modname,
-		    name, FBT_RETURN, 3, fbt);
+		    name, FBT_RETURN, FBT_AFRAMES, fbt);
 	} else {
 		retfbt->fbtp_probenext = fbt;
 		fbt->fbtp_id = retfbt->fbtp_id;

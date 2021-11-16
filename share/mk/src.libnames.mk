@@ -51,6 +51,7 @@ _INTERNALLIBS=	\
 		opts \
 		parse \
 		pe \
+		pfctl \
 		pmcstat \
 		sl \
 		sm \
@@ -304,11 +305,7 @@ _DP_radius=	crypto
 _DP_rtld_db=	elf procstat
 _DP_procstat=	kvm util elf
 .if ${MK_CXX} == "yes"
-.if ${MK_LIBCPLUSPLUS} != "no"
 _DP_proc=	cxxrt
-.else
-_DP_proc=	supcplusplus
-.endif
 .endif
 .if ${MK_CDDL} != "no"
 _DP_proc+=	ctf
@@ -400,6 +397,7 @@ _DP_zutil=	avl tpool
 _DP_be=		zfs spl nvpair zfsbootenv
 _DP_netmap=
 _DP_ifconfig=	m
+_DP_pfctl=	nv
 
 # OFED support
 .if ${MK_OFED} != "no"
@@ -560,6 +558,9 @@ LIBOPTS?=	${LIBOPTSDIR}/libopts${PIE_SUFFIX}.a
 
 LIBPARSEDIR=	${_LIB_OBJTOP}/usr.sbin/ntp/libparse
 LIBPARSE?=	${LIBPARSEDIR}/libparse${PIE_SUFFIX}.a
+
+LIBPFCTL=	${_LIB_OBJTOP}/lib/libpfctl
+LIBPFCTL?=	${LIBPFCTLDIR}/libpfctl${PIE_SUFFIX}.a
 
 LIBLPRDIR=	${_LIB_OBJTOP}/usr.sbin/lpr/common_source
 LIBLPR?=	${LIBLPRDIR}/liblpr${PIE_SUFFIX}.a

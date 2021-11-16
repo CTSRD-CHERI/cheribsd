@@ -876,13 +876,12 @@ ufs_makedirentry(ip, cnp, newdirp)
  * soft dependency code).
  */
 int
-ufs_direnter(dvp, tvp, dirp, cnp, newdirbp, isrename)
+ufs_direnter(dvp, tvp, dirp, cnp, newdirbp)
 	struct vnode *dvp;
 	struct vnode *tvp;
 	struct direct *dirp;
 	struct componentname *cnp;
 	struct buf *newdirbp;
-	int isrename;
 {
 	struct ucred *cr;
 	struct thread *td;
@@ -964,9 +963,7 @@ ufs_direnter(dvp, tvp, dirp, cnp, newdirbp, isrename)
 			if (newdirbp)
 				bdwrite(newdirbp);
 			bdwrite(bp);
-			if ((dp->i_flag & IN_NEEDSYNC) == 0)
-				return (UFS_UPDATE(dvp, 0));
-			return (0);
+			return (UFS_UPDATE(dvp, 0));
 		}
 		if (DOINGASYNC(dvp)) {
 			bdwrite(bp);
@@ -1113,32 +1110,14 @@ ufs_direnter(dvp, tvp, dirp, cnp, newdirbp, isrename)
 			error = bwrite(bp);
 		}
 	}
-	UFS_INODE_SET_FLAG(dp, IN_CHANGE | IN_UPDATE);
+
 	/*
-	 * If all went well, and the directory can be shortened, proceed
-	 * with the truncation. Note that we have to unlock the inode for
-	 * the entry that we just entered, as the truncation may need to
-	 * lock other inodes which can lead to deadlock if we also hold a
-	 * lock on the newly entered node.
+	 * If all went well, and the directory can be shortened,
+	 * mark directory inode with the truncation request.
 	 */
-	if (isrename == 0 && error == 0 &&
-	    I_ENDOFF(dp) != 0 && I_ENDOFF(dp) < dp->i_size) {
-		if (tvp != NULL)
-			VOP_UNLOCK(tvp);
-		error = UFS_TRUNCATE(dvp, (off_t)I_ENDOFF(dp),
-		    IO_NORMAL | (DOINGASYNC(dvp) ? 0 : IO_SYNC), cr);
-		if (error != 0)
-			vn_printf(dvp,
-			    "ufs_direnter: failed to truncate, error %d\n",
-			    error);
-#ifdef UFS_DIRHASH
-		if (error == 0 && dp->i_dirhash != NULL)
-			ufsdirhash_dirtrunc(dp, I_ENDOFF(dp));
-#endif
-		error = 0;
-		if (tvp != NULL)
-			vn_lock(tvp, LK_EXCLUSIVE | LK_RETRY);
-	}
+	UFS_INODE_SET_FLAG(dp, IN_CHANGE | IN_UPDATE | (error == 0 &&
+	    I_ENDOFF(dp) != 0 && I_ENDOFF(dp) < dp->i_size ? IN_ENDOFF : 0));
+
 	return (error);
 }
 

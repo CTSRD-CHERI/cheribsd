@@ -208,6 +208,8 @@ nd6_lle_event(void *arg __unused, struct llentry *lle, int evt)
 static void
 nd6_iflladdr(void *arg __unused, struct ifnet *ifp)
 {
+	if (ifp->if_afdata[AF_INET6] == NULL)
+		return;
 
 	lltable_update_ifaddr(LLTABLE6(ifp));
 }
@@ -2460,6 +2462,7 @@ nd6_flush_holdchain(struct ifnet *ifp, struct mbuf *chain,
 	while (m_head) {
 		m = m_head;
 		m_head = m_head->m_nextpkt;
+		m->m_nextpkt = NULL;
 		error = nd6_output_ifp(ifp, ifp, m, dst, NULL);
 	}
 

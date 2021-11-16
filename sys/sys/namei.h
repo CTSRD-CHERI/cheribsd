@@ -112,11 +112,10 @@ struct nameidata {
 	 */
 	struct componentname ni_cnd;
 	struct nameicap_tracker_head ni_cap_tracker;
-	struct vnode *ni_beneath_latch;
 };
 
-enum cache_fpl_status { CACHE_FPL_STATUS_ABORTED, CACHE_FPL_STATUS_PARTIAL,
-    CACHE_FPL_STATUS_HANDLED, CACHE_FPL_STATUS_UNSET };
+enum cache_fpl_status { CACHE_FPL_STATUS_DESTROYED, CACHE_FPL_STATUS_ABORTED,
+    CACHE_FPL_STATUS_PARTIAL, CACHE_FPL_STATUS_HANDLED, CACHE_FPL_STATUS_UNSET };
 int	cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
     struct pwd **pwdp);
 
@@ -144,11 +143,12 @@ int	cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
 #define	WANTPARENT	0x0010	/* want parent vnode returned unlocked */
 #define	FAILIFEXISTS	0x0020	/* return EEXIST if found */
 #define	FOLLOW		0x0040	/* follow symbolic links */
-#define	BENEATH		0x0080	/* No escape from the start dir */
+#define	EMPTYPATH	0x0080	/* Allow empty path for *at */
 #define	LOCKSHARED	0x0100	/* Shared lock leaf */
 #define	NOFOLLOW	0x0000	/* do not follow symbolic links (pseudo) */
 #define	RBENEATH	0x100000000ULL /* No escape, even tmp, from start dir */
 #define	MODMASK		0xf000001ffULL	/* mask of operational modifiers */
+
 /*
  * Namei parameter descriptors.
  *
@@ -199,15 +199,13 @@ int	cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
  */
 #define	NIRES_ABS	0x00000001 /* Path was absolute */
 #define	NIRES_STRICTREL	0x00000002 /* Restricted lookup result */
+#define	NIRES_EMPTYPATH	0x00000004 /* EMPTYPATH used */
 
 /*
  * Flags in ni_lcf, valid for the duration of the namei call.
  */
 #define	NI_LCF_STRICTRELATIVE	0x0001	/* relative lookup only */
 #define	NI_LCF_CAP_DOTDOT	0x0002	/* ".." in strictrelative case */
-#define	NI_LCF_BENEATH_ABS	0x0004	/* BENEATH with absolute path */
-#define	NI_LCF_BENEATH_LATCHED	0x0008	/* BENEATH_ABS traversed starting dir */
-#define	NI_LCF_LATCH		0x0010	/* ni_beneath_latch valid */
 
 /*
  * Initialization of a nameidata structure.

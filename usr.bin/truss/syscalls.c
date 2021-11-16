@@ -488,6 +488,10 @@ static const struct syscall_decode decoded_syscalls[] = {
 	  .args = { { Int, 0 }, { Iovec | IN, 1 }, { Int, 2 },
 	            { Sockaddr | IN, 3 }, { Socklent, 4 },
 	            { Sctpsndrcvinfo | IN, 5 }, { Msgflags, 6 } } },
+	{ .name = "sendfile", .ret_type = 1, .nargs = 7,
+	  .args = { { Int, 0 }, { Int, 1 }, { QuadHex, 2 }, { Sizet, 3 },
+		    { Sendfilehdtr, 4 }, { QuadHex | OUT, 5 },
+		    { Sendfileflags, 6 } } },
 	{ .name = "select", .ret_type = 1, .nargs = 5,
 	  .args = { { Int, 0 }, { Fd_set, 1 }, { Fd_set, 2 }, { Fd_set, 3 },
 		    { Timeval, 4 } } },
@@ -2713,6 +2717,24 @@ print_arg(struct syscall_arg *sc, syscallarg_t *args, syscallarg_t *retval,
 		print_integer_arg(sysdecode_ptrace_request, fp,
 		    args[sc->offset]);
 		break;
+	case Sendfileflags:
+		print_mask_arg(sysdecode_sendfile_flags, fp, args[sc->offset]);
+		break;
+	case Sendfilehdtr: {
+		struct sf_hdtr hdtr;
+
+		if (get_struct(pid, args[sc->offset], &hdtr, sizeof(hdtr)) !=
+		    -1) {
+			fprintf(fp, "{");
+			print_iovec(fp, trussinfo, (uintptr_t)hdtr.headers,
+			    hdtr.hdr_cnt);
+			print_iovec(fp, trussinfo, (uintptr_t)hdtr.trailers,
+			    hdtr.trl_cnt);
+			fprintf(fp, "}");
+		} else
+			print_pointer(fp, args[sc->offset]);
+		break;
+	}
 	case Quotactlcmd:
 		if (!sysdecode_quotactl_cmd(fp, args[sc->offset]))
 			fprintf(fp, "%#x", (int)args[sc->offset]);

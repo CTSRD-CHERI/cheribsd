@@ -33,6 +33,7 @@
 #include <sys/zio.h>
 #include <sys/dmu.h>
 #include <sys/space_map.h>
+#include <sys/metaslab.h>
 #include <sys/fs/zfs.h>
 
 #ifdef	__cplusplus
@@ -113,6 +114,9 @@ extern void vdev_xlate_walk(vdev_t *vd, const range_seg64_t *logical_rs,
     vdev_xlate_func_t *func, void *arg);
 
 extern void vdev_get_stats_ex(vdev_t *vd, vdev_stat_t *vs, vdev_stat_ex_t *vsx);
+
+extern metaslab_group_t *vdev_get_mg(vdev_t *vd, metaslab_class_t *mc);
+
 extern void vdev_get_stats(vdev_t *vd, vdev_stat_t *vs);
 extern void vdev_clear_stats(vdev_t *vd);
 extern void vdev_stat_update(zio_t *zio, uint64_t psize);
@@ -128,6 +132,15 @@ extern void vdev_space_update(vdev_t *vd,
 extern int64_t vdev_deflated_space(vdev_t *vd, int64_t space);
 
 extern uint64_t vdev_psize_to_asize(vdev_t *vd, uint64_t psize);
+
+/*
+ * Return the amount of space allocated for a gang block header.
+ */
+static inline uint64_t
+vdev_gang_header_asize(vdev_t *vd)
+{
+	return (vdev_psize_to_asize(vd, SPA_GANGBLOCKSIZE));
+}
 
 extern int vdev_fault(spa_t *spa, uint64_t guid, vdev_aux_t aux);
 extern int vdev_degrade(spa_t *spa, uint64_t guid, vdev_aux_t aux);

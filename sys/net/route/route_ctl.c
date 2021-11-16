@@ -101,7 +101,7 @@ SYSCTL_DECL(_net_route);
 #else
 #define _MP_FLAGS	CTLFLAG_RD
 #endif
-VNET_DEFINE(u_int, rib_route_multipath) = 0;
+VNET_DEFINE(u_int, rib_route_multipath) = 1;
 SYSCTL_UINT(_net_route, OID_AUTO, multipath, _MP_FLAGS | CTLFLAG_VNET,
     &VNET_NAME(rib_route_multipath), 0, "Enable route multipath");
 #undef _MP_FLAGS
@@ -130,13 +130,24 @@ vnet_rtzone_destroy()
 static void
 destroy_rtentry(struct rtentry *rt)
 {
+#ifdef VIMAGE
+	struct nhop_object *nh = rt->rt_nhop;
 
 	/*
 	 * At this moment rnh, nh_control may be already freed.
 	 * nhop interface may have been migrated to a different vnet.
 	 * Use vnet stored in the nexthop to delete the entry.
 	 */
-	CURVNET_SET(nhop_get_vnet(rt->rt_nhop));
+#ifdef ROUTE_MPATH
+	if (NH_IS_NHGRP(nh)) {
+		struct weightened_nhop *wn;
+		uint32_t num_nhops;
+		wn = nhgrp_get_nhops((struct nhgrp_object *)nh, &num_nhops);
+		nh = wn[0].nh;
+	}
+#endif
+	CURVNET_SET(nhop_get_vnet(nh));
+#endif
 
 	/* Unreference nexthop */
 	nhop_free_any(rt->rt_nhop);
@@ -589,19 +600,14 @@ create_rtentry(struct rib_head *rnh, struct rt_addrinfo *info,
 		error = rt_getifa_fib(info, rnh->rib_fibnum);
 		if (error)
 			return (error);
-	} else {
-		ifa_ref(info->rti_ifa);
 	}
 
 	error = nhop_create_from_info(rnh, info, &nh);
-	if (error != 0) {
-		ifa_free(info->rti_ifa);
+	if (error != 0)
 		return (error);
-	}
 
 	rt = uma_zalloc(V_rtzone, M_NOWAIT | M_ZERO);
 	if (rt == NULL) {
-		ifa_free(info->rti_ifa);
 		nhop_free(nh);
 		return (ENOBUFS);
 	}
@@ -914,7 +920,6 @@ static int
 change_nhop(struct rib_head *rnh, struct rt_addrinfo *info,
     struct nhop_object *nh_orig, struct nhop_object **nh_new)
 {
-	int free_ifa = 0;
 	int error;
 
 	/*
@@ -928,24 +933,15 @@ change_nhop(struct rib_head *rnh, struct rt_addrinfo *info,
 	    (info->rti_info[RTAX_IFA] != NULL &&
 	     !sa_equal(info->rti_info[RTAX_IFA], nh_orig->nh_ifa->ifa_addr))) {
 		error = rt_getifa_fib(info, rnh->rib_fibnum);
-		if (info->rti_ifa != NULL)
-			free_ifa = 1;
 
 		if (error != 0) {
-			if (free_ifa) {
-				ifa_free(info->rti_ifa);
-				info->rti_ifa = NULL;
-			}
-
+			info->rti_ifa = NULL;
 			return (error);
 		}
 	}
 
 	error = nhop_create_from_nhop(rnh, nh_orig, info, nh_new);
-	if (free_ifa) {
-		ifa_free(info->rti_ifa);
-		info->rti_ifa = NULL;
-	}
+	info->rti_ifa = NULL;
 
 	return (error);
 }
@@ -1245,7 +1241,6 @@ rt_checkdelroute(struct radix_node *rn, void *arg)
 	struct rt_delinfo *di;
 	struct rt_addrinfo *info;
 	struct rtentry *rt;
-	int error;
 
 	di = (struct rt_delinfo *)arg;
 	rt = (struct rtentry *)rn;
@@ -1254,7 +1249,8 @@ rt_checkdelroute(struct radix_node *rn, void *arg)
 	info->rti_info[RTAX_DST] = rt_key(rt);
 	info->rti_info[RTAX_NETMASK] = rt_mask(rt);
 
-	error = rt_unlinkrte(di->rnh, info, &di->rc);
+	if (rt_unlinkrte(di->rnh, info, &di->rc) != 0)
+		return (0);
 
 	/*
 	 * Add deleted rtentries to the list to GC them
@@ -1263,10 +1259,18 @@ rt_checkdelroute(struct radix_node *rn, void *arg)
 	 * XXX: Delayed notifications not implemented
 	 *  for nexthop updates.
 	 */
-	if ((error == 0) && (di->rc.rc_cmd == RTM_DELETE)) {
+	if (di->rc.rc_cmd == RTM_DELETE) {
 		/* Add to the list and return */
 		rt->rt_chain = di->head;
 		di->head = rt;
+#ifdef ROUTE_MPATH
+	} else {
+		/*
+		 * RTM_CHANGE to a diferent nexthop or nexthop group.
+		 * Free old multipath group.
+		 */
+		nhop_free_any(di->rc.rc_nh_old);
+#endif
 	}
 
 	return (0);
@@ -1343,6 +1347,42 @@ rib_walk_del(u_int fibnum, int family, rib_filter_f_t *filter_f, void *arg, bool
 	NET_EPOCH_EXIT(et);
 }
 
+static int
+rt_delete_unconditional(struct radix_node *rn, void *arg)
+{
+	struct rtentry *rt = RNTORT(rn);
+	struct rib_head *rnh = (struct rib_head *)arg;
+
+	rn = rnh->rnh_deladdr(rt_key(rt), rt_mask(rt), &rnh->head);
+	if (RNTORT(rn) == rt)
+		rtfree(rt);
+
+	return (0);
+}
+
+/*
+ * Removes all routes from the routing table without executing notifications.
+ * rtentres will be removed after the end of a current epoch.
+ */
+static void
+rib_flush_routes(struct rib_head *rnh)
+{
+	RIB_WLOCK(rnh);
+	rnh->rnh_walktree(&rnh->head, rt_delete_unconditional, rnh);
+	RIB_WUNLOCK(rnh);
+}
+
+void
+rib_flush_routes_family(int family)
+{
+	struct rib_head *rnh;
+
+	for (uint32_t fibnum = 0; fibnum < rt_numfibs; fibnum++) {
+		if ((rnh = rt_tables_get_rnh(fibnum, family)) != NULL)
+			rib_flush_routes(rnh);
+	}
+}
+
 static void
 rib_notify(struct rib_head *rnh, enum rib_subscription_type type,
     struct rib_cmd_info *rc)
@@ -1407,9 +1447,27 @@ rib_subscribe_internal(struct rib_head *rnh, rib_subscription_cb_t *f, void *arg
 
 	NET_EPOCH_ENTER(et);
 	RIB_WLOCK(rnh);
-	CK_STAILQ_INSERT_TAIL(&rnh->rnh_subscribers, rs, next);
+	CK_STAILQ_INSERT_HEAD(&rnh->rnh_subscribers, rs, next);
 	RIB_WUNLOCK(rnh);
 	NET_EPOCH_EXIT(et);
+
+	return (rs);
+}
+
+struct rib_subscription *
+rib_subscribe_locked(struct rib_head *rnh, rib_subscription_cb_t *f, void *arg,
+    enum rib_subscription_type type)
+{
+	struct rib_subscription *rs;
+
+	NET_EPOCH_ASSERT();
+	RIB_WLOCK_ASSERT(rnh);
+
+	if ((rs = allocate_subscription(f, arg, type, false)) == NULL)
+		return (NULL);
+	rs->rnh = rnh;
+
+	CK_STAILQ_INSERT_HEAD(&rnh->rnh_subscribers, rs, next);
 
 	return (rs);
 }
@@ -1428,6 +1486,20 @@ rib_unsibscribe(struct rib_subscription *rs)
 	RIB_WLOCK(rnh);
 	CK_STAILQ_REMOVE(&rnh->rnh_subscribers, rs, rib_subscription, next);
 	RIB_WUNLOCK(rnh);
+
+	epoch_call(net_epoch_preempt, destroy_subscription_epoch,
+	    &rs->epoch_ctx);
+}
+
+void
+rib_unsibscribe_locked(struct rib_subscription *rs)
+{
+	struct rib_head *rnh = rs->rnh;
+
+	NET_EPOCH_ASSERT();
+	RIB_WLOCK_ASSERT(rnh);
+
+	CK_STAILQ_REMOVE(&rnh->rnh_subscribers, rs, rib_subscription, next);
 
 	epoch_call(net_epoch_preempt, destroy_subscription_epoch,
 	    &rs->epoch_ctx);

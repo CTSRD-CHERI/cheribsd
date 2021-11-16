@@ -131,12 +131,11 @@ static void linkmap_delete(Obj_Entry *);
 static void load_filtees(Obj_Entry *, int flags, RtldLockState *);
 static void unload_filtees(Obj_Entry *, RtldLockState *);
 static int load_needed_objects(Obj_Entry *, int);
-static int load_preload_objects(void);
+static int load_preload_objects(char *, bool);
 static Obj_Entry *load_object(const char *, int fd, const Obj_Entry *, int);
 static void map_stacks_exec(RtldLockState *);
 static int obj_disable_relro(Obj_Entry *);
 static int obj_enforce_relro(Obj_Entry *);
-static Obj_Entry *obj_from_addr(const void *);
 static void objlist_call_fini(Objlist *, Obj_Entry *, RtldLockState *);
 static void objlist_call_init(Objlist *, RtldLockState *);
 static void objlist_clear(Objlist *);
@@ -178,6 +177,7 @@ static int symlook_list(SymLook *, const Objlist *, DoneList *);
 static int symlook_needed(SymLook *, const Needed_Entry *, DoneList *);
 static int symlook_obj1_sysv(SymLook *, const Obj_Entry *);
 static int symlook_obj1_gnu(SymLook *, const Obj_Entry *);
+static void *tls_get_addr_slow(uintptr_t **, int, size_t, bool) __noinline;
 static void trace_loaded_objects(Obj_Entry *);
 static void unlink_object(Obj_Entry *);
 static void unload_object(Obj_Entry *, RtldLockState *lockstate);
@@ -205,7 +205,6 @@ void _r_debug_postinit(struct link_map *) __noinline __exported;
 /*
  * Data declarations.
  */
-static char *error_message;	/* Message for dlerror(), or NULL */
 struct r_debug r_debug __exported;	/* for GDB; */
 static bool libmap_disable;	/* Disable libmap */
 static bool ld_loadfltr;	/* Immediate filters processing */
@@ -219,6 +218,8 @@ static char *ld_library_path;	/* Environment variable for search path */
 static char *ld_library_dirs;	/* Environment variable for library descriptors */
 static char *ld_preload;	/* Environment variable for libraries to
 				   load first */
+static char *ld_preload_fds;	/* Environment variable for libraries represented by
+				   descriptors */
 static const char *ld_elf_hints_path;	/* Environment variable for alternative hints path */
 static const char *ld_tracing;	/* Called from ldd to print libs */
 static char *ld_utrace;		/* Use utrace() to log events. */
@@ -494,6 +495,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     assert((vaddr_t)aux_info[AT_BASE]->a_un.a_ptr != 0 && "rtld cannot be mapped at address zero!");
     init_rtld((caddr_t) aux_info[AT_BASE]->a_un.a_ptr, aux_info);
 
+    dlerror_dflt_init();
+
     __progname = obj_rtld.path;
     argv0 = argv[0] != NULL ? argv[0] : "(null)";
     environ = env;
@@ -589,7 +592,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		for (;; auxp++, auxpf++) {
 		    *auxp = *auxpf;
 		    if (auxp->a_type == AT_NULL)
-			break;
+			    break;
 		}
 		/* Since the auxiliary vector has moved, redigest it. */
 		for (i = 0;  i < AT_COUNT;  i++)
@@ -632,7 +635,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	    unsetenv(_LD("LIBMAP_DISABLE")) || unsetenv(_LD("BIND_NOT")) ||
 	    unsetenv(_LD("DEBUG")) || unsetenv(_LD("ELF_HINTS_PATH")) ||
 	    unsetenv(_LD("SKIP_INIT_FUNCS")) ||
-	    unsetenv(_LD("LOADFLTR")) || unsetenv(_LD("LIBRARY_PATH_RPATH"))) {
+	    unsetenv(_LD("LOADFLTR")) || unsetenv(_LD("LIBRARY_PATH_RPATH")) ||
+	    unsetenv(_LD("PRELOAD_FDS"))) {
 		rtld_fatal("environment corrupt; aborting");
 	}
     }
@@ -643,6 +647,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     ld_library_path = getenv(_LD("LIBRARY_PATH"));
     ld_library_dirs = getenv(_LD("LIBRARY_PATH_FDS"));
     ld_preload = getenv(_LD("PRELOAD"));
+    ld_preload_fds = getenv(_LD("PRELOAD_FDS"));
     ld_elf_hints_path = getenv(_LD("ELF_HINTS_PATH"));
     ld_loadfltr = getenv(_LD("LOADFLTR")) != NULL;
     library_path_rpath = getenv(_LD("LIBRARY_PATH_RPATH"));
@@ -784,8 +789,12 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     if (!libmap_disable)
         libmap_disable = (bool)lm_init(libmap_override);
 
+    dbg("loading LD_PRELOAD_FDS libraries");
+    if (load_preload_objects(ld_preload_fds, true) == -1)
+	rtld_die();
+
     dbg("loading LD_PRELOAD libraries");
-    if (load_preload_objects() == -1)
+    if (load_preload_objects(ld_preload, false) == -1)
 	rtld_die();
     preload_tail = globallist_curr(TAILQ_LAST(&obj_list, obj_entry_q));
 
@@ -1013,8 +1022,10 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 #endif
 
     dbg("\"%s\" in \"%s\" ==> %p in \"%s\"",
-      defobj->strtab + def->st_name, basename(obj->path),
-      (void *)target, basename(defobj->path));
+      defobj->strtab + def->st_name,
+      obj->path == NULL ? NULL : basename(obj->path),
+      (void *)target,
+      defobj->path == NULL ? NULL : basename(defobj->path));
 
     /*
      * Write the new contents for the jmpslot. Note that depending on
@@ -1036,14 +1047,14 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 void
 _rtld_error(const char *fmt, ...)
 {
-    static char buf[512];
-    va_list ap;
+	va_list ap;
 
-    va_start(ap, fmt);
-    rtld_vsnprintf(buf, sizeof buf, fmt, ap);
-    error_message = buf;
-    va_end(ap);
-    LD_UTRACE(UTRACE_RTLD_ERROR, NULL, NULL, 0, 0, error_message);
+	va_start(ap, fmt);
+	rtld_vsnprintf(lockinfo.dlerror_loc(), lockinfo.dlerror_loc_sz,
+	    fmt, ap);
+	va_end(ap);
+	*lockinfo.dlerror_seen() = 0;
+	LD_UTRACE(UTRACE_RTLD_ERROR, NULL, NULL, 0, 0, lockinfo.dlerror_loc());
 }
 
 /*
@@ -1052,7 +1063,7 @@ _rtld_error(const char *fmt, ...)
 static char *
 errmsg_save(void)
 {
-    return error_message == NULL ? NULL : xstrdup(error_message);
+	return (xstrdup(lockinfo.dlerror_loc()));
 }
 
 /*
@@ -1062,12 +1073,12 @@ errmsg_save(void)
 static void
 errmsg_restore(char *saved_msg)
 {
-    if (saved_msg == NULL)
-	error_message = NULL;
-    else {
-	_rtld_error("%s", saved_msg);
-	free(saved_msg);
-    }
+	if (saved_msg == NULL)
+		_rtld_error("");
+	else {
+		_rtld_error("%s", saved_msg);
+		free(saved_msg);
+	}
 }
 
 static const char *
@@ -2872,32 +2883,44 @@ load_needed_objects(Obj_Entry *first, int flags)
 }
 
 static int
-load_preload_objects(void)
+load_preload_objects(char *p, bool isfd)
 {
-    char *p = ld_preload;
-    Obj_Entry *obj;
-    static const char delim[] = " \t:;";
+	Obj_Entry *obj;
+	static const char delim[] = " \t:;";
 
-    if (p == NULL)
-	return 0;
+	if (p == NULL)
+		return (0);
 
-    p += strspn(p, delim);
-    while (*p != '\0') {
-	size_t len = strcspn(p, delim);
-	char savech;
-
-	savech = p[len];
-	p[len] = '\0';
-	obj = load_object(p, -1, NULL, 0);
-	if (obj == NULL)
-	    return -1;	/* XXX - cleanup */
-	obj->z_interpose = true;
-	p[len] = savech;
-	p += len;
 	p += strspn(p, delim);
-    }
-    LD_UTRACE(UTRACE_PRELOAD_FINISHED, NULL, NULL, 0, 0, NULL);
-    return 0;
+	while (*p != '\0') {
+		const char *name;
+		size_t len = strcspn(p, delim);
+		char savech;
+		int fd;
+
+		savech = p[len];
+		p[len] = '\0';
+		if (isfd) {
+			name = NULL;
+			fd = parse_integer(p);
+			if (fd == -1)
+				return (-1);
+		} else {
+			name = p;
+			fd = -1;
+		}
+
+		obj = load_object(name, fd, NULL, 0);
+		if (obj == NULL)
+			return (-1);	/* XXX - cleanup */
+		obj->z_interpose = true;
+		p[len] = savech;
+		p += len;
+		p += strspn(p, delim);
+	}
+	LD_UTRACE(UTRACE_PRELOAD_FINISHED, NULL, NULL, 0, 0, NULL);
+
+	return (0);
 }
 
 static const char *
@@ -3074,7 +3097,7 @@ errp:
     return (NULL);
 }
 
-static Obj_Entry *
+Obj_Entry *
 obj_from_addr(const void *addr)
 {
     Obj_Entry *obj;
@@ -3795,9 +3818,10 @@ dlclose_locked(void *handle, RtldLockState *lockstate)
 char *
 dlerror(void)
 {
-    char *msg = error_message;
-    error_message = NULL;
-    return msg;
+	if (*(lockinfo.dlerror_seen()) != 0)
+		return (NULL);
+	*lockinfo.dlerror_seen() = 1;
+	return (lockinfo.dlerror_loc());
 }
 
 /*
@@ -4346,6 +4370,7 @@ dlinfo(void *handle, int request, void *p)
 static void
 rtld_fill_dl_phdr_info(const Obj_Entry *obj, struct dl_phdr_info *phdr_info)
 {
+	uintptr_t **dtvp;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	phdr_info->dlpi_addr = (uintptr_t)cheri_andperm(obj->relocbase,
@@ -4359,7 +4384,9 @@ rtld_fill_dl_phdr_info(const Obj_Entry *obj, struct dl_phdr_info *phdr_info)
 	phdr_info->dlpi_name = obj->path;
 	phdr_info->dlpi_phnum = obj->phsize / sizeof(obj->phdr[0]);
 	phdr_info->dlpi_tls_modid = obj->tlsindex;
-	phdr_info->dlpi_tls_data = obj->tlsinit;
+	dtvp = _get_tp();
+	phdr_info->dlpi_tls_data = (char *)tls_get_addr_slow(dtvp,
+	    obj->tlsindex, 0, true) + TLS_DTV_OFFSET;
 	phdr_info->dlpi_adds = obj_loads;
 	phdr_info->dlpi_subs = obj_loads - obj_count;
 }
@@ -5312,39 +5339,42 @@ unref_dag(Obj_Entry *root)
 /*
  * Common code for MD __tls_get_addr().
  */
-static void *tls_get_addr_slow(uintptr_t **, int, size_t) __noinline;
 static void *
-tls_get_addr_slow(uintptr_t **dtvp, int index, size_t offset)
+tls_get_addr_slow(uintptr_t **dtvp, int index, size_t offset, bool locked)
 {
-    uintptr_t *newdtv, *dtv;
-    RtldLockState lockstate;
-    int to_copy;
+	uintptr_t *newdtv, *dtv;
+	RtldLockState lockstate;
+	int to_copy;
 
-    dtv = *dtvp;
-    /* Check dtv generation in case new modules have arrived */
-    if (dtv[0] != tls_dtv_generation) {
-	wlock_acquire(rtld_bind_lock, &lockstate);
-	newdtv = xcalloc(tls_max_index + 2, sizeof(newdtv[0]));
-	to_copy = dtv[1];
-	if (to_copy > tls_max_index)
-	    to_copy = tls_max_index;
-	memcpy(&newdtv[2], &dtv[2], to_copy * sizeof(newdtv[0]));
-	newdtv[0] = tls_dtv_generation;
-	newdtv[1] = tls_max_index;
-	free(dtv);
-	lock_release(rtld_bind_lock, &lockstate);
-	dtv = *dtvp = newdtv;
-    }
+	dtv = *dtvp;
+	/* Check dtv generation in case new modules have arrived */
+	if (dtv[0] != tls_dtv_generation) {
+		if (!locked)
+			wlock_acquire(rtld_bind_lock, &lockstate);
+		newdtv = xcalloc(tls_max_index + 2, sizeof(newdtv[0]));
+		to_copy = dtv[1];
+		if (to_copy > tls_max_index)
+			to_copy = tls_max_index;
+		memcpy(&newdtv[2], &dtv[2], to_copy * sizeof(newdtv[0]));
+		newdtv[0] = tls_dtv_generation;
+		newdtv[1] = tls_max_index;
+		free(dtv);
+		if (!locked)
+			lock_release(rtld_bind_lock, &lockstate);
+		dtv = *dtvp = newdtv;
+	}
 
-    /* Dynamically allocate module TLS if necessary */
-    if (dtv[index + 1] == 0) {
-	/* Signal safe, wlock will block out signals. */
-	wlock_acquire(rtld_bind_lock, &lockstate);
-	if (!dtv[index + 1])
-	    dtv[index + 1] = (uintptr_t)allocate_module_tls(index);
-	lock_release(rtld_bind_lock, &lockstate);
-    }
-    return ((void *)(dtv[index + 1] + offset));
+	/* Dynamically allocate module TLS if necessary */
+	if (dtv[index + 1] == 0) {
+		/* Signal safe, wlock will block out signals. */
+		if (!locked)
+			wlock_acquire(rtld_bind_lock, &lockstate);
+		if (!dtv[index + 1])
+			dtv[index + 1] = (uintptr_t)allocate_module_tls(index);
+		if (!locked)
+			lock_release(rtld_bind_lock, &lockstate);
+	}
+	return ((void *)(dtv[index + 1] + offset));
 }
 
 void *
@@ -5357,7 +5387,7 @@ tls_get_addr_common(uintptr_t **dtvp, int index, size_t offset)
 	if (__predict_true(dtv[0] == tls_dtv_generation &&
 	    dtv[index + 1] != 0))
 		return ((void *)(dtv[index + 1] + offset));
-	return (tls_get_addr_slow(dtvp, index, offset));
+	return (tls_get_addr_slow(dtvp, index, offset, false));
 }
 
 #if defined(__aarch64__) || defined(__arm__) || defined(__mips__) || \
@@ -6364,3 +6394,6 @@ int _rtld_version__FreeBSD_version = __FreeBSD_version;
 
 extern char _rtld_version_laddr_offset __exported;
 char _rtld_version_laddr_offset;
+
+extern char _rtld_version_dlpi_tls_data __exported;
+char _rtld_version_dlpi_tls_data;

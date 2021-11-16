@@ -39,7 +39,10 @@ __FBSDID("$FreeBSD$");
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
+#if defined(__amd64__) || defined(__i386__)
 #include <machine/pc/bios.h>
+#endif
+#include <dev/smbios/smbios.h>
 
 #ifdef LOCAL_MODULE
 #include <ipmi.h>
@@ -76,8 +79,6 @@ struct ipmi_entry {
 #define	SPACING_32		0x1
 #define	SPACING_16		0x2
 
-typedef void (*smbios_callback_t)(struct smbios_structure_header *, void *);
-
 static struct ipmi_get_info ipmi_info;
 static int ipmi_probed;
 static struct mtx ipmi_info_mtx;
@@ -85,8 +86,6 @@ MTX_SYSINIT(ipmi_info, &ipmi_info_mtx, "ipmi info", MTX_DEF);
 
 static void	ipmi_smbios_probe(struct ipmi_get_info *);
 static int	smbios_cksum(struct smbios_eps *);
-static void	smbios_walk_table(uint8_t *, int, smbios_callback_t,
-		    void *);
 static void	smbios_ipmi_info(struct smbios_structure_header *, void *);
 
 static void
@@ -143,31 +142,6 @@ smbios_ipmi_info(struct smbios_structure_header *h, void *arg)
 	info->iface_type = s->interface_type;
 }
 
-static void
-smbios_walk_table(uint8_t *p, int entries, smbios_callback_t cb, void *arg)
-{
-	struct smbios_structure_header *s;
-
-	while (entries--) {
-		s = (struct smbios_structure_header *)p;
-		cb(s, arg);
-
-		/*
-		 * Look for a double-nul after the end of the
-		 * formatted area of this structure.
-		 */
-		p += s->length;
-		while (!(p[0] == 0 && p[1] == 0))
-			p++;
-
-		/*
-		 * Skip over the double-nul to the start of the next
-		 * structure.
-		 */
-		p += 2;
-	}
-}
-
 /*
  * Walk the SMBIOS table looking for an IPMI (type 38) entry.  If we find
  * one, return the parsed data in the passed in ipmi_get_info structure and
@@ -198,7 +172,7 @@ ipmi_smbios_probe(struct ipmi_get_info *info)
 	pmap_unmapbios((vm_pointer_t)header, sizeof(struct smbios_eps));
 	header = table;
 	if (smbios_cksum(header) != 0) {
-		pmap_unmapbios((vm_pointer_t)header, header->length);
+		pmap_unmapbios((vm_offset_t)header, header->length);
 		return;
 	}
 

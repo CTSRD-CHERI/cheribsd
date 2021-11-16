@@ -600,6 +600,9 @@ setinodebuf(int cg, ino_t inosused)
 	nextino = inum;
 	lastinum = inum;
 	readcount = 0;
+	/* Flush old contents in case they have been updated */
+	flush(fswritefd, &inobuf);
+	inobuf.b_bno = 0;
 	if (inobuf.b_un.b_buf == NULL) {
 		inobufsize = blkroundup(&sblock,
 		    MAX(INOBUFSIZE, sblock.fs_bsize));
@@ -611,8 +614,9 @@ setinodebuf(int cg, ino_t inosused)
 	    sizeof(struct ufs1_dinode) : sizeof(struct ufs2_dinode));
 	readpercg = inosused / fullcnt;
 	partialcnt = inosused % fullcnt;
-	partialsize = partialcnt * ((sblock.fs_magic == FS_UFS1_MAGIC) ?
-	    sizeof(struct ufs1_dinode) : sizeof(struct ufs2_dinode));
+	partialsize = fragroundup(&sblock,
+	    partialcnt * ((sblock.fs_magic == FS_UFS1_MAGIC) ?
+	    sizeof(struct ufs1_dinode) : sizeof(struct ufs2_dinode)));
 	if (partialcnt != 0) {
 		readpercg++;
 	} else {

@@ -163,6 +163,7 @@ KERNEL_C = \
 	zfs_debug.c \
 	zfs_fm.c \
 	zfs_fuid.c \
+	zfs_racct.c \
 	zfs_sa.c \
 	zfs_znode.c \
 	zfs_ratelimit.c \
@@ -235,3 +236,5 @@ if TARGET_CPU_POWERPC
 vdev_raidz_math_powerpc_altivec.$(OBJEXT): CFLAGS += -maltivec
 vdev_raidz_math_powerpc_altivec.l$(OBJEXT): CFLAGS += -maltivec
 endif
+
+include $(top_srcdir)/config/CppCheck.am

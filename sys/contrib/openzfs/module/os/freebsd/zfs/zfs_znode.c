@@ -444,6 +444,7 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, int blksz,
 	zp->z_blksz = blksz;
 	zp->z_seq = 0x7A4653;
 	zp->z_sync_cnt = 0;
+	atomic_store_ptr(&zp->z_cached_symlink, NULL);
 
 	vp = ZTOV(zp);
 
@@ -1237,6 +1238,7 @@ void
 zfs_znode_free(znode_t *zp)
 {
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
+	char *symlink;
 
 	ASSERT(zp->z_sa_hdl == NULL);
 	zp->z_vnode = NULL;
@@ -1245,6 +1247,11 @@ zfs_znode_free(znode_t *zp)
 	list_remove(&zfsvfs->z_all_znodes, zp);
 	zfsvfs->z_nr_znodes--;
 	mutex_exit(&zfsvfs->z_znodes_lock);
+	symlink = atomic_load_ptr(&zp->z_cached_symlink);
+	if (symlink != NULL) {
+		atomic_store_rel_ptr((uintptr_t *)&zp->z_cached_symlink, (uintptr_t)NULL);
+		cache_symlink_free(symlink, strlen(symlink) + 1);
+	}
 
 	if (zp->z_acl_cached) {
 		zfs_acl_free(zp->z_acl_cached);
@@ -1905,8 +1912,10 @@ zfs_obj_to_path_impl(objset_t *osp, uint64_t obj, sa_handle_t *hdl,
 		size_t complen;
 		int is_xattrdir;
 
-		if (prevdb)
+		if (prevdb) {
+			ASSERT(prevhdl != NULL);
 			zfs_release_sa_handle(prevhdl, prevdb, FTAG);
+		}
 
 		if ((error = zfs_obj_to_pobj(osp, sa_hdl, sa_table, &pobj,
 		    &is_xattrdir)) != 0)
@@ -2013,7 +2022,7 @@ zfs_obj_to_stats(objset_t *osp, uint64_t obj, zfs_stat_t *sb,
 
 
 void
-zfs_inode_update(znode_t *zp)
+zfs_znode_update_vfs(znode_t *zp)
 {
 	vm_object_t object;
 

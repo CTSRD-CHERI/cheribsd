@@ -256,10 +256,8 @@ pf_kkif_free(struct pfi_kkif *kif)
 	for (int i = 0; i < 2; i++) {
 		for (int j = 0; j < 2; j++) {
 			for (int k = 0; k < 2; k++) {
-				if (kif->pfik_packets[i][j][k])
-					counter_u64_free(kif->pfik_packets[i][j][k]);
-				if (kif->pfik_bytes[i][j][k])
-					counter_u64_free(kif->pfik_bytes[i][j][k]);
+				counter_u64_free(kif->pfik_packets[i][j][k]);
+				counter_u64_free(kif->pfik_bytes[i][j][k]);
 			}
 		}
 	}
@@ -488,6 +486,7 @@ pfi_dynaddr_setup(struct pf_addr_wrap *aw, sa_family_t af)
 		dyn->pfid_kif = pfi_kkif_attach(kif, IFG_ALL);
 	else
 		dyn->pfid_kif = pfi_kkif_attach(kif, aw->v.ifname);
+	kif = NULL;
 	pfi_kkif_ref(dyn->pfid_kif);
 
 	dyn->pfid_net = pfi_unmask(&aw->v.a.mask);

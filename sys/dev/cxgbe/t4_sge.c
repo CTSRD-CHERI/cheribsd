@@ -212,6 +212,22 @@ static counter_u64_t defrags;
 SYSCTL_COUNTER_U64(_hw_cxgbe, OID_AUTO, defrags, CTLFLAG_RD, &defrags,
     "Number of mbuf defrags performed");
 
+static int t4_tx_coalesce = 1;
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, tx_coalesce, CTLFLAG_RWTUN, &t4_tx_coalesce, 0,
+    "tx coalescing allowed");
+
+/*
+ * The driver will make aggressive attempts at tx coalescing if it sees these
+ * many packets eligible for coalescing in quick succession, with no more than
+ * the specified gap in between the eth_tx calls that delivered the packets.
+ */
+static int t4_tx_coalesce_pkts = 32;
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, tx_coalesce_pkts, CTLFLAG_RWTUN,
+    &t4_tx_coalesce_pkts, 0,
+    "# of consecutive packets (1 - 255) that will trigger tx coalescing");
+static int t4_tx_coalesce_gap = 5;
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, tx_coalesce_gap, CTLFLAG_RWTUN,
+    &t4_tx_coalesce_gap, 0, "tx gap (in microseconds)");
 
 static int service_iq(struct sge_iq *, int);
 static int service_iq_fl(struct sge_iq *, int);
@@ -254,6 +270,11 @@ static int free_wrq(struct adapter *, struct sge_wrq *);
 static int alloc_txq(struct vi_info *, struct sge_txq *, int,
     struct sysctl_oid *);
 static int free_txq(struct vi_info *, struct sge_txq *);
+#if defined(TCP_OFFLOAD) || defined(RATELIMIT)
+static int alloc_ofld_txq(struct vi_info *, struct sge_ofld_txq *, int,
+    struct sysctl_oid *);
+static int free_ofld_txq(struct vi_info *, struct sge_ofld_txq *);
+#endif
 static void oneseg_dma_callback(void *, bus_dma_segment_t *, int, int);
 static inline void ring_fl_db(struct adapter *, struct sge_fl *);
 static int refill_fl(struct adapter *, struct sge_fl *, int);
@@ -810,16 +831,15 @@ hwsz_ok(struct adapter *sc, int hwsz)
 }
 
 /*
- * XXX: driver really should be able to deal with unexpected settings.
+ * Initialize the rx buffer sizes and figure out which zones the buffers will
+ * be allocated from.
  */
-int
-t4_read_chip_settings(struct adapter *sc)
+void
+t4_init_rx_buf_info(struct adapter *sc)
 {
 	struct sge *s = &sc->sge;
 	struct sge_params *sp = &sc->params.sge;
-	int i, j, n, rc = 0;
-	uint32_t m, v, r;
-	uint16_t indsz = min(RX_COPY_THRESHOLD - 1, M_INDICATESIZE);
+	int i, j, n;
 	static int sw_buf_sizes[] = {	/* Sorted by size */
 		MCLBYTES,
 #if MJUMPAGESIZE != MCLBYTES
@@ -829,23 +849,6 @@ t4_read_chip_settings(struct adapter *sc)
 		MJUM16BYTES
 	};
 	struct rx_buf_info *rxb;
-
-	m = F_RXPKTCPLMODE;
-	v = F_RXPKTCPLMODE;
-	r = sc->params.sge.sge_control;
-	if ((r & m) != v) {
-		device_printf(sc->dev, "invalid SGE_CONTROL(0x%x)\n", r);
-		rc = EINVAL;
-	}
-
-	/*
-	 * If this changes then every single use of PAGE_SHIFT in the driver
-	 * needs to be carefully reviewed for PAGE_SHIFT vs sp->page_shift.
-	 */
-	if (sp->page_shift != PAGE_SHIFT) {
-		device_printf(sc->dev, "invalid SGE_HOST_PAGE_SIZE(0x%x)\n", r);
-		rc = EINVAL;
-	}
 
 	s->safe_zidx = -1;
 	rxb = &s->rx_buf_info[0];
@@ -891,6 +894,36 @@ t4_read_chip_settings(struct adapter *sc)
 		if (s->safe_zidx == -1 && rxb->size1 == safest_rx_cluster)
 			s->safe_zidx = i;
 	}
+}
+
+/*
+ * Verify some basic SGE settings for the PF and VF driver, and other
+ * miscellaneous settings for the PF driver.
+ */
+int
+t4_verify_chip_settings(struct adapter *sc)
+{
+	struct sge_params *sp = &sc->params.sge;
+	uint32_t m, v, r;
+	int rc = 0;
+	const uint16_t indsz = min(RX_COPY_THRESHOLD - 1, M_INDICATESIZE);
+
+	m = F_RXPKTCPLMODE;
+	v = F_RXPKTCPLMODE;
+	r = sp->sge_control;
+	if ((r & m) != v) {
+		device_printf(sc->dev, "invalid SGE_CONTROL(0x%x)\n", r);
+		rc = EINVAL;
+	}
+
+	/*
+	 * If this changes then every single use of PAGE_SHIFT in the driver
+	 * needs to be carefully reviewed for PAGE_SHIFT vs sp->page_shift.
+	 */
+	if (sp->page_shift != PAGE_SHIFT) {
+		device_printf(sc->dev, "invalid SGE_HOST_PAGE_SIZE(0x%x)\n", r);
+		rc = EINVAL;
+	}
 
 	if (sc->flags & IS_VF)
 		return (0);
@@ -899,14 +932,16 @@ t4_read_chip_settings(struct adapter *sc)
 	r = t4_read_reg(sc, A_ULP_RX_TDDP_PSZ);
 	if (r != v) {
 		device_printf(sc->dev, "invalid ULP_RX_TDDP_PSZ(0x%x)\n", r);
-		rc = EINVAL;
+		if (sc->vres.ddp.size != 0)
+			rc = EINVAL;
 	}
 
 	m = v = F_TDDPTAGTCB;
 	r = t4_read_reg(sc, A_ULP_RX_CTL);
 	if ((r & m) != v) {
 		device_printf(sc->dev, "invalid ULP_RX_CTL(0x%x)\n", r);
-		rc = EINVAL;
+		if (sc->vres.ddp.size != 0)
+			rc = EINVAL;
 	}
 
 	m = V_INDICATESIZE(M_INDICATESIZE) | F_REARMDDPOFFSET |
@@ -915,13 +950,9 @@ t4_read_chip_settings(struct adapter *sc)
 	r = t4_read_reg(sc, A_TP_PARA_REG5);
 	if ((r & m) != v) {
 		device_printf(sc->dev, "invalid TP_PARA_REG5(0x%x)\n", r);
-		rc = EINVAL;
+		if (sc->vres.ddp.size != 0)
+			rc = EINVAL;
 	}
-
-	t4_init_tp_params(sc, 1);
-
-	t4_read_mtu_tbl(sc, sc->params.mtus, NULL);
-	t4_load_mtus(sc, sc->params.mtus, sc->params.a_wnd, sc->params.b_wnd);
 
 	return (rc);
 }
@@ -1083,7 +1114,7 @@ t4_setup_vi_queues(struct vi_info *vi)
 	struct sge_ofld_rxq *ofld_rxq;
 #endif
 #if defined(TCP_OFFLOAD) || defined(RATELIMIT)
-	struct sge_wrq *ofld_txq;
+	struct sge_ofld_txq *ofld_txq;
 #endif
 #ifdef DEV_NETMAP
 	int saved_idx;
@@ -1202,26 +1233,20 @@ t4_setup_vi_queues(struct vi_info *vi)
 	oid = SYSCTL_ADD_NODE(&vi->ctx, children, OID_AUTO, "ofld_txq",
 	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "tx queues for TOE/ETHOFLD");
 	for_each_ofld_txq(vi, i, ofld_txq) {
-		struct sysctl_oid *oid2;
-
 		snprintf(name, sizeof(name), "%s ofld_txq%d",
 		    device_get_nameunit(vi->dev), i);
 		if (vi->nofldrxq > 0) {
 			iqidx = vi->first_ofld_rxq + (i % vi->nofldrxq);
-			init_eq(sc, &ofld_txq->eq, EQ_OFLD, vi->qsize_txq,
+			init_eq(sc, &ofld_txq->wrq.eq, EQ_OFLD, vi->qsize_txq,
 			    pi->tx_chan, sc->sge.ofld_rxq[iqidx].iq.cntxt_id,
 			    name);
 		} else {
 			iqidx = vi->first_rxq + (i % vi->nrxq);
-			init_eq(sc, &ofld_txq->eq, EQ_OFLD, vi->qsize_txq,
+			init_eq(sc, &ofld_txq->wrq.eq, EQ_OFLD, vi->qsize_txq,
 			    pi->tx_chan, sc->sge.rxq[iqidx].iq.cntxt_id, name);
 		}
 
-		snprintf(name, sizeof(name), "%d", i);
-		oid2 = SYSCTL_ADD_NODE(&vi->ctx, SYSCTL_CHILDREN(oid), OID_AUTO,
-		    name, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "offload tx queue");
-
-		rc = alloc_wrq(sc, vi, ofld_txq, oid2);
+		rc = alloc_ofld_txq(vi, ofld_txq, i, oid);
 		if (rc != 0)
 			goto done;
 	}
@@ -1243,9 +1268,7 @@ t4_teardown_vi_queues(struct vi_info *vi)
 	struct sge_rxq *rxq;
 	struct sge_txq *txq;
 #if defined(TCP_OFFLOAD) || defined(RATELIMIT)
-	struct port_info *pi = vi->pi;
-	struct adapter *sc = pi->adapter;
-	struct sge_wrq *ofld_txq;
+	struct sge_ofld_txq *ofld_txq;
 #endif
 #ifdef TCP_OFFLOAD
 	struct sge_ofld_rxq *ofld_rxq;
@@ -1283,7 +1306,7 @@ t4_teardown_vi_queues(struct vi_info *vi)
 	}
 #if defined(TCP_OFFLOAD) || defined(RATELIMIT)
 	for_each_ofld_txq(vi, i, ofld_txq) {
-		free_wrq(sc, ofld_txq);
+		free_ofld_txq(vi, ofld_txq);
 	}
 #endif
 
@@ -2049,6 +2072,8 @@ have_mbuf:
 			rxq->rxcsum++;
 		} else {
 			MPASS(tnl_type == RX_PKT_TNL_TYPE_VXLAN);
+
+			M_HASHTYPE_SETINNER(m0);
 			if (__predict_false(cpl->ip_frag)) {
 				/*
 				 * csum_data is for the inner frame (which is an
@@ -3120,6 +3145,26 @@ set_txupdate_flags(struct sge_txq *txq, u_int avail,
 	}
 }
 
+#if defined(__i386__) || defined(__amd64__)
+extern uint64_t tsc_freq;
+#endif
+
+static inline bool
+record_eth_tx_time(struct sge_txq *txq)
+{
+	const uint64_t cycles = get_cyclecount();
+	const uint64_t last_tx = txq->last_tx;
+#if defined(__i386__) || defined(__amd64__)
+	const uint64_t itg = tsc_freq * t4_tx_coalesce_gap / 1000000;
+#else
+	const uint64_t itg = 0;
+#endif
+
+	MPASS(cycles >= last_tx);
+	txq->last_tx = cycles;
+	return (cycles - last_tx < itg);
+}
+
 /*
  * r->items[cidx] to r->items[pidx], with a wraparound at r->size, are ready to
  * be consumed.  Return the actual number consumed.  0 indicates a stall.
@@ -3137,10 +3182,11 @@ eth_tx(struct mp_ring *r, u_int cidx, u_int pidx, bool *coalescing)
 	u_int n, avail, dbdiff;		/* # of hardware descriptors */
 	int i, rc;
 	struct mbuf *m0;
-	bool snd;
+	bool snd, recent_tx;
 	void *wr;	/* start of the last WR written to the ring */
 
 	TXQ_LOCK_ASSERT_OWNED(txq);
+	recent_tx = record_eth_tx_time(txq);
 
 	remaining = IDXDIFF(pidx, cidx, r->size);
 	if (__predict_false(discard_tx(eq))) {
@@ -3159,17 +3205,15 @@ eth_tx(struct mp_ring *r, u_int cidx, u_int pidx, bool *coalescing)
 	}
 
 	/* How many hardware descriptors do we have readily available. */
-	if (eq->pidx == eq->cidx) {
+	if (eq->pidx == eq->cidx)
 		avail = eq->sidx - 1;
-		if (txp->score++ >= 5)
-			txp->score = 5;	/* tx is completely idle, reset. */
-	} else
+	else
 		avail = IDXDIFF(eq->cidx, eq->pidx, eq->sidx) - 1;
 
 	total = 0;
 	if (remaining == 0) {
-		if (txp->score-- == 1)	/* egr_update had to drain txpkts */
-			txp->score = 1;
+		txp->score = 0;
+		txq->txpkts_flush++;
 		goto send_txpkts;
 	}
 
@@ -3183,7 +3227,17 @@ eth_tx(struct mp_ring *r, u_int cidx, u_int pidx, bool *coalescing)
 		if (avail < 2 * SGE_MAX_WR_NDESC)
 			avail += reclaim_tx_descs(txq, 64);
 
-		if (txp->npkt > 0 || remaining > 1 || txp->score > 3 ||
+		if (t4_tx_coalesce == 0 && txp->npkt == 0)
+			goto skip_coalescing;
+		if (cannot_use_txpkts(m0))
+			txp->score = 0;
+		else if (recent_tx) {
+			if (++txp->score == 0)
+				txp->score = UINT8_MAX;
+		} else
+			txp->score = 1;
+		if (txp->npkt > 0 || remaining > 1 ||
+		    txp->score >= t4_tx_coalesce_pkts ||
 		    atomic_load_int(&txq->eq.equiq) != 0) {
 			if (vi->flags & TX_USES_VM_WR)
 				rc = add_to_txpkts_vf(sc, txq, m0, avail, &snd);
@@ -3198,8 +3252,6 @@ eth_tx(struct mp_ring *r, u_int cidx, u_int pidx, bool *coalescing)
 			for (i = 0; i < txp->npkt; i++)
 				ETHER_BPF_MTAP(ifp, txp->mb[i]);
 			if (txp->npkt > 1) {
-				if (txp->score++ >= 10)
-					txp->score = 10;
 				MPASS(avail >= tx_len16_to_desc(txp->len16));
 				if (vi->flags & TX_USES_VM_WR)
 					n = write_txpkts_vm_wr(sc, txq);
@@ -3239,7 +3291,7 @@ eth_tx(struct mp_ring *r, u_int cidx, u_int pidx, bool *coalescing)
 
 		MPASS(rc != 0 && rc != EAGAIN);
 		MPASS(txp->npkt == 0);
-
+skip_coalescing:
 		n = tx_len16_to_desc(mbuf_len16(m0));
 		if (__predict_false(avail < n)) {
 			avail += reclaim_tx_descs(txq, min(n, 32));
@@ -3684,15 +3736,12 @@ add_iq_sysctls(struct sysctl_ctx_list *ctx, struct sysctl_oid *oid,
 	    "bus address of descriptor ring");
 	SYSCTL_ADD_INT(ctx, children, OID_AUTO, "dmalen", CTLFLAG_RD, NULL,
 	    iq->qsize * IQ_ESIZE, "descriptor ring size in bytes");
-	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "abs_id",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &iq->abs_id, 0,
-	    sysctl_uint16, "I", "absolute id of the queue");
-	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "cntxt_id",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &iq->cntxt_id, 0,
-	    sysctl_uint16, "I", "SGE context id of the queue");
-	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "cidx",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &iq->cidx, 0,
-	    sysctl_uint16, "I", "consumer index");
+	SYSCTL_ADD_U16(ctx, children, OID_AUTO, "abs_id", CTLFLAG_RD,
+	    &iq->abs_id, 0, "absolute id of the queue");
+	SYSCTL_ADD_U16(ctx, children, OID_AUTO, "cntxt_id", CTLFLAG_RD,
+	    &iq->cntxt_id, 0, "SGE context id of the queue");
+	SYSCTL_ADD_U16(ctx, children, OID_AUTO, "cidx", CTLFLAG_RD, &iq->cidx,
+	    0, "consumer index");
 }
 
 static void
@@ -3710,9 +3759,8 @@ add_fl_sysctls(struct adapter *sc, struct sysctl_ctx_list *ctx,
 	SYSCTL_ADD_INT(ctx, children, OID_AUTO, "dmalen", CTLFLAG_RD, NULL,
 	    fl->sidx * EQ_ESIZE + sc->params.sge.spg_len,
 	    "desc ring size in bytes");
-	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "cntxt_id",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &fl->cntxt_id, 0,
-	    sysctl_uint16, "I", "SGE context id of the freelist");
+	SYSCTL_ADD_U16(ctx, children, OID_AUTO, "cntxt_id", CTLFLAG_RD,
+	    &fl->cntxt_id, 0, "SGE context id of the freelist");
 	SYSCTL_ADD_UINT(ctx, children, OID_AUTO, "padding", CTLFLAG_RD, NULL,
 	    fl_pad ? 1 : 0, "padding enabled");
 	SYSCTL_ADD_UINT(ctx, children, OID_AUTO, "packing", CTLFLAG_RD, NULL,
@@ -3911,6 +3959,13 @@ alloc_ofld_rxq(struct vi_info *vi, struct sge_ofld_rxq *ofld_rxq,
 	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "rx queue");
 	add_iq_sysctls(&vi->ctx, oid, &ofld_rxq->iq);
 	add_fl_sysctls(pi->adapter, &vi->ctx, oid, &ofld_rxq->fl);
+
+	SYSCTL_ADD_ULONG(&vi->ctx, SYSCTL_CHILDREN(oid), OID_AUTO,
+	    "rx_toe_tls_records", CTLFLAG_RD, &ofld_rxq->rx_toe_tls_records,
+	    "# of TOE TLS records received");
+	SYSCTL_ADD_ULONG(&vi->ctx, SYSCTL_CHILDREN(oid), OID_AUTO,
+	    "rx_toe_tls_octets", CTLFLAG_RD, &ofld_rxq->rx_toe_tls_octets,
+	    "# of payload octets in received TOE TLS records");
 
 	return (rc);
 }
@@ -4222,12 +4277,10 @@ alloc_wrq(struct adapter *sc, struct vi_info *vi, struct sge_wrq *wrq,
 	    "desc ring size in bytes");
 	SYSCTL_ADD_UINT(ctx, children, OID_AUTO, "cntxt_id", CTLFLAG_RD,
 	    &wrq->eq.cntxt_id, 0, "SGE context id of the queue");
-	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "cidx",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &wrq->eq.cidx, 0,
-	    sysctl_uint16, "I", "consumer index");
-	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "pidx",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &wrq->eq.pidx, 0,
-	    sysctl_uint16, "I", "producer index");
+	SYSCTL_ADD_U16(ctx, children, OID_AUTO, "cidx", CTLFLAG_RD,
+	    &wrq->eq.cidx, 0, "consumer index");
+	SYSCTL_ADD_U16(ctx, children, OID_AUTO, "pidx", CTLFLAG_RD,
+	    &wrq->eq.pidx, 0, "producer index");
 	SYSCTL_ADD_INT(ctx, children, OID_AUTO, "sidx", CTLFLAG_RD, NULL,
 	    wrq->eq.sidx, "status page index");
 	SYSCTL_ADD_UQUAD(ctx, children, OID_AUTO, "tx_wrs_direct", CTLFLAG_RD,
@@ -4304,7 +4357,6 @@ alloc_txq(struct vi_info *vi, struct sge_txq *txq, int idx,
 	    M_ZERO | M_WAITOK);
 
 	txp = &txq->txp;
-	txp->score = 5;
 	MPASS(nitems(txp->mb) >= sc->params.max_pkts_per_eth_tx_pkts_wr);
 	txq->txp.max_npkt = min(nitems(txp->mb),
 	    sc->params.max_pkts_per_eth_tx_pkts_wr);
@@ -4325,12 +4377,10 @@ alloc_txq(struct vi_info *vi, struct sge_txq *txq, int idx,
 	    &eq->abs_id, 0, "absolute id of the queue");
 	SYSCTL_ADD_UINT(&vi->ctx, children, OID_AUTO, "cntxt_id", CTLFLAG_RD,
 	    &eq->cntxt_id, 0, "SGE context id of the queue");
-	SYSCTL_ADD_PROC(&vi->ctx, children, OID_AUTO, "cidx",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &eq->cidx, 0,
-	    sysctl_uint16, "I", "consumer index");
-	SYSCTL_ADD_PROC(&vi->ctx, children, OID_AUTO, "pidx",
-	    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, &eq->pidx, 0,
-	    sysctl_uint16, "I", "producer index");
+	SYSCTL_ADD_U16(&vi->ctx, children, OID_AUTO, "cidx", CTLFLAG_RD,
+	    &eq->cidx, 0, "consumer index");
+	SYSCTL_ADD_U16(&vi->ctx, children, OID_AUTO, "pidx", CTLFLAG_RD,
+	    &eq->pidx, 0, "producer index");
 	SYSCTL_ADD_INT(&vi->ctx, children, OID_AUTO, "sidx", CTLFLAG_RD, NULL,
 	    eq->sidx, "status page index");
 
@@ -4363,6 +4413,9 @@ alloc_txq(struct vi_info *vi, struct sge_txq *txq, int idx,
 	SYSCTL_ADD_UQUAD(&vi->ctx, children, OID_AUTO, "txpkts1_pkts",
 	    CTLFLAG_RD, &txq->txpkts1_pkts,
 	    "# of frames tx'd using type1 txpkts work requests");
+	SYSCTL_ADD_UQUAD(&vi->ctx, children, OID_AUTO, "txpkts_flush",
+	    CTLFLAG_RD, &txq->txpkts_flush,
+	    "# of times txpkts had to be flushed out by an egress-update");
 	SYSCTL_ADD_UQUAD(&vi->ctx, children, OID_AUTO, "raw_wrs", CTLFLAG_RD,
 	    &txq->raw_wrs, "# of raw work requests (non-packets)");
 	SYSCTL_ADD_UQUAD(&vi->ctx, children, OID_AUTO, "vxlan_tso_wrs",
@@ -4372,7 +4425,7 @@ alloc_txq(struct vi_info *vi, struct sge_txq *txq, int idx,
 	    "# of times hardware assisted with inner checksums (VXLAN)");
 
 #ifdef KERN_TLS
-	if (sc->flags & KERN_TLS_OK) {
+	if (is_ktls(sc)) {
 		SYSCTL_ADD_UQUAD(&vi->ctx, children, OID_AUTO,
 		    "kern_tls_records", CTLFLAG_RD, &txq->kern_tls_records,
 		    "# of NIC TLS records transmitted");
@@ -4435,6 +4488,67 @@ free_txq(struct vi_info *vi, struct sge_txq *txq)
 	return (0);
 }
 
+#if defined(TCP_OFFLOAD) || defined(RATELIMIT)
+static int
+alloc_ofld_txq(struct vi_info *vi, struct sge_ofld_txq *ofld_txq, int idx,
+    struct sysctl_oid *oid)
+{
+	struct adapter *sc = vi->adapter;
+	struct sysctl_oid_list *children;
+	char name[16];
+	int rc;
+
+	children = SYSCTL_CHILDREN(oid);
+
+	snprintf(name, sizeof(name), "%d", idx);
+	oid = SYSCTL_ADD_NODE(&vi->ctx, children, OID_AUTO, name,
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "offload tx queue");
+	children = SYSCTL_CHILDREN(oid);
+
+	rc = alloc_wrq(sc, vi, &ofld_txq->wrq, oid);
+	if (rc != 0)
+		return (rc);
+
+	ofld_txq->tx_iscsi_pdus = counter_u64_alloc(M_WAITOK);
+	ofld_txq->tx_iscsi_octets = counter_u64_alloc(M_WAITOK);
+	ofld_txq->tx_toe_tls_records = counter_u64_alloc(M_WAITOK);
+	ofld_txq->tx_toe_tls_octets = counter_u64_alloc(M_WAITOK);
+	SYSCTL_ADD_COUNTER_U64(&vi->ctx, children, OID_AUTO,
+	    "tx_iscsi_pdus", CTLFLAG_RD, &ofld_txq->tx_iscsi_pdus,
+	    "# of iSCSI PDUs transmitted");
+	SYSCTL_ADD_COUNTER_U64(&vi->ctx, children, OID_AUTO,
+	    "tx_iscsi_octets", CTLFLAG_RD, &ofld_txq->tx_iscsi_octets,
+	    "# of payload octets in transmitted iSCSI PDUs");
+	SYSCTL_ADD_COUNTER_U64(&vi->ctx, children, OID_AUTO,
+	    "tx_toe_tls_records", CTLFLAG_RD, &ofld_txq->tx_toe_tls_records,
+	    "# of TOE TLS records transmitted");
+	SYSCTL_ADD_COUNTER_U64(&vi->ctx, children, OID_AUTO,
+	    "tx_toe_tls_octets", CTLFLAG_RD, &ofld_txq->tx_toe_tls_octets,
+	    "# of payload octets in transmitted TOE TLS records");
+
+	return (rc);
+}
+
+static int
+free_ofld_txq(struct vi_info *vi, struct sge_ofld_txq *ofld_txq)
+{
+	struct adapter *sc = vi->adapter;
+	int rc;
+
+	rc = free_wrq(sc, &ofld_txq->wrq);
+	if (rc != 0)
+		return (rc);
+
+	counter_u64_free(ofld_txq->tx_iscsi_pdus);
+	counter_u64_free(ofld_txq->tx_iscsi_octets);
+	counter_u64_free(ofld_txq->tx_toe_tls_records);
+	counter_u64_free(ofld_txq->tx_toe_tls_octets);
+
+	bzero(ofld_txq, sizeof(*ofld_txq));
+	return (0);
+}
+#endif
+
 static void
 oneseg_dma_callback(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 {
@@ -4479,7 +4593,7 @@ refill_fl(struct adapter *sc, struct sge_fl *fl, int n)
 	caddr_t cl;
 	struct rx_buf_info *rxb;
 	struct cluster_metadata *clm;
-	uint16_t max_pidx;
+	uint16_t max_pidx, zidx = fl->zidx;
 	uint16_t hw_cidx = fl->hw_cidx;		/* stable snapshot */
 
 	FL_LOCK_ASSERT_OWNED(fl);
@@ -4495,6 +4609,7 @@ refill_fl(struct adapter *sc, struct sge_fl *fl, int n)
 
 	d = &fl->desc[fl->pidx];
 	sd = &fl->sdesc[fl->pidx];
+	rxb = &sc->sge.rx_buf_info[zidx];
 
 	while (n > 0) {
 
@@ -4528,11 +4643,11 @@ refill_fl(struct adapter *sc, struct sge_fl *fl, int n)
 			sd->cl = NULL;	/* gave up my reference */
 		}
 		MPASS(sd->cl == NULL);
-		rxb = &sc->sge.rx_buf_info[fl->zidx];
 		cl = uma_zalloc(rxb->zone, M_NOWAIT);
 		if (__predict_false(cl == NULL)) {
-			if (fl->zidx != fl->safe_zidx) {
-				rxb = &sc->sge.rx_buf_info[fl->safe_zidx];
+			if (zidx != fl->safe_zidx) {
+				zidx = fl->safe_zidx;
+				rxb = &sc->sge.rx_buf_info[zidx];
 				cl = uma_zalloc(rxb->zone, M_NOWAIT);
 			}
 			if (cl == NULL)
@@ -4543,7 +4658,7 @@ refill_fl(struct adapter *sc, struct sge_fl *fl, int n)
 
 		pa = pmap_kextract((vm_offset_t)cl);
 		sd->cl = cl;
-		sd->zidx = fl->zidx;
+		sd->zidx = zidx;
 
 		if (fl->flags & FL_BUF_PACKING) {
 			*d = htobe64(pa | rxb->hwidx2);
@@ -5977,15 +6092,6 @@ t4_handle_wrerr_rpl(struct adapter *adap, const __be64 *rpl)
 	return (0);
 }
 
-int
-sysctl_uint16(SYSCTL_HANDLER_ARGS)
-{
-	uint16_t *id = arg1;
-	int i = *id;
-
-	return sysctl_handle_int(oidp, &i, 0, req);
-}
-
 static inline bool
 bufidx_used(struct adapter *sc, int idx)
 {
@@ -6069,7 +6175,7 @@ send_etid_flowc_wr(struct cxgbe_rate_tag *cst, struct port_info *pi,
 	MPASS((cst->flags & (EO_FLOWC_PENDING | EO_FLOWC_RPL_PENDING)) ==
 	    EO_FLOWC_PENDING);
 
-	flowc = start_wrq_wr(cst->eo_txq, ETID_FLOWC_LEN16, &cookie);
+	flowc = start_wrq_wr(&cst->eo_txq->wrq, ETID_FLOWC_LEN16, &cookie);
 	if (__predict_false(flowc == NULL))
 		return (ENOMEM);
 
@@ -6091,7 +6197,7 @@ send_etid_flowc_wr(struct cxgbe_rate_tag *cst, struct port_info *pi,
 	flowc->mnemval[5].mnemonic = FW_FLOWC_MNEM_SCHEDCLASS;
 	flowc->mnemval[5].val = htobe32(cst->schedcl);
 
-	commit_wrq_wr(cst->eo_txq, flowc, &cookie);
+	commit_wrq_wr(&cst->eo_txq->wrq, flowc, &cookie);
 
 	cst->flags &= ~EO_FLOWC_PENDING;
 	cst->flags |= EO_FLOWC_RPL_PENDING;
@@ -6111,7 +6217,7 @@ send_etid_flush_wr(struct cxgbe_rate_tag *cst)
 
 	mtx_assert(&cst->lock, MA_OWNED);
 
-	flowc = start_wrq_wr(cst->eo_txq, ETID_FLUSH_LEN16, &cookie);
+	flowc = start_wrq_wr(&cst->eo_txq->wrq, ETID_FLUSH_LEN16, &cookie);
 	if (__predict_false(flowc == NULL))
 		CXGBE_UNIMPLEMENTED(__func__);
 
@@ -6121,7 +6227,7 @@ send_etid_flush_wr(struct cxgbe_rate_tag *cst)
 	flowc->flowid_len16 = htobe32(V_FW_WR_LEN16(ETID_FLUSH_LEN16) |
 	    V_FW_WR_FLOWID(cst->etid));
 
-	commit_wrq_wr(cst->eo_txq, flowc, &cookie);
+	commit_wrq_wr(&cst->eo_txq->wrq, flowc, &cookie);
 
 	cst->flags |= EO_FLUSH_RPL_PENDING;
 	MPASS(cst->tx_credits >= ETID_FLUSH_LEN16);
@@ -6306,7 +6412,7 @@ ethofld_tx(struct cxgbe_rate_tag *cst)
 			MPASS(cst->ncompl > 0);
 			return;
 		}
-		wr = start_wrq_wr(cst->eo_txq, next_credits, &cookie);
+		wr = start_wrq_wr(&cst->eo_txq->wrq, next_credits, &cookie);
 		if (__predict_false(wr == NULL)) {
 			/* XXX: wishful thinking, not a real assertion. */
 			MPASS(cst->ncompl > 0);
@@ -6317,7 +6423,7 @@ ethofld_tx(struct cxgbe_rate_tag *cst)
 		compl = cst->ncompl == 0 || cst->tx_nocompl >= cst->tx_total / 2;
 		ETHER_BPF_MTAP(cst->com.ifp, m);
 		write_ethofld_wr(cst, wr, m, compl);
-		commit_wrq_wr(cst->eo_txq, wr, &cookie);
+		commit_wrq_wr(&cst->eo_txq->wrq, wr, &cookie);
 		if (compl) {
 			cst->ncompl++;
 			cst->tx_nocompl	= 0;

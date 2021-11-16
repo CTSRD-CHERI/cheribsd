@@ -861,6 +861,29 @@ m_adj(struct mbuf *mp, int req_len)
 	}
 }
 
+void
+m_adj_decap(struct mbuf *mp, int len)
+{
+	uint8_t rsstype;
+
+	m_adj(mp, len);
+	if ((mp->m_flags & M_PKTHDR) != 0) {
+		/*
+		 * If flowid was calculated by card from the inner
+		 * headers, move flowid to the decapsulated mbuf
+		 * chain, otherwise clear.  This depends on the
+		 * internals of m_adj, which keeps pkthdr as is, in
+		 * particular not changing rsstype and flowid.
+		 */
+		rsstype = mp->m_pkthdr.rsstype;
+		if ((rsstype & M_HASHTYPE_INNER) != 0) {
+			M_HASHTYPE_SET(mp, rsstype & ~M_HASHTYPE_INNER);
+		} else {
+			M_HASHTYPE_CLEAR(mp);
+		}
+	}
+}
+
 /*
  * Rearange an mbuf chain so that len bytes are contiguous
  * and in the data area of an mbuf (so that mtod will work
@@ -1662,6 +1685,7 @@ m_uiotombuf_nomap(struct uio *uio, int how, int len, int maxseg, int flags)
 	    VM_ALLOC_WIRED;
 
 	MPASS((flags & M_PKTHDR) == 0);
+	MPASS((how & M_ZERO) == 0);
 
 	/*
 	 * len can be zero or an arbitrary large value bound by
@@ -1715,7 +1739,6 @@ retry_page:
 					goto retry_page;
 				}
 			}
-			pg_array[i]->flags &= ~PG_ZERO;
 			mb->m_epg_pa[i] = VM_PAGE_TO_PHYS(pg_array[i]);
 			mb->m_epg_npgs++;
 		}

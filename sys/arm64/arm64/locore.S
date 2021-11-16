@@ -850,44 +850,6 @@ LENTRY(link_l1_pagetable)
 LEND(link_l1_pagetable)
 
 /*
- * Builds count 1 GiB page table entry
- *  x6  = L1 table
- *  x7  = Variable lower block attributes
- *  x8  = VA start
- *  x9  = PA start (trashed)
- *  x10 = Entry count
- *  x11, x12 and x13 are trashed
- */
-LENTRY(build_l1_block_pagetable)
-	/*
-	 * Build the L1 table entry.
-	 */
-	/* Find the table index */
-	lsr	x11, x8, #L1_SHIFT
-	and	x11, x11, #Ln_ADDR_MASK
-
-	/* Build the L1 block entry */
-	orr	x12, x7, #L1_BLOCK
-	orr	x12, x12, #(ATTR_DEFAULT)
-
-	/* Only use the output address bits */
-	lsr	x9, x9, #L1_SHIFT
-
-	/* Set the physical address for this virtual address */
-1:	orr	x13, x12, x9, lsl #L1_SHIFT
-
-	/* Store the entry */
-	str	x13, [x6, x11, lsl #3]
-
-	sub	x10, x10, #1
-	add	x11, x11, #1
-	add	x9, x9, #1
-	cbnz	x10, 1b
-
-	ret
-LEND(build_l1_block_pagetable)
-
-/*
  * Builds count 2 MiB page table entry
  *  x/c6  = L2 table
  *  x7  = Block attributes
@@ -1016,10 +978,11 @@ LENTRY(start_mmu)
 
 	.align 3
 mair:
-	.quad	MAIR_ATTR(MAIR_DEVICE_nGnRnE, VM_MEMATTR_DEVICE)    |	\
+	.quad	MAIR_ATTR(MAIR_DEVICE_nGnRnE, VM_MEMATTR_DEVICE_nGnRnE) | \
 		MAIR_ATTR(MAIR_NORMAL_NC, VM_MEMATTR_UNCACHEABLE)   |	\
 		MAIR_ATTR(MAIR_NORMAL_WB, VM_MEMATTR_WRITE_BACK)    |	\
-		MAIR_ATTR(MAIR_NORMAL_WT, VM_MEMATTR_WRITE_THROUGH)
+		MAIR_ATTR(MAIR_NORMAL_WT, VM_MEMATTR_WRITE_THROUGH) |	\
+		MAIR_ATTR(MAIR_DEVICE_nGnRE, VM_MEMATTR_DEVICE_nGnRE)
 tcr:
 #if __has_feature(capabilities)
 #define	TCR_MORELLO	(TCR_HPD0 | TCR_HPD1 | TCR_HWU0 | TCR_HWU1)
@@ -1181,7 +1144,6 @@ SIGCODE(aarch32_sigcode)
 	.word 0xe59f7008	// ldr r7, [pc, #8]
 	.word 0xef000000	// swi #0
 	.word 0xeafffffa	// b . - 16
-
 	.word SYS_sigreturn
 	.word SYS_exit
 	.align	3

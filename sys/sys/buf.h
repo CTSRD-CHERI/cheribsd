@@ -132,7 +132,8 @@ struct buf {
 	union {
 		TAILQ_ENTRY(buf) b_freelist; /* (Q) */
 		struct {
-			void	(*b_pgiodone)(void *, vm_page_t *, int, int);
+			void	(*b_pgiodone)(void *, struct vm_page **,
+				    int, int);
 			int	b_pgbefore;
 			int	b_pgafter;
 		};
@@ -232,7 +233,7 @@ struct buf {
 #define	B_MALLOC	0x00010000	/* malloced b_data */
 #define	B_CLUSTEROK	0x00020000	/* Pagein op, so swap() can count it. */
 #define	B_INVALONERR	0x00040000	/* Invalidate on write error. */
-#define	B_00080000	0x00080000	/* Available flag. */
+#define	B_IOSTARTED	0x00080000	/* buf_start() called */
 #define	B_00100000	0x00100000	/* Available flag. */
 #define	B_MAXPHYS	0x00200000	/* nitems(b_pages[]) = atop(MAXPHYS). */
 #define	B_RELBUF	0x00400000	/* Release VMIO buffer. */
@@ -248,8 +249,8 @@ struct buf {
 
 #define PRINT_BUF_FLAGS "\20\40remfree\37cluster\36vmio\35ram\34managed" \
 	"\33paging\32infreecnt\31nocopy\30b23\27relbuf\26maxphys\25b20" \
-	"\24b19\23invalonerr\22clusterok\21malloc\20nocache\17b14\16inval" \
-	"\15reuse\14noreuse\13eintr\12done\11b8\10delwri" \
+	"\24iostarted\23invalonerr\22clusterok\21malloc\20nocache\17b14" \
+	"\16inval\15reuse\14noreuse\13eintr\12done\11b8\10delwri" \
 	"\7validsuspwrt\6cache\5deferred\4direct\3async\2needcommit\1age"
 
 /*
@@ -406,6 +407,16 @@ struct cluster_save {
 	struct buf **bs_children;	/* List of associated buffers. */
 };
 
+/*
+ * Vnode clustering tracker
+ */
+struct vn_clusterw {
+	daddr_t	v_cstart;			/* v start block of cluster */
+	daddr_t	v_lasta;			/* v last allocation  */
+	daddr_t	v_lastw;			/* v last write  */
+	int	v_clen;				/* v length of cur. cluster */
+};
+
 #ifdef _KERNEL
 
 static __inline int
@@ -434,6 +445,9 @@ bstrategy(struct buf *bp)
 static __inline void
 buf_start(struct buf *bp)
 {
+	KASSERT((bp->b_flags & B_IOSTARTED) == 0,
+	    ("recursed buf_start %p", bp));
+	bp->b_flags |= B_IOSTARTED;
 	if (bioops.io_start)
 		(*bioops.io_start)(bp);
 }
@@ -441,8 +455,11 @@ buf_start(struct buf *bp)
 static __inline void
 buf_complete(struct buf *bp)
 {
-	if (bioops.io_complete)
-		(*bioops.io_complete)(bp);
+	if ((bp->b_flags & B_IOSTARTED) != 0) {
+		bp->b_flags &= ~B_IOSTARTED;
+		if (bioops.io_complete)
+			(*bioops.io_complete)(bp);
+	}
 }
 
 static __inline void
@@ -564,10 +581,14 @@ void	bd_speedup(void);
 extern uma_zone_t pbuf_zone;
 uma_zone_t pbuf_zsecond_create(const char *name, int max);
 
+struct vn_clusterw;
+
+void	cluster_init_vn(struct vn_clusterw *vnc);
 int	cluster_read(struct vnode *, u_quad_t, daddr_t, long,
 	    struct ucred *, long, int, int, struct buf **);
 int	cluster_wbuild(struct vnode *, long, daddr_t, int, int);
-void	cluster_write(struct vnode *, struct buf *, u_quad_t, int, int);
+void	cluster_write(struct vnode *, struct vn_clusterw *, struct buf *,
+	    u_quad_t, int, int);
 void	vfs_bio_brelse(struct buf *bp, int ioflags);
 void	vfs_bio_bzero_buf(struct buf *bp, int base, int size);
 void	vfs_bio_clrbuf(struct buf *);

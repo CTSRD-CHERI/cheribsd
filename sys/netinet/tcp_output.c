@@ -785,6 +785,10 @@ send:
 #endif
 		hdrlen = sizeof (struct tcpiphdr);
 
+	if (flags & TH_SYN) {
+		tp->snd_nxt = tp->iss;
+	}
+
 	/*
 	 * Compute options for segment.
 	 * We only have to care about SYN and established connection
@@ -795,7 +799,6 @@ send:
 	if ((tp->t_flags & TF_NOOPT) == 0) {
 		/* Maximum segment size. */
 		if (flags & TH_SYN) {
-			tp->snd_nxt = tp->iss;
 			to.to_mss = tcp_mssopt(&tp->t_inpcb->inp_inc);
 			to.to_flags |= TOF_MSS;
 
@@ -1178,7 +1181,7 @@ send:
 			tp->t_flags2 &= ~TF2_ECN_SND_ECE;
 	}
 
-	if (tp->t_state == TCPS_ESTABLISHED &&
+	if (TCPS_HAVEESTABLISHED(tp->t_state) &&
 	    (tp->t_flags2 & TF2_ECN_PERMIT)) {
 		/*
 		 * If the peer has ECN, mark data packets with
@@ -1232,6 +1235,14 @@ send:
 		th->th_seq = htonl(p->rxmit);
 		p->rxmit += len;
 		tp->sackhint.sack_bytes_rexmit += len;
+	}
+	if (IN_RECOVERY(tp->t_flags)) {
+		/*
+		 * Account all bytes transmitted while
+		 * IN_RECOVERY, simplifying PRR and
+		 * Lost Retransmit Detection
+		 */
+		tp->sackhint.prr_out += len;
 	}
 	th->th_ack = htonl(tp->rcv_nxt);
 	if (optlen) {

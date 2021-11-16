@@ -335,10 +335,10 @@ int nfsv4_loadattr(struct nfsrv_descript *, vnode_t,
     struct nfsv3_pathconf *, struct statfs *, struct nfsstatfs *,
     struct nfsfsinfo *, NFSACL_T *,
     int, int *, u_int32_t *, u_int32_t *, NFSPROC_T *, struct ucred *);
-int nfsv4_lock(struct nfsv4lock *, int, int *, void *, struct mount *);
+int nfsv4_lock(struct nfsv4lock *, int, int *, struct mtx *, struct mount *);
 void nfsv4_unlock(struct nfsv4lock *, int);
 void nfsv4_relref(struct nfsv4lock *);
-void nfsv4_getref(struct nfsv4lock *, int *, void *, struct mount *);
+void nfsv4_getref(struct nfsv4lock *, int *, struct mtx *, struct mount *);
 int nfsv4_getref_nonblock(struct nfsv4lock *);
 int nfsv4_testlock(struct nfsv4lock *);
 int nfsrv_mtostr(struct nfsrv_descript *, char *, int);
@@ -561,6 +561,7 @@ int nfsrpc_listextattr(vnode_t, uint64_t *, struct uio *, size_t *, bool *,
     struct nfsvattr *, int *, struct ucred *, NFSPROC_T *);
 int nfsrpc_rmextattr(vnode_t, const char *, struct nfsvattr *, int *,
     struct ucred *, NFSPROC_T *);
+void nfsrpc_bindconnsess(CLIENT *, void *, struct ucred *);
 
 /* nfs_clstate.c */
 int nfscl_open(vnode_t, u_int8_t *, int, u_int32_t, int,

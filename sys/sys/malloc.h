@@ -54,6 +54,7 @@
  */
 #define	M_NOWAIT	0x0001		/* do not block */
 #define	M_WAITOK	0x0002		/* ok to block */
+#define	M_NORECLAIM	0x0080		/* do not reclaim after failure */
 #define	M_ZERO		0x0100		/* bzero the allocation */
 #define	M_NOVM		0x0200		/* don't ask VM for pages */
 #define	M_USE_RESERVE	0x0400		/* can alloc out of reserve memory */
@@ -249,6 +250,9 @@ void	*malloc_domainset(size_t size, struct malloc_type *type,
 	    __alloc_size(1);
 void	*mallocarray(size_t nmemb, size_t size, struct malloc_type *type,
 	    int flags) __malloc_like __result_use_check
+	    __alloc_size2(1, 2);
+void	*mallocarray_domainset(size_t nmemb, size_t size, struct malloc_type *type,
+	    struct domainset *ds, int flags) __malloc_like __result_use_check
 	    __alloc_size2(1, 2);
 void	*malloc_exec(size_t size, struct malloc_type *type, int flags) __malloc_like
 	    __result_use_check __alloc_size(1);

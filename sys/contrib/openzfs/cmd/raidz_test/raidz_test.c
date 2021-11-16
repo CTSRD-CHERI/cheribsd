@@ -448,7 +448,6 @@ vdev_raidz_map_alloc_expanded(abd_t *abd, uint64_t size, uint64_t offset,
 		rr->rr_missingdata = 0;
 		rr->rr_missingparity = 0;
 		rr->rr_firstdatacol = nparity;
-		rr->rr_abd_copy = NULL;
 		rr->rr_abd_empty = NULL;
 		rr->rr_nempty = 0;
 
@@ -459,7 +458,6 @@ vdev_raidz_map_alloc_expanded(abd_t *abd, uint64_t size, uint64_t offset,
 			}
 			rr->rr_col[c].rc_devidx = child_id;
 			rr->rr_col[c].rc_offset = child_offset;
-			rr->rr_col[c].rc_gdata = NULL;
 			rr->rr_col[c].rc_orig_data = NULL;
 			rr->rr_col[c].rc_error = 0;
 			rr->rr_col[c].rc_tried = 0;
@@ -492,8 +490,9 @@ vdev_raidz_map_alloc_expanded(abd_t *abd, uint64_t size, uint64_t offset,
 					    (dc - r) * (rows - 1) + row;
 				}
 				rr->rr_col[c].rc_size = 1ULL << ashift;
-				rr->rr_col[c].rc_abd =
-				    abd_get_offset(abd, off << ashift);
+				rr->rr_col[c].rc_abd = abd_get_offset_struct(
+				    &rr->rr_col[c].rc_abdstruct,
+				    abd, off << ashift, 1 << ashift);
 			}
 
 			asize += rr->rr_col[c].rc_size;

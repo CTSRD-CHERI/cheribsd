@@ -43,6 +43,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/capsicum.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
@@ -79,8 +80,8 @@ EVENTHANDLER_LIST_DEFINE(rt_addrmsg);
 
 static int rt_ifdelroute(const struct rtentry *rt, const struct nhop_object *,
     void *arg);
-static int rt_exportinfo(struct rtentry *rt, struct rt_addrinfo *info,
-    int flags);
+static int rt_exportinfo(struct rtentry *rt, struct nhop_object *nh,
+    struct rt_addrinfo *info, int flags);
 
 /*
  * route initialization must occur before ip6_init2(), which happenas at
@@ -207,7 +208,6 @@ rib_add_redirect(u_int fibnum, struct sockaddr *dst, struct sockaddr *gateway,
 	/* Get the best ifa for the given interface and gateway. */
 	if ((ifa = ifaof_ifpforaddr(gateway, ifp)) == NULL)
 		return (ENETUNREACH);
-	ifa_ref(ifa);
 
 	bzero(&info, sizeof(info));
 	info.rti_info[RTAX_DST] = dst;
@@ -224,7 +224,6 @@ rib_add_redirect(u_int fibnum, struct sockaddr *dst, struct sockaddr *gateway,
 	info.rti_rmx = &rti_rmx;
 
 	error = rib_action(fibnum, RTM_ADD, &info, &rc);
-	ifa_free(ifa);
 
 	if (error != 0) {
 		/* TODO: add per-fib redirect stats. */
@@ -247,8 +246,10 @@ rib_add_redirect(u_int fibnum, struct sockaddr *dst, struct sockaddr *gateway,
  * Routing table ioctl interface.
  */
 int
-rtioctl_fib(u_long req, caddr_t data, u_int fibnum)
+rtioctl_fib(u_long req, caddr_t data, u_int fibnum, struct thread *td)
 {
+	if (IN_CAPABILITY_MODE(td))
+		return (ECAPMODE);
 
 	/*
 	 * If more ioctl commands are added here, make sure the proper
@@ -330,15 +331,14 @@ ifa_ifwithroute(int flags, const struct sockaddr *dst,
  *
  * Returns 0 on success.
  */
-int
-rt_exportinfo(struct rtentry *rt, struct rt_addrinfo *info, int flags)
+static int
+rt_exportinfo(struct rtentry *rt, struct nhop_object *nh,
+    struct rt_addrinfo *info, int flags)
 {
 	struct rt_metrics *rmx;
 	struct sockaddr *src, *dst;
-	struct nhop_object *nh;
 	int sa_len;
 
-	nh = rt->rt_nhop;
 	if (flags & NHR_COPY) {
 		/* Copy destination if dst is non-zero */
 		src = rt_key(rt);
@@ -424,6 +424,7 @@ rib_lookup_info(uint32_t fibnum, const struct sockaddr *dst, uint32_t flags,
 	struct rib_head *rh;
 	struct radix_node *rn;
 	struct rtentry *rt;
+	struct nhop_object *nh;
 	int error;
 
 	KASSERT((fibnum < rt_numfibs), ("rib_lookup_rte: bad fibnum"));
@@ -435,10 +436,11 @@ rib_lookup_info(uint32_t fibnum, const struct sockaddr *dst, uint32_t flags,
 	rn = rh->rnh_matchaddr(__DECONST(void *, dst), &rh->head);
 	if (rn != NULL && ((rn->rn_flags & RNF_ROOT) == 0)) {
 		rt = RNTORT(rn);
+		nh = nhop_select(rt->rt_nhop, flowid);
 		/* Ensure route & ifp is UP */
-		if (RT_LINK_IS_UP(rt->rt_nhop->nh_ifp)) {
+		if (RT_LINK_IS_UP(nh->nh_ifp)) {
 			flags = (flags & NHR_REF) | NHR_COPY;
-			error = rt_exportinfo(rt, info, flags);
+			error = rt_exportinfo(rt, nh, info, flags);
 			RIB_RUNLOCK(rh);
 
 			return (error);
@@ -494,21 +496,6 @@ rt_ifdelroute(const struct rtentry *rt, const struct nhop_object *nh, void *arg)
 	return (1);
 }
 
-/*
- * Delete all remaining routes using this interface
- * Unfortuneatly the only way to do this is to slog through
- * the entire routing table looking for routes which point
- * to this interface...oh well...
- */
-void
-rt_flushifroutes_af(struct ifnet *ifp, int af)
-{
-	KASSERT((af >= 1 && af <= AF_MAX), ("%s: af %d not >= 1 and <= %d",
-	    __func__, af, AF_MAX));
-
-	rib_foreach_table_walk_del(af, rt_ifdelroute, ifp);
-}
-
 void
 rt_flushifroutes(struct ifnet *ifp)
 {
@@ -517,8 +504,7 @@ rt_flushifroutes(struct ifnet *ifp)
 }
 
 /*
- * Look up rt_addrinfo for a specific fib.  Note that if rti_ifa is defined,
- * it will be referenced so the caller must free it.
+ * Look up rt_addrinfo for a specific fib.
  *
  * Assume basic consistency checks are executed by callers:
  * RTAX_DST exists, if RTF_GATEWAY is set, RTAX_GATEWAY exists as well.
@@ -527,8 +513,7 @@ int
 rt_getifa_fib(struct rt_addrinfo *info, u_int fibnum)
 {
 	const struct sockaddr *dst, *gateway, *ifpaddr, *ifaaddr;
-	struct epoch_tracker et;
-	int needref, error, flags;
+	int error, flags;
 
 	dst = info->rti_info[RTAX_DST];
 	gateway = info->rti_info[RTAX_GATEWAY];
@@ -541,8 +526,6 @@ rt_getifa_fib(struct rt_addrinfo *info, u_int fibnum)
 	 * when protocol address is ambiguous.
 	 */
 	error = 0;
-	needref = (info->rti_ifa == NULL);
-	NET_EPOCH_ENTER(et);
 
 	/* If we have interface specified by the ifindex in the address, use it */
 	if (info->rti_ifp == NULL && ifpaddr != NULL &&
@@ -597,13 +580,11 @@ rt_getifa_fib(struct rt_addrinfo *info, u_int fibnum)
 			info->rti_ifa = ifa_ifwithroute(flags, sa, sa,
 							fibnum);
 	}
-	if (needref && info->rti_ifa != NULL) {
+	if (info->rti_ifa != NULL) {
 		if (info->rti_ifp == NULL)
 			info->rti_ifp = info->rti_ifa->ifa_ifp;
-		ifa_ref(info->rti_ifa);
 	} else
 		error = ENETUNREACH;
-	NET_EPOCH_EXIT(et);
 	return (error);
 }
 

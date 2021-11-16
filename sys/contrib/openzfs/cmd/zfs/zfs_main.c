@@ -53,7 +53,6 @@
 #include <grp.h>
 #include <pwd.h>
 #include <signal.h>
-#include <sys/debug.h>
 #include <sys/list.h>
 #include <sys/mkdev.h>
 #include <sys/mntent.h>
@@ -71,7 +70,6 @@
 #include <zfs_prop.h>
 #include <zfs_deleg.h>
 #include <libzutil.h>
-#include <libuutil.h>
 #ifdef HAVE_IDMAP
 #include <aclutils.h>
 #include <directory.h>
@@ -6911,9 +6909,6 @@ report_mount_progress(int current, int total)
 	static time_t last_progress_time = 0;
 	time_t now = time(NULL);
 	char info[32];
-
-	/* report 1..n instead of 0..n-1 */
-	++current;
 
 	/* display header if we're here for the first time */
 	if (current == 1) {

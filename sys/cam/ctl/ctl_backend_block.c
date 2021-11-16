@@ -226,7 +226,7 @@ struct ctl_be_block_io {
 
 extern struct ctl_softc *control_softc;
 
-static int cbb_num_threads = 14;
+static int cbb_num_threads = 32;
 SYSCTL_NODE(_kern_cam_ctl, OID_AUTO, block, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
 	    "CAM Target Layer Block Backend");
 SYSCTL_INT(_kern_cam_ctl_block, OID_AUTO, num_threads, CTLFLAG_RWTUN,
@@ -235,7 +235,7 @@ SYSCTL_INT(_kern_cam_ctl_block, OID_AUTO, num_threads, CTLFLAG_RWTUN,
 static struct ctl_be_block_io *ctl_alloc_beio(struct ctl_be_block_softc *softc);
 static void ctl_free_beio(struct ctl_be_block_io *beio);
 static void ctl_complete_beio(struct ctl_be_block_io *beio);
-static int ctl_be_block_move_done(union ctl_io *io);
+static int ctl_be_block_move_done(union ctl_io *io, bool samethr);
 static void ctl_be_block_biodone(struct bio *bio);
 static void ctl_be_block_flush_file(struct ctl_be_block_lun *be_lun,
 				    struct ctl_be_block_io *beio);
@@ -291,7 +291,6 @@ static struct ctl_backend_driver ctl_be_block_driver =
 	.init = ctl_be_block_init,
 	.shutdown = ctl_be_block_shutdown,
 	.data_submit = ctl_be_block_submit,
-	.data_move_done = ctl_be_block_move_done,
 	.config_read = ctl_be_block_config_read,
 	.config_write = ctl_be_block_config_write,
 	.ioctl = ctl_be_block_ioctl,
@@ -432,47 +431,23 @@ ctl_be_block_compare(union ctl_io *io)
 }
 
 static int
-ctl_be_block_move_done(union ctl_io *io)
+ctl_be_block_move_done(union ctl_io *io, bool samethr)
 {
 	struct ctl_be_block_io *beio;
 	struct ctl_be_block_lun *be_lun;
 	struct ctl_lba_len_flags *lbalen;
-#ifdef CTL_TIME_IO
-	struct bintime cur_bt;
-#endif
 
 	beio = (struct ctl_be_block_io *)PRIV(io)->ptr;
-	be_lun = beio->lun;
 
 	DPRINTF("entered\n");
-
-#ifdef CTL_TIME_IO
-	getbinuptime(&cur_bt);
-	bintime_sub(&cur_bt, &io->io_hdr.dma_start_bt);
-	bintime_add(&io->io_hdr.dma_bt, &cur_bt);
-#endif
-	io->io_hdr.num_dmas++;
 	io->scsiio.kern_rel_offset += io->scsiio.kern_data_len;
 
 	/*
-	 * We set status at this point for read commands, and write
-	 * commands with errors.
+	 * We set status at this point for read and compare commands.
 	 */
-	if (io->io_hdr.flags & CTL_FLAG_ABORT) {
-		;
-	} else if ((io->io_hdr.port_status != 0) &&
-	    ((io->io_hdr.status & CTL_STATUS_MASK) == CTL_STATUS_NONE ||
-	     (io->io_hdr.status & CTL_STATUS_MASK) == CTL_SUCCESS)) {
-		ctl_set_internal_failure(&io->scsiio, /*sks_valid*/ 1,
-		    /*retry_count*/ io->io_hdr.port_status);
-	} else if (io->scsiio.kern_data_resid != 0 &&
-	    (io->io_hdr.flags & CTL_FLAG_DATA_MASK) == CTL_FLAG_DATA_OUT &&
-	    ((io->io_hdr.status & CTL_STATUS_MASK) == CTL_STATUS_NONE ||
-	     (io->io_hdr.status & CTL_STATUS_MASK) == CTL_SUCCESS)) {
-		ctl_set_invalid_field_ciu(&io->scsiio);
-	} else if ((io->io_hdr.port_status == 0) &&
-	    ((io->io_hdr.status & CTL_STATUS_MASK) == CTL_STATUS_NONE)) {
-		lbalen = ARGS(beio->io);
+	if ((io->io_hdr.flags & CTL_FLAG_ABORT) == 0 &&
+	    (io->io_hdr.status & CTL_STATUS_MASK) == CTL_STATUS_NONE) {
+		lbalen = ARGS(io);
 		if (lbalen->flags & CTL_LLF_READ) {
 			ctl_set_success(&io->scsiio);
 		} else if (lbalen->flags & CTL_LLF_COMPARE) {
@@ -492,31 +467,35 @@ ctl_be_block_move_done(union ctl_io *io)
 	}
 
 	/*
-	 * At this point, we have a write and the DMA completed
-	 * successfully.  We now have to queue it to the task queue to
+	 * At this point, we have a write and the DMA completed successfully.
+	 * If we were called synchronously in the original thread then just
+	 * dispatch, otherwise we now have to queue it to the task queue to
 	 * execute the backend I/O.  That is because we do blocking
 	 * memory allocations, and in the file backing case, blocking I/O.
 	 * This move done routine is generally called in the SIM's
 	 * interrupt context, and therefore we cannot block.
 	 */
-	mtx_lock(&be_lun->queue_lock);
-	STAILQ_INSERT_TAIL(&be_lun->datamove_queue, &io->io_hdr, links);
-	mtx_unlock(&be_lun->queue_lock);
-	taskqueue_enqueue(be_lun->io_taskqueue, &be_lun->io_task);
-
+	be_lun = (struct ctl_be_block_lun *)CTL_BACKEND_LUN(io);
+	if (samethr) {
+		be_lun->dispatch(be_lun, beio);
+	} else {
+		mtx_lock(&be_lun->queue_lock);
+		STAILQ_INSERT_TAIL(&be_lun->datamove_queue, &io->io_hdr, links);
+		mtx_unlock(&be_lun->queue_lock);
+		taskqueue_enqueue(be_lun->io_taskqueue, &be_lun->io_task);
+	}
 	return (0);
 }
 
 static void
 ctl_be_block_biodone(struct bio *bio)
 {
-	struct ctl_be_block_io *beio;
-	struct ctl_be_block_lun *be_lun;
+	struct ctl_be_block_io *beio = bio->bio_caller1;
+	struct ctl_be_block_lun *be_lun = beio->lun;
+	struct ctl_be_lun *cbe_lun = &be_lun->cbe_lun;
 	union ctl_io *io;
 	int error;
 
-	beio = bio->bio_caller1;
-	be_lun = beio->lun;
 	io = beio->io;
 
 	DPRINTF("entered\n");
@@ -596,11 +575,9 @@ ctl_be_block_biodone(struct bio *bio)
 		if ((ARGS(io)->flags & CTL_LLF_READ) &&
 		    beio->beio_cont == NULL) {
 			ctl_set_success(&io->scsiio);
-			ctl_serseq_done(io);
+			if (cbe_lun->serseq >= CTL_LUN_SERSEQ_SOFT)
+				ctl_serseq_done(io);
 		}
-#ifdef CTL_TIME_IO
-		getbinuptime(&io->io_hdr.dma_start_bt);
-#endif
 		ctl_datamove(io);
 	}
 }
@@ -659,6 +636,7 @@ static void
 ctl_be_block_dispatch_file(struct ctl_be_block_lun *be_lun,
 			   struct ctl_be_block_io *beio)
 {
+	struct ctl_be_lun *cbe_lun = &be_lun->cbe_lun;
 	struct ctl_be_block_filedata *file_data;
 	union ctl_io *io;
 	struct uio xuio;
@@ -700,6 +678,9 @@ ctl_be_block_dispatch_file(struct ctl_be_block_lun *be_lun,
 	if (beio->bio_cmd == BIO_READ) {
 		vn_lock(be_lun->vn, LK_SHARED | LK_RETRY);
 
+		if (beio->beio_cont == NULL &&
+		    cbe_lun->serseq == CTL_LUN_SERSEQ_SOFT)
+			ctl_serseq_done(io);
 		/*
 		 * UFS pays attention to IO_DIRECT for reads.  If the
 		 * DIRECTIO option is configured into the kernel, it calls
@@ -807,11 +788,9 @@ ctl_be_block_dispatch_file(struct ctl_be_block_lun *be_lun,
 		if ((ARGS(io)->flags & CTL_LLF_READ) &&
 		    beio->beio_cont == NULL) {
 			ctl_set_success(&io->scsiio);
-			ctl_serseq_done(io);
+			if (cbe_lun->serseq > CTL_LUN_SERSEQ_SOFT)
+				ctl_serseq_done(io);
 		}
-#ifdef CTL_TIME_IO
-		getbinuptime(&io->io_hdr.dma_start_bt);
-#endif
 		ctl_datamove(io);
 	}
 }
@@ -887,6 +866,7 @@ static void
 ctl_be_block_dispatch_zvol(struct ctl_be_block_lun *be_lun,
 			   struct ctl_be_block_io *beio)
 {
+	struct ctl_be_lun *cbe_lun = &be_lun->cbe_lun;
 	union ctl_io *io;
 	struct cdevsw *csw;
 	struct cdev *dev;
@@ -926,9 +906,12 @@ ctl_be_block_dispatch_zvol(struct ctl_be_block_lun *be_lun,
 
 	csw = devvn_refthread(be_lun->vn, &dev, &ref);
 	if (csw) {
-		if (beio->bio_cmd == BIO_READ)
+		if (beio->bio_cmd == BIO_READ) {
+			if (beio->beio_cont == NULL &&
+			    cbe_lun->serseq == CTL_LUN_SERSEQ_SOFT)
+				ctl_serseq_done(io);
 			error = csw->d_read(dev, &xuio, flags);
-		else
+		} else
 			error = csw->d_write(dev, &xuio, flags);
 		dev_relthread(dev, ref);
 	} else
@@ -974,11 +957,9 @@ ctl_be_block_dispatch_zvol(struct ctl_be_block_lun *be_lun,
 		if ((ARGS(io)->flags & CTL_LLF_READ) &&
 		    beio->beio_cont == NULL) {
 			ctl_set_success(&io->scsiio);
-			ctl_serseq_done(io);
+			if (cbe_lun->serseq > CTL_LUN_SERSEQ_SOFT)
+				ctl_serseq_done(io);
 		}
-#ifdef CTL_TIME_IO
-		getbinuptime(&io->io_hdr.dma_start_bt);
-#endif
 		ctl_datamove(io);
 	}
 }
@@ -1305,7 +1286,7 @@ ctl_be_block_cw_dispatch_ws(struct ctl_be_block_lun *be_lun,
 	DPRINTF("entered\n");
 
 	beio = (struct ctl_be_block_io *)PRIV(io)->ptr;
-	lbalen = ARGS(beio->io);
+	lbalen = ARGS(io);
 
 	if (lbalen->flags & ~(SWS_LBDATA | SWS_UNMAP | SWS_ANCHOR | SWS_NDOB) ||
 	    (lbalen->flags & (SWS_UNMAP | SWS_ANCHOR) && be_lun->unmap == NULL)) {
@@ -1668,9 +1649,6 @@ ctl_be_block_dispatch(struct ctl_be_block_lun *be_lun,
 		be_lun->dispatch(be_lun, beio);
 	} else {
 		SDT_PROBE0(cbb, , write, alloc_done);
-#ifdef CTL_TIME_IO
-		getbinuptime(&io->io_hdr.dma_start_bt);
-#endif
 		ctl_datamove(io);
 	}
 }
@@ -1694,14 +1672,13 @@ ctl_be_block_worker(void *context, int pending)
 		io = (union ctl_io *)STAILQ_FIRST(&be_lun->datamove_queue);
 		if (io != NULL) {
 			DPRINTF("datamove queue\n");
-			STAILQ_REMOVE(&be_lun->datamove_queue, &io->io_hdr,
-				      ctl_io_hdr, links);
+			STAILQ_REMOVE_HEAD(&be_lun->datamove_queue, links);
 			mtx_unlock(&be_lun->queue_lock);
 			beio = (struct ctl_be_block_io *)PRIV(io)->ptr;
 			if (cbe_lun->flags & CTL_LUN_FLAG_NO_MEDIA) {
 				ctl_set_busy(&io->scsiio);
 				ctl_complete_beio(beio);
-				return;
+				continue;
 			}
 			be_lun->dispatch(be_lun, beio);
 			continue;
@@ -1709,13 +1686,12 @@ ctl_be_block_worker(void *context, int pending)
 		io = (union ctl_io *)STAILQ_FIRST(&be_lun->config_write_queue);
 		if (io != NULL) {
 			DPRINTF("config write queue\n");
-			STAILQ_REMOVE(&be_lun->config_write_queue, &io->io_hdr,
-				      ctl_io_hdr, links);
+			STAILQ_REMOVE_HEAD(&be_lun->config_write_queue, links);
 			mtx_unlock(&be_lun->queue_lock);
 			if (cbe_lun->flags & CTL_LUN_FLAG_NO_MEDIA) {
 				ctl_set_busy(&io->scsiio);
 				ctl_config_write_done(io);
-				return;
+				continue;
 			}
 			ctl_be_block_cw_dispatch(be_lun, io);
 			continue;
@@ -1723,13 +1699,12 @@ ctl_be_block_worker(void *context, int pending)
 		io = (union ctl_io *)STAILQ_FIRST(&be_lun->config_read_queue);
 		if (io != NULL) {
 			DPRINTF("config read queue\n");
-			STAILQ_REMOVE(&be_lun->config_read_queue, &io->io_hdr,
-				      ctl_io_hdr, links);
+			STAILQ_REMOVE_HEAD(&be_lun->config_read_queue, links);
 			mtx_unlock(&be_lun->queue_lock);
 			if (cbe_lun->flags & CTL_LUN_FLAG_NO_MEDIA) {
 				ctl_set_busy(&io->scsiio);
 				ctl_config_read_done(io);
-				return;
+				continue;
 			}
 			ctl_be_block_cr_dispatch(be_lun, io);
 			continue;
@@ -1737,13 +1712,12 @@ ctl_be_block_worker(void *context, int pending)
 		io = (union ctl_io *)STAILQ_FIRST(&be_lun->input_queue);
 		if (io != NULL) {
 			DPRINTF("input queue\n");
-			STAILQ_REMOVE(&be_lun->input_queue, &io->io_hdr,
-				      ctl_io_hdr, links);
+			STAILQ_REMOVE_HEAD(&be_lun->input_queue, links);
 			mtx_unlock(&be_lun->queue_lock);
 			if (cbe_lun->flags & CTL_LUN_FLAG_NO_MEDIA) {
 				ctl_set_busy(&io->scsiio);
 				ctl_data_submit_done(io);
-				return;
+				continue;
 			}
 			ctl_be_block_dispatch(be_lun, io);
 			continue;
@@ -1772,11 +1746,8 @@ ctl_be_block_submit(union ctl_io *io)
 
 	be_lun = (struct ctl_be_block_lun *)CTL_BACKEND_LUN(io);
 
-	/*
-	 * Make sure we only get SCSI I/O.
-	 */
-	KASSERT(io->io_hdr.io_type == CTL_IO_SCSI, ("Non-SCSI I/O (type "
-		"%#x) encountered", io->io_hdr.io_type));
+	KASSERT(io->io_hdr.io_type == CTL_IO_SCSI,
+	    ("%s: unexpected I/O type %x", __func__, io->io_hdr.io_type));
 
 	PRIV(io)->len = 0;
 
@@ -2223,12 +2194,14 @@ again:
 		ctl_be_block_close(be_lun);
 	cbe_lun->serseq = CTL_LUN_SERSEQ_OFF;
 	if (be_lun->dispatch != ctl_be_block_dispatch_dev)
-		cbe_lun->serseq = CTL_LUN_SERSEQ_READ;
+		cbe_lun->serseq = CTL_LUN_SERSEQ_SOFT;
 	value = dnvlist_get_string(cbe_lun->options, "serseq", NULL);
 	if (value != NULL && strcmp(value, "on") == 0)
 		cbe_lun->serseq = CTL_LUN_SERSEQ_ON;
 	else if (value != NULL && strcmp(value, "read") == 0)
 		cbe_lun->serseq = CTL_LUN_SERSEQ_READ;
+	else if (value != NULL && strcmp(value, "soft") == 0)
+		cbe_lun->serseq = CTL_LUN_SERSEQ_SOFT;
 	else if (value != NULL && strcmp(value, "off") == 0)
 		cbe_lun->serseq = CTL_LUN_SERSEQ_OFF;
 	return (0);

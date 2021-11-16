@@ -135,10 +135,9 @@ typedef	__pid_t		pid_t;
 
 #if __BSD_VISIBLE
 #define	O_VERIFY	0x00200000	/* open only after verification */
-#define	O_BENEATH	0x00400000	/* Fail if not under cwd */
-#define	O_RESOLVE_BENEATH 0x00800000	/* As O_BENEATH, but do not allow
-					   resolve to walk out of cwd even to
-					   return back */
+#define O_PATH		0x00400000	/* fd is only a path */
+#define	O_RESOLVE_BENEATH 0x00800000	/* Do not allow name resolution to walk
+					   out of cwd */
 #endif
 
 #define	O_DSYNC		0x01000000	/* POSIX data sync */
@@ -154,13 +153,17 @@ typedef	__pid_t		pid_t;
 #define	FREVOKE		O_VERIFY
 /* Only for fo_close() from half-succeeded open */
 #define	FOPENFAILED	O_TTY_INIT
+/* Only for O_PATH files which passed ACCESS FREAD check on open */
+#define	FKQALLOWED	O_RESOLVE_BENEATH
 
 /* convert from open() flags to/from fflags; convert O_RD/WR to FREAD/FWRITE */
 #define	FFLAGS(oflags)	((oflags) & O_EXEC ? (oflags) : (oflags) + 1)
-#define	OFLAGS(fflags)	((fflags) & O_EXEC ? (fflags) : (fflags) - 1)
+#define	OFLAGS(fflags)	\
+    (((fflags) & (O_EXEC | O_PATH)) != 0 ? (fflags) : (fflags) - 1)
 
 /* bits to save after open */
-#define	FMASK	(FREAD|FWRITE|FAPPEND|FASYNC|FFSYNC|FDSYNC|FNONBLOCK|O_DIRECT|FEXEC)
+#define	FMASK	(FREAD|FWRITE|FAPPEND|FASYNC|FFSYNC|FDSYNC|FNONBLOCK| \
+		 O_DIRECT|FEXEC|O_PATH)
 /* bits settable by fcntl(F_SETFL, ...) */
 #define	FCNTLFLAGS	(FAPPEND|FASYNC|FFSYNC|FDSYNC|FNONBLOCK|FRDAHEAD|O_DIRECT)
 
@@ -220,11 +223,13 @@ typedef	__pid_t		pid_t;
 #define	AT_SYMLINK_NOFOLLOW	0x0200	/* Do not follow symbolic links */
 #define	AT_SYMLINK_FOLLOW	0x0400	/* Follow symbolic link */
 #define	AT_REMOVEDIR		0x0800	/* Remove directory instead of file */
-#define	AT_BENEATH		0x1000	/* Fail if not under dirfd */
-#define	AT_RESOLVE_BENEATH	0x2000	/* As AT_BENEATH, but do not allow
-					   resolve to walk out of dirfd even
-					   to return back */
-#endif
+#endif	/* __POSIX_VISIBLE >= 200809 */
+#if __BSD_VISIBLE
+/* #define AT_UNUSED1		0x1000 *//* Was AT_BENEATH */
+#define	AT_RESOLVE_BENEATH	0x2000	/* Do not allow name resolution
+					   to walk out of dirfd */
+#define	AT_EMPTY_PATH		0x4000	/* Operate on dirfd if path is empty */
+#endif	/* __BSD_VISIBLE */
 
 /*
  * Constants used for fcntl(2)
@@ -287,6 +292,7 @@ typedef	__pid_t		pid_t;
 #define	F_POSIX		0x040	 	/* Use POSIX semantics for lock */
 #define	F_REMOTE	0x080		/* Lock owner is remote NFS client */
 #define	F_NOINTR	0x100		/* Ignore signals when waiting */
+#define	F_FIRSTOPEN	0x200		/* First right to advlock file */
 #endif
 
 /*

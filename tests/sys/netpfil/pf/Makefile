@@ -5,22 +5,27 @@ PACKAGE=	tests
 TESTSDIR=       ${TESTSBASE}/sys/netpfil/pf
 TESTS_SUBDIRS+=	ioctl
 
-ATF_TESTS_SH+=	anchor \
+ATF_TESTS_SH+=	altq \
+		anchor \
 		checksum \
+		dup \
 		forward \
 		fragmentation \
 		icmp \
+		map_e \
 		names \
 		nat \
 		pass_block \
 		pfsync	\
 		rdr \
 		route_to \
+		rules_counter \
 		set_skip \
 		set_tos \
 		src_track \
 		synproxy \
-		table
+		table \
+		tos
 
 ${PACKAGE}FILES+=	CVE-2019-5597.py \
 			CVE-2019-5598.py \

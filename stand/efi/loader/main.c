@@ -296,6 +296,21 @@ probe_zfs_currdev(uint64_t guid)
 }
 #endif
 
+#ifdef MD_IMAGE_SIZE
+static bool
+probe_md_currdev(void)
+{
+	extern struct devsw md_dev;
+	bool rv;
+
+	set_currdev_devsw(&md_dev, 0);
+	rv = sanity_check_currdev();
+	if (!rv)
+		printf("MD not present\n");
+	return (rv);
+}
+#endif
+
 static bool
 try_as_currdev(pdinfo_t *hd, pdinfo_t *pp)
 {
@@ -569,6 +584,15 @@ find_currdev(bool do_bootmgr, bool is_last,
 	}
 #endif /* EFI_ZFS_BOOT */
 
+#ifdef MD_IMAGE_SIZE
+	/*
+	 * If there is an embedded MD, try to use that.
+	 */
+	printf("Trying MD\n");
+	if (probe_md_currdev())
+		return (0);
+#endif /* MD_IMAGE_SIZE */
+
 	/*
 	 * Try to find the block device by its handle based on the
 	 * image we're booting. If we can't find a sane partition,
@@ -735,6 +759,8 @@ parse_uefi_con_out(void)
 	how = 0;
 	sz = sizeof(buf);
 	rv = efi_global_getenv("ConOut", buf, &sz);
+	if (rv != EFI_SUCCESS)
+		rv = efi_global_getenv("ConOutDev", buf, &sz);
 	if (rv != EFI_SUCCESS) {
 		/* If we don't have any ConOut default to serial */
 		how = RB_SERIAL;

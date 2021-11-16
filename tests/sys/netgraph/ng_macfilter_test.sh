@@ -29,6 +29,8 @@
 #
 # $FreeBSD$
 
+set -e
+
 progname="$(basename $0 .sh)"
 entries_lst="/tmp/$progname.entries.lst"
 entries2_lst="/tmp/$progname.entries2.lst"
@@ -45,7 +47,7 @@ find_iface () {
 
 loaded_modules=''
 load_modules () {
-	for kmod in $*; do
+	for kmod in "$@"; do
 		if ! kldstat -q -m $kmod; then
 			test_comment "Loading $kmod..."
 			kldload $kmod
@@ -96,16 +98,16 @@ TSTNR=0
 TSTFAILS=0
 TSTSUCCS=0
 
-_test_next () { TSTNR=$(($TSTNR + 1)); }
-_test_succ () { TSTSUCCS=$(($TSTSUCCS + 1)); }
-_test_fail () { TSTFAILS=$(($TSTFAILS + 1)); }
+_test_next () { TSTNR=$((TSTNR + 1)); }
+_test_succ () { TSTSUCCS=$((TSTSUCCS + 1)); }
+_test_fail () { TSTFAILS=$((TSTFAILS + 1)); }
 
 test_cnt () { echo "1..${1:-$TSTNR}"; }
 test_title () {
 	local msg="$1"
 
 	printf '### %s ' "$msg"
-	printf '#%.0s' `seq $((80 - ${#msg} - 5))`
+	printf '#%.0s' $(seq $((80 - ${#msg} - 5)))
 	printf "\n"
 }
 test_comment () { echo "# $1"; }
@@ -124,7 +126,7 @@ test_not_ok () {
 	local msg="$1"
 
 	_test_next
-	_test_fails
+	_test_fail
 	echo "not ok $TSTNR - $msg"
 
 	return 1
@@ -183,9 +185,24 @@ test_ge () {
 		test_not_ok "$v1 <= $v2 $msg"
 	fi
 }
-test_rc ()      { test_eq $? $1 "$2"; }
-test_failure () { test_ne $? 0 "$1"; }
-test_success () { test_eq $? 0 "$1"; }
+test_failure () {
+	msg=$1
+	shift
+	if ! "$@"; then
+		test_ok "$msg - \"$@\" failed as expected"
+	else
+		test_not_ok "$msg - expected \"$@\" to fail but succeeded"
+	fi
+}
+test_success () {
+	msg=$1
+	shift
+	if ! "$@"; then
+		test_not_ok "$msg - \"$@\" failed unexpectedly"
+	else
+		test_ok "$msg - \"$@\" succeeded"
+	fi
+}
 
 gethooks () {
 	ngctl msg MF: 'gethooks' \
@@ -217,6 +234,12 @@ genmac () {
 test_title "Setting up system..."
 load_modules netgraph ng_socket ng_ether ng_macfilter ng_one2many
 eth=$(find_iface)
+if [ -z "$eth" ]; then
+	echo "1..0 # SKIP could not find a valid interface"
+	echo "Available interfaces:"
+	ifconfig
+	exit 1
+fi
 test_comment "Using $eth..."
 
 
@@ -229,7 +252,8 @@ trap 'cleanup' EXIT
 created_hooks=$(gethooks)
 rc=0
 
-test_cnt
+# Update this number when adding new tests
+test_cnt 46
 
 
 ################################################################################
@@ -238,31 +262,23 @@ test_cnt
 
 ################################################################################
 test_title "Test: Duplicate default hook"
-ngctl connect MF: O2M: default many99 2>/dev/null
-test_failure "duplicate connect of default hook"
-
+test_failure "duplicate connect of default hook" ngctl connect MF: O2M: default many99
 
 ################################################################################
 test_title "Test: Add and remove hooks"
-ngctl connect MF: O2M: xxx1 many$(($HOOKS + 1))
-test_success "connect MF:xxx1 to O2M:many$(($HOOKS + 1))"
-ngctl connect MF: O2M: xxx2 many$(($HOOKS + 2))
-test_success "connect MF:xxx2 to O2M:many$(($HOOKS + 2))"
-ngctl connect MF: O2M: xxx3 many$(($HOOKS + 3))
-test_success "connect MF:xxx3 to O2M:many$(($HOOKS + 3))"
+test_success "connect MF:xxx1 to O2M:many$((HOOKS + 1))" ngctl connect MF: O2M: xxx1 many$((HOOKS + 1))
+test_success "connect MF:xxx2 to O2M:many$((HOOKS + 2))" ngctl connect MF: O2M: xxx2 many$((HOOKS + 2))
+test_success "connect MF:xxx3 to O2M:many$((HOOKS + 3))" ngctl connect MF: O2M: xxx3 many$((HOOKS + 3))
 hooks=$(gethooks)
 test_eq $created_hooks:xxx1:xxx2:xxx3 $hooks 'hooks after adding xxx1-3'
 
-ngctl rmhook MF: xxx1
-test_success "rmhook MF:xxx$i"
+test_success "rmhook MF:xxx$i" ngctl rmhook MF: xxx1
 hooks=$(gethooks)
 test_eq $created_hooks:xxx2:xxx3 $hooks 'hooks after removing xxx1'
-ngctl rmhook MF: xxx2
-test_success "rmhook MF:xxx$i"
+test_success "rmhook MF:xxx$i" ngctl rmhook MF: xxx2
 hooks=$(gethooks)
 test_eq $created_hooks:xxx3 $hooks 'hooks after removing xxx2'
-ngctl rmhook MF: xxx3
-test_success "rmhook MF:xxx$i"
+test_success "rmhook MF:xxx$i" ngctl rmhook MF: xxx3
 hooks=$(gethooks)
 test_eq $created_hooks $hooks 'hooks after removing xxx3'
 
@@ -273,7 +289,7 @@ test_title "Test: Add many hooks"
 added_hooks=""
 for i in $(seq 10 1 $HOOKSADD); do
 	added_hooks="$added_hooks:xxx$i"
-	ngctl connect MF: O2M: xxx$i many$(($HOOKS + $i))
+	ngctl connect MF: O2M: xxx$i many$((HOOKS + i))
 done
 hooks=$(gethooks)
 test_eq $created_hooks$added_hooks $hooks 'hooks after adding many hooks'
@@ -291,21 +307,21 @@ test_bail_on_fail
 test_title "Test: Adding many MACs..."
 I=1
 for i in $(seq $ITERATIONS | sort -R); do
-	test_comment "Iteration $I/$iterations..."
+	test_comment "Iteration $I/$ITERATIONS..."
 	for j in $(seq 0 1 $SUBITERATIONS); do
 		test $i = 2 && edge='out2' || edge='out1'
 		ether=$(genmac $j $i)
 
 		ngctl msg MF: 'direct' "{ hookname=\"$edge\" ether=$ether }"
 	done
-	I=$(($I + 1))
+	I=$((I + 1))
 done
 
 n=$(countmacs out1)
-n2=$(( ( $ITERATIONS - 1 ) * ( $SUBITERATIONS + 1 ) ))
+n2=$(( ( ITERATIONS - 1 ) * ( SUBITERATIONS + 1 ) ))
 test_eq $n $n2 'MACs in table for out1'
 n=$(countmacs out2)
-n2=$(( 1 * ( $SUBITERATIONS + 1 ) ))
+n2=$(( 1 * ( SUBITERATIONS + 1 ) ))
 test_eq $n $n2 'MACs in table for out2'
 n=$(countmacs out3)
 n2=0
@@ -324,10 +340,10 @@ for i in $(seq $ITERATIONS); do
 done
 
 n=$(countmacs out1)
-n2=$(( ( $ITERATIONS - 1 ) * ( $SUBITERATIONS + 1 - 1 ) ))
+n2=$(( ( ITERATIONS - 1 ) * ( SUBITERATIONS + 1 - 1 ) ))
 test_eq $n $n2 'MACs in table for out1'
 n=$(countmacs out2)
-n2=$(( 1 * ( $SUBITERATIONS + 1 - 1 ) ))
+n2=$(( 1 * ( SUBITERATIONS + 1 - 1 ) ))
 test_eq $n $n2 'MACs in table for out2'
 n=$(countmacs out3)
 n2=$ITERATIONS
@@ -340,7 +356,7 @@ test_bail_on_fail
 test_title "Test: Removing all MACs one by one..."
 I=1
 for i in $(seq $ITERATIONS | sort -R); do
-	test_comment "Iteration $I/$iterations..."
+	test_comment "Iteration $I/$ITERATIONS..."
 	for j in $(seq 0 1 $SUBITERATIONS | sort -R); do
 		edge="default"
 		ether=$(genmac $j $i)
@@ -360,7 +376,7 @@ test_bail_on_fail
 test_title "Test: Randomly adding MACs on random hooks..."
 rm -f $entries_lst
 for i in $(seq $ITERATIONS); do
-	test_comment "Iteration $i/$iterations..."
+	test_comment "Iteration $i/$ITERATIONS..."
 	for j in $(seq 0 1 $SUBITERATIONS | sort -R); do
 		edge=$(randomedge)
 		ether=$(genmac $j $i)
@@ -390,7 +406,7 @@ test_bail_on_fail
 test_title "Test: Randomly changing MAC assignments..."
 rm -f $entries2_lst
 for i in $(seq $ITERATIONS); do
-	test_comment "Iteration $i/$iterations..."
+	test_comment "Iteration $i/$ITERATIONS..."
 	cat $entries_lst | while read ether edge; do
 		edge2=$(randomedge)
 
@@ -417,14 +433,12 @@ done
 
 ################################################################################
 test_title "Test: Resetting macfilter..."
-ngctl msg MF: reset
-test_success "**** reset failed"
+test_success "**** reset failed" ngctl msg MF: reset
 test_eq $(countmacs) 0 'MACs in table'
 
 test_bail_on_fail
 
 
 ################################################################################
-test_cnt
 
 exit 0
