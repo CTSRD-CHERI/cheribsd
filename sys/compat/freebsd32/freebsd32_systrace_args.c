@@ -2926,7 +2926,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd32_wait6 */
 	case 532: {
 		struct freebsd32_wait6_args *p = params;
-		iarg[0] = p->idtype; /* int */
+		iarg[0] = p->idtype; /* idtype_t */
 		iarg[1] = p->pad; /* int */
 		uarg[2] = p->id1; /* uint32_t */
 		uarg[3] = p->id2; /* uint32_t */
@@ -2964,7 +2964,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd32_wait6 */
 	case 532: {
 		struct freebsd32_wait6_args *p = params;
-		iarg[0] = p->idtype; /* int */
+		iarg[0] = p->idtype; /* idtype_t */
 		uarg[1] = p->id1; /* uint32_t */
 		uarg[2] = p->id2; /* uint32_t */
 		uarg[3] = (intptr_t)p->status; /* int * */
@@ -3076,7 +3076,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd32_procctl */
 	case 544: {
 		struct freebsd32_procctl_args *p = params;
-		iarg[0] = p->idtype; /* int */
+		iarg[0] = p->idtype; /* idtype_t */
 		iarg[1] = p->pad; /* int */
 		uarg[2] = p->id1; /* uint32_t */
 		uarg[3] = p->id2; /* uint32_t */
@@ -3089,7 +3089,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd32_procctl */
 	case 544: {
 		struct freebsd32_procctl_args *p = params;
-		iarg[0] = p->idtype; /* int */
+		iarg[0] = p->idtype; /* idtype_t */
 		uarg[1] = p->id1; /* uint32_t */
 		uarg[2] = p->id2; /* uint32_t */
 		iarg[3] = p->com; /* int */
@@ -8323,7 +8323,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 532:
 		switch (ndx) {
 		case 0:
-			p = "int";
+			p = "idtype_t";
 			break;
 		case 1:
 			p = "int";
@@ -8402,7 +8402,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 532:
 		switch (ndx) {
 		case 0:
-			p = "int";
+			p = "idtype_t";
 			break;
 		case 1:
 			p = "uint32_t";
@@ -8602,7 +8602,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 544:
 		switch (ndx) {
 		case 0:
-			p = "int";
+			p = "idtype_t";
 			break;
 		case 1:
 			p = "int";
@@ -8628,7 +8628,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 544:
 		switch (ndx) {
 		case 0:
-			p = "int";
+			p = "idtype_t";
 			break;
 		case 1:
 			p = "uint32_t";
