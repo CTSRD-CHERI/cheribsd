@@ -12,7 +12,7 @@ When building with [cheribuild] this is usually handled automatically,
 but if necessary the `--clean` flag can be used.  When building
 directly, avoid the `-DNO_CLEAN` make option.
 
-### Flag days on [master]
+### Flag days on [main]
 
 | Date       | Commit      | Description | Required action |
 | ---------- | ----------- | --- | --- |
@@ -46,7 +46,7 @@ are:
   targeted here.  When using this branch, you should also track the [LLVM dev]
   branch.
 
-* [master] - The default branch, synced periodically with [dev] and kept in
+* [main] - The default branch, synced periodically with [dev] and kept in
   sync with the [LLVM master] branch.  Outside consumers likely wish to follow
   this branch.
 
@@ -69,14 +69,14 @@ of changes from the end of Friday UTC.  These are merged one upstream
 commit at a time using [mergify] to aid bisection.  Sometimes we either
 merge at other times because we need an upstream commit.  In a steady
 state we merge weekly, but delay and batch updates if we need extra
-platform stability and the [master] branch isn't appropriate.
+platform stability and the [main] branch isn't appropriate.
 
 Each merge from upstream FreeBSD to [dev] is accompanied by a tag of the form
 `freebsd-main-YYYYMMDD`, and updates to [freebsd-main].
 
-### Updating [master]
+### Updating [main]
 
-We typically merge to [master] from [dev] at stable points at least a week
+We typically merge to [main] from [dev] at stable points at least a week
 apart.
 
 [cheribuild]: https://github.com/CTSRD-CHERI/cheribuild
@@ -86,7 +86,7 @@ apart.
 [freebsd/freebsd-src]: https://github.com/freebsd/freebsd-src
 [LLVM dev]: https://github.com/CTSRD-CHERI/llvm-project/tree/dev
 [LLVM master]: https://github.com/CTSRD-CHERI/llvm-project/tree/master
-[master]: https://github.com/CTSRD-CHERI/cheribsd/tree/master
+[main]: https://github.com/CTSRD-CHERI/cheribsd/tree/main
 [mergify]: https://github.com/brooksdavis/mergify
 [UPDATING]: UPDATING
 
