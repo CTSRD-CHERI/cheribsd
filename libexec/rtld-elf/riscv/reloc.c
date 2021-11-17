@@ -482,17 +482,11 @@ allocate_initial_tls(Obj_Entry *objs)
 void *
 __tls_get_addr(tls_index* ti)
 {
-	char *_tp;
+	uintptr_t **dtvp;
 	void *p;
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	__asm __volatile("cmove %0, ctp" : "=C" (_tp));
-#else
-	__asm __volatile("mv %0, tp" : "=r" (_tp));
-#endif
-
-	p = tls_get_addr_common((uintptr_t **)(_tp - TLS_TP_OFFSET
-	    - TLS_TCB_SIZE), ti->ti_module, ti->ti_offset);
+	dtvp = _get_tp();
+	p = tls_get_addr_common(dtvp, ti->ti_module, ti->ti_offset);
 
 	return ((char*)p + TLS_DTV_OFFSET);
 }

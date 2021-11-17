@@ -850,15 +850,8 @@ allocate_initial_tls(Obj_Entry *objs)
 void *
 __tls_get_addr(tls_index* ti)
 {
-      char *p;
-      void *_tp;
+	uintptr_t **dtvp;
 
-#ifdef __CHERI_PURE_CAPABILITY__
-      __asm __volatile("mrs	%0, ctpidr_el0"  : "=C" (_tp));
-#else
-      __asm __volatile("mrs	%0, tpidr_el0"  : "=r" (_tp));
-#endif
-      p = tls_get_addr_common((uintptr_t **)(_tp), ti->ti_module, ti->ti_offset);
-
-      return (p);
+	dtvp = _get_tp();
+	return (tls_get_addr_common(dtvp, ti->ti_module, ti->ti_offset));
 }
