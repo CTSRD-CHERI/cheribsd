@@ -78,7 +78,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* link */
 	case 9: {
 		struct link_args *p = params;
-		uarg[0] = (intptr_t)p->path; /* char * */
+		uarg[0] = (intptr_t)p->path; /* const char * */
 		uarg[1] = (intptr_t)p->to; /* const char * */
 		*n_args = 2;
 		break;
@@ -868,6 +868,13 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[2] = p->a3; /* uint32_t */
 		uarg[3] = p->a4; /* uint32_t */
 		*n_args = 4;
+		break;
+	}
+	/* setfib */
+	case 175: {
+		struct setfib_args *p = params;
+		iarg[0] = p->fibnum; /* int */
+		*n_args = 1;
 		break;
 	}
 	/* freebsd32_ntp_adjtime */
@@ -1981,6 +1988,13 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[0] = (intptr_t)p->oucp; /* struct __ucontext32 * */
 		uarg[1] = (intptr_t)p->ucp; /* const struct __ucontext32 * */
 		*n_args = 2;
+		break;
+	}
+	/* swapoff */
+	case 424: {
+		struct swapoff_args *p = params;
+		uarg[0] = (intptr_t)p->name; /* const char * */
+		*n_args = 1;
 		break;
 	}
 	/* __acl_get_link */
@@ -3541,7 +3555,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 9:
 		switch (ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "userland const char *";
@@ -4828,6 +4842,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 3:
 			p = "uint32_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* setfib */
+	case 175:
+		switch (ndx) {
+		case 0:
+			p = "int";
 			break;
 		default:
 			break;
@@ -6611,6 +6635,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 1:
 			p = "userland const struct __ucontext32 *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* swapoff */
+	case 424:
+		switch (ndx) {
+		case 0:
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -9750,6 +9784,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
+	/* setfib */
+	case 175:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
 	/* freebsd32_ntp_adjtime */
 	case 176:
 		if (ndx == 0 || ndx == 1)
@@ -10399,6 +10438,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* freebsd32_swapcontext */
 	case 423:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* swapoff */
+	case 424:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
