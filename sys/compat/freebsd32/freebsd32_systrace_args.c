@@ -2038,21 +2038,21 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* thr_exit */
 	case 431: {
 		struct thr_exit_args *p = params;
-		uarg[0] = (intptr_t)p->state; /* long * */
+		uarg[0] = (intptr_t)p->state; /* int32_t * */
 		*n_args = 1;
 		break;
 	}
 	/* thr_self */
 	case 432: {
 		struct thr_self_args *p = params;
-		uarg[0] = (intptr_t)p->id; /* long * */
+		uarg[0] = (intptr_t)p->id; /* int32_t * */
 		*n_args = 1;
 		break;
 	}
 	/* thr_kill */
 	case 433: {
 		struct thr_kill_args *p = params;
-		iarg[0] = p->id; /* long */
+		iarg[0] = p->id; /* int32_t */
 		iarg[1] = p->sig; /* int */
 		*n_args = 2;
 		break;
@@ -2112,7 +2112,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* thr_wake */
 	case 443: {
 		struct thr_wake_args *p = params;
-		iarg[0] = p->id; /* long */
+		iarg[0] = p->id; /* int32_t */
 		*n_args = 1;
 		break;
 	}
@@ -2288,7 +2288,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* thr_set_name */
 	case 464: {
 		struct thr_set_name_args *p = params;
-		iarg[0] = p->id; /* long */
+		iarg[0] = p->id; /* int32_t */
 		uarg[1] = (intptr_t)p->name; /* const char * */
 		*n_args = 2;
 		break;
@@ -2496,7 +2496,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 481: {
 		struct thr_kill2_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
-		iarg[1] = p->id; /* long */
+		iarg[1] = p->id; /* int32_t */
 		iarg[2] = p->sig; /* int */
 		*n_args = 3;
 		break;
@@ -6719,7 +6719,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 431:
 		switch (ndx) {
 		case 0:
-			p = "userland long *";
+			p = "userland int32_t *";
 			break;
 		default:
 			break;
@@ -6729,7 +6729,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 432:
 		switch (ndx) {
 		case 0:
-			p = "userland long *";
+			p = "userland int32_t *";
 			break;
 		default:
 			break;
@@ -6739,7 +6739,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 433:
 		switch (ndx) {
 		case 0:
-			p = "long";
+			p = "int32_t";
 			break;
 		case 1:
 			p = "int";
@@ -6842,7 +6842,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 443:
 		switch (ndx) {
 		case 0:
-			p = "long";
+			p = "int32_t";
 			break;
 		default:
 			break;
@@ -7139,7 +7139,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 464:
 		switch (ndx) {
 		case 0:
-			p = "long";
+			p = "int32_t";
 			break;
 		case 1:
 			p = "userland const char *";
@@ -7548,7 +7548,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "pid_t";
 			break;
 		case 1:
-			p = "long";
+			p = "int32_t";
 			break;
 		case 2:
 			p = "int";
