@@ -1150,7 +1150,7 @@ freebsd32_copyiniov(const struct iovec * __capability cb_arg, u_int iovcnt,
 }
 
 static int
-freebsd32_copyinmsghdr(struct msghdr32 *msg32, struct msghdr *msg)
+freebsd32_copyinmsghdr(const struct msghdr32 *msg32, struct msghdr *msg)
 {
 	struct msghdr32 m32;
 	int error;
