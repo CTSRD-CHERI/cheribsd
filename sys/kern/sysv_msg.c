@@ -214,8 +214,8 @@ struct msqid_ds32 {
 
 #if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
-struct msqid_ds32_old {
-	struct ipc_perm32_old msg_perm;
+struct msqid_ds_old32 {
+	struct ipc_perm_old32 msg_perm;
 	uint32_t	__msg_first;
 	uint32_t	__msg_last;
 	uint32_t	msg_cbytes;
@@ -1841,7 +1841,7 @@ freebsd7_freebsd32_msgctl(struct thread *td,
     struct freebsd7_freebsd32_msgctl_args *uap)
 {
 	struct msqid_ds msqbuf;
-	struct msqid_ds32_old msqbuf32;
+	struct msqid_ds_old32 msqbuf32;
 	int error;
 
 	if (uap->cmd == IPC_SET) {

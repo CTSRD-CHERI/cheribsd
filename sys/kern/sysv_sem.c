@@ -257,8 +257,8 @@ struct semid_ds32 {
 
 #if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
-struct semid_ds32_old {
-	struct ipc_perm32_old sem_perm;
+struct semid_ds_old32 {
+	struct ipc_perm_old32 sem_perm;
 	uint32_t	__sem_base;
 	unsigned short	sem_nsems;
 	int32_t		sem_otime;
@@ -2004,7 +2004,7 @@ int
 freebsd7_freebsd32_semctl(struct thread *td,
     struct freebsd7_freebsd32_semctl_args *uap)
 {
-	struct semid_ds32_old dsbuf32;
+	struct semid_ds_old32 dsbuf32;
 	struct semid_ds dsbuf;
 	union semun semun;
 	union semun_old32 arg;

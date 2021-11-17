@@ -1077,8 +1077,8 @@ struct shmid_ds32 {
 
 #if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
-struct shmid_ds32_old {
-	struct ipc_perm32_old shm_perm;
+struct shmid_ds_old32 {
+	struct ipc_perm_old32 shm_perm;
 	int32_t		shm_segsz;
 	pid_t		shm_lpid;
 	pid_t		shm_cpid;
@@ -1721,7 +1721,7 @@ freebsd7_freebsd32_shmctl(struct thread *td,
 		struct shminfo shminfo;
 	} u;
 	union {
-		struct shmid_ds32_old shmid_ds32;
+		struct shmid_ds_old32 shmid_ds32;
 		struct shm_info32 shm_info32;
 		struct shminfo32 shminfo32;
 	} u32;
