@@ -128,7 +128,7 @@ struct radix_head {
 };
 
 struct radix_node_head {
-	struct radix_head rh;
+	struct radix_head rh __subobject_member_used_for_c_inheritance;
 	rn_matchaddr_f_t	*rnh_matchaddr;	/* longest match for sockaddr */
 	rn_addaddr_f_t	*rnh_addaddr;	/* add based on sockaddr*/
 	rn_deladdr_f_t	*rnh_deladdr;	/* remove based on sockaddr */
@@ -143,7 +143,7 @@ struct radix_node_head {
 };
 
 struct radix_mask_head {
-	struct radix_head head;
+	struct radix_head head __subobject_member_used_for_c_inheritance;
 	struct radix_node mask_nodes[3];
 };
 
