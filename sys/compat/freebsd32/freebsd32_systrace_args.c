@@ -3173,7 +3173,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 555: {
 		struct statfs_args *p = params;
 		uarg[0] = (intptr_t)p->path; /* const char * */
-		uarg[1] = (intptr_t)p->buf; /* struct statfs32 * */
+		uarg[1] = (intptr_t)p->buf; /* struct statfs * */
 		*n_args = 2;
 		break;
 	}
@@ -3181,14 +3181,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 556: {
 		struct fstatfs_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t)p->buf; /* struct statfs32 * */
+		uarg[1] = (intptr_t)p->buf; /* struct statfs * */
 		*n_args = 2;
 		break;
 	}
 	/* getfsstat */
 	case 557: {
 		struct getfsstat_args *p = params;
-		uarg[0] = (intptr_t)p->buf; /* struct statfs32 * */
+		uarg[0] = (intptr_t)p->buf; /* struct statfs * */
 		iarg[1] = p->bufsize; /* long */
 		iarg[2] = p->mode; /* int */
 		*n_args = 3;
@@ -3198,7 +3198,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 558: {
 		struct fhstatfs_args *p = params;
 		uarg[0] = (intptr_t)p->u_fhp; /* const struct fhandle * */
-		uarg[1] = (intptr_t)p->buf; /* struct statfs32 * */
+		uarg[1] = (intptr_t)p->buf; /* struct statfs * */
 		*n_args = 2;
 		break;
 	}
@@ -8779,7 +8779,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland struct statfs32 *";
+			p = "userland struct statfs *";
 			break;
 		default:
 			break;
@@ -8792,7 +8792,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct statfs32 *";
+			p = "userland struct statfs *";
 			break;
 		default:
 			break;
@@ -8802,7 +8802,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 557:
 		switch (ndx) {
 		case 0:
-			p = "userland struct statfs32 *";
+			p = "userland struct statfs *";
 			break;
 		case 1:
 			p = "long";
@@ -8821,7 +8821,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const struct fhandle *";
 			break;
 		case 1:
-			p = "userland struct statfs32 *";
+			p = "userland struct statfs *";
 			break;
 		default:
 			break;
