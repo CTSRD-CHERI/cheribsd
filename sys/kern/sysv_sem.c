@@ -267,6 +267,12 @@ struct semid_ds32_old {
 	int32_t		sem_pad2;
 	int32_t		sem_pad3[4];
 };
+
+union semun_old32 {
+	int		val;
+	uint32_t	buf;
+	uint32_t	array;
+};
 #endif
 
 struct semid_kernel32 {
@@ -2001,7 +2007,7 @@ freebsd7_freebsd32_semctl(struct thread *td,
 	struct semid_ds32_old dsbuf32;
 	struct semid_ds dsbuf;
 	union semun semun;
-	union semun32 arg;
+	union semun_old32 arg;
 	register_t rval;
 	int error;
 
