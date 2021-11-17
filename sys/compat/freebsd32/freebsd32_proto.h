@@ -357,7 +357,7 @@ struct freebsd32_swapcontext_args {
 	char ucp_l_[PADL_(const struct __ucontext32 *)]; const struct __ucontext32 * ucp; char ucp_r_[PADR_(const struct __ucontext32 *)];
 };
 struct freebsd32_ksem_timedwait_args {
-	char id_l_[PADL_(semid_t)]; semid_t id; char id_r_[PADR_(semid_t)];
+	char id_l_[PADL_(int32_t)]; int32_t id; char id_r_[PADR_(int32_t)];
 	char abstime_l_[PADL_(const struct timespec32 *)]; const struct timespec32 * abstime; char abstime_r_[PADR_(const struct timespec32 *)];
 };
 struct freebsd32_thr_suspend_args {

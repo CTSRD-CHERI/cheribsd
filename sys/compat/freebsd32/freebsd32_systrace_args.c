@@ -1910,7 +1910,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* ksem_init */
 	case 404: {
 		struct ksem_init_args *p = params;
-		uarg[0] = (intptr_t)p->idp; /* uint32_t * */
+		uarg[0] = (intptr_t)p->idp; /* semid_t * */
 		uarg[1] = p->value; /* unsigned int */
 		*n_args = 2;
 		break;
@@ -1918,7 +1918,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* ksem_open */
 	case 405: {
 		struct ksem_open_args *p = params;
-		uarg[0] = (intptr_t)p->idp; /* uint32_t * */
+		uarg[0] = (intptr_t)p->idp; /* semid_t * */
 		uarg[1] = (intptr_t)p->name; /* const char * */
 		iarg[2] = p->oflag; /* int */
 		iarg[3] = p->mode; /* mode_t */
@@ -1936,7 +1936,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* ksem_getvalue */
 	case 407: {
 		struct ksem_getvalue_args *p = params;
-		iarg[0] = p->id; /* semid_t */
+		iarg[0] = p->id; /* int32_t */
 		uarg[1] = (intptr_t)p->val; /* int * */
 		*n_args = 2;
 		break;
@@ -1944,7 +1944,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* ksem_destroy */
 	case 408: {
 		struct ksem_destroy_args *p = params;
-		iarg[0] = p->id; /* semid_t */
+		iarg[0] = p->id; /* int32_t */
 		*n_args = 1;
 		break;
 	}
@@ -2129,7 +2129,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd32_ksem_timedwait */
 	case 441: {
 		struct freebsd32_ksem_timedwait_args *p = params;
-		iarg[0] = p->id; /* semid_t */
+		iarg[0] = p->id; /* int32_t */
 		uarg[1] = (intptr_t)p->abstime; /* const struct timespec32 * */
 		*n_args = 2;
 		break;
@@ -6537,7 +6537,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 404:
 		switch (ndx) {
 		case 0:
-			p = "userland uint32_t *";
+			p = "userland semid_t *";
 			break;
 		case 1:
 			p = "unsigned int";
@@ -6550,7 +6550,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 405:
 		switch (ndx) {
 		case 0:
-			p = "userland uint32_t *";
+			p = "userland semid_t *";
 			break;
 		case 1:
 			p = "userland const char *";
@@ -6582,7 +6582,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 407:
 		switch (ndx) {
 		case 0:
-			p = "semid_t";
+			p = "int32_t";
 			break;
 		case 1:
 			p = "userland int *";
@@ -6595,7 +6595,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 408:
 		switch (ndx) {
 		case 0:
-			p = "semid_t";
+			p = "int32_t";
 			break;
 		default:
 			break;
@@ -6908,7 +6908,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 441:
 		switch (ndx) {
 		case 0:
-			p = "semid_t";
+			p = "int32_t";
 			break;
 		case 1:
 			p = "userland const struct timespec32 *";
