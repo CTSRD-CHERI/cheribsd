@@ -110,7 +110,9 @@ local function cleanup()
 	if cleantmp then
 		if lfs.dir(tmpspace) then
 			for fname in lfs.dir(tmpspace) do
-				os.remove(tmpspace .. "/" .. fname)
+				if fname ~= "." and fname ~= ".." then
+					os.remove(tmpspace .. "/" .. fname)
+				end
 			end
 		end
 
