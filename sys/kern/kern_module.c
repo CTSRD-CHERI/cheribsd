@@ -362,9 +362,17 @@ sys_modfnext(struct thread *td, struct modfnext_args *uap)
 
 struct module_stat_v1 {
 	int	version;		/* set to sizeof(struct module_stat) */
-	char	name[MAXMODNAME];
+	char	name[MAXMODNAMEV1V2];
 	int	refs;
 	int	id;
+};
+
+struct module_stat_v2 {
+	int	version;		/* set to sizeof(struct module_stat) */
+	char	name[MAXMODNAMEV1V2];
+	int	refs;
+	int	id;
+	modspecific_t	data;
 };
 
 int
@@ -382,7 +390,9 @@ kern_modstat(struct thread *td, int modid,
 	modspecific_t data;
 	int error = 0;
 	int id, namelen, refs, version;
+	struct module_stat_v2 * __capability stat_v2;
 	char *name;
+	bool is_v1v2;
 
 	MOD_SLOCK;
 	mod = module_lookupbyid(modid);
@@ -401,26 +411,44 @@ kern_modstat(struct thread *td, int modid,
 	 */
 	if ((error = copyin(&stat->version, &version, sizeof(version))) != 0)
 		return (error);
-	if (version != sizeof(struct module_stat_v1)
-	    && version != sizeof(struct module_stat))
+	is_v1v2 = (version == sizeof(struct module_stat_v1) ||
+	    version == sizeof(struct module_stat_v2));
+	if (!is_v1v2 && version != sizeof(struct module_stat))
 		return (EINVAL);
 	namelen = strlen(mod->name) + 1;
-	if (namelen > MAXMODNAME)
-		namelen = MAXMODNAME;
+	if (is_v1v2 && namelen > MAXMODNAMEV1V2)
+		namelen = MAXMODNAMEV1V2;
+	else if (namelen > MAXMODNAMEV3)
+		namelen = MAXMODNAMEV3;
 	if ((error = copyout(name, &stat->name[0], namelen)) != 0)
 		return (error);
 
-	if ((error = copyout(&refs, &stat->refs, sizeof(int))) != 0)
-		return (error);
-	if ((error = copyout(&id, &stat->id, sizeof(int))) != 0)
-		return (error);
+	/* Extending MAXMODNAME gives an offset change for v3. */
+	if (is_v1v2) {
+		stat_v2 = (struct module_stat_v2 * __capability)stat;
+		if ((error = copyout(&refs, &stat_v2->refs, sizeof(int))) != 0)
+			return (error);
+		if ((error = copyout(&id, &stat_v2->id, sizeof(int))) != 0)
+			return (error);
+	} else {
+		if ((error = copyout(&refs, &stat->refs, sizeof(int))) != 0)
+			return (error);
+		if ((error = copyout(&id, &stat->id, sizeof(int))) != 0)
+			return (error);
+	}
 
 	/*
 	 * >v1 stat includes module data.
 	 */
-	if (version == sizeof(struct module_stat))
-		if ((error = copyout(&data, &stat->data, sizeof(data))) != 0)
+	if (version == sizeof(struct module_stat_v2)) {
+		if ((error = copyout(&data, &stat_v2->data,
+		    sizeof(data))) != 0)
 			return (error);
+	} else if (version == sizeof(struct module_stat)) {
+		if ((error = copyout(&data, &stat->data, 
+		    sizeof(data))) != 0)
+			return (error);
+	}
 	td->td_retval[0] = 0;
 	return (error);
 }
@@ -436,7 +464,7 @@ int
 kern_modfind(struct thread *td, const char * __capability uname)
 {
 	int error = 0;
-	char name[MAXMODNAME];
+	char name[MAXMODNAMEV3];
 	module_t mod;
 
 	if ((error = copyinstr(uname, name, sizeof name, 0)) != 0)
@@ -468,6 +496,14 @@ typedef union modspecific32 {
 	uint32_t	ulongval;
 } modspecific32_t;
 
+struct module_stat32_v2 {
+	int		version;
+	char		name[MAXMODNAMEV1V2];
+	int		refs;
+	int		id;
+	modspecific32_t	data;
+};
+
 struct module_stat32 {
 	int		version;
 	char		name[MAXMODNAME];
@@ -484,7 +520,9 @@ freebsd32_modstat(struct thread *td, struct freebsd32_modstat_args *uap)
 	int error = 0;
 	int id, namelen, refs, version;
 	struct module_stat32 *stat32;
+	struct module_stat32_v2 *stat32_v2;
 	char *name;
+	bool is_v1v2;
 
 	MOD_SLOCK;
 	mod = module_lookupbyid(uap->modid);
@@ -505,27 +543,44 @@ freebsd32_modstat(struct thread *td, struct freebsd32_modstat_args *uap)
 
 	if (fueword32(__USER_CAP_OBJ(&stat32->version), &version) != 0)
 		return (EFAULT);
-	if (version != sizeof(struct module_stat_v1)
-	    && version != sizeof(struct module_stat32))
+	is_v1v2 = (version == sizeof(struct module_stat_v1) ||
+	    version == sizeof(struct module_stat32_v2));
+	if (!is_v1v2 && version != sizeof(struct module_stat32))
 		return (EINVAL);
 	namelen = strlen(mod->name) + 1;
-	if (namelen > MAXMODNAME)
-		namelen = MAXMODNAME;
+	if (is_v1v2 && namelen > MAXMODNAMEV1V2)
+		namelen = MAXMODNAMEV1V2;
+	else if (namelen > MAXMODNAMEV3)
+		namelen = MAXMODNAMEV3;
 	if ((error = copyout(name, &stat32->name[0], namelen)) != 0)
 		return (error);
 
-	if ((error = copyout(&refs, &stat32->refs, sizeof(int))) != 0)
-		return (error);
-	if ((error = copyout(&id, &stat32->id, sizeof(int))) != 0)
-		return (error);
+	/* Extending MAXMODNAME gives an offset change for v3. */
+	if (is_v1v2) {
+		stat32_v2 = (struct module_stat32_v2 *)stat32;
+		if ((error = copyout(&refs, &stat32_v2->refs, sizeof(int))) != 0)
+			return (error);
+		if ((error = copyout(&id, &stat32_v2->id, sizeof(int))) != 0)
+			return (error);
+	} else {
+		if ((error = copyout(&refs, &stat32->refs, sizeof(int))) != 0)
+			return (error);
+		if ((error = copyout(&id, &stat32->id, sizeof(int))) != 0)
+			return (error);
+	}
 
 	/*
 	 * >v1 stat includes module data.
 	 */
-	if (version == sizeof(struct module_stat32))
+	if (version == sizeof(struct module_stat32_v2)) {
+		if ((error = copyout(&data32, &stat32_v2->data,
+		    sizeof(data32))) != 0)
+			return (error);
+	} else if (version == sizeof(struct module_stat32)) {
 		if ((error = copyout(&data32, &stat32->data,
 		    sizeof(data32))) != 0)
 			return (error);
+	}
 	td->td_retval[0] = 0;
 	return (error);
 }
