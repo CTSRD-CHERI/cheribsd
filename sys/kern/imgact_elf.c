@@ -332,7 +332,7 @@ bool
 __elfN(brand_inuse)(Elf_Brandinfo *entry)
 {
 	struct proc *p;
-	int rval = false;
+	bool rval = false;
 
 	sx_slock(&allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
