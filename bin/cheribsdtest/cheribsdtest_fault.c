@@ -38,6 +38,7 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
+#include <sys/wait.h>
 
 #include <machine/frame.h>
 #include <machine/trap.h>
@@ -287,6 +288,57 @@ CHERIBSDTEST(test_storeversion_mmap, "Attempt to store version on MAP_ANON PROT_
 	*vcp = 1;
 	if (*vcp != 1)
 		cheribsdtest_failure_errx("Failed to store to versioned memory.");
+	CHERIBSDTEST_CHECK_SYSCALL(munmap(p, page_sz));
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(test_storeversion_fork_cow, "Check for correct copy-on-write handling of versions on fork.")
+{
+	int status, pid;
+	int  page_sz = getpagesize();
+	void * __capability *p = CHERIBSDTEST_CHECK_SYSCALL(
+		mmap(NULL, page_sz, PROT_READ|PROT_WRITE|PROT_MTE, MAP_ANON, -1, 0)
+	);
+	void * __capability * __capability cp = cheri_ptr(p, page_sz);
+	int v = cheri_loadversion(cp);
+	if (v != 0)
+		cheribsdtest_failure_errx("Unexpected initial version: %d", v);
+	cheri_storeversion(cp, 3);
+	v = cheri_loadversion(cp);
+	if (v != 3)
+		cheribsdtest_failure_errx("Unexpected version after storeversion: %d", v);
+
+	pid = CHERIBSDTEST_CHECK_SYSCALL(fork());
+	if (pid == 0) {
+		/* Check CoW works in the child */
+		v = cheri_loadversion(cp);
+		CHERIBSDTEST_VERIFY2(v == 3, "incorrect version read in child: %d", v);
+		/*
+		 * attempt to trigger CoW -- use a different location so we can
+		 * check original version is copied.
+		 */
+		cheri_storeversion(&cp[1], 4);
+		v = cheri_loadversion(cp); /* check CoW copied parent's version */
+		CHERIBSDTEST_VERIFY2(v == 3, "incorrect version read in child after CoW: %d", v);
+		v = cheri_loadversion(&cp[1]); /* check our store worked */
+		CHERIBSDTEST_VERIFY2(v == 4, "failed to read back version stored in child: %d", v);
+		/*
+		 * store a different version to original location so we can
+		 * check parent's version is not affected
+		 */
+		cheri_storeversion(&cp[0], 5);
+		exit(EX_OK);
+	}
+	CHERIBSDTEST_CHECK_SYSCALL(waitpid(pid, &status, 0));
+	CHERIBSDTEST_VERIFY2(WIFEXITED(status), "child exited abnormally");
+	/*
+	 * If the child exited with error status then hopefully it set an error
+	 * message in the shared state so exit with the same code.
+	 */
+	if (WEXITSTATUS(status) != EX_OK)
+		exit(WEXITSTATUS(status));
+	v = cheri_loadversion(cp);
+	CHERIBSDTEST_VERIFY2(v == 3, "incorrect version after child exited: %d", v);
 	CHERIBSDTEST_CHECK_SYSCALL(munmap(p, page_sz));
 	cheribsdtest_success();
 }
