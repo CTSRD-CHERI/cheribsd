@@ -3,6 +3,7 @@
 SHLIBDIR?= /lib
 
 .include <src.opts.mk>
+.include <bsd.compiler.mk>
 
 PACKAGE=	runtime
 LIB=	md
@@ -134,6 +135,12 @@ SRCS+=	sha256c_arm64.c
 CFLAGS_CRYPTO:=	${CFLAGS:M-march=*:S/^$/-march=armv8-a/W:[-1]}+crypto
 CFLAGS+= -DARM64_SHA2
 CFLAGS.sha256c_arm64.c+= ${CFLAGS_CRYPTO}
+.if ${COMPILER_FEATURES:Maarch64-sha512}
+SRCS+=	sha512c_arm64.c
+CFLAGS_SHA3:=	${CFLAGS:M-march=*:S/^$/-march=armv8.2-a/W:[-1]}+sha3
+CFLAGS+= -DARM64_SHA512
+CFLAGS.sha512c_arm64.c+= ${CFLAGS_SHA3}
+.endif # aarch64-sha512
 .endif
 .endif # ${USE_ASM_SOURCES} != 0
 
