@@ -52,6 +52,24 @@
 ;	CAPENABLED syscall is allowed in capability mode
 ;	VARARG	last argument is passed with a variadic calling convention.
 ;	VARARG#	last # args are passed with a variadic calling convention.
+;
+; To support programmatic generation of both the default ABI and 32-bit compat
+; (freebsd32) we impose a number of restrictions on the types of system calls.
+; For integer types:
+;  - Bare int and long are allowed (long is a sign of a bad interface).
+;  - Use u_int and u_long rather than "unsigned (int|long)".
+;  - size_t is allowed.
+;  - typedefs are allowed, but new signed types that vary between 32- and
+;    64-bit ABIs must be added to makesyscalls.lua so it knows they require
+;    handling.
+;  - Always-64-bit types other than dev_t, id_t, and off_t must be added to
+;    makesyscalls.lua.
+; For pointers:
+;  - Prefer structs to typedefs so an ABI-specific suffix (e.g., "32") can
+;    be prepended (e.g., ucontext_t -> struct ucontext -> struct ucontext32).
+;  - Pointers to objects (structs, unions, etc) containing any long, pointer,
+;    or time_t arguments need _Contains_ annotations.  Such objects should be
+;    padded such that all 64-bit types are 64-bit aligned.
 
 ; annotations:
 ;	SAL 2.0 annotations are used to specify how system calls treat
@@ -89,9 +107,6 @@
 ;		32- and 64-bit ABIs.
 ;	timet_	Object contains a time_t and varies between i386 and other
 ;		ABIs.
-
-; Please copy any additions and changes to the following compatability tables:
-; sys/compat/freebsd32/syscalls.master
 
 ; #ifdef's, etc. may be included, and are copied to the output files.
 
