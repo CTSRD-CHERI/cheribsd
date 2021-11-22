@@ -77,6 +77,18 @@
 ;	    for an array of n elements.
 ;	_In_reads_bytes_(n), _Out_writes_bytes_(n), _Inout_updates_bytes(n):
 ;	    for a buffer of n-bytes.
+;
+;	In addition to SAL annotations, pointers are annotated to indicate
+;	that they point to types that change between ABIs.  That means that
+;	they contain long, pointer, or time_t types.  This is indicated with
+;	a _Contains_ annotation followed immediately by one or more of:
+;
+;	long_	Object contains a direct (or typedef'd) long value and varies
+;		between 32- and 64-bit ABIs.  This includes size_t.
+;	ptr_	Object contains pointers (or intptr_t) and varies between
+;		32- and 64-bit ABIs.
+;	timet_	Object contains a time_t and varies between i386 and other
+;		ABIs.
 
 ; Please copy any additions and changes to the following compatability tables:
 ; sys/compat/freebsd32/syscalls.master
@@ -232,7 +244,7 @@
 		int ptrace(
 		    int req,
 		    pid_t pid,
-		    _Inout_opt_ char *addr,
+		    _Inout_opt_ _Contains_long_ptr_ char *addr,
 		    int data
 		);
 	}
@@ -398,7 +410,7 @@
 		int ioctl(
 		    int fd,
 		    u_long com,
-		    _Inout_opt_ char *data
+		    _Inout_opt_ _Contains_long_ptr_ char *data
 		);
 	}
 55	AUE_REBOOT	STD {
@@ -728,7 +740,7 @@
 114	AUE_SENDMSG	COMPAT|CAPENABLED {
 		int sendmsg(
 		    int s,
-		    _In_ const struct omsghdr *msg,
+		    _In_ _Contains_ptr_ const struct omsghdr *msg,
 		    int flags
 		);
 	}
@@ -1285,7 +1297,7 @@
 226	AUE_MSGSND	NOSTD {
 		int msgsnd(
 		    int msqid,
-		    _In_reads_bytes_(msgsz) const void *msgp,
+		    _In_reads_bytes_(msgsz) _Contains_long_ const void *msgp,
 		    size_t msgsz,
 		    int msgflg
 		);
@@ -1293,7 +1305,7 @@
 227	AUE_MSGRCV	NOSTD {
 		ssize_t msgrcv(
 		    int msqid,
-		    _Out_writes_bytes_(msgsz) void *msgp,
+		    _Out_writes_bytes_(msgsz) _Contains_long_ void *msgp,
 		    size_t msgsz,
 		    long msgtyp,
 		    int msgflg
@@ -1628,7 +1640,7 @@
 	}
 315	AUE_AIO_SUSPEND	STD|CAPENABLED {
 		int aio_suspend(
-		    _Inout_updates_(nent) _Contains_long_ptr_ struct aiocb * const *aiocbp,
+		    _Inout_updates_(nent) _Contains_long_ptr_ struct aiocb * const * aiocbp,
 		    int nent,
 		    _In_opt_ _Contains_long_timet_ const struct timespec *timeout
 		);
@@ -3251,12 +3263,12 @@
 	}
 578	AUE_AIO_WRITEV	STD|CAPENABLED {
 		int aio_writev(
-		    _Inout_ struct aiocb *aiocbp
+		    _Inout_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 579	AUE_AIO_READV	STD|CAPENABLED {
 		int aio_readv(
-		    _Inout_ struct aiocb *aiocbp
+		    _Inout_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 580	AUE_FSPACECTL	STD|CAPENABLED {
