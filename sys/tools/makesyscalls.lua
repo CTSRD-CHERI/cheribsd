@@ -1399,9 +1399,9 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 -- buffer, one per line, for later processing once they're all glued together.
 process_sysfile(sysfile)
 
-write_line("sysinc",
+write_line("sysinc", string.format(
     "\n#define AS(name) (sizeof(struct name) / sizeof(%s))\n",
-    config['abi_syscallarg_t'])
+    config['abi_syscallarg_t']))
 
 for _, v in pairs(compat_options) do
 	if v["count"] > 0 then
