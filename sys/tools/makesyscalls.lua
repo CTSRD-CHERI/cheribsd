@@ -666,8 +666,7 @@ local function process_args(args)
 end
 
 local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
-    auditev, syscallret, funcname, funcalias, funcargs, argalias,
-    skip_proto)
+    auditev, syscallret, funcname, funcalias, funcargs, argalias)
 	local argssize
 
 	if #funcargs > 0 or flags & known_flags["NODEF"] ~= 0 then
@@ -745,7 +744,7 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 	write_line("systracetmp", "\t\tbreak;\n")
 
 	local nargflags = get_mask({"NOARGS", "NOPROTO", "NODEF"})
-	if flags & nargflags == 0 and not skip_proto then
+	if flags & nargflags == 0 then
 		if #funcargs > 0 then
 			write_line("sysarg", string.format("struct %s {\n",
 			    argalias))
@@ -780,7 +779,7 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 	end
 
 	local protoflags = get_mask({"NOPROTO", "NODEF"})
-	if flags & protoflags == 0 and not skip_proto then
+	if flags & protoflags == 0 then
 		if funcname == "nosys" or funcname == "lkmnosys" or
 		    funcname == "sysarch" or funcname:find("^freebsd") or
 		    funcname:find("^linux") or
@@ -855,7 +854,7 @@ local function handle_obsol(sysnum, funcname, comment)
 end
 
 local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
-    auditev, funcname, funcalias, funcargs, argalias, skip_proto)
+    auditev, funcname, funcalias, funcargs, argalias)
 	local argssize, out, outdcl, wrap, prefix, descr
 
 	if #funcargs > 0 or flags & known_flags["NODEF"] ~= 0 then
@@ -884,7 +883,7 @@ local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
 	::compatdone::
 	local dprotoflags = get_mask({"NOPROTO", "NODEF"})
 	local nargflags = dprotoflags | known_flags["NOARGS"]
-	if #funcargs > 0 and flags & nargflags == 0 and not skip_proto then
+	if #funcargs > 0 and flags & nargflags == 0 then
 		write_line(out, string.format("struct %s {\n", argalias))
 		for _, v in ipairs(funcargs) do
 			local argname, argtype = v["name"], v["type"]
@@ -895,11 +894,11 @@ local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
 			    argname, argtype))
 		end
 		write_line(out, "};\n")
-	elseif flags & nargflags == 0 and not skip_proto then
+	elseif flags & nargflags == 0 then
 		write_line("sysarg", string.format(
 		    "struct %s {\n\tregister_t dummy;\n};\n", argalias))
 	end
-	if flags & dprotoflags == 0 and not skip_proto then
+	if flags & dprotoflags == 0 then
 		write_line(outdcl, string.format(
 		    "%s\t%s%s(struct thread *, struct %s *);\n",
 		    rettype, prefix, funcname, argalias))
@@ -1126,7 +1125,7 @@ process_syscall_def = function(line)
 	if args ~= nil then
 		funcargs, changes_abi = process_args(args)
 	end
-	local skip_proto = config["abi_flags"] ~= "" and changes_abi
+	local noproto = config["abi_flags"] ~= "" and changes_abi
 
 	local argprefix = ''
 	local funcprefix = ''
@@ -1138,7 +1137,7 @@ process_syscall_def = function(line)
 				argprefix = config['abi_func_prefix']
 				funcprefix = config['abi_func_prefix']
 				funcalias = funcprefix .. funcname
-				skip_proto = false
+				noproto = false
 				goto ptrfound
 			end
 		end
@@ -1170,18 +1169,20 @@ process_syscall_def = function(line)
 	local ncompatflags = get_mask({"STD", "NODEF", "NOARGS", "NOPROTO",
 	    "NOSTD"})
 	local compatflags = get_mask_pat("COMPAT.*")
+	if noproto then
+		flags = flags | known_flags["NOPROTO"];
+	end
 	-- Now try compat...
 	if flags & compatflags ~= 0 then
 		if flags & known_flags['STD'] ~= 0 then
 			abort(1, "Incompatible COMPAT/STD: " .. line)
 		end
 		handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
-		    auditev, funcname, funcalias, funcargs, argalias,
-		    skip_proto)
+		    auditev, funcname, funcalias, funcargs, argalias)
 	elseif flags & ncompatflags ~= 0 then
 		handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 		    auditev, syscallret, funcname, funcalias, funcargs,
-		    argalias, skip_proto)
+		    argalias)
 	elseif flags & known_flags["OBSOL"] ~= 0 then
 		handle_obsol(sysnum, funcname, funcomment)
 	elseif flags & known_flags["RESERVED"] ~= 0 then
