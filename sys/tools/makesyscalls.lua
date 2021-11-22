@@ -656,7 +656,7 @@ local function process_args(args)
 	local changes_abi = false
 
 	for arg in args:gmatch("([^,]+)") do
-		local arg_abi_change = not isptrtype(arg) or check_abi_changes(arg)
+		local arg_abi_change = check_abi_changes(arg)
 		changes_abi = changes_abi or arg_abi_change
 
 		arg = strip_arg_annotations(arg)
@@ -669,6 +669,10 @@ local function process_args(args)
 		if argtype == "" and argname == "void" then
 			goto out
 		end
+
+		-- is64bittype() needs a bare type so check it after argname
+		-- is removed
+		changes_abi = changes_abi or (abi_changes("pair_64bit") and is64bittype(argtype))
 
 		argtype = argtype:gsub("intptr_t", config["abi_intptr_t"])
 		argtype = argtype:gsub("semid_t", config["abi_semid_t"])
@@ -1230,23 +1234,26 @@ process_syscall_def = function(line)
 	if args ~= nil then
 		funcargs, changes_abi = process_args(args)
 	end
-	local noproto = config["abi_flags"] ~= "" and changes_abi
+	local noproto = config["abi_flags"] ~= "" and not changes_abi
 
 	local argprefix = ''
 	local funcprefix = ''
 	if abi_changes("pointer_args") then
 		for _, v in ipairs(funcargs) do
 			if isptrtype(v["type"]) then
-				-- argalias should be:
-				--   COMPAT_PREFIX + ABI Prefix + funcname
-				argprefix = config['abi_func_prefix']
-				funcprefix = config['abi_func_prefix']
-				funcalias = funcprefix .. funcname
-				noproto = false
+				changes_abi = true
 				goto ptrfound
 			end
 		end
 		::ptrfound::
+	end
+	if changes_abi then
+		-- argalias should be:
+		--   COMPAT_PREFIX + ABI Prefix + funcname
+		argprefix = config['abi_func_prefix']
+		funcprefix = config['abi_func_prefix']
+		funcalias = funcprefix .. funcname
+		noproto = false
 	end
 	if funcname ~= nil then
 		funcname = funcprefix .. funcname
