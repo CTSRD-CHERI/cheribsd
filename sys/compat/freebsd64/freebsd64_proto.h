@@ -1505,10 +1505,10 @@ struct freebsd64___specialfd_args {
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 };
 struct freebsd64_aio_writev_args {
-	char aiocbp_l_[PADL_(struct aiocb *)]; struct aiocb * aiocbp; char aiocbp_r_[PADR_(struct aiocb *)];
+	char aiocbp_l_[PADL_(struct aiocb64 *)]; struct aiocb64 * aiocbp; char aiocbp_r_[PADR_(struct aiocb64 *)];
 };
 struct freebsd64_aio_readv_args {
-	char aiocbp_l_[PADL_(struct aiocb *)]; struct aiocb * aiocbp; char aiocbp_r_[PADR_(struct aiocb *)];
+	char aiocbp_l_[PADL_(struct aiocb64 *)]; struct aiocb64 * aiocbp; char aiocbp_r_[PADR_(struct aiocb64 *)];
 };
 struct freebsd64_fspacectl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];

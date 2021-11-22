@@ -3407,14 +3407,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd64_aio_writev */
 	case 578: {
 		struct freebsd64_aio_writev_args *p = params;
-		uarg[a++] = (intptr_t)p->aiocbp; /* struct aiocb * */
+		uarg[a++] = (intptr_t)p->aiocbp; /* struct aiocb64 * */
 		*n_args = 1;
 		break;
 	}
 	/* freebsd64_aio_readv */
 	case 579: {
 		struct freebsd64_aio_readv_args *p = params;
-		uarg[a++] = (intptr_t)p->aiocbp; /* struct aiocb * */
+		uarg[a++] = (intptr_t)p->aiocbp; /* struct aiocb64 * */
 		*n_args = 1;
 		break;
 	}
@@ -9139,7 +9139,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 578:
 		switch (ndx) {
 		case 0:
-			p = "userland struct aiocb *";
+			p = "userland struct aiocb64 *";
 			break;
 		default:
 			break;
@@ -9149,7 +9149,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 579:
 		switch (ndx) {
 		case 0:
-			p = "userland struct aiocb *";
+			p = "userland struct aiocb64 *";
 			break;
 		default:
 			break;

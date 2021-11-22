@@ -174,7 +174,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct freebsd32_ptrace_args *p = params;
 		iarg[a++] = p->req; /* int */
 		iarg[a++] = p->pid; /* pid_t */
-		uarg[a++] = (intptr_t)p->addr; /* caddr_t */
+		uarg[a++] = (intptr_t)p->addr; /* char * */
 		iarg[a++] = p->data; /* int */
 		*n_args = 4;
 		break;
@@ -542,7 +542,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct freebsd32_fcntl_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		iarg[a++] = p->cmd; /* int */
-		iarg[a++] = p->arg; /* int32_t */
+		uarg[a++] = (intptr_t)p->arg; /* intptr_t */
 		*n_args = 3;
 		break;
 	}
@@ -842,10 +842,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 169: {
 		struct freebsd32_semsys_args *p = params;
 		iarg[a++] = p->which; /* int */
-		iarg[a++] = p->a2; /* int */
-		iarg[a++] = p->a3; /* int */
-		iarg[a++] = p->a4; /* int */
-		iarg[a++] = p->a5; /* int */
+		uarg[a++] = (intptr_t)p->a2; /* intptr_t */
+		uarg[a++] = (intptr_t)p->a3; /* intptr_t */
+		uarg[a++] = (intptr_t)p->a4; /* intptr_t */
+		uarg[a++] = (intptr_t)p->a5; /* intptr_t */
 		*n_args = 5;
 		break;
 	}
@@ -853,11 +853,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 170: {
 		struct freebsd32_msgsys_args *p = params;
 		iarg[a++] = p->which; /* int */
-		iarg[a++] = p->a2; /* int */
-		iarg[a++] = p->a3; /* int */
-		iarg[a++] = p->a4; /* int */
-		iarg[a++] = p->a5; /* int */
-		iarg[a++] = p->a6; /* int */
+		uarg[a++] = (intptr_t)p->a2; /* intptr_t */
+		uarg[a++] = (intptr_t)p->a3; /* intptr_t */
+		uarg[a++] = (intptr_t)p->a4; /* intptr_t */
+		uarg[a++] = (intptr_t)p->a5; /* intptr_t */
+		uarg[a++] = (intptr_t)p->a6; /* intptr_t */
 		*n_args = 6;
 		break;
 	}
@@ -865,9 +865,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 171: {
 		struct freebsd32_shmsys_args *p = params;
 		iarg[a++] = p->which; /* int */
-		iarg[a++] = p->a2; /* int */
-		iarg[a++] = p->a3; /* int */
-		iarg[a++] = p->a4; /* int */
+		uarg[a++] = (intptr_t)p->a2; /* intptr_t */
+		uarg[a++] = (intptr_t)p->a3; /* intptr_t */
+		uarg[a++] = (intptr_t)p->a4; /* intptr_t */
 		*n_args = 4;
 		break;
 	}
@@ -1295,11 +1295,19 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* kbounce */
 	case 258: {
 		struct kbounce_args *p = params;
-		uarg[a++] = (intptr_t)p->src; /* void * */
+		uarg[a++] = (intptr_t)p->src; /* const void * */
 		uarg[a++] = (intptr_t)p->dst; /* void * */
 		uarg[a++] = p->len; /* size_t */
 		iarg[a++] = p->flags; /* int */
 		*n_args = 4;
+		break;
+	}
+	/* flag_captured */
+	case 259: {
+		struct flag_captured_args *p = params;
+		uarg[a++] = (intptr_t)p->message; /* const char * */
+		uarg[a++] = p->key; /* uint32_t */
+		*n_args = 2;
 		break;
 	}
 	/* lchmod */
@@ -1467,9 +1475,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* freebsd32_aio_cancel */
+	/* aio_cancel */
 	case 316: {
-		struct freebsd32_aio_cancel_args *p = params;
+		struct aio_cancel_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		uarg[a++] = (intptr_t)p->aiocbp; /* struct aiocb32 * */
 		*n_args = 2;
@@ -1577,7 +1585,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd32_jail */
 	case 338: {
 		struct freebsd32_jail_args *p = params;
-		uarg[a++] = (intptr_t)p->jail; /* struct jail32 * */
+		uarg[a++] = (intptr_t)p->jailp; /* struct jail32 * */
 		*n_args = 1;
 		break;
 	}
@@ -1862,43 +1870,43 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* ksem_close */
 	case 400: {
 		struct ksem_close_args *p = params;
-		iarg[a++] = p->id; /* semid_t */
+		iarg[a++] = p->id; /* int32_t */
 		*n_args = 1;
 		break;
 	}
 	/* ksem_post */
 	case 401: {
 		struct ksem_post_args *p = params;
-		iarg[a++] = p->id; /* semid_t */
+		iarg[a++] = p->id; /* int32_t */
 		*n_args = 1;
 		break;
 	}
 	/* ksem_wait */
 	case 402: {
 		struct ksem_wait_args *p = params;
-		iarg[a++] = p->id; /* semid_t */
+		iarg[a++] = p->id; /* int32_t */
 		*n_args = 1;
 		break;
 	}
 	/* ksem_trywait */
 	case 403: {
 		struct ksem_trywait_args *p = params;
-		iarg[a++] = p->id; /* semid_t */
+		iarg[a++] = p->id; /* int32_t */
 		*n_args = 1;
 		break;
 	}
-	/* ksem_init */
+	/* freebsd32_ksem_init */
 	case 404: {
-		struct ksem_init_args *p = params;
-		uarg[a++] = (intptr_t)p->idp; /* semid_t * */
+		struct freebsd32_ksem_init_args *p = params;
+		uarg[a++] = (intptr_t)p->idp; /* int32_t * */
 		uarg[a++] = p->value; /* unsigned int */
 		*n_args = 2;
 		break;
 	}
-	/* ksem_open */
+	/* freebsd32_ksem_open */
 	case 405: {
-		struct ksem_open_args *p = params;
-		uarg[a++] = (intptr_t)p->idp; /* semid_t * */
+		struct freebsd32_ksem_open_args *p = params;
+		uarg[a++] = (intptr_t)p->idp; /* int32_t * */
 		uarg[a++] = (intptr_t)p->name; /* const char * */
 		iarg[a++] = p->oflag; /* int */
 		iarg[a++] = p->mode; /* mode_t */
@@ -2343,9 +2351,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 7;
 		break;
 	}
-	/* freebsd32_sctp_generic_sendmsg_iov */
+	/* sctp_generic_sendmsg_iov */
 	case 473: {
-		struct freebsd32_sctp_generic_sendmsg_iov_args *p = params;
+		struct sctp_generic_sendmsg_iov_args *p = params;
 		iarg[a++] = p->sd; /* int */
 		uarg[a++] = (intptr_t)p->iov; /* struct iovec32 * */
 		iarg[a++] = p->iovlen; /* int */
@@ -2356,9 +2364,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 7;
 		break;
 	}
-	/* freebsd32_sctp_generic_recvmsg */
+	/* sctp_generic_recvmsg */
 	case 474: {
-		struct freebsd32_sctp_generic_recvmsg_args *p = params;
+		struct sctp_generic_recvmsg_args *p = params;
 		iarg[a++] = p->sd; /* int */
 		uarg[a++] = (intptr_t)p->iov; /* struct iovec32 * */
 		iarg[a++] = p->iovlen; /* int */
@@ -3291,9 +3299,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* freebsd32___specialfd */
+	/* __specialfd */
 	case 577: {
-		struct freebsd32___specialfd_args *p = params;
+		struct __specialfd_args *p = params;
 		iarg[a++] = p->type; /* int */
 		uarg[a++] = (intptr_t)p->req; /* const void * */
 		uarg[a++] = p->len; /* size_t */
@@ -3576,7 +3584,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "pid_t";
 			break;
 		case 2:
-			p = "caddr_t";
+			p = "userland char *";
 			break;
 		case 3:
 			p = "int";
@@ -4156,7 +4164,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "int32_t";
+			p = "intptr_t";
 			break;
 		default:
 			break;
@@ -4670,16 +4678,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "int";
+			p = "intptr_t";
 			break;
 		case 2:
-			p = "int";
+			p = "intptr_t";
 			break;
 		case 3:
-			p = "int";
+			p = "intptr_t";
 			break;
 		case 4:
-			p = "int";
+			p = "intptr_t";
 			break;
 		default:
 			break;
@@ -4692,19 +4700,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "int";
+			p = "intptr_t";
 			break;
 		case 2:
-			p = "int";
+			p = "intptr_t";
 			break;
 		case 3:
-			p = "int";
+			p = "intptr_t";
 			break;
 		case 4:
-			p = "int";
+			p = "intptr_t";
 			break;
 		case 5:
-			p = "int";
+			p = "intptr_t";
 			break;
 		default:
 			break;
@@ -4717,13 +4725,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "int";
+			p = "intptr_t";
 			break;
 		case 2:
-			p = "int";
+			p = "intptr_t";
 			break;
 		case 3:
-			p = "int";
+			p = "intptr_t";
 			break;
 		default:
 			break;
@@ -5368,7 +5376,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 258:
 		switch (ndx) {
 		case 0:
-			p = "userland void *";
+			p = "userland const void *";
 			break;
 		case 1:
 			p = "userland void *";
@@ -5378,6 +5386,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 3:
 			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* flag_captured */
+	case 259:
+		switch (ndx) {
+		case 0:
+			p = "userland const char *";
+			break;
+		case 1:
+			p = "uint32_t";
 			break;
 		default:
 			break;
@@ -5660,7 +5681,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* freebsd32_aio_cancel */
+	/* aio_cancel */
 	case 316:
 		switch (ndx) {
 		case 0:
@@ -6319,7 +6340,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 400:
 		switch (ndx) {
 		case 0:
-			p = "semid_t";
+			p = "int32_t";
 			break;
 		default:
 			break;
@@ -6329,7 +6350,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 401:
 		switch (ndx) {
 		case 0:
-			p = "semid_t";
+			p = "int32_t";
 			break;
 		default:
 			break;
@@ -6339,7 +6360,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 402:
 		switch (ndx) {
 		case 0:
-			p = "semid_t";
+			p = "int32_t";
 			break;
 		default:
 			break;
@@ -6349,17 +6370,17 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 403:
 		switch (ndx) {
 		case 0:
-			p = "semid_t";
+			p = "int32_t";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* ksem_init */
+	/* freebsd32_ksem_init */
 	case 404:
 		switch (ndx) {
 		case 0:
-			p = "userland semid_t *";
+			p = "userland int32_t *";
 			break;
 		case 1:
 			p = "unsigned int";
@@ -6368,11 +6389,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* ksem_open */
+	/* freebsd32_ksem_open */
 	case 405:
 		switch (ndx) {
 		case 0:
-			p = "userland semid_t *";
+			p = "userland int32_t *";
 			break;
 		case 1:
 			p = "userland const char *";
@@ -7129,7 +7150,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* freebsd32_sctp_generic_sendmsg_iov */
+	/* sctp_generic_sendmsg_iov */
 	case 473:
 		switch (ndx) {
 		case 0:
@@ -7157,7 +7178,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* freebsd32_sctp_generic_recvmsg */
+	/* sctp_generic_recvmsg */
 	case 474:
 		switch (ndx) {
 		case 0:
@@ -8928,7 +8949,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* freebsd32___specialfd */
+	/* __specialfd */
 	case 577:
 		switch (ndx) {
 		case 0:
@@ -9740,6 +9761,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
+	/* flag_captured */
+	case 259:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
 	/* lchmod */
 	case 274:
 		if (ndx == 0 || ndx == 1)
@@ -9840,7 +9866,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* freebsd32_aio_cancel */
+	/* aio_cancel */
 	case 316:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -10083,12 +10109,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* ksem_init */
+	/* freebsd32_ksem_init */
 	case 404:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* ksem_open */
+	/* freebsd32_ksem_open */
 	case 405:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -10353,12 +10379,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* freebsd32_sctp_generic_sendmsg_iov */
+	/* sctp_generic_sendmsg_iov */
 	case 473:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* freebsd32_sctp_generic_recvmsg */
+	/* sctp_generic_recvmsg */
 	case 474:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -10830,7 +10856,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* freebsd32___specialfd */
+	/* __specialfd */
 	case 577:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
