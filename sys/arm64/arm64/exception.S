@@ -74,6 +74,13 @@ __FBSDID("$FreeBSD$");
 	mrs	PTR(18), PTRN(tpidr_el1)
 	add	PTR(29), PTRN(sp), #(TF_SIZE)
 .if \el == 0
+#if defined(PERTHREAD_SSP)
+	/* Load the SSP canary to sp_el0 */
+	ldr	x1, [x18, #(PC_CURTHREAD)]
+	add	x1, x1, #(TD_MD_CANARY)
+	msr	sp_el0, x1
+#endif
+
 	/* Apply the SSBD (CVE-2018-3639) workaround if needed */
 	ldr	PTR(1), [PTR(18), #PC_SSBD]
 	cbz	x1, 1f
