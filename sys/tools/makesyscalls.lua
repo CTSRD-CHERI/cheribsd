@@ -483,8 +483,10 @@ local pattern_table = {
 		dump_prevline = true,
 		pattern = "%%ABI_HEADERS%%",
 		process = function()
-			line = config['abi_headers'] .. "\n"
-			write_line('sysinc', line)
+			if config['abi_headers'] ~= "" then
+				line = config['abi_headers'] .. "\n"
+				write_line('sysinc', line)
+			end
 		end,
 	},
 	{
