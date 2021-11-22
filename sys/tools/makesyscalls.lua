@@ -624,8 +624,8 @@ local function process_args(args)
 	local changes_abi = false
 
 	for arg in args:gmatch("([^,]+)") do
-		local abi_change = not isptrtype(arg) or check_abi_changes(arg)
-		changes_abi = changes_abi or abi_change
+		local arg_abi_change = not isptrtype(arg) or check_abi_changes(arg)
+		changes_abi = changes_abi or arg_abi_change
 
 		arg = strip_arg_annotations(arg)
 
@@ -641,7 +641,7 @@ local function process_args(args)
 		argtype = argtype:gsub("intptr_t", config["abi_intptr_t"])
 
 		-- XX TODO: Forward declarations? See: sysstubfwd in CheriBSD
-		if abi_change then
+		if arg_abi_change then
 			local abi_type_suffix = config["abi_type_suffix"]
 			argtype = argtype:gsub("_native ", " ")
 			argtype = argtype:gsub("(struct [^ ]*)", "%1" ..
