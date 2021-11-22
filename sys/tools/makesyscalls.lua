@@ -151,6 +151,18 @@ local known_abi_flags = {
 		value	= 0x00000008,
 		expr	= "_Contains[a-z_]*_ptr_",
 	},
+	force_proto = {
+		value	= 0x00000010,
+		expr	= "",
+	},
+	skip_funcprefix = {
+		value	= 0x00000020,
+		expr	= "",
+	},
+	skip_handler = {
+		value	= 0x00000040,
+		expr	= "",
+	},
 }
 
 local known_flags = {
@@ -412,6 +424,14 @@ local function strip_abi_prefix(funcname)
 	end
 
 	return stripped_name
+end
+
+local function abi_funcname(funcname)
+	funcname = strip_abi_prefix(funcname)
+	if abi_changes("skip_handler")  then
+		funcname = config['abi_func_prefix'] .. "nosys"
+	end
+	return funcname
 end
 
 local function read_file(tmpfile)
@@ -790,9 +810,11 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 	end
 
 	local protoflags = get_mask({"NOPROTO", "NODEF"})
-	if flags & protoflags == 0 and not skip_proto then
+	if flags & protoflags == 0 and not skip_proto and
+	    not abi_changes("skip_handler") then
 		if funcname == "nosys" or funcname == "lkmnosys" or
 		    funcname == "sysarch" or funcname:find("^freebsd") or
+		    funcname:find("^do_bsd_") or
 		    funcname:find("^linux") or
 		    funcname:find("^cloudabi") then
 			write_line("sysdcl", string.format(
@@ -814,23 +836,26 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 
 	if flags & known_flags["NOSTD"] ~= 0 then
 		write_line("sysent", string.format(
-		    "lkmressys, .sy_auevent = AUE_NULL, " ..
+		    "%s, .sy_auevent = AUE_NULL, " ..
 		    ".sy_flags = %s, .sy_thrcnt = SY_THR_ABSENT },",
-		    sysflags))
-		column = column + #"lkmressys" + #"AUE_NULL" + 3
+		    abi_funcname("lkmressys"), sysflags))
+		column = column + #abi_funcname("lkmressys") + #"AUE_NULL" + 3
 	else
 		if funcname == "nosys" or funcname == "lkmnosys" or
 		    funcname == "sysarch" or funcname:find("^freebsd") or
+		    funcname:find("^do_bsd_") or
 		    funcname:find("^linux") or
 		    funcname:find("^cloudabi") then
 			write_line("sysent", string.format(
 			    "%s, .sy_auevent = %s, .sy_flags = %s, .sy_thrcnt = %s },",
-			    funcname, auditev, sysflags, thr_flag))
+			    abi_funcname(funcname), auditev, sysflags,
+			    thr_flag))
 			column = column + #funcname + #auditev + #sysflags + 3
 		else
 			write_line("sysent", string.format(
-			    "sys_%s, .sy_auevent = %s, .sy_flags = %s, .sy_thrcnt = %s },",
-			    funcname, auditev, sysflags, thr_flag))
+			    "%s, .sy_auevent = %s, .sy_flags = %s, .sy_thrcnt = %s },",
+			    abi_funcname("sys_" .. funcname), auditev, sysflags,
+			    thr_flag))
 			column = column + #funcname + #auditev + #sysflags + 7
 		end
 	end
@@ -850,9 +875,10 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 end
 
 local function handle_obsol(sysnum, funcname, comment)
-	write_line("sysent",
-	    "\t{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, " ..
-	    ".sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },")
+	write_line("sysent", string.format(
+	    "\t{ .sy_narg = 0, .sy_call = (sy_call_t *)%s, " ..
+	    ".sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_ABSENT },",
+	    abi_funcname("nosys")))
 	align_sysent_comment(34)
 
 	write_line("sysent", string.format("/* %d = obsolete %s */\n",
@@ -909,7 +935,8 @@ local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
 		write_line("sysarg", string.format(
 		    "struct %s {\n\tregister_t dummy;\n};\n", argalias))
 	end
-	if flags & dprotoflags == 0 and not skip_proto then
+	if flags & dprotoflags == 0 and not skip_proto and
+	    not abi_changes("skip_handler") then
 		write_line(outdcl, string.format(
 		    "%s\t%s%s(struct thread *, struct %s *);\n",
 		    rettype, prefix, funcname, argalias))
@@ -923,8 +950,8 @@ local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
 		    "\t{ .sy_narg = %s, .sy_call = (sy_call_t *)%s, " ..
 		    ".sy_auevent = %s, .sy_flags = 0, " ..
 		    ".sy_thrcnt = SY_THR_ABSENT },",
-		    "0", "lkmressys", "AUE_NULL"))
-		align_sysent_comment(8 + 2 + #"0" + 15 + #"lkmressys" +
+		    "0", abi_funcname("lkmressys"), "AUE_NULL"))
+		align_sysent_comment(8 + 2 + #"0" + 15 + #abi_funcname("lkmressys") +
 		    #"AUE_NULL" + 3)
 	else
 		write_line("sysent", string.format(
@@ -962,10 +989,10 @@ local function handle_unimpl(sysnum, sysstart, sysend, comment)
 	sysnum = sysstart
 	while sysnum <= sysend do
 		write_line("sysent", string.format(
-		    "\t{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, " ..
+		    "\t{ .sy_narg = 0, .sy_call = (sy_call_t *)%s, " ..
 		    ".sy_auevent = AUE_NULL, .sy_flags = 0, " ..
 		    ".sy_thrcnt = SY_THR_ABSENT },\t\t\t/* %d = %s */\n",
-		    sysnum, comment))
+		    abi_funcname("nosys"), sysnum, comment))
 		write_line("sysnames", string.format(
 		    "\t\"#%d\",\t\t\t/* %d = %s */\n",
 		    sysnum, sysnum, comment))
@@ -1136,7 +1163,8 @@ process_syscall_def = function(line)
 	if args ~= nil then
 		funcargs, changes_abi = process_args(args)
 	end
-	local skip_proto = config["abi_flags"] ~= "" and changes_abi
+	local skip_proto = config["abi_flags"] ~= "" and changes_abi and
+	    not abi_changes("force_proto")
 
 	local argprefix = ''
 	local funcprefix = ''
@@ -1145,8 +1173,9 @@ process_syscall_def = function(line)
 			if isptrtype(v["type"]) then
 				-- argalias should be:
 				--   COMPAT_PREFIX + ABI Prefix + funcname
-				argprefix = config['abi_func_prefix']
-				funcprefix = config['abi_func_prefix']
+				if not abi_changes("skip_funcprefix") then
+					funcprefix = config['abi_func_prefix']
+				end
 				funcalias = funcprefix .. funcname
 				skip_proto = false
 				goto ptrfound
@@ -1154,15 +1183,10 @@ process_syscall_def = function(line)
 		end
 		::ptrfound::
 	end
-	if funcname ~= nil then
-		funcname = funcprefix .. funcname
-	end
-	if funcalias == nil or funcalias == "" then
-		funcalias = funcname
-	end
 
 	if argalias == nil and funcname ~= nil then
-		argalias = funcname .. "_args"
+		argalias = config['abi_arg_prefix'] .. funcprefix
+		argalias = argalias .. funcname .. "_args"
 		for _, v in pairs(compat_options) do
 			local mask = v["mask"]
 			if (flags & mask) ~= 0 then
@@ -1175,8 +1199,15 @@ process_syscall_def = function(line)
 		::out::
 	elseif argalias ~= nil then
 		argalias = argprefix .. argalias
+		argalias = config['abi_arg_prefix'] .. argalias
 	end
-	argalias = config['abi_arg_prefix'] .. argalias
+
+	if funcname ~= nil then
+		funcname = funcprefix .. funcname
+	end
+	if funcalias == nil or funcalias == "" then
+		funcalias = funcname
+	end
 
 	local ncompatflags = get_mask({"STD", "NODEF", "NOARGS", "NOPROTO",
 	    "NOSTD"})
@@ -1410,9 +1441,10 @@ for _, v in pairs(compat_options) do
 #ifdef %s
 #define %s(n, name) .sy_narg = n, .sy_call = (sy_call_t *)__CONCAT(%s,name)
 #else
-#define %s(n, name) .sy_narg = 0, .sy_call = (sy_call_t *)nosys
+#define %s(n, name) .sy_narg = 0, .sy_call = (sy_call_t *)%s
 #endif
-]], v["definition"], v["flag"]:lower(), v["prefix"], v["flag"]:lower()))
+]], v["definition"], v["flag"]:lower(), v["prefix"], v["flag"]:lower(),
+    abi_funcname("nosys")))
 	end
 
 	write_line(v["dcltmp"], string.format("\n#endif /* %s */\n\n",
