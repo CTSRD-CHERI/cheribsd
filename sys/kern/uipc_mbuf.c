@@ -161,6 +161,13 @@ SYSCTL_INT(_kern_ipc, OID_AUTO, m_defragrandomfailures, CTLFLAG_RW,
  */
 CTASSERT(MSIZE - offsetof(struct mbuf, m_dat) == MLEN);
 CTASSERT(MSIZE - offsetof(struct mbuf, m_pktdat) == MHLEN);
+#ifdef CHERI_PURECAP_MBUF_FIXUP
+/*
+ * Check that the sizes agrees with the hybrid kernel mbuf sizes
+ */
+CTASSERT(MLEN == 224);
+CTASSERT(MHLEN == 168);
+#endif
 
 /*
  * mbuf data storage should be 64-bit aligned regardless of architectural
@@ -181,7 +188,11 @@ CTASSERT(offsetof(struct mbuf, m_pktdat) % 8 == 0);
  * comments.
  */
 #if defined(__CHERI_PURE_CAPABILITY__)
+#ifdef CHERI_PURECAP_MBUF_FIXUP
+CTASSERT(offsetof(struct mbuf, m_dat) == 288);
+#else
 CTASSERT(offsetof(struct mbuf, m_dat) == 64);
+#endif
 CTASSERT(sizeof(struct pkthdr) == 112);
 CTASSERT(sizeof(struct m_ext) == 336);
 #elif __SIZEOF_POINTER__ == 8

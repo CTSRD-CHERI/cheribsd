@@ -422,10 +422,20 @@ struct mbuf {
 				/* M_EXT or M_EXTPG set. */
 				struct m_ext	m_ext;
 				/* M_PKTHDR set, neither M_EXT nor M_EXTPG. */
-				char		m_pktdat[0];
+				struct {
+#ifdef CHERI_PURECAP_MBUF_FIXUP
+					char		m_fixup_pktdat_pad[184];
+#endif
+					char		m_pktdat[0];
+				};
 			};
 		};
-		char	m_dat[0] __no_subobject_bounds;	/* !M_PKTHDR, !M_EXT */
+		struct {
+#ifdef CHERI_PURECAP_MBUF_FIXUP
+			char	m_fixup_dat_pad[224];
+#endif
+			char	m_dat[0] __no_subobject_bounds;	/* !M_PKTHDR, !M_EXT */
+		};
 	};
 };
 
