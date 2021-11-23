@@ -9,6 +9,7 @@ TESTSRC=	${SRCTOP}/contrib/netbsd-tests/kernel
 
 TESTSDIR=	${TESTSBASE}/sys/kern
 
+ATF_TESTS_C+=	basic_signal
 #ATF_TESTS_C+=	kcov
 .if !${MACHINE_ABI:Mpurecap}
 # Makes pointers from raw VA
