@@ -38,7 +38,6 @@
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
-#include <sys/wait.h>
 
 #include <machine/frame.h>
 #include <machine/trap.h>
@@ -76,12 +75,6 @@
 #define	ARRAY_LEN	2
 static char array[ARRAY_LEN];
 static char sink;
-
-/* 
- * Test data for cap version tests. A capability is handy because it is one
- * version granule.
- */
-static void * __capability vp;
 
 CHERIBSDTEST(test_fault_bounds, "Exercise capability bounds check failure",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
@@ -208,180 +201,6 @@ CHERIBSDTEST(test_fault_tag, "Store via untagged capability",
 
 	chp = cheri_cleartag(chp);
 	*chp = '\0';
-}
-
-CHERIBSDTEST(test_fault_setversion, "Attempt to set version twice.",
-    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
-    .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_VERSION,
-    .ct_si_trapno = TRAPNO_CHERI)
-{
-	char ch;
-	char * __capability chp = cheri_ptr(&ch, sizeof(ch));
-	chp = cheri_setversion(chp, 3);
-	/* Attempt to set version again on versioned cap: */
-	chp = cheri_setversion(chp, 0); /* fault */
-}
-
-CHERIBSDTEST(test_fault_wrong_version, "Store to unversioned memory via versioned cap",
-    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
-    .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_VERSION,
-    .ct_si_trapno = TRAPNO_VERSION)
-{
-	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(&vp));
-	void * __capability * __capability cvpp = cheri_ptr(&vp, sizeof(vp));
-	cvpp = cheri_setversion(cvpp, 3);
-	*cvpp = NULL; /* should fault due to incorrect version */
-}
-
-CHERIBSDTEST(test_fault_storeversion, "Attempt to store version on memory without CWV",
-    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
-    .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_VERSION,
-    .ct_si_trapno = TRAPNO_VERSION)
-{
-	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(&vp));
-	void * __capability * __capability cvpp = cheri_ptr(&vp, sizeof(vp));
-	int v = cheri_loadversion(cvpp);
-	if (v != 0)
-		cheribsdtest_failure_errx("Unexpected initial version: %d", v);
-	cheri_storeversion(cvpp, 3); /* fault due to absent PTE bit */
-}
-
-CHERIBSDTEST(test_fault_storeversion_mmap, "Attempt to store version on MAP_ANON memory without CWV",
-    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
-    .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_VERSION,
-    .ct_si_trapno = TRAPNO_VERSION)
-{
-	int *p = CHERIBSDTEST_CHECK_SYSCALL(
-		mmap(NULL, getpagesize(), PROT_READ|PROT_WRITE,	MAP_ANON, -1, 0)
-	);
-	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(p));
-	void * __capability cp = cheri_ptr(p, getpagesize());
-	int v = cheri_loadversion(cp);
-	if (v != 0)
-		cheribsdtest_failure_errx("Unexpected initial version: %d", v);
-	cheri_storeversion(cp, 3); /* fault due to absent PTE bit */
-
-	/* *p leaked here! */
-}
-
-CHERIBSDTEST(test_storeversion_mmap, "Attempt to store version on MAP_ANON PROT_MTE memory")
-{
-	int  page_sz = getpagesize(); 
-	int *p = CHERIBSDTEST_CHECK_SYSCALL(
-		mmap(NULL, page_sz, PROT_READ|PROT_WRITE|PROT_MTE, MAP_ANON, -1, 0)
-	);
-	int * __capability cp = cheri_ptr(p, page_sz);
-	int v = cheri_loadversion(cp);
-	if (v != 0)
-		cheribsdtest_failure_errx("Unexpected initial version: %d", v);
-	cheri_storeversion(cp, 3);
-	v = cheri_loadversion(cp);
-	if (v != 3)
-		cheribsdtest_failure_errx("Unexpected version after storeversion: %d", v);
-	cp = cheri_setversion(cp, 3);
-	/* Cast to volatile so that store / load do not get optimised away. */
-	volatile int * __capability vcp = cp;
-	*vcp = 1;
-	if (*vcp != 1)
-		cheribsdtest_failure_errx("Failed to store to versioned memory.");
-	CHERIBSDTEST_CHECK_SYSCALL(munmap(p, page_sz));
-	cheribsdtest_success();
-}
-
-CHERIBSDTEST(test_storeversion_fork_cow, "Check for correct copy-on-write handling of versions on fork.")
-{
-	int status, pid;
-	int  page_sz = getpagesize();
-	void * __capability *p = CHERIBSDTEST_CHECK_SYSCALL(
-		mmap(NULL, page_sz, PROT_READ|PROT_WRITE|PROT_MTE, MAP_ANON, -1, 0)
-	);
-	void * __capability * __capability cp = cheri_ptr(p, page_sz);
-	int v = cheri_loadversion(cp);
-	if (v != 0)
-		cheribsdtest_failure_errx("Unexpected initial version: %d", v);
-	cheri_storeversion(cp, 3);
-	v = cheri_loadversion(cp);
-	if (v != 3)
-		cheribsdtest_failure_errx("Unexpected version after storeversion: %d", v);
-
-	pid = CHERIBSDTEST_CHECK_SYSCALL(fork());
-	if (pid == 0) {
-		/* Check CoW works in the child */
-		v = cheri_loadversion(cp);
-		CHERIBSDTEST_VERIFY2(v == 3, "incorrect version read in child: %d", v);
-		/*
-		 * attempt to trigger CoW -- use a different location so we can
-		 * check original version is copied.
-		 */
-		cheri_storeversion(&cp[1], 4);
-		v = cheri_loadversion(cp); /* check CoW copied parent's version */
-		CHERIBSDTEST_VERIFY2(v == 3, "incorrect version read in child after CoW: %d", v);
-		v = cheri_loadversion(&cp[1]); /* check our store worked */
-		CHERIBSDTEST_VERIFY2(v == 4, "failed to read back version stored in child: %d", v);
-		/*
-		 * store a different version to original location so we can
-		 * check parent's version is not affected
-		 */
-		cheri_storeversion(&cp[0], 5);
-		exit(EX_OK);
-	}
-	CHERIBSDTEST_CHECK_SYSCALL(waitpid(pid, &status, 0));
-	CHERIBSDTEST_VERIFY2(WIFEXITED(status), "child exited abnormally");
-	/*
-	 * If the child exited with error status then hopefully it set an error
-	 * message in the shared state so exit with the same code.
-	 */
-	if (WEXITSTATUS(status) != EX_OK)
-		exit(WEXITSTATUS(status));
-	v = cheri_loadversion(cp);
-	CHERIBSDTEST_VERIFY2(v == 3, "incorrect version after child exited: %d", v);
-	CHERIBSDTEST_CHECK_SYSCALL(munmap(p, page_sz));
-	cheribsdtest_success();
-}
-
-CHERIBSDTEST(test_storeversion_fork_shared, "Check for correct handling of versions on shared memory after fork.")
-{
-	int status, pid;
-	int  page_sz = getpagesize();
-	void * __capability *p = CHERIBSDTEST_CHECK_SYSCALL(
-		mmap(NULL, page_sz, PROT_READ|PROT_WRITE|PROT_MTE, MAP_ANON | MAP_SHARED, -1, 0)
-	);
-	void * __capability * __capability cp = cheri_ptr(p, page_sz);
-	int v = cheri_loadversion(cp);
-	if (v != 0)
-		cheribsdtest_failure_errx("Unexpected initial version: %d", v);
-	cheri_storeversion(cp, 3);
-	v = cheri_loadversion(cp);
-	if (v != 3)
-		cheribsdtest_failure_errx("Unexpected version after storeversion: %d", v);
-
-	pid = CHERIBSDTEST_CHECK_SYSCALL(fork());
-	if (pid == 0) {
-		/* Check shared memory works in the child */
-		v = cheri_loadversion(cp);
-		CHERIBSDTEST_VERIFY2(v == 3, "incorrect version read in child: %d", v);
-		/* Store a new version. */
-		cheri_storeversion(cp, 4);
-		v = cheri_loadversion(cp); /* check our store worked */
-		CHERIBSDTEST_VERIFY2(v == 4, "failed to read back version stored in child: %d", v);
-		exit(EX_OK);
-	}
-	CHERIBSDTEST_CHECK_SYSCALL(waitpid(pid, &status, 0));
-	CHERIBSDTEST_VERIFY2(WIFEXITED(status), "child exited abnormally");
-	/*
-	 * If the child exited with error status then hopefully it set an error
-	 * message in the shared state so exit with the same code.
-	 */
-	if (WEXITSTATUS(status) != EX_OK)
-		exit(WEXITSTATUS(status));
-	v = cheri_loadversion(cp);
-	CHERIBSDTEST_VERIFY2(v == 4, "incorrect version after child exited: %d", v);
-	CHERIBSDTEST_CHECK_SYSCALL(munmap(p, page_sz));
-	cheribsdtest_success();
 }
 
 #ifdef __mips__
