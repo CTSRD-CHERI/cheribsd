@@ -2524,8 +2524,8 @@ kern_swapon(struct thread *td, const char * __capability name)
 		goto done;
 	}
 
-	NDINIT(&nd, LOOKUP, ISOPEN | FOLLOW | AUDITVNODE1, UIO_USERSPACE,
-	    name, td);
+	NDINIT(&nd, LOOKUP, ISOPEN | FOLLOW | LOCKLEAF | AUDITVNODE1,
+	    UIO_USERSPACE, name, td);
 	error = namei(&nd);
 	if (error)
 		goto done;
@@ -2545,8 +2545,10 @@ kern_swapon(struct thread *td, const char * __capability name)
 		error = swaponvp(td, vp, attr.va_size / DEV_BSIZE);
 	}
 
-	if (error)
-		vrele(vp);
+	if (error != 0)
+		vput(vp);
+	else
+		VOP_UNLOCK(vp);
 done:
 	sx_xunlock(&swdev_syscall_lock);
 	return (error);
@@ -3176,7 +3178,7 @@ swapongeom(struct vnode *vp)
 {
 	int error;
 
-	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
+	ASSERT_VOP_ELOCKED(vp, "swapongeom");
 	if (vp->v_type != VCHR || VN_IS_DOOMED(vp)) {
 		error = ENOENT;
 	} else {
@@ -3184,7 +3186,6 @@ swapongeom(struct vnode *vp)
 		error = swapongeom_locked(vp->v_rdev, vp);
 		g_topology_unlock();
 	}
-	VOP_UNLOCK(vp);
 	return (error);
 }
 
@@ -3235,6 +3236,7 @@ swaponvp(struct thread *td, struct vnode *vp, u_long nblks)
 	struct swdevt *sp;
 	int error;
 
+	ASSERT_VOP_ELOCKED(vp, "swaponvp");
 	if (nblks == 0)
 		return (ENXIO);
 	mtx_lock(&sw_dev_mtx);
@@ -3246,14 +3248,12 @@ swaponvp(struct thread *td, struct vnode *vp, u_long nblks)
 	}
 	mtx_unlock(&sw_dev_mtx);
 
-	(void) vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 #ifdef MAC
 	error = mac_system_check_swapon(td->td_ucred, vp);
 	if (error == 0)
 #endif
 		error = VOP_OPEN(vp, FREAD | FWRITE, td->td_ucred, td, NULL);
-	(void) VOP_UNLOCK(vp);
-	if (error)
+	if (error != 0)
 		return (error);
 
 	swaponsomething(vp, vp, nblks, swapdev_strategy, swapdev_close,
