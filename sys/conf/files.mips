@@ -29,7 +29,6 @@ mips/mips/fp.S				standard
 mips/mips/freebsd32_machdep.c		optional	compat_freebsd32
 mips/mips/freebsd64_machdep.c		optional	compat_freebsd64
 mips/mips/gdb_machdep.c			standard
-mips/mips/in_cksum.c			optional	inet
 mips/mips/libkern_machdep.c		standard
 mips/mips/locore.S			optional	no-obj !cheri_purecap_kernel
 mips/mips/machdep.c			standard
