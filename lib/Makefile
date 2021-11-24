@@ -40,6 +40,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libauditd \
 	libbegemot \
 	libblocksruntime \
+	libbsddialog \
 	libbsdstat \
 	libbsm \
 	libbz2 \
