@@ -515,7 +515,7 @@ interpret:
 		 */
 		NDINIT(&nd, LOOKUP, ISOPEN | LOCKLEAF | LOCKSHARED | FOLLOW |
 		    SAVENAME | AUDITVNODE1 | WANTPARENT, UIO_SYSSPACE,
-		    PTR2CAP(args->fname), td);
+		    PTR2CAP(args->fname));
 
 		error = namei(&nd);
 		if (error)

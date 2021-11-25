@@ -225,7 +225,7 @@ kern_acct(struct thread *td, const char * __capability path)
 	 */
 	if (path != NULL) {
 		NDINIT(&nd, LOOKUP, NOFOLLOW | AUDITVNODE1,
-		    UIO_USERSPACE, path, td);
+		    UIO_USERSPACE, path);
 		flags = FWRITE | O_APPEND;
 		error = vn_open(&nd, &flags, 0, NULL);
 		if (error)

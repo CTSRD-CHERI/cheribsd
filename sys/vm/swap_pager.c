@@ -2525,7 +2525,7 @@ kern_swapon(struct thread *td, const char * __capability name)
 	}
 
 	NDINIT(&nd, LOOKUP, ISOPEN | FOLLOW | LOCKLEAF | AUDITVNODE1,
-	    UIO_USERSPACE, name, td);
+	    UIO_USERSPACE, name);
 	error = namei(&nd);
 	if (error)
 		goto done;
@@ -2671,7 +2671,7 @@ kern_swapoff(struct thread *td, const char * __capability name)
 
 	sx_xlock(&swdev_syscall_lock);
 
-	NDINIT(&nd, LOOKUP, FOLLOW | AUDITVNODE1, UIO_USERSPACE, name, td);
+	NDINIT(&nd, LOOKUP, FOLLOW | AUDITVNODE1, UIO_USERSPACE, name);
 	error = namei(&nd);
 	if (error)
 		goto done;

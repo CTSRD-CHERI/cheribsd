@@ -725,7 +725,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 	hdr = NULL;
 
 	nd = malloc(sizeof(struct nameidata), M_TEMP, M_WAITOK);
-	NDINIT(nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(filename), td);
+	NDINIT(nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(filename));
 	flags = FREAD;
 	error = vn_open(nd, &flags, 0, NULL);
 	if (error) {

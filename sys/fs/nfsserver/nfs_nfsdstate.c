@@ -7644,7 +7644,7 @@ nfsrv_setdsserver(char *dspathp, char *mdspathp, NFSPROC_T *p,
 	NFSD_DEBUG(4, "setdssrv path=%s\n", dspathp);
 	*dsp = NULL;
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF, UIO_SYSSPACE,
-	    PTR2CAP(dspathp), p);
+	    PTR2CAP(dspathp));
 	error = namei(&nd);
 	NFSD_DEBUG(4, "lookup=%d\n", error);
 	if (error != 0)
@@ -7680,7 +7680,7 @@ nfsrv_setdsserver(char *dspathp, char *mdspathp, NFSPROC_T *p,
 	for (i = 0; i < nfsrv_dsdirsize; i++) {
 		snprintf(dsdirpath, dsdirsize, "%s/ds%d", dspathp, i);
 		NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF,
-		    UIO_SYSSPACE, PTR2CAP(dsdirpath), p);
+		    UIO_SYSSPACE, PTR2CAP(dsdirpath));
 		error = namei(&nd);
 		NFSD_DEBUG(4, "dsdirpath=%s lookup=%d\n", dsdirpath, error);
 		if (error != 0)
@@ -7708,7 +7708,7 @@ nfsrv_setdsserver(char *dspathp, char *mdspathp, NFSPROC_T *p,
 		 * system.
 		 */
 		NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF,
-		    UIO_SYSSPACE, PTR2CAP(mdspathp), p);
+		    UIO_SYSSPACE, PTR2CAP(mdspathp));
 		error = namei(&nd);
 		NFSD_DEBUG(4, "mds lookup=%d\n", error);
 		if (error != 0)
@@ -8567,7 +8567,7 @@ nfsrv_mdscopymr(char *mdspathp, char *dspathp, char *curdspathp, char *buf,
 	 */
 	NFSD_DEBUG(4, "mdsopen path=%s\n", mdspathp);
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF, UIO_SYSSPACE,
-	    PTR2CAP(mdspathp), p);
+	    PTR2CAP(mdspathp));
 	error = namei(&nd);
 	NFSD_DEBUG(4, "lookup=%d\n", error);
 	if (error != 0)
@@ -8586,7 +8586,7 @@ nfsrv_mdscopymr(char *mdspathp, char *dspathp, char *curdspathp, char *buf,
 		 */
 		NFSD_DEBUG(4, "curmdsdev path=%s\n", curdspathp);
 		NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF,
-		    UIO_SYSSPACE, PTR2CAP(curdspathp), p);
+		    UIO_SYSSPACE, PTR2CAP(curdspathp));
 		error = namei(&nd);
 		NFSD_DEBUG(4, "ds lookup=%d\n", error);
 		if (error != 0) {
@@ -8626,7 +8626,7 @@ nfsrv_mdscopymr(char *mdspathp, char *dspathp, char *curdspathp, char *buf,
 		/* Look up the nfsdev path and find the nfsdev structure. */
 		NFSD_DEBUG(4, "mdsdev path=%s\n", dspathp);
 		NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF,
-		    UIO_SYSSPACE, PTR2CAP(dspathp), p);
+		    UIO_SYSSPACE, PTR2CAP(dspathp));
 		error = namei(&nd);
 		NFSD_DEBUG(4, "ds lookup=%d\n", error);
 		if (error != 0) {

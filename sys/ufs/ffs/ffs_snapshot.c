@@ -265,7 +265,7 @@ ffs_snapshot(mp, snapfile)
 	 */
 restart:
 	NDINIT(&nd, CREATE, LOCKPARENT | LOCKLEAF | NOCACHE, UIO_SYSSPACE,
-	    PTR2CAP(snapfile), td);
+	    PTR2CAP(snapfile));
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	if (nd.ni_vp != NULL) {

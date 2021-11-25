@@ -1735,13 +1735,13 @@ kern_alternate_path(const char *prefix, const char * __capability path,
 		for (cp = &ptr[len] - 1; *cp != '/'; cp--);
 		*cp = '\0';
 
-		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, PTR2CAP(buf), td);
+		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, PTR2CAP(buf));
 		error = namei(&nd);
 		*cp = '/';
 		if (error != 0)
 			goto keeporig;
 	} else {
-		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, PTR2CAP(buf), td);
+		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, PTR2CAP(buf));
 
 		error = namei(&nd);
 		if (error != 0)
@@ -1755,8 +1755,7 @@ kern_alternate_path(const char *prefix, const char * __capability path,
 		 * root directory and never finding it, because "/" resolves
 		 * to the emulation root directory. This is expensive :-(
 		 */
-		NDINIT(&ndroot, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(prefix),
-		    td);
+		NDINIT(&ndroot, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(prefix));
 
 		/* We shouldn't ever get an error from this namei(). */
 		error = namei(&ndroot);

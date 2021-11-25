@@ -1081,7 +1081,7 @@ kern_ktrace(struct thread *td, const char * __capability fname, int uops,
 		/*
 		 * an operation which requires a file argument.
 		 */
-		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, fname, td);
+		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, fname);
 		flags = FREAD | FWRITE | O_NOFOLLOW;
 		error = vn_open(&nd, &flags, 0, NULL);
 		if (error)

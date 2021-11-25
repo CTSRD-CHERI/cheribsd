@@ -159,8 +159,7 @@ cd9660_mount(struct mount *mp)
 	 * Not an update, or updating the name: look up the name
 	 * and verify that it refers to a sensible block device.
 	 */
-	NDINIT(&ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, PTR2CAP(fspec),
-	    td);
+	NDINIT(&ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, PTR2CAP(fspec));
 	if ((error = namei(&ndp)))
 		return (error);
 	NDFREE(&ndp, NDF_ONLY_PNBUF);

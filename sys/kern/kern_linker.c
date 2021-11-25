@@ -1888,7 +1888,7 @@ linker_lookup_file(const char *path, int pathlen, const char *name,
 		 * Attempt to open the file, and return the path if
 		 * we succeed and it's a regular file.
 		 */
-		NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(result), td);
+		NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(result));
 		flags = FREAD;
 		error = vn_open(&nd, &flags, 0, NULL);
 		if (error == 0) {
@@ -1938,7 +1938,7 @@ linker_hints_lookup(const char *path, int pathlen, const char *modname,
 	snprintf(pathbuf, reclen, "%.*s%s%s", pathlen, path, sep,
 	    linker_hintfile);
 
-	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, PTR2CAP(pathbuf), td);
+	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, PTR2CAP(pathbuf));
 	flags = FREAD;
 	error = vn_open(&nd, &flags, 0, NULL);
 	if (error)
