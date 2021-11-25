@@ -306,7 +306,6 @@ MAN=	aac.4 \
 	mlx.4 \
 	mlx4en.4 \
 	mlx5en.4 \
-	mly.4 \
 	mmc.4 \
 	mmcsd.4 \
 	mod_cc.4 \
