@@ -123,9 +123,8 @@ int	kern_accessat(struct thread *td, int fd, const char * __capability path,
 int	kern_acct(struct thread *td, const char * __capability path);
 int	kern_adjtime(struct thread *td, struct timeval *delta,
 	    struct timeval *olddelta);
-int	kern_alternate_path(struct thread *td, const char *prefix,
-	    const char * __capability path, enum uio_seg pathseg,
-	    char **pathbuf, int create, int dirfd);
+int	kern_alternate_path(const char *prefix, const char * __capability path,
+	    enum uio_seg pathseg, char **pathbuf, int create, int dirfd);
 int	kern_audit(struct thread *td, const void * __capability record,
 	    u_int length);
 int	kern_auditctl(struct thread *td, const char * __capability path);
