@@ -224,7 +224,6 @@ MAN=	aac.4 \
 	iichid.4 \
 	iicmux.4 \
 	iicsmb.4 \
-	iir.4 \
 	${_igc.4} \
 	${_imcsmb.4} \
 	inet.4 \
