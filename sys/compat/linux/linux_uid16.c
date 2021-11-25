@@ -85,7 +85,7 @@ linux_chown16(struct thread *td, struct linux_chown16_args *args)
 		    UIO_USERSPACE, CAST_NOCHG(args->uid),
 		    CAST_NOCHG(args->gid), 0);
 	} else {
-		LCONVPATHEXIST(td, args->path, &path);
+		LCONVPATHEXIST(args->path, &path);
 		/*
 		 * The DTrace probes have to be after the LCONVPATHEXIST, as
 		 * LCONVPATHEXIST may return on its own and we do not want to
@@ -111,7 +111,7 @@ linux_lchown16(struct thread *td, struct linux_lchown16_args *args)
 		    UIO_USERSPACE, CAST_NOCHG(args->uid),
 		    CAST_NOCHG(args->gid), AT_SYMLINK_NOFOLLOW);
 	} else {
-		LCONVPATHEXIST(td, args->path, &path);
+		LCONVPATHEXIST(args->path, &path);
 
 		/*
 		 * The DTrace probes have to be after the LCONVPATHEXIST, as

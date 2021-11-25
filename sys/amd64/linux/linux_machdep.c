@@ -112,7 +112,7 @@ linux_execve(struct thread *td, struct linux_execve_args *args)
 		    UIO_USERSPACE, __USER_CAP_UNBOUND(args->argp),
 		    __USER_CAP_UNBOUND(args->envp));
 	} else {
-		LCONVPATHEXIST(td, args->path, &path);
+		LCONVPATHEXIST(args->path, &path);
 		error = exec_copyin_args(&eargs, PTR2CAP(path), UIO_SYSSPACE,
 		    __USER_CAP_UNBOUND(args->argp),
 		    __USER_CAP_UNBOUND(args->envp));
