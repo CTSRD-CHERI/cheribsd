@@ -1675,13 +1675,11 @@ int
 kern_alternate_path(const char *prefix, const char * __capability path,
     enum uio_seg pathseg, char **pathbuf, int create, int dirfd)
 {
-	struct thread *td;
 	struct nameidata nd, ndroot;
 	char *ptr, *buf, *cp;
 	size_t len, sz;
 	int error;
 
-	td = curthread;
 	buf = (char *) malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
 	*pathbuf = buf;
 
