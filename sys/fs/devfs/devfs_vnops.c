@@ -2078,6 +2078,7 @@ static struct vop_vector devfs_vnodeops = {
 	.vop_lock1 =		vop_lock,
 	.vop_unlock =		vop_unlock,
 	.vop_islocked =		vop_islocked,
+	.vop_add_writecount =	vop_stdadd_writecount_nomsync,
 };
 VFS_VOP_VECTOR_REGISTER(devfs_vnodeops);
 
@@ -2119,6 +2120,7 @@ static struct vop_vector devfs_specops = {
 	.vop_lock1 =		vop_lock,
 	.vop_unlock =		vop_unlock,
 	.vop_islocked =		vop_islocked,
+	.vop_add_writecount =	vop_stdadd_writecount_nomsync,
 };
 VFS_VOP_VECTOR_REGISTER(devfs_specops);
 
