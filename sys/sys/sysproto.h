@@ -2368,6 +2368,14 @@ struct osendmsg_args {
 	char msg_l_[PADL_(const struct omsghdr * __capability)]; const struct omsghdr * __capability msg; char msg_r_[PADR_(const struct omsghdr * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
+struct orecvfrom_args {
+	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
+	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char from_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability from; char from_r_[PADR_(struct sockaddr * __capability)];
+	char fromlenaddr_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __capability)];
+};
 struct otruncate_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char length_l_[PADL_(long)]; long length; char length_r_[PADR_(long)];
@@ -2395,6 +2403,11 @@ struct osetrlimit_args {
 struct okillpg_args {
 	char pgid_l_[PADL_(int)]; int pgid; char pgid_r_[PADR_(int)];
 	char signum_l_[PADL_(int)]; int signum; char signum_r_[PADR_(int)];
+};
+struct ogetsockname_args {
+	char fdes_l_[PADL_(int)]; int fdes; char fdes_r_[PADR_(int)];
+	char asa_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability asa; char asa_r_[PADR_(struct sockaddr * __capability)];
+	char alen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability alen; char alen_r_[PADR_(__socklen_t * __capability)];
 };
 struct ogetdirentries_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -2427,7 +2440,7 @@ int	osigsuspend(struct thread *, struct osigsuspend_args *);
 int	osigstack(struct thread *, struct osigstack_args *);
 int	orecvmsg(struct thread *, struct orecvmsg_args *);
 int	osendmsg(struct thread *, struct osendmsg_args *);
-int	orecvfrom(struct thread *, struct recvfrom_args *);
+int	orecvfrom(struct thread *, struct orecvfrom_args *);
 int	otruncate(struct thread *, struct otruncate_args *);
 int	oftruncate(struct thread *, struct oftruncate_args *);
 int	ogetpeername(struct thread *, struct ogetpeername_args *);
@@ -2437,7 +2450,7 @@ int	ogetrlimit(struct thread *, struct ogetrlimit_args *);
 int	osetrlimit(struct thread *, struct osetrlimit_args *);
 int	okillpg(struct thread *, struct okillpg_args *);
 int	oquota(struct thread *, struct oquota_args *);
-int	ogetsockname(struct thread *, struct getsockname_args *);
+int	ogetsockname(struct thread *, struct ogetsockname_args *);
 int	ogetdirentries(struct thread *, struct ogetdirentries_args *);
 
 #endif /* COMPAT_43 */
