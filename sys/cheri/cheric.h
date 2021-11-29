@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2013-2016 Robert N. M. Watson
+ * Copyright (c) 2021 Microsoft Corp.
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -75,6 +76,29 @@
 
 #define	cheri_setbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
 #define	cheri_setboundsexact(x, y)	__builtin_cheri_bounds_set_exact((x), (y))
+
+/* Compare capabilities including bounds and perms etc. */
+#define cheri_equal_exact(x, y) __builtin_cheri_equal_exact(x, y)
+
+/*
+ * Return whether the two pointers are equal, including capability metadata if
+ * in purecap mode.
+ */
+#ifdef __cplusplus
+static inline bool
+#else
+static inline _Bool
+#endif
+cheri_ptr_equal_exact(void *x, void *y)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* For purecap compare the entire capability including metadata */
+	return (cheri_equal_exact(x, y));
+#else
+	/* In hybrid mode void * is just an address */
+	return (x == y);
+#endif
+}
 
 /*
  * Soft implementation of cheri_subset_test().
