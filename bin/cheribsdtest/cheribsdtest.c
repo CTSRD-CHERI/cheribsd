@@ -1,6 +1,7 @@
 /*-
  * Copyright (c) 2012-2018, 2020 Robert N. M. Watson
  * Copyright (c) 2014-2016 SRI International
+ * Copyright (c) 2021 Microsoft Corp.
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -374,7 +375,25 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 	(void)waitpid(childpid, &status, 0);
 
 	/*
-	 * First, check for errors from the test framework: successful process
+	 * If the test explicitly signalled failure for some reason, report
+	 * this first rather than reporting an expected failure that has
+	 * not yet been triggered.
+	 */
+	if (ccsp->ccs_testresult == TESTRESULT_FAILURE) {
+		/*
+		 * Ensure string is nul-terminated, as we will print
+		 * it in due course, and a failed test might have left
+		 * a corrupted string.
+		 */
+		ccsp->ccs_testresult_str[sizeof(ccsp->ccs_testresult_str) - 1] =
+		    '\0';
+		memcpy(reason, ccsp->ccs_testresult_str,
+		    sizeof(ccsp->ccs_testresult_str));
+		goto fail;
+	}
+
+	/*
+	 * Check for errors from the test framework: successful process
 	 * termination, signal disposition/exception codes/etc.  Analyse
 	 * child's signal state returned via shared memory.
 	 */
@@ -443,18 +462,6 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		if (ccsp->ccs_testresult == TESTRESULT_UNKNOWN) {
 			snprintf(reason, sizeof(reason),
 			    "Test failed to set a success/failure status");
-			goto fail;
-		}
-		if (ccsp->ccs_testresult == TESTRESULT_FAILURE) {
-			/*
-			 * Ensure string is nul-terminated, as we will print
-			 * it in due course, and a failed test might have left
-			 * a corrupted string.
-			 */
-			ccsp->ccs_testresult_str[
-			    sizeof(ccsp->ccs_testresult_str) - 1] = '\0';
-			memcpy(reason, ccsp->ccs_testresult_str,
-			    sizeof(ccsp->ccs_testresult_str));
 			goto fail;
 		}
 		if (ccsp->ccs_testresult != TESTRESULT_SUCCESS) {
