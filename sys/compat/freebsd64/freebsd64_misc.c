@@ -1453,7 +1453,7 @@ freebsd64_rtprio(struct thread *td, struct freebsd64_rtprio_args *uap)
 }
 
 int
-freebsd64_setrlimit(struct thread *td, struct freebsd64___setrlimit_args *uap)
+freebsd64_setrlimit(struct thread *td, struct freebsd64_setrlimit_args *uap)
 {
 	struct rlimit alim;
 	int error;
@@ -1465,7 +1465,7 @@ freebsd64_setrlimit(struct thread *td, struct freebsd64___setrlimit_args *uap)
 }
 
 int
-freebsd64_getrlimit(struct thread *td, struct freebsd64___getrlimit_args *uap)
+freebsd64_getrlimit(struct thread *td, struct freebsd64_getrlimit_args *uap)
 {
 	struct rlimit rlim;
 	int error;
