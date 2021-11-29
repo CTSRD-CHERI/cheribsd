@@ -9,7 +9,6 @@
 #define	_SYSARGMAP_H_
 
 static int sysargmask[] = {
-	[SYS_syscall] = (0x0),
 	[SYS_exit] = (0x0),
 	[SYS_fork] = (0x0),
 	[SYS_read] = (0x0 | 0x2),
