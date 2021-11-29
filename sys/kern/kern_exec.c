@@ -488,6 +488,7 @@ kern_execve(struct thread *td, struct image_args *args,
 		case ENOEXEC:
 		case ENOENT:
 		case ELOOP:
+			exec_free_args(args);
 			return (error);
 		default:
 			break;
@@ -1088,7 +1089,6 @@ exec_fail:
 	mac_execve_exit(imgp);
 	mac_execve_interpreter_exit(interpvplabel);
 #endif
-	exec_free_args(args);
 
 	/*
 	 * Handle deferred decrement of ref counts.
@@ -1115,6 +1115,8 @@ exec_fail:
 			if (error == EJUSTRETURN)
 				return (error);
 		}
+		exec_free_args(args);
+
 		/* sorry, no more process anymore. exit gracefully */
 		if (cop != NULL)
 			PRELE(cop);
@@ -1122,6 +1124,8 @@ exec_fail:
 		exit1(td, 0, SIGABRT);
 		/* NOT REACHED */
 	}
+	if (!opportunistic)
+		exec_free_args(args);
 
 #ifdef KTRACE
 	if (error == 0)

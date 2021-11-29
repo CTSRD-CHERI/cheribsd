@@ -540,7 +540,7 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	    CHERI_PERM_STORE_CAP;
 	vm_offset_t start = (vm_offset_t)-1;
 	vm_offset_t end = 0;
-	vm_offset_t alignment, seg_addr;
+	vm_offset_t alignment, load_addr, seg_addr;
 	vm_size_t seg_size, size;
 	int i, result;
 	vm_pointer_t reservation;
@@ -593,20 +593,21 @@ __elfN(build_imgact_capability)(struct image_params *imgp,
 	 */
 	alignment = MAX(CHERI_REPRESENTABLE_ALIGNMENT(end - start), PAGE_SIZE);
 	size = CHERI_REPRESENTABLE_LENGTH(end - start);
-	reservation = roundup2(start + rbase, alignment);
+	load_addr = roundup2(start + rbase, alignment);
 	vm_map_lock(map);
 	if (imgp->cop != NULL) {
 		/*
 		 * For binaries in coprocesses, find an available load
 		 * address.
 		 */
-		result = vm_map_find_aligned(map, &reservation, size, 0,
+		result = vm_map_find_aligned(map, &load_addr, size, 0,
 		    alignment);
 		if (result != KERN_SUCCESS) {
 			vm_map_unlock(map);
 			return (ENOMEM);
 		}
 	}
+	reservation = load_addr;
 	result = vm_map_reservation_create_locked(map, &reservation, size,
 	    VM_PROT_ALL);
 	vm_map_unlock(map);
@@ -1394,20 +1395,19 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	sv = brand_info->sysvec;
 
 	/*
-	 * Check if colocation is allowed.  We can only do it after we know
-	 * if the binary is for CheriABI or not.  We also check the proccess
-	 * to colocate with.
+	 * Check if colocation is allowed.  We require both processes
+	 * to be CheriABI.
 	 */
 	if (imgp->cop != NULL) {
-		/* XXX-JHB: This check is equivalent to #ifndef ELF_CHERI. */
-		if ((sv->sv_flags & SV_CHERI) == 0) {
-			error = EPERM;
-			goto ret;
-		}
+#ifdef ELF_CHERI
 		if (SV_PROC_FLAG(imgp->cop, SV_CHERI) == 0) {
 			error = EPERM;
 			goto ret;
 		}
+#else
+		error = EPERM;
+		goto ret;
+#endif
 	}
 
 	et_dyn_addr = 0;
@@ -1511,16 +1511,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 	if (error != 0)
 		goto ret;
-
-#if 0
-	/*
-	 * XXX: For some reason imgp->start_addr is changed from ~0UL to 0 so due
-	 * to computing the minimum we were always getting a start_addr of 0.
-	 */
-	/* KASSERT(imgp->start_addr != 0,
-	 *   ("Should be ULONG_MAX and not 0x%lx", imgp->start_addr)); */
-	imgp->start_addr = ~0UL;
-#endif
 
 #if __has_feature(capabilities)
 	error = __elfN(build_imgact_capability)(imgp, &imgp->imgact_capability,
