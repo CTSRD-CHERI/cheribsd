@@ -498,7 +498,7 @@ static void	swp_pager_free_empty_swblk(vm_object_t, struct swblk *sb);
 static int	swapongeom(struct vnode *);
 static int	swaponvp(struct thread *, struct vnode *, u_long);
 static int	swapoff_one(struct swdevt *sp, struct ucred *cred,
-		    bool ignore_check);
+		    u_int flags);
 
 /*
  * Swap bitmap functions
@@ -2676,7 +2676,7 @@ kern_swapoff(struct thread *td, const char * __capability name)
 		error = copyincap(name, &sa, sizeof(sa));
 		if (error != 0)
 			return (error);
-		if (sa.flags != 0)
+		if ((sa.flags & ~(SWAPOFF_FORCE)) != 0)
 			return (EINVAL);
 		break;
 	default:
@@ -2704,14 +2704,14 @@ kern_swapoff(struct thread *td, const char * __capability name)
 		error = EINVAL;
 		goto done;
 	}
-	error = swapoff_one(sp, td->td_ucred, false);
+	error = swapoff_one(sp, td->td_ucred, sa.flags);
 done:
 	sx_xunlock(&swdev_syscall_lock);
 	return (error);
 }
 
 static int
-swapoff_one(struct swdevt *sp, struct ucred *cred, bool ignore_check)
+swapoff_one(struct swdevt *sp, struct ucred *cred, u_int flags)
 {
 	u_long nblks;
 #ifdef MAC
@@ -2741,7 +2741,7 @@ swapoff_one(struct swdevt *sp, struct ucred *cred, bool ignore_check)
 	 * means that we can lose swap data when filesystems go away,
 	 * which is arguably worse.
 	 */
-	if (!ignore_check &&
+	if ((flags & SWAPOFF_FORCE) == 0 &&
 	    vm_free_count() + swap_pager_avail < nblks + nswap_lowat)
 		return (ENOMEM);
 
@@ -2792,7 +2792,7 @@ swapoff_all(void)
 			devname = devtoname(sp->sw_vp->v_rdev);
 		else
 			devname = "[file]";
-		error = swapoff_one(sp, thread0.td_ucred, true);
+		error = swapoff_one(sp, thread0.td_ucred, SWAPOFF_FORCE);
 		if (error != 0) {
 			printf("Cannot remove swap device %s (error=%d), "
 			    "skipping.\n", devname, error);
