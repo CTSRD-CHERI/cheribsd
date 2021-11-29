@@ -947,7 +947,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	}
 	/* freebsd64_getrlimit */
 	case 194: {
-		struct freebsd64___getrlimit_args *p = params;
+		struct freebsd64_getrlimit_args *p = params;
 		uarg[a++] = p->which; /* u_int */
 		uarg[a++] = (intptr_t)p->rlp; /* struct rlimit * */
 		*n_args = 2;
@@ -955,7 +955,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	}
 	/* freebsd64_setrlimit */
 	case 195: {
-		struct freebsd64___setrlimit_args *p = params;
+		struct freebsd64_setrlimit_args *p = params;
 		uarg[a++] = p->which; /* u_int */
 		uarg[a++] = (intptr_t)p->rlp; /* struct rlimit * */
 		*n_args = 2;

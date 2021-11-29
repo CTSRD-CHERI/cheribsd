@@ -385,11 +385,11 @@ struct freebsd64_pathconf_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
 	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
 };
-struct freebsd64___getrlimit_args {
+struct freebsd64_getrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
 	char rlp_l_[PADL_(struct rlimit *)]; struct rlimit * rlp; char rlp_r_[PADR_(struct rlimit *)];
 };
-struct freebsd64___setrlimit_args {
+struct freebsd64_setrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
 	char rlp_l_[PADL_(struct rlimit *)]; struct rlimit * rlp; char rlp_r_[PADR_(struct rlimit *)];
 };
@@ -1591,8 +1591,8 @@ int	freebsd64_msgsys(struct thread *, struct freebsd64_msgsys_args *);
 int	freebsd64_shmsys(struct thread *, struct freebsd64_shmsys_args *);
 int	freebsd64_ntp_adjtime(struct thread *, struct freebsd64_ntp_adjtime_args *);
 int	freebsd64_pathconf(struct thread *, struct freebsd64_pathconf_args *);
-int	freebsd64_getrlimit(struct thread *, struct freebsd64___getrlimit_args *);
-int	freebsd64_setrlimit(struct thread *, struct freebsd64___setrlimit_args *);
+int	freebsd64_getrlimit(struct thread *, struct freebsd64_getrlimit_args *);
+int	freebsd64_setrlimit(struct thread *, struct freebsd64_setrlimit_args *);
 int	freebsd64___sysctl(struct thread *, struct freebsd64___sysctl_args *);
 int	freebsd64_mlock(struct thread *, struct freebsd64_mlock_args *);
 int	freebsd64_munlock(struct thread *, struct freebsd64_munlock_args *);
