@@ -621,7 +621,7 @@ int	user_getpeername(struct thread *td, int fdes,
 	    socklen_t * __capability alen, int compat);
 int	user_getsockname(struct thread *td, int fdes,
 	    struct sockaddr * __restrict __capability asa,
-	    socklen_t * __capability alen, int compat);
+	    socklen_t * __capability alen, bool compat);
 int	user_getsockopt(struct thread *td, int s, int level, int name,
 	    void * __capability val, socklen_t * __capability avalsize);
 int	user_ioctl(struct thread *td, int fd, u_long com,

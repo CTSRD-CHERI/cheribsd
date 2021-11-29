@@ -1381,7 +1381,7 @@ kern_getsockopt(struct thread *td, int s, int level, int name,
 int
 user_getsockname(struct thread *td, int fdes,
     struct sockaddr * __restrict __capability asa,
-    socklen_t * __capability alen, int compat)
+    socklen_t * __capability alen, bool compat)
 {
 	struct sockaddr *sa;
 	socklen_t len;
@@ -1450,16 +1450,14 @@ bad:
 int
 sys_getsockname(struct thread *td, struct getsockname_args *uap)
 {
-
-	return (user_getsockname(td, uap->fdes, uap->asa, uap->alen, 0));
+	return (user_getsockname(td, uap->fdes, uap->asa, uap->alen, false));
 }
 
 #ifdef COMPAT_OLDSOCK
 int
 ogetsockname(struct thread *td, struct getsockname_args *uap)
 {
-
-	return (user_getsockname(td, uap->fdes, uap->asa, uap->alen, 1));
+	return (user_getsockname(td, uap->fdes, uap->asa, uap->alen, true));
 }
 #endif /* COMPAT_OLDSOCK */
 
@@ -1540,7 +1538,6 @@ done:
 int
 sys_getpeername(struct thread *td, struct getpeername_args *uap)
 {
-
 	return (user_getpeername(td, uap->fdes, uap->asa, uap->alen, 0));
 }
 
@@ -1548,7 +1545,6 @@ sys_getpeername(struct thread *td, struct getpeername_args *uap)
 int
 ogetpeername(struct thread *td, struct ogetpeername_args *uap)
 {
-
 	return (user_getpeername(td, uap->fdes, uap->asa, uap->alen, 1));
 }
 #endif /* COMPAT_OLDSOCK */

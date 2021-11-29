@@ -440,7 +440,7 @@ freebsd64_getsockname(struct thread *td, struct freebsd64_getsockname_args *uap)
 {
 
 	return (user_getsockname(td, uap->fdes, __USER_CAP_UNBOUND(uap->asa),
-	    __USER_CAP_OBJ(uap->alen), 0));
+	    __USER_CAP_OBJ(uap->alen), false));
 }
 
 int
