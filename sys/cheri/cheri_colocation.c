@@ -506,7 +506,7 @@ setup_scb(struct thread *td)
 	}
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	td->td_scb = addr;
+	td->td_scb = (void *)addr;
 #else
 	td->td_scb = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 	    addr, PAGE_SIZE, 0);
@@ -1149,7 +1149,7 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 	bool have_scb, shown_borrowertd;
 
 	if (have_addr) {
-		error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_root_cap),
+		error = copyincap(___USER_CFROMPTR(addr, userspace_root_cap),
 		    &scb, sizeof(scb));
 		if (error != 0) {
 			db_printf("%s: copyincap failed, error %d\n", __func__, error);
