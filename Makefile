@@ -165,8 +165,9 @@ TGTS=	all all-man buildenv buildenvvars buildkernel buildsysroot buildworld \
 	build32 distribute32 install32 \
 	build64 distribute64 install64 \
 	buildsoft distributesoft installsoft \
-	buildcheri distributecheri \
+	build64c distribute64c \
 	libcheribuildenv libcheribuildenvvars \
+	lib64cbuildenv lib64cbuildenvvars \
 	lib64buildenv lib64buildenvvars lib32buildenv lib32buildenvvars \
 	builddtb xdev xdev-build xdev-install \
 	xdev-links native-xtools native-xtools-install stageworld stagekernel \
@@ -486,7 +487,7 @@ MMAKE=		${MMAKEENV} ${MAKE} \
 		OBJTOP=${MYMAKE:H}/obj \
 		OBJROOT='$${OBJTOP}/' \
 		MAKEOBJDIRPREFIX= \
-		MAN= -DNO_SHARED \
+		MK_MAN=no -DNO_SHARED \
 		-DNO_CPU_CFLAGS MK_WERROR=no \
 		-DNO_SUBDIR \
 		DESTDIR= PROGNAME=${MYMAKE:T}

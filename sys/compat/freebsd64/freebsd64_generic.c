@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/ioccom.h>
 #include <sys/poll.h>
 #include <sys/proc.h>
+#include <sys/specialfd.h>
 #include <sys/syscallsubr.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
@@ -151,6 +152,23 @@ freebsd64_ioctl(struct thread *td, struct freebsd64_ioctl_args *uap)
 		udata = __USER_CAP(uap->data, IOCPARM_LEN(com));
 
 	return (user_ioctl(td, uap->fd, com, udata, &uap->data, 0));
+}
+
+int
+freebsd64___specialfd(struct thread *td,
+    struct freebsd64___specialfd_args *args)
+{
+	void * __capability req;
+
+	switch(args->type) {
+	case SPECIALFD_EVENTFD:
+		req = __USER_CAP(args->req, sizeof(struct specialfd_eventfd));
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	return (user_specialfd(td, args->type, req, args->len));
 }
 
 int

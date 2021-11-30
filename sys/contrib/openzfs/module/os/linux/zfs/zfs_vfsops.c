@@ -294,7 +294,7 @@ zfs_sync(struct super_block *sb, int wait, cred_t *cr)
 	} else {
 		/*
 		 * Sync all ZFS filesystems.  This is what happens when you
-		 * run sync(1M).  Unlike other filesystems, ZFS honors the
+		 * run sync(1).  Unlike other filesystems, ZFS honors the
 		 * request by waiting for all pools to commit all dirty data.
 		 */
 		spa_sync_allpools();
@@ -1451,7 +1451,7 @@ int
 zfs_domount(struct super_block *sb, zfs_mnt_t *zm, int silent)
 {
 	const char *osname = zm->mnt_osname;
-	struct inode *root_inode;
+	struct inode *root_inode = NULL;
 	uint64_t recordsize;
 	int error = 0;
 	zfsvfs_t *zfsvfs = NULL;
@@ -1734,7 +1734,11 @@ zfs_vget(struct super_block *sb, struct inode **ipp, fid_t *fidp)
 			VERIFY(zfsctl_root_lookup(*ipp, "snapshot", ipp,
 			    0, kcred, NULL, NULL) == 0);
 		} else {
-			igrab(*ipp);
+			/*
+			 * Must have an existing ref, so igrab()
+			 * cannot return NULL
+			 */
+			VERIFY3P(igrab(*ipp), !=, NULL);
 		}
 		ZFS_EXIT(zfsvfs);
 		return (0);
@@ -1772,7 +1776,7 @@ zfs_vget(struct super_block *sb, struct inode **ipp, fid_t *fidp)
 
 	*ipp = ZTOI(zp);
 	if (*ipp)
-		zfs_inode_update(ITOZ(*ipp));
+		zfs_znode_update_vfs(ITOZ(*ipp));
 
 	ZFS_EXIT(zfsvfs);
 	return (0);

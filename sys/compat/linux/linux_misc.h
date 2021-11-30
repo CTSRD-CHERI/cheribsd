@@ -58,6 +58,7 @@
 #define	LINUX_PR_GET_NAME	16	/* Get process name. */
 #define	LINUX_PR_GET_SECCOMP	21
 #define	LINUX_PR_SET_SECCOMP	22
+#define	LINUX_PR_CAPBSET_READ	23
 #define	LINUX_PR_SET_NO_NEW_PRIVS	38
 #define	LINUX_PR_SET_PTRACER	1499557217
 
@@ -87,6 +88,7 @@ extern const char *linux_kplatform;
 					 * differ from AT_PLATFORM.
 					 */
 #define	LINUX_AT_RANDOM		25	/* address of random bytes */
+#define	LINUX_AT_HWCAP2		26	/* CPU capabilities, second part */
 #define	LINUX_AT_EXECFN		31	/* filename of program */
 #define	LINUX_AT_SYSINFO	32	/* vsyscall */
 #define	LINUX_AT_SYSINFO_EHDR	33	/* vdso header */
@@ -180,7 +182,7 @@ extern int stclohz;
 int linux_ptrace_status(struct thread *td, int pid, int status);
 #endif
 void linux_to_bsd_waitopts(int options, int *bsdopts);
-int linux_set_upcall_kse(struct thread *td, register_t stack);
+int linux_set_upcall(struct thread *td, register_t stack);
 int linux_set_cloned_tls(struct thread *td, void *desc);
 struct thread	*linux_tdfind(struct thread *, lwpid_t, pid_t);
 

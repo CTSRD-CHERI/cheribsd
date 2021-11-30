@@ -302,8 +302,7 @@ int
 sys_mmap(struct thread *td, struct mmap_args *uap)
 {
 #if !__has_feature(capabilities)
-	return (kern_mmap(td,
-	    &(struct mmap_req){
+	return (kern_mmap(td, &(struct mmap_req){
 		.mr_hint = (uintptr_t)uap->addr,
 		.mr_len = uap->len,
 		.mr_prot = uap->prot,
@@ -429,8 +428,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	 * set at this point.  A simple assert is not easy to contruct...
 	 */
 
-	return (kern_mmap(td,
-	    &(struct mmap_req){
+	return (kern_mmap(td, &(struct mmap_req){
 		.mr_hint = hint,
 		.mr_max_addr = cheri_gettop(source_cap),
 		.mr_len = uap->len,
@@ -462,7 +460,7 @@ kern_mmap_maxprot(struct proc *p, int prot)
 }
 
 int
-kern_mmap(struct thread *td, struct mmap_req *mrp)
+kern_mmap(struct thread *td, const struct mmap_req *mrp)
 {
 	struct vmspace *vms;
 	struct file *fp;
@@ -498,7 +496,7 @@ kern_mmap(struct thread *td, struct mmap_req *mrp)
 	prot = PROT_EXTRACT(prot);
 	if (max_prot != 0 && (max_prot & prot) != prot) {
 		SYSERRCAUSE(
-		    "%s: requested page permissions exceed requesed maximum",
+		    "%s: requested page permissions exceed requested maximum",
 		    __func__);
 		return (ENOTSUP);
 	}
@@ -823,8 +821,7 @@ done:
 int
 freebsd6_mmap(struct thread *td, struct freebsd6_mmap_args *uap)
 {
-	return (kern_mmap(td,
-	    &(struct mmap_req){
+	return (kern_mmap(td, &(struct mmap_req){
 		.mr_hint = (uintptr_t)uap->addr,
 		.mr_len = uap->len,
 		.mr_prot = uap->prot,
@@ -883,8 +880,7 @@ ommap(struct thread *td, struct ommap_args *uap)
 		flags |= MAP_PRIVATE;
 	if (uap->flags & OMAP_FIXED)
 		flags |= MAP_FIXED;
-	return (kern_mmap(td,
-	    &(struct mmap_req){
+	return (kern_mmap(td, &(struct mmap_req){
 		.mr_hint = (uintptr_t)uap->addr,
 		.mr_len = uap->len,
 		.mr_prot = prot,
@@ -1080,6 +1076,7 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
 	vm_offset_t addr;
 	vm_size_t pageoff;
 	int vm_error, max_prot;
+	int flags;
 
 	addr = addr0;
 	if ((prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))) != 0)
@@ -1103,16 +1100,15 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
 	    (vm_error = vm_wxcheck(td->td_proc, "mprotect")))
 		goto out;
 
-	vm_error = KERN_SUCCESS;
+	flags = VM_MAP_PROTECT_SET_PROT | VM_MAP_PROTECT_KEEP_CAP;
 	if (max_prot != 0) {
 		if ((max_prot & prot) != prot)
 			return (ENOTSUP);
-		vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
-		    addr, addr + size, max_prot, TRUE, TRUE);
+		flags |= VM_MAP_PROTECT_SET_MAXPROT;
 	}
 	if (vm_error == KERN_SUCCESS)
 		vm_error = vm_map_protect(&td->td_proc->p_vmspace->vm_map,
-		    addr, addr + size, prot, FALSE, TRUE);
+		    addr, addr + size, prot, max_prot, flags);
 
 out:
 	switch (vm_error) {
@@ -1122,6 +1118,8 @@ out:
 		return (EACCES);
 	case KERN_RESOURCE_SHORTAGE:
 		return (ENOMEM);
+	case KERN_OUT_OF_BOUNDS:
+		return (ENOTSUP);
 	}
 	return (EINVAL);
 }

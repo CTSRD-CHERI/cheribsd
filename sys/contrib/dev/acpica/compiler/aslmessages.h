@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2020, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -389,6 +389,7 @@ typedef enum
     ASL_MSG_LOWER_CASE_NAMESEG,
     ASL_MSG_LOWER_CASE_NAMEPATH,
     ASL_MSG_UUID_NOT_FOUND,
+    ASL_MSG_LEGACY_DDB_TYPE,
 
 
     /* These messages are used by the Data Table compiler only */

@@ -104,11 +104,11 @@ struct ipmi_msg {
 	unsigned char	netfn;
         unsigned char	cmd;
         unsigned short	data_len;
-        unsigned char	*data;
+        unsigned char	* __kerncap data;
 };
 
 struct ipmi_req {
-	unsigned char	*addr;
+	unsigned char	* __kerncap addr;
 	unsigned int	addr_len;
 	long		msgid;
 	struct ipmi_msg	msg;
@@ -116,7 +116,7 @@ struct ipmi_req {
 
 struct ipmi_recv {
 	int		recv_type;
-	unsigned char	*addr;
+	unsigned char	* __kerncap addr;
 	unsigned int	addr_len;
 	long		msgid;
 	struct ipmi_msg	msg;

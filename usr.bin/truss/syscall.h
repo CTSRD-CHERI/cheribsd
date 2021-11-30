@@ -87,6 +87,7 @@ enum Argtype {
 	/* Encoded scalar values. */
 	Accessmode,
 	Acltype,
+	AiofsyncOp,
 	Atfd,
 	Atflags,
 	CapFcntlRights,
@@ -101,6 +102,7 @@ enum Argtype {
 	Ioctl,
 	Kldsymcmd,
 	Kldunloadflags,
+	LioMode,
 	Madvice,
 	Minherit,
 	Msgflags,
@@ -115,6 +117,8 @@ enum Argtype {
 	Procctl,
 	Priowhich,
 	Ptraceop,
+	Sendfileflags,
+	Sendfilehdtr,
 	Quotactlcmd,
 	Reboothowto,
 	Resource,
@@ -139,6 +143,8 @@ enum Argtype {
 
 	/* Pointers to non-structures. */
 	Ptr,
+	AiocbArray,
+	AiocbPointer,
 	BinString,
 	CapRights,
 	ExecArgs,
@@ -157,6 +163,7 @@ enum Argtype {
 	StringArray,
 
 	/* Pointers to structures. */
+	Aiocb,
 	Itimerval,
 	Kevent,
 	Kevent11,
@@ -168,6 +175,7 @@ enum Argtype {
 	Schedparam,
 	Sctpsndrcvinfo,
 	Sigaction,
+	Sigevent,
 	Siginfo,
 	Sigset,
 	Sockaddr,

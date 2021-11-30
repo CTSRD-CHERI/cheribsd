@@ -163,7 +163,9 @@ struct ostatfs {
 	 */
 	long	f_spare[2];		/* unused spare */
 };
+#endif	/* _KERNEL */
 
+#if defined(_WANT_MOUNT) || defined(_KERNEL)
 TAILQ_HEAD(vnodelst, vnode);
 
 /* Mount options list */
@@ -196,6 +198,7 @@ _Static_assert(sizeof(struct mount_pcpu) == 16,
  * 	l - mnt_listmtx
  *	m - mountlist_mtx
  *	i - interlock
+ *	i* - interlock of uppers' list head
  *	v - vnode freelist mutex
  *
  * Unmarked fields are considered stable as long as a ref is held.
@@ -240,10 +243,12 @@ struct mount {
 	struct vnodelst	mnt_lazyvnodelist;	/* (l) list of lazy vnodes */
 	int		mnt_lazyvnodelistsize;	/* (l) # of lazy vnodes */
 	struct lock	mnt_explock;		/* vfs_export walkers lock */
-	TAILQ_ENTRY(mount) mnt_upper_link;	/* (m) we in the all uppers */
-	TAILQ_HEAD(, mount) mnt_uppers;		/* (m) upper mounts over us*/
+	TAILQ_ENTRY(mount) mnt_upper_link;	/* (i*) we in the all uppers */
+	TAILQ_HEAD(, mount) mnt_uppers;		/* (i) upper mounts over us */
 };
+#endif	/* _WANT_MOUNT || _KERNEL */
 
+#ifdef _KERNEL
 /*
  * Definitions for MNT_VNODE_FOREACH_ALL.
  */
@@ -1003,6 +1008,7 @@ void	vfs_mount_error(struct mount *, const char *, ...);
 void	vfs_mountroot(void);			/* mount our root filesystem */
 void	vfs_mountedfrom(struct mount *, const char *from);
 void	vfs_notify_upper(struct vnode *, int);
+struct mount *vfs_ref_from_vp(struct vnode *);
 void	vfs_ref(struct mount *);
 void	vfs_rel(struct mount *);
 struct mount *vfs_mount_alloc(struct vnode *, struct vfsconf *, const char *,
@@ -1092,7 +1098,7 @@ void resume_all_fs(void);
 	_mpcpu = vfs_mount_pcpu(mp);				\
 	MPASS(mpcpu->mntp_thread_in_ops == 0);			\
 	_mpcpu->mntp_thread_in_ops = 1;				\
-	__compiler_membar();					\
+	atomic_interrupt_fence();					\
 	if (__predict_false(mp->mnt_vfs_ops > 0)) {		\
 		vfs_op_thread_exit_crit(mp, _mpcpu);		\
 		_retval_crit = false;				\
@@ -1112,7 +1118,7 @@ void resume_all_fs(void);
 #define vfs_op_thread_exit_crit(mp, _mpcpu) do {		\
 	MPASS(_mpcpu == vfs_mount_pcpu(mp));			\
 	MPASS(_mpcpu->mntp_thread_in_ops == 1);			\
-	__compiler_membar();					\
+	atomic_interrupt_fence();					\
 	_mpcpu->mntp_thread_in_ops = 0;				\
 } while (0)
 

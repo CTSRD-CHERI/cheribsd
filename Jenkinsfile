@@ -23,14 +23,14 @@ def jobProperties = [
         rateLimit,
 ]
 // Don't archive sysroot/disk image/kernel images for pull requests and non-default branches:
-def archiveBranches = ['master', 'dev']
+def archiveBranches = ['main', 'master', 'dev']
 if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
     if (!GlobalVars.isTestSuiteJob) {
         // Don't archive disk images for the test suite job
         GlobalVars.archiveArtifacts = true
     }
-    // For branches other than the master branch, only keep the last two artifacts to save disk space
-    if (env.BRANCH_NAME != 'master') {
+    // For branches other than the master/main branch, only keep the last two artifacts to save disk space
+    if (env.BRANCH_NAME != 'main' && env.BRANCH_NAME != 'master') {
         jobProperties.add(buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '2')))
     }
 }
@@ -124,8 +124,7 @@ def runTests(params, String suffix) {
     stage("Test setup") {
         // copy qemu archive and run directly on the host
         dir("qemu-${params.buildOS}") { deleteDir() }
-        def qemuProject = suffix.contains('morello') ? 'qemu/qemu-morello-merged' : 'qemu/qemu-cheri'
-        copyArtifacts projectName: qemuProject, filter: "qemu-${params.buildOS}/**", target: '.',
+        copyArtifacts projectName: 'qemu/qemu-cheri', filter: "qemu-${params.buildOS}/**", target: '.',
                       fingerprintArtifacts: false
         sh label: 'generate SSH key',
            script: 'test -e $WORKSPACE/id_ed25519 || ssh-keygen -t ed25519 -N \'\' -f $WORKSPACE/id_ed25519 < /dev/null'

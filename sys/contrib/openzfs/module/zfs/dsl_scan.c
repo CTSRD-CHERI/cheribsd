@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, 2018 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2021 by Delphix. All rights reserved.
  * Copyright 2016 Gary Mills
  * Copyright (c) 2017, 2019, Datto Inc. All rights reserved.
  * Copyright (c) 2015, Nexenta Systems, Inc. All rights reserved.
@@ -713,7 +713,7 @@ dsl_scan_setup_check(void *arg, dmu_tx_t *tx)
 	return (0);
 }
 
-static void
+void
 dsl_scan_setup_sync(void *arg, dmu_tx_t *tx)
 {
 	dsl_scan_t *scn = dmu_tx_pool(tx)->dp_scan;
@@ -987,6 +987,10 @@ dsl_scan_done(dsl_scan_t *scn, boolean_t complete, dmu_tx_t *tx)
 			    (u_longlong_t)spa_get_errlog_size(spa));
 			spa_async_request(spa, SPA_ASYNC_RESILVER);
 		}
+
+		/* Clear recent error events (i.e. duplicate events tracking) */
+		if (complete)
+			zfs_ereport_clear(spa, NULL);
 	}
 
 	scn->scn_phys.scn_end_time = gethrestime_sec();
@@ -3328,19 +3332,12 @@ dsl_scan_need_resilver(spa_t *spa, const dva_t *dva, size_t psize,
 	}
 
 	/*
-	 * Check if the txg falls within the range which must be
-	 * resilvered.  DVAs outside this range can always be skipped.
-	 */
-	if (!vdev_dtl_contains(vd, DTL_PARTIAL, phys_birth, 1))
-		return (B_FALSE);
-
-	/*
 	 * Check if the top-level vdev must resilver this offset.
 	 * When the offset does not intersect with a dirty leaf DTL
 	 * then it may be possible to skip the resilver IO.  The psize
 	 * is provided instead of asize to simplify the check for RAIDZ.
 	 */
-	if (!vdev_dtl_need_resilver(vd, DVA_GET_OFFSET(dva), psize))
+	if (!vdev_dtl_need_resilver(vd, dva, psize, phys_birth))
 		return (B_FALSE);
 
 	/*
@@ -3987,7 +3984,7 @@ dsl_scan_scrub_cb(dsl_pool_t *dp,
 
 		/*
 		 * Keep track of how much data we've examined so that
-		 * zpool(1M) status can make useful progress reports.
+		 * zpool(8) status can make useful progress reports.
 		 */
 		scn->scn_phys.scn_examined += DVA_GET_ASIZE(dva);
 		spa->spa_scan_pass_exam += DVA_GET_ASIZE(dva);

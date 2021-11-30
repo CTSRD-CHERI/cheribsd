@@ -12,6 +12,7 @@ ATF_TESTS_C+=			coexecve_test
     !${MACHINE_ABI:Mpurecap}
 ATF_TESTS_C+=			brk_test
 .endif
+ATF_TESTS_C+=			cpuset_test
 ATF_TESTS_C+=			queue_test
 ATF_TESTS_C+=			sendfile_test
 

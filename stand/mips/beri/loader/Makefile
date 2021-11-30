@@ -48,7 +48,8 @@ SRCS=		start.S						\
 		devicename.c					\
 		exec.c						\
 		vers.c						\
-		arch.c
+		arch.c						\
+		gfx_fb.c
 
 # libstand front-ends for shared driver code
 SRCS+=		beri_console.c					\
@@ -60,6 +61,9 @@ SRCS+=		altera_jtag_uart.c				\
 		cache.c						\
 		cfi.c						\
 		sdcard.c
+
+CFLAGS.gfx_fb.c += -I${SRCTOP}/contrib/pnglite
+CFLAGS.gfx_fb.c += -I${SRCTOP}/sys/teken
 
 # Since we don't have a backward compatibility issue, default to this on BERI.
 CFLAGS+=	-DBOOT_PROMPT_123

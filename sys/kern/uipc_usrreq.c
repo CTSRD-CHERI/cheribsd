@@ -382,7 +382,7 @@ unp_pcb_lock_peer(struct unpcb *unp)
 
 	UNP_PCB_LOCK_ASSERT(unp);
 	unp2 = unp->unp_conn;
-	if (__predict_false(unp2 == NULL))
+	if (unp2 == NULL)
 		return (NULL);
 	if (__predict_false(unp == unp2))
 		return (unp);
@@ -428,14 +428,15 @@ static struct protosw localsw[] = {
 {
 	.pr_type =		SOCK_STREAM,
 	.pr_domain =		&localdomain,
-	.pr_flags =		PR_CONNREQUIRED|PR_WANTRCVD|PR_RIGHTS,
+	.pr_flags =		PR_CONNREQUIRED|PR_WANTRCVD|PR_RIGHTS|
+				    PR_CAPATTACH,
 	.pr_ctloutput =		&uipc_ctloutput,
 	.pr_usrreqs =		&uipc_usrreqs_stream
 },
 {
 	.pr_type =		SOCK_DGRAM,
 	.pr_domain =		&localdomain,
-	.pr_flags =		PR_ATOMIC|PR_ADDR|PR_RIGHTS,
+	.pr_flags =		PR_ATOMIC|PR_ADDR|PR_RIGHTS|PR_CAPATTACH,
 	.pr_ctloutput =		&uipc_ctloutput,
 	.pr_usrreqs =		&uipc_usrreqs_dgram
 },
@@ -448,8 +449,8 @@ static struct protosw localsw[] = {
 	 * due to our use of sbappendaddr.  A new sbappend variants is needed
 	 * that supports both atomic record writes and control data.
 	 */
-	.pr_flags =		PR_ADDR|PR_ATOMIC|PR_CONNREQUIRED|PR_WANTRCVD|
-				    PR_RIGHTS,
+	.pr_flags =		PR_ADDR|PR_ATOMIC|PR_CONNREQUIRED|
+				    PR_WANTRCVD|PR_RIGHTS|PR_CAPATTACH,
 	.pr_ctloutput =		&uipc_ctloutput,
 	.pr_usrreqs =		&uipc_usrreqs_seqpacket,
 },
@@ -637,7 +638,7 @@ uipc_bindat(int fd, struct socket *so, struct sockaddr *nam, struct thread *td)
 restart:
 	NDINIT_ATRIGHTS(&nd, CREATE, NOFOLLOW | LOCKPARENT | SAVENAME | NOCACHE,
 	    UIO_SYSSPACE, PTR2CAP(buf), fd,
-	    cap_rights_init(&rights, CAP_BINDAT), td);
+	    cap_rights_init_one(&rights, CAP_BINDAT), td);
 /* SHOULD BE ABLE TO ADOPT EXISTING AND wakeup() ALA FIFO's */
 	error = namei(&nd);
 	if (error)
@@ -669,8 +670,8 @@ restart:
 	if (error == 0)
 		error = VOP_CREATE(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd, &vattr);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
-	vput(nd.ni_dvp);
 	if (error) {
+		VOP_VPUT_PAIR(nd.ni_dvp, NULL, true);
 		vn_finished_write(mp);
 		if (error == ERELOOKUP)
 			goto restart;
@@ -686,7 +687,8 @@ restart:
 	unp->unp_addr = soun;
 	unp->unp_flags &= ~UNP_BINDING;
 	UNP_PCB_UNLOCK(unp);
-	VOP_UNLOCK(vp);
+	vref(vp);
+	VOP_VPUT_PAIR(nd.ni_dvp, &vp, true);
 	vn_finished_write(mp);
 	free(buf, M_TEMP);
 	return (0);
@@ -1560,14 +1562,15 @@ unp_connectat(int fd, struct socket *so, struct sockaddr *nam,
 	else
 		sa = NULL;
 	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF,
-	    UIO_SYSSPACE, buf, fd, cap_rights_init(&rights, CAP_CONNECTAT), td);
+	    UIO_SYSSPACE, buf, fd, cap_rights_init_one(&rights, CAP_CONNECTAT),
+	    td);
 	error = namei(&nd);
 	if (error)
 		vp = NULL;
 	else
 		vp = nd.ni_vp;
 	ASSERT_VOP_LOCKED(vp, "unp_connect");
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_NOTHING(&nd);
 	if (error)
 		goto bad;
 
@@ -2065,7 +2068,7 @@ unp_externalize(struct mbuf *control, struct mbuf **controlp, int flags)
 			}
 			for (i = 0; i < newfds; i++, fdp++) {
 				_finstall(fdesc, fdep[i]->fde_file, *fdp,
-				    (flags & MSG_CMSG_CLOEXEC) != 0 ? UF_EXCLOSE : 0,
+				    (flags & MSG_CMSG_CLOEXEC) != 0 ? O_CLOEXEC : 0,
 				    &fdep[i]->fde_caps);
 				unp_externalize_fp(fdep[i]->fde_file);
 			}
@@ -2485,7 +2488,7 @@ unp_discard(struct file *fp)
 		atomic_add_int(&unp_defers_count, 1);
 		taskqueue_enqueue(taskqueue_thread, &unp_defer_task);
 	} else
-		(void) closef(fp, (struct thread *)NULL);
+		closef_nothread(fp);
 }
 
 static void
@@ -2507,7 +2510,7 @@ unp_process_defers(void *arg __unused, int pending)
 		count = 0;
 		while ((dr = SLIST_FIRST(&drl)) != NULL) {
 			SLIST_REMOVE_HEAD(&drl, ud_link);
-			closef(dr->ud_fp, NULL);
+			closef_nothread(dr->ud_fp);
 			free(dr, M_TEMP);
 			count++;
 		}

@@ -682,8 +682,7 @@
 #endif	/* __STDC__ */
 #endif	/* __GNUC__ */
 
-#define	__GLOBL1(sym)	__asm__(".globl " #sym)
-#define	__GLOBL(sym)	__GLOBL1(sym)
+#define	__GLOBL(sym)	__asm__(".globl " __XSTRING(sym))
 #define	__WEAK(sym)	__asm__(".weak " __XSTRING(sym))
 
 #if defined(__GNUC__)
@@ -933,11 +932,6 @@
 #define	__EXT1_VISIBLE		0
 #endif
 #endif /* __STDC_WANT_LIB_EXT1__ */
-
-#if defined(__mips) || defined(__riscv) || \
-    (defined(__powerpc64__) && (!defined(_CALL_ELF) || _CALL_ELF == 1))
-#define	__NO_TLS 1
-#endif
 
 /*
  * Old versions of GCC use non-standard ARM arch symbols; acle-compat.h

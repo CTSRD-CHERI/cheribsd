@@ -712,6 +712,7 @@ sddaasync(void *callback_arg, u_int32_t code,
 	{
 		CAM_DEBUG(path, CAM_DEBUG_TRACE, ("=> AC_GETDEV_CHANGED\n"));
 		softc = (struct sdda_softc *)periph->softc;
+		memset(&cgd, 0, sizeof(cgd));
 		xpt_setup_ccb(&cgd.ccb_h, periph->path, CAM_PRIORITY_NORMAL);
 		cgd.ccb_h.func_code = XPT_GDEV_TYPE;
 		xpt_action((union ccb *)&cgd);
@@ -1592,7 +1593,7 @@ sdda_add_part(struct cam_periph *periph, u_int type, const char *name,
 	part->disk->d_name = part->name;
 	part->disk->d_drv1 = part;
 	part->disk->d_maxsize =
-	    MIN(MAXPHYS, sdda_get_max_data(periph,
+	    MIN(maxphys, sdda_get_max_data(periph,
 		    (union ccb *)&cpi) * mmc_get_sector_size(periph));
 	part->disk->d_unit = cnt;
 	part->disk->d_flags = 0;

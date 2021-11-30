@@ -96,6 +96,7 @@ LINUXKPI_GENSRCS+= \
 	device_if.h \
 	pci_if.h \
 	pci_iov_if.h \
+	pcib_if.h \
 	vnode_if.h \
 	usb_if.h \
 	opt_usb.h \
@@ -145,7 +146,7 @@ LDFLAGS+=	--build-id=sha1
 .endif
 
 CFLAGS+=	${DEBUG_FLAGS}
-.if ${MACHINE_CPUARCH} == amd64
+.if ${MACHINE_CPUARCH} == aarch64 || ${MACHINE_CPUARCH} == amd64
 CFLAGS+=	-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
 .endif
 
@@ -316,7 +317,7 @@ ${_ILINKS}:
 	*) \
 		path=${SYSDIR}/${.TARGET:T}/include ;; \
 	esac ; \
-	path=`(cd $$path && /bin/pwd)` ; \
+	path=`realpath $$path`; \
 	${ECHO} ${.TARGET:T} "->" $$path ; \
 	ln -fns $$path ${.TARGET:T}
 
@@ -548,7 +549,9 @@ OPENZFS_CFLAGS=     \
 	-I${SYSDIR}/cddl/compat/opensolaris \
 	-I${SYSDIR}/cddl/contrib/opensolaris/uts/common \
 	-include ${ZINCDIR}/os/freebsd/spl/sys/ccompile.h
-
+OPENZFS_CWARNFLAGS= \
+	-Wno-nested-externs \
+	-Wno-redundant-decls
 
 .include <bsd.dep.mk>
 .include <bsd.clang-analyze.mk>

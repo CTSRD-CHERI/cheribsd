@@ -178,8 +178,8 @@ const char *openpam_module_path[] = {
 #ifdef OPENPAM_MODULES_DIRECTORY
 	OPENPAM_MODULES_DIRECTORY,
 #elif COMPAT_CHERI
-	"/usr/libcheri",
-	"/usr/local/libcheri",
+	"/usr/lib64c",
+	"/usr/local/lib64c",
 #elif COMPAT_32BIT
 	"/usr/lib32",
 	"/usr/local/lib32",

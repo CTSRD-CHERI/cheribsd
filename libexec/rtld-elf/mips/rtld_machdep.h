@@ -64,8 +64,6 @@ Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
 Elf_Addr _mips_rtld_bind(struct Struct_Obj_Entry *obj, Elf_Size reloff);
 #endif
 
-void *_mips_get_tls(void);
-
 #if __has_feature(capabilities)
 
 #define FUNC_PTR_REMOVE_PERMS	(__CHERI_CAP_PERMISSION_PERMIT_SEAL__ |	\
@@ -318,6 +316,8 @@ extern void *__tls_get_addr(tls_index *ti);
 #define	RTLD_DEFAULT_STACK_EXEC		PROT_EXEC
 
 #define md_abi_variant_hook(x)
+
+#define	TLS_DTV_OFFSET	0
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /* Add function not used by CHERI as inlines here so that the compiler can

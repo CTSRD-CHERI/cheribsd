@@ -880,7 +880,7 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_sendsig	= linux_sendsig,
 	.sv_sigcode	= &_binary_linux_locore_o_start,
 	.sv_szsigcode	= &linux_szsigcode,
-	.sv_name	= "Linux ELF",
+	.sv_name	= "Linux ELF32",
 	.sv_coredump	= elf32_coredump,
 	.sv_imgact_try	= linux_exec_imgact_try,
 	.sv_minsigstksz	= LINUX_MINSIGSTKSZ,
@@ -936,7 +936,8 @@ static void
 linux_vdso_deinstall(void *param)
 {
 
-	__elfN(linux_shared_page_fini)(linux_shared_page_obj);
+	__elfN(linux_shared_page_fini)(linux_shared_page_obj,
+	    linux_shared_page_mapping);
 }
 SYSUNINIT(elf_linux_vdso_uninit, SI_SUB_EXEC, SI_ORDER_FIRST,
     linux_vdso_deinstall, NULL);

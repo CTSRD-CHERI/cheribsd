@@ -178,17 +178,18 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 	(((uintptr_t (*)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, \
 	    uint64_t, uint64_t, uint64_t))ptr)(0, 0, 0, 0, 0, 0, 0, 0))
 
+#define	TLS_TCB_SIZE	(2 * sizeof(void *))
+
 #define	round(size, align)				\
 	(((size) + (align) - 1) & ~((align) - 1))
 #define	calculate_first_tls_offset(size, align, offset)	\
-	round(16, align)
+	round(TLS_TCB_SIZE, align)
 #define	calculate_tls_offset(prev_offset, prev_size, size, align, offset) \
 	round(prev_offset + prev_size, align)
 #define	calculate_tls_end(off, size) 	((off) + (size))
 #define calculate_tls_post_size(align) \
 	round(TLS_TCB_SIZE, align) - TLS_TCB_SIZE
 
-#define	TLS_TCB_SIZE	16
 typedef struct {
     unsigned long ti_module;
     unsigned long ti_offset;
@@ -200,6 +201,8 @@ extern void *__tls_get_addr(tls_index *ti);
 #define	RTLD_DEFAULT_STACK_EXEC		PROT_EXEC
 
 #define md_abi_variant_hook(x)
+
+#define	TLS_DTV_OFFSET	0
 
 #define rtld_validate_target_eflags(path, hdr, main_path)	\
 	_rtld_validate_target_eflags(path, hdr, main_path)

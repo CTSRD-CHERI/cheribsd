@@ -1122,6 +1122,34 @@ setup_priv_lcall_gate(struct proc *p)
 #endif
 
 /*
+ * Reset the hardware debug registers if they were in use.
+ * They won't have any meaning for the newly exec'd process.
+ */
+void
+x86_clear_dbregs(struct pcb *pcb)
+{
+        if ((pcb->pcb_flags & PCB_DBREGS) == 0)
+		return;
+
+	pcb->pcb_dr0 = 0;
+	pcb->pcb_dr1 = 0;
+	pcb->pcb_dr2 = 0;
+	pcb->pcb_dr3 = 0;
+	pcb->pcb_dr6 = 0;
+	pcb->pcb_dr7 = 0;
+
+	if (pcb == curpcb) {
+		/*
+		 * Clear the debug registers on the running CPU,
+		 * otherwise they will end up affecting the next
+		 * process we switch to.
+		 */
+		reset_dbregs();
+	}
+	pcb->pcb_flags &= ~PCB_DBREGS;
+}
+
+/*
  * Reset registers to default values on exec.
  */
 void
@@ -1174,27 +1202,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 	/* PS_STRINGS value for BSD/OS binaries.  It is 0 for non-BSD/OS. */
 	regs->tf_ebx = (register_t)imgp->ps_strings;
 
-        /*
-         * Reset the hardware debug registers if they were in use.
-         * They won't have any meaning for the newly exec'd process.  
-         */
-        if (pcb->pcb_flags & PCB_DBREGS) {
-                pcb->pcb_dr0 = 0;
-                pcb->pcb_dr1 = 0;
-                pcb->pcb_dr2 = 0;
-                pcb->pcb_dr3 = 0;
-                pcb->pcb_dr6 = 0;
-                pcb->pcb_dr7 = 0;
-                if (pcb == curpcb) {
-		        /*
-			 * Clear the debug registers on the running
-			 * CPU, otherwise they will end up affecting
-			 * the next process we switch to.
-			 */
-		        reset_dbregs();
-                }
-		pcb->pcb_flags &= ~PCB_DBREGS;
-        }
+	x86_clear_dbregs(pcb);
 
 	pcb->pcb_initial_npxcw = __INITIAL_NPXCW__;
 
@@ -1236,10 +1244,6 @@ cpu_setregs(void)
 u_long bootdev;		/* not a struct cdev *- encoding is different */
 SYSCTL_ULONG(_machdep, OID_AUTO, guessed_bootdev,
 	CTLFLAG_RD, &bootdev, 0, "Maybe the Boot device (not in struct cdev *format)");
-
-static char bootmethod[16] = "BIOS";
-SYSCTL_STRING(_machdep, OID_AUTO, bootmethod, CTLFLAG_RD, bootmethod, 0,
-    "System firmware boot method");
 
 /*
  * Initialize 386 and configure to run kernel
@@ -2347,6 +2351,9 @@ init386(int first)
 
 	/* Init basic tunables, hz etc */
 	init_param1();
+
+	/* Set bootmethod to BIOS: it's the only supported on i386. */
+	strlcpy(bootmethod, "BIOS", sizeof(bootmethod));
 
 	/*
 	 * Make gdt memory segments.  All segments cover the full 4GB

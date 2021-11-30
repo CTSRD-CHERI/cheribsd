@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2020 Netflix, Inc
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,15 +41,14 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/module.h>
+
 #include <machine/fpu.h>
-#include <machine/md_var.h>
-#include <x86/cputypes.h>
-#include <x86/specialreg.h>
 
 #include <opencrypto/cryptodev.h>
 #include <opencrypto/xform_auth.h>
 
 #include <crypto/openssl/ossl.h>
+#include <crypto/openssl/ossl_chacha.h>
 
 #include "cryptodev_if.h"
 
@@ -66,81 +67,7 @@ struct ossl_session {
 	struct ossl_session_hash hash;
 };
 
-/*
- * See OPENSSL_ia32cap(3).
- *
- * [0] = cpu_feature but with a few custom bits
- * [1] = cpu_feature2 but with AMD XOP in bit 11
- * [2] = cpu_stdext_feature
- * [3] = 0
- */
-unsigned int OPENSSL_ia32cap_P[4];
-
 static MALLOC_DEFINE(M_OSSL, "ossl", "OpenSSL crypto");
-
-static void
-ossl_cpuid(void)
-{
-	uint64_t xcr0;
-	u_int regs[4];
-	u_int max_cores;
-
-	/* Derived from OpenSSL_ia32_cpuid. */
-
-	OPENSSL_ia32cap_P[0] = cpu_feature & ~(CPUID_B20 | CPUID_IA64);
-	if (cpu_vendor_id == CPU_VENDOR_INTEL) {
-		OPENSSL_ia32cap_P[0] |= CPUID_IA64;
-		if ((cpu_id & 0xf00) != 0xf00)
-			OPENSSL_ia32cap_P[0] |= CPUID_B20;
-	}
-
-	/* Only leave CPUID_HTT on if HTT is present. */
-	if (cpu_vendor_id == CPU_VENDOR_AMD && cpu_exthigh >= 0x80000008) {
-		max_cores = (cpu_procinfo2 & AMDID_CMP_CORES) + 1;
-		if (cpu_feature & CPUID_HTT) {
-			if ((cpu_procinfo & CPUID_HTT_CORES) >> 16 <= max_cores)
-				OPENSSL_ia32cap_P[0] &= ~CPUID_HTT;
-		}
-	} else {
-		if (cpu_high >= 4) {
-			cpuid_count(4, 0, regs);
-			max_cores = (regs[0] >> 26) & 0xfff;
-		} else
-			max_cores = -1;
-	}
-	if (max_cores == 0)
-		OPENSSL_ia32cap_P[0] &= ~CPUID_HTT;
-	else if ((cpu_procinfo & CPUID_HTT_CORES) >> 16 == 0)
-		OPENSSL_ia32cap_P[0] &= ~CPUID_HTT;
-
-	OPENSSL_ia32cap_P[1] = cpu_feature2 & ~AMDID2_XOP;
-	if (cpu_vendor_id == CPU_VENDOR_AMD)
-		OPENSSL_ia32cap_P[1] |= amd_feature2 & AMDID2_XOP;
-
-	OPENSSL_ia32cap_P[2] = cpu_stdext_feature;
-	if ((OPENSSL_ia32cap_P[1] & CPUID2_XSAVE) == 0)
-		OPENSSL_ia32cap_P[2] &= ~(CPUID_STDEXT_AVX512F |
-		    CPUID_STDEXT_AVX512DQ);
-
-	/* Disable AVX512F on Skylake-X. */
-	if ((cpu_id & 0x0fff0ff0) == 0x00050650)
-		OPENSSL_ia32cap_P[2] &= ~(CPUID_STDEXT_AVX512F);
-
-	if (cpu_feature2 & CPUID2_OSXSAVE)
-		xcr0 = rxcr(0);
-	else
-		xcr0 = 0;
-
-	if ((xcr0 & (XFEATURE_AVX512 | XFEATURE_AVX)) !=
-	    (XFEATURE_AVX512 | XFEATURE_AVX))
-		OPENSSL_ia32cap_P[2] &= ~(CPUID_STDEXT_AVX512VL |
-		    CPUID_STDEXT_AVX512BW | CPUID_STDEXT_AVX512IFMA |
-		    CPUID_STDEXT_AVX512F);
-	if ((xcr0 & XFEATURE_AVX) != XFEATURE_AVX) {
-		OPENSSL_ia32cap_P[1] &= ~(CPUID2_AVX | AMDID2_XOP | CPUID2_FMA);
-		OPENSSL_ia32cap_P[2] &= ~CPUID_STDEXT_AVX2;
-	}
-}
 
 static void
 ossl_identify(driver_t *driver, device_t parent)
@@ -209,6 +136,8 @@ ossl_lookup_hash(const struct crypto_session_params *csp)
 	case CRYPTO_SHA2_512:
 	case CRYPTO_SHA2_512_HMAC:
 		return (&ossl_hash_sha512);
+	case CRYPTO_POLY1305:
+		return (&ossl_hash_poly1305);
 	default:
 		return (NULL);
 	}
@@ -226,6 +155,24 @@ ossl_probesession(device_t dev, const struct crypto_session_params *csp)
 		if (ossl_lookup_hash(csp) == NULL)
 			return (EINVAL);
 		break;
+	case CSP_MODE_CIPHER:
+		switch (csp->csp_cipher_alg) {
+		case CRYPTO_CHACHA20:
+			if (csp->csp_cipher_klen != CHACHA_KEY_SIZE)
+				return (EINVAL);
+			break;
+		default:
+			return (EINVAL);
+		}
+		break;
+	case CSP_MODE_AEAD:
+		switch (csp->csp_cipher_alg) {
+		case CRYPTO_CHACHA20_POLY1305:
+			break;
+		default:
+			return (EINVAL);
+		}
+		break;
 	default:
 		return (EINVAL);
 	}
@@ -234,21 +181,10 @@ ossl_probesession(device_t dev, const struct crypto_session_params *csp)
 }
 
 static void
-ossl_setkey_hmac(struct ossl_session *s, const void *key, int klen)
-{
-
-	hmac_init_ipad(s->hash.axf, key, klen, &s->hash.ictx);
-	hmac_init_opad(s->hash.axf, key, klen, &s->hash.octx);
-}
-
-static int
-ossl_newsession(device_t dev, crypto_session_t cses,
+ossl_newsession_hash(struct ossl_session *s,
     const struct crypto_session_params *csp)
 {
-	struct ossl_session *s;
 	struct auth_hash *axf;
-
-	s = crypto_get_driver_session(cses);
 
 	axf = ossl_lookup_hash(csp);
 	s->hash.axf = axf;
@@ -262,40 +198,60 @@ ossl_newsession(device_t dev, crypto_session_t cses,
 	} else {
 		if (csp->csp_auth_key != NULL) {
 			fpu_kern_enter(curthread, NULL, FPU_KERN_NOCTX);
-			ossl_setkey_hmac(s, csp->csp_auth_key,
-			    csp->csp_auth_klen);
+			if (axf->Setkey != NULL) {
+				axf->Init(&s->hash.ictx);
+				axf->Setkey(&s->hash.ictx, csp->csp_auth_key,
+				    csp->csp_auth_klen);
+			} else {
+				hmac_init_ipad(axf, csp->csp_auth_key,
+				    csp->csp_auth_klen, &s->hash.ictx);
+				hmac_init_opad(axf, csp->csp_auth_key,
+				    csp->csp_auth_klen, &s->hash.octx);
+			}
 			fpu_kern_leave(curthread, NULL);
 		}
 	}
+}
+
+static int
+ossl_newsession(device_t dev, crypto_session_t cses,
+    const struct crypto_session_params *csp)
+{
+	struct ossl_session *s;
+
+	s = crypto_get_driver_session(cses);
+	switch (csp->csp_mode) {
+	case CSP_MODE_DIGEST:
+		ossl_newsession_hash(s, csp);
+		break;
+	}
+
 	return (0);
 }
 
 static int
-ossl_process(device_t dev, struct cryptop *crp, int hint)
+ossl_process_hash(struct ossl_session *s, struct cryptop *crp,
+    const struct crypto_session_params *csp)
 {
 	struct ossl_hash_context ctx;
 	char digest[HASH_MAX_LEN];
-	const struct crypto_session_params *csp;
-	struct ossl_session *s;
 	struct auth_hash *axf;
 	int error;
-	bool fpu_entered;
 
-	s = crypto_get_driver_session(crp->crp_session);
-	csp = crypto_get_params(crp->crp_session);
 	axf = s->hash.axf;
 
-	if (is_fpu_kern_thread(0)) {
-		fpu_entered = false;
+	if (crp->crp_auth_key == NULL) {
+		ctx = s->hash.ictx;
 	} else {
-		fpu_kern_enter(curthread, NULL, FPU_KERN_NOCTX);
-		fpu_entered = true;
+		if (axf->Setkey != NULL) {
+			axf->Init(&ctx);
+			axf->Setkey(&ctx, crp->crp_auth_key,
+			    csp->csp_auth_klen);
+		} else {
+			hmac_init_ipad(axf, crp->crp_auth_key,
+			    csp->csp_auth_klen, &ctx);
+		}
 	}
-
-	if (crp->crp_auth_key != NULL)
-		ossl_setkey_hmac(s, crp->crp_auth_key, csp->csp_auth_klen);
-
-	ctx = s->hash.ictx;
 
 	if (crp->crp_aad != NULL)
 		error = axf->Update(&ctx, crp->crp_aad, crp->crp_aad_length);
@@ -312,8 +268,12 @@ ossl_process(device_t dev, struct cryptop *crp, int hint)
 
 	axf->Final(digest, &ctx);
 
-	if (csp->csp_auth_klen != 0) {
-		ctx = s->hash.octx;
+	if (csp->csp_auth_klen != 0 && axf->Setkey == NULL) {
+		if (crp->crp_auth_key == NULL)
+			ctx = s->hash.octx;
+		else
+			hmac_init_opad(axf, crp->crp_auth_key,
+			    csp->csp_auth_klen, &ctx);
 		axf->Update(&ctx, digest, axf->hashsize);
 		axf->Final(digest, &ctx);
 	}
@@ -333,13 +293,51 @@ ossl_process(device_t dev, struct cryptop *crp, int hint)
 	explicit_bzero(digest, sizeof(digest));
 
 out:
+	explicit_bzero(&ctx, sizeof(ctx));
+	return (error);
+}
+
+static int
+ossl_process(device_t dev, struct cryptop *crp, int hint)
+{
+	const struct crypto_session_params *csp;
+	struct ossl_session *s;
+	int error;
+	bool fpu_entered;
+
+	s = crypto_get_driver_session(crp->crp_session);
+	csp = crypto_get_params(crp->crp_session);
+
+	if (is_fpu_kern_thread(0)) {
+		fpu_entered = false;
+	} else {
+		fpu_kern_enter(curthread, NULL, FPU_KERN_NOCTX);
+		fpu_entered = true;
+	}
+
+	switch (csp->csp_mode) {
+	case CSP_MODE_DIGEST:
+		error = ossl_process_hash(s, crp, csp);
+		break;
+	case CSP_MODE_CIPHER:
+		error = ossl_chacha20(crp, csp);
+		break;
+	case CSP_MODE_AEAD:
+		if (CRYPTO_OP_IS_ENCRYPT(crp->crp_op))
+			error = ossl_chacha20_poly1305_encrypt(crp, csp);
+		else
+			error = ossl_chacha20_poly1305_decrypt(crp, csp);
+		break;
+	default:
+		__assert_unreachable();
+	}
+
 	if (fpu_entered)
 		fpu_kern_leave(curthread, NULL);
 
 	crp->crp_etype = error;
 	crypto_done(crp);
 
-	explicit_bzero(&ctx, sizeof(ctx));
 	return (0);
 }
 

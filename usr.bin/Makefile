@@ -68,7 +68,6 @@ SUBDIR=	alias \
 	ktrace \
 	ktrdump \
 	lam \
-	lastcomm \
 	ldd \
 	leave \
 	less \
@@ -99,6 +98,7 @@ SUBDIR=	alias \
 	mkuzip \
 	mt \
 	ncal \
+	ncurses \
 	netstat \
 	newgrp \
 	nfsstat \
@@ -150,7 +150,6 @@ SUBDIR=	alias \
 	su \
 	syscall_timing \
 	systat \
-	tabs \
 	tail \
 	tar \
 	tcopy \
@@ -160,11 +159,9 @@ SUBDIR=	alias \
 	tip \
 	top \
 	touch \
-	tput \
 	tr \
 	true \
 	truncate \
-	tset \
 	tsort \
 	tty \
 	uname \
@@ -199,6 +196,7 @@ SUBDIR+=	minimal_count_stats
 
 # NB: keep these sorted by MK_* knobs
 
+SUBDIR.${MK_ACCT}+=	lastcomm
 SUBDIR.${MK_AT}+=	at
 SUBDIR.${MK_ATM}+=	atm
 SUBDIR.${MK_BLUETOOTH}+=	bluetooth
@@ -225,9 +223,7 @@ SUBDIR.${MK_GAMES}+=	number
 SUBDIR.${MK_GAMES}+=	pom
 SUBDIR.${MK_GAMES}+=	primes
 SUBDIR.${MK_GAMES}+=	random
-.if ${COMPILER_FEATURES:Mc++11}
 SUBDIR.${MK_CXX}+=	dtc
-.endif
 .if ${MK_GH_BC} == "yes"
 SUBDIR+=		gh-bc
 .else

@@ -10,7 +10,6 @@ CFLAGS+=	-DHAVE_CONFIG_H -I${.CURDIR:H:H}/include
 
 WARNS?=		1
 CWARNFLAGS.clang+=	-Wno-absolute-value
-CWARNFLAGS+=	-Wno-error=deprecated-declarations
 
 .if ${MK_OPENLDAP} != "no" && !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT)
 OPENLDAPBASE?=	/usr/local

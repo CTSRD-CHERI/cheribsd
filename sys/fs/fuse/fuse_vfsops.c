@@ -441,7 +441,7 @@ fuse_vfsop_mount(struct mount *mp)
 	}
 	memset(mp->mnt_stat.f_mntfromname, 0, MNAMELEN);
 	strlcpy(mp->mnt_stat.f_mntfromname, fspec, MNAMELEN);
-	mp->mnt_iosize_max = MAXPHYS;
+	mp->mnt_iosize_max = maxphys;
 
 	/* Now handshaking with daemon */
 	fuse_internal_send_init(data, td);
@@ -501,7 +501,7 @@ fuse_vfsop_unmount(struct mount *mp, int mntflags)
 	if (fdata_get_dead(data)) {
 		goto alreadydead;
 	}
-	if (fsess_isimpl(mp, FUSE_DESTROY)) {
+	if (fsess_maybe_impl(mp, FUSE_DESTROY)) {
 		fdisp_init(&fdi, 0);
 		fdisp_make(&fdi, FUSE_DESTROY, mp, 0, td, NULL);
 

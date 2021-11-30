@@ -151,16 +151,17 @@ local known_abi_flags = {
 local known_flags = {
 	STD		= 0x00000001,
 	OBSOL		= 0x00000002,
-	UNIMPL		= 0x00000004,
-	NODEF		= 0x00000008,
-	NOARGS		= 0x00000010,
-	NOPROTO		= 0x00000020,
-	NOSTD		= 0x00000040,
-	NOTSTATIC	= 0x00000080,
-	VARARG		= 0x00000100,
-	VARARG3		= 0x00000200,
-	VARARG4		= 0x00000400,
-	VARARG5		= 0x00000800,
+	RESERVED	= 0x00000004,
+	UNIMPL		= 0x00000008,
+	NODEF		= 0x00000010,
+	NOARGS		= 0x00000020,
+	NOPROTO		= 0x00000040,
+	NOSTD		= 0x00000080,
+	NOTSTATIC	= 0x00000100,
+	VARARG		= 0x00000200,
+	VARARG3		= 0x00000400,
+	VARARG4		= 0x00000800,
+	VARARG5		= 0x00001000,
 
 	-- Compat flags start from here.  We have plenty of space.
 }
@@ -396,6 +397,9 @@ end
 local function strip_abi_prefix(funcname)
 	local abiprefix = config["abi_func_prefix"]
 	local stripped_name
+	if funcname == nil then
+		return nil
+	end
 	if abiprefix ~= "" and funcname:find("^" .. abiprefix) then
 		stripped_name = funcname:gsub("^" .. abiprefix, "")
 	else
@@ -959,6 +963,10 @@ local function handle_unimpl(sysnum, sysstart, sysend, comment)
 	end
 end
 
+local function handle_reserved(sysnum, sysstart, sysend, comment)
+	handle_unimpl(sysnum, sysstart, sysend, "reserved for local use")
+end
+
 process_syscall_def = function(line)
 	local sysstart, sysend, flags, funcname, sysflags
 	local thr_flag, syscallret
@@ -1003,8 +1011,8 @@ process_syscall_def = function(line)
 		flags = flags | known_flags[flag]
 	end
 
-	if (flags & known_flags["UNIMPL"]) == 0 and sysnum == nil then
-		abort(1, "Range only allowed with UNIMPL: " .. line)
+	if (flags & get_mask({"RESERVED", "UNIMPL"})) == 0 and sysnum == nil then
+		abort(1, "Range only allowed with RESERVED and UNIMPL: " .. line)
 	end
 
 	if (flags & known_flags["NOTSTATIC"]) ~= 0 then
@@ -1176,6 +1184,8 @@ process_syscall_def = function(line)
 		    argalias, skip_proto)
 	elseif flags & known_flags["OBSOL"] ~= 0 then
 		handle_obsol(sysnum, funcname, funcomment)
+	elseif flags & known_flags["RESERVED"] ~= 0 then
+		handle_reserved(sysnum, sysstart, sysend)
 	elseif flags & known_flags["UNIMPL"] ~= 0 then
 		handle_unimpl(sysnum, sysstart, sysend, funcomment)
 	else

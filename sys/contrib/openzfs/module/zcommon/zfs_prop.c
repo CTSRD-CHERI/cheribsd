@@ -417,7 +417,7 @@ zfs_prop_init(void)
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "on | off | lzjb | gzip | gzip-[1-9] | zle | lz4 | "
 	    "zstd | zstd-[1-19] | "
-	    "zstd-fast-[1-10,20,30,40,50,60,70,80,90,100,500,1000]",
+	    "zstd-fast | zstd-fast-[1-10,20,30,40,50,60,70,80,90,100,500,1000]",
 	    "COMPRESS", compress_table);
 	zprop_register_index(ZFS_PROP_SNAPDIR, "snapdir", ZFS_SNAPDIR_HIDDEN,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
@@ -551,14 +551,14 @@ zfs_prop_init(void)
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM, "<path> | legacy | none",
 	    "MOUNTPOINT");
 	zprop_register_string(ZFS_PROP_SHARENFS, "sharenfs", "off",
-	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM, "on | off | share(1M) options",
+	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM, "on | off | NFS share options",
 	    "SHARENFS");
 	zprop_register_string(ZFS_PROP_TYPE, "type", NULL, PROP_READONLY,
 	    ZFS_TYPE_DATASET | ZFS_TYPE_BOOKMARK,
 	    "filesystem | volume | snapshot | bookmark", "TYPE");
 	zprop_register_string(ZFS_PROP_SHARESMB, "sharesmb", "off",
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
-	    "on | off | sharemgr(1M) options", "SHARESMB");
+	    "on | off | SMB share options", "SHARESMB");
 	zprop_register_string(ZFS_PROP_MLSLABEL, "mlslabel",
 	    ZFS_MLSLABEL_DEFAULT, PROP_INHERIT, ZFS_TYPE_DATASET,
 	    "<sensitivity label>", "MLSLABEL");
@@ -1016,7 +1016,7 @@ zcommon_fini(void)
 	kfpu_fini();
 }
 
-module_init(zcommon_init);
+module_init_early(zcommon_init);
 module_exit(zcommon_fini);
 
 #endif

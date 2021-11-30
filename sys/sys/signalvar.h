@@ -304,14 +304,14 @@ sigsetmasked(sigset_t *set, sigset_t *mask)
 #define	ksiginfo_init(ksi)			\
 do {						\
 	bzero(ksi, sizeof(ksiginfo_t));		\
-} while(0)
+} while (0)
 
 #define	ksiginfo_init_trap(ksi)			\
 do {						\
 	ksiginfo_t *kp = ksi;			\
 	bzero(kp, sizeof(ksiginfo_t));		\
 	kp->ksi_flags |= KSI_TRAP;		\
-} while(0)
+} while (0)
 
 static __inline void
 ksiginfo_copy(ksiginfo_t *src, ksiginfo_t *dst)
@@ -380,7 +380,7 @@ static inline int
 sigdeferstop(int mode)
 {
 
-	if (__predict_true(mode == SIGDEFERSTOP_NOP))
+	if (__predict_false(mode == SIGDEFERSTOP_NOP))
 		return (SIGDEFERSTOP_VAL_NCHG);
 	return (sigdeferstop_impl(mode));
 }

@@ -42,6 +42,7 @@
 #include <sys/mount.h>
 #include <sys/cmn_err.h>
 #include <sys/zfs_znode.h>
+#include <sys/zfs_vnops.h>
 #include <sys/zfs_dir.h>
 #include <sys/zil.h>
 #include <sys/fs/zfs.h>
@@ -433,7 +434,7 @@ zfs_sync(vfs_t *vfsp, int waitfor)
 	} else {
 		/*
 		 * Sync all ZFS filesystems.  This is what happens when you
-		 * run sync(1M).  Unlike other filesystems, ZFS honors the
+		 * run sync(8).  Unlike other filesystems, ZFS honors the
 		 * request by waiting for all pools to commit all dirty data.
 		 */
 		spa_sync_allpools();
@@ -1290,6 +1291,18 @@ getpoolname(const char *osname, char *poolname)
 	return (0);
 }
 
+static void
+fetch_osname_options(char *name, bool *checkpointrewind)
+{
+
+	if (name[0] == '!') {
+		*checkpointrewind = true;
+		memmove(name, name + 1, strlen(name));
+	} else {
+		*checkpointrewind = false;
+	}
+}
+
 /*ARGSUSED*/
 static int
 zfs_mount(vfs_t *vfsp)
@@ -1300,6 +1313,7 @@ zfs_mount(vfs_t *vfsp)
 	char		*osname;
 	int		error = 0;
 	int		canwrite;
+	bool		checkpointrewind;
 
 	if (vfs_getopt(vfsp->mnt_optnew, "from", (void **)&osname, NULL))
 		return (SET_ERROR(EINVAL));
@@ -1312,6 +1326,8 @@ zfs_mount(vfs_t *vfsp)
 	    dsl_deleg_access(osname, ZFS_DELEG_PERM_MOUNT, cr) != ECANCELED) {
 		secpolicy_fs_mount_clearopts(cr, vfsp);
 	}
+
+	fetch_osname_options(osname, &checkpointrewind);
 
 	/*
 	 * Check for mount privilege?
@@ -1391,7 +1407,7 @@ zfs_mount(vfs_t *vfsp)
 
 		error = getpoolname(osname, pname);
 		if (error == 0)
-			error = spa_import_rootpool(pname, false);
+			error = spa_import_rootpool(pname, checkpointrewind);
 		if (error)
 			goto out;
 	}

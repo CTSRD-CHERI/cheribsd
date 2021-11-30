@@ -303,6 +303,9 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	vm_offset_t va;
 	struct proc *p;
 	int error, sig, ucode;
+#ifdef KDB
+	bool handled;
+#endif
 
 #ifdef KDB
 	if (kdb_active) {
@@ -379,6 +382,15 @@ done:
 
 fatal:
 	dump_regs(frame);
+#ifdef KDB
+	if (debugger_on_trap) {
+		kdb_why = KDB_WHY_TRAP;
+		handled = kdb_trap(frame->tf_scause & SCAUSE_CODE, 0, frame);
+		kdb_why = KDB_WHY_UNSET;
+		if (handled)
+			return;
+	}
+#endif
 	panic("Fatal page fault at %#lx: %#016lx",
 	    (__cheri_addr unsigned long)frame->tf_sepc, stval);
 }
@@ -391,6 +403,9 @@ do_trap_supervisor(struct trapframe *frame)
 	/* Ensure we came from supervisor mode, interrupts disabled */
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) ==
 	    SSTATUS_SPP, ("Came from S mode with interrupts enabled"));
+
+	KASSERT((csr_read(sstatus) & (SSTATUS_SUM)) == 0,
+	    ("Came from S mode with SUM enabled"));
 
 	exception = frame->tf_scause & SCAUSE_CODE;
 	if ((frame->tf_scause & SCAUSE_INTR) != 0) {
@@ -486,6 +501,9 @@ do_trap_user(struct trapframe *frame)
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) == 0,
 	    ("Came from U mode with interrupts enabled"));
 
+	KASSERT((csr_read(sstatus) & (SSTATUS_SUM)) == 0,
+	    ("Came from U mode with SUM enabled"));
+
 	exception = frame->tf_scause & SCAUSE_CODE;
 	if ((frame->tf_scause & SCAUSE_INTR) != 0) {
 		/* Interrupt */
@@ -543,18 +561,21 @@ do_trap_user(struct trapframe *frame)
 	case SCAUSE_STORE_MISALIGNED:
 		call_trapsignal(td, SIGBUS, BUS_ADRALN,
 		    (uintcap_t)frame->tf_stval, exception, 0);
+		userret(td, frame);
 		break;
 	case SCAUSE_LOAD_CAP_PAGE_FAULT:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_LOADTAG,
 		    (uintcap_t)frame->tf_stval, exception, 0);
+		userret(td, frame);
 		break;
 	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
 		if (log_user_cheri_exceptions)
 			dump_cheri_exception(frame);
 		call_trapsignal(td, SIGSEGV, SEGV_STORETAG,
 		    (uintcap_t)frame->tf_stval, exception, 0);
+		userret(td, frame);
 		break;
 	case SCAUSE_CHERI:
 		if (log_user_cheri_exceptions)

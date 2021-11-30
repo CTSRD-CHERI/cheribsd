@@ -538,12 +538,22 @@ __cxa_demangle_gnu3(const char *org)
 	struct type_delimit td;
 	ssize_t org_len;
 	unsigned int limit;
-	char *rtn;
-	bool has_ret, more_type;
+	char *rtn = NULL;
+	bool has_ret = false, more_type = false;
 
-	if (org == NULL || (org_len = strlen(org)) < 2)
+	if (org == NULL)
 		return (NULL);
 
+	org_len = strlen(org);
+	// Try demangling as a type for short encodings
+	if ((org_len < 2) || (org[0] != '_' || org[1] != 'Z' )) {
+		if (!cpp_demangle_data_init(&ddata, org))
+			return (NULL);
+		if (!cpp_demangle_read_type(&ddata, 0))
+			goto clean;
+		rtn = vector_str_get_flat(&ddata.output, (size_t *) NULL);
+		goto clean;
+	}
 	if (org_len > 11 && !strncmp(org, "_GLOBAL__I_", 11)) {
 		if ((rtn = malloc(org_len + 19)) == NULL)
 			return (NULL);
@@ -552,14 +562,8 @@ __cxa_demangle_gnu3(const char *org)
 		return (rtn);
 	}
 
-	if (org[0] != '_' || org[1] != 'Z')
-		return (NULL);
-
 	if (!cpp_demangle_data_init(&ddata, org + 2))
 		return (NULL);
-
-	rtn = NULL;
-	has_ret = more_type = false;
 
 	if (!cpp_demangle_read_encoding(&ddata))
 		goto clean;

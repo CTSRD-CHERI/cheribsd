@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018-2020 Gavin D. Howard and contributors.
+ * Copyright (c) 2018-2021 Gavin D. Howard and contributors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -172,9 +172,10 @@ struct BcRNG;
 #endif // BC_DEBUG_CODE
 
 typedef void (*BcNumBinaryOp)(BcNum*, BcNum*, BcNum*, size_t);
+typedef void (*BcNumBinOp)(BcNum*, BcNum*, BcNum* restrict, size_t);
 typedef size_t (*BcNumBinaryOpReq)(const BcNum*, const BcNum*, size_t);
 typedef void (*BcNumDigitOp)(size_t, size_t, bool);
-typedef void (*BcNumShiftAddOp)(BcDig*, const BcDig*, size_t);
+typedef void (*BcNumShiftAddOp)(BcDig* restrict, const BcDig* restrict, size_t);
 
 void bc_num_init(BcNum *restrict n, size_t req);
 void bc_num_setup(BcNum *restrict n, BcDig *restrict num, size_t cap);
@@ -236,7 +237,9 @@ void bc_num_zero(BcNum *restrict n);
 void bc_num_one(BcNum *restrict n);
 ssize_t bc_num_cmpZero(const BcNum *n);
 
+#if !defined(NDEBUG) || BC_ENABLE_LIBRARY
 bool bc_num_strValid(const char *restrict val);
+#endif // !defined(NDEBUG) || BC_ENABLE_LIBRARY
 void bc_num_parse(BcNum *restrict n, const char *restrict val, BcBigDig base);
 void bc_num_print(BcNum *restrict n, BcBigDig base, bool newline);
 #if DC_ENABLED

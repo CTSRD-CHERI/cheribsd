@@ -44,8 +44,6 @@
 
 #define __PCI_REROUTE_INTERRUPT
 
-#define __PCI_REROUTE_INTERRUPT
-
 #ifndef MACHINE
 #define	MACHINE		"riscv"
 #endif

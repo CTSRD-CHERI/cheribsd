@@ -36,7 +36,7 @@ LIB32CPUFLAGS=	-march=${COMPAT_CPUTYPE}
 .endif
 .if ${COMPAT_COMPILER_TYPE} == gcc
 .else
-LIB32CPUFLAGS+=	-target x86_64-unknown-freebsd13.0
+LIB32CPUFLAGS+=	-target x86_64-unknown-freebsd14.0
 .endif
 LIB32CPUFLAGS+=	-m32
 LIB32_MACHINE=	i386
@@ -57,7 +57,7 @@ LIB32CPUFLAGS=	-mcpu=${COMPAT_CPUTYPE}
 .if ${COMPAT_COMPILER_TYPE} == "gcc"
 LIB32CPUFLAGS+=	-m32
 .else
-LIB32CPUFLAGS+=	-target powerpc-unknown-freebsd13.0
+LIB32CPUFLAGS+=	-target powerpc-unknown-freebsd14.0
 .endif
 
 LIB32_MACHINE=	powerpc
@@ -74,10 +74,10 @@ LIB32CPUFLAGS=	-march=mips3
 LIB32CPUFLAGS=	-march=${COMPAT_CPUTYPE}
 .endif
 .else
-.if ${COMPAT_ARCH:Mmips64el*}
-LIB32CPUFLAGS=  -target mipsel-unknown-freebsd13.0
+.if ${COMPAT_ARCH:Mmips64el*} != ""
+LIB32CPUFLAGS=  -target mipsel-unknown-freebsd14.0
 .else
-LIB32CPUFLAGS=  -target mips-unknown-freebsd13.0
+LIB32CPUFLAGS=  -target mips-unknown-freebsd14.0
 .endif
 .endif
 LIB32CPUFLAGS+= -mabi=32
@@ -165,33 +165,33 @@ LIB64_MACHINE_ABI=	${MACHINE_ABI:Npurecap}
 .if ${MK_COMPAT_CHERIABI} != "no"
 .if ${COMPAT_ARCH} == "aarch64"
 HAS_COMPAT+=CHERI
-LIBCHERI_MACHINE=	arm64
-LIBCHERI_MACHINE_ARCH=	aarch64c
-LIBCHERICPUFLAGS=	-target aarch64-unknown-freebsd13.0
+LIB64C_MACHINE=	arm64
+LIB64C_MACHINE_ARCH=	aarch64c
+LIB64CCPUFLAGS=	-target aarch64-unknown-freebsd13.0
 # XXX: Drop -femulated-tls once bsd.cpu.mk no longer passes it
-LIBCHERICPUFLAGS+=	-march=morello+c64 -mabi=purecap -femulated-tls
+LIB64CCPUFLAGS+=	-march=morello+c64 -mabi=purecap -femulated-tls
 .elif ${COMPAT_ARCH:Mmips64*} && !${COMPAT_ARCH:Mmips64*c*}
 .if ${COMPAT_ARCH:Mmips*el*}
 .error No little endian CHERI
 .endif
 HAS_COMPAT+=CHERI
-LIBCHERICPUFLAGS=  -target mips64-unknown-freebsd13.0 -cheri -mabi=purecap
-LIBCHERICPUFLAGS+=	-fpic
-LIBCHERICPUFLAGS+=	-Werror=cheri-bitwise-operations
-LIBCHERI_MACHINE=	mips
-LIBCHERI_MACHINE_ARCH=	mips64c128
-LIBCHERILDFLAGS=	-fuse-ld=lld
+LIB64CCPUFLAGS=  -target mips64-unknown-freebsd13.0 -cheri -mabi=purecap
+LIB64CCPUFLAGS+=	-fpic
+LIB64CCPUFLAGS+=	-Werror=cheri-bitwise-operations
+LIB64C_MACHINE=	mips
+LIB64C_MACHINE_ARCH=	mips64c128
+LIB64CLDFLAGS=	-fuse-ld=lld
 .elif ${COMPAT_ARCH:Mriscv64*} && !${COMPAT_ARCH:Mriscv64*c*}
 HAS_COMPAT+=CHERI
-LIBCHERI_MACHINE=	riscv
-LIBCHERI_MACHINE_ARCH=	${COMPAT_ARCH}c
-LIBCHERIWMAKEFLAGS=	CPUTYPE=cheri
-LIBCHERICPUFLAGS=	-target riscv64-unknown-freebsd13.0
+LIB64C_MACHINE=	riscv
+LIB64C_MACHINE_ARCH=	${COMPAT_ARCH}c
+LIB64CWMAKEFLAGS=	CPUTYPE=cheri
+LIB64CCPUFLAGS=	-target riscv64-unknown-freebsd13.0
 COMPAT_RISCV_ABI=	l64pc128
 .if !${MACHINE_ARCH:Mriscv*sf}
 COMPAT_RISCV_ABI:=	${COMPAT_RISCV_ABI}d
 .endif
-LIBCHERICPUFLAGS+=	-march=${COMPAT_RISCV_MARCH} -mabi=${COMPAT_RISCV_ABI}
+LIB64CCPUFLAGS+=	-march=${COMPAT_RISCV_MARCH} -mabi=${COMPAT_RISCV_ABI}
 .endif	# ${COMPAT_ARCH:Mriscv64*}
 .endif # ${MK_COMPAT_CHERIABI} != "no"
 
@@ -209,31 +209,31 @@ COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}xcheri
 
 # Common CHERI flags
 .if defined(HAS_COMPAT) && ${HAS_COMPAT:MCHERI}
-LIBCHERICFLAGS+=	-DCOMPAT_CHERI
-LIBCHERIWMAKEFLAGS+=	COMPAT_CHERI=yes
-LIBCHERI_MACHINE_ABI=	${MACHINE_ABI} purecap
+LIB64CCFLAGS+=	-DCOMPAT_CHERI
+LIB64CWMAKEFLAGS+=	COMPAT_CHERI=yes
+LIB64C_MACHINE_ABI=	${MACHINE_ABI} purecap
 
 # This duplicates some logic in bsd.cpu.mk that is needed for the
 # WANT_COMPAT/NEED_COMPAT case.
-LIBCHERICFLAGS+=	-D__LP64__=1
+LIB64CCFLAGS+=	-D__LP64__=1
 
-LIBCHERICFLAGS+=	-Werror=implicit-function-declaration
+LIB64CCFLAGS+=	-Werror=implicit-function-declaration
 
 .ifdef CHERI_USE_CAP_TABLE
-LIBCHERICFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
+LIB64CCFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 .endif
 
 .if defined(CHERI_SUBOBJECT_BOUNDS)
 # Allow per-subdirectory overrides if we know that there is maximum that works
 .if defined(CHERI_SUBOBJECT_BOUNDS_MAX)
-LIBCHERICFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
+LIB64CCFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
 .else
-LIBCHERICFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
+LIB64CCFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
 .endif # CHERI_SUBOBJECT_BOUNDS_MAX
 CHERI_SUBOBJECT_BOUNDS_DEBUG?=yes
 .if ${CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
 # If debugging is enabled, clear SW permission bit 2 when the bounds are reduced
-LIBCHERICFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
+LIB64CCFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
 .endif # CHERI_SUBOBJECT_BOUNDS_DEBUG
 .endif # CHERI_SUBOBJECT_BOUNDS
 .endif
@@ -268,12 +268,12 @@ WANT_COMPAT:=	${NEED_COMPAT}
 
 .if defined(HAS_COMPAT) && defined(WANT_COMPAT)
 .if ${WANT_COMPAT} == "any"
-_LIBCOMPAT:=	${HAS_COMPAT:[1]}
+_LIBCOMPAT:=	${HAS_COMPAT:[1]:S/CHERI/64C/}
 .elif !${HAS_COMPAT:M${WANT_COMPAT}}
 .warning WANT_COMPAT (${WANT_COMPAT}) defined, but not in HAS_COMPAT (${HAS_COMPAT})
 .undef WANT_COMPAT
 .else
-_LIBCOMPAT:=	${WANT_COMPAT}
+_LIBCOMPAT:=	${WANT_COMPAT:S/CHERI/64C/}
 .endif
 .else # defined(HAS_COMPAT) && defined(WANT_COMPAT)
 .undef WANT_COMPAT

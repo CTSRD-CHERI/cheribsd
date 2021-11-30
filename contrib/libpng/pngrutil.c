@@ -4152,11 +4152,11 @@ defined(PNG_USER_TRANSFORM_PTR_SUPPORTED)
       */
      {
         png_bytep temp = png_ptr->big_row_buf + 32;
-        int extra = (int)((temp - (png_bytep)0) & 0x0f);
+        int extra = (ptraddr_t)temp & 0x0f;
         png_ptr->row_buf = temp - extra - 1/*filter byte*/;
 
         temp = png_ptr->big_prev_row + 32;
-        extra = (int)((temp - (png_bytep)0) & 0x0f);
+        extra = (ptraddr_t)temp & 0x0f;
         png_ptr->prev_row = temp - extra - 1/*filter byte*/;
      }
 

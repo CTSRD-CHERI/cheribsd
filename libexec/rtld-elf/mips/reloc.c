@@ -1039,12 +1039,6 @@ ifunc_init(Elf_Auxinfo aux_info[__min_size(AT_COUNT)] __unused)
 }
 
 void
-pre_init(void)
-{
-
-}
-
-void
 allocate_initial_tls(Obj_Entry *objs)
 {
 	char *tls;
@@ -1061,73 +1055,10 @@ allocate_initial_tls(Obj_Entry *objs)
 	sysarch(MIPS_SET_TLS, tls);
 }
 
-#ifdef __mips_n64
-void *
-_mips_get_tls(void)
-{
-#ifdef __CHERI_PURE_CAPABILITY__
-	uintcap_t _rv;
-
-	__asm__ __volatile__ (
-	    "creadhwr\t%0, $chwr_userlocal"
-	    : "=C" (_rv));
-#else
-	uint64_t _rv;
-
-	__asm__ __volatile__ (
-	    ".set\tpush\n\t"
-	    ".set\tmips64r2\n\t"
-	    "rdhwr\t%0, $29\n\t"
-	    ".set\tpop"
-	    : "=r" (_rv));
-#endif
-
-	/*
-	 * XXXSS See 'git show c6be4f4d2d1b71c04de5d3bbb6933ce2dbcdb317'
-	 *
-	 * Remove the offset since this really a request to get the TLS
-	 * pointer via sysarch() (in theory).  Of course, this may go away
-	 * once the TLS code is rewritten.
-	 */
-	_rv = _rv - TLS_TP_OFFSET - TLS_TCB_SIZE;
-
-#ifndef __CHERI_PURE_CAPABILITY__
-	return (void *)_rv;
-#else
-	return (void *)_rv;
-#endif
-}
-
-#else /* mips 32 */
-
-void *
-_mips_get_tls(void)
-{
-	uint32_t _rv;
-
-	__asm__ __volatile__ (
-	    ".set\tpush\n\t"
-	    ".set\tmips32r2\n\t"
-	    "rdhwr\t%0, $29\n\t"
-	    ".set\tpop"
-	    : "=r" (_rv));
-	/*
-	 * XXXSS See 'git show c6be4f4d2d1b71c04de5d3bbb6933ce2dbcdb317'
-	 *
-	 * Remove the offset since this really a request to get the TLS
-	 * pointer via sysarch() (in theory).  Of course, this may go away
-	 * once the TLS code is rewritten.
-	 */
-	_rv = _rv - TLS_TP_OFFSET - TLS_TCB_SIZE;
-
-	return (void *)_rv;
-}
-#endif /* ! __mips_n64 */
-
 void *
 __tls_get_addr(tls_index* ti)
 {
-	uintptr_t** tls;
+	uintptr_t **tls;
 	char *p;
 
 #if defined(__CHERI_PURE_CAPABILITY__) // && defined(DEBUG)
@@ -1139,13 +1070,9 @@ __tls_get_addr(tls_index* ti)
 	dbg_assert(cheri_getlen(ti) == sizeof(*ti) && "tls_index should have bounds!");
 #endif
 
-#ifdef TLS_USE_SYSARCH
-	sysarch(MIPS_GET_TLS, &tls);
-#else
-	tls = _mips_get_tls();
-#endif
-
-	p = tls_get_addr_common(tls, ti->ti_module, ti->ti_offset + TLS_DTP_OFFSET);
+	tls = _get_tp();
+	p = tls_get_addr_common(tls, ti->ti_module, ti->ti_offset +
+	    TLS_DTP_OFFSET);
 
 	return (p);
 }

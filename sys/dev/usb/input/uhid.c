@@ -43,6 +43,8 @@ __FBSDID("$FreeBSD$");
  * HID spec: http://www.usb.org/developers/devclass_docs/HID1_11.pdf
  */
 
+#include "opt_hid.h"
+
 #include <sys/stdint.h>
 #include <sys/stddef.h>
 #include <sys/param.h>
@@ -63,6 +65,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/priv.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
+
+#include <dev/hid/hid.h>
 
 #include "usbdevs.h"
 #include <dev/usb/usb.h>
@@ -828,13 +832,13 @@ uhid_attach(device_t dev)
 		DPRINTF("set idle failed, error=%s (ignored)\n",
 		    usbd_errstr(error));
 	}
-	sc->sc_isize = hid_report_size
+	sc->sc_isize = hid_report_size_max
 	    (sc->sc_repdesc_ptr, sc->sc_repdesc_size, hid_input, &sc->sc_iid);
 
-	sc->sc_osize = hid_report_size
+	sc->sc_osize = hid_report_size_max
 	    (sc->sc_repdesc_ptr, sc->sc_repdesc_size, hid_output, &sc->sc_oid);
 
-	sc->sc_fsize = hid_report_size
+	sc->sc_fsize = hid_report_size_max
 	    (sc->sc_repdesc_ptr, sc->sc_repdesc_size, hid_feature, &sc->sc_fid);
 
 	if (sc->sc_isize > UHID_BSIZE) {
@@ -889,7 +893,9 @@ uhid_detach(device_t dev)
 	return (0);
 }
 
+#ifndef HIDRAW_MAKE_UHID_ALIAS
 static devclass_t uhid_devclass;
+#endif
 
 static device_method_t uhid_methods[] = {
 	DEVMETHOD(device_probe, uhid_probe),
@@ -900,12 +906,21 @@ static device_method_t uhid_methods[] = {
 };
 
 static driver_t uhid_driver = {
+#ifdef HIDRAW_MAKE_UHID_ALIAS
+	.name = "hidraw",
+#else
 	.name = "uhid",
+#endif
 	.methods = uhid_methods,
 	.size = sizeof(struct uhid_softc),
 };
 
+#ifdef HIDRAW_MAKE_UHID_ALIAS
+DRIVER_MODULE(uhid, uhub, uhid_driver, hidraw_devclass, NULL, 0);
+#else
 DRIVER_MODULE(uhid, uhub, uhid_driver, uhid_devclass, NULL, 0);
+#endif
 MODULE_DEPEND(uhid, usb, 1, 1, 1);
+MODULE_DEPEND(uhid, hid, 1, 1, 1);
 MODULE_VERSION(uhid, 1);
 USB_PNP_HOST_INFO(uhid_devs);

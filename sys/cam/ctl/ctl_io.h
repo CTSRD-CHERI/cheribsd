@@ -42,6 +42,10 @@
 #ifndef	_CTL_IO_H_
 #define	_CTL_IO_H_
 
+#ifndef _KERNEL
+#include <stdbool.h>
+#endif
+
 #define	CTL_MAX_CDBLEN	32
 /*
  * Uncomment this next line to enable printing out times for I/Os
@@ -247,7 +251,7 @@ struct ctl_io_hdr {
 	union ctl_priv	  ctl_private[CTL_NUM_PRIV];/* CTL private area */
 	TAILQ_HEAD(, ctl_io_hdr) blocked_queue;	/* I/Os blocked by this one */
 	STAILQ_ENTRY(ctl_io_hdr) links;	/* linked list pointer */
-	TAILQ_ENTRY(ctl_io_hdr) ooa_links;	/* ooa_queue links */
+	LIST_ENTRY(ctl_io_hdr) ooa_links;	/* ooa_queue links */
 	TAILQ_ENTRY(ctl_io_hdr) blocked_links;	/* blocked_queue links */
 };
 
@@ -337,7 +341,7 @@ struct ctl_scsiio {
 	struct     scsi_sense_data sense_data;	/* sense data */
 	uint8_t	   sense_len;		/* Returned sense length */
 	uint8_t	   scsi_status;		/* SCSI status byte */
-	uint8_t	   sense_residual;	/* Unused. */
+	uint8_t	   seridx;		/* Serialization index. */
 	uint8_t	   priority;		/* Command priority */
 	uint32_t   residual;		/* Unused */
 	uint32_t   tag_num;		/* tag number */
@@ -348,7 +352,7 @@ struct ctl_scsiio {
 #ifdef _KERNEL
 		void * __kerncap _dummy0;
 #endif
-		int (*be_move_done)(union ctl_io *io); /* called by fe */
+		int (*be_move_done)(union ctl_io *io, bool samethr); /* called by fe */
 	};
 	union {
 #ifdef _KERNEL

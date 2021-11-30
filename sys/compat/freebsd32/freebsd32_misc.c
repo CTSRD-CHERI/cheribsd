@@ -74,6 +74,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/signalvar.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/specialfd.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/syscallsubr.h>
@@ -82,6 +83,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysproto.h>
 #include <sys/systm.h>
 #include <sys/thr.h>
+#include <sys/timex.h>
 #include <sys/unistd.h>
 #include <sys/ucontext.h>
 #include <sys/umtx.h>
@@ -431,8 +433,7 @@ freebsd32_mmap(struct thread *td, struct freebsd32_mmap_args *uap)
 		prot |= PROT_EXEC;
 #endif
 
-	return (kern_mmap(td,
-	    &(struct mmap_req){
+	return (kern_mmap(td, &(struct mmap_req){
 		.mr_hint = (uintptr_t)uap->addr,
 		.mr_len = uap->len,
 		.mr_prot = prot,
@@ -455,8 +456,7 @@ freebsd6_freebsd32_mmap(struct thread *td,
 		prot |= PROT_EXEC;
 #endif
 
-	return (kern_mmap(td,
-	    &(struct mmap_req){
+	return (kern_mmap(td, &(struct mmap_req){
 		.mr_hint = (uintptr_t)uap->addr,
 		.mr_len = uap->len,
 		.mr_prot = PROT_MAX(_PROT_ALL) | prot,
@@ -1015,7 +1015,7 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 	return (error);
 }
 
-static int
+int
 freebsd32_copyinuio(const struct iovec * __capability cb_arg, u_int iovcnt,
     struct uio **uiop)
 {
@@ -3249,8 +3249,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	destp = rounddown2(destp, sizeof(uint32_t));
 	ustringp = destp;
 
-	if (imgp->sysent->sv_stackgap != NULL)
-		imgp->sysent->sv_stackgap(imgp, &destp);
+	exec_stackgap(imgp, &destp);
 
 	if (imgp->auxargs) {
 		/*
@@ -3381,6 +3380,23 @@ freebsd32_posix_fallocate(struct thread *td,
 	error = kern_posix_fallocate(td, uap->fd,
 	    PAIR32TO64(off_t, uap->offset), PAIR32TO64(off_t, uap->len));
 	return (kern_posix_error(td, error));
+}
+
+int
+freebsd32___specialfd(struct thread *td,
+    struct freebsd32___specialfd_args *args)
+{
+	void * __capability req;
+
+	switch(args->type) {
+	case SPECIALFD_EVENTFD:
+		req = __USER_CAP(args->req, sizeof(struct specialfd_eventfd));
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	return (user_specialfd(td, args->type, req, args->len));
 }
 
 int
@@ -3594,6 +3610,71 @@ freebsd32_sched_rr_get_interval(struct thread *td,
 		CP(ts, ts32, tv_sec);
 		CP(ts, ts32, tv_nsec);
 		error = copyout(&ts32, uap->interval, sizeof(ts32));
+	}
+	return (error);
+}
+
+static void
+timex_to_32(struct timex32 *dst, struct timex *src)
+{
+	CP(*src, *dst, modes);
+	CP(*src, *dst, offset);
+	CP(*src, *dst, freq);
+	CP(*src, *dst, maxerror);
+	CP(*src, *dst, esterror);
+	CP(*src, *dst, status);
+	CP(*src, *dst, constant);
+	CP(*src, *dst, precision);
+	CP(*src, *dst, tolerance);
+	CP(*src, *dst, ppsfreq);
+	CP(*src, *dst, jitter);
+	CP(*src, *dst, shift);
+	CP(*src, *dst, stabil);
+	CP(*src, *dst, jitcnt);
+	CP(*src, *dst, calcnt);
+	CP(*src, *dst, errcnt);
+	CP(*src, *dst, stbcnt);
+}
+
+static void
+timex_from_32(struct timex *dst, struct timex32 *src)
+{
+	CP(*src, *dst, modes);
+	CP(*src, *dst, offset);
+	CP(*src, *dst, freq);
+	CP(*src, *dst, maxerror);
+	CP(*src, *dst, esterror);
+	CP(*src, *dst, status);
+	CP(*src, *dst, constant);
+	CP(*src, *dst, precision);
+	CP(*src, *dst, tolerance);
+	CP(*src, *dst, ppsfreq);
+	CP(*src, *dst, jitter);
+	CP(*src, *dst, shift);
+	CP(*src, *dst, stabil);
+	CP(*src, *dst, jitcnt);
+	CP(*src, *dst, calcnt);
+	CP(*src, *dst, errcnt);
+	CP(*src, *dst, stbcnt);
+}
+
+int
+freebsd32_ntp_adjtime(struct thread *td, struct freebsd32_ntp_adjtime_args *uap)
+{
+	struct timex tx;
+	struct timex32 tx32;
+	int error, retval;
+
+	error = copyin(__USER_CAP_OBJ(uap->tp), &tx32, sizeof(tx32));
+	if (error == 0) {
+		timex_from_32(&tx, &tx32);
+		error = kern_ntp_adjtime(td, &tx, &retval);
+		if (error == 0) {
+			timex_to_32(&tx32, &tx);
+			error = copyout(&tx32, __USER_CAP_OBJ(uap->tp), sizeof(tx32));
+			if (error == 0)
+				td->td_retval[0] = retval;
+		}
 	}
 	return (error);
 }

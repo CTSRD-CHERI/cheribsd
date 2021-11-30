@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# Copyright (c) 2018-2020 Gavin D. Howard and contributors.
+# Copyright (c) 2018-2021 Gavin D. Howard and contributors.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -43,7 +43,7 @@ print_manpage() {
 	cat "$manualsdir/header.txt" > "$_print_manpage_out"
 	cat "$manualsdir/header_${manpage}.txt" >> "$_print_manpage_out"
 
-	pandoc -f markdown -t man "$_print_manpage_md" >> "$_print_manpage_out"
+	pandoc -f commonmark -t man "$_print_manpage_md" >> "$_print_manpage_out"
 
 }
 

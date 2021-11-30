@@ -3,7 +3,7 @@ NEED_COMPAT=	64
 
 PROG=	ktrdump64
 MAN=
-SRCS=	ktrdump.c
+MLINKS=	ktrdump.8 ktrdump64.8
 
 .PATH:	${SRCTOP}/usr.bin/ktrdump
 .include "${SRCTOP}/usr.bin/ktrdump/Makefile"

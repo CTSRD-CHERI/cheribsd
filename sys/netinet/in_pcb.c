@@ -75,6 +75,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #include <vm/uma.h>
+#include <vm/vm.h>
 
 #include <net/if.h>
 #include <net/if_var.h>
@@ -150,7 +151,8 @@ static void	in_pcbremlists(struct inpcb *inp);
 static struct inpcb	*in_pcblookup_hash_locked(struct inpcbinfo *pcbinfo,
 			    struct in_addr faddr, u_int fport_arg,
 			    struct in_addr laddr, u_int lport_arg,
-			    int lookupflags, struct ifnet *ifp);
+			    int lookupflags, struct ifnet *ifp,
+			    uint8_t numa_domain);
 
 #define RANGECHK(var, min, max) \
 	if ((var) < (min)) { (var) = (min); } \
@@ -222,6 +224,8 @@ SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, randomtime,
 	"allocation before switching to a random one");
 
 #ifdef RATELIMIT
+counter_u64_t rate_limit_new;
+counter_u64_t rate_limit_chg;
 counter_u64_t rate_limit_active;
 counter_u64_t rate_limit_alloc_fail;
 counter_u64_t rate_limit_set_ok;
@@ -234,6 +238,11 @@ SYSCTL_COUNTER_U64(_net_inet_ip_rl, OID_AUTO, alloc_fail, CTLFLAG_RD,
    &rate_limit_alloc_fail, "Rate limited connection failures");
 SYSCTL_COUNTER_U64(_net_inet_ip_rl, OID_AUTO, set_ok, CTLFLAG_RD,
    &rate_limit_set_ok, "Rate limited setting succeeded");
+SYSCTL_COUNTER_U64(_net_inet_ip_rl, OID_AUTO, newrl, CTLFLAG_RD,
+   &rate_limit_new, "Total Rate limit new attempts");
+SYSCTL_COUNTER_U64(_net_inet_ip_rl, OID_AUTO, chgrl, CTLFLAG_RD,
+   &rate_limit_chg, "Total Rate limited change attempts");
+
 #endif /* RATELIMIT */
 
 #endif /* INET */
@@ -248,7 +257,8 @@ SYSCTL_COUNTER_U64(_net_inet_ip_rl, OID_AUTO, set_ok, CTLFLAG_RD,
 
 static struct inpcblbgroup *
 in_pcblbgroup_alloc(struct inpcblbgrouphead *hdr, u_char vflag,
-    uint16_t port, const union in_dependaddr *addr, int size)
+    uint16_t port, const union in_dependaddr *addr, int size,
+    uint8_t numa_domain)
 {
 	struct inpcblbgroup *grp;
 	size_t bytes;
@@ -259,6 +269,7 @@ in_pcblbgroup_alloc(struct inpcblbgrouphead *hdr, u_char vflag,
 		return (NULL);
 	grp->il_vflag = vflag;
 	grp->il_lport = port;
+	grp->il_numa_domain = numa_domain;
 	grp->il_dependladdr = *addr;
 	grp->il_inpsiz = size;
 	CK_LIST_INSERT_HEAD(hdr, grp, il_list);
@@ -290,7 +301,8 @@ in_pcblbgroup_resize(struct inpcblbgrouphead *hdr,
 	int i;
 
 	grp = in_pcblbgroup_alloc(hdr, old_grp->il_vflag,
-	    old_grp->il_lport, &old_grp->il_dependladdr, size);
+	    old_grp->il_lport, &old_grp->il_dependladdr, size,
+	    old_grp->il_numa_domain);
 	if (grp == NULL)
 		return (NULL);
 
@@ -333,7 +345,7 @@ in_pcblbgroup_reorder(struct inpcblbgrouphead *hdr, struct inpcblbgroup **grpp,
  * Add PCB to load balance group for SO_REUSEPORT_LB option.
  */
 static int
-in_pcbinslbgrouphash(struct inpcb *inp)
+in_pcbinslbgrouphash(struct inpcb *inp, uint8_t numa_domain)
 {
 	const static struct timeval interval = { 60, 0 };
 	static struct timeval lastprint;
@@ -369,6 +381,7 @@ in_pcbinslbgrouphash(struct inpcb *inp)
 	CK_LIST_FOREACH(grp, hdr, il_list) {
 		if (grp->il_vflag == inp->inp_vflag &&
 		    grp->il_lport == inp->inp_lport &&
+		    grp->il_numa_domain == numa_domain &&
 		    memcmp(&grp->il_dependladdr,
 		    &inp->inp_inc.inc_ie.ie_dependladdr,
 		    sizeof(grp->il_dependladdr)) == 0)
@@ -378,7 +391,7 @@ in_pcbinslbgrouphash(struct inpcb *inp)
 		/* Create new load balance group. */
 		grp = in_pcblbgroup_alloc(hdr, inp->inp_vflag,
 		    inp->inp_lport, &inp->inp_inc.inc_ie.ie_dependladdr,
-		    INPCBLBGROUP_SIZMIN);
+		    INPCBLBGROUP_SIZMIN, numa_domain);
 		if (grp == NULL)
 			return (ENOBUFS);
 	} else if (grp->il_inpcnt == grp->il_inpsiz) {
@@ -437,6 +450,57 @@ in_pcbremlbgrouphash(struct inpcb *inp)
 			return;
 		}
 	}
+}
+
+int
+in_pcblbgroup_numa(struct inpcb *inp, int arg)
+{
+	struct inpcbinfo *pcbinfo;
+	struct inpcblbgrouphead *hdr;
+	struct inpcblbgroup *grp;
+	int err, i;
+	uint8_t numa_domain;
+
+	switch (arg) {
+	case TCP_REUSPORT_LB_NUMA_NODOM:
+		numa_domain = M_NODOM;
+		break;
+	case TCP_REUSPORT_LB_NUMA_CURDOM:
+		numa_domain = PCPU_GET(domain);
+		break;
+	default:
+		if (arg < 0 || arg >= vm_ndomains)
+			return (EINVAL);
+		numa_domain = arg;
+	}
+
+	err = 0;
+	pcbinfo = inp->inp_pcbinfo;
+	INP_WLOCK_ASSERT(inp);
+	INP_HASH_WLOCK(pcbinfo);
+	hdr = &pcbinfo->ipi_lbgrouphashbase[
+	    INP_PCBPORTHASH(inp->inp_lport, pcbinfo->ipi_lbgrouphashmask)];
+	CK_LIST_FOREACH(grp, hdr, il_list) {
+		for (i = 0; i < grp->il_inpcnt; ++i) {
+			if (grp->il_inp[i] != inp)
+				continue;
+
+			if (grp->il_numa_domain == numa_domain) {
+				goto abort_with_hash_wlock;
+			}
+
+			/* Remove it from the old group. */
+			in_pcbremlbgrouphash(inp);
+
+			/* Add it to the new group based on numa domain. */
+			in_pcbinslbgrouphash(inp, numa_domain);
+			goto abort_with_hash_wlock;
+		}
+	}
+	err = ENOENT;
+abort_with_hash_wlock:
+	INP_HASH_WUNLOCK(pcbinfo);
+	return (err);
 }
 
 /*
@@ -731,14 +795,14 @@ in_pcb_lport_dest(struct inpcb *inp, struct sockaddr *lsa, u_short *lportp,
 			if (lsa->sa_family == AF_INET) {
 				tmpinp = in_pcblookup_hash_locked(pcbinfo,
 				    faddr, fport, laddr, lport, lookupflags,
-				    NULL);
+				    NULL, M_NODOM);
 			}
 #endif
 #ifdef INET6
 			if (lsa->sa_family == AF_INET6) {
 				tmpinp = in6_pcblookup_hash_locked(pcbinfo,
 				    faddr6, fport, laddr6, lport, lookupflags,
-				    NULL);
+				    NULL, M_NODOM);
 			}
 #endif
 		} else {
@@ -1399,9 +1463,10 @@ in_pcbconnect_setup(struct inpcb *inp, struct sockaddr *nam,
 		if (error)
 			return (error);
 	}
+
 	if (lport != 0) {
 		oinp = in_pcblookup_hash_locked(inp->inp_pcbinfo, faddr,
-		    fport, laddr, lport, 0, NULL);
+		    fport, laddr, lport, 0, NULL, M_NODOM);
 		if (oinp != NULL) {
 			if (oinpp != NULL)
 				*oinpp = oinp;
@@ -2019,9 +2084,9 @@ in_pcblookup_local(struct inpcbinfo *pcbinfo, struct in_addr laddr,
 static struct inpcb *
 in_pcblookup_lbgroup(const struct inpcbinfo *pcbinfo,
     const struct in_addr *laddr, uint16_t lport, const struct in_addr *faddr,
-    uint16_t fport, int lookupflags)
+    uint16_t fport, int lookupflags, int numa_domain)
 {
-	struct inpcb *local_wild;
+	struct inpcb *local_wild, *numa_wild;
 	const struct inpcblbgrouphead *hdr;
 	struct inpcblbgroup *grp;
 	uint32_t idx;
@@ -2041,6 +2106,7 @@ in_pcblookup_lbgroup(const struct inpcbinfo *pcbinfo,
 	 * - Load balanced group does not contain IPv4 mapped INET6 wild sockets
 	 */
 	local_wild = NULL;
+	numa_wild = NULL;
 	CK_LIST_FOREACH(grp, hdr, il_list) {
 #ifdef INET6
 		if (!(grp->il_vflag & INP_IPV4))
@@ -2051,12 +2117,24 @@ in_pcblookup_lbgroup(const struct inpcbinfo *pcbinfo,
 
 		idx = INP_PCBLBGROUP_PKTHASH(faddr->s_addr, lport, fport) %
 		    grp->il_inpcnt;
-		if (grp->il_laddr.s_addr == laddr->s_addr)
-			return (grp->il_inp[idx]);
+		if (grp->il_laddr.s_addr == laddr->s_addr) {
+			if (numa_domain == M_NODOM ||
+			    grp->il_numa_domain == numa_domain) {
+				return (grp->il_inp[idx]);
+			} else {
+				numa_wild = grp->il_inp[idx];
+			}
+		}
 		if (grp->il_laddr.s_addr == INADDR_ANY &&
-		    (lookupflags & INPLOOKUP_WILDCARD) != 0)
+		    (lookupflags & INPLOOKUP_WILDCARD) != 0 &&
+		    (local_wild == NULL || numa_domain == M_NODOM ||
+			grp->il_numa_domain == numa_domain)) {
 			local_wild = grp->il_inp[idx];
+		}
 	}
+	if (numa_wild != NULL)
+		return (numa_wild);
+
 	return (local_wild);
 }
 
@@ -2303,7 +2381,7 @@ found:
 static struct inpcb *
 in_pcblookup_hash_locked(struct inpcbinfo *pcbinfo, struct in_addr faddr,
     u_int fport_arg, struct in_addr laddr, u_int lport_arg, int lookupflags,
-    struct ifnet *ifp)
+    struct ifnet *ifp, uint8_t numa_domain)
 {
 	struct inpcbhead *head;
 	struct inpcb *inp, *tmpinp;
@@ -2348,7 +2426,7 @@ in_pcblookup_hash_locked(struct inpcbinfo *pcbinfo, struct in_addr faddr,
 	 */
 	if ((lookupflags & INPLOOKUP_WILDCARD) != 0) {
 		inp = in_pcblookup_lbgroup(pcbinfo, &laddr, lport, &faddr,
-		    fport, lookupflags);
+		    fport, lookupflags, numa_domain);
 		if (inp != NULL)
 			return (inp);
 	}
@@ -2435,35 +2513,23 @@ in_pcblookup_hash_locked(struct inpcbinfo *pcbinfo, struct in_addr faddr,
 static struct inpcb *
 in_pcblookup_hash(struct inpcbinfo *pcbinfo, struct in_addr faddr,
     u_int fport, struct in_addr laddr, u_int lport, int lookupflags,
-    struct ifnet *ifp)
+    struct ifnet *ifp, uint8_t numa_domain)
 {
 	struct inpcb *inp;
 
 	inp = in_pcblookup_hash_locked(pcbinfo, faddr, fport, laddr, lport,
-	    (lookupflags & ~(INPLOOKUP_RLOCKPCB | INPLOOKUP_WLOCKPCB)), ifp);
+	    lookupflags & INPLOOKUP_WILDCARD, ifp, numa_domain);
 	if (inp != NULL) {
 		if (lookupflags & INPLOOKUP_WLOCKPCB) {
 			INP_WLOCK(inp);
-			if (__predict_false(inp->inp_flags2 & INP_FREED)) {
-				INP_WUNLOCK(inp);
-				inp = NULL;
-			}
 		} else if (lookupflags & INPLOOKUP_RLOCKPCB) {
 			INP_RLOCK(inp);
-			if (__predict_false(inp->inp_flags2 & INP_FREED)) {
-				INP_RUNLOCK(inp);
-				inp = NULL;
-			}
 		} else
 			panic("%s: locking bug", __func__);
-#ifdef INVARIANTS
-		if (inp != NULL) {
-			if (lookupflags & INPLOOKUP_WLOCKPCB)
-				INP_WLOCK_ASSERT(inp);
-			else
-				INP_RLOCK_ASSERT(inp);
+		if (__predict_false(inp->inp_flags2 & INP_FREED)) {
+			INP_UNLOCK(inp);
+			inp = NULL;
 		}
-#endif
 	}
 
 	return (inp);
@@ -2507,7 +2573,7 @@ in_pcblookup(struct inpcbinfo *pcbinfo, struct in_addr faddr, u_int fport,
 	}
 #endif
 	return (in_pcblookup_hash(pcbinfo, faddr, fport, laddr, lport,
-	    lookupflags, ifp));
+	    lookupflags, ifp, M_NODOM));
 }
 
 struct inpcb *
@@ -2549,7 +2615,7 @@ in_pcblookup_mbuf(struct inpcbinfo *pcbinfo, struct in_addr faddr,
 	}
 #endif
 	return (in_pcblookup_hash(pcbinfo, faddr, fport, laddr, lport,
-	    lookupflags, ifp));
+	    lookupflags, ifp, m->m_pkthdr.numa_domain));
 }
 #endif /* INET */
 
@@ -2591,7 +2657,7 @@ in_pcbinshash_internal(struct inpcb *inp, struct mbuf *m)
 	 */
 	so_options = inp_so_options(inp);
 	if (so_options & SO_REUSEPORT_LB) {
-		int ret = in_pcbinslbgrouphash(inp);
+		int ret = in_pcbinslbgrouphash(inp, M_NODOM);
 		if (ret) {
 			/* pcb lb group malloc fail (ret=ENOBUFS). */
 			return (ret);
@@ -3327,7 +3393,12 @@ in_pcbattach_txrtlmt(struct inpcb *inp, struct ifnet *ifp,
 
 	INP_WLOCK_ASSERT(inp);
 
-	if (*st != NULL)
+	/*
+	 * If there is already a send tag, or the INP is being torn
+	 * down, allocating a new send tag is not allowed. Else send
+	 * tags may leak.
+	 */
+	if (*st != NULL || (inp->inp_flags & (INP_TIMEWAIT | INP_DROPPED)) != 0)
 		return (EINVAL);
 
 	error = m_snd_tag_alloc(ifp, &params, st);
@@ -3369,6 +3440,9 @@ in_pcbdetach_txrtlmt(struct inpcb *inp)
 		return;
 
 	m_snd_tag_rele(mst);
+#ifdef INET
+	counter_u64_add(rate_limit_active, -1);
+#endif
 }
 
 int
@@ -3511,6 +3585,8 @@ in_pcboutput_eagain(struct inpcb *inp)
 static void
 rl_init(void *st)
 {
+	rate_limit_new = counter_u64_alloc(M_WAITOK);
+	rate_limit_chg = counter_u64_alloc(M_WAITOK);
 	rate_limit_active = counter_u64_alloc(M_WAITOK);
 	rate_limit_alloc_fail = counter_u64_alloc(M_WAITOK);
 	rate_limit_set_ok = counter_u64_alloc(M_WAITOK);

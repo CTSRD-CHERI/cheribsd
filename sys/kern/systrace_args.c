@@ -3404,6 +3404,29 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
+	/* __specialfd */
+	case 577: {
+		struct __specialfd_args *p = params;
+		iarg[0] = p->type; /* int */
+		uarg[1] = (intptr_t) p->req; /* const void * __capability */
+		uarg[2] = p->len; /* size_t */
+		*n_args = 3;
+		break;
+	}
+	/* aio_writev */
+	case 578: {
+		struct aio_writev_args *p = params;
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb * __capability */
+		*n_args = 1;
+		break;
+	}
+	/* aio_readv */
+	case 579: {
+		struct aio_readv_args *p = params;
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb * __capability */
+		*n_args = 1;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -9108,6 +9131,42 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* __specialfd */
+	case 577:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland const void * __capability";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* aio_writev */
+	case 578:
+		switch(ndx) {
+		case 0:
+			p = "userland struct aiocb * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* aio_readv */
+	case 579:
+		switch(ndx) {
+		case 0:
+			p = "userland struct aiocb * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -11051,6 +11110,21 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* rpctls_syscall */
 	case 576:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* __specialfd */
+	case 577:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* aio_writev */
+	case 578:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* aio_readv */
+	case 579:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

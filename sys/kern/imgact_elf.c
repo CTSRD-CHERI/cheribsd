@@ -216,6 +216,11 @@ SYSCTL_INT(ELF_NODE_OID, OID_AUTO, sigfastblock,
     CTLFLAG_RWTUN, &__elfN(sigfastblock), 0,
     "enable sigfastblock for new processes");
 
+static bool __elfN(allow_wx) = true;
+SYSCTL_BOOL(ELF_NODE_OID, OID_AUTO, allow_wx, CTLFLAG_RWTUN,
+    &__elfN(allow_wx), 0,
+    "Allow pages to be mapped simultaneously writable and executable");
+
 static Elf_Brandinfo *elf_brand_list[MAX_BRANDS];
 
 #define	aligned(a, t)	(rounddown2((u_long)(a), sizeof(t)) == (u_long)(a))
@@ -843,7 +848,7 @@ __elfN(load_section)(const struct image_params *imgp, vm_ooffset_t offset,
 	 */
 	if ((prot & VM_PROT_WRITE) == 0)
 		vm_map_protect(map, trunc_page(map_addr), round_page(map_addr +
-		    map_len), prot, FALSE, FALSE);
+		    map_len), prot, 0, VM_MAP_PROTECT_SET_PROT);
 
 	return (0);
 }
@@ -1489,6 +1494,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			imgp->map_flags |= MAP_ASLR_IGNSTART;
 	}
 
+	if (!__elfN(allow_wx) && (fctl0 & NT_FREEBSD_FCTL_WXNEEDED) == 0)
+		imgp->map_flags |= MAP_WXORX;
+
 	error = exec_new_vmspace(imgp, sv);
 	/*
 	 * If coexecuting, from this point on we're in a shared vmspace.
@@ -1547,7 +1555,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		maxv1 = maxv / 2 + addr / 2;
 		MPASS(maxv1 >= addr);	/* No overflow */
 		map->anon_loc = __CONCAT(rnd_, __elfN(base))(map, addr, maxv1,
-		    MAXPAGESIZES > 1 ? pagesizes[1] : pagesizes[0]);
+		    (MAXPAGESIZES > 1 && pagesizes[1] != 0) ?
+		    pagesizes[1] : pagesizes[0]);
 	} else {
 		map->anon_loc = addr;
 	}
@@ -1560,7 +1569,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	if (interp != NULL) {
 		VOP_UNLOCK(imgp->vp);
 		if ((map->flags & MAP_ASLR) != 0) {
-			/* Assume that interpeter fits into 1/4 of AS */
+			/* Assume that interpreter fits into 1/4 of AS */
 			maxv1 = maxv / 2 + addr / 2;
 			MPASS(maxv1 >= addr);	/* No overflow */
 			addr = __CONCAT(rnd_, __elfN(base))(map, addr,
@@ -3198,6 +3207,7 @@ note_fctl_cb(const Elf_Note *note, void *arg0, bool *res)
 	desc = (const Elf32_Word *)p;
 	*arg->has_fctl0 = true;
 	*arg->fctl0 = desc[0];
+	*res = true;
 	return (true);
 }
 
@@ -3292,8 +3302,6 @@ __elfN(stackgap)(struct image_params *imgp, uintcap_t *stack_base)
 	vm_offset_t range, gap;
 	int pct;
 
-	if ((imgp->map_flags & MAP_ASLR) == 0)
-		return;
 	pct = __elfN(aslr_stack_gap);
 	if (pct == 0)
 		return;

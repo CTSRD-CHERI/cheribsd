@@ -71,6 +71,21 @@ void _rtld_thread_init(struct RtldLockInfo *) __exported;
 void _rtld_atfork_pre(int *) __exported;
 void _rtld_atfork_post(int *) __exported;
 
+static char def_dlerror_msg[512];
+static int def_dlerror_seen_val;
+
+static char *
+def_dlerror_loc(void)
+{
+	return (def_dlerror_msg);
+}
+
+static int *
+def_dlerror_seen(void)
+{
+	return (&def_dlerror_seen_val);
+}
+
 #define WAFLAG		0x1	/* A writer holds the lock */
 #define RC_INCR		0x2	/* Adjusts count of readers desiring lock */
 
@@ -202,7 +217,7 @@ def_thread_clr_flag(int mask)
 /*
  * Public interface exposed to the rest of the dynamic linker.
  */
-static struct RtldLockInfo lockinfo;
+struct RtldLockInfo lockinfo;
 static struct RtldLockInfo deflockinfo;
 
 static __inline int
@@ -312,6 +327,14 @@ lock_restart_for_upgrade(RtldLockState *lockstate)
 #define local_rtld_function_pointer(func) &func
 
 void
+dlerror_dflt_init(void)
+{
+	lockinfo.dlerror_loc = def_dlerror_loc;
+	lockinfo.dlerror_loc_sz = sizeof(def_dlerror_msg);
+	lockinfo.dlerror_seen = def_dlerror_seen;
+}
+
+void
 lockdflt_init(void)
 {
 	int i;
@@ -325,6 +348,9 @@ lockdflt_init(void)
 	deflockinfo.thread_set_flag = make_rtld_function_pointer(def_thread_set_flag);
 	deflockinfo.thread_clr_flag = make_rtld_function_pointer(def_thread_clr_flag);
 	deflockinfo.at_fork = NULL;
+	deflockinfo.dlerror_loc = def_dlerror_loc;
+	deflockinfo.dlerror_loc_sz = sizeof(def_dlerror_msg);
+	deflockinfo.dlerror_seen = def_dlerror_seen;
 
 
 	for (i = 0; i < RTLD_LOCK_CNT; i++) {
@@ -357,8 +383,23 @@ lockdflt_init(void)
 void
 _rtld_thread_init(struct RtldLockInfo *pli)
 {
-	int flags, i;
+	const Obj_Entry *obj;
+	SymLook req;
 	void *locks[RTLD_LOCK_CNT];
+	int flags, i, res;
+
+	if (pli == NULL) {
+		lockinfo.rtli_version = RTLI_VERSION;
+	} else {
+		lockinfo.rtli_version = RTLI_VERSION_ONE;
+		obj = obj_from_addr(pli->lock_create);
+		if (obj != NULL) {
+			symlook_init(&req, "_pli_rtli_version");
+			res = symlook_obj(&req, obj);
+			if (res == 0)
+				lockinfo.rtli_version = pli->rtli_version;
+		}
+	}
 
 	/* disable all locking while this function is running */
 	flags =	thread_mask_set(~0);
@@ -402,6 +443,13 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 	lockinfo.thread_set_flag = pli->thread_set_flag;
 	lockinfo.thread_clr_flag = pli->thread_clr_flag;
 	lockinfo.at_fork = pli->at_fork;
+	if (lockinfo.rtli_version > RTLI_VERSION_ONE && pli != NULL) {
+		strlcpy(pli->dlerror_loc(), lockinfo.dlerror_loc(),
+		    lockinfo.dlerror_loc_sz);
+		lockinfo.dlerror_loc = pli->dlerror_loc;
+		lockinfo.dlerror_loc_sz = pli->dlerror_loc_sz;
+		lockinfo.dlerror_seen = pli->dlerror_seen;
+	}
 
 	/* restore thread locking state, this time with new locks */
 	thread_mask_clear(~0);

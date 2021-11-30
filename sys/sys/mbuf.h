@@ -200,13 +200,16 @@ struct pkthdr {
 	} PH_loc;
 };
 #define	ether_vtag	PH_per.sixteen[0]
+#define tcp_tun_port	PH_per.sixteen[0] /* outbound */
 #define	PH_vt		PH_per
 #define	vt_nrecs	sixteen[0]	  /* mld and v6-ND */
 #define	tso_segsz	PH_per.sixteen[1] /* inbound after LRO */
 #define	lro_nsegs	tso_segsz	  /* inbound after LRO */
 #define	csum_data	PH_per.thirtytwo[1] /* inbound from hardware up */
-#define lro_len		PH_loc.sixteen[0] /* inbound during LRO (no reassembly) */
-#define lro_csum	PH_loc.sixteen[1] /* inbound during LRO (no reassembly) */
+#define	lro_tcp_d_len	PH_loc.sixteen[0] /* inbound during LRO (no reassembly) */
+#define	lro_tcp_d_csum	PH_loc.sixteen[1] /* inbound during LRO (no reassembly) */
+#define	lro_tcp_h_off	PH_loc.sixteen[2] /* inbound during LRO (no reassembly) */
+#define	lro_etype	PH_loc.sixteen[3] /* inbound during LRO (no reassembly) */
 /* Note PH_loc is used during IP reassembly (all 8 bytes as a ptr) */
 
 /*
@@ -543,6 +546,7 @@ m_epg_pagelen(const struct mbuf *m, int pidx, int pgoff)
  * https://docs.microsoft.com/en-us/windows-hardware/drivers/network/rss-hashing-types#ndishashipv6ex
  */
 #define	M_HASHTYPE_HASHPROP		0x80	/* has hash properties */
+#define	M_HASHTYPE_INNER		0x40	/* calculated from inner headers */
 #define	M_HASHTYPE_HASH(t)		(M_HASHTYPE_HASHPROP | (t))
 /* Microsoft RSS standard hash types */
 #define	M_HASHTYPE_NONE			0
@@ -559,15 +563,19 @@ m_epg_pagelen(const struct mbuf *m, int pidx, int pgoff)
 #define	M_HASHTYPE_RSS_UDP_IPV6_EX	M_HASHTYPE_HASH(10)/* IPv6 UDP 4-tuple +
 							    * ext hdrs */
 
-#define	M_HASHTYPE_OPAQUE		63	/* ordering, not affinity */
+#define	M_HASHTYPE_OPAQUE		0x3f	/* ordering, not affinity */
 #define	M_HASHTYPE_OPAQUE_HASH		M_HASHTYPE_HASH(M_HASHTYPE_OPAQUE)
 						/* ordering+hash, not affinity*/
 
 #define	M_HASHTYPE_CLEAR(m)	((m)->m_pkthdr.rsstype = 0)
-#define	M_HASHTYPE_GET(m)	((m)->m_pkthdr.rsstype)
+#define	M_HASHTYPE_GET(m)	((m)->m_pkthdr.rsstype & ~M_HASHTYPE_INNER)
 #define	M_HASHTYPE_SET(m, v)	((m)->m_pkthdr.rsstype = (v))
 #define	M_HASHTYPE_TEST(m, v)	(M_HASHTYPE_GET(m) == (v))
-#define	M_HASHTYPE_ISHASH(m)	(M_HASHTYPE_GET(m) & M_HASHTYPE_HASHPROP)
+#define	M_HASHTYPE_ISHASH(m)	\
+    (((m)->m_pkthdr.rsstype & M_HASHTYPE_HASHPROP) != 0)
+#define	M_HASHTYPE_SETINNER(m)	do {			\
+	(m)->m_pkthdr.rsstype |= M_HASHTYPE_INNER;	\
+    } while (0)
 
 /*
  * External mbuf storage buffer types.
@@ -803,6 +811,7 @@ int		 mb_unmapped_compress(struct mbuf *m);
 struct mbuf 	*mb_unmapped_to_ext(struct mbuf *m);
 void		 mb_free_notready(struct mbuf *m, int count);
 void		 m_adj(struct mbuf *, int);
+void		 m_adj_decap(struct mbuf *, int);
 int		 m_apply(struct mbuf *, int, int,
 		    int (*)(void *, void *, u_int), void *);
 int		 m_append(struct mbuf *, int, c_caddr_t);
@@ -1115,6 +1124,17 @@ m_extrefcnt(struct mbuf *m)
 #define	M_ASSERTVALID(m)						\
 	KASSERT((((struct mbuf *)m)->m_flags & 0) == 0,			\
 	    ("%s: attempted use of a free mbuf!", __func__))
+
+/* Check whether any mbuf in the chain is unmapped. */
+#ifdef INVARIANTS
+#define	M_ASSERTMAPPED(m) do {						\
+	for (struct mbuf *__m = (m); __m != NULL; __m = __m->m_next)	\
+		KASSERT((__m->m_flags & M_EXTPG) == 0,			\
+		    ("%s: chain %p contains an unmapped mbuf", __func__, (m)));\
+} while (0)
+#else
+#define	M_ASSERTMAPPED(m)
+#endif
 
 /*
  * Return the address of the start of the buffer associated with an mbuf,

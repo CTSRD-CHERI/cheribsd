@@ -91,7 +91,6 @@ SUBDIR=	\
 	cloudabi \
 	${_cloudabi32} \
 	${_cloudabi64} \
-	${_cmx} \
 	${_coretemp} \
 	${_cp} \
 	${_cpsw} \
@@ -105,8 +104,11 @@ SUBDIR=	\
 	dc \
 	dcons \
 	dcons_crom \
+	${_dpdk_lpm4} \
+	${_dpdk_lpm6} \
 	${_dpms} \
 	dummynet \
+	${_dwwdt} \
 	${_efirt} \
 	${_em} \
 	${_ena} \
@@ -121,6 +123,7 @@ SUBDIR=	\
 	filemon \
 	firewire \
 	firmware \
+	${_ftwd} \
 	fusefs \
 	${_fxp} \
 	gem \
@@ -128,8 +131,8 @@ SUBDIR=	\
 	${_glxiic} \
 	${_glxsb} \
 	gpio \
+	hid \
 	hifn \
-	hme \
 	${_hpt27xx} \
 	${_hptiop} \
 	${_hptmv} \
@@ -156,7 +159,6 @@ SUBDIR=	\
 	${_if_me} \
 	if_infiniband \
 	if_lagg \
-	${_if_ndis} \
 	${_if_stf} \
 	if_tuntap \
 	if_vlan \
@@ -257,7 +259,6 @@ SUBDIR=	\
 	mxge \
 	my \
 	${_nctgpio} \
-	${_ndis} \
 	${_netgraph} \
 	${_nfe} \
 	nfscl \
@@ -372,7 +373,7 @@ SUBDIR=	\
 	unionfs \
 	usb \
 	${_vesa} \
-	${_virtio} \
+	virtio \
 	vge \
 	${_viawd} \
 	videomode \
@@ -383,7 +384,6 @@ SUBDIR=	\
 	vr \
 	vte \
 	${_wbwd} \
-	${_wi} \
 	wlan \
 	wlan_acl \
 	wlan_amrr \
@@ -478,6 +478,14 @@ _ipfilter=	ipfilter
 .endif
 .endif
 
+.if ${MK_INET_SUPPORT} != "no" && ${KERN_OPTS:MFIB_ALGO}
+_dpdk_lpm4=	dpdk_lpm4
+.endif
+
+.if ${MK_INET6_SUPPORT} != "no" && ${KERN_OPTS:MFIB_ALGO}
+_dpdk_lpm6=	dpdk_lpm6
+.endif
+
 .if ${MK_ISCSI} != "no" || defined(ALL_MODULES)
 SUBDIR+=	cfiscsi
 SUBDIR+=	iscsi
@@ -510,6 +518,7 @@ _ibcore=	ibcore
 _ipoib=		ipoib
 _iser=		iser
 .endif
+_ipmi=		ipmi
 _mlx4=		mlx4
 _mlx5=		mlx5
 .if (${MK_INET_SUPPORT} != "no" && ${MK_INET6_SUPPORT} != "no") || \
@@ -521,6 +530,9 @@ _mlx5en=	mlx5en
 _mthca=		mthca
 _mlx4ib=	mlx4ib
 _mlx5ib=	mlx5ib
+.endif
+.if !${MACHINE_ABI:Mpurecap}
+_ossl=		ossl
 .endif
 _vmware=	vmware
 .endif
@@ -614,6 +626,7 @@ _cxgb=		cxgb
 .if ${MACHINE_CPUARCH} == "aarch64"
 _allwinner=	allwinner
 _armv8crypto=	armv8crypto
+_dwwdt=		dwwdt
 _em=		em
 _rockchip=	rockchip
 .endif
@@ -633,8 +646,8 @@ _cpufreq=	cpufreq
 _dpms=		dpms
 _em=		em
 _et=		et
+_ftwd=		ftwd
 _exca=		exca
-_if_ndis=	if_ndis
 _io=		io
 _itwd=		itwd
 _ix=		ix
@@ -643,10 +656,8 @@ _ixv=		ixv
 _lio=		lio
 .endif
 _nctgpio=	nctgpio
-_ndis=		ndis
 _ntb=		ntb
 _ocs_fc=	ocs_fc
-_ossl=		ossl
 _pccard=	pccard
 _qat=		qat
 _qatfw=		qatfw
@@ -658,7 +669,6 @@ _speaker=	speaker
 _splash=	splash
 _sppp=		sppp
 _wbwd=		wbwd
-_wi=		wi
 
 _aac=		aac
 _aacraid=	aacraid
@@ -679,7 +689,6 @@ _bytgpio=	bytgpio
 _chvgpio=	chvgpio
 _ciss=		ciss
 _chromebook_platform=	chromebook_platform
-_cmx=		cmx
 _coretemp=	coretemp
 .if ${MK_SOURCELESS_HOST} != "no" && empty(KCSAN_ENABLED)
 _hpt27xx=	hpt27xx
@@ -695,7 +704,6 @@ _ichwd=		ichwd
 _ida=		ida
 _iir=		iir
 _intelspi=	intelspi
-_ipmi=		ipmi
 _ips=		ips
 _isci=		isci
 _ipw=		ipw
@@ -726,7 +734,6 @@ _tpm=		tpm
 _twa=		twa
 _vesa=		vesa
 _viawd=		viawd
-_virtio=	virtio
 _wpi=		wpi
 .if ${MK_SOURCELESS_UCODE} != "no"
 _wpifw=		wpifw
@@ -770,7 +777,7 @@ _3dfx_linux=	3dfx_linux
 .if ${MK_SOURCELESS_HOST} != "no"
 _ce=		ce
 .endif
-.if ${MK_SOURCELESS_UCODE} != "no"
+.if ${MK_SOURCELESS_HOST} != "no"
 _cp=		cp
 .endif
 _glxiic=	glxiic
@@ -798,8 +805,6 @@ _ffec=		ffec
 _nvd=		nvd
 _nvme=		nvme
 _pccard=	pccard
-_wi=		wi
-_virtio=	virtio
 .endif
 
 .if ${MACHINE_ARCH:Mpowerpc64*} != ""

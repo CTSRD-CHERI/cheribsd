@@ -212,7 +212,7 @@ fbd_list()
 
 	LIST_FOREACH(entry, &fb_list_head, fb_list) {
 		printf("FB %s @%p\n", entry->fb_info->fb_name,
-		    (void *)entry->fb_info->fb_pbase);
+		    (void *)(uintptr_t)entry->fb_info->fb_pbase);
 	}
 
 	return (0);

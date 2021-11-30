@@ -1,6 +1,6 @@
-/*	$NetBSD: filemon_dev.c,v 1.4 2020/11/05 17:27:16 rillig Exp $	*/
+/*	$NetBSD: filemon_dev.c,v 1.8 2021/02/01 21:09:25 rillig Exp $	*/
 
-/*-
+/*
  * Copyright (c) 2020 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -39,11 +39,11 @@
 #include <unistd.h>
 
 #ifdef HAVE_FILEMON_H
-#  include <filemon.h>
+# include <filemon.h>
 #endif
 
 #ifndef _PATH_FILEMON
-#define	_PATH_FILEMON	"/dev/filemon"
+#define _PATH_FILEMON	"/dev/filemon"
 #endif
 
 struct filemon {
@@ -127,7 +127,7 @@ filemon_close(struct filemon *F)
 	free(F);
 
 	/* Set errno and return -1 if anything went wrong.  */
-	if (error) {
+	if (error != 0) {
 		errno = error;
 		return -1;
 	}

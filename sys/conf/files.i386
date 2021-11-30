@@ -52,7 +52,6 @@ cddl/dev/dtrace/i386/dtrace_asm.S			optional dtrace compile-with "${DTRACE_S}"
 cddl/dev/dtrace/i386/dtrace_subr.c			optional dtrace compile-with "${DTRACE_C}"
 compat/linprocfs/linprocfs.c	optional linprocfs
 compat/linsysfs/linsysfs.c	optional linsysfs
-compat/linux/linux_common.c	optional compat_linux
 compat/linux/linux_dummy.c	optional compat_linux
 compat/linux/linux_event.c	optional compat_linux
 compat/linux/linux_emul.c	optional compat_linux
@@ -76,9 +75,10 @@ compat/linux/linux_uid16.c	optional compat_linux
 compat/linux/linux_util.c	optional compat_linux
 compat/linux/linux_vdso.c	optional compat_linux
 compat/linux/linux.c		optional compat_linux
-compat/ndis/winx32_wrap.S	optional ndisapi pci
 crypto/aesni/aeskeys_i386.S	optional aesni
 crypto/des/arch/i386/des_enc.S	optional netsmb
+crypto/openssl/i386/chacha-x86.S	optional ossl
+crypto/openssl/i386/poly1305-x86.S	optional ossl
 crypto/openssl/i386/sha1-586.S	optional ossl
 crypto/openssl/i386/sha256-586.S	optional ossl
 crypto/openssl/i386/sha512-586.S	optional ossl
@@ -190,7 +190,6 @@ i386/i386/perfmon.c		optional perfmon
 i386/i386/pmap_base.c		standard
 i386/i386/pmap_nopae.c		standard
 i386/i386/pmap_pae.c		standard
-i386/i386/prof_machdep.c	optional profiling-routine
 i386/i386/ptrace_machdep.c	standard
 i386/i386/sigtramp.s		standard
 i386/i386/support.s		standard
@@ -220,6 +219,7 @@ libkern/memcmp.c		standard
 libkern/memset.c		standard
 libkern/moddi3.c		standard
 libkern/qdivrem.c		standard
+libkern/strlen.c		standard
 libkern/ucmpdi2.c		standard
 libkern/udivdi3.c		standard
 libkern/umoddi3.c		standard
@@ -227,11 +227,6 @@ libkern/umoddi3.c		standard
 # x86 real mode BIOS support, required by dpms/pci/vesa
 #
 compat/x86bios/x86bios.c	optional x86bios | dpms | pci | vesa
-#
-# bvm console
-#
-dev/bvm/bvm_console.c		optional	bvmconsole
-dev/bvm/bvm_dbg.c		optional	bvmdebug
 # Common files where we currently configure the system differently, but perhaps shouldn't
 # config(8) doesn't have a way to force standard options, so we've been inconsistent
 # about marking non-optional things 'standard'.
@@ -247,3 +242,6 @@ x86/x86/local_apic.c		optional apic
 x86/x86/mptable.c		optional apic
 x86/x86/mptable_pci.c		optional apic pci
 x86/x86/msi.c			optional apic pci
+
+compat/linuxkpi/common/src/linux_fpu.c		optional compat_linuxkpi \
+	compile-with "${LINUXKPI_C}"

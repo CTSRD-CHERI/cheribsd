@@ -285,7 +285,7 @@ static const char *elf_osabi(unsigned int abi);
 static const char *elf_type(unsigned int type);
 static const char *elf_ver(unsigned int ver);
 static const char *dt_type(unsigned int mach, unsigned int dtype);
-static void dump_ar(struct readelf *re, int);
+static bool dump_ar(struct readelf *re, int);
 static void dump_arm_attributes(struct readelf *re, uint8_t *p, uint8_t *pe);
 static void dump_attributes(struct readelf *re);
 static uint8_t *dump_compatibility_tag(uint8_t *p, uint8_t *pe);
@@ -315,7 +315,7 @@ static void dump_dwarf_ranges_foreach(struct readelf *re, Dwarf_Die die,
     Dwarf_Addr base);
 static void dump_dwarf_str(struct readelf *re);
 static void dump_eflags(struct readelf *re, uint64_t e_flags);
-static void dump_elf(struct readelf *re);
+static bool dump_elf(struct readelf *re);
 static void dump_flags(struct flag_desc *fd, uint64_t flags);
 static void dump_dyn_val(struct readelf *re, GElf_Dyn *dyn, uint32_t stab);
 static void dump_dynamic(struct readelf *re);
@@ -2637,16 +2637,21 @@ dump_shdr(struct readelf *re)
 				    " %6.6jx %6.6jx %2.2jx  %2u %3u %2ju\n"
 				    "       %s\n", ST_CT);
 			else
-				printf("  [%2d] %-17.17s %-15.15s %8.8jx"
-				    " %6.6jx %6.6jx %2.2jx %3s %2u %3u %2ju\n",
-				    S_CT);
+				if (re->options & RE_WW)
+					printf("  [%2d] %-17s %-15.15s "
+					    "%8.8jx %6.6jx %6.6jx %2.2jx %3s "
+					    "%2u %3u %2ju\n", S_CT);
+				else
+					printf("  [%2d] %-17.17s %-15.15s "
+					    "%8.8jx %6.6jx %6.6jx %2.2jx %3s "
+					    "%2u %3u %2ju\n", S_CT);
 		} else if (re->options & RE_WW) {
 			if (re->options & RE_T)
 				printf("  [%2d] %s\n       %-15.15s %16.16jx"
 				    " %6.6jx %6.6jx %2.2jx  %2u %3u %2ju\n"
 				    "       %s\n", ST_CT);
 			else
-				printf("  [%2d] %-17.17s %-15.15s %16.16jx"
+				printf("  [%2d] %-17s %-15.15s %16.16jx"
 				    " %6.6jx %6.6jx %2.2jx %3s %2u %3u %2ju\n",
 				    S_CT);
 		} else {
@@ -3685,6 +3690,8 @@ static struct flag_desc note_feature_ctl_flags[] = {
 	{ NT_FREEBSD_FCTL_PROTMAX_DISABLE,	"PROTMAX_DISABLE" },
 	{ NT_FREEBSD_FCTL_STKGAP_DISABLE,	"STKGAP_DISABLE" },
 	{ NT_FREEBSD_FCTL_WXNEEDED,		"WXNEEDED" },
+	{ NT_FREEBSD_FCTL_LA48,			"LA48" },
+	{ NT_FREEBSD_FCTL_ASG_DISABLE,		"ASG_DISABLE" },
 	{ 0, NULL }
 };
 
@@ -3746,9 +3753,7 @@ dump_notes_data(struct readelf *re, const char *name, uint32_t type,
 			return;
 		/* NT_FREEBSD_NOINIT_TAG carries no data, treat as unknown. */
 		case NT_FREEBSD_ARCH_TAG:
-			if (sz != 4)
-				goto unknown;
-			printf("   Arch tag: %x\n", ubuf[0]);
+			printf("   Arch tag: %s\n", buf);
 			return;
 		case NT_FREEBSD_FEATURE_CTL:
 			if (sz != 4)
@@ -7211,18 +7216,18 @@ unload_sections(struct readelf *re)
 	}
 }
 
-static void
+static bool
 dump_elf(struct readelf *re)
 {
 
 	/* Fetch ELF header. No need to continue if it fails. */
 	if (gelf_getehdr(re->elf, &re->ehdr) == NULL) {
 		warnx("gelf_getehdr failed: %s", elf_errmsg(-1));
-		return;
+		return (false);
 	}
 	if ((re->ec = gelf_getclass(re->elf)) == ELFCLASSNONE) {
 		warnx("gelf_getclass failed: %s", elf_errmsg(-1));
-		return;
+		return (false);
 	}
 	if (re->ehdr.e_ident[EI_DATA] == ELFDATA2MSB) {
 		re->dw_read = _read_msb;
@@ -7266,6 +7271,7 @@ dump_elf(struct readelf *re)
 		dump_dwarf(re);
 	if (re->options & ~RE_H)
 		unload_sections(re);
+	return (true);
 }
 
 static void
@@ -7311,7 +7317,7 @@ dump_dwarf(struct readelf *re)
 	dwarf_finish(re->dbg, &de);
 }
 
-static void
+static bool
 dump_ar(struct readelf *re, int fd)
 {
 	Elf_Arsym *arsym;
@@ -7362,14 +7368,14 @@ dump_ar(struct readelf *re, int fd)
 		}
 		if (elf_rand(re->ar, SARMAG) != SARMAG) {
 			warnx("elf_rand() failed: %s", elf_errmsg(-1));
-			return;
+			return (false);
 		}
 	}
 
 process_members:
 
 	if ((re->options & ~RE_C) == 0)
-		return;
+		return (true);
 
 	cmd = ELF_C_READ;
 	while ((re->elf = elf_begin(fd, cmd, re->ar)) != NULL) {
@@ -7389,11 +7395,14 @@ process_members:
 		elf_end(re->elf);
 	}
 	re->elf = re->ar;
+	return (true);
 }
 
-static void
+static bool
 dump_object(struct readelf *re, int fd)
 {
+	bool rv = false;
+
 	if ((re->flags & DISPLAY_FILENAME) != 0)
 		printf("\nFile: %s\n", re->filename);
 
@@ -7407,10 +7416,10 @@ dump_object(struct readelf *re, int fd)
 		warnx("Not an ELF file.");
 		goto done;
 	case ELF_K_ELF:
-		dump_elf(re);
+		rv = dump_elf(re);
 		break;
 	case ELF_K_AR:
-		dump_ar(re, fd);
+		rv = dump_ar(re, fd);
 		break;
 	default:
 		warnx("Internal: libelf returned unknown elf kind.");
@@ -7418,6 +7427,7 @@ dump_object(struct readelf *re, int fd)
 
 done:
 	elf_end(re->elf);
+	return (rv);
 }
 
 static void
@@ -7765,7 +7775,7 @@ main(int argc, char **argv)
 	fileargs_t	*fa;
 	struct readelf	*re, re_storage;
 	unsigned long	 si;
-	int		 fd, opt, i;
+	int		 fd, opt, i, exit_code;
 	char		*ep;
 
 	re = &re_storage;
@@ -7906,16 +7916,19 @@ main(int argc, char **argv)
 		err(1, "Unable to enter capability mode");
 	}
 
+	exit_code = EXIT_SUCCESS;
 	for (i = 0; i < argc; i++) {
 		re->filename = argv[i];
 		fd = fileargs_open(fa, re->filename);
 		if (fd < 0) {
 			warn("open %s failed", re->filename);
+			exit_code = EXIT_FAILURE;
 		} else {
-			dump_object(re, fd);
+			if (!dump_object(re, fd))
+				exit_code = EXIT_FAILURE;
 			close(fd);
 		}
 	}
 
-	exit(EXIT_SUCCESS);
+	exit(exit_code);
 }

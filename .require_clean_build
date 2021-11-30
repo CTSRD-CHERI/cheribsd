@@ -9,3 +9,5 @@
 # https://github.com/CTSRD-CHERI/cheribsd/commit/e5c4980cdaf260f2092eb2ed1a2c44ea5fde7526
 20200624  # Sentry capabilities and MK_LIB64 on CHERI-RISC-V
 20201117  # OpenZFS import
+# https://github.com/CTSRD-CHERI/cheribsd/commit/97059f6a18084befde0d486914d337a0c927e967
+20210910  # libcheri -> lib64c rename

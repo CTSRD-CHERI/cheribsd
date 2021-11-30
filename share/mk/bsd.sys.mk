@@ -60,7 +60,7 @@ CWARNFLAGS+=	-Wcast-align
 .endif # !NO_WCAST_ALIGN !NO_WCAST_ALIGN.${COMPILER_TYPE}
 .endif # WARNS >= 4
 .if ${WARNS} >= 6
-CWARNFLAGS+=	-Wchar-subscripts -Winline -Wnested-externs -Wredundant-decls\
+CWARNFLAGS+=	-Wchar-subscripts -Wnested-externs -Wredundant-decls\
 		-Wold-style-definition
 .if !defined(NO_WMISSING_VARIABLE_DECLARATIONS)
 CWARNFLAGS.clang+=	-Wmissing-variable-declarations
@@ -80,6 +80,9 @@ CWARNFLAGS+=	-Wno-pointer-sign
 .if ${WARNS} <= 6
 CWARNFLAGS.clang+=	-Wno-empty-body -Wno-string-plus-int
 CWARNFLAGS.clang+=	-Wno-unused-const-variable
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_FEATURES:MWunused-but-set-variable}
+CWARNFLAGS.clang+=	-Wno-error=unused-but-set-variable
+.endif
 .endif # WARNS <= 6
 .if ${WARNS} <= 3
 CWARNFLAGS.clang+=	-Wno-tautological-compare -Wno-unused-value\
@@ -147,7 +150,6 @@ CWARNFLAGS+=	-Wno-error=address			\
 		-Wno-error=deprecated-declarations	\
 		-Wno-error=enum-compare			\
 		-Wno-error=extra			\
-		-Wno-error=inline			\
 		-Wno-error=logical-not-parentheses	\
 		-Wno-error=strict-aliasing		\
 		-Wno-error=uninitialized		\
@@ -213,6 +215,11 @@ CWARNFLAGS+=	-Wno-error=pass-failed
 CXXWARNFLAGS+=	-Wno-error=non-c-typedef-for-linkage
 .endif
 
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 130000
+# Work around c++/v1/__bit_reference warning until we update subrepocheri-libc++
+CXXWARNFLAGS+=  -Wno-error=deprecated-copy
+.endif
+
 # How to handle FreeBSD custom printf format specifiers.
 .if ${COMPILER_TYPE} == "clang"
 FORMAT_EXTENSIONS=	-D__printf__=__freebsd_kprintf__
@@ -242,8 +249,10 @@ CFLAGS+=-nobuiltininc -idirafter ${COMPILER_RESOURCE_DIR}/include
 .endif
 .endif
 
-CLANG_OPT_SMALL= -mstack-alignment=8 -mllvm -inline-threshold=3\
-		 -mllvm -simplifycfg-dup-ret
+CLANG_OPT_SMALL= -mstack-alignment=8 -mllvm -inline-threshold=3
+.if ${COMPILER_VERSION} < 130000
+CLANG_OPT_SMALL+= -mllvm -simplifycfg-dup-ret
+.endif
 CLANG_OPT_SMALL+= -mllvm -enable-load-pre=false
 CFLAGS.clang+=	 -Qunused-arguments
 # The libc++ headers use c++11 extensions.  These are normally silenced because
@@ -319,7 +328,11 @@ LDFLAGS+=	-fuse-ld=${LD:[1]:S/^ld.//1W}
 .else
 # GCC does not support an absolute path for -fuse-ld so we just print this
 # warning instead and let the user add the required symlinks.
+# However, we can avoid this warning if -B is set appropriately (e.g. for
+# CROSS_TOOLCHAIN=...-gcc).
+.if !(${LD:[1]:T} == "ld" && ${CC:tw:M-B${LD:[1]:H}/})
 .warning LD (${LD}) is not the default linker for ${CC} but -fuse-ld= is not supported
+.endif
 .endif
 .endif
 

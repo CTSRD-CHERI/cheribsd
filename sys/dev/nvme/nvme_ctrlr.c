@@ -255,23 +255,22 @@ nvme_ctrlr_fail_req_task(void *arg, int pending)
 static int
 nvme_ctrlr_wait_for_ready(struct nvme_controller *ctrlr, int desired_val)
 {
-	int ms_waited;
+	int timeout = ticks + (uint64_t)ctrlr->ready_timeout_in_ms * hz / 1000;
 	uint32_t csts;
 
-	ms_waited = 0;
 	while (1) {
 		csts = nvme_mmio_read_4(ctrlr, csts);
-		if (csts == 0xffffffff)		/* Hot unplug. */
+		if (csts == NVME_GONE)		/* Hot unplug. */
 			return (ENXIO);
 		if (((csts >> NVME_CSTS_REG_RDY_SHIFT) & NVME_CSTS_REG_RDY_MASK)
 		    == desired_val)
 			break;
-		if (ms_waited++ > ctrlr->ready_timeout_in_ms) {
+		if (timeout - ticks < 0) {
 			nvme_printf(ctrlr, "controller ready did not become %d "
 			    "within %d ms\n", desired_val, ctrlr->ready_timeout_in_ms);
 			return (ENXIO);
 		}
-		DELAY(1000);
+		pause("nvmerdy", 1);
 	}
 
 	return (0);
@@ -403,14 +402,14 @@ nvme_ctrlr_disable_qpairs(struct nvme_controller *ctrlr)
 	}
 }
 
-int
+static int
 nvme_ctrlr_hw_reset(struct nvme_controller *ctrlr)
 {
 	int err;
 
 	nvme_ctrlr_disable_qpairs(ctrlr);
 
-	DELAY(100*1000);
+	pause("nvmehwreset", hz / 10);
 
 	err = nvme_ctrlr_disable(ctrlr);
 	if (err != 0)
@@ -1053,15 +1052,15 @@ nvme_ctrlr_start(void *ctrlr_arg, bool resetting)
 	 *  the number of I/O queues supported, so cannot reset
 	 *  the adminq again here.
 	 */
-	if (resetting)
+	if (resetting) {
 		nvme_qpair_reset(&ctrlr->adminq);
+		nvme_admin_qpair_enable(&ctrlr->adminq);
+	}
 
 	if (ctrlr->ioq != NULL) {
 		for (i = 0; i < ctrlr->num_io_queues; i++)
 			nvme_qpair_reset(&ctrlr->ioq[i]);
 	}
-
-	nvme_admin_qpair_enable(&ctrlr->adminq);
 
 	/*
 	 * If it was a reset on initialization command timeout, just
@@ -1070,7 +1069,7 @@ nvme_ctrlr_start(void *ctrlr_arg, bool resetting)
 	if (resetting && !ctrlr->is_initialized)
 		return;
 
-	if (nvme_ctrlr_identify(ctrlr) != 0) {
+	if (resetting && nvme_ctrlr_identify(ctrlr) != 0) {
 		nvme_ctrlr_fail(ctrlr);
 		return;
 	}
@@ -1135,7 +1134,6 @@ nvme_ctrlr_start_config_hook(void *arg)
 fail:
 		nvme_ctrlr_fail(ctrlr);
 		config_intrhook_disestablish(&ctrlr->config_hook);
-		ctrlr->config_hook.ich_arg = NULL;
 		return;
 	}
 
@@ -1145,7 +1143,8 @@ fail:
 	nvme_qpair_reset(&ctrlr->adminq);
 	nvme_admin_qpair_enable(&ctrlr->adminq);
 
-	if (nvme_ctrlr_set_num_qpairs(ctrlr) == 0 &&
+	if (nvme_ctrlr_identify(ctrlr) == 0 &&
+	    nvme_ctrlr_set_num_qpairs(ctrlr) == 0 &&
 	    nvme_ctrlr_construct_io_qpairs(ctrlr) == 0)
 		nvme_ctrlr_start(ctrlr, false);
 	else
@@ -1153,7 +1152,6 @@ fail:
 
 	nvme_sysctl_initialize_ctrlr(ctrlr);
 	config_intrhook_disestablish(&ctrlr->config_hook);
-	ctrlr->config_hook.ich_arg = NULL;
 
 	ctrlr->is_initialized = 1;
 	nvme_notify_new_controller(ctrlr);
@@ -1243,20 +1241,8 @@ nvme_ctrlr_passthrough_cmd(struct nvme_controller *ctrlr,
 	struct mtx		*mtx;
 	struct buf		*buf = NULL;
 	int			ret = 0;
-	vm_offset_t		addr, end;
 
 	if (pt->len > 0) {
-		/*
-		 * vmapbuf calls vm_fault_quick_hold_pages which only maps full
-		 * pages. Ensure this request has fewer than MAXPHYS bytes when
-		 * extended to full pages.
-		 */
-		addr = (__cheri_addr vm_offset_t)pt->buf;
-		end = round_page(addr + pt->len);
-		addr = trunc_page(addr);
-		if (end - addr > MAXPHYS)
-			return EIO;
-
 		if (pt->len > ctrlr->max_xfer_size) {
 			nvme_printf(ctrlr, "pt->len (%d) "
 			    "exceeds max_xfer_size (%d)\n", pt->len,
@@ -1483,7 +1469,7 @@ nvme_ctrlr_destruct(struct nvme_controller *ctrlr, device_t dev)
 	 * Check whether it is a hot unplug or a clean driver detach.
 	 * If device is not there any more, skip any shutdown commands.
 	 */
-	gone = (nvme_mmio_read_4(ctrlr, csts) == 0xffffffff);
+	gone = (nvme_mmio_read_4(ctrlr, csts) == NVME_GONE);
 	if (gone)
 		nvme_ctrlr_fail(ctrlr);
 	else
@@ -1550,27 +1536,26 @@ nvme_ctrlr_shutdown(struct nvme_controller *ctrlr)
 {
 	uint32_t	cc;
 	uint32_t	csts;
-	int		ticks = 0, timeout;
+	int		timeout;
 
 	cc = nvme_mmio_read_4(ctrlr, cc);
 	cc &= ~(NVME_CC_REG_SHN_MASK << NVME_CC_REG_SHN_SHIFT);
 	cc |= NVME_SHN_NORMAL << NVME_CC_REG_SHN_SHIFT;
 	nvme_mmio_write_4(ctrlr, cc, cc);
 
-	timeout = ctrlr->cdata.rtd3e == 0 ? 5 * hz :
-	    ((uint64_t)ctrlr->cdata.rtd3e * hz + 999999) / 1000000;
+	timeout = ticks + (ctrlr->cdata.rtd3e == 0 ? 5 * hz :
+	    ((uint64_t)ctrlr->cdata.rtd3e * hz + 999999) / 1000000);
 	while (1) {
 		csts = nvme_mmio_read_4(ctrlr, csts);
-		if (csts == 0xffffffff)		/* Hot unplug. */
+		if (csts == NVME_GONE)		/* Hot unplug. */
 			break;
 		if (NVME_CSTS_GET_SHST(csts) == NVME_SHST_COMPLETE)
 			break;
-		if (ticks++ > timeout) {
-			nvme_printf(ctrlr, "did not complete shutdown within"
-			    " %d ticks of notification\n", timeout);
+		if (timeout - ticks < 0) {
+			nvme_printf(ctrlr, "shutdown timeout\n");
 			break;
 		}
-		pause("nvme shn", 1);
+		pause("nvmeshut", 1);
 	}
 }
 
@@ -1647,7 +1632,7 @@ nvme_ctrlr_suspend(struct nvme_controller *ctrlr)
 	 */
 	nvme_ctrlr_delete_qpairs(ctrlr);
 	nvme_ctrlr_disable_qpairs(ctrlr);
-	DELAY(100*1000);
+	pause("nvmesusp", hz / 10);
 	nvme_ctrlr_shutdown(ctrlr);
 
 	return (0);

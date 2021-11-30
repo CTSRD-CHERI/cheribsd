@@ -127,12 +127,14 @@ static const char *features_for_read[] = {
 	"com.delphix:zpool_checkpoint",
 	"com.delphix:spacemap_v2",
 	"com.datto:encryption",
+	"com.datto:bookmark_v2",
 	"org.zfsonlinux:allocation_classes",
 	"com.datto:resilver_defer",
 	"com.delphix:device_removal",
 	"com.delphix:obsolete_counts",
 	"com.intel:allocation_classes",
 	"org.freebsd:zstd_compress",
+	"com.delphix:bookmark_written",
 	NULL
 };
 
@@ -189,8 +191,16 @@ nvlist_check_features_for_read(nvlist_t *nvl)
 
 	rc = nvlist_find(nvl, ZPOOL_CONFIG_FEATURES_FOR_READ,
 	    DATA_TYPE_NVLIST, NULL, &features, NULL);
-	if (rc != 0)
-		return (rc);
+	switch (rc) {
+	case 0:
+		break;		/* Continue with checks */
+
+	case ENOENT:
+		return (0);	/* All features are disabled */
+
+	default:
+		return (rc);	/* Error while reading nvlist */
+	}
 
 	data = (nvs_data_t *)features->nv_data;
 	nvp = &data->nvl_pair;	/* first pair in nvlist */

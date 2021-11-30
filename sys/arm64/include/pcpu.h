@@ -42,7 +42,7 @@ struct debug_monitor_state;
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	PCPU_MD_FIELDS_PAD 0
 #else
-#define	PCPU_MD_FIELDS_PAD 205
+#define	PCPU_MD_FIELDS_PAD 201
 #endif
 
 #define	PCPU_MD_FIELDS							\
@@ -54,25 +54,21 @@ struct debug_monitor_state;
 	struct pmap *pc_curpmap;					\
 	struct pmap *pc_curvmpmap;					\
 	u_int	pc_bcast_tlbi_workaround;				\
-	char __pad[PCPU_MD_FIELDS_PAD]	/* Pad to factor of PAGE_SIZE */
+	u_int	pc_mpidr;	/* stored MPIDR value */		\
+	char __pad[PCPU_MD_FIELDS_PAD]	/* Pad to factor of PAGE_SIZE */ \
 
 #ifdef _KERNEL
 
 struct pcb;
 struct pcpu;
 
-static inline struct pcpu *
-get_pcpu(void)
-{
-	struct pcpu *pcpu;
-
 #ifdef __CHERI_PURE_CAPABILITY__
-	__asm __volatile("mov	%0, c18" : "=&C"(pcpu));
+register struct pcpu *pcpup __asm ("c18");
 #else
-	__asm __volatile("mov	%0, x18" : "=&r"(pcpu));
+register struct pcpu *pcpup __asm ("x18");
 #endif
-	return (pcpu);
-}
+
+#define	get_pcpu()	pcpup
 
 static inline struct thread *
 get_curthread(void)
@@ -107,11 +103,10 @@ init_cpu_pcpup(void *pcpup)
 
 #define	curthread get_curthread()
 
-#define	PCPU_GET(member)	(get_pcpu()->pc_ ## member)
-#define	PCPU_ADD(member, value)	(get_pcpu()->pc_ ## member += (value))
-#define	PCPU_INC(member)	PCPU_ADD(member, 1)
-#define	PCPU_PTR(member)	(&get_pcpu()->pc_ ## member)
-#define	PCPU_SET(member,value)	(get_pcpu()->pc_ ## member = (value))
+#define	PCPU_GET(member)	(pcpup->pc_ ## member)
+#define	PCPU_ADD(member, value)	(pcpup->pc_ ## member += (value))
+#define	PCPU_PTR(member)	(&pcpup->pc_ ## member)
+#define	PCPU_SET(member,value)	(pcpup->pc_ ## member = (value))
 
 #endif	/* _KERNEL */
 

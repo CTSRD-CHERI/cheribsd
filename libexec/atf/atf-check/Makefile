@@ -40,6 +40,7 @@ NO_SHARED=	yes
 ATF=		${SRCTOP}/contrib/atf
 .PATH:		${ATF}/atf-sh
 
+PACKAGE=	tests
 PROG_CXX=	atf-check
 SRCS=		atf-check.cpp
 MAN=		atf-check.1

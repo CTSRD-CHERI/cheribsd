@@ -197,7 +197,7 @@ VNET_DECLARE(u_int, fib_hash_outbound);
 					/* 0x8000000 and up unassigned */
 #define	RTF_STICKY	 0x10000000	/* always route dst->src */
 
-#define	RTF_RNH_LOCKED	 0x40000000	/* radix node head is locked */
+/*			0x40000000	   unused, was RTF_RNH_LOCKED */
 
 #define	RTF_GWFLAG_COMPAT 0x80000000	/* a compatibility bit for interacting
 					   with existing routing apps */
@@ -223,14 +223,12 @@ VNET_DECLARE(u_int, fib_hash_outbound);
 
 /* Nexthop request flags */
 #define	NHR_NONE		0x00	/* empty flags field */
-#define	NHR_IFAIF		0x01	/* Return ifa_ifp interface */
-#define	NHR_REF			0x02	/* For future use */
-
-/* uRPF */
-#define	NHR_NODEFAULT		0x04	/* do not consider default route */
+#define	NHR_REF			0x01	/* reference nexhop */
+#define	NHR_NODEFAULT		0x02	/* uRPF: do not consider default route */
 
 /* Control plane route request flags */
 #define	NHR_COPY		0x100	/* Copy rte data */
+#define	NHR_UNLOCKED		0x200	/* Do not lock table */
 
 /*
  * Routing statistics.
@@ -417,9 +415,8 @@ void	 rt_ifannouncemsg(struct ifnet *, int);
 void	 rt_ifmsg(struct ifnet *);
 void	 rt_missmsg(int, struct rt_addrinfo *, int, int);
 void	 rt_missmsg_fib(int, struct rt_addrinfo *, int, int, int);
-void	 rt_newaddrmsg_fib(int, struct ifaddr *, struct rtentry *, int);
 int	 rt_addrmsg(int, struct ifaddr *, int);
-int	 rt_routemsg(int, struct rtentry *, struct ifnet *ifp, int, int);
+int	 rt_routemsg(int, struct rtentry *, struct nhop_object *, int);
 int	 rt_routemsg_info(int, struct rt_addrinfo *, int);
 void	 rt_newmaddrmsg(int, struct ifmultiaddr *);
 void 	 rt_maskedcopy(struct sockaddr *, struct sockaddr *, struct sockaddr *);
@@ -427,32 +424,24 @@ struct rib_head *rt_table_init(int, int, u_int);
 void	rt_table_destroy(struct rib_head *);
 u_int	rt_tables_get_gen(uint32_t table, sa_family_t family);
 
-int	rtsock_addrmsg(int, struct ifaddr *, int);
-int	rtsock_routemsg(int, struct rtentry *, struct ifnet *ifp, int, int);
-int	rtsock_routemsg_info(int, struct rt_addrinfo *, int);
-
 struct sockaddr *rtsock_fix_netmask(const struct sockaddr *dst,
 	    const struct sockaddr *smask, struct sockaddr_storage *dmask);
 
 void	rt_updatemtu(struct ifnet *);
 
-void	rt_flushifroutes_af(struct ifnet *, int);
 void	rt_flushifroutes(struct ifnet *ifp);
-
-/* XXX MRT COMPAT VERSIONS THAT SET UNIVERSE to 0 */
-/* Thes are used by old code not yet converted to use multiple FIBS */
-int	 rtinit(struct ifaddr *, int, int);
 
 /* XXX MRT NEW VERSIONS THAT USE FIBs
  * For now the protocol indepedent versions are the same as the AF_INET ones
  * but this will change.. 
  */
-int	 rtioctl_fib(u_long, caddr_t, u_int);
+int	rtioctl_fib(u_long, caddr_t, u_int);
 int	rib_lookup_info(uint32_t, const struct sockaddr *, uint32_t, uint32_t,
 	    struct rt_addrinfo *);
 void	rib_free_info(struct rt_addrinfo *info);
 
 /* New API */
+void rib_flush_routes_family(int family);
 struct nhop_object *rib_lookup(uint32_t fibnum, const struct sockaddr *dst,
 	    uint32_t flags, uint32_t flowid);
 #endif

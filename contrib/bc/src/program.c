@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018-2020 Gavin D. Howard and contributors.
+ * Copyright (c) 2018-2021 Gavin D. Howard and contributors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -454,9 +454,11 @@ static void bc_program_read(BcProgram *p) {
 	BC_SIG_UNLOCK;
 
 	bc_lex_file(&parse.l, bc_program_stdin_name);
-	bc_vec_npop(&f->code, f->code.len);
+	bc_vec_popAll(&f->code);
 
-	s = bc_read_line(&buf, BC_IS_BC ? "read> " : "?> ");
+	if (BC_R) s = bc_read_line(&buf, "");
+	else s = bc_read_line(&buf, BC_IS_BC ? "read> " : "?> ");
+
 	if (s == BC_STATUS_EOF) bc_vm_err(BC_ERR_EXEC_READ_EXPR);
 
 	bc_parse_text(&parse, buf.v);
@@ -512,7 +514,7 @@ static void bc_program_printChars(const char *str) {
 	const char *nl;
 	size_t len = vm.nchars + strlen(str);
 
-	bc_file_puts(&vm.fout, str);
+	bc_file_puts(&vm.fout, bc_flush_save, str);
 	nl = strrchr(str, '\n');
 
 	if (nl != NULL) len = strlen(nl + 1);
@@ -526,7 +528,7 @@ static void bc_program_printString(const char *restrict str) {
 
 #if DC_ENABLED
 	if (!len && BC_IS_DC) {
-		bc_vm_putchar('\0');
+		bc_vm_putchar('\0', bc_flush_save);
 		return;
 	}
 #endif // DC_ENABLED
@@ -549,11 +551,11 @@ static void bc_program_printString(const char *restrict str) {
 			else {
 				// Just print the backslash. The following
 				// character will be printed later.
-				bc_vm_putchar('\\');
+				bc_vm_putchar('\\', bc_flush_save);
 			}
 		}
 
-		bc_vm_putchar(c);
+		bc_vm_putchar(c, bc_flush_save);
 	}
 }
 
@@ -598,13 +600,14 @@ static void bc_program_print(BcProgram *p, uchar inst, size_t idx) {
 
 		size_t i = (r->t == BC_RESULT_STR) ? r->d.loc.loc : n->scale;
 
-		bc_file_flush(&vm.fout);
+		bc_file_flush(&vm.fout, bc_flush_save);
 		str = *((char**) bc_vec_item(p->strs, i));
 
 		if (inst == BC_INST_PRINT_STR) bc_program_printChars(str);
 		else {
 			bc_program_printString(str);
-			if (inst == BC_INST_PRINT) bc_vm_putchar('\n');
+			if (inst == BC_INST_PRINT)
+				bc_vm_putchar('\n', bc_flush_err);
 		}
 	}
 
@@ -723,13 +726,13 @@ static void bc_program_logical(BcProgram *p, uchar inst) {
 }
 
 #if DC_ENABLED
-static void bc_program_assignStr(BcProgram *p, BcResult *r,
+static void bc_program_assignStr(BcProgram *p, size_t idx,
                                  BcVec *v, bool push)
 {
 	BcNum n2;
 
 	bc_num_clear(&n2);
-	n2.scale = r->d.loc.loc;
+	n2.scale = idx;
 
 	assert(BC_PROG_STACK(&p->results, 1 + !push));
 
@@ -777,8 +780,13 @@ static void bc_program_copyToVar(BcProgram *p, size_t idx,
 
 #if DC_ENABLED
 	if (BC_IS_DC && (ptr->t == BC_RESULT_STR || BC_PROG_STR(n))) {
+
+		size_t str_idx = ptr->t == BC_RESULT_STR ? ptr->d.loc.loc : n->scale;
+
 		if (BC_ERR(!var)) bc_vm_err(BC_ERR_EXEC_TYPE);
-		bc_program_assignStr(p, ptr, vec, true);
+
+		bc_program_assignStr(p, str_idx, vec, true);
+
 		return;
 	}
 #endif // DC_ENABLED
@@ -864,7 +872,7 @@ static void bc_program_assign(BcProgram *p, uchar inst) {
 		}
 		else {
 			BcVec *v = bc_program_vec(p, left->d.loc.loc, BC_TYPE_VAR);
-			bc_program_assignStr(p, right, v, false);
+			bc_program_assignStr(p, idx, v, false);
 		}
 
 		return;
@@ -1249,8 +1257,10 @@ static void bc_program_builtin(BcProgram *p, uchar inst) {
 			{
 #if DC_ENABLED
 				if (!BC_PROG_NUM(opd, num)) {
+
 					size_t idx;
 					char *str;
+
 					idx = opd->t == BC_RESULT_STR ? opd->d.loc.loc : num->scale;
 					str = *((char**) bc_vec_item(p->strs, idx));
 					val = (BcBigDig) strlen(str);
@@ -1433,6 +1443,8 @@ static void bc_program_printStream(BcProgram *p) {
 		size_t idx = (r->t == BC_RESULT_STR) ? r->d.loc.loc : n->scale;
 		bc_program_printChars(*((char**) bc_vec_item(p->strs, idx)));
 	}
+
+	bc_vec_pop(&p->results);
 }
 
 static void bc_program_nquit(BcProgram *p, uchar inst) {
@@ -1456,7 +1468,7 @@ static void bc_program_nquit(BcProgram *p, uchar inst) {
 	for (i = 0; val && i < p->tail_calls.len; ++i) {
 		size_t calls = *((size_t*) bc_vec_item_rev(&p->tail_calls, i)) + 1;
 		if (calls >= val) val = 0;
-		else val -= calls;
+		else val -= (BcBigDig) calls;
 	}
 
 	if (i == p->stack.len) {
@@ -1578,7 +1590,7 @@ err:
 	BC_SIG_MAYLOCK;
 	bc_parse_free(&prs);
 	f = bc_vec_item(&p->fns, fidx);
-	bc_vec_npop(&f->code, f->code.len);
+	bc_vec_popAll(&f->code);
 exit:
 	bc_vec_pop(&p->results);
 	BC_LONGJMP_CONT;
@@ -1714,7 +1726,6 @@ void bc_program_init(BcProgram *p) {
 
 	BcInstPtr ip;
 	size_t i;
-	BcBigDig val = BC_BASE;
 
 	BC_SIG_ASSERT_LOCKED;
 
@@ -1724,8 +1735,8 @@ void bc_program_init(BcProgram *p) {
 	memset(&ip, 0, sizeof(BcInstPtr));
 
 	for (i = 0; i < BC_PROG_GLOBALS_LEN; ++i) {
+		BcBigDig val = i == BC_PROG_GLOBALS_SCALE ? 0 : BC_BASE;
 		bc_vec_init(p->globals_v + i, sizeof(BcBigDig), NULL);
-		val = i == BC_PROG_GLOBALS_SCALE ? 0 : val;
 		bc_vec_push(p->globals_v + i, &val);
 		p->globals[i] = val;
 	}
@@ -1788,20 +1799,22 @@ void bc_program_reset(BcProgram *p) {
 	BC_SIG_ASSERT_LOCKED;
 
 	bc_vec_npop(&p->stack, p->stack.len - 1);
-	bc_vec_npop(&p->results, p->results.len);
+	bc_vec_popAll(&p->results);
 
 #if BC_ENABLED
 	if (BC_G) bc_program_popGlobals(p, true);
 #endif // BC_ENABLED
 
 	f = bc_vec_item(&p->fns, BC_PROG_MAIN);
+	bc_vec_npop(&f->code, f->code.len);
 	ip = bc_vec_top(&p->stack);
 	bc_program_setVecs(p, f);
-	ip->idx = f->code.len;
+	memset(ip, 0, sizeof(BcInstPtr));
 
 	if (vm.sig) {
-		bc_file_write(&vm.fout, bc_program_ready_msg, bc_program_ready_msg_len);
-		bc_file_flush(&vm.fout);
+		bc_file_write(&vm.fout, bc_flush_none, bc_program_ready_msg,
+		              bc_program_ready_msg_len);
+		bc_file_flush(&vm.fout, bc_flush_err);
 		vm.sig = 0;
 	}
 }
@@ -1921,6 +1934,10 @@ void bc_program_exec(BcProgram *p) {
 
 			case BC_INST_READ:
 			{
+				// We want to flush output before
+				// this in case there is a prompt.
+				bc_file_flush(&vm.fout, bc_flush_save);
+
 				bc_program_read(p);
 
 				ip = bc_vec_top(&p->stack);
@@ -2017,6 +2034,7 @@ void bc_program_exec(BcProgram *p) {
 			case BC_INST_PRINT_STR:
 			{
 				bc_program_print(p, inst, 0);
+				bc_file_flush(&vm.fout, bc_flush_save);
 				break;
 			}
 
@@ -2145,7 +2163,7 @@ void bc_program_exec(BcProgram *p) {
 
 			case BC_INST_CLEAR_STACK:
 			{
-				bc_vec_npop(&p->results, p->results.len);
+				bc_vec_popAll(&p->results);
 				break;
 			}
 
@@ -2253,9 +2271,9 @@ void bc_program_exec(BcProgram *p) {
 #if BC_DEBUG_CODE
 #if BC_ENABLED && DC_ENABLED
 void bc_program_printStackDebug(BcProgram *p) {
-	bc_file_puts(&vm.fout, "-------------- Stack ----------\n");
+	bc_file_puts(&vm.fout, bc_flush_err, "-------------- Stack ----------\n");
 	bc_program_printStack(p);
-	bc_file_puts(&vm.fout, "-------------- Stack End ------\n");
+	bc_file_puts(&vm.fout, bc_flush_err, "-------------- Stack End ------\n");
 }
 
 static void bc_program_printIndex(const char *restrict code,
@@ -2309,7 +2327,7 @@ void bc_program_printInst(const BcProgram *p, const char *restrict code,
 		if (inst == BC_INST_CALL) bc_program_printIndex(code, bgn);
 	}
 
-	bc_vm_putchar('\n');
+	bc_vm_putchar('\n', bc_flush_err);
 }
 
 void bc_program_code(const BcProgram* p) {
@@ -2329,7 +2347,7 @@ void bc_program_code(const BcProgram* p) {
 
 		bc_vm_printf("func[%zu]:\n", ip.func);
 		while (ip.idx < f->code.len) bc_program_printInst(p, code, &ip.idx);
-		bc_file_puts(&vm.fout, "\n\n");
+		bc_file_puts(&vm.fout, bc_flush_err, "\n\n");
 	}
 }
 #endif // BC_ENABLED && DC_ENABLED
