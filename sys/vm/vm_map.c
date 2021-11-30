@@ -3995,7 +3995,7 @@ retry:
 			}
 		} else {
 			KASSERT(object->type == OBJT_DEFAULT ||
-			    object->type == OBJT_SWAP,
+			    (object->flags & OBJ_SWAP) != 0,
 			    ("XXX"));
 			if (m->valid != 0) {
 #if 0
@@ -4129,7 +4129,7 @@ vm_map_sync(vm_map_t map, vm_offset_t start, vm_offset_t end,
 		last_timestamp = map->timestamp;
 		if (pageout) {
 			if (object->type == OBJT_DEFAULT ||
-			    object->type == OBJT_SWAP) {
+			    (object->flags & OBJ_SWAP) != 0) {
 				if (!vm_map_pageout_range(map, entry,
 				    start, start + size, &size))
 					failed = TRUE;
