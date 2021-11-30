@@ -32,16 +32,16 @@
 #undef _PATH_ELF_HINTS
 
 #define	_DEFAULT_BASENAME_RTLD		"ld-elf.so.1"
-#define	_CHERIABI_BASENAME_RTLD		"ld-cheri-elf.so.1"
+#define	_CHERIABI_BASENAME_RTLD		"ld-elf64c.so.1"
 #define	_COMPAT32_BASENAME_RTLD		"ld-elf32.so.1"
 #define	_COMPAT64_BASENAME_RTLD		"ld-elf64.so.1"
 
 
 #ifdef COMPAT_CHERI
-#define	_PATH_ELF_HINTS		"/var/run/ld-cheri-elf.so.hints"
-#define	_PATH_LIBMAP_CONF	"/etc/libmap-cheri.conf"
+#define	_PATH_ELF_HINTS		"/var/run/ld-elf64c.so.hints"
+#define	_PATH_LIBMAP_CONF	"/etc/libmap64c.conf"
 #define	_BASENAME_RTLD		_CHERIABI_BASENAME_RTLD
-#define	STANDARD_LIBRARY_PATH	"/libcheri:/usr/libcheri"
+#define	STANDARD_LIBRARY_PATH	"/lib64c:/usr/lib64c"
 #define	LD_			"LD_CHERI_"
 #endif
 

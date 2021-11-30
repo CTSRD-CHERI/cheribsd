@@ -1982,6 +1982,10 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	if (start == end || !vm_map_range_valid(map, start, end))
 		return (KERN_INVALID_ADDRESS);
 
+	if ((map->flags & MAP_WXORX) != 0 && (prot & (VM_PROT_WRITE |
+	    VM_PROT_EXECUTE)) == (VM_PROT_WRITE | VM_PROT_EXECUTE))
+		return (KERN_PROTECTION_FAILURE);
+
 	if (map->flags & MAP_RESERVATIONS) {
 		/* Make sure we fit into a single reservation entry. */
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -3255,14 +3259,12 @@ vm_map_check_owner(vm_map_t map, vm_offset_t start, vm_offset_t end)
 /*
  *	vm_map_protect:
  *
- *	Sets the protection of the specified address
- *	region in the target map.  If "set_max" is
- *	specified, the maximum protection is to be set;
- *	otherwise, only the current protection is affected.
+ *	Sets the protection and/or the maximum protection of the
+ *	specified address region in the target map.
  */
 int
 vm_map_protect(vm_map_t map, vm_offset_t start, vm_offset_t end,
-    vm_prot_t new_prot, boolean_t set_max, boolean_t keep_cap)
+    vm_prot_t new_prot, vm_prot_t new_maxprot, int flags)
 {
 	vm_map_entry_t entry, first_entry, in_tran, prev_entry;
 	vm_object_t obj;
@@ -3275,9 +3277,22 @@ vm_map_protect(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	if (start == end)
 		return (KERN_SUCCESS);
 
+	if ((flags & (VM_MAP_PROTECT_SET_PROT | VM_MAP_PROTECT_SET_MAXPROT)) ==
+	    (VM_MAP_PROTECT_SET_PROT | VM_MAP_PROTECT_SET_MAXPROT) &&
+	    (new_prot & new_maxprot) != new_prot)
+		return (KERN_OUT_OF_BOUNDS);
+
 again:
 	in_tran = NULL;
 	vm_map_lock(map);
+
+	if ((map->flags & MAP_WXORX) != 0 &&
+	    (flags & VM_MAP_PROTECT_SET_PROT) != 0 &&
+	    (new_prot & (VM_PROT_WRITE | VM_PROT_EXECUTE)) == (VM_PROT_WRITE |
+	    VM_PROT_EXECUTE)) {
+		vm_map_unlock(map);
+		return (KERN_PROTECTION_FAILURE);
+	}
 
 	/*
 	 * Ensure that we are not concurrently wiring pages.  vm_map_wire() may
@@ -3315,27 +3330,32 @@ restart_checks:
 		}
 
 		/*
-		 * When keep_cap is used (for mprotect()), upgrade
-		 * new_prot to include the associated VM_PROT_CAP bits
-		 * and retry the the scan.  This means that the
+		 * When VM_MAP_PROTECT_KEEP_CAP is used (for mprotect()),
+		 * upgrade* new_prot to include the associated VM_PROT_CAP
+		 * bits and retry the the scan.  This means that the
 		 * mprotect will fail if it spans map entries with and
 		 * without VM_PROT_CAP set.
 		 *
-		 * Alternatively, keep_cap could be applied to
+		 * Alternatively, VM_MAP_PROTECT_KEEP_CAP could be applied to
 		 * individual map entries.  The current approach gives
 		 * more conservative semantics at the cost of
 		 * potential compatibility breakage.  The alternative
 		 * would maximize compatibility.
 		 */
-		if (keep_cap &&
-		    ((set_max && (entry->max_protection & VM_PROT_CAP) != 0) ||
-		    (!set_max && (entry->protection & VM_PROT_CAP) != 0))) {
+		if (flags & VM_MAP_PROTECT_KEEP_CAP &&
+		    (((flags & VM_MAP_PROTECT_SET_MAXPROT) != 0 && (entry->max_protection & VM_PROT_CAP) != 0) ||
+		    ((flags & VM_MAP_PROTECT_SET_MAXPROT) == 0 && (entry->protection & VM_PROT_CAP) != 0))) {
 			new_prot = VM_PROT_ADD_CAP(new_prot);
-			keep_cap = FALSE;
+			flags &= ~VM_MAP_PROTECT_KEEP_CAP;
 			goto restart_checks;
 		}
 
-		if ((new_prot & entry->max_protection) != new_prot) {
+		if ((flags & VM_MAP_PROTECT_SET_PROT) == 0)
+			new_prot = entry->protection;
+		if ((flags & VM_MAP_PROTECT_SET_MAXPROT) == 0)
+			new_maxprot = entry->max_protection;
+		if ((new_prot & entry->max_protection) != new_prot ||
+		    (new_maxprot & entry->max_protection) != new_maxprot) {
 			vm_map_unlock(map);
 			return (KERN_PROTECTION_FAILURE);
 		}
@@ -3376,13 +3396,12 @@ restart_checks:
 			return (rv);
 		}
 
-		if (set_max ||
+		if ((flags & VM_MAP_PROTECT_SET_PROT) == 0 ||
 		    ((new_prot & ~entry->protection) & VM_PROT_WRITE) == 0 ||
 		    ENTRY_CHARGED(entry) ||
 		    (entry->eflags &
-		    (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0) {
+		    (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0)
 			continue;
-		}
 
 		cred = curthread->td_ucred;
 		obj = entry->object.vm_object;
@@ -3444,11 +3463,11 @@ restart_checks:
 
 		old_prot = entry->protection;
 
-		if (set_max)
-			entry->protection =
-			    (entry->max_protection = new_prot) &
-			    old_prot;
-		else
+		if ((flags & VM_MAP_PROTECT_SET_MAXPROT) != 0) {
+			entry->max_protection = new_maxprot;
+			entry->protection = new_maxprot & old_prot;
+		}
+		if ((flags & VM_MAP_PROTECT_SET_PROT) != 0)
 			entry->protection = new_prot;
 		vm_map_log("protect", entry);
 
@@ -5089,7 +5108,7 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 	new_map->anon_loc = old_map->anon_loc;
 	new_map->flags |= old_map->flags &
-	    (MAP_ASLR | MAP_ASLR_IGNSTART | MAP_RESERVATIONS);
+	    (MAP_ASLR | MAP_ASLR_IGNSTART | MAP_RESERVATIONS | MAP_WXORX);
 
 	VM_MAP_ENTRY_FOREACH(old_entry, old_map) {
 		if ((old_entry->eflags & MAP_ENTRY_IS_SUB_MAP) != 0)

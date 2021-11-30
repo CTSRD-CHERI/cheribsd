@@ -57,17 +57,11 @@ typedef enum {
 static void
 list_cloners(void)
 {
-	ifconfig_handle_t *lifh;
 	char *cloners;
 	size_t cloners_count;
 
-	lifh = ifconfig_open();
-	if (lifh == NULL)
-		return;
-
 	if (ifconfig_list_cloners(lifh, &cloners, &cloners_count) < 0)
 		errc(1, ifconfig_err_errno(lifh), "unable to list cloners");
-	ifconfig_close(lifh);
 
 	for (const char *name = cloners;
 	    name < cloners + cloners_count * IFNAMSIZ;
@@ -128,32 +122,32 @@ ifclonecreate(int s, void *arg)
 {
 	struct ifreq ifr;
 	struct clone_defcb *dcp;
-	clone_callback_func *clone_cb = NULL;
 
 	memset(&ifr, 0, sizeof(ifr));
 	(void) strlcpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
 
-	if (clone_cb == NULL) {
-		/* Try to find a default callback */
+	/* Try to find a default callback by filter */
+	SLIST_FOREACH(dcp, &clone_defcbh, next) {
+		if (dcp->clone_mt == MT_FILTER &&
+		    dcp->ifmatch(ifr.ifr_name) != 0)
+			break;
+	}
+
+	if (dcp == NULL) {
+		/* Try to find a default callback by prefix */
 		SLIST_FOREACH(dcp, &clone_defcbh, next) {
-			if ((dcp->clone_mt == MT_PREFIX) &&
-			    (strncmp(dcp->ifprefix, ifr.ifr_name,
-			             strlen(dcp->ifprefix)) == 0)) {
-				clone_cb = dcp->clone_cb;
+			if (dcp->clone_mt == MT_PREFIX &&
+			    strncmp(dcp->ifprefix, ifr.ifr_name,
+			    strlen(dcp->ifprefix)) == 0)
 				break;
-			}
-			if ((dcp->clone_mt == MT_FILTER) &&
-			          dcp->ifmatch(ifr.ifr_name)) {
-				clone_cb = dcp->clone_cb;
-				break;
-			}
 		}
 	}
-	if (clone_cb == NULL) {
+
+	if (dcp == NULL || dcp->clone_cb == NULL) {
 		/* NB: no parameters */
 	  	ioctl_ifcreate(s, &ifr);
 	} else {
-		clone_cb(s, &ifr);
+		dcp->clone_cb(s, &ifr);
 	}
 
 	/*

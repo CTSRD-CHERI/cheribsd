@@ -54,5 +54,6 @@ options	USB_DEBUG
 options	USB_VERBOSE
 device		usb
 device		saf1761otg
+device		hid
 device		ukbd
 device		ums

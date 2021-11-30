@@ -1034,7 +1034,7 @@ report_esp_device(bool do_dp, bool do_unix)
 		printf("%s\n", buf);
 		exit(0);
 	}
-	if (efivar_device_path_to_unix_path(dp, &dev, &relpath, &abspath) < 0)
+	if (efivar_device_path_to_unix_path(dp, &dev, &relpath, &abspath) != 0)
 		errx(1, "Can't convert to unix path");
 	if (do_unix) {
 		if (abspath == NULL)
@@ -1072,11 +1072,12 @@ int
 main(int argc, char *argv[])
 {
 
+	memset(&opts, 0, sizeof (bmgr_opts_t));
+	parse_args(argc, argv);
+
 	if (!efi_variables_supported())
 		errx(1, "efi variables not supported on this system. root? kldload efirt?");
 
-	memset(&opts, 0, sizeof (bmgr_opts_t));
-	parse_args(argc, argv);
 	read_vars();
 
 	if (opts.create)

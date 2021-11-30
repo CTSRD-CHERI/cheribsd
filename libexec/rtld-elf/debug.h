@@ -81,7 +81,7 @@ __END_DECLS
 #elif defined(COMPAT_64BIT)
 #define _MYNAME	"ld-elf64.so.1"
 #elif defined(COMPAT_CHERI)
-#define _MYNAME	"ld-cheri-elf.so.1"
+#define _MYNAME	"ld-elf64c.so.1"
 #else
 #define _MYNAME	"ld-elf.so.1"
 #endif

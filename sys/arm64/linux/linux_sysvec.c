@@ -57,6 +57,10 @@ __FBSDID("$FreeBSD$");
 #include <compat/linux/linux_util.h>
 #include <compat/linux/linux_vdso.h>
 
+#ifdef VFP
+#include <machine/vfp.h>
+#endif
+
 MODULE_VERSION(linux64elf, 1);
 
 const char *linux_kplatform;
@@ -347,6 +351,7 @@ linux_exec_setregs(struct thread *td, struct image_params *imgp,
     uintptr_t stack)
 {
 	struct trapframe *regs = td->td_frame;
+	struct pcb *pcb = td->td_pcb;
 
 	/* LINUXTODO: validate */
 	LIN_SDT_PROBE0(sysvec, linux_exec_setregs, todo);
@@ -360,6 +365,20 @@ linux_exec_setregs(struct thread *td, struct image_params *imgp,
         regs->tf_lr = 0xffffffffffffffff;
 #endif
         regs->tf_elr = imgp->entry_addr;
+
+	pcb->pcb_tpidr_el0 = 0;
+	pcb->pcb_tpidrro_el0 = 0;
+	WRITE_SPECIALREG(tpidrro_el0, 0);
+	WRITE_SPECIALREG(tpidr_el0, 0);
+
+#ifdef VFP
+	vfp_reset_state(td, pcb);
+#endif
+
+	/*
+	 * Clear debug register state. It is not applicable to the new process.
+	 */
+	bzero(&pcb->pcb_dbg_regs, sizeof(pcb->pcb_dbg_regs));
 }
 
 int
@@ -461,7 +480,8 @@ linux_vdso_deinstall(const void *param)
 {
 
 	LIN_SDT_PROBE0(sysvec, linux_vdso_deinstall, todo);
-	__elfN(linux_shared_page_fini)(linux_shared_page_obj);
+	__elfN(linux_shared_page_fini)(linux_shared_page_obj,
+	    linux_shared_page_mapping);
 }
 SYSUNINIT(elf_linux_vdso_uninit, SI_SUB_EXEC, SI_ORDER_FIRST,
     linux_vdso_deinstall, NULL);

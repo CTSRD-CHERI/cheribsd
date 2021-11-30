@@ -52,14 +52,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include "cheri_private.h"
 
-/*
- * sizeof(word) MUST BE A POWER OF TWO
- * SO THAT wmask BELOW IS ALL ONES
- */
 #if __has_feature(capabilities)
-typedef	__intcap_t word;		/* "word" used for optimal copy speed */
+typedef	__intcap_t word;	/* "word" used for optimal copy speed */
 #else
-typedef	int word;		/* "word" used for optimal copy speed */
+typedef	intptr_t word;		/* "word" used for optimal copy speed */
 #endif
 
 #define	wsize	sizeof(word)
@@ -124,7 +120,9 @@ bcopy(const void *src0, void *dst0, size_t length)
 		 * Copy whole words, then mop up any trailing bytes.
 		 */
 		t = length / wsize;
-		TLOOP(*(word * __CAP)dst = *(const word * __CAP)src; src += wsize; dst += wsize);
+		TLOOP(*(word * __CAP)(void * __CAP)dst =
+		    *(const word * __CAP)(const void * __CAP)src;
+		    src += wsize; dst += wsize);
 		t = length & wmask;
 		TLOOP(*dst++ = *src++);
 	} else {
@@ -145,7 +143,9 @@ bcopy(const void *src0, void *dst0, size_t length)
 			TLOOP1(*--dst = *--src);
 		}
 		t = length / wsize;
-		TLOOP(src -= wsize; dst -= wsize; *(word * __CAP)dst = *(const word * __CAP)src);
+		TLOOP(src -= wsize; dst -= wsize;
+		    *(word * __CAP)(void * __CAP)dst =
+		    *(const word * __CAP)(const void * __CAP)src);
 		t = length & wmask;
 		TLOOP(*--dst = *--src);
 	}

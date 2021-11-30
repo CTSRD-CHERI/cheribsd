@@ -101,6 +101,23 @@ atf_check_equal()
 }
 
 #
+# atf_check_not_equal expected_expression actual_expression
+#
+#   Checks that expected_expression's value does not match actual_expression's
+#   and, if it does, raises an error.  Ideally expected_expression and
+#   actual_expression should be provided quoted (not expanded) so that
+#   the error message is helpful; otherwise it will only show the values,
+#   not the expressions themselves.
+#
+atf_check_not_equal()
+{
+    eval _val1=\"${1}\"
+    eval _val2=\"${2}\"
+    test "${_val1}" != "${_val2}" || \
+        atf_fail "${1} == ${2} (${_val1} == ${_val2})"
+}
+
+#
 # atf_config_get varname [defvalue]
 #
 #   Prints the value of a configuration variable.  If it is not

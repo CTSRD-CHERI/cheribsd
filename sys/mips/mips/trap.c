@@ -716,6 +716,9 @@ trap(struct trapframe *trapframe)
 	trapf_pc_t pc;
 	int cop, error;
 	register_t *frame_regs;
+#ifdef KDB
+	bool handled;
+#endif
 
 	trapdebug_enter(trapframe, 0);
 #ifdef KDB
@@ -1411,8 +1414,10 @@ err:
 #ifdef KDB
 		if (debugger_on_trap) {
 			kdb_why = KDB_WHY_TRAP;
-			kdb_trap(type, 0, trapframe);
+			handled = kdb_trap(type, 0, trapframe);
 			kdb_why = KDB_WHY_UNSET;
+			if (handled)
+				return (trapframe->pc);
 		}
 #endif
 		panic("trap");

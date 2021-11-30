@@ -46,11 +46,11 @@ struct rm_queue {
 };
 
 struct rmlock {
-	struct lock_object lock_object;
+	struct lock_object lock_object __subobject_member_used_for_c_inheritance;
 	volatile cpuset_t rm_writecpus;
 	LIST_HEAD(,rm_priotracker) rm_activeReaders;
 	union {
-		struct lock_object _rm_wlock_object;
+		struct lock_object _rm_wlock_object __subobject_use_container_bounds;
 		struct mtx _rm_lock_mtx;
 		struct sx _rm_lock_sx;
 	} _rm_lock;

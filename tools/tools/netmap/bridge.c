@@ -17,6 +17,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#if defined(_WIN32)
+#define BUSYWAIT
+#endif
+
 static int verbose = 0;
 
 static int do_abort = 0;
@@ -86,13 +90,12 @@ rings_move(struct netmap_ring *rxring, struct netmap_ring *txring,
 		struct netmap_slot *rs = &rxring->slot[j];
 		struct netmap_slot *ts = &txring->slot[k];
 
-		/* swap packets */
 		if (ts->buf_idx < 2 || rs->buf_idx < 2) {
 			RD(2, "wrong index rxr[%d] = %d  -> txr[%d] = %d",
 			    j, rs->buf_idx, k, ts->buf_idx);
 			sleep(2);
 		}
-		/* copy the packet length. */
+		/* Copy the packet length. */
 		if (rs->len > rxring->nr_buf_size) {
 			RD(2,  "%s: invalid len %u, rxr[%d] -> txr[%d]",
 			    msg, rs->len, j, k);
@@ -109,13 +112,16 @@ rings_move(struct netmap_ring *rxring, struct netmap_ring *txring,
 			/* report the buffer change. */
 			ts->flags |= NS_BUF_CHANGED;
 			rs->flags |= NS_BUF_CHANGED;
-			/* copy the NS_MOREFRAG */
-			rs->flags = (rs->flags & ~NS_MOREFRAG) | (ts->flags & NS_MOREFRAG);
 		} else {
 			char *rxbuf = NETMAP_BUF(rxring, rs->buf_idx);
 			char *txbuf = NETMAP_BUF(txring, ts->buf_idx);
 			nm_pkt_copy(rxbuf, txbuf, ts->len);
 		}
+		/*
+		 * Copy the NS_MOREFRAG from rs to ts, leaving any
+		 * other flags unchanged.
+		 */
+		ts->flags = (ts->flags & ~NS_MOREFRAG) | (rs->flags & NS_MOREFRAG);
 		j = nm_ring_next(rxring, j);
 		k = nm_ring_next(txring, k);
 	}
@@ -190,7 +196,7 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	char msg_a2b[128], msg_b2a[128];
+	char msg_a2b[256], msg_b2a[256];
 	struct pollfd pollfd[2];
 	u_int burst = 1024, wait_link = 4;
 	struct nmport_d *pa = NULL, *pb = NULL;
@@ -319,21 +325,19 @@ main(int argc, char **argv)
 		pollfd[0].revents = pollfd[1].revents = 0;
 		n0 = rx_slots_avail(pa);
 		n1 = rx_slots_avail(pb);
-#if defined(_WIN32) || defined(BUSYWAIT)
+#ifdef BUSYWAIT
 		if (n0) {
-			ioctl(pollfd[1].fd, NIOCTXSYNC, NULL);
 			pollfd[1].revents = POLLOUT;
 		} else {
 			ioctl(pollfd[0].fd, NIOCRXSYNC, NULL);
 		}
 		if (n1) {
-			ioctl(pollfd[0].fd, NIOCTXSYNC, NULL);
 			pollfd[0].revents = POLLOUT;
 		} else {
 			ioctl(pollfd[1].fd, NIOCRXSYNC, NULL);
 		}
 		ret = 1;
-#else
+#else  /* !defined(BUSYWAIT) */
 		if (n0)
 			pollfd[1].events |= POLLOUT;
 		else
@@ -345,7 +349,7 @@ main(int argc, char **argv)
 
 		/* poll() also cause kernel to txsync/rxsync the NICs */
 		ret = poll(pollfd, 2, 2500);
-#endif /* defined(_WIN32) || defined(BUSYWAIT) */
+#endif /* !defined(BUSYWAIT) */
 		if (ret <= 0 || verbose)
 		    D("poll %s [0] ev %x %x rx %d@%d tx %d,"
 			     " [1] ev %x %x rx %d@%d tx %d",
@@ -373,11 +377,19 @@ main(int argc, char **argv)
 			D("error on fd1, rx [%d,%d,%d)",
 			    rx->head, rx->cur, rx->tail);
 		}
-		if (pollfd[0].revents & POLLOUT)
+		if (pollfd[0].revents & POLLOUT) {
 			ports_move(pb, pa, burst, msg_b2a);
+#ifdef BUSYWAIT
+			ioctl(pollfd[0].fd, NIOCTXSYNC, NULL);
+#endif
+		}
 
-		if (pollfd[1].revents & POLLOUT)
+		if (pollfd[1].revents & POLLOUT) {
 			ports_move(pa, pb, burst, msg_a2b);
+#ifdef BUSYWAIT
+			ioctl(pollfd[1].fd, NIOCTXSYNC, NULL);
+#endif
+		}
 
 		/*
 		 * We don't need ioctl(NIOCTXSYNC) on the two file descriptors.

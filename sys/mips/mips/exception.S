@@ -116,11 +116,6 @@ dtrace_invop_calltrap_addr:
 #endif
 
 /*
- * Reasonable limit
- */
-#define	INTRCNT_COUNT	256
-
-/*
  * General MIPS CPU state for exceptions:
  *
  * EPC Register will point to the instruction that caused fault, unless the

@@ -870,10 +870,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* ntp_adjtime */
+	/* freebsd32_ntp_adjtime */
 	case 176: {
-		struct ntp_adjtime_args *p = params;
-		uarg[0] = (intptr_t) p->tp; /* struct timex * */
+		struct freebsd32_ntp_adjtime_args *p = params;
+		uarg[0] = (intptr_t) p->tp; /* struct timex32 * */
 		*n_args = 1;
 		break;
 	}
@@ -3401,6 +3401,29 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
+	/* freebsd32___specialfd */
+	case 577: {
+		struct freebsd32___specialfd_args *p = params;
+		iarg[0] = p->type; /* int */
+		uarg[1] = (intptr_t) p->req; /* const void * */
+		uarg[2] = p->len; /* size_t */
+		*n_args = 3;
+		break;
+	}
+	/* freebsd32_aio_writev */
+	case 578: {
+		struct freebsd32_aio_writev_args *p = params;
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb32 * */
+		*n_args = 1;
+		break;
+	}
+	/* freebsd32_aio_readv */
+	case 579: {
+		struct freebsd32_aio_readv_args *p = params;
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb32 * */
+		*n_args = 1;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -4803,11 +4826,11 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* ntp_adjtime */
+	/* freebsd32_ntp_adjtime */
 	case 176:
 		switch(ndx) {
 		case 0:
-			p = "userland struct timex *";
+			p = "userland struct timex32 *";
 			break;
 		default:
 			break;
@@ -9170,6 +9193,42 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* freebsd32___specialfd */
+	case 577:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland const void *";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* freebsd32_aio_writev */
+	case 578:
+		switch(ndx) {
+		case 0:
+			p = "userland struct aiocb32 *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* freebsd32_aio_readv */
+	case 579:
+		switch(ndx) {
+		case 0:
+			p = "userland struct aiocb32 *";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -9675,7 +9734,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* ntp_adjtime */
+	/* freebsd32_ntp_adjtime */
 	case 176:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -11081,6 +11140,21 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* rpctls_syscall */
 	case 576:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* freebsd32___specialfd */
+	case 577:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* freebsd32_aio_writev */
+	case 578:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* freebsd32_aio_readv */
+	case 579:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

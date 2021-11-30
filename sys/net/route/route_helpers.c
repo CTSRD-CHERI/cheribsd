@@ -67,6 +67,17 @@ __FBSDID("$FreeBSD$");
  * RIB helper functions.
  */
 
+void
+rib_walk_ext_locked(struct rib_head *rnh, rib_walktree_f_t *wa_f,
+    rib_walk_hook_f_t *hook_f, void *arg)
+{
+	if (hook_f != NULL)
+		hook_f(rnh, RIB_WALK_HOOK_PRE, arg);
+	rnh->rnh_walktree(&rnh->head, (walktree_f_t *)wa_f, arg);
+	if (hook_f != NULL)
+		hook_f(rnh, RIB_WALK_HOOK_POST, arg);
+}
+
 /*
  * Calls @wa_f with @arg for each entry in the table specified by
  * @af and @fibnum.
@@ -77,28 +88,30 @@ __FBSDID("$FreeBSD$");
  * Table is traversed under read lock unless @wlock is set.
  */
 void
-rib_walk_ext(uint32_t fibnum, int family, bool wlock, rib_walktree_f_t *wa_f,
+rib_walk_ext_internal(struct rib_head *rnh, bool wlock, rib_walktree_f_t *wa_f,
     rib_walk_hook_f_t *hook_f, void *arg)
 {
 	RIB_RLOCK_TRACKER;
-	struct rib_head *rnh;
-
-	if ((rnh = rt_tables_get_rnh(fibnum, family)) == NULL)
-		return;
 
 	if (wlock)
 		RIB_WLOCK(rnh);
 	else
 		RIB_RLOCK(rnh);
-	if (hook_f != NULL)
-		hook_f(rnh, RIB_WALK_HOOK_PRE, arg);
-	rnh->rnh_walktree(&rnh->head, (walktree_f_t *)wa_f, arg);
-	if (hook_f != NULL)
-		hook_f(rnh, RIB_WALK_HOOK_POST, arg);
+	rib_walk_ext_locked(rnh, wa_f, hook_f, arg);
 	if (wlock)
 		RIB_WUNLOCK(rnh);
 	else
 		RIB_RUNLOCK(rnh);
+}
+
+void
+rib_walk_ext(uint32_t fibnum, int family, bool wlock, rib_walktree_f_t *wa_f,
+    rib_walk_hook_f_t *hook_f, void *arg)
+{
+	struct rib_head *rnh;
+
+	if ((rnh = rt_tables_get_rnh(fibnum, family)) != NULL)
+		rib_walk_ext_internal(rnh, wlock, wa_f, hook_f, arg);
 }
 
 /*
@@ -113,6 +126,38 @@ rib_walk(uint32_t fibnum, int family, bool wlock, rib_walktree_f_t *wa_f,
 {
 
 	rib_walk_ext(fibnum, family, wlock, wa_f, NULL, arg);
+}
+
+/*
+ * Calls @wa_f with @arg for each entry in the table matching @prefix/@mask.
+ *
+ * The following flags are supported:
+ *  RIB_FLAG_WLOCK: acquire exclusive lock
+ *  RIB_FLAG_LOCKED: Assumes the table is already locked & skip locking
+ *
+ * By default, table is traversed under read lock.
+ */
+void
+rib_walk_from(uint32_t fibnum, int family, uint32_t flags, struct sockaddr *prefix,
+    struct sockaddr *mask, rib_walktree_f_t *wa_f, void *arg)
+{
+	RIB_RLOCK_TRACKER;
+	struct rib_head *rnh = rt_tables_get_rnh(fibnum, family);
+
+	if (rnh == NULL)
+		return;
+
+	if (flags & RIB_FLAG_WLOCK)
+		RIB_WLOCK(rnh);
+	else if (!(flags & RIB_FLAG_LOCKED))
+		RIB_RLOCK(rnh);
+
+	rnh->rnh_walktree_from(&rnh->head, prefix, mask, (walktree_f_t *)wa_f, arg);
+
+	if (flags & RIB_FLAG_WLOCK)
+		RIB_WUNLOCK(rnh);
+	else if (!(flags & RIB_FLAG_LOCKED))
+		RIB_RUNLOCK(rnh);
 }
 
 /*

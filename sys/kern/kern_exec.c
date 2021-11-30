@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/acct.h>
+#include <sys/asan.h>
 #include <sys/capsicum.h>
 #include <sys/eventhandler.h>
 #include <sys/exec.h>
@@ -1220,9 +1221,9 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	register_t perms;
 #endif
 	vm_map_t map;
+	vm_prot_t stack_prot;
 	u_long ssiz;
 	vm_pointer_t shared_page_addr;
-	vm_prot_t stack_prot;
 
 	imgp->vmspace_destroyed = 1;
 	imgp->sysent = sv;
@@ -1254,12 +1255,12 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		pmap_remove_pages(vmspace_pmap(vmspace));
 		vm_map_clear(map);
 		/*
-		 * An exec terminates mlockall(MCL_FUTURE), ASLR state
-		 * must be re-evaluated.
+		 * An exec terminates mlockall(MCL_FUTURE).
+		 * ASLR and W^X states must be re-evaluated.
 		 */
 		vm_map_lock(map);
 		vm_map_modflags(map, 0, MAP_WIREFUTURE | MAP_ASLR |
-		    MAP_ASLR_IGNSTART);
+		    MAP_ASLR_IGNSTART | MAP_WXORX);
 		vm_map_unlock(map);
 	} else if (imgp->cop != NULL) {
 		error = vmspace_coexec(p, imgp->cop, sv_minuser, sv->sv_maxuser);
@@ -1381,9 +1382,9 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	}
 
 	/* We reserve the whole max stack size with restricted permission */
-	stack_addr =  p->p_usrstack - ssiz;
-	stack_prot = (obj != NULL && imgp->stack_prot != 0) ? imgp->stack_prot :
-	    sv->sv_stackprot;
+	stack_addr = p->p_usrstack - ssiz;
+	stack_prot = obj != NULL && imgp->stack_prot != 0 ?
+	    imgp->stack_prot : sv->sv_stackprot;
 	imgp->stack_sz = ssiz;
 	error = vm_map_reservation_create(map, &stack_addr, ssiz,
 	    PAGE_SIZE, stack_prot);
@@ -1393,6 +1394,9 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz, stack_prot,
 	    stack_prot, MAP_STACK_GROWS_DOWN);
 	if (error != KERN_SUCCESS) {
+		uprintf("exec_new_vmspace: mapping stack size %#jx prot %#x "
+		    "failed mach error %d errno %d\n", (uintmax_t)ssiz,
+		    stack_prot, error, vm_mmap_to_errno(error));
 		vm_map_reservation_delete(map, stack_addr);
 		return (vm_mmap_to_errno(error));
 	}
@@ -1702,6 +1706,8 @@ exec_alloc_args_kva(void **cookie)
 		SLIST_REMOVE_HEAD(&exec_args_kva_freelist, next);
 		mtx_unlock(&exec_args_kva_mtx);
 	}
+	kasan_mark((void *)argkva->addr, exec_map_entry_size,
+	    exec_map_entry_size, 0);
 	*(struct exec_args_kva **)cookie = argkva;
 	return (argkva->addr);
 }
@@ -1712,6 +1718,8 @@ exec_release_args_kva(struct exec_args_kva *argkva, u_int gen)
 	vm_offset_t base;
 
 	base = argkva->addr;
+	kasan_mark((void *)argkva->addr, 0, exec_map_entry_size,
+	    KASAN_EXEC_ARGS_FREED);
 	if (argkva->gen != gen) {
 		(void)vm_map_madvise(exec_map, base, base + exec_map_entry_size,
 		    MADV_FREE);
@@ -1932,6 +1940,17 @@ exec_args_get_begin_envv(struct image_args *args)
 	return (args->endp);
 }
 
+void
+exec_stackgap(struct image_params *imgp, uintcap_t *dp)
+{
+	if (imgp->sysent->sv_stackgap == NULL ||
+	    (imgp->proc->p_fctl0 & (NT_FREEBSD_FCTL_ASLR_DISABLE |
+	    NT_FREEBSD_FCTL_ASG_DISABLE)) != 0 ||
+	    (imgp->map_flags & MAP_ASLR) == 0)
+		return;
+	imgp->sysent->sv_stackgap(imgp, dp);
+}
+
 /*
  * Copy strings out to the new process address space, constructing new arg
  * and env vector tables. Return a pointer to the base so that it can be used
@@ -2071,8 +2090,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	ustringp = destp;
 #endif
 
-	if (imgp->sysent->sv_stackgap != NULL)
-		imgp->sysent->sv_stackgap(imgp, &destp);
+	exec_stackgap(imgp, &destp);
 
 	if (imgp->auxargs) {
 		/*

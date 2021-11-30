@@ -115,7 +115,7 @@ ENTRY(cpu_throw)
 	ldp	PTR(24), PTR(25), [PTR(4), #PCB_REGS + 24 * PTR_WIDTH]
 	ldp	PTR(26), PTR(27), [PTR(4), #PCB_REGS + 26 * PTR_WIDTH]
 	ldp	PTR(28), PTR(29), [PTR(4), #PCB_REGS + 28 * PTR_WIDTH]
-	ldr	PTR(30), [PTR(4), #PCB_REGS + 30 * PTR_WIDTH]
+	ldr	PTRN(lr), [PTR(4), #PCB_LR]
 
 	ret
 END(cpu_throw)
@@ -146,7 +146,7 @@ ENTRY(cpu_switch)
 	stp	PTR(24), PTR(25), [PTR(4), #PCB_REGS + 24 * PTR_WIDTH]
 	stp	PTR(26), PTR(27), [PTR(4), #PCB_REGS + 26 * PTR_WIDTH]
 	stp	PTR(28), PTR(29), [PTR(4), #PCB_REGS + 28 * PTR_WIDTH]
-	str	PTR(30), [PTR(4), #PCB_REGS + 30 * PTR_WIDTH]
+	str	PTRN(lr), [PTR(4), #PCB_LR]
 	/* And the old stack pointer */
 	mov	PTR(5), PTRN(sp)
 #if __has_feature(capabilities)
@@ -239,7 +239,7 @@ ENTRY(cpu_switch)
 	ldp	PTR(24), PTR(25), [PTR(4), #PCB_REGS + 24 * PTR_WIDTH]
 	ldp	PTR(26), PTR(27), [PTR(4), #PCB_REGS + 26 * PTR_WIDTH]
 	ldp	PTR(28), PTR(29), [PTR(4), #PCB_REGS + 28 * PTR_WIDTH]
-	ldr	PTR(30), [PTR(4), #PCB_REGS + 30 * PTR_WIDTH]
+	ldr	PTRN(lr), [PTR(4), #PCB_LR]
 
 	str	PTR(zr), [PTR(4), #PCB_REGS + 18 * PTR_WIDTH]
 	ret
@@ -318,7 +318,7 @@ ENTRY(savectx)
 	stp	PTR(24), PTR(25), [PTR(0), #PCB_REGS + 24 * PTR_WIDTH]
 	stp	PTR(26), PTR(27), [PTR(0), #PCB_REGS + 26 * PTR_WIDTH]
 	stp	PTR(28), PTR(29), [PTR(0), #PCB_REGS + 28 * PTR_WIDTH]
-	str	PTR(30), [PTR(0), #PCB_REGS + 30 * PTR_WIDTH]
+	str	PTRN(lr), [PTR(0), #PCB_LR]
 	/* And the old stack pointer */
 	mov	PTR(5), PTRN(sp)
 #if __has_feature(capabilities)

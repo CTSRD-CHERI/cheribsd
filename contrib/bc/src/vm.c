@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018-2020 Gavin D. Howard and contributors.
+ * Copyright (c) 2018-2021 Gavin D. Howard and contributors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -56,6 +56,7 @@
 
 #endif // _WIN32
 
+#include <status.h>
 #include <vector.h>
 #include <args.h>
 #include <vm.h>
@@ -76,10 +77,10 @@ BC_NORETURN void bc_vm_jmp(void) {
 	BC_SIG_MAYLOCK;
 
 #if BC_DEBUG_CODE
-	bc_file_puts(&vm.ferr, "Longjmp: ");
-	bc_file_puts(&vm.ferr, f);
-	bc_file_putchar(&vm.ferr, '\n');
-	bc_file_flush(&vm.ferr);
+	bc_file_puts(&vm.ferr, bc_flush_none, "Longjmp: ");
+	bc_file_puts(&vm.ferr, bc_flush_none, f);
+	bc_file_putchar(&vm.ferr, bc_flush_none, '\n');
+	bc_file_flush(&vm.ferr, bc_flush_none);
 #endif // BC_DEBUG_CODE
 
 #ifndef NDEBUG
@@ -119,24 +120,59 @@ static void bc_vm_sig(int sig) {
 	if (!vm.sig_lock) BC_VM_JMP;
 }
 
+static void bc_vm_sigaction(void) {
+#ifndef _WIN32
+
+	struct sigaction sa;
+
+	sigemptyset(&sa.sa_mask);
+	sa.sa_handler = bc_vm_sig;
+	sa.sa_flags = SA_NODEFER;
+
+	sigaction(SIGTERM, &sa, NULL);
+	sigaction(SIGQUIT, &sa, NULL);
+	sigaction(SIGINT, &sa, NULL);
+
+#if BC_ENABLE_HISTORY
+	if (BC_TTY) sigaction(SIGHUP, &sa, NULL);
+#endif // BC_ENABLE_HISTORY
+
+#else // _WIN32
+
+	signal(SIGTERM, bc_vm_sig);
+
+#endif // _WIN32
+}
+
 void bc_vm_info(const char* const help) {
 
 	BC_SIG_ASSERT_LOCKED;
 
-	bc_file_puts(&vm.fout, vm.name);
-	bc_file_putchar(&vm.fout, ' ');
-	bc_file_puts(&vm.fout, BC_VERSION);
-	bc_file_putchar(&vm.fout, '\n');
-	bc_file_puts(&vm.fout, bc_copyright);
+	bc_file_puts(&vm.fout, bc_flush_none, vm.name);
+	bc_file_putchar(&vm.fout, bc_flush_none, ' ');
+	bc_file_puts(&vm.fout, bc_flush_none, BC_VERSION);
+	bc_file_putchar(&vm.fout, bc_flush_none, '\n');
+	bc_file_puts(&vm.fout, bc_flush_none, bc_copyright);
 
 	if (help) {
-		bc_file_putchar(&vm.fout, '\n');
-		bc_file_printf(&vm.fout, help, vm.name, vm.name);
+		bc_file_putchar(&vm.fout, bc_flush_none, '\n');
+		bc_file_printf(&vm.fout, help, vm.name, vm.name,
+		               BC_VERSION, BC_BUILD_TYPE);
 	}
 
-	bc_file_flush(&vm.fout);
+	bc_file_flush(&vm.fout, bc_flush_err);
 }
 #endif // !BC_ENABLE_LIBRARY
+
+#if !BC_ENABLE_LIBRARY && !BC_ENABLE_MEMCHECK
+BC_NORETURN
+#endif // !BC_ENABLE_LIBRARY && !BC_ENABLE_MEMCHECK
+void bc_vm_fatalError(BcErr e) {
+	bc_vm_err(e);
+#if !BC_ENABLE_LIBRARY && !BC_ENABLE_MEMCHECK
+	abort();
+#endif // !BC_ENABLE_LIBRARY && !BC_ENABLE_MEMCHECK
+}
 
 #if BC_ENABLE_LIBRARY
 void bc_vm_handleError(BcErr e) {
@@ -182,7 +218,7 @@ void bc_vm_handleError(BcErr e, size_t line, ...) {
 	BC_SIG_TRYLOCK(lock);
 
 	// Make sure all of stdout is written first.
-	s = bc_file_flushErr(&vm.fout);
+	s = bc_file_flushErr(&vm.fout, bc_flush_err);
 
 	if (BC_ERR(s == BC_STATUS_ERROR_FATAL)) {
 		vm.status = (sig_atomic_t) s;
@@ -190,9 +226,9 @@ void bc_vm_handleError(BcErr e, size_t line, ...) {
 	}
 
 	va_start(args, line);
-	bc_file_putchar(&vm.ferr, '\n');
-	bc_file_puts(&vm.ferr, err_type);
-	bc_file_putchar(&vm.ferr, ' ');
+	bc_file_putchar(&vm.ferr, bc_flush_none, '\n');
+	bc_file_puts(&vm.ferr, bc_flush_none, err_type);
+	bc_file_putchar(&vm.ferr, bc_flush_none, ' ');
 	bc_file_vprintf(&vm.ferr, vm.err_msgs[e], args);
 	va_end(args);
 
@@ -201,8 +237,8 @@ void bc_vm_handleError(BcErr e, size_t line, ...) {
 		// This is the condition for parsing vs runtime.
 		// If line is not 0, it is parsing.
 		if (line) {
-			bc_file_puts(&vm.ferr, "\n    ");
-			bc_file_puts(&vm.ferr, vm.file);
+			bc_file_puts(&vm.ferr, bc_flush_none, "\n    ");
+			bc_file_puts(&vm.ferr, bc_flush_none, vm.file);
 			bc_file_printf(&vm.ferr, bc_err_line, line);
 		}
 		else {
@@ -210,27 +246,38 @@ void bc_vm_handleError(BcErr e, size_t line, ...) {
 			BcInstPtr *ip = bc_vec_item_rev(&vm.prog.stack, 0);
 			BcFunc *f = bc_vec_item(&vm.prog.fns, ip->func);
 
-			bc_file_puts(&vm.ferr, "\n    ");
-			bc_file_puts(&vm.ferr, vm.func_header);
-			bc_file_putchar(&vm.ferr, ' ');
-			bc_file_puts(&vm.ferr, f->name);
+			bc_file_puts(&vm.ferr, bc_flush_none, "\n    ");
+			bc_file_puts(&vm.ferr, bc_flush_none, vm.func_header);
+			bc_file_putchar(&vm.ferr, bc_flush_none, ' ');
+			bc_file_puts(&vm.ferr, bc_flush_none, f->name);
 
 #if BC_ENABLED
 			if (BC_IS_BC && ip->func != BC_PROG_MAIN &&
 			    ip->func != BC_PROG_READ)
 			{
-				bc_file_puts(&vm.ferr, "()");
+				bc_file_puts(&vm.ferr, bc_flush_none, "()");
 			}
 #endif // BC_ENABLED
 		}
 	}
 
-	bc_file_puts(&vm.ferr, "\n\n");
+	bc_file_puts(&vm.ferr, bc_flush_none, "\n\n");
 
-	s = bc_file_flushErr(&vm.ferr);
+	s = bc_file_flushErr(&vm.ferr, bc_flush_err);
 
-	vm.status = s == BC_STATUS_ERROR_FATAL ?
-	    (sig_atomic_t) s : (sig_atomic_t) (uchar) (id + 1);
+#if !BC_ENABLE_MEMCHECK
+	// Because this function is called by a BC_NORETURN function when fatal
+	// errors happen, we need to make sure to exit on fatal errors. This will
+	// be faster anyway. This function *cannot jump when a fatal error occurs!*
+	if (BC_ERR(id == BC_ERR_IDX_FATAL || s == BC_STATUS_ERROR_FATAL))
+		exit(bc_vm_atexit((int) BC_STATUS_ERROR_FATAL));
+#else // !BC_ENABLE_MEMCHECK
+	if (BC_ERR(s == BC_STATUS_ERROR_FATAL)) vm.status = (sig_atomic_t) s;
+	else
+#endif // !BC_ENABLE_MEMCHECK
+	{
+		vm.status = (sig_atomic_t) (uchar) (id + 1);
+	}
 
 	if (BC_ERR(vm.status)) BC_VM_JMP;
 
@@ -239,14 +286,19 @@ void bc_vm_handleError(BcErr e, size_t line, ...) {
 
 static void bc_vm_envArgs(const char* const env_args_name) {
 
-	char *env_args = getenv(env_args_name), *buf, *start;
+	char *env_args = bc_vm_getenv(env_args_name), *buf, *start;
 	char instr = '\0';
 
 	BC_SIG_ASSERT_LOCKED;
 
 	if (env_args == NULL) return;
 
+	// Windows already allocates, so we don't need to.
+#ifndef _WIN32
 	start = buf = vm.env_args_buffer = bc_vm_strdup(env_args);
+#else // _WIN32
+	start = buf = vm.env_args_buffer = env_args;
+#endif // _WIN32
 
 	assert(buf != NULL);
 
@@ -294,12 +346,12 @@ static void bc_vm_envArgs(const char* const env_args_name) {
 	buf = NULL;
 	bc_vec_push(&vm.env_args, &buf);
 
-	bc_args((int) vm.env_args.len - 1, bc_vec_item(&vm.env_args, 0));
+	bc_args((int) vm.env_args.len - 1, bc_vec_item(&vm.env_args, 0), false);
 }
 
 static size_t bc_vm_envLen(const char *var) {
 
-	char *lenv = getenv(var);
+	char *lenv = bc_vm_getenv(var);
 	size_t i, len = BC_NUM_PRINT_WIDTH;
 	int num;
 
@@ -314,6 +366,8 @@ static size_t bc_vm_envLen(const char *var) {
 		if (len < 2 || len >= UINT16_MAX) len = BC_NUM_PRINT_WIDTH;
 	}
 	else len = BC_NUM_PRINT_WIDTH;
+
+	bc_vm_getenvFree(lenv);
 
 	return len;
 }
@@ -367,14 +421,14 @@ void bc_vm_freeTemps(void) {
 inline size_t bc_vm_arraySize(size_t n, size_t size) {
 	size_t res = n * size;
 	if (BC_ERR(res >= SIZE_MAX || (n != 0 && res / n != size)))
-		bc_vm_err(BC_ERR_FATAL_ALLOC_ERR);
+		bc_vm_fatalError(BC_ERR_FATAL_ALLOC_ERR);
 	return res;
 }
 
 inline size_t bc_vm_growSize(size_t a, size_t b) {
 	size_t res = a + b;
 	if (BC_ERR(res >= SIZE_MAX || res < a || res < b))
-		bc_vm_err(BC_ERR_FATAL_ALLOC_ERR);
+		bc_vm_fatalError(BC_ERR_FATAL_ALLOC_ERR);
 	return res;
 }
 
@@ -386,7 +440,7 @@ void* bc_vm_malloc(size_t n) {
 
 	ptr = malloc(n);
 
-	if (BC_ERR(ptr == NULL)) bc_vm_err(BC_ERR_FATAL_ALLOC_ERR);
+	if (BC_ERR(ptr == NULL)) bc_vm_fatalError(BC_ERR_FATAL_ALLOC_ERR);
 
 	return ptr;
 }
@@ -399,7 +453,7 @@ void* bc_vm_realloc(void *ptr, size_t n) {
 
 	temp = realloc(ptr, n);
 
-	if (BC_ERR(temp == NULL)) bc_vm_err(BC_ERR_FATAL_ALLOC_ERR);
+	if (BC_ERR(temp == NULL)) bc_vm_fatalError(BC_ERR_FATAL_ALLOC_ERR);
 
 	return temp;
 }
@@ -412,7 +466,7 @@ char* bc_vm_strdup(const char *str) {
 
 	s = strdup(str);
 
-	if (BC_ERR(!s)) bc_vm_err(BC_ERR_FATAL_ALLOC_ERR);
+	if (BC_ERR(s == NULL)) bc_vm_fatalError(BC_ERR_FATAL_ALLOC_ERR);
 
 	return s;
 }
@@ -434,13 +488,33 @@ void bc_vm_printf(const char *fmt, ...) {
 }
 #endif // !BC_ENABLE_LIBRARY
 
-void bc_vm_putchar(int c) {
+void bc_vm_putchar(int c, BcFlushType type) {
 #if BC_ENABLE_LIBRARY
 	bc_vec_pushByte(&vm.out, (uchar) c);
 #else // BC_ENABLE_LIBRARY
-	bc_file_putchar(&vm.fout, (uchar) c);
+	bc_file_putchar(&vm.fout, type, (uchar) c);
 	vm.nchars = (c == '\n' ? 0 : vm.nchars + 1);
 #endif // BC_ENABLE_LIBRARY
+}
+
+char* bc_vm_getenv(const char* var) {
+
+	char* ret;
+
+#ifndef _WIN32
+	ret = getenv(var);
+#else // _WIN32
+	_dupenv_s(&ret, NULL, var);
+#endif // _WIN32
+
+	return ret;
+}
+
+void bc_vm_getenvFree(char* var) {
+	BC_UNUSED(var);
+#ifdef _WIN32
+	free(var);
+#endif // _WIN32
 }
 
 #if !BC_ENABLE_LIBRARY
@@ -477,18 +551,18 @@ static void bc_vm_clean(void) {
 
 #if BC_ENABLED
 		if (BC_IS_BC) {
-			bc_vec_npop(&f->labels, f->labels.len);
-			bc_vec_npop(&f->strs, f->strs.len);
-			bc_vec_npop(&f->consts, f->consts.len);
+			bc_vec_popAll(&f->labels);
+			bc_vec_popAll(&f->strs);
+			bc_vec_popAll(&f->consts);
 		}
 #endif // BC_ENABLED
 
 #if DC_ENABLED
 		// Note to self: you cannot delete strings and functions. Deal with it.
-		if (BC_IS_DC) bc_vec_npop(vm.prog.consts, vm.prog.consts->len);
+		if (BC_IS_DC) bc_vec_popAll(vm.prog.consts);
 #endif // DC_ENABLED
 
-		bc_vec_npop(&f->code, f->code.len);
+		bc_vec_popAll(&f->code);
 
 		ip->idx = 0;
 	}
@@ -510,7 +584,7 @@ static void bc_vm_process(const char *text) {
 
 		assert(BC_IS_DC || vm.prog.results.len == 0);
 
-		if (BC_I) bc_file_flush(&vm.fout);
+		if (BC_I) bc_file_flush(&vm.fout, bc_flush_save);
 
 	} while (vm.prs.l.t != BC_LEX_EOF);
 }
@@ -659,9 +733,16 @@ err:
 
 	bc_vm_clean();
 
+#if !BC_ENABLE_MEMCHECK
+	assert(vm.status != BC_STATUS_ERROR_FATAL);
+
+	vm.status = vm.status == BC_STATUS_QUIT || !BC_I ?
+	            vm.status : BC_STATUS_SUCCESS;
+#else // !BC_ENABLE_MEMCHECK
 	vm.status = vm.status == BC_STATUS_ERROR_FATAL ||
 	            vm.status == BC_STATUS_QUIT || !BC_I ?
 	            vm.status : BC_STATUS_SUCCESS;
+#endif // !BC_ENABLE_MEMCHECK
 
 	if (!vm.status && !vm.eof) {
 		bc_vec_empty(&buffer);
@@ -779,7 +860,7 @@ static void bc_vm_exec(void) {
 			bc_vec_pushByte(&buf, '\0');
 			bc_vm_process(buf.v);
 
-			bc_vec_npop(&buf, buf.len);
+			bc_vec_popAll(&buf);
 
 		} while (more);
 
@@ -792,7 +873,7 @@ static void bc_vm_exec(void) {
 
 		BC_SIG_UNLOCK;
 
-		if (!vm.no_exit_exprs) return;
+		if (!vm.no_exit_exprs && vm.exit_exprs) return;
 	}
 
 	for (i = 0; i < vm.files.len; ++i) {
@@ -802,10 +883,14 @@ static void bc_vm_exec(void) {
 		bc_vm_file(path);
 	}
 
+#if BC_ENABLE_AFL
+	__AFL_INIT();
+#endif // BC_ENABLE_AFL
+
 	if (BC_IS_BC || !has_file) bc_vm_stdin();
 
 // These are all protected by ifndef NDEBUG because if these are needed, bc is
-// goingi to exit anyway, and I see no reason to include this code in a release
+// going to exit anyway, and I see no reason to include this code in a release
 // build when the OS is going to free all of the resources anyway.
 #ifndef NDEBUG
 	return;
@@ -821,7 +906,6 @@ void bc_vm_boot(int argc, char *argv[], const char *env_len,
                 const char* const env_args)
 {
 	int ttyin, ttyout, ttyerr;
-	struct sigaction sa;
 
 	BC_SIG_ASSERT_LOCKED;
 
@@ -833,17 +917,7 @@ void bc_vm_boot(int argc, char *argv[], const char *env_len,
 	vm.flags |= (ttyin != 0 && ttyout != 0 && ttyerr != 0) ? BC_FLAG_TTY : 0;
 	vm.flags |= ttyin && ttyout ? BC_FLAG_I : 0;
 
-	sigemptyset(&sa.sa_mask);
-	sa.sa_handler = bc_vm_sig;
-	sa.sa_flags = SA_NODEFER;
-
-	sigaction(SIGTERM, &sa, NULL);
-	sigaction(SIGQUIT, &sa, NULL);
-	sigaction(SIGINT, &sa, NULL);
-
-#if BC_ENABLE_HISTORY
-	if (BC_TTY) sigaction(SIGHUP, &sa, NULL);
-#endif // BC_ENABLE_HISTORY
+	bc_vm_sigaction();
 
 	bc_vm_init();
 
@@ -869,11 +943,15 @@ void bc_vm_boot(int argc, char *argv[], const char *env_len,
 #endif // BC_ENABLE_HISTORY
 
 #if BC_ENABLED
-	if (BC_IS_BC) vm.flags |= BC_FLAG_S * (getenv("POSIXLY_CORRECT") != NULL);
+	if (BC_IS_BC) {
+		char* var = bc_vm_getenv("POSIXLY_CORRECT");
+		vm.flags |= BC_FLAG_S * (var != NULL);
+		bc_vm_getenvFree(var);
+	}
 #endif // BC_ENABLED
 
 	bc_vm_envArgs(env_args);
-	bc_args(argc, argv);
+	bc_args(argc, argv, true);
 
 #if BC_ENABLED
 	if (BC_IS_POSIX) vm.flags &= ~(BC_FLAG_G);
@@ -917,3 +995,27 @@ void bc_vm_init(void) {
 	}
 #endif // BC_ENABLED
 }
+
+#if BC_ENABLE_LIBRARY
+void bc_vm_atexit(void) {
+
+	bc_vm_shutdown();
+
+#ifndef NDEBUG
+	bc_vec_free(&vm.jmp_bufs);
+#endif // NDEBUG
+}
+#else // BC_ENABLE_LIBRARY
+int bc_vm_atexit(int status) {
+
+	int s = BC_STATUS_IS_ERROR(status) ? status : BC_STATUS_SUCCESS;
+
+	bc_vm_shutdown();
+
+#ifndef NDEBUG
+	bc_vec_free(&vm.jmp_bufs);
+#endif // NDEBUG
+
+	return s;
+}
+#endif // BC_ENABLE_LIBRARY

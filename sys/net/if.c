@@ -37,6 +37,7 @@
 #include "opt_inet.h"
 
 #include <sys/param.h>
+#include <sys/capsicum.h>
 #include <sys/conf.h>
 #include <sys/eventhandler.h>
 #include <sys/malloc.h>
@@ -381,6 +382,10 @@ VNET_DEFINE(struct ifnet **, ifindex_table);
 struct sx ifnet_sxlock;
 SX_SYSINIT_FLAGS(ifnet_sx, &ifnet_sxlock, "ifnet_sx", SX_RECURSE);
 
+struct sx ifnet_detach_sxlock;
+SX_SYSINIT_FLAGS(ifnet_detach, &ifnet_detach_sxlock, "ifnet_detach_sx",
+    SX_RECURSE);
+
 /*
  * The allocation of network interfaces is a rather non-atomic affair; we
  * need to select an index before we are ready to expose the interface for
@@ -422,7 +427,8 @@ ifnet_byindex_ref(u_short idx)
 	ifp = ifnet_byindex(idx);
 	if (ifp == NULL || (ifp->if_flags & IFF_DYING))
 		return (NULL);
-	if_ref(ifp);
+	if (!if_try_ref(ifp))
+		return (NULL);
 	return (ifp);
 }
 
@@ -801,9 +807,18 @@ if_free(struct ifnet *ifp)
 void
 if_ref(struct ifnet *ifp)
 {
+	u_int old;
 
 	/* We don't assert the ifnet list lock here, but arguably should. */
-	refcount_acquire(&ifp->if_refcount);
+	old = refcount_acquire(&ifp->if_refcount);
+	KASSERT(old > 0, ("%s: ifp %p has 0 refs", __func__, ifp));
+}
+
+bool
+if_try_ref(struct ifnet *ifp)
+{
+	NET_EPOCH_ASSERT();
+	return (refcount_acquire_if_not_zero(&ifp->if_refcount));
 }
 
 void
@@ -1139,7 +1154,7 @@ if_purgeaddrs(struct ifnet *ifp)
 #endif /* INET */
 #ifdef INET6
 		if (ifa->ifa_addr->sa_family == AF_INET6) {
-			in6_purgeaddr(ifa);
+			in6_purgeifaddr((struct in6_ifaddr *)ifa);
 			/* ifp_addrhead is already updated */
 			continue;
 		}
@@ -1185,8 +1200,11 @@ if_detach(struct ifnet *ifp)
 
 	CURVNET_SET_QUIET(ifp->if_vnet);
 	found = if_unlink_ifnet(ifp, false);
-	if (found)
+	if (found) {
+		sx_xlock(&ifnet_detach_sxlock);
 		if_detach_internal(ifp, 0, NULL);
+		sx_xunlock(&ifnet_detach_sxlock);
+	}
 	CURVNET_RESTORE();
 }
 
@@ -1396,11 +1414,6 @@ if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 	IFNET_WLOCK();
 	ifindex_free_locked(ifp->if_index);
 	IFNET_WUNLOCK();
-
-
-	/* Don't re-attach DYING interfaces. */
-	if (ifp->if_flags & IFF_DYING)
-		return (0);
 
 	/*
 	 * Perform interface-specific reassignment tasks, if provided by
@@ -1895,8 +1908,18 @@ fail:
 void
 ifa_ref(struct ifaddr *ifa)
 {
+	u_int old;
 
-	refcount_acquire(&ifa->ifa_refcnt);
+	old = refcount_acquire(&ifa->ifa_refcnt);
+	KASSERT(old > 0, ("%s: ifa %p has 0 refs", __func__, ifa));
+}
+
+int
+ifa_try_ref(struct ifaddr *ifa)
+{
+
+	NET_EPOCH_ASSERT();
+	return (refcount_acquire_if_not_zero(&ifa->ifa_refcnt));
 }
 
 static void
@@ -3306,8 +3329,12 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 
 	case CASE_IOC_IFREQ(SIOCIFDESTROY):
 		error = priv_check(td, PRIV_NET_IFDESTROY);
-		if (error == 0)
+
+		if (error == 0) {
+			sx_xlock(&ifnet_detach_sxlock);
 			error = if_clone_destroy(ifr->ifr_name);
+			sx_xunlock(&ifnet_detach_sxlock);
+		}
 		goto out_noref;
 
 	case SIOCIFGCLONERS:
@@ -3592,8 +3619,8 @@ ifconf(u_long cmd, struct ifconf *ifc)
 	struct sbuf *sb;
 	int error, full = 0, valid_len, max_len;
 
-	/* Limit initial buffer size to MAXPHYS to avoid DoS from userspace. */
-	max_len = MAXPHYS - 1;
+	/* Limit initial buffer size to maxphys to avoid DoS from userspace. */
+	max_len = maxphys - 1;
 
 	/* Prevent hostile input from being able to crash the system */
 	if (ifc->ifc_len <= 0)
@@ -4334,15 +4361,35 @@ if_initname(struct ifnet *ifp, const char *name, int unit)
 		strlcpy(ifp->if_xname, name, IFNAMSIZ);
 }
 
+static int
+if_vlog(struct ifnet *ifp, int pri, const char *fmt, va_list ap)
+{
+	char if_fmt[256];
+
+	snprintf(if_fmt, sizeof(if_fmt), "%s: %s", ifp->if_xname, fmt);
+	vlog(pri, if_fmt, ap);
+	return (0);
+}
+
+
 int
 if_printf(struct ifnet *ifp, const char *fmt, ...)
 {
-	char if_fmt[256];
 	va_list ap;
 
-	snprintf(if_fmt, sizeof(if_fmt), "%s: %s", ifp->if_xname, fmt);
 	va_start(ap, fmt);
-	vlog(LOG_INFO, if_fmt, ap);
+	if_vlog(ifp, LOG_INFO, fmt, ap);
+	va_end(ap);
+	return (0);
+}
+
+int
+if_log(struct ifnet *ifp, int pri, const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	if_vlog(ifp, pri, fmt, ap);
 	va_end(ap);
 	return (0);
 }
@@ -4421,6 +4468,14 @@ if_deregister_com_alloc(u_char type)
 	    ("if_deregister_com_alloc: %d not registered", type));
 	KASSERT(if_com_free[type] != NULL,
 	    ("if_deregister_com_alloc: %d free not registered", type));
+
+	/*
+	 * Ensure all pending EPOCH(9) callbacks have been executed. This
+	 * fixes issues about late invocation of if_destroy(), which leads
+	 * to memory leak from if_com_alloc[type] allocated if_l2com.
+	 */
+	epoch_drain_callbacks(net_epoch_preempt);
+
 	if_com_alloc[type] = NULL;
 	if_com_free[type] = NULL;
 }

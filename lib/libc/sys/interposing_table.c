@@ -98,6 +98,7 @@ interpos_func_t __libc_interposing[INTERPOS_MAX] = {
 #ifndef INTERPOS_SYSCALLS_ONLY
 	SLOT(distribute_static_tls, __libc_distribute_static_tls)
 #endif
+	SLOT_SYS(pdfork)
 };
 #undef SLOT
 #undef SLOT_SYS

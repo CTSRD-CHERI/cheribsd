@@ -38,7 +38,7 @@ __FBSDID("$FreeBSD$");
 	mov	PTR(18), PTRN(sp)
 	sub	PTRN(sp), PTRN(sp), #128
 .endif
-	stp	PTR(29), PTR(30), [PTRN(sp), #(-2 * PTR_WIDTH)]!
+	stp	PTR(29), PTRN(lr), [PTRN(sp), #(-2 * PTR_WIDTH)]!
 	sub	PTRN(sp), PTRN(sp), #(TF_SIZE)
 	stp	CAP(28), CAP(29), [PTRN(sp), #(TF_X + 28 * CAP_WIDTH)]
 	stp	CAP(26), CAP(27), [PTRN(sp), #(TF_X + 26 * CAP_WIDTH)]
@@ -83,8 +83,12 @@ __FBSDID("$FreeBSD$");
 
 	ldr	PTR(0), [PTR(18), #(PC_CURTHREAD)]
 	bl	dbg_monitor_enter
-.endif
 	msr	daifclr, #8	/* Enable the debug exception */
+.endif
+	/*
+	 * For EL1, debug exceptions are conditionally unmasked in
+	 * do_el1h_sync().
+	 */
 .endm
 
 .macro	restore_registers el

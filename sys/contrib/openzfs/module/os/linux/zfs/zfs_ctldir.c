@@ -467,7 +467,6 @@ zfsctl_inode_alloc(zfsvfs_t *zfsvfs, uint64_t id,
 	zp->z_unlinked = B_FALSE;
 	zp->z_atime_dirty = B_FALSE;
 	zp->z_zn_prefetch = B_FALSE;
-	zp->z_moved = B_FALSE;
 	zp->z_is_sa = B_FALSE;
 	zp->z_is_mapped = B_FALSE;
 	zp->z_is_ctldir = B_TRUE;
@@ -591,7 +590,8 @@ struct inode *
 zfsctl_root(znode_t *zp)
 {
 	ASSERT(zfs_has_ctldir(zp));
-	igrab(ZTOZSB(zp)->z_ctldir);
+	/* Must have an existing ref, so igrab() cannot return NULL */
+	VERIFY3P(igrab(ZTOZSB(zp)->z_ctldir), !=, NULL);
 	return (ZTOZSB(zp)->z_ctldir);
 }
 

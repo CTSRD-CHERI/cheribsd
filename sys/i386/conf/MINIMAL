@@ -104,6 +104,7 @@ device		cpufreq
 
 # Bus support.
 device		acpi
+device		smbios
 device		pci
 
 # atkbdc0 controls both the keyboard and the PS/2 mouse
@@ -126,6 +127,7 @@ options 	SC_PIXEL_MODE		# add support for the raster text mode
 device		vt
 device		vt_vga
 device		vt_efifb
+device		vt_vbefb
 
 device		agp			# support several AGP chipsets
 

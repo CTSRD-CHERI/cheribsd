@@ -34,6 +34,7 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_ufs.h"
 #include "opt_quota.h"
 
 #include <sys/param.h>
@@ -59,6 +60,10 @@ __FBSDID("$FreeBSD$");
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/ufsmount.h>
 #include <ufs/ufs/inode.h>
+#include <ufs/ufs/dir.h>
+#ifdef UFS_DIRHASH
+#include <ufs/ufs/dirhash.h>
+#endif
 #include <ufs/ufs/ufs_extern.h>
 
 #include <ufs/ffs/fs.h>
@@ -349,7 +354,7 @@ ffs_truncate(vp, length, flags, cred)
 		panic("ffs_truncate: read-only filesystem");
 	if (IS_SNAPSHOT(ip))
 		ffs_snapremove(vp);
-	vp->v_lasta = vp->v_clen = vp->v_cstart = vp->v_lastw = 0;
+	cluster_init_vn(&ip->i_clusterw);
 	osize = ip->i_size;
 	/*
 	 * Lengthen the size of the file. We must ensure that the
@@ -456,6 +461,10 @@ ffs_truncate(vp, length, flags, cred)
 		ip->i_size = length;
 		DIP_SET(ip, i_size, length);
 		UFS_INODE_SET_FLAG(ip, IN_SIZEMOD | IN_CHANGE | IN_UPDATE);
+#ifdef UFS_DIRHASH
+		if (vp->v_type == VDIR && ip->i_dirhash != NULL)
+			ufsdirhash_dirtrunc(ip, length);
+#endif
 	} else {
 		lbn = lblkno(fs, length);
 		flags |= BA_CLRBUF;
@@ -482,6 +491,10 @@ ffs_truncate(vp, length, flags, cred)
 			return (error);
 		ip->i_size = length;
 		DIP_SET(ip, i_size, length);
+#ifdef UFS_DIRHASH
+		if (vp->v_type == VDIR && ip->i_dirhash != NULL)
+			ufsdirhash_dirtrunc(ip, length);
+#endif
 		size = blksize(fs, ip, lbn);
 		if (vp->v_type != VDIR && offset != 0)
 			bzero((char *)bp->b_data + offset,

@@ -218,7 +218,7 @@ static struct nfsrv_lughash	*nfsgroupnamehash;
 static int nfs_bigreply[NFSV42_NPROCS] = { 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-    1, 0, 0, 1 };
+    1, 0, 0, 1, 0 };
 
 /* local functions */
 static int nfsrv_skipace(struct nfsrv_descript *nd, int *acesizep);
@@ -301,6 +301,7 @@ static struct {
 	{ NFSV4OP_SETXATTR, 2, "Setxattr", 8, },
 	{ NFSV4OP_REMOVEXATTR, 2, "Rmxattr", 7, },
 	{ NFSV4OP_LISTXATTRS, 2, "Listxattr", 9, },
+	{ NFSV4OP_BINDCONNTOSESS, 1, "BindConSess", 11, },
 };
 
 /*
@@ -309,7 +310,7 @@ static struct {
 static int nfs_bigrequest[NFSV42_NPROCS] = {
 	0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0
+	0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0
 };
 
 /*
@@ -2251,7 +2252,7 @@ nfsmout:
  */
 int
 nfsv4_lock(struct nfsv4lock *lp, int iwantlock, int *isleptp,
-    void *mutex, struct mount *mp)
+    struct mtx *mutex, struct mount *mp)
 {
 
 	if (isleptp)
@@ -2279,8 +2280,7 @@ nfsv4_lock(struct nfsv4lock *lp, int iwantlock, int *isleptp,
 		lp->nfslock_lock |= NFSV4LOCK_WANTED;
 		if (isleptp)
 			*isleptp = 1;
-		(void) nfsmsleep(&lp->nfslock_lock, mutex,
-		    PZERO - 1, "nfsv4lck", NULL);
+		msleep(&lp->nfslock_lock, mutex, PVFS, "nfsv4lck", hz);
 		if (iwantlock && !(lp->nfslock_lock & NFSV4LOCK_LOCK) &&
 		    lp->nfslock_usecnt == 0) {
 			lp->nfslock_lock &= ~NFSV4LOCK_LOCKWANTED;
@@ -2330,7 +2330,7 @@ nfsv4_relref(struct nfsv4lock *lp)
  * return without getting a refcnt for that case.
  */
 void
-nfsv4_getref(struct nfsv4lock *lp, int *isleptp, void *mutex,
+nfsv4_getref(struct nfsv4lock *lp, int *isleptp, struct mtx *mutex,
     struct mount *mp)
 {
 
@@ -2346,8 +2346,7 @@ nfsv4_getref(struct nfsv4lock *lp, int *isleptp, void *mutex,
 		lp->nfslock_lock |= NFSV4LOCK_WANTED;
 		if (isleptp)
 			*isleptp = 1;
-		(void) nfsmsleep(&lp->nfslock_lock, mutex,
-		    PZERO - 1, "nfsv4gr", NULL);
+		msleep(&lp->nfslock_lock, mutex, PVFS, "nfsv4gr", hz);
 	}
 	if (mp != NULL && NFSCL_FORCEDISM(mp))
 		return;
@@ -2703,8 +2702,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			savuid = p->p_cred->p_ruid;
 			p->p_cred->p_ruid = cred->cr_uid;
 			if (!VFS_QUOTACTL(mp, QCMD(Q_GETQUOTA,USRQUOTA),
-			    cred->cr_uid,
-			    (struct dqblk * __capability)&dqb))
+			    cred->cr_uid, (struct dqblk * __capability)&dqb))
 			    freenum = min(dqb.dqb_isoftlimit-dqb.dqb_curinodes,
 				freenum);
 			p->p_cred->p_ruid = savuid;
@@ -2811,8 +2809,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			savuid = p->p_cred->p_ruid;
 			p->p_cred->p_ruid = cred->cr_uid;
 			if (!VFS_QUOTACTL(mp, QCMD(Q_GETQUOTA,USRQUOTA),
-			    cred->cr_uid,
-			    (struct dqblk * __capability)&dqb))
+			    cred->cr_uid, (struct dqblk * __capability)&dqb))
 			    freenum = min(dqb.dqb_bhardlimit, freenum);
 			p->p_cred->p_ruid = savuid;
 #endif	/* QUOTA */
@@ -2836,8 +2833,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			savuid = p->p_cred->p_ruid;
 			p->p_cred->p_ruid = cred->cr_uid;
 			if (!VFS_QUOTACTL(mp, QCMD(Q_GETQUOTA,USRQUOTA),
-			    cred->cr_uid,
-			    (struct dqblk * __capability)&dqb))
+			    cred->cr_uid, (struct dqblk * __capability)&dqb))
 			    freenum = min(dqb.dqb_bsoftlimit, freenum);
 			p->p_cred->p_ruid = savuid;
 #endif	/* QUOTA */
@@ -2858,8 +2854,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			savuid = p->p_cred->p_ruid;
 			p->p_cred->p_ruid = cred->cr_uid;
 			if (!VFS_QUOTACTL(mp, QCMD(Q_GETQUOTA,USRQUOTA),
-			    cred->cr_uid,
-			    (struct dqblk * __capability)&dqb))
+			    cred->cr_uid, (struct dqblk * __capability)&dqb))
 			    freenum = dqb.dqb_curblocks;
 			p->p_cred->p_ruid = savuid;
 #endif	/* QUOTA */
@@ -4618,12 +4613,13 @@ nfsmout:
  * Handle an NFSv4.1 Sequence request for the session.
  * If reply != NULL, use it to return the cached reply, as required.
  * The client gets a cached reply via this call for callbacks, however the
- * server gets a cached reply via the nfsv4_seqsess_cachereply() call.
+ * server gets a cached reply via the nfsv4_seqsess_cacherep() call.
  */
 int
 nfsv4_seqsession(uint32_t seqid, uint32_t slotid, uint32_t highslot,
     struct nfsslot *slots, struct mbuf **reply, uint16_t maxslot)
 {
+	struct mbuf *m;
 	int error;
 
 	error = 0;
@@ -4637,8 +4633,14 @@ nfsv4_seqsession(uint32_t seqid, uint32_t slotid, uint32_t highslot,
 			error = NFSERR_DELAY;
 		else if (slots[slotid].nfssl_reply != NULL) {
 			if (reply != NULL) {
-				*reply = slots[slotid].nfssl_reply;
-				slots[slotid].nfssl_reply = NULL;
+				m = m_copym(slots[slotid].nfssl_reply, 0,
+				    M_COPYALL, M_NOWAIT);
+				if (m != NULL)
+					*reply = m;
+				else {
+					*reply = slots[slotid].nfssl_reply;
+					slots[slotid].nfssl_reply = NULL;
+				}
 			}
 			slots[slotid].nfssl_inprog = 1;
 			error = NFSERR_REPLYFROMCACHE;
@@ -4665,10 +4667,29 @@ void
 nfsv4_seqsess_cacherep(uint32_t slotid, struct nfsslot *slots, int repstat,
    struct mbuf **rep)
 {
+	struct mbuf *m;
 
 	if (repstat == NFSERR_REPLYFROMCACHE) {
-		*rep = slots[slotid].nfssl_reply;
-		slots[slotid].nfssl_reply = NULL;
+		if (slots[slotid].nfssl_reply != NULL) {
+			/*
+			 * We cannot sleep here, but copy will usually
+			 * succeed.
+			 */
+			m = m_copym(slots[slotid].nfssl_reply, 0, M_COPYALL,
+			    M_NOWAIT);
+			if (m != NULL)
+				*rep = m;
+			else {
+				/*
+				 * Multiple retries would be extremely rare,
+				 * so using the cached reply will likely
+				 * be ok.
+				 */
+				*rep = slots[slotid].nfssl_reply;
+				slots[slotid].nfssl_reply = NULL;
+			}
+		} else
+			*rep = NULL;
 	} else {
 		if (slots[slotid].nfssl_reply != NULL)
 			m_freem(slots[slotid].nfssl_reply);
@@ -4789,7 +4810,7 @@ nfsv4_sequencelookup(struct nfsmount *nmp, struct nfsclsession *sep,
  * Free a session slot.
  */
 void
-nfsv4_freeslot(struct nfsclsession *sep, int slot)
+nfsv4_freeslot(struct nfsclsession *sep, int slot, bool resetseq)
 {
 	uint64_t bitval;
 
@@ -4797,6 +4818,8 @@ nfsv4_freeslot(struct nfsclsession *sep, int slot)
 	if (slot > 0)
 		bitval <<= slot;
 	mtx_lock(&sep->nfsess_mtx);
+	if (resetseq)
+		sep->nfsess_slotseq[slot]--;
 	if ((bitval & sep->nfsess_slots) == 0)
 		printf("freeing free slot!!\n");
 	sep->nfsess_slots &= ~bitval;

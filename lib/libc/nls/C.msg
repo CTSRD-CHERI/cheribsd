@@ -211,8 +211,6 @@ $ EINTEGRITY
 97 Integrity check failed
 $ EPROT
 98 Memory protection violation
-$ ENOMETHOD
-99 Object-capability method not defined
 $
 $ strsignal() support catalog
 $

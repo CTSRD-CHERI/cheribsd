@@ -72,6 +72,7 @@ extern "C" {
 #include <sys/trace.h>
 #include <sys/procfs_list.h>
 #include <sys/mod.h>
+#include <sys/uio_impl.h>
 #include <sys/zfs_context_os.h>
 #else /* _KERNEL || _STANDALONE */
 
@@ -626,6 +627,7 @@ extern void delay(clock_t ticks);
 #define	defclsyspri	0
 
 #define	CPU_SEQID	((uintptr_t)pthread_self() & (max_ncpus - 1))
+#define	CPU_SEQID_UNSTABLE	CPU_SEQID
 
 #define	kcred		NULL
 #define	CRED()		NULL
@@ -651,7 +653,7 @@ extern void random_fini(void);
 
 struct spa;
 extern void show_pool_stats(struct spa *);
-extern int set_global_var(char *arg);
+extern int set_global_var(char const *arg);
 
 typedef struct callb_cpr {
 	kmutex_t	*cc_lockp;

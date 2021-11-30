@@ -31,7 +31,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd November 25, 2020
+.Dd March 8, 2021
 .Dt KTLS 4
 .Os
 .Sh NAME
@@ -54,7 +54,7 @@ and
 .Dv TCP_RXTLS_ENABLE
 socket options.
 Both socket options accept a
-.Vt struct tls_so_enable
+.Vt struct tls_enable
 structure as their argument.
 The members of this structure describe the cipher suite used for the
 TLS session and provide the session keys used for the respective
@@ -78,13 +78,13 @@ is not enabled.
 .It Dv TCP_TLS_MODE_SW
 TLS records are encrypted or decrypted in the kernel in the socket
 layer.
-Typically the encryption or decryption is performred in software,
+Typically the encryption or decryption is performed in software,
 but it may also be performed by co-processors via
 .Xr crypto 9 .
 .It Dv TCP_TLS_MODE_IFNET
 TLS records are encrypted or decrypted by the network interface card (NIC).
 In this mode, the network stack does not work with encrypted data.
-Instead, the NIC is encrypts TLS records as they are being transmitted,
+Instead, the NIC encrypts TLS records as they are being transmitted,
 or decrypts received TLS records before providing them to the host.
 .Pp
 Network interfaces which support this feature will advertise the
@@ -160,13 +160,13 @@ The control message contains a
 .Vt struct tls_get_record
 which includes fields from the TLS record header.
 If an invalid or corrupted TLS record is received,
-recvmsg 2
+.Xr recvmsg 2
 will fail with one of the following errors:
 .Bl -tag -width Er
 .It Bq Er EINVAL
 The version fields in a TLS record's header did not match the version required
 by the
-.Vt struct tls_so_enable
+.Vt struct tls_enable
 structure used to enable in-kernel TLS.
 .It Bq Er EMSGSIZE
 A TLS record's length was either too small or too large.
@@ -237,7 +237,9 @@ port may also be built with support for
 .Nm
 by enabling the
 .Dv KTLS
-option .
+option.
+OpenSSL in the base system includes KTLS support when built with
+.Dv WITH_OPENSSL_KTLS .
 .Pp
 Applications using a supported library should generally work with
 .Nm
@@ -256,6 +258,7 @@ As a result, it is only supported on architectures with a direct map.
 .Xr cxgbe 4 ,
 .Xr mlx5en 4 ,
 .Xr tcp 4 ,
+.Xr src.conf 5 ,
 .Xr ifconfig 8 ,
 .Xr sysctl 8 ,
 .Xr crypto 9

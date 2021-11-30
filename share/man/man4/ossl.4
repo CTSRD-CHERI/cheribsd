@@ -26,12 +26,12 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd October 19, 2020
+.Dd March 3, 2021
 .Dt OSSL 4
 .Os
 .Sh NAME
 .Nm ossl
-.Nd "driver using OpenSSL assembly routines on x86 CPUs"
+.Nd "driver using OpenSSL assembly routines"
 .Sh SYNOPSIS
 To compile this driver into the kernel,
 place the following lines in your
@@ -61,6 +61,8 @@ architectures:
 .Pp
 .Bl -bullet -compact
 .It
+arm64
+.It
 amd64
 .It
 i386
@@ -71,6 +73,12 @@ The
 driver includes support for the following algorithms:
 .Pp
 .Bl -bullet -compact
+.It
+ChaCha20
+.It
+ChaCha20-Poly1305 (RFC 8439)
+.It
+Poly1305
 .It
 SHA1
 .It

@@ -26,6 +26,12 @@
 #              mitigation.
 # - init-all:  supports stack variable initialization.
 #
+# When bootstrapping on macOS, 'apple-clang' will be set in COMPILER_FEATURES
+# to differentiate Apple's version of Clang. Apple Clang uses a different
+# versioning scheme and may not support the same -W/-Wno warning flags. For a
+# mapping of Apple Clang versions to upstream clang versions see
+# https://en.wikipedia.org/wiki/Xcode#Xcode_7.0_-_12.x_(since_Free_On-Device_Development)
+#
 # These variables with an X_ prefix will also be provided if XCC is set.
 #
 # This file may be included multiple times, but only has effect the first time.
@@ -217,6 +223,10 @@ ${X_}COMPILER_TYPE:=	gcc
 .if !defined(${X_}COMPILER_VERSION)
 ${X_}COMPILER_VERSION!=echo "${_v:M[1-9]*.[0-9]*}" | awk -F. '{print $$1 * 10000 + $$2 * 100 + $$3;}'
 .endif
+# Detect apple clang when bootstrapping to select appropriate warning flags.
+.if !defined(${X_}COMPILER_FEATURES) && ${_v:[*]:M*Apple clang version*}
+${X_}COMPILER_FEATURES=	apple-clang
+.endif
 .undef _v
 .endif
 .if !defined(${X_}COMPILER_FREEBSD_VERSION)
@@ -238,13 +248,26 @@ ${X_}COMPILER_FREEBSD_VERSION=	unknown
 ${X_}COMPILER_RESOURCE_DIR!=	${${cc}:N${CCACHE_BIN}} -print-resource-dir 2>/dev/null || echo unknown
 .endif
 
-${X_}COMPILER_FEATURES=		c++11 c++14
+${X_}COMPILER_FEATURES+=		c++11 c++14
 .if ${${X_}COMPILER_TYPE} == "clang" || \
 	(${${X_}COMPILER_TYPE} == "gcc" && ${${X_}COMPILER_VERSION} >= 70000)
 ${X_}COMPILER_FEATURES+=	c++17
 .endif
 .if ${${X_}COMPILER_TYPE} == "clang"
 ${X_}COMPILER_FEATURES+=	retpoline init-all
+# Detect certain supported warning flags to allow building with clang versions
+# built from git between releases. For example this affects all CHERI LLVM
+# versions that include the April 2021 upstream merge but not the September one.
+# Without this check we get the following build failure:
+# error: unknown warning option '-Werror=unused-but-set-variable'
+_check_flag=${${cc}:N${CCACHE_BIN}} -Werror=unknown-warning-option -fsyntax-only -xc /dev/null
+_warning_flags_to_check=unused-but-set-variable
+.for _flag in ${_warning_flags_to_check}
+_flag_supported!=	${_check_flag} -Werror=${_flag} 2>/dev/null && echo "yes" || echo "no"
+.if ${_flag_supported} == "yes"
+${X_}COMPILER_FEATURES+= W${_flag}
+.endif
+.endfor
 .endif
 
 .if ${${cc}:N${CCACHE_BIN}:[1]:M/*} && exists(${${cc}:N${CCACHE_BIN}:[1]})
@@ -255,6 +278,10 @@ ${X_}COMPILER_ABSOLUTE_PATH!=	which ${${cc}:N${CCACHE_BIN}:[1]}
 .if empty(${X_}COMPILER_ABSOLUTE_PATH)
 .error Could not find $$CC (${${cc}:N${CCACHE_BIN}:[1]}) in $$PATH. \
 	Please pass an absolute path to CC instead.
+.endif
+.if ${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 100000 || \
+	(${${X_}COMPILER_TYPE} == "gcc" && ${${X_}COMPILER_VERSION} >= 80100)
+${X_}COMPILER_FEATURES+=	fileprefixmap
 .endif
 
 .else

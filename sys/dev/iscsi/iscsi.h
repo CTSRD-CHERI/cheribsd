@@ -45,7 +45,7 @@ struct iscsi_outstanding {
 	union ccb			*io_ccb;
 	size_t				io_received;
 	uint32_t			io_initiator_task_tag;
-	uint32_t			io_datasn;
+	uint32_t			io_referenced_task_tag;
 	void				*io_icl_prv;
 };
 
@@ -132,6 +132,7 @@ struct iscsi_softc {
 	TAILQ_HEAD(, iscsi_session)	sc_sessions;
 	struct cv			sc_cv;
 	unsigned int			sc_last_session_id;
+	bool				sc_unloading;
 	eventhandler_tag		sc_shutdown_pre_eh;
 	eventhandler_tag		sc_shutdown_post_eh;
 };

@@ -1,7 +1,8 @@
 # $FreeBSD$
 
-NAME=	nbt
-SRCS=	alias_nbt.c
+PACKAGE=	natd
+NAME=		nbt
+SRCS=		alias_nbt.c
 
 .include <bsd.compiler.mk>
 

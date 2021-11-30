@@ -277,7 +277,7 @@ kern_mac_get_fd(struct thread *td, int fd, void * __capability mac_p)
 	}
 
 	buffer = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK | M_ZERO);
-	error = fget(td, fd, cap_rights_init(&rights, CAP_MAC_GET), &fp);
+	error = fget(td, fd, cap_rights_init_one(&rights, CAP_MAC_GET), &fp);
 	if (error)
 		goto out;
 
@@ -442,7 +442,7 @@ kern_mac_set_fd(struct thread *td, int fd, void * __capability mac_p)
 		return (error);
 	}
 
-	error = fget(td, fd, cap_rights_init(&rights, CAP_MAC_SET), &fp);
+	error = fget(td, fd, cap_rights_init_one(&rights, CAP_MAC_SET), &fp);
 	if (error)
 		goto out;
 

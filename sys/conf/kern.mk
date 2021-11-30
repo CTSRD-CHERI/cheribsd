@@ -25,6 +25,9 @@ NO_WUNNEEDED_INTERNAL_DECL=	-Wno-error=unneeded-internal-declaration
 NO_WSOMETIMES_UNINITIALIZED=	-Wno-error=sometimes-uninitialized
 NO_WCAST_QUAL=			-Wno-error=cast-qual
 NO_WTAUTOLOGICAL_POINTER_COMPARE= -Wno-tautological-pointer-compare
+.if ${COMPILER_VERSION} >= 100000
+NO_WMISLEADING_INDENTATION=	-Wno-misleading-indentation
+.endif
 # Several other warnings which might be useful in some cases, but not severe
 # enough to error out the whole kernel build.  Display them anyway, so there is
 # some incentive to fix them eventually.
@@ -33,8 +36,8 @@ CWARNEXTRA?=	-Wno-error=tautological-compare -Wno-error=empty-body \
 		-Wno-error=pointer-sign
 CWARNEXTRA+=	-Wno-error=shift-negative-value
 CWARNEXTRA+=	-Wno-address-of-packed-member
-.if ${COMPILER_VERSION} >= 100000
-NO_WMISLEADING_INDENTATION=	-Wno-misleading-indentation
+.if ${COMPILER_FEATURES:MWunused-but-set-variable}
+CWARNFLAGS+=	-Wno-error=unused-but-set-variable
 .endif
 .endif	# clang
 
@@ -48,7 +51,6 @@ CWARNEXTRA?=	-Wno-error=address				\
 		-Wno-error=attributes				\
 		-Wno-error=cast-qual				\
 		-Wno-error=enum-compare				\
-		-Wno-error=inline				\
 		-Wno-error=maybe-uninitialized			\
 		-Wno-error=misleading-indentation		\
 		-Wno-error=nonnull-compare			\
@@ -104,7 +106,7 @@ FORMAT_EXTENSIONS=	-fformat-extensions
 # Setting -mno-sse implies -mno-sse2, -mno-sse3, -mno-ssse3, -mno-sse41 and -mno-sse42
 #
 .if ${MACHINE_CPUARCH} == "i386"
-CFLAGS.gcc+=	-mno-align-long-strings -mpreferred-stack-boundary=2
+CFLAGS.gcc+=	-mpreferred-stack-boundary=2
 CFLAGS.clang+=	-mno-aes -mno-avx
 CFLAGS+=	-mno-mmx -mno-sse -msoft-float
 INLINE_LIMIT?=	8000
@@ -264,17 +266,6 @@ CFLAGS+= -ftrivial-auto-var-init=pattern
 .endif
 
 #
-# Add -gdwarf-2 when compiling -g. The default starting in clang v3.4
-# and gcc 4.8 is to generate DWARF version 4. However, our tools don't
-# cope well with DWARF 4, so force it to genereate DWARF2, which they
-# understand. Do this unconditionally as it is harmless when not needed,
-# but critical for these newer versions.
-#
-.if ${CFLAGS:M-g} != "" && ${CFLAGS:M-gdwarf*} == ""
-CFLAGS+=	-gdwarf-2
-.endif
-
-#
 # CHERI purecap kernel flags
 #
 .if ${MACHINE_ABI:Mpurecap}
@@ -330,17 +321,21 @@ CFLAGS+=        -std=${CSTD}
 # Please keep this if in sync with bsd.sys.mk
 .if ${LD} != "ld" && (${CC:[1]:H} != ${LD:[1]:H} || ${LD:[1]:T} != "ld")
 # Add -fuse-ld=${LD} if $LD is in a different directory or not called "ld".
-# Note: Clang 12+ will prefer --ld-path= over -fuse-ld=.
 .if ${COMPILER_TYPE} == "clang"
-# Note: unlike bsd.sys.mk we can't use LDFLAGS here since that is used for the
-# flags required when linking the kernel. We don't need those flags when
-# building the vdsos. However, we do need -fuse-ld, so use ${CCLDFLAGS} instead.
-# Note: Clang does not like relative paths in -fuse-ld so we map ld.lld -> lld.
+# Note: Clang does not like relative paths for ld so we map ld.lld -> lld.
+.if ${COMPILER_VERSION} >= 120000
+CCLDFLAGS+=	--ld-path=${LD:[1]:S/^ld.//1W}
+.else
 CCLDFLAGS+=	-fuse-ld=${LD:[1]:S/^ld.//1W}
+.endif
 .else
 # GCC does not support an absolute path for -fuse-ld so we just print this
 # warning instead and let the user add the required symlinks.
+# However, we can avoid this warning if -B is set appropriately (e.g. for
+# CROSS_TOOLCHAIN=...-gcc).
+.if !(${LD:[1]:T} == "ld" && ${CC:tw:M-B${LD:[1]:H}/})
 .warning LD (${LD}) is not the default linker for ${CC} but -fuse-ld= is not supported
+.endif
 .endif
 .endif
 

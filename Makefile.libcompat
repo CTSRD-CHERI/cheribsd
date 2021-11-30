@@ -91,7 +91,12 @@ build${libcompat}: .PHONY
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
 	    -p ${WORLDTMP}/usr/lib/debug/usr >/dev/null
 .endif
-.for _dir in lib/ncurses/ncurses lib/ncurses/ncursesw ${_libmagic} ${_jevents}
+# XXX: Remove this hack once morello-llvm supports lib64c
+.if ${libcompat} == "64c" && ${COMPAT_ARCH} == "aarch64"
+	@echo "Morello: creating libcheri link in WORLDTMP"
+	ln -sfnv lib64c ${WORLDTMP}/usr/libcheri
+.endif
+.for _dir in lib/ncurses/ncurses ${_libmagic} ${_jevents}
 .for _t in ${_obj} build-tools
 	${_+_}cd ${.CURDIR}/${_dir}; \
 	    WORLDTMP=${WORLDTMP} \
@@ -108,11 +113,8 @@ build${libcompat}: .PHONY
 	${_+_}cd ${.CURDIR}; \
 	    ${LIBCOMPATWMAKE} -f Makefile.inc1 -DNO_FSCHG libraries
 .if ${MK_COMPAT_CHERIABI} == "yes" && ${MK_CHERI_PURE} == "yes"
-# To build a purecap world against /usr/libcheri, we need internal libs.
-# Skip amu because it needs unifdef which isn't available here and we
-# don't build amd (and it's going away).
-# We've locally removed gdb.
-.for _lib in ${_INTERNALLIBS:Namu:Ngdb}
+# To build a purecap world against /usr/lib64c, we need internal libs.
+.for _lib in ${_INTERNALLIBS}
 	${_+_}cd ${.CURDIR}${LIB${_lib:tu}DIR:S|${_LIB_OBJTOP}||}; \
 	    ${LIBCOMPATWMAKE} all
 .endfor
@@ -122,7 +124,7 @@ distribute${libcompat} install${libcompat}: .PHONY
 	${_+_}cd ${.CURDIR}; \
 	    ${LIBCOMPATIMAKE} -f Makefile.inc1 _lc_${.TARGET:S/${libcompat}$//}
 
-.if ${.TARGETS:Mlib${libcompat}buildenv}
+.if ${.TARGETS:Mlib${libcompat}buildenv} || ${.TARGETS:Mlibcheribuildenv}
 .if ${.MAKEFLAGS:M-j}
 .error The lib${libcompat}buildenv target is incompatible with -j
 .endif
@@ -140,6 +142,10 @@ lib${libcompat}buildenv: .PHONY
 	    INSTALL="${INSTALL_CMD} ${INSTALLFLAGS}" \
 	    MTREE_CMD="${MTREE_CMD} ${MTREEFLAGS}" \
 	    "MAKEFLAGS=${MAKEFLAGS:NTARGET*}" ${BUILDENV_SHELL} || true
+
+.if ${libcompat} == "64c"
+libcheribuildenv: lib64cbuildenv
+.endif
 .endif
 
 .endif # defined(_LIBCOMPAT)

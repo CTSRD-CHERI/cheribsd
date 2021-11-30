@@ -1698,7 +1698,7 @@ psm_support_abs_bulk(struct evdev_dev *evdev, const uint16_t info[][4])
 	size_t i;
 
 	for (i = 0; info[i][0] != ABS_CNT; i++)
-		evdev_support_abs(evdev, info[i][0], 0, info[i][1], info[i][2],
+		evdev_support_abs(evdev, info[i][0], info[i][1], info[i][2],
 		    0, 0, info[i][3]);
 }
 
@@ -1858,7 +1858,7 @@ psm_register_synaptics(device_t dev)
 	if (sc->synhw.capAdvancedGestures || sc->synhw.capReportsV)
 		psm_support_abs_bulk(evdev_a, synaptics_absinfo_mt);
 	if (sc->synhw.capPalmDetect)
-		evdev_support_abs(evdev_a, ABS_TOOL_WIDTH, 0, 0, 15, 0, 0, 0);
+		evdev_support_abs(evdev_a, ABS_TOOL_WIDTH, 0, 15, 0, 0, 0);
 	evdev_support_key(evdev_a, BTN_LEFT);
 	if (!sc->synhw.capClickPad) {
 		evdev_support_key(evdev_a, BTN_RIGHT);
@@ -6423,6 +6423,15 @@ enable_synaptics(struct psm_softc *sc, enum probearg arg)
 		printf("   infoGeometry: %d\n", synhw.infoGeometry);
 	}
 
+	/*
+	 * Typical bezel limits. Taken from 'Synaptics
+	 * PS/2 * TouchPad Interfacing Guide' p.3.2.3.
+	 */
+	synhw.maximumXCoord = 5472;
+	synhw.maximumYCoord = 4448;
+	synhw.minimumXCoord = 1472;
+	synhw.minimumYCoord = 1408;
+
 	/* Read the extended capability bits. */
 	if (mouse_ext_command(kbdc, SYNAPTICS_READ_CAPABILITIES) == 0)
 		return (FALSE);
@@ -6564,13 +6573,6 @@ enable_synaptics(struct psm_softc *sc, enum probearg arg)
 						     ((status[1] & 0x0f) << 1);
 				synhw.maximumYCoord = (status[2] << 5) |
 						     ((status[1] & 0xf0) >> 3);
-			} else {
-				/*
-				 * Typical bezel limits. Taken from 'Synaptics
-				 * PS/2 * TouchPad Interfacing Guide' p.3.2.3.
-				 */
-				synhw.maximumXCoord = 5472;
-				synhw.maximumYCoord = 4448;
 			}
 
 			if (synhw.capReportsMin) {
@@ -6586,13 +6588,6 @@ enable_synaptics(struct psm_softc *sc, enum probearg arg)
 						     ((status[1] & 0x0f) << 1);
 				synhw.minimumYCoord = (status[2] << 5) |
 						     ((status[1] & 0xf0) >> 3);
-			} else {
-				/*
-				 * Typical bezel limits. Taken from 'Synaptics
-				 * PS/2 * TouchPad Interfacing Guide' p.3.2.3.
-				 */
-				synhw.minimumXCoord = 1472;
-				synhw.minimumYCoord = 1408;
 			}
 
 			/*

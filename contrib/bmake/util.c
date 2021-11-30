@@ -1,9 +1,9 @@
-/*	$NetBSD: util.c,v 1.68 2020/11/16 18:29:49 rillig Exp $	*/
+/*	$NetBSD: util.c,v 1.76 2021/02/03 08:00:36 rillig Exp $	*/
 
 /*
  * Missing stuff from OS's
  *
- *	$Id: util.c,v 1.41 2020/11/18 03:58:32 sjg Exp $
+ *	$Id: util.c,v 1.46 2021/02/05 20:02:29 sjg Exp $
  */
 
 #include <sys/param.h>
@@ -13,7 +13,7 @@
 
 #include "make.h"
 
-MAKE_RCSID("$NetBSD: util.c,v 1.68 2020/11/16 18:29:49 rillig Exp $");
+MAKE_RCSID("$NetBSD: util.c,v 1.76 2021/02/03 08:00:36 rillig Exp $");
 
 #if !defined(MAKE_NATIVE) && !defined(HAVE_STRERROR)
 extern int errno, sys_nerr;
@@ -74,7 +74,7 @@ unsetenv(const char *name)
 	}
 
 	while (findenv(name, &offset))	{ /* if set multiple times */
-		for (p = &environ[offset];; ++p)
+		for (p = &environ[offset];; p++)
 			if (!(*p = *(p + 1)))
 				break;
 	}
@@ -122,7 +122,7 @@ setenv(const char *name, const char *value, int rewrite)
 		environ = savedEnv;
 		environ[offset + 1] = NULL;
 	}
-	for (cc = name; *cc && *cc != '='; ++cc)	/* no `=' in name */
+	for (cc = name; *cc && *cc != '='; cc++)	/* no `=' in name */
 		continue;
 	size = cc - name;
 	/* name + `=' + value */
@@ -153,7 +153,8 @@ main(int argc, char *argv[])
 
 
 #if defined(__hpux__) || defined(__hpux)
-/* strrcpy():
+/*
+ * strrcpy():
  *	Like strcpy, going backwards and returning the new pointer
  */
 static char *
@@ -161,7 +162,7 @@ strrcpy(char *ptr, char *str)
 {
     int len = strlen(str);
 
-    while (len)
+    while (len != 0)
 	*--ptr = str[--len];
 
     return ptr;
@@ -170,38 +171,38 @@ strrcpy(char *ptr, char *str)
 
 char    *sys_siglist[] = {
 	"Signal 0",
-	"Hangup",                       /* SIGHUP    */
-	"Interrupt",                    /* SIGINT    */
-	"Quit",                         /* SIGQUIT   */
-	"Illegal instruction",          /* SIGILL    */
-	"Trace/BPT trap",               /* SIGTRAP   */
-	"IOT trap",                     /* SIGIOT    */
-	"EMT trap",                     /* SIGEMT    */
-	"Floating point exception",     /* SIGFPE    */
-	"Killed",                       /* SIGKILL   */
-	"Bus error",                    /* SIGBUS    */
-	"Segmentation fault",           /* SIGSEGV   */
-	"Bad system call",              /* SIGSYS    */
-	"Broken pipe",                  /* SIGPIPE   */
-	"Alarm clock",                  /* SIGALRM   */
-	"Terminated",                   /* SIGTERM   */
-	"User defined signal 1",        /* SIGUSR1   */
-	"User defined signal 2",        /* SIGUSR2   */
-	"Child exited",                 /* SIGCLD    */
-	"Power-fail restart",           /* SIGPWR    */
-	"Virtual timer expired",        /* SIGVTALRM */
-	"Profiling timer expired",      /* SIGPROF   */
-	"I/O possible",                 /* SIGIO     */
-	"Window size changes",          /* SIGWINDOW */
-	"Stopped (signal)",             /* SIGSTOP   */
-	"Stopped",                      /* SIGTSTP   */
-	"Continued",                    /* SIGCONT   */
-	"Stopped (tty input)",          /* SIGTTIN   */
-	"Stopped (tty output)",         /* SIGTTOU   */
-	"Urgent I/O condition",         /* SIGURG    */
-	"Remote lock lost (NFS)",       /* SIGLOST   */
-	"Signal 31",                    /* reserved  */
-	"DIL signal"                    /* SIGDIL    */
+	"Hangup",			/* SIGHUP    */
+	"Interrupt",			/* SIGINT    */
+	"Quit",				/* SIGQUIT   */
+	"Illegal instruction",		/* SIGILL    */
+	"Trace/BPT trap",		/* SIGTRAP   */
+	"IOT trap",			/* SIGIOT    */
+	"EMT trap",			/* SIGEMT    */
+	"Floating point exception",	/* SIGFPE    */
+	"Killed",			/* SIGKILL   */
+	"Bus error",			/* SIGBUS    */
+	"Segmentation fault",		/* SIGSEGV   */
+	"Bad system call",		/* SIGSYS    */
+	"Broken pipe",			/* SIGPIPE   */
+	"Alarm clock",			/* SIGALRM   */
+	"Terminated",			/* SIGTERM   */
+	"User defined signal 1",	/* SIGUSR1   */
+	"User defined signal 2",	/* SIGUSR2   */
+	"Child exited",			/* SIGCLD    */
+	"Power-fail restart",		/* SIGPWR    */
+	"Virtual timer expired",	/* SIGVTALRM */
+	"Profiling timer expired",	/* SIGPROF   */
+	"I/O possible",			/* SIGIO     */
+	"Window size changes",		/* SIGWINDOW */
+	"Stopped (signal)",		/* SIGSTOP   */
+	"Stopped",			/* SIGTSTP   */
+	"Continued",			/* SIGCONT   */
+	"Stopped (tty input)",		/* SIGTTIN   */
+	"Stopped (tty output)",		/* SIGTTOU   */
+	"Urgent I/O condition",		/* SIGURG    */
+	"Remote lock lost (NFS)",	/* SIGLOST   */
+	"Signal 31",			/* reserved  */
+	"DIL signal"			/* SIGDIL    */
 };
 #endif /* __hpux__ || __hpux */
 
@@ -343,16 +344,16 @@ getcwd(path, sz)
 SignalProc
 bmake_signal(int s, SignalProc a)
 {
-    struct sigaction sa, osa;
+	struct sigaction sa, osa;
 
-    sa.sa_handler = a;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
+	sa.sa_handler = a;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_RESTART;
 
-    if (sigaction(s, &sa, &osa) == -1)
-	return SIG_ERR;
-    else
-	return osa.sa_handler;
+	if (sigaction(s, &sa, &osa) == -1)
+		return SIG_ERR;
+	else
+		return osa.sa_handler;
 }
 
 #if !defined(HAVE_VSNPRINTF) || !defined(HAVE_VASPRINTF)

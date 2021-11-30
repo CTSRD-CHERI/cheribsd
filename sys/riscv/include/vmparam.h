@@ -219,14 +219,7 @@
  * How many physical pages per kmem arena virtual page.
  */
 #ifndef VM_KMEM_SIZE_SCALE
-#define	VM_KMEM_SIZE_SCALE	(3)
-#endif
-
-/*
- * Optional floor (in bytes) on the size of the kmem arena.
- */
-#ifndef VM_KMEM_SIZE_MIN
-#define	VM_KMEM_SIZE_MIN	(16 * 1024 * 1024)
+#define	VM_KMEM_SIZE_SCALE	(1)
 #endif
 
 /*
@@ -262,6 +255,7 @@ extern void *init_pt_va;
 #define	ZERO_REGION_SIZE	(64 * 1024)	/* 64KB */
 
 #define	DEVMAP_MAX_VADDR	VM_MAX_KERNEL_ADDRESS
+#define	PMAP_MAPDEV_EARLY_SIZE	(L2_SIZE * 2)
 
 /*
  * No non-transparent large page support in the pmap.

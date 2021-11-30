@@ -38,4 +38,5 @@ ATF_TESTS_C:=	${ATF_TESTS_C:N${_T}}
 TEST_METADATA.${_T}+=	required_programs="cc"
 .endfor
 
+.include "Makefile.inc"
 .include <bsd.test.mk>

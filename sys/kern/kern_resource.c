@@ -784,7 +784,8 @@ kern_proc_setrlimit(struct thread *td, struct proc *p, u_int which,
 			addr = trunc_page(addr);
 			size = round_page(size);
 			(void)vm_map_protect(&p->p_vmspace->vm_map,
-			    addr, addr + size, prot, FALSE, FALSE);
+			    addr, addr + size, prot, 0,
+			    VM_MAP_PROTECT_SET_PROT);
 		}
 	}
 

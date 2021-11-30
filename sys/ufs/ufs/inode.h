@@ -47,6 +47,7 @@
 #ifdef DIAGNOSTIC
 #include <sys/stack.h>
 #endif
+#include <sys/buf.h>
 
 /*
  * This must agree with the definition in <ufs/ufs/dir.h>.
@@ -115,6 +116,8 @@ struct inode {
 
 	int	i_nextclustercg; /* last cg searched for cluster */
 
+	struct vn_clusterw i_clusterw;	/* Buffer clustering information */
+
 	/*
 	 * Data for extended attribute modification.
  	 */
@@ -152,6 +155,8 @@ struct inode {
 #define	IN_IBLKDATA	0x0800		/* datasync requires inode block
 					   update */
 #define	IN_SIZEMOD	0x1000		/* Inode size has been modified */
+#define	IN_ENDOFF	0x2000		/* Free space at the end of directory,
+					   try to truncate when possible */
 
 #define PRINT_INODE_FLAGS "\20\20b16\17b15\16b14\15sizemod" \
 	"\14iblkdata\13is_ufs2\12truncated\11ea_lockwait\10ea_locked" \
@@ -205,13 +210,13 @@ struct inode {
 #define	i_din1 dinode_u.din1
 #define	i_din2 dinode_u.din2
 
-#ifdef _KERNEL
-
 #define	ITOUMP(ip)	((ip)->i_ump)
 #define	ITODEV(ip)	(ITOUMP(ip)->um_dev)
 #define	ITODEVVP(ip)	(ITOUMP(ip)->um_devvp)
 #define	ITOFS(ip)	(ITOUMP(ip)->um_fs)
 #define	ITOVFS(ip)	((ip)->i_vnode->v_mount)
+
+#ifdef _KERNEL
 
 static inline _Bool
 I_IS_UFS1(const struct inode *ip)
@@ -226,6 +231,7 @@ I_IS_UFS2(const struct inode *ip)
 
 	return ((ip->i_flag & IN_UFS2) != 0);
 }
+#endif	/* _KERNEL */
 
 /*
  * The DIP macro is used to access fields in the dinode that are
@@ -259,11 +265,11 @@ struct indir {
 #define	ITOV(ip)	((ip)->i_vnode)
 
 /* Determine if soft dependencies are being done */
-#define	DOINGSOFTDEP(vp)   \
-	(((vp)->v_mount->mnt_flag & (MNT_SOFTDEP | MNT_SUJ)) != 0)
-#define	MOUNTEDSOFTDEP(mp) (((mp)->mnt_flag & (MNT_SOFTDEP | MNT_SUJ)) != 0)
-#define	DOINGSUJ(vp)	   (((vp)->v_mount->mnt_flag & MNT_SUJ) != 0)
-#define	MOUNTEDSUJ(mp)	   (((mp)->mnt_flag & MNT_SUJ) != 0)
+#define	MOUNTEDSOFTDEP(mp)	(((mp)->mnt_flag & MNT_SOFTDEP) != 0)
+#define	DOINGSOFTDEP(vp)	MOUNTEDSOFTDEP((vp)->v_mount)
+#define	MOUNTEDSUJ(mp)		(((mp)->mnt_flag & (MNT_SOFTDEP | MNT_SUJ)) == \
+    (MNT_SOFTDEP | MNT_SUJ))
+#define	DOINGSUJ(vp)		MOUNTEDSUJ((vp)->v_mount)
 
 /* This overlays the fid structure (see mount.h). */
 struct ufid {
@@ -273,6 +279,7 @@ struct ufid {
 	uint32_t  ufid_gen;	/* Generation number. */
 };
 
+#ifdef _KERNEL
 #ifdef DIAGNOSTIC
 void ufs_init_trackers(struct inode *ip);
 void ufs_unlock_tracker(struct inode *ip);

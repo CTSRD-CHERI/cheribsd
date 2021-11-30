@@ -80,7 +80,7 @@ CHERIBSDTEST(test_sentry_dlsym,
 	const char *libm_so;
 
 #if defined(COMPAT_CHERI)
-	libm_so = "/usr/libcheri/" LIBM_SONAME;
+	libm_so = "/usr/lib64c/" LIBM_SONAME;
 #else
 	libm_so = "/lib/" LIBM_SONAME;
 #endif

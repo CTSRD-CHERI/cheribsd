@@ -90,6 +90,7 @@ libkern/ashldi3.c			standard
 libkern/ashrdi3.c			standard
 libkern/memcmp.c			standard
 libkern/bcopy.c				standard
+libkern/strlen.c			standard
 
 # cfe support
 dev/cfe/cfe_api.c			optional	cfe

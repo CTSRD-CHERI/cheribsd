@@ -66,6 +66,10 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_directio.h"
+#include "opt_ffs.h"
+#include "opt_ufs.h"
+
 #include <sys/param.h>
 #include <sys/bio.h>
 #include <sys/systm.h>
@@ -96,11 +100,13 @@ __FBSDID("$FreeBSD$");
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/ufs_extern.h>
 #include <ufs/ufs/ufsmount.h>
+#include <ufs/ufs/dir.h>
+#ifdef UFS_DIRHASH
+#include <ufs/ufs/dirhash.h>
+#endif
 
 #include <ufs/ffs/fs.h>
 #include <ufs/ffs/ffs_extern.h>
-#include "opt_directio.h"
-#include "opt_ffs.h"
 
 #define	ALIGNED_TO(ptr, s)	\
 	is_aligned(ptr, _Alignof(s))
@@ -129,6 +135,7 @@ static vop_listextattr_t	ffs_listextattr;
 static vop_openextattr_t	ffs_openextattr;
 static vop_setextattr_t	ffs_setextattr;
 static vop_vptofh_t	ffs_vptofh;
+static vop_vput_pair_t	ffs_vput_pair;
 
 /* Global vfs data structures for ufs. */
 struct vop_vector ffs_vnodeops1 = {
@@ -145,6 +152,7 @@ struct vop_vector ffs_vnodeops1 = {
 	.vop_reallocblks =	ffs_reallocblks,
 	.vop_write =		ffs_write,
 	.vop_vptofh =		ffs_vptofh,
+	.vop_vput_pair =	ffs_vput_pair,
 };
 VFS_VOP_VECTOR_REGISTER(ffs_vnodeops1);
 
@@ -181,6 +189,7 @@ struct vop_vector ffs_vnodeops2 = {
 	.vop_openextattr =	ffs_openextattr,
 	.vop_setextattr =	ffs_setextattr,
 	.vop_vptofh =		ffs_vptofh,
+	.vop_vput_pair =	ffs_vput_pair,
 };
 VFS_VOP_VECTOR_REGISTER(ffs_vnodeops2);
 
@@ -256,7 +265,6 @@ ffs_syncvnode(struct vnode *vp, int waitfor, int flags)
 	bool still_dirty, unlocked, wait;
 
 	ip = VTOI(vp);
-	ip->i_flag &= ~IN_NEEDSYNC;
 	bo = &vp->v_bufobj;
 	ump = VFSTOUFS(vp->v_mount);
 
@@ -313,8 +321,9 @@ loop:
 			if (BUF_LOCK(bp,
 			    LK_EXCLUSIVE | LK_SLEEPFAIL | LK_INTERLOCK,
 			    BO_LOCKPTR(bo)) != 0) {
+				BO_LOCK(bo);
 				bp->b_vflags &= ~BV_SCANNED;
-				goto next;
+				goto next_locked;
 			}
 		} else
 			continue;
@@ -377,6 +386,7 @@ next:
 		 * to start from a known point.
 		 */
 		BO_LOCK(bo);
+next_locked:
 		nbp = TAILQ_FIRST(&bo->bo_dirty.bv_hd);
 	}
 	if (waitfor != MNT_WAIT) {
@@ -444,6 +454,8 @@ next:
 	}
 	if (error == 0 && unlocked)
 		error = ERELOOKUP;
+	if (error == 0)
+		ip->i_flag &= ~IN_NEEDSYNC;
 	return (error);
 }
 
@@ -581,6 +593,9 @@ ffs_unlock_debug(struct vop_unlock_args *ap)
 			VI_UNLOCK(vp);
 		}
 	}
+	KASSERT(vp->v_type != VDIR || vp->v_vnlock->lk_recurse != 0 ||
+	    (ip->i_flag & IN_ENDOFF) == 0,
+	    ("ufs dir vp %p ip %p flags %#x", vp, ip, ip->i_flag));
 #ifdef DIAGNOSTIC
 	if (VOP_ISLOCKED(vp) == LK_EXCLUSIVE && ip != NULL &&
 	    vp->v_vnlock->lk_recurse == 0)
@@ -821,6 +836,11 @@ ffs_write(ap)
 	int blkoffset, error, flags, ioflag, size, xfersize;
 
 	vp = ap->a_vp;
+	if (DOINGSUJ(vp))
+		softdep_prealloc(vp, MNT_WAIT);
+	if (vp->v_data == NULL)
+		return (EBADF);
+
 	uio = ap->a_uio;
 	ioflag = ap->a_ioflag;
 	if (ap->a_ioflag & IO_EXT)
@@ -963,8 +983,8 @@ ffs_write(ap)
 		} else if (xfersize + blkoffset == fs->fs_bsize) {
 			if ((vp->v_mount->mnt_flag & MNT_NOCLUSTERW) == 0) {
 				bp->b_flags |= B_CLUSTEROK;
-				cluster_write(vp, bp, ip->i_size, seqcount,
-				    GB_UNMAPPED);
+				cluster_write(vp, &ip->i_clusterw, bp,
+				    ip->i_size, seqcount, GB_UNMAPPED);
 			} else {
 				bawrite(bp);
 			}
@@ -1001,7 +1021,9 @@ ffs_write(ap)
 			uio->uio_resid = resid;
 		}
 	} else if (resid > uio->uio_resid && (ioflag & IO_SYNC)) {
-		error = ffs_update(vp, 1);
+		if (!(ioflag & IO_DATASYNC) ||
+		    (ip->i_flags & (IN_SIZEMOD | IN_IBLKDATA)))
+			error = ffs_update(vp, 1);
 		if (ffs_fsfail_cleanup(VFSTOUFS(vp->v_mount), error))
 			error = ENXIO;
 	}
@@ -1325,13 +1347,20 @@ ffs_rdextattr(u_char **p, struct vnode *vp, struct thread *td)
 	/* Validate disk xattrfile contents. */
 	for (eap = (void *)eae, eaend = (void *)(eae + easize); eap < eaend;
 	    eap = eapnext) {
+		/* Detect zeroed out tail */
+		if (eap->ea_length < sizeof(*eap) || eap->ea_length == 0) {
+			easize = (const u_char *)eap - eae;
+			break;
+		}
+			
 		eapnext = EXTATTR_NEXT(eap);
-		/* Bogusly short entry or bogusly long entry. */
-		if (eap->ea_length < sizeof(*eap) || eapnext > eaend) {
+		/* Bogusly long entry. */
+		if (eapnext > eaend) {
 			free(eae, M_TEMP);
 			return (EINTEGRITY);
 		}
 	}
+	ip->i_ea_len = easize;
 	*p = eae;
 	return (0);
 }
@@ -1386,7 +1415,6 @@ ffs_open_ea(struct vnode *vp, struct ucred *cred, struct thread *td)
 		ffs_unlock_ea(vp);
 		return (error);
 	}
-	ip->i_ea_len = dp->di_extsize;
 	ip->i_ea_error = 0;
 	ip->i_ea_refs++;
 	ffs_unlock_ea(vp);
@@ -1401,9 +1429,11 @@ ffs_close_ea(struct vnode *vp, int commit, struct ucred *cred, struct thread *td
 {
 	struct inode *ip;
 	struct uio luio;
-	struct iovec liovec;
-	int error;
+	struct iovec *liovec;
 	struct ufs2_dinode *dp;
+	size_t ea_len, tlen;
+	int error, i, lcnt;
+	bool truncate;
 
 	ip = VTOI(vp);
 
@@ -1414,22 +1444,38 @@ ffs_close_ea(struct vnode *vp, int commit, struct ucred *cred, struct thread *td
 	}
 	dp = ip->i_din2;
 	error = ip->i_ea_error;
+	truncate = false;
 	if (commit && error == 0) {
 		ASSERT_VOP_ELOCKED(vp, "ffs_close_ea commit");
 		if (cred == NOCRED)
 			cred =  vp->v_mount->mnt_cred;
-		IOVEC_INIT(&liovec, ip->i_ea_area, ip->i_ea_len);
-		luio.uio_iov = &liovec;
-		luio.uio_iovcnt = 1;
+
+		ea_len = MAX(ip->i_ea_len, dp->di_extsize);
+		for (lcnt = 1, tlen = ea_len - ip->i_ea_len; tlen > 0;) {
+			tlen -= MIN(ZERO_REGION_SIZE, tlen);
+			lcnt++;
+		}
+
+		liovec = __builtin_alloca(lcnt * sizeof(struct iovec));
+		luio.uio_iovcnt = lcnt;
+
+		IOVEC_INIT(&liovec[0], ip->i_ea_area, ip->i_ea_len);
+		for (i = 1, tlen = ea_len - ip->i_ea_len; i < lcnt; i++) {
+			IOVEC_INIT(&liovec[i], __DECONST(void *, zero_region),
+			    MIN(ZERO_REGION_SIZE, tlen));
+			tlen -= liovec[i].iov_len;
+		}
+		MPASS(tlen == 0);
+
+		luio.uio_iov = liovec;
 		luio.uio_offset = 0;
-		luio.uio_resid = ip->i_ea_len;
+		luio.uio_resid = ea_len;
 		luio.uio_segflg = UIO_SYSSPACE;
 		luio.uio_rw = UIO_WRITE;
 		luio.uio_td = td;
-		/* XXX: I'm not happy about truncating to zero size */
-		if (ip->i_ea_len < dp->di_extsize)
-			error = ffs_truncate(vp, 0, IO_EXT, cred);
 		error = ffs_extwrite(vp, &luio, IO_EXT | IO_SYNC, cred);
+		if (error == 0 && ip->i_ea_len == 0)
+			truncate = true;
 	}
 	if (--ip->i_ea_refs == 0) {
 		free(ip->i_ea_area, M_TEMP);
@@ -1438,6 +1484,9 @@ ffs_close_ea(struct vnode *vp, int commit, struct ucred *cred, struct thread *td
 		ip->i_ea_error = 0;
 	}
 	ffs_unlock_ea(vp);
+
+	if (truncate)
+		ffs_truncate(vp, 0, IO_EXT, cred);
 	return (error);
 }
 
@@ -1505,14 +1554,21 @@ struct vop_closeextattr_args {
 };
 */
 {
+	struct vnode *vp;
 
-	if (ap->a_vp->v_type == VCHR || ap->a_vp->v_type == VBLK)
+	vp = ap->a_vp;
+	if (vp->v_type == VCHR || vp->v_type == VBLK)
 		return (EOPNOTSUPP);
-
-	if (ap->a_commit && (ap->a_vp->v_mount->mnt_flag & MNT_RDONLY))
+	if (ap->a_commit && (vp->v_mount->mnt_flag & MNT_RDONLY) != 0)
 		return (EROFS);
 
-	return (ffs_close_ea(ap->a_vp, ap->a_commit, ap->a_cred, ap->a_td));
+	if (ap->a_commit && DOINGSUJ(vp)) {
+		ASSERT_VOP_ELOCKED(vp, "ffs_closeextattr commit");
+		softdep_prealloc(vp, MNT_WAIT);
+		if (vp->v_data == NULL)
+			return (EBADF);
+	}
+	return (ffs_close_ea(vp, ap->a_commit, ap->a_cred, ap->a_td));
 }
 
 /*
@@ -1530,6 +1586,7 @@ vop_deleteextattr {
 };
 */
 {
+	struct vnode *vp;
 	struct inode *ip;
 	struct extattr *eap;
 	uint32_t ul;
@@ -1537,18 +1594,17 @@ vop_deleteextattr {
 	u_char *eae;
 	void *tmp;
 
-	ip = VTOI(ap->a_vp);
+	vp = ap->a_vp;
+	ip = VTOI(vp);
 
-	if (ap->a_vp->v_type == VCHR || ap->a_vp->v_type == VBLK)
+	if (vp->v_type == VCHR || vp->v_type == VBLK)
 		return (EOPNOTSUPP);
-
 	if (strlen(ap->a_name) == 0)
 		return (EINVAL);
-
-	if (ap->a_vp->v_mount->mnt_flag & MNT_RDONLY)
+	if (vp->v_mount->mnt_flag & MNT_RDONLY)
 		return (EROFS);
 
-	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
+	error = extattr_check_cred(vp, ap->a_attrnamespace,
 	    ap->a_cred, ap->a_td, VWRITE);
 	if (error) {
 		/*
@@ -1560,7 +1616,14 @@ vop_deleteextattr {
 		return (error);
 	}
 
-	error = ffs_open_ea(ap->a_vp, ap->a_cred, ap->a_td);
+	if (DOINGSUJ(vp)) {
+		ASSERT_VOP_ELOCKED(vp, "ffs_deleteextattr");
+		softdep_prealloc(vp, MNT_WAIT);
+		if (vp->v_data == NULL)
+			return (EBADF);
+	}
+
+	error = ffs_open_ea(vp, ap->a_cred, ap->a_td);
 	if (error)
 		return (error);
 
@@ -1574,7 +1637,7 @@ vop_deleteextattr {
 	if (olen == -1) {
 		/* delete but nonexistent */
 		free(eae, M_TEMP);
-		ffs_close_ea(ap->a_vp, 0, ap->a_cred, ap->a_td);
+		ffs_close_ea(vp, 0, ap->a_cred, ap->a_td);
 		return (ENOATTR);
 	}
 	ul = eap->ea_length;
@@ -1586,7 +1649,7 @@ vop_deleteextattr {
 	ip->i_ea_area = eae;
 	ip->i_ea_len = easize;
 	free(tmp, M_TEMP);
-	error = ffs_close_ea(ap->a_vp, 1, ap->a_cred, ap->a_td);
+	error = ffs_close_ea(vp, 1, ap->a_cred, ap->a_td);
 	return (error);
 }
 
@@ -1719,6 +1782,7 @@ vop_setextattr {
 };
 */
 {
+	struct vnode *vp;
 	struct inode *ip;
 	struct fs *fs;
 	struct extattr *eap;
@@ -1728,12 +1792,12 @@ vop_setextattr {
 	u_char *eae;
 	void *tmp;
 
-	ip = VTOI(ap->a_vp);
+	vp = ap->a_vp;
+	ip = VTOI(vp);
 	fs = ITOFS(ip);
 
-	if (ap->a_vp->v_type == VCHR || ap->a_vp->v_type == VBLK)
+	if (vp->v_type == VCHR || vp->v_type == VBLK)
 		return (EOPNOTSUPP);
-
 	if (strlen(ap->a_name) == 0)
 		return (EINVAL);
 
@@ -1741,14 +1805,14 @@ vop_setextattr {
 	if (ap->a_uio == NULL)
 		return (EOPNOTSUPP);
 
-	if (ap->a_vp->v_mount->mnt_flag & MNT_RDONLY)
+	if (vp->v_mount->mnt_flag & MNT_RDONLY)
 		return (EROFS);
 
 	ealen = ap->a_uio->uio_resid;
 	if (ealen < 0 || ealen > lblktosize(fs, UFS_NXADDR))
 		return (EINVAL);
 
-	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
+	error = extattr_check_cred(vp, ap->a_attrnamespace,
 	    ap->a_cred, ap->a_td, VWRITE);
 	if (error) {
 		/*
@@ -1760,7 +1824,14 @@ vop_setextattr {
 		return (error);
 	}
 
-	error = ffs_open_ea(ap->a_vp, ap->a_cred, ap->a_td);
+	if (DOINGSUJ(vp)) {
+		ASSERT_VOP_ELOCKED(vp, "ffs_deleteextattr");
+		softdep_prealloc(vp, MNT_WAIT);
+		if (vp->v_data == NULL)
+			return (EBADF);
+	}
+
+	error = ffs_open_ea(vp, ap->a_cred, ap->a_td);
 	if (error)
 		return (error);
 
@@ -1797,7 +1868,7 @@ vop_setextattr {
 	}
 	if (easize > lblktosize(fs, UFS_NXADDR)) {
 		free(eae, M_TEMP);
-		ffs_close_ea(ap->a_vp, 0, ap->a_cred, ap->a_td);
+		ffs_close_ea(vp, 0, ap->a_cred, ap->a_td);
 		if (ip->i_ea_area != NULL && ip->i_ea_error == 0)
 			ip->i_ea_error = ENOSPC;
 		return (ENOSPC);
@@ -1811,7 +1882,7 @@ vop_setextattr {
 	error = uiomove(EXTATTR_CONTENT(eap), ealen, ap->a_uio);
 	if (error) {
 		free(eae, M_TEMP);
-		ffs_close_ea(ap->a_vp, 0, ap->a_cred, ap->a_td);
+		ffs_close_ea(vp, 0, ap->a_cred, ap->a_td);
 		if (ip->i_ea_area != NULL && ip->i_ea_error == 0)
 			ip->i_ea_error = error;
 		return (error);
@@ -1822,7 +1893,7 @@ vop_setextattr {
 	ip->i_ea_area = eae;
 	ip->i_ea_len = easize;
 	free(tmp, M_TEMP);
-	error = ffs_close_ea(ap->a_vp, 1, ap->a_cred, ap->a_td);
+	error = ffs_close_ea(vp, 1, ap->a_cred, ap->a_td);
 	return (error);
 }
 
@@ -1909,6 +1980,117 @@ ffs_getpages_async(struct vop_getpages_async_args *ap)
 	if (do_iodone && ap->a_iodone != NULL)
 		ap->a_iodone(ap->a_arg, ap->a_m, ap->a_count, error);
 
+	return (error);
+}
+
+static int
+ffs_vput_pair(struct vop_vput_pair_args *ap)
+{
+	struct mount *mp;
+	struct vnode *dvp, *vp, *vp1, **vpp;
+	struct inode *dp, *ip;
+	ino_t ip_ino;
+	u_int64_t ip_gen;
+	off_t old_size;
+	int error, vp_locked;
+
+	dvp = ap->a_dvp;
+	dp = VTOI(dvp);
+	vpp = ap->a_vpp;
+	vp = vpp != NULL ? *vpp : NULL;
+
+	if ((dp->i_flag & (IN_NEEDSYNC | IN_ENDOFF)) == 0) {
+		vput(dvp);
+		if (vp != NULL && ap->a_unlock_vp)
+			vput(vp);
+		return (0);
+	}
+
+	mp = dvp->v_mount;
+	if (vp != NULL) {
+		if (ap->a_unlock_vp) {
+			vput(vp);
+		} else {
+			MPASS(vp->v_type != VNON);
+			vp_locked = VOP_ISLOCKED(vp);
+			ip = VTOI(vp);
+			ip_ino = ip->i_number;
+			ip_gen = ip->i_gen;
+			VOP_UNLOCK(vp);
+		}
+	}
+
+	/*
+	 * If compaction or fsync was requested do it in ffs_vput_pair()
+	 * now that other locks are no longer held.
+         */
+	if ((dp->i_flag & IN_ENDOFF) != 0) {
+		VNASSERT(I_ENDOFF(dp) != 0 && I_ENDOFF(dp) < dp->i_size, dvp,
+		    ("IN_ENDOFF set but I_ENDOFF() is not"));
+		dp->i_flag &= ~IN_ENDOFF;
+		old_size = dp->i_size;
+		error = UFS_TRUNCATE(dvp, (off_t)I_ENDOFF(dp), IO_NORMAL |
+		    (DOINGASYNC(dvp) ? 0 : IO_SYNC), curthread->td_ucred);
+		if (error != 0 && error != ERELOOKUP) {
+			if (!ffs_fsfail_cleanup(VFSTOUFS(mp), error)) {
+				vn_printf(dvp,
+				    "IN_ENDOFF: failed to truncate, "
+				    "error %d\n", error);
+			}
+#ifdef UFS_DIRHASH
+			ufsdirhash_free(dp);
+#endif
+		}
+		SET_I_ENDOFF(dp, 0);
+	}
+	if ((dp->i_flag & IN_NEEDSYNC) != 0) {
+		do {
+			error = ffs_syncvnode(dvp, MNT_WAIT, 0);
+		} while (error == ERELOOKUP);
+	}
+
+	vput(dvp);
+
+	if (vp == NULL || ap->a_unlock_vp)
+		return (0);
+	MPASS(mp != NULL);
+
+	/*
+	 * It is possible that vp is reclaimed at this point. Only
+	 * routines that call us with a_unlock_vp == false can find
+	 * that their vp has been reclaimed. There are three areas
+	 * that are affected:
+	 * 1) vn_open_cred() - later VOPs could fail, but
+	 *    dead_open() returns 0 to simulate successful open.
+	 * 2) ffs_snapshot() - creation of snapshot fails with EBADF.
+	 * 3) NFS server (several places) - code is prepared to detect
+	 *    and respond to dead vnodes by returning ESTALE.
+	 */
+	VOP_LOCK(vp, vp_locked | LK_RETRY);
+	if (!VN_IS_DOOMED(vp))
+		return (0);
+
+	/*
+	 * Try harder to recover from reclaimed vp if reclaim was not
+	 * because underlying inode was cleared.  We saved inode
+	 * number and inode generation, so we can try to reinstantiate
+	 * exactly same version of inode.  If this fails, return
+	 * original doomed vnode and let caller to handle
+	 * consequences.
+	 *
+	 * Note that callers must keep write started around
+	 * VOP_VPUT_PAIR() calls, so it is safe to use mp without
+	 * busying it.
+	 */
+	VOP_UNLOCK(vp);
+	error = ffs_inotovp(mp, ip_ino, ip_gen, LK_EXCLUSIVE, &vp1,
+	    FFSV_REPLACE_DOOMED);
+	if (error != 0) {
+		VOP_LOCK(vp, vp_locked | LK_RETRY);
+	} else {
+		vrele(vp);
+		*vpp = vp1;
+	}
 	return (error);
 }
 // CHERI CHANGES START

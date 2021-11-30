@@ -117,9 +117,6 @@ static const u_char etherbroadcastaddr[ETHER_ADDR_LEN] =
 
 static	int ether_resolvemulti(struct ifnet *, struct sockaddr **,
 		struct sockaddr *);
-#ifdef VIMAGE
-static	void ether_reassign(struct ifnet *, struct vnet *, char *);
-#endif
 static	int ether_requestencap(struct ifnet *, struct if_encap_req *);
 
 #define senderr(e) do { error = (e); goto bad;} while (0)
@@ -287,7 +284,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 	char linkhdr[ETHER_HDR_LEN], *phdr;
 	struct ether_header *eh;
 	struct pf_mtag *t;
-	int loop_copy = 1;
+	bool loop_copy;
 	int hlen;	/* link layer header length */
 	uint32_t pflags;
 	struct llentry *lle = NULL;
@@ -357,7 +354,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m,
 		update_mbuf_csumflags(m, m);
 		return (if_simloop(ifp, m, dst->sa_family, 0));
 	}
-	loop_copy = pflags & RT_MAY_LOOP;
+	loop_copy = (pflags & RT_MAY_LOOP) != 0;
 
 	/*
 	 * Add local net header.  If no space in first mbuf,

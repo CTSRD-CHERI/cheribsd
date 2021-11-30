@@ -22,7 +22,7 @@
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/select.h>
-#ifdef __FreeBSD_version
+#ifdef __FreeBSD__
 # include <sys/selinfo.h>
 # include <sys/jail.h>
 # ifdef _KERNEL
@@ -52,7 +52,7 @@
 VNET_DECLARE(ipf_main_softc_t, ipfmain);
 #define	V_ipfmain		VNET(ipfmain)
 
-#ifdef __FreeBSD_version
+#ifdef __FreeBSD__
 static struct cdev *ipf_devs[IPL_LOGSIZE];
 #else
 static dev_t ipf_devs[IPL_LOGSIZE];
@@ -68,18 +68,23 @@ static int ipf_modunload(void);
 static int ipf_fbsd_sysctl_create(void);
 static int ipf_fbsd_sysctl_destroy(void);
 
-#ifdef __FreeBSD_version
-static	int	ipfopen __P((struct cdev*, int, int, struct thread *));
-static	int	ipfclose __P((struct cdev*, int, int, struct thread *));
-static	int	ipfread __P((struct cdev*, struct uio *, int));
-static	int	ipfwrite __P((struct cdev*, struct uio *, int));
+#ifdef __FreeBSD__
+static	int	ipfopen(struct cdev*, int, int, struct thread *);
+static	int	ipfclose(struct cdev*, int, int, struct thread *);
+static	int	ipfread(struct cdev*, struct uio *, int);
+static	int	ipfwrite(struct cdev*, struct uio *, int);
 #else
-static	int	ipfopen __P((dev_t, int, int, struct proc *));
-static	int	ipfclose __P((dev_t, int, int, struct proc *));
-static	int	ipfread __P((dev_t, struct uio *, int));
-static	int	ipfwrite __P((dev_t, struct uio *, int));
+static	int	ipfopen(dev_t, int, int, struct proc *);
+static	int	ipfclose(dev_t, int, int, struct proc *);
+static	int	ipfread(dev_t, struct uio *, int);
+static	int	ipfwrite(dev_t, struct uio *, int);
 #endif
 
+#ifdef LARGE_NAT
+#define IPF_LARGE_NAT	1
+#else
+#define IPF_LARGE_NAT	0
+#endif
 
 SYSCTL_DECL(_net_inet);
 #define SYSCTL_IPF(parent, nbr, name, access, ptr, val, descr) \
@@ -132,10 +137,11 @@ SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_running, CTLFLAG_RD,
 	   &VNET_NAME(ipfmain.ipf_running), 0, "IPF is running");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_chksrc, CTLFLAG_RW, &VNET_NAME(ipfmain.ipf_chksrc), 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_minttl, CTLFLAG_RW, &VNET_NAME(ipfmain.ipf_minttl), 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, large_nat, CTLFLAG_RD, &VNET_NAME(ipfmain.ipf_large_nat), 0, "large_nat");
 
 #define CDEV_MAJOR 79
 #include <sys/poll.h>
-#ifdef __FreeBSD_version
+#ifdef __FreeBSD__
 # include <sys/select.h>
 static int ipfpoll(struct cdev *dev, int events, struct thread *td);
 
@@ -417,7 +423,7 @@ sysctl_ipf_int_frag ( SYSCTL_HANDLER_ARGS )
 
 
 static int
-#ifdef __FreeBSD_version
+#ifdef __FreeBSD__
 ipfpoll(struct cdev *dev, int events, struct thread *td)
 #else
 ipfpoll(dev_t dev, int events, struct proc *td)
@@ -470,7 +476,7 @@ ipfpoll(dev_t dev, int events, struct proc *td)
  * routines below for saving IP headers to buffer
  */
 static int ipfopen(dev, flags
-#ifdef __FreeBSD_version
+#ifdef __FreeBSD__
 , devtype, p)
 	int devtype;
 	struct thread *p;
@@ -510,7 +516,7 @@ static int ipfopen(dev, flags
 
 
 static int ipfclose(dev, flags
-#ifdef __FreeBSD_version
+#ifdef __FreeBSD__
 , devtype, p)
 	int devtype;
 	struct thread *p;
@@ -536,13 +542,9 @@ static int ipfclose(dev, flags
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
-#if (BSD >= 199306)
 static int ipfread(dev, uio, ioflag)
 	int ioflag;
-#else
-static int ipfread(dev, uio)
-#endif
-#ifdef __FreeBSD_version
+#ifdef __FreeBSD__
 	struct cdev *dev;
 #else
 	dev_t dev;
@@ -583,13 +585,9 @@ static int ipfread(dev, uio)
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
-#if (BSD >= 199306)
 static int ipfwrite(dev, uio, ioflag)
 	int ioflag;
-#else
-static int ipfwrite(dev, uio)
-#endif
-#ifdef __FreeBSD_version
+#ifdef __FreeBSD__
 	struct cdev *dev;
 #else
 	dev_t dev;
@@ -654,4 +652,3 @@ ipf_fbsd_sysctl_destroy(void)
 	}
 	return 0;
 }
-

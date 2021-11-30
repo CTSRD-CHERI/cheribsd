@@ -252,9 +252,10 @@ ufs_mknod(ap)
 		DIP_SET(ip, i_rdev, vap->va_rdev);
 	}
 	/*
-	 * Remove inode, then reload it through VFS_VGET so it is
-	 * checked to see if it is an alias of an existing entry in
-	 * the inode cache.  XXX I don't believe this is necessary now.
+	 * Remove inode, then reload it through VFS_VGET().  This is
+	 * needed to do further inode initialization, for instance
+	 * fifo, which was too early for VFS_VGET() done as part of
+	 * UFS_VALLOC().
 	 */
 	(*vpp)->v_type = VNON;
 	ino = ip->i_number;	/* Save this before vgone() invalidates ip. */
@@ -283,10 +284,8 @@ ufs_open(struct vop_open_args *ap)
 
 	ip = VTOI(vp);
 	vnode_create_vobject(vp, DIP(ip, i_size), ap->a_td);
-	if (vp->v_type == VREG && (vp->v_irflag & VIRF_PGREAD) == 0) {
-		VI_LOCK(vp);
-		vp->v_irflag |= VIRF_PGREAD;
-		VI_UNLOCK(vp);
+	if (vp->v_type == VREG && (vn_irflag_read(vp) & VIRF_PGREAD) == 0) {
+		vn_irflag_set_cond(vp, VIRF_PGREAD);
 	}
 
 	/*
@@ -1008,8 +1007,8 @@ ufs_remove(ap)
 	if ((ip->i_flags & (NOUNLINK | IMMUTABLE | APPEND)) ||
 	    (VTOI(dvp)->i_flags & APPEND))
 		return (EPERM);
-	if (DOINGSOFTDEP(dvp)) {
-		error = softdep_prelink(dvp, vp, true);
+	if (DOINGSUJ(dvp)) {
+		error = softdep_prelink(dvp, vp);
 		if (error != 0) {
 			MPASS(error == ERELOOKUP);
 			return (error);
@@ -1073,8 +1072,8 @@ ufs_link(ap)
 		panic("ufs_link: no name");
 #endif
 
-	if (DOINGSOFTDEP(tdvp)) {
-		error = softdep_prelink(tdvp, vp, true);
+	if (DOINGSUJ(tdvp)) {
+		error = softdep_prelink(tdvp, vp);
 		if (error != 0) {
 			MPASS(error == ERELOOKUP);
 			return (error);
@@ -1113,7 +1112,7 @@ ufs_link(ap)
 	error = UFS_UPDATE(vp, !DOINGSOFTDEP(vp) && !DOINGASYNC(vp));
 	if (!error) {
 		ufs_makedirentry(ip, cnp, &newdir);
-		error = ufs_direnter(tdvp, vp, &newdir, cnp, NULL, 0);
+		error = ufs_direnter(tdvp, vp, &newdir, cnp, NULL);
 	}
 
 	if (error) {
@@ -1144,9 +1143,9 @@ ufs_whiteout(ap)
 	struct direct newdir;
 	int error = 0;
 
-	if (DOINGSOFTDEP(dvp) && (ap->a_flags == CREATE ||
+	if (DOINGSUJ(dvp) && (ap->a_flags == CREATE ||
 	    ap->a_flags == DELETE)) {
-		error = softdep_prelink(dvp, NULL, true);
+		error = softdep_prelink(dvp, NULL);
 		if (error != 0) {
 			MPASS(error == ERELOOKUP);
 			return (error);
@@ -1173,7 +1172,7 @@ ufs_whiteout(ap)
 		newdir.d_namlen = cnp->cn_namelen;
 		bcopy(cnp->cn_nameptr, newdir.d_name, (unsigned)cnp->cn_namelen + 1);
 		newdir.d_type = DT_WHT;
-		error = ufs_direnter(dvp, NULL, &newdir, cnp, NULL, 0);
+		error = ufs_direnter(dvp, NULL, &newdir, cnp, NULL);
 		break;
 
 	case DELETE:
@@ -1513,7 +1512,7 @@ relock:
 			}
 		}
 		ufs_makedirentry(fip, tcnp, &newdir);
-		error = ufs_direnter(tdvp, NULL, &newdir, tcnp, NULL, 1);
+		error = ufs_direnter(tdvp, NULL, &newdir, tcnp, NULL);
 		if (error)
 			goto bad;
 		/* Setup tdvp for directory compaction if needed. */
@@ -1678,40 +1677,16 @@ unlockout:
 
 	vput(fdvp);
 	vput(fvp);
-	if (tvp)
-		vput(tvp);
+
 	/*
-	 * If compaction or fsync was requested do it now that other locks
-	 * are no longer needed.
+	 * If compaction or fsync was requested do it in
+	 * ffs_vput_pair() now that other locks are no longer needed.
 	 */
 	if (error == 0 && endoff != 0) {
-		do {
-			error = UFS_TRUNCATE(tdvp, endoff, IO_NORMAL |
-			    (DOINGASYNC(tdvp) ? 0 : IO_SYNC), tcnp->cn_cred);
-		} while (error == ERELOOKUP);
-		if (error != 0 && !ffs_fsfail_cleanup(VFSTOUFS(mp), error))
-			vn_printf(tdvp,
-			    "ufs_rename: failed to truncate, error %d\n",
-			    error);
-#ifdef UFS_DIRHASH
-		if (error != 0)
-			ufsdirhash_free(tdp);
-		else if (tdp->i_dirhash != NULL)
-			ufsdirhash_dirtrunc(tdp, endoff);
-#endif
-		/*
-		 * Even if the directory compaction failed, rename was
-		 * succesful.  Do not propagate a UFS_TRUNCATE() error
-		 * to the caller.
-		 */
-		error = 0;
+		UFS_INODE_SET_FLAG(tdp, IN_ENDOFF);
+		SET_I_ENDOFF(tdp, endoff);
 	}
-	if (error == 0 && tdp->i_flag & IN_NEEDSYNC) {
-		do {
-			error = VOP_FSYNC(tdvp, MNT_WAIT, td);
-		} while (error == ERELOOKUP);
-	}
-	vput(tdvp);
+	VOP_VPUT_PAIR(tdvp, &tvp, true);
 	return (error);
 
 bad:
@@ -1971,8 +1946,8 @@ ufs_mkdir(ap)
 		goto out;
 	}
 
-	if (DOINGSOFTDEP(dvp)) {
-		error = softdep_prelink(dvp, NULL, true);
+	if (DOINGSUJ(dvp)) {
+		error = softdep_prelink(dvp, NULL);
 		if (error != 0) {
 			MPASS(error == ERELOOKUP);
 			return (error);
@@ -2158,7 +2133,7 @@ ufs_mkdir(ap)
 	else if (!DOINGSOFTDEP(dvp) && ((error = bwrite(bp))))
 		goto bad;
 	ufs_makedirentry(ip, cnp, &newdir);
-	error = ufs_direnter(dvp, tvp, &newdir, cnp, bp, 0);
+	error = ufs_direnter(dvp, tvp, &newdir, cnp, bp);
 
 bad:
 	if (error == 0) {
@@ -2235,8 +2210,8 @@ ufs_rmdir(ap)
 		error = EINVAL;
 		goto out;
 	}
-	if (DOINGSOFTDEP(dvp)) {
-		error = softdep_prelink(dvp, vp, false);
+	if (DOINGSUJ(dvp)) {
+		error = softdep_prelink(dvp, vp);
 		if (error != 0) {
 			MPASS(error == ERELOOKUP);
 			return (error);
@@ -2762,8 +2737,8 @@ ufs_makeinode(mode, dvp, vpp, cnp, callfunc)
 		print_bad_link_count(callfunc, dvp);
 		return (EINVAL);
 	}
-	if (DOINGSOFTDEP(dvp)) {
-		error = softdep_prelink(dvp, NULL, true);
+	if (DOINGSUJ(dvp)) {
+		error = softdep_prelink(dvp, NULL);
 		if (error != 0) {
 			MPASS(error == ERELOOKUP);
 			return (error);
@@ -2891,7 +2866,7 @@ ufs_makeinode(mode, dvp, vpp, cnp, callfunc)
 	}
 #endif /* !UFS_ACL */
 	ufs_makedirentry(ip, cnp, &newdir);
-	error = ufs_direnter(dvp, tvp, &newdir, cnp, NULL, 0);
+	error = ufs_direnter(dvp, tvp, &newdir, cnp, NULL);
 	if (error)
 		goto bad;
 	vn_seqc_write_end(tvp);
@@ -2947,7 +2922,7 @@ ufs_read_pgcache(struct vop_read_pgcache_args *ap)
 
 	uio = ap->a_uio;
 	vp = ap->a_vp;
-	MPASS((vp->v_irflag & VIRF_PGREAD) != 0);
+	VNPASS((vn_irflag_read(vp) & VIRF_PGREAD) != 0, vp);
 
 	if (uio->uio_resid > ptoa(io_hold_cnt) || uio->uio_offset < 0 ||
 	    (ap->a_ioflag & IO_DIRECT) != 0)
@@ -2965,6 +2940,7 @@ struct vop_vector ufs_vnodeops = {
 	.vop_accessx =		ufs_accessx,
 	.vop_bmap =		ufs_bmap,
 	.vop_fplookup_vexec =	ufs_fplookup_vexec,
+	.vop_fplookup_symlink =	VOP_EAGAIN,
 	.vop_cachedlookup =	ufs_lookup,
 	.vop_close =		ufs_close,
 	.vop_create =		ufs_create,

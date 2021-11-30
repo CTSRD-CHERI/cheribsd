@@ -23,7 +23,7 @@ SRCS+=	lauxlib.c lbaselib.c lstrlib.c loadlib.c
 #SRCS+=	lbitlib.c liolib.c lmathlib.c loslib.c ltablib.c
 
 # Our utilities.
-SRCS+=	lerrno.c lstd.c lutils.c
+SRCS+=	lerrno.c lpager.c lstd.c lutils.c
 
 .PATH:	${FLUASRC}/modules
 SRCS+=	lfs.c
@@ -35,11 +35,12 @@ CFLAGS+= -ffreestanding -nostdlib -DLUA_USE_POSIX
 CFLAGS+= -fno-stack-protector -D__BSD_VISIBLE
 CFLAGS+= -I${BOOTSRC}/include -I${LIBLUASRC} -I${LUASRC} -I${LDRSRC}
 
+CFLAGS.lutils.c+= -I${SRCTOP}/sys/teken -I${SRCTOP}/contrib/pnglite
+
 .if ${MACHINE_CPUARCH} == "amd64" && ${DO32:U0} == 0
 CFLAGS+=	-fPIC
 .endif
-.if ${MK_LOADER_VERIEXEC} == "yes"
-CFLAGS+= -I${SRCTOP}/lib/libsecureboot/h -DLOADER_VERIEXEC
-.endif
+
+.include "${BOOTSRC}/veriexec.mk"
 
 .include <bsd.lib.mk>

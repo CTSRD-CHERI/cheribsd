@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2018-2020 Gavin D. Howard and contributors.
+ * Copyright (c) 2018-2021 Gavin D. Howard and contributors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -1389,7 +1389,7 @@ static void bc_num_right(BcNum *a, BcNum *b, BcNum *restrict c, size_t scale) {
 #endif // BC_ENABLE_EXTRA_MATH
 
 static void bc_num_binary(BcNum *a, BcNum *b, BcNum *c, size_t scale,
-                          BcNumBinaryOp op, size_t req)
+                          BcNumBinOp op, size_t req)
 {
 	BcNum *ptr_a, *ptr_b, num2;
 	bool init = false;
@@ -1588,9 +1588,9 @@ static void bc_num_parseBase(BcNum *restrict n, const char *restrict val,
 		bc_num_add(&mult1, &temp, n, 0);
 	}
 
-	if (i == len && !(c = val[i])) goto int_err;
+	if (i == len && !val[i]) goto int_err;
 
-	assert(c == '.');
+	assert(val[i] == '.');
 
 	BC_SIG_LOCK;
 
@@ -1655,15 +1655,15 @@ int_err:
 static inline void bc_num_printNewline(void) {
 #if !BC_ENABLE_LIBRARY
 	if (vm.nchars >= vm.line_len - 1) {
-		bc_vm_putchar('\\');
-		bc_vm_putchar('\n');
+		bc_vm_putchar('\\', bc_flush_none);
+		bc_vm_putchar('\n', bc_flush_err);
 	}
 #endif // !BC_ENABLE_LIBRARY
 }
 
 static void bc_num_putchar(int c) {
 	if (c != '\n') bc_num_printNewline();
-	bc_vm_putchar(c);
+	bc_vm_putchar(c, bc_flush_save);
 }
 
 #if DC_ENABLED && !BC_ENABLE_LIBRARY
@@ -1671,7 +1671,7 @@ static void bc_num_printChar(size_t n, size_t len, bool rdx) {
 	BC_UNUSED(rdx);
 	BC_UNUSED(len);
 	assert(len == 1);
-	bc_vm_putchar((uchar) n);
+	bc_vm_putchar((uchar) n, bc_flush_save);
 }
 #endif // DC_ENABLED && !BC_ENABLE_LIBRARY
 
@@ -2138,7 +2138,7 @@ size_t bc_num_len(const BcNum *restrict n) {
 
 	size_t len = n->len;
 
-	if (BC_NUM_ZERO(n)) return 0;
+	if (BC_NUM_ZERO(n)) return n->scale ? n->scale : 1;
 
 	if (BC_NUM_RDX_VAL(n) == len) {
 
@@ -2665,7 +2665,7 @@ void bc_num_rshift(BcNum *a, BcNum *b, BcNum *c, size_t scale) {
 void bc_num_sqrt(BcNum *restrict a, BcNum *restrict b, size_t scale) {
 
 	BcNum num1, num2, half, f, fprime, *x0, *x1, *temp;
-	size_t pow, len, rdx, req, digs, digs1, digs2, resscale;
+	size_t pow, len, rdx, req, resscale;
 	BcDig half_digs[1];
 
 	assert(a != NULL && b != NULL && a != b);
@@ -2736,7 +2736,7 @@ void bc_num_sqrt(BcNum *restrict a, BcNum *restrict b, size_t scale) {
 	}
 
 	// I can set the rdx here directly because neg should be false.
-	x0->scale = x0->rdx = digs = digs1 = digs2 = 0;
+	x0->scale = x0->rdx = 0;
 	resscale = (scale + BC_BASE_DIGS) + 2;
 
 	while (bc_num_cmp(x1, x0)) {
@@ -2908,11 +2908,11 @@ err:
 
 #if BC_DEBUG_CODE
 void bc_num_printDebug(const BcNum *n, const char *name, bool emptyline) {
-	bc_file_puts(&vm.fout, name);
-	bc_file_puts(&vm.fout, ": ");
+	bc_file_puts(&vm.fout, bc_flush_none, name);
+	bc_file_puts(&vm.fout, bc_flush_none, ": ");
 	bc_num_printDecimal(n);
-	bc_file_putchar(&vm.fout, '\n');
-	if (emptyline) bc_file_putchar(&vm.fout, '\n');
+	bc_file_putchar(&vm.fout, bc_flush_err, '\n');
+	if (emptyline) bc_file_putchar(&vm.fout, bc_flush_err, '\n');
 	vm.nchars = 0;
 }
 
@@ -2923,13 +2923,13 @@ void bc_num_printDigs(const BcDig *n, size_t len, bool emptyline) {
 	for (i = len - 1; i < len; --i)
 		bc_file_printf(&vm.fout, " %lu", (unsigned long) n[i]);
 
-	bc_file_putchar(&vm.fout, '\n');
-	if (emptyline) bc_file_putchar(&vm.fout, '\n');
+	bc_file_putchar(&vm.fout, bc_flush_err, '\n');
+	if (emptyline) bc_file_putchar(&vm.fout, bc_flush_err, '\n');
 	vm.nchars = 0;
 }
 
 void bc_num_printWithDigs(const BcNum *n, const char *name, bool emptyline) {
-	bc_file_puts(&vm.fout, name);
+	bc_file_puts(&vm.fout, bc_flush_none, name);
 	bc_file_printf(&vm.fout, " len: %zu, rdx: %zu, scale: %zu\n",
 	               name, n->len, BC_NUM_RDX_VAL(n), n->scale);
 	bc_num_printDigs(n->num, n->len, emptyline);
@@ -2944,7 +2944,8 @@ void bc_num_dump(const char *varname, const BcNum *n) {
 
 	for (i = n->len - 1; i < n->len; --i) {
 
-		if (i + 1 == BC_NUM_RDX_VAL(n)) bc_file_puts(&vm.ferr, ". ");
+		if (i + 1 == BC_NUM_RDX_VAL(n))
+			bc_file_puts(&vm.ferr, bc_flush_none, ". ");
 
 		if (scale / BC_BASE_DIGS != BC_NUM_RDX_VAL(n) - i - 1)
 			bc_file_printf(&vm.ferr, "%lu ", (unsigned long) n->num[i]);
@@ -2967,5 +2968,7 @@ void bc_num_dump(const char *varname, const BcNum *n) {
 	bc_file_printf(&vm.ferr, "(%zu | %zu.%zu / %zu) %lu\n",
 	               n->scale, n->len, BC_NUM_RDX_VAL(n), n->cap,
 	               (unsigned long) (void*) n->num);
+
+	bc_file_flush(&vm.ferr, bc_flush_err);
 }
 #endif // BC_DEBUG_CODE

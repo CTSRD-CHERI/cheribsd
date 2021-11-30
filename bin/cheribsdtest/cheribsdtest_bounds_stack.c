@@ -131,15 +131,13 @@ CHERIBSDTEST(test_bounds_stack_static_uint8,
 }
 
 CHERIBSDTEST(test_bounds_stack_alloca_uint8,
-    "Check bounds on 8-bit alloca stack allocation",
-    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
+    "Check bounds on 8-bit alloca stack allocation")
 {
 	test_bounds_stack_alloca(sizeof(uint8_t));
 }
 
 CHERIBSDTEST(test_bounds_stack_vla_uint8,
-    "Check bounds on 8-bit VLA stack allocation",
-    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
+    "Check bounds on 8-bit VLA stack allocation")
 {
 	test_bounds_stack_vla(sizeof(uint8_t));
 }
@@ -154,15 +152,13 @@ CHERIBSDTEST(test_bounds_stack_static_uint16,
 }
 
 CHERIBSDTEST(test_bounds_stack_alloca_uint16,
-    "Check bounds on 16-bit alloca stack allocation",
-    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
+    "Check bounds on 16-bit alloca stack allocation")
 {
 	test_bounds_stack_alloca(sizeof(uint16_t));
 }
 
 CHERIBSDTEST(test_bounds_stack_vla_uint16,
-    "Check bounds on 16-bit VLA stack allocation",
-    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
+    "Check bounds on 16-bit VLA stack allocation")
 {
 	test_bounds_stack_vla(sizeof(uint16_t));
 }
@@ -177,15 +173,13 @@ CHERIBSDTEST(test_bounds_stack_static_uint32,
 }
 
 CHERIBSDTEST(test_bounds_stack_alloca_uint32,
-    "Check bounds 32-bit alloca stack allocation",
-    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
+    "Check bounds 32-bit alloca stack allocation")
 {
 	test_bounds_stack_alloca(sizeof(uint32_t));
 }
 
 CHERIBSDTEST(test_bounds_stack_vla_uint32,
-    "Check bounds 32-bit VLA stack allocation",
-    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
+    "Check bounds 32-bit VLA stack allocation")
 {
 	test_bounds_stack_vla(sizeof(uint32_t));
 }
@@ -200,15 +194,13 @@ CHERIBSDTEST(test_bounds_stack_static_uint64,
 }
 
 CHERIBSDTEST(test_bounds_stack_alloca_uint64,
-    "Check bounds on 64-bit alloca stack allocation",
-    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
+    "Check bounds on 64-bit alloca stack allocation")
 {
 	test_bounds_stack_alloca(sizeof(uint64_t));
 }
 
 CHERIBSDTEST(test_bounds_stack_vla_uint64,
-    "Check bounds on 64-bit VLA stack allocation",
-    .ct_flaky_reason = FLAKY_COMPILER_BOUNDS)
+    "Check bounds on 64-bit VLA stack allocation")
 {
 	test_bounds_stack_vla(sizeof(uint64_t));
 }
