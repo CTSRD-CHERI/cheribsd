@@ -671,9 +671,9 @@ db_show_frame_td(struct thread *td, struct trapframe *frame)
 	db_print_cap(td, "x31/t6:  ", (void * __capability)frame->tf_t[6]);
 	db_print_cap(td, "  sepc:  ", (void * __capability)frame->tf_sepc);
 	db_print_cap(td, "   ddc:  ", (void * __capability)frame->tf_ddc);
-	db_print_cap(td, "sstatus: ", (void * __capability)frame->tf_sstatus);
-	db_print_cap(td, " stval:  ", (void * __capability)frame->tf_stval);
-	db_print_cap(td, "scause:  ", (void * __capability)frame->tf_scause);
+	(kdb_active ? db_printf : printf)("sstatus: 0x%016lx\n", frame->tf_sstatus);
+	db_print_cap(td, " stval:  ", (void * __capability)(uintcap_t)frame->tf_stval);
+	(kdb_active ? db_printf : printf)("scause:  0x%016lx\n", frame->tf_scause);
 }
 
 DB_SHOW_COMMAND(frame, db_show_frame)
