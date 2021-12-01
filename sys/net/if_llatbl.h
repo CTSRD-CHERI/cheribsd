@@ -83,7 +83,7 @@ struct llentry {
 	struct callout		lle_timer;
 	struct rwlock		 lle_lock;
 	struct mtx		req_mtx;
-	struct epoch_context lle_epoch_ctx __subobject_use_container_bounds;
+	struct epoch_context lle_epoch_ctx;
 };
 
 #define	LLE_WLOCK(lle)		rw_wlock(&(lle)->lle_lock)

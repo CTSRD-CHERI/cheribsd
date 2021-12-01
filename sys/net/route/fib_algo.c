@@ -186,7 +186,7 @@ struct fib_data {
 	struct rib_subscription	*fd_rs;		/* storing table subscription */
 	struct fib_dp		fd_dp;		/* fib datapath data */
 	struct vnet		*fd_vnet;	/* vnet fib belongs to */
-	struct epoch_context	fd_epoch_ctx __subobject_use_container_bounds;	/* epoch context for deletion */
+	struct epoch_context	fd_epoch_ctx;	/* epoch context for deletion */
 	struct fib_lookup_module	*fd_flm;/* pointer to the lookup module */
 	struct fib_sync_status	fd_ss;		/* State relevant to the rib sync  */
 	uint32_t		fd_num_changes;	/* number of changes since last callout */
@@ -294,7 +294,7 @@ VNET_DEFINE_STATIC(TAILQ_HEAD(fib_error_head, fib_error), fib_error_list);
 
 /* Per-family array of fibnum -> {func, arg} mappings used in datapath */
 struct fib_dp_header {
-	struct epoch_context	fdh_epoch_ctx __subobject_use_container_bounds;
+	struct epoch_context	fdh_epoch_ctx;
 	uint32_t		fdh_num_tables;
 	struct fib_dp		fdh_idx[0] __subobject_use_container_bounds;
 };
@@ -1809,7 +1809,7 @@ fib_ref_nhop(struct fib_data *fd, struct nhop_object *nh)
 
 struct nhop_release_data {
 	struct nhop_object	*nh;
-	struct epoch_context	ctx __subobject_use_container_bounds;
+	struct epoch_context	ctx;
 };
 
 static void

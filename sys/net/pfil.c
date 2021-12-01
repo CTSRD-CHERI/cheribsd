@@ -86,7 +86,7 @@ struct pfil_link {
 	void			*link_ruleset;
 	int			 link_flags;
 	struct pfil_hook	*link_hook;
-	struct epoch_context	 link_epoch_ctx __subobject_use_container_bounds;
+	struct epoch_context	 link_epoch_ctx;
 };
 
 typedef CK_STAILQ_HEAD(pfil_chain, pfil_link)	pfil_chain_t;
