@@ -178,7 +178,7 @@ mst_to_vst(struct m_snd_tag *mst)
 struct vlan_mc_entry {
 	struct sockaddr_dl		mc_addr;
 	CK_SLIST_ENTRY(vlan_mc_entry)	mc_entries;
-	struct epoch_context		mc_epoch_ctx __subobject_use_container_bounds;
+	struct epoch_context		mc_epoch_ctx;
 };
 
 struct ifvlan {

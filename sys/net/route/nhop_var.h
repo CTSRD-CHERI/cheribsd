@@ -60,7 +60,7 @@ struct nh_control {
 	struct bitmask_head	gr_idx_head;	/* nhgrp index head */
 	struct rwlock		ctl_lock;	/* overall ctl lock */
 	struct rib_head		*ctl_rh;	/* pointer back to rnh */
-	struct epoch_context	ctl_epoch_ctx __subobject_use_container_bounds;	/* epoch ctl helper */
+	struct epoch_context	ctl_epoch_ctx;	/* epoch ctl helper */
 };
 
 #define	NHOPS_WLOCK(ctl)	rw_wlock(&(ctl)->ctl_lock)
@@ -88,7 +88,7 @@ struct nhop_priv {
 	struct nh_control	*nh_control;	/* backreference to the rnh */
 	struct nhop_priv	*nh_next;	/* hash table membership */
 	struct vnet		*nh_vnet;	/* vnet nhop belongs to */
-	struct epoch_context	nh_epoch_ctx __subobject_use_container_bounds;	/* epoch data for nhop */
+	struct epoch_context	nh_epoch_ctx;	/* epoch data for nhop */
 };
 
 #define	NH_PRIV_END_CMP	(__offsetof(struct nhop_priv, nh_idx))

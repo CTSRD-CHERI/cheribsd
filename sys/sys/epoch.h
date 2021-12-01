@@ -32,7 +32,7 @@
 
 struct epoch_context {
 	void   *data[2];
-} __aligned(sizeof(void *));
+} __aligned(sizeof(void *)) __subobject_use_container_bounds;
 
 typedef struct epoch_context *epoch_context_t;
 typedef	void epoch_callback_t(epoch_context_t);

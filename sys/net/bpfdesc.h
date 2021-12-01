@@ -108,7 +108,7 @@ struct bpf_d {
 	u_char		bd_compat32;	/* 32-bit stream on LP64 system */
 
 	volatile u_int	bd_refcnt;
-	struct epoch_context epoch_ctx __subobject_use_container_bounds;
+	struct epoch_context epoch_ctx;
 };
 
 /* Values for bd_state */

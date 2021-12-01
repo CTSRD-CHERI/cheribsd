@@ -115,13 +115,13 @@ struct bpf_if {
 	struct ifnet	*bif_ifp;	/* corresponding interface */
 	struct bpf_if	**bif_bpf;	/* Pointer to pointer to us */
 	volatile u_int	bif_refcnt;
-	struct epoch_context epoch_ctx __subobject_use_container_bounds;
+	struct epoch_context epoch_ctx;
 };
 
 CTASSERT(offsetof(struct bpf_if, bif_ext) == 0);
 
 struct bpf_program_buffer {
-	struct epoch_context	epoch_ctx __subobject_use_container_bounds;
+	struct epoch_context	epoch_ctx;
 #ifdef BPF_JITTER
 	bpf_jit_filter		*func;
 #endif

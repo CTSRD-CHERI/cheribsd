@@ -69,7 +69,7 @@ struct rib_subscription {
 	void					*arg;
 	struct rib_head				*rnh;
 	enum rib_subscription_type		type;
-	struct epoch_context			epoch_ctx __subobject_use_container_bounds;
+	struct epoch_context			epoch_ctx;
 };
 
 static int add_route(struct rib_head *rnh, struct rt_addrinfo *info,
