@@ -1608,12 +1608,19 @@ kern_linkat(struct thread *td, int fd1, int fd2,
 
 	do {
 		bwillwrite();
-		NDINIT_ATRIGHTS(&nd, LOOKUP, at2cnpflags(flag,
-		    AT_SYMLINK_FOLLOW | AT_RESOLVE_BENEATH) | AUDITVNODE1,
+		NDINIT_ATRIGHTS(&nd, LOOKUP, AUDITVNODE1 | at2cnpflags(flag,
+		    AT_SYMLINK_FOLLOW | AT_RESOLVE_BENEATH | AT_EMPTY_PATH),
 		    segflag, path1, fd1, &cap_linkat_source_rights, td);
 		if ((error = namei(&nd)) != 0)
 			return (error);
 		NDFREE(&nd, NDF_ONLY_PNBUF);
+		if ((nd.ni_resflags & NIRES_EMPTYPATH) != 0) {
+			error = priv_check(td, PRIV_VFS_FHOPEN);
+			if (error != 0) {
+				vrele(nd.ni_vp);
+				return (error);
+			}
+		}
 		error = kern_linkat_vp(td, nd.ni_vp, fd2, path2, segflag);
 	} while (error ==  EAGAIN || error == ERELOOKUP);
 	return (error);
@@ -1635,23 +1642,6 @@ kern_linkat_vp(struct thread *td, struct vnode *vp, int fd,
 	    LOCKPARENT | SAVENAME | AUDITVNODE2 | NOCACHE, segflag, path, fd,
 	    &cap_linkat_target_rights, td);
 	if ((error = namei(&nd)) == 0) {
-		if ((nd.ni_resflags & NIRES_EMPTYPATH) != 0) {
-			error = priv_check(td, PRIV_VFS_FHOPEN);
-			if (error != 0) {
-				NDFREE(&nd, NDF_ONLY_PNBUF);
-				if (nd.ni_vp != NULL) {
-					if (nd.ni_dvp == nd.ni_vp)
-						vrele(nd.ni_dvp);
-					else
-						vput(nd.ni_dvp);
-					vrele(nd.ni_vp);
-				} else {
-					vput(nd.ni_dvp);
-				}
-				vrele(vp);
-				return (error);
-			}
-		}
 		if (nd.ni_vp != NULL) {
 			NDFREE(&nd, NDF_ONLY_PNBUF);
 			if (nd.ni_dvp == nd.ni_vp)

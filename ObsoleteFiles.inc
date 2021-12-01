@@ -40,15 +40,18 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20210426: remove unused libexec/rc.d/addswap
+OLD_FILES+=etc/rc.d/addswap
+
 # 20210413: Remove pfctlinput2
 OLD_FILES+=usr/share/man/man9/pfctlinput2.9.gz
 
 # 20210412: Remove kernel asymmetric crypto
-OLD_FILES+=usr/share/man/man9/crypto_asym.9
-OLD_FILES+=usr/share/man/man9/crypto_kdispatch.9
-OLD_FILES+=usr/share/man/man9/crypto_kdone.9
-OLD_FILES+=usr/share/man/man9/crypto_kregister.9
-OLD_FILES+=usr/share/man/man9/CRYPTODEV_KPROCESS.9
+OLD_FILES+=usr/share/man/man9/crypto_asym.9.gz
+OLD_FILES+=usr/share/man/man9/crypto_kdispatch.9.gz
+OLD_FILES+=usr/share/man/man9/crypto_kdone.9.gz
+OLD_FILES+=usr/share/man/man9/crypto_kregister.9.gz
+OLD_FILES+=usr/share/man/man9/CRYPTODEV_KPROCESS.9.gz
 
 # 20210410: remove unused libexec/rc.d/archdep
 OLD_FILES+=etc/rc.d/archdep

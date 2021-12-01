@@ -682,8 +682,7 @@
 #endif	/* __STDC__ */
 #endif	/* __GNUC__ */
 
-#define	__GLOBL1(sym)	__asm__(".globl " #sym)
-#define	__GLOBL(sym)	__GLOBL1(sym)
+#define	__GLOBL(sym)	__asm__(".globl " __XSTRING(sym))
 #define	__WEAK(sym)	__asm__(".weak " __XSTRING(sym))
 
 #if defined(__GNUC__)

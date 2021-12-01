@@ -34,7 +34,7 @@
 .\"     From: @(#)tcp.4	8.1 (Berkeley) 6/5/93
 .\" $FreeBSD$
 .\"
-.Dd April 8, 2021
+.Dd April 24, 2021
 .Dt TCP 4
 .Os
 .Sh NAME
@@ -329,6 +329,9 @@ currently executing.
 This is typically used after a process or thread inherits a listen
 socket from its parent, and sets its CPU affinity to a particular core.
 .El
+.It Dv TCP_REMOTE_UDP_ENCAPS_PORT
+Set and get the remote UDP encapsulation port.
+It can only be set on a closed TCP socket.
 .El
 .Pp
 The option level for the
@@ -558,16 +561,8 @@ Helpful when a misconfigured token bucket traffic policer causes persistent
 high losses leading to RTO, but reduces PRR effectiveness in more common settings
 (default is false).
 .It Va rfc6675_pipe
-Calculate the bytes in flight using the algorithm described in RFC 6675, and
-is also an improvement when Proportional Rate Reduction is enabled.
-Also enables two other mechanisms from RFC6675.
-Rescue Retransmission helps timely loss recovery, when the trailing segments
-of a transmission are lost, while no additional data is ready to be sent.
-In case a partial ACK without a SACK block is received during SACK loss
-recovery, the trailing segment is immediately resent, rather than waiting
-for a Retransmission timeout.
-SACK loss recovery is also engaged, once two segments plus one byte are
-SACKed - even if no traditional duplicate ACKs were seen.
+Deprecated and superseded by
+.Va sack.revised
 .It Va rfc3042
 Enable the Limited Transmit algorithm as described in RFC 3042.
 It helps avoid timeouts on lossy links and also when the congestion window
@@ -584,6 +579,17 @@ Enable support for RFC 2018, TCP Selective Acknowledgment option,
 which allows the receiver to inform the sender about all successfully
 arrived segments, allowing the sender to retransmit the missing segments
 only.
+.It Va sack.revised
+Enables three updated mechanisms from RFC6675 (default is true).
+Calculate the bytes in flight using the algorithm described in RFC 6675, and
+is also an improvement when Proportional Rate Reduction is enabled.
+Next, Rescue Retransmission helps timely loss recovery, when the trailing segments
+of a transmission are lost, while no additional data is ready to be sent.
+In case a partial ACK without a SACK block is received during SACK loss
+recovery, the trailing segment is immediately resent, rather than waiting
+for a Retransmission timeout.
+Finally, SACK loss recovery is also engaged, once two segments plus one byte are
+SACKed - even if no traditional duplicate ACKs were observed.
 .It Va sack.maxholes
 Maximum number of SACK holes per connection.
 Defaults to 128.
@@ -684,6 +690,7 @@ for the connection for some defined period of time.
 Disable the host cache.
 .It 1
 Enable the host cache. (default)
+.El
 .It Va hostcache.purgenow
 Immediately purge all entries once set to any value.
 Setting this to 2 will also reseed the hash salt.
@@ -698,6 +705,7 @@ Do not purge all entries when pruning the host cache. (default)
 Purge all entries when doing the next pruning.
 .It 2
 Purge all entries, and also reseed the hash salt.
+.El
 .It Va hostcache.prune
 Time in seconds between pruning expired host cache entries.
 Defaults to 300 (5 minutes).
@@ -752,6 +760,16 @@ A CSV list of template_spec=percent key-value pairs which controls the per
 template sampling rates when
 .Xr stats 3
 sampling is enabled.
+.It Va udp_tunneling_port
+The local UDP encapsulation port.
+A value of 0 indicates that UDP encapsulation is disabled.
+The default is 0.
+.It Va udp_tunneling_overhead
+The overhead taken into account when using UDP encapsulation.
+Since MSS clamping by middleboxes will most likely not work, values larger than
+8 (the size of the UDP header) are also supported.
+Supported values are between 8 and 1024.
+The default is 8.
 .El
 .Sh ERRORS
 A socket operation may fail with one of the following errors returned:

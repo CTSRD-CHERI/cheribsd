@@ -130,10 +130,16 @@ VNET_DECLARE(struct uma_zone *, sack_hole_zone);
 
 SYSCTL_NODE(_net_inet_tcp, OID_AUTO, sack, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "TCP SACK");
+
 VNET_DEFINE(int, tcp_do_sack) = 1;
-#define	V_tcp_do_sack			VNET(tcp_do_sack)
 SYSCTL_INT(_net_inet_tcp_sack, OID_AUTO, enable, CTLFLAG_VNET | CTLFLAG_RW,
-    &VNET_NAME(tcp_do_sack), 0, "Enable/Disable TCP SACK support");
+    &VNET_NAME(tcp_do_sack), 0,
+    "Enable/Disable TCP SACK support");
+
+VNET_DEFINE(int, tcp_do_newsack) = 1;
+SYSCTL_INT(_net_inet_tcp_sack, OID_AUTO, revised, CTLFLAG_VNET | CTLFLAG_RW,
+    &VNET_NAME(tcp_do_newsack), 0,
+    "Use revised SACK loss recovery per RFC 6675");
 
 VNET_DEFINE(int, tcp_sack_maxholes) = 128;
 SYSCTL_INT(_net_inet_tcp_sack, OID_AUTO, maxholes, CTLFLAG_VNET | CTLFLAG_RW,
@@ -559,6 +565,15 @@ tcp_sack_doack(struct tcpcb *tp, struct tcpopt *to, tcp_seq th_ack)
 		left_edge_delta = th_ack - tp->snd_una;
 		sack_blocks[num_sack_blks].start = tp->snd_una;
 		sack_blocks[num_sack_blks++].end = th_ack;
+		/*
+		 * Pulling snd_fack forward if we got here
+		 * due to DSACK blocks
+		 */
+		if (SEQ_LT(tp->snd_fack, th_ack)) {
+			delivered_data += th_ack - tp->snd_una;
+			tp->snd_fack = th_ack;
+			sack_changed = 1;
+		}
 	}
 	/*
 	 * Append received valid SACK blocks to sack_blocks[], but only if we
@@ -628,35 +643,52 @@ tcp_sack_doack(struct tcpcb *tp, struct tcpopt *to, tcp_seq th_ack)
 	tp->sackhint.last_sack_ack = sblkp->end;
 	if (SEQ_LT(tp->snd_fack, sblkp->start)) {
 		/*
-		 * The highest SACK block is beyond fack.  Append new SACK
-		 * hole at the tail.  If the second or later highest SACK
-		 * blocks are also beyond the current fack, they will be
-		 * inserted by way of hole splitting in the while-loop below.
+		 * The highest SACK block is beyond fack.  First,
+		 * check if there was a successful Rescue Retransmission,
+		 * and move this hole left. With normal holes, snd_fack
+		 * is always to the right of the end.
 		 */
-		temp = tcp_sackhole_insert(tp, tp->snd_fack,sblkp->start,NULL);
-		if (temp != NULL) {
+		if (((temp = TAILQ_LAST(&tp->snd_holes, sackhole_head)) != NULL) &&
+		    SEQ_LEQ(tp->snd_fack,temp->end)) {
+			temp->start = SEQ_MAX(tp->snd_fack, SEQ_MAX(tp->snd_una, th_ack));
+			temp->end = sblkp->start;
+			temp->rxmit = temp->start;
 			delivered_data += sblkp->end - sblkp->start;
 			tp->snd_fack = sblkp->end;
-			/* Go to the previous sack block. */
 			sblkp--;
 			sack_changed = 1;
 		} else {
 			/*
-			 * We failed to add a new hole based on the current
-			 * sack block.  Skip over all the sack blocks that
-			 * fall completely to the right of snd_fack and
-			 * proceed to trim the scoreboard based on the
-			 * remaining sack blocks.  This also trims the
-			 * scoreboard for th_ack (which is sack_blocks[0]).
+			 * Append a new SACK hole at the tail.  If the
+			 * second or later highest SACK blocks are also
+			 * beyond the current fack, they will be inserted
+			 * by way of hole splitting in the while-loop below.
 			 */
-			while (sblkp >= sack_blocks &&
-			       SEQ_LT(tp->snd_fack, sblkp->start))
-				sblkp--;
-			if (sblkp >= sack_blocks &&
-			    SEQ_LT(tp->snd_fack, sblkp->end)) {
-				delivered_data += sblkp->end - tp->snd_fack;
+			temp = tcp_sackhole_insert(tp, tp->snd_fack,sblkp->start,NULL);
+			if (temp != NULL) {
+				delivered_data += sblkp->end - sblkp->start;
 				tp->snd_fack = sblkp->end;
+				/* Go to the previous sack block. */
+				sblkp--;
 				sack_changed = 1;
+			} else {
+				/*
+				 * We failed to add a new hole based on the current
+				 * sack block.  Skip over all the sack blocks that
+				 * fall completely to the right of snd_fack and
+				 * proceed to trim the scoreboard based on the
+				 * remaining sack blocks.  This also trims the
+				 * scoreboard for th_ack (which is sack_blocks[0]).
+				 */
+				while (sblkp >= sack_blocks &&
+				       SEQ_LT(tp->snd_fack, sblkp->start))
+					sblkp--;
+				if (sblkp >= sack_blocks &&
+				    SEQ_LT(tp->snd_fack, sblkp->end)) {
+					delivered_data += sblkp->end - tp->snd_fack;
+					tp->snd_fack = sblkp->end;
+					sack_changed = 1;
+				}
 			}
 		}
 	} else if (SEQ_LT(tp->snd_fack, sblkp->end)) {
@@ -826,7 +858,7 @@ tcp_sack_partialack(struct tcpcb *tp, struct tcphdr *th)
 	 * the trailing packets of a window are lost and no further data
 	 * is available for sending.
 	 */
-	if ((V_tcp_do_rfc6675_pipe) &&
+	if ((V_tcp_do_newsack) &&
 	    SEQ_LT(th->th_ack, tp->snd_recover) &&
 	    (tp->snd_recover == tp->snd_max) &&
 	    TAILQ_EMPTY(&tp->snd_holes) &&
@@ -840,9 +872,11 @@ tcp_sack_partialack(struct tcpcb *tp, struct tcphdr *th)
 		tcp_seq highdata = tp->snd_max;
 		if (tp->t_flags & TF_SENTFIN)
 			highdata--;
-		if (th->th_ack != highdata)
+		if (th->th_ack != highdata) {
+			tp->snd_fack = th->th_ack;
 			(void)tcp_sackhole_insert(tp, SEQ_MAX(th->th_ack,
 			    highdata - maxseg), highdata, NULL);
+		}
 	}
 	(void) tp->t_fb->tfb_tcp_output(tp);
 }

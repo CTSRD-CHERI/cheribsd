@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2014, 2016 Robert N. M. Watson
+ * Copyright (c) 2021 Microsoft Corp.
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -432,7 +433,7 @@ create_tempfile()
  */
 CHERIBSDTEST(cheribsdtest_vm_notag_tmpfile_shared,
     "check tags are not stored for tmpfile() MAP_SHARED pages",
-    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
     .ct_signum = SIGSEGV,
     .ct_si_code = SEGV_STORETAG,
     .ct_si_trapno = TRAPNO_STORE_CAP_PF,
@@ -445,6 +446,7 @@ CHERIBSDTEST(cheribsdtest_vm_notag_tmpfile_shared,
 	fd = create_tempfile();
 	cp = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
 	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(cp));
 	cp_value = cheri_ptr(&v, sizeof(v));
 	*cp = cp_value;
 	cheribsdtest_failure_errx("tagged store succeeded");

@@ -53,7 +53,7 @@ struct pfctl_rule {
 	struct pf_rule_addr	 src;
 	struct pf_rule_addr	 dst;
 	union pf_rule_ptr	 skip[PF_SKIP_COUNT];
-	char			 label[PF_RULE_LABEL_SIZE];
+	char			 label[PF_RULE_MAX_LABEL_COUNT][PF_RULE_LABEL_SIZE];
 	char			 ifname[IFNAMSIZ];
 	char			 qname[PF_QNAME_SIZE];
 	char			 pqname[PF_QNAME_SIZE];
@@ -188,5 +188,6 @@ int	pfctl_get_clear_rule(int dev, u_int32_t nr, u_int32_t ticket,
 int	pfctl_add_rule(int dev, const struct pfctl_rule *r,
 	    const char *anchor, const char *anchor_call, u_int32_t ticket,
 	    u_int32_t pool_ticket);
+int	pfctl_set_keepcounters(int dev, bool keep);
 
 #endif

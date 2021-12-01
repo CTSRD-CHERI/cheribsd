@@ -4571,7 +4571,11 @@ static int yy_get_next_buffer (void)
 				case EOB_ACT_END_OF_FILE:
 					{
 					if ( yywrap(  ) )
+#ifdef YY_FLEX_LEX_COMPAT
 						return 0;
+#else
+						return EOF;
+#endif
 
 					if ( ! (yy_did_buffer_switch_on_eof) )
 						YY_NEW_FILE;

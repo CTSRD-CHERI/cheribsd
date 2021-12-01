@@ -1019,8 +1019,9 @@ print_rule(struct pfctl_rule *r, const char *anchor_call, int verbose, int numer
 
 		printf(" fragment reassemble");
 	}
-	if (r->label[0])
-		printf(" label \"%s\"", r->label);
+	i = 0;
+	while (r->label[i][0])
+		printf(" label \"%s\"", r->label[i++]);
 	if (r->qname[0] && r->pqname[0])
 		printf(" queue(%s, %s)", r->qname, r->pqname);
 	else if (r->qname[0])
@@ -1395,26 +1396,6 @@ ifa_exists(char *ifa_name)
 	return (NULL);
 }
 
-static struct node_host *
-if_lookup(char *if_name)
-{
-	struct node_host *p, *n;
-
-	for (p = iftab; p; p = p->next) {
-		if (! strcmp(if_name, p->ifname)) {
-			n = calloc(1, sizeof(struct node_host));
-			bcopy(p, n, sizeof(struct node_host));
-
-			n->next = NULL;
-			n->tail = n;
-
-			return (n);
-		}
-	}
-
-	return (NULL);
-}
-
 struct node_host *
 ifa_grouplookup(char *ifa_name, int flags)
 {
@@ -1438,7 +1419,7 @@ ifa_grouplookup(char *ifa_name, int flags)
 	for (ifg = ifgr.ifgr_groups; ifg && len >= sizeof(struct ifg_req);
 	    ifg++) {
 		len -= sizeof(struct ifg_req);
-		if ((n = if_lookup(ifg->ifgrq_member)) == NULL)
+		if ((n = ifa_lookup(ifg->ifgrq_member, flags)) == NULL)
 			continue;
 		if (h == NULL)
 			h = n;

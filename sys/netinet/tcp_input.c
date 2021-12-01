@@ -123,6 +123,7 @@ __FBSDID("$FreeBSD$");
 #ifdef TCP_OFFLOAD
 #include <netinet/tcp_offload.h>
 #endif
+#include <netinet/udp.h>
 
 #include <netipsec/ipsec_support.h>
 
@@ -167,11 +168,6 @@ VNET_DEFINE(int, tcp_do_newcwv) = 0;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, newcwv, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(tcp_do_newcwv), 0,
     "Enable New Congestion Window Validation per RFC7661");
-
-VNET_DEFINE(int, tcp_do_rfc6675_pipe) = 0;
-SYSCTL_INT(_net_inet_tcp, OID_AUTO, rfc6675_pipe, CTLFLAG_VNET | CTLFLAG_RW,
-    &VNET_NAME(tcp_do_rfc6675_pipe), 0,
-    "Use calculated pipe/in-flight bytes per RFC 6675");
 
 VNET_DEFINE(int, tcp_do_rfc3042) = 1;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, rfc3042, CTLFLAG_VNET | CTLFLAG_RW,
@@ -510,6 +506,7 @@ cc_post_recovery(struct tcpcb *tp, struct tcphdr *th)
 	}
 	/* XXXLAS: EXIT_RECOVERY ? */
 	tp->t_bytes_acked = 0;
+	tp->sackhint.delivered_data = 0;
 	tp->sackhint.prr_out = 0;
 }
 
@@ -572,7 +569,7 @@ cc_ecnpkt_handler(struct tcpcb *tp, struct tcphdr *th, uint8_t iptos)
  */
 #ifdef INET6
 int
-tcp6_input(struct mbuf **mp, int *offp, int proto)
+tcp6_input_with_port(struct mbuf **mp, int *offp, int proto, uint16_t port)
 {
 	struct mbuf *m;
 	struct in6_ifaddr *ia6;
@@ -602,12 +599,19 @@ tcp6_input(struct mbuf **mp, int *offp, int proto)
 	}
 
 	*mp = m;
-	return (tcp_input(mp, offp, proto));
+	return (tcp_input_with_port(mp, offp, proto, port));
+}
+
+int
+tcp6_input(struct mbuf **mp, int *offp, int proto)
+{
+
+	return(tcp6_input_with_port(mp, offp, proto, 0));
 }
 #endif /* INET6 */
 
 int
-tcp_input(struct mbuf **mp, int *offp, int proto)
+tcp_input_with_port(struct mbuf **mp, int *offp, int proto, uint16_t port)
 {
 	struct mbuf *m = *mp;
 	struct tcphdr *th = NULL;
@@ -664,6 +668,8 @@ tcp_input(struct mbuf **mp, int *offp, int proto)
 		ip6 = mtod(m, struct ip6_hdr *);
 		th = (struct tcphdr *)((caddr_t)ip6 + off0);
 		tlen = sizeof(*ip6) + ntohs(ip6->ip6_plen) - off0;
+		if (port)
+			goto skip6_csum;
 		if (m->m_pkthdr.csum_flags & CSUM_DATA_VALID_IPV6) {
 			if (m->m_pkthdr.csum_flags & CSUM_PSEUDO_HDR)
 				th->th_sum = m->m_pkthdr.csum_data;
@@ -677,7 +683,7 @@ tcp_input(struct mbuf **mp, int *offp, int proto)
 			TCPSTAT_INC(tcps_rcvbadsum);
 			goto drop;
 		}
-
+	skip6_csum:
 		/*
 		 * Be proactive about unspecified IPv6 address in source.
 		 * As we use all-zero to indicate unbounded/unconnected pcb,
@@ -718,6 +724,8 @@ tcp_input(struct mbuf **mp, int *offp, int proto)
 		tlen = ntohs(ip->ip_len) - off0;
 
 		iptos = ip->ip_tos;
+		if (port)
+			goto skip_csum;
 		if (m->m_pkthdr.csum_flags & CSUM_DATA_VALID) {
 			if (m->m_pkthdr.csum_flags & CSUM_PSEUDO_HDR)
 				th->th_sum = m->m_pkthdr.csum_data;
@@ -747,8 +755,8 @@ tcp_input(struct mbuf **mp, int *offp, int proto)
 			ip->ip_v = IPVERSION;
 			ip->ip_hl = off0 >> 2;
 		}
-
-		if (th->th_sum) {
+	skip_csum:
+		if (th->th_sum && (port == 0)) {
 			TCPSTAT_INC(tcps_rcvbadsum);
 			goto drop;
 		}
@@ -827,11 +835,12 @@ tcp_input(struct mbuf **mp, int *offp, int proto)
 		fwd_tag = m_tag_find(m, PACKET_TAG_IPFORWARD, NULL);
 
 	/*
-	 * For initial SYN packets arriving on listening socket,
-	 * we don't need write lock.
+	 * For initial SYN packets we don't need write lock on matching
+	 * PCB, be it a listening one or a synchronized one.  The packet
+	 * shall not modify its state.
 	 */
 	lookupflag = (thflags & (TH_ACK|TH_SYN)) == TH_SYN ?
-	    INPLOOKUP_RLOCKLISTEN : INPLOOKUP_WLOCKPCB;
+	    INPLOOKUP_RLOCKPCB : INPLOOKUP_WLOCKPCB;
 findpcb:
 #ifdef INET6
 	if (isipv6 && fwd_tag != NULL) {
@@ -977,16 +986,6 @@ findpcb:
 	 * or duplicate segments arriving late.  If this segment was a
 	 * legitimate new connection attempt, the old INPCB gets removed and
 	 * we can try again to find a listening socket.
-	 *
-	 * At this point, due to earlier optimism, we may hold only an inpcb
-	 * lock, and not the inpcbinfo write lock.  If so, we need to try to
-	 * acquire it, or if that fails, acquire a reference on the inpcb,
-	 * drop all locks, acquire a global write lock, and then re-acquire
-	 * the inpcb lock.  We may at that point discover that another thread
-	 * has tried to free the inpcb, in which case we need to loop back
-	 * and try to find a new inpcb to deliver to.
-	 *
-	 * XXXRW: It may be time to rethink timewait locking.
 	 */
 	if (inp->inp_flags & INP_TIMEWAIT) {
 		tcp_dooptions(&to, optp, optlen,
@@ -1005,6 +1004,11 @@ findpcb:
 	 */
 	tp = intotcpcb(inp);
 	if (tp == NULL || tp->t_state == TCPS_CLOSED) {
+		rstreason = BANDLIM_RST_CLOSEDPORT;
+		goto dropwithreset;
+	}
+
+	if ((tp->t_port != port) && (tp->t_state > TCPS_LISTEN)) {
 		rstreason = BANDLIM_RST_CLOSEDPORT;
 		goto dropwithreset;
 	}
@@ -1079,7 +1083,7 @@ findpcb:
 			 * NB: syncache_expand() doesn't unlock
 			 * inp and tcpinfo locks.
 			 */
-			rstreason = syncache_expand(&inc, &to, th, &so, m);
+			rstreason = syncache_expand(&inc, &to, th, &so, m, port);
 			if (rstreason < 0) {
 				/*
 				 * A failing TCP MD5 signature comparison
@@ -1161,7 +1165,7 @@ tfo_socket_result:
 		 * causes.
 		 */
 		if (thflags & TH_RST) {
-			syncache_chkrst(&inc, th, m);
+			syncache_chkrst(&inc, th, m, port);
 			goto dropunlock;
 		}
 		/*
@@ -1183,7 +1187,7 @@ tfo_socket_result:
 				log(LOG_DEBUG, "%s; %s: Listen socket: "
 				    "SYN|ACK invalid, segment rejected\n",
 				    s, __func__);
-			syncache_badack(&inc);	/* XXX: Not needed! */
+			syncache_badack(&inc, port);	/* XXX: Not needed! */
 			TCPSTAT_INC(tcps_badsyn);
 			rstreason = BANDLIM_RST_OPENPORT;
 			goto dropwithreset;
@@ -1342,14 +1346,13 @@ tfo_socket_result:
 		TCP_PROBE3(debug__input, tp, th, m);
 		tcp_dooptions(&to, optp, optlen, TO_SYN);
 		if ((so = syncache_add(&inc, &to, th, inp, so, m, NULL, NULL,
-		    iptos)) != NULL)
+		    iptos, port)) != NULL)
 			goto tfo_socket_result;
 
 		/*
 		 * Entry added to syncache and mbuf consumed.
 		 * Only the listen socket is unlocked by syncache_add().
 		 */
-		INP_INFO_WUNLOCK_ASSERT(&V_tcbinfo);
 		return (IPPROTO_DONE);
 	} else if (tp->t_state == TCPS_LISTEN) {
 		/*
@@ -1379,7 +1382,16 @@ tfo_socket_result:
 	 * Segment belongs to a connection in SYN_SENT, ESTABLISHED or later
 	 * state.  tcp_do_segment() always consumes the mbuf chain, unlocks
 	 * the inpcb, and unlocks pcbinfo.
+	 *
+	 * XXXGL: in case of a pure SYN arriving on existing connection
+	 * TCP stacks won't need to modify the PCB, they would either drop
+	 * the segment silently, or send a challenge ACK.  However, we try
+	 * to upgrade the lock, because calling convention for stacks is
+	 * write-lock on PCB.  If upgrade fails, drop the SYN.
 	 */
+	if (lookupflag == INPLOOKUP_RLOCKPCB && INP_TRY_UPGRADE(inp) == 0)
+		goto dropunlock;
+
 	tp->t_fb->tfb_tcp_do_segment(m, th, so, tp, drop_hdrlen, tlen, iptos);
 	return (IPPROTO_DONE);
 
@@ -1402,7 +1414,6 @@ dropunlock:
 		INP_UNLOCK(inp);
 
 drop:
-	INP_INFO_WUNLOCK_ASSERT(&V_tcbinfo);
 	if (s != NULL)
 		free(s, M_TCPLOG);
 	if (m != NULL)
@@ -1471,6 +1482,12 @@ tcp_autorcvbuf(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		tp->rfbuf_cnt += tlen;	/* add up */
 	}
 	return (newsize);
+}
+
+int
+tcp_input(struct mbuf **mp, int *offp, int proto)
+{
+	return(tcp_input_with_port(mp, offp, proto, 0));
 }
 
 void
@@ -2595,7 +2612,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 						 * we have less than 1/2 the original window's
 						 * worth of data in flight.
 						 */
-						if (V_tcp_do_rfc6675_pipe)
+						if (V_tcp_do_newsack)
 							awnd = tcp_compute_pipe(tp);
 						else
 							awnd = (tp->snd_nxt - tp->snd_fack) +
@@ -2612,7 +2629,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 					goto drop;
 				} else if (tp->t_dupacks == tcprexmtthresh ||
 					    (tp->t_flags & TF_SACK_PERMIT &&
-					     V_tcp_do_rfc6675_pipe &&
+					     V_tcp_do_newsack &&
 					     tp->sackhint.sacked_bytes >
 					     (tcprexmtthresh - 1) * maxseg)) {
 enter_recovery:
@@ -3677,11 +3694,13 @@ tcp_mss_update(struct tcpcb *tp, int offer, int mtuoffer,
 			    sizeof (struct ip6_hdr) + sizeof (struct tcphdr) :
 			    sizeof (struct tcpiphdr);
 #else
-	const size_t min_protoh = sizeof(struct tcpiphdr);
+	 size_t min_protoh = sizeof(struct tcpiphdr);
 #endif
 
 	INP_WLOCK_ASSERT(tp->t_inpcb);
 
+	if (tp->t_port)
+		min_protoh += V_tcp_udp_tunneling_overhead;
 	if (mtuoffer != -1) {
 		KASSERT(offer == -1, ("%s: conflict", __func__));
 		offer = mtuoffer - min_protoh;
@@ -3940,7 +3959,7 @@ tcp_do_prr_ack(struct tcpcb *tp, struct tcphdr *th, struct tcpopt *to)
 	 * network.
 	 */
 	del_data = tp->sackhint.delivered_data;
-	if (V_tcp_do_rfc6675_pipe)
+	if (V_tcp_do_newsack)
 		pipe = tcp_compute_pipe(tp);
 	else
 		pipe = (tp->snd_nxt - tp->snd_fack) + tp->sackhint.sack_bytes_rexmit;

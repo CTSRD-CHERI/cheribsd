@@ -450,6 +450,7 @@ struct pf_rule {
 #define PF_SKIP_COUNT		8
 	union pf_rule_ptr	 skip[PF_SKIP_COUNT];
 #define PF_RULE_LABEL_SIZE	 64
+#define PF_RULE_MAX_LABEL_COUNT	 5
 	char			 label[PF_RULE_LABEL_SIZE];
 	char			 ifname[IFNAMSIZ];
 	char			 qname[PF_QNAME_SIZE];
@@ -561,7 +562,10 @@ struct pf_rule {
 #define	PFRULE_NOSYNC		0x0010
 #define PFRULE_SRCTRACK		0x0020  /* track source states */
 #define PFRULE_RULESRCTRACK	0x0040  /* per rule */
+
+#ifdef _KERNEL
 #define	PFRULE_REFS		0x0080	/* rule has references */
+#endif
 
 /* scrub flags */
 #define	PFRULE_NODF		0x0100

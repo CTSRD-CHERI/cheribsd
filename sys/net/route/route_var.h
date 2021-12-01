@@ -60,7 +60,7 @@ struct rib_head {
 	rn_walktree_t		*rnh_walktree;	/* traverse tree */
 	rn_walktree_from_t	*rnh_walktree_from; /* traverse tree below a */
 	rnh_preadd_entry_f_t	*rnh_preadd;	/* hook to alter record prior to insertion */
-	rt_gen_t		rnh_gen;	/* generation counter */
+	rt_gen_t		rnh_gen;	/* datapath generation counter */
 	int			rnh_multipath;	/* multipath capable ? */
 	struct radix_node	rnh_nodes[3];	/* empty tree for common case */
 	struct rmlock		rib_lock;	/* config/data path lock */
@@ -71,8 +71,10 @@ struct rib_head {
 	struct callout		expire_callout;	/* Callout for expiring dynamic routes */
 	time_t			next_expire;	/* Next expire run ts */
 	uint32_t		rnh_prefixes;	/* Number of prefixes */
+	rt_gen_t		rnh_gen_rib;	/* fib algo: rib generation counter */
 	uint32_t		rib_dying:1;	/* rib is detaching */
 	uint32_t		rib_algo_fixed:1;/* fixed algorithm */
+	uint32_t		rib_algo_init:1;/* algo init done */
 	struct nh_control	*nh_control;	/* nexthop subsystem data */
 	CK_STAILQ_HEAD(, rib_subscription)	rnh_subscribers;/* notification subscribers */
 };
@@ -115,6 +117,16 @@ _Static_assert(__offsetof(_s1, _f1) == __offsetof(_s2, _f2),		\
 CHK_STRUCT_ROUTE_FIELDS(_ro_new);						\
 _Static_assert(__offsetof(struct route, ro_dst) == __offsetof(_ro_new, _dst_new),\
 		"ro_dst and " #_dst_new " are at different offset")
+
+static inline void
+rib_bump_gen(struct rib_head *rnh)
+{
+#ifdef FIB_ALGO
+	rnh->rnh_gen_rib++;
+#else
+	rnh->rnh_gen++;
+#endif
+}
 
 struct rib_head *rt_tables_get_rnh(uint32_t table, sa_family_t family);
 int rt_getifa_fib(struct rt_addrinfo *info, u_int fibnum);
@@ -317,7 +329,7 @@ int rtsock_addrmsg(int cmd, struct ifaddr *ifa, int fibnum);
 
 /* lookup_framework.c */
 void fib_grow_rtables(uint32_t new_num_tables);
-int fib_select_algo_initial(struct rib_head *rh);
+void fib_setup_family(int family, uint32_t num_tables);
 void fib_destroy_rib(struct rib_head *rh);
 void vnet_fib_init(void);
 void vnet_fib_destroy(void);

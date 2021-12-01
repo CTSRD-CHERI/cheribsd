@@ -237,6 +237,7 @@ ken [label="Ken Merry\nken@FreeBSD.org\n1998/09/08"]
 kensmith [label="Ken Smith\nkensmith@FreeBSD.org\n2004/01/23"]
 kevans [label="Kyle Evans\nkevans@FreeBSD.org\n2017/06/20"]
 kevlo [label="Kevin Lo\nkevlo@FreeBSD.org\n2006/07/23"]
+khng [label="Ka Ho Ng\nkhng@FreeBSD.org\n2021/03/15"]
 kib [label="Konstantin Belousov\nkib@FreeBSD.org\n2006/06/03"]
 kibab [label="Ilya Bakulin\nkibab@FreeBSD.org\n2017/09/02"]
 kmacy [label="Kip Macy\nkmacy@FreeBSD.org\n2005/06/01"]
@@ -282,6 +283,7 @@ np [label="Navdeep Parhar\nnp@FreeBSD.org\n2009/06/05"]
 nwhitehorn [label="Nathan Whitehorn\nnwhitehorn@FreeBSD.org\n2008/07/03"]
 n_hibma [label="Nick Hibma\nn_hibma@FreeBSD.org\n1998/11/26"]
 obrien [label="David E. O'Brien\nobrien@FreeBSD.org\n1996/10/29"]
+oh [label="Oskar Holmlund\noh@FreeBSD.org\n2021/04/21"]
 olli [label="Oliver Fromme\nolli@FreeBSD.org\n2008/02/14"]
 oshogbo [label="Mariusz Zaborski\noshogbo@FreeBSD.org\n2015/04/15"]
 peadar [label="Peter Edwards\npeadar@FreeBSD.org\n2004/03/08"]
@@ -711,6 +713,10 @@ kmacy -> lstewart
 kp -> donner
 kp -> nick
 
+lwhsu -> khng
+
+manu -> oh
+
 marcel -> allanjude
 marcel -> art
 marcel -> arun
@@ -785,6 +791,7 @@ philip -> benl
 philip -> donner
 philip -> ed
 philip -> jls
+philip -> khng
 philip -> matteo
 philip -> uqs
 philip -> kp
