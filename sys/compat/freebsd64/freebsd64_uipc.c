@@ -178,12 +178,11 @@ freebsd64_copyout_control(struct msghdr *msg, struct mbuf *control)
 	socklen_t clen, datalen, oldclen;
 	int error;
 	char * __capability ctlbuf;
-	int len, maxlen, copylen;
+	int len, copylen;
 	struct mbuf *m;
 	error = 0;
 
 	len    = msg->msg_controllen;
-	maxlen = msg->msg_controllen;
 	msg->msg_controllen = 0;
 
 	ctlbuf = msg->msg_control;
