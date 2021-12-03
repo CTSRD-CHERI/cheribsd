@@ -157,7 +157,7 @@ aout_fixup(uintptr_t *stack_base, struct image_params *imgp)
 static int
 exec_aout_imgact(struct image_params *imgp)
 {
-	const struct exec *a_out = (const struct exec *) imgp->image_header;
+	const struct exec *a_out;
 	struct vmspace *vmspace;
 	vm_map_t map;
 	vm_object_t object;
@@ -169,6 +169,8 @@ exec_aout_imgact(struct image_params *imgp)
 	vm_pointer_t reservation;
 	vm_size_t reserv_size;
 
+	a_out = (const struct exec *)imgp->image_header;
+
 	/*
 	 * Linux and *BSD binaries look very much alike,
 	 * only the machine id is different:
@@ -178,7 +180,7 @@ exec_aout_imgact(struct image_params *imgp)
 	if (((a_out->a_midmag >> 16) & 0xff) != 0x86 &&
 	    ((a_out->a_midmag >> 16) & 0xff) != 0 &&
 	    ((((int)ntohl(a_out->a_midmag)) >> 16) & 0xff) != 0x86)
-                return -1;
+                return (-1);
 
 	/*
 	 * Set file/virtual offset based on a.out variant.
