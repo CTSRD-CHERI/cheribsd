@@ -363,6 +363,7 @@ INSTALLDIR_LIST= \
 	usr/include/private/ucl \
 	usr/include/private/zstd \
 	usr/lib \
+	usr/libdata/pkgconfig \
 	usr/libexec
 
 installdirs:
