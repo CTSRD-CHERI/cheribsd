@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #ifdef KDB
 #include <sys/kdb.h>
 #endif
+#include <ddb/ddb.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -328,6 +329,7 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		printf(" esr:         %.8lx\n", esr);
 	}
 
+	colocation_trap_in_switcher(td, frame, "cap abort");
 	call_trapsignal(td, SIGPROT, cheri_esr_to_sicode(esr),
 	    (void * __capability)frame->tf_elr, ESR_ELx_EXCEPTION(esr));
 	userret(td, frame);
@@ -438,6 +440,7 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	if (error != KERN_SUCCESS) {
 bad_far:
 		if (lower) {
+			colocation_trap_in_switcher(td, frame, "data abort");
 			call_trapsignal(td, sig, ucode,
 			    (void * __capability)(uintcap_t)far,
 			    ESR_ELx_EXCEPTION(esr));
@@ -688,6 +691,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		break;
 	case EXCP_SVC32:
 	case EXCP_SVC64:
+		colocation_unborrow(td);
 		svc_handler(td, frame);
 		break;
 	case EXCP_INSN_ABORT_L:
@@ -699,6 +703,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 			abort_handlers[dfsc](td, frame, esr, far, 1);
 		else {
 			print_registers(frame);
+			colocation_trap_in_switcher(td, frame, "data/insn abort");
 			print_gp_register("far", far);
 			printf(" esr:         %.8lx\n", esr);
 			panic("Unhandled EL0 %s abort: %x",
@@ -707,9 +712,11 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		}
 		break;
 	case EXCP_UNKNOWN:
-		if (!undef_insn(0, frame))
+		if (!undef_insn(0, frame)) {
+			colocation_trap_in_switcher(td, frame, "unknown");
 			call_trapsignal(td, SIGILL, ILL_ILLTRP,
 			    (void * __capability)(uintcap_t)far, exception);
+		}
 		userret(td, frame);
 		break;
 	case EXCP_FPAC:
@@ -718,11 +725,13 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		userret(td, frame);
 		break;
 	case EXCP_SP_ALIGN:
+		colocation_trap_in_switcher(td, frame, "sp alignment");
 		call_trapsignal(td, SIGBUS, BUS_ADRALN,
 		    (void * __capability)frame->tf_sp, exception);
 		userret(td, frame);
 		break;
 	case EXCP_PC_ALIGN:
+		colocation_trap_in_switcher(td, frame, "pc alignment");
 		call_trapsignal(td, SIGBUS, BUS_ADRALN,
 		    (void * __capability)frame->tf_elr, exception);
 		userret(td, frame);
@@ -732,6 +741,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 #ifdef COMPAT_FREEBSD32
 	case EXCP_BRKPT_32:
 #endif /* COMPAT_FREEBSD32 */
+		colocation_trap_in_switcher(td, frame, "breakpoint");
 		call_trapsignal(td, SIGTRAP, TRAP_BRKPT,
 		    (void * __capability)frame->tf_elr, exception);
 		userret(td, frame);
@@ -747,9 +757,11 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		 * instruction to access a special register userspace doesn't
 		 * have access to.
 		 */
-		if (!undef_insn(0, frame))
+		if (!undef_insn(0, frame)) {
+			colocation_trap_in_switcher(td, frame, "msr");
 			call_trapsignal(td, SIGILL, ILL_PRVOPC,
 			    (void * __capability)frame->tf_elr, exception); 
+		}
 		userret(td, frame);
 		break;
 	case EXCP_SOFTSTP_EL0:
@@ -759,6 +771,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 			td->td_pcb->pcb_flags &= ~PCB_SINGLE_STEP;
 			WRITE_SPECIALREG(mdscr_el1,
 			    READ_SPECIALREG(mdscr_el1) & ~MDSCR_SS);
+			colocation_trap_in_switcher(td, frame, "softstp");
 		}
 		PROC_UNLOCK(td->td_proc);
 		call_trapsignal(td, SIGTRAP, TRAP_TRACE,
@@ -766,6 +779,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		userret(td, frame);
 		break;
 	default:
+		colocation_trap_in_switcher(td, frame, "default");
 		call_trapsignal(td, SIGBUS, BUS_OBJERR,
 		    (void * __capability)frame->tf_elr, exception);
 		userret(td, frame);
@@ -808,4 +822,19 @@ unhandled_exception(struct trapframe *frame)
 	print_gp_register("far", far);
 	printf(" esr:         %.8lx\n", esr);
 	panic("Unhandled exception");
+}
+
+void
+db_print_cap(struct thread *td, const char *name, const void * __capability value)
+{
+	pid_t pid;
+
+	pid = vm_get_cap_owner(td, (uintcap_t)value);
+
+	if (pid >= 0) {
+		(kdb_active ? db_printf : printf)("%s%#lp (pid %d)\n",
+		    name, value, pid);
+	} else {
+		(kdb_active ? db_printf : printf)("%s%#lp\n", name, value);
+	}
 }
