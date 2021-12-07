@@ -209,7 +209,7 @@ SUBDIR.${MK_STATS}+=	libstats
     ${MACHINE_ARCH:Mmips64*}) && \
     !${MACHINE_ABI:Mpurecap}
 _libclang_rt=	libclang_rt
-.elif ${MK_ASAN} != "no" || ${MK_UBSAN} != "no"
+.elif (${MK_ASAN} != "no" || ${MK_UBSAN} != "no") && make(all)
 .error "Requested build with sanitizers but cannot build runtime libraries!"
 .elif !${MACHINE_ABI:Mpurecap} && ${MACHINE_ARCH} != "mips" && \
     ! ${MACHINE_ARCH:Mriscv*}
