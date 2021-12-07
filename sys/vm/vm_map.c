@@ -503,6 +503,9 @@ SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_margin_down, CTLFLAG_RWTUN,
 static int abandon_on_munmap = 1;
 SYSCTL_INT(_debug, OID_AUTO, abandon_on_munmap, CTLFLAG_RWTUN, &abandon_on_munmap, 0,
     "Add abandoned vm entries on munmap(2)/shmdt(2)");
+static int kdb_on_overlap = 0;
+SYSCTL_INT(_debug, OID_AUTO, kdb_on_overlap, CTLFLAG_RWTUN, &kdb_on_overlap, 0,
+    "Enter ddb(4) when vm_map_check_owner_proc() overlaps");
 
 static bool
 vm_map_entry_abandoned(vm_map_entry_t entry)
@@ -3260,6 +3263,8 @@ vm_map_check_owner_proc(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			    __func__, start, end,
 			    p->p_pid, p->p_comm, &p->p_vmspace->vm_map,
 			    entry->start, entry->end, entry->owner);
+			if (kdb_on_overlap)
+				kdb_enter(KDB_WHY_CHERI, "overlap");
 			return (KERN_PROTECTION_FAILURE);
 		}
 	}
