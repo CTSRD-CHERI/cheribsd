@@ -319,10 +319,12 @@ void	ktrsyserrcause(const char *format, ...) __printflike(1, 2);
 
 #define ktrstat_error(s, error) \
 	ktrstruct_error("stat", (s), sizeof(struct stat), error)
-
 extern u_int ktr_geniosize;
 #ifdef	KTRACE
 extern int ktr_filesize_limit_signal;
+#else
+#define	ktr_filesize_limit_signal 0
+#endif
 
 #ifdef KTRACE
 #define SYSERRCAUSE(fmt, ...) \
@@ -332,9 +334,6 @@ extern int ktr_filesize_limit_signal;
 #define SYSERRCAUSE(fmt, ...)
 #endif
 
-#else
-#define	ktr_filesize_limit_signal 0
-#endif
 #else
 
 #include <sys/cdefs.h>
