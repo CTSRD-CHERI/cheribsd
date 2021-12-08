@@ -1405,14 +1405,12 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 */
 	if (imgp->cop != NULL) {
 #ifdef __ELF_CHERI
-		if (SV_PROC_FLAG(imgp->cop, SV_CHERI) == 0) {
+		if (!SV_PROC_FLAG(imgp->cop, SV_CHERI))
+#endif
+		{
 			error = EPERM;
 			goto ret;
 		}
-#else
-		error = EPERM;
-		goto ret;
-#endif
 	}
 
 	et_dyn_addr = 0;
