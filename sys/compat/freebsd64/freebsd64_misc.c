@@ -1754,8 +1754,19 @@ int
 freebsd64_swapoff(struct thread *td, struct freebsd64_swapoff_args *uap)
 {
 
-	return (kern_swapoff(td, __USER_CAP_STR(uap->name)));
+	return (kern_swapoff(td, __USER_CAP_STR(uap->name), UIO_USERSPACE,
+	    uap->flags));
 }
+
+#ifdef COMPAT_FREEBSD13
+int
+freebsd13_freebsd64_swapoff(struct thread *td,
+    struct freebsd13_freebsd64_swapoff_args *uap)
+{
+
+	return (kern_swapoff(td, __USER_CAP_STR(uap->name), UIO_USERSPACE, 0));
+}
+#endif
 
 /*
  * sys_capability.c

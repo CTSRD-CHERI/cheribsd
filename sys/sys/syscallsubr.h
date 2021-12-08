@@ -520,7 +520,8 @@ int	kern_statat(struct thread *td, int flag, int fd,
 int	kern_specialfd(struct thread *td, int type, void * __capability arg);
 int	kern_statfs(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg, struct statfs *buf);
-int	kern_swapoff(struct thread *td, const char * __capability name);
+int	kern_swapoff(struct thread *td, const char * __capability name,
+	    enum uio_seg name_seg, u_int flags);
 int	kern_swapon(struct thread *td, const char * __capability name);
 int	kern_symlinkat(struct thread *td, const char *__capability path1,
 	    int fd, const char * __capability path2, enum uio_seg segflg);
