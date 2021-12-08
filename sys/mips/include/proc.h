@@ -91,15 +91,6 @@ struct mdproc {
 #endif
 };
 
-#define	MAXARGS		8
-struct syscall_args {
-	u_int code;
-	u_int original_code;
-	u_int argoff;
-	struct sysent *callp;
-	syscallarg_t args[MAXARGS];
-};
-
 #ifdef __mips_n64
 #if __has_feature(capabilities)
 #define	KINFO_PROC_SIZE 1248

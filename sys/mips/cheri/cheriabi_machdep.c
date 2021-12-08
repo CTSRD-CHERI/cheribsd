@@ -63,7 +63,7 @@ cheriabi_fetch_syscall_args(struct thread *td)
 	struct trapframe *locr0 = td->td_frame;	 /* aka td->td_pcb->pcv_regs */
 	struct sysentvec *se;
 	struct syscall_args *sa;
-	int error, i, ptrmask;
+	int argoff, error, i, ptrmask;
 
 	error = 0;
 
@@ -78,10 +78,10 @@ cheriabi_fetch_syscall_args(struct thread *td)
 		TRAPF_PC_INCREMENT(locr0, sizeof(int));
 
 	sa->code = locr0->v0;
-	sa->argoff = 0;
+	argoff = 0;
 	if (sa->code == SYS_syscall || sa->code == SYS___syscall) {
 		sa->code = locr0->a0;
-		sa->argoff = 1;
+		argoff = 1;
 	}
 
 	se = td->td_proc->p_sysent;
@@ -100,7 +100,7 @@ cheriabi_fetch_syscall_args(struct thread *td)
 	 * For syscall() and __syscall(), the arguments are stored in a
 	 * var args block pointed to by c13.
 	 */
-	if (td->td_sa.argoff == 1) {
+	if (argoff == 1) {
 		uint64_t intval;
 		int offset;
 
