@@ -1590,7 +1590,7 @@ iscsi_ioctl_daemon_connect(struct iscsi_softc *sc,
 		from_sa = NULL;
 	}
 	error = getsockaddr(&to_sa, __USER_CAP(idc->idc_to_addr,
-	    idc->idc_to_addrlen), idc->idc_to_add rlen);
+	    idc->idc_to_addrlen), idc->idc_to_addrlen);
 	if (error != 0) {
 		ISCSI_SESSION_WARN(is, "getsockaddr failed with error %d",
 		    error);
