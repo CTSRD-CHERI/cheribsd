@@ -278,7 +278,7 @@ MIASM =  \
 	freebsd64_getcontext.o \
 	freebsd64_setcontext.o \
 	freebsd64_swapcontext.o \
-	freebsd64_swapoff.o \
+	freebsd13_freebsd64_swapoff.o \
 	freebsd64___acl_get_link.o \
 	freebsd64___acl_set_link.o \
 	freebsd64___acl_delete_link.o \
@@ -426,4 +426,5 @@ MIASM =  \
 	freebsd64_aio_writev.o \
 	freebsd64_aio_readv.o \
 	freebsd64_fspacectl.o \
-	sched_getcpu.o
+	sched_getcpu.o \
+	freebsd64_swapoff.o

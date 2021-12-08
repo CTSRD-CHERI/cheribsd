@@ -2005,13 +2005,6 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* swapoff */
-	case 424: {
-		struct swapoff_args *p = params;
-		uarg[a++] = (intptr_t)p->name; /* const char * */
-		*n_args = 1;
-		break;
-	}
 	/* __acl_get_link */
 	case 425: {
 		struct __acl_get_link_args *p = params;
@@ -3336,6 +3329,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* sched_getcpu */
 	case 581: {
 		*n_args = 0;
+		break;
+	}
+	/* swapoff */
+	case 582: {
+		struct swapoff_args *p = params;
+		uarg[a++] = (intptr_t)p->name; /* const char * */
+		uarg[a++] = p->flags; /* u_int */
+		*n_args = 2;
 		break;
 	}
 	default:
@@ -6563,16 +6564,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* swapoff */
-	case 424:
-		switch (ndx) {
-		case 0:
-			p = "userland const char *";
-			break;
-		default:
-			break;
-		};
-		break;
 	/* __acl_get_link */
 	case 425:
 		switch (ndx) {
@@ -9010,6 +9001,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* sched_getcpu */
 	case 581:
 		break;
+	/* swapoff */
+	case 582:
+		switch (ndx) {
+		case 0:
+			p = "userland const char *";
+			break;
+		case 1:
+			p = "u_int";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -10174,11 +10178,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* swapoff */
-	case 424:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
 	/* __acl_get_link */
 	case 425:
 		if (ndx == 0 || ndx == 1)
@@ -10878,6 +10877,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* sched_getcpu */
 	case 581:
+	/* swapoff */
+	case 582:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
 	default:
 		break;
 	};

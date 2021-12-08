@@ -368,7 +368,7 @@
 #define	FREEBSD64_SYS_freebsd64_getcontext	421
 #define	FREEBSD64_SYS_freebsd64_setcontext	422
 #define	FREEBSD64_SYS_freebsd64_swapcontext	423
-#define	FREEBSD64_SYS_freebsd64_swapoff	424
+#define	FREEBSD64_SYS_freebsd13_freebsd64_swapoff	424
 #define	FREEBSD64_SYS_freebsd64___acl_get_link	425
 #define	FREEBSD64_SYS_freebsd64___acl_set_link	426
 #define	FREEBSD64_SYS_freebsd64___acl_delete_link	427
@@ -521,4 +521,5 @@
 #define	FREEBSD64_SYS_freebsd64_aio_readv	579
 #define	FREEBSD64_SYS_freebsd64_fspacectl	580
 #define	FREEBSD64_SYS_sched_getcpu	581
-#define	FREEBSD64_SYS_MAXSYSCALL	582
+#define	FREEBSD64_SYS_freebsd64_swapoff	582
+#define	FREEBSD64_SYS_MAXSYSCALL	583

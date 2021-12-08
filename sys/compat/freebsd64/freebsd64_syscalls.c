@@ -430,7 +430,7 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_getcontext",			/* 421 = freebsd64_getcontext */
 	"freebsd64_setcontext",			/* 422 = freebsd64_setcontext */
 	"freebsd64_swapcontext",			/* 423 = freebsd64_swapcontext */
-	"freebsd64_swapoff",			/* 424 = freebsd64_swapoff */
+	"compat13.freebsd64_swapoff",		/* 424 = freebsd13 freebsd64_swapoff */
 	"freebsd64___acl_get_link",			/* 425 = freebsd64___acl_get_link */
 	"freebsd64___acl_set_link",			/* 426 = freebsd64___acl_set_link */
 	"freebsd64___acl_delete_link",			/* 427 = freebsd64___acl_delete_link */
@@ -588,4 +588,5 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_aio_readv",			/* 579 = freebsd64_aio_readv */
 	"freebsd64_fspacectl",			/* 580 = freebsd64_fspacectl */
 	"sched_getcpu",			/* 581 = sched_getcpu */
+	"freebsd64_swapoff",			/* 582 = freebsd64_swapoff */
 };

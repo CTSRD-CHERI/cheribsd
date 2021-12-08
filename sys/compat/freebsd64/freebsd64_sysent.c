@@ -42,6 +42,12 @@
 #define compat12(n, name) .sy_narg = 0, .sy_call = (sy_call_t *)nosys
 #endif
 
+#ifdef COMPAT_FREEBSD13
+#define compat13(n, name) .sy_narg = n, .sy_call = (sy_call_t *)__CONCAT(freebsd13_, name)
+#else
+#define compat13(n, name) .sy_narg = 0, .sy_call = (sy_call_t *)nosys
+#endif
+
 /* The casts are bogus but will do for now. */
 struct sysent freebsd64_sysent[] = {
 	{ .sy_narg = 0, .sy_call = (sy_call_t *)nosys, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },		/* 0 = syscall */
@@ -468,7 +474,7 @@ struct sysent freebsd64_sysent[] = {
 	{ .sy_narg = AS(freebsd64_getcontext_args), .sy_call = (sy_call_t *)freebsd64_getcontext, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 421 = freebsd64_getcontext */
 	{ .sy_narg = AS(freebsd64_setcontext_args), .sy_call = (sy_call_t *)freebsd64_setcontext, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 422 = freebsd64_setcontext */
 	{ .sy_narg = AS(freebsd64_swapcontext_args), .sy_call = (sy_call_t *)freebsd64_swapcontext, .sy_auevent = AUE_NULL, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 423 = freebsd64_swapcontext */
-	{ .sy_narg = AS(freebsd64_swapoff_args), .sy_call = (sy_call_t *)freebsd64_swapoff, .sy_auevent = AUE_SWAPOFF, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 424 = freebsd64_swapoff */
+	{ compat13(AS(freebsd13_freebsd64_swapoff_args),freebsd64_swapoff), .sy_auevent = AUE_SWAPOFF, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 424 = freebsd13 freebsd64_swapoff */
 	{ .sy_narg = AS(freebsd64___acl_get_link_args), .sy_call = (sy_call_t *)freebsd64___acl_get_link, .sy_auevent = AUE_ACL_GET_LINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 425 = freebsd64___acl_get_link */
 	{ .sy_narg = AS(freebsd64___acl_set_link_args), .sy_call = (sy_call_t *)freebsd64___acl_set_link, .sy_auevent = AUE_ACL_SET_LINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 426 = freebsd64___acl_set_link */
 	{ .sy_narg = AS(freebsd64___acl_delete_link_args), .sy_call = (sy_call_t *)freebsd64___acl_delete_link, .sy_auevent = AUE_ACL_DELETE_LINK, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 427 = freebsd64___acl_delete_link */
@@ -626,4 +632,5 @@ struct sysent freebsd64_sysent[] = {
 	{ .sy_narg = AS(freebsd64_aio_readv_args), .sy_call = (sy_call_t *)freebsd64_aio_readv, .sy_auevent = AUE_AIO_READV, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 579 = freebsd64_aio_readv */
 	{ .sy_narg = AS(freebsd64_fspacectl_args), .sy_call = (sy_call_t *)freebsd64_fspacectl, .sy_auevent = AUE_FSPACECTL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 580 = freebsd64_fspacectl */
 	{ .sy_narg = 0, .sy_call = (sy_call_t *)sys_sched_getcpu, .sy_auevent = AUE_NULL, .sy_flags = SYF_CAPENABLED, .sy_thrcnt = SY_THR_STATIC },	/* 581 = sched_getcpu */
+	{ .sy_narg = AS(freebsd64_swapoff_args), .sy_call = (sy_call_t *)freebsd64_swapoff, .sy_auevent = AUE_SWAPOFF, .sy_flags = 0, .sy_thrcnt = SY_THR_STATIC },	/* 582 = freebsd64_swapoff */
 };

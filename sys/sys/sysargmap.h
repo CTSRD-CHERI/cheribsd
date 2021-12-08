@@ -263,7 +263,6 @@ static int sysargmask[] = {
 	[SYS_getcontext] = (0x0 | 0x1),
 	[SYS_setcontext] = (0x0 | 0x1),
 	[SYS_swapcontext] = (0x0 | 0x1 | 0x2),
-	[SYS_swapoff] = (0x0 | 0x1),
 	[SYS___acl_get_link] = (0x0 | 0x1 | 0x4),
 	[SYS___acl_set_link] = (0x0 | 0x1 | 0x4),
 	[SYS___acl_delete_link] = (0x0 | 0x1),
@@ -406,6 +405,7 @@ static int sysargmask[] = {
 	[SYS_aio_readv] = (0x0 | 0x1),
 	[SYS_fspacectl] = (0x0 | 0x4 | 0x10),
 	[SYS_sched_getcpu] = (0x0),
+	[SYS_swapoff] = (0x0 | 0x1),
 };
 
 #endif /* !_SYSARGMAP_H_ */
