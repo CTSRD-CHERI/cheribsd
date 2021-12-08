@@ -201,12 +201,11 @@ struct vm_map;
 struct vm_map_entry;
 struct epoch_tracker;
 
-#define MAXARGS	8
 struct syscall_args {
 	u_int code;
 	u_int original_code;
 	struct sysent *callp;
-	syscallarg_t args[MAXARGS];
+	syscallarg_t args[8];
 };
 
 /*
