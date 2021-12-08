@@ -1404,7 +1404,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 * to be CheriABI.
 	 */
 	if (imgp->cop != NULL) {
-#ifdef ELF_CHERI
+#ifdef __ELF_CHERI
 		if (SV_PROC_FLAG(imgp->cop, SV_CHERI) == 0) {
 			error = EPERM;
 			goto ret;
