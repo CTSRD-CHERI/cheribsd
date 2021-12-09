@@ -581,7 +581,7 @@ ENTRY(cpu_switch)
 	ld	a3, TD_TID(s1)
 #endif
 	li	a4, -1 // ignore compartment ID for now
-	slti	zero, zero, 0x30 // event logging NOP
+	slti	zero, zero, 0x2f // event logging NOP
 	/* Check if we need to disable tracing for next thread */
 	or	t0, t0, t1
 	bnez	t0, .Lout_qemu_tracing

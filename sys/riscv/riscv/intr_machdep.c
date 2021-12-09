@@ -160,6 +160,9 @@ riscv_cpu_intr(struct trapframe *frame)
 
 	KASSERT((frame->tf_scause & SCAUSE_INTR) != 0,
 		("riscv_cpu_intr: wrong frame passed"));
+#ifdef CPU_QEMU_RISCV
+	QEMU_EVENT_MARKER(QEMU_TRACE_MARKER_INTR_ENTRY);
+#endif
 
 	active_irq = frame->tf_scause & SCAUSE_CODE;
 
@@ -177,6 +180,9 @@ riscv_cpu_intr(struct trapframe *frame)
 		intr_irq_handler(frame);
 		break;
 	}
+#ifdef CPU_QEMU_RISCV
+	QEMU_EVENT_MARKER(QEMU_TRACE_MARKER_INTR_RET);
+#endif
 }
 
 #ifdef SMP

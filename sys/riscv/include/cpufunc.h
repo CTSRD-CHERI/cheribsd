@@ -144,14 +144,14 @@ void riscv_nullop(void);
  * tid: current thread id
  * cid: compartment id
  */
-#define QEMU_EVENT_CONTEXT_UPDATE(pid, tid, cid)        \
+#define	QEMU_EVENT_CONTEXT_UPDATE(pid, tid, cid)        \
 	__asm__ __volatile__(				\
 		"li a0, 0x1\n"				\
 		"li a1, 0x1\n"				\
 		"mv a2, %0\n"				\
 		"mv a3, %1\n"				\
 		"mv a4, %2\n"				\
-		"slti zero, zero, 0x30\n"		\
+		"slti zero, zero, 0x2f\n"		\
 		:: "r" (pid), "r" (tid), "r" (cid)	\
 		: "a0", "a1", "a2", "a3", "a4")
 
@@ -160,16 +160,33 @@ void riscv_nullop(void);
  * Note: this is equivalent to QEMU_EVENT_CONTEXT_UPDATE but
  * can be used before tracing is started.
  */
-#define QEMU_EVENT_CONTEXT_SETUP(pid, tid, cid)         \
+#define	QEMU_EVENT_CONTEXT_SETUP(pid, tid, cid)		\
 	__asm__ __volatile__(				\
 		"li a0, 0x1\n"				\
 		"li a1, 0x2\n"				\
 		"mv a2, %0\n"				\
 		"mv a3, %1\n"				\
 		"mv a4, %2\n"				\
-		"slti zero, zero, 0x30\n"		\
+		"slti zero, zero, 0x2f\n"		\
 		:: "r" (pid), "r" (tid), "r" (cid)	\
 		: "a0", "a1", "a2", "a3", "a4")
+
+/*
+ * Arbitrary marker event to emit to the trace.
+ * 0x00 - 0x9fff reserved for kernel-level markers
+ * 0xa000 - 0xffff reserved for benchmarks use
+ */
+#define	QEMU_EVENT_MARKER(trace_marker)		\
+	__asm__ __volatile__(			\
+	    "li a0, 0x2\n"			\
+	    "mv a1, %0\n"			\
+	    "slti zero, zero, 0x2f\n"		\
+	    :: "r" (trace_marker)		\
+	    : "a0", "a1")
+
+#define	QEMU_TRACE_MARKER_INTR_ENTRY	0x10
+#define	QEMU_TRACE_MARKER_INTR_RET	0x11
+#define	QEMU_TRACE_MARKER_BENCHMARK_ITERATION	0xbeef
 #endif	/* _MACHINE_CPUFUNC_H_ */
 // CHERI CHANGES START
 // {
