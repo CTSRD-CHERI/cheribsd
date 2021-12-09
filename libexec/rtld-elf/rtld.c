@@ -4647,7 +4647,7 @@ rtld_fill_dl_phdr_info(const Obj_Entry *obj, struct dl_phdr_info *phdr_info)
 	phdr_info->dlpi_name = obj->path;
 	phdr_info->dlpi_phnum = obj->phsize / sizeof(obj->phdr[0]);
 	phdr_info->dlpi_tls_modid = obj->tlsindex;
-	dtvp = _get_tp();
+	dtvp = &_tcb_get()->tcb_dtv;
 	phdr_info->dlpi_tls_data = (char *)tls_get_addr_slow(dtvp,
 	    obj->tlsindex, 0, true) + TLS_DTV_OFFSET;
 	phdr_info->dlpi_adds = obj_loads;

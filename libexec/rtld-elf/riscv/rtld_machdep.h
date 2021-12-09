@@ -42,6 +42,7 @@
 
 #include <sys/types.h>
 #include <machine/atomic.h>
+#include <machine/tls.h>
 
 struct Struct_Obj_Entry;
 
@@ -184,14 +185,6 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 /*
  * TLS
  */
-#define	TLS_VARIANT_I	1
-#define	TLS_TP_OFFSET	0x0
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	TLS_DTV_OFFSET	0
-#else
-#define	TLS_DTV_OFFSET	0x800
-#endif
-#define	TLS_TCB_SIZE	(2 * sizeof(void *))
 
 #define round(size, align) \
     (((size) + (align) - 1) & ~((align) - 1))

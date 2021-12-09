@@ -1041,8 +1041,7 @@ ifunc_init(Elf_Auxinfo aux_info[__min_size(AT_COUNT)] __unused)
 void
 allocate_initial_tls(Obj_Entry *objs)
 {
-	char *tls;
-
+	
 	/*
 	 * Fix the size of the static TLS block by using the maximum
 	 * offset allocated so far and adding a bit for dynamic modules to
@@ -1050,15 +1049,13 @@ allocate_initial_tls(Obj_Entry *objs)
 	 */
 	tls_static_space = tls_last_offset + tls_last_size + RTLD_STATIC_TLS_EXTRA;
 
-	tls = (char *) allocate_tls(objs, NULL, TLS_TCB_SIZE, 8);
-
-	sysarch(MIPS_SET_TLS, tls);
+	_tcb_set(allocate_tls(objs, NULL, TLS_TCB_SIZE, TLS_TCB_ALIGN));
 }
 
 void *
 __tls_get_addr(tls_index* ti)
 {
-	uintptr_t **tls;
+	uintptr_t **dtvp;
 	char *p;
 
 #if defined(__CHERI_PURE_CAPABILITY__) // && defined(DEBUG)
@@ -1070,8 +1067,8 @@ __tls_get_addr(tls_index* ti)
 	dbg_assert(cheri_getlen(ti) == sizeof(*ti) && "tls_index should have bounds!");
 #endif
 
-	tls = _get_tp();
-	p = tls_get_addr_common(tls, ti->ti_module, ti->ti_offset);
+	dtvp = &_tcb_get()->tcb_dtv;
+	p = tls_get_addr_common(dtvp, ti->ti_module, ti->ti_offset);
 
 	return (p + TLS_DTV_OFFSET);
 }
