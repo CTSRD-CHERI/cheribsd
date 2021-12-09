@@ -44,11 +44,14 @@ _libc_get_static_tls_base(size_t offset)
 	uintptr_t tlsbase;
 #endif
 
-#if defined(__mips_n64)
 #ifndef __CHERI_PURE_CAPABILITY__
 	__asm__ __volatile__ (
 	    ".set\tpush\n\t"
+#if defined(__mips_n64)
 	    ".set\tmips64r2\n\t"
+#else /* mips 32 */
+	    ".set\tmips32r2\n\t"
+#endif /* ! __mips_n64 */
 	    "rdhwr\t%0, $29\n\t"
 	    ".set\tpop"
 	    : "=r" (tlsbase));
@@ -58,15 +61,6 @@ _libc_get_static_tls_base(size_t offset)
 	    : "=C" (tlsbase));
 #endif
 	tlsbase -= TLS_TP_OFFSET + TLS_TCB_SIZE;
-#else /* mips 32 */
-	__asm__ __volatile__ (
-	    ".set\tpush\n\t"
-	    ".set\tmips32r2\n\t"
-	    "rdhwr\t%0, $29\n\t"
-	    ".set\tpop"
-	    : "=r" (tlsbase));
-	tlsbase -= TLS_TP_OFFSET + TLS_TCB_SIZE;
-#endif /* ! __mips_n64 */
 	tlsbase += offset;
 	return (tlsbase);
 }
