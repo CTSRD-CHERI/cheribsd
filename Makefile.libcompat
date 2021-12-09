@@ -6,8 +6,8 @@ __<${_this:T}>__:
 .include <src.libnames.mk>
 
 # Makefile for the compatibility libraries.
-# - 32-bit compat libraries on MIPS, PowerPC, and AMD64.
-# - 64-bit compat on CHERI MIPS
+# - 32-bit compat libraries on PowerPC, and AMD64.
+# - 64-bit compat on CHERI MIPS, CHERI RISC-V, and Morello.
 
 _LC_LIBDIRS.yes=		lib
 _LC_LIBDIRS.yes+=		gnu/lib
