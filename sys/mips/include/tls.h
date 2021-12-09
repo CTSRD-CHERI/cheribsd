@@ -41,10 +41,10 @@
 #if defined(__CHERI_PURE_CAPABILITY__) || \
     (defined(_KERNEL) && __has_feature(capabilities))
 #define TLS_TP_OFFSET	0
-#define TLS_DTP_OFFSET	0
+#define TLS_DTV_OFFSET	0
 #else
 #define TLS_TP_OFFSET	0x7000
-#define TLS_DTP_OFFSET	0x8000
+#define TLS_DTV_OFFSET	0x8000
 #endif
 #ifdef COMPAT_FREEBSD32
 #define TLS_TP_OFFSET32	0x7000

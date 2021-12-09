@@ -313,7 +313,6 @@ extern void *__tls_get_addr(tls_index *ti);
 #define md_abi_variant_hook(x)
 
 #define	TLS_VARIANT_I	1
-#define	TLS_DTV_OFFSET	0
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /* Add function not used by CHERI as inlines here so that the compiler can
