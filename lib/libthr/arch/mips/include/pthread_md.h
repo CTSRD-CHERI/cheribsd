@@ -51,10 +51,8 @@
 #include <sys/types.h>
 #include <machine/sysarch.h>
 #include <machine/tls.h>
-#include <stddef.h>
 
 #define	CPU_SPINWAIT
-#define	DTV_OFFSET		offsetof(struct tcb, tcb_dtv)
 #ifdef __CHERI_PURE_CAPABILITY__
 #define TCB_ALIGN (CHERICAP_SIZE)
 #else
