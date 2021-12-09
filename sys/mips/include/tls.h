@@ -34,31 +34,70 @@
 #ifndef	__MIPS_TLS_H__
 #define	__MIPS_TLS_H__
 
+#include <sys/_tls_variant_i.h>
+#include <machine/sysarch.h>
+
 /*
  * TLS parameters
  */
 
 #if defined(__CHERI_PURE_CAPABILITY__) || \
     (defined(_KERNEL) && __has_feature(capabilities))
-#define TLS_TP_OFFSET	0
-#define TLS_DTV_OFFSET	0
+#define	TLS_DTV_OFFSET	0
+#define	TLS_TCB_ALIGN	sizeof(void * __capability)
+#define	TLS_TP_OFFSET	0
 #else
-#define TLS_TP_OFFSET	0x7000
-#define TLS_DTV_OFFSET	0x8000
+#define	TLS_DTV_OFFSET	0x8000
+#define	TLS_TCB_ALIGN	16
+#define	TLS_TP_OFFSET	0x7000
 #endif
+
 #ifdef COMPAT_FREEBSD32
+#define	TLS_TCB_SIZE32	8
 #define TLS_TP_OFFSET32	0x7000
 #endif
 #ifdef COMPAT_FREEBSD64
+#define	TLS_TCB_SIZE64	16
 #define TLS_TP_OFFSET64	0x7000
 #endif
 
-#define	TLS_TCB_SIZE	(2 * sizeof(void * __kerncap))
-#ifdef COMPAT_FREEBSD32
-#define TLS_TCB_SIZE32	8
+#ifndef _KERNEL
+
+static __inline void
+_tcb_set(struct tcb *tcb)
+{
+	sysarch(MIPS_SET_TLS, tcb);
+}
+
+static __inline struct tcb *
+_tcb_get(void)
+{
+	struct tcb *tcb;
+
+#ifdef TLS_USE_SYSARCH
+	sysarch(MIPS_GET_TLS, &tcb);
+#else
+#ifdef __CHERI_PURE_CAPABILITY__
+	__asm__ __volatile__ (
+	    "creadhwr\t%0, $chwr_userlocal"
+	    : "=C" (tcb));
+#else
+	__asm__ __volatile__ (
+	    ".set\tpush\n\t"
+#ifdef __mips_n64
+	    ".set\tmips64r2\n\t"
+#else
+	    ".set\tmips32r2\n\t"
 #endif
-#ifdef COMPAT_FREEBSD64
-#define	TLS_TCB_SIZE64	16
+	    "rdhwr\t%0, $29\n\t"
+	    ".set\tpop"
+	    : "=r" (tcb));
+#endif
+	tcb = (struct tcb *)((uintptr_t)tcb - TLS_TP_OFFSET - TLS_TCB_SIZE);
+#endif
+	return (tcb);
+}
+
 #endif
 
 #endif	/* __MIPS_TLS_H__ */
