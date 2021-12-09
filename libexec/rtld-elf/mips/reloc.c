@@ -1071,8 +1071,7 @@ __tls_get_addr(tls_index* ti)
 #endif
 
 	tls = _get_tp();
-	p = tls_get_addr_common(tls, ti->ti_module, ti->ti_offset +
-	    TLS_DTV_OFFSET);
+	p = tls_get_addr_common(tls, ti->ti_module, ti->ti_offset);
 
-	return (p);
+	return (p + TLS_DTV_OFFSET);
 }
