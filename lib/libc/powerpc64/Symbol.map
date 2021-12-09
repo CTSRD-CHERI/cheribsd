@@ -38,7 +38,6 @@ FBSDprivate_1.0 {
 	/* PSEUDO syscalls */
 	_getlogin;
 
-	_set_tp;
 	_fpgetsticky;
 	__makecontext;
 	__longjmp;

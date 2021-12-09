@@ -6,7 +6,7 @@ SRCS+=	infinity.c fabs.c ldexp.c flt_rounds.c
 # SRCS+=	flt_rounds.c fpgetmask.c fpgetround.c fpgetsticky.c fpsetmask.c \
 #	fpsetround.c fpsetsticky.c
 
-SRCS+=	_ctx_start.S _get_tp.c _set_tp.c makecontext.c \
+SRCS+=	_ctx_start.S makecontext.c \
 	signalcontext.c sigsetjmp.S \
 	trivial-getcontextx.c
 
