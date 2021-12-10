@@ -446,6 +446,8 @@ arm64/cavium/thunder_pcie_pem_fdt.c		optional soc_cavm_thunderx pci fdt
 arm64/cavium/thunder_pcie_common.c		optional soc_cavm_thunderx pci
 
 # CHERI
+arm64/cheri/cheri_coaccept.S			optional cpu_cheri
+arm64/cheri/cheri_cocall.S			optional cpu_cheri
 arm64/cheri/cheri_exception.c			optional cpu_cheri
 arm64/cheri/cheri_machdep.c			optional cpu_cheri
 
