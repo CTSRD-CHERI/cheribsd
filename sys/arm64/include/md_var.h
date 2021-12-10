@@ -48,6 +48,14 @@ extern u_long elf32_hwcap2;
 #endif
 extern struct regset regset_arm64_addr_mask;
 
+extern	char	switcher_cocall[];
+extern	char	switcher_cocall_copy_start[];
+extern	char	switcher_cocall_copy_end[];
+extern	char	switcher_cocall_copy_onfault[];
+extern	int	szswitcher_cocall;
+extern	char	switcher_coaccept[];
+extern	int	szswitcher_coaccept;
+
 struct dumperinfo;
 struct minidumpstate;
 

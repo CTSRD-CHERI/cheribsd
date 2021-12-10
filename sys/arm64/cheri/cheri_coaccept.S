@@ -1,10 +1,14 @@
 /*-
- * Copyright (c) 2020 Edward Tomasz Napierala <trasz@FreeBSD.org>
+ * Copyright (c) 2020, 2021 Edward Tomasz Napierala <trasz@FreeBSD.org>
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory under DARPA/AFRL contract (FA8750-10-C-0237)
  * ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * This software was developed by the University of Cambridge Computer
+ * Laboratory as part of the CHERI for Hypervisors and Operating Systems
+ * (CHaOS) project, funded by EPSRC grant EP/V000292/1.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,85 +37,96 @@
 #include <machine/cherireg.h>
 #include <machine/switcher.h>
 
-#define	idc ct6
-
-.option capmode
-
 /*
  * Everywhere below the "caller" and "callee" terms are swapped.
  * In other words, the "caller" here is the same thread as the "caller"
  * on the cocall(2) side.  We - the thread calling into coaccept(2) - are
  * called the callee here.
  *
- * Register usage: we save and restore csp and cra.  The rest gets zeroed;
- * the libc wrappers are responsible for saving and restoring the context.
- *
  * Note that this code executes while ignoring all the signals - a trapping
  * instruction will just get skipped over.
  *
- * Layout of struct switchercb, pointed to by idc (callee side)
- * and, later on, ct0 (caller side):
+ * The switchercb is pointed to by c29/c29 (callee side) and, later on,
+ * c8 (caller side).
  *
- * scb_caller_scb:	0(idc)
- * scb_callee_scb:	1*CHERICAP_SIZE(idc)
- * scb_td:		2*CHERICAP_SIZE(idc)
- * scb_borrower_td:	2*CHERICAP_SIZE+8(idc)
- * scb_unsealcap:	3*CHERICAP_SIZE(idc)
- * scb_csp:		4*CHERICAP_SIZE(idc)
- * scb_clr:		5*CHERICAP_SIZE(idc)
- * scb_outbuf (ca3):	6*CHERICAP_SIZE(idc)
- * scb_outlen (a4):	7*CHERICAP_SIZE(idc)
- * scb_inbuf (ca3):	8*CHERICAP_SIZE(idc)
- * scb_inlen (a4):	9*CHERICAP_SIZE(idc)
- * scb_cookiep (ca2):	10*CHERICAP_SIZE(idc)
  */
 
 .text
 .globl _C_LABEL(switcher_coaccept)
 _C_LABEL(switcher_coaccept):
 	/*
-	 * Save the callee's stack pointer and return address (PCC)
-	 * in the callee's control block.
+	 * Save the callee's CPU context in the callee's control block.
 	 *
 	 * XXX: Make sure the IDC is cleared if we get a signal while here.
 	 */
-	csc	csp, SCB_CSP(idc)
-	csc	cra, SCB_CRA(idc)
+	mov	c8, csp
+	str	c8, SCB_CSP(c29)
+	str	c30, SCB_CRA(c29)
+
+	str	q8, SCB_Q8(c29)
+	str	q9, SCB_Q9(c29)
+	str	q10, SCB_Q10(c29)
+	str	q11, SCB_Q11(c29)
+	str	q12, SCB_Q12(c29)
+	str	q13, SCB_Q13(c29)
+	str	q14, SCB_Q14(c29)
+	str	q15, SCB_Q15(c29)
+	mrs	x8, FPCR
+	str	x8, SCB_FPCR(c29)
+	mrs	x8, FPSR
+	str	x8, SCB_FPSR(c29)
+
+	str	c19, SCB_C19(c29)
+	str	c20, SCB_C20(c29)
+	str	c21, SCB_C21(c29)
+	str	c22, SCB_C22(c29)
+	str	c23, SCB_C23(c29)
+	str	c24, SCB_C24(c29)
+	str	c25, SCB_C25(c29)
+	str	c26, SCB_C26(c29)
+	str	c27, SCB_C27(c29)
+	str	c28, SCB_C28(c29)
+
+	/*
+	 * Save CTPIDR_EL0, the TLS pointer.
+	 */
+	mrs	c8, CTPIDR_EL0
+	str	c8, SCB_TLS(c29)
 
 	/*
 	 * Save the pointer to the cookie.
 	 */
-	csc	ca2, SCB_COOKIEP(idc)
+	str	c2, SCB_COOKIEP(c29)
 
 	/*
 	 * Save the data transfer args.
 	 */
-	csc	ca3, SCB_OUTBUF(idc)
-	csd	a4, SCB_OUTLEN(idc)
-	csc	ca5, SCB_INBUF(idc)
-	csd	a6, SCB_INLEN(idc)
+	str	c3, SCB_OUTBUF(c29)
+	str	x4, SCB_OUTLEN(c29)
+	str	c5, SCB_INBUF(c29)
+	str	x6, SCB_INLEN(c29)
 
 	/*
 	 * Load the capability to the caller's control block.
 	 */
-	clc	ct0, SCB_CALLER_SCB(idc)
+	ldr	c8, SCB_CALLER_SCB(c29)
 
 	/*
 	 * Is this the first invocation of coaccept, or rather a response
 	 * for a ccall()?  If the former - call copark(2).
 	 */
-	cgetlen	t1, ct0
-	bnez	t1, 1f
-	csc	cnull, SCB_CALLER_SCB(idc)
-	li	t0, SYS_copark
-	ecall
+	gclen	x9, c8
+	cbnz	x9, 1f
+	str	czr, SCB_CALLER_SCB(c29)
+	mov	x8, SYS_copark
+	svc	#0
 
 	/*
 	 * Returned from copark(2).
 	 *
 	 * XXX: Wait for the spinlock to be released.
 	 */
-	j	3f
+	b	3f
 
 1:
 	/*
@@ -123,20 +138,64 @@ _C_LABEL(switcher_coaccept):
 	 * is returning to the caller and scb_borrower_thread
 	 * needs to be set to NULL in the caller's scb.
 	 */
-	cld	t1, SCB_BORROWER_TD(ct0)
-	bnez	t1, 4f
-	cld	t3, SCB_TD(ct0)
-	csd	t3, SCB_BORROWER_TD(idc)
-	j	5f
+	ldr	x9, SCB_BORROWER_TD(c8)
+	cbnz	x9, 4f
+	ldr	x11, SCB_TD(c8)
+	str	x11, SCB_BORROWER_TD(c29)
+	b	5f
 4:
-	csd	zero, SCB_BORROWER_TD(ct0)
+	str	czr, SCB_BORROWER_TD(c8)
 5:
 
 	/*
 	 * Restore the caller's context.
 	 */
-	clc	csp, SCB_CSP(ct0)
-	clc	cra, SCB_CRA(ct0)
+	ldr	c10, SCB_CSP(c8)
+	mov	csp, c10
+	ldr	c30, SCB_CRA(c8)
+
+#ifdef can_build_now
+	ldr	q8, SCB_Q9(c8)
+	ldr	q9, SCB_Q9(c8)
+	ldr	q10, SCB_Q10(c8)
+	ldr	q11, SCB_Q11(c8)
+	ldr	q12, SCB_Q12(c8)
+	ldr	q13, SCB_Q13(c8)
+	ldr	q14, SCB_Q14(c8)
+	ldr	q15, SCB_Q15(c8)
+#else
+	add	c9, c8, #3*CHERICAP_SIZE
+	# XXX: Won't compile if the immediate is #0, that's why we need the line above
+	ldr	q8, [c9, #1*CHERICAP_SIZE]
+	ldr	q9, [c9, #2*CHERICAP_SIZE]
+	ldr	q10, [c9, #3*CHERICAP_SIZE]
+	ldr	q11, [c9, #4*CHERICAP_SIZE]
+	ldr	q12, [c9, #5*CHERICAP_SIZE]
+	ldr	q13, [c9, #6*CHERICAP_SIZE]
+	ldr	q14, [c9, #7*CHERICAP_SIZE]
+	ldr	q15, [c9, #8*CHERICAP_SIZE]
+#endif
+	ldr	x10, SCB_FPCR(c8);
+	msr	FPCR, x10
+	ldr	x10, SCB_FPSR(c8);
+	msr	FPSR, x10
+
+	ldr	c19, SCB_C19(c8)
+	ldr	c20, SCB_C20(c8)
+	ldr	c21, SCB_C21(c8)
+	ldr	c22, SCB_C22(c8)
+	ldr	c23, SCB_C23(c8)
+	ldr	c24, SCB_C24(c8)
+	ldr	c25, SCB_C25(c8)
+	ldr	c26, SCB_C26(c8)
+	ldr	c27, SCB_C27(c8)
+	ldr	c28, SCB_C28(c8)
+
+	/*
+	 * Restore CTPIDR_EL0, the TLS pointer.
+	 */
+	ldr	c10, SCB_TLS(c8)
+	msr	CTPIDR_EL0, c10
 
 	/*
 	 * Do the data transfer back to the caller.  The reason
@@ -144,72 +203,62 @@ _C_LABEL(switcher_coaccept):
 	 * is doing - it transfers the data there and back, both
 	 * sides.
 	 */
-	clc	ct4, SCB_INBUF(ct0)
-	cld	t5, SCB_INLEN(ct0)
+	ldr	c12, SCB_INBUF(c8)
+	ldr	x13, SCB_INLEN(c8)
 
 	/*
-	 * Compare buffer sizes, put the smaller one into t5.
+	 * Compare buffer sizes, put the smaller one into x13.
+	 * XXX: use csel
 	 */
-	sub	t3, a4, t5
-	bgez	t3, 2f
-	mv	t5, a4
+	sub	x11, x4, x13
+	cmp	x11, #0
+	bge	2f
+	mov	x13, x4
 
 2:
-	cld	t3, 0(ca3)
-	csd	t3, 0(ct4)
-	cincoffset ca3, ca3, 8
-	cincoffset ct4, ct4, 8
-	addi	t5, t5, -8
-	bgtz	t5, 2b
+	add	x13, x13, #-8
+	ldr	x11, [c3, x13]
+	str	x11, [c12, x13]
+	cbnz	x13, 2b
 
 	/*
 	 * Zero out the scb_peer_scb variables, releasing the spinlock.
 	 */
-	csc	cnull, SCB_CALLEE_SCB(ct0)
-	csc	cnull, SCB_CALLER_SCB(idc)
+	str	czr, SCB_CALLEE_SCB(c8)
+	str	czr, SCB_CALLER_SCB(c29)
 
-	li	t0, 0
-	li	a0, 0
-
-3:
 	/*
-	 * XXX: We should use cclear here, but until it's supported in qemu, let's just...
+	 * Return success; clear the carry flag.
 	 */
-	/* Preserve x1 (ra), and x2 (sp). */
-	li x3, 0
-	li x4, 0
-	/* Preserve x5 (t0), used for errno (XXX). */
-	li x6, 0
-	li x7, 0
-	li x8, 0
-	li x9, 0
-	/* Preserve x10 (a0), which is our return value. */
-	li x11, 0
-	li x12, 0
-	li x13, 0
-	li x14, 0
-	li x15, 0
-	li x16, 0
-	li x17, 0
-	li x18, 0
-	li x19, 0
-	li x20, 0
-	li x21, 0
-	li x22, 0
-	li x23, 0
-	li x24, 0
-	li x25, 0
-	li x26, 0
-	li x27, 0
-	li x28, 0
-	li x29, 0
-	li x30, 0
-	li x31, 0
+	adds	x0, x0, x0
+	mov	x0, 0
+3:
+	/* Preserve x0, which is our return value. */
+	mov	x1, 0
+	mov	x2, 0
+	mov	x3, 0
+	mov	x4, 0
+	mov	x5, 0
+	mov	x6, 0
+	mov	x7, 0
+	mov	x8, 0
+	mov	x9, 0
+	mov	x11, 0
+	mov	x12, 0
+	mov	x13, 0
+	mov	x14, 0
+	mov	x15, 0
+	mov	x16, 0
+	mov	x17, 0
+	mov	x18, 0
+	/* Preserve x18-x28, restored from caller's SCB. */
+	mov	x29, 0
+	/* Preserve x30 (lr) and csp, restored from calee's SCB. */
 
 	/*
 	 * Bye!
 	 */
-	cret
+	rets	c30
 .globl _C_LABEL(eswitcher_coaccept)
 _C_LABEL(eswitcher_coaccept):
 
