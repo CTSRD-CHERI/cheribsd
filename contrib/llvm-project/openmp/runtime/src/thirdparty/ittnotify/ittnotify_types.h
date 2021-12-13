@@ -34,7 +34,9 @@ typedef enum ___itt_group_id
     __itt_group_all       = -1
 } __itt_group_id;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(push, 8)
+#endif
 
 typedef struct ___itt_group_list
 {
@@ -42,7 +44,9 @@ typedef struct ___itt_group_list
     const char*    name;
 } __itt_group_list;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(pop)
+#endif
 
 #define ITT_GROUP_LIST(varname) \
     static __itt_group_list varname[] = {       \

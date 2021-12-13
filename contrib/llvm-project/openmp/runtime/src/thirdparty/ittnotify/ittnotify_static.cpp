@@ -183,7 +183,9 @@ ITT_EXTERN_C_BEGIN ITT_JOIN(_N_(name),_t)* ITTNOTIFY_NAME(name) = ITT_VERSIONIZE
 
 ITT_GROUP_LIST(group_list);
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(push, 8)
+#endif
 
 typedef struct ___itt_group_alias
 {
@@ -198,7 +200,9 @@ static __itt_group_alias group_alias[] = {
     { api_version,        (__itt_group_none) } /* !!! Just to avoid unused code elimination !!! */
 };
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(pop)
+#endif
 
 #if ITT_PLATFORM==ITT_PLATFORM_WIN && KMP_MSVC_COMPAT
 #pragma warning(push)

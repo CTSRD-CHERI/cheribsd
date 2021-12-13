@@ -1663,7 +1663,9 @@ ITT_STUBV(ITTAPI, void, heap_record, (unsigned int record_mask))
  */
 
 /** @cond exclude_from_documentation */
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(push, 8)
+#endif
 
 typedef struct ___itt_domain
 {
@@ -1679,7 +1681,9 @@ typedef struct ___itt_domain
     struct ___itt_domain* next;
 } __itt_domain;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(pop)
+#endif
 /** @endcond */
 
 /**
@@ -1754,14 +1758,18 @@ ITT_STUB(ITTAPI, __itt_domain*, domain_create,  (const char    *name))
  */
 
 /** @cond exclude_from_documentation */
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(push, 8)
+#endif
 
 typedef struct ___itt_id
 {
     unsigned long long d1, d2, d3;
 } __itt_id;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(pop)
+#endif
 /** @endcond */
 
 static const __itt_id __itt_null = { 0, 0, 0 };
@@ -1852,7 +1860,9 @@ ITT_STUBV(ITTAPI, void, id_destroy, (const __itt_domain *domain, __itt_id id))
  */
 
 /** @cond exclude_from_documentation */
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(push, 8)
+#endif
 
 typedef struct ___itt_string_handle
 {
@@ -1867,7 +1877,9 @@ typedef struct ___itt_string_handle
     struct ___itt_string_handle* next;
 } __itt_string_handle;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(pop)
+#endif
 /** @endcond */
 
 /**
@@ -2581,7 +2593,9 @@ ITT_STUBV(ITTAPI, void, relation_add,            (const __itt_domain *domain, __
 /** @} relations group */
 
 /** @cond exclude_from_documentation */
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(push, 8)
+#endif
 
 typedef struct ___itt_clock_info
 {
@@ -2589,7 +2603,9 @@ typedef struct ___itt_clock_info
     unsigned long long clock_base; /*!< Clock domain base timestamp */
 } __itt_clock_info;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(pop)
+#endif
 /** @endcond */
 
 /** @cond exclude_from_documentation */
@@ -2597,7 +2613,9 @@ typedef void (ITTAPI *__itt_get_clock_info_fn)(__itt_clock_info* clock_info, voi
 /** @endcond */
 
 /** @cond exclude_from_documentation */
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(push, 8)
+#endif
 
 typedef struct ___itt_clock_domain
 {
@@ -2609,7 +2627,9 @@ typedef struct ___itt_clock_domain
     struct ___itt_clock_domain* next;
 } __itt_clock_domain;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(pop)
+#endif
 /** @endcond */
 
 /**
@@ -3215,7 +3235,9 @@ typedef enum ___itt_track_group_type
 /** @endcond */
 
 /** @cond exclude_from_documentation */
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(push, 8)
+#endif
 
 typedef struct ___itt_track_group
 {
@@ -3227,7 +3249,9 @@ typedef struct ___itt_track_group
     struct ___itt_track_group* next;
 } __itt_track_group;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(pop)
+#endif
 /** @endcond */
 
 /**
@@ -3243,7 +3267,9 @@ typedef enum ___itt_track_type
 } __itt_track_type;
 
 /** @cond exclude_from_documentation */
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(push, 8)
+#endif
 
 typedef struct ___itt_track
 {
@@ -3255,7 +3281,9 @@ typedef struct ___itt_track
     struct ___itt_track* next;
 } __itt_track;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(pop)
+#endif
 /** @endcond */
 
 /**
