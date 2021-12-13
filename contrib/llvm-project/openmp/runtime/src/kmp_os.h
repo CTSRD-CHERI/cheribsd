@@ -976,6 +976,12 @@ extern kmp_real64 __kmp_xchg_real64(volatile kmp_real64 *p, kmp_real64 v);
 
 #endif /* KMP_ARCH_X86 */
 
+#define TCR_ADDR TCR_PTR
+#define TCW_ADDR TCW_PTR
+#define TCR_SYNC_ADDR TCR_SYNC_PTR
+#define TCW_SYNC_ADDR TCW_SYNC_PTR
+#define TCX_SYNC_ADDR TCX_SYNC_PTR
+
 /* If these FTN_{TRUE,FALSE} values change, may need to change several places
    where they are used to check that language is Fortran, not C. */
 
