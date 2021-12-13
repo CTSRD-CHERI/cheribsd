@@ -113,8 +113,10 @@ static int
 enetc_mdio_pci_probe(device_t dev)
 {
 	struct entec_mdio_pci_id *id;
+	u_int i;
 
-	for (id = enetc_mdio_pci_ids; id->vendor != 0; ++id) {
+	for (i = 0; i < nitems(enetc_mdio_pci_ids); i++) {
+		id = &enetc_mdio_pci_ids[i];
 		if (pci_get_device(dev) != id->device ||
 		    pci_get_vendor(dev) != id->vendor)
 			continue;
