@@ -185,10 +185,17 @@ typedef double kmp_real64;
 
 #ifndef KMP_INTPTR
 #define KMP_INTPTR 1
+#ifdef __CHERI_PURE_CAPABILITY__
+typedef intptr_t kmp_intptr_t;
+typedef uintptr_t kmp_uintptr_t;
+#define KMP_INTPTR_SPEC "Pd"
+#define KMP_UINTPTR_SPEC "Pu"
+#else
 typedef long kmp_intptr_t;
 typedef unsigned long kmp_uintptr_t;
 #define KMP_INTPTR_SPEC "ld"
 #define KMP_UINTPTR_SPEC "lu"
+#endif
 #endif
 
 #ifdef BUILD_I8
@@ -958,6 +965,18 @@ extern kmp_real64 __kmp_xchg_real64(volatile kmp_real64 *p, kmp_real64 v);
   KMP_COMPARE_AND_STORE_REL64((volatile kmp_int64 *)(volatile void *)&(a),     \
                               (kmp_int64)(b), (kmp_int64)(c))
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define TCR_C(a) (a)
+#define TCW_C(a, b) (a) = (b)
+#define TCI_C(a) (++(a))
+#define TCD_C(a) (--(a))
+#define TCR_SYNC_C(a) (a)
+#define TCW_SYNC_C(a, b) (a) = (b)
+#define TCX_SYNC_C(a, b, c)                                                    \
+  KMP_COMPARE_AND_STORE_RELPTR((volatile void *)&(a),                          \
+                              (kmp_intptr_t)(b), (kmp_intptr_t)(c))
+#endif
+
 #if KMP_ARCH_X86 || KMP_ARCH_MIPS
 // What about ARM?
 #define TCR_PTR(a) ((void *)TCR_4(a))
@@ -965,6 +984,14 @@ extern kmp_real64 __kmp_xchg_real64(volatile kmp_real64 *p, kmp_real64 v);
 #define TCR_SYNC_PTR(a) ((void *)TCR_SYNC_4(a))
 #define TCW_SYNC_PTR(a, b) TCW_SYNC_4((a), (b))
 #define TCX_SYNC_PTR(a, b, c) ((void *)TCX_SYNC_4((a), (b), (c)))
+
+#elif defined(__CHERI_PURE_CAPABILITY__)
+
+#define TCR_PTR(a) ((void *)TCR_C(a))
+#define TCW_PTR(a, b) TCW_C((a), (b))
+#define TCR_SYNC_PTR(a) ((void *)TCR_SYNC_C(a))
+#define TCW_SYNC_PTR(a, b) TCW_SYNC_C((a), (b))
+#define TCX_SYNC_PTR(a, b, c) ((void *)TCX_SYNC_C((a), (b), (c)))
 
 #else /* 64 bit pointers */
 
@@ -976,11 +1003,19 @@ extern kmp_real64 __kmp_xchg_real64(volatile kmp_real64 *p, kmp_real64 v);
 
 #endif /* KMP_ARCH_X86 */
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define TCR_ADDR TCR_8
+#define TCW_ADDR TCW_8
+#define TCR_SYNC_ADDR TCR_SYNC_8
+#define TCW_SYNC_ADDR TCW_SYNC_8
+#define TCX_SYNC_ADDR TCX_SYNC_8
+#else
 #define TCR_ADDR TCR_PTR
 #define TCW_ADDR TCW_PTR
 #define TCR_SYNC_ADDR TCR_SYNC_PTR
 #define TCW_SYNC_ADDR TCW_SYNC_PTR
 #define TCX_SYNC_ADDR TCX_SYNC_PTR
+#endif
 
 /* If these FTN_{TRUE,FALSE} values change, may need to change several places
    where they are used to check that language is Fortran, not C. */
