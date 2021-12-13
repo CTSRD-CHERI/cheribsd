@@ -546,10 +546,16 @@ extern kmp_real64 __kmp_xchg_real64(volatile kmp_real64 *p, kmp_real64 v);
 #define KMP_COMPARE_AND_STORE_PTR(p, cv, sv)                                   \
   __kmp_compare_and_store32((volatile kmp_int32 *)(p), (kmp_int32)(cv),        \
                             (kmp_int32)(sv))
+#define KMP_COMPARE_AND_STORE_RETPTR(p, cv, sv)                                \
+  (void *)__kmp_compare_and_storeret32((volatile kmp_int32 *)(p), (kmp_int32)(cv), \
+                               (kmp_int32)(sv))
 #else /* 64 bit pointers */
 #define KMP_COMPARE_AND_STORE_PTR(p, cv, sv)                                   \
   __kmp_compare_and_store64((volatile kmp_int64 *)(p), (kmp_int64)(cv),        \
                             (kmp_int64)(sv))
+#define KMP_COMPARE_AND_STORE_RETPTR(p, cv, sv)                                \
+  (void *)__kmp_compare_and_storeret64((volatile kmp_int64 *)(p), (kmp_int64)(cv), \
+                               (kmp_int64)(sv))
 #endif /* KMP_ARCH_X86 */
 
 #define KMP_COMPARE_AND_STORE_RET8(p, cv, sv)                                  \
@@ -679,6 +685,9 @@ extern kmp_real64 __kmp_xchg_real64(volatile kmp_real64 *p, kmp_real64 v);
 #define KMP_COMPARE_AND_STORE_RET32(p, cv, sv)                                 \
   __sync_val_compare_and_swap((volatile kmp_uint32 *)(p), (kmp_uint32)(cv),    \
                               (kmp_uint32)(sv))
+#define KMP_COMPARE_AND_STORE_RETPTR(p, cv, sv)                                \
+  __sync_val_compare_and_swap((void *volatile *)(p), (void *)(cv),             \
+                              (void *)(sv))
 #if KMP_ARCH_MIPS
 static inline bool mips_sync_bool_compare_and_swap(
   volatile kmp_uint64 *p, kmp_uint64 cv, kmp_uint64 sv) {
@@ -842,10 +851,16 @@ extern kmp_real64 __kmp_xchg_real64(volatile kmp_real64 *p, kmp_real64 v);
 #define KMP_COMPARE_AND_STORE_PTR(p, cv, sv)                                   \
   __kmp_compare_and_store32((volatile kmp_int32 *)(p), (kmp_int32)(cv),        \
                             (kmp_int32)(sv))
+#define KMP_COMPARE_AND_STORE_RETPTR(p, cv, sv)                                \
+  (void *)__kmp_compare_and_storeret32((volatile kmp_int32 *)(p), (kmp_int32)(cv), \
+                               (kmp_int32)(sv))
 #else /* 64 bit pointers */
 #define KMP_COMPARE_AND_STORE_PTR(p, cv, sv)                                   \
   __kmp_compare_and_store64((volatile kmp_int64 *)(p), (kmp_int64)(cv),        \
                             (kmp_int64)(sv))
+#define KMP_COMPARE_AND_STORE_RETPTR(p, cv, sv)                                \
+  (void *)__kmp_compare_and_storeret64((volatile kmp_int64 *)(p), (kmp_int64)(cv), \
+                               (kmp_int64)(sv))
 #endif /* KMP_ARCH_X86 */
 
 #define KMP_COMPARE_AND_STORE_RET8(p, cv, sv)                                  \
