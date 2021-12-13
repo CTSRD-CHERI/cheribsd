@@ -447,6 +447,11 @@ __DEFAULT_YES_OPTIONS+=OPENMP
 __DEFAULT_NO_OPTIONS+=OPENMP
 .endif
 
+# XXX: Not yet ported for purecap
+.if ${__T} == "aarch64c" || ${__T:Mmips64*c*} || ${__T:Mriscv*c*}
+BROKEN_OPTIONS+=OPENMP
+.endif
+
 .if ${.MAKE.OS} != "FreeBSD"
 # Building the target compiler requires building tablegen on the host
 # which is (currently) not possible on non-FreeBSD.
