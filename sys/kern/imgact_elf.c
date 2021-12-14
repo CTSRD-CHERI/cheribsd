@@ -223,7 +223,7 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, honor_sbrk, CTLFLAG_RW,
     &__elfN(aslr_honor_sbrk), 0,
     ELF_ABI_NAME ": assume sbrk is used");
 
-static int __elfN(aslr_stack_gap) = 3;
+static int __elfN(aslr_stack_gap) = 0;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, stack_gap, CTLFLAG_RW,
     &__elfN(aslr_stack_gap), 0,
     ELF_ABI_NAME
