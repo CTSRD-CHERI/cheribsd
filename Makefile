@@ -173,7 +173,8 @@ TGTS=	all all-man buildenv buildenvvars buildkernel buildsysroot buildworld \
 	stage-packages stage-packages-kernel stage-packages-world \
 	create-packages-world create-packages-kernel create-packages \
 	update-packages packages installconfig real-packages real-update-packages \
-	sign-packages package-pkg print-dir test-system-compiler test-system-linker
+	sign-packages package-pkg print-dir test-system-compiler test-system-linker \
+	test-includes
 
 # These targets require a TARGET and TARGET_ARCH be defined.
 XTGTS=	native-xtools native-xtools-install xdev xdev-build xdev-install \
@@ -197,8 +198,8 @@ TGTS+=	${BITGTS}
 META_TGT_WHITELIST+= \
 	_* build32 buildfiles buildincludes buildkernel buildsoft \
 	buildworld everything kernel-toolchain kernel-toolchains kernel \
-	kernels libraries native-xtools showconfig test-system-compiler \
-	test-system-linker tinderbox toolchain \
+	kernels libraries native-xtools showconfig test-includes \
+	test-system-compiler test-system-linker tinderbox toolchain \
 	toolchains universe universe-toolchain world worlds xdev xdev-build
 
 .ORDER: buildworld installworld
