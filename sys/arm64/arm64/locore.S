@@ -1077,45 +1077,6 @@ initstack_end:
 	.section .rodata; .globl sym; .align 2; .type sym,#object; sym:	\
 	.cfi_startproc
 
-SIGCODE(sigcode)
-#if __has_feature(capabilities)
-#ifndef __CHERI_PURE_CAPABILITY__
-	.arch_extension c64
-#endif
-	add	c0, csp, #SF_UC
-#else
-	mov	x0, sp
-	add	x0, x0, #SF_UC
-#endif
-
-1:
-	mov	x8, #SYS_sigreturn
-	svc	0
-
-	/* sigreturn failed, exit */
-	mov	x8, #SYS_exit
-	svc	0
-
-	b	1b
-#if __has_feature(capabilities)
-#ifndef __CHERI_PURE_CAPABILITY__
-	.arch_extension noc64
-	.arch_extension a64c
-#endif
-#endif
-	/* This may be copied to the stack, keep it 16-byte aligned */
-	.align	3
-END(sigcode)
-esigcode:
-
-	.data
-	.align	3
-	.global	szsigcode
-	.type	szsigcode,#object
-	.size	szsigcode, 8
-szsigcode:
-	.quad	esigcode - sigcode
-
 #ifdef COMPAT_FREEBSD64
 SIGCODE(freebsd64_sigcode)
 	mov	x0, sp
