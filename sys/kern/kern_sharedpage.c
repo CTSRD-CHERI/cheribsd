@@ -327,8 +327,17 @@ exec_sysvec_init(void *param)
 			    compat32_svtk->sv_timekeep_off;
 		} else {
 #endif
+#ifdef COMPAT_FREEBSD64
+			/*
+			 * freebsd64 and purecap share the same
+			 * timekeep data.
+			 */
+			if (host_svtk == NULL)
+				host_svtk = alloc_sv_tk();
+#else
 			KASSERT(host_svtk == NULL, ("Host already registered"));
 			host_svtk = alloc_sv_tk();
+#endif
 			sv->sv_timekeep_base = sv->sv_shared_page_base +
 			    host_svtk->sv_timekeep_off;
 #ifdef COMPAT_FREEBSD32
