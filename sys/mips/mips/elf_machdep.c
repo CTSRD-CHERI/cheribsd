@@ -93,13 +93,13 @@ static struct sysentvec elf_freebsd_sysvec = {
 	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_ASLR | SV_RNG_SEED_VER |
+	.sv_flags	= SV_ABI_FREEBSD | SV_RNG_SEED_VER |
 #if __has_feature(capabilities)
 	    SV_LP64 | SV_CHERI |
 #elif __mips_n64
-	    SV_LP64 |
+	    SV_LP64 | SV_ASLR |
 #else
-	    SV_ILP32 |
+	    SV_ILP32 | SV_ASLR |
 #endif
 #ifdef MIPS_SHAREDPAGE
 			    SV_SHP,
