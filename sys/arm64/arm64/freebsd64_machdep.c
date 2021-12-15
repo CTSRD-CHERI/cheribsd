@@ -100,8 +100,8 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_SHP | SV_ABI_FREEBSD | SV_LP64 |
-	    SV_ASLR,
+	.sv_flags	= SV_SHP | SV_TIMEKEEP | SV_ABI_FREEBSD | SV_LP64 |
+	    SV_ASLR | SV_RNG_SEED_VER,
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = freebsd64_syscallnames,
@@ -111,6 +111,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
 	.sv_hwcap	= &elf_hwcap,
+	.sv_hwcap2	= &elf_hwcap2,
 	.sv_onexec_old	= exec_onexec_old,
 	.sv_onexit	= exit_onexit,
 };
