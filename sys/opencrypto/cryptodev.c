@@ -347,7 +347,7 @@ cse_create(struct fcrypt *fcr, struct session2_op *sop)
 		txform = NULL;
 		break;
 	case CRYPTO_AES_CBC:
-		txform = &enc_xform_rijndael128;
+		txform = &enc_xform_aes_cbc;
 		break;
 	case CRYPTO_AES_XTS:
 		txform = &enc_xform_aes_xts;
