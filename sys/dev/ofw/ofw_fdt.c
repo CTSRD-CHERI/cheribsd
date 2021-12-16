@@ -45,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofwvar.h>
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_bus_subr.h>
+#include <dev/ofw/ofw_subr.h>
 
 #include "ofw_if.h"
 
@@ -106,6 +107,13 @@ static ofw_def_t ofw_fdt = {
 OFW_DEF(ofw_fdt);
 
 static void *fdtp = NULL;
+
+void *
+ofw_fdtp(void)
+{
+
+	return (fdtp);
+}
 
 static int
 sysctl_handle_dtb(SYSCTL_HANDLER_ARGS)

@@ -218,7 +218,7 @@ em_tso_setup(struct adapter *adapter, if_pkt_info_t pi, u32 *txd_upper, u32 *txd
 static int
 em_transmit_checksum_setup(struct adapter *adapter, if_pkt_info_t pi, u32 *txd_upper, u32 *txd_lower)
 {
-	 struct e1000_context_desc *TXD = NULL;
+	struct e1000_context_desc *TXD = NULL;
 	if_softc_ctx_t scctx = adapter->shared;
 	struct em_tx_queue *que = &adapter->tx_queues[pi->ipi_qsidx];
 	struct tx_ring *txr = &que->txr;
@@ -299,6 +299,7 @@ em_transmit_checksum_setup(struct adapter *adapter, if_pkt_info_t pi, u32 *txd_u
 	return (cur);
 }
 
+/* Used by DM. */
 static int
 em_isc_txd_encap(void *arg, if_pkt_info_t pi)
 {
@@ -311,6 +312,9 @@ em_isc_txd_encap(void *arg, if_pkt_info_t pi)
 	int csum_flags = pi->ipi_csum_flags;
 	int i, j, first, pidx_last;
 	u32 txd_flags, txd_upper = 0, txd_lower = 0;
+#if defined(E1000_DESC_CAP)
+	void * __capability cap;
+#endif
 
 	struct e1000_tx_desc *ctxd = NULL;
 	bool do_tso, tso_desc;
@@ -369,7 +373,13 @@ em_isc_txd_encap(void *arg, if_pkt_info_t pi)
 		 */
 		if (tso_desc && (j == (nsegs - 1)) && (seg_len > 8)) {
 			seg_len -= TSO_WORKAROUND;
+#if defined(E1000_DESC_CAP)
+			cap = cheri_getdefault();
+			cap = cheri_setoffset(cap, seg_addr);
+			ctxd->buffer_addr = cap;
+#else
 			ctxd->buffer_addr = htole64(seg_addr);
+#endif
 			ctxd->lower.data = htole32(cmd | txd_lower | seg_len);
 			ctxd->upper.data = htole32(txd_upper);
 
@@ -378,7 +388,13 @@ em_isc_txd_encap(void *arg, if_pkt_info_t pi)
 
 			/* Now make the sentinel */
 			ctxd = &txr->tx_base[i];
+#if defined(E1000_DESC_CAP)
+			cap = cheri_getdefault();
+			cap = cheri_setoffset(cap, seg_addr + seg_len);
+			ctxd->buffer_addr = cap;
+#else
 			ctxd->buffer_addr = htole64(seg_addr + seg_len);
+#endif
 			ctxd->lower.data = htole32(cmd | txd_lower | TSO_WORKAROUND);
 			ctxd->upper.data = htole32(txd_upper);
 			pidx_last = i;
@@ -386,7 +402,13 @@ em_isc_txd_encap(void *arg, if_pkt_info_t pi)
 				i = 0;
 			DPRINTF(iflib_get_dev(sc->ctx), "TSO path pidx_last=%d i=%d ntxd[0]=%d\n", pidx_last, i, scctx->isc_ntxd[0]);
 		} else {
+#if defined(E1000_DESC_CAP)
+			cap = cheri_getdefault();
+			cap = cheri_setoffset(cap, seg_addr);
+			ctxd->buffer_addr = cap;
+#else
 			ctxd->buffer_addr = htole64(seg_addr);
+#endif
 			ctxd->lower.data = htole32(cmd | txd_lower | seg_len);
 			ctxd->upper.data = htole32(txd_upper);
 			pidx_last = i;
@@ -481,6 +503,7 @@ em_isc_txd_credits_update(void *arg, uint16_t txqid, bool clear)
 	return(processed);
 }
 
+/* Used by DM. */
 static void
 lem_isc_rxd_refill(void *arg, if_rxd_update_t iru)
 {
@@ -492,6 +515,9 @@ lem_isc_rxd_refill(void *arg, if_rxd_update_t iru)
 	uint64_t *paddrs;
 	uint32_t next_pidx, pidx;
 	uint16_t count;
+#if defined(E1000_DESC_CAP)
+	void * __capability cap;
+#endif
 	int i;
 
 	paddrs = iru->iru_paddrs;
@@ -500,7 +526,13 @@ lem_isc_rxd_refill(void *arg, if_rxd_update_t iru)
 
 	for (i = 0, next_pidx = pidx; i < count; i++) {
 		rxd = (struct e1000_rx_desc *)&rxr->rx_base[next_pidx];
+#if defined(E1000_DESC_CAP)
+		cap = cheri_getdefault();
+		cap = cheri_setoffset(cap, paddrs[i]);
+		rxd->buffer_addr = cap;
+#else
 		rxd->buffer_addr = htole64(paddrs[i]);
+#endif
 		/* status bits must be cleared */
 		rxd->status = 0;
 
@@ -521,6 +553,9 @@ em_isc_rxd_refill(void *arg, if_rxd_update_t iru)
 	uint64_t *paddrs;
 	uint32_t next_pidx, pidx;
 	uint16_t count;
+#if defined(E1000_DESC_CAP)
+	void * __capability cap;
+#endif
 	int i;
 
 	paddrs = iru->iru_paddrs;
@@ -529,7 +564,13 @@ em_isc_rxd_refill(void *arg, if_rxd_update_t iru)
 
 	for (i = 0, next_pidx = pidx; i < count; i++) {
 		rxd = &rxr->rx_base[next_pidx];
+#if defined(E1000_DESC_CAP)
+		cap = cheri_getdefault();
+		cap = cheri_setoffset(cap, paddrs[i]);
+		rxd->read.buffer_addr = cap;
+#else
 		rxd->read.buffer_addr = htole64(paddrs[i]);
+#endif
 		/* DD bits must be cleared */
 		rxd->wb.upper.status_error = 0;
 

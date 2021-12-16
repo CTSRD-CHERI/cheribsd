@@ -119,6 +119,7 @@ struct pcpu __pcpu[MAXCPU];
 
 static struct trapframe proc0_tf;
 
+vm_offset_t __dm_boot[1] __section(".data");
 int early_boot = 1;
 int cold = 1;
 

@@ -411,7 +411,11 @@ enum e1000_serdes_link_state {
 #define __le64 u64
 /* Receive Descriptor */
 struct e1000_rx_desc {
+#if defined(E1000_DESC_CAP)
+	void * __capability	buffer_addr;
+#else
 	__le64 buffer_addr; /* Address of the descriptor's data buffer */
+#endif
 	__le16 length;      /* Length of data DMAed into data buffer */
 	__le16 csum; /* Packet checksum */
 	u8  status;  /* Descriptor status */
@@ -422,7 +426,11 @@ struct e1000_rx_desc {
 /* Receive Descriptor - Extended */
 union e1000_rx_desc_extended {
 	struct {
+#if defined(E1000_DESC_CAP)
+		void * __capability buffer_addr;
+#else
 		__le64 buffer_addr;
+#endif
 		__le64 reserved;
 	} read;
 	struct {
@@ -452,8 +460,12 @@ union e1000_rx_desc_extended {
 /* Receive Descriptor - Packet Split */
 union e1000_rx_desc_packet_split {
 	struct {
+#if defined(E1000_DESC_CAP)
+		void * __capability buffer_addr[MAX_PS_BUFFERS];
+#else
 		/* one buffer for protocol header(s), three data buffers */
 		__le64 buffer_addr[MAX_PS_BUFFERS];
+#endif
 	} read;
 	struct {
 		struct {
@@ -482,7 +494,11 @@ union e1000_rx_desc_packet_split {
 
 /* Transmit Descriptor */
 struct e1000_tx_desc {
+#if defined(E1000_DESC_CAP)
+	void * __capability buffer_addr;
+#else
 	__le64 buffer_addr;   /* Address of the descriptor's data buffer */
+#endif
 	union {
 		__le32 data;
 		struct {
@@ -503,6 +519,7 @@ struct e1000_tx_desc {
 
 /* Offload Context Descriptor */
 struct e1000_context_desc {
+	uint64_t reserved; /* align for capabilities */
 	union {
 		__le32 ip_config;
 		struct {
@@ -532,7 +549,11 @@ struct e1000_context_desc {
 
 /* Offload data descriptor */
 struct e1000_data_desc {
+#if defined(E1000_DESC_CAP)
+	void * __capability buffer_addr;
+#else
 	__le64 buffer_addr;  /* Address of the descriptor's buffer address */
+#endif
 	union {
 		__le32 data;
 		struct {

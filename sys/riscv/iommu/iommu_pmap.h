@@ -1,6 +1,15 @@
 /*-
- * Copyright (c) 2015 Ian Lepore <ian@freebsd.org>
+ * Copyright (c) 2014 Andrew Turner
+ * Copyright (c) 2015-2021 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
+ *
+ * Portions of this software were developed by SRI International and the
+ * University of Cambridge Computer Laboratory under DARPA/AFRL contract
+ * FA8750-10-C-0237 ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * Portions of this software were developed by the University of Cambridge
+ * Computer Laboratory as part of the CTSRD Project, with support from the
+ * UK Higher Education Innovation Fund (HEIF).
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,27 +35,15 @@
  * $FreeBSD$
  */
 
-#ifndef	_DEV_OFW_OFW_SUBR_H_
-#define	_DEV_OFW_OFW_SUBR_H_
+#ifndef _RISCV_IOMMU_IOMMU_PMAP_H_
+#define	_RISCV_IOMMU_IOMMU_PMAP_H_
 
-/*
- * Translate an address from the Nth tuple of a device node's reg properties to
- * a physical memory address, by applying the range mappings from all ancestors.
- * This assumes that all ancestor ranges are simple numerical offsets for which
- * addition and subtraction operations will perform the required mapping (the
- * bit-options in the high word of standard PCI properties are also handled).
- * After the call, *pci_hi (if non-NULL) contains the phys.hi cell of the
- * device's parent PCI bus, or OFW_PADDR_NOT_PCI if no PCI bus is involved.
- *
- * This is intended to be a helper function called by the platform-specific
- * implementation of OF_decode_addr(), and not for direct use by device drivers.
- */
-#define	OFW_PADDR_NOT_PCI	(~0)
+int iommu_pmap_pinit(pmap_t pmap);
+void iommu_pmap_remove_pages(pmap_t pmap);
+void iommu_pmap_release(pmap_t pmap);
 
-int ofw_reg_to_paddr(phandle_t _dev, int _regno, bus_addr_t *_paddr,
-    bus_size_t *_size, pcell_t *_pci_hi);
+/* CHERI Device-Model (Example map/unmap routines). */
+int pmap_dm_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa, vm_prot_t prot);
+int pmap_dm_remove(pmap_t pmap, vm_offset_t va);
 
-int ofw_parse_bootargs(void);
-void * ofw_fdtp(void);
-
-#endif
+#endif /* !_RISCV_IOMMU_IOMMU_PMAP_H_ */
