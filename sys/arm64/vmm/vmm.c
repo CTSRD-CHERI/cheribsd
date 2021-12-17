@@ -378,7 +378,7 @@ vm_create(const char *name, struct vm **retvm)
 	strcpy(vm->name, name);
 	vm->vmspace = vmspace;
 #if __has_feature(capabilities)
-	vm->maxpcc = cheri_getpcc();
+	vm->maxpcc = (uintcap_t)cheri_getpcc();
 #endif
 
 	vm->sockets = 1;

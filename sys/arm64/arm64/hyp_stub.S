@@ -35,7 +35,12 @@ __FBSDID("$FreeBSD$");
  * parameter in register x0.
  */
 ENTRY(handle_stub_el1h_sync)
+#if __has_feature(capabilities)
+	cvtp	c0, x0
+	msr 	cvbar_el2, c0
+#else
 	msr 	vbar_el2, x0
+#endif
 	eret
 END(handle_hyp_stub)
 
