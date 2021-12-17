@@ -337,19 +337,12 @@ exec_sysvec_init(void *param)
 			    compat32_svtk->sv_timekeep_off;
 		} else {
 #endif
-#if __has_feature(capabilities)
-			if ((flags & (SV_ABI_MASK | SV_CHERI)) ==
-			    (SV_ABI_FREEBSD | SV_CHERI)) {
-#else
-			if ((flags & SV_ABI_MASK) == SV_ABI_FREEBSD) {
-#endif
-				KASSERT(host_svtk == NULL,
-				    ("Host already registered"));
+			/*
+			 * Only allocate a single shared page entry
+			 * for all non-COMPAT32 ABIs.
+			 */
+			if (host_svtk == NULL)
 				host_svtk = alloc_sv_tk();
-			} else {
-				KASSERT(host_svtk != NULL,
-				    ("Host not registered"));
-			}
 			sv->sv_timekeep_base = sv->sv_shared_page_base +
 			    host_svtk->sv_timekeep_off;
 #ifdef COMPAT_FREEBSD32
