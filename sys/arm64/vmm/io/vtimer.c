@@ -262,7 +262,7 @@ vtimer_remove_irq(struct hypctx *hypctx, int vcpuid)
  */
 
 int
-vtimer_phys_ctl_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
+vtimer_phys_ctl_read(void *vm, int vcpuid, vmm_register_t *rval, void *arg)
 {
 	struct hyp *hyp;
 	struct vtimer_cpu *vtimer_cpu;
@@ -282,7 +282,7 @@ vtimer_phys_ctl_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 }
 
 int
-vtimer_phys_ctl_write(void *vm, int vcpuid, uint64_t wval, void *arg)
+vtimer_phys_ctl_write(void *vm, int vcpuid, vmm_register_t wval, void *arg)
 {
 	struct hyp *hyp;
 	struct hypctx *hypctx;
@@ -309,7 +309,7 @@ vtimer_phys_ctl_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 }
 
 int
-vtimer_phys_cnt_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
+vtimer_phys_cnt_read(void *vm, int vcpuid, vmm_register_t *rval, void *arg)
 {
 	struct hyp *hyp;
 
@@ -319,13 +319,13 @@ vtimer_phys_cnt_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 }
 
 int
-vtimer_phys_cnt_write(void *vm, int vcpuid, uint64_t wval, void *arg)
+vtimer_phys_cnt_write(void *vm, int vcpuid, vmm_register_t wval, void *arg)
 {
 	return (0);
 }
 
 int
-vtimer_phys_cval_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
+vtimer_phys_cval_read(void *vm, int vcpuid, vmm_register_t *rval, void *arg)
 {
 	struct hyp *hyp;
 	struct vtimer_cpu *vtimer_cpu;
@@ -339,7 +339,7 @@ vtimer_phys_cval_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 }
 
 int
-vtimer_phys_cval_write(void *vm, int vcpuid, uint64_t wval, void *arg)
+vtimer_phys_cval_write(void *vm, int vcpuid, vmm_register_t wval, void *arg)
 {
 	struct hyp *hyp;
 	struct hypctx *hypctx;
@@ -360,7 +360,7 @@ vtimer_phys_cval_write(void *vm, int vcpuid, uint64_t wval, void *arg)
 }
 
 int
-vtimer_phys_tval_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
+vtimer_phys_tval_read(void *vm, int vcpuid, vmm_register_t *rval, void *arg)
 {
 	struct hyp *hyp;
 	struct vtimer_cpu *vtimer_cpu;
@@ -387,7 +387,7 @@ vtimer_phys_tval_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 }
 
 int
-vtimer_phys_tval_write(void *vm, int vcpuid, uint64_t wval, void *arg)
+vtimer_phys_tval_write(void *vm, int vcpuid, vmm_register_t wval, void *arg)
 {
 	struct hyp *hyp;
 	struct hypctx *hypctx;

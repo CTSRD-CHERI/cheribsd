@@ -1571,7 +1571,7 @@ redist_write(void *vm, int vcpuid, uint64_t fault_ipa, uint64_t wval,
 }
 
 int
-vgic_v3_icc_sgi1r_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
+vgic_v3_icc_sgi1r_read(void *vm, int vcpuid, vmm_register_t *rval, void *arg)
 {
 	/*
 	 * TODO: Inject an unknown exception.
@@ -1583,7 +1583,7 @@ vgic_v3_icc_sgi1r_read(void *vm, int vcpuid, uint64_t *rval, void *arg)
 /* vgic_v3_icc_sgi1r_write currently only handles 16 CPUs */
 CTASSERT(VM_MAXCPU <= 16);
 int
-vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg)
+vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, vmm_register_t rval, void *arg)
 {
 	struct hyp *hyp;
 	cpuset_t active_cpus;

@@ -781,7 +781,7 @@ arm64_handle_world_switch(struct hyp *hyp, int vcpu, int excp_type,
 }
 
 static int
-arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
+arm_vmrun(void *arg, int vcpu, vmm_register_t pc, pmap_t pmap,
     struct vm_eventinfo *evinfo)
 {
 	uint64_t excp_type;
@@ -797,7 +797,7 @@ arm_vmrun(void *arg, int vcpu, register_t pc, pmap_t pmap,
 	vme = vm_exitinfo(vm, vcpu);
 
 	hypctx = &hyp->ctx[vcpu];
-	hypctx->tf.tf_elr = (uint64_t)pc;
+	hypctx->tf.tf_elr = pc;
 
 	for (;;) {
 		daif = intr_disable();
@@ -983,7 +983,7 @@ hypctx_regptr(struct hypctx *hypctx, int reg)
 }
 
 static int
-arm_getreg(void *arg, int vcpu, int reg, uint64_t *retval)
+arm_getreg(void *arg, int vcpu, int reg, vmm_register_t *retval)
 {
 	void *regp;
 	int running, hostcpu;
@@ -997,7 +997,7 @@ arm_getreg(void *arg, int vcpu, int reg, uint64_t *retval)
 		if (reg == VM_REG_GUEST_SPSR)
 			*retval = *(uint32_t *)regp;
 		else
-			*retval = *(uint64_t *)regp;
+			*retval = *(vmm_register_t *)regp;
 		return (0);
 	} else {
 		return (EINVAL);
@@ -1005,7 +1005,7 @@ arm_getreg(void *arg, int vcpu, int reg, uint64_t *retval)
 }
 
 static int
-arm_setreg(void *arg, int vcpu, int reg, uint64_t val)
+arm_setreg(void *arg, int vcpu, int reg, vmm_register_t val)
 {
 	void *regp;
 	struct hyp *hyp = arg;
@@ -1019,7 +1019,7 @@ arm_setreg(void *arg, int vcpu, int reg, uint64_t val)
 		if (reg == VM_REG_GUEST_SPSR)
 			*(uint32_t *)regp = (uint32_t)val;
 		else
-			*(uint64_t *)regp = val;
+			*(vmm_register_t *)regp = val;
 		return (0);
 	} else {
 		return (EINVAL);

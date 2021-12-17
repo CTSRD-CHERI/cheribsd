@@ -55,19 +55,24 @@ vmm_emulate_instruction(void *vm, int vcpuid, uint64_t gpa, struct vie *vie,
     struct vm_guest_paging *paging, mem_region_read_t memread,
     mem_region_write_t memwrite, void *memarg)
 {
-	uint64_t val;
+	vmm_register_t regval;
+	uint64_t memval;
 	int error;
 
 	if (vie->dir == VM_DIR_READ) {
-		error = memread(vm, vcpuid, gpa, &val, vie->access_size, memarg);
+		error = memread(vm, vcpuid, gpa, &memval, vie->access_size,
+		    memarg);
 		if (error)
 			goto out;
-		error = vm_set_register(vm, vcpuid, vie->reg, val);
+		regval = memval;
+		error = vm_set_register(vm, vcpuid, vie->reg, regval);
 	} else {
-		error = vm_get_register(vm, vcpuid, vie->reg, &val);
+		error = vm_get_register(vm, vcpuid, vie->reg, &regval);
 		if (error)
 			goto out;
-		error = memwrite(vm, vcpuid, gpa, val, vie->access_size, memarg);
+		memval = regval;
+		error = memwrite(vm, vcpuid, gpa, memval, vie->access_size,
+		    memarg);
 	}
 
 out:
@@ -78,7 +83,7 @@ int
 vmm_emulate_register(void *vm, int vcpuid, struct vre *vre, reg_read_t regread,
     reg_write_t regwrite, void *regarg)
 {
-	uint64_t val;
+	vmm_register_t val;
 	int error;
 
 	if (vre->dir == VM_DIR_READ) {

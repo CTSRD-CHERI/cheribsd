@@ -52,14 +52,14 @@ struct vm_memseg {
 struct vm_register {
 	int		cpuid;
 	int		regnum;		/* enum vm_reg_name */
-	uint64_t	regval;
+	vmm_register_t	regval;
 };
 
 struct vm_register_set {
 	int		cpuid;
 	unsigned int	count;
 	const int	*regnums;	/* enum vm_reg_name */
-	uint64_t	*regvals;
+	vmm_register_t	*regvals;
 };
 
 struct vm_run {

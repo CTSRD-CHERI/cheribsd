@@ -99,6 +99,12 @@ enum vm_reg_name {
 
 #define VM_GUEST_BASE_IPA	0x80000000UL	/* Guest kernel start ipa */
 
+#if __has_feature(capabilities)
+typedef	__uintcap_t	vmm_register_t;
+#else
+typedef	__uint64_t	vmm_register_t;
+#endif
+
 #ifdef _KERNEL
 
 #define	VM_MAX_NAMELEN	32
@@ -120,7 +126,7 @@ typedef int	(*vmm_init_func_t)(int ipinum);
 typedef int	(*vmm_cleanup_func_t)(void);
 typedef void	(*vmm_resume_func_t)(void);
 typedef void *	(*vmi_init_func_t)(struct vm *vm, struct pmap *pmap);
-typedef int	(*vmi_run_func_t)(void *vmi, int vcpu, register_t rip,
+typedef int	(*vmi_run_func_t)(void *vmi, int vcpu, vmm_register_t rip,
 				  struct pmap *pmap, struct vm_eventinfo *evinfo);
 typedef void	(*vmi_cleanup_func_t)(void *vmi);
 typedef void	(*vmi_mmap_set_func_t)(void *arg, vm_offset_t va,
@@ -128,9 +134,9 @@ typedef void	(*vmi_mmap_set_func_t)(void *arg, vm_offset_t va,
 				       vm_prot_t prot);
 typedef vm_paddr_t (*vmi_mmap_get_func_t)(void *arg, vm_offset_t va);
 typedef int	(*vmi_get_register_t)(void *vmi, int vcpu, int num,
-				      uint64_t *retval);
+				      vmm_register_t *retval);
 typedef int	(*vmi_set_register_t)(void *vmi, int vcpu, int num,
-				      uint64_t val);
+				      vmm_register_t val);
 typedef int	(*vmi_get_cap_t)(void *vmi, int vcpu, int num, int *retval);
 typedef int	(*vmi_set_cap_t)(void *vmi, int vcpu, int num, int val);
 typedef struct vmspace * (*vmi_vmspace_alloc)(vm_offset_t min, vm_offset_t max);
@@ -195,8 +201,8 @@ void vm_get_topology(struct vm *vm, uint16_t *sockets, uint16_t *cores,
     uint16_t *threads, uint16_t *maxcpus);
 int vm_set_topology(struct vm *vm, uint16_t sockets, uint16_t cores,
     uint16_t threads, uint16_t maxcpus);
-int vm_get_register(struct vm *vm, int vcpu, int reg, uint64_t *retval);
-int vm_set_register(struct vm *vm, int vcpu, int reg, uint64_t val);
+int vm_get_register(struct vm *vm, int vcpu, int reg, vmm_register_t *retval);
+int vm_set_register(struct vm *vm, int vcpu, int reg, vmm_register_t val);
 int vm_run(struct vm *vm, struct vm_run *vmrun);
 int vm_suspend(struct vm *vm, enum vm_suspend_how how);
 void* vm_get_cookie(struct vm *vm);
@@ -403,7 +409,7 @@ struct vm_task_switch {
 struct vm_exit {
 	enum vm_exitcode	exitcode;
 	int			inst_length;
-	uint64_t		pc;
+	vmm_register_t		pc;
 	union {
 		/*
 		 * ARM specific payload.

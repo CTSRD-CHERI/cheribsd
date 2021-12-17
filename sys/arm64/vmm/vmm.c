@@ -81,7 +81,7 @@ struct vcpu {
 	int		vcpuid;
 	void		*stats;
 	struct vm_exit	exitinfo;
-	uint64_t	nextpc;		/* (x) next instruction to execute */
+	vmm_register_t	nextpc;		/* (x) next instruction to execute */
 };
 
 #define	vcpu_lock_initialized(v) mtx_initialized(&((v)->mtx))
@@ -762,21 +762,21 @@ vmm_sysmem_maxaddr(struct vm *vm)
 }
 
 static int
-vmm_reg_raz(void *vm, int vcpuid, uint64_t *rval, void *arg)
+vmm_reg_raz(void *vm, int vcpuid, vmm_register_t *rval, void *arg)
 {
 	*rval = 0;
 	return (0);
 }
 
 static int
-vmm_reg_read_arg(void *vm, int vcpuid, uint64_t *rval, void *arg)
+vmm_reg_read_arg(void *vm, int vcpuid, vmm_register_t *rval, void *arg)
 {
 	*rval = *(uint64_t *)arg;
 	return (0);
 }
 
 static int
-vmm_reg_wi(void *vm, int vcpuid, uint64_t wval, void *arg)
+vmm_reg_wi(void *vm, int vcpuid, vmm_register_t wval, void *arg)
 {
 	return (0);
 }
@@ -1355,7 +1355,7 @@ vm_gpa_release(void *cookie)
 }
 
 int
-vm_get_register(struct vm *vm, int vcpu, int reg, uint64_t *retval)
+vm_get_register(struct vm *vm, int vcpu, int reg, vmm_register_t *retval)
 {
 
 	if (vcpu < 0 || vcpu >= vm->maxcpus)
@@ -1368,7 +1368,7 @@ vm_get_register(struct vm *vm, int vcpu, int reg, uint64_t *retval)
 }
 
 int
-vm_set_register(struct vm *vm, int vcpuid, int reg, uint64_t val)
+vm_set_register(struct vm *vm, int vcpuid, int reg, vmm_register_t val)
 {
 	struct vcpu *vcpu;
 	int error;

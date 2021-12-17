@@ -302,7 +302,7 @@ done:
 
 static int
 vm_get_register_set(struct vm *vm, int vcpu, unsigned int count, int *regnum,
-    uint64_t *regval)
+    vmm_register_t *regval)
 {
 	int error, i;
 
@@ -317,7 +317,7 @@ vm_get_register_set(struct vm *vm, int vcpu, unsigned int count, int *regnum,
 
 static int
 vm_set_register_set(struct vm *vm, int vcpu, unsigned int count, int *regnum,
-    uint64_t *regval)
+    vmm_register_t *regval)
 {
 	int error, i;
 
@@ -351,7 +351,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	struct vm_memmap *mm;
 	struct vm_msi *vmsi;
 	struct vm_cpu_topology *topology;
-	uint64_t *regvals;
+	vmm_register_t *regvals;
 	int *regnums;
 
 	error = vmm_priv_check(curthread->td_ucred);

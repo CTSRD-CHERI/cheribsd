@@ -41,8 +41,8 @@
 
 struct hypctx;
 
-int vgic_v3_icc_sgi1r_read(void *vm, int vcpuid, uint64_t *rval, void *arg);
-int vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, uint64_t rval, void *arg);
+int vgic_v3_icc_sgi1r_read(void *vm, int vcpuid, vmm_register_t *rval, void *arg);
+int vgic_v3_icc_sgi1r_write(void *vm, int vcpuid, vmm_register_t rval, void *arg);
 
 #define VGIC_SGI_NUM		(GIC_LAST_SGI - GIC_FIRST_SGI + 1)
 #define VGIC_PPI_NUM		(GIC_LAST_PPI - GIC_FIRST_PPI + 1)
