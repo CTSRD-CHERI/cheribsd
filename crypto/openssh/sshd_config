@@ -105,7 +105,7 @@ UsePAM no
 #PermitTunnel no
 #ChrootDirectory none
 #UseBlacklist no
-#VersionAddendum FreeBSD-20210907
+#VersionAddendum FreeBSD-20211221
 
 # no default banner path
 #Banner none
