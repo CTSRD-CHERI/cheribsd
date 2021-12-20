@@ -903,9 +903,6 @@ atf_check::main(void)
 
     int status = EXIT_FAILURE;
 
-    std::unique_ptr< atf::check::check_result > r =
-        m_xflag ? execute_with_shell(m_argv) : execute(m_argv);
-
     if (m_status_checks.empty())
         m_status_checks.push_back(status_check(sc_exit, false, EXIT_SUCCESS));
     else if (m_status_checks.size() > 1) {
