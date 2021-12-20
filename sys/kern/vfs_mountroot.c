@@ -1004,6 +1004,7 @@ vfs_mountroot_wait(void)
 		    hz);
 		TSUNWAIT("root mount");
 	}
+	g_waitidle();
 
 	TSEXIT();
 }
