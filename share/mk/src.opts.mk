@@ -313,9 +313,6 @@ BROKEN_OPTIONS+=LIB32
 BROKEN_OPTIONS+=OFED
 .endif
 
-.if ${__T:Mriscv*} != ""
-BROKEN_OPTIONS+=OFED
-.endif
 .if ${__T} == "aarch64" || ${__T} == "amd64" || ${__T} == "i386"
 __DEFAULT_YES_OPTIONS+=LLDB
 .else
