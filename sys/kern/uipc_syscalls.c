@@ -1104,14 +1104,6 @@ recvit(struct thread *td, int s, struct msghdr *mp,
 }
 
 int
-sys_recvfrom(struct thread *td, struct recvfrom_args *uap)
-{
-
-	return (kern_recvfrom(td, uap->s, uap->buf,
-	    uap->len, uap->flags, uap->from, uap->fromlenaddr));
-}
-
-int
 kern_recvfrom(struct thread *td, int s, void * __capability buf, size_t len,
     int flags, struct sockaddr * __capability __restrict from,
     socklen_t * __capability __restrict fromlenaddr)
@@ -1139,13 +1131,19 @@ done2:
 	return (error);
 }
 
+int
+sys_recvfrom(struct thread *td, struct recvfrom_args *uap)
+{
+	return (kern_recvfrom(td, uap->s, uap->buf, uap->len,
+	    uap->flags, uap->from, uap->fromlenaddr));
+}
+
 #ifdef COMPAT_OLDSOCK
 int
 orecvfrom(struct thread *td, struct recvfrom_args *uap)
 {
-
-	uap->flags |= MSG_COMPAT;
-	return (sys_recvfrom(td, uap));
+	return (kern_recvfrom(td, uap->s, uap->buf, uap->len,
+	    uap->flags | MSG_COMPAT, uap->from, uap->fromlenaddr));
 }
 #endif
 
