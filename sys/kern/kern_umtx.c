@@ -5036,8 +5036,8 @@ static int
 __umtx_op_wake64(struct thread *td, struct freebsd64__umtx_op_args *uap)
 {
 
-	return (kern_umtx_wake(td, __USER_CAP(uap->obj, sizeof(struct umutex)),
-	    uap->val, 0));
+	return (kern_umtx_wake(td,
+	    __USER_CAP(uap->obj, sizeof(struct umutex64)), uap->val, 0));
 }
 
 static int
@@ -5058,7 +5058,7 @@ __umtx_op_nwake_private64(struct thread *td,
 			break;
 		for (i = 0; i < tocopy; ++i)
 			kern_umtx_wake(td,
-			    __USER_CAP(uaddrs[i], sizeof(struct umutex)),
+			    __USER_CAP(uaddrs[i], sizeof(struct umutex64)),
 			    INT_MAX, 1);
 		maybe_yield();
 	}
@@ -5069,8 +5069,8 @@ static int
 __umtx_op_wake_private64(struct thread *td, struct freebsd64__umtx_op_args *uap)
 {
 
-	return (kern_umtx_wake(td, __USER_CAP(uap->obj, sizeof(struct umutex)),
-	    uap->val, 1));
+	return (kern_umtx_wake(td,
+	    __USER_CAP(uap->obj, sizeof(struct umutex64)), uap->val, 1));
 }
 
 static int
@@ -5090,16 +5090,16 @@ __umtx_op_lock_umutex64(struct thread *td, struct freebsd64__umtx_op_args *uap)
 			return (error);
 		tm_p = &timeout;
 	}
-	return (do_lock_umutex(td, __USER_CAP(uap->obj, sizeof(struct umutex)),
-	    tm_p, 0));
+	return (do_lock_umutex(td,
+	    __USER_CAP(uap->obj, sizeof(struct umutex64)), tm_p, 0));
 }
 
 static int
 __umtx_op_trylock_umutex64(struct thread *td, struct freebsd64__umtx_op_args *uap)
 {
 
-	return (do_lock_umutex(td, __USER_CAP(uap->obj, sizeof(struct umutex)),
-	    NULL, _UMUTEX_TRY));
+	return (do_lock_umutex(td,
+	    __USER_CAP(uap->obj, sizeof(struct umutex64)), NULL, _UMUTEX_TRY));
 }
 
 static int
@@ -5119,8 +5119,8 @@ __umtx_op_wait_umutex64(struct thread *td, struct freebsd64__umtx_op_args *uap)
 			return (error);
 		tm_p = &timeout;
 	}
-	return (do_lock_umutex(td, __USER_CAP(uap->obj, sizeof(struct umutex)),
-	    tm_p, _UMUTEX_WAIT));
+	return (do_lock_umutex(td,
+	    __USER_CAP(uap->obj, sizeof(struct umutex64)), tm_p, _UMUTEX_WAIT));
 }
 
 static int
@@ -5128,7 +5128,7 @@ __umtx_op_wake_umutex64(struct thread *td, struct freebsd64__umtx_op_args *uap)
 {
 
 	return (do_wake_umutex(td,
-	    __USER_CAP(uap->obj, sizeof(struct umutex))));
+	    __USER_CAP(uap->obj, sizeof(struct umutex64))));
 }
 
 static int
@@ -5137,7 +5137,7 @@ __umtx_op_unlock_umutex64(struct thread *td,
 {
 
 	return (do_unlock_umutex(td,
-	    __USER_CAP(uap->obj, sizeof(struct umutex)), false));
+	    __USER_CAP(uap->obj, sizeof(struct umutex64)), false));
 }
 
 static int
@@ -5145,7 +5145,7 @@ __umtx_op_set_ceiling64(struct thread *td, struct freebsd64__umtx_op_args *uap)
 {
 
 	return (do_set_ceiling(td,
-	    __USER_CAP(uap->obj, sizeof(struct umutex)), uap->val,
+	    __USER_CAP(uap->obj, sizeof(struct umutex64)), uap->val,
 	    __USER_CAP(uap->uaddr1, sizeof(uint32_t))));
 }
 
@@ -5167,7 +5167,7 @@ __umtx_op_cv_wait64(struct thread *td, struct freebsd64__umtx_op_args *uap)
 		ts = &timeout;
 	}
 	return (do_cv_wait(td, __USER_CAP(uap->obj, sizeof(struct ucond)),
-	    __USER_CAP(uap->uaddr1, sizeof(struct umutex)), ts, uap->val));
+	    __USER_CAP(uap->uaddr1, sizeof(struct umutex64)), ts, uap->val));
 }
 
 static int
@@ -5245,7 +5245,7 @@ __umtx_op_wake2_umutex64(struct thread *td, struct freebsd64__umtx_op_args *uap)
 {
 
 	return (do_wake2_umutex(td,
-	    __USER_CAP(uap->obj, sizeof(struct umutex)), uap->val));
+	    __USER_CAP(uap->obj, sizeof(struct umutex64)), uap->val));
 }
 
 static int
