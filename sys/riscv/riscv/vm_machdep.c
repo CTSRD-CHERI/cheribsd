@@ -243,6 +243,10 @@ cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 void
 cpu_thread_exit(struct thread *td)
 {
+#ifdef CPU_QEMU_RISCV
+	/* Clear thread tracing state */
+	td->td_md.md_flags &= ~(MDTD_QTRACE | MDTD_QTRACE_USERMODE);
+#endif
 }
 
 void
