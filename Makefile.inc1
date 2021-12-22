@@ -97,8 +97,8 @@ MK_CLANG_BOOTSTRAP=	no
 # Pull in compiler metadata from buildworld/toolchain if possible to avoid
 # running CC from bsd.compiler.mk.
 .if make(installworld) || make(installsysroot) || make(install) || \
-    make(distributeworld) || make(stageworld) || make(distribution) || \
-    make(distrib-dirs) || make(distributekernel) || make(stagekernel)
+    make(distributeworld) || make(stageworld) || \
+    make(distributekernel) || make(stagekernel)
 .-include "${OBJTOP}/toolchain-metadata.mk"
 .if !defined(_LOADED_TOOLCHAIN_METADATA)
 .error A build is required first.  You may have the wrong MAKEOBJDIRPREFIX set.
@@ -127,9 +127,9 @@ _WANT_TOOLCHAIN_CROSS_VARS=	t
 # Avoiding unncessary cc --version calls can noticeable speed up walking over
 # the source tree (e.g. in the make includes step)
 _TOOLCHAIN_VARS_SHOULD_BE_SET=yes
-.if ${.TARGETS:N*buildenv:N*kernel*}
-# It is fine to recompute the variables in the kernel and buildenv environment
-# but otherwise they should be set for all submakes,
+.if ${.TARGETS:N*buildenv:N*kernel*:Ndistrib-dirs:Ndistribution}
+# It is fine to recompute the variables in the kernel, buildenv and some
+# distribution environments but otherwise they should be set for all submakes,
 .export _TOOLCHAIN_VARS_SHOULD_BE_SET
 .endif
 
