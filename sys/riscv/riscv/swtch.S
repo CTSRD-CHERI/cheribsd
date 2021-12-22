@@ -570,7 +570,7 @@ ENTRY(cpu_switch)
 	/* Expect: t1 = enable tracing; t0 = enable user tracing; */
 	/* Log context switch */
 	li	a0, 0x1 // LOG_EVENT_CTX_UPDATE
-	li	a1, 0x1 // LOG_EVENT_CTX_OP_SWITCH
+	li	a1, 0x0 // LOG_EVENT_CTX_OP_SWITCH
 #ifdef __CHERI_PURE_CAPABILITY__
 	clc	ca2, TD_PROC(cs1)
 	cld	a2, P_PID(ca2)

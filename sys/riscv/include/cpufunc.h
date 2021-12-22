@@ -147,7 +147,7 @@ void riscv_nullop(void);
 #define	QEMU_EVENT_CONTEXT_UPDATE(pid, tid, cid)        \
 	__asm__ __volatile__(				\
 		"li a0, 0x1\n"				\
-		"li a1, 0x1\n"				\
+		"li a1, 0x0\n"				\
 		"mv a2, %0\n"				\
 		"mv a3, %1\n"				\
 		"mv a4, %2\n"				\
@@ -163,7 +163,7 @@ void riscv_nullop(void);
 #define	QEMU_EVENT_CONTEXT_SETUP(pid, tid, cid)		\
 	__asm__ __volatile__(				\
 		"li a0, 0x1\n"				\
-		"li a1, 0x2\n"				\
+		"li a1, 0x1\n"				\
 		"mv a2, %0\n"				\
 		"mv a3, %1\n"				\
 		"mv a4, %2\n"				\
