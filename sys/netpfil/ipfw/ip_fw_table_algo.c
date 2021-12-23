@@ -324,7 +324,7 @@ static int bdel(const void *key, void *base, size_t nmemb, size_t size,
 #define OFF_LEN_INET6	(8 * offsetof(struct sa_in6, sin6_addr))
 
 struct radix_addr_entry {
-	struct radix_node	rn[2];
+	struct radix_node	rn[2] __subobject_use_container_bounds;
 	struct sockaddr_in	addr;
 	uint32_t		value;
 	uint8_t			masklen;
@@ -338,7 +338,7 @@ struct sa_in6 {
 };
 
 struct radix_addr_xentry {
-	struct radix_node	rn[2];
+	struct radix_node	rn[2] __subobject_use_container_bounds;
 	struct sa_in6		addr6;
 	uint32_t		value;
 	uint8_t			masklen;

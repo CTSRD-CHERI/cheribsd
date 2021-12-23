@@ -81,7 +81,7 @@ static struct netcred *vfs_export_lookup(struct mount *, struct sockaddr *);
  * Network address lookup element
  */
 struct netcred {
-	struct	radix_node netc_rnodes[2];
+	struct	radix_node netc_rnodes[2] __subobject_use_container_bounds;
 	uint64_t netc_exflags;
 	struct	ucred *netc_anon;
 	int	netc_numsecflavors;

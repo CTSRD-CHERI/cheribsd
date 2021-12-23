@@ -1216,7 +1216,7 @@ struct pfr_kcounters {
 #ifdef _KERNEL
 SLIST_HEAD(pfr_kentryworkq, pfr_kentry);
 struct pfr_kentry {
-	struct radix_node	 pfrke_node[2];
+	struct radix_node	 pfrke_node[2] __subobject_use_container_bounds;
 	union sockaddr_union	 pfrke_sa;
 	SLIST_ENTRY(pfr_kentry)	 pfrke_workq;
 	struct pfr_kcounters	 pfrke_counters;
