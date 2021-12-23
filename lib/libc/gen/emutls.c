@@ -182,7 +182,8 @@ emutls_get_array(size_t index)
 
 /*
  * Allocate an index for this tsl value. The index is 1 based as 0 is special
- * under emutls to indicate the index is unallocated.
+ * under emutls to indicate the index is unallocated, and SIZE_MAX is used to
+ * indicate that another thread is currently allocating an index.
  */
 static inline size_t
 emutls_index(struct emutls_control* control)
@@ -190,21 +191,22 @@ emutls_index(struct emutls_control* control)
 	size_t index;
 
 	index = atomic_load_explicit(&control->index, memory_order_acquire);
-	if (index <= 0) {
-		do {
-			if (index > 0)
-				return (index);
-			/* If index < 0 another thread is allocating it */
-			if (index < 0)
-				cpu_spinwait();
-			else if (atomic_compare_exchange_weak(&control->index,
-			    &index, -1))
-				break;
-		} while (true);
-
+	/*
+	 * Try and claim allocation of this index; if this fails then another
+	 * thread is allocating and we must wait until it's done.
+	 */
+	if (index == 0 &&
+	    atomic_compare_exchange_strong_explicit(&control->index, &index,
+	    SIZE_MAX, memory_order_acquire, memory_order_acquire)) {
 		index = atomic_fetch_add(&emutls_next_index, 1);
 		atomic_store_explicit(&control->index, index,
 		    memory_order_release);
+	} else {
+		while (index == SIZE_MAX) {
+			cpu_spinwait();
+			index = atomic_load_explicit(&control->index,
+			    memory_order_acquire);
+		}
 	}
 
 	return (index);
