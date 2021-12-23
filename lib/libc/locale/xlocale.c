@@ -240,7 +240,6 @@ static int dupcomponent(int type, locale_t base, locale_t new)
 
 locale_t newlocale(int mask, const char *locale, locale_t base)
 {
-#ifndef FORCE_C_LOCALE
 	locale_t orig_base;
 	int type;
 	const char *realLocale = locale;
@@ -294,14 +293,10 @@ locale_t newlocale(int mask, const char *locale, locale_t base)
 	}
 
 	return (new);
-#else
-	return (NULL);
-#endif
 }
 
 locale_t duplocale(locale_t base)
 {
-#ifndef FORCE_C_LOCALE
 	locale_t new = alloc_locale();
 	int type;
 
@@ -319,9 +314,6 @@ locale_t duplocale(locale_t base)
 	}
 
 	return (new);
-#else
-	return (NULL);
-#endif
 }
 
 /*
@@ -368,14 +360,10 @@ const char *querylocale(int mask, locale_t loc)
  */
 locale_t uselocale(locale_t loc)
 {
-#ifndef FORCE_C_LOCALE
 	locale_t old = get_thread_locale();
 	if (NULL != loc) {
 		set_thread_locale(loc);
 	}
 	return (old ? old : LC_GLOBAL_LOCALE);
-#else
-	return (LC_GLOBAL_LOCALE);
-#endif
 }
 
