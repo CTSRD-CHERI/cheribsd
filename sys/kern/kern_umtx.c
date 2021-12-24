@@ -5044,16 +5044,15 @@ static int
 __umtx_op_nwake_private64(struct thread *td,
     struct freebsd64__umtx_op_args *uap)
 {
-	char *uaddrs[BATCH_SIZE], **upp;
+	uint64_t uaddrs[BATCH_SIZE], * __capability upp;
 	int count, error, i, pos, tocopy;
 
-	upp = (char **)uap->obj;
+	upp = __USER_CAP(uap->obj, uap->val * sizeof(uint64_t));
 	error = 0;
 	for (count = uap->val, pos = 0; count > 0; count -= tocopy,
 	    pos += tocopy) {
 		tocopy = MIN(count, BATCH_SIZE);
-		error = copyin(__USER_CAP_UNBOUND(upp + pos), uaddrs,
-		    tocopy * sizeof(char *));
+		error = copyin(upp + pos, uaddrs, tocopy * sizeof(uint64_t));
 		if (error != 0)
 			break;
 		for (i = 0; i < tocopy; ++i)
