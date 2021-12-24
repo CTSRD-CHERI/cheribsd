@@ -2184,6 +2184,10 @@ vm_page_find_contig_domain(int domain, int req, u_long npages, vm_paddr_t low,
 	struct vm_domain *vmd;
 	vm_page_t m_ret;
 
+	/*
+	 * Can we allocate the pages without the number of free pages falling
+	 * below the lower bound for the allocation class?
+	 */
 	vmd = VM_DOMAIN(domain);
 	if (!vm_domain_allocate(vmd, req, npages))
 		return (NULL);
@@ -2237,11 +2241,6 @@ vm_page_alloc_contig_domain(vm_object_t object, vm_pindex_t pindex, int domain,
 	mpred = vm_radix_lookup_le(&object->rtree, pindex);
 	KASSERT(mpred == NULL || mpred->pindex != pindex,
 	    ("vm_page_alloc_contig: pindex already allocated"));
-
-	/*
-	 * Can we allocate the pages without the number of free pages falling
-	 * below the lower bound for the allocation class?
-	 */
 	for (;;) {
 #if VM_NRESERVLEVEL > 0
 		/*
