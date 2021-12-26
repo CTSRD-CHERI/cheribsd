@@ -1342,7 +1342,7 @@ vm_reserv_reclaim_contig(int domain, u_long npages, vm_paddr_t low,
 	 * doesn't include a boundary-multiple within it.  Otherwise,
 	 * no boundary-constrained allocation is possible.
 	 */
-	if (size > boundary)
+	if (size > boundary && boundary > 0)
 		return (NULL);
 	marker = &vm_rvd[domain].marker;
 	queue = &vm_rvd[domain].partpop;
@@ -1353,7 +1353,8 @@ vm_reserv_reclaim_contig(int domain, u_long npages, vm_paddr_t low,
 	 */
 	ppn_align = (int)(ulmin(ulmax(PAGE_SIZE, alignment),
 	    VM_LEVEL_0_SIZE) >> PAGE_SHIFT);
-	ppn_bound = (int)(MIN(MAX(PAGE_SIZE, boundary),
+	ppn_bound = boundary == 0 ? VM_LEVEL_0_NPAGES :
+	    (int)(MIN(MAX(PAGE_SIZE, boundary),
             VM_LEVEL_0_SIZE) >> PAGE_SHIFT);
 
 	vm_reserv_domain_scan_lock(domain);
