@@ -211,6 +211,7 @@ SUBDIR=	\
 	libmchain \
 	lindebugfs \
 	${_linuxkpi} \
+	${_linuxkpi_wlan} \
 	${_lio} \
 	lpt \
 	mac_biba \
@@ -839,6 +840,7 @@ _malo=	malo
 
 .if !${MACHINE_CPU:Mcheri}
 _linuxkpi=	linuxkpi
+_linuxkpi_wlan=	linuxkpi_wlan
 .endif
 
 SUBDIR+=${MODULES_EXTRA}
