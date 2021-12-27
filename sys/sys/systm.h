@@ -399,20 +399,6 @@ void	hexdump(const void *ptr, int length, const char *hdr, int flags);
 #define	HD_OMIT_CHARS	(1 << 18)
 
 #define ovbcopy(f, t, l) bcopy((f), (t), (l))
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-void	bcopy_c(const void * _Nonnull __capability from,
-	    void * _Nonnull __capability to, size_t len);
-void	bcopynocap_c(const void * _Nonnull __capability from,
-	    void * _Nonnull __capability to, size_t len);
-#else
-#define	bcopy_c		bcopy
-#define	bcopynocap_c	bcopynocap
-#endif
-#if __has_feature(capabilities)
-void	bcopynocap(const void *src0, void *dst0, size_t length);
-#else
-#define	bcopynocap	bcopy
-#endif
 void	explicit_bzero(void * _Nonnull, size_t);
 
 void	*memset(void * _Nonnull buf, int c, size_t len);
@@ -475,6 +461,10 @@ int	SAN_INTERCEPTOR(memcmp)(const void *, const void *, size_t);
 #define memmove(dest, src, n)	__builtin_memmove((dest), (src), (n))
 #define memcmp(b1, b2, len)	__builtin_memcmp((b1), (b2), (len))
 #endif /* SAN_NEEDS_INTERCEPTORS */
+
+#define bcopy_c(from, to, len)		memmove_c((to), (from), (len))
+#define bcopynocap(from, to, len)	memmovenocap((to), (from), (len))
+#define bcopynocap_c(from, to, len)	memmovenocap_c((to), (from), (len))
 
 void	*memset_early(void * _Nonnull buf, int c, size_t len);
 #define bzero_early(buf, len) memset_early((buf), 0, (len))
