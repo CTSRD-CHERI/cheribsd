@@ -2065,7 +2065,7 @@ bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 	BPFD_UNLOCK(d);
 
 	if (old_fcode != NULL)
-		NET_EPOCH_CALL(bpf_program_buffer_free, &fcode->epoch_ctx);
+		NET_EPOCH_CALL(bpf_program_buffer_free, &old_fcode->epoch_ctx);
 
 	if (track_event)
 		EVENTHANDLER_INVOKE(bpf_track,
