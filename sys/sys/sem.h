@@ -71,7 +71,7 @@ struct sembuf {
     defined(_WANT_SEMUN_OLD)
 union semun_old {
 	int		val;		/* value for SETVAL */
-	struct		semid_ds_old *buf; /* buffer for IPC_STAT & IPC_SET */
+	struct semid_ds_old * __kerncap buf; /* buffer for IPC_STAT & IPC_SET */
 	unsigned short * __kerncap array; /* array for GETALL & SETALL */
 };
 #endif
