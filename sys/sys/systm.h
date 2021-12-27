@@ -403,38 +403,32 @@ void	explicit_bzero(void * _Nonnull, size_t);
 
 void	*memset(void * _Nonnull buf, int c, size_t len);
 void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
+void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
+int	memcmp(const void *b1, const void *b2, size_t len);
+#if __has_feature(capabilities)
+void	*memcpynocap(void * _Nonnull to, const void * _Nonnull from,
+    size_t len);
+void	*memmovenocap(void * _Nonnull dest, const void * _Nonnull src,
+    size_t n);
+#else
+#define	memcpynocap	memcpy
+#define	memmovenocap	memmove
+#endif
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 void	* __capability memcpy_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
 void	* __capability memcpynocap_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
-#else
-#define	memcpy_c	memcpy
-#define	memcpynocap_c	memcpynocap
-#endif
-#if __has_feature(capabilities)
-void	*memcpynocap(void * _Nonnull to, const void * _Nonnull from,
-    size_t len);
-#else
-#define	memcpynocap	memcpy
-#endif
-void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 void	* __capability memmove_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
 void	* __capability memmovenocap_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
 #else
+#define	memcpy_c	memcpy
+#define	memcpynocap_c	memcpynocap
 #define	memmove_c	memmove
 #define	memmovenocap_c	memmovenocap
 #endif
-#if __has_feature(capabilities)
-void	*memmovenocap(void * _Nonnull dest, const void * _Nonnull src,
-    size_t n);
-#else
-#define	memmovenocap	memmove
-#endif
-int	memcmp(const void *b1, const void *b2, size_t len);
 
 #ifdef SAN_NEEDS_INTERCEPTORS
 #define	SAN_INTERCEPTOR(func)	\
