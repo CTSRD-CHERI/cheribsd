@@ -448,12 +448,6 @@ void	*memmovenocap(void * _Nonnull dest, const void * _Nonnull src,
 #else
 #define	memmovenocap	memmove
 #endif
-
-struct copy_map {
-	size_t	len;
-	size_t	uoffset;
-	size_t	koffset;
-};
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
 int	memcmp(const void *b1, const void *b2, size_t len);
 
