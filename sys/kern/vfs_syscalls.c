@@ -111,7 +111,7 @@ static int kern_linkat_vp(struct thread *td, struct vnode *vp, int fd,
 static uint64_t
 at2cnpflags(u_int at_flags, u_int mask)
 {
-	u_int64_t res;
+	uint64_t res;
 
 	MPASS((at_flags & (AT_SYMLINK_FOLLOW | AT_SYMLINK_NOFOLLOW)) !=
 	    (AT_SYMLINK_FOLLOW | AT_SYMLINK_NOFOLLOW));
@@ -3724,7 +3724,7 @@ kern_renameat(struct thread *td, int oldfd, const char * __capability old,
 	struct mount *mp = NULL;
 	struct vnode *tvp, *fvp, *tdvp;
 	struct nameidata fromnd, tond;
-	u_int64_t tondflags;
+	uint64_t tondflags;
 	int error;
 
 again:
