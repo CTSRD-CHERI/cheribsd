@@ -2641,7 +2641,7 @@ freebsd4_freebsd32_sigaction(struct thread *td,
 
 #ifdef COMPAT_43
 struct osigaction32 {
-	u_int32_t	sa_u;
+	uint32_t	sa_u;
 	osigset_t	sa_mask;
 	int		sa_flags;
 };
@@ -2680,7 +2680,7 @@ ofreebsd32_sigaction(struct thread *td,
 }
 
 struct sigvec32 {
-	u_int32_t	sv_handler;
+	uint32_t	sv_handler;
 	int		sv_mask;
 	int		sv_flags;
 };
@@ -2720,7 +2720,7 @@ ofreebsd32_sigvec(struct thread *td,
 }
 
 struct sigstack32 {
-	u_int32_t	ss_sp;
+	uint32_t	ss_sp;
 	int		ss_onstack;
 };
 
@@ -3207,7 +3207,7 @@ int
 freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 {
 	int argc, envc, i;
-	u_int32_t *vectp;
+	uint32_t *vectp;
 	char *stringp;
 	uintptr_t destp, ustringp;
 	struct freebsd32_ps_strings *arginfo;
@@ -3325,7 +3325,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 	imgp->argv = vectp;
-	if (suword32(&arginfo->ps_argvstr, (u_int32_t)(intptr_t)vectp) != 0 ||
+	if (suword32(&arginfo->ps_argvstr, (uint32_t)(intptr_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
@@ -3345,7 +3345,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		return (EFAULT);
 
 	imgp->envv = vectp;
-	if (suword32(&arginfo->ps_envstr, (u_int32_t)(intptr_t)vectp) != 0 ||
+	if (suword32(&arginfo->ps_envstr, (uint32_t)(intptr_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 

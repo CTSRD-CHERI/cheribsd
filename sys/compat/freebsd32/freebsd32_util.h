@@ -44,9 +44,9 @@
 
 /* XXXRW: ps_nargvstr, etc, are unsigned ints in ps_strings? */
 struct freebsd32_ps_strings {
-	u_int32_t ps_argvstr;	/* first of 0 or more argument strings */
+	uint32_t ps_argvstr;	/* first of 0 or more argument strings */
 	int	ps_nargvstr;	/* the number of argument strings */
-	u_int32_t ps_envstr;	/* first of 0 or more environment strings */
+	uint32_t ps_envstr;	/* first of 0 or more environment strings */
 	int	ps_nenvstr;	/* the number of environment strings */
 };
 

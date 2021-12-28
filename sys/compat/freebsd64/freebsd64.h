@@ -115,7 +115,7 @@ struct kinfo_proc64 {
 	u_int	ki_slptime;
 	u_int	ki_swtime;
 	u_int	ki_cow;
-	u_int64_t ki_runtime;
+	uint64_t ki_runtime;
 	struct	timeval ki_start;
 	struct	timeval ki_childtime;
 	long	ki_flag;
