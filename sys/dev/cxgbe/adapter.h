@@ -641,7 +641,7 @@ struct sge_txq {
 
 /* rxq: SGE ingress queue + SGE free list + miscellaneous items */
 struct sge_rxq {
-	struct sge_iq iq;	/* MUST be first */
+	struct sge_iq iq __subobject_member_used_for_c_inheritance;	/* MUST be first */
 	struct sge_fl fl;	/* MUST follow iq */
 
 	struct ifnet *ifp;	/* the interface this rxq belongs to */
@@ -666,7 +666,7 @@ iq_to_rxq(struct sge_iq *iq)
 
 /* ofld_rxq: SGE ingress queue + SGE free list + miscellaneous items */
 struct sge_ofld_rxq {
-	struct sge_iq iq;	/* MUST be first */
+	struct sge_iq iq __subobject_member_used_for_c_inheritance;	/* MUST be first */
 	struct sge_fl fl;	/* MUST follow iq */
 	counter_u64_t rx_iscsi_ddp_setup_ok;
 	counter_u64_t rx_iscsi_ddp_setup_error;
@@ -689,7 +689,7 @@ struct wrqe {
 	STAILQ_ENTRY(wrqe) link;
 	struct sge_wrq *wrq;
 	int wr_len;
-	char wr[] __aligned(16);
+	char wr[] __aligned(16) __subobject_use_container_bounds;
 };
 
 struct wrq_cookie {

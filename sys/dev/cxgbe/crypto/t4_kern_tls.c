@@ -68,7 +68,7 @@ struct tls_scmd {
 };
 
 struct tlspcb {
-	struct m_snd_tag com;
+	struct m_snd_tag com __subobject_member_used_for_c_inheritance;
 	struct vi_info *vi;	/* virtual interface */
 	struct adapter *sc;
 	struct l2t_entry *l2te;	/* L2 table entry used by this connection */

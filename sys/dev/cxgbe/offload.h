@@ -88,7 +88,7 @@ enum {
 };
 
 struct cxgbe_rate_tag {
-	struct m_snd_tag com;
+	struct m_snd_tag com __subobject_member_used_for_c_inheritance;
 	struct adapter *adapter;
 	u_int flags;
 	struct mtx lock;
