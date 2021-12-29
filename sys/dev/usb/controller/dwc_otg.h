@@ -161,7 +161,7 @@ struct dwc_otg_chan_state {
 };
 
 struct dwc_otg_softc {
-	struct usb_bus sc_bus;
+	struct usb_bus sc_bus __subobject_member_used_for_c_inheritance;
 	union dwc_otg_hub_temp sc_hub_temp;
 	struct dwc_otg_profile sc_hw_ep_profile[DWC_OTG_MAX_ENDPOINTS];
 	struct dwc_otg_tt_info sc_tt_info[DWC_OTG_MAX_DEVICES];
