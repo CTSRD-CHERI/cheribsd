@@ -102,7 +102,7 @@ static struct {
 };
 
 struct lagg_snd_tag {
-	struct m_snd_tag com;
+	struct m_snd_tag com __subobject_member_used_for_c_inheritance;
 	struct m_snd_tag *tag;
 };
 
