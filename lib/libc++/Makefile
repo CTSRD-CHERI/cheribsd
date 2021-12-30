@@ -3,7 +3,6 @@
 .include <src.opts.mk>
 
 PACKAGE=	clibs
-SHLIBDIR?=	/lib
 LIBCXX_VERSION=	13
 _LIBCXXRTDIR=   ${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 HDRDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/include
