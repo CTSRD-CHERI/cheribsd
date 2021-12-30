@@ -3672,6 +3672,9 @@ uma_zalloc_smr(uma_zone_t zone, int flags)
 	uma_cache_bucket_t bucket;
 	uma_cache_t cache;
 
+	CTR3(KTR_UMA, "uma_zalloc_smr zone %s(%p) flags %d", zone->uz_name,
+	    zone, flags);
+
 #ifdef UMA_ZALLOC_DEBUG
 	void *item;
 
@@ -4433,6 +4436,9 @@ uma_zfree_smr(uma_zone_t zone, void *item)
 	uma_cache_t cache;
 	uma_cache_bucket_t bucket;
 	int itemdomain, uz_flags;
+
+	CTR3(KTR_UMA, "uma_zfree_smr zone %s(%p) item %p",
+	    zone->uz_name, zone, item);
 
 #ifdef UMA_ZALLOC_DEBUG
 	KASSERT((zone->uz_flags & UMA_ZONE_SMR) != 0,
