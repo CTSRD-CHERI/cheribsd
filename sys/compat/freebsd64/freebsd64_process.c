@@ -144,6 +144,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		struct ptrace_io_desc piod;
 		struct ptrace_lwpinfo pl;
 		struct ptrace_vm_entry pve;
+		struct ptrace_coredump pc;
 #if __has_feature(capabilities)
 		struct capreg capreg;
 #endif
@@ -262,6 +263,13 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		CP(r64.pve, r.pve, pve_fsid);
 		r.pve.pve_path = __USER_CAP(r64.pve.pve_path,
 		    r64.pve.pve_pathlen);
+		break;
+	case PT_COREDUMP:
+		if (uap->data != sizeof(r.pc))
+			error = EINVAL;
+		else
+			error = copyin(__USER_CAP(uap->addr, uap->data), &r.pc,
+			    uap->data);
 		break;
 	default:
 		addr = __USER_CAP_UNBOUND(uap->addr);
