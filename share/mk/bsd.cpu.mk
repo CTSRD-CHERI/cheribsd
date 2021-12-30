@@ -514,10 +514,5 @@ CFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
 .else
 CFLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
 .endif # CHERI_SUBOBJECT_BOUNDS_MAX
-CHERI_SUBOBJECT_BOUNDS_DEBUG?=yes
-.if ${CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
-# If debugging is enabled, clear SW permission bit 2 when the bounds are reduced
-CFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
-.endif # CHERI_SUBOBJECT_BOUNDS_DEBUG
 .endif # CHERI_SUBOBJECT_BOUNDS
 .endif
