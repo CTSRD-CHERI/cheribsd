@@ -411,7 +411,7 @@ _autofs=	autofs
 .endif
 
 .if ${MK_CDDL} != "no" || defined(ALL_MODULES)
-.if (${MACHINE_CPUARCH} != "arm" || ${MACHINE_ARCH:Marmv[67]*} != "")
+.if ${MACHINE_CPUARCH} != "arm" || ${MACHINE_ARCH:Marmv[67]*} != ""
 .if ${KERN_OPTS:MKDTRACE_HOOKS}
 SUBDIR+=	dtrace
 .endif
@@ -563,17 +563,13 @@ _bce=		bce
 _fxp=		fxp
 _ispfw=		ispfw
 _ti=		ti
-
-.if ${MACHINE_CPUARCH} != "mips"
 _mwlfw=		mwlfw
 _otusfw=	otusfw
 _ralfw=		ralfw
 _rtwnfw=	rtwnfw
 .endif
-.endif
 
 .if ${MK_SOURCELESS_UCODE} != "no" && ${MACHINE_CPUARCH} != "arm" && \
-	${MACHINE_CPUARCH} != "mips" && \
 	${MACHINE_ARCH} != "powerpc" && ${MACHINE_ARCH} != "powerpcspe" && \
 	${MACHINE_CPUARCH} != "riscv"
 _cxgbe=		cxgbe
@@ -588,8 +584,7 @@ _ice=		ice
 .endif
 
 # These rely on 64bit atomics
-.if ${MACHINE_ARCH} != "powerpc" && ${MACHINE_ARCH} != "powerpcspe" && \
-	${MACHINE_CPUARCH} != "mips"
+.if ${MACHINE_ARCH} != "powerpc" && ${MACHINE_ARCH} != "powerpcspe"
 _mps=		mps
 _mpr=		mpr
 .endif
@@ -607,17 +602,12 @@ _oce=		oce
 .endif
 
 .if ${MACHINE_CPUARCH} != "aarch64" && ${MACHINE_CPUARCH} != "arm" && \
-	${MACHINE_CPUARCH} != "mips" && ${MACHINE_CPUARCH} != "powerpc" && \
-	${MACHINE_CPUARCH} != "riscv"
+	${MACHINE_CPUARCH} != "powerpc" && ${MACHINE_CPUARCH} != "riscv"
 _syscons=	syscons
 .endif
 
-.if ${MACHINE_CPUARCH} != "mips"
 .if !${MACHINE_ABI:Mpurecap}
-# no BUS_SPACE_UNSPECIFIED
-# No barrier instruction support (specific to this driver)
 _sym=		sym
-.endif
 # intr_disable() is a macro, causes problems
 .if ${MK_SOURCELESS_UCODE} != "no"
 _cxgb=		cxgb
