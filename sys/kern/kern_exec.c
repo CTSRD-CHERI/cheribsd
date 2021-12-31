@@ -1770,22 +1770,14 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	uintcap_t destp, ustringp;
 	struct ps_strings * __capability arginfo;
 	struct proc *p;
+	struct sysentvec *sysent;
 	size_t execpath_len, len;
-	int error, szsigcode, szps;
+	int error, szsigcode;
 	char canary[sizeof(long) * 8];
 	bool strings_on_stack;
 
-	szps = sizeof(pagesizes[0]) * MAXPAGESIZES;
-	/*
-	 * Calculate string base and vector table pointers.
-	 * Also deal with signal trampoline code for this exec type.
-	 */
-	if (imgp->execpath != NULL && imgp->auxargs != NULL)
-		execpath_len = strlen(imgp->execpath) + 1;
-	else
-		execpath_len = 0;
 	p = imgp->proc;
-	szsigcode = 0;
+	sysent = p->p_sysent;
 
 	strings_on_stack = true;
 #if __has_feature(capabilities)
@@ -1800,19 +1792,16 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	arginfo = (struct ps_strings *)destp;
 #endif
 	imgp->ps_strings = arginfo;
-	if (p->p_sysent->sv_sigcode_base == 0) {
-		if (p->p_sysent->sv_szsigcode != NULL)
-			szsigcode = *(p->p_sysent->sv_szsigcode);
-	}
 
 	/*
-	 * install sigcode
+	 * Install sigcode.
 	 */
-	if (szsigcode != 0) {
+	if (sysent->sv_sigcode_base == 0 && sysent->sv_szsigcode != NULL) {
+		szsigcode = *(sysent->sv_szsigcode);
 		destp -= szsigcode;
 		destp = rounddown2(destp, sizeof(void * __capability));
-		error = copyout(p->p_sysent->sv_sigcode,
-		    (void * __capability)destp, szsigcode);
+		error = copyout(sysent->sv_sigcode, (void * __capability)destp,
+		    szsigcode);
 		if (error != 0)
 			return (error);
 	}
@@ -1820,7 +1809,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * Copy the image path for the rtld.
 	 */
-	if (execpath_len != 0) {
+	if (imgp->execpath != NULL && imgp->auxargs != NULL) {
+		execpath_len = strlen(imgp->execpath) + 1;
 		destp -= execpath_len;
 		destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
@@ -1853,18 +1843,18 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * Prepare the pagesizes array.
 	 */
-	destp -= szps;
+	imgp->pagesizeslen = sizeof(pagesizes[0]) * MAXPAGESIZES;
+	destp -= imgp->pagesizeslen;
 	destp = rounddown2(destp, sizeof(void * __capability));
 #if __has_feature(capabilities)
 	imgp->pagesizes = (void * __capability)cheri_setboundsexact(destp,
-	    szps);
+	    imgp->pagesizeslen);
 #else
 	imgp->pagesizes = (void *)destp;
 #endif
-	error = copyout(pagesizes, imgp->pagesizes, szps);
+	error = copyout(pagesizes, imgp->pagesizes, imgp->pagesizeslen);
 	if (error != 0)
 		return (error);
-	imgp->pagesizeslen = szps;
 
 	/*
 	 * Allocate room for the argument and environment strings.
