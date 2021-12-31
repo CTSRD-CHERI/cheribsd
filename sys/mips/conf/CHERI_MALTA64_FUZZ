@@ -1,7 +1,0 @@
-# Inherit base config
-include "CHERI_MALTA64"
-
-ident CHERI_MALTA64_FUZZ
-
-options		COVERAGE
-options 	KCOV
