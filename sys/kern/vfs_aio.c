@@ -3362,6 +3362,8 @@ aiocb64_copyin(void * __capability ujob, struct kaiocb *kjob, int type)
 	CP(job64, *kcb, aio_fildes);
 	CP(job64, *kcb, aio_offset);
 	CP(job64, *kcb, aio_lio_opcode);
+	if (type == LIO_NOP)
+		type = kcb->aio_lio_opcode;
 	if (type & LIO_VECTORED) {
 		CP(job64, *kcb, aio_iovcnt);
 		iov64 = __USER_CAP(job64.aio_iov, kcb->aio_iovcnt * sizeof(struct iovec64));
