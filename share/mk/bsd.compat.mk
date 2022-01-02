@@ -64,32 +64,6 @@ LIB32_MACHINE=	powerpc
 LIB32_MACHINE_ARCH=	powerpc
 LIB32WMAKEFLAGS=	\
 		LD="${XLD} -m elf32ppc_fbsd"
-
-.elif ${COMPAT_ARCH:Mmips64*}
-HAS_COMPAT=32
-.if ${COMPAT_COMPILER_TYPE} == gcc
-.if empty(COMPAT_CPUTYPE)
-LIB32CPUFLAGS=	-march=mips3
-.else
-LIB32CPUFLAGS=	-march=${COMPAT_CPUTYPE}
-.endif
-.else
-.if ${COMPAT_ARCH:Mmips64el*} != ""
-LIB32CPUFLAGS=  -target mipsel-unknown-freebsd14.0
-.else
-LIB32CPUFLAGS=  -target mips-unknown-freebsd14.0
-.endif
-.endif
-LIB32CPUFLAGS+= -mabi=32
-LIB32_MACHINE=	mips
-LIB32_MACHINE_ARCH:=	${COMPAT_ARCH:S/64//}
-.if ${COMPAT_ARCH:Mmips64el*}
-_EMULATION=	elf32ltsmip_fbsd
-.else
-_EMULATION=	elf32btsmip_fbsd
-.endif
-LIB32WMAKEFLAGS= LD="${XLD} -m ${_EMULATION}"
-LIB32LDFLAGS=	-Wl,-m${_EMULATION}
 .endif
 
 LIB32WMAKEFLAGS+= NM="${XNM}"
@@ -114,27 +88,6 @@ LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=morello
 LIB64CPUFLAGS=	-target aarch64-unknown-freebsd13.0
 # XXX: Drop -fno-emulated-tls once bsd.cpu.mk no longer enables it
 LIB64CPUFLAGS+=	-march=morello -mabi=aapcs -fno-emulated-tls
-.endif
-
-.if ${COMPAT_ARCH:Mmips64*c*}
-HAS_COMPAT=64
-# XXX: clang specific
-.if ${COMPAT_ARCH:Mmips64el*}
-LIB64CPUFLAGS=  -target mips64el-unknown-freebsd13.0
-.else
-LIB64CPUFLAGS=  -target mips64-unknown-freebsd13.0
-.endif
-LIB64CPUFLAGS+=	-cheri -mabi=64
-LIB64_MACHINE=	mips
-LIB64_MACHINE_ARCH=	mips64
-LIB64WMAKEENV=	MACHINE_CPU="mips cheri"
-.if ${COMPAT_ARCH:Mmips64el*}
-_EMULATION=	elf64ltsmip_fbsd
-.else
-_EMULATION=	elf64btsmip_fbsd
-.endif
-LIB64WMAKEFLAGS= LD="${XLD} -m ${_EMULATION}" CPUTYPE=cheri
-LIB64LDFLAGS=	-Wl,-m${_EMULATION}
 .endif
 
 .if ${COMPAT_ARCH:Mriscv*c*}
@@ -170,17 +123,6 @@ LIB64C_MACHINE_ARCH=	aarch64c
 LIB64CCPUFLAGS=	-target aarch64-unknown-freebsd13.0
 # XXX: Drop -femulated-tls once bsd.cpu.mk no longer passes it
 LIB64CCPUFLAGS+=	-march=morello+c64 -mabi=purecap -femulated-tls
-.elif ${COMPAT_ARCH:Mmips64*} && !${COMPAT_ARCH:Mmips64*c*}
-.if ${COMPAT_ARCH:Mmips*el*}
-.error No little endian CHERI
-.endif
-HAS_COMPAT+=CHERI
-LIB64CCPUFLAGS=  -target mips64-unknown-freebsd13.0 -cheri -mabi=purecap
-LIB64CCPUFLAGS+=	-fpic
-LIB64CCPUFLAGS+=	-Werror=cheri-bitwise-operations
-LIB64C_MACHINE=	mips
-LIB64C_MACHINE_ARCH=	mips64c128
-LIB64CLDFLAGS=	-fuse-ld=lld
 .elif ${COMPAT_ARCH:Mriscv64*} && !${COMPAT_ARCH:Mriscv64*c*}
 HAS_COMPAT+=CHERI
 LIB64C_MACHINE=	riscv
