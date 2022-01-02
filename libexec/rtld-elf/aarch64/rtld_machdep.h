@@ -218,18 +218,11 @@ _rtld_validate_target_eflags(const char *path, Elf_Ehdr *hdr, const char *main_p
 #endif
 	hdr_is_cheriabi = ELF_IS_CHERI(hdr);
 
-	/*
-	 * TODO: restore validation when the Morello toolchain correctly
-	 * identifies purecap libraries.
-	 */
-	(void)path; (void)main_path;
-#if 0
 	if (rtld_is_cheriabi != hdr_is_cheriabi) {
 		_rtld_error("%s: cannot load %s since it is%s CheriABI",
 		    main_path, path, hdr_is_cheriabi ? "" : " not");
 		return (false);
 	}
-#endif
 
 	return (true);
 }
