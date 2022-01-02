@@ -17,11 +17,6 @@ MACHINE_CPU = amd64 sse2 sse mmx
 MACHINE_CPU = arm
 . elif ${MACHINE_CPUARCH} == "i386"
 MACHINE_CPU = i486
-. elif ${MACHINE_CPUARCH} == "mips"
-.  if ${MACHINE_ARCH:Mmips64*c*}
-MACHINE_CPU = cheri
-.   endif
-MACHINE_CPU += mips
 . elif ${MACHINE_CPUARCH} == "powerpc"
 MACHINE_CPU = aim
 . elif ${MACHINE_CPUARCH} == "riscv"
@@ -90,7 +85,6 @@ CPUTYPE = pentium
 # defined therein.  Consult:
 #	http://gcc.gnu.org/onlinedocs/gcc/ARM-Options.html
 #	http://gcc.gnu.org/onlinedocs/gcc/RS-6000-and-PowerPC-Options.html
-#	http://gcc.gnu.org/onlinedocs/gcc/MIPS-Options.html
 #	http://gcc.gnu.org/onlinedocs/gcc/SPARC-Options.html
 #	http://gcc.gnu.org/onlinedocs/gcc/i386-and-x86_002d64-Options.html
 
@@ -141,22 +135,6 @@ _CPUCFLAGS = -mcpu=${CPUTYPE} -mno-powerpc64
 .  endif
 . elif ${MACHINE_ARCH:Mpowerpc64*} != ""
 _CPUCFLAGS = -mcpu=${CPUTYPE}
-. elif ${MACHINE_CPUARCH} == "mips"
-# mips[1234], mips32, mips64, and all later releases need to have mips
-# preserved (releases later than r2 require external toolchain)
-.  if ${CPUTYPE:Mmips32*} != "" || ${CPUTYPE:Mmips64*} != "" || \
-	${CPUTYPE:Mmips[1234]} != ""
-_CPUCFLAGS = -march=${CPUTYPE}
-. elif ${CPUTYPE} == "cheri"
-_CPUCFLAGS = -cheri=128
-. else
-# Default -march to the CPUTYPE passed in, with mips stripped off so we
-# accept either mips4kc or 4kc, mostly for historical reasons
-# Typical values for cores:
-#	4kc, 24kc, 34kc, 74kc, 1004kc, octeon, octeon+, octeon2, octeon3,
-#	sb1, xlp, xlr
-_CPUCFLAGS = -march=${CPUTYPE:S/^mips//}
-. endif
 . elif ${MACHINE_CPUARCH} == "aarch64"
 .  if ${CPUTYPE:Marmv*} != ""
 # Use -march when the CPU type is an architecture value, e.g. armv8.1-a
@@ -310,12 +288,6 @@ MACHINE_CPU += amd64 sse2 sse mmx
 MACHINE_CPU = cheri morello
 .  endif
 MACHINE_CPU += arm64
-########## Mips
-. elif ${MACHINE_CPUARCH} == "mips"
-.  if ${CPUTYPE} == "cheri"
-MACHINE_CPU = cheri
-.  endif
-MACHINE_CPU += mips
 ########## powerpc
 . elif ${MACHINE_ARCH} == "powerpc"
 .  if ${CPUTYPE} == "e500"
@@ -340,46 +312,6 @@ LDFLAGS+=	-march=morello+c64 -mabi=purecap
 . elif defined(CPUTYPE) && ${CPUTYPE} == "morello"
 CFLAGS+=	-march=morello -mabi=aapcs
 LDFLAGS+=	-march=morello -mabi=aapcs
-. endif
-.endif
-
-.if ${MACHINE_CPUARCH} == "mips"
-CFLAGS += -G0
-# Hack for CheriBSD because clang targets a much newer CPU
-# -mcpu=beri ensures that instructions are scheduled so that they can execute
-# without excessive pipeline bubbles on BERI FPGAs (whereas -mcpu=mips4 doesn't)
-.if ${MACHINE_ARCH} != mips
-CFLAGS += -mcpu=beri
-.endif
-AFLAGS+= -${MIPS_ENDIAN} -mabi=${MIPS_ABI}
-CFLAGS+= -${MIPS_ENDIAN} -mabi=${MIPS_ABI}
-LDFLAGS+= -${MIPS_ENDIAN} -mabi=${MIPS_ABI}
-. if ${MACHINE_ARCH:Mmips*el*} != ""
-MIPS_ENDIAN=	EL
-. else
-MIPS_ENDIAN=	EB
-. endif
-. if ${MACHINE_ARCH:Mmips*c*}
-MIPS_ABI?=	purecap
-. elif ${MACHINE_ARCH:Mmips64*} != ""
-MIPS_ABI?=	64
-. elif ${MACHINE_ARCH:Mmipsn32*} != ""
-MIPS_ABI?=	n32
-. else
-MIPS_ABI?=	32
-. endif
-.if ${MACHINE_ARCH:Mmips*c*}
-CFLAGS+=	-fpic
-STATIC_CFLAGS+=	-ftls-model=local-exec
-CFLAGS+=	-cheri
-LDFLAGS+=	-fuse-ld=lld
-
-CFLAGS+=	-Werror=cheri-bitwise-operations
-.endif
-. if ${MACHINE_ARCH:Mmips*hf}
-CFLAGS += -mhard-float
-. else
-CFLAGS += -msoft-float
 . endif
 .endif
 
@@ -480,12 +412,12 @@ CXXFLAGS += ${CXXFLAGS.${MACHINE_ARCH}}
 #
 # MACHINE_ABI is a list of properties about the ABI used for MACHINE_ARCH.
 #
-.if (${MACHINE_ARCH:Mmips*} && !${MACHINE_ARCH:Mmips*hf*}) || ${MACHINE_ARCH:Mriscv*sf*}
+.if ${MACHINE_ARCH:Mriscv*sf*}
 MACHINE_ABI+=	soft-float
 .else
 MACHINE_ABI+=	hard-float
 .endif
-.if (${MACHINE_ARCH:Maarch64*c*} || ${MACHINE_ARCH:Mmips*c*} || ${MACHINE_ARCH:Mriscv*c*})
+.if (${MACHINE_ARCH:Maarch64*c*} || ${MACHINE_ARCH:Mriscv*c*})
 MACHINE_ABI+=	purecap
 .endif
 # Currently all 64-bit architectures include 64 in their name (see arch(7)).
