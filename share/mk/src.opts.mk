@@ -292,23 +292,6 @@ __DEFAULT_DEPENDENT_OPTIONS+=	LLVM_TARGET_${__llt:${__LLVM_TARGET_FILT}:tu}/LLVM
 __DEFAULT_NO_OPTIONS+=LLVM_TARGET_BPF LLVM_TARGET_MIPS
 
 .include <bsd.compiler.mk>
-.if ${__T:Mmips*c*}
-# Don't build CLANG for now
-__DEFAULT_NO_OPTIONS+=CLANG CLANG_IS_CC
-# Don't bootstrap clang, it isn't the version we want
-__DEFAULT_NO_OPTIONS+=CLANG_BOOTSTRAP
-__DEFAULT_NO_OPTIONS+=LLD
-# stand/libsa required -fno-pic which can't work with CHERI
-# XXXBD: we should build mips*c* as mips here, but punt for now
-BROKEN_OPTIONS+=BOOT
-# rescue doesn't link
-BROKEN_OPTIONS+=RESCUE
-# ofed needs work
-BROKEN_OPTIONS+=OFED
-# lib32 could probalby be made to work, but makes little sense
-# Must be broken for LIB64 to work while we can have only one LIBCOMPAT
-BROKEN_OPTIONS+=LIB32
-.endif
 
 .ifdef COMPAT_64BIT
 # ofed needs to be part of the default build for headers to be available.
@@ -321,8 +304,8 @@ __DEFAULT_YES_OPTIONS+=LLDB
 .else
 __DEFAULT_NO_OPTIONS+=LLDB
 .endif
-# LIB32 is supported on amd64, mips64, and powerpc64
-.if (${__T} == "amd64" || ${__T:Mmips64*} || ${__T} == "powerpc64")
+# LIB32 is supported on amd64 and powerpc64
+.if (${__T} == "amd64" || ${__T} == "powerpc64")
 __DEFAULT_YES_OPTIONS+=LIB32
 .else
 BROKEN_OPTIONS+=LIB32
@@ -346,23 +329,15 @@ BROKEN_OPTIONS+=LIBSOFT
 .if ${__T:Maarch64*c*}
 BROKEN_OPTIONS+=GOOGLETEST
 .endif
-.if ${__T:Mmips*}
-# GOOGLETEST cannot currently be compiled on mips due to external circumstances.
-# Notably, the freebsd-gcc port isn't linking in libgcc so we end up trying ot
-# link to a hidden symbol. LLVM would successfully link this in, but some of
-# the mips variants are broken under LLVM until LLVM 10. GOOGLETEST should be
-# marked no longer broken with the switch to LLVM.
-BROKEN_OPTIONS+=GOOGLETEST SSP
-.endif
 
-.if ${__T:Mmips64*c*} || ${__T:Mriscv*c*}
+.if ${__T:Mriscv*c*}
 # nscd(8) caching depends on marshaling pointers to the daemon and back
 # and can't work without a rewrite.
 BROKEN_OPTIONS+=NS_CACHING
 .endif
 
 .if ${__C} == "cheri" || ${__C} == "morello" || \
-    ${__T:Maarch64*c*} || ${__T:Mmips64*c*} || ${__T:Mriscv*c*} || \
+    ${__T:Maarch64*c*} || ${__T:Mriscv*c*} || \
     ${.MAKE.OS} == "Linux"
 # Broken post OpenZFS import
 BROKEN_OPTIONS+=CDDL ZFS
@@ -373,8 +348,8 @@ BROKEN_OPTIONS+=CDDL ZFS
 BROKEN_OPTIONS+=CDDL
 .endif
 
-# EFI doesn't exist on mips or powerpc.
-.if ${__T:Mmips*} || ${__T:Mpowerpc*}
+# EFI doesn't exist on powerpc (well, officially)
+.if ${__T:Mpowerpc*}
 BROKEN_OPTIONS+=EFI
 .endif
 # OFW is only for powerpc, exclude others
@@ -404,10 +379,6 @@ __DEFAULT_YES_OPTIONS+=OPENSSL_KTLS
 __DEFAULT_NO_OPTIONS+=OPENSSL_KTLS
 .endif
 
-.if ${__T:Mmips64*}
-# profiling won't work on MIPS64 because there is only assembly for o32
-BROKEN_OPTIONS+=PROFILE
-.endif
 .if !${__T:Maarch64*} && ${__T} != "amd64" && ${__T} != "i386" && \
     ${__T} != "powerpc64"
 BROKEN_OPTIONS+=CXGBETOOL
@@ -418,7 +389,7 @@ BROKEN_OPTIONS+=MLX5TOOL
 #    !${MACHINE_CPU:Mcheri} || ${MACHINE_ABI:Mpurecap}
 # but that logic doesn't work in Makefile.inc1...
 .if (${__C} != "cheri" && ${__C} != "morello") || \
-    (${__T:Maarch64*c*} || ${__T:Mmips64*c*} || ${__T:Mriscv64*c*})
+    (${__T:Maarch64*c*} || ${__T:Mriscv64*c*})
 BROKEN_OPTIONS+=COMPAT_CHERIABI
 .endif
 
@@ -438,11 +409,6 @@ BROKEN_OPTIONS+=HYPERV
 BROKEN_OPTIONS+=NVME
 .endif
 
-# Doesn't link
-.if ${__T:Mmips*}
-BROKEN_OPTIONS+=GOOGLETEST
-.endif
-
 # XXX: Does not yet build for aarch64c
 .if ${__T} == "aarch64" || ${__T} == "amd64" || ${__T} == "i386" || \
     ${__T:Mpowerpc64*} != "" || ${__T:Mriscv64*} != ""
@@ -452,7 +418,7 @@ __DEFAULT_NO_OPTIONS+=OPENMP
 .endif
 
 # XXX: Not yet ported for purecap
-.if ${__T} == "aarch64c" || ${__T:Mmips64*c*} || ${__T:Mriscv*c*}
+.if ${__T} == "aarch64c" || ${__T:Mriscv*c*}
 BROKEN_OPTIONS+=OPENMP
 .endif
 
