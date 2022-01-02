@@ -204,29 +204,6 @@ extern void *__tls_get_addr(tls_index *ti);
 #define	TLS_VARIANT_I	1
 #define	TLS_DTV_OFFSET	0
 
-#define rtld_validate_target_eflags(path, hdr, main_path)	\
-	_rtld_validate_target_eflags(path, hdr, main_path)
-static inline bool
-_rtld_validate_target_eflags(const char *path, Elf_Ehdr *hdr, const char *main_path)
-{
-	bool rtld_is_cheriabi, hdr_is_cheriabi;
-
-#ifdef __CHERI_PURE_CAPABILITY__
-	rtld_is_cheriabi = true;
-#else
-	rtld_is_cheriabi = false;
-#endif
-	hdr_is_cheriabi = ELF_IS_CHERI(hdr);
-
-	if (rtld_is_cheriabi != hdr_is_cheriabi) {
-		_rtld_error("%s: cannot load %s since it is%s CheriABI",
-		    main_path, path, hdr_is_cheriabi ? "" : " not");
-		return (false);
-	}
-
-	return (true);
-}
-
 #ifdef __CHERI_PURE_CAPABILITY__
 static inline void
 fix_obj_mapping_cap_permissions(Obj_Entry *obj, const char *path __unused)
