@@ -216,7 +216,7 @@ _rtld_validate_target_eflags(const char *path, Elf_Ehdr *hdr, const char *main_p
 #else
 	rtld_is_cheriabi = false;
 #endif
-	hdr_is_cheriabi = (hdr->e_entry & 0x1) != 0;
+	hdr_is_cheriabi = ELF_IS_CHERI(hdr);
 
 	/*
 	 * TODO: restore validation when the Morello toolchain correctly

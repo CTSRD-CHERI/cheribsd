@@ -385,7 +385,7 @@ _rtld_validate_target_eflags(const char* path, Elf_Ehdr *hdr, const char* main_p
 		}
 	}
 
-	hdr_is_cheriabi = (hdr->e_flags & EF_MIPS_ABI) == EF_MIPS_ABI_CHERIABI;
+	hdr_is_cheriabi = ELF_IS_CHERI(hdr);
 	if (rtld_is_cheriabi != hdr_is_cheriabi) {
 		_rtld_error("%s: cannot load %s since it is%s CheriABI",
 		    main_path, path, hdr_is_cheriabi ? "" : " not");
