@@ -139,12 +139,6 @@ STATIC_CFLAGS+= -ftls-model=initial-exec
 STATIC_CXXFLAGS+= -ftls-model=initial-exec
 .endif
 
-# clang currently defaults to dynamic TLS for mips64 object files without -fPIC
-.if ${MACHINE_ARCH:Mmips64*} && ${COMPILER_TYPE} == "clang"
-STATIC_CFLAGS+= -ftls-model=initial-exec
-STATIC_CXXFLAGS+= -ftls-model=initial-exec
-.endif
-
 .if ${MACHINE_CPUARCH} == "riscv" && ${LINKER_FEATURES:Mriscv-relaxations} == ""
 CFLAGS += -mno-relax
 .endif
