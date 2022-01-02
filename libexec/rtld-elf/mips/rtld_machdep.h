@@ -367,29 +367,19 @@ static_assert(_MIPS_SZCAP == 128, "CHERI bits != 128?");
 static inline bool
 _rtld_validate_target_eflags(const char* path, Elf_Ehdr *hdr, const char* main_path)
 {
-	bool rtld_is_cheriabi, hdr_is_cheriabi;
 	size_t machine = (hdr->e_flags & EF_MIPS_MACH);
-	bool is_cheri = machine == EF_MIPS_MACH_CHERI256 || machine == EF_MIPS_MACH_CHERI128;
 
+	/* Catch bogus non-CHERI CheriABI and any CHERI-256 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	rtld_is_cheriabi = true;
+	if (machine != EF_MIPS_MACH_CHERI128)
 #else
-	rtld_is_cheriabi = false;
+	if (machine == EF_MIPS_MACH_CHERI256)
 #endif
-	if (rtld_is_cheriabi || is_cheri) {
-		if (machine != EF_MIPS_MACH_CHERI128) {
-			_rtld_error("%s: cannot load %s since its capability "
-			    "size is not 128 bits (e_flags=0x%zx)",
-			    main_path, path, (size_t)hdr->e_flags);
-			return false;
-		}
-	}
-
-	hdr_is_cheriabi = ELF_IS_CHERI(hdr);
-	if (rtld_is_cheriabi != hdr_is_cheriabi) {
-		_rtld_error("%s: cannot load %s since it is%s CheriABI",
-		    main_path, path, hdr_is_cheriabi ? "" : " not");
-		return (false);
+	{
+		_rtld_error("%s: cannot load %s since its capability "
+		    "size is not 128 bits (e_flags=0x%zx)",
+		    main_path, path, (size_t)hdr->e_flags);
+		return false;
 	}
 
 #ifdef __CHERI_PURE_CAPABILITY__
