@@ -3126,7 +3126,8 @@ issignal(struct thread *td)
 		 * Return the signal's number, or fall through
 		 * to clear it from the pending mask.
 		 */
-		if (p->p_sigacts->ps_sigact[_SIG_IDX(sig)] == SIG_DFL) {
+		switch ((intcap_t)p->p_sigacts->ps_sigact[_SIG_IDX(sig)]) {
+		case (intcap_t)SIG_DFL:
 			/*
 			 * Don't take default actions on system processes.
 			 */
@@ -3139,7 +3140,7 @@ issignal(struct thread *td)
 				printf("Process (pid %lu) got signal %d\n",
 					(u_long)p->p_pid, sig);
 #endif
-				goto ignore;		/* == ignore */
+				break;		/* == ignore */
 			}
 			/*
 			 * If there is a pending stop signal to process with
@@ -3155,7 +3156,7 @@ issignal(struct thread *td)
 				    pg_flags & PGRP_ORPHANED) != 0 &&
 				    (prop & SIGPROP_TTYSTOP) != 0)) {
 					mtx_lock(&ps->ps_mtx);
-					goto ignore;	/* == ignore */
+					break;	/* == ignore */
 				}
 				if (TD_SBDRY_INTR(td)) {
 					KASSERT((td->td_flags & TDF_SBDRY) != 0,
@@ -3181,24 +3182,24 @@ issignal(struct thread *td)
 				 * Default action is to ignore; drop it if
 				 * not in kern_sigtimedwait().
 				 */
-				goto ignore;	/* == ignore */
+				break;		/* == ignore */
 			} else
 				return (sig);
 			/*NOTREACHED*/
 
-		} else if (p->p_sigacts->ps_sigact[_SIG_IDX(sig)] == SIG_IGN) {
+		case (intcap_t)SIG_IGN:
 			if ((td->td_flags & TDF_SIGWAIT) == 0)
-				goto ignore;	/* == ignore */
+				break;		/* == ignore */
 			else
 				return (sig);
-		} else {
+
+		default:
 			/*
 			 * This signal has an action, let
 			 * postsig() process it.
 			 */
 			return (sig);
 		}
-ignore:
 		sigqueue_delete(&td->td_sigqueue, sig);	/* take the signal! */
 		sigqueue_delete(&p->p_sigqueue, sig);
 next:;
