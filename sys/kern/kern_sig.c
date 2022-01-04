@@ -117,6 +117,7 @@ static int	killpg1(struct thread *td, int sig, int pgid, int all,
 		    ksiginfo_t *ksi);
 static int	issignal(struct thread *td);
 static void	reschedule_signals(struct proc *p, sigset_t block, int flags);
+static int	sigprop(int sig);
 static void	tdsigwakeup(struct thread *, int, sig_t, int);
 static int	sig_suspend_threads(struct thread *, struct proc *, int);
 static int	filt_sigattach(struct knote *kn);
@@ -218,8 +219,17 @@ SYSCTL_INT(_kern, OID_AUTO, coredump_devctl, CTLFLAG_RW, &coredump_devctl,
 
 /*
  * Signal properties and actions.
- * The array below categorizes the signals and their default actions.
+ * The array below categorizes the signals and their default actions
+ * according to the following properties:
  */
+#define	SIGPROP_KILL		0x01	/* terminates process by default */
+#define	SIGPROP_CORE		0x02	/* ditto and coredumps */
+#define	SIGPROP_STOP		0x04	/* suspend process */
+#define	SIGPROP_TTYSTOP		0x08	/* ditto, from tty */
+#define	SIGPROP_IGNORE		0x10	/* ignore by default */
+#define	SIGPROP_CONT		0x20	/* continue if suspended */
+#define	SIGPROP_SBUNWIND	0x80	/* sandbox unwind if not caught */
+
 static int sigproptbl[NSIG] = {
 	[SIGHUP] =	SIGPROP_KILL,
 	[SIGINT] =	SIGPROP_KILL,
@@ -658,7 +668,7 @@ sigonstack(size_t sp)
 	       + (__cheri_addr size_t)td->td_sigstk.ss_sp);
 }
 
-int
+static __inline int
 sigprop(int sig)
 {
 
