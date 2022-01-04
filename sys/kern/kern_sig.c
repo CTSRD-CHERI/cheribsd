@@ -935,13 +935,12 @@ osigaction(struct thread *td, struct osigaction_args *uap)
 		error = copyin(uap->nsa, &sa, sizeof(sa));
 		if (error)
 			return (error);
-		nsap.sa_handler = sa.sa_handler;
+		nsap->sa_handler = sa.sa_handler;
 		nsap->sa_flags = sa.sa_flags;
 		OSIG2SIG(sa.sa_mask, nsap->sa_mask);
 	}
 	error = kern_sigaction(td, uap->signum, nsap, osap, KSA_OSIGSET);
 	if (osap && !error) {
-		sa.sa_handler = osap->sa_handler;
 		sa.sa_handler = osap->sa_handler;
 		sa.sa_flags = osap->sa_flags;
 		SIG2OSIG(osap->sa_mask, sa.sa_mask);
@@ -2113,7 +2112,6 @@ trapsignal(struct thread *td, ksiginfo_t *ksi)
 	PROC_LOCK(p);
 	ps = p->p_sigacts;
 	mtx_lock(&ps->ps_mtx);
-
 	sigmask = td->td_sigmask;
 	if (td->td_sigblock_val != 0)
 		SIGSETOR(sigmask, fastblock_mask);
