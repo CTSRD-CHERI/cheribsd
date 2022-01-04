@@ -228,20 +228,19 @@ SYSCTL_INT(_kern, OID_AUTO, coredump_devctl, CTLFLAG_RW, &coredump_devctl,
 #define	SIGPROP_TTYSTOP		0x08	/* ditto, from tty */
 #define	SIGPROP_IGNORE		0x10	/* ignore by default */
 #define	SIGPROP_CONT		0x20	/* continue if suspended */
-#define	SIGPROP_SBUNWIND	0x80	/* sandbox unwind if not caught */
 
 static int sigproptbl[NSIG] = {
 	[SIGHUP] =	SIGPROP_KILL,
 	[SIGINT] =	SIGPROP_KILL,
 	[SIGQUIT] =	SIGPROP_KILL | SIGPROP_CORE,
-	[SIGILL] =	SIGPROP_KILL | SIGPROP_CORE | SIGPROP_SBUNWIND,
-	[SIGTRAP] =	SIGPROP_KILL | SIGPROP_CORE | SIGPROP_SBUNWIND,
+	[SIGILL] =	SIGPROP_KILL | SIGPROP_CORE,
+	[SIGTRAP] =	SIGPROP_KILL | SIGPROP_CORE,
 	[SIGABRT] =	SIGPROP_KILL | SIGPROP_CORE,
-	[SIGEMT] =	SIGPROP_KILL | SIGPROP_CORE | SIGPROP_SBUNWIND,
-	[SIGFPE] =	SIGPROP_KILL | SIGPROP_CORE | SIGPROP_SBUNWIND,
+	[SIGEMT] =	SIGPROP_KILL | SIGPROP_CORE,
+	[SIGFPE] =	SIGPROP_KILL | SIGPROP_CORE,
 	[SIGKILL] =	SIGPROP_KILL,
-	[SIGBUS] =	SIGPROP_KILL | SIGPROP_CORE | SIGPROP_SBUNWIND,
-	[SIGSEGV] =	SIGPROP_KILL | SIGPROP_CORE | SIGPROP_SBUNWIND,
+	[SIGBUS] =	SIGPROP_KILL | SIGPROP_CORE,
+	[SIGSEGV] =	SIGPROP_KILL | SIGPROP_CORE,
 	[SIGSYS] =	SIGPROP_KILL | SIGPROP_CORE,
 	[SIGPIPE] =	SIGPROP_KILL,
 	[SIGALRM] =	SIGPROP_KILL,
@@ -262,7 +261,7 @@ static int sigproptbl[NSIG] = {
 	[SIGINFO] =	SIGPROP_IGNORE,
 	[SIGUSR1] =	SIGPROP_KILL,
 	[SIGUSR2] =	SIGPROP_KILL,
-	[SIGPROT] =	SIGPROP_KILL | SIGPROP_CORE | SIGPROP_SBUNWIND,
+	[SIGPROT] =	SIGPROP_KILL | SIGPROP_CORE,
 };
 
 sigset_t fastblock_mask;
@@ -3140,16 +3139,7 @@ issignal(struct thread *td)
 				printf("Process (pid %lu) got signal %d\n",
 					(u_long)p->p_pid, sig);
 #endif
-				/*
-				 * Deliver signals that would cause a sandbox
-				 * unwind (fatal signals) to init to avoid an
-				 * inifinite loop on boot if we miscompile init.
-				 */
-				if (p->p_pid == 1 && (prop & SIGPROP_SBUNWIND) != 0)
-					printf("Delivering fatal signal %d to "
-					   "system process %s\n", sig, p->p_comm);
-				else
-					goto ignore;		/* == ignore */
+				goto ignore;		/* == ignore */
 			}
 			/*
 			 * If there is a pending stop signal to process with
