@@ -89,15 +89,6 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/jail.h>
 
-#if __has_feature(capabilities)
-/*
- * XXXRW: We're not quite doing this in the right place, hence the header;
- * need to work on that.
- */
-#include <cheri/cheri.h>
-#include <cheri/cheric.h>
-#endif
-
 #include <machine/cpu.h>
 
 #include <security/audit/audit.h>
