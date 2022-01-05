@@ -717,7 +717,6 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct trapframe *tf;
 	struct sigframe * __capability fp, frame;
 	struct sigacts *psp;
-	struct sysentvec *sysent;
 	int onstack, sig;
 
 	td = curthread;
@@ -786,15 +785,10 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_elr = (uintcap_t)catcher;
 #endif
 	tf->tf_sp = (uintcap_t)fp;
-	sysent = p->p_sysent;
 #if __has_feature(capabilities)
 	tf->tf_lr = (uintcap_t)p->p_md.md_sigcode;
 #else
-	if (sysent->sv_sigcode_base != 0)
-		tf->tf_lr = (register_t)sysent->sv_sigcode_base;
-	else
-		tf->tf_lr = (register_t)(p->p_psstrings -
-		    *(sysent->sv_szsigcode));
+	tf->tf_lr = (register_t)p->p_sysent->sv_sigcode_base;
 #endif
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_elr,
