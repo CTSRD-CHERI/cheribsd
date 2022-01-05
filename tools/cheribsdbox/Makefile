@@ -322,6 +322,7 @@ LINKS=	${BINDIR}/alias ${BINDIR}/bg \
 .if ${MK_VI} != "no"
 # let's see if vi also works
 CRUNCH_PROGS_usr.bin+= vi
+CRUNCH_LIBS+= -lncursesw_real
 .endif
 
 CRUNCH_ALIAS_id= groups whoami
