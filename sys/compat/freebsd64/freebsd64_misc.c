@@ -597,9 +597,115 @@ freebsd64_swapcontext(struct thread *td, struct freebsd64_swapcontext_args *uap)
 int
 freebsd64_procctl(struct thread *td, struct freebsd64_procctl_args *uap)
 {
+	void *data;
+	union {
+		struct procctl_reaper_status rs;
+		struct procctl_reaper_pids rp;
+		struct procctl_reaper_kill rk;
+	} x;
+	union {
+		struct procctl_reaper_pids64 rp;
+	} x64;
+	int error, error1, flags, signum;
 
-	return (user_procctl(td, uap->idtype, uap->id, uap->com,
-	    __USER_CAP_UNBOUND(uap->data)));
+	if (uap->com >= PROC_PROCCTL_MD_MIN)
+		return (cpu_procctl(td, uap->idtype, uap->id, uap->com,
+		    __USER_CAP_UNBOUND(uap->data)));
+
+	switch (uap->com) {
+	case PROC_ASLR_CTL:
+	case PROC_PROTMAX_CTL:
+	case PROC_SPROTECT:
+	case PROC_STACKGAP_CTL:
+	case PROC_TRACE_CTL:
+	case PROC_TRAPCAP_CTL:
+	case PROC_NO_NEW_PRIVS_CTL:
+	case PROC_WXMAP_CTL:
+		error = copyin(__USER_CAP(uap->data, sizeof(flags)), &flags,
+		    sizeof(flags));
+		if (error != 0)
+			return (error);
+		data = &flags;
+		break;
+	case PROC_REAP_ACQUIRE:
+	case PROC_REAP_RELEASE:
+		if (uap->data != NULL)
+			return (EINVAL);
+		data = NULL;
+		break;
+	case PROC_REAP_STATUS:
+		data = &x.rs;
+		break;
+	case PROC_REAP_GETPIDS:
+		error = copyin(__USER_CAP(uap->data, sizeof(x64.rp)), &x64.rp,
+		    sizeof(x64.rp));
+		if (error != 0)
+			return (error);
+		CP(x64.rp, x.rp, rp_count);
+		x.rp.rp_pids = __USER_CAP(x64.rp.rp_pids,
+		    x64.rp.rp_count * sizeof(*x.rp.rp_pids));
+		data = &x.rp;
+		break;
+	case PROC_REAP_KILL:
+		error = copyin(__USER_CAP(uap->data, sizeof(x.rk)), &x.rk,
+		    sizeof(x.rk));
+		if (error != 0)
+			return (error);
+		data = &x.rk;
+		break;
+	case PROC_ASLR_STATUS:
+	case PROC_PROTMAX_STATUS:
+	case PROC_STACKGAP_STATUS:
+	case PROC_TRACE_STATUS:
+	case PROC_TRAPCAP_STATUS:
+	case PROC_NO_NEW_PRIVS_STATUS:
+	case PROC_WXMAP_STATUS:
+		data = &flags;
+		break;
+	case PROC_PDEATHSIG_CTL:
+		error = copyin(__USER_CAP(uap->data, sizeof(signum)), &signum,
+		    sizeof(signum));
+		if (error != 0)
+			return (error);
+		data = &signum;
+		break;
+	case PROC_PDEATHSIG_STATUS:
+		data = &signum;
+		break;
+	default:
+		return (EINVAL);
+	}
+	error = kern_procctl(td, uap->idtype, uap->id, uap->com, data);
+	switch (uap->com) {
+	case PROC_REAP_STATUS:
+		if (error == 0)
+			error = copyout(&x.rs, __USER_CAP(uap->data,
+			    sizeof(x.rs)), sizeof(x.rs));
+		break;
+	case PROC_REAP_KILL:
+		error1 = copyout(&x.rk, __USER_CAP(uap->data, sizeof(x.rk)),
+		    sizeof(x.rk));
+		if (error == 0)
+			error = error1;
+		break;
+	case PROC_ASLR_STATUS:
+	case PROC_PROTMAX_STATUS:
+	case PROC_STACKGAP_STATUS:
+	case PROC_TRACE_STATUS:
+	case PROC_TRAPCAP_STATUS:
+	case PROC_NO_NEW_PRIVS_STATUS:
+	case PROC_WXMAP_STATUS:
+		if (error == 0)
+			error = copyout(&flags, __USER_CAP(uap->data,
+			    sizeof(flags)), sizeof(flags));
+		break;
+	case PROC_PDEATHSIG_STATUS:
+		if (error == 0)
+			error = copyout(&signum, __USER_CAP(uap->data,
+			    sizeof(signum)), sizeof(signum));
+		break;
+	}
+	return (error);
 }
 
 int

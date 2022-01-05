@@ -50,16 +50,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_map.h>
 #include <vm/vm_extern.h>
 
-#ifdef COMPAT_FREEBSD32
-#include <compat/freebsd32/freebsd32.h>
-#endif
-
-struct procctl_reaper_pids_c {
-	u_int	rp_count;
-	u_int	rp_pad0[15];
-	struct procctl_reaper_pidinfo * __capability rp_pids;
-};
-
 static int
 protect_setchild(struct thread *td, struct proc *p, int flags)
 {
@@ -209,7 +199,7 @@ reap_status(struct thread *td, struct proc *p,
 }
 
 static int
-reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids_c *rp)
+reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids *rp)
 {
 	struct proc *reap, *p2;
 	struct procctl_reaper_pidinfo *pi;
@@ -677,32 +667,19 @@ struct procctl_args {
 int
 sys_procctl(struct thread *td, struct procctl_args *uap)
 {
-
-	return (user_procctl(td, uap->idtype, uap->id, uap->com, uap->data));
-}
-
-int
-user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
-    void * __capability udata)
-{
 	void *data;
 	union {
 		struct procctl_reaper_status rs;
-		struct procctl_reaper_pids_c rp;
+		struct procctl_reaper_pids rp;
 		struct procctl_reaper_kill rk;
 	} x;
-	union {
-		struct procctl_reaper_pids rp;
-#ifdef COMPAT_FREEBSD32
-		struct procctl_reaper_pids32 rp32;
-#endif
-	} xpids;
 	int error, error1, flags, signum;
 
-	if (com >= PROC_PROCCTL_MD_MIN)
-		return (cpu_procctl(td, idtype, id, com, udata));
+	if (uap->com >= PROC_PROCCTL_MD_MIN)
+		return (cpu_procctl(td, uap->idtype, uap->id,
+		    uap->com, uap->data));
 
-	switch (com) {
+	switch (uap->com) {
 	case PROC_ASLR_CTL:
 	case PROC_PROTMAX_CTL:
 	case PROC_SPROTECT:
@@ -711,14 +688,14 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 	case PROC_TRAPCAP_CTL:
 	case PROC_NO_NEW_PRIVS_CTL:
 	case PROC_WXMAP_CTL:
-		error = copyin(udata, &flags, sizeof(flags));
+		error = copyin(uap->data, &flags, sizeof(flags));
 		if (error != 0)
 			return (error);
 		data = &flags;
 		break;
 	case PROC_REAP_ACQUIRE:
 	case PROC_REAP_RELEASE:
-		if (udata != NULL)
+		if (uap->data != NULL)
 			return (EINVAL);
 		data = NULL;
 		break;
@@ -726,38 +703,13 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 		data = &x.rs;
 		break;
 	case PROC_REAP_GETPIDS:
-		/* XXX: fix for cheriabi and freebsd32 */
-#if __has_feature(capabilities)
-		if (SV_CURPROC_FLAG(SV_CHERI)) {
-			error = copyincap(udata, &x.rp, sizeof(x.rp));
-			if (error != 0)
-				return (error);
-		} else
-#endif
-#ifdef COMPAT_FREEBSD32
-		if (SV_CURPROC_FLAG(SV_ILP32)) {
-			error = copyin(udata, &xpids.rp32,
-			    sizeof(xpids.rp32));
-			if (error != 0)
-				return (error);
-			x.rp.rp_count = xpids.rp32.rp_count;
-			x.rp.rp_pids = __USER_CAP_ARRAY(
-			    (void *)(uintptr_t)xpids.rp32.rp_pids,
-			    xpids.rp32.rp_count);
-		} else
-#endif
-		{
-			error = copyin(udata, &xpids.rp, sizeof(xpids.rp));
-			if (error != 0)
-				return (error);
-			x.rp.rp_count = xpids.rp.rp_count;
-			x.rp.rp_pids = __USER_CAP_ARRAY(xpids.rp.rp_pids,
-			    xpids.rp.rp_count);
-		}
+		error = copyincap(uap->data, &x.rp, sizeof(x.rp));
+		if (error != 0)
+			return (error);
 		data = &x.rp;
 		break;
 	case PROC_REAP_KILL:
-		error = copyin(udata, &x.rk, sizeof(x.rk));
+		error = copyin(uap->data, &x.rk, sizeof(x.rk));
 		if (error != 0)
 			return (error);
 		data = &x.rk;
@@ -772,7 +724,7 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 		data = &flags;
 		break;
 	case PROC_PDEATHSIG_CTL:
-		error = copyin(udata, &signum, sizeof(signum));
+		error = copyin(uap->data, &signum, sizeof(signum));
 		if (error != 0)
 			return (error);
 		data = &signum;
@@ -783,14 +735,14 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 	default:
 		return (EINVAL);
 	}
-	error = kern_procctl(td, idtype, id, com, data);
-	switch (com) {
+	error = kern_procctl(td, uap->idtype, uap->id, uap->com, data);
+	switch (uap->com) {
 	case PROC_REAP_STATUS:
 		if (error == 0)
-			error = copyout(&x.rs, udata, sizeof(x.rs));
+			error = copyout(&x.rs, uap->data, sizeof(x.rs));
 		break;
 	case PROC_REAP_KILL:
-		error1 = copyout(&x.rk, udata, sizeof(x.rk));
+		error1 = copyout(&x.rk, uap->data, sizeof(x.rk));
 		if (error == 0)
 			error = error1;
 		break;
@@ -802,11 +754,11 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 	case PROC_NO_NEW_PRIVS_STATUS:
 	case PROC_WXMAP_STATUS:
 		if (error == 0)
-			error = copyout(&flags, udata, sizeof(flags));
+			error = copyout(&flags, uap->data, sizeof(flags));
 		break;
 	case PROC_PDEATHSIG_STATUS:
 		if (error == 0)
-			error = copyout(&signum, udata, sizeof(signum));
+			error = copyout(&signum, uap->data, sizeof(signum));
 		break;
 	}
 	return (error);
