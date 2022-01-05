@@ -636,8 +636,6 @@ int	user_ppoll(struct thread *td, struct pollfd *__capability fds,
 	    const sigset_t * __capability uset);
 int	user_preadv(struct thread *td, int fd, struct iovec * __capability iovp,
 	    u_int iovcnt, off_t offset, copyinuio_t *copyinuio_f);
-int	user_procctl(struct thread *td, enum idtype idtype, id_t id, int com,
-	    void * __capability data);
 int	user_pselect(struct thread *td, int nd, fd_set * __capability in,
 	    fd_set * __capability ou, fd_set * __capability ex,
 	    const struct timespec * __capability uts,
