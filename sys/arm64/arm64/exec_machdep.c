@@ -768,7 +768,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		sigexit(td, SIGILL);
 	}
 
-	tf->tf_x[0]= sig;
+	tf->tf_x[0] = sig;
 #if __has_feature(capabilities)
 	tf->tf_x[1] = (uintcap_t)cheri_setbounds(&fp->sf_si,
 	    sizeof(fp->sf_si));
