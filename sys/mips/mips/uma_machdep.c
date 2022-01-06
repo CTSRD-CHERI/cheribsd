@@ -75,7 +75,9 @@ uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
 	pa = VM_PAGE_TO_PHYS(m);
 	if ((wait & M_NODUMP) == 0)
 		dump_add_page(pa);
-	va = (void *)cheri_kern_setbounds(MIPS_PHYS_TO_DIRECT(pa), bytes);
+	KASSERT(bytes == PAGE_SIZE, ("%s: invalid allocation size %zu",
+	    __func__, bytes));
+	va = (void *)cheri_kern_setbounds(MIPS_PHYS_TO_DIRECT(pa), PAGE_SIZE);
 	return (va);
 }
 

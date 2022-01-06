@@ -56,9 +56,11 @@ uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
 	pa = m->phys_addr;
 	if ((wait & M_NODUMP) == 0)
 		dump_add_page(pa);
+	KASSERT(bytes == PAGE_SIZE, ("%s: invalid allocation size %zu",
+	    __func__, bytes));
 	va = (void *)PHYS_TO_DMAP(pa);
 #ifdef __CHERI_PURE_CAPABILITY__
-	va = cheri_setbounds(va, bytes);
+	va = cheri_setbounds(va, PAGE_SIZE);
 	va = cheri_andperm(va, CHERI_PERMS_KERNEL_DATA |
 	    CHERI_PERMS_KERNEL_CODE);
 #endif
