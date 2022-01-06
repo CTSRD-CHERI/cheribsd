@@ -251,25 +251,6 @@ typedef struct Struct_Obj_Entry {
     caddr_t cap_relocs;		/* start of the __cap_relocs section */
     size_t cap_relocs_size;	/* size of the __cap_relocs section */
 #endif
-#ifdef __mips__
-#ifdef __CHERI_PURE_CAPABILITY__
-    /*
-     * Two pointers to the start of the .cap_table section: one writable
-     * for use by RTLD and one read-only for use as the target $cgp in plt stubs.
-     */
-    struct CheriCapTableEntry* writable_captable;
-    const struct CheriCapTableEntry* _target_cgp;
-    size_t captable_size;	/* size of the .cap_table section */
-#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
-    const struct CheriCapTableMappingEntry* captable_mapping;
-    size_t captable_mapping_size;	/* size of the .cap_table_mapping section */
-#endif /* RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 */
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
-    Elf_Word local_gotno;	/* Number of local GOT entries */
-    Elf_Word symtabno;		/* Number of dynamic symbols */
-    Elf_Word gotsym;		/* First dynamic symbol in GOT */
-    Elf_Addr *mips_pltgot;	/* Second PLT GOT */
-#endif /* defined(__mips__) */
 #ifdef __powerpc__
 #ifdef __powerpc64__
     Elf_Addr glink;		/* GLINK PLT call stub section */
@@ -562,12 +543,7 @@ bool check_elf_headers(const Elf_Ehdr *hdr, const char *path);
 int do_copy_relocations(Obj_Entry *);
 int reloc_non_plt(Obj_Entry *, Obj_Entry *, int flags,
     struct Struct_RtldLockState *);
-#if defined(__mips__) && defined(__CHERI_PURE_CAPABILITY__)
-int reloc_plt(Obj_Entry *obj, bool bind_now, int flags, const Obj_Entry *rtldobj,
-    struct Struct_RtldLockState *lockstate);
-#else
 int reloc_plt(Obj_Entry *, int flags, struct Struct_RtldLockState *);
-#endif
 int reloc_jmpslots(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 int reloc_iresolve(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_iresolve_nonplt(Obj_Entry *, struct Struct_RtldLockState *);

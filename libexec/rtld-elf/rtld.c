@@ -235,10 +235,7 @@ static const char *ld_utrace;	/* Use utrace() to log events. */
 static bool ld_skip_init_funcs = false;	/* XXXAR: debug environment variable to verify relocation processing */
 static struct obj_entry_q obj_list;	/* Queue of all loaded objects */
 static Obj_Entry *obj_main;	/* The main program shared object */
-#if !defined(__mips__) || !defined(__CHERI_PURE_CAPABILITY__)
-static
-#endif
-Obj_Entry obj_rtld;	/* The dynamic linker shared object */
+static Obj_Entry obj_rtld;	/* The dynamic linker shared object */
 static unsigned int obj_count;	/* Number of objects in obj_list */
 static unsigned int obj_loads;	/* Number of loads of objects (gen count) */
 
@@ -1091,22 +1088,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     *exit_proc = rtld_exit_ptr;
     *objp = obj_main;
 
-#if defined(__mips__) && defined(__CHERI_PURE_CAPABILITY__)
-    // ensure that we setup a valid $cgp if the binary is built with -nostartfiles
-    // Note: This value should still remain valid after the return since clang
-    // won't clobber it. This should ensure that on return from here to
-    // rtld_start.S $cgp will be set up correctly. We could also pass another
-    // reference argument and store obj_main->captable there but this is easier
-    // and should have the same effect.
-    const void *entry_cgp = target_cgp_for_func(obj_main, (dlfunc_t)obj_main->entry);
-    dbg_cheri("Setting initial $cgp for %s to " PTR_FMT, obj_main->path, entry_cgp);
-    assert(cheri_getperm(obj_main->entry) & CHERI_PERM_EXECUTE);
-    /* Add memory clobber to ensure that it is done last thing before return
-     *
-     * TODO: would be nice if we could return pairs in $c3/$c4
-     */
-    __asm__ volatile("cmove $cgp, %0" :: "C"(entry_cgp): "$c26", "memory");
-#endif
     return ((func_ptr_type)obj_main->entry);
 }
 
@@ -1121,10 +1102,6 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 	return ((void *)target);
 }
 
-/*
- * NB: MIPS uses a private version of this function (_mips_rtld_bind).
- * Changes to this function should be applied there as well.
- */
 uintptr_t
 _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 {
@@ -1588,19 +1565,6 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    obj->fini_array_num = dynp->d_un.d_val / sizeof(InitArrayEntry);
 	    break;
 
-	/*
-	 * Don't process DT_DEBUG on MIPS as the dynamic section
-	 * is mapped read-only. DT_MIPS_RLD_MAP is used instead.
-	 */
-
-#ifndef __mips__
-	case DT_DEBUG:
-	    if (!early)
-		dbg("Filling in DT_DEBUG entry");
-	    (__DECONST(Elf_Dyn *, dynp))->d_un.d_ptr = (Elf_Addr)&r_debug;
-	    break;
-#endif
-
 	case DT_FLAGS:
 		if (dynp->d_un.d_val & DF_ORIGIN)
 		    obj->z_origin = true;
@@ -1622,97 +1586,6 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	case DT_CHERI___CAPRELOCSSZ:
 		obj->cap_relocs_size = dynp->d_un.d_val;
 		break;
-#endif
-
-#ifdef __mips__
-	case DT_MIPS_LOCAL_GOTNO:
-		obj->local_gotno = dynp->d_un.d_val;
-		break;
-
-	case DT_MIPS_SYMTABNO:
-		obj->symtabno = dynp->d_un.d_val;
-		break;
-
-	case DT_MIPS_GOTSYM:
-		obj->gotsym = dynp->d_un.d_val;
-		break;
-
-	case DT_MIPS_RLD_MAP:
-		// We still need to add relocbase for CHERI non-PIE binaries
-		// since we need something to derive the pointer from.
-		assert((vaddr_t)obj->relocbase == 0);
-		// All CheriABI binaries should be PIE so this should be unused.
-		*((Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr)) = (Elf_Addr) &r_debug;
-		break;
-
-	case DT_MIPS_RLD_MAP_REL: {
-		char* tag_loc;
-		// The MIPS_RLD_MAP_REL tag stores the offset to the .rld_map
-		// section relative to the address of the tag itself.
-#ifdef __CHERI_PURE_CAPABILITY__
-		tag_loc = (char*)cheri_copyaddress(obj->relocbase, dynp);
-#else
-		tag_loc = __DECONST(char*, dynp);
-#endif
-		dbg("Setting DT_MIPS_RLD_MAP_REL for %s: %p <- %p", obj->path,
-		    ((Elf_Addr *)(tag_loc + dynp->d_un.d_val)), &r_debug);
-		*((Elf_Addr *)(tag_loc + dynp->d_un.d_val)) = (Elf_Addr) &r_debug;
-		break;
-	}
-
-	case DT_MIPS_PLTGOT:
-		obj->mips_pltgot = (Elf_Addr *)(obj->relocbase +
-		    dynp->d_un.d_ptr);
-		break;
-
-#ifdef __CHERI_PURE_CAPABILITY__
-	case DT_MIPS_CHERI_FLAGS: {
-	    size_t flags = dynp->d_un.d_val;
-	    unsigned abi = flags & DF_MIPS_CHERI_ABI_MASK;
-	    obj->cheri_captable_abi = abi;
-	    flags &= ~DF_MIPS_CHERI_ABI_MASK;
-	    if ((flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS) == 0) {
-		rtld_fatal("File '%s' still uses old __cap_relocs."
-		    " Please recompile it with a newer toolchain.\n",
-		    obj->path);
-	    }
-	    flags &= ~DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
-	    if ((flags & DF_MIPS_CHERI_CAPTABLE_PER_FILE) ||
-	        (flags & DF_MIPS_CHERI_CAPTABLE_PER_FUNC)) {
-#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
-		obj->per_function_captable = true;
-#else
-		rtld_fatal("Cannot load %s with per-file/per-function "
-		    "captable since " _PATH_RTLD " was not compiled with "
-		    "-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1", obj->path);
-#endif
-	    } else if (flags) {
-		rtld_fdprintf(STDERR_FILENO, "Unknown DT_MIPS_CHERI_FLAGS in %s"
-		    ": 0x%zx", obj->path, (size_t)flags);
-	    }
-	    break;
-	}
-
-	case DT_MIPS_CHERI_CAPTABLE:
-	    obj->writable_captable =
-	        (struct CheriCapTableEntry*)(obj->relocbase + dynp->d_un.d_ptr);
-	    break;
-
-	case DT_MIPS_CHERI_CAPTABLESZ:
-	    obj->captable_size = dynp->d_un.d_val;
-	    break;
-
-#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
-	case DT_MIPS_CHERI_CAPTABLE_MAPPING:
-	    obj->captable_mapping =
-	        (struct CheriCapTableMappingEntry*)(obj->relocbase + dynp->d_un.d_ptr);
-	    break;
-
-	case DT_MIPS_CHERI_CAPTABLE_MAPPINGSZ:
-	    obj->captable_mapping_size = dynp->d_un.d_val;
-	    break;
-#endif /* RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 */
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 #endif
 
 #ifdef __powerpc__
@@ -3731,20 +3604,12 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 	init_pltgot(obj);
 
 	/* Process the PLT relocations. */
-#if defined(__mips__) && defined(__CHERI_PURE_CAPABILITY__)
-	/* No reloc_jmpslots for CHERI since it works differently: if BIND_NOW
-	 * is set, reloc_plt can avoid allocating trampolines for pc-rel code */
-	if (reloc_plt(obj, (obj->bind_now || bind_now), flags, rtldobj,
-	    lockstate) == -1)
-		return (-1);
-#else
 	if (reloc_plt(obj, flags, lockstate) == -1)
 		return (-1);
 	/* Relocate the jump slots if we are doing immediate binding. */
 	if ((obj->bind_now || bind_now) && reloc_jmpslots(obj, flags,
 	    lockstate) == -1)
 		return (-1);
-#endif
 
 	if (!obj->mainprog && obj_enforce_relro(obj) == -1)
 		return (-1);
@@ -5246,11 +5111,9 @@ matched_symbol(SymLook *req, const Obj_Entry *obj, Sym_Match_Result *result,
 	case STT_TLS:
 		if (symp->st_shndx != SHN_UNDEF)
 			break;
-#ifndef __mips__
 		else if (((req->flags & SYMLOOK_IN_PLT) == 0) &&
 		    (ELF_ST_TYPE(symp->st_info) == STT_FUNC))
 			break;
-#endif
 		/* fallthrough */
 	default:
 		return (false);
