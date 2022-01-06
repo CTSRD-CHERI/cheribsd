@@ -316,19 +316,7 @@ vm_thread_stack_create(struct domainset *ds, int pages)
 	/*
 	 * Get a kernel virtual address for this thread's kstack.
 	 */
-#if defined(__mips__)
-	/*
-	 * We need to align the kstack's mapped address to fit within
-	 * a single TLB entry.
-	 */
-	if (vmem_xalloc(kernel_arena, (pages + KSTACK_GUARD_PAGES) * PAGE_SIZE,
-	    KSTACK_PAGE_SIZE * 2, 0, 0, VMEM_ADDR_MIN, VMEM_ADDR_MAX,
-	    M_BESTFIT | M_NOWAIT, &ks)) {
-		ks = 0;
-	}
-#else
 	ks = kva_alloc((pages + KSTACK_GUARD_PAGES) * PAGE_SIZE);
-#endif
 	if (ks == 0) {
 		printf("%s: kstack allocation failed\n", __func__);
 		return (0);
