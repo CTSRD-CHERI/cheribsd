@@ -1922,7 +1922,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 		imgp->auxv = vectp;
 #endif
-		error = imgp->sysent->sv_copyout_auxargs(imgp, (uintcap_t)imgp->auxv);
+		error = imgp->sysent->sv_copyout_auxargs(imgp,
+		    (uintcap_t)imgp->auxv);
 		if (error != 0)
 			return (error);
 	}
