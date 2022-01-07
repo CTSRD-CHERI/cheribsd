@@ -204,7 +204,6 @@ __DEFAULT_NO_OPTIONS = \
     DTRACE_TESTS \
     EXPERIMENTAL \
     HESIOD \
-    LIBSOFT \
     LOADER_FIREWIRE \
     LOADER_VERBOSE \
     LOADER_VERIEXEC_PASS_MANIFEST \
@@ -318,10 +317,6 @@ __DEFAULT_YES_OPTIONS+=LIB64
 BROKEN_OPTIONS+=LIB32
 .else
 BROKEN_OPTIONS+=LIB64
-.endif
-# Only doing soft float API stuff on armv6 and armv7
-.if ${__T} != "armv6" && ${__T} != "armv7"
-BROKEN_OPTIONS+=LIBSOFT
 .endif
 # XXX: Fails to link due to old broken C++ mangling; remove once
 # https://git.morello-project.org/morello/llvm-project/-/merge_requests/23
