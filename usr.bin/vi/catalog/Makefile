@@ -107,8 +107,7 @@ english.base: dump ${SCAN} #Makefile
 
 
 DEPENDOBJS+=	dump
-dump: dump.c ${BUILD_TOOLS_META}
-	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} ${BUILD_TOOLS_LDFLAGS} -o ${.TARGET} ${.IMPSRC}
+dump: ${BUILD_TOOLS_META}
 
 CLEANFILES+= dump ${CAT} english.base *.check __ck1 __ck2
 

@@ -5,11 +5,6 @@ DPADD+=		${WORLDTMP}/legacy/usr/lib/libegacy.a
 LDADD+=		-legacy
 LDFLAGS+=	-L${WORLDTMP}/legacy/usr/lib
 
-# Remove all warning flags that a potentially different compiler might not understand
-BUILD_TOOLS_CC=${CC}
-BUILD_TOOLS_CFLAGS=${CFLAGS:N-Q*:N-W*}
-BUILD_TOOLS_LDFLAGS=${LDFLAGS}
-
 .if ${.MAKE.OS} != "FreeBSD"
 # On MacOS using a non-mac ar will fail the build, similarly on Linux using
 # nm may not work as expected if the nm for the target architecture comes in
