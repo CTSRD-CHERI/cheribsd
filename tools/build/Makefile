@@ -128,27 +128,30 @@ CHACHA20INCSDIR=	${INCLUDEDIR}/crypto/chacha20
 CHACHA20INCS+=	${SRCTOP}/sys/crypto/chacha20/_chacha.h \
 	${SRCTOP}/sys/crypto/chacha20/chacha.h
 
-# bmake on Linux/mac often prints x86_64 instead of amd64 and we place the
-# AArch64 headers in an arm64 directory.
-_host_sysincsdir=${MACHINE:S/x86_64/amd64/:S/aarch64/arm64/}
-.if ${_host_sysincsdir:Mppc*}
-_host_sysincsdir=powerpc
+_host_arch=${MACHINE}
+.if ${_host_arch} == "x86_64"
+# bmake on Linux/mac often prints that instead of amd64
+_host_arch=amd64
+.elif ${_host_arch} == "aarch64"
+# Linux calls arm64, aarch64, across the board
+_host_arch=arm64
+.elif ${_host_arch:Mppc*}
+_host_arch=powerpc
 .endif
-.if ${_host_sysincsdir} == "unknown"
+.if ${_host_arch} == "unknown"
 # HACK: If MACHINE is unknown, assume we are building on x86
-_host_sysincsdir=amd64
+_host_arch=amd64
 .endif
-_host_sysincsdir:=${_host_sysincsdir}
-MACHINESYSINCS+=	${SRCTOP}/sys/${_host_sysincsdir}/include/elf.h
-.if ${_host_sysincsdir} == "amd64" || ${_host_sysincsdir} == "i386"
+MACHINESYSINCS+=	${SRCTOP}/sys/${_host_arch}/include/elf.h
+.if ${_host_arch} == "amd64" || ${_host_arch} == "i386"
 INCSGROUPS+=	X86INCS
 X86INCSDIR=	${INCLUDEDIR}/x86
 X86INCS+=	${SRCTOP}/sys/x86/include/elf.h
 .endif
 
 # needed for btxld:
-MACHINESYSINCS+=	${SRCTOP}/sys/${_host_sysincsdir}/include/exec.h
-MACHINESYSINCS+=	${SRCTOP}/sys/${_host_sysincsdir}/include/reloc.h
+MACHINESYSINCS+=	${SRCTOP}/sys/${_host_arch}/include/exec.h
+MACHINESYSINCS+=	${SRCTOP}/sys/${_host_arch}/include/reloc.h
 INCS+=	${SRCTOP}/include/a.out.h
 INCS+=	${SRCTOP}/include/nlist.h
 SYSINCS+=	${SRCTOP}/sys/sys/imgact_aout.h
