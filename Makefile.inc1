@@ -911,8 +911,6 @@ _LIBCOMPAT= 64C
 _LIBCOMPAT= 32
 .elif ${MK_LIB64} == "yes"
 _LIBCOMPAT= 64
-.elif ${MK_LIBSOFT} == "yes"
-_LIBCOMPAT= SOFT
 .endif
 .include "Makefile.libcompat"
 

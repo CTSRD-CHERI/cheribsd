@@ -181,19 +181,6 @@ LIB64CCFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
 .endif
 
 # -------------------------------------------------------------------
-# soft-fp world
-.if ${COMPAT_ARCH:Marmv[67]*}
-HAS_COMPAT=SOFT
-LIBSOFTCFLAGS=        -DCOMPAT_SOFTFP
-LIBSOFTCPUFLAGS= -mfloat-abi=softfp
-LIBSOFT_MACHINE=	arm
-LIBSOFT_MACHINE_ARCH=	${COMPAT_ARCH}
-LIBSOFTWMAKEENV= CPUTYPE=soft
-LIBSOFTWMAKEFLAGS=        -DCOMPAT_SOFTFP
-LIBSOFT_MACHINE_ABI=	${MACHINE_ABI:Nhard-float} soft-float
-.endif
-
-# -------------------------------------------------------------------
 # In the program linking case, select LIBCOMPAT
 .if defined(NEED_COMPAT)
 .if !defined(HAS_COMPAT)
@@ -253,8 +240,8 @@ LIBCOMPATWMAKEFLAGS+=	TARGET_ARCH=${LIBCOMPAT_MACHINE_ARCH}
 .for BINUTIL in ${XBINUTILS}
 LIBCOMPATWMAKEENV+=	${BINUTIL}="${X${BINUTIL}}"
 .endfor
-# -B is needed to find /usr/lib32/crti.o for GCC and /usr/libsoft/crti.o for
-# Clang/GCC.
+
+# -B is needed to find /usr/lib32/crti.o for gcc.
 LIBCOMPATCFLAGS+=	-B${WORLDTMP}/usr/lib${libcompat}
 
 .if defined(WANT_COMPAT)

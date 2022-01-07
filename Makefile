@@ -163,7 +163,6 @@ TGTS=	all all-man buildenv buildenvvars buildkernel buildsysroot buildworld \
 	_build-tools _build-metadata _cross-tools _includes _libraries \
 	build32 distribute32 install32 \
 	build64 distribute64 install64 \
-	buildsoft distributesoft installsoft \
 	build64c distribute64c \
 	libcheribuildenv libcheribuildenvvars \
 	lib64cbuildenv lib64cbuildenvvars \
@@ -196,7 +195,7 @@ TGTS+=	${BITGTS}
 # the interactive tty prompt.  The safest route is to just whitelist
 # the ones that benefit from it.
 META_TGT_WHITELIST+= \
-	_* build32 buildfiles buildincludes buildkernel buildsoft \
+	_* build32 buildfiles buildincludes buildkernel \
 	buildworld everything kernel-toolchain kernel-toolchains kernel \
 	kernels libraries native-xtools showconfig test-includes \
 	test-system-compiler test-system-linker tinderbox toolchain \
