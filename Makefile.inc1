@@ -2718,6 +2718,7 @@ _bt_clean=	${CLEANDIR}
 .for _tool in \
     ${_tcsh} \
     bin/sh \
+    libexec/atf/sh_static \
     ${LOCAL_TOOL_DIRS} \
     ${_jevents} \
     lib/ncurses/tinfo \
