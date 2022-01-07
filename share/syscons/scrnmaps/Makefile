@@ -23,8 +23,7 @@ ${SCRMAPS}: ${.TARGET:R}.mk
 	rm -f ${.TARGET:R}.tmp
 
 ${SCRMAPS_MK}: ${.TARGET:R} mkscrfil.c ${BUILD_TOOLS_META}
-	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} -I${.CURDIR} \
-	    -DFIL=\"${.TARGET:R}\" ${BUILD_TOOLS_LDFLAGS} \
-	    -o ${.TARGET} ${.CURDIR}/mkscrfil.c
+	${CC:N${CCACHE_BIN}} ${CFLAGS} -I${.CURDIR} -DFIL=\"${.TARGET:R}\" \
+	    ${LDFLAGS} -o ${.TARGET} ${.CURDIR}/mkscrfil.c
 
 .include <bsd.prog.mk>

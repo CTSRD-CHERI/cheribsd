@@ -273,16 +273,13 @@ keys.list: MKkeys_list.sh Caps Caps-ncurses
 # Build tools
 DEPENDOBJS+= make_hash make_keys
 build-tools: make_hash make_keys
-BUILD_TOOLS_CFLAGS+=	-I. -I${.CURDIR}/../ncurses
-BUILD_TOOLS_CFLAGS+=	-I${NCURSES_DIR}/ncurses -I${NCURSES_DIR}/include
 
 make_keys: make_keys.c names.c ncurses_def.h ${HEADERS} ${SRCHDRS} ${BUILD_TOOLS_META}
-	${BUILD_TOOLS_CC:N${CCACHE_BIN}} -o $@ ${BUILD_TOOLS_CFLAGS} \
-		${BUILD_TOOLS_LDFLAGS} ${NCURSES_DIR}/ncurses/tinfo/make_keys.c
+	${CC:N${CCACHE_BIN}} -o $@ ${CFLAGS} ${NCURSES_DIR}/ncurses/tinfo/make_keys.c
 
 make_hash: make_hash.c hashsize.h ncurses_def.h ${HEADERS} ${SRCHDRS} ${BUILD_TOOLS_META}
-	${BUILD_TOOLS_CC:N${CCACHE_BIN}} -o $@ ${BUILD_TOOLS_CFLAGS} -DMAIN_PROGRAM \
-		${BUILD_TOOLS_LDFLAGS} ${NCURSES_DIR}/ncurses/tinfo/make_hash.c
+	${CC:N${CCACHE_BIN}} -o $@ ${CFLAGS} -DMAIN_PROGRAM \
+		${NCURSES_DIR}/ncurses/tinfo/make_hash.c
 
 # ./configure generated
 MKterm.h.awk: MKterm.h.awk.in

@@ -27,9 +27,7 @@ proctab.c: maketab awkgram.tab.h
 
 DEPENDOBJS+= maketab
 build-tools: maketab
-maketab: maketab.c awkgram.tab.h ${BUILD_TOOLS_META}
-	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} -I. ${BUILD_TOOLS_LDFLAGS} \
-	    ${.ALLSRC:[1]} -o ${.TARGET}
+maketab: awkgram.tab.h ${BUILD_TOOLS_META}
 
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
