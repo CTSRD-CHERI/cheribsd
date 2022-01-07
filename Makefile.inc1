@@ -2709,6 +2709,10 @@ _libmagic=lib/libmagic
 _jevents=lib/libpmc/pmu-events
 .endif
 
+.if ${MK_CHERIBSDBOX} != "no"
+_cheribsdbox=tools/cheribsdbox
+.endif
+
 # kernel-toolchain skips _cleanobj, so handle cleaning up previous
 # build-tools directories if needed.
 .if ${MK_CLEAN} == "yes" && make(kernel-toolchain)
@@ -2719,6 +2723,7 @@ _bt_clean=	${CLEANDIR}
     ${_tcsh} \
     bin/sh \
     libexec/atf/sh_static \
+    ${_cheribsdbox} \
     ${LOCAL_TOOL_DIRS} \
     ${_jevents} \
     lib/ncurses/tinfo \
