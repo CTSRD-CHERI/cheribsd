@@ -280,6 +280,8 @@ CRUNCH_PROGS_usr.bin+= \
 		which \
 		xargs
 
+CRUNCH_BUILDTOOLS+=	usr.bin/awk
+
 CRUNCH_ALIAS_bmake=	make
 CRUNCH_ALIAS_bzip2=	bunzip2
 CRUNCH_ALIAS_tar=	bsdtar
@@ -321,6 +323,7 @@ LINKS=	${BINDIR}/alias ${BINDIR}/bg \
 
 .if ${MK_VI} != "no"
 # let's see if vi also works
+CRUNCH_BUILDTOOLS+=	usr.bin/vi/catalog
 CRUNCH_PROGS_usr.bin+= vi
 CRUNCH_LIBS+= -lncursesw_real
 .endif
