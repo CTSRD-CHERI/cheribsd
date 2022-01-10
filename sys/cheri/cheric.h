@@ -235,7 +235,8 @@ cheri_bytes_remaining(const void * __capability cap)
 
 #endif	/* __has_feature(capabilities) */
 
-#if defined(_KERNEL) && defined(__CHERI_PURE_CAPABILITY__)
+#ifdef _KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 #define	cheri_kern_gettag(x)		cheri_gettag(x)
 #define	cheri_kern_setbounds(x, y)	cheri_setbounds(x, y)
 #define	cheri_kern_setboundsexact(x, y)	cheri_setboundsexact(x, y)
@@ -249,7 +250,8 @@ cheri_bytes_remaining(const void * __capability cap)
 #define	cheri_kern_setaddress(x, y)	((__typeof__(x))(y))
 #define	cheri_kern_getaddress(x)	((uintptr_t)(x))
 #define	cheri_kern_andperm(x, y)	(x)
-#endif
+#endif	/* __CHERI_PURE_CAPABILITY__ */
+#endif	/* _KERNEL */
 
 /*
  * The cheri_{get,set,clear}_low_pointer_bits() functions work both with and
