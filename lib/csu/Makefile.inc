@@ -30,7 +30,6 @@ CFLAGS+=	-I${.CURDIR:H}/common \
 .if ${MACHINE_ABI:Mpurecap}
 # Purecap code requires crt_init_globals to be called before using jump tables
 CFLAGS+=	-fno-jump-tables
-CFLAGS+=	-DCRT_IRELOC_SUPPRESS
 CFLAGS+=	-I${.CURDIR:H}/common-cheri
 .endif
 

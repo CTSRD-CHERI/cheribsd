@@ -33,6 +33,12 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+/* PIEs always have their relocations processed by rtld */
+#ifdef PIC
+#undef	CRT_IRELOC_RELA
+#define	CRT_IRELOC_SUPPRESS
+#endif
+
 #include <sys/types.h>
 #include <machine/elf.h>
 #include <stdbool.h>
@@ -81,6 +87,8 @@ _start(void *auxv,
 #ifndef PIC
 	const Elf_Phdr *at_phdr = NULL;
 	long at_phnum = 0;
+	void *data_cap;
+	const void *code_cap;
 #else
 	if (!has_dynamic_linker)
 		__builtin_trap(); /* RTLD missing? Wrong *crt1.o linked? */
@@ -120,7 +128,8 @@ _start(void *auxv,
 	 * not span the readonly segment or text segment.
 	 */
 	if (!has_dynamic_linker)
-		crt_init_globals(at_phdr, at_phnum, NULL, NULL, NULL);
+		crt_init_globals(at_phdr, at_phnum, &data_cap, &code_cap,
+		    NULL);
 #endif
 	/* We can access global variables/make function calls now. */
 
@@ -130,8 +139,12 @@ _start(void *auxv,
 
 	if (cleanup != NULL)
 		atexit(cleanup);
-	else
+	else {
+#ifndef PIC
+		process_irelocs(data_cap, code_cap);
+#endif
 		_init_tls();
+	}
 
 	handle_static_init(argc, argv, env);
 
