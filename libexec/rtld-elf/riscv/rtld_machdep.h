@@ -155,12 +155,6 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 #define call_fini_array_pointer(obj, target)				\
 	(((InitFunc)(target).value)())
 
-/*
- * TODO: Not implemented for CHERI.
- * #define	call_ifunc_resolver(ptr) \
- * 	(((Elf_Addr (*)(void))ptr)())
- */
-
 #else /* __CHERI_PURE_CAPABILITY__ */
 
 #define make_function_pointer(def, defobj) \
@@ -182,10 +176,10 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 	__asm __volatile("mv    gp, %0" :: "r"(old1));			\
 })
 
-#define	call_ifunc_resolver(ptr) \
-	(((Elf_Addr (*)(void))ptr)())
-
 #endif /* __CHERI_PURE_CAPABILITY__ */
+
+#define	call_ifunc_resolver(ptr) \
+	(((uintptr_t (*)(void))ptr)())
 
 /*
  * TLS
