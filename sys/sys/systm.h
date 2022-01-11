@@ -531,7 +531,7 @@ int64_t	fuword64(volatile const void * __capability base);
 #if __has_feature(capabilities)
 int	fuecap(volatile const void * __capability base, intcap_t *val);
 #else
-#define	fuecap		fueword
+#define	fuecap(base, val)		fueword((base), (long *)(val))
 #endif
 int	fueword(volatile const void * __capability base, long *val);
 int	fueword32(volatile const void * __capability base, int32_t *val);
