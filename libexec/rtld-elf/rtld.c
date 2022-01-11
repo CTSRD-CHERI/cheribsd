@@ -1094,19 +1094,12 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 void *
 rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 {
-#ifdef __CHERI_PURE_CAPABILITY__
-	(void)obj;
-	(void)def;
-	rtld_fatal("IFUNC is not implemented for CheriABI");
-#else
-
 	void *ptr;
-	Elf_Addr target;
+	uintptr_t target;
 
 	ptr = (void *)make_function_pointer(def, obj);
 	target = call_ifunc_resolver(ptr);
 	return ((void *)target);
-#endif
 }
 
 /*
