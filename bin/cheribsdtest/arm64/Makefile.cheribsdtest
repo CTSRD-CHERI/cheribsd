@@ -1,0 +1,3 @@
+# $FreeBSD$
+
+CHERIBSD_IFUNC_TESTS=	yes

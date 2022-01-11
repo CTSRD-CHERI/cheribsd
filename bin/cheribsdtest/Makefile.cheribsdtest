@@ -67,6 +67,10 @@ SRCS+=		cheribsdtest_lazy_bind.c
 NO_SHARED?=	YES
 .endif
 
+.ifdef CHERIBSD_IFUNC_TESTS
+SRCS+=		cheribsdtest_ifunc.c
+.endif
+
 .ifdef CHERIBSD_THREAD_TESTS
 LIBADD+=	pthread
 SRCS+=		cheribsdtest_tls_threads.c
