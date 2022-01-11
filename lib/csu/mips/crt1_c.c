@@ -61,8 +61,6 @@ extern int etext;
 #endif
 
 #ifdef SHOULD_PROCESS_CAP_RELOCS
-#define DONT_EXPORT_CRT_INIT_GLOBALS
-#define CRT_INIT_GLOBALS_GDC_ONLY
 #include "crt_init_globals.c"
 #endif
 
@@ -108,7 +106,7 @@ __start(char **ap,
 		}
 
 		if (phdr != NULL && phnum != 0) {
-			do_crt_init_globals(phdr, phnum);
+			crt_init_globals(phdr, phnum);
 		}
 	}
 #endif
