@@ -44,7 +44,10 @@
 
 /* This is __always_inline since it is called before globals have been set up */
 static __always_inline void
-crt_init_globals(const Elf_Phdr *phdr, long phnum)
+crt_init_globals(const Elf_Phdr *phdr, long phnum,
+    void * __capability *data_cap_out,
+    const void * __capability *code_cap_out,
+    const void * __capability *rodata_cap_out)
 {
 	const Elf_Phdr *phlimit = phdr + phnum;
 	Elf_Addr text_start = (Elf_Addr)-1l;
@@ -166,4 +169,10 @@ crt_init_globals(const Elf_Phdr *phdr, long phnum)
 			__builtin_trap();
 	}
 	cheri_init_globals_3(data_cap, code_cap, rodata_cap);
+	if (data_cap_out)
+		*data_cap_out = data_cap;
+	if (code_cap_out)
+		*code_cap_out = code_cap;
+	if (rodata_cap_out)
+		*rodata_cap_out = rodata_cap;
 }

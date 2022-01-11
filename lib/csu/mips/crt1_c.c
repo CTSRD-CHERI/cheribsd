@@ -106,7 +106,7 @@ __start(char **ap,
 		}
 
 		if (phdr != NULL && phnum != 0) {
-			crt_init_globals(phdr, phnum);
+			crt_init_globals(phdr, phnum, NULL, NULL, NULL);
 		}
 	}
 #endif
