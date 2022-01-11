@@ -74,12 +74,20 @@ extern const Elf_Rela __rela_iplt_end[] __weak_symbol __hidden;
 #include "reloc.c"
 
 static void
+#ifdef __CHERI_PURE_CAPABILITY__
+process_irelocs(void *data_cap, const void *code_cap)
+#else
 process_irelocs(void)
+#endif
 {
 	const Elf_Rela *r;
 
 	for (r = &__rela_iplt_start[0]; r < &__rela_iplt_end[0]; r++)
+#ifdef __CHERI_PURE_CAPABILITY__
+		crt1_handle_rela(r, data_cap, code_cap);
+#else
 		crt1_handle_rela(r);
+#endif
 }
 #elif defined(CRT_IRELOC_REL)
 extern const Elf_Rel __rel_iplt_start[] __weak_symbol __hidden;
