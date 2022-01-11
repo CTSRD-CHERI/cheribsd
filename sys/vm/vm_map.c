@@ -254,7 +254,7 @@ kmapent_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	if (addr + bytes < addr || addr + bytes > vm_map_max(kernel_map))
 		panic("%s: kernel map is exhausted", __func__);
 	error = vm_map_insert(kernel_map, NULL, 0, addr, addr + bytes,
-	    VM_PROT_RW, VM_PROT_RW, MAP_NOFAULT);
+	    VM_PROT_RW, VM_PROT_RW, MAP_NOFAULT, addr);
 	if (error != KERN_SUCCESS)
 		panic("%s: vm_map_insert() failed: %d", __func__, error);
 	if (!locked)
@@ -266,7 +266,7 @@ kmapent_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	} else {
 		if (!locked)
 			vm_map_lock(kernel_map);
-		vm_map_delete(kernel_map, addr, bytes);
+		vm_map_delete(kernel_map, addr, bytes, false);
 		if (!locked)
 			vm_map_unlock(kernel_map);
 		return (NULL);
@@ -4401,7 +4401,8 @@ vm_map_remove_locked(vm_map_t map, vm_offset_t start, vm_offset_t end)
 				return (KERN_PROTECTION_FAILURE);
 			KASSERT((entry->eflags & MAP_ENTRY_UNMAPPED) == 0,
 			    ("Attempting to remove unmapped reservation entry "
-			    "start:%lx end:%lx", entry->start, entry->end));
+			    "start:%lx end:%lx", (u_long)entry->start,
+			    (u_long)entry->end));
 			entry = vm_map_entry_succ(entry);
 		}
 	}
@@ -5891,7 +5892,7 @@ vm_map_reservation_create_locked(vm_map_t map, vm_pointer_t *addr,
 	KASSERT(is_aligned(*addr, CHERI_REPRESENTABLE_ALIGNMENT(length)),
 	    ("Reservation base is not representable %p", (void *)*addr));
 	KASSERT(length == CHERI_REPRESENTABLE_LENGTH(length),
-	    ("Reservation length is not representable %lx", length));
+	    ("Reservation length is not representable %lx", (u_long)length));
 
 	/* Check that the start and end points are not bogus. */
 	if (start < vm_map_min(map) || end > vm_map_max(map) ||
@@ -5973,7 +5974,7 @@ vm_map_reservation_delete_locked(vm_map_t map, vm_offset_t reservation)
 
 	KASSERT(entry->reservation == reservation,
 	    ("Reservation mismatch requested %lx found %lx",
-		 reservation, entry->reservation));
+	    (u_long)reservation, (u_long)entry->reservation));
 
 	while (entry->reservation == reservation) {
 		next_entry = vm_map_entry_succ(entry);
