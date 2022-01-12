@@ -76,17 +76,15 @@ init_pltgot(Obj_Entry *obj)
  * Fragments consist of a 64-bit address followed by a 56-bit length and an
  * 8-bit permission field.
  */
-static void
-init_cap_from_fragment(void *where, void * __capability data_cap,
+static uintcap_t
+init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
     const void * __capability text_rodata_cap, Elf_Addr base_addr,
     Elf_Size addend)
 {
-	Elf_Addr *fragment;
 	uintcap_t cap;
 	Elf_Addr address, len;
 	uint8_t perms;
 
-	fragment = (Elf_Addr *)where;
 	address = fragment[0];
 	len = fragment[1] & ((1UL << (8 * sizeof(*fragment) - 8)) - 1);
 	perms = fragment[1] >> (8 * sizeof(*fragment) - 8);
@@ -113,7 +111,7 @@ init_cap_from_fragment(void *where, void * __capability data_cap,
 		cap = cheri_sealentry(cap);
 	}
 
-	*((uintcap_t *)where) = cap;
+	return (cap);
 }
 #endif /* __has_feature(capabilities) */
 
@@ -163,8 +161,8 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 			__builtin_trap();
 
 		where = (Elf_Addr *)(relocbase + rela->r_offset);
-		init_cap_from_fragment(where, relocbase, pcc,
-		    (Elf_Addr)(uintptr_t)relocbase, rela->r_addend);
+		*(uintcap_t *)where = init_cap_from_fragment(where, relocbase,
+		    pcc, (Elf_Addr)(uintptr_t)relocbase, rela->r_addend);
 	}
 }
 #endif /* __CHERI_PURE_CAPABILITY__ */
@@ -697,8 +695,8 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				return (-1);
 			break;
 		case R_MORELLO_RELATIVE:
-			init_cap_from_fragment(where, data_cap,
-			    text_rodata_cap,
+			*(uintcap_t *)where = init_cap_from_fragment(where,
+			    data_cap, text_rodata_cap,
 			    (Elf_Addr)(uintptr_t)obj->relocbase,
 			    rela->r_addend);
 			break;
