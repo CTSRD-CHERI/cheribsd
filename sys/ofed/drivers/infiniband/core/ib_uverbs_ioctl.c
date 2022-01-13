@@ -577,7 +577,7 @@ static int ib_uverbs_cmd_verbs(struct ib_uverbs_file *ufile,
 	return ret;
 }
 
-long ib_uverbs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+long ib_uverbs_ioctl(struct file *filp, unsigned int cmd, uintcap_t arg)
 {
 	struct ib_uverbs_file *file = filp->private_data;
 	struct ib_uverbs_ioctl_hdr __user *user_hdr =
