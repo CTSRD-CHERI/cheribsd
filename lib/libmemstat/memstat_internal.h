@@ -68,6 +68,15 @@ struct memory_type {
 	uint64_t	 mt_memunreserved;	 /* Bytes unreserved over life time. */
 	uint64_t	 mt_reserved_bytes;	 /* Bytes currently reserved */
 	uint64_t	 mt_large_malloc_count;	 /* Large malloc hits */
+	uint64_t	 mt_bucket_allocs;	 /* uma: Number of bucket allocations */
+	uint64_t	 mt_bucket_frees;	 /* uma: Number of bucket frees */
+	uint64_t	 mt_failures_import;	 /*
+						  * uma: Number of failures due to
+						  * zone import failing to obtain any
+						  * items
+						  */
+	uint64_t	 mt_pressure;		 /* uma: Zone alloc/free pressure */
+	uint64_t	 mt_uma_miss;		 /* uma: Total pcpu cache miss */
 #endif
 	uint64_t	 mt_numfrees;	/* Frees over life time. */
 	uint64_t	 mt_bytes;	/* Bytes currently allocated. */
@@ -119,6 +128,7 @@ struct memory_type {
 
 	struct mt_percpu_cache_s {
 		uint64_t	 mtp_free;	/* Per-CPU cache free items. */
+		uint64_t	 mtp_uma_miss;	/* Per-CPU UMA cache miss */
 	}	*mt_percpu_cache;
 
 	LIST_ENTRY(memory_type)	mt_list;	/* List of types. */

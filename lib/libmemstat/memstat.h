@@ -141,6 +141,14 @@ uint64_t	 memstat_get_memreserved(const struct memory_type *mtp);
 uint64_t	 memstat_get_memunreserved(const struct memory_type *mtp);
 uint64_t	 memstat_get_reserved_bytes(const struct memory_type *mtp);
 uint64_t	 memstat_get_large_malloc_count(const struct memory_type *mtp);
+uint64_t	 memstat_get_bucket_allocs(const struct memory_type *mtp);
+uint64_t	 memstat_get_bucket_frees(const struct memory_type *mtp);
+uint64_t	 memstat_get_failures_zone_import(
+		    const struct memory_type *mtp);
+uint64_t	 memstat_get_zone_pressure(const struct memory_type *mtp);
+uint64_t	 memstat_get_zone_cache_miss(const struct memory_type *mtp);
+uint64_t	 memstat_get_percpu_zone_cache_miss(
+		    const struct memory_type *mtp, int cpu);
 #endif
 uint64_t	 memstat_get_numallocs(const struct memory_type *mtp);
 uint64_t	 memstat_get_numfrees(const struct memory_type *mtp);

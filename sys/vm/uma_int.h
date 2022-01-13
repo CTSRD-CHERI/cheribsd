@@ -273,6 +273,9 @@ struct uma_cache {
 	struct uma_cache_bucket	uc_crossbucket;	/* cross domain bucket */
 	uint64_t		uc_allocs;	/* Count of allocations */
 	uint64_t		uc_frees;	/* Count of frees */
+#ifdef CHERI_UMA_EXTRA_STATS
+	uint64_t		uc_miss;	/* Count of cache miss */
+#endif
 } UMA_ALIGN;
 
 typedef struct uma_cache * uma_cache_t;
@@ -504,6 +507,17 @@ struct uma_zone {
 
 	/* Offset 256. */
 	struct mtx	uz_cross_lock;	/* Cross domain free lock */
+#ifdef CHERI_UMA_EXTRA_STATS
+	counter_u64_t	uz_bucket_allocs; /*
+					   * Total number of buckets allocations
+					   */
+	counter_u64_t	uz_bucket_frees; /* Total number of bucket frees */
+	counter_u64_t	uz_fails_import; /*
+					  * Failures due to keg not being able
+					  * to provide a slab/item
+					  */
+	counter_u64_t	uz_pressure;	/* Allocation deallocation attempts */
+#endif
 
 	/*
 	 * This HAS to be the last item because we adjust the zone size

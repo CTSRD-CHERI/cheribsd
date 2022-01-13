@@ -216,6 +216,8 @@ _memstat_mt_reset_stats(struct memory_type *mtp, int maxcpus)
 #if __has_feature(capabilities)
 		mtp->mt_percpu_alloc[i].mtp_memreserved = 0;
 		mtp->mt_percpu_alloc[i].mtp_memunreserved = 0;
+		mtp->mt_percpu_alloc[i].mtp_large_malloc_count = 0;
+		mtp->mt_percpu_cache[i].mtp_uma_miss = 0;
 #endif
 	}
 }
@@ -485,6 +487,42 @@ uint64_t
 memstat_get_large_malloc_count(const struct memory_type *mtp)
 {
 
-    return (mtp->mt_large_malloc_count);
+	return (mtp->mt_large_malloc_count);
+}
+
+uint64_t
+memstat_get_bucket_allocs(const struct memory_type *mtp)
+{
+	return (mtp->mt_bucket_allocs);
+}
+
+uint64_t
+memstat_get_bucket_frees(const struct memory_type *mtp)
+{
+	return (mtp->mt_bucket_frees);
+}
+
+uint64_t
+memstat_get_failures_zone_import(const struct memory_type *mtp)
+{
+	return (mtp->mt_failures_import);
+}
+
+uint64_t
+memstat_get_zone_pressure(const struct memory_type *mtp)
+{
+	return (mtp->mt_pressure);
+}
+
+uint64_t
+memstat_get_percpu_zone_cache_miss(const struct memory_type *mtp, int cpu)
+{
+	return (mtp->mt_percpu_cache[cpu].mtp_uma_miss);
+}
+
+uint64_t
+memstat_get_zone_cache_miss(const struct memory_type *mtp)
+{
+	return (mtp->mt_uma_miss);
 }
 #endif

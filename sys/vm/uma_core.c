@@ -354,6 +354,23 @@ static int sysctl_handle_uma_zone_frees(SYSCTL_HANDLER_ARGS);
 static int sysctl_handle_uma_zone_flags(SYSCTL_HANDLER_ARGS);
 static int sysctl_handle_uma_slab_efficiency(SYSCTL_HANDLER_ARGS);
 static int sysctl_handle_uma_zone_items(SYSCTL_HANDLER_ARGS);
+#ifdef CHERI_UMA_EXTRA_STATS
+static int sysctl_handle_uma_zone_cache_miss(SYSCTL_HANDLER_ARGS);
+#endif
+
+#ifdef CHERI_UMA_QEMU_COUNTERS
+static void cache_sample_stats(uma_zone_t, uma_cache_t);
+
+/* Counter slots from 0 to MAXCPU for PCPU cache items */
+#define	QEMU_UMA_CNT_PCPU_CACHE 0
+/* Imported/released items count */
+#define	QEMU_UMA_CNT_IMPORT 100
+/* Successful bucket allocations */
+#define	QEMU_UMA_CNT_BUCKETS 101
+/* Fallback alloc/free */
+#define	QEMU_UMA_CNT_FALLBACK_ALLOC 102
+#define	QEMU_UMA_CNT_FALLBACK_FREE 103
+#endif
 
 static uint64_t uma_zone_get_allocs(uma_zone_t zone);
 
@@ -521,6 +538,10 @@ bucket_alloc(uma_zone_t zone, void *udata, int flags)
 		bucket->ub_seq = SMR_SEQ_INVALID;
 		CTR3(KTR_UMA, "bucket_alloc: zone %s(%p) allocated bucket %p",
 		    zone->uz_name, zone, bucket);
+#ifdef CHERI_UMA_EXTRA_STATS
+		counter_u64_add(zone->uz_bucket_allocs, 1);
+		QEMU_EVENT_INC_COUNTER(zone->uz_name, QEMU_UMA_CNT_BUCKETS, 1);
+#endif
 	}
 
 	return (bucket);
@@ -542,6 +563,10 @@ bucket_free(uma_zone_t zone, uma_bucket_t bucket, void *udata)
 		udata = (void *)(uintptr_t)zone->uz_flags;
 	ubz = bucket_zone_lookup(bucket->ub_entries);
 	uma_zfree_arg(ubz->ubz_zone, bucket, udata);
+#ifdef CHERI_UMA_EXTRA_STATS
+	counter_u64_add(zone->uz_bucket_frees, 1);
+	QEMU_EVENT_INC_COUNTER(zone->uz_name, QEMU_UMA_CNT_BUCKETS, -1);
+#endif
 }
 
 static void
@@ -1090,6 +1115,20 @@ cache_fetch_bucket(uma_zone_t zone, uma_cache_t cache, int domain)
 	return (NULL);
 }
 
+#ifdef CHERI_UMA_QEMU_COUNTERS
+static void
+cache_sample_stats(uma_zone_t zone, uma_cache_t cache)
+{
+	int64_t items = cache->uc_allocbucket.ucb_cnt +
+	    cache->uc_freebucket.ucb_cnt;
+#ifdef NUMA
+	items += cache->uc_crossbucket.ucb_cnt;
+#endif
+	QEMU_EVENT_ABS_COUNTER(zone->uz_name, QEMU_UMA_CNT_PCPU_CACHE + curcpu,
+	    items);
+}
+#endif
+
 static void
 zone_log_warning(uma_zone_t zone)
 {
@@ -1380,6 +1419,9 @@ bucket_drain(uma_zone_t zone, uma_bucket_t bucket)
 			kasan_mark_item_invalid(zone, bucket->ub_bucket[i]);
 		}
 	zone->uz_release(zone->uz_arg, bucket->ub_bucket, bucket->ub_cnt);
+#ifdef CHERI_UMA_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER(zone->uz_name, QEMU_UMA_CNT_IMPORT, -bucket->ub_cnt);
+#endif
 	if (zone->uz_max_items > 0)
 		zone_free_limit(zone, bucket->ub_cnt);
 #ifdef INVARIANTS
@@ -1435,6 +1477,9 @@ cache_drain(uma_zone_t zone)
 			bucket->ub_seq = seq;
 			bucket_free(zone, bucket, NULL);
 		}
+#ifdef CHERI_UMA_QEMU_COUNTERS
+		cache_sample_stats(zone, cache);
+#endif
 	}
 	bucket_cache_reclaim(zone, true, UMA_ANYDOMAIN);
 }
@@ -1476,6 +1521,9 @@ cache_drain_safe_cpu(uma_zone_t zone, void *unused)
 		b2 = cache_bucket_unload_free(cache);
 		b3 = cache_bucket_unload_cross(cache);
 	}
+#ifdef CHERI_UMA_QEMU_COUNTERS
+	cache_sample_stats(zone, cache);
+#endif
 	critical_exit();
 
 	if (b1 != NULL)
@@ -2619,6 +2667,12 @@ zone_alloc_counters(uma_zone_t zone, void *unused)
 	zone->uz_frees = counter_u64_alloc(M_WAITOK);
 	zone->uz_fails = counter_u64_alloc(M_WAITOK);
 	zone->uz_xdomain = counter_u64_alloc(M_WAITOK);
+#ifdef CHERI_UMA_EXTRA_STATS
+	zone->uz_bucket_allocs = counter_u64_alloc(M_WAITOK);
+	zone->uz_bucket_frees = counter_u64_alloc(M_WAITOK);
+	zone->uz_fails_import = counter_u64_alloc(M_WAITOK);
+	zone->uz_pressure = counter_u64_alloc(M_WAITOK);
+#endif
 }
 
 static void
@@ -2801,6 +2855,24 @@ zone_alloc_sysctl(uma_zone_t zone, void *unused)
 	SYSCTL_ADD_COUNTER_U64(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
 	    "xdomain", CTLFLAG_RD, &zone->uz_xdomain,
 	    "Free calls from the wrong domain");
+#ifdef CHERI_UMA_EXTRA_STATS
+	SYSCTL_ADD_COUNTER_U64(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
+	    "bucket_allocs", CTLFLAG_RD, &zone->uz_bucket_allocs,
+	    "Total number of buckets allocated");
+	SYSCTL_ADD_COUNTER_U64(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
+	    "bucket_frees", CTLFLAG_RD, &zone->uz_bucket_frees,
+	    "Total number of buckets freed");
+	SYSCTL_ADD_COUNTER_U64(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
+	    "fails_import", CTLFLAG_RD, &zone->uz_fails_import,
+	    "Number of keg bucket fill failures");
+	SYSCTL_ADD_COUNTER_U64(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
+	    "zone_pressure", CTLFLAG_RD, &zone->uz_pressure,
+	    "Number of zalloc and zfree");
+	SYSCTL_ADD_PROC(NULL, SYSCTL_CHILDREN(oid), OID_AUTO,
+	    "miss", CTLFLAG_RD | CTLTYPE_U64 | CTLFLAG_MPSAFE,
+	    zone, 0, sysctl_handle_uma_zone_cache_miss, "QU",
+	    "Total pcpu bucket cache miss");
+#endif
 }
 
 struct uma_zone_count {
@@ -2980,6 +3052,12 @@ out:
 		zone->uz_allocs = EARLY_COUNTER;
 		zone->uz_frees = EARLY_COUNTER;
 		zone->uz_fails = EARLY_COUNTER;
+#ifdef CHERI_UMA_EXTRA_STATS
+		zone->uz_bucket_allocs = EARLY_COUNTER;
+		zone->uz_bucket_frees = EARLY_COUNTER;
+		zone->uz_fails_import = EARLY_COUNTER;
+		zone->uz_pressure = EARLY_COUNTER;
+#endif
 	}
 
 	/* Caller requests a private SMR context. */
@@ -3078,6 +3156,12 @@ zone_dtor(void *arg, int size, void *udata)
 	counter_u64_free(zone->uz_frees);
 	counter_u64_free(zone->uz_fails);
 	counter_u64_free(zone->uz_xdomain);
+#ifdef CHERI_UMA_EXTRA_STATS
+	counter_u64_free(zone->uz_bucket_allocs);
+	counter_u64_free(zone->uz_bucket_frees);
+	counter_u64_free(zone->uz_fails_import);
+	counter_u64_free(zone->uz_pressure);
+#endif
 	free(zone->uz_ctlname, M_UMA);
 	for (i = 0; i < vm_ndomains; i++)
 		ZDOM_LOCK_FINI(ZDOM_GET(zone, i));
@@ -3661,6 +3745,9 @@ cache_alloc_item(uma_zone_t zone, uma_cache_t cache, uma_cache_bucket_t bucket,
 	int size, uz_flags;
 
 	item = cache_bucket_pop(cache, bucket);
+#ifdef CHERI_UMA_QEMU_COUNTERS
+	cache_sample_stats(zone, cache);
+#endif
 	size = cache_uz_size(cache);
 	uz_flags = cache_uz_flags(cache);
 	critical_exit();
@@ -3672,6 +3759,15 @@ cache_alloc_retry(uma_zone_t zone, uma_cache_t cache, void *udata, int flags)
 {
 	uma_cache_bucket_t bucket;
 	int domain;
+
+#ifdef CHERI_UMA_EXTRA_STATS
+	/*
+	 * XXX-AM: Record a single cache miss for the whole retry, counting
+	 * inside the loop would pollute the couter with bucket allocation
+	 * failures.
+	 */
+	cache->uc_miss += 1;
+#endif
 
 	while (cache_alloc(zone, cache, udata, flags)) {
 		cache = &zone->uz_cpu[curcpu];
@@ -3689,6 +3785,9 @@ cache_alloc_retry(uma_zone_t zone, uma_cache_t cache, void *udata, int flags)
 		domain = PCPU_GET(domain);
 	else
 		domain = UMA_ANYDOMAIN;
+#ifdef CHERI_UMA_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER(zone->uz_name, QEMU_UMA_CNT_FALLBACK_ALLOC, 1);
+#endif
 	return (zone_alloc_item(zone, udata, domain, flags));
 }
 
@@ -3709,6 +3808,9 @@ uma_zalloc_smr(uma_zone_t zone, int flags)
 	    ("uma_zalloc_arg: called with non-SMR zone."));
 	if (uma_zalloc_debug(zone, &item, NULL, flags) == EJUSTRETURN)
 		return (item);
+#endif
+#ifdef CHERI_UMA_EXTRA_STATS
+	counter_u64_add(zone->uz_pressure, 1);
 #endif
 
 	critical_enter();
@@ -3732,6 +3834,9 @@ uma_zalloc_arg(uma_zone_t zone, void *udata, int flags)
 	/* This is the fast path allocation */
 	CTR3(KTR_UMA, "uma_zalloc_arg zone %s(%p) flags %d", zone->uz_name,
 	    zone, flags);
+#ifdef CHERI_UMA_EXTRA_STATS
+	counter_u64_add(zone->uz_pressure, 1);
+#endif
 
 #ifdef UMA_ZALLOC_DEBUG
 	void *item;
@@ -3846,6 +3951,9 @@ cache_alloc(uma_zone_t zone, uma_cache_t cache, void *udata, int flags)
 			atomic_add_long(&ZDOM_GET(zone, domain)->uzd_imax,
 			    bucket->ub_cnt);
 		cache_bucket_load_alloc(cache, bucket);
+#ifdef CHERI_UMA_QEMU_COUNTERS
+		cache_sample_stats(zone, cache);
+#endif
 		return (true);
 	}
 
@@ -3915,6 +4023,9 @@ uma_zalloc_domain(uma_zone_t zone, void *udata, int domain, int flags)
 		return (item);
 	}
 	ZDOM_UNLOCK(zdom);
+#ifdef CHERI_UMA_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER(zone->uz_name, QEMU_UMA_CNT_FALLBACK_ALLOC, 1);
+#endif
 	return (zone_alloc_item(zone, udata, domain, flags));
 #else
 	return (uma_zalloc_arg(zone, udata, flags));
@@ -4367,11 +4478,18 @@ zone_alloc_bucket(uma_zone_t zone, void *udata, int domain, int flags)
 			bucket->ub_cnt = i;
 		}
 	}
+#ifdef CHERI_UMA_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER(zone->uz_name, QEMU_UMA_CNT_IMPORT, bucket->ub_cnt);
+#endif
 
 	cnt = bucket->ub_cnt;
 	if (bucket->ub_cnt == 0) {
 		bucket_free(zone, bucket, udata);
+#ifdef CHERI_UMA_EXTRA_STATS
+		counter_u64_add(zone->uz_fails_import, 1);
+#else
 		counter_u64_add(zone->uz_fails, 1);
+#endif
 		bucket = NULL;
 	}
 out:
@@ -4409,11 +4527,20 @@ zone_alloc_item(uma_zone_t zone, void *udata, int domain, int flags)
 	if (domain != UMA_ANYDOMAIN && VM_DOMAIN_EMPTY(domain))
 		domain = UMA_ANYDOMAIN;
 
-	if (zone->uz_import(zone->uz_arg, &item, 1, domain, flags) != 1)
-		goto fail_cnt;
+	if (zone->uz_import(zone->uz_arg, &item, 1, domain, flags) != 1) {
+#ifdef CHERI_UMA_EXTRA_STATS
+		counter_u64_add(zone->uz_fails_import, 1);
+#else
+		counter_u64_add(zone->uz_fails, 1);
+#endif
+		goto fail;
+	}
 #ifdef __CHERI_PURE_CAPABILITY__
 	if ((zone->uz_flags & UMA_ZONE_PCPU) == 0)
 		item = cheri_setboundsexact(item, zone->uz_size);
+#endif
+#ifdef CHERI_UMA_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER(zone->uz_name, QEMU_UMA_CNT_IMPORT, 1);
 #endif
 
 	/*
@@ -4430,7 +4557,8 @@ zone_alloc_item(uma_zone_t zone, void *udata, int domain, int flags)
 		kasan_mark_item_invalid(zone, item);
 		if (error != 0) {
 			zone_free_item(zone, item, udata, SKIP_FINI | SKIP_CNT);
-			goto fail_cnt;
+			counter_u64_add(zone->uz_fails, 1);
+			goto fail;
 		}
 	}
 	item = item_ctor(zone, zone->uz_flags, zone->uz_size, udata, flags,
@@ -4444,8 +4572,6 @@ zone_alloc_item(uma_zone_t zone, void *udata, int domain, int flags)
 
 	return (item);
 
-fail_cnt:
-	counter_u64_add(zone->uz_fails, 1);
 fail:
 	if (zone->uz_max_items > 0)
 		zone_free_limit(zone, 1);
@@ -4477,6 +4603,9 @@ uma_zfree_smr(uma_zone_t zone, void *item)
 	if (uma_zfree_debug(zone, item, NULL) == EJUSTRETURN)
 		return;
 #endif
+#ifdef CHERI_UMA_EXTRA_STATS
+	counter_u64_add(zone->uz_pressure, 1);
+#endif
 	cache = &zone->uz_cpu[curcpu];
 	itemdomain = 0;
 #ifdef NUMA
@@ -4497,6 +4626,9 @@ uma_zfree_smr(uma_zone_t zone, void *item)
 #endif
 		if (__predict_true(bucket->ucb_cnt < bucket->ucb_entries)) {
 			cache_bucket_push(cache, bucket, item);
+#ifdef CHERI_UMA_QEMU_COUNTERS
+			cache_sample_stats(zone, cache);
+#endif
 			critical_exit();
 			return;
 		}
@@ -4506,6 +4638,9 @@ uma_zfree_smr(uma_zone_t zone, void *item)
 	/*
 	 * If nothing else caught this, we'll just do an internal free.
 	 */
+#ifdef CHERI_UMA_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER(zone->uz_name, QEMU_UMA_CNT_FALLBACK_FREE, 1);
+#endif
 	zone_free_item(zone, item, NULL, SKIP_NONE);
 }
 
@@ -4525,6 +4660,9 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 
 	CTR3(KTR_UMA, "uma_zfree_arg zone %s(%p) item %p",
 	    zone->uz_name, zone, item);
+#ifdef CHERI_UMA_EXTRA_STATS
+	counter_u64_add(zone->uz_pressure, 1);
+#endif
 
 #ifdef UMA_ZALLOC_DEBUG
 	KASSERT((zone->uz_flags & UMA_ZONE_SMR) == 0,
@@ -4617,6 +4755,9 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 			    &cache->uc_allocbucket);
 		if (__predict_true(bucket->ucb_cnt < bucket->ucb_entries)) {
 			cache_bucket_push(cache, bucket, item);
+#ifdef CHERI_UMA_QEMU_COUNTERS
+			cache_sample_stats(zone, cache);
+#endif
 			critical_exit();
 			return;
 		}
@@ -4627,6 +4768,9 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 	 * If nothing else caught this, we'll just do an internal free.
 	 */
 zfree_item:
+#ifdef CHERI_UMA_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER(zone->uz_name, QEMU_UMA_CNT_FALLBACK_FREE, 1);
+#endif
 	zone_free_item(zone, item, udata, SKIP_DTOR);
 }
 
@@ -4793,6 +4937,10 @@ cache_free(uma_zone_t zone, uma_cache_t cache, void *udata, int itemdomain)
 	bucket = cache_bucket_unload(cbucket);
 	KASSERT(bucket == NULL || bucket->ub_cnt == bucket->ub_entries,
 	    ("cache_free: Entered with non-full free bucket."));
+#ifdef CHERI_UMA_QEMU_COUNTERS
+	if (bucket != NULL)
+		cache_sample_stats(zone, cache);
+#endif
 
 	/* We are no longer associated with this CPU. */
 	critical_exit();
@@ -4954,6 +5102,9 @@ zone_free_item(uma_zone_t zone, void *item, void *udata, enum zfreeskip skip)
 	}
 
 	zone->uz_release(zone->uz_arg, &item, 1);
+#ifdef CHERI_UMA_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER(zone->uz_name, QEMU_UMA_CNT_IMPORT, -1);
+#endif
 
 	if (skip & SKIP_CNT)
 		return;
@@ -5028,6 +5179,20 @@ uma_zone_set_maxcache(uma_zone_t zone, int nitems)
 	zone->uz_bucket_max = nitems - nb * bsize;
 	ZONE_UNLOCK(zone);
 }
+
+#ifdef CHERI_UMA_BUCKET_ADJUST
+void
+uma_zone_set_bucket_max(uma_zone_t zone, int bsize)
+{
+	ZONE_LOCK(zone);
+
+	MPASS(bsize >= 2 && bsize <= 256);
+	zone->uz_bucket_size_max = zone->uz_bucket_size = bsize;
+	if (zone->uz_bucket_size_min > zone->uz_bucket_size_max)
+		zone->uz_bucket_size_min = zone->uz_bucket_size_max;
+	ZONE_UNLOCK(zone);
+}
+#endif
 
 /* See uma.h */
 int
@@ -5105,6 +5270,21 @@ uma_zone_get_frees(uma_zone_t zone)
 
 	return (nitems);
 }
+
+#ifdef CHERI_UMA_EXTRA_STATS
+static uint64_t
+uma_zone_get_cache_miss(uma_zone_t zone)
+{
+	uint64_t nitems;
+	u_int i;
+
+	nitems = 0;
+	CPU_FOREACH(i)
+		nitems += atomic_load_64(&zone->uz_cpu[i].uc_miss);
+
+	return (nitems);
+}
+#endif
 
 #ifdef INVARIANTS
 /* Used only for KEG_ASSERT_COLD(). */
@@ -5547,6 +5727,17 @@ uma_vm_zone_stats(struct uma_type_header *uth, uma_zone_t z, struct sbuf *sbuf,
 	uth->uth_fails = counter_u64_fetch(z->uz_fails);
 	uth->uth_xdomain = counter_u64_fetch(z->uz_xdomain);
 	uth->uth_sleeps = z->uz_sleeps;
+#ifdef CHERI_UMA_EXTRA_STATS
+	uth->uth_bucket_allocs = counter_u64_fetch(z->uz_bucket_allocs);
+	uth->uth_bucket_frees = counter_u64_fetch(z->uz_bucket_frees);
+	uth->uth_fails_import = counter_u64_fetch(z->uz_fails_import);
+	uth->uth_pressure = counter_u64_fetch(z->uz_pressure);
+#else
+	uth->uth_bucket_allocs = 0;
+	uth->uth_bucket_frees = 0;
+	uth->uth_fails_import = 0;
+	uth->uth_pressure = 0;
+#endif
 
 	for (i = 0; i < mp_maxid + 1; i++) {
 		bzero(&ups[i], sizeof(*ups));
@@ -5558,6 +5749,11 @@ uma_vm_zone_stats(struct uma_type_header *uth, uma_zone_t z, struct sbuf *sbuf,
 		ups[i].ups_cache_free += cache->uc_crossbucket.ucb_cnt;
 		ups[i].ups_allocs = cache->uc_allocs;
 		ups[i].ups_frees = cache->uc_frees;
+#ifdef CHERI_UMA_EXTRA_STATS
+		ups[i].ups_miss = cache->uc_miss;
+#else
+		ups[i].ups_miss = 0;
+#endif
 	}
 }
 
@@ -5707,6 +5903,18 @@ sysctl_handle_uma_zone_frees(SYSCTL_HANDLER_ARGS)
 	cur = uma_zone_get_frees(zone);
 	return (sysctl_handle_64(oidp, &cur, 0, req));
 }
+
+#ifdef CHERI_UMA_EXTRA_STATS
+static int
+sysctl_handle_uma_zone_cache_miss(SYSCTL_HANDLER_ARGS)
+{
+	uma_zone_t zone = arg1;
+	uint64_t cur;
+
+	cur = uma_zone_get_cache_miss(zone);
+	return (sysctl_handle_64(oidp, &cur, 0, req));
+}
+#endif
 
 static int
 sysctl_handle_uma_zone_flags(SYSCTL_HANDLER_ARGS)

@@ -204,6 +204,12 @@ retry:
 		mtp->mt_failures = uthp->uth_fails;
 		mtp->mt_sleeps = uthp->uth_sleeps;
 		mtp->mt_xdomain = uthp->uth_xdomain;
+#if __has_feature(capabilities)
+		mtp->mt_bucket_allocs = uthp->uth_bucket_allocs;
+		mtp->mt_bucket_frees = uthp->uth_bucket_frees;
+		mtp->mt_failures_import = uthp->uth_fails_import;
+		mtp->mt_pressure = uthp->uth_pressure;
+#endif
 
 		for (j = 0; j < maxcpus; j++) {
 			upsp = (struct uma_percpu_stat *)p;
@@ -214,6 +220,10 @@ retry:
 			mtp->mt_free += upsp->ups_cache_free;
 			mtp->mt_numallocs += upsp->ups_allocs;
 			mtp->mt_numfrees += upsp->ups_frees;
+#if __has_feature(capabilities)
+			mtp->mt_percpu_cache[j].mtp_uma_miss = upsp->ups_miss;
+			mtp->mt_uma_miss += upsp->ups_miss;
+#endif
 		}
 
 		/*

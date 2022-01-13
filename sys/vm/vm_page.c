@@ -238,6 +238,9 @@ vm_page_init_cache_zones(void *dummy __unused)
 			cache = maxcache != 0 ? maxcache :
 			    vmd->vmd_page_count / 1000;
 			uma_zone_set_maxcache(pgcache->zone, cache);
+#ifdef CHERI_UMA_BUCKET_ADJUST
+			uma_zone_set_bucket_max(pgcache->zone, 60);
+#endif
 		}
 	}
 }

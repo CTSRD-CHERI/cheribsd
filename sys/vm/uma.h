@@ -526,6 +526,13 @@ int uma_zone_set_max(uma_zone_t zone, int nitems);
  */
 void uma_zone_set_maxcache(uma_zone_t zone, int nitems);
 
+#ifdef CHERI_UMA_BUCKET_ADJUST
+/*
+ * Force max bucket size for extra kernel tweaking
+ */
+void uma_zone_set_bucket_max(uma_zone_t zone, int bsize);
+#endif
+
 /*
  * Obtains the effective limit on the number of items in a zone
  *
@@ -725,13 +732,21 @@ struct uma_type_header {
 	uint64_t	uth_sleeps;	/* Zone: number of alloc sleeps. */
 	uint64_t	uth_xdomain;	/* Zone: Number of cross domain frees. */
 	uint64_t	_uth_reserved1[1];	/* Reserved. */
+	uint64_t	uth_bucket_allocs; /* Zone: number of bucket allocations */
+	uint64_t	uth_bucket_frees; /* Zone: number of bucket frees */
+	uint64_t	uth_fails_import; /*
+					   * Zone: number of alloc failures due to
+					   * zone import
+					   */
+	uint64_t	uth_pressure;	/* Zone: allocation/free pressure */
 };
 
 struct uma_percpu_stat {
 	uint64_t	ups_allocs;	/* Cache: number of allocations. */
 	uint64_t	ups_frees;	/* Cache: number of frees. */
 	uint64_t	ups_cache_free;	/* Cache: free items in cache. */
-	uint64_t	_ups_reserved[5];	/* Reserved. */
+	uint64_t	ups_miss;	/* Cache: miss count. */
+	uint64_t	_ups_reserved[4];	/* Reserved. */
 };
 
 void uma_reclaim_wakeup(void);
