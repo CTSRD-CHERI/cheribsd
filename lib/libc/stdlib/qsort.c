@@ -146,6 +146,8 @@ local_qsort(void *a, size_t n, size_t es, cmp_t *cmp, void *thunk)
 	int cmp_result;
 	int swaptype_intcap_t, swaptype_int, swap_cnt;
 
+	if (__predict_false(n == 0))
+		return;
 loop:
 	SWAPINIT(intcap_t, a, es);
 	SWAPINIT(int, a, es);
