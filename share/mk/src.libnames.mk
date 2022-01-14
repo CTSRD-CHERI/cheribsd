@@ -36,6 +36,10 @@ _PRIVATELIBS=	\
 		unbound \
 		zstd
 
+# Let projects based on FreeBSD append to _PRIVATELIBS
+# by maintaining their own LOCAL_PRIVATELIBS list.
+_PRIVATELIBS+=	${LOCAL_PRIVATELIBS}
+
 _INTERNALLIBS=	\
 		amu \
 		c_nossp_pic \
@@ -82,6 +86,10 @@ _INTERNALLIBS=	\
 .if ${MK_BSNMP} == "yes"
 _INTERNALLIBS+=	bsnmptools
 .endif
+
+# Let projects based on FreeBSD append to _INTERNALLIBS
+# by maintaining their own LOCAL_INTERNALLIBS list.
+_INTERNALLIBS+=	${LOCAL_INTERNALLIBS}
 
 _LIBRARIES=	\
 		${_PRIVATELIBS} \
