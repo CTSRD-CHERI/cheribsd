@@ -500,7 +500,7 @@ void *__kmp_itt_barrier_object(int gtid, int bt, int set_name,
     // different ids (for each barrier type).
     object = reinterpret_cast<void *>(
         (kmp_uintptr_t)(team) +
-        (kmp_uintptr_t)counter % (sizeof(kmp_team_t) / bs_last_barrier) *
+        (size_t)(kmp_uintptr_t)counter % (sizeof(kmp_team_t) / bs_last_barrier) *
             bs_last_barrier +
         bt);
     KMP_ITT_DEBUG_LOCK();

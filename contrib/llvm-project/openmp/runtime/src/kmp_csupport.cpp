@@ -3953,16 +3953,11 @@ void __kmpc_doacross_init(ident_t *loc, int gtid, int num_dims,
     __kmp_wait_4((volatile kmp_uint32 *)&sh_buf->doacross_buf_idx, idx,
                  __kmp_eq_4, NULL);
   }
-#if KMP_32_BIT_ARCH
   // Check if we are the first thread. After the CAS the first thread gets 0,
   // others get 1 if initialization is in progress, allocated pointer otherwise.
   // Treat pointer as volatile integer (value 0 or 1) until memory is allocated.
-  flags = (kmp_uint32 *)KMP_COMPARE_AND_STORE_RET32(
-      (volatile kmp_int32 *)&sh_buf->doacross_flags, NULL, 1);
-#else
-  flags = (kmp_uint32 *)KMP_COMPARE_AND_STORE_RET64(
-      (volatile kmp_int64 *)&sh_buf->doacross_flags, NULL, 1LL);
-#endif
+  flags = (kmp_uint32 *)KMP_COMPARE_AND_STORE_RETPTR(&sh_buf->doacross_flags, NULL,
+                                                     (kmp_uint32 *)1);
   if (flags == NULL) {
     // we are the first thread, allocate the array of flags
     size_t size =

@@ -377,7 +377,9 @@ typedef enum {
     __itt_thread_ignored = 1
 } __itt_thread_state;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(push, 8)
+#endif
 
 typedef struct ___itt_thread_info
 {
@@ -460,7 +462,9 @@ typedef struct ___itt_global
     __itt_counter_info_t* counter_list;
 } __itt_global;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 #pragma pack(pop)
+#endif
 
 #define NEW_THREAD_INFO_W(gptr,h,h_tail,t,s,n) { \
     h = (__itt_thread_info*)malloc(sizeof(__itt_thread_info)); \

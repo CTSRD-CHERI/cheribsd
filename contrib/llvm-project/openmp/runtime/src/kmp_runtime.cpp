@@ -162,7 +162,7 @@ int __kmp_get_global_thread_id() {
     if (!thr)
       continue;
 
-    stack_size = (size_t)TCR_PTR(thr->th.th_info.ds.ds_stacksize);
+    stack_size = (size_t)TCR_ADDR(thr->th.th_info.ds.ds_stacksize);
     stack_base = (char *)TCR_PTR(thr->th.th_info.ds.ds_stackbase);
 
     /* stack grows down -- search through all of the active threads */
@@ -306,7 +306,7 @@ void __kmp_check_stack_overlap(kmp_info_t *th) {
         char *other_stack_end =
             (char *)TCR_PTR(f_th->th.th_info.ds.ds_stackbase);
         char *other_stack_beg =
-            other_stack_end - (size_t)TCR_PTR(f_th->th.th_info.ds.ds_stacksize);
+            other_stack_end - (size_t)TCR_ADDR(f_th->th.th_info.ds.ds_stacksize);
         if ((stack_beg > other_stack_beg && stack_beg < other_stack_end) ||
             (stack_end > other_stack_beg && stack_end < other_stack_end)) {
 
@@ -314,7 +314,7 @@ void __kmp_check_stack_overlap(kmp_info_t *th) {
           if (__kmp_storage_map)
             __kmp_print_storage_map_gtid(
                 -1, other_stack_beg, other_stack_end,
-                (size_t)TCR_PTR(f_th->th.th_info.ds.ds_stacksize),
+                (size_t)TCR_ADDR(f_th->th.th_info.ds.ds_stacksize),
                 "th_%d stack (overlapped)", __kmp_gtid_from_thread(f_th));
 
           __kmp_fatal(KMP_MSG(StackOverlap), KMP_HNT(ChangeStackLimit),

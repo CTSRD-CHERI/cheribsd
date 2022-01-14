@@ -1560,6 +1560,20 @@ __kmp_invoke_microtask:
 
 #if KMP_ARCH_RISCV64
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define PTR_REG(x)  c ## x
+#define REG(x)      c ## x
+#define REG_SIZE    16
+#define LR          lc
+#define SR          sc
+#else
+#define PTR_REG(x)  x
+#define REG(x)      x
+#define REG_SIZE    8
+#define LR          ld
+#define SR          sd
+#endif
+	
 //------------------------------------------------------------------------
 //
 // typedef void (*microtask_t)(int *gtid, int *tid, ...);
@@ -1616,13 +1630,21 @@ __kmp_invoke_microtask:
 	.cfi_startproc
 
 	// First, save ra and fp
+#ifdef __CHERI_PURE_CAPABILITY__
+	cincoffset csp, csp, -32
+#else
 	addi	sp, sp, -16
-	sd	ra, 8(sp)
-	sd	fp, 0(sp)
+#endif
+	SR	REG(ra), 8(PTR_REG(sp))
+	SR	REG(fp), 0(PTR_REG(sp))
+#ifdef __CHERI_PURE_CAPABILITY__
+	cincoffset cfp, csp, 32
+#else
 	addi	fp, sp, 16
-	.cfi_def_cfa	fp, 0
-	.cfi_offset	ra, -8
-	.cfi_offset	fp, -16
+#endif
+	.cfi_def_cfa	REG(fp), 0
+	.cfi_offset	REG(ra), -(REG_SIZE)
+	.cfi_offset	REG(fp), -(REG_SIZE * 2)
 
 	// Compute the dynamic stack size:
 	//

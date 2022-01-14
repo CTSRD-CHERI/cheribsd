@@ -60,7 +60,7 @@ const size_t MAX_GEN = 8;
 static inline size_t __kmp_dephash_hash(kmp_intptr_t addr, size_t hsize) {
   // TODO alternate to try: set = (((Addr64)(addrUsefulBits * 9.618)) %
   // m_num_sets );
-  return ((addr >> 6) ^ (addr >> 2)) % hsize;
+  return (((size_t)addr >> 6) ^ ((size_t)addr >> 2)) % hsize;
 }
 
 static kmp_dephash_t *__kmp_dephash_extend(kmp_info_t *thread,

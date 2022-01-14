@@ -1216,7 +1216,7 @@ void KMP_EXPAND_NAME(KMP_API_NAME_GOMP_TASK)(void (*func)(void *), void *data,
 
   if (arg_size > 0) {
     if (arg_align > 0) {
-      task->shareds = (void *)((((size_t)task->shareds) + arg_align - 1) /
+      task->shareds = (void *)((((kmp_uintptr_t)task->shareds) + arg_align - 1) /
                                arg_align * arg_align);
     }
     // else error??
@@ -1766,7 +1766,7 @@ void __GOMP_taskloop(void (*func)(void *), void *data,
 
   // re-align shareds if needed and setup firstprivate copy constructors
   // through the task_dup mechanism
-  task->shareds = (void *)((((size_t)task->shareds) + arg_align - 1) /
+  task->shareds = (void *)((((kmp_uintptr_t)task->shareds) + arg_align - 1) /
                            arg_align * arg_align);
   if (copy_func) {
     task_dup = __kmp_gomp_task_dup;
