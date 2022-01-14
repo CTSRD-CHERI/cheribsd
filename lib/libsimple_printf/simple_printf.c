@@ -572,6 +572,18 @@ SIMPLE_PRINTF_FN(fdprintf)(int fd, const char *fmt, ...)
 }
 
 int
+SIMPLE_PRINTF_FN(fdprintfx)(int fd, const char *fmt, ...)
+{
+	va_list ap;
+	int retval;
+
+	va_start(ap, fmt);
+	retval = SIMPLE_PRINTF_FN(vfdprintf)(fd, fmt, ap);
+	va_end(ap);
+	return (retval);
+}
+
+int
 SIMPLE_PRINTF_FN(printf)(const char *fmt, ...)
 {
 	va_list ap;
