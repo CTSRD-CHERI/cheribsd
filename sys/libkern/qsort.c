@@ -28,6 +28,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20181121,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "integer_provenance"
+ *   ],
+ *   "change_comment": "memswap"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -62,10 +74,10 @@ static inline void	 swapfunc(char *, char *, size_t, int, int);
 	es % sizeof(TYPE) ? 2 : es == sizeof(TYPE) ? 0 : 1;
 
 static inline void
-swapfunc(char *a, char *b, size_t n, int swaptype_long, int swaptype_int)
+swapfunc(char *a, char *b, size_t n, int swaptype_intcap_t, int swaptype_int)
 {
-	if (swaptype_long <= 1)
-		swapcode(long, a, b, n)
+	if (swaptype_intcap_t <= 1)
+		swapcode(intcap_t, a, b, n)
 	else if (swaptype_int <= 1)
 		swapcode(int, a, b, n)
 	else
@@ -73,19 +85,19 @@ swapfunc(char *a, char *b, size_t n, int swaptype_long, int swaptype_int)
 }
 
 #define	swap(a, b)					\
-	if (swaptype_long == 0) {			\
-		long t = *(long *)(a);			\
-		*(long *)(a) = *(long *)(b);		\
-		*(long *)(b) = t;			\
+	if (swaptype_intcap_t == 0) {			\
+		intcap_t t = *(intcap_t *)(a);		\
+		*(intcap_t *)(a) = *(intcap_t *)(b);	\
+		*(intcap_t *)(b) = t;			\
 	} else if (swaptype_int == 0) {			\
 		int t = *(int *)(a);			\
 		*(int *)(a) = *(int *)(b);		\
 		*(int *)(b) = t;			\
 	} else						\
-		swapfunc(a, b, es, swaptype_long, swaptype_int)
+		swapfunc(a, b, es, swaptype_intcap_t, swaptype_int)
 
 #define	vecswap(a, b, n)				\
-	if ((n) > 0) swapfunc(a, b, n, swaptype_long, swaptype_int)
+	if ((n) > 0) swapfunc(a, b, n, swaptype_intcap_t, swaptype_int)
 
 #ifdef I_AM_QSORT_R
 #define	CMP(t, x, y) (cmp((t), (x), (y)))
@@ -117,9 +129,9 @@ qsort(void *a, size_t n, size_t es, cmp_t *cmp)
 	char *pa, *pb, *pc, *pd, *pl, *pm, *pn;
 	size_t d1, d2;
 	int cmp_result;
-	int swaptype_long, swaptype_int, swap_cnt;
+	int swaptype_intcap_t, swaptype_int, swap_cnt;
 
-loop:	SWAPINIT(long, a, es);
+loop:	SWAPINIT(intcap_t, a, es);
 	SWAPINIT(int, a, es);
 	swap_cnt = 0;
 	if (n < 7) {
