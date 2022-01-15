@@ -1053,10 +1053,17 @@ pmap_bootstrap(vm_pointer_t l0pt, vm_pointer_t l1pt, vm_paddr_t kernstart,
 
 	cpu_tlb_flushID();
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define alloc_pages(var, np)						\
+	(var) = cheri_setbounds(freemempos, (np * PAGE_SIZE));		\
+	freemempos += cheri_getlen((void *)(var));			\
+	memset((char *)(var), 0, ((np) * PAGE_SIZE));
+#else
 #define alloc_pages(var, np)						\
 	(var) = freemempos;						\
 	freemempos += (np * PAGE_SIZE);					\
 	memset((char *)(var), 0, ((np) * PAGE_SIZE));
+#endif
 
 	/* Allocate dynamic per-cpu area. */
 	alloc_pages(dpcpu, DPCPU_SIZE / PAGE_SIZE);
