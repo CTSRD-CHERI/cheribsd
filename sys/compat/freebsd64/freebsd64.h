@@ -197,23 +197,6 @@ struct procctl_reaper_pids64 {
 	uint64_t	rp_pids;	/* struct procctl_reaper_pidinfo* */
 };
 
-#include <sys/ipc.h>
-#include <sys/msg.h>
-
-struct msqid_ds64 {
-	struct ipc_perm			msg_perm;
-	uint64_t			msg_first;	/* struct msg64 * */
-	uint64_t			msg_last;	/* struct msg64 * */
-	msglen_t			msg_cbytes;
-	msgqnum_t			msg_qnum;
-	msglen_t			msg_qbytes;
-	pid_t				msg_lspid;
-	pid_t  				msg_lrpid;
-	time_t				msg_stime;
-	time_t 				msg_rtime;
-	time_t				msg_ctime;
-};
-
 struct iovec64 {
 	uint64_t iov_base;	/* void* */
 	size_t	iov_len;

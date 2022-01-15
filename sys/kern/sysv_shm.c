@@ -1080,42 +1080,10 @@ static struct syscall_helper_data shm32_syscalls[] = {
 
 #ifdef COMPAT_FREEBSD64
 #include <compat/freebsd64/freebsd64.h>
+#include <compat/freebsd64/freebsd64_ipc.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
-
-struct shmid_ds64 {
-	struct ipc_perm	shm_perm;
-	size_t		shm_segsz;
-	pid_t		shm_lpid;
-	pid_t		shm_cpid;
-	shmatt_t	shm_nattch;
-	time_t		shm_atime;
-	time_t		shm_dtime;
-	time_t		shm_ctime;
-};
-
-#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
-    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
-struct shmid_ds_old64 {
-	struct ipc_perm_old shm_perm;
-	int		shm_segsz;
-	pid_t		shm_lpid;
-	pid_t		shm_cpid;
-	short		shm_nattch;
-	time_t		shm_atime;
-	time_t		shm_dtime;
-	time_t		shm_ctime;
-	void		*shm_internal;
-};
-#endif
-
-struct shmid_kernel64 {
-	struct shmid_ds64	 u;
-	struct vm_object	*object;
-	struct label		*label;
-	struct ucred		*cred;
-};
 
 static struct syscall_helper_data shm64_syscalls[] = {
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_shmat),
