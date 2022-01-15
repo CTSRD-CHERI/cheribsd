@@ -2086,7 +2086,7 @@ int
 freebsd7_freebsd64___semctl(struct thread *td,
     struct freebsd7_freebsd64___semctl_args *uap)
 {
-	struct semid_ds64_old dsbuf64;
+	struct semid_ds_old64 dsbuf64;
 	struct semid_ds dsbuf;
 	union semun semun;
 	union semun64 arg;

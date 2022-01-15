@@ -111,7 +111,7 @@ struct shmid_kernel64 {
 
 #if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
-struct semid_ds64_old {
+struct semid_ds_old64 {
 	struct ipc_perm_old sem_perm;
 	void		*__sem_base;
 	unsigned short	sem_nsems;
