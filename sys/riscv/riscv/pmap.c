@@ -678,8 +678,7 @@ pmap_bootstrap(vm_pointer_t l1pt, vm_paddr_t kernstart, vm_size_t kernlen)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define alloc_pages(var, np)						\
-	(var) = (vm_pointer_t)cheri_setbounds((void *)freemempos,		\
-	    (np * PAGE_SIZE));						\
+	(var) = cheri_setbounds(freemempos, (np * PAGE_SIZE));		\
 	freemempos += cheri_getlen((void *)(var));			\
 	memset((char *)(var), 0, ((np) * PAGE_SIZE));
 #else
