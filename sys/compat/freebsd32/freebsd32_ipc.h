@@ -41,6 +41,93 @@ struct ipc_perm32 {
 	uint32_t	key;
 };
 
+struct semid_ds32 {
+	struct ipc_perm32 sem_perm;
+	uint32_t	__sem_base;
+	unsigned short	sem_nsems;
+	int32_t		sem_otime;
+	int32_t		sem_ctime;
+};
+
+#ifdef _KERNEL
+struct semid_kernel32 {
+	/* Data structure exposed to user space. */
+	struct semid_ds32	u;
+
+	/* Kernel-private components of the semaphore. */
+	int32_t			label;
+	int32_t			cred;
+};
+#endif /* _KERNEL */
+
+union semun32 {
+	int		val;
+	uint32_t	buf;
+	uint32_t	array;
+};
+
+struct msqid_ds32 {
+	struct ipc_perm32 msg_perm;
+	uint32_t	__msg_first;
+	uint32_t	__msg_last;
+	uint32_t	msg_cbytes;
+	uint32_t	msg_qnum;
+	uint32_t	msg_qbytes;
+	pid_t		msg_lspid;
+	pid_t		msg_lrpid;
+	int32_t		msg_stime;
+	int32_t		msg_rtime;
+	int32_t		msg_ctime;
+};
+
+#ifdef _KERNEL
+struct msqid_kernel32 {
+	/* Data structure exposed to user space. */
+	struct msqid_ds32	u;
+
+	/* Kernel-private components of the message queue. */
+	uint32_t		label;
+	uint32_t		cred;
+};
+#endif
+
+struct shmid_ds32 {
+	struct ipc_perm32 shm_perm;
+	int32_t		shm_segsz;
+	pid_t		shm_lpid;
+	pid_t		shm_cpid;
+	unsigned int	shm_nattch;
+	int32_t		shm_atime;
+	int32_t		shm_dtime;
+	int32_t		shm_ctime;
+};
+
+#ifdef _KERNEL
+struct shmid_kernel32 {
+	struct shmid_ds32	 u;
+	int32_t			*object;
+	int32_t			*label;
+	int32_t			*cred;
+};
+#endif
+
+struct shm_info32 {
+	int32_t		used_ids;
+	uint32_t	shm_tot;
+	uint32_t	shm_rss;
+	uint32_t	shm_swp;
+	uint32_t	swap_attempts;
+	uint32_t	swap_successes;
+};
+
+struct shminfo32 {
+	uint32_t	shmmax;
+	uint32_t	shmmin;
+	uint32_t	shmmni;
+	uint32_t	shmseg;
+	uint32_t	shmall;
+};
+
 #if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
 struct ipc_perm_old32 {
@@ -51,6 +138,53 @@ struct ipc_perm_old32 {
 	uint16_t	mode;
 	uint16_t	seq;
 	uint32_t	key;
+};
+
+struct semid_ds_old32 {
+	struct ipc_perm_old32 sem_perm;
+	uint32_t	__sem_base;
+	unsigned short	sem_nsems;
+	int32_t		sem_otime;
+	int32_t		sem_pad1;
+	int32_t		sem_ctime;
+	int32_t		sem_pad2;
+	int32_t		sem_pad3[4];
+};
+
+struct msqid_ds_old32 {
+	struct ipc_perm_old32 msg_perm;
+	uint32_t	__msg_first;
+	uint32_t	__msg_last;
+	uint32_t	msg_cbytes;
+	uint32_t	msg_qnum;
+	uint32_t	msg_qbytes;
+	pid_t		msg_lspid;
+	pid_t		msg_lrpid;
+	int32_t		msg_stime;
+	int32_t		msg_pad1;
+	int32_t		msg_rtime;
+	int32_t		msg_pad2;
+	int32_t		msg_ctime;
+	int32_t		msg_pad3;
+	int32_t		msg_pad4[4];
+};
+
+struct shmid_ds_old32 {
+	struct ipc_perm_old32 shm_perm;
+	int32_t		shm_segsz;
+	pid_t		shm_lpid;
+	pid_t		shm_cpid;
+	int16_t		shm_nattch;
+	int32_t		shm_atime;
+	int32_t		shm_dtime;
+	int32_t		shm_ctime;
+	uint32_t	shm_internal;
+};
+
+union semun_old32 {
+	int		val;
+	uint32_t	buf;
+	uint32_t	array;
 };
 
 void	freebsd32_ipcperm_old_in(struct ipc_perm_old32 *ip32,

@@ -247,49 +247,6 @@ static struct syscall_helper_data sem_syscalls[] = {
 #include <compat/freebsd32/freebsd32_syscall.h>
 #include <compat/freebsd32/freebsd32_util.h>
 
-struct semid_ds32 {
-	struct ipc_perm32 sem_perm;
-	uint32_t	__sem_base;
-	unsigned short	sem_nsems;
-	int32_t		sem_otime;
-	int32_t		sem_ctime;
-};
-
-#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
-    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
-struct semid_ds_old32 {
-	struct ipc_perm_old32 sem_perm;
-	uint32_t	__sem_base;
-	unsigned short	sem_nsems;
-	int32_t		sem_otime;
-	int32_t		sem_pad1;
-	int32_t		sem_ctime;
-	int32_t		sem_pad2;
-	int32_t		sem_pad3[4];
-};
-
-union semun_old32 {
-	int		val;
-	uint32_t	buf;
-	uint32_t	array;
-};
-#endif
-
-struct semid_kernel32 {
-	/* Data structure exposed to user space. */
-	struct semid_ds32	u;
-
-	/* Kernel-private components of the semaphore. */
-	int32_t			label;
-	int32_t			cred;
-};
-
-union semun32 {
-	int		val;
-	uint32_t	buf;
-	uint32_t	array;
-};
-
 static struct syscall_helper_data sem32_syscalls[] = {
 	SYSCALL32_INIT_HELPER(freebsd32___semctl),
 	SYSCALL32_INIT_HELPER_COMPAT(semget),
