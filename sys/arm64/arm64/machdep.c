@@ -100,6 +100,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #ifdef FDT
+#include <contrib/libfdt/libfdt.h>
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/openfirm.h>
 #endif
@@ -567,6 +568,14 @@ try_load_dtb(caddr_t kmdp)
 	vm_pointer_t dtbp;
 
 	dtbp = MD_FETCH(kmdp, MODINFOMD_DTBP, vm_offset_t);
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (dtbp != (vm_pointer_t)NULL) {
+		dtbp = (vm_pointer_t)cheri_andperm(cheri_setaddress(
+		    kernel_root_cap, dtbp), CHERI_PERMS_KERNEL_DATA);
+		dtbp = cheri_setbounds(dtbp, fdt_totalsize((void *)dtbp));
+	}
+#endif
+
 #if defined(FDT_DTB_STATIC)
 	/*
 	 * In case the device tree blob was not retrieved (from metadata) try
