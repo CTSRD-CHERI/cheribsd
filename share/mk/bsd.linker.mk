@@ -81,9 +81,9 @@ ${var}=	${${var}__${${X_}_ld_hash}}
 .if !defined(${X_}LINKER_TYPE) || !defined(${X_}LINKER_VERSION)
 # See bsd.compiler.mk
 .if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !make(sysent)
-.warning "${.CURDIR}: Rerunning ${${ld}} -v to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION. This value should be cached!"
+.warning ${.CURDIR}: Rerunning ${${ld}} -v to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION. This value should be cached!
 .else
-# .info "${.CURDIR}: Running ${${ld}} -v to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION"
+# .info ${.CURDIR}: Running ${${ld}} -v to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION
 .endif
 _ld_version!=	(${${ld}} -v 2>&1 || echo none) | sed -n 1p
 .if ${_ld_version} == "none"

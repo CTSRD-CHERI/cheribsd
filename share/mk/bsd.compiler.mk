@@ -192,9 +192,9 @@ ${X_}COMPILER_FREEBSD_VERSION= 0
 # lot of unccessary fork()+exec() when building world
 # walking the entire object tree
 .if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !make(sysent) && !defined(_CRUNCHGEN)
-.error "${.CURDIR}: Rerunning ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. This value should be cached!"
+.error ${.CURDIR}: Rerunning ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. This value should be cached!
 .else
-# .info "${.CURDIR}: Running ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. ${cc}=${${cc}}"
+# .info ${.CURDIR}: Running ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. ${cc}=${${cc}}
 .endif
 _v!=	${${cc}:N${CCACHE_BIN}} --version || echo 0.0.0
 
@@ -233,9 +233,9 @@ ${X_}COMPILER_FEATURES=	apple-clang
 .endif
 .if !defined(${X_}COMPILER_FREEBSD_VERSION)
 .if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !make(sysent) && !defined(_CRUNCHGEN)
-.error "${.CURDIR}: Recomputing ${X_}COMPILER_FREEBSD_VERSION. This value should be cached!"
+.error ${.CURDIR}: Recomputing ${X_}COMPILER_FREEBSD_VERSION. This value should be cached!
 .else
-# .info "${.CURDIR}: Computing ${X_}COMPILER_FREEBSD_VERSION. ${cc}=${${cc}}"
+# .info ${.CURDIR}: Computing ${X_}COMPILER_FREEBSD_VERSION. ${cc}=${${cc}}
 .endif
 ${X_}COMPILER_FREEBSD_VERSION!=	{ echo "__FreeBSD_cc_version" | ${${cc}:N${CCACHE_BIN}} -E - 2>/dev/null || echo __FreeBSD_cc_version; } | sed -n '$$p'
 # If we get a literal "__FreeBSD_cc_version" back then the compiler

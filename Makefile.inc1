@@ -49,7 +49,7 @@
 #		obj depend all install clean cleandepend cleanobj
 
 .if !defined(TARGET) || !defined(TARGET_ARCH)
-.error "Both TARGET and TARGET_ARCH must be defined."
+.error Both TARGET and TARGET_ARCH must be defined.
 .endif
 
 .if make(showconfig) || make(test-system-*)
@@ -195,7 +195,7 @@ _t=		${TARGET_ARCH}/${TARGET}
 .if ${.MAKE.OS} != "FreeBSD"
 CROSSBUILD_HOST=${.MAKE.OS}
 .if ${.MAKE.OS} != "Linux" && ${.MAKE.OS} != "Darwin"
-.warning "Unsupported crossbuild system: ${.MAKE.OS}. Build will probably fail!"
+.warning Unsupported crossbuild system: ${.MAKE.OS}. Build will probably fail!
 .endif
 # We need to force NO_ROOT/DB_FROM_SRC builds when building on other operating
 # systems since the BSD.foo.dist specs contain users and groups that do not
@@ -1667,7 +1667,7 @@ restage reinstall reinstallsysroot: .MAKE .PHONY
 	ln -sfnv lib ${DESTDIR}/lib32
 	ln -sfnv lib ${DESTDIR}/usr/lib32
 .else
-.error "MACHINE_ABI incorrect? ${MACHINE_ABI}"
+.error MACHINE_ABI incorrect? ${MACHINE_ABI}
 .endif
 .if ${MACHINE_ABI:Mpurecap}
 	@echo "Purecap ABI: creating libcheri links"
