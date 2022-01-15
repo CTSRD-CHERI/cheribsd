@@ -2112,7 +2112,7 @@ freebsd7_freebsd64___semctl(struct thread *td,
 		semun.buf = &dsbuf;
 		break;
 	case IPC_SET:
-		error = copyin(__USER_CAP_OBJ(arg.buf), &dsbuf64,
+		error = copyin(__USER_CAP(arg.buf, sizeof(dsbuf64)), &dsbuf64,
 		    sizeof(dsbuf64));
 		if (error)
 			return (error);
@@ -2125,7 +2125,8 @@ freebsd7_freebsd64___semctl(struct thread *td,
 		break;
 	case GETALL:
 	case SETALL:
-		semun.array = __USER_CAP_ARRAY(arg.array, SHRT_MAX);
+		semun.array = __USER_CAP(arg.array, SHRT_MAX *
+		    sizeof(*semun.array));
 		break;
 	case SETVAL:
 		semun.val = arg.val;
@@ -2146,7 +2147,7 @@ freebsd7_freebsd64___semctl(struct thread *td,
 		CP(dsbuf, dsbuf64, sem_nsems);
 		CP(dsbuf, dsbuf64, sem_otime);
 		CP(dsbuf, dsbuf64, sem_ctime);
-		error = copyout(&dsbuf64, __USER_CAP_OBJ(arg.buf),
+		error = copyout(&dsbuf64, __USER_CAP(arg.buf, sizeof(dsbuf64)),
 		    sizeof(dsbuf64));
 		break;
 	}
@@ -2186,7 +2187,7 @@ freebsd64___semctl(struct thread *td, struct freebsd64___semctl_args *uap)
 		semun.buf = &dsbuf;
 		break;
 	case IPC_SET:
-		error = copyin(__USER_CAP_OBJ(arg.buf), &dsbuf64,
+		error = copyin(__USER_CAP(arg.buf, sizeof(dsbuf64)), &dsbuf64,
 		    sizeof(dsbuf64));
 		if (error)
 			return (error);
@@ -2219,7 +2220,8 @@ freebsd64___semctl(struct thread *td, struct freebsd64___semctl_args *uap)
 		CP(dsbuf, dsbuf64, sem_nsems);
 		CP(dsbuf, dsbuf64, sem_otime);
 		CP(dsbuf, dsbuf64, sem_ctime);
-		error = copyout(&dsbuf64, __USER_CAP_OBJ(arg.buf), sizeof(dsbuf64));
+		error = copyout(&dsbuf64, __USER_CAP(arg.buf, sizeof(dsbuf64)),
+		    sizeof(dsbuf64));
 		break;
 	}
 

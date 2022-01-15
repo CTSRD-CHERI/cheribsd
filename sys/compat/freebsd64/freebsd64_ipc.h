@@ -44,7 +44,7 @@
 
 struct semid_ds64 {
 	struct ipc_perm	sem_perm;
-	void		*__sem_base;
+	uint64_t	__sem_base;
 	unsigned short	sem_nsems;
 	time_t		sem_otime;
 	time_t		sem_ctime;
@@ -56,21 +56,21 @@ struct semid_kernel64 {
 	struct semid_ds64	u;
 
 	/* Kernel-private components of the semaphore. */
-	void			*label;
-	void			*cred;
+	uint64_t		label;
+	uint64_t		cred;
 };
 #endif /* _KERNEL */
 
 union semun64 {
-	int			val;
-	struct semid_ds64	*buf;
-	unsigned short		*array;
+	int		val;
+	uint64_t	buf;
+	uint64_t	array;
 };
 
 struct msqid_ds64 {
 	struct ipc_perm	msg_perm;
-	void		*__msg_first;
-	void		*__msg_last;
+	uint64_t	__msg_first;
+	uint64_t	__msg_last;
 	msglen_t	msg_cbytes;
 	msgqnum_t	msg_qnum;
 	msglen_t	msg_qbytes;
@@ -84,8 +84,8 @@ struct msqid_ds64 {
 #ifdef _KERNEL
 struct msqid_kernel64 {
 	struct msqid_ds64	u;
-	struct label		*label;
-	struct ucred		*cred;
+	uint64_t		label;
+	uint64_t		cred;
 };
 #endif
 
@@ -102,10 +102,10 @@ struct shmid_ds64 {
 
 #ifdef _KERNEL
 struct shmid_kernel64 {
-	struct shmid_ds64	 u;
-	struct vm_object	*object;
-	struct label		*label;
-	struct ucred		*cred;
+	struct shmid_ds64	u;
+	uint64_t		object;
+	uint64_t		label;
+	uint64_t		cred;
 };
 #endif
 
@@ -113,7 +113,7 @@ struct shmid_kernel64 {
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
 struct semid_ds_old64 {
 	struct ipc_perm_old sem_perm;
-	void		*__sem_base;
+	uint64_t	__sem_base;
 	unsigned short	sem_nsems;
 	time_t		sem_otime;
 	long		sem_pad1;
@@ -150,13 +150,13 @@ struct shmid_ds_old64 {
 	time_t		shm_atime;
 	time_t		shm_dtime;
 	time_t		shm_ctime;
-	void		*shm_internal;
+	uint64_t	shm_internal;
 };
 
 union semun_old64 {
-	int			val;
-	struct semid_ds_old64	*buf;
-	unsigned short		*array;
+	int		val;
+	uint64_t	buf;
+	uint64_t	array;
 };
 #endif
 
