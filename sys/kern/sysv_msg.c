@@ -213,51 +213,10 @@ static struct syscall_helper_data msg32_syscalls[] = {
 #endif
 
 #ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64_ipc.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
-
-struct msqid_ds64 {
-	struct ipc_perm	msg_perm;
-	void		*__msg_first;
-	void		*__msg_last;
-	msglen_t	msg_cbytes;
-	msgqnum_t	msg_qnum;
-	msglen_t	msg_qbytes;
-	pid_t		msg_lspid;
-	pid_t		msg_lrpid;
-	time_t		msg_stime;
-	time_t		msg_rtime;
-	time_t		msg_ctime;
-};
-
-#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
-    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
-struct msqid_ds_old64 {
-	struct ipc_perm_old	msg_perm;
-	int64_t			__msg_first;
-	int64_t			__msg_last;
-	msglen_t		msg_cbytes;
-	msgqnum_t		msg_qnum;
-	msglen_t		msg_qbytes;
-	pid_t			msg_lspid;
-	pid_t			msg_lrpid;
-	time_t			msg_stime;
-	long			msg_pad1;
-	time_t			msg_rtime;
-	long			msg_pad2;
-	time_t			msg_ctime;
-	long			msg_pad3;
-	long			msg_pad4[4];
-
-};
-#endif
-
-struct msqid_kernel64 {
-	struct msqid_ds64	u;
-	struct label		*label;
-	struct ucred		*cred;
-};
 
 static struct syscall_helper_data msg64_syscalls[] = {
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_msgctl),
