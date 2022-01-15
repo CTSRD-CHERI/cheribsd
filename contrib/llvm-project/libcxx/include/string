@@ -10,10 +10,6 @@
 #ifndef _LIBCPP_STRING
 #define _LIBCPP_STRING
 
-#ifdef __CHERI__
-#error should not be using this file
-#endif
-
 /*
     string synopsis
 

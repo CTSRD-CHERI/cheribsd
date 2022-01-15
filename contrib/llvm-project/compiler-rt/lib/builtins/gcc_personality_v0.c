@@ -5,19 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20180629,
- *   "target_type": "lib",
- *   "changes": [
- *     "pointer_as_integer"
- *   ],
- *   "change_comment": "encoded virtual address to pointer",
- *   "hybrid_specific": false
- * }
- * CHERI CHANGES END
- */
 
 #include "int_lib.h"
 #include <stddef.h>
@@ -61,26 +48,24 @@ EXCEPTION_DISPOSITION _GCC_specific_handler(PEXCEPTION_RECORD, void *, PCONTEXT,
 // Pointer encodings documented at:
 //   http://refspecs.freestandards.org/LSB_1.3.0/gLSB/gLSB/ehframehdr.html
 
-#define DW_EH_PE_omit      0xff  /* no data follows */
+#define DW_EH_PE_omit 0xff // no data follows
 
-#define DW_EH_PE_absptr    0x00
-#define DW_EH_PE_uleb128   0x01
-#define DW_EH_PE_udata2    0x02
-#define DW_EH_PE_udata4    0x03
-#define DW_EH_PE_udata8    0x04
-#define DW_EH_PE_sleb128   0x09
-#define DW_EH_PE_sdata2    0x0A
-#define DW_EH_PE_sdata4    0x0B
-#define DW_EH_PE_sdata8    0x0C
+#define DW_EH_PE_absptr 0x00
+#define DW_EH_PE_uleb128 0x01
+#define DW_EH_PE_udata2 0x02
+#define DW_EH_PE_udata4 0x03
+#define DW_EH_PE_udata8 0x04
+#define DW_EH_PE_sleb128 0x09
+#define DW_EH_PE_sdata2 0x0A
+#define DW_EH_PE_sdata4 0x0B
+#define DW_EH_PE_sdata8 0x0C
 
-#define DW_EH_PE_pcrel     0x10
-#define DW_EH_PE_textrel   0x20
-#define DW_EH_PE_datarel   0x30
-#define DW_EH_PE_funcrel   0x40
-#define DW_EH_PE_aligned   0x50  
-#define DW_EH_PE_indirect  0x80 /* gcc extension */
-
-
+#define DW_EH_PE_pcrel 0x10
+#define DW_EH_PE_textrel 0x20
+#define DW_EH_PE_datarel 0x30
+#define DW_EH_PE_funcrel 0x40
+#define DW_EH_PE_aligned 0x50
+#define DW_EH_PE_indirect 0x80 // gcc extension
 
 // read a uleb128 encoded value and advance pointer
 static size_t readULEB128(const uint8_t **data) {
@@ -236,7 +221,7 @@ COMPILER_RT_ABI _Unwind_Reason_Code __gcc_personality_v0(
 
   uintptr_t pc = (uintptr_t)_Unwind_GetIP(context) - 1;
   uintptr_t funcStart = (uintptr_t)_Unwind_GetRegionStart(context);
-  uintptr_t pcOffset = (char*)pc - (char*)funcStart;
+  uintptr_t pcOffset = pc - funcStart;
 
   // Parse LSDA header.
   uint8_t lpStartEncoding = *lsda++;

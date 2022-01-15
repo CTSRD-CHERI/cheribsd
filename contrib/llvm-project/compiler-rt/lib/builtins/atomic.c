@@ -22,17 +22,6 @@
 //  always acquired first, to avoid deadlock.
 //
 //===----------------------------------------------------------------------===//
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20180629,
- *   "target_type": "lib",
- *   "changes": [
- *     "hashing"
- *   ]
- * }
- * CHERI CHANGES END
- */
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -120,20 +109,15 @@ __inline static void lock(Lock *l) {
 static Lock locks[SPINLOCK_COUNT];
 #endif
 
-#ifndef _VADDR_T_DECLARED
-typedef	__uintptr_t	vaddr_t;
-#define	_VADDR_T_DECLARED
-#endif
-
 /// Returns a lock to use for a given pointer.
 static __inline Lock *lock_for_pointer(void *ptr) {
-  vaddr_t hash = (vaddr_t)ptr;
+  intptr_t hash = (intptr_t)ptr;
   // Disregard the lowest 4 bits.  We want all values that may be part of the
   // same memory operation to hash to the same value and therefore use the same
   // lock.
   hash >>= 4;
   // Use the next bits as the basis for the hash
-  vaddr_t low = hash & SPINLOCK_MASK;
+  intptr_t low = hash & SPINLOCK_MASK;
   // Now use the high(er) set of bits to perturb the hash, so that we don't
   // get collisions from atomic fields in a single object
   hash >>= 16;
