@@ -367,8 +367,7 @@ try_load_dtb(caddr_t kmdp)
 	if (dtbp != (vm_pointer_t)NULL) {
 		dtbp = (vm_pointer_t)cheri_andperm(cheri_setaddress(
 		    kernel_root_cap, dtbp), CHERI_PERMS_KERNEL_DATA);
-		dtbp = (vm_pointer_t)cheri_setbounds((void *)dtbp,
-		    fdt_totalsize((void *)dtbp));
+		dtbp = cheri_setbounds(dtbp, fdt_totalsize((void *)dtbp));
 	}
 #endif
 
