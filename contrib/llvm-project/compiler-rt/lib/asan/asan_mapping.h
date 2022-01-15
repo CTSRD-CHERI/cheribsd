@@ -207,7 +207,7 @@ static const u64 kWindowsShadowOffset32 = 3ULL << 28;  // 0x30000000
 #    define SHADOW_OFFSET kPPC64_ShadowOffset64
 #  elif defined(__s390x__)
 #    define SHADOW_OFFSET kSystemZ_ShadowOffset64
-#  elif SANITIZER_FREEBSD && !defined(__mips64)
+#  elif SANITIZER_FREEBSD
 #    define SHADOW_OFFSET kFreeBSD_ShadowOffset64
 #  elif SANITIZER_NETBSD
 #    define SHADOW_OFFSET kNetBSD_ShadowOffset64

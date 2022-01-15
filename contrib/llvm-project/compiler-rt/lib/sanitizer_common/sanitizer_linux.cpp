@@ -34,7 +34,7 @@
 // format. Struct kernel_stat is defined as 'struct stat' in asm/stat.h. To
 // access stat from asm/stat.h, without conflicting with definition in
 // sys/stat.h, we use this trick.
-#if defined(__mips64) && SANITIZER_LINUX
+#if defined(__mips64)
 #include <asm/unistd.h>
 #include <sys/types.h>
 #define stat kernel_stat
@@ -260,7 +260,7 @@ static void stat64_to_stat(struct stat64 *in, struct stat *out) {
 }
 #endif
 
-#if defined(__mips64) && SANITIZER_LINUX
+#if defined(__mips64)
 // Undefine compatibility macros from <sys/stat.h>
 // so that they would not clash with the kernel_stat
 // st_[a|m|c]time fields
@@ -361,7 +361,7 @@ uptr internal_lstat(const char *path, void *buf) {
 
 uptr internal_fstat(fd_t fd, void *buf) {
 #if SANITIZER_FREEBSD || SANITIZER_LINUX_USES_64BIT_SYSCALLS
-# if SANITIZER_MIPS64 && !SANITIZER_FREEBSD
+#if SANITIZER_MIPS64
   // For mips64, fstat syscall fills buffer in the format of kernel_stat
   struct kernel_stat kbuf;
   int res = internal_syscall(SYSCALL(fstat), fd, &kbuf);
@@ -809,7 +809,7 @@ int internal_sysctlbyname(const char *sname, void *oldp, uptr *oldlenp,
   static decltype(sysctlnametomib) *real_sysctlnametomib = nullptr;
   if (!real_sysctlnametomib)
     real_sysctlnametomib =
-        (decltype(sysctlnametomib) *)dlfunc(RTLD_NEXT, "sysctlnametomib");
+        (decltype(sysctlnametomib) *)dlsym(RTLD_NEXT, "sysctlnametomib");
   CHECK(real_sysctlnametomib);
 
   int oid[CTL_MAXNAME];
@@ -1279,7 +1279,7 @@ uptr internal_clone(int (*fn)(void *), void *child_stack, int flags, void *arg,
                        : "memory", "r11", "rcx");
   return res;
 }
-#elif defined(__mips__) && SANITIZER_LINUX
+#elif defined(__mips__)
 uptr internal_clone(int (*fn)(void *), void *child_stack, int flags, void *arg,
                     int *parent_tidptr, void *newtls, int *child_tidptr) {
   long long res;
@@ -1847,11 +1847,7 @@ SignalContext::WriteFlag SignalContext::GetWriteFlag() const {
   uint32_t faulty_instruction;
   uint32_t op_code;
 
-#ifdef SANITIZER_FREEBSD
-  exception_source = (uint32_t *)ucontext->uc_mcontext.mc_pc;
-#else
   exception_source = (uint32_t *)ucontext->uc_mcontext.pc;
-#endif
   faulty_instruction = (uint32_t)(*exception_source);
 
   op_code = (faulty_instruction >> 26) & 0x3f;
@@ -2125,17 +2121,10 @@ static void GetPcSpBp(void *context, uptr *pc, uptr *sp, uptr *bp) {
 # endif
   *bp = (uptr)((uhwptr *)*sp)[14] + STACK_BIAS;
 #elif defined(__mips__)
-# if SANITIZER_FREEBSD
-  ucontext_t *ucontext = (ucontext_t*)context;
-  *pc = ucontext->uc_mcontext.mc_pc;
-  *bp = ucontext->uc_mcontext.mc_regs[30];
-  *sp = ucontext->uc_mcontext.mc_regs[29];
-# else
   ucontext_t *ucontext = (ucontext_t*)context;
   *pc = ucontext->uc_mcontext.pc;
   *bp = ucontext->uc_mcontext.gregs[30];
   *sp = ucontext->uc_mcontext.gregs[29];
-# endif
 #elif defined(__s390__)
   ucontext_t *ucontext = (ucontext_t*)context;
 # if defined(__s390x__)

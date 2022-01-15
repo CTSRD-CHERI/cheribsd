@@ -414,9 +414,7 @@ static struct tls_tcb * ThreadSelfTlsTcb() {
 uptr ThreadSelf() {
   return (uptr)ThreadSelfTlsTcb()->tcb_pthread;
 }
-#endif
 
-#if SANITIZER_NETBSD || (SANITIZER_FREEBSD && defined(__mips__))
 int GetSizeFromHdr(struct dl_phdr_info *info, size_t size, void *data) {
   const Elf_Phdr *hdr = info->dlpi_phdr;
   const Elf_Phdr *last_hdr = hdr + info->dlpi_phnum;
