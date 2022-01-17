@@ -766,13 +766,10 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	char *stringp;
 	uintptr_t destp, ustringp;
 	struct linux32_ps_strings *arginfo;
-	struct proc *p;
 	char canary[LINUX_AT_RANDOM_LEN];
 	size_t execpath_len;
 
-	p = imgp->proc;
-
-	arginfo = (struct linux32_ps_strings *)p->p_psstrings;
+	arginfo = (struct linux32_ps_strings *)PROC_PS_STRINGS(imgp->proc);
 	destp = (uintptr_t)arginfo;
 
 	if (imgp->execpath != NULL && imgp->auxargs != NULL) {

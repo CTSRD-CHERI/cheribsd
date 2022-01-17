@@ -166,19 +166,18 @@ static int
 sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS)
 {
 	struct proc *p;
-	int error;
+	vm_offset_t ps_strings;
 
 	p = curproc;
 #ifdef SCTL_MASK32
 	if (req->flags & SCTL_MASK32) {
 		unsigned int val;
-		val = (unsigned int)p->p_psstrings;
-		error = SYSCTL_OUT(req, &val, sizeof(val));
-	} else
+		val = (unsigned int)PROC_PS_STRINGS(p);
+		return (SYSCTL_OUT(req, &val, sizeof(val)));
+	}
 #endif
-		error = SYSCTL_OUT(req, &p->p_psstrings,
-		   sizeof(p->p_psstrings));
-	return error;
+	ps_strings = PROC_PS_STRINGS(p);
+	return (SYSCTL_OUT(req, &ps_strings, sizeof(ps_strings)));
 }
 
 static int
@@ -1755,11 +1754,11 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (imgp->stack != imgp->strings)
 		strings_on_stack = false;
 	destp = (uintcap_t)imgp->strings;
-	destp = cheri_setaddress(destp, p->p_psstrings);
+	destp = cheri_setaddress(destp, PROC_PS_STRINGS(p));
 	arginfo = (struct ps_strings * __capability)cheri_setboundsexact(destp,
 	    sizeof(*arginfo));
 #else
-	destp = (uintptr_t)p->p_psstrings;
+	destp = (uintptr_t)PROC_PS_STRINGS(p);
 	arginfo = (struct ps_strings *)destp;
 #endif
 	imgp->ps_strings = arginfo;

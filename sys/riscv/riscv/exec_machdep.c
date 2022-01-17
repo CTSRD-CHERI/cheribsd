@@ -65,6 +65,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/sbi.h>
 #include <machine/trap.h>
 
+#include <vm/vm.h>
+#include <vm/vm_param.h>
+#include <vm/pmap.h>
+#include <vm/vm_map.h>
+
 #ifdef FPE
 #include <machine/fpe.h>
 #endif
@@ -559,7 +564,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_ra = (register_t)sysent->sv_sigcode_base;
 	else
-		tf->tf_ra = (register_t)(p->p_psstrings -
+		tf->tf_ra = (register_t)(PROC_PS_STRINGS(p) -
 		    *(sysent->sv_szsigcode));
 #endif
 

@@ -3219,7 +3219,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 
 	sysent = imgp->sysent;
 
-	arginfo = (struct freebsd32_ps_strings *)curproc->p_psstrings;
+	arginfo = (struct freebsd32_ps_strings *)PROC_PS_STRINGS(imgp->proc);
 	imgp->ps_strings = arginfo;
 	destp =	(uintptr_t)arginfo;
 

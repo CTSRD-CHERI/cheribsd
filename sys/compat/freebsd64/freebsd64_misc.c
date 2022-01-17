@@ -737,7 +737,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	    ("%s: stack != strings", __func__));
 
 	destp = (uintcap_t)imgp->strings;
-	destp = cheri_setaddress(destp, p->p_psstrings);
+	destp = cheri_setaddress(destp, PROC_PS_STRINGS(p));
 	arginfo = (struct freebsd64_ps_strings * __capability)
 	    cheri_setboundsexact(destp, sizeof(*arginfo));
 	imgp->ps_strings = arginfo;
