@@ -184,19 +184,19 @@ static int
 sysctl_kern_usrstack(SYSCTL_HANDLER_ARGS)
 {
 	struct proc *p;
-	int error;
+	vm_offset_t val;
 
 	p = curproc;
 #ifdef SCTL_MASK32
 	if (req->flags & SCTL_MASK32) {
-		unsigned int val;
-		val = (unsigned int)p->p_usrstack;
-		error = SYSCTL_OUT(req, &val, sizeof(val));
-	} else
+		unsigned int val32;
+
+		val32 = round_page((unsigned int)p->p_vmspace->vm_stacktop);
+		return (SYSCTL_OUT(req, &val32, sizeof(val32)));
+	}
 #endif
-		error = SYSCTL_OUT(req, &p->p_usrstack,
-		    sizeof(p->p_usrstack));
-	return (error);
+	val = round_page(p->p_vmspace->vm_stacktop);
+	return (SYSCTL_OUT(req, &val, sizeof(val)));
 }
 
 static int
@@ -1122,9 +1122,8 @@ exec_free_abi_mappings(struct proc *p)
 }
 
 /*
- * Destroy old address space, and allocate a new stack.
- *	The new stack is only sgrowsiz large because it is grown
- *	automatically on a page fault.
+ * Run down the current address space and install a new one.  Map the shared
+ * page.
  */
 int
 exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
@@ -1134,16 +1133,8 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	struct vmspace *vmspace = p->p_vmspace;
 	struct thread *td = curthread;
 	vm_object_t obj;
-	struct rlimit rlim_stack;
 	vm_offset_t sv_minuser;
-	vm_pointer_t stack_addr;
-#if __has_feature(capabilities)
-	vm_pointer_t strings_addr;
-	register_t perms;
-#endif
 	vm_map_t map;
-	vm_prot_t stack_prot;
-	u_long ssiz;
 	vm_pointer_t shared_page_addr;
 
 	imgp->vmspace_destroyed = true;
@@ -1179,7 +1170,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		 */
 		vm_map_lock(map);
 		vm_map_modflags(map, 0, MAP_WIREFUTURE | MAP_ASLR |
-		    MAP_ASLR_IGNSTART | MAP_WXORX);
+		    MAP_ASLR_IGNSTART | MAP_ASLR_STACK | MAP_WXORX);
 		vm_map_unlock(map);
 	} else {
 		error = vmspace_exec(p, sv_minuser, sv->sv_maxuser);
@@ -1232,7 +1223,32 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		}
 	}
 
-	/* Allocate a new stack */
+	return (sv->sv_onexec != NULL ? sv->sv_onexec(p, imgp) : 0);
+}
+
+/*
+ * Compute the stack size limit and map the main process stack.
+ */
+int
+exec_map_stack(struct image_params *imgp)
+{
+	struct rlimit rlim_stack;
+	struct sysentvec *sv;
+	struct proc *p;
+	vm_map_t map;
+	struct vmspace *vmspace;
+	vm_pointer_t stack_addr, stack_top;
+#if __has_feature(capabilities)
+	vm_pointer_t strings_addr;
+	register_t perms;
+#endif
+	u_long ssiz;
+	int error, find_space, stack_off;
+	vm_prot_t stack_prot;
+
+	p = imgp->proc;
+	sv = p->p_sysent;
+
 	if (imgp->stack_sz != 0) {
 		ssiz = trunc_page(imgp->stack_sz);
 		PROC_LOCK(p);
@@ -1256,40 +1272,51 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	 */
 	ssiz = CHERI_REPRESENTABLE_LENGTH(ssiz);
 #endif
-	p->p_usrstack = sv->sv_usrstack;
-#if __has_feature(capabilities)
-	p->p_usrstack = CHERI_REPRESENTABLE_BASE(p->p_usrstack, ssiz);
-#endif
 
-	/* We reserve the whole max stack size with restricted permission */
-	stack_addr = p->p_usrstack - ssiz;
-	stack_prot = obj != NULL && imgp->stack_prot != 0 ?
+	vmspace = p->p_vmspace;
+	map = &vmspace->vm_map;
+
+	stack_prot = sv->sv_shared_page_obj != NULL && imgp->stack_prot != 0 ?
 	    imgp->stack_prot : sv->sv_stackprot;
-	imgp->stack_sz = ssiz;
-	error = vm_map_reservation_create(map, &stack_addr, ssiz,
-	    PAGE_SIZE, stack_prot);
-	if (error != KERN_SUCCESS)
-		return (vm_mmap_to_errno(error));
+	if ((map->flags & MAP_ASLR_STACK) != 0) {
+		stack_addr = round_page((vm_offset_t)p->p_vmspace->vm_daddr +
+		    lim_max(curthread, RLIMIT_DATA));
+		find_space = VMFS_ANY_SPACE;
+	} else {
+		stack_top = sv->sv_usrstack;
+#if __has_feature(capabilities)
+		stack_top = CHERI_REPRESENTABLE_BASE(stack_top, ssiz);
+#endif
+		stack_addr = stack_top - ssiz;
+		find_space = VMFS_NO_SPACE;
+	}
 
-	error = vm_map_stack(map, stack_addr, (vm_size_t)ssiz, stack_prot,
-	    stack_prot, MAP_STACK_GROWS_DOWN);
+	error = vm_map_find(map, NULL, 0, &stack_addr, (vm_size_t)ssiz,
+	    sv->sv_usrstack, find_space, stack_prot, stack_prot,
+	    MAP_STACK_GROWS_DOWN);
 	if (error != KERN_SUCCESS) {
 		uprintf("exec_new_vmspace: mapping stack size %#jx prot %#x "
-		    "failed mach error %d errno %d\n", (uintmax_t)ssiz,
+		    "failed, mach error %d errno %d\n", (uintmax_t)ssiz,
 		    stack_prot, error, vm_mmap_to_errno(error));
-		vm_map_reservation_delete(map, stack_addr);
 		return (vm_mmap_to_errno(error));
 	}
-	vmspace->vm_stkgap = 0;
+
+	imgp->stack_sz = ssiz;
+	stack_top = stack_addr + ssiz;
+	if ((map->flags & MAP_ASLR_STACK) != 0) {
+		/* Randomize within the first page of the stack. */
+		arc4rand(&stack_off, sizeof(stack_off), 0);
+		stack_top -= rounddown2(stack_off & PAGE_MASK, sizeof(void *));
+	}
 
 #if __has_feature(capabilities)
 	perms = (~CHERI_PROT2PERM_MASK | vm_map_prot2perms(stack_prot)) &
 	    CHERI_CAP_USER_DATA_PERMS;
 #ifdef __CHERI_PURE_CAPABILITY__
-	imgp->stack = (void *)cheri_andperm(stack_addr + ssiz, perms);
+	imgp->stack = (void *)cheri_andperm(stack_top, perms);
 #else
 	imgp->stack = cheri_capability_build_user_data(perms, stack_addr,
-	    ssiz, ssiz);
+	    ssiz, stack_top - stack_addr);
 #endif
 
 	if (sv->sv_flags & SV_CHERI) {
@@ -1303,7 +1330,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		    CHERI_REPRESENTABLE_BASE(stack_addr - ARG_MAX, ARG_MAX);
 		error = vm_mmap_object(map, &strings_addr, 0, ARG_MAX,
 		    VM_PROT_RW_CAP, VM_PROT_RW_CAP, MAP_ANON | MAP_FIXED |
-		    MAP_RESERVATION_CREATE, NULL, 0, FALSE, td);
+		    MAP_RESERVATION_CREATE, NULL, 0, FALSE, curthread);
 		if (error != KERN_SUCCESS)
 			return (vm_mmap_to_errno(error));
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -1319,16 +1346,17 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		p->p_psstrings = strings_addr + ARG_MAX - sv->sv_psstringssz;
 	else
 #endif
-		p->p_psstrings = p->p_usrstack - sv->sv_psstringssz;
+		p->p_psstrings = stack_top - sv->sv_psstringssz;
 
 	/*
 	 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they
 	 * are still used to enforce the stack rlimit on the process stack.
 	 */
-	vmspace->vm_ssize = sgrowsiz >> PAGE_SHIFT;
 	vmspace->vm_maxsaddr = stack_addr;
+	vmspace->vm_stacktop = stack_top;
+	vmspace->vm_ssize = sgrowsiz >> PAGE_SHIFT;
 
-	return (sv->sv_onexec != NULL ? sv->sv_onexec(p, imgp) : 0);
+	return (0);
 }
 
 /*

@@ -716,7 +716,6 @@ struct proc {
 	uint64_t	p_elf_flags;	/* (x) ELF flags */
 	void		*p_elf_brandinfo; /* (x) Elf_Brandinfo, NULL for
 						 non ELF binaries. */
-	vm_offset_t	p_usrstack;
 	vm_offset_t	p_psstrings;
 /* End area that is copied on creation. */
 #define	p_endcopy	p_xexit
