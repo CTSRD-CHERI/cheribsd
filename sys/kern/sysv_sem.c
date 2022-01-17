@@ -2125,7 +2125,7 @@ freebsd7_freebsd64___semctl(struct thread *td,
 		break;
 	case GETALL:
 	case SETALL:
-		semun.array = __USER_CAP(arg.array, SHRT_MAX *
+		semun.array = __USER_CAP(arg.array, seminfo.semmns *
 		    sizeof(*semun.array));
 		break;
 	case SETVAL:
@@ -2200,7 +2200,8 @@ freebsd64___semctl(struct thread *td, struct freebsd64___semctl_args *uap)
 		break;
 	case GETALL:
 	case SETALL:
-		semun.array = __USER_CAP_UNBOUND(arg.array);
+		semun.array = __USER_CAP(arg.array, seminfo.semmns *
+		    sizeof(*semun.array));
 		break;
 	case SETVAL:
 		semun.val = arg.val;
