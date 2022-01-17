@@ -1320,10 +1320,10 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 		imgp->strings = imgp->stack;
 
 	if (sv->sv_flags & SV_CHERI)
-		p->p_psstrings = strings_addr + ARG_MAX - sv->sv_szpsstrings;
+		p->p_psstrings = strings_addr + ARG_MAX - sv->sv_psstringssz;
 	else
 #endif
-		p->p_psstrings = p->p_usrstack - sv->sv_szpsstrings;
+		p->p_psstrings = p->p_usrstack - sv->sv_psstringssz;
 
 	/*
 	 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they

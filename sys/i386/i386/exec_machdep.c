@@ -960,7 +960,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 
 #ifdef COMPAT_43
 	if (td->td_proc->p_psstrings != elf32_freebsd_sysvec.sv_usrstack -
-	    elf32_freebsd_sysvec.sv_szpsstrings)
+	    elf32_freebsd_sysvec.sv_psstringssz)
 		setup_priv_lcall_gate(td->td_proc);
 #endif
 
