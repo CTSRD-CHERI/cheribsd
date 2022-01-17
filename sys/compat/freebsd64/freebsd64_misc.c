@@ -800,8 +800,6 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	destp = rounddown2(destp, sizeof(uint64_t));
 	ustringp = cheri_setbounds(destp, ARG_MAX - imgp->args->stringspace);
 
-	exec_stackgap(imgp, &destp);
-
 	if (imgp->auxargs) {
 		/*
 		 * Allocate room on the stack for the ELF auxargs

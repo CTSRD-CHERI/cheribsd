@@ -3279,8 +3279,6 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	destp = rounddown2(destp, sizeof(uint32_t));
 	ustringp = destp;
 
-	exec_stackgap(imgp, &destp);
-
 	if (imgp->auxargs) {
 		/*
 		 * Allocate room on the stack for the ELF auxargs
