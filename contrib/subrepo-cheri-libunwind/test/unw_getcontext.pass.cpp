@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int main() {
+int main(int, char**) {
   unw_context_t context;
   int ret = unw_getcontext(&context);
   if (ret != UNW_ESUCCESS) {

@@ -35,7 +35,7 @@ int test(int i) {
   }
 }
 
-int main() {
+int main(int, char**) {
   int total = test(50);
   if (total != 1275) {
     fprintf(stderr, "Got incorrect total: %d\n", total);

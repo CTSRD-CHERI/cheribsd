@@ -1,6 +1,9 @@
-// UNSUPPORTED: libunwind-no-exceptions
+// UNSUPPORTED: no-exceptions
 // Tell lit to add -lc++abi/-lcxxrt/-lsupc++, etc. to the linker flags:
-// ADDITIONAL_LINK_FLAGS: %{link_libcxxabi}
+// Note: we also have to append -lc when linking with ld.bfd since -lsupc++ is added at the end of the command line.
+// FIXME: if link_libcxxabi==-lsupc++ it should include -lc when linking with ld.bfd
+// ADDITIONAL_COMPILE_FLAGS: -fexceptions -frtti
+// ADDITIONAL_LINK_FLAGS: %{link_libcxxabi} -lc
 
 #include <stdio.h>
 #include <stdlib.h>

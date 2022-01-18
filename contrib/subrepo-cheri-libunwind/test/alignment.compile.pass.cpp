@@ -11,7 +11,6 @@
 // aligned".
 
 #include <unwind.h>
-#include <stdio.h>
 
 // EHABI  : 8-byte aligned
 // itanium: largest supported alignment for the system
@@ -23,8 +22,3 @@ struct MaxAligned {} __attribute__((__aligned__));
 static_assert(alignof(_Unwind_Exception) == alignof(MaxAligned),
               "_Unwind_Exception must be maximally aligned");
 #endif
-
-int main()
-{
-	fprintf(stderr, "Success!\n");
-}
