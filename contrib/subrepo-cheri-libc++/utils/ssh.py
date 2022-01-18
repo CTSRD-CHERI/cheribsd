@@ -25,6 +25,12 @@ import sys
 import tarfile
 import tempfile
 
+try:
+   from shlex import quote as cmd_quote
+except ImportError:
+   # for Python 2 compatibility
+   from pipes import quote as cmd_quote
+
 def ssh(args, command):
     cmd = ['ssh', '-oBatchMode=yes']
     if args.extra_ssh_args is not None:
@@ -51,7 +57,7 @@ def createTempdir(args):
         debug(args, "Created local tmp dir:", localTmp)
         debug(args, "Assuming remote path is:", remoteTmp)
         return localTmp, remoteTmp
-    remoteTmp = subprocess.check_output(ssh(args, 'mktemp -d /tmp/libcxx.XXXXXXXXXX'),
+    remoteTmp = subprocess.check_output(ssh(args, 'mktemp -d {}/libcxx.XXXXXXXXXX'.format(args.tempdir)),
                                         universal_newlines=True).strip()
     debug(args, "Create remote tmp dir:", remoteTmp)
     return None, remoteTmp
@@ -89,6 +95,7 @@ def main():
     parser.add_argument('--host', type=str, required=True)
     parser.add_argument('--execdir', type=str, required=True)
     parser.add_argument('--debug', action="store_true", required=False)
+    parser.add_argument('--tempdir', type=str, required=False, default='/tmp')
     parser.add_argument('--extra-ssh-args', type=str, required=False)
     parser.add_argument('--extra-scp-args', type=str, required=False)
     parser.add_argument('--shared-mount-local-path', type=str, required=False,
@@ -166,7 +173,7 @@ def main():
         commandLine = (pathOnRemote(x) if isTestExe(x) else x for x in commandLine)
         remoteCommands.append('cd {}'.format(remoteTmp))
         if args.env:
-            remoteCommands.append('export {}'.format(' '.join(args.env)))
+            remoteCommands.append('export {}'.format(cmd_quote(' '.join(args.env))))
         remoteCommands.append(subprocess.list2cmdline(commandLine))
 
         # Finally, SSH to the remote host and execute all the commands.

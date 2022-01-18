@@ -8,7 +8,11 @@
 //===----------------------------------------------------------------------===//
 
 // We're building as C, so this test doesn't work when building with modules.
-// UNSUPPORTED: -fmodules
+// UNSUPPORTED: modules-build
+
+// GCC complains about unrecognized arguments because we're compiling the
+// file as C, but we're passing C++ flags on the command-line.
+// UNSUPPORTED: gcc
 
 // Test that the C wrapper headers can be included when compiling them as C.
 
@@ -17,6 +21,8 @@
 
 // RUN: %{cxx} -c -xc %s -fsyntax-only %{flags} %{compile_flags} -std=c99
 
+#include <__config>
+
 #include <complex.h>
 #include <ctype.h>
 #include <errno.h>
@@ -24,7 +30,9 @@
 #include <float.h>
 #include <inttypes.h>
 #include <limits.h>
-#include <locale.h>
+#ifndef _LIBCPP_HAS_NO_LOCALIZATION
+#   include <locale.h>
+#endif
 #include <math.h>
 #include <setjmp.h>
 #include <stdbool.h>
@@ -33,7 +41,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <tgmath.h>
+// The clang-shipped tgmath.h header doesn't work with MSVC/UCRT's complex
+// headers in C mode, see PR46207.
+#ifndef _MSC_VER
+#    include <tgmath.h>
+#endif
 #include <wchar.h>
 #include <wctype.h>
 

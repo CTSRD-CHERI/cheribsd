@@ -20,9 +20,10 @@
 //     up the OS's collation files.
 
 // TODO investigation needed.
-// Glibc seems to collate files differently from the way Apple's C library does
-// it.
-// XFAIL: linux-gnu
+// Glibc seems to collate files differently from the way Apple's C library does it.
+// XFAIL: target={{.*}}-linux-gnu{{.*}}
+
+// XFAIL: LIBCXX-WINDOWS-FIXME
 
 #include <locale>
 #include <string>
