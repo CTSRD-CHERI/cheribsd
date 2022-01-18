@@ -124,7 +124,7 @@ struct UnwindInfoSections {
   uintptr_t       dso_base;
 #endif
 #if defined(_LIBUNWIND_USE_DL_ITERATE_PHDR)
-  uintptr_t       text_segment_length;
+  size_t          text_segment_length;
 #endif
 #if defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND)
 private:
