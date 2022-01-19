@@ -90,7 +90,7 @@ static char sbuf[KTR_PARMS][SBUFLEN];
 int
 main(int ac, char **av)
 {
-	u_long parms[KTR_PARMS];
+	uintptr_t parms[KTR_PARMS];
 	struct ktr_entry *buf;
 	uintmax_t tlast, tnow;
 	unsigned long bufptr;
@@ -314,7 +314,7 @@ next:			if ((c = *p++) == '\0')
 				    sbuf[parm], sizeof(sbuf[parm])) == -1)
 					strcpy(sbuf[parm], "(null)");
 				sbuf[parm][sizeof(sbuf[0]) - 1] = '\0';
-				parms[parm] = (u_long)sbuf[parm];
+				parms[parm] = (uintptr_t)sbuf[parm];
 				parm++;
 				break;
 			default:
