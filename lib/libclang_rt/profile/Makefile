@@ -13,10 +13,6 @@ CXXFLAGS+=	-fvisibility=default
 
 SRCS+=		profile/GCDAProfiling.c
 SRCS+=		profile/InstrProfiling.c
-.if 1
-# Removed in LLVM 13
-SRCS+=		profile/InstrProfilingBiasVar.c
-.endif
 SRCS+=		profile/InstrProfilingBuffer.c
 SRCS+=		profile/InstrProfilingFile.c
 SRCS+=		profile/InstrProfilingInternal.c
@@ -28,10 +24,7 @@ SRCS+=		profile/InstrProfilingPlatformOther.c
 SRCS+=		profile/InstrProfilingRuntime.cpp
 SRCS+=		profile/InstrProfilingUtil.c
 SRCS+=		profile/InstrProfilingValue.c
-.if 0
-# Added in LLVM 13
 SRCS+=		profile/InstrProfilingVersionVar.c
-.endif
 SRCS+=		profile/InstrProfilingWriter.c
 
 .PATH:		${CRTSRC}/include/profile

@@ -10,10 +10,7 @@ SRCS+=		sanitizer_common/sancov_flags.cpp
 SRCS+=		sanitizer_common/sanitizer_allocator.cpp
 SRCS+=		sanitizer_common/sanitizer_allocator_checks.cpp
 SRCS+=		sanitizer_common/sanitizer_allocator_report.cpp
-.if 0
-# Added in LLVM 13
 SRCS+=		sanitizer_common/sanitizer_chained_origin_depot.cpp
-.endif
 SRCS+=		sanitizer_common/sanitizer_common.cpp
 SRCS+=		sanitizer_common/sanitizer_common_libcdep.cpp
 SRCS+=		sanitizer_common/sanitizer_coverage_libcdep_new.cpp
@@ -27,10 +24,7 @@ SRCS+=		sanitizer_common/sanitizer_libc.cpp
 SRCS+=		sanitizer_common/sanitizer_libignore.cpp
 SRCS+=		sanitizer_common/sanitizer_linux.cpp
 SRCS+=		sanitizer_common/sanitizer_linux_libcdep.cpp
-.if 0
-# Added in LLVM 13
 SRCS+=		sanitizer_common/sanitizer_mutex.cpp
-.endif
 SRCS+=		sanitizer_common/sanitizer_persistent_allocator.cpp
 SRCS+=		sanitizer_common/sanitizer_platform_limits_freebsd.cpp
 SRCS+=		sanitizer_common/sanitizer_platform_limits_linux.cpp
@@ -68,10 +62,6 @@ SRCS+=		tsan/rtl/tsan_interface_atomic.cpp
 SRCS+=		tsan/rtl/tsan_interface_java.cpp
 SRCS+=		tsan/rtl/tsan_md5.cpp
 SRCS+=		tsan/rtl/tsan_mman.cpp
-.if 1
-# Removed in LLVM 13
-SRCS+=		tsan/rtl/tsan_mutex.cpp
-.endif
 SRCS+=		tsan/rtl/tsan_mutexset.cpp
 SRCS+=		tsan/rtl/tsan_platform_linux.cpp
 SRCS+=		tsan/rtl/tsan_platform_posix.cpp
@@ -84,10 +74,6 @@ SRCS+=		tsan/rtl/tsan_rtl_proc.cpp
 SRCS+=		tsan/rtl/tsan_rtl_report.cpp
 SRCS+=		tsan/rtl/tsan_rtl_thread.cpp
 SRCS+=		tsan/rtl/tsan_stack_trace.cpp
-.if 1
-# Removed in LLVM 13
-SRCS+=		tsan/rtl/tsan_stat.cpp
-.endif
 SRCS+=		tsan/rtl/tsan_suppressions.cpp
 SRCS+=		tsan/rtl/tsan_symbolize.cpp
 SRCS+=		tsan/rtl/tsan_sync.cpp

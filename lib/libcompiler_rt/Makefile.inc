@@ -33,10 +33,7 @@ SRCF+=		divdc3
 SRCF+=		divdi3
 SRCF+=		divmoddi4
 SRCF+=		divmodsi4
-.if 0
-# Added in LLVM 13
 SRCF+=		divmodti4
-.endif
 SRCF+=		divsc3
 SRCF+=		divsi3
 SRCF+=		divtc3
@@ -173,10 +170,7 @@ SRCF+=		addtf3
 SRCF+=		comparetf2
 SRCF+=		divtf3
 SRCF+=		extenddftf2
-.if 0
-# Added in LLVM 13
 SRCF+=		extendhftf2
-.endif
 SRCF+=		extendsftf2
 SRCF+=		fixtfdi
 SRCF+=		fixtfsi
@@ -191,10 +185,7 @@ SRCF+=		floatuntitf
 SRCF+=		multf3
 SRCF+=		subtf3
 SRCF+=		trunctfdf2
-.if 0
-# Added in LLVM 13
 SRCF+=		trunctfhf2
-.endif
 SRCF+=		trunctfsf2
 .endif
 

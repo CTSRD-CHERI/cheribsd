@@ -19,9 +19,6 @@ MK_WERROR.gcc=	no
 
 .include "Makefile.inc"
 
-# subrepo-cheri-compiler-rt doesn't have lse.S yet
-.if ${CRTSRC:M*subrepo*} == ""
-
 # Out-of-line LSE atomics helpers for aarch64
 .if ${MACHINE_CPUARCH} == "aarch64"
 . for pat in cas swp ldadd ldclr ldeor ldset
@@ -40,7 +37,6 @@ ${lse_name}: lse.S
 .   endfor # model
 .  endfor # size
 . endfor # pat
-.endif
 .endif
 
 .if ${MK_INSTALLLIB} != "no"
