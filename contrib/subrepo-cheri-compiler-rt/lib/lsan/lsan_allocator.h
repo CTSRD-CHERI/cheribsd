@@ -50,7 +50,7 @@ struct ChunkMetadata {
 };
 
 #if defined(__mips64) || defined(__aarch64__) || defined(__i386__) || \
-    defined(__arm__)
+    defined(__arm__) || SANITIZER_RISCV64
 template <typename AddressSpaceViewTy>
 struct AP32 {
   static const vaddr kSpaceBeg = 0;
@@ -67,26 +67,26 @@ using PrimaryAllocatorASVT = SizeClassAllocator32<AP32<AddressSpaceView>>;
 using PrimaryAllocator = PrimaryAllocatorASVT<LocalAddressSpaceView>;
 #elif defined(__x86_64__) || defined(__powerpc64__) || defined(__s390x__)
 # if SANITIZER_FUCHSIA
-const vaddr kAllocatorSpace = ~(uptr)0;
-const usize kAllocatorSize  =  0x40000000000ULL;  // 4T.
+const uptr kAllocatorSpace = ~(uptr)0;
+const uptr kAllocatorSize  =  0x40000000000ULL;  // 4T.
 # elif defined(__powerpc64__)
-const vaddr kAllocatorSpace = 0xa0000000000ULL;
-const usize kAllocatorSize  = 0x20000000000ULL;  // 2T.
+const uptr kAllocatorSpace = 0xa0000000000ULL;
+const uptr kAllocatorSize  = 0x20000000000ULL;  // 2T.
 #elif defined(__s390x__)
-const vaddr kAllocatorSpace = 0x40000000000ULL;
-const usize kAllocatorSize = 0x40000000000ULL;  // 4T.
+const uptr kAllocatorSpace = 0x40000000000ULL;
+const uptr kAllocatorSize = 0x40000000000ULL;  // 4T.
 # else
-const vaddr kAllocatorSpace = 0x600000000000ULL;
-const usize kAllocatorSize  = 0x40000000000ULL;  // 4T.
+const uptr kAllocatorSpace = 0x600000000000ULL;
+const uptr kAllocatorSize  = 0x40000000000ULL;  // 4T.
 # endif
 template <typename AddressSpaceViewTy>
 struct AP64 {  // Allocator64 parameters. Deliberately using a short name.
-  static const vaddr kSpaceBeg = kAllocatorSpace;
-  static const usize kSpaceSize = kAllocatorSize;
-  static const usize kMetadataSize = sizeof(ChunkMetadata);
+  static const uptr kSpaceBeg = kAllocatorSpace;
+  static const uptr kSpaceSize = kAllocatorSize;
+  static const uptr kMetadataSize = sizeof(ChunkMetadata);
   typedef DefaultSizeClassMap SizeClassMap;
   typedef NoOpMapUnmapCallback MapUnmapCallback;
-  static const usize kFlags = 0;
+  static const uptr kFlags = 0;
   using AddressSpaceView = AddressSpaceViewTy;
 };
 

@@ -24,10 +24,14 @@
 //===----------------------------------------------------------------------===//
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
-#include <string.h>
 
 #include "assembly.h"
+
+// We use __builtin_mem* here to avoid dependencies on libc-provided headers.
+#define memcpy __builtin_memcpy
+#define memcmp __builtin_memcmp
 
 // Clang objects if you redefine a builtin.  This little hack allows us to
 // define a function with the same name as an intrinsic.
@@ -36,6 +40,8 @@
 #pragma redefine_extname __atomic_exchange_c SYMBOL_NAME(__atomic_exchange)
 #pragma redefine_extname __atomic_compare_exchange_c SYMBOL_NAME(              \
     __atomic_compare_exchange)
+#pragma redefine_extname __atomic_is_lock_free_c SYMBOL_NAME(                  \
+    __atomic_is_lock_free)
 
 /// Number of locks.  This allocates one page on 32-bit platforms, two on
 /// 64-bit.  This can be specified externally if a different trade between
@@ -50,7 +56,7 @@ static const long SPINLOCK_MASK = SPINLOCK_COUNT - 1;
 // defined.  Each platform should define the Lock type, and corresponding
 // lock() and unlock() functions.
 ////////////////////////////////////////////////////////////////////////////////
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__DragonFly__)
 #include <errno.h>
 // clang-format off
 #include <sys/types.h>
@@ -156,6 +162,14 @@ static __inline Lock *lock_for_pointer(void *ptr) {
       break;                                                                   \
     }                                                                          \
   } while (0)
+
+/// Whether atomic operations for the given size (and alignment) are lock-free.
+bool __atomic_is_lock_free_c(size_t size, void *ptr) {
+#define LOCK_FREE_ACTION(type) return true;
+  LOCK_FREE_CASES(ptr);
+#undef LOCK_FREE_ACTION
+  return false;
+}
 
 /// An atomic load operation.  This is atomic with respect to the source
 /// pointer only.

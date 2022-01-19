@@ -15,10 +15,11 @@
 #define ASAN_ALLOCATOR_H
 
 #include "asan_flags.h"
-#include "asan_internal.h"
 #include "asan_interceptors.h"
+#include "asan_internal.h"
 #include "sanitizer_common/sanitizer_allocator.h"
 #include "sanitizer_common/sanitizer_list.h"
+#include "sanitizer_common/sanitizer_platform.h"
 
 namespace __asan {
 
@@ -28,7 +29,7 @@ enum AllocType {
   FROM_NEW_BR = 3   // Memory block came from operator new [ ]
 };
 
-struct AsanChunk;
+class AsanChunk;
 
 struct AllocatorOptions {
   u32 quarantine_size_mb;
@@ -120,34 +121,38 @@ struct AsanMapUnmapCallback {
 
 #if SANITIZER_CAN_USE_ALLOCATOR64
 # if SANITIZER_FUCHSIA
-const vaddr kAllocatorSpace = ~(uptr)0;
+const uptr kAllocatorSpace = ~(uptr)0;
 const uptr kAllocatorSize  =  0x40000000000ULL;  // 4T.
 typedef DefaultSizeClassMap SizeClassMap;
 # elif defined(__powerpc64__)
-const vaddr kAllocatorSpace = ~(uptr)0;
+const uptr kAllocatorSpace = ~(uptr)0;
 const uptr kAllocatorSize  =  0x20000000000ULL;  // 2T.
 typedef DefaultSizeClassMap SizeClassMap;
 # elif defined(__aarch64__) && SANITIZER_ANDROID
 // Android needs to support 39, 42 and 48 bit VMA.
-const vaddr kAllocatorSpace =  ~(uptr)0;
+const uptr kAllocatorSpace =  ~(uptr)0;
 const uptr kAllocatorSize  =  0x2000000000ULL;  // 128G.
 typedef VeryCompactSizeClassMap SizeClassMap;
+#elif SANITIZER_RISCV64
+const uptr kAllocatorSpace = ~(uptr)0;
+const uptr kAllocatorSize = 0x2000000000ULL;  // 128G.
+typedef VeryDenseSizeClassMap SizeClassMap;
 # elif defined(__aarch64__)
 // AArch64/SANITIZER_CAN_USE_ALLOCATOR64 is only for 42-bit VMA
 // so no need to different values for different VMA.
-const vaddr kAllocatorSpace =  0x10000000000ULL;
+const uptr kAllocatorSpace =  0x10000000000ULL;
 const uptr kAllocatorSize  =  0x10000000000ULL;  // 3T.
 typedef DefaultSizeClassMap SizeClassMap;
 #elif defined(__sparc__)
-const vaddr kAllocatorSpace = ~(uptr)0;
+const uptr kAllocatorSpace = ~(uptr)0;
 const uptr kAllocatorSize = 0x20000000000ULL;  // 2T.
 typedef DefaultSizeClassMap SizeClassMap;
 # elif SANITIZER_WINDOWS
-const vaddr kAllocatorSpace = ~(uptr)0;
+const uptr kAllocatorSpace = ~(uptr)0;
 const uptr kAllocatorSize  =  0x8000000000ULL;  // 500G
 typedef DefaultSizeClassMap SizeClassMap;
 # else
-const vaddr kAllocatorSpace = 0x600000000000ULL;
+const uptr kAllocatorSpace = 0x600000000000ULL;
 const uptr kAllocatorSize  =  0x40000000000ULL;  // 4T.
 typedef DefaultSizeClassMap SizeClassMap;
 # endif
@@ -171,7 +176,7 @@ template <typename AddressSpaceViewTy>
 struct AP32 {
   static const vaddr kSpaceBeg = 0;
   static const u64 kSpaceSize = SANITIZER_MMAP_RANGE_SIZE;
-  static const usize kMetadataSize = 16;
+  static const usize kMetadataSize = 0;
   typedef __asan::SizeClassMap SizeClassMap;
   static const usize kRegionSizeLog = 20;
   using AddressSpaceView = AddressSpaceViewTy;
