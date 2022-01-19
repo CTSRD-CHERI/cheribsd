@@ -20,7 +20,7 @@ MK_WERROR.gcc=	no
 .include "Makefile.inc"
 
 # Out-of-line LSE atomics helpers for aarch64
-.if ${MACHINE_CPUARCH} == "aarch64"
+.if ${MACHINE_CPUARCH} == "aarch64" && !${MACHINE_ABI:Mpurecap}
 . for pat in cas swp ldadd ldclr ldeor ldset
 .  for size in 1 2 4 8 16
 .   for model in 1 2 3 4
