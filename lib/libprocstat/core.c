@@ -111,12 +111,6 @@ struct _cap128_ps_strings {
 	int		ps_nargvstr;
 	cap128_t	ps_envstr __aligned(16);
 	int		ps_nenvstr;
-	cap128_t	ps_sbclasses __aligned(16);
-	size_t		ps_sbclasseslen;
-	cap128_t	ps_sbmethods __aligned(16);
-	size_t		ps_sbmethodslen;
-	cap128_t	ps_sbobjects __aligned(16);
-	size_t		ps_sbobjectslen;
 };
 typedef struct _cap128_ps_strings cap128_ps_strings_t;
 

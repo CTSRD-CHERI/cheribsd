@@ -52,24 +52,12 @@
  * pointers in ps_strings.  The kern.proc.args sysctl first tries p_args.
  * If p_args is NULL, it then falls back to reading ps_strings and following
  * the pointers.
- *
- * XXXRW: It appears this is safely extensible by appending new fields without
- * damaging the ABI.  However, good to confirm before upstreaming this change.
- *
- * XXXRW: Although it is not strictly required for CHERI, I have made similar
- * changes to freebsd32_ps_strings.
  */
 struct ps_strings {
 	char * __kerncap * __kerncap ps_argvstr; /* first of 0 or more argument strings */
 	unsigned int ps_nargvstr; /* the number of argument strings */
 	char * __kerncap * __kerncap ps_envstr;	/* first of 0 or more environment strings */
 	unsigned int ps_nenvstr; /* the number of environment strings */
-	void * __kerncap ps_sbclasses;	/* pointer to sandbox class data */
-	size_t	 ps_sbclasseslen;	/* length of sandbox class data */
-	void * __kerncap ps_sbmethods;	/* pointer to sandbox method data */
-	size_t	 ps_sbmethodslen;	/* length of sandbox method data */
-	void * __kerncap ps_sbobjects;	/* pointer to sandbox object data */
-	size_t	 ps_sbobjectslen;	/* length of sandbox object data */
 };
 
 /* Coredump output parameters. */
