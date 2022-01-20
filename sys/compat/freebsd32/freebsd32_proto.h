@@ -283,6 +283,10 @@ struct freebsd32_aio_suspend_args {
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec32 *)]; const struct timespec32 * timeout; char timeout_r_[PADR_(const struct timespec32 *)];
 };
+struct freebsd32_aio_cancel_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char aiocbp_l_[PADL_(struct aiocb32 *)]; struct aiocb32 * aiocbp; char aiocbp_r_[PADR_(struct aiocb32 *)];
+};
 struct freebsd32_aio_error_args {
 	char aiocbp_l_[PADL_(struct aiocb32 *)]; struct aiocb32 * aiocbp; char aiocbp_r_[PADR_(struct aiocb32 *)];
 };
@@ -320,17 +324,6 @@ struct freebsd32_sendfile_args {
 	char hdtr_l_[PADL_(struct sf_hdtr32 *)]; struct sf_hdtr32 * hdtr; char hdtr_r_[PADR_(struct sf_hdtr32 *)];
 	char sbytes_l_[PADL_(off_t *)]; off_t * sbytes; char sbytes_r_[PADR_(off_t *)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-};
-struct freebsd32_ksem_init_args {
-	char idp_l_[PADL_(int32_t *)]; int32_t * idp; char idp_r_[PADR_(int32_t *)];
-	char value_l_[PADL_(unsigned int)]; unsigned int value; char value_r_[PADR_(unsigned int)];
-};
-struct freebsd32_ksem_open_args {
-	char idp_l_[PADL_(int32_t *)]; int32_t * idp; char idp_r_[PADR_(int32_t *)];
-	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
-	char oflag_l_[PADL_(int)]; int oflag; char oflag_r_[PADR_(int)];
-	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
-	char value_l_[PADL_(unsigned int)]; unsigned int value; char value_r_[PADR_(unsigned int)];
 };
 struct freebsd32_sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
@@ -410,6 +403,24 @@ struct freebsd32_abort2_args {
 struct freebsd32_aio_fsync_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
 	char aiocbp_l_[PADL_(struct aiocb32 *)]; struct aiocb32 * aiocbp; char aiocbp_r_[PADR_(struct aiocb32 *)];
+};
+struct freebsd32_sctp_generic_sendmsg_iov_args {
+	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
+	char iov_l_[PADL_(struct iovec32 *)]; struct iovec32 * iov; char iov_r_[PADR_(struct iovec32 *)];
+	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
+	char to_l_[PADL_(const struct sockaddr *)]; const struct sockaddr * to; char to_r_[PADR_(const struct sockaddr *)];
+	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo *)]; struct sctp_sndrcvinfo * sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct freebsd32_sctp_generic_recvmsg_args {
+	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
+	char iov_l_[PADL_(struct iovec32 *)]; struct iovec32 * iov; char iov_r_[PADR_(struct iovec32 *)];
+	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
+	char from_l_[PADL_(struct sockaddr *)]; struct sockaddr * from; char from_r_[PADR_(struct sockaddr *)];
+	char fromlenaddr_l_[PADL_(__socklen_t *)]; __socklen_t * fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t *)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo *)]; struct sctp_sndrcvinfo * sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo *)];
+	char msg_flags_l_[PADL_(int *)]; int * msg_flags; char msg_flags_r_[PADR_(int *)];
 };
 struct freebsd32_pread_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -679,6 +690,11 @@ struct freebsd32___sysctlbyname_args {
 	char new_l_[PADL_(void *)]; void * new; char new_r_[PADR_(void *)];
 	char newlen_l_[PADL_(size_t)]; size_t newlen; char newlen_r_[PADR_(size_t)];
 };
+struct freebsd32___specialfd_args {
+	char type_l_[PADL_(int)]; int type; char type_r_[PADR_(int)];
+	char req_l_[PADL_(const void *)]; const void * req; char req_r_[PADR_(const void *)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+};
 struct freebsd32_aio_writev_args {
 	char aiocbp_l_[PADL_(struct aiocb32 *)]; struct aiocb32 * aiocbp; char aiocbp_r_[PADR_(struct aiocb32 *)];
 };
@@ -734,6 +750,7 @@ int	freebsd32_modstat(struct thread *, struct freebsd32_modstat_args *);
 int	freebsd32_kldstat(struct thread *, struct freebsd32_kldstat_args *);
 int	freebsd32_aio_return(struct thread *, struct freebsd32_aio_return_args *);
 int	freebsd32_aio_suspend(struct thread *, struct freebsd32_aio_suspend_args *);
+int	freebsd32_aio_cancel(struct thread *, struct freebsd32_aio_cancel_args *);
 int	freebsd32_aio_error(struct thread *, struct freebsd32_aio_error_args *);
 int	freebsd32_sched_rr_get_interval(struct thread *, struct freebsd32_sched_rr_get_interval_args *);
 int	freebsd32_jail(struct thread *, struct freebsd32_jail_args *);
@@ -742,8 +759,6 @@ int	freebsd32_sigwaitinfo(struct thread *, struct freebsd32_sigwaitinfo_args *);
 int	freebsd32_aio_waitcomplete(struct thread *, struct freebsd32_aio_waitcomplete_args *);
 int	freebsd32_nmount(struct thread *, struct freebsd32_nmount_args *);
 int	freebsd32_sendfile(struct thread *, struct freebsd32_sendfile_args *);
-int	freebsd32_ksem_init(struct thread *, struct freebsd32_ksem_init_args *);
-int	freebsd32_ksem_open(struct thread *, struct freebsd32_ksem_open_args *);
 int	freebsd32_sigaction(struct thread *, struct freebsd32_sigaction_args *);
 int	freebsd32_sigreturn(struct thread *, struct freebsd32_sigreturn_args *);
 int	freebsd32_getcontext(struct thread *, struct freebsd32_getcontext_args *);
@@ -761,6 +776,8 @@ int	freebsd32_kmq_timedsend(struct thread *, struct freebsd32_kmq_timedsend_args
 int	freebsd32_kmq_notify(struct thread *, struct freebsd32_kmq_notify_args *);
 int	freebsd32_abort2(struct thread *, struct freebsd32_abort2_args *);
 int	freebsd32_aio_fsync(struct thread *, struct freebsd32_aio_fsync_args *);
+int	freebsd32_sctp_generic_sendmsg_iov(struct thread *, struct freebsd32_sctp_generic_sendmsg_iov_args *);
+int	freebsd32_sctp_generic_recvmsg(struct thread *, struct freebsd32_sctp_generic_recvmsg_args *);
 int	freebsd32_pread(struct thread *, struct freebsd32_pread_args *);
 int	freebsd32_pwrite(struct thread *, struct freebsd32_pwrite_args *);
 int	freebsd32_mmap(struct thread *, struct freebsd32_mmap_args *);
@@ -798,6 +815,7 @@ int	freebsd32_kevent(struct thread *, struct freebsd32_kevent_args *);
 int	freebsd32_cpuset_getdomain(struct thread *, struct freebsd32_cpuset_getdomain_args *);
 int	freebsd32_cpuset_setdomain(struct thread *, struct freebsd32_cpuset_setdomain_args *);
 int	freebsd32___sysctlbyname(struct thread *, struct freebsd32___sysctlbyname_args *);
+int	freebsd32___specialfd(struct thread *, struct freebsd32___specialfd_args *);
 int	freebsd32_aio_writev(struct thread *, struct freebsd32_aio_writev_args *);
 int	freebsd32_aio_readv(struct thread *, struct freebsd32_aio_readv_args *);
 
@@ -1210,6 +1228,7 @@ int	freebsd11_freebsd32_fstatat(struct thread *, struct freebsd11_freebsd32_fsta
 #define	FREEBSD32_SYS_AUE_freebsd32_kldstat	AUE_NULL
 #define	FREEBSD32_SYS_AUE_freebsd32_aio_return	AUE_AIO_RETURN
 #define	FREEBSD32_SYS_AUE_freebsd32_aio_suspend	AUE_AIO_SUSPEND
+#define	FREEBSD32_SYS_AUE_freebsd32_aio_cancel	AUE_AIO_CANCEL
 #define	FREEBSD32_SYS_AUE_freebsd32_aio_error	AUE_AIO_ERROR
 #define	FREEBSD32_SYS_AUE_freebsd6_freebsd32_aio_read	AUE_AIO_READ
 #define	FREEBSD32_SYS_AUE_freebsd6_freebsd32_aio_write	AUE_AIO_WRITE
@@ -1226,8 +1245,6 @@ int	freebsd11_freebsd32_fstatat(struct thread *, struct freebsd11_freebsd32_fsta
 #define	FREEBSD32_SYS_AUE_freebsd32_nmount	AUE_NMOUNT
 #define	FREEBSD32_SYS_AUE_freebsd32_sendfile	AUE_SENDFILE
 #define	FREEBSD32_SYS_AUE_freebsd11_freebsd32_getfsstat	AUE_GETFSSTAT
-#define	FREEBSD32_SYS_AUE_freebsd32_ksem_init	AUE_SEMINIT
-#define	FREEBSD32_SYS_AUE_freebsd32_ksem_open	AUE_SEMOPEN
 #define	FREEBSD32_SYS_AUE_freebsd32_sigaction	AUE_SIGACTION
 #define	FREEBSD32_SYS_AUE_freebsd32_sigreturn	AUE_SIGRETURN
 #define	FREEBSD32_SYS_AUE_freebsd32_getcontext	AUE_NULL
@@ -1247,6 +1264,8 @@ int	freebsd11_freebsd32_fstatat(struct thread *, struct freebsd11_freebsd32_fsta
 #define	FREEBSD32_SYS_AUE_freebsd32_kmq_notify	AUE_MQ_NOTIFY
 #define	FREEBSD32_SYS_AUE_freebsd32_abort2	AUE_NULL
 #define	FREEBSD32_SYS_AUE_freebsd32_aio_fsync	AUE_AIO_FSYNC
+#define	FREEBSD32_SYS_AUE_freebsd32_sctp_generic_sendmsg_iov	AUE_SCTP_GENERIC_SENDMSG_IOV
+#define	FREEBSD32_SYS_AUE_freebsd32_sctp_generic_recvmsg	AUE_SCTP_GENERIC_RECVMSG
 #define	FREEBSD32_SYS_AUE_freebsd32_pread	AUE_PREAD
 #define	FREEBSD32_SYS_AUE_freebsd32_pwrite	AUE_PWRITE
 #define	FREEBSD32_SYS_AUE_freebsd32_mmap	AUE_MMAP
@@ -1285,6 +1304,7 @@ int	freebsd11_freebsd32_fstatat(struct thread *, struct freebsd11_freebsd32_fsta
 #define	FREEBSD32_SYS_AUE_freebsd32_cpuset_getdomain	AUE_NULL
 #define	FREEBSD32_SYS_AUE_freebsd32_cpuset_setdomain	AUE_NULL
 #define	FREEBSD32_SYS_AUE_freebsd32___sysctlbyname	AUE_SYSCTL
+#define	FREEBSD32_SYS_AUE_freebsd32___specialfd	AUE_SPECIALFD
 #define	FREEBSD32_SYS_AUE_freebsd32_aio_writev	AUE_AIO_WRITEV
 #define	FREEBSD32_SYS_AUE_freebsd32_aio_readv	AUE_AIO_READV
 

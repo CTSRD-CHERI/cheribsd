@@ -261,7 +261,7 @@
 				/* 313 is obsolete signanosleep */
 #define	FREEBSD32_SYS_freebsd32_aio_return	314
 #define	FREEBSD32_SYS_freebsd32_aio_suspend	315
-#define	FREEBSD32_SYS_aio_cancel	316
+#define	FREEBSD32_SYS_freebsd32_aio_cancel	316
 #define	FREEBSD32_SYS_freebsd32_aio_error	317
 				/* 318 is freebsd6 freebsd32_aio_read */
 				/* 319 is freebsd6 freebsd32_aio_write */
@@ -337,8 +337,8 @@
 #define	FREEBSD32_SYS_ksem_post	401
 #define	FREEBSD32_SYS_ksem_wait	402
 #define	FREEBSD32_SYS_ksem_trywait	403
-#define	FREEBSD32_SYS_freebsd32_ksem_init	404
-#define	FREEBSD32_SYS_freebsd32_ksem_open	405
+#define	FREEBSD32_SYS_ksem_init	404
+#define	FREEBSD32_SYS_ksem_open	405
 #define	FREEBSD32_SYS_ksem_unlink	406
 #define	FREEBSD32_SYS_ksem_getvalue	407
 #define	FREEBSD32_SYS_ksem_destroy	408
@@ -394,8 +394,8 @@
 #define	FREEBSD32_SYS_rtprio_thread	466
 #define	FREEBSD32_SYS_sctp_peeloff	471
 #define	FREEBSD32_SYS_sctp_generic_sendmsg	472
-#define	FREEBSD32_SYS_sctp_generic_sendmsg_iov	473
-#define	FREEBSD32_SYS_sctp_generic_recvmsg	474
+#define	FREEBSD32_SYS_freebsd32_sctp_generic_sendmsg_iov	473
+#define	FREEBSD32_SYS_freebsd32_sctp_generic_recvmsg	474
 #define	FREEBSD32_SYS_freebsd32_pread	475
 #define	FREEBSD32_SYS_freebsd32_pwrite	476
 #define	FREEBSD32_SYS_freebsd32_mmap	477
@@ -497,7 +497,7 @@
 #define	FREEBSD32_SYS___realpathat	574
 #define	FREEBSD32_SYS_close_range	575
 #define	FREEBSD32_SYS_rpctls_syscall	576
-#define	FREEBSD32_SYS___specialfd	577
+#define	FREEBSD32_SYS_freebsd32___specialfd	577
 #define	FREEBSD32_SYS_freebsd32_aio_writev	578
 #define	FREEBSD32_SYS_freebsd32_aio_readv	579
 #define	FREEBSD32_SYS_fspacectl	580

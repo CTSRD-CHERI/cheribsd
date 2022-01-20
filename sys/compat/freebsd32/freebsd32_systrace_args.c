@@ -1475,9 +1475,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* aio_cancel */
+	/* freebsd32_aio_cancel */
 	case 316: {
-		struct aio_cancel_args *p = params;
+		struct freebsd32_aio_cancel_args *p = params;
 		iarg[a++] = p->fd; /* int */
 		uarg[a++] = (intptr_t)p->aiocbp; /* struct aiocb32 * */
 		*n_args = 2;
@@ -1895,17 +1895,17 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
-	/* freebsd32_ksem_init */
+	/* ksem_init */
 	case 404: {
-		struct freebsd32_ksem_init_args *p = params;
+		struct ksem_init_args *p = params;
 		uarg[a++] = (intptr_t)p->idp; /* int32_t * */
 		uarg[a++] = p->value; /* unsigned int */
 		*n_args = 2;
 		break;
 	}
-	/* freebsd32_ksem_open */
+	/* ksem_open */
 	case 405: {
-		struct freebsd32_ksem_open_args *p = params;
+		struct ksem_open_args *p = params;
 		uarg[a++] = (intptr_t)p->idp; /* int32_t * */
 		uarg[a++] = (intptr_t)p->name; /* const char * */
 		iarg[a++] = p->oflag; /* int */
@@ -2351,9 +2351,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 7;
 		break;
 	}
-	/* sctp_generic_sendmsg_iov */
+	/* freebsd32_sctp_generic_sendmsg_iov */
 	case 473: {
-		struct sctp_generic_sendmsg_iov_args *p = params;
+		struct freebsd32_sctp_generic_sendmsg_iov_args *p = params;
 		iarg[a++] = p->sd; /* int */
 		uarg[a++] = (intptr_t)p->iov; /* struct iovec32 * */
 		iarg[a++] = p->iovlen; /* int */
@@ -2364,9 +2364,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 7;
 		break;
 	}
-	/* sctp_generic_recvmsg */
+	/* freebsd32_sctp_generic_recvmsg */
 	case 474: {
-		struct sctp_generic_recvmsg_args *p = params;
+		struct freebsd32_sctp_generic_recvmsg_args *p = params;
 		iarg[a++] = p->sd; /* int */
 		uarg[a++] = (intptr_t)p->iov; /* struct iovec32 * */
 		iarg[a++] = p->iovlen; /* int */
@@ -3299,9 +3299,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* __specialfd */
+	/* freebsd32___specialfd */
 	case 577: {
-		struct __specialfd_args *p = params;
+		struct freebsd32___specialfd_args *p = params;
 		iarg[a++] = p->type; /* int */
 		uarg[a++] = (intptr_t)p->req; /* const void * */
 		uarg[a++] = p->len; /* size_t */
@@ -5681,7 +5681,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* aio_cancel */
+	/* freebsd32_aio_cancel */
 	case 316:
 		switch (ndx) {
 		case 0:
@@ -6376,7 +6376,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* freebsd32_ksem_init */
+	/* ksem_init */
 	case 404:
 		switch (ndx) {
 		case 0:
@@ -6389,7 +6389,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* freebsd32_ksem_open */
+	/* ksem_open */
 	case 405:
 		switch (ndx) {
 		case 0:
@@ -7150,7 +7150,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* sctp_generic_sendmsg_iov */
+	/* freebsd32_sctp_generic_sendmsg_iov */
 	case 473:
 		switch (ndx) {
 		case 0:
@@ -7178,7 +7178,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* sctp_generic_recvmsg */
+	/* freebsd32_sctp_generic_recvmsg */
 	case 474:
 		switch (ndx) {
 		case 0:
@@ -8949,7 +8949,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* __specialfd */
+	/* freebsd32___specialfd */
 	case 577:
 		switch (ndx) {
 		case 0:
@@ -9866,7 +9866,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* aio_cancel */
+	/* freebsd32_aio_cancel */
 	case 316:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -10109,12 +10109,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* freebsd32_ksem_init */
+	/* ksem_init */
 	case 404:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* freebsd32_ksem_open */
+	/* ksem_open */
 	case 405:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -10379,12 +10379,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sctp_generic_sendmsg_iov */
+	/* freebsd32_sctp_generic_sendmsg_iov */
 	case 473:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sctp_generic_recvmsg */
+	/* freebsd32_sctp_generic_recvmsg */
 	case 474:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -10856,7 +10856,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* __specialfd */
+	/* freebsd32___specialfd */
 	case 577:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
