@@ -108,10 +108,11 @@
 #define	LD_			"LD_"
 #endif
 
+#define	_PATH_SOFT_ELF_HINTS	"/var/run/ld-elf-soft.so.hints"
+
 #ifdef __CHERI_PURE_CAPABILITY__
 /* -soft not supported for CheriABI */
 #else
-#define	_PATH_SOFT_ELF_HINTS	"/var/run/ld-elf-soft.so.hints"
 #define	_PATH_SOFT_LIBMAP_CONF	"/etc/libmap-soft.conf"
 #define	_PATH_SOFT_RTLD		"/libexec/ld-elf.so.1"
 #define	SOFT_STANDARD_LIBRARY_PATH "/usr/libsoft"
