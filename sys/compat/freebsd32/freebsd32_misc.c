@@ -2499,7 +2499,7 @@ freebsd32_jail(struct thread *td, struct freebsd32_jail_args *uap)
 	uint32_t version;
 	int error;
 
-	error = copyin(uap->jail, &version, sizeof(version));
+	error = copyin(uap->jailp, &version, sizeof(version));
 	if (error)
 		return (error);
 
@@ -2509,7 +2509,7 @@ freebsd32_jail(struct thread *td, struct freebsd32_jail_args *uap)
 		struct jail32_v0 j32_v0;
 		struct in_addr ip4;
 
-		error = copyin(uap->jail, &j32_v0, sizeof(struct jail32_v0));
+		error = copyin(uap->jailp, &j32_v0, sizeof(struct jail32_v0));
 		if (error)
 			return (error);
 		/* jail_v0 is host order */
@@ -2531,7 +2531,7 @@ freebsd32_jail(struct thread *td, struct freebsd32_jail_args *uap)
 		/* FreeBSD multi-IPv4/IPv6,noIP jails. */
 		struct jail32 j32;
 
-		error = copyin(uap->jail, &j32, sizeof(struct jail32));
+		error = copyin(uap->jailp, &j32, sizeof(struct jail32));
 		if (error)
 			return (error);
 		return (kern_jail(td, __USER_CAP_STR(PTRIN(j32.path)),
