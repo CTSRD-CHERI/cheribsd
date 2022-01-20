@@ -207,9 +207,11 @@ vm_page_init(void *dummy)
 static void
 vm_page_init_cache_zones(void *dummy __unused)
 {
+	static char cache_zone_names[MAXMEMDOM * VM_NFREEPOOL][32];
+	char *zone_name;
 	struct vm_domain *vmd;
 	struct vm_pgcache *pgcache;
-	int cache, domain, maxcache, pool;
+	int cache, domain, maxcache, pool, cnt;
 
 	maxcache = 0;
 	TUNABLE_INT_FETCH("vm.pgcache_zone_max_pcpu", &maxcache);
@@ -217,10 +219,14 @@ vm_page_init_cache_zones(void *dummy __unused)
 	for (domain = 0; domain < vm_ndomains; domain++) {
 		vmd = VM_DOMAIN(domain);
 		for (pool = 0; pool < VM_NFREEPOOL; pool++) {
+			zone_name = cache_zone_names[domain * VM_NFREEPOOL + pool];
+			cnt = snprintf(zone_name, 32, "vm pgcache %d.%d",
+			    domain, pool);
+			MPASS(cnt < 32);
 			pgcache = &vmd->vmd_pgcache[pool];
 			pgcache->domain = domain;
 			pgcache->pool = pool;
-			pgcache->zone = uma_zcache_create("vm pgcache",
+			pgcache->zone = uma_zcache_create(zone_name,
 			    sizeof(struct vm_page), NULL, NULL, NULL, NULL,
 			    vm_page_zone_import, vm_page_zone_release, pgcache,
 			    UMA_ZONE_VM);
