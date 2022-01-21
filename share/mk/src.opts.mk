@@ -237,7 +237,7 @@ __DEFAULT_DEPENDENT_OPTIONS= \
 __SINGLE_OPTIONS = \
 	LIBC_MALLOC
 
-__LIBC_MALLOC_OPTIONS=	jemalloc
+__LIBC_MALLOC_OPTIONS=	jemalloc snmalloc
 __LIBC_MALLOC_DEFAULT=	jemalloc
 
 # MK_*_SUPPORT options which default to "yes" unless their corresponding

@@ -239,7 +239,9 @@ CFLAGS+= -I${SRCTOP}/lib/msun/${MSUN_ARCH_SUBDIR}
 .if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
 CFLAGS+= -I${SRCTOP}/lib/msun/x86
 .endif
-CFLAGS+= -I${SRCTOP}/lib/msun/src
+# Add msun headers *after* the default ones so that #include_next in libc++'s
+# math.h can find them.
+CFLAGS+= --include-directory-after ${SRCTOP}/lib/msun/src
 # and we do not want to record a dependency on msun
 .if ${.MAKE.LEVEL} > 0
 GENDIRDEPS_FILTER+= N${RELDIR:H}/msun
