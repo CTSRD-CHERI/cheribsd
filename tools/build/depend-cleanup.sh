@@ -48,6 +48,7 @@ clean_dep()
 clean_dep lib/libomp ittnotify_static c
 # 20200414  r359930  closefrom
 clean_dep lib/libc   closefrom S
+clean_dep lib/libsyscalls closefrom S
 
 # 20200826  r364746  OpenZFS merge, apply a big hammer (remove whole tree)
 if [ -e "$OBJTOP"/cddl/lib/libzfs/.depend.libzfs_changelist.o ] && \
@@ -84,3 +85,4 @@ fi
 clean_dep   cddl/lib/libspl atomic S
 # 20211207  cbdec8db18b5    switch to libthr-friendly pdfork
 clean_dep   lib/libc        pdfork S
+clean_dep   lib/libsyscalls pdfork S
