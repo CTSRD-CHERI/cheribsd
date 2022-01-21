@@ -34,6 +34,10 @@ clean_dep()
 		rm -f \
 		    "$OBJTOP"/$1/.depend.$2.* \
 		    "$OBJTOP"/$1/$2.*o \
+		    "$OBJTOP"/obj-lib64/$1/.depend.$2.* \
+		    "$OBJTOP"/obj-lib64/$1/$2.*o \
+		    "$OBJTOP"/obj-lib64c/$1/.depend.$2.* \
+		    "$OBJTOP"/obj-lib64c/$1/$2.*o \
 		    "$OBJTOP"/obj-lib32/$1/.depend.$2.* \
 		    "$OBJTOP"/obj-lib32/$1/$2.*o
 	fi
@@ -50,7 +54,8 @@ if [ -e "$OBJTOP"/cddl/lib/libzfs/.depend.libzfs_changelist.o ] && \
     egrep -qw "cddl/contrib/opensolaris/lib/libzfs/common/libzfs_changelist.c" \
     "$OBJTOP"/cddl/lib/libzfs/.depend.libzfs_changelist.o; then
 	echo "Removing old ZFS tree"
-	rm -rf "$OBJTOP"/cddl "$OBJTOP"/obj-lib32/cddl
+	rm -rf "$OBJTOP"/cddl "$OBJTOP"/obj-lib32/cddl \
+	   "$OBJTOP"/obj-lib64/cddl "$OBJTOP"/obj-lib64c/cddl
 fi
 
 # 20200916  WARNS bumped, need bootstrapped crunchgen stubs
@@ -71,7 +76,8 @@ fi
 # 20210108  821aa63a0940   non-widechar version of ncurses removed
 if [ -e "$OBJTOP"/lib/ncurses/ncursesw ]; then
 	echo "Removing stale ncurses objects"
-	rm -rf "$OBJTOP"/lib/ncurses "$OBJTOP"/obj-lib32/lib/ncurses
+	rm -rf "$OBJTOP"/lib/ncurses "$OBJTOP"/obj-lib32/lib/ncurses \
+	   "$OBJTOP"/obj-lib64/lib/ncurses "$OBJTOP"/obj-lib64c/lib/ncurses
 fi
 
 # 20210608  f20893853e8e    move from atomic.S to atomic.c
