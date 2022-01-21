@@ -910,7 +910,11 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 		struct ptrace_sc_ret32 psr;
 	} r32;
 	void * __capability addr;
-	int data, error = 0, i;
+	int data, error, i;
+
+	if (!allow_ptrace)
+		return (ENOSYS);
+	error = 0;
 
 	AUDIT_ARG_PID(uap->pid);
 	AUDIT_ARG_CMD(uap->req);

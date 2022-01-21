@@ -163,7 +163,11 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		struct ptrace_sc_ret64 psr;
 	} r64;
 	void * __capability addr;
-	int data, error = 0, i;
+	int data, error, i;
+
+	if (!allow_ptrace)
+		return (ENOSYS);
+	error = 0;
 
 	AUDIT_ARG_PID(uap->pid);
 	AUDIT_ARG_CMD(uap->req);
