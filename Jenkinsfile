@@ -37,7 +37,6 @@ if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
 // Add an architecture selector for manual builds
 def allArchitectures = [
         "aarch64", "amd64",
-        "mips64", "mips64-hybrid", "mips64-purecap",
         "morello-hybrid", "morello-purecap",
         "riscv64", "riscv64-hybrid", "riscv64-purecap"
 ]
@@ -97,7 +96,7 @@ def buildImage(params, String suffix) {
         }
     }
     // No need for MFS_ROOT kernels when running the testsuite
-    if (!GlobalVars.isTestSuiteJob && (suffix.startsWith('mips64') || suffix.startsWith('riscv64'))) {
+    if (!GlobalVars.isTestSuiteJob && suffix.startsWith('riscv64')) {
         stage("Building MFS_ROOT kernels") {
             sh label: "Building MFS_ROOT disk image",
                script: "./cheribuild/jenkins-cheri-build.py --build disk-image-mfs-root-${suffix} ${params.extraArgs}"
