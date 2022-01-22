@@ -268,25 +268,7 @@ SUB_MAKE= `test -x ${MYMAKE} && echo ${MYMAKE} || echo ${MAKE}` \
 SUB_MAKE= ${MAKE} -m ${.CURDIR}/share/mk
 .endif
 
-.if defined(CHERI)
-TARGET=		mips
-TARGET_ARCH=	mips64
-CHERI_FLAGS=	-DDB_FROM_SRC \
-		-DMALLOC_PRODUCTION \
-		LOCAL_DIRS="ctsrd tools/tools/atsectl" \
-		LOCAL_LIB_DIRS=ctsrd/lib \
-		LOCAL_MTREE=ctsrd/ctsrd.mtree
-.if ${CHERI} == "128"
-CHERI_FLAGS+=	-DWITH_CHERI128
-.elif ${CHERI} == "256" || ${CHERI} == "1"
-CHERI_FLAGS+=	-DWITH_CHERI256
-.else
-.error CHERI is an unexpected value '${CHERI}' must be '128' or '256'
-.endif
-.endif
-
 _MAKE=	PATH="${PATH}" _ORIGIAL_PATH="${_ORIGIAL_PATH}" MAKE_CMD="${MAKE}" ${SUB_MAKE} -f Makefile.inc1 \
-	${CHERI_FLAGS} \
 	TARGET=${_TARGET} TARGET_ARCH=${_TARGET_ARCH} ${_MAKEARGS}
 
 .if defined(MK_META_MODE) && ${MK_META_MODE} == "yes"
