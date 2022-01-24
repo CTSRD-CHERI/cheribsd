@@ -619,7 +619,7 @@ int	user_getfsstat(struct thread *td, struct statfs * __capability buf,
 	    long bufsize, int mode);
 int	user_getpeername(struct thread *td, int fdes,
 	    struct sockaddr * __restrict __capability asa,
-	    socklen_t * __capability alen, int compat);
+	    socklen_t * __capability alen, bool compat);
 int	user_getsockname(struct thread *td, int fdes,
 	    struct sockaddr * __restrict __capability asa,
 	    socklen_t * __capability alen, bool compat);

@@ -448,7 +448,7 @@ freebsd64_getpeername(struct thread *td, struct freebsd64_getpeername_args *uap)
 {
 
 	return (user_getpeername(td, uap->fdes, __USER_CAP_UNBOUND(uap->asa),
-	    __USER_CAP_OBJ(uap->alen), 0));
+	    __USER_CAP_OBJ(uap->alen), false));
 }
 
 /*
