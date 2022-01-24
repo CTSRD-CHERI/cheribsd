@@ -65,6 +65,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_page.h>
 #include <vm/vm_param.h>
 
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 
 struct ptrace_io_desc64 {
@@ -151,6 +152,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		struct dbreg dbreg;
 		struct fpreg fpreg;
 		struct reg reg;
+		struct iovec vec;
 		syscallarg_t args[nitems(td->td_sa.args)];
 		struct ptrace_sc_ret psr;
 		int ptevents;
@@ -161,6 +163,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		struct ptrace_vm_entry64 pve;
 		uint64_t args[nitems(td->td_sa.args)];
 		struct ptrace_sc_ret64 psr;
+		struct iovec64 vec;
 	} r64;
 	void * __capability addr;
 	int data, error, i;
@@ -231,6 +234,15 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		    &r.capreg, sizeof r.capreg);
 		break;
 #endif
+	case PT_GETREGSET:
+	case PT_SETREGSET:
+		error = copyin(__USER_CAP(uap->addr, sizeof(r64.vec)), &r64.vec,
+		    sizeof(r64.vec));
+		if (error != 0)
+			break;
+		IOVEC_INIT_C(&r.vec, __USER_CAP(r64.vec.iov_base,
+		    r64.vec.iov_len), r64.vec.iov_len);
+		break;
 	case PT_SET_EVENT_MASK:
 		if (uap->data != sizeof(r.ptevents))
 			error = EINVAL;
@@ -323,6 +335,11 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		    sizeof(r.capreg)), sizeof r.capreg);
 		break;
 #endif
+	case PT_GETREGSET:
+		r64.vec.iov_len = r.vec.iov_len;
+		error = copyout(&r64.vec, __USER_CAP(uap->addr,
+		    sizeof(r64.vec)), sizeof(r64.vec));
+		break;
 	case PT_GET_EVENT_MASK:
 		/* NB: The size in uap->data is validated in kern_ptrace(). */
 		error = copyout(&r.ptevents, __USER_CAP(uap->addr, uap->data),

@@ -897,6 +897,7 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 		struct dbreg32 dbreg;
 		struct fpreg32 fpreg;
 		struct reg32 reg;
+		struct iovec vec;
 		syscallarg_t args[nitems(td->td_sa.args)];
 		struct ptrace_sc_ret psr;
 		int ptevents;
@@ -908,6 +909,7 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 		struct ptrace_coredump32 pc;
 		uint32_t args[nitems(td->td_sa.args)];
 		struct ptrace_sc_ret32 psr;
+		struct iovec32 vec;
 	} r32;
 	void * __capability addr;
 	int data, error, i;
@@ -956,6 +958,22 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 		break;
 	case PT_SETDBREGS:
 		error = copyin(uap->addr, &r.dbreg, sizeof(r.dbreg));
+		break;
+	case PT_SETREGSET:
+		error = copyin(uap->addr, &r32.vec, sizeof(r32.vec));
+		if (error != 0)
+			break;
+
+		r.vec.iov_len = r32.vec.iov_len;
+		r.vec.iov_base = PTRIN(r32.vec.iov_base);
+		break;
+	case PT_GETREGSET:
+		error = copyin(uap->addr, &r32.vec, sizeof(r32.vec));
+		if (error != 0)
+			break;
+
+		r.vec.iov_len = r32.vec.iov_len;
+		r.vec.iov_base = PTRIN(r32.vec.iov_base);
 		break;
 	case PT_SET_EVENT_MASK:
 		if (uap->data != sizeof(r.ptevents))
@@ -1034,6 +1052,10 @@ freebsd32_ptrace(struct thread *td, struct freebsd32_ptrace_args *uap)
 		break;
 	case PT_GETDBREGS:
 		error = copyout(&r.dbreg, uap->addr, sizeof(r.dbreg));
+		break;
+	case PT_GETREGSET:
+		r32.vec.iov_len = r.vec.iov_len;
+		error = copyout(&r32.vec, uap->addr, sizeof(r32.vec));
 		break;
 	case PT_GET_EVENT_MASK:
 		/* NB: The size in uap->data is validated in kern_ptrace(). */

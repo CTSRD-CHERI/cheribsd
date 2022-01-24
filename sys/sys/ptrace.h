@@ -85,6 +85,8 @@
 
 #define	PT_VM_TIMESTAMP	40	/* Get VM version (timestamp) */
 #define	PT_VM_ENTRY	41	/* Get VM map (entry) */
+#define	PT_GETREGSET	42	/* Get a target register set */
+#define	PT_SETREGSET	43	/* Set a target register set */
 
 #define	PT_GETCAPREGS	50	/* get capability registers */
 #define	PT_SETCAPREGS	51	/* set capability registers */
