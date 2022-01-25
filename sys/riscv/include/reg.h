@@ -62,17 +62,17 @@ struct dbreg {
 
 #if __has_feature(capabilities)
 struct capreg {
-	uintcap_t cra;		/* return address */
-	uintcap_t csp;		/* stack pointer */
-	uintcap_t cgp;		/* global pointer */
-	uintcap_t ctp;		/* thread pointer */
-	uintcap_t ct[7];	/* temporaries */
-	uintcap_t cs[12];	/* saved registers */
-	uintcap_t ca[8];	/* function arguments */
-	uintcap_t sepcc;	/* exception program counter */
-	uintcap_t ddc;
-	uint64_t tagmask;
-	uint64_t pad;
+	__uintcap_t cra;		/* return address */
+	__uintcap_t csp;		/* stack pointer */
+	__uintcap_t cgp;		/* global pointer */
+	__uintcap_t ctp;		/* thread pointer */
+	__uintcap_t ct[7];	/* temporaries */
+	__uintcap_t cs[12];	/* saved registers */
+	__uintcap_t ca[8];	/* function arguments */
+	__uintcap_t sepcc;	/* exception program counter */
+	__uintcap_t ddc;
+	__uint64_t tagmask;
+	__uint64_t pad;
 };
 #endif
 

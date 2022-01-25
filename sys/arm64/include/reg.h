@@ -85,19 +85,19 @@ struct dbreg32 {
 
 #if __has_feature(capabilities)
 struct capreg {
-	uintcap_t c[30];
-	uintcap_t clr;
-	uintcap_t csp;
-	uintcap_t celr;
-	uintcap_t ddc;
-	uintcap_t ctpidr;
-	uintcap_t ctpidrro;
-	uintcap_t cid;
-	uintcap_t rcsp;
-	uintcap_t rddc;
-	uintcap_t rctpidr;
-	uint64_t tagmask;
-	uint64_t pad;
+	__uintcap_t c[30];
+	__uintcap_t clr;
+	__uintcap_t csp;
+	__uintcap_t celr;
+	__uintcap_t ddc;
+	__uintcap_t ctpidr;
+	__uintcap_t ctpidrro;
+	__uintcap_t cid;
+	__uintcap_t rcsp;
+	__uintcap_t rddc;
+	__uintcap_t rctpidr;
+	__uint64_t tagmask;
+	__uint64_t pad;
 };
 #endif
 
