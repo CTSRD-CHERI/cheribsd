@@ -5486,7 +5486,7 @@ umtx_read_uptr(struct thread *td, uintcap_t ptr, uintcap_t *res, bool compat32)
 	} else
 #endif
 	{
-		error = fuecap((void * __capability)ptr, &res1);
+		error = fueptr((void * __capability)ptr, &res1);
 	}
 	if (error == 0)
 		*res = res1;

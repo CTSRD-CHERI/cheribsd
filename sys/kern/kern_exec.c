@@ -1398,7 +1398,7 @@ get_argenv_ptr(void * __capability *arrayp, void * __capability *ptrp)
 	} else
 #endif
 	{
-		if (fuecap(array, &ptr) == -1)
+		if (fueptr(array, &ptr) == -1)
 			return (EFAULT);
 		array += sizeof(ptr);
 		*ptrp = (void * __capability)ptr;
@@ -1925,7 +1925,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->argv = vectp;
 #endif
-	if (sucap(&arginfo->ps_argvstr, (intcap_t)imgp->argv) != 0 ||
+	if (suptr(&arginfo->ps_argvstr, (intcap_t)imgp->argv) != 0 ||
 	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
@@ -1938,7 +1938,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		if (sucap(vectp++, cheri_setbounds(ustringp, len)) != 0)
 			return (EFAULT);
 #else
-		if (suword(vectp++, ustringp) != 0)
+		if (suptr(vectp++, ustringp) != 0)
 			return (EFAULT);
 #endif
 		stringp += len;
@@ -1954,7 +1954,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->envv = vectp;
 #endif
-	if (sucap(&arginfo->ps_envstr, (intcap_t)imgp->envv) != 0 ||
+	if (suptr(&arginfo->ps_envstr, (intcap_t)imgp->envv) != 0 ||
 	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
@@ -1967,7 +1967,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		if (sucap(vectp++, cheri_setbounds(ustringp, len)) != 0)
 			return (EFAULT);
 #else
-		if (suword(vectp++, ustringp) != 0)
+		if (suptr(vectp++, ustringp) != 0)
 			return (EFAULT);
 #endif
 		stringp += len;
