@@ -76,7 +76,7 @@
 #define	cheri_setbounds(ptr, size)	((void *)(ptr))
 #define	cheri_andperm(ptr, size)	((void *)(ptr))
 #define	CHERI_PERMS_USERSPACE_DATA	0
-#define	CHERI_PERM_CHERIABI_VMMAP	0
+#define	CHERI_PERM_SW_VMEM		0
 #endif
 
 static spinlock_t tls_malloc_lock = _SPINLOCK_INITIALIZER;
@@ -222,7 +222,7 @@ bound_ptr(void *mem, size_t nbytes)
 
 	ptr = cheri_setbounds(mem, nbytes);
 	ptr = cheri_andperm(ptr,
-	    CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP);
+	    CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_SW_VMEM);
 	return (ptr);
 }
 
@@ -367,7 +367,7 @@ find_overhead(void * cp)
 	 *  - Point somewhere before us and within the current pagepool.
 	 */
 	if (cheri_gettag(op->ov_next) &&
-	    (cheri_getperm(op->ov_next) & CHERI_PERM_CHERIABI_VMMAP) != 0) {
+	    (cheri_getperm(op->ov_next) & CHERI_PERM_SW_VMEM) != 0) {
 		vaddr_t base, pp_base;
 
 		pp_base = cheri_getbase(op);

@@ -345,7 +345,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	if (cheri_gettag(uap->addr)) {
 		if ((flags & MAP_FIXED) == 0)
 			return (EPROT);
-		else if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP))
+		else if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM))
 			source_cap = uap->addr;
 		else
 			return (EACCES);
@@ -987,7 +987,7 @@ sys_munmap(struct thread *td, struct munmap_args *uap)
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
 		return (EPROT);
-	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+	if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
 		return (EPROT);
 #endif
 
@@ -1073,7 +1073,7 @@ sys_mprotect(struct thread *td, struct mprotect_args *uap)
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
 		return (EPROT);
-	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+	if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
 		return (EPROT);
 #endif
 
@@ -1149,7 +1149,7 @@ sys_minherit(struct thread *td, struct minherit_args *uap)
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
 		return (EPROT);
-	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+	if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
 		return (EPROT);
 #endif
 	return (kern_minherit(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
@@ -1202,10 +1202,10 @@ sys_madvise(struct thread *td, struct madvise_args *uap)
 
 	/*
 	 * MADV_FREE may change the page contents so require
-	 * CHERI_PERM_CHERIABI_VMMAP.
+	 * CHERI_PERM_SW_VMEM.
 	 */
 	if (uap->behav == MADV_FREE &&
-	    (cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+	    (cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
 		return (EPROT);
 #endif
 

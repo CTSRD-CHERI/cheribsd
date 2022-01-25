@@ -992,8 +992,8 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_insert,
 	    PROT_MAX(PROT_READ | PROT_WRITE), MAP_GUARD, -1, 0));
 	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0,
 	    "mmap failed to return valid capability");
-	CHERIBSDTEST_VERIFY2(cheri_getperm(map) & CHERI_PERM_CHERIABI_VMMAP,
-	    "mmap failed to return capability with CHERIABI_VMMAP perm");
+	CHERIBSDTEST_VERIFY2(cheri_getperm(map) & CHERI_PERM_SW_VMEM,
+	    "mmap failed to return capability with VMEM perm");
 
 	CHERIBSDTEST_CHECK_SYSCALL(mmap((char *)(map) + PAGE_SIZE, PAGE_SIZE,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0));
@@ -1019,16 +1019,16 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_insert_noperm,
 	    PROT_MAX(PROT_READ | PROT_WRITE), MAP_GUARD, -1, 0));
 	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0,
 	    "mmap failed to return valid capability");
-	CHERIBSDTEST_VERIFY2(cheri_getperm(map) & CHERI_PERM_CHERIABI_VMMAP,
-	    "mmap failed to return capability with CHERIABI_VMMAP perm");
+	CHERIBSDTEST_VERIFY2(cheri_getperm(map) & CHERI_PERM_SW_VMEM,
+	    "mmap failed to return capability with VMEM perm");
 
-	not_enough_perm = cheri_andperm(map, ~CHERI_PERM_CHERIABI_VMMAP);
+	not_enough_perm = cheri_andperm(map, ~CHERI_PERM_SW_VMEM);
 	map2 = mmap((char *)(not_enough_perm) + PAGE_SIZE, PAGE_SIZE,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
 	CHERIBSDTEST_VERIFY2(map2 == MAP_FAILED,
-	    "mmap fixed with capability missing VM_MAP perms succeeds");
+	    "mmap fixed with capability missing VMEM perm succeeds");
 	CHERIBSDTEST_VERIFY2(errno == EACCES,
-	    "mmap fixed with capability missing VM_MAP perms failed "
+	    "mmap fixed with capability missing VMEM perm failed "
 	    "with %d instead of EACCES", errno);
 
 	cheribsdtest_success();

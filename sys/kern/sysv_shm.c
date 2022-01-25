@@ -408,7 +408,7 @@ sys_shmdt(struct thread *td, struct shmdt_args *uap)
 	 */
 	if (shmaddr != NULL &&
 	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||
-	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0))
+	    (cheri_getperm(shmaddr) & CHERI_PERM_SW_VMEM) == 0))
 		return (EPROT);
 #endif
 	return (kern_shmdt(td, shmaddr));
@@ -631,7 +631,7 @@ sys_shmat(struct thread *td, struct shmat_args *uap)
 	 */
 	if (!cheri_is_null_derived(shmaddr) &&
 	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||
-	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0))
+	    (cheri_getperm(shmaddr) & CHERI_PERM_SW_VMEM) == 0))
 		return (EPROT);
 #endif
 	return (kern_shmat(td, uap->shmid, shmaddr, uap->shmflg));
