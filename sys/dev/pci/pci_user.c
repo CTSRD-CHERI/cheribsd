@@ -1000,7 +1000,7 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 		if ((pbm->pbm_flags & PCIIO_BAR_MMAP_FIXED) == 0)
 			return (EPROT);
 		if ((cheri_getperm(pbm->pbm_map_base) &
-		    CHERI_PERM_CHERIABI_VMMAP) == 0)
+		    CHERI_PERM_SW_VMEM) == 0)
 			return (EACCES);
 	} else {
 		if (!cheri_is_null_derived(pbm->pbm_map_base))

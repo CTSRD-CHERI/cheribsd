@@ -103,14 +103,14 @@
  * and CHERI_PERM_STORE_LOCAL_CAP will be added for data permissions ($ddc).
  *
  * All user software permissions are included along with
- * CHERI_PERM_SYSCALL.  CHERI_PERM_CHERIABI_VMMAP will be added for
+ * CHERI_PERM_SYSCALL.  CHERI_PERM_SW_VMEM will be added for
  * permissions returned from mmap().
  *
  * No variation required between 256-bit and 128-bit CHERI.
  */
 #define	CHERI_PERMS_USERSPACE						\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |	\
-	CHERI_PERM_CCALL | (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
+	CHERI_PERM_CCALL | (CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM))
 
 #define	CHERI_PERMS_USERSPACE_CODE					\
 	(CHERI_PERMS_USERSPACE | CHERI_PERM_EXECUTE)

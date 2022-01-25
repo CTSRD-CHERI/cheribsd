@@ -38,7 +38,7 @@ void * __capability
 hybridabi_user_ddc(void)
 {
 	return (cheri_capability_build_user_rwx(
-	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_CHERIABI_VMMAP,
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_PERM_SW_VMEM,
 	    CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
 	    CHERI_CAP_USER_DATA_OFFSET));
 }
