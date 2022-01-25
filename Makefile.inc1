@@ -129,7 +129,14 @@ _WANT_TOOLCHAIN_CROSS_VARS=	t
 # variable we can cause an error if bsd.compiler.mk has to invoke ${CC} again.
 # Avoiding unncessary cc --version calls can noticeable speed up walking over
 # the source tree (e.g. in the make includes step)
+# test-includes is the exception, this doesn't work, so we need to forcefully
+# export it as unset (to override the existing variable in the environment from
+# buildworld if not run directly). This should probably be investigated.
+.if ${.TARGETS:Ntest-includes}
 _TOOLCHAIN_VARS_SHOULD_BE_SET=yes
+.else
+_TOOLCHAIN_VARS_SHOULD_BE_SET=
+.endif
 .if ${.TARGETS:N*buildenv:N*kernel*:Ndistrib-dirs:Ndistribution}
 # It is fine to recompute the variables in the kernel, buildenv and some
 # distribution environments but otherwise they should be set for all submakes,
