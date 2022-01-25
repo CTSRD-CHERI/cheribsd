@@ -32,7 +32,14 @@ CFLAGS += -DLINUX_DTS_VERSION=\"${LINUX_DTS_VERSION}\"
 
 PERTHREAD_SSP_ENABLED!=	grep PERTHREAD_SSP opt_global.h || true ; echo
 .if !empty(PERTHREAD_SSP_ENABLED)
-. if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 130000
+# CHERI/Morello LLVM versions that include the April 2021 upstream merge but
+# not the September one identify as 13.0.0 but do not include per-thread SSP
+# support. Detect these until we can stop supporting them.
+. if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} == 130000
+_mstack_protector_guard_sysreg_broken!=	{CC:N${CCACHE_BIN}} ${CFLAGS} -fsyntax-only -xc /dev/null -mstack-protector-guard=sysreg 2>/dev/null && echo "no" || echo "yes"
+. endif
+. if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 130000 && \
+	${_mstack_protector_guard_sysreg_broken} != "yes"
 ARM64_SSP_CFLAGS = -mstack-protector-guard=sysreg
 ARM64_SSP_CFLAGS += -mstack-protector-guard-reg=sp_el0
 ARM64_SSP_CFLAGS += -mstack-protector-guard-offset=0
