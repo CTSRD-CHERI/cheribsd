@@ -1483,7 +1483,7 @@ aiocb_store_kernelinfo(void * __capability ujobp, long jobref)
 	struct aiocb * __capability ujob;
 
 	ujob = ujobp;
-	return (sucap(&ujob->_aiocb_private.kernelinfo, jobref));
+	return (suptr(&ujob->_aiocb_private.kernelinfo, jobref));
 }
 
 static int
@@ -1491,7 +1491,7 @@ aiocb_store_aiocb(struct aiocb ** __capability ujobp,
     struct aiocb * __capability ujob)
 {
 
-	return (sucap(ujobp, (intcap_t)ujob));
+	return (suptr(ujobp, (intcap_t)ujob));
 }
 
 static size_t

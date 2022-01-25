@@ -530,8 +530,9 @@ int32_t	fuword32(volatile const void * __capability base);
 int64_t	fuword64(volatile const void * __capability base);
 #if __has_feature(capabilities)
 int	fuecap(volatile const void * __capability base, intcap_t *val);
+#define	fueptr			fuecap
 #else
-#define	fuecap(base, val)		fueword((base), (long *)(val))
+#define	fueptr(base, val)	fueword((base), (long *)(val))
 #endif
 int	fueword(volatile const void * __capability base, long *val);
 int	fueword32(volatile const void * __capability base, int32_t *val);
@@ -543,8 +544,9 @@ int	suword32(volatile void * __capability base, int32_t word);
 int	suword64(volatile void * __capability base, int64_t word);
 #if __has_feature(capabilities)
 int	sucap(volatile const void * __capability base, intcap_t val);
+#define	suptr			sucap
 #else
-#define	sucap		suword
+#define	suptr			suword
 #endif
 uint32_t casuword32(volatile uint32_t * __capability base, uint32_t oldval,
 	    uint32_t newval);
