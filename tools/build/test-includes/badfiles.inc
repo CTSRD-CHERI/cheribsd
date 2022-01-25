@@ -121,6 +121,7 @@ BADHDRS= \
 	sys/stack.h \
 	sys/stats.h \
 	sys/sx.h \
+	sys/sysargmap.h \
 	sys/syscallsubr.h \
 	sys/syslimits.h \
 	sys/systm.h \
