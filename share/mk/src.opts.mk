@@ -332,8 +332,7 @@ BROKEN_OPTIONS+=NS_CACHING
 .endif
 
 .if ${__C} == "cheri" || ${__C} == "morello" || \
-    ${__T:Maarch64*c*} || ${__T:Mriscv*c*} || \
-    ${.MAKE.OS} == "Linux"
+    ${__T:Maarch64*c*} || ${__T:Mriscv*c*}
 # Broken post OpenZFS import
 BROKEN_OPTIONS+=CDDL ZFS
 .endif
