@@ -40,10 +40,6 @@ SUBDIR= cat \
 	test \
 	uuidgen
 
-.if ${TARGET} == "mips"
-SUBDIR+=	shmem_bench
-.endif
-
 # Small cheri programs
 .if ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
 SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
