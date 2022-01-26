@@ -126,10 +126,7 @@
 /*
  * Defined if clock_gettime(CLOCK_MONOTONIC, ...) is available.
  */
-/* XXX: CLOCK_MONOTONIC goes backwards on mips under qemu... */
-#ifndef __mips__
 #define JEMALLOC_HAVE_CLOCK_MONOTONIC 1
-#endif
 
 /*
  * Defined if mach_absolute_time() is available.
