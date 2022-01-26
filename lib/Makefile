@@ -243,11 +243,6 @@ SUBDIR.${MK_BHYVE}+=	libvmmapi
 _libstatcounters=	libstatcounters
 .endif
 
-.if ${MACHINE_ARCH:Mmips64*}
-# Used by ctsrd/lib/libterasic_mtl
-SUBDIR+=	libpng
-.endif
-
 .if ${MACHINE_ARCH} != "powerpc"
 SUBDIR.${MK_OPENMP}+=	libomp
 .endif
