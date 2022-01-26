@@ -357,10 +357,6 @@ typedef struct {
 #define	EF_MIPS_ABI_O64		0x00002000
 #define	EF_MIPS_ABI_EABI32	0x00003000
 #define	EF_MIPS_ABI_EABI64	0x00004000
-#define	EF_MIPS_ABI_CHERIABI	0x0000C000
-#define	EF_MIPS_MACH_CHERI128	0x00C10000	/* 128 bit CHERI */
-#define	EF_MIPS_MACH_CHERI256	0x00C20000	/* 256 bit CHERI */
-#define	EF_MIPS_MACH		0x00FF0000	/* Machine mask */
 #define	EF_MIPS_ARCH_ASE	0x0F000000	/* Architectural extensions */
 #define	EF_MIPS_ARCH_ASE_MDMX	0x08000000	/* MDMX multimedia extension */
 #define	EF_MIPS_ARCH_ASE_M16	0x04000000	/* MIPS-16 ISA extensions */
@@ -744,28 +740,6 @@ typedef struct {
 #define	DT_MIPS_RLD_OBJ_UPDATE		0x70000033
 #define	DT_MIPS_RWPLT			0x70000034
 #define	DT_MIPS_RLD_MAP_REL		0x70000035
-
-#define	DT_MIPS_CHERI___CAPRELOCS	0x7000c000 /* start of __cap_relocs section */
-#define	DT_MIPS_CHERI___CAPRELOCSSZ	0x7000c001 /* size of __cap_relocs section */
-#define	DT_MIPS_CHERI_FLAGS		0x7000c002 /* various CHERI flags (e.g. ABI) */
-#define	DT_MIPS_CHERI_CAPTABLE		0x7000c003 /* start of .captable */
-#define	DT_MIPS_CHERI_CAPTABLESZ	0x7000c004 /* size of .captable */
-#define	DT_MIPS_CHERI_CAPTABLE_MAPPING	0x7000c005 /* start of .captable_mapping */
-#define	DT_MIPS_CHERI_CAPTABLE_MAPPINGSZ	0x7000c006 /* size of .captable_mapping */
-
-#ifndef LOCORE
-enum MipsCheriFlags {
-	DF_MIPS_CHERI_NONE		= 0x00000000,
-	DF_MIPS_CHERI_ABI_MASK		= 0x00000007,
-	DF_MIPS_CHERI_ABI_LEGACY	= 0x00000000, /* No longer supported. */
-	DF_MIPS_CHERI_ABI_PCREL		= 0x00000001,
-	DF_MIPS_CHERI_ABI_PLT		= 0x00000002,
-	DF_MIPS_CHERI_ABI_FNDESC	= 0x00000003,
-	DF_MIPS_CHERI_CAPTABLE_PER_FILE = 0x00000008,
-	DF_MIPS_CHERI_CAPTABLE_PER_FUNC = 0x00000010,
-	DF_MIPS_CHERI_RELATIVE_CAPRELOCS = 0x00000020
-};
-#endif
 
 #define	DT_PPC_GOT			0x70000000
 #define	DT_PPC_TLSOPT			0x70000001
