@@ -7,9 +7,6 @@
 .if ${MACHINE_ABI:Mpurecap}
 CFLAGS+=	-DNO_COMPAT7
 .endif
-.if ${MACHINE_ARCH:Mmips*c*}
-CFLAGS.getpwent.c=	-mxgot
-.endif
 
 CONFS+=	group master.passwd shells
 CONFSMODE_master.passwd=	600
