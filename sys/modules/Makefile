@@ -366,7 +366,7 @@ SUBDIR=	\
 	${_tpm} \
 	twe \
 	tws \
-	${_uart} \
+	uart \
 	udf \
 	udf_iconv \
 	ufs \
@@ -400,11 +400,6 @@ SUBDIR=	\
 	xl \
 	xz \
 	zlib
-
-.if ${MACHINE_CPUARCH} != "mips"
-# XXX: Building with -j2 and higher broken on mips.
-_uart=		uart
-.endif
 
 .if ${MK_AUTOFS} != "no" || defined(ALL_MODULES)
 _autofs=	autofs
