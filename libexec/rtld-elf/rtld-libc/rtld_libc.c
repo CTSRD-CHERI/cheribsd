@@ -138,23 +138,3 @@ sysctl(const int *name, u_int namelen, void *oldp, size_t *oldlenp,
 	retval = __sys___sysctl(name, namelen, oldp, oldlenp, newp, newlen);
 	return (retval);
 }
-
-#ifdef __mips__
-/*
- * Add rtld_fdprintf as the implementation of dprintf() to avoid pulling in
- * all the locale code just for the one warning in CHERI memcpy/memmove
- */
-extern int dprintf(int fd, const char *fmt, ...);
-int
-dprintf(int fd, const char *fmt, ...)
-{
-	va_list ap;
-	int retval;
-
-	va_start(ap, fmt);
-	retval = rtld_vfdprintf(fd, fmt, ap);
-	va_end(ap);
-	return (retval);
-}
-
-#endif

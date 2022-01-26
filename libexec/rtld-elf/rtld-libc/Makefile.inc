@@ -66,13 +66,6 @@ _libc_other_objects+=syncicache abs
 .elif ${LIBC_ARCH} == "powerpc64"
 # ppc64 needs __syncicache for reloc.c
 _libc_other_objects+=syncicache
-.elif ${LIBC_ARCH} == "mips"
-# For CHERI we also use sysctlbyname
-_libc_other_objects+=sysctlbyname
-.if ${MACHINE_ABI:Mpurecap}
-# Instead of setjmp/_setjmp we use setjmp_c/_setjmp_c
-_libc_other_objects:=${_libc_other_objects:Nsetjmp:N_setjmp} setjmp_c _setjmp_c
-.endif
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}
