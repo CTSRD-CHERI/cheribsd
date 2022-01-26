@@ -344,9 +344,6 @@ typedef struct Struct_Obj_Entry {
 #if __has_feature(capabilities)
     bool cap_relocs_processed : 1; /* __cap_relocs section has been processed */
 #endif
-#ifdef __CHERI_PURE_CAPABILITY__
-    unsigned cheri_captable_abi : 3;
-#endif /* __CHERI_PURE_CAPABILITY__ */
 
     struct link_map linkmap;	/* For GDB and dlinfo() */
     Objlist dldags;		/* Object belongs to these dlopened DAGs (%) */
