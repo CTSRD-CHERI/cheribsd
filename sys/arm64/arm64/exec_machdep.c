@@ -108,7 +108,6 @@ set_regs(struct thread *td, struct reg *regs)
 	frame = td->td_frame;
 	frame->tf_sp = regs->sp;
 	frame->tf_lr = regs->lr;
-	frame->tf_spsr &= ~PSR_FLAGS;
 
 #if __has_feature(capabilities)
 	for (i = 0; i < nitems(frame->tf_x); i++)
@@ -125,12 +124,27 @@ set_regs(struct thread *td, struct reg *regs)
 		 * it put it.
 		 */
 		frame->tf_elr = regs->x[15];
-		frame->tf_spsr |= regs->x[16] & PSR_FLAGS;
+		frame->tf_spsr &= ~PSR_SETTABLE_32;
+		frame->tf_spsr |= regs->x[16] & PSR_SETTABLE_32;
+		/* Don't allow userspace to ask to continue single stepping.
+		 * The SPSR.SS field doesn't exist when the EL1 is AArch32.
+		 * As the SPSR.DIT field has moved in its place don't
+		 * allow userspace to set the SPSR.SS field.
+		 */
 	} else
 #endif
 	{
 		frame->tf_elr = regs->elr;
-		frame->tf_spsr |= regs->spsr & PSR_FLAGS;
+		frame->tf_spsr &= ~PSR_SETTABLE_64;
+		frame->tf_spsr |= regs->spsr & PSR_SETTABLE_64;
+		/* Enable single stepping if userspace asked fot it */
+		if ((frame->tf_spsr & PSR_SS) != 0) {
+			td->td_pcb->pcb_flags |= PCB_SINGLE_STEP;
+
+			WRITE_SPECIALREG(mdscr_el1,
+			    READ_SPECIALREG(mdscr_el1) | MDSCR_SS);
+			isb();
+		}
 	}
 	return (0);
 }
@@ -349,8 +363,8 @@ set_regs32(struct thread *td, struct reg32 *regs)
 	tf->tf_x[13] = regs->r_sp;
 	tf->tf_x[14] = regs->r_lr;
 	tf->tf_elr = regs->r_pc;
-	tf->tf_spsr &= ~PSR_FLAGS;
-	tf->tf_spsr |= regs->r_cpsr & PSR_FLAGS;
+	tf->tf_spsr &= ~PSR_SETTABLE_32;
+	tf->tf_spsr |= regs->r_cpsr & PSR_SETTABLE_32;
 
 	return (0);
 }
@@ -622,6 +636,13 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	tf->tf_lr = mcp->mc_gpregs.gp_lr;
 	tf->tf_elr = mcp->mc_gpregs.gp_elr;
 	tf->tf_spsr = mcp->mc_gpregs.gp_spsr;
+	if ((tf->tf_spsr & PSR_SS) != 0) {
+		td->td_pcb->pcb_flags |= PCB_SINGLE_STEP;
+
+		WRITE_SPECIALREG(mdscr_el1,
+		    READ_SPECIALREG(mdscr_el1) | MDSCR_SS);
+		isb();
+	}
 	set_fpcontext(td, mcp);
 
 	return (0);
@@ -791,6 +812,14 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #else
 	tf->tf_lr = (register_t)p->p_sysent->sv_sigcode_base;
 #endif
+
+	/* Clear the single step flag while in the signal handler */
+	if ((td->td_pcb->pcb_flags & PCB_SINGLE_STEP) != 0) {
+		td->td_pcb->pcb_flags &= ~PCB_SINGLE_STEP;
+		WRITE_SPECIALREG(mdscr_el1,
+		    READ_SPECIALREG(mdscr_el1) & ~MDSCR_SS);
+		isb();
+	}
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_elr,
 	    tf->tf_sp);
