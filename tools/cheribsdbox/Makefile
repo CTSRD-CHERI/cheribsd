@@ -377,13 +377,8 @@ CRUNCH_ALIAS_nmtree= mtree
 # It seems like ${LIBNETBSD} works:
 CRUNCH_LIBS+=	${LIBNETBSD}
 
-# usr/sbin/de4ctl
-# usr/sbin/flashit
 # usr/sbin/vipw
 
-# TODO: ctsrd/usr.sbin/mtlctl?
-
-# TODO: do we need ctsrd/bin/wr?
 
 
 
