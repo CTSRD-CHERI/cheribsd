@@ -190,12 +190,12 @@ SUBDIR=	alias \
 	yes \
 	zstd
 
-.if ${MACHINE_ARCH:Mmips64*} || ${MACHINE_ARCH:Mriscv64*}
+.if ${MACHINE_ARCH:Mriscv64*}
 SUBDIR+=	minimal_count_stats
 .endif
 
 # Tracing currently only implemented for CHERI-QEMU architectures
-.if ${MACHINE} == "mips" || ${MACHINE} == "riscv"
+.if ${MACHINE} == "riscv"
 SUBDIR+=	qtrace
 .endif
 

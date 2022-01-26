@@ -175,8 +175,7 @@ SUBDIR.${MK_CHERI}+=	libsyscalls
 _libcheribsdtest_dynamic=	libcheribsdtest_dynamic
 .endif
 
-.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "mips" || \
-    ${MACHINE_CPUARCH} == "riscv"
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "riscv"
 .if !${MACHINE_ABI:Mptr32}
 SUBDIR+= libsimple_printf
 .endif
@@ -206,14 +205,12 @@ SUBDIR.${MK_STATS}+=	libstats
 .if ${COMPILER_TYPE} == "clang" && ${MK_CXX} != "no"
 .if (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "i386" || \
-    ${MACHINE_CPUARCH} == "powerpc" || \
-    ${MACHINE_ARCH:Mmips64*}) && \
+    ${MACHINE_CPUARCH} == "powerpc") && \
     !${MACHINE_ABI:Mpurecap}
 _libclang_rt=	libclang_rt
 .elif (${MK_ASAN} != "no" || ${MK_UBSAN} != "no") && make(all)
 .error "Requested build with sanitizers but cannot build runtime libraries!"
-.elif !${MACHINE_ABI:Mpurecap} && ${MACHINE_ARCH} != "mips" && \
-    ! ${MACHINE_ARCH:Mriscv*}
+.elif !${MACHINE_ABI:Mpurecap} && ! ${MACHINE_ARCH:Mriscv*}
 .error "NOT BUILDING libclang_rt for ${MACHINE_ARCH}"
 .endif
 .endif # ${COMPILER_TYPE} == "clang"
@@ -242,7 +239,7 @@ SUBDIR.${MK_PMC}+=	libipt
 SUBDIR.${MK_BHYVE}+=	libvmmapi
 .endif
 
-.if ${MACHINE_ARCH:Mmips64*} || ${MACHINE_ARCH:Mriscv*}
+.if ${MACHINE_ARCH:Mriscv*}
 _libstatcounters=	libstatcounters
 .endif
 
