@@ -109,18 +109,6 @@ beforeinstall:
 .PATH: ${RTLD_ELF_DIR}/cheri
 SRCS+=		cheri_reloc.c
 CFLAGS+=	-I${RTLD_ELF_DIR}/cheri
-
-# Make per-file captable opt-in since it slows down normal code that doesn't
-# use it and increases the size of plt stubs.
-# This could be optimized to use different stubs for per-file stubs but for
-# now making it opt-in is easier.
-# TODO: add a make options for this (e.g. MK_BENCHMARK_OPTIONS)?
-.if defined(RTLD_PER_FUNCTION_CAPTABLE_SUPPORT) && \
-    ${MACHINE_CPUARCH} == "mips" && ${MACHINE_ABI:Mpurecap}
-CFLAGS+=	-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1
-.else
-CFLAGS+=	-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=0
-.endif
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}

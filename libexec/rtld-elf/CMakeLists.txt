@@ -19,7 +19,6 @@ if (EXISTS ${RTLD_ARCH}/cheri_plt.cpp)
 endif()
 
 # For code completion:
-add_definitions(-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1)
 add_definitions(-DIN_RTLD=1)
 include_directories(${RTLD_ARCH})
 include_directories(${CMAKE_CURRENT_LIST_DIR})
