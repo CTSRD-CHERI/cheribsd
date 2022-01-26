@@ -17,9 +17,6 @@ CFLAGS+=	-I${SYSDIR}/cddl/contrib/opensolaris/uts/intel
 .elif ${MACHINE_CPUARCH} == "powerpc"
 CFLAGS+=	-I${SYSDIR}/cddl/contrib/opensolaris/uts/powerpc
 .PATH:		${SYSDIR}/cddl/contrib/opensolaris/uts/powerpc/dtrace
-.elif ${MACHINE_CPUARCH} == "mips"
-CFLAGS+=	-I${SYSDIR}/cddl/contrib/opensolaris/uts/mips
-.PATH:		${SYSDIR}/cddl/contrib/opensolaris/uts/mips/dtrace
 .endif
 
 .PATH:		${SYSDIR}/contrib/openzfs/module/unicode
