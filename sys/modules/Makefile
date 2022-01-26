@@ -276,7 +276,7 @@ SUBDIR=	\
 	${_nvdimm} \
 	${_nvme} \
 	${_nvram} \
-	${_oce} \
+	oce \
 	${_ocs_fc} \
 	${_ossl} \
 	otus \
@@ -590,10 +590,6 @@ SUBDIR+=	tests
 
 .if ${MK_ZFS} != "no" || (defined(ALL_MODULES)  && ${MACHINE_CPUARCH} != "powerpc")
 SUBDIR+=	zfs
-.endif
-
-.if ${MK_CHERI} == "no"
-_oce=		oce
 .endif
 
 .if ${MACHINE_CPUARCH} != "aarch64" && ${MACHINE_CPUARCH} != "arm" && \
