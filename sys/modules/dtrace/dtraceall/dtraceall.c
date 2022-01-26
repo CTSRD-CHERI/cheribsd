@@ -75,12 +75,12 @@ MODULE_DEPEND(dtraceall, dtnfscl, 1, 1, 1);
     defined(__powerpc__) || defined(__riscv)
 MODULE_DEPEND(dtraceall, fbt, 1, 1, 1);
 #endif
-#if defined(__amd64__) || defined(__i386__) || defined(__mips__)
+#if defined(__amd64__) || defined(__i386__)
 MODULE_DEPEND(dtraceall, fasttrap, 1, 1, 1);
 #endif
 MODULE_DEPEND(dtraceall, sdt, 1, 1, 1);
 MODULE_DEPEND(dtraceall, systrace, 1, 1, 1);
-#if defined(COMPAT_FREEBSD32) && !defined(__mips__)
+#if defined(COMPAT_FREEBSD32)
 MODULE_DEPEND(dtraceall, systrace_freebsd32, 1, 1, 1);
 #endif
 MODULE_DEPEND(dtraceall, profile, 1, 1, 1);

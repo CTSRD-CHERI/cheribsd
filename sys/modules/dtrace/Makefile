@@ -16,11 +16,6 @@ SUBDIR=		dtaudit		\
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
 SUBDIR+=	fasttrap fbt systrace_linux
 .endif
-
-.if ${MACHINE_CPUARCH} == "mips"
-SUBDIR+=	fasttrap
-.endif
-
 .if ${MACHINE_CPUARCH} == "amd64"
 SUBDIR+=	systrace_linux32
 .endif
