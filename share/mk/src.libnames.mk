@@ -83,8 +83,6 @@ _INTERNALLIBS=	\
 _INTERNALLIBS+=	bsnmptools
 .endif
 
-_INTERNALLIBS+=	png
-
 _LIBRARIES=	\
 		${_PRIVATELIBS} \
 		${_INTERNALLIBS} \
@@ -322,7 +320,6 @@ _DP_cap_syslog=	nv
 _DP_pcap=	ibverbs mlx5
 .endif
 _DP_pjdlog=	util
-_DP_png=	z
 _DP_opie=	md
 _DP_usb=	pthread
 _DP_unbound=	ssl crypto pthread
@@ -616,9 +613,6 @@ LIBBE?=		${LIBBEDIR}/libbe${PIE_SUFFIX}.a
 
 LIBPMCSTATDIR=	${_LIB_OBJTOP}/lib/libpmcstat
 LIBPMCSTAT?=	${LIBPMCSTATDIR}/libpmcstat${PIE_SUFFIX}.a
-
-LIBPNGDIR=	${_LIB_OBJTOP}/lib/libpng
-LIBPNG?=	${LIBPNGDIR}/libpng${PIE_SUFFIX}.a
 
 LIBWPAAPDIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/ap
 LIBWPAAP?=	${LIBWPAAPDIR}/libwpaap${PIE_SUFFIX}.a

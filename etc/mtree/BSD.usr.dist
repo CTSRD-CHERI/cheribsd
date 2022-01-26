@@ -15,8 +15,6 @@
             ..
             event1
             ..
-            png
-            ..
             gmock
                 internal
                     custom
