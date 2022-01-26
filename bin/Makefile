@@ -44,10 +44,6 @@ SUBDIR= cat \
 .if ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
 SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
 SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
-.if ${MACHINE} == "mips"
-# mips assembly
-SUBDIR.${MK_CHERI}+=	cheri_pthreads
-.endif
 SUBDIR.${MK_CHERI}+=	helloworld
 .if ${MK_CXX} != "no"
 SUBDIR.${MK_CHERI}+=	helloworld_cxx
