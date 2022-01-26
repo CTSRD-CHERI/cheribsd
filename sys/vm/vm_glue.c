@@ -439,43 +439,11 @@ vm_thread_stack_back(struct domainset *ds, vm_offset_t ks, vm_page_t ma[],
     int npages, int req_class)
 {
 	vm_pindex_t pindex;
-#if defined(__mips__) && defined(KSTACK_LARGE_PAGE)
-	vm_page_t m;
-#endif
 	int n;
 
 	pindex = atop(ks - VM_MIN_KERNEL_ADDRESS);
 
 	VM_OBJECT_WLOCK(kstack_object);
-#if defined(__mips__) && defined(KSTACK_LARGE_PAGE)
-#ifndef NO_SWAPPING
-	/*
-	 * Swapping adds races where some of the backing store might
-	 * be swapped out when swapping back in, but then we'd need to
-	 * make sure new pages are physically contiguous.  Without
-	 * swapping, this is only called for new kstacks for which
-	 * there should never be any existing backing store.
-	 */
-#error "KSTACK_LARGE_PAGE requires NO_SWAPPING"
-#endif
-	KASSERT(npages == atop(KSTACK_SIZE),
-	    ("%s: request for %d pages != KSTACK_SIZE", __func__, npages));
-
-	for (;;) {
-		m = vm_page_alloc_contig(kstack_object, pindex, req_class |
-		    VM_ALLOC_WIRED | VM_ALLOC_NOWAIT, atop(KSTACK_SIZE),
-		    0ul, ~0ul, KSTACK_PAGE_SIZE, 0, VM_MEMATTR_DEFAULT);
-		if (m != NULL)
-			break;
-		VM_OBJECT_WUNLOCK(kstack_object);
-		if (!vm_page_reclaim_contig(req_class,
-		    atop(KSTACK_SIZE), 0ul, ~0ul, KSTACK_PAGE_SIZE, 0))
-			vm_wait(kstack_object);
-		VM_OBJECT_WLOCK(kstack_object);
-	}
-	for (n = 0; n < atop(KSTACK_SIZE); m++, n++)
-		ma[n] = m;
-#else
 	for (n = 0; n < npages;) {
 		if (vm_ndomains > 1)
 			kstack_object->domain.dr_policy = ds;
@@ -488,7 +456,6 @@ vm_thread_stack_back(struct domainset *ds, vm_offset_t ks, vm_page_t ma[],
 		    req_class | VM_ALLOC_WIRED | VM_ALLOC_WAITFAIL,
 		    &ma[n], npages - n);
 	}
-#endif
 	VM_OBJECT_WUNLOCK(kstack_object);
 }
 
