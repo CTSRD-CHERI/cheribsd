@@ -1652,11 +1652,16 @@ m_rcvif_serialize(struct mbuf *m)
 struct ifnet *
 m_rcvif_restore(struct mbuf *m)
 {
+	struct ifnet *ifp;
 
 	M_ASSERTPKTHDR(m);
+	NET_EPOCH_ASSERT();
 
-	return ((m->m_pkthdr.rcvif = ifnet_byindexgen(m->m_pkthdr.rcvidx,
-	    m->m_pkthdr.rcvgen)));
+	ifp = ifnet_byindexgen(m->m_pkthdr.rcvidx, m->m_pkthdr.rcvgen);
+	if (ifp == NULL || (ifp->if_flags & IFF_DYING))
+		return (NULL);
+
+	return (m->m_pkthdr.rcvif = ifp);
 }
 
 /*
