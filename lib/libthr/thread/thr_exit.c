@@ -87,7 +87,7 @@ static uwl_forcedunwind_t uwl_forcedunwind;
 #endif
 static uwl_forcedunwind_t get_uwl_forcedunwind(void);
 
-static unsigned long (*uwl_getcfa)(struct _Unwind_Context *);
+static uintptr_t (*uwl_getcfa)(struct _Unwind_Context *);
 
 static void
 thread_uw_init(void)
@@ -152,7 +152,7 @@ _Unwind_ForcedUnwind(struct _Unwind_Exception *ex, _Unwind_Stop_Fn stop_func,
 	return (*get_uwl_forcedunwind())(ex, stop_func, stop_arg);
 }
 
-unsigned long
+uintptr_t
 _Unwind_GetCFA(struct _Unwind_Context *context)
 {
 	return (*uwl_getcfa)(context);
