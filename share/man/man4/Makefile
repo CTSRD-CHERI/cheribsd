@@ -547,8 +547,6 @@ MAN=	aac.4 \
 	tcp.4 \
 	tcp_bbr.4 \
 	tdfx.4 \
-	terasic_de4led.4 \
-	terasic_mtl.4 \
 	termios.4 \
 	textdump.4 \
 	ti.4 \
@@ -752,7 +750,6 @@ MLINKS+=syscons.4 sc.4
 MLINKS+=tap.4 if_tap.4 \
 	tap.4 vmnet.4 \
 	tap.4 if_vmnet.4
-MLINKS+=terasic_de4led.4 de4led.4
 MLINKS+=tdfx.4 tdfx_linux.4
 MLINKS+=ti.4 if_ti.4
 MLINKS+=tun.4 if_tun.4
