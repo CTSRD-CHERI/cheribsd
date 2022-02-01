@@ -153,17 +153,15 @@ PIEFLAG=-fpie
 PO_FLAG=-pg
 
 .c.po:
-	${CC.${.IMPSRC:T}:U${CC}} ${PO_FLAG} ${STATIC_CFLAGS} ${PO_CFLAGS} \
-	    -c ${.IMPSRC} -o ${.TARGET}
+	${CC} ${PO_FLAG} ${STATIC_CFLAGS} ${PO_CFLAGS} -c ${.IMPSRC} -o ${.TARGET}
 	${CTFCONVERT_CMD}
 
 .c.pico:
-	${CC.${.IMPSRC:T}:U${CC}} ${PICFLAG} -DPIC ${SHARED_CFLAGS} ${CFLAGS} \
-	    -c ${.IMPSRC} -o ${.TARGET}
+	${CC} ${PICFLAG} -DPIC ${SHARED_CFLAGS} ${CFLAGS} -c ${.IMPSRC} -o ${.TARGET}
 	${CTFCONVERT_CMD}
 
 .c.nossppico:
-	${CC.${.IMPSRC:T}:U${CC}} ${PICFLAG} -DPIC ${SHARED_CFLAGS:C/^-fstack-protector.*$//:C/^-fsanitize.*$//} ${CFLAGS:C/^-fstack-protector.*$//:C/^-fsanitize.*$//} -c ${.IMPSRC} -o ${.TARGET}
+	${CC} ${PICFLAG} -DPIC ${SHARED_CFLAGS:C/^-fstack-protector.*$//:C/^-fsanitize.*$//} ${CFLAGS:C/^-fstack-protector.*$//:C/^-fsanitize.*$//} -c ${.IMPSRC} -o ${.TARGET}
 	${CTFCONVERT_CMD}
 
 .c.pieo:
@@ -218,23 +216,18 @@ PO_FLAG=-pg
 	    ${CFLAGS} ${ACFLAGS} -c ${.IMPSRC} -o ${.TARGET}
 	${CTFCONVERT_CMD}
 
-.S.o:
-	${CC.${.IMPSRC:T}:U${CC}} ${STATIC_CFLAGS} ${CFLAGS} ${ACFLAGS} \
-	    -c ${.IMPSRC} -o ${.TARGET}
-	${CTFCONVERT_CMD}
-
 .S.po:
-	${CC.${.IMPSRC:T}:U${CC}:N${CCACHE_BIN}} -DPROF ${PO_CFLAGS} \
-	    ${ACFLAGS} -c ${.IMPSRC} -o ${.TARGET}
+	${CC:N${CCACHE_BIN}} -DPROF ${PO_CFLAGS} ${ACFLAGS} -c ${.IMPSRC} \
+	    -o ${.TARGET}
 	${CTFCONVERT_CMD}
 
 .S.pico:
-	${CC.${.IMPSRC:T}:U${CC}:N${CCACHE_BIN}} ${PICFLAG} -DPIC ${CFLAGS} \
-	    ${ACFLAGS} -c ${.IMPSRC} -o ${.TARGET}
+	${CC:N${CCACHE_BIN}} ${PICFLAG} -DPIC ${CFLAGS} ${ACFLAGS} \
+	    -c ${.IMPSRC} -o ${.TARGET}
 	${CTFCONVERT_CMD}
 
 .S.nossppico:
-	${CC.${.IMPSRC:T}:U${CC}:N${CCACHE_BIN}} ${PICFLAG} -DPIC ${CFLAGS:C/^-fstack-protector.*$//} ${ACFLAGS} \
+	${CC:N${CCACHE_BIN}} ${PICFLAG} -DPIC ${CFLAGS:C/^-fstack-protector.*$//} ${ACFLAGS} \
 	    -c ${.IMPSRC} -o ${.TARGET}
 	${CTFCONVERT_CMD}
 
