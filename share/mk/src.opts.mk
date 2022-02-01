@@ -317,12 +317,6 @@ BROKEN_OPTIONS+=LIB32
 .else
 BROKEN_OPTIONS+=LIB64
 .endif
-# XXX: Fails to link due to old broken C++ mangling; remove once
-# https://git.morello-project.org/morello/llvm-project/-/merge_requests/23
-# has been merged.
-.if ${__T:Maarch64*c*}
-BROKEN_OPTIONS+=GOOGLETEST
-.endif
 
 .if ${__T:Maarch64*c*} || ${__T:Mriscv*c*}
 # nscd(8) caching depends on marshaling pointers to the daemon and back
