@@ -183,7 +183,7 @@ LIB64CCFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
 # -------------------------------------------------------------------
 # In the program linking case, select LIBCOMPAT
 .if defined(NEED_COMPAT)
-.if !defined(HAS_COMPAT)
+.ifndef HAS_COMPAT
 .warning NEED_COMPAT defined, but no LIBCOMPAT is available (COMPAT_ARCH == ${COMPAT_ARCH})
 .elif !${HAS_COMPAT:M${NEED_COMPAT}} && ${NEED_COMPAT} != "any"
 .error NEED_COMPAT (${NEED_COMPAT}) defined, but not in HAS_COMPAT (${HAS_COMPAT})

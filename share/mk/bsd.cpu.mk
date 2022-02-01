@@ -327,7 +327,7 @@ MACHINE_CPU += armv7
 # armv6 and armv7 are a hybrid. It can use the softfp ABI, but doesn't emulate
 # floating point in the general case, so don't define softfp for it at this
 # time. arm is pure softfp, so define it for them.
-. if !${MACHINE_ARCH:Marmv[67]*}
+. if ${MACHINE_ARCH:Marmv[67]*} == ""
 MACHINE_CPU += softfp
 . endif
 # Normally armv6 and armv7 are hard float ABI from FreeBSD 11 onwards. However
