@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
+#include <vm/vm_page.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_map.h>
 #include <vm/vm_param.h>
@@ -260,6 +261,25 @@ dump_cheri_exception(struct trapframe *frame)
 		break;
 	case SCAUSE_CHERI_VERSION:
 		printf("CHERI version fault");
+		{
+			vm_page_t m;
+			vaddr_t fault_addr = frame->tf_stval;
+			vm_map_t map = &(td->td_proc->p_vmspace->vm_map);
+			/* attempt to wire the page of fault address  */
+			int r = vm_fault(map, fault_addr, VM_PROT_READ, VM_FAULT_NORMAL, &m);
+			if (r == KERN_SUCCESS) {
+				/* Compute (granule aligned) address for fault address in direct map */
+				vm_offset_t dva = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)) +
+					(fault_addr & (PAGE_MASK & ~(VERSION_GRANULE_MASK)));
+				void * __capability c = cheri_setaddress(swap_restore_cap, dva);
+				int v = cheri_loadversion(c);
+				boolean_t wv = pmap_has_store_version(map->pmap, fault_addr);
+				printf(" ver(0x%016lx)=%x %s", fault_addr, v, wv ? "PTE_WV" : "!PTE_WV");
+				vm_page_unwire(m, PQ_ACTIVE);
+			} else  {
+				printf(" 0x%016lx (could not wire page)", frame->tf_stval);
+			}
+		}
 		break;
 	default:
 		printf("fault %ld", frame->tf_scause & SCAUSE_CODE);
