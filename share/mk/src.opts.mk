@@ -336,11 +336,6 @@ BROKEN_OPTIONS+=NS_CACHING
 BROKEN_OPTIONS+=CDDL ZFS
 .endif
 
-.if ${__T:Mriscv*c*}
-# Crash in ZFS code. TODO: investigate
-BROKEN_OPTIONS+=CDDL
-.endif
-
 # EFI doesn't exist on powerpc (well, officially)
 .if ${__T:Mpowerpc*}
 BROKEN_OPTIONS+=EFI
