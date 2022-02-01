@@ -119,13 +119,6 @@ build${libcompat}: .PHONY
 .endfor
 	${_+_}cd ${.CURDIR}; \
 	    ${LIBCOMPATWMAKE} -f Makefile.inc1 -DNO_FSCHG libraries
-.if ${MK_COMPAT_CHERIABI} == "yes" && ${MK_CHERI_PURE} == "yes"
-# To build a purecap world against /usr/lib64c, we need internal libs.
-.for _lib in ${_INTERNALLIBS}
-	${_+_}cd ${.CURDIR}${LIB${_lib:tu}DIR:S|${_LIB_OBJTOP}||}; \
-	    ${LIBCOMPATWMAKE} all
-.endfor
-.endif
 
 distribute${libcompat} install${libcompat}: .PHONY
 	${_+_}cd ${.CURDIR}; \
