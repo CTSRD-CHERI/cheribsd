@@ -119,7 +119,6 @@ _LIBRARIES=	\
 		crypt \
 		crypto \
 		ctf \
-		curl \
 		cuse \
 		cxxrt \
 		devctl \
