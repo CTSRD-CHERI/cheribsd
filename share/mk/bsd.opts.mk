@@ -126,14 +126,6 @@ __TT=${TARGET}
 __TT=${MACHINE}
 .endif
 
-.if !defined(WITH_CHERI) && defined(WITH_CHERI128)
-.if defined(WITHOUT_CHERI)
-.error WITHOUT_CHERI and WITH_CHERI128 makes no sense
-.endif
-.warning WITH_CHERI128 is obsolete, use WITH_CHERI instead.
-WITH_CHERI:=	yes
-.endif
-
 .include <bsd.mkopt.mk>
 
 .if ${__TT:Mmips*} && ${MK_CHERI} == "yes"
