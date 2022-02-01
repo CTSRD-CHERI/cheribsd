@@ -106,31 +106,7 @@ __DEFAULT_NO_OPTIONS+= PIE
 __DEFAULT_YES_OPTIONS+=PIE
 .endif
 
-#
-# Default behaviour of some options depends on the architecture.  Unfortunately
-# this means that we have to test TARGET_ARCH (the buildworld case) as well
-# as MACHINE_ARCH (the non-buildworld case).  Normally TARGET_ARCH is not
-# used at all in bsd.*.mk, but we have to make an exception here if we want
-# to allow defaults for some things like clang to vary by target architecture.
-# Additional, per-target behavior should be rarely added only after much
-# gnashing of teeth and grinding of gears.
-#
-.if defined(TARGET_ARCH)
-__T=${TARGET_ARCH}
-.else
-__T=${MACHINE_ARCH}
-.endif
-.if defined(TARGET)
-__TT=${TARGET}
-.else
-__TT=${MACHINE}
-.endif
-
 .include <bsd.mkopt.mk>
-
-.if ${__TT:Mmips*} && ${MK_CHERI} == "yes"
-MK_CLANG:=	no
-.endif
 
 .if ${MK_INIT_ALL_PATTERN} == "yes" && ${MK_INIT_ALL_ZERO} == "yes"
 .warning WITH_INIT_ALL_PATTERN and WITH_INIT_ALL_ZERO are mutually exclusive.
