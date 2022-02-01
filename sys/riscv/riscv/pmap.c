@@ -3488,8 +3488,8 @@ pmap_zero_page_area(vm_page_t m, int off, int size)
 #endif
 	
 	/* XXX I don't think these assertions are true -- deal with this */
-	MPASS(((va + off) & (VERSION_GRANULE_MASK - 1)) == 0);
-	MPASS(((va + off + size) & (VERSION_GRANULE_MASK - 1)) == 0);
+	MPASS(((va + off) & VERSION_GRANULE_MASK) == 0);
+	MPASS(((va + off + size) & VERSION_GRANULE_MASK) == 0);
 
 	/* clear MTE tags */
 	char * __capability vac = (char * __capability) va + off;
