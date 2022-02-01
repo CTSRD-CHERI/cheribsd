@@ -41,7 +41,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_hid.h"
 
 #include <sys/param.h>
-#ifdef COMPAT_FREEBSD32
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 #include <sys/abi_compat.h>
 #endif
 #include <sys/bus.h>
@@ -141,6 +141,31 @@ struct hidraw_gen_descriptor32 {
     _IOC_NEWTYPE(HIDRAW_SET_REPORT_DESC, struct hidraw_gen_descriptor32)
 #define	HIDRAW_SET_REPORT32 \
     _IOC_NEWTYPE(HIDRAW_SET_REPORT, struct hidraw_gen_descriptor32)
+#endif
+
+#ifdef COMPAT_FREEBSD64
+struct hidraw_gen_descriptor64 {
+	uint64_t hgd_data;	/* void * */
+	uint16_t hgd_lang_id;
+	uint16_t hgd_maxlen;
+	uint16_t hgd_actlen;
+	uint16_t hgd_offset;
+	uint8_t hgd_config_index;
+	uint8_t hgd_string_index;
+	uint8_t hgd_iface_index;
+	uint8_t hgd_altif_index;
+	uint8_t hgd_endpt_index;
+	uint8_t hgd_report_type;
+	uint8_t reserved[8];
+};
+#define	HIDRAW_GET_REPORT_DESC64 \
+    _IOC_NEWTYPE(HIDRAW_GET_REPORT_DESC, struct hidraw_gen_descriptor64)
+#define	HIDRAW_GET_REPORT64 \
+    _IOC_NEWTYPE(HIDRAW_GET_REPORT, struct hidraw_gen_descriptor64)
+#define	HIDRAW_SET_REPORT_DESC64 \
+    _IOC_NEWTYPE(HIDRAW_SET_REPORT_DESC, struct hidraw_gen_descriptor64)
+#define	HIDRAW_SET_REPORT64 \
+    _IOC_NEWTYPE(HIDRAW_SET_REPORT, struct hidraw_gen_descriptor64)
 #endif
 
 static d_open_t		hidraw_open;
@@ -555,14 +580,39 @@ update_hgd32(const struct hidraw_gen_descriptor *hgd,
 }
 #endif
 
+#ifdef COMPAT_FREEBSD64
+static void
+update_hgd64(const struct hidraw_gen_descriptor *hgd,
+    struct hidraw_gen_descriptor64 *hgd64)
+{
+	/* Don't update hgd_data pointer */
+	CP(*hgd, *hgd64, hgd_lang_id);
+	CP(*hgd, *hgd64, hgd_maxlen);
+	CP(*hgd, *hgd64, hgd_actlen);
+	CP(*hgd, *hgd64, hgd_offset);
+	CP(*hgd, *hgd64, hgd_config_index);
+	CP(*hgd, *hgd64, hgd_string_index);
+	CP(*hgd, *hgd64, hgd_iface_index);
+	CP(*hgd, *hgd64, hgd_altif_index);
+	CP(*hgd, *hgd64, hgd_endpt_index);
+	CP(*hgd, *hgd64, hgd_report_type);
+	/* Don't update reserved */
+}
+#endif
+
 static int
 hidraw_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
     struct thread *td)
 {
 	uint8_t local_buf[HIDRAW_LOCAL_BUFSIZE];
-#ifdef COMPAT_FREEBSD32
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 	struct hidraw_gen_descriptor local_hgd;
+#endif
+#ifdef COMPAT_FREEBSD32
 	struct hidraw_gen_descriptor32 *hgd32 = NULL;
+#endif
+#ifdef COMPAT_FREEBSD64
+	struct hidraw_gen_descriptor64 *hgd64 = NULL;
 #endif
 	void *buf;
 	struct hidraw_softc *sc;
@@ -581,8 +631,9 @@ hidraw_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 
 	hgd = (struct hidraw_gen_descriptor *)addr;
 
-#ifdef COMPAT_FREEBSD32
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 	switch (cmd) {
+#ifdef COMPAT_FREEBSD32
 	case HIDRAW_GET_REPORT_DESC32:
 	case HIDRAW_GET_REPORT32:
 	case HIDRAW_SET_REPORT_DESC32:
@@ -603,6 +654,29 @@ hidraw_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 		CP(*hgd32, *hgd, hgd_report_type);
 		/* Don't copy reserved */
 		break;
+#endif
+#ifdef COMPAT_FREEBSD64
+	case HIDRAW_GET_REPORT_DESC64:
+	case HIDRAW_GET_REPORT64:
+	case HIDRAW_SET_REPORT_DESC64:
+	case HIDRAW_SET_REPORT64:
+		cmd = _IOC_NEWTYPE(cmd, struct hidraw_gen_descriptor);
+		hgd64 = (struct hidraw_gen_descriptor64 *)addr;
+		hgd = &local_hgd;
+		hgd->hgd_data = __USER_CAP(hgd64->hgd_data, hgd64->hgd_maxlen);
+		CP(*hgd64, *hgd, hgd_lang_id);
+		CP(*hgd64, *hgd, hgd_maxlen);
+		CP(*hgd64, *hgd, hgd_actlen);
+		CP(*hgd64, *hgd, hgd_offset);
+		CP(*hgd64, *hgd, hgd_config_index);
+		CP(*hgd64, *hgd, hgd_string_index);
+		CP(*hgd64, *hgd, hgd_iface_index);
+		CP(*hgd64, *hgd, hgd_altif_index);
+		CP(*hgd64, *hgd, hgd_endpt_index);
+		CP(*hgd64, *hgd, hgd_report_type);
+		/* Don't copy reserved */
+		break;
+#endif
 	}
 #endif
 
@@ -650,6 +724,10 @@ hidraw_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 #ifdef COMPAT_FREEBSD32
 		if (hgd32 != NULL)
 			update_hgd32(hgd, hgd32);
+#endif
+#ifdef COMPAT_FREEBSD64
+		if (hgd64 != NULL)
+			update_hgd64(hgd, hgd64);
 #endif
 		if (hgd->hgd_data == NULL)
 			return (0);		/* descriptor length only */
@@ -751,6 +829,12 @@ hidraw_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 		/*
 		 * HIDRAW_GET_REPORT is declared _IOWR, but hgd is not written
 		 * so we don't call update_hgd32().
+		 */
+#endif
+#ifdef COMPAT_FREEBSD64
+		/*
+		 * HIDRAW_GET_REPORT is declared _IOWR, but hgd is not written
+		 * so we don't call update_hgd64().
 		 */
 #endif
 		return (error);
