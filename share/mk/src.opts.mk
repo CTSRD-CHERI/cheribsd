@@ -324,7 +324,7 @@ BROKEN_OPTIONS+=LIB64
 BROKEN_OPTIONS+=GOOGLETEST
 .endif
 
-.if ${__T:Mriscv*c*}
+.if ${__T:Maarch64*c*} || ${__T:Mriscv*c*}
 # nscd(8) caching depends on marshaling pointers to the daemon and back
 # and can't work without a rewrite.
 BROKEN_OPTIONS+=NS_CACHING
