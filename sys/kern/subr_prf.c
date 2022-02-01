@@ -863,7 +863,14 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 					PCHAR('R');
 				if (num & CHERI_PERM_STORE_CAP)
 					PCHAR('W');
+				num = cheri_getversion(cap);
+				if (num != 0) {
+					PCHAR('V')
+					PCHAR(hex2ascii(num & 0x0f));
+				}
 				PCHAR(',');
+
+
 
 				/* bounds */
 				num = cheri_getbase(cap);
