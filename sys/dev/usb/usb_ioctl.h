@@ -388,6 +388,79 @@ struct usb_fs_init32 {
 #define	USB_FS_INIT32	_IOC_NEWTYPE(USB_FS_INIT, struct usb_fs_init32)
 
 #endif	/* COMPAT_FREEBSD32 */
+
+#ifdef COMPAT_FREEBSD64
+
+struct usb_read_dir64 {
+	uint64_t urd_data;
+	uint32_t urd_startentry;
+	uint32_t urd_maxlen;
+};
+#define	USB_READ_DIR64 \
+    _IOC_NEWTYPE(USB_READ_DIR, struct usb_read_dir64)
+
+struct usb_ctl_request64 {
+	uint64_t ucr_data;
+	uint16_t ucr_flags;
+	uint16_t ucr_actlen;
+	uint8_t ucr_addr;
+	struct usb_device_request ucr_request;
+};
+#define	USB_REQUEST64		_IOC_NEWTYPE(USB_REQUEST, struct usb_ctl_request64)
+#define	USB_DO_REQUEST64	_IOC_NEWTYPE(USB_DO_REQUEST, struct usb_ctl_request64)
+
+struct usb_gen_descriptor64 {
+	uint64_t ugd_data;	/* void * */
+	uint16_t ugd_lang_id;
+	uint16_t ugd_maxlen;
+	uint16_t ugd_actlen;
+	uint16_t ugd_offset;
+	uint8_t	ugd_config_index;
+	uint8_t	ugd_string_index;
+	uint8_t	ugd_iface_index;
+	uint8_t	ugd_altif_index;
+	uint8_t	ugd_endpt_index;
+	uint8_t	ugd_report_type;
+	uint8_t	reserved[8];
+};
+
+#define	USB_GET_REPORT_DESC64 \
+    _IOC_NEWTYPE(USB_GET_REPORT_DESC, struct usb_gen_descriptor64)
+#define	USB_GET_REPORT64 \
+    _IOC_NEWTYPE(USB_GET_REPORT, struct usb_gen_descriptor64)
+#define	USB_SET_REPORT64 \
+    _IOC_NEWTYPE(USB_SET_REPORT, struct usb_gen_descriptor64)
+#define	USB_GET_FULL_DESC64 \
+    _IOC_NEWTYPE(USB_GET_FULL_DESC, struct usb_gen_descriptor64)
+#define	USB_GET_STRING_DESC64 \
+    _IOC_NEWTYPE(USB_GET_STRING_DESC, struct usb_gen_descriptor64)
+#define	USB_GET_IFACE_DRIVER64 \
+    _IOC_NEWTYPE(USB_GET_IFACE_DRIVER, struct usb_gen_descriptor64)
+
+void	usb_gen_descriptor_from64(struct usb_gen_descriptor *ugd,
+    const struct usb_gen_descriptor64 *ugd64);
+void	update_usb_gen_descriptor64(struct usb_gen_descriptor64 *ugd64,
+    struct usb_gen_descriptor *ugd);
+
+struct usb_fs_endpoint64 {
+	uint64_t ppBuffer;		/* void ** */
+	uint64_t pLength;		/* uint32_t * */
+	uint32_t nFrames;
+	uint32_t aFrames;
+	uint16_t flags;
+	uint16_t timeout;
+	uint16_t isoc_time_complete;
+	int	status;
+};
+
+struct usb_fs_init64 {
+	uint64_t pEndpoints;		/* struct usb_fs_endpoint64 * */
+	uint8_t	ep_index_max;
+};
+
+#define	USB_FS_INIT64	_IOC_NEWTYPE(USB_FS_INIT, struct usb_fs_init64)
+
+#endif	/* COMPAT_FREEBSD64 */
 #endif	/* _KERNEL */
 
 #endif					/* _USB_IOCTL_H_ */
