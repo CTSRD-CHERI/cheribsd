@@ -81,6 +81,14 @@
 #define cheri_equal_exact(x, y) __builtin_cheri_equal_exact(x, y)
 
 /* XXX temporary static inline function until compiler builtin exists */
+
+static inline int _cheri_getversion(void * __capability c) {
+	int ret;
+	__asm__ __volatile__ ("cgetversion %0, %1":"=r"(ret):"C"(c));
+	return ret;
+}
+#define cheri_getversion(x) _cheri_getversion(x)
+
 static inline void * __capability _cheri_setversion(void * __capability c, int v) {
 	__asm__ __volatile__ ("csetversion %0, %1, %2":"=C"(c):"C"(c),"r"(v));
 	return c;
