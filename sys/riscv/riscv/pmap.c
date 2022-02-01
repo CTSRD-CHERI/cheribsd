@@ -4008,6 +4008,31 @@ pmap_is_prefaultable(pmap_t pmap, vm_offset_t addr)
 	return (rv);
 }
 
+boolean_t
+pmap_has_store_version(pmap_t pmap, vm_offset_t addr)
+{
+	boolean_t rv = FALSE;
+	pt_entry_t *l2, *l3, tpte;
+	PMAP_LOCK(pmap);
+	l2 = pmap_l2(pmap, addr);
+	if (l2 != NULL && ((tpte = pmap_load(l2)) & PTE_V) != 0) {
+		/* l2 pte valid */
+		if ((tpte & PTE_RWX) == 0) {
+			/* fetch l3 pte */
+			l3 = pmap_l2_to_l3(l2, addr);
+			tpte = pmap_load(l3);
+			if ((tpte & PTE_V) == 0) {
+				/* invalid */
+				PMAP_UNLOCK(pmap);
+				return FALSE;
+			}
+		} /* else superpage */
+		rv = (tpte & PTE_CWV) != 0;
+	}
+	PMAP_UNLOCK(pmap);
+	return (rv);
+}
+
 /*
  *	pmap_is_referenced:
  *
