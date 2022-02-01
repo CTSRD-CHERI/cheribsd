@@ -308,8 +308,8 @@ __DEFAULT_YES_OPTIONS+=LIB32
 .else
 BROKEN_OPTIONS+=LIB32
 .endif
-# LIB64 is supported on aarch64*c*, mips64*c* and riscv64*c*
-.if ${__T:Maarch64*c*} || ${__T:Mmips64*c*} || ${__T:Mriscv64*c*}
+# LIB64 is supported on aarch64*c* and riscv64*c*
+.if ${__T:Maarch64*c*} || ${__T:Mriscv64*c*}
 __DEFAULT_YES_OPTIONS+=LIB64
 # In principle, LIB32 could work on architectures where it's supported, but
 # Makefile.libcompat only supports one compat layer.
