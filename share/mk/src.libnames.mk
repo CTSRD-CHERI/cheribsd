@@ -101,15 +101,11 @@ _LIBRARIES=	\
 		bsnmp \
 		bz2 \
 		c \
-		c_cheri \
 		c_nosyscalls \
 		c_pic \
 		calendar \
 		cam \
 		casper \
-		cheri \
-		cheri_support \
-		cheri_syscalls \
 		cap_dns \
 		cap_fileargs \
 		cap_grp \
@@ -147,7 +143,6 @@ _LIBRARIES=	\
 		gssapi \
 		gssapi_krb5 \
 		hdb \
-		helloworld \
 		heimbase \
 		heimntlm \
 		heimsqlite \
@@ -444,8 +439,6 @@ _DP_osmcomp=	pthread
 _DP_opensm=	pthread osmcomp
 _DP_osmvendor=	ibumad pthread osmcomp
 .endif
-
-_DP_helloworld=	cheri
 
 # Define special cases
 LDADD_supcplusplus=	-lsupc++
