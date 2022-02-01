@@ -178,12 +178,9 @@ LIBC_NOSYSCALLS?=	${DESTDIR}${LIBDIR_BASE}/libc_nosyscalls.a
 LIBMALLOC_SIMPLE=	${DESTDIR}${LIBDIR_BASE}/libmalloc_simple.a
 LIBSYSCALLS?=	${DESTDIR}${LIBDIR_BASE}/libsyscalls.a
 
-# enforce that -lcheri, -lpthread, and -lc to always be the last in that
-# exact order
+# enforce that -lpthread, -lc, and -lmalloc_simple to always be the
+# last in that exact order
 .if defined(LDADD)
-.if ${LDADD:M-lcheri}
-LDADD:=	${LDADD:N-lcheri} -lcheri
-.endif
 .if ${LDADD:M-lpthread}
 LDADD:=	${LDADD:N-lpthread} -lpthread
 .endif
