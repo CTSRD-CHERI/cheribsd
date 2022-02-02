@@ -47,6 +47,7 @@ LIBCOMPATWMAKEFLAGS+= \
 		MK_CTF=no \
 		-DNO_LINT \
 		MK_TESTS=no MK_TESTS_SUPPORT=${MK_TESTS} \
+		MK_BOOT=no \
 		WORLDTMP_MTREE="${WORLDTMP_MTREE}"
 # Avoid re-computing COMPILER_VERSION, etc. values:
 # $CC is different in the libcompat case compared to the non-compat value.
