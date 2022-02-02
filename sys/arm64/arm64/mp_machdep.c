@@ -209,7 +209,9 @@ init_secondary(uint64_t cpu)
 	pmap_t pmap0;
 	u_int mpidr;
 
+#ifdef PAC
 	ptrauth_mp_start(cpu);
+#endif
 
 	/*
 	 * Verify that the value passed in 'cpu' argument (aka context_id) is

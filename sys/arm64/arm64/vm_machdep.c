@@ -113,7 +113,9 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	p2->p_md.md_sigcode = td1->td_proc->p_md.md_sigcode;
 #endif
 
+#ifdef PAC
 	ptrauth_fork(td2, td1);
+#endif
 
 	tf = (struct trapframe *)STACKALIGN((struct trapframe *)pcb2 - 1);
 	bcopy(td1->td_frame, tf, sizeof(*tf));
@@ -219,8 +221,10 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	arc4random_buf(&td->td_md.md_canary, sizeof(td->td_md.md_canary));
 #endif
 
+#ifdef PAC
 	/* Generate new pointer authentication keys. */
 	ptrauth_copy_thread(td, td0);
+#endif
 }
 
 /*
@@ -301,7 +305,9 @@ cpu_thread_alloc(struct thread *td)
 	    td->td_kstack_pages * PAGE_SIZE) - 1;
 	td->td_frame = (struct trapframe *)STACKALIGN(
 	    (struct trapframe *)td->td_pcb - 1);
+#ifdef PAC
 	ptrauth_thread_alloc(td);
+#endif
 }
 
 void

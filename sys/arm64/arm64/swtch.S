@@ -78,8 +78,10 @@ ENTRY(cpu_throw)
 	mov	PTR(0), PTR(1)
 #endif
 
+#ifdef PAC
 	/* This returns the thread pointer so no need to save it */
 	bl	ptrauth_switch
+#endif
 	/* This returns the thread pcb */
 	bl	pmap_switch
 	mov	PTR(4), PTR(0)
@@ -188,8 +190,10 @@ ENTRY(cpu_switch)
 	mov	PTR(0), PTR(1)
 #endif
 
+#ifdef PAC
 	/* This returns the thread pointer so no need to save it */
 	bl	ptrauth_switch
+#endif
 	/* This returns the thread pcb */
 	bl	pmap_switch
 	/* Move the new pcb out of the way */
@@ -267,8 +271,10 @@ ENTRY(fork_trampoline)
 	 */
 	msr	daifset, #(DAIF_D | DAIF_INTR)
 
+#ifdef PAC
 	ldr	x0, [x18, #PC_CURTHREAD]
 	bl	ptrauth_enter_el0
+#endif
 
 	/* Restore sp, lr, elr, and spsr */
 	ldp	CAP(18), CAPN(lr), [PTRN(sp), #TF_SP]

@@ -514,8 +514,10 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	 */
 	bzero(&pcb->pcb_dbg_regs, sizeof(pcb->pcb_dbg_regs));
 
+#ifdef PAC
 	/* Generate new pointer authentication keys */
 	ptrauth_exec(td);
+#endif
 }
 
 /* Sanity check these are the same size, they will be memcpy'd to and fro */

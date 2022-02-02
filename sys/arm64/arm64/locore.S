@@ -342,6 +342,7 @@ virtdone:
 	/* We are done with the boot params */
 	add	PTRN(sp), PTRN(sp), #BOOTPARAMS_SIZE
 
+#ifdef PAC
 	/*
 	 * Enable pointer authentication in the kernel. We set the keys for
 	 * thread0 in initarm so have to wait until it returns to enable it.
@@ -350,6 +351,7 @@ virtdone:
 	 * disabled.
 	 */
 	bl	ptrauth_start
+#endif
 
 	bl	mi_startup
 

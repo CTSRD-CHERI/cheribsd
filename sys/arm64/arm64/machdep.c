@@ -380,7 +380,9 @@ init_proc0(vm_pointer_t kstack)
 	thread0.td_pcb->pcb_fpusaved = &thread0.td_pcb->pcb_fpustate;
 	thread0.td_pcb->pcb_vfpcpu = UINT_MAX;
 	thread0.td_frame = &proc0_tf;
+#ifdef PAC
 	ptrauth_thread0(&thread0);
+#endif
 	pcpup->pc_curpcb = thread0.td_pcb;
 
 	/*
@@ -842,12 +844,14 @@ initarm(struct arm64_bootparams *abp)
 		panic("Invalid bus configuration: %s",
 		    kern_getenv("kern.cfg.order"));
 
+#ifdef PAC
 	/*
 	 * Check if pointer authentication is available on this system, and
 	 * if so enable its use. This needs to be called before init_proc0
 	 * as that will configure the thread0 pointer authentication keys.
 	 */
 	ptrauth_init();
+#endif
 
 	/*
 	 * Dump the boot metadata. We have to wait for cninit() since console
