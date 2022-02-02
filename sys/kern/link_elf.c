@@ -683,10 +683,13 @@ parse_dynamic(elf_file_t ef)
 			ef->caprelocssize = dp->d_un.d_val;
 			break;
 #endif
+#ifndef __CHERI_PURE_CAPABILITY__
+		/* XXX: dp is read-only in purecap kernels. */
 #ifdef GDB
 		case DT_DEBUG:
 			dp->d_un.d_ptr = (Elf_Addr)&r_debug;
 			break;
+#endif
 #endif
 		}
 	}
