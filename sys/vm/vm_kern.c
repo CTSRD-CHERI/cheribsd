@@ -427,6 +427,9 @@ kmem_subinit(vm_map_t map, vm_map_t parent, vm_pointer_t *min, vm_pointer_t *max
 		panic("kmem_subinit: bad status return of %d", ret);
 	*max = *min + size;
 	vm_map_init(map, vm_map_pmap(parent), *min, *max);
+#ifdef __CHERI_PURE_CAPABILITY__
+	map->flags |= MAP_RESERVATIONS;
+#endif
 	if (vm_map_submap(parent, *min, *max, map) != KERN_SUCCESS)
 		panic("kmem_subinit: unable to change range to submap");
 }
@@ -830,6 +833,9 @@ kmem_init(vm_pointer_t start, vm_pointer_t end)
 
 	vm_map_init(kernel_map, kernel_pmap,
 	    cheri_kern_setaddress(start, VM_MIN_KERNEL_ADDRESS), end);
+#ifdef __CHERI_PURE_CAPABILITY__
+	kernel_map->flags |= MAP_RESERVATIONS;
+#endif
 	kernel_map->system_map = 1;
 	vm_map_lock(kernel_map);
 	/* N.B.: cannot use kgdb to debug, starting with this assignment ... */
