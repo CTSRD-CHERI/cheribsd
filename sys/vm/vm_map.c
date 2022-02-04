@@ -6048,7 +6048,7 @@ vm_map_reservation_delete(vm_map_t map, vm_offset_t reservation)
 	result = vm_map_reservation_delete_locked(map, reservation);
 	vm_map_unlock(map);
 
-	return (KERN_SUCCESS);
+	return (result);
 }
 
 bool
