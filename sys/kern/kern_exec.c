@@ -1266,11 +1266,13 @@ exec_map_stack(struct image_params *imgp)
 		ssiz = maxssiz;
 	}
 #if __has_feature(capabilities)
-	/*
-	 * NB: This may cause the stack to exceed the administrator-
-	 * configured stack size limit.
-	 */
-	ssiz = CHERI_REPRESENTABLE_LENGTH(ssiz);
+	if (sv->sv_flags & SV_CHERI) {
+		/*
+		 * NB: This may cause the stack to exceed the
+		 * administrator-configured stack size limit.
+		 */
+		ssiz = CHERI_REPRESENTABLE_LENGTH(ssiz);
+	}
 #endif
 
 	vmspace = p->p_vmspace;
@@ -1279,13 +1281,16 @@ exec_map_stack(struct image_params *imgp)
 	stack_prot = sv->sv_shared_page_obj != NULL && imgp->stack_prot != 0 ?
 	    imgp->stack_prot : sv->sv_stackprot;
 	if ((map->flags & MAP_ASLR_STACK) != 0) {
+		KASSERT((sv->sv_flags & SV_CHERI) == 0,
+		    ("MAP_ASLR_STACK with SV_CHERI"));
 		stack_addr = round_page((vm_offset_t)p->p_vmspace->vm_daddr +
 		    lim_max(curthread, RLIMIT_DATA));
 		find_space = VMFS_ANY_SPACE;
 	} else {
 		stack_top = sv->sv_usrstack;
 #if __has_feature(capabilities)
-		stack_top = CHERI_REPRESENTABLE_BASE(stack_top, ssiz);
+		if (sv->sv_flags & SV_CHERI)
+			stack_top = CHERI_REPRESENTABLE_BASE(stack_top, ssiz);
 #endif
 		stack_addr = stack_top - ssiz;
 		find_space = VMFS_NO_SPACE;
@@ -1315,8 +1320,12 @@ exec_map_stack(struct image_params *imgp)
 #ifdef __CHERI_PURE_CAPABILITY__
 	imgp->stack = (void *)cheri_andperm(stack_top, perms);
 #else
-	imgp->stack = cheri_capability_build_user_data(perms, stack_addr,
-	    ssiz, stack_top - stack_addr);
+	if (sv->sv_flags & SV_CHERI)
+		imgp->stack = cheri_capability_build_user_data(perms,
+		    stack_addr, ssiz, ssiz);
+	else
+		imgp->stack = cheri_capability_build_inexact_user_data(perms,
+		    stack_addr, ssiz, stack_top - stack_addr);
 #endif
 
 	if (sv->sv_flags & SV_CHERI) {

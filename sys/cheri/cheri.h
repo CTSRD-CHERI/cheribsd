@@ -63,19 +63,22 @@ void * __capability	_cheri_capability_build_user_code(struct thread *td,
 			    off_t off, const char* func, int line);
 void * __capability	_cheri_capability_build_user_data(uint32_t perms,
 			    vaddr_t basep, size_t length, off_t off,
-			    const char* func, int line);
+			    const char* func, int line, bool exact);
 void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
 			    vaddr_t basep, size_t length, off_t off,
-			    const char* func, int line);
+			    const char* func, int line, bool exact);
 #define cheri_capability_build_user_code(td, perms, basep, length, off)	\
 	_cheri_capability_build_user_code(td, perms, basep, length, off,\
 	    __func__, __LINE__)
 #define cheri_capability_build_user_data(perms, basep, length, off)	\
 	_cheri_capability_build_user_data(perms, basep, length, off,	\
-	    __func__, __LINE__)
+	    __func__, __LINE__, true)
+#define cheri_capability_build_inexact_user_data(perms, basep, length, off) \
+	_cheri_capability_build_user_data(perms, basep, length, off,	\
+	    __func__, __LINE__, false)
 #define cheri_capability_build_user_rwx(perms, basep, length, off)	\
 	_cheri_capability_build_user_rwx(perms, basep, length, off,	\
-	    __func__, __LINE__)
+	    __func__, __LINE__, true)
 
 /*
  * Global capabilities used to construct other capabilities.
