@@ -982,7 +982,6 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 	 */
 	map->map_capability = cheri_setbounds(min,
 	    (ptraddr_t)max - (ptraddr_t)min);
-	map->flags |= MAP_RESERVATIONS;
 #endif
 #ifdef DIAGNOSTIC
 	map->nupdates = 0;

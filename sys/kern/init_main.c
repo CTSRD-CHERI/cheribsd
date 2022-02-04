@@ -638,6 +638,7 @@ proc0_init(void *dummy __unused)
 	vm_map_init(&vmspace0.vm_map, vmspace_pmap(&vmspace0),
 	    (vm_pointer_t)minuser_cap,
 	    (vm_pointer_t)minuser_cap + cheri_getlen(minuser_cap));
+	vmspace0.vm_map.flags |= MAP_RESERVATIONS;
 #endif
 
 	/*
