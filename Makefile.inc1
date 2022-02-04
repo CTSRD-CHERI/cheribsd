@@ -3367,7 +3367,11 @@ list-old-files: .PHONY
 	${MAKE} -f ${.CURDIR}/Makefile.inc1 ${.MAKEFLAGS} ${.TARGET} \
 	    -V OLD_FILES -V "OLD_FILES:Musr/share/*.gz:R" \
 	    -V "OLD_FILES:Mlib/*.so.*:S,^lib,usr/lib32," \
-	    -V "OLD_FILES:Musr/lib/*:S,^usr/lib,usr/lib32," | xargs -n1 | sort
+	    -V "OLD_FILES:Musr/lib/*:S,^usr/lib,usr/lib32," \
+	    -V "OLD_FILES:Mlib/*.so.*:S,^lib,usr/lib64," \
+	    -V "OLD_FILES:Musr/lib/*:S,^usr/lib,usr/lib64," \
+	    -V "OLD_FILES:Mlib/*.so.*:S,^lib,usr/lib64c," \
+	    -V "OLD_FILES:Musr/lib/*:S,^usr/lib,usr/lib64c," | xargs -n1 | sort
 
 delete-old-files: .PHONY
 	@echo ">>> Removing old files (only deletes safe to delete libs)"
@@ -3433,7 +3437,13 @@ list-old-libs: .PHONY
 	${MAKE} -f ${.CURDIR}/Makefile.inc1 ${.MAKEFLAGS} ${.TARGET} \
 	    -V OLD_LIBS -V MOVED_LIBS -V "OLD_LIBS:Mlib/*:S,^lib,usr/lib32," \
 	    -V "OLD_LIBS:Musr/lib/*:S,^usr/lib,usr/lib32," \
-	    -V "OLD_LIBS:Mlib/casper/*:S,^lib/casper,usr/lib32," | \
+	    -V "OLD_LIBS:Mlib/casper/*:S,^lib/casper,usr/lib32," \
+	    -V "OLD_LIBS:Mlib/*:S,^lib,usr/lib64," \
+	    -V "OLD_LIBS:Musr/lib/*:S,^usr/lib,usr/lib64," \
+	    -V "OLD_LIBS:Mlib/casper/*:S,^lib/casper,usr/lib64," \
+	    -V "OLD_LIBS:Mlib/*:S,^lib,usr/lib64c," \
+	    -V "OLD_LIBS:Musr/lib/*:S,^usr/lib,usr/lib64c," \
+	    -V "OLD_LIBS:Mlib/casper/*:S,^lib/casper,usr/lib64c," | \
 	    xargs -n1 | sort
 
 delete-old-libs: .PHONY
