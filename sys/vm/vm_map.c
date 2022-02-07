@@ -6049,18 +6049,6 @@ vm_map_reservation_delete_locked(vm_map_t map, vm_offset_t reservation)
 	return (KERN_SUCCESS);
 }
 
-int
-vm_map_reservation_delete(vm_map_t map, vm_offset_t reservation)
-{
-	int result;
-
-	vm_map_lock(map);
-	result = vm_map_reservation_delete_locked(map, reservation);
-	vm_map_unlock(map);
-
-	return (result);
-}
-
 bool
 vm_map_reservation_is_unmapped(vm_map_t map, vm_offset_t reservation)
 {
