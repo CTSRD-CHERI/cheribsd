@@ -391,6 +391,7 @@ kern_modstat(struct thread *td, int modid,
 	int error = 0;
 	int id, namelen, refs, version;
 	struct module_stat_v2 * __capability stat_v2;
+	char * __capability user_namep;
 	char *name;
 	bool is_v1v2;
 
@@ -415,12 +416,16 @@ kern_modstat(struct thread *td, int modid,
 	    version == sizeof(struct module_stat_v2));
 	if (!is_v1v2 && version != sizeof(struct module_stat))
 		return (EINVAL);
+	if (is_v1v2)
+		user_namep = ((struct module_stat_v1 * __capability)stat)->name;
+	else
+		user_namep = stat->name;
 	namelen = strlen(mod->name) + 1;
 	if (is_v1v2 && namelen > MAXMODNAMEV1V2)
 		namelen = MAXMODNAMEV1V2;
 	else if (namelen > MAXMODNAMEV3)
 		namelen = MAXMODNAMEV3;
-	if ((error = copyout(name, &stat->name[0], namelen)) != 0)
+	if ((error = copyout(name, user_namep, namelen)) != 0)
 		return (error);
 
 	/* Extending MAXMODNAME gives an offset change for v3. */
@@ -587,10 +592,13 @@ freebsd32_modstat(struct thread *td, struct freebsd32_modstat_args *uap)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20220208,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END
