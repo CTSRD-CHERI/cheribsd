@@ -506,7 +506,6 @@ int vm_map_lookup_locked(vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, v
 void vm_map_lookup_done (vm_map_t, vm_map_entry_t);
 boolean_t vm_map_lookup_entry (vm_map_t, vm_offset_t, vm_map_entry_t *);
 bool vm_map_reservation_is_unmapped(vm_map_t, vm_offset_t);
-int vm_map_reservation_delete(vm_map_t, vm_offset_t);
 int vm_map_reservation_delete_locked(vm_map_t, vm_offset_t);
 int vm_map_reservation_create(vm_map_t, vm_pointer_t *, vm_size_t, vm_offset_t,
     vm_prot_t);
