@@ -3671,7 +3671,7 @@ freebsd64_lio_listio(struct thread *td, struct freebsd64_lio_listio_args *uap)
 	struct aiocb * __capability *acb_list;
 	struct sigevent *sigp, sig;
 	struct sigevent64 sig64;
-	void * /* __ptr64 */ *acb_list64;
+	uint64_t *acb_list64;
 	int error, i, nent;
 
 	if ((uap->mode != LIO_NOWAIT) && (uap->mode != LIO_WAIT))
