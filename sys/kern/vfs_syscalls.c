@@ -4412,6 +4412,7 @@ getvnode_path(struct thread *td, int fd, cap_rights_t *rightsp,
 	 */
 	if (__predict_false(fp->f_vnode == NULL || fp->f_ops == &badfileops)) {
 		fdrop(fp, td);
+		*fpp = NULL;
 		return (EINVAL);
 	}
 
@@ -4439,6 +4440,7 @@ getvnode(struct thread *td, int fd, cap_rights_t *rightsp, struct file **fpp)
 	 */
 	if (__predict_false((*fpp)->f_ops == &path_fileops)) {
 		fdrop(*fpp, td);
+		*fpp = NULL;
 		error = EBADF;
 	}
 
