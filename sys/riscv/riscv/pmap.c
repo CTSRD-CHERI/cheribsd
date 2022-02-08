@@ -1279,13 +1279,11 @@ pmap_pinit(pmap_t pmap)
 
 	CPU_ZERO(&pmap->pm_active);
 
-	/* Install kernel pagetables */
-	memcpy(pmap->pm_l1, kernel_pmap->pm_l1, PAGE_SIZE);
-
-	/* Add to the list of all user pmaps */
 	mtx_lock(&allpmaps_lock);
 	LIST_INSERT_HEAD(&allpmaps, pmap, pm_list);
 	mtx_unlock(&allpmaps_lock);
+
+	memcpy(pmap->pm_l1, kernel_pmap->pm_l1, PAGE_SIZE);
 
 	vm_radix_init(&pmap->pm_root);
 
