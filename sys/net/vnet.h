@@ -161,8 +161,16 @@ __GLOBL(__start_set_vnet);
 extern uintptr_t	*__stop_set_vnet;
 __GLOBL(__stop_set_vnet);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+extern uintptr_t	vnet_start;
+#endif
+
+#ifdef KLD_MODULE
+#define	VNET_START	vnet_start
+#else
 #define	VNET_START	(uintptr_t)&__start_set_vnet
 #define	VNET_STOP	(uintptr_t)&__stop_set_vnet
+#endif
 
 /*
  * Functions to allocate and destroy virtual network stacks.
