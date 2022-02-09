@@ -144,8 +144,12 @@ extern u_int	security_cheri_bound_legacy_capabilities;
 /*
  * Used by the kernel linker to handle caprelocs in modules.
  */
-void	init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
-	    void *data_cap, void *code_cap, ptraddr_t base_addr);
+typedef void (cap_relocs_cb)(void *arg, bool function, bool constant,
+    ptraddr_t object, void **src);
+
+void	init_linker_file_cap_relocs(const void *start_relocs,
+	    const void *stop_relocs, void *data_cap, ptraddr_t base_addr,
+	    cap_relocs_cb *cb, void *cb_arg);
 #endif
 #endif /* !_KERNEL */
 

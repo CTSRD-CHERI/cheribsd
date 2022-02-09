@@ -2067,6 +2067,37 @@ elf_lookup(linker_file_t lf, Elf_Size symidx, int deps, Elf_Addr *res)
 	return (error);
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
+static void
+resolve_cap_reloc(void *arg, bool function, bool constant, ptraddr_t object,
+    void **src)
+{
+	elf_file_t ef = arg;
+	caddr_t addr, start, base;
+
+	addr = ef->address + object;
+	if (elf_set_find(&set_pcpu_list, addr, &start, &base)) {
+		addr = (ptraddr_t)addr - (ptraddr_t)start + base;
+	}
+#ifdef VIMAGE
+	else if (elf_set_find(&set_vnet_list, addr, &start, &base)) {
+		addr = (ptraddr_t)addr - (ptraddr_t)start + base;
+	}
+#endif
+	if (function) {
+		addr = cheri_andperm(addr, CHERI_PERMS_KERNEL_CODE);
+#ifdef CHERI_FLAGS_CAP_MODE
+		addr = cheri_setflags(addr, CHERI_FLAGS_CAP_MODE);
+#endif
+	} else if (constant) {
+		addr = cheri_andperm(addr, CHERI_PERMS_KERNEL_RODATA);
+	} else {
+		addr = cheri_andperm(addr, CHERI_PERMS_KERNEL_DATA);
+	}
+	*src = addr;
+}
+#endif
+
 static void
 link_elf_reloc_local(linker_file_t lf)
 {
@@ -2099,16 +2130,12 @@ link_elf_reloc_local(linker_file_t lf)
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(DT_CHERI___CAPRELOCS)
 	if (ef->caprelocs != NULL) {
-		void *data_cap, *pc_cap;
+		void *data_cap;
 
 		data_cap = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_DATA);
-		pc_cap = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_CODE);
-#ifdef CHERI_FLAGS_CAP_MODE
-		pc_cap = cheri_setflags(pc_cap, CHERI_FLAGS_CAP_MODE);
-#endif
 		init_linker_file_cap_relocs(ef->caprelocs,
-		    (char *)ef->caprelocs + ef->caprelocssize, data_cap, pc_cap,
-		    (ptraddr_t)ef->address);
+		    (char *)ef->caprelocs + ef->caprelocssize, data_cap,
+		    (ptraddr_t)ef->address, resolve_cap_reloc, ef);
 	}
 #endif
 }
