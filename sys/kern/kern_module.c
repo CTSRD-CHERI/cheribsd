@@ -384,7 +384,7 @@ sys_modstat(struct thread *td, struct modstat_args *uap)
 
 int
 kern_modstat(struct thread *td, int modid,
-    struct module_stat * __capability stat)
+    struct module_stat __no_user_subobject_bounds * __capability stat)
 {
 	module_t mod;
 	modspecific_t data;
