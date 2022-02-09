@@ -63,6 +63,10 @@ __GLOBL(__start_set_pcpu);
 extern uintptr_t *__stop_set_pcpu;
 __GLOBL(__stop_set_pcpu);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+extern uintptr_t dpcpu_start;
+#endif
+
 /*
  * Array of dynamic pcpu base offsets.  Indexed by id.
  */
@@ -71,12 +75,16 @@ extern uintptr_t dpcpu_off[];
 /*
  * Convenience defines.
  */
+#ifdef KLD_MODULE
+#define	DPCPU_START		dpcpu_start
+#else
 #define	DPCPU_START		((uintptr_t)&__start_set_pcpu)
 #define	DPCPU_STOP		((uintptr_t)&__stop_set_pcpu)
 #define	DPCPU_BYTES		((ptraddr_t)DPCPU_STOP - (ptraddr_t)DPCPU_START)
 #define	DPCPU_MODMIN		2048
 #define	DPCPU_SIZE		roundup2(DPCPU_BYTES, PAGE_SIZE)
 #define	DPCPU_MODSIZE		(DPCPU_SIZE - (DPCPU_BYTES - DPCPU_MODMIN))
+#endif
 
 /*
  * Declaration and definition.
