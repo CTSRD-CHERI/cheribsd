@@ -323,6 +323,18 @@
 #define __subobject_type_used_for_c_inheritance
 #endif
 
+/*
+ * Used to tag the pointee type of user pointer variables for which
+ * pointers to members are taken.  Subobject bounds are problematic with
+ * user pointers since untrusted input can cause faults in the kernel
+ * on architectures for which cheri_csetbounds faults.
+ */
+#ifdef __riscv
+#define	__no_user_subobject_bounds	__no_subobject_bounds
+#else
+#define	__no_user_subobject_bounds
+#endif
+
 #if !__has_builtin(__builtin_no_change_bounds)
 #define __builtin_no_change_bounds(expr) (expr)
 #endif
