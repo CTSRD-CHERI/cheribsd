@@ -69,6 +69,10 @@ __FBSDID("$FreeBSD$");
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
 
+_Static_assert(sizeof(mcontext64_t) == 880, "mcontext64_t size incorrect");
+_Static_assert(sizeof(ucontext64_t) == 960, "ucontext64_t size incorrect");
+_Static_assert(sizeof(struct siginfo64) == 80, "struct siginfo64 size incorrect");
+
 extern u_long elf_hwcap;
 
 static void	freebsd64_sendsig(sig_t, ksiginfo_t *, sigset_t *);
