@@ -228,7 +228,7 @@ struct g_eli_softc {
 
 struct g_eli_key {
 	/* Key value, must be first in the structure. */
-	uint8_t		gek_key[G_ELI_DATAKEYLEN];
+	uint8_t		gek_key[G_ELI_DATAKEYLEN] __subobject_use_container_bounds;
 	/* Magic. */
 	int		gek_magic;
 	/* Key number. */
