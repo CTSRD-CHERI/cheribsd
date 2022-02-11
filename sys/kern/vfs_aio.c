@@ -2447,8 +2447,7 @@ freebsd6_lio_listio(struct thread *td, struct freebsd6_lio_listio_args *uap)
 	} else
 		sigp = NULL;
 
-	acb_list = malloc(sizeof(struct aiocb * __capability) * nent, M_LIO,
-	    M_WAITOK);
+	acb_list = malloc(sizeof(acb_list[0]) * nent, M_LIO, M_WAITOK);
 	error = copyincap(uap->acb_list, acb_list, nent * sizeof(acb_list[0]));
 	if (error == 0)
 		error = kern_lio_listio(td, uap->mode,
@@ -2482,8 +2481,7 @@ sys_lio_listio(struct thread *td, struct lio_listio_args *uap)
 	} else
 		sigp = NULL;
 
-	acb_list = malloc(sizeof(struct aiocb * __capability) * nent, M_LIO,
-	    M_WAITOK);
+	acb_list = malloc(sizeof(acb_list[0]) * nent, M_LIO, M_WAITOK);
 	error = copyincap(uap->acb_list, acb_list, nent * sizeof(acb_list[0]));
 	if (error == 0)
 		error = kern_lio_listio(td, uap->mode, (intcap_t)uap->acb_list,
@@ -3189,8 +3187,7 @@ freebsd6_freebsd32_lio_listio(struct thread *td,
 		free(acb_list32, M_LIO);
 		return (error);
 	}
-	acb_list = malloc(sizeof(struct aiocb * __capability) * nent, M_LIO,
-	    M_WAITOK);
+	acb_list = malloc(sizeof(acb_list[0]) * nent, M_LIO, M_WAITOK);
 	for (i = 0; i < nent; i++)
 		acb_list[i] = __USER_CAP(PTRIN(acb_list32[i]),
 		    sizeof(struct aiocb32));
@@ -3236,8 +3233,7 @@ freebsd32_lio_listio(struct thread *td, struct freebsd32_lio_listio_args *uap)
 		free(acb_list32, M_LIO);
 		return (error);
 	}
-	acb_list = malloc(sizeof(struct aiocb * __capability) * nent, M_LIO,
-	    M_WAITOK);
+	acb_list = malloc(sizeof(acb_list[0]) * nent, M_LIO, M_WAITOK);
 	for (i = 0; i < nent; i++)
 		acb_list[i] = __USER_CAP(PTRIN(acb_list32[i]),
 		    sizeof(struct aiocb32));
@@ -3656,8 +3652,7 @@ freebsd6_freebsd64_lio_listio(struct thread *td,
 		free(acb_list64, M_LIO);
 		return (error);
 	}
-	acb_list = malloc(sizeof(struct aiocb * __capability) * nent, M_LIO,
-	    M_WAITOK);
+	acb_list = malloc(sizeof(acb_list[0]) * nent, M_LIO, M_WAITOK);
 	for (i = 0; i < nent; i++)
 		acb_list[i] = __USER_CAP(acb_list64[i], sizeof(struct aiocb64));
 	free(acb_list64, M_LIO);
@@ -3696,15 +3691,14 @@ freebsd64_lio_listio(struct thread *td, struct freebsd64_lio_listio_args *uap)
 	} else
 		sigp = NULL;
 
-	acb_list64 = malloc(sizeof(*acb_list64) * nent, M_LIO, M_WAITOK);
+	acb_list64 = malloc(sizeof(acb_list64[0]) * nent, M_LIO, M_WAITOK);
 	error = copyin(__USER_CAP_ARRAY(uap->acb_list, nent), acb_list64,
-	    nent * sizeof(*acb_list64));
+	    nent * sizeof(acb_list64[0]));
 	if (error) {
 		free(acb_list64, M_LIO);
 		return (error);
 	}
-	acb_list = malloc(sizeof(struct aiocb * __capability) * nent, M_LIO,
-	    M_WAITOK);
+	acb_list = malloc(sizeof(acb_list[0]) * nent, M_LIO, M_WAITOK);
 	for (i = 0; i < nent; i++)
 		acb_list[i] = __USER_CAP(acb_list64[i], sizeof(struct aiocb64));
 	free(acb_list64, M_LIO);
