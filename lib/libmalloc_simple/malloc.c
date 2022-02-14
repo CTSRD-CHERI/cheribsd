@@ -173,6 +173,7 @@ __simple_malloc_unaligned(size_t nbytes)
 	}
 	/* remove from linked list */
 	nextf[bucket] = op->ov_next;
+	op->ov_next = NULL;
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
 	return (op + 1);

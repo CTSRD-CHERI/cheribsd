@@ -263,6 +263,7 @@ __tls_malloc(size_t nbytes)
 	/* remove from linked list */
 	nextf[bucket] = op->ov_next;
 	TLS_MALLOC_UNLOCK;
+	op->ov_next = NULL;
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
 	return (op + 1);
