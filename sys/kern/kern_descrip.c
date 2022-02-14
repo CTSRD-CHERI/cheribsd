@@ -1024,7 +1024,7 @@ kern_dup(struct thread *td, u_int mode, int flags, int old, int new)
 	seqc_write_begin(&newfde->fde_seqc);
 #endif
 	oioctls = filecaps_free_prep(&newfde->fde_caps);
-	memcpy(newfde, oldfde, fde_change_size);
+	fde_copy(oldfde, newfde);
 	filecaps_copy_finish(&oldfde->fde_caps, &newfde->fde_caps,
 	    nioctls);
 	if ((flags & FDDUP_FLAG_CLOEXEC) != 0)
@@ -3637,7 +3637,7 @@ dupfdopen(struct thread *td, struct filedesc *fdp, int dfd, int mode,
 #ifdef CAPABILITIES
 		seqc_write_begin(&newfde->fde_seqc);
 #endif
-		memcpy(newfde, oldfde, fde_change_size);
+		fde_copy(oldfde, newfde);
 		filecaps_copy_finish(&oldfde->fde_caps, &newfde->fde_caps,
 		    ioctls);
 #ifdef CAPABILITIES
@@ -3654,7 +3654,7 @@ dupfdopen(struct thread *td, struct filedesc *fdp, int dfd, int mode,
 		seqc_write_begin(&oldfde->fde_seqc);
 		seqc_write_begin(&newfde->fde_seqc);
 #endif
-		memcpy(newfde, oldfde, fde_change_size);
+		fde_copy(oldfde, newfde);
 		oldfde->fde_file = NULL;
 		fdunused(fdp, dfd);
 #ifdef CAPABILITIES
