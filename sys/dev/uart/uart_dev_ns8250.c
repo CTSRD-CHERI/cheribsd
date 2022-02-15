@@ -981,12 +981,6 @@ ns8250_bus_receive(struct uart_softc *sc)
 		uart_rx_put(sc, xc);
 		lsr = uart_getreg(bas, REG_LSR);
 	}
-	/* Discard everything left in the Rx FIFO. */
-	while (lsr & LSR_RXRDY) {
-		(void)uart_getreg(bas, REG_DATA);
-		uart_barrier(bas);
-		lsr = uart_getreg(bas, REG_LSR);
-	}
 	uart_unlock(sc->sc_hwmtx);
  	return (0);
 }
