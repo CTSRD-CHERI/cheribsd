@@ -58,16 +58,22 @@
 #endif
 
 #ifndef __ASSEMBLER__
+#ifdef __CHERI_PURE_CAPABILITY__
+typedef __intcap_t __jb_elt;
+#else
+typedef __int128_t __jb_elt;
+#endif
+
 /*
  * jmp_buf and sigjmp_buf are encapsulated in different structs to force
  * compile-time diagnostics for mismatches.  The structs are the same
  * internally to avoid some run-time errors for mismatches.
  */
 #if __BSD_VISIBLE || __POSIX_VISIBLE || __XSI_VISIBLE
-typedef struct _sigjmp_buf { __int128_t _sjb[_JBLEN + 1]; } sigjmp_buf[1];
+typedef struct _sigjmp_buf { __jb_elt _sjb[_JBLEN + 1]; } sigjmp_buf[1];
 #endif
 
-typedef struct _jmp_buf { __int128_t _jb[_JBLEN + 1]; } jmp_buf[1];
+typedef struct _jmp_buf { __jb_elt _jb[_JBLEN + 1]; } jmp_buf[1];
 #endif /* __ASSEMBLER__ */
 
 #endif /* !_MACHINE_SETJMP_H_ */
