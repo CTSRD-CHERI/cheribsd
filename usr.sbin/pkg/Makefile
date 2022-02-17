@@ -16,7 +16,9 @@ PKGCONFBRANCH?=	latest
 . endif
 .endif
 CONFS=		FreeBSD.conf.${PKGCONFBRANCH}
+CONFS+=		CheriBSD.conf.${PKGCONFBRANCH}
 CONFSNAME=	FreeBSD.conf
+CONFSNAME+=	CheriBSD.conf
 CONFSDIR=	/etc/pkg
 CONFSMODE=	644
 PROG=	pkg
