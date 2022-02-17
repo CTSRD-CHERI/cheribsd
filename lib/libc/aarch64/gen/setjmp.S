@@ -34,6 +34,18 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/setjmp.h>
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+.weak _rtld_setjmp;
+LENTRY(_rtld_setjmp)
+	ret
+LEND(_rtld_setjmp)
+
+.weak _rtld_longjmp;
+LENTRY(_rtld_longjmp)
+	ret
+LEND(_rtld_longjmp)
+#endif
+
 ENTRY(setjmp)
 	sub	REGN(sp), REGN(sp), #(REG_WIDTH * 2)
 	stp	REG(0), REGN(lr), [REGN(sp)]
@@ -43,6 +55,12 @@ ENTRY(setjmp)
 	mov	x1, #0				/* set */
 	mov	x0, #1				/* SIG_BLOCK */
 	bl	sigprocmask
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	/* Store Executive mode state */
+	bl	_rtld_setjmp
+	mov	c1, c0
+#endif
 
 	ldp	REG(0), REGN(lr), [REGN(sp)]
 	add	REGN(sp), REGN(sp), #(REG_WIDTH * 2)
@@ -64,7 +82,12 @@ ENTRY(setjmp)
 	stp	d8, d9, [REG(0)], #16
 	stp	d10, d11, [REG(0)], #16
 	stp	d12, d13, [REG(0)], #16
-	stp	d14, d15, [REG(0)]
+	stp	d14, d15, [REG(0)], #16
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	/* Store Executive mode state */
+	str	c1, [REG(0)], #16
+#endif
 
 	/* Return value */
 	mov	x0, #0
@@ -111,7 +134,17 @@ ENTRY(longjmp)
 	ldp	d8, d9, [REG(0)], #16
 	ldp	d10, d11, [REG(0)], #16
 	ldp	d12, d13, [REG(0)], #16
-	ldp	d14, d15, [REG(0)]
+	ldp	d14, d15, [REG(0)], #16
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	/* Restore Executive mode state */
+	stp	REG(1), REGN(lr), [REGN(sp), #-(REG_WIDTH * 2)]!
+
+	ldr	c0, [c0], #16
+	bl	_rtld_longjmp
+
+	ldp	REG(1), REGN(lr), [REGN(sp)], #(REG_WIDTH * 2)
+#endif
 
 	/* Load the return value */
 	mov	x0, x1

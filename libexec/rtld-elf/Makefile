@@ -14,6 +14,8 @@ DEBUG+=-DDEBUG
 .endif
 .endif
 
+CFLAGS+=-DRTLD_SANDBOX
+
 .if empty(DEBUG) && !defined(RTLD_INCLUDE_DEBUG_MESSAGES)
 # Avoid the overhead of all the debug checks now that we have a rtld-debug that
 # can be used instead.

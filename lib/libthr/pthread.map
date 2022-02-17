@@ -299,6 +299,9 @@ FBSDprivate_1.0 {
 
 	/* ABI bug workaround, indicate that pli->rtli_version is valid */
 	_pli_rtli_version;
+
+	_rtld_thread_start;
+	_rtld_sighandler;
 };
 
 FBSD_1.1 {

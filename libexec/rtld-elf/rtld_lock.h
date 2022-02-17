@@ -76,6 +76,11 @@ void _rtld_atfork_post(int *) __exported;
 
 #endif /* IN_RTLD || PTHREAD_KERNEL */
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+void _rtld_thread_start_init(void (*)(struct pthread *));
+void _rtld_sighandler_init(void *);
+#endif
+
 #ifdef IN_RTLD
 
 struct rtld_lock;
