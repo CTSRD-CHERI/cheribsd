@@ -84,6 +84,10 @@ extern size_t tls_static_space;
 extern Elf_Addr tls_dtv_generation;
 extern int tls_max_index;
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+extern uint32_t compart_max_index;
+#endif
+
 extern int npagesizes;
 extern size_t *pagesizes;
 extern size_t page_size;
@@ -138,6 +142,13 @@ typedef struct Struct_Name_Entry {
     STAILQ_ENTRY(Struct_Name_Entry) link;
     char   name[1];
 } Name_Entry;
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+struct Struct_Stack_Entry {
+    SLIST_ENTRY(Struct_Stack_Entry) link;
+    void *stack;
+};
+#endif
 
 /* Lock object */
 typedef struct Struct_LockInfo {
@@ -290,6 +301,12 @@ typedef struct Struct_Obj_Entry {
 					       know about. */
     Ver_Entry *vertab;		/* Versions required /defined by this object */
     int vernum;			/* Number of entries in vertab */
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    SLIST_HEAD(, Struct_Stack_Entry) stacks; /* List of object's per-thread stacks */
+    void *stackslock;
+    uint32_t compart_id;
+#endif
 
     void* init_ptr;		/* Initialization function to call */
     void* fini_ptr;		/* Termination function to call */
@@ -542,7 +559,11 @@ int reloc_iresolve(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_iresolve_nonplt(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_gnu_ifunc(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 void ifunc_init(Elf_Auxinfo[__min_size(AT_COUNT)]);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+void init_pltgot(Obj_Entry *, uintptr_t);
+#else
 void init_pltgot(Obj_Entry *);
+#endif
 void allocate_initial_tls(Obj_Entry *);
 
 void *__crt_calloc(size_t num, size_t size);

@@ -311,6 +311,14 @@ static size_t tls_static_max_align;
 Elf_Addr tls_dtv_generation = 1;	/* Used to detect when dtv size changes */
 int tls_max_index = 1;		/* Largest module index allocated */
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+/*
+ * Globals for compartmentalisation
+ */
+uint32_t compart_max_index; /* Largest compartment index allocated */
+static uintptr_t sealer_cap; /* Sealer for RTLD privilege information */
+#endif
+
 static bool ld_library_path_rpath = false;
 bool ld_fast_sigblock = false;
 
@@ -849,12 +857,18 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	dbg("processing main program's program header");
 	assert(aux_info[AT_PHDR] != NULL);
 	phdr = (const Elf_Phdr *) aux_info[AT_PHDR]->a_un.a_ptr;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	phdr = (const Elf_Phdr *) cheri_clearperm(phdr, CHERI_PERM_EXECUTIVE);
+#endif
 	assert(aux_info[AT_PHNUM] != NULL);
 	phnum = aux_info[AT_PHNUM]->a_un.a_val;
 	assert(aux_info[AT_PHENT] != NULL);
 	assert(aux_info[AT_PHENT]->a_un.a_val == sizeof(Elf_Phdr));
 	assert(aux_info[AT_ENTRY] != NULL);
 	imgentry = (dlfunc_t) aux_info[AT_ENTRY]->a_un.a_ptr;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	imgentry = (dlfunc_t) cheri_clearperm(imgentry, CHERI_PERM_EXECUTIVE);
+#endif
 	dbg("Values from kernel:\n\tAT_PHDR=" PTR_FMT "\n"
 	    "\tAT_BASE=" PTR_FMT "\n\tAT_ENTRY=" PTR_FMT "\n",
 		phdr, aux_info[AT_BASE]->a_un.a_ptr, (const void *)imgentry);
@@ -1101,7 +1115,11 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     *exit_proc = rtld_exit_ptr;
     *objp = obj_main;
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    return ((func_ptr_type)tramp_pgs_append(cheri_sealentry(obj_main->entry), obj_main));
+#else
     return ((func_ptr_type)obj_main->entry);
+#endif
 }
 
 void *
@@ -1111,6 +1129,9 @@ rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 	uintptr_t target;
 
 	ptr = (void *)make_function_pointer(def, obj);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	ptr = tramp_pgs_append(ptr, obj);
+#endif
 	target = call_ifunc_resolver(ptr);
 	return ((void *)target);
 }
@@ -1124,6 +1145,10 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
     uintptr_t *where;
     uintptr_t target;
     RtldLockState lockstate;
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    obj = cheri_unseal(obj, sealer_cap);
+#endif
 
     rlock_acquire(rtld_bind_lock, &lockstate);
     if (sigsetjmp(lockstate.env, 0) != 0)
@@ -1160,6 +1185,9 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
      * address. The value returned from reloc_jmpslot() is the value
      * that the trampoline needs.
      */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    target = (uintptr_t)tramp_pgs_append((const void *)target, defobj);
+#endif
     target = reloc_jmpslot(where, target, defobj, obj, rel);
     lock_release(rtld_bind_lock, &lockstate);
     return (target);
@@ -1892,6 +1920,10 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
      */
     obj->text_rodata_cap = (const char *)cheri_copyaddress(entry, obj->relocbase);
     fix_obj_mapping_cap_permissions(obj, path);
+#endif
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    obj->compart_id = ++compart_max_index;
 #endif
 
     obj->entry = entry;
@@ -2673,6 +2705,12 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     r_debug.r_brk = make_rtld_local_function_pointer(r_debug_state);
     r_debug.r_state = RT_CONSISTENT;
     r_debug.r_ldbase = obj_rtld.relocbase;
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+    if (sysctlbyname("security.cheri.sealcap", &sealer_cap,
+                     &(size_t) { sizeof(sealer_cap) }, NULL, 0) < 0)
+	rtld_die();
+#endif
 }
 
 /*
@@ -3325,6 +3363,9 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	if (reg != NULL) {
 		func_ptr_type exit_ptr = make_rtld_function_pointer(rtld_exit);
 		dbg("Calling __libc_atexit(rtld_exit (" PTR_FMT "))", (void*)exit_ptr);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+		reg = tramp_pgs_append(reg, obj_from_addr(reg));
+#endif
 		reg(exit_ptr);
 		rtld_exit_ptr = make_rtld_function_pointer(rtld_nop_exit);
 	}
@@ -3555,7 +3596,11 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 		return (-1);
 
 	/* Set the special PLT or GOT entries. */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	init_pltgot(obj, sealer_cap);
+#else
 	init_pltgot(obj);
+#endif
 
 	/* Process the PLT relocations. */
 	if (reloc_plt(obj, flags, lockstate) == -1)
@@ -4245,9 +4290,15 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	 */
 	if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 	    sym = __DECONST(void*, make_function_pointer(def, defobj));
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	    sym = tramp_pgs_append(sym, defobj);
+#endif
 	    dbg("dlsym(%s) is function: " PTR_FMT, name, sym);
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	    sym = tramp_pgs_append(sym, defobj);
+#endif
 	    dbg("dlsym(%s) is ifunc. Resolved to: " PTR_FMT, name, sym);
 	} else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
 	    ti.ti_module = defobj->tlsindex;

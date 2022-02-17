@@ -11,6 +11,8 @@ MK_TOOLCHAIN=	yes
 
 LIBC_SRCTOP?= ${.CURDIR}
 
+CFLAGS+=-DRTLD_SANDBOX
+
 # Pick the current architecture directory for libc. In general, this is
 # named MACHINE_CPUARCH, but some ABIs are different enough to require
 # their own libc, so allow a directory named MACHINE_ARCH to override this.
