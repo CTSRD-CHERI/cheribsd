@@ -654,6 +654,8 @@ mdstart_malloc(struct md_s *sc, struct bio *bp)
 	case BIO_WRITE:
 	case BIO_DELETE:
 		break;
+	case BIO_FLUSH:
+		return (0);
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -1031,6 +1033,8 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 	case BIO_WRITE:
 	case BIO_DELETE:
 		break;
+	case BIO_FLUSH:
+		return (0);
 	default:
 		return (EOPNOTSUPP);
 	}
