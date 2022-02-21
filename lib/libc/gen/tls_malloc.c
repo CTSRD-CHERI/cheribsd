@@ -264,7 +264,7 @@ __tls_malloc(size_t nbytes)
 	nextf[bucket] = op->ov_next;
 	TLS_MALLOC_UNLOCK;
 	/*
-	 * XXXKW: Set an ov_next capability to a NULL capability without any
+	 * XXXQEMU: Set an ov_next capability to a NULL capability, clearing any
 	 * permissions.
 	 *
 	 * Based on a tag and permissions of ov_next, find_overhead() determines
