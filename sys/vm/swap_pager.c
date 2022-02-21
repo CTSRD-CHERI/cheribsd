@@ -2246,14 +2246,15 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 	void * __capability *scan;
 	void * __capability *p;
 	struct swblk *sb;
-	vm_pindex_t swidx;
+	vm_pindex_t modpi;
 
-	swidx = rounddown(page->pindex, SWAP_META_PAGES);
 	scan = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
-	sb = SWAP_PCTRIE_LOOKUP(&page->object->un_pager.swp.swp_blks, swidx);
+	sb = SWAP_PCTRIE_LOOKUP(&page->object->un_pager.swp.swp_blks,
+	    rounddown(page->pindex, SWAP_META_PAGES));
 
-	for (i = swidx * BITS_PER_TAGS_PER_PAGE;
-	    i < (swidx + 1) * BITS_PER_TAGS_PER_PAGE; i++) {
+	modpi = page->pindex % SWAP_META_PAGES;
+	for (i = modpi * BITS_PER_TAGS_PER_PAGE;
+	    i < (modpi + 1) * BITS_PER_TAGS_PER_PAGE; i++) {
 		p = scan;
 		for (t = sb->swb_tags[i]; t != 0; t >>= j) {
 			j = ffsl((long)t);
@@ -2276,15 +2277,16 @@ swp_pager_meta_cheri_put_tags(vm_page_t page)
 	uint64_t t, m;
 	void * __capability *scan;
 	struct swblk *sb;
-	vm_pindex_t swidx;
+	vm_pindex_t modpi;
 	int tag;
 
-	swidx = rounddown(page->pindex, SWAP_META_PAGES);
 	scan = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
-	sb = SWAP_PCTRIE_LOOKUP(&page->object->un_pager.swp.swp_blks, swidx);
+	sb = SWAP_PCTRIE_LOOKUP(&page->object->un_pager.swp.swp_blks,
+	    rounddown(page->pindex, SWAP_META_PAGES));
 
-	for (i = swidx * BITS_PER_TAGS_PER_PAGE;
-	    i < (swidx + 1) * BITS_PER_TAGS_PER_PAGE; i++) {
+	modpi = page->pindex % SWAP_META_PAGES;
+	for (i = modpi * BITS_PER_TAGS_PER_PAGE;
+	    i < (modpi + 1) * BITS_PER_TAGS_PER_PAGE; i++) {
 		t = 0;
 		m = 1;
 		for (j = 0; j < 8 * sizeof(uint64_t); j++) {
