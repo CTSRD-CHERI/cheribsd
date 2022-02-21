@@ -146,7 +146,7 @@ __crt_malloc(size_t nbytes)
 	/* remove from linked list */
   	nextf[bucket] = op->ov_next;
 	/*
-	 * XXXKW: Set an ov_next capability to a NULL capability without any
+	 * XXXKW: Set an ov_next capability to a NULL capability, clearing any
 	 * permissions.
 	 *
 	 * Based on a tag and permissions of ov_next, find_overhead() determines
