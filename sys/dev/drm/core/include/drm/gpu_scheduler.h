@@ -88,13 +88,13 @@ struct drm_sched_entity {
 	enum drm_sched_priority         priority;
 	spinlock_t			rq_lock;
 
-	struct spsc_queue		job_queue;
+	struct spsc_queue		job_queue __subobject_use_container_bounds;
 
 	atomic_t			fence_seq;
 	uint64_t			fence_context;
 
 	struct dma_fence		*dependency;
-	struct dma_fence_cb		cb;
+	struct dma_fence_cb		cb __subobject_use_container_bounds;
 	atomic_t			*guilty;
 	struct dma_fence                *last_scheduled;
 #if 0
@@ -189,16 +189,16 @@ struct drm_sched_fence *to_drm_sched_fence(struct dma_fence *f);
  * to schedule the job.
  */
 struct drm_sched_job {
-	struct spsc_node		queue_node;
+	struct spsc_node		queue_node __subobject_use_container_bounds;
 	struct drm_gpu_scheduler	*sched;
 	struct drm_sched_fence		*s_fence;
-	struct dma_fence_cb		finish_cb;
+	struct dma_fence_cb		finish_cb __subobject_use_container_bounds;
 	struct list_head		node;
 	uint64_t			id;
 	atomic_t			karma;
 	enum drm_sched_priority		s_priority;
 	struct drm_sched_entity  *entity;
-	struct dma_fence_cb		cb;
+	struct dma_fence_cb		cb __subobject_use_container_bounds;
 };
 
 static inline bool drm_sched_invalidate_job(struct drm_sched_job *s_job,
@@ -293,7 +293,7 @@ struct drm_gpu_scheduler {
 	atomic_t                        num_jobs;
 	bool			ready;
 	bool				free_guilty;
-};
+} __subobject_use_container_bounds;
 
 int drm_sched_init(struct drm_gpu_scheduler *sched,
 		   const struct drm_sched_backend_ops *ops,

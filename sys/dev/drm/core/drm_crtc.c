@@ -29,6 +29,11 @@
  *      Dave Airlie <airlied@linux.ie>
  *      Jesse Barnes <jesse.barnes@intel.com>
  */
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
+
 #include <linux/ctype.h>
 #include <linux/list.h>
 #include <linux/slab.h>
@@ -360,11 +365,24 @@ int drm_mode_getcrtc(struct drm_device *dev,
 		     void *data, struct drm_file *file_priv)
 {
 	struct drm_mode_crtc *crtc_resp = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_mode_crtc64 *crtc_resp64;
+	struct drm_mode_crtc local_crtc_resp;
+#endif
 	struct drm_crtc *crtc;
 	struct drm_plane *plane;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		crtc_resp64 = (struct drm_mode_crtc64 *)data;
+		crtc_resp = &local_crtc_resp;
+		CP(*crtc_resp64, *crtc_resp, crtc_id);
+		CP(*crtc_resp64, *crtc_resp, mode);
+	}
+#endif
 
 	crtc = drm_crtc_find(dev, file_priv, crtc_resp->crtc_id);
 	if (!crtc)
@@ -411,6 +429,19 @@ int drm_mode_getcrtc(struct drm_device *dev,
 	if (!file_priv->aspect_ratio_allowed)
 		crtc_resp->mode.flags &= ~DRM_MODE_FLAG_PIC_AR_MASK;
 	drm_modeset_unlock(&crtc->mutex);
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		CP(*crtc_resp, *crtc_resp64, count_connectors);
+		CP(*crtc_resp, *crtc_resp64, crtc_id);
+		CP(*crtc_resp, *crtc_resp64, fb_id);
+		CP(*crtc_resp, *crtc_resp64, x);
+		CP(*crtc_resp, *crtc_resp64, y);
+		CP(*crtc_resp, *crtc_resp64, gamma_size);
+		CP(*crtc_resp, *crtc_resp64, mode_valid);
+		CP(*crtc_resp, *crtc_resp64, mode);
+	}
+#endif
 
 	return 0;
 }
@@ -527,19 +558,42 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 {
 	struct drm_mode_config *config = &dev->mode_config;
 	struct drm_mode_crtc *crtc_req = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_mode_crtc64 *crtc_req64;
+	struct drm_mode_crtc local_crtc_req;
+#endif
 	struct drm_crtc *crtc;
 	struct drm_plane *plane;
 	struct drm_connector **connector_set = NULL, *connector;
 	struct drm_framebuffer *fb = NULL;
 	struct drm_display_mode *mode = NULL;
 	struct drm_mode_set set;
-	uint32_t __user *set_connectors_ptr;
+	uint32_t __user * __capability set_connectors_ptr;
 	struct drm_modeset_acquire_ctx ctx;
 	int ret;
 	int i;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		crtc_req64 = (struct drm_mode_crtc64 *)data;
+		crtc_req = &local_crtc_req;
+		CP(*crtc_req64, *crtc_req, count_connectors);
+		CP(*crtc_req64, *crtc_req, crtc_id);
+		CP(*crtc_req64, *crtc_req, fb_id);
+		CP(*crtc_req64, *crtc_req, x);
+		CP(*crtc_req64, *crtc_req, y);
+		CP(*crtc_req64, *crtc_req, gamma_size);
+		CP(*crtc_req64, *crtc_req, mode_valid);
+		CP(*crtc_req64, *crtc_req, mode);
+
+		crtc_req->set_connectors_ptr = (uintcap_t)__USER_CAP(
+		    crtc_req64->set_connectors_ptr,
+		    crtc_req64->count_connectors * sizeof(uint32_t));
+	}
+#endif
 
 	/*
 	 * Universal plane src offsets are only 16.16, prevent havoc for
@@ -676,7 +730,7 @@ int drm_mode_setcrtc(struct drm_device *dev, void *data,
 
 		for (i = 0; i < crtc_req->count_connectors; i++) {
 			connector_set[i] = NULL;
-			set_connectors_ptr = (uint32_t __user *)(unsigned long)crtc_req->set_connectors_ptr;
+			set_connectors_ptr = (uint32_t __user * __capability)crtc_req->set_connectors_ptr;
 			if (get_user(out_id, &set_connectors_ptr[i])) {
 				ret = -EFAULT;
 				goto out;
@@ -730,6 +784,19 @@ out:
 
 	DRM_MODESET_LOCK_ALL_END(ctx, ret);
 	mutex_unlock(&crtc->dev->mode_config.mutex);
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		CP(*crtc_req, *crtc_req64, count_connectors);
+		CP(*crtc_req, *crtc_req64, crtc_id);
+		CP(*crtc_req, *crtc_req64, fb_id);
+		CP(*crtc_req, *crtc_req64, x);
+		CP(*crtc_req, *crtc_req64, y);
+		CP(*crtc_req, *crtc_req64, gamma_size);
+		CP(*crtc_req, *crtc_req64, mode_valid);
+		CP(*crtc_req, *crtc_req64, mode);
+	}
+#endif
 
 	return ret;
 }

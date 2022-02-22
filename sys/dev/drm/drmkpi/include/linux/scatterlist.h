@@ -38,7 +38,7 @@
 #include <linux/mm.h>
 
 struct scatterlist {
-	unsigned long page_link;
+	uintptr_t page_link;
 #define	SG_PAGE_LINK_CHAIN	0x1UL
 #define	SG_PAGE_LINK_LAST	0x2UL
 #define	SG_PAGE_LINK_MASK	0x3UL
@@ -94,7 +94,7 @@ sg_assign_page(struct scatterlist *sg, struct page *page)
 {
 	unsigned long page_link = sg->page_link & SG_PAGE_LINK_MASK;
 
-	sg->page_link = page_link | (unsigned long)page;
+	sg->page_link = page_link | (uintptr_t)page;
 }
 
 static inline void
@@ -137,7 +137,7 @@ sg_chain(struct scatterlist *prv, unsigned int prv_nents,
 
 	sg->offset = 0;
 	sg->length = 0;
-	sg->page_link = ((unsigned long)sgl |
+	sg->page_link = ((uintptr_t)sgl |
 	    SG_PAGE_LINK_CHAIN) & ~SG_PAGE_LINK_LAST;
 }
 
@@ -168,7 +168,7 @@ static inline void
 sg_kfree(struct scatterlist *sg, unsigned int nents)
 {
 	if (nents == SG_MAX_SINGLE_ALLOC) {
-		free_page((unsigned long)sg);
+		free_page((uintptr_t)sg);
 	} else
 		kfree(sg);
 }

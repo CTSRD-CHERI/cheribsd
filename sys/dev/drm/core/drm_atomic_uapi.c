@@ -26,6 +26,11 @@
  * Daniel Vetter <daniel.vetter@ffwll.ch>
  */
 
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
+
 #include <drm/drm_atomic_uapi.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_print.h>
@@ -338,15 +343,15 @@ drm_atomic_set_crtc_for_connector(struct drm_connector_state *conn_state,
 EXPORT_SYMBOL(drm_atomic_set_crtc_for_connector);
 
 static void set_out_fence_for_crtc(struct drm_atomic_state *state,
-				   struct drm_crtc *crtc, s32 __user *fence_ptr)
+	   struct drm_crtc *crtc, s32 __user * __capability fence_ptr)
 {
 	state->crtcs[drm_crtc_index(crtc)].out_fence_ptr = fence_ptr;
 }
 
-static s32 __user *get_out_fence_for_crtc(struct drm_atomic_state *state,
+static s32 __user * __capability get_out_fence_for_crtc(struct drm_atomic_state *state,
 					  struct drm_crtc *crtc)
 {
-	s32 __user *fence_ptr;
+	s32 __user * __capability fence_ptr;
 
 	fence_ptr = state->crtcs[drm_crtc_index(crtc)].out_fence_ptr;
 	state->crtcs[drm_crtc_index(crtc)].out_fence_ptr = NULL;
@@ -356,7 +361,7 @@ static s32 __user *get_out_fence_for_crtc(struct drm_atomic_state *state,
 
 static int set_out_fence_for_connector(struct drm_atomic_state *state,
 					struct drm_connector *connector,
-					s32 __user *fence_ptr)
+					s32 __user * __capability fence_ptr)
 {
 	unsigned int index = drm_connector_index(connector);
 
@@ -371,11 +376,11 @@ static int set_out_fence_for_connector(struct drm_atomic_state *state,
 	return 0;
 }
 
-static s32 __user *get_out_fence_for_connector(struct drm_atomic_state *state,
+static s32 __user * __capability get_out_fence_for_connector(struct drm_atomic_state *state,
 					       struct drm_connector *connector)
 {
 	unsigned int index = drm_connector_index(connector);
-	s32 __user *fence_ptr;
+	s32 __user * __capability fence_ptr;
 
 	fence_ptr = state->connectors[index].out_fence_ptr;
 	state->connectors[index].out_fence_ptr = NULL;
@@ -460,7 +465,7 @@ static int drm_atomic_crtc_set_property(struct drm_crtc *crtc,
 		state->color_mgmt_changed |= replaced;
 		return ret;
 	} else if (property == config->prop_out_fence_ptr) {
-		s32 __user *fence_ptr = u64_to_user_ptr(val);
+		s32 __user * __capability fence_ptr = __USER_CAP(val, sizeof(uint64_t));
 
 		if (!fence_ptr)
 			return 0;
@@ -760,7 +765,7 @@ static int drm_atomic_connector_set_property(struct drm_connector *connector,
 			drm_framebuffer_put(fb);
 		return ret;
 	} else if (property == config->writeback_out_fence_ptr_property) {
-		s32 __user *fence_ptr = u64_to_user_ptr(val);
+		s32 __user * __capability fence_ptr = __USER_CAP(val, sizeof(uint64_t));
 
 		return set_out_fence_for_connector(state->state, connector,
 						   fence_ptr);
@@ -893,7 +898,7 @@ int drm_atomic_get_property(struct drm_mode_object *obj,
  */
 
 static struct drm_pending_vblank_event *create_vblank_event(
-		struct drm_crtc *crtc, uint64_t user_data)
+		struct drm_crtc *crtc, uintcap_t user_data)
 {
 	struct drm_pending_vblank_event *e = NULL;
 
@@ -1078,7 +1083,7 @@ int drm_atomic_set_property(struct drm_atomic_state *state,
  */
 
 struct drm_out_fence_state {
-	s32 __user *out_fence_ptr;
+	s32 __user * __capability out_fence_ptr;
 	struct sync_file *sync_file;
 	int fd;
 };
@@ -1117,7 +1122,7 @@ static int prepare_signaling(struct drm_device *dev,
 		return 0;
 
 	for_each_new_crtc_in_state(state, crtc, crtc_state, i) {
-		s32 __user *fence_ptr;
+		s32 __user * __capability fence_ptr;
 
 		fence_ptr = get_out_fence_for_crtc(crtc_state->state, crtc);
 
@@ -1180,7 +1185,7 @@ static int prepare_signaling(struct drm_device *dev,
 		struct drm_writeback_connector *wb_conn;
 		struct drm_out_fence_state *f;
 		struct dma_fence *fence;
-		s32 __user *fence_ptr;
+		s32 __user * __capability fence_ptr;
 
 		if (!conn_state->writeback_job)
 			continue;
@@ -1277,10 +1282,14 @@ int drm_mode_atomic_ioctl(struct drm_device *dev,
 			  void *data, struct drm_file *file_priv)
 {
 	struct drm_mode_atomic *arg = data;
-	uint32_t __user *objs_ptr = (uint32_t __user *)(unsigned long)(arg->objs_ptr);
-	uint32_t __user *count_props_ptr = (uint32_t __user *)(unsigned long)(arg->count_props_ptr);
-	uint32_t __user *props_ptr = (uint32_t __user *)(unsigned long)(arg->props_ptr);
-	uint64_t __user *prop_values_ptr = (uint64_t __user *)(unsigned long)(arg->prop_values_ptr);
+#ifdef COMPAT_FREEBSD64
+	struct drm_mode_atomic64 *arg64;
+	struct drm_mode_atomic local_arg;
+#endif
+	uint32_t __user * __capability objs_ptr;
+	uint32_t __user * __capability count_props_ptr;
+	uint32_t __user * __capability props_ptr;
+	uint64_t __user * __capability prop_values_ptr;
 	unsigned int copied_objs, copied_props;
 	struct drm_atomic_state *state;
 	struct drm_modeset_acquire_ctx ctx;
@@ -1291,6 +1300,25 @@ int drm_mode_atomic_ioctl(struct drm_device *dev,
 	/* disallow for drivers not supporting atomic: */
 	if (!drm_core_check_feature(dev, DRIVER_ATOMIC))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		arg64 = (struct drm_mode_atomic64 *)data;
+		arg = &local_arg;
+		CP(*arg64, *arg, flags);
+		CP(*arg64, *arg, count_objs);
+		CP(*arg64, *arg, user_data);
+		CP(*arg64, *arg, reserved);
+		arg->objs_ptr = (uintcap_t)__USER_CAP(
+		    arg64->objs_ptr,
+		    arg64->count_objs * sizeof(uint32_t));
+		arg->count_props_ptr = (uintcap_t)__USER_CAP(
+		    arg64->count_props_ptr,
+		    arg64->count_objs * sizeof(uint32_t));
+	}
+#endif
+	objs_ptr = (uint32_t __user * __capability)arg->objs_ptr;
+	count_props_ptr = (uint32_t __user * __capability)arg->count_props_ptr;
 
 	/* disallow for userspace that has not enabled atomic cap (even
 	 * though this may be a bit overkill, since legacy userspace
@@ -1355,6 +1383,19 @@ retry:
 		}
 
 		copied_objs++;
+
+#ifdef COMPAT_FREEBSD64
+		if (!SV_CURPROC_FLAG(SV_CHERI)) {
+			props_ptr = (uint32_t __user * __capability)__USER_CAP(arg64->props_ptr,
+			    (copied_props + count_props) * sizeof(uint32_t));
+			prop_values_ptr = (uint64_t __user * __capability)__USER_CAP(arg64->prop_values_ptr,
+			    (copied_props + count_props) * sizeof(uint64_t));
+		} else
+#endif
+		{
+			props_ptr = (uint32_t __user * __capability)arg->props_ptr;
+			prop_values_ptr = (uint64_t __user * __capability)arg->prop_values_ptr;
+		}
 
 		for (j = 0; j < count_props; j++) {
 			uint32_t prop_id;

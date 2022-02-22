@@ -401,7 +401,7 @@ static inline bool drm_is_render_client(const struct drm_file *file_priv)
 }
 
 int drm_open(struct inode *inode, struct file *filp);
-ssize_t drm_read(struct file *filp, char __user *buffer,
+ssize_t drm_read(struct file *filp, char __user * __capability buffer,
 		 size_t count, loff_t *offset);
 int drm_release(struct inode *inode, struct file *filp);
 int drm_release_noglobal(struct inode *inode, struct file *filp);

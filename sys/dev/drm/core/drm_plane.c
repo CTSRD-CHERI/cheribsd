@@ -20,6 +20,11 @@
  * OF THIS SOFTWARE.
  */
 
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
+
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 
@@ -484,12 +489,27 @@ int drm_mode_getplane_res(struct drm_device *dev, void *data,
 			  struct drm_file *file_priv)
 {
 	struct drm_mode_get_plane_res *plane_resp = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_mode_get_plane_res64 *plane_resp64;
+	struct drm_mode_get_plane_res local_plane_resp;
+#endif
 	struct drm_plane *plane;
-	uint32_t __user *plane_ptr;
+	uint32_t __user * __capability plane_ptr;
 	int count = 0;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		plane_resp64 = (struct drm_mode_get_plane_res64 *)data;
+		plane_resp = &local_plane_resp;
+		CP(*plane_resp64, *plane_resp, count_planes);
+		plane_resp->plane_id_ptr = (uintcap_t)__USER_CAP(
+		    plane_resp64->plane_id_ptr,
+		    plane_resp64->count_planes * sizeof(uint32_t));
+	}
+#endif
 
 	plane_ptr = u64_to_user_ptr(plane_resp->plane_id_ptr);
 
@@ -515,6 +535,11 @@ int drm_mode_getplane_res(struct drm_device *dev, void *data,
 	}
 	plane_resp->count_planes = count;
 
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		CP(*plane_resp, *plane_resp64, count_planes);
+#endif
+
 	return 0;
 }
 
@@ -522,15 +547,40 @@ int drm_mode_getplane(struct drm_device *dev, void *data,
 		      struct drm_file *file_priv)
 {
 	struct drm_mode_get_plane *plane_resp = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_mode_get_plane64 *plane_resp64;
+	struct drm_mode_get_plane local_plane_resp;
+#endif
 	struct drm_plane *plane;
-	uint32_t __user *format_ptr;
+	uint32_t __user * __capability format_ptr;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
 
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		plane_resp64 = (struct drm_mode_get_plane64 *)data;
+		plane_resp = &local_plane_resp;
+		CP(*plane_resp64, *plane_resp, plane_id);
+		CP(*plane_resp64, *plane_resp, crtc_id);
+		CP(*plane_resp64, *plane_resp, fb_id);
+		CP(*plane_resp64, *plane_resp, possible_crtcs);
+		CP(*plane_resp64, *plane_resp, gamma_size);
+		CP(*plane_resp64, *plane_resp, count_format_types);
+	}
+#endif
+
 	plane = drm_plane_find(dev, file_priv, plane_resp->plane_id);
 	if (!plane)
 		return -ENOENT;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		plane_resp->format_type_ptr = (uintcap_t)__USER_CAP(
+		    plane_resp64->format_type_ptr,
+		    plane->format_count * sizeof(uint32_t));
+	}
+#endif
 
 	drm_modeset_lock(&plane->mutex, NULL);
 	if (plane->state && plane->state->crtc && drm_lease_held(file_priv, plane->state->crtc->base.id))
@@ -560,7 +610,7 @@ int drm_mode_getplane(struct drm_device *dev, void *data,
 	 */
 	if (plane->format_count &&
 	    (plane_resp->count_format_types >= plane->format_count)) {
-		format_ptr = (uint32_t __user *)(unsigned long)plane_resp->format_type_ptr;
+		format_ptr = (uint32_t __user * __capability)plane_resp->format_type_ptr;
 		if (copy_to_user(format_ptr,
 				 plane->format_types,
 				 sizeof(uint32_t) * plane->format_count)) {
@@ -568,6 +618,17 @@ int drm_mode_getplane(struct drm_device *dev, void *data,
 		}
 	}
 	plane_resp->count_format_types = plane->format_count;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		CP(*plane_resp, *plane_resp64, plane_id);
+		CP(*plane_resp, *plane_resp64, crtc_id);
+		CP(*plane_resp, *plane_resp64, fb_id);
+		CP(*plane_resp, *plane_resp64, possible_crtcs);
+		CP(*plane_resp, *plane_resp64, gamma_size);
+		CP(*plane_resp, *plane_resp64, count_format_types);
+	}
+#endif
 
 	return 0;
 }
@@ -1044,6 +1105,10 @@ int drm_mode_page_flip_ioctl(struct drm_device *dev,
 			     void *data, struct drm_file *file_priv)
 {
 	struct drm_mode_crtc_page_flip_target *page_flip = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_mode_crtc_page_flip_target64 *page_flip64;
+	struct drm_mode_crtc_page_flip_target local_page_flip;
+#endif
 	struct drm_crtc *crtc;
 	struct drm_plane *plane;
 	struct drm_framebuffer *fb = NULL, *old_fb;
@@ -1054,6 +1119,18 @@ int drm_mode_page_flip_ioctl(struct drm_device *dev,
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		page_flip64 = (struct drm_mode_crtc_page_flip_target64 *)data;
+		page_flip = &local_page_flip;
+		CP(*page_flip64, *page_flip, crtc_id);
+		CP(*page_flip64, *page_flip, fb_id);
+		CP(*page_flip64, *page_flip, flags);
+		CP(*page_flip64, *page_flip, sequence);
+		CP(*page_flip64, *page_flip, user_data);
+	}
+#endif
 
 	if (page_flip->flags & ~DRM_MODE_PAGE_FLIP_FLAGS)
 		return -EINVAL;

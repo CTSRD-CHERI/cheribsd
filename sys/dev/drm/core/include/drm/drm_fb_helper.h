@@ -268,9 +268,9 @@ void drm_fb_helper_deferred_io(struct fb_info *info,
 			       struct list_head *pagelist);
 int drm_fb_helper_defio_init(struct drm_fb_helper *fb_helper);
 
-ssize_t drm_fb_helper_sys_read(struct fb_info *info, char __user *buf,
+ssize_t drm_fb_helper_sys_read(struct fb_info *info, char __user * __capability buf,
 			       size_t count, loff_t *ppos);
-ssize_t drm_fb_helper_sys_write(struct fb_info *info, const char __user *buf,
+ssize_t drm_fb_helper_sys_write(struct fb_info *info, const char __user * __capability buf,
 				size_t count, loff_t *ppos);
 
 void drm_fb_helper_sys_fillrect(struct fb_info *info,
@@ -418,14 +418,14 @@ static inline int drm_fb_helper_defio_init(struct drm_fb_helper *fb_helper)
 }
 
 static inline ssize_t drm_fb_helper_sys_read(struct fb_info *info,
-					     char __user *buf, size_t count,
+					     char __user * __capability buf, size_t count,
 					     loff_t *ppos)
 {
 	return -ENODEV;
 }
 
 static inline ssize_t drm_fb_helper_sys_write(struct fb_info *info,
-					      const char __user *buf,
+					      const char __user * __capability buf,
 					      size_t count, loff_t *ppos)
 {
 	return -ENODEV;

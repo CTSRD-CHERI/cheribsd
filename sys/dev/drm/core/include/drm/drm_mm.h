@@ -174,7 +174,7 @@ struct drm_mm_node {
 #ifdef CONFIG_DRM_DEBUG_MM
 	depot_stack_handle_t stack;
 #endif
-};
+} __subobject_use_container_bounds;
 
 /**
  * struct drm_mm - DRM allocator

@@ -42,7 +42,7 @@
 struct drm_hash_item {
 	struct hlist_node head;
 	unsigned long key;
-};
+} __subobject_use_container_bounds;
 
 struct drm_open_hash {
 	struct hlist_head *table;

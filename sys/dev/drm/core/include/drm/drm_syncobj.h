@@ -61,7 +61,7 @@ struct drm_syncobj {
 	 * @file: A file backing for this syncobj.
 	 */
 	struct file *file;
-};
+} __subobject_use_container_bounds;
 
 void drm_syncobj_free(struct kref *kref);
 

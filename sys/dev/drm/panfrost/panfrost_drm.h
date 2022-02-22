@@ -32,7 +32,8 @@
  *
  * This asks the kernel to have the GPU execute a render command list.
  */
-struct drm_panfrost_submit {
+#ifdef _KERNEL
+struct drm_panfrost_submit64 {
 
 	/** Address to GPU mapping of job descriptor */
 	uint64_t jc;
@@ -48,6 +49,31 @@ struct drm_panfrost_submit {
 
 	/** Pointer to a u32 array of the BOs that are referenced by the job. */
 	uint64_t bo_handles;
+
+	/** Number of BO handles passed in (size is that times 4). */
+	uint32_t bo_handle_count;
+
+	/** A combination of PANFROST_JD_REQ_* */
+	uint32_t requirements;
+};
+#endif
+
+struct drm_panfrost_submit {
+
+	/** Address to GPU mapping of job descriptor */
+	uint64_t jc;
+
+	/** An optional array of sync objects to wait on before starting this job. */
+	kuint64cap_t in_syncs;
+
+	/** Number of sync objects to wait on before starting this job. */
+	uint32_t in_sync_count;
+
+	/** An optional sync object to place the completion fence in. */
+	uint32_t out_sync;
+
+	/** Pointer to a u32 array of the BOs that are referenced by the job. */
+	kuint64cap_t bo_handles;
 
 	/** Number of BO handles passed in (size is that times 4). */
 	uint32_t bo_handle_count;

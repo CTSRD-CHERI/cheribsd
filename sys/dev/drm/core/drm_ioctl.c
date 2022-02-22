@@ -28,6 +28,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
+
 /* FBSD: Linux header polution, we need fs.h and ioctl.h */
 #include <linux/fs.h>
 #include <linux/ioctl.h>
@@ -496,7 +501,7 @@ EXPORT_SYMBOL(drm_invalid_op);
 /*
  * Copy and IOCTL return string to user space
  */
-static int drm_copy_field(char __user *buf, size_t *buf_len, const char *value)
+static int drm_copy_field(char __user * __capability buf, size_t *buf_len, const char *value)
 {
 	int len;
 
@@ -531,7 +536,24 @@ int drm_version(struct drm_device *dev, void *data,
 		       struct drm_file *file_priv)
 {
 	struct drm_version *version = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_version64 *version64;
+	struct drm_version local_version;
+#endif
 	int err;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		version64 = (struct drm_version64 *)data;
+		version = &local_version;
+		CP(*version64, *version, name_len);
+		CP(*version64, *version, date_len);
+		CP(*version64, *version, desc_len);
+		version->name = __USER_CAP(version64->name, version->name_len);
+		version->date = __USER_CAP(version64->date, version->date_len);
+		version->desc = __USER_CAP(version64->desc, version->desc_len);
+	}
+#endif
 
 	version->version_major = dev->driver->major;
 	version->version_minor = dev->driver->minor;
@@ -544,6 +566,17 @@ int drm_version(struct drm_device *dev, void *data,
 	if (!err)
 		err = drm_copy_field(version->desc, &version->desc_len,
 				dev->driver->desc);
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		CP(*version, *version64, version_major);
+		CP(*version, *version64, version_minor);
+		CP(*version, *version64, version_patchlevel);
+		CP(*version, *version64, name_len);
+		CP(*version, *version64, date_len);
+		CP(*version, *version64, desc_len);
+	}
+#endif
 
 	return err;
 }
@@ -836,7 +869,7 @@ EXPORT_SYMBOL(drm_ioctl_kernel);
  * Zero on success, negative error code on failure.
  */
 long drm_ioctl(struct file *filp,
-	      unsigned int cmd, unsigned long arg)
+	      unsigned int cmd, uintcap_t arg)
 {
 	struct drm_file *file_priv = filp->private_data;
 	struct drm_device *dev;
@@ -844,7 +877,7 @@ long drm_ioctl(struct file *filp,
 	drm_ioctl_t *func;
 	unsigned int nr = DRM_IOCTL_NR(cmd);
 	int retcode = -EINVAL;
-	char stack_kdata[128];
+	char stack_kdata[128] __aligned(sizeof(void *__capability));
 	char *kdata = NULL;
 	unsigned int in_size, out_size, drv_size, ksize;
 	bool is_driver_ioctl;
@@ -916,18 +949,19 @@ long drm_ioctl(struct file *filp,
 		goto err_i1;
 	}
 #else
-	memcpy(kdata, (void __user *)arg, in_size);
+	memcpy_c(PTR2CAP(kdata), (void * __capability)arg, in_size);
 #endif
 
 	if (ksize > in_size)
 		memset(kdata + in_size, 0, ksize - in_size);
 
 	retcode = drm_ioctl_kernel(filp, func, kdata, ioctl->flags);
+
 #ifdef __linux__
 	if (copy_to_user((void __user *)arg, kdata, out_size) != 0)
 		retcode = -EFAULT;
 #else
-	memcpy((void __user *)arg, kdata, out_size);
+	memcpy_c((void * __capability)arg, PTR2CAP(kdata), out_size);
 #endif
 
       err_i1:

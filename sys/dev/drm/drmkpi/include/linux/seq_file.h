@@ -49,7 +49,7 @@ struct seq_operations {
 	int (*show) (struct seq_file *m, void *v);
 };
 
-ssize_t linux_seq_read(struct file *, char __user *, size_t, loff_t *);
+ssize_t linux_seq_read(struct file *, char __user * __capability, size_t, loff_t *);
 int seq_write(struct seq_file *seq, const void *data, size_t len);
 
 loff_t seq_lseek(struct file *file, loff_t offset, int whence);

@@ -43,7 +43,7 @@
 static inline void *
 ERR_PTR(long error)
 {
-	return (void *)error;
+	return (void *)(intptr_t)error;
 }
 
 static inline long

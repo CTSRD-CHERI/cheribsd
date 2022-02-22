@@ -188,7 +188,7 @@ struct drm_property {
 	 * enum and bitmask values.
 	 */
 	struct list_head enum_list;
-};
+} __subobject_use_container_bounds;
 
 /**
  * struct drm_property_blob - Blob data for &drm_property
@@ -213,7 +213,7 @@ struct drm_property_blob {
 	struct list_head head_file;
 	size_t length;
 	void *data;
-};
+} __subobject_use_container_bounds;
 
 struct drm_prop_enum_list {
 	int type;

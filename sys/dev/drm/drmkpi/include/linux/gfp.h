@@ -84,10 +84,10 @@ CTASSERT((__GFP_BITS_MASK & GFP_NATIVE_MASK) == GFP_NATIVE_MASK);
 /*
  * Page management for mapped pages:
  */
-vm_offset_t drmcompat_alloc_kmem(gfp_t flags, unsigned int order);
-void drmcompat_free_kmem(vm_offset_t, unsigned int order);
+vm_pointer_t drmcompat_alloc_kmem(gfp_t flags, unsigned int order);
+void drmcompat_free_kmem(vm_pointer_t, unsigned int order);
 
-static inline vm_offset_t
+static inline vm_pointer_t
 __get_free_page(gfp_t flags)
 {
 

@@ -185,7 +185,7 @@ struct drm_encoder {
 
 	const struct drm_encoder_funcs *funcs;
 	const struct drm_encoder_helper_funcs *helper_private;
-};
+} __subobject_use_container_bounds;
 
 #define obj_to_encoder(x) container_of(x, struct drm_encoder, base)
 

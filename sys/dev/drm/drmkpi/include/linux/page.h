@@ -49,8 +49,8 @@ typedef unsigned long pgprot_t;
 
 #define page	vm_page
 
-#define	DRMCOMPAT_PROT_VALID (1 << 3)
-#define	DRMCOMPAT_CACHE_MODE_SHIFT 4
+#define	DRMCOMPAT_PROT_VALID (1 << 5)
+#define	DRMCOMPAT_CACHE_MODE_SHIFT 6
 
 CTASSERT((VM_PROT_ALL & -DRMCOMPAT_PROT_VALID) == 0);
 

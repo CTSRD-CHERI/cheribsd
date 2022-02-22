@@ -1203,7 +1203,7 @@ EXPORT_SYMBOL(drm_fb_helper_defio_init);
  *
  * A wrapper around fb_sys_read implemented by fbdev core
  */
-ssize_t drm_fb_helper_sys_read(struct fb_info *info, char __user *buf,
+ssize_t drm_fb_helper_sys_read(struct fb_info *info, char __user * __capability buf,
 			       size_t count, loff_t *ppos)
 {
 	return fb_sys_read(info, buf, count, ppos);
@@ -1219,7 +1219,7 @@ EXPORT_SYMBOL(drm_fb_helper_sys_read);
  *
  * A wrapper around fb_sys_write implemented by fbdev core
  */
-ssize_t drm_fb_helper_sys_write(struct fb_info *info, const char __user *buf,
+ssize_t drm_fb_helper_sys_write(struct fb_info *info, const char __user * __capability buf,
 				size_t count, loff_t *ppos)
 {
 	ssize_t ret;

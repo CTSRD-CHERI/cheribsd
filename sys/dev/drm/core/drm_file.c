@@ -31,6 +31,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
+
 #include <linux/anon_inodes.h>
 #include <linux/dma-fence.h>
 #include <linux/file.h>
@@ -535,6 +540,52 @@ int drm_release_noglobal(struct inode *inode, struct file *filp)
 }
 EXPORT_SYMBOL(drm_release_noglobal);
 
+#ifdef COMPAT_FREEBSD64
+static uint32_t
+hybrid_process_event(struct drm_pending_event *e, void **ptr)
+{
+	struct drm_event_crtc_sequence64 crtc_seq64;
+	struct drm_event_crtc_sequence *crtc_seq;
+	struct drm_event_vblank64 vbl64;
+	struct drm_event_vblank *vbl;
+	uint32_t length;
+
+	switch (e->event->type) {
+	case DRM_EVENT_VBLANK:
+	case DRM_EVENT_FLIP_COMPLETE:
+		vbl = (struct drm_event_vblank *)e->event;
+		CP(*vbl, vbl64, base);
+		CP(*vbl, vbl64, user_data);
+		CP(*vbl, vbl64, tv_sec);
+		CP(*vbl, vbl64, tv_usec);
+		CP(*vbl, vbl64, sequence);
+		CP(*vbl, vbl64, crtc_id);
+		vbl64.base.length =
+		    sizeof(struct drm_event_vblank64);
+		length = vbl64.base.length;
+		*ptr = (void *)&vbl64;
+		break;
+
+	case DRM_EVENT_CRTC_SEQUENCE:
+		crtc_seq =
+		    (struct drm_event_crtc_sequence *)e->event;
+		CP(*crtc_seq, crtc_seq64, base);
+		CP(*crtc_seq, crtc_seq64, user_data);
+		CP(*crtc_seq, crtc_seq64, time_ns);
+		CP(*crtc_seq, crtc_seq64, sequence);
+		crtc_seq64.base.length =
+		    sizeof(struct drm_event_crtc_sequence64);
+		length = crtc_seq64.base.length;
+		*ptr = (void *)&crtc_seq64;
+		break;
+	default:
+		panic("unknown event %d", e->event->type);
+	};
+
+	return (length);
+}
+#endif
+
 /**
  * drm_read - read method for DRM file
  * @filp: file pointer
@@ -561,7 +612,7 @@ EXPORT_SYMBOL(drm_release_noglobal);
  * Number of bytes read (always aligned to full events, and can be 0) or a
  * negative error code on failure.
  */
-ssize_t drm_read(struct file *filp, char __user *buffer,
+ssize_t drm_read(struct file *filp, char __user * __capability buffer,
 		 size_t count, loff_t *offset)
 {
 	struct drm_file *file_priv = filp->private_data;
@@ -603,6 +654,13 @@ ssize_t drm_read(struct file *filp, char __user *buffer,
 				return ret;
 		} else {
 			unsigned length = e->event->length;
+			void *ptr;
+
+			ptr = e->event;
+#ifdef COMPAT_FREEBSD64
+			if (!SV_CURPROC_FLAG(SV_CHERI))
+				length = hybrid_process_event(e, &ptr);
+#endif
 
 			if (length > count - ret) {
 put_back_event:
@@ -626,7 +684,7 @@ put_back_event:
 				break;
 			}
 
-			if (copy_to_user(buffer + ret, e->event, length)) {
+			if (copy_to_user(buffer + ret, ptr, length)) {
 				if (ret == 0)
 					ret = -EFAULT;
 				goto put_back_event;

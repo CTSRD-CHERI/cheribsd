@@ -724,7 +724,7 @@ struct drm_plane {
 	 * See drm_plane_create_color_properties().
 	 */
 	struct drm_property *color_range_property;
-};
+} __subobject_use_container_bounds;
 
 #define obj_to_plane(x) container_of(x, struct drm_plane, base)
 

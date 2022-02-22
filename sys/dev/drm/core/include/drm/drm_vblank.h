@@ -42,7 +42,7 @@ struct drm_pending_vblank_event {
 	/**
 	 * @base: Base structure for tracking pending DRM events.
 	 */
-	struct drm_pending_event base;
+	struct drm_pending_event base __subobject_use_container_bounds;
 	/**
 	 * @pipe: drm_crtc_index() of the &drm_crtc this event is for.
 	 */
@@ -204,7 +204,7 @@ struct drm_vblank_crtc {
 	 * disabling functions multiple times.
 	 */
 	bool enabled;
-};
+} __subobject_use_container_bounds;
 
 int drm_vblank_init(struct drm_device *dev, unsigned int num_crtcs);
 bool drm_dev_has_vblank(const struct drm_device *dev);

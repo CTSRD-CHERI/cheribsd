@@ -708,7 +708,7 @@ static int objects_lookup(struct drm_file *filp, u32 *handle, int count,
  * failure. 0 is returned on success.
  *
  */
-int drm_gem_objects_lookup(struct drm_file *filp, void __user *bo_handles,
+int drm_gem_objects_lookup(struct drm_file *filp, void __user * __capability bo_handles,
 			   int count, struct drm_gem_object ***objs_out)
 {
 	int ret;

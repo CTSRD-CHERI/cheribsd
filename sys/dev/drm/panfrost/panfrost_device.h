@@ -44,7 +44,7 @@ struct panfrost_mmu {
 
 struct panfrost_file {
 	struct		panfrost_softc *sc;
-	struct		panfrost_mmu mmu;
+	struct		panfrost_mmu mmu __subobject_use_container_bounds;
 	struct		drm_sched_entity sched_entity[NUM_JOB_SLOTS];
 	struct		drm_mm mm;
 	struct mtx	mm_lock;

@@ -89,8 +89,8 @@ struct drm_prime_member {
 	struct dma_buf *dma_buf;
 	uint32_t handle;
 
-	struct rb_node dmabuf_rb;
-	struct rb_node handle_rb;
+	struct rb_node dmabuf_rb __subobject_use_container_bounds;
+	struct rb_node handle_rb __subobject_use_container_bounds;
 };
 
 static int drm_prime_add_buf_handle(struct drm_prime_file_private *prime_fpriv,

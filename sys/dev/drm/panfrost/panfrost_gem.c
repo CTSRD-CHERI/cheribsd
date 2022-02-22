@@ -575,7 +575,7 @@ panfrost_alloc_pages_iommu(struct panfrost_gem_object *bo)
 	vm_paddr_t low, high, boundary;
 	vm_memattr_t memattr;
 	int alignment;
-	vm_offset_t va;
+	vm_pointer_t va;
 	int pflags;
 	vm_page_t m;
 	int tries;
@@ -624,7 +624,7 @@ panfrost_alloc_pages_contig(struct panfrost_gem_object *bo)
 	vm_paddr_t low, high, boundary;
 	vm_memattr_t memattr;
 	int alignment;
-	vm_offset_t va;
+	vm_pointer_t va;
 	int pflags;
 	vm_page_t m;
 	int tries;

@@ -69,7 +69,7 @@ struct drm_lock_data {
  * nodes, hence there can only be one per device, not one per drm_minor.
  */
 struct drm_master {
-	struct kref refcount;
+	struct kref refcount __subobject_use_container_bounds;
 	struct drm_device *dev;
 	/**
 	 * @unique: Unique identifier: e.g. busid. Protected by

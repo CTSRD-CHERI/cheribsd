@@ -1,9 +1,5 @@
 /*-
- * Copyright (c) 2010 Isilon Systems, Inc.
- * Copyright (c) 2010 iX Systems, Inc.
- * Copyright (c) 2010 Panasas, Inc.
- * Copyright (c) 2013, 2014 Mellanox Technologies, Ltd.
- * All rights reserved.
+ * Copyright (c) 2022 Ruslan Bukin <br@bsdpad.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,23 +25,22 @@
  * $FreeBSD$
  */
 
-#ifndef __DRMCOMPAT_TIMER_H__
-#define	__DRMCOMPAT_TIMER_H__
+#ifndef	_ATOMIC_PTR_H_
+#define	_ATOMIC_PTR_H_
 
-struct timer_list {
-	struct callout callout;
-	union {
-		void (*function) (uintptr_t);	/* < v4.15 */
-		void (*function_415) (struct timer_list *);
-	};
-	uintptr_t data;
-	int expires;
-} __subobject_use_container_bounds;
+static inline uintptr_t
+atomic_ptr_cmpxchg(uintptr_t *v, uintptr_t old, uintptr_t new)
+{
+	uintptr_t ret = old;
 
-int drmcompat_mod_timer(struct timer_list *timer, int expires);
-void drmcompat_add_timer(struct timer_list *timer);
-void drmcompat_add_timer_on(struct timer_list *timer, int cpu);
-int drmcompat_del_timer(struct timer_list *timer);
-int drmcompat_del_timer_sync(struct timer_list *timer);
+	for (;;) {
+		if (atomic_fcmpset_ptr(v, &ret, new))
+			break;
+		if (ret != old)
+			break;
+	}
 
-#endif /* __DRMCOMPAT_TIMER_H__ */
+	return (ret);
+}
+
+#endif	/* _ATOMIC_PTR_H_ */
