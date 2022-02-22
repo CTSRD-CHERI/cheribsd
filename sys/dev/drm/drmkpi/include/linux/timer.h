@@ -49,7 +49,7 @@ extern unsigned long drmcompat_timer_hz_mask;
 #define	timer_setup(timer, func, flags) do {				\
 	CTASSERT(((flags) & ~TIMER_IRQSAFE) == 0);			\
 	(timer)->function_415 = (func);					\
-	(timer)->data = (unsigned long)(timer);				\
+	(timer)->data = (uintptr_t)(timer);				\
 	callout_init(&(timer)->callout, 1);				\
 } while (0)
 

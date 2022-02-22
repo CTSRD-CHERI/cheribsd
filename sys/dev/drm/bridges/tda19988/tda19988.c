@@ -266,8 +266,8 @@ struct tda19988_softc {
 	uint32_t		sc_edid_len;
 
 	struct drm_encoder	encoder;
-	struct drm_connector	connector;
-	struct drm_bridge	bridge;
+	struct drm_connector	connector __subobject_use_container_bounds;
+	struct drm_bridge	bridge __subobject_use_container_bounds;
 	struct drm_display_mode	mode;
 };
 

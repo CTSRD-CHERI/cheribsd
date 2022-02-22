@@ -324,9 +324,10 @@ dmabuf_fop_kqfilter(struct file *file, struct knote *kn)
 }
 
 static int
-dmabuf_fop_mmap(struct file *file, vm_map_t map, vm_offset_t *addr,
-	     vm_size_t size, vm_prot_t prot, vm_prot_t cap_maxprot,
-	     int flags, vm_ooffset_t foff, struct thread *td)
+dmabuf_fop_mmap(struct file *file, vm_map_t map, vm_pointer_t *addr,
+	    vm_offset_t max_addr, vm_size_t size, vm_prot_t prot,
+	    vm_prot_t cap_maxprot, int flags, vm_ooffset_t foff,
+	    struct thread *td)
 {
 	struct dma_buf *dmabuf;
 	struct vm_area_struct vma;
@@ -337,6 +338,9 @@ dmabuf_fop_mmap(struct file *file, vm_map_t map, vm_offset_t *addr,
 	dmabuf = file->f_data;
 
 	if (foff + size  > dmabuf->size)
+		return (EINVAL);
+
+	if (*addr + size > max_addr)
 		return (EINVAL);
 
 	vma.vm_start = *addr;

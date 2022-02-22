@@ -47,14 +47,14 @@ struct drm_vma_offset_file {
 	struct rb_node vm_rb;
 	struct drm_file *vm_tag;
 	unsigned long vm_count;
-};
+} __subobject_use_container_bounds;
 
 struct drm_vma_offset_node {
 	rwlock_t vm_lock;
 	struct drm_mm_node vm_node;
 	struct rb_root vm_files;
 	bool readonly:1;
-};
+} __subobject_use_container_bounds;
 
 struct drm_vma_offset_manager {
 	rwlock_t vm_lock;

@@ -20,6 +20,11 @@
  * OF THIS SOFTWARE.
  */
 
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
+
 #include <linux/export.h>
 #include <linux/uaccess.h>
 
@@ -358,8 +363,8 @@ EXPORT_SYMBOL(drm_object_property_get_value);
 
 /* helper for getconnector and getproperties ioctls */
 int drm_mode_object_get_properties(struct drm_mode_object *obj, bool atomic,
-				   uint32_t __user *prop_ptr,
-				   uint64_t __user *prop_values,
+				   uint32_t __user * __capability prop_ptr,
+				   uint64_t __user * __capability prop_values,
 				   uint32_t *arg_count_props)
 {
 	int i, ret, count;
@@ -409,12 +414,32 @@ int drm_mode_obj_get_properties_ioctl(struct drm_device *dev, void *data,
 				      struct drm_file *file_priv)
 {
 	struct drm_mode_obj_get_properties *arg = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_mode_obj_get_properties64 *arg64;
+	struct drm_mode_obj_get_properties local_arg;
+#endif
 	struct drm_mode_object *obj;
 	struct drm_modeset_acquire_ctx ctx;
 	int ret = 0;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		arg64 = (struct drm_mode_obj_get_properties64 *)data;
+		arg = &local_arg;
+		CP(*arg64, *arg, count_props);
+		CP(*arg64, *arg, obj_id);
+		CP(*arg64, *arg, obj_type);
+		arg->props_ptr = (uintcap_t)__USER_CAP(
+		    arg64->props_ptr,
+		    arg64->count_props * sizeof(uint32_t));
+		arg->prop_values_ptr = (uintcap_t)__USER_CAP(
+		    arg64->prop_values_ptr,
+		    arg64->count_props * sizeof(uint64_t));
+	}
+#endif
 
 	DRM_MODESET_LOCK_ALL_BEGIN(dev, ctx, 0, ret);
 
@@ -429,14 +454,22 @@ int drm_mode_obj_get_properties_ioctl(struct drm_device *dev, void *data,
 	}
 
 	ret = drm_mode_object_get_properties(obj, file_priv->atomic,
-			(uint32_t __user *)(unsigned long)(arg->props_ptr),
-			(uint64_t __user *)(unsigned long)(arg->prop_values_ptr),
+			(uint32_t __user * __capability)(arg->props_ptr),
+			(uint64_t __user * __capability)(arg->prop_values_ptr),
 			&arg->count_props);
 
 out_unref:
 	drm_mode_object_put(obj);
 out:
 	DRM_MODESET_LOCK_ALL_END(ctx, ret);
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		CP(*arg, *arg64, count_props);
+		CP(*arg, *arg64, obj_id);
+		CP(*arg, *arg64, obj_type);
+	}
+#endif
 	return ret;
 }
 

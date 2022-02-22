@@ -20,6 +20,11 @@
  * OF THIS SOFTWARE.
  */
 
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
+
 #include <linux/export.h>
 #include <linux/uaccess.h>
 
@@ -460,16 +465,37 @@ int drm_mode_getproperty_ioctl(struct drm_device *dev,
 			       void *data, struct drm_file *file_priv)
 {
 	struct drm_mode_get_property *out_resp = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_mode_get_property64 *out_resp64;
+	struct drm_mode_get_property local_out_resp;
+#endif
 	struct drm_property *property;
 	int enum_count = 0;
 	int value_count = 0;
 	int i, copied;
 	struct drm_property_enum *prop_enum;
-	struct drm_mode_property_enum __user *enum_ptr;
-	uint64_t __user *values_ptr;
+	struct drm_mode_property_enum __user * __capability enum_ptr;
+	uint64_t __user * __capability values_ptr;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		out_resp64 = (struct drm_mode_get_property64 *)data;
+		out_resp = &local_out_resp;
+		CP(*out_resp64, *out_resp, prop_id);
+		CP(*out_resp64, *out_resp, flags);
+		CP(*out_resp64, *out_resp, count_values);
+		CP(*out_resp64, *out_resp, count_enum_blobs);
+		out_resp->values_ptr = (uintcap_t)__USER_CAP(
+		    out_resp64->values_ptr,
+		    out_resp64->count_values * sizeof(uint64_t));
+		out_resp->enum_blob_ptr = (uintcap_t)__USER_CAP(
+		    out_resp64->enum_blob_ptr,
+		    out_resp64->count_enum_blobs * sizeof(uint64_t));
+	}
+#endif
 
 	property = drm_property_find(dev, file_priv, out_resp->prop_id);
 	if (!property)
@@ -522,6 +548,16 @@ int drm_mode_getproperty_ioctl(struct drm_device *dev,
 	 */
 	if (drm_property_type_is(property, DRM_MODE_PROP_BLOB))
 		out_resp->count_enum_blobs = 0;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		CP(*out_resp, *out_resp64, prop_id);
+		CP(*out_resp, *out_resp64, flags);
+		CP(*out_resp, *out_resp64, count_values);
+		CP(*out_resp, *out_resp64, count_enum_blobs);
+		memcpy(out_resp64->name, out_resp->name, DRM_PROP_NAME_LEN);
+	}
+#endif
 
 	return 0;
 }
@@ -758,11 +794,26 @@ int drm_mode_getblob_ioctl(struct drm_device *dev,
 			   void *data, struct drm_file *file_priv)
 {
 	struct drm_mode_get_blob *out_resp = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_mode_get_blob64 *out_resp64;
+	struct drm_mode_get_blob local_out_resp;
+#endif
 	struct drm_property_blob *blob;
 	int ret = 0;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		out_resp64 = (struct drm_mode_get_blob64 *)data;
+		out_resp = &local_out_resp;
+		CP(*out_resp64, *out_resp, blob_id);
+		CP(*out_resp64, *out_resp, length);
+		out_resp->data = (uintcap_t)__USER_CAP(out_resp64->data,
+		    out_resp64->length);
+	}
+#endif
 
 	blob = drm_property_lookup_blob(dev, out_resp->blob_id);
 	if (!blob)
@@ -780,6 +831,11 @@ int drm_mode_getblob_ioctl(struct drm_device *dev,
 unref:
 	drm_property_blob_put(blob);
 
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		CP(*out_resp, *out_resp64, length);
+#endif
+
 	return ret;
 }
 
@@ -787,11 +843,25 @@ int drm_mode_createblob_ioctl(struct drm_device *dev,
 			      void *data, struct drm_file *file_priv)
 {
 	struct drm_mode_create_blob *out_resp = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_mode_create_blob64 *out_resp64;
+	struct drm_mode_create_blob local_out_resp;
+#endif
 	struct drm_property_blob *blob;
 	int ret = 0;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		out_resp64 = (struct drm_mode_create_blob64 *)data;
+		out_resp = &local_out_resp;
+		CP(*out_resp64, *out_resp, length);
+		out_resp->data = (uintcap_t)__USER_CAP(out_resp64->data,
+		    out_resp64->length);
+	}
+#endif
 
 	blob = drm_property_create_blob(dev, out_resp->length, NULL);
 	if (IS_ERR(blob))
@@ -812,10 +882,16 @@ int drm_mode_createblob_ioctl(struct drm_device *dev,
 	list_add_tail(&blob->head_file, &file_priv->blobs);
 	mutex_unlock(&dev->mode_config.blob_lock);
 
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		CP(*out_resp, *out_resp64, blob_id);
+#endif
+
 	return 0;
 
 out_blob:
 	drm_property_blob_put(blob);
+
 	return ret;
 }
 

@@ -54,11 +54,11 @@ __FBSDID("$FreeBSD$");
 
 #include <drmcompat/fs.h>
 
-vm_offset_t
+vm_pointer_t
 drmcompat_alloc_kmem(gfp_t flags, unsigned int order)
 {
 	size_t size = ((size_t)PAGE_SIZE) << order;
-	vm_offset_t addr;
+	vm_pointer_t addr;
 
 	if ((flags & GFP_DMA32) == 0) {
 		addr = kmem_malloc(size, flags & GFP_NATIVE_MASK);
@@ -70,7 +70,7 @@ drmcompat_alloc_kmem(gfp_t flags, unsigned int order)
 }
 
 void
-drmcompat_free_kmem(vm_offset_t addr, unsigned int order)
+drmcompat_free_kmem(vm_pointer_t addr, unsigned int order)
 {
 	size_t size = ((size_t)PAGE_SIZE) << order;
 

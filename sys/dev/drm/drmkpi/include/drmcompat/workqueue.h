@@ -61,7 +61,7 @@ struct delayed_work {
 		struct mtx mtx;
 		int	expires;
 	} timer;
-};
+} __subobject_use_container_bounds;
 
 extern struct workqueue_struct *drmcompat_system_wq;
 extern struct workqueue_struct *drmcompat_system_long_wq;

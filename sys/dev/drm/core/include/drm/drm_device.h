@@ -381,6 +381,6 @@ struct drm_device {
 	/* Scatter gather memory */
 	struct drm_sg_mem *sg;
 #endif
-};
+} __subobject_use_container_bounds;
 
 #endif

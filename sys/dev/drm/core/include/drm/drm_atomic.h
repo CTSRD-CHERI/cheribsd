@@ -82,7 +82,7 @@ struct drm_crtc_commit {
 	 * completions without the risk of the completion disappearing
 	 * meanwhile.
 	 */
-	struct kref ref;
+	struct kref ref __subobject_use_container_bounds;
 
 	/**
 	 * @flip_done:
@@ -96,7 +96,7 @@ struct drm_crtc_commit {
 	 * Completion of this stage is signalled implicitly by calling
 	 * drm_crtc_send_vblank_event() on &drm_crtc_state.event.
 	 */
-	struct completion flip_done;
+	struct completion flip_done __subobject_use_container_bounds;
 
 	/**
 	 * @hw_done:
@@ -174,7 +174,7 @@ struct __drm_crtcs_state {
 	 */
 	struct drm_crtc_commit *commit;
 
-	s32 __user *out_fence_ptr;
+	s32 __user * __capability out_fence_ptr;
 	u64 last_vblank_count;
 };
 
@@ -188,7 +188,7 @@ struct __drm_connnectors_state {
 	 * file descriptor. Used by writeback connectors to signal completion of
 	 * the writeback.
 	 */
-	s32 __user *out_fence_ptr;
+	s32 __user * __capability out_fence_ptr;
 };
 
 struct drm_private_obj;
@@ -323,7 +323,7 @@ struct __drm_private_objs_state {
  * private state structures, drm_atomic_get_private_obj_state().
  */
 struct drm_atomic_state {
-	struct kref ref;
+	struct kref ref __subobject_use_container_bounds;
 
 	struct drm_device *dev;
 
@@ -374,7 +374,7 @@ struct drm_atomic_state {
 	 * Work item which can be used by the driver or helpers to execute the
 	 * commit without blocking.
 	 */
-	struct work_struct commit_work;
+	struct work_struct commit_work __subobject_use_container_bounds;
 };
 
 void __drm_crtc_commit_free(struct kref *kref);
@@ -1034,7 +1034,7 @@ struct drm_bridge_state {
 	/**
 	 * @base: inherit from &drm_private_state
 	 */
-	struct drm_private_state base;
+	struct drm_private_state base __subobject_use_container_bounds;
 
 	/**
 	 * @bridge: the bridge this state refers to

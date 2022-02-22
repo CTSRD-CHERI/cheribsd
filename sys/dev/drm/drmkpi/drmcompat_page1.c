@@ -58,7 +58,7 @@ void *
 kmap(vm_page_t page)
 {
 #ifdef DRMCOMPAT_HAVE_DMAP
-	vm_offset_t daddr;
+	vm_pointer_t daddr;
 
 	daddr = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
 

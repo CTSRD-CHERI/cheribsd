@@ -7,7 +7,7 @@
 
 struct llist_node {
 	struct llist_node *next;
-};
+} __subobject_use_container_bounds;
 
 struct llist_head {
 	struct llist_node *first;

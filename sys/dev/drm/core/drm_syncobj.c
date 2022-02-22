@@ -183,6 +183,11 @@
  * point 0 to mean take/replace the fence in the syncobj.
  */
 
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
+
 #include <linux/anon_inodes.h>
 #include <linux/file.h>
 #include <linux/fs.h>
@@ -209,7 +214,7 @@ struct syncobj_wait_entry {
 	bool   *signalledp;
 #endif
 	struct dma_fence *fence;
-	struct dma_fence_cb fence_cb;
+	struct dma_fence_cb fence_cb __subobject_use_container_bounds;
 	u64    point;
 };
 
@@ -1039,7 +1044,7 @@ static void syncobj_wait_syncobj_func(struct drm_syncobj *syncobj,
 }
 
 static signed long drm_syncobj_array_wait_timeout(struct drm_syncobj **syncobjs,
-						  void __user *user_points,
+						  void __user * __capability user_points,
 						  uint32_t count,
 						  uint32_t flags,
 						  signed long timeout,
@@ -1265,7 +1270,7 @@ static int drm_syncobj_array_wait(struct drm_device *dev,
 }
 
 static int drm_syncobj_array_find(struct drm_file *file_private,
-				  void __user *user_handles,
+				  void __user * __capability user_handles,
 				  uint32_t count_handles,
 				  struct drm_syncobj ***syncobjs_out)
 {
@@ -1325,11 +1330,28 @@ drm_syncobj_wait_ioctl(struct drm_device *dev, void *data,
 		       struct drm_file *file_private)
 {
 	struct drm_syncobj_wait *args = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_syncobj_wait64 *args64;
+	struct drm_syncobj_wait local_args;
+#endif
 	struct drm_syncobj **syncobjs;
 	int ret = 0;
 
 	if (!drm_core_check_feature(dev, DRIVER_SYNCOBJ))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		args64 = (struct drm_syncobj_wait64 *)data;
+		args = &local_args;
+		CP(*args64, *args, timeout_nsec);
+		CP(*args64, *args, count_handles);
+		CP(*args64, *args, flags);
+		CP(*args64, *args, first_signaled);
+		args->handles = (uintcap_t)__USER_CAP(args64->handles,
+		    args64->count_handles * sizeof(uint64_t));
+	}
+#endif
 
 	if (args->flags & ~(DRM_SYNCOBJ_WAIT_FLAGS_WAIT_ALL |
 			    DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT))
@@ -1350,6 +1372,15 @@ drm_syncobj_wait_ioctl(struct drm_device *dev, void *data,
 
 	drm_syncobj_array_free(syncobjs, args->count_handles);
 
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		CP(*args, *args64, timeout_nsec);
+		CP(*args, *args64, count_handles);
+		CP(*args, *args64, flags);
+		CP(*args, *args64, first_signaled);
+	}
+#endif
+
 	return ret;
 }
 
@@ -1358,11 +1389,30 @@ drm_syncobj_timeline_wait_ioctl(struct drm_device *dev, void *data,
 				struct drm_file *file_private)
 {
 	struct drm_syncobj_timeline_wait *args = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_syncobj_timeline_wait64 *args64;
+	struct drm_syncobj_timeline_wait local_args;
+#endif
 	struct drm_syncobj **syncobjs;
 	int ret = 0;
 
 	if (!drm_core_check_feature(dev, DRIVER_SYNCOBJ_TIMELINE))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		args64 = (struct drm_syncobj_timeline_wait64 *)data;
+		args = &local_args;
+		CP(*args64, *args, timeout_nsec);
+		CP(*args64, *args, count_handles);
+		CP(*args64, *args, flags);
+		CP(*args64, *args, first_signaled);
+		args->handles = (uintcap_t)__USER_CAP(args64->handles,
+		    args64->count_handles * sizeof(uint64_t));
+		args->points = (uintcap_t)__USER_CAP(args64->points,
+		    args64->count_handles * sizeof(uint64_t));
+	}
+#endif
 
 	if (args->flags & ~(DRM_SYNCOBJ_WAIT_FLAGS_WAIT_ALL |
 			    DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT |
@@ -1384,6 +1434,15 @@ drm_syncobj_timeline_wait_ioctl(struct drm_device *dev, void *data,
 
 	drm_syncobj_array_free(syncobjs, args->count_handles);
 
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		CP(*args, *args64, timeout_nsec);
+		CP(*args, *args64, count_handles);
+		CP(*args, *args64, flags);
+		CP(*args, *args64, first_signaled);
+	}
+#endif
+
 	return ret;
 }
 
@@ -1393,12 +1452,26 @@ drm_syncobj_reset_ioctl(struct drm_device *dev, void *data,
 			struct drm_file *file_private)
 {
 	struct drm_syncobj_array *args = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_syncobj_array64 *args64;
+	struct drm_syncobj_array local_args;
+#endif
 	struct drm_syncobj **syncobjs;
 	uint32_t i;
 	int ret;
 
 	if (!drm_core_check_feature(dev, DRIVER_SYNCOBJ))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		args64 = (struct drm_syncobj_array64 *)data;
+		args = &local_args;
+		CP(*args64, *args, count_handles);
+		args->handles = (uintcap_t)__USER_CAP(args64->handles,
+		    args64->count_handles * sizeof(uint64_t));
+	}
+#endif
 
 	if (args->pad != 0)
 		return -EINVAL;
@@ -1426,12 +1499,26 @@ drm_syncobj_signal_ioctl(struct drm_device *dev, void *data,
 			 struct drm_file *file_private)
 {
 	struct drm_syncobj_array *args = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_syncobj_array64 *args64;
+	struct drm_syncobj_array local_args;
+#endif
 	struct drm_syncobj **syncobjs;
 	uint32_t i;
 	int ret;
 
 	if (!drm_core_check_feature(dev, DRIVER_SYNCOBJ))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		args64 = (struct drm_syncobj_array64 *)data;
+		args = &local_args;
+		CP(*args64, *args, count_handles);
+		args->handles = (uintcap_t)__USER_CAP(args64->handles,
+		    args64->count_handles * sizeof(uint64_t));
+	}
+#endif
 
 	if (args->pad != 0)
 		return -EINVAL;
@@ -1459,6 +1546,10 @@ drm_syncobj_timeline_signal_ioctl(struct drm_device *dev, void *data,
 				  struct drm_file *file_private)
 {
 	struct drm_syncobj_timeline_array *args = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_syncobj_timeline_array64 *args64;
+	struct drm_syncobj_timeline_array local_args;
+#endif
 	struct drm_syncobj **syncobjs;
 	struct dma_fence_chain **chains;
 	uint64_t *points;
@@ -1467,6 +1558,19 @@ drm_syncobj_timeline_signal_ioctl(struct drm_device *dev, void *data,
 
 	if (!drm_core_check_feature(dev, DRIVER_SYNCOBJ_TIMELINE))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		args64 = (struct drm_syncobj_timeline_array64 *)data;
+		args = &local_args;
+		CP(*args64, *args, count_handles);
+		CP(*args64, *args, flags);
+		args->handles = (uintcap_t)__USER_CAP(args64->handles,
+		    args64->count_handles * sizeof(uint64_t));
+		args->points = (uintcap_t)__USER_CAP(args64->points,
+		    args64->count_handles * sizeof(uint64_t));
+	}
+#endif
 
 	if (args->flags != 0)
 		return -EINVAL;
@@ -1531,13 +1635,31 @@ int drm_syncobj_query_ioctl(struct drm_device *dev, void *data,
 			    struct drm_file *file_private)
 {
 	struct drm_syncobj_timeline_array *args = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_syncobj_timeline_array64 *args64;
+	struct drm_syncobj_timeline_array local_args;
+#endif
 	struct drm_syncobj **syncobjs;
-	uint64_t __user *points = u64_to_user_ptr(args->points);
+	uint64_t __user * __capability points = u64_to_user_ptr(args->points);
 	uint32_t i;
 	int ret;
 
 	if (!drm_core_check_feature(dev, DRIVER_SYNCOBJ_TIMELINE))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		args64 = (struct drm_syncobj_timeline_array64 *)data;
+		args = &local_args;
+		CP(*args64, *args, count_handles);
+		CP(*args64, *args, flags);
+		args->handles = (uintcap_t)__USER_CAP(args64->handles,
+		    args64->count_handles * sizeof(uint64_t));
+		args->points = (uintcap_t)__USER_CAP(args64->points,
+		    args64->count_handles * sizeof(uint64_t));
+		points = u64_to_user_ptr(args->points);
+	}
+#endif
 
 	if (args->flags & ~DRM_SYNCOBJ_QUERY_FLAGS_LAST_SUBMITTED)
 		return -EINVAL;

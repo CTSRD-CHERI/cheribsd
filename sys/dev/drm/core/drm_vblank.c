@@ -24,6 +24,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
+
 #include <linux/export.h>
 #include <linux/moduleparam.h>
 
@@ -1724,6 +1729,10 @@ int drm_wait_vblank_ioctl(struct drm_device *dev, void *data,
 	struct drm_crtc *crtc;
 	struct drm_vblank_crtc *vblank;
 	union drm_wait_vblank *vblwait = data;
+#ifdef COMPAT_FREEBSD64
+	union drm_wait_vblank64 *vblwait64;
+	union drm_wait_vblank local_vblwait;
+#endif
 	int ret;
 	u64 req_seq, seq;
 	unsigned int pipe_index;
@@ -1731,6 +1740,16 @@ int drm_wait_vblank_ioctl(struct drm_device *dev, void *data,
 
 	if (!dev->irq_enabled)
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		vblwait64 = (union drm_wait_vblank64 *)data;
+		vblwait = &local_vblwait;
+		CP(*vblwait64, *vblwait, request.type);
+		CP(*vblwait64, *vblwait, request.sequence);
+		CP(*vblwait64, *vblwait, request.signal);
+	}
+#endif
 
 	if (vblwait->request.type & _DRM_VBLANK_SIGNAL)
 		return -EINVAL;
@@ -2045,6 +2064,10 @@ int drm_crtc_queue_sequence_ioctl(struct drm_device *dev, void *data,
 	struct drm_vblank_crtc *vblank;
 	int pipe;
 	struct drm_crtc_queue_sequence *queue_seq = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_crtc_queue_sequence64 *queue_seq64;
+	struct drm_crtc_queue_sequence local_queue_seq;
+#endif
 	ktime_t now;
 	struct drm_pending_vblank_event *e;
 	u32 flags;
@@ -2058,6 +2081,17 @@ int drm_crtc_queue_sequence_ioctl(struct drm_device *dev, void *data,
 
 	if (!dev->irq_enabled)
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		queue_seq64 = (struct drm_crtc_queue_sequence64 *)data;
+		queue_seq = &local_queue_seq;
+		CP(*queue_seq64, *queue_seq, crtc_id);
+		CP(*queue_seq64, *queue_seq, flags);
+		CP(*queue_seq64, *queue_seq, sequence);
+		CP(*queue_seq64, *queue_seq, user_data);
+	}
+#endif
 
 	crtc = drm_crtc_find(dev, file_priv, queue_seq->crtc_id);
 	if (!crtc)

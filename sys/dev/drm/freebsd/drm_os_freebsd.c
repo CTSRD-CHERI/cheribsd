@@ -96,7 +96,7 @@ drm_fstub_read(struct file *file, struct uio *uio, struct ucred *cred,
 	   &uio->uio_offset);
 	if (rv >= 0) {
 		uio->uio_iov->iov_base =
-		    ((uint8_t *)uio->uio_iov->iov_base) + bytes;
+		    ((uint8_t * __capability)uio->uio_iov->iov_base) + bytes;
 		uio->uio_iov->iov_len -= bytes;
 		uio->uio_resid -= bytes;
 		rv = 0;
@@ -143,7 +143,7 @@ drm_fstub_write(struct file *file, struct uio *uio, struct ucred *cred,
 	   &uio->uio_offset);
 	if (rv >= 0) {
 		uio->uio_iov->iov_base =
-		    ((uint8_t *)uio->uio_iov->iov_base) + bytes;
+		    ((uint8_t * __capability)uio->uio_iov->iov_base) + bytes;
 		uio->uio_iov->iov_len -= bytes;
 		uio->uio_resid -= bytes;
 		rv = 0;
@@ -267,7 +267,7 @@ drm_fstub_ioctl(struct file *file, u_long cmd, void *data, struct ucred *cred,
 		goto out_release;
 	}
 
-	rv = fops->unlocked_ioctl(file, cmd, (unsigned long)data);
+	rv = fops->unlocked_ioctl(file, cmd, (uintcap_t)PTR2CAP(data));
 
 	dev_relthread(cdev, ref);
 	return (rv);
@@ -602,9 +602,9 @@ drm_fstub_do_mmap(struct file *file, const struct file_operations *fops,
 }
 
 static int
-drm_fstub_mmap(struct file *file, vm_map_t map, vm_offset_t *addr,
-    vm_size_t size, vm_prot_t prot, vm_prot_t cap_maxprot, int flags,
-    vm_ooffset_t foff, struct thread *td)
+drm_fstub_mmap(struct file *file, vm_map_t map, vm_pointer_t *addr,
+    vm_offset_t max_addr, vm_size_t size, vm_prot_t prot,
+    vm_prot_t cap_maxprot, int flags, vm_ooffset_t foff, struct thread *td)
 {
 	struct cdev *cdev;
 	struct drm_minor *minor;
@@ -671,8 +671,8 @@ drm_fstub_mmap(struct file *file, vm_map_t map, vm_offset_t *addr,
 	if (rv != 0)
 		goto out_release;
 
-	rv = vm_mmap_object(map, addr, size, prot, maxprot, flags, obj,
-	    foff, FALSE, td);
+	rv = vm_mmap_object(map, addr, max_addr, size, prot, maxprot, flags,
+	    obj, foff, FALSE, td);
 	if (rv != 0)
 		vm_object_deallocate(obj);
 out_release:

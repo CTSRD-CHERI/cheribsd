@@ -1645,7 +1645,7 @@ dev/drm/core/drm_fourcc.c			optional compat_drmcompat drm compile-with "${DRM_C}
 dev/drm/core/drm_framebuffer.c			optional compat_drmcompat drm compile-with "${DRM_C}"
 dev/drm/core/drm_gem.c				optional compat_drmcompat drm compile-with "${DRM_C}"
 dev/drm/core/drm_hashtab.c			optional compat_drmcompat drm compile-with "${DRM_C}"
-dev/drm/core/drm_ioc32.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_ioc32.c			optional compat_drmcompat compat_freebsd32 drm compile-with "${DRM_C}"
 dev/drm/core/drm_ioctl.c			optional compat_drmcompat drm compile-with "${DRM_C}"
 dev/drm/core/drm_kms_helper_common.c		optional compat_drmcompat drm compile-with "${DRM_C}"
 dev/drm/core/drm_memory.c			optional compat_drmcompat drm compile-with "${DRM_C}"

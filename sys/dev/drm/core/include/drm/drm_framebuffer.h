@@ -211,7 +211,7 @@ struct drm_framebuffer {
 	 * drm_gem_fb_create().
 	 */
 	struct drm_gem_object *obj[4];
-};
+} __subobject_use_container_bounds;
 
 #define obj_to_fb(x) container_of(x, struct drm_framebuffer, base)
 

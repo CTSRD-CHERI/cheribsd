@@ -47,7 +47,7 @@ struct reservation_object {
 };
 
 struct reservation_object_list {
-	struct rcu_head		rol_rcu;
+	struct rcu_head		rol_rcu __subobject_use_container_bounds;
 
 	uint32_t		shared_count;
 	uint32_t		shared_max;
@@ -58,7 +58,7 @@ struct reservation_object_list {
 struct reservation_poll {
 	struct sx 		rp_lock;
 	struct selinfo		rp_selq;
-	struct dma_fence_cb	rp_fcb;
+	struct dma_fence_cb	rp_fcb __subobject_use_container_bounds;
 	bool			rp_claimed;
 };
 

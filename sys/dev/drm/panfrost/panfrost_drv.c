@@ -33,6 +33,9 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#endif
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -41,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/rman.h>
 #include <sys/resource.h>
+#include <sys/sysent.h>
 #include <machine/bus.h>
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -218,7 +222,7 @@ panfrost_copy_in_fences(struct drm_device *dev, struct drm_file *file_priv,
 	sz = job->in_fence_count * sizeof(uint32_t);
 	handles = malloc(sz, M_PANFROST1, M_WAITOK | M_ZERO);
 
-	error = copyin((void *)args->in_syncs, handles, sz);
+	error = copyin((void * __capability)args->in_syncs, handles, sz);
 	if (error) {
 		free(job->in_fences, M_PANFROST1);
 		goto done;
@@ -259,7 +263,7 @@ panfrost_lookup_bos(struct drm_device *dev, struct drm_file *file_priv,
 	job->implicit_fences = malloc(sz, M_PANFROST1, M_WAITOK | M_ZERO);
 
 	error = drm_gem_objects_lookup(file_priv,
-	    (void __user *)(uintptr_t)args->bo_handles, job->bo_count,
+	    (void __user * __capability)args->bo_handles, job->bo_count,
 	    &job->bos);
 	if (error) {
 		free(job->implicit_fences, M_PANFROST1);
@@ -288,6 +292,11 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
     struct drm_file *file)
 {
 	struct panfrost_softc *sc;
+#ifdef COMPAT_FREEBSD64
+	struct drm_panfrost_submit64 *args64;
+	struct drm_panfrost_submit local_args;
+	int sz;
+#endif
 	struct drm_panfrost_submit *args;
 	struct panfrost_job *job;
 	struct drm_syncobj *sync_out;
@@ -296,6 +305,25 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	sc = dev->dev_private;
 
 	args = data;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		args64 = (struct drm_panfrost_submit64 *)data;
+		args = &local_args;
+		CP(*args64, *args, jc);
+		CP(*args64, *args, in_sync_count);
+		CP(*args64, *args, out_sync);
+		CP(*args64, *args, bo_handle_count);
+		CP(*args64, *args, requirements);
+
+		sz = args64->in_sync_count * sizeof(uint32_t);
+		args->in_syncs = (uintcap_t)__USER_CAP(args64->in_syncs, sz);
+
+		sz = args64->bo_handle_count * sizeof(uint32_t);
+		args->bo_handles = (uintcap_t)__USER_CAP(args64->bo_handles,sz);
+	}
+#endif
+
 	sync_out = NULL;
 
 	dprintf("%s: jc %x\n", __func__, args->jc);
@@ -592,7 +620,7 @@ panfrost_ioctl_madvise(struct drm_device *dev, void *data,
 	struct drm_panfrost_madvise *args;
 	struct drm_gem_object *obj;
 	struct panfrost_gem_object *bo;
-	vm_offset_t va;
+	vm_pointer_t va;
 	vm_page_t m;
 	int i;
 

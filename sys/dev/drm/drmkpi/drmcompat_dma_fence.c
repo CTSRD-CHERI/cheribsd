@@ -543,7 +543,7 @@ struct wait_any {
 		struct cv	cv;
 		bool		done;
 	} *common;
-};
+} __subobject_use_container_bounds;
 
 static void
 wait_any_cb(struct dma_fence *fence, struct dma_fence_cb *fcb)

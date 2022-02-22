@@ -56,7 +56,7 @@ struct drm_mode_object {
 	uint32_t id;
 	uint32_t type;
 	struct drm_object_properties *properties;
-	struct kref refcount;
+	struct kref refcount __subobject_use_container_bounds;
 	void (*free_cb)(struct kref *kref);
 };
 

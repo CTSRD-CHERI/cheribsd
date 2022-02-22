@@ -1140,7 +1140,7 @@ struct drm_connector {
 	struct list_head head;
 
 	/** @base: base KMS object */
-	struct drm_mode_object base;
+	struct drm_mode_object base __subobject_use_container_bounds;
 
 	/** @name: human readable name, can be overwritten by the driver */
 	char *name;
@@ -1614,7 +1614,7 @@ struct drm_tile_group {
 	struct drm_device *dev;
 	int id;
 	u8 group_data[8];
-};
+} __subobject_use_container_bounds;
 
 struct drm_tile_group *drm_mode_create_tile_group(struct drm_device *dev,
 						  const char topology[8]);

@@ -33,9 +33,9 @@
 #ifndef	__DRMCOMPAT_UACCESS_H__
 #define	__DRMCOMPAT_UACCESS_H__
 
-int drmcompat_copyin(const void *uaddr, void *kaddr, size_t len);
-int drmcompat_copyout(const void *kaddr, void *uaddr, size_t len);
-size_t drmcompat_clear_user(void *uaddr, size_t len);
-int drmcompat_access_ok(const void *uaddr, size_t len);
+int drmcompat_copyin(const void * __capability uaddr, void *kaddr, size_t len);
+int drmcompat_copyout(const void *kaddr, void * __capability uaddr, size_t len);
+size_t drmcompat_clear_user(void * __capability uaddr, size_t len);
+int drmcompat_access_ok(const void * __capability uaddr, size_t len);
 
 #endif	/* __DRMCOMPAT_UACCESS_H__ */

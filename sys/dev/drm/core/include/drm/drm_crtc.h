@@ -1172,7 +1172,7 @@ struct drm_crtc {
 	 * Initialized via drm_self_refresh_helper_init().
 	 */
 	struct drm_self_refresh_data *self_refresh_data;
-};
+} __subobject_use_container_bounds;
 
 /**
  * struct drm_mode_set - new values for a CRTC config change

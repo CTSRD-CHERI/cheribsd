@@ -34,7 +34,7 @@
 #define	_DEV_DRM_PANFROST_PANFROST_JOB_H_
 
 struct panfrost_job {
-	struct drm_sched_job base;	/* must go first */
+	struct drm_sched_job base __subobject_use_container_bounds; /* must go first */
 	struct panfrost_softc *sc;
 	struct panfrost_file *pfile;
 	uint64_t jc;

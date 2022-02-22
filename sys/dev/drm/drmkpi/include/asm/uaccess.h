@@ -34,7 +34,7 @@
 #include <linux/uaccess.h>
 
 static inline long
-copy_to_user(void *to, const void *from, unsigned long n)
+copy_to_user(void * __capability to, const void *from, unsigned long n)
 {
 	if (drmcompat_copyout(from, to, n) != 0)
 		return n;
@@ -43,7 +43,7 @@ copy_to_user(void *to, const void *from, unsigned long n)
 #define	__copy_to_user(...)	copy_to_user(__VA_ARGS__)
 
 static inline long
-copy_from_user(void *to, const void *from, unsigned long n)
+copy_from_user(void *to, const void * __capability from, unsigned long n)
 {
 	if (drmcompat_copyin(from, to, n) != 0)
 		return n;

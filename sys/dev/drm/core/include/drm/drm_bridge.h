@@ -706,7 +706,7 @@ enum drm_bridge_ops {
  */
 struct drm_bridge {
 	/** @base: inherit from &drm_private_object */
-	struct drm_private_obj base;
+	struct drm_private_obj base __subobject_use_container_bounds;
 	/** @dev: DRM device this bridge belongs to */
 	struct drm_device *dev;
 	/** @encoder: encoder to which this bridge is connected */

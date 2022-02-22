@@ -20,6 +20,11 @@
  * OF THIS SOFTWARE.
  */
 
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
+
 /* Due to header polution in Linux we need those files included */
 #ifdef __FreeBSD__
 #include <linux/refcount.h>
@@ -2244,6 +2249,10 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 			  struct drm_file *file_priv)
 {
 	struct drm_mode_get_connector *out_resp = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_mode_get_connector64 *out_resp64;
+	struct drm_mode_get_connector local_out_resp;
+#endif
 	struct drm_connector *connector;
 	struct drm_encoder *encoder;
 	struct drm_display_mode *mode;
@@ -2252,12 +2261,43 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 	int ret = 0;
 	int copied = 0;
 	struct drm_mode_modeinfo u_mode;
-	struct drm_mode_modeinfo __user *mode_ptr;
-	uint32_t __user *encoder_ptr;
+	struct drm_mode_modeinfo __user * __capability mode_ptr;
+	uint32_t __user * __capability encoder_ptr;
 	LIST_HEAD(export_list);
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		out_resp64 = (struct drm_mode_get_connector64 *)data;
+		out_resp = &local_out_resp;
+		CP(*out_resp64, *out_resp, count_modes);
+		CP(*out_resp64, *out_resp, count_props);
+		CP(*out_resp64, *out_resp, count_encoders);
+		CP(*out_resp64, *out_resp, encoder_id);
+		CP(*out_resp64, *out_resp, connector_id);
+		CP(*out_resp64, *out_resp, connector_type);
+		CP(*out_resp64, *out_resp, connector_type_id);
+		CP(*out_resp64, *out_resp, connection);
+		CP(*out_resp64, *out_resp, mm_width);
+		CP(*out_resp64, *out_resp, mm_height);
+		CP(*out_resp64, *out_resp, subpixel);
+
+		out_resp->encoders_ptr = (uintcap_t)__USER_CAP(
+		    out_resp64->encoders_ptr,
+		    out_resp64->count_encoders * sizeof(uint32_t));
+		out_resp->modes_ptr = (uintcap_t)__USER_CAP(
+		    out_resp64->modes_ptr,
+		    out_resp64->count_modes * sizeof(struct drm_mode_modeinfo));
+		out_resp->props_ptr = (uintcap_t)__USER_CAP(
+		    out_resp64->props_ptr,
+		    out_resp64->count_props * sizeof(uint32_t));
+		out_resp->prop_values_ptr = (uintcap_t)__USER_CAP(
+		    out_resp64->prop_values_ptr,
+		    out_resp64->count_props * sizeof(uint64_t));
+	}
+#endif
 
 	memset(&u_mode, 0, sizeof(struct drm_mode_modeinfo));
 
@@ -2269,8 +2309,7 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 
 	if ((out_resp->count_encoders >= encoders_count) && encoders_count) {
 		copied = 0;
-		encoder_ptr = (uint32_t __user *)(unsigned long)(out_resp->encoders_ptr);
-
+		encoder_ptr = (uint32_t __user * __capability)(out_resp->encoders_ptr);
 		drm_connector_for_each_possible_encoder(connector, encoder) {
 			if (put_user(encoder->base.id, encoder_ptr + copied)) {
 				ret = -EFAULT;
@@ -2315,7 +2354,7 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 	 */
 	if ((out_resp->count_modes >= mode_count) && mode_count) {
 		copied = 0;
-		mode_ptr = (struct drm_mode_modeinfo __user *)(unsigned long)out_resp->modes_ptr;
+		mode_ptr = (struct drm_mode_modeinfo __user * __capability)out_resp->modes_ptr;
 		list_for_each_entry(mode, &export_list, export_head) {
 			drm_mode_convert_to_umode(&u_mode, mode);
 			/*
@@ -2347,13 +2386,29 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 	/* Only grab properties after probing, to make sure EDID and other
 	 * properties reflect the latest status. */
 	ret = drm_mode_object_get_properties(&connector->base, file_priv->atomic,
-			(uint32_t __user *)(unsigned long)(out_resp->props_ptr),
-			(uint64_t __user *)(unsigned long)(out_resp->prop_values_ptr),
+			(uint32_t __user * __capability)(out_resp->props_ptr),
+			(uint64_t __user * __capability)(out_resp->prop_values_ptr),
 			&out_resp->count_props);
 	drm_modeset_unlock(&dev->mode_config.connection_mutex);
 
 out:
 	drm_connector_put(connector);
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		CP(*out_resp, *out_resp64, count_modes);
+		CP(*out_resp, *out_resp64, count_props);
+		CP(*out_resp, *out_resp64, count_encoders);
+		CP(*out_resp, *out_resp64, encoder_id);
+		CP(*out_resp, *out_resp64, connector_id);
+		CP(*out_resp, *out_resp64, connector_type);
+		CP(*out_resp, *out_resp64, connector_type_id);
+		CP(*out_resp, *out_resp64, connection);
+		CP(*out_resp, *out_resp64, mm_width);
+		CP(*out_resp, *out_resp64, mm_height);
+		CP(*out_resp, *out_resp64, subpixel);
+	}
+#endif
 
 	return ret;
 }

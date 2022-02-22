@@ -34,7 +34,7 @@ __FBSDID("$FreeBSD$");
 struct drmcompat_kmem_rcu {
 	struct rcu_head rcu_head;
 	struct drmcompat_kmem_cache *cache;
-};
+} __subobject_use_container_bounds;
 
 #define	LINUX_KMEM_TO_RCU(c, m)					\
 	((struct drmcompat_kmem_rcu *)((char *)(m) +		\

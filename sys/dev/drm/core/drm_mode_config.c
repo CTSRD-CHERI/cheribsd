@@ -20,6 +20,11 @@
  * OF THIS SOFTWARE.
  */
 
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
+
 #include <linux/uaccess.h>
 
 #include <drm/drm_drv.h>
@@ -88,20 +93,55 @@ void drm_modeset_unregister_all(struct drm_device *dev)
 int drm_mode_getresources(struct drm_device *dev, void *data,
 			  struct drm_file *file_priv)
 {
+#ifdef COMPAT_FREEBSD64
+	struct drm_mode_card_res64 *card_res64;
+	struct drm_mode_card_res local_card_res;
+#endif
 	struct drm_mode_card_res *card_res = data;
 	struct drm_framebuffer *fb;
 	struct drm_connector *connector;
 	struct drm_crtc *crtc;
 	struct drm_encoder *encoder;
 	int count, ret = 0;
-	uint32_t __user *fb_id;
-	uint32_t __user *crtc_id;
-	uint32_t __user *connector_id;
-	uint32_t __user *encoder_id;
+	uint32_t __user * __capability fb_id;
+	uint32_t __user * __capability crtc_id;
+	uint32_t __user * __capability connector_id;
+	uint32_t __user * __capability encoder_id;
 	struct drm_connector_list_iter conn_iter;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		card_res64 = (struct drm_mode_card_res64 *)data;
+		card_res = &local_card_res;
+		CP(*card_res64, *card_res, count_fbs);
+		CP(*card_res64, *card_res, count_crtcs);
+		CP(*card_res64, *card_res, count_connectors);
+		CP(*card_res64, *card_res, count_encoders);
+		CP(*card_res64, *card_res, min_width);
+		CP(*card_res64, *card_res, max_width);
+		CP(*card_res64, *card_res, min_height);
+		CP(*card_res64, *card_res, max_height);
+
+		card_res->fb_id_ptr = (uintcap_t)__USER_CAP(
+		    card_res64->fb_id_ptr,
+		    card_res64->count_fbs * sizeof(uint32_t));
+
+		card_res->crtc_id_ptr = (uintcap_t)__USER_CAP(
+		    card_res64->crtc_id_ptr,
+		    card_res64->count_crtcs * sizeof(uint32_t));
+
+		card_res->connector_id_ptr = (uintcap_t)__USER_CAP(
+		    card_res64->connector_id_ptr,
+		    card_res64->count_connectors * sizeof(uint32_t));
+
+		card_res->encoder_id_ptr = (uintcap_t)__USER_CAP(
+		    card_res64->encoder_id_ptr,
+		    card_res64->count_encoders * sizeof(uint32_t));
+	}
+#endif
 
 	mutex_lock(&file_priv->fbs_lock);
 	count = 0;
@@ -164,6 +204,19 @@ int drm_mode_getresources(struct drm_device *dev, void *data,
 	}
 	card_res->count_connectors = count;
 	drm_connector_list_iter_end(&conn_iter);
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		CP(*card_res, *card_res64, count_fbs);
+		CP(*card_res, *card_res64, count_crtcs);
+		CP(*card_res, *card_res64, count_connectors);
+		CP(*card_res, *card_res64, count_encoders);
+		CP(*card_res, *card_res64, min_width);
+		CP(*card_res, *card_res64, max_width);
+		CP(*card_res, *card_res64, min_height);
+		CP(*card_res, *card_res64, max_height);
+	}
+#endif
 
 	return ret;
 }

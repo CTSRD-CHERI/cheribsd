@@ -32,5 +32,6 @@
 #include <asm/atomic.h>
 #include <asm/atomic64.h>
 #include <asm/atomic-long.h>
+#include <asm/atomic-ptr.h>
 
 #endif /* __DRMCOMPAT_LINUX_ATOMIC_H__ */

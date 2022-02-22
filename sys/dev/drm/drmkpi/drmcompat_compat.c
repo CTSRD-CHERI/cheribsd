@@ -58,27 +58,27 @@ drmcompat_panic_cmp(struct rb_node *one, struct rb_node *two)
 RB_GENERATE(drmcompat_root, rb_node, __entry, drmcompat_panic_cmp);
 
 int
-drmcompat_copyin(const void *uaddr, void *kaddr, size_t len)
+drmcompat_copyin(const void * __capability uaddr, void *kaddr, size_t len)
 {
 
-	return (-copyin(uaddr, kaddr, len));
+	return (-copyincap(uaddr, kaddr, len));
 }
 
 int
-drmcompat_copyout(const void *kaddr, void *uaddr, size_t len)
+drmcompat_copyout(const void *kaddr, void * __capability uaddr, size_t len)
 {
 
-	return (-copyout(kaddr, uaddr, len));
+	return (-copyoutcap(kaddr, uaddr, len));
 }
 
 size_t
-drmcompat_clear_user(void *_uaddr, size_t _len)
+drmcompat_clear_user(void * __capability _uaddr, size_t _len)
 {
-	uint8_t *uaddr = _uaddr;
+	uint8_t * __capability uaddr = _uaddr;
 	size_t len = _len;
 
 	/* make sure uaddr is aligned before going into the fast loop */
-	while (((uintptr_t)uaddr & 7) != 0 && len > 7) {
+	while (((uintcap_t)uaddr & 7) != 0 && len > 7) {
 		if (subyte(uaddr, 0))
 			return (_len);
 		uaddr++;
@@ -111,14 +111,14 @@ drmcompat_clear_user(void *_uaddr, size_t _len)
 }
 
 int
-drmcompat_access_ok(const void *uaddr, size_t len)
+drmcompat_access_ok(const void * __capability uaddr, size_t len)
 {
 	uintptr_t saddr;
 	uintptr_t eaddr;
 
 	/* get start and end address */
-	saddr = (uintptr_t)uaddr;
-	eaddr = (uintptr_t)uaddr + len;
+	saddr = (uintcap_t)uaddr;
+	eaddr = (uintcap_t)uaddr + len;
 
 	/* verify addresses are valid for userspace */
 	return ((saddr == eaddr) ||
@@ -144,4 +144,6 @@ drmcompat_iminor(struct inode *inode)
  * used. Assert these types have the same size, else some parts of the
  * DRMCOMPAT may not work like expected:
  */
+#ifndef __CHERI_PURE_CAPABILITY__
 CTASSERT(sizeof(unsigned long) == sizeof(uintptr_t));
+#endif

@@ -20,6 +20,11 @@
  * OF THIS SOFTWARE.
  */
 
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
+
 #include <linux/export.h>
 #include <linux/uaccess.h>
 
@@ -396,7 +401,7 @@ int drm_mode_addfb2_ioctl(struct drm_device *dev,
 }
 
 struct drm_mode_rmfb_work {
-	struct work_struct work;
+	struct work_struct work __subobject_use_container_bounds;
 	struct list_head fbs;
 };
 
@@ -696,9 +701,13 @@ out:
 int drm_mode_dirtyfb_ioctl(struct drm_device *dev,
 			   void *data, struct drm_file *file_priv)
 {
-	struct drm_clip_rect __user *clips_ptr;
+	struct drm_clip_rect __user * __capability clips_ptr;
 	struct drm_clip_rect *clips = NULL;
 	struct drm_mode_fb_dirty_cmd *r = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_mode_fb_dirty_cmd64 *r64;
+	struct drm_mode_fb_dirty_cmd local_r;
+#endif
 	struct drm_framebuffer *fb;
 	unsigned flags;
 	int num_clips;
@@ -707,12 +716,25 @@ int drm_mode_dirtyfb_ioctl(struct drm_device *dev,
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
 
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		r64 = (struct drm_mode_fb_dirty_cmd64 *)data;
+		r = &local_r;
+		CP(*r64, *r, fb_id);
+		CP(*r64, *r, flags);
+		CP(*r64, *r, color);
+		CP(*r64, *r, num_clips);
+		r->clips_ptr = (uintcap_t)__USER_CAP(r64->clips_ptr,
+		    r64->num_clips * sizeof(uint64_t));
+	}
+#endif
+
 	fb = drm_framebuffer_lookup(dev, file_priv, r->fb_id);
 	if (!fb)
 		return -ENOENT;
 
 	num_clips = r->num_clips;
-	clips_ptr = (struct drm_clip_rect __user *)(unsigned long)r->clips_ptr;
+	clips_ptr = (struct drm_clip_rect __user * __capability)r->clips_ptr;
 
 	if (!num_clips != !clips_ptr) {
 		ret = -EINVAL;
@@ -757,6 +779,15 @@ out_err2:
 	kfree(clips);
 out_err1:
 	drm_framebuffer_put(fb);
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		CP(*r, *r64, fb_id);
+		CP(*r, *r64, flags);
+		CP(*r, *r64, color);
+		CP(*r, *r64, num_clips);
+	}
+#endif
 
 	return ret;
 }

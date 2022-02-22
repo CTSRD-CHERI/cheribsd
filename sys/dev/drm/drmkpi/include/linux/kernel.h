@@ -262,15 +262,12 @@ scnprintf(char *buf, size_t size, const char *fmt, ...)
 })
 #endif
 
-#define container_of(ptr, type, member)				\
-({								\
-	const __typeof(((type *)0)->member) *__p = (ptr);	\
-	(type *)((uintptr_t)__p - offsetof(type, member));	\
-})
+/* Use FreeBSD's containerof. */
+#define	container_of(x, s, m)	__containerof(x, s, m)
 
 #define	ARRAY_SIZE(x)	(sizeof(x) / sizeof((x)[0]))
 
-#define	u64_to_user_ptr(val)	((void *)(uintptr_t)(val))
+#define	u64_to_user_ptr(val)	((void * __capability)val)
 
 static inline unsigned long long
 simple_strtoull(const char *cp, char **endp, unsigned int base)
@@ -407,7 +404,7 @@ kstrtobool(const char *s, bool *res)
 }
 
 static inline int
-kstrtobool_from_user(const char __user *s, size_t count, bool *res)
+kstrtobool_from_user(const char __user * __capability s, size_t count, bool *res)
 {
 	char buf[8] = {};
 

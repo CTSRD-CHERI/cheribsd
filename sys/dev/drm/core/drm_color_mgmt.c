@@ -20,6 +20,11 @@
  * OF THIS SOFTWARE.
  */
 
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#include <sys/sysent.h>
+#endif
+
 #include <linux/uaccess.h>
 
 #include <drm/drm_color_mgmt.h>
@@ -249,6 +254,10 @@ int drm_mode_gamma_set_ioctl(struct drm_device *dev,
 			     void *data, struct drm_file *file_priv)
 {
 	struct drm_mode_crtc_lut *crtc_lut = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_mode_crtc_lut64 *crtc_lut64;
+	struct drm_mode_crtc_lut local_crtc_lut;
+#endif
 	struct drm_crtc *crtc;
 	void *r_base, *g_base, *b_base;
 	int size;
@@ -257,6 +266,20 @@ int drm_mode_gamma_set_ioctl(struct drm_device *dev,
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		crtc_lut64 = (struct drm_mode_crtc_lut64 *)data;
+		crtc_lut = &local_crtc_lut;
+		CP(*crtc_lut64, *crtc_lut, crtc_id);
+		CP(*crtc_lut64, *crtc_lut, gamma_size);
+		size = crtc_lut64->gamma_size * sizeof(uint16_t);
+		crtc_lut->red = (uintcap_t)__USER_CAP(crtc_lut64->red, size);
+		crtc_lut->green = (uintcap_t)__USER_CAP(crtc_lut64->green,
+		    size);
+		crtc_lut->blue = (uintcap_t)__USER_CAP(crtc_lut64->blue, size);
+	}
+#endif
 
 	crtc = drm_crtc_find(dev, file_priv, crtc_lut->crtc_id);
 	if (!crtc)
@@ -273,19 +296,19 @@ int drm_mode_gamma_set_ioctl(struct drm_device *dev,
 
 	size = crtc_lut->gamma_size * (sizeof(uint16_t));
 	r_base = crtc->gamma_store;
-	if (copy_from_user(r_base, (void __user *)(unsigned long)crtc_lut->red, size)) {
+	if (copy_from_user(r_base, (void __user * __capability)crtc_lut->red, size)) {
 		ret = -EFAULT;
 		goto out;
 	}
 
 	g_base = r_base + size;
-	if (copy_from_user(g_base, (void __user *)(unsigned long)crtc_lut->green, size)) {
+	if (copy_from_user(g_base, (void __user * __capability)crtc_lut->green, size)){
 		ret = -EFAULT;
 		goto out;
 	}
 
 	b_base = g_base + size;
-	if (copy_from_user(b_base, (void __user *)(unsigned long)crtc_lut->blue, size)) {
+	if (copy_from_user(b_base, (void __user * __capability)crtc_lut->blue, size)) {
 		ret = -EFAULT;
 		goto out;
 	}
@@ -318,6 +341,10 @@ int drm_mode_gamma_get_ioctl(struct drm_device *dev,
 			     void *data, struct drm_file *file_priv)
 {
 	struct drm_mode_crtc_lut *crtc_lut = data;
+#ifdef COMPAT_FREEBSD64
+	struct drm_mode_crtc_lut64 *crtc_lut64;
+	struct drm_mode_crtc_lut local_crtc_lut;
+#endif
 	struct drm_crtc *crtc;
 	void *r_base, *g_base, *b_base;
 	int size;
@@ -325,6 +352,20 @@ int drm_mode_gamma_get_ioctl(struct drm_device *dev,
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EOPNOTSUPP;
+
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		crtc_lut64 = (struct drm_mode_crtc_lut64 *)data;
+		crtc_lut = &local_crtc_lut;
+		CP(*crtc_lut64, *crtc_lut, crtc_id);
+		CP(*crtc_lut64, *crtc_lut, gamma_size);
+		size = crtc_lut64->gamma_size * sizeof(uint16_t);
+		crtc_lut->red = (uintcap_t)__USER_CAP(crtc_lut64->red, size);
+		crtc_lut->green = (uintcap_t)__USER_CAP(crtc_lut64->green,
+		    size);
+		crtc_lut->blue = (uintcap_t)__USER_CAP(crtc_lut64->blue, size);
+	}
+#endif
 
 	crtc = drm_crtc_find(dev, file_priv, crtc_lut->crtc_id);
 	if (!crtc)
@@ -337,19 +378,19 @@ int drm_mode_gamma_get_ioctl(struct drm_device *dev,
 	drm_modeset_lock(&crtc->mutex, NULL);
 	size = crtc_lut->gamma_size * (sizeof(uint16_t));
 	r_base = crtc->gamma_store;
-	if (copy_to_user((void __user *)(unsigned long)crtc_lut->red, r_base, size)) {
+	if (copy_to_user((void __user * __capability)crtc_lut->red, r_base, size)) {
 		ret = -EFAULT;
 		goto out;
 	}
 
 	g_base = r_base + size;
-	if (copy_to_user((void __user *)(unsigned long)crtc_lut->green, g_base, size)) {
+	if (copy_to_user((void __user * __capability)crtc_lut->green, g_base, size)) {
 		ret = -EFAULT;
 		goto out;
 	}
 
 	b_base = g_base + size;
-	if (copy_to_user((void __user *)(unsigned long)crtc_lut->blue, b_base, size)) {
+	if (copy_to_user((void __user * __capability)crtc_lut->blue, b_base, size)) {
 		ret = -EFAULT;
 		goto out;
 	}
