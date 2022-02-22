@@ -419,6 +419,7 @@ MAN=	aac.4 \
 	ow.4 \
 	ow_temp.4 \
 	owc.4 \
+	ovpn.4 \
 	${_padlock.4} \
 	pass.4 \
 	pca954x.4 \
