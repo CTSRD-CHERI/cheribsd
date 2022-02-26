@@ -145,6 +145,21 @@ __crt_malloc(size_t nbytes)
 	}
 	/* remove from linked list */
   	nextf[bucket] = op->ov_next;
+	/*
+	 * XXXQEMU: Set an ov_next capability to a NULL capability, clearing any
+	 * permissions.
+	 *
+	 * Based on a tag and permissions of ov_next, find_overhead() determines
+	 * if an allocation is aligned. The QEMU user mode for CheriABI doesn't
+	 * implement tagged memory and find_overhead() might incorrectly assume
+	 * the allocation is aligned because of a non-cleared tag. Having the
+	 * permissions cleared, find_overhead() behaves as expected under the
+	 * user mode.
+	 *
+	 * This is a workaround and should be reverted once the user mode
+	 * implements tagged memory.
+	 */
+	op->ov_next = NULL;
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
   	return ((char *)(op + 1));
