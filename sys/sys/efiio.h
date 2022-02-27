@@ -34,7 +34,7 @@
 
 struct efi_get_table_ioc
 {
-	void *buf;		/* Pointer to userspace buffer */
+	void * __kerncap buf;	/* Pointer to userspace buffer */
 	struct uuid uuid;	/* UUID to look up */
 	size_t table_len;	/* Table size */
 	size_t buf_len;		/* Size of the buffer */
