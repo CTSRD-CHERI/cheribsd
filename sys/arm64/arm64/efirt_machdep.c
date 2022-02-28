@@ -147,7 +147,7 @@ efi_1t1_l3(vm_offset_t va)
  * Map a physical address from EFI runtime space into KVA space.  Returns 0 to
  * indicate a failed mapping so that the caller may handle error.
  */
-vm_offset_t
+vm_pointer_t
 efi_phys_to_kva(vm_paddr_t paddr)
 {
 
@@ -265,7 +265,11 @@ efi_arch_leave(void)
 	 * the pmap pointer.
 	 */
 	__asm __volatile(
+#ifdef __CHERI_PURE_CAPABILITY__
+	    "mrs c18, ctpidr_el1\n"
+#else
 	    "mrs x18, tpidr_el1	\n"
+#endif
 	);
 	set_ttbr0(pmap_to_ttbr0(PCPU_GET(curpmap)));
 	if (PCPU_GET(bcast_tlbi_workaround) != 0)
