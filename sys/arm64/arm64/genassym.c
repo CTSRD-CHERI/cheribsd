@@ -33,6 +33,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/pcpu.h>
 #include <sys/proc.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <machine/efi.h>
+#endif
 #include <machine/frame.h>
 #include <machine/machdep.h>
 #include <machine/pcb.h>
@@ -92,3 +95,14 @@ ASSYM(TF_DDC, offsetof(struct trapframe, tf_ddc));
 #endif
 ASSYM(TF_SPSR, offsetof(struct trapframe, tf_spsr));
 ASSYM(TF_X, offsetof(struct trapframe, tf_x));
+
+#ifdef __CHERI_PURE_CAPABILITY__
+ASSYM(EC_EFI_STATUS, offsetof(struct efirt_callinfo, ec_efi_status));
+ASSYM(EC_FPTR, offsetof(struct efirt_callinfo, ec_fptr));
+ASSYM(EC_ARGCNT, offsetof(struct efirt_callinfo, ec_argcnt));
+ASSYM(EC_ARG1, offsetof(struct efirt_callinfo, ec_arg1));
+ASSYM(EC_ARG2, offsetof(struct efirt_callinfo, ec_arg2));
+ASSYM(EC_ARG3, offsetof(struct efirt_callinfo, ec_arg3));
+ASSYM(EC_ARG4, offsetof(struct efirt_callinfo, ec_arg4));
+ASSYM(EC_ARG5, offsetof(struct efirt_callinfo, ec_arg5));
+#endif
