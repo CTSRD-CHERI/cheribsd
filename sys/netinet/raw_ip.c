@@ -783,9 +783,7 @@ void
 rip_ctlinput(int cmd, struct sockaddr *sa, void *vip)
 {
 	struct in_ifaddr *ia;
-	struct ifnet *ifp;
 	int err;
-	int flags;
 
 	NET_EPOCH_ASSERT();
 
@@ -820,12 +818,6 @@ rip_ctlinput(int cmd, struct sockaddr *sa, void *vip)
 		if (ia == NULL || (ia->ia_flags & IFA_ROUTE))
 			return;
 		ifa_ref(&ia->ia_ifa);
-		flags = RTF_UP;
-		ifp = ia->ia_ifa.ifa_ifp;
-
-		if ((ifp->if_flags & IFF_LOOPBACK)
-		    || (ifp->if_flags & IFF_POINTOPOINT))
-			flags |= RTF_HOST;
 
 		err = ifa_del_loopback_route((struct ifaddr *)ia, sa);
 
