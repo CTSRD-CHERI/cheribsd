@@ -94,8 +94,8 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
-	.sv_maxuser	= VM_MAXUSER_ADDRESS,
-	.sv_usrstack	= USRSTACK,
+	.sv_maxuser	= 0,	/* Filled in during boot. */
+	.sv_usrstack	= 0,	/* Filled in during boot. */
 	.sv_psstringssz	= sizeof(struct freebsd64_ps_strings),
 	.sv_stackprot	= VM_PROT_RW_CAP,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
@@ -108,7 +108,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = freebsd64_syscallnames,
-	.sv_shared_page_base = SHAREDPAGE,
+	.sv_shared_page_base = 0,	/* Filled in during boot. */
 	.sv_shared_page_len = PAGE_SIZE,
 	.sv_schedtail	= NULL,
 	.sv_thread_detach = NULL,
@@ -147,6 +147,9 @@ static Elf64_Brandinfo freebsd_freebsd64_brand_info = {
 SYSINIT(freebsd64, SI_SUB_EXEC, SI_ORDER_ANY,
     (sysinit_cfunc_t) elf64_insert_brand_entry,
     &freebsd_freebsd64_brand_info);
+
+SYSINIT(freebsd64_register_sysvec, SI_SUB_VM, SI_ORDER_ANY,
+    elf64_register_sysvec, &elf_freebsd_freebsd64_sysvec);
 
 /*
  * Number of GPRs in mc_gpregs that are mirrored in mc_capregs up to,
