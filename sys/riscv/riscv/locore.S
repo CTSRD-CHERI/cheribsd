@@ -151,7 +151,16 @@ _start:
 	mv	a1, zero
 
 	/*
-	 * Page tables setup
+	 * Set up page tables: map a 1GB region starting at KERNBASE using 2MB
+	 * superpages, starting from the first 2MB physical page into which the
+	 * kernel was loaded.  Also reserve an L2 page for the early device map
+	 * and map the DTB, if any, using the second-last entry of that L2
+	 * page.  This is hopefully enough to get us to pmap_bootstrap().
+	 *
+	 * Implementations are required to provide SV39 mode, so we use that
+	 * initially and will optionally enable SV48 mode during kernel pmap
+	 * initialization.
+	 *
 	 *  a0 - modulep or zero
 	 *  a1 - zero or dtbp
 	 */
@@ -176,7 +185,7 @@ pagetables:
 
 	li	a5, KERNBASE
 	srli	a5, a5, L1_SHIFT	/* >> L1_SHIFT */
-	andi	a5, a5, 0x1ff		/* & 0x1ff */
+	andi	a5, a5, Ln_ADDR_MASK	/* & Ln_ADDR_MASK */
 	li	t4, PTE_V
 	slli	t5, s2, PTE_PPN0_S	/* (s2 << PTE_PPN0_S) */
 	or	t6, t4, t5
@@ -216,7 +225,7 @@ pagetables:
 	addi	t4, t4, 1
 	bltu	t4, t3, 1b
 
-	/* Create an L1 page for early devmap */
+	/* Create an L1 table entry for early devmap */
 #ifdef __CHERI_PURE_CAPABILITY__
 	cllc	cs1, pagetable_l1
 	cllc	cs2, pagetable_l2_devmap /* Link to next level PN */
@@ -228,12 +237,12 @@ pagetables:
 
 	li	a5, (VM_MAX_KERNEL_ADDRESS - L2_SIZE)
 	srli	a5, a5, L1_SHIFT	/* >> L1_SHIFT */
-	andi	a5, a5, 0x1ff		/* & 0x1ff */
+	andi	a5, a5, Ln_ADDR_MASK	/* & Ln_ADDR_MASK */
 	li	t4, PTE_V
 	slli	t5, s2, PTE_PPN0_S	/* (s2 << PTE_PPN0_S) */
 	or	t6, t4, t5
 
-	/* Store single level1 PTE entry to position */
+	/* Store the L1 table entry */
 	li	a6, PTE_SIZE
 	mulw	a5, a5, a6
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -247,7 +256,7 @@ pagetables:
 	/* Check if we have a DTB that needs to be mapped */
 	beqz	a1, 2f
 
-	/* Create an L2 page superpage for DTB */
+	/* Create an L2 mapping for the DTB */
 #ifdef __CHERI_PURE_CAPABILITY__
 	cllc	cs1, pagetable_l2_devmap
 #else
@@ -262,7 +271,7 @@ pagetables:
 	slli	t2, s2, PTE_PPN0_S	/* << PTE_PPN0_S */
 	or	t0, t0, t2
 
-	/* Store PTE entry to position */
+	/* Store the L2 table entry for the DTB */
 	li	a6, PTE_SIZE
 	li	a5, 510
 	mulw	a5, a5, a6
