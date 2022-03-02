@@ -154,23 +154,6 @@ void riscv_nullop(void);
 		"slti zero, zero, 0x2f\n"		\
 		:: "r" (pid), "r" (tid), "r" (cid)	\
 		: "a0", "a1", "a2", "a3", "a4")
-
-/*
- * Initialize qemu notion of the current context.
- * Note: this is equivalent to QEMU_EVENT_CONTEXT_UPDATE but
- * can be used before tracing is started.
- */
-#define	QEMU_EVENT_CONTEXT_SETUP(pid, tid, cid)		\
-	__asm__ __volatile__(				\
-		"li a0, 0x1\n"				\
-		"li a1, 0x1\n"				\
-		"mv a2, %0\n"				\
-		"mv a3, %1\n"				\
-		"mv a4, %2\n"				\
-		"slti zero, zero, 0x2f\n"		\
-		:: "r" (pid), "r" (tid), "r" (cid)	\
-		: "a0", "a1", "a2", "a3", "a4")
-
 /*
  * Arbitrary marker event to emit to the trace.
  * 0x00 - 0x9fff reserved for kernel-level markers
@@ -187,6 +170,41 @@ void riscv_nullop(void);
 #define	QEMU_TRACE_MARKER_INTR_ENTRY	0x10
 #define	QEMU_TRACE_MARKER_INTR_RET	0x11
 #define	QEMU_TRACE_MARKER_BENCHMARK_ITERATION	0xbeef
+
+/*
+ * QEMU tracing counter event.
+ * This is an (hopefully) low overhead counter that only
+ * requires a NOP to be incremented/decremented.
+ */
+#define	QEMU_EVENT_COUNTER_FLAGS(slot, inc)			\
+	((((uint64_t)inc & 0x1) << 32) | (slot & 0xffff))
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	QEMU_EVENT_COUNTER(name, slot, value, incremental)		\
+	__asm__ __volatile__(						\
+	    "li a0, 0x4\n"						\
+	    "cmove ca1, %0\n"						\
+	    "mv a2, %1\n"						\
+	    "mv a3, %2\n"						\
+	    "slti zero, zero, 0x2f\n"					\
+	    :: "C" (name), "r" ((int64_t)value),			\
+	     "r" (QEMU_EVENT_COUNTER_FLAGS(slot, incremental))		\
+	    : "a0", "ca1", "a2", "a3")
+#else
+#define	QEMU_EVENT_COUNTER(name, slot, value, incremental)	\
+	__asm__ __volatile__(					\
+	    "li a0, 0x4\n"					\
+	    "mv a1, %0\n"					\
+	    "mv a2, %1\n"					\
+	    "mv a3, %2\n"					\
+	    "slti zero, zero, 0x2f\n"				\
+	    :: "r" (name), "r" ((int64_t)value),		\
+	     "r" (QEMU_EVENT_COUNTER_FLAGS(slot, incremental))	\
+	    : "a0", "ca1", "a2", "a3")
+#endif
+#define	QEMU_EVENT_ABS_COUNTER(name, slot, value)	\
+	QEMU_EVENT_COUNTER(name, slot, value, 0)
+#define	QEMU_EVENT_INC_COUNTER(name, slot, value)	\
+	QEMU_EVENT_COUNTER(name, slot, value, 1)
 #endif	/* _MACHINE_CPUFUNC_H_ */
 // CHERI CHANGES START
 // {
