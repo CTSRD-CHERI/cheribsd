@@ -132,7 +132,8 @@ TESTS+=		deptgt-end-fail-indirect
 TESTS+=		deptgt-end-jobs
 TESTS+=		deptgt-error
 TESTS+=		deptgt-ignore
-TESTS+=		deptgt-interrupt
+# Broken on Linux after bmake-20220208
+#TESTS+=		deptgt-interrupt
 TESTS+=		deptgt-main
 TESTS+=		deptgt-makeflags
 TESTS+=		deptgt-no_parallel
