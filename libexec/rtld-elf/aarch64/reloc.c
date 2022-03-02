@@ -447,7 +447,7 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 	 * that's reliable enough until the commit is old enough that we can
 	 * assume the new ABI and ditch this.
 	 *
-	 * See also: lib/csu/aarch64c/reloc.c
+	 * See also: lib/csu/aarch64c/reloc.c and sys/arm64/arm64/elf_machdep.c
 	 */
 	if ((fragment[0] == 0 && fragment[1] == 0) ||
 	    (Elf_Ssize)fragment[0] == rela->r_addend)
