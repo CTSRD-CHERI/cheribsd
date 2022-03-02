@@ -142,7 +142,8 @@ bool
 elf_is_ifunc_reloc(Elf_Size r_info __unused)
 {
 
-	return (ELF_R_TYPE(r_info) == R_AARCH64_IRELATIVE);
+	return (ELF_R_TYPE(r_info) == R_AARCH64_IRELATIVE ||
+	    ELF_R_TYPE(r_info) == R_MORELLO_IRELATIVE);
 }
 
 static int
@@ -243,6 +244,12 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 	if ((flags & ARM64_ELF_RELOC_LATE_IFUNC) != 0) {
 		KASSERT(type == ELF_RELOC_RELA,
 		    ("Only RELA ifunc relocations are supported"));
+		/*
+		 * NB: We do *not* re-process R_MORELLO_IRELATIVE since the
+		 * normal pass has already trashed the fragment and so we no
+		 * longer know what the resolver is, just like architectures
+		 * that use REL instead of RELA.
+		 */
 		if (rtype != R_AARCH64_IRELATIVE)
 			return (0);
 	}
@@ -331,7 +338,20 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		*(uintcap_t *)where = cheri_sealentry(cap);
 		break;
 	case R_MORELLO_IRELATIVE:
-		panic("TODO implement R_MORELLO_IRELATIVE relocation");
+		/* XXX: See libexec/rtld-elf/aarch64/reloc.c. */
+		if ((where[0] == 0 && where[1] == 0) ||
+		    (Elf_Ssize)where[0] == rela->r_addend) {
+			cap = (uintptr_t)(relocbase + rela->r_addend);
+			cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+			    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+			    CHERI_PERM_STORE_LOCAL_CAP);
+			cap = cheri_sealentry(cap);
+		} else
+			cap = build_cap_from_fragment(where,
+			    (Elf_Addr)relocbase, rela->r_addend,
+			    relocbase, relocbase);
+		cap = ((uintptr_t (*)(void))cap)();
+		*(uintcap_t *)where = cap;
 		break;
 #endif
 #endif
