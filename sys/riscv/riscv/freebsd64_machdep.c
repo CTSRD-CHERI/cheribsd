@@ -56,6 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/proc.h>
+#include <sys/reg.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysent.h>
 #include <sys/ucontext.h>
@@ -116,6 +117,8 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_machine_arch = freebsd64_riscv_machine_arch,
 	.sv_onexec_old	= exec_onexec_old,
 	.sv_onexit	= exit_onexit,
+	.sv_regset_begin = SET_BEGIN(__elfN(regset)),
+	.sv_regset_end	= SET_LIMIT(__elfN(regset)),
 };
 INIT_SYSENTVEC(freebsd64_sysent, &elf_freebsd_freebsd64_sysvec);
 
