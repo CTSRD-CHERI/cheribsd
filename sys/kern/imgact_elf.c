@@ -2650,7 +2650,7 @@ __elfN(get_fpregset)(struct regset *rs, struct thread *td, void *buf,
 		fill_fpregs(td, fpregset);
 #endif
 	}
-	*sizep = sizeof(fpregset);
+	*sizep = sizeof(*fpregset);
 	return (true);
 }
 
