@@ -343,6 +343,8 @@ freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 	return (ENOTSUP);
 }
 
+ELF_REGSET(regset_arm64_addr_mask);
+
 void
 elf64_dump_thread(struct thread *td __unused, void *dst __unused,
     size_t *off __unused)

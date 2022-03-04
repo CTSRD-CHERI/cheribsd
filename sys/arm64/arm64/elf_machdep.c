@@ -147,7 +147,7 @@ get_arm64_addr_mask(struct regset *rs, struct thread *td, void *buf,
 	return (true);
 }
 
-static struct regset regset_arm64_addr_mask = {
+struct regset regset_arm64_addr_mask = {
 	.note = NT_ARM_ADDR_MASK,
 	.size = sizeof(struct arm64_addr_mask),
 	.get = get_arm64_addr_mask,
