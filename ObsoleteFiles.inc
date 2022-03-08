@@ -52,6 +52,9 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20220307: remove 330.news
+OLD_FILES+=etc/periodic/daily/330.news
+
 # 20220505: Remove libcheri symlinks
 OLD_FILES+=libcheri
 OLD_FILES+=usr/libcheri
