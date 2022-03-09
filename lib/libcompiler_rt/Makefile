@@ -11,7 +11,7 @@ WARNS?=		2
 CFLAGS+=	${PICFLAG}
 CFLAGS+=	-fvisibility=hidden
 CFLAGS+=	-DVISIBILITY_HIDDEN
-CFLAGS+=	-I${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
+CFLAGS+=	-I${SRCTOP}/contrib/subrepo-cheri-libunwind/include
 
 # gcc has incompatible internal declarations for __divtc3 and __multc3, but has
 # no option to silence its warning, so make warnings non-fatal.
