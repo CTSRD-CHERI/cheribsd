@@ -1010,7 +1010,7 @@ sysctl_rman(SYSCTL_HANDLER_ARGS)
 	 */
 	if (res_idx == -1) {
 		bzero(&urm, sizeof(urm));
-		urm.rm_handle = (uintptr_t)rm;
+		urm.rm_handle = (kvaddr_t)rm;
 		if (rm->rm_descr != NULL)
 			strlcpy(urm.rm_descr, rm->rm_descr, RM_TEXTLEN);
 		urm.rm_start = rm->rm_start;
@@ -1041,9 +1041,9 @@ sysctl_rman(SYSCTL_HANDLER_ARGS)
 
 found:
 	bzero(&ures, sizeof(ures));
-	ures.r_handle = (uintptr_t)res;
-	ures.r_parent = (uintptr_t)res->r_rm;
-	ures.r_device = (uintptr_t)res->r_dev;
+	ures.r_handle = (kvaddr_t)res;
+	ures.r_parent = (kvaddr_t)res->r_rm;
+	ures.r_device = (kvaddr_t)res->r_dev;
 	if (res->r_dev != NULL) {
 		if (device_get_name(res->r_dev) != NULL) {
 			snprintf(ures.r_devname, RM_TEXTLEN,
