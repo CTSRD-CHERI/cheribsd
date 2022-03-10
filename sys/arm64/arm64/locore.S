@@ -1012,7 +1012,7 @@ tcr:
 #else
 #define	TCR_MORELLO	0
 #endif
-	.quad (TCR_TxSZ(64 - VIRT_BITS) | TCR_TG1_4K | \
+	.quad (TCR_TxSZ(64 - VIRT_BITS) | TCR_TG1_4K | TCR_TG0_4K | \
 	    TCR_CACHE_ATTRS | TCR_SMP_ATTRS | TCR_MORELLO)
 sctlr_set:
 	/* Bits to set */
