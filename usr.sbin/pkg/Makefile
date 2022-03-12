@@ -20,11 +20,13 @@ PKGCONFBRANCH?=	latest
 PKGCONF?=	FreeBSD.conf.${PKGCONFBRANCH}
 CONFS=		${PKGCONF}
 CONFSNAME_${PKGCONF}=	${PKGCONF:C/\.conf.+$/.conf/}
-CONFSDIR=	/etc/pkg
+CONFSDIR=	/etc/pkg${PKG_SUFFIX}
 CONFSMODE=	644
-PROG=	pkg
+PROG=	pkg${PKG_SUFFIX}
 SRCS=	pkg.c dns_utils.c config.c
-MAN=	pkg.7
+MAN=	pkg${PKG_SUFFIX}.7
+
+CFLAGS+='-DPKG_SUFFIX="${PKG_SUFFIX}"'
 
 CFLAGS+=-I${SRCTOP}/contrib/libucl/include
 .PATH:	${SRCTOP}/contrib/libucl/include

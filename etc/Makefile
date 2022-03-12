@@ -112,6 +112,9 @@ MTREES+=	mtree/BSD.lib32.dist		/usr
 MTREES+=	mtree/BSD.lib32.dist		/usr/lib/debug/usr
 .endif
 .if ${MK_LIB64} != "no"
+.if ${MK_PKGBOOTSTRAP} != "no"
+MTREES+=	mtree/BSD.pkg64.dist		/
+.endif
 MTREES+=	mtree/BSD.lib64.dist		/usr
 MTREES+=	mtree/BSD.lib64.dist		/usr/lib/debug/usr
 .endif

@@ -185,6 +185,7 @@ SUBDIR.${MK_OPENSSL_KTLS}+=	rpc.tlsclntd
 SUBDIR.${MK_OPENSSL_KTLS}+=	rpc.tlsservd
 SUBDIR.${MK_PF}+=	ftp-proxy
 SUBDIR.${MK_PKGBOOTSTRAP}+=	pkg
+SUBDIR.${MK_PKGBOOTSTRAP}.${MK_LIB64}+=	pkg64
 SUBDIR.${MK_PMC}+=	pmc pmcannotate pmccontrol pmcstat pmcstudy
 SUBDIR.${MK_PORTSNAP}+=	portsnap
 SUBDIR.${MK_PPP}+=	ppp
