@@ -91,7 +91,7 @@ FORMAT_EXTENSIONS=	-Wno-format
 .elif ${COMPILER_TYPE} == "clang"
 FORMAT_EXTENSIONS=	-D__printf__=__freebsd_kprintf__
 # Only newer versions of clang have -Wno-unused-but-set-variable
-.if ${COMPILER_VERSION} >= 130000
+.if ${COMPILER_FEATURES:MWunused-but-set-variable}
 NO_WUNUSED_BUT_SET_VARIABLE=-Wno-unused-but-set-variable
 .endif
 .else
