@@ -655,7 +655,7 @@ namei(struct nameidata *ndp)
 	 */
 	for (;;) {
 		ndp->ni_startdir = dp;
-		error = lookup(ndp);
+		error = vfs_lookup(ndp);
 		if (error != 0)
 			goto out;
 
@@ -842,7 +842,7 @@ _Static_assert(MAXNAMLEN == NAME_MAX,
  *	    if WANTPARENT set, return unlocked parent in ni_dvp
  */
 int
-lookup(struct nameidata *ndp)
+vfs_lookup(struct nameidata *ndp)
 {
 	char *cp;			/* pointer into pathname argument */
 	char *prev_ni_next;		/* saved ndp->ni_next */
@@ -1387,7 +1387,7 @@ bad_eexist:
  *    Used by lookup to re-acquire things.
  */
 int
-relookup(struct vnode *dvp, struct vnode **vpp, struct componentname *cnp)
+vfs_relookup(struct vnode *dvp, struct vnode **vpp, struct componentname *cnp)
 {
 	struct vnode *dp = NULL;		/* the directory we are searching */
 	int rdonly;			/* lookup read-only flag bit */
