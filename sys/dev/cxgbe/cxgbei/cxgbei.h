@@ -45,7 +45,7 @@ struct cxgbei_cmp {
 LIST_HEAD(cxgbei_cmp_head, cxgbei_cmp);
 
 struct icl_cxgbei_conn {
-	struct icl_conn ic;
+	struct icl_conn ic __subobject_member_used_for_c_inheritance;
 
 	/* cxgbei specific stuff goes here. */
 	uint32_t icc_signature;
@@ -87,7 +87,7 @@ enum {
 };
 
 struct icl_cxgbei_pdu {
-	struct icl_pdu ip;
+	struct icl_pdu ip __subobject_member_used_for_c_inheritance;
 
 	/* cxgbei specific stuff goes here. */
 	uint32_t icp_signature;

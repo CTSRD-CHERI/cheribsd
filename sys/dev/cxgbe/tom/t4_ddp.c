@@ -1485,7 +1485,7 @@ hold_aio(struct toepcb *toep, struct kaiocb *job, struct pageset **pps)
 	 */
 	vm = job->userproc->p_vmspace;
 	map = &vm->vm_map;
-	start = __DEVOLATILE(char * __capability, job->uaiocb.aio_buf);
+	start = __DEVOLATILE_CAP(char * __capability, job->uaiocb.aio_buf);
 	pgoff = (__cheri_addr vm_offset_t)start & PAGE_MASK;
 	end = round_page(start + job->uaiocb.aio_nbytes);
 	start = trunc_page(start);
