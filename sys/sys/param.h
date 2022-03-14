@@ -79,6 +79,20 @@
 #define __FreeBSD_version 1400053
 
 /*
+ * __CheriBSD_version numbers describe CheriBSD ABIs.
+ *
+ * Encoding:	<YYYY><MM><DD>
+ *
+ * __CheriBSD_version is bumped with every ABI change. This includes the
+ * kernel's KBI and the base system's ABI, similarly to __FreeBSD_version.
+ * The separate __CheriBSD_version counter was introduced to allow external
+ * software still use __FreeBSD_version which is independently incremented in
+ * FreeBSD.
+ */
+#undef __CheriBSD_version
+#define __CheriBSD_version 20220314
+
+/*
  * __FreeBSD_kernel__ indicates that this system uses the kernel of FreeBSD,
  * which by definition is always true on FreeBSD. This macro is also defined
  * on other systems that use the kernel of FreeBSD, such as GNU/kFreeBSD.
