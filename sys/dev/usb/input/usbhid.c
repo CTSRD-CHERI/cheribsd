@@ -699,7 +699,7 @@ usbhid_ioctl(device_t dev, unsigned long cmd, uintptr_t data)
 		if (error)
 			break;
 		error = usbhid_sync_xfer(
-		    sc, USBHID_CTRL_DT, &req, ucr->ucr_data);
+		    sc, USBHID_CTRL_DT, &req, (__cheri_fromcap void *)ucr->ucr_data);
 		if (error == 0)
 			ucr->ucr_actlen = UGETW(req.ctrl.wLength);
 		break;
