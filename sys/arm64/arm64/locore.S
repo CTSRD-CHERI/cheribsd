@@ -40,7 +40,6 @@
 #include <machine/cherireg.h>
 
 #define	VIRT_BITS	48
-#define	DMAP_TABLES	((DMAP_MAX_ADDRESS - DMAP_MIN_ADDRESS) >> L0_SHIFT)
 
 	.globl	kernbase
 	.set	kernbase, KERNBASE
@@ -604,7 +603,6 @@ LEND(get_virt_delta)
  *    - The Kernel L0 table             (TTBR1)
  *    - The identity (PA = VA) L1 table
  *    - The identity (PA = VA) L0 table (TTBR0)
- *    - The DMAP L1 tables
  */
 LENTRY(create_pagetables)
 	/* Save the Link register */
@@ -713,12 +711,6 @@ common:
 	mov	x9, x6
 	mov	PTR(6), PTR(24)
 	mov	x10, #1
-	bl	link_l0_pagetable
-
-	/* Link the DMAP tables */
-	ldr	x8, =DMAP_MIN_ADDRESS
-	early_idmap_addr x9, pagetable_dmap, x29
-	mov	x10, #DMAP_TABLES
 	bl	link_l0_pagetable
 
 	/*
@@ -1045,8 +1037,11 @@ pagetable:
 	.space	PAGE_SIZE
 pagetable_l1_ttbr1:
 	.space	PAGE_SIZE
+	.globl pagetable_l0_ttbr1
+	.type	pagetable_l0_ttbr1,#object
 pagetable_l0_ttbr1:
 	.space	PAGE_SIZE
+	.size	pagetable_l0_ttbr1, . - pagetable_l0_ttbr1
 pagetable_l2_ttbr0_bootstrap:
 	.space	PAGE_SIZE
 pagetable_l1_ttbr0_bootstrap:
@@ -1056,12 +1051,7 @@ pagetable_l0_ttbr0_bootstrap:
 pagetable_l0_ttbr0:
 	.space	PAGE_SIZE
 
-	.globl	pagetable_dmap
-	.type	pagetable_dmap,#object
-pagetable_dmap:
-	.space	PAGE_SIZE * DMAP_TABLES
 pagetable_end:
-	.size	pagetable_dmap, pagetable_end - pagetable_dmap
 
 	.type	el2_pagetable,#object
 el2_pagetable:
