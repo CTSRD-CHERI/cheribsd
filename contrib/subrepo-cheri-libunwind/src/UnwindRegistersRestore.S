@@ -1243,11 +1243,6 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_sparc6jumptoEv)
 //
   .p2align 2
 DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_riscv6jumptoEv)
-#ifdef __CHERI_PURE_CAPABILITY__
-  clc ct0, (__SIZEOF_CHERI_CAPABILITY__ * 32 + 8 * 32)(ca0)
-  cspecialw ddc, ct0
-#endif
-
 #if defined(__riscv_flen)
    restore_fpr 0
    restore_fpr 1

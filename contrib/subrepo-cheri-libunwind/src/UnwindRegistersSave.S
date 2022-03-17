@@ -1284,11 +1284,6 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   save_fpr 31
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
-  cspecialr ct0, ddc
-  csc ct0, (__SIZEOF_CHERI_CAPABILITY__ * 32 + 8 * 32)(ca0)
-#endif
-
   li     a0, 0  // return UNW_ESUCCESS
 #ifdef __CHERI_PURE_CAPABILITY__
   cret          // jump to cra
