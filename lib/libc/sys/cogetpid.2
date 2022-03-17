@@ -40,15 +40,13 @@
 .Sh SYNOPSIS
 .In unistd.h
 .Ft int
-.Fn cogetpid "void * __capability cookie" "pid_t *pidp"
+.Fn cogetpid "pid_t *pidp"
 .Sh DESCRIPTION
 The
 .Fn cogetpid
 writes PID of the calling process into the variable pointed at by
 .Ar pidp .
-It is intended to use at the callee side, identified by the
-.Ar cookie
-argument filled in by
+It is intended for use on the callee side, after successfully returning from
 .Xr coaccept 2 .
 .Sh RETURN VALUES
 .Rv -std cogetpid
@@ -58,15 +56,13 @@ The
 system call
 will fail if:
 .Bl -tag -width Er
-.It Bq Er EINVAL
-The
-.Fa cookie
-argument is invalid.
 .It Bq Er EFAULT
 The
 .Fa pidp
 argument
 points outside the process's allocated address space.
+.It Bq Er ESRCH
+Unable to determine identity of the caller.
 .El
 .Sh SEE ALSO
 .Xr copong 1 ,
