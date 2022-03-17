@@ -58,6 +58,7 @@ main(int argc, char **argv)
 	void * __capability *lookedup;
 	char *registered, *tmp;
 	uint64_t *halfcookie;
+	pid_t pid;
 	float dt = 0.0;
 	bool kflag = false, vflag = false, xflag = false;
 	int c, ch, error;
@@ -148,8 +149,11 @@ main(int argc, char **argv)
 			warn("coaccept");
 		if (vflag) {
 			halfcookie = (uint64_t *)&cookie;
-			printf("%s: %s: coaccepted, pid %d, cookie %#lx%lx\n",
-			    getprogname(), registered, getpid(), halfcookie[0], halfcookie[1]);
+			error = cogetpid(&pid);
+			if (error != 0)
+				warn("cogetpid");
+			printf("%s: %s: coaccepted, pid %d, caller pid %d, cookie %#lx%lx\n",
+			    getprogname(), registered, getpid(), pid, halfcookie[0], halfcookie[1]);
 		}
 
 		for (c = 0; c < argc; c++) {
