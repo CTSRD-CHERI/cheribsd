@@ -91,11 +91,6 @@ build${libcompat}: .PHONY
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
 	    -p ${WORLDTMP}/usr/lib/debug/usr >/dev/null
 .endif
-# XXX: Remove this hack once morello-llvm supports lib64c
-.if ${libcompat} == "64c" && ${COMPAT_ARCH} == "aarch64"
-	@echo "Morello: creating libcheri link in WORLDTMP"
-	ln -sfnv lib64c ${WORLDTMP}/usr/libcheri
-.endif
 .for _dir in lib/ncurses/tinfo ${_libmagic} ${_jevents}
 .for _t in ${_obj} build-tools
 	${_+_}cd ${.CURDIR}/${_dir}; \

@@ -52,6 +52,10 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20220505: Remove libcheri symlinks
+OLD_FILES+=libcheri
+OLD_FILES+=usr/libcheri
+
 # 20220210: unwind.h moved to /usr/include
 OLD_FILES+=usr/include/c++/v1/unwind-arm.h
 OLD_FILES+=usr/include/c++/v1/unwind-itanium.h
