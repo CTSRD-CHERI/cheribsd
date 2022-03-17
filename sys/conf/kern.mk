@@ -142,6 +142,7 @@ CFLAGS+=	-march=morello+c64 -mabi=purecap
 .else
 CFLAGS+=	-march=morello
 .endif
+CFLAGS+=	-Xclang -morello-vararg=new
 .endif
 .endif
 

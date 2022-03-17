@@ -308,9 +308,11 @@ MACHINE_CPU += riscv
 # CheriBSD implements the resolvers) or the Morello toolchain implements a
 # pure-capability traditional TLS like MIPS or RISC-V.
 CFLAGS+=	-march=morello+c64 -mabi=purecap -femulated-tls
+CFLAGS+=	-Xclang -morello-vararg=new
 LDFLAGS+=	-march=morello+c64 -mabi=purecap
 . elif defined(CPUTYPE) && ${CPUTYPE} == "morello"
 CFLAGS+=	-march=morello -mabi=aapcs
+CFLAGS+=	-Xclang -morello-vararg=new
 LDFLAGS+=	-march=morello -mabi=aapcs
 . endif
 .endif
