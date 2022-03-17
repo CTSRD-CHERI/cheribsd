@@ -43,8 +43,6 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <unistd.h>
 
-static long long buf[MAXBSIZE / sizeof(long long)];
-
 static void
 usage(void)
 {
@@ -143,31 +141,30 @@ main(int argc, char **argv)
 
 	for (;;) {
 		if (kflag)
-			error = coaccept_slow(&cookie, buf, sizeof(buf), buf, sizeof(buf));
+			error = coaccept_slow(&cookie, NULL, 0, NULL, 0);
 		else
-			error = coaccept(&cookie, buf, sizeof(buf), buf, sizeof(buf));
+			error = coaccept(&cookie, NULL, 0, NULL, 0);
 		if (error != 0)
 			warn("coaccept");
 		if (vflag) {
 			halfcookie = (uint64_t *)&cookie;
-			printf("%s: %s: coaccepted, pid %d, cookie %#lx%lx, buf[0] is %lld\n",
-			    getprogname(), registered, getpid(), halfcookie[0], halfcookie[1], buf[0]);
+			printf("%s: %s: coaccepted, pid %d, cookie %#lx%lx\n",
+			    getprogname(), registered, getpid(), halfcookie[0], halfcookie[1]);
 		}
-		buf[0]++;
 
 		for (c = 0; c < argc; c++) {
 			if (vflag)
 				fprintf(stderr, "%s: %s: cocalling \"%s\"...\n",
 				    getprogname(), registered, argv[c]);
 			if (kflag)
-				error = cocall_slow(lookedup[c], buf, sizeof(buf), buf, sizeof(buf));
+				error = cocall_slow(lookedup[c], NULL, 0, NULL, 0);
 			else
-				error = cocall(lookedup[c], buf, sizeof(buf), buf, sizeof(buf));
+				error = cocall(lookedup[c], NULL, 0, NULL, 0);
 			if (error != 0)
 				warn("cocall");
 			if (vflag)
-				printf("%s: %s: returned from \"%s\", pid %d, buf[0] is %lld\n",
-				    getprogname(), registered, argv[c], getpid(), buf[0]);
+				printf("%s: %s: returned from \"%s\", pid %d\n",
+				    getprogname(), registered, argv[c], getpid());
 		}
 
 		if (dt > 0)
