@@ -119,7 +119,7 @@ distribute${libcompat} install${libcompat}: .PHONY
 	${_+_}cd ${.CURDIR}; \
 	    ${LIBCOMPATIMAKE} -f Makefile.inc1 _lc_${.TARGET:S/${libcompat}$//}
 
-.if ${.TARGETS:Mlib${libcompat}buildenv} || ${.TARGETS:Mlibcheribuildenv}
+.if ${.TARGETS:Mlib${libcompat}buildenv}
 .if ${.MAKEFLAGS:M-j}
 .error The lib${libcompat}buildenv target is incompatible with -j
 .endif
@@ -137,10 +137,6 @@ lib${libcompat}buildenv: .PHONY
 	    INSTALL="${INSTALL_CMD} ${INSTALLFLAGS}" \
 	    MTREE_CMD="${MTREE_CMD} ${MTREEFLAGS}" \
 	    "MAKEFLAGS=${MAKEFLAGS:NTARGET*}" ${BUILDENV_SHELL} || true
-
-.if ${libcompat} == "64c"
-libcheribuildenv: lib64cbuildenv
-.endif
 .endif
 
 .endif # defined(_LIBCOMPAT)
