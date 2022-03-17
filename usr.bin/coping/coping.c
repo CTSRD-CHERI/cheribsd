@@ -56,7 +56,6 @@ main(int argc, char **argv)
 {
 	void * __capability *lookedup;
 	char *tmp;
-	long long in, out;
 	float dt = 1.0;
 	bool kflag = false, vflag = false;
 	int count = 0, ch, error, i = 0, c = 0;
@@ -121,25 +120,22 @@ main(int argc, char **argv)
 	}
 
 	c = 0;
-	in = out = 0;
 
 	for (;;) {
 		if (vflag)
 			fprintf(stderr, "%s: cocalling \"%s\"...\n", getprogname(), argv[c]);
 
 		if (kflag)
-			error = cocall_slow(lookedup[c], &out, sizeof(out), &in, sizeof(in));
+			error = cocall_slow(lookedup[c], NULL, 0, NULL, 0);
 		else
-			error = cocall(lookedup[c], &out, sizeof(out), &in, sizeof(in));
+			error = cocall(lookedup[c], NULL, 0, NULL, 0);
 		if (error != 0)
 			warn("cocall");
 
 		if (vflag)
-			printf("%s: returned from \"%s\", pid %d, out: %lld, in: %lld\n", getprogname(), argv[c], getpid(), out, in);
+			printf("%s: returned from \"%s\", pid %d\n", getprogname(), argv[c], getpid());
 		else
 			printf(".");
-
-		out = in;
 
 		c++;
 		if (c == argc)
