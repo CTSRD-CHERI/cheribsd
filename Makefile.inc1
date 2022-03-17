@@ -1669,14 +1669,6 @@ restage reinstall reinstallsysroot: .MAKE .PHONY
 .else
 .error MACHINE_ABI incorrect? ${MACHINE_ABI}
 .endif
-.if ${MACHINE_ABI:Mpurecap}
-	@echo "Purecap ABI: creating libcheri links"
-	ln -sfnv lib ${DESTDIR}/libcheri
-	ln -sfnv lib ${DESTDIR}/usr/libcheri
-.elif ${MK_COMPAT_CHERIABI} == "yes"
-	@echo "Hybrid ABI: creating libcheri links"
-	ln -sfnv lib64c ${DESTDIR}/usr/libcheri
-.endif
 .if make(reinstallsysroot)
 	@echo "Removing $$(find ${DESTDIR} -type d -empty -print | wc -l) empty directories from ${DESTDIR}"
 	find ${DESTDIR} -type d -empty -delete
