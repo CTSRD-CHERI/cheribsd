@@ -33,6 +33,7 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/sysarch.h>
 #include <sys/param.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <ctype.h>
@@ -41,6 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 
 static void
@@ -51,9 +53,30 @@ usage(void)
 	exit(0);
 }
 
+static const char *
+humanize(long x)
+{
+	static char *str = NULL;
+
+	free(str);
+	str = NULL;
+
+	if (x > 1000000000)
+		asprintf(&str, "%.3fs", x / 1000000000.0);
+	else if (x > 1000000)
+		asprintf(&str, "%.3fms", x / 1000000.0);
+	else if (x > 1000)
+		asprintf(&str, "%.3fus", x / 1000.0);
+	else
+		asprintf(&str, "%.3fns", x / 1.0);
+
+	return (str);
+}
+
 int
 main(int argc, char **argv)
 {
+	struct timespec before, after, took;
 	void * __capability *lookedup;
 	char *tmp;
 	float dt = 1.0;
@@ -122,8 +145,12 @@ main(int argc, char **argv)
 	c = 0;
 
 	for (;;) {
-		if (vflag)
+		if (vflag) {
 			fprintf(stderr, "%s: cocalling \"%s\"...\n", getprogname(), argv[c]);
+			error = clock_gettime(CLOCK_REALTIME, &before);
+			if (error != 0)
+				warn("clock_gettime");
+		}
 
 		if (kflag)
 			error = cocall_slow(lookedup[c], NULL, 0, NULL, 0);
@@ -132,9 +159,15 @@ main(int argc, char **argv)
 		if (error != 0)
 			warn("cocall");
 
-		if (vflag)
-			printf("%s: returned from \"%s\", pid %d\n", getprogname(), argv[c], getpid());
-		else
+		if (vflag) {
+			error = clock_gettime(CLOCK_REALTIME, &after);
+			if (error != 0)
+				warn("clock_gettime");
+
+			timespecsub(&after, &before, &took);
+			printf("%s: returned from \"%s\" after %s, pid %d\n",
+			    getprogname(), argv[c], humanize(took.tv_sec * 1000000000L + took.tv_nsec), getpid());
+		} else
 			printf(".");
 
 		c++;
