@@ -43,7 +43,6 @@ __FBSDID("$FreeBSD$");
 	mov	PTR(18), PTRN(sp)
 	sub	PTRN(sp), PTRN(sp), #128
 .endif
-	stp	PTR(29), PTRN(lr), [PTRN(sp), #(-2 * PTR_WIDTH)]!
 	sub	PTRN(sp), PTRN(sp), #(TF_SIZE)
 	stp	CAP(28), CAP(29), [PTRN(sp), #(TF_X + 28 * CAP_WIDTH)]
 	stp	CAP(26), CAP(27), [PTRN(sp), #(TF_X + 26 * CAP_WIDTH)]
@@ -184,7 +183,7 @@ __FBSDID("$FreeBSD$");
 .endif
 #endif
 .if \el == 0
-	add	PTRN(sp), PTRN(sp), #(TF_SIZE + 2 * PTR_WIDTH)
+	add	PTRN(sp), PTRN(sp), #(TF_SIZE)
 .else
 	mov	PTRN(sp), PTR(18)
 	mrs	PTR(18), PTRN(tpidr_el1)
