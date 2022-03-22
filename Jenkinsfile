@@ -152,9 +152,23 @@ def runTests(params, String suffix) {
     }
 }
 
+def buildRelease(params, String suffix) {
+    def releaseArchitectures = ['morello-purecap']
+    if (!GlobalVars.isTestSuiteJob && releaseArchitectures.contains(suffix)) {
+        stage("Building release images") {
+            sh label: "Building release images",
+               // params.extraArgs includes --install-prefix=/rootfs but we
+               // don't want the release media to end up there, so override it
+               // to the top-level output directory.
+               script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-release-${suffix} --cheribsd-release/install-dir=\${WORKSPACE}/tarball ${params.extraArgs}"
+        }
+    }
+}
+
 def buildImageAndRunTests(params, String suffix) {
     buildImage(params, suffix)
     runTests(params, suffix)
+    buildRelease(params, suffix)
     maybeArchiveArtifacts(params, suffix)
 }
 
@@ -167,8 +181,12 @@ def maybeArchiveArtifacts(params, String suffix) {
             // Archive disk image
             sh label: 'Compress kernel and images', script: """
 rm -fv *.img *.xz kernel*
+rm -rfv ftp
 mv -v tarball/rootfs/boot/kernel/kernel tarball/kernel
 mv -v tarball/*.img tarball/kernel* .
+[ ! -d tarball/ftp ] || mv -v tarball/ftp .
+rm -rf *-mini-memstick.img
+[ ! -f *-memstick.img ] || mv -v *-memstick.img "cheribsd-memstick-${suffix}.img"
 # Use xz -T0 to speed up compression by using multiple threads
 xz -T0 *.img kernel*
 """
@@ -195,10 +213,11 @@ rm -rf tarball artifacts-*
 chmod +w *.xz
 mkdir -p "artifacts-${suffix}"
 mv -v *.xz "artifacts-${suffix}"
+[ ! -d ftp ] || tar -cJvf "artifacts-${suffix}/cheribsd-ftp-${suffix}.tar.xz" ftp
 ls -la "artifacts-${suffix}/"
 """
             archiveArtifacts allowEmptyArchive: false,
-                             artifacts: "artifacts-${suffix}/cheribsd-sysroot.tar.xz, artifacts-${suffix}/*.img.xz, artifacts-${suffix}/kernel*.xz",
+                             artifacts: "artifacts-${suffix}/cheribsd-sysroot.tar.xz, artifacts-${suffix}/*.img.xz, artifacts-${suffix}/kernel*.xz, artifacts-${suffix}/cheribsd-ftp*.tar.xz",
                              fingerprint: true, onlyIfSuccessful: true
         }
     }
