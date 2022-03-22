@@ -115,7 +115,7 @@ ENTRY(_rtld_bind_start)
 	stp	CAP(2), CAP(3), [PTRN(sp), #-(CAP_WIDTH * 2)]!
 	stp	CAP(4), CAP(5), [PTRN(sp), #-(CAP_WIDTH * 2)]!
 	stp	CAP(6), CAP(7), [PTRN(sp), #-(CAP_WIDTH * 2)]!
-	stp	CAP(8), CAP(zr), [PTRN(sp), #-(CAP_WIDTH * 2)]!
+	stp	CAP(8), CAP(9), [PTRN(sp), #-(CAP_WIDTH * 2)]!
 
 	/* Save any floating-point arguments */
 	stp	q0, q1, [PTRN(sp), #-32]!
@@ -156,7 +156,7 @@ ENTRY(_rtld_bind_start)
 	ldp	q4, q5, [PTRN(sp)], #32
 	ldp	q2, q3, [PTRN(sp)], #32
 	ldp	q0, q1, [PTRN(sp)], #32
-	ldp	CAP(8), CAP(zr), [PTRN(sp)], #(CAP_WIDTH * 2)
+	ldp	CAP(8), CAP(9), [PTRN(sp)], #(CAP_WIDTH * 2)
 	ldp	CAP(6), CAP(7), [PTRN(sp)], #(CAP_WIDTH * 2)
 	ldp	CAP(4), CAP(5), [PTRN(sp)], #(CAP_WIDTH * 2)
 	ldp	CAP(2), CAP(3), [PTRN(sp)], #(CAP_WIDTH * 2)
