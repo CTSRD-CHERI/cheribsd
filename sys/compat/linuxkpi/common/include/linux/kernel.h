@@ -525,6 +525,21 @@ kstrtoint_from_user(const char __user * __capability s, size_t count, unsigned i
 }
 
 static inline int
+kstrtouint_from_user(const char __user * __capability s, size_t count, unsigned int base,
+    int *p)
+{
+	char buf[36] = {};
+
+	if (count > (sizeof(buf) - 1))
+		count = (sizeof(buf) - 1);
+
+	if (copy_from_user(buf, s, count))
+		return (-EFAULT);
+
+	return (kstrtouint(buf, base, p));
+}
+
+static inline int
 kstrtou8_from_user(const char __user * __capability s, size_t count, unsigned int base,
     u8 *p)
 {
