@@ -158,6 +158,10 @@ cpu_fetch_syscall_args(struct thread *td)
 	struct proc *p;
 	syscallarg_t *ap, *dst_ap;
 	struct syscall_args *sa;
+#if __has_feature(capabilities)
+	syscallarg_t * __capability stack_args = NULL;
+	int error;
+#endif
 
 	p = td->td_proc;
 	sa = &td->td_sa;
@@ -169,6 +173,17 @@ cpu_fetch_syscall_args(struct thread *td)
 
 	if (__predict_false(sa->code == SYS_syscall || sa->code == SYS___syscall)) {
 		sa->code = *ap++;
+
+#if __has_feature(capabilities)
+		/*
+		 * For syscall() and __syscall(), the arguments are
+		 * stored in a var args block on the stack pointed to
+		 * by C9.
+		 */
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+			stack_args =
+			    (syscallarg_t * __capability)td->td_frame->tf_x[9];
+#endif
 	} else {
 		*dst_ap++ = *ap++;
 	}
@@ -181,7 +196,16 @@ cpu_fetch_syscall_args(struct thread *td)
 	KASSERT(sa->callp->sy_narg <= nitems(sa->args),
 	    ("Syscall %d takes too many arguments", sa->code));
 
-	memcpy(dst_ap, ap, (nitems(sa->args) - 1) * sizeof(syscallarg_t));
+#if __has_feature(capabilities)
+	if (__predict_false(stack_args != NULL)) {
+		error = copyincap(stack_args, dst_ap, sa->callp->sy_narg *
+		    sizeof(syscallarg_t));
+		if (error)
+			return (error);
+	} else
+#endif
+		memcpy(dst_ap, ap, (nitems(sa->args) - 1) *
+		    sizeof(syscallarg_t));
 
 	td->td_retval[0] = 0;
 	td->td_retval[1] = 0;
