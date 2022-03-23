@@ -52,7 +52,7 @@ unwind_frame(struct thread *td, struct unwind_state *frame)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	if ((ptraddr_t)(fp - sizeof(fp) * 2) < cheri_getbase(fp) ||
-	    (ptraddr_t)fp >= cheri_gettop(fp) ||
+	    (ptraddr_t)fp > cheri_gettop(fp) ||
 	    cheri_gettag(fp) == 0 ||
 	    (cheri_getperm(fp) & (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)) !=
 	    (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP))
