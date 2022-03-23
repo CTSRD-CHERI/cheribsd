@@ -694,7 +694,7 @@ common:
 	/* Create the kernel space L2 table */
 	mov	PTR(6), PTR(26)
 	mov	x7, #(ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK))
-	mov	x8, #(KERNBASE & L2_BLOCK_MASK)
+	mov	x8, #(KERNBASE)
 	mov	x9, x28
 	bl	build_l2_block_pagetable
 
