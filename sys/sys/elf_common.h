@@ -804,6 +804,9 @@ typedef struct {
 #define	NT_FREEBSD_ARCH_TAG	3
 #define	NT_FREEBSD_FEATURE_CTL	4
 
+/* Values for n_type used in CheriBSD executables. */
+#define	NT_CHERIBSD_ABI_TAG	1
+
 /* NT_FREEBSD_FEATURE_CTL desc[0] bits */
 #define	NT_FREEBSD_FCTL_ASLR_DISABLE	0x00000001
 #define	NT_FREEBSD_FCTL_PROTMAX_DISABLE	0x00000002
