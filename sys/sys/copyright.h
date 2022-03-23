@@ -29,7 +29,8 @@
 
 /* Add a FreeBSD vendor copyright here */
 #define	COPYRIGHT_Vendor \
-	""
+	"Copyright 2011-2022 University of Cambridge.\n" \
+	"Copyright 2012-2022 SRI International.\n"
 
 /* FreeBSD */
 #define COPYRIGHT_FreeBSD \
