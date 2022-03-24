@@ -3751,7 +3751,7 @@ corefile_open_last(struct thread *td, char *name, int indexpos,
 			break;
 
 		vp = nd.ni_vp;
-		NDFREE(&nd, NDF_ONLY_PNBUF);
+		NDFREE_PNBUF(&nd);
 		if ((flags & O_CREAT) == O_CREAT) {
 			nextvp = vp;
 			break;
@@ -3927,7 +3927,7 @@ corefile_open(const char *comm, uid_t uid, pid_t pid, struct thread *td,
 		    NULL);
 		if (error == 0) {
 			*vpp = nd.ni_vp;
-			NDFREE(&nd, NDF_ONLY_PNBUF);
+			NDFREE_PNBUF(&nd);
 		}
 	}
 

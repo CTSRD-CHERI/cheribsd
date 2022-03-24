@@ -707,7 +707,7 @@ interpret:
 				vrele(newtextdvp);
 				newtextdvp = NULL;
 			}
-			NDFREE(&nd, NDF_ONLY_PNBUF);
+			NDFREE_PNBUF(&nd);
 			free(newbinname, M_PARGS);
 			newbinname = NULL;
 		}
@@ -964,7 +964,7 @@ exec_fail_dealloc:
 		else
 			VOP_UNLOCK(imgp->vp);
 		if (args->fname != NULL)
-			NDFREE(&nd, NDF_ONLY_PNBUF);
+			NDFREE_PNBUF(&nd);
 		if (newtextdvp != NULL)
 			vrele(newtextdvp);
 		free(newbinname, M_PARGS);

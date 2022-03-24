@@ -2526,7 +2526,7 @@ kern_swapon(struct thread *td, const char * __capability name)
 	if (error)
 		goto done;
 
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 	vp = nd.ni_vp;
 
 	if (vn_isdisk_error(vp, &error)) {
@@ -2657,7 +2657,7 @@ kern_swapoff(struct thread *td, const char * __capability name,
 	error = namei(&nd);
 	if (error)
 		goto done;
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 	vp = nd.ni_vp;
 
 	mtx_lock(&sw_dev_mtx);

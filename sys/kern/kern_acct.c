@@ -230,7 +230,7 @@ kern_acct(struct thread *td, const char * __capability path)
 		error = vn_open(&nd, &flags, 0, NULL);
 		if (error)
 			return (error);
-		NDFREE(&nd, NDF_ONLY_PNBUF);
+		NDFREE_PNBUF(&nd);
 #ifdef MAC
 		error = mac_system_check_acct(td->td_ucred, nd.ni_vp);
 		if (error) {

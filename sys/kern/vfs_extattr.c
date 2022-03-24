@@ -318,7 +318,7 @@ kern_extattr_set_path(struct thread *td,
 	error = namei(&nd);
 	if (error)
 		return (error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 
 	error = extattr_set_vp(nd.ni_vp, attrnamespace, attrname, data,
 	    nbytes, td);
@@ -493,7 +493,7 @@ kern_extattr_get_path(struct thread *td, const char * __capability path,
 	error = namei(&nd);
 	if (error)
 		return (error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 
 	error = extattr_get_vp(nd.ni_vp, attrnamespace, attrname, data,
 	    nbytes, td);
@@ -634,7 +634,7 @@ kern_extattr_delete_path(struct thread *td, const char * __capability path,
 	error = namei(&nd);
 	if (error)
 		return(error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 
 	error = extattr_delete_vp(nd.ni_vp, attrnamespace, attrname, td);
 	vrele(nd.ni_vp);
@@ -784,7 +784,7 @@ kern_extattr_list_path(struct thread *td, const char * __capability path,
 	error = namei(&nd);
 	if (error)
 		return (error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 
 	error = extattr_list_vp(nd.ni_vp, attrnamespace, data, nbytes, td);
 

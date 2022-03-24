@@ -245,7 +245,7 @@ nfsrv_lookupfilename(struct nameidata *ndp, char * __capability fname,
 	NDINIT(ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE, fname);
 	error = namei(ndp);
 	if (!error) {
-		NDFREE(ndp, NDF_ONLY_PNBUF);
+		NDFREE_PNBUF(ndp);
 	}
 	return (error);
 }

@@ -1086,7 +1086,7 @@ kern_ktrace(struct thread *td, const char * __capability fname, int uops,
 		error = vn_open(&nd, &flags, 0, NULL);
 		if (error)
 			return (error);
-		NDFREE(&nd, NDF_ONLY_PNBUF);
+		NDFREE_PNBUF(&nd);
 		vp = nd.ni_vp;
 		VOP_UNLOCK(vp);
 		if (vp->v_type != VREG) {
