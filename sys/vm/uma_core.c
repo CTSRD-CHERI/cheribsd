@@ -370,6 +370,9 @@ static void cache_sample_stats(uma_zone_t, uma_cache_t);
 /* Fallback alloc/free */
 #define	QEMU_UMA_CNT_FALLBACK_ALLOC 102
 #define	QEMU_UMA_CNT_FALLBACK_FREE 103
+/* NOVM pressure */
+#define	QEMU_UMA_CNT_PRESSURE 104
+#define	QEMU_UMA_CNT_NOVM_PRESSURE 105
 #endif
 
 static uint64_t uma_zone_get_allocs(uma_zone_t zone);
@@ -3814,6 +3817,13 @@ uma_zalloc_smr(uma_zone_t zone, int flags)
 		counter_u64_add(zone->uz_pressure, 1);
 	}
 #endif
+#ifdef CHERI_UMA_QEMU_COUNTERS
+	if ((flags & M_NOVM) == 0) {
+		QEMU_EVENT_INC_COUNTER(zone->uz_name, QEMU_UMA_CNT_PRESSURE, 1);
+	} else {
+		QEMU_EVENT_INC_COUNTER(zone->uz_name, QEMU_UMA_CNT_NOVM_PRESSURE, 1);
+	}
+#endif
 
 	critical_enter();
 	cache = &zone->uz_cpu[curcpu];
@@ -3839,6 +3849,13 @@ uma_zalloc_arg(uma_zone_t zone, void *udata, int flags)
 #ifdef CHERI_UMA_EXTRA_STATS
 	if ((flags & M_NOVM) == 0) {
 		counter_u64_add(zone->uz_pressure, 1);
+	}
+#endif
+#ifdef CHERI_UMA_QEMU_COUNTERS
+	if ((flags & M_NOVM) == 0) {
+		QEMU_EVENT_INC_COUNTER(zone->uz_name, QEMU_UMA_CNT_PRESSURE, 1);
+	} else {
+		QEMU_EVENT_INC_COUNTER(zone->uz_name, QEMU_UMA_CNT_NOVM_PRESSURE, 1);
 	}
 #endif
 
