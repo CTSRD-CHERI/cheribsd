@@ -153,23 +153,30 @@ pctrie_is_empty(struct pctrie *ptree)
  * These widths should allow the pointers to a node's children to fit within
  * a single cache line.  The extra levels from a narrow width should not be
  * a problem thanks to path compression.
+ * XXX-AM: The original tuning values did not respect this condition for LP64.
+ * Due to lack of pctrie specific testing we leave the same values for CHERI
+ * as well, as we need to find workloads to test this properly.
  */
-#ifdef __LP64__
-#define	PCTRIE_WIDTH	4
+#if __SIZEOF_POINTER__ == 4
+#define	PCTRIE_WIDTH	(3)
+#elif __SIZEOF_POINTER__ == 8
+#define	PCTRIE_WIDTH	(4)
+#elif __SIZEOF_POINTER__ == 16
+#define	PCTRIE_WIDTH	(3)
 #else
-#define	PCTRIE_WIDTH	3
+#error "Unexpected pointer size"
 #endif
-
 #define	PCTRIE_COUNT	(1 << PCTRIE_WIDTH)
 
 #endif /* _KERNEL */
 #endif /* !_SYS_PCTRIE_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20220425,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "subobject_bounds"
+//     "subobject_bounds",
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END
