@@ -516,7 +516,9 @@ struct uma_zone {
 					  * Failures due to keg not being able
 					  * to provide a slab/item
 					  */
-	counter_u64_t	uz_pressure;	/* Allocation deallocation attempts */
+	counter_u64_t	uz_pressure;	/* zallocs that may result in memory
+					 * allocation.
+					 */
 #endif
 
 	/*
