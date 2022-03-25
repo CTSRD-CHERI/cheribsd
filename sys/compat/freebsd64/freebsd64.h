@@ -198,7 +198,7 @@ struct procctl_reaper_pids64 {
 };
 
 struct iovec64 {
-	uint64_t iov_base;	/* void* */
+	uintptr_t iov_base;	/* void* */
 	size_t	iov_len;
 };
 

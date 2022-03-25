@@ -48,7 +48,7 @@ extern void zfs_uioskip(zfs_uio_t *, size_t);
 static inline void
 zfs_uio_iov_at_index(zfs_uio_t *uio, uint_t idx, void **base, uint64_t *len)
 {
-	*base = zfs_uio_iovbase(uio, idx);
+	*base = (__cheri_fromcap void *)zfs_uio_iovbase(uio, idx);
 	*len = zfs_uio_iovlen(uio, idx);
 }
 

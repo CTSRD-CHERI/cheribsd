@@ -193,7 +193,7 @@ struct nstat32 {
 };
 
 struct iovec32 {
-	uint32_t iov_base;
+	uintptr_t iov_base;
 	int	iov_len;
 };
 

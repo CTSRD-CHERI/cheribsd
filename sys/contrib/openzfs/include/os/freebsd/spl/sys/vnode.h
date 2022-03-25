@@ -219,7 +219,7 @@ vn_rename(char *from, char *to, enum uio_seg seg)
 
 	ASSERT(seg == UIO_SYSSPACE);
 
-	return (kern_renameat(curthread, AT_FDCWD, from, AT_FDCWD, to, seg));
+	return (kern_renameat(curthread, AT_FDCWD, PTR2CAP(from), AT_FDCWD, PTR2CAP(to), seg));
 }
 
 #include <sys/vfs.h>

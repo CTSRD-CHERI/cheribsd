@@ -77,7 +77,7 @@ extern "C" {
 
 typedef struct zfs_iocparm {
 	uint32_t	zfs_ioctl_version;
-	uint64_t	zfs_cmd;
+	uintptr_t	zfs_cmd;
 	uint64_t	zfs_cmd_size;
 } zfs_iocparm_t;
 
@@ -93,7 +93,7 @@ typedef struct zfs_iocparm {
  */
 typedef struct zfs_cmd_legacy {
 	char		zc_name[LEGACY_MAXPATHLEN];	/* pool|dataset name */
-	uint64_t	zc_nvlist_src;		/* really (char *) */
+	uintptr_t	zc_nvlist_src;		/* really (char *) */
 	uint64_t	zc_nvlist_src_size;
 	uint64_t	zc_nvlist_dst;		/* really (char *) */
 	uint64_t	zc_nvlist_dst_size;
@@ -108,7 +108,7 @@ typedef struct zfs_cmd_legacy {
 	char		zc_value[LEGACY_MAXPATHLEN * 2];
 	char		zc_string[LEGACY_MAXNAMELEN];
 	uint64_t	zc_guid;
-	uint64_t	zc_nvlist_conf;		/* really (char *) */
+	uintptr_t	zc_nvlist_conf;		/* really (char *) */
 	uint64_t	zc_nvlist_conf_size;
 	uint64_t	zc_cookie;
 	uint64_t	zc_objset_type;

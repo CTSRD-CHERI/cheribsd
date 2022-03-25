@@ -120,7 +120,17 @@ struct mfi_ioc_packet64 {
 	} mfi_frame;
 
 	struct iovec64 mfi_sgl[MAX_IOCTL_SGE];
-} __packed;
+} __packed __attribute__((annotate("underaligned_capability")));
+/* This annotation is not the correct fix, it's a placeholder.
+ * The correct fix is to set CHERI alignment, as in the
+ * mfi_ioc_packet struct above. Unfortunately, that breaks the
+ * IOCTL constant MFI_CMD64, defined below, because proper CHERI
+ * alignment means that the two structs mfi_ioc_packet and
+ * mfi_ioc_packet64 are exactly the same size, and so the IOCTL
+ * constants MFI_CMD and MFI_CMD64 end up calculated as the same
+ * number. Then the case statements in mfi.c fail, because C
+ * can't compare two cases with exactly the same value.
+*/
 #endif
 
 struct mfi_ioc_aen {

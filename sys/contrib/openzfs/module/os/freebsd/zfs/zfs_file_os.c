@@ -58,7 +58,7 @@ zfs_file_open(const char *path, int flags, int mode, zfs_file_t **fpp)
 	td = curthread;
 	pwd_ensure_dirs();
 	/* 12.x doesn't take a const char * */
-	rc = kern_openat(td, AT_FDCWD, __DECONST(char *, path),
+	rc = kern_openat(td, AT_FDCWD, __USER_CAP_STR(path),
 	    UIO_SYSSPACE, flags, mode);
 	if (rc)
 		return (SET_ERROR(rc));
@@ -85,7 +85,7 @@ zfs_file_write_impl(zfs_file_t *fp, const void *buf, size_t count, loff_t *offp,
 	struct iovec aiov;
 
 	td = curthread;
-	aiov.iov_base = (void *)(uintptr_t)buf;
+	aiov.iov_base = (__cheri_tocap void * __capability)buf;
 	aiov.iov_len = count;
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
@@ -142,7 +142,7 @@ zfs_file_read_impl(zfs_file_t *fp, void *buf, size_t count, loff_t *offp,
 	struct iovec aiov;
 
 	td = curthread;
-	aiov.iov_base = (void *)(uintptr_t)buf;
+	aiov.iov_base = (__cheri_tocap void * __capability)buf;
 	aiov.iov_len = count;
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
@@ -291,7 +291,7 @@ zfs_file_unlink(const char *fnamep)
 	int rc;
 
 #if __FreeBSD_version >= 1300018
-	rc = kern_funlinkat(curthread, AT_FDCWD, fnamep, FD_NONE, seg, 0, 0);
+	rc = kern_funlinkat(curthread, AT_FDCWD, (__cheri_tocap const char * __capability)fnamep, FD_NONE, seg, 0, 0);
 #elif __FreeBSD_version >= 1202504 || defined(AT_BENEATH)
 	rc = kern_unlinkat(curthread, AT_FDCWD, __DECONST(char *, fnamep),
 	    seg, 0, 0);

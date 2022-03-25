@@ -189,7 +189,7 @@ lzc_ioctl(zfs_ioc_t ioc, const char *name,
 
 	if (source != NULL) {
 		packed = fnvlist_pack(source, &size);
-		zc.zc_nvlist_src = (uint64_t)(uintptr_t)packed;
+		zc.zc_nvlist_src = (uintptr_t)packed;
 		zc.zc_nvlist_src_size = size;
 	}
 
@@ -900,13 +900,13 @@ recv_impl(const char *snapname, nvlist_t *recvdprops, nvlist_t *localprops,
 
 		if (recvdprops != NULL) {
 			packed = fnvlist_pack(recvdprops, &size);
-			zc.zc_nvlist_src = (uint64_t)(uintptr_t)packed;
+			zc.zc_nvlist_src = (uintptr_t)packed;
 			zc.zc_nvlist_src_size = size;
 		}
 
 		if (localprops != NULL) {
 			packed = fnvlist_pack(localprops, &size);
-			zc.zc_nvlist_conf = (uint64_t)(uintptr_t)packed;
+			zc.zc_nvlist_conf = (uintptr_t)packed;
 			zc.zc_nvlist_conf_size = size;
 		}
 

@@ -103,10 +103,10 @@ SYSCTL_INT(_vfs_zfs_version, OID_AUTO, zpl, CTLFLAG_RD, &zfs_version_zpl, 0,
 /* END CSTYLED */
 
 #if __FreeBSD_version >= 1400018
-static int zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg,
+static int zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void * __capability arg,
     bool *mp_busy);
 #else
-static int zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg);
+static int zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void * __capability arg);
 #endif
 static int zfs_mount(vfs_t *vfsp);
 static int zfs_umount(vfs_t *vfsp, int fflag);
@@ -273,9 +273,9 @@ done:
 
 static int
 #if __FreeBSD_version >= 1400018
-zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg, bool *mp_busy)
+zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void * __capability arg, bool *mp_busy)
 #else
-zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg)
+zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void * __capability arg)
 #endif
 {
 	zfsvfs_t *zfsvfs = vfsp->vfs_data;
@@ -357,7 +357,7 @@ zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg)
 	switch (cmd) {
 	case Q_GETQUOTASIZE:
 		bitsize = 64;
-		error = copyout(&bitsize, arg, sizeof (int));
+		error = copyout(&bitsize, (__cheri_tocap void * __capability)arg, sizeof (int));
 		break;
 	case Q_QUOTAON:
 		// As far as I can tell, you can't turn quotas on or off on zfs
@@ -373,7 +373,7 @@ zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg)
 #endif
 		break;
 	case Q_SETQUOTA:
-		error = copyin(arg, &dqblk, sizeof (dqblk));
+		error = copyin((__cheri_tocap void * __capability)arg, &dqblk, sizeof (dqblk));
 		if (error == 0)
 			error = zfs_set_userquota(zfsvfs, quota_type,
 			    "", id, dbtob(dqblk.dqb_bhardlimit));
@@ -381,7 +381,7 @@ zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg)
 	case Q_GETQUOTA:
 		error = zfs_getquota(zfsvfs, id, type == GRPQUOTA, &dqblk);
 		if (error == 0)
-			error = copyout(&dqblk, arg, sizeof (dqblk));
+			error = copyout(&dqblk, (__cheri_tocap void * __capability)arg, sizeof (dqblk));
 		break;
 	default:
 		error = EINVAL;

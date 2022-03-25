@@ -152,21 +152,21 @@ zfsdev_ioctl(struct cdev *dev, ulong_t zcmd, caddr_t arg, int flag,
 			return (ENOTSUP);
 		}
 		zcl = kmem_zalloc(sizeof (zfs_cmd_legacy_t), KM_SLEEP);
-		if (copyin(uaddr, zcl, sizeof (zfs_cmd_legacy_t))) {
+		if (copyin((__cheri_tocap const void * __capability)uaddr, zcl, sizeof (zfs_cmd_legacy_t))) {
 			error = SET_ERROR(EFAULT);
 			goto out;
 		}
 		zfs_cmd_legacy_to_ozfs(zcl, zc);
-	} else if (copyin(uaddr, zc, sizeof (zfs_cmd_t))) {
+	} else if (copyin((__cheri_tocap const void * __capability)uaddr, zc, sizeof (zfs_cmd_t))) {
 		error = SET_ERROR(EFAULT);
 		goto out;
 	}
 	error = zfsdev_ioctl_common(vecnum, zc, 0);
 	if (zcl) {
 		zfs_cmd_ozfs_to_legacy(zc, zcl);
-		rc = copyout(zcl, uaddr, sizeof (*zcl));
+		rc = copyout(zcl, (__cheri_tocap void * __capability)uaddr, sizeof (*zcl));
 	} else {
-		rc = copyout(zc, uaddr, sizeof (*zc));
+		rc = copyout(zc, (__cheri_tocap void * __capability)uaddr, sizeof (*zc));
 	}
 	if (error == 0 && rc != 0)
 		error = SET_ERROR(EFAULT);
