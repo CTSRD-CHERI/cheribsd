@@ -808,7 +808,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 			    addr + pageoff,  mrp);
 		else
 #endif
-			td->td_retval[0] = (syscallarg_t)(addr + pageoff);
+			td->td_retval[0] = addr + pageoff;
 	}
 done:
 	if (fp)

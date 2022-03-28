@@ -1596,7 +1596,7 @@ print_arg(struct syscall_arg *sc, syscallarg_t *args, syscallarg_t *retval,
 		break;
 	}
 	case LongHex:
-		fprintf(fp, "0x%lx", (unsigned long)args[sc->offset]);
+		fprintf(fp, "0x%lx", (long)args[sc->offset]);
 		break;
 	case Long:
 		fprintf(fp, "%ld", (long)args[sc->offset]);

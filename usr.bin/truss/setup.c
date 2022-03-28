@@ -576,8 +576,8 @@ exit_syscall(struct trussinfo *info, struct ptrace_lwpinfo *pl)
 			 * getting the data; it may not be valid.
 			 */
 			if (psr.sr_error != 0) {
-				asprintf(&temp, "0x%jx",
-				    (intmax_t)t->cs.args[sc->decode.args[i].offset]);
+				asprintf(&temp, "0x%lx",
+				    (long)t->cs.args[sc->decode.args[i].offset]);
 			} else {
 				temp = print_arg(&sc->decode.args[i],
 				    t->cs.args, psr.sr_retval, info);

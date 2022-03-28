@@ -1204,7 +1204,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		bcopy(td2->td_sa.args, (__cheri_fromcap void *)addr,
 		    SV_PROC_ABI(td->td_proc) == SV_ABI_LINUX ?
 		    sizeof(td2->td_sa.args) :
-		    td2->td_sa.callp->sy_narg * sizeof(register_t));
+		    td2->td_sa.callp->sy_narg * sizeof(syscallarg_t));
 		break;
 
 	case PT_GET_SC_RET:

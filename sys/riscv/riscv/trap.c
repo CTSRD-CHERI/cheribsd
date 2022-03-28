@@ -185,7 +185,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	} else
 #endif
 	{
-		memcpy(dst_ap, ap, (NARGREG - 1) * sizeof(syscallarg_t));
+		memcpy(dst_ap, ap, (NARGREG - 1) * sizeof(*dst_ap));
 	}
 
 	td->td_retval[0] = 0;

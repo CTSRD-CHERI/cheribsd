@@ -199,13 +199,12 @@ cpu_fetch_syscall_args(struct thread *td)
 #if __has_feature(capabilities)
 	if (__predict_false(stack_args != NULL)) {
 		error = copyincap(stack_args, dst_ap, sa->callp->sy_narg *
-		    sizeof(syscallarg_t));
+		    sizeof(*dst_ap));
 		if (error)
 			return (error);
 	} else
 #endif
-		memcpy(dst_ap, ap, (nitems(sa->args) - 1) *
-		    sizeof(syscallarg_t));
+		memcpy(dst_ap, ap, (nitems(sa->args) - 1) * sizeof(*dst_ap));
 
 	td->td_retval[0] = 0;
 	td->td_retval[1] = 0;

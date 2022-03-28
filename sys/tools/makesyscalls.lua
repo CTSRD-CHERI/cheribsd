@@ -881,7 +881,7 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 			write_line("sysarg", "};\n")
 		else
 			write_line("sysarg", string.format(
-			    "struct %s {\n\tregister_t dummy;\n};\n", argalias))
+			    "struct %s {\n\tsyscallarg_t dummy;\n};\n", argalias))
 		end
 	end
 
@@ -1022,7 +1022,7 @@ local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
 		write_line(out, "};\n")
 	elseif flags & nargflags == 0 then
 		write_line("sysarg", string.format(
-		    "struct %s {\n\tregister_t dummy;\n};\n", argalias))
+		    "struct %s {\n\tsyscallarg_t dummy;\n};\n", argalias))
 	end
 	if flags & dprotoflags == 0 then
 		write_line(outdcl, string.format(
