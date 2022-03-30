@@ -3314,6 +3314,4 @@
 		);
 	}
 
-; Please copy any additions and changes to the following compatability tables:
-; sys/compat/freebsd32/syscalls.master
 ; vim: syntax=off
