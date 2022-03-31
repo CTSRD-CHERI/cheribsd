@@ -1052,6 +1052,9 @@ linux_readlink(struct thread *td, struct linux_readlink_args *args)
 	char *name;
 	int error;
 
+	if (args->count <= 0)
+		return (EINVAL);
+
 	if (!LUSECONVPATH(td)) {
 		return (kern_readlinkat(td, AT_FDCWD, args->name, UIO_USERSPACE,
 		    args->buf, UIO_USERSPACE, args->count));
@@ -1069,6 +1072,9 @@ linux_readlinkat(struct thread *td, struct linux_readlinkat_args *args)
 {
 	char *name;
 	int error, dfd;
+
+	if (args->bufsiz <= 0)
+		return (EINVAL);
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	if (!LUSECONVPATH(td)) {
