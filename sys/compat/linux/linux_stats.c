@@ -810,7 +810,6 @@ linux_statx(struct thread *td, struct linux_statx_args *args)
 
 	return (error);
 }
-
 // CHERI CHANGES START
 // {
 //   "updated": 20181114,
