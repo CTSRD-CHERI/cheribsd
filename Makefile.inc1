@@ -3360,7 +3360,8 @@ list-old-files: .PHONY
 	    -V "OLD_FILES:Mlib/*.so.*:S,^lib,usr/lib64," \
 	    -V "OLD_FILES:Musr/lib/*:S,^usr/lib,usr/lib64," \
 	    -V "OLD_FILES:Mlib/*.so.*:S,^lib,usr/lib64c," \
-	    -V "OLD_FILES:Musr/lib/*:S,^usr/lib,usr/lib64c," | xargs -n1 | sort
+	    -V "OLD_FILES:Musr/lib/*:S,^usr/lib,usr/lib64c," | \
+	    sed -E 's/[[:space:]]+/\n/g' | sort
 
 delete-old-files: .PHONY
 	@echo ">>> Removing old files (only deletes safe to delete libs)"
@@ -3434,6 +3435,7 @@ list-old-libs: .PHONY
 	    -V "OLD_LIBS:Musr/lib/*:S,^usr/lib,usr/lib64c," \
 	    -V "OLD_LIBS:Mlib/casper/*:S,^lib/casper,usr/lib64c," | \
 	    xargs -n1 | sort
+	    sed -E 's/[[:space:]]+/\n/g' | sort
 
 delete-old-libs: .PHONY
 	@echo ">>> Removing old libraries"
@@ -3474,7 +3476,7 @@ check-old-libs: .PHONY
 list-old-dirs: .PHONY
 	@cd ${.CURDIR}; \
 	${MAKE} -f ${.CURDIR}/Makefile.inc1 ${.MAKEFLAGS} ${.TARGET} \
-	    -V OLD_DIRS | xargs -n1 | sort -r
+	    -V OLD_DIRS | sed -E 's/[[:space:]]+/\n/g' | sort -r
 
 delete-old-dirs: .PHONY
 	@echo ">>> Removing old directories"
