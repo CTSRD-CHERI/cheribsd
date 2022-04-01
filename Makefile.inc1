@@ -1469,6 +1469,10 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	if [ -z "${CROSSBUILD_HOST}" ] ; then \
 		libs=$$(ldd -f "%o %p\n" -f "%o %p\n" $$progs 2>/dev/null | sort -u | \
 		    while read line; do \
+			case $$line in \
+			"["*"]") \
+				continue;; \
+			esac; \
 			set -- $$line; \
 			if [ "$$2 $$3" != "not found" ]; then \
 				echo $$2; \
