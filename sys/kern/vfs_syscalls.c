@@ -1207,7 +1207,8 @@ kern_openat(struct thread *td, int fd, char const * __capability path,
 	NDINIT_ATRIGHTS(&nd, LOOKUP, FOLLOW | AUDITVNODE1 | WANTIOCTLCAPS,
 	    pathseg, path, fd, &rights);
 	td->td_dupfd = -1;		/* XXX check for fdopen */
-	error = vn_open(&nd, &flags, cmode, fp);
+	error = vn_open_cred(&nd, &flags, cmode, VN_OPEN_WANTIOCTLCAPS,
+	    td->td_ucred, fp);
 	if (error != 0) {
 		/*
 		 * If the vn_open replaced the method vector, something
