@@ -283,6 +283,7 @@ uintptr_t _rtld_bind(Obj_Entry *obj, Elf_Size reloff);
 int npagesizes;
 static int osreldate;
 size_t *pagesizes;
+size_t page_size;
 
 static int stack_prot = PROT_READ | PROT_WRITE | RTLD_DEFAULT_STACK_EXEC;
 static int max_stack_flags;
@@ -514,6 +515,18 @@ set_ld_elf_hints_path(void)
 {
 	if (ld_elf_hints_path == NULL || strlen(ld_elf_hints_path) == 0)
 		ld_elf_hints_path = ld_elf_hints_default;
+}
+
+uintptr_t
+rtld_round_page(uintptr_t x)
+{
+	return (roundup2(x, page_size));
+}
+
+uintptr_t
+rtld_trunc_page(uintptr_t x)
+{
+	return (rounddown2(x, page_size));
 }
 
 /*
@@ -1805,11 +1818,11 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 
 	case PT_LOAD:
 	    if (nsegs == 0) {	/* First load segment */
-		obj->vaddrbase = trunc_page(ph->p_vaddr);
+		obj->vaddrbase = rtld_trunc_page(ph->p_vaddr);
 		obj->mapbase = obj->vaddrbase + obj->relocbase;
 	    } else {		/* Last load segment */
 		obj->mapsize = rtld_max(obj->mapsize,
-		    round_page(ph->p_vaddr + ph->p_memsz) - obj->vaddrbase);
+		    rtld_round_page(ph->p_vaddr + ph->p_memsz) - obj->vaddrbase);
 	    }
 	    nsegs++;
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -1842,9 +1855,9 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 	    break;
 
 	case PT_GNU_RELRO:
-	    obj->relro_page = obj->relocbase + trunc_page(ph->p_vaddr);
-	    obj->relro_size = trunc_page(ph->p_vaddr + ph->p_memsz) -
-	      trunc_page(ph->p_vaddr);
+	    obj->relro_page = obj->relocbase + rtld_trunc_page(ph->p_vaddr);
+	    obj->relro_size = rtld_trunc_page(ph->p_vaddr + ph->p_memsz) -
+	      rtld_trunc_page(ph->p_vaddr);
 #ifdef __CHERI_PURE_CAPABILITY__
 	    obj->text_rodata_start_offset = rtld_min(ph->p_vaddr, obj->text_rodata_start_offset);
 	    obj->text_rodata_end_offset = rtld_max(ph->p_vaddr + ph->p_memsz, obj->text_rodata_end_offset);
@@ -2515,8 +2528,8 @@ parse_rtld_phdr(Obj_Entry *obj)
 			break;
 		case PT_GNU_RELRO:
 			obj->relro_page = obj->relocbase +
-			    trunc_page(ph->p_vaddr);
-			obj->relro_size = round_page(ph->p_memsz);
+			    rtld_trunc_page(ph->p_vaddr);
+			obj->relro_size = rtld_round_page(ph->p_memsz);
 			break;
 		case PT_NOTE:
 			note_start = (Elf_Note *)((char *)obj->relocbase + ph->p_vaddr);
@@ -2703,6 +2716,8 @@ psa_filled:
 	/* Discard any invalid entries at the end of the array. */
 	while (npagesizes > 0 && pagesizes[npagesizes - 1] == 0)
 		npagesizes--;
+
+	page_size = pagesizes[0];
 }
 
 /*
@@ -3463,9 +3478,9 @@ reloc_textrel_prot(Obj_Entry *obj, bool before)
 	    l--, ph++) {
 		if (ph->p_type != PT_LOAD || (ph->p_flags & PF_W) != 0)
 			continue;
-		base = obj->relocbase + trunc_page(ph->p_vaddr);
-		sz = round_page(ph->p_vaddr + ph->p_filesz) -
-		    trunc_page(ph->p_vaddr);
+		base = obj->relocbase + rtld_trunc_page(ph->p_vaddr);
+		sz = rtld_round_page(ph->p_vaddr + ph->p_filesz) -
+		    rtld_trunc_page(ph->p_vaddr);
 		prot = before ? (PROT_READ | PROT_WRITE) :
 		    convert_prot(ph->p_flags);
 		if (mprotect(base, sz, prot) == -1) {

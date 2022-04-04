@@ -62,8 +62,7 @@ int __getosreldate(void);
 static bool
 phdr_in_zero_page(const Elf_Ehdr *hdr)
 {
-	return (hdr->e_phoff + hdr->e_phnum * sizeof(Elf_Phdr) <=
-	    (size_t)PAGE_SIZE);
+	return (hdr->e_phoff + hdr->e_phnum * sizeof(Elf_Phdr) <= page_size);
 }
 
 /*
@@ -151,7 +150,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 
 	case PT_LOAD:
 	    segs[++nsegs] = phdr;
-    	    if ((segs[nsegs]->p_align & (PAGE_SIZE - 1)) != 0) {
+	    if ((segs[nsegs]->p_align & (page_size - 1)) != 0) {
 		_rtld_error("%s: PT_LOAD segment %d not page-aligned",
 		    path, nsegs);
 		goto error;
@@ -168,7 +167,8 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 #endif
 	    if ((segs[nsegs]->p_flags & PF_X) == PF_X) {
 		text_end = MAX(text_end,
-		    round_page(segs[nsegs]->p_vaddr + segs[nsegs]->p_memsz));
+		    rtld_round_page(segs[nsegs]->p_vaddr +
+		    segs[nsegs]->p_memsz));
 	    }
 	    break;
 
@@ -202,18 +202,18 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    break;
 
 	case PT_NOTE:
-	    if (phdr->p_offset > PAGE_SIZE ||
-	      phdr->p_offset + phdr->p_filesz > PAGE_SIZE) {
-		note_map_len = round_page(phdr->p_offset +
-		  phdr->p_filesz) - trunc_page(phdr->p_offset);
+	    if (phdr->p_offset > page_size ||
+	      phdr->p_offset + phdr->p_filesz > page_size) {
+		note_map_len = rtld_round_page(phdr->p_offset +
+		  phdr->p_filesz) - rtld_trunc_page(phdr->p_offset);
 		note_map = mmap(NULL, note_map_len, PROT_READ,
-		  MAP_PRIVATE, fd, trunc_page(phdr->p_offset));
+		  MAP_PRIVATE, fd, rtld_trunc_page(phdr->p_offset));
 		if (note_map == MAP_FAILED) {
 		    _rtld_error("%s: error mapping PT_NOTE (%d)", path, errno);
 		    goto error;
 		}
 		note_start = (note_map + phdr->p_offset -
-		  trunc_page(phdr->p_offset));
+		  rtld_trunc_page(phdr->p_offset));
 	    } else {
 		note_start = (char *)hdr + phdr->p_offset;
 	    }
@@ -237,8 +237,8 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
      * Map the entire address space of the object, to stake out our
      * contiguous region, and to establish the base address for relocation.
      */
-    base_vaddr = trunc_page(segs[0]->p_vaddr);
-    base_vlimit = round_page(segs[nsegs]->p_vaddr + segs[nsegs]->p_memsz);
+    base_vaddr = rtld_trunc_page(segs[0]->p_vaddr);
+    base_vlimit = rtld_round_page(segs[nsegs]->p_vaddr + segs[nsegs]->p_memsz);
     mapsize = base_vlimit - base_vaddr;
 #ifdef __CHERI_PURE_CAPABILITY__
     /* round up the requested size so that the kernel can represent the mmap result */
@@ -249,7 +249,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     base_addr = (caddr_t)(uintptr_t)base_vaddr;
     base_flags = __getosreldate() >= P_OSREL_MAP_GUARD ? MAP_GUARD :
 	MAP_PRIVATE | MAP_ANON | MAP_NOCORE;
-    if (npagesizes > 1 && round_page(segs[0]->p_filesz) >= pagesizes[1])
+    if (npagesizes > 1 && rtld_round_page(segs[0]->p_filesz) >= pagesizes[1])
 	base_flags |= MAP_ALIGNED_SUPER;
     if (base_vaddr != 0) {
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -283,9 +283,9 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 
     for (i = 0; i <= nsegs; i++) {
 	/* Overlay the segment onto the proper region. */
-	data_offset = trunc_page(segs[i]->p_offset);
-	data_vaddr = trunc_page(segs[i]->p_vaddr);
-	data_vlimit = round_page(segs[i]->p_vaddr + segs[i]->p_filesz);
+	data_offset = rtld_trunc_page(segs[i]->p_offset);
+	data_vaddr = rtld_trunc_page(segs[i]->p_vaddr);
+	data_vlimit = rtld_round_page(segs[i]->p_vaddr + segs[i]->p_filesz);
 	data_addr = mapbase + (data_vaddr - base_vaddr);
 	data_prot = convert_prot(segs[i]->p_flags);
 	/*
@@ -312,12 +312,12 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    /* Clear any BSS in the last page of the segment. */
 	    clear_vaddr = segs[i]->p_vaddr + segs[i]->p_filesz;
 	    clear_addr = mapbase + (clear_vaddr - base_vaddr);
-	    clear_page = mapbase + (trunc_page(clear_vaddr) - base_vaddr);
+	    clear_page = mapbase + (rtld_trunc_page(clear_vaddr) - base_vaddr);
 
 	    if ((nclear = data_vlimit - clear_vaddr) > 0) {
 		/* Make sure the end of the segment is writable */
 		if ((data_prot & PROT_WRITE) == 0 && -1 ==
-		     mprotect(clear_page, PAGE_SIZE, data_prot|PROT_WRITE)) {
+		     mprotect(clear_page, page_size, data_prot|PROT_WRITE)) {
 			_rtld_error("%s: mprotect failed: %s", path,
 			    rtld_strerror(errno));
 			goto error1;
@@ -327,12 +327,12 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 
 		/* Reset the data protection back */
 		if ((data_prot & PROT_WRITE) == 0)
-		    mprotect(clear_page, PAGE_SIZE, data_prot);
+		    mprotect(clear_page, page_size, data_prot);
 	    }
 
 	    /* Overlay the BSS segment onto the proper region. */
 	    bss_vaddr = data_vlimit;
-	    bss_vlimit = round_page(segs[i]->p_vaddr + segs[i]->p_memsz);
+	    bss_vlimit = rtld_round_page(segs[i]->p_vaddr + segs[i]->p_memsz);
 	    bss_addr = mapbase + (bss_vaddr - base_vaddr);
 	    /* Map a bit more than required for CheriABI if it is not representable. */
 	    size_t bss_len = bss_vlimit - bss_vaddr;
@@ -411,14 +411,14 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	obj->tlsinit = mapbase + phtls->p_vaddr;
     }
     obj->stack_flags = stack_flags;
-    obj->relro_page = obj->relocbase + trunc_page(relro_page);
-    obj->relro_size = trunc_page(relro_page + relro_size) -
-      trunc_page(relro_page);
+    obj->relro_page = obj->relocbase + rtld_trunc_page(relro_page);
+    obj->relro_size = rtld_trunc_page(relro_page + relro_size) -
+      rtld_trunc_page(relro_page);
     if (note_start < note_end)
 	digest_notes(obj, (const Elf_Note *)note_start, (const Elf_Note *)note_end);
     if (note_map != NULL)
 	munmap(note_map, note_map_len);
-    munmap(hdr, PAGE_SIZE);
+    munmap(hdr, page_size);
     return (obj);
 
 error1:
@@ -428,7 +428,7 @@ error:
 	munmap(note_map, note_map_len);
     if (!phdr_in_zero_page(hdr))
 	munmap(phdr, hdr->e_phnum * sizeof(phdr[0]));
-    munmap(hdr, PAGE_SIZE);
+    munmap(hdr, page_size);
     return (NULL);
 }
 
@@ -478,7 +478,7 @@ get_elf_header(int fd, const char *path, const struct stat *sbp,
 		return (NULL);
 	}
 
-	hdr = mmap(NULL, PAGE_SIZE, PROT_READ, MAP_PRIVATE | MAP_PREFAULT_READ,
+	hdr = mmap(NULL, page_size, PROT_READ, MAP_PRIVATE | MAP_PREFAULT_READ,
 	    fd, 0);
 	if (hdr == MAP_FAILED) {
 		_rtld_error("%s: read error: %s", path, rtld_strerror(errno));
@@ -535,7 +535,7 @@ get_elf_header(int fd, const char *path, const struct stat *sbp,
 	return (hdr);
 
 error:
-	munmap(hdr, PAGE_SIZE);
+	munmap(hdr, page_size);
 	return (NULL);
 }
 
