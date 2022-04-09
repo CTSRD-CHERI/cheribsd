@@ -1405,6 +1405,7 @@ prefetch(void *x)
 {
 	__asm volatile("prefetcht0 %0" :: "m" (*(unsigned long *)x));
 }
+
 static __inline void
 prefetch2cachelines(void *x)
 {
@@ -1414,8 +1415,15 @@ prefetch2cachelines(void *x)
 #endif
 }
 #else
-#define prefetch(x)
-#define prefetch2cachelines(x)
+static __inline void
+prefetch(void *x)
+{
+}
+
+static __inline void
+prefetch2cachelines(void *x)
+{
+}
 #endif
 
 static void
