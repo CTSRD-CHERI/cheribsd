@@ -40,6 +40,9 @@ f_include $BSDCFG_SHARE/dialog.subr
 # Default value
 #
 : ${HOSTNAME=$( hostname )}
+if [ "X$HOSTNAME" = "X" ]; then
+	HOSTNAME="cheribsd"
+fi
 
 #
 # Default file to store hostname entry in
