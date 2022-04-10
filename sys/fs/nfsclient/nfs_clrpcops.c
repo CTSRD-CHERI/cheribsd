@@ -336,7 +336,7 @@ nfsrpc_accessrpc(vnode_t vp, u_int32_t mode, struct ucred *cred,
 	if (error)
 		return (error);
 	if (nd->nd_flag & ND_NFSV3) {
-		error = nfscl_postop_attr(nd, nap, attrflagp, stuff);
+		error = nfscl_postop_attr(nd, nap, attrflagp);
 		if (error)
 			goto nfsmout;
 	}
@@ -349,7 +349,7 @@ nfsrpc_accessrpc(vnode_t vp, u_int32_t mode, struct ucred *cred,
 		}
 		rmode = fxdr_unsigned(u_int32_t, *tl);
 		if (nd->nd_flag & ND_NFSV4)
-			error = nfscl_postop_attr(nd, nap, attrflagp, stuff);
+			error = nfscl_postop_attr(nd, nap, attrflagp);
 
 		/*
 		 * It's not obvious what should be done about
@@ -1392,7 +1392,7 @@ nfsrpc_setattrrpc(vnode_t vp, struct vattr *vap,
 	if ((nd->nd_flag & (ND_NFSV4 | ND_NOMOREDATA)) == ND_NFSV4 && !error)
 		error = nfsrv_getattrbits(nd, &attrbits, NULL, NULL);
 	if (!(nd->nd_flag & ND_NFSV3) && !nd->nd_repstat && !error)
-		error = nfscl_postop_attr(nd, rnap, attrflagp, stuff);
+		error = nfscl_postop_attr(nd, rnap, attrflagp);
 	m_freem(nd->nd_mrep);
 	if (nd->nd_repstat && !error)
 		error = nd->nd_repstat;
@@ -1504,7 +1504,7 @@ nfsrpc_lookup(vnode_t dvp, char *name, int len, struct ucred *cred,
 		    return (0);
 		}
 		if (nd->nd_flag & ND_NFSV3)
-		    error = nfscl_postop_attr(nd, dnap, dattrflagp, stuff);
+		    error = nfscl_postop_attr(nd, dnap, dattrflagp);
 		else if ((nd->nd_flag & (ND_NFSV4 | ND_NOMOREDATA)) ==
 		    ND_NFSV4) {
 			/* Load the directory attributes. */
@@ -1558,7 +1558,7 @@ nfsrpc_lookup(vnode_t dvp, char *name, int len, struct ucred *cred,
 	if (error)
 		goto nfsmout;
 
-	error = nfscl_postop_attr(nd, nap, attrflagp, stuff);
+	error = nfscl_postop_attr(nd, nap, attrflagp);
 	if (openmode != 0 && error == 0) {
 		NFSM_DISSECT(tl, uint32_t *, NFSX_STATEID +
 		    10 * NFSX_UNSIGNED);
@@ -1631,7 +1631,7 @@ nfsrpc_lookup(vnode_t dvp, char *name, int len, struct ucred *cred,
 		}
 	}
 	if ((nd->nd_flag & ND_NFSV3) && !error)
-		error = nfscl_postop_attr(nd, dnap, dattrflagp, stuff);
+		error = nfscl_postop_attr(nd, dnap, dattrflagp);
 nfsmout:
 	m_freem(nd->nd_mrep);
 	if (!error && nd->nd_repstat)
@@ -1668,7 +1668,7 @@ nfsrpc_readlink(vnode_t vp, struct uio *uiop, struct ucred *cred,
 	if (error)
 		return (error);
 	if (nd->nd_flag & ND_NFSV3)
-		error = nfscl_postop_attr(nd, nap, attrflagp, stuff);
+		error = nfscl_postop_attr(nd, nap, attrflagp);
 	if (!nd->nd_repstat && !error) {
 		NFSM_STRSIZ(len, NFS_MAXPATHLEN);
 		/*
@@ -1687,7 +1687,7 @@ nfsrpc_readlink(vnode_t vp, struct uio *uiop, struct ucred *cred,
 		}
 		error = nfsm_mbufuio(nd, uiop, len);
 		if ((nd->nd_flag & ND_NFSV4) && !error && cangetattr)
-			error = nfscl_postop_attr(nd, nap, attrflagp, stuff);
+			error = nfscl_postop_attr(nd, nap, attrflagp);
 	}
 	if (nd->nd_repstat && !error)
 		error = nd->nd_repstat;
@@ -1811,7 +1811,7 @@ nfsrpc_readrpc(vnode_t vp, struct uio *uiop, struct ucred *cred,
 		if (error)
 			return (error);
 		if (nd->nd_flag & ND_NFSV3) {
-			error = nfscl_postop_attr(nd, nap, attrflagp, stuff);
+			error = nfscl_postop_attr(nd, nap, attrflagp);
 		} else if (!nd->nd_repstat && (nd->nd_flag & ND_NFSV2)) {
 			error = nfsm_loadattr(nd, nap);
 			if (!error)
@@ -2945,7 +2945,7 @@ nfsrpc_link(vnode_t dvp, vnode_t vp, char *name, int namelen,
 	if (error)
 		return (error);
 	if (nd->nd_flag & ND_NFSV3) {
-		error = nfscl_postop_attr(nd, nap, attrflagp, dstuff);
+		error = nfscl_postop_attr(nd, nap, attrflagp);
 		if (!error)
 			error = nfscl_wcc_data(nd, dvp, dnap, dattrflagp,
 			    NULL, NULL);
@@ -3390,8 +3390,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 			return (error);
 		if (!(nd->nd_flag & ND_NFSV2)) {
 			if (nd->nd_flag & ND_NFSV3)
-				error = nfscl_postop_attr(nd, nap, attrflagp,
-				    stuff);
+				error = nfscl_postop_attr(nd, nap, attrflagp);
 			if (!nd->nd_repstat && !error) {
 				NFSM_DISSECT(tl, u_int32_t *, NFSX_HYPER);
 				NFSLOCKNODE(dnp);
@@ -3540,8 +3539,7 @@ nfsrpc_readdir(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 			if (tryformoredirs)
 				more_dirs = !eof;
 			if (nd->nd_flag & ND_NFSV4) {
-				error = nfscl_postop_attr(nd, nap, attrflagp,
-				    stuff);
+				error = nfscl_postop_attr(nd, nap, attrflagp);
 				if (error)
 					goto nfsmout;
 			}
@@ -3818,7 +3816,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 		if (error)
 			return (error);
 		if (nd->nd_flag & ND_NFSV3)
-			error = nfscl_postop_attr(nd, nap, attrflagp, stuff);
+			error = nfscl_postop_attr(nd, nap, attrflagp);
 		if (nd->nd_repstat || error) {
 			if (!error)
 				error = nd->nd_repstat;
@@ -4064,8 +4062,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 			if (tryformoredirs)
 				more_dirs = !eof;
 			if (nd->nd_flag & ND_NFSV4) {
-				error = nfscl_postop_attr(nd, nap, attrflagp,
-				    stuff);
+				error = nfscl_postop_attr(nd, nap, attrflagp);
 				if (error)
 					goto nfsmout;
 			}
@@ -4165,7 +4162,7 @@ nfsrpc_commit(vnode_t vp, u_quad_t offset, int cnt, struct ucred *cred,
 		}
 		NFSUNLOCKMNT(nmp);
 		if (nd->nd_flag & ND_NFSV4)
-			error = nfscl_postop_attr(nd, nap, attrflagp, stuff);
+			error = nfscl_postop_attr(nd, nap, attrflagp);
 	}
 nfsmout:
 	if (!error && nd->nd_repstat)
@@ -4604,7 +4601,7 @@ nfsrpc_statfs(vnode_t vp, struct nfsstatfs *sbp, struct nfsfsinfo *fsp,
 		if (error)
 			return (error);
 		if (nd->nd_flag & ND_NFSV3) {
-			error = nfscl_postop_attr(nd, nap, attrflagp, stuff);
+			error = nfscl_postop_attr(nd, nap, attrflagp);
 			if (error)
 				goto nfsmout;
 		}
@@ -4676,7 +4673,7 @@ nfsrpc_pathconf(vnode_t vp, struct nfsv3_pathconf *pc,
 		error = nfscl_request(nd, vp, p, cred, stuff);
 		if (error)
 			return (error);
-		error = nfscl_postop_attr(nd, nap, attrflagp, stuff);
+		error = nfscl_postop_attr(nd, nap, attrflagp);
 		if (nd->nd_repstat && !error)
 			error = nd->nd_repstat;
 		if (!error) {
@@ -4712,7 +4709,7 @@ nfsrpc_fsinfo(vnode_t vp, struct nfsfsinfo *fsp, struct ucred *cred,
 	error = nfscl_request(nd, vp, p, cred, stuff);
 	if (error)
 		return (error);
-	error = nfscl_postop_attr(nd, nap, attrflagp, stuff);
+	error = nfscl_postop_attr(nd, nap, attrflagp);
 	if (nd->nd_repstat && !error)
 		error = nd->nd_repstat;
 	if (!error) {
@@ -6669,7 +6666,7 @@ nfsrpc_readds(vnode_t vp, struct uio *uiop, nfsv4stateid_t *stateidp, int *eofp,
 	if (error != 0)
 		return (error);
 	if (vers == NFS_VER3) {
-		error = nfscl_postop_attr(nd, &na, &attrflag, NULL);
+		error = nfscl_postop_attr(nd, &na, &attrflag);
 		NFSCL_DEBUG(4, "nfsrpc_readds: postop=%d\n", error);
 		if (error != 0)
 			goto nfsmout;
