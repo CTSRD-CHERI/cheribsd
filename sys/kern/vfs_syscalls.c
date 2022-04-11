@@ -4264,6 +4264,10 @@ unionread:
 		error = EINVAL;
 		goto fail;
 	}
+	if (__predict_false((vp->v_vflag & VV_UNLINKED) != 0)) {
+		error = ENOENT;
+		goto fail;
+	}
 	IOVEC_INIT_C(&aiov, buf, count);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
