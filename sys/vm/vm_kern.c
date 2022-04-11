@@ -101,6 +101,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <vm/uma.h>
 
+#ifdef CHERI_VM_QEMU_COUNTERS
+#include <machine/cpufunc.h>
+#endif
+
 struct vm_map kernel_map_store;
 struct vm_map exec_map_store;
 struct vm_map pipe_map_store;
@@ -156,6 +160,10 @@ kva_alloc(vm_size_t size)
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
 #endif
+#ifdef CHERI_VM_QEMU_COUNTERS
+	if ((void *)addr != NULL)
+		QEMU_EVENT_INC_COUNTER("kva", 0, size);
+#endif
 	return (addr);
 }
 
@@ -174,6 +182,9 @@ kva_free(vm_pointer_t addr, vm_size_t size)
 
 	size = round_page(size);
 	vmem_free(kernel_arena, addr, size);
+#ifdef CHERI_VM_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER("kva", 0, -size);
+#endif
 }
 
 /*
@@ -286,6 +297,9 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	    ("Inexact bounds expected %zx found %zx",
 	    (size_t)asize, (size_t)cheri_getlen(addr)));
 #endif
+#ifdef CHERI_VM_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER("kmem", 0, size);
+#endif
 	return (addr);
 }
 
@@ -379,6 +393,9 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	KASSERT(cheri_getlen(addr) == asize,
 	    ("Inexact bounds expected %zx found %zx",
 	    (size_t)asize, (size_t)cheri_getlen(addr)));
+#endif
+#ifdef CHERI_VM_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER("kmem", 0, size);
 #endif
 	return (addr);
 }
@@ -481,6 +498,9 @@ kmem_malloc_domain(int domain, vm_size_t size, int flags)
 	kasan_mark((void *)addr, size, asize, KASAN_KMEM_REDZONE);
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
+#endif
+#ifdef CHERI_VM_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER("kmem", 0, size);
 #endif
 	return (addr);
 }
@@ -690,6 +710,9 @@ kmem_free(vm_pointer_t addr, vm_size_t size)
 	arena = _kmem_unback(kernel_object, addr, size);
 	if (arena != NULL)
 		vmem_free(arena, addr, size);
+#ifdef CHERI_VM_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER("kmem", 0, -size);
+#endif
 }
 
 /*
@@ -806,6 +829,9 @@ kva_import(void *unused, vmem_size_t size, int flags, vmem_addr_t *addrp)
 	    VMFS_SUPER_SPACE, VM_PROT_ALL, VM_PROT_ALL, MAP_NOFAULT);
 	if (result != KERN_SUCCESS)
                 return (ENOMEM);
+#ifdef CHERI_VM_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER("vmem-kva", 0, size);
+#endif
 
 	*addrp = addr;
 

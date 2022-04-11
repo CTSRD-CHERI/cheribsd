@@ -363,6 +363,8 @@ static void cache_sample_stats(uma_zone_t, uma_cache_t);
 
 /* Counter slots from 0 to MAXCPU for PCPU cache items */
 #define	QEMU_UMA_CNT_PCPU_CACHE 0
+/* Counter slots from 50 to 50 + MAXCPU for PCPU currently allocated items */
+#define	QEMU_UMA_CNT_PCPU_ALLOC 50
 /* Imported/released items count */
 #define	QEMU_UMA_CNT_IMPORT 100
 /* Successful bucket allocations */
@@ -373,6 +375,8 @@ static void cache_sample_stats(uma_zone_t, uma_cache_t);
 /* NOVM pressure */
 #define	QEMU_UMA_CNT_PRESSURE 104
 #define	QEMU_UMA_CNT_NOVM_PRESSURE 105
+/* Keg allocation activity */
+#define	QEMU_UMA_CNT_KEG_PAGES 106
 #endif
 
 static uint64_t uma_zone_get_allocs(uma_zone_t zone);
@@ -1129,6 +1133,8 @@ cache_sample_stats(uma_zone_t zone, uma_cache_t cache)
 #endif
 	QEMU_EVENT_ABS_COUNTER(zone->uz_name, QEMU_UMA_CNT_PCPU_CACHE + curcpu,
 	    items);
+	QEMU_EVENT_ABS_COUNTER(zone->uz_name, QEMU_UMA_CNT_PCPU_ALLOC + curcpu,
+	    cache->uc_allocs - cache->uc_frees);
 }
 #endif
 
@@ -1694,6 +1700,9 @@ keg_free_slab(uma_keg_t keg, uma_slab_t slab, int start)
 	}
 	keg->uk_freef(mem, size, flags);
 	uma_total_dec(size);
+#ifdef CHERI_UMA_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER(keg->uk_name, QEMU_UMA_CNT_KEG_PAGES, -keg->uk_ppera);
+#endif
 }
 
 static void
@@ -1928,6 +1937,9 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int flags,
 	LIST_INSERT_HEAD(&dom->ud_part_slab, slab, us_link);
 	dom->ud_pages += keg->uk_ppera;
 	dom->ud_free_items += keg->uk_ipers;
+#ifdef CHERI_UMA_QEMU_COUNTERS
+	QEMU_EVENT_INC_COUNTER(keg->uk_name, QEMU_UMA_CNT_KEG_PAGES, keg->uk_ppera);
+#endif
 
 	return (slab);
 

@@ -1045,6 +1045,7 @@ CHERI_PURECAP_MBUF_FIXUP	opt_global.h
 CHERI_UMA_BUCKET_ADJUST		opt_global.h
 CHERI_UMA_EXTRA_STATS		opt_global.h
 CHERI_UMA_QEMU_COUNTERS		opt_global.h
+CHERI_VM_QEMU_COUNTERS		opt_global.h
 
 #
 # Disable system-call authorisation for compartmentalised user code.
