@@ -487,6 +487,7 @@ struct coexecvec_args {
 	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
 	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
 	char capv_l_[PADL_(char * __capability __capability * __capability)]; char * __capability __capability * __capability capv; char capv_r_[PADR_(char * __capability __capability * __capability)];
+	char capc_l_[PADL_(int)]; int capc; char capc_r_[PADR_(int)];
 };
 struct nlm_syscall_args {
 	char debug_level_l_[PADL_(int)]; int debug_level; char debug_level_r_[PADR_(int)];

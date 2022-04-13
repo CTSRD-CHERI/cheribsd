@@ -88,7 +88,7 @@ __init_elf_aux_vector(void)
 
 static pthread_once_t aux_once = PTHREAD_ONCE_INIT;
 static int pagesize, osreldate, canary_len, ncpus, pagesizes_len, bsdflags;
-static int hwcap_present, hwcap2_present;
+static int hwcap_present, hwcap2_present, capc;
 static char *canary, *pagesizes, *execpath;
 static void *ps_strings, *timekeep, *capv;
 static u_long hwcap, hwcap2;
@@ -172,6 +172,10 @@ init_aux(void)
 
 		case AT_USRSTACKLIM:
 			usrstacklim = aux->a_un.a_val;
+			break;
+
+		case AT_CAPC:
+			capc = aux->a_un.a_val;
 			break;
 
 		case AT_CAPV:
@@ -424,16 +428,24 @@ _elf_aux_info(int aux, void *buf, int buflen)
 		} else
 			res = EINVAL;
 		break;
+	case AT_CAPC:
+		if (buflen == sizeof(int)) {
+			*(int *)buf = capc;
+			res = 0;
+		} else
+			res = EINVAL;
+		break;
 	case AT_CAPV:
 		if (buflen == sizeof(void *)) {
 			if (capv != NULL) {
 				*(void **)buf = capv;
 				res = 0;
-			} else
+			} else {
+				/* XXX: Do we need this? */
 				res = ENOENT;
+			}
 		} else
 			res = EINVAL;
-
 		break;
 	default:
 		res = ENOENT;

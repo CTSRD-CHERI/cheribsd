@@ -41,7 +41,7 @@
 .Ft int
 .Fn coexecve "pid_t pid" "const char *path" "char *const argv[]" "char *const envp[]"
 .Ft int
-.Fn coexecvec "pid_t pid" "const char *path" "char *const argv[]" "char *const envp[]" "char *const capv[]"
+.Fn coexecvec "pid_t pid" "const char *path" "char *const argv[]" "char *const envp[]" "char *const capv[]" "int capc"
 .Ft int
 .Fn execve "const char *path" "char *const argv[]" "char *const envp[]"
 .Ft int
@@ -259,12 +259,14 @@ The
 .Fn coexecvec
 is equivalent to
 .Fn coexecve ,
-except it also takes a NULL-terminated capability vector, which
+except it also takes a capability vector, which
 can be retrieved in the child process using
 .Xr elf_aux_info 3
-with the
+with
+.Dv AT_CAPC
+and
 .Dv AT_CAPV
-argument.
+arguments.
 .Sh RETURN VALUES
 As the
 .Fn execve

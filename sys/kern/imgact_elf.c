@@ -1957,8 +1957,10 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	    round_page(imgp->proc->p_vm_stacktop));
 	stacksz = imgp->proc->p_limit->pl_rlimit[RLIMIT_STACK].rlim_cur;
 	AUXARGS_ENTRY(pos, AT_USRSTACKLIM, stacksz);
-	if (imgp->capv != NULL)
+	if (imgp->capv != NULL) {
+		AUXARGS_ENTRY(pos, AT_CAPC, imgp->args->capc);
 		AUXARGS_ENTRY_PTR(pos, AT_CAPV, imgp->capv);
+	}
 	AUXARGS_ENTRY(pos, AT_NULL, 0);
 
 	free(imgp->auxargs, M_TEMP);

@@ -71,7 +71,7 @@ get_exec_path(char *path)
 }
 
 static int
-coexecvec_helper(pid_t pid, char *name, void **capv)
+coexecvec_helper(pid_t pid, char *name, void **capv, int capc)
 {
 	char path[PATH_MAX];
 	char *helper_argv[4];
@@ -86,7 +86,7 @@ coexecvec_helper(pid_t pid, char *name, void **capv)
 	error = setenv("COCALL_TEST_HELPER_ARG", "1", 1);
 	ATF_REQUIRE_EQ(error, 0);
 
-	error = coexecvec(pid, path, helper_argv, environ, capv);
+	error = coexecvec(pid, path, helper_argv, environ, capv, capc);
 	return (error);
 }
 
@@ -215,13 +215,12 @@ ATF_TC_BODY(fork_coexecvec, tc)
 	int cookie, error;
 
 	new_capv[0] = (void *)&cookie;
-	new_capv[1] = NULL;
 
 	cookie = 42;
 
 	pid = atf_utils_fork();
 	if (pid == 0) {
-		error = coexecvec_helper(getppid(), "fork_coexecvec_h", new_capv);
+		error = coexecvec_helper(getppid(), "fork_coexecvec_h", new_capv, 1);
 		ATF_REQUIRE_EQ(error, -1);
 		ATF_REQUIRE_EQ(errno, EPROT);
 	} else {
@@ -249,7 +248,6 @@ ATF_TC_BODY(vfork_coexecvec, tc)
 	int cookie, error, status;
 
 	new_capv[0] = (void *)&cookie;
-	new_capv[1] = NULL;
 
 	cookie = 42;
 
@@ -257,7 +255,7 @@ ATF_TC_BODY(vfork_coexecvec, tc)
 	if (pid < 0) {
 		atf_tc_fail("vfork returned %d: %s", pid, strerror(errno));
 	} else if (pid == 0) {
-		error = coexecvec_helper(getppid(), "vfork_coexecvec_h", new_capv);
+		error = coexecvec_helper(getppid(), "vfork_coexecvec_h", new_capv, 1);
 		atf_tc_fail("coexecvec returned %d: %s", error, strerror(errno));
 	} else {
 		pid = waitpid(pid, &status, 0);
@@ -282,7 +280,6 @@ ATF_TC_BODY(vfork_coexecvec_h, tc)
 	ATF_REQUIRE_EQ(error, 0);
 
 	ATF_REQUIRE(capv[0] != NULL);
-	ATF_REQUIRE(capv[1] == NULL);
 	intp = (int *)capv[0];
 	ATF_REQUIRE_EQ(*intp, 42);
 }

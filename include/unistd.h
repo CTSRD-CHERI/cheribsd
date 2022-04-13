@@ -334,7 +334,7 @@ int	 execlp(const char *, const char *, ...) __null_sentinel;
 int	 execv(const char *, char * const *);
 int	 execve(const char *, char * const *, char * const *);
 int	 coexecve(pid_t, const char *, char * const *, char * const *);
-int	 coexecvec(pid_t, const char *, char * const *, char * const *, void * const *);
+int	 coexecvec(pid_t, const char *, char * const *, char * const *, void * const *, int);
 int	 execvp(const char *, char * const *);
 int	 coexecvp(pid_t, const char *, char * const *);
 pid_t	 fork(void);
