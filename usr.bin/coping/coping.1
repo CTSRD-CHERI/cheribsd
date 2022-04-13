@@ -37,6 +37,18 @@
 .Nd colocated ping
 .Sh SYNOPSIS
 .Nm
+.Fl a
+.Op Fl c Ar count
+.Op Fl k
+.Op Fl s Ar time
+.Op Fl v
+.Nm
+.Fl i Ar index
+.Op Fl c Ar count
+.Op Fl k
+.Op Fl s Ar time
+.Op Fl v
+.Nm
 .Op Fl c Ar count
 .Op Fl k
 .Op Fl s Ar time
@@ -50,11 +62,18 @@ utility is used to send colocated pings; usually used with
 .Xr copong 1 .
 .Pp
 The following options are available:
-.Bl -tag -width ".Fl c Ar count"
+.Bl -tag -width "c Ar count"
+.It Fl a
+Ping all services found in the capability vector inherited
+from the parent process.
 .It Fl c Ar count
 Exit after
 .Ar count
 iterations.
+.It Fl i
+Ping service found at offset
+.Ar index
+in the capability vector inherited from the parent process.
 .It Fl k
 Use
 .Xr cocall_slow 2
@@ -76,6 +95,7 @@ shell process:
 .Dl coexec Ar $$ Ar /usr/bin/coping target-name
 .Pp
 .Sh SEE ALSO
+.Xr capv 1 ,
 .Xr coexec 1 ,
 .Xr copong 1 ,
 .Xr cocall 2
