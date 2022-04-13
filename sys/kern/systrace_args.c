@@ -4843,6 +4843,9 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		case 4:
 			p = "userland char * __capability __capability * __capability";
 			break;
+		case 5:
+			p = "int";
+			break;
 		default:
 			break;
 		};

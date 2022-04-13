@@ -1886,8 +1886,10 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		AUXARGS_ENTRY(pos, AT_FXRNG, imgp->sysent->sv_fxrng_gen_base);
 	if (imgp->sysent->sv_vdso_base != 0 && __elfN(vdso) != 0)
 		AUXARGS_ENTRY(pos, AT_KPRELOAD, imgp->sysent->sv_vdso_base);
-	if (imgp->capv != NULL)
+	if (imgp->capv != NULL) {
+		AUXARGS_ENTRY(pos, AT_CAPC, imgp->args->capc);
 		AUXARGS_ENTRY_PTR(pos, AT_CAPV, imgp->capv);
+	}
 	AUXARGS_ENTRY(pos, AT_NULL, 0);
 
 	free(imgp->auxargs, M_TEMP);

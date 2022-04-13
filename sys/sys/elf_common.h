@@ -995,9 +995,10 @@ typedef struct {
 #define	AT_PS_STRINGS	32	/* struct ps_strings */
 #define	AT_FXRNG	33	/* Pointer to root RNG seed version. */
 #define	AT_KPRELOAD	34	/* Base of vdso, preloaded by rtld */
-#define	AT_CAPV		35	/* Capability vector passed to coexecvec(2) */
+#define	AT_CAPC		35	/* Number of entries in capability vector */
+#define	AT_CAPV		36	/* Capability vector passed to coexecvec(2) */
 
-#define	AT_COUNT	36	/* Count of defined aux entry types. */
+#define	AT_COUNT	37	/* Count of defined aux entry types. */
 
 /*
  * Relocation types.

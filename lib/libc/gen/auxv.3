@@ -79,10 +79,13 @@ Page size in bytes
 .It AT_TIMEKEEP
 Pointer to VDSO timehands (for library internal use,
 .Dv sizeof(void *)).
-.It AT_CAPV
-Pointer to a NULL-terminated capability vector passed to the
+.It AT_CAPC
+Number of entries in the capability vector passed to the
 .Xr coexecvec 2
 syscall
+.Dv (sizeof(int)).
+.It AT_CAPV
+Pointer to the capability vector
 .Dv (sizeof(void *)).
 .El
 .Sh RETURN VALUES
