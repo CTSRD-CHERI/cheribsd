@@ -1,4 +1,8 @@
-set(RTLD_ARCH ${TARGET})
+if (IS_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/${TARGET_ARCH})
+	set(RTLD_ARCH ${TARGET_ARCH})
+else()
+	set(RTLD_ARCH ${TARGET})
+endif()
 set(rtld_SRCS
 	${RTLD_ARCH}/rtld_start.S
 	${RTLD_ARCH}/reloc.c
