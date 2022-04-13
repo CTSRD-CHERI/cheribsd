@@ -4018,7 +4018,7 @@ nfsrpc_readdirplus(vnode_t vp, struct uio *uiop, nfsuint64 *cookiep,
 				if (newvp != NULLVP) {
 				    if (attr_ok)
 					error = nfscl_loadattrcache(&newvp,
-					    &nfsva, NULL, NULL, 0, 0);
+					    &nfsva, NULL, 0, 0);
 				    if (error) {
 					if (unlocknewvp)
 					    vput(newvp);
