@@ -32,6 +32,7 @@
 __FBSDID("$FreeBSD$");
 
 #include <machine/sysarch.h>
+#include <sys/auxv.h>
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -49,6 +50,8 @@ static void
 usage(void)
 {
 
+	fprintf(stderr, "usage: coping [-c count] [-s time] [-kv] -a\n");
+	fprintf(stderr, "usage: coping [-c count] [-s time] [-kv] -i index\n");
 	fprintf(stderr, "usage: coping [-c count] [-s time] [-kv] service-name ...\n");
 	exit(0);
 }
@@ -73,21 +76,82 @@ humanize(long x)
 	return (str);
 }
 
+static void
+fetch_capv(void * __capability **capvp, int *capcp)
+{
+	int error;
+
+	error = elf_aux_info(AT_CAPC, capcp, sizeof(*capcp));
+	if (error != 0)
+		errc(1, error, "AT_CAPC");
+
+	error = elf_aux_info(AT_CAPV, capvp, sizeof(*capvp));
+	if (error != 0) {
+		if (error == ENOENT)
+			errx(1, "no capability vector");
+		errc(1, error, "AT_CAPV");
+	}
+}
+
+static void
+ping(void * __capability target, const char *target_name, bool kflag, bool vflag)
+{
+	struct timespec before, after, took;
+	int error;
+
+	if (vflag) {
+		fprintf(stderr, "%s: cocalling \"%s\"...\n", getprogname(), target_name);
+		error = clock_gettime(CLOCK_REALTIME, &before);
+		if (error != 0)
+			warn("clock_gettime");
+	}
+
+	if (kflag)
+		error = cocall_slow(target, NULL, 0, NULL, 0);
+	else
+		error = cocall(target, NULL, 0, NULL, 0);
+	if (error != 0)
+		warn("cocall");
+
+	if (vflag) {
+		error = clock_gettime(CLOCK_REALTIME, &after);
+		if (error != 0)
+			warn("clock_gettime");
+
+		timespecsub(&after, &before, &took);
+		printf("%s: returned from \"%s\" after %s, pid %d\n",
+		    getprogname(), target_name, humanize(took.tv_sec * 1000000000L + took.tv_nsec), getpid());
+	} else
+		printf(".");
+}
+
 int
 main(int argc, char **argv)
 {
-	struct timespec before, after, took;
+	void * __capability *capv;
 	void * __capability *lookedup;
+	void * __capability *target;
+	char *target_name;
 	char *tmp;
 	float dt = 1.0;
-	bool kflag = false, vflag = false;
-	int count = 0, ch, error, i = 0, c = 0;
+	bool aflag = false, kflag = false, vflag = false;
+	int capc, count = 0, ch, error, index = -1, i = 0, c = 0;
 
-	while ((ch = getopt(argc, argv, "c:ks:v")) != -1) {
+	while ((ch = getopt(argc, argv, "ac:i:ks:v")) != -1) {
 		switch (ch) {
+		case 'a':
+			aflag = true;
+			break;
 		case 'c':
 			count = atoi(optarg);
 			if (count <= 0)
+				usage();
+			break;
+		case 'i':
+			index = strtol(optarg, &tmp, 10);
+			if (*tmp != '\0')
+				errx(1, "argument to -i must be a number");
+			if (index < 0)
 				usage();
 			break;
 		case 'k':
@@ -111,8 +175,52 @@ main(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
-	if (argc < 1)
-		usage();
+
+	if (aflag) {
+		/* coping -a */
+		if (index >= 0)
+			errx(1, "-a and -i are mutually exclusive");
+		if (argc != 0)
+			errx(1, "-a and target name are mutually exclusive");
+
+		fetch_capv(&capv, &capc);
+
+	} else if (index >= 0) {
+		/* coping -i */
+		if (argc != 0)
+			errx(1, "-i and target name are mutually exclusive");
+
+		fetch_capv(&capv, &capc);
+		if (index >= capc)
+			errx(1, "index %d must be lower than capc %d", index, capc);
+		target = capv[index];
+		asprintf(&target_name, "capv[%d]", index);
+		if (target_name == NULL)
+			err(1, "asprintf");
+
+	} else {
+		/* coping target-name */
+		if (argc < 1)
+			usage();
+
+		lookedup = malloc(argc * sizeof(void * __capability));
+		if (lookedup == NULL)
+			err(1, "malloc");
+
+		for (c = 0; c < argc; c++) {
+			target_name = argv[c];
+			if (vflag)
+				fprintf(stderr, "%s: colooking up \"%s\"...\n", getprogname(), target_name);
+			error = colookup(target_name, &lookedup[c]);
+			if (error != 0) {
+				if (errno == ESRCH) {
+					warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", target_name);
+					warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
+				}
+				err(1, "colookup");
+			}
+		}
+	}
 
 	if (vflag)
 		fprintf(stderr, "%s: setting up...\n", getprogname());
@@ -120,66 +228,50 @@ main(int argc, char **argv)
 	if (error != 0)
 		err(1, "cosetup");
 
-	lookedup = malloc(argc * sizeof(void * __capability));
-	if (lookedup == NULL)
-		err(1, "malloc");
-
-	for (c = 0; c < argc; c++) {
-		if (vflag)
-			fprintf(stderr, "%s: colooking up \"%s\"...\n", getprogname(), argv[c]);
-		error = colookup(argv[c], &lookedup[c]);
-		if (error != 0) {
-			if (errno == ESRCH) {
-				warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", argv[c]);
-				warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
-			}
-			err(1, "colookup");
-		}
-	}
-
 	if (!vflag) {
 		if (isatty(1))
 			setvbuf(stdout, NULL, _IONBF, 0);
 	}
 
 	c = 0;
-
 	for (;;) {
-		if (vflag) {
-			fprintf(stderr, "%s: cocalling \"%s\"...\n", getprogname(), argv[c]);
-			error = clock_gettime(CLOCK_REALTIME, &before);
-			if (error != 0)
-				warn("clock_gettime");
+		if (aflag) {
+			if (c == capc)
+				break;
+			target = capv[c];
+			if (target == NULL) {
+				c++;
+				continue;
+			}
+			asprintf(&target_name, "capv[%d]", c);
+			if (target_name == NULL)
+				err(1, "asprintf");
+
+			c++;
+
+		} else if (index >= 0) {
+			target = capv[index];
+			asprintf(&target_name, "capv[%d]", index);
+			if (target_name == NULL)
+				err(1, "asprintf");
+
+		} else {
+			target = lookedup[c];
+			target_name = argv[c];
+
+			c++;
+			if (c == argc)
+				c = 0;
 		}
 
-		if (kflag)
-			error = cocall_slow(lookedup[c], NULL, 0, NULL, 0);
-		else
-			error = cocall(lookedup[c], NULL, 0, NULL, 0);
-		if (error != 0)
-			warn("cocall");
-
-		if (vflag) {
-			error = clock_gettime(CLOCK_REALTIME, &after);
-			if (error != 0)
-				warn("clock_gettime");
-
-			timespecsub(&after, &before, &took);
-			printf("%s: returned from \"%s\" after %s, pid %d\n",
-			    getprogname(), argv[c], humanize(took.tv_sec * 1000000000L + took.tv_nsec), getpid());
-		} else
-			printf(".");
-
-		c++;
-		if (c == argc)
-			c = 0;
+		ping(target, target_name, kflag, vflag);
 
 		i++;
 		if (count != 0 && i >= count)
 			break;
 
 		if (dt > 0)
-			usleep(dt * 1000000);
+			usleep(dt * 1000000.0);
 	}
 
 	if (!vflag)
