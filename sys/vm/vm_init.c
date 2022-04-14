@@ -251,7 +251,8 @@ again:
 		kmi->transient_sva = (vm_offset_t)firstaddr;
 		kmi->transient_eva = kmi->transient_sva + size;
 		vmem_init(transient_arena, "transient arena",
-		    firstaddr, size, PAGE_SIZE, 0, 0, VMEM_CAPABILITY_ARENA);
+		    firstaddr, size, PAGE_SIZE, 0, M_WAITOK,
+		    VMEM_CAPABILITY_ARENA);
 	}
 
 	/*
