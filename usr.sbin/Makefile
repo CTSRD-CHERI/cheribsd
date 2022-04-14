@@ -184,8 +184,13 @@ SUBDIR.${MK_OPENSSL}+=	keyserv
 SUBDIR.${MK_OPENSSL_KTLS}+=	rpc.tlsclntd
 SUBDIR.${MK_OPENSSL_KTLS}+=	rpc.tlsservd
 SUBDIR.${MK_PF}+=	ftp-proxy
-SUBDIR.${MK_PKGBOOTSTRAP}+=	pkg
+.if ${MACHINE_ABI:Mpurecap}
+# Install pkg64 and pkg64c instead of pkg if world is purecap.
 SUBDIR.${MK_PKGBOOTSTRAP}.${MK_LIB64}+=	pkg64
+SUBDIR.${MK_PKGBOOTSTRAP}+=	pkg64c
+.else
+SUBDIR.${MK_PKGBOOTSTRAP}+=	pkg
+.endif
 SUBDIR.${MK_PMC}+=	pmc pmcannotate pmccontrol pmcstat pmcstudy
 SUBDIR.${MK_PORTSNAP}+=	portsnap
 SUBDIR.${MK_PPP}+=	ppp
