@@ -9,7 +9,7 @@ CONFS=		${PKGCONF}
 CONFSNAME_${PKGCONF}=	${PKGCONF:C/\.conf.+$/.conf/}
 CONFSDIR=	/etc/pkg${PKG_SUFFIX}
 CONFSMODE=	644
-PROG=	pkg${PKG_SUFFIX}
+PROG?=	pkg${PKG_SUFFIX}
 SRCS=	pkg.c dns_utils.c config.c
 MAN?=	pkg${PKG_SUFFIX}.7
 
