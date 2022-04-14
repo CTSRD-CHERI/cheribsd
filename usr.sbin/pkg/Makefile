@@ -11,7 +11,7 @@ CONFSDIR=	/etc/pkg${PKG_SUFFIX}
 CONFSMODE=	644
 PROG=	pkg${PKG_SUFFIX}
 SRCS=	pkg.c dns_utils.c config.c
-MAN=	pkg${PKG_SUFFIX}.7
+MAN?=	pkg${PKG_SUFFIX}.7
 
 CFLAGS+='-DPKG_SUFFIX="${PKG_SUFFIX}"'
 
