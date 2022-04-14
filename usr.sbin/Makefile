@@ -185,7 +185,7 @@ SUBDIR.${MK_OPENSSL_KTLS}+=	rpc.tlsclntd
 SUBDIR.${MK_OPENSSL_KTLS}+=	rpc.tlsservd
 SUBDIR.${MK_PF}+=	ftp-proxy
 .if ${MACHINE_ABI:Mpurecap}
-# Install pkg64 and pkg64c instead of pkg if world is purecap.
+# Install pkg64 and pkg64c with pkg.sh instead of pkg if world is purecap.
 SUBDIR.${MK_PKGBOOTSTRAP}.${MK_LIB64}+=	pkg64
 SUBDIR.${MK_PKGBOOTSTRAP}+=	pkg64c
 .else
