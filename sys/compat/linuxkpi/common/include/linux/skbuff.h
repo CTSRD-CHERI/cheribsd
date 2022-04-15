@@ -235,7 +235,8 @@ static inline void
 dev_kfree_skb_irq(struct sk_buff *skb)
 {
 	SKB_TRACE(skb);
-	SKB_TODO();
+	SKB_IMPROVE("Do we have to defer this?");
+	dev_kfree_skb(skb);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -335,6 +336,8 @@ skb_put(struct sk_buff *skb, size_t len)
 	    skb, skb->tail, len, skb->end, skb->head, skb->data, skb->len));
 
 	s = skb_tail_pointer(skb);
+	if (len == 0)
+		return (s);
 	skb->tail += len;
 	skb->len += len;
 #ifdef SKB_DEBUG
@@ -354,6 +357,8 @@ skb_put_data(struct sk_buff *skb, const void *buf, size_t len)
 
 	SKB_TRACE2(skb, buf);
 	s = skb_put(skb, len);
+	if (len == 0)
+		return (s);
 	memcpy(s, buf, len);
 	return (s);
 }
@@ -756,7 +761,7 @@ static inline bool
 skb_is_gso(struct sk_buff *skb)
 {
 	SKB_TRACE(skb);
-	SKB_TODO();
+	SKB_IMPROVE("Really a TODO but get it away from logging");
 	return (false);
 }
 
