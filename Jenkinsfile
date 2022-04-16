@@ -278,12 +278,9 @@ selectedArchitectures.each { suffix ->
                 '--cheribsd/build-tests',
                 '--cheribsd/build-bench-kernels',
                 '--cheribsd/with-manpages',
+                '--cheribsd/debug-info',
+                '--cheribsd/debug-files',
         ]
-        if (GlobalVars.isTestSuiteJob) {
-            cheribuildArgs.add('--cheribsd/debug-info')
-        } else {
-            cheribuildArgs.add('--cheribsd/no-debug-info')
-        }
         if (GlobalVars.selectedPurecapKernelArchitectures.contains(suffix)) {
             cheribuildArgs.add('--cheribsd/build-alternate-abi-kernels')
         }
