@@ -94,7 +94,6 @@ struct uhid_snes_softc {
 	int sc_fflags;
 	struct usb_fifo *sc_fifo_open[2];
 	uint8_t sc_zero_length_packets;
-	uint8_t sc_previous_status;
 	uint8_t sc_iid;
 	uint8_t sc_oid;
 	uint8_t sc_fid;
@@ -519,7 +518,6 @@ uhid_snes_status_callback(struct usb_xfer *transfer, usb_error_t error)
 	struct uhid_snes_softc *sc = usbd_xfer_softc(transfer);
 	struct usb_device_request req;
 	struct usb_page_cache *pc;
-	uint8_t current_status, new_status;
 
 	switch (USB_GET_STATE(transfer)) {
 	case USB_ST_SETUP:
@@ -536,13 +534,6 @@ uhid_snes_status_callback(struct usb_xfer *transfer, usb_error_t error)
 		usbd_xfer_set_frame_len(transfer, 1, 1);
 		usbd_xfer_set_frames(transfer, 2);
 		usbd_transfer_submit(transfer);
-		break;
-
-	case USB_ST_TRANSFERRED:
-		pc = usbd_xfer_get_frame(transfer, 1);
-		usbd_copy_out(pc, 0, &current_status, 1);
-		new_status = current_status & ~sc->sc_previous_status;
-		sc->sc_previous_status = current_status;
 		break;
 
 	default:
