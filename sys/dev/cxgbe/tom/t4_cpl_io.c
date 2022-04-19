@@ -2193,7 +2193,6 @@ static void
 t4_aiotx_process_job(struct toepcb *toep, struct socket *so, struct kaiocb *job)
 {
 	struct sockbuf *sb;
-	struct file *fp;
 	struct inpcb *inp;
 	struct tcpcb *tp;
 	struct mbuf *m;
@@ -2202,11 +2201,10 @@ t4_aiotx_process_job(struct toepcb *toep, struct socket *so, struct kaiocb *job)
 
 	sb = &so->so_snd;
 	SOCKBUF_UNLOCK(sb);
-	fp = job->fd_file;
 	m = NULL;
 
 #ifdef MAC
-	error = mac_socket_check_send(fp->f_cred, so);
+	error = mac_socket_check_send(job->fd_file->f_cred, so);
 	if (error != 0)
 		goto out;
 #endif
