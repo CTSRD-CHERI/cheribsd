@@ -31,12 +31,13 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <machine/sysarch.h>
 #include <sys/auxv.h>
+#include <sys/nv.h>
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <assert.h>
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
@@ -96,8 +97,18 @@ fetch_capv(void * __capability **capvp, int *capcp)
 static void
 ping(void * __capability target, const char *target_name, bool kflag, bool vflag)
 {
+	char in[BUFSIZ];
 	struct timespec before, after, took;
+	nvlist_t *nvl;
+	void *out;
+	size_t outlen;
 	int error;
+
+	nvl = nvlist_create(NV_FLAG_MEMALIGN);
+	nvlist_add_number(nvl, "op", 0 /* XXX */);
+	out = nvlist_pack(nvl, &outlen);
+	assert(out != NULL);
+	nvlist_destroy(nvl);
 
 	if (vflag) {
 		fprintf(stderr, "%s: cocalling \"%s\"...\n", getprogname(), target_name);
@@ -107,9 +118,10 @@ ping(void * __capability target, const char *target_name, bool kflag, bool vflag
 	}
 
 	if (kflag)
-		error = cocall_slow(target, NULL, 0, NULL, 0);
+		error = cocall_slow(target, out, outlen, in, sizeof(in));
 	else
-		error = cocall(target, NULL, 0, NULL, 0);
+		error = cocall(target, out, outlen, in, sizeof(in));
+	free(out);
 	if (error != 0)
 		warn("cocall");
 
