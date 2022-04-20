@@ -31,7 +31,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <machine/sysarch.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -54,6 +53,7 @@ usage(void)
 int
 main(int argc, char **argv)
 {
+	char inout[BUFSIZ];
 	void * __capability cookie;
 	void * __capability *lookedup;
 	char *registered, *tmp;
@@ -141,9 +141,9 @@ main(int argc, char **argv)
 
 	for (;;) {
 		if (kflag)
-			error = coaccept_slow(&cookie, NULL, 0, NULL, 0);
+			error = coaccept_slow(&cookie, inout, sizeof(inout), inout, sizeof(inout));
 		else
-			error = coaccept(&cookie, NULL, 0, NULL, 0);
+			error = coaccept(&cookie, inout, sizeof(inout), inout, sizeof(inout));
 		if (error != 0)
 			warn("coaccept");
 		if (vflag) {
@@ -157,9 +157,9 @@ main(int argc, char **argv)
 				fprintf(stderr, "%s: %s: cocalling \"%s\"...\n",
 				    getprogname(), registered, argv[c]);
 			if (kflag)
-				error = cocall_slow(lookedup[c], NULL, 0, NULL, 0);
+				error = cocall_slow(lookedup[c], inout, sizeof(inout), inout, sizeof(inout));
 			else
-				error = cocall(lookedup[c], NULL, 0, NULL, 0);
+				error = cocall(lookedup[c], inout, sizeof(inout), inout, sizeof(inout));
 			if (error != 0)
 				warn("cocall");
 			if (vflag)
