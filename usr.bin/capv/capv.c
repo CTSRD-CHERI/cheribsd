@@ -32,6 +32,7 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/auxv.h>
+#include <sys/nv.h>
 #include <assert.h>
 #include <ctype.h>
 #include <err.h>
@@ -44,18 +45,61 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: capv\n");
+	fprintf(stderr, "usage: capv [-kv]\n");
 	exit(0);
+}
+
+static void
+interrogate(void * __capability target, char **bufp, bool kflag)
+{
+	char in[BUFSIZ];
+	nvlist_t *nvl;
+	void *out;
+	size_t outlen;
+	int error;
+
+	nvl = nvlist_create(NV_FLAG_MEMALIGN);
+	nvlist_add_number(nvl, "op", 42 /* XXX */);
+	out = nvlist_pack(nvl, &outlen);
+	assert(out != NULL);
+	nvlist_destroy(nvl);
+
+	if (kflag)
+		error = cocall_slow(target, out, outlen, in, sizeof(in));
+	else
+		error = cocall(target, out, outlen, in, sizeof(in));
+	free(out);
+	if (error != 0) {
+		warn("cocall");
+		return;
+	}
+
+	nvl = nvlist_unpack(in, sizeof(in), NV_FLAG_MEMALIGN);
+	if (nvl == NULL) {
+		warnx("nvlist_unpack(3) failed");
+		return;
+	}
+
+	asprintf(bufp, "%s", nvlist_get_string(nvl, "answerback" /* XXX */));
+	nvlist_destroy(nvl);
 }
 
 int
 main(int argc, char **argv)
 {
 	void * __capability *capv;
+	char *buf = NULL;
 	int capc, ch, error, i;
+	bool kflag = false, vflag = false;
 
-	while ((ch = getopt(argc, argv, "")) != -1) {
+	while ((ch = getopt(argc, argv, "kv")) != -1) {
 		switch (ch) {
+		case 'k':
+			kflag = true;
+			break;
+		case 'v':
+			vflag = true;
+			break;
 		case '?':
 		default:
 			usage();
@@ -78,6 +122,12 @@ main(int argc, char **argv)
 		errc(1, error, "AT_CAPV");
 	}
 
+	if (vflag) {
+		error = cosetup(COSETUP_COCALL);
+		if (error != 0)
+			err(1, "cosetup");
+	}
+
 	if (capc == 0)
 		assert(capv == NULL);
 	else
@@ -87,7 +137,12 @@ main(int argc, char **argv)
 		if (capv[i] == NULL)
 			continue;
 
-		printf("%i:\t%#lp\n", i, capv[i]);
+		if (vflag) {
+			interrogate(capv[i], &buf, kflag);
+			printf("%i:\t%#lp: %s\n", i, capv[i], buf);
+		} else {
+			printf("%i:\t%#lp\n", i, capv[i]);
+		}
 	}
 
 	return (0);

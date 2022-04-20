@@ -30,24 +30,32 @@
 .\" $FreeBSD$
 .\"
 .Dd February 24, 2022
-.Dt 
+.Dt CAPV 1
 .Os
 .Sh NAME
 .Nm capv
 .Nd display capability vector contents
 .Sh SYNOPSIS
 .Nm
+.Op Fl k
+.Op Fl v
 .Sh DESCRIPTION
 The
 .Nm
 utility is used to display capabilities inherited from the parent process
 via the capability vector.
 .Pp
-.\"The following options are available:
-.\".Bl -tag -width ".Fl c Ar count"
-.\".It Fl l
-.\"XXX placeholder
-.\".El
+The following options are available:
+.Bl -tag -width ".Fl c"
+.It Fl k
+Use
+.Xr cocall_slow 2
+instead of
+.Xr cocall 2 .
+.It Fl v
+Interrogate each service found in the capability vector and display
+the returned string.
+.El
 .Sh EXIT STATUS
 The
 .Nm
