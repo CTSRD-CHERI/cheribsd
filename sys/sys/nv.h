@@ -76,6 +76,10 @@ typedef struct nvlist nvlist_t;
  * Names don't have to be unique.
  */
 #define	NV_FLAG_NO_UNIQUE		0x02
+/*
+ * Allocate memory using posix_memalign(3).
+ */
+#define	NV_FLAG_MEMALIGN		0x04
 
 #if defined(_KERNEL) && defined(MALLOC_DECLARE)
 MALLOC_DECLARE(M_NVLIST);

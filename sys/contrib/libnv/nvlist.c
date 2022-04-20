@@ -91,7 +91,8 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #define	NV_FLAG_PRIVATE_MASK	(NV_FLAG_BIG_ENDIAN | NV_FLAG_IN_ARRAY)
-#define	NV_FLAG_PUBLIC_MASK	(NV_FLAG_IGNORE_CASE | NV_FLAG_NO_UNIQUE)
+#define	NV_FLAG_PUBLIC_MASK	(NV_FLAG_IGNORE_CASE | NV_FLAG_NO_UNIQUE | \
+				    NV_FLAG_MEMALIGN)
 #define	NV_FLAG_ALL_MASK	(NV_FLAG_PRIVATE_MASK | NV_FLAG_PUBLIC_MASK)
 
 #define	NVLIST_MAGIC	0x6e766c	/* "nvl" */
@@ -858,6 +859,9 @@ nvlist_xpack(const nvlist_t *nvl, int64_t *fdidxp, size_t *sizep)
 	const nvlist_t *tmpnvl;
 	nvpair_t *nvp, *tmpnvp;
 	void *cookie;
+#ifndef _KERNEL
+	int error;
+#endif
 
 	NVLIST_ASSERT(nvl);
 
@@ -867,9 +871,23 @@ nvlist_xpack(const nvlist_t *nvl, int64_t *fdidxp, size_t *sizep)
 	}
 
 	size = nvlist_size(nvl);
-	buf = nv_malloc(size);
-	if (buf == NULL)
-		return (NULL);
+
+	if ((nvl->nvl_flags & NV_FLAG_MEMALIGN) == 0) {
+		buf = nv_malloc(size);
+		if (buf == NULL)
+			return (NULL);
+	} else {
+#ifdef _KERNEL
+		PJDLOG_ABORT("Can't use NV_FLAG_MEMALIGN with _KERNEL.");
+#else
+		error = posix_memalign((void **)&buf, 16, roundup2(size, 16));
+		/*
+		 * XXX: We should probably clear the slack.
+		 */
+		if (error != 0)
+			return (NULL);
+#endif /* !_KERNEL */
+	}
 
 	ptr = buf;
 	left = size;
@@ -1066,8 +1084,13 @@ nvlist_unpack_header(nvlist_t *nvl, const unsigned char *ptr, size_t nfds,
 	if (!nvlist_check_header(&nvlhdr))
 		goto fail;
 
-	if (nvlhdr.nvlh_size != *leftp - sizeof(nvlhdr))
+	if (nvlhdr.nvlh_size > *leftp - sizeof(nvlhdr))
 		goto fail;
+
+	/*
+	 * Ignore any slack after the end of the buffer.
+	 */
+	*leftp = nvlhdr.nvlh_size + sizeof(nvlhdr);
 
 	/*
 	 * nvlh_descriptors might be smaller than nfds in embedded nvlists.
