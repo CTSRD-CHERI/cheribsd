@@ -37,14 +37,20 @@
 .Nd execute a process within colocated address space
 .Sh SYNOPSIS
 .Nm
-.Ar pid Ar path Op Ar args
+.Ar pid Ar command Op Ar args
 .Sh DESCRIPTION
 The
 .Nm
 utility is used to execute the binary specified by
-.Ar path
+.Ar command
 within address space indicated by
 .Ar pid .
+.Pp
+Note that using
+.Nm
+is usually not necessary if the
+.Va kern.opportunistic_coexecve
+sysctl is set to 1, which is the default.
 .Sh EXIT STATUS
 The
 .Nm
@@ -53,7 +59,7 @@ utility exits 0 on success, and >0 if an error occurs.
 Execute
 .Xr procstat 1
 within the address space of the current shell process:
-.Dl Nm Ar $$ Ar /usr/bin/procstat Ar -v Ar $$
+.Dl Nm Ar $$ Ar procstat Ar -v Ar $$
 .Pp
 .Sh SEE ALSO
 .Xr coexecve 2
