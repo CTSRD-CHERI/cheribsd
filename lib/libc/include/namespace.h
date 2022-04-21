@@ -64,6 +64,7 @@
 #define		dup				_dup
 #define		dup2				_dup2
 #define		execve				_execve
+#define		coexecvec			_coexecvec
 #define		fcntl				_fcntl
 /*#define		flock				_flock */
 #define		flockfile			_flockfile

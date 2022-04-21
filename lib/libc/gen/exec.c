@@ -146,8 +146,8 @@ execvp(const char *name, char * const *argv)
 }
 
 static int
-execvPe(const char *name, const char *path, char * const *argv,
-    char * const *envp)
+coexecvPec(pid_t pid, const char *name, const char *path, char * const *argv,
+    char * const *envp, void * const *capv, int capc)
 {
 	char **memp;
 	size_t cnt, lp, ln;
@@ -215,7 +215,11 @@ execvPe(const char *name, const char *path, char * const *argv,
 		bcopy(name, buf + lp + 1, ln);
 		buf[lp + ln + 1] = '\0';
 
-retry:		(void)_execve(bp, argv, envp);
+retry:
+		if (capv == NULL)
+			(void)_execve(bp, argv, envp);
+		else
+			(void)_coexecvec(pid, bp, argv, envp, capv, capc);
 		switch (errno) {
 		case E2BIG:
 			goto done;
@@ -248,7 +252,10 @@ retry:		(void)_execve(bp, argv, envp);
 				memp[1] = __DECONST(char*, bp);
 				memp[2] = NULL;
 			}
- 			(void)_execve(_PATH_BSHELL, memp, envp);
+			if (capv == NULL)
+				(void)_execve(_PATH_BSHELL, memp, envp);
+			else
+				(void)_coexecvec(pid, bp, argv, envp, capv, capc);
 			goto done;
 		case ENOMEM:
 			goto done;
@@ -289,11 +296,12 @@ done:
 int
 execvP(const char *name, const char *path, char * const argv[])
 {
-	return execvPe(name, path, argv, environ);
+	return coexecvPec(-1, name, path, argv, environ, NULL, 0);
 }
 
-int
-_execvpe(const char *name, char * const argv[], char * const envp[])
+static int
+_coexecvpec(pid_t pid, const char *name, char * const argv[],
+    char * const envp[], void * const *capv, int capc)
 {
 	const char *path;
 
@@ -301,5 +309,17 @@ _execvpe(const char *name, char * const argv[], char * const envp[])
 	if ((path = getenv("PATH")) == NULL)
 		path = _PATH_DEFPATH;
 
-	return (execvPe(name, path, argv, envp));
+	return (coexecvPec(pid, name, path, argv, envp, capv, capc));
+}
+
+int
+_execvpe(const char *name, char * const argv[], char * const envp[])
+{
+	return (_coexecvpec(-1, name, argv, envp, NULL, 0));
+}
+
+int
+coexecvpc(pid_t pid, const char *name, char * const *argv, void * const *capv, int capc)
+{
+	return (_coexecvpec(pid, name, argv, environ, capv, capc));
 }

@@ -32,6 +32,7 @@
 .Dt EXEC 3
 .Os
 .Sh NAME
+.Nm coexecvpc ,
 .Nm execl ,
 .Nm execlp ,
 .Nm execle ,
@@ -45,6 +46,8 @@
 .Sh SYNOPSIS
 .In unistd.h
 .Vt extern char **environ ;
+.Ft int
+.Fn coexecvpc "pid_t pid" "const char *file" "char *const argv[]" "void * __capability capv" "int capc"
 .Ft int
 .Fn execl "const char *path" "const char *arg" ... NULL
 .Ft int
