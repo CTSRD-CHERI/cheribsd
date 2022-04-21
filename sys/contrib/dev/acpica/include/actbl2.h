@@ -228,7 +228,7 @@
 typedef struct acpi_table_aest
 {
     ACPI_TABLE_HEADER       Header;
-    void                    *NodeArray[];
+    UINT8                   NodeArray[];
 
 } ACPI_TABLE_AEST;
 
