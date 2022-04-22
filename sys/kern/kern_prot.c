@@ -2482,6 +2482,7 @@ kern_setlogin(struct thread *td, const char * __capability namebuf)
 	SESS_LOCK(p->p_session);
 	strcpy(p->p_session->s_login, logintmp);
 	SESS_UNLOCK(p->p_session);
+	p->p_flag2 |= P2_NOCOLOCATE;
 	PROC_UNLOCK(p);
 	return (0);
 }

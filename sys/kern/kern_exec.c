@@ -455,10 +455,15 @@ kern_execve(struct thread *td, struct image_args *args,
 	}
 
 	if (opportunistic_coexecve != 0) {
-#ifdef OPPORTUNISTIC_USE_PARENTS
+#ifndef OPPORTUNISTIC_USE_SID
 		sx_slock(&proctree_lock);
 		cop = proc_realparent(p);
 		PROC_LOCK(cop);
+		if (cop->p_flag2 & P2_NOCOLOCATE) {
+			PROC_UNLOCK(cop);
+			sx_sunlock(&proctree_lock);
+			goto fallback;
+		}
 #else
 		/*
 		 * If we're the session leader and we're executing something,
@@ -963,6 +968,7 @@ interpret:
 		p->p_flag2 &= ~P2_NOTRACE;
 	if ((p->p_flag2 & P2_STKGAP_DISABLE_EXEC) == 0)
 		p->p_flag2 &= ~P2_STKGAP_DISABLE;
+	p->p_flag2 &= ~P2_NOCOLOCATE;
 	if (p->p_flag & P_PPWAIT) {
 		p->p_flag &= ~(P_PPWAIT | P_PPTRACE);
 		cv_broadcast(&p->p_pwait);
