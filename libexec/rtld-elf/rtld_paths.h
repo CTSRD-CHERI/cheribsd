@@ -62,8 +62,12 @@
 #define	LD_			"LD_32_"
 #endif
 
+#ifndef _PATH_ELF64_HINTS
+#define	_PATH_ELF64_HINTS	"/var/run/ld-elf64.so.hints"
+#endif
+
 #ifdef COMPAT_64BIT
-#define	_PATH_ELF_HINTS		"/var/run/ld-elf64.so.hints"
+#define	_PATH_ELF_HINTS		_PATH_ELF64_HINTS
 #define	_PATH_LIBMAP_CONF	"/etc/libmap64.conf"
 #define	_BASENAME_RTLD		_COMPAT64_BASENAME_RTLD
 #define	STANDARD_LIBRARY_PATH	"/lib64:/usr/lib64"
