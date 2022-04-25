@@ -243,6 +243,7 @@ selectedArchitectures.each { suffix ->
                 '--install-prefix=/rootfs',
                 '--cheribsd/build-tests',
                 '--cheribsd/build-bench-kernels',
+                '--cheribsd/with-manpages',
         ]
         if (GlobalVars.isTestSuiteJob) {
             cheribuildArgs.add('--cheribsd/debug-info')
