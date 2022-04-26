@@ -1,10 +1,16 @@
 @Library('ctsrd-jenkins-scripts') _
 
+import java.time.Instant
+import java.time.format.DateTimeFormatter
+
 class GlobalVars { // "Groovy"
+    public static String buildTimestamp = null
     public static boolean archiveArtifacts = false
     public static boolean isTestSuiteJob = false
     public static List<String> selectedPurecapKernelArchitectures = []
 }
+
+GlobalVars.buildTimestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochMilli(currentBuild.startTimeInMillis));
 
 echo("JOB_NAME='${env.JOB_NAME}', JOB_BASE_NAME='${env.JOB_BASE_NAME}'")
 def rateLimit = rateLimitBuilds(throttle: [count: 1, durationName: 'hour', userBoost: true])
@@ -178,6 +184,26 @@ def maybeArchiveArtifacts(params, String suffix) {
             error("Should not happen!")
         }
         stage("Archiving artifacts") {
+            sh label: 'Create metadata file', script: """
+ABI_VERSION=`awk '/^#define[[:space:]]+__CheriBSD_version/{print \$3}' tarball/rootfs/usr/include/sys/param.h`
+# ABI_VERSION is YYYYMMDD, perform approximate sanity check
+case "\$ABI_VERSION" in
+202[2-9][0-1][0-9][0-3][0-9])
+    ;;
+*)
+    echo >&2 "__CheriBSD_version '\$ABI_VERSION' has an unexpected value"
+    ;;
+esac
+tee metadata.json <<EOF
+{
+    "abi-version": "\$ABI_VERSION",
+    "architecture": "${suffix}",
+    "branch": "${env.BRANCH_NAME}",
+    "commit": "${params.gitInfo.GIT_COMMIT}",
+    "timestamp": "${GlobalVars.buildTimestamp}"
+}
+EOF
+"""
             // Archive disk image
             sh label: 'Compress kernel and images', script: """
 rm -fv *.img *.xz kernel*
@@ -212,12 +238,13 @@ mv tarball/sysroot-${suffix}.tar.* cheribsd-sysroot.tar.xz
 rm -rf tarball artifacts-*
 chmod +w *.xz
 mkdir -p "artifacts-${suffix}"
+mv -v metadata.json "artifacts-${suffix}"
 mv -v *.xz "artifacts-${suffix}"
 [ ! -d ftp ] || tar -cJvf "artifacts-${suffix}/cheribsd-ftp-${suffix}.tar.xz" ftp
 ls -la "artifacts-${suffix}/"
 """
             archiveArtifacts allowEmptyArchive: false,
-                             artifacts: "artifacts-${suffix}/cheribsd-sysroot.tar.xz, artifacts-${suffix}/*.img.xz, artifacts-${suffix}/kernel*.xz, artifacts-${suffix}/cheribsd-ftp*.tar.xz",
+                             artifacts: "artifacts-${suffix}/cheribsd-sysroot.tar.xz, artifacts-${suffix}/*.img.xz, artifacts-${suffix}/kernel*.xz, artifacts-${suffix}/cheribsd-ftp*.tar.xz, artifacts-${suffix}/metadata.json",
                              fingerprint: true, onlyIfSuccessful: true
         }
     }
