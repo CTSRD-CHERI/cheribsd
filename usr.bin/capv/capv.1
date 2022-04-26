@@ -38,12 +38,14 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl k
+.Op Fl n
 .Op Fl v
 .Sh DESCRIPTION
 The
 .Nm
-utility is used to display capabilities inherited from the parent process
-via the capability vector.
+utility is used to interrogate services found in the capability vector
+inherited from the parent process.
+It can also display raw vector contents.
 .Pp
 The following options are available:
 .Bl -tag -width ".Fl c"
@@ -52,9 +54,10 @@ Use
 .Xr cocall_slow 2
 instead of
 .Xr cocall 2 .
+.It Fl n
+Do not interrogate.
 .It Fl v
-Interrogate each service found in the capability vector and display
-the returned string.
+Print raw capabilities.
 .El
 .Sh EXIT STATUS
 The

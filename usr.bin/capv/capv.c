@@ -45,7 +45,7 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: capv [-kv]\n");
+	fprintf(stderr, "usage: capv [-knv]\n");
 	exit(0);
 }
 
@@ -90,12 +90,15 @@ main(int argc, char **argv)
 	void * __capability *capv;
 	char *buf = NULL;
 	int capc, ch, error, i;
-	bool kflag = false, vflag = false;
+	bool kflag = false, nflag = false, vflag = false;
 
-	while ((ch = getopt(argc, argv, "kv")) != -1) {
+	while ((ch = getopt(argc, argv, "knv")) != -1) {
 		switch (ch) {
 		case 'k':
 			kflag = true;
+			break;
+		case 'n':
+			nflag = true;
 			break;
 		case 'v':
 			vflag = true;
@@ -122,7 +125,7 @@ main(int argc, char **argv)
 		errc(1, error, "AT_CAPV");
 	}
 
-	if (vflag) {
+	if (!nflag) {
 		error = cosetup(COSETUP_COCALL);
 		if (error != 0)
 			err(1, "cosetup");
@@ -137,12 +140,14 @@ main(int argc, char **argv)
 		if (capv[i] == NULL)
 			continue;
 
-		if (vflag) {
+		printf("%d", i);
+		if (vflag)
+			printf(":\t%#lp", capv[i]);
+		if (!nflag) {
 			interrogate(capv[i], &buf, kflag);
-			printf("%i:\t%#lp: %s\n", i, capv[i], buf);
-		} else {
-			printf("%i:\t%#lp\n", i, capv[i]);
+			printf(":\t%s", buf);
 		}
+		printf("\n");
 	}
 
 	return (0);
