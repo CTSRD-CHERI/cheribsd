@@ -1058,13 +1058,13 @@ SYSCTL=/sbin/sysctl
 
 debug=0
 man_default_sections='1:8:2:3:3lua:n:4:5:6:7:9:l'
-man_default_path='/usr/share/man:/usr/share/openssl/man:/usr/local/share/man:/usr/local/man'
+man_default_path='/usr/share/man:/usr/share/openssl/man:/usr/local/share/man:/usr/local/man:/usr/local64/share/man:/usr/local64/man'
 cattool='/usr/bin/zcat -f'
 
 config_global='/etc/man.conf'
 
 # This can be overridden via a setting in /etc/man.conf.
-config_local='/usr/local/etc/man.d/*.conf'
+config_local='/usr/local/etc/man.d/*.conf /usr/local64/etc/man.d/*.conf'
 
 # Set noglobbing for now. I don't want spurious globbing.
 set -f
