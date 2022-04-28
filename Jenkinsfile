@@ -159,8 +159,7 @@ def runTests(params, String suffix) {
 }
 
 def buildRelease(params, String suffix) {
-    def releaseArchitectures = ['morello-purecap']
-    if (!GlobalVars.isTestSuiteJob && releaseArchitectures.contains(suffix)) {
+    if (!GlobalVars.isTestSuiteJob) {
         stage("Building release images") {
             sh label: "Building release images",
                // params.extraArgs includes --install-prefix=/rootfs but we
@@ -209,10 +208,18 @@ EOF
 rm -fv *.img *.xz kernel*
 rm -rfv ftp
 mv -v tarball/rootfs/boot/kernel/kernel tarball/kernel
-mv -v tarball/*.img tarball/kernel* .
-[ ! -d tarball/ftp ] || mv -v tarball/ftp .
-rm -rf *-mini-memstick.img
-[ ! -f *-memstick.img ] || mv -v *-memstick.img "cheribsd-memstick-${suffix}.img"
+mv -v tarball/*.img tarball/kernel* tarball/ftp .
+rm -fv *-mini-memstick.img
+case "${suffix}" in
+riscv64*)
+    # QEMU kernel configs hard-code wrong rootfs for installer, and kernel
+    # lives outside disk image, so don't archive known-broken installer images
+    rm -fv *-memstick.img
+    ;;
+*)
+    mv -v *-memstick.img "cheribsd-memstick-${suffix}.img"
+    ;;
+esac
 # Use xz -T0 to speed up compression by using multiple threads
 xz -T0 *.img kernel*
 """
@@ -240,7 +247,7 @@ chmod +w *.xz
 mkdir -p "artifacts-${suffix}"
 mv -v metadata.json "artifacts-${suffix}"
 mv -v *.xz "artifacts-${suffix}"
-[ ! -d ftp ] || tar -cJvf "artifacts-${suffix}/cheribsd-ftp-${suffix}.tar.xz" ftp
+tar -cJvf "artifacts-${suffix}/cheribsd-ftp-${suffix}.tar.xz" ftp
 ls -la "artifacts-${suffix}/"
 """
             archiveArtifacts allowEmptyArchive: false,
