@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-NEED_COMPAT=	CHERI
+NEED_COMPAT=	64C
 .include <bsd.compat.mk>
 
 PROG=	ld-elf64c.so.1
