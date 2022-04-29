@@ -117,14 +117,14 @@ LIB64_MACHINE_ABI=	${MACHINE_ABI:Npurecap}
 # CHERI world
 .if ${MK_LIB64C} != "no"
 .if ${COMPAT_ARCH} == "aarch64"
-HAS_COMPAT+=CHERI
+HAS_COMPAT+=64C
 LIB64C_MACHINE=	arm64
 LIB64C_MACHINE_ARCH=	aarch64c
 LIB64CCPUFLAGS=	-target aarch64-unknown-freebsd13.0
 # XXX: Drop -femulated-tls once bsd.cpu.mk no longer passes it
 LIB64CCPUFLAGS+=	-march=morello+c64 -mabi=purecap -femulated-tls
 .elif ${COMPAT_ARCH:Mriscv64*} && !${COMPAT_ARCH:Mriscv64*c*}
-HAS_COMPAT+=CHERI
+HAS_COMPAT+=64C
 LIB64C_MACHINE=	riscv
 LIB64C_MACHINE_ARCH=	${COMPAT_ARCH}c
 LIB64CWMAKEFLAGS=	CPUTYPE=cheri
@@ -144,13 +144,13 @@ COMPAT_RISCV_MARCH=	rv64ima
 COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}fd
 .endif
 COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}c
-.if ${COMPAT_ARCH:Mriscv*c*} || (defined(HAS_COMPAT) && ${HAS_COMPAT:MCHERI})
+.if ${COMPAT_ARCH:Mriscv*c*} || (defined(HAS_COMPAT) && ${HAS_COMPAT:M64C})
 COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}xcheri
 .endif
 .endif
 
 # Common CHERI flags
-.if defined(HAS_COMPAT) && ${HAS_COMPAT:MCHERI}
+.if defined(HAS_COMPAT) && ${HAS_COMPAT:M64C}
 LIB64CCFLAGS+=	-DCOMPAT_CHERI
 LIB64CWMAKEFLAGS+=	COMPAT_CHERI=yes
 LIB64C_MACHINE_ABI=	${MACHINE_ABI} purecap
@@ -197,12 +197,12 @@ WANT_COMPAT:=	${NEED_COMPAT}
 
 .if defined(HAS_COMPAT) && defined(WANT_COMPAT)
 .if ${WANT_COMPAT} == "any"
-_LIBCOMPAT:=	${HAS_COMPAT:[1]:S/CHERI/64C/}
+_LIBCOMPAT:=	${HAS_COMPAT:[1]}
 .elif !${HAS_COMPAT:M${WANT_COMPAT}}
 .warning WANT_COMPAT (${WANT_COMPAT}) defined, but not in HAS_COMPAT (${HAS_COMPAT})
 .undef WANT_COMPAT
 .else
-_LIBCOMPAT:=	${WANT_COMPAT:S/CHERI/64C/}
+_LIBCOMPAT:=	${WANT_COMPAT}
 .endif
 .else # defined(HAS_COMPAT) && defined(WANT_COMPAT)
 .undef WANT_COMPAT
