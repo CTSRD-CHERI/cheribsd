@@ -41,7 +41,7 @@ SUBDIR= cat \
 	uuidgen
 
 # Small cheri programs
-.if ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
+.if ${MACHINE_ABI:Mpurecap} || ${MK_LIB64C} == "yes"
 SUBDIR.${MK_CHERI}+=	cheri_minimal_dynamic_exe
 SUBDIR.${MK_CHERI}+=	cheri_minimal_pie_exe
 SUBDIR.${MK_CHERI}+=	helloworld
@@ -51,7 +51,7 @@ SUBDIR.${MK_CHERI}+=	helloworld_cxx
 SUBDIR.${MK_CHERI}+=	helloworld_static
 
 SUBDIR.${MK_CHERI}+=	cheribsdtest
-.endif  # ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
+.endif  # ${MACHINE_ABI:Mpurecap} || ${MK_LIB64C} == "yes"
 
 
 .include <bsd.arch.inc.mk>

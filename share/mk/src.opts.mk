@@ -216,8 +216,8 @@ __DEFAULT_NO_OPTIONS = \
     ZONEINFO_LEAPSECONDS_SUPPORT \
 
 __DEFAULT_YES_OPTIONS+=	\
-	COMPAT_CHERIABI \
-	CHERIBSDBOX
+	CHERIBSDBOX \
+	LIB64C
 
 # LEFT/RIGHT. Left options which default to "yes" unless their corresponding
 # RIGHT option is disabled.
@@ -372,7 +372,7 @@ BROKEN_OPTIONS+=MLX5TOOL
 # but that logic doesn't work in Makefile.inc1...
 .if (${__C} != "cheri" && ${__C} != "morello") || \
     (${__T:Maarch64*c*} || ${__T:Mriscv64*c*})
-BROKEN_OPTIONS+=COMPAT_CHERIABI
+BROKEN_OPTIONS+=LIB64C
 .endif
 
 .if ${.MAKE.OS} != "FreeBSD"
