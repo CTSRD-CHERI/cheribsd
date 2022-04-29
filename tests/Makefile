@@ -10,7 +10,7 @@ ${PACKAGE}FILES+=		README
 
 KYUAFILE= yes
 
-SUBDIR.${MK_COMPAT_CHERIABI}+=	cheri
+SUBDIR.${MK_LIB64C}+=	cheri
 SUBDIR+= etc
 SUBDIR+= sys
 

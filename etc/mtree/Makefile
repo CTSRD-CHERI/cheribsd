@@ -17,7 +17,7 @@ FILES=	\
 	BSD.usr.dist \
 	BSD.var.dist
 
-.if ${MK_COMPAT_CHERIABI} != "no"
+.if ${MK_LIB64C} != "no"
 _BSD.lib64c.dist=	BSD.lib64c.dist
 .endif
 .if ${MK_LIB32} != "no"

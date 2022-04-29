@@ -115,7 +115,7 @@ LIB64_MACHINE_ABI=	${MACHINE_ABI:Npurecap}
 
 # -------------------------------------------------------------------
 # CHERI world
-.if ${MK_COMPAT_CHERIABI} != "no"
+.if ${MK_LIB64C} != "no"
 .if ${COMPAT_ARCH} == "aarch64"
 HAS_COMPAT+=CHERI
 LIB64C_MACHINE=	arm64
@@ -135,7 +135,7 @@ COMPAT_RISCV_ABI:=	${COMPAT_RISCV_ABI}d
 .endif
 LIB64CCPUFLAGS+=	-march=${COMPAT_RISCV_MARCH} -mabi=${COMPAT_RISCV_ABI}
 .endif	# ${COMPAT_ARCH:Mriscv64*}
-.endif # ${MK_COMPAT_CHERIABI} != "no"
+.endif # ${MK_LIB64C} != "no"
 
 .if ${COMPAT_ARCH:Mriscv*}
 # See bsd.cpu.mk

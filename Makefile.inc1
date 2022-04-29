@@ -905,7 +905,7 @@ XCFLAGS+=	--sysroot=${WORLDTMP}
 XCFLAGS+=	${BFLAGS}
 .endif
 
-.if ${MK_COMPAT_CHERIABI} == "yes"
+.if ${MK_LIB64C} == "yes"
 _LIBCOMPAT= 64C
 .elif ${MK_LIB32} == "yes"
 _LIBCOMPAT= 32
@@ -1679,7 +1679,7 @@ restage reinstall reinstallsysroot: .MAKE .PHONY
 	@echo "Purecap ABI: creating libcheri links"
 	ln -sfnv lib ${DESTDIR}/libcheri
 	ln -sfnv lib ${DESTDIR}/usr/libcheri
-.elif ${MK_COMPAT_CHERIABI} == "yes"
+.elif ${MK_LIB64C} == "yes"
 	@echo "Hybrid ABI: creating libcheri links"
 	ln -sfnv lib64c ${DESTDIR}/usr/libcheri
 .endif
