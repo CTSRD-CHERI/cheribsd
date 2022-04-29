@@ -362,7 +362,11 @@ if [ "$NETCONFIG_DONE" != yes ]; then
 fi
 bsdinstall time
 bsdinstall services
-bsdinstall hardening
+
+# Disable use of the interactive hardening menu in CheriBSD, as most of these
+# sysctls don't directly address our use cases.
+#
+#bsdinstall hardening
 
 dialog --backtitle "FreeBSD Installer" --title "Add User Accounts" --yesno \
     "Would you like to add users to the installed system now?" 0 0 && \
