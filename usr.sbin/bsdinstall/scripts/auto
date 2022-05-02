@@ -152,23 +152,14 @@ bsdinstall keymap
 trap error SIGINT	# Catch cntrl-C here
 bsdinstall hostname || error "Set hostname failed"
 
+# In CheriBSD, we automatically install all available distributions, rather
+# than prompting the user to select as in baseline FreeBSD.  This is because
+# we don't ship src and ports tarballs, expecting the user to check out fresh
+# versions themselves.
 export DISTRIBUTIONS="base.txz kernel.txz"
 if [ -f $BSDINSTALL_DISTDIR/MANIFEST ]; then
-	DISTMENU=`awk -F'\t' '!/^(kernel\.txz|base\.txz)/{print $1,$5,$6}' $BSDINSTALL_DISTDIR/MANIFEST`
-	DISTMENU="$(echo ${DISTMENU} | sed -E 's/\.txz//g')"
-
-	if [ -n "$DISTMENU" ]; then
-		exec 3>&1
-		EXTRA_DISTS=$( eval dialog \
-		    --backtitle \"FreeBSD Installer\" \
-		    --title \"Distribution Select\" --nocancel --separate-output \
-		    --checklist \"Choose optional system components to install:\" \
-		    0 0 0 $DISTMENU \
-		2>&1 1>&3 )
-		for dist in $EXTRA_DISTS; do
-			export DISTRIBUTIONS="$DISTRIBUTIONS $dist.txz"
-		done
-	fi
+	EXTRA_DISTS=`awk -F'\t' '!/^(kernel\.txz|base\.txz)/{print $1}' $BSDINSTALL_DISTDIR/MANIFEST`
+	export DISTRIBUTIONS="$DISTRIBUTIONS $EXTRA_DISTS"
 fi
 
 FETCH_DISTRIBUTIONS=""
@@ -362,7 +353,11 @@ if [ "$NETCONFIG_DONE" != yes ]; then
 fi
 bsdinstall time
 bsdinstall services
-bsdinstall hardening
+
+# Disable use of the interactive hardening menu in CheriBSD, as most of these
+# sysctls don't directly address our use cases.
+#
+#bsdinstall hardening
 
 dialog --backtitle "FreeBSD Installer" --title "Add User Accounts" --yesno \
     "Would you like to add users to the installed system now?" 0 0 && \
