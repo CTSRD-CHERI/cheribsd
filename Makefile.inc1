@@ -164,10 +164,10 @@ TARGET_ABI=	gnueabi
 .endif
 _MACHINE_ABI?=	unknown
 MACHINE_MACHINE=${MACHINE_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:C/sf$//:S/riscv64c/riscv64/}
-MACHINE_TRIPLE?=${MACHINE_MACHINE}-${_MACHINE_ABI}-freebsd14.0
+MACHINE_TRIPLE?=${MACHINE_MACHINE}-${_MACHINE_ABI}-freebsd${OS_REVISION}
 TARGET_ABI?=	unknown
 TARGET_MACHINE=	${TARGET_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:C/sf$//:S/riscv64c/riscv64/}
-TARGET_TRIPLE?=	${TARGET_MACHINE}-${TARGET_ABI}-freebsd14.0
+TARGET_TRIPLE?=	${TARGET_MACHINE}-${TARGET_ABI}-freebsd${OS_REVISION}
 KNOWN_ARCHES?=	aarch64/arm64 \
 		aarch64c/arm64 \
 		amd64 \
