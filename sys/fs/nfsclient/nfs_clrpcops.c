@@ -6984,6 +6984,7 @@ start_writedsmir(void *arg, int pending)
 	    drpc->fhp, drpc->m, drpc->vers, drpc->minorvers, drpc->cred,
 	    drpc->p);
 	drpc->done = 1;
+	crfree(drpc->cred);
 	NFSCL_DEBUG(4, "start_writedsmir: err=%d\n", drpc->err);
 }
 
@@ -7011,7 +7012,7 @@ nfsio_writedsmir(vnode_t vp, int *iomode, int *must_commit,
 	drpc->m = m;
 	drpc->vers = vers;
 	drpc->minorvers = minorvers;
-	drpc->cred = cred;
+	drpc->cred = crhold(cred);
 	drpc->p = p;
 	drpc->inprog = 0;
 	ret = EIO;
@@ -7019,9 +7020,11 @@ nfsio_writedsmir(vnode_t vp, int *iomode, int *must_commit,
 		ret = nfs_pnfsio(start_writedsmir, drpc);
 		NFSCL_DEBUG(4, "nfsio_writedsmir: nfs_pnfsio=%d\n", ret);
 	}
-	if (ret != 0)
+	if (ret != 0) {
 		error = nfsrpc_writedsmir(vp, iomode, &drpc->must_commit,
 		    stateidp, dsp, off, len, fhp, m, vers, minorvers, cred, p);
+		crfree(drpc->cred);
+	}
 	NFSCL_DEBUG(4, "nfsio_writedsmir: error=%d\n", error);
 	return (error);
 }
@@ -7169,6 +7172,7 @@ start_commitds(void *arg, int pending)
 	    drpc->dsp, drpc->fhp, drpc->vers, drpc->minorvers, drpc->cred,
 	    drpc->p);
 	drpc->done = 1;
+	crfree(drpc->cred);
 	NFSCL_DEBUG(4, "start_commitds: err=%d\n", drpc->err);
 }
 
@@ -7191,7 +7195,7 @@ nfsio_commitds(vnode_t vp, uint64_t offset, int cnt, struct nfsclds *dsp,
 	drpc->fhp = fhp;
 	drpc->vers = vers;
 	drpc->minorvers = minorvers;
-	drpc->cred = cred;
+	drpc->cred = crhold(cred);
 	drpc->p = p;
 	drpc->inprog = 0;
 	ret = EIO;
@@ -7199,9 +7203,11 @@ nfsio_commitds(vnode_t vp, uint64_t offset, int cnt, struct nfsclds *dsp,
 		ret = nfs_pnfsio(start_commitds, drpc);
 		NFSCL_DEBUG(4, "nfsio_commitds: nfs_pnfsio=%d\n", ret);
 	}
-	if (ret != 0)
+	if (ret != 0) {
 		error = nfsrpc_commitds(vp, offset, cnt, dsp, fhp, vers,
 		    minorvers, cred, p);
+		crfree(drpc->cred);
+	}
 	NFSCL_DEBUG(4, "nfsio_commitds: error=%d\n", error);
 	return (error);
 }
@@ -7308,11 +7314,12 @@ start_adviseds(void *arg, int pending)
 	    drpc->advise, drpc->dsp, drpc->fhp, drpc->vers, drpc->minorvers,
 	    drpc->cred, drpc->p);
 	drpc->done = 1;
+	crfree(drpc->cred);
 	NFSCL_DEBUG(4, "start_adviseds: err=%d\n", drpc->err);
 }
 
 /*
- * Set up the commit DS mirror call for the pNFS I/O thread.
+ * Set up the advise DS mirror call for the pNFS I/O thread.
  */
 static int
 nfsio_adviseds(vnode_t vp, uint64_t offset, int cnt, int advise,
@@ -7331,7 +7338,7 @@ nfsio_adviseds(vnode_t vp, uint64_t offset, int cnt, int advise,
 	drpc->fhp = fhp;
 	drpc->vers = vers;
 	drpc->minorvers = minorvers;
-	drpc->cred = cred;
+	drpc->cred = crhold(cred);
 	drpc->p = p;
 	drpc->inprog = 0;
 	ret = EIO;
@@ -7339,9 +7346,11 @@ nfsio_adviseds(vnode_t vp, uint64_t offset, int cnt, int advise,
 		ret = nfs_pnfsio(start_adviseds, drpc);
 		NFSCL_DEBUG(4, "nfsio_adviseds: nfs_pnfsio=%d\n", ret);
 	}
-	if (ret != 0)
+	if (ret != 0) {
 		error = nfsrpc_adviseds(vp, offset, cnt, advise, dsp, fhp, vers,
 		    minorvers, cred, p);
+		crfree(drpc->cred);
+	}
 	NFSCL_DEBUG(4, "nfsio_adviseds: error=%d\n", error);
 	return (error);
 }
