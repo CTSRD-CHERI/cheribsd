@@ -104,7 +104,7 @@ BROKEN_OPTIONS+=EFI
 
 # Broken post OpenZFS import
 .if ${MACHINE_CPU:Mcheri}
-BROKEN_OPTIONS=CDDL ZFS
+BROKEN_OPTIONS+= CDDL ZFS
 .endif
 
 # expanded inline from bsd.mkopt.mk to avoid share/mk dependency
