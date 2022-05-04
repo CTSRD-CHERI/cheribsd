@@ -216,11 +216,9 @@ __DEFAULT_NO_OPTIONS = \
     ZONEINFO_LEAPSECONDS_SUPPORT \
 
 __DEFAULT_YES_OPTIONS+=	\
+	CHERI \
 	CHERIBSDBOX \
 	LIB64C
-
-__DEFAULT_NO_OPTIONS+=	\
-	CHERI
 
 # LEFT/RIGHT. Left options which default to "yes" unless their corresponding
 # RIGHT option is disabled.
@@ -368,6 +366,11 @@ __DEFAULT_NO_OPTIONS+=OPENSSL_KTLS
     ${__T:Mpowerpc64*} == ""
 BROKEN_OPTIONS+=CXGBETOOL
 BROKEN_OPTIONS+=MLX5TOOL
+.endif
+
+.if (${__C} != "cheri" && ${__C} != "morello" && \
+    !${__T:Maarch64*c*} && !${__T:Mriscv64*c*})
+BROKEN_OPTIONS+=CHERI
 .endif
 
 # We'd really like this to be:
