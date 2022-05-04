@@ -2045,7 +2045,7 @@ __PMC_EV_ALIAS("unhalted-core-cycles",		IAP_ARCH_UNH_COR_CYC)
  * 0x13200	0x00FF		free (was IBM POWER8 events)
  * 0x13300	0x00FF		Freescale e500 events
  * 0x14000	0x0100		ARMv7 events
- * 0x14100	0x0100		ARMv8 events
+ * 0x14100	0x0300		ARMv8 events
  * 0x20000	0x1000		Software events
  */
 #define	__PMC_EVENTS()				\
