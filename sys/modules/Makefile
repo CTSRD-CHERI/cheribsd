@@ -824,9 +824,19 @@ _linuxkpi=	linuxkpi
 _linuxkpi_wlan=	linuxkpi_wlan
 .endif
 
+# Some of these work in hybrid kernels but we disable them for consistency
+# (e.g. we don't want purecap kernels penalised by not having accelerated
+# crypto just because we haven't ported the assembly).
+.if ${MACHINE_CPU:Mcheri}
+BROKEN_MODULES+=armv8crypto
+BROKEN_MODULES+=ena
+BROKEN_MODULES+=linprocfs linux64 linux_common
+BROKEN_MODULES+=mlx4 mlx4en mlx5 mlx5en
+.endif
+
 SUBDIR+=${MODULES_EXTRA}
 
-.for reject in ${WITHOUT_MODULES}
+.for reject in ${BROKEN_MODULES} ${WITHOUT_MODULES}
 SUBDIR:= ${SUBDIR:N${reject}}
 .endfor
 
