@@ -323,6 +323,8 @@ BROKEN_OPTIONS+=LIB64
 # nscd(8) caching depends on marshaling pointers to the daemon and back
 # and can't work without a rewrite.
 BROKEN_OPTIONS+=NS_CACHING
+# Not ported
+BROKEN_OPTIONS+=OFED
 .endif
 
 .if ${__C} == "cheri" || ${__C} == "morello" || \
