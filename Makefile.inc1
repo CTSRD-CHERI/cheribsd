@@ -1027,7 +1027,7 @@ CERTCTLFLAGS+=	-d /base
 .else
 CERTCTLDESTDIR=	${DESTDIR}
 .endif
-CERTCTLFLAGS+=	-D ${CERTCTLDESTDIR}
+CERTCTLFLAGS+=	-D "${CERTCTLDESTDIR}"
 
 DESTDIR_MTREEFLAGS=	-deU
 # When creating worldtmp we don't need to set the directories as owned by root
