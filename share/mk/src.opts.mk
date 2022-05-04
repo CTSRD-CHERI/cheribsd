@@ -292,6 +292,9 @@ __DEFAULT_NO_OPTIONS+=LLVM_TARGET_BPF LLVM_TARGET_MIPS
 
 .include <bsd.compiler.mk>
 
+# Never use in-tree LLVM for CheriBSD
+BROKEN_OPTIONS+=CLANG LLD LLDB CLANG_BOOTSTRAP LLD_BOOTSTRAP
+
 .ifdef COMPAT_64BIT
 # ofed needs to be part of the default build for headers to be available.
 # Since it isn't yet working under purecap, disable it here.
