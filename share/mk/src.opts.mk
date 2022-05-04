@@ -219,6 +219,9 @@ __DEFAULT_YES_OPTIONS+=	\
 	CHERIBSDBOX \
 	LIB64C
 
+__DEFAULT_NO_OPTIONS+=	\
+	CHERI
+
 # LEFT/RIGHT. Left options which default to "yes" unless their corresponding
 # RIGHT option is disabled.
 __DEFAULT_DEPENDENT_OPTIONS= \
