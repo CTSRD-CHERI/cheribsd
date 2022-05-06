@@ -209,6 +209,27 @@ CHERIBSDTEST(test_tls_threads, "Test TLS across threads")
 #endif
 	CHECK_DISJOINT(tls_ie);
 	CHECK_DISJOINT(tls_le);
+
+#ifdef TLS_EXACT_BOUNDS
+#define	CHECK_BOUNDS(_var)						\
+	if (__builtin_cheri_offset_get((_var)) != 0)			\
+		cheribsdtest_failure_errx("TLS variable "#_var" with "	\
+		    "non-zero offset: %#p", (_var));			\
+	if (__builtin_cheri_length_get((_var)) != sizeof(*(_var)))	\
+		cheribsdtest_failure_errx("TLS variable "#_var" (size " \
+		    "%zu) with bad length: %#p", sizeof(*(_var)), (_var));
+
+#ifdef CHERIBSD_DYNAMIC_TESTS
+	CHECK_BOUNDS(my_tls_gd);
+	CHECK_BOUNDS(my_tls_ld);
+	CHECK_BOUNDS(thr_tls_gd);
+	CHECK_BOUNDS(thr_tls_ld);
+#endif
+	CHECK_BOUNDS(my_tls_ie);
+	CHECK_BOUNDS(my_tls_le);
+	CHECK_BOUNDS(thr_tls_ie);
+	CHECK_BOUNDS(thr_tls_le);
+#endif
 #endif
 
 	cheribsdtest_success();
