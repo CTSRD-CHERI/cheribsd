@@ -1072,6 +1072,8 @@ typedef struct {
 #define	R_MORELLO_JUMP_SLOT	59394
 #define	R_MORELLO_RELATIVE	59395
 #define	R_MORELLO_IRELATIVE	59396
+#define	R_MORELLO_TLSDESC	59397
+#define	R_MORELLO_TLS_TPREL128	59398
 
 #if __has_feature(capabilities)
 #define	MORELLO_FRAG_EXECUTABLE	0x4
