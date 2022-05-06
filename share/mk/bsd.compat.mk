@@ -86,8 +86,7 @@ LIB64WMAKEENV=	MACHINE_CPU="arm64 cheri"
 LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=morello
 # XXX: clang specific
 LIB64CPUFLAGS=	-target aarch64-unknown-freebsd13.0
-# XXX: Drop -fno-emulated-tls once bsd.cpu.mk no longer enables it
-LIB64CPUFLAGS+=	-march=morello -mabi=aapcs -fno-emulated-tls
+LIB64CPUFLAGS+=	-march=morello -mabi=aapcs
 .endif
 
 .if ${COMPAT_ARCH:Mriscv*c*}
@@ -121,8 +120,7 @@ HAS_COMPAT+=64C
 LIB64C_MACHINE=	arm64
 LIB64C_MACHINE_ARCH=	aarch64c
 LIB64CCPUFLAGS=	-target aarch64-unknown-freebsd13.0
-# XXX: Drop -femulated-tls once bsd.cpu.mk no longer passes it
-LIB64CCPUFLAGS+=	-march=morello+c64 -mabi=purecap -femulated-tls
+LIB64CCPUFLAGS+=	-march=morello+c64 -mabi=purecap
 .elif ${COMPAT_ARCH:Mriscv64*} && !${COMPAT_ARCH:Mriscv64*c*}
 HAS_COMPAT+=64C
 LIB64C_MACHINE=	riscv

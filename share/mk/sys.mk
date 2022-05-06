@@ -244,8 +244,7 @@ LFLAGS		?=
 # compiler driver flags (e.g. -mabi=*) that conflict with flags to LD.
 LD		?=	ld
 LDFLAGS		?=
-# XXX: Drop -femulated-tls once bsd.cpu.mk no longer sets it for aarch64c.
-_LDFLAGS	=	${LDFLAGS:S/-Wl,//g:N-mabi=*:N-march=*:N-femulated-tls:N-fuse-ld=*:N--ld-path=*:N-fsanitize=*:N-fno-sanitize=*}
+_LDFLAGS	=	${LDFLAGS:S/-Wl,//g:N-mabi=*:N-march=*:N-fuse-ld=*:N--ld-path=*:N-fsanitize=*:N-fno-sanitize=*}
 
 MAKE		?=	make
 
