@@ -539,7 +539,6 @@ FBSDprivate_1.0 {
 	_sleep;
 	_rtld_allocate_tls;
 	_rtld_free_tls;
-	__emutls_get_address;
 #if defined(i386)
 	___libc_tls_get_addr;	/* x86 only */
 #endif
