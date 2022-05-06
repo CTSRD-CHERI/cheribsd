@@ -53,4 +53,8 @@
 #define	XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN	NULL
 #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	TLS_EXACT_BOUNDS
+#endif
+
 #endif /* !_CHERIBSDTEST_H_ */
