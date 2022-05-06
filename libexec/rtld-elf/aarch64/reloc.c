@@ -224,6 +224,28 @@ do_copy_relocations(Obj_Entry *dstobj)
 	return (0);
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+struct tls_data {
+	uintcap_t	dtv_gen;
+	int		tls_index;
+	Elf_Addr	tls_offs;
+	Elf_Addr	tls_size;
+};
+
+static void *
+reloc_tlsdesc_alloc(int tlsindex, Elf_Addr tlsoffs, Elf_Addr tlssize)
+{
+	struct tls_data *tlsdesc;
+
+	tlsdesc = xmalloc(sizeof(struct tls_data));
+	tlsdesc->dtv_gen = tls_dtv_generation;
+	tlsdesc->tls_index = tlsindex;
+	tlsdesc->tls_offs = tlsoffs;
+	tlsdesc->tls_size = tlssize;
+
+	return (tlsdesc);
+}
+#else
 struct tls_data {
 	Elf_Addr	dtv_gen;
 	int		tls_index;
@@ -242,6 +264,7 @@ reloc_tlsdesc_alloc(int tlsindex, Elf_Addr tlsoffs)
 
 	return ((Elf_Addr)tlsdesc);
 }
+#endif
 
 static void
 reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where,
@@ -250,7 +273,10 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where,
 	const Elf_Sym *def;
 	const Obj_Entry *defobj;
 	Elf_Addr offs;
-
+#ifdef __CHERI_PURE_CAPABILITY__
+	Elf_Addr size = where[3];
+	void **wherec = (void **)where;
+#endif
 
 	offs = 0;
 	if (ELF_R_SYM(rela->r_info) != 0) {
@@ -259,24 +285,44 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where,
 		if (def == NULL)
 			rtld_die();
 		offs = def->st_value;
+#ifdef __CHERI_PURE_CAPABILITY__
+		if (size == 0)
+			size = def->st_size;
+#endif
 		obj = defobj;
 		if (def->st_shndx == SHN_UNDEF) {
 			/* Weak undefined thread variable */
+#ifdef __CHERI_PURE_CAPABILITY__
+			wherec[0] = _rtld_tlsdesc_undef;
+			where[2] = rela->r_addend;
+#else
 			where[0] = (Elf_Addr)_rtld_tlsdesc_undef;
 			where[1] = rela->r_addend;
+#endif
 			return;
 		}
 	}
 	offs += rela->r_addend;
 
 	if (obj->tlsoffset != 0) {
-		/* Variable is in initialy allocated TLS segment */
+		/* Variable is in initially allocated TLS segment */
+#ifdef __CHERI_PURE_CAPABILITY__
+		wherec[0] = _rtld_tlsdesc_static;
+		where[2] = obj->tlsoffset + offs;
+		where[3] = size;
+#else
 		where[0] = (Elf_Addr)_rtld_tlsdesc_static;
 		where[1] = obj->tlsoffset + offs;
+#endif
 	} else {
-		/* TLS offest is unknown at load time, use dynamic resolving */
+		/* TLS offset is unknown at load time, use dynamic resolving */
+#ifdef __CHERI_PURE_CAPABILITY__
+		wherec[0] = _rtld_tlsdesc_dynamic;
+		wherec[1] = reloc_tlsdesc_alloc(obj->tlsindex, offs, size);
+#else
 		where[0] = (Elf_Addr)_rtld_tlsdesc_dynamic;
 		where[1] = reloc_tlsdesc_alloc(obj->tlsindex, offs);
+#endif
 	}
 }
 
@@ -328,7 +374,11 @@ reloc_plt(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 			    obj->path);
 			return (-1);
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
+		case R_MORELLO_TLSDESC:
+#else
 		case R_AARCH64_TLSDESC:
+#endif
 			reloc_tlsdesc(obj, rela, where, SYMLOOK_IN_PLT | flags,
 			    lockstate);
 			break;
@@ -667,9 +717,13 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		switch (ELF_R_TYPE(rela->r_info)) {
 		case R_AARCH64_ABS64:
 		case R_AARCH64_GLOB_DAT:
+#ifdef __CHERI_PURE_CAPABILITY__
+		case R_MORELLO_TLS_TPREL128:
+#else
 		case R_AARCH64_TLS_TPREL64:
 		case R_AARCH64_TLS_DTPREL64:
 		case R_AARCH64_TLS_DTPMOD64:
+#endif
 			def = find_symdef(ELF_R_SYM(rela->r_info), obj,
 			    &defobj, flags, cache, lockstate);
 			if (def == NULL)
@@ -754,10 +808,18 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				return (-1);
 			}
 			break;
+#ifdef __CHERI_PURE_CAPABILITY__
+		case R_MORELLO_TLSDESC:
+#else
 		case R_AARCH64_TLSDESC:
+#endif
 			reloc_tlsdesc(obj, rela, where, flags, lockstate);
 			break;
+#ifdef __CHERI_PURE_CAPABILITY__
+		case R_MORELLO_TLS_TPREL128:
+#else
 		case R_AARCH64_TLS_TPREL64:
+#endif
 			/*
 			 * We lazily allocate offsets for static TLS as we
 			 * see the first relocation that references the
@@ -775,10 +837,15 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 					return (-1);
 				}
 			}
-			*where = def->st_value + rela->r_addend +
+			where[0] = def->st_value + rela->r_addend +
 			    defobj->tlsoffset;
+#ifdef __CHERI_PURE_CAPABILITY__
+			if (where[1] == 0)
+				where[1] = def->st_size;
+#endif
 			break;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 		/*
 		 * !!! BEWARE !!!
 		 * ARM ELF ABI defines TLS_DTPMOD64 as 1029, and TLS_DTPREL64
@@ -791,6 +858,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		case R_AARCH64_TLS_DTPMOD64: /* efectively is TLS_DTPREL64 */
 			*where += (Elf_Addr)(def->st_value + rela->r_addend);
 			break;
+#endif
 		case R_AARCH64_RELATIVE:
 			*where = (Elf_Addr)(obj->relocbase + rela->r_addend);
 			break;
