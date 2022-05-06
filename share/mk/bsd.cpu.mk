@@ -304,10 +304,7 @@ MACHINE_CPU += riscv
 
 .if ${MACHINE_CPUARCH} == "aarch64"
 . if ${MACHINE_ARCH:Maarch64*c*}
-# XXX: Stop using emulated TLS once purecap TLSDESC is properly specified (and
-# CheriBSD implements the resolvers) or the Morello toolchain implements a
-# pure-capability traditional TLS like MIPS or RISC-V.
-CFLAGS+=	-march=morello+c64 -mabi=purecap -femulated-tls
+CFLAGS+=	-march=morello+c64 -mabi=purecap
 CFLAGS+=	-Xclang -morello-vararg=new
 LDFLAGS+=	-march=morello+c64 -mabi=purecap
 . elif defined(CPUTYPE) && ${CPUTYPE} == "morello"
