@@ -2,7 +2,10 @@
 Welcome to CheriBSD!
 
 CheriBSD extends FreeBSD to implement memory protection and software
-compartmentalization features available in CHERI-extended CPUs.
+compartmentalization features enabled by CHERI-extended CPUs.
+
+The CheriBSD front page:
+  https://www.cheribsd.org/
 
 We provide support via a mailing list:
   https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/cheri-lists.html
