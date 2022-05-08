@@ -2381,15 +2381,11 @@ linux_prlimit64(struct thread *td, struct linux_prlimit64_args *args)
 int
 linux_pselect6(struct thread *td, struct linux_pselect6_args *args)
 {
-	struct l_timespec lts;
 	struct timespec ts, *tsp;
 	int error;
 
 	if (args->tsp != NULL) {
-		error = copyin(args->tsp, &lts, sizeof(lts));
-		if (error != 0)
-			return (error);
-		error = linux_to_native_timespec(&ts, &lts);
+		error = linux_get_timespec(&ts, args->tsp);
 		if (error != 0)
 			return (error);
 		tsp = &ts;
@@ -2474,15 +2470,11 @@ int
 linux_pselect6_time64(struct thread *td,
     struct linux_pselect6_time64_args *args)
 {
-	struct l_timespec64 lts;
 	struct timespec ts, *tsp;
 	int error;
 
 	if (args->tsp != NULL) {
-		error = copyin(args->tsp, &lts, sizeof(lts));
-		if (error != 0)
-			return (error);
-		error = linux_to_native_timespec64(&ts, &lts);
+		error = linux_get_timespec64(&ts, args->tsp);
 		if (error != 0)
 			return (error);
 		tsp = &ts;
@@ -2502,14 +2494,10 @@ int
 linux_ppoll(struct thread *td, struct linux_ppoll_args *args)
 {
 	struct timespec uts, *tsp;
-	struct l_timespec lts;
 	int error;
 
 	if (args->tsp != NULL) {
-		error = copyin(args->tsp, &lts, sizeof(lts));
-		if (error)
-			return (error);
-		error = linux_to_native_timespec(&uts, &lts);
+		error = linux_get_timespec(&uts, args->tsp);
 		if (error != 0)
 			return (error);
 		tsp = &uts;
@@ -2584,14 +2572,10 @@ int
 linux_ppoll_time64(struct thread *td, struct linux_ppoll_time64_args *args)
 {
 	struct timespec uts, *tsp;
-	struct l_timespec64 lts;
 	int error;
 
 	if (args->tsp != NULL) {
-		error = copyin(args->tsp, &lts, sizeof(lts));
-		if (error != 0)
-			return (error);
-		error = linux_to_native_timespec64(&uts, &lts);
+		error = linux_get_timespec64(&uts, args->tsp);
 		if (error != 0)
 			return (error);
 		tsp = &uts;
