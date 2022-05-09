@@ -981,7 +981,15 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 	ef = (elf_file_t) lf;
 	ef->preloaded = 1;
 	ef->modptr = modptr;
+#ifdef __CHERI_PURE_CAPABILITY__
+	ef->address = cheri_setaddress(kernel_root_cap,
+	    *(ptraddr_t *)baseptr);
+	ef->address = cheri_setbounds(ef->address, *(size_t *)sizeptr);
+	ef->address = cheri_andperm(ef->address, CHERI_PERMS_KERNEL_CODE |
+	    CHERI_PERMS_KERNEL_DATA);
+#else
 	ef->address = *(caddr_t *)baseptr;
+#endif
 #ifdef SPARSE_MAPPING
 	ef->object = NULL;
 #endif
