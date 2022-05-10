@@ -93,6 +93,36 @@ CHERIBSDTEST(test_cheriabi_mmap_unrepresentable,
 	cheribsdtest_success();
 }
 
+CHERIBSDTEST(test_cheriabi_mmap_fixed,
+    "Verify that we can MAP_FIXED over multiple vm map entries")
+{
+	void *p1, *p2;
+
+	/* Create a large mapping */
+	p1 = mmap(0, 0x200000, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_ANON | MAP_ALIGNED(21), -1, 0);
+	CHERIBSDTEST_VERIFY(p1 != MAP_FAILED);
+
+	/*
+	 * Map over part of the mapping.  This (currently) results
+	 * in there being two vm map entries, one of length 0x20000
+	 * and another of 0x200000 - 0x20000.
+	 */
+	p2 = mmap(p1, 0x20000, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_FIXED | MAP_ANON, -1, 0);
+	CHERIBSDTEST_VERIFY(p1 == p2);
+
+	/*
+	 * Map over a larger part of the origional mapping spanning
+	 * two vm map entries.
+	 */
+	p2 = mmap(p1, 0x40000, PROT_READ | PROT_WRITE,
+	    MAP_PRIVATE | MAP_FIXED | MAP_ANON, -1, 0);
+	CHERIBSDTEST_VERIFY(p1 == p2);
+
+	cheribsdtest_success();
+}
+
 CHERIBSDTEST(test_cheriabi_malloc_zero_size,
     "Check that zero-sized mallocs are properly bounded")
 {
