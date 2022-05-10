@@ -4351,7 +4351,7 @@ int
 vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
     bool keep_reservation)
 {
-	vm_map_entry_t entry, next_entry, scratch_entry;
+	vm_map_entry_t entry, next_entry, prev_entry;
 	int rv;
 
 	VM_MAP_ASSERT_LOCKED(map);
@@ -4363,10 +4363,10 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	 * Find the start of the region, and clip it.
 	 * Step through all entries in this region.
 	 */
-	rv = vm_map_lookup_clip_start(map, start, &entry, &scratch_entry);
+	rv = vm_map_lookup_clip_start(map, start, &entry, &prev_entry);
 	if (rv != KERN_SUCCESS)
 		return (rv);
-	for (; entry->start < end; entry = next_entry) {
+	for (; entry->start < end; prev_entry = entry, entry = next_entry) {
 		/*
 		 * Wait for wiring or unwiring of an entry to complete.
 		 * Also wait for any system wirings to disappear on
@@ -4391,7 +4391,7 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 				 * clipped, merged, or deleted.
 				 */
 				rv = vm_map_lookup_clip_start(map, saved_start,
-				    &next_entry, &scratch_entry);
+				    &next_entry, &prev_entry);
 				if (rv != KERN_SUCCESS)
 					break;
 			} else
@@ -4437,8 +4437,7 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 				/* XXX-AM: How do we reset maxprot? */
 				vm_map_reservation_init_entry(entry);
 			}
-			/* Attempt to consolidate the mapping anyway? */
-			vm_map_try_merge_entries(map, scratch_entry, entry);
+			vm_map_try_merge_entries(map, prev_entry, entry);
 		} else {
 			vm_map_entry_delete(map, entry);
 		}
