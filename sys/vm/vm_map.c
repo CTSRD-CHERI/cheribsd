@@ -6094,6 +6094,12 @@ _vm_map_assert_consistent(vm_map_t map, int check)
 		    entry->start < entry->right->start,
 		    ("map %p start = %jx, right->start = %jx", map,
 		    (uintmax_t)entry->start, (uintmax_t)entry->right->start));
+		KASSERT((map->flags & MAP_RESERVATIONS) == 0 ||
+		    prev->reservation < entry->reservation ||
+		    prev->end == entry->start,
+		    ("map %p, prev->end = %jx, start = %jx, reservation = %jx",
+		    map, (uintmax_t)prev->end, (uintmax_t)entry->start,
+		    (uintmax_t)entry->reservation));
 		cur = map->root;
 		lbound = ubound = header;
 		for (;;) {
