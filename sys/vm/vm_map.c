@@ -4442,6 +4442,7 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			vm_map_entry_delete(map, entry);
 		}
 	}
+	VM_MAP_ASSERT_CONSISTENT(map);
 	return (rv);
 }
 
