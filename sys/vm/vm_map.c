@@ -6100,6 +6100,12 @@ _vm_map_assert_consistent(vm_map_t map, int check)
 		    ("map %p, prev->end = %jx, start = %jx, reservation = %jx",
 		    map, (uintmax_t)prev->end, (uintmax_t)entry->start,
 		    (uintmax_t)entry->reservation));
+		KASSERT(prev->reservation != entry->reservation ||
+		    !((prev->eflags & MAP_ENTRY_UNMAPPED) != 0 &&
+		    (entry->eflags & MAP_ENTRY_UNMAPPED) != 0),
+		    ("map %p prev->start %jx, start %jx, reservation %jx, "
+		    "both MAP_ENTRY_UNMAPPED", map, (uintmax_t)prev->start,
+		    (uintmax_t)entry->start, entry->reservation));
 		cur = map->root;
 		lbound = ubound = header;
 		for (;;) {
