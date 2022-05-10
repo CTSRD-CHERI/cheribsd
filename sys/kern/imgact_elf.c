@@ -232,6 +232,12 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, stack, CTLFLAG_RWTUN,
     ELF_ABI_NAME
     ": enable stack address randomization");
 
+static int __elfN(aslr_shared_page) = __ELF_WORD_SIZE == 64;
+SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, shared_page, CTLFLAG_RWTUN,
+    &__elfN(aslr_shared_page), 0,
+    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
+    ": enable shared page address randomization");
+
 #ifdef __ELF_CHERI
 static int __elfN(sigfastblock) = 0;
 #else
@@ -1511,6 +1517,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			imgp->map_flags |= MAP_ASLR_IGNSTART;
 		if (__elfN(aslr_stack))
 			imgp->map_flags |= MAP_ASLR_STACK;
+		if (__elfN(aslr_shared_page))
+			imgp->imgp_flags |= IMGP_ASLR_SHARED_PAGE;
 	}
 
 	if ((!__elfN(allow_wx) && (fctl0 & NT_FREEBSD_FCTL_WXNEEDED) == 0 &&
