@@ -1107,7 +1107,7 @@ freebsd64_cpuset_setaffinity(struct thread *td,
     struct freebsd64_cpuset_setaffinity_args *uap)
 {
 
-	return (kern_cpuset_setaffinity(td, uap->level, uap->which, uap->id,
+	return (user_cpuset_setaffinity(td, uap->level, uap->which, uap->id,
 	    uap->cpusetsize, __USER_CAP(uap->mask, uap->cpusetsize)));
 }
 
