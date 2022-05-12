@@ -42,6 +42,7 @@
 #include <sys/_uio.h>
 
 struct __wrusage;
+struct cpuset_copy_cb;
 struct ffclock_estimate;
 struct file;
 struct filecaps;
@@ -170,18 +171,22 @@ int	kern_copy_file_range(struct thread *td, int infd, off_t *inoffp,
 int	kern_cpuset(struct thread *td, cpusetid_t * __capability setid);
 int	kern_cpuset_getaffinity(struct thread *td, cpulevel_t level,
 	    cpuwhich_t which, id_t id, size_t cpusetsize,
-	    cpuset_t * __capability maskp);
+	    cpuset_t * __capability maskp,
+	    const struct cpuset_copy_cb *cb);
 int	kern_cpuset_setaffinity(struct thread *td, cpulevel_t level,
 	    cpuwhich_t which, id_t id, cpuset_t *maskp);
 int	user_cpuset_setaffinity(struct thread *td, cpulevel_t level,
 	    cpuwhich_t which, id_t id, size_t cpusetsize,
-	    const cpuset_t * __capability maskp);
+	    const cpuset_t * __capability maskp,
+	    const struct cpuset_copy_cb *cb);
 int	kern_cpuset_getdomain(struct thread *td, cpulevel_t level,
 	    cpuwhich_t which, id_t id, size_t domainsetsize,
-	    domainset_t * __capability maskp, int * __capability policyp);
+	    domainset_t * __capability maskp, int * __capability policyp,
+	    const struct cpuset_copy_cb *cb);
 int	kern_cpuset_setdomain(struct thread *td, cpulevel_t level,
 	    cpuwhich_t which, id_t id, size_t domainsetsize,
-	    const domainset_t * __capability maskp, int policy);
+	    const domainset_t * __capability maskp, int policy,
+	    const struct cpuset_copy_cb *cb);
 int	kern_cpuset_getid(struct thread *td, cpulevel_t level,
 	    cpuwhich_t which, id_t id, cpusetid_t * __capability setid);
 int	kern_cpuset_setid(struct thread *td, cpuwhich_t which,

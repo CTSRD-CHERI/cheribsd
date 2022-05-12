@@ -1093,13 +1093,72 @@ freebsd64_cpuset_getid(struct thread *td,
 	    __USER_CAP_OBJ(uap->setid)));
 }
 
+static int
+copyin64_set(const void * __capability u, void *k, size_t size)
+{
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	int rv;
+	struct bitset *kb = k;
+	int *p;
+
+	rv = copyin(u, k, size);
+	if (rv != 0)
+		return (rv);
+
+	p = (int *)kb->__bits;
+	/* Loop through swapping words.
+	 * `size' is in bytes, we need bits. */
+	for (int i = 0; i < __bitset_words(size * 8); i++) {
+		int tmp = p[0];
+		p[0] = p[1];
+		p[1] = tmp;
+		p += 2;
+	}
+	return (0);
+#else
+	return (copyin(u, k, size));
+#endif
+}
+
+static int
+copyout64_set(const void *k, void * __capability u, size_t size)
+{
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+	const struct bitset *kb = k;
+	struct bitset * __capability ub = u;
+	const int *kp = (const int *)kb->__bits;
+	int * __capability up = (int * __capability)ub->__bits;
+	int rv;
+
+	for (int i = 0; i < __bitset_words(CPU_SETSIZE); i++) {
+		/* `size' is in bytes, we need bits. */
+		for (int i = 0; i < __bitset_words(size * 8); i++) {
+			rv = suword32(up, kp[1]);
+			if (rv == 0)
+				rv = suword32(up + 1, kp[0]);
+			if (rv != 0)
+				return (EFAULT);
+		}
+	}
+	return (0);
+#else
+	return (copyout(k, u, size));
+#endif
+}
+
+static const struct cpuset_copy_cb cpuset_copy64_cb = {
+	.copyin = copyin64_set,
+	.copyout = copyout64_set
+};
+
 int
 freebsd64_cpuset_getaffinity(struct thread *td,
     struct freebsd64_cpuset_getaffinity_args *uap)
 {
 
 	return (kern_cpuset_getaffinity(td, uap->level, uap->which,
-	    uap->id, uap->cpusetsize, __USER_CAP(uap->mask, uap->cpusetsize)));
+	    uap->id, uap->cpusetsize, __USER_CAP(uap->mask, uap->cpusetsize),
+	    &cpuset_copy64_cb));
 }
 
 int
@@ -1108,7 +1167,8 @@ freebsd64_cpuset_setaffinity(struct thread *td,
 {
 
 	return (user_cpuset_setaffinity(td, uap->level, uap->which, uap->id,
-	    uap->cpusetsize, __USER_CAP(uap->mask, uap->cpusetsize)));
+	    uap->cpusetsize, __USER_CAP(uap->mask, uap->cpusetsize),
+	    &cpuset_copy64_cb));
 }
 
 int
@@ -1119,7 +1179,8 @@ freebsd64_cpuset_getdomain(struct thread *td,
 	return (kern_cpuset_getdomain(td, uap->level, uap->which,
 	    uap->id, uap->domainsetsize,
 	    __USER_CAP(uap->mask, uap->domainsetsize),
-	    __USER_CAP_OBJ(uap->policy)));
+	    __USER_CAP_OBJ(uap->policy),
+	    &cpuset_copy64_cb));
 }
 
 int
@@ -1129,8 +1190,8 @@ freebsd64_cpuset_setdomain(struct thread *td,
 
 	return (kern_cpuset_setdomain(td, uap->level, uap->which,
 	    uap->id, uap->domainsetsize,
-	    __USER_CAP(uap->mask, uap->domainsetsize),
-	    uap->policy));
+	    __USER_CAP(uap->mask, uap->domainsetsize), uap->policy,
+	    &cpuset_copy64_cb));
 }
 
 /*
