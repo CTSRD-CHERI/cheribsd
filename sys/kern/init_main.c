@@ -146,6 +146,10 @@ int	verbose_sysinit = VERBOSE_SYSINIT;
 TUNABLE_INT("debug.verbose_sysinit", &verbose_sysinit);
 #endif
 
+#ifdef DIAGNOSTIC
+FEATURE(diagnostic, "Kernel compiled with DIAGNOSTIC, may affect performance");
+#endif
+
 #ifdef INVARIANTS
 FEATURE(invariants, "Kernel compiled with INVARIANTS, may affect performance");
 #endif
