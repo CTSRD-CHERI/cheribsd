@@ -85,9 +85,6 @@ struct cheribsdtest_child_state {
 	int		ccs_si_code;
 	int		ccs_si_trapno;
 	void		*ccs_si_addr;
-#ifdef __mips__
-	register_t	ccs_cp2_cause;
-#endif
 
 	/* Fields filled in by the test itself. */
 	int		ccs_testresult;
