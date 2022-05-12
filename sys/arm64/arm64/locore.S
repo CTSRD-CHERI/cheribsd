@@ -153,10 +153,7 @@
  */
 .macro morello_cpu_init
 #if __has_feature(capabilities)
-	/*
-	 * Enable Morello instructions at EL1. We will enable them at EL0
-	 * later when we know userspace is expecting to use them.
-	 */
+	/* Enable Morello instructions at EL0 and EL1 */
 	mrs	x2, cpacr_el1
 	bic	x2, x2, CPACR_CEN_MASK
 	orr	x2, x2, CPACR_CEN_TRAP_NONE
