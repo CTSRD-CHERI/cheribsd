@@ -38,7 +38,6 @@
 
 #include <machine/armreg.h>
 
-#define	TRAPNO_CHERI		0
 #define	TRAPNO_STORE_CAP_PF	EXCP_DATA_ABORT_L
 #define	TRAPNO_LOAD_STORE	EXCP_DATA_ABORT_L
 
