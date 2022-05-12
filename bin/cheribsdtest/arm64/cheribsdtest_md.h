@@ -53,8 +53,4 @@
 #define	XFAIL_HYBRID_BOUNDS_GLOBALS_EXTERN	NULL
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	XFAIL_VARARG_BOUNDS	"varargs bounds known to be unimplemented"
-#endif
-
 #endif /* !_CHERIBSDTEST_H_ */
