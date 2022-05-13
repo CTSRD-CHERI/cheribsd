@@ -41,6 +41,7 @@
 .Op Fl I Ar patterns
 .Op Fl L Ar logfile
 .Op Fl M Ar options
+.Op Fl m Ar make
 .Nm
 .Cm build
 .Op Fl B
@@ -48,6 +49,7 @@
 .Op Fl s Ar source
 .Op Fl L Ar logfile
 .Op Fl M Ar options
+.Op Fl m Ar make
 .Ar tarball
 .Nm
 .Cm diff
@@ -63,6 +65,7 @@
 .Op Fl D Ar destdir
 .Op Fl L Ar logfile
 .Op Fl M Ar options
+.Op Fl m Ar make
 .Nm
 .Cm resolve
 .Op Fl p
@@ -489,6 +492,14 @@ This can be used for to set the
 or
 .Dv TARGET_ARCH
 variables for a cross-build.
+.It Fl m Ar make
+Use
+.Ar make
+as the
+.Xr make 1
+binary when building a
+.Dq current
+tree.
 .It Fl n
 Enable
 .Dq dry-run
