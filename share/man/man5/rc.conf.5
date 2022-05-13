@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd March 3, 2022
+.Dd May 13, 2022
 .Dt RC.CONF 5
 .Os
 .Sh NAME
@@ -2383,6 +2383,14 @@ If set to
 .Dq Li NO ,
 .Pa /etc/motd
 will not be updated.
+.It Va motd_perf_warnings
+If set to
+.Dq Li YES
+along with
+.Va update_motd
+add warnings about performance impacting kernel and world options
+to the bottom of
+.Pa /etc/motd .
 .It Va nfs_client_enable
 .Pq Vt bool
 If set to
