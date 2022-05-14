@@ -690,7 +690,7 @@ sys___semctl(struct thread *td, struct __semctl_args *uap)
 		break;
 	case SETVAL:
 		semun.val = arg.val;
-		break;		
+		break;
 	}
 
 	error = kern_semctl(td, uap->semid, uap->semnum, uap->cmd, &semun,
@@ -873,7 +873,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 		 * won't work for SETALL since we can't copyin() more
 		 * data than the user specified as we may return a
 		 * spurious EFAULT.
-		 * 
+		 *
 		 * Note that the number of semaphores in a set is
 		 * fixed for the life of that set.  The only way that
 		 * the 'count' could change while are blocked in
@@ -886,7 +886,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 		 *
 		 */
 		count = semakptr->u.sem_nsems;
-		mtx_unlock(sema_mtxp);		    
+		mtx_unlock(sema_mtxp);
 		array = malloc(sizeof(*array) * count, M_TEMP, M_WAITOK);
 		mtx_lock(sema_mtxp);
 		if ((error = semvalid(semid, rpr, semakptr)) != 0)
@@ -939,7 +939,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 		 * and why we require a userland buffer.
 		 */
 		count = semakptr->u.sem_nsems;
-		mtx_unlock(sema_mtxp);		    
+		mtx_unlock(sema_mtxp);
 		array = malloc(sizeof(*array) * count, M_TEMP, M_WAITOK);
 		error = copyin(arg->array, array, count * sizeof(*array));
 		mtx_lock(sema_mtxp);
@@ -1880,7 +1880,7 @@ freebsd7___semctl(struct thread *td, struct freebsd7___semctl_args *uap)
 		break;
 	case SETVAL:
 		semun.val = arg.val;
-		break;		
+		break;
 	}
 
 	error = kern_semctl(td, uap->semid, uap->semnum, uap->cmd, &semun,
@@ -1951,7 +1951,7 @@ freebsd7_freebsd32___semctl(struct thread *td,
 	case SETALL:
 		error = copyin(uap->arg, &arg, sizeof(arg));
 		if (error)
-			return (error);		
+			return (error);
 		break;
 	}
 
@@ -2023,7 +2023,7 @@ freebsd32___semctl(struct thread *td, struct freebsd32___semctl_args *uap)
 	case SETALL:
 		error = copyin(uap->arg, &arg, sizeof(arg));
 		if (error)
-			return (error);		
+			return (error);
 		break;
 	}
 
@@ -2049,7 +2049,7 @@ freebsd32___semctl(struct thread *td, struct freebsd32___semctl_args *uap)
 		break;
 	case SETVAL:
 		semun.val = arg.val;
-		break;		
+		break;
 	}
 
 	error = kern_semctl(td, uap->semid, uap->semnum, uap->cmd, &semun,
