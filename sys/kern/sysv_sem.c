@@ -731,7 +731,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 	AUDIT_ARG_SVIPC_ID(semid);
 
 	rpr = sem_find_prison(td->td_ucred);
-	if (sem == NULL)
+	if (rpr == NULL)
 		return (ENOSYS);
 
 	array = NULL;
@@ -1156,7 +1156,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 	AUDIT_ARG_SVIPC_ID(usemid);
 
 	rpr = sem_find_prison(td->td_ucred);
-	if (sem == NULL)
+	if (rpr == NULL)
 		return (ENOSYS);
 
 	semid = IPCID_TO_IX(usemid);	/* Convert back to zero origin */
