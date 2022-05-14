@@ -275,7 +275,7 @@ typedef	__vm_offset_t	vm_pointer_t;
 
 typedef __rman_res_t    rman_res_t;
 
-#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
+#if __CHERI_USER_ABI
 typedef __intcap_t	syscallarg_t;
 #else
 typedef __register_t	syscallarg_t;

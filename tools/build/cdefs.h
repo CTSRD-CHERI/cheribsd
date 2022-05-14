@@ -38,6 +38,7 @@
 
 /* Provide stub __kerncap when bootstrapping */
 #define __kerncap
+#define __CHERI_USER_ABI 0
 
 /* Provide stub sub-object opt-out macros when bootstrapping */
 #define __no_subobject_bounds

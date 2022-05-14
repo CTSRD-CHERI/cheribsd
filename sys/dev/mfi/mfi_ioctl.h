@@ -63,7 +63,7 @@ union mfi_sense_ptr {
 		uint32_t	high;
 	} addr;
 }
-#if !(defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__))
+#if !__CHERI_USER_ABI
 /*
  * XXX-BD: This __packed appears to be gratutious and won't whole thing
  * is a bit absurd in CheriABI.

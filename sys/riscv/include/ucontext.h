@@ -73,8 +73,7 @@ struct capregs {
 #endif
 
 struct __mcontext {
-#if (defined(_KERNEL) && __has_feature(capabilities)) || \
-    defined(__CHERI_PURE_CAPABILITY__)
+#if __CHERI_USER_ABI
 	struct capregs	mc_capregs;
 #else
 	struct gpregs	mc_gpregs;
@@ -84,8 +83,7 @@ struct __mcontext {
 #define	_MC_FP_VALID	0x1		/* Set when mc_fpregs has valid data */
 #define	_MC_CAP_VALID	0x2		/* Set when mc_capregs has valid data */
 	int		mc_pad;
-#if (defined(_KERNEL) && __has_feature(capabilities)) || \
-    defined(__CHERI_PURE_CAPABILITY__)
+#if __CHERI_USER_ABI
 	__uint64_t	mc_spare[8];
 #else
 	__uint64_t	mc_capregs;

@@ -1093,6 +1093,13 @@
 #define	__kerncap
 #endif
 
+#if (defined(_KERNEL) && __has_feature(capabilities)) || \
+    defined(__CHERI_PURE_CAPABILITY__)
+#define __CHERI_USER_ABI 1
+#else
+#define __CHERI_USER_ABI 0
+#endif
+
 #if !__has_feature(cheri_casts)
 /* Support old compiler versions without CHERI casts: */
 #define __cheri_tocap
