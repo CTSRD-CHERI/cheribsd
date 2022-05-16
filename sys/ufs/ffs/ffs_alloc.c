@@ -68,6 +68,9 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#endif
 #include <sys/bio.h>
 #include <sys/buf.h>
 #include <sys/capsicum.h>
@@ -3134,6 +3137,16 @@ ffs_fserr(fs, inum, cp)
  *	with nameptr in the current directory is oldvalue then unlink it.
  */
 
+#ifdef COMPAT_FREEBSD64
+struct fsck_cmd_compat {
+	int32_t version;
+	int32_t handle;
+	int64_t value;
+	int64_t size;
+	int64_t spare;
+};
+#endif
+
 static int sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS);
 
 SYSCTL_PROC(_vfs_ffs, FFS_ADJ_REFCNT, adjrefcnt,
@@ -3208,6 +3221,9 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 {
 	struct thread *td = curthread;
 	struct fsck_cmd cmd;
+#ifdef COMPAT_FREEBSD64
+	struct fsck_cmd_compat cmd_compat;
+#endif
 	struct ufsmount *ump;
 	struct vnode *vp, *dvp, *fdvp;
 	struct inode *ip, *dp;
@@ -3221,10 +3237,32 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 	cap_rights_t rights;
 	int filetype, error;
 
-	if (req->newptr == NULL || req->newlen > sizeof(cmd))
+	if (req->newptr == NULL)
 		return (EBADRPC);
-	if ((error = SYSCTL_IN(req, &cmd, sizeof(cmd))) != 0)
-		return (error);
+#ifdef COMPAT_FREEBSD64
+	if ((req->flags & SCTL_MASK64) != 0) {
+		if (req->newlen > sizeof(struct fsck_cmd_compat))
+			return (EBADRPC);
+		if ((error = SYSCTL_IN(req, &cmd_compat,
+		    sizeof(cmd_compat))) != 0)
+			return (error);
+		memset(&cmd, 0, sizeof(cmd));
+		CP(cmd_compat, cmd, version);
+		CP(cmd_compat, cmd, handle);
+		if (oidp->oid_number == FFS_UNLINK)
+			cmd.value = (uintcap_t)__USER_CAP_STR(cmd_compat.value);
+		else
+			CP(cmd_compat, cmd, value);
+		CP(cmd_compat, cmd, size);
+		CP(cmd_compat, cmd, spare);
+	} else
+#endif
+	if (req->newlen > sizeof(cmd))
+		return (EBADRPC);
+	else
+		if ((error = SYSCTL_IN(req, &cmd, sizeof(cmd))) != 0)
+			return (error);
+
 	if (cmd.version != FFS_CMD_VERSION)
 		return (ERPCMISMATCH);
 	if ((error = getvnode(td, cmd.handle,
