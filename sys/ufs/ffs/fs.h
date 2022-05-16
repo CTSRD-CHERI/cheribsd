@@ -36,6 +36,7 @@
 #define	_UFS_FFS_FS_H_
 
 #include <sys/mount.h>
+#include <sys/stdint.h>
 #include <ufs/ufs/dinode.h>
 
 /*
@@ -249,6 +250,7 @@
 #define	FFS_SET_SIZE		17	/* set inode size */
 #define	FFS_MAXID		17	/* number of valid ffs ids */
 
+#ifndef MAKEFS
 /*
  * Command structure passed in to the filesystem to adjust filesystem values.
  */
@@ -256,10 +258,15 @@
 struct fsck_cmd {
 	int32_t	version;	/* version of command structure */
 	int32_t	handle;		/* reference to filesystem to be changed */
-	int64_t	value;		/* inode or block number to be affected */
+#ifdef __ILP32__
+	int64_t value;		/* inode or block number to be affected */
+#else
+	kintcap_t value;
+#endif
 	int64_t	size;		/* amount or range to be adjusted */
 	int64_t	spare;		/* reserved for future use */
 };
+#endif
 
 /*
  * A recovery structure placed at the end of the boot block area by newfs
