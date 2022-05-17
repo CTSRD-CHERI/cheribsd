@@ -2783,7 +2783,10 @@ unp_dispose(struct socket *so)
 	if (SOCK_IO_RECV_OWNED(so))
 		SOCK_IO_RECV_UNLOCK(so);
 
-	unp_dispose_mbuf(m);
+	if (m != NULL) {
+		unp_dispose_mbuf(m);
+		m_freem(m);
+	}
 }
 
 static void
