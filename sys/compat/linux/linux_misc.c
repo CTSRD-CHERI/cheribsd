@@ -2240,6 +2240,11 @@ linux_sched_getparam(struct thread *td,
 	return (error);
 }
 
+static const struct cpuset_copy_cb copy_set = {
+	.copyin = copyin,
+	.copyout = copyout
+};
+
 /*
  * Get affinity of a process.
  */
@@ -2258,7 +2263,7 @@ linux_sched_getaffinity(struct thread *td,
 	PROC_UNLOCK(tdt->td_proc);
 
 	error = kern_cpuset_getaffinity(td, CPU_LEVEL_WHICH, CPU_WHICH_TID,
-	    tid, args->len, (cpuset_t *)args->user_mask_ptr);
+	    tid, args->len, (cpuset_t *)args->user_mask_ptr, &copy_set);
 	if (error == ERANGE)
 		error = EINVAL;
 	if (error == 0)
