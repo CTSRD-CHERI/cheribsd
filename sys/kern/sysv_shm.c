@@ -437,9 +437,6 @@ kern_shmat_locked(struct thread *td, int shmid,
 	vm_prot_t prot;
 	vm_size_t size;
 	int cow, error, find_space, i, rv;
-#if __has_feature(capabilities)
-	int reqperm;
-#endif
 
 	AUDIT_ARG_SVIPC_ID(shmid);
 	AUDIT_ARG_VALUE(shmflg);
@@ -502,12 +499,21 @@ kern_shmat_locked(struct thread *td, int shmid,
 		if (CHERI_REPRESENTABLE_BASE(attach_va, size) != attach_va)
 			return (EINVAL);
 		if (cheri_gettag(shmaddr)) {
+			int reqperm;
+
 			/*
 			 * Fixed mapping through a capability only makes
 			 * sense if we're knowingly remapping.
 			 */
 			if ((shmflg & SHM_REMAP) == 0)
 				return (EINVAL);
+
+			reqperm = CHERI_PERM_LOAD;
+			if ((shmflg & SHM_RDONLY) == 0)
+				reqperm |= CHERI_PERM_STORE;
+			if ((cheri_getperm(shmaddr) & reqperm) != reqperm)
+				return (EPROT);
+
 			/* XXX: require that a reservation exists. */
 			/* Handle any rounding above */
 			shmaddr = cheri_setaddress(shmaddr, attach_va);
@@ -551,11 +557,6 @@ kern_shmat_locked(struct thread *td, int shmid,
 			find_space = VMFS_OPTIMAL_SPACE;
 	}
 #if __has_feature(capabilities)
-	reqperm = CHERI_PERM_LOAD;
-	reqperm |= (shmflg & SHM_RDONLY) != 0 ? 0 : CHERI_PERM_STORE;
-	if ((cheri_getperm(shmaddr) & reqperm) != reqperm)
-	    return (EPROT);
-
 	max_va = cheri_gettop(shmaddr);
 #else
 	max_va = 0;
