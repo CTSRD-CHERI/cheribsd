@@ -16,6 +16,7 @@ directly, avoid the `-DNO_CLEAN` make option.
 
 | Date       | Commit      | Description | Required action |
 | ---------- | ----------- | --- | --- |
+| 2022-05-23 | [86d134e9e] | Morello TLS and vararg bounds | Update to [Morello LLVM a7d0053c29] and perform a clean rebuild of all Morello software |
 | 2020-11-30 | [3bcdffa1a] | OpenZFS import | Clean rebuild |
 | 2020-11-30 | [73173b1f1] | ABI note tag in shared libraries | Clean rebuild |
 | 2020-11-30 | [cc876df74] | MIPS with CHERI support now builds hybrid | Clean rebuild |
@@ -27,6 +28,7 @@ directly, avoid the `-DNO_CLEAN` make option.
 
 | Date       | Commit      | Description | Required action |
 | ---------- | ----------- | --- | --- |
+| 2022-05-12 | [86d134e9e] | Morello TLS and vararg bounds | Update to [Morello LLVM a7d0053c29] and perform a clean rebuild of all Morello software |
 | 2020-11-17 | [3bcdffa1a] | OpenZFS import | Clean rebuild |
 | 2020-11-12 | [73173b1f1] | ABI note tag in shared libraries | Clean rebuild |
 | 2020-06-24 | [e5c4980cd] | Enable MK_LIB64 on CHERI-RISC-V | delete bin/cheritest*/*.o and usr.bin/kyua/main.o from riscv64 purecap build directores or clean rebuild |
@@ -247,3 +249,5 @@ Delete the `merge-freebsd-<YYYYMMDD>` branch.
 [7e76d8f71]: https://github.com/CTSRD-CHERI/cheribsd/7e76d8f71
 [3bcdffa1a]: https://github.com/CTSRD-CHERI/cheribsd/3bcdffa1a
 [LLVM b7f5c847dc]: https://github.com/CTSRD-CHERI/llvm-project/commit/b7f5c847dc
+[86d134e9e]: https://github.com/CTSRD-CHERI/cheribsd/86d134e9e
+[Morello LLVM a7d0053c29]: https://git.morello-project.org/morello/llvm-project/-/commit/a7d0053c29e0275a7d920170fe686ba3b6d61cbf
