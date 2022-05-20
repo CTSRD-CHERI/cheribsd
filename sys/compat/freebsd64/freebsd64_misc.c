@@ -1147,8 +1147,8 @@ copyout64_set(const void *k, void * __capability u, size_t size)
 }
 
 static const struct cpuset_copy_cb cpuset_copy64_cb = {
-	.copyin = copyin64_set,
-	.copyout = copyout64_set
+	.cpuset_copyin = copyin64_set,
+	.cpuset_copyout = copyout64_set
 };
 
 int
