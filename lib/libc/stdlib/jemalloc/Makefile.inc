@@ -50,7 +50,7 @@ MLINKS+= \
 	jemalloc.3 malloc.conf.5
 
 .if defined(MALLOC_DEBUG)
-CFLAGS+=	-DMALLOC_DEBUG
+CFLAGS+=	-DJEMALLOC_DEBUG
 .elif ${MK_MALLOC_PRODUCTION} != "no" || defined(MALLOC_PRODUCTION)
 CFLAGS+=	-DMALLOC_PRODUCTION
 .endif
