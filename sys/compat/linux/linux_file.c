@@ -743,7 +743,7 @@ linux_unlink(struct thread *td, struct linux_unlink_args *args)
 		if (error == EPERM) {
 			/* Introduce POSIX noncompliant behaviour of Linux */
 			if (kern_statat(td, 0, AT_FDCWD,
-			    __USER_CAP_PATH(args->path), UIO_SYSSPACE, &st,
+			    __USER_CAP_PATH(args->path), UIO_USERSPACE, &st,
 			    NULL) == 0) {
 				if (S_ISDIR(st.st_mode))
 					error = EISDIR;
