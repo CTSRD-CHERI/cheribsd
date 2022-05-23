@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/imgact_aout.h>
 #endif
 #include <sys/jail.h>
+#include <sys/imgact.h>
 #include <sys/kernel.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
@@ -74,6 +75,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/cpuset.h>
 #include <sys/uio.h>
 
+#include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
 #include <vm/vm.h>
@@ -2908,6 +2910,34 @@ linux_seccomp(struct thread *td, struct linux_seccomp_args *args)
 		return (EINVAL);
 	}
 }
+
+#ifndef COMPAT_LINUX32
+int
+linux_execve(struct thread *td, struct linux_execve_args *args)
+{
+	struct image_args eargs;
+	char *path;
+	int error;
+
+	LINUX_CTR(execve);
+
+	if (!LUSECONVPATH(td)) {
+		error = exec_copyin_args(&eargs, __USER_CAP_PATH(args->path),
+		    UIO_USERSPACE, __USER_CAP_UNBOUND(args->argp),
+		    __USER_CAP_UNBOUND(args->envp));
+	} else {
+		LCONVPATHEXIST(args->path, &path);
+		error = exec_copyin_args(&eargs, PTR2CAP(path), UIO_SYSSPACE,
+		    __USER_CAP_UNBOUND(args->argp),
+		    __USER_CAP_UNBOUND(args->envp));
+		LFREEPATH(path);
+	}
+	if (error == 0)
+		error = linux_common_execve(td, &eargs);
+	AUDIT_SYSCALL_EXIT(error == EJUSTRETURN ? 0 : error, td);
+	return (error);
+}
+#endif
 // CHERI CHANGES START
 // {
 //   "updated": 20191025,
