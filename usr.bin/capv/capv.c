@@ -39,13 +39,16 @@ __FBSDID("$FreeBSD$");
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: capv [-knv]\n");
+	fprintf(stderr,
+	    "usage: capv [-knv]\n"
+	    "       capv [-k] -i entry [-i entry ...] command [args ...]\n");
 	exit(0);
 }
 
@@ -87,13 +90,44 @@ interrogate(void * __capability target, char **bufp, bool kflag)
 int
 main(int argc, char **argv)
 {
-	void * __capability *capv;
+	void * __capability *capv, * __capability *new_capv;
 	char *buf = NULL;
-	int capc, ch, error, i;
-	bool kflag = false, nflag = false, vflag = false;
+	char *tmp;
+	int capc, ch, entry, error, i;
+	bool iflag = false, kflag = false, nflag = false, vflag = false;
 
-	while ((ch = getopt(argc, argv, "knv")) != -1) {
+	error = elf_aux_info(AT_CAPC, &capc, sizeof(capc));
+	if (error != 0)
+		errc(1, error, "AT_CAPC");
+	if (capc <= 0)
+		errx(1, "no capability vector");
+
+	error = elf_aux_info(AT_CAPV, &capv, sizeof(capv));
+	if (error != 0)
+		errc(1, error, "AT_CAPV");
+
+	assert(capv != NULL);
+
+	new_capv = calloc(capc, sizeof(new_capv));
+	if (new_capv == NULL)
+		err(1, "calloc");
+	memset(new_capv, 0, capc * sizeof(new_capv));
+
+	while ((ch = getopt(argc, argv, "i:knv")) != -1) {
 		switch (ch) {
+		case 'i':
+			entry = strtol(optarg, &tmp, 10);
+			if (*tmp != '\0')
+				errx(1, "argument to -i must be a number");
+			if (entry < 0)
+				usage();
+			iflag = true;
+			if (entry >= capc) {
+				// Silently ignore for convenience.
+				break;
+			}
+			new_capv[entry] = capv[entry];
+			break;
 		case 'k':
 			kflag = true;
 			break;
@@ -111,18 +145,18 @@ main(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
-	if (argc != 0)
-		usage();
 
-	error = elf_aux_info(AT_CAPC, &capc, sizeof(capc));
-	if (error != 0)
-		errc(1, error, "AT_CAPC");
+	if (iflag) {
+		if (argc < 1)
+			usage();
+	} else {
+		if (argc != 0)
+			usage();
+	}
 
-	error = elf_aux_info(AT_CAPV, &capv, sizeof(capv));
-	if (error != 0) {
-		if (error == ENOENT)
-			errx(1, "no capability vector");
-		errc(1, error, "AT_CAPV");
+	if (iflag) {
+		coexecvpc(getppid(), argv[0], argv, new_capv, capc);
+		err(1, "%s", argv[0]);
 	}
 
 	if (!nflag) {
@@ -130,11 +164,6 @@ main(int argc, char **argv)
 		if (error != 0)
 			err(1, "cosetup");
 	}
-
-	if (capc == 0)
-		assert(capv == NULL);
-	else
-		assert(capv != NULL);
 
 	for (i = 0; i < capc; i++) {
 		if (capv[i] == NULL)

@@ -34,21 +34,30 @@
 .Os
 .Sh NAME
 .Nm capv
-.Nd display capability vector contents
+.Nd display or filter capability vector contents
 .Sh SYNOPSIS
 .Nm
 .Op Fl k
 .Op Fl n
 .Op Fl v
+.Nm
+.Op Fl k
+.Fl i Ar entry
+.Op Fl i Ar entry Ar ...
+.Ar command Op Ar args ...
 .Sh DESCRIPTION
 The
 .Nm
 utility is used to interrogate services found in the capability vector
 inherited from the parent process.
-It can also display raw vector contents.
+It can also display raw vector contents,
+and to start a command with only the selected entries inherited.
 .Pp
 The following options are available:
-.Bl -tag -width ".Fl c"
+.Bl -tag -width ".Fl c Ar index"
+.It Fl i Ar index
+Allow capability vector entry at offset
+.Ar index .
 .It Fl k
 Use
 .Xr cocall_slow 2
@@ -64,9 +73,10 @@ The
 .Nm
 utility exits 0 on success, and >0 if an error occurs.
 .Sh EXAMPLES
-Execute within the address space of the current
-shell process:
-.Dl coexec Ar $$ Ar /usr/bin/capv
+Execute
+.Xr sh 1
+with capability vector that includes only entries 0 and 42:
+.Dl capv -i 0 -i 42 sh
 .Pp
 .Sh SEE ALSO
 .Xr coexec 1 ,
