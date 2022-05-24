@@ -92,6 +92,8 @@ dtrace_fork_func_t	dtrace_fasttrap_fork;
 SDT_PROVIDER_DECLARE(proc);
 SDT_PROBE_DEFINE3(proc, , , create, "struct proc *", "struct proc *", "int");
 
+MALLOC_DEFINE(M_CAPV, "capv", "Capability vectors");
+
 #ifndef _SYS_SYSPROTO_H_
 struct fork_args {
 	int     dummy;
@@ -710,6 +712,20 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	 */
 	if (fr->fr_flags & RFPROCDESC)
 		procdesc_new(p2, fr->fr_pd_flags);
+
+	/*
+	 * Copy the capability vector, if any.
+	 */
+	if (p1->p_capc > 0) {
+		p2->p_capc = p1->p_capc;
+		p2->p_capv = malloc(p2->p_capc * sizeof(void * __capability), M_CAPV, M_WAITOK);
+		memcpy(p2->p_capv, p1->p_capv, p2->p_capc * sizeof(void * __capability));
+		p2->p_capv_vmspace = p1->p_capv_vmspace;
+	} else {
+		p2->p_capc = 0;
+		p2->p_capv = NULL;
+		p2->p_capv_vmspace = 0;
+	}
 
 	/*
 	 * Both processes are set up, now check if any loadable modules want

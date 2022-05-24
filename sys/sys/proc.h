@@ -789,6 +789,13 @@ struct proc {
 	LIST_ENTRY(proc) p_orphan;	/* (e) List of orphan processes. */
 	LIST_HEAD(, proc) p_orphans;	/* (e) Pointer to list of orphans. */
 
+	/*
+	 * Capability vector, see coxecvec(2).
+	 */
+	int			p_capc;
+	void * __capability	*p_capv;
+	const void 		*p_capv_vmspace;
+
 	TAILQ_HEAD(, kq_timer_cb_data)	p_kqtim_stop;	/* (c) */
 	LIST_ENTRY(proc) p_jaillist;	/* (d) Jail process linkage. */
 };
@@ -954,6 +961,7 @@ struct proc {
 #define	SINGLE_ALLPROC	3
 
 #ifdef MALLOC_DECLARE
+MALLOC_DECLARE(M_CAPV);
 MALLOC_DECLARE(M_PARGS);
 MALLOC_DECLARE(M_SESSION);
 MALLOC_DECLARE(M_SUBPROC);

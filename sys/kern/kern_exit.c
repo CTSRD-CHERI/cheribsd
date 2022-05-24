@@ -253,6 +253,16 @@ exit1(struct thread *td, int rval, int signo)
 	}
 
 	/*
+	 * Free the capability vector.
+	 */
+	if (p->p_capc > 0) {
+		free(p->p_capv, M_CAPV);
+		p->p_capc = 0;
+		p->p_capv = NULL;
+		p->p_capv_vmspace = NULL;
+	}
+
+	/*
 	 * Process deferred operations, designated with ASTF_KCLEAR.
 	 * For instance, we need to deref SU mp, since the thread does
 	 * not return to userspace, and wait for geom to stabilize.

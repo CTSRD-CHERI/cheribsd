@@ -260,13 +260,33 @@ The
 is equivalent to
 .Fn coexecve ,
 except it also takes a capability vector, which
-can be retrieved in the child process using
+can then be retrieved using
 .Xr elf_aux_info 3
 with
 .Dv AT_CAPC
 and
 .Dv AT_CAPV
 arguments.
+The
+.Fa capv
+argument points to the capability vector, while the
+.Fa capc
+is the number of entries in the vector (and not its length in bytes).
+Passing
+.Dv NULL
+as
+.Fa capv
+and
+.Dv 0
+for
+.Fa capc
+results in inheriting the vector.
+Other values result in the indicated vector replacing the inherited one.
+To force passing an empty vector, pass one with a single, NULL entry.
+The vector will not be made accessible unless the
+.Fa pid
+argument points to a process colocated in the address space the vector
+originated from.
 .Sh RETURN VALUES
 As the
 .Fn execve
