@@ -51,7 +51,7 @@ The
 utility is used to interrogate services found in the capability vector
 inherited from the parent process.
 It can also display raw vector contents,
-and to start a command with only the selected entries inherited.
+and execute a command with only the selected entries inherited.
 .Pp
 The following options are available:
 .Bl -tag -width ".Fl c Ar index"
@@ -79,9 +79,8 @@ with capability vector that includes only entries 0 and 42:
 .Dl capv -i 0 -i 42 sh
 .Pp
 .Sh SEE ALSO
-.Xr coexec 1 ,
 .Xr cocall 2 ,
-.Xr coexecve 2 ,
+.Xr coexecvec 2 ,
 .Xr elf_aux_info 3
 .Sh HISTORY
 The

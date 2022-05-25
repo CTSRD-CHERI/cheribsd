@@ -52,7 +52,7 @@ usage(void)
 	exit(0);
 }
 
-static void
+static int
 interrogate(void * __capability target, char **bufp, bool kflag)
 {
 	char in[BUFSIZ];
@@ -62,7 +62,7 @@ interrogate(void * __capability target, char **bufp, bool kflag)
 	int error;
 
 	nvl = nvlist_create(NV_FLAG_MEMALIGN);
-	nvlist_add_number(nvl, "op", 42 /* XXX */);
+	nvlist_add_number(nvl, "op", 0);
 	out = nvlist_pack(nvl, &outlen);
 	assert(out != NULL);
 	nvlist_destroy(nvl);
@@ -72,19 +72,18 @@ interrogate(void * __capability target, char **bufp, bool kflag)
 	else
 		error = cocall(target, out, outlen, in, sizeof(in));
 	free(out);
-	if (error != 0) {
-		warn("cocall");
-		return;
-	}
+	if (error != 0)
+		return (errno);
 
 	nvl = nvlist_unpack(in, sizeof(in), NV_FLAG_MEMALIGN);
 	if (nvl == NULL) {
 		warnx("nvlist_unpack(3) failed");
-		return;
+		return (EPROGUNAVAIL);
 	}
 
-	asprintf(bufp, "%s", nvlist_get_string(nvl, "answerback" /* XXX */));
+	asprintf(bufp, "%s", nvlist_get_string(nvl, "answerback"));
 	nvlist_destroy(nvl);
+	return (0);
 }
 
 int
@@ -173,8 +172,13 @@ main(int argc, char **argv)
 		if (vflag)
 			printf(":\t%#lp", capv[i]);
 		if (!nflag) {
-			interrogate(capv[i], &buf, kflag);
-			printf(":\t%s", buf);
+			error = interrogate(capv[i], &buf, kflag);
+			if (error != 0) {
+				printf(":\t%s", strerror(error));
+			} else {
+				/* XXX Double quotes to hint that this string came from the service itself? */
+				printf(":\t\"%s\"", buf);
+			}
 		}
 		printf("\n");
 	}
