@@ -173,6 +173,11 @@ SYSCTL_INT(_kern, OID_AUTO, opportunistic_coexecve, CTLFLAG_RW,
     &opportunistic_coexecve, 0,
     "Try to colocate binaries on execve(2)");
 
+static int opportunistic_capv = 1;
+SYSCTL_INT(_kern, OID_AUTO, opportunistic_capv, CTLFLAG_RW,
+    &opportunistic_capv, 0,
+    "Inherit the capability vector by default");
+
 static int
 sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS)
 {
@@ -882,12 +887,13 @@ interpret:
 	}
 
 	/*
-	 * Inherit the capability vector, unless we got explicitly
+	 * Copy out the inherited capability vector, unless we got explicitly
 	 * passed a new one, or the inherited one came from a different
-	 * vmspace.
+	 * vmspace, or it's globally disabled.
 	 */
 	if (imgp->args->capc <= 0 && p->p_capc > 0 &&
-	    p->p_capv_vmspace == p->p_vmspace) {
+	    p->p_capv_vmspace == p->p_vmspace &&
+	    opportunistic_capv) {
 		imgp->args->capc = p->p_capc;
 		imgp->args->capv = p->p_capv;
 		p->p_capc = 0;
