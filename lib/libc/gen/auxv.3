@@ -88,7 +88,13 @@ syscall
 .Dv (sizeof(int)).
 .It AT_CAPV
 Pointer to the capability vector
-.Dv (sizeof(void *)).
+.Dv (sizeof(void * __capability)).
+Note that this vector will not be available in the child process after
+.Xr fork 2 ,
+until that child gets colocated again with the parent.
+Use
+.Xr vfork 2
+instead.
 .El
 .Sh RETURN VALUES
 Returns zero on success, or an error number on failure.

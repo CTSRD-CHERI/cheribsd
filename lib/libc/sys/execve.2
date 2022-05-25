@@ -382,9 +382,11 @@ In addition, the
 will fail and return to the calling process if:
 .Bl -tag -width Er
 .It Bq Er EPROT
-Attempt to pass the capability vector across address spaces,
+Attempt to pass explicitly specified capability vector across address spaces,
 usually caused by an attempt to call
 .Fn coexecvec
+with non-NULL
+.Ar capv
 after
 .Xr fork 2
 instead of
