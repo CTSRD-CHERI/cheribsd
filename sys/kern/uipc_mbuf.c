@@ -182,15 +182,15 @@ CTASSERT(offsetof(struct mbuf, m_pktdat) % 8 == 0);
  */
 #if defined(__CHERI_PURE_CAPABILITY__)
 CTASSERT(offsetof(struct mbuf, m_dat) == 64);
-CTASSERT(sizeof(struct pkthdr) == 96);
-CTASSERT(sizeof(struct m_ext) == 352);
+CTASSERT(sizeof(struct pkthdr) == 112);
+CTASSERT(sizeof(struct m_ext) == 336);
 #elif __SIZEOF_POINTER__ == 8
 CTASSERT(offsetof(struct mbuf, m_dat) == 32);
-CTASSERT(sizeof(struct pkthdr) == 56);
+CTASSERT(sizeof(struct pkthdr) == 64);
 CTASSERT(sizeof(struct m_ext) == 160);
 #else
 CTASSERT(offsetof(struct mbuf, m_dat) == 24);
-CTASSERT(sizeof(struct pkthdr) == 48);
+CTASSERT(sizeof(struct pkthdr) == 52);
 #if defined(__powerpc__) && defined(BOOKE)
 /* PowerPC booke has 64-bit physical pointers. */
 CTASSERT(sizeof(struct m_ext) == 184);

@@ -151,9 +151,9 @@ struct m_snd_tag {
 
 /*
  * Record/packet header in first mbuf of chain; valid only if M_PKTHDR is set.
- * Size ILP32: 48
- *	LP64: 56
- *	CHERI128: 96
+ * Size ILP32: 52
+ *	 LP64: 64
+ *   CHERI128: 112
  * Compile-time assertions in uipc_mbuf.c test these values to ensure that
  * they are correct.
  */
@@ -164,6 +164,13 @@ struct pkthdr {
 		struct {
 			uint16_t rcvidx;	/* rcv interface index ... */
 			uint16_t rcvgen;	/* ... and generation count */
+		};
+	};
+	union {
+		struct ifnet	*leaf_rcvif;	/* leaf rcv interface */
+		struct {
+			uint16_t leaf_rcvidx;	/* leaf rcv interface index ... */
+			uint16_t leaf_rcvgen;	/* ... and generation count */
 		};
 	};
 	SLIST_HEAD(packet_tags, m_tag) tags; /* list of packet tags */
@@ -242,7 +249,7 @@ struct pkthdr {
  * MSIZE bytes as EXT_PGS mbufs are allocated from the mbuf_zone.
  */
 #if defined(__CHERI_PURE_CAPABILITY__)
-#define MBUF_PEXT_MAX_PGS (200 / sizeof(vm_paddr_t))
+#define MBUF_PEXT_MAX_PGS (184 / sizeof(vm_paddr_t))
 #elif __SIZEOF_POINTER__ == 8
 #define MBUF_PEXT_MAX_PGS (40 / sizeof(vm_paddr_t))
 #else
