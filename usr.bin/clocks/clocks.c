@@ -32,10 +32,10 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/auxv.h>
-#include <sys/nv.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <assert.h>
+#include <capv.h>
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
@@ -62,57 +62,34 @@ sigchld_handler(int dummy __unused)
 	exit(0);
 }
 
-/*
- * XXX: Move to libc?
- */
 static void
-capvset(int *capcp, void * __capability **capvp, int new_index, void * __capability new_value)
+answerback(capv_answerback_t *out, bool kflag)
 {
-	void * __capability *capv;
-	void * __capability *old_capv;
-	int capc;
 
-	capc = *capcp;
-	capv = *capvp;
-
-	if (capc <= new_index) {
-		/*
-		 * XXX: We can't free old_capv, we don't know how it's been allocated.
-		 */
-		old_capv = capv;
-		capv = calloc(new_index + 1, sizeof(void * __capability));
-		if (capv == NULL)
-			err(1, "calloc");
-		if (capc > 0)
-			memcpy(capv, old_capv, capc * sizeof(void * __capability));
-#ifdef notyet
-		capc = (new_index < 16 ? 8 : new_index) * 2;
-#else
-		capc = new_index + 1;
-#endif
-	}
-
-	capv[new_index] = new_value;
-
-	*capcp = capc;
-	*capvp = capv;
+	memset(out, 0, sizeof(*out));
+	out->len = sizeof(*out);
+	out->op = 0;
+	snprintf(out->answerback, sizeof(out->answerback),
+	    "this is %s, pid %d, %s responding to clock_gettime(), running as uid %d",
+	    getprogname(), getpid(), kflag ? "halfheartedly" : "merrily", getuid());
 }
 
 int
 main(int argc, char **argv)
 {
-	char in[BUFSIZ];
-	struct timespec tp;
+	capv_t in;
+	union {
+		capv_answerback_t answerback;
+		capv_clocks_t clocks;
+	} outbuf;
+	capv_clocks_t *out = &outbuf.clocks;
 	clockid_t clock_id;
-	nvlist_t *nvl;
 	void * __capability dummy; // XXX
 	void * __capability public;
 	void * __capability *capv = NULL;
-	void *out;
 	pid_t pid;
-	size_t outlen;
 	bool kflag = false, vflag = false;
-	int capc, ch, error, op;
+	int capc, ch, error;
 
 	while ((ch = getopt(argc, argv, "ks:v")) != -1) {
 		switch (ch) {
@@ -156,7 +133,9 @@ main(int argc, char **argv)
 	if (error != 0 && error != ENOENT)
 		errc(1, error, "AT_CAPV");
 
-	capvset(&capc, &capv, CAPV_CLOCKS, public);
+	error = capvset(&capc, &capv, CAPV_CLOCKS, public);
+	if (error != 0)
+		err(1, "capvset");
 
 	pid = vfork();
 	if (pid < 0)
@@ -189,35 +168,30 @@ main(int argc, char **argv)
 			error = setenv("LIBCLOCKS_SLOW", "1", 1);
 			if (error != 0)
 				err(1, "setenv");
-		} else {
-			warnx("XXX consider using -k");
 		}
 
-		/*
-		 * This doesn't return.
-		 */
 		coexecvpc(getppid(), argv[0], argv, capv, capc);
+		/*
+		 * Shouldn't have returned.
+		 */
 		err(1, "coexecvpc");
 	}
 
 	/*
 	 * Parent, will loop on coaccept(2) until SIGCHLD.
 	 */
-	out = NULL;
-	outlen = 0;
+	//out->len = 0; /* Nothing to send at this point. */
+	out->len = 16; /* XXX */
 
 	for (;;) {
+		memset(&in, 0, sizeof(in));
 		if (kflag)
-			error = coaccept_slow(&dummy, out, outlen, in, sizeof(in));
+			error = coaccept_slow(&dummy, out, out->len, &in, sizeof(in));
 		else
-			error = coaccept(&dummy, out, outlen, in, sizeof(in));
-
-		free(out);
-		out = NULL;
-		outlen = 0;
-
+			error = coaccept(&dummy, out, out->len, &in, sizeof(in));
 		if (error != 0) {
-			warn("%s", kflag ? "cocall_slow" : "cocall");
+			warn("%s", kflag ? "coaccept_slow" : "coaccept");
+			out->len = 0;
 			continue;
 		}
 
@@ -228,50 +202,54 @@ main(int argc, char **argv)
 			error = cogetpid(&pid);
 			if (error != 0)
 				warn("cogetpid");
-			printf("%s: call from pid %d -> pid %d%s\n",
-			    getprogname(), pid, getpid(), kflag ? " (slow)" : "");
+			printf("%s: op %d, len %zd from pid %d -> pid %d%s\n",
+			    getprogname(), in.op, in.len, pid, getpid(), kflag ? " (slow)" : "");
 		}
 
-		nvl = nvlist_unpack(in, sizeof(in), NV_FLAG_MEMALIGN);
-		if (nvl == NULL) {
-			warnx("nvlist_unpack(3) failed");
-			continue;
-		}
-
-		op = nvlist_get_number(nvl, "op");
-		nvlist_destroy(nvl);
-
-		nvl = nvlist_create(NV_FLAG_MEMALIGN);
-		switch (op) {
+		clock_id = error = errno = 0;
+		switch (in.op) {
 		case 0:
-			nvlist_add_stringf(nvl, "answerback", "pid %d (%s), uid %d",
-			    getpid(), getprogname(), getuid());
-			clock_id = error = errno = 0;
+			answerback(&outbuf.answerback, kflag);
 			break;
 		default:
 			/*
+			 * Is this a proper packet?
+			 */
+			if (in.len != sizeof(in)) {
+				error = cogetpid(&pid);
+				if (error != 0)
+					warn("cogetpid");
+				warnx("in.len %zd != sizeof %zd, in.op %d, caller pid %d; returning ENOMSG",
+				    in.len, sizeof(in), in.op, pid);
+				memset(out, 0, sizeof(*out));
+				out->len = sizeof(*out);
+				out->op = 0;
+				out->error = error;
+				out->_errno = ENOMSG;
+				break;
+			}
+
+			/*
 			 * Check time.
 			 */
-			clock_id = op - CAPV_CLOCKS; /* iksde */
-			error = clock_gettime(clock_id, &tp);
+			memset(out, 0, sizeof(*out));
+			clock_id = in.op - CAPV_CLOCKS; /* iksde */
+			error = clock_gettime(clock_id, &out->ts);
+			out->len = sizeof(*out);
+			out->op = 0;
+			out->error = error;
+			out->_errno = errno;
 			if (error != 0)
 				warn("clock_gettime(%d)", clock_id);
-			nvlist_add_binary(nvl, "tp", &tp, sizeof(tp));
-			nvlist_add_number(nvl, "error", error);
-			nvlist_add_number(nvl, "errno", errno);
 			break;
 		}
 
 		/*
 		 * Send the response back and loop.
 		 */
-		out = nvlist_pack(nvl, &outlen);
-		assert(out != NULL);
-		nvlist_destroy(nvl);
-
 		if (vflag) {
-			printf("%s: returning to pid %d <- pid %d: op %d, clock_id %d, error %d, errno %d%s\n",
-			    getprogname(), pid, getpid(), op, clock_id, error, errno, kflag ? " (slow)" : "");
+			printf("%s: returning to pid %d <- pid %d: op %d, len %zd, error %d, errno %d%s\n",
+			    getprogname(), pid, getpid(), out->op, out->len, out->error, out->_errno, kflag ? " (slow)" : "");
 		}
 	}
 }

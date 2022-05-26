@@ -32,47 +32,28 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/auxv.h>
-#include <sys/nv.h>
 #include <sys/param.h>
 #include <assert.h>
+#include <capv.h>
 #include <err.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
 
-// XXX
-static __inline int imin(int a, int b) { return (a < b ? a : b); }
-
 int
 clock_gettime(clockid_t clock_id, struct timespec *tp)
 {
 	__thread static void * __capability target = NULL;
-	__thread static volatile bool in_progress = false;
-	static bool go_slow = false;
-	char in[BUFSIZ];
+	capv_clocks_t in;
+	capv_t out;
 	void * __capability *capv;
-	const struct timespec *returned_tp;
-	nvlist_t *nvl;
+	static bool go_slow = false;
 	char *libclocks_slow = NULL;
-	void *out;
-	size_t outlen, returned_tplen;
-	int capc, error, returned_error, returned_errno;
-
-	/*
-	 * XXX: This is no longer necessary - was supposed to detect situations
-	 * 	like nvlist_create(3) calling malloc(3) calling back
-	 * 	into clock_gettime(3), but jemalloc got hacked into compliance.
-	 * 	Not even sure if this chunk works; it will be removed next anyway.
-	 */
-	if (in_progress) {
-		warnx("%s recursing, returning EDEADLK", __func__);
-		errno = EDEADLK;
-		return (-1);
-	}
-	in_progress = true;
+	int capc, error;
 
 	/*
 	 * We could turn this into a constructor, but then we would lose
@@ -83,25 +64,22 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 		errno = elf_aux_info(AT_CAPC, &capc, sizeof(capc));
 		if (errno != 0) {
 			warn("AT_CAPC");
-			error = -1;
-			goto out;
+			return (-1);
 		}
 		errno = elf_aux_info(AT_CAPV, &capv, sizeof(capv));
 		if (errno != 0) {
 			warn("AT_CAPV");
-			error = -1;
-			goto out;
+			return (-1);
 		}
 		if (capc <= CAPV_CLOCKS || capv[CAPV_CLOCKS] == NULL) {
-			warn("null capability");
+			warn("null capability %d", CAPV_CLOCKS);
 			errno = ENOLINK;
-			error = -1;
-			goto out;
+			return (-1);
 		}
-		error = cosetup(COSETUP_COACCEPT);
+		error = cosetup(COSETUP_COCALL);
 		if (error != 0) {
 			warn("cosetup");
-			goto out;
+			return (-1);
 		}
 		target = capv[CAPV_CLOCKS];
 
@@ -113,45 +91,35 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 	/*
 	 * Send our request.
 	 */
-	nvl = nvlist_create(NV_FLAG_MEMALIGN);
-	nvlist_add_number(nvl, "op", clock_id + CAPV_CLOCKS /* I'm sorry, but CLOCK_REALTIME == 0 */);
-	out = nvlist_pack(nvl, &outlen);
-	assert(out != NULL);
-	outlen = roundup2(outlen, 16);
-	nvlist_destroy(nvl);
+	memset(&in, 0, sizeof(in));
+	memset(&out, 0, sizeof(out));
+	out.len = sizeof(out);
+	out.op = clock_id + CAPV_CLOCKS; /* I'm sorry, but CLOCK_REALTIME == 0 */
 
-	//fprintf(stderr, "%s: -> calling target %lp%s\n", __func__, target, go_slow ? " (slow)" : "");
+	//fprintf(stderr, "%s: -> calling target %lp, in %lp, inlen %zd, out %lp, outlen %zd%s\n", __func__, target, &in, sizeof(in), &out, sizeof(out), go_slow ? " (slow)" : "");
 	if (go_slow)
-		error = cocall_slow(target, out, outlen, in, sizeof(in));
+		error = cocall_slow(target, &out, out.len, &in, sizeof(in));
 	else
-		error = cocall(target, out, outlen, in, sizeof(in));
-	free(out);
-	//fprintf(stderr, "%s: <- returned error %d, errno %d%s\n", __func__, error, errno, go_slow ? " (slow)" : "");
+		error = cocall(target, &out, out.len, &in, sizeof(in));
 	if (error != 0) {
 		warn("%s", go_slow ? "cocall_slow" : "cocall");
-		goto out;
+		return (error);
 	}
 
 	/*
 	 * Handle the response.
 	 */
-	nvl = nvlist_unpack(in, sizeof(in), NV_FLAG_MEMALIGN);
-	if (nvl == NULL) {
-		warnx("nvlist_unpack(3) failed");
-		in_progress = false;
+	if (in.len != sizeof(in)) {
+		warnx("in.len %zd != sizeof %zd", in.len, sizeof(in));
+		errno = ENOMSG;
 		return (error);
 	}
-	returned_error = nvlist_get_number(nvl, "error");
-	if (returned_error != 0) {
-		returned_errno = nvlist_get_number(nvl, "errno");
-		errno = returned_errno;
-	} else {
-		returned_tp = nvlist_get_binary(nvl, "tp", &returned_tplen);
-		memcpy(tp, returned_tp, imin(sizeof(*tp), returned_tplen));
-	}
-	nvlist_destroy(nvl);
-	error = returned_error;
-out:
-	in_progress = false;
+
+	//fprintf(stderr, "%s: <- returned error %d, errno %d%s\n", __func__, in.error, in._errno, go_slow ? " (slow)" : "");
+	error = in.error;
+	if (error != 0)
+		errno = in._errno;
+	else
+		memcpy(tp, &in.ts, sizeof(*tp));
 	return (error);
 }

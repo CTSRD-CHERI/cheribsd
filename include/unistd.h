@@ -318,11 +318,6 @@ typedef	__useconds_t	useconds_t;
 #define	_CS_POSIX_V6_WIDTH_RESTRICTED_ENVS	14
 #endif
 
-/*
- * XXX: Visibility?
- */
-#define	CAPV_CLOCKS	5
-
 __BEGIN_DECLS
 /* 1003.1-1990 */
 void	 _exit(int) __dead2;

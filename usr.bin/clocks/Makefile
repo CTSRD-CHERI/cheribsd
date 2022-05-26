@@ -5,8 +5,6 @@
 PROG=		clocks
 SRCS=		clocks.c
 
-LIBADD=		nv
-
 CFLAGS+=	-fPIE -pie -Wno-error=deprecated-declarations -fuse-ld=lld
 #NEED_CHERI=	hybrid
 NEED_CHERI=	pure
