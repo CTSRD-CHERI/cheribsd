@@ -129,6 +129,13 @@
 #define JEMALLOC_HAVE_CLOCK_MONOTONIC 1
 
 /*
+ * XXX: A terrible hack to make clocks(1) work; otherwise we would
+ *	end up with malloc(3) recursing back into cocall-based
+ *	clock_gettime(2) wrapper.
+ */
+#undef JEMALLOC_HAVE_CLOCK_MONOTONIC
+
+/*
  * Defined if mach_absolute_time() is available.
  */
 /* #undef JEMALLOC_HAVE_MACH_ABSOLUTE_TIME */
