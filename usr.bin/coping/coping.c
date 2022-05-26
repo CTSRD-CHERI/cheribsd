@@ -32,18 +32,19 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/auxv.h>
-#include <sys/nv.h>
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <assert.h>
+#include <capv.h>
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -97,18 +98,14 @@ fetch_capv(void * __capability **capvp, int *capcp)
 static void
 ping(void * __capability target, const char *target_name, bool kflag, bool vflag)
 {
-	char in[BUFSIZ];
+	capv_t in, out;
 	struct timespec before, after, took;
-	nvlist_t *nvl;
-	void *out;
-	size_t outlen;
 	int error;
 
-	nvl = nvlist_create(NV_FLAG_MEMALIGN);
-	nvlist_add_number(nvl, "op", 0 /* XXX */);
-	out = nvlist_pack(nvl, &outlen);
-	assert(out != NULL);
-	nvlist_destroy(nvl);
+	memset(&in, 0, sizeof(in));
+	memset(&out, 0, sizeof(out));
+	out.len = sizeof(out);
+	out.op = 0;
 
 	if (vflag) {
 		fprintf(stderr, "%s: cocalling \"%s\"...\n", getprogname(), target_name);
@@ -118,10 +115,9 @@ ping(void * __capability target, const char *target_name, bool kflag, bool vflag
 	}
 
 	if (kflag)
-		error = cocall_slow(target, out, outlen, in, sizeof(in));
+		error = cocall_slow(target, &out, out.len, &in, sizeof(in));
 	else
-		error = cocall(target, out, outlen, in, sizeof(in));
-	free(out);
+		error = cocall(target, &out, out.len, &in, sizeof(in));
 	if (error != 0)
 		warn("cocall");
 
