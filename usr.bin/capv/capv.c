@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018 Edward Tomasz Napierala <trasz@FreeBSD.org>
+ * Copyright (c) 2022 Edward Tomasz Napierala <trasz@FreeBSD.org>
  * All rights reserved.
  *
  * This software was developed by the University of Cambridge Computer
@@ -31,12 +31,14 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <sys/param.h>
 #include <sys/auxv.h>
-#include <sys/nv.h>
 #include <assert.h>
+#include <capv.h>
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -55,34 +57,30 @@ usage(void)
 static int
 interrogate(void * __capability target, char **bufp, bool kflag)
 {
-	char in[BUFSIZ];
-	nvlist_t *nvl;
-	void *out;
-	size_t outlen;
+	capv_answerback_t in;
+	capv_t out;
 	int error;
 
-	nvl = nvlist_create(NV_FLAG_MEMALIGN);
-	nvlist_add_number(nvl, "op", 0);
-	out = nvlist_pack(nvl, &outlen);
-	assert(out != NULL);
-	nvlist_destroy(nvl);
+	memset(&in, 0, sizeof(in));
+	memset(&out, 0, sizeof(out));
+	out.len = sizeof(out);
+	out.op = 0;
+
+	//fprintf(stderr, "%s: out %#lp, outlen %zd, in %#lp, inlen %zd\n", __func__, &out, out.len, &in, sizeof(in));
 
 	if (kflag)
-		error = cocall_slow(target, out, outlen, in, sizeof(in));
+		error = cocall_slow(target, &out, out.len, &in, sizeof(in));
 	else
-		error = cocall(target, out, outlen, in, sizeof(in));
-	free(out);
+		error = cocall(target, &out, out.len, &in, sizeof(in));
 	if (error != 0)
 		return (errno);
 
-	nvl = nvlist_unpack(in, sizeof(in), NV_FLAG_MEMALIGN);
-	if (nvl == NULL) {
-		warnx("nvlist_unpack(3) failed");
-		return (EPROGUNAVAIL);
+	if (in.len != sizeof(in)) {
+		warnx("received in.len %zd >= %zd", in.len, sizeof(in));
+		return (ENOMSG);
 	}
 
-	asprintf(bufp, "%s", nvlist_get_string(nvl, "answerback"));
-	nvlist_destroy(nvl);
+	*bufp = strndup(in.answerback, sizeof(in.answerback));
 	return (0);
 }
 
@@ -90,7 +88,7 @@ int
 main(int argc, char **argv)
 {
 	void * __capability *capv, * __capability *new_capv;
-	char *buf = NULL;
+	char *tmpstr;
 	char *tmp;
 	int capc, ch, entry, error, i;
 	bool iflag = false, kflag = false, nflag = false, vflag = false;
@@ -172,12 +170,13 @@ main(int argc, char **argv)
 		if (vflag)
 			printf(":\t%#lp", capv[i]);
 		if (!nflag) {
-			error = interrogate(capv[i], &buf, kflag);
+			error = interrogate(capv[i], &tmpstr, kflag);
 			if (error != 0) {
 				printf(":\t%s", strerror(error));
 			} else {
 				/* XXX Double quotes to hint that this string came from the service itself? */
-				printf(":\t\"%s\"", buf);
+				printf(":\t\"%s\"", tmpstr);
+				free(tmpstr);
 			}
 		}
 		printf("\n");

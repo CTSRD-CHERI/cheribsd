@@ -54,7 +54,7 @@ It can also display raw vector contents,
 and execute a command with only the selected entries inherited.
 .Pp
 The following options are available:
-.Bl -tag -width ".Fl c Ar index"
+.Bl -tag -width ".Fl i index"
 .It Fl i Ar index
 Allow capability vector entry at offset
 .Ar index .
@@ -79,6 +79,7 @@ with capability vector that includes only entries 0 and 42:
 .Dl capv -i 0 -i 42 sh
 .Pp
 .Sh SEE ALSO
+.Xr colookup 1 ,
 .Xr cocall 2 ,
 .Xr coexecvec 2 ,
 .Xr elf_aux_info 3
