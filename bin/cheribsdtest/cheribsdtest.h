@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2018, 2020 Robert N. M. Watson
+ * Copyright (c) 2012-2018, 2020-2021 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
  * Copyright (c) 2021 Microsoft Corp.
  * All rights reserved.
@@ -250,6 +250,26 @@ _cheribsdtest_check_cap_eq(void *__capability a, void *__capability b,
 }
 #define CHERIBSDTEST_CHECK_EQ_CAP(a, b)	\
 	_cheribsdtest_check_cap_eq(a, b, __STRING(a), __STRING(b))
+
+static inline void
+_cheribsdtest_check_cap_bounds_precise(void *__capability c,
+    size_t expected_len)
+{
+	size_t len, offset;
+
+	offset = cheri_getoffset(c);
+	len = cheri_getlen(c);
+
+	/* Confirm precise lower bound: offset of zero. */
+	CHERIBSDTEST_VERIFY2(offset == 0,
+	    "offset (%jd) not zero: %#lp", offset, c);
+
+	/* Confirm precise upper bound: length of expected size for type. */
+	CHERIBSDTEST_VERIFY2(len == expected_len,
+	    "length (%jd) not expected %jd: %#lp", len, expected_len, c);
+}
+#define	CHERIBSDTEST_CHECK_CAP_BOUNDS_PRECISE(c, expected_len) \
+	_cheribsdtest_check_cap_bounds_precise((c), (expected_len))
 
 /**
  * Like CHERIBSDTEST_CHECK_SYSCALL but instead of printing call details prints
