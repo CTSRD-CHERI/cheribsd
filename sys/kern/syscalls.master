@@ -1153,7 +1153,7 @@
 		    _Out_ void * __capability *cap
 		);
 	}
-180	AUE_NULL	STD	{
+180	AUE_NULL	STD|CAPENABLED	{
 		int copark(void);
 	}
 181	AUE_SETGID	STD|CAPENABLED {
@@ -1205,7 +1205,7 @@
 		    int name
 		);
 	}
-193	AUE_NULL        STD     {
+193	AUE_NULL        STD|CAPENABLED {
 		int cogetpid(
 		    _Out_ pid_t *pidp
 		);
@@ -3133,7 +3133,7 @@
 		    int flag
 		);
 	}
-548	AUE_NULL	STD {
+548	AUE_NULL	STD|CAPENABLED {
 		int cocall_slow(
 		    _In_ void * __capability target,
 		    _In_reads_bytes_(outlen) const void * __capability outbuf,
@@ -3142,7 +3142,7 @@
 		    size_t inlen
 		);
 	}
-549	AUE_NULL	STD {
+549	AUE_NULL	STD|CAPENABLED {
 		int coaccept_slow(
 		    _Inout_ void * __capability *cookiep,
 		    _In_reads_bytes_(outlen) const void * __capability outbuf,
