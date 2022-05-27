@@ -610,6 +610,7 @@ int	 cosetup(int);
 int	 coregister(const char *, void * __capability *);
 int	 colookup(const char *, void * __capability *);
 int	 cogetpid(pid_t *pidp);
+int	 capvset(int *, void * __capability **, int, void * __capability);
 
 /*
  * This is the interface between libc and the switcher.

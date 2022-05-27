@@ -29,6 +29,7 @@ SRCS+=	__getosreldate.c \
 	basename.c \
 	basename_compat.c \
 	cap_sandboxed.c \
+	capv.c \
 	check_utility_compat.c \
 	clock.c \
 	clock_getcpuclockid.c \
