@@ -37,6 +37,7 @@
 .Nd display or filter capability vector contents
 .Sh SYNOPSIS
 .Nm
+.Op Fl c
 .Op Fl k
 .Op Fl n
 .Op Fl v
@@ -55,6 +56,8 @@ and execute a command with only the selected entries inherited.
 .Pp
 The following options are available:
 .Bl -tag -width ".Fl i index"
+.It Fl c
+Print raw capabilities.
 .It Fl i Ar index
 Allow capability vector entry at offset
 .Ar index .
@@ -66,7 +69,7 @@ instead of
 .It Fl n
 Do not interrogate.
 .It Fl v
-Print raw capabilities.
+Do not truncate the answerback strings.
 .El
 .Sh EXIT STATUS
 The

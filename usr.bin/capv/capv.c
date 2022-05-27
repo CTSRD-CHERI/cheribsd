@@ -49,13 +49,13 @@ usage(void)
 {
 
 	fprintf(stderr,
-	    "usage: capv [-knv]\n"
+	    "usage: capv [-ckn]\n"
 	    "       capv [-k] -i entry [-i entry ...] command [args ...]\n");
 	exit(0);
 }
 
 static int
-interrogate(void * __capability target, char **bufp, bool kflag)
+interrogate(void * __capability target, char **bufp, bool kflag, bool vflag)
 {
 	capv_answerback_t in;
 	capv_t out;
@@ -80,6 +80,16 @@ interrogate(void * __capability target, char **bufp, bool kflag)
 		return (ENOMSG);
 	}
 
+	if (!vflag) {
+		/*
+		 * Try doing this with libxo :->
+		 */
+		in.answerback[66] = '.';
+		in.answerback[67] = '.';
+		in.answerback[68] = '.';
+		in.answerback[69] = '\0';
+	}
+
 	*bufp = strndup(in.answerback, sizeof(in.answerback));
 	return (0);
 }
@@ -91,7 +101,7 @@ main(int argc, char **argv)
 	char *tmpstr;
 	char *tmp;
 	int capc, ch, entry, error, i;
-	bool iflag = false, kflag = false, nflag = false, vflag = false;
+	bool cflag = false, iflag = false, kflag = false, nflag = false, vflag = false;
 
 	error = elf_aux_info(AT_CAPC, &capc, sizeof(capc));
 	if (error != 0)
@@ -110,8 +120,11 @@ main(int argc, char **argv)
 		err(1, "calloc");
 	memset(new_capv, 0, capc * sizeof(new_capv));
 
-	while ((ch = getopt(argc, argv, "i:knv")) != -1) {
+	while ((ch = getopt(argc, argv, "ci:knv")) != -1) {
 		switch (ch) {
+		case 'c':
+			cflag = true;
+			break;
 		case 'i':
 			entry = strtol(optarg, &tmp, 10);
 			if (*tmp != '\0')
@@ -167,10 +180,10 @@ main(int argc, char **argv)
 			continue;
 
 		printf("%d", i);
-		if (vflag)
+		if (cflag)
 			printf(":\t%#lp", capv[i]);
 		if (!nflag) {
-			error = interrogate(capv[i], &tmpstr, kflag);
+			error = interrogate(capv[i], &tmpstr, kflag, vflag);
 			if (error != 0) {
 				printf(":\t%s", strerror(error));
 			} else {
