@@ -40,6 +40,7 @@
 #include <sys/wait.h>
 
 #ifdef __CHERI__
+#include <sys/auxv.h>
 #include <cheri/cheri.h>
 #endif
 
@@ -250,26 +251,35 @@ static uintmax_t
 test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
 {
 	char buf[int_arg];
-	void * __capability lookedup;
+	void * __capability *capv, *target;
+	char *tmp;
 	uintmax_t i;
-	int error;
+	int capc, entry, error;
+
+	error = elf_aux_info(AT_CAPC, &capc, sizeof(capc));
+	if (error != 0)
+		errc(1, error, "AT_CAPC");
+	if (capc <= 0)
+		errx(1, "no capability vector");
+
+	error = elf_aux_info(AT_CAPV, &capv, sizeof(capv));
+	if (error != 0)
+		errc(1, error, "AT_CAPV");
+
+	entry = strtol(path, &tmp, 10);
+	if (*tmp != '\0' || entry < 0)
+		errx(1, "path argument must be a positive number"); /* xD */
+	if (entry >= capc)
+		errx(1, "entry %d >= capc %d", entry, capc);
+	target = capv[entry];
 
 	error = cosetup(COSETUP_COCALL);
 	if (error != 0)
 		err(1, "cosetup");
 
-	error = colookup(path, &lookedup);
-	if (error != 0) {
-		if (errno == ESRCH) {
-			warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", path);
-			warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
-		}
-		err(1, "colookup");
-	}
-
 	benchmark_start();
 	BENCHMARK_FOREACH(i, num) {
-		error = cocall(lookedup, buf, int_arg, buf, int_arg);
+		error = cocall(target, buf, int_arg, buf, int_arg);
 		if (error != 0)
 			err(1, "cocall");
 	}
@@ -281,26 +291,31 @@ static uintmax_t
 test_coping_slow(uintmax_t num, uintmax_t int_arg, const char *path)
 {
 	char buf[int_arg];
-	void * __capability lookedup;
+	void * __capability *capv, *target;
+	char *tmp;
 	uintmax_t i;
-	int error;
+	int capc, entry, error;
 
-	error = cosetup(COSETUP_COCALL);
+	error = elf_aux_info(AT_CAPC, &capc, sizeof(capc));
 	if (error != 0)
-		err(1, "cosetup");
+		errc(1, error, "AT_CAPC");
+	if (capc <= 0)
+		errx(1, "no capability vector");
 
-	error = colookup(path, &lookedup);
-	if (error != 0) {
-		if (errno == ESRCH) {
-			warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", path);
-			warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
-		}
-		err(1, "colookup");
-	}
+	error = elf_aux_info(AT_CAPV, &capv, sizeof(capv));
+	if (error != 0)
+		errc(1, error, "AT_CAPV");
+
+	entry = strtol(path, &tmp, 10);
+	if (*tmp != '\0' || entry < 0)
+		errx(1, "path argument must be a positive number"); /* xD */
+	if (entry >= capc)
+		errx(1, "entry %d >= capc %d", entry, capc);
+	target = capv[entry];
 
 	benchmark_start();
 	BENCHMARK_FOREACH(i, num) {
-		error = cocall_slow(lookedup, buf, int_arg, buf, int_arg);
+		error = cocall_slow(target, buf, int_arg, buf, int_arg);
 		if (error != 0)
 			err(1, "cocall");
 	}
