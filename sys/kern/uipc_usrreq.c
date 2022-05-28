@@ -2042,13 +2042,7 @@ unp_externalize(struct mbuf *control, struct mbuf **controlp, int flags)
 			 */
 			newlen = newfds * sizeof(int);
 			*controlp = sbcreatecontrol(NULL, newlen,
-			    SCM_RIGHTS, SOL_SOCKET, M_NOWAIT);
-			if (*controlp == NULL) {
-				FILEDESC_XUNLOCK(fdesc);
-				error = E2BIG;
-				unp_freerights(fdep, newfds);
-				goto next;
-			}
+			    SCM_RIGHTS, SOL_SOCKET, M_WAITOK);
 
 			fdp = (int *)
 			    CMSG_DATA(mtod(*controlp, struct cmsghdr *));
@@ -2080,11 +2074,7 @@ unp_externalize(struct mbuf *control, struct mbuf **controlp, int flags)
 			if (error || controlp == NULL)
 				goto next;
 			*controlp = sbcreatecontrol(NULL, datalen,
-			    cm->cmsg_type, cm->cmsg_level, M_NOWAIT);
-			if (*controlp == NULL) {
-				error = ENOBUFS;
-				goto next;
-			}
+			    cm->cmsg_type, cm->cmsg_level, M_WAITOK);
 			bcopy(data,
 			    CMSG_DATA(mtod(*controlp, struct cmsghdr *)),
 			    datalen);
