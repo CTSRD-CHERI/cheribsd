@@ -51,8 +51,6 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 	capv_clocks_t in;
 	capv_t out;
 	void * __capability *capv;
-	static bool go_slow = false;
-	char *libclocks_slow = NULL;
 	int capc, error;
 
 	/*
@@ -82,10 +80,6 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 			return (-1);
 		}
 		target = capv[CAPV_CLOCKS];
-
-		libclocks_slow = getenv("LIBCLOCKS_SLOW");
-		if (libclocks_slow != NULL && libclocks_slow[0] == '1')
-			go_slow = true;
 	}
 
 	/*
@@ -96,13 +90,10 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 	out.len = sizeof(out);
 	out.op = clock_id + CAPV_CLOCKS; /* I'm sorry, but CLOCK_REALTIME == 0 */
 
-	//fprintf(stderr, "%s: -> calling target %lp, in %lp, inlen %zd, out %lp, outlen %zd%s\n", __func__, target, &in, sizeof(in), &out, sizeof(out), go_slow ? " (slow)" : "");
-	if (go_slow)
-		error = cocall_slow(target, &out, out.len, &in, sizeof(in));
-	else
-		error = cocall(target, &out, out.len, &in, sizeof(in));
+	//fprintf(stderr, "%s: -> calling target %lp, in %lp, inlen %zd, out %lp, outlen %zd\n", __func__, target, &in, sizeof(in), &out, sizeof(out));
+	error = cocall(target, &out, out.len, &in, sizeof(in));
 	if (error != 0) {
-		warn("%s", go_slow ? "cocall_slow" : "cocall");
+		warn("cocall");
 		return (error);
 	}
 
@@ -115,7 +106,7 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 		return (error);
 	}
 
-	//fprintf(stderr, "%s: <- returned error %d, errno %d%s\n", __func__, in.error, in._errno, go_slow ? " (slow)" : "");
+	//fprintf(stderr, "%s: <- returned error %d, errno %d\n", __func__, in.error, in._errno);
 	error = in.error;
 	if (error != 0)
 		errno = in._errno;

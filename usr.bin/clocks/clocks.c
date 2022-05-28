@@ -164,12 +164,6 @@ main(int argc, char **argv)
 		if (error != 0)
 			err(1, "setenv");
 
-		if (kflag) {
-			error = setenv("LIBCLOCKS_SLOW", "1", 1);
-			if (error != 0)
-				err(1, "setenv");
-		}
-
 		coexecvpc(getppid(), argv[0], argv, capv, capc);
 		/*
 		 * Shouldn't have returned.
