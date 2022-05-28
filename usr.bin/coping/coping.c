@@ -46,6 +46,8 @@ __FBSDID("$FreeBSD$");
 #include <time.h>
 #include <unistd.h>
 
+static bool aflag = false, kflag = false, vflag = false;
+
 static void
 usage(void)
 {
@@ -94,13 +96,14 @@ fetch_capv(void * __capability **capvp, int *capcp)
 }
 
 static void
-ping(void * __capability target, const char *target_name, bool kflag, bool vflag)
+ping(void * __capability target, const char *target_name)
 {
 	struct timespec before, after, took;
 	int error;
 
-	if (vflag) {
-		fprintf(stderr, "%s: cocalling \"%s\"...\n", getprogname(), target_name);
+	if (vflag || aflag) {
+		if (!aflag)
+			fprintf(stderr, "%s: cocalling \"%s\"...\n", getprogname(), target_name);
 		error = clock_gettime(CLOCK_REALTIME, &before);
 		if (error != 0)
 			warn("clock_gettime");
@@ -113,14 +116,19 @@ ping(void * __capability target, const char *target_name, bool kflag, bool vflag
 	if (error != 0)
 		warn("cocall");
 
-	if (vflag) {
+	if (vflag || aflag) {
 		error = clock_gettime(CLOCK_REALTIME, &after);
 		if (error != 0)
 			warn("clock_gettime");
 
 		timespecsub(&after, &before, &took);
-		printf("%s: returned from \"%s\" after %s, pid %d\n",
-		    getprogname(), target_name, humanize(took.tv_sec * 1000000000L + took.tv_nsec), getpid());
+		if (aflag && !vflag) {
+			printf("%s: %s: %s\n",
+			    getprogname(), target_name, humanize(took.tv_sec * 1000000000L + took.tv_nsec));
+		} else {
+			printf("%s: returned from \"%s\" after %s, pid %d\n",
+			    getprogname(), target_name, humanize(took.tv_sec * 1000000000L + took.tv_nsec), getpid());
+		}
 	} else
 		printf(".");
 }
@@ -134,7 +142,6 @@ main(int argc, char **argv)
 	char *target_name;
 	char *tmp;
 	float dt = 1.0;
-	bool aflag = false, kflag = false, vflag = false;
 	int capc, count = 0, ch, error, index = -1, i = 0, c = 0;
 
 	while ((ch = getopt(argc, argv, "ac:i:ks:v")) != -1) {
@@ -209,8 +216,6 @@ main(int argc, char **argv)
 
 		for (c = 0; c < argc; c++) {
 			target_name = argv[c];
-			if (vflag)
-				fprintf(stderr, "%s: colooking up \"%s\"...\n", getprogname(), target_name);
 			error = colookup(target_name, &lookedup[c]);
 			if (error != 0) {
 				if (errno == ESRCH) {
@@ -222,8 +227,6 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (vflag)
-		fprintf(stderr, "%s: setting up...\n", getprogname());
 	error = cosetup(COSETUP_COCALL);
 	if (error != 0)
 		err(1, "cosetup");
@@ -246,7 +249,6 @@ main(int argc, char **argv)
 			asprintf(&target_name, "capv[%d]", c);
 			if (target_name == NULL)
 				err(1, "asprintf");
-
 			c++;
 
 		} else if (index >= 0) {
@@ -254,7 +256,6 @@ main(int argc, char **argv)
 			asprintf(&target_name, "capv[%d]", index);
 			if (target_name == NULL)
 				err(1, "asprintf");
-
 		} else {
 			target = lookedup[c];
 			target_name = argv[c];
@@ -264,17 +265,17 @@ main(int argc, char **argv)
 				c = 0;
 		}
 
-		ping(target, target_name, kflag, vflag);
+		ping(target, target_name);
 
 		i++;
 		if (count != 0 && i >= count)
 			break;
 
-		if (dt > 0)
+		if (dt > 0 && !aflag)
 			usleep(dt * 1000000.0);
 	}
 
-	if (!vflag)
+	if (!vflag && !aflag)
 		printf("\n");
 
 	return (0);
