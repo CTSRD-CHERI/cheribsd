@@ -170,15 +170,9 @@ int	kern_copy_file_range(struct thread *td, int infd, off_t *inoffp,
 	    int outfd, off_t *outoffp, size_t len, unsigned int flags);
 int	kern_cpuset(struct thread *td, cpusetid_t * __capability setid);
 int	kern_cpuset_getaffinity(struct thread *td, cpulevel_t level,
-	    cpuwhich_t which, id_t id, size_t cpusetsize,
-	    cpuset_t * __capability maskp,
-	    const struct cpuset_copy_cb *cb);
+	    cpuwhich_t which, id_t id, size_t cpusetsize, cpuset_t *mask);
 int	kern_cpuset_setaffinity(struct thread *td, cpulevel_t level,
 	    cpuwhich_t which, id_t id, cpuset_t *maskp);
-int	user_cpuset_setaffinity(struct thread *td, cpulevel_t level,
-	    cpuwhich_t which, id_t id, size_t cpusetsize,
-	    const cpuset_t * __capability maskp,
-	    const struct cpuset_copy_cb *cb);
 int	kern_cpuset_getdomain(struct thread *td, cpulevel_t level,
 	    cpuwhich_t which, id_t id, size_t domainsetsize,
 	    domainset_t * __capability maskp, int * __capability policyp,
@@ -611,6 +605,14 @@ int	user_copy_file_range(struct thread *td,
 	    int infd, off_t * __capability inoffp,
 	    int outfd, off_t * __capability outoffp,
 	    size_t len, unsigned int flags);
+int	user_cpuset_getaffinity(struct thread *td, cpulevel_t level,
+	    cpuwhich_t which, id_t id, size_t cpusetsize,
+	    cpuset_t * __capability maskp,
+	    const struct cpuset_copy_cb *cb);
+int	user_cpuset_setaffinity(struct thread *td, cpulevel_t level,
+	    cpuwhich_t which, id_t id, size_t cpusetsize,
+	    const cpuset_t * __capability maskp,
+	    const struct cpuset_copy_cb *cb);
 int	user_fhstat(struct thread *td,
 	    const struct fhandle * __capability u_fhp,
 	    struct stat * __capability sb);
