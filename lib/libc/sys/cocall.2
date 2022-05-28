@@ -58,9 +58,16 @@ Before returning, at most
 bytes will be copied from the callee's output buffer into
 .Fa inbuf .
 Any capabilities copied will have their tag bits cleared.
-The
+.Pp
+.Fn cocall 2
+attempts to use the switcher-based
+.Fn _cocall 2
+fast path first, transparently falling back to
 .Fn cocall_slow 2
-provides the same semantics, but implemented as a traditional system call.
+if required.
+.Fn cocall_slow 2
+can be used to force the slow syscall path; it provides
+the same semantic otherwise.
 .Pp
 The
 .Ar target
