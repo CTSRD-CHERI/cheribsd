@@ -55,7 +55,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sched.h>
 #include <sys/smp.h>
 #include <sys/sysctl.h>
-#include <sys/sysent.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
 #include <sys/syscallsubr.h>
@@ -82,6 +81,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #ifdef COMPAT_FREEBSD64
+#include <sys/sysent.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #endif
 
