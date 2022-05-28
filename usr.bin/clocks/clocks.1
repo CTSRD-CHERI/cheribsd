@@ -37,6 +37,7 @@
 .Nd colocated time service
 .Sh SYNOPSIS
 .Nm
+.Op Fl C
 .Op Fl k
 .Op Fl v
 .Ar command Op Ar args ...
@@ -45,7 +46,7 @@ The
 .Nm
 utility is used to provide
 .Xr clock_gettime 2
-functionality to its descendants.
+colocated service to its descendants.
 It spawns a child process, adjusts the
 .Ev LD_PRELOAD
 variable to make descendant processes use a wrapper which replaces
@@ -63,6 +64,12 @@ service inserted into its inherited capability vector.
 .Pp
 The following options are available:
 .Bl -tag -width ".Fl s time"
+.It Fl C
+Do not call
+.Xr cap_enter 2 ;
+thus do not enter
+.Xr capsicum 4
+capability mode.
 .It Fl k
 Use
 .Xr coaccept_slow 2

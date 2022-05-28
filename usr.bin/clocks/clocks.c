@@ -28,10 +28,19 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * This is the callee (coaccepting) part of the clock service,
+ * with the client (cocalling) part in lib/libclocks/clocks.c.
+ * The fact that clock_gettime() gets called all over the place
+ * makes it easier to exercise underlying mechanisms.  It's also
+ * a good starting point for implementing a new service.
+ */
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
 #include <sys/auxv.h>
+#include <sys/capsicum.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <assert.h>
@@ -47,11 +56,13 @@ __FBSDID("$FreeBSD$");
 #include <time.h>
 #include <unistd.h>
 
+bool Cflag = false, kflag = false, vflag = false;
+
 static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: clocks [-kv] command [args ...]\n");
+	fprintf(stderr, "usage: clocks [-Ckv] command [args ...]\n");
 	exit(0);
 }
 
@@ -63,15 +74,22 @@ sigchld_handler(int dummy __unused)
 }
 
 static void
-answerback(capv_answerback_t *out, bool kflag)
+answerback(capv_answerback_t *out)
 {
+	int error, mode;
+
+	mode = 0;
+	error = cap_getmode(&mode);
+	if (error != 0)
+		err(1, "cap_getmode");
 
 	memset(out, 0, sizeof(*out));
 	out->len = sizeof(*out);
 	out->op = 0;
 	snprintf(out->answerback, sizeof(out->answerback),
-	    "this is %s, pid %d, %s responding to clock_gettime(), running as uid %d",
-	    getprogname(), getpid(), kflag ? "halfheartedly" : "merrily", getuid());
+	    "this is %s, pid %d, %s%s responding to clock_gettime(), running as uid %d",
+	    getprogname(), getpid(), kflag ? "halfheartedly" : "merrily",
+	    mode ? "" : ", yet unsettlingly,", getuid());
 }
 
 int
@@ -88,11 +106,13 @@ main(int argc, char **argv)
 	void * __capability public;
 	void * __capability *capv = NULL;
 	pid_t pid;
-	bool kflag = false, vflag = false;
 	int capc, ch, error;
 
-	while ((ch = getopt(argc, argv, "ks:v")) != -1) {
+	while ((ch = getopt(argc, argv, "Cks:v")) != -1) {
 		switch (ch) {
+		case 'C':
+			Cflag = true;
+			break;
 		case 'k':
 			kflag = true;
 			break;
@@ -171,6 +191,12 @@ main(int argc, char **argv)
 		err(1, "coexecvpc");
 	}
 
+	if (!Cflag) {
+		error = cap_enter();
+		if (error != 0)
+			err(1, "cap_enter");
+	}
+
 	/*
 	 * Parent, will loop on coaccept(2) until SIGCHLD.
 	 */
@@ -203,7 +229,7 @@ main(int argc, char **argv)
 		clock_id = error = errno = 0;
 		switch (in.op) {
 		case 0:
-			answerback(&outbuf.answerback, kflag);
+			answerback(&outbuf.answerback);
 			break;
 		default:
 			/*
