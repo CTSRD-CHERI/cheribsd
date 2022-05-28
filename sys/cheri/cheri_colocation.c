@@ -317,7 +317,7 @@ colocation_thread_exit(struct thread *td)
 	 * Set scb_caller_scb to a special "null" capability, so that cocall(2)
 	 * can see the callee thread is dead.
 	 */
-	scb.scb_caller_scb = errno_cap(EPIPE);
+	scb.scb_caller_scb = errno_cap(ENOLINK);
 	scb.scb_td = NULL;
 	scb.scb_borrower_td = NULL;
 
