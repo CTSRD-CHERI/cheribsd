@@ -55,7 +55,7 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 
 	/*
 	 * We could turn this into a constructor, but then we would lose
-	 * the advantage of this code never being run unless the process
+	 * the advantage of this code never being run unless the thread
 	 * actually makes an attempt to call clock_gettime().
 	 */
 	if (__predict_false(target == NULL)) {

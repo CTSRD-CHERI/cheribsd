@@ -75,8 +75,6 @@ Use
 .Xr coaccept_slow 2
 instead of
 .Xr coaccept 2 .
-.Pp
-XXX I mean really use it, things don't quite work with the fast switcher yet.
 .It Fl v
 Be verbose.
 .El
@@ -97,9 +95,10 @@ To spawn a shell with
 service passed in the inherited capability vector, view the vector,
 and then make use of it:
 .Pp
-.Dl clocks -kv sh
-.Dl capv -k
+.Dl clocks -v sh
 .Dl date
+.Dl capv
+.Dl coping -vi 5
 .Pp
 .Sh SEE ALSO
 .Xr capv 1 ,

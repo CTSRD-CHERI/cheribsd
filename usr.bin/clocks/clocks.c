@@ -102,9 +102,10 @@ main(int argc, char **argv)
 	} outbuf;
 	capv_clocks_t *out = &outbuf.clocks;
 	clockid_t clock_id;
-	void * __capability dummy; // XXX
 	void * __capability public;
 	void * __capability *capv = NULL;
+	char *ld_preload;
+	char *tmp = NULL;
 	pid_t pid;
 	int capc, ch, error;
 
@@ -157,6 +158,27 @@ main(int argc, char **argv)
 	if (error != 0)
 		err(1, "capvset");
 
+	/*
+	 * This whole mess with environment variables is to preload
+	 * libclocks.so, which provides clock_gettime(3) replacement,
+	 * which then shadows the system call.  This makes unmodified
+	 * purecap binaries transparently call clocks(1) instead
+	 * of kernel.  A bit ugly, but convenient for now.
+	 */
+	ld_preload = getenv("LD_PRELOAD");
+	if (ld_preload != NULL) {
+		asprintf(&tmp, "%s:%s", ld_preload, "/usr/lib/libclocks.so");
+	} else {
+		asprintf(&tmp, "%s", "/usr/lib/libclocks.so");
+	}
+	error = setenv("LD_PRELOAD", tmp, 1);
+	if (error != 0)
+		err(1, "setenv");
+
+	/*
+	 * We can't explicitely pass capv into another address space,
+	 * so we need vfork(2) here, not fork(2).
+	 */
 	pid = vfork();
 	if (pid < 0)
 		err(1, "vfork");
@@ -164,32 +186,18 @@ main(int argc, char **argv)
 	if (pid == 0) {
 		/*
 		 * Child, will coexecvec(2) the new command.
-		 *
-		 * This whole mess with environment variables is to preload
-		 * libclocks.so, which provides clock_gettime(3) replacement,
-		 * which then shadows the system call.  This makes unmodified
-		 * purecap binaries transparently call clocks(1) instead
-		 * of kernel.  A bit ugly, but convenient for now.
 		 */
-		char *ld_preload;
-		char *tmp = NULL;
-
-		ld_preload = getenv("LD_PRELOAD");
-		if (ld_preload != NULL) {
-			asprintf(&tmp, "%s:%s", ld_preload, "/usr/lib/libclocks.so");
-		} else {
-			asprintf(&tmp, "%s", "/usr/lib/libclocks.so");
-		}
-		error = setenv("LD_PRELOAD", tmp, 1);
-		if (error != 0)
-			err(1, "setenv");
-
 		coexecvpc(getppid(), argv[0], argv, capv, capc);
+
 		/*
 		 * Shouldn't have returned.
 		 */
 		err(1, "coexecvpc");
 	}
+
+	/*
+	 * Parent, will loop on coaccept(2) until SIGCHLD.
+	 */
 
 	if (!Cflag) {
 		error = cap_enter();
@@ -197,18 +205,15 @@ main(int argc, char **argv)
 			err(1, "cap_enter");
 	}
 
-	/*
-	 * Parent, will loop on coaccept(2) until SIGCHLD.
-	 */
 	//out->len = 0; /* Nothing to send at this point. */
 	out->len = 16; /* XXX */
 
 	for (;;) {
 		memset(&in, 0, sizeof(in));
 		if (kflag)
-			error = coaccept_slow(&dummy, out, out->len, &in, sizeof(in));
+			error = coaccept_slow(NULL, out, out->len, &in, sizeof(in));
 		else
-			error = coaccept(&dummy, out, out->len, &in, sizeof(in));
+			error = coaccept(NULL, out, out->len, &in, sizeof(in));
 		if (error != 0) {
 			warn("%s", kflag ? "coaccept_slow" : "coaccept");
 			out->len = 0;
