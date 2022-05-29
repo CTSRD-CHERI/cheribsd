@@ -103,17 +103,9 @@ main(int argc, char **argv)
 	int capc, ch, entry, error, i;
 	bool cflag = false, iflag = false, kflag = false, nflag = false, vflag = false;
 
-	error = elf_aux_info(AT_CAPC, &capc, sizeof(capc));
-	if (error != 0)
-		errc(1, error, "AT_CAPC");
+	capvfetch(&capc, &capv);
 	if (capc <= 0)
 		errx(1, "no capability vector");
-
-	error = elf_aux_info(AT_CAPV, &capv, sizeof(capv));
-	if (error != 0)
-		errc(1, error, "AT_CAPV");
-
-	assert(capv != NULL);
 
 	new_capv = calloc(capc, sizeof(new_capv));
 	if (new_capv == NULL)

@@ -81,23 +81,6 @@ humanize(long x)
 }
 
 static void
-fetch_capv(void * __capability **capvp, int *capcp)
-{
-	int error;
-
-	error = elf_aux_info(AT_CAPC, capcp, sizeof(*capcp));
-	if (error != 0)
-		errc(1, error, "AT_CAPC");
-
-	error = elf_aux_info(AT_CAPV, capvp, sizeof(*capvp));
-	if (error != 0) {
-		if (error == ENOENT)
-			errx(1, "no capability vector");
-		errc(1, error, "AT_CAPV");
-	}
-}
-
-static void
 ping(void * __capability target, const char *target_name)
 {
 	capv_t in, out;
@@ -202,14 +185,18 @@ main(int argc, char **argv)
 		if (argc != 0)
 			errx(1, "-a and target name are mutually exclusive");
 
-		fetch_capv(&capv, &capc);
+		capvfetch(&capc, &capv);
+		if (capc <= 0)
+			errx(1, "no capability vector");
 
 	} else if (index >= 0) {
 		/* coping -i */
 		if (argc != 0)
 			errx(1, "-i and target name are mutually exclusive");
 
-		fetch_capv(&capv, &capc);
+		capvfetch(&capc, &capv);
+		if (capc <= 0)
+			errx(1, "no capability vector");
 		if (index >= capc)
 			errx(1, "index %d must be lower than capc %d", index, capc);
 		target = capv[index];

@@ -34,11 +34,29 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/auxv.h>
 
+#include <err.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
 #include "libc_private.h"
+
+void
+capvfetch(int *capcp, void * __capability **capvp)
+{
+	int error;
+
+	error = elf_aux_info(AT_CAPC, capcp, sizeof(*capcp));
+	if (error != 0)
+		errc(1, error, "AT_CAPC");
+	if (*capcp <= 0) {
+		*capvp = NULL;
+		return;
+	}
+	error = elf_aux_info(AT_CAPV, capvp, sizeof(*capvp));
+	if (error != 0)
+		errc(1, error, "AT_CAPV");
+}
 
 /*
  * Convenience function to insert capabilities into capv, mostly

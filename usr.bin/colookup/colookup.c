@@ -56,16 +56,9 @@ main(int argc, char **argv)
 	char *tmp;
 	int capc, ch, entry, error;
 
-	error = elf_aux_info(AT_CAPC, &capc, sizeof(capc));
-	if (error != 0)
-		errc(1, error, "AT_CAPC");
-	if (capc > 0) {
-		error = elf_aux_info(AT_CAPV, &capv, sizeof(capv));
-		if (error != 0)
-			errc(1, error, "AT_CAPV");
-	} else {
+	capvfetch(&capc, &capv);
+	if (capc <= 0) {
 		//warnx("no capability vector");
-		capv = NULL;
 	}
 
 	while ((ch = getopt(argc, argv, "i:k")) != -1) {

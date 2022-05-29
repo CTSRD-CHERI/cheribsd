@@ -60,16 +60,7 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 	 * actually makes an attempt to call clock_gettime().
 	 */
 	if (__predict_false(target == NULL)) {
-		errno = elf_aux_info(AT_CAPC, &capc, sizeof(capc));
-		if (errno != 0) {
-			warn("AT_CAPC");
-			return (-1);
-		}
-		errno = elf_aux_info(AT_CAPV, &capv, sizeof(capv));
-		if (errno != 0) {
-			warn("AT_CAPV");
-			return (-1);
-		}
+		capvfetch(&capc, &capv);
 		if (capc <= CAPV_CLOCKS || capv[CAPV_CLOCKS] == NULL) {
 			warn("null capability %d", CAPV_CLOCKS);
 			errno = ENOLINK;

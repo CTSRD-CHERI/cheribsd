@@ -256,15 +256,9 @@ test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
 	uintmax_t i;
 	int capc, entry, error;
 
-	error = elf_aux_info(AT_CAPC, &capc, sizeof(capc));
-	if (error != 0)
-		errc(1, error, "AT_CAPC");
+	capvfetch(&capc, &capv);
 	if (capc <= 0)
 		errx(1, "no capability vector");
-
-	error = elf_aux_info(AT_CAPV, &capv, sizeof(capv));
-	if (error != 0)
-		errc(1, error, "AT_CAPV");
 
 	entry = strtol(path, &tmp, 10);
 	if (*tmp != '\0' || entry < 0)
@@ -296,15 +290,9 @@ test_coping_slow(uintmax_t num, uintmax_t int_arg, const char *path)
 	uintmax_t i;
 	int capc, entry, error;
 
-	error = elf_aux_info(AT_CAPC, &capc, sizeof(capc));
-	if (error != 0)
-		errc(1, error, "AT_CAPC");
+	capvfetch(&capc, &capv);
 	if (capc <= 0)
 		errx(1, "no capability vector");
-
-	error = elf_aux_info(AT_CAPV, &capv, sizeof(capv));
-	if (error != 0)
-		errc(1, error, "AT_CAPV");
 
 	entry = strtol(path, &tmp, 10);
 	if (*tmp != '\0' || entry < 0)

@@ -148,13 +148,7 @@ main(int argc, char **argv)
 	if (error != 0)
 		err(1, "coregister");
 
-	error = elf_aux_info(AT_CAPC, &capc, sizeof(capc));
-	if (error != 0)
-		errc(1, error, "AT_CAPC");
-	error = elf_aux_info(AT_CAPV, &capv, sizeof(capv));
-	if (error != 0 && error != ENOENT)
-		errc(1, error, "AT_CAPV");
-
+	capvfetch(&capc, &capv);
 	error = capvset(&capc, &capv, CAPV_CLOCKS, public);
 	if (error != 0)
 		err(1, "capvset");
