@@ -106,6 +106,7 @@ main(int argc, char **argv)
 	void * __capability *capv = NULL;
 	char *ld_preload;
 	char *tmp = NULL;
+	ssize_t received;
 	pid_t pid;
 	int capc, ch, error;
 
@@ -205,16 +206,16 @@ main(int argc, char **argv)
 			err(1, "cap_enter");
 	}
 
+	memset(out, 0, sizeof(*out));
 	//out->len = 0; /* Nothing to send at this point. */
 	out->len = 16; /* XXX */
 
 	for (;;) {
-		memset(&in, 0, sizeof(in));
 		if (kflag)
-			error = coaccept_slow(NULL, out, out->len, &in, sizeof(in));
+			received = coaccept_slow(NULL, out, out->len, &in, sizeof(in));
 		else
-			error = coaccept(NULL, out, out->len, &in, sizeof(in));
-		if (error != 0) {
+			received = coaccept(NULL, out, out->len, &in, sizeof(in));
+		if (received < 0) {
 			warn("%s", kflag ? "coaccept_slow" : "coaccept");
 			out->len = 0;
 			continue;
@@ -240,12 +241,9 @@ main(int argc, char **argv)
 			/*
 			 * Is this a proper packet?
 			 */
-			if (in.len != sizeof(in)) {
-				error = cogetpid(&pid);
-				if (error != 0)
-					warn("cogetpid");
-				warnx("in.len %zd != sizeof %zd, in.op %d, caller pid %d; returning ENOMSG",
-				    in.len, sizeof(in), in.op, pid);
+			if ((size_t)received != in.len || in.len != sizeof(in)) {
+				warnx("size mismatch: received %zd, in.len %zd, expected %zd",
+				    (size_t)received, in.len, sizeof(in));
 				memset(out, 0, sizeof(*out));
 				out->len = sizeof(*out);
 				out->op = 0;

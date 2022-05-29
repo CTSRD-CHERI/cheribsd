@@ -102,9 +102,9 @@ ping(void * __capability target, const char *target_name)
 {
 	capv_t in, out;
 	struct timespec before, after, took;
+	ssize_t received;
 	int error;
 
-	memset(&in, 0, sizeof(in));
 	memset(&out, 0, sizeof(out));
 	out.len = sizeof(out);
 	out.op = 0;
@@ -118,11 +118,15 @@ ping(void * __capability target, const char *target_name)
 	}
 
 	if (kflag)
-		error = cocall_slow(target, &out, out.len, &in, sizeof(in));
+		received = cocall_slow(target, &out, out.len, &in, sizeof(in));
 	else
-		error = cocall(target, &out, out.len, &in, sizeof(in));
-	if (error != 0)
+		received = cocall(target, &out, out.len, &in, sizeof(in));
+	if (received < 0)
 		warn("cocall");
+
+	/*
+	 * We don't care about received data.  It's truncated anyway.
+	 */
 
 	if (vflag || aflag) {
 		error = clock_gettime(CLOCK_REALTIME, &after);

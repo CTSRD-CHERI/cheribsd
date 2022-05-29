@@ -51,6 +51,7 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 	capv_clocks_t in;
 	capv_t out;
 	void * __capability *capv;
+	ssize_t received;
 	int capc, error;
 
 	/*
@@ -85,14 +86,13 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 	/*
 	 * Send our request.
 	 */
-	memset(&in, 0, sizeof(in));
 	memset(&out, 0, sizeof(out));
 	out.len = sizeof(out);
 	out.op = clock_id + CAPV_CLOCKS; /* I'm sorry, but CLOCK_REALTIME == 0 */
 
 	//fprintf(stderr, "%s: -> calling target %lp, in %lp, inlen %zd, out %lp, outlen %zd\n", __func__, target, &in, sizeof(in), &out, sizeof(out));
-	error = cocall(target, &out, out.len, &in, sizeof(in));
-	if (error != 0) {
+	received = cocall(target, &out, out.len, &in, sizeof(in));
+	if (received < 0) {
 		warn("cocall");
 		return (error);
 	}
@@ -100,8 +100,9 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 	/*
 	 * Handle the response.
 	 */
-	if (in.len != sizeof(in)) {
-		warnx("in.len %zd != sizeof %zd", in.len, sizeof(in));
+	if ((size_t)received != in.len || in.len != sizeof(in)) {
+		warnx("size mismatch: received %zd, in.len %zd, expected %zd; returning ENOMSG",
+		    (size_t)received, in.len, sizeof(in));
 		errno = ENOMSG;
 		return (error);
 	}

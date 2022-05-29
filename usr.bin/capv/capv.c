@@ -59,9 +59,8 @@ interrogate(void * __capability target, char **bufp, bool kflag, bool vflag)
 {
 	capv_answerback_t in;
 	capv_t out;
-	int error;
+	ssize_t received;
 
-	memset(&in, 0, sizeof(in));
 	memset(&out, 0, sizeof(out));
 	out.len = sizeof(out);
 	out.op = 0;
@@ -69,15 +68,16 @@ interrogate(void * __capability target, char **bufp, bool kflag, bool vflag)
 	//fprintf(stderr, "%s: out %#lp, outlen %zd, in %#lp, inlen %zd\n", __func__, &out, out.len, &in, sizeof(in));
 
 	if (kflag)
-		error = cocall_slow(target, &out, out.len, &in, sizeof(in));
+		received = cocall_slow(target, &out, out.len, &in, sizeof(in));
 	else
-		error = cocall(target, &out, out.len, &in, sizeof(in));
-	if (error != 0)
+		received = cocall(target, &out, out.len, &in, sizeof(in));
+	if (received < 0)
 		return (errno);
 
-	if (in.len != sizeof(in)) {
-		warnx("received in.len %zd >= %zd", in.len, sizeof(in));
-		return (ENOMSG);
+	if ((size_t)received != in.len) {
+		warnx("truncated: received %zd, in.len %zd", (size_t)received, in.len);
+	} else if (in.len != sizeof(in)) {
+		warnx("size mismatch: in.len %zd, expected %zd", in.len, sizeof(in));
 	}
 
 	if (!vflag) {

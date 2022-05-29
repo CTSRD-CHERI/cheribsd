@@ -753,6 +753,7 @@ struct proc {
 	 */
 	LIST_ENTRY(proc) p_orphan;	/* (e) List of orphan processes. */
 	LIST_HEAD(, proc) p_orphans;	/* (e) Pointer to list of orphans. */
+	TAILQ_HEAD(, kq_timer_cb_data)	p_kqtim_stop;	/* (c) */
 
 	/*
 	 * Capability vector, see coxecvec(2).
@@ -760,8 +761,7 @@ struct proc {
 	int			p_capc;
 	void * __capability	*p_capv;
 	const void 		*p_capv_vmspace;
-
-	TAILQ_HEAD(, kq_timer_cb_data)	p_kqtim_stop;	/* (c) */
+	ssize_t			p_cocall_received;
 };
 
 #define	p_session	p_pgrp->pg_session

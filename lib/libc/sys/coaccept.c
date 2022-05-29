@@ -36,7 +36,7 @@ __FBSDID("$FreeBSD$");
 #include "cheri_private.h"
 #include "un-namespace.h"
 
-int
+ssize_t
 coaccept(void * __capability * __capability cookiep,
     const void * __capability outbuf, size_t outlen,
     void * __capability inbuf, size_t inlen)

@@ -771,6 +771,7 @@ kern_cocall_slow(void * __capability target,
 	struct switchercb scb, calleescb;
 	struct switchercb * __capability targetscb;
 	struct thread *calleetd __diagused;
+	ssize_t received;
 	int error;
 	bool have_scb;
 
@@ -803,6 +804,8 @@ kern_cocall_slow(void * __capability target,
 		COLOCATION_DEBUG("no scb, returning EINVAL");
 		return (EINVAL);
 	}
+
+	curproc->p_cocall_received = 0;
 
 	/*
 	 * Unseal the capability to the callee control block and load it.
@@ -900,11 +903,15 @@ again:
 	SWITCHER_UNLOCK();
 
 	/*
-	 * XXX: There is currently no way to return an error to the caller,
-	 *      should the copyuser() fail.
+	 * Return the error stored by the callee.
 	 */
+	received = curproc->p_cocall_received;
+	if (received >= 0) {
+		curthread->td_retval[0] = received;
+		return (0);
+	}
 
-	return (error);
+	return (-received);
 }
 
 int
@@ -922,6 +929,7 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 {
 	struct switchercb scb, callerscb;
 	void * __capability cookie;
+	size_t copied;
 	int error;
 	bool have_scb, is_callee;
 
@@ -981,16 +989,20 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 
 		/*
 		 * Move data from callee to caller.
+		 *
+		 * XXX MOVE THIS SOMEWHERE FFS
 		 */
-		error = copyuser(outbuf, callerscb.scb_inbuf,
-		    MIN(outlen, callerscb.scb_inlen));
+		copied = MIN(outlen, callerscb.scb_inlen);
+		error = copyuser(outbuf, callerscb.scb_inbuf, copied);
 		if (error != 0) {
+			callerscb.scb_td->td_proc->p_cocall_received = -error;
 			SWITCHER_UNLOCK();
 			COLOCATION_DEBUG("copyuser error %d, waking up %lp",
 			    error, callerscb.scb_td->td_scb);
 			wakeupself();
 			return (error);
 		}
+		callerscb.scb_td->td_proc->p_cocall_received = copied;
 
 		wakeupself();
 	}
@@ -1023,8 +1035,8 @@ again:
 	/*
 	 * Move data from caller to callee.
 	 */
-	error = copyuser(callerscb.scb_outbuf, inbuf,
-	    MIN(inlen, callerscb.scb_outlen));
+	copied = MIN(inlen, callerscb.scb_outlen); // XXX
+	error = copyuser(callerscb.scb_outbuf, inbuf, copied);
 	if (error != 0) {
 		COLOCATION_DEBUG("copyuser error %d", error);
 		wakeupself();
@@ -1044,6 +1056,7 @@ again:
 		}
 	}
 
+	curthread->td_retval[0] = copied;
 	return (0);
 }
 

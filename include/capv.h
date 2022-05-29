@@ -36,9 +36,11 @@
  * Try to follow those, unless you really have a good reason not
  * to (and writing a replacement mechanism is just one example).
  * Or at least keep the size_t-sized length at the very beginning
- * of every output buffer passed to cocall(2).  Integer-sized
- * opcode 0 that follows is reserved for answerback; other values
- * are left for application use.
+ * of every output buffer passed to cocall(2).  You can compare
+ * it with the size returned by cocall(2)/coaccept(2) to make sure
+ * you actually received all the data.  Integer-sized opcode 0
+ * that follows is reserved for answerback; other values are left
+ * for application use.
  *
  * For an example of how to use it, see usr.bin/clocks/clocks.c
  * (service) and lib/libclocks/clocks.c (client).
