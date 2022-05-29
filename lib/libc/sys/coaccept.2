@@ -39,8 +39,9 @@
 .Lb libc
 .Sh SYNOPSIS
 .In unistd.h
-.Ft int
+.Ft ssize_t
 .Fn coaccept "void * __capability * __capability cookiep" "const void * __capability outbuf" "size_t outlen" "void * __capability inbuf" "size_t inlen"
+.Ft ssize_t
 .Fn coaccept_slow "void * __capability * __capability cookiep" "const void * __capability outbuf" "size_t outlen" "void * __capability inbuf" "size_t inlen"
 .Sh DESCRIPTION
 The
@@ -80,7 +81,12 @@ with
 .Dv COSETUP_COACCEPT
 argument.
 .Sh RETURN VALUES
-.Rv -std coaccept
+Upon successful completion the number of bytes copied into
+.Fa inbuf
+is returned.
+Otherwise a -1 is returned and the global variable
+.Va errno
+is set to indicate the error.
 .Sh ERRORS
 The
 .Fn coaccept
@@ -100,8 +106,8 @@ reach beyond the allocated memory.
 .Sh EXAMPLES
 Basic usage example:
 .Bd -literal
-	void * __capability cookie;
 	uint64_t buf[MAXBSIZE];
+	ssize_t received;
 
 	error = cosetup(COSETUP_COACCEPT);
 	if (error != 0)
@@ -111,9 +117,11 @@ Basic usage example:
 	if (error != 0)
 		err(1, "coregister");
 
+	memset(buf, 0, sizeof(buf));
+
 	for (;;) {
-		error = coaccept(&cookie, buf, sizeof(buf), buf, sizeof(buf));
-		if (error != 0)
+		received = coaccept(NULL, buf, sizeof(buf), buf, sizeof(buf));
+		if (received < 0)
 			err(1, "coaccept");
 	}
 .Ed

@@ -151,8 +151,10 @@ _C_LABEL(switcher_coaccept):
 	 * Compare buffer sizes, put the smaller one into t5.
 	 */
 	sub	t3, a4, t5
+	mv	a0, t5
 	bgez	t3, 2f
 	mv	t5, a4
+	mv	a0, a4
 
 2:
 	cld	t3, 0(ca3)
@@ -169,7 +171,6 @@ _C_LABEL(switcher_coaccept):
 	csc	cnull, SCB_CALLER_SCB(idc)
 
 	li	t0, 0
-	li	a0, 0
 
 3:
 	/*

@@ -158,8 +158,10 @@ SIGCODE(switcher_cocall)
 	 * Compare buffer sizes, put the smaller one into t5.
 	 */
 	sub	t3, a4, t5
+	mv	a0, t5
 	bgez	t3, 3f
 	mv	t5, a4
+	mv	a0, a4
 
 CSYM(switcher_cocall_copy_start)
 3:
@@ -172,7 +174,6 @@ CSYM(switcher_cocall_copy_start)
 CSYM(switcher_cocall_copy_end)
 
 	li	t0, 0
-	li	a0, 0
 
 4:
 	/*

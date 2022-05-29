@@ -119,6 +119,7 @@ ATF_TC_BODY(cocall, tc)
 	char *name;
 	uint64_t buf;
 	pid_t pid, pid2;
+	ssize_t received;
 	int error;
 
 	name = random_string();
@@ -133,8 +134,8 @@ ATF_TC_BODY(cocall, tc)
 
 		buf = 42;
 		for (;;) {
-			error = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
-			ATF_REQUIRE_EQ(error, 0);
+			received = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
+			ATF_REQUIRE_EQ(received, sizeof(buf));
 			ATF_REQUIRE_EQ(buf, 1);
 			buf++;
 		}
@@ -158,6 +159,7 @@ ATF_TC_BODY(cocall_h, tc)
 	void * __capability lookedup;
 	char *arg;
 	uint64_t buf;
+	ssize_t received;
 	int error;
 
 	arg = getenv("COCALL_TEST_HELPER_ARG");
@@ -170,8 +172,8 @@ ATF_TC_BODY(cocall_h, tc)
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 	buf = 1;
-	error = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
-	ATF_REQUIRE_EQ(error, 0);
+	received = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
+	ATF_REQUIRE_EQ(received, sizeof(buf));
 	ATF_REQUIRE_EQ(buf, 2);
 }
 
@@ -182,6 +184,7 @@ ATF_TC_BODY(cocall_cookie, tc)
 	char *name;
 	uint64_t buf;
 	pid_t pid, pid2;
+	ssize_t received;
 	int error;
 
 	name = random_string();
@@ -197,8 +200,8 @@ ATF_TC_BODY(cocall_cookie, tc)
 		buf = 42;
 		cookie = NULL;
 		for (;;) {
-			error = coaccept(&cookie, &buf, sizeof(buf), &buf, sizeof(buf));
-			ATF_REQUIRE_EQ(error, 0);
+			received = coaccept(&cookie, &buf, sizeof(buf), &buf, sizeof(buf));
+			ATF_REQUIRE_EQ(received, sizeof(buf));
 			ATF_REQUIRE_EQ(buf, 1);
 			ATF_REQUIRE((uintptr_t)cookie != 0);
 			buf++;
@@ -223,6 +226,7 @@ ATF_TC_BODY(cocall_cookie_h, tc)
 	void * __capability lookedup;
 	char *arg;
 	uint64_t buf;
+	ssize_t received;
 	int error;
 
 	arg = getenv("COCALL_TEST_HELPER_ARG");
@@ -235,8 +239,8 @@ ATF_TC_BODY(cocall_cookie_h, tc)
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 	buf = 1;
-	error = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
-	ATF_REQUIRE_EQ(error, 0);
+	received = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
+	ATF_REQUIRE_EQ(received, sizeof(buf));
 	ATF_REQUIRE_EQ(buf, 2);
 }
 
@@ -279,6 +283,7 @@ ATF_TC_BODY(cocall_eagain_h, tc)
 	void * __capability lookedup;
 	char *arg;
 	uint64_t buf;
+	ssize_t received;
 	int error;
 
 	arg = getenv("COCALL_TEST_HELPER_ARG");
@@ -291,8 +296,8 @@ ATF_TC_BODY(cocall_eagain_h, tc)
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 	buf = 1;
-	error = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
-	ATF_REQUIRE_EQ(error, -1);
+	received = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
+	ATF_REQUIRE_EQ(received, -1);
 	ATF_REQUIRE_EQ(errno, EAGAIN);
 	ATF_REQUIRE_EQ(buf, 1);
 }
@@ -303,6 +308,7 @@ ATF_TC_BODY(cocall_bad_caller_buf, tc)
 	char *name;
 	uint64_t buf;
 	pid_t pid, pid2;
+	ssize_t received;
 	int error;
 
 	name = random_string();
@@ -317,8 +323,8 @@ ATF_TC_BODY(cocall_bad_caller_buf, tc)
 
 		buf = 42;
 		for (;;) {
-			error = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
-			ATF_REQUIRE_EQ(error, EFAULT);
+			received = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
+			ATF_REQUIRE_EQ(received, EFAULT);
 			ATF_REQUIRE_EQ(buf, 42);
 		}
 		atf_tc_fail("You're not supposed to be here");
@@ -340,6 +346,7 @@ ATF_TC_BODY(cocall_bad_caller_buf_h, tc)
 {
 	void * __capability lookedup;
 	char *arg;
+	ssize_t received;
 	int error;
 
 	arg = getenv("COCALL_TEST_HELPER_ARG");
@@ -351,8 +358,8 @@ ATF_TC_BODY(cocall_bad_caller_buf_h, tc)
 	wait_for_coregister();
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
-	error = cocall(lookedup, (void *)13, 8, (void *)42, 8);
-	ATF_REQUIRE(error == 0 || (error == -1 && errno == EPROT));
+	received = cocall(lookedup, (void *)13, 8, (void *)42, 8);
+	ATF_REQUIRE(received >= 0 || (received == -1 && errno == EPROT));
 }
 
 ATF_TC_WITHOUT_HEAD(cocall_bad_callee_buf);
@@ -396,6 +403,7 @@ ATF_TC_BODY(cocall_bad_callee_buf_h, tc)
 	void * __capability lookedup;
 	char *arg;
 	uint64_t buf;
+	ssize_t received;
 	int error;
 
 	arg = getenv("COCALL_TEST_HELPER_ARG");
@@ -408,8 +416,8 @@ ATF_TC_BODY(cocall_bad_callee_buf_h, tc)
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 	buf = 1;
-	error = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
-	ATF_REQUIRE(error == 0 || (error == -1 && errno == EPROT));
+	received = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
+	ATF_REQUIRE(received >= 0 || (received  == -1 && errno == EPROT));
 	ATF_REQUIRE_EQ(buf, 1);
 }
 
@@ -433,7 +441,7 @@ ATF_TC_BODY(cocall_callee_abort, tc)
 
 		buf = 42;
 		for (;;) {
-			error = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
+			coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
 			abort();
 		}
 		atf_tc_fail("You're not supposed to be here");
@@ -456,6 +464,7 @@ ATF_TC_BODY(cocall_callee_abort_h, tc)
 	void * __capability lookedup;
 	char *arg;
 	uint64_t buf;
+	ssize_t received;
 	int error;
 
 	arg = getenv("COCALL_TEST_HELPER_ARG");
@@ -468,8 +477,8 @@ ATF_TC_BODY(cocall_callee_abort_h, tc)
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 	buf = 1;
-	error = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
-	ATF_REQUIRE_EQ(error, 0);
+	received = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
+	ATF_REQUIRE(received >= 0);
 	ATF_REQUIRE_EQ(buf, 1);
 }
 
@@ -479,6 +488,7 @@ ATF_TC_BODY(cocall_callee_dead, tc)
 	char *name, *pidstr;
 	uint64_t buf;
 	pid_t pid, pid2;
+	ssize_t received;
 	int error;
 
 	name = random_string();
@@ -493,9 +503,9 @@ ATF_TC_BODY(cocall_callee_dead, tc)
 
 		buf = 42;
 		for (;;) {
-			error = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
-			ATF_REQUIRE_EQ(error, -1);
-			ATF_REQUIRE_ERRNO(EINTR, error);
+			received = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
+			ATF_REQUIRE_EQ(received, -1);
+			ATF_REQUIRE_ERRNO(EINTR, -1);
 			ATF_REQUIRE_EQ(buf, 42);
 			abort();
 		}
@@ -521,6 +531,7 @@ ATF_TC_BODY(cocall_callee_dead_h, tc)
 	char *arg, *arg2;
 	uint64_t buf;
 	pid_t pid;
+	ssize_t received;
 	int error;
 
 	arg = getenv("COCALL_TEST_HELPER_ARG");
@@ -548,9 +559,9 @@ ATF_TC_BODY(cocall_callee_dead_h, tc)
 	ATF_REQUIRE_EQ(error, 0);
 
 	buf = 1;
-	error = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
-	ATF_REQUIRE_EQ(error, -1);
-	ATF_REQUIRE_ERRNO(EPIPE, error);
+	received = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
+	ATF_REQUIRE_EQ(received, -1);
+	ATF_REQUIRE_ERRNO(EPIPE, -1);
 	ATF_REQUIRE_EQ(buf, 1);
 }
 
@@ -560,6 +571,7 @@ ATF_TC_BODY(cocall_proxy, tc)
 	char *name, *name2;
 	uint64_t buf;
 	pid_t pid, pid2, pid3;
+	ssize_t received;
 	int error;
 
 	/*
@@ -579,10 +591,8 @@ ATF_TC_BODY(cocall_proxy, tc)
 
 		buf = 42;
 		for (;;) {
-			fprintf(stderr, "%s: waiting\n", __func__);
-			error = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
-			fprintf(stderr, "%s: waited\n", __func__);
-			ATF_REQUIRE_EQ(error, 0);
+			received = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
+			ATF_REQUIRE_EQ(received, sizeof(buf));
 			ATF_REQUIRE_EQ(buf, 2);
 			buf++;
 		}
@@ -615,6 +625,7 @@ ATF_TC_BODY(cocall_proxy_h, tc)
 	void * __capability lookedup;
 	char *arg, *arg2;
 	uint64_t buf;
+	ssize_t received;
 	int error;
 
 	/*
@@ -642,13 +653,13 @@ ATF_TC_BODY(cocall_proxy_h, tc)
 
 	buf = 42;
 	for (;;) {
-		error = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
-		ATF_REQUIRE_EQ(error, 0);
+		received = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
+		ATF_REQUIRE_EQ(received, sizeof(buf));
 		ATF_REQUIRE_EQ(buf, 1);
 
 		buf = 2;
-		error = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
-		ATF_REQUIRE_EQ(error, 0);
+		received = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
+		ATF_REQUIRE_EQ(received, sizeof(buf));
 		ATF_REQUIRE_EQ(buf, 3);
 
 		buf = 4;
@@ -661,6 +672,7 @@ ATF_TC_BODY(cocall_proxy_h2, tc)
 	void * __capability lookedup;
 	char *arg;
 	uint64_t buf;
+	ssize_t received;
 	int error;
 
 	/*
@@ -677,8 +689,8 @@ ATF_TC_BODY(cocall_proxy_h2, tc)
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 	buf = 1;
-	error = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
-	ATF_REQUIRE_EQ(error, 0);
+	received = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
+	ATF_REQUIRE_EQ(received, sizeof(buf));
 	ATF_REQUIRE_EQ(buf, 4);
 }
 
@@ -707,8 +719,7 @@ ATF_TC_BODY(cocall_proxy_abort, tc)
 
 		buf = 42;
 		for (;;) {
-			fprintf(stderr, "%s: waiting\n", __func__);
-			error = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
+			coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
 			abort();
 		}
 		atf_tc_fail("You're not supposed to be here");
@@ -740,6 +751,7 @@ ATF_TC_BODY(cocall_proxy_abort_h, tc)
 	void * __capability lookedup;
 	char *arg, *arg2;
 	uint64_t buf;
+	ssize_t received;
 	int error;
 
 	/*
@@ -767,13 +779,13 @@ ATF_TC_BODY(cocall_proxy_abort_h, tc)
 
 	buf = 42;
 	for (;;) {
-		error = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
-		ATF_REQUIRE_EQ(error, 0);
+		received = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
+		ATF_REQUIRE_EQ(received, sizeof(buf));
 		ATF_REQUIRE_EQ(buf, 1);
 
 		buf = 2;
-		error = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
-		ATF_REQUIRE_EQ(error, 0);
+		received = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
+		ATF_REQUIRE_EQ(received, sizeof(buf));
 		ATF_REQUIRE_EQ(buf, 2);
 
 		buf = 4;
@@ -786,6 +798,7 @@ ATF_TC_BODY(cocall_proxy_abort_h2, tc)
 	void * __capability lookedup;
 	char *arg;
 	uint64_t buf;
+	ssize_t received;
 	int error;
 
 	/*
@@ -802,8 +815,8 @@ ATF_TC_BODY(cocall_proxy_abort_h2, tc)
 	error = colookup(arg, &lookedup);
 	ATF_REQUIRE_EQ(error, 0);
 	buf = 1;
-	error = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
-	ATF_REQUIRE_EQ(error, 0);
+	received = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
+	ATF_REQUIRE_EQ(received, sizeof(buf));
 	ATF_REQUIRE_EQ(buf, 4);
 }
 

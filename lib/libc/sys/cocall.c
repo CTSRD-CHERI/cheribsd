@@ -39,22 +39,22 @@ __FBSDID("$FreeBSD$");
 
 int __usleep(useconds_t);	// XXX
 
-int
+ssize_t
 cocall(void * __capability target,
     const void * __capability outbuf, size_t outlen,
     void * __capability inbuf, size_t inlen)
 {
-	int error;
+	ssize_t received;
 
 	_trace_cocall((ptraddr_t)target, outlen, inlen);
 
 	/* XXX This loop is like this for no particular reason. */
 	for (;;) {
-		error = _cocall(_cocall_code, _cocall_data, target,
+		received = _cocall(_cocall_code, _cocall_data, target,
 		    outbuf, outlen, inbuf, inlen);
 
-		if (__predict_true(error == 0))
-			return (error);
+		if (__predict_true(received >= 0))
+			return (received);
 
 		switch (errno) {
 		case EAGAIN:
@@ -91,7 +91,7 @@ cocall(void * __capability target,
 			return (cocall_slow(target, outbuf, outlen, inbuf, inlen));
 
 		default:
-			return (error);
+			return (received);
 		}
 	}
 

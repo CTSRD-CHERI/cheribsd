@@ -151,6 +151,7 @@ service_proc(void *dummy __unused)
 	void * __capability cookie;
 	uint64_t *halfcookie;
 	char buf[8];
+	ssize_t copied;
 	pid_t pid;
 	int error;
 
@@ -167,8 +168,8 @@ service_proc(void *dummy __unused)
 	fprintf(stderr, "%s: buf %p, we are thread %d, accepting...\n",
 	    __func__, buf, pthread_getthreadid_np());
 	for (;;) {
-		error = coaccept(&cookie, buf, sizeof(buf), buf, sizeof(buf));
-		if (error != 0)
+		copied = coaccept(&cookie, buf, sizeof(buf), buf, sizeof(buf));
+		if (copied < 0)
 			fprintf(stderr, "%s: coaccept: %s\n", __func__, strerror(errno));
 		error = cogetpid(&pid);
 		if (error != 0)

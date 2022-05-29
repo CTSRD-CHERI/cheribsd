@@ -39,8 +39,9 @@
 .Lb libc
 .Sh SYNOPSIS
 .In unistd.h
-.Ft int
+.Ft ssize_t
 .Fn cocall "void * __capability target" "const void * __capability outbuf" "size_t outlen" "void * __capability inbuf" "size_t inlen"
+.Ft ssize_t
 .Fn cocall_slow "void * __capability target" "const void * __capability outbuf" "size_t outlen" "void * __capability inbuf" "size_t inlen"
 .Sh DESCRIPTION
 The
@@ -87,7 +88,12 @@ with
 .Dv COSETUP_COCALL
 argument.
 .Sh RETURN VALUES
-.Rv -std cocall
+Upon successful completion the number of bytes copied into
+.Fa inbuf
+is returned.
+Otherwise a -1 is returned and the global variable
+.Va errno
+is set to indicate the error.
 .Sh ERRORS
 The
 .Fn cocall
@@ -126,6 +132,7 @@ Basic usage example:
 .Bd -literal
 	void * __capability lookedup;
 	uint64_t buf[MAXBSIZE];
+	ssize_t received;
 
 	error = cosetup(COSETUP_COCALL);
 	if (error != 0)
@@ -135,8 +142,10 @@ Basic usage example:
 	if (error != 0)
 		err(1, "colookup");
 
-	error = cocall(lookedup, buf, sizeof(buf), buf, sizeof(buf));
-	if (error != 0)
+	memset(buf, 0, sizeof(buf);
+
+	received = cocall(lookedup, buf, sizeof(buf), buf, sizeof(buf));
+	if (received < 0)
 		err(1, "cocall");
 .Ed
 .Sh SEE ALSO

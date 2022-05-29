@@ -3134,7 +3134,7 @@
 		);
 	}
 548	AUE_NULL	STD|CAPENABLED {
-		int cocall_slow(
+		ssize_t cocall_slow(
 		    _In_ void * __capability target,
 		    _In_reads_bytes_(outlen) const void * __capability outbuf,
 		    size_t outlen,
@@ -3143,14 +3143,14 @@
 		);
 	}
 549	AUE_NULL	STD|CAPENABLED {
-		int coaccept_slow(
+		ssize_t coaccept_slow(
 		    _Inout_ void * __capability *cookiep,
 		    _In_reads_bytes_(outlen) const void * __capability outbuf,
 		    size_t outlen,
 		    _Out_writes_bytes_(inlen) void * __capability inbuf,
 		    size_t inlen
 		);
-}
+	}
 550	AUE_FSYNC	STD|CAPENABLED {
 		int fdatasync(
 		    int fd

@@ -58,6 +58,7 @@ main(int argc, char **argv)
 	void * __capability *lookedup;
 	char *registered, *tmp;
 	uint64_t *halfcookie;
+	ssize_t received;
 	pid_t pid;
 	float dt = 0.0;
 	bool kflag = false, vflag = false, xflag = false;
@@ -142,10 +143,10 @@ main(int argc, char **argv)
 
 	for (;;) {
 		if (kflag)
-			error = coaccept_slow(&cookie, inout, sizeof(inout), inout, sizeof(inout));
+			received = coaccept_slow(&cookie, inout, sizeof(inout), inout, sizeof(inout));
 		else
-			error = coaccept(&cookie, inout, sizeof(inout), inout, sizeof(inout));
-		if (error != 0)
+			received = coaccept(&cookie, inout, sizeof(inout), inout, sizeof(inout));
+		if (received < 0)
 			warn("coaccept");
 		if (vflag) {
 			halfcookie = (uint64_t *)&cookie;
