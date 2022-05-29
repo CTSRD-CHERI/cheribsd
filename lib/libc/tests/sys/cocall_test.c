@@ -324,7 +324,8 @@ ATF_TC_BODY(cocall_bad_caller_buf, tc)
 		buf = 42;
 		for (;;) {
 			received = coaccept(NULL, &buf, sizeof(buf), &buf, sizeof(buf));
-			ATF_REQUIRE_EQ(received, EFAULT);
+			ATF_REQUIRE_EQ(received, -1);
+			ATF_REQUIRE_EQ(errno, EFAULT);
 			ATF_REQUIRE_EQ(buf, 42);
 		}
 		atf_tc_fail("You're not supposed to be here");
@@ -561,7 +562,7 @@ ATF_TC_BODY(cocall_callee_dead_h, tc)
 	buf = 1;
 	received = cocall(lookedup, &buf, sizeof(buf), &buf, sizeof(buf));
 	ATF_REQUIRE_EQ(received, -1);
-	ATF_REQUIRE_ERRNO(EPIPE, -1);
+	ATF_REQUIRE_ERRNO(ENOLINK, -1);
 	ATF_REQUIRE_EQ(buf, 1);
 }
 
