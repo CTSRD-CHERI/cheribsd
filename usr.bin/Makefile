@@ -198,6 +198,7 @@ SUBDIR=	alias \
 SUBDIR+= \
 	coping \
 	copong \
+	coregister \
 	cotrace \
 	stevie
 .endif
