@@ -1,0 +1,126 @@
+.\"
+.\" Copyright (c) 2022 Edward Tomasz Napierala <en322@cl.cam.ac.uk>
+.\" All rights reserved.
+.\"
+.\" This software was developed by the University of Cambridge Computer
+.\" Laboratory as part of the CHERI for Hypervisors and Operating Systems
+.\" (CHaOS) project, funded by EPSRC grant EP/V000292/1.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" $FreeBSD$
+.\"
+.Dd May 25, 2022
+.Dt COTRACE 1
+.Os
+.Sh NAME
+.Nm cotrace
+.Nd trace calls to capv services
+.Sh SYNOPSIS
+.Nm
+.Op Fl C
+.Op Fl k
+.Op Fl v
+.Fl i Ar index
+.Ar command Op Ar args ...
+.Sh DESCRIPTION
+The
+.Nm
+utility is used to display
+.Xr cocall 2
+and
+.Xr coaccept 2
+interactions.
+.Pp
+XXX
+.Pp
+It spawns a child process passing it the capability vector modified
+to interpose the service at offset
+.Ar chosen
+then executes
+.Ar command .
+The parent process transparently relays the calls.
+.Pp
+The following options are available:
+.Bl -tag -width ".Fl s time"
+.It Fl C
+Do not call
+.Xr cap_enter 2 ;
+thus do not enter
+.Xr capsicum 4
+capability mode.
+.It Fl i
+Interpose the service found at offset
+.Ar index
+in the capability vector inherited from the parent process.
+.It Fl k
+Use
+.Xr coaccept_slow 2
+instead of
+.Xr coaccept 2 .
+.It Fl v
+Be verbose.
+This also makes
+.Nm
+send its own answerback instead of relaying them.
+.El
+.Pp
+.Nm
+can be used as a template when implementing new
+.Xr cocall 2
+services, because it is small, straighforward,
+.\" XXX I'm flat out lying here.
+and even somewhat commented.
+.Sh EXIT STATUS
+The
+.Nm
+utility exits 0 on success, and >0 if an error occurs.
+.Sh EXAMPLES
+To trace a
+.Xr clocks 1
+service; notice the answerback from
+.Xr capv 1 :
+.Pp
+.Dl clocks cotrace -vi5 sh
+.Dl capv -v
+.Dl date
+.Pp
+.Sh SEE ALSO
+.Xr capv 1 ,
+.Xr coping 1 ,
+.Xr copong 1 ,
+.Xr cocall 2
+.Xr coaccept 2
+.Sh HISTORY
+The
+.Nm
+command appeared in
+.Tn CheriBSD .
+.Sh AUTHORS
+.An -nosplit
+The
+.Nm
+utility was developed by
+.An Edward Tomasz Napierala Aq Mt trasz@FreeBSD.org
+at the University of Cambridge Computer Laboratory as part of the CHERI
+for Hypervisors and Operating Systems (CHaOS) project, funded by EPSRC
+grant EP/V000292/1.
