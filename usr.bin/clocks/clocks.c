@@ -110,7 +110,7 @@ main(int argc, char **argv)
 	pid_t pid;
 	int capc, ch, error;
 
-	while ((ch = getopt(argc, argv, "Cks:v")) != -1) {
+	while ((ch = getopt(argc, argv, "Ckv")) != -1) {
 		switch (ch) {
 		case 'C':
 			Cflag = true;

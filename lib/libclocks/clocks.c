@@ -62,13 +62,13 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 	if (__predict_false(target == NULL)) {
 		capvfetch(&capc, &capv);
 		if (capc <= CAPV_CLOCKS || capv[CAPV_CLOCKS] == NULL) {
-			warn("null capability %d", CAPV_CLOCKS);
+			warn("%s: null capability %d", __func__, CAPV_CLOCKS);
 			errno = ENOLINK;
 			return (-1);
 		}
 		error = cosetup(COSETUP_COCALL);
 		if (error != 0) {
-			warn("cosetup");
+			warn("%s: cosetup", __func__);
 			return (-1);
 		}
 		target = capv[CAPV_CLOCKS];
@@ -84,7 +84,7 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 	//fprintf(stderr, "%s: -> calling target %lp, in %lp, inlen %zd, out %lp, outlen %zd\n", __func__, target, &in, sizeof(in), &out, sizeof(out));
 	received = cocall(target, &out, out.len, &in, sizeof(in));
 	if (received < 0) {
-		warn("cocall");
+		warn("%s: cocall", __func__);
 		return (error);
 	}
 
@@ -92,8 +92,8 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 	 * Handle the response.
 	 */
 	if ((size_t)received != in.len || in.len != sizeof(in)) {
-		warnx("size mismatch: received %zd, in.len %zd, expected %zd; returning ENOMSG",
-		    (size_t)received, in.len, sizeof(in));
+		warnx("%s: size mismatch: received %zd, in.len %zd, expected %zd; returning ENOMSG",
+		    __func__, (size_t)received, in.len, sizeof(in));
 		errno = ENOMSG;
 		return (error);
 	}
