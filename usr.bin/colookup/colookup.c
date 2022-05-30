@@ -61,7 +61,7 @@ main(int argc, char **argv)
 		//warnx("no capability vector");
 	}
 
-	while ((ch = getopt(argc, argv, "i:k")) != -1) {
+	while ((ch = getopt(argc, argv, "i:")) != -1) {
 		switch (ch) {
 		case 'i':
 			entry = strtol(optarg, &tmp, 10);
