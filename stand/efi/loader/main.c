@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <efi.h>
 #include <efilib.h>
 #include <efichar.h>
+#include <efirng.h>
 
 #include <uuid.h>
 
@@ -187,15 +188,12 @@ static void
 set_currdev(const char *devname)
 {
 
-	/*
-	 * Don't execute hooks here; we may need to try setting these more than
-	 * once here if we're probing for the ZFS pool we're supposed to boot.
-	 * The currdev hook is intended to just validate user input anyways,
-	 * while the loaddev hook makes it immutable once we've determined what
-	 * the proper currdev is.
-	 */
-	env_setenv("currdev", EV_VOLATILE | EV_NOHOOK, devname, efi_setcurrdev,
+	env_setenv("currdev", EV_VOLATILE, devname, efi_setcurrdev,
 	    env_nounset);
+	/*
+	 * Don't execute hook here; the loaddev hook makes it immutable
+	 * once we've determined what the proper currdev is.
+	 */
 	env_setenv("loaddev", EV_VOLATILE | EV_NOHOOK, devname, env_noset,
 	    env_nounset);
 }
@@ -950,11 +948,14 @@ main(int argc, CHAR16 *argv[])
 	 */
 	setenv("console", "efi", 1);
 	uhowto = parse_uefi_con_out();
-#if defined(__aarch64__) || defined(__arm__) || defined(__riscv)
+#if defined(__riscv)
 	if ((uhowto & RB_SERIAL) != 0)
 		setenv("console", "comconsole", 1);
 #endif
 	cons_probe();
+
+	/* Set up currdev variable to have hooks in place. */
+	env_setenv("currdev", EV_VOLATILE, "", efi_setcurrdev, env_nounset);
 
 	/* Init the time source */
 	efi_time_init();
@@ -1204,6 +1205,47 @@ main(int argc, CHAR16 *argv[])
 	return (EFI_SUCCESS);		/* keep compiler happy */
 }
 
+COMMAND_SET(efi_seed_entropy, "efi-seed-entropy", "try to get entropy from the EFI RNG", command_seed_entropy);
+
+static int
+command_seed_entropy(int argc, char *argv[])
+{
+	EFI_STATUS status;
+	EFI_RNG_PROTOCOL *rng;
+	unsigned int size = 2048;
+	void *buf;
+
+	if (argc > 1) {
+		size = strtol(argv[1], NULL, 0);
+	}
+
+	status = BS->LocateProtocol(&rng_guid, NULL, (VOID **)&rng);
+	if (status != EFI_SUCCESS) {
+		command_errmsg = "RNG protocol not found";
+		return (CMD_ERROR);
+	}
+
+	if ((buf = malloc(size)) == NULL) {
+		command_errmsg = "out of memory";
+		return (CMD_ERROR);
+	}
+
+	status = rng->GetRNG(rng, NULL, size, (UINT8 *)buf);
+	if (status != EFI_SUCCESS) {
+		free(buf);
+		command_errmsg = "GetRNG failed";
+		return (CMD_ERROR);
+	}
+
+	if (file_addbuf("efi_rng_seed", "boot_entropy_platform", size, buf) != 0) {
+		free(buf);
+		return (CMD_ERROR);
+	}
+
+	free(buf);
+	return (CMD_OK);
+}
+
 COMMAND_SET(poweroff, "poweroff", "power off the system", command_poweroff);
 
 static int
@@ -1402,6 +1444,30 @@ command_mode(int argc, char *argv[])
 
 COMMAND_SET(lsefi, "lsefi", "list EFI handles", command_lsefi);
 
+static void
+lsefi_print_handle_info(EFI_HANDLE handle)
+{
+	EFI_DEVICE_PATH *devpath;
+	EFI_DEVICE_PATH *imagepath;
+	CHAR16 *dp_name;
+
+	imagepath = efi_lookup_image_devpath(handle);
+	if (imagepath != NULL) {
+		dp_name = efi_devpath_name(imagepath);
+		printf("Handle for image %S", dp_name);
+		efi_free_devpath_name(dp_name);
+		return;
+	}
+	devpath = efi_lookup_devpath(handle);
+	if (devpath != NULL) {
+		dp_name = efi_devpath_name(devpath);
+		printf("Handle for device %S", dp_name);
+		efi_free_devpath_name(dp_name);
+		return;
+	}
+	printf("Handle %p", handle);
+}
+
 static int
 command_lsefi(int argc __unused, char *argv[] __unused)
 {
@@ -1437,7 +1503,7 @@ command_lsefi(int argc __unused, char *argv[] __unused)
 		EFI_GUID **protocols = NULL;
 
 		handle = buffer[i];
-		printf("Handle %p", handle);
+		lsefi_print_handle_info(handle);
 		if (pager_output("\n"))
 			break;
 		/* device path */

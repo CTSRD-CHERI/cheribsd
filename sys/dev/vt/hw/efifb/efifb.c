@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2014 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Aleksandr Rybalko under sponsorship from the
  * FreeBSD Foundation.
@@ -118,6 +117,7 @@ vt_efifb_init(struct vt_device *vd)
 	if (efifb == NULL)
 		return (CN_DEAD);
 
+	info->fb_type = FBTYPE_EFIFB;
 	info->fb_height = efifb->fb_height;
 	info->fb_width = efifb->fb_width;
 
@@ -132,7 +132,7 @@ vt_efifb_init(struct vt_device *vd)
 	roff = ffs(efifb->fb_mask_red) - 1;
 	goff = ffs(efifb->fb_mask_green) - 1;
 	boff = ffs(efifb->fb_mask_blue) - 1;
-	vt_generate_cons_palette(info->fb_cmap, COLOR_FORMAT_RGB,
+	vt_config_cons_colors(info, COLOR_FORMAT_RGB,
 	    efifb->fb_mask_red >> roff, roff,
 	    efifb->fb_mask_green >> goff, goff,
 	    efifb->fb_mask_blue >> boff, boff);

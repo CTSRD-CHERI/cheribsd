@@ -313,9 +313,8 @@ typedef struct callout sctp_os_timer_t;
 /*************************/
 /*      MTU              */
 /*************************/
-#define SCTP_GATHER_MTU_FROM_IFN_INFO(ifn, ifn_index, af) ((struct ifnet *)ifn)->if_mtu
+#define SCTP_GATHER_MTU_FROM_IFN_INFO(ifn, ifn_index) ((ifn != NULL) ? ((struct ifnet *)ifn)->if_mtu : 0)
 #define SCTP_GATHER_MTU_FROM_ROUTE(sctp_ifa, sa, nh) ((uint32_t)((nh != NULL) ? nh->nh_mtu : 0))
-#define SCTP_GATHER_MTU_FROM_INTFC(sctp_ifn) ((sctp_ifn->ifn_p != NULL) ? ((struct ifnet *)(sctp_ifn->ifn_p))->if_mtu : 0)
 
 /*************************/
 /* These are for logging */
@@ -411,28 +410,30 @@ typedef struct route sctp_route_t;
 /*
  * IP output routines
  */
-#define SCTP_IP_OUTPUT(result, o_pak, ro, stcb, vrf_id) \
-{ \
-	int o_flgs = IP_RAWOUTPUT; \
-	struct sctp_tcb *local_stcb = stcb; \
-	if (local_stcb && \
-	    local_stcb->sctp_ep && \
-	    local_stcb->sctp_ep->sctp_socket) \
-		o_flgs |= local_stcb->sctp_ep->sctp_socket->so_options & SO_DONTROUTE; \
-	m_clrprotoflags(o_pak); \
-	result = ip_output(o_pak, NULL, ro, o_flgs, 0, NULL); \
+#define SCTP_IP_OUTPUT(result, o_pak, ro, _inp, vrf_id)                      \
+{                                                                            \
+	struct sctp_inpcb *local_inp = _inp;                                 \
+	int o_flgs = IP_RAWOUTPUT;                                           \
+	                                                                     \
+	m_clrprotoflags(o_pak);                                              \
+	if ((local_inp != NULL) && (local_inp->sctp_socket != NULL)) {       \
+		o_flgs |= local_inp->sctp_socket->so_options & SO_DONTROUTE; \
+	}                                                                    \
+	result = ip_output(o_pak, NULL, ro, o_flgs, 0, NULL);                \
 }
 
-#define SCTP_IP6_OUTPUT(result, o_pak, ro, ifp, stcb, vrf_id) \
-{ \
-	struct sctp_tcb *local_stcb = stcb; \
-	m_clrprotoflags(o_pak); \
-	if (local_stcb && local_stcb->sctp_ep) \
-		result = ip6_output(o_pak, \
-				    ((struct inpcb *)(local_stcb->sctp_ep))->in6p_outputopts, \
-				    (ro), 0, 0, ifp, NULL); \
-	else \
-		result = ip6_output(o_pak, NULL, (ro), 0, 0, ifp, NULL); \
+#define SCTP_IP6_OUTPUT(result, o_pak, ro, ifp, _inp, vrf_id)                \
+{                                                                            \
+	struct sctp_inpcb *local_inp = _inp;                                 \
+	                                                                     \
+	m_clrprotoflags(o_pak);                                              \
+	if (local_inp != NULL) {                                             \
+		result = ip6_output(o_pak,                                   \
+		                    local_inp->ip_inp.inp.in6p_outputopts,   \
+		                    (ro), 0, 0, ifp, NULL);                  \
+	} else {                                                             \
+		result = ip6_output(o_pak, NULL, (ro), 0, 0, ifp, NULL);     \
+	}                                                                    \
 }
 
 struct mbuf *

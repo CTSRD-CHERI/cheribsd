@@ -2129,11 +2129,11 @@ umass_cam_attach(struct umass_softc *sc)
 static void
 umass_cam_detach_sim(struct umass_softc *sc)
 {
-	cam_status status;
+	int error;
 
 	if (sc->sc_sim != NULL) {
-		status = xpt_bus_deregister(cam_sim_path(sc->sc_sim));
-		if (status == CAM_REQ_CMP) {
+		error = xpt_bus_deregister(cam_sim_path(sc->sc_sim));
+		if (error == 0) {
 			/* accessing the softc is not possible after this */
 			sc->sc_sim->softc = NULL;
 			DPRINTF(sc, UDMASS_SCSI, "%s: %s:%d:%d caling "
@@ -2143,8 +2143,8 @@ umass_cam_detach_sim(struct umass_softc *sc)
 			    sc->sc_sim->refcount, sc->sc_sim->mtx);
 			cam_sim_free(sc->sc_sim, /* free_devq */ TRUE);
 		} else {
-			panic("%s: %s: CAM layer is busy: %#x\n",
-			    __func__, sc->sc_name, status);
+			panic("%s: %s: CAM layer is busy: errno %d\n",
+			    __func__, sc->sc_name, error);
 		}
 		sc->sc_sim = NULL;
 	}
@@ -2157,7 +2157,7 @@ umass_cam_detach_sim(struct umass_softc *sc)
 static void
 umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 {
-	struct umass_softc *sc = (struct umass_softc *)sim->softc;
+	struct umass_softc *sc = cam_sim_softc(sim);
 
 	if (sc == NULL) {
 		ccb->ccb_h.status = CAM_SEL_TIMEOUT;
@@ -2289,6 +2289,13 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 					}
 				} else if (sc->sc_transfer.cmd_data[0] == SYNCHRONIZE_CACHE) {
 					if (sc->sc_quirks & NO_SYNCHRONIZE_CACHE) {
+						ccb->csio.scsi_status = SCSI_STATUS_OK;
+						ccb->ccb_h.status = CAM_REQ_CMP;
+						xpt_done(ccb);
+						goto done;
+					}
+				} else if (sc->sc_transfer.cmd_data[0] == START_STOP_UNIT) {
+					if (sc->sc_quirks & NO_START_STOP) {
 						ccb->csio.scsi_status = SCSI_STATUS_OK;
 						ccb->ccb_h.status = CAM_REQ_CMP;
 						xpt_done(ccb);
@@ -2433,7 +2440,7 @@ done:
 static void
 umass_cam_poll(struct cam_sim *sim)
 {
-	struct umass_softc *sc = (struct umass_softc *)sim->softc;
+	struct umass_softc *sc = cam_sim_softc(sim);
 
 	if (sc == NULL)
 		return;
@@ -2501,7 +2508,8 @@ umass_cam_cb(struct umass_softc *sc, union ccb *ccb, uint32_t residue,
 		DPRINTF(sc, UDMASS_SCSI, "Fetching %d bytes of "
 		    "sense data\n", ccb->csio.sense_len);
 
-		if (umass_std_transform(sc, ccb, &sc->cam_scsi_sense.opcode,
+		if (umass_std_transform(sc, ccb,
+		    (uint8_t *)&sc->cam_scsi_sense,
 		    sizeof(sc->cam_scsi_sense))) {
 			if ((sc->sc_quirks & FORCE_SHORT_INQUIRY) &&
 			    (sc->sc_transfer.cmd_data[0] == INQUIRY)) {
@@ -2597,7 +2605,7 @@ umass_cam_sense_cb(struct umass_softc *sc, union ccb *ccb, uint32_t residue,
 			/* the rest of the command was filled in at attach */
 
 			if ((sc->sc_transform)(sc,
-			    &sc->cam_scsi_test_unit_ready.opcode,
+			    (uint8_t *)&sc->cam_scsi_test_unit_ready,
 			    sizeof(sc->cam_scsi_test_unit_ready)) == 1) {
 				umass_command_start(sc, DIR_NONE, NULL, 0,
 				    ccb->ccb_h.timeout,

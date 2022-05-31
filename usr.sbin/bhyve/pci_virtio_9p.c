@@ -153,7 +153,7 @@ pci_vt9p_get_buffer(struct l9p_request *req, struct iovec *iov, size_t *niov,
 {
 	struct pci_vt9p_request *preq = req->lr_aux;
 	size_t n = preq->vsr_niov - preq->vsr_respidx;
-	
+
 	memcpy(iov, preq->vsr_iov + preq->vsr_respidx,
 	    n * sizeof(struct iovec));
 	*niov = n;
@@ -198,12 +198,13 @@ pci_vt9p_notify(void *vsc, struct vqueue_info *vq)
 	struct pci_vt9p_softc *sc;
 	struct pci_vt9p_request *preq;
 	struct vi_req req;
-	uint16_t n;
+	int n;
 
 	sc = vsc;
 
 	while (vq_has_descs(vq)) {
 		n = vq_getchain(vq, iov, VT9P_MAX_IOV, &req);
+		assert(n >= 1 && n <= VT9P_MAX_IOV);
 		preq = calloc(1, sizeof(struct pci_vt9p_request));
 		preq->vsr_sc = sc;
 		preq->vsr_idx = req.idx;
@@ -303,7 +304,7 @@ pci_vt9p_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 
 	sc->vsc_config->tag_len = (uint16_t)strlen(sharename);
 	memcpy(sc->vsc_config->tag, sharename, sc->vsc_config->tag_len);
-	
+
 	if (l9p_backend_fs_init(&sc->vsc_fs_backend, rootfd, ro) != 0) {
 		errno = ENXIO;
 		return (1);

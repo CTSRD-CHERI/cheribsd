@@ -58,6 +58,9 @@ __FBSDID("$FreeBSD$");
 static MALLOC_DEFINE(M_CAMSCHED, "CAM I/O Scheduler",
     "CAM I/O Scheduler buffers");
 
+static SYSCTL_NODE(_kern_cam, OID_AUTO, iosched, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
+    "CAM I/O Scheduler parameters");
+
 /*
  * Default I/O scheduler for FreeBSD. This implementation is just a thin-vineer
  * over the bioq_* interface, with notions of separate calls for normal I/O and
@@ -70,9 +73,8 @@ static MALLOC_DEFINE(M_CAMSCHED, "CAM I/O Scheduler",
 
 #ifdef CAM_IOSCHED_DYNAMIC
 
-static int do_dynamic_iosched = 1;
-TUNABLE_INT("kern.cam.do_dynamic_iosched", &do_dynamic_iosched);
-SYSCTL_INT(_kern_cam, OID_AUTO, do_dynamic_iosched, CTLFLAG_RD,
+static bool do_dynamic_iosched = true;
+SYSCTL_BOOL(_kern_cam_iosched, OID_AUTO, dynamic, CTLFLAG_RD | CTLFLAG_TUN,
     &do_dynamic_iosched, 1,
     "Enable Dynamic I/O scheduler optimizations.");
 
@@ -97,10 +99,45 @@ SYSCTL_INT(_kern_cam, OID_AUTO, do_dynamic_iosched, CTLFLAG_RD,
  * Note: See computation of EMA and EMVAR for acceptable ranges of alpha.
  */
 static int alpha_bits = 9;
-TUNABLE_INT("kern.cam.iosched_alpha_bits", &alpha_bits);
-SYSCTL_INT(_kern_cam, OID_AUTO, iosched_alpha_bits, CTLFLAG_RW,
+SYSCTL_INT(_kern_cam_iosched, OID_AUTO, alpha_bits, CTLFLAG_RW | CTLFLAG_TUN,
     &alpha_bits, 1,
     "Bits in EMA's alpha.");
+
+/*
+ * Different parameters for the buckets of latency we keep track of. These are all
+ * published read-only since at present they are compile time constants.
+ *
+ * Bucket base is the upper bounds of the first latency bucket. It's currently 20us.
+ * With 20 buckets (see below), that leads to a geometric progression with a max size
+ * of 5.2s which is safeily larger than 1s to help diagnose extreme outliers better.
+ */
+#ifndef BUCKET_BASE
+#define BUCKET_BASE ((SBT_1S / 50000) + 1)	/* 20us */
+#endif
+static sbintime_t bucket_base = BUCKET_BASE;
+SYSCTL_SBINTIME_USEC(_kern_cam_iosched, OID_AUTO, bucket_base_us, CTLFLAG_RD,
+    &bucket_base,
+    "Size of the smallest latency bucket");
+
+/*
+ * Bucket ratio is the geometric progression for the bucket. For a bucket b_n
+ * the size of bucket b_n+1 is b_n * bucket_ratio / 100.
+ */
+static int bucket_ratio = 200;	/* Rather hard coded at the moment */
+SYSCTL_INT(_kern_cam_iosched, OID_AUTO, bucket_ratio, CTLFLAG_RD,
+    &bucket_ratio, 200,
+    "Latency Bucket Ratio for geometric progression.");
+
+/*
+ * Number of total buckets. Starting at BUCKET_BASE, each one is a power of 2.
+ */
+#ifndef LAT_BUCKETS
+#define LAT_BUCKETS 20	/* < 20us < 40us ... < 2^(n-1)*20us >= 2^(n-1)*20us */
+#endif
+static int lat_buckets = LAT_BUCKETS;
+SYSCTL_INT(_kern_cam_iosched, OID_AUTO, buckets, CTLFLAG_RD,
+    &lat_buckets, LAT_BUCKETS,
+    "Total number of latency buckets published");
 
 struct iop_stats;
 struct cam_iosched_softc;
@@ -235,7 +272,6 @@ struct iop_stats {
 	uint32_t	state_flags;
 #define IOP_RATE_LIMITED		1u
 
-#define LAT_BUCKETS 15			/* < 1ms < 2ms ... < 2^(n-1)ms >= 2^(n-1)ms*/
 	uint64_t	latencies[LAT_BUCKETS];
 
 	struct cam_iosched_softc *softc;
@@ -1011,7 +1047,7 @@ cam_iosched_iop_stats_sysctl_init(struct cam_iosched_softc *isc, struct iop_stat
 
 	SYSCTL_ADD_PROC(ctx, n,
 	    OID_AUTO, "limiter",
-	    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+	    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_MPSAFE,
 	    ios, 0, cam_iosched_limiter_sysctl, "A",
 	    "Current limiting type.");
 	SYSCTL_ADD_INT(ctx, n,
@@ -1029,7 +1065,7 @@ cam_iosched_iop_stats_sysctl_init(struct cam_iosched_softc *isc, struct iop_stat
 
 	SYSCTL_ADD_PROC(ctx, n,
 	    OID_AUTO, "latencies",
-	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
+	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE,
 	    &ios->latencies, 0,
 	    cam_iosched_sysctl_latencies, "A",
 	    "Array of power of 2 latency from 1ms to 1.024s");
@@ -1059,22 +1095,22 @@ cam_iosched_cl_sysctl_init(struct cam_iosched_softc *isc)
 
 	SYSCTL_ADD_PROC(ctx, n,
 	    OID_AUTO, "type",
-	    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+	    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_MPSAFE,
 	    clp, 0, cam_iosched_control_type_sysctl, "A",
 	    "Control loop algorithm");
 	SYSCTL_ADD_PROC(ctx, n,
 	    OID_AUTO, "steer_interval",
-	    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+	    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_MPSAFE,
 	    &clp->steer_interval, 0, cam_iosched_sbintime_sysctl, "A",
 	    "How often to steer (in us)");
 	SYSCTL_ADD_PROC(ctx, n,
 	    OID_AUTO, "lolat",
-	    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+	    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_MPSAFE,
 	    &clp->lolat, 0, cam_iosched_sbintime_sysctl, "A",
 	    "Low water mark for Latency (in us)");
 	SYSCTL_ADD_PROC(ctx, n,
 	    OID_AUTO, "hilat",
-	    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+	    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_MPSAFE,
 	    &clp->hilat, 0, cam_iosched_sbintime_sysctl, "A",
 	    "Hi water mark for Latency (in us)");
 	SYSCTL_ADD_INT(ctx, n,
@@ -1202,7 +1238,7 @@ void cam_iosched_sysctl_init(struct cam_iosched_softc *isc,
 	    "How biased towards read should we be independent of limits");
 
 	SYSCTL_ADD_PROC(ctx, n,
-	    OID_AUTO, "quanta", CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+	    OID_AUTO, "quanta", CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE,
 	    &isc->quanta, 0, cam_iosched_quanta_sysctl, "I",
 	    "How many quanta per second do we slice the I/O up into");
 
@@ -1482,8 +1518,9 @@ cam_iosched_next_bio(struct cam_iosched_softc *isc)
 
 #ifdef CAM_IOSCHED_DYNAMIC
 	/*
-	 * See if we have any pending writes, and room in the queue for them,
-	 * and if so, those are next.
+	 * See if we have any pending writes, room in the queue for them,
+	 * and no pending reads (unless we've scheduled too many).
+	 * if so, those are next.
 	 */
 	if (do_dynamic_iosched) {
 		if ((bp = cam_iosched_get_write(isc)) != NULL)
@@ -1685,7 +1722,8 @@ cam_iosched_bio_complete(struct cam_iosched_softc *isc, struct bio *bp,
 			printf("Completing command with bio_cmd == %#x\n", bp->bio_cmd);
 	}
 
-	if (!(bp->bio_flags & BIO_ERROR) && done_ccb != NULL) {
+	if ((bp->bio_flags & BIO_ERROR) == 0 && done_ccb != NULL &&
+	    (done_ccb->ccb_h.status & CAM_QOS_VALID) != 0) {
 		sbintime_t sim_latency;
 		
 		sim_latency = cam_iosched_sbintime_t(done_ccb->ccb_h.qos.periph_data);
@@ -1791,20 +1829,25 @@ isqrt64(uint64_t val)
 }
 
 static sbintime_t latencies[LAT_BUCKETS - 1] = {
-	SBT_1MS <<  0,
-	SBT_1MS <<  1,
-	SBT_1MS <<  2,
-	SBT_1MS <<  3,
-	SBT_1MS <<  4,
-	SBT_1MS <<  5,
-	SBT_1MS <<  6,
-	SBT_1MS <<  7,
-	SBT_1MS <<  8,
-	SBT_1MS <<  9,
-	SBT_1MS << 10,
-	SBT_1MS << 11,
-	SBT_1MS << 12,
-	SBT_1MS << 13		/* 8.192s */
+	BUCKET_BASE <<  0,	/* 20us */
+	BUCKET_BASE <<  1,
+	BUCKET_BASE <<  2,
+	BUCKET_BASE <<  3,
+	BUCKET_BASE <<  4,
+	BUCKET_BASE <<  5,
+	BUCKET_BASE <<  6,
+	BUCKET_BASE <<  7,
+	BUCKET_BASE <<  8,
+	BUCKET_BASE <<  9,
+	BUCKET_BASE << 10,
+	BUCKET_BASE << 11,
+	BUCKET_BASE << 12,
+	BUCKET_BASE << 13,
+	BUCKET_BASE << 14,
+	BUCKET_BASE << 15,
+	BUCKET_BASE << 16,
+	BUCKET_BASE << 17,
+	BUCKET_BASE << 18	/* 5,242,880us */
 };
 
 static void
@@ -1824,7 +1867,7 @@ cam_iosched_update(struct iop_stats *iop, sbintime_t sim_latency)
 		}
 	}
 	if (i == LAT_BUCKETS - 1)
-		iop->latencies[i]++; 	 /* Put all > 1024ms values into the last bucket. */
+		iop->latencies[i]++; 	 /* Put all > 8192ms values into the last bucket. */
 
 	/*
 	 * Classic exponentially decaying average with a tiny alpha

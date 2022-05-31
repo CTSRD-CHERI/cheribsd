@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2016, Mellanox Technologies, Ltd.  All rights reserved.
+ * Copyright (c) 2016-2020, Mellanox Technologies, Ltd.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,7 +25,10 @@
  * $FreeBSD$
  */
 
-#include "mlx5_ib.h"
+#include "opt_rss.h"
+#include "opt_ratelimit.h"
+
+#include <dev/mlx5/mlx5_ib/mlx5_ib.h>
 
 struct mlx5_ib_gsi_wr {
 	struct ib_cqe cqe;
@@ -472,8 +475,8 @@ static struct ib_qp *get_tx_qp(struct mlx5_ib_gsi_qp *gsi, struct ib_ud_wr *wr)
 	return gsi->tx_qps[qp_index];
 }
 
-int mlx5_ib_gsi_post_send(struct ib_qp *qp, struct ib_send_wr *wr,
-			  struct ib_send_wr **bad_wr)
+int mlx5_ib_gsi_post_send(struct ib_qp *qp, const struct ib_send_wr *wr,
+			  const struct ib_send_wr **bad_wr)
 {
 	struct mlx5_ib_gsi_qp *gsi = gsi_qp(qp);
 	struct ib_qp *tx_qp;
@@ -517,8 +520,8 @@ err:
 	return ret;
 }
 
-int mlx5_ib_gsi_post_recv(struct ib_qp *qp, struct ib_recv_wr *wr,
-			  struct ib_recv_wr **bad_wr)
+int mlx5_ib_gsi_post_recv(struct ib_qp *qp, const struct ib_recv_wr *wr,
+			  const struct ib_recv_wr **bad_wr)
 {
 	struct mlx5_ib_gsi_qp *gsi = gsi_qp(qp);
 

@@ -153,10 +153,7 @@
  */
 .macro morello_cpu_init
 #if __has_feature(capabilities)
-	/*
-	 * Enable Morello instructions at EL1. We will enable them at EL0
-	 * later when we know userspace is expecting to use them.
-	 */
+	/* Enable Morello instructions at EL0 and EL1 */
 	mrs	x2, cpacr_el1
 	bic	x2, x2, CPACR_CEN_MASK
 	orr	x2, x2, CPACR_CEN_TRAP_NONE
@@ -272,6 +269,13 @@ virtdone:
 	cmp	PTR(15), PTR(14)
 	b.lo	1b
 
+#if defined(PERTHREAD_SSP)
+	/* Set sp_el0 to the boot canary for early per-thread SSP to work */
+	adrp	x15, boot_canary
+	add	x15, x15, :lo12:boot_canary
+	msr	sp_el0, x15
+#endif
+
 	/* Backup the module pointer */
 	mov	x19, x0
 
@@ -334,6 +338,18 @@ virtdone:
 	bl	initarm
 	/* We are done with the boot params */
 	add	PTRN(sp), PTRN(sp), #BOOTPARAMS_SIZE
+
+#ifdef PAC
+	/*
+	 * Enable pointer authentication in the kernel. We set the keys for
+	 * thread0 in initarm so have to wait until it returns to enable it.
+	 * If we were to enable it in initarm then any authentication when
+	 * returning would fail as it was called with pointer authentication
+	 * disabled.
+	 */
+	bl	ptrauth_start
+#endif
+
 	bl	mi_startup
 
 	/* We should not get here */
@@ -359,7 +375,7 @@ ENTRY(mpentry)
 	.arch_extension a64c
 #endif
 	/* Disable interrupts */
-	msr	daifset, #2
+	msr	daifset, #DAIF_INTR
 
 	/* Drop to EL1 */
 	bl	drop_to_el1
@@ -392,6 +408,13 @@ mp_virtdone:
 	LDR_LABEL(PTR(4), PTR(4), bootstack)
 	mov	PTRN(sp), PTR(4)
 
+#if defined(PERTHREAD_SSP)
+	/* Set sp_el0 to the boot canary for early per-thread SSP to work */
+	adrp	x15, boot_canary
+	add	x15, x15, :lo12:boot_canary
+	msr	sp_el0, x15
+#endif
+
 	/* Load the kernel ttbr0 pagetable */
 	msr	ttbr0_el1, x27
 	isb
@@ -423,7 +446,7 @@ LENTRY(drop_to_el1)
 	ret
 1:
 	/* Configure the Hypervisor */
-	mov	x2, #(HCR_RW)
+	ldr	x2, =(HCR_RW | HCR_APK | HCR_API)
 	msr	hcr_el2, x2
 
 	/* Load the Virtualization Process ID Register */
@@ -804,6 +827,7 @@ LENTRY(link_l0_pagetable)
 
 	/* Build the L0 block entry */
 	mov	x12, #L0_TABLE
+	orr	x12, x12, #(TATTR_UXN_TABLE | TATTR_AP_TABLE_NO_EL0)
 
 	/* Only use the output address bits */
 	lsr	x9, x9, #PAGE_SHIFT
@@ -998,17 +1022,13 @@ sctlr_set:
 	    SCTLR_M | SCTLR_CP15BEN)
 sctlr_clear:
 	/* Bits to clear */
-	.quad (SCTLR_EE | SCTLR_EOE | SCTLR_IESB | SCTLR_WXN | SCTLR_UMA | \
+	.quad (SCTLR_EE | SCTLR_E0E | SCTLR_IESB | SCTLR_WXN | SCTLR_UMA | \
 	    SCTLR_ITD | SCTLR_A)
 LEND(start_mmu)
 
 ENTRY(abort)
 	b abort
 END(abort)
-
-	.align 3
-init_pt_va:
-	.quad pagetable		/* XXX: Keep page tables VA */
 
 	.section .init_pagetable, "aw", %nobits
 	.align PAGE_SHIFT
@@ -1048,8 +1068,6 @@ el2_pagetable:
 	.space	PAGE_SIZE
 	.size	el2_pagetable, . - el2_pagetable
 
-	.globl init_pt_va
-
 	.align	4
 	.type	initstack,#object
 initstack:
@@ -1067,45 +1085,6 @@ initstack_end:
 #define	SIGCODE(sym)						\
 	.section .rodata; .globl sym; .align 2; .type sym,#object; sym:	\
 	.cfi_startproc
-
-SIGCODE(sigcode)
-#if __has_feature(capabilities)
-#ifndef __CHERI_PURE_CAPABILITY__
-	.arch_extension c64
-#endif
-	add	c0, csp, #SF_UC
-#else
-	mov	x0, sp
-	add	x0, x0, #SF_UC
-#endif
-
-1:
-	mov	x8, #SYS_sigreturn
-	svc	0
-
-	/* sigreturn failed, exit */
-	mov	x8, #SYS_exit
-	svc	0
-
-	b	1b
-#if __has_feature(capabilities)
-#ifndef __CHERI_PURE_CAPABILITY__
-	.arch_extension noc64
-	.arch_extension a64c
-#endif
-#endif
-	/* This may be copied to the stack, keep it 16-byte aligned */
-	.align	3
-END(sigcode)
-esigcode:
-
-	.data
-	.align	3
-	.global	szsigcode
-	.type	szsigcode,#object
-	.size	szsigcode, 8
-szsigcode:
-	.quad	esigcode - sigcode
 
 #ifdef COMPAT_FREEBSD64
 SIGCODE(freebsd64_sigcode)

@@ -18,16 +18,20 @@ SUBDIR = \
 	isl \
 	isl12xx \
 	jedec_dimm \
+	max44009 \
 	mux \
 	nxprtc \
+	pcf8574 \
+	pcf8591 \
 	rtc8583 \
 	s35390a \
 	smb \
 	smbus \
 
 .if !empty(OPT_FDT)
-SUBDIR += tca6416 \
-	  rx8803
+SUBDIR += rx8803 \
+	  tca6416 \
+	  tmp461
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \

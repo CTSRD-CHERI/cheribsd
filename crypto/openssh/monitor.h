@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.h,v 1.21 2018/07/09 21:53:45 markus Exp $ */
+/* $OpenBSD: monitor.h,v 1.23 2019/01/19 21:43:56 djm Exp $ */
 
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
@@ -53,8 +53,7 @@ enum monitor_reqtype {
 	MONITOR_REQ_GSSSTEP = 44, MONITOR_ANS_GSSSTEP = 45,
 	MONITOR_REQ_GSSUSEROK = 46, MONITOR_ANS_GSSUSEROK = 47,
 	MONITOR_REQ_GSSCHECKMIC = 48, MONITOR_ANS_GSSCHECKMIC = 49,
-	MONITOR_REQ_GETPWCLASS = 50, MONITOR_ANS_GETPWCLASS = 51,
-	MONITOR_REQ_TERM = 52,
+	MONITOR_REQ_TERM = 50,
 
 	MONITOR_REQ_PAM_START = 100,
 	MONITOR_REQ_PAM_ACCOUNT = 102, MONITOR_ANS_PAM_ACCOUNT = 103,
@@ -65,6 +64,8 @@ enum monitor_reqtype {
 	MONITOR_REQ_AUDIT_EVENT = 112, MONITOR_REQ_AUDIT_COMMAND = 113,
 
 };
+
+struct ssh;
 
 struct monitor {
 	int			 m_recvfd;
@@ -79,15 +80,16 @@ struct monitor *monitor_init(void);
 void monitor_reinit(struct monitor *);
 
 struct Authctxt;
-void monitor_child_preauth(struct Authctxt *, struct monitor *);
-void monitor_child_postauth(struct monitor *);
+void monitor_child_preauth(struct ssh *, struct monitor *);
+void monitor_child_postauth(struct ssh *, struct monitor *);
 
-struct mon_table;
-int monitor_read(struct monitor*, struct mon_table *, struct mon_table **);
+void monitor_clear_keystate(struct ssh *, struct monitor *);
+void monitor_apply_keystate(struct ssh *, struct monitor *);
 
 /* Prototypes for request sending and receiving */
 void mm_request_send(int, enum monitor_reqtype, struct sshbuf *);
 void mm_request_receive(int, struct sshbuf *);
 void mm_request_receive_expect(int, enum monitor_reqtype, struct sshbuf *);
+void mm_get_keystate(struct ssh *, struct monitor *);
 
 #endif /* _MONITOR_H_ */

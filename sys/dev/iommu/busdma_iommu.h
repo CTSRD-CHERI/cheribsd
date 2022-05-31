@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2013 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Konstantin Belousov <kib@FreeBSD.org>
  * under sponsorship from the FreeBSD Foundation.
@@ -55,6 +54,9 @@ struct bus_dmamap_iommu {
 	bool locked;
 	bool cansleep;
 	int flags;
+#ifdef KMSAN
+	struct memdesc kmsan_mem;
+#endif
 };
 
 #define	BUS_DMAMAP_IOMMU_MALLOC	0x0001

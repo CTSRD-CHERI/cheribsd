@@ -94,7 +94,7 @@ DISTRIBUTION?=	base
 distribute: .MAKE
 .for dist in ${DISTRIBUTION}
 	${_+_}cd ${.CURDIR}; \
-	    ${MAKE} install installconfig -DNO_SUBDIR DESTDIR=${DISTDIR}/${dist} SHARED=copies
+	    ${MAKE} install installconfig -DNO_SUBDIR DISTBASE=/${dist} DESTDIR=${DISTDIR}/${dist} SHARED=copies
 .endfor
 .endif
 # Convenience targets to run 'build${target}' and 'install${target}' when
@@ -129,8 +129,8 @@ SUBDIR:=${SUBDIR:u}
 
 .if defined(SUBDIR.)
 .error ${.CURDIR}: Found variable SUBDIR. with value "${SUBDIR.}". This was \
-    probably caused by using SUBDIR.$${MK_FOO} without including \
-    <src.opts.mk> or by using an invalid $${MK_FOO} option.
+        probably caused by using SUBDIR.$${MK_FOO} without including \
+        <src.opts.mk> or by using an invalid $${MK_FOO} option.
 .endif
 
 # Subdir code shared among 'make <subdir>', 'make <target>' and SUBDIR_PARALLEL.

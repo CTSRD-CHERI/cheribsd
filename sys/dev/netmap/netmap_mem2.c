@@ -1702,11 +1702,11 @@ _netmap_mem_private_new(size_t size, struct netmap_obj_params *p, int grp_id,
 				nm_blueprint.pools[i].name,
 				d->name);
 		if (checksz) {
-			uint64_t poolsz = p[i].num * p[i].size;
+			uint64_t poolsz = (uint64_t)p[i].num * p[i].size;
 			if (memtotal < poolsz) {
 				nm_prerr("%s: request too large", d->pools[i].name);
 				err = ENOMEM;
-				goto error;
+				goto error_rel_id;
 			}
 			memtotal -= poolsz;
 		}
@@ -1731,14 +1731,15 @@ _netmap_mem_private_new(size_t size, struct netmap_obj_params *p, int grp_id,
 
 	err = netmap_mem_config(d);
 	if (err)
-		goto error_rel_id;
+		goto error_destroy_lock;
 
 	d->flags &= ~NETMAP_MEM_FINALIZED;
 
 	return d;
 
-error_rel_id:
+error_destroy_lock:
 	NMA_LOCK_DESTROY(d);
+error_rel_id:
 	nm_mem_release_id(d);
 error_free:
 	nm_os_free(d);

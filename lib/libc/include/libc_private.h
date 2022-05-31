@@ -271,12 +271,6 @@ void	 tls_free_aligned(void *ptr);
 int _once(pthread_once_t *, void (*)(void));
 
 /*
- * Get/set the TLS thread pointer
- */
-void *_get_tp(void);
-void _set_tp(void *tp);
-
-/*
  * This is a pointer in the C run-time startup code. It is used
  * by getprogname() and setprogname().
  */
@@ -380,6 +374,7 @@ __ssize_t	__sys_recv(int, void *, __size_t, int);
 __ssize_t	__sys_recvfrom(int, void *, __size_t, int, struct sockaddr *,
 		    __socklen_t *);
 __ssize_t	__sys_recvmsg(int, struct msghdr *, int);
+int		__sys_sched_getcpu(void);
 int		__sys_select(int, struct fd_set *, struct fd_set *,
 		    struct fd_set *, struct timeval *);
 __ssize_t	__sys_sendmsg(int, const struct msghdr *, int);

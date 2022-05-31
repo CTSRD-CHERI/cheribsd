@@ -37,11 +37,16 @@
 
 #include <sys/cdefs.h>
 
+#ifdef COMPAT_64BIT
+#define	_PATH_LOCALBASE	"/usr/local64"
+#else
 #define	_PATH_LOCALBASE	"/usr/local"
+#endif
 
 /* Default search path. */
 #define	_PATH_DEFPATH	"/sbin:/bin:/usr/sbin:/usr/bin:" \
-  			_PATH_LOCALBASE "/sbin:" _PATH_LOCALBASE "/bin"
+			"/usr/local/sbin:/usr/local/bin:" \
+			"/usr/local64/sbin:/usr/local64/bin"
 /* All standard utilities path. */
 #define	_PATH_STDPATH	"/usr/bin:/bin:/usr/sbin:/sbin"
 /* Locate system binaries. */

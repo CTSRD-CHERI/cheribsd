@@ -29,7 +29,6 @@
  */
 
 #include <sys/param.h>
-#include <sys/sysctl.h>
 #include <errno.h>
 #include <inttypes.h>
 #include <libutil.h>
@@ -275,9 +274,18 @@ query:
 			gpart_destroy(gpart);
 		}
 
+		/*
+		 * For CheriBSD/Morello, don't bother prompting for the
+		 * partition type when using the entire disk -- always use
+		 * GPT.
+		 */
+#if 0
 		scheme = choose_part_type(default_scheme());
 		if (scheme == NULL)
 			return NULL;
+#else
+		scheme = default_scheme();
+#endif
 		gpart_partition(disk, scheme);
 	}
 

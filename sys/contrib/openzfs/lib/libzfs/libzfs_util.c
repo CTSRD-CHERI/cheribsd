@@ -44,6 +44,9 @@
 #include <strings.h>
 #include <unistd.h>
 #include <math.h>
+#if LIBFETCH_DYNAMIC
+#include <dlfcn.h>
+#endif
 #include <sys/stat.h>
 #include <sys/mnttab.h>
 #include <sys/mntent.h>
@@ -293,6 +296,9 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	case EZFS_REBUILDING:
 		return (dgettext(TEXT_DOMAIN, "currently sequentially "
 		    "resilvering"));
+	case EZFS_VDEV_NOTSUP:
+		return (dgettext(TEXT_DOMAIN, "operation not supported "
+		    "on this type of vdev"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:
@@ -301,7 +307,6 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	}
 }
 
-/*PRINTFLIKE2*/
 void
 zfs_error_aux(libzfs_handle_t *hdl, const char *fmt, ...)
 {
@@ -349,7 +354,6 @@ zfs_error(libzfs_handle_t *hdl, int error, const char *msg)
 	return (zfs_error_fmt(hdl, error, "%s", msg));
 }
 
-/*PRINTFLIKE3*/
 int
 zfs_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 {
@@ -400,7 +404,6 @@ zfs_standard_error(libzfs_handle_t *hdl, int error, const char *msg)
 	return (zfs_standard_error_fmt(hdl, error, "%s", msg));
 }
 
-/*PRINTFLIKE3*/
 int
 zfs_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 {
@@ -483,7 +486,7 @@ zfs_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 		zfs_verror(hdl, EZFS_BADPROP, fmt, ap);
 		break;
 	default:
-		zfs_error_aux(hdl, strerror(error));
+		zfs_error_aux(hdl, "%s", strerror(error));
 		zfs_verror(hdl, EZFS_UNKNOWN, fmt, ap);
 		break;
 	}
@@ -598,7 +601,7 @@ zfs_setprop_error(libzfs_handle_t *hdl, zfs_prop_t prop, int err,
 			break;
 		}
 #endif
-		/* FALLTHROUGH */
+		fallthrough;
 	default:
 		(void) zfs_standard_error(hdl, err, errbuf);
 	}
@@ -610,7 +613,6 @@ zpool_standard_error(libzfs_handle_t *hdl, int error, const char *msg)
 	return (zpool_standard_error_fmt(hdl, error, "%s", msg));
 }
 
-/*PRINTFLIKE3*/
 int
 zpool_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 {
@@ -717,6 +719,9 @@ zpool_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 	case ZFS_ERR_BADPROP:
 		zfs_verror(hdl, EZFS_BADPROP, fmt, ap);
 		break;
+	case ZFS_ERR_VDEV_NOTSUP:
+		zfs_verror(hdl, EZFS_VDEV_NOTSUP, fmt, ap);
+		break;
 	case ZFS_ERR_IOC_CMD_UNAVAIL:
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "the loaded zfs "
 		    "module does not support this operation. A reboot may "
@@ -734,7 +739,7 @@ zpool_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 		zfs_verror(hdl, EZFS_IOC_NOTSUPPORTED, fmt, ap);
 		break;
 	default:
-		zfs_error_aux(hdl, strerror(error));
+		zfs_error_aux(hdl, "%s", strerror(error));
 		zfs_verror(hdl, EZFS_UNKNOWN, fmt, ap);
 	}
 
@@ -768,7 +773,6 @@ zfs_alloc(libzfs_handle_t *hdl, size_t size)
 /*
  * A safe form of asprintf() which will die if the allocation fails.
  */
-/*PRINTFLIKE2*/
 char *
 zfs_asprintf(libzfs_handle_t *hdl, const char *fmt, ...)
 {
@@ -782,8 +786,10 @@ zfs_asprintf(libzfs_handle_t *hdl, const char *fmt, ...)
 
 	va_end(ap);
 
-	if (err < 0)
+	if (err < 0) {
 		(void) no_memory(hdl);
+		ret = NULL;
+	}
 
 	return (ret);
 }
@@ -842,17 +848,13 @@ libzfs_read_stdout_from_fd(int fd, char **lines[])
 	size_t len = 0;
 	char *line = NULL;
 	char **tmp_lines = NULL, **tmp;
-	char *nl = NULL;
-	int rc;
 
 	fp = fdopen(fd, "r");
-	if (fp == NULL)
+	if (fp == NULL) {
+		close(fd);
 		return (0);
-	while (1) {
-		rc = getline(&line, &len, fp);
-		if (rc == -1)
-			break;
-
+	}
+	while (getline(&line, &len, fp) != -1) {
 		tmp = realloc(tmp_lines, sizeof (*tmp_lines) * (lines_cnt + 1));
 		if (tmp == NULL) {
 			/* Return the lines we were able to process */
@@ -860,13 +862,16 @@ libzfs_read_stdout_from_fd(int fd, char **lines[])
 		}
 		tmp_lines = tmp;
 
-		/* Terminate newlines */
-		if ((nl = strchr(line, '\n')) != NULL)
-			*nl = '\0';
-		tmp_lines[lines_cnt] = line;
-		lines_cnt++;
-		line = NULL;
+		/* Remove newline if not EOF */
+		if (line[strlen(line) - 1] == '\n')
+			line[strlen(line) - 1] = '\0';
+
+		tmp_lines[lines_cnt] = strdup(line);
+		if (tmp_lines[lines_cnt] == NULL)
+			break;
+		++lines_cnt;
 	}
+	free(line);
 	fclose(fp);
 	*lines = tmp_lines;
 	return (lines_cnt);
@@ -884,13 +889,13 @@ libzfs_run_process_impl(const char *path, char *argv[], char *env[], int flags,
 	 * Setup a pipe between our child and parent process if we're
 	 * reading stdout.
 	 */
-	if ((lines != NULL) && pipe(link) == -1)
+	if (lines != NULL && pipe2(link, O_NONBLOCK | O_CLOEXEC) == -1)
 		return (-EPIPE);
 
-	pid = vfork();
+	pid = fork();
 	if (pid == 0) {
 		/* Child process */
-		devnull_fd = open("/dev/null", O_WRONLY);
+		devnull_fd = open("/dev/null", O_WRONLY | O_CLOEXEC);
 
 		if (devnull_fd < 0)
 			_exit(-1);
@@ -900,14 +905,10 @@ libzfs_run_process_impl(const char *path, char *argv[], char *env[], int flags,
 		else if (lines != NULL) {
 			/* Save the output to lines[] */
 			dup2(link[1], STDOUT_FILENO);
-			close(link[0]);
-			close(link[1]);
 		}
 
 		if (!(flags & STDERR_VERBOSE))
 			(void) dup2(devnull_fd, STDERR_FILENO);
-
-		close(devnull_fd);
 
 		if (flags & NO_DEFAULT_PATH) {
 			if (env == NULL)
@@ -927,7 +928,8 @@ libzfs_run_process_impl(const char *path, char *argv[], char *env[], int flags,
 		int status;
 
 		while ((error = waitpid(pid, &status, 0)) == -1 &&
-		    errno == EINTR) { }
+		    errno == EINTR)
+			;
 		if (error < 0 || !WIFEXITED(status))
 			return (-1);
 
@@ -1024,24 +1026,13 @@ libzfs_init(void)
 		return (NULL);
 	}
 
-	if ((hdl->libzfs_fd = open(ZFS_DEV, O_RDWR|O_EXCL)) < 0) {
-		free(hdl);
-		return (NULL);
-	}
-
-#ifdef HAVE_SETMNTENT
-	if ((hdl->libzfs_mnttab = setmntent(MNTTAB, "r")) == NULL) {
-#else
-	if ((hdl->libzfs_mnttab = fopen(MNTTAB, "r")) == NULL) {
-#endif
-		(void) close(hdl->libzfs_fd);
+	if ((hdl->libzfs_fd = open(ZFS_DEV, O_RDWR|O_EXCL|O_CLOEXEC)) < 0) {
 		free(hdl);
 		return (NULL);
 	}
 
 	if (libzfs_core_init() != 0) {
 		(void) close(hdl->libzfs_fd);
-		(void) fclose(hdl->libzfs_mnttab);
 		free(hdl);
 		return (NULL);
 	}
@@ -1049,6 +1040,7 @@ libzfs_init(void)
 	zfs_prop_init();
 	zpool_prop_init();
 	zpool_feature_init();
+	vdev_prop_init();
 	libzfs_mnttab_init(hdl);
 	fletcher_4_init();
 
@@ -1060,7 +1052,6 @@ libzfs_init(void)
 		    &hdl->libzfs_max_nvlist))) {
 			errno = error;
 			(void) close(hdl->libzfs_fd);
-			(void) fclose(hdl->libzfs_mnttab);
 			free(hdl);
 			return (NULL);
 		}
@@ -1091,18 +1082,17 @@ void
 libzfs_fini(libzfs_handle_t *hdl)
 {
 	(void) close(hdl->libzfs_fd);
-	if (hdl->libzfs_mnttab)
-#ifdef HAVE_SETMNTENT
-		(void) endmntent(hdl->libzfs_mnttab);
-#else
-		(void) fclose(hdl->libzfs_mnttab);
-#endif
 	zpool_free_handles(hdl);
 	namespace_clear(hdl);
 	libzfs_mnttab_fini(hdl);
 	libzfs_core_fini();
 	regfree(&hdl->libzfs_urire);
 	fletcher_4_fini();
+#if LIBFETCH_DYNAMIC
+	if (hdl->libfetch != (void *)-1 && hdl->libfetch != NULL)
+		(void) dlclose(hdl->libfetch);
+	free(hdl->libfetch_load_error);
+#endif
 	free(hdl);
 }
 
@@ -1142,10 +1132,6 @@ zfs_path_to_zhandle(libzfs_handle_t *hdl, const char *path, zfs_type_t argtype)
 		 */
 		return (zfs_open(hdl, path, argtype));
 	}
-
-	/* Reopen MNTTAB to prevent reading stale data from open file */
-	if (freopen(MNTTAB, "r", hdl->libzfs_mnttab) == NULL)
-		return (NULL);
 
 	if (getextmntent(path, &entry, &statbuf) != 0)
 		return (NULL);
@@ -1288,7 +1274,8 @@ zprop_print_headers(zprop_get_cbdata_t *cbp, zfs_type_t type)
 
 	/* first property is always NAME */
 	assert(cbp->cb_proplist->pl_prop ==
-	    ((type == ZFS_TYPE_POOL) ?  ZPOOL_PROP_NAME : ZFS_PROP_NAME));
+	    ((type == ZFS_TYPE_POOL) ? ZPOOL_PROP_NAME :
+	    ((type == ZFS_TYPE_VDEV) ? VDEV_PROP_NAME : ZFS_PROP_NAME)));
 
 	/*
 	 * Go through and calculate the widths for each column.  For the
@@ -1305,12 +1292,16 @@ zprop_print_headers(zprop_get_cbdata_t *cbp, zfs_type_t type)
 		if (pl->pl_prop != ZPROP_INVAL) {
 			const char *propname = (type == ZFS_TYPE_POOL) ?
 			    zpool_prop_to_name(pl->pl_prop) :
-			    zfs_prop_to_name(pl->pl_prop);
+			    ((type == ZFS_TYPE_VDEV) ?
+			    vdev_prop_to_name(pl->pl_prop) :
+			    zfs_prop_to_name(pl->pl_prop));
 
+			assert(propname != NULL);
 			len = strlen(propname);
 			if (len > cbp->cb_colwidths[GET_COL_PROPERTY])
 				cbp->cb_colwidths[GET_COL_PROPERTY] = len;
 		} else {
+			assert(pl->pl_user_prop != NULL);
 			len = strlen(pl->pl_user_prop);
 			if (len > cbp->cb_colwidths[GET_COL_PROPERTY])
 				cbp->cb_colwidths[GET_COL_PROPERTY] = len;
@@ -1335,9 +1326,10 @@ zprop_print_headers(zprop_get_cbdata_t *cbp, zfs_type_t type)
 		/*
 		 * 'NAME' and 'SOURCE' columns
 		 */
-		if (pl->pl_prop == (type == ZFS_TYPE_POOL ? ZPOOL_PROP_NAME :
-		    ZFS_PROP_NAME) &&
-		    pl->pl_width > cbp->cb_colwidths[GET_COL_NAME]) {
+		if (pl->pl_prop == ((type == ZFS_TYPE_POOL) ? ZPOOL_PROP_NAME :
+		    ((type == ZFS_TYPE_VDEV) ? VDEV_PROP_NAME :
+		    ZFS_PROP_NAME)) && pl->pl_width >
+		    cbp->cb_colwidths[GET_COL_NAME]) {
 			cbp->cb_colwidths[GET_COL_NAME] = pl->pl_width;
 			cbp->cb_colwidths[GET_COL_SOURCE] = pl->pl_width +
 			    strlen(dgettext(TEXT_DOMAIN, "inherited from"));
@@ -1618,6 +1610,9 @@ zprop_parse_value(libzfs_handle_t *hdl, nvpair_t *elem, int prop,
 	if (type == ZFS_TYPE_POOL) {
 		proptype = zpool_prop_get_type(prop);
 		propname = zpool_prop_to_name(prop);
+	} else if (type == ZFS_TYPE_VDEV) {
+		proptype = vdev_prop_get_type(prop);
+		propname = vdev_prop_to_name(prop);
 	} else {
 		proptype = zfs_prop_get_type(prop);
 		propname = zfs_prop_to_name(prop);
@@ -1768,15 +1763,15 @@ addlist(libzfs_handle_t *hdl, char *propname, zprop_list_t **listp,
 		prop = ZPROP_INVAL;
 
 	/*
-	 * When no property table entry can be found, return failure if
-	 * this is a pool property or if this isn't a user-defined
-	 * dataset property,
+	 * Return failure if no property table entry was found and this isn't
+	 * a user-defined property.
 	 */
 	if (prop == ZPROP_INVAL && ((type == ZFS_TYPE_POOL &&
 	    !zpool_prop_feature(propname) &&
 	    !zpool_prop_unsupported(propname)) ||
-	    (type == ZFS_TYPE_DATASET && !zfs_prop_user(propname) &&
-	    !zfs_prop_userquota(propname) && !zfs_prop_written(propname)))) {
+	    ((type == ZFS_TYPE_DATASET) && !zfs_prop_user(propname) &&
+	    !zfs_prop_userquota(propname) && !zfs_prop_written(propname)) ||
+	    ((type == ZFS_TYPE_VDEV) && !vdev_prop_user(propname)))) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "invalid property '%s'"), propname);
 		return (zfs_error(hdl, EZFS_BADPROP,
@@ -1959,8 +1954,8 @@ zprop_expand_list(libzfs_handle_t *hdl, zprop_list_t **plp, zfs_type_t type)
 		if ((entry = zfs_alloc(hdl, sizeof (zprop_list_t))) == NULL)
 			return (-1);
 
-		entry->pl_prop = (type == ZFS_TYPE_POOL) ?  ZPOOL_PROP_NAME :
-		    ZFS_PROP_NAME;
+		entry->pl_prop = ((type == ZFS_TYPE_POOL) ?  ZPOOL_PROP_NAME :
+		    ((type == ZFS_TYPE_VDEV) ? VDEV_PROP_NAME : ZFS_PROP_NAME));
 		entry->pl_width = zprop_width(entry->pl_prop,
 		    &entry->pl_fixed, type);
 		entry->pl_all = B_TRUE;

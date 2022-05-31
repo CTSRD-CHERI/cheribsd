@@ -1754,6 +1754,27 @@ in6_localip(struct in6_addr *in6)
 }
 
 /*
+ * Like in6_localip(), but FIB-aware.
+ */
+bool
+in6_localip_fib(struct in6_addr *in6, uint16_t fib)
+{
+	struct rm_priotracker in6_ifa_tracker;
+	struct in6_ifaddr *ia;
+
+	IN6_IFADDR_RLOCK(&in6_ifa_tracker);
+	CK_LIST_FOREACH(ia, IN6ADDR_HASH(in6), ia6_hash) {
+		if (IN6_ARE_ADDR_EQUAL(in6, &ia->ia_addr.sin6_addr) &&
+		    ia->ia_ifa.ifa_ifp->if_fib == fib) {
+			IN6_IFADDR_RUNLOCK(&in6_ifa_tracker);
+			return (true);
+		}
+	}
+	IN6_IFADDR_RUNLOCK(&in6_ifa_tracker);
+	return (false);
+}
+
+/*
  * Return 1 if an internet address is configured on an interface.
  */
 int
@@ -2214,25 +2235,6 @@ in6_lltable_rtcheck(struct ifnet *ifp,
 	return 0;
 }
 
-/*
- * Called by the datapath to indicate that the entry was used.
- */
-static void
-in6_lltable_mark_used(struct llentry *lle)
-{
-
-	LLE_REQ_LOCK(lle);
-	lle->r_skip_req = 0;
-
-	/*
-	 * Set the hit time so the callback function
-	 * can determine the remaining time before
-	 * transiting to the DELAY state.
-	 */
-	lle->lle_hittime = time_uptime;
-	LLE_REQ_UNLOCK(lle);
-}
-
 static inline uint32_t
 in6_lltable_hash_dst(const struct in6_addr *dst, uint32_t hsize)
 {
@@ -2342,6 +2344,7 @@ in6_lltable_lookup(struct lltable *llt, u_int flags,
 	const struct sockaddr *l3addr)
 {
 	const struct sockaddr_in6 *sin6 = (const struct sockaddr_in6 *)l3addr;
+	int family = flags >> 16;
 	struct llentry *lle;
 
 	IF_AFDATA_LOCK_ASSERT(llt->llt_ifp);
@@ -2352,8 +2355,13 @@ in6_lltable_lookup(struct lltable *llt, u_int flags,
 	    ("wrong lle request flags: %#x", flags));
 
 	lle = in6_lltable_find_dst(llt, &sin6->sin6_addr);
+
+	if (__predict_false(family != AF_INET6))
+		lle = llentry_lookup_family(lle, family);
+
 	if (lle == NULL)
 		return (NULL);
+
 	if (flags & LLE_UNLOCKED)
 		return (lle);
 
@@ -2469,9 +2477,20 @@ in6_lltattach(struct ifnet *ifp)
 	llt->llt_fill_sa_entry = in6_lltable_fill_sa_entry;
 	llt->llt_free_entry = in6_lltable_free_entry;
 	llt->llt_match_prefix = in6_lltable_match_prefix;
-	llt->llt_mark_used = in6_lltable_mark_used;
+	llt->llt_mark_used = llentry_mark_used;
  	lltable_link(llt);
 
+	return (llt);
+}
+
+struct lltable *
+in6_lltable_get(struct ifnet *ifp)
+{
+	struct lltable *llt = NULL;
+
+	void *afdata_ptr = ifp->if_afdata[AF_INET6];
+	if (afdata_ptr != NULL)
+		llt = ((struct in6_ifextra *)afdata_ptr)->lltable;
 	return (llt);
 }
 

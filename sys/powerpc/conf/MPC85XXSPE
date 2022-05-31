@@ -11,7 +11,7 @@ ident		MPC85XXSPE
 machine		powerpc	powerpcspe
 
 include 	"dpaa/config.dpaa"
-makeoptions	DEBUG=-g		#Build kernel with gdb(1) debug symbols
+makeoptions	DEBUG=-g		# Build kernel with gdb(1) debug symbols
 makeoptions	WITH_CTF=1
 
 options 	FPU_EMU
@@ -62,6 +62,7 @@ options 	WITNESS_SKIPSPIN
 options 	COMPAT_FREEBSD10
 options 	COMPAT_FREEBSD11
 options 	COMPAT_FREEBSD12
+options 	COMPAT_FREEBSD13
 options 	HWPMC_HOOKS
 options 	KDTRACE_HOOKS		# Kernel DTrace hooks
 options 	DDB_CTF			# Kernel ELF linker loads CTF data

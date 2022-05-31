@@ -141,7 +141,6 @@ armv7_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	struct armv7_cpu *pac;
 	enum pmc_event pe;
 	uint32_t config;
-	uint32_t caps;
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[armv7,%d] illegal CPU value %d", __LINE__, cpu));
@@ -150,7 +149,6 @@ armv7_allocate_pmc(int cpu, int ri, struct pmc *pm,
 
 	pac = armv7_pcpu[cpu];
 
-	caps = a->pm_caps;
 	if (a->pm_class != PMC_CLASS_ARMV7)
 		return (EINVAL);
 	pe = a->pm_ev;
@@ -191,8 +189,7 @@ armv7_read_pmc(int cpu, int ri, pmc_value_t *v)
 	if ((cp15_pmovsr_get() & reg) != 0) {
 		/* Clear Overflow Flag */
 		cp15_pmovsr_set(reg);
-		if (!PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)))
-			pm->pm_pcpu_state[cpu].pps_overflowcnt++;
+		pm->pm_pcpu_state[cpu].pps_overflowcnt++;
 
 		/* Reread counter in case we raced. */
 		tmp = armv7_pmcn_read(ri, pm->pm_md.pm_armv7.pm_armv7_evsel);
@@ -201,10 +198,18 @@ armv7_read_pmc(int cpu, int ri, pmc_value_t *v)
 	intr_restore(s);
 
 	PMCDBG2(MDP, REA, 2, "armv7-read id=%d -> %jd", ri, tmp);
-	if (PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)))
-		*v = ARMV7_PERFCTR_VALUE_TO_RELOAD_COUNT(tmp);
-	else
-		*v = tmp;
+	if (PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm))) {
+		/*
+		 * Clamp value to 0 if the counter just overflowed,
+		 * otherwise the returned reload count would wrap to a
+		 * huge value.
+		 */
+		if ((tmp & (1ull << 63)) == 0)
+			tmp = 0;
+		else
+			tmp = ARMV7_PERFCTR_VALUE_TO_RELOAD_COUNT(tmp);
+	}
+	*v = tmp;
 
 	return 0;
 }
@@ -362,10 +367,11 @@ armv7_intr(struct trapframe *tf)
 
 		retval = 1; /* Found an interrupting PMC. */
 
-		if (!PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm))) {
-			pm->pm_pcpu_state[cpu].pps_overflowcnt += 1;
+		pm->pm_pcpu_state[cpu].pps_overflowcnt += 1;
+
+		if (!PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)))
 			continue;
-		}
+
 		if (pm->pm_state != PMC_STATE_RUNNING)
 			continue;
 

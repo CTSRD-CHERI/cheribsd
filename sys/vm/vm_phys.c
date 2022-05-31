@@ -62,6 +62,7 @@ __FBSDID("$FreeBSD$");
 #include <ddb/ddb.h>
 
 #include <vm/vm.h>
+#include <vm/vm_extern.h>
 #include <vm/vm_param.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_object.h>
@@ -712,6 +713,18 @@ vm_phys_enq_range(vm_page_t m, u_int npages, struct vm_freelist *fl, int tail)
 }
 
 /*
+ * Set the pool for a contiguous, power of two-sized set of physical pages. 
+ */
+static void
+vm_phys_set_pool(int pool, vm_page_t m, int order)
+{
+	vm_page_t m_tmp;
+
+	for (m_tmp = m; m_tmp < &m[1 << order]; m_tmp++)
+		m_tmp->pool = pool;
+}
+
+/*
  * Tries to allocate the specified number of pages from the specified pool
  * within the specified domain.  Returns the actual number of allocated pages
  * and a pointer to each page through the array ma[].
@@ -1274,18 +1287,6 @@ vm_phys_scan_contig(int domain, u_long npages, vm_paddr_t low, vm_paddr_t high,
 }
 
 /*
- * Set the pool for a contiguous, power of two-sized set of physical pages. 
- */
-void
-vm_phys_set_pool(int pool, vm_page_t m, int order)
-{
-	vm_page_t m_tmp;
-
-	for (m_tmp = m; m_tmp < &m[1 << order]; m_tmp++)
-		m_tmp->pool = pool;
-}
-
-/*
  * Search for the given physical page "m" in the free lists.  If the search
  * succeeds, remove "m" from the free lists and return TRUE.  Otherwise, return
  * FALSE, indicating that "m" is not in the free lists.
@@ -1427,48 +1428,45 @@ vm_phys_alloc_seg_contig(struct vm_phys_seg *seg, u_long npages,
 			fl = (*seg->free_queues)[pind];
 			TAILQ_FOREACH(m_ret, &fl[oind].pl, listq) {
 				/*
-				 * Is the size of this allocation request
-				 * larger than the largest block size?
-				 */
-				if (order >= VM_NFREEORDER) {
-					/*
-					 * Determine if a sufficient number of
-					 * subsequent blocks to satisfy the
-					 * allocation request are free.
-					 */
-					pa = VM_PAGE_TO_PHYS(m_ret);
-					pa_end = pa + size;
-					if (pa_end < pa)
-						continue;
-					for (;;) {
-						pa += 1 << (PAGE_SHIFT +
-						    VM_NFREEORDER - 1);
-						if (pa >= pa_end ||
-						    pa < seg->start ||
-						    pa >= seg->end)
-							break;
-						m = &seg->first_page[atop(pa -
-						    seg->start)];
-						if (m->order != VM_NFREEORDER -
-						    1)
-							break;
-					}
-					/* If not, go to the next block. */
-					if (pa < pa_end)
-						continue;
-				}
-
-				/*
-				 * Determine if the blocks are within the
-				 * given range, satisfy the given alignment,
-				 * and do not cross the given boundary.
+				 * Determine if the address range starting at pa
+				 * is within the given range, satisfies the
+				 * given alignment, and does not cross the given
+				 * boundary.
 				 */
 				pa = VM_PAGE_TO_PHYS(m_ret);
 				pa_end = pa + size;
-				if (pa >= low && pa_end <= high &&
-				    (pa & (alignment - 1)) == 0 &&
-				    rounddown2(pa ^ (pa_end - 1), boundary) == 0)
+				if (pa < low || pa_end > high ||
+				    !vm_addr_ok(pa, size, alignment, boundary))
+					continue;
+
+				/*
+				 * Is the size of this allocation request
+				 * no more than the largest block size?
+				 */
+				if (order < VM_NFREEORDER)
 					goto done;
+
+				/*
+				 * Determine if the address range is valid
+				 * (without overflow in pa_end calculation)
+				 * and fits within the segment.
+				 */
+				if (pa_end < pa ||
+				    pa < seg->start || seg->end < pa_end)
+					continue;
+
+				/*
+				 * Determine if a sufficient number of
+				 * subsequent blocks to satisfy the
+				 * allocation request are free.
+				 */
+				do {
+					pa += 1 <<
+					    (PAGE_SHIFT + VM_NFREEORDER - 1);
+					if (pa >= pa_end)
+						goto done;
+				} while (VM_NFREEORDER - 1 == seg->first_page[
+				    atop(pa - seg->start)].order);
 			}
 		}
 	}
@@ -1591,6 +1589,25 @@ vm_phys_avail_split(vm_paddr_t pa, int i)
 	vm_phys_avail_check(i+2);
 
 	return (0);
+}
+
+/*
+ * Check if a given physical address can be included as part of a crash dump.
+ */
+bool
+vm_phys_is_dumpable(vm_paddr_t pa)
+{
+	vm_page_t m;
+	int i;
+
+	if ((m = vm_phys_paddr_to_vm_page(pa)) != NULL)
+		return ((m->flags & PG_NODUMP) == 0);
+
+	for (i = 0; dump_avail[i] != 0 || dump_avail[i + 1] != 0; i += 2) {
+		if (pa >= dump_avail[i] && pa < dump_avail[i + 1])
+			return (true);
+	}
+	return (false);
 }
 
 void

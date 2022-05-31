@@ -452,11 +452,9 @@ axge_attach_post(struct usb_ether *ue)
 static int
 axge_attach_post_sub(struct usb_ether *ue)
 {
-	struct axge_softc *sc;
 	struct ifnet *ifp;
 	int error;
 
-	sc = uether_getsc(ue);
 	ifp = ue->ue_ifp;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_start = uether_start;
@@ -470,11 +468,11 @@ axge_attach_post_sub(struct usb_ether *ue)
 	ifp->if_hwassist = AXGE_CSUM_FEATURES;
 	ifp->if_capenable = ifp->if_capabilities;
 
-	mtx_lock(&Giant);
+	bus_topo_lock();
 	error = mii_attach(ue->ue_dev, &ue->ue_miibus, ifp,
 	    uether_ifmedia_upd, ue->ue_methods->ue_mii_sts,
 	    BMSR_DEFCAPMASK, AXGE_PHY_ADDR, MII_OFFSET_ANY, MIIF_DOPAUSE);
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 
 	return (error);
 }

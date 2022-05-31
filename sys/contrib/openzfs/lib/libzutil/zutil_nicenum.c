@@ -27,6 +27,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <libzutil.h>
+#include <string.h>
 
 /*
  * Return B_TRUE if "str" is a number string, B_FALSE otherwise.
@@ -35,9 +36,20 @@
 boolean_t
 zfs_isnumber(const char *str)
 {
+	if (!*str)
+		return (B_FALSE);
+
 	for (; *str; str++)
 		if (!(isdigit(*str) || (*str == '.')))
 			return (B_FALSE);
+
+	/*
+	 * Numbers should not end with a period ("." ".." or "5." are
+	 * not valid)
+	 */
+	if (str[strlen(str) - 1] == '.') {
+		return (B_FALSE);
+	}
 
 	return (B_TRUE);
 }

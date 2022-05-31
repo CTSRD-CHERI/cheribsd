@@ -43,7 +43,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 
 #include <machine/pcb.h>
-#include <machine/vmparam.h>
 
 #include <ddb/ddb.h>
 #include <ddb/db_variables.h>
@@ -81,23 +80,6 @@ db_show_regs(db_expr_t _1, bool _2, db_expr_t _3, char *modif)
 			continue;
 		db_printf("%-12s%#*lr", regp->name,
 		    (int)(sizeof(unsigned long) * 2 + 2), (unsigned long)value);
-#ifdef __mips__
-		if (value >= VM_MAXUSER_ADDRESS) {
-#if __has_feature(capabilities)
-			if ((value % sizeof(void * __capability)) == 0)
-				db_printf("\t(capability-aligned)");
-			else
-#endif
-			if ((value % 8) == 0)
-				db_printf("\t(dword-aligned)");
-			else if ((value % 4) == 0)
-				db_printf("\t(word-aligned)");
-			else if ((value % 2) == 0)
-				db_printf("\t(halfword-aligned)");
-			else
-				db_printf("\t(unaligned)");
-		}
-#endif
 		db_find_xtrn_sym_and_offset((db_addr_t)value, &name, &offset);
 		if (name != NULL && offset <= (unsigned long)db_maxoff &&
 		    offset != value) {

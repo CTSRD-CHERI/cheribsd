@@ -25,6 +25,9 @@
  * $FreeBSD$
  */
 
+#include "opt_rss.h"
+#include "opt_ratelimit.h"
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/random.h>
@@ -33,7 +36,7 @@
 #include <linux/delay.h>
 #include <dev/mlx5/driver.h>
 #include <dev/mlx5/mlx5_ifc.h>
-#include "mlx5_core.h"
+#include <dev/mlx5/mlx5_core/mlx5_core.h>
 
 #define	MLX5_HEALTH_POLL_INTERVAL	(2 * HZ)
 #define	MAX_MISSES			3
@@ -374,7 +377,8 @@ static void health_recover(struct work_struct *work)
 	priv = container_of(health, struct mlx5_priv, health);
 	dev = container_of(priv, struct mlx5_core_dev, priv);
 
-	mtx_lock(&Giant);	/* XXX newbus needs this */
+	/* This might likely be wrong, cut and paste from elsewhere? */
+	bus_topo_lock();
 
 	if (sensor_pci_no_comm(dev)) {
 		mlx5_core_err(dev,
@@ -401,7 +405,7 @@ static void health_recover(struct work_struct *work)
 		mlx5_recover_device(dev);
 	}
 
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 }
 
 /* How much time to wait until health resetting the driver (in msecs) */

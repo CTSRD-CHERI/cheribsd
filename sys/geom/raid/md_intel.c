@@ -80,7 +80,7 @@ struct intel_raid_map {
 
 struct intel_raid_vol {
 	uint8_t		name[16];
-	u_int64_t	total_sectors __packed;
+	uint64_t	total_sectors __packed;
 	uint32_t	state;
 #define INTEL_ST_BOOTABLE		0x00000001
 #define INTEL_ST_BOOT_DEVICE		0x00000002
@@ -593,7 +593,8 @@ intel_meta_read(struct g_consumer *cp)
 	uint32_t checksum, *ptr;
 
 	pp = cp->provider;
-
+	if (pp->sectorsize < sizeof(*meta))
+		return (NULL);
 	/* Read the anchor sector. */
 	buf = g_read_data(cp,
 	    pp->mediasize - pp->sectorsize * 2, pp->sectorsize, &error);

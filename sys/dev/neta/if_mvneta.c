@@ -65,12 +65,12 @@ __FBSDID("$FreeBSD$");
 #include <sys/rman.h>
 #include <machine/resource.h>
 
+#if defined(__aarch64__)
+#include <dev/extres/clk/clk.h>
+#endif
+
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
-
-#include <dev/ofw/openfirm.h>
-#include <dev/ofw/ofw_bus.h>
-#include <dev/ofw/ofw_bus_subr.h>
 
 #include <dev/mdio/mdio.h>
 
@@ -190,7 +190,6 @@ STATIC uint64_t mvneta_read_mib(struct mvneta_softc *, int);
 STATIC void mvneta_update_mib(struct mvneta_softc *);
 
 /* Switch */
-STATIC boolean_t mvneta_find_ethernet_prop_switch(phandle_t, phandle_t);
 STATIC boolean_t mvneta_has_switch(device_t);
 
 #define	mvneta_sc_lock(sc) mtx_lock(&sc->mtx)
@@ -204,9 +203,6 @@ STATIC int mvneta_detach(device_t);
 /* MII */
 STATIC int mvneta_miibus_readreg(device_t, int, int);
 STATIC int mvneta_miibus_writereg(device_t, int, int, int);
-
-/* Clock */
-STATIC uint32_t mvneta_get_clk(void);
 
 static device_method_t mvneta_methods[] = {
 	/* Device interface */
@@ -349,16 +345,6 @@ static struct {
 	{ mvneta_rxtxth_intr, "MVNETA aggregated interrupt" },
 };
 
-STATIC uint32_t
-mvneta_get_clk()
-{
-#if defined(__aarch64__)
-	return (A3700_TCLK_250MHZ);
-#else
-	return (get_tclk());
-#endif
-}
-
 static int
 mvneta_set_mac_address(struct mvneta_softc *sc, uint8_t *addr)
 {
@@ -414,39 +400,13 @@ mvneta_get_mac_address(struct mvneta_softc *sc, uint8_t *addr)
 }
 
 STATIC boolean_t
-mvneta_find_ethernet_prop_switch(phandle_t ethernet, phandle_t node)
-{
-	boolean_t ret;
-	phandle_t child, switch_eth_handle, switch_eth;
-
-	for (child = OF_child(node); child != 0; child = OF_peer(child)) {
-		if (OF_getencprop(child, "ethernet", (void*)&switch_eth_handle,
-		    sizeof(switch_eth_handle)) > 0) {
-			if (switch_eth_handle > 0) {
-				switch_eth = OF_node_from_xref(
-				    switch_eth_handle);
-
-				if (switch_eth == ethernet)
-					return (true);
-			}
-		}
-
-		ret = mvneta_find_ethernet_prop_switch(ethernet, child);
-		if (ret != 0)
-			return (ret);
-	}
-
-	return (false);
-}
-
-STATIC boolean_t
 mvneta_has_switch(device_t self)
 {
-	phandle_t node;
+#ifdef FDT
+	return (mvneta_has_switch_fdt(self));
+#endif
 
-	node = ofw_bus_get_node(self);
-
-	return mvneta_find_ethernet_prop_switch(node, OF_finddevice("/"));
+	return (false);
 }
 
 STATIC int
@@ -572,7 +532,9 @@ mvneta_attach(device_t self)
 #if !defined(__aarch64__)
 	uint32_t reg;
 #endif
-
+#if defined(__aarch64__)
+	clk_t clk;
+#endif
 	sc = device_get_softc(self);
 	sc->dev = self;
 
@@ -594,6 +556,27 @@ mvneta_attach(device_t self)
 	MVNETA_WRITE(sc, MVNETA_PRXINIT, 0x00000001);
 	MVNETA_WRITE(sc, MVNETA_PTXINIT, 0x00000001);
 
+#if defined(__aarch64__)
+	error = clk_get_by_ofw_index(sc->dev, ofw_bus_get_node(sc->dev), 0,
+	    &clk);
+	if (error != 0) {
+		device_printf(sc->dev,
+			"Cannot get clock, using default frequency: %d\n",
+			A3700_TCLK_250MHZ);
+		sc->clk_freq = A3700_TCLK_250MHZ;
+	} else {
+		error = clk_get_freq(clk, &sc->clk_freq);
+		if (error != 0) {
+			device_printf(sc->dev,
+				"Cannot obtain frequency from parent clock\n");
+			bus_release_resources(sc->dev, res_spec, sc->res);
+			return (error);
+		}
+	}
+#else
+	sc->clk_freq = get_tclk();
+#endif
+
 #if !defined(__aarch64__)
 	/*
 	 * Disable port snoop for buffers and descriptors
@@ -608,6 +591,16 @@ mvneta_attach(device_t self)
 		MVNETA_WRITE(sc, MVNETA_PSNPCFG, reg);
 	}
 #endif
+
+	error = bus_setup_intr(self, sc->res[1],
+	    INTR_TYPE_NET | INTR_MPSAFE, NULL, mvneta_intrs[0].handler, sc,
+	    &sc->ih_cookie[0]);
+	if (error) {
+		device_printf(self, "could not setup %s\n",
+		    mvneta_intrs[0].description);
+		mvneta_detach(self);
+		return (error);
+	}
 
 	/*
 	 * MAC address
@@ -704,8 +697,6 @@ mvneta_attach(device_t self)
 		}
 	}
 
-	ether_ifattach(ifp, sc->enaddr);
-
 	/*
 	 * Enable DMA engines and Initialize Device Registers.
 	 */
@@ -735,10 +726,8 @@ mvneta_attach(device_t self)
 		    mvneta_mediastatus, BMSR_DEFCAPMASK, sc->phy_addr,
 		    MII_OFFSET_ANY, 0);
 		if (error != 0) {
-			if (bootverbose) {
-				device_printf(self,
-				    "MII attach failed, error: %d\n", error);
-			}
+			device_printf(self, "MII attach failed, error: %d\n",
+			    error);
 			ether_ifdetach(sc->ifp);
 			mvneta_detach(self);
 			return (error);
@@ -835,20 +824,11 @@ mvneta_attach(device_t self)
 		mvneta_update_media(sc, ifm_target);
 	}
 
-	sysctl_mvneta_init(sc);
+	ether_ifattach(ifp, sc->enaddr);
 
 	callout_reset(&sc->tick_ch, 0, mvneta_tick, sc);
 
-	error = bus_setup_intr(self, sc->res[1],
-	    INTR_TYPE_NET | INTR_MPSAFE, NULL, mvneta_intrs[0].handler, sc,
-	    &sc->ih_cookie[0]);
-	if (error) {
-		device_printf(self, "could not setup %s\n",
-		    mvneta_intrs[0].description);
-		ether_ifdetach(sc->ifp);
-		mvneta_detach(self);
-		return (error);
-	}
+	sysctl_mvneta_init(sc);
 
 	return (0);
 }
@@ -857,19 +837,27 @@ STATIC int
 mvneta_detach(device_t dev)
 {
 	struct mvneta_softc *sc;
+	struct ifnet *ifp;
 	int q;
 
 	sc = device_get_softc(dev);
+	ifp = sc->ifp;
 
-	mvneta_stop(sc);
-	/* Detach network interface */
-	if (sc->ifp)
-		if_free(sc->ifp);
+	if (device_is_attached(dev)) {
+		mvneta_stop(sc);
+		callout_drain(&sc->tick_ch);
+		ether_ifdetach(sc->ifp);
+	}
 
 	for (q = 0; q < MVNETA_RX_QNUM_MAX; q++)
 		mvneta_ring_dealloc_rx_queue(sc, q);
 	for (q = 0; q < MVNETA_TX_QNUM_MAX; q++)
 		mvneta_ring_dealloc_tx_queue(sc, q);
+
+	device_delete_children(dev);
+
+	if (sc->ih_cookie[0] != NULL)
+		bus_teardown_intr(dev, sc->res[1], sc->ih_cookie[0]);
 
 	if (sc->tx_dtag != NULL)
 		bus_dma_tag_destroy(sc->tx_dtag);
@@ -881,6 +869,13 @@ mvneta_detach(device_t dev)
 		bus_dma_tag_destroy(sc->rxbuf_dtag);
 
 	bus_release_resources(dev, res_spec, sc->res);
+
+	if (sc->ifp)
+		if_free(sc->ifp);
+
+	if (mtx_initialized(&sc->mtx))
+		mtx_destroy(&sc->mtx);
+
 	return (0);
 }
 
@@ -1254,6 +1249,9 @@ mvneta_ring_alloc_rx_queue(struct mvneta_softc *sc, int q)
 
 	return (0);
 fail:
+	mvneta_rx_lockq(sc, q);
+	mvneta_ring_flush_rx_queue(sc, q);
+	mvneta_rx_unlockq(sc, q);
 	mvneta_ring_dealloc_rx_queue(sc, q);
 	device_printf(sc->dev, "DMA Ring buffer allocation failure.\n");
 	return (error);
@@ -1295,6 +1293,9 @@ mvneta_ring_alloc_tx_queue(struct mvneta_softc *sc, int q)
 
 	return (0);
 fail:
+	mvneta_tx_lockq(sc, q);
+	mvneta_ring_flush_tx_queue(sc, q);
+	mvneta_tx_unlockq(sc, q);
 	mvneta_ring_dealloc_tx_queue(sc, q);
 	device_printf(sc->dev, "DMA Ring buffer allocation failure.\n");
 	return (error);
@@ -1324,16 +1325,6 @@ mvneta_ring_dealloc_tx_queue(struct mvneta_softc *sc, int q)
 #endif
 
 	if (sc->txmbuf_dtag != NULL) {
-		if (mtx_name(&tx->ring_mtx) != NULL) {
-			/*
-			 * It is assumed that maps are being loaded after mutex
-			 * is initialized. Therefore we can skip unloading maps
-			 * when mutex is empty.
-			 */
-			mvneta_tx_lockq(sc, q);
-			mvneta_ring_flush_tx_queue(sc, q);
-			mvneta_tx_unlockq(sc, q);
-		}
 		for (i = 0; i < MVNETA_TX_RING_CNT; i++) {
 			txbuf = &tx->txbuf[i];
 			if (txbuf->dmap != NULL) {
@@ -1372,8 +1363,6 @@ mvneta_ring_dealloc_rx_queue(struct mvneta_softc *sc, int q)
 
 	rx = MVNETA_RX_RING(sc, q);
 
-	mvneta_ring_flush_rx_queue(sc, q);
-
 	if (rx->desc_pa != 0)
 		bus_dmamap_unload(sc->rx_dtag, rx->desc_map);
 
@@ -1403,7 +1392,7 @@ mvneta_ring_init_rx_queue(struct mvneta_softc *sc, int q)
 	rx = MVNETA_RX_RING(sc, q);
 	rx->dma = rx->cpu = 0;
 	rx->queue_th_received = MVNETA_RXTH_COUNT;
-	rx->queue_th_time = (mvneta_get_clk() / 1000) / 10; /* 0.1 [ms] */
+	rx->queue_th_time = (sc->clk_freq / 1000) / 10; /* 0.1 [ms] */
 
 	/* Initialize LRO */
 	rx->lro_enabled = FALSE;
@@ -2168,29 +2157,28 @@ mvneta_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				ifp->if_hwassist = CSUM_IP | CSUM_TCP |
 					CSUM_UDP;
 			}
-
-			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
-				/* Stop hardware */
+			/*
+			 * Reinitialize RX queues.
+			 * We need to update RX descriptor size.
+			 */
+			if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 				mvneta_stop_locked(sc);
-				/*
-				 * Reinitialize RX queues.
-				 * We need to update RX descriptor size.
-				 */
-				for (q = 0; q < MVNETA_RX_QNUM_MAX; q++) {
-					mvneta_rx_lockq(sc, q);
-					if (mvneta_rx_queue_init(ifp, q) != 0) {
-						device_printf(sc->dev,
-						    "initialization failed:"
-						    " cannot initialize queue\n");
-						mvneta_rx_unlockq(sc, q);
-						error = ENOBUFS;
-						break;
-					}
+
+			for (q = 0; q < MVNETA_RX_QNUM_MAX; q++) {
+				mvneta_rx_lockq(sc, q);
+				if (mvneta_rx_queue_init(ifp, q) != 0) {
+					device_printf(sc->dev,
+					    "initialization failed:"
+					    " cannot initialize queue\n");
 					mvneta_rx_unlockq(sc, q);
+					error = ENOBUFS;
+					break;
 				}
-				/* Trigger reinitialization */
-				mvneta_init_locked(sc);
+				mvneta_rx_unlockq(sc, q);
 			}
+			if (ifp->if_drv_flags & IFF_DRV_RUNNING)
+				mvneta_init_locked(sc);
+
 			mvneta_sc_unlock(sc);
                 }
                 break;
@@ -2575,8 +2563,8 @@ mvneta_link_isr(struct mvneta_softc *sc)
 		mvneta_linkdown(sc);
 
 #ifdef DEBUG
-	log(LOG_DEBUG,
-	    "%s: link %s\n", device_xname(sc->dev), linkup ? "up" : "down");
+	device_printf(sc->dev,
+	    "%s: link %s\n", sc->ifp->if_xname, linkup ? "up" : "down");
 #endif
 }
 
@@ -2592,8 +2580,8 @@ mvneta_linkupdate(struct mvneta_softc *sc, boolean_t linkup)
 		mvneta_linkdown(sc);
 
 #ifdef DEBUG
-	log(LOG_DEBUG,
-	    "%s: link %s\n", device_xname(sc->dev), linkup ? "up" : "down");
+	device_printf(sc->dev,
+	    "%s: link %s\n", sc->ifp->if_xname, linkup ? "up" : "down");
 #endif
 }
 
@@ -2816,6 +2804,7 @@ mvneta_tx_set_csumflag(struct ifnet *ifp,
     struct mvneta_tx_desc *t, struct mbuf *m)
 {
 	struct ether_header *eh;
+	struct ether_vlan_header *evh;
 	int csum_flags;
 	uint32_t iphl, ipoff;
 	struct ip *ip;
@@ -2830,6 +2819,9 @@ mvneta_tx_set_csumflag(struct ifnet *ifp,
 		break;
 	case ETHERTYPE_VLAN:
 		ipoff = ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN;
+		evh = mtod(m, struct ether_vlan_header *);
+		if (ntohs(evh->evl_proto) == ETHERTYPE_VLAN)
+			ipoff += ETHER_VLAN_ENCAP_LEN;
 		break;
 	default:
 		csum_flags = 0;
@@ -3409,7 +3401,7 @@ sysctl_set_queue_rxthtime(SYSCTL_HANDLER_ARGS)
 	mvneta_rx_lockq(sc, arg->queue);
 	rx = MVNETA_RX_RING(sc, arg->queue);
 	time_mvtclk = rx->queue_th_time;
-	time_us = ((uint64_t)time_mvtclk * 1000ULL * 1000ULL) / mvneta_get_clk();
+	time_us = ((uint64_t)time_mvtclk * 1000ULL * 1000ULL) / sc->clk_freq;
 	mvneta_rx_unlockq(sc, arg->queue);
 	mvneta_sc_unlock(sc);
 
@@ -3426,8 +3418,7 @@ sysctl_set_queue_rxthtime(SYSCTL_HANDLER_ARGS)
 		mvneta_sc_unlock(sc);
 		return (EINVAL);
 	}
-	time_mvtclk =
-	    (uint64_t)mvneta_get_clk() * (uint64_t)time_us / (1000ULL * 1000ULL);
+	time_mvtclk = sc->clk_freq * (uint64_t)time_us / (1000ULL * 1000ULL);
 	rx->queue_th_time = time_mvtclk;
 	reg = MVNETA_PRXITTH_RITT(rx->queue_th_time);
 	MVNETA_WRITE(sc, MVNETA_PRXITTH(arg->queue), reg);

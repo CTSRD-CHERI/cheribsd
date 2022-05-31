@@ -332,7 +332,7 @@ tcp_reass_append(struct tcpcb *tp, struct tseg_qent *last,
 	last->tqe_len += tlen;
 	last->tqe_m->m_pkthdr.len += tlen;
 	/* Preserve the FIN bit if its there */
-	last->tqe_flags |= (th->th_flags & TH_FIN);
+	last->tqe_flags |= (tcp_get_flags(th) & TH_FIN);
 	last->tqe_last->m_next = m;
 	last->tqe_last = mlast;
 	last->tqe_mbuf_cnt += lenofoh;
@@ -384,7 +384,7 @@ tcp_reass_prepend(struct tcpcb *tp, struct tseg_qent *first, struct mbuf *m, str
 
 static void
 tcp_reass_replace(struct tcpcb *tp, struct tseg_qent *q, struct mbuf *m,
-    tcp_seq seq, int len, struct mbuf *mlast, int mbufoh, uint8_t flags)
+    tcp_seq seq, int len, struct mbuf *mlast, int mbufoh, uint16_t flags)
 {
 	/*
 	 * Free the data in q, and replace
@@ -564,13 +564,14 @@ tcp_reass(struct tcpcb *tp, struct tcphdr *th, tcp_seq *seq_start,
 	/*
 	 * Check for zero length data.
 	 */
-	if ((*tlenp == 0) && ((th->th_flags & TH_FIN) == 0)) {
+	if ((*tlenp == 0) && ((tcp_get_flags(th) & TH_FIN) == 0)) {
 		/*
 		 * A zero length segment does no
 		 * one any good. We could check
 		 * the rcv_nxt <-> rcv_wnd but thats
 		 * already done for us by the caller.
 		 */
+strip_fin:
 #ifdef TCP_REASS_COUNTERS
 		counter_u64_add(tcp_zero_input, 1);
 #endif
@@ -579,6 +580,19 @@ tcp_reass(struct tcpcb *tp, struct tcphdr *th, tcp_seq *seq_start,
 		tcp_reass_log_dump(tp);
 #endif
 		return (0);
+	} else if ((*tlenp == 0) &&
+		   (tcp_get_flags(th) & TH_FIN) &&
+		   !TCPS_HAVEESTABLISHED(tp->t_state)) {
+		/*
+		 * We have not established, and we
+		 * have a FIN and no data. Lets treat
+		 * this as the same as if the FIN were
+		 * not present. We don't want to save
+		 * the FIN bit in a reassembly buffer
+		 * we want to get established first before
+		 * we do that (the peer will retransmit).
+		 */
+		goto strip_fin;
 	}
 	/*
 	 * Will it fit?
@@ -614,7 +628,7 @@ tcp_reass(struct tcpcb *tp, struct tcphdr *th, tcp_seq *seq_start,
 	 */
 	last = TAILQ_LAST_FAST(&tp->t_segq, tseg_qent, tqe_q);
 	if (last != NULL) {
-		if ((th->th_flags & TH_FIN) &&
+		if ((tcp_get_flags(th) & TH_FIN) &&
 		    SEQ_LT((th->th_seq + *tlenp), (last->tqe_start + last->tqe_len))) {
 			/*
 			 * Someone is trying to game us, dump
@@ -901,7 +915,7 @@ tcp_reass(struct tcpcb *tp, struct tcphdr *th, tcp_seq *seq_start,
 #ifdef TCP_REASS_COUNTERS
 			counter_u64_add(reass_path7, 1);
 #endif
-			tcp_reass_replace(tp, q, m, th->th_seq, *tlenp, mlast, lenofoh, th->th_flags);
+			tcp_reass_replace(tp, q, m, th->th_seq, *tlenp, mlast, lenofoh, tcp_get_flags(th));
 		} else {
 			/*
 			 * We just need to prepend the data
@@ -950,7 +964,7 @@ tcp_reass(struct tcpcb *tp, struct tcphdr *th, tcp_seq *seq_start,
 new_entry:
 	if (th->th_seq == tp->rcv_nxt && TCPS_HAVEESTABLISHED(tp->t_state)) {
 		tp->rcv_nxt += *tlenp;
-		flags = th->th_flags & TH_FIN;
+		flags = tcp_get_flags(th) & TH_FIN;
 		TCPSTAT_INC(tcps_rcvoopack);
 		TCPSTAT_ADD(tcps_rcvoobyte, *tlenp);
 		SOCKBUF_LOCK(&so->so_rcv);
@@ -959,7 +973,6 @@ new_entry:
 		} else {
 			sbappendstream_locked(&so->so_rcv, m, 0);
 		}
-		SOCKBUF_UNLOCK(&so->so_rcv);
 		tp->t_flags |= TF_WAKESOR;
 		return (flags);
 	}
@@ -1026,7 +1039,7 @@ new_entry:
 	TCPSTAT_ADD(tcps_rcvoobyte, *tlenp);
 	/* Insert the new segment queue entry into place. */
 	te->tqe_m = m;
-	te->tqe_flags = th->th_flags;
+	te->tqe_flags = tcp_get_flags(th);
 	te->tqe_len = *tlenp;
 	te->tqe_start = th->th_seq;
 	te->tqe_last = mlast;
@@ -1108,7 +1121,6 @@ present:
 #ifdef TCP_REASS_LOGGING
 	tcp_reass_log_dump(tp);
 #endif
-	SOCKBUF_UNLOCK(&so->so_rcv);
 	tp->t_flags |= TF_WAKESOR;
 	return (flags);
 }

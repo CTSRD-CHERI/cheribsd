@@ -361,13 +361,13 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 		/* Remount old root under /.mount or /mnt */
 		fspath = "/.mount";
 		NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE,
-		    PTR2CAP(fspath), td);
+		    PTR2CAP(fspath));
 		error = namei(&nd);
 		if (error) {
 			NDFREE(&nd, NDF_ONLY_PNBUF);
 			fspath = "/mnt";
 			NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE,
-			    PTR2CAP(fspath), td);
+			    PTR2CAP(fspath));
 			error = namei(&nd);
 		}
 		if (!error) {
@@ -377,10 +377,13 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 				error = vinvalbuf(vp, V_SAVE, 0, 0);
 			if (!error) {
 				cache_purge(vp);
+				VI_LOCK(vp);
 				mporoot->mnt_vnodecovered = vp;
+				vn_irflag_set_locked(vp, VIRF_MOUNTPOINT);
 				vp->v_mountedhere = mporoot;
 				strlcpy(mporoot->mnt_stat.f_mntonname,
 				    fspath, MNAMELEN);
+				VI_UNLOCK(vp);
 				VOP_UNLOCK(vp);
 			} else
 				vput(vp);
@@ -393,7 +396,7 @@ vfs_mountroot_shuffle(struct thread *td, struct mount *mpdevfs)
 	}
 
 	/* Remount devfs under /dev */
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, "/dev", td);
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, "/dev");
 	error = namei(&nd);
 	if (!error) {
 		vp = nd.ni_vp;
@@ -721,8 +724,7 @@ parse_mount_dev_present(const char *dev)
 	struct nameidata nd;
 	int error;
 
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, PTR2CAP(dev),
-	    curthread);
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, PTR2CAP(dev));
 	error = namei(&nd);
 	if (!error)
 		vput(nd.ni_vp);
@@ -945,7 +947,7 @@ vfs_mountroot_readconf(struct thread *td, struct sbuf *sb)
 	ssize_t resid;
 	int error, flags, len;
 
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, "/.mount.conf", td);
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, "/.mount.conf");
 	flags = FREAD;
 	error = vn_open(&nd, &flags, 0, NULL);
 	if (error)
@@ -982,6 +984,8 @@ vfs_mountroot_wait(void)
 	TSENTER();
 
 	curfail = 0;
+	lastfail.tv_sec = 0;
+	ppsratecheck(&lastfail, &curfail, 1);
 	while (1) {
 		g_waitidle();
 		mtx_lock(&root_holds_mtx);
@@ -1000,6 +1004,7 @@ vfs_mountroot_wait(void)
 		    hz);
 		TSUNWAIT("root mount");
 	}
+	g_waitidle();
 
 	TSEXIT();
 }
@@ -1034,6 +1039,8 @@ vfs_mountroot_wait_if_neccessary(const char *fs, const char *dev)
 	 * to behave exactly as it used to work before.
 	 */
 	vfs_mountroot_wait();
+	if (parse_mount_dev_present(dev))
+		return (0);
 	printf("mountroot: waiting for device %s...\n", dev);
 	delay = hz / 10;
 	timeout = root_mount_timeout * hz;

@@ -44,11 +44,8 @@ static struct {
 	int pfx_end;  /* Number of chars in pfx */
 } linebuf;
 
-static struct {
-	char *buf;
-	int size;
-	int end;
-} shifted_ansi;
+struct xbuffer shifted_ansi;
+struct xbuffer last_ansi;
 
 public int size_linebuf = 0; /* Size of line buffer (and attr buffer) */
 static struct ansi_state *line_ansi = NULL;
@@ -69,6 +66,7 @@ static LWCHAR pendc;
 static POSITION pendpos;
 static char *end_ansi_chars;
 static char *mid_ansi_chars;
+static int in_hilite;
 
 static int attr_swidth LESSPARAMS ((int a));
 static int attr_ewidth LESSPARAMS ((int a));
@@ -142,8 +140,8 @@ init_line(VOID_PARAM)
 	linebuf.buf = (char *) ecalloc(LINEBUF_SIZE, sizeof(char));
 	linebuf.attr = (int *) ecalloc(LINEBUF_SIZE, sizeof(int));
 	size_linebuf = LINEBUF_SIZE;
-	shifted_ansi.buf = NULL;
-	shifted_ansi.size = 0;
+	xbuf_init(&shifted_ansi);
+	xbuf_init(&last_ansi);
 }
 
 /*
@@ -233,7 +231,9 @@ prewind(VOID_PARAM)
 	mbc_buf_len = 0;
 	is_null_line = 0;
 	pendc = '\0';
-	shifted_ansi.end = 0;
+	in_hilite = 0;
+	xbuf_reset(&shifted_ansi);
+	xbuf_reset(&last_ansi);
 }
 
 /*
@@ -366,26 +366,6 @@ line_pfx_width(VOID_PARAM)
 }
 
 /*
- * Add char to the shifted_ansi buffer.
- */
-	static void
-add_ansi(ch)
-	char ch;
-{
-	if (shifted_ansi.end == shifted_ansi.size)
-	{
-		/* Expand shifted_ansi buffer. */
-		int size = (shifted_ansi.size == 0) ? 8 : shifted_ansi.size * 2;
-		char *buf = (char *) ecalloc(size, sizeof(char));
-		memcpy(buf, shifted_ansi.buf, shifted_ansi.size);
-		if (shifted_ansi.buf != NULL) free(shifted_ansi.buf);
-		shifted_ansi.buf = buf;
-		shifted_ansi.size = size;
-	}
-	shifted_ansi.buf[shifted_ansi.end++] = ch;
-}
-
-/*
  * Shift line left so that the last char is just to the left
  * of the first visible column.
  */
@@ -395,7 +375,7 @@ pshift_all(VOID_PARAM)
 	int i;
 	for (i = linebuf.print;  i < linebuf.end;  i++)
 		if (linebuf.attr[i] == AT_ANSI)
-			add_ansi(linebuf.buf[i]);
+			xbuf_add(&shifted_ansi, linebuf.buf[i]);
 	linebuf.end = linebuf.print;
 	end_column = linebuf.pfx_end;
 }
@@ -687,6 +667,7 @@ store_char(ch, a, rep, pos)
 #if HILITE_SEARCH
 	{
 		int matches;
+		int resend_last = 0;
 		int hl_attr = is_hilited_attr(pos, pos+1, 0, &matches);
 		if (hl_attr)
 		{
@@ -700,6 +681,23 @@ store_char(ch, a, rep, pos)
 					highest_hilite = pos;
 				a |= hl_attr;
 			}
+			in_hilite = 1;
+		} else 
+		{
+			if (in_hilite)
+			{
+				/*
+				 * This is the first non-hilited char after a hilite.
+				 * Resend the last ANSI seq to restore color.
+				 */
+				resend_last = 1;
+			}
+			in_hilite = 0;
+		}
+		if (resend_last)
+		{
+			for (i = 0;  i < last_ansi.end;  i++)
+				STORE_CHAR(last_ansi.data[i], AT_ANSI, NULL, pos);
 		}
 	}
 #endif
@@ -742,8 +740,8 @@ store_char(ch, a, rep, pos)
 	{
 		/* Copy shifted ANSI sequences to beginning of line. */
 		for (i = 0;  i < shifted_ansi.end;  i++)
-			add_linebuf(shifted_ansi.buf[i], AT_ANSI, 0);
-		shifted_ansi.end = 0;
+			add_linebuf(shifted_ansi.data[i], AT_ANSI, 0);
+		xbuf_reset(&shifted_ansi);
 	}
 	/* Add the char to the buf, even if we will left-shift it next. */
 	inc_end_column(w);
@@ -754,12 +752,16 @@ store_char(ch, a, rep, pos)
 	{
 		/* We haven't left-shifted enough yet. */
 		if (a == AT_ANSI)
-			add_ansi(ch); /* Save ANSI attributes */
+			xbuf_add(&shifted_ansi, ch); /* Save ANSI attributes */
 		if (linebuf.end > linebuf.print)
 		{
 			/* Shift left enough to put last byte of this char at print-1. */
-			memcpy(&linebuf.buf[0], &linebuf.buf[replen], linebuf.print);
-			memcpy(&linebuf.attr[0], &linebuf.attr[replen], linebuf.print);
+			int i;
+			for (i = 0; i < linebuf.print; i++)
+			{
+				linebuf.buf[i] = linebuf.buf[i+replen];
+				linebuf.attr[i] = linebuf.attr[i+replen];
+			}
 			linebuf.end -= replen;
 			cshift += w;
 			/*
@@ -965,16 +967,18 @@ store_ansi(ch, rep, pos)
 	switch (ansi_step(line_ansi, ch))
 	{
 	case ANSI_MID:
-		STORE_CHAR(ch, AT_ANSI, rep, pos);
+		if (!in_hilite)
+			STORE_CHAR(ch, AT_ANSI, rep, pos);
 		break;
 	case ANSI_END:
-		STORE_CHAR(ch, AT_ANSI, rep, pos);
+		if (!in_hilite)
+			STORE_CHAR(ch, AT_ANSI, rep, pos);
 		ansi_done(line_ansi);
 		line_ansi = NULL;
 		break;
 	case ANSI_ERR: {
 		/* Remove whole unrecognized sequence.  */
-		char *start = (cshift < hshift) ? shifted_ansi.buf : linebuf.buf;
+		char *start = (cshift < hshift) ? shifted_ansi.data : linebuf.buf;
 		int *end = (cshift < hshift) ? &shifted_ansi.end : &linebuf.end;
 		char *p = start + *end;
 		LWCHAR bch;
@@ -1017,10 +1021,17 @@ do_append(ch, rep, pos)
 	int a = AT_NORMAL;
 
 	if (ctldisp == OPT_ONPLUS && line_ansi == NULL)
+	{
 		line_ansi = ansi_start(ch);
+		if (line_ansi != NULL)
+			xbuf_reset(&last_ansi);
+	}
 
 	if (line_ansi != NULL)
+	{
+		xbuf_add(&last_ansi, ch);
 		return store_ansi(ch, rep, pos);
+	}
 
 	if (ch == '\b')
 		return store_bs(ch, rep, pos);

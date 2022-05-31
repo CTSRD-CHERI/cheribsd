@@ -74,13 +74,11 @@ __collate_load_tables_l(const char *encoding, struct xlocale_collate *table);
 static void
 destruct_collate(void *t)
 {
-#ifndef FORCE_C_LOCALE
 	struct xlocale_collate *table = t;
 	if (table->map && (table->maplen > 0)) {
 		(void) munmap(table->map, table->maplen);
 	}
 	free(t);
-#endif
 }
 
 void *
@@ -88,17 +86,23 @@ __collate_load(const char *encoding, __unused locale_t unused)
 {
 	if (strcmp(encoding, "C") == 0 || strcmp(encoding, "POSIX") == 0 ||
 	    strncmp(encoding, "C.", 2) == 0) {
-		return &__xlocale_C_collate;
+		return (&__xlocale_C_collate);
 	}
-	struct xlocale_collate *table = calloc(sizeof(struct xlocale_collate), 1);
+	struct xlocale_collate *table = calloc(sizeof(struct xlocale_collate),
+	    1);
+	if (table == NULL)
+		return (NULL);
 	table->header.header.destructor = destruct_collate;
-	// FIXME: Make sure that _LDP_CACHE is never returned.  We should be doing
-	// the caching outside of this section
+
+	/*
+	 * FIXME: Make sure that _LDP_CACHE is never returned.  We
+	 * should be doing the caching outside of this section.
+	 */
 	if (__collate_load_tables_l(encoding, table) != _LDP_LOADED) {
 		xlocale_release(table);
-		return NULL;
+		return (NULL);
 	}
-	return table;
+	return (table);
 }
 
 /**
@@ -114,7 +118,6 @@ __collate_load_tables(const char *encoding)
 static int
 __collate_load_tables_l(const char *encoding, struct xlocale_collate *table)
 {
-#ifndef FORCE_C_LOCALE
 	int i, chains, z;
 	char *buf;
 	char *TMP;
@@ -122,12 +125,8 @@ __collate_load_tables_l(const char *encoding, struct xlocale_collate *table)
 	collate_info_t *info;
 	struct stat sbuf;
 	int fd;
-#endif
 
 	table->__collate_load_error = 1;
-#ifdef FORCE_C_LOCALE
-	return (_LDP_CACHE);
-#else
 
 	/* 'encoding' must be already checked. */
 	if (strcmp(encoding, "C") == 0 || strcmp(encoding, "POSIX") == 0 ||
@@ -138,7 +137,7 @@ __collate_load_tables_l(const char *encoding, struct xlocale_collate *table)
 	if (asprintf(&buf, "%s/%s/LC_COLLATE", _PathLocale, encoding) == -1)
 		return (_LDP_ERROR);
 
-	if ((fd = _open(buf, O_RDONLY)) < 0) {
+	if ((fd = _open(buf, O_RDONLY | O_CLOEXEC)) < 0) {
 		free(buf);
 		return (_LDP_ERROR);
 	}
@@ -222,7 +221,6 @@ __collate_load_tables_l(const char *encoding, struct xlocale_collate *table)
 
 	table->__collate_load_error = 0;
 	return (_LDP_LOADED);
-#endif
 }
 
 static const int32_t *

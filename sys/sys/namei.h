@@ -38,6 +38,7 @@
 #include <sys/caprights.h>
 #include <sys/filedesc.h>
 #include <sys/queue.h>
+#include <sys/_seqc.h>
 #include <sys/_uio.h>
 
 enum nameiop { LOOKUP, CREATE, DELETE, RENAME };
@@ -48,7 +49,6 @@ struct componentname {
 	 */
 	u_int64_t cn_origflags;	/* flags to namei */
 	u_int64_t cn_flags;	/* flags to namei */
-	struct	thread *cn_thread;/* thread requesting lookup */
 	struct	ucred *cn_cred;	/* credentials */
 	enum nameiop cn_nameiop;	/* namei operation */
 	int	cn_lkflags;	/* Lock flags LK_EXCLUSIVE or LK_SHARED */
@@ -110,8 +110,14 @@ struct nameidata {
 	 * information from the nameidata structure that is passed
 	 * through the VOP interface.
 	 */
-	struct componentname ni_cnd;
+	struct componentname ni_cnd __subobject_use_container_bounds;
 	struct nameicap_tracker_head ni_cap_tracker;
+	/*
+	 * Private helper data for UFS, must be at the end.  See
+	 * NDINIT_PREFILL().
+	 */
+	seqc_t	ni_dvp_seqc;
+	seqc_t	ni_vp_seqc;
 };
 
 enum cache_fpl_status { CACHE_FPL_STATUS_DESTROYED, CACHE_FPL_STATUS_ABORTED,
@@ -175,8 +181,8 @@ int	cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
 #define	AUDITVNODE1	0x00040000 /* audit the looked up vnode information */
 #define	AUDITVNODE2	0x00080000 /* audit the looked up vnode information */
 #define	NOCAPCHECK	0x00100000 /* do not perform capability checks */
-/* UNUSED		0x00200000 */
-/* UNUSED		0x00400000 */
+#define	OPENREAD	0x00200000 /* open for reading */
+#define	OPENWRITE	0x00400000 /* open for writing */
 /* UNUSED		0x00800000 */
 #define	HASBUF		0x01000000 /* has allocated pathname buffer */
 #define	NOEXECCHECK	0x02000000 /* do not perform exec check on dir */
@@ -210,20 +216,21 @@ int	cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
 /*
  * Initialization of a nameidata structure.
  */
-#define	NDINIT(ndp, op, flags, segflg, namep, td)			\
-	NDINIT_ALL(ndp, op, flags, segflg, namep, AT_FDCWD, NULL, &cap_no_rights, td)
-#define	NDINIT_AT(ndp, op, flags, segflg, namep, dirfd, td)		\
-	NDINIT_ALL(ndp, op, flags, segflg, namep, dirfd, NULL, &cap_no_rights, td)
-#define	NDINIT_ATRIGHTS(ndp, op, flags, segflg, namep, dirfd, rightsp, td) \
-	NDINIT_ALL(ndp, op, flags, segflg, namep, dirfd, NULL, rightsp, td)
-#define	NDINIT_ATVP(ndp, op, flags, segflg, namep, vp, td)		\
-	NDINIT_ALL(ndp, op, flags, segflg, namep, AT_FDCWD, vp, &cap_no_rights, td)
+#define	NDINIT(ndp, op, flags, segflg, namep)				\
+	NDINIT_ALL(ndp, op, flags, segflg, namep, AT_FDCWD, NULL, &cap_no_rights)
+#define	NDINIT_AT(ndp, op, flags, segflg, namep, dirfd)			\
+	NDINIT_ALL(ndp, op, flags, segflg, namep, dirfd, NULL, &cap_no_rights)
+#define	NDINIT_ATRIGHTS(ndp, op, flags, segflg, namep, dirfd, rightsp) 	\
+	NDINIT_ALL(ndp, op, flags, segflg, namep, dirfd, NULL, rightsp)
+#define	NDINIT_ATVP(ndp, op, flags, segflg, namep, vp)			\
+	NDINIT_ALL(ndp, op, flags, segflg, namep, AT_FDCWD, vp, &cap_no_rights)
 
 /*
  * Note the constant pattern may *hide* bugs.
  */
 #ifdef INVARIANTS
-#define NDINIT_PREFILL(arg)	memset(arg, 0xff, sizeof(*arg))
+#define NDINIT_PREFILL(arg)	memset(arg, 0xff, offsetof(struct nameidata,	\
+    ni_dvp_seqc))
 #define NDINIT_DBG(arg)		{ (arg)->ni_debugflags = NAMEI_DBG_INITED; }
 #define NDREINIT_DBG(arg)	{						\
 	if (((arg)->ni_debugflags & NAMEI_DBG_INITED) == 0)			\
@@ -238,7 +245,7 @@ int	cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
 #define NDREINIT_DBG(arg)	do { } while (0)
 #endif
 
-#define NDINIT_ALL(ndp, op, flags, segflg, namep, dirfd, startdir, rightsp, td)	\
+#define NDINIT_ALL(ndp, op, flags, segflg, namep, dirfd, startdir, rightsp)	\
 do {										\
 	struct nameidata *_ndp = (ndp);						\
 	cap_rights_t *_rightsp = (rightsp);					\
@@ -253,7 +260,6 @@ do {										\
 	_ndp->ni_startdir = startdir;						\
 	_ndp->ni_resflags = 0;							\
 	filecaps_init(&_ndp->ni_filecaps);					\
-	_ndp->ni_cnd.cn_thread = td;						\
 	_ndp->ni_rightsneeded = _rightsp;					\
 } while (0)
 
@@ -262,6 +268,11 @@ do {										\
 	NDREINIT_DBG(_ndp);							\
 	_ndp->ni_resflags = 0;							\
 	_ndp->ni_startdir = NULL;						\
+} while (0)
+
+#define	NDPREINIT(ndp) do {							\
+	(ndp)->ni_dvp_seqc = SEQC_MOD;						\
+	(ndp)->ni_vp_seqc = SEQC_MOD;						\
 } while (0)
 
 #define NDF_NO_DVP_RELE		0x00000001

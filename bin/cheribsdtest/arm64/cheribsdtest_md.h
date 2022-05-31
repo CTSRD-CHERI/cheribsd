@@ -54,7 +54,7 @@
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	XFAIL_VARARG_BOUNDS	"varargs bounds known to be unimplemented"
+#define	TLS_EXACT_BOUNDS
 #endif
 
 #endif /* !_CHERIBSDTEST_H_ */

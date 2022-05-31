@@ -36,9 +36,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/sockio.h>
-#include <sys/mbuf.h>
 #include <sys/malloc.h>
+#include <sys/mbuf.h>
 #include <sys/module.h>
+#include <sys/msan.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/random.h>
@@ -516,6 +517,11 @@ vtnet_detach(device_t dev)
 #ifdef DEV_NETMAP
 	netmap_detach(ifp);
 #endif
+
+	if (sc->vtnet_pfil != NULL) {
+		pfil_head_unregister(sc->vtnet_pfil);
+		sc->vtnet_pfil = NULL;
+	}
 
 	vtnet_free_taskqueues(sc);
 
@@ -1296,9 +1302,13 @@ vtnet_ioctl_ifflags(struct vtnet_softc *sc)
 
 	if ((ifp->if_flags ^ sc->vtnet_if_flags) &
 	    (IFF_PROMISC | IFF_ALLMULTI)) {
-		if ((sc->vtnet_flags & VTNET_FLAG_CTRL_RX) == 0)
-			return (ENOTSUP);
-		vtnet_rx_filter(sc);
+		if (sc->vtnet_flags & VTNET_FLAG_CTRL_RX)
+			vtnet_rx_filter(sc);
+		else {
+			if ((ifp->if_flags ^ sc->vtnet_if_flags) & IFF_ALLMULTI)
+				return (ENOTSUP);
+			ifp->if_flags |= IFF_PROMISC;
+		}
 	}
 
 out:
@@ -1810,10 +1820,14 @@ static int
 vtnet_rxq_csum_data_valid(struct vtnet_rxq *rxq, struct mbuf *m,
     uint16_t etype, int hoff, struct virtio_net_hdr *hdr __unused)
 {
+#if 0
 	struct vtnet_softc *sc;
+#endif
 	int protocol;
 
+#if 0
 	sc = rxq->vtnrx_sc;
+#endif
 
 	switch (etype) {
 #if defined(INET)
@@ -1904,7 +1918,7 @@ vtnet_rxq_discard_merged_bufs(struct vtnet_rxq *rxq, int nbufs)
 static void
 vtnet_rxq_discard_buf(struct vtnet_rxq *rxq, struct mbuf *m)
 {
-	int error;
+	int error __diagused;
 
 	/*
 	 * Requeue the discarded mbuf. This should always be successful
@@ -2074,6 +2088,7 @@ vtnet_rxq_eof(struct vtnet_rxq *rxq)
 		if (sc->vtnet_flags & VTNET_FLAG_MRG_RXBUFS) {
 			struct virtio_net_hdr_mrg_rxbuf *mhdr =
 			    mtod(m, struct virtio_net_hdr_mrg_rxbuf *);
+			kmsan_mark(mhdr, sizeof(*mhdr), KMSAN_STATE_INITED);
 			nbufs = vtnet_htog16(sc, mhdr->num_buffers);
 			adjsz = sizeof(struct virtio_net_hdr_mrg_rxbuf);
 		} else if (vtnet_modern(sc)) {
@@ -2106,6 +2121,8 @@ vtnet_rxq_eof(struct vtnet_rxq *rxq)
 			if (vtnet_rxq_merged_eof(rxq, m, nbufs) != 0)
 				continue;
 		}
+
+		kmsan_mark_mbuf(m, KMSAN_STATE_INITED);
 
 		/*
 		 * Save an endian swapped version of the header prior to it
@@ -3389,11 +3406,9 @@ vtnet_update_rx_offloads(struct vtnet_softc *sc)
 static int
 vtnet_reinit(struct vtnet_softc *sc)
 {
-	device_t dev;
 	struct ifnet *ifp;
 	int error;
 
-	dev = sc->vtnet_dev;
 	ifp = sc->vtnet_ifp;
 
 	bcopy(IF_LLADDR(ifp), sc->vtnet_hwaddr, ETHER_ADDR_LEN);
@@ -3428,10 +3443,8 @@ vtnet_reinit(struct vtnet_softc *sc)
 static void
 vtnet_init_locked(struct vtnet_softc *sc, int init_mode)
 {
-	device_t dev;
 	struct ifnet *ifp;
 
-	dev = sc->vtnet_dev;
 	ifp = sc->vtnet_ifp;
 
 	VTNET_CORE_LOCK_ASSERT(sc);

@@ -115,7 +115,7 @@ struct kinfo_proc64 {
 	u_int	ki_slptime;
 	u_int	ki_swtime;
 	u_int	ki_cow;
-	u_int64_t ki_runtime;
+	uint64_t ki_runtime;
 	struct	timeval ki_start;
 	struct	timeval ki_childtime;
 	long	ki_flag;
@@ -195,23 +195,6 @@ struct procctl_reaper_pids64 {
 	u_int		rp_count;
 	u_int		rp_pad0[15];
 	uint64_t	rp_pids;	/* struct procctl_reaper_pidinfo* */
-};
-
-#include <sys/ipc.h>
-#include <sys/msg.h>
-
-struct msqid_ds64 {
-	struct ipc_perm			msg_perm;
-	uint64_t			msg_first;	/* struct msg64 * */
-	uint64_t			msg_last;	/* struct msg64 * */
-	msglen_t			msg_cbytes;
-	msgqnum_t			msg_qnum;
-	msglen_t			msg_qbytes;
-	pid_t				msg_lspid;
-	pid_t  				msg_lrpid;
-	time_t				msg_stime;
-	time_t 				msg_rtime;
-	time_t				msg_ctime;
 };
 
 struct iovec64 {

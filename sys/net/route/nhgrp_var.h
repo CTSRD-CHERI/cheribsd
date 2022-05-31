@@ -54,7 +54,7 @@ struct nhgrp_priv {
 	struct nh_control	*nh_control;	/* parent control structure */
 	struct nhgrp_priv	*nhg_priv_next;
 	struct nhgrp_object	*nhg;
-	struct epoch_context	nhg_epoch_ctx __subobject_use_container_bounds;	/* epoch data for nhop */
+	struct epoch_context	nhg_epoch_ctx;	/* epoch data for nhop */
 	struct weightened_nhop	nhg_nh_weights[0];
 };
 

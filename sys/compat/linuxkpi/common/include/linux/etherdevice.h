@@ -24,10 +24,11 @@
  *
  * $FreeBSD$
  */
-#ifndef _LINUX_ETHERDEVICE
-#define	_LINUX_ETHERDEVICE
+#ifndef _LINUXKPI_LINUX_ETHERDEVICE_H_
+#define	_LINUXKPI_LINUX_ETHERDEVICE_H_
 
 #include <linux/types.h>
+#include <linux/device.h>
 
 #include <sys/random.h>
 #include <sys/libkern.h>
@@ -82,10 +83,11 @@ ether_addr_copy(u8 * dst, const u8 * src)
 }
 
 static inline bool
-ether_addr_equal(const u8 *pa, const u8 *pb)
+ether_addr_equal_unaligned(const u8 *pa, const u8 *pb)
 {
 	return (memcmp(pa, pb, 6) == 0);
 }
+#define	ether_addr_equal(_pa, _pb)	ether_addr_equal_unaligned(_pa, _pb)
 
 static inline bool
 ether_addr_equal_64bits(const u8 *pa, const u8 *pb)
@@ -106,7 +108,7 @@ eth_zero_addr(u8 *pa)
 }
 
 static inline void
-random_ether_addr(u8 * dst)
+random_ether_addr(u8 *dst)
 {
 	arc4random_buf(dst, 6);
 
@@ -114,4 +116,19 @@ random_ether_addr(u8 * dst)
 	dst[0] |= 0x02;
 }
 
-#endif					/* _LINUX_ETHERDEVICE */
+static inline void
+eth_random_addr(u8 *dst)
+{
+
+	random_ether_addr(dst);
+}
+
+static inline int
+device_get_mac_address(struct device *dev, char *dst)
+{
+
+	/* XXX get mac address from FDT? */
+	return (-ENOENT);
+}
+
+#endif					/* _LINUXKPI_LINUX_ETHERDEVICE_H_ */

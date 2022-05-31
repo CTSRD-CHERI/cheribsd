@@ -1,6 +1,9 @@
 # $FreeBSD$
 
-# Options set in the build system that affect the kernel somehow.
+# Options set in the build system which affect the building of kernel
+# modules. These select which parts to compile in or out (eg INET) or which
+# parts to omit (eg CDDL or SOURCELESS_HOST). Some of these will cause
+# config.mk to define symbols in various opt_*.h files.
 
 #
 # Define MK_* variables (which are either "yes" or "no") for users
@@ -79,10 +82,6 @@ BROKEN_OPTIONS+= CDDL ZFS
 . endif
 .endif
 
-.if ${MACHINE_CPUARCH} == "mips"
-BROKEN_OPTIONS+= ZFS SSP
-.endif
-
 .if ${MACHINE_CPUARCH} == "powerpc" && ${MACHINE_ARCH} == "powerpc"
 BROKEN_OPTIONS+= ZFS
 .endif
@@ -98,14 +97,14 @@ BROKEN_OPTIONS+= OFED
 BROKEN_OPTIONS+= KERNEL_RETPOLINE
 .endif
 
-# EFI doesn't exist on mips, powerpc, or riscv.
-.if ${MACHINE:Mmips} || ${MACHINE:Mpowerpc} || ${MACHINE:Mriscv}
+# EFI doesn't exist on powerpc, or riscv
+.if ${MACHINE:Mpowerpc} || ${MACHINE:Mriscv}
 BROKEN_OPTIONS+=EFI
 .endif
 
 # Broken post OpenZFS import
-.if ${MACHINE_CPU:Mcheri} || ${.MAKE.OS} == "Linux"
-BROKEN_OPTIONS=CDDL ZFS
+.if ${MACHINE_CPU:Mcheri}
+BROKEN_OPTIONS+= CDDL ZFS
 .endif
 
 # expanded inline from bsd.mkopt.mk to avoid share/mk dependency

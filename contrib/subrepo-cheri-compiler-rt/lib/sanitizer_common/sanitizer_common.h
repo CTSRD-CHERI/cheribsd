@@ -44,7 +44,7 @@ const uptr kMaxPathLength = 4096;
 
 const uptr kMaxThreadStackSize = 1 << 30;  // 1Gb
 
-static const uptr kErrorMessageBufferSize = 1 << 16;
+const uptr kErrorMessageBufferSize = 1 << 16;
 
 // Denotes fake PC values that come from JIT/JAVA/etc.
 // For such PC values __tsan_symbolize_external_ex() will be called.
@@ -53,25 +53,25 @@ const u64 kExternalPCBit = 1ULL << 60;
 extern const char *SanitizerToolName;  // Can be changed by the tool.
 
 extern atomic_uint32_t current_verbosity;
-INLINE void SetVerbosity(int verbosity) {
+inline void SetVerbosity(int verbosity) {
   atomic_store(&current_verbosity, verbosity, memory_order_relaxed);
 }
-INLINE int Verbosity() {
+inline int Verbosity() {
   return atomic_load(&current_verbosity, memory_order_relaxed);
 }
 
 #if SANITIZER_ANDROID
-INLINE usize GetPageSize() {
+inline usize GetPageSize() {
 // Android post-M sysconf(_SC_PAGESIZE) crashes if called from .preinit_array.
   return 4096;
 }
-INLINE usize GetPageSizeCached() {
+inline usize GetPageSizeCached() {
   return 4096;
 }
 #else
 usize GetPageSize();
 extern usize PageSizeCached;
-INLINE usize GetPageSizeCached() {
+inline usize GetPageSizeCached() {
   if (!PageSizeCached)
     PageSizeCached = GetPageSize();
   return PageSizeCached;
@@ -91,7 +91,7 @@ void GetThreadStackAndTls(bool main, uptr *stk_addr, usize *stk_size,
 
 // Memory management
 void *MmapOrDie(usize size, const char *mem_type, bool raw_report = false);
-INLINE void *MmapOrDieQuietly(usize size, const char *mem_type) {
+inline void *MmapOrDieQuietly(usize size, const char *mem_type) {
   return MmapOrDie(size, mem_type, /*raw_report*/ true);
 }
 void UnmapOrDie(void *addr, usize size);
@@ -120,6 +120,40 @@ bool MprotectNoAccess(uptr addr, usize size);
 bool MprotectReadOnly(uptr addr, usize size);
 
 void MprotectMallocZones(void *addr, int prot);
+
+#if SANITIZER_LINUX
+// Unmap memory. Currently only used on Linux.
+void UnmapFromTo(uptr from, uptr to);
+#endif
+
+// Maps shadow_size_bytes of shadow memory and returns shadow address. It will
+// be aligned to the mmap granularity * 2^shadow_scale, or to
+// 2^min_shadow_base_alignment if that is larger. The returned address will
+// have max(2^min_shadow_base_alignment, mmap granularity) on the left, and
+// shadow_size_bytes bytes on the right, which on linux is mapped no access.
+// The high_mem_end may be updated if the original shadow size doesn't fit.
+uptr MapDynamicShadow(uptr shadow_size_bytes, uptr shadow_scale,
+                      uptr min_shadow_base_alignment, uptr &high_mem_end);
+
+// Let S = max(shadow_size, num_aliases * alias_size, ring_buffer_size).
+// Reserves 2*S bytes of address space to the right of the returned address and
+// ring_buffer_size bytes to the left.  The returned address is aligned to 2*S.
+// Also creates num_aliases regions of accessible memory starting at offset S
+// from the returned address.  Each region has size alias_size and is backed by
+// the same physical memory.
+uptr MapDynamicShadowAndAliases(uptr shadow_size, uptr alias_size,
+                                uptr num_aliases, uptr ring_buffer_size);
+
+// Reserve memory range [beg, end]. If madvise_shadow is true then apply
+// madvise (e.g. hugepages, core dumping) requested by options.
+void ReserveShadowMemoryRange(uptr beg, uptr end, const char *name,
+                              bool madvise_shadow = true);
+
+// Protect size bytes of memory starting at addr. Also try to protect
+// several pages at the start of the address space as specified by
+// zero_base_shadow_start, at most up to the size or zero_base_max_shadow_start.
+void ProtectGap(uptr addr, uptr size, uptr zero_base_shadow_start,
+                uptr zero_base_max_shadow_start);
 
 // Find an available address space.
 uptr FindAvailableMemoryRange(usize size, usize alignment, usize left_padding,
@@ -203,10 +237,16 @@ void SetPrintfAndReportCallback(void (*callback)(const char *));
 // Lock sanitizer error reporting and protects against nested errors.
 class ScopedErrorReportLock {
  public:
-  ScopedErrorReportLock();
-  ~ScopedErrorReportLock();
+  ScopedErrorReportLock() ACQUIRE(mutex_) { Lock(); }
+  ~ScopedErrorReportLock() RELEASE(mutex_) { Unlock(); }
 
-  static void CheckLocked();
+  static void Lock() ACQUIRE(mutex_);
+  static void Unlock() RELEASE(mutex_);
+  static void CheckLocked() CHECK_LOCKED(mutex_);
+
+ private:
+  static atomic_uintptr_t reporting_thread_;
+  static StaticSpinMutex mutex_;
 };
 
 extern pid_t stoptheworld_tracer_pid;
@@ -223,13 +263,13 @@ const char *StripModuleName(const char *module);
 // OS
 usize ReadBinaryName(/*out*/char *buf, usize buf_len);
 usize ReadBinaryNameCached(/*out*/char *buf, usize buf_len);
+usize ReadBinaryDir(/*out*/ char *buf, usize buf_len);
 usize ReadLongProcessName(/*out*/ char *buf, usize buf_len);
 const char *GetProcessName();
 void UpdateProcessName();
 void CacheBinaryName();
 void DisableCoreDumperIfNecessary();
 void DumpProcessMap();
-void PrintModuleMap();
 const char *GetEnv(const char *name);
 bool SetEnv(const char *name, const char *value);
 
@@ -254,8 +294,8 @@ void InitTlsSize();
 usize GetTlsSize();
 
 // Other
-void SleepForSeconds(int seconds);
-void SleepForMillis(int millis);
+void SleepForSeconds(unsigned seconds);
+void SleepForMillis(unsigned millis);
 u64 NanoTime();
 u64 MonotonicNanoTime();
 int Atexit(void (*function)(void));
@@ -270,8 +310,8 @@ void NORETURN ReportMmapFailureAndDie(usize size, const char *mem_type,
                                       const char *mmap_type, error_t err,
                                       bool raw_report = false);
 
-// Specific tools may override behavior of "Die" and "CheckFailed" functions
-// to do tool-specific job.
+// Specific tools may override behavior of "Die" function to do tool-specific
+// job.
 typedef void (*DieCallbackType)(void);
 
 // It's possible to add several callbacks that would be run when "Die" is
@@ -283,9 +323,7 @@ bool RemoveDieCallback(DieCallbackType callback);
 
 void SetUserDieCallback(DieCallbackType callback);
 
-typedef void (*CheckFailedCallbackType)(const char *, int, const char *,
-                                       u64, u64);
-void SetCheckFailedCallback(CheckFailedCallbackType callback);
+void SetCheckUnwindCallback(void (*callback)());
 
 // Callback will be called if soft_rss_limit_mb is given and the limit is
 // exceeded (exceeded==true) or if rss went down below the limit
@@ -319,8 +357,6 @@ void ReportDeadlySignal(const SignalContext &sig, u32 tid,
 void SetAlternateSignalStack();
 void UnsetAlternateSignalStack();
 
-// We don't want a summary too long.
-const int kMaxSummaryLength = 1024;
 // Construct a one-line string:
 //   SUMMARY: SanitizerToolName: error_message
 // and pass it to __sanitizer_report_error_summary.
@@ -349,7 +385,7 @@ unsigned char _BitScanReverse64(unsigned long *index, unsigned __int64 mask);
 }
 #endif
 
-INLINE usize MostSignificantSetBitIndex(usize x) {
+inline usize MostSignificantSetBitIndex(usize x) {
   CHECK_NE(x, 0U);
   unsigned long up;
 #if !SANITIZER_WINDOWS || defined(__clang__) || defined(__GNUC__)
@@ -372,7 +408,7 @@ INLINE usize MostSignificantSetBitIndex(u64 x) {
 }
 #endif
 
-INLINE usize LeastSignificantSetBitIndex(usize x) {
+inline usize LeastSignificantSetBitIndex(usize x) {
   CHECK_NE(x, 0U);
   unsigned long up;
 #if !SANITIZER_WINDOWS || defined(__clang__) || defined(__GNUC__)
@@ -395,7 +431,7 @@ INLINE usize LeastSignificantSetBitIndex(u64 x) {
 }
 #endif
 
-INLINE bool IsPowerOfTwo(u64 x) {
+inline bool IsPowerOfTwo(u64 x) {
   return (x & (x - 1)) == 0;
 }
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -405,7 +441,7 @@ INLINE bool IsPowerOfTwo(usize x) {
 }
 #endif
 
-INLINE u64 RoundUpToPowerOfTwo(u64 size) {
+inline u64 RoundUpToPowerOfTwo(u64 size) {
   CHECK(size);
   if (IsPowerOfTwo(size)) return size;
 
@@ -421,7 +457,7 @@ INLINE usize RoundUpToPowerOfTwo(usize x) {
 }
 #endif
 
-INLINE uptr RoundUpTo(uptr p, usize boundary) {
+inline uptr RoundUpTo(uptr p, usize boundary) {
   RAW_CHECK(IsPowerOfTwo(boundary));
 #if __has_builtin(__builtin_align_up)
   return __builtin_align_up(p, boundary);
@@ -430,7 +466,7 @@ INLINE uptr RoundUpTo(uptr p, usize boundary) {
 #endif
 }
 template <typename T>
-INLINE T *RoundUpTo(T *p, usize boundary) {
+inline T *RoundUpTo(T *p, usize boundary) {
   RAW_CHECK(IsPowerOfTwo(boundary));
 #if __has_builtin(__builtin_align_up)
   return __builtin_align_up(p, boundary);
@@ -439,7 +475,7 @@ INLINE T *RoundUpTo(T *p, usize boundary) {
 #endif
 }
 
-INLINE uptr RoundDownTo(uptr x, usize boundary) {
+inline uptr RoundDownTo(uptr x, usize boundary) {
 #if __has_builtin(__builtin_align_down)
   return __builtin_align_down(x, boundary);
 #else
@@ -447,7 +483,7 @@ INLINE uptr RoundDownTo(uptr x, usize boundary) {
 #endif
 }
 template <typename T>
-INLINE T *RoundDownTo(T *p, usize boundary) {
+inline T *RoundDownTo(T *p, usize boundary) {
   RAW_CHECK(IsPowerOfTwo(boundary));
 #if __has_builtin(__builtin_align_down)
   return __builtin_align_down(p, boundary);
@@ -456,7 +492,7 @@ INLINE T *RoundDownTo(T *p, usize boundary) {
 #endif
 }
 
-INLINE bool IsAligned(uptr a, usize alignment) {
+inline bool IsAligned(uptr a, usize alignment) {
 #if __has_builtin(__builtin_is_aligned)
   return __builtin_is_aligned(a, alignment);
 #else
@@ -464,11 +500,11 @@ INLINE bool IsAligned(uptr a, usize alignment) {
 #endif
 }
 
-INLINE bool IsAligned(const void *ptr, usize alignment) {
+inline bool IsAligned(const void *ptr, usize alignment) {
   return IsAligned((uptr)ptr, alignment);
 }
 
-INLINE u64 Log2(u64 x) {
+inline u64 Log2(u64 x) {
   CHECK(IsPowerOfTwo(x));
   return LeastSignificantSetBitIndex(x);
 }
@@ -481,8 +517,14 @@ INLINE usize Log2(usize x) {
 
 // Don't use std::min, std::max or std::swap, to minimize dependency
 // on libstdc++.
-template<class T> T Min(T a, T b) { return a < b ? a : b; }
-template<class T> constexpr T Max(T a, T b) { return a > b ? a : b; }
+template <class T>
+constexpr T Min(T a, T b) {
+  return a < b ? a : b;
+}
+template <class T>
+constexpr T Max(T a, T b) {
+  return a > b ? a : b;
+}
 template<class T> void Swap(T& a, T& b) {
   T tmp = a;
   a = b;
@@ -490,14 +532,14 @@ template<class T> void Swap(T& a, T& b) {
 }
 
 // Char handling
-INLINE bool IsSpace(int c) {
+inline bool IsSpace(int c) {
   return (c == ' ') || (c == '\n') || (c == '\t') ||
          (c == '\f') || (c == '\r') || (c == '\v');
 }
-INLINE bool IsDigit(int c) {
+inline bool IsDigit(int c) {
   return (c >= '0') && (c <= '9');
 }
-INLINE int ToLower(int c) {
+inline int ToLower(int c) {
   return (c >= 'A' && c <= 'Z') ? (c + 'a' - 'A') : c;
 }
 
@@ -507,6 +549,7 @@ INLINE int ToLower(int c) {
 template<typename T>
 class InternalMmapVectorNoCtor {
  public:
+  using value_type = T;
   void Initialize(usize initial_capacity) {
     capacity_bytes_ = 0;
     size_ = 0;
@@ -630,21 +673,21 @@ class InternalMmapVector : public InternalMmapVectorNoCtor<T> {
   InternalMmapVector &operator=(InternalMmapVector &&) = delete;
 };
 
-class InternalScopedString : public InternalMmapVector<char> {
+class InternalScopedString {
  public:
-  explicit InternalScopedString(usize max_length)
-      : InternalMmapVector<char>(max_length), length_(0) {
-    (*this)[0] = '\0';
-  }
-  usize length() { return length_; }
+  InternalScopedString() : buffer_(1) { buffer_[0] = '\0'; }
+
+  usize length() const { return buffer_.size() - 1; }
   void clear() {
-    (*this)[0] = '\0';
-    length_ = 0;
+    buffer_.resize(1);
+    buffer_[0] = '\0';
   }
   void append(const char *format, ...);
+  const char *data() const { return buffer_.data(); }
+  char *data() { return buffer_.data(); }
 
  private:
-  usize length_;
+  InternalMmapVector<char> buffer_;
 };
 
 template <class T>
@@ -691,9 +734,13 @@ void Sort(T *v, usize size, Compare comp = {}) {
 
 // Works like std::lower_bound: finds the first element that is not less
 // than the val.
-template <class Container, class Value, class Compare>
-usize InternalLowerBound(const Container &v, usize first, usize last,
-                        const Value &val, Compare comp) {
+template <class Container,
+          class Compare = CompareLess<typename Container::value_type>>
+usize InternalLowerBound(const Container &v,
+                        const typename Container::value_type &val,
+                        Compare comp = {}) {
+  usize first = 0;
+  usize last = v.size();
   while (last > first) {
     usize mid = (first + last) / 2;
     if (comp(v[mid], val))
@@ -713,8 +760,30 @@ enum ModuleArch {
   kModuleArchARMV7,
   kModuleArchARMV7S,
   kModuleArchARMV7K,
-  kModuleArchARM64
+  kModuleArchARM64,
+  kModuleArchRISCV64
 };
+
+// Sorts and removes duplicates from the container.
+template <class Container,
+          class Compare = CompareLess<typename Container::value_type>>
+void SortAndDedup(Container &v, Compare comp = {}) {
+  Sort(v.data(), v.size(), comp);
+  uptr size = v.size();
+  if (size < 2)
+    return;
+  uptr last = 0;
+  for (uptr i = 1; i < size; ++i) {
+    if (comp(v[last], v[i])) {
+      ++last;
+      if (last != i)
+        v[last] = v[i];
+    } else {
+      CHECK(!comp(v[i], v[last]));
+    }
+  }
+  v.resize(last + 1);
+}
 
 // Opens the file 'file_name" and reads up to 'max_len' bytes.
 // The resulting buffer is mmaped and stored in '*buff'.
@@ -757,6 +826,8 @@ inline const char *ModuleArchToString(ModuleArch arch) {
       return "armv7k";
     case kModuleArchARM64:
       return "arm64";
+    case kModuleArchRISCV64:
+      return "riscv64";
   }
   CHECK(0 && "Invalid module arch");
   return "";
@@ -879,15 +950,15 @@ void WriteToSyslog(const char *buffer);
 #if SANITIZER_MAC || SANITIZER_WIN_TRACE
 void LogFullErrorReport(const char *buffer);
 #else
-INLINE void LogFullErrorReport(const char *buffer) {}
+inline void LogFullErrorReport(const char *buffer) {}
 #endif
 
 #if SANITIZER_LINUX || SANITIZER_MAC
 void WriteOneLineToSyslog(const char *s);
 void LogMessageOnPrintf(const char *str);
 #else
-INLINE void WriteOneLineToSyslog(const char *s) {}
-INLINE void LogMessageOnPrintf(const char *str) {}
+inline void WriteOneLineToSyslog(const char *s) {}
+inline void LogMessageOnPrintf(const char *str) {}
 #endif
 
 #if SANITIZER_LINUX || SANITIZER_WIN_TRACE
@@ -895,21 +966,21 @@ INLINE void LogMessageOnPrintf(const char *str) {}
 void AndroidLogInit();
 void SetAbortMessage(const char *);
 #else
-INLINE void AndroidLogInit() {}
+inline void AndroidLogInit() {}
 // FIXME: MacOS implementation could use CRSetCrashLogMessage.
-INLINE void SetAbortMessage(const char *) {}
+inline void SetAbortMessage(const char *) {}
 #endif
 
 #if SANITIZER_ANDROID
 void SanitizerInitializeUnwinder();
 AndroidApiLevel AndroidGetApiLevel();
 #else
-INLINE void AndroidLogWrite(const char *buffer_unused) {}
-INLINE void SanitizerInitializeUnwinder() {}
-INLINE AndroidApiLevel AndroidGetApiLevel() { return ANDROID_NOT_ANDROID; }
+inline void AndroidLogWrite(const char *buffer_unused) {}
+inline void SanitizerInitializeUnwinder() {}
+inline AndroidApiLevel AndroidGetApiLevel() { return ANDROID_NOT_ANDROID; }
 #endif
 
-INLINE usize GetPthreadDestructorIterations() {
+inline usize GetPthreadDestructorIterations() {
 #if SANITIZER_ANDROID
   return (AndroidGetApiLevel() == ANDROID_LOLLIPOP_MR1) ? 8 : 4;
 #elif SANITIZER_POSIX
@@ -1015,7 +1086,7 @@ RunOnDestruction<Fn> at_scope_exit(Fn fn) {
 #if SANITIZER_LINUX && SANITIZER_S390_64
 void AvoidCVE_2016_2143();
 #else
-INLINE void AvoidCVE_2016_2143() {}
+inline void AvoidCVE_2016_2143() {}
 #endif
 
 struct StackDepotStats {
@@ -1036,7 +1107,7 @@ bool GetRandom(void *buffer, usize length, bool blocking = true);
 // Returns the number of logical processors on the system.
 u32 GetNumberOfCPUs();
 extern u32 NumberOfCPUsCached;
-INLINE u32 GetNumberOfCPUsCached() {
+inline u32 GetNumberOfCPUsCached() {
   if (!NumberOfCPUsCached)
     NumberOfCPUsCached = GetNumberOfCPUs();
   return NumberOfCPUsCached;
@@ -1055,6 +1126,13 @@ class ArrayRef {
   T *begin_ = nullptr;
   T *end_ = nullptr;
 };
+
+#define PRINTF_128(v)                                                         \
+  (*((u8 *)&v + 0)), (*((u8 *)&v + 1)), (*((u8 *)&v + 2)), (*((u8 *)&v + 3)), \
+      (*((u8 *)&v + 4)), (*((u8 *)&v + 5)), (*((u8 *)&v + 6)),                \
+      (*((u8 *)&v + 7)), (*((u8 *)&v + 8)), (*((u8 *)&v + 9)),                \
+      (*((u8 *)&v + 10)), (*((u8 *)&v + 11)), (*((u8 *)&v + 12)),             \
+      (*((u8 *)&v + 13)), (*((u8 *)&v + 14)), (*((u8 *)&v + 15))
 
 }  // namespace __sanitizer
 

@@ -67,26 +67,11 @@ static MALLOC_DEFINE(M_NETGRAPH_PARSE, "netgraph_parse", "netgraph parse info");
 #define M_NETGRAPH_PARSE M_NETGRAPH
 #endif
 
-/* Compute alignment for primitive integral types */
-struct int16_temp {
-	char	x;
-	int16_t	y;
-};
-
-struct int32_temp {
-	char	x;
-	int32_t	y;
-};
-
-struct int64_temp {
-	char	x;
-	int64_t	y;
-};
-
-#define INT8_ALIGNMENT		1
-#define INT16_ALIGNMENT		((size_t)&((struct int16_temp *)0)->y)
-#define INT32_ALIGNMENT		((size_t)&((struct int32_temp *)0)->y)
-#define INT64_ALIGNMENT		((size_t)&((struct int64_temp *)0)->y)
+/* Alignment for primitive integral types */
+#define INT8_ALIGNMENT		_Alignof(int8_t)
+#define INT16_ALIGNMENT		_Alignof(int16_t)
+#define INT32_ALIGNMENT		_Alignof(int32_t)
+#define INT64_ALIGNMENT		_Alignof(int64_t)
 
 /* Output format for integral types */
 #define INT_UNSIGNED		0
@@ -960,9 +945,11 @@ ng_ipaddr_parse(const struct ng_parse_type *type,
 		if ((error = ng_int8_parse(&ng_parse_int8_type,
 		    s, off, start, buf + i, buflen)) != 0)
 			return (error);
-		if (i < 3 && s[*off] != '.')
-			return (EINVAL);
-		(*off)++;
+		if (i < 3) {
+			if (s[*off] != '.')
+				return (EINVAL);
+			(*off)++;
+		}
 	}
 	*buflen = 4;
 	return (0);

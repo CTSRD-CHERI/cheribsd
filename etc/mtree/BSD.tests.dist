@@ -438,7 +438,11 @@
         ..
         ifconfig
         ..
+        md5
+        ..
         mdconfig
+        ..
+        newfs_msdos
         ..
         nvmecontrol
         ..
@@ -864,11 +868,17 @@
         ..
         vm
         ..
+        vmm
+        ..
     ..
     usr.bin
         apply
         ..
         awk
+	    bugs-fixed
+	    ..
+	    netbsd
+	    ..
         ..
         basename
         ..
@@ -992,11 +1002,15 @@
         ..
         diff
         ..
+        diff3
+        ..
         dirname
         ..
         du
         ..
         file2c
+        ..
+        file
         ..
         find
         ..
@@ -1056,6 +1070,8 @@
         ..
         soelim
         ..
+        sort
+        ..
         stat
         ..
         tail
@@ -1093,6 +1109,8 @@
     ..
     usr.sbin
         chown
+        ..
+        daemon
         ..
         etcupdate
         ..

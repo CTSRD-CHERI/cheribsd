@@ -78,6 +78,9 @@ static struct sx dpcpu_lock;
 uintptr_t dpcpu_off[MAXCPU];
 struct pcpu *cpuid_to_pcpu[MAXCPU];
 struct cpuhead cpuhead = STAILQ_HEAD_INITIALIZER(cpuhead);
+#ifdef __CHERI_PURE_CAPABILITY__
+uintptr_t dpcpu_start = DPCPU_START;
+#endif
 
 /*
  * Initialize the MI portions of a struct pcpu.

@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/imgact.h>
 #include <sys/linker.h>
 #include <sys/proc.h>
+#include <sys/reg.h>
 #include <sys/sysent.h>
 #include <sys/imgact_elf.h>
 #include <sys/syscall.h>
@@ -58,6 +59,8 @@ __FBSDID("$FreeBSD$");
 u_long __read_frequently elf_hwcap;
 u_long __read_frequently elf_hwcap2;
 
+struct arm64_addr_mask elf64_addr_mask;
+
 static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
@@ -72,24 +75,27 @@ static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_name	= "FreeBSD ELF64",
 #endif
 	.sv_coredump	= __elfN(coredump),
+	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
+	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
+	.sv_elf_core_prepare_notes = __elfN(prepare_notes),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
-	.sv_szpsstrings	= sizeof(struct ps_strings),
+	.sv_psstringssz	= sizeof(struct ps_strings),
 	.sv_stackprot	= VM_PROT_RW_CAP,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = exec_copyout_strings,
 	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
+	.sv_flags	= SV_SHP | SV_TIMEKEEP | SV_ABI_FREEBSD | SV_LP64 |
+	    SV_RNG_SEED_VER |
 #if __has_feature(capabilities)
-	.sv_flags	= SV_SHP | SV_TIMEKEEP | SV_ABI_FREEBSD | SV_LP64 |
-	    SV_RNG_SEED_VER | SV_CHERI,
+	    SV_CHERI,
 #else
-	.sv_flags	= SV_SHP | SV_TIMEKEEP | SV_ABI_FREEBSD | SV_LP64 |
-	    SV_ASLR | SV_RNG_SEED_VER,
+	    SV_ASLR,
 #endif
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
@@ -101,6 +107,10 @@ static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_trap	= NULL,
 	.sv_hwcap	= &elf_hwcap,
 	.sv_hwcap2	= &elf_hwcap2,
+	.sv_onexec_old	= exec_onexec_old,
+	.sv_onexit	= exit_onexit,
+	.sv_regset_begin = SET_BEGIN(__elfN(regset)),
+	.sv_regset_end	= SET_LIMIT(__elfN(regset)),
 };
 INIT_SYSENTVEC(elf64_sysvec, &elf64_freebsd_sysvec);
 
@@ -123,18 +133,55 @@ static __ElfN(Brandinfo) freebsd_brand_info = {
 SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_FIRST,
     (sysinit_cfunc_t)__elfN(insert_brand_entry), &freebsd_brand_info);
 
-void
-__elfN(dump_thread)(struct thread *td __unused, void *dst __unused,
-    size_t *off __unused)
+static bool
+get_arm64_addr_mask(struct regset *rs, struct thread *td, void *buf,
+    size_t *sizep)
 {
+	if (buf != NULL) {
+		KASSERT(*sizep == sizeof(elf64_addr_mask),
+		    ("%s: invalid size", __func__));
+		memcpy(buf, &elf64_addr_mask, sizeof(elf64_addr_mask));
+	}
+	*sizep = sizeof(elf64_addr_mask);
 
+	return (true);
+}
+
+struct regset regset_arm64_addr_mask = {
+	.note = NT_ARM_ADDR_MASK,
+	.size = sizeof(struct arm64_addr_mask),
+	.get = get_arm64_addr_mask,
+};
+ELF_REGSET(regset_arm64_addr_mask);
+
+void
+__elfN(dump_thread)(struct thread *td, void *dst, size_t *off)
+{
+	struct arm64_addr_mask addr_mask;
+	size_t len, mask_size;
+
+	len = 0;
+	if (dst != NULL) {
+		mask_size = sizeof(addr_mask);
+		get_arm64_addr_mask(&regset_arm64_addr_mask, td, &addr_mask,
+		    &mask_size);
+
+		len += __elfN(populate_note)(NT_ARM_ADDR_MASK, &addr_mask, dst,
+		    sizeof(addr_mask), NULL);
+	} else {
+		len += __elfN(populate_note)(NT_ARM_ADDR_MASK, NULL, NULL,
+		    sizeof(addr_mask), NULL);
+	}
+
+	*off += len;
 }
 
 bool
 elf_is_ifunc_reloc(Elf_Size r_info __unused)
 {
 
-	return (ELF_R_TYPE(r_info) == R_AARCH64_IRELATIVE);
+	return (ELF_R_TYPE(r_info) == R_AARCH64_IRELATIVE ||
+	    ELF_R_TYPE(r_info) == R_MORELLO_IRELATIVE);
 }
 
 static int
@@ -235,6 +282,12 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 	if ((flags & ARM64_ELF_RELOC_LATE_IFUNC) != 0) {
 		KASSERT(type == ELF_RELOC_RELA,
 		    ("Only RELA ifunc relocations are supported"));
+		/*
+		 * NB: We do *not* re-process R_MORELLO_IRELATIVE since the
+		 * normal pass has already trashed the fragment and so we no
+		 * longer know what the resolver is, just like architectures
+		 * that use REL instead of RELA.
+		 */
 		if (rtype != R_AARCH64_IRELATIVE)
 			return (0);
 	}
@@ -323,7 +376,20 @@ elf_reloc_internal(linker_file_t lf, char *relocbase, const void *data,
 		*(uintcap_t *)where = cheri_sealentry(cap);
 		break;
 	case R_MORELLO_IRELATIVE:
-		panic("TODO implement R_MORELLO_IRELATIVE relocation");
+		/* XXX: See libexec/rtld-elf/aarch64/reloc.c. */
+		if ((where[0] == 0 && where[1] == 0) ||
+		    (Elf_Ssize)where[0] == rela->r_addend) {
+			cap = (uintptr_t)(relocbase + rela->r_addend);
+			cap = cheri_clearperm(cap, CHERI_PERM_SEAL |
+			    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+			    CHERI_PERM_STORE_LOCAL_CAP);
+			cap = cheri_sealentry(cap);
+		} else
+			cap = build_cap_from_fragment(where,
+			    (Elf_Addr)relocbase, rela->r_addend,
+			    relocbase, relocbase);
+		cap = ((uintptr_t (*)(void))cap)();
+		*(uintcap_t *)where = cap;
 		break;
 #endif
 #endif

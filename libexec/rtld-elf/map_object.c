@@ -412,7 +412,8 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     }
     obj->stack_flags = stack_flags;
     obj->relro_page = obj->relocbase + trunc_page(relro_page);
-    obj->relro_size = round_page(relro_size);
+    obj->relro_size = trunc_page(relro_page + relro_size) -
+      trunc_page(relro_page);
     if (note_start < note_end)
 	digest_notes(obj, (const Elf_Note *)note_start, (const Elf_Note *)note_end);
     if (note_map != NULL)
@@ -429,6 +430,39 @@ error:
 	munmap(phdr, hdr->e_phnum * sizeof(phdr[0]));
     munmap(hdr, PAGE_SIZE);
     return (NULL);
+}
+
+bool
+check_elf_headers(const Elf_Ehdr *hdr, const char *path)
+{
+	if (!IS_ELF(*hdr)) {
+		_rtld_error("%s: invalid file format", path);
+		return (false);
+	}
+	if (hdr->e_ident[EI_CLASS] != ELF_TARG_CLASS ||
+	    hdr->e_ident[EI_DATA] != ELF_TARG_DATA) {
+		_rtld_error("%s: unsupported file layout", path);
+		return (false);
+	}
+	if (hdr->e_ident[EI_VERSION] != EV_CURRENT ||
+	    hdr->e_version != EV_CURRENT) {
+		_rtld_error("%s: unsupported file version", path);
+		return (false);
+	}
+	if (hdr->e_type != ET_EXEC && hdr->e_type != ET_DYN) {
+		_rtld_error("%s: unsupported file type", path);
+		return (false);
+	}
+	if (hdr->e_machine != ELF_TARG_MACH) {
+		_rtld_error("%s: unsupported machine", path);
+		return (false);
+	}
+	if (hdr->e_phentsize != sizeof(Elf_Phdr)) {
+		_rtld_error(
+	    "%s: invalid shared object: e_phentsize != sizeof(Elf_Phdr)", path);
+		return (false);
+	}
+	return (true);
 }
 
 static Elf_Ehdr *
@@ -452,26 +486,23 @@ get_elf_header(int fd, const char *path, const struct stat *sbp,
 	}
 
 	/* Make sure the file is valid */
-	if (!IS_ELF(*hdr)) {
-		_rtld_error("%s: invalid file format", path);
+	if (!check_elf_headers(hdr, path))
 		goto error;
-	}
-	if (hdr->e_ident[EI_CLASS] != ELF_TARG_CLASS ||
-	    hdr->e_ident[EI_DATA] != ELF_TARG_DATA) {
-		_rtld_error("%s: unsupported file layout", path);
-		goto error;
-	}
-	if (hdr->e_ident[EI_VERSION] != EV_CURRENT ||
-	    hdr->e_version != EV_CURRENT) {
-		_rtld_error("%s: unsupported file version", path);
-		goto error;
-	}
-	if (hdr->e_type != ET_EXEC && hdr->e_type != ET_DYN) {
-		_rtld_error("%s: unsupported file type", path);
-		goto error;
-	}
-	if (hdr->e_machine != ELF_TARG_MACH) {
-		_rtld_error("%s: unsupported machine", path);
+
+#ifndef ELF_IS_CHERI
+#if __has_feature(capabilities)
+#error "Must have ELF_IS_CHERI for CHERI architectures"
+#endif
+#define ELF_IS_CHERI(hdr) false
+#endif
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (!ELF_IS_CHERI(hdr))
+#else
+	if (ELF_IS_CHERI(hdr))
+#endif
+	{
+		_rtld_error("%s: cannot load %s since it is%s CheriABI",
+		    main_path, path, ELF_IS_CHERI(hdr) ? "" : " not");
 		goto error;
 	}
 
@@ -488,11 +519,6 @@ get_elf_header(int fd, const char *path, const struct stat *sbp,
 	 * not strictly required by the ABI specification, but it seems to
 	 * always true in practice.  And, it simplifies things considerably.
 	 */
-	if (hdr->e_phentsize != sizeof(Elf_Phdr)) {
-		_rtld_error(
-	    "%s: invalid shared object: e_phentsize != sizeof(Elf_Phdr)", path);
-		goto error;
-	}
 	if (phdr_in_zero_page(hdr)) {
 		phdr = (Elf_Phdr *)((char *)hdr + hdr->e_phoff);
 	} else {

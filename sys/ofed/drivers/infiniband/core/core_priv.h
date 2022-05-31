@@ -44,6 +44,9 @@
 
 #include <net/if_vlan_var.h>
 
+/* Total number of ports combined across all struct ib_devices's */
+#define RDMA_MAX_PORTS 8192
+
 #ifdef CONFIG_INFINIBAND_ADDR_TRANS_CONFIGFS
 int cma_configfs_init(void);
 void cma_configfs_exit(void);
@@ -79,10 +82,10 @@ void ib_cache_setup(void);
 void ib_cache_cleanup(void);
 
 typedef void (*roce_netdev_callback)(struct ib_device *device, u8 port,
-	      struct net_device *idev, void *cookie);
+	      struct ifnet *idev, void *cookie);
 
 typedef int (*roce_netdev_filter)(struct ib_device *device, u8 port,
-	     struct net_device *idev, void *cookie);
+	     struct ifnet *idev, void *cookie);
 
 void ib_enum_roce_netdev(struct ib_device *ib_dev,
 			 roce_netdev_filter filter,
@@ -104,7 +107,7 @@ int ib_cache_gid_parse_type_str(const char *buf);
 const char *ib_cache_gid_type_str(enum ib_gid_type gid_type);
 
 void ib_cache_gid_set_default_gid(struct ib_device *ib_dev, u8 port,
-				  struct net_device *ndev,
+				  struct ifnet *ndev,
 				  unsigned long gid_type_mask,
 				  enum ib_cache_gid_default_mode mode);
 
@@ -115,8 +118,8 @@ int ib_cache_gid_del(struct ib_device *ib_dev, u8 port,
 		     union ib_gid *gid, struct ib_gid_attr *attr);
 
 int ib_cache_gid_del_all_netdev_gids(struct ib_device *ib_dev, u8 port,
-				     struct net_device *ndev);
-void ib_cache_gid_del_all_by_netdev(struct net_device *ndev);
+				     struct ifnet *ndev);
+void ib_cache_gid_del_all_by_netdev(struct ifnet *ndev);
 
 int roce_gid_mgmt_init(void);
 void roce_gid_mgmt_cleanup(void);
@@ -128,6 +131,8 @@ int ib_cache_setup_one(struct ib_device *device);
 void ib_cache_cleanup_one(struct ib_device *device);
 void ib_cache_release_one(struct ib_device *device);
 
+#define	ib_rdmacg_try_charge(...) ({ 0; })
+
 int addr_init(void);
 void addr_cleanup(void);
 
@@ -136,5 +141,54 @@ void ib_mad_cleanup(void);
 
 int ib_sa_init(void);
 void ib_sa_cleanup(void);
+
+int ib_port_register_module_stat(struct ib_device *device, u8 port_num,
+				 struct kobject *kobj, struct kobj_type *ktype,
+				 const char *name);
+void ib_port_unregister_module_stat(struct kobject *kobj);
+
+static inline struct ib_qp *_ib_create_qp(struct ib_device *dev,
+					  struct ib_pd *pd,
+					  struct ib_qp_init_attr *attr,
+					  struct ib_udata *udata,
+					  struct ib_uqp_object *uobj)
+{
+	struct ib_qp *qp;
+
+	if (!dev->create_qp)
+		return ERR_PTR(-EOPNOTSUPP);
+
+	qp = dev->create_qp(pd, attr, udata);
+	if (IS_ERR(qp))
+		return qp;
+
+	qp->device = dev;
+	qp->pd = pd;
+	qp->uobject = uobj;
+	qp->real_qp = qp;
+
+	qp->qp_type = attr->qp_type;
+	qp->rwq_ind_tbl = attr->rwq_ind_tbl;
+	qp->send_cq = attr->send_cq;
+	qp->recv_cq = attr->recv_cq;
+	qp->srq = attr->srq;
+	qp->rwq_ind_tbl = attr->rwq_ind_tbl;
+	qp->event_handler = attr->event_handler;
+
+	atomic_set(&qp->usecnt, 0);
+	spin_lock_init(&qp->mr_lock);
+
+	return qp;
+}
+
+struct rdma_umap_priv {
+	struct vm_area_struct *vma;
+	struct list_head list;
+	struct rdma_user_mmap_entry *entry;
+};
+
+void rdma_umap_priv_init(struct rdma_umap_priv *priv,
+			 struct vm_area_struct *vma,
+			 struct rdma_user_mmap_entry *entry);
 
 #endif /* _CORE_PRIV_H */

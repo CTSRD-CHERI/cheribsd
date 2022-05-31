@@ -297,6 +297,8 @@ struct ada_softc {
 	char	announce_buffer[ADA_ANNOUNCE_SZ];
 };
 
+static uma_zone_t ada_ccb_zone;
+
 struct ada_quirk_entry {
 	struct scsi_inquiry_pattern inq_pat;
 	ada_quirks quirks;
@@ -902,6 +904,7 @@ static int ada_spindown_suspend = ADA_DEFAULT_SPINDOWN_SUSPEND;
 static int ada_read_ahead = ADA_DEFAULT_READ_AHEAD;
 static int ada_write_cache = ADA_DEFAULT_WRITE_CACHE;
 static int ada_enable_biospeedup = 1;
+static int ada_enable_uma_ccbs = 1;
 
 static SYSCTL_NODE(_kern_cam, OID_AUTO, ada, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "CAM Direct Access Disk driver");
@@ -921,6 +924,8 @@ SYSCTL_INT(_kern_cam_ada, OID_AUTO, write_cache, CTLFLAG_RWTUN,
            &ada_write_cache, 0, "Enable disk write cache");
 SYSCTL_INT(_kern_cam_ada, OID_AUTO, enable_biospeedup, CTLFLAG_RDTUN,
 	   &ada_enable_biospeedup, 0, "Enable BIO_SPEEDUP processing");
+SYSCTL_INT(_kern_cam_ada, OID_AUTO, enable_uma_ccbs, CTLFLAG_RWTUN,
+	    &ada_enable_uma_ccbs, 0, "Use UMA for CCBs");
 
 /*
  * ADA_ORDEREDTAG_INTERVAL determines how often, relative
@@ -1177,6 +1182,10 @@ static void
 adainit(void)
 {
 	cam_status status;
+
+	ada_ccb_zone = uma_zcreate("ada_ccb",
+	    sizeof(struct ccb_ataio), NULL, NULL, NULL, NULL,
+	    UMA_ALIGN_PTR, 0);
 
 	/*
 	 * Install a global async callback.  This callback will
@@ -1485,7 +1494,7 @@ adasysctlinit(void *context, int pending)
 
 	SYSCTL_ADD_PROC(&softc->sysctl_ctx, SYSCTL_CHILDREN(softc->sysctl_tree),
 		OID_AUTO, "delete_method",
-		CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+		CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_MPSAFE,
 		softc, 0, adadeletemethodsysctl, "A",
 		"BIO_DELETE execution method");
 	SYSCTL_ADD_UQUAD(&softc->sysctl_ctx,
@@ -1508,12 +1517,12 @@ adasysctlinit(void *context, int pending)
 		&softc->write_cache, 0, "Enable disk write cache.");
 	SYSCTL_ADD_PROC(&softc->sysctl_ctx, SYSCTL_CHILDREN(softc->sysctl_tree),
 		OID_AUTO, "zone_mode",
-		CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
+		CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE,
 		softc, 0, adazonemodesysctl, "A",
 		"Zone Mode");
 	SYSCTL_ADD_PROC(&softc->sysctl_ctx, SYSCTL_CHILDREN(softc->sysctl_tree),
 		OID_AUTO, "zone_support",
-		CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
+		CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE,
 		softc, 0, adazonesupsysctl, "A",
 		"Zone Support");
 	SYSCTL_ADD_UQUAD(&softc->sysctl_ctx,
@@ -1856,6 +1865,15 @@ adaregister(struct cam_periph *periph, void *arg)
 	TUNABLE_INT_FETCH(announce_buf, &softc->write_cache);
 
 	/*
+	 * Let XPT know we can use UMA-allocated CCBs.
+	 */
+	if (ada_enable_uma_ccbs) {
+		KASSERT(ada_ccb_zone != NULL,
+		    ("%s: NULL ada_ccb_zone", __func__));
+		periph->ccb_zone = ada_ccb_zone;
+	}
+
+	/*
 	 * Set support flags based on the Identify data and quirks.
 	 */
 	adasetflags(softc, cgd);
@@ -1939,9 +1957,9 @@ adaregister(struct cam_periph *periph, void *arg)
 	 * ordered tag to a device.
 	 */
 	callout_init_mtx(&softc->sendordered_c, cam_periph_mtx(periph), 0);
-	callout_reset(&softc->sendordered_c,
-	    (ada_default_timeout * hz) / ADA_ORDEREDTAG_INTERVAL,
-	    adasendorderedtag, softc);
+	callout_reset_sbt(&softc->sendordered_c,
+	    SBT_1S / ADA_ORDEREDTAG_INTERVAL * ada_default_timeout, 0,
+	    adasendorderedtag, softc, C_PREL(1));
 
 	if (ADA_RA >= 0 && softc->flags & ADA_FLAG_CAN_RAHEAD) {
 		softc->state = ADA_STATE_RAHEAD;
@@ -3406,6 +3424,7 @@ adasetgeom(struct ada_softc *softc, struct ccb_getdev *cgd)
 	u_int64_t lbasize48;
 	u_int32_t lbasize;
 	u_int maxio, d_flags;
+	size_t tmpsize;
 
 	dp->secsize = ata_logical_sector_size(&cgd->ident_data);
 	if ((cgd->ident_data.atavalid & ATA_FLAG_54_58) &&
@@ -3469,10 +3488,25 @@ adasetgeom(struct ada_softc *softc, struct ccb_getdev *cgd)
 		softc->flags |= ADA_FLAG_UNMAPPEDIO;
 	}
 	softc->disk->d_flags = d_flags;
-	strlcpy(softc->disk->d_descr, cgd->ident_data.model,
-	    MIN(sizeof(softc->disk->d_descr), sizeof(cgd->ident_data.model)));
-	strlcpy(softc->disk->d_ident, cgd->ident_data.serial,
-	    MIN(sizeof(softc->disk->d_ident), sizeof(cgd->ident_data.serial)));
+
+	/*
+	 * ata_param_fixup will strip trailing padding spaces and add a NUL,
+	 * but if the field has no padding (as is common for serial numbers)
+	 * there will still be no NUL terminator. We cannot use strlcpy, since
+	 * it keeps reading src until it finds a NUL in order to compute the
+	 * return value (and will truncate the final character due to having a
+	 * single dsize rather than separate ssize and dsize), and strncpy does
+	 * not add a NUL to the destination if it reaches the character limit.
+	 */
+	tmpsize = MIN(sizeof(softc->disk->d_descr) - 1,
+	    sizeof(cgd->ident_data.model));
+	memcpy(softc->disk->d_descr, cgd->ident_data.model, tmpsize);
+	softc->disk->d_descr[tmpsize] = '\0';
+
+	tmpsize = MIN(sizeof(softc->disk->d_ident) - 1,
+	    sizeof(cgd->ident_data.serial));
+	memcpy(softc->disk->d_ident, cgd->ident_data.serial, tmpsize);
+	softc->disk->d_ident[tmpsize] = '\0';
 
 	softc->disk->d_sectorsize = softc->params.secsize;
 	softc->disk->d_mediasize = (off_t)softc->params.sectors *
@@ -3507,10 +3541,11 @@ adasendorderedtag(void *arg)
 			softc->flags &= ~ADA_FLAG_WAS_OTAG;
 		}
 	}
+
 	/* Queue us up again */
-	callout_reset(&softc->sendordered_c,
-	    (ada_default_timeout * hz) / ADA_ORDEREDTAG_INTERVAL,
-	    adasendorderedtag, softc);
+	callout_schedule_sbt(&softc->sendordered_c,
+	    SBT_1S / ADA_ORDEREDTAG_INTERVAL * ada_default_timeout, 0,
+	    C_PREL(1));
 }
 
 /*
@@ -3577,6 +3612,7 @@ adaspindown(uint8_t cmd, int flags)
 	struct ada_softc *softc;
 	struct ccb_ataio local_ccb;
 	int error;
+	int mode;
 
 	CAM_PERIPH_FOREACH(periph, &adadriver) {
 		/* If we paniced with lock held - not recurse here. */
@@ -3590,6 +3626,52 @@ adaspindown(uint8_t cmd, int flags)
 		if ((softc->flags & ADA_FLAG_CAN_POWERMGT) == 0) {
 			cam_periph_unlock(periph);
 			continue;
+		}
+
+		/*
+		 * Additionally check if we would spin up the drive instead of
+		 * spinning it down.
+		 */
+		if (cmd == ATA_IDLE_IMMEDIATE) {
+			memset(&local_ccb, 0, sizeof(local_ccb));
+			xpt_setup_ccb(&local_ccb.ccb_h, periph->path,
+			    CAM_PRIORITY_NORMAL);
+			local_ccb.ccb_h.ccb_state = ADA_CCB_DUMP;
+
+			cam_fill_ataio(&local_ccb, 0, NULL, CAM_DIR_NONE,
+			    0, NULL, 0, ada_default_timeout * 1000);
+			ata_28bit_cmd(&local_ccb, ATA_CHECK_POWER_MODE,
+			    0, 0, 0);
+			local_ccb.cmd.flags |= CAM_ATAIO_NEEDRESULT;
+
+			error = cam_periph_runccb((union ccb *)&local_ccb,
+			    adaerror, /*cam_flags*/0,
+			    /*sense_flags*/ SF_NO_RECOVERY | SF_NO_RETRY,
+			    softc->disk->d_devstat);
+			if (error != 0) {
+				xpt_print(periph->path,
+				    "Failed to read current power mode\n");
+			} else {
+				mode = local_ccb.res.sector_count;
+#ifdef DIAGNOSTIC
+				if (bootverbose) {
+					xpt_print(periph->path,
+					    "disk power mode 0x%02x\n", mode);
+				}
+#endif
+				switch (mode) {
+				case ATA_PM_STANDBY:
+				case ATA_PM_STANDBY_Y:
+					if (bootverbose) {
+						xpt_print(periph->path,
+						    "already spun down\n");
+					}
+					cam_periph_unlock(periph);
+					continue;
+				default:
+					break;
+				}
+			}
 		}
 
 		if (bootverbose)

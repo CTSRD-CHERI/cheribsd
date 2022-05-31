@@ -52,9 +52,9 @@ __FBSDID("$FreeBSD$");
 
 #define SMBIOS_BASE		0xF1000
 
-#define	FIRMWARE_VERSION	"13.0"
+#define	FIRMWARE_VERSION	"14.0"
 /* The SMBIOS specification defines the date format to be mm/dd/yyyy */
-#define	FIRMWARE_RELEASE_DATE	"11/10/2020"
+#define	FIRMWARE_RELEASE_DATE	"10/17/2021"
 
 /* BHYVE_ACPI_BASE - SMBIOS_BASE) */
 #define	SMBIOS_MAX_LENGTH	(0xF2400 - 0xF1000)
@@ -199,6 +199,7 @@ struct smbios_table_type3 {
 	uint8_t			psstate;	/* power supply state */
 	uint8_t			tstate;		/* thermal state */
 	uint8_t			security;	/* security status */
+	uint32_t		oemdata;	/* OEM-specific data */
 	uint8_t			uheight;	/* height in 'u's */
 	uint8_t			cords;		/* number of power cords */
 	uint8_t			elems;		/* number of element records */
@@ -417,6 +418,7 @@ struct smbios_table_type3 smbios_type3_template = {
 	SMBIOS_CHST_SAFE,
 	SMBIOS_CHST_SAFE,
 	SMBIOS_CHSC_NONE,
+	0,		/* OEM specific data, we have none */
 	0,		/* height in 'u's (0=enclosure height unspecified) */
 	0,		/* number of power cords (0=number unspecified) */
 	0,		/* number of contained element records */

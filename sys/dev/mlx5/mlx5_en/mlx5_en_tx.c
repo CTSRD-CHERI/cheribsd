@@ -1,5 +1,6 @@
 /*-
- * Copyright (c) 2015-2019 Mellanox Technologies. All rights reserved.
+ * Copyright (c) 2015-2021 Mellanox Technologies. All rights reserved.
+ * Copyright (c) 2022 NVIDIA corporation & affiliates.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,8 +27,10 @@
  */
 
 #include "opt_kern_tls.h"
+#include "opt_rss.h"
+#include "opt_ratelimit.h"
 
-#include "en.h"
+#include <dev/mlx5/mlx5_en/en.h>
 #include <machine/atomic.h>
 
 static inline bool
@@ -73,7 +76,6 @@ mlx5e_send_nop(struct mlx5e_sq *sq, u32 ds_cnt)
 	sq->pc += sq->mbuf[pi].num_wqebbs;
 }
 
-#if (__FreeBSD_version >= 1100000)
 static uint32_t mlx5e_hash_value;
 
 static void
@@ -84,7 +86,6 @@ mlx5e_hash_init(void *arg)
 
 /* Make kernel call mlx5e_hash_init after the random stack finished initializing */
 SYSINIT(mlx5e_hash_init, SI_SUB_RANDOM, SI_ORDER_ANY, &mlx5e_hash_init, NULL);
-#endif
 
 static struct mlx5e_sq *
 mlx5e_select_queue_by_send_tag(struct ifnet *ifp, struct mbuf *mb)
@@ -98,7 +99,7 @@ mlx5e_select_queue_by_send_tag(struct ifnet *ifp, struct mbuf *mb)
 top:
 #endif
 	/* get pointer to sendqueue */
-	switch (mb_tag->type) {
+	switch (mb_tag->sw->type) {
 #ifdef RATELIMIT
 	case IF_SND_TAG_TYPE_RATE_LIMIT:
 		sq = container_of(mb_tag,
@@ -164,16 +165,8 @@ mlx5e_select_queue(struct ifnet *ifp, struct mbuf *mb)
 #endif
 			ch = (mb->m_pkthdr.flowid % 128) % ch;
 	} else {
-#if (__FreeBSD_version >= 1100000)
 		ch = m_ether_tcpip_hash(MBUF_HASHFLAG_L3 |
 		    MBUF_HASHFLAG_L4, mb, mlx5e_hash_value) % ch;
-#else
-		/*
-		 * m_ether_tcpip_hash not present in stable, so just
-		 * throw unhashed mbufs on queue 0
-		 */
-		ch = 0;
-#endif
 	}
 
 	/* check if send queue is running */
@@ -256,7 +249,7 @@ mlx5e_get_full_header_size(const struct mbuf *mb, const struct tcphdr **ppth)
 	if (unlikely(mb->m_len < ETHER_HDR_LEN))
 		goto failure;
 	if (eh->evl_encap_proto == htons(ETHERTYPE_VLAN)) {
-		if (unlikely(mb->m_len < (ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN)))
+		if (unlikely(mb->m_len < ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN))
 			goto failure;
 		eth_type = ntohs(eh->evl_proto);
 		eth_hdr_len = ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN;
@@ -277,7 +270,7 @@ mlx5e_get_full_header_size(const struct mbuf *mb, const struct tcphdr **ppth)
 			goto tcp_packet;
 		case IPPROTO_UDP:
 			ip_hlen = ip->ip_hl << 2;
-			eth_hdr_len += ip_hlen + 8;
+			eth_hdr_len += ip_hlen + sizeof(struct udphdr);
 			th = NULL;
 			goto udp_packet;
 		default:
@@ -293,7 +286,7 @@ mlx5e_get_full_header_size(const struct mbuf *mb, const struct tcphdr **ppth)
 			eth_hdr_len += sizeof(*ip6);
 			goto tcp_packet;
 		case IPPROTO_UDP:
-			eth_hdr_len += sizeof(*ip6) + 8;
+			eth_hdr_len += sizeof(*ip6) + sizeof(struct udphdr);
 			th = NULL;
 			goto udp_packet;
 		default:
@@ -330,6 +323,219 @@ failure:
 	if (ppth != NULL)
 		*ppth = NULL;
 	return (0);
+}
+
+/*
+ * Locate a pointer inside a mbuf chain. Returns NULL upon failure.
+ */
+static inline void *
+mlx5e_parse_mbuf_chain(const struct mbuf **mb, int *poffset, int eth_hdr_len,
+    int min_len)
+{
+	if (unlikely(mb[0]->m_len == eth_hdr_len)) {
+		poffset[0] = eth_hdr_len;
+		if (unlikely((mb[0] = mb[0]->m_next) == NULL))
+			return (NULL);
+	}
+	if (unlikely(mb[0]->m_len < eth_hdr_len - poffset[0] + min_len))
+		return (NULL);
+	return (mb[0]->m_data + eth_hdr_len - poffset[0]);
+}
+
+/*
+ * This function parse IPv4 and IPv6 packets looking for UDP, VXLAN
+ * and TCP headers.
+ *
+ * The return value indicates the number of bytes from the beginning
+ * of the packet until the first byte after the TCP header. If this
+ * function returns zero, the parsing failed.
+ */
+static int
+mlx5e_get_vxlan_header_size(const struct mbuf *mb, struct mlx5e_tx_wqe *wqe,
+    uint8_t cs_mask, uint8_t opcode)
+{
+	const struct ether_vlan_header *eh;
+	struct ip *ip4;
+	struct ip6_hdr *ip6;
+	struct tcphdr *th;
+	struct udphdr *udp;
+	bool has_outer_vlan_tag;
+	uint16_t eth_type;
+	uint8_t ip_type;
+	int pkt_hdr_len;
+	int eth_hdr_len;
+	int tcp_hlen;
+	int ip_hlen;
+	int offset;
+
+	pkt_hdr_len = mb->m_pkthdr.len;
+	has_outer_vlan_tag = (mb->m_flags & M_VLANTAG) != 0;
+	offset = 0;
+
+	eh = mtod(mb, const struct ether_vlan_header *);
+	if (unlikely(mb->m_len < ETHER_HDR_LEN))
+		return (0);
+
+	if (eh->evl_encap_proto == htons(ETHERTYPE_VLAN)) {
+		if (unlikely(mb->m_len < ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN))
+			return (0);
+		eth_type = eh->evl_proto;
+		eth_hdr_len = ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN;
+	} else {
+		eth_type = eh->evl_encap_proto;
+		eth_hdr_len = ETHER_HDR_LEN;
+	}
+
+	switch (eth_type) {
+	case htons(ETHERTYPE_IP):
+		ip4 = mlx5e_parse_mbuf_chain(&mb, &offset, eth_hdr_len,
+		    sizeof(*ip4));
+		if (unlikely(ip4 == NULL))
+			return (0);
+		ip_type = ip4->ip_p;
+		if (unlikely(ip_type != IPPROTO_UDP))
+			return (0);
+		wqe->eth.swp_outer_l3_offset = eth_hdr_len / 2;
+		wqe->eth.cs_flags = MLX5_ETH_WQE_L3_CSUM | MLX5_ETH_WQE_L4_CSUM;
+		ip_hlen = ip4->ip_hl << 2;
+		eth_hdr_len += ip_hlen;
+		udp = mlx5e_parse_mbuf_chain(&mb, &offset, eth_hdr_len,
+		    sizeof(*udp));
+		if (unlikely(udp == NULL))
+			return (0);
+		wqe->eth.swp_outer_l4_offset = eth_hdr_len / 2;
+		wqe->eth.swp_flags |= MLX5_ETH_WQE_SWP_OUTER_L4_TYPE;
+		eth_hdr_len += sizeof(*udp);
+		break;
+	case htons(ETHERTYPE_IPV6):
+		ip6 = mlx5e_parse_mbuf_chain(&mb, &offset, eth_hdr_len,
+		    sizeof(*ip6));
+		if (unlikely(ip6 == NULL))
+			return (0);
+		ip_type = ip6->ip6_nxt;
+		if (unlikely(ip_type != IPPROTO_UDP))
+			return (0);
+		wqe->eth.swp_outer_l3_offset = eth_hdr_len / 2;
+		wqe->eth.cs_flags = MLX5_ETH_WQE_L4_CSUM;
+		eth_hdr_len += sizeof(*ip6);
+		udp = mlx5e_parse_mbuf_chain(&mb, &offset, eth_hdr_len,
+		    sizeof(*udp));
+		if (unlikely(udp == NULL))
+			return (0);
+		wqe->eth.swp_outer_l4_offset = eth_hdr_len / 2;
+		wqe->eth.swp_flags |= MLX5_ETH_WQE_SWP_OUTER_L4_TYPE |
+		    MLX5_ETH_WQE_SWP_OUTER_L3_TYPE;
+		eth_hdr_len += sizeof(*udp);
+		break;
+	default:
+		return (0);
+	}
+
+	/*
+	 * If the hardware is not computing inner IP checksum, then
+	 * skip inlining the inner outer UDP and VXLAN header:
+	 */
+	if (unlikely((cs_mask & MLX5_ETH_WQE_L3_INNER_CSUM) == 0))
+		goto done;
+	if (unlikely(mlx5e_parse_mbuf_chain(&mb, &offset, eth_hdr_len,
+	    8) == NULL))
+		return (0);
+	eth_hdr_len += 8;
+
+	/* Check for ethernet header again. */
+	eh = mlx5e_parse_mbuf_chain(&mb, &offset, eth_hdr_len, ETHER_HDR_LEN);
+	if (unlikely(eh == NULL))
+		return (0);
+	if (eh->evl_encap_proto == htons(ETHERTYPE_VLAN)) {
+		if (unlikely(mb->m_len < eth_hdr_len - offset + ETHER_HDR_LEN +
+		    ETHER_VLAN_ENCAP_LEN))
+			return (0);
+		eth_type = eh->evl_proto;
+		eth_hdr_len += ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN;
+	} else {
+		eth_type = eh->evl_encap_proto;
+		eth_hdr_len += ETHER_HDR_LEN;
+	}
+
+	/* Check for IP header again. */
+	switch (eth_type) {
+	case htons(ETHERTYPE_IP):
+		ip4 = mlx5e_parse_mbuf_chain(&mb, &offset, eth_hdr_len,
+		    sizeof(*ip4));
+		if (unlikely(ip4 == NULL))
+			return (0);
+		wqe->eth.swp_inner_l3_offset = eth_hdr_len / 2;
+		wqe->eth.cs_flags |= MLX5_ETH_WQE_L3_INNER_CSUM;
+		ip_type = ip4->ip_p;
+		ip_hlen = ip4->ip_hl << 2;
+		eth_hdr_len += ip_hlen;
+		break;
+	case htons(ETHERTYPE_IPV6):
+		ip6 = mlx5e_parse_mbuf_chain(&mb, &offset, eth_hdr_len,
+		    sizeof(*ip6));
+		if (unlikely(ip6 == NULL))
+			return (0);
+		wqe->eth.swp_inner_l3_offset = eth_hdr_len / 2;
+		wqe->eth.swp_flags |= MLX5_ETH_WQE_SWP_INNER_L3_TYPE;
+		ip_type = ip6->ip6_nxt;
+		eth_hdr_len += sizeof(*ip6);
+		break;
+	default:
+		return (0);
+	}
+
+	/*
+	 * If the hardware is not computing inner UDP/TCP checksum,
+	 * then skip inlining the inner UDP/TCP header:
+	 */
+	if (unlikely((cs_mask & MLX5_ETH_WQE_L4_INNER_CSUM) == 0))
+		goto done;
+
+	switch (ip_type) {
+	case IPPROTO_UDP:
+		udp = mlx5e_parse_mbuf_chain(&mb, &offset, eth_hdr_len,
+		    sizeof(*udp));
+		if (unlikely(udp == NULL))
+			return (0);
+		wqe->eth.swp_inner_l4_offset = (eth_hdr_len / 2);
+		wqe->eth.cs_flags |= MLX5_ETH_WQE_L4_INNER_CSUM;
+		wqe->eth.swp_flags |= MLX5_ETH_WQE_SWP_INNER_L4_TYPE;
+		eth_hdr_len += sizeof(*udp);
+		break;
+	case IPPROTO_TCP:
+		th = mlx5e_parse_mbuf_chain(&mb, &offset, eth_hdr_len,
+		    sizeof(*th));
+		if (unlikely(th == NULL))
+			return (0);
+		wqe->eth.swp_inner_l4_offset = eth_hdr_len / 2;
+		wqe->eth.cs_flags |= MLX5_ETH_WQE_L4_INNER_CSUM;
+		tcp_hlen = th->th_off << 2;
+		eth_hdr_len += tcp_hlen;
+		break;
+	default:
+		return (0);
+	}
+done:
+	if (unlikely(pkt_hdr_len < eth_hdr_len))
+		return (0);
+
+	/* Account for software inserted VLAN tag, if any. */
+	if (unlikely(has_outer_vlan_tag)) {
+		wqe->eth.swp_outer_l3_offset += ETHER_VLAN_ENCAP_LEN / 2;
+		wqe->eth.swp_outer_l4_offset += ETHER_VLAN_ENCAP_LEN / 2;
+		wqe->eth.swp_inner_l3_offset += ETHER_VLAN_ENCAP_LEN / 2;
+		wqe->eth.swp_inner_l4_offset += ETHER_VLAN_ENCAP_LEN / 2;
+	}
+
+	/*
+	 * When inner checksums are set, outer L4 checksum flag must
+	 * be disabled.
+	 */
+	if (wqe->eth.cs_flags & (MLX5_ETH_WQE_L3_INNER_CSUM |
+	    MLX5_ETH_WQE_L4_INNER_CSUM))
+		wqe->eth.cs_flags &= ~MLX5_ETH_WQE_L4_CSUM;
+
+	return (eth_hdr_len);
 }
 
 struct mlx5_wqe_dump_seg {
@@ -460,8 +666,7 @@ mlx5e_sq_dump_xmit(struct mlx5e_sq *sq, struct mlx5e_xmit_args *parg, struct mbu
 
 	/* store pointer to mbuf */
 	sq->mbuf[pi].mbuf = mb;
-	sq->mbuf[pi].p_refcount = parg->pref;
-	atomic_add_int(parg->pref, 1);
+	sq->mbuf[pi].mst = m_snd_tag_ref(parg->mst);
 
 	/* count all traffic going out */
 	sq->stats.packets++;
@@ -574,8 +779,78 @@ top:
 			num_pkts = DIV_ROUND_UP(payload_len, mss);
 		sq->mbuf[pi].num_bytes = payload_len + (num_pkts * args.ihs);
 
+
 		sq->stats.tso_packets++;
 		sq->stats.tso_bytes += payload_len;
+	} else if (mb->m_pkthdr.csum_flags & CSUM_ENCAP_VXLAN) {
+		/* check for inner TCP TSO first */
+		if (mb->m_pkthdr.csum_flags & (CSUM_INNER_IP_TSO |
+		    CSUM_INNER_IP6_TSO)) {
+			u32 payload_len;
+			u32 mss = mb->m_pkthdr.tso_segsz;
+			u32 num_pkts;
+
+			wqe->eth.mss = cpu_to_be16(mss);
+			opcode = MLX5_OPCODE_LSO;
+
+			if (likely(args.ihs == 0)) {
+				args.ihs = mlx5e_get_vxlan_header_size(mb, wqe,
+				       MLX5_ETH_WQE_L3_INNER_CSUM |
+				       MLX5_ETH_WQE_L4_INNER_CSUM |
+				       MLX5_ETH_WQE_L4_CSUM |
+				       MLX5_ETH_WQE_L3_CSUM,
+				       opcode);
+				if (unlikely(args.ihs == 0)) {
+					err = EINVAL;
+					goto tx_drop;
+				}
+			}
+
+			payload_len = mb->m_pkthdr.len - args.ihs;
+			if (payload_len == 0)
+				num_pkts = 1;
+			else
+				num_pkts = DIV_ROUND_UP(payload_len, mss);
+			sq->mbuf[pi].num_bytes = payload_len +
+			    num_pkts * args.ihs;
+
+			sq->stats.tso_packets++;
+			sq->stats.tso_bytes += payload_len;
+		} else {
+			opcode = MLX5_OPCODE_SEND;
+
+			if (likely(args.ihs == 0)) {
+				uint8_t cs_mask;
+
+				if (mb->m_pkthdr.csum_flags &
+				    (CSUM_INNER_IP_TCP | CSUM_INNER_IP_UDP |
+				     CSUM_INNER_IP6_TCP | CSUM_INNER_IP6_UDP)) {
+					cs_mask =
+					    MLX5_ETH_WQE_L3_INNER_CSUM |
+					    MLX5_ETH_WQE_L4_INNER_CSUM |
+					    MLX5_ETH_WQE_L4_CSUM |
+					    MLX5_ETH_WQE_L3_CSUM;
+				} else if (mb->m_pkthdr.csum_flags & CSUM_INNER_IP) {
+					cs_mask =
+					    MLX5_ETH_WQE_L3_INNER_CSUM |
+					    MLX5_ETH_WQE_L4_CSUM |
+					    MLX5_ETH_WQE_L3_CSUM;
+				} else {
+					cs_mask =
+					    MLX5_ETH_WQE_L4_CSUM |
+					    MLX5_ETH_WQE_L3_CSUM;
+				}
+				args.ihs = mlx5e_get_vxlan_header_size(mb, wqe,
+				    cs_mask, opcode);
+				if (unlikely(args.ihs == 0)) {
+					err = EINVAL;
+					goto tx_drop;
+				}
+			}
+
+			sq->mbuf[pi].num_bytes = max_t (unsigned int,
+			    mb->m_pkthdr.len, ETHER_MIN_LEN - ETHER_CRC_LEN);
+		}
 	} else {
 		opcode = MLX5_OPCODE_SEND;
 
@@ -622,7 +897,7 @@ top:
 
 		/* Range checks */
 		if (unlikely(args.ihs > (sq->max_inline - ETHER_VLAN_ENCAP_LEN))) {
-			if (mb->m_pkthdr.csum_flags & CSUM_TSO) {
+			if (mb->m_pkthdr.csum_flags & (CSUM_TSO | CSUM_ENCAP_VXLAN)) {
 				err = EINVAL;
 				goto tx_drop;
 			}
@@ -646,7 +921,8 @@ top:
 	} else {
 		/* check if inline header size is too big */
 		if (unlikely(args.ihs > sq->max_inline)) {
-			if (unlikely(mb->m_pkthdr.csum_flags & CSUM_TSO)) {
+			if (unlikely(mb->m_pkthdr.csum_flags & (CSUM_TSO |
+			    CSUM_ENCAP_VXLAN))) {
 				err = EINVAL;
 				goto tx_drop;
 			}
@@ -720,9 +996,11 @@ top:
 	/* Store pointer to mbuf */
 	sq->mbuf[pi].mbuf = mb;
 	sq->mbuf[pi].num_wqebbs = DIV_ROUND_UP(ds_cnt, MLX5_SEND_WQEBB_NUM_DS);
-	sq->mbuf[pi].p_refcount = args.pref;
-	if (unlikely(args.pref != NULL))
-		atomic_add_int(args.pref, 1);
+	if (unlikely(args.mst != NULL))
+		sq->mbuf[pi].mst = m_snd_tag_ref(args.mst);
+	else
+		MPASS(sq->mbuf[pi].mst == NULL);
+
 	sq->pc += sq->mbuf[pi].num_wqebbs;
 
 	/* Count all traffic going out */
@@ -752,7 +1030,11 @@ mlx5e_poll_tx_cq(struct mlx5e_sq *sq, int budget)
 
 	while (budget > 0) {
 		struct mlx5_cqe64 *cqe;
+		struct m_snd_tag *mst;
 		struct mbuf *mb;
+		bool match;
+		u16 sqcc_this;
+		u16 delta;
 		u16 x;
 		u16 ci;
 
@@ -762,24 +1044,38 @@ mlx5e_poll_tx_cq(struct mlx5e_sq *sq, int budget)
 
 		mlx5_cqwq_pop(&sq->cq.wq);
 
+		/* check if the completion event indicates an error */
+		if (unlikely(get_cqe_opcode(cqe) != MLX5_CQE_REQ)) {
+			mlx5e_dump_err_cqe(&sq->cq, sq->sqn, (const void *)cqe);
+			sq->stats.cqe_err++;
+		}
+
+		/* setup local variables */
+		sqcc_this = be16toh(cqe->wqe_counter);
+		match = false;
+
 		/* update budget according to the event factor */
 		budget -= sq->cev_factor;
 
-		for (x = 0; x != sq->cev_factor; x++) {
+		for (x = 0;; x++) {
+			if (unlikely(match != false)) {
+				break;
+			} else if (unlikely(x == sq->cev_factor)) {
+				/* WQE counter match not found */
+				sq->stats.cqe_err++;
+				break;
+			}
 			ci = sqcc & sq->wq.sz_m1;
+			delta = sqcc_this - sqcc;
+			match = (delta < sq->mbuf[ci].num_wqebbs);
 			mb = sq->mbuf[ci].mbuf;
 			sq->mbuf[ci].mbuf = NULL;
+			mst = sq->mbuf[ci].mst;
+			sq->mbuf[ci].mst = NULL;
 
-			if (unlikely(sq->mbuf[ci].p_refcount != NULL)) {
-				atomic_add_int(sq->mbuf[ci].p_refcount, -1);
-				sq->mbuf[ci].p_refcount = NULL;
-			}
-
-			if (mb == NULL) {
-				if (sq->mbuf[ci].num_bytes == 0) {
-					/* NOP */
+			if (unlikely(mb == NULL)) {
+				if (unlikely(sq->mbuf[ci].num_bytes == 0))
 					sq->stats.nop++;
-				}
 			} else {
 				bus_dmamap_sync(sq->dma_tag, sq->mbuf[ci].dma_map,
 				    BUS_DMASYNC_POSTWRITE);
@@ -788,6 +1084,10 @@ mlx5e_poll_tx_cq(struct mlx5e_sq *sq, int budget)
 				/* Free transmitted mbuf */
 				m_freem(mb);
 			}
+
+			if (unlikely(mst != NULL))
+				m_snd_tag_rele(mst);
+
 			sqcc += sq->mbuf[ci].num_wqebbs;
 		}
 	}
@@ -818,11 +1118,8 @@ mlx5e_xmit_locked(struct ifnet *ifp, struct mlx5e_sq *sq, struct mbuf *mb)
 		err = ENOBUFS;
 	}
 
-	/* Check if we need to write the doorbell */
-	if (likely(sq->doorbell.d64 != 0)) {
-		mlx5e_tx_notify_hw(sq, sq->doorbell.d32);
-		sq->doorbell.d64 = 0;
-	}
+	/* Write the doorbell record, if any. */
+	mlx5e_tx_notify_hw(sq, false);
 
 	/*
 	 * Check if we need to start the event timer which flushes the

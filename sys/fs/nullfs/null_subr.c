@@ -71,8 +71,7 @@ static struct vnode * null_hashins(struct mount *, struct null_node *);
  * Initialise cache headers
  */
 int
-nullfs_init(vfsp)
-	struct vfsconf *vfsp;
+nullfs_init(struct vfsconf *vfsp)
 {
 
 	null_node_hashtbl = hashinit(desiredvnodes, M_NULLFSHASH,
@@ -82,8 +81,7 @@ nullfs_init(vfsp)
 }
 
 int
-nullfs_uninit(vfsp)
-	struct vfsconf *vfsp;
+nullfs_uninit(struct vfsconf *vfsp)
 {
 
 	rw_destroy(&null_hash_lock);
@@ -96,9 +94,7 @@ nullfs_uninit(vfsp)
  * Lower vnode should be locked on entry and will be left locked on exit.
  */
 struct vnode *
-null_hashget(mp, lowervp)
-	struct mount *mp;
-	struct vnode *lowervp;
+null_hashget(struct mount *mp, struct vnode *lowervp)
 {
 	struct null_node_hashhead *hd;
 	struct null_node *a;
@@ -139,9 +135,7 @@ null_hashget(mp, lowervp)
  * node found.
  */
 static struct vnode *
-null_hashins(mp, xp)
-	struct mount *mp;
-	struct null_node *xp;
+null_hashins(struct mount *mp, struct null_node *xp)
 {
 	struct null_node_hashhead *hd;
 	struct null_node *oxp;
@@ -182,14 +176,6 @@ null_destroy_proto(struct vnode *vp, void *xp)
 	free(xp, M_NULLFSNODE);
 }
 
-static void
-null_insmntque_dtr(struct vnode *vp, void *xp)
-{
-
-	vput(((struct null_node *)xp)->null_lowervp);
-	null_destroy_proto(vp, xp);
-}
-
 /*
  * Make a new or get existing nullfs node.
  * Vp is the alias vnode, lowervp is the lower vnode.
@@ -199,10 +185,7 @@ null_insmntque_dtr(struct vnode *vp, void *xp)
  * the caller's "spare" reference to created nullfs vnode.
  */
 int
-null_nodeget(mp, lowervp, vpp)
-	struct mount *mp;
-	struct vnode *lowervp;
-	struct vnode **vpp;
+null_nodeget(struct mount *mp, struct vnode *lowervp, struct vnode **vpp)
 {
 	struct null_node *xp;
 	struct vnode *vp;
@@ -252,9 +235,12 @@ null_nodeget(mp, lowervp, vpp)
 	vp->v_type = lowervp->v_type;
 	vp->v_data = xp;
 	vp->v_vnlock = lowervp->v_vnlock;
-	error = insmntque1(vp, mp, null_insmntque_dtr, xp);
-	if (error != 0)
+	error = insmntque1(vp, mp);
+	if (error != 0) {
+		vput(lowervp);
+		null_destroy_proto(vp, xp);
 		return (error);
+	}
 	if (lowervp == MOUNTTONULLMOUNT(mp)->nullm_lowerrootvp)
 		vp->v_vflag |= VV_ROOT;
 
@@ -296,8 +282,7 @@ null_nodeget(mp, lowervp, vpp)
  * Remove node from hash.
  */
 void
-null_hashrem(xp)
-	struct null_node *xp;
+null_hashrem(struct null_node *xp)
 {
 
 	rw_wlock(&null_hash_lock);
@@ -308,10 +293,7 @@ null_hashrem(xp)
 #ifdef DIAGNOSTIC
 
 struct vnode *
-null_checkvp(vp, fil, lno)
-	struct vnode *vp;
-	char *fil;
-	int lno;
+null_checkvp(struct vnode *vp, char *fil, int lno)
 {
 	struct null_node *a = VTONULL(vp);
 

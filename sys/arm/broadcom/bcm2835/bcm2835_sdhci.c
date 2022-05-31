@@ -32,6 +32,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
+#include <sys/conf.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -156,7 +157,7 @@ struct bcm_sdhci_softc {
 	void *			sc_intrhand;
 	struct mmc_request *	sc_req;
 	struct sdhci_slot	sc_slot;
-	struct mmc_fdt_helper	sc_mmc_helper;
+	struct mmc_helper	sc_mmc_helper;
 	int			sc_dma_ch;
 	bus_dma_tag_t		sc_dma_tag;
 	bus_dmamap_t		sc_dma_map;
@@ -394,13 +395,10 @@ bcm_sdhci_intr(void *arg)
 static int
 bcm_sdhci_update_ios(device_t bus, device_t child)
 {
-#ifdef EXT_RESOURCES
 	struct bcm_sdhci_softc *sc;
 	struct mmc_ios *ios;
-#endif
 	int rv;
 
-#ifdef EXT_RESOURCES
 	sc = device_get_softc(bus);
 	ios = &sc->sc_slot.host.ios;
 
@@ -410,20 +408,17 @@ bcm_sdhci_update_ios(device_t bus, device_t child)
 		if (sc->sc_mmc_helper.vqmmc_supply)
 			regulator_enable(sc->sc_mmc_helper.vqmmc_supply);
 	}
-#endif
 
 	rv = sdhci_generic_update_ios(bus, child);
 	if (rv != 0)
 		return (rv);
 
-#ifdef EXT_RESOURCES
 	if (ios->power_mode == power_off) {
 		if (sc->sc_mmc_helper.vmmc_supply)
 			regulator_disable(sc->sc_mmc_helper.vmmc_supply);
 		if (sc->sc_mmc_helper.vqmmc_supply)
 			regulator_disable(sc->sc_mmc_helper.vqmmc_supply);
 	}
-#endif
 
 	return (0);
 }
@@ -761,6 +756,13 @@ bcm_sdhci_will_handle_transfer(device_t dev, struct sdhci_slot *slot)
 #ifdef INVARIANTS
 	struct bcm_sdhci_softc *sc = device_get_softc(slot->bus);
 #endif
+
+	/*
+	 * We don't want to perform DMA in this context -- interrupts are
+	 * disabled, and a transaction may already be in progress.
+	 */
+	if (dumping)
+		return (0);
 
 	/*
 	 * This indicates that we somehow let a data interrupt slip by into the

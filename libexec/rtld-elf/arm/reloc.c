@@ -16,47 +16,7 @@ __FBSDID("$FreeBSD$");
 
 #include "debug.h"
 #include "rtld.h"
-#include "paths.h"
-
-#ifdef __ARM_FP
-/*
- * On processors that have hard floating point supported, we also support
- * running soft float binaries. If we're being built with hard float support,
- * check the ELF headers to make sure that this is a hard float binary. If it is
- * a soft float binary, force the dynamic linker to use the alternative soft
- * float path.
- */
-void
-arm_abi_variant_hook(Elf_Auxinfo **aux_info)
-{
-	Elf_Word ehdr;
-
-	/*
-	 * If we're running an old kernel that doesn't provide any data fail
-	 * safe by doing nothing.
-	 */
-	if (aux_info[AT_EHDRFLAGS] == NULL)
-		return;
-	ehdr = aux_info[AT_EHDRFLAGS]->a_un.a_val;
-
-	/*
-	 * Hard float ABI binaries are the default, and use the default paths
-	 * and such.
-	 */
-	if ((ehdr & EF_ARM_VFP_FLOAT) != 0)
-		return;
-
-	/*
-	 * This is a soft float ABI binary. We need to use the soft float
-	 * settings.
-	 */
-	ld_elf_hints_default = _PATH_SOFT_ELF_HINTS;
-	ld_path_libmap_conf = _PATH_SOFT_LIBMAP_CONF;
-	ld_path_rtld = _PATH_SOFT_RTLD;
-	ld_standard_library_path = SOFT_STANDARD_LIBRARY_PATH;
-	ld_env_prefix = LD_SOFT_;
-}
-#endif
+#include "rtld_paths.h"
 
 void
 init_pltgot(Obj_Entry *obj)
@@ -499,17 +459,14 @@ allocate_initial_tls(Obj_Entry *objs)
 
 	tls_static_space = tls_last_offset + tls_last_size + RTLD_STATIC_TLS_EXTRA;
 
-	sysarch(ARM_SET_TP, allocate_tls(objs, NULL, TLS_TCB_SIZE, 8));
+	_tcb_set(allocate_tls(objs, NULL, TLS_TCB_SIZE, TLS_TCB_ALIGN));
 }
 
 void *
 __tls_get_addr(tls_index* ti)
 {
-	char *p;
-	void *_tp;
-	__asm __volatile("mrc  p15, 0, %0, c13, c0, 3"		\
-	    : "=r" (_tp));
-	p = tls_get_addr_common((Elf_Addr **)(_tp), ti->ti_module, ti->ti_offset);
+	uintptr_t **dtvp;
 
-	return (p);
+	dtvp = &_tcb_get()->tcb_dtv;
+	return (tls_get_addr_common(dtvp, ti->ti_module, ti->ti_offset));
 }

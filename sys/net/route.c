@@ -50,6 +50,7 @@
 #include <sys/syslog.h>
 #include <sys/sysproto.h>
 #include <sys/proc.h>
+#include <sys/devctl.h>
 #include <sys/domain.h>
 #include <sys/eventhandler.h>
 #include <sys/kernel.h>
@@ -67,6 +68,7 @@
 
 #include <netinet/in.h>
 #include <netinet/ip_mroute.h>
+#include <netinet6/in6_var.h>
 
 VNET_PCPUSTAT_DEFINE(struct rtstat, rtstat);
 
@@ -501,6 +503,73 @@ rt_flushifroutes(struct ifnet *ifp)
 }
 
 /*
+ * Tries to extract interface from RTAX_IFP passed in rt_addrinfo.
+ * Interface can be specified ether as interface index (sdl_index) or
+ * the interface name (sdl_data).
+ *
+ * Returns found ifp or NULL
+ */
+static struct ifnet *
+info_get_ifp(struct rt_addrinfo *info)
+{
+	const struct sockaddr_dl *sdl;
+
+	sdl = (const struct sockaddr_dl *)info->rti_info[RTAX_IFP];
+	if (sdl->sdl_family != AF_LINK)
+		return (NULL);
+
+	if (sdl->sdl_index != 0)
+		return (ifnet_byindex(sdl->sdl_index));
+	if (sdl->sdl_nlen > 0) {
+		char if_name[IF_NAMESIZE];
+		if (sdl->sdl_nlen + offsetof(struct sockaddr_dl, sdl_data) > sdl->sdl_len)
+			return (NULL);
+		if (sdl->sdl_nlen >= IF_NAMESIZE)
+			return (NULL);
+		bzero(if_name, sizeof(if_name));
+		memcpy(if_name, sdl->sdl_data, sdl->sdl_nlen);
+		return (ifunit(if_name));
+	}
+
+	return (NULL);
+}
+
+/*
+ * Calculates proper ifa/ifp for the cases when gateway AF is different
+ * from dst AF.
+ *
+ * Returns 0 on success.
+ */
+__noinline static int
+rt_getifa_family(struct rt_addrinfo *info, uint32_t fibnum)
+{
+	if (info->rti_ifp == NULL) {
+		struct ifaddr *ifa = NULL;
+		/*
+		 * No transmit interface specified. Guess it by checking gw sa.
+		 */
+		const struct sockaddr *gw = info->rti_info[RTAX_GATEWAY];
+		ifa = ifa_ifwithroute(RTF_GATEWAY, gw, gw, fibnum);
+		if (ifa == NULL)
+			return (ENETUNREACH);
+		info->rti_ifp = ifa->ifa_ifp;
+	}
+
+	/* Prefer address from outgoing interface */
+	info->rti_ifa = ifaof_ifpforaddr(info->rti_info[RTAX_DST], info->rti_ifp);
+#ifdef INET
+	if (info->rti_ifa == NULL) {
+		/* Use first found IPv4 address */
+		bool loopback_ok = info->rti_ifp->if_flags & IFF_LOOPBACK;
+		info->rti_ifa = (struct ifaddr *)in_findlocal(fibnum, loopback_ok);
+	}
+#endif
+	if (info->rti_ifa == NULL)
+		return (ENETUNREACH);
+	return (0);
+}
+
+/*
  * Look up rt_addrinfo for a specific fib.
  *
  * Assume basic consistency checks are executed by callers:
@@ -509,12 +578,11 @@ rt_flushifroutes(struct ifnet *ifp)
 int
 rt_getifa_fib(struct rt_addrinfo *info, u_int fibnum)
 {
-	const struct sockaddr *dst, *gateway, *ifpaddr, *ifaaddr;
+	const struct sockaddr *dst, *gateway, *ifaaddr;
 	int error, flags;
 
 	dst = info->rti_info[RTAX_DST];
 	gateway = info->rti_info[RTAX_GATEWAY];
-	ifpaddr = info->rti_info[RTAX_IFP];
 	ifaaddr = info->rti_info[RTAX_IFA];
 	flags = info->rti_flags;
 
@@ -524,19 +592,18 @@ rt_getifa_fib(struct rt_addrinfo *info, u_int fibnum)
 	 */
 	error = 0;
 
-	/* If we have interface specified by the ifindex in the address, use it */
-	if (info->rti_ifp == NULL && ifpaddr != NULL &&
-	    ifpaddr->sa_family == AF_LINK) {
-	    const struct sockaddr_dl *sdl = (const struct sockaddr_dl *)ifpaddr;
-	    if (sdl->sdl_index != 0)
-		    info->rti_ifp = ifnet_byindex(sdl->sdl_index);
-	}
+	/* If we have interface specified by RTAX_IFP address, try to use it */
+	if ((info->rti_ifp == NULL) && (info->rti_info[RTAX_IFP] != NULL))
+		info->rti_ifp = info_get_ifp(info);
 	/*
 	 * If we have source address specified, try to find it
 	 * TODO: avoid enumerating all ifas on all interfaces.
 	 */
 	if (info->rti_ifa == NULL && ifaaddr != NULL)
 		info->rti_ifa = ifa_ifwithaddr(ifaaddr);
+	if ((info->rti_ifa == NULL) && ((info->rti_flags & RTF_GATEWAY) != 0) &&
+	    (gateway->sa_family != dst->sa_family))
+		return (rt_getifa_family(info, fibnum));
 	if (info->rti_ifa == NULL) {
 		const struct sockaddr *sa;
 
@@ -685,6 +752,10 @@ rt_maskedcopy(struct sockaddr *src, struct sockaddr *dst, struct sockaddr *netma
 int
 rt_addrmsg(int cmd, struct ifaddr *ifa, int fibnum)
 {
+#if defined(INET) || defined(INET6)
+	struct sockaddr *sa = ifa->ifa_addr;
+	struct ifnet *ifp = ifa->ifa_ifp;
+#endif
 
 	KASSERT(cmd == RTM_ADD || cmd == RTM_DELETE,
 	    ("unexpected cmd %d", cmd));
@@ -692,6 +763,29 @@ rt_addrmsg(int cmd, struct ifaddr *ifa, int fibnum)
 	    ("%s: fib out of range 0 <=%d<%d", __func__, fibnum, rt_numfibs));
 
 	EVENTHANDLER_DIRECT_INVOKE(rt_addrmsg, ifa, cmd);
+
+#ifdef INET
+	if (sa->sa_family == AF_INET) {
+		char addrstr[INET_ADDRSTRLEN];
+		char strbuf[INET_ADDRSTRLEN + 12];
+
+		inet_ntoa_r(((struct sockaddr_in *)sa)->sin_addr, addrstr);
+		snprintf(strbuf, sizeof(strbuf), "address=%s", addrstr);
+		devctl_notify("IFNET", ifp->if_xname,
+		    (cmd == RTM_ADD) ? "ADDR_ADD" : "ADDR_DEL", strbuf);
+	}
+#endif
+#ifdef INET6
+	if (sa->sa_family == AF_INET6) {
+		char addrstr[INET6_ADDRSTRLEN];
+		char strbuf[INET6_ADDRSTRLEN + 12];
+
+		ip6_sprintf(addrstr, IFA_IN6(ifa));
+		snprintf(strbuf, sizeof(strbuf), "address=%s", addrstr);
+		devctl_notify("IFNET", ifp->if_xname,
+		    (cmd == RTM_ADD) ? "ADDR_ADD" : "ADDR_DEL", strbuf);
+	}
+#endif
 
 	if (V_rt_add_addr_allfibs)
 		fibnum = RT_ALL_FIBS;

@@ -282,7 +282,7 @@ _thr_stack_alloc(struct pthread_attr *attr)
 		 * on the LIBPTHREAD_BIGSTACK_MAIN env variable.
 		 */
 		if (last_stack == NULL)
-			last_stack = (void*)(_usrstack - _thr_stack_initial -
+			last_stack = (void *)(_usrstack - _thr_stack_initial -
 			    _thr_guard_default);
 
 		/* Allocate a new stack. */

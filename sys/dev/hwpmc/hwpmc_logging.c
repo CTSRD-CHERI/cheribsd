@@ -86,7 +86,7 @@ SYSCTL_INT(_kern_hwpmc, OID_AUTO, logbuffersize, CTLFLAG_RDTUN,
     &pmclog_buffer_size, 0, "size of log buffers in kilobytes");
 
 /*
- * kern.hwpmc.nbuffer -- number of global log buffers
+ * kern.hwpmc.nbuffers_pcpu -- number of global log buffers
  */
 
 static int pmc_nlogbuffers_pcpu = PMC_NLOGBUFFERS_PCPU;
@@ -550,7 +550,7 @@ pmclog_release(struct pmc_owner *po)
 static uint32_t *
 pmclog_reserve(struct pmc_owner *po, int length)
 {
-	uintptr_t newptr, oldptr;
+	uintptr_t newptr, oldptr __diagused;
 	struct pmclog_buffer *plb, **pplb;
 
 	PMCDBG2(LOG,ALL,1, "po=%p len=%d", po, length);
@@ -693,7 +693,6 @@ pmclog_configure_log(struct pmc_mdep *md, struct pmc_owner *po, int logfd)
 {
 	struct proc *p;
 	struct timespec ts;
-	uint64_t tsc;
 	int error;
 
 	sx_assert(&pmc_sx, SA_XLOCKED);
@@ -722,7 +721,6 @@ pmclog_configure_log(struct pmc_mdep *md, struct pmc_owner *po, int logfd)
 	p->p_flag |= P_HWPMC;
 	PROC_UNLOCK(p);
 	nanotime(&ts);
-	tsc = pmc_rdtsc();
 	/* create a log initialization entry */
 	PMCLOG_RESERVE_WITH_ERROR(po, INITIALIZE,
 	    sizeof(struct pmclog_initialize));
@@ -924,7 +922,7 @@ pmclog_process_callchain(struct pmc *pm, struct pmc_sample *ps)
 	    ps->ps_nsamples);
 
 	recordlen = offsetof(struct pmclog_callchain, pl_pc) +
-	    ps->ps_nsamples * sizeof(uintfptr_t);
+	    ps->ps_nsamples * sizeof(ptraddr_t);
 	po = pm->pm_owner;
 	flags = PMC_CALLCHAIN_TO_CPUFLAGS(ps->ps_cpu,ps->ps_flags);
 	PMCLOG_RESERVE_SAFE(po, CALLCHAIN, recordlen, ps->ps_tsc);

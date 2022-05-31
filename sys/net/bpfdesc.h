@@ -92,6 +92,7 @@ struct bpf_d {
 	int		bd_feedback;	/* true to feed back sent packets */
 	int		bd_async;	/* non-zero if packet reception should generate signal */
 	int		bd_sig;		/* signal to send upon packet reception */
+	int		bd_pcp;		/* VLAN pcp tag */
 	struct sigio *	bd_sigio;	/* information for async I/O */
 	struct selinfo	bd_sel;		/* bsd select info */
 	struct mtx	bd_lock;	/* per-descriptor lock */
@@ -108,7 +109,7 @@ struct bpf_d {
 	u_char		bd_compat32;	/* 32-bit stream on LP64 system */
 
 	volatile u_int	bd_refcnt;
-	struct epoch_context epoch_ctx __subobject_use_container_bounds;
+	struct epoch_context epoch_ctx;
 };
 
 /* Values for bd_state */

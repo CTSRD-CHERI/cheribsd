@@ -73,7 +73,8 @@ SRCS=	\
 	libdwarf_reloc.c	\
 	libdwarf_rw.c		\
 	libdwarf_sections.c	\
-	libdwarf_str.c
+	libdwarf_str.c		\
+	zlib_stub.c
 
 INCS=		dwarf.h libdwarf.h
 
@@ -98,7 +99,7 @@ sys/elf32.h sys/elf64.h sys/elf_common.h: ${SRCTOP}/sys/${.TARGET} .NOMETA
 	mkdir -p ${.OBJDIR}/sys
 	ln -sf ${.ALLSRC} ${.TARGET}
 
-LIBADD+=	elf
+LIBADD+=	elf z
 
 SHLIB_MAJOR=	4
 

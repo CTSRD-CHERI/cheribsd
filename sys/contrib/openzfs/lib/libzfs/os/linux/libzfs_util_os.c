@@ -38,7 +38,7 @@
 #include <libzfs.h>
 #include <libzfs_core.h>
 
-#include "libzfs_impl.h"
+#include "../../libzfs_impl.h"
 #include "zfs_prop.h"
 #include <libzutil.h>
 #include <sys/zfs_sysfs.h>
@@ -143,7 +143,7 @@ libzfs_load_module_impl(const char *module)
 
 	start = gethrtime();
 	do {
-		fd = open(ZFS_DEV, O_RDWR);
+		fd = open(ZFS_DEV, O_RDWR | O_CLOEXEC);
 		if (fd >= 0) {
 			(void) close(fd);
 			return (0);
@@ -184,6 +184,13 @@ find_shares_object(differ_info_t *di)
 	return (0);
 }
 
+int
+zfs_destroy_snaps_nvl_os(libzfs_handle_t *hdl, nvlist_t *snaps)
+{
+	(void) hdl, (void) snaps;
+	return (0);
+}
+
 /*
  * Fill given version buffer with zfs kernel version read from ZFS_SYSFS_DIR
  * Returns 0 on success, and -1 on error (with errno set)
@@ -195,7 +202,7 @@ zfs_version_kernel(char *version, int len)
 	int fd;
 	int rlen;
 
-	if ((fd = open(ZFS_SYSFS_DIR "/version", O_RDONLY)) == -1)
+	if ((fd = open(ZFS_SYSFS_DIR "/version", O_RDONLY | O_CLOEXEC)) == -1)
 		return (-1);
 
 	if ((rlen = read(fd, version, len)) == -1) {

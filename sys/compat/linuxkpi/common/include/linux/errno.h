@@ -28,8 +28,8 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_ERRNO_H_
-#define	_LINUX_ERRNO_H_
+#ifndef	_LINUXKPI_LINUX_ERRNO_H_
+#define	_LINUXKPI_LINUX_ERRNO_H_
 
 #include <sys/errno.h>
 
@@ -64,5 +64,8 @@
 #define	EIOCBQUEUED	529
 #define	ERFKILL		530
 #define	EBADE		531
+#define	ENOMEDIUM	532
+#define	ENOSR		533
+#define	ELNRNG		534
 
-#endif					/* _LINUX_ERRNO_H_ */
+#endif					/* _LINUXKPI_LINUX_ERRNO_H_ */

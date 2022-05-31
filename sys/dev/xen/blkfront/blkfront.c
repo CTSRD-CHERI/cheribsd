@@ -47,15 +47,14 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <sys/rman.h>
 #include <machine/resource.h>
-#include <machine/intr_machdep.h>
 #include <machine/vmparam.h>
 
 #include <xen/xen-os.h>
 #include <xen/hypervisor.h>
 #include <xen/xen_intr.h>
 #include <xen/gnttab.h>
-#include <xen/interface/grant_table.h>
-#include <xen/interface/io/protocols.h>
+#include <contrib/xen/grant_table.h>
+#include <contrib/xen/io/protocols.h>
 #include <xen/xenbus/xenbusvar.h>
 
 #include <machine/_inttypes.h>
@@ -925,7 +924,7 @@ xbd_setup_sysctl(struct xbd_softc *xbd)
 	    "communication channel pages (negotiated)");
 
 	SYSCTL_ADD_PROC(sysctl_ctx, children, OID_AUTO,
-	    "features", CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, xbd,
+	    "features", CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, xbd,
 	    0, xbd_sysctl_features, "A", "protocol features (negotiated)");
 }
 
@@ -1439,7 +1438,7 @@ xbd_probe(device_t dev)
 	if (strcmp(xenbus_get_type(dev), "vbd") != 0)
 		return (ENXIO);
 
-	if (xen_hvm_domain() && xen_disable_pv_disks != 0)
+	if (xen_pv_disks_disabled())
 		return (ENXIO);
 
 	if (xen_hvm_domain()) {

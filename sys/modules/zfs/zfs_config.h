@@ -85,8 +85,14 @@
 /* bdev_check_media_change() exists */
 /* #undef HAVE_BDEV_CHECK_MEDIA_CHANGE */
 
+/* block_device_operations->submit_bio() returns void */
+/* #undef HAVE_BDEV_SUBMIT_BIO_RETURNS_VOID */
+
 /* bdev_whole() is available */
 /* #undef HAVE_BDEV_WHOLE */
+
+/* bio->bi_bdev->bd_disk exists */
+/* #undef HAVE_BIO_BDEV_DISK */
 
 /* bio->bi_opf is defined */
 /* #undef HAVE_BIO_BI_OPF */
@@ -100,14 +106,23 @@
 /* bio_*_io_acct() available */
 /* #undef HAVE_BIO_IO_ACCT */
 
+/* bio_max_segs() is implemented */
+/* #undef HAVE_BIO_MAX_SEGS */
+
 /* bio_set_dev() is available */
 /* #undef HAVE_BIO_SET_DEV */
 
 /* bio_set_dev() GPL-only */
 /* #undef HAVE_BIO_SET_DEV_GPL_ONLY */
 
+/* bio_set_dev() is a macro */
+/* #undef HAVE_BIO_SET_DEV_MACRO */
+
 /* bio_set_op_attrs is available */
 /* #undef HAVE_BIO_SET_OP_ATTRS */
+
+/* blkdev_get_by_path() handles ERESTARTSYS */
+/* #undef HAVE_BLKDEV_GET_ERESTARTSYS */
 
 /* blkdev_reread_part() exists */
 /* #undef HAVE_BLKDEV_REREAD_PART */
@@ -117,6 +132,9 @@
 
 /* blkg_tryget() GPL-only */
 /* #undef HAVE_BLKG_TRYGET_GPL_ONLY */
+
+/* blk_alloc_disk() exists */
+/* #undef HAVE_BLK_ALLOC_DISK */
 
 /* blk_alloc_queue() expects request function */
 /* #undef HAVE_BLK_ALLOC_QUEUE_REQUEST_FN */
@@ -145,11 +163,17 @@
 /* blk_queue_secure_erase() is available */
 /* #undef HAVE_BLK_QUEUE_SECURE_ERASE */
 
+/* blk_queue_update_readahead() exists */
+/* #undef HAVE_BLK_QUEUE_UPDATE_READAHEAD */
+
 /* blk_queue_write_cache() exists */
 /* #undef HAVE_BLK_QUEUE_WRITE_CACHE */
 
 /* blk_queue_write_cache() is GPL-only */
 /* #undef HAVE_BLK_QUEUE_WRITE_CACHE_GPL_ONLY */
+
+/* Define if revalidate_disk() in block_device_operations */
+/* #undef HAVE_BLOCK_DEVICE_OPERATIONS_REVALIDATE_DISK */
 
 /* Define to 1 if you have the Mac OS X function CFLocaleCopyCurrent in the
    CoreFoundation framework. */
@@ -197,6 +221,12 @@
 /* sops->dirty_inode() wants flags */
 /* #undef HAVE_DIRTY_INODE_WITH_FLAGS */
 
+/* disk_*_io_acct() available */
+/* #undef HAVE_DISK_IO_ACCT */
+
+/* disk_update_readahead() exists */
+/* #undef HAVE_DISK_UPDATE_READAHEAD */
+
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #define HAVE_DLFCN_H 1
 
@@ -236,6 +266,9 @@
 /* fops->fsync() without dentry */
 /* #undef HAVE_FSYNC_WITHOUT_DENTRY */
 
+/* generic_fillattr requires struct user_namespace* */
+/* #undef HAVE_GENERIC_FILLATTR_USERNS */
+
 /* generic_*_io_acct() 3 arg available */
 /* #undef HAVE_GENERIC_IO_ACCT_3ARG */
 
@@ -253,6 +286,12 @@
 
 /* Define if the GNU gettext() function is already present or preinstalled. */
 /* #undef HAVE_GETTEXT */
+
+/* iops->get_acl() exists */
+/* #undef HAVE_GET_ACL */
+
+/* iops->get_acl() takes rcu */
+/* #undef HAVE_GET_ACL_RCU */
 
 /* iops->get_link() cookie */
 /* #undef HAVE_GET_LINK_COOKIE */
@@ -272,6 +311,12 @@
 /* yes */
 /* #undef HAVE_INODE_LOCK_SHARED */
 
+/* inode_owner_or_capable() exists */
+/* #undef HAVE_INODE_OWNER_OR_CAPABLE */
+
+/* inode_owner_or_capable() takes user_ns */
+/* #undef HAVE_INODE_OWNER_OR_CAPABLE_IDMAPPED */
+
 /* inode_set_flags() exists */
 /* #undef HAVE_INODE_SET_FLAGS */
 
@@ -290,6 +335,21 @@
 /* in_compat_syscall() is available */
 /* #undef HAVE_IN_COMPAT_SYSCALL */
 
+/* iops->create() takes struct user_namespace* */
+/* #undef HAVE_IOPS_CREATE_USERNS */
+
+/* iops->mkdir() takes struct user_namespace* */
+/* #undef HAVE_IOPS_MKDIR_USERNS */
+
+/* iops->mknod() takes struct user_namespace* */
+/* #undef HAVE_IOPS_MKNOD_USERNS */
+
+/* iops->rename() takes struct user_namespace* */
+/* #undef HAVE_IOPS_RENAME_USERNS */
+
+/* iops->symlink() takes struct user_namespace* */
+/* #undef HAVE_IOPS_SYMLINK_USERNS */
+
 /* iov_iter_advance() is available */
 /* #undef HAVE_IOV_ITER_ADVANCE */
 
@@ -299,14 +359,11 @@
 /* iov_iter_fault_in_readable() is available */
 /* #undef HAVE_IOV_ITER_FAULT_IN_READABLE */
 
-/* iov_iter_init() is available */
-/* #undef HAVE_IOV_ITER_INIT */
-
-/* iov_iter_init() is available */
-/* #undef HAVE_IOV_ITER_INIT_LEGACY */
-
 /* iov_iter_revert() is available */
 /* #undef HAVE_IOV_ITER_REVERT */
+
+/* iov_iter_type() is available */
+/* #undef HAVE_IOV_ITER_TYPE */
 
 /* iov_iter types are available */
 /* #undef HAVE_IOV_ITER_TYPES */
@@ -325,6 +382,9 @@
 
 /* kernel fpu internal */
 /* #undef HAVE_KERNEL_FPU_INTERNAL */
+
+/* kernel has asm/fpu/xcr.h */
+/* #undef HAVE_KERNEL_FPU_XCR_HEADER */
 
 /* uncached_acl_sentinel() exists */
 /* #undef HAVE_KERNEL_GET_ACL_HANDLE_CACHE */
@@ -365,9 +425,6 @@
 /* kvmalloc exists */
 /* #undef HAVE_KVMALLOC */
 
-/* kernel has large stacks */
-/* #undef HAVE_LARGE_STACKS */
-
 /* Define if you have [aio] */
 /* #undef HAVE_LIBAIO */
 
@@ -385,6 +442,9 @@
 
 /* Define if you have [uuid] */
 /* #undef HAVE_LIBUUID */
+
+/* linux/blk-cgroup.h exists */
+/* #undef HAVE_LINUX_BLK_CGROUP_HEADER */
 
 /* lseek_execute() is available */
 /* #undef HAVE_LSEEK_EXECUTE */
@@ -404,7 +464,7 @@
 /* Define to 1 if you have the <memory.h> header file. */
 #define HAVE_MEMORY_H 1
 
-/* iops->create()/mkdir()/mknod() take umode_t */
+/* iops->mkdir() takes umode_t */
 /* #undef HAVE_MKDIR_UMODE_T */
 
 /* Define to 1 if you have the `mlockall' function. */
@@ -419,11 +479,17 @@
 /* new_sync_read()/new_sync_write() are available */
 /* #undef HAVE_NEW_SYNC_READ */
 
+/* folio_wait_bit() exists */
+/* #undef HAVE_PAGEMAP_FOLIO_WAIT_BIT */
+
 /* iops->getattr() takes a path */
 /* #undef HAVE_PATH_IOPS_GETATTR */
 
 /* Define if host toolchain supports PCLMULQDQ */
 #define HAVE_PCLMULQDQ 1
+
+/* percpu_counter_add_batch() is defined */
+/* #undef HAVE_PERCPU_COUNTER_ADD_BATCH */
 
 /* percpu_counter_init() wants gfp_t */
 /* #undef HAVE_PERCPU_COUNTER_INIT_WITH_GFP */
@@ -500,17 +566,32 @@
 /* Define to 1 if you have the <security/pam_modules.h> header file. */
 #define HAVE_SECURITY_PAM_MODULES_H 1
 
-/* setattr_prepare() is available */
-/* #undef HAVE_SETATTR_PREPARE */
+/* setattr_prepare() is available, doesn't accept user_namespace */
+/* #undef HAVE_SETATTR_PREPARE_NO_USERNS */
 
-/* iops->set_acl() exists */
+/* setattr_prepare() accepts user_namespace */
+/* #undef HAVE_SETATTR_PREPARE_USERNS */
+
+/* iops->set_acl() exists, takes 3 args */
 /* #undef HAVE_SET_ACL */
+
+/* iops->set_acl() takes 4 args */
+/* #undef HAVE_SET_ACL_USERNS */
 
 /* set_cached_acl() is usable */
 /* #undef HAVE_SET_CACHED_ACL_USABLE */
 
+/* set_special_state() exists */
+/* #undef HAVE_SET_SPECIAL_STATE */
+
 /* struct shrink_control exists */
 /* #undef HAVE_SHRINK_CONTROL_STRUCT */
+
+/* kernel_siginfo_t exists */
+/* #undef HAVE_SIGINFO */
+
+/* signal_stop() exists */
+/* #undef HAVE_SIGNAL_STOP */
 
 /* new shrinker callback wants 2 args */
 /* #undef HAVE_SINGLE_SHRINKER_CALLBACK */
@@ -540,6 +621,9 @@
 
 /* STACK_FRAME_NON_STANDARD is defined */
 /* #undef HAVE_STACK_FRAME_NON_STANDARD */
+
+/* standalone <linux/stdarg.h> exists */
+/* #undef HAVE_STANDALONE_LINUX_STDARG */
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
@@ -577,6 +661,9 @@
 /* i_op->tmpfile() exists */
 /* #undef HAVE_TMPFILE */
 
+/* i_op->tmpfile() has userns */
+/* #undef HAVE_TMPFILE_USERNS */
+
 /* totalhigh_pages() exists */
 /* #undef HAVE_TOTALHIGH_PAGES */
 
@@ -591,6 +678,9 @@
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #define HAVE_UNISTD_H 1
+
+/* iops->getattr() takes struct user_namespace* */
+/* #undef HAVE_USERNS_IOPS_GETATTR */
 
 /* iops->getattr() takes a vfsmount */
 /* #undef HAVE_VFSMOUNT_IOPS_GETATTR */
@@ -621,6 +711,9 @@
 
 /* fops->read/write_iter() are available */
 /* #undef HAVE_VFS_RW_ITERATE */
+
+/* __set_page_dirty_nobuffers exists */
+/* #undef HAVE_VFS_SET_PAGE_DIRTY_NOBUFFERS */
 
 /* __vmalloc page flags exists */
 /* #undef HAVE_VMALLOC_PAGE_KERNEL */
@@ -664,6 +757,9 @@
 /* xattr_handler->set() wants xattr_handler */
 /* #undef HAVE_XATTR_SET_HANDLER */
 
+/* xattr_handler->set() takes user_namespace */
+/* #undef HAVE_XATTR_SET_USERNS */
+
 /* Define if you have [z] */
 #define HAVE_ZLIB 1
 
@@ -672,6 +768,21 @@
 
 /* kernel exports FPU functions */
 /* #undef KERNEL_EXPORTS_X86_FPU */
+
+/* TBD: fetch(3) support */
+#if 0
+/* whether the chosen libfetch is to be loaded at run-time */
+#define LIBFETCH_DYNAMIC 1
+
+/* libfetch is fetch(3) */
+#define LIBFETCH_IS_FETCH 1
+
+/* libfetch is libcurl */
+#define LIBFETCH_IS_LIBCURL 0
+
+/* soname of chosen libfetch */
+#define LIBFETCH_SONAME "libfetch.so.6"
+#endif
 
 /* Define to the sub-directory where libtool stores uninstalled libraries. */
 #define LT_OBJDIR ".libs/"
@@ -734,7 +845,7 @@
 /* #undef ZFS_IS_GPL_COMPATIBLE */
 
 /* Define the project alias string. */
-#define ZFS_META_ALIAS "zfs-2.1.0-FreeBSD_g3522f57b6"
+#define ZFS_META_ALIAS "zfs-2.1.99-FreeBSD_g17b2ae0b2"
 
 /* Define the project author. */
 #define ZFS_META_AUTHOR "OpenZFS"
@@ -743,7 +854,7 @@
 /* #undef ZFS_META_DATA */
 
 /* Define the maximum compatible kernel version. */
-#define ZFS_META_KVER_MAX "5.11"
+#define ZFS_META_KVER_MAX "5.15"
 
 /* Define the minimum compatible kernel version. */
 #define ZFS_META_KVER_MIN "3.10"
@@ -764,10 +875,10 @@
 #define ZFS_META_NAME "zfs"
 
 /* Define the project release. */
-#define ZFS_META_RELEASE "FreeBSD_g3522f57b6"
+#define ZFS_META_RELEASE "FreeBSD_g17b2ae0b2"
 
 /* Define the project version. */
-#define ZFS_META_VERSION "2.1.0"
+#define ZFS_META_VERSION "2.1.99"
 
 /* count is located in percpu_ref.data */
 /* #undef ZFS_PERCPU_REF_COUNT_IN_DATA */

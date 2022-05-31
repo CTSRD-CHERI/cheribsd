@@ -118,7 +118,7 @@ static TAILQ_HEAD(fibl_head_t, fibl) fibl_head;
 static void	printb(int, const char *);
 static void	flushroutes(int argc, char *argv[]);
 static int	flushroutes_fib(int);
-static int	getaddr(int, char *, struct hostent **, int);
+static int	getaddr(int, char *, int);
 static int	keyword(const char *);
 #ifdef INET
 static void	inet_makemask(struct sockaddr_in *, u_long);
@@ -791,7 +791,6 @@ static void
 newroute(int argc, char **argv)
 {
 	struct sigaction sa;
-	struct hostent *hp;
 	struct fibl *fl;
 	char *cmd;
 	const char *dest, *gateway, *errmsg;
@@ -803,7 +802,6 @@ newroute(int argc, char **argv)
 	gateway = NULL;
 	flags = RTF_STATIC;
 	nrflags = 0;
-	hp = NULL;
 	TAILQ_INIT(&fibl_head);
 
 	sigemptyset(&sa.sa_mask);
@@ -894,35 +892,35 @@ newroute(int argc, char **argv)
 			case K_IFA:
 				if (!--argc)
 					usage(NULL);
-				getaddr(RTAX_IFA, *++argv, 0, nrflags);
+				getaddr(RTAX_IFA, *++argv, nrflags);
 				break;
 			case K_IFP:
 				if (!--argc)
 					usage(NULL);
-				getaddr(RTAX_IFP, *++argv, 0, nrflags);
+				getaddr(RTAX_IFP, *++argv, nrflags);
 				break;
 			case K_GENMASK:
 				if (!--argc)
 					usage(NULL);
-				getaddr(RTAX_GENMASK, *++argv, 0, nrflags);
+				getaddr(RTAX_GENMASK, *++argv, nrflags);
 				break;
 			case K_GATEWAY:
 				if (!--argc)
 					usage(NULL);
-				getaddr(RTAX_GATEWAY, *++argv, 0, nrflags);
+				getaddr(RTAX_GATEWAY, *++argv, nrflags);
 				gateway = *argv;
 				break;
 			case K_DST:
 				if (!--argc)
 					usage(NULL);
-				if (getaddr(RTAX_DST, *++argv, &hp, nrflags))
+				if (getaddr(RTAX_DST, *++argv, nrflags))
 					nrflags |= F_ISHOST;
 				dest = *argv;
 				break;
 			case K_NETMASK:
 				if (!--argc)
 					usage(NULL);
-				getaddr(RTAX_NETMASK, *++argv, 0, nrflags);
+				getaddr(RTAX_NETMASK, *++argv, nrflags);
 				/* FALLTHROUGH */
 			case K_NET:
 				nrflags |= F_FORCENET;
@@ -957,13 +955,13 @@ newroute(int argc, char **argv)
 		} else {
 			if ((rtm_addrs & RTA_DST) == 0) {
 				dest = *argv;
-				if (getaddr(RTAX_DST, *argv, &hp, nrflags))
+				if (getaddr(RTAX_DST, *argv, nrflags))
 					nrflags |= F_ISHOST;
 			} else if ((rtm_addrs & RTA_GATEWAY) == 0) {
 				gateway = *argv;
-				getaddr(RTAX_GATEWAY, *argv, &hp, nrflags);
+				getaddr(RTAX_GATEWAY, *argv, nrflags);
 			} else {
-				getaddr(RTAX_NETMASK, *argv, 0, nrflags);
+				getaddr(RTAX_NETMASK, *argv, nrflags);
 				nrflags |= F_FORCENET;
 			}
 		}
@@ -1155,7 +1153,7 @@ inet6_makenetandmask(struct sockaddr_in6 *sin6, const char *plen)
  * returning 1 if a host address, 0 if a network address.
  */
 static int
-getaddr(int idx, char *str, struct hostent **hpp, int nrflags)
+getaddr(int idx, char *str, int nrflags)
 {
 	struct sockaddr *sa;
 #if defined(INET)
@@ -1180,9 +1178,6 @@ getaddr(int idx, char *str, struct hostent **hpp, int nrflags)
 		aflen = sizeof(struct sockaddr_dl);
 #endif
 	}
-#ifndef INET
-	hpp = NULL;
-#endif
 	rtm_addrs |= (1 << idx);
 	sa = (struct sockaddr *)&so[idx];
 	sa->sa_family = af;
@@ -1234,7 +1229,7 @@ getaddr(int idx, char *str, struct hostent **hpp, int nrflags)
 		switch (idx) {
 		case RTAX_DST:
 			nrflags |= F_FORCENET;
-			getaddr(RTAX_NETMASK, str, 0, nrflags);
+			getaddr(RTAX_NETMASK, str, nrflags);
 			break;
 		}
 		return (0);
@@ -1281,9 +1276,6 @@ getaddr(int idx, char *str, struct hostent **hpp, int nrflags)
 
 #ifdef INET
 	sin = (struct sockaddr_in *)(void *)sa;
-	if (hpp == NULL)
-		hpp = &hp;
-	*hpp = NULL;
 
 	q = strchr(str,'/');
 	if (q != NULL && idx == RTAX_DST) {
@@ -1304,7 +1296,6 @@ getaddr(int idx, char *str, struct hostent **hpp, int nrflags)
 
 	hp = gethostbyname(str);
 	if (hp != NULL) {
-		*hpp = hp;
 		sin->sin_family = hp->h_addrtype;
 		memmove((char *)&sin->sin_addr, hp->h_addr,
 		    MIN((size_t)hp->h_length, sizeof(sin->sin_addr)));
@@ -1445,9 +1436,20 @@ monitor(int argc, char *argv[])
 		interfaces();
 		exit(0);
 	}
+
+#ifdef SO_RERROR
+	n = 1;
+	if (setsockopt(s, SOL_SOCKET, SO_RERROR, &n, sizeof(n)) == -1)
+		warn("SO_RERROR");
+#endif
+
 	for (;;) {
 		time_t now;
-		n = read(s, msg, 2048);
+		n = read(s, msg, sizeof(msg));
+		if (n == -1) {
+			warn("read");
+			continue;
+		}
 		now = time(NULL);
 		(void)printf("\ngot message of size %d on %s", n, ctime(&now));
 		print_rtmsg((struct rt_msghdr *)(void *)msg, n);

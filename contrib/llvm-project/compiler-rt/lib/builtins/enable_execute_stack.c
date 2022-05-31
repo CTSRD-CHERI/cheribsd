@@ -5,19 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20180629,
- *   "target_type": "lib",
- *   "changes": [
- *     "monotonicity",
- *     "unsupported"
- *   ],
- *   "change_comment": "Attempts to make stack executable"
- * }
- * CHERI CHANGES END
- */
 
 #include "int_lib.h"
 
@@ -45,12 +32,6 @@
 #define TRAMPOLINE_SIZE 40
 #endif
 
-#ifdef __CHERI_PURE_CAPABILITY__
-static const char __enable_execute_stack_warning[]
-    __attribute__((section(".gnu.warning.__enable_execute_stack"))) =
-    "__enable_execute_stack is unimplemented for CheriABI";
-#endif
-
 // The compiler generates calls to __enable_execute_stack() when creating
 // trampoline functions on the stack for use with nested functions.
 // It is expected to mark the page(s) containing the address
@@ -59,7 +40,6 @@ static const char __enable_execute_stack_warning[]
 
 COMPILER_RT_ABI void __enable_execute_stack(void *addr) {
 
-#ifndef __CHERI_PURE_CAPABILITY__
 #if _WIN32
   MEMORY_BASIC_INFORMATION mbi;
   if (!VirtualQuery(addr, &mbi, sizeof(mbi)))
@@ -83,6 +63,5 @@ COMPILER_RT_ABI void __enable_execute_stack(void *addr) {
       (unsigned char *)((p + TRAMPOLINE_SIZE + pageSize) & pageAlignMask);
   size_t length = endPage - startPage;
   (void)mprotect((void *)startPage, length, PROT_READ | PROT_WRITE | PROT_EXEC);
-#endif
 #endif
 }

@@ -59,6 +59,7 @@ size_t ppc_event_codes_size;
 int ppc_event_first;
 int ppc_event_last;
 int ppc_max_pmcs;
+enum pmc_class ppc_class;
 
 void (*powerpc_set_pmc)(int cpu, int ri, int config);
 pmc_value_t (*powerpc_pmcn_read)(unsigned int pmc);
@@ -210,6 +211,9 @@ powerpc_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	    ("[powerpc,%d] illegal CPU value %d", __LINE__, cpu));
 	KASSERT(ri >= 0 && ri < ppc_max_pmcs,
 	    ("[powerpc,%d] illegal row index %d", __LINE__, ri));
+
+	if (a->pm_class != ppc_class)
+		return (EINVAL);
 
 	caps = a->pm_caps;
 
@@ -602,6 +606,9 @@ pmc_md_initialize()
 		pmc_mdep_free(pmc_mdep);
 		pmc_mdep = NULL;
 	}
+
+	/* Set the value for kern.hwpmc.cpuid */
+	snprintf(pmc_cpuid, sizeof(pmc_cpuid), "%08x", mfpvr());
 
 	return (pmc_mdep);
 }

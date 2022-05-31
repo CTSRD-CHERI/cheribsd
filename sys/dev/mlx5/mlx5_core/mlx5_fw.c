@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013-2017, Mellanox Technologies, Ltd.  All rights reserved.
+ * Copyright (c) 2013-2020, Mellanox Technologies, Ltd.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,9 +25,12 @@
  * $FreeBSD$
  */
 
+#include "opt_rss.h"
+#include "opt_ratelimit.h"
+
 #include <dev/mlx5/driver.h>
 #include <linux/module.h>
-#include "mlx5_core.h"
+#include <dev/mlx5/mlx5_core/mlx5_core.h>
 
 static int mlx5_cmd_query_adapter(struct mlx5_core_dev *dev, u32 *out,
 				  int outlen)
@@ -229,6 +232,12 @@ int mlx5_query_hca_caps(struct mlx5_core_dev *dev)
 
 	if (MLX5_CAP_GEN(dev, tls_tx)) {
 		err = mlx5_core_get_caps(dev, MLX5_CAP_TLS);
+		if (err)
+			return err;
+	}
+
+	if (MLX5_CAP_GEN(dev, event_cap)) {
+		err = mlx5_core_get_caps(dev, MLX5_CAP_DEV_EVENT);
 		if (err)
 			return err;
 	}

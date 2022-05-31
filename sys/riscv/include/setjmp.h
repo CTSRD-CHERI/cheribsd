@@ -39,10 +39,11 @@
 
 #include <sys/cdefs.h>
 
-#define	_JBLEN		63	/* sp, ra, [f]s0-11, magic val, sigmask */
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	_JB_SIGMASK	44
+#define	_JBLEN		31	/* csp, cra, [fc]s0-11, magic val, sigmask */
+#define	_JB_SIGMASK	22
 #else
+#define	_JBLEN		63	/* sp, ra, [f]s0-11, magic val, sigmask */
 #define	_JB_SIGMASK	27
 #endif
 
@@ -52,16 +53,18 @@
 #endif /* !__ASSEMBLER__ */
 
 #ifndef	__ASSEMBLER__
+#include <sys/_types.h>
+
 /*
  * jmp_buf and sigjmp_buf are encapsulated in different structs to force
  * compile-time diagnostics for mismatches.  The structs are the same
  * internally to avoid some run-time errors for mismatches.
  */
 #if __BSD_VISIBLE || __POSIX_VISIBLE || __XSI_VISIBLE
-typedef	struct _sigjmp_buf { long _sjb[_JBLEN + 1] __aligned(16); } sigjmp_buf[1];
+typedef	struct _sigjmp_buf { __intptr_t _sjb[_JBLEN + 1] __aligned(16); } sigjmp_buf[1];
 #endif
 
-typedef	struct _jmp_buf { long _jb[_JBLEN + 1] __aligned(16); } jmp_buf[1];
+typedef	struct _jmp_buf { __intptr_t _jb[_JBLEN + 1] __aligned(16); } jmp_buf[1];
 #endif	/* __ASSEMBLER__ */
 
 #endif /* !_MACHINE_SETJMP_H_ */

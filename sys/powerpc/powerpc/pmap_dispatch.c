@@ -83,7 +83,7 @@ int vm_level_0_order = 9;
 
 SYSCTL_NODE(_vm, OID_AUTO, pmap, CTLFLAG_RD, 0, "VM/pmap parameters");
 
-int superpages_enabled = 0;
+int superpages_enabled = 1;
 SYSCTL_INT(_vm_pmap, OID_AUTO, superpages_enabled, CTLFLAG_RDTUN,
     &superpages_enabled, 0, "Enable support for transparent superpages");
 
@@ -188,7 +188,7 @@ DEFINE_PMAP_IFUNC(void, tlbie_all, (void));
 DEFINE_DUMPSYS_IFUNC(void, map_chunk, (vm_paddr_t, size_t, void **));
 DEFINE_DUMPSYS_IFUNC(void, unmap_chunk, (vm_paddr_t, size_t, void *));
 DEFINE_DUMPSYS_IFUNC(void, pa_init, (void));
-DEFINE_DUMPSYS_IFUNC(size_t, scan_pmap, (void));
+DEFINE_DUMPSYS_IFUNC(size_t, scan_pmap, (struct bitset *));
 DEFINE_DUMPSYS_IFUNC(void *, dump_pmap_init, (unsigned));
 DEFINE_DUMPSYS_IFUNC(void *, dump_pmap, (void *, void *, u_long *));
 

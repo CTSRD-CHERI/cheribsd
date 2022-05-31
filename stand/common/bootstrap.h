@@ -29,6 +29,7 @@
 #ifndef _BOOTSTRAP_H_
 #define	_BOOTSTRAP_H_
 
+#include <stand.h>
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/linker_set.h>
@@ -122,6 +123,14 @@ extern struct console *consoles[];
 void cons_probe(void);
 bool		cons_update_mode(bool);
 void		autoload_font(bool);
+
+extern int module_verbose;
+enum {
+	MODULE_VERBOSE_SILENT,		/* say nothing */
+	MODULE_VERBOSE_SIZE,		/* print name and size */
+	MODULE_VERBOSE_TWIDDLE,		/* show progress */
+	MODULE_VERBOSE_FULL,		/* all we have */
+};
 
 /*
  * Plug-and-play enumerator/configurator interface.
@@ -228,6 +237,12 @@ struct preloaded_file
 	size_t f_size;		/* file size */
 	struct kernel_module	*f_modules;	/* list of modules if any */
 	struct preloaded_file	*f_next;	/* next file */
+#ifdef __amd64__
+	bool			f_kernphys_relocatable;
+#endif
+#if defined(__i386__)
+	bool			f_tg_kernel_support;
+#endif
 };
 
 struct file_format
@@ -260,6 +275,9 @@ void file_addmetadata(struct preloaded_file *, int, size_t, void *);
 int file_addmodule(struct preloaded_file *, char *, int,
     struct kernel_module **);
 void file_removemetadata(struct preloaded_file *fp);
+int file_addbuf(const char *name, const char *type, size_t len, void *buf);
+int tslog_init(void);
+int tslog_publish(void);
 
 vm_offset_t build_font_module(vm_offset_t);
 
@@ -393,6 +411,9 @@ int nvstore_set_var(void *, int, const char *, void *, size_t);
 int nvstore_set_var_from_string(void *, const char *, const char *,
     const char *);
 int nvstore_unset_var(void *, const char *);
+
+/* common code to set currdev variable. */
+extern int mount_currdev(struct env_var *, int, const void *);
 
 #ifndef CTASSERT
 #define	CTASSERT(x)	_Static_assert(x, "compile-time assertion failed")

@@ -187,7 +187,7 @@ struct rtentry {
 	u_long		rt_expire;	/* lifetime for route, e.g. redirect */
 	struct rtentry	*rt_chain;	/* pointer to next rtentry to delete */
 	/* net epoch tracker */
-	struct epoch_context	rt_epoch_ctx __subobject_use_container_bounds;
+	struct epoch_context	rt_epoch_ctx;
 };
 
 /*

@@ -213,7 +213,7 @@ nhop_map_update(struct nhop_map *map, uint32_t idx, char *gw, char *ifname)
 		else
 			new_size = map->size * 2;
 		if (new_size <= idx)
-			new_size = roundup(idx + 1, 32);
+			new_size = roundup2(idx + 1, 32);
 
 		sz = new_size * (sizeof(struct nhop_entry));
 		if ((map->ptr = realloc(map->ptr, sz)) == NULL)
@@ -312,8 +312,10 @@ print_nhop_entry_sysctl(const char *name, struct rt_msghdr *rtm, struct nhop_ext
 
 	xo_emit("{t:refcount/%*lu} ", wid_refcnt, nh->nh_refcount);
 	if (Wflag && nh->prepend_len) {
-		char *prepend_hex = "AABBCCDDEE";
-		xo_emit(" {:nhop-prepend/%*s}", wid_prepend, prepend_hex);
+		int max_bytes = MIN(nh->prepend_len, sizeof(buffer) / 2 - 1);
+		for (int i = 0; i < max_bytes; i++)
+			snprintf(&buffer[i * 2], 3, "%02X", nh->nh_prepend[i]);
+		xo_emit(" {:nhop-prepend/%*s}", wid_prepend, buffer);
 	}
 
 	xo_emit("\n");

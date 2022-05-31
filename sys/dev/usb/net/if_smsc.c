@@ -1411,7 +1411,7 @@ smsc_chip_init(struct smsc_softc *sc)
 	reg_val &= ~SMSC_HW_CFG_RXDOFF;
 	reg_val |= (ETHER_ALIGN << 9) & SMSC_HW_CFG_RXDOFF;
 
-	/* The following setings are used for 'turbo mode', a.k.a multiple frames
+	/* The following settings are used for 'turbo mode', a.k.a multiple frames
 	 * per Rx transaction (again info taken form Linux driver).
 	 */
 	if (smsc_rx_packet_batching)
@@ -1641,11 +1641,11 @@ smsc_attach_post_sub(struct usb_ether *ue)
 
 	ifp->if_capenable = ifp->if_capabilities;
 
-	mtx_lock(&Giant);
+	bus_topo_lock();
 	error = mii_attach(ue->ue_dev, &ue->ue_miibus, ifp,
 	    uether_ifmedia_upd, ue->ue_methods->ue_mii_sts,
 	    BMSR_DEFCAPMASK, sc->sc_phyno, MII_OFFSET_ANY, 0);
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 
 	return (error);
 }

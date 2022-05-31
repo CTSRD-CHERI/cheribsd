@@ -1,8 +1,0 @@
-# Inherit base config
-include "MALTA64"
-
-ident MALTA64_BENCHMARK
-
-# Disable slow things
-include "std.BENCHMARK"
-

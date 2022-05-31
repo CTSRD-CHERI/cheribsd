@@ -27,7 +27,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd August 6, 2019
+.Dd October 20, 2021
 .Dt CAMCONTROL 8
 .Os
 .Sh NAME
@@ -365,6 +365,13 @@
 .Nm
 .Ic devtype
 .Op device id
+.Nm
+.Ic depop
+.Op device id
+.Op generic args
+.Ao Fl l | Fl d | Fl r Ac
+.Op Fl e Ar elem
+.Op Fl c Ar capacity
 .Nm
 .Ic help
 .Sh DESCRIPTION
@@ -1085,18 +1092,8 @@ to print out the tagged queueing related fields of the XPT_GDEV_TYPE CCB:
 This is the amount of capacity for transactions queued to a given device.
 .It dev_active
 This is the number of transactions currently queued to a device.
-.It devq_openings
-This is the kernel queue space for transactions.
-This count usually mirrors
-dev_openings except during error recovery operations when
-the device queue is frozen (device is not allowed to receive
-commands), the number of dev_openings is reduced, or transaction
-replay is occurring.
-.It devq_queued
-This is the number of transactions waiting in the kernel queue for capacity
-on the device.
-This number is usually zero unless error recovery is in
-progress.
+.It allocated
+This is the number of CCBs allocated for the device.
 .It held
 The held count is the number of CCBs held by peripheral drivers that have
 either just been completed or are about to be released to the transport
@@ -1806,7 +1803,7 @@ One of those two options is required.
 Persistent reservations are complex, and fully explaining them is outside
 the scope of this manual.
 Please visit
-http://www.t10.org
+https://www.t10.org
 and download the latest SPC spec for a full explanation of persistent
 reservations.
 .Bl -tag -width 8n
@@ -2593,6 +2590,60 @@ No device type reported
 Device type is unknown
 .It illegal
 A programming error occurred
+.El
+.It Ic depop
+Commands necessary to support the depopulation (depop) of defective elements of a device
+(typically heads for hard drives) or setting capacity point (typically used on
+flash drives).
+Issues either GET PHYSICAL ELEMENT STATUS, REMOVE ELEMENT AND TRUNCATE, or RESTORE
+ELEMENT AND REBUILD command to manage storage elements of a drive.
+Removal or restoration of elements may take up to a day to complete.
+One of the
+.Fl d ,
+.Fl l ,
+or
+.Fl r
+options must be specified.
+These options are mutually exclusive.
+Only SCSI drives are supported.
+Changing the storage elements of a storage drive may result in the loss of all
+data on that storage drive.
+The drive may need to reinitialize after
+.Fl d
+or
+.Fl r
+commands.
+The data on the drive is inaccessible until one of these commands complete.
+Once one of these commands start, the drive is format corrupt until the
+operation successfully completes.
+While format corrupt, no read or write I/O is possible to the drive.
+If the drive power cycles, it will remain format corrupt and the operation
+must be restarted.
+TEST UNIT READY or
+.Dq camcontrol tur
+can monitor an in-progress depop operation.
+.Bl -tag -width 6n
+.It Fl c Ar capacity
+Specify the desired capacity point for the drive.
+Valid only for the
+.Fl d
+flag.
+.It Fl d
+Remove the physical element from service or set the capacity point specified by the
+.Fl e
+or
+.Fl c
+flags.
+The drive's capacity may be reduced by this operation.
+.It Fl e Ar element
+Specify the physical element to remove from service.
+Valid only for the
+.Fl d
+flag.
+.It Fl l
+Report the current status of the physical elements of a drive.
+.It Fl r
+Restore all the eligible physical elements to service.
 .El
 .It Ic help
 Print out verbose usage information.

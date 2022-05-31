@@ -44,12 +44,15 @@ and its related utilities.
 During initialization,
 .Xr man 1
 reads the configuration files located at
-.Pa /usr/local/etc/man.d/*.conf
+.Pa /usr/local/etc/man.d/*.conf ,
+.Pa /usr/local64/etc/man.d/*.conf
 and
 .Pa /etc/man.conf .
 .Pp
 The files contained in
 .Pa /usr/local/etc/man.d/*.conf
+and
+.Pa /usr/local64/etc/man.d/*.conf
 are intended to be used by the
 .Xr ports 7
 system for extending the manual set to support additional paths and locales.
@@ -61,7 +64,9 @@ Currently supported configuration variables include:
 .It MANCONFIG
 Overrides the default location to import additional manual configuration files.
 Defaults to
-.Pa /usr/local/etc/man.d/*.conf .
+.Pa /usr/local/etc/man.d/*.conf
+and
+.Pa /usr/local64/etc/man.d/*.conf .
 .It MANPATH
 Adds the specified directory to the manual search path.
 .It MANLOCALE
@@ -88,11 +93,13 @@ section for how to use these variables.
 The parser used for this utility is very basic and only supports comment
 characters (#) at the beginning of a line.
 .Sh FILES
-.Bl -tag -width "Pa /usr/local/etc/man.d/*.conf" -compact
+.Bl -tag -width "Pa /usr/local64/etc/man.d/*.conf" -compact
 .It Pa /etc/man.conf
 System configuration file.
 .It Pa /usr/local/etc/man.d/*.conf
 Local configuration files.
+.It Pa /usr/local64/etc/man.d/*.conf
+Local configuration files for the hybrid ABI.
 .El
 .Sh EXAMPLES
 A perl port that needs to install additional manual pages outside of the

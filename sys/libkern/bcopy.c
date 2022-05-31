@@ -54,7 +54,6 @@ __FBSDID("$FreeBSD$");
 
 #undef memcpy
 #undef memmove
-#undef bcopy
 
 /*
  * sizeof(word) MUST BE A POWER OF TWO
@@ -174,13 +173,6 @@ memcpy(void *dst0, const void *src0, size_t length)
 
 __strong_reference(memcpy, memmove);
 
-void
-(bcopy)(const void *src0, void *dst0, size_t length)
-{
-
-	_memcpy(dst0, src0, length, true);
-}
-
 #if __has_feature(capabilities)
 void *
 memcpynocap(void *dst0, const void *src0, size_t length)
@@ -189,12 +181,6 @@ memcpynocap(void *dst0, const void *src0, size_t length)
 }
 
 __strong_reference(memcpynocap, memmovenocap);
-
-void
-bcopynocap(const void *src0, void *dst0, size_t length)
-{
-	_memcpy(dst0, src0, length, false);
-}
 #endif
 // CHERI CHANGES START
 // {

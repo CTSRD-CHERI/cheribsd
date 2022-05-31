@@ -37,10 +37,13 @@ description: |
         msm8994
         msm8996
         sc7180
+        sc7280
         sdm630
         sdm660
         sdm845
+        sdx55
         sm8250
+        sm8350
 
   The 'board' element must be one of the following strings:
 
@@ -135,6 +138,16 @@ properties:
           - const: qcom,msm8916
 
       - items:
+          - enum:
+              - sony,karin_windy
+              - sony,karin-row
+              - sony,satsuki-row
+              - sony,sumire-row
+              - sony,suzuran-row
+              - qcom,msm8994
+          - const: qcom,apq8094
+
+      - items:
           - const: qcom,msm8996-mtp
 
       - items:
@@ -164,11 +177,24 @@ properties:
 
       - items:
           - enum:
+              - qcom,sc7280-idp
+          - const: qcom,sc7280
+
+      - items:
+          - enum:
               - xiaomi,lavender
           - const: qcom,sdm660
 
       - items:
           - enum:
+              - qcom,sdx55-mtp
+              - qcom,sdx55-telit-fn980-tlb
+              - qcom,sdx55-t55
+          - const: qcom,sdx55
+
+      - items:
+          - enum:
+              - qcom,ipq6018-cp01
               - qcom,ipq6018-cp01-c1
           - const: qcom,ipq6018
 
@@ -177,6 +203,12 @@ properties:
               - qcom,qrb5165-rb5
               - qcom,sm8250-mtp
           - const: qcom,sm8250
+
+      - items:
+          - enum:
+              - qcom,sm8350-hdk
+              - qcom,sm8350-mtp
+          - const: qcom,sm8350
 
 additionalProperties: true
 

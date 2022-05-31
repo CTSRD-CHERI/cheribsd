@@ -1,6 +1,7 @@
 /*-
  * Copyright (c) 2012-2018, 2020 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
+ * Copyright (c) 2021 Microsoft Corp.
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -69,6 +70,12 @@
 } while (0)
 
 /*
+ * Convert a pointer to a null-derived void * with the same address. This is
+ * useful for getting the correct value for ccs_si_addr_expected.
+ */
+#define	NULL_DERIVED_VOIDP(x) ((void *)(uintptr_t)(ptraddr_t)(x))
+
+/*
  * Shared memory interface between tests and the test controller process.
  */
 #define	TESTRESULT_STR_LEN	1024
@@ -77,6 +84,7 @@ struct cheribsdtest_child_state {
 	int		ccs_signum;
 	int		ccs_si_code;
 	int		ccs_si_trapno;
+	void		*ccs_si_addr;
 #ifdef __mips__
 	register_t	ccs_cp2_cause;
 #endif
@@ -84,6 +92,7 @@ struct cheribsdtest_child_state {
 	/* Fields filled in by the test itself. */
 	int		ccs_testresult;
 	char		ccs_testresult_str[TESTRESULT_STR_LEN];
+	void		*ccs_si_addr_expected;
 };
 extern struct cheribsdtest_child_state *ccsp;
 
@@ -111,6 +120,7 @@ extern struct cheribsdtest_child_state *ccsp;
 #define	CT_FLAG_SI_CODE		0x00000200  /* Check signal si_code. */
 #define	CT_FLAG_SIGEXIT		0x00000400  /* Exits with uncaught signal;
 					       checks status signum. */
+#define	CT_FLAG_SI_ADDR		0x00000800  /* Check signal si_addr. */
 
 /*
  * Macros defined in one or more cheribsdtest_md.h to indicate the
@@ -192,6 +202,7 @@ void	cheribsdtest_failure_errc(int code, const char *msg, ...) __dead2
 void	cheribsdtest_failure_errx(const char *msg, ...) __dead2  __printflike(1, 2);
 void	cheribsdtest_success(void) __dead2;
 void	signal_handler_clear(int sig);
+void	cheribsdtest_set_expected_si_addr(void *addr);
 
 /**
  * Like CHERIBSDTEST_VERIFY but instead of printing condition details prints

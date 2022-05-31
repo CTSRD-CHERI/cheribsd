@@ -79,6 +79,8 @@ ef_reloc(struct elf_file *ef, const void *reldata, int reltype, Elf_Off relbase,
 		*((void * __capability *)where) = cheri_fromint(fragment[0] +
 		    relbase + addend);
 		break;
+	case R_MORELLO_CAPINIT:
+		break;
 #endif
 	default:
 		warnx("unhandled relocation type %lu", rtype);

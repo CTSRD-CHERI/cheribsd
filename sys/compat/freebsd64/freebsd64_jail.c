@@ -45,10 +45,10 @@ __FBSDID("$FreeBSD$");
 #include <compat/freebsd64/freebsd64_proto.h>
 
 struct jail64_v0 {
-	u_int32_t	version;
+	uint32_t	version;
 	uint64_t	path;
 	uint64_t	hostname;
-	u_int32_t	ip_number;
+	uint32_t	ip_number;
 };
 
 struct jail64 {

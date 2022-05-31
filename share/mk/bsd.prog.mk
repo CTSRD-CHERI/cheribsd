@@ -98,6 +98,9 @@ LDFLAGS+=	-Wl,--fatal-warnings
 .endif
 .endif
 
+# bsd.sanitizer.mk is not installed, so don't require it (e.g. for ports).
+.sinclude "bsd.sanitizer.mk"
+
 .if ${MACHINE_CPUARCH} == "riscv" && ${LINKER_FEATURES:Mriscv-relaxations} == ""
 CFLAGS += -mno-relax
 .endif
@@ -107,7 +110,11 @@ CFLAGS+=${CRUNCH_CFLAGS}
 .else
 .if ${MK_DEBUG_FILES} != "no" && empty(DEBUG_FLAGS:M-g) && \
     empty(DEBUG_FLAGS:M-gdwarf-*)
+.if !${COMPILER_FEATURES:Mcompressed-debug}
+CFLAGS+= ${DEBUG_FILES_CFLAGS:N-gz*}
+.else
 CFLAGS+= ${DEBUG_FILES_CFLAGS}
+.endif
 CTFFLAGS+= -g
 .endif
 .endif
@@ -125,11 +132,6 @@ TAG_ARGS=	-T ${TAGS:[*]:S/ /,/g}
 
 .if defined(NO_SHARED) && ${NO_SHARED:tl} != "no"
 LDFLAGS+= -static
-.endif
-
-# clang currently defaults to dynamic TLS for mips64 binaries
-.if ${MACHINE_ARCH:Mmips64*} && ${COMPILER_TYPE} == "clang"
-CFLAGS+= -ftls-model=initial-exec
 .endif
 
 .if ${MK_DEBUG_FILES} != "no"
@@ -260,7 +262,12 @@ MAN1=	${MAN}
 .if defined(_SKIP_BUILD)
 all:
 .else
+.if target(afterbuild)
+.ORDER: ${PROG_INSTALL} afterbuild
+all: ${PROG_INSTALL} ${SCRIPTS} afterbuild
+.else
 all: ${PROG_INSTALL} ${SCRIPTS}
+.endif
 .if ${MK_MAN} != "no"
 all: all-man
 .endif

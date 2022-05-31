@@ -303,7 +303,7 @@ pmclog_get_event(void *cookie, char **data, ssize_t *len,
 
 #define	PMCLOG_GET_CALLCHAIN_SIZE(SZ,E) do {				\
 		(SZ) = ((E) - offsetof(struct pmclog_callchain, pl_pc))	\
-			/ sizeof(uintfptr_t);				\
+			/ sizeof(ptraddr_t);				\
 	} while (0);
 
 	switch (ev->pl_type = PMCLOG_HEADER_TO_TYPE(h)) {

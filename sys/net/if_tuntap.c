@@ -1044,7 +1044,7 @@ tunopen(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	struct ifnet	*ifp;
 	struct tuntap_softc *tp;
-	int error, tunflags;
+	int error __diagused, tunflags;
 
 	tunflags = 0;
 	CURVNET_SET(TD_TO_VNET(td));
@@ -1404,7 +1404,7 @@ tunoutput(struct ifnet *ifp, struct mbuf *m0, const struct sockaddr *dst,
 	if (dst->sa_family == AF_UNSPEC)
 		bcopy(dst->sa_data, &af, sizeof(af));
 	else
-		af = dst->sa_family;
+		af = RO_GET_FAMILY(ro, dst);
 
 	if (bpf_peers_present(ifp->if_bpf))
 		bpf_mtap2(ifp->if_bpf, &af, sizeof(af), m0);

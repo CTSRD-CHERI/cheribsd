@@ -39,14 +39,13 @@ The
 kernel configuration can be used to compile a KASAN-enabled kernel using
 .Pa GENERIC
 as a base configuration.
-Alternately, to compile
-.Nm
-into the kernel, place the following line in your
+Alternately, to compile KASAN into the kernel, place the following line in your
 kernel configuration file:
 .Bd -ragged -offset indent
 .Cd "options KASAN"
 .Ed
 .Pp
+.In sys/asan.h
 .Ft void
 .Fn kasan_mark "const void *addr" "size_t size" "size_t redzsize" "uint8_t code"
 .Sh DESCRIPTION
@@ -150,6 +149,7 @@ are equal,
 should be 0.
 .Sh SEE ALSO
 .Xr build 7 ,
+.Xr KMSAN 9 ,
 .Xr malloc 9 ,
 .Xr memguard 9 ,
 .Xr redzone 9 ,

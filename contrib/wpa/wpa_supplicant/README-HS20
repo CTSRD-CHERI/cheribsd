@@ -78,7 +78,7 @@ hs20=1
 
 # Parameters for controlling scanning
 
-# Homogenous ESS identifier
+# Homogeneous ESS identifier
 # If this is set, scans will be used to request response only from BSSes
 # belonging to the specified Homogeneous ESS. This is used only if interworking
 # is enabled.
@@ -285,6 +285,12 @@ Credentials can be pre-configured for automatic network selection:
 #	2 = require valid OCSP stapling response
 #
 # sim_num: Identifier for which SIM to use in multi-SIM devices
+#
+# engine: Whether to use an engine for private key operations (0/1)
+# engine_id: String identifying the engine to use
+# ca_cert_id: The CA certificate identifier when using an engine
+# cert_id: The certificate identifier when using an engine
+# key_id: The private key identifier when using an engine
 #
 # for example:
 #

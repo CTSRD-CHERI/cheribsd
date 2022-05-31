@@ -394,7 +394,7 @@ struct musb_otg_ep_cfg {
 };
 
 struct musbotg_softc {
-	struct usb_bus sc_bus;
+	struct usb_bus sc_bus __subobject_member_used_for_c_inheritance;
 	union musbotg_hub_temp sc_hub_temp;
 	struct usb_hw_ep_profile sc_hw_ep_profile[MUSB2_EP_MAX];
 

@@ -158,10 +158,9 @@ extern struct pmap	kernel_pmap_store;
 #define	ASID_RESERVED_FOR_PID_0	0
 #define	ASID_RESERVED_FOR_EFI	1
 #define	ASID_FIRST_AVAILABLE	(ASID_RESERVED_FOR_EFI + 1)
-#define	ASID_TO_OPERAND_SHIFT	48
 #define	ASID_TO_OPERAND(asid)	({					\
 	KASSERT((asid) != -1, ("invalid ASID"));			\
-	(uint64_t)(asid) << ASID_TO_OPERAND_SHIFT;			\
+	(uint64_t)(asid) << TTBR_ASID_SHIFT;			\
 })
 
 extern vm_pointer_t virtual_avail;
@@ -174,9 +173,12 @@ extern vm_pointer_t virtual_end;
 #define	L1_MAPPABLE_P(va, pa, size)					\
 	((((va) | (pa)) & L1_OFFSET) == 0 && (size) >= L1_SIZE)
 
+#define	pmap_vm_page_alloc_check(m)
+
 void	pmap_activate_vm(pmap_t);
 void	pmap_bootstrap(vm_pointer_t, vm_pointer_t, vm_paddr_t, vm_size_t);
 int	pmap_change_attr(vm_offset_t va, vm_size_t size, int mode);
+int	pmap_change_prot(vm_offset_t va, vm_size_t size, vm_prot_t prot);
 void	pmap_kenter(vm_offset_t sva, vm_size_t size, vm_paddr_t pa, int mode);
 void	pmap_kenter_device(vm_offset_t, vm_size_t, vm_paddr_t);
 bool	pmap_klookup(vm_offset_t va, vm_paddr_t *pa);
@@ -202,7 +204,7 @@ bool	pmap_get_tables(pmap_t, vm_offset_t, pd_entry_t **, pd_entry_t **,
 
 int	pmap_fault(pmap_t, uint64_t, uint64_t);
 
-struct pcb *pmap_switch(struct thread *, struct thread *);
+struct pcb *pmap_switch(struct thread *);
 
 extern void (*pmap_clean_stage2_tlbi)(void);
 extern void (*pmap_invalidate_vpipt_icache)(void);

@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
+#include <sys/fcntl.h>
 #include <sys/ioccom.h>
 #include <sys/poll.h>
 #include <sys/proc.h>
@@ -152,6 +153,14 @@ freebsd64_ioctl(struct thread *td, struct freebsd64_ioctl_args *uap)
 		udata = __USER_CAP(uap->data, IOCPARM_LEN(com));
 
 	return (user_ioctl(td, uap->fd, com, udata, &uap->data, 0));
+}
+
+int
+freebsd64_fspacectl(struct thread *td, struct freebsd64_fspacectl_args *uap)
+{
+	return (user_fspacectl(td, uap->fd, uap->cmd,
+	    (const void * __capability)__USER_CAP_OBJ(uap->rqsr), uap->flags,
+	    __USER_CAP_OBJ(uap->rmsr)));
 }
 
 int

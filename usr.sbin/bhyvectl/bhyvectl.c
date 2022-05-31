@@ -33,10 +33,13 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/types.h>
-#include <sys/sysctl.h>
+#include <sys/cpuset.h>
 #include <sys/errno.h>
 #include <sys/mman.h>
-#include <sys/cpuset.h>
+#include <sys/nv.h>
+#include <sys/socket.h>
+#include <sys/sysctl.h>
+#include <sys/un.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -56,9 +59,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/vmm.h>
 #include <machine/vmm_dev.h>
 #include <vmmapi.h>
-
-#include <sys/socket.h>
-#include <sys/un.h>
 
 #include "amd/vmcb.h"
 #include "intel/vmcs.h"
@@ -1684,10 +1684,9 @@ show_memseg(struct vmctx *ctx)
 
 #ifdef BHYVE_SNAPSHOT
 static int
-send_checkpoint_op_req(struct vmctx *ctx, struct checkpoint_op *op)
+send_message(struct vmctx *ctx, nvlist_t *nvl)
 {
 	struct sockaddr_un addr;
-	ssize_t len_sent;
 	int err, socket_fd;
 	char vmname_buf[MAX_VMNAME];
 
@@ -1709,13 +1708,15 @@ send_checkpoint_op_req(struct vmctx *ctx, struct checkpoint_op *op)
 
 	snprintf(addr.sun_path, sizeof(addr.sun_path), "%s%s", BHYVE_RUN_DIR, vmname_buf);
 
-	len_sent = sendto(socket_fd, op, sizeof(*op), 0,
-	    (struct sockaddr *)&addr, sizeof(struct sockaddr_un));
-
-	if (len_sent < 0) {
-		perror("Failed to send message to bhyve vm");
-		err = -1;
+	if (connect(socket_fd, (struct sockaddr *)&addr, SUN_LEN(&addr)) != 0) {
+		perror("connect() failed");
+		err = errno;
+		goto done;
 	}
+
+	if (nvlist_send(socket_fd, nvl) < 0)
+		perror("nvlist_send() failed");
+	nvlist_destroy(nvl);
 
 done:
 	if (socket_fd > 0)
@@ -1724,14 +1725,16 @@ done:
 }
 
 static int
-snapshot_request(struct vmctx *ctx, const char *file, enum ipc_opcode code)
+snapshot_request(struct vmctx *ctx, const char *file, bool suspend)
 {
-	struct checkpoint_op op;
+	nvlist_t *nvl;
 
-	op.op = code;
-	strlcpy(op.snapshot_filename, file, MAX_SNAPSHOT_FILENAME);
+	nvl = nvlist_create(0);
+	nvlist_add_string(nvl, "cmd", "checkpoint");
+	nvlist_add_string(nvl, "filename", file);
+	nvlist_add_bool(nvl, "suspend", suspend);
 
-	return (send_checkpoint_op_req(ctx, &op));
+	return (send_message(ctx, nvl));
 }
 #endif
 
@@ -2395,10 +2398,10 @@ main(int argc, char *argv[])
 
 #ifdef BHYVE_SNAPSHOT
 	if (!error && vm_checkpoint_opt)
-		error = snapshot_request(ctx, checkpoint_file, START_CHECKPOINT);
+		error = snapshot_request(ctx, checkpoint_file, false);
 
 	if (!error && vm_suspend_opt)
-		error = snapshot_request(ctx, suspend_file, START_SUSPEND);
+		error = snapshot_request(ctx, suspend_file, true);
 #endif
 
 	free (opts);

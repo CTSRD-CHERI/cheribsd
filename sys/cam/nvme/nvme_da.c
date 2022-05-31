@@ -375,10 +375,8 @@ ndaioctl(struct disk *dp, u_long cmd, void *data, int fflag,
     struct thread *td)
 {
 	struct cam_periph *periph;
-	struct nda_softc *softc;
 
 	periph = (struct cam_periph *)dp->d_drv1;
-	softc = (struct nda_softc *)periph->softc;
 
 	switch (cmd) {
 	case NVME_IO_TEST:
@@ -932,10 +930,12 @@ ndaregister(struct cam_periph *periph, void *arg)
 	 * d_ident and d_descr are both far bigger than the length of either
 	 *  the serial or model number strings.
 	 */
-	cam_strvis(disk->d_descr, cd->mn,
-	    NVME_MODEL_NUMBER_LENGTH, sizeof(disk->d_descr));
-	cam_strvis(disk->d_ident, cd->sn,
-	    NVME_SERIAL_NUMBER_LENGTH, sizeof(disk->d_ident));
+	cam_strvis_flag(disk->d_descr, cd->mn, NVME_MODEL_NUMBER_LENGTH,
+	    sizeof(disk->d_descr), CAM_STRVIS_FLAG_NONASCII_SPC);
+
+	cam_strvis_flag(disk->d_ident, cd->sn, NVME_SERIAL_NUMBER_LENGTH,
+	    sizeof(disk->d_ident), CAM_STRVIS_FLAG_NONASCII_SPC);
+
 	disk->d_hba_vendor = cpi.hba_vendor;
 	disk->d_hba_device = cpi.hba_device;
 	disk->d_hba_subvendor = cpi.hba_subvendor;
@@ -1269,11 +1269,13 @@ ndadone(struct cam_periph *periph, union ccb *done_ccb)
 static int
 ndaerror(union ccb *ccb, u_int32_t cam_flags, u_int32_t sense_flags)
 {
+#ifdef CAM_IO_STATS
 	struct nda_softc *softc;
 	struct cam_periph *periph;
 
 	periph = xpt_path_periph(ccb->ccb_h.path);
 	softc = (struct nda_softc *)periph->softc;
+#endif
 
 	switch (ccb->ccb_h.status & CAM_STATUS_MASK) {
 	case CAM_CMD_TIMEOUT:

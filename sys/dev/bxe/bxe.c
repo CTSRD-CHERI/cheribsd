@@ -2767,7 +2767,7 @@ bxe_tpa_start(struct bxe_softc            *sc,
     struct bxe_sw_rx_bd tmp_bd;
     struct bxe_sw_rx_bd *rx_buf;
     struct eth_rx_bd *rx_bd;
-    int max_agg_queues;
+    int max_agg_queues __diagused;
     struct bxe_sw_tpa_info *tpa_info = &fp->rx_tpa_info[queue];
     uint16_t index;
 
@@ -4794,9 +4794,7 @@ bxe_chktso_window(struct bxe_softc  *sc,
     uint32_t num_wnds, wnd_size, wnd_sum;
     int32_t frag_idx, wnd_idx;
     unsigned short lso_mss;
-    int defrag;
 
-    defrag = 0;
     wnd_sum = 0;
     wnd_size = 10;
     num_wnds = nsegs - wnd_size;
@@ -5675,7 +5673,7 @@ bxe_tx_mq_start_locked(struct bxe_softc    *sc,
     }
 
     /* fetch the depth of the driver queue */
-    depth = drbr_inuse_drv(ifp, tx_br);
+    depth = drbr_inuse(ifp, tx_br);
     if (depth > fp->eth_q_stats.tx_max_drbr_queue_depth) {
         fp->eth_q_stats.tx_max_drbr_queue_depth = depth;
     }
@@ -6084,10 +6082,7 @@ bxe_alloc_mem(struct bxe_softc *sc)
 static void
 bxe_free_rx_bd_chain(struct bxe_fastpath *fp)
 {
-    struct bxe_softc *sc;
     int i;
-
-    sc = fp->sc;
 
     if (fp->rx_mbuf_tag == NULL) {
         return;
@@ -6146,10 +6141,7 @@ bxe_free_tpa_pool(struct bxe_fastpath *fp)
 static void
 bxe_free_sge_chain(struct bxe_fastpath *fp)
 {
-    struct bxe_softc *sc;
     int i;
-
-    sc = fp->sc;
 
     if (fp->rx_sge_mbuf_tag == NULL) {
         return;
@@ -16088,19 +16080,19 @@ bxe_add_sysctls(struct bxe_softc *sc)
                     "rx processing budget");
 
     SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "pause_param",
-        CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+        CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE, sc, 0,
         bxe_sysctl_pauseparam, "IU",
         "need pause frames- DEF:0/TX:1/RX:2/BOTH:3/AUTO:4/AUTOTX:5/AUTORX:6/AUTORXTX:7/NONE:8");
 
 
     SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "state",
-        CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+        CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE, sc, 0,
         bxe_sysctl_state, "IU", "dump driver state");
 
     for (i = 0; i < BXE_NUM_ETH_STATS; i++) {
         SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
             bxe_eth_stats_arr[i].string,
-            CTLTYPE_U64 | CTLFLAG_RD | CTLFLAG_NEEDGIANT, sc, i,
+            CTLTYPE_U64 | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, i,
             bxe_sysctl_eth_stat, "LU", bxe_eth_stats_arr[i].string);
     }
 
@@ -16120,7 +16112,7 @@ bxe_add_sysctls(struct bxe_softc *sc)
             q_stat = ((i << 16) | j);
             SYSCTL_ADD_PROC(ctx, queue_children, OID_AUTO,
                  bxe_eth_q_stats_arr[j].string,
-                 CTLTYPE_U64 | CTLFLAG_RD | CTLFLAG_NEEDGIANT, sc, q_stat,
+                 CTLTYPE_U64 | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, q_stat,
                  bxe_sysctl_eth_q_stat, "LU", bxe_eth_q_stats_arr[j].string);
         }
     }
@@ -16245,7 +16237,7 @@ bxe_attach(device_t dev)
     bxe_init_mutexes(sc);
 
     /* prepare the periodic callout */
-    callout_init(&sc->periodic_callout, 0);
+    callout_init(&sc->periodic_callout, 1);
 
     /* prepare the chip taskqueue */
     sc->chip_tq_flags = CHIP_TQ_NONE;
@@ -17179,7 +17171,7 @@ bxe_init_hw_common(struct bxe_softc *sc)
  *          stay set)
  *      f.  If this is VNIC 3 of a port then also init
  *          first_timers_ilt_entry to zero and last_timers_ilt_entry
- *          to the last enrty in the ILT.
+ *          to the last entry in the ILT.
  *
  *      Notes:
  *      Currently the PF error in the PGLC is non recoverable.
@@ -19288,7 +19280,6 @@ bxe_eioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 {
     struct bxe_softc    *sc;
     int                 rval = 0;
-    device_t            pci_dev;
     bxe_grcdump_t       *dump = NULL;
     int grc_dump_size;
     bxe_drvinfo_t   *drv_infop = NULL;
@@ -19302,8 +19293,6 @@ bxe_eioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
     if ((sc = (struct bxe_softc *)dev->si_drv1) == NULL)
         return ENXIO;
-
-    pci_dev= sc->dev;
 
     dump = (bxe_grcdump_t *)data;
 

@@ -236,10 +236,7 @@ iaf_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	if (ri < 0 || ri > core_iaf_npmc)
 		return (EINVAL);
 
-	caps = a->pm_caps;
-
-	if (a->pm_class != PMC_CLASS_IAF ||
-	    (caps & IAF_PMC_CAPS) != caps)
+	if (a->pm_class != PMC_CLASS_IAF)
 		return (EINVAL);
 
 	iap = &a->pm_md.pm_iap;
@@ -261,8 +258,8 @@ iaf_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	if ((cpu_stdext_feature3 & CPUID_STDEXT3_TSXFA) != 0 &&
 	    !pmc_tsx_force_abort_set) {
 		pmc_tsx_force_abort_set = true;
-		x86_msr_op(MSR_TSX_FORCE_ABORT, MSR_OP_RENDEZVOUS |
-		    MSR_OP_WRITE, 1);
+		x86_msr_op(MSR_TSX_FORCE_ABORT, MSR_OP_RENDEZVOUS_ALL |
+		    MSR_OP_WRITE, 1, NULL);
 	}
 
 	flags = 0;
@@ -275,6 +272,7 @@ iaf_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	if (config & IAP_INT)
 		flags |= IAF_PMI;
 
+	caps = a->pm_caps;
 	if (caps & PMC_CAP_INTERRUPT)
 		flags |= IAF_PMI;
 	if (caps & PMC_CAP_SYSTEM)
@@ -403,8 +401,8 @@ iaf_release_pmc(int cpu, int ri, struct pmc *pmc)
 	MPASS(pmc_alloc_refs > 0);
 	if (pmc_alloc_refs-- == 1 && pmc_tsx_force_abort_set) {
 		pmc_tsx_force_abort_set = false;
-		x86_msr_op(MSR_TSX_FORCE_ABORT, MSR_OP_RENDEZVOUS |
-		    MSR_OP_WRITE, 0);
+		x86_msr_op(MSR_TSX_FORCE_ABORT, MSR_OP_RENDEZVOUS_ALL |
+		    MSR_OP_WRITE, 0, NULL);
 	}
 
 	return (0);
@@ -741,9 +739,7 @@ static int
 iap_allocate_pmc(int cpu, int ri, struct pmc *pm,
     const struct pmc_op_pmcallocate *a)
 {
-	enum pmc_event map;
 	uint8_t ev;
-	uint32_t caps;
 	const struct pmc_md_iap_op_pmcallocate *iap;
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
@@ -751,11 +747,9 @@ iap_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	KASSERT(ri >= 0 && ri < core_iap_npmc,
 	    ("[core,%d] illegal row-index value %d", __LINE__, ri));
 
-	/* check requested capabilities */
-	caps = a->pm_caps;
-	if ((IAP_PMC_CAPS & caps) != caps)
-		return (EPERM);
-	map = 0;	/* XXX: silent GCC warning */
+	if (a->pm_class != PMC_CLASS_IAP)
+		return (EINVAL);
+
 	iap = &a->pm_md.pm_iap;
 	ev = IAP_EVSEL_GET(iap->pm_iap_config);
 
@@ -767,6 +761,8 @@ iap_allocate_pmc(int cpu, int ri, struct pmc *pm,
 		break;
 	case PMC_CPU_INTEL_SKYLAKE:
 	case PMC_CPU_INTEL_SKYLAKE_XEON:
+	case PMC_CPU_INTEL_ICELAKE:
+	case PMC_CPU_INTEL_ICELAKE_XEON:
 	case PMC_CPU_INTEL_BROADWELL:
 	case PMC_CPU_INTEL_BROADWELL_XEON:
 	case PMC_CPU_INTEL_SANDYBRIDGE:
@@ -961,7 +957,7 @@ iap_start_pmc(int cpu, int ri)
 static int
 iap_stop_pmc(int cpu, int ri)
 {
-	struct pmc *pm;
+	struct pmc *pm __diagused;
 	struct core_cpu *cc;
 	uint64_t msr;
 
@@ -985,7 +981,6 @@ iap_stop_pmc(int cpu, int ri)
 	if (core_cputype == PMC_CPU_INTEL_CORE)
 		return (0);
 
-	msr = 0;
 	do {
 		cc->pc_resync = 0;
 		cc->pc_globalctrl &= ~(1ULL << ri);
@@ -1078,7 +1073,7 @@ core_intr(struct trapframe *tf)
 	int error, found_interrupt, ri;
 	uint64_t msr;
 
-	PMCDBG3(MDP,INT, 1, "cpu=%d tf=0x%p um=%d", curcpu, (void *) tf,
+	PMCDBG3(MDP,INT, 1, "cpu=%d tf=%p um=%d", curcpu, (void *) tf,
 	    TRAPF_USERMODE(tf));
 
 	found_interrupt = 0;
@@ -1270,7 +1265,7 @@ pmc_core_initialize(struct pmc_mdep *md, int maxcpu, int version_override)
 	PMCDBG3(MDP,INI,1,"core-init cputype=%d ncpu=%d ipa-version=%d",
 	    core_cputype, maxcpu, ipa_version);
 
-	if (ipa_version < 1 || ipa_version > 4 ||
+	if (ipa_version < 1 || ipa_version > 5 ||
 	    (core_cputype != PMC_CPU_INTEL_CORE && ipa_version == 1)) {
 		/* Unknown PMC architecture. */
 		printf("hwpc_core: unknown PMC architecture: %d\n",

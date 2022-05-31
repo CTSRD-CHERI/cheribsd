@@ -1,8 +1,0 @@
-# Inherit base config
-include "MALTA64_MFS_ROOT"
-
-ident MALTA64_MFS_ROOT_BENCHMARK
-
-# Disable slow things
-include "std.BENCHMARK"
-

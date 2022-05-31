@@ -258,13 +258,11 @@ nvme_probe_start(struct cam_periph *periph, union ccb *start_ccb)
 {
 	struct ccb_nvmeio *nvmeio;
 	nvme_probe_softc *softc;
-	struct cam_path *path;
 	lun_id_t lun;
 
 	CAM_DEBUG(start_ccb->ccb_h.path, CAM_DEBUG_TRACE, ("nvme_probe_start\n"));
 
 	softc = (nvme_probe_softc *)periph->softc;
-	path = start_ccb->ccb_h.path;
 	nvmeio = &start_ccb->nvmeio;
 	lun = xpt_path_lun_id(periph->path);
 
@@ -312,7 +310,6 @@ nvme_probe_done(struct cam_periph *periph, union ccb *done_ccb)
 	struct cam_path *path;
 	struct scsi_vpd_device_id *did;
 	struct scsi_vpd_id_descriptor *idd;
-	cam_status status;
 	u_int32_t  priority;
 	int found = 1, e, g, len;
 
@@ -335,7 +332,6 @@ out:
 			/* Don't wedge the queue */
 			xpt_release_devq(path, /*count*/1, /*run_queue*/TRUE);
 		}
-		status = done_ccb->ccb_h.status & CAM_STATUS_MASK;
 
 		/*
 		 * If we get to this point, we got an error status back
@@ -380,8 +376,11 @@ device_fail:	if ((path->device->flags & CAM_DEV_UNCONFIGURED) == 0)
 		path->device->serial_num = (u_int8_t *)
 		    malloc(NVME_SERIAL_NUMBER_LENGTH + 1, M_CAMXPT, M_NOWAIT);
 		if (path->device->serial_num != NULL) {
-			cam_strvis(path->device->serial_num, nvme_cdata->sn,
-			    NVME_SERIAL_NUMBER_LENGTH, NVME_SERIAL_NUMBER_LENGTH + 1);
+			cam_strvis_flag(path->device->serial_num,
+			    nvme_cdata->sn, sizeof(nvme_cdata->sn),
+			    NVME_SERIAL_NUMBER_LENGTH + 1,
+			    CAM_STRVIS_FLAG_NONASCII_SPC);
+
 			path->device->serial_num_len =
 			    strlen(path->device->serial_num);
 		}
@@ -683,9 +682,11 @@ nvme_dev_advinfo(union ccb *start_ccb)
 		break;
 	case CDAI_TYPE_PHYS_PATH:
 		if (cdai->flags & CDAI_FLAG_STORE) {
-			if (device->physpath != NULL)
+			if (device->physpath != NULL) {
 				free(device->physpath, M_CAMXPT);
-			device->physpath_len = cdai->bufsiz;
+				device->physpath = NULL;
+				device->physpath_len = 0;
+			}
 			/* Clear existing buffer if zero length */
 			if (cdai->bufsiz == 0)
 				break;
@@ -694,6 +695,7 @@ nvme_dev_advinfo(union ccb *start_ccb)
 				start_ccb->ccb_h.status = CAM_REQ_ABORTED;
 				return;
 			}
+			device->physpath_len = cdai->bufsiz;
 			memcpy(device->physpath, cdai->buf, cdai->bufsiz);
 		} else {
 			cdai->provsiz = device->physpath_len;

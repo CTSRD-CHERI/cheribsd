@@ -34,9 +34,35 @@
 #ifndef	_MACHINE_PROC_H_
 #define	_MACHINE_PROC_H_
 
+struct ptrauth_key {
+	uint64_t pa_key_lo;
+	uint64_t pa_key_hi;
+};
+
 struct mdthread {
 	int	md_spinlock_count;	/* (k) */
 	register_t md_saved_daif;	/* (k) */
+	uintptr_t md_canary;
+
+	/*
+	 * The pointer authentication keys. These are shared within a process,
+	 * however this may change for some keys as the PAuth ABI Extension to
+	 * ELF for the Arm 64-bit Architecture [1] is currently (July 2021) at
+	 * an Alpha release quality so may change.
+	 *
+	 * [1] https://github.com/ARM-software/abi-aa/blob/main/pauthabielf64/pauthabielf64.rst
+	 */
+	struct {
+		struct ptrauth_key apia;
+		struct ptrauth_key apib;
+		struct ptrauth_key apda;
+		struct ptrauth_key apdb;
+		struct ptrauth_key apga;
+	} md_ptrauth_user;
+
+	struct {
+		struct ptrauth_key apia;
+	} md_ptrauth_kern;
 };
 
 struct mdproc {
@@ -54,13 +80,6 @@ struct mdproc {
 #endif
 #define	KINFO_PROC32_SIZE 816
 
-#define	MAXARGS		8
-struct syscall_args {
-	u_int code;
-	struct sysent *callp;
-	syscallarg_t args[MAXARGS];
-};
-
 #ifdef _KERNEL
 
 #include <machine/pcb.h>
@@ -68,9 +87,7 @@ struct syscall_args {
 #define	GET_STACK_USAGE(total, used) do {				\
 	struct thread *td = curthread;					\
 	(total) = td->td_kstack_pages * PAGE_SIZE - sizeof(struct pcb);	\
-	(used) = (char *)td->td_kstack +				\
-	    td->td_kstack_pages * PAGE_SIZE -				\
-	    (char *)&td;						\
+	(used) = td->td_kstack + (total) - (vm_offset_t)&td;		\
 } while (0)
 
 #endif

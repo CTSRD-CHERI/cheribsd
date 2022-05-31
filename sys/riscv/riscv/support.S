@@ -92,7 +92,7 @@ END(fsu_fault)
  */
 ENTRY(casueword32)
 	li	a4, (VM_MAXUSER_ADDRESS-3)
-	bgt	a0, a4, fsu_fault_nopcb
+	bgeu	a0, a4, fsu_fault_nopcb
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca4)	/* And set it */
@@ -134,7 +134,7 @@ END(casueword32)
  */
 ENTRY(casueword)
 	li	a4, (VM_MAXUSER_ADDRESS-7)
-	bgt	a0, a4, fsu_fault_nopcb
+	bgeu	a0, a4, fsu_fault_nopcb
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca4)	/* And set it */
@@ -176,7 +176,7 @@ END(casueword)
  */
 ENTRY(fubyte)
 	li	a1, VM_MAXUSER_ADDRESS
-	bgt	a0, a1, fsu_fault_nopcb
+	bgeu	a0, a1, fsu_fault_nopcb
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca1)	/* And set it */
@@ -204,7 +204,7 @@ END(fubyte)
  */
 ENTRY(fuword16)
 	li	a1, (VM_MAXUSER_ADDRESS-1)
-	bgt	a0, a1, fsu_fault_nopcb
+	bgeu	a0, a1, fsu_fault_nopcb
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca1)	/* And set it */
@@ -232,7 +232,7 @@ END(fuword16)
  */
 ENTRY(fueword32)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
-	bgt	a0, a2, fsu_fault_nopcb
+	bgeu	a0, a2, fsu_fault_nopcb
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
@@ -265,7 +265,7 @@ END(fueword32)
 ENTRY(fueword)
 EENTRY(fueword64)
 	li	a2, (VM_MAXUSER_ADDRESS-7)
-	bgt	a0, a2, fsu_fault_nopcb
+	bgeu	a0, a2, fsu_fault_nopcb
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
@@ -298,7 +298,7 @@ END(fueword)
  */
 ENTRY(fuecap)
 	li	a2, (VM_MAXUSER_ADDRESS-7)
-	bgt	a0, a2, fsu_fault_nopcb
+	bgeu	a0, a2, fsu_fault_nopcb
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
@@ -326,7 +326,7 @@ END(fuecap)
  */
 ENTRY(subyte)
 	li	a2, VM_MAXUSER_ADDRESS
-	bgt	a0, a2, fsu_fault_nopcb
+	bgeu	a0, a2, fsu_fault_nopcb
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
@@ -355,7 +355,7 @@ END(subyte)
  */
 ENTRY(suword16)
 	li	a2, (VM_MAXUSER_ADDRESS-1)
-	bgt	a0, a2, fsu_fault_nopcb
+	bgeu	a0, a2, fsu_fault_nopcb
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
@@ -384,7 +384,7 @@ END(suword16)
  */
 ENTRY(suword32)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
-	bgt	a0, a2, fsu_fault_nopcb
+	bgeu	a0, a2, fsu_fault_nopcb
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
@@ -414,7 +414,7 @@ END(suword32)
 ENTRY(suword)
 EENTRY(suword64)
 	li	a2, (VM_MAXUSER_ADDRESS-7)
-	bgt	a0, a2, fsu_fault_nopcb
+	bgeu	a0, a2, fsu_fault_nopcb
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
@@ -445,7 +445,7 @@ END(suword)
  */
 ENTRY(sucap)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
-	bgt	a0, a2, fsu_fault_nopcb
+	bgeu	a0, a2, fsu_fault_nopcb
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */

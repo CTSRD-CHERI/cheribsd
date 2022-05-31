@@ -1,9 +1,0 @@
-# CHERI_PURECAP_MALTA64 -- 64-bit purecap ABI kernel config for MALTA boards + 128-bit CHERI purecap kernel
-#
-# $FreeBSD$
-
-include		"std.MALTA"
-include		"CHERI_PURECAP_MALTA64"
-ident		CHERI_PURECAP_MALTA64_MFS_ROOT
-
-include   "std.MFS_ROOT"

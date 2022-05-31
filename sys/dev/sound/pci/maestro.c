@@ -1716,8 +1716,8 @@ dma_malloc(bus_dma_tag_t dmat, u_int32_t sz, bus_addr_t *phys,
 
 	if (bus_dmamem_alloc(dmat, &buf, BUS_DMA_NOWAIT, map))
 		return NULL;
-	if (bus_dmamap_load(dmat, *map, buf, sz, setmap, phys, 0) != 0 ||
-	    *phys == 0) {
+	if (bus_dmamap_load(dmat, *map, buf, sz, setmap, phys,
+	    BUS_DMA_NOWAIT) != 0 || *phys == 0) {
 		bus_dmamem_free(dmat, buf, *map);
 		return NULL;
 	}
@@ -1776,11 +1776,6 @@ agg_attach(device_t dev)
 
 	mtx_init(&ess->lock, device_get_desc(dev), "snd_maestro softc",
 		 MTX_DEF | MTX_RECURSE);
-	if (!mtx_initialized(&ess->lock)) {
-		device_printf(dev, "failed to create a mutex.\n");
-		ret = ENOMEM;
-		goto bad;
-	}
 
 	if (resource_int_value(device_get_name(dev), device_get_unit(dev),
 	    "dac", &dacn) == 0) {
@@ -1798,7 +1793,7 @@ agg_attach(device_t dev)
 			       /*filter*/ NULL, NULL,
 			       /*size  */ ess->bufsz, 1, 0x3ffff,
 			       /*flags */ 0,
-			       /*lock  */ busdma_lock_mutex, &Giant,
+			       /*lock  */ NULL, NULL,
 			       &ess->buf_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		ret = ENOMEM;
@@ -1812,7 +1807,7 @@ agg_attach(device_t dev)
 			       /*filter*/ NULL, NULL,
 			       /*size  */ 3*ess->bufsz, 1, 0x3ffff,
 			       /*flags */ 0,
-			       /*lock  */ busdma_lock_mutex, &Giant,
+			       /*lock  */ NULL, NULL,
 			       &ess->stat_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		ret = ENOMEM;
@@ -1929,8 +1924,7 @@ agg_attach(device_t dev)
 			bus_dma_tag_destroy(ess->stat_dmat);
 		if (ess->buf_dmat != NULL)
 			bus_dma_tag_destroy(ess->buf_dmat);
-		if (mtx_initialized(&ess->lock))
-			mtx_destroy(&ess->lock);
+		mtx_destroy(&ess->lock);
 		free(ess, M_DEVBUF);
 	}
 

@@ -19,7 +19,7 @@ if("${TARGET}" STREQUAL "mips")
     if("${TARGET_ARCH}" STREQUAL "mips64")
         # Default to purecap compilation mode for code completion
         add_compile_options(-mabi=purecap -msoft-float)
-        set(CLANG_TRIPLE mips64-unknown-freebsd13)
+        set(CLANG_TRIPLE mips64-unknown-freebsd14)
     else()
         message(FATAL_ERROR "Unsupported MIPS TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
     endif()
@@ -27,25 +27,25 @@ elseif("${TARGET}" STREQUAL "riscv")
     if("${TARGET_ARCH}" STREQUAL "riscv64")
         # Default to purecap compilation mode for code completion
         add_compile_options(-march=rv64imafdcxcheri -mabi=l64pc128d -mno-relax)
-        set(CLANG_TRIPLE riscv64-unknown-freebsd13)
+        set(CLANG_TRIPLE riscv64-unknown-freebsd14)
     else()
         message(FATAL_ERROR "Unsupported RISC-V TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
     endif()
 elseif("${TARGET}" STREQUAL "arm64")
     if("${TARGET_ARCH}" STREQUAL "aarch64")
-        set(CLANG_TRIPLE aarch64-unknown-freebsd13)
+        set(CLANG_TRIPLE aarch64-unknown-freebsd14)
     else()
         message(FATAL_ERROR "Unsupported ARM64 TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
     endif()
 elseif("${TARGET}" STREQUAL "amd64")
     if("${TARGET_ARCH}" STREQUAL "amd64")
-        set(CLANG_TRIPLE x86_64-unknown-freebsd13)
+        set(CLANG_TRIPLE x86_64-unknown-freebsd14)
     else()
         message(FATAL_ERROR "Unsupported x86 TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
     endif()
 elseif("${TARGET}" STREQUAL "i386")
     if("${TARGET_ARCH}" STREQUAL "i386")
-        set(CLANG_TRIPLE i686-unknown-freebsd13)
+        set(CLANG_TRIPLE i686-unknown-freebsd14)
     else()
         message(FATAL_ERROR "Unsupported x86 TARGET_ARCH: ${TARGET}:${TARGET_ARCH}!")
     endif()
@@ -102,6 +102,7 @@ add_compile_definitions(HAVE_CASPER=1)
 # TODO: should only be for CHERI
 file(MAKE_DIRECTORY ${TMPSYSROOT}/include/c++)
 file(CREATE_LINK ${CMAKE_SOURCE_DIR}/contrib/subrepo-cheri-libc++/include ${TMPSYSROOT}/include/c++/v1 SYMBOLIC)
+file(CREATE_LINK ${CMAKE_SOURCE_DIR}/lib/libc++/__config_site ${TMPSYSROOT}/include/c++/v1/__config_site SYMBOLIC)
 
 file(MAKE_DIRECTORY ${TMPSYSROOT}/kern_opt)
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_ddb.h "#define DDB 1\n")
@@ -181,6 +182,7 @@ file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "
 #define INVARIANT_SUPPORT 1
 #define INVARIANTS 1
 #define FDT 1
+#define DEV_ACPI 1
 #define CPU_MALTA 1
 #define TICK_USE_YAMON_FREQ defined
 #define YAMON 1
@@ -215,13 +217,24 @@ enable_language(CXX)
 # Work around https://youtrack.jetbrains.com/issue/CPP-21358
 add_compile_options(-target ${CLANG_TRIPLE})
 
+# Ensure that the libc++ include paths are used.
+add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-stdlib=libc++>)
+
 # Ensure that we can find the clang builtin headers
 add_compile_options(-nobuiltininc)
 execute_process(COMMAND ${CMAKE_C_COMPILER} -print-resource-dir OUTPUT_VARIABLE BUILTIN_HEADERS_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 message(STATUS "BUILTIN_HEADERS_DIR=${BUILTIN_HEADERS_DIR}")
 add_compile_options(-idirafter ${BUILTIN_HEADERS_DIR}/include)
 add_compile_options(-Wall -Wextra -Wcast-align)
-add_compile_options(-Wpedantic -Wno-zero-length-array -Wno-format-pedantic)
+add_compile_options(-Wno-pointer-sign)
+
+# Generate osreldate.h
+execute_process(
+    COMMAND env "NEWVERS_SH=${CMAKE_SOURCE_DIR}/sys/conf/newvers.sh"
+        "PARAMFILE=${CMAKE_SOURCE_DIR}/sys/sys/param.h"
+        "SYSDIR=${CMAKE_SOURCE_DIR}/sys" sh
+        "${CMAKE_SOURCE_DIR}/include/mk-osreldate.sh"
+    WORKING_DIRECTORY ${TMPSYSROOT}/include)
 
 function(add_fake_targets_for_subdir _subdir)
     cmake_parse_arguments(aftfs "LIBRARIES" "PREFIX" "" ${ARGN})
@@ -250,7 +263,7 @@ function(add_fake_targets_for_subdir _subdir)
                 add_library(${_prefix}_${_dirname} STATIC ${_fake_srcs})
             endif()
             # Add the source dir as an include path
-            target_include_directories(${_prefix}_${_dirname} PRIVATE ${_dirpath} ${_dirpath}/include)
+            target_include_directories(${_prefix}_${_dirname} PUBLIC ${_dirpath} ${_dirpath}/include)
             # Add include paths for commonly used libraries
             target_include_directories(${_prefix}_${_dirname} PRIVATE
                 lib/libutil
@@ -265,11 +278,18 @@ endfunction()
 function(add_contrib_sources _tgt _dir)
     file(GLOB_RECURSE _contrib_srcs LIST_DIRECTORIES FALSE "${_dir}/*.c")
     target_sources(${_tgt} PRIVATE ${_contrib_srcs})
-    target_include_directories(${_tgt} PRIVATE "${_dir}" "${_dir}/include")
+    target_include_directories(${_tgt} PUBLIC "${_dir}" "${_dir}/include")
 endfunction()
 
 add_fake_targets_for_subdir(lib LIBRARIES)
 add_contrib_sources(lib_libc contrib/jemalloc)
+add_contrib_sources(lib_ncurses contrib/jemalloc)
+add_contrib_sources(lib_libelf contrib/elftoolchain/libelf)
+target_include_directories(lib_libelf PUBLIC contrib/elftoolchain/common)
+target_link_libraries(lib_libkvm PUBLIC lib_libelf)
+target_include_directories(lib_libpmc PRIVATE lib/libpmcstat)
+target_link_libraries(lib_libpmc PUBLIC lib_libelf)
+target_link_libraries(lib_libpmcstat PUBLIC lib_libelf PRIVATE lib_libpmc)
 target_include_directories(lib_msun PRIVATE lib/msun/src)
 target_compile_definitions(lib_msun PRIVATE -DDOPRINT -DDEBUG -DDOPRINT_LD80)
 target_include_directories(lib_libsimple_printf PRIVATE lib/libc/stdio)
@@ -285,7 +305,8 @@ add_contrib_sources(usr.sbin_makefs contrib/mknod)
 target_include_directories(usr.sbin_makefs PRIVATE lib/libnetbsd sys/fs/cd9660 sys/ufs/ffs sys/fs/msdosfs sbin/newfs_msdos)
 add_contrib_sources(usr.sbin_nmtree contrib/mtree)
 add_contrib_sources(usr.sbin_nmtree contrib/mknod)
-target_include_directories(usr.sbin_nmtree PRIVATE lib/libnetbsd)
+target_link_libraries(usr.sbin_nmtree PRIVATE lib_libnetbsd)
+target_link_libraries(usr.sbin_pmcstat PRIVATE lib_libpmcstat lib_libpmc lib_libelf lib_libkvm)
 
 
 set(AWK "awk" CACHE FILEPATH "Path to awk")

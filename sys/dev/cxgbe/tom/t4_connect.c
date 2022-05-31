@@ -182,11 +182,18 @@ t4_uninit_connect_cpl_handlers(void)
 	t4_register_shared_cpl_handler(CPL_ACT_OPEN_RPL, NULL, CPL_COOKIE_TOM);
 }
 
+#ifdef KTR
 #define DONT_OFFLOAD_ACTIVE_OPEN(x)	do { \
 	reason = __LINE__; \
 	rc = (x); \
 	goto failed; \
 } while (0)
+#else
+#define DONT_OFFLOAD_ACTIVE_OPEN(x)	do { \
+	rc = (x); \
+	goto failed; \
+} while (0)
+#endif
 
 static inline int
 act_open_cpl_size(struct adapter *sc, int isipv6)
@@ -235,7 +242,9 @@ t4_connect(struct toedev *tod, struct socket *so, struct nhop_object *nh,
 	int qid_atid, rc, isipv6;
 	struct inpcb *inp = sotoinpcb(so);
 	struct tcpcb *tp = intotcpcb(inp);
+#ifdef KTR
 	int reason;
+#endif
 	struct offload_settings settings;
 	struct epoch_tracker et;
 	uint16_t vid = 0xfff, pcp = 0;
@@ -300,7 +309,7 @@ t4_connect(struct toedev *tod, struct socket *so, struct nhop_object *nh,
 		if ((inp->inp_vflag & INP_IPV6) == 0)
 			DONT_OFFLOAD_ACTIVE_OPEN(ENOTSUP);
 
-		toep->ce = t4_hold_lip(sc, &inp->in6p_laddr, NULL);
+		toep->ce = t4_get_clip_entry(sc, &inp->in6p_laddr, true);
 		if (toep->ce == NULL)
 			DONT_OFFLOAD_ACTIVE_OPEN(ENOENT);
 
@@ -381,7 +390,9 @@ t4_connect(struct toedev *tod, struct socket *so, struct nhop_object *nh,
 	}
 
 	undo_offload_socket(so);
+#if defined(KTR)
 	reason = __LINE__;
+#endif
 failed:
 	CTR3(KTR_CXGBE, "%s: not offloading (%d), rc %d", __func__, reason, rc);
 
@@ -394,7 +405,7 @@ failed:
 		if (toep->l2te)
 			t4_l2t_release(toep->l2te);
 		if (toep->ce)
-			t4_release_lip(sc, toep->ce);
+			t4_release_clip_entry(sc, toep->ce);
 		free_toepcb(toep);
 	}
 

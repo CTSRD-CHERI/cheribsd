@@ -85,8 +85,6 @@ SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RWTUN,
 
 int (*dtrace_invop_jump_addr)(struct trapframe *);
 
-extern register_t fsu_intr_fault;
-
 #ifdef CPU_QEMU_RISCV
 extern u_int qemu_trace_buffered;
 #endif
@@ -133,6 +131,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	dst_ap = &sa->args[0];
 
 	sa->code = td->td_frame->tf_t[0];
+	sa->original_code = sa->code;
 
 	if (__predict_false(sa->code == SYS_syscall || sa->code == SYS___syscall)) {
 		sa->code = *ap++;
@@ -325,7 +324,12 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		goto fatal;
 
 	if (usermode) {
-		map = &td->td_proc->p_vmspace->vm_map;
+		if (!VIRT_IS_VALID(stval)) {
+			call_trapsignal(td, SIGSEGV, SEGV_MAPERR, stval,
+			    frame->tf_scause & SCAUSE_CODE, 0);
+			goto done;
+		}
+		map = &p->p_vmspace->vm_map;
 	} else {
 		/*
 		 * Enable interrupts for the duration of the page fault. For
@@ -333,12 +337,15 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		 */
 		intr_enable();
 
+		if (!VIRT_IS_VALID(stval))
+			goto fatal;
+
 		if (stval >= VM_MAX_USER_ADDRESS) {
 			map = kernel_map;
 		} else {
 			if (pcb->pcb_onfault == 0)
 				goto fatal;
-			map = &td->td_proc->p_vmspace->vm_map;
+			map = &p->p_vmspace->vm_map;
 		}
 	}
 
@@ -352,7 +359,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		ftype = VM_PROT_READ;
 	}
 
-	if (pmap_fault_fixup(map->pmap, va, ftype))
+	if (pmap_fault(map->pmap, va, ftype))
 		goto done;
 
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);

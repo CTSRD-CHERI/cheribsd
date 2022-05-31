@@ -83,12 +83,6 @@ tsc_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	if (a->pm_class != PMC_CLASS_TSC)
 		return (EINVAL);
 
-	if ((pm->pm_caps & TSC_CAPS) == 0)
-		return (EINVAL);
-
-	if ((pm->pm_caps & ~TSC_CAPS) != 0)
-		return (EPERM);
-
 	if (a->pm_ev != PMC_EV_TSC_TSC ||
 	    a->pm_mode != PMC_MODE_SC)
 		return (EINVAL);
@@ -237,7 +231,7 @@ static int
 tsc_read_pmc(int cpu, int ri, pmc_value_t *v)
 {
 	struct pmc *pm;
-	enum pmc_mode mode;
+	enum pmc_mode mode __diagused;
 	const struct pmc_hw *phw;
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
@@ -265,7 +259,7 @@ tsc_read_pmc(int cpu, int ri, pmc_value_t *v)
 static int
 tsc_release_pmc(int cpu, int ri, struct pmc *pmc)
 {
-	struct pmc_hw *phw;
+	struct pmc_hw *phw __diagused;
 
 	(void) pmc;
 

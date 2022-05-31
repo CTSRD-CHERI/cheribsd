@@ -202,6 +202,25 @@ static struct zstd_fallback_mem zstd_dctx_fallback;
 static struct zstd_pool *zstd_mempool_cctx;
 static struct zstd_pool *zstd_mempool_dctx;
 
+/*
+ * The library zstd code expects these if ADDRESS_SANITIZER gets defined,
+ * and while ASAN does this, KASAN defines that and does not. So to avoid
+ * changing the external code, we do this.
+ */
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define	ADDRESS_SANITIZER 1
+#endif
+#elif defined(__SANITIZE_ADDRESS__)
+#define	ADDRESS_SANITIZER 1
+#endif
+#if defined(_KERNEL) && defined(ADDRESS_SANITIZER)
+void __asan_unpoison_memory_region(void const volatile *addr, size_t size);
+void __asan_poison_memory_region(void const volatile *addr, size_t size);
+void __asan_unpoison_memory_region(void const volatile *addr, size_t size) {};
+void __asan_poison_memory_region(void const volatile *addr, size_t size) {};
+#endif
+
 
 static void
 zstd_mempool_reap(struct zstd_pool *zstd_mempool)
@@ -258,7 +277,7 @@ zstd_mempool_alloc(struct zstd_pool *zstd_mempool, size_t size)
 	for (int i = 0; i < ZSTD_POOL_MAX; i++) {
 		pool = &zstd_mempool[i];
 		/*
-		 * This lock is simply a marker for a pool object beeing in use.
+		 * This lock is simply a marker for a pool object being in use.
 		 * If it's already hold, it will be skipped.
 		 *
 		 * We need to create it before checking it to avoid race
@@ -361,6 +380,7 @@ zstd_enum_to_level(enum zio_zstd_levels level, int16_t *zstd_level)
 	return (1);
 }
 
+
 /* Compress block using zstd */
 size_t
 zfs_zstd_compress(void *s_start, void *d_start, size_t s_len, size_t d_len,
@@ -458,8 +478,8 @@ zfs_zstd_compress(void *s_start, void *d_start, size_t s_len, size_t d_len,
 	 * As soon as such incompatibility occurs, handling code needs to be
 	 * added, differentiating between the versions.
 	 */
-	hdr->version = ZSTD_VERSION_NUMBER;
-	hdr->level = level;
+	zfs_set_hdrversion(hdr, ZSTD_VERSION_NUMBER);
+	zfs_set_hdrlevel(hdr, level);
 	hdr->raw_version_level = BE_32(hdr->raw_version_level);
 
 	return (c_len + sizeof (*hdr));
@@ -485,10 +505,11 @@ zfs_zstd_decompress_level(void *s_start, void *d_start, size_t s_len,
 	 * not modify the original data that may be used again later.
 	 */
 	hdr_copy.raw_version_level = BE_32(hdr->raw_version_level);
+	uint8_t curlevel = zfs_get_hdrlevel(&hdr_copy);
 
 	/*
 	 * NOTE: We ignore the ZSTD version for now. As soon as any
-	 * incompatibility occurrs, it has to be handled accordingly.
+	 * incompatibility occurs, it has to be handled accordingly.
 	 * The version can be accessed via `hdr_copy.version`.
 	 */
 
@@ -497,13 +518,13 @@ zfs_zstd_decompress_level(void *s_start, void *d_start, size_t s_len,
 	 * An invalid level is a strong indicator for data corruption! In such
 	 * case return an error so the upper layers can try to fix it.
 	 */
-	if (zstd_enum_to_level(hdr_copy.level, &zstd_level)) {
+	if (zstd_enum_to_level(curlevel, &zstd_level)) {
 		ZSTDSTAT_BUMP(zstd_stat_dec_inval);
 		return (1);
 	}
 
 	ASSERT3U(d_len, >=, s_len);
-	ASSERT3U(hdr_copy.level, !=, ZIO_COMPLEVEL_INHERIT);
+	ASSERT3U(curlevel, !=, ZIO_COMPLEVEL_INHERIT);
 
 	/* Invalid compressed buffer size encoded at start */
 	if (c_len + sizeof (*hdr) > s_len) {
@@ -534,7 +555,7 @@ zfs_zstd_decompress_level(void *s_start, void *d_start, size_t s_len,
 	}
 
 	if (level) {
-		*level = hdr_copy.level;
+		*level = curlevel;
 	}
 
 	return (0);
@@ -771,7 +792,7 @@ module_exit(zstd_fini);
 
 ZFS_MODULE_DESCRIPTION("ZSTD Compression for ZFS");
 ZFS_MODULE_LICENSE("Dual BSD/GPL");
-ZFS_MODULE_VERSION(ZSTD_VERSION_STRING);
+ZFS_MODULE_VERSION(ZSTD_VERSION_STRING "a");
 
 EXPORT_SYMBOL(zfs_zstd_compress);
 EXPORT_SYMBOL(zfs_zstd_decompress_level);

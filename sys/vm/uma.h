@@ -233,6 +233,10 @@ uma_zone_t uma_zcache_create(const char *name, int size, uma_ctor ctor,
  * These flags share space with UMA_ZFLAGs in uma_int.h.  Be careful not to
  * overlap when adding new features.
  */
+#define	UMA_ZONE_UNMANAGED	0x0001	/*
+					 * Don't regulate the cache size, even
+					 * under memory pressure.
+					 */
 #define UMA_ZONE_ZINIT		0x0002	/* Initialize with zeros */
 #define UMA_ZONE_CONTIG		0x0004	/*
 					 * Physical memory underlying an object
@@ -483,7 +487,8 @@ void uma_zone_reserve(uma_zone_t zone, int nitems);
 
 /*
  * Reserves the maximum KVA space required by the zone and configures the zone
- * to use a VM_ALLOC_NOOBJ-based backend allocator.
+ * to use a backend that allocates physical memory and maps it using the
+ * reserved KVA. 
  *
  * Arguments:
  *	zone  The zone to update.

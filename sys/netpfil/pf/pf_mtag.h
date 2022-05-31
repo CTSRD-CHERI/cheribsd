@@ -36,21 +36,24 @@
 
 #ifdef _KERNEL
 
-#define	PF_TAG_GENERATED		0x01
-#define	PF_TAG_FRAGCACHE		0x02
+/*					0x01 unused. */
+#define	PF_TAG_DUMMYNET			0x02
 #define	PF_TAG_TRANSLATE_LOCALHOST	0x04
 #define	PF_PACKET_LOOPED		0x08
 #define	PF_FASTFWD_OURS_PRESENT		0x10
 #define	PF_REASSEMBLED			0x20
 #define	PF_DUPLICATED			0x40
+#define	PF_TAG_SYNCOOKIE_RECREATED	0x80
 
 struct pf_mtag {
 	void		*hdr;		/* saved hdr pos in mbuf, for ECN */
-	u_int32_t	 qid;		/* queue id */
+	u_int16_t	 qid;		/* queue id */
 	u_int32_t	 qid_hash;	/* queue hashid used by WFQ like algos */
 	u_int16_t	 tag;		/* tag id */
 	u_int8_t	 flags;
 	u_int8_t	 routed;
+	u_int16_t	 dnpipe;
+	u_int32_t	 dnflags;
 };
 
 static __inline struct pf_mtag *

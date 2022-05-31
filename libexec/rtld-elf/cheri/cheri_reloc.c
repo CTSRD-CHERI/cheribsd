@@ -80,20 +80,6 @@ process___cap_relocs(Obj_Entry* obj)
 #endif
 	_do___caprelocs(start_relocs, end_relocs, data_base, code_base, base_addr,
 	    tight_pcc_bounds);
-#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
-	// TODO: do this later
-	if (obj->per_function_captable) {
-		dbg_cheri_plt("Adding per-function plt stubs for %s", obj->path);
-		for (const struct capreloc *reloc = start_relocs; reloc < end_relocs; reloc++) {
-			bool isFunction = (reloc->permissions & function_reloc_flag) == function_reloc_flag;
-			if (!isFunction)
-				continue;
-			// TODO: write location as a relative value
-			dlfunc_t *dest = (dlfunc_t*)cheri_setaddress(obj->relocbase, reloc->capability_location);
-			add_cgp_stub_for_local_function(obj, dest);
-		}
-	}
-#endif
 	obj->cap_relocs_processed = true;
 }
 #endif

@@ -1,6 +1,5 @@
 /*-
  * Copyright (c) 2015-2016 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Andrew Turner under
  * the sponsorship of the FreeBSD Foundation.
@@ -223,7 +222,7 @@ struct its_cmd {
 
 /* An ITS private table */
 struct its_ptable {
-	vm_offset_t	ptab_vaddr;
+	vm_pointer_t	ptab_vaddr;
 	unsigned long	ptab_size;
 };
 
@@ -234,7 +233,7 @@ struct its_col {
 };
 
 struct gicv3_its_irqsrc {
-	struct intr_irqsrc	gi_isrc;
+	struct intr_irqsrc	gi_isrc __subobject_member_used_for_c_inheritance;
 	u_int			gi_id;
 	u_int			gi_lpi;
 	struct its_dev		*gi_its_dev;
@@ -258,7 +257,7 @@ struct gicv3_its_softc {
 	 * single copy of each across the interrupt controller.
 	 */
 	uint8_t		*sc_conf_base;
-	vm_offset_t sc_pend_base[MAXCPU];
+	vm_pointer_t sc_pend_base[MAXCPU];
 
 	/* Command handling */
 	struct mtx sc_its_cmd_lock;
@@ -430,7 +429,7 @@ gicv3_its_cmdq_init(struct gicv3_its_softc *sc)
 static int
 gicv3_its_table_init(device_t dev, struct gicv3_its_softc *sc)
 {
-	vm_offset_t table;
+	vm_pointer_t table;
 	vm_paddr_t paddr;
 	uint64_t cache, reg, share, tmp, type;
 	size_t esize, its_tbl_size, nidents, nitspages, npages;
@@ -489,7 +488,7 @@ gicv3_its_table_init(device_t dev, struct gicv3_its_softc *sc)
 		npages = howmany(its_tbl_size, PAGE_SIZE);
 
 		/* Allocate the table */
-		table = (vm_offset_t)contigmalloc_domainset(npages * PAGE_SIZE,
+		table = (vm_pointer_t)contigmalloc_domainset(npages * PAGE_SIZE,
 		    M_GICV3_ITS, sc->sc_ds, M_WAITOK | M_ZERO, 0,
 		    (1ul << 48) - 1, PAGE_SIZE_64K, 0);
 
@@ -594,7 +593,7 @@ gicv3_its_conftable_init(struct gicv3_its_softc *sc)
 	    LPI_CONFTAB_SIZE);
 
 	/* Flush the table to memory */
-	cpu_dcache_wb_range((vm_offset_t)sc->sc_conf_base, LPI_CONFTAB_SIZE);
+	cpu_dcache_wb_range((vm_pointer_t)sc->sc_conf_base, LPI_CONFTAB_SIZE);
 }
 
 static void
@@ -606,13 +605,12 @@ gicv3_its_pendtables_init(struct gicv3_its_softc *sc)
 		if (CPU_ISSET(i, &sc->sc_cpus) == 0)
 			continue;
 
-		sc->sc_pend_base[i] = (vm_offset_t)contigmalloc(
+		sc->sc_pend_base[i] = (vm_pointer_t)contigmalloc(
 		    LPI_PENDTAB_SIZE, M_GICV3_ITS, M_WAITOK | M_ZERO,
 		    0, LPI_PENDTAB_MAX_ADDR, LPI_PENDTAB_ALIGN, 0);
 
 		/* Flush so the ITS can see the memory */
-		cpu_dcache_wb_range((vm_offset_t)sc->sc_pend_base[i],
-		    LPI_PENDTAB_SIZE);
+		cpu_dcache_wb_range(sc->sc_pend_base[i], LPI_PENDTAB_SIZE);
 	}
 }
 
@@ -711,7 +709,7 @@ its_init_cpu(device_t dev, struct gicv3_its_softc *sc)
 		return (0);
 
 	/* Check if the ITS is enabled on this CPU */
-	if ((gic_r_read_4(gicv3, GICR_TYPER) & GICR_TYPER_PLPIS) == 0)
+	if ((gic_r_read_8(gicv3, GICR_TYPER) & GICR_TYPER_PLPIS) == 0)
 		return (ENXIO);
 
 	rpcpu = gicv3_get_redist(dev);
@@ -971,7 +969,7 @@ gicv3_its_disable_intr(device_t dev, struct intr_irqsrc *isrc)
 
 	if ((sc->sc_its_flags & ITS_FLAGS_LPI_CONF_FLUSH) != 0) {
 		/* Clean D-cache under command. */
-		cpu_dcache_wb_range((vm_offset_t)&conf[girq->gi_lpi], 1);
+		cpu_dcache_wb_range((vm_pointer_t)&conf[girq->gi_lpi], 1);
 	} else {
 		/* DSB inner shareable, store */
 		dsb(ishst);
@@ -995,7 +993,7 @@ gicv3_its_enable_intr(device_t dev, struct intr_irqsrc *isrc)
 
 	if ((sc->sc_its_flags & ITS_FLAGS_LPI_CONF_FLUSH) != 0) {
 		/* Clean D-cache under command. */
-		cpu_dcache_wb_range((vm_offset_t)&conf[girq->gi_lpi], 1);
+		cpu_dcache_wb_range((vm_pointer_t)&conf[girq->gi_lpi], 1);
 	} else {
 		/* DSB inner shareable, store */
 		dsb(ishst);
@@ -1026,9 +1024,7 @@ static void
 gicv3_its_pre_ithread(device_t dev, struct intr_irqsrc *isrc)
 {
 	struct gicv3_its_irqsrc *girq;
-	struct gicv3_its_softc *sc;
 
-	sc = device_get_softc(dev);
 	girq = (struct gicv3_its_irqsrc *)isrc;
 	gic_icc_write(EOIR1, girq->gi_lpi + GIC_FIRST_LPI);
 }
@@ -1043,9 +1039,7 @@ static void
 gicv3_its_post_filter(device_t dev, struct intr_irqsrc *isrc)
 {
 	struct gicv3_its_irqsrc *girq;
-	struct gicv3_its_softc *sc;
 
-	sc = device_get_softc(dev);
 	girq = (struct gicv3_its_irqsrc *)isrc;
 	gic_icc_write(EOIR1, girq->gi_lpi + GIC_FIRST_LPI);
 }
@@ -1125,7 +1119,8 @@ its_get_devid(device_t pci_dev)
 	uintptr_t id;
 
 	if (pci_get_id(pci_dev, PCI_ID_MSI, &id) != 0)
-		panic("its_get_devid: Unable to get the MSI DeviceID");
+		panic("%s: %s: Unable to get the MSI DeviceID", __func__,
+		    device_get_nameunit(pci_dev));
 
 	return (id);
 }
@@ -1591,7 +1586,7 @@ its_cmd_sync(struct gicv3_its_softc *sc, struct its_cmd *cmd)
 
 	if ((sc->sc_its_flags & ITS_FLAGS_CMDQ_FLUSH) != 0) {
 		/* Clean D-cache under command. */
-		cpu_dcache_wb_range((vm_offset_t)cmd, sizeof(*cmd));
+		cpu_dcache_wb_range((vm_pointer_t)cmd, sizeof(*cmd));
 	} else {
 		/* DSB inner shareable, store */
 		dsb(ishst);
@@ -1960,11 +1955,19 @@ gicv3_its_fdt_attach(device_t dev)
 	/* Register this device as a interrupt controller */
 	xref = OF_xref_from_node(ofw_bus_get_node(dev));
 	sc->sc_pic = intr_pic_register(dev, xref);
-	intr_pic_add_handler(device_get_parent(dev), sc->sc_pic,
+	err = intr_pic_add_handler(device_get_parent(dev), sc->sc_pic,
 	    gicv3_its_intr, sc, sc->sc_irq_base, sc->sc_irq_length);
+	if (err != 0) {
+		device_printf(dev, "Failed to add PIC handler: %d\n", err);
+		return (err);
+	}
 
 	/* Register this device to handle MSI interrupts */
-	intr_msi_register(dev, xref);
+	err = intr_msi_register(dev, xref);
+	if (err != 0) {
+		device_printf(dev, "Failed to register for MSIs: %d\n", err);
+		return (err);
+	}
 
 	return (0);
 }
@@ -2021,11 +2024,19 @@ gicv3_its_acpi_attach(device_t dev)
 
 	di = device_get_ivars(dev);
 	sc->sc_pic = intr_pic_register(dev, di->msi_xref);
-	intr_pic_add_handler(device_get_parent(dev), sc->sc_pic,
+	err = intr_pic_add_handler(device_get_parent(dev), sc->sc_pic,
 	    gicv3_its_intr, sc, sc->sc_irq_base, sc->sc_irq_length);
+	if (err != 0) {
+		device_printf(dev, "Failed to add PIC handler: %d\n", err);
+		return (err);
+	}
 
 	/* Register this device to handle MSI interrupts */
-	intr_msi_register(dev, di->msi_xref);
+	err = intr_msi_register(dev, di->msi_xref);
+	if (err != 0) {
+		device_printf(dev, "Failed to register for MSIs: %d\n", err);
+		return (err);
+	}
 
 	return (0);
 }

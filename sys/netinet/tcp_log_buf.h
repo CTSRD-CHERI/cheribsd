@@ -95,7 +95,7 @@ struct tcp_log_bbr {
 	uint8_t bbr_state;
 	uint8_t bbr_substate;
 	uint8_t inhpts;
-	uint8_t ininput;
+	uint8_t __spare;
 	uint8_t use_lt_bw;
 	uint8_t flex8;
 	uint32_t pkt_epoch;
@@ -174,7 +174,7 @@ enum tcp_log_events {
 	TCP_LOG_IN = 1,		/* Incoming packet                   1 */
 	TCP_LOG_OUT,		/* Transmit (without other event)    2 */
 	TCP_LOG_RTO,		/* Retransmit timeout                3 */
-	TCP_LOG_TF_ACK,		/* Transmit due to TF_ACK            4 */
+	TCP_LOG_SB_WAKE,	/* Awaken socket buffer              4 */
 	TCP_LOG_BAD_RETRAN,	/* Detected bad retransmission       5 */
 	TCP_LOG_PRR,		/* Doing PRR                         6 */
 	TCP_LOG_REORDER,	/* Detected reorder                  7 */
@@ -200,7 +200,7 @@ enum tcp_log_events {
 	BBR_LOG_DOSEG_DONE,     /* hpts do_segment completes        27 */
 	BBR_LOG_EXIT_GAIN,      /* hpts do_segment completes        28 */
 	BBR_LOG_THRESH_CALC,    /* Doing threshold calculation      29 */
-	BBR_LOG_EXTRACWNDGAIN,	/* Removed                          30 */
+	TCP_LOG_MAPCHG,		/* Map Changes to the sendmap       30 */
 	TCP_LOG_USERSEND, 	/* User level sends data            31 */
 	BBR_RSM_CLEARED,	/* RSM cleared of ACK flags         32 */
 	BBR_LOG_STATE_TARGET, 	/* Log of target at state           33 */
@@ -232,7 +232,11 @@ enum tcp_log_events {
 	TCP_LOG_USER_EVENT,	/* User space event data            59 */
 	TCP_LOG_SENDFILE,	/* sendfile() logging for TCP connections 60 */
 	TCP_LOG_HTTP_T,		/* logging of http request tracking 61 */
-	TCP_LOG_END		/* End (keep at end)                62 */
+	TCP_LOG_ACCOUNTING,	/* Log of TCP Accounting data 62 */
+	TCP_LOG_FSB,		/* FSB information 63 */
+	RACK_DSACK_HANDLING,	/* Handling of DSACK in rack for reordering window 64 */
+	TCP_HYSTART,		/* TCP Hystart logging 65 */
+	TCP_LOG_END		/* End (keep at end)                66 */
 };
 
 enum tcp_log_states {

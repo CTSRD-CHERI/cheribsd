@@ -229,6 +229,13 @@ function core.kernelList()
 		end
 	end
 
+	-- Do not attempt to autodetect if underlying filesystem
+	-- do not support directory listing (e.g. tftp, http)
+	if not lfs.attributes("/boot", "mode") then
+		autodetect = "no"
+		loader.setenv("kernels_autodetect", "NO")
+	end
+
 	-- Base whether we autodetect kernels or not on a loader.conf(5)
 	-- setting, kernels_autodetect. If it's set to 'yes', we'll add
 	-- any kernels we detect based on the criteria described.
@@ -344,6 +351,14 @@ function core.changeRewindCheckpoint()
 	end
 end
 
+function core.loadEntropy()
+	if core.isUEFIBoot() then
+		if (loader.getenv("entropy_efi_seed") or "no"):lower() == "yes" then
+			loader.perform("efi-seed-entropy")
+		end
+	end
+end
+
 function core.setDefaults()
 	core.setACPI(core.getACPIPresent(true))
 	core.setSafeMode(default_safe_mode)
@@ -356,6 +371,7 @@ function core.autoboot(argstr)
 	if loader.getenv("kernelname") == nil then
 		config.loadelf()
 	end
+	core.loadEntropy()
 	loader.perform(composeLoaderCmd("autoboot", argstr))
 end
 
@@ -364,6 +380,7 @@ function core.boot(argstr)
 	if loader.getenv("kernelname") == nil then
 		config.loadelf()
 	end
+	core.loadEntropy()
 	loader.perform(composeLoaderCmd("boot", argstr))
 end
 

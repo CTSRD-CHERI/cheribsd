@@ -60,7 +60,7 @@ CWARNFLAGS+=	-Wcast-align
 .endif # !NO_WCAST_ALIGN !NO_WCAST_ALIGN.${COMPILER_TYPE}
 .endif # WARNS >= 4
 .if ${WARNS} >= 6
-CWARNFLAGS+=	-Wchar-subscripts -Wnested-externs -Wredundant-decls\
+CWARNFLAGS+=	-Wchar-subscripts -Wnested-externs \
 		-Wold-style-definition
 .if !defined(NO_WMISSING_VARIABLE_DECLARATIONS)
 CWARNFLAGS.clang+=	-Wmissing-variable-declarations
@@ -111,6 +111,9 @@ CWARNFLAGS.clang+=	-Wno-array-bounds
       ${COMPILER_TYPE} == "gcc")
 CWARNFLAGS+=		-Wno-misleading-indentation
 .endif # NO_WMISLEADING_INDENTATION
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 140000
+NO_WBITWISE_INSTEAD_OF_LOGICAL=	-Wno-bitwise-instead-of-logical
+.endif
 .endif # WARNS
 
 .if defined(FORMAT_AUDIT)
@@ -163,7 +166,6 @@ CWARNFLAGS+=	-Wno-error=address			\
 CWARNFLAGS+=	-Wno-error=empty-body			\
 		-Wno-error=maybe-uninitialized		\
 		-Wno-error=nonnull-compare		\
-		-Wno-error=redundant-decls		\
 		-Wno-error=shift-negative-value		\
 		-Wno-error=tautological-compare		\
 		-Wno-error=unused-const-variable
@@ -195,6 +197,17 @@ CWARNFLAGS+=	-Wno-error=aggressive-loop-optimizations	\
 		-Wno-error=sizeof-pointer-memaccess		\
 		-Wno-error=stringop-truncation
 .endif
+
+# GCC 9.2.0
+.if ${COMPILER_VERSION} >= 90200
+.if ${MACHINE_ARCH} == "i386"
+CWARNFLAGS+=	-Wno-error=overflow
+.endif
+.endif
+
+# GCC produces false positives for functions that switch on an
+# enum (GCC bug 87950)
+CWARNFLAGS+=	-Wno-return-type
 
 # GCC's own arm_neon.h triggers various warnings
 .if ${MACHINE_CPUARCH} == "aarch64"
@@ -262,16 +275,15 @@ CFLAGS.clang+=	 -Qunused-arguments
 # but not yet.
 CXXFLAGS.clang+=	 -Wno-c++11-extensions
 
-.if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap} && \
-    ${MACHINE_CPUARCH} != "arm" && ${MACHINE_CPUARCH} != "mips"
+.if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap}
 # Don't use -Wstack-protector as it breaks world with -Werror.
 SSP_CFLAGS?=	-fstack-protector-strong
 CFLAGS+=	${SSP_CFLAGS}
-.endif # SSP && !ARM && !MIPS && !purecap
+.endif # SSP && !purecap
 
 # Additional flags passed in CFLAGS and CXXFLAGS when MK_DEBUG_FILES is
 # enabled.
-DEBUG_FILES_CFLAGS?= -g
+DEBUG_FILES_CFLAGS?= -g -gz=zlib
 
 # Allow user-specified additional warning flags, plus compiler and file
 # specific flag overrides, unless we've overridden this...
@@ -297,7 +309,14 @@ LDFLAGS+=	${LDFLAGS.${LINKER_TYPE}}
 # Only allow .TARGET when not using PROGS as it has the same syntax
 # per PROG which is ambiguous with this syntax. This is only needed
 # for PROG_VARS vars.
-.if !defined(_RECURSING_PROGS)
+#
+# Some directories (currently just clang) also need to disable this since
+# CFLAGS.${COMPILER_TYPE}, CFLAGS.${.IMPSRC:T} and CFLAGS.${.TARGET:T} all live
+# in the same namespace, meaning that, for example, GCC builds of clang pick up
+# CFLAGS.clang via CFLAGS.${.TARGET:T} and thus try to pass Clang-specific
+# flags. Ideally the different sources of CFLAGS would be namespaced to avoid
+# collisions.
+.if !defined(_RECURSING_PROGS) && !defined(NO_TARGET_FLAGS)
 .if ${MK_WARNS} != "no"
 CFLAGS+=	${CWARNFLAGS.${.TARGET:T}}
 .endif

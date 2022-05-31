@@ -277,8 +277,12 @@ parseDWM(struct ptime_data *ptime, const char *s)
 				tm.tm_mday += save;
 
 				if (tm.tm_mday > daysmon) {
-					tm.tm_mon++;
+					tm.tm_mon = (tm.tm_mon + 1) % 12;
 					tm.tm_mday = tm.tm_mday - daysmon;
+					if (tm.tm_mon >= 12) {
+						tm.tm_mon = 0;
+						tm.tm_year++;
+					}
 				}
 			}
 			break;

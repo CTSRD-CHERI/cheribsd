@@ -105,9 +105,7 @@ static void	 traverse(int, char **, int);
 
 static const struct option long_opts[] =
 {
-#ifdef COLORLS
         {"color",       optional_argument,      NULL, COLOR_OPT},
-#endif
         {NULL,          no_argument,            NULL, 0}
 };
 
@@ -161,6 +159,7 @@ char *ansi_fgcol;		/* ANSI sequence to set foreground colour */
 char *ansi_coloff;		/* ANSI sequence to reset colours */
 char *attrs_off;		/* ANSI sequence to turn off attributes */
 char *enter_bold;		/* ANSI sequence to set color to bold mode */
+char *enter_underline;		/* ANSI sequence to enter underline mode */
 #endif
 
 static int rval;
@@ -448,8 +447,8 @@ main(int argc, char *argv[])
 		case 'y':
 			f_samesort = 1;
 			break;
-#ifdef COLORLS
 		case COLOR_OPT:
+#ifdef COLORLS
 			if (optarg == NULL || do_color_always(optarg))
 				colorflag = COLORFLAG_ALWAYS;
 			else if (do_color_auto(optarg))
@@ -460,6 +459,8 @@ main(int argc, char *argv[])
 				errx(2, "unsupported --color value '%s' (must be always, auto, or never)",
 				    optarg);
 			break;
+#else
+			warnx("color support not compiled in");
 #endif
 		default:
 		case '?':
@@ -485,6 +486,7 @@ main(int argc, char *argv[])
 			ansi_bgcol = tgetstr("AB", &bp);
 			attrs_off = tgetstr("me", &bp);
 			enter_bold = tgetstr("md", &bp);
+			enter_underline = tgetstr("us", &bp);
 
 			/* To switch colours off use 'op' if
 			 * available, otherwise use 'oc', or
@@ -503,8 +505,6 @@ main(int argc, char *argv[])
 			f_color = 1;
 			explicitansi = true;
 		}
-#else
-		warnx("color support not compiled in");
 #endif /*COLORLS*/
 	}
 

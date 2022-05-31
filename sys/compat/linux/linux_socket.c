@@ -574,6 +574,10 @@ linux_to_bsd_tcp_sockopt(int opt)
 		return (TCP_KEEPINTVL);
 	case LINUX_TCP_KEEPCNT:
 		return (TCP_KEEPCNT);
+	case LINUX_TCP_INFO:
+		LINUX_RATELIMIT_MSG_OPT1(
+		    "unsupported TCP socket option TCP_INFO (%d)", opt);
+		return (-2);
 	case LINUX_TCP_MD5SIG:
 		return (TCP_MD5SIG);
 	}
@@ -1531,6 +1535,12 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	if (error != 0)
 		return (error);
 
+	/*
+	 * Pass user-supplied recvmsg() flags in msg_flags field,
+	 * following sys_recvmsg() convention.
+	*/
+	linux_msghdr.msg_flags = flags;
+
 	error = linux_to_bsd_msghdr(msg, &linux_msghdr);
 	if (error != 0)
 		return (error);
@@ -2094,6 +2104,8 @@ linux_sendfile_common(struct thread *td, l_int out, l_int in,
 	td->td_retval[0] = (ssize_t)bytes_read;
 drop:
 	fdrop(fp, td);
+	if (error == ENOTSOCK)
+		error = EINVAL;
 	return (error);
 }
 

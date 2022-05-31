@@ -261,11 +261,8 @@ device		s3pci
 # linked to /dev/3dfx and /dev/voodoo.  Note that this is not the same as
 # the tdfx DRI module from XFree86 and is completely unrelated.
 #
-# To enable Linuxulator support, one must also include COMPAT_LINUX in the
-# config as well.  The other option is to load both as modules.
 
 device		tdfx			# Enable 3Dfx Voodoo support
-#XXX#device 	tdfx_linux		# Enable Linuxulator support
 
 #
 # ACPI support using the Intel ACPI Component Architecture reference
@@ -290,6 +287,7 @@ device		cpufreq
 #       adapters.
 # ice:	Intel 800 Series Physical Function
 #	Requires the ice_ddp module for full functionality
+# igc:	Intel I225 2.5Gb Ethernet adapter
 # ipw:	Intel PRO/Wireless 2100 IEEE 802.11 adapter
 #	Requires the ipw firmware module
 # iwi:	Intel PRO/Wireless 2200BG/2225BG/2915ABG IEEE 802.11 adapters
@@ -309,9 +307,7 @@ device		cpufreq
 #   Requires the miibus module
 
 device		bxe		# Broadcom NetXtreme II BCM5771X/BCM578XX 10GbE
-options 	ED_3C503
-options 	ED_HPP
-options 	ED_SIC
+device		igc		# Intel I225 2.5G Ethernet
 device		ipw		# Intel 2100 wireless NICs.
 device		iwi		# Intel 2200BG/2225BG/2915ABG wireless NICs.
 device		iwn		# Intel 4965/1000/5000/6000 wireless NICs.
@@ -408,13 +404,6 @@ device		arcmsr		# Areca SATA II RAID
 device		smartpqi
 
 #
-# 3ware 9000 series PATA/SATA RAID controller driver and options.
-# The driver is implemented as a SIM, and so, needs the CAM infrastructure.
-#
-options 	TWA_DEBUG		# 0-10; 10 prints the most messages.
-device		twa			# 3ware 9000 series PATA/SATA RAID
-
-#
 # Adaptec FSA RAID controllers, including integrated DELL controllers,
 # the Dell PERC 2/QC and the HP NetRAID-4M
 device		aac
@@ -462,8 +451,7 @@ device         nvd     # expose NVMe namespaces as disks, depends on nvme
 
 #
 # Intel Volume Management Device (VMD) support
-device		vmd		# base VMD device
-device		vmd_bus		# bus for VMD children
+device		vmd
 
 #
 # PMC-Sierra SAS/SATA controller
@@ -499,12 +487,16 @@ device		virtio_balloon	# VirtIO Memory Balloon device
 device		virtio_random	# VirtIO Entropy device
 device		virtio_console	# VirtIO Console device
 
+# Linux KVM paravirtualization support
+device		kvm_clock	# KVM paravirtual clock driver
+
 # Microsoft Hyper-V enhancement support
 device 		hyperv		# HyperV drivers
 
 # Xen HVM Guest Optimizations
 options 	XENHVM		# Xen HVM kernel infrastructure
 device 		xenpci		# Xen HVM Hypervisor services driver
+device		xentimer	# Xen x86 PV timer device
 
 #####################################################################
 
@@ -623,26 +615,6 @@ options 	COMPAT_FREEBSD32
 
 # Enable (32-bit) a.out binary support
 options 	COMPAT_AOUT
-
-# Enable 32-bit runtime support for CloudABI binaries.
-options 	COMPAT_CLOUDABI32
-
-# Enable 64-bit runtime support for CloudABI binaries.
-options 	COMPAT_CLOUDABI64
-
-# Enable Linux ABI emulation
-#XXX#options 	COMPAT_LINUX
-
-# Enable 32-bit Linux ABI emulation (requires COMPAT_FREEBSD32).
-options 	COMPAT_LINUX32
-
-# Enable the linux-like proc filesystem support (requires COMPAT_LINUX32
-# and PSEUDOFS)
-options 	LINPROCFS
-
-#Enable the linux-like sys filesystem support (requires COMPAT_LINUX32
-# and PSEUDOFS)
-options 	LINSYSFS
 
 #####################################################################
 # ZFS support

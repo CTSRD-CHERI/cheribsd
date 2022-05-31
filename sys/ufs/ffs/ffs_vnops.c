@@ -261,12 +261,17 @@ ffs_syncvnode(struct vnode *vp, int waitfor, int flags)
 	struct ufsmount *ump;
 	struct buf *bp, *nbp;
 	ufs_lbn_t lbn;
-	int error, passes;
+	int error, passes, wflag;
 	bool still_dirty, unlocked, wait;
 
 	ip = VTOI(vp);
 	bo = &vp->v_bufobj;
 	ump = VFSTOUFS(vp->v_mount);
+#ifdef WITNESS
+	wflag = IS_SNAPSHOT(ip) ? LK_NOWITNESS : 0;
+#else
+	wflag = 0;
+#endif
 
 	/*
 	 * When doing MNT_WAIT we must first flush all dependencies
@@ -318,9 +323,8 @@ loop:
 		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT, NULL) == 0) {
 			BO_UNLOCK(bo);
 		} else if (wait) {
-			if (BUF_LOCK(bp,
-			    LK_EXCLUSIVE | LK_SLEEPFAIL | LK_INTERLOCK,
-			    BO_LOCKPTR(bo)) != 0) {
+			if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_SLEEPFAIL |
+			    LK_INTERLOCK | wflag, BO_LOCKPTR(bo)) != 0) {
 				BO_LOCK(bo);
 				bp->b_vflags &= ~BV_SCANNED;
 				goto next_locked;
@@ -675,7 +679,7 @@ ffs_read(ap)
 		panic("ffs_read: mode");
 
 	if (vp->v_type == VLNK) {
-		if ((int)ip->i_size < vp->v_mount->mnt_maxsymlinklen)
+		if ((int)ip->i_size < VFSTOUFS(vp->v_mount)->um_maxsymlinklen)
 			panic("ffs_read: short symlink");
 	} else if (vp->v_type != VREG && vp->v_type != VDIR)
 		panic("ffs_read: type %d",  vp->v_type);
@@ -691,6 +695,9 @@ ffs_read(ap)
 		return (EOVERFLOW);
 
 	bflag = GB_UNMAPPED | (uio->uio_segflg == UIO_NOCOPY ? 0 : GB_NOSPARSE);
+#ifdef WITNESS
+	bflag |= IS_SNAPSHOT(ip) ? GB_NOWITNESS : 0;
+#endif
 	for (error = 0, bp = NULL; uio->uio_resid > 0; bp = NULL) {
 		if ((bytesinfile = ip->i_size - uio->uio_offset) <= 0)
 			break;
@@ -1398,7 +1405,6 @@ static int
 ffs_open_ea(struct vnode *vp, struct ucred *cred, struct thread *td)
 {
 	struct inode *ip;
-	struct ufs2_dinode *dp;
 	int error;
 
 	ip = VTOI(vp);
@@ -1409,7 +1415,6 @@ ffs_open_ea(struct vnode *vp, struct ucred *cred, struct thread *td)
 		ffs_unlock_ea(vp);
 		return (0);
 	}
-	dp = ip->i_din2;
 	error = ffs_rdextattr(&ip->i_ea_area, vp, td);
 	if (error) {
 		ffs_unlock_ea(vp);
@@ -1933,10 +1938,11 @@ ffs_gbp_getblkno(struct vnode *vp, vm_ooffset_t off)
 }
 
 static int
-ffs_gbp_getblksz(struct vnode *vp, daddr_t lbn)
+ffs_gbp_getblksz(struct vnode *vp, daddr_t lbn, long *sz)
 {
 
-	return (blksize(VFSTOUFS(vp->v_mount)->um_fs, VTOI(vp), lbn));
+	*sz = blksize(VFSTOUFS(vp->v_mount)->um_fs, VTOI(vp), lbn);
+	return (0);
 }
 
 static int
@@ -1991,7 +1997,6 @@ ffs_vput_pair(struct vop_vput_pair_args *ap)
 	struct inode *dp, *ip;
 	ino_t ip_ino;
 	u_int64_t ip_gen;
-	off_t old_size;
 	int error, vp_locked;
 
 	dvp = ap->a_dvp;
@@ -2028,7 +2033,6 @@ ffs_vput_pair(struct vop_vput_pair_args *ap)
 		VNASSERT(I_ENDOFF(dp) != 0 && I_ENDOFF(dp) < dp->i_size, dvp,
 		    ("IN_ENDOFF set but I_ENDOFF() is not"));
 		dp->i_flag &= ~IN_ENDOFF;
-		old_size = dp->i_size;
 		error = UFS_TRUNCATE(dvp, (off_t)I_ENDOFF(dp), IO_NORMAL |
 		    (DOINGASYNC(dvp) ? 0 : IO_SYNC), curthread->td_ucred);
 		if (error != 0 && error != ERELOOKUP) {
@@ -2067,7 +2071,7 @@ ffs_vput_pair(struct vop_vput_pair_args *ap)
 	 *    and respond to dead vnodes by returning ESTALE.
 	 */
 	VOP_LOCK(vp, vp_locked | LK_RETRY);
-	if (!VN_IS_DOOMED(vp))
+	if (IS_UFS(vp))
 		return (0);
 
 	/*

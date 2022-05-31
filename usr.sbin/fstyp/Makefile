@@ -3,7 +3,7 @@
 .include <src.opts.mk>
 
 PROG=	fstyp
-SRCS=	apfs.c cd9660.c exfat.c ext2fs.c fstyp.c geli.c hammer.c	\
+SRCS=	apfs.c befs.c cd9660.c exfat.c ext2fs.c fstyp.c geli.c hammer.c	\
 	hammer2.c hfsplus.c msdosfs.c ntfs.c ufs.c
 
 .if ${MK_ZFS} != "no"
@@ -11,8 +11,6 @@ SRCS +=	zfs.c
 .endif
 
 MAN=	fstyp.8
-
-WARNS?=	2
 
 .if ${MK_ICONV} == "yes"
 CFLAGS+=	-DWITH_ICONV
@@ -28,7 +26,7 @@ SUBDIR.${MK_TESTS}+= tests
 .if ${MK_ZFS} != "no"
 IGNORE_PRAGMA=  YES
 
-WARNS?=	0
+CFLAGS+= -DHAVE_ZFS
 CFLAGS.zfs.c+= -DIN_BASE
 CFLAGS.zfs.c+= -I${SRCTOP}/sys/contrib/openzfs/include
 CFLAGS.zfs.c+= -I${SRCTOP}/sys/contrib/openzfs/lib/libspl/include
@@ -37,6 +35,7 @@ CFLAGS.zfs.c+= -I${SRCTOP}/sys/contrib/openzfs/module/icp/include
 CFLAGS.zfs.c+= -include ${SRCTOP}/sys/contrib/openzfs/include/os/freebsd/spl/sys/ccompile.h
 CFLAGS.zfs.c+= -DHAVE_ISSETUGID
 CFLAGS.zfs.c+= -include ${SRCTOP}/sys/modules/zfs/zfs_config.h
+CFLAGS.zfs.c+= -Wno-cast-qual
 .endif
 
 .for src in ${SRCS}

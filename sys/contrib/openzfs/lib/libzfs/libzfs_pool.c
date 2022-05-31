@@ -29,6 +29,7 @@
  * Copyright (c) 2017, Intel Corporation.
  * Copyright (c) 2018, loli10K <ezomori.nozomu@gmail.com>
  * Copyright (c) 2021, Colm Buckley <colm@tuatha.org>
+ * Copyright (c) 2021, Klara Inc.
  */
 
 #include <errno.h>
@@ -61,6 +62,7 @@ static boolean_t zpool_vdev_is_interior(const char *name);
 typedef struct prop_flags {
 	int create:1;	/* Validate property on creation */
 	int import:1;	/* Validate property on import */
+	int vdevprop:1;	/* Validate property as a VDEV property */
 } prop_flags_t;
 
 /*
@@ -314,7 +316,7 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *buf,
 				    len);
 				break;
 			}
-			/* FALLTHROUGH */
+			fallthrough;
 		default:
 			(void) strlcpy(buf, "-", len);
 			break;
@@ -405,7 +407,7 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *buf,
 				(void) snprintf(buf, len, "-");
 				break;
 			}
-			/* FALLTHROUGH */
+			fallthrough;
 		default:
 			(void) snprintf(buf, len, "%llu", (u_longlong_t)intval);
 		}
@@ -467,8 +469,7 @@ zpool_valid_proplist(libzfs_handle_t *hdl, const char *poolname,
 	char *slash, *check;
 	struct stat64 statbuf;
 	zpool_handle_t *zhp;
-	char badword[ZFS_MAXPROPLEN];
-	char badfile[MAXPATHLEN];
+	char report[1024];
 
 	if (nvlist_alloc(&retprops, NV_UNIQUE_NAME, 0) != 0) {
 		(void) no_memory(hdl);
@@ -478,6 +479,35 @@ zpool_valid_proplist(libzfs_handle_t *hdl, const char *poolname,
 	elem = NULL;
 	while ((elem = nvlist_next_nvpair(props, elem)) != NULL) {
 		const char *propname = nvpair_name(elem);
+
+		if (flags.vdevprop && zpool_prop_vdev(propname)) {
+			vdev_prop_t vprop = vdev_name_to_prop(propname);
+
+			if (vdev_prop_readonly(vprop)) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "'%s' "
+				    "is readonly"), propname);
+				(void) zfs_error(hdl, EZFS_PROPREADONLY,
+				    errbuf);
+				goto error;
+			}
+
+			if (zprop_parse_value(hdl, elem, vprop, ZFS_TYPE_VDEV,
+			    retprops, &strval, &intval, errbuf) != 0)
+				goto error;
+
+			continue;
+		} else if (flags.vdevprop && vdev_prop_user(propname)) {
+			if (nvlist_add_nvpair(retprops, elem) != 0) {
+				(void) no_memory(hdl);
+				goto error;
+			}
+			continue;
+		} else if (flags.vdevprop) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "invalid property: '%s'"), propname);
+			(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
+			goto error;
+		}
 
 		prop = zpool_name_to_prop(propname);
 		if (prop == ZPOOL_PROP_INVAL && zpool_prop_feature(propname)) {
@@ -564,8 +594,8 @@ zpool_valid_proplist(libzfs_handle_t *hdl, const char *poolname,
 			if (intval < version ||
 			    !SPA_VERSION_IS_SUPPORTED(intval)) {
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "property '%s' number %d is invalid."),
-				    propname, intval);
+				    "property '%s' number %llu is invalid."),
+				    propname, (unsigned long long)intval);
 				(void) zfs_error(hdl, EZFS_BADVERSION, errbuf);
 				goto error;
 			}
@@ -575,10 +605,11 @@ zpool_valid_proplist(libzfs_handle_t *hdl, const char *poolname,
 			if (intval != 0 &&
 			    (intval < ASHIFT_MIN || intval > ASHIFT_MAX)) {
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "property '%s' number %d is invalid, only "
-				    "values between %" PRId32 " and "
-				    "%" PRId32 " are allowed."),
-				    propname, intval, ASHIFT_MIN, ASHIFT_MAX);
+				    "property '%s' number %llu is invalid, "
+				    "only values between %" PRId32 " and %"
+				    PRId32 " are allowed."),
+				    propname, (unsigned long long)intval,
+				    ASHIFT_MIN, ASHIFT_MAX);
 				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
 				goto error;
 			}
@@ -679,33 +710,14 @@ zpool_valid_proplist(libzfs_handle_t *hdl, const char *poolname,
 			break;
 
 		case ZPOOL_PROP_COMPATIBILITY:
-			switch (zpool_load_compat(strval, NULL,
-			    badword, badfile)) {
+			switch (zpool_load_compat(strval, NULL, report, 1024)) {
 			case ZPOOL_COMPATIBILITY_OK:
+			case ZPOOL_COMPATIBILITY_WARNTOKEN:
 				break;
-			case ZPOOL_COMPATIBILITY_READERR:
-				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "error reading feature file '%s'"),
-				    badfile);
-				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
-				goto error;
 			case ZPOOL_COMPATIBILITY_BADFILE:
-				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "feature file '%s' too large or not "
-				    "newline-terminated"),
-				    badfile);
-				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
-				goto error;
-			case ZPOOL_COMPATIBILITY_BADWORD:
-				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "unknown feature '%s' in feature "
-				    "file '%s'"),
-				    badword, badfile);
-				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
-				goto error;
+			case ZPOOL_COMPATIBILITY_BADTOKEN:
 			case ZPOOL_COMPATIBILITY_NOFILES:
-				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-				    "no feature files specified"));
+				zfs_error_aux(hdl, "%s", report);
 				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
 				goto error;
 			}
@@ -825,7 +837,7 @@ zpool_set_prop(zpool_handle_t *zhp, const char *propname, const char *propval)
 
 int
 zpool_expand_proplist(zpool_handle_t *zhp, zprop_list_t **plp,
-    boolean_t literal)
+    zfs_type_t type, boolean_t literal)
 {
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
 	zprop_list_t *entry;
@@ -836,8 +848,11 @@ zpool_expand_proplist(zpool_handle_t *zhp, zprop_list_t **plp,
 	boolean_t firstexpand = (NULL == *plp);
 	int i;
 
-	if (zprop_expand_list(hdl, plp, ZFS_TYPE_POOL) != 0)
+	if (zprop_expand_list(hdl, plp, type) != 0)
 		return (-1);
+
+	if (type == ZFS_TYPE_VDEV)
+		return (0);
 
 	last = plp;
 	while (*last != NULL)
@@ -912,6 +927,77 @@ zpool_expand_proplist(zpool_handle_t *zhp, zprop_list_t **plp,
 		    NULL, literal) == 0) {
 			if (strlen(buf) > entry->pl_width)
 				entry->pl_width = strlen(buf);
+		}
+	}
+
+	return (0);
+}
+
+int
+vdev_expand_proplist(zpool_handle_t *zhp, const char *vdevname,
+    zprop_list_t **plp)
+{
+	zprop_list_t *entry;
+	char buf[ZFS_MAXPROPLEN];
+	char *strval = NULL;
+	int err = 0;
+	nvpair_t *elem = NULL;
+	nvlist_t *vprops = NULL;
+	nvlist_t *propval = NULL;
+	const char *propname;
+	vdev_prop_t prop;
+	zprop_list_t **last;
+
+	for (entry = *plp; entry != NULL; entry = entry->pl_next) {
+		if (entry->pl_fixed)
+			continue;
+
+		if (zpool_get_vdev_prop(zhp, vdevname, entry->pl_prop,
+		    entry->pl_user_prop, buf, sizeof (buf), NULL,
+		    B_FALSE) == 0) {
+			if (strlen(buf) > entry->pl_width)
+				entry->pl_width = strlen(buf);
+		}
+		if (entry->pl_prop == VDEV_PROP_NAME &&
+		    strlen(vdevname) > entry->pl_width)
+			entry->pl_width = strlen(vdevname);
+	}
+
+	/* Handle the all properties case */
+	last = plp;
+	if (*last != NULL && (*last)->pl_all == B_TRUE) {
+		while (*last != NULL)
+			last = &(*last)->pl_next;
+
+		err = zpool_get_all_vdev_props(zhp, vdevname, &vprops);
+		if (err != 0)
+			return (err);
+
+		while ((elem = nvlist_next_nvpair(vprops, elem)) != NULL) {
+			propname = nvpair_name(elem);
+
+			/* Skip properties that are not user defined */
+			if ((prop = vdev_name_to_prop(propname)) !=
+			    VDEV_PROP_USER)
+				continue;
+
+			if (nvpair_value_nvlist(elem, &propval) != 0)
+				continue;
+
+			verify(nvlist_lookup_string(propval, ZPROP_VALUE,
+			    &strval) == 0);
+
+			if ((entry = zfs_alloc(zhp->zpool_hdl,
+			    sizeof (zprop_list_t))) == NULL)
+				return (ENOMEM);
+
+			entry->pl_prop = prop;
+			entry->pl_user_prop = zfs_strdup(zhp->zpool_hdl,
+			    propname);
+			entry->pl_width = strlen(strval);
+			entry->pl_all = B_TRUE;
+			*last = entry;
+			last = &entry->pl_next;
 		}
 	}
 
@@ -1668,10 +1754,6 @@ zpool_export_common(zpool_handle_t *zhp, boolean_t force, boolean_t hardforce,
     const char *log_str)
 {
 	zfs_cmd_t zc = {"\0"};
-	char msg[1024];
-
-	(void) snprintf(msg, sizeof (msg), dgettext(TEXT_DOMAIN,
-	    "cannot export '%s'"), zhp->zpool_name);
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	zc.zc_cookie = force;
@@ -1686,11 +1768,13 @@ zpool_export_common(zpool_handle_t *zhp, boolean_t force, boolean_t hardforce,
 			    "'%s' has an active shared spare which could be"
 			    " used by other pools once '%s' is exported."),
 			    zhp->zpool_name, zhp->zpool_name);
-			return (zfs_error(zhp->zpool_hdl, EZFS_ACTIVE_SPARE,
-			    msg));
+			return (zfs_error_fmt(zhp->zpool_hdl, EZFS_ACTIVE_SPARE,
+			    dgettext(TEXT_DOMAIN, "cannot export '%s'"),
+			    zhp->zpool_name));
 		default:
 			return (zpool_standard_error_fmt(zhp->zpool_hdl, errno,
-			    msg));
+			    dgettext(TEXT_DOMAIN, "cannot export '%s'"),
+			    zhp->zpool_name));
 		}
 	}
 
@@ -2100,7 +2184,7 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 					    "the zgenhostid(8) command.\n"));
 				}
 
-				(void) zfs_error_aux(hdl, aux);
+				(void) zfs_error_aux(hdl, "%s", aux);
 			}
 			(void) zfs_error(hdl, EZFS_ACTIVE_POOL, desc);
 			break;
@@ -3385,9 +3469,20 @@ zpool_vdev_attach(zpool_handle_t *zhp, const char *old_disk,
 				    "cannot replace a replacing device"));
 			}
 		} else {
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "can only attach to mirrors and top-level "
-			    "disks"));
+			char status[64] = {0};
+			zpool_prop_get_feature(zhp,
+			    "feature@device_rebuild", status, 63);
+			if (rebuild &&
+			    strncmp(status, ZFS_FEATURE_DISABLED, 64) == 0) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "device_rebuild feature must be enabled "
+				    "in order to use sequential "
+				    "reconstruction"));
+			} else {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "can only attach to mirrors and top-level "
+				    "disks"));
+			}
 		}
 		(void) zfs_error(hdl, EZFS_BADTARGET, msg);
 		break;
@@ -3712,8 +3807,8 @@ zpool_vdev_split(zpool_handle_t *zhp, char *newname, nvlist_t **newroot,
 	}
 
 	/* Add all the children we found */
-	if (nvlist_add_nvlist_array(*newroot, ZPOOL_CONFIG_CHILDREN, varray,
-	    lastlog == 0 ? vcount : lastlog) != 0)
+	if (nvlist_add_nvlist_array(*newroot, ZPOOL_CONFIG_CHILDREN,
+	    (const nvlist_t **)varray, lastlog == 0 ? vcount : lastlog) != 0)
 		goto out;
 
 	/*
@@ -4330,7 +4425,7 @@ zfs_save_arguments(int argc, char **argv, char *string, int len)
 {
 	int i;
 
-	(void) strlcpy(string, basename(argv[0]), len);
+	(void) strlcpy(string, zfs_basename(argv[0]), len);
 	for (i = 1; i < argc; i++) {
 		(void) strlcat(string, " ", len);
 		(void) strlcat(string, argv[i], len);
@@ -4456,7 +4551,7 @@ zpool_get_history(zpool_handle_t *zhp, nvlist_t **nvhisp, uint64_t *off,
 	if (!err) {
 		verify(nvlist_alloc(nvhisp, NV_UNIQUE_NAME, 0) == 0);
 		verify(nvlist_add_nvlist_array(*nvhisp, ZPOOL_HIST_RECORD,
-		    records, numrecords) == 0);
+		    (const nvlist_t **)records, numrecords) == 0);
 	}
 	for (i = 0; i < numrecords; i++)
 		nvlist_free(records[i]);
@@ -4540,13 +4635,10 @@ int
 zpool_events_clear(libzfs_handle_t *hdl, int *count)
 {
 	zfs_cmd_t zc = {"\0"};
-	char msg[1024];
-
-	(void) snprintf(msg, sizeof (msg), dgettext(TEXT_DOMAIN,
-	    "cannot clear events"));
 
 	if (zfs_ioctl(hdl, ZFS_IOC_EVENTS_CLEAR, &zc) != 0)
-		return (zpool_standard_error_fmt(hdl, errno, msg));
+		return (zpool_standard_error(hdl, errno,
+		    dgettext(TEXT_DOMAIN, "cannot clear events")));
 
 	if (count != NULL)
 		*count = (int)zc.zc_cookie; /* # of events cleared */
@@ -4742,8 +4834,8 @@ zpool_get_bootenv(zpool_handle_t *zhp, nvlist_t **nvlp)
  * Arguments:
  *  compatibility : string containing feature filenames
  *  features : either NULL or pointer to array of boolean
- *  badtoken : either NULL or pointer to char[ZFS_MAXPROPLEN]
- *  badfile : either NULL or pointer to char[MAXPATHLEN]
+ *  report : either NULL or pointer to string buffer
+ *  rlen : length of "report" buffer
  *
  * compatibility is NULL (unset), "", "off", "legacy", or list of
  * comma-separated filenames. filenames should either be absolute,
@@ -4752,48 +4844,56 @@ zpool_get_bootenv(zpool_handle_t *zhp, nvlist_t **nvlp)
  *   2) ZPOOL_DATA_COMPAT_D (eg: /usr/share/zfs/compatibility.d).
  * (Unset), "" or "off" => enable all features
  * "legacy" => disable all features
+ *
  * Any feature names read from files which match unames in spa_feature_table
  * will have the corresponding boolean set in the features array (if non-NULL).
  * If more than one feature set specified, only features present in *all* of
  * them will be set.
  *
- * An unreadable filename will be strlcpy'd to badfile (if non-NULL).
- * An unrecognized feature will be strlcpy'd to badtoken (if non-NULL).
+ * "report" if not NULL will be populated with a suitable status message.
  *
  * Return values:
  *   ZPOOL_COMPATIBILITY_OK : files read and parsed ok
- *   ZPOOL_COMPATIBILITY_READERR : file could not be opened / mmap'd
  *   ZPOOL_COMPATIBILITY_BADFILE : file too big or not a text file
- *   ZPOOL_COMPATIBILITY_BADWORD : file contains invalid feature name
- *   ZPOOL_COMPATIBILITY_NOFILES  : no file names found
+ *   ZPOOL_COMPATIBILITY_BADTOKEN : SYSCONF file contains invalid feature name
+ *   ZPOOL_COMPATIBILITY_WARNTOKEN : DATA file contains invalid feature name
+ *   ZPOOL_COMPATIBILITY_NOFILES : no feature files found
  */
 zpool_compat_status_t
-zpool_load_compat(const char *compatibility,
-    boolean_t *features, char *badtoken, char *badfile)
+zpool_load_compat(const char *compat, boolean_t *features, char *report,
+    size_t rlen)
 {
 	int sdirfd, ddirfd, featfd;
-	int i;
 	struct stat fs;
-	char *fc;			/* mmap of file */
-	char *ps, *ls, *ws;		/* strtok state */
+	char *fc;
+	char *ps, *ls, *ws;
 	char *file, *line, *word;
-	char filenames[ZFS_MAXPROPLEN];
-	int filecount = 0;
+
+	char l_compat[ZFS_MAXPROPLEN];
+
+	boolean_t ret_nofiles = B_TRUE;
+	boolean_t ret_badfile = B_FALSE;
+	boolean_t ret_badtoken = B_FALSE;
+	boolean_t ret_warntoken = B_FALSE;
 
 	/* special cases (unset), "" and "off" => enable all features */
-	if (compatibility == NULL || compatibility[0] == '\0' ||
-	    strcmp(compatibility, ZPOOL_COMPAT_OFF) == 0) {
+	if (compat == NULL || compat[0] == '\0' ||
+	    strcmp(compat, ZPOOL_COMPAT_OFF) == 0) {
 		if (features != NULL)
-			for (i = 0; i < SPA_FEATURES; i++)
+			for (uint_t i = 0; i < SPA_FEATURES; i++)
 				features[i] = B_TRUE;
+		if (report != NULL)
+			strlcpy(report, gettext("all features enabled"), rlen);
 		return (ZPOOL_COMPATIBILITY_OK);
 	}
 
 	/* Final special case "legacy" => disable all features */
-	if (strcmp(compatibility, ZPOOL_COMPAT_LEGACY) == 0) {
+	if (strcmp(compat, ZPOOL_COMPAT_LEGACY) == 0) {
 		if (features != NULL)
-			for (i = 0; i < SPA_FEATURES; i++)
+			for (uint_t i = 0; i < SPA_FEATURES; i++)
 				features[i] = B_FALSE;
+		if (report != NULL)
+			strlcpy(report, gettext("all features disabled"), rlen);
 		return (ZPOOL_COMPATIBILITY_OK);
 	}
 
@@ -4801,122 +4901,513 @@ zpool_load_compat(const char *compatibility,
 	 * Start with all true; will be ANDed with results from each file
 	 */
 	if (features != NULL)
-		for (i = 0; i < SPA_FEATURES; i++)
+		for (uint_t i = 0; i < SPA_FEATURES; i++)
 			features[i] = B_TRUE;
+
+	char err_badfile[1024] = "";
+	char err_badtoken[1024] = "";
 
 	/*
 	 * We ignore errors from the directory open()
 	 * as they're only needed if the filename is relative
 	 * which will be checked during the openat().
 	 */
-#ifdef O_PATH
-	sdirfd = open(ZPOOL_SYSCONF_COMPAT_D, O_DIRECTORY | O_PATH);
-	ddirfd = open(ZPOOL_DATA_COMPAT_D, O_DIRECTORY | O_PATH);
+
+/* O_PATH safer than O_RDONLY if system allows it */
+#if defined(O_PATH)
+#define	ZC_DIR_FLAGS (O_DIRECTORY | O_CLOEXEC | O_PATH)
 #else
-	sdirfd = open(ZPOOL_SYSCONF_COMPAT_D, O_DIRECTORY | O_RDONLY);
-	ddirfd = open(ZPOOL_DATA_COMPAT_D, O_DIRECTORY | O_RDONLY);
+#define	ZC_DIR_FLAGS (O_DIRECTORY | O_CLOEXEC | O_RDONLY)
 #endif
 
-	(void) strlcpy(filenames, compatibility, ZFS_MAXPROPLEN);
-	file = strtok_r(filenames, ",", &ps);
-	while (file != NULL) {
-		boolean_t features_local[SPA_FEATURES];
+	sdirfd = open(ZPOOL_SYSCONF_COMPAT_D, ZC_DIR_FLAGS);
+	ddirfd = open(ZPOOL_DATA_COMPAT_D, ZC_DIR_FLAGS);
+
+	(void) strlcpy(l_compat, compat, ZFS_MAXPROPLEN);
+
+	for (file = strtok_r(l_compat, ",", &ps);
+	    file != NULL;
+	    file = strtok_r(NULL, ",", &ps)) {
+
+		boolean_t l_features[SPA_FEATURES];
+
+		enum { Z_SYSCONF, Z_DATA } source;
 
 		/* try sysconfdir first, then datadir */
-		if ((featfd = openat(sdirfd, file, 0, O_RDONLY)) < 0)
-			featfd = openat(ddirfd, file, 0, O_RDONLY);
-
-		if (featfd < 0 || fstat(featfd, &fs) < 0) {
-			(void) close(featfd);
-			(void) close(sdirfd);
-			(void) close(ddirfd);
-			if (badfile != NULL)
-				(void) strlcpy(badfile, file, MAXPATHLEN);
-			return (ZPOOL_COMPATIBILITY_READERR);
+		source = Z_SYSCONF;
+		if ((featfd = openat(sdirfd, file, O_RDONLY | O_CLOEXEC)) < 0) {
+			featfd = openat(ddirfd, file, O_RDONLY | O_CLOEXEC);
+			source = Z_DATA;
 		}
 
-		/* Too big or too small */
-		if (fs.st_size < 1 || fs.st_size > ZPOOL_COMPAT_MAXSIZE) {
+		/* File readable and correct size? */
+		if (featfd < 0 ||
+		    fstat(featfd, &fs) < 0 ||
+		    fs.st_size < 1 ||
+		    fs.st_size > ZPOOL_COMPAT_MAXSIZE) {
 			(void) close(featfd);
-			(void) close(sdirfd);
-			(void) close(ddirfd);
-			if (badfile != NULL)
-				(void) strlcpy(badfile, file, MAXPATHLEN);
-			return (ZPOOL_COMPATIBILITY_BADFILE);
+			strlcat(err_badfile, file, ZFS_MAXPROPLEN);
+			strlcat(err_badfile, " ", ZFS_MAXPROPLEN);
+			ret_badfile = B_TRUE;
+			continue;
 		}
+
+/* Prefault the file if system allows */
+#if defined(MAP_POPULATE)
+#define	ZC_MMAP_FLAGS (MAP_PRIVATE | MAP_POPULATE)
+#elif defined(MAP_PREFAULT_READ)
+#define	ZC_MMAP_FLAGS (MAP_PRIVATE | MAP_PREFAULT_READ)
+#else
+#define	ZC_MMAP_FLAGS (MAP_PRIVATE)
+#endif
 
 		/* private mmap() so we can strtok safely */
-		fc = (char *)mmap(NULL, fs.st_size,
-		    PROT_READ|PROT_WRITE, MAP_PRIVATE, featfd, 0);
+		fc = (char *)mmap(NULL, fs.st_size, PROT_READ | PROT_WRITE,
+		    ZC_MMAP_FLAGS, featfd, 0);
 		(void) close(featfd);
 
-		if (fc < 0) {
-			(void) close(sdirfd);
-			(void) close(ddirfd);
-			if (badfile != NULL)
-				(void) strlcpy(badfile, file, MAXPATHLEN);
-			return (ZPOOL_COMPATIBILITY_READERR);
-		}
-
-		/* Text file sanity check - last char should be newline */
-		if (fc[fs.st_size - 1] != '\n') {
+		/* map ok, and last character == newline? */
+		if (fc == MAP_FAILED || fc[fs.st_size - 1] != '\n') {
 			(void) munmap((void *) fc, fs.st_size);
-			(void) close(sdirfd);
-			(void) close(ddirfd);
-			if (badfile != NULL)
-				(void) strlcpy(badfile, file, MAXPATHLEN);
-			return (ZPOOL_COMPATIBILITY_BADFILE);
+			strlcat(err_badfile, file, ZFS_MAXPROPLEN);
+			strlcat(err_badfile, " ", ZFS_MAXPROPLEN);
+			ret_badfile = B_TRUE;
+			continue;
 		}
 
-		/* replace with NUL to ensure we have a delimiter */
+		ret_nofiles = B_FALSE;
+
+		for (uint_t i = 0; i < SPA_FEATURES; i++)
+			l_features[i] = B_FALSE;
+
+		/* replace final newline with NULL to ensure string ends */
 		fc[fs.st_size - 1] = '\0';
 
-		for (i = 0; i < SPA_FEATURES; i++)
-			features_local[i] = B_FALSE;
-
-		line = strtok_r(fc, "\n", &ls);
-		while (line != NULL) {
+		for (line = strtok_r(fc, "\n", &ls);
+		    line != NULL;
+		    line = strtok_r(NULL, "\n", &ls)) {
 			/* discard comments */
-			*(strchrnul(line, '#')) = '\0';
+			char *r = strchr(line, '#');
+			if (r != NULL)
+				*r = '\0';
 
-			word = strtok_r(line, ", \t", &ws);
-			while (word != NULL) {
+			for (word = strtok_r(line, ", \t", &ws);
+			    word != NULL;
+			    word = strtok_r(NULL, ", \t", &ws)) {
 				/* Find matching feature name */
-				for (i = 0; i < SPA_FEATURES; i++) {
+				uint_t f;
+				for (f = 0; f < SPA_FEATURES; f++) {
 					zfeature_info_t *fi =
-					    &spa_feature_table[i];
+					    &spa_feature_table[f];
 					if (strcmp(word, fi->fi_uname) == 0) {
-						features_local[i] = B_TRUE;
+						l_features[f] = B_TRUE;
 						break;
 					}
 				}
-				if (i == SPA_FEATURES) {
-					if (badtoken != NULL)
-						(void) strlcpy(badtoken, word,
-						    ZFS_MAXPROPLEN);
-					if (badfile != NULL)
-						(void) strlcpy(badfile, file,
-						    MAXPATHLEN);
-					(void) munmap((void *) fc, fs.st_size);
-					(void) close(sdirfd);
-					(void) close(ddirfd);
-					return (ZPOOL_COMPATIBILITY_BADWORD);
-				}
-				word = strtok_r(NULL, ", \t", &ws);
+				if (f < SPA_FEATURES)
+					continue;
+
+				/* found an unrecognized word */
+				/* lightly sanitize it */
+				if (strlen(word) > 32)
+					word[32] = '\0';
+				for (char *c = word; *c != '\0'; c++)
+					if (!isprint(*c))
+						*c = '?';
+
+				strlcat(err_badtoken, word, ZFS_MAXPROPLEN);
+				strlcat(err_badtoken, " ", ZFS_MAXPROPLEN);
+				if (source == Z_SYSCONF)
+					ret_badtoken = B_TRUE;
+				else
+					ret_warntoken = B_TRUE;
 			}
-			line = strtok_r(NULL, "\n", &ls);
 		}
 		(void) munmap((void *) fc, fs.st_size);
-		if (features != NULL) {
-			for (i = 0; i < SPA_FEATURES; i++)
-				features[i] &= features_local[i];
-		}
-		filecount++;
-		file = strtok_r(NULL, ",", &ps);
+
+		if (features != NULL)
+			for (uint_t i = 0; i < SPA_FEATURES; i++)
+				features[i] &= l_features[i];
 	}
 	(void) close(sdirfd);
 	(void) close(ddirfd);
-	if (filecount == 0)
+
+	/* Return the most serious error */
+	if (ret_badfile) {
+		if (report != NULL)
+			snprintf(report, rlen, gettext("could not read/"
+			    "parse feature file(s): %s"), err_badfile);
+		return (ZPOOL_COMPATIBILITY_BADFILE);
+	}
+	if (ret_nofiles) {
+		if (report != NULL)
+			strlcpy(report,
+			    gettext("no valid compatibility files specified"),
+			    rlen);
 		return (ZPOOL_COMPATIBILITY_NOFILES);
+	}
+	if (ret_badtoken) {
+		if (report != NULL)
+			snprintf(report, rlen, gettext("invalid feature "
+			    "name(s) in local compatibility files: %s"),
+			    err_badtoken);
+		return (ZPOOL_COMPATIBILITY_BADTOKEN);
+	}
+	if (ret_warntoken) {
+		if (report != NULL)
+			snprintf(report, rlen, gettext("unrecognized feature "
+			    "name(s) in distribution compatibility files: %s"),
+			    err_badtoken);
+		return (ZPOOL_COMPATIBILITY_WARNTOKEN);
+	}
+	if (report != NULL)
+		strlcpy(report, gettext("compatibility set ok"), rlen);
 	return (ZPOOL_COMPATIBILITY_OK);
+}
+
+static int
+zpool_vdev_guid(zpool_handle_t *zhp, const char *vdevname, uint64_t *vdev_guid)
+{
+	nvlist_t *tgt;
+	boolean_t avail_spare, l2cache;
+
+	verify(zhp != NULL);
+	if (zpool_get_state(zhp) == POOL_STATE_UNAVAIL) {
+		char errbuf[1024];
+		(void) snprintf(errbuf, sizeof (errbuf),
+		    dgettext(TEXT_DOMAIN, "pool is in an unavailable state"));
+		return (zfs_error(zhp->zpool_hdl, EZFS_POOLUNAVAIL, errbuf));
+	}
+
+	if ((tgt = zpool_find_vdev(zhp, vdevname, &avail_spare, &l2cache,
+	    NULL)) == NULL) {
+		char errbuf[1024];
+		(void) snprintf(errbuf, sizeof (errbuf),
+		    dgettext(TEXT_DOMAIN, "can not find %s in %s"),
+		    vdevname, zhp->zpool_name);
+		return (zfs_error(zhp->zpool_hdl, EZFS_NODEVICE, errbuf));
+	}
+
+	verify(nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_GUID, vdev_guid) == 0);
+	return (0);
+}
+
+/*
+ * Get a vdev property value for 'prop' and return the value in
+ * a pre-allocated buffer.
+ */
+int
+zpool_get_vdev_prop_value(nvlist_t *nvprop, vdev_prop_t prop, char *prop_name,
+    char *buf, size_t len, zprop_source_t *srctype, boolean_t literal)
+{
+	nvlist_t *nv;
+	uint64_t intval;
+	char *strval;
+	zprop_source_t src = ZPROP_SRC_NONE;
+
+	if (prop == VDEV_PROP_USER) {
+		/* user property, prop_name must contain the property name */
+		assert(prop_name != NULL);
+		if (nvlist_lookup_nvlist(nvprop, prop_name, &nv) == 0) {
+			verify(nvlist_lookup_uint64(nv, ZPROP_SOURCE,
+			    &intval) == 0);
+			src = intval;
+			verify(nvlist_lookup_string(nv, ZPROP_VALUE,
+			    &strval) == 0);
+		} else {
+			/* user prop not found */
+			return (-1);
+		}
+		(void) strlcpy(buf, strval, len);
+		if (srctype)
+			*srctype = src;
+		return (0);
+	}
+
+	if (prop_name == NULL)
+		prop_name = (char *)vdev_prop_to_name(prop);
+
+	switch (vdev_prop_get_type(prop)) {
+	case PROP_TYPE_STRING:
+		if (nvlist_lookup_nvlist(nvprop, prop_name, &nv) == 0) {
+			verify(nvlist_lookup_uint64(nv, ZPROP_SOURCE,
+			    &intval) == 0);
+			src = intval;
+			verify(nvlist_lookup_string(nv, ZPROP_VALUE,
+			    &strval) == 0);
+		} else {
+			src = ZPROP_SRC_DEFAULT;
+			if ((strval = (char *)vdev_prop_default_string(prop))
+			    == NULL)
+				strval = "-";
+		}
+		(void) strlcpy(buf, strval, len);
+		break;
+
+	case PROP_TYPE_NUMBER:
+		if (nvlist_lookup_nvlist(nvprop, prop_name, &nv) == 0) {
+			verify(nvlist_lookup_uint64(nv, ZPROP_SOURCE,
+			    &intval) == 0);
+			src = intval;
+			verify(nvlist_lookup_uint64(nv, ZPROP_VALUE,
+			    &intval) == 0);
+		} else {
+			src = ZPROP_SRC_DEFAULT;
+			intval = vdev_prop_default_numeric(prop);
+		}
+
+		switch (prop) {
+		case VDEV_PROP_ASIZE:
+		case VDEV_PROP_PSIZE:
+		case VDEV_PROP_SIZE:
+		case VDEV_PROP_ALLOCATED:
+		case VDEV_PROP_FREE:
+		case VDEV_PROP_READ_ERRORS:
+		case VDEV_PROP_WRITE_ERRORS:
+		case VDEV_PROP_CHECKSUM_ERRORS:
+		case VDEV_PROP_INITIALIZE_ERRORS:
+		case VDEV_PROP_OPS_NULL:
+		case VDEV_PROP_OPS_READ:
+		case VDEV_PROP_OPS_WRITE:
+		case VDEV_PROP_OPS_FREE:
+		case VDEV_PROP_OPS_CLAIM:
+		case VDEV_PROP_OPS_TRIM:
+		case VDEV_PROP_BYTES_NULL:
+		case VDEV_PROP_BYTES_READ:
+		case VDEV_PROP_BYTES_WRITE:
+		case VDEV_PROP_BYTES_FREE:
+		case VDEV_PROP_BYTES_CLAIM:
+		case VDEV_PROP_BYTES_TRIM:
+			if (literal) {
+				(void) snprintf(buf, len, "%llu",
+				    (u_longlong_t)intval);
+			} else {
+				(void) zfs_nicenum(intval, buf, len);
+			}
+			break;
+		case VDEV_PROP_EXPANDSZ:
+			if (intval == 0) {
+				(void) strlcpy(buf, "-", len);
+			} else if (literal) {
+				(void) snprintf(buf, len, "%llu",
+				    (u_longlong_t)intval);
+			} else {
+				(void) zfs_nicenum(intval, buf, len);
+			}
+			break;
+		case VDEV_PROP_CAPACITY:
+			if (literal) {
+				(void) snprintf(buf, len, "%llu",
+				    (u_longlong_t)intval);
+			} else {
+				(void) snprintf(buf, len, "%llu%%",
+				    (u_longlong_t)intval);
+			}
+			break;
+		case VDEV_PROP_FRAGMENTATION:
+			if (intval == UINT64_MAX) {
+				(void) strlcpy(buf, "-", len);
+			} else {
+				(void) snprintf(buf, len, "%llu%%",
+				    (u_longlong_t)intval);
+			}
+			break;
+		case VDEV_PROP_STATE:
+			if (literal) {
+				(void) snprintf(buf, len, "%llu",
+				    (u_longlong_t)intval);
+			} else {
+				(void) strlcpy(buf, zpool_state_to_name(intval,
+				    VDEV_AUX_NONE), len);
+			}
+			break;
+		default:
+			(void) snprintf(buf, len, "%llu",
+			    (u_longlong_t)intval);
+		}
+		break;
+
+	case PROP_TYPE_INDEX:
+		if (nvlist_lookup_nvlist(nvprop, prop_name, &nv) == 0) {
+			verify(nvlist_lookup_uint64(nv, ZPROP_SOURCE,
+			    &intval) == 0);
+			src = intval;
+			verify(nvlist_lookup_uint64(nv, ZPROP_VALUE,
+			    &intval) == 0);
+		} else {
+			src = ZPROP_SRC_DEFAULT;
+			intval = vdev_prop_default_numeric(prop);
+		}
+		if (vdev_prop_index_to_string(prop, intval,
+		    (const char **)&strval) != 0)
+			return (-1);
+		(void) strlcpy(buf, strval, len);
+		break;
+
+	default:
+		abort();
+	}
+
+	if (srctype)
+		*srctype = src;
+
+	return (0);
+}
+
+/*
+ * Get a vdev property value for 'prop_name' and return the value in
+ * a pre-allocated buffer.
+ */
+int
+zpool_get_vdev_prop(zpool_handle_t *zhp, const char *vdevname, vdev_prop_t prop,
+    char *prop_name, char *buf, size_t len, zprop_source_t *srctype,
+    boolean_t literal)
+{
+	nvlist_t *reqnvl, *reqprops;
+	nvlist_t *retprops = NULL;
+	uint64_t vdev_guid;
+	int ret;
+
+	if ((ret = zpool_vdev_guid(zhp, vdevname, &vdev_guid)) != 0)
+		return (ret);
+
+	if (nvlist_alloc(&reqnvl, NV_UNIQUE_NAME, 0) != 0)
+		return (no_memory(zhp->zpool_hdl));
+	if (nvlist_alloc(&reqprops, NV_UNIQUE_NAME, 0) != 0)
+		return (no_memory(zhp->zpool_hdl));
+
+	fnvlist_add_uint64(reqnvl, ZPOOL_VDEV_PROPS_GET_VDEV, vdev_guid);
+
+	if (prop != VDEV_PROP_USER) {
+		/* prop_name overrides prop value */
+		if (prop_name != NULL)
+			prop = vdev_name_to_prop(prop_name);
+		else
+			prop_name = (char *)vdev_prop_to_name(prop);
+		assert(prop < VDEV_NUM_PROPS);
+	}
+
+	assert(prop_name != NULL);
+	if (nvlist_add_uint64(reqprops, prop_name, prop) != 0) {
+		nvlist_free(reqnvl);
+		nvlist_free(reqprops);
+		return (no_memory(zhp->zpool_hdl));
+	}
+
+	fnvlist_add_nvlist(reqnvl, ZPOOL_VDEV_PROPS_GET_PROPS, reqprops);
+
+	ret = lzc_get_vdev_prop(zhp->zpool_name, reqnvl, &retprops);
+
+	if (ret == 0) {
+		ret = zpool_get_vdev_prop_value(retprops, prop, prop_name, buf,
+		    len, srctype, literal);
+	} else {
+		char errbuf[1024];
+		(void) snprintf(errbuf, sizeof (errbuf),
+		    dgettext(TEXT_DOMAIN, "cannot get vdev property %s from"
+		    " %s in %s"), prop_name, vdevname, zhp->zpool_name);
+		(void) zpool_standard_error(zhp->zpool_hdl, ret, errbuf);
+	}
+
+	nvlist_free(reqnvl);
+	nvlist_free(reqprops);
+	nvlist_free(retprops);
+
+	return (ret);
+}
+
+/*
+ * Get all vdev properties
+ */
+int
+zpool_get_all_vdev_props(zpool_handle_t *zhp, const char *vdevname,
+    nvlist_t **outnvl)
+{
+	nvlist_t *nvl = NULL;
+	uint64_t vdev_guid;
+	int ret;
+
+	if ((ret = zpool_vdev_guid(zhp, vdevname, &vdev_guid)) != 0)
+		return (ret);
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+		return (no_memory(zhp->zpool_hdl));
+
+	fnvlist_add_uint64(nvl, ZPOOL_VDEV_PROPS_GET_VDEV, vdev_guid);
+
+	ret = lzc_get_vdev_prop(zhp->zpool_name, nvl, outnvl);
+
+	nvlist_free(nvl);
+
+	if (ret) {
+		char errbuf[1024];
+		(void) snprintf(errbuf, sizeof (errbuf),
+		    dgettext(TEXT_DOMAIN, "cannot get vdev properties for"
+		    " %s in %s"), vdevname, zhp->zpool_name);
+		(void) zpool_standard_error(zhp->zpool_hdl, errno, errbuf);
+	}
+
+	return (ret);
+}
+
+/*
+ * Set vdev property
+ */
+int
+zpool_set_vdev_prop(zpool_handle_t *zhp, const char *vdevname,
+    const char *propname, const char *propval)
+{
+	int ret;
+	nvlist_t *nvl = NULL;
+	nvlist_t *outnvl = NULL;
+	nvlist_t *props;
+	nvlist_t *realprops;
+	prop_flags_t flags = { 0 };
+	uint64_t version;
+	uint64_t vdev_guid;
+
+	if ((ret = zpool_vdev_guid(zhp, vdevname, &vdev_guid)) != 0)
+		return (ret);
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+		return (no_memory(zhp->zpool_hdl));
+	if (nvlist_alloc(&props, NV_UNIQUE_NAME, 0) != 0)
+		return (no_memory(zhp->zpool_hdl));
+
+	fnvlist_add_uint64(nvl, ZPOOL_VDEV_PROPS_SET_VDEV, vdev_guid);
+
+	if (nvlist_add_string(props, propname, propval) != 0) {
+		nvlist_free(props);
+		return (no_memory(zhp->zpool_hdl));
+	}
+
+	char errbuf[1024];
+	(void) snprintf(errbuf, sizeof (errbuf),
+	    dgettext(TEXT_DOMAIN, "cannot set property %s for %s on %s"),
+	    propname, vdevname, zhp->zpool_name);
+
+	flags.vdevprop = 1;
+	version = zpool_get_prop_int(zhp, ZPOOL_PROP_VERSION, NULL);
+	if ((realprops = zpool_valid_proplist(zhp->zpool_hdl,
+	    zhp->zpool_name, props, version, flags, errbuf)) == NULL) {
+		nvlist_free(props);
+		nvlist_free(nvl);
+		return (-1);
+	}
+
+	nvlist_free(props);
+	props = realprops;
+
+	fnvlist_add_nvlist(nvl, ZPOOL_VDEV_PROPS_SET_PROPS, props);
+
+	ret = lzc_set_vdev_prop(zhp->zpool_name, nvl, &outnvl);
+
+	nvlist_free(props);
+	nvlist_free(nvl);
+	nvlist_free(outnvl);
+
+	if (ret)
+		(void) zpool_standard_error(zhp->zpool_hdl, errno, errbuf);
+
+	return (ret);
 }

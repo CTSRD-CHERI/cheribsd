@@ -32,6 +32,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_page.h>
+#include <vm/vm_phys.h>
 #include <vm/vm_dumpset.h>
 #include <vm/uma.h>
 #include <vm/uma_int.h>
@@ -47,16 +48,16 @@ uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
 	void *va;
 
 	*flags = UMA_SLAB_PRIV;
-	m = vm_page_alloc_domain(NULL, 0, domain,
-	    malloc2vm_flags(wait) | VM_ALLOC_NOOBJ | VM_ALLOC_WIRED);
+	m = vm_page_alloc_noobj_domain(domain, malloc2vm_flags(wait) |
+	    VM_ALLOC_WIRED);
 	if (m == NULL)
 		return (NULL);
 	pa = m->phys_addr;
 	if ((wait & M_NODUMP) == 0)
 		dump_add_page(pa);
+	KASSERT(bytes == PAGE_SIZE, ("%s: invalid allocation size %zu",
+	    __func__, bytes));
 	va = (void *)cheri_kern_setbounds(PHYS_TO_DMAP(pa), PAGE_SIZE);
-	if ((wait & M_ZERO) && (m->flags & PG_ZERO) == 0)
-		bzero(va, PAGE_SIZE);
 	return (va);
 }
 
@@ -66,6 +67,12 @@ uma_small_free(void *mem, vm_size_t size, u_int8_t flags)
 	vm_page_t m;
 	vm_paddr_t pa;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	KASSERT(!cheri_getsealed(mem),
+	    ("uma_small_free: Unexpected sealed capability %#p", mem));
+	KASSERT(cheri_gettag(mem),
+	    ("uma_small_free: Attempt to free invalid capability %#p", mem));
+#endif
 	pa = DMAP_TO_PHYS((vm_offset_t)mem);
 	dump_drop_page(pa);
 	m = PHYS_TO_VM_PAGE(pa);

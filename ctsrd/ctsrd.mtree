@@ -1,9 +1,0 @@
-/set type=dir uname=root gname=wheel mode=0755
-.              nochange
-    usr            nochange
-        share          nochange
-            images
-            ..
-        ..
-    ..
-..

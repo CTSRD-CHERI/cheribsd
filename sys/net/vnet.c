@@ -208,6 +208,9 @@ static MALLOC_DEFINE(M_VNET_DATA_FREE, "vnet_data_free",
 static TAILQ_HEAD(, vnet_data_free) vnet_data_free_head =
 	    TAILQ_HEAD_INITIALIZER(vnet_data_free_head);
 static struct sx vnet_data_free_lock;
+#ifdef __CHERI_PURE_CAPABILITY__
+uintptr_t vnet_start = VNET_START;
+#endif
 
 SDT_PROVIDER_DEFINE(vnet);
 SDT_PROBE_DEFINE1(vnet, functions, vnet_alloc, entry, "int");

@@ -35,6 +35,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <sys/kdb.h>
 #include <sys/pcpu.h>
+#include <sys/reg.h>
 #include <sys/smp.h>
 #include <sys/systm.h>
 
@@ -44,7 +45,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/debug_monitor.h>
 #include <machine/kdb.h>
 #include <machine/pcb.h>
-#include <machine/reg.h>
 
 #include <ddb/ddb.h>
 #include <ddb/db_access.h>
@@ -960,6 +960,10 @@ vectr_clr:
 void
 dbg_monitor_init(void)
 {
+#ifdef	ARM_FORCE_DBG_MONITOR_DISABLE
+	db_printf("ARM Debug Architecture disabled in kernel compilation.\n");
+	return;
+#else
 	int err;
 
 	/* Fetch ARM Debug Architecture model */
@@ -1001,6 +1005,7 @@ dbg_monitor_init(void)
 
 	db_printf("HW Breakpoints/Watchpoints not enabled on CPU%d\n",
 	    PCPU_GET(cpuid));
+#endif	/* ARM_FORCE_DBG_MONITOR_DISABLE */
 }
 
 CTASSERT(sizeof(struct dbreg) == sizeof(((struct pcpu *)NULL)->pc_dbreg));

@@ -43,7 +43,9 @@ struct m_snd_tag;
 struct tcp_hwrate_limit_table {
 	const struct tcp_rate_set *ptbl;	/* Pointer to parent table */
 	struct m_snd_tag *tag;	/* Send tag if needed (chelsio) */
-	uint64_t rate;		/* Rate we get in Bytes per second (Bps) */
+	long	 rate;		/* Rate we get in Bytes per second (Bps) */
+	long	 using;		/* How many flows are using this hdwr rate. */
+	long	 rs_num_enobufs;
 	uint32_t time_between;	/* Time-Gap between packets at this rate */
 	uint32_t flags;
 };
@@ -145,6 +147,20 @@ tcp_rel_pacing_rate(const struct tcp_hwrate_limit_table *crte,
 {
 	return;
 }
+
+static uint64_t inline
+tcp_hw_highest_rate(const struct tcp_hwrate_limit_table *rle)
+{
+	return (0);
+}
+
+static uint64_t inline
+tcp_hw_highest_rate_ifp(struct ifnet *ifp, struct inpcb *inp)
+{
+	return (0);
+}
+
+
 #endif
 /*
  * Given a b/w and a segsiz, and optional hardware

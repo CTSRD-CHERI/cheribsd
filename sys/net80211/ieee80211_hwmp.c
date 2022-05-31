@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2009 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Rui Paulo under sponsorship from the
  * FreeBSD Foundation.
@@ -173,7 +172,7 @@ SYSCTL_PROC(_net_wlan_hwmp, OID_AUTO, net_diameter_traversal_time,
     CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
     &ieee80211_hwmp_net_diameter_traversaltime, 0,
     ieee80211_sysctl_msecs_ticks, "I",
-    "estimate travelse time across the MBSS (ms)");
+    "estimate traversal time across the MBSS (ms)");
 static int	ieee80211_hwmp_roottimeout = -1;
 SYSCTL_PROC(_net_wlan_hwmp, OID_AUTO, roottimeout,
     CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
@@ -1840,7 +1839,7 @@ hwmp_send_rann(struct ieee80211vap *vap,
 	 *     [6] addr3 = sa
 	 *     [1] action
 	 *     [1] category
-	 *     [tlv] root annoucement
+	 *     [tlv] root announcement
 	 */
 	rann->rann_ie = IEEE80211_ELEMID_MESHRANN;
 	rann->rann_len = IEEE80211_MESHRANN_BASE_SZ;

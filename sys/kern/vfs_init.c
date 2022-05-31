@@ -213,12 +213,13 @@ vfs_cachedroot_sigdefer(struct mount *mp, int flags, struct vnode **vpp)
 
 static int
 vfs_quotactl_sigdefer(struct mount *mp, int cmd, uid_t uid,
-    void * __capability arg)
+    void * __capability arg, bool *mp_busy)
 {
 	int prev_stops, rc;
 
 	prev_stops = sigdeferstop(SIGDEFERSTOP_SILENT);
-	rc = (*mp->mnt_vfc->vfc_vfsops_sd->vfs_quotactl)(mp, cmd, uid, arg);
+	rc = (*mp->mnt_vfc->vfc_vfsops_sd->vfs_quotactl)(mp, cmd, uid, arg,
+	    mp_busy);
 	sigallowstop(prev_stops);
 	return (rc);
 }
@@ -546,13 +547,12 @@ vfs_unregister(struct vfsconf *vfc)
 		if (vfc->vfc_vfsops_sd->vfs_uninit != NULL)
 			error = vfc->vfc_vfsops_sd->vfs_uninit(vfsp);
 	} else {
-		if (vfc->vfc_vfsops->vfs_uninit != NULL) {
+		if (vfc->vfc_vfsops->vfs_uninit != NULL)
 			error = vfc->vfc_vfsops->vfs_uninit(vfsp);
 	}
 	if (error != 0) {
 		vfsconf_unlock();
 		return (error);
-	}
 	}
 	TAILQ_REMOVE(&vfsconf, vfsp, vfc_list);
 	maxtypenum = VFS_GENERIC;

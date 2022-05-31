@@ -472,7 +472,7 @@ static bool dwarf_eh_find_callsite(struct _Unwind_Context *context,
 				return false;
 			}
 			// Read a capability from the next aligned address (must be valid)
-			callsite_table = __builtin_align_up(callsite_table, alignof(uintptr_t*));
+			callsite_table = __builtin_align_up(callsite_table, alignof(uintptr_t));
 			landing_pad = assert_pointer_in_bounds(*((uintptr_t*)callsite_table));
 			callsite_table += sizeof(uintptr_t);
 		}

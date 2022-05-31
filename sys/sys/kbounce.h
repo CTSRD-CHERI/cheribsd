@@ -34,6 +34,8 @@
 #define	__SYS_KBOUNCE_H__
 
 #ifndef _KERNEL
+#include <sys/types.h>
+
 int	kbounce(const void *src, void *dst, size_t len, int flags);
 #endif
 

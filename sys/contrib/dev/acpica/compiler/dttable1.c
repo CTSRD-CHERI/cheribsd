@@ -172,6 +172,223 @@ static ACPI_DMTABLE_INFO           TableInfoDmarPciPath[] =
 
 /******************************************************************************
  *
+ * FUNCTION:    DtCompileAest
+ *
+ * PARAMETERS:  List                - Current field list pointer
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Compile AEST.
+ *
+ * NOTE: Assumes the following table structure:
+ *      For all AEST Error Nodes:
+ *          1) An AEST Error Node, followed immediately by:
+ *          2) Any node-specific data
+ *          3) An Interface Structure (one)
+ *          4) A list (array) of Interrupt Structures, the count as specified
+ *              in the NodeInterruptCount field of the Error Node header.
+ *
+ * AEST - ARM Error Source table. Conforms to:
+ * ACPI for the Armv8 RAS Extensions 1.1 Platform Design Document Sep 2020
+ *
+ *****************************************************************************/
+
+ACPI_STATUS
+DtCompileAest (
+    void                    **List)
+{
+    ACPI_AEST_HEADER        *ErrorNodeHeader;
+    ACPI_AEST_PROCESSOR     *AestProcessor;
+    DT_SUBTABLE             *Subtable;
+    DT_SUBTABLE             *ParentTable;
+    ACPI_DMTABLE_INFO       *InfoTable;
+    ACPI_STATUS             Status;
+    UINT32                  i;
+    UINT32                  Offset;
+    DT_FIELD                **PFieldList = (DT_FIELD **) List;
+
+
+    while (*PFieldList)
+    {
+        /* Compile the common error node header */
+
+        Status = DtCompileTable (PFieldList, AcpiDmTableInfoAestHdr,
+            &Subtable);
+        if (ACPI_FAILURE (Status))
+        {
+            return (Status);
+        }
+
+        ParentTable = DtPeekSubtable ();
+        DtInsertSubtable (ParentTable, Subtable);
+
+        /* Everything past the error node header will be a subtable */
+
+        DtPushSubtable (Subtable);
+
+        /*
+         * Compile the node-specific structure (Based on the error
+         * node header Type field)
+         */
+        ErrorNodeHeader = ACPI_CAST_PTR (ACPI_AEST_HEADER, Subtable->Buffer);
+
+        /* Point past the common error node header */
+
+        Offset = sizeof (ACPI_AEST_HEADER);
+        ErrorNodeHeader->NodeSpecificOffset = Offset;
+
+        /* Decode the error node type */
+
+        switch (ErrorNodeHeader->Type)
+        {
+        case ACPI_AEST_PROCESSOR_ERROR_NODE:
+
+            InfoTable = AcpiDmTableInfoAestProcError;
+            break;
+
+        case ACPI_AEST_MEMORY_ERROR_NODE:
+
+            InfoTable = AcpiDmTableInfoAestMemError;
+            break;
+
+        case ACPI_AEST_SMMU_ERROR_NODE:
+
+            InfoTable = AcpiDmTableInfoAestSmmuError;
+            break;
+
+        case ACPI_AEST_VENDOR_ERROR_NODE:
+
+            InfoTable = AcpiDmTableInfoAestVendorError;
+            break;
+
+        case ACPI_AEST_GIC_ERROR_NODE:
+
+            InfoTable = AcpiDmTableInfoAestGicError;
+            break;
+
+        /* Error case below */
+        default:
+            AcpiOsPrintf ("Unknown AEST Subtable Type: %X\n",
+                ErrorNodeHeader->Type);
+            return (AE_ERROR);
+        }
+
+        Status = DtCompileTable (PFieldList, InfoTable, &Subtable);
+        if (ACPI_FAILURE (Status))
+        {
+            return (Status);
+        }
+
+        /* Point past the node-specific structure */
+
+        Offset += Subtable->Length;
+        ErrorNodeHeader->NodeInterfaceOffset = Offset;
+
+        ParentTable = DtPeekSubtable ();
+        DtInsertSubtable (ParentTable, Subtable);
+
+        /* Compile any additional node-specific substructures */
+
+        if (ErrorNodeHeader->Type == ACPI_AEST_PROCESSOR_ERROR_NODE)
+        {
+            /*
+             * Special handling for PROCESSOR_ERROR_NODE subtables
+             * (to handle the Resource Substructure via the ResourceType
+             * field).
+             */
+            AestProcessor = ACPI_CAST_PTR (ACPI_AEST_PROCESSOR,
+                Subtable->Buffer);
+
+            switch (AestProcessor->ResourceType)
+            {
+            case ACPI_AEST_CACHE_RESOURCE:
+
+                InfoTable = AcpiDmTableInfoAestCacheRsrc;
+                break;
+
+            case ACPI_AEST_TLB_RESOURCE:
+
+                InfoTable = AcpiDmTableInfoAestTlbRsrc;
+                break;
+
+            case ACPI_AEST_GENERIC_RESOURCE:
+
+                InfoTable = AcpiDmTableInfoAestGenRsrc;
+                AcpiOsPrintf ("Generic Resource Type (%X) is not supported at this time\n",
+                    AestProcessor->ResourceType);
+                return (AE_ERROR);
+
+            /* Error case below */
+            default:
+                AcpiOsPrintf ("Unknown AEST Processor Resource Type: %X\n",
+                    AestProcessor->ResourceType);
+                return (AE_ERROR);
+            }
+
+            Status = DtCompileTable (PFieldList, InfoTable, &Subtable);
+            if (ACPI_FAILURE (Status))
+            {
+                return (Status);
+            }
+
+            /* Point past the resource substructure subtable */
+
+            Offset += Subtable->Length;
+            ErrorNodeHeader->NodeInterfaceOffset = Offset;
+
+            ParentTable = DtPeekSubtable ();
+            DtInsertSubtable (ParentTable, Subtable);
+        }
+
+        /* Compile the (required) node interface structure */
+
+        Status = DtCompileTable (PFieldList, AcpiDmTableInfoAestXface,
+            &Subtable);
+        if (ACPI_FAILURE (Status))
+        {
+            return (Status);
+        }
+
+        ErrorNodeHeader->NodeInterruptOffset = 0;
+        ParentTable = DtPeekSubtable ();
+        DtInsertSubtable (ParentTable, Subtable);
+
+        /* Compile each of the node interrupt structures */
+
+        if (ErrorNodeHeader->NodeInterruptCount)
+        {
+            /* Point to the first interrupt structure */
+
+            Offset += Subtable->Length;
+            ErrorNodeHeader->NodeInterruptOffset = Offset;
+        }
+
+        /* Compile each of the interrupt structures */
+
+        for (i = 0; i < ErrorNodeHeader->NodeInterruptCount; i++)
+        {
+            Status = DtCompileTable (PFieldList, AcpiDmTableInfoAestXrupt,
+                &Subtable);
+            if (ACPI_FAILURE (Status))
+            {
+                return (Status);
+            }
+
+            ParentTable = DtPeekSubtable ();
+            DtInsertSubtable (ParentTable, Subtable);
+        }
+
+        /* Prepare for the next AEST Error node */
+
+        DtPopSubtable ();
+    }
+
+    return (AE_OK);
+}
+
+
+/******************************************************************************
+ *
  * FUNCTION:    DtCompileAsf
  *
  * PARAMETERS:  List                - Current field list pointer
@@ -2058,7 +2275,18 @@ DtCompileIort (
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Compile IVRS.
+ * DESCRIPTION: Compile IVRS. Notes:
+ *              The IVRS is essentially a flat table, with the following
+ *              structure:
+ *              <Main ACPI Table Header>
+ *              <Main subtable - virtualization info>
+ *              <IVHD>
+ *                  <Device Entries>
+ *              ...
+ *              <IVHD>
+ *                  <Device Entries>
+ *              <IVMD>
+ *              ...
  *
  *****************************************************************************/
 
@@ -2069,12 +2297,16 @@ DtCompileIvrs (
     ACPI_STATUS             Status;
     DT_SUBTABLE             *Subtable;
     DT_SUBTABLE             *ParentTable;
+    DT_SUBTABLE             *MainSubtable;
     DT_FIELD                **PFieldList = (DT_FIELD **) List;
     DT_FIELD                *SubtableStart;
-    ACPI_DMTABLE_INFO       *InfoTable;
-    ACPI_IVRS_HEADER        *IvrsHeader;
-    UINT8                   EntryType;
+    ACPI_DMTABLE_INFO       *InfoTable = NULL;
+    UINT8                   SubtableType;
+    UINT8                   Temp64[16];
+    UINT8                   Temp8;
 
+
+    /* Main table */
 
     Status = DtCompileTable (PFieldList, AcpiDmTableInfoIvrs,
         &Subtable);
@@ -2085,11 +2317,98 @@ DtCompileIvrs (
 
     ParentTable = DtPeekSubtable ();
     DtInsertSubtable (ParentTable, Subtable);
+    DtPushSubtable (Subtable);
+
+    /* Save a pointer to the main subtable */
+
+    MainSubtable = Subtable;
 
     while (*PFieldList)
     {
         SubtableStart = *PFieldList;
-        Status = DtCompileTable (PFieldList, AcpiDmTableInfoIvrsHdr,
+
+        /* Compile the SubtableType integer */
+
+        DtCompileInteger (&SubtableType, *PFieldList, 1, 0);
+
+        switch (SubtableType)
+        {
+
+        /* Type 10h, IVHD (I/O Virtualization Hardware Definition) */
+
+        case ACPI_IVRS_TYPE_HARDWARE1:
+
+            InfoTable = AcpiDmTableInfoIvrsHware1;
+            break;
+
+        /* Types 11h, 40h, IVHD (I/O Virtualization Hardware Definition) */
+
+        case ACPI_IVRS_TYPE_HARDWARE2:
+        case ACPI_IVRS_TYPE_HARDWARE3:
+
+            InfoTable = AcpiDmTableInfoIvrsHware23;
+            break;
+
+        /* Types 20h, 21h, 22h, IVMD (I/O Virtualization Memory Definition Block) */
+
+        case ACPI_IVRS_TYPE_MEMORY1:
+        case ACPI_IVRS_TYPE_MEMORY2:
+        case ACPI_IVRS_TYPE_MEMORY3:
+
+            InfoTable = AcpiDmTableInfoIvrsMemory;
+            break;
+
+        /* 4-byte device entries */
+
+        case ACPI_IVRS_TYPE_PAD4:
+        case ACPI_IVRS_TYPE_ALL:
+        case ACPI_IVRS_TYPE_SELECT:
+        case ACPI_IVRS_TYPE_START:
+        case ACPI_IVRS_TYPE_END:
+
+            InfoTable = AcpiDmTableInfoIvrs4;
+            break;
+
+        /* 8-byte device entries, type A */
+
+        case ACPI_IVRS_TYPE_ALIAS_SELECT:
+        case ACPI_IVRS_TYPE_ALIAS_START:
+
+            InfoTable = AcpiDmTableInfoIvrs8a;
+            break;
+
+        /* 8-byte device entries, type B */
+
+        case ACPI_IVRS_TYPE_EXT_SELECT:
+        case ACPI_IVRS_TYPE_EXT_START:
+
+            InfoTable = AcpiDmTableInfoIvrs8b;
+            break;
+
+        /* 8-byte device entries, type C */
+
+        case ACPI_IVRS_TYPE_SPECIAL:
+
+            InfoTable = AcpiDmTableInfoIvrs8c;
+            break;
+
+        /* Variable device entries, type F0h */
+
+        case ACPI_IVRS_TYPE_HID:
+
+            InfoTable = AcpiDmTableInfoIvrsHid;
+            break;
+
+        default:
+
+            DtFatal (ASL_MSG_UNKNOWN_SUBTABLE, SubtableStart,
+                "IVRS Device Entry");
+            return (AE_ERROR);
+        }
+
+        /* Compile the InfoTable from above */
+
+        Status = DtCompileTable (PFieldList, InfoTable,
             &Subtable);
         if (ACPI_FAILURE (Status))
         {
@@ -2097,110 +2416,164 @@ DtCompileIvrs (
         }
 
         ParentTable = DtPeekSubtable ();
-        DtInsertSubtable (ParentTable, Subtable);
-        DtPushSubtable (Subtable);
+        if (SubtableType != ACPI_IVRS_TYPE_HARDWARE1 &&
+            SubtableType != ACPI_IVRS_TYPE_HARDWARE2 &&
+            SubtableType != ACPI_IVRS_TYPE_HARDWARE3 &&
+            SubtableType != ACPI_IVRS_TYPE_HID &&
+            SubtableType != ACPI_IVRS_TYPE_MEMORY1 &&
+            SubtableType != ACPI_IVRS_TYPE_MEMORY2 &&
+            SubtableType != ACPI_IVRS_TYPE_MEMORY3)
+        {
+            if (ParentTable)
+                DtInsertSubtable (ParentTable, Subtable);
+        }
 
-        IvrsHeader = ACPI_CAST_PTR (ACPI_IVRS_HEADER, Subtable->Buffer);
-
-        switch (IvrsHeader->Type)
+        switch (SubtableType)
         {
         case ACPI_IVRS_TYPE_HARDWARE1:
-
-            InfoTable = AcpiDmTableInfoIvrs0;
-            break;
-
         case ACPI_IVRS_TYPE_HARDWARE2:
-
-            InfoTable = AcpiDmTableInfoIvrs01;
-            break;
-
+        case ACPI_IVRS_TYPE_HARDWARE3:
         case ACPI_IVRS_TYPE_MEMORY1:
         case ACPI_IVRS_TYPE_MEMORY2:
         case ACPI_IVRS_TYPE_MEMORY3:
 
-            InfoTable = AcpiDmTableInfoIvrs1;
+            /* Insert these IVHDs/IVMDs at the root subtable */
+
+            DtInsertSubtable (MainSubtable, Subtable);
+            DtPushSubtable (Subtable);
+            ParentTable = MainSubtable;
             break;
 
-        default:
+        case ACPI_IVRS_TYPE_HID:
 
-            DtFatal (ASL_MSG_UNKNOWN_SUBTABLE, SubtableStart, "IVRS");
-            return (AE_ERROR);
-        }
+            /* Special handling for the HID named device entry (0xF0) */
 
-        Status = DtCompileTable (PFieldList, InfoTable, &Subtable);
-        if (ACPI_FAILURE (Status))
-        {
-            return (Status);
-        }
-
-        ParentTable = DtPeekSubtable ();
-        DtInsertSubtable (ParentTable, Subtable);
-
-        if (IvrsHeader->Type == ACPI_IVRS_TYPE_HARDWARE1 ||
-            IvrsHeader->Type == ACPI_IVRS_TYPE_HARDWARE2)
-        {
-            while (*PFieldList &&
-                !strcmp ((*PFieldList)->Name, "Entry Type"))
+            if (ParentTable)
             {
-                SubtableStart = *PFieldList;
-                DtCompileInteger (&EntryType, *PFieldList, 1, 0);
+                DtInsertSubtable (ParentTable, Subtable);
+            }
 
-                switch (EntryType)
-                {
-                /* 4-byte device entries */
+            /*
+             * Process the HID value. First, get the HID value as a string.
+             */
+            DtCompileOneField ((UINT8 *) &Temp64, *PFieldList, 16, DT_FIELD_TYPE_STRING, 0);
 
-                case ACPI_IVRS_TYPE_PAD4:
-                case ACPI_IVRS_TYPE_ALL:
-                case ACPI_IVRS_TYPE_SELECT:
-                case ACPI_IVRS_TYPE_START:
-                case ACPI_IVRS_TYPE_END:
+               /*
+                * Determine if the HID is an integer or a string.
+                * An integer is defined to be 32 bits, with the upper 32 bits
+                * set to zero. (from the ACPI Spec): "The HID can be a 32-bit
+                * integer or a character string. If an integer, the lower
+                * 4 bytes of the field contain the integer and the upper
+                * 4 bytes are padded with 0".
+                */
+            if (UtIsIdInteger ((UINT8 *) &Temp64))
+            {
+                /* Compile the HID value as an integer */
 
-                    InfoTable = AcpiDmTableInfoIvrs4;
-                    break;
+                DtCompileOneField ((UINT8 *) &Temp64, *PFieldList, 8, DT_FIELD_TYPE_INTEGER, 0);
 
-                /* 8-byte entries, type A */
-
-                case ACPI_IVRS_TYPE_ALIAS_SELECT:
-                case ACPI_IVRS_TYPE_ALIAS_START:
-
-                    InfoTable = AcpiDmTableInfoIvrs8a;
-                    break;
-
-                /* 8-byte entries, type B */
-
-                case ACPI_IVRS_TYPE_PAD8:
-                case ACPI_IVRS_TYPE_EXT_SELECT:
-                case ACPI_IVRS_TYPE_EXT_START:
-
-                    InfoTable = AcpiDmTableInfoIvrs8b;
-                    break;
-
-                /* 8-byte entries, type C */
-
-                case ACPI_IVRS_TYPE_SPECIAL:
-
-                    InfoTable = AcpiDmTableInfoIvrs8c;
-                    break;
-
-                default:
-
-                    DtFatal (ASL_MSG_UNKNOWN_SUBTABLE, SubtableStart,
-                        "IVRS Device Entry");
-                    return (AE_ERROR);
-                }
-
-                Status = DtCompileTable (PFieldList, InfoTable,
+                Status = DtCompileTable (PFieldList, AcpiDmTableInfoIvrsHidInteger,
                     &Subtable);
                 if (ACPI_FAILURE (Status))
                 {
                     return (Status);
                 }
-
-                DtInsertSubtable (ParentTable, Subtable);
             }
-        }
+            else
+            {
+                /* Compile the HID value as a string */
 
-        DtPopSubtable ();
+                Status = DtCompileTable (PFieldList, AcpiDmTableInfoIvrsHidString,
+                    &Subtable);
+                if (ACPI_FAILURE (Status))
+                {
+                    return (Status);
+                }
+            }
+
+            DtInsertSubtable (ParentTable, Subtable);
+
+            /*
+             * Process the CID value. First, get the CID value as a string.
+             */
+            DtCompileOneField ((UINT8 *) &Temp64, *PFieldList, 16, DT_FIELD_TYPE_STRING, 0);
+
+            if (UtIsIdInteger ((UINT8 *) &Temp64))
+            {
+                /* Compile the CID value as an integer */
+
+                DtCompileOneField ((UINT8 *) &Temp64, *PFieldList, 8, DT_FIELD_TYPE_INTEGER, 0);
+
+                Status = DtCompileTable (PFieldList, AcpiDmTableInfoIvrsCidInteger,
+                    &Subtable);
+                if (ACPI_FAILURE (Status))
+                {
+                    return (Status);
+                }
+            }
+            else
+            {
+                /* Compile the CID value as a string */
+
+                Status = DtCompileTable (PFieldList, AcpiDmTableInfoIvrsCidString,
+                    &Subtable);
+                if (ACPI_FAILURE (Status))
+                {
+                    return (Status);
+                }
+            }
+
+            DtInsertSubtable (ParentTable, Subtable);
+
+            /*
+             * Process the UID value. First, get and decode the "UID Format" field (Integer).
+             */
+            if (!*PFieldList)
+            {
+                return (AE_OK);
+            }
+
+            DtCompileOneField (&Temp8, *PFieldList, 1, DT_FIELD_TYPE_INTEGER, 0);
+
+            switch (Temp8)
+            {
+            case ACPI_IVRS_UID_NOT_PRESENT:
+                break;
+
+            case ACPI_IVRS_UID_IS_INTEGER:
+
+                Status = DtCompileTable (PFieldList, AcpiDmTableInfoIvrsUidInteger,
+                    &Subtable);
+                if (ACPI_FAILURE (Status))
+                {
+                    return (Status);
+                }
+                DtInsertSubtable (ParentTable, Subtable);
+                break;
+
+            case ACPI_IVRS_UID_IS_STRING:
+
+                Status = DtCompileTable (PFieldList, AcpiDmTableInfoIvrsUidString,
+                    &Subtable);
+                if (ACPI_FAILURE (Status))
+                {
+                    return (Status);
+                }
+                DtInsertSubtable (ParentTable, Subtable);
+                break;
+
+            default:
+
+                DtFatal (ASL_MSG_UNKNOWN_FORMAT, SubtableStart,
+                    "IVRS Device Entry");
+                return (AE_ERROR);
+            }
+
+        default:
+
+            /* All other subtable types come through here */
+            break;
+        }
     }
 
     return (AE_OK);

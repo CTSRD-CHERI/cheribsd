@@ -5,7 +5,7 @@
 # It also means we don't have to process capability relocations on startup.
 .include <src.opts.mk>
 
-.if ${MACHINE_ABI:Mpurecap}
+.if ${MACHINE_ABI:Mpurecap} && !make(build-tools)
 NEED_COMPAT=	64
 .include <bsd.compat.mk>
 .endif

@@ -47,3 +47,12 @@ __FBSDID("$FreeBSD$");
 2:	.p2align	2
 3:	.4byte		__FreeBSD_version
 4:
+	.section .note.tag,"aG",%note,.freebsd.noteG,comdat
+	.p2align	2
+	.4byte		6f-5f
+	.4byte		8f-7f
+	.4byte		NT_CHERIBSD_ABI_TAG
+5:	.asciz		NOTE_CHERIBSD_VENDOR
+6:	.p2align	2
+7:	.4byte		__CheriBSD_version
+8:

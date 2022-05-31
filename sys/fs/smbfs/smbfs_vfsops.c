@@ -352,7 +352,8 @@ out:
  */
 /* ARGSUSED */
 static int
-smbfs_quotactl(struct mount *mp, int cmd, uid_t uid, void * __capability arg)
+smbfs_quotactl(struct mount *mp, int cmd, uid_t uid, void * __capability arg,
+    bool *mp_busy)
 {
 	SMBVDEBUG("return EOPNOTSUPP\n");
 	return EOPNOTSUPP;

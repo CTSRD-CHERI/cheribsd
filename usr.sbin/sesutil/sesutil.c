@@ -138,10 +138,11 @@ do_led(int fd, unsigned int idx, elm_type_t type, bool onoff, bool setfault)
 		close(fd);
 		xo_err(EXIT_FAILURE, "ENCIOC_GETELMSTAT");
 	}
-	slot = (struct ses_ctrl_dev_slot *) &o.cstat[0];
+	ses_status_to_ctrl(type, &o.cstat[0]);
 	switch (type) {
 	case ELMTYP_DEVICE:
 	case ELMTYP_ARRAY_DEV:
+		slot = (struct ses_ctrl_dev_slot *) &o.cstat[0];
 		ses_ctrl_common_set_select(&slot->common, 1);
 		if (setfault)
 			ses_ctrl_dev_slot_set_rqst_fault(slot, state);
@@ -483,6 +484,7 @@ objmap(int argc, char **argv __unused)
 			memset(&e_desc, 0, sizeof(e_desc));
 			e_desc.elm_idx = e_ptr[j].elm_idx;
 			e_desc.elm_desc_len = UINT16_MAX;
+			/* XXX memory leak! */
 			e_desc.elm_desc_str = calloc(UINT16_MAX, sizeof(char));
 			if (e_desc.elm_desc_str == NULL) {
 				close(fd);
@@ -504,7 +506,7 @@ objmap(int argc, char **argv __unused)
 			}
 			if (ioctl(fd, ENCIOC_GETELMDEVNAMES,
 			    (caddr_t) &e_devname) <0) {
-				/* We don't care if this fails */
+				/* Continue even if we can't look up devnames */
 				e_devname.elm_devnames[0] = '\0';
 			}
 			xo_open_instance("elements");
@@ -642,15 +644,15 @@ show_device(int fd, int elm_idx, encioc_elm_status_t e_status, encioc_elm_desc_t
 	}
 	xo_open_instance("elements");
 	xo_emit("{e:type/device_slot}");
-	xo_emit("{d:description/%-8s} ", e_desc.elm_desc_len > 0 ? e_desc.elm_desc_str : "-");
-	xo_emit("{e:description/%-8s}", e_desc.elm_desc_len > 0 ? e_desc.elm_desc_str : "");
+	xo_emit("{d:description/%-15s} ", e_desc.elm_desc_len > 0 ? e_desc.elm_desc_str : "-");
+	xo_emit("{e:description/%-15s}", e_desc.elm_desc_len > 0 ? e_desc.elm_desc_str : "");
 	xo_emit("{d:device_names/%-7s} ", e_devname.elm_names_len > 0 ? e_devname.elm_devnames : "-");
 	xo_emit("{e:device_names/%s}", e_devname.elm_names_len > 0 ? e_devname.elm_devnames : "");
 	xo_emit("{d:model/%-25s} ", model ? model : "-");
 	xo_emit("{e:model/%s}", model ? model : "");
 	xo_emit("{d:serial/%-20s} ", serial != NULL ? serial : "-");
 	xo_emit("{e:serial/%s}", serial != NULL ? serial : "");
-	if (e_status.cstat[0] == SES_OBJSTAT_OK && size >= 0) {
+	if ((e_status.cstat[0] & 0xf) == SES_OBJSTAT_OK && size >= 0) {
 		xo_emit("{h,hn-1000:size/%ld}{e:status/%s}",
 		    size, scode2ascii(e_status.cstat[0]));
 	} else {
@@ -824,7 +826,7 @@ show(int argc, char **argv __unused)
 			case ELMTYP_DEVICE:
 			case ELMTYP_ARRAY_DEV:
 				if (e_ptr[j].elm_type != prev_type)
-					xo_emit("Desc     Dev     Model                     Ident                Size/Status\n");
+					xo_emit("Desc            Dev     Model                     Ident                Size/Status\n");
 
 				show_device(fd, e_ptr[j].elm_idx, e_status, e_desc);
 				prev_type = e_ptr[j].elm_type;

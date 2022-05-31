@@ -97,8 +97,17 @@ typedef u_char vm_prot_t;	/* protection codes */
 	((prot) | (((prot) & VM_PROT_READ) != 0 ? VM_PROT_READ_CAP : 0) | \
 	    (((prot) & VM_PROT_WRITE) != 0 ? VM_PROT_WRITE_CAP : 0))
 
-enum obj_type { OBJT_DEFAULT, OBJT_SWAP, OBJT_VNODE, OBJT_DEVICE, OBJT_PHYS,
-		OBJT_DEAD, OBJT_SG, OBJT_MGTDEVICE };
+enum obj_type {
+	OBJT_DEFAULT,
+	OBJT_SWAP,
+	OBJT_VNODE,
+	OBJT_DEVICE,
+	OBJT_PHYS,
+	OBJT_DEAD,
+	OBJT_SG,
+	OBJT_MGTDEVICE,
+	OBJT_FIRST_DYN,
+};
 typedef u_char objtype_t;
 
 union vm_map_object;

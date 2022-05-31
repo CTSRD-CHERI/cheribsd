@@ -930,9 +930,9 @@ xpt_init(void *dummy)
 	if (xpt_sim == NULL)
 		return (ENOMEM);
 
-	if ((status = xpt_bus_register(xpt_sim, NULL, 0)) != CAM_SUCCESS) {
-		printf("xpt_init: xpt_bus_register failed with status %#x,"
-		       " failing attach\n", status);
+	if ((error = xpt_bus_register(xpt_sim, NULL, 0)) != CAM_SUCCESS) {
+		printf("xpt_init: xpt_bus_register failed with errno %d,"
+		       " failing attach\n", error);
 		return (EINVAL);
 	}
 
@@ -1386,6 +1386,8 @@ xptbusmatch(struct dev_match_pattern *patterns, u_int num_patterns,
 
 	for (i = 0; i < num_patterns; i++) {
 		struct bus_match_pattern *cur_pattern;
+		struct device_match_pattern *dp = &patterns[i].pattern.device_pattern;
+		struct periph_match_pattern *pp = &patterns[i].pattern.periph_pattern;
 
 		/*
 		 * If the pattern in question isn't for a bus node, we
@@ -1394,6 +1396,14 @@ xptbusmatch(struct dev_match_pattern *patterns, u_int num_patterns,
 		 * tree, since the user wants to match against lower-level
 		 * EDT elements.
 		 */
+		if (patterns[i].type == DEV_MATCH_DEVICE &&
+		    (dp->flags & DEV_MATCH_PATH) != 0 &&
+		    dp->path_id != bus->path_id)
+			continue;
+		if (patterns[i].type == DEV_MATCH_PERIPH &&
+		    (pp->flags & PERIPH_MATCH_PATH) != 0 &&
+		    pp->path_id != bus->path_id)
+			continue;
 		if (patterns[i].type != DEV_MATCH_BUS) {
 			if ((retval & DM_RET_ACTION_MASK) == DM_RET_NONE)
 				retval |= DM_RET_DESCEND;
@@ -1401,28 +1411,6 @@ xptbusmatch(struct dev_match_pattern *patterns, u_int num_patterns,
 		}
 
 		cur_pattern = &patterns[i].pattern.bus_pattern;
-
-		/*
-		 * If they want to match any bus node, we give them any
-		 * device node.
-		 */
-		if (cur_pattern->flags == BUS_MATCH_ANY) {
-			/* set the copy flag */
-			retval |= DM_RET_COPY;
-
-			/*
-			 * If we've already decided on an action, go ahead
-			 * and return.
-			 */
-			if ((retval & DM_RET_ACTION_MASK) != DM_RET_NONE)
-				return(retval);
-		}
-
-		/*
-		 * Not sure why someone would do this...
-		 */
-		if (cur_pattern->flags == BUS_MATCH_NONE)
-			continue;
 
 		if (((cur_pattern->flags & BUS_MATCH_PATH) != 0)
 		 && (cur_pattern->path_id != bus->path_id))
@@ -1499,11 +1487,20 @@ xptdevicematch(struct dev_match_pattern *patterns, u_int num_patterns,
 	for (i = 0; i < num_patterns; i++) {
 		struct device_match_pattern *cur_pattern;
 		struct scsi_vpd_device_id *device_id_page;
+		struct periph_match_pattern *pp = &patterns[i].pattern.periph_pattern;
 
 		/*
 		 * If the pattern in question isn't for a device node, we
 		 * aren't interested.
 		 */
+		if (patterns[i].type == DEV_MATCH_PERIPH &&
+		    (pp->flags & PERIPH_MATCH_TARGET) != 0 &&
+		    pp->target_id != device->target->target_id)
+			continue;
+		if (patterns[i].type == DEV_MATCH_PERIPH &&
+		    (pp->flags & PERIPH_MATCH_LUN) != 0 &&
+		    pp->target_lun != device->lun_id)
+			continue;
 		if (patterns[i].type != DEV_MATCH_DEVICE) {
 			if ((patterns[i].type == DEV_MATCH_PERIPH)
 			 && ((retval & DM_RET_ACTION_MASK) == DM_RET_NONE))
@@ -1517,19 +1514,6 @@ xptdevicematch(struct dev_match_pattern *patterns, u_int num_patterns,
 		if ((cur_pattern->flags & (DEV_MATCH_INQUIRY|DEV_MATCH_DEVID))
 		 == (DEV_MATCH_INQUIRY|DEV_MATCH_DEVID))
 			return(DM_RET_ERROR);
-
-		/*
-		 * If they want to match any device node, we give them any
-		 * device node.
-		 */
-		if (cur_pattern->flags == DEV_MATCH_ANY)
-			goto copy_dev_node;
-
-		/*
-		 * Not sure why someone would do this...
-		 */
-		if (cur_pattern->flags == DEV_MATCH_NONE)
-			continue;
 
 		if (((cur_pattern->flags & DEV_MATCH_PATH) != 0)
 		 && (cur_pattern->path_id != device->target->bus->path_id))
@@ -1560,7 +1544,6 @@ xptdevicematch(struct dev_match_pattern *patterns, u_int num_patterns,
 				      cur_pattern->data.devid_pat.id_len) != 0))
 			continue;
 
-copy_dev_node:
 		/*
 		 * If we get to this point, the user definitely wants
 		 * information on this device.  So tell the caller to copy
@@ -1634,27 +1617,6 @@ xptperiphmatch(struct dev_match_pattern *patterns, u_int num_patterns,
 			continue;
 
 		cur_pattern = &patterns[i].pattern.periph_pattern;
-
-		/*
-		 * If they want to match on anything, then we will do so.
-		 */
-		if (cur_pattern->flags == PERIPH_MATCH_ANY) {
-			/* set the copy flag */
-			retval |= DM_RET_COPY;
-
-			/*
-			 * We've already set the return action to stop,
-			 * since there are no nodes below peripherals in
-			 * the tree.
-			 */
-			return(retval);
-		}
-
-		/*
-		 * Not sure why someone would do this...
-		 */
-		if (cur_pattern->flags == PERIPH_MATCH_NONE)
-			continue;
 
 		if (((cur_pattern->flags & PERIPH_MATCH_PATH) != 0)
 		 && (cur_pattern->path_id != periph->path->bus->path_id))
@@ -2702,6 +2664,8 @@ xpt_action_default(union ccb *start_ccb)
 	case XPT_NVME_IO:
 	case XPT_NVME_ADMIN:
 	case XPT_MMC_IO:
+	case XPT_MMC_GET_TRAN_SETTINGS:
+	case XPT_MMC_SET_TRAN_SETTINGS:
 	case XPT_RESET_DEV:
 	case XPT_ENG_EXEC:
 	case XPT_SMP_IO:
@@ -3079,7 +3043,7 @@ call_sim:
 			}
 
 			callout_reset_sbt(&dev->callout,
-			    SBT_1MS * crs->release_timeout, 0,
+			    SBT_1MS * crs->release_timeout, SBT_1MS,
 			    xpt_release_devq_timeout, dev, 0);
 
 			dev->flags |= CAM_DEV_REL_TIMEOUT_PENDING;
@@ -3269,28 +3233,6 @@ xpt_pollwait(union ccb *start_ccb, uint32_t timeout)
 		 */
 		start_ccb->ccb_h.status = CAM_CMD_TIMEOUT;
 	}
-}
-
-void
-xpt_polled_action(union ccb *start_ccb)
-{
-	uint32_t	timeout;
-	struct cam_ed	*dev;
-
-	timeout = start_ccb->ccb_h.timeout * 10;
-	dev = start_ccb->ccb_h.path->device;
-
-	mtx_unlock(&dev->device_mtx);
-
-	timeout = xpt_poll_setup(start_ccb);
-	if (timeout > 0) {
-		xpt_action(start_ccb);
-		xpt_pollwait(start_ccb, timeout);
-	} else {
-		start_ccb->ccb_h.status = CAM_RESRC_UNAVAIL;
-	}
-
-	mtx_lock(&dev->device_mtx);
 }
 
 /*
@@ -3689,14 +3631,14 @@ xpt_compile_path(struct cam_path *new_path, struct cam_periph *perph,
 	return (status);
 }
 
-cam_status
+int
 xpt_clone_path(struct cam_path **new_path_ptr, struct cam_path *path)
 {
 	struct	   cam_path *new_path;
 
 	new_path = (struct cam_path *)malloc(sizeof(*path), M_CAMPATH, M_NOWAIT);
 	if (new_path == NULL)
-		return(CAM_RESRC_UNAVAIL);
+		return (ENOMEM);
 	*new_path = *path;
 	if (path->bus != NULL)
 		xpt_acquire_bus(path->bus);
@@ -3705,7 +3647,7 @@ xpt_clone_path(struct cam_path **new_path_ptr, struct cam_path *path)
 	if (path->device != NULL)
 		xpt_acquire_device(path->device);
 	*new_path_ptr = new_path;
-	return (CAM_REQ_CMP);
+	return (0);
 }
 
 void
@@ -4019,8 +3961,8 @@ CAM_XPT_XPORT(xport_default);
  * information specified by the user.  Once interrupt services are
  * available, the bus will be probed.
  */
-int32_t
-xpt_bus_register(struct cam_sim *sim, device_t parent, u_int32_t bus)
+int
+xpt_bus_register(struct cam_sim *sim, device_t parent, uint32_t bus)
 {
 	struct cam_eb *new_bus;
 	struct cam_eb *old_bus;
@@ -4033,7 +3975,7 @@ xpt_bus_register(struct cam_sim *sim, device_t parent, u_int32_t bus)
 					  M_CAMXPT, M_NOWAIT|M_ZERO);
 	if (new_bus == NULL) {
 		/* Couldn't satisfy request */
-		return (CAM_RESRC_UNAVAIL);
+		return (ENOMEM);
 	}
 
 	mtx_init(&new_bus->eb_mtx, "CAM bus lock", NULL, MTX_DEF);
@@ -4044,6 +3986,7 @@ xpt_bus_register(struct cam_sim *sim, device_t parent, u_int32_t bus)
 	new_bus->flags = 0;
 	new_bus->refcount = 1;	/* Held until a bus_deregister event */
 	new_bus->generation = 0;
+	new_bus->parent_dev = parent;
 
 	xpt_lock_buses();
 	sim->path_id = new_bus->path_id =
@@ -4070,7 +4013,7 @@ xpt_bus_register(struct cam_sim *sim, device_t parent, u_int32_t bus)
 				  CAM_TARGET_WILDCARD, CAM_LUN_WILDCARD);
 	if (status != CAM_REQ_CMP) {
 		xpt_release_bus(new_bus);
-		return (CAM_RESRC_UNAVAIL);
+		return (ENOMEM);
 	}
 
 	xpt_path_inq(&cpi, path);
@@ -4089,7 +4032,7 @@ xpt_bus_register(struct cam_sim *sim, device_t parent, u_int32_t bus)
 			    "No transport found for %d\n", cpi.transport);
 			xpt_release_bus(new_bus);
 			free(path, M_CAMXPT);
-			return (CAM_RESRC_UNAVAIL);
+			return (EINVAL);
 		}
 	}
 
@@ -4118,7 +4061,7 @@ xpt_bus_register(struct cam_sim *sim, device_t parent, u_int32_t bus)
 	return (CAM_SUCCESS);
 }
 
-int32_t
+int
 xpt_bus_deregister(path_id_t pathid)
 {
 	struct cam_path bus_path;
@@ -4127,7 +4070,7 @@ xpt_bus_deregister(path_id_t pathid)
 	status = xpt_compile_path(&bus_path, NULL, pathid,
 				  CAM_TARGET_WILDCARD, CAM_LUN_WILDCARD);
 	if (status != CAM_REQ_CMP)
-		return (status);
+		return (ENOMEM);
 
 	xpt_async(AC_LOST_DEVICE, &bus_path, NULL);
 	xpt_async(AC_PATH_DEREGISTERED, &bus_path, NULL);
@@ -4136,7 +4079,7 @@ xpt_bus_deregister(path_id_t pathid)
 	xpt_release_bus(bus_path.bus);
 	xpt_release_path(&bus_path);
 
-	return (CAM_REQ_CMP);
+	return (CAM_SUCCESS);
 }
 
 static path_id_t
@@ -4416,7 +4359,7 @@ xpt_async(u_int32_t async_code, struct cam_path *path, void *async_arg)
 		return;
 	}
 
-	if (xpt_clone_path(&ccb->ccb_h.path, path) != CAM_REQ_CMP) {
+	if (xpt_clone_path(&ccb->ccb_h.path, path) != 0) {
 		xpt_print(path, "Can't allocate path to send %s\n",
 		    xpt_async_string(async_code));
 		xpt_free_ccb(ccb);
@@ -4605,15 +4548,6 @@ xpt_release_simq(struct cam_sim *sim, int run_queue)
 	} else
 		devq->send_queue.qfrozen_cnt--;
 	if (devq->send_queue.qfrozen_cnt == 0) {
-		/*
-		 * If there is a timeout scheduled to release this
-		 * sim queue, remove it.  The queue frozen count is
-		 * already at 0.
-		 */
-		if ((sim->flags & CAM_SIM_REL_TIMEOUT_PENDING) != 0){
-			callout_stop(&sim->callout);
-			sim->flags &= ~CAM_SIM_REL_TIMEOUT_PENDING;
-		}
 		if (run_queue) {
 			/*
 			 * Now that we are unfrozen run the send queue.
@@ -4646,6 +4580,7 @@ xpt_done(union ccb *done_ccb)
 
 	/* Store the time the ccb was in the sim */
 	done_ccb->ccb_h.qos.periph_data = cam_iosched_delta_t(done_ccb->ccb_h.qos.periph_data);
+	done_ccb->ccb_h.status |= CAM_QOS_VALID;
 	hash = (u_int)(done_ccb->ccb_h.path_id + done_ccb->ccb_h.target_id +
 	    done_ccb->ccb_h.target_lun) % cam_num_doneqs;
 	queue = &cam_doneqs[hash];
@@ -4654,7 +4589,7 @@ xpt_done(union ccb *done_ccb)
 	STAILQ_INSERT_TAIL(&queue->cam_doneq, &done_ccb->ccb_h, sim_links.stqe);
 	done_ccb->ccb_h.pinfo.index = CAM_DONEQ_INDEX;
 	mtx_unlock(&queue->cam_doneq_mtx);
-	if (run)
+	if (run && !dumping)
 		wakeup(&queue->cam_doneq);
 }
 
@@ -4669,6 +4604,7 @@ xpt_done_direct(union ccb *done_ccb)
 
 	/* Store the time the ccb was in the sim */
 	done_ccb->ccb_h.qos.periph_data = cam_iosched_delta_t(done_ccb->ccb_h.qos.periph_data);
+	done_ccb->ccb_h.status |= CAM_QOS_VALID;
 	xpt_done_process(&done_ccb->ccb_h);
 }
 
@@ -4693,7 +4629,17 @@ xpt_alloc_ccb_nowait(void)
 void
 xpt_free_ccb(union ccb *free_ccb)
 {
-	free(free_ccb, M_CAMCCB);
+	struct cam_periph *periph;
+
+	if (free_ccb->ccb_h.alloc_flags & CAM_CCB_FROM_UMA) {
+		/*
+		 * Looks like a CCB allocated from a periph UMA zone.
+		 */
+		periph = free_ccb->ccb_h.path->periph;
+		uma_zfree(periph->ccb_zone, free_ccb);
+	} else {
+		free(free_ccb, M_CAMCCB);
+	}
 }
 
 /* Private XPT functions */
@@ -4707,10 +4653,18 @@ static union ccb *
 xpt_get_ccb_nowait(struct cam_periph *periph)
 {
 	union ccb *new_ccb;
+	int alloc_flags;
 
-	new_ccb = malloc(sizeof(*new_ccb), M_CAMCCB, M_ZERO|M_NOWAIT);
+	if (periph->ccb_zone != NULL) {
+		alloc_flags = CAM_CCB_FROM_UMA;
+		new_ccb = uma_zalloc(periph->ccb_zone, M_ZERO|M_NOWAIT);
+	} else {
+		alloc_flags = 0;
+		new_ccb = malloc(sizeof(*new_ccb), M_CAMCCB, M_ZERO|M_NOWAIT);
+	}
 	if (new_ccb == NULL)
 		return (NULL);
+	new_ccb->ccb_h.alloc_flags = alloc_flags;
 	periph->periph_allocated++;
 	cam_ccbq_take_opening(&periph->path->device->ccbq);
 	return (new_ccb);
@@ -4720,9 +4674,17 @@ static union ccb *
 xpt_get_ccb(struct cam_periph *periph)
 {
 	union ccb *new_ccb;
+	int alloc_flags;
 
 	cam_periph_unlock(periph);
-	new_ccb = malloc(sizeof(*new_ccb), M_CAMCCB, M_ZERO|M_WAITOK);
+	if (periph->ccb_zone != NULL) {
+		alloc_flags = CAM_CCB_FROM_UMA;
+		new_ccb = uma_zalloc(periph->ccb_zone, M_ZERO|M_WAITOK);
+	} else {
+		alloc_flags = 0;
+		new_ccb = malloc(sizeof(*new_ccb), M_CAMCCB, M_ZERO|M_WAITOK);
+	}
+	new_ccb->ccb_h.alloc_flags = alloc_flags;
 	cam_periph_lock(periph);
 	periph->periph_allocated++;
 	cam_ccbq_take_opening(&periph->path->device->ccbq);
@@ -5137,8 +5099,8 @@ xpt_ch_done(void *arg)
 {
 
 	callout_init(&xsoftc.boot_callout, 1);
-	callout_reset_sbt(&xsoftc.boot_callout, SBT_1MS * xsoftc.boot_delay, 0,
-	    xpt_boot_delay, NULL, 0);
+	callout_reset_sbt(&xsoftc.boot_callout, SBT_1MS * xsoftc.boot_delay,
+	    SBT_1MS, xpt_boot_delay, NULL, 0);
 }
 SYSINIT(xpt_hw_delay, SI_SUB_INT_CONFIG_HOOKS, SI_ORDER_ANY, xpt_ch_done, NULL);
 
@@ -5575,6 +5537,22 @@ camisr_runqueue(void)
 	}
 }
 
+/**
+ * @brief Return the device_t associated with the path
+ *
+ * When a SIM is created, it registers a bus with a NEWBUS device_t. This is
+ * stored in the internal cam_eb bus structure. There is no guarnatee any given
+ * path will have a @c device_t associated with it (it's legal to call @c
+ * xpt_bus_register with a @c NULL @c device_t.
+ *
+ * @param path		Path to return the device_t for.
+ */
+device_t
+xpt_path_sim_device(const struct cam_path *path)
+{
+	return (path->bus->parent_dev);
+}
+
 struct kv 
 {
 	uint32_t v;
@@ -5627,7 +5605,7 @@ static struct kv map[] = {
 };
 
 const char *
-xpt_action_name(uint32_t action) 
+xpt_action_name(uint32_t action)
 {
 	static char buffer[32];	/* Only for unknown messages -- racy */
 	struct kv *walker = map;

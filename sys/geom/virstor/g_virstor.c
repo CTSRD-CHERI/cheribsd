@@ -780,6 +780,7 @@ g_virstor_taste(struct g_class *mp, struct g_provider *pp, int flags)
 	gp->orphan = (void *)invalid_call;	/* I really want these to fail. */
 
 	cp = g_new_consumer(gp);
+	cp->flags |= G_CF_DIRECT_SEND | G_CF_DIRECT_RECEIVE;
 	error = g_attach(cp, pp);
 	if (error == 0) {
 		error = read_metadata(cp, &md);
@@ -1528,11 +1529,9 @@ g_virstor_dumpconf(struct sbuf *sb, const char *indent, struct g_geom *gp,
 static void
 g_virstor_done(struct bio *b)
 {
-	struct g_virstor_softc *sc;
 	struct bio *parent_b;
 
 	parent_b = b->bio_parent;
-	sc = parent_b->bio_to->geom->softc;
 
 	if (b->bio_error != 0) {
 		LOG_MSG(LVL_ERROR, "Error %d for offset=%ju, length=%ju, %s",
