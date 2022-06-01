@@ -2263,6 +2263,22 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 }
 
 #if __has_feature(capabilities)
+static int
+core_extend_file(struct coredump_params *cp, off_t newlen)
+{
+	struct mount *mp;
+	int error;
+
+	error = vn_start_write(cp->vp, &mp, V_WAIT);
+	if (error != 0)
+		return (error);
+	vn_lock(cp->vp, LK_EXCLUSIVE | LK_RETRY);
+	error = vn_truncate_locked(cp->vp, newlen, false, cp->td->td_ucred);
+	VOP_UNLOCK(cp->vp);
+	vn_finished_write(mp);
+	return (error);
+}
+
 int
 core_output_memtag_cheri(char * __capability base, size_t mem_len,
     size_t file_len, off_t offset, struct coredump_params *cp,
@@ -2272,50 +2288,60 @@ core_output_memtag_cheri(char * __capability base, size_t mem_len,
 	char *tagbuf;
 	size_t tagbuflen;
 	int error;
-	bool hastags;
+	bool hastags, pagehastags;
 
 	KASSERT(is_aligned(base, PAGE_SIZE),
 	    ("%s: user address %lp is not page-aligned", __func__, base));
 
 	tagbuf = tagtmpbuf;
 	tagbuflen = 0;
+	hastags = false;
 
 	map = &cp->td->td_proc->p_vmspace->vm_map;
 	for (; mem_len > 0; base += PAGE_SIZE, mem_len -= PAGE_SIZE) {
 		if (core_dump_can_intr && curproc_sigkilled())
 			return (EINTR);
 
-		/*
-		 * XXX: We could perhaps try to track large ranges of
-		 * unmapped pages and leave those portions of the
-		 * core dump sparse.  (At least we could maybe skip over
-		 * regions where the tagbuf is completely empty.)
-		 */
 		error = proc_read_cheri_tags_page(map, (uintcap_t)base,
-		    tagbuf + tagbuflen, &hastags);
+		    tagbuf + tagbuflen, &pagehastags);
+		if (error != 0)
+			return (error);
+		if (pagehastags)
+			hastags = true;
 		tagbuflen += TAG_BYTES_PER_PAGE;
 
 		if (tagbuflen == CORE_BUF_SIZE) {
 			if (cp->comp != NULL)
 				error = compressor_write(cp->comp, tagbuf,
 				    CORE_BUF_SIZE);
-			else
-				error = core_write(cp, tagbuf, CORE_BUF_SIZE,
-				    offset, UIO_SYSSPACE, NULL);
+			else {
+				if (hastags)
+					error = core_write(cp, tagbuf,
+					    CORE_BUF_SIZE, offset,
+					    UIO_SYSSPACE, NULL);
+				else
+					error = 0;
+			}
 			offset += CORE_BUF_SIZE;
 			if (error != 0)
 				return (error);
 
 			tagbuflen = 0;
+			hastags = false;
 		}
 	}
 
 	if (tagbuflen != 0) {
 		if (cp->comp != NULL)
 			error = compressor_write(cp->comp, tagbuf, tagbuflen);
-		else
-			error = core_write(cp, tagbuf, tagbuflen, offset,
-			    UIO_SYSSPACE, NULL);
+		else {
+			if (hastags)
+				error = core_write(cp, tagbuf, tagbuflen,
+				    offset, UIO_SYSSPACE, NULL);
+			else
+				error = core_extend_file(cp, offset +
+				    tagbuflen);
+		}
 		return (error);
 	}
 	return (0);
