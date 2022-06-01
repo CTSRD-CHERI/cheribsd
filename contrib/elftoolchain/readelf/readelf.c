@@ -678,10 +678,21 @@ phdr_type(unsigned int mach, unsigned int ptype)
 
 	if (ptype >= PT_LOPROC && ptype <= PT_HIPROC) {
 		switch (mach) {
+		case EM_AARCH64:
+			switch (ptype) {
+			case PT_AARCH64_MEMTAG_CHERI:
+				return "AARCH64_MEMTAG_CHERI";
+			}
+			break;
 		case EM_ARM:
 			switch (ptype) {
 			case PT_ARM_ARCHEXT: return "ARM_ARCHEXT";
 			case PT_ARM_EXIDX: return "ARM_EXIDX";
+			}
+			break;
+		case EM_RISCV:
+			switch (ptype) {
+			case PT_RISCV_MEMTAG_CHERI: return "RISCV_MEMTAG_CHERI";
 			}
 			break;
 		}
