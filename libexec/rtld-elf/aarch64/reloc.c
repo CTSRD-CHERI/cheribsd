@@ -350,8 +350,8 @@ reloc_plt(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 		where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
 
 		switch(ELF_R_TYPE(rela->r_info)) {
-		case R_MORELLO_JUMP_SLOT:
 #ifdef __CHERI_PURE_CAPABILITY__
+		case R_MORELLO_JUMP_SLOT:
 			/*
 			 * XXX: This would be far more natural if the linker
 			 * made it an R_MORELLO_RELATIVE-like fragment instead.
@@ -361,18 +361,9 @@ reloc_plt(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 			    *where);
 			break;
 #else
-			_rtld_error("%s: R_MORELLO_JUMP_SLOT in hybrid binary",
-			    obj->path);
-			return (-1);
-#endif
 		case R_AARCH64_JUMP_SLOT:
-#ifndef __CHERI_PURE_CAPABILITY__
 			*where += (Elf_Addr)obj->relocbase;
 			break;
-#else
-			_rtld_error("%s: R_AARCH64_JUMP_SLOT in purecap binary",
-			    obj->path);
-			return (-1);
 #endif
 #ifdef __CHERI_PURE_CAPABILITY__
 		case R_MORELLO_TLSDESC:
@@ -382,23 +373,11 @@ reloc_plt(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 			reloc_tlsdesc(obj, rela, where, SYMLOOK_IN_PLT | flags,
 			    lockstate);
 			break;
-		case R_MORELLO_IRELATIVE:
 #ifdef __CHERI_PURE_CAPABILITY__
-			goto irelative;
+		case R_MORELLO_IRELATIVE:
 #else
-			_rtld_error("%s: R_MORELLO_IRELATIVE in hybrid binary",
-			    obj->path);
-			return (-1);
-#endif
 		case R_AARCH64_IRELATIVE:
-#ifndef __CHERI_PURE_CAPABILITY__
-			goto irelative;
-#else
-			_rtld_error("%s: R_AARCH64_IRELATIVE in purecap binary",
-			    obj->path);
-			return (-1);
 #endif
-		irelative:
 			obj->irelative = true;
 			break;
 		case R_AARCH64_NONE:
@@ -434,21 +413,11 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 
 		where = (uintptr_t *)(obj->relocbase + rela->r_offset);
 		switch(ELF_R_TYPE(rela->r_info)) {
-		case R_MORELLO_JUMP_SLOT:
-#ifndef __CHERI_PURE_CAPABILITY__
-			_rtld_error("%s: R_MORELLO_JUMP_SLOT in hybrid binary",
-			    obj->path);
-			return (-1);
-#endif
-			goto jump_slot;
-		case R_AARCH64_JUMP_SLOT:
 #ifdef __CHERI_PURE_CAPABILITY__
-			_rtld_error("%s: R_AARCH64_JUMP_SLOT in purecap binary",
-			    obj->path);
-			return (-1);
+		case R_MORELLO_JUMP_SLOT:
+#else
+		case R_AARCH64_JUMP_SLOT:
 #endif
-			goto jump_slot;
-		jump_slot:
 			def = find_symdef(ELF_R_SYM(rela->r_info), obj,
 			    &defobj, SYMLOOK_IN_PLT | flags, NULL, lockstate);
 			if (def == NULL)
@@ -530,23 +499,11 @@ reloc_iresolve(Obj_Entry *obj, struct Struct_RtldLockState *lockstate)
 	    obj->pltrelasize);
 	for (rela = obj->pltrela;  rela < relalim;  rela++) {
 		switch (ELF_R_TYPE(rela->r_info)) {
-		case R_MORELLO_IRELATIVE:
 #ifdef __CHERI_PURE_CAPABILITY__
-			goto irelative;
+		case R_MORELLO_IRELATIVE:
 #else
-			_rtld_error("%s: R_MORELLO_IRELATIVE in hybrid binary",
-			    obj->path);
-			return (-1);
-#endif
 		case R_AARCH64_IRELATIVE:
-#ifndef __CHERI_PURE_CAPABILITY__
-			goto irelative;
-#else
-			_rtld_error("%s: R_AARCH64_IRELATIVE in purecap binary",
-			    obj->path);
-			return (-1);
 #endif
-		irelative:
 			reloc_iresolve_one(obj, rela, lockstate);
 			break;
 		}
@@ -566,23 +523,11 @@ reloc_iresolve_nonplt(Obj_Entry *obj, struct Struct_RtldLockState *lockstate)
 	relalim = (const Elf_Rela *)((const char *)obj->rela + obj->relasize);
 	for (rela = obj->rela;  rela < relalim;  rela++) {
 		switch (ELF_R_TYPE(rela->r_info)) {
-		case R_MORELLO_IRELATIVE:
 #ifdef __CHERI_PURE_CAPABILITY__
-			goto irelative;
+		case R_MORELLO_IRELATIVE:
 #else
-			_rtld_error("%s: R_MORELLO_IRELATIVE in hybrid binary",
-			    obj->path);
-			return (-1);
-#endif
 		case R_AARCH64_IRELATIVE:
-#ifndef __CHERI_PURE_CAPABILITY__
-			goto irelative;
-#else
-			_rtld_error("%s: R_AARCH64_IRELATIVE in purecap binary",
-			    obj->path);
-			return (-1);
 #endif
-		irelative:
 			reloc_iresolve_one(obj, rela, lockstate);
 			break;
 		}
@@ -606,21 +551,11 @@ reloc_gnu_ifunc(Obj_Entry *obj, int flags,
 	for (rela = obj->pltrela;  rela < relalim;  rela++) {
 		where = (uintptr_t *)(obj->relocbase + rela->r_offset);
 		switch (ELF_R_TYPE(rela->r_info)) {
-		case R_MORELLO_JUMP_SLOT:
-#ifndef __CHERI_PURE_CAPABILITY__
-			_rtld_error("%s: R_MORELLO_JUMP_SLOT in hybrid binary",
-			    obj->path);
-			return (-1);
-#endif
-			goto jump_slot;
-		case R_AARCH64_JUMP_SLOT:
 #ifdef __CHERI_PURE_CAPABILITY__
-			_rtld_error("%s: R_AARCH64_JUMP_SLOT in purecap binary",
-			    obj->path);
-			return (-1);
+		case R_MORELLO_JUMP_SLOT:
+#else
+		case R_AARCH64_JUMP_SLOT:
 #endif
-			goto jump_slot;
-		jump_slot:
 			def = find_symdef(ELF_R_SYM(rela->r_info), obj, &defobj,
 			    SYMLOOK_IN_PLT | flags, NULL, lockstate);
 			if (def == NULL)
@@ -864,23 +799,11 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			break;
 		case R_AARCH64_NONE:
 			break;
-		case R_MORELLO_IRELATIVE:
 #ifdef __CHERI_PURE_CAPABILITY__
-			goto irelative;
+		case R_MORELLO_IRELATIVE:
 #else
-			_rtld_error("%s: R_MORELLO_IRELATIVE in hybrid binary",
-			    obj->path);
-			return (-1);
-#endif
 		case R_AARCH64_IRELATIVE:
-#ifndef __CHERI_PURE_CAPABILITY__
-			goto irelative;
-#else
-			_rtld_error("%s: R_AARCH64_IRELATIVE in purecap binary",
-			    obj->path);
-			return (-1);
 #endif
-		irelative:
 			obj->irelative_nonplt = true;
 			break;
 		default:

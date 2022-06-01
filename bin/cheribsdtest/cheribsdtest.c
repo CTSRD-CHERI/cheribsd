@@ -160,37 +160,13 @@ list_tests(void)
 static void
 signal_handler(int signum, siginfo_t *info, void *vuap)
 {
-#ifdef __mips__
-	struct cheri_frame *cfp;
-#endif
 	ucontext_t *uap;
 
 	uap = (ucontext_t *)vuap;
-#ifdef __mips__
-	if (uap->uc_mcontext.mc_regs[0] != /* UCONTEXT_MAGIC */ 0xACEDBADE) {
-		ccsp->ccs_signum = -1;
-		fprintf(stderr, "%s: missing UCONTEXT_MAGIC\n", __func__);
-		_exit(EX_OSERR);
-	}
-#ifdef __CHERI_PURE_CAPABILITY__
-	cfp = &uap->uc_mcontext.mc_cheriframe;
-	if (cfp == NULL) {
-#else
-	cfp = (struct cheri_frame *)uap->uc_mcontext.mc_cp2state;
-	if (cfp == NULL || uap->uc_mcontext.mc_cp2state_len != sizeof(*cfp)) {
-#endif
-		fprintf(stderr, "%s: NULL cfp or mc_cp2state", __func__);
-		ccsp->ccs_signum = -1;
-		_exit(EX_OSERR);
-	}
-#endif	/* __mips__ */
 	ccsp->ccs_signum = signum;
 	ccsp->ccs_si_code = info->si_code;
 	ccsp->ccs_si_trapno = info->si_trapno;
 	ccsp->ccs_si_addr = info->si_addr;
-#ifdef __mips__
-	ccsp->ccs_cp2_cause = cfp->cf_capcause;
-#endif
 
 	/*
 	 * Signal delivered outside of a sandbox; catch but terminate

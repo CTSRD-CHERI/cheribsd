@@ -63,7 +63,7 @@ struct image_params {
 	struct vnode *vp;		/* pointer to vnode of file to exec */
 	struct vm_object *object;	/* The vm object for this vp */
 	struct vattr *attr;		/* attributes of file */
-	struct proc *cop;	/* process we're coexecing into */
+	struct proc *cop;		/* process we're coexecing into */
 	const char *image_header;	/* header of file to exec */
 	unsigned long entry_addr;	/* entry address of target executable */
 	unsigned long start_addr;	/* start of mapped image (including bss) */

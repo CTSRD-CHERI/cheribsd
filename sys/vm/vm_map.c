@@ -6359,7 +6359,7 @@ vm_map_reservation_abandon_locked(vm_map_t map, vm_offset_t reservation)
 
 	KASSERT(entry->reservation == reservation,
 	    ("Reservation mismatch requested %lx found %lx",
-		 reservation, entry->reservation));
+	    (u_long)reservation, (u_long)entry->reservation));
 
 	while (entry->reservation == reservation) {
 		next_entry = vm_map_entry_succ(entry);

@@ -1426,6 +1426,9 @@ exec_map_stack(struct image_params *imgp)
 		} while (dummy == vm_map_max(map) - ssiz + 1);
 	}
 
+	vmspace = p->p_vmspace;
+	map = &vmspace->vm_map;
+
 	stack_prot = sv->sv_shared_page_obj != NULL && imgp->stack_prot != 0 ?
 	    imgp->stack_prot : sv->sv_stackprot;
 	if ((map->flags & MAP_ASLR_STACK) != 0) {

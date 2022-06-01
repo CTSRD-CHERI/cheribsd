@@ -2197,7 +2197,6 @@ each_dumpable_segment(struct thread *td, segment_callback func, void *closure,
 		 */
 		if (entry->owner != p->p_pid)
 			continue;
-
 		if ((object = entry->object.vm_object) == NULL)
 			continue;
 
