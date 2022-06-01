@@ -2262,6 +2262,66 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 	return (error);
 }
 
+#if __has_feature(capabilities)
+int
+core_output_memtag_cheri(char * __capability base, size_t mem_len,
+    size_t file_len, off_t offset, struct coredump_params *cp,
+    void *tagtmpbuf, void *tmpbuf)
+{
+	vm_map_t map;
+	char *tagbuf;
+	size_t tagbuflen;
+	int error;
+	bool hastags;
+
+	KASSERT(is_aligned(base, PAGE_SIZE),
+	    ("%s: user address %lp is not page-aligned", __func__, base));
+
+	tagbuf = tagtmpbuf;
+	tagbuflen = 0;
+
+	map = &cp->td->td_proc->p_vmspace->vm_map;
+	for (; mem_len > 0; base += PAGE_SIZE, mem_len -= PAGE_SIZE) {
+		if (core_dump_can_intr && curproc_sigkilled())
+			return (EINTR);
+
+		/*
+		 * XXX: We could perhaps try to track large ranges of
+		 * unmapped pages and leave those portions of the
+		 * core dump sparse.  (At least we could maybe skip over
+		 * regions where the tagbuf is completely empty.)
+		 */
+		error = proc_read_cheri_tags_page(map, (uintcap_t)base,
+		    tagbuf + tagbuflen, &hastags);
+		tagbuflen += TAG_BYTES_PER_PAGE;
+
+		if (tagbuflen == CORE_BUF_SIZE) {
+			if (cp->comp != NULL)
+				error = compressor_write(cp->comp, tagbuf,
+				    CORE_BUF_SIZE);
+			else
+				error = core_write(cp, tagbuf, CORE_BUF_SIZE,
+				    offset, UIO_SYSSPACE, NULL);
+			offset += CORE_BUF_SIZE;
+			if (error != 0)
+				return (error);
+
+			tagbuflen = 0;
+		}
+	}
+
+	if (tagbuflen != 0) {
+		if (cp->comp != NULL)
+			error = compressor_write(cp->comp, tagbuf, tagbuflen);
+		else
+			error = core_write(cp, tagbuf, tagbuflen, offset,
+			    UIO_SYSSPACE, NULL);
+		return (error);
+	}
+	return (0);
+}
+#endif
+
 /*
  * Drain into a core file.
  */

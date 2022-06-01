@@ -123,6 +123,9 @@ static bool __elfN(check_note)(struct image_params *imgp,
     uint32_t *fctl0);
 static vm_prot_t __elfN(trans_prot)(Elf_Word);
 static Elf_Word __elfN(untrans_prot)(vm_prot_t);
+#if __has_feature(capabilities)
+static Elf_Word __elfN(untrans_capprot)(vm_prot_t);
+#endif
 static size_t __elfN(prepare_register_notes)(struct thread *td,
     struct note_info_list *list, struct thread *target_td);
 
@@ -1915,6 +1918,10 @@ extern int compress_user_cores_level;
 
 static void cb_put_phdr(vm_map_entry_t, void *);
 static void cb_size_segment(vm_map_entry_t, void *);
+#if __has_feature(capabilities)
+static void cb_put_memtag_phdr(vm_map_entry_t, void *);
+static void cb_size_memtag_segment(vm_map_entry_t, void *);
+#endif
 static void each_dumpable_segment(struct thread *, segment_callback, void *,
     int);
 static int __elfN(corehdr)(struct coredump_params *, int, void *, size_t,
@@ -1951,10 +1958,16 @@ __elfN(coredump)(struct thread *td, struct vnode *vp, off_t limit, int flags)
 	struct coredump_params params;
 	struct note_info *ninfo;
 	void *hdr, *tmpbuf;
+#if __has_feature(capabilities)
+	void *tagbuf;
+#endif
 	size_t hdrsize, notesz, coresize;
 
 	hdr = NULL;
 	tmpbuf = NULL;
+#if __has_feature(capabilities)
+	tagbuf = NULL;
+#endif
 	TAILQ_INIT(&notelst);
 
 	/* Size the program segments. */
@@ -1993,6 +2006,10 @@ __elfN(coredump)(struct thread *td, struct vnode *vp, off_t limit, int flags)
 		goto done;
 	}
 
+#if __has_feature(capabilities)
+	tagbuf = malloc(CORE_BUF_SIZE, M_TEMP, M_WAITOK | M_ZERO);
+#endif
+
 	/* Create a compression stream if necessary. */
 	compm = compress_user_cores;
 	if ((flags & (SVC_PT_COREDUMP | SVC_NOCOMPRESS)) == SVC_PT_COREDUMP &&
@@ -2020,12 +2037,10 @@ __elfN(coredump)(struct thread *td, struct vnode *vp, off_t limit, int flags)
 	/* Write the contents of all of the writable segments. */
 	if (error == 0) {
 		Elf_Phdr *php;
-		off_t offset;
 		int i;
 		char * __capability section_cap;
 
 		php = (Elf_Phdr *)((char *)hdr + sizeof(Elf_Ehdr)) + 1;
-		offset = round_page(hdrsize + notesz);
 		for (i = 0; i < seginfo.count; i++) {
 #if __has_feature(capabilities)
 			section_cap = cheri_capability_build_user_data(
@@ -2035,11 +2050,17 @@ __elfN(coredump)(struct thread *td, struct vnode *vp, off_t limit, int flags)
 #else
 			section_cap = (char *)(uintptr_t)php->p_vaddr;
 #endif
+#if __has_feature(capabilities)
+			if (php->p_type == PT_MEMTAG_CHERI)
+				error = core_output_memtag_cheri(section_cap,
+				    php->p_memsz, php->p_filesz, php->p_offset,
+				    &params, tagbuf, tmpbuf);
+			else
+#endif
 			error = core_output(section_cap,
-			    php->p_filesz, offset, &params, tmpbuf);
+			    php->p_filesz, php->p_offset, &params, tmpbuf);
 			if (error != 0)
 				break;
-			offset += php->p_filesz;
 			php++;
 		}
 		if (error == 0 && params.comp != NULL)
@@ -2053,6 +2074,9 @@ __elfN(coredump)(struct thread *td, struct vnode *vp, off_t limit, int flags)
 
 done:
 	free(tmpbuf, M_TEMP);
+#if __has_feature(capabilities)
+	free(tagbuf, M_TEMP);
+#endif
 	if (params.comp != NULL)
 		compressor_fini(params.comp);
 	while ((ninfo = TAILQ_FIRST(&notelst)) != NULL) {
@@ -2089,6 +2113,29 @@ cb_put_phdr(vm_map_entry_t entry, void *closure)
 	phc->phdr++;
 }
 
+#if __has_feature(capabilities)
+static void
+cb_put_memtag_phdr(vm_map_entry_t entry, void *closure)
+{
+	struct phdr_closure *phc = (struct phdr_closure *)closure;
+	Elf_Phdr *phdr = phc->phdr;
+
+	if ((entry->protection & VM_PROT_CAP) != 0) {
+		phdr->p_type = PT_MEMTAG_CHERI;
+		phdr->p_offset = phc->offset;
+		phdr->p_vaddr = entry->start;
+		phdr->p_paddr = 0;
+		phdr->p_memsz = entry->end - entry->start;
+		phdr->p_filesz = phdr->p_memsz / (sizeof(uintcap_t) * NBBY);
+		phdr->p_align = 0;
+		phdr->p_flags = __elfN(untrans_capprot)(entry->protection);
+
+		phc->offset += phdr->p_filesz;
+		phc->phdr++;
+	}
+}
+#endif
+
 /*
  * A callback for each_dumpable_segment() to gather information about
  * the number of segments and their total size.
@@ -2102,6 +2149,20 @@ cb_size_segment(vm_map_entry_t entry, void *closure)
 	ssc->size += entry->end - entry->start;
 }
 
+#if __has_feature(capabilities)
+static void
+cb_size_memtag_segment(vm_map_entry_t entry, void *closure)
+{
+	struct sseg_closure *ssc = (struct sseg_closure *)closure;
+
+	if ((entry->protection & VM_PROT_CAP) != 0) {
+		ssc->count++;
+		ssc->size += (entry->end - entry->start) /
+		    (sizeof(uintcap_t) * NBBY);
+	}
+}
+#endif
+
 void
 __elfN(size_segments)(struct thread *td, struct sseg_closure *seginfo,
     int flags)
@@ -2110,6 +2171,9 @@ __elfN(size_segments)(struct thread *td, struct sseg_closure *seginfo,
 	seginfo->size = 0;
 
 	each_dumpable_segment(td, cb_size_segment, seginfo, flags);
+#if __has_feature(capabilities)
+	each_dumpable_segment(td, cb_size_memtag_segment, seginfo, flags);
+#endif
 }
 
 /*
@@ -2348,6 +2412,9 @@ __elfN(puthdr)(struct thread *td, void *hdr, size_t hdrsize, int numsegs,
 	phc.phdr = phdr;
 	phc.offset = round_page(hdrsize + notesz);
 	each_dumpable_segment(td, cb_put_phdr, &phc, flags);
+#if __has_feature(capabilities)
+	each_dumpable_segment(td, cb_put_memtag_phdr, &phc, flags);
+#endif
 }
 
 static size_t
@@ -3324,6 +3391,21 @@ __elfN(untrans_prot)(vm_prot_t prot)
 		flags |= PF_W;
 	return (flags);
 }
+
+#if __has_feature(capabilities)
+static Elf_Word
+__elfN(untrans_capprot)(vm_prot_t prot)
+{
+	Elf_Word flags;
+
+	flags = 0;
+	if (prot & VM_PROT_READ_CAP)
+		flags |= PF_R;
+	if (prot & VM_PROT_WRITE_CAP)
+		flags |= PF_W;
+	return (flags);
+}
+#endif
 // CHERI CHANGES START
 // {
 //   "updated": 20200708,
