@@ -991,6 +991,8 @@ _ELF_DEFINE_PT(PT_HIOS,             0x6FFFFFFFUL,		\
 	"end of OS-specific range")				\
 _ELF_DEFINE_PT(PT_LOPROC,           0x70000000UL,		\
 	"start of processor-specific range")			\
+_ELF_DEFINE_PT(PT_AARCH64_MEMTAG_CHERI, 0x70000003UL,		\
+	"CHERI memory tags")					\
 _ELF_DEFINE_PT(PT_ARM_ARCHEXT,      0x70000000UL,		\
 	"platform architecture compatibility information")	\
 _ELF_DEFINE_PT(PT_ARM_EXIDX,        0x70000001UL,		\
@@ -1001,6 +1003,8 @@ _ELF_DEFINE_PT(PT_MIPS_RTPROC,      0x70000001UL,		\
 	"runtime procedure table")				\
 _ELF_DEFINE_PT(PT_MIPS_OPTIONS,     0x70000002UL,		\
 	"options segment")					\
+_ELF_DEFINE_PT(PT_RISCV_MEMTAG_CHERI, 0x7FFFFFFFUL,		\
+	"CHERI memory tags")					\
 _ELF_DEFINE_PT(PT_HIPROC,           0x7FFFFFFFUL,		\
 	"end of processor-specific range")
 
