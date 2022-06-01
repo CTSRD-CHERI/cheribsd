@@ -139,6 +139,7 @@ extern u_int	security_cheri_debugger_on_sandbox_unwind;
 extern u_int	security_cheri_sandboxed_signals;
 extern u_int	security_cheri_syscall_violations;
 extern u_int	security_cheri_bound_legacy_capabilities;
+extern u_int	cheri_cloadtags_stride;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
