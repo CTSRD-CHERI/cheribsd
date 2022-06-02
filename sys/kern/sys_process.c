@@ -484,6 +484,67 @@ proc_writemem(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
 	return (proc_iop(td, p, va, buf, len, UIO_WRITE));
 }
 
+#if __has_feature(capabilities)
+int
+proc_read_cheri_tags_page(vm_map_t map, vm_offset_t va, void *tagbuf,
+    bool *hastagsp)
+{
+	vm_page_t m;
+	char *src, *dst;
+	uint64_t tags;
+	u_int len, tagbits;
+	int error;
+	bool hastags;
+
+	KASSERT(is_aligned(va, PAGE_SIZE),
+	    ("%s: user address %lx is not page-aligned", __func__, va));
+
+	/*
+	 * Fault in the next page, but only if it already exists.  If
+	 * the page doesn't exist, fill the tag buffer with zeroes.
+	 */
+	error = vm_fault(map, va, VM_PROT_READ, VM_FAULT_NOFILL, &m);
+	if (error == KERN_PAGE_NOT_FILLED) {
+		memset(tagbuf, 0, TAG_BYTES_PER_PAGE);
+		*hastagsp = false;
+		return (0);
+	}
+	if (error != 0)
+		return (EFAULT);
+
+	src = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+	dst = tagbuf;
+	len = PAGE_SIZE;
+	tags = 0;
+	tagbits = 0;
+	hastags = false;
+	while (len > 0) {
+		tags = (tags << cheri_cloadtags_stride) | cheri_loadtags(src);
+		tagbits += cheri_cloadtags_stride;
+		if (tags != 0)
+			hastags = true;
+
+		while (tagbits >= 8) {
+			*dst = tags & 0xff;
+
+			tags >>= 8;
+			tagbits -= 8;
+			dst++;
+		}
+
+		src += cheri_cloadtags_stride * sizeof(uintcap_t);
+		len -= cheri_cloadtags_stride * sizeof(uintcap_t);
+	}
+
+	KASSERT(tagbits == 0, ("%s: partial tag bits %u at end of page",
+	    __func__, tagbits));
+
+	vm_page_unwire(m, PQ_ACTIVE);
+	*hastagsp = hastags;
+	return (0);
+}
+#endif
+
 static int
 ptrace_vm_entry(struct thread *td, struct proc *p,
 		struct ptrace_vm_entry *pve)
