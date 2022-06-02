@@ -973,7 +973,7 @@
 		    _Out_writes_bytes_(*alen) struct sockaddr *asa,
 		    _Inout_ __socklen_t *alen
 		);
-	} getsockname getsockname_args int
+	}
 151	AUE_NULL	STD {
 		int coexecve(
 		    pid_t pid,

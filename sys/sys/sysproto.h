@@ -2408,7 +2408,7 @@ struct okillpg_args {
 	char pgid_l_[PADL_(int)]; int pgid; char pgid_r_[PADR_(int)];
 	char signum_l_[PADL_(int)]; int signum; char signum_r_[PADR_(int)];
 };
-struct getsockname_args {
+struct ogetsockname_args {
 	char fdes_l_[PADL_(int)]; int fdes; char fdes_r_[PADR_(int)];
 	char asa_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability asa; char asa_r_[PADR_(struct sockaddr * __capability)];
 	char alen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability alen; char alen_r_[PADR_(__socklen_t * __capability)];
@@ -2454,7 +2454,7 @@ int	ogetrlimit(struct thread *, struct ogetrlimit_args *);
 int	osetrlimit(struct thread *, struct osetrlimit_args *);
 int	okillpg(struct thread *, struct okillpg_args *);
 int	oquota(struct thread *, struct oquota_args *);
-int	ogetsockname(struct thread *, struct getsockname_args *);
+int	ogetsockname(struct thread *, struct ogetsockname_args *);
 int	ogetdirentries(struct thread *, struct ogetdirentries_args *);
 
 #endif /* COMPAT_43 */
