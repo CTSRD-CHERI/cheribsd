@@ -1395,6 +1395,12 @@ exec_map_stack(struct image_params *imgp)
 		ssiz = CHERI_REPRESENTABLE_LENGTH(ssiz);
 	}
 #endif
+
+	vmspace = p->p_vmspace;
+	map = &vmspace->vm_map;
+
+	stack_prot = sv->sv_shared_page_obj != NULL && imgp->stack_prot != 0 ?
+	    imgp->stack_prot : sv->sv_stackprot;
 	if (imgp->cop != NULL) {
 		vm_offset_t dummy;
 
@@ -1424,14 +1430,14 @@ exec_map_stack(struct image_params *imgp)
 			dummy = vm_map_findspace(map, stack_addr, ssiz);
 			vm_map_unlock(map);
 		} while (dummy == vm_map_max(map) - ssiz + 1);
-	}
-
-	vmspace = p->p_vmspace;
-	map = &vmspace->vm_map;
-
-	stack_prot = sv->sv_shared_page_obj != NULL && imgp->stack_prot != 0 ?
-	    imgp->stack_prot : sv->sv_stackprot;
-	if ((map->flags & MAP_ASLR_STACK) != 0) {
+		/*
+		 * XXX: We don't really care where this ends up, but
+		 * there's little point in trying to look elsewere given
+		 * that we're at the top of the addres space and have
+		 * searched downward to find this spot.
+		 */
+		find_space = VMFS_NO_SPACE;
+	} else if ((map->flags & MAP_ASLR_STACK) != 0) {
 		KASSERT((sv->sv_flags & SV_CHERI) == 0,
 		    ("MAP_ASLR_STACK with SV_CHERI"));
 		stack_addr = round_page((vm_offset_t)p->p_vmspace->vm_daddr +
