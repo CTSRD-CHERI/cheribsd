@@ -155,12 +155,6 @@ DEBUGMKDIR=
 PROG_FULL=	${PROG}
 .endif
 
-.if defined(STRIP) && !empty(STRIP) && defined(PROG) && !defined(INTERNALPROG)
-PROG_INSTALL=	${PROG}.stripped
-.else
-PROG_INSTALL=	${PROG}
-.endif
-
 .if defined(PROG)
 PROGNAME?=	${PROG}
 
@@ -235,11 +229,6 @@ ${PROGNAME}.debug: ${PROG_FULL}
 	${OBJCOPY} --only-keep-debug ${PROG_FULL} ${.TARGET}
 .endif
 
-.if ${PROG_INSTALL} != ${PROG}
-${PROG_INSTALL}: ${PROG}
-	${STRIPBIN} -o ${.TARGET} ${STRIP_FLAGS} ${PROG}
-.endif
-
 .if defined(LLVM_LINK)
 ${PROG_FULL}.bc: ${BCOBJS}
 	${LLVM_LINK} -o ${.TARGET} ${BCOBJS}
@@ -263,10 +252,10 @@ MAN1=	${MAN}
 all:
 .else
 .if target(afterbuild)
-.ORDER: ${PROG_INSTALL} afterbuild
-all: ${PROG_INSTALL} ${SCRIPTS} afterbuild
+.ORDER: ${PROG} afterbuild
+all: ${PROG} ${SCRIPTS} afterbuild
 .else
-all: ${PROG_INSTALL} ${SCRIPTS}
+all: ${PROG} ${SCRIPTS}
 .endif
 .if ${MK_MAN} != "no"
 all: all-man
@@ -275,7 +264,6 @@ all: all-man
 
 .if defined(PROG)
 CLEANFILES+= ${PROG} ${PROG}.bc ${PROG}.ll
-CLEANFILES+= ${PROG}.stripped
 .if ${MK_DEBUG_FILES} != "no"
 CLEANFILES+= ${PROG_FULL} ${PROGNAME}.debug
 .endif
