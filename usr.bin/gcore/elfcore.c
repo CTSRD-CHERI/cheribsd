@@ -358,6 +358,9 @@ elf_putnotes(pid_t pid, struct sbuf *sb, size_t *sizep)
 
 	for (i = 0; i < threads; ++i) {
 		elf_putregnote(NT_PRSTATUS, tids[i], sb);
+#if __has_feature(capabilities)
+		elf_putregnote(NT_CAPREGS, tids[i], sb);
+#endif
 		elf_putregnote(NT_FPREGSET, tids[i], sb);
 		elf_putregnote(NT_THRMISC, tids[i], sb);
 		elf_putregnote(NT_PTLWPINFO, tids[i], sb);
