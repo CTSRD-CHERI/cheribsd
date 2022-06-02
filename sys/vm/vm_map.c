@@ -5497,8 +5497,7 @@ retry:
 	 * If this is the main process stack, see if we're over the stack
 	 * limit.
 	 */
-	is_procstack = addr >= p->p_vm_maxsaddr &&
-	    addr < (vm_offset_t)p->p_vm_stacktop;
+	is_procstack = addr >= p->p_vm_maxsaddr && addr < p->p_vm_stacktop;
 	if (is_procstack && (ctob(p->p_vm_ssize) + grow_amount > stacklim))
 		return (KERN_NO_SPACE);
 
@@ -5682,7 +5681,7 @@ out:
 			    ptoa(pmap_wired_count(map->pmap)));
 			KASSERT(error == 0, ("decreasing RACCT_MEMLOCK failed"));
 		}
-	    	error = racct_set(p, RACCT_STACK, ctob(p->p_vm_ssize));
+		error = racct_set(p, RACCT_STACK, ctob(p->p_vm_ssize));
 		KASSERT(error == 0, ("decreasing RACCT_STACK failed"));
 		PROC_UNLOCK(p);
 	}
@@ -6313,8 +6312,8 @@ vm_map_reservation_create_locked(vm_map_t map, vm_pointer_t *addr,
  * ensure CHERI exact representability.
  */
 int
-vm_map_reservation_create(vm_map_t map, vm_pointer_t *addr,
-    vm_size_t length, vm_offset_t alignment, vm_prot_t max_prot)
+vm_map_reservation_create(vm_map_t map, vm_pointer_t *addr, vm_size_t length,
+    vm_offset_t alignment, vm_prot_t max_prot)
 {
 	int result;
 	vm_size_t padded_length = CHERI_REPRESENTABLE_LENGTH(length);
