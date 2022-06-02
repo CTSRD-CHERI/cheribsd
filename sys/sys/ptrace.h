@@ -212,6 +212,8 @@ struct ptrace_coredump {
 
 #ifdef _KERNEL
 
+#include <vm/vm.h>
+
 struct thr_coredump_req {
 	struct vnode	*tc_vp;		/* vnode to write coredump to. */
 	off_t		tc_limit;	/* max coredump file size. */
@@ -250,6 +252,10 @@ ssize_t	proc_readmem(struct thread *_td, struct proc *_p, vm_offset_t _va,
 ssize_t	proc_writemem(struct thread *_td, struct proc *_p, vm_offset_t _va,
 	    void *_buf, size_t _len);
 #if __has_feature(capabilities)
+#define	TAG_BYTES_PER_PAGE	(PAGE_SIZE / (sizeof(uintcap_t) * NBBY))
+
+int	proc_read_cheri_tags_page(vm_map_t _map, vm_offset_t _va,
+	    void *_tagbuf, bool *_hastags);
 int	proc_read_capregs(struct thread *_td, struct capreg *_capregs);
 int	proc_write_capregs(struct thread *_td, struct capreg *_capregs);
 #endif
