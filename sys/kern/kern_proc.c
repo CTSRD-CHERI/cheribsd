@@ -3372,8 +3372,8 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 		bzero(&kst32, sizeof(kst32));
 		if (SV_PROC_FLAG(p, SV_ILP32)) {
 			if (sv->sv_sigcode_base != 0) {
-				kst32.ksigtramp_start = sv->sv_sigcode_base;
-				kst32.ksigtramp_end = sv->sv_sigcode_base +
+				kst32.ksigtramp_start = PROC_SIGCODE(p);
+				kst32.ksigtramp_end = kst32.ksigtramp_start +
 				    ((sv->sv_flags & SV_DSO_SIG) == 0 ?
 				    *sv->sv_szsigcode :
 				    (uintptr_t)sv->sv_szsigcode);
@@ -3393,8 +3393,8 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 		bzero(&kst64, sizeof(kst64));
 		if (!SV_PROC_FLAG(p, SV_CHERI)) {
 			if (sv->sv_sigcode_base != 0) {
-				kst64.ksigtramp_start = sv->sv_sigcode_base;
-				kst64.ksigtramp_end = sv->sv_sigcode_base +
+				kst64.ksigtramp_start = PROC_SIGCODE(p);
+				kst64.ksigtramp_end = kst64.ksigtramp_start +
 				    *sv->sv_szsigcode;
 			} else {
 				kst64.ksigtramp_start = PROC_PS_STRINGS(p) -
@@ -3409,10 +3409,10 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 #endif
 	bzero(&kst, sizeof(kst));
 	if (sv->sv_sigcode_base != 0) {
-		kst.ksigtramp_start = EXPORT_KPTR(sv->sv_sigcode_base);
-		kst.ksigtramp_end = EXPORT_KPTR(sv->sv_sigcode_base +
+		kst.ksigtramp_start = EXPORT_KPTR(PROC_SIGCODE(p));
+		kst.ksigtramp_end = EXPORT_KPTR((intcap_t)kst.ksigtramp_start +
 		    ((sv->sv_flags & SV_DSO_SIG) == 0 ? *sv->sv_szsigcode :
-		    (uintptr_t)sv->sv_szsigcode));
+		    (ptraddr_t)sv->sv_szsigcode));
 	} else {
 		kst.ksigtramp_start = EXPORT_KPTR(PROC_PS_STRINGS(p) -
 		    *sv->sv_szsigcode);

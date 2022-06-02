@@ -815,7 +815,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #if __has_feature(capabilities)
 	trapframe_set_elr(tf, (uintcap_t)p->p_md.md_sigcode);
 #else
-	tf->tf_elr = (register_t)p->p_sysent->sv_sigcode_base;
+	tf->tf_elr = (register_t)PROC_SIGCODE(p);
 #endif
 
 	/* Clear the single step flag while in the signal handler */
