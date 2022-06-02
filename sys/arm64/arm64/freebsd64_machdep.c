@@ -64,6 +64,10 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/md_var.h>
 
+#include <vm/vm.h>
+#include <vm/pmap.h>
+#include <vm/vm_map.h>
+
 #include <cheri/cheric.h>
 
 #include <compat/freebsd64/freebsd64_proto.h>

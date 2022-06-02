@@ -1702,10 +1702,11 @@ interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
 static void * __capability
 timekeep_cap(struct image_params *imgp)
 {
+	struct vmspace *vmspace = imgp->proc->p_vmspace;
 	ptraddr_t timekeep_base;
 	size_t timekeep_len;
 
-	timekeep_base = imgp->sysent->sv_timekeep_base;
+	timekeep_base = vmspace->vm_shp_base + imgp->sysent->sv_timekeep_offset;
 	timekeep_len = sizeof(struct vdso_timekeep) +
 	    sizeof(struct vdso_timehands) * VDSO_TH_NUM;
 
@@ -1726,6 +1727,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
 	Elf_Auxinfo *argarray, *pos;
+	struct vmspace *vmspace;
 #ifdef __ELF_CHERI
 	void * __capability exec_base;
 	void * __capability entry;
@@ -1734,6 +1736,8 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 
 	argarray = pos = malloc(AT_COUNT * sizeof(*pos), M_TEMP,
 	    M_WAITOK | M_ZERO);
+
+	vmspace = imgp->proc->p_vmspace;
 
 	if (args->execfd != -1)
 		AUXARGS_ENTRY(pos, AT_EXECFD, args->execfd);
@@ -1813,11 +1817,12 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		AUXARGS_ENTRY_PTR(pos, AT_PAGESIZES, imgp->pagesizes);
 		AUXARGS_ENTRY(pos, AT_PAGESIZESLEN, imgp->pagesizeslen);
 	}
-	if (imgp->sysent->sv_timekeep_base != 0) {
+	if ((imgp->sysent->sv_flags & SV_TIMEKEEP) != 0) {
 #ifdef __ELF_CHERI
 		AUXARGS_ENTRY_PTR(pos, AT_TIMEKEEP, timekeep_cap(imgp));
 #else
-		AUXARGS_ENTRY(pos, AT_TIMEKEEP, imgp->sysent->sv_timekeep_base);
+		AUXARGS_ENTRY(pos, AT_TIMEKEEP,
+		    vmspace->vm_shp_base + imgp->sysent->sv_timekeep_offset);
 #endif
 	}
 	AUXARGS_ENTRY(pos, AT_STACKPROT, (imgp->sysent->sv_shared_page_obj
@@ -1834,10 +1839,16 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY(pos, AT_ENVC, imgp->args->envc);
 	AUXARGS_ENTRY_PTR(pos, AT_ENVV, imgp->envv);
 	AUXARGS_ENTRY_PTR(pos, AT_PS_STRINGS, imgp->ps_strings);
-	if (imgp->sysent->sv_fxrng_gen_base != 0)
-		AUXARGS_ENTRY(pos, AT_FXRNG, imgp->sysent->sv_fxrng_gen_base);
-	if (imgp->sysent->sv_vdso_base != 0 && __elfN(vdso) != 0)
-		AUXARGS_ENTRY(pos, AT_KPRELOAD, imgp->sysent->sv_vdso_base);
+#ifdef RANDOM_FENESTRASX
+	if ((imgp->sysent->sv_flags & SV_RNG_SEED_VER) != 0) {
+		AUXARGS_ENTRY(pos, AT_FXRNG,
+		    vmspace->vm_shp_base + imgp->sysent->sv_fxrng_gen_offset);
+	}
+#endif
+	if ((imgp->sysent->sv_flags & SV_DSO_SIG) != 0 && __elfN(vdso) != 0) {
+		AUXARGS_ENTRY(pos, AT_KPRELOAD,
+		    vmspace->vm_shp_base + imgp->sysent->sv_vdso_offset);
+	}
 	AUXARGS_ENTRY(pos, AT_NULL, 0);
 
 	free(imgp->auxargs, M_TEMP);

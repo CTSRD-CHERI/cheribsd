@@ -573,7 +573,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_ra = (uintcap_t)p->p_md.md_sigcode;
 #else
 	sysent = p->p_sysent;
-	if (sysent->sv_sigcode_base != 0)
+	if (PROC_HAS_SHP(p))
 		tf->tf_ra = (register_t)PROC_SIGCODE(p);
 	else
 		tf->tf_ra = (register_t)(PROC_PS_STRINGS(p) -
