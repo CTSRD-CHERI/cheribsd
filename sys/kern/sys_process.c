@@ -519,7 +519,7 @@ proc_read_cheri_tags_page(vm_map_t map, vm_offset_t va, void *tagbuf,
 	tagbits = 0;
 	hastags = false;
 	while (len > 0) {
-		tags = (tags << cheri_cloadtags_stride) | cheri_loadtags(src);
+		tags |= cheri_loadtags(src) << tagbits;
 		tagbits += cheri_cloadtags_stride;
 		if (tags != 0)
 			hastags = true;
