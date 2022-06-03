@@ -6434,6 +6434,8 @@ _vm_map_assert_consistent(vm_map_t map, int check)
 		    ("map %p start = %jx, end = %jx", map,
 		    (uintmax_t)entry->start, (uintmax_t)entry->end));
 		KASSERT((map->flags & MAP_RESERVATIONS) == 0 ||
+		    prev->reservation == (vm_offset_t)-1 ||
+		    entry->reservation == (vm_offset_t)-1 ||
 		    prev->reservation <= entry->reservation,
 		    ("map %p prev->reservation = %jx, reservation = %jx", map,
 		    (uintmax_t)prev->reservation,
@@ -6447,6 +6449,8 @@ _vm_map_assert_consistent(vm_map_t map, int check)
 		    ("map %p start = %jx, right->start = %jx", map,
 		    (uintmax_t)entry->start, (uintmax_t)entry->right->start));
 		KASSERT((map->flags & MAP_RESERVATIONS) == 0 ||
+		    prev->reservation == (vm_offset_t)-1 ||
+		    entry->reservation == (vm_offset_t)-1 ||
 		    prev->reservation < entry->reservation ||
 		    prev->end == entry->start,
 		    ("map %p, prev->end = %jx, start = %jx, reservation = %jx",
