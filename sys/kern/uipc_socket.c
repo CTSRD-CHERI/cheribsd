@@ -3739,6 +3739,7 @@ soo_kqfilter(struct file *fp, struct knote *kn)
 {
 	struct socket *so = kn->kn_fp->f_data;
 	struct sockbuf *sb;
+	sb_which which;
 	struct knlist *knl;
 
 	switch (kn->kn_filter) {
@@ -3746,16 +3747,19 @@ soo_kqfilter(struct file *fp, struct knote *kn)
 		kn->kn_fop = &soread_filtops;
 		knl = &so->so_rdsel.si_note;
 		sb = &so->so_rcv;
+		which = SO_RCV;
 		break;
 	case EVFILT_WRITE:
 		kn->kn_fop = &sowrite_filtops;
 		knl = &so->so_wrsel.si_note;
 		sb = &so->so_snd;
+		which = SO_SND;
 		break;
 	case EVFILT_EMPTY:
 		kn->kn_fop = &soempty_filtops;
 		knl = &so->so_wrsel.si_note;
 		sb = &so->so_snd;
+		which = SO_SND;
 		break;
 	default:
 		return (EINVAL);
@@ -3765,10 +3769,10 @@ soo_kqfilter(struct file *fp, struct knote *kn)
 	if (SOLISTENING(so)) {
 		knlist_add(knl, kn, 1);
 	} else {
-		SOCKBUF_LOCK(sb);
+		SOCK_BUF_LOCK(so, which);
 		knlist_add(knl, kn, 1);
 		sb->sb_flags |= SB_KNOTE;
-		SOCKBUF_UNLOCK(sb);
+		SOCK_BUF_UNLOCK(so, which);
 	}
 	SOCK_UNLOCK(so);
 	return (0);
@@ -3979,7 +3983,7 @@ filt_soread(struct knote *kn, long hint)
 		return (!TAILQ_EMPTY(&so->sol_comp));
 	}
 
-	SOCKBUF_LOCK_ASSERT(&so->so_rcv);
+	SOCK_RECVBUF_LOCK_ASSERT(so);
 
 	kn->kn_data = sbavail(&so->so_rcv) - so->so_rcv.sb_ctl;
 	if (so->so_rcv.sb_state & SBS_CANTRCVMORE) {
@@ -4022,7 +4026,7 @@ filt_sowrite(struct knote *kn, long hint)
 	if (SOLISTENING(so))
 		return (0);
 
-	SOCKBUF_LOCK_ASSERT(&so->so_snd);
+	SOCK_SENDBUF_LOCK_ASSERT(so);
 	kn->kn_data = sbspace(&so->so_snd);
 
 	hhook_run_socket(so, kn, HHOOK_FILT_SOWRITE);
@@ -4052,7 +4056,7 @@ filt_soempty(struct knote *kn, long hint)
 	if (SOLISTENING(so))
 		return (1);
 
-	SOCKBUF_LOCK_ASSERT(&so->so_snd);
+	SOCK_SENDBUF_LOCK_ASSERT(so);
 	kn->kn_data = sbused(&so->so_snd);
 
 	if (kn->kn_data == 0)
@@ -4164,7 +4168,7 @@ again:
 			SOCK_UNLOCK(so);
 			solisten_wakeup(head);	/* unlocks */
 		} else {
-			SOCKBUF_LOCK(&so->so_rcv);
+			SOCK_RECVBUF_LOCK(so);
 			soupcall_set(so, SO_RCV,
 			    head->sol_accept_filter->accf_callback,
 			    head->sol_accept_filter_arg);
@@ -4173,10 +4177,10 @@ again:
 			    head->sol_accept_filter_arg, M_NOWAIT);
 			if (ret == SU_ISCONNECTED) {
 				soupcall_clear(so, SO_RCV);
-				SOCKBUF_UNLOCK(&so->so_rcv);
+				SOCK_RECVBUF_UNLOCK(so);
 				goto again;
 			}
-			SOCKBUF_UNLOCK(&so->so_rcv);
+			SOCK_RECVBUF_UNLOCK(so);
 			SOCK_UNLOCK(so);
 			SOLISTEN_UNLOCK(head);
 		}
@@ -4197,9 +4201,9 @@ soisdisconnecting(struct socket *so)
 	so->so_state |= SS_ISDISCONNECTING;
 
 	if (!SOLISTENING(so)) {
-		SOCKBUF_LOCK(&so->so_rcv);
+		SOCK_RECVBUF_LOCK(so);
 		socantrcvmore_locked(so);
-		SOCKBUF_LOCK(&so->so_snd);
+		SOCK_SENDBUF_LOCK(so);
 		socantsendmore_locked(so);
 	}
 	SOCK_UNLOCK(so);
@@ -4225,9 +4229,9 @@ soisdisconnected(struct socket *so)
 
 	if (!SOLISTENING(so)) {
 		SOCK_UNLOCK(so);
-		SOCKBUF_LOCK(&so->so_rcv);
+		SOCK_RECVBUF_LOCK(so);
 		socantrcvmore_locked(so);
-		SOCKBUF_LOCK(&so->so_snd);
+		SOCK_SENDBUF_LOCK(so);
 		sbdrop_locked(&so->so_snd, sbused(&so->so_snd));
 		socantsendmore_locked(so);
 	} else
@@ -4310,10 +4314,8 @@ soupcall_set(struct socket *so, sb_which which, so_upcall_t func, void *arg)
 	case SO_SND:
 		sb = &so->so_snd;
 		break;
-	default:
-		panic("soupcall_set: bad which");
 	}
-	SOCKBUF_LOCK_ASSERT(sb);
+	SOCK_BUF_LOCK_ASSERT(so, which);
 	sb->sb_upcall = func;
 	sb->sb_upcallarg = arg;
 	sb->sb_flags |= SB_UPCALL;
@@ -4334,7 +4336,7 @@ soupcall_clear(struct socket *so, sb_which which)
 		sb = &so->so_snd;
 		break;
 	}
-	SOCKBUF_LOCK_ASSERT(sb);
+	SOCK_BUF_LOCK_ASSERT(so, which);
 	KASSERT(sb->sb_upcall != NULL,
 	    ("%s: so %p no upcall to clear", __func__, so));
 	sb->sb_upcall = NULL;
@@ -4359,7 +4361,7 @@ so_rdknl_lock(void *arg)
 	if (SOLISTENING(so))
 		SOCK_LOCK(so);
 	else
-		SOCKBUF_LOCK(&so->so_rcv);
+		SOCK_RECVBUF_LOCK(so);
 }
 
 static void
@@ -4370,7 +4372,7 @@ so_rdknl_unlock(void *arg)
 	if (SOLISTENING(so))
 		SOCK_UNLOCK(so);
 	else
-		SOCKBUF_UNLOCK(&so->so_rcv);
+		SOCK_RECVBUF_UNLOCK(so);
 }
 
 static void
