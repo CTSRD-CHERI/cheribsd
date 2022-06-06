@@ -34,6 +34,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/auxv.h>
 #include <err.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,7 +45,8 @@ usage(void)
 {
 
 	fprintf(stderr,
-	    "usage: colookups -i index name [-i index name ...] command [args ...]\n");
+	    "usage: colookup -c name\n"
+	    "       colookup -i index name [-i index name ...] command [args ...]\n");
 	exit(0);
 }
 
@@ -55,14 +57,27 @@ main(int argc, char **argv)
 	void * __capability lookedup;
 	char *tmp;
 	int capc, ch, entry, error;
+	bool cflag = false;
 
 	capvfetch(&capc, &capv);
 	if (capc <= 0) {
 		//warnx("no capability vector");
 	}
 
-	while ((ch = getopt(argc, argv, "i:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:i:")) != -1) {
 		switch (ch) {
+		case 'c':
+			cflag = true;
+			error = colookup(optarg, &lookedup);
+			if (error != 0) {
+				if (errno == ESRCH) {
+					warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", optarg);
+					warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
+				}
+				err(1, "colookup");
+			}
+			printf("%s: %#lp\n", optarg, lookedup);
+			break;
 		case 'i':
 			entry = strtol(optarg, &tmp, 10);
 			if (*tmp != '\0')
@@ -94,6 +109,12 @@ main(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
+
+	if (cflag) {
+		if (argc != 0)
+			usage();
+		return (0);
+	}
 
 	if (argc < 1)
 		usage();

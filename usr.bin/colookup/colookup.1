@@ -37,6 +37,8 @@
 .Nd insert public capability into capability vector
 .Sh SYNOPSIS
 .Nm
+.Fl c Ar name
+.Nm
 .Fl i Ar index Ar name
 .Op Fl i Ar index Ar name Ar ...
 .Ar command Op Ar args ...
@@ -51,6 +53,8 @@ with that capability passed in its inherited capability vector.
 .Pp
 The following options are available:
 .Bl -tag -width ".Fl i"
+.It Fl c
+Instead of spawning anything, print out the capability value and exit.
 .It Fl i
 Lookup capability
 .Ar name
