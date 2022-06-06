@@ -156,7 +156,7 @@ bsdinstall hostname || error "Set hostname failed"
 # than prompting the user to select as in baseline FreeBSD.  This is because
 # we don't ship src and ports tarballs, expecting the user to check out fresh
 # versions themselves.
-export DISTRIBUTIONS="base.txz kernel.txz"
+export DISTRIBUTIONS="${DISTRIBUTIONS:-base.txz kernel.txz}"
 if [ -f $BSDINSTALL_DISTDIR/MANIFEST ]; then
 	EXTRA_DISTS=`awk -F'\t' '!/^(kernel\.txz|base\.txz)/{print $1}' $BSDINSTALL_DISTDIR/MANIFEST`
 	export DISTRIBUTIONS="$DISTRIBUTIONS $EXTRA_DISTS"
