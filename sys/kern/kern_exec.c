@@ -2222,12 +2222,12 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 int
 sbuf_drain_core_output(void *arg, const char *data, int len)
 {
-	struct coredump_params *cp;
-	struct proc *p;
-	int error, locked;
+struct coredump_params *cp;
+struct proc *p;
+int error, locked;
 
-	cp = arg;
-	p = cp->td->td_proc;
+cp = arg;
+p = cp->td->td_proc;
 
 	/*
 	 * Some kern_proc out routines that print to this sbuf may
