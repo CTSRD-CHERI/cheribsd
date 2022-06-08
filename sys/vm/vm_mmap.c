@@ -149,13 +149,14 @@ cap_covers_pages(const void * __capability cap, size_t size)
 	return (__CAP_CHECK(__DECONST_CAP(void * __capability, addr), size));
 }
 
-static void * __capability
+static uintcap_t
 mmap_retcap(struct thread *td, vm_pointer_t addr,
     const struct mmap_req *mrp)
 {
-	void * __capability newcap;
+	uintcap_t newcap;
 #ifndef __CHERI_PURE_CAPABILITY__
-	size_t cap_base, cap_len;
+	ptraddr_t cap_base;
+	size_t cap_len;
 #endif
 	register_t perms, cap_prot;
 
@@ -164,18 +165,18 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 	 *
 	 * NB: This means no permission changes.
 	 * The assumption is that the larger capability has the correct
-	 * permissions and we're only intrested in adjusting page mappings.
+	 * permissions and we're only interested in adjusting page mappings.
 	 */
 	if (mrp->mr_flags & MAP_CHERI_NOSETBOUNDS)
-		return (mrp->mr_source_cap);
+		return ((uintcap_t)mrp->mr_source_cap);
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
-	newcap = (void *)addr;
+	newcap = addr;
 	/* Enforce per-thread mmap capability permission */
 	newcap = cheri_andperm(newcap, cheri_getperm(mrp->mr_source_cap));
 #else
-	newcap = mrp->mr_source_cap;
+	newcap = (uintcap_t)mrp->mr_source_cap;
 #endif
 
 	/*
@@ -804,8 +805,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	if (error == 0) {
 #if __has_feature(capabilities)
 		if (SV_CURPROC_FLAG(SV_CHERI))
-			td->td_retval[0] = (uintcap_t)mmap_retcap(td,
-			    addr + pageoff,  mrp);
+			td->td_retval[0] = mmap_retcap(td, addr + pageoff, mrp);
 		else
 #endif
 			td->td_retval[0] = addr + pageoff;
