@@ -31,3 +31,10 @@ jobs:
         with:
           source-ref: "${{ github.event.pull_request.head.sha }}"
           target-ref: "${{ github.base_ref }}"
+      - name: Add comment
+        if: ${{ failure() }}
+        uses: peter-evans/create-or-update-comment@v2
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            Check the clang-format job for formatting suggestions.
