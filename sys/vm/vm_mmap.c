@@ -170,6 +170,11 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 	if (mrp->mr_flags & MAP_CHERI_NOSETBOUNDS)
 		return ((uintcap_t)mrp->mr_source_cap);
 
+	/*
+	 * The purecap kernel returns a properly bounded capability
+	 * from the vm_map API.  Hybrid kernels need to use the
+	 * address 'addr' to derive a valid capability.
+	 */
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
 	newcap = addr;
@@ -177,28 +182,10 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 	newcap = cheri_andperm(newcap, cheri_getperm(mrp->mr_source_cap));
 #else
 	newcap = (uintcap_t)mrp->mr_source_cap;
-#endif
-
-	/*
-	 * If PROT_MAX() was not passed, use the prot value to derive
-	 * capability permissions.
-	 */
-	cap_prot = PROT_MAX_EXTRACT(mrp->mr_prot);
-	if (cap_prot == 0)
-		cap_prot = PROT_EXTRACT(mrp->mr_prot);
-	/*
-	 * Set the permissions to PROT_MAX to allow a full
-	 * range of access subject to page permissions.
-	 */
-	perms = ~CHERI_PROT2PERM_MASK | vm_map_prot2perms(cap_prot);
-	newcap = cheri_andperm(newcap, perms);
-
-#ifndef __CHERI_PURE_CAPABILITY__
-	/* Reservations in the kernel ensure this */
 	if (mrp->mr_flags & MAP_FIXED) {
 		/*
 		 * If hint was under aligned, we need to return a
-		 * capability to the whole, properly aligned region
+		 * capability to the whole, properly-aligned region
 		 * with the offset pointing to hint.
 		 */
 		cap_base = cheri_getbase(newcap);
@@ -224,6 +211,20 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 		    roundup2(mrp->mr_len, PAGE_SIZE));
 	}
 #endif
+
+	/*
+	 * If PROT_MAX() was not passed, use the prot value to derive
+	 * capability permissions.
+	 */
+	cap_prot = PROT_MAX_EXTRACT(mrp->mr_prot);
+	if (cap_prot == 0)
+		cap_prot = PROT_EXTRACT(mrp->mr_prot);
+	/*
+	 * Set the permissions to PROT_MAX to allow a full
+	 * range of access subject to page permissions.
+	 */
+	perms = ~CHERI_PROT2PERM_MASK | vm_map_prot2perms(cap_prot);
+	newcap = cheri_andperm(newcap, perms);
 
 	return (newcap);
 }
