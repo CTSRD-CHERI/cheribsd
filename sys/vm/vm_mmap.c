@@ -188,15 +188,11 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 		 * capability to the whole, properly-aligned region
 		 * with the offset pointing to hint.
 		 */
-		cap_base = cheri_getbase(newcap);
-		/* TODO: use cheri_setaddress? */
-		/* Set offset to vaddr of page */
-		newcap = cheri_setoffset(newcap,
-		    rounddown2(addr, PAGE_SIZE) - cap_base);
+		newcap = cheri_setaddress(newcap, rounddown2(addr, PAGE_SIZE));
 		newcap = cheri_setbounds(newcap,
 		    roundup2(mrp->mr_len + (addr - rounddown2(addr, PAGE_SIZE)),
 		    PAGE_SIZE));
-		/* Shift offset up if required */
+		/* Shift address up if required */
 		newcap = cheri_setaddress(newcap, addr);
 	} else {
 		cap_base = cheri_getbase(newcap);
