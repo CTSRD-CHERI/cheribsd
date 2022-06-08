@@ -42,6 +42,7 @@ __DEFAULT_YES_OPTIONS = \
     IPFILTER \
     IPSEC_SUPPORT \
     ISCSI \
+    SPLIT_KERNEL_DEBUG \
     KERNEL_SYMBOLS \
     NETGRAPH \
     OFED \
@@ -195,6 +196,10 @@ CTFCONVERT_CMD=	${CTFCONVERT} ${CTFFLAGS} ${.TARGET}
 CTFCONVERT_CMD=
 .else
 CTFCONVERT_CMD=	@:
+.endif
+
+.if ${MK_SPLIT_KERNEL_DEBUG} == "no"
+MK_KERNEL_SYMBOLS:=	no
 .endif
 
 # Some modules only compile successfully if option FDT is set, due to #ifdef FDT
