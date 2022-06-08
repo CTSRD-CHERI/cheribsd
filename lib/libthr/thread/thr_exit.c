@@ -208,19 +208,6 @@ thread_unwind_stop(int version __unused, _Unwind_Action actions,
 	return (_URC_NO_REASON);
 }
 
-/*
- * Check that the _Unwind_Exception structure from include/unwind.h is
- * compatible with LLVM libunwind. This was causing crashes before.
- */
-#ifdef __CHERI_PURE_CAPABILITY__
-#if __SIZEOF_CHERI_CAPABILITY__ == 16
-_Static_assert(sizeof(struct _Unwind_Exception) == 0x40, "");
-#else
-_Static_assert(__SIZEOF_CHERI_CAPABILITY__ == 32, "");
-_Static_assert(sizeof(struct _Unwind_Exception) == 0x80, "");
-#endif
-#endif
-
 static void
 thread_unwind(void)
 {
