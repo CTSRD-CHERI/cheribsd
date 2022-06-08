@@ -412,6 +412,8 @@ vmspace_alloc(vm_pointer_t min, vm_pointer_t max, pmap_pinit_t pinit)
 	vm->vm_dsize = 0;
 	vm->vm_taddr = 0;
 	vm->vm_daddr = 0;
+	vm->vm_cocall_codecap = NULL;
+	vm->vm_coaccept_codecap = NULL;
 	return (vm);
 }
 

@@ -255,8 +255,8 @@ CSYM(switcher_cocall_copy_onfault)
 	j	4b
 
 END(switcher_cocall)
-eswitcher_cocall:
 
+eswitcher_cocall:
 	.data
 	.align	3
 	.globl szswitcher_cocall
