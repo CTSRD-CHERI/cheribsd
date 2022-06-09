@@ -491,7 +491,9 @@ void
 sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
 	struct sigframe * __capability fp, frame;
+#if !__has_feature(capabilities)
 	struct sysentvec *sysent;
+#endif
 	struct trapframe *tf;
 	struct sigacts *psp;
 	struct thread *td;
@@ -567,10 +569,10 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_sepc = (uintcap_t)catcher;
 	tf->tf_sp = (uintcap_t)fp;
 
-	sysent = p->p_sysent;
 #if __has_feature(capabilities)
 	tf->tf_ra = (uintcap_t)p->p_md.md_sigcode;
 #else
+	sysent = p->p_sysent;
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_ra = (register_t)sysent->sv_sigcode_base;
 	else
