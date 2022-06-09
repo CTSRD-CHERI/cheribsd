@@ -375,7 +375,7 @@
 #define	SYS_getcontext	421
 #define	SYS_setcontext	422
 #define	SYS_swapcontext	423
-#define	SYS_swapoff	424
+#define	SYS_freebsd13_swapoff	424
 #define	SYS___acl_get_link	425
 #define	SYS___acl_set_link	426
 #define	SYS___acl_delete_link	427
@@ -385,6 +385,8 @@
 #define	SYS_thr_exit	431
 #define	SYS_thr_self	432
 #define	SYS_thr_kill	433
+#define	SYS_freebsd10__umtx_lock	434
+#define	SYS_freebsd10__umtx_unlock	435
 #define	SYS_jail_attach	436
 #define	SYS_extattr_list_fd	437
 #define	SYS_extattr_list_file	438
@@ -524,4 +526,7 @@
 #define	SYS___specialfd	577
 #define	SYS_aio_writev	578
 #define	SYS_aio_readv	579
-#define	SYS_MAXSYSCALL	580
+#define	SYS_fspacectl	580
+#define	SYS_sched_getcpu	581
+#define	SYS_swapoff	582
+#define	SYS_MAXSYSCALL	583

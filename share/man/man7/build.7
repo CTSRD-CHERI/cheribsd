@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd April 28, 2021
+.Dd August 10, 2021
 .Dt BUILD 7
 .Os
 .Sh NAME
@@ -216,10 +216,15 @@ for native builds, and
 for cross builds and native builds with variable
 .Va CROSS_BUILD_TESTING
 set.
+.It Cm cleankernel
+Attempts to clean up targets built by a preceding
+.Cm buildkernel ,
+or similar step, built from the same source directory and
+.Va KERNCONF .
 .It Cm cleanworld
 Attempt to clean up targets built by a preceding
 .Cm buildworld ,
-or similar step built from this source directory.
+or similar step, built from this source directory.
 .It Cm cleanuniverse
 When
 .Va WITH_UNIFIED_OBJDIR
@@ -310,9 +315,6 @@ Like
 with
 .Va WITHOUT_KERNELS
 defined so only the worlds for each architecture are built.
-.It Cm update
-Get updated sources as configured in
-.Xr make.conf 5 .
 .It Cm targets
 Print a list of supported
 .Va TARGET
@@ -602,8 +604,23 @@ and
 .Cm installkernel
 process.
 .Bd -literal -offset indent
-make PORTS_MODULES=emulators/kqemu-kmod kernel
+make PORTS_MODULES=emulators/virtualbox-ose-kmod kernel
 .Ed
+.It Va LOCAL_MODULES
+A list of external kernel modules that should be built and installed
+as part of the
+.Cm buildkernel
+and
+.Cm installkernel
+process.
+Defaults to the list of sub-directories of
+.Va LOCAL_MODULES_DIR .
+.It Va LOCAL_MODULES_DIR
+The directory in which to search for the kernel modules specified by
+.Va LOCAL_MODULES .
+Each kernel module should consist of a directory containing a makefile.
+Defaults to
+.Pa ${LOCALBASE}/sys/modules .
 .It Va SRCCONF
 Specify a file to override the default
 .Pa /etc/src.conf .
@@ -760,26 +777,12 @@ If set, the build process does not run
 as part of the
 .Cm buildkernel
 target.
-.It Va NO_DOCUPDATE
-If set, the update process does not update the source of the
-.Fx
-documentation as part of the
-.Dq make update
-target.
 .It Va NO_LIBS
 If set, the libraries phase will be skipped.
 .It Va NO_OBJWALK
 If set, no object directories will be created.
 This should only be used if object directories were created in a
 previous build and no new directories are connected.
-.It Va NO_PORTSUPDATE
-If set, the update process does not update the Ports tree as part of the
-.Dq make update
-target.
-.It Va NO_WWWUPDATE
-If set, the update process does not update the www tree as part of the
-.Dq make update
-target.
 .It Va WORLDFAST
 If set, the build target
 .Cm buildworld

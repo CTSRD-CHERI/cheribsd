@@ -41,7 +41,7 @@
 
 #define	BUFSIZE	(MNT_LINE_MAX + 2)
 
-__thread char buf[BUFSIZE];
+static __thread char buf[BUFSIZE];
 
 #define	DIFF(xx)	( \
 	    (mrefp->xx != NULL) && \
@@ -83,7 +83,7 @@ _sol_getmntent(FILE *fp, struct mnttab *mgetp)
 }
 
 static int
-getextmntent_impl(FILE *fp, struct extmnttab *mp, int len)
+getextmntent_impl(FILE *fp, struct extmnttab *mp)
 {
 	int ret;
 	struct stat64 st;
@@ -127,11 +127,7 @@ getextmntent(const char *path, struct extmnttab *entry, struct stat64 *statbuf)
 	}
 
 
-#ifdef HAVE_SETMNTENT
-	if ((fp = setmntent(MNTTAB, "r")) == NULL) {
-#else
-	if ((fp = fopen(MNTTAB, "r")) == NULL) {
-#endif
+	if ((fp = fopen(MNTTAB, "re")) == NULL) {
 		(void) fprintf(stderr, "cannot open %s\n", MNTTAB);
 		return (-1);
 	}
@@ -141,13 +137,14 @@ getextmntent(const char *path, struct extmnttab *entry, struct stat64 *statbuf)
 	 */
 
 	match = 0;
-	while (getextmntent_impl(fp, entry, sizeof (*entry)) == 0) {
+	while (getextmntent_impl(fp, entry) == 0) {
 		if (makedev(entry->mnt_major, entry->mnt_minor) ==
 		    statbuf->st_dev) {
 			match = 1;
 			break;
 		}
 	}
+	(void) fclose(fp);
 
 	if (!match) {
 		(void) fprintf(stderr, "cannot find mountpoint for '%s'\n",

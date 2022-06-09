@@ -1098,14 +1098,10 @@ ng_btsocket_sco_rtclean(void *context, int pending)
  * Initialize everything
  */
 
-void
-ng_btsocket_sco_init(void)
+static void
+ng_btsocket_sco_init(void *arg __unused)
 {
 	int	error = 0;
-
-	/* Skip initialization of globals for non-default instances. */
-	if (!IS_DEFAULT_VNET(curvnet))
-		return;
 
 	ng_btsocket_sco_node = NULL;
 	ng_btsocket_sco_debug_level = NG_BTSOCKET_WARN_LEVEL;
@@ -1160,6 +1156,8 @@ ng_btsocket_sco_init(void)
 	TASK_INIT(&ng_btsocket_sco_rt_task, 0,
 		ng_btsocket_sco_rtclean, NULL);
 } /* ng_btsocket_sco_init */
+SYSINIT(ng_btsocket_sco_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_THIRD,
+    ng_btsocket_sco_init, NULL);
 
 /*
  * Abort connection on socket
@@ -1829,7 +1827,7 @@ ng_btsocket_sco_pcb_by_addr(bdaddr_p bdaddr)
 	LIST_FOREACH(p, &ng_btsocket_sco_sockets, next) {
 		mtx_lock(&p->pcb_mtx);
 
-		if (p->so == NULL || !(p->so->so_options & SO_ACCEPTCONN)) {
+		if (p->so == NULL || !SOLISTENING(p->so)) {
 			mtx_unlock(&p->pcb_mtx);
 			continue;
 		}

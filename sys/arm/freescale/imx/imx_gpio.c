@@ -1,6 +1,5 @@
 /*-
  * Copyright (c) 2012, 2013 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Oleksandr Rybalko under sponsorship
  * from the FreeBSD Foundation.
@@ -57,7 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
-#if defined(EXT_RESOURCES) && defined(__aarch64__)
+#if defined(__aarch64__)
 #define	IMX_ENABLE_CLOCKS
 #endif
 

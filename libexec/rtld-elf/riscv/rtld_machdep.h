@@ -42,6 +42,7 @@
 
 #include <sys/types.h>
 #include <machine/atomic.h>
+#include <machine/tls.h>
 
 struct Struct_Obj_Entry;
 
@@ -155,12 +156,6 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 #define call_fini_array_pointer(obj, target)				\
 	(((InitFunc)(target).value)())
 
-/*
- * TODO: Not implemented for CHERI.
- * #define	call_ifunc_resolver(ptr) \
- * 	(((Elf_Addr (*)(void))ptr)())
- */
-
 #else /* __CHERI_PURE_CAPABILITY__ */
 
 #define make_function_pointer(def, defobj) \
@@ -182,21 +177,14 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 	__asm __volatile("mv    gp, %0" :: "r"(old1));			\
 })
 
-#define	call_ifunc_resolver(ptr) \
-	(((Elf_Addr (*)(void))ptr)())
-
 #endif /* __CHERI_PURE_CAPABILITY__ */
+
+#define	call_ifunc_resolver(ptr) \
+	(((uintptr_t (*)(void))ptr)())
 
 /*
  * TLS
  */
-#define	TLS_TP_OFFSET	0x0
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	TLS_DTV_OFFSET	0
-#else
-#define	TLS_DTV_OFFSET	0x800
-#endif
-#define	TLS_TCB_SIZE	(2 * sizeof(void *))
 
 #define round(size, align) \
     (((size) + (align) - 1) & ~((align) - 1))
@@ -204,7 +192,6 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
     TLS_TCB_SIZE
 #define calculate_tls_offset(prev_offset, prev_size, size, align, offset) \
     round(prev_offset + prev_size, align)
-#define calculate_tls_end(off, size)    ((off) + (size))
 #define calculate_tls_post_size(align)  0
 
 typedef struct {
@@ -218,29 +205,6 @@ extern void *__tls_get_addr(tls_index* ti);
 #define	RTLD_DEFAULT_STACK_EXEC		PROT_EXEC
 
 #define	md_abi_variant_hook(x)
-
-#define rtld_validate_target_eflags(path, hdr, main_path)	\
-	_rtld_validate_target_eflags(path, hdr, main_path)
-static inline bool
-_rtld_validate_target_eflags(const char *path, Elf_Ehdr *hdr, const char *main_path)
-{
-	bool rtld_is_cheriabi, hdr_is_cheriabi;
-
-#ifdef __CHERI_PURE_CAPABILITY__
-	rtld_is_cheriabi = true;
-#else
-	rtld_is_cheriabi = false;
-#endif
-	hdr_is_cheriabi = (hdr->e_flags & EF_RISCV_CHERIABI) != 0;
-
-	if (rtld_is_cheriabi != hdr_is_cheriabi) {
-		_rtld_error("%s: cannot load %s since it is%s CheriABI",
-		    main_path, path, hdr_is_cheriabi ? "" : " not");
-		return (false);
-	}
-
-	return (true);
-}
 
 #ifdef __CHERI_PURE_CAPABILITY__
 static inline void

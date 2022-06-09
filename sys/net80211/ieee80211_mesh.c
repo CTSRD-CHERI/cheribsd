@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2009 The FreeBSD Foundation 
- * All rights reserved. 
  * 
  * This software was developed by Rui Paulo under sponsorship from the
  * FreeBSD Foundation. 
@@ -1642,7 +1641,7 @@ mesh_input(struct ieee80211_node *ni, struct mbuf *m,
 		 */
 		hdrspace = ieee80211_hdrspace(ic, wh);
 		if (!IEEE80211_IS_MULTICAST(wh->i_addr1)) {
-			m = ieee80211_defrag(ni, m, hdrspace);
+			m = ieee80211_defrag(ni, m, hdrspace, 0);
 			if (m == NULL) {
 				/* Fragment dropped or frame not complete yet */
 				goto out;
@@ -2960,7 +2959,7 @@ mesh_send_action_meshgate(struct ieee80211_node *ni,
 		 * mesh link metric
 		 *   [1] category
 		 *   [1] action
-		 *   [tlv] mesh gate annoucement
+		 *   [tlv] mesh gate announcement
 		 */
 		*frm++ = category;
 		*frm++ = action;

@@ -60,7 +60,7 @@ $set 4
 5 "ongeldige token"
 6 "ongeldige uitdrukking"
 7 "lege uitdrukking"
-8 "ongeldige afdruk"
+8 "ongeldige print- of stream-instructie"
 9 "ongeldige functiedefinitie"
 10 "ongeldige toewijzing: linkerzijde moet scale, ibase, obase, last, var of array element zijn"
 11 "geen autovariabele gevonden"
@@ -77,9 +77,12 @@ $set 4
 22 "POSIX laat geen vergelijking toe tussen operatoren buiten als verklaringen of lussen"
 23 "POSIX vereist 0 of 1 vergelijkingsoperator per conditie"
 24 "POSIX vereist dat alle 3 de delen van een lus niet leeg zijn"
-25 "POSIX laat geen exponentiële notatie toe"
-26 "POSIX staat geen arrayreferenties toe als functieparameters"
-27 "POSIX vereist dat de linkse beugel op dezelfde regel staat als de functiehoofding"
+25 "POSIX vereist een nieuwe regel tussen een puntkomma en een functiedefinitie"
+26 "POSIX laat geen exponentiële notatie toe"
+27 "POSIX staat geen arrayreferenties toe als functieparameters"
+28 "POSIX staat geen lege functies toe"
+29 "POSIX vereist dat de linkse beugel op dezelfde regel staat als de functiehoofding"
+30 "POSIX staat niet toe dat strings worden toegewezen aan variabelen of arrays"
 
 $ Runtime fouten.
 $set 5
@@ -91,9 +94,10 @@ $set 5
 5 "recursieve read() call"
 6 "Variabele of matrix-element is het verkeerde type"
 7 "Stapel heeft te weinig elementen"
-8 "Verkeerd aantal parameters; hebben %zu nodig, hebben %zu"
-9 "ongedefinieerde functie: %s()"
-10 "kan geen nietige waarde in een uitdrukking gebruiken"
+8 "Stapel voor register %s heeft te weinig elementen"
+9 "Verkeerd aantal parameters; hebben %zu nodig, hebben %zu"
+10 "ongedefinieerde functie: %s()"
+11 "kan geen nietige waarde in een uitdrukking gebruiken"
 
 $ Fatale fouten.
 $set 6
@@ -101,11 +105,9 @@ $set 6
 1 "geheugentoewijzing mislukt"
 2 "I/O-fout"
 3 "kon geen file openen: %s"
-4 "bestand is niet ASCII: %s"
+4 "bestand is geen tekst: %s"
 5 "pad is een directory: %s"
-6 "ongeldige opdrachtregeloptie: '%c' (%s)"
-
-$set 7
-
-1 "optie vereist een argument: '%c' (\"%s\")"
-2 "optie neemt geen argumenten aan: '%c' (\"%s\")"
+6 "ongeldige opdrachtregeloptie: %s"
+7 "optie vereist een argument: '%c' (\"%s\")"
+8 "optie neemt geen argumenten aan: '%c' (\"%s\")"
+9 "ongeldige opdrachtregeloptie argument: %s"

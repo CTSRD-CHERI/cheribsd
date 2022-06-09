@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd December 20, 2020
+.Dd June 14, 2021
 .Dt MAKE.CONF 5
 .Os
 .Sh NAME
@@ -229,29 +229,6 @@ Setting this variable will prevent CPU specific compiler flags
 from being automatically added to
 .Va CFLAGS
 during compile time.
-.It Va NO_DOCUPDATE
-.Pq Vt bool
-Set this to not update the doc tree during
-.Dq Li "make update" .
-.It Va NO_PORTSUPDATE
-.Pq Vt bool
-Set this to not update the ports tree during
-.Dq Li "make update" .
-.It Va SVN_UPDATE
-.Pq Vt bool
-Set this to use
-.Xr svn 1
-or
-.Xr svnlite 1
-to update your
-.Pa src
-tree with
-.Dq Li "make update" .
-Note that you can set
-.Va SVN
-to the full path of a
-.Xr svn 1
-binary.
 .El
 .Ss "BUILDING THE KERNEL"
 The following list provides a name and short description for variables
@@ -408,7 +385,7 @@ for which section 4 man pages will be installed.
 The special value
 .Sq all
 installs all available architectures.
-The default is the MACHINE and MACHINE_ARCH being built.
+It is also the default value.
 .It Va MODULES_WITH_WORLD
 .Pq Vt bool
 Set to build modules with the system instead of the kernel.
@@ -636,20 +613,16 @@ The value assigned is the highest optimization value used.
 The following list provides a name and short description for variables
 that are used when building documentation.
 .Bl -tag -width ".Va PRINTERDEVICE"
-.It Va DISTDIR
-.Pq Vt str
-Where distfiles are kept.
-Normally, this is
-.Pa distfiles
-in
-.Va PORTSDIR .
 .It Va DOC_LANG
 .Pq Vt str
-The list of languages and encodings to build and install.
+The list of languages to build and install when building documentation
+in
+.Pa /usr/doc .
 .It Va PRINTERDEVICE
 .Pq Vt str
-The default format for system documentation, depends on your
-printer.
+The default format for system documentation in
+.Pa /usr/src/share/doc ,
+depends on your printer.
 This can be set to
 .Dq Li ascii
 for simple printers, or

@@ -79,11 +79,7 @@ __FBSDID("$FreeBSD$");
 /*
  * We use a linked list rather than a bitmap because we need to be able to
  * represent potentially huge objects (like all of a processor's physical
- * address space).  That is also why the indices are defined to have type
- * `unsigned long' -- that being the largest integral type in ISO C (1990).
- * The 1999 version of C allows `long long'; we may need to switch to that
- * at some point in the future, particularly if we want to support 36-bit
- * addresses on IA32 hardware.
+ * address space).
  */
 struct resource_i {
 	struct resource		r_r;
@@ -449,6 +445,8 @@ rman_reserve_resource_bound(struct rman *rm, rman_res_t start, rman_res_t end,
 	       "length %#jx, flags %x, device %s\n", rm->rm_descr, start, end,
 	       count, flags,
 	       dev == NULL ? "<null>" : device_get_nameunit(dev)));
+	KASSERT(count != 0, ("%s: attempted to allocate an empty range",
+	    __func__));
 	KASSERT((flags & RF_FIRSTSHARE) == 0,
 	    ("invalid flags %#x", flags));
 	new_rflags = (flags & ~RF_FIRSTSHARE) | RF_ALLOCATED;
@@ -524,7 +522,7 @@ rman_reserve_resource_bound(struct rman *rm, rman_res_t start, rman_res_t end,
 		DPRINTF(("truncated region: [%#jx, %#jx]; size %#jx (requested %#jx)\n",
 		       rstart, rend, (rend - rstart + 1), count));
 
-		if ((rend - rstart + 1) >= count) {
+		if ((rend - rstart) >= (count - 1)) {
 			DPRINTF(("candidate region: [%#jx, %#jx], size %#jx\n",
 			       rstart, rend, (rend - rstart + 1)));
 			if ((s->r_end - s->r_start + 1) == count) {

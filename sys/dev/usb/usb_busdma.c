@@ -547,7 +547,7 @@ usb_pc_alloc_mem(struct usb_page_cache *pc, struct usb_page *pg,
 		/*
 		 * XXX BUS-DMA workaround - FIXME later:
 		 *
-		 * We assume that that the aligment at this point of
+		 * We assume that that the alignment at this point of
 		 * the code is greater than or equal to the size and
 		 * less than two times the size, so that if we double
 		 * the size, the size will be greater than the
@@ -601,6 +601,7 @@ usb_pc_alloc_mem(struct usb_page_cache *pc, struct usb_page *pg,
 		bus_dmamem_free(utag->tag, ptr, map);
 		goto error;
 	}
+	pc->isloaded = 1;
 	memset(ptr, 0, size);
 
 	usb_pc_cpu_flush(pc);
@@ -613,6 +614,7 @@ error:
 	pc->page_start = NULL;
 	pc->page_offset_buf = 0;
 	pc->page_offset_end = 0;
+	pc->isloaded = 0;
 	pc->map = NULL;
 	pc->tag = NULL;
 	return (1);
@@ -627,11 +629,13 @@ void
 usb_pc_free_mem(struct usb_page_cache *pc)
 {
 	if (pc && pc->buffer) {
-		bus_dmamap_unload(pc->tag, pc->map);
+		if (pc->isloaded)
+			bus_dmamap_unload(pc->tag, pc->map);
 
 		bus_dmamem_free(pc->tag, pc->buffer, pc->map);
 
 		pc->buffer = NULL;
+		pc->isloaded = 0;
 	}
 }
 
@@ -663,7 +667,8 @@ usb_pc_load_mem(struct usb_page_cache *pc, usb_size_t size, uint8_t sync)
 			 * We have to unload the previous loaded DMA
 			 * pages before trying to load a new one!
 			 */
-			bus_dmamap_unload(pc->tag, pc->map);
+			if (pc->isloaded)
+				bus_dmamap_unload(pc->tag, pc->map);
 
 			/*
 			 * Try to load memory into DMA.
@@ -676,6 +681,7 @@ usb_pc_load_mem(struct usb_page_cache *pc, usb_size_t size, uint8_t sync)
 				err = 0;
 			}
 			if (err || uptag->dma_error) {
+				pc->isloaded = 0;
 				return (1);
 			}
 		} else {
@@ -683,7 +689,8 @@ usb_pc_load_mem(struct usb_page_cache *pc, usb_size_t size, uint8_t sync)
 			 * We have to unload the previous loaded DMA
 			 * pages before trying to load a new one!
 			 */
-			bus_dmamap_unload(pc->tag, pc->map);
+			if (pc->isloaded)
+				bus_dmamap_unload(pc->tag, pc->map);
 
 			/*
 			 * Try to load memory into DMA. The callback
@@ -694,6 +701,7 @@ usb_pc_load_mem(struct usb_page_cache *pc, usb_size_t size, uint8_t sync)
 			    &usb_pc_load_mem_cb, pc, BUS_DMA_WAITOK)) {
 			}
 		}
+		pc->isloaded = 1;
 	} else {
 		if (!sync) {
 			/*
@@ -786,6 +794,8 @@ void
 usb_pc_dmamap_destroy(struct usb_page_cache *pc)
 {
 	if (pc && pc->tag) {
+		if (pc->isloaded)
+			bus_dmamap_unload(pc->tag, pc->map);
 		bus_dmamap_destroy(pc->tag, pc->map);
 		pc->tag = NULL;
 		pc->map = NULL;

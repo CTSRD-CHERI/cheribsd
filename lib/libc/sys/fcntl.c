@@ -65,6 +65,7 @@ fcntl(int fd, int cmd, ...)
 	case F_GETLK:
 	case F_SETLK:
 	case F_SETLKW:
+	case F_KINFO:
 		arg = va_arg(args, intptr_t);
 		break;
 
@@ -100,6 +101,7 @@ _fcntl(int fd, int cmd, ...)
 	case F_GETLK:
 	case F_SETLK:
 	case F_SETLKW:
+	case F_KINFO:
 		arg = va_arg(args, intptr_t);
 		break;
 

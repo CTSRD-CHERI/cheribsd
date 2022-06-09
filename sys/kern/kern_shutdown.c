@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bio.h>
+#include <sys/boottrace.h>
 #include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/compressor.h>
@@ -331,14 +332,19 @@ shutdown_nice_task_fn(void *arg, int pending __unused)
 	howto = (uintptr_t)arg;
 	/* Send a signal to init(8) and have it shutdown the world. */
 	PROC_LOCK(initproc);
-	if (howto & RB_POWEROFF)
+	if ((howto & RB_POWEROFF) != 0) {
+		BOOTTRACE("SIGUSR2 to init(8)");
 		kern_psignal(initproc, SIGUSR2);
-	else if (howto & RB_POWERCYCLE)
+	} else if ((howto & RB_POWERCYCLE) != 0) {
+		BOOTTRACE("SIGWINCH to init(8)");
 		kern_psignal(initproc, SIGWINCH);
-	else if (howto & RB_HALT)
+	} else if ((howto & RB_HALT) != 0) {
+		BOOTTRACE("SIGUSR1 to init(8)");
 		kern_psignal(initproc, SIGUSR1);
-	else
+	} else {
+		BOOTTRACE("SIGINT to init(8)");
 		kern_psignal(initproc, SIGINT);
+	}
 	PROC_UNLOCK(initproc);
 }
 
@@ -353,6 +359,7 @@ shutdown_nice(int howto)
 {
 
 	if (initproc != NULL && !SCHEDULER_STOPPED()) {
+		BOOTTRACE("shutdown initiated");
 		shutdown_nice_task.ta_context = (void *)(uintptr_t)howto;
 		taskqueue_enqueue(taskqueue_fast, &shutdown_nice_task);
 	} else {
@@ -429,12 +436,41 @@ doadump(boolean_t textdump)
 }
 
 /*
- * Shutdown the system cleanly to prepare for reboot, halt, or power off.
+ * Trace the shutdown reason.
+ */
+static void
+reboottrace(int howto)
+{
+	if ((howto & RB_DUMP) != 0) {
+		if ((howto & RB_HALT) != 0)
+			BOOTTRACE("system panic: halting...");
+		if ((howto & RB_POWEROFF) != 0)
+			BOOTTRACE("system panic: powering off...");
+		if ((howto & (RB_HALT|RB_POWEROFF)) == 0)
+			BOOTTRACE("system panic: rebooting...");
+	} else {
+		if ((howto & RB_HALT) != 0)
+			BOOTTRACE("system halting...");
+		if ((howto & RB_POWEROFF) != 0)
+			BOOTTRACE("system powering off...");
+		if ((howto & (RB_HALT|RB_POWEROFF)) == 0)
+			BOOTTRACE("system rebooting...");
+	}
+}
+
+/*
+ * kern_reboot(9): Shut down the system cleanly to prepare for reboot, halt, or
+ * power off.
  */
 void
 kern_reboot(int howto)
 {
 	static int once = 0;
+
+	if (initproc != NULL && curproc != initproc)
+		BOOTTRACE("kernel shutdown (dirty) started");
+	else
+		BOOTTRACE("kernel shutdown (clean) started");
 
 	/*
 	 * Normal paths here don't hold Giant, but we can wind up here
@@ -458,11 +494,12 @@ kern_reboot(int howto)
 		sched_bind(curthread, CPU_FIRST());
 		thread_unlock(curthread);
 		KASSERT(PCPU_GET(cpuid) == CPU_FIRST(),
-		    ("boot: not running on cpu 0"));
+		    ("%s: not running on cpu 0", __func__));
 	}
 #endif
 	/* We're in the process of rebooting. */
 	rebooting = 1;
+	reboottrace(howto);
 
 	/* We are out of the debugger now. */
 	kdb_active = 0;
@@ -471,13 +508,16 @@ kern_reboot(int howto)
 	 * Do any callouts that should be done BEFORE syncing the filesystems.
 	 */
 	EVENTHANDLER_INVOKE(shutdown_pre_sync, howto);
+	BOOTTRACE("shutdown pre sync complete");
 
 	/* 
 	 * Now sync filesystems
 	 */
 	if (!cold && (howto & RB_NOSYNC) == 0 && once == 0) {
 		once = 1;
+		BOOTTRACE("bufshutdown begin");
 		bufshutdown(show_busybufs);
+		BOOTTRACE("bufshutdown end");
 	}
 
 	print_uptime();
@@ -489,11 +529,17 @@ kern_reboot(int howto)
 	 * been completed.
 	 */
 	EVENTHANDLER_INVOKE(shutdown_post_sync, howto);
+	BOOTTRACE("shutdown post sync complete");
 
 	if ((howto & (RB_HALT|RB_DUMP)) == RB_DUMP && !cold && !dumping) 
 		doadump(TRUE);
 
 	/* Now that we're going to really halt the system... */
+	BOOTTRACE("shutdown final begin");
+
+	if (shutdown_trace)
+		boottrace_dump_console();
+
 	EVENTHANDLER_INVOKE(shutdown_final, howto);
 #ifdef CPU_QEMU_MALTA
 	printf("%s: shutdown did not work, attempting mtc0 $zero, $23\n", __func__);
@@ -754,7 +800,7 @@ SYSCTL_INT(_debug_kassert, OID_AUTO, suppress_in_panic, KASSERT_RWTUN,
 static int kassert_sysctl_kassert(SYSCTL_HANDLER_ARGS);
 
 SYSCTL_PROC(_debug_kassert, OID_AUTO, kassert,
-    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SECURE | CTLFLAG_NEEDGIANT, NULL, 0,
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SECURE | CTLFLAG_MPSAFE, NULL, 0,
     kassert_sysctl_kassert, "I",
     "set to trigger a test kassert");
 
@@ -1051,7 +1097,7 @@ dumpdevname_sysctl_handler(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 SYSCTL_PROC(_kern_shutdown, OID_AUTO, dumpdevname,
-    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, &dumper_configs, 0,
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, &dumper_configs, 0,
     dumpdevname_sysctl_handler, "A",
     "Device(s) for kernel dumps");
 
@@ -1518,7 +1564,7 @@ dump_write_headers(struct dumperinfo *di, struct kerneldumpheader *kdh)
 #ifdef EKCD
 	struct kerneldumpcrypto *kdc;
 #endif
-	void *buf, *key;
+	void *buf;
 	size_t hdrsz;
 	uint64_t extent;
 	uint32_t keysize;
@@ -1530,10 +1576,8 @@ dump_write_headers(struct dumperinfo *di, struct kerneldumpheader *kdh)
 
 #ifdef EKCD
 	kdc = di->kdcrypto;
-	key = kdc->kdc_dumpkey;
 	keysize = kerneldumpcrypto_dumpkeysize(kdc);
 #else
-	key = NULL;
 	keysize = 0;
 #endif
 
@@ -1542,7 +1586,7 @@ dump_write_headers(struct dumperinfo *di, struct kerneldumpheader *kdh)
 	 * of writing them out.
 	 */
 	if (di->dumper_hdr != NULL)
-		return (di->dumper_hdr(di, kdh, key, keysize));
+		return (di->dumper_hdr(di, kdh));
 
 	if (hdrsz == di->blocksize)
 		buf = kdh;
@@ -1601,22 +1645,30 @@ dump_write_headers(struct dumperinfo *di, struct kerneldumpheader *kdh)
 int
 dump_start(struct dumperinfo *di, struct kerneldumpheader *kdh)
 {
+#ifdef EKCD
+	struct kerneldumpcrypto *kdc;
+#endif
+	void *key;
 	uint64_t dumpextent, span;
 	uint32_t keysize;
 	int error;
 
 #ifdef EKCD
-	error = kerneldumpcrypto_init(di->kdcrypto);
+	/* Send the key before the dump so a partial dump is still usable. */
+	kdc = di->kdcrypto;
+	error = kerneldumpcrypto_init(kdc);
 	if (error != 0)
 		return (error);
-	keysize = kerneldumpcrypto_dumpkeysize(di->kdcrypto);
+	keysize = kerneldumpcrypto_dumpkeysize(kdc);
+	key = keysize > 0 ? kdc->kdc_dumpkey : NULL;
 #else
 	error = 0;
 	keysize = 0;
+	key = NULL;
 #endif
 
 	if (di->dumper_start != NULL) {
-		error = di->dumper_start(di);
+		error = di->dumper_start(di, key, keysize);
 	} else {
 		dumpextent = dtoh64(kdh->dumpextent);
 		span = SIZEOF_METADATA + dumpextent + 2 * di->blocksize +

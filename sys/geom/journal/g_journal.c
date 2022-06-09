@@ -129,7 +129,7 @@ g_journal_record_entries_sysctl(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 SYSCTL_PROC(_kern_geom_journal, OID_AUTO, record_entries,
-    CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, NULL, 0,
+    CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE, NULL, 0,
     g_journal_record_entries_sysctl, "I",
     "Maximum number of entires in one journal record");
 SYSCTL_UINT(_kern_geom_journal, OID_AUTO, optimize, CTLFLAG_RW,
@@ -163,7 +163,7 @@ g_journal_cache_limit_sysctl(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 SYSCTL_PROC(_kern_geom_journal_cache, OID_AUTO, limit,
-    CTLTYPE_ULONG | CTLFLAG_RWTUN | CTLFLAG_NEEDGIANT, NULL, 0,
+    CTLTYPE_ULONG | CTLFLAG_RWTUN | CTLFLAG_MPSAFE, NULL, 0,
     g_journal_cache_limit_sysctl, "I",
     "Maximum number of allocated bytes");
 SYSCTL_UINT(_kern_geom_journal_cache, OID_AUTO, divisor, CTLFLAG_RDTUN,
@@ -186,7 +186,7 @@ g_journal_cache_switch_sysctl(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 SYSCTL_PROC(_kern_geom_journal_cache, OID_AUTO, switch,
-    CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, NULL, 0,
+    CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE, NULL, 0,
     g_journal_cache_switch_sysctl, "I",
     "Force switch when we hit this percent of cache use");
 SYSCTL_UINT(_kern_geom_journal_cache, OID_AUTO, misses, CTLFLAG_RW,
@@ -256,7 +256,7 @@ struct meminfo {
 #endif
 
 /*
- * We use our own malloc/realloc/free funtions, so we can collect statistics
+ * We use our own malloc/realloc/free functions, so we can collect statistics
  * and force journal switch when we're running out of cache.
  */
 static void *
@@ -421,15 +421,13 @@ static int
 g_journal_access(struct g_provider *pp, int acr, int acw, int ace)
 {
 	struct g_journal_softc *sc;
-	int dcr, dcw, dce;
+	int dcw;
 
 	g_topology_assert();
 	GJ_DEBUG(2, "Access request for %s: r%dw%de%d.", pp->name,
 	    acr, acw, ace);
 
-	dcr = pp->acr + acr;
 	dcw = pp->acw + acw;
-	dce = pp->ace + ace;
 
 	sc = pp->geom->softc;
 	if (sc == NULL || (sc->sc_flags & GJF_DEVICE_DESTROY)) {
@@ -2445,7 +2443,7 @@ g_journal_destroy(struct g_journal_softc *sc)
 		if (cp->acr + cp->acw + cp->ace > 0)
 			g_access(cp, -1, -1, -1);
 		/*
-		 * We keep all consumers open for writting, so if I'll detach
+		 * We keep all consumers open for writing, so if I'll detach
 		 * and destroy consumer here, I'll get providers for taste, so
 		 * journal will be started again.
 		 * Sending an event here, prevents this from happening.
@@ -2483,6 +2481,7 @@ g_journal_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	/* This orphan function should be never called. */
 	gp->orphan = g_journal_taste_orphan;
 	cp = g_new_consumer(gp);
+	cp->flags |= G_CF_DIRECT_SEND | G_CF_DIRECT_RECEIVE;
 	error = g_attach(cp, pp);
 	if (error == 0) {
 		error = g_journal_metadata_read(cp, &md);
@@ -2963,7 +2962,7 @@ next:
 static void
 g_journal_start_switcher(struct g_class *mp)
 {
-	int error;
+	int error __diagused;
 
 	g_topology_assert();
 	MPASS(g_journal_switcher_proc == NULL);

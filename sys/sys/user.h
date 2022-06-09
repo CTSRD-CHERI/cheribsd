@@ -349,7 +349,7 @@ struct kinfo_file {
 	int64_t		kf_offset;		/* Seek location. */
 	union {
 		struct {
-			/* API compatiblity with FreeBSD < 12. */
+			/* API compatibility with FreeBSD < 12. */
 			int		kf_vnode_type;
 			int		kf_sock_domain;
 			int		kf_sock_type;
@@ -602,6 +602,25 @@ struct kinfo_sigtramp {
 	void * __kerncap ksigtramp_start;
 	void * __kerncap ksigtramp_end;
 	void * __kerncap ksigtramp_spare[4];
+};
+
+#define	KMAP_FLAG_WIREFUTURE	0x01	/* all future mappings wil be wired */
+#define	KMAP_FLAG_ASLR		0x02	/* ASLR is applied to mappings */
+#define	KMAP_FLAG_ASLR_IGNSTART	0x04	/* ASLR may map into sbrk grow region */
+#define	KMAP_FLAG_WXORX		0x08	/* W^X mapping policy is enforced */
+#define	KMAP_FLAG_ASLR_STACK	0x10	/* the stack location is randomized */
+
+struct kinfo_vm_layout {
+	ptraddr_t	kvm_min_user_addr;
+	ptraddr_t	kvm_max_user_addr;
+	ptraddr_t	kvm_text_addr;
+	size_t		kvm_text_size;
+	ptraddr_t	kvm_data_addr;
+	size_t		kvm_data_size;
+	ptraddr_t	kvm_stack_addr;
+	size_t		kvm_stack_size;
+	int		kvm_map_flags;
+	ptraddr_t	kvm_spare[14];
 };
 
 #ifdef _KERNEL

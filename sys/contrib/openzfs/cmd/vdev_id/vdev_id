@@ -140,15 +140,17 @@ Usage: vdev_id [-h]
   -p    number of phy's per switch port [default=$PHYS_PER_PORT]
   -h    show this summary
 EOF
-	exit 0
+	exit 1
+	# exit with error to avoid processing usage message by a udev rule
 }
 
 map_slot() {
 	LINUX_SLOT=$1
 	CHANNEL=$2
 
-	MAPPED_SLOT=$(awk '$1 == "slot" && $2 == "${LINUX_SLOT}" && \
-			$4 ~ /^${CHANNEL}$|^$/ { print $3; exit}' $CONFIG)
+	MAPPED_SLOT=$(awk -v linux_slot="$LINUX_SLOT" -v channel="$CHANNEL" \
+			'$1 == "slot" && $2 == linux_slot && \
+			($4 ~ "^"channel"$" || $4 ~ /^$/) { print $3; exit}' $CONFIG)
 	if [ -z "$MAPPED_SLOT" ] ; then
 		MAPPED_SLOT=$LINUX_SLOT
 	fi
@@ -163,7 +165,7 @@ map_channel() {
 	case $TOPOLOGY in
 		"sas_switch")
 		MAPPED_CHAN=$(awk -v port="$PORT" \
-			'$1 == "channel" && $2 == ${PORT} \
+			'$1 == "channel" && $2 == port \
 			{ print $3; exit }' $CONFIG)
 		;;
 		"sas_direct"|"scsi")
@@ -373,7 +375,7 @@ sas_handler() {
 		i=$((i + 1))
 	done
 
-	PHY=$(ls -d "$port_dir"/phy* 2>/dev/null | head -1 | awk -F: '{print $NF}')
+	PHY=$(ls -vd "$port_dir"/phy* 2>/dev/null | head -1 | awk -F: '{print $NF}')
 	if [ -z "$PHY" ] ; then
 		PHY=0
 	fi
@@ -594,7 +596,9 @@ enclosure_handler () {
 	# DEVPATH=/sys/devices/pci0000:00/0000:00:03.0/0000:05:00.0/host0/subsystem/devices/0:0:0:0/scsi_generic/sg0
 
 	# Get the enclosure ID ("0:0:0:0")
-	ENC=$(basename $(readlink -m "/sys/$DEVPATH/../.."))
+	ENC="${DEVPATH%/*}"
+	ENC="${ENC%/*}"
+	ENC="${ENC##*/}"
 	if [ ! -d "/sys/class/enclosure/$ENC" ] ; then
 		# Not an enclosure, bail out
 		return
@@ -614,14 +618,15 @@ enclosure_handler () {
 
 	# The PCI directory is two directories up from the port directory
 	# /sys/devices/pci0000:00/0000:00:03.0/0000:05:00.0
-	PCI_ID_LONG=$(basename $(readlink -m "/sys/$PORT_DIR/../.."))
+	PCI_ID_LONG="$(readlink -m "/sys/$PORT_DIR/../..")"
+	PCI_ID_LONG="${PCI_ID_LONG##*/}"
 
 	# Strip down the PCI address from 0000:05:00.0 to 05:00.0
-	PCI_ID=$(echo "$PCI_ID_LONG" | sed -r 's/^[0-9]+://g')
+	PCI_ID="${PCI_ID_LONG#[0-9]*:}"
 
 	# Name our device according to vdev_id.conf (like "L0" or "U1").
-	NAME=$(awk '/channel/{if ($1 == "channel" && $2 == "$PCI_ID" && \
-		$3 == "$PORT_ID") {print ${4}int(count[$4])}; count[$4]++}' $CONFIG)
+	NAME=$(awk "/channel/{if (\$1 == \"channel\" && \$2 == \"$PCI_ID\" && \
+		\$3 == \"$PORT_ID\") {print \$4\$3}}" $CONFIG)
 
 	echo "${NAME}"
 }
@@ -672,7 +677,7 @@ alias_handler () {
 			link=$(echo "$link" | sed 's/p[0-9][0-9]*$//')
 		fi
 		# Check both the fully qualified and the base name of link.
-		for l in $link $(basename "$link") ; do
+		for l in $link ${link##*/} ; do
 			if [ ! -z "$l" ]; then
 				alias=$(awk -v var="$l" '($1 == "alias") && \
 					($3 == var) \
@@ -727,7 +732,7 @@ done
 
 if [ ! -r "$CONFIG" ] ; then
 	echo "Error: Config file \"$CONFIG\" not found"
-	exit 0
+	exit 1
 fi
 
 if [ -z "$DEV" ] && [ -z "$ENCLOSURE_MODE" ] ; then

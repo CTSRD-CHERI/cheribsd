@@ -28,6 +28,6 @@ makeoptions	CHERI_SUBOBJECT_BOUNDS=subobject-safe
 
 options 	CHERI_PURECAP_KERNEL
 
-nooptions	GDB	# Hangs on boot
+nooptions 	PERTHREAD_SSP		# Not relevant in purecap
 
 nodevice	armv8crypto	# No purecap assembly

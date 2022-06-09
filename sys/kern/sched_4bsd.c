@@ -56,7 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/sx.h>
 #include <sys/turnstile.h>
-#include <sys/umtx.h>
+#include <sys/umtxvar.h>
 #include <machine/pcb.h>
 #include <machine/smp.h>
 
@@ -678,6 +678,13 @@ schedinit(void)
 	mtx_init(&sched_lock, "sched lock", NULL, MTX_SPIN);
 }
 
+void
+schedinit_ap(void)
+{
+
+	/* Nothing needed. */
+}
+
 int
 sched_runnable(void)
 {
@@ -1053,7 +1060,7 @@ sched_switch(struct thread *td, int flags)
 		SDT_PROBE2(sched, , , off__cpu, newtd, newtd->td_proc);
 
                 /* I feel sleepy */
-		lock_profile_release_lock(&sched_lock.lock_object);
+		lock_profile_release_lock(&sched_lock.lock_object, true);
 #ifdef KDTRACE_HOOKS
 		/*
 		 * If DTrace has set the active vtime enum to anything
@@ -1065,7 +1072,7 @@ sched_switch(struct thread *td, int flags)
 #endif
 
 		cpu_switch(td, newtd, tmtx);
-		lock_profile_obtain_lock_success(&sched_lock.lock_object,
+		lock_profile_obtain_lock_success(&sched_lock.lock_object, true,
 		    0, 0, __FILE__, __LINE__);
 		/*
 		 * Where am I?  What year is it?
@@ -1158,8 +1165,8 @@ forward_wakeup(int cpunum)
 		return (0);
 
 	CPU_SETOF(me, &dontuse);
-	CPU_OR(&dontuse, &stopped_cpus);
-	CPU_OR(&dontuse, &hlt_cpus_mask);
+	CPU_OR(&dontuse, &dontuse, &stopped_cpus);
+	CPU_OR(&dontuse, &dontuse, &hlt_cpus_mask);
 	CPU_ZERO(&map2);
 	if (forward_wakeup_use_loop) {
 		STAILQ_FOREACH(pc, &cpuhead, pc_allcpu) {
@@ -1173,7 +1180,7 @@ forward_wakeup(int cpunum)
 
 	if (forward_wakeup_use_mask) {
 		map = idle_cpus_mask;
-		CPU_ANDNOT(&map, &dontuse);
+		CPU_ANDNOT(&map, &map, &dontuse);
 
 		/* If they are both on, compare and use loop if different. */
 		if (forward_wakeup_use_loop) {
@@ -1360,7 +1367,7 @@ sched_add(struct thread *td, int flags)
 	} else {
 		if (!single_cpu) {
 			tidlemsk = idle_cpus_mask;
-			CPU_ANDNOT(&tidlemsk, &hlt_cpus_mask);
+			CPU_ANDNOT(&tidlemsk, &tidlemsk, &hlt_cpus_mask);
 			CPU_CLR(cpuid, &tidlemsk);
 
 			if (!CPU_ISSET(cpuid, &idle_cpus_mask) &&
@@ -1655,12 +1662,22 @@ sched_idletd(void *dummy)
 	}
 }
 
+static void
+sched_throw_tail(struct thread *td)
+{
+
+	mtx_assert(&sched_lock, MA_OWNED);
+	KASSERT(curthread->td_md.md_spinlock_count == 1, ("invalid count"));
+	cpu_throw(td, choosethread());	/* doesn't return */
+}
+
 /*
- * A CPU is entering for the first time or a thread is exiting.
+ * A CPU is entering for the first time.
  */
 void
-sched_throw(struct thread *td)
+sched_ap_entry(void)
 {
+
 	/*
 	 * Correct spinlock nesting.  The idle thread context that we are
 	 * borrowing was created so that it would start out with a single
@@ -1670,20 +1687,29 @@ sched_throw(struct thread *td)
 	 * spinlock_exit() will simply adjust the counts without allowing
 	 * spin lock using code to interrupt us.
 	 */
-	if (td == NULL) {
-		mtx_lock_spin(&sched_lock);
-		spinlock_exit();
-		PCPU_SET(switchtime, cpu_ticks());
-		PCPU_SET(switchticks, ticks);
-	} else {
-		lock_profile_release_lock(&sched_lock.lock_object);
-		MPASS(td->td_lock == &sched_lock);
-		td->td_lastcpu = td->td_oncpu;
-		td->td_oncpu = NOCPU;
-	}
-	mtx_assert(&sched_lock, MA_OWNED);
-	KASSERT(curthread->td_md.md_spinlock_count == 1, ("invalid count"));
-	cpu_throw(td, choosethread());	/* doesn't return */
+	mtx_lock_spin(&sched_lock);
+	spinlock_exit();
+	PCPU_SET(switchtime, cpu_ticks());
+	PCPU_SET(switchticks, ticks);
+
+	sched_throw_tail(NULL);
+}
+
+/*
+ * A thread is exiting.
+ */
+void
+sched_throw(struct thread *td)
+{
+
+	MPASS(td != NULL);
+	MPASS(td->td_lock == &sched_lock);
+
+	lock_profile_release_lock(&sched_lock.lock_object, true);
+	td->td_lastcpu = td->td_oncpu;
+	td->td_oncpu = NOCPU;
+
+	sched_throw_tail(td);
 }
 
 void
@@ -1696,7 +1722,7 @@ sched_fork_exit(struct thread *td)
 	 */
 	td->td_oncpu = PCPU_GET(cpuid);
 	sched_lock.mtx_lock = (uintptr_t)td;
-	lock_profile_obtain_lock_success(&sched_lock.lock_object,
+	lock_profile_obtain_lock_success(&sched_lock.lock_object, true,
 	    0, 0, __FILE__, __LINE__);
 	THREAD_LOCK_ASSERT(td, MA_OWNED | MA_NOTRECURSED);
 

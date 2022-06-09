@@ -2,6 +2,8 @@
 
 .include <src.opts.mk>
 
+PACKAGE=	mtree
+
 # NOTE: BSD.debug.dist is unconditionally installed for developer ease-of-use.
 FILES=	\
 	BSD.debug.dist \
@@ -10,13 +12,12 @@ FILES=	\
 	${_BSD.lib32.dist} \
 	${_BSD.lib64.dist} \
 	${_BSD.lib64c.dist} \
-	${_BSD.libsoft.dist} \
 	${_BSD.sendmail.dist} \
 	${_BSD.tests.dist} \
 	BSD.usr.dist \
 	BSD.var.dist
 
-.if ${MK_COMPAT_CHERIABI} != "no"
+.if ${MK_LIB64C} != "no"
 _BSD.lib64c.dist=	BSD.lib64c.dist
 .endif
 .if ${MK_LIB32} != "no"
@@ -24,9 +25,6 @@ _BSD.lib32.dist=	BSD.lib32.dist
 .endif
 .if ${MK_LIB64} != "no"
 _BSD.lib64.dist=	BSD.lib64.dist
-.endif
-.if ${MK_LIBSOFT} != "no"
-_BSD.libsoft.dist=	BSD.libsoft.dist
 .endif
 .if ${MK_SENDMAIL} != "no"
 _BSD.sendmail.dist=	BSD.sendmail.dist

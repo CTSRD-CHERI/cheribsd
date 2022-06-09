@@ -669,7 +669,6 @@ typedef UINT64                          ACPI_INTEGER;
 #define ACPI_TO_INTEGER(p)              ACPI_PTR_DIFF (p, (void *) 0)
 #define ACPI_OFFSET(d, f)               ACPI_PTR_DIFF (&(((d *) 0)->f), (void *) 0)
 #endif
-#define ACPI_PHYSADDR_TO_PTR(i)         ACPI_TO_POINTER(i)
 #define ACPI_PTR_TO_PHYSADDR(i)         ACPI_TO_INTEGER(i)
 
 /* Optimizations for 4-character (32-bit) ACPI_NAME manipulation */
@@ -1467,6 +1466,12 @@ typedef struct acpi_mem_space_context
 
 } ACPI_MEM_SPACE_CONTEXT;
 
+typedef struct acpi_data_table_space_context
+{
+    void                            *Pointer;
+
+} ACPI_DATA_TABLE_MAPPING;
+
 
 /*
  * ACPI_MEMORY_LIST is used only if the ACPICA local cache is enabled
@@ -1540,6 +1545,7 @@ typedef enum
 #define ACPI_OSI_WIN_10_RS4             0x12
 #define ACPI_OSI_WIN_10_RS5             0x13
 #define ACPI_OSI_WIN_10_19H1            0x14
+#define ACPI_OSI_WIN_10_20H1            0x15
 
 
 /* Definitions of getopt */

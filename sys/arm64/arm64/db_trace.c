@@ -1,6 +1,5 @@
 /*-
  * Copyright (c) 2015 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Semihalf under
  * the sponsorship of the FreeBSD Foundation.
@@ -123,7 +122,12 @@ db_stack_trace_cmd(struct thread *td, struct unwind_state *frame)
 			}
 
 			frame->fp = tf->tf_x[29];
-			frame->pc = tf->tf_elr;
+			frame->pc = ADDR_MAKE_CANONICAL(tf->tf_elr);
+#if __has_feature(capabilities)
+			/* Make ELR look like LR regarding the C64 LSB */
+			if ((tf->tf_spsr & PSR_C64) != 0)
+				frame->pc |= 0x1;
+#endif
 			if (!INKERNEL(frame->fp))
 				break;
 		} else {

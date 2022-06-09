@@ -33,6 +33,12 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+/* PIEs always have their relocations processed by rtld */
+#ifdef PIC
+#undef	CRT_IRELOC_RELA
+#define	CRT_IRELOC_SUPPRESS
+#endif
+
 #include <sys/types.h>
 #include <machine/elf.h>
 #include <stdbool.h>
@@ -45,8 +51,6 @@ __FBSDID("$FreeBSD$");
  * to include the code here.
  */
 #ifndef PIC
-#define DONT_EXPORT_CRT_INIT_GLOBALS
-#define CRT_INIT_GLOBALS_GDC_ONLY
 #include "crt_init_globals.c"
 #endif
 
@@ -66,7 +70,7 @@ Elf_Auxinfo *__auxargs;
  *
  * Note: If we want to support tight function bounds, it is important that
  * function calls and global variable accesses are only be made after
- * do_crt_init_globals() has completed (as this initializes the capabilities to
+ * crt_init_globals() has completed (as this initializes the capabilities to
  * globals and functions in the captable, which is used for all function calls).
  * This restriction only applies to statically linked binaries since the dynamic
  * linker takes care of initialization otherwise.
@@ -83,6 +87,8 @@ _start(void *auxv,
 #ifndef PIC
 	const Elf_Phdr *at_phdr = NULL;
 	long at_phnum = 0;
+	void *data_cap;
+	const void *code_cap;
 #else
 	if (!has_dynamic_linker)
 		__builtin_trap(); /* RTLD missing? Wrong *crt1.o linked? */
@@ -95,7 +101,7 @@ _start(void *auxv,
 	 * Digest the auxiliary vector for local use.
 	 *
 	 * Note: this file must be compile with -fno-jump-tables to avoid use
-	 * of the captable before do_crt_init_globals() has been called.
+	 * of the captable before crt_init_globals() has been called.
 	 */
 	for (Elf_Auxinfo *auxp = auxv; auxp->a_type != AT_NULL;  auxp++) {
 		if (auxp->a_type == AT_ARGV) {
@@ -116,13 +122,14 @@ _start(void *auxv,
 	/* For -pie executables rtld will initialize the __cap_relocs */
 #ifndef PIC
 	/*
-	 * crt_init_globals_3 must be called before accessing any globals.
+	 * crt_init_globals must be called before accessing any globals.
 	 *
 	 * Note: We parse the phdrs to ensure that the global data cap does
 	 * not span the readonly segment or text segment.
 	 */
 	if (!has_dynamic_linker)
-		do_crt_init_globals(at_phdr, at_phnum);
+		crt_init_globals(at_phdr, at_phnum, &data_cap, &code_cap,
+		    NULL);
 #endif
 	/* We can access global variables/make function calls now. */
 
@@ -132,8 +139,12 @@ _start(void *auxv,
 
 	if (cleanup != NULL)
 		atexit(cleanup);
-	else
+	else {
+#ifndef PIC
+		process_irelocs(data_cap, code_cap);
+#endif
 		_init_tls();
+	}
 
 	handle_static_init(argc, argv, env);
 

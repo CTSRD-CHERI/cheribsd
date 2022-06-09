@@ -82,8 +82,10 @@ struct linker_file {
     int			id;		/* unique id */
     caddr_t		address;	/* load address */
     size_t		size;		/* size of file */
-    caddr_t		ctors_addr;	/* address of .ctors */
-    size_t		ctors_size;	/* size of .ctors */
+    caddr_t		ctors_addr;	/* address of .ctors/.init_array */
+    size_t		ctors_size;	/* size of .ctors/.init_array */
+    caddr_t		dtors_addr;	/* address of .dtors/.fini_array */
+    size_t		dtors_size;	/* size of .dtors/.fini_array */
     int			ndeps;		/* number of dependencies */
     linker_file_t*	deps;		/* list of dependencies */
     STAILQ_HEAD(, common_symbol) common; /* list of common symbols */
@@ -195,6 +197,15 @@ int linker_search_symbol_name(ptraddr_t value, char *buf, u_int buflen,
 
 /* HWPMC helper */
 void *linker_hwpmc_list_objects(void);
+
+/* kldload/kldunload syscalls blocking */
+#define	LINKER_UB_UNLOCK	0x0001	/* busy: unlock kld_sx locked on
+					   return */
+#define	LINKER_UB_LOCKED	0x0002	/* busy/unbusy: kld_sx locked on
+					   entry */
+#define	LINKER_UB_PCATCH	0x0004	/* busy: sleep interruptible */
+int linker_kldload_busy(int flags);
+void linker_kldload_unbusy(int flags);
 
 #endif	/* _KERNEL */
 

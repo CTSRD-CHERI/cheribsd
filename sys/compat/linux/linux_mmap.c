@@ -81,16 +81,13 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 {
 	struct mmap_req mr, mr_fixed;
 	struct proc *p = td->td_proc;
-	struct vmspace *vms = td->td_proc->p_vmspace;
 	int bsd_flags, error;
-	struct file *fp;
 
 	LINUX_CTR6(mmap2, "0x%lx, %ld, %ld, 0x%08lx, %ld, 0x%lx",
 	    addr, len, prot, flags, fd, pos);
 
 	error = 0;
 	bsd_flags = 0;
-	fp = NULL;
 
 	/*
 	 * Linux mmap(2):
@@ -160,17 +157,17 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 		 * fixed size of (STACK_SIZE - GUARD_SIZE).
 		 */
 
-		if (addr + len > vms->vm_maxsaddr) {
+		if (addr + len > p->p_vm_maxsaddr) {
 			/*
 			 * Some Linux apps will attempt to mmap
 			 * thread stacks near the top of their
 			 * address space.  If their TOS is greater
-			 * than vm_maxsaddr, vm_map_growstack()
+			 * than p_vm_maxsaddr, vm_map_growstack()
 			 * will confuse the thread stack with the
 			 * process stack and deliver a SEGV if they
 			 * attempt to grow the thread stack past their
 			 * current stacksize rlimit.  To avoid this,
-			 * adjust vm_maxsaddr upwards to reflect
+			 * adjust p_vm_maxsaddr upwards to reflect
 			 * the current stacksize rlimit rather
 			 * than the maximum possible stacksize.
 			 * It would be better to adjust the
@@ -178,7 +175,7 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 			 * mmap's return value.
 			 */
 			PROC_LOCK(p);
-			vms->vm_maxsaddr = p->p_usrstack -
+			p->p_vm_maxsaddr = round_page(p->p_vm_stacktop) -
 			    lim_cur_proc(p, RLIMIT_STACK);
 			PROC_UNLOCK(p);
 		}

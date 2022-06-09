@@ -111,6 +111,8 @@ extern char pmc_cpuid[PMC_CPUID_LEN];
 	__PMC_CPU(INTEL_SKYLAKE, 0x98,   "Intel Skylake")		\
 	__PMC_CPU(INTEL_SKYLAKE_XEON, 0x99,   "Intel Skylake Xeon")	\
 	__PMC_CPU(INTEL_ATOM_GOLDMONT, 0x9A,   "Intel Atom Goldmont")	\
+	__PMC_CPU(INTEL_ICELAKE, 0x9B,	"Intel Icelake")		\
+	__PMC_CPU(INTEL_ICELAKE_XEON, 0x9C,	"Intel Icelake Xeon")	\
 	__PMC_CPU(INTEL_XSCALE,	0x100,	"Intel XScale")		\
 	__PMC_CPU(MIPS_24K,     0x200,  "MIPS 24K")		\
 	__PMC_CPU(MIPS_OCTEON,  0x201,  "Cavium Octeon")	\
@@ -129,7 +131,8 @@ extern char pmc_cpuid[PMC_CPUID_LEN];
 	__PMC_CPU(ARMV7_CORTEX_A17,	0x505,	"ARMv7 Cortex A17")	\
 	__PMC_CPU(ARMV8_CORTEX_A53,	0x600,	"ARMv8 Cortex A53")	\
 	__PMC_CPU(ARMV8_CORTEX_A57,	0x601,	"ARMv8 Cortex A57")	\
-	__PMC_CPU(ARMV8_CORTEX_A76,	0x602,	"ARMv8 Cortex A76")
+	__PMC_CPU(ARMV8_CORTEX_A76,	0x602,	"ARMv8 Cortex A76")	\
+	__PMC_CPU(ARMV8_RAINIER,	0x6ff,	"ARMv8 Rainier")
 
 enum pmc_cputype {
 #undef	__PMC_CPU
@@ -138,7 +141,7 @@ enum pmc_cputype {
 };
 
 #define	PMC_CPU_FIRST	PMC_CPU_AMD_K7
-#define	PMC_CPU_LAST	PMC_CPU_GENERIC
+#define	PMC_CPU_LAST	PMC_CPU_ARMV8_CORTEX_A76
 
 /*
  * Classes of PMCs
@@ -404,7 +407,7 @@ typedef uint64_t	pmc_value_t;
  * |   CPU      | PMC MODE | CLASS | ROW INDEX |
  * +-----------------------+-------+-----------+
  *
- * where CPU is 12 bits, MODE 8, CLASS 4, and ROW INDEX 8  Field 'CPU'
+ * where CPU is 12 bits, MODE 4, CLASS 8, and ROW INDEX 8  Field 'CPU'
  * is set to the requested CPU for system-wide PMCs or PMC_CPU_ANY for
  * process-mode PMCs.  Field 'PMC MODE' is the allocated PMC mode.
  * Field 'PMC CLASS' is the class of the PMC.  Field 'ROW INDEX' is the
@@ -415,12 +418,12 @@ typedef uint64_t	pmc_value_t;
  */
 
 #define	PMC_ID_TO_ROWINDEX(ID)	((ID) & 0xFF)
-#define	PMC_ID_TO_CLASS(ID)	(((ID) & 0xF00) >> 8)
-#define	PMC_ID_TO_MODE(ID)	(((ID) & 0xFF000) >> 12)
+#define	PMC_ID_TO_CLASS(ID)	(((ID) & 0xFF00) >> 8)
+#define	PMC_ID_TO_MODE(ID)	(((ID) & 0xF0000) >> 16)
 #define	PMC_ID_TO_CPU(ID)	(((ID) & 0xFFF00000) >> 20)
 #define	PMC_ID_MAKE_ID(CPU,MODE,CLASS,ROWINDEX)			\
-	((((CPU) & 0xFFF) << 20) | (((MODE) & 0xFF) << 12) |	\
-	(((CLASS) & 0xF) << 8) | ((ROWINDEX) & 0xFF))
+	((((CPU) & 0xFFF) << 20) | (((MODE) & 0xF) << 16) |	\
+	(((CLASS) & 0xFF) << 8) | ((ROWINDEX) & 0xFF))
 
 /*
  * Data structures for system calls supported by the pmc driver.

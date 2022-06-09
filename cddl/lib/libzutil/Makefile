@@ -5,7 +5,7 @@
 .PATH: ${SRCTOP}/sys/contrib/openzfs/module/os/freebsd/zfs
 
 LIB=	zutil
-LIBADD=	avl tpool
+LIBADD=	avl geom m tpool
 PACKAGE=	runtime
 
 INCS = zutil_import.h
@@ -18,9 +18,8 @@ SRCS = \
         zutil_pool.c
 
 SRCS += \
-        zutil_device_path_os.c \
-        zutil_import_os.c \
-        zutil_compat.c
+	os/freebsd/zutil_device_path_os.c \
+	os/freebsd/zutil_import_os.c
 
 SRCS += zfs_ioctl_compat.c
 

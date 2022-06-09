@@ -428,7 +428,7 @@ xenbusb_release_confighook(struct xenbusb_softc *xbs)
 }
 
 /**
- * \brief Verify the existance of attached device instances and perform
+ * \brief Verify the existence of attached device instances and perform
  *        probe/attach processing for newly arrived devices.
  *
  * \param dev  The NewBus device representing this XenBus bus.
@@ -533,12 +533,9 @@ xenbusb_probe_children_cb(void *arg, int pending __unused)
 {
 	device_t dev = (device_t)arg;
 
-	/*
-	 * Hold Giant until the Giant free newbus changes are committed.
-	 */
-	mtx_lock(&Giant);
+	bus_topo_lock();
 	xenbusb_probe_children(dev);
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 }
 
 /**

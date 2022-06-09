@@ -81,7 +81,7 @@
  * Advantages:
  *
  *   - Sequential reconstruction is performed in LBA order which may be faster
- *     than healing reconstruction particularly when using using HDDs (or
+ *     than healing reconstruction particularly when using HDDs (or
  *     especially with SMR devices).  Only allocated capacity is resilvered.
  *
  *   - Sequential reconstruction is not constrained by ZFS block boundaries.
@@ -103,7 +103,7 @@
  * Size of rebuild reads; defaults to 1MiB per data disk and is capped at
  * SPA_MAXBLOCKSIZE.
  */
-unsigned long zfs_rebuild_max_segment = 1024 * 1024;
+static unsigned long zfs_rebuild_max_segment = 1024 * 1024;
 
 /*
  * Maximum number of parallelly executed bytes per leaf vdev caused by a
@@ -121,14 +121,14 @@ unsigned long zfs_rebuild_max_segment = 1024 * 1024;
  * With a value of 32MB the sequential resilver write rate was measured at
  * 800MB/s sustained while rebuilding to a distributed spare.
  */
-unsigned long zfs_rebuild_vdev_limit = 32 << 20;
+static unsigned long zfs_rebuild_vdev_limit = 32 << 20;
 
 /*
  * Automatically start a pool scrub when the last active sequential resilver
  * completes in order to verify the checksums of all blocks which have been
  * resilvered. This option is enabled by default and is strongly recommended.
  */
-int zfs_rebuild_scrub_enabled = 1;
+static int zfs_rebuild_scrub_enabled = 1;
 
 /*
  * For vdev_rebuild_initiate_sync() and vdev_rebuild_reset_sync().
@@ -331,9 +331,9 @@ vdev_rebuild_complete_sync(void *arg, dmu_tx_t *tx)
 	 * While we're in syncing context take the opportunity to
 	 * setup the scrub when there are no more active rebuilds.
 	 */
-	if (!vdev_rebuild_active(spa->spa_root_vdev) &&
+	pool_scan_func_t func = POOL_SCAN_SCRUB;
+	if (dsl_scan_setup_check(&func, tx) == 0 &&
 	    zfs_rebuild_scrub_enabled) {
-		pool_scan_func_t func = POOL_SCAN_SCRUB;
 		dsl_scan_setup_sync(&func, tx);
 	}
 

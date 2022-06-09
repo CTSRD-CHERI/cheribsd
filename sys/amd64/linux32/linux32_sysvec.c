@@ -56,6 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/resourcevar.h>
+#include <sys/stddef.h>
 #include <sys/signalvar.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
@@ -78,9 +79,11 @@ __FBSDID("$FreeBSD$");
 #include <machine/specialreg.h>
 #include <machine/trap.h>
 
+#include <x86/linux/linux_x86.h>
 #include <amd64/linux32/linux.h>
 #include <amd64/linux32/linux32_proto.h>
 #include <compat/linux/linux_emul.h>
+#include <compat/linux/linux_fork.h>
 #include <compat/linux/linux_ioctl.h>
 #include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_misc.h>
@@ -90,12 +93,22 @@ __FBSDID("$FreeBSD$");
 
 MODULE_VERSION(linux, 1);
 
-const char *linux_kplatform;
+#define	LINUX32_MAXUSER		((1ul << 32) - PAGE_SIZE)
+#define	LINUX32_VDSOPAGE_SIZE	PAGE_SIZE * 2
+#define	LINUX32_VDSOPAGE	(LINUX32_MAXUSER - LINUX32_VDSOPAGE_SIZE)
+#define	LINUX32_SHAREDPAGE	(LINUX32_VDSOPAGE - PAGE_SIZE)
+				/*
+				 * PAGE_SIZE - the size
+				 * of the native SHAREDPAGE
+				 */
+#define	LINUX32_USRSTACK	LINUX32_SHAREDPAGE
+
 static int linux_szsigcode;
-static vm_object_t linux_shared_page_obj;
-static char *linux_shared_page_mapping;
-extern char _binary_linux32_locore_o_start;
-extern char _binary_linux32_locore_o_end;
+static vm_object_t linux_vdso_obj;
+static char *linux_vdso_mapping;
+extern char _binary_linux32_vdso_so_o_start;
+extern char _binary_linux32_vdso_so_o_end;
+static vm_offset_t linux_vdso_base;
 
 extern struct sysent linux32_sysent[LINUX32_SYS_MAXSYSCALL];
 
@@ -108,10 +121,15 @@ static int	linux_copyout_strings(struct image_params *imgp,
 static void     linux_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask);
 static void	linux_exec_setregs(struct thread *td,
 				   struct image_params *imgp, uintptr_t stack);
+static void	linux_exec_sysvec_init(void *param);
+static int	linux_on_exec_vmspace(struct proc *p,
+		    struct image_params *imgp);
 static void	linux32_fixlimit(struct rlimit *rl, int which);
 static bool	linux32_trans_osrel(const Elf_Note *note, int32_t *osrel);
-static void	linux_vdso_install(void *param);
-static void	linux_vdso_deinstall(void *param);
+static void	linux_vdso_install(const void *param);
+static void	linux_vdso_deinstall(const void *param);
+static void	linux_vdso_reloc(char *mapping, Elf_Addr offset);
+static void	linux32_set_fork_retval(struct thread *td);
 static void	linux32_set_syscall_retval(struct thread *td, int error);
 
 #define LINUX_T_UNKNOWN  255
@@ -160,9 +178,11 @@ struct linux32_ps_strings {
 	u_int ps_nenvstr;	/* the number of environment strings */
 };
 
-LINUX_VDSO_SYM_INTPTR(linux32_sigcode);
-LINUX_VDSO_SYM_INTPTR(linux32_rt_sigcode);
-LINUX_VDSO_SYM_INTPTR(linux32_vsyscall);
+LINUX_VDSO_SYM_INTPTR(__kernel_vsyscall);
+LINUX_VDSO_SYM_INTPTR(__kernel_sigreturn);
+LINUX_VDSO_SYM_INTPTR(__kernel_rt_sigreturn);
+LINUX_VDSO_SYM_INTPTR(kern_timekeep_base);
+LINUX_VDSO_SYM_INTPTR(kern_tsc_selector);
 LINUX_VDSO_SYM_CHAR(linux_platform);
 
 /*
@@ -199,9 +219,8 @@ linux_copyout_auxargs(struct image_params *imgp, uintptr_t base)
 	    M_WAITOK | M_ZERO);
 
 	issetugid = imgp->proc->p_flag & P_SUGID ? 1 : 0;
-	AUXARGS_ENTRY(pos, LINUX_AT_SYSINFO, linux32_vsyscall);
-	AUXARGS_ENTRY(pos, LINUX_AT_SYSINFO_EHDR,
-	    imgp->proc->p_sysent->sv_shared_page_base);
+	AUXARGS_ENTRY(pos, LINUX_AT_SYSINFO, __kernel_vsyscall);
+	AUXARGS_ENTRY(pos, LINUX_AT_SYSINFO_EHDR, linux_vdso_base);
 	AUXARGS_ENTRY(pos, LINUX_AT_HWCAP, cpu_feature);
 	AUXARGS_ENTRY(pos, AT_PAGESZ, args->pagesz);
 
@@ -298,7 +317,7 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	frame.sf_ucontext = PTROUT(&fp->sf_sc);
 
 	/* Fill in POSIX parts. */
-	ksiginfo_to_lsiginfo(ksi, &frame.sf_si, sig);
+	siginfo_to_lsiginfo(&ksi->ksi_info, &frame.sf_si, sig);
 
 	/*
 	 * Build the signal context to be used by sigreturn and libgcc unwind.
@@ -347,7 +366,7 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	/* Build context to run handler in. */
 	regs->tf_rsp = PTROUT(fp);
-	regs->tf_rip = linux32_rt_sigcode;
+	regs->tf_rip = __kernel_rt_sigreturn;
 	regs->tf_rflags &= ~(PSL_T | PSL_D);
 	regs->tf_cs = _ucode32sel;
 	regs->tf_ss = _udatasel;
@@ -453,7 +472,7 @@ linux_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	/* Build context to run handler in. */
 	regs->tf_rsp = PTROUT(fp);
-	regs->tf_rip = linux32_sigcode;
+	regs->tf_rip = __kernel_sigreturn;
 	regs->tf_rflags &= ~(PSL_T | PSL_D);
 	regs->tf_cs = _ucode32sel;
 	regs->tf_ss = _udatasel;
@@ -498,9 +517,8 @@ linux_sigreturn(struct thread *td, struct linux_sigreturn_args *args)
 		return (EFAULT);
 
 	/* Check for security violations. */
-#define	EFLAGS_SECURE(ef, oef)	((((ef) ^ (oef)) & ~PSL_USERCHANGE) == 0)
 	eflags = frame.sf_sc.sc_eflags;
-	if (!EFLAGS_SECURE(eflags, regs->tf_rflags))
+	if (!EFL_SECURE(eflags, regs->tf_rflags))
 		return(EINVAL);
 
 	/*
@@ -508,7 +526,6 @@ linux_sigreturn(struct thread *td, struct linux_sigreturn_args *args)
 	 * hardware check for invalid selectors, excess privilege in
 	 * other selectors, invalid %eip's and invalid %esp's.
 	 */
-#define	CS_SECURE(cs)	(ISPL(cs) == SEL_UPL)
 	if (!CS_SECURE(frame.sf_sc.sc_cs)) {
 		ksiginfo_init_trap(&ksi);
 		ksi.ksi_signo = SIGBUS;
@@ -581,9 +598,8 @@ linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 	context = &uc.uc_mcontext;
 
 	/* Check for security violations. */
-#define	EFLAGS_SECURE(ef, oef)	((((ef) ^ (oef)) & ~PSL_USERCHANGE) == 0)
 	eflags = context->sc_eflags;
-	if (!EFLAGS_SECURE(eflags, regs->tf_rflags))
+	if (!EFL_SECURE(eflags, regs->tf_rflags))
 		return(EINVAL);
 
 	/*
@@ -591,7 +607,6 @@ linux_rt_sigreturn(struct thread *td, struct linux_rt_sigreturn_args *args)
 	 * hardware check for invalid selectors, excess privilege in
 	 * other selectors, invalid %eip's and invalid %esp's.
 	 */
-#define	CS_SECURE(cs)	(ISPL(cs) == SEL_UPL)
 	if (!CS_SECURE(context->sc_cs)) {
 		ksiginfo_init_trap(&ksi);
 		ksi.ksi_signo = SIGBUS;
@@ -657,6 +672,7 @@ linux32_fetch_syscall_args(struct thread *td)
 	sa->args[4] = frame->tf_rdi;
 	sa->args[5] = frame->tf_rbp;	/* Unconfirmed */
 	sa->code = frame->tf_rax;
+	sa->original_code = sa->code;
 
 	if (sa->code >= p->p_sysent->sv_size)
 		/* nosys */
@@ -681,6 +697,14 @@ linux32_set_syscall_retval(struct thread *td, int error)
 		if (error != ERESTART && error != EJUSTRETURN)
 			frame->tf_rax = bsd_to_linux_errno(error);
 	}
+}
+
+static void
+linux32_set_fork_retval(struct thread *td)
+{
+	struct trapframe *frame = td->td_frame;
+
+	frame->tf_rax = 0;
 }
 
 /*
@@ -742,21 +766,14 @@ linux_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	char *stringp;
 	uintptr_t destp, ustringp;
 	struct linux32_ps_strings *arginfo;
-	struct proc *p;
 	char canary[LINUX_AT_RANDOM_LEN];
 	size_t execpath_len;
 
-	/* Calculate string base and vector table pointers. */
-	if (imgp->execpath != NULL && imgp->auxargs != NULL)
-		execpath_len = strlen(imgp->execpath) + 1;
-	else
-		execpath_len = 0;
-	p = imgp->proc;
-
-	arginfo = (struct linux32_ps_strings *)p->p_psstrings;
+	arginfo = (struct linux32_ps_strings *)PROC_PS_STRINGS(imgp->proc);
 	destp = (uintptr_t)arginfo;
 
-	if (execpath_len != 0) {
+	if (imgp->execpath != NULL && imgp->auxargs != NULL) {
+		execpath_len = strlen(imgp->execpath) + 1;
 		destp -= execpath_len;
 		destp = rounddown2(destp, sizeof(uint32_t));
 		imgp->execpathp = (void *)destp;
@@ -905,23 +922,27 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_transtrap	= linux_translate_traps,
 	.sv_fixup	= linux_fixup_elf,
 	.sv_sendsig	= linux_sendsig,
-	.sv_sigcode	= &_binary_linux32_locore_o_start,
+	.sv_sigcode	= &_binary_linux32_vdso_so_o_start,
 	.sv_szsigcode	= &linux_szsigcode,
 	.sv_name	= "Linux ELF32",
 	.sv_coredump	= elf32_coredump,
+	.sv_elf_core_osabi = ELFOSABI_NONE,
+	.sv_elf_core_abi_vendor = LINUX_ABI_VENDOR,
+	.sv_elf_core_prepare_notes = linux32_prepare_notes,
 	.sv_imgact_try	= linux_exec_imgact_try,
 	.sv_minsigstksz	= LINUX_MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= LINUX32_MAXUSER,
 	.sv_usrstack	= LINUX32_USRSTACK,
-	.sv_szpsstrings	= sizeof(struct linux32_ps_strings),
+	.sv_psstringssz	= sizeof(struct linux32_ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_auxargs = linux_copyout_auxargs,
 	.sv_copyout_strings = linux_copyout_strings,
 	.sv_setregs	= linux_exec_setregs,
 	.sv_fixlimit	= linux32_fixlimit,
 	.sv_maxssiz	= &linux32_maxssiz,
-	.sv_flags	= SV_ABI_LINUX | SV_ILP32 | SV_IA32 | SV_SHP,
+	.sv_flags	= SV_ABI_LINUX | SV_ILP32 | SV_IA32 | SV_SHP |
+	    SV_SIG_DISCIGN | SV_SIG_WAITNDQ | SV_TIMEKEEP,
 	.sv_set_syscall_retval = linux32_set_syscall_retval,
 	.sv_fetch_syscall_args = linux32_fetch_syscall_args,
 	.sv_syscallnames = NULL,
@@ -930,47 +951,140 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_schedtail	= linux_schedtail,
 	.sv_thread_detach = linux_thread_detach,
 	.sv_trap	= NULL,
-	.sv_onexec	= linux_on_exec,
+	.sv_onexec	= linux_on_exec_vmspace,
 	.sv_onexit	= linux_on_exit,
 	.sv_ontdexit	= linux_thread_dtor,
+	.sv_setid_allowed = &linux_setid_allowed_query,
+	.sv_set_fork_retval = linux32_set_fork_retval,
 };
 
-static void
-linux_vdso_install(void *param)
+static int
+linux_on_exec_vmspace(struct proc *p, struct image_params *imgp)
 {
+	int error;
 
-	linux_szsigcode = (&_binary_linux32_locore_o_end -
-	    &_binary_linux32_locore_o_start);
-
-	if (linux_szsigcode > elf_linux_sysvec.sv_shared_page_len)
-		panic("Linux invalid vdso size\n");
-
-	__elfN(linux_vdso_fixup)(&elf_linux_sysvec);
-
-	linux_shared_page_obj = __elfN(linux_shared_page_init)
-	    (&linux_shared_page_mapping);
-
-	__elfN(linux_vdso_reloc)(&elf_linux_sysvec);
-
-	bcopy(elf_linux_sysvec.sv_sigcode, linux_shared_page_mapping,
-	    linux_szsigcode);
-	elf_linux_sysvec.sv_shared_page_obj = linux_shared_page_obj;
-
-	linux_kplatform = linux_shared_page_mapping +
-	    (linux_platform - (caddr_t)elf_linux_sysvec.sv_shared_page_base);
+	error = linux_map_vdso(p, linux_vdso_obj, linux_vdso_base,
+	    LINUX32_VDSOPAGE_SIZE, imgp);
+	if (error == 0)
+		linux_on_exec(p, imgp);
+	return (error);
 }
-SYSINIT(elf_linux_vdso_init, SI_SUB_EXEC, SI_ORDER_ANY,
+
+/*
+ * linux_vdso_install() and linux_exec_sysvec_init() must be called
+ * after exec_sysvec_init() which is SI_SUB_EXEC (SI_ORDER_ANY).
+ */
+static void
+linux_exec_sysvec_init(void *param)
+{
+	l_uintptr_t *ktimekeep_base, *ktsc_selector;
+	struct sysentvec *sv;
+	ptrdiff_t tkoff;
+
+	sv = param;
+	/* Fill timekeep_base */
+	exec_sysvec_init(sv);
+
+	tkoff = kern_timekeep_base - linux_vdso_base;
+	ktimekeep_base = (l_uintptr_t *)(linux_vdso_mapping + tkoff);
+	*ktimekeep_base = sv->sv_timekeep_base;
+
+	tkoff = kern_tsc_selector - linux_vdso_base;
+	ktsc_selector = (l_uintptr_t *)(linux_vdso_mapping + tkoff);
+	*ktsc_selector = linux_vdso_tsc_selector_idx();
+	if (bootverbose)
+		printf("Linux i386 vDSO tsc_selector: %u\n", *ktsc_selector);
+}
+SYSINIT(elf_linux_exec_sysvec_init, SI_SUB_EXEC + 1, SI_ORDER_ANY,
+    linux_exec_sysvec_init, &elf_linux_sysvec);
+
+static void
+linux_vdso_install(const void *param)
+{
+	char *vdso_start = &_binary_linux32_vdso_so_o_start;
+	char *vdso_end = &_binary_linux32_vdso_so_o_end;
+
+	linux_szsigcode = vdso_end - vdso_start;
+	MPASS(linux_szsigcode <= LINUX32_VDSOPAGE_SIZE);
+
+	linux_vdso_base = LINUX32_VDSOPAGE;
+
+	__elfN(linux_vdso_fixup)(vdso_start, linux_vdso_base);
+
+	linux_vdso_obj = __elfN(linux_shared_page_init)
+	    (&linux_vdso_mapping, LINUX32_VDSOPAGE_SIZE);
+	bcopy(vdso_start, linux_vdso_mapping, linux_szsigcode);
+
+	linux_vdso_reloc(linux_vdso_mapping, linux_vdso_base);
+}
+SYSINIT(elf_linux_vdso_init, SI_SUB_EXEC + 1, SI_ORDER_FIRST,
     linux_vdso_install, NULL);
 
 static void
-linux_vdso_deinstall(void *param)
+linux_vdso_deinstall(const void *param)
 {
 
-	__elfN(linux_shared_page_fini)(linux_shared_page_obj,
-	    linux_shared_page_mapping);
+	__elfN(linux_shared_page_fini)(linux_vdso_obj,
+	    linux_vdso_mapping, LINUX32_VDSOPAGE_SIZE);
 }
 SYSUNINIT(elf_linux_vdso_uninit, SI_SUB_EXEC, SI_ORDER_FIRST,
     linux_vdso_deinstall, NULL);
+
+static void
+linux_vdso_reloc(char *mapping, Elf_Addr offset)
+{
+	const Elf_Shdr *shdr;
+	const Elf_Rel *rel;
+	const Elf_Ehdr *ehdr;
+	Elf32_Addr *where;
+	Elf_Size rtype, symidx;
+	Elf32_Addr addr, addend;
+	int i, relcnt;
+
+	MPASS(offset != 0);
+
+	relcnt = 0;
+	ehdr = (const Elf_Ehdr *)mapping;
+	shdr = (const Elf_Shdr *)(mapping + ehdr->e_shoff);
+	for (i = 0; i < ehdr->e_shnum; i++)
+	{
+		switch (shdr[i].sh_type) {
+		case SHT_REL:
+			rel = (const Elf_Rel *)(mapping + shdr[i].sh_offset);
+			relcnt = shdr[i].sh_size / sizeof(*rel);
+			break;
+		case SHT_RELA:
+			printf("Linux i386 vDSO: unexpected Rela section\n");
+			break;
+		}
+	}
+
+	for (i = 0; i < relcnt; i++, rel++) {
+		where = (Elf32_Addr *)(mapping + rel->r_offset);
+		addend = *where;
+		rtype = ELF_R_TYPE(rel->r_info);
+		symidx = ELF_R_SYM(rel->r_info);
+
+		switch (rtype) {
+		case R_386_NONE:	/* none */
+			break;
+
+		case R_386_RELATIVE:	/* B + A */
+			addr = (Elf32_Addr)PTROUT(offset + addend);
+			if (*where != addr)
+				*where = addr;
+			break;
+
+		case R_386_IRELATIVE:
+			printf("Linux i386 vDSO: unexpected ifunc relocation, "
+			    "symbol index %ld\n", (intmax_t)symidx);
+			break;
+		default:
+			printf("Linux i386 vDSO: unexpected relocation type %ld, "
+			    "symbol index %ld\n", (intmax_t)rtype, (intmax_t)symidx);
+		}
+	}
+}
 
 static char GNU_ABI_VENDOR[] = "GNU";
 static int GNULINUX_ABI_DESC = 0;
@@ -1040,7 +1154,8 @@ static Elf32_Brandinfo linux_muslbrand = {
 	.sysvec		= &elf_linux_sysvec,
 	.interp_newpath	= NULL,
 	.brand_note	= &linux32_brandnote,
-	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
+	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE |
+			    LINUX_BI_FUTEX_REQUEUE
 };
 
 Elf32_Brandinfo *linux_brandlist[] = {
@@ -1070,9 +1185,9 @@ linux_elf_modevent(module_t mod, int type, void *data)
 				linux32_ioctl_register_handler(*lihp);
 			stclohz = (stathz ? stathz : hz);
 			if (bootverbose)
-				printf("Linux ELF exec handler installed\n");
+				printf("Linux i386 ELF exec handler installed\n");
 		} else
-			printf("cannot insert Linux ELF brand handler\n");
+			printf("cannot insert Linux i386 ELF brand handler\n");
 		break;
 	case MOD_UNLOAD:
 		for (brandinfo = &linux_brandlist[0]; *brandinfo != NULL;
@@ -1089,9 +1204,9 @@ linux_elf_modevent(module_t mod, int type, void *data)
 			SET_FOREACH(lihp, linux_ioctl_handler_set)
 				linux32_ioctl_unregister_handler(*lihp);
 			if (bootverbose)
-				printf("Linux ELF exec handler removed\n");
+				printf("Linux i386 ELF exec handler removed\n");
 		} else
-			printf("Could not deinstall ELF interpreter entry\n");
+			printf("Could not deinstall Linux i386 ELF interpreter entry\n");
 		break;
 	default:
 		return (EOPNOTSUPP);

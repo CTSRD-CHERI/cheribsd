@@ -25,7 +25,10 @@
  * $FreeBSD$
  */
 
-#include "port_buffer.h"
+#include "opt_rss.h"
+#include "opt_ratelimit.h"
+
+#include <dev/mlx5/mlx5_en/port_buffer.h>
 
 #define MLX5E_MAX_PORT_MTU  9216
 
@@ -178,7 +181,7 @@ static int update_xoff_threshold(struct mlx5e_priv *priv,
  *   port_buffer: <output> port receive buffer configuration
  *   change: <output>
  *
- *   Update buffer configuration based on pfc configuraiton and priority
+ *   Update buffer configuration based on pfc configuration and priority
  *   to buffer mapping.
  *   Buffer's lossy bit is changed to:
  *     lossless if there is at least one PFC enabled priority mapped to this buffer

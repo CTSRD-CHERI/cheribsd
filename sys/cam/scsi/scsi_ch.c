@@ -145,7 +145,6 @@ struct ch_softc {
 	ch_flags	flags;
 	ch_state	state;
 	ch_quirks	quirks;
-	union ccb	saved_ccb;
 	struct devstat	*device_stats;
 	struct cdev     *dev;
 	int		open_count;
@@ -735,11 +734,6 @@ chdone(struct cam_periph *periph, union ccb *done_ccb)
 static int
 cherror(union ccb *ccb, u_int32_t cam_flags, u_int32_t sense_flags)
 {
-	struct ch_softc *softc;
-	struct cam_periph *periph;
-
-	periph = xpt_path_periph(ccb->ccb_h.path);
-	softc = (struct ch_softc *)periph->softc;
 
 	return (cam_periph_error(ccb, cam_flags, sense_flags));
 }

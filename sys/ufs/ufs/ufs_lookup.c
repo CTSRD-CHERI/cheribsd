@@ -76,9 +76,6 @@ static int	dirchk = 0;
 
 SYSCTL_INT(_debug, OID_AUTO, dircheck, CTLFLAG_RW, &dirchk, 0, "");
 
-/* true if old FS format...*/
-#define OFSFMT(vp)	((vp)->v_mount->mnt_maxsymlinklen <= 0)
-
 static int
 ufs_delete_denied(struct vnode *vdp, struct vnode *tdp, struct ucred *cred,
     struct thread *td)
@@ -233,7 +230,7 @@ ufs_lookup_ino(struct vnode *vdp, struct vnode **vpp, struct componentname *cnp,
 	 * in VFS_VGET but we could end up creating objects
 	 * that are never used.
 	 */
-	vnode_create_vobject(vdp, DIP(dp, i_size), cnp->cn_thread);
+	vnode_create_vobject(vdp, DIP(dp, i_size), curthread);
 
 	bmask = VFSTOUFS(vdp->v_mount)->um_mountp->mnt_stat.f_iosize - 1;
 
@@ -440,8 +437,7 @@ foundentry:
 				 * reclen in ndp->ni_ufs area, and release
 				 * directory buffer.
 				 */
-				if (vdp->v_mount->mnt_maxsymlinklen > 0 &&
-				    ep->d_type == DT_WHT) {
+				if (!OFSFMT(vdp) && ep->d_type == DT_WHT) {
 					slotstatus = FOUND;
 					slotoffset = i_offset;
 					slotsize = ep->d_reclen;
@@ -490,9 +486,9 @@ notfound:
 		 * XXX: Fix the comment above.
 		 */
 		if (flags & WILLBEDIR)
-			error = VOP_ACCESSX(vdp, VWRITE | VAPPEND, cred, cnp->cn_thread);
+			error = VOP_ACCESSX(vdp, VWRITE | VAPPEND, cred, curthread);
 		else
-			error = VOP_ACCESS(vdp, VWRITE, cred, cnp->cn_thread);
+			error = VOP_ACCESS(vdp, VWRITE, cred, curthread);
 		if (error)
 			return (error);
 		/*
@@ -605,7 +601,7 @@ found:
 		if ((error = VFS_VGET(vdp->v_mount, ino,
 		    LK_EXCLUSIVE, &tdp)) != 0)
 			return (error);
-		error = ufs_delete_denied(vdp, tdp, cred, cnp->cn_thread);
+		error = ufs_delete_denied(vdp, tdp, cred, curthread);
 		if (error) {
 			vput(tdp);
 			return (error);
@@ -629,9 +625,9 @@ found:
 	 */
 	if (nameiop == RENAME && (flags & ISLASTCN)) {
 		if (flags & WILLBEDIR)
-			error = VOP_ACCESSX(vdp, VWRITE | VAPPEND, cred, cnp->cn_thread);
+			error = VOP_ACCESSX(vdp, VWRITE | VAPPEND, cred, curthread);
 		else
-			error = VOP_ACCESS(vdp, VWRITE, cred, cnp->cn_thread);
+			error = VOP_ACCESS(vdp, VWRITE, cred, curthread);
 		if (error)
 			return (error);
 		/*
@@ -647,7 +643,7 @@ found:
 		    LK_EXCLUSIVE, &tdp)) != 0)
 			return (error);
 
-		error = ufs_delete_denied(vdp, tdp, cred, cnp->cn_thread);
+		error = ufs_delete_denied(vdp, tdp, cred, curthread);
 		if (error) {
 			vput(tdp);
 			return (error);
@@ -664,9 +660,9 @@ found:
 		 * of EACCESS.
 		 */
 		if (tdp->v_type == VDIR)
-			error = VOP_ACCESSX(vdp, VWRITE | VAPPEND, cred, cnp->cn_thread);
+			error = VOP_ACCESSX(vdp, VWRITE | VAPPEND, cred, curthread);
 		else
-			error = VOP_ACCESS(vdp, VWRITE, cred, cnp->cn_thread);
+			error = VOP_ACCESS(vdp, VWRITE, cred, curthread);
 		if (error) {
 			vput(tdp);
 			return (error);
@@ -854,7 +850,7 @@ ufs_makedirentry(ip, cnp, newdirp)
 
 	bcopy(cnp->cn_nameptr, newdirp->d_name, namelen);
 
-	if (ITOV(ip)->v_mount->mnt_maxsymlinklen > 0)
+	if (!OFSFMT(ITOV(ip)))
 		newdirp->d_type = IFTODT(ip->i_mode);
 	else {
 		newdirp->d_type = 0;
@@ -1249,8 +1245,7 @@ out:
 	 * drop its snapshot reference so that it will be reclaimed
 	 * when last open reference goes away.
 	 */
-	if (ip != NULL && (ip->i_flags & SF_SNAPSHOT) != 0 &&
-	    ip->i_effnlink == 0)
+	if (ip != NULL && IS_SNAPSHOT(ip) && ip->i_effnlink == 0)
 		UFS_SNAPGONE(ip);
 	return (error);
 }
@@ -1324,7 +1319,7 @@ ufs_dirrewrite(dp, oip, newinum, newtype, isrmdir)
 	 * drop its snapshot reference so that it will be reclaimed
 	 * when last open reference goes away.
 	 */
-	if ((oip->i_flags & SF_SNAPSHOT) != 0 && oip->i_effnlink == 0)
+	if (IS_SNAPSHOT(oip) && oip->i_effnlink == 0)
 		UFS_SNAPGONE(oip);
 	return (error);
 }
@@ -1445,7 +1440,8 @@ ufs_dir_dd_ino(struct vnode *vp, struct ucred *cred, ino_t *dd_ino,
  * Check if source directory is in the path of the target directory.
  */
 int
-ufs_checkpath(ino_t source_ino, ino_t parent_ino, struct inode *target, struct ucred *cred, ino_t *wait_ino)
+ufs_checkpath(ino_t source_ino, ino_t parent_ino, struct inode *target,
+    struct ucred *cred, ino_t *wait_ino)
 {
 	struct mount *mp;
 	struct vnode *tvp, *vp, *vp1;
@@ -1455,6 +1451,8 @@ ufs_checkpath(ino_t source_ino, ino_t parent_ino, struct inode *target, struct u
 	vp = tvp = ITOV(target);
 	mp = vp->v_mount;
 	*wait_ino = 0;
+	sx_assert(&VFSTOUFS(mp)->um_checkpath_lock, SA_XLOCKED);
+
 	if (target->i_number == source_ino)
 		return (EEXIST);
 	if (target->i_number == parent_ino)

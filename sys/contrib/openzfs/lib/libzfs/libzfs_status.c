@@ -89,54 +89,55 @@ static char *zfs_msgid_table[] = {
 	 *	ZPOOL_STATUS_REBUILDING
 	 *	ZPOOL_STATUS_REBUILD_SCRUB
 	 *	ZPOOL_STATUS_COMPATIBILITY_ERR
+	 *	ZPOOL_STATUS_INCOMPATIBLE_FEAT
 	 *	ZPOOL_STATUS_OK
 	 */
 };
 
 #define	NMSGID	(sizeof (zfs_msgid_table) / sizeof (zfs_msgid_table[0]))
 
-/* ARGSUSED */
 static int
 vdev_missing(vdev_stat_t *vs, uint_t vsc)
 {
+	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_CANT_OPEN &&
 	    vs->vs_aux == VDEV_AUX_OPEN_FAILED);
 }
 
-/* ARGSUSED */
 static int
 vdev_faulted(vdev_stat_t *vs, uint_t vsc)
 {
+	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_FAULTED);
 }
 
-/* ARGSUSED */
 static int
 vdev_errors(vdev_stat_t *vs, uint_t vsc)
 {
+	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_DEGRADED ||
 	    vs->vs_read_errors != 0 || vs->vs_write_errors != 0 ||
 	    vs->vs_checksum_errors != 0);
 }
 
-/* ARGSUSED */
 static int
 vdev_broken(vdev_stat_t *vs, uint_t vsc)
 {
+	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_CANT_OPEN);
 }
 
-/* ARGSUSED */
 static int
 vdev_offlined(vdev_stat_t *vs, uint_t vsc)
 {
+	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_OFFLINE);
 }
 
-/* ARGSUSED */
 static int
 vdev_removed(vdev_stat_t *vs, uint_t vsc)
 {
+	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_REMOVED);
 }
 
@@ -453,11 +454,17 @@ check_status(nvlist_t *config, boolean_t isimport,
 	/*
 	 * Outdated, but usable, version
 	 */
-	if (SPA_VERSION_IS_SUPPORTED(version) && version != SPA_VERSION)
-		return (ZPOOL_STATUS_VERSION_OLDER);
+	if (SPA_VERSION_IS_SUPPORTED(version) && version != SPA_VERSION) {
+		/* "legacy" compatibility disables old version reporting */
+		if (compat != NULL && strcmp(compat, ZPOOL_COMPAT_LEGACY) == 0)
+			return (ZPOOL_STATUS_OK);
+		else
+			return (ZPOOL_STATUS_VERSION_OLDER);
+	}
 
 	/*
-	 * Usable pool with disabled features
+	 * Usable pool with disabled or superfluous features
+	 * (superfluous = beyond what's requested by 'compatibility')
 	 */
 	if (version >= SPA_VERSION_FEATURES) {
 		int i;
@@ -475,18 +482,23 @@ check_status(nvlist_t *config, boolean_t isimport,
 		}
 
 		/* check against all features, or limited set? */
-		boolean_t pool_features[SPA_FEATURES];
+		boolean_t c_features[SPA_FEATURES];
 
-		if (zpool_load_compat(compat, pool_features, NULL, NULL) !=
-		    ZPOOL_COMPATIBILITY_OK)
+		switch (zpool_load_compat(compat, c_features, NULL, 0)) {
+		case ZPOOL_COMPATIBILITY_OK:
+		case ZPOOL_COMPATIBILITY_WARNTOKEN:
+			break;
+		default:
 			return (ZPOOL_STATUS_COMPATIBILITY_ERR);
+		}
 		for (i = 0; i < SPA_FEATURES; i++) {
 			zfeature_info_t *fi = &spa_feature_table[i];
 			if (!fi->fi_zfs_mod_supported)
 				continue;
-			if (pool_features[i] &&
-			    !nvlist_exists(feat, fi->fi_guid))
+			if (c_features[i] && !nvlist_exists(feat, fi->fi_guid))
 				return (ZPOOL_STATUS_FEAT_DISABLED);
+			if (!c_features[i] && nvlist_exists(feat, fi->fi_guid))
+				return (ZPOOL_STATUS_INCOMPATIBLE_FEAT);
 		}
 	}
 

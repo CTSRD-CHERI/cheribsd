@@ -84,7 +84,6 @@
 #define	__GNUCLIKE_ASM 2
 #endif
 #define	__GNUCLIKE___TYPEOF 1
-#define	__GNUCLIKE___OFFSETOF 1
 #define	__GNUCLIKE___SECTION 1
 
 #define	__GNUCLIKE_CTOR_SECTION_HANDLING 1
@@ -97,16 +96,12 @@
 #define	__GNUCLIKE_BUILTIN_VAALIST 1
 #endif
 
-#if defined(__GNUC__)
 #define	__GNUC_VA_LIST_COMPATIBILITY 1
-#endif
 
 /*
  * Compiler memory barriers, specific to gcc and clang.
  */
-#if defined(__GNUC__)
 #define	__compiler_membar()	__asm __volatile(" " : : : "memory")
-#endif
 
 #define	__GNUCLIKE_BUILTIN_NEXT_ARG 1
 #define	__GNUCLIKE_MATH_BUILTIN_RELOPS
@@ -326,6 +321,18 @@
 #define __subobject_cxx_reference_use_full_array_bounds
 #define __subobject_member_used_for_c_inheritance
 #define __subobject_type_used_for_c_inheritance
+#endif
+
+/*
+ * Used to tag the pointee type of user pointer variables for which
+ * pointers to members are taken.  Subobject bounds are problematic with
+ * user pointers since untrusted input can cause faults in the kernel
+ * on architectures for which cheri_csetbounds faults.
+ */
+#ifdef __riscv
+#define	__no_user_subobject_bounds	__no_subobject_bounds
+#else
+#define	__no_user_subobject_bounds
 #endif
 
 #if !__has_builtin(__builtin_no_change_bounds)
@@ -883,6 +890,17 @@
 #define	__POSIX_VISIBLE		198808
 #define	__ISO_C_VISIBLE		0
 #endif /* _POSIX_C_SOURCE */
+/*
+ * Both glibc and OpenBSD enable c11 features when _ISOC11_SOURCE is defined, or
+ * when compiling with -stdc=c11. A strict reading of the standard would suggest
+ * doing it only for the former. However, a strict reading also requires C99
+ * mode only, so building with C11 is already undefined. Follow glibc's and
+ * OpenBSD's lead for this non-standard configuration for maximum compatibility.
+ */
+#if _ISOC11_SOURCE || (defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L)
+#undef __ISO_C_VISIBLE
+#define __ISO_C_VISIBLE		2011
+#endif
 #else
 /*-
  * Deal with _ANSI_SOURCE:
@@ -1028,15 +1046,22 @@
 #define	__no_lock_analysis	__lock_annotate(no_thread_safety_analysis)
 
 /*
- * Function or variable should not be sanitized, i.e. by AddressSanitizer.
+ * Function or variable should not be sanitized, e.g., by AddressSanitizer.
  * GCC has the nosanitize attribute, but as a function attribute only, and
  * warns on use as a variable attribute.
  */
 #if __has_attribute(no_sanitize) && defined(__clang__)
+#ifdef _KERNEL
+#define __nosanitizeaddress	__attribute__((no_sanitize("kernel-address")))
+#define __nosanitizememory	__attribute__((no_sanitize("kernel-memory")))
+#else
 #define __nosanitizeaddress	__attribute__((no_sanitize("address")))
+#define __nosanitizememory	__attribute__((no_sanitize("memory")))
+#endif
 #define __nosanitizethread	__attribute__((no_sanitize("thread")))
 #else
 #define __nosanitizeaddress
+#define __nosanitizememory
 #define __nosanitizethread
 #endif
 

@@ -4,7 +4,7 @@
 # For more information on this file, please read the config(5) manual page,
 # and/or the handbook section on Kernel Configuration Files:
 #
-#    https://www.FreeBSD.org/doc/en_US.ISO8859-1/books/handbook/kernelconfig-config.html
+#    https://docs.freebsd.org/en/books/handbook/kernelconfig/#kernelconfig-config
 #
 # The handbook is also available locally in /usr/share/doc/handbook
 # if you've installed the doc distribution, otherwise always see the
@@ -67,6 +67,7 @@ options 	COMPAT_FREEBSD9		# Compatible with FreeBSD9
 options 	COMPAT_FREEBSD10	# Compatible with FreeBSD10
 options 	COMPAT_FREEBSD11	# Compatible with FreeBSD11
 options 	COMPAT_FREEBSD12	# Compatible with FreeBSD12
+options 	COMPAT_FREEBSD13	# Compatible with FreeBSD13
 options 	SCSI_DELAY=5000		# Delay (in ms) before probing SCSI
 options 	KTRACE			# ktrace(1) support
 options 	STACK			# stack(9) support
@@ -138,6 +139,12 @@ options		PCI_IOV			# PCI SR-IOV support
 
 options 	COMPAT_LINUXKPI
 
+# Enable support for the kernel PLL to use an external PPS signal,
+# under supervision of [x]ntpd(8)
+# More info in ntpd documentation: http://www.eecis.udel.edu/~ntp
+
+options 	PPS_SYNC
+
 # Floppy drives
 device		fdc
 
@@ -150,7 +157,6 @@ device		siis			# SiliconImage SiI3124/SiI3132/SiI3531 SATA
 # SCSI Controllers
 device		ahc			# AHA2940 and onboard AIC7xxx devices
 device		ahd			# AHA39320/29320 and onboard AIC79xx devices
-device		esp			# AMD Am53C974 (Tekram DC-390(T))
 device		hptiop			# Highpoint RocketRaid 3xxx series
 device		isp			# Qlogic family
 #device		ispfw			# Firmware for QLogic HBAs- normally a module
@@ -173,13 +179,9 @@ device		ses			# Enclosure Services (SES and SAF-TE)
 #device		ctl			# CAM Target Layer
 
 # RAID controllers interfaced to the SCSI subsystem
-device		amr			# AMI MegaRAID
 device		arcmsr			# Areca SATA II RAID
 device		ciss			# Compaq Smart RAID 5*
-device		iir			# Intel Integrated RAID
 device		ips			# IBM (Adaptec) ServeRAID
-device		mly			# Mylex AcceleRAID/eXtremeRAID
-device		twa			# 3ware 9000 series PATA/SATA RAID
 device		smartpqi		# Microsemi smartpqi driver
 device		tws			# LSI 3ware 9750 SATA+SAS 6Gb/s RAID controller
 
@@ -201,8 +203,7 @@ device		nvme			# base NVMe driver
 device		nvd			# expose NVMe namespaces as disks, depends on nvme
 
 # Intel Volume Management Device (VMD) support
-device		vmd			# base VMD device
-device		vmd_bus			# bus for VMD children
+device		vmd
 
 # atkbdc0 controls both the keyboard and the PS/2 mouse
 device		atkbdc			# AT keyboard controller
@@ -211,16 +212,13 @@ device		psm			# PS/2 mouse
 
 device		kbdmux			# keyboard multiplexer
 
+# syscons is the legacy console driver, resembling an SCO console
 device		vga			# VGA video card driver
-options 	VESA			# Add support for VESA BIOS Extensions (VBE)
-
 device		splash			# Splash screen and screen saver support
-
-# syscons is the default console driver, resembling an SCO console
 device		sc
 options 	SC_PIXEL_MODE		# add support for the raster text mode
 
-# vt is the new video console driver
+# vt is the default video console driver
 device		vt
 device		vt_vga
 device		vt_efifb
@@ -228,10 +226,8 @@ device		vt_vbefb
 
 device		agp			# support several AGP chipsets
 
-# PCCARD (PCMCIA) support
-# PCMCIA and cardbus bridge support
-device		cbb			# cardbus (yenta) bridge
-device		pccard			# PC Card (16-bit) bus
+# CardBus bridge support
+device		cbb			# CardBus (yenta) bridge
 device		cardbus			# CardBus (32-bit) bus
 
 # Serial (COM) ports
@@ -249,6 +245,7 @@ device		puc			# Multi I/O cards and multi-channel UARTs
 # PCI/PCI-X/PCIe Ethernet NICs that use iflib infrastructure
 device		iflib
 device		em			# Intel PRO/1000 Gigabit Ethernet Family
+device		igc			# Intel I225 2.5G Ethernet
 device		ix			# Intel PRO/10GbE PCIE PF Ethernet
 device		ixv			# Intel PRO/10GbE PCIE VF Ethernet
 device		ixl			# Intel 700 Series Physical Function
@@ -307,7 +304,6 @@ device		wlan_wep		# 802.11 WEP support
 device		wlan_ccmp		# 802.11 CCMP support
 device		wlan_tkip		# 802.11 TKIP support
 device		wlan_amrr		# AMRR transmit rate control algorithm
-device		an			# Aironet 4500/4800 802.11 wireless NICs.
 device		ath			# Atheros NICs
 device		ath_pci			# Atheros pci/cardbus glue
 device		ath_hal			# pci/cardbus chip support
@@ -377,13 +373,18 @@ device		virtio_blk		# VirtIO Block device
 device		virtio_scsi		# VirtIO SCSI device
 device		virtio_balloon		# VirtIO Memory Balloon device
 
+# Linux KVM paravirtualization support
+device		kvm_clock		# KVM paravirtual clock driver
+
 # HyperV drivers and enhancement support
 device		hyperv			# HyperV drivers 
 
 # Xen HVM Guest Optimizations
-# NOTE: XENHVM depends on xenpci.  They must be added or removed together.
+# NOTE: XENHVM depends on xenpci and xentimer.
+# They must be added or removed together.
 options 	XENHVM			# Xen HVM kernel infrastructure
 device		xenpci			# Xen HVM Hypervisor services driver
+device		xentimer		# Xen x86 PV timer device
 
 # Netmap provides direct access to TX/RX rings on supported NICs
 device		netmap			# netmap(4) support

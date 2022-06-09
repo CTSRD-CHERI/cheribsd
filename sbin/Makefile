@@ -53,7 +53,6 @@ SUBDIR=adjkerntz \
 	nfsiod \
 	nos-tun \
 	pfilctl \
-	ping \
 	rcorder \
 	reboot \
 	recoverdisk \
@@ -63,11 +62,14 @@ SUBDIR=adjkerntz \
 	savecore \
 	setkey \
 	shutdown \
-	spppcontrol \
 	swapon \
 	sysctl \
 	tunefs \
 	umount
+
+.if ${MK_INET} != "no" || ${MK_INET6} != "no"
+SUBDIR+=	ping
+.endif
 
 SUBDIR.${MK_CCD}+=	ccdconfig
 SUBDIR.${MK_CXX}+=	devd
@@ -77,7 +79,6 @@ SUBDIR.${MK_INET6}+=	rtsol
 SUBDIR.${MK_IPFILTER}+=	ipf
 SUBDIR.${MK_IPFW}+=	ipfw
 SUBDIR.${MK_IPFW}+=	natd
-SUBDIR.${MK_ISCSI}+=	iscontrol
 SUBDIR.${MK_NVME}+=	nvmecontrol
 SUBDIR.${MK_OPENSSL}+=	decryptcore
 SUBDIR.${MK_PF}+=	pfctl
@@ -93,5 +94,7 @@ SUBDIR.${MK_TESTS}+=	tests
 .include <bsd.arch.inc.mk>
 
 SUBDIR_PARALLEL=
+
+.include <bsd.prog.mk>
 
 .include <bsd.subdir.mk>

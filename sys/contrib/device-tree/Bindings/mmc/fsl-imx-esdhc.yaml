@@ -39,6 +39,7 @@ properties:
               - fsl,imx8mn-usdhc
               - fsl,imx8mp-usdhc
               - fsl,imx8mq-usdhc
+              - fsl,imx8qm-usdhc
               - fsl,imx8qxp-usdhc
           - const: fsl,imx7d-usdhc
 
@@ -101,6 +102,26 @@ properties:
       If not use this property, driver default set the delay target to value 7.
       Only eMMC HS400 mode need to take care of this property.
     default: 0
+
+  clocks:
+    maxItems: 3
+    description:
+      Handle clocks for the sdhc controller.
+
+  clock-names:
+    items:
+      - const: ipg
+      - const: ahb
+      - const: per
+
+  pinctrl-names:
+    minItems: 1
+    maxItems: 4
+    items:
+      - const: default
+      - const: state_100mhz
+      - const: state_200mhz
+      - const: sleep
 
 required:
   - compatible

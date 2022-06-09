@@ -59,8 +59,6 @@ extern long * _end;
 #endif
 
 #ifdef SHOULD_PROCESS_CAP_RELOCS
-#define DONT_EXPORT_CRT_INIT_GLOBALS
-#define CRT_INIT_GLOBALS_GDC_ONLY
 #include "crt_init_globals.c"
 #endif
 
@@ -97,7 +95,7 @@ __start(int argc, char *argv[], char *env[], void (*cleanup)(void))
 		}
 
 		if (phdr != NULL && phnum != 0) {
-			do_crt_init_globals(phdr, phnum);
+			crt_init_globals(phdr, phnum, NULL, NULL, NULL);
 		}
 	}
 #endif
@@ -106,8 +104,10 @@ __start(int argc, char *argv[], char *env[], void (*cleanup)(void))
 
 	if (&_DYNAMIC != NULL)
 		atexit(cleanup);
-	else
+	else {
+		process_irelocs();
 		_init_tls();
+	}
 
 #ifdef GCRT
 	atexit(_mcleanup);

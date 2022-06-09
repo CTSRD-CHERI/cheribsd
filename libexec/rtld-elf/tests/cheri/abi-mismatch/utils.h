@@ -62,14 +62,6 @@ get_executable_dir(void)
 	return exe_buf;
 }
 
-#ifdef __mips__
-#if _MIPS_SZCAP != 128
-#error BAD _MIPS_SZCAP
-#endif
-#define GOOD_CHERI_MACH (0xc1)
-#define BAD_CHERI_MACH (0xc2)
-#endif
-
 #define CHECK_DLERROR_NULL()	do { \
 	const char* error = dlerror(); \
 	ATF_CHECK_MSG(error == NULL, "Unexpected dlerror() = %s", error); \

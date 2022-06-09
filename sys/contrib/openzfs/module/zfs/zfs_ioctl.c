@@ -38,7 +38,7 @@
  * Copyright (c) 2017 Open-E, Inc. All Rights Reserved.
  * Copyright (c) 2019 Datto Inc.
  * Copyright (c) 2019, 2020 by Christian Schwarz. All rights reserved.
- * Copyright (c) 2019, Klara Inc.
+ * Copyright (c) 2019, 2021, Klara Inc.
  * Copyright (c) 2019, Allan Jude
  */
 
@@ -222,7 +222,7 @@
 #include <sys/zfs_ioctl_impl.h>
 
 kmutex_t zfsdev_state_lock;
-zfsdev_state_t *zfsdev_state_list;
+static zfsdev_state_t *zfsdev_state_list;
 
 /*
  * Limit maximum nvlist size.  We don't want users passing in insane values
@@ -233,10 +233,10 @@ unsigned long zfs_max_nvlist_src_size = 0;
 
 /*
  * When logging the output nvlist of an ioctl in the on-disk history, limit
- * the logged size to this many bytes.  This must be less then DMU_MAX_ACCESS.
+ * the logged size to this many bytes.  This must be less than DMU_MAX_ACCESS.
  * This applies primarily to zfs_ioc_channel_program().
  */
-unsigned long zfs_history_output_max = 1024 * 1024;
+static unsigned long zfs_history_output_max = 1024 * 1024;
 
 uint_t zfs_fsyncer_key;
 uint_t zfs_allow_log_key;
@@ -2521,6 +2521,26 @@ zfs_prop_set_special(const char *dsname, zprop_source_t source,
 	return (err);
 }
 
+static boolean_t
+zfs_is_namespace_prop(zfs_prop_t prop)
+{
+	switch (prop) {
+
+	case ZFS_PROP_ATIME:
+	case ZFS_PROP_RELATIME:
+	case ZFS_PROP_DEVICES:
+	case ZFS_PROP_EXEC:
+	case ZFS_PROP_SETUID:
+	case ZFS_PROP_READONLY:
+	case ZFS_PROP_XATTR:
+	case ZFS_PROP_NBMAND:
+		return (B_TRUE);
+
+	default:
+		return (B_FALSE);
+	}
+}
+
 /*
  * This function is best effort. If it fails to set any of the given properties,
  * it continues to set as many as it can and returns the last error
@@ -2540,6 +2560,7 @@ zfs_set_prop_nvlist(const char *dsname, zprop_source_t source, nvlist_t *nvl,
 	int rv = 0;
 	uint64_t intval;
 	const char *strval;
+	boolean_t should_update_mount_cache = B_FALSE;
 
 	nvlist_t *genericnvl = fnvlist_alloc();
 	nvlist_t *retrynvl = fnvlist_alloc();
@@ -2637,6 +2658,9 @@ retry:
 				fnvlist_add_int32(errlist, propname, err);
 			rv = err;
 		}
+
+		if (zfs_is_namespace_prop(prop))
+			should_update_mount_cache = B_TRUE;
 	}
 
 	if (nvl != retrynvl && !nvlist_empty(retrynvl)) {
@@ -2685,6 +2709,9 @@ retry:
 			}
 		}
 	}
+	if (should_update_mount_cache)
+		zfs_ioctl_update_mount_cache(dsname);
+
 	nvlist_free(genericnvl);
 	nvlist_free(retrynvl);
 
@@ -2951,6 +2978,96 @@ zfs_ioc_pool_get_props(zfs_cmd_t *zc)
 		error = SET_ERROR(EFAULT);
 
 	nvlist_free(nvp);
+	return (error);
+}
+
+/*
+ * innvl: {
+ *     "vdevprops_set_vdev" -> guid
+ *     "vdevprops_set_props" -> { prop -> value }
+ * }
+ *
+ * outnvl: propname -> error code (int32)
+ */
+static const zfs_ioc_key_t zfs_keys_vdev_set_props[] = {
+	{ZPOOL_VDEV_PROPS_SET_VDEV,	DATA_TYPE_UINT64,	0},
+	{ZPOOL_VDEV_PROPS_SET_PROPS,	DATA_TYPE_NVLIST,	0}
+};
+
+static int
+zfs_ioc_vdev_set_props(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
+{
+	spa_t *spa;
+	int error;
+	vdev_t *vd;
+	uint64_t vdev_guid;
+
+	/* Early validation */
+	if (nvlist_lookup_uint64(innvl, ZPOOL_VDEV_PROPS_SET_VDEV,
+	    &vdev_guid) != 0)
+		return (SET_ERROR(EINVAL));
+
+	if (outnvl == NULL)
+		return (SET_ERROR(EINVAL));
+
+	if ((error = spa_open(poolname, &spa, FTAG)) != 0)
+		return (error);
+
+	ASSERT(spa_writeable(spa));
+
+	if ((vd = spa_lookup_by_guid(spa, vdev_guid, B_TRUE)) == NULL) {
+		spa_close(spa, FTAG);
+		return (SET_ERROR(ENOENT));
+	}
+
+	error = vdev_prop_set(vd, innvl, outnvl);
+
+	spa_close(spa, FTAG);
+
+	return (error);
+}
+
+/*
+ * innvl: {
+ *     "vdevprops_get_vdev" -> guid
+ *     (optional) "vdevprops_get_props" -> { propname -> propid }
+ * }
+ *
+ * outnvl: propname -> value
+ */
+static const zfs_ioc_key_t zfs_keys_vdev_get_props[] = {
+	{ZPOOL_VDEV_PROPS_GET_VDEV,	DATA_TYPE_UINT64,	0},
+	{ZPOOL_VDEV_PROPS_GET_PROPS,	DATA_TYPE_NVLIST,	ZK_OPTIONAL}
+};
+
+static int
+zfs_ioc_vdev_get_props(const char *poolname, nvlist_t *innvl, nvlist_t *outnvl)
+{
+	spa_t *spa;
+	int error;
+	vdev_t *vd;
+	uint64_t vdev_guid;
+
+	/* Early validation */
+	if (nvlist_lookup_uint64(innvl, ZPOOL_VDEV_PROPS_GET_VDEV,
+	    &vdev_guid) != 0)
+		return (SET_ERROR(EINVAL));
+
+	if (outnvl == NULL)
+		return (SET_ERROR(EINVAL));
+
+	if ((error = spa_open(poolname, &spa, FTAG)) != 0)
+		return (error);
+
+	if ((vd = spa_lookup_by_guid(spa, vdev_guid, B_TRUE)) == NULL) {
+		spa_close(spa, FTAG);
+		return (SET_ERROR(ENOENT));
+	}
+
+	error = vdev_prop_get(vd, innvl, outnvl);
+
+	spa_close(spa, FTAG);
+
 	return (error);
 }
 
@@ -4834,8 +4951,8 @@ zfs_ioc_recv_impl(char *tofs, char *tosnap, char *origin, nvlist_t *recvprops,
 	*errors = fnvlist_alloc();
 	off = 0;
 
-	if ((error = zfs_file_get(input_fd, &input_fp)))
-		return (error);
+	if ((input_fp = zfs_file_get(input_fd)) == NULL)
+		return (SET_ERROR(EBADF));
 
 	noff = off = zfs_file_off(input_fp);
 	error = dmu_recv_begin(tofs, tosnap, begin_record, force,
@@ -5115,7 +5232,7 @@ zfs_ioc_recv_impl(char *tofs, char *tosnap, char *origin, nvlist_t *recvprops,
 		nvlist_free(inheritprops);
 	}
 out:
-	zfs_file_put(input_fd);
+	zfs_file_put(input_fp);
 	nvlist_free(origrecvd);
 	nvlist_free(origprops);
 
@@ -5445,8 +5562,8 @@ zfs_ioc_send(zfs_cmd_t *zc)
 		zfs_file_t *fp;
 		dmu_send_outparams_t out = {0};
 
-		if ((error = zfs_file_get(zc->zc_cookie, &fp)))
-			return (error);
+		if ((fp = zfs_file_get(zc->zc_cookie)) == NULL)
+			return (SET_ERROR(EBADF));
 
 		off = zfs_file_off(fp);
 		out.dso_outfunc = dump_bytes;
@@ -5456,7 +5573,7 @@ zfs_ioc_send(zfs_cmd_t *zc)
 		    zc->zc_fromobj, embedok, large_block_ok, compressok,
 		    rawok, savedok, zc->zc_cookie, &off, &out);
 
-		zfs_file_put(zc->zc_cookie);
+		zfs_file_put(fp);
 	}
 	return (error);
 }
@@ -5978,10 +6095,6 @@ zfs_ioc_share(zfs_cmd_t *zc)
 	return (SET_ERROR(ENOSYS));
 }
 
-ace_t full_access[] = {
-	{(uid_t)-1, ACE_ALL_PERMS, ACE_EVERYONE, 0}
-};
-
 /*
  * inputs:
  * zc_name		name of containing filesystem
@@ -6020,25 +6133,24 @@ zfs_ioc_tmp_snapshot(zfs_cmd_t *zc)
 {
 	char *snap_name;
 	char *hold_name;
-	int error;
 	minor_t minor;
 
-	error = zfs_onexit_fd_hold(zc->zc_cleanup_fd, &minor);
-	if (error != 0)
-		return (error);
+	zfs_file_t *fp = zfs_onexit_fd_hold(zc->zc_cleanup_fd, &minor);
+	if (fp == NULL)
+		return (SET_ERROR(EBADF));
 
 	snap_name = kmem_asprintf("%s-%016llx", zc->zc_value,
 	    (u_longlong_t)ddi_get_lbolt64());
 	hold_name = kmem_asprintf("%%%s", zc->zc_value);
 
-	error = dsl_dataset_snapshot_tmp(zc->zc_name, snap_name, minor,
+	int error = dsl_dataset_snapshot_tmp(zc->zc_name, snap_name, minor,
 	    hold_name);
 	if (error == 0)
 		(void) strlcpy(zc->zc_value, snap_name,
 		    sizeof (zc->zc_value));
 	kmem_strfree(snap_name);
 	kmem_strfree(hold_name);
-	zfs_onexit_fd_rele(zc->zc_cleanup_fd);
+	zfs_onexit_fd_rele(fp);
 	return (error);
 }
 
@@ -6058,13 +6170,13 @@ zfs_ioc_diff(zfs_cmd_t *zc)
 	offset_t off;
 	int error;
 
-	if ((error = zfs_file_get(zc->zc_cookie, &fp)))
-		return (error);
+	if ((fp = zfs_file_get(zc->zc_cookie)) == NULL)
+		return (SET_ERROR(EBADF));
 
 	off = zfs_file_off(fp);
 	error = dmu_diff(zc->zc_name, zc->zc_value, fp, &off);
 
-	zfs_file_put(zc->zc_cookie);
+	zfs_file_put(fp);
 
 	return (error);
 }
@@ -6100,6 +6212,7 @@ zfs_ioc_hold(const char *pool, nvlist_t *args, nvlist_t *errlist)
 	int cleanup_fd = -1;
 	int error;
 	minor_t minor = 0;
+	zfs_file_t *fp = NULL;
 
 	holds = fnvlist_lookup_nvlist(args, "holds");
 
@@ -6117,14 +6230,16 @@ zfs_ioc_hold(const char *pool, nvlist_t *args, nvlist_t *errlist)
 	}
 
 	if (nvlist_lookup_int32(args, "cleanup_fd", &cleanup_fd) == 0) {
-		error = zfs_onexit_fd_hold(cleanup_fd, &minor);
-		if (error != 0)
-			return (SET_ERROR(error));
+		fp = zfs_onexit_fd_hold(cleanup_fd, &minor);
+		if (fp == NULL)
+			return (SET_ERROR(EBADF));
 	}
 
 	error = dsl_dataset_user_hold(holds, minor, errlist);
-	if (minor != 0)
-		zfs_onexit_fd_rele(cleanup_fd);
+	if (fp != NULL) {
+		ASSERT3U(minor, !=, 0);
+		zfs_onexit_fd_rele(fp);
+	}
 	return (SET_ERROR(error));
 }
 
@@ -6187,9 +6302,9 @@ zfs_ioc_events_next(zfs_cmd_t *zc)
 	uint64_t dropped = 0;
 	int error;
 
-	error = zfs_zevent_fd_hold(zc->zc_cleanup_fd, &minor, &ze);
-	if (error != 0)
-		return (error);
+	zfs_file_t *fp = zfs_zevent_fd_hold(zc->zc_cleanup_fd, &minor, &ze);
+	if (fp == NULL)
+		return (SET_ERROR(EBADF));
 
 	do {
 		error = zfs_zevent_next(ze, &event,
@@ -6211,7 +6326,7 @@ zfs_ioc_events_next(zfs_cmd_t *zc)
 			break;
 	} while (1);
 
-	zfs_zevent_fd_rele(zc->zc_cleanup_fd);
+	zfs_zevent_fd_rele(fp);
 
 	return (error);
 }
@@ -6243,12 +6358,12 @@ zfs_ioc_events_seek(zfs_cmd_t *zc)
 	minor_t minor;
 	int error;
 
-	error = zfs_zevent_fd_hold(zc->zc_cleanup_fd, &minor, &ze);
-	if (error != 0)
-		return (error);
+	zfs_file_t *fp = zfs_zevent_fd_hold(zc->zc_cleanup_fd, &minor, &ze);
+	if (fp == NULL)
+		return (SET_ERROR(EBADF));
 
 	error = zfs_zevent_seek(ze, zc->zc_guid);
-	zfs_zevent_fd_rele(zc->zc_cleanup_fd);
+	zfs_zevent_fd_rele(fp);
 
 	return (error);
 }
@@ -6432,8 +6547,8 @@ zfs_ioc_send_new(const char *snapname, nvlist_t *innvl, nvlist_t *outnvl)
 
 	(void) nvlist_lookup_string(innvl, "redactbook", &redactbook);
 
-	if ((error = zfs_file_get(fd, &fp)))
-		return (error);
+	if ((fp = zfs_file_get(fd)) == NULL)
+		return (SET_ERROR(EBADF));
 
 	off = zfs_file_off(fp);
 
@@ -6445,7 +6560,7 @@ zfs_ioc_send_new(const char *snapname, nvlist_t *innvl, nvlist_t *outnvl)
 	    compressok, rawok, savedok, resumeobj, resumeoff,
 	    redactbook, fd, &off, &out);
 
-	zfs_file_put(fd);
+	zfs_file_put(fp);
 	return (error);
 }
 
@@ -7078,6 +7193,16 @@ zfs_ioctl_init(void)
 	    POOL_CHECK_SUSPENDED, B_FALSE, B_TRUE,
 	    zfs_keys_get_bootenv, ARRAY_SIZE(zfs_keys_get_bootenv));
 
+	zfs_ioctl_register("zpool_vdev_get_props", ZFS_IOC_VDEV_GET_PROPS,
+	    zfs_ioc_vdev_get_props, zfs_secpolicy_read, POOL_NAME,
+	    POOL_CHECK_NONE, B_FALSE, B_FALSE, zfs_keys_vdev_get_props,
+	    ARRAY_SIZE(zfs_keys_vdev_get_props));
+
+	zfs_ioctl_register("zpool_vdev_set_props", ZFS_IOC_VDEV_SET_PROPS,
+	    zfs_ioc_vdev_set_props, zfs_secpolicy_config, POOL_NAME,
+	    POOL_CHECK_SUSPENDED | POOL_CHECK_READONLY, B_FALSE, B_FALSE,
+	    zfs_keys_vdev_set_props, ARRAY_SIZE(zfs_keys_vdev_set_props));
+
 	/* IOCTLS that use the legacy function signature */
 
 	zfs_ioctl_register_legacy(ZFS_IOC_POOL_FREEZE, zfs_ioc_pool_freeze,
@@ -7318,16 +7443,11 @@ pool_status_check(const char *name, zfs_ioc_namecheck_t type,
 }
 
 int
-zfsdev_getminor(int fd, minor_t *minorp)
+zfsdev_getminor(zfs_file_t *fp, minor_t *minorp)
 {
 	zfsdev_state_t *zs, *fpd;
-	zfs_file_t *fp;
-	int rc;
 
 	ASSERT(!MUTEX_HELD(&zfsdev_state_lock));
-
-	if ((rc = zfs_file_get(fd, &fp)))
-		return (rc);
 
 	fpd = zfs_file_private(fp);
 	if (fpd == NULL)
@@ -7352,8 +7472,8 @@ zfsdev_getminor(int fd, minor_t *minorp)
 	return (SET_ERROR(EBADF));
 }
 
-static void *
-zfsdev_get_state_impl(minor_t minor, enum zfsdev_state_type which)
+void *
+zfsdev_get_state(minor_t minor, enum zfsdev_state_type which)
 {
 	zfsdev_state_t *zs;
 
@@ -7374,21 +7494,11 @@ zfsdev_get_state_impl(minor_t minor, enum zfsdev_state_type which)
 	return (NULL);
 }
 
-void *
-zfsdev_get_state(minor_t minor, enum zfsdev_state_type which)
-{
-	void *ptr;
-
-	ptr = zfsdev_get_state_impl(minor, which);
-
-	return (ptr);
-}
-
 /*
  * Find a free minor number.  The zfsdev_state_list is expected to
  * be short since it is only a list of currently open file handles.
  */
-minor_t
+static minor_t
 zfsdev_minor_alloc(void)
 {
 	static minor_t last_minor = 0;
@@ -7399,13 +7509,86 @@ zfsdev_minor_alloc(void)
 	for (m = last_minor + 1; m != last_minor; m++) {
 		if (m > ZFSDEV_MAX_MINOR)
 			m = 1;
-		if (zfsdev_get_state_impl(m, ZST_ALL) == NULL) {
+		if (zfsdev_get_state(m, ZST_ALL) == NULL) {
 			last_minor = m;
 			return (m);
 		}
 	}
 
 	return (0);
+}
+
+int
+zfsdev_state_init(void *priv)
+{
+	zfsdev_state_t *zs, *zsprev = NULL;
+	minor_t minor;
+	boolean_t newzs = B_FALSE;
+
+	ASSERT(MUTEX_HELD(&zfsdev_state_lock));
+
+	minor = zfsdev_minor_alloc();
+	if (minor == 0)
+		return (SET_ERROR(ENXIO));
+
+	for (zs = zfsdev_state_list; zs != NULL; zs = zs->zs_next) {
+		if (zs->zs_minor == -1)
+			break;
+		zsprev = zs;
+	}
+
+	if (!zs) {
+		zs = kmem_zalloc(sizeof (zfsdev_state_t), KM_SLEEP);
+		newzs = B_TRUE;
+	}
+
+	zfsdev_private_set_state(priv, zs);
+
+	zfs_onexit_init((zfs_onexit_t **)&zs->zs_onexit);
+	zfs_zevent_init((zfs_zevent_t **)&zs->zs_zevent);
+
+	/*
+	 * In order to provide for lock-free concurrent read access
+	 * to the minor list in zfsdev_get_state(), new entries
+	 * must be completely written before linking them into the
+	 * list whereas existing entries are already linked; the last
+	 * operation must be updating zs_minor (from -1 to the new
+	 * value).
+	 */
+	if (newzs) {
+		zs->zs_minor = minor;
+		membar_producer();
+		zsprev->zs_next = zs;
+	} else {
+		membar_producer();
+		zs->zs_minor = minor;
+	}
+
+	return (0);
+}
+
+void
+zfsdev_state_destroy(void *priv)
+{
+	zfsdev_state_t *zs = zfsdev_private_get_state(priv);
+
+	ASSERT(zs != NULL);
+	ASSERT3S(zs->zs_minor, >, 0);
+
+	/*
+	 * The last reference to this zfsdev file descriptor is being dropped.
+	 * We don't have to worry about lookup grabbing this state object, and
+	 * zfsdev_state_init() will not try to reuse this object until it is
+	 * invalidated by setting zs_minor to -1.  Invalidation must be done
+	 * last, with a memory barrier to ensure ordering.  This lets us avoid
+	 * taking the global zfsdev state lock around destruction.
+	 */
+	zfs_onexit_destroy(zs->zs_onexit);
+	zfs_zevent_destroy(zs->zs_zevent);
+	zs->zs_onexit = NULL;
+	zs->zs_zevent = NULL;
+	membar_producer();
+	zs->zs_minor = -1;
 }
 
 long

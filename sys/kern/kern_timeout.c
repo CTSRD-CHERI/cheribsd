@@ -52,14 +52,18 @@ __FBSDID("$FreeBSD$");
 #include <sys/interrupt.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
+#include <sys/kthread.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
+#include <sys/random.h>
+#include <sys/sched.h>
 #include <sys/sdt.h>
 #include <sys/sleepqueue.h>
 #include <sys/sysctl.h>
 #include <sys/smp.h>
+#include <sys/unistd.h>
 
 #ifdef DDB
 #include <ddb/ddb.h>
@@ -76,6 +80,8 @@ DPCPU_DECLARE(sbintime_t, hardclocktime);
 SDT_PROVIDER_DEFINE(callout_execute);
 SDT_PROBE_DEFINE1(callout_execute, , , callout__start, "struct callout *");
 SDT_PROBE_DEFINE1(callout_execute, , , callout__end, "struct callout *");
+
+static void	softclock_thread(void *arg);
 
 #ifdef CALLOUT_PROFILING
 static int avg_depth;
@@ -166,7 +172,7 @@ struct callout_cpu {
 	struct callout_tailq	cc_expireq;
 	sbintime_t		cc_firstevent;
 	sbintime_t		cc_lastscan;
-	void			*cc_cookie;
+	struct thread		*cc_thread;
 	u_int			cc_bucket;
 	u_int			cc_inited;
 #ifdef KTR
@@ -190,14 +196,14 @@ struct callout_cpu {
 #define	cc_migration_time(cc, dir)	cc->cc_exec_entity[dir].ce_migration_time
 #define	cc_migration_prec(cc, dir)	cc->cc_exec_entity[dir].ce_migration_prec
 
-struct callout_cpu cc_cpu[MAXCPU];
+static struct callout_cpu cc_cpu[MAXCPU];
 #define	CPUBLOCK	MAXCPU
 #define	CC_CPU(cpu)	(&cc_cpu[(cpu)])
 #define	CC_SELF()	CC_CPU(PCPU_GET(cpuid))
 #else
-struct callout_cpu cc_cpu;
-#define	CC_CPU(cpu)	&cc_cpu
-#define	CC_SELF()	&cc_cpu
+static struct callout_cpu cc_cpu;
+#define	CC_CPU(cpu)	(&cc_cpu)
+#define	CC_SELF()	(&cc_cpu)
 #endif
 #define	CC_LOCK(cc)	mtx_lock_spin(&(cc)->cc_lock)
 #define	CC_UNLOCK(cc)	mtx_unlock_spin(&(cc)->cc_lock)
@@ -222,7 +228,7 @@ static MALLOC_DEFINE(M_CALLOUT, "callout", "Callout datastructures");
  *                     relevant callout completes.
  *   cc_cancel       - Changing to 1 with both callout_lock and cc_lock held
  *                     guarantees that the current callout will not run.
- *                     The softclock() function sets this to 0 before it
+ *                     The softclock_call_cc() function sets this to 0 before it
  *                     drops callout_lock to acquire c_lock, and it calls
  *                     the handler only if curr_cancelled is still 0 after
  *                     cc_lock is successfully acquired.
@@ -316,7 +322,7 @@ callout_cpu_init(struct callout_cpu *cc, int cpu)
 {
 	int i;
 
-	mtx_init(&cc->cc_lock, "callout", NULL, MTX_SPIN | MTX_RECURSE);
+	mtx_init(&cc->cc_lock, "callout", NULL, MTX_SPIN);
 	cc->cc_inited = 1;
 	cc->cc_callwheel = malloc_domainset(sizeof(struct callout_list) *
 	    callwheelsize, M_CALLOUT,
@@ -369,28 +375,38 @@ callout_cpu_switch(struct callout *c, struct callout_cpu *cc, int new_cpu)
 static void
 start_softclock(void *dummy)
 {
+	struct proc *p;
+	struct thread *td;
 	struct callout_cpu *cc;
-	char name[MAXCOMLEN];
-	int cpu;
+	int cpu, error;
 	bool pin_swi;
-	struct intr_event *ie;
 
+	p = NULL;
 	CPU_FOREACH(cpu) {
 		cc = CC_CPU(cpu);
-		snprintf(name, sizeof(name), "clock (%d)", cpu);
-		ie = NULL;
-		if (swi_add(&ie, name, softclock, cc, SWI_CLOCK,
-		    INTR_MPSAFE, &cc->cc_cookie))
-			panic("died while creating standard software ithreads");
+		error = kproc_kthread_add(softclock_thread, cc, &p, &td,
+		    RFSTOPPED, 0, "clock", "clock (%d)", cpu);
+		if (error != 0)
+			panic("failed to create softclock thread for cpu %d: %d",
+			    cpu, error);
+		CC_LOCK(cc);
+		cc->cc_thread = td;
+		thread_lock(td);
+		sched_class(td, PRI_ITHD);
+		sched_prio(td, PI_SWI(SWI_CLOCK));
+		TD_SET_IWAIT(td);
+		thread_lock_set(td, (struct mtx *)&cc->cc_lock);
+		thread_unlock(td);
 		if (cpu == cc_default_cpu)
 			pin_swi = pin_default_swi;
 		else
 			pin_swi = pin_pcpu_swi;
-		if (pin_swi && (intr_event_bind(ie, cpu) != 0)) {
-			printf("%s: %s clock couldn't be pinned to cpu %d\n",
-			    __func__,
-			    cpu == cc_default_cpu ? "default" : "per-cpu",
-			    cpu);
+		if (pin_swi) {
+			error = cpuset_setithread(td->td_tid, cpu);
+			if (error != 0)
+				printf("%s: %s clock couldn't be pinned to cpu %d: %d\n",
+				    __func__, cpu == cc_default_cpu ?
+				    "default" : "per-cpu", cpu, error);
 		}
 	}
 }
@@ -415,11 +431,16 @@ callout_get_bucket(sbintime_t sbt)
 void
 callout_process(sbintime_t now)
 {
+	struct callout_entropy {
+		struct callout_cpu *cc;
+		struct thread *td;
+		sbintime_t now;
+	} entropy;
 	struct callout *tmp, *tmpn;
 	struct callout_cpu *cc;
 	struct callout_list *sc;
-	sbintime_t first, last, max, tmp_max;
-	uint32_t lookahead;
+	struct thread *td;
+	sbintime_t first, last, lookahead, max, tmp_max;
 	u_int firstb, lastb, nowb;
 #ifdef CALLOUT_PROFILING
 	int depth_dir = 0, mpcalls_dir = 0, lockcalls_dir = 0;
@@ -439,7 +460,7 @@ callout_process(sbintime_t now)
 	else if (nowb - firstb == 1)
 		lookahead = (SBT_1S / 8);
 	else
-		lookahead = (SBT_1S / 2);
+		lookahead = SBT_1S;
 	first = last = now;
 	first += (lookahead / 2);
 	last += lookahead;
@@ -529,13 +550,22 @@ next:
 	avg_mpcalls_dir += (mpcalls_dir * 1000 - avg_mpcalls_dir) >> 8;
 	avg_lockcalls_dir += (lockcalls_dir * 1000 - avg_lockcalls_dir) >> 8;
 #endif
-	mtx_unlock_spin_flags(&cc->cc_lock, MTX_QUIET);
-	/*
-	 * swi_sched acquires the thread lock, so we don't want to call it
-	 * with cc_lock held; incorrect locking order.
-	 */
-	if (!TAILQ_EMPTY(&cc->cc_expireq))
-		swi_sched(cc->cc_cookie, 0);
+	if (!TAILQ_EMPTY(&cc->cc_expireq)) {
+		entropy.cc = cc;
+		entropy.td = curthread;
+		entropy.now = now;
+		random_harvest_queue(&entropy, sizeof(entropy), RANDOM_CALLOUT);
+
+		td = cc->cc_thread;
+		if (TD_AWAITING_INTR(td)) {
+			thread_lock_block_wait(td);
+			THREAD_LOCK_ASSERT(td, MA_OWNED);
+			TD_CLR_IWAIT(td);
+			sched_add(td, SRQ_INTR);
+		} else
+			mtx_unlock_spin_flags(&cc->cc_lock, MTX_QUIET);
+	} else
+		mtx_unlock_spin_flags(&cc->cc_lock, MTX_QUIET);
 }
 
 static struct callout_cpu *
@@ -797,38 +827,57 @@ skip:
  */
 
 /*
- * Software (low priority) clock interrupt.
+ * Software (low priority) clock interrupt thread handler.
  * Run periodic events from timeout queue.
  */
-void
-softclock(void *arg)
+static void
+softclock_thread(void *arg)
 {
+	struct thread *td = curthread;
 	struct callout_cpu *cc;
 	struct callout *c;
 #ifdef CALLOUT_PROFILING
-	int depth = 0, gcalls = 0, lockcalls = 0, mpcalls = 0;
+	int depth, gcalls, lockcalls, mpcalls;
 #endif
 
 	cc = (struct callout_cpu *)arg;
 	CC_LOCK(cc);
-	while ((c = TAILQ_FIRST(&cc->cc_expireq)) != NULL) {
-		TAILQ_REMOVE(&cc->cc_expireq, c, c_links.tqe);
-		softclock_call_cc(c, cc,
+	for (;;) {
+		while (TAILQ_EMPTY(&cc->cc_expireq)) {
+			/*
+			 * Use CC_LOCK(cc) as the thread_lock while
+			 * idle.
+			 */
+			thread_lock(td);
+			thread_lock_set(td, (struct mtx *)&cc->cc_lock);
+			TD_SET_IWAIT(td);
+			mi_switch(SW_VOL | SWT_IWAIT);
+
+			/* mi_switch() drops thread_lock(). */
+			CC_LOCK(cc);
+		}
+
 #ifdef CALLOUT_PROFILING
-		    &mpcalls, &lockcalls, &gcalls,
+		depth = gcalls = lockcalls = mpcalls = 0;
 #endif
-		    0);
+		while ((c = TAILQ_FIRST(&cc->cc_expireq)) != NULL) {
+			TAILQ_REMOVE(&cc->cc_expireq, c, c_links.tqe);
+			softclock_call_cc(c, cc,
 #ifdef CALLOUT_PROFILING
-		++depth;
+			    &mpcalls, &lockcalls, &gcalls,
+#endif
+			    0);
+#ifdef CALLOUT_PROFILING
+			++depth;
+#endif
+		}
+#ifdef CALLOUT_PROFILING
+		avg_depth += (depth * 1000 - avg_depth) >> 8;
+		avg_mpcalls += (mpcalls * 1000 - avg_mpcalls) >> 8;
+		avg_lockcalls += (lockcalls * 1000 - avg_lockcalls) >> 8;
+		avg_gcalls += (gcalls * 1000 - avg_gcalls) >> 8;
 #endif
 	}
-#ifdef CALLOUT_PROFILING
-	avg_depth += (depth * 1000 - avg_depth) >> 8;
-	avg_mpcalls += (mpcalls * 1000 - avg_mpcalls) >> 8;
-	avg_lockcalls += (lockcalls * 1000 - avg_lockcalls) >> 8;
-	avg_gcalls += (gcalls * 1000 - avg_gcalls) >> 8;
-#endif
-	CC_UNLOCK(cc);
 }
 
 void
@@ -919,8 +968,9 @@ callout_reset_sbt_on(struct callout *c, sbintime_t sbt, sbintime_t prec,
 	} else {
 		direct = 0;
 	}
-	KASSERT(!direct || c->c_lock == NULL,
-	    ("%s: direct callout %p has lock", __func__, c));
+	KASSERT(!direct || c->c_lock == NULL ||
+	    (LOCK_CLASS(c->c_lock)->lc_flags & LC_SPINLOCK),
+	    ("%s: direct callout %p has non-spin lock", __func__, c));
 	cc = callout_lock(c);
 	/*
 	 * Don't allow migration if the user does not care.
@@ -1332,9 +1382,8 @@ _callout_init_lock(struct callout *c, struct lock_object *lock, int flags)
 	    ("callout_init_lock: bad flags %d", flags));
 	KASSERT(lock != NULL || (flags & CALLOUT_RETURNUNLOCKED) == 0,
 	    ("callout_init_lock: CALLOUT_RETURNUNLOCKED with no lock"));
-	KASSERT(lock == NULL || !(LOCK_CLASS(lock)->lc_flags &
-	    (LC_SPINLOCK | LC_SLEEPABLE)), ("%s: invalid lock class",
-	    __func__));
+	KASSERT(lock == NULL || !(LOCK_CLASS(lock)->lc_flags & LC_SLEEPABLE),
+	    ("%s: callout %p has sleepable lock", __func__, c));
 	c->c_iflags = flags & (CALLOUT_RETURNUNLOCKED | CALLOUT_SHAREDLOCK);
 	c->c_cpu = cc_default_cpu;
 }

@@ -214,8 +214,6 @@ static int hptiop_ioctl(ioctl_dev_t dev, u_long cmd, caddr_t data,
 	int ret = EFAULT;
 	struct hpt_iop_hba *hba = hba_from_dev(dev);
 
-	mtx_lock(&Giant);
-
 	switch (cmd) {
 	case HPT_DO_IOCONTROL:
 		ret = hba->ops->do_ioctl(hba,
@@ -225,9 +223,6 @@ static int hptiop_ioctl(ioctl_dev_t dev, u_long cmd, caddr_t data,
 		ret = hptiop_rescan_bus(hba);
 		break;
 	}
-
-	mtx_unlock(&Giant);
-
 	return ret;
 }
 
@@ -473,10 +468,6 @@ static void hptiop_drain_outbound_queue_itl(struct hpt_iop_hba *hba)
 		if (req & IOPMU_QUEUE_MASK_HOST_BITS)
 			hptiop_request_callback_itl(hba, req);
 		else {
-			struct hpt_iop_request_header *p;
-
-			p = (struct hpt_iop_request_header *)
-				((char *)hba->u.itl.mu + req);
 			temp = bus_space_read_4(hba->bar0t,
 					hba->bar0h,req +
 					offsetof(struct hpt_iop_request_header,
@@ -2046,6 +2037,7 @@ static int hptiop_attach(device_t dev)
 		goto free_hba_path;
 	}
 
+	memset(&ccb, 0, sizeof(ccb));
 	xpt_setup_ccb(&ccb.ccb_h, hba->path, /*priority*/5);
 	ccb.ccb_h.func_code = XPT_SASYNC_CB;
 	ccb.event_enable = (AC_FOUND_DEVICE | AC_LOST_DEVICE);
@@ -2797,6 +2789,7 @@ static void hptiop_release_resource(struct hpt_iop_hba *hba)
 	if (hba->path) {
 		struct ccb_setasync ccb;
 
+		memset(&ccb, 0, sizeof(ccb));
 		xpt_setup_ccb(&ccb.ccb_h, hba->path, /*priority*/5);
 		ccb.ccb_h.func_code = XPT_SASYNC_CB;
 		ccb.event_enable = 0;

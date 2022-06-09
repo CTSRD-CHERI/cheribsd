@@ -94,6 +94,7 @@ struct md_ioctl {
 #define MD_ASYNC	0x40	/* Asynchronous mode */
 #define MD_VERIFY	0x80	/* Open file with O_VERIFY (vnode only) */
 #define	MD_CACHE	0x100	/* Cache vnode data */
+#define	MD_MUSTDEALLOC	0x200	/* BIO_DELETE only if dealloc is available */
 
 #ifdef _KERNEL
 struct md_req {

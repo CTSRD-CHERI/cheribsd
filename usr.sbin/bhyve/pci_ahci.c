@@ -1937,7 +1937,7 @@ ata_ioreq_cb(struct blockif_req *br, int err)
 	if (!err && aior->more) {
 		if (dsm)
 			ahci_handle_dsm_trim(p, slot, cfis, aior->done);
-		else 
+		else
 			ahci_handle_rw(p, slot, cfis, aior->done);
 		goto out;
 	}
@@ -2440,7 +2440,7 @@ pci_ahci_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	slots = 32;
 
 	ports_nvl = find_relative_config_node(nvl, "port");
-	for (p = 0; p < MAX_PORTS; p++) {
+	for (p = 0; ports_nvl != NULL && p < MAX_PORTS; p++) {
 		struct ata_params *ata_ident = &sc->port[p].ata_ident;
 		char ident[AHCI_PORT_IDENT];
 
@@ -2470,7 +2470,7 @@ pci_ahci_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 			sc->ports = p;
 			ret = 1;
 			goto open_fail;
-		}	
+		}
 		sc->port[p].bctx = bctxt;
 		sc->port[p].pr_sc = sc;
 		sc->port[p].port = p;

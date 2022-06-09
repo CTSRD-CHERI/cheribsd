@@ -168,14 +168,13 @@ init_toepcb(struct vi_info *vi, struct toepcb *toep)
 	struct adapter *sc = pi->adapter;
 	struct tx_cl_rl_params *tc;
 
-	if (cp->tc_idx >= 0 && cp->tc_idx < sc->chip_params->nsched_cls) {
+	if (cp->tc_idx >= 0 && cp->tc_idx < sc->params.nsched_cls) {
 		tc = &pi->sched_params->cl_rl[cp->tc_idx];
 		mtx_lock(&sc->tc_lock);
-		if (tc->flags & CLRL_ERR) {
-			log(LOG_ERR,
-			    "%s: failed to associate traffic class %u with tid %u\n",
-			    device_get_nameunit(vi->dev), cp->tc_idx,
-			    toep->tid);
+		if (tc->state != CS_HW_CONFIGURED) {
+			CH_ERR(vi, "tid %d cannot be bound to traffic class %d "
+			    "because it is not configured (its state is %d)\n",
+			    toep->tid, cp->tc_idx, tc->state);
 			cp->tc_idx = -1;
 		} else {
 			tc->refcount++;
@@ -348,7 +347,7 @@ release_offload_resources(struct toepcb *toep)
 	}
 
 	if (toep->ce)
-		t4_release_lip(sc, toep->ce);
+		t4_release_clip_entry(sc, toep->ce);
 
 	if (toep->params.tc_idx != -1)
 		t4_release_cl_rl(sc, toep->vi->pi->port_id, toep->params.tc_idx);
@@ -1009,6 +1008,7 @@ void
 final_cpl_received(struct toepcb *toep)
 {
 	struct inpcb *inp = toep->inp;
+	bool need_wakeup;
 
 	KASSERT(inp != NULL, ("%s: inp is NULL", __func__));
 	INP_WLOCK_ASSERT(inp);
@@ -1023,7 +1023,9 @@ final_cpl_received(struct toepcb *toep)
 	else if (ulp_mode(toep) == ULP_MODE_TLS)
 		tls_detach(toep);
 	toep->inp = NULL;
-	toep->flags &= ~TPF_CPL_PENDING;
+	need_wakeup = (toep->flags & TPF_WAITING_FOR_FINAL) != 0;
+	toep->flags &= ~(TPF_CPL_PENDING | TPF_WAITING_FOR_FINAL);
+	mbufq_drain(&toep->ulp_pduq);
 	mbufq_drain(&toep->ulp_pdu_reclaimq);
 
 	if (!(toep->flags & TPF_ATTACHED))
@@ -1031,6 +1033,14 @@ final_cpl_received(struct toepcb *toep)
 
 	if (!in_pcbrele_wlocked(inp))
 		INP_WUNLOCK(inp);
+
+	if (need_wakeup) {
+		struct mtx *lock = mtx_pool_find(mtxpool_sleep, toep);
+
+		mtx_lock(lock);
+		wakeup(toep);
+		mtx_unlock(lock);
+	}
 }
 
 void
@@ -1313,11 +1323,10 @@ init_conn_params(struct vi_info *vi , struct offload_settings *s,
 	}
 
 	/* Tx traffic scheduling class. */
-	if (s->sched_class >= 0 &&
-	    s->sched_class < sc->chip_params->nsched_cls) {
-	    cp->tc_idx = s->sched_class;
-	} else
-	    cp->tc_idx = -1;
+	if (s->sched_class >= 0 && s->sched_class < sc->params.nsched_cls)
+		cp->tc_idx = s->sched_class;
+	else
+		cp->tc_idx = -1;
 
 	/* Nagle's algorithm. */
 	if (s->nagle >= 0)
@@ -1980,6 +1989,13 @@ t4_aio_queue_tom(struct socket *so, struct kaiocb *job)
 	struct toepcb *toep = tp->t_toe;
 	int error;
 
+	/*
+	 * No lock is needed as TOE sockets never change between
+	 * active and passive.
+	 */
+	if (SOLISTENING(so))
+		return (EINVAL);
+
 	if (ulp_mode(toep) == ULP_MODE_TCPDDP) {
 		error = t4_aio_queue_ddp(so, job);
 		if (error != EOPNOTSUPP)
@@ -1987,24 +2003,6 @@ t4_aio_queue_tom(struct socket *so, struct kaiocb *job)
 	}
 
 	return (t4_aio_queue_aiotx(so, job));
-}
-
-static int
-t4_ctloutput_tom(struct socket *so, struct sockopt *sopt)
-{
-
-	if (sopt->sopt_level != IPPROTO_TCP)
-		return (tcp_ctloutput(so, sopt));
-
-	switch (sopt->sopt_name) {
-	case TCP_TLSOM_SET_TLS_CONTEXT:
-	case TCP_TLSOM_GET_TLS_TOM:
-	case TCP_TLSOM_CLR_TLS_TOM:
-	case TCP_TLSOM_CLR_QUIES:
-		return (t4_ctloutput_tls(so, sopt));
-	default:
-		return (tcp_ctloutput(so, sopt));
-	}
 }
 
 static int
@@ -2027,7 +2025,6 @@ t4_tom_mod_load(void)
 	bcopy(tcp_protosw, &toe_protosw, sizeof(toe_protosw));
 	bcopy(tcp_protosw->pr_usrreqs, &toe_usrreqs, sizeof(toe_usrreqs));
 	toe_usrreqs.pru_aio_queue = t4_aio_queue_tom;
-	toe_protosw.pr_ctloutput = t4_ctloutput_tom;
 	toe_protosw.pr_usrreqs = &toe_usrreqs;
 
 	tcp6_protosw = pffindproto(PF_INET6, IPPROTO_TCP, SOCK_STREAM);
@@ -2036,7 +2033,6 @@ t4_tom_mod_load(void)
 	bcopy(tcp6_protosw, &toe6_protosw, sizeof(toe6_protosw));
 	bcopy(tcp6_protosw->pr_usrreqs, &toe6_usrreqs, sizeof(toe6_usrreqs));
 	toe6_usrreqs.pru_aio_queue = t4_aio_queue_tom;
-	toe6_protosw.pr_ctloutput = t4_ctloutput_tom;
 	toe6_protosw.pr_usrreqs = &toe6_usrreqs;
 
 	return (t4_register_uld(&tom_uld_info));

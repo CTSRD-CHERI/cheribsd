@@ -272,10 +272,22 @@ struct ktr_struct_array {
 #define	KTRFAC_DROP	0x20000000	/* last event was dropped */
 
 #ifdef	_KERNEL
+struct ktr_io_params;
 struct uio;
 struct vnode;
 
-void	ktrnamei(char *);
+#ifdef	KTRACE
+struct vnode *ktr_get_tracevp(struct proc *, bool);
+#else
+static inline struct vnode *
+ktr_get_tracevp(struct proc *p, bool ref)
+{
+
+	return (NULL);
+}
+#endif
+void	ktr_io_params_free(struct ktr_io_params *);
+void	ktrnamei(const char *);
 void	ktrcsw(int, int, const char *);
 void	ktrpsig(int, sig_t, sigset_t *, int);
 void	ktrfault(vm_offset_t, int);
@@ -285,7 +297,7 @@ void	ktrsyscall(int, int narg, syscallarg_t args[]);
 void	ktrsysctl(int *name, u_int namelen);
 void	ktrsysret(int, int, register_t);
 void	ktrprocctor(struct proc *);
-void	ktrprocexec(struct proc *, struct ucred **, struct vnode **);
+struct ktr_io_params *ktrprocexec(struct proc *);
 void	ktrprocexit(struct thread *);
 void	ktrprocfork(struct proc *, struct proc *);
 void	ktruserret(struct thread *);
@@ -307,6 +319,12 @@ void	ktrsyserrcause(const char *format, ...) __printflike(1, 2);
 
 #define ktrstat_error(s, error) \
 	ktrstruct_error("stat", (s), sizeof(struct stat), error)
+extern u_int ktr_geniosize;
+#ifdef	KTRACE
+extern int ktr_filesize_limit_signal;
+#else
+#define	ktr_filesize_limit_signal 0
+#endif
 
 #ifdef KTRACE
 #define SYSERRCAUSE(fmt, ...) \

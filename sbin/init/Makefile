@@ -13,15 +13,7 @@ CFLAGS+=-I${SRCTOP}/contrib/uthash/src
 LIBADD=	util crypt
 
 CONFTTYSNAME=	ttys
-.if exists(${.CURDIR}/ttys.${MACHINE})
-CONFTTYS+=	ttys.${MACHINE}
-.elif exists(${.CURDIR}/ttys.${MACHINE_ARCH})
-CONFTTYS+=	ttys.${MACHINE_ARCH}
-.elif exists(${.CURDIR}/ttys.${MACHINE_CPUARCH})
-CONFTTYS+=	ttys.${MACHINE_CPUARCH}
-.else
-.error MACHINE.ttys missing
-.endif
+CONFTTYS+=	ttys
 
 # Needed for getmntopts.c
 MOUNT=	${SRCTOP}/sbin/mount

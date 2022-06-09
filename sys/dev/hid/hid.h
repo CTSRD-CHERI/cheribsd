@@ -185,6 +185,7 @@
 #define	HUM_CENTIMETER	0x11
 #define	HUM_RADIAN	0x12
 #define	HUM_INCH	0x13
+#define	HUM_INCH_EGALAX	0x33
 #define	HUM_DEGREE	0x14
 
 #if defined(_KERNEL) || defined(_STANDALONE)
@@ -343,5 +344,6 @@ int	hid_get_report(device_t, void *, hid_size_t, hid_size_t *, uint8_t,
 int	hid_set_report(device_t, const void *, hid_size_t, uint8_t, uint8_t);
 int	hid_set_idle(device_t, uint16_t, uint8_t);
 int	hid_set_protocol(device_t, uint16_t);
+int	hid_ioctl(device_t, unsigned long, uintptr_t);
 #endif	/* _KERNEL || _STANDALONE */
 #endif	/* _HID_HID_H_ */

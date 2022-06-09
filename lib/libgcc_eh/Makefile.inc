@@ -20,13 +20,20 @@ SRCS_EXC+=	libunwind.cpp
 SRCS+=		${SRCS_EXC}
 .for file in ${SRCS_EXC:M*.c}
 CFLAGS.${file}+=	-fno-exceptions -funwind-tables
+.if ${MK_ASAN} != "no"
+# False-positives during stack unwinding
+CFLAGS.${file}+=	-fno-sanitize=address
+.endif
 .endfor
 .for file in ${SRCS_EXC:M*.cpp}
 CXXFLAGS.${file}+=	-fno-exceptions -funwind-tables
+.if ${MK_ASAN} != "no"
+# False-positives during stack unwinding
+CXXFLAGS.${file}+=	-fno-sanitize=address
+.endif
 .endfor
 
 CFLAGS+=	-I${UNWINDINCDIR}
-CFLAGS+=	-I${.CURDIR}
 CFLAGS+=	-D_LIBUNWIND_IS_NATIVE_ONLY
 CFLAGS+=	-D_LIBUNWIND_USE_FRAME_HEADER_CACHE
 CXXFLAGS+=	-fno-rtti

@@ -11,3 +11,6 @@
 20201117  # OpenZFS import
 # https://github.com/CTSRD-CHERI/cheribsd/commit/97059f6a18084befde0d486914d337a0c927e967
 20210910  # libcheri -> lib64c rename
+# https://github.com/CTSRD-CHERI/cheribsd/commit/fbbed9d1eb296c1a38c8be1f627aede717da6dfe
+# https://github.com/CTSRD-CHERI/cheribsd/commit/6d95323f57bc4def4fadc889e766a0c08ffe5994
+20220512  # TLS and varargs ABI changes on Morello

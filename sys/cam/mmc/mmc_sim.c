@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2020 Emmanuel Vadot <manu@FreeBSD.org>
+ * Copyright (c) 2020-2021 Emmanuel Vadot <manu@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -46,9 +46,49 @@ __FBSDID("$FreeBSD$");
 static void
 mmc_cam_default_poll(struct cam_sim *sim)
 {
+	struct mmc_sim *mmc_sim;
 
-	return;
+	mmc_sim = cam_sim_softc(sim);
+	MMC_SIM_CAM_POLL(mmc_sim->dev);
 }
+
+static void
+mmc_sim_task(void *arg, int pending)
+{
+	struct mmc_sim *mmc_sim;
+	struct ccb_trans_settings *cts;
+	int rv;
+
+	mmc_sim = arg;
+
+	if (mmc_sim->ccb == NULL)
+		return;
+
+	cts = &mmc_sim->ccb->cts;
+	switch (mmc_sim->ccb->ccb_h.func_code) {
+	case XPT_MMC_GET_TRAN_SETTINGS:
+		rv = MMC_SIM_GET_TRAN_SETTINGS(mmc_sim->dev, &cts->proto_specific.mmc);
+		if (rv != 0)
+			mmc_sim->ccb->ccb_h.status = CAM_REQ_INVALID;
+		else
+			mmc_sim->ccb->ccb_h.status = CAM_REQ_CMP;
+		break;
+	case XPT_MMC_SET_TRAN_SETTINGS:
+		rv = MMC_SIM_SET_TRAN_SETTINGS(mmc_sim->dev, &cts->proto_specific.mmc);
+		if (rv != 0)
+			mmc_sim->ccb->ccb_h.status = CAM_REQ_INVALID;
+		else
+			mmc_sim->ccb->ccb_h.status = CAM_REQ_CMP;
+		break;
+	default:
+		panic("Unsupported ccb func %x\n", mmc_sim->ccb->ccb_h.func_code);
+		break;
+	}
+
+	xpt_done(mmc_sim->ccb);
+	mmc_sim->ccb = NULL;
+}
+
 
 static void
 mmc_cam_sim_default_action(struct cam_sim *sim, union ccb *ccb)
@@ -59,13 +99,13 @@ mmc_cam_sim_default_action(struct cam_sim *sim, union ccb *ccb)
 
 	mmc_sim = cam_sim_softc(sim);
 
-	if (mmc_sim == NULL) {
-		ccb->ccb_h.status = CAM_SEL_TIMEOUT;
+	mtx_assert(&mmc_sim->mtx, MA_OWNED);
+
+	if (mmc_sim->ccb != NULL) {
+		ccb->ccb_h.status = CAM_BUSY;
 		xpt_done(ccb);
 		return;
 	}
-
-	mtx_assert(&mmc_sim->mtx, MA_OWNED);
 
 	switch (ccb->ccb_h.func_code) {
 	case XPT_PATH_INQ:
@@ -94,6 +134,15 @@ mmc_cam_sim_default_action(struct cam_sim *sim, union ccb *ccb)
 		}
 		break;
 	}
+	case XPT_MMC_GET_TRAN_SETTINGS:
+	{
+		ccb->ccb_h.status = CAM_SIM_QUEUED;
+		mmc_sim->ccb = ccb;
+		taskqueue_enqueue(taskqueue_thread, &mmc_sim->sim_task);
+		return;
+		/* NOTREACHED */
+		break;
+	}
 	case XPT_SET_TRAN_SETTINGS:
 	{
 		struct ccb_trans_settings *cts = &ccb->cts;
@@ -105,6 +154,15 @@ mmc_cam_sim_default_action(struct cam_sim *sim, union ccb *ccb)
 			ccb->ccb_h.status = CAM_REQ_CMP;
 		break;
 	}
+	case XPT_MMC_SET_TRAN_SETTINGS:
+	{
+		ccb->ccb_h.status = CAM_SIM_QUEUED;
+		mmc_sim->ccb = ccb;
+		taskqueue_enqueue(taskqueue_thread, &mmc_sim->sim_task);
+		return;
+		/* NOTREACHED */
+		break;
+	}
 	case XPT_RESET_BUS:
 		ccb->ccb_h.status = CAM_REQ_CMP;
 		break;
@@ -112,9 +170,7 @@ mmc_cam_sim_default_action(struct cam_sim *sim, union ccb *ccb)
 	{
 		rv = MMC_SIM_CAM_REQUEST(mmc_sim->dev, ccb);
 		if (rv != 0)
-			ccb->ccb_h.status = CAM_REQ_INPROG;
-		else
-			ccb->ccb_h.status = CAM_REQ_INVALID;
+			ccb->ccb_h.status = CAM_SIM_QUEUED;
 		return;
 		/* NOTREACHED */
 		break;
@@ -130,7 +186,8 @@ mmc_cam_sim_default_action(struct cam_sim *sim, union ccb *ccb)
 int
 mmc_cam_sim_alloc(device_t dev, const char *name, struct mmc_sim *mmc_sim)
 {
-	char sim_name[64], mtx_name[64];
+	kobjop_desc_t kobj_desc;
+	kobj_method_t *kobj_method;
 
 	mmc_sim->dev = dev;
 
@@ -138,13 +195,16 @@ mmc_cam_sim_alloc(device_t dev, const char *name, struct mmc_sim *mmc_sim)
 		goto fail;
 	}
 
-	snprintf(sim_name, sizeof(sim_name), "%s_sim", name);
-	snprintf(mtx_name, sizeof(mtx_name), "%s_mtx", name);
+	snprintf(mmc_sim->name, sizeof(mmc_sim->name), "%s_sim", name);
+	mtx_init(&mmc_sim->mtx, mmc_sim->name, NULL, MTX_DEF);
 
-	mtx_init(&mmc_sim->mtx, sim_name, NULL, MTX_DEF);
-	mmc_sim->sim = cam_sim_alloc_dev(mmc_cam_sim_default_action,
-	    mmc_cam_default_poll,
-	    name, mmc_sim, dev,
+	/* Provide sim_poll hook only if the device has the poll method. */
+	kobj_desc = &mmc_sim_cam_poll_desc;
+	kobj_method = kobj_lookup_method(((kobj_t)dev)->ops->cls, NULL,
+	    kobj_desc);
+	mmc_sim->sim = cam_sim_alloc(mmc_cam_sim_default_action,
+	    kobj_method == &kobj_desc->deflt ? NULL : mmc_cam_default_poll,
+	    mmc_sim->name, mmc_sim, device_get_unit(dev),
 	    &mmc_sim->mtx, 1, 1, mmc_sim->devq);
 
 	if (mmc_sim->sim == NULL) {
@@ -163,6 +223,7 @@ mmc_cam_sim_alloc(device_t dev, const char *name, struct mmc_sim *mmc_sim)
 	}
 
 	mtx_unlock(&mmc_sim->mtx);
+	TASK_INIT(&mmc_sim->sim_task, 0, mmc_sim_task, mmc_sim);
 
 	return (0);
 

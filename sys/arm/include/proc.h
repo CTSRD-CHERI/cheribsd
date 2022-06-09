@@ -40,13 +40,6 @@
 #ifndef	_MACHINE_PROC_H_
 #define	_MACHINE_PROC_H_
 
-#include <machine/utrap.h>
-
-struct md_utrap {
-	utrap_entry_t *ut_precise[UT_MAX];	/* must be first */
-	int	ut_refcnt;
-};
-
 struct mdthread {
 	int	md_spinlock_count;	/* (k) */
 	register_t md_saved_cspr;	/* (k) */
@@ -58,25 +51,20 @@ struct mdthread {
 };
 
 struct mdproc {
-	struct	md_utrap *md_utrap;
-	void	*md_sigtramp;
+	long	md_dummy;
 };
 
 #define	KINFO_PROC_SIZE 816
 
-#define MAXARGS	8
-/*
- * This holds the syscall state for a single system call.
- * As some syscall arguments may be 64-bit aligned we need to ensure the
- * args value is 64-bit aligned. The ABI will then ensure any 64-bit
- * arguments are already correctly aligned, even if they were passed in
- * via registers, we just need to make sure we copy them to an aligned
- * buffer.
- */
-struct syscall_args {
-	u_int code;
-	struct sysent *callp;
-	register_t args[MAXARGS];
-} __aligned(8);
+#ifdef _KERNEL
+#include <machine/pcb.h>
 
+/* Get the current kernel thread stack usage. */
+#define	GET_STACK_USAGE(total, used) do {				\
+	struct thread *td = curthread;					\
+	(total) = td->td_kstack_pages * PAGE_SIZE - sizeof(struct pcb);	\
+	(used) = td->td_kstack + (total) - (vm_offset_t)&td;		\
+} while (0)
+
+#endif  /* _KERNEL */
 #endif /* !_MACHINE_PROC_H_ */

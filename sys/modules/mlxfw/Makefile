@@ -10,8 +10,11 @@ SRCS+=	${LINUXKPI_GENSRCS}
 
 CFLAGS+= \
 	-I${SRCTOP}/sys/ofed/include \
+	-I${SRCTOP}/sys/ofed/include/uapi \
 	-I${SRCTOP}/sys/compat/linuxkpi/common/include \
 	-I${SRCTOP}/sys/contrib/xz-embedded/freebsd \
 	-I${SRCTOP}/sys/contrib/xz-embedded/linux/lib/xz
+
+EXPORT_SYMS=	YES
 
 .include <bsd.kmod.mk>

@@ -75,6 +75,7 @@ struct mdthread {
 	int	md_efirt_dis_pf;	/* (k) */
 	struct pcb md_pcb;
 	vm_offset_t md_stack_base;
+	void *md_usr_fpu_save;
 };
 
 struct mdproc {
@@ -89,12 +90,6 @@ struct mdproc {
 
 #define	KINFO_PROC_SIZE 1088
 #define	KINFO_PROC32_SIZE 768
-
-struct syscall_args {
-	u_int code;
-	struct sysent *callp;
-	register_t args[8];
-};
 
 #ifdef	_KERNEL
 

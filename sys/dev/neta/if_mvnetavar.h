@@ -258,6 +258,8 @@ struct mvneta_softc {
 	struct mtx	mtx;
 	struct resource *res[2];
 	void            *ih_cookie[1];
+	
+	uint64_t	clk_freq;
 
 	struct ifnet	*ifp;
 	uint32_t        mvneta_if_flags;
@@ -321,6 +323,7 @@ struct mvneta_softc {
 int mvneta_attach(device_t);
 
 #ifdef FDT
+boolean_t mvneta_has_switch_fdt(device_t);
 int mvneta_fdt_mac_address(struct mvneta_softc *, uint8_t *);
 #endif
 

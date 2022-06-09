@@ -33,7 +33,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/exec.h>
 #include <sys/sysctl.h>
+#include <sys/user.h>
+
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -54,35 +57,47 @@ copyin_checker(uintptr_t uaddr, size_t len)
 	return (ret == -1 ? errno : 0);
 }
 
+#if __SIZEOF_POINTER__ == 8
+/*
+ * A slightly more direct path to calling copyin(), but without the ability
+ * to specify a length.
+ */
+static int
+copyin_checker2(uintptr_t uaddr)
+{
+	int ret;
+
+	ret = fcntl(scratch_file, F_GETLK, (const void *)uaddr);
+	return (ret == -1 ? errno : 0);
+}
+#endif
+
 #ifdef __amd64__
 static uintptr_t
 get_maxuser_address(void)
 {
+	struct kinfo_vm_layout kvm;
 	size_t len;
-	uintptr_t psstrings;
 	int error, mib[4];
 
 	mib[0] = CTL_KERN;
 	mib[1] = KERN_PROC;
-	mib[2] = KERN_PROC_PS_STRINGS;
+	mib[2] = KERN_PROC_VM_LAYOUT;
 	mib[3] = getpid();
-	len = sizeof(psstrings);
-	error = sysctl(mib, nitems(mib), &psstrings, &len, NULL, 0);
+	len = sizeof(kvm);
+	error = sysctl(mib, nitems(mib), &kvm, &len, NULL, 0);
 	if (error != 0)
 		return (0);
 
-	if (psstrings == PS_STRINGS_LA57)
-		return (VM_MAXUSER_ADDRESS_LA57);
-	if (psstrings == PS_STRINGS_LA48)
-		return (VM_MAXUSER_ADDRESS_LA48);
-	/* AMD LA48 with clipped UVA */
-	if (psstrings == PS_STRINGS_LA48 - PAGE_SIZE)
-		return (VM_MAXUSER_ADDRESS_LA48 - PAGE_SIZE);
-	return (0);
+	return (kvm.kvm_max_user_addr);
 }
 #endif
 
 #define	FMAX	ULONG_MAX
+#if __SIZEOF_POINTER__ == 8
+/* PR 257193 */
+#define	ADDR_SIGNED	0x800000c000000000
+#endif
 
 ATF_TC_WITHOUT_HEAD(kern_copyin);
 ATF_TC_BODY(kern_copyin, tc)
@@ -122,6 +137,10 @@ ATF_TC_BODY(kern_copyin, tc)
 	ATF_CHECK(copyin_checker(FMAX - 10, 9) == EFAULT);
 	ATF_CHECK(copyin_checker(FMAX - 10, 10) == EFAULT);
 	ATF_CHECK(copyin_checker(FMAX - 10, 11) == EFAULT);
+#if __SIZEOF_POINTER__ == 8
+	ATF_CHECK(copyin_checker(ADDR_SIGNED, 1) == EFAULT);
+	ATF_CHECK(copyin_checker2(ADDR_SIGNED) == EFAULT);
+#endif
 }
 
 ATF_TP_ADD_TCS(tp)

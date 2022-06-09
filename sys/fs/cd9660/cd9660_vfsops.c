@@ -159,8 +159,7 @@ cd9660_mount(struct mount *mp)
 	 * Not an update, or updating the name: look up the name
 	 * and verify that it refers to a sensible block device.
 	 */
-	NDINIT(&ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, PTR2CAP(fspec),
-	    td);
+	NDINIT(&ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, PTR2CAP(fspec));
 	if ((error = namei(&ndp)))
 		return (error);
 	NDFREE(&ndp, NDF_ONLY_PNBUF);
@@ -379,7 +378,6 @@ iso_mountfs(devvp, mp)
 	mp->mnt_data = isomp;
 	mp->mnt_stat.f_fsid.val[0] = dev2udev(dev);
 	mp->mnt_stat.f_fsid.val[1] = mp->mnt_vfc->vfc_typenum;
-	mp->mnt_maxsymlinklen = 0;
 	MNT_ILOCK(mp);
 	if (isverified)
 		mp->mnt_flag |= MNT_VERIFIED;

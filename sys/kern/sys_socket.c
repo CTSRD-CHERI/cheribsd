@@ -206,12 +206,13 @@ soo_ioctl(struct file *fp, u_long cmd, void *data, struct ucred *active_cred,
 		break;
 
 	case FIONREAD:
-		/* Unlocked read. */
+		SOCK_RECVBUF_LOCK(so);
 		if (SOLISTENING(so)) {
 			error = EINVAL;
 		} else {
-			*(int *)data = sbavail(&so->so_rcv);
+			*(int *)data = sbavail(&so->so_rcv) - so->so_rcv.sb_ctl;
 		}
+		SOCK_RECVBUF_UNLOCK(so);
 		break;
 
 	case FIONWRITE:
@@ -300,8 +301,7 @@ soo_poll(struct file *fp, int events, struct ucred *active_cred,
 }
 
 static int
-soo_stat(struct file *fp, struct stat *ub, struct ucred *active_cred,
-    struct thread *td)
+soo_stat(struct file *fp, struct stat *ub, struct ucred *active_cred)
 {
 	struct socket *so = fp->f_data;
 	int error;
@@ -583,8 +583,6 @@ soaio_init(void)
 	mtx_init(&soaio_jobs_lock, "soaio jobs", NULL, MTX_DEF);
 	soaio_kproc_unr = new_unrhdr(1, INT_MAX, NULL);
 	TASK_INIT(&soaio_kproc_task, 0, soaio_kproc_create, NULL);
-	if (soaio_target_procs > 0)
-		taskqueue_enqueue(taskqueue_thread, &soaio_kproc_task);
 }
 SYSINIT(soaio, SI_SUB_VFS, SI_ORDER_ANY, soaio_init, NULL);
 
@@ -600,7 +598,7 @@ soaio_process_job(struct socket *so, struct sockbuf *sb, struct kaiocb *job)
 	struct ucred *td_savedcred;
 	struct thread *td;
 	struct file *fp;
-	size_t cnt, done, job_total_nbytes;
+	size_t cnt, done, job_total_nbytes __diagused;
 	long ru_before;
 	int error, flags;
 
@@ -729,7 +727,6 @@ soaio_process_sb(struct socket *so, struct sockbuf *sb)
 	sb->sb_flags &= ~SB_AIO_RUNNING;
 	SOCKBUF_UNLOCK(sb);
 
-	SOCK_LOCK(so);
 	sorele(so);
 	CURVNET_RESTORE();
 }
@@ -808,18 +805,28 @@ soo_aio_queue(struct file *fp, struct kaiocb *job)
 	if (error == 0)
 		return (0);
 
+	/* Lock through the socket, since this may be a listening socket. */
 	switch (job->uaiocb.aio_lio_opcode & (LIO_WRITE | LIO_READ)) {
 	case LIO_READ:
 		sb = &so->so_rcv;
+		SOCK_RECVBUF_LOCK(so);
 		break;
 	case LIO_WRITE:
 		sb = &so->so_snd;
+		SOCK_SENDBUF_LOCK(so);
 		break;
 	default:
 		return (EINVAL);
 	}
 
-	SOCKBUF_LOCK(sb);
+	if (SOLISTENING(so)) {
+		if (sb == &so->so_rcv)
+			SOCK_RECVBUF_UNLOCK(so);
+		else
+			SOCK_SENDBUF_UNLOCK(so);
+		return (EINVAL);
+	}
+
 	if (!aio_set_cancel_function(job, soo_aio_cancel))
 		panic("new job was cancelled");
 	TAILQ_INSERT_TAIL(&sb->sb_aiojobq, job, list);

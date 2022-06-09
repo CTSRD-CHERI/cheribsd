@@ -282,7 +282,6 @@ struct __no_subobject_bounds {						\
 #define	SLIST_NEXT(elm, field)	((elm)->field.sle_next)
 
 #define	SLIST_REMOVE(head, elm, type, field) do {			\
-	QMD_SAVELINK(oldnext, (elm)->field.sle_next);			\
 	if (SLIST_FIRST((head)) == (elm)) {				\
 		SLIST_REMOVE_HEAD((head), field);			\
 	}								\
@@ -292,16 +291,19 @@ struct __no_subobject_bounds {						\
 			curelm = SLIST_NEXT(curelm, field);		\
 		SLIST_REMOVE_AFTER(curelm, field);			\
 	}								\
-	TRASHIT(*oldnext);						\
 } while (0)
 
 #define SLIST_REMOVE_AFTER(elm, field) do {				\
+	QMD_SAVELINK(oldnext, SLIST_NEXT(elm, field)->field.sle_next);	\
 	SLIST_NEXT(elm, field) =					\
 	    SLIST_NEXT(SLIST_NEXT(elm, field), field);			\
+	TRASHIT(*oldnext);						\
 } while (0)
 
 #define	SLIST_REMOVE_HEAD(head, field) do {				\
+	QMD_SAVELINK(oldnext, SLIST_FIRST(head)->field.sle_next);	\
 	SLIST_FIRST((head)) = SLIST_NEXT(SLIST_FIRST((head)), field);	\
+	TRASHIT(*oldnext);						\
 } while (0)
 
 #define	SLIST_REMOVE_PREVPTR(prevp, elm, field) do {			\

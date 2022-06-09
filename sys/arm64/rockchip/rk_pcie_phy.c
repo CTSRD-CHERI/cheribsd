@@ -252,7 +252,6 @@ rk_pcie_phy_enable(struct phynode *phynode, bool enable)
 }
 
 /* Phy class and methods. */
-static int rk_pcie_phy_enable(struct phynode *phynode, bool enable);
 static phynode_method_t rk_pcie_phy_phynode_methods[] = {
 	PHYNODEMETHOD(phynode_enable,		 rk_pcie_phy_enable),
 
@@ -293,6 +292,13 @@ static int
 	if (SYSCON_GET_HANDLE(sc->dev, &sc->syscon) != 0 ||
 	    sc->syscon == NULL) {
 		device_printf(dev, "cannot get syscon for device\n");
+		rv = ENXIO;
+		goto fail;
+	}
+
+	rv = clk_set_assigned(dev, ofw_bus_get_node(dev));
+	if (rv != 0 && rv != ENOENT) {
+		device_printf(dev, "clk_set_assigned failed: %d\n", rv);
 		rv = ENXIO;
 		goto fail;
 	}

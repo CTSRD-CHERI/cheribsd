@@ -1,6 +1,5 @@
 /*-
  * Copyright (c) 2015 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Andrew Turner under
  * sponsorship from the FreeBSD Foundation.
@@ -70,7 +69,7 @@ stack_save_td(struct stack *st, struct thread *td)
 		return (EOPNOTSUPP);
 
 	frame.fp = td->td_pcb->pcb_x[29];
-	frame.pc = td->td_pcb->pcb_lr;
+	frame.pc = ADDR_MAKE_CANONICAL(td->td_pcb->pcb_lr);
 
 	stack_capture(td, st, &frame);
 	return (0);

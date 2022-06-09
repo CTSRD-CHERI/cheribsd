@@ -149,7 +149,7 @@ ieee80211_node_vattach(struct ieee80211vap *vap)
 	/* NB: driver can override */
 	vap->iv_max_aid = IEEE80211_AID_DEF;
 
-	/* default station inactivity timer setings */
+	/* default station inactivity timer settings */
 	vap->iv_inact_init = IEEE80211_INACT_INIT;
 	vap->iv_inact_auth = IEEE80211_INACT_AUTH;
 	vap->iv_inact_run = IEEE80211_INACT_RUN;
@@ -895,6 +895,9 @@ ieee80211_sta_join1(struct ieee80211_node *selbs)
 			 * us to try to re-authenticate if we are operating
 			 * as a station.
 			 */
+			IEEE80211_DPRINTF(vap, IEEE80211_MSG_AUTH,
+			    "%s %p<%s> -> AUTH, FC0_SUBTYPE_DEAUTH\n",
+			    __func__, selbs, ether_sprintf(selbs->ni_macaddr));
 			ieee80211_new_state(vap, IEEE80211_S_AUTH,
 				IEEE80211_FC0_SUBTYPE_DEAUTH);
 		}
@@ -1133,7 +1136,7 @@ ieee80211_ies_expand(struct ieee80211_ies *ies)
 
 	ie = ies->data;
 	ielen = ies->len;
-	while (ielen > 0) {
+	while (ielen > 1) {
 		switch (ie[0]) {
 		case IEEE80211_ELEMID_VENDOR:
 			if (iswpaoui(ie))
@@ -2616,9 +2619,10 @@ ieee80211_iterate_nodes(struct ieee80211_node_table *nt,
 }
 
 void
-ieee80211_dump_node(struct ieee80211_node_table *nt, struct ieee80211_node *ni)
+ieee80211_dump_node(struct ieee80211_node_table *nt __unused,
+    struct ieee80211_node *ni)
 {
-	printf("0x%p: mac %s refcnt %d\n", ni,
+	printf("%p: mac %s refcnt %d\n", ni,
 		ether_sprintf(ni->ni_macaddr), ieee80211_node_refcnt(ni));
 	printf("\tauthmode %u flags 0x%x\n",
 		ni->ni_authmode, ni->ni_flags);

@@ -55,7 +55,9 @@ MLINKS+=libprocstat.3 procstat_close.3 \
 		libprocstat.3 procstat_open_sysctl.3
 
 # XXX This is a hack.
-.if ${MK_ZFS} != "no"
+# Also disable for hybrid as it uses -D_KERNEL, so __kerncap leaks in iovec and
+# kern_renameat. Punt until ZFS works at all.
+.if ${MK_ZFS} != "no" && (!${MACHINE_CPU:Mcheri} || ${MACHINE_ABI:Mpurecap})
 CFLAGS+=	-DLIBPROCSTAT_ZFS
 SRCS+=	zfs.c
 OBJS+=	zfs/zfs_defs.o
@@ -64,6 +66,8 @@ zfs/zfs_defs.o: .PHONY
 	@cd ${.CURDIR}/zfs && ${MAKE} zfs_defs.o
 zfs/zfs_defs.pico: .PHONY
 	@cd ${.CURDIR}/zfs && ${MAKE} zfs_defs.pico
+zfs/zfs_defs.pieo: .PHONY
+	@cd ${.CURDIR}/zfs && ${MAKE} zfs_defs.pieo
 zfs/zfs_defs.po: .PHONY
 	@cd ${.CURDIR}/zfs && ${MAKE} zfs_defs.po
 .endif

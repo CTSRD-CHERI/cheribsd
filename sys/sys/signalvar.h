@@ -350,16 +350,6 @@ extern struct mtx	sigio_lock;
 #define	SIGPROCMASK_PS_LOCKED	0x0004
 #define	SIGPROCMASK_FASTBLK	0x0008
 
-/* Signal properties returned by sigprop(). */
-#define	SIGPROP_KILL		0x01	/* terminates process by default */
-#define	SIGPROP_CORE		0x02	/* ditto and coredumps */
-#define	SIGPROP_STOP		0x04	/* suspend process */
-#define	SIGPROP_TTYSTOP		0x08	/* ditto, from tty */
-#define	SIGPROP_IGNORE		0x10	/* ignore by default */
-#define	SIGPROP_CONT		0x20	/* continue if suspended */
-#define	SIGPROP_CANTMASK	0x40	/* non-maskable, catchable */
-#define	SIGPROP_SBUNWIND	0x80	/* sandbox unwind if not caught */
-
 /*
  * Modes for sigdeferstop().  Manages behaviour of
  * thread_suspend_check() in the region delimited by
@@ -417,14 +407,12 @@ int	sig_ast_needsigchk(struct thread *td);
 void	sig_drop_caught(struct proc *p);
 void	sigexit(struct thread *td, int sig) __dead2;
 int	sigev_findtd(struct proc *p, struct sigevent *sigev, struct thread **);
-int	sig_ffs(sigset_t *set);
 void	sigfastblock_clear(struct thread *td);
 void	sigfastblock_fetch(struct thread *td);
 void	sigfastblock_setpend(struct thread *td, bool resched);
 int	sig_intr(void);
 void	siginit(struct proc *p);
 void	signotify(struct thread *td);
-int	sigprop(int sig);
 void	sigqueue_delete(struct sigqueue *queue, int sig);
 void	sigqueue_delete_proc(struct proc *p, int sig);
 void	sigqueue_flush(struct sigqueue *queue);

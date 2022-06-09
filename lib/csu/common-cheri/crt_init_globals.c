@@ -32,53 +32,22 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#ifdef PIC
+#error "PIEs never need to initialise their own globals"
+#endif
+
 #define CHERI_INIT_GLOBALS_GDC_ONLY
 #include <cheri_init_globals.h>
 #if !defined(CHERI_INIT_GLOBALS_VERSION) || CHERI_INIT_GLOBALS_VERSION < 4
 #error "cheri_init_globals.h is outdated. Please update LLVM"
 #endif
 
-/*
- * Avoid adding an unnecessary crt_init_globals() export from crt1.o for a
- * function that the compiler will inline anyway:
- */
-#ifndef DONT_EXPORT_CRT_INIT_GLOBALS
-#define CRT_INIT_GLOBALS_STATIC
-#else
-#define CRT_INIT_GLOBALS_STATIC static __always_inline
-#endif
-
-#ifndef CRT_INIT_GLOBALS_GDC_ONLY
-CRT_INIT_GLOBALS_STATIC void crt_init_globals(void) __hidden;
-#endif
-CRT_INIT_GLOBALS_STATIC void crt_init_globals_3(void * __capability,
-    const void * __capability, const void * __capability) __hidden;
-
-__attribute__((weak)) extern int _DYNAMIC __no_subobject_bounds;
-
-CRT_INIT_GLOBALS_STATIC void
-crt_init_globals_3(void * __capability data_cap,
-    const void * __capability code_cap, const void * __capability rodata_cap)
-{
-	/* Otherwise we need to initialize globals manually */
-	cheri_init_globals_3(data_cap, code_cap, rodata_cap);
-}
-
-#ifndef CRT_INIT_GLOBALS_GDC_ONLY
-CRT_INIT_GLOBALS_STATIC void
-crt_init_globals(void)
-{
-
-	crt_init_globals_3(__builtin_cheri_global_data_get(),
-	    __builtin_cheri_program_counter_get(),
-	    __builtin_cheri_global_data_get());
-}
-#endif /* !CRT_INIT_GLOBALS_GDC_ONLY */
-
-#ifndef PIC
 /* This is __always_inline since it is called before globals have been set up */
 static __always_inline void
-do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
+crt_init_globals(const Elf_Phdr *phdr, long phnum,
+    void * __capability *data_cap_out,
+    const void * __capability *code_cap_out,
+    const void * __capability *rodata_cap_out)
 {
 	const Elf_Phdr *phlimit = phdr + phnum;
 	Elf_Addr text_start = (Elf_Addr)-1l;
@@ -199,6 +168,11 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 		if (!cheri_gettag(code_cap))
 			__builtin_trap();
 	}
-	crt_init_globals_3(data_cap, code_cap, rodata_cap);
+	cheri_init_globals_3(data_cap, code_cap, rodata_cap);
+	if (data_cap_out)
+		*data_cap_out = data_cap;
+	if (code_cap_out)
+		*code_cap_out = code_cap;
+	if (rodata_cap_out)
+		*rodata_cap_out = rodata_cap;
 }
-#endif /* !defined(PIC) */

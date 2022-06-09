@@ -93,14 +93,7 @@ __ElfType(Auxinfo);
 
 #define	ELF_MACHINE_OK(x) ((x) == (ELF_ARCH))
 
-/*
- * TODO: Remove old e_entry check. This is deprecated, but needed to support
- * binaries built with a compiler and linker that predate setting the ELF flag
- * appropriately.
- */
-#define	ELF_IS_CHERI(hdr) \
-    ((((hdr)->e_flags & EF_AARCH64_CHERI_PURECAP) != 0) || \
-     (((hdr)->e_entry & 1) == 1))
+#define	ELF_IS_CHERI(hdr) (((hdr)->e_flags & EF_AARCH64_CHERI_PURECAP) != 0)
 
 /* Define "machine" characteristics */
 #if __ELF_WORD_SIZE == 64
@@ -179,6 +172,35 @@ __ElfType(Auxinfo);
 #define	HWCAP2_DGH		0x00008000
 #define	HWCAP2_RNG		0x00010000
 #define	HWCAP2_BTI		0x00020000
+
+#ifdef COMPAT_FREEBSD32
+/* ARM HWCAP */
+#define	HWCAP32_HALF		0x00000002	/* Always set.               */
+#define	HWCAP32_THUMB		0x00000004	/* Always set.               */
+#define	HWCAP32_FAST_MULT	0x00000010	/* Always set.               */
+#define	HWCAP32_VFP		0x00000040
+#define	HWCAP32_EDSP		0x00000080	/* Always set.               */
+#define	HWCAP32_NEON		0x00001000
+#define	HWCAP32_VFPv3		0x00002000
+#define	HWCAP32_TLS		0x00008000	/* Always set.               */
+#define	HWCAP32_VFPv4		0x00010000
+#define	HWCAP32_IDIVA		0x00020000	/* Always set.               */
+#define	HWCAP32_IDIVT		0x00040000	/* Always set.               */
+#define	HWCAP32_VFPD32		0x00080000	/* Always set.               */
+#define	HWCAP32_LPAE		0x00100000	/* Always set.               */
+
+#define HWCAP32_DEFAULT \
+   (HWCAP32_HALF | HWCAP32_THUMB | HWCAP32_FAST_MULT | HWCAP32_EDSP |\
+    HWCAP32_TLS | HWCAP32_IDIVA | HWCAP32_IDIVT | HWCAP32_VFPD32 |   \
+    HWCAP32_LPAE)
+
+/* ARM HWCAP2 */
+#define	HWCAP32_2_AES		0x00000001
+#define	HWCAP32_2_PMULL		0x00000002
+#define	HWCAP32_2_SHA1		0x00000004
+#define	HWCAP32_2_SHA2		0x00000008
+#define	HWCAP32_2_CRC32		0x00000010
+#endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
 void elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap);

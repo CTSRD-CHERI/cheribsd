@@ -2429,6 +2429,7 @@ vxlan_encap_header(struct vxlan_softc *sc, struct mbuf *m, int ipoff,
 }
 #endif
 
+#if defined(INET6) || defined(INET)
 /*
  * Return the CSUM_INNER_* equivalent of CSUM_* caps.
  */
@@ -2470,6 +2471,7 @@ csum_flags_to_inner_flags(uint32_t csum_flags_in, const uint32_t encap)
 
 	return (csum_flags);
 }
+#endif
 
 static int
 vxlan_encap4(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
@@ -2812,12 +2814,16 @@ vxlan_input(struct vxlan_socket *vso, uint32_t vni, struct mbuf **m0,
 	struct ether_header *eh;
 	int error;
 
+	m = *m0;
+
+	if (m->m_pkthdr.len < ETHER_HDR_LEN)
+		return (EINVAL);
+
 	sc = vxlan_socket_lookup_softc(vso, vni);
 	if (sc == NULL)
 		return (ENOENT);
 
 	ifp = sc->vxl_ifp;
-	m = *m0;
 	eh = mtod(m, struct ether_header *);
 
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
@@ -2857,8 +2863,9 @@ vxlan_input(struct vxlan_socket *vso, uint32_t vni, struct mbuf **m0,
 		m->m_pkthdr.csum_data = 0;
 	}
 
-	error = netisr_dispatch(NETISR_ETHER, m);
+	(*ifp->if_input)(ifp, m);
 	*m0 = NULL;
+	error = 0;
 
 out:
 	vxlan_release(sc);

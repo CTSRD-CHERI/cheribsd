@@ -27,6 +27,16 @@
 
 # $FreeBSD$
 
+atf_test_case befs
+befs_head() {
+	atf_set "descr" "fstyp(8) can detect BeFS and label filesystem"
+}
+befs_body() {
+	bzcat $(atf_get_srcdir)/befs.img.bz2 > befs.img
+	atf_check -s exit:0 -o inline:"befs\n" fstyp befs.img
+	atf_check -s exit:0 -o inline:"befs BeFS\n" fstyp -l befs.img
+}
+
 atf_test_case cd9660
 cd9660_head() {
 	atf_set "descr" "fstyp(8) should detect cd9660 filesystems"
@@ -257,28 +267,23 @@ zeros_body() {
 
 
 atf_init_test_cases() {
+	atf_add_test_case befs
 	atf_add_test_case cd9660
 	atf_add_test_case cd9660_label
 	atf_add_test_case dir
 	atf_add_test_case empty
 	atf_add_test_case exfat
 	atf_add_test_case exfat_label
-# https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=210715
-if [ $(uname -m) != "mips" ]; then
 	atf_add_test_case ext2
 	atf_add_test_case ext3
 	atf_add_test_case ext4
 	atf_add_test_case ext4_label
-fi
 	atf_add_test_case fat12
 	atf_add_test_case fat16
 	atf_add_test_case fat32
 	atf_add_test_case fat32_label
-# https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=210715
-if [ $(uname -m) != "mips" ]; then
 	atf_add_test_case ntfs
 	atf_add_test_case ntfs_with_label
-fi
 	atf_add_test_case ufs1
 	atf_add_test_case ufs2
 	atf_add_test_case ufs2_label

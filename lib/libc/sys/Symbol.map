@@ -263,7 +263,6 @@ FBSD_1.0 {
 	sigwaitinfo;
 	socket;
 	socketpair;
-	swapoff;
 	swapon;
 	symlink;
 	sync;
@@ -431,6 +430,12 @@ FBSD_1.6 {
 	shm_rename;
 };
 
+FBSD_1.7 {
+	_Fork;
+	fspacectl;
+	swapoff;
+};
+
 FBSDprivate_1.0 {
 	___acl_aclcheck_fd;
 	__sys___acl_aclcheck_fd;
@@ -504,10 +509,12 @@ FBSDprivate_1.0 {
 	__sys_aio_error;
 	__sys_aio_fsync;
 	__sys_aio_read;
+	__sys_aio_readv;
 	__sys_aio_return;
 	__sys_aio_suspend;
 	__sys_aio_waitcomplete;
 	__sys_aio_write;
+	__sys_aio_writev;
 	_audit;
 	__sys_audit;
 	_auditctl;

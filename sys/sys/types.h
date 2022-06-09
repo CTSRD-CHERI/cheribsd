@@ -193,7 +193,7 @@ typedef	__rlim_t	rlim_t;		/* resource limit */
 #define	_RLIM_T_DECLARED
 #endif
 
-typedef	__int64_t	sbintime_t;
+typedef	__sbintime_t	sbintime_t;
 
 typedef	__segsz_t	segsz_t;	/* segment size (in pages) */
 
@@ -278,7 +278,7 @@ typedef __rman_res_t    rman_res_t;
 #if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
 typedef __intcap_t	syscallarg_t;
 #else
-typedef register_t	syscallarg_t;
+typedef __register_t	syscallarg_t;
 #endif
 
 #ifdef _KERNEL

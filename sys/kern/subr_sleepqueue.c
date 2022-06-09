@@ -146,12 +146,12 @@ struct sleepqueue_chain {
 } __aligned(CACHE_LINE_SIZE);
 
 #ifdef SLEEPQUEUE_PROFILING
-u_int sleepq_max_depth;
 static SYSCTL_NODE(_debug, OID_AUTO, sleepq, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "sleepq profiling");
 static SYSCTL_NODE(_debug_sleepq, OID_AUTO, chains,
     CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "sleepq chain stats");
+static u_int sleepq_max_depth;
 SYSCTL_UINT(_debug_sleepq, OID_AUTO, max_depth, CTLFLAG_RD, &sleepq_max_depth,
     0, "maxmimum depth achieved of a single chain");
 
@@ -833,7 +833,8 @@ sleepq_remove_thread(struct sleepqueue *sq, struct thread *td)
 		td->td_sleepqueue = LIST_FIRST(&sq->sq_free);
 	LIST_REMOVE(td->td_sleepqueue, sq_hash);
 
-	if ((td->td_flags & TDF_TIMEOUT) == 0 && td->td_sleeptimo != 0)
+	if ((td->td_flags & TDF_TIMEOUT) == 0 && td->td_sleeptimo != 0 &&
+	    td->td_lock == &sc->sc_lock) {
 		/*
 		 * We ignore the situation where timeout subsystem was
 		 * unable to stop our callout.  The struct thread is
@@ -843,8 +844,16 @@ sleepq_remove_thread(struct sleepqueue *sq, struct thread *td)
 		 * sleepq_timeout() ensure that the thread does not
 		 * get spurious wakeups, even if the callout was reset
 		 * or thread reused.
+		 *
+		 * We also cannot safely stop the callout if a scheduler
+		 * lock is held since softclock_thread() forces a lock
+		 * order of callout lock -> scheduler lock.  The thread
+		 * lock will be a scheduler lock only if the thread is
+		 * preparing to go to sleep, so this is hopefully a rare
+		 * scenario.
 		 */
 		callout_stop(&td->td_slpcallout);
+	}
 
 	td->td_wmesg = NULL;
 	td->td_wchan = NULL;
@@ -852,6 +861,26 @@ sleepq_remove_thread(struct sleepqueue *sq, struct thread *td)
 
 	CTR3(KTR_PROC, "sleepq_wakeup: thread %p (pid %ld, %s)",
 	    (void *)td, (long)td->td_proc->p_pid, td->td_name);
+}
+
+void
+sleepq_remove_nested(struct thread *td)
+{
+	struct sleepqueue_chain *sc;
+	struct sleepqueue *sq;
+	const void *wchan;
+
+	MPASS(TD_ON_SLEEPQ(td));
+
+	wchan = td->td_wchan;
+	sc = SC_LOOKUP(wchan);
+	mtx_lock_spin(&sc->sc_lock);
+	sq = sleepq_lookup(wchan);
+	MPASS(sq != NULL);
+	thread_lock(td);
+	sleepq_remove_thread(sq, td);
+	mtx_unlock_spin(&sc->sc_lock);
+	/* Returns with the thread lock owned. */
 }
 
 #ifdef INVARIANTS
@@ -907,8 +936,11 @@ sleepq_signal(const void *wchan, int flags, int pri, int queue)
 	KASSERT(wchan != NULL, ("%s: invalid NULL wait channel", __func__));
 	MPASS((queue >= 0) && (queue < NR_SLEEPQS));
 	sq = sleepq_lookup(wchan);
-	if (sq == NULL)
+	if (sq == NULL) {
+		if (flags & SLEEPQ_DROP)
+			sleepq_release(wchan);
 		return (0);
+	}
 	KASSERT(sq->sq_type == (flags & SLEEPQ_TYPE),
 	    ("%s: mismatch between sleep/wakeup and cv_*", __func__));
 
@@ -941,7 +973,8 @@ sleepq_signal(const void *wchan, int flags, int pri, int queue)
 		}
 	}
 	MPASS(besttd != NULL);
-	wakeup_swapper = sleepq_resume_thread(sq, besttd, pri, SRQ_HOLD);
+	wakeup_swapper = sleepq_resume_thread(sq, besttd, pri,
+	    (flags & SLEEPQ_DROP) ? 0 : SRQ_HOLD);
 	return (wakeup_swapper);
 }
 
@@ -1016,7 +1049,8 @@ sleepq_timeout(void *arg)
 	    (void *)td, (long)td->td_proc->p_pid, (void *)td->td_name);
 
 	thread_lock(td);
-	if (td->td_sleeptimo == 0 || td->td_sleeptimo > sbinuptime()) {
+	if (td->td_sleeptimo == 0 ||
+	    td->td_sleeptimo > td->td_slpcallout.c_time) {
 		/*
 		 * The thread does not want a timeout (yet).
 		 */
@@ -1101,7 +1135,8 @@ sleepq_abort(struct thread *td, int intrval)
 	THREAD_LOCK_ASSERT(td, MA_OWNED);
 	MPASS(TD_ON_SLEEPQ(td));
 	MPASS(td->td_flags & TDF_SINTR);
-	MPASS(intrval == EINTR || intrval == ERESTART);
+	MPASS((intrval == 0 && (td->td_flags & TDF_SIGWAIT) != 0) ||
+	    intrval == EINTR || intrval == ERESTART);
 
 	/*
 	 * If the TDF_TIMEOUT flag is set, just leave. A

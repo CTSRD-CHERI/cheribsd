@@ -55,12 +55,12 @@ struct tcphdr {
 	tcp_seq	th_seq;			/* sequence number */
 	tcp_seq	th_ack;			/* acknowledgement number */
 #if BYTE_ORDER == LITTLE_ENDIAN
-	u_char	th_x2:4,		/* (unused) */
+	u_char	th_x2:4,		/* upper 4 (reserved) flags */
 		th_off:4;		/* data offset */
 #endif
 #if BYTE_ORDER == BIG_ENDIAN
 	u_char	th_off:4,		/* data offset */
-		th_x2:4;		/* (unused) */
+		th_x2:4;		/* upper 4 (reserved) flags */
 #endif
 	u_char	th_flags;
 #define	TH_FIN	0x01
@@ -104,6 +104,8 @@ struct tcphdr {
 #define	   TCPOLEN_SIGNATURE		18
 #define	TCPOPT_FAST_OPEN	34
 #define	   TCPOLEN_FAST_OPEN_EMPTY	2
+
+#define	MAX_TCPOPTLEN		40	/* Absolute maximum TCP options len */
 
 /* Miscellaneous constants */
 #define	MAX_SACK_BLKS	6	/* Max # SACK blocks stored at receiver side */
@@ -181,13 +183,25 @@ struct tcphdr {
 #define	TCP_TXTLS_MODE	40	/* Transmit TLS mode */
 #define	TCP_RXTLS_ENABLE 41	/* TLS framing and encryption for receive */
 #define	TCP_RXTLS_MODE	42	/* Receive TLS mode */
+#define	TCP_IWND_NB	43	/* Override initial window (units: bytes) */
+#define	TCP_IWND_NSEG	44	/* Override initial window (units: MSS segs) */
+#define	TCP_LOGID_CNT	46	/* get number of connections with the same ID */
+#define	TCP_LOG_TAG	47	/* configure tag for grouping logs */
+#define	TCP_USER_LOG	48	/* userspace log event */
 #define	TCP_CONGESTION	64	/* get/set congestion control algorithm */
 #define	TCP_CCALGOOPT	65	/* get/set cc algorithm specific options */
+#define	TCP_MAXUNACKTIME 68	/* maximum time without making progress (sec) */
+#define	TCP_MAXPEAKRATE 69	/* maximum peak rate allowed (kbps) */
+#define TCP_IDLE_REDUCE 70	/* Reduce cwnd on idle input */
 #define TCP_REMOTE_UDP_ENCAPS_PORT 71	/* Enable TCP over UDP tunneling via the specified port */
 #define TCP_DELACK  	72	/* socket option for delayed ack */
 #define TCP_FIN_IS_RST 73	/* A fin from the peer is treated has a RST */
 #define TCP_LOG_LIMIT  74	/* Limit to number of records in tcp-log */
 #define TCP_SHARED_CWND_ALLOWED 75 	/* Use of a shared cwnd is allowed */
+#define TCP_PROC_ACCOUNTING 76	/* Do accounting on tcp cpu usage and counts */
+#define TCP_USE_CMP_ACKS 77 	/* The transport can handle the Compressed mbuf acks */
+#define	TCP_PERF_INFO	78	/* retrieve accounting counters */
+#define	TCP_LRD		79	/* toggle Lost Retransmission Detection for A/B testing */
 #define	TCP_KEEPINIT	128	/* N, time to establish connection */
 #define	TCP_KEEPIDLE	256	/* L,N,X start keeplives after this period */
 #define	TCP_KEEPINTVL	512	/* L,N interval between keepalives */
@@ -196,12 +210,13 @@ struct tcphdr {
 #define	TCP_PCAP_OUT	2048	/* number of output packets to keep */
 #define	TCP_PCAP_IN	4096	/* number of input packets to keep */
 #define TCP_FUNCTION_BLK 8192	/* Set the tcp function pointers to the specified stack */
+#define TCP_FUNCTION_ALIAS 8193	/* Get the current tcp function pointer name alias */
 /* Options for Rack and BBR */
 #define	TCP_REUSPORT_LB_NUMA   1026	/* set listen socket numa domain */
 #define TCP_RACK_MBUF_QUEUE   1050 /* Do we allow mbuf queuing if supported */
 #define TCP_RACK_PROP	      1051 /* RACK proportional rate reduction (bool) */
 #define TCP_RACK_TLP_REDUCE   1052 /* RACK TLP cwnd reduction (bool) */
-#define TCP_RACK_PACE_REDUCE  1053 /* RACK Pacing reduction factor (divisor) */
+#define TCP_RACK_PACE_REDUCE  1053 /* RACK Pacingv reduction factor (divisor) */
 #define TCP_RACK_PACE_MAX_SEG 1054 /* Max TSO size we will send  */
 #define TCP_RACK_PACE_ALWAYS  1055 /* Use the always pace method */
 #define TCP_RACK_PROP_RATE    1056 /* The proportional reduction rate */
@@ -284,7 +299,19 @@ struct tcphdr {
 #define TCP_RACK_PACE_TO_FILL 1127 /* If we are not in recovery, always pace to fill the cwnd in 1 RTT */
 #define TCP_SHARED_CWND_TIME_LIMIT 1128 /* we should limit to low time values the scwnd life */
 #define TCP_RACK_PROFILE 1129	/* Select a profile that sets multiple options */
-
+#define TCP_HDWR_RATE_CAP 1130 /* Allow hardware rates to cap pacing rate */
+#define TCP_PACING_RATE_CAP 1131 /* Highest rate allowed in pacing in bytes per second (uint64_t) */
+#define TCP_HDWR_UP_ONLY 1132	/* Allow the pacing rate to climb but not descend (with the exception of fill-cw */
+#define TCP_RACK_ABC_VAL 1133	/* Set a local ABC value different then the system default */
+#define TCP_REC_ABC_VAL 1134	/* Do we use the ABC value for recovery or the override one from sysctl  */
+#define TCP_RACK_MEASURE_CNT 1135 /* How many measurements are required in GP pacing */
+#define TCP_DEFER_OPTIONS 1136 /* Defer options until the proper number of measurements occur, does not defer TCP_RACK_MEASURE_CNT */
+#define TCP_FAST_RSM_HACK 1137 /* Do we do the broken thing where we don't twiddle the TLP bits properly in fast_rsm_output? */
+#define TCP_RACK_PACING_BETA 1138	/* Changing the beta for pacing */
+#define TCP_RACK_PACING_BETA_ECN 1139	/* Changing the beta for ecn with pacing */
+#define TCP_RACK_TIMER_SLOP 1140	/* Set or get the timer slop used */
+#define TCP_RACK_DSACK_OPT 1141		/* How do we setup rack timer DSACK options bit 1/2 */
+#define TCP_RACK_ENABLE_HYSTART 1142	/* Do we allow hystart in the CC modules */
 /* Start of reserved space for third-party user-settable options. */
 #define	TCP_VENDOR	SO_VENDOR
 
@@ -295,6 +322,7 @@ struct tcphdr {
 #define	TCPI_OPT_WSCALE		0x04
 #define	TCPI_OPT_ECN		0x08
 #define	TCPI_OPT_TOE		0x10
+#define	TCPI_OPT_TFO		0x20
 
 /* Maximum length of log ID. */
 #define TCP_LOG_ID_LEN	64

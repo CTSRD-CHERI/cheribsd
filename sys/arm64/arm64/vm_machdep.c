@@ -113,6 +113,10 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	p2->p_md.md_sigcode = td1->td_proc->p_md.md_sigcode;
 #endif
 
+#ifdef PAC
+	ptrauth_fork(td2, td1);
+#endif
+
 	tf = (struct trapframe *)STACKALIGN((struct trapframe *)pcb2 - 1);
 	bcopy(td1->td_frame, tf, sizeof(*tf));
 	tf->tf_x[0] = 0;
@@ -131,7 +135,12 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 
 	/* Setup to release spin count in fork_exit(). */
 	td2->td_md.md_spinlock_count = 1;
-	td2->td_md.md_saved_daif = td1->td_md.md_saved_daif & ~DAIF_I_MASKED;
+	td2->td_md.md_saved_daif = PSR_DAIF_DEFAULT;
+
+#if defined(PERTHREAD_SSP)
+	/* Set the new canary */
+	arc4random_buf(&td2->td_md.md_canary, sizeof(td2->td_md.md_canary));
+#endif
 }
 
 void
@@ -205,7 +214,17 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 
 	/* Setup to release spin count in fork_exit(). */
 	td->td_md.md_spinlock_count = 1;
-	td->td_md.md_saved_daif = td0->td_md.md_saved_daif & ~DAIF_I_MASKED;
+	td->td_md.md_saved_daif = PSR_DAIF_DEFAULT;
+
+#if defined(PERTHREAD_SSP)
+	/* Set the new canary */
+	arc4random_buf(&td->td_md.md_canary, sizeof(td->td_md.md_canary));
+#endif
+
+#ifdef PAC
+	/* Generate new pointer authentication keys. */
+	ptrauth_copy_thread(td, td0);
+#endif
 }
 
 /*
@@ -219,9 +238,11 @@ cpu_set_upcall(struct thread *td, void (* __capability entry)(void *),
 	struct trapframe *tf = td->td_frame;
 
 	/* 32bits processes use r13 for sp */
-	if (td->td_frame->tf_spsr & PSR_M_32)
+	if (td->td_frame->tf_spsr & PSR_M_32) {
 		tf->tf_x[13] = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
-	else
+		if ((uintcap_t)entry & 1)
+			tf->tf_spsr |= PSR_T;
+	} else
 		tf->tf_sp = STACKALIGN((uintcap_t)stack->ss_sp + stack->ss_size);
 
 #if __has_feature(capabilities)
@@ -284,6 +305,9 @@ cpu_thread_alloc(struct thread *td)
 	    td->td_kstack_pages * PAGE_SIZE) - 1;
 	td->td_frame = (struct trapframe *)STACKALIGN(
 	    (struct trapframe *)td->td_pcb - 1);
+#ifdef PAC
+	ptrauth_thread_alloc(td);
+#endif
 }
 
 void
@@ -328,12 +352,4 @@ cpu_procctl(struct thread *td __unused, int idtype __unused, id_t id __unused,
 {
 
 	return (EINVAL);
-}
-
-void
-swi_vm(void *v)
-{
-
-	if (busdma_swi_pending != 0)
-		busdma_swi();
 }

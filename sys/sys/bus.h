@@ -58,7 +58,6 @@ typedef enum device_state {
 	DS_ALIVE = 20,			/**< @brief probe succeeded */
 	DS_ATTACHING = 25,		/**< @brief currently attaching */
 	DS_ATTACHED = 30,		/**< @brief attach method called */
-	DS_BUSY = 40			/**< @brief device is open */
 } device_state_t;
 
 /**
@@ -90,7 +89,6 @@ struct u_device {
 #define	DF_QUIET	0x10		/* don't print verbose attach message */
 #define	DF_DONENOMATCH	0x20		/* don't execute DEVICE_NOMATCH again */
 #define	DF_EXTERNALSOFTC 0x40		/* softc not allocated by us */
-#define	DF_REBID	0x80		/* Can rebid after attach */
 #define	DF_SUSPENDED	0x100		/* Device is suspended. */
 #define	DF_QUIET_CHILDREN 0x200		/* Default to quiet for all my children */
 #define	DF_ATTACHED_ONCE 0x400		/* Has been attached at least once */
@@ -131,6 +129,7 @@ struct devreq {
 #define	DEV_FREEZE	_IOW('D', 11, struct devreq)
 #define	DEV_THAW	_IOW('D', 12, struct devreq)
 #define	DEV_RESET	_IOW('D', 13, struct devreq)
+#define	DEV_GET_PATH	_IOWR('D', 14, struct devreq)
 
 /* Flags for DEV_DETACH and DEV_DISABLE. */
 #define	DEVF_FORCE_DETACH	0x0000001
@@ -426,6 +425,8 @@ int	bus_generic_translate_resource(device_t dev, int type, rman_res_t start,
 int	bus_generic_attach(device_t dev);
 int	bus_generic_bind_intr(device_t dev, device_t child,
 			      struct resource *irq, int cpu);
+int	bus_generic_child_location(device_t dev, device_t child, struct sbuf *sb);
+int	bus_generic_child_pnpinfo(device_t dev, device_t child, struct sbuf *sb);
 int	bus_generic_child_present(device_t dev, device_t child);
 int	bus_generic_config_intr(device_t, int, enum intr_trigger,
 				enum intr_polarity);
@@ -491,6 +492,8 @@ int	bus_generic_unmap_resource(device_t dev, device_t child, int type,
 				   struct resource_map *map);
 int	bus_generic_write_ivar(device_t dev, device_t child, int which,
 			       uintptr_t value);
+int	bus_generic_get_device_path(device_t bus, device_t child, const char *locator,
+				    struct sbuf *sb);
 int	bus_helper_reset_post(device_t dev, int flags);
 int	bus_helper_reset_prepare(device_t dev, int flags);
 int	bus_null_rescan(device_t dev);
@@ -514,6 +517,8 @@ void	bus_release_resources(device_t dev, const struct resource_spec *rs,
 
 int	bus_adjust_resource(device_t child, int type, struct resource *r,
 			    rman_res_t start, rman_res_t end);
+int	bus_translate_resource(device_t child, int type, rman_res_t start,
+			       rman_res_t *newstart);
 struct	resource *bus_alloc_resource(device_t dev, int type, int *rid,
 				     rman_res_t start, rman_res_t end,
 				     rman_res_t count, u_int flags);
@@ -551,8 +556,8 @@ rman_res_t	bus_get_resource_start(device_t dev, int type, int rid);
 rman_res_t	bus_get_resource_count(device_t dev, int type, int rid);
 void	bus_delete_resource(device_t dev, int type, int rid);
 int	bus_child_present(device_t child);
-int	bus_child_pnpinfo_str(device_t child, char *buf, size_t buflen);
-int	bus_child_location_str(device_t child, char *buf, size_t buflen);
+int	bus_child_pnpinfo(device_t child, struct sbuf *sb);
+int	bus_child_location(device_t child, struct sbuf *sb);
 void	bus_enumerate_hinted_children(device_t bus);
 int	bus_delayed_attach_children(device_t bus);
 
@@ -629,6 +634,8 @@ int	device_set_unit(device_t dev, int unit);	/* XXX DONT USE XXX */
 int	device_shutdown(device_t dev);
 void	device_unbusy(device_t dev);
 void	device_verbose(device_t dev);
+ssize_t	device_get_property(device_t dev, const char *prop, void *val, size_t sz);
+bool device_has_property(device_t dev, const char *prop);
 
 /*
  * Access functions for devclass.
@@ -730,9 +737,22 @@ void	bus_data_generation_update(void);
 #define	BUS_PASS_ORDER_LATE	7
 #define	BUS_PASS_ORDER_LAST	9
 
+#define BUS_LOCATOR_ACPI	"ACPI"
+#define BUS_LOCATOR_FREEBSD	"FreeBSD"
+#define BUS_LOCATOR_UEFI	"UEFI"
+
 extern int bus_current_pass;
 
 void	bus_set_pass(int pass);
+
+/**
+ * Routines to lock / unlock the newbus lock.
+ * Must be taken out to interact with newbus.
+ */
+void bus_topo_lock(void);
+void bus_topo_unlock(void);
+struct mtx * bus_topo_mtx(void);
+void bus_topo_assert(void);
 
 /**
  * Shorthands for constructing method tables.
@@ -764,7 +784,7 @@ struct driver_module_data {
 
 #define	EARLY_DRIVER_MODULE_ORDERED(name, busname, driver, devclass,	\
     evh, arg, order, pass)						\
-									\
+								\
 static struct driver_module_data name##_##busname##_driver_mod = {	\
 	evh, arg,							\
 	#busname,							\
@@ -802,7 +822,7 @@ DECLARE_MODULE(name##_##busname, name##_##busname##_mod,		\
 static __inline type varp ## _get_ ## var(device_t dev)			\
 {									\
 	uintptr_t v;							\
-	int e;								\
+	int e __diagused;						\
 	e = BUS_READ_IVAR(device_get_parent(dev), dev,			\
 	    ivarp ## _IVAR_ ## ivar, &v);				\
 	KASSERT(e == 0, ("%s failed for %s on bus %s, error = %d",	\
@@ -814,13 +834,20 @@ static __inline type varp ## _get_ ## var(device_t dev)			\
 static __inline void varp ## _set_ ## var(device_t dev, type t)		\
 {									\
 	uintptr_t v = (uintptr_t) t;					\
-	int e;								\
+	int e __diagused;						\
 	e = BUS_WRITE_IVAR(device_get_parent(dev), dev,			\
 	    ivarp ## _IVAR_ ## ivar, v);				\
 	KASSERT(e == 0, ("%s failed for %s on bus %s, error = %d",	\
 	    __func__, device_get_nameunit(dev),				\
 	    device_get_nameunit(device_get_parent(dev)), e));		\
 }
+
+struct device_location_cache;
+typedef struct device_location_cache device_location_cache_t;
+device_location_cache_t *dev_wired_cache_init(void);
+void dev_wired_cache_fini(device_location_cache_t *dcp);
+bool dev_wired_cache_match(device_location_cache_t *dcp, device_t dev, const char *at);
+
 
 /**
  * Shorthand macros, taking resource argument

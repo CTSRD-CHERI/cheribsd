@@ -178,12 +178,11 @@ freebsd64_copyout_control(struct msghdr *msg, struct mbuf *control)
 	socklen_t clen, datalen, oldclen;
 	int error;
 	char * __capability ctlbuf;
-	int len, maxlen, copylen;
+	int len, copylen;
 	struct mbuf *m;
 	error = 0;
 
 	len    = msg->msg_controllen;
-	maxlen = msg->msg_controllen;
 	msg->msg_controllen = 0;
 
 	ctlbuf = msg->msg_control;
@@ -441,7 +440,7 @@ freebsd64_getsockname(struct thread *td, struct freebsd64_getsockname_args *uap)
 {
 
 	return (user_getsockname(td, uap->fdes, __USER_CAP_UNBOUND(uap->asa),
-	    __USER_CAP_OBJ(uap->alen), 0));
+	    __USER_CAP_OBJ(uap->alen), false));
 }
 
 int
@@ -449,7 +448,7 @@ freebsd64_getpeername(struct thread *td, struct freebsd64_getpeername_args *uap)
 {
 
 	return (user_getpeername(td, uap->fdes, __USER_CAP_UNBOUND(uap->asa),
-	    __USER_CAP_OBJ(uap->alen), 0));
+	    __USER_CAP_OBJ(uap->alen), false));
 }
 
 /*

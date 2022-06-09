@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 
 #include <geom/geom.h>
+#include <geom/geom_vfs.h>
 
 #include <ufs/ufs/extattr.h>
 #include <ufs/ufs/quota.h>
@@ -174,6 +175,7 @@ static int mapacct_ufs2(struct vnode *, ufs2_daddr_t *, ufs2_daddr_t *,
     struct fs *, ufs_lbn_t, int);
 static int readblock(struct vnode *vp, struct buf *, ufs2_daddr_t);
 static void try_free_snapdata(struct vnode *devvp);
+static void revert_snaplock(struct vnode *, struct vnode *, struct snapdata *);
 static struct snapdata *ffs_snapdata_acquire(struct vnode *devvp);
 static int ffs_bp_snapblk(struct vnode *, struct buf *);
 
@@ -264,7 +266,7 @@ ffs_snapshot(mp, snapfile)
 	 */
 restart:
 	NDINIT(&nd, CREATE, LOCKPARENT | LOCKLEAF | NOCACHE, UIO_SYSSPACE,
-	    PTR2CAP(snapfile), td);
+	    PTR2CAP(snapfile));
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	if (nd.ni_vp != NULL) {
@@ -651,6 +653,27 @@ loop:
 		vput(xvp);
 	}
 	/*
+	 * Preallocate all the direct blocks in the snapshot inode so
+	 * that we never have to write the inode itself to commit an
+	 * update to the contents of the snapshot. Note that once
+	 * created, the size of the snapshot will never change, so
+	 * there will never be a need to write the inode except to
+	 * update the non-integrity-critical time fields and
+	 * allocated-block count.
+	 */
+	for (blockno = 0; blockno < UFS_NDADDR; blockno++) {
+		if (DIP(ip, i_db[blockno]) != 0)
+			continue;
+		error = UFS_BALLOC(vp, lblktosize(fs, blockno),
+		    fs->fs_bsize, KERNCRED, BA_CLRBUF, &bp);
+		if (error)
+			goto resumefs;
+		error = readblock(vp, bp, blockno);
+		bawrite(bp);
+		if (error != 0)
+			goto resumefs;
+	}
+	/*
 	 * Acquire a lock on the snapdata structure, creating it if necessary.
 	 */
 	sn = ffs_snapdata_acquire(devvp);
@@ -690,27 +713,6 @@ loop:
 		sn->sn_blklist = snapblklist;
 		sn->sn_listsize = blkp - snapblklist;
 		VI_UNLOCK(devvp);
-	}
-	/*
-	 * Preallocate all the direct blocks in the snapshot inode so
-	 * that we never have to write the inode itself to commit an
-	 * update to the contents of the snapshot. Note that once
-	 * created, the size of the snapshot will never change, so
-	 * there will never be a need to write the inode except to
-	 * update the non-integrity-critical time fields and
-	 * allocated-block count.
-	 */
-	for (blockno = 0; blockno < UFS_NDADDR; blockno++) {
-		if (DIP(ip, i_db[blockno]) != 0)
-			continue;
-		error = UFS_BALLOC(vp, lblktosize(fs, blockno),
-		    fs->fs_bsize, KERNCRED, BA_CLRBUF, &bp);
-		if (error)
-			goto resumefs;
-		error = readblock(vp, bp, blockno);
-		bawrite(bp);
-		if (error != 0)
-			goto resumefs;
 	}
 	/*
 	 * Record snapshot inode. Since this is the newest snapshot,
@@ -1082,7 +1084,8 @@ expunge_ufs1(snapvp, cancelip, fs, acctfunc, expungetype, clearmode)
 	dip->di_size = 0;
 	dip->di_blocks = 0;
 	dip->di_flags &= ~SF_SNAPSHOT;
-	bzero(&dip->di_db[0], (UFS_NDADDR + UFS_NIADDR) * sizeof(ufs1_daddr_t));
+	bzero(dip->di_db, UFS_NDADDR * sizeof(ufs1_daddr_t));
+	bzero(dip->di_ib, UFS_NIADDR * sizeof(ufs1_daddr_t));
 	bdwrite(bp);
 	/*
 	 * Now go through and expunge all the blocks in the file
@@ -1364,7 +1367,8 @@ expunge_ufs2(snapvp, cancelip, fs, acctfunc, expungetype, clearmode)
 	dip->di_size = 0;
 	dip->di_blocks = 0;
 	dip->di_flags &= ~SF_SNAPSHOT;
-	bzero(&dip->di_db[0], (UFS_NDADDR + UFS_NIADDR) * sizeof(ufs2_daddr_t));
+	bzero(dip->di_db, UFS_NDADDR * sizeof(ufs2_daddr_t));
+	bzero(dip->di_ib, UFS_NIADDR * sizeof(ufs2_daddr_t));
 	if (clearmode || cancelip->i_effnlink == 0)
 		dip->di_mode = 0;
 	else
@@ -1647,7 +1651,7 @@ ffs_snapremove(vp)
 	struct buf *ibp;
 	struct fs *fs;
 	ufs2_daddr_t numblks, blkno, dblk;
-	int error, i, last, loc;
+	int error, last, loc;
 	struct snapdata *sn;
 
 	ip = VTOI(vp);
@@ -1665,20 +1669,10 @@ ffs_snapremove(vp)
 		sn = devvp->v_rdev->si_snapdata;
 		TAILQ_REMOVE(&sn->sn_head, ip, i_nextsnap);
 		ip->i_nextsnap.tqe_prev = 0;
-		VI_UNLOCK(devvp);
-		lockmgr(&vp->v_lock, LK_EXCLUSIVE, NULL);
-		for (i = 0; i < sn->sn_lock.lk_recurse; i++)
-			lockmgr(&vp->v_lock, LK_EXCLUSIVE, NULL);
-		KASSERT(vp->v_vnlock == &sn->sn_lock,
-			("ffs_snapremove: lost lock mutation")); 
-		vp->v_vnlock = &vp->v_lock;
-		VI_LOCK(devvp);
-		while (sn->sn_lock.lk_recurse > 0)
-			lockmgr(&sn->sn_lock, LK_RELEASE, NULL);
-		lockmgr(&sn->sn_lock, LK_RELEASE, NULL);
+		revert_snaplock(vp, devvp, sn);
 		try_free_snapdata(devvp);
-	} else
-		VI_UNLOCK(devvp);
+	}
+	VI_UNLOCK(devvp);
 	/*
 	 * Clear all BLK_NOCOPY fields. Pass any block claims to other
 	 * snapshots that want them (see ffs_snapblkfree below).
@@ -1805,9 +1799,15 @@ retry:
 		VI_UNLOCK(devvp);
 		return (0);
 	}
+
+	/*
+	 * Use LK_SLEEPFAIL because sn might be freed under us while
+	 * both devvp interlock and snaplk are not owned.
+	 */
 	if (lockmgr(&sn->sn_lock, LK_INTERLOCK | LK_EXCLUSIVE | LK_SLEEPFAIL,
 	    VI_MTX(devvp)) != 0)
 		goto retry;
+
 	TAILQ_FOREACH(ip, &sn->sn_head, i_nextsnap) {
 		vp = ITOV(ip);
 		if (DOINGSOFTDEP(vp))
@@ -2120,7 +2120,6 @@ ffs_snapshot_mount(mp)
 	}
 	VOP_UNLOCK(vp);
 	VI_LOCK(devvp);
-	ASSERT_VOP_LOCKED(devvp, "ffs_snapshot_mount");
 	sn->sn_listsize = snaplistsize;
 	sn->sn_blklist = (daddr_t *)snapblklist;
 	devvp->v_vflag |= VV_COPYONWRITE;
@@ -2147,28 +2146,18 @@ ffs_snapshot_unmount(mp)
 		xp->i_nextsnap.tqe_prev = 0;
 		lockmgr(&sn->sn_lock, LK_INTERLOCK | LK_EXCLUSIVE,
 		    VI_MTX(devvp));
-		/*
-		 * Avoid LOR with above snapshot lock. The LK_NOWAIT should
-		 * never fail as the lock is currently unused. Rather than
-		 * panic, we recover by doing the blocking lock.
-		 */
-		if (lockmgr(&vp->v_lock, LK_EXCLUSIVE | LK_NOWAIT, NULL) != 0) {
-			printf("ffs_snapshot_unmount: Unexpected LK_NOWAIT "
-			    "failure\n");
-			lockmgr(&vp->v_lock, LK_EXCLUSIVE, NULL);
-		}
-		KASSERT(vp->v_vnlock == &sn->sn_lock,
-		("ffs_snapshot_unmount: lost lock mutation")); 
-		vp->v_vnlock = &vp->v_lock;
-		lockmgr(&vp->v_lock, LK_RELEASE, NULL);
-		lockmgr(&sn->sn_lock, LK_RELEASE, NULL);
-		if (xp->i_effnlink > 0)
-			vrele(vp);
 		VI_LOCK(devvp);
+		revert_snaplock(vp, devvp, sn);
+		lockmgr(&vp->v_lock, LK_RELEASE, NULL);
+		if (xp->i_effnlink > 0) {
+			VI_UNLOCK(devvp);
+			vrele(vp);
+			VI_LOCK(devvp);
+		}
 		sn = devvp->v_rdev->si_snapdata;
 	}
 	try_free_snapdata(devvp);
-	ASSERT_VOP_LOCKED(devvp, "ffs_snapshot_unmount");
+	VI_UNLOCK(devvp);
 }
 
 /*
@@ -2551,22 +2540,16 @@ readblock(vp, bp, lbn)
 	ufs2_daddr_t lbn;
 {
 	struct inode *ip;
-	struct bio *bip;
 	struct fs *fs;
 
 	ip = VTOI(vp);
 	fs = ITOFS(ip);
 
-	bip = g_alloc_bio();
-	bip->bio_cmd = BIO_READ;
-	bip->bio_offset = dbtob(fsbtodb(fs, blkstofrags(fs, lbn)));
-	bip->bio_data = bp->b_data;
-	bip->bio_length = bp->b_bcount;
-	bip->bio_done = NULL;
-
-	g_io_request(bip, ITODEVVP(ip)->v_bufobj.bo_private);
-	bp->b_error = biowait(bip, "snaprdb");
-	g_destroy_bio(bip);
+	bp->b_iocmd = BIO_READ;
+	bp->b_iooffset = dbtob(fsbtodb(fs, blkstofrags(fs, lbn)));
+	bp->b_iodone = bdone;
+	g_vfs_strategy(&ITODEVVP(ip)->v_bufobj, bp);
+	bufwait(bp);
 	return (bp->b_error);
 }
 
@@ -2678,10 +2661,8 @@ try_free_snapdata(struct vnode *devvp)
 	sn = devvp->v_rdev->si_snapdata;
 
 	if (sn == NULL || TAILQ_FIRST(&sn->sn_head) != NULL ||
-	    (devvp->v_vflag & VV_COPYONWRITE) == 0) {
-		VI_UNLOCK(devvp);
+	    (devvp->v_vflag & VV_COPYONWRITE) == 0)
 		return;
-	}
 
 	devvp->v_rdev->si_snapdata = NULL;
 	devvp->v_vflag &= ~VV_COPYONWRITE;
@@ -2693,6 +2674,46 @@ try_free_snapdata(struct vnode *devvp)
 	if (snapblklist != NULL)
 		free(snapblklist, M_UFSMNT);
 	ffs_snapdata_free(sn);
+	VI_LOCK(devvp);
+}
+
+/*
+ * Revert a vnode lock from using the snapshot lock back to its own lock.
+ *
+ * Aquire a lock on the vnode's own lock and release the lock on the
+ * snapshot lock. If there are any recursions on the snapshot lock
+ * get the same number of recursions on the vnode's own lock.
+ */
+static void
+revert_snaplock(vp, devvp, sn)
+	struct vnode *vp;
+	struct vnode *devvp;
+	struct snapdata *sn;
+{
+	int i;
+
+	ASSERT_VI_LOCKED(devvp, "revert_snaplock");
+	/*
+	 * Avoid LOR with snapshot lock. The LK_NOWAIT should
+	 * never fail as the lock is currently unused. Rather than
+	 * panic, we recover by doing the blocking lock.
+	 */
+	for (i = 0; i <= sn->sn_lock.lk_recurse; i++) {
+		if (lockmgr(&vp->v_lock, LK_EXCLUSIVE | LK_NOWAIT |
+		    LK_INTERLOCK, VI_MTX(devvp)) != 0) {
+			printf("revert_snaplock: Unexpected LK_NOWAIT "
+			    "failure\n");
+			lockmgr(&vp->v_lock, LK_EXCLUSIVE | LK_INTERLOCK,
+			    VI_MTX(devvp));
+		}
+		VI_LOCK(devvp);
+	}
+	KASSERT(vp->v_vnlock == &sn->sn_lock,
+	    ("revert_snaplock: lost lock mutation")); 
+	vp->v_vnlock = &vp->v_lock;
+	while (sn->sn_lock.lk_recurse > 0)
+		lockmgr(&sn->sn_lock, LK_RELEASE, NULL);
+	lockmgr(&sn->sn_lock, LK_RELEASE, NULL);
 }
 
 static struct snapdata *

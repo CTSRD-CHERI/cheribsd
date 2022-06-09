@@ -34,14 +34,11 @@ struct thread;
 #define	PADR_(t)	0
 #endif
 
-struct nosys_args {
-	register_t dummy;
-};
-struct sys_exit_args {
+struct exit_args {
 	char rval_l_[PADL_(int)]; int rval; char rval_r_[PADR_(int)];
 };
 struct fork_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct read_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -93,7 +90,7 @@ struct break_args {
 	char nsize_l_[PADL_(char * __capability)]; char * __capability nsize; char nsize_r_[PADR_(char * __capability)];
 };
 struct getpid_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct mount_args {
 	char type_l_[PADL_(const char * __capability)]; const char * __capability type; char type_r_[PADR_(const char * __capability)];
@@ -109,10 +106,10 @@ struct setuid_args {
 	char uid_l_[PADL_(uid_t)]; uid_t uid; char uid_r_[PADR_(uid_t)];
 };
 struct getuid_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct geteuid_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct ptrace_args {
 	char req_l_[PADL_(int)]; int req; char req_r_[PADR_(int)];
@@ -166,23 +163,23 @@ struct fchflags_args {
 	char flags_l_[PADL_(u_long)]; u_long flags; char flags_r_[PADR_(u_long)];
 };
 struct sync_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct kill_args {
 	char pid_l_[PADL_(int)]; int pid; char pid_r_[PADR_(int)];
 	char signum_l_[PADL_(int)]; int signum; char signum_r_[PADR_(int)];
 };
 struct getppid_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct dup_args {
 	char fd_l_[PADL_(u_int)]; u_int fd; char fd_r_[PADR_(u_int)];
 };
 struct freebsd10_pipe_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct getegid_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct profil_args {
 	char samples_l_[PADL_(char * __capability)]; char * __capability samples; char samples_r_[PADR_(char * __capability)];
@@ -197,7 +194,7 @@ struct ktrace_args {
 	char pid_l_[PADL_(int)]; int pid; char pid_r_[PADR_(int)];
 };
 struct getgid_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct getlogin_args {
 	char namebuf_l_[PADL_(char * __capability)]; char * __capability namebuf; char namebuf_r_[PADR_(char * __capability)];
@@ -210,7 +207,7 @@ struct acct_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct osigpending_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct sigaltstack_args {
 	char ss_l_[PADL_(const struct sigaltstack * __capability)]; const struct sigaltstack * __capability ss; char ss_r_[PADR_(const struct sigaltstack * __capability)];
@@ -248,7 +245,7 @@ struct chroot_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct ogetpagesize_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct msync_args {
 	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
@@ -256,7 +253,7 @@ struct msync_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct vfork_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct sbrk_args {
 	char incr_l_[PADL_(int)]; int incr; char incr_r_[PADR_(int)];
@@ -269,7 +266,7 @@ struct munmap_args {
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 };
 struct mprotect_args {
-	char addr_l_[PADL_(const void * __capability)]; const void * __capability addr; char addr_r_[PADR_(const void * __capability)];
+	char addr_l_[PADL_(void * __capability)]; void * __capability addr; char addr_r_[PADR_(void * __capability)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char prot_l_[PADL_(int)]; int prot; char prot_r_[PADR_(int)];
 };
@@ -284,15 +281,15 @@ struct mincore_args {
 	char vec_l_[PADL_(char * __capability)]; char * __capability vec; char vec_r_[PADR_(char * __capability)];
 };
 struct getgroups_args {
-	char gidsetsize_l_[PADL_(u_int)]; u_int gidsetsize; char gidsetsize_r_[PADR_(u_int)];
+	char gidsetsize_l_[PADL_(int)]; int gidsetsize; char gidsetsize_r_[PADR_(int)];
 	char gidset_l_[PADL_(gid_t * __capability)]; gid_t * __capability gidset; char gidset_r_[PADR_(gid_t * __capability)];
 };
 struct setgroups_args {
-	char gidsetsize_l_[PADL_(u_int)]; u_int gidsetsize; char gidsetsize_r_[PADR_(u_int)];
+	char gidsetsize_l_[PADL_(int)]; int gidsetsize; char gidsetsize_r_[PADR_(int)];
 	char gidset_l_[PADL_(const gid_t * __capability)]; const gid_t * __capability gidset; char gidset_r_[PADR_(const gid_t * __capability)];
 };
 struct getpgrp_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct setpgid_args {
 	char pid_l_[PADL_(int)]; int pid; char pid_r_[PADR_(int)];
@@ -304,7 +301,7 @@ struct setitimer_args {
 	char oitv_l_[PADL_(struct itimerval * __capability)]; struct itimerval * __capability oitv; char oitv_r_[PADR_(struct itimerval * __capability)];
 };
 struct owait_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct swapon_args {
 	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
@@ -314,7 +311,7 @@ struct getitimer_args {
 	char itv_l_[PADL_(struct itimerval * __capability)]; struct itimerval * __capability itv; char itv_r_[PADR_(struct itimerval * __capability)];
 };
 struct getdtablesize_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct dup2_args {
 	char from_l_[PADL_(u_int)]; u_int from; char from_r_[PADR_(u_int)];
@@ -462,10 +459,10 @@ struct adjtime_args {
 	char olddelta_l_[PADL_(struct timeval * __capability)]; struct timeval * __capability olddelta; char olddelta_r_[PADR_(struct timeval * __capability)];
 };
 struct ogethostid_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct setsid_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct quotactl_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
@@ -474,7 +471,7 @@ struct quotactl_args {
 	char arg_l_[PADL_(void * __capability)]; void * __capability arg; char arg_r_[PADR_(void * __capability)];
 };
 struct oquota_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct coexecve_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
@@ -557,7 +554,7 @@ struct colookup_args {
 	char cap_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability cap; char cap_r_[PADR_(void * __capability __capability * __capability)];
 };
 struct copark_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct setgid_args {
 	char gid_l_[PADL_(gid_t)]; gid_t gid; char gid_r_[PADR_(gid_t)];
@@ -579,11 +576,11 @@ struct fpathconf_args {
 struct cogetpid_args {
 	char pidp_l_[PADL_(pid_t * __capability)]; pid_t * __capability pidp; char pidp_r_[PADR_(pid_t * __capability)];
 };
-struct __getrlimit_args {
+struct getrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
 	char rlp_l_[PADL_(struct rlimit * __capability)]; struct rlimit * __capability rlp; char rlp_r_[PADR_(struct rlimit * __capability)];
 };
-struct __setrlimit_args {
+struct setrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
 	char rlp_l_[PADL_(struct rlimit * __capability)]; struct rlimit * __capability rlp; char rlp_r_[PADR_(struct rlimit * __capability)];
 };
@@ -727,7 +724,7 @@ struct rfork_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct issetugid_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct lchown_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
@@ -841,13 +838,13 @@ struct aio_error_args {
 	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
 struct yield_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct mlockall_args {
 	char how_l_[PADL_(int)]; int how; char how_r_[PADR_(int)];
 };
 struct munlockall_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct __getcwd_args {
 	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
@@ -870,7 +867,7 @@ struct sched_getscheduler_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
 };
 struct sched_yield_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct sched_get_priority_max_args {
 	char policy_l_[PADL_(int)]; int policy; char policy_r_[PADR_(int)];
@@ -1000,7 +997,7 @@ struct getresgid_args {
 	char sgid_l_[PADL_(gid_t * __capability)]; gid_t * __capability sgid; char sgid_r_[PADR_(gid_t * __capability)];
 };
 struct kqueue_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct extattr_set_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -1179,9 +1176,6 @@ struct setcontext_args {
 struct swapcontext_args {
 	char oucp_l_[PADL_(struct __ucontext * __capability)]; struct __ucontext * __capability oucp; char oucp_r_[PADR_(struct __ucontext * __capability)];
 	char ucp_l_[PADL_(const struct __ucontext * __capability)]; const struct __ucontext * __capability ucp; char ucp_r_[PADR_(const struct __ucontext * __capability)];
-};
-struct swapoff_args {
-	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
 };
 struct __acl_get_link_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
@@ -1573,7 +1567,7 @@ struct __cap_rights_get_args {
 	char rightsp_l_[PADL_(cap_rights_t * __capability)]; cap_rights_t * __capability rightsp; char rightsp_r_[PADR_(cap_rights_t * __capability)];
 };
 struct cap_enter_args {
-	register_t dummy;
+	syscallarg_t dummy;
 };
 struct cap_getmode_args {
 	char modep_l_[PADL_(u_int * __capability)]; u_int * __capability modep; char modep_r_[PADR_(u_int * __capability)];
@@ -1903,8 +1897,21 @@ struct aio_writev_args {
 struct aio_readv_args {
 	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
-int	nosys(struct thread *, struct nosys_args *);
-void	sys_sys_exit(struct thread *, struct sys_exit_args *);
+struct fspacectl_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
+	char rqsr_l_[PADL_(const struct spacectl_range * __capability)]; const struct spacectl_range * __capability rqsr; char rqsr_r_[PADR_(const struct spacectl_range * __capability)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char rmsr_l_[PADL_(struct spacectl_range * __capability)]; struct spacectl_range * __capability rmsr; char rmsr_r_[PADR_(struct spacectl_range * __capability)];
+};
+struct sched_getcpu_args {
+	syscallarg_t dummy;
+};
+struct swapoff_args {
+	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char flags_l_[PADL_(u_int)]; u_int flags; char flags_r_[PADR_(u_int)];
+};
+int	sys_exit(struct thread *, struct exit_args *);
 int	sys_fork(struct thread *, struct fork_args *);
 int	sys_read(struct thread *, struct read_args *);
 int	sys_write(struct thread *, struct write_args *);
@@ -2026,8 +2033,8 @@ int	sys_seteuid(struct thread *, struct seteuid_args *);
 int	sys_pathconf(struct thread *, struct pathconf_args *);
 int	sys_fpathconf(struct thread *, struct fpathconf_args *);
 int	sys_cogetpid(struct thread *, struct cogetpid_args *);
-int	sys_getrlimit(struct thread *, struct __getrlimit_args *);
-int	sys_setrlimit(struct thread *, struct __setrlimit_args *);
+int	sys_getrlimit(struct thread *, struct getrlimit_args *);
+int	sys_setrlimit(struct thread *, struct setrlimit_args *);
 int	sys___sysctl(struct thread *, struct __sysctl_args *);
 int	sys_mlock(struct thread *, struct mlock_args *);
 int	sys_munlock(struct thread *, struct munlock_args *);
@@ -2165,7 +2172,6 @@ int	sys_sigreturn(struct thread *, struct sigreturn_args *);
 int	sys_getcontext(struct thread *, struct getcontext_args *);
 int	sys_setcontext(struct thread *, struct setcontext_args *);
 int	sys_swapcontext(struct thread *, struct swapcontext_args *);
-int	sys_swapoff(struct thread *, struct swapoff_args *);
 int	sys___acl_get_link(struct thread *, struct __acl_get_link_args *);
 int	sys___acl_set_link(struct thread *, struct __acl_set_link_args *);
 int	sys___acl_delete_link(struct thread *, struct __acl_delete_link_args *);
@@ -2308,6 +2314,9 @@ int	sys_rpctls_syscall(struct thread *, struct rpctls_syscall_args *);
 int	sys___specialfd(struct thread *, struct __specialfd_args *);
 int	sys_aio_writev(struct thread *, struct aio_writev_args *);
 int	sys_aio_readv(struct thread *, struct aio_readv_args *);
+int	sys_fspacectl(struct thread *, struct fspacectl_args *);
+int	sys_sched_getcpu(struct thread *, struct sched_getcpu_args *);
+int	sys_swapoff(struct thread *, struct swapoff_args *);
 
 #ifdef COMPAT_43
 
@@ -2408,8 +2417,16 @@ struct orecvmsg_args {
 };
 struct osendmsg_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char msg_l_[PADL_(const void * __capability)]; const void * __capability msg; char msg_r_[PADR_(const void * __capability)];
+	char msg_l_[PADL_(const struct omsghdr * __capability)]; const struct omsghdr * __capability msg; char msg_r_[PADR_(const struct omsghdr * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct orecvfrom_args {
+	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
+	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char from_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability from; char from_r_[PADR_(struct sockaddr * __capability)];
+	char fromlenaddr_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __capability)];
 };
 struct otruncate_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
@@ -2438,6 +2455,11 @@ struct osetrlimit_args {
 struct okillpg_args {
 	char pgid_l_[PADL_(int)]; int pgid; char pgid_r_[PADR_(int)];
 	char signum_l_[PADL_(int)]; int signum; char signum_r_[PADR_(int)];
+};
+struct ogetsockname_args {
+	char fdes_l_[PADL_(int)]; int fdes; char fdes_r_[PADR_(int)];
+	char asa_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability asa; char asa_r_[PADR_(struct sockaddr * __capability)];
+	char alen_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability alen; char alen_r_[PADR_(__socklen_t * __capability)];
 };
 struct ogetdirentries_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -2470,7 +2492,7 @@ int	osigsuspend(struct thread *, struct osigsuspend_args *);
 int	osigstack(struct thread *, struct osigstack_args *);
 int	orecvmsg(struct thread *, struct orecvmsg_args *);
 int	osendmsg(struct thread *, struct osendmsg_args *);
-int	orecvfrom(struct thread *, struct recvfrom_args *);
+int	orecvfrom(struct thread *, struct orecvfrom_args *);
 int	otruncate(struct thread *, struct otruncate_args *);
 int	oftruncate(struct thread *, struct oftruncate_args *);
 int	ogetpeername(struct thread *, struct ogetpeername_args *);
@@ -2480,7 +2502,7 @@ int	ogetrlimit(struct thread *, struct ogetrlimit_args *);
 int	osetrlimit(struct thread *, struct osetrlimit_args *);
 int	okillpg(struct thread *, struct okillpg_args *);
 int	oquota(struct thread *, struct oquota_args *);
-int	ogetsockname(struct thread *, struct getsockname_args *);
+int	ogetsockname(struct thread *, struct ogetsockname_args *);
 int	ogetdirentries(struct thread *, struct ogetdirentries_args *);
 
 #endif /* COMPAT_43 */
@@ -2640,7 +2662,15 @@ int	freebsd7_shmctl(struct thread *, struct freebsd7_shmctl_args *);
 
 #ifdef COMPAT_FREEBSD10
 
+struct freebsd10__umtx_lock_args {
+	char umtx_l_[PADL_(struct umtx * __capability)]; struct umtx * __capability umtx; char umtx_r_[PADR_(struct umtx * __capability)];
+};
+struct freebsd10__umtx_unlock_args {
+	char umtx_l_[PADL_(struct umtx * __capability)]; struct umtx * __capability umtx; char umtx_r_[PADR_(struct umtx * __capability)];
+};
 int	freebsd10_pipe(struct thread *, struct freebsd10_pipe_args *);
+int	freebsd10__umtx_lock(struct thread *, struct freebsd10__umtx_lock_args *);
+int	freebsd10__umtx_unlock(struct thread *, struct freebsd10__umtx_unlock_args *);
 
 #endif /* COMPAT_FREEBSD10 */
 
@@ -2696,9 +2726,9 @@ struct freebsd11_fhstat_args {
 };
 struct freebsd11_kevent_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char changelist_l_[PADL_(struct kevent_freebsd11 * __capability)]; struct kevent_freebsd11 * __capability changelist; char changelist_r_[PADR_(struct kevent_freebsd11 * __capability)];
+	char changelist_l_[PADL_(const struct freebsd11_kevent * __capability)]; const struct freebsd11_kevent * __capability changelist; char changelist_r_[PADR_(const struct freebsd11_kevent * __capability)];
 	char nchanges_l_[PADL_(int)]; int nchanges; char nchanges_r_[PADR_(int)];
-	char eventlist_l_[PADL_(struct kevent_freebsd11 * __capability)]; struct kevent_freebsd11 * __capability eventlist; char eventlist_r_[PADR_(struct kevent_freebsd11 * __capability)];
+	char eventlist_l_[PADL_(struct freebsd11_kevent * __capability)]; struct freebsd11_kevent * __capability eventlist; char eventlist_r_[PADR_(struct freebsd11_kevent * __capability)];
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
 };
@@ -2768,7 +2798,16 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 
 #endif /* COMPAT_FREEBSD12 */
 
-#define	SYS_AUE_syscall	AUE_NULL
+
+#ifdef COMPAT_FREEBSD13
+
+struct freebsd13_swapoff_args {
+	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+};
+int	freebsd13_swapoff(struct thread *, struct freebsd13_swapoff_args *);
+
+#endif /* COMPAT_FREEBSD13 */
+
 #define	SYS_AUE_exit	AUE_EXIT
 #define	SYS_AUE_fork	AUE_FORK
 #define	SYS_AUE_read	AUE_READ
@@ -3106,7 +3145,7 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 #define	SYS_AUE_getcontext	AUE_NULL
 #define	SYS_AUE_setcontext	AUE_NULL
 #define	SYS_AUE_swapcontext	AUE_NULL
-#define	SYS_AUE_swapoff	AUE_SWAPOFF
+#define	SYS_AUE_freebsd13_swapoff	AUE_SWAPOFF
 #define	SYS_AUE___acl_get_link	AUE_ACL_GET_LINK
 #define	SYS_AUE___acl_set_link	AUE_ACL_SET_LINK
 #define	SYS_AUE___acl_delete_link	AUE_ACL_DELETE_LINK
@@ -3116,6 +3155,8 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 #define	SYS_AUE_thr_exit	AUE_THR_EXIT
 #define	SYS_AUE_thr_self	AUE_NULL
 #define	SYS_AUE_thr_kill	AUE_THR_KILL
+#define	SYS_AUE_freebsd10__umtx_lock	AUE_NULL
+#define	SYS_AUE_freebsd10__umtx_unlock	AUE_NULL
 #define	SYS_AUE_jail_attach	AUE_JAIL_ATTACH
 #define	SYS_AUE_extattr_list_fd	AUE_EXTATTR_LIST_FD
 #define	SYS_AUE_extattr_list_file	AUE_EXTATTR_LIST_FILE
@@ -3253,6 +3294,9 @@ int	freebsd12_closefrom(struct thread *, struct freebsd12_closefrom_args *);
 #define	SYS_AUE___specialfd	AUE_SPECIALFD
 #define	SYS_AUE_aio_writev	AUE_AIO_WRITEV
 #define	SYS_AUE_aio_readv	AUE_AIO_READV
+#define	SYS_AUE_fspacectl	AUE_FSPACECTL
+#define	SYS_AUE_sched_getcpu	AUE_NULL
+#define	SYS_AUE_swapoff	AUE_SWAPOFF
 
 #undef PAD_
 #undef PADL_

@@ -108,7 +108,7 @@ struct icmp {
 			uint32_t its_ttime;	/* Transmit */
 		} id_ts;
 		struct id_ip  {
-			struct ip idi_ip;
+			struct ip idi_ip __subobject_use_container_bounds;
 			/* options and then 64 bits of data */
 		} id_ip;
 		struct icmp_ra_addr id_radv;

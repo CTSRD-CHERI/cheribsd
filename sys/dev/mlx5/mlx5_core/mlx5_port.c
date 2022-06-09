@@ -25,9 +25,12 @@
  * $FreeBSD$
  */
 
+#include "opt_rss.h"
+#include "opt_ratelimit.h"
+
 #include <linux/module.h>
 #include <dev/mlx5/port.h>
-#include "mlx5_core.h"
+#include <dev/mlx5/mlx5_core/mlx5_core.h>
 
 int mlx5_core_access_reg(struct mlx5_core_dev *dev, void *data_in,
 			 int size_in, void *data_out, int size_out,
@@ -1220,6 +1223,21 @@ int mlx5_query_pddr_range_info(struct mlx5_core_dev *mdev, u8 local_port, u8 *is
 	return (0);
 }
 EXPORT_SYMBOL_GPL(mlx5_query_pddr_range_info);
+
+int mlx5_query_pddr_cable_type(struct mlx5_core_dev *mdev, u8 local_port, u8 *cable_type)
+{
+	u32 pddr_reg[MLX5_ST_SZ_DW(pddr_reg)] = {};
+	int error;
+
+	error = mlx5_query_pddr(mdev, local_port, MLX5_PDDR_MODULE_INFO_PAGE,
+	    pddr_reg, sizeof(pddr_reg));
+	if (error != 0)
+		return (error);
+
+	*cable_type = MLX5_GET(pddr_reg, pddr_reg, page_data.pddr_module_info.cable_type);
+	return (0);
+}
+EXPORT_SYMBOL_GPL(mlx5_query_pddr_cable_type);
 
 int mlx5_query_pddr_troubleshooting_info(struct mlx5_core_dev *mdev,
     u16 *monitor_opcode, u8 *status_message, size_t sm_len)

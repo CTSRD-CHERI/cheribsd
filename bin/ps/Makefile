@@ -14,7 +14,4 @@ SRCS=	fmt.c keyword.c nlist.c print.c ps.c
 CFLAGS+=-DLAZY_PS
 LIBADD=	m kvm jail xo
 
-# Stuff like "ps -o vmaddr" doesn't work in pure mode.
-NEED_CHERI=   hybrid
-
 .include <bsd.prog.mk>

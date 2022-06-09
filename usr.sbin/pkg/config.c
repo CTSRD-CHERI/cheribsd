@@ -66,7 +66,7 @@ static struct config_entry c[] = {
 	[PACKAGESITE] = {
 		PKG_CONFIG_STRING,
 		"PACKAGESITE",
-		URL_SCHEME_PREFIX "http://pkg.FreeBSD.org/${ABI}/latest",
+		URL_SCHEME_PREFIX "http://pkg.CheriBSD.org/${ABI}",
 		NULL,
 		NULL,
 		false,
@@ -149,14 +149,9 @@ static struct config_entry c[] = {
 static int
 pkg_get_myabi(char *dest, size_t sz)
 {
-	struct utsname uts;
 	char machine_arch[255];
 	size_t len;
 	int error;
-
-	error = uname(&uts);
-	if (error)
-		return (errno);
 
 	len = sizeof(machine_arch);
 	error = sysctlbyname("hw.machine_arch", machine_arch, &len, NULL, 0);
@@ -164,12 +159,7 @@ pkg_get_myabi(char *dest, size_t sz)
 		return (errno);
 	machine_arch[len] = '\0';
 
-	/*
-	 * Use __FreeBSD_version rather than kernel version (uts.release) for
-	 * use in jails. This is equivalent to the value of uname -U.
-	 */
-	snprintf(dest, sz, "%s:%d:%s", uts.sysname, __FreeBSD_version/100000,
-	    machine_arch);
+	snprintf(dest, sz, "CheriBSD:%d:%s", __CheriBSD_version, machine_arch);
 
 	return (error);
 }
@@ -500,7 +490,7 @@ config_init(const char *requested_repo)
 		c[REPOS_DIR].list = malloc(sizeof(*c[REPOS_DIR].list));
 		STAILQ_INIT(c[REPOS_DIR].list);
 		cv = malloc(sizeof(struct config_value));
-		cv->value = strdup("/etc/pkg");
+		cv->value = strdup("/etc/pkg" PKG_SUFFIX);
 		STAILQ_INSERT_TAIL(c[REPOS_DIR].list, cv, next);
 		cv = malloc(sizeof(struct config_value));
 		if (asprintf(&cv->value, "%s/etc/pkg/repos", localbase) < 0)

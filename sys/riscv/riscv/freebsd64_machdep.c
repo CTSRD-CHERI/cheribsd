@@ -56,6 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/proc.h>
+#include <sys/reg.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysent.h>
 #include <sys/ucontext.h>
@@ -67,6 +68,10 @@ __FBSDID("$FreeBSD$");
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
+
+_Static_assert(sizeof(mcontext64_t) == 864, "mcontext64_t size incorrect");
+_Static_assert(sizeof(ucontext64_t) == 936, "ucontext64_t size incorrect");
+_Static_assert(sizeof(struct siginfo64) == 80, "struct siginfo64 size incorrect");
 
 static const char *freebsd64_riscv_machine_arch(struct proc *p);
 static void	freebsd64_sendsig(sig_t, ksiginfo_t *, sigset_t *);
@@ -83,29 +88,37 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_szsigcode	= &freebsd64_szsigcode,
 	.sv_name	= "FreeBSD ELF64",
 	.sv_coredump	= __elfN(coredump),
+	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
+	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
+	.sv_elf_core_prepare_notes = __elfN(prepare_notes),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
-	.sv_maxuser	= VM_MAXUSER_ADDRESS,
-	.sv_usrstack	= USRSTACK,
-	.sv_szpsstrings	= sizeof(struct freebsd64_ps_strings),
+	.sv_maxuser	= 0,	/* Filled in during boot. */
+	.sv_usrstack	= 0,	/* Filled in during boot. */
+	.sv_psstringssz	= sizeof(struct freebsd64_ps_strings),
 	.sv_stackprot	= VM_PROT_RW_CAP,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = freebsd64_copyout_strings,
 	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP | SV_ASLR,
+	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP | SV_TIMEKEEP |
+	    SV_ASLR | SV_RNG_SEED_VER,
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = freebsd64_syscallnames,
-	.sv_shared_page_base = SHAREDPAGE,
+	.sv_shared_page_base = 0,	/* Filled in during boot. */
 	.sv_shared_page_len = PAGE_SIZE,
 	.sv_schedtail	= NULL,
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
 	.sv_hwcap	= &elf_hwcap,
 	.sv_machine_arch = freebsd64_riscv_machine_arch,
+	.sv_onexec_old	= exec_onexec_old,
+	.sv_onexit	= exit_onexit,
+	.sv_regset_begin = SET_BEGIN(__elfN(regset)),
+	.sv_regset_end	= SET_LIMIT(__elfN(regset)),
 };
 INIT_SYSENTVEC(freebsd64_sysent, &elf_freebsd_freebsd64_sysvec);
 
@@ -134,6 +147,9 @@ static Elf64_Brandinfo freebsd_freebsd64_brand_info = {
 SYSINIT(freebsd64, SI_SUB_EXEC, SI_ORDER_ANY,
     (sysinit_cfunc_t) elf64_insert_brand_entry,
     &freebsd_freebsd64_brand_info);
+
+SYSINIT(freebsd64_register_sysvec, SI_SUB_VM, SI_ORDER_ANY,
+    elf64_register_sysvec, &elf_freebsd_freebsd64_sysvec);
 
 /*
  * Number of GPRs in mc_gpregs that are mirrored in mc_capregs up to,
@@ -308,7 +324,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_ra = (register_t)sysent->sv_sigcode_base;
 	else
-		tf->tf_ra = (register_t)(p->p_psstrings -
+		tf->tf_ra = (register_t)(PROC_PS_STRINGS(p) -
 		    *(sysent->sv_szsigcode));
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_sepc,

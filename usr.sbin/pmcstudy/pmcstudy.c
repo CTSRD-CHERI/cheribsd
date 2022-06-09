@@ -2249,6 +2249,10 @@ process_file(char *filename)
 
 	if (filename ==  NULL) {
 		io = my_popen(command, "r", &pid_of_command);
+		if (io == NULL) {
+			printf("Can't popen the command %s\n", command);
+			return;
+		}
 	} else {
 		io = fopen(filename, "r");
 		if (io == NULL) {
@@ -2261,8 +2265,10 @@ process_file(char *filename)
 	if (cnts == NULL) {
 		/* Nothing we can do */
 		printf("Nothing to do -- no counters built\n");
-		if (io) {
+		if (filename) {
 			fclose(io);
+		} else {
+			my_pclose(io, pid_of_command);
 		}
 		return;
 	}
@@ -2859,7 +2865,7 @@ main(int argc, char **argv)
 			       argv[0]);
 			printf("-i inputfile -- use source as inputfile not stdin (if stdin collect)\n");
 			printf("-v -- verbose dump debug type things -- you don't want this\n");
-			printf("-m N -- maximum to collect is N measurments\n");
+			printf("-m N -- maximum to collect is N measurements\n");
 			printf("-e expr-name -- Do expression expr-name\n");
 			printf("-E 'your expression' -- Do your expression\n");
 			printf("-h -- Don't do the expression I put in -e xxx just explain what it does and exit\n");

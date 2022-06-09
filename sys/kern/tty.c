@@ -241,8 +241,7 @@ ttydev_leave(struct tty *tp)
 	tp->t_flags |= TF_OPENCLOSE;
 
 	/* Remove console TTY. */
-	if (constty == tp)
-		constty_clear();
+	constty_clear(tp);
 
 	/* Drain any output. */
 	if (!tty_gone(tp))
@@ -525,7 +524,7 @@ static int
 ttydev_write(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	struct tty *tp = dev->si_drv1;
-	int error;
+	int defer, error;
 
 	error = ttydev_enter(tp);
 	if (error)
@@ -549,7 +548,9 @@ ttydev_write(struct cdev *dev, struct uio *uio, int ioflag)
 		}
 
 		tp->t_flags |= TF_BUSY_OUT;
+		defer = sigdeferstop(SIGDEFERSTOP_ERESTART);
 		error = ttydisc_write(tp, uio, ioflag);
+		sigallowstop(defer);
 		tp->t_flags &= ~TF_BUSY_OUT;
 		cv_signal(&tp->t_outserwait);
 	}
@@ -1918,24 +1919,11 @@ tty_generic_ioctl(struct tty *tp, u_long cmd, void *data, int fflag,
 			error = priv_check(td, PRIV_TTY_CONSOLE);
 			if (error)
 				return (error);
-
-			/*
-			 * XXX: constty should really need to be locked!
-			 * XXX: allow disconnected constty's to be stolen!
-			 */
-
-			if (constty == tp)
-				return (0);
-			if (constty != NULL)
-				return (EBUSY);
-
-			tty_unlock(tp);
-			constty_set(tp);
-			tty_lock(tp);
-		} else if (constty == tp) {
-			constty_clear();
+			error = constty_set(tp);
+		} else {
+			error = constty_clear(tp);
 		}
-		return (0);
+		return (error);
 	case TIOCGWINSZ:
 		/* Obtain window size. */
 		*(struct winsize*)data = tp->t_winsize;
@@ -2086,9 +2074,18 @@ ttyhook_register(struct tty **rtp, struct proc *p, int fd, struct ttyhook *th,
 	int error, ref;
 
 	/* Validate the file descriptor. */
+	/*
+	 * XXX this code inspects a file descriptor from a different process,
+	 * but there is no dedicated routine to do it in fd code, making the
+	 * ordeal highly questionable.
+	 */
 	fdp = p->p_fd;
-	error = fget_unlocked(fdp, fd, cap_rights_init_one(&rights, CAP_TTYHOOK),
-	    &fp);
+	FILEDESC_SLOCK(fdp);
+	error = fget_cap_noref(fdp, fd, cap_rights_init_one(&rights, CAP_TTYHOOK),
+	    &fp, NULL);
+	if (error == 0 && !fhold(fp))
+		error = EBADF;
+	FILEDESC_SUNLOCK(fdp);
 	if (error != 0)
 		return (error);
 	if (fp->f_ops == &badfileops) {

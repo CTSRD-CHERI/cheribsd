@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 //
 // UNSUPPORTED: libcpp-has-no-threads
+// XFAIL: !non-lockfree-atomics
 //  ... assertion fails line 34
 
 // <atomic>
@@ -31,9 +32,8 @@ struct TestFn {
   void operator()() const {
     {
         typedef std::atomic<T> A;
-        A a;
         T t(T(1));
-        std::atomic_init(&a, t);
+        A a(t);
         assert(std::atomic_compare_exchange_strong(&a, &t, T(2)) == true);
         assert(a == T(2));
         assert(t == T(1));
@@ -43,9 +43,8 @@ struct TestFn {
     }
     {
         typedef std::atomic<T> A;
-        volatile A a;
         T t(T(1));
-        std::atomic_init(&a, t);
+        volatile A a(t);
         assert(std::atomic_compare_exchange_strong(&a, &t, T(2)) == true);
         assert(a == T(2));
         assert(t == T(1));

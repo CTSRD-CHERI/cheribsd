@@ -42,11 +42,14 @@ else
 	echo "   xterm    xterm terminal emulator (or compatible)"
 	echo "   cons25w  cons25w terminal"
 	echo
-	echo -n "Console type [vt100]: "
+	echo -n "Console type [xterm]: "
 	read TERM
-	TERM=${TERM:-vt100}
+	TERM=${TERM:-xterm}
 fi
 export TERM
+
+# Query terminal size; useful for serial lines.
+resizewin -z
 
 if [ -f /etc/installerconfig ]; then
 	if bsdinstall script /etc/installerconfig; then

@@ -78,7 +78,7 @@ __FBSDID("$FreeBSD$");
  * is not a valid pointer on CHERIABI, as sysctl kern.usrstack returns a
  * virtual address and not a capability. However, we don't need to use
  * it as a pointer anyway as there is no need to group stacks together
- * and add guard pages on CHERABI. In CHERIABI _usrstack is only used to
+ * and add guard pages on CHERIABI. In CHERIABI _usrstack is only used to
  * initialize stackaddr_attr for the main thread.
  */
 vaddr_t		_usrstack;
@@ -437,8 +437,7 @@ init_main_thread(struct pthread *thread)
 	 *       actually free() it; it just puts it in the free
 	 *       stack queue for later reuse.
 	 */
-
-	thread->attr.stackaddr_attr = (void*)(uintptr_t)(_usrstack -
+	thread->attr.stackaddr_attr = (void *)(uintptr_t)(_usrstack -
 	    _thr_stack_initial);
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* In CHERIABI stackaddr_attr can't be dereferenced */
@@ -469,7 +468,7 @@ init_main_thread(struct pthread *thread)
 	thread->attr.prio = sched_param.sched_priority;
 
 #ifdef _PTHREAD_FORCED_UNWIND
-	thread->unwind_stackend = (void*)(uintptr_t)_usrstack;
+	thread->unwind_stackend = (void *)(uintptr_t)_usrstack;
 #endif
 
 	/* Others cleared to zero by thr_alloc() */

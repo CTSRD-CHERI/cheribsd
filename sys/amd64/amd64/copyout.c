@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2018 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Konstantin Belousov <kib@FreeBSD.org>
  * under sponsorship from the FreeBSD Foundation.
@@ -31,6 +30,10 @@
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
+
+#ifdef SAN_NEEDS_INTERCEPTORS
+#define	SAN_RUNTIME
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -145,10 +148,6 @@ DEFINE_IFUNC(, int, casueword, (volatile u_long *, u_long, u_long *, u_long))
 	return ((cpu_stdext_feature & CPUID_STDEXT_SMAP) != 0 ?
 	    casueword_smap : casueword_nosmap);
 }
-
-#undef copyinstr
-#undef copyin
-#undef copyout
 
 int	copyinstr_nosmap(const void *udaddr, void *kaddr, size_t len,
 	    size_t *lencopied);

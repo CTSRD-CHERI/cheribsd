@@ -1325,7 +1325,7 @@ vm_vcpu_resume(struct vmctx *ctx)
 }
 
 static int
-vm_checkpoint(struct vmctx *ctx, char *checkpoint_file, bool stop_vm)
+vm_checkpoint(struct vmctx *ctx, const char *checkpoint_file, bool stop_vm)
 {
 	int fd_checkpoint = 0, kdata_fd = 0;
 	int ret = 0;
@@ -1440,26 +1440,32 @@ done:
 	return (error);
 }
 
-int
-handle_message(struct checkpoint_op *checkpoint_op, struct vmctx *ctx)
+static int
+handle_message(struct vmctx *ctx, nvlist_t *nvl)
 {
 	int err;
+	const char *cmd;
 
-	switch (checkpoint_op->op) {
-		case START_CHECKPOINT:
-			err = vm_checkpoint(ctx, checkpoint_op->snapshot_filename, false);
-			break;
-		case START_SUSPEND:
-			err = vm_checkpoint(ctx, checkpoint_op->snapshot_filename, true);
-			break;
-		default:
-			EPRINTLN("Unrecognized checkpoint operation\n");
+	if (!nvlist_exists_string(nvl, "cmd"))
+		return (-1);
+
+	cmd = nvlist_get_string(nvl, "cmd");
+	if (strcmp(cmd, "checkpoint") == 0) {
+		if (!nvlist_exists_string(nvl, "filename") ||
+		    !nvlist_exists_bool(nvl, "suspend"))
 			err = -1;
+		else
+			err = vm_checkpoint(ctx, nvlist_get_string(nvl, "filename"),
+			    nvlist_get_bool(nvl, "suspend"));
+	} else {
+		EPRINTLN("Unrecognized checkpoint operation\n");
+		err = -1;
 	}
 
 	if (err != 0)
 		EPRINTLN("Unable to perform the requested operation\n");
 
+	nvlist_destroy(nvl);
 	return (err);
 }
 
@@ -1469,28 +1475,37 @@ handle_message(struct checkpoint_op *checkpoint_op, struct vmctx *ctx)
 void *
 checkpoint_thread(void *param)
 {
-	struct checkpoint_op op;
 	struct checkpoint_thread_info *thread_info;
-	ssize_t n;
+	nvlist_t *nvl;
 
 	pthread_set_name_np(pthread_self(), "checkpoint thread");
 	thread_info = (struct checkpoint_thread_info *)param;
 
 	for (;;) {
-		n = recvfrom(thread_info->socket_fd, &op, sizeof(op), 0, NULL, 0);
-
-		/*
-		 * slight sanity check: see if there's enough data to at
-		 * least determine the type of message.
-		 */
-		if (n >= sizeof(op.op))
-			handle_message(&op, thread_info->ctx);
+		nvl = nvlist_recv(thread_info->socket_fd, 0);
+		if (nvl != NULL)
+			handle_message(thread_info->ctx, nvl);
 		else
-			EPRINTLN("Failed to receive message: %s\n",
-			    n == -1 ? strerror(errno) : "unknown error");
+			EPRINTLN("nvlist_recv() failed: %s", strerror(errno));
 	}
 
 	return (NULL);
+}
+
+void
+init_snapshot(void)
+{
+	int err;
+
+	err = pthread_mutex_init(&vcpu_lock, NULL);
+	if (err != 0)
+		errc(1, err, "checkpoint mutex init");
+	err = pthread_cond_init(&vcpus_idle, NULL);
+	if (err != 0)
+		errc(1, err, "checkpoint cv init (vcpus_idle)");
+	err = pthread_cond_init(&vcpus_can_run, NULL);
+	if (err != 0)
+		errc(1, err, "checkpoint cv init (vcpus_can_run)");
 }
 
 /*
@@ -1504,18 +1519,9 @@ init_checkpoint_thread(struct vmctx *ctx)
 	int socket_fd;
 	pthread_t checkpoint_pthread;
 	char vmname_buf[MAX_VMNAME];
-	int ret, err = 0;
+	int err;
 
 	memset(&addr, 0, sizeof(addr));
-
-	err = pthread_mutex_init(&vcpu_lock, NULL);
-	if (err != 0)
-		errc(1, err, "checkpoint mutex init");
-	err = pthread_cond_init(&vcpus_idle, NULL);
-	if (err == 0)
-		err = pthread_cond_init(&vcpus_can_run, NULL);
-	if (err != 0)
-		errc(1, err, "checkpoint cv init");
 
 	socket_fd = socket(PF_UNIX, SOCK_DGRAM, 0);
 	if (socket_fd < 0) {
@@ -1548,12 +1554,10 @@ init_checkpoint_thread(struct vmctx *ctx)
 	checkpoint_info->ctx = ctx;
 	checkpoint_info->socket_fd = socket_fd;
 
-	ret = pthread_create(&checkpoint_pthread, NULL, checkpoint_thread,
+	err = pthread_create(&checkpoint_pthread, NULL, checkpoint_thread,
 		checkpoint_info);
-	if (ret < 0) {
-		err = ret;
+	if (err != 0)
 		goto fail;
-	}
 
 	return (0);
 fail:

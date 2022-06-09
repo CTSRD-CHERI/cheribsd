@@ -102,7 +102,12 @@ SYSCTL_INT(_vfs_zfs_version, OID_AUTO, zpl, CTLFLAG_RD, &zfs_version_zpl, 0,
     "ZPL_VERSION");
 /* END CSTYLED */
 
+#if __FreeBSD_version >= 1400018
+static int zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg,
+    bool *mp_busy);
+#else
 static int zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg);
+#endif
 static int zfs_mount(vfs_t *vfsp);
 static int zfs_umount(vfs_t *vfsp, int fflag);
 static int zfs_root(vfs_t *vfsp, int flags, vnode_t **vpp);
@@ -267,7 +272,11 @@ done:
 }
 
 static int
+#if __FreeBSD_version >= 1400018
+zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg, bool *mp_busy)
+#else
 zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg)
+#endif
 {
 	zfsvfs_t *zfsvfs = vfsp->vfs_data;
 	struct thread *td;
@@ -291,8 +300,10 @@ zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg)
 			break;
 		default:
 			error = EINVAL;
+#if __FreeBSD_version < 1400018
 			if (cmd == Q_QUOTAON || cmd == Q_QUOTAOFF)
 				vfs_unbusy(vfsp);
+#endif
 			goto done;
 		}
 	}
@@ -351,11 +362,15 @@ zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg)
 	case Q_QUOTAON:
 		// As far as I can tell, you can't turn quotas on or off on zfs
 		error = 0;
+#if __FreeBSD_version < 1400018
 		vfs_unbusy(vfsp);
+#endif
 		break;
 	case Q_QUOTAOFF:
 		error = ENOTSUP;
+#if __FreeBSD_version < 1400018
 		vfs_unbusy(vfsp);
+#endif
 		break;
 	case Q_SETQUOTA:
 		error = copyin(arg, &dqblk, sizeof (dqblk));
@@ -570,14 +585,6 @@ snapdir_changed_cb(void *arg, uint64_t newval)
 }
 
 static void
-vscan_changed_cb(void *arg, uint64_t newval)
-{
-	zfsvfs_t *zfsvfs = arg;
-
-	zfsvfs->z_vscan = newval;
-}
-
-static void
 acl_mode_changed_cb(void *arg, uint64_t newval)
 {
 	zfsvfs_t *zfsvfs = arg;
@@ -620,9 +627,9 @@ zfs_register_callbacks(vfs_t *vfsp)
 	boolean_t do_xattr = B_FALSE;
 	int error = 0;
 
-	ASSERT(vfsp);
+	ASSERT3P(vfsp, !=, NULL);
 	zfsvfs = vfsp->vfs_data;
-	ASSERT(zfsvfs);
+	ASSERT3P(zfsvfs, !=, NULL);
 	os = zfsvfs->z_os;
 
 	/*
@@ -738,8 +745,6 @@ zfs_register_callbacks(vfs_t *vfsp)
 	error = error ? error : dsl_prop_register(ds,
 	    zfs_prop_to_name(ZFS_PROP_ACLINHERIT), acl_inherit_changed_cb,
 	    zfsvfs);
-	error = error ? error : dsl_prop_register(ds,
-	    zfs_prop_to_name(ZFS_PROP_VSCAN), vscan_changed_cb, zfsvfs);
 	dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
 	if (error)
 		goto unregister;
@@ -831,6 +836,10 @@ zfsvfs_init(zfsvfs_t *zfsvfs, objset_t *os)
 		    &sa_obj);
 		if (error != 0)
 			return (error);
+
+		error = zfs_get_zplprop(os, ZFS_PROP_XATTR, &val);
+		if (error == 0 && val == ZFS_XATTR_SA)
+			zfsvfs->z_xattr_sa = B_TRUE;
 	}
 
 	error = sa_setup(os, sa_obj, zfs_attr_table, ZPL_END,
@@ -845,7 +854,7 @@ zfsvfs_init(zfsvfs_t *zfsvfs, objset_t *os)
 	    &zfsvfs->z_root);
 	if (error != 0)
 		return (error);
-	ASSERT(zfsvfs->z_root != 0);
+	ASSERT3U(zfsvfs->z_root, !=, 0);
 
 	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_UNLINKED_SET, 8, 1,
 	    &zfsvfs->z_unlinkedobj);
@@ -1051,7 +1060,7 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 				    &zfsvfs->z_kstat, zs.zs_num_entries);
 				dprintf_ds(zfsvfs->z_os->os_dsl_dataset,
 				    "num_entries in unlinked set: %llu",
-				    zs.zs_num_entries);
+				    (u_longlong_t)zs.zs_num_entries);
 			}
 
 			zfs_unlinked_drain(zfsvfs);
@@ -1124,7 +1133,7 @@ zfsvfs_free(zfsvfs_t *zfsvfs)
 
 	mutex_destroy(&zfsvfs->z_znodes_lock);
 	mutex_destroy(&zfsvfs->z_lock);
-	ASSERT(zfsvfs->z_nr_znodes == 0);
+	ASSERT3U(zfsvfs->z_nr_znodes, ==, 0);
 	list_destroy(&zfsvfs->z_all_znodes);
 	ZFS_TEARDOWN_DESTROY(zfsvfs);
 	ZFS_TEARDOWN_INACTIVE_DESTROY(zfsvfs);
@@ -1166,8 +1175,8 @@ zfs_domount(vfs_t *vfsp, char *osname)
 	int error = 0;
 	zfsvfs_t *zfsvfs;
 
-	ASSERT(vfsp);
-	ASSERT(osname);
+	ASSERT3P(vfsp, !=, NULL);
+	ASSERT3P(osname, !=, NULL);
 
 	error = zfsvfs_create(osname, vfsp->mnt_flag & MNT_RDONLY, &zfsvfs);
 	if (error)
@@ -1205,9 +1214,9 @@ zfs_domount(vfs_t *vfsp, char *osname)
 	 * because that's where other Solaris filesystems put it.
 	 */
 	fsid_guid = dmu_objset_fsid_guid(zfsvfs->z_os);
-	ASSERT((fsid_guid & ~((1ULL<<56)-1)) == 0);
+	ASSERT3U((fsid_guid & ~((1ULL << 56) - 1)), ==, 0);
 	vfsp->vfs_fsid.val[0] = fsid_guid;
-	vfsp->vfs_fsid.val[1] = ((fsid_guid>>32) << 8) |
+	vfsp->vfs_fsid.val[1] = ((fsid_guid >> 32) << 8) |
 	    (vfsp->mnt_vfc->vfc_typenum & 0xFF);
 
 	/*
@@ -1591,11 +1600,11 @@ zfsvfs_teardown(zfsvfs_t *zfsvfs, boolean_t unmounting)
 	 */
 	mutex_enter(&zfsvfs->z_znodes_lock);
 	for (zp = list_head(&zfsvfs->z_all_znodes); zp != NULL;
-	    zp = list_next(&zfsvfs->z_all_znodes, zp))
-		if (zp->z_sa_hdl) {
-			ASSERT(ZTOV(zp)->v_count >= 0);
+	    zp = list_next(&zfsvfs->z_all_znodes, zp)) {
+		if (zp->z_sa_hdl != NULL) {
 			zfs_znode_dmu_fini(zp);
 		}
+	}
 	mutex_exit(&zfsvfs->z_znodes_lock);
 
 	/*
@@ -1682,7 +1691,7 @@ zfs_umount(vfs_t *vfsp, int fflag)
 		taskqueue_drain(zfsvfs_taskq->tq_queue,
 		    &zfsvfs->z_unlinked_drain_task);
 
-	VERIFY(zfsvfs_teardown(zfsvfs, B_TRUE) == 0);
+	VERIFY0(zfsvfs_teardown(zfsvfs, B_TRUE));
 	os = zfsvfs->z_os;
 
 	/*
@@ -1782,6 +1791,7 @@ zfs_fhtovp(vfs_t *vfsp, fid_t *fidp, int flags, vnode_t **vpp)
 	vnode_t		*dvp;
 	uint64_t	object = 0;
 	uint64_t	fid_gen = 0;
+	uint64_t	setgen = 0;
 	uint64_t	gen_mask;
 	uint64_t	zp_gen;
 	int 		i, err;
@@ -1797,7 +1807,6 @@ zfs_fhtovp(vfs_t *vfsp, fid_t *fidp, int flags, vnode_t **vpp)
 	if (zfsvfs->z_parent == zfsvfs && fidp->fid_len == LONG_FID_LEN) {
 		zfid_long_t	*zlfid = (zfid_long_t *)fidp;
 		uint64_t	objsetid = 0;
-		uint64_t	setgen = 0;
 
 		for (i = 0; i < sizeof (zlfid->zf_setid); i++)
 			objsetid |= ((uint64_t)zlfid->zf_setid[i]) << (8 * i);
@@ -1823,6 +1832,12 @@ zfs_fhtovp(vfs_t *vfsp, fid_t *fidp, int flags, vnode_t **vpp)
 			fid_gen |= ((uint64_t)zfid->zf_gen[i]) << (8 * i);
 	} else {
 		ZFS_EXIT(zfsvfs);
+		return (SET_ERROR(EINVAL));
+	}
+
+	if (fidp->fid_len == LONG_FID_LEN && (fid_gen > 1 || setgen != 0)) {
+		dprintf("snapdir fid: fid_gen (%llu) and setgen (%llu)\n",
+		    (u_longlong_t)fid_gen, (u_longlong_t)setgen);
 		return (SET_ERROR(EINVAL));
 	}
 
@@ -1865,7 +1880,9 @@ zfs_fhtovp(vfs_t *vfsp, fid_t *fidp, int flags, vnode_t **vpp)
 
 	gen_mask = -1ULL >> (64 - 8 * i);
 
-	dprintf("getting %llu [%u mask %llx]\n", object, fid_gen, gen_mask);
+	dprintf("getting %llu [%llu mask %llx]\n", (u_longlong_t)object,
+	    (u_longlong_t)fid_gen,
+	    (u_longlong_t)gen_mask);
 	if ((err = zfs_zget(zfsvfs, object, &zp))) {
 		ZFS_EXIT(zfsvfs);
 		return (err);
@@ -1876,7 +1893,8 @@ zfs_fhtovp(vfs_t *vfsp, fid_t *fidp, int flags, vnode_t **vpp)
 	if (zp_gen == 0)
 		zp_gen = 1;
 	if (zp->z_unlinked || zp_gen != fid_gen) {
-		dprintf("znode gen (%u) != fid gen (%u)\n", zp_gen, fid_gen);
+		dprintf("znode gen (%llu) != fid gen (%llu)\n",
+		    (u_longlong_t)zp_gen, (u_longlong_t)fid_gen);
 		vrele(ZTOV(zp));
 		ZFS_EXIT(zfsvfs);
 		return (SET_ERROR(EINVAL));
@@ -1944,7 +1962,7 @@ zfs_resume_fs(zfsvfs_t *zfsvfs, dsl_dataset_t *ds)
 		goto bail;
 
 	ds->ds_dir->dd_activity_cancelled = B_FALSE;
-	VERIFY(zfsvfs_setup(zfsvfs, B_FALSE) == 0);
+	VERIFY0(zfsvfs_setup(zfsvfs, B_FALSE));
 
 	zfs_set_fuid_feature(zfsvfs);
 
@@ -2157,7 +2175,7 @@ zfs_set_version(zfsvfs_t *zfsvfs, uint64_t newvers)
 		    ZFS_SA_ATTRS, 8, 1, &sa_obj, tx);
 		ASSERT0(error);
 
-		VERIFY(0 == sa_set_sa_object(os, sa_obj));
+		VERIFY0(sa_set_sa_object(os, sa_obj));
 		sa_register_update_callback(os, zfs_sa_upgrade);
 	}
 
@@ -2271,7 +2289,7 @@ zfs_get_vfs_flag_unmounted(objset_t *os)
 	zfsvfs_t *zfvp;
 	boolean_t unmounted = B_FALSE;
 
-	ASSERT(dmu_objset_type(os) == DMU_OST_ZFS);
+	ASSERT3U(dmu_objset_type(os), ==, DMU_OST_ZFS);
 
 	mutex_enter(&os->os_user_ptr_lock);
 	zfvp = dmu_objset_get_user(os);

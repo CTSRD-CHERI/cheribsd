@@ -30,18 +30,6 @@
  *
  * $FreeBSD$
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181114,
- *   "target_type": "lib",
- *   "changes": [
- *     "virtual_address"
- *   ],
- *   "change_comment": "is this still needed?"
- * }
- * CHERI CHANGES END
- */
 
 #ifndef _XLOCALE_PRIVATE__H_
 #define _XLOCALE_PRIVATE__H_
@@ -213,14 +201,10 @@ extern _Thread_local locale_t __thread_locale;
 static inline locale_t __get_locale(void)
 {
 
-#ifdef FORCE_C_LOCALE
-	return (&__xlocale_C_locale);
-#else
 	if (!__has_thread_locale) {
 		return (&__xlocale_global_locale);
 	}
 	return (__thread_locale ? __thread_locale : &__xlocale_global_locale);
-#endif
 }
 
 /**
@@ -229,7 +213,7 @@ static inline locale_t __get_locale(void)
  */
 static inline locale_t get_real_locale(locale_t locale)
 {
-	switch ((size_t)locale) {
+	switch ((intptr_t)locale) {
 		case 0: return (&__xlocale_C_locale);
 		case -1: return (&__xlocale_global_locale);
 		default: return (locale);

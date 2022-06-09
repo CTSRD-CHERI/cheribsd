@@ -58,6 +58,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/loginclass.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
+#include <sys/ptrace.h>
 #include <sys/refcount.h>
 #include <sys/sx.h>
 #include <sys/priv.h>
@@ -287,7 +288,7 @@ sys_getegid(struct thread *td, struct getegid_args *uap)
 
 #ifndef _SYS_SYSPROTO_H_
 struct getgroups_args {
-	u_int	gidsetsize;
+	int	gidsetsize;
 	gid_t	*gidset;
 };
 #endif
@@ -299,11 +300,10 @@ sys_getgroups(struct thread *td, struct getgroups_args *uap)
 }
 
 int
-kern_getgroups(struct thread *td, u_int gidsetsize, gid_t * __capability gidset)
+kern_getgroups(struct thread *td, int gidsetsize, gid_t * __capability gidset)
 {
 	struct ucred *cred;
-	u_int ngrp;
-	int error;
+	int ngrp, error;
 
 	cred = td->td_ucred;
 	ngrp = cred->cr_ngroups;
@@ -797,7 +797,7 @@ fail:
 
 #ifndef _SYS_SYSPROTO_H_
 struct setgroups_args {
-	u_int	gidsetsize;
+	int	gidsetsize;
 	gid_t	*gidset;
 };
 #endif
@@ -810,14 +810,14 @@ sys_setgroups(struct thread *td, struct setgroups_args *uap)
 }
 
 int
-user_setgroups(struct thread *td, u_int gidsetsize,
+user_setgroups(struct thread *td, int gidsetsize,
     const gid_t * __capability gidset)
 {
 	gid_t smallgroups[XU_NGROUPS];
 	gid_t *groups;
 	int error;
 
-	if (gidsetsize > ngroups_max + 1)
+	if (gidsetsize > ngroups_max + 1 || gidsetsize < 0)
 		return (EINVAL);
 
 	if (gidsetsize > XU_NGROUPS)
@@ -1487,10 +1487,12 @@ cr_cansee(struct ucred *u1, struct ucred *u2)
 int
 p_cansee(struct thread *td, struct proc *p)
 {
-
 	/* Wrap cr_cansee() for all functionality. */
 	KASSERT(td == curthread, ("%s: td not curthread", __func__));
 	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	if (td->td_proc == p)
+		return (0);
 	return (cr_cansee(td->td_ucred, p->p_ucred));
 }
 
@@ -1763,10 +1765,10 @@ p_candebug(struct thread *td, struct proc *p)
 
 	KASSERT(td == curthread, ("%s: td not curthread", __func__));
 	PROC_LOCK_ASSERT(p, MA_OWNED);
-	if ((error = priv_check(td, PRIV_DEBUG_UNPRIV)))
-		return (error);
 	if (td->td_proc == p)
 		return (0);
+	if ((error = priv_check(td, PRIV_DEBUG_UNPRIV)))
+		return (error);
 	if ((error = prison_check(td->td_ucred, p->p_ucred)))
 		return (error);
 #ifdef MAC
@@ -2579,6 +2581,11 @@ change_svgid(struct ucred *newcred, gid_t svgid)
 
 	newcred->cr_svgid = svgid;
 }
+
+bool allow_ptrace = true;
+SYSCTL_BOOL(_security_bsd, OID_AUTO, allow_ptrace, CTLFLAG_RWTUN,
+    &allow_ptrace, 0,
+    "Deny ptrace(2) use by returning ENOSYS");
 // CHERI CHANGES START
 // {
 //   "updated": 20181127,

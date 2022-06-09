@@ -18,11 +18,11 @@ jobs:
           - os: ubuntu-20.04
             compiler: clang-10
             cross-bindir: /usr/lib/llvm-10/bin
-            pkgs: bmake libarchive-dev
-          - os: macOS-latest
-            compiler: clang-11
+            pkgs: bmake libarchive-dev clang-10 lld-10
+          - os: macos-latest
+            compiler: clang-12
+            cross-bindir: /usr/local/opt/llvm/bin
             pkgs: bmake libarchive
-
     steps:
       - uses: actions/checkout@v2
       - name: install packages (Ubuntu)

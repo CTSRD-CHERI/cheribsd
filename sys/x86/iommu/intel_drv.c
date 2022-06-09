@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2013-2015 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Konstantin Belousov <kib@FreeBSD.org>
  * under sponsorship from the FreeBSD Foundation.
@@ -763,7 +762,6 @@ dmar_find_by_scope(int dev_domain, int dev_busno,
 struct dmar_unit *
 dmar_find(device_t dev, bool verbose)
 {
-	device_t dmar_dev;
 	struct dmar_unit *unit;
 	const char *banner;
 	int i, dev_domain, dev_busno, dev_path_len;
@@ -775,7 +773,6 @@ dmar_find(device_t dev, bool verbose)
 	    devclass_find("pci"))
 		return (NULL);
 
-	dmar_dev = NULL;
 	dev_domain = pci_get_domain(dev);
 	dev_path_len = dmar_dev_depth(dev);
 	ACPI_DMAR_PCI_PATH dev_path[dev_path_len];
@@ -1068,6 +1065,10 @@ dmar_instantiate_rmrr_ctxs(struct iommu_unit *unit)
 		KASSERT((dmar->hw_gcmd & DMAR_GCMD_TE) == 0,
 	    ("dmar%d: RMRR not handled but translation is already enabled",
 		    dmar->iommu.unit));
+		error = dmar_disable_protected_regions(dmar);
+		if (error != 0)
+			printf("dmar%d: Failed to disable protected regions\n",
+			    dmar->iommu.unit);
 		error = dmar_enable_translation(dmar);
 		if (bootverbose) {
 			if (error == 0) {

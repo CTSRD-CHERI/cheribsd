@@ -37,21 +37,23 @@
 #ifndef	_MACHINE_REG_H_
 #define	_MACHINE_REG_H_
 
+#include <sys/_types.h>
+
 struct reg {
-	uint64_t ra;		/* return address */
-	uint64_t sp;		/* stack pointer */
-	uint64_t gp;		/* global pointer */
-	uint64_t tp;		/* thread pointer */
-	uint64_t t[7];		/* temporaries */
-	uint64_t s[12];		/* saved registers */
-	uint64_t a[8];		/* function arguments */
-	uint64_t sepc;		/* exception program counter */
-	uint64_t sstatus;	/* status register */
+	__uint64_t	ra;		/* return address */
+	__uint64_t	sp;		/* stack pointer */
+	__uint64_t	gp;		/* global pointer */
+	__uint64_t	tp;		/* thread pointer */
+	__uint64_t	t[7];		/* temporaries */
+	__uint64_t	s[12];		/* saved registers */
+	__uint64_t	a[8];		/* function arguments */
+	__uint64_t	sepc;		/* exception program counter */
+	__uint64_t	sstatus;	/* status register */
 };
 
 struct fpreg {
-	uint64_t	fp_x[32][2];	/* Floating point registers */
-	uint64_t	fp_fcsr;	/* Floating point control reg */
+	__uint64_t	fp_x[32][2];	/* Floating point registers */
+	__uint64_t	fp_fcsr;	/* Floating point control reg */
 };
 
 struct dbreg {
@@ -60,34 +62,18 @@ struct dbreg {
 
 #if __has_feature(capabilities)
 struct capreg {
-	uintcap_t cra;		/* return address */
-	uintcap_t csp;		/* stack pointer */
-	uintcap_t cgp;		/* global pointer */
-	uintcap_t ctp;		/* thread pointer */
-	uintcap_t ct[7];	/* temporaries */
-	uintcap_t cs[12];	/* saved registers */
-	uintcap_t ca[8];	/* function arguments */
-	uintcap_t sepcc;	/* exception program counter */
-	uintcap_t ddc;
-	uint64_t tagmask;
-	uint64_t pad;
+	__uintcap_t cra;		/* return address */
+	__uintcap_t csp;		/* stack pointer */
+	__uintcap_t cgp;		/* global pointer */
+	__uintcap_t ctp;		/* thread pointer */
+	__uintcap_t ct[7];	/* temporaries */
+	__uintcap_t cs[12];	/* saved registers */
+	__uintcap_t ca[8];	/* function arguments */
+	__uintcap_t sepcc;	/* exception program counter */
+	__uintcap_t ddc;
+	__uint64_t tagmask;
+	__uint64_t pad;
 };
-#endif
-
-#ifdef _KERNEL
-/*
- * XXX these interfaces are MI, so they should be declared in a MI place.
- */
-int	fill_regs(struct thread *, struct reg *);
-int	set_regs(struct thread *, struct reg *);
-int	fill_fpregs(struct thread *, struct fpreg *);
-int	set_fpregs(struct thread *, struct fpreg *);
-int	fill_dbregs(struct thread *, struct dbreg *);
-int	set_dbregs(struct thread *, struct dbreg *);
-#if __has_feature(capabilities)
-int	fill_capregs(struct thread *, struct capreg *);
-int	set_capregs(struct thread *, struct capreg *);
-#endif
 #endif
 
 #endif /* !_MACHINE_REG_H_ */

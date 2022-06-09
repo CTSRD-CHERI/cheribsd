@@ -431,9 +431,18 @@ amd_read_pmc(int cpu, int ri, pmc_value_t *v)
 	tmp = rdmsr(pd->pm_perfctr); /* RDMSR serializes */
 	PMCDBG2(MDP,REA,2,"amd-read (pre-munge) id=%d -> %jd", ri, tmp);
 	if (PMC_IS_SAMPLING_MODE(mode)) {
-		/* Sign extend 48 bit value to 64 bits. */
-		tmp = (pmc_value_t) (((int64_t) tmp << 16) >> 16);
-		tmp = AMD_PERFCTR_VALUE_TO_RELOAD_COUNT(tmp);
+		/*
+		 * Clamp value to 0 if the counter just overflowed,
+		 * otherwise the returned reload count would wrap to a
+		 * huge value.
+		 */
+		if ((tmp & (1ULL << 47)) == 0)
+			tmp = 0;
+		else {
+			/* Sign extend 48 bit value to 64 bits. */
+			tmp = (pmc_value_t) ((int64_t)(tmp << 16) >> 16);
+			tmp = AMD_PERFCTR_VALUE_TO_RELOAD_COUNT(tmp);
+		}
 	}
 	*v = tmp;
 
@@ -600,8 +609,6 @@ amd_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	if((ri >= 12 && ri < 16) && !(a->pm_md.pm_amd.pm_amd_sub_class == PMC_AMD_SUB_CLASS_DATA_FABRIC))
 		return EINVAL;
 
-	if ((pd->pd_caps & caps) != caps)
-		return EPERM;
 	if (strlen(pmc_cpuid) != 0) {
 		pm->pm_md.pm_amd.pm_amd_evsel =
 			a->pm_md.pm_amd.pm_amd_config;
@@ -669,7 +676,7 @@ amd_release_pmc(int cpu, int ri, struct pmc *pmc)
 #ifdef	HWPMC_DEBUG
 	const struct amd_descr *pd;
 #endif
-	struct pmc_hw *phw;
+	struct pmc_hw *phw __diagused;
 
 	(void) pmc;
 
@@ -771,7 +778,7 @@ amd_stop_pmc(int cpu, int ri)
 	/*
 	 * Due to NMI latency on newer AMD processors
 	 * NMI interrupts are ignored, which leads to
-	 * panic or messages based on kernel configuraiton
+	 * panic or messages based on kernel configuration
 	 */
 
 	/* Wait for the count to be reset */

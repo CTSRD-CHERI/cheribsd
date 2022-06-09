@@ -37,7 +37,7 @@
  * Shared/exclusive lock main structure definition.
  */
 struct sx {
-	struct lock_object	lock_object __subobject_use_container_bounds;
+	struct lock_object	lock_object __subobject_member_used_for_c_inheritance;
 	volatile uintptr_t	sx_lock;
 };
 

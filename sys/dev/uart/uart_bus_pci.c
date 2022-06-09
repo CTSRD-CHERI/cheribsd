@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/resource.h>
 
 #include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 
 #include <dev/uart/uart.h>
 #include <dev/uart/uart_bus.h>
@@ -74,6 +75,9 @@ struct pci_id {
 	int		rclk;
 	int		regshft;
 };
+
+#define PCI_NO_MSI	0x40000000
+#define PCI_RID_MASK	0x0000ffff
 
 static const struct pci_id pci_ns8250_ids[] = {
 { 0x1028, 0x0008, 0xffff, 0, "Dell Remote Access Card III", 0x14,
@@ -135,17 +139,34 @@ static const struct pci_id pci_ns8250_ids[] = {
 { 0x8086, 0x108f, 0xffff, 0, "Intel AMT - SOL", 0x10 },
 { 0x8086, 0x19d8, 0xffff, 0, "Intel Denverton UART", 0x10 },
 { 0x8086, 0x1c3d, 0xffff, 0, "Intel AMT - KT Controller", 0x10 },
-{ 0x8086, 0x1d3d, 0xffff, 0, "Intel C600/X79 Series Chipset KT Controller", 0x10 },
+{ 0x8086, 0x1d3d, 0xffff, 0, "Intel C600/X79 Series Chipset KT Controller",
+	0x10 },
 { 0x8086, 0x1e3d, 0xffff, 0, "Intel Panther Point KT Controller", 0x10 },
 { 0x8086, 0x228a, 0xffff, 0, "Intel Cherryview SIO HSUART#1", 0x10,
-       24 * DEFAULT_RCLK, 2 },
+	24 * DEFAULT_RCLK, 2 },
 { 0x8086, 0x228c, 0xffff, 0, "Intel Cherryview SIO HSUART#2", 0x10,
-       24 * DEFAULT_RCLK, 2 },
+	24 * DEFAULT_RCLK, 2 },
 { 0x8086, 0x2a07, 0xffff, 0, "Intel AMT - PM965/GM965 KT Controller", 0x10 },
 { 0x8086, 0x2a47, 0xffff, 0, "Mobile 4 Series Chipset KT Controller", 0x10 },
 { 0x8086, 0x2e17, 0xffff, 0, "4 Series Chipset Serial KT Controller", 0x10 },
+{ 0x8086, 0x31bc, 0xffff, 0, "Intel Gemini Lake SIO/LPSS UART 0", 0x10,
+	24 * DEFAULT_RCLK, 2 },
+{ 0x8086, 0x31be, 0xffff, 0, "Intel Gemini Lake SIO/LPSS UART 1", 0x10,
+	24 * DEFAULT_RCLK, 2 },
+{ 0x8086, 0x31c0, 0xffff, 0, "Intel Gemini Lake SIO/LPSS UART 2", 0x10,
+	24 * DEFAULT_RCLK, 2 },
+{ 0x8086, 0x31ee, 0xffff, 0, "Intel Gemini Lake SIO/LPSS UART 3", 0x10,
+	24 * DEFAULT_RCLK, 2 },
 { 0x8086, 0x3b67, 0xffff, 0, "5 Series/3400 Series Chipset KT Controller",
 	0x10 },
+{ 0x8086, 0x5abc, 0xffff, 0, "Intel Apollo Lake SIO/LPSS UART 0", 0x10,
+	24 * DEFAULT_RCLK, 2 },
+{ 0x8086, 0x5abe, 0xffff, 0, "Intel Apollo Lake SIO/LPSS UART 1", 0x10,
+	24 * DEFAULT_RCLK, 2 },
+{ 0x8086, 0x5ac0, 0xffff, 0, "Intel Apollo Lake SIO/LPSS UART 2", 0x10,
+	24 * DEFAULT_RCLK, 2 },
+{ 0x8086, 0x5aee, 0xffff, 0, "Intel Apollo Lake SIO/LPSS UART 3", 0x10,
+	24 * DEFAULT_RCLK, 2 },
 { 0x8086, 0x8811, 0xffff, 0, "Intel EG20T Serial Port 0", 0x10 },
 { 0x8086, 0x8812, 0xffff, 0, "Intel EG20T Serial Port 1", 0x10 },
 { 0x8086, 0x8813, 0xffff, 0, "Intel EG20T Serial Port 2", 0x10 },
@@ -153,6 +174,9 @@ static const struct pci_id pci_ns8250_ids[] = {
 { 0x8086, 0x8c3d, 0xffff, 0, "Intel Lynx Point KT Controller", 0x10 },
 { 0x8086, 0x8cbd, 0xffff, 0, "Intel Wildcat Point KT Controller", 0x10 },
 { 0x8086, 0x9c3d, 0xffff, 0, "Intel Lynx Point-LP HECI KT", 0x10 },
+{ 0x8086, 0xa13d, 0xffff, 0,
+	"100 Series/C230 Series Chipset Family KT Redirection",
+	0x10 | PCI_NO_MSI },
 { 0x9710, 0x9820, 0x1000, 1, "NetMos NM9820 Serial Port", 0x10 },
 { 0x9710, 0x9835, 0x1000, 1, "NetMos NM9835 Serial Port", 0x10 },
 { 0x9710, 0x9865, 0xa000, 0x1000, "NetMos NM9865 Serial Port", 0x10 },
@@ -195,6 +219,12 @@ uart_pci_probe(device_t dev)
 {
 	struct uart_softc *sc;
 	const struct pci_id *id;
+	struct pci_id cid = {
+		.regshft = 0,
+		.rclk = 0,
+		.rid = 0x10 | PCI_NO_MSI,
+		.desc = "Generic SimpleComm PCI device",
+	};
 	int result;
 
 	sc = device_get_softc(dev);
@@ -204,11 +234,20 @@ uart_pci_probe(device_t dev)
 		sc->sc_class = &uart_ns8250_class;
 		goto match;
 	}
+	if (pci_get_class(dev) == PCIC_SIMPLECOMM &&
+	    pci_get_subclass(dev) == PCIS_SIMPLECOMM_UART &&
+	    pci_get_progif(dev) < PCIP_SIMPLECOMM_UART_16550A) {
+		/* XXX rclk what to do */
+		id = &cid;
+		sc->sc_class = &uart_ns8250_class;
+		goto match;
+	}
 	/* Add checks for non-ns8250 IDs here. */
 	return (ENXIO);
 
  match:
-	result = uart_bus_probe(dev, id->regshft, 0, id->rclk, id->rid, 0, 0);
+	result = uart_bus_probe(dev, id->regshft, 0, id->rclk,
+	    id->rid & PCI_RID_MASK, 0, 0);
 	/* Bail out on error. */
 	if (result > 0)
 		return (result);
@@ -222,6 +261,7 @@ static int
 uart_pci_attach(device_t dev)
 {
 	struct uart_softc *sc;
+	const struct pci_id *id;
 	int count;
 
 	sc = device_get_softc(dev);
@@ -230,7 +270,9 @@ uart_pci_attach(device_t dev)
 	 * Use MSI in preference to legacy IRQ if available. However, experience
 	 * suggests this is only reliable when one MSI vector is advertised.
 	 */
-	if (pci_msi_count(dev) == 1) {
+	id = uart_pci_match(dev, pci_ns8250_ids);
+	if ((id == NULL || (id->rid & PCI_NO_MSI) == 0) &&
+	    pci_msi_count(dev) == 1) {
 		count = 1;
 		if (pci_alloc_msi(dev, &count) == 0) {
 			sc->sc_irid = 1;

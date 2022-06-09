@@ -25,6 +25,9 @@
  * $FreeBSD$
  */
 
+#include "opt_rss.h"
+#include "opt_ratelimit.h"
+
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/pci.h>
@@ -37,8 +40,7 @@
 #include <linux/ktime.h>
 #include <dev/mlx5/driver.h>
 #include <dev/mlx5/cmd.h>
-
-#include "mlx5_core.h"
+#include <dev/mlx5/mlx5_core/mlx5_core.h>
 
 static int mlx5_copy_from_msg(void *to, struct mlx5_cmd_msg *from, int size);
 static void mlx5_free_cmd_msg(struct mlx5_core_dev *dev,
@@ -1287,8 +1289,7 @@ static int cmd_exec_helper(struct mlx5_core_dev *dev,
 	u8 status = 0;
 	u32 drv_synd;
 
-	if (pci_channel_offline(dev->pdev) ||
-	    dev->state == MLX5_DEVICE_STATE_INTERNAL_ERROR) {
+	if (dev->state == MLX5_DEVICE_STATE_INTERNAL_ERROR) {
 		u16 opcode = MLX5_GET(mbox_in, in, opcode);
 		err = mlx5_internal_err_ret_value(dev, opcode, &drv_synd, &status);
 		MLX5_SET(mbox_out, out, status, status);
@@ -1669,3 +1670,26 @@ int mlx5_cmd_modify_cong_params(struct mlx5_core_dev *dev,
 	return mlx5_cmd_exec(dev, in, in_size, out, sizeof(out));
 }
 EXPORT_SYMBOL(mlx5_cmd_modify_cong_params);
+
+int mlx5_cmd_query_cong_status(struct mlx5_core_dev *dev, int cong_point,
+			       int prio, void *out, int out_size)
+{
+	u32 in[MLX5_ST_SZ_DW(query_cong_status_in)] = { };
+
+	MLX5_SET(query_cong_status_in, in, opcode,
+		 MLX5_CMD_OP_QUERY_CONG_STATUS);
+	MLX5_SET(query_cong_status_in, in, priority, prio);
+	MLX5_SET(query_cong_status_in, in, cong_protocol, cong_point);
+
+	return mlx5_cmd_exec(dev, in, sizeof(in), out, out_size);
+}
+EXPORT_SYMBOL(mlx5_cmd_query_cong_status);
+
+int mlx5_cmd_modify_cong_status(struct mlx5_core_dev *dev,
+				void *in, int in_size)
+{
+	u32 out[MLX5_ST_SZ_DW(modify_cong_status_out)] = { };
+
+	return mlx5_cmd_exec(dev, in, in_size, out, sizeof(out));
+}
+EXPORT_SYMBOL(mlx5_cmd_modify_cong_status);
