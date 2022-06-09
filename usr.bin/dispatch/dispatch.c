@@ -109,13 +109,16 @@ main(int argc, char **argv)
 
 	/*
 	 * Do not mess up an existing address space - fork(2) to get
-	 * a fresh new one, and use setsid(2) to make sure the kernel
-	 * won't opportunistically colocate us back.
+	 * a fresh new one.
 	 */
 	pid = fork();
 	if (pid < 0)
 		err(1, "fork");
 	if (pid > 0) {
+		/*
+		 * We're the parent, in the old address space; nothing
+		 * to do here except waiting for the child to exit.
+		 */
 		error = waitpid(pid, &status, WEXITED);
 		if (error < 0)
 			err(1, "waitpid");
@@ -123,14 +126,8 @@ main(int argc, char **argv)
 	}
 
 	/*
-	 * XXX: Makes sh(1) unhappy:
-	 *
-	 * # dispatch sh
-	 * sh: can't access tty; job control turned off
+	 * At this point we are running in a new address space.
 	 */
-	pid = setsid();
-	if (pid < 0)
-		err(1, "setsid");
 
 	_cocall_code = switcher_cocall;
 	_coaccept_code = switcher_coaccept;
@@ -139,7 +136,6 @@ main(int argc, char **argv)
 		err(1, "COSETUP_TAKEOVER");
 
 	/*
-	 * At this point we are running in a new address space.
 	 * We can't explicitely pass capv into another address space,
 	 * so we need vfork(2) here, not fork(2).
 	 */

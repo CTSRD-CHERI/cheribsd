@@ -44,10 +44,17 @@
 The
 .Nm
 utility constructs an empty address space with the default switcher
-replaced with a custom one, then uses it to execute the command specified.
+replaced with a custom one, then executes the command specified inside
+that address space.
 The custom switcher is statically compiled into
 .Nm ,
-and by default uses the exact same assembly source files.
+and by default uses the exact same assembly source files, thus providing
+the same functionality.
+.Pp
+The primary purpose of
+.Nm
+is to make it easier to experiment with switcher semantics.
+It should provide for a template for custom switcher functionality.
 .Pp
 Under the hood this uses
 .Xr cosetup 2
@@ -75,9 +82,6 @@ XXX replace with adequately disturbing message
 .It Fl v
 Be verbose.
 .El
-.Pp
-.Nm
-should be useful as a template when implementing custom switcher functionality.
 .Sh EXIT STATUS
 The
 .Nm
