@@ -42,6 +42,12 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <unistd.h>
 
+/*
+ * Note that this code is trusted by the kernel.  It can cause panic,
+ * it can inject code, and when that happens it is a bug in dispatch(1),
+ * not kernel.
+ */
+
 extern ssize_t	switcher_cocall(void * __capability, void * __capability,
     const void * __capability,
     const void * __capability, size_t, void * __capability, size_t);
