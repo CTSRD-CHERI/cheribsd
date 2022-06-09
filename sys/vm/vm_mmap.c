@@ -155,8 +155,8 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 {
 	uintcap_t newcap;
 #ifndef __CHERI_PURE_CAPABILITY__
-	ptraddr_t cap_base;
-	size_t cap_len;
+	ptraddr_t cap_base __diagused;
+	size_t cap_len __diagused;
 #endif
 	register_t perms, cap_prot;
 

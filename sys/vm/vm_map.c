@@ -1719,7 +1719,7 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	vm_inherit_t inheritance;
 	u_long bdry;
 	u_int bidx;
-	int error;
+	int error __diagused;
 
 	VM_MAP_ASSERT_LOCKED(map);
 	KASSERT(object != kernel_object ||
