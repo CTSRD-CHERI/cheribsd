@@ -162,10 +162,10 @@ main(int argc, char **argv)
 				fprintf(stderr, "%s: %s: cocalling \"%s\"...\n",
 				    getprogname(), registered, argv[c]);
 			if (kflag)
-				error = cocall_slow(lookedup[c], inout, sizeof(inout), inout, sizeof(inout));
+				received = cocall_slow(lookedup[c], inout, sizeof(inout), inout, sizeof(inout));
 			else
-				error = cocall(lookedup[c], inout, sizeof(inout), inout, sizeof(inout));
-			if (error != 0)
+				received = cocall(lookedup[c], inout, sizeof(inout), inout, sizeof(inout));
+			if (received < 0)
 				warn("cocall");
 			if (vflag)
 				printf("%s: %s: returned from \"%s\", pid %d\n",
