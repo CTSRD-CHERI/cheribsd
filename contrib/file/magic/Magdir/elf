@@ -262,8 +262,8 @@
 >18	leshort		183		ARM aarch64,
 # only for 64-bit
 >>4	byte		2
->>>24	lelong&0x1	0x0		A64,
->>>24	lelong&0x1	0x1		C64, CheriABI,
+>>>48	lelong&0x00010000	0x00000000	A64,
+>>>48	lelong&0x00010000	0x00010000	C64, CheriABI,
 >18	leshort		185		Atmel 32-bit family,
 >18	leshort		186		STMicroeletronics STM8 8-bit,
 >18	leshort		187		Tilera TILE64,
