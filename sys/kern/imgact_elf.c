@@ -1086,7 +1086,7 @@ __elfN(enforce_limits)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 	text_size = data_size = total_size = text_addr = data_addr = 0;
 
 	for (i = 0; i < hdr->e_phnum; i++) {
-		u_long seg_size, seg_addr, end_addr;
+		u_long seg_size, seg_addr;
 
 		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
 			continue;
@@ -1094,7 +1094,6 @@ __elfN(enforce_limits)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 		seg_addr = trunc_page(phdr[i].p_vaddr + et_dyn_addr);
 		seg_size = round_page(phdr[i].p_memsz +
 		    phdr[i].p_vaddr + et_dyn_addr - seg_addr);
-		end_addr = seg_addr + seg_size;
 
 		/*
 		 * Make the largest executable segment the official
