@@ -998,7 +998,7 @@ vm_reserv_init(void)
 	struct vm_phys_seg *seg;
 	struct vm_reserv *rv, *rv_slice;
 	struct vm_reserv_domain *rvd;
-	vm_pindex_t nreserv;
+	vm_pindex_t nreserv __unused;
 #ifdef VM_PHYSSEG_SPARSE
 	vm_pindex_t used;
 #endif
