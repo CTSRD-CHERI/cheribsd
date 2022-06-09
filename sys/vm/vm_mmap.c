@@ -2048,7 +2048,6 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 	vm_pointer_t *reservp;
 	int docow, error, findspace, rv;
 	bool curmap, fitit;
-	vm_size_t padded_size;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_getlen(addr) == sizeof(void *),
@@ -2058,7 +2057,6 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 
 	curmap = map == &td->td_proc->p_vmspace->vm_map;
 	if (curmap) {
-		padded_size = CHERI_REPRESENTABLE_LENGTH(size);
 		error = kern_mmap_racct_check(td, map, size);
 		if (error != 0)
 			return (error);
