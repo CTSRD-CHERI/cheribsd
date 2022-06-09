@@ -227,6 +227,7 @@ CRUNCH_LIBS+=	-lbz2
 CRUNCH_PROGS_usr.bin+= \
 		awk \
 		basename \
+		bintrans \
 		bmake \
 		bzip2 \
 		cpuset \
@@ -272,8 +273,6 @@ CRUNCH_PROGS_usr.bin+= \
 		true \
 		truss \
 		uname \
-		uudecode \
-		uuencode \
 		vmstat \
 		w \
 		wall \
@@ -282,6 +281,7 @@ CRUNCH_PROGS_usr.bin+= \
 
 CRUNCH_BUILDTOOLS+=	usr.bin/awk
 
+CRUNCH_ALIAS_bintrans=	uuencode b64encode uudecode b64decode base64
 CRUNCH_ALIAS_bmake=	make
 CRUNCH_ALIAS_bzip2=	bunzip2
 CRUNCH_ALIAS_tar=	bsdtar
