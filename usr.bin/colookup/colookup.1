@@ -42,6 +42,8 @@
 .Fl i Ar index Ar name
 .Op Fl i Ar index Ar name Ar ...
 .Ar command Op Ar args ...
+.Nm
+.Fl s
 .Sh DESCRIPTION
 The
 .Nm
@@ -52,7 +54,7 @@ to find named public capability and spawns
 with that capability passed in its inherited capability vector.
 .Pp
 The following options are available:
-.Bl -tag -width ".Fl i"
+.Bl -tag -width ".Fl ii"
 .It Fl c
 Instead of spawning anything, print out the capability value and exit.
 .It Fl i
@@ -60,6 +62,9 @@ Lookup capability
 .Ar name
 and insert it at
 .Ar index .
+.It Fl s
+Instead of spawning anything, print out the sealed pairs returned by
+.Xr cosetup 2 .
 .El
 .Sh EXIT STATUS
 The

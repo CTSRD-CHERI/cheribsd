@@ -46,7 +46,8 @@ usage(void)
 
 	fprintf(stderr,
 	    "usage: colookup -c name\n"
-	    "       colookup -i index name [-i index name ...] command [args ...]\n");
+	    "       colookup -i index name [-i index name ...] command [args ...]\n"
+	    "       colookup -s\n");
 	exit(0);
 }
 
@@ -55,19 +56,19 @@ main(int argc, char **argv)
 {
 	void * __capability *capv;
 	void * __capability lookedup;
+	void * __capability code;
+	void * __capability data;
 	char *tmp;
 	int capc, ch, entry, error;
-	bool cflag = false;
 
 	capvfetch(&capc, &capv);
 	if (capc <= 0) {
 		//warnx("no capability vector");
 	}
 
-	while ((ch = getopt(argc, argv, "c:i:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:i:s")) != -1) {
 		switch (ch) {
 		case 'c':
-			cflag = true;
 			error = colookup(optarg, &lookedup);
 			if (error != 0) {
 				if (errno == ESRCH) {
@@ -77,7 +78,7 @@ main(int argc, char **argv)
 				err(1, "colookup");
 			}
 			printf("%s: %#lp\n", optarg, lookedup);
-			break;
+			return (0);
 		case 'i':
 			entry = strtol(optarg, &tmp, 10);
 			if (*tmp != '\0')
@@ -101,6 +102,16 @@ main(int argc, char **argv)
 			if (error != 0)
 				err(1, "capvset");
 			break;
+		case 's':
+			error = _cosetup(COSETUP_COCALL, &code, &data);
+			if (error != 0)
+				err(1, "cosetup");
+			printf("cocall %#lp, %#lp\n", code, data);
+			error = _cosetup(COSETUP_COACCEPT, &code, &data);
+			if (error != 0)
+				err(1, "cosetup");
+			printf("coaccept %#lp, %#lp\n", code, data);
+			return (0);
 		case '?':
 		default:
 			usage();
@@ -109,12 +120,6 @@ main(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
-
-	if (cflag) {
-		if (argc != 0)
-			usage();
-		return (0);
-	}
 
 	if (argc < 1)
 		usage();
