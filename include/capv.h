@@ -39,8 +39,8 @@
  * of every output buffer passed to cocall(2).  You can compare
  * it with the size returned by cocall(2)/coaccept(2) to make sure
  * you actually received all the data.  Integer-sized opcode 0
- * that follows is reserved for answerback; other values are left
- * for application use.
+ * that follows is reserved for answerback, for both calls and
+ * returns; other values are left for application use.
  *
  * For an example of how to use it, see usr.bin/clocks/clocks.c
  * (service) and lib/libclocks/clocks.c (client).
@@ -49,12 +49,13 @@
 /*
  * Applications might expect services to be found at particular
  * offsets within the capability vector they inherit.  Those numbers
- * can be thought of as part of capv ABI.
+ * can be thought of as part of capv ABI.  Use the even numbers,
+ * leaving odd ones for ad-hoc use.
  */
-#define	CAPV_CODISCOVER	1
-#define	CAPV_COINSERT	2
-#define	CAPV_COSELECT	3
-#define	CAPV_CLOCKS	5
+#define	CAPV_CODISCOVER	2
+#define	CAPV_COINSERT	4
+#define	CAPV_COSELECT	6
+#define	CAPV_CLOCKS	8
 
 #include <time.h> // XXX timespec
 
