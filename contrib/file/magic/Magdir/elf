@@ -295,12 +295,6 @@
 # only for 64-bit
 >>4	byte		2
 >>>48	use		elf-riscv
-# only for 32-bit
->>4	byte		1
->>>36	use		elf-riscv
-# only for 64-bit
->>4	byte		2
->>>48	use		elf-riscv
 >18	leshort		244		Lanai 32-bit processor,
 >18	leshort		245		CEVA Processor Architecture Family,
 >18	leshort		246		CEVA X2 Processor Family,
