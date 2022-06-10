@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <vis.h>
 
 static void
 usage(void)
@@ -60,6 +61,7 @@ interrogate(void * __capability target, char **bufp, bool kflag, bool vflag)
 	capv_answerback_t in;
 	capv_t out;
 	ssize_t received;
+	int len;
 
 	memset(&out, 0, sizeof(out));
 	out.len = sizeof(out);
@@ -76,21 +78,26 @@ interrogate(void * __capability target, char **bufp, bool kflag, bool vflag)
 
 	if ((size_t)received != in.len) {
 		warnx("truncated: received %zd, in.len %zd", (size_t)received, in.len);
-	} else if (in.len != sizeof(in)) {
-		warnx("size mismatch: in.len %zd, expected %zd", in.len, sizeof(in));
+		/* Note that we're continuing despite of this, same below. */
 	}
+	if (in.len != sizeof(in))
+		warnx("size mismatch: in.len %zd, expected %zd", in.len, sizeof(in));
+	if (in.op != 0)
+		warnx("op mismatch: in.op %d, expected %d", in.op, 0);
 
-	if (!vflag) {
-		/*
-		 * Try doing this with libxo :->
-		 */
+	if (vflag) {
+		in.answerback[sizeof(in.answerback) - 1] = '\0';
+	} else {
 		in.answerback[66] = '.';
 		in.answerback[67] = '.';
 		in.answerback[68] = '.';
 		in.answerback[69] = '\0';
 	}
 
-	*bufp = strndup(in.answerback, sizeof(in.answerback));
+	len = stravis(bufp, in.answerback, VIS_DQ | VIS_NL | VIS_CSTYLE);
+	if (len < 0)
+		err(1, "stravis");
+
 	return (0);
 }
 
