@@ -890,6 +890,12 @@ interpret:
 	 * Copy out the inherited capability vector, unless we got explicitly
 	 * passed a new one, or the inherited one came from a different
 	 * vmspace, or it's globally disabled.
+	 *
+	 * XXX security policy goes here
+	 *
+	 * ... to decide which capabilities can be allowed through,
+	 * and which need to be invalidated; currently we allow all
+	 * of them, similar to what we do with colookup(2).
 	 */
 	if (imgp->args->capc <= 0 && p->p_capc > 0 &&
 	    p->p_capv_vmspace == p->p_vmspace &&
