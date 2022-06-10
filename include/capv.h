@@ -85,7 +85,7 @@ typedef union {
 		size_t	len;
 		int	op;
 		int	error;
-		int	_errno;
+		int	errno_;
 		struct timespec	ts;
 	};
 } capv_clocks_t;

@@ -87,8 +87,8 @@ answerback(capv_answerback_t *out)
 	out->len = sizeof(*out);
 	out->op = 0;
 	snprintf(out->answerback, sizeof(out->answerback),
-	    "this is %s, pid %d, %s%s responding to clock_gettime(), running as uid %d",
-	    getprogname(), getpid(), kflag ? "halfheartedly" : "merrily",
+	    "clocks(1), pid %d, %s%s responding to clock_gettime(), running as uid %d",
+	    getpid(), kflag ? "halfheartedly" : "merrily",
 	    mode ? "" : ", yet unsettlingly,", getuid());
 }
 
@@ -242,7 +242,7 @@ main(int argc, char **argv)
 				out->len = sizeof(*out);
 				out->op = 0;
 				out->error = error;
-				out->_errno = ENOMSG;
+				out->errno_ = ENOMSG;
 				break;
 			}
 
@@ -251,11 +251,14 @@ main(int argc, char **argv)
 			 */
 			memset(out, 0, sizeof(*out));
 			clock_id = in.op - CAPV_CLOCKS; /* iksde */
+			/*
+			 * XXX: Insert code to talk to USB GPS dongle.
+			 */
 			error = clock_gettime(clock_id, &out->ts);
 			out->len = sizeof(*out);
-			out->op = 0;
+			out->op = -CAPV_CLOCKS;
 			out->error = error;
-			out->_errno = errno;
+			out->errno_ = errno;
 			if (error != 0)
 				warn("clock_gettime(%d)", clock_id);
 			break;
@@ -266,7 +269,7 @@ main(int argc, char **argv)
 		 */
 		if (vflag) {
 			printf("%s: returning to pid %d <- pid %d: op %d, len %zd, error %d, errno %d%s\n",
-			    getprogname(), pid, getpid(), out->op, out->len, out->error, out->_errno, kflag ? " (slow)" : "");
+			    getprogname(), pid, getpid(), out->op, out->len, out->error, out->errno_, kflag ? " (slow)" : "");
 		}
 	}
 }

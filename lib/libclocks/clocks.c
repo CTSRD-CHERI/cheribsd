@@ -98,10 +98,17 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 		return (error);
 	}
 
-	//fprintf(stderr, "%s: <- returned error %d, errno %d\n", __func__, in.error, in._errno);
+	if (in.op != -CAPV_CLOCKS) {
+		warnx("%s: id mismatch: in.op %d, expected %d; returning ENOMSG",
+		    __func__, in.op, -CAPV_CLOCKS);
+		errno = ENOMSG;
+		return (error);
+	}
+
+	//fprintf(stderr, "%s: <- returned error %d, errno %d\n", __func__, in.error, in.errno_);
 	error = in.error;
 	if (error != 0)
-		errno = in._errno;
+		errno = in.errno_;
 	else
 		memcpy(tp, &in.ts, sizeof(*tp));
 	return (error);
