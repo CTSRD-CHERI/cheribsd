@@ -150,7 +150,7 @@ efi_1t1_l3(vm_offset_t va)
 vm_pointer_t
 efi_phys_to_kva(vm_paddr_t paddr)
 {
-	vm_offset_t vaddr;
+	vm_pointer_t vaddr;
 
 	if (PHYS_IN_DMAP(paddr)) {
 		vaddr = PHYS_TO_DMAP(paddr);
