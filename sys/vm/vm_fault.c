@@ -2192,7 +2192,6 @@ again:
 				break;
 			}
 		}
-		VM_OBJECT_WUNLOCK(dst_object);
 
 		/*
 		 * Enter it in the pmap. If a wired, copy-on-write
@@ -2207,17 +2206,17 @@ again:
 		 * backing pages.
 		 */
 		if (vm_page_all_valid(dst_m)) {
+			VM_OBJECT_WUNLOCK(dst_object);
 			VM_OBJECT_ASSERT_CAP(dst_object, prot);
 			pmap_enter(dst_map->pmap, vaddr, dst_m,
 			    VM_OBJECT_MASK_CAP_PROT(dst_object, prot),
 			    access | (upgrade ? PMAP_ENTER_WIRED : 0), 0);
+			VM_OBJECT_WLOCK(dst_object);
 		}
 
 		/*
 		 * Mark it no longer busy, and put it on the active list.
 		 */
-		VM_OBJECT_WLOCK(dst_object);
-		
 		if (upgrade) {
 			if (src_m != dst_m) {
 				vm_page_unwire(src_m, PQ_INACTIVE);
