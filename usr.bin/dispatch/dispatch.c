@@ -51,7 +51,13 @@ __FBSDID("$FreeBSD$");
 extern ssize_t	switcher_cocall(void * __capability, void * __capability,
     const void * __capability,
     const void * __capability, size_t, void * __capability, size_t);
+extern ssize_t	switcher_cocall_eprototype(void * __capability, void * __capability,
+    const void * __capability,
+    const void * __capability, size_t, void * __capability, size_t);
 extern ssize_t	switcher_coaccept(void * __capability, void * __capability,
+    void * __capability * __capability,
+    const void * __capability, size_t, void * __capability, size_t);
+extern ssize_t	switcher_coaccept_eprototype(void * __capability, void * __capability,
     void * __capability * __capability,
     const void * __capability, size_t, void * __capability, size_t);
 
@@ -59,7 +65,7 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: dispatch [-Cv] command [args ...]\n");
+	fprintf(stderr, "usage: dispatch [-Ckv] command [args ...]\n");
 	exit(0);
 }
 
@@ -78,12 +84,15 @@ main(int argc, char **argv)
 	void * __capability _coaccept_code;
 	pid_t pid;
 	int ch, error, status;
-	bool Cflag = false, vflag = false;
+	bool Cflag = false, kflag = false, vflag = false;
 
-	while ((ch = getopt(argc, argv, "Cv")) != -1) {
+	while ((ch = getopt(argc, argv, "Ckv")) != -1) {
 		switch (ch) {
 		case 'C':
 			Cflag = true;
+			break;
+		case 'k':
+			kflag = true;
 			break;
 		case 'v':
 			vflag = true;
@@ -129,8 +138,13 @@ main(int argc, char **argv)
 	 * At this point we are running in a new address space.
 	 */
 
-	_cocall_code = switcher_cocall;
-	_coaccept_code = switcher_coaccept;
+	if (kflag) {
+		_cocall_code = switcher_cocall_eprototype;
+		_coaccept_code = switcher_coaccept_eprototype;
+	} else {
+		_cocall_code = switcher_cocall;
+		_coaccept_code = switcher_coaccept;
+	}
 	error = _cosetup(COSETUP_TAKEOVER, &_cocall_code, &_coaccept_code);
 	if (error != 0)
 		err(1, "COSETUP_TAKEOVER");

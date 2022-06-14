@@ -29,7 +29,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd May 25, 2022
+.Dd June 10, 2022
 .Dt DISPATCH 1
 .Os
 .Sh NAME
@@ -38,6 +38,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl C
+.Op Fl k
 .Op Fl v
 .Ar command Op Ar args ...
 .Sh DESCRIPTION
@@ -79,6 +80,19 @@ thus do not enter
 capability mode.
 .Pp
 XXX replace with adequately disturbing message
+.It Fl k
+Instead of the default switcher, provide a dummy one that always returns
+EPROTOTYPE.
+This can be used to force descendant processes to use
+.Xr cocall_slow 2
+and
+.Xr coaccept_slow 2
+system calls instead of the fast route via switcher.
+Note that all services still need to be run with the
+.Fl k
+flag; only
+.Xr cocall 2
+supports the automatic fallback.
 .It Fl v
 Be verbose.
 .El

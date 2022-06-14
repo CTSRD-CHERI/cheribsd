@@ -5,7 +5,7 @@
 .PATH: ${SRCTOP}/sys/riscv/cheri
 
 PROG=	dispatch
-SRCS=	dispatch.c cheri_cocall.S cheri_coaccept.S
+SRCS=	dispatch.c eprototype.S cheri_cocall.S cheri_coaccept.S
 
 # XXX this is required to make the *.S build
 CFLAGS.cheri_cocall.S+=	-D_KERNEL
