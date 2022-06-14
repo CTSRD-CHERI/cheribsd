@@ -1262,7 +1262,12 @@ sys_mincore(struct thread *td, struct mincore_args *uap)
 {
 
 #if __has_feature(capabilities)
-	if (cap_covers_pages(uap->addr, uap->len) == 0)
+	/*
+	 * Since this is a read-only query that does not modify any mappings
+	 * or raise faults, we do not require the cap to cover
+	 * the full page, just to overlap at least part of the page.
+	 */
+	if (__CAP_CHECK(uap->addr, uap->len) == 0)
 		return (EPROT);
 #endif
 
