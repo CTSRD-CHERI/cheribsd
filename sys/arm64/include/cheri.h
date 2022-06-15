@@ -56,6 +56,9 @@
 
 struct thread;
 
+/* Used to set DDC_EL0 in psci call functions. */
+extern void * __capability smccc_ddc_el0;
+
 /*
  * Morello specific kernel utility functions.
  */
