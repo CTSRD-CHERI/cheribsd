@@ -2719,8 +2719,7 @@ nfsmout:
  */
 int
 nfsrpc_remove(vnode_t dvp, char *name, int namelen, vnode_t vp,
-    struct ucred *cred, NFSPROC_T *p, struct nfsvattr *dnap, int *dattrflagp,
-    void *dstuff)
+    struct ucred *cred, NFSPROC_T *p, struct nfsvattr *dnap, int *dattrflagp)
 {
 	u_int32_t *tl;
 	struct nfsrv_descript nfsd, *nd = &nfsd;
@@ -2798,7 +2797,7 @@ int
 nfsrpc_rename(vnode_t fdvp, vnode_t fvp, char *fnameptr, int fnamelen,
     vnode_t tdvp, vnode_t tvp, char *tnameptr, int tnamelen, struct ucred *cred,
     NFSPROC_T *p, struct nfsvattr *fnap, struct nfsvattr *tnap,
-    int *fattrflagp, int *tattrflagp, void *fstuff, void *tstuff)
+    int *fattrflagp, int *tattrflagp)
 {
 	u_int32_t *tl;
 	struct nfsrv_descript nfsd, *nd = &nfsd;
@@ -2954,7 +2953,7 @@ nfsmout:
 int
 nfsrpc_link(vnode_t dvp, vnode_t vp, char *name, int namelen,
     struct ucred *cred, NFSPROC_T *p, struct nfsvattr *dnap,
-    struct nfsvattr *nap, int *attrflagp, int *dattrflagp, void *dstuff)
+    struct nfsvattr *nap, int *attrflagp, int *dattrflagp)
 {
 	u_int32_t *tl;
 	struct nfsrv_descript nfsd, *nd = &nfsd;
