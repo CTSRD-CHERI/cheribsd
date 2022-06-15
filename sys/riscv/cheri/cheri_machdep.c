@@ -43,7 +43,9 @@
 #include <machine/riscvreg.h>
 #include <machine/vmparam.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
 void *kernel_root_cap = (void *)(intcap_t)-1;
+#endif
 
 void
 cheri_init_capabilities(void * __capability kroot)
