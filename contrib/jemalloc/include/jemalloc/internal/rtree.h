@@ -221,7 +221,7 @@ rtree_leaf_elm_bits_extent_get(uintptr_t bits) {
 	return (extent_t *)(bits & mask);
 #    else
 	/* Restore sign-extended high bits, mask slab bit. */
-	return (extent_t *)((uintptr_t)((uintptr_t)(bits << RTREE_NHIB) >>
+	return (extent_t *)((uintptr_t)((intptr_t)(bits << RTREE_NHIB) >>
 	    RTREE_NHIB) & ~((uintptr_t)0x1));
 #    endif
 }
