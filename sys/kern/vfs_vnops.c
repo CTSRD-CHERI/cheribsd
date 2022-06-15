@@ -633,7 +633,7 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base, int len, off_t offset,
 	if (segflg == UIO_USERSPACE)
 		IOVEC_INIT_C(&aiov,
 		    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
-			(vaddr_t)base, len, 0), len);
+			(ptraddr_t)base, len, 0), len);
 	else
 #endif
 		IOVEC_INIT(&aiov, base, len);

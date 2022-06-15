@@ -411,7 +411,7 @@ umtxq_hash(struct umtx_key *key)
 {
 	unsigned n;
 
-	n = (vaddr_t)key->info.both.a + (vaddr_t)key->info.both.b;
+	n = (ptraddr_t)key->info.both.a + (ptraddr_t)key->info.both.b;
 	key->hash = ((n * GOLDEN_RATIO_PRIME) >> UMTX_SHIFTS) % UMTX_CHAINS;
 }
 
@@ -881,7 +881,7 @@ umtx_key_get(const void * __capability addr, int type, int share,
 	if (share == THREAD_SHARE) {
 		key->shared = 0;
 		key->info.private.vs = td->td_proc->p_vmspace;
-		key->info.private.addr = (__cheri_addr vaddr_t)addr;
+		key->info.private.addr = (__cheri_addr ptraddr_t)addr;
 	} else {
 		MPASS(share == PROCESS_SHARE || share == AUTO_SHARE);
 		map = &td->td_proc->p_vmspace->vm_map;
@@ -901,7 +901,7 @@ umtx_key_get(const void * __capability addr, int type, int share,
 		} else {
 			key->shared = 0;
 			key->info.private.vs = td->td_proc->p_vmspace;
-			key->info.private.addr = (__cheri_addr vaddr_t)addr;
+			key->info.private.addr = (__cheri_addr ptraddr_t)addr;
 		}
 		vm_map_lookup_done(map, entry);
 	}
@@ -4504,7 +4504,7 @@ umtx_shm_alive(struct thread *td, void * __capability addr)
 	boolean_t wired;
 
 	map = &td->td_proc->p_vmspace->vm_map;
-	res = vm_map_lookup(&map, (__cheri_addr vaddr_t)addr, VM_PROT_READ, &entry,
+	res = vm_map_lookup(&map, (__cheri_addr ptraddr_t)addr, VM_PROT_READ, &entry,
 	    &object, &pindex, &prot, &wired);
 	if (res != KERN_SUCCESS)
 		return (EFAULT);

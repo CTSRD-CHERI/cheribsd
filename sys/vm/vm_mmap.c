@@ -141,7 +141,7 @@ cap_covers_pages(const void * __capability cap, size_t size)
 	size_t pageoff;
 
 	addr = cap;
-	pageoff = ((__cheri_addr vaddr_t)addr & PAGE_MASK);
+	pageoff = ((__cheri_addr ptraddr_t)addr & PAGE_MASK);
 	addr -= pageoff;
 	size += pageoff;
 	size = (vm_size_t)round_page(size);

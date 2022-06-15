@@ -3481,7 +3481,7 @@ sysctl_kern_proc_sigfastblk(SYSCTL_HANDLER_ARGS)
 	 * meantime.
 	 */
 	if ((td1->td_pflags & TDP_SIGFASTBLOCK) != 0)
-		addr = (uintptr_t)(__cheri_addr vaddr_t)td1->td_sigblock_ptr;
+		addr = (uintptr_t)(__cheri_addr ptraddr_t)td1->td_sigblock_ptr;
 	else
 		error = ENOTTY;
 

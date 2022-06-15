@@ -59,13 +59,13 @@ struct cheri_object {
  * Functions to construct userspace capabilities.
  */
 void * __capability	_cheri_capability_build_user_code(struct thread *td,
-			    uint32_t perms, vaddr_t basep, size_t length,
+			    uint32_t perms, ptraddr_t basep, size_t length,
 			    off_t off, const char* func, int line);
 void * __capability	_cheri_capability_build_user_data(uint32_t perms,
-			    vaddr_t basep, size_t length, off_t off,
+			    ptraddr_t basep, size_t length, off_t off,
 			    const char* func, int line, bool exact);
 void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
-			    vaddr_t basep, size_t length, off_t off,
+			    ptraddr_t basep, size_t length, off_t off,
 			    const char* func, int line, bool exact);
 #define cheri_capability_build_user_code(td, perms, basep, length, off)	\
 	_cheri_capability_build_user_code(td, perms, basep, length, off,\
