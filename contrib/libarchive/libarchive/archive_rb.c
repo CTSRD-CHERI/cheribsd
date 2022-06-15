@@ -114,14 +114,14 @@
 static inline void
 RB_COPY_PROPERTIES(struct archive_rb_node * const dst, struct archive_rb_node * const src)
 {
-	vaddr_t src_bits = __get_bits(src->rb_info, RB_FLAG_MASK);
+	ptraddr_t src_bits = __get_bits(src->rb_info, RB_FLAG_MASK);
 	dst->rb_info = __clear_bits(dst->rb_info, RB_FLAG_MASK) | src_bits;
 }
 static inline void
 RB_SWAP_PROPERTIES(struct archive_rb_node * const a, struct archive_rb_node * const b)
 {
-	vaddr_t a_bits = __get_bits(a->rb_info, RB_FLAG_MASK);
-	vaddr_t b_bits = __get_bits(b->rb_info, RB_FLAG_MASK);
+	ptraddr_t a_bits = __get_bits(a->rb_info, RB_FLAG_MASK);
+	ptraddr_t b_bits = __get_bits(b->rb_info, RB_FLAG_MASK);
 	a->rb_info = __clear_bits(a->rb_info, RB_FLAG_MASK) | b_bits;
 	b->rb_info = __clear_bits(b->rb_info, RB_FLAG_MASK) | a_bits;
 }

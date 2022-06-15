@@ -375,7 +375,7 @@ int mlx4_post_send(struct ibv_qp *ibqp, struct ibv_send_wr *wr,
 
 			seg = wqe;
 			wqe += sizeof *seg;
-			off = ((vaddr_t) wqe) & (MLX4_INLINE_ALIGN - 1);
+			off = ((ptraddr_t) wqe) & (MLX4_INLINE_ALIGN - 1);
 			num_seg = 0;
 			seg_len = 0;
 
