@@ -1135,7 +1135,7 @@ arena_reset(tsd_t *tsd, arena_t *arena) {
 		alloc_ctx_t alloc_ctx;
 		rtree_ctx_t *rtree_ctx = tsd_rtree_ctx(tsd);
 		rtree_szind_slab_read(tsd_tsdn(tsd), &extents_rtree, rtree_ctx,
-		    (ptraddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
+		    (uintptr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
 		assert(alloc_ctx.szind != SC_NSIZES);
 
 		if (config_stats || (config_prof && opt_prof)) {
@@ -1579,12 +1579,12 @@ arena_prof_promote(tsdn_t *tsdn, void *ptr, size_t usize) {
 	rtree_ctx_t *rtree_ctx = tsdn_rtree_ctx(tsdn, &rtree_ctx_fallback);
 
 	extent_t *extent = rtree_extent_read(tsdn, &extents_rtree, rtree_ctx,
-	    (ptraddr_t)ptr, true);
+	    (uintptr_t)ptr, true);
 	arena_t *arena = extent_arena_get(extent);
 
 	szind_t szind = sz_size2index(usize);
 	extent_szind_set(extent, szind);
-	rtree_szind_slab_update(tsdn, &extents_rtree, rtree_ctx, (ptraddr_t)ptr,
+	rtree_szind_slab_update(tsdn, &extents_rtree, rtree_ctx, (uintptr_t)ptr,
 	    szind, false);
 
 	prof_accum_cancel(tsdn, &arena->prof_accum, usize);
@@ -1600,7 +1600,7 @@ arena_prof_demote(tsdn_t *tsdn, extent_t *extent, const void *ptr) {
 	extent_szind_set(extent, SC_NBINS);
 	rtree_ctx_t rtree_ctx_fallback;
 	rtree_ctx_t *rtree_ctx = tsdn_rtree_ctx(tsdn, &rtree_ctx_fallback);
-	rtree_szind_slab_update(tsdn, &extents_rtree, rtree_ctx, (ptraddr_t)ptr,
+	rtree_szind_slab_update(tsdn, &extents_rtree, rtree_ctx, (uintptr_t)ptr,
 	    SC_NBINS, false);
 
 	assert(isalloc(tsdn, ptr) == SC_LARGE_MINCLASS);
