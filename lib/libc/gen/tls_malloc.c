@@ -383,7 +383,7 @@ find_overhead(void * cp)
 	 */
 	if (cheri_gettag(op->ov_next) &&
 	    (cheri_getperm(op->ov_next) & CHERI_PERM_SW_VMEM) != 0) {
-		vaddr_t base, pp_base;
+		ptraddr_t base, pp_base;
 
 		pp_base = cheri_getbase(op);
 		base = cheri_getbase(op->ov_next);
@@ -439,13 +439,14 @@ tls_free(void *cp)
 static void *
 __tls_malloc_aligned(size_t size, size_t align)
 {
-	vaddr_t memshift;
+	ptraddr_t memshift;
 	void *mem, *res;
 	if (align < sizeof(void *))
 		align = sizeof(void *);
 
 	mem = __tls_malloc(size + sizeof(void *) + align - 1);
-	memshift = roundup2((vaddr_t)mem + sizeof(void *), align) - (vaddr_t)mem;
+	memshift = roundup2((ptraddr_t)mem + sizeof(void *), align) -
+	    (ptraddr_t)mem;
 	res = (void *)((uintptr_t)mem + memshift);
 	*(void **)((uintptr_t)res - sizeof(void *)) = mem;
 	return (res);

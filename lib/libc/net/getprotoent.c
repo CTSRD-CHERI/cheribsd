@@ -275,9 +275,9 @@ __proto_unmarshal_func(char *buffer, size_t buffer_size, void *retval,
 
 	orig_buf = (char *)_ALIGN(orig_buf);
 	memcpy(orig_buf, buffer + sizeof(struct protoent) + sizeof(char *) +
-	    (vaddr_t)_ALIGN(p) - (vaddr_t)p,
+	    (ptraddr_t)_ALIGN(p) - (ptraddr_t)p,
 	    buffer_size - sizeof(struct protoent) - sizeof(char *) -
-	    (vaddr_t)_ALIGN(p) + (vaddr_t)p);
+	    (ptraddr_t)_ALIGN(p) + (ptraddr_t)p);
 	p = (char *)_ALIGN(p);
 
 	NS_APPLY_OFFSET(proto->p_name, orig_buf, p, char *);
