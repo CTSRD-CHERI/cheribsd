@@ -216,7 +216,7 @@ CHERIBSDTEST(test_nofault_cfromptr, "Exercise CFromPtr success")
 	 * has an offset interpretation).
 	 * https://git.morello-project.org/morello/llvm-project/-/issues/16
 	 */
-	cd = __builtin_cheri_cap_from_pointer(cb, (vaddr_t)buf + 10);
+	cd = __builtin_cheri_cap_from_pointer(cb, (ptraddr_t)buf + 10);
 #else
 	/*
 	 * This pragma is require to allow compiling this file both with and

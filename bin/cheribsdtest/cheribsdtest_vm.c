@@ -694,7 +694,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_reuse,
 	 * XXX-AM: is this checking the right thing?
 	 * We may be failing because the reservation length is not enough.
 	 */
-	map2 = mmap((void *)(uintptr_t)((vaddr_t)map + PAGE_SIZE),
+	map2 = mmap((void *)(uintptr_t)((ptraddr_t)map + PAGE_SIZE),
 	    PAGE_SIZE * 2, PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
 	if (map2 == MAP_FAILED) {
 		CHERIBSDTEST_VERIFY2(errno == ENOMEM,
@@ -720,14 +720,14 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_align,
 	/* No alignment */
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
-	CHERIBSDTEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	CHERIBSDTEST_VERIFY2(((ptraddr_t)(map) & align_mask) == 0,
 	    "mmap failed to align representable region for %p", map);
 
 	/* Underaligned */
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED(align_shift - 1),
 	    -1, 0));
-	CHERIBSDTEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	CHERIBSDTEST_VERIFY2(((ptraddr_t)(map) & align_mask) == 0,
 	    "mmap failed to align representable region with requested "
 	    "alignment %lx for %p", align_shift - 1, map);
 
@@ -736,20 +736,20 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_align,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED(align_shift + 1),
 	    -1, 0));
 	CHERIBSDTEST_VERIFY2(
-	    ((vaddr_t)(map) & ((1 << (align_shift + 1)) - 1)) == 0,
+	    ((ptraddr_t)(map) & ((1 << (align_shift + 1)) - 1)) == 0,
 	    "mmap failed to align representable region with requested "
 	    "alignment %lx for %p", align_shift + 1, map);
 
 	/* Explicit cheri alignment */
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED_CHERI, -1, 0));
-	CHERIBSDTEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	CHERIBSDTEST_VERIFY2(((ptraddr_t)(map) & align_mask) == 0,
 	    "mmap failed to align representable region with requested "
 	    "cheri alignment for %p", map);
 
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED_CHERI_SEAL, -1, 0));
-	CHERIBSDTEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	CHERIBSDTEST_VERIFY2(((ptraddr_t)(map) & align_mask) == 0,
 	    "mmap failed to align representable region with requested "
 	    "cheri seal alignment for %p", map);
 
@@ -826,7 +826,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_shared,
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
 	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
 
-	CHERIBSDTEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	CHERIBSDTEST_VERIFY2(((ptraddr_t)(map) & align_mask) == 0,
 	    "mmap failed to align shared regiont for representability");
 	CHERIBSDTEST_VERIFY2(cheri_getlen(map) == expected_len,
 	    "mmap returned pointer with unrepresentable length");
@@ -967,7 +967,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_insert_null_derived,
 	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0,
 	    "mmap failed to return valid capability");
 
-	map = mmap((void *)(uintptr_t)(vaddr_t)map, PAGE_SIZE,
+	map = mmap((void *)(uintptr_t)(ptraddr_t)map, PAGE_SIZE,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
 	CHERIBSDTEST_VERIFY2(map == MAP_FAILED,
 	    "mmap fixed with NULL-derived hint succeded");
