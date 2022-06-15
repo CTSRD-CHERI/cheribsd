@@ -78,7 +78,7 @@ _WITH_NO_SUBOBJECT_BOUNDS!= grep -c __no_subobject_bounds ${HOST_INCLUDE_ROOT}/s
 .if ${_WITH_NO_SUBOBJECT_BOUNDS} == 0
 SYSINCS+=	cdefs.h
 .endif
-# Define vaddr_t for bootstrapping
+# Define ptraddr_t for bootstrapping
 INCS+=	stdint.h
 
 _WITH_EXPLICIT_BZERO!= grep -c explicit_bzero ${HOST_INCLUDE_ROOT}/strings.h || true
