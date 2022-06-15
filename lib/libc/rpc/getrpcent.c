@@ -788,9 +788,9 @@ rpc_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
 
 	orig_buf = (char *)_ALIGN(orig_buf);
 	memcpy(orig_buf, buffer + sizeof(struct rpcent) + sizeof(char *) +
-	    (ptraddr_t)_ALIGN(p) - (ptraddr_t)p,
+	    ((char *)_ALIGN(p) - p),
 	    buffer_size - sizeof(struct rpcent) - sizeof(char *) -
-	    (ptraddr_t)_ALIGN(p) + (ptraddr_t)p);
+	    ((char *)_ALIGN(p) - p));
 	p = (char *)_ALIGN(p);
 
 	NS_APPLY_OFFSET(rpc->r_name, orig_buf, p, char *);
