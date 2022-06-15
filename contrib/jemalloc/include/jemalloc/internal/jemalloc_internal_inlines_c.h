@@ -50,6 +50,10 @@ unbound_ptr(tsdn_t *tsdn, void *ptr) {
 		    "non-zero offset\n");
 		abort();
 	}
+	if (unlikely(cheri_getsealed(ptr))) {
+		malloc_write("<jemalloc>: refusing to unbound sealed cap\n");
+		abort();
+	}
 
 	rtree_ctx = tsdn_rtree_ctx(tsdn, &rtree_ctx_fallback);
 	extent = rtree_extent_read(tsdn, &extents_rtree,
