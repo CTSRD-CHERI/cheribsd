@@ -470,16 +470,16 @@ extent_esn_comp(const extent_t *a, const extent_t *b) {
 
 static inline int
 extent_ad_comp(const extent_t *a, const extent_t *b) {
-	ptraddr_t a_addr = (ptraddr_t)extent_addr_get(a);
-	ptraddr_t b_addr = (ptraddr_t)extent_addr_get(b);
+	uintptr_t a_addr = (uintptr_t)extent_addr_get(a);
+	uintptr_t b_addr = (uintptr_t)extent_addr_get(b);
 
 	return (a_addr > b_addr) - (a_addr < b_addr);
 }
 
 static inline int
 extent_ead_comp(const extent_t *a, const extent_t *b) {
-	ptraddr_t a_eaddr = (ptraddr_t)a;
-	ptraddr_t b_eaddr = (ptraddr_t)b;
+	uintptr_t a_eaddr = (uintptr_t)a;
+	uintptr_t b_eaddr = (uintptr_t)b;
 
 	return (a_eaddr > b_eaddr) - (a_eaddr < b_eaddr);
 }

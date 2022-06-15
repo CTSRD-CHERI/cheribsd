@@ -1,14 +1,3 @@
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181113,
- *   "target_type": "lib",
- *   "changes": [
- *     "virtual_address"
- *   ]
- * }
- * CHERI CHANGES END
- */
 #define JEMALLOC_MUTEX_C_
 #include "jemalloc/internal/jemalloc_preamble.h"
 #include "jemalloc/internal/jemalloc_internal_includes.h"
@@ -142,8 +131,8 @@ mutex_addr_comp(const witness_t *witness1, void *mutex1,
     const witness_t *witness2, void *mutex2) {
 	assert(mutex1 != NULL);
 	assert(mutex2 != NULL);
-	ptraddr_t mu1int = (ptraddr_t)mutex1;
-	ptraddr_t mu2int = (ptraddr_t)mutex2;
+	uintptr_t mu1int = (uintptr_t)mutex1;
+	uintptr_t mu2int = (uintptr_t)mutex2;
 	if (mu1int < mu2int) {
 		return -1;
 	} else if (mu1int == mu2int) {

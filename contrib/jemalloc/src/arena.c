@@ -351,13 +351,13 @@ arena_slab_regind(extent_t *slab, szind_t binind, const void *ptr) {
 	size_t diff, regind;
 
 	/* Freeing a pointer outside the slab can cause assertion failure. */
-	assert((ptraddr_t)ptr >= (ptraddr_t)extent_addr_get(slab));
-	assert((ptraddr_t)ptr < (ptraddr_t)extent_past_get(slab));
+	assert((uintptr_t)ptr >= (uintptr_t)extent_addr_get(slab));
+	assert((uintptr_t)ptr < (uintptr_t)extent_past_get(slab));
 	/* Freeing an interior pointer can cause assertion failure. */
-	assert(((ptraddr_t)ptr - (ptraddr_t)extent_addr_get(slab)) %
-	    (ptraddr_t)bin_infos[binind].reg_size == 0);
+	assert(((uintptr_t)ptr - (uintptr_t)extent_addr_get(slab)) %
+	    (uintptr_t)bin_infos[binind].reg_size == 0);
 
-	diff = (size_t)((ptraddr_t)ptr - (ptraddr_t)extent_addr_get(slab));
+	diff = (size_t)((uintptr_t)ptr - (uintptr_t)extent_addr_get(slab));
 
 	/* Avoid doing division with a variable divisor. */
 	regind = div_compute(&arena_binind_div_info[binind], diff);
