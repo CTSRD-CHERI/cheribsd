@@ -355,15 +355,6 @@ invalid:
 	close(1);
 	close(2);
 
-#ifdef __DEBUG_CHERI_TRAP_DURING_INIT__
-	warning("RAISING a CHERI violation:\n");
-	void * __capability cap = __builtin_cheri_global_data_get();
-	cap = __builtin_cheri_offset_set(cap, (vaddr_t)&Reboot);
-	cap = __builtin_cheri_perms_and(cap, ~__CHERI_CAP_PERMISSION_PERMIT_LOAD__);
-	Reboot = *((int * __capability)cap);
-	__builtin_trap();
-#endif
-
 	if (kenv(KENV_GET, "init_exec", kenv_value, sizeof(kenv_value)) > 0) {
 		replace_init(kenv_value);
 		_exit(0); /* reboot */
