@@ -507,7 +507,7 @@ a_prefix##insert(a_rbt_type *rbtree, a_type *node) {			\
     }									\
     pathp->node = node;							\
     /* Unwind. */							\
-    for (pathp--; (ptraddr_t)pathp >= (ptraddr_t)path; pathp--) {	\
+    for (pathp--; (uintptr_t)pathp >= (uintptr_t)path; pathp--) {	\
 	a_type *cnode = pathp->node;					\
 	if (pathp->cmp < 0) {						\
 	    a_type *left = pathp[1].node;				\
@@ -651,7 +651,7 @@ a_prefix##remove(a_rbt_type *rbtree, a_type *node) {			\
     /* The node to be pruned is black, so unwind until balance is     */\
     /* restored.                                                      */\
     pathp->node = NULL;							\
-    for (pathp--; (ptraddr_t)pathp >= (ptraddr_t)path; pathp--) {	\
+    for (pathp--; (uintptr_t)pathp >= (uintptr_t)path; pathp--) {	\
 	assert(pathp->cmp != 0);					\
 	if (pathp->cmp < 0) {						\
 	    rbtn_left_set(a_type, a_field, pathp->node,			\
@@ -692,7 +692,7 @@ a_prefix##remove(a_rbt_type *rbtree, a_type *node) {			\
 		}							\
 		/* Balance restored, but rotation modified subtree    */\
 		/* root.                                              */\
-		assert((ptraddr_t)pathp > (ptraddr_t)path);		\
+		assert((uintptr_t)pathp > (uintptr_t)path);		\
 		if (pathp[-1].cmp < 0) {				\
 		    rbtn_left_set(a_type, a_field, pathp[-1].node,	\
 		      tnode);						\
@@ -827,7 +827,7 @@ a_prefix##remove(a_rbt_type *rbtree, a_type *node) {			\
 		      tnode);						\
 		    /* Balance restored, but rotation modified        */\
 		    /* subtree root.                                  */\
-		    assert((ptraddr_t)pathp > (ptraddr_t)path);		\
+		    assert((uintptr_t)pathp > (uintptr_t)path);		\
 		    if (pathp[-1].cmp < 0) {				\
 			rbtn_left_set(a_type, a_field, pathp[-1].node,	\
 			  tnode);					\
