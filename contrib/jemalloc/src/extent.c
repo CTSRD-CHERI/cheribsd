@@ -430,11 +430,11 @@ extents_fit_alignment(extents_t *extents, size_t min_size, size_t max_size,
 		assert(i < SC_NPSIZES);
 		assert(!extent_heap_empty(&extents->heaps[i]));
 		extent_t *extent = extent_heap_first(&extents->heaps[i]);
-		ptraddr_t base = (ptraddr_t)extent_base_get(extent);
+		uintptr_t base = (uintptr_t)extent_base_get(extent);
 		size_t candidate_size = extent_size_get(extent);
 		assert(candidate_size >= min_size);
 
-		ptraddr_t next_align = ALIGNMENT_CEILING(base,
+		uintptr_t next_align = ALIGNMENT_CEILING((uintptr_t)base,
 		    PAGE_CEILING(alignment));
 		if (base > next_align || base + candidate_size <= next_align) {
 			/* Overflow or not crossing the next alignment. */
@@ -1006,8 +1006,8 @@ extent_split_interior(tsdn_t *tsdn, arena_t *arena,
     void *new_addr, size_t size, size_t pad, size_t alignment, bool slab,
     szind_t szind, bool growing_retained) {
 	size_t esize = size + pad;
-	size_t leadsize = ALIGNMENT_CEILING((ptraddr_t)extent_base_get(*extent),
-	    PAGE_CEILING(alignment)) - (ptraddr_t)extent_base_get(*extent);
+	size_t leadsize = ALIGNMENT_CEILING((uintptr_t)extent_base_get(*extent),
+	    PAGE_CEILING(alignment)) - (uintptr_t)extent_base_get(*extent);
 	assert(new_addr == NULL || leadsize == 0);
 	if (extent_size_get(*extent) < leadsize + esize) {
 		return extent_split_interior_cant_alloc;
@@ -1935,7 +1935,7 @@ extent_destroy_wrapper(tsdn_t *tsdn, arena_t *arena,
 static bool
 extent_commit_default(extent_hooks_t *extent_hooks, void *addr, size_t size,
     size_t offset, size_t length, unsigned arena_ind) {
-	return pages_commit((void *)((uintptr_t)addr + (ptraddr_t)offset),
+	return pages_commit((void *)((uintptr_t)addr + (uintptr_t)offset),
 	    length);
 }
 
@@ -1971,7 +1971,7 @@ extent_commit_wrapper(tsdn_t *tsdn, arena_t *arena,
 static bool
 extent_decommit_default(extent_hooks_t *extent_hooks, void *addr, size_t size,
     size_t offset, size_t length, unsigned arena_ind) {
-	return pages_decommit((void *)((uintptr_t)addr + (ptraddr_t)offset),
+	return pages_decommit((void *)((uintptr_t)addr + (uintptr_t)offset),
 	    length);
 }
 
@@ -2007,7 +2007,7 @@ extent_purge_lazy_default(extent_hooks_t *extent_hooks, void *addr, size_t size,
 	assert(length != 0);
 	assert((length & PAGE_MASK) == 0);
 
-	return pages_purge_lazy((void *)((uintptr_t)addr + (ptraddr_t)offset),
+	return pages_purge_lazy((void *)((uintptr_t)addr + (uintptr_t)offset),
 	    length);
 }
 #endif

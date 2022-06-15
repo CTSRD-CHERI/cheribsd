@@ -188,8 +188,8 @@ pages_map_slow(size_t size, size_t alignment, bool *commit) {
 		if (pages == NULL) {
 			return NULL;
 		}
-		size_t leadsize = ALIGNMENT_CEILING((ptraddr_t)pages, alignment)
-		    - (ptraddr_t)pages;
+		size_t leadsize = ALIGNMENT_CEILING((uintptr_t)pages, alignment)
+		    - (uintptr_t)pages;
 		ret = os_pages_trim(pages, alloc_size, leadsize, size, commit);
 	} while (ret == NULL);
 
@@ -256,7 +256,7 @@ pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
 		return ret;
 	}
 	assert(addr == NULL);
-	if (ALIGNMENT_ADDR2OFFSET((ptraddr_t)ret, alignment) != 0) {
+	if (ALIGNMENT_ADDR2OFFSET(ret, alignment) != 0) {
 		os_pages_unmap(ret, size);
 		return pages_map_slow(size, alignment, commit);
 	}

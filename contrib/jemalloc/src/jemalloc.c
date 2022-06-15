@@ -2199,7 +2199,7 @@ imalloc_body(static_opts_t *sopts, dynamic_opts_t *dopts, tsd_t *tsd) {
 	 * post-allocation work to do though.
 	 */
 	assert(dopts->alignment == 0
-	    || ((ptraddr_t)allocation & (dopts->alignment - 1)) == ZU(0));
+	    || ((uintptr_t)allocation & (dopts->alignment - 1)) == ZU(0));
 
 	if (config_stats) {
 		assert(usize == isalloc(tsd_tsdn(tsd), allocation));
@@ -3339,7 +3339,7 @@ je_rallocx(void *ptr, size_t size, int flags) {
 			usize = isalloc(tsd_tsdn(tsd), p);
 		}
 	}
-	assert(alignment == 0 || ((ptraddr_t)p & (alignment - 1)) == ZU(0));
+	assert(alignment == 0 || ((uintptr_t)p & (alignment - 1)) == ZU(0));
 
 	if (config_stats) {
 		*tsd_thread_allocatedp_get(tsd) += usize;
