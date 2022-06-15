@@ -119,7 +119,8 @@ static bool __elfN(freebsd_trans_osrel)(const Elf_Note *note,
     int32_t *osrel);
 static bool kfreebsd_trans_osrel(const Elf_Note *note, int32_t *osrel);
 static bool __elfN(check_note)(struct image_params *imgp,
-    Elf_Brandnote *checknote, int32_t *osrel, bool *has_fctl0, uint32_t *fctl0);
+    Elf_Brandnote *checknote, int32_t *osrel, bool *has_fctl0,
+    uint32_t *fctl0);
 static vm_prot_t __elfN(trans_prot)(Elf_Word);
 static Elf_Word __elfN(untrans_prot)(vm_prot_t);
 static size_t __elfN(prepare_register_notes)(struct thread *td,
@@ -1080,14 +1081,13 @@ __elfN(enforce_limits)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 	struct vmspace *vmspace;
 	const char *err_str;
 	u_long text_size, data_size, total_size, text_addr, data_addr;
+	u_long seg_size, seg_addr;
 	int i;
 
 	err_str = NULL;
 	text_size = data_size = total_size = text_addr = data_addr = 0;
 
 	for (i = 0; i < hdr->e_phnum; i++) {
-		u_long seg_size, seg_addr;
-
 		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
 			continue;
 
@@ -1160,6 +1160,7 @@ __elfN(enforce_limits)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 	vmspace->vm_taddr = (caddr_t)(uintptr_t)text_addr;
 	vmspace->vm_dsize = data_size >> PAGE_SHIFT;
 	vmspace->vm_daddr = (caddr_t)(uintptr_t)data_addr;
+
 	return (0);
 }
 
@@ -1236,6 +1237,7 @@ __elfN(load_interp)(struct image_params *imgp, const Elf_Brandinfo *brand_info,
 	char *path;
 	int error;
 	u_long end_addr;
+
 	if (brand_info->emul_path != NULL &&
 	    brand_info->emul_path[0] != '\0') {
 		path = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
