@@ -115,7 +115,7 @@ struct avl_node {
  * index of this node in its parent's avl_child[]: bit #2
  */
 #ifndef __CHERI_PURE_CAPABILITY__
-#define	AVL_XCHILD(n)	(((vaddr_t)(n)->avl_pcb >> 2) & 1)
+#define	AVL_XCHILD(n)	(((ptraddr_t)(n)->avl_pcb >> 2) & 1)
 #define	AVL_SETCHILD(n, c)						\
 	((n)->avl_pcb = (uintptr_t)(((n)->avl_pcb & (uintptr_t)~4) | (uintptr_t)((c) << 2)))
 #else
@@ -129,7 +129,7 @@ struct avl_node {
  * -1, 0, or +1, and is encoded by adding 1 to the value to get the
  * unsigned values of 0, 1, 2.
  */
-#define	AVL_XBALANCE(n)		((int)(((vaddr_t)(n)->avl_pcb & 3) - 1))
+#define	AVL_XBALANCE(n)		((int)(((ptraddr_t)(n)->avl_pcb & 3) - 1))
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	AVL_SETBALANCE(n, b)						\
 	((n)->avl_pcb = (uintptr_t)((((n)->avl_pcb & (uintptr_t)~3) | (uintptr_t)((b) + 1))))

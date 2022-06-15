@@ -947,7 +947,7 @@ linux_dev_fdopen(struct cdev *dev, int fflags, struct thread *td,
 static inline int
 linux_remap_address(void * __capability *uaddr, size_t len)
 {
-	vaddr_t uaddr_val = (__cheri_addr vaddr_t)(*uaddr);
+	ptraddr_t uaddr_val = (__cheri_addr ptraddr_t)(*uaddr);
 
 	if (unlikely(uaddr_val >= LINUX_IOCTL_MIN_PTR &&
 	    uaddr_val < LINUX_IOCTL_MAX_PTR)) {
@@ -1040,12 +1040,12 @@ linux_clear_user(void * __capability _uaddr, size_t _len)
 int
 linux_access_ok(const void * __capability uaddr, size_t len)
 {
-	vaddr_t saddr;
-	vaddr_t eaddr;
+	ptraddr_t saddr;
+	ptraddr_t eaddr;
 
 	/* get start and end address */
-	saddr = (__cheri_addr vaddr_t)uaddr;
-	eaddr = (__cheri_addr vaddr_t)uaddr + len;
+	saddr = (__cheri_addr ptraddr_t)uaddr;
+	eaddr = (__cheri_addr ptraddr_t)uaddr + len;
 
 	/* verify addresses are valid for userspace */
 	return ((saddr == eaddr) ||

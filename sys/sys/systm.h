@@ -126,8 +126,8 @@ struct ucred;
     ((void *)(uintptr_t)(ptr) == NULL ? NULL :				\
      ((vm_offset_t)(ptr) < 4096 ||					\
       (vm_offset_t)(ptr) > VM_MAXUSER_ADDRESS) ?			\
-	__builtin_cheri_offset_set(NULL, (vaddr_t)(ptr)) :		\
-	__builtin_cheri_offset_set((cap), (vaddr_t)(ptr)))
+	__builtin_cheri_offset_set(NULL, (ptraddr_t)(ptr)) :		\
+	__builtin_cheri_offset_set((cap), (ptraddr_t)(ptr)))
 
 #define	__USER_CAP_UNBOUND(ptr)						\
 	___USER_CFROMPTR((ptr), __USER_DDC)

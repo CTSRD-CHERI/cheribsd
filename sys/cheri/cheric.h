@@ -133,7 +133,7 @@ static inline bool
 #else
 static inline _Bool
 #endif
-cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
+cheri_is_address_inbounds(const void * __capability cap, ptraddr_t addr)
 {
 	return (addr >= cheri_getbase(cap) && addr < cheri_gettop(cap));
 }
