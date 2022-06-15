@@ -56,6 +56,14 @@ unbound_ptr(tsdn_t *tsdn, void *ptr) {
 	    rtree_ctx, (uintptr_t)ptr, true);
 	assert(extent != NULL);
 	ubptr = cheri_setaddress(extent->e_addr, (ptraddr_t)ptr);
+	/*
+	 * Compare pointer addresses to work around an issue where
+	 * LLVM's GVN pass replaces ubptr with ptr in the assert
+	 * about equal bases on riscv64.
+	 *
+	 * This works around:
+	 * https://github.com/CTSRD-CHERI/llvm-project/issues/619
+	 */
 	assert((ptraddr_t)ptr == (ptraddr_t)ubptr);
 	assert(cheri_getbase(ubptr) == cheri_getbase(extent->e_addr));
 	assert(cheri_getlen(ubptr) == cheri_getlen(extent->e_addr));
