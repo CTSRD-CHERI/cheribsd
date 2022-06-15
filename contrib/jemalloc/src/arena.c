@@ -685,7 +685,7 @@ arena_decay_reinit(arena_decay_t *decay, ssize_t decay_ms) {
 
 	nstime_init(&decay->epoch, 0);
 	nstime_update(&decay->epoch);
-	decay->jitter_state = (uint64_t)(ptraddr_t)decay;
+	decay->jitter_state = (uint64_t)(uintptr_t)decay;
 	arena_decay_deadline_init(decay);
 	decay->nunpurged = 0;
 	memset(decay->backlog, 0, SMOOTHSTEP_NSTEPS * sizeof(size_t));
@@ -2015,7 +2015,7 @@ arena_new(tsdn_t *tsdn, unsigned ind, extent_hooks_t *extent_hooks) {
 		 * deterministic seed.
 		 */
 		atomic_store_zu(&arena->offset_state, config_debug ? ind :
-		    (size_t)(ptraddr_t)arena, ATOMIC_RELAXED);
+		    (size_t)(uintptr_t)arena, ATOMIC_RELAXED);
 	}
 
 	atomic_store_zu(&arena->extent_sn_next, 0, ATOMIC_RELAXED);
