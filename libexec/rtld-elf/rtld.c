@@ -637,7 +637,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     /* Initialize and relocate ourselves. */
     assert(aux_info[AT_BASE] != NULL);
-    assert((vaddr_t)aux_info[AT_BASE]->a_un.a_ptr != 0 && "rtld cannot be mapped at address zero!");
+    assert((ptraddr_t)aux_info[AT_BASE]->a_un.a_ptr != 0 && "rtld cannot be mapped at address zero!");
     init_rtld((caddr_t) aux_info[AT_BASE]->a_un.a_ptr, aux_info);
 
     dlerror_dflt_init();
@@ -927,7 +927,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     /* Initialize a fake symbol for resolving undefined weak references. */
     sym_zero.st_info = ELF_ST_INFO(STB_GLOBAL, STT_NOTYPE);
     sym_zero.st_shndx = SHN_UNDEF;
-    sym_zero.st_value = -(vaddr_t)obj_main->relocbase;
+    sym_zero.st_value = -(ptraddr_t)obj_main->relocbase;
 
     if (!libmap_disable)
         libmap_disable = (bool)lm_init(libmap_override);
@@ -2637,7 +2637,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	    objtmp.cap_relocs, &__start___cap_relocs, cap_relocs_size,
 	    objtmp.cap_relocs_size);
 #endif
-	assert((vaddr_t)objtmp.cap_relocs == (vaddr_t)&__start___cap_relocs);
+	assert((ptraddr_t)objtmp.cap_relocs == (ptraddr_t)&__start___cap_relocs);
 	assert(objtmp.cap_relocs_size == cap_relocs_size);
     }
 #endif
@@ -4382,7 +4382,7 @@ dladdr(const void *addr, Dl_info *info)
         /* Clear all permissions from the symbol_addr */
         symbol_addr = cheri_andperm(symbol_addr, 0);
 #endif
-        if ((vaddr_t)symbol_addr > (vaddr_t)addr || (vaddr_t)symbol_addr < (vaddr_t)info->dli_saddr)
+        if ((ptraddr_t)symbol_addr > (ptraddr_t)addr || (ptraddr_t)symbol_addr < (ptraddr_t)info->dli_saddr)
             continue;
 
         dbg_cat(SYMLOOKUP, "%s: Found partial match for %s (" PTR_FMT ")\n", __func__,
@@ -4392,7 +4392,7 @@ dladdr(const void *addr, Dl_info *info)
         info->dli_saddr = symbol_addr;
 
         /* Exact match? */
-        if ((vaddr_t)info->dli_saddr == (vaddr_t)addr) {
+        if ((ptraddr_t)info->dli_saddr == (ptraddr_t)addr) {
             dbg_cat(SYMLOOKUP, "%s: Found exact match for %s (" PTR_FMT ")\n", __func__,
                 obj->strtab + def->st_name, symbol_addr);
             break;

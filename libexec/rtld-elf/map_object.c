@@ -270,7 +270,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	  path, rtld_strerror(errno));
 	goto error;
     }
-    if (base_addr != NULL && (vaddr_t)mapbase != (vaddr_t)base_addr) {
+    if (base_addr != NULL && (ptraddr_t)mapbase != (ptraddr_t)base_addr) {
 #ifdef __CHERI_PURE_CAPABILITY__
 	_rtld_error("%s: mmap returned wrong address: wanted %#p, got %#p",
 	  path, base_addr, mapbase);
