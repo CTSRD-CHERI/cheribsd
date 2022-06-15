@@ -2199,7 +2199,7 @@ imalloc_body(static_opts_t *sopts, dynamic_opts_t *dopts, tsd_t *tsd) {
 	 * post-allocation work to do though.
 	 */
 	assert(dopts->alignment == 0
-	    || ((vaddr_t)allocation & (dopts->alignment - 1)) == ZU(0));
+	    || ((ptraddr_t)allocation & (dopts->alignment - 1)) == ZU(0));
 
 	if (config_stats) {
 		assert(usize == isalloc(tsd_tsdn(tsd), allocation));
@@ -2638,7 +2638,7 @@ ifree(tsd_t *tsd, void *ptr, tcache_t *tcache, bool slow_path) {
 	alloc_ctx_t alloc_ctx;
 	rtree_ctx_t *rtree_ctx = tsd_rtree_ctx(tsd);
 	rtree_szind_slab_read(tsd_tsdn(tsd), &extents_rtree, rtree_ctx,
-	    (vaddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
+	    (ptraddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
 	assert(alloc_ctx.szind != SC_NSIZES);
 
 	size_t usize;
@@ -2696,7 +2696,7 @@ isfree(tsd_t *tsd, void *ptr, size_t usize, tcache_t *tcache, bool slow_path) {
 	} else if (config_prof && opt_prof) {
 		rtree_ctx_t *rtree_ctx = tsd_rtree_ctx(tsd);
 		rtree_szind_slab_read(tsd_tsdn(tsd), &extents_rtree, rtree_ctx,
-		    (vaddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
+		    (ptraddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
 		assert(alloc_ctx.szind == sz_size2index(usize));
 		ctx = &alloc_ctx;
 	} else {
@@ -2747,7 +2747,7 @@ je_realloc(void *ptr, size_t arg_size) {
 		alloc_ctx_t alloc_ctx;
 		rtree_ctx_t *rtree_ctx = tsd_rtree_ctx(tsd);
 		rtree_szind_slab_read(tsd_tsdn(tsd), &extents_rtree, rtree_ctx,
-		    (vaddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
+		    (ptraddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
 		assert(alloc_ctx.szind != SC_NSIZES);
 		old_usize = sz_index2size(alloc_ctx.szind);
 		assert(old_usize == isalloc(tsd_tsdn(tsd), ptr));
@@ -3310,7 +3310,7 @@ je_rallocx(void *ptr, size_t size, int flags) {
 	alloc_ctx_t alloc_ctx;
 	rtree_ctx_t *rtree_ctx = tsd_rtree_ctx(tsd);
 	rtree_szind_slab_read(tsd_tsdn(tsd), &extents_rtree, rtree_ctx,
-	    (vaddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
+	    (ptraddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
 	assert(alloc_ctx.szind != SC_NSIZES);
 	old_usize = sz_index2size(alloc_ctx.szind);
 	assert(old_usize == isalloc(tsd_tsdn(tsd), ptr));
@@ -3339,7 +3339,7 @@ je_rallocx(void *ptr, size_t size, int flags) {
 			usize = isalloc(tsd_tsdn(tsd), p);
 		}
 	}
-	assert(alignment == 0 || ((vaddr_t)p & (alignment - 1)) == ZU(0));
+	assert(alignment == 0 || ((ptraddr_t)p & (alignment - 1)) == ZU(0));
 
 	if (config_stats) {
 		*tsd_thread_allocatedp_get(tsd) += usize;
@@ -3460,7 +3460,7 @@ je_xallocx(void *ptr, size_t size, size_t extra, int flags) {
 	alloc_ctx_t alloc_ctx;
 	rtree_ctx_t *rtree_ctx = tsd_rtree_ctx(tsd);
 	rtree_szind_slab_read(tsd_tsdn(tsd), &extents_rtree, rtree_ctx,
-	    (vaddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
+	    (ptraddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
 	assert(alloc_ctx.szind != SC_NSIZES);
 	old_usize = sz_index2size(alloc_ctx.szind);
 	assert(old_usize == isalloc(tsd_tsdn(tsd), ptr));

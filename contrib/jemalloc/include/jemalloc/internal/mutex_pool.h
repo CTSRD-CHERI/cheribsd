@@ -29,7 +29,7 @@ bool mutex_pool_init(mutex_pool_t *pool, const char *name, witness_rank_t rank);
 
 /* Internal helper - not meant to be called outside this module. */
 static inline malloc_mutex_t *
-mutex_pool_mutex(mutex_pool_t *pool, vaddr_t key) {
+mutex_pool_mutex(mutex_pool_t *pool, ptraddr_t key) {
 	size_t hash_result[2];
 	hash(&key, sizeof(key), 0xd50dcc1b, hash_result);
 	return &pool->mutexes[hash_result[0] % MUTEX_POOL_SIZE];
@@ -50,7 +50,7 @@ mutex_pool_assert_not_held(tsdn_t *tsdn, mutex_pool_t *pool) {
  */
 
 static inline void
-mutex_pool_lock(tsdn_t *tsdn, mutex_pool_t *pool, vaddr_t key) {
+mutex_pool_lock(tsdn_t *tsdn, mutex_pool_t *pool, ptraddr_t key) {
 	mutex_pool_assert_not_held(tsdn, pool);
 
 	malloc_mutex_t *mutex = mutex_pool_mutex(pool, key);
@@ -58,7 +58,7 @@ mutex_pool_lock(tsdn_t *tsdn, mutex_pool_t *pool, vaddr_t key) {
 }
 
 static inline void
-mutex_pool_unlock(tsdn_t *tsdn, mutex_pool_t *pool, vaddr_t key) {
+mutex_pool_unlock(tsdn_t *tsdn, mutex_pool_t *pool, ptraddr_t key) {
 	malloc_mutex_t *mutex = mutex_pool_mutex(pool, key);
 	malloc_mutex_unlock(tsdn, mutex);
 
@@ -66,16 +66,16 @@ mutex_pool_unlock(tsdn_t *tsdn, mutex_pool_t *pool, vaddr_t key) {
 }
 
 static inline void
-mutex_pool_lock2(tsdn_t *tsdn, mutex_pool_t *pool, vaddr_t key1,
-    vaddr_t key2) {
+mutex_pool_lock2(tsdn_t *tsdn, mutex_pool_t *pool, ptraddr_t key1,
+    ptraddr_t key2) {
 	mutex_pool_assert_not_held(tsdn, pool);
 
 	malloc_mutex_t *mutex1 = mutex_pool_mutex(pool, key1);
 	malloc_mutex_t *mutex2 = mutex_pool_mutex(pool, key2);
-	if ((vaddr_t)mutex1 < (vaddr_t)mutex2) {
+	if ((ptraddr_t)mutex1 < (ptraddr_t)mutex2) {
 		malloc_mutex_lock(tsdn, mutex1);
 		malloc_mutex_lock(tsdn, mutex2);
-	} else if ((vaddr_t)mutex1 == (vaddr_t)mutex2) {
+	} else if ((ptraddr_t)mutex1 == (ptraddr_t)mutex2) {
 		malloc_mutex_lock(tsdn, mutex1);
 	} else {
 		malloc_mutex_lock(tsdn, mutex2);
@@ -84,8 +84,8 @@ mutex_pool_lock2(tsdn_t *tsdn, mutex_pool_t *pool, vaddr_t key1,
 }
 
 static inline void
-mutex_pool_unlock2(tsdn_t *tsdn, mutex_pool_t *pool, vaddr_t key1,
-    vaddr_t key2) {
+mutex_pool_unlock2(tsdn_t *tsdn, mutex_pool_t *pool, ptraddr_t key1,
+    ptraddr_t key2) {
 	malloc_mutex_t *mutex1 = mutex_pool_mutex(pool, key1);
 	malloc_mutex_t *mutex2 = mutex_pool_mutex(pool, key2);
 	if (mutex1 == mutex2) {
@@ -99,7 +99,7 @@ mutex_pool_unlock2(tsdn_t *tsdn, mutex_pool_t *pool, vaddr_t key1,
 }
 
 static inline void
-mutex_pool_assert_owner(tsdn_t *tsdn, mutex_pool_t *pool, vaddr_t key) {
+mutex_pool_assert_owner(tsdn_t *tsdn, mutex_pool_t *pool, ptraddr_t key) {
 	malloc_mutex_assert_owner(tsdn, mutex_pool_mutex(pool, key));
 }
 
