@@ -53,10 +53,10 @@ unbound_ptr(tsdn_t *tsdn, void *ptr) {
 
 	rtree_ctx = tsdn_rtree_ctx(tsdn, &rtree_ctx_fallback);
 	extent = rtree_extent_read(tsdn, &extents_rtree,
-	    rtree_ctx, (vaddr_t)ptr, true);
+	    rtree_ctx, (ptraddr_t)ptr, true);
 	assert(extent != NULL);
-	ubptr = cheri_setaddress(extent->e_addr, (vaddr_t)ptr);
-	assert((vaddr_t)ptr == (vaddr_t)ubptr);
+	ubptr = cheri_setaddress(extent->e_addr, (ptraddr_t)ptr);
+	assert((ptraddr_t)ptr == (ptraddr_t)ubptr);
 	assert(cheri_getbase(ubptr) == cheri_getbase(extent->e_addr));
 	assert(cheri_getlen(ubptr) == cheri_getlen(extent->e_addr));
 #endif
@@ -133,7 +133,7 @@ ipallocztm(tsdn_t *tsdn, size_t usize, size_t alignment, bool zero,
 	    WITNESS_RANK_CORE, 0);
 
 	ret = arena_palloc(tsdn, arena, usize, alignment, zero, tcache);
-	assert(ALIGNMENT_ADDR2BASE(ret, alignment) == (vaddr_t)ret);
+	assert(ALIGNMENT_ADDR2BASE(ret, alignment) == (ptraddr_t)ret);
 	if (config_stats && is_internal && likely(ret != NULL)) {
 		arena_internal_add(iaalloc(tsdn, ret), isalloc(tsdn, ret));
 	}
@@ -237,7 +237,7 @@ iralloct(tsdn_t *tsdn, void *ptr, size_t oldsize, size_t size, size_t alignment,
 	witness_assert_depth_to_rank(tsdn_witness_tsdp_get(tsdn),
 	    WITNESS_RANK_CORE, 0);
 
-	if (alignment != 0 && ((vaddr_t)ptr & ((vaddr_t)alignment-1))
+	if (alignment != 0 && ((ptraddr_t)ptr & ((ptraddr_t)alignment-1))
 	    != 0) {
 		/*
 		 * Existing object alignment is inadequate; allocate new space
@@ -266,7 +266,7 @@ ixalloc(tsdn_t *tsdn, void *ptr, size_t oldsize, size_t size, size_t extra,
 	witness_assert_depth_to_rank(tsdn_witness_tsdp_get(tsdn),
 	    WITNESS_RANK_CORE, 0);
 
-	if (alignment != 0 && ((vaddr_t)ptr & ((vaddr_t)alignment-1))
+	if (alignment != 0 && ((ptraddr_t)ptr & ((ptraddr_t)alignment-1))
 	    != 0) {
 		/* Existing object alignment is inadequate. */
 		*newsize = oldsize;

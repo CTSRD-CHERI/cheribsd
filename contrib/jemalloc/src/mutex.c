@@ -142,8 +142,8 @@ mutex_addr_comp(const witness_t *witness1, void *mutex1,
     const witness_t *witness2, void *mutex2) {
 	assert(mutex1 != NULL);
 	assert(mutex2 != NULL);
-	vaddr_t mu1int = (vaddr_t)mutex1;
-	vaddr_t mu2int = (vaddr_t)mutex2;
+	ptraddr_t mu1int = (ptraddr_t)mutex1;
+	ptraddr_t mu2int = (ptraddr_t)mutex2;
 	if (mu1int < mu2int) {
 		return -1;
 	} else if (mu1int == mu2int) {

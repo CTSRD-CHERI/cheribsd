@@ -200,7 +200,7 @@ arena_salloc(tsdn_t *tsdn, const void *ptr) {
 	rtree_ctx_t *rtree_ctx = tsdn_rtree_ctx(tsdn, &rtree_ctx_fallback);
 
 	szind_t szind = rtree_szind_read(tsdn, &extents_rtree, rtree_ctx,
-	    (vaddr_t)ptr, true);
+	    (ptraddr_t)ptr, true);
 	assert(szind != SC_NSIZES);
 
 	return sz_index2size(szind);
@@ -223,7 +223,7 @@ arena_vsalloc(tsdn_t *tsdn, const void *ptr) {
 	extent_t *extent;
 	szind_t szind;
 	if (rtree_extent_szind_read(tsdn, &extents_rtree, rtree_ctx,
-	    (vaddr_t)ptr, false, &extent, &szind)) {
+	    (ptraddr_t)ptr, false, &extent, &szind)) {
 		return 0;
 	}
 
@@ -258,12 +258,12 @@ arena_dalloc_no_tcache(tsdn_t *tsdn, void *ptr) {
 
 	szind_t szind;
 	bool slab;
-	rtree_szind_slab_read(tsdn, &extents_rtree, rtree_ctx, (vaddr_t)ptr,
+	rtree_szind_slab_read(tsdn, &extents_rtree, rtree_ctx, (ptraddr_t)ptr,
 	    true, &szind, &slab);
 
 	if (config_debug) {
 		extent_t *extent = rtree_extent_read(tsdn, &extents_rtree,
-		    rtree_ctx, (vaddr_t)ptr, true);
+		    rtree_ctx, (ptraddr_t)ptr, true);
 		assert(szind == extent_szind_get(extent));
 		assert(szind < SC_NSIZES);
 		assert(slab == extent_slab_get(extent));
@@ -314,13 +314,13 @@ arena_dalloc(tsdn_t *tsdn, void *ptr, tcache_t *tcache,
 	} else {
 		rtree_ctx = tsd_rtree_ctx(tsdn_tsd(tsdn));
 		rtree_szind_slab_read(tsdn, &extents_rtree, rtree_ctx,
-		    (vaddr_t)ptr, true, &szind, &slab);
+		    (ptraddr_t)ptr, true, &szind, &slab);
 	}
 
 	if (config_debug) {
 		rtree_ctx = tsd_rtree_ctx(tsdn_tsd(tsdn));
 		extent_t *extent = rtree_extent_read(tsdn, &extents_rtree,
-		    rtree_ctx, (vaddr_t)ptr, true);
+		    rtree_ctx, (ptraddr_t)ptr, true);
 		assert(szind == extent_szind_get(extent));
 		assert(szind < SC_NSIZES);
 		assert(slab == extent_slab_get(extent));
@@ -357,14 +357,14 @@ arena_sdalloc_no_tcache(tsdn_t *tsdn, void *ptr, size_t size) {
 		    &rtree_ctx_fallback);
 
 		rtree_szind_slab_read(tsdn, &extents_rtree, rtree_ctx,
-		    (vaddr_t)ptr, true, &szind, &slab);
+		    (ptraddr_t)ptr, true, &szind, &slab);
 
 		assert(szind == sz_size2index(size));
 		assert((config_prof && opt_prof) || slab == (szind < SC_NBINS));
 
 		if (config_debug) {
 			extent_t *extent = rtree_extent_read(tsdn,
-			    &extents_rtree, rtree_ctx, (vaddr_t)ptr, true);
+			    &extents_rtree, rtree_ctx, (ptraddr_t)ptr, true);
 			assert(szind == extent_szind_get(extent));
 			assert(slab == extent_slab_get(extent));
 		}
@@ -400,7 +400,7 @@ arena_sdalloc(tsdn_t *tsdn, void *ptr, size_t size, tcache_t *tcache,
 			rtree_ctx_t *rtree_ctx = tsdn_rtree_ctx(tsdn,
 			    &rtree_ctx_fallback);
 			rtree_szind_slab_read(tsdn, &extents_rtree, rtree_ctx,
-			    (vaddr_t)ptr, true, &local_ctx.szind,
+			    (ptraddr_t)ptr, true, &local_ctx.szind,
 			    &local_ctx.slab);
 			assert(local_ctx.szind == sz_size2index(size));
 			alloc_ctx = &local_ctx;
@@ -419,9 +419,9 @@ arena_sdalloc(tsdn_t *tsdn, void *ptr, size_t size, tcache_t *tcache,
 	if (config_debug) {
 		rtree_ctx_t *rtree_ctx = tsd_rtree_ctx(tsdn_tsd(tsdn));
 		rtree_szind_slab_read(tsdn, &extents_rtree, rtree_ctx,
-		    (vaddr_t)ptr, true, &szind, &slab);
+		    (ptraddr_t)ptr, true, &szind, &slab);
 		extent_t *extent = rtree_extent_read(tsdn,
-		    &extents_rtree, rtree_ctx, (vaddr_t)ptr, true);
+		    &extents_rtree, rtree_ctx, (ptraddr_t)ptr, true);
 		assert(szind == extent_szind_get(extent));
 		assert(slab == extent_slab_get(extent));
 	}

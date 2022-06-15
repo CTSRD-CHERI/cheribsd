@@ -2237,7 +2237,7 @@ prof_tdata_init_impl(tsd_t *tsd, uint64_t thr_uid, uint64_t thr_discrim,
 		return NULL;
 	}
 
-	tdata->prng_state = (uint64_t)(vaddr_t)tdata;
+	tdata->prng_state = (uint64_t)(ptraddr_t)tdata;
 	prof_sample_threshold_update(tdata);
 
 	tdata->enq = false;
