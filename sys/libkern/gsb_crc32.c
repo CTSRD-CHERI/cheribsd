@@ -747,7 +747,7 @@ multitable_crc32c(uint32_t crc32c,
 	if (length == 0) {
 		return (crc32c);
 	}
-	to_even_word = (4 - (((ptraddr_t) buffer) & 0x3));
+	to_even_word = (4 - (((uintptr_t) buffer) & 0x3));
 	return (crc32c_sb8_64_bit(crc32c, buffer, length, to_even_word));
 }
 
@@ -800,12 +800,3 @@ calculate_crc32c(uint32_t crc32c, const unsigned char *buffer, unsigned int leng
 	return (singletable_crc32c(crc32c, buffer, length));
 }
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "kernel",
-//   "changes": [
-//     "pointer_alignment"
-//   ]
-// }
-// CHERI CHANGES END
