@@ -637,7 +637,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     /* Initialize and relocate ourselves. */
     assert(aux_info[AT_BASE] != NULL);
-    assert((ptraddr_t)aux_info[AT_BASE]->a_un.a_ptr != 0 && "rtld cannot be mapped at address zero!");
+    assert(aux_info[AT_BASE]->a_un.a_ptr != NULL && "rtld cannot be mapped at address zero!");
     init_rtld((caddr_t) aux_info[AT_BASE]->a_un.a_ptr, aux_info);
 
     dlerror_dflt_init();
@@ -2637,7 +2637,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	    objtmp.cap_relocs, &__start___cap_relocs, cap_relocs_size,
 	    objtmp.cap_relocs_size);
 #endif
-	assert((ptraddr_t)objtmp.cap_relocs == (ptraddr_t)&__start___cap_relocs);
+	assert(objtmp.cap_relocs == &__start___cap_relocs);
 	assert(objtmp.cap_relocs_size == cap_relocs_size);
     }
 #endif
@@ -4382,7 +4382,7 @@ dladdr(const void *addr, Dl_info *info)
         /* Clear all permissions from the symbol_addr */
         symbol_addr = cheri_andperm(symbol_addr, 0);
 #endif
-        if ((ptraddr_t)symbol_addr > (ptraddr_t)addr || (ptraddr_t)symbol_addr < (ptraddr_t)info->dli_saddr)
+        if (symbol_addr > addr || symbol_addr < info->dli_saddr)
             continue;
 
         dbg_cat(SYMLOOKUP, "%s: Found partial match for %s (" PTR_FMT ")\n", __func__,
@@ -4392,7 +4392,7 @@ dladdr(const void *addr, Dl_info *info)
         info->dli_saddr = symbol_addr;
 
         /* Exact match? */
-        if ((ptraddr_t)info->dli_saddr == (ptraddr_t)addr) {
+        if (info->dli_saddr == addr) {
             dbg_cat(SYMLOOKUP, "%s: Found exact match for %s (" PTR_FMT ")\n", __func__,
                 obj->strtab + def->st_name, symbol_addr);
             break;
