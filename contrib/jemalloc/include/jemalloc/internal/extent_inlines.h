@@ -23,27 +23,27 @@
 static inline void
 extent_lock(tsdn_t *tsdn, extent_t *extent) {
 	assert(extent != NULL);
-	mutex_pool_lock(tsdn, &extent_mutex_pool, (ptraddr_t)extent);
+	mutex_pool_lock(tsdn, &extent_mutex_pool, (uintptr_t)extent);
 }
 
 static inline void
 extent_unlock(tsdn_t *tsdn, extent_t *extent) {
 	assert(extent != NULL);
-	mutex_pool_unlock(tsdn, &extent_mutex_pool, (ptraddr_t)extent);
+	mutex_pool_unlock(tsdn, &extent_mutex_pool, (uintptr_t)extent);
 }
 
 static inline void
 extent_lock2(tsdn_t *tsdn, extent_t *extent1, extent_t *extent2) {
 	assert(extent1 != NULL && extent2 != NULL);
-	mutex_pool_lock2(tsdn, &extent_mutex_pool, (ptraddr_t)extent1,
-	    (ptraddr_t)extent2);
+	mutex_pool_lock2(tsdn, &extent_mutex_pool, (uintptr_t)extent1,
+	    (uintptr_t)extent2);
 }
 
 static inline void
 extent_unlock2(tsdn_t *tsdn, extent_t *extent1, extent_t *extent2) {
 	assert(extent1 != NULL && extent2 != NULL);
-	mutex_pool_unlock2(tsdn, &extent_mutex_pool, (ptraddr_t)extent1,
-	    (ptraddr_t)extent2);
+	mutex_pool_unlock2(tsdn, &extent_mutex_pool, (uintptr_t)extent1,
+	    (uintptr_t)extent2);
 }
 
 static inline unsigned
