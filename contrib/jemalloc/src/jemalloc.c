@@ -2633,7 +2633,7 @@ ifree(tsd_t *tsd, void *ptr, tcache_t *tcache, bool slow_path) {
 	alloc_ctx_t alloc_ctx;
 	rtree_ctx_t *rtree_ctx = tsd_rtree_ctx(tsd);
 	rtree_szind_slab_read(tsd_tsdn(tsd), &extents_rtree, rtree_ctx,
-	    (uintptr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
+	    (uintptr_t)(ptraddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
 	assert(alloc_ctx.szind != SC_NSIZES);
 
 	size_t usize;
