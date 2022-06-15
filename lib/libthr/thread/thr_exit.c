@@ -162,13 +162,6 @@ _Unwind_GetCFA(struct _Unwind_Context *context)
 #pragma weak _Unwind_ForcedUnwind
 #endif /* PIC */
 
-#ifndef __CHERI_PURE_CAPABILITY__
-#define WEAK_SYMBOL_NONNULL(sym) ((sym) != NULL)
-#else
-/* Work around https://github.com/CTSRD-CHERI/llvm/issues/167 */
-#define WEAK_SYMBOL_NONNULL(sym) ((vaddr_t)(sym) != (vaddr_t)0)
-#endif
-
 static void
 thread_unwind_cleanup(_Unwind_Reason_Code code __unused,
     struct _Unwind_Exception *e __unused)
@@ -307,7 +300,7 @@ _pthread_exit_mask(void *status, sigset_t *mask)
 	thread_uw_init();
 	if (get_uwl_forcedunwind() != NULL) {
 #else
-	if (WEAK_SYMBOL_NONNULL(_Unwind_ForcedUnwind)) {
+	if (_Unwind_ForcedUnwind != NULL) {
 #endif
 		if (curthread->unwind_disabled) {
 			if (message_printed == 0) {
