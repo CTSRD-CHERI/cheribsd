@@ -53,7 +53,7 @@ unbound_ptr(tsdn_t *tsdn, void *ptr) {
 
 	rtree_ctx = tsdn_rtree_ctx(tsdn, &rtree_ctx_fallback);
 	extent = rtree_extent_read(tsdn, &extents_rtree,
-	    rtree_ctx, (ptraddr_t)ptr, true);
+	    rtree_ctx, (uintptr_t)ptr, true);
 	assert(extent != NULL);
 	ubptr = cheri_setaddress(extent->e_addr, (ptraddr_t)ptr);
 	assert((ptraddr_t)ptr == (ptraddr_t)ubptr);

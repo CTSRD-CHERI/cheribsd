@@ -175,7 +175,7 @@ extent_lock_from_addr(tsdn_t *tsdn, rtree_ctx_t *rtree_ctx, void *addr,
     bool inactive_only) {
 	extent_t *ret = NULL;
 	rtree_leaf_elm_t *elm = rtree_leaf_elm_lookup(tsdn, &extents_rtree,
-	    rtree_ctx, (ptraddr_t)addr, false, false);
+	    rtree_ctx, (uintptr_t)addr, false, false);
 	if (elm == NULL) {
 		return NULL;
 	}
@@ -721,14 +721,14 @@ extent_rtree_leaf_elms_lookup(tsdn_t *tsdn, rtree_ctx_t *rtree_ctx,
     const extent_t *extent, bool dependent, bool init_missing,
     rtree_leaf_elm_t **r_elm_a, rtree_leaf_elm_t **r_elm_b) {
 	*r_elm_a = rtree_leaf_elm_lookup(tsdn, &extents_rtree, rtree_ctx,
-	    (ptraddr_t)extent_base_get(extent), dependent, init_missing);
+	    (uintptr_t)extent_base_get(extent), dependent, init_missing);
 	if (!dependent && *r_elm_a == NULL) {
 		return true;
 	}
 	assert(*r_elm_a != NULL);
 
 	*r_elm_b = rtree_leaf_elm_lookup(tsdn, &extents_rtree, rtree_ctx,
-	    (ptraddr_t)extent_last_get(extent), dependent, init_missing);
+	    (uintptr_t)extent_last_get(extent), dependent, init_missing);
 	if (!dependent && *r_elm_b == NULL) {
 		return true;
 	}
@@ -755,7 +755,7 @@ extent_interior_register(tsdn_t *tsdn, rtree_ctx_t *rtree_ctx, extent_t *extent,
 	/* Register interior. */
 	for (size_t i = 1; i < (extent_size_get(extent) >> LG_PAGE) - 1; i++) {
 		rtree_write(tsdn, &extents_rtree, rtree_ctx,
-		    (ptraddr_t)extent_base_get(extent) + (ptraddr_t)(i <<
+		    (uintptr_t)extent_base_get(extent) + (uintptr_t)(i <<
 		    LG_PAGE), extent, szind, true);
 	}
 }
@@ -863,7 +863,7 @@ extent_interior_deregister(tsdn_t *tsdn, rtree_ctx_t *rtree_ctx,
 
 	for (i = 1; i < (extent_size_get(extent) >> LG_PAGE) - 1; i++) {
 		rtree_clear(tsdn, &extents_rtree, rtree_ctx,
-		    (ptraddr_t)extent_base_get(extent) + (ptraddr_t)(i <<
+		    (uintptr_t)extent_base_get(extent) + (uintptr_t)(i <<
 		    LG_PAGE));
 	}
 }
@@ -1054,12 +1054,12 @@ extent_split_interior(tsdn_t *tsdn, arena_t *arena,
 		extent_szind_set(*extent, szind);
 		if (szind != SC_NSIZES) {
 			rtree_szind_slab_update(tsdn, &extents_rtree, rtree_ctx,
-			    (ptraddr_t)extent_addr_get(*extent), szind, slab);
+			    (uintptr_t)extent_addr_get(*extent), szind, slab);
 			if (slab && extent_size_get(*extent) > PAGE) {
 				rtree_szind_slab_update(tsdn, &extents_rtree,
 				    rtree_ctx,
-				    (ptraddr_t)extent_past_get(*extent) -
-				    (ptraddr_t)PAGE, szind, slab);
+				    (uintptr_t)extent_past_get(*extent) -
+				    (uintptr_t)PAGE, szind, slab);
 			}
 		}
 	}
@@ -1736,7 +1736,7 @@ extent_record(tsdn_t *tsdn, arena_t *arena, extent_hooks_t **r_extent_hooks,
 	}
 
 	assert(rtree_extent_read(tsdn, &extents_rtree, rtree_ctx,
-	    (ptraddr_t)extent_base_get(extent), true) == extent);
+	    (uintptr_t)extent_base_get(extent), true) == extent);
 
 	if (!extents->delay_coalesce) {
 		extent = extent_try_coalesce(tsdn, arena, r_extent_hooks,
