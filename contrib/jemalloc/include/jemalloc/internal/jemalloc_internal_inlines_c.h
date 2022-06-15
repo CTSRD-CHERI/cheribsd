@@ -141,7 +141,7 @@ ipallocztm(tsdn_t *tsdn, size_t usize, size_t alignment, bool zero,
 	    WITNESS_RANK_CORE, 0);
 
 	ret = arena_palloc(tsdn, arena, usize, alignment, zero, tcache);
-	assert(ALIGNMENT_ADDR2BASE(ret, alignment) == (ptraddr_t)ret);
+	assert(ALIGNMENT_ADDR2BASE(ret, alignment) == ret);
 	if (config_stats && is_internal && likely(ret != NULL)) {
 		arena_internal_add(iaalloc(tsdn, ret), isalloc(tsdn, ret));
 	}
