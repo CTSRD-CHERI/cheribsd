@@ -237,7 +237,7 @@ iralloct(tsdn_t *tsdn, void *ptr, size_t oldsize, size_t size, size_t alignment,
 	witness_assert_depth_to_rank(tsdn_witness_tsdp_get(tsdn),
 	    WITNESS_RANK_CORE, 0);
 
-	if (alignment != 0 && ((ptraddr_t)ptr & ((ptraddr_t)alignment-1))
+	if (alignment != 0 && ((uintptr_t)ptr & (alignment-1))
 	    != 0) {
 		/*
 		 * Existing object alignment is inadequate; allocate new space
@@ -266,7 +266,7 @@ ixalloc(tsdn_t *tsdn, void *ptr, size_t oldsize, size_t size, size_t extra,
 	witness_assert_depth_to_rank(tsdn_witness_tsdp_get(tsdn),
 	    WITNESS_RANK_CORE, 0);
 
-	if (alignment != 0 && ((ptraddr_t)ptr & ((ptraddr_t)alignment-1))
+	if (alignment != 0 && ((uintptr_t)ptr & (alignment-1))
 	    != 0) {
 		/* Existing object alignment is inadequate. */
 		*newsize = oldsize;
