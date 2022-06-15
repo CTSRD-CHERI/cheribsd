@@ -809,11 +809,6 @@ init_opt_stats_print_opts(const char *v, size_t vlen) {
 	assert(opts_len == strlen(opt_stats_print_opts));
 }
 
-static inline ptrdiff_t
-pointer_distance(const void* end, const void* start) {
-	return (const uint8_t*)end - (const uint8_t*)start;
-}
-
 /* Reads the next size pair in a multi-sized option. */
 static bool
 malloc_conf_multi_sizes_next(const char **slab_size_segment_cur,
@@ -885,7 +880,7 @@ malloc_conf_next(char const **opts_p, char const **k_p, size_t *klen_p,
 			break;
 		case ':':
 			opts++;
-			*klen_p = pointer_distance(opts, *k_p) - 1;
+			*klen_p = (uintptr_t)opts - 1 - (uintptr_t)*k_p;
 			*v_p = opts;
 			accept = true;
 			break;
@@ -916,11 +911,11 @@ malloc_conf_next(char const **opts_p, char const **k_p, size_t *klen_p,
 				malloc_write("<jemalloc>: Conf string ends "
 				    "with comma\n");
 			}
-			*vlen_p = pointer_distance(opts, *v_p) - 1;
+			*vlen_p = (uintptr_t)opts - 1 - (uintptr_t)*v_p;
 			accept = true;
 			break;
 		case '\0':
-			*vlen_p = pointer_distance(opts, *v_p);
+			*vlen_p = (uintptr_t)opts - (uintptr_t)*v_p;
 			accept = true;
 			break;
 		default:
@@ -1141,8 +1136,8 @@ malloc_conf_init_helper(sc_data_t *sc_data, unsigned bin_shard_sizes[SC_NBINS],
 									\
 				set_errno(0);				\
 				um = malloc_strtoumax(v, &end, 0);	\
-				if (get_errno() != 0 || 		\
-				    pointer_distance(end, v) != vlen) {	\
+				if (get_errno() != 0 || (uintptr_t)end -\
+				    (uintptr_t)v != vlen) {	\
 					CONF_ERROR("Invalid conf value",\
 					    k, klen, v, vlen);		\
 				} else if (clip) {			\
@@ -1181,8 +1176,8 @@ malloc_conf_init_helper(sc_data_t *sc_data, unsigned bin_shard_sizes[SC_NBINS],
 									\
 				set_errno(0);				\
 				l = strtol(v, &end, 0);			\
-				if (get_errno() != 0 || 		\
-				    pointer_distance(end, v) != vlen) {	\
+				if (get_errno() != 0 || (uintptr_t)end -\
+				    (uintptr_t)v != vlen) {		\
 					CONF_ERROR("Invalid conf value",\
 					    k, klen, v, vlen);		\
 				} else if (l < (ssize_t)(min) || l >	\
