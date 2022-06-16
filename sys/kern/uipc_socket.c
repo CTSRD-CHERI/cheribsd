@@ -4358,10 +4358,16 @@ so_rdknl_lock(void *arg)
 {
 	struct socket *so = arg;
 
-	if (SOLISTENING(so))
-		SOCK_LOCK(so);
-	else
+retry:
+	if (SOLISTENING(so)) {
+		SOLISTEN_LOCK(so);
+	} else {
 		SOCK_RECVBUF_LOCK(so);
+		if (__predict_false(SOLISTENING(so))) {
+			SOCK_RECVBUF_UNLOCK(so);
+			goto retry;
+		}
+	}
 }
 
 static void
@@ -4370,7 +4376,7 @@ so_rdknl_unlock(void *arg)
 	struct socket *so = arg;
 
 	if (SOLISTENING(so))
-		SOCK_UNLOCK(so);
+		SOLISTEN_UNLOCK(so);
 	else
 		SOCK_RECVBUF_UNLOCK(so);
 }
@@ -4382,12 +4388,12 @@ so_rdknl_assert_lock(void *arg, int what)
 
 	if (what == LA_LOCKED) {
 		if (SOLISTENING(so))
-			SOCK_LOCK_ASSERT(so);
+			SOLISTEN_LOCK_ASSERT(so);
 		else
 			SOCK_RECVBUF_LOCK_ASSERT(so);
 	} else {
 		if (SOLISTENING(so))
-			SOCK_UNLOCK_ASSERT(so);
+			SOLISTEN_UNLOCK_ASSERT(so);
 		else
 			SOCK_RECVBUF_UNLOCK_ASSERT(so);
 	}
@@ -4398,10 +4404,16 @@ so_wrknl_lock(void *arg)
 {
 	struct socket *so = arg;
 
-	if (SOLISTENING(so))
-		SOCK_LOCK(so);
-	else
+retry:
+	if (SOLISTENING(so)) {
+		SOLISTEN_LOCK(so);
+	} else {
 		SOCK_SENDBUF_LOCK(so);
+		if (__predict_false(SOLISTENING(so))) {
+			SOCK_SENDBUF_UNLOCK(so);
+			goto retry;
+		}
+	}
 }
 
 static void
@@ -4410,7 +4422,7 @@ so_wrknl_unlock(void *arg)
 	struct socket *so = arg;
 
 	if (SOLISTENING(so))
-		SOCK_UNLOCK(so);
+		SOLISTEN_UNLOCK(so);
 	else
 		SOCK_SENDBUF_UNLOCK(so);
 }
@@ -4422,12 +4434,12 @@ so_wrknl_assert_lock(void *arg, int what)
 
 	if (what == LA_LOCKED) {
 		if (SOLISTENING(so))
-			SOCK_LOCK_ASSERT(so);
+			SOLISTEN_LOCK_ASSERT(so);
 		else
 			SOCK_SENDBUF_LOCK_ASSERT(so);
 	} else {
 		if (SOLISTENING(so))
-			SOCK_UNLOCK_ASSERT(so);
+			SOLISTEN_UNLOCK_ASSERT(so);
 		else
 			SOCK_SENDBUF_UNLOCK_ASSERT(so);
 	}
