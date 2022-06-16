@@ -828,7 +828,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[a++] = (intptr_t)p->argv; /* char * __capability * __capability */
 		uarg[a++] = (intptr_t)p->envv; /* char * __capability * __capability */
 		uarg[a++] = (intptr_t)p->capv; /* char * __capability __capability * __capability */
-		*n_args = 5;
+		iarg[a++] = p->capc; /* int */
+		*n_args = 6;
 		break;
 	}
 	/* nlm_syscall */
