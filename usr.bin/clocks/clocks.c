@@ -103,6 +103,7 @@ main(int argc, char **argv)
 	capv_clocks_t *out = &outbuf.clocks;
 	clockid_t clock_id;
 	void * __capability public;
+	void * __capability cookie;
 	void * __capability *capv = NULL;
 	char *ld_preload;
 	char *tmp = NULL;
@@ -206,9 +207,9 @@ main(int argc, char **argv)
 
 	for (;;) {
 		if (kflag)
-			received = coaccept_slow(NULL, out, out->len, &in, sizeof(in));
+			received = coaccept_slow(&cookie, out, out->len, &in, sizeof(in));
 		else
-			received = coaccept(NULL, out, out->len, &in, sizeof(in));
+			received = coaccept(&cookie, out, out->len, &in, sizeof(in));
 		if (received < 0) {
 			warn("%s", kflag ? "coaccept_slow" : "coaccept");
 			out->len = 0;
@@ -219,7 +220,7 @@ main(int argc, char **argv)
 		 * Answered, unmarshall the input buffer.
 		 */
 		if (vflag) {
-			error = cogetpid(&pid);
+			error = cocachedpid(&pid, cookie);
 			if (error != 0)
 				warn("cogetpid");
 			printf("%s: op %d, len %zd from pid %d -> pid %d%s\n",

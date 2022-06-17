@@ -131,6 +131,7 @@ FBSD_1.6 {
 
 FBSD_1.7 {
 	clearenv;
+	cocachedpid;
 };
 
 FBSDprivate_1.0 {

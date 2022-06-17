@@ -50,7 +50,10 @@ It is intended for use on the callee side, after successfully returning from
 .Xr coaccept 2 .
 .Pp
 It is a system call, so it is relatively slow.
-Users are expected to cache the PID, by keeping a dictionary of (cookie, pid) pairs, only calling
+Users are expected to use a caching wrapper, such as
+.Xr cocachedpid 3 ,
+or use a custom mechanism to keep dictionary of (cookie, pid) pairs,
+and only call
 .Fn cogetpid
 when the value of the cookie - filled in by
 .Xr coaccept 2 -
@@ -78,7 +81,8 @@ Unable to determine identity of the caller.
 .Xr cosetup 2 ,
 .Xr coregister 2 ,
 .Xr colookup 2 ,
-.Xr coaccept 2
+.Xr coaccept 2 ,
+.Xr cocachedpid 3
 .Sh HISTORY
 The
 .Fn coaccept

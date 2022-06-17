@@ -97,6 +97,7 @@ main(int argc, char **argv)
 	capv_t *out = &outbuf.cap;
 	void * __capability target = NULL;
 	void * __capability public;
+	void * __capability cookie;
 	void * __capability *capv;
 	char *tmp = NULL;
 	ssize_t received;
@@ -178,9 +179,9 @@ main(int argc, char **argv)
 		 * Receive cocalls from the child process.
 		 */
 		if (kflag)
-			received = coaccept_slow(NULL, out, out->len, in, sizeof(inbuf));
+			received = coaccept_slow(&cookie, out, out->len, in, sizeof(inbuf));
 		else
-			received = coaccept(NULL, out, out->len, in, sizeof(inbuf));
+			received = coaccept(&cookie, out, out->len, in, sizeof(inbuf));
 		if (received < 0) {
 			warn("%s", kflag ? "coaccept_slow" : "coaccept");
 			out->len = 0;
@@ -192,7 +193,7 @@ main(int argc, char **argv)
 		 * we are interposing.
 		 */
 		if (vflag) {
-			error = cogetpid(&pid);
+			error = cocachedpid(&pid, cookie);
 			if (error != 0)
 				warn("cogetpid");
 			printf("%s: cocall op %d, len %zd from pid %d -> pid %d%s\n",

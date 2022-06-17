@@ -150,7 +150,7 @@ main(int argc, char **argv)
 			warn("coaccept");
 		if (vflag) {
 			halfcookie = (uint64_t *)&cookie;
-			error = cogetpid(&pid);
+			error = cocachedpid(&pid, cookie);
 			if (error != 0)
 				warn("cogetpid");
 			printf("%s: %s: coaccepted, pid %d, caller pid %d, cookie %#lx%lx\n",
