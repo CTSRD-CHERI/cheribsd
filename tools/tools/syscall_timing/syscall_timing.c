@@ -250,10 +250,11 @@ test_clock_gettime(uintmax_t num, uintmax_t int_arg __unused, const char *path _
 static uintmax_t
 test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
 {
-	char buf[int_arg];
+	void * __capability buf[int_arg / 16 /* XXX */ + 2];
 	void * __capability *capv, *target;
 	char *tmp;
 	uintmax_t i;
+	ssize_t received;
 	int capc, entry, error;
 
 	capvfetch(&capc, &capv);
@@ -262,7 +263,7 @@ test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
 
 	entry = strtol(path, &tmp, 10);
 	if (*tmp != '\0' || entry < 0)
-		errx(1, "path argument must be a positive number"); /* xD */
+		errx(1, "-n requires a natural number");
 	if (entry >= capc)
 		errx(1, "entry %d >= capc %d", entry, capc);
 	target = capv[entry];
@@ -273,8 +274,10 @@ test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
 
 	benchmark_start();
 	BENCHMARK_FOREACH(i, num) {
-		error = cocall(target, buf, int_arg, buf, int_arg);
-		if (error != 0)
+		buf[0] = (void * __capability)(uintcap_t)int_arg;
+		buf[1] = NULL;
+		received = cocall(target, buf, int_arg, buf, int_arg);
+		if (received < 0)
 			err(1, "cocall");
 	}
 	benchmark_stop();
@@ -284,11 +287,12 @@ test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
 static uintmax_t
 test_coping_slow(uintmax_t num, uintmax_t int_arg, const char *path)
 {
-	char buf[int_arg];
+	void * __capability buf[int_arg / 16 /* XXX */ + 2];
 	void * __capability *capv, *target;
 	char *tmp;
 	uintmax_t i;
-	int capc, entry, error;
+	ssize_t received;
+	int capc, entry;
 
 	capvfetch(&capc, &capv);
 	if (capc <= 0)
@@ -296,16 +300,18 @@ test_coping_slow(uintmax_t num, uintmax_t int_arg, const char *path)
 
 	entry = strtol(path, &tmp, 10);
 	if (*tmp != '\0' || entry < 0)
-		errx(1, "path argument must be a positive number"); /* xD */
+		errx(1, "-n requires a natural number");
 	if (entry >= capc)
 		errx(1, "entry %d >= capc %d", entry, capc);
 	target = capv[entry];
 
 	benchmark_start();
 	BENCHMARK_FOREACH(i, num) {
-		error = cocall_slow(target, buf, int_arg, buf, int_arg);
-		if (error != 0)
-			err(1, "cocall");
+		buf[0] = (void * __capability)(uintcap_t)int_arg;
+		buf[1] = NULL;
+		received = cocall_slow(target, buf, int_arg, buf, int_arg);
+		if (received < 0)
+			err(1, "cocall_slow");
 	}
 	benchmark_stop();
 	return (i);
