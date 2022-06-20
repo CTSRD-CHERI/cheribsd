@@ -5428,7 +5428,6 @@ vm_map_growstack(vm_map_t map, vm_offset_t addr, vm_map_entry_t gap_entry)
 {
 	vm_map_entry_t stack_entry, tmp_entry;
 	struct proc *p;
-	struct vmspace *vm;
 	struct ucred *cred;
 	vm_pointer_t gap_end, gap_start, grow_start;
 	vm_size_t grow_amount, guard, max_grow;
@@ -5444,7 +5443,6 @@ vm_map_growstack(vm_map_t map, vm_offset_t addr, vm_map_entry_t gap_entry)
 #endif
 
 	p = curproc;
-	vm = p->p_vmspace;
 
 	/*
 	 * Disallow stack growth when the access is performed by a
