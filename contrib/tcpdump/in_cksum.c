@@ -34,17 +34,6 @@
  *
  *	@(#)in_cksum.c	8.1 (Berkeley) 6/10/93
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20180629,
- *   "target_type": "prog",
- *   "changes": [
- *     "pointer_alignment"
- *   ]
- * }
- * CHERI CHANGES END
- */
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"
@@ -103,7 +92,7 @@ in_cksum(const struct cksum_vec *vec, int veclen)
 		/*
 		 * Force to even boundary.
 		 */
-		if ((1 & (vaddr_t) w) && (mlen > 0)) {
+		if ((1 & (uintptr_t) w) && (mlen > 0)) {
 			REDUCE;
 			sum <<= 8;
 			s_util.c[0] = *(const uint8_t *)w;

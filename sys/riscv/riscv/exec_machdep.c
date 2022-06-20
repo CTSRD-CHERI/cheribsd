@@ -275,8 +275,8 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	} else
 #endif
 	{
-		tf->tf_a[0] = (__cheri_addr vaddr_t)stack;
-		tf->tf_sp = STACKALIGN((__cheri_addr vaddr_t)stack);
+		tf->tf_a[0] = (__cheri_addr ptraddr_t)stack;
+		tf->tf_sp = STACKALIGN((__cheri_addr ptraddr_t)stack);
 #if __has_feature(capabilities)
 		hybridabi_thread_setregs(td, imgp->entry_addr);
 #else
@@ -491,7 +491,9 @@ void
 sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
 	struct sigframe * __capability fp, frame;
+#if !__has_feature(capabilities)
 	struct sysentvec *sysent;
+#endif
 	struct trapframe *tf;
 	struct sigacts *psp;
 	struct thread *td;
@@ -518,7 +520,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	onstack = sigonstack(tf->tf_sp);
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
-	    (__cheri_addr vaddr_t)catcher, sig);
+	    (__cheri_addr ptraddr_t)catcher, sig);
 
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
@@ -548,7 +550,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	if (copyoutcap(&frame, fp, sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td,
-				(__cheri_addr vaddr_t)fp);
+				(__cheri_addr ptraddr_t)fp);
 		PROC_LOCK(p);
 		sigexit(td, SIGILL);
 	}
@@ -567,10 +569,10 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_sepc = (uintcap_t)catcher;
 	tf->tf_sp = (uintcap_t)fp;
 
-	sysent = p->p_sysent;
 #if __has_feature(capabilities)
 	tf->tf_ra = (uintcap_t)p->p_md.md_sigcode;
 #else
+	sysent = p->p_sysent;
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_ra = (register_t)sysent->sv_sigcode_base;
 	else

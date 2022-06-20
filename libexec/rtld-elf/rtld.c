@@ -185,7 +185,7 @@ static int symlook_needed(SymLook *, const Needed_Entry *, DoneList *);
 static int symlook_obj1_sysv(SymLook *, const Obj_Entry *);
 static int symlook_obj1_gnu(SymLook *, const Obj_Entry *);
 static void *tls_get_addr_slow(uintptr_t **, int, size_t, bool) __noinline;
-static void trace_loaded_objects(Obj_Entry *);
+static void trace_loaded_objects(Obj_Entry *, bool);
 static void unlink_object(Obj_Entry *);
 static void unload_object(Obj_Entry *, RtldLockState *lockstate);
 static void unref_dag(Obj_Entry *);
@@ -283,6 +283,7 @@ uintptr_t _rtld_bind(Obj_Entry *obj, Elf_Size reloff);
 int npagesizes;
 static int osreldate;
 size_t *pagesizes;
+size_t page_size;
 
 static int stack_prot = PROT_READ | PROT_WRITE | RTLD_DEFAULT_STACK_EXEC;
 static int max_stack_flags;
@@ -516,6 +517,18 @@ set_ld_elf_hints_path(void)
 		ld_elf_hints_path = ld_elf_hints_default;
 }
 
+uintptr_t
+rtld_round_page(uintptr_t x)
+{
+	return (roundup2(x, page_size));
+}
+
+uintptr_t
+rtld_trunc_page(uintptr_t x)
+{
+	return (rounddown2(x, page_size));
+}
+
 /*
  * Main entry point for dynamic linking.
  *
@@ -624,7 +637,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     /* Initialize and relocate ourselves. */
     assert(aux_info[AT_BASE] != NULL);
-    assert((vaddr_t)aux_info[AT_BASE]->a_un.a_ptr != 0 && "rtld cannot be mapped at address zero!");
+    assert(aux_info[AT_BASE]->a_un.a_ptr != NULL && "rtld cannot be mapped at address zero!");
     init_rtld((caddr_t) aux_info[AT_BASE]->a_un.a_ptr, aux_info);
 
     dlerror_dflt_init();
@@ -914,7 +927,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     /* Initialize a fake symbol for resolving undefined weak references. */
     sym_zero.st_info = ELF_ST_INFO(STB_GLOBAL, STT_NOTYPE);
     sym_zero.st_shndx = SHN_UNDEF;
-    sym_zero.st_value = -(vaddr_t)obj_main->relocbase;
+    sym_zero.st_value = -(ptraddr_t)obj_main->relocbase;
 
     if (!libmap_disable)
         libmap_disable = (bool)lm_init(libmap_override);
@@ -962,7 +975,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
        dump_auxv(aux_info);
 
     if (ld_tracing) {		/* We're done */
-	trace_loaded_objects(obj_main);
+	trace_loaded_objects(obj_main, true);
 	exit(0);
     }
 
@@ -1805,11 +1818,11 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 
 	case PT_LOAD:
 	    if (nsegs == 0) {	/* First load segment */
-		obj->vaddrbase = trunc_page(ph->p_vaddr);
+		obj->vaddrbase = rtld_trunc_page(ph->p_vaddr);
 		obj->mapbase = obj->vaddrbase + obj->relocbase;
 	    } else {		/* Last load segment */
 		obj->mapsize = rtld_max(obj->mapsize,
-		    round_page(ph->p_vaddr + ph->p_memsz) - obj->vaddrbase);
+		    rtld_round_page(ph->p_vaddr + ph->p_memsz) - obj->vaddrbase);
 	    }
 	    nsegs++;
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -1842,9 +1855,9 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 	    break;
 
 	case PT_GNU_RELRO:
-	    obj->relro_page = obj->relocbase + trunc_page(ph->p_vaddr);
-	    obj->relro_size = trunc_page(ph->p_vaddr + ph->p_memsz) -
-	      trunc_page(ph->p_vaddr);
+	    obj->relro_page = obj->relocbase + rtld_trunc_page(ph->p_vaddr);
+	    obj->relro_size = rtld_trunc_page(ph->p_vaddr + ph->p_memsz) -
+	      rtld_trunc_page(ph->p_vaddr);
 #ifdef __CHERI_PURE_CAPABILITY__
 	    obj->text_rodata_start_offset = rtld_min(ph->p_vaddr, obj->text_rodata_start_offset);
 	    obj->text_rodata_end_offset = rtld_max(ph->p_vaddr + ph->p_memsz, obj->text_rodata_end_offset);
@@ -2515,8 +2528,8 @@ parse_rtld_phdr(Obj_Entry *obj)
 			break;
 		case PT_GNU_RELRO:
 			obj->relro_page = obj->relocbase +
-			    trunc_page(ph->p_vaddr);
-			obj->relro_size = round_page(ph->p_memsz);
+			    rtld_trunc_page(ph->p_vaddr);
+			obj->relro_size = rtld_round_page(ph->p_memsz);
 			break;
 		case PT_NOTE:
 			note_start = (Elf_Note *)((char *)obj->relocbase + ph->p_vaddr);
@@ -2624,7 +2637,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	    objtmp.cap_relocs, &__start___cap_relocs, cap_relocs_size,
 	    objtmp.cap_relocs_size);
 #endif
-	assert((vaddr_t)objtmp.cap_relocs == (vaddr_t)&__start___cap_relocs);
+	assert(objtmp.cap_relocs == &__start___cap_relocs);
 	assert(objtmp.cap_relocs_size == cap_relocs_size);
     }
 #endif
@@ -2703,6 +2716,8 @@ psa_filled:
 	/* Discard any invalid entries at the end of the array. */
 	while (npagesizes > 0 && pagesizes[npagesizes - 1] == 0)
 		npagesizes--;
+
+	page_size = pagesizes[0];
 }
 
 /*
@@ -3463,9 +3478,9 @@ reloc_textrel_prot(Obj_Entry *obj, bool before)
 	    l--, ph++) {
 		if (ph->p_type != PT_LOAD || (ph->p_flags & PF_W) != 0)
 			continue;
-		base = obj->relocbase + trunc_page(ph->p_vaddr);
-		sz = round_page(ph->p_vaddr + ph->p_filesz) -
-		    trunc_page(ph->p_vaddr);
+		base = obj->relocbase + rtld_trunc_page(ph->p_vaddr);
+		sz = rtld_round_page(ph->p_vaddr + ph->p_filesz) -
+		    rtld_trunc_page(ph->p_vaddr);
 		prot = before ? (PROT_READ | PROT_WRITE) :
 		    convert_prot(ph->p_flags);
 		if (mprotect(base, sz, prot) == -1) {
@@ -4096,7 +4111,7 @@ dlopen_object(const char *name, int fd, Obj_Entry *refobj, int lo_flags,
 	lock_release(rtld_bind_lock, lockstate);
     return (obj);
 trace:
-    trace_loaded_objects(obj);
+    trace_loaded_objects(obj, false);
     if (lockstate == &mlockstate)
 	lock_release(rtld_bind_lock, lockstate);
     exit(0);
@@ -4367,7 +4382,7 @@ dladdr(const void *addr, Dl_info *info)
         /* Clear all permissions from the symbol_addr */
         symbol_addr = cheri_andperm(symbol_addr, 0);
 #endif
-        if ((vaddr_t)symbol_addr > (vaddr_t)addr || (vaddr_t)symbol_addr < (vaddr_t)info->dli_saddr)
+        if (symbol_addr > addr || symbol_addr < info->dli_saddr)
             continue;
 
         dbg_cat(SYMLOOKUP, "%s: Found partial match for %s (" PTR_FMT ")\n", __func__,
@@ -4377,7 +4392,7 @@ dladdr(const void *addr, Dl_info *info)
         info->dli_saddr = symbol_addr;
 
         /* Exact match? */
-        if ((vaddr_t)info->dli_saddr == (vaddr_t)addr) {
+        if (info->dli_saddr == addr) {
             dbg_cat(SYMLOOKUP, "%s: Found exact match for %s (" PTR_FMT ")\n", __func__,
                 obj->strtab + def->st_name, symbol_addr);
             break;
@@ -5220,101 +5235,125 @@ symlook_obj1_gnu(SymLook *req, const Obj_Entry *obj)
 }
 
 static void
-trace_loaded_objects(Obj_Entry *obj)
+trace_calc_fmts(const char **main_local, const char **fmt1, const char **fmt2)
 {
-    const char *fmt1, *fmt2, *fmt, *main_local, *list_containers;
-    int c;
+	*main_local = ld_get_env_var(LD_TRACE_LOADED_OBJECTS_PROGNAME);
+	if (*main_local == NULL)
+		*main_local = "";
 
-    if ((main_local = ld_get_env_var(LD_TRACE_LOADED_OBJECTS_PROGNAME)) ==
-      NULL)
-	main_local = "";
+	*fmt1 = ld_get_env_var(LD_TRACE_LOADED_OBJECTS_FMT1);
+	if (*fmt1 == NULL)
+		*fmt1 = "\t%o => %p (%x)\n";
 
-    if ((fmt1 = ld_get_env_var(LD_TRACE_LOADED_OBJECTS_FMT1)) == NULL)
-	fmt1 = "\t%o => %p (%x)\n";
+	*fmt2 = ld_get_env_var(LD_TRACE_LOADED_OBJECTS_FMT2);
+	if (*fmt2 == NULL)
+		*fmt2 = "\t%o (%x)\n";
+}
 
-    if ((fmt2 = ld_get_env_var(LD_TRACE_LOADED_OBJECTS_FMT2)) == NULL)
-	fmt2 = "\t%o (%x)\n";
+static void
+trace_print_obj(Obj_Entry *obj, const char *name, const char *path,
+    const char *main_local, const char *fmt1, const char *fmt2)
+{
+	const char *fmt;
+	int c;
 
-    list_containers = ld_get_env_var(LD_TRACE_LOADED_OBJECTS_ALL);
-
-    for (; obj != NULL; obj = TAILQ_NEXT(obj, next)) {
-	Needed_Entry *needed;
-	const char *name, *path;
-	bool is_lib;
-
-	if (obj->marker)
-	    continue;
-	if (list_containers && obj->needed != NULL)
-	    rtld_printf("%s:\n", obj->path);
-	for (needed = obj->needed; needed; needed = needed->next) {
-	    if (needed->obj != NULL) {
-		if (needed->obj->traced && !list_containers)
-		    continue;
-		needed->obj->traced = true;
-		path = needed->obj->path;
-	    } else
-		path = "not found";
-
-	    name = obj->strtab + needed->name;
-	    is_lib = strncmp(name, "lib", 3) == 0;	/* XXX - bogus */
-
-	    fmt = is_lib ? fmt1 : fmt2;
-	    while ((c = *fmt++) != '\0') {
+	fmt = strncmp(name, "lib", 3) == 0 ? fmt1 : fmt2;	/* XXX bogus */
+	while ((c = *fmt++) != '\0') {
 		switch (c) {
 		default:
-		    rtld_putchar(c);
-		    continue;
-		case '\\':
-		    switch (c = *fmt) {
-		    case '\0':
-			continue;
-		    case 'n':
-			rtld_putchar('\n');
-			break;
-		    case 't':
-			rtld_putchar('\t');
-			break;
-		    }
-		    break;
-		case '%':
-		    switch (c = *fmt) {
-		    case '\0':
-			continue;
-		    case '%':
-		    default:
 			rtld_putchar(c);
+			continue;
+		case '\\':
+			switch (c = *fmt) {
+			case '\0':
+				continue;
+			case 'n':
+				rtld_putchar('\n');
+				break;
+			case 't':
+				rtld_putchar('\t');
+				break;
+			}
 			break;
-		    case 'A':
-			rtld_putstr(main_local);
+		case '%':
+			switch (c = *fmt) {
+			case '\0':
+				continue;
+			case '%':
+			default:
+				rtld_putchar(c);
+				break;
+			case 'A':
+				rtld_putstr(main_local);
+				break;
+			case 'a':
+				rtld_putstr(obj_main->path);
+				break;
+			case 'o':
+				rtld_putstr(name);
+				break;
+			case 'p':
+				rtld_putstr(path);
+				break;
+			case 'x':
+				rtld_printf("%p", obj != NULL ?
+				    obj->mapbase : NULL);
+				break;
+			}
 			break;
-		    case 'a':
-			rtld_putstr(obj_main->path);
-			break;
-		    case 'o':
-			rtld_putstr(name);
-			break;
-#if 0
-		    case 'm':
-			rtld_printf("%d", sodp->sod_major);
-			break;
-		    case 'n':
-			rtld_printf("%d", sodp->sod_minor);
-			break;
-#endif
-		    case 'p':
-			rtld_putstr(path);
-			break;
-		    case 'x':
-			rtld_printf("%p", needed->obj ? needed->obj->mapbase :
-			  0);
-			break;
-		    }
-		    break;
 		}
 		++fmt;
-	    }
 	}
-    }
+}
+
+static void
+trace_loaded_objects(Obj_Entry *obj, bool show_preload)
+{
+	const char *fmt1, *fmt2, *main_local;
+	const char *name, *path;
+	bool first_spurious, list_containers;
+
+	trace_calc_fmts(&main_local, &fmt1, &fmt2);
+	list_containers = ld_get_env_var(LD_TRACE_LOADED_OBJECTS_ALL) != NULL;
+
+	for (; obj != NULL; obj = TAILQ_NEXT(obj, next)) {
+		Needed_Entry *needed;
+
+		if (obj->marker)
+			continue;
+		if (list_containers && obj->needed != NULL)
+			rtld_printf("%s:\n", obj->path);
+		for (needed = obj->needed; needed; needed = needed->next) {
+			if (needed->obj != NULL) {
+				if (needed->obj->traced && !list_containers)
+					continue;
+				needed->obj->traced = true;
+				path = needed->obj->path;
+			} else
+				path = "not found";
+
+			name = obj->strtab + needed->name;
+			trace_print_obj(obj, name, path, main_local,
+			    fmt1, fmt2);
+		}
+	}
+
+	if (show_preload) {
+		first_spurious = true;
+		TAILQ_FOREACH(obj, &obj_list, next) {
+			if (obj->marker || obj == obj_main || obj->traced)
+				continue;
+
+			if (first_spurious) {
+				rtld_printf("[preloaded]\n");
+				first_spurious = false;
+			}
+			Name_Entry *fname = STAILQ_FIRST(&obj->names);
+			name = fname == NULL ? "<unknown>" : fname->name;
+			trace_print_obj(obj, name, obj->path, main_local,
+			    fmt1, fmt2);
+		}
+	}
 }
 
 /*

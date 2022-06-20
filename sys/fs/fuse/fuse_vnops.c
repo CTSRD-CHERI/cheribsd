@@ -1042,7 +1042,11 @@ fuse_vnop_create(struct vop_create_args *ap)
 	}
 
 	if (op == FUSE_CREATE) {
-		foo = (struct fuse_open_out*)(feo + 1);
+		if (fuse_libabi_geq(data, 7, 9))
+			foo = (struct fuse_open_out*)(feo + 1);
+		else
+			foo = (struct fuse_open_out*)((char*)feo +
+				FUSE_COMPAT_ENTRY_OUT_SIZE);
 	} else {
 		/* Issue a separate FUSE_OPEN */
 		struct fuse_open_in *foi;
@@ -1429,7 +1433,7 @@ fuse_vnop_lookup(struct vop_lookup_args *ap)
 		vtyp = VDIR;
 	} else {
 		struct timespec timeout;
-		int ncpticks; /* here to accomodate for API contract */
+		int ncpticks; /* here to accommodate for API contract */
 
 		err = cache_lookup(dvp, vpp, cnp, &timeout, &ncpticks);
 		getnanouptime(&now);
@@ -1980,7 +1984,24 @@ fuse_vnop_reclaim(struct vop_reclaim_args *ap)
 		fuse_filehandle_close(vp, fufh, td, NULL);
 	}
 
-	if (!fuse_isdeadfs(vp) && fvdat->nlookup > 0) {
+	if (VTOI(vp) == 1) {
+		/*
+		 * Don't send FUSE_FORGET for the root inode, because
+		 * we never send FUSE_LOOKUP for it (see
+		 * fuse_vfsop_root) and we don't want the server to see
+		 * mismatched lookup counts.
+		 */
+		struct fuse_data *data;
+		struct vnode *vroot;
+
+		data = fuse_get_mpdata(vnode_mount(vp));
+		FUSE_LOCK();
+		vroot = data->vroot;
+		data->vroot = NULL;
+		FUSE_UNLOCK();
+		if (vroot)
+			vrele(vroot);
+	} else if (!fuse_isdeadfs(vp) && fvdat->nlookup > 0) {
 		fuse_internal_forget_send(vnode_mount(vp), td, NULL, VTOI(vp),
 		    fvdat->nlookup);
 	}

@@ -1391,6 +1391,10 @@ vmbus_pcib_prepopulate_bars(struct hv_pcibus *hbus)
 
 				_hv_pcifront_write_config(hpdev, PCIR_BAR(i),
 				    4, 0xffffffff);
+
+				/* Now write the original value back */
+				_hv_pcifront_write_config(hpdev, PCIR_BAR(i),
+				    4, bar_val);
 			}
 		}
 	}
@@ -1886,11 +1890,9 @@ static device_method_t vmbus_pcib_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t pcib_devclass;
-
 DEFINE_CLASS_0(pcib, vmbus_pcib_driver, vmbus_pcib_methods,
 		sizeof(struct vmbus_pcib_softc));
-DRIVER_MODULE(vmbus_pcib, vmbus, vmbus_pcib_driver, pcib_devclass, 0, 0);
+DRIVER_MODULE(vmbus_pcib, vmbus, vmbus_pcib_driver, 0, 0);
 MODULE_DEPEND(vmbus_pcib, vmbus, 1, 1, 1);
 MODULE_DEPEND(vmbus_pcib, pci, 1, 1, 1);
 

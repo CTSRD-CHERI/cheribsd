@@ -36,10 +36,6 @@ failloop_head()
 }
 failloop_body()
 {
-	if [ "$(atf_config_get ci false)" = "true" ]; then
-		atf_skip "https://bugs.freebsd.org/258763"
-	fi
-
 	sysctl -n kern.geom.notaste > kern.geom.notaste.txt
 	load_gnop
 	load_gmultipath
@@ -61,7 +57,7 @@ failloop_body()
 		-c "dd if=/dev/zero of=/dev/multipath/"$name" bs=4096 count=1" \
 		2>&1 | awk '/exited with status/ {print $NF}'`
 	if [ ! -f restore_count ]; then
-		atf_fail "dtrace didn't execute successfully"
+		atf_skip "dtrace didn't execute successfully"
 	fi
 	# The dd command should've failed ...
 	atf_check_equal 1 $dd_status

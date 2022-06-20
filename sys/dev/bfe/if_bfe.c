@@ -153,12 +153,10 @@ static driver_t bfe_driver = {
 	sizeof(struct bfe_softc)
 };
 
-static devclass_t bfe_devclass;
-
-DRIVER_MODULE(bfe, pci, bfe_driver, bfe_devclass, 0, 0);
+DRIVER_MODULE(bfe, pci, bfe_driver, 0, 0);
 MODULE_PNP_INFO("U16:vendor;U16:device;D:#", pci, bfe, bfe_devs,
     nitems(bfe_devs) - 1);
-DRIVER_MODULE(miibus, bfe, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(miibus, bfe, miibus_driver, 0, 0);
 
 /*
  * Probe for a Broadcom 4401 chip.
@@ -1405,7 +1403,7 @@ bfe_rxeof(struct bfe_softc *sc)
 		/*
 		 * Rx status should be read from mbuf such that we can't
 		 * delay bus_dmamap_sync(9). This hardware limiation
-		 * results in inefficent mbuf usage as bfe(4) couldn't
+		 * results in inefficient mbuf usage as bfe(4) couldn't
 		 * reuse mapped buffer from errored frame. 
 		 */
 		if (bfe_list_newbuf(sc, cons) != 0) {

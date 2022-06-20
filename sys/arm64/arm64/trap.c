@@ -199,13 +199,12 @@ cpu_fetch_syscall_args(struct thread *td)
 #if __has_feature(capabilities)
 	if (__predict_false(stack_args != NULL)) {
 		error = copyincap(stack_args, dst_ap, sa->callp->sy_narg *
-		    sizeof(syscallarg_t));
+		    sizeof(*dst_ap));
 		if (error)
 			return (error);
 	} else
 #endif
-		memcpy(dst_ap, ap, (nitems(sa->args) - 1) *
-		    sizeof(syscallarg_t));
+		memcpy(dst_ap, ap, (nitems(sa->args) - 1) * sizeof(*dst_ap));
 
 	td->td_retval[0] = 0;
 	td->td_retval[1] = 0;
@@ -412,24 +411,30 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 		ucode = (esr & ISS_DATA_WnR) == 0 ? SEGV_LOADTAG :
 		    SEGV_STORETAG;
 		error = KERN_FAILURE;
-	} else
-#endif
-	{
-		switch (ESR_ELx_EXCEPTION(esr)) {
-		case EXCP_INSN_ABORT:
-		case EXCP_INSN_ABORT_L:
-			ftype = VM_PROT_EXECUTE;
-			break;
-		default:
-			ftype = (esr & ISS_DATA_WnR) == 0 ? VM_PROT_READ :
-			    VM_PROT_WRITE;
-			break;
-		}
-
-		/* Fault in the page. */
-		error = vm_fault_trap(map, far, ftype, VM_FAULT_NORMAL, &sig,
-		    &ucode);
+		goto bad_far;
 	}
+#endif
+	switch (ESR_ELx_EXCEPTION(esr)) {
+	case EXCP_INSN_ABORT:
+	case EXCP_INSN_ABORT_L:
+		ftype = VM_PROT_EXECUTE;
+		break;
+	default:
+		/*
+		 * If the exception was because of a read or cache operation
+		 * pass a read fault type into the vm code. Cache operations
+		 * need read permission but will set the WnR flag when the
+		 * memory is unmapped.
+		 */
+		if ((esr & ISS_DATA_WnR) == 0 || (esr & ISS_DATA_CM) != 0)
+			ftype = VM_PROT_READ;
+		else
+			ftype = VM_PROT_WRITE;
+		break;
+	}
+
+	/* Fault in the page. */
+	error = vm_fault_trap(map, far, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 bad_far:
 		if (lower) {
@@ -618,6 +623,8 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 	case EXCP_UNKNOWN:
 		if (undef_insn(1, frame))
 			break;
+		printf("Undefined instruction: %08x\n",
+		    *(uint32_t * __capability)frame->tf_elr);
 		/* FALLTHROUGH */
 	default:
 		print_registers(frame);

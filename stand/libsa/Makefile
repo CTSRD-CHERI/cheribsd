@@ -167,6 +167,9 @@ SRCS+=	time.c
 .PATH: ${SRCTOP}/sys/ufs/ffs
 SRCS+=ffs_subr.c ffs_tables.c
 
+CFLAGS.dosfs.c+= -I${LDRSRC}
+CFLAGS.tftp.c+= -I${LDRSRC}
+CFLAGS.ufs.c+= -I${LDRSRC}
 CFLAGS.bzipfs.c+= -I${SRCTOP}/contrib/bzip2
 
 # explicit_bzero and calculate_crc32c
@@ -186,6 +189,10 @@ SRCS+=  explicit_bzero.c crc32_libkern.c
 # Maybe ZFS
 .if ${MK_LOADER_ZFS} == "yes"
 .include "${SASRC}/zfs/Makefile.inc"
+.endif
+
+.if ${DO32:U0} == 0
+MAN=libsa.3
 .endif
 
 .include <bsd.lib.mk>

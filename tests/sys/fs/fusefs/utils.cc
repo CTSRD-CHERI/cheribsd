@@ -161,7 +161,7 @@ void FuseTest::SetUp() {
 			m_default_permissions, m_push_symlinks_in, m_ro,
 			m_pm, m_init_flags, m_kernel_minor_version,
 			m_maxwrite, m_async, m_noclusterr, m_time_gran,
-			m_nointr, m_noatime);
+			m_nointr, m_noatime, m_fsname, m_subtype);
 		/* 
 		 * FUSE_ACCESS is called almost universally.  Expecting it in
 		 * each test case would be super-annoying.  Instead, set a
@@ -217,7 +217,7 @@ FuseTest::expect_destroy(int error)
 			return (in.header.opcode == FUSE_DESTROY);
 		}, Eq(true)),
 		_)
-	).WillOnce(Invoke( ReturnImmediate([&](auto in, auto& out) {
+	).WillOnce(Invoke(ReturnImmediate([=](auto in, auto& out) {
 		m_mock->m_quit = true;
 		out.header.len = sizeof(out.header);
 		out.header.unique = in.header.unique;

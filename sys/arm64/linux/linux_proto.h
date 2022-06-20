@@ -731,12 +731,10 @@ struct linux_semctl_args {
 	char arg_l_[PADL_(union l_semun)]; union l_semun arg; char arg_r_[PADR_(union l_semun)];
 };
 struct linux_semtimedop_args {
-	syscallarg_t dummy;
-};
-struct linux_semop_args {
 	char semid_l_[PADL_(l_int)]; l_int semid; char semid_r_[PADR_(l_int)];
-	char tsops_l_[PADL_(struct l_sembuf *)]; struct l_sembuf * tsops; char tsops_r_[PADR_(struct l_sembuf *)];
-	char nsops_l_[PADL_(l_uint)]; l_uint nsops; char nsops_r_[PADR_(l_uint)];
+	char tsops_l_[PADL_(struct sembuf *)]; struct sembuf * tsops; char tsops_r_[PADR_(struct sembuf *)];
+	char nsops_l_[PADL_(l_size_t)]; l_size_t nsops; char nsops_r_[PADR_(l_size_t)];
+	char timeout_l_[PADL_(struct l_timespec *)]; struct l_timespec * timeout; char timeout_r_[PADR_(struct l_timespec *)];
 };
 struct linux_shmget_args {
 	char key_l_[PADL_(l_key_t)]; l_key_t key; char key_r_[PADR_(l_key_t)];
@@ -1126,7 +1124,10 @@ struct linux_io_pgetevents_args {
 	syscallarg_t dummy;
 };
 struct linux_rseq_args {
-	syscallarg_t dummy;
+	char rseq_l_[PADL_(struct linux_rseq *)]; struct linux_rseq * rseq; char rseq_r_[PADR_(struct linux_rseq *)];
+	char rseq_len_l_[PADL_(uint32_t)]; uint32_t rseq_len; char rseq_len_r_[PADR_(uint32_t)];
+	char flags_l_[PADL_(l_int)]; l_int flags; char flags_r_[PADR_(l_int)];
+	char sig_l_[PADL_(uint32_t)]; uint32_t sig; char sig_r_[PADR_(uint32_t)];
 };
 struct linux_kexec_file_load_args {
 	syscallarg_t dummy;
@@ -1190,7 +1191,12 @@ struct linux_process_madvise_args {
 	syscallarg_t dummy;
 };
 struct linux_epoll_pwait2_args {
-	syscallarg_t dummy;
+	char epfd_l_[PADL_(l_int)]; l_int epfd; char epfd_r_[PADR_(l_int)];
+	char events_l_[PADL_(struct epoll_event *)]; struct epoll_event * events; char events_r_[PADR_(struct epoll_event *)];
+	char maxevents_l_[PADL_(l_int)]; l_int maxevents; char maxevents_r_[PADR_(l_int)];
+	char timeout_l_[PADL_(struct l_timespec *)]; struct l_timespec * timeout; char timeout_r_[PADR_(struct l_timespec *)];
+	char mask_l_[PADL_(l_sigset_t *)]; l_sigset_t * mask; char mask_r_[PADR_(l_sigset_t *)];
+	char sigsetsize_l_[PADL_(l_size_t)]; l_size_t sigsetsize; char sigsetsize_r_[PADR_(l_size_t)];
 };
 struct linux_mount_setattr_args {
 	syscallarg_t dummy;
@@ -1347,7 +1353,6 @@ int	linux_msgsnd(struct thread *, struct linux_msgsnd_args *);
 int	linux_semget(struct thread *, struct linux_semget_args *);
 int	linux_semctl(struct thread *, struct linux_semctl_args *);
 int	linux_semtimedop(struct thread *, struct linux_semtimedop_args *);
-int	linux_semop(struct thread *, struct linux_semop_args *);
 int	linux_shmget(struct thread *, struct linux_shmget_args *);
 int	linux_shmctl(struct thread *, struct linux_shmctl_args *);
 int	linux_shmat(struct thread *, struct linux_shmat_args *);
@@ -1596,7 +1601,6 @@ int	linux_mount_setattr(struct thread *, struct linux_mount_setattr_args *);
 #define	LINUX_SYS_AUE_linux_semget	AUE_NULL
 #define	LINUX_SYS_AUE_linux_semctl	AUE_NULL
 #define	LINUX_SYS_AUE_linux_semtimedop	AUE_NULL
-#define	LINUX_SYS_AUE_linux_semop	AUE_NULL
 #define	LINUX_SYS_AUE_linux_shmget	AUE_NULL
 #define	LINUX_SYS_AUE_linux_shmctl	AUE_NULL
 #define	LINUX_SYS_AUE_linux_shmat	AUE_NULL

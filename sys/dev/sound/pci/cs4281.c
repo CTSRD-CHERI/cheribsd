@@ -257,9 +257,7 @@ static int
 cs4281_rdcd(kobj_t obj, void *devinfo, int regno)
 {
     struct sc_info *sc = (struct sc_info *)devinfo;
-    int codecno;
 
-    codecno = regno >> 8;
     regno &= 0xff;
 
     /* Remove old state */
@@ -291,9 +289,7 @@ static int
 cs4281_wrcd(kobj_t obj, void *devinfo, int regno, u_int32_t data)
 {
     struct sc_info *sc = (struct sc_info *)devinfo;
-    int codecno;
 
-    codecno = regno >> 8;
     regno &= 0xff;
 
     cs4281_wr(sc, CS4281PCI_ACCAD, regno);
@@ -968,6 +964,6 @@ static driver_t cs4281_driver = {
     PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(snd_cs4281, pci, cs4281_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_cs4281, pci, cs4281_driver, 0, 0);
 MODULE_DEPEND(snd_cs4281, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_cs4281, 1);

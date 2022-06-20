@@ -240,7 +240,7 @@ MODULE_DEPEND(cpswss, etherswitch, 1, 1, 1);
 #endif
 
 DRIVER_MODULE(cpsw, cpswss, cpswp_driver, cpswp_devclass, 0, 0);
-DRIVER_MODULE(miibus, cpsw, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(miibus, cpsw, miibus_driver, 0, 0);
 MODULE_DEPEND(cpsw, ether, 1, 1, 1);
 MODULE_DEPEND(cpsw, miibus, 1, 1, 1);
 
@@ -530,7 +530,7 @@ cpsw_add_slots(struct cpsw_softc *sc, struct cpsw_queue *queue, int requested)
 static void
 cpsw_free_slot(struct cpsw_softc *sc, struct cpsw_slot *slot)
 {
-	int error;
+	int error __diagused;
 
 	if (slot->dmamap) {
 		if (slot->mbuf)

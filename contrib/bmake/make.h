@@ -1,4 +1,4 @@
-/*	$NetBSD: make.h,v 1.298 2022/02/05 00:26:21 rillig Exp $	*/
+/*	$NetBSD: make.h,v 1.300 2022/04/18 15:06:27 rillig Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1990, 1993
@@ -141,7 +141,7 @@
 #define MAKE_ATTR_USE		/* delete */
 #endif
 
-#if __STDC__ >= 199901L || defined(lint)
+#if __STDC_VERSION__ >= 199901L || defined(lint)
 #define MAKE_INLINE static inline MAKE_ATTR_UNUSED
 #else
 #define MAKE_INLINE static MAKE_ATTR_UNUSED
@@ -521,6 +521,17 @@ typedef struct GNode {
 	/* Line number where the GNode got defined, 1-based */
 	unsigned lineno;
 } GNode;
+
+/*
+ * Keep track of whether to include <posix.mk> when parsing the line
+ * '.POSIX:'.
+ */
+extern enum PosixState {
+	PS_NOT_YET,
+	PS_MAYBE_NEXT_LINE,
+	PS_NOW_OR_NEVER,
+	PS_TOO_LATE
+} posix_state;
 
 /* Error levels for diagnostics during parsing. */
 typedef enum ParseErrorLevel {

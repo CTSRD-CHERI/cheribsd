@@ -445,9 +445,7 @@ qls_set_promisc(qla_host_t *ha)
 void
 qls_reset_promisc(qla_host_t *ha)
 {
-	int ret;
-
-	ret = qls_load_route_idx_reg_locked(ha, (Q81_CTL_RI_TYPE_NICQMASK |
+	qls_load_route_idx_reg_locked(ha, (Q81_CTL_RI_TYPE_NICQMASK |
 			Q81_CTL_RI_IDX_PROMISCUOUS | Q81_CTL_RI_DST_DFLTQ), 0);
 	return;
 }
@@ -467,9 +465,7 @@ qls_set_allmulti(qla_host_t *ha)
 void
 qls_reset_allmulti(qla_host_t *ha)
 {
-	int ret;
-
-	ret = qls_load_route_idx_reg_locked(ha, (Q81_CTL_RI_TYPE_NICQMASK |
+	qls_load_route_idx_reg_locked(ha, (Q81_CTL_RI_TYPE_NICQMASK |
 			Q81_CTL_RI_IDX_ALLMULTI | Q81_CTL_RI_DST_DFLTQ), 0);
 	return;
 }
@@ -531,17 +527,17 @@ qls_init_fw_routing_table_exit:
 static int
 qls_tx_tso_chksum(qla_host_t *ha, struct mbuf *mp, q81_tx_tso_t *tx_mac)
 {
+#if defined(INET) || defined(INET6)
         struct ether_vlan_header *eh;
         struct ip *ip;
+#if defined(INET6)
         struct ip6_hdr *ip6;
+#endif
 	struct tcphdr *th;
         uint32_t ehdrlen, ip_hlen;
 	int ret = 0;
         uint16_t etype;
-        device_t dev;
         uint8_t buf[sizeof(struct ip6_hdr)];
-
-        dev = ha->pci_dev;
 
         eh = mtod(mp, struct ether_vlan_header *);
 
@@ -554,6 +550,7 @@ qls_tx_tso_chksum(qla_host_t *ha, struct mbuf *mp, q81_tx_tso_t *tx_mac)
         }
 
         switch (etype) {
+#ifdef INET
                 case ETHERTYPE_IP:
                         ip = (struct ip *)(mp->m_data + ehdrlen);
 
@@ -594,7 +591,9 @@ qls_tx_tso_chksum(qla_host_t *ha, struct mbuf *mp, q81_tx_tso_t *tx_mac)
 				tx_mac->flags |= Q81_TX_TSO_FLAGS_UC;
                         }
                 break;
+#endif
 
+#ifdef INET6
                 case ETHERTYPE_IPV6:
                         ip6 = (struct ip6_hdr *)(mp->m_data + ehdrlen);
 
@@ -620,6 +619,7 @@ qls_tx_tso_chksum(qla_host_t *ha, struct mbuf *mp, q81_tx_tso_t *tx_mac)
 				tx_mac->flags |= Q81_TX_TSO_FLAGS_UC;
                         }
                 break;
+#endif
 
                 default:
                         ret = -1;
@@ -627,6 +627,9 @@ qls_tx_tso_chksum(qla_host_t *ha, struct mbuf *mp, q81_tx_tso_t *tx_mac)
         }
 
         return (ret);
+#else
+	return (-1);
+#endif
 }
 
 #define QLA_TX_MIN_FREE 2
@@ -815,14 +818,11 @@ qls_del_hw_if(qla_host_t *ha)
 int
 qls_init_hw_if(qla_host_t *ha)
 {
-	device_t	dev;
 	uint32_t	value;
 	int		ret = 0;
 	int		i;
 
 	QL_DPRINT2((ha->pci_dev, "%s:enter\n", __func__));
-
-	dev = ha->pci_dev;
 
 	ret = qls_hw_reset(ha);
 	if (ret)
@@ -936,7 +936,8 @@ qls_init_hw_if(qla_host_t *ha)
 		Q81_WR_LBQ_PROD_IDX(i, ha->rx_ring[i].lbq_in);
 		Q81_WR_SBQ_PROD_IDX(i, ha->rx_ring[i].sbq_in);
 
-		QL_DPRINT2((dev, "%s: [wq_idx, cq_idx, lbq_idx, sbq_idx]"
+		QL_DPRINT2((ha->pci_dev,
+			"%s: [wq_idx, cq_idx, lbq_idx, sbq_idx]"
 			"[0x%08x, 0x%08x, 0x%08x, 0x%08x]\n", __func__,
 			Q81_RD_WQ_IDX(i), Q81_RD_CQ_IDX(i), Q81_RD_LBQ_IDX(i),
 			Q81_RD_SBQ_IDX(i)));
@@ -2133,7 +2134,7 @@ qls_mbx_cmd(qla_host_t *ha, uint32_t *in_mbx, uint32_t i_count,
 	uint32_t *out_mbx, uint32_t o_count)
 {
 	int i, ret = -1;
-	uint32_t data32, mbx_cmd = 0;
+	uint32_t data32;
 	uint32_t count = 50;
 
 	QL_DPRINT2((ha->pci_dev, "%s: enter[0x%08x 0x%08x 0x%08x]\n",
@@ -2154,8 +2155,6 @@ qls_mbx_cmd(qla_host_t *ha, uint32_t *in_mbx, uint32_t i_count,
 	}
 
 	ha->mbx_done = 0;
-
-	mbx_cmd = *in_mbx;
 
 	for (i = 0; i < i_count; i++) {
 		ret = qls_mbx_wr_reg(ha, i, *in_mbx);

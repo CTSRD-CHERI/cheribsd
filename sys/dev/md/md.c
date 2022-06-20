@@ -1442,7 +1442,7 @@ mdcreate_vnode(struct md_s *sc, struct md_req *mdr, struct thread *td)
 	error = vn_open(&nd, &flags, 0, NULL);
 	if (error != 0)
 		return (error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 	if (nd.ni_vp->v_type != VREG) {
 		error = EINVAL;
 		goto bad;
@@ -1917,7 +1917,7 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			return (EINVAL);
 		MD_IOCTL2REQ(mdio, &mdr);
 		/* If the file is adjacent to the md_ioctl it's in kernel. */
-		if ((__cheri_addr vaddr_t)mdio->md_file == (vaddr_t)(mdio + 1))
+		if ((__cheri_addr ptraddr_t)mdio->md_file == (ptraddr_t)(mdio + 1))
 			mdr.md_file_seg = UIO_SYSSPACE;
 		else
 			mdr.md_file_seg = UIO_USERSPACE;

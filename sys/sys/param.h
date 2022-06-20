@@ -76,7 +76,7 @@
  * cannot include sys/param.h and should only be updated here.
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 1400053
+#define __FreeBSD_version 1400057
 
 /*
  * __CheriBSD_version numbers describe CheriBSD ABIs.
@@ -391,12 +391,12 @@ __END_DECLS
  * Scale factor for scaled integers used to count %cpu time and load avgs.
  *
  * The number of CPU `tick's that map to a unique `%age' can be expressed
- * by the formula (1 / (2 ^ (FSHIFT - 11))).  The maximum load average that
- * can be calculated (assuming 32 bits) can be closely approximated using
- * the formula (2 ^ (2 * (16 - FSHIFT))) for (FSHIFT < 15).
+ * by the formula (1 / (2 ^ (FSHIFT - 11))).  Since the intermediate
+ * calculation is done with 64-bit precision, the maximum load average that can
+ * be calculated is approximately 2^32 / FSCALE.
  *
  * For the scheduler to maintain a 1:1 mapping of CPU `tick' to `%age',
- * FSHIFT must be at least 11; this gives us a maximum load avg of ~1024.
+ * FSHIFT must be at least 11.  This gives a maximum load avg of 2 million.
  */
 #define	FSHIFT	11		/* bits to right of fixed binary point */
 #define FSCALE	(1<<FSHIFT)
@@ -427,8 +427,8 @@ __END_DECLS
  * capability.  NB: For purecap kernels this is a no-op.
  */
 #define	PTR2CAP(p)	({					\
-	KASSERT((vaddr_t)((p)) == 0 ||				\
-	    (vaddr_t)((p)) >= VM_MAXUSER_ADDRESS,		\
+	KASSERT((ptraddr_t)((p)) == 0 ||			\
+	    (ptraddr_t)((p)) >= VM_MAXUSER_ADDRESS,		\
 	    ("PTR2CAP on user address: %p", (p)));		\
 	(__cheri_tocap __typeof__((*p)) * __capability)(p);	\
 	})

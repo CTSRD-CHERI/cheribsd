@@ -497,7 +497,7 @@ linux_getdents(struct thread *td, struct linux_getdents_args *args)
 
 		linux_dirent = (struct l_dirent*)lbuf;
 		linux_dirent->d_ino = bdp->d_fileno;
-		linux_dirent->d_off = base + reclen;
+		linux_dirent->d_off = bdp->d_off;
 		linux_dirent->d_reclen = linuxreclen;
 		/*
 		 * Copy d_type to last byte of l_dirent buffer
@@ -574,7 +574,7 @@ linux_getdents64(struct thread *td, struct linux_getdents64_args *args)
 
 		linux_dirent64 = (struct l_dirent64*)lbuf;
 		linux_dirent64->d_ino = bdp->d_fileno;
-		linux_dirent64->d_off = base + reclen;
+		linux_dirent64->d_off = bdp->d_off;
 		linux_dirent64->d_reclen = linuxreclen;
 		linux_dirent64->d_type = bdp->d_type;
 		strlcpy(linux_dirent64->d_name, bdp->d_name,
@@ -631,7 +631,7 @@ linux_readdir(struct thread *td, struct linux_readdir_args *args)
 
 	linux_dirent = (struct l_dirent*)lbuf;
 	linux_dirent->d_ino = bdp->d_fileno;
-	linux_dirent->d_off = linuxreclen;
+	linux_dirent->d_off = bdp->d_off;
 	linux_dirent->d_reclen = bdp->d_namlen;
 	strlcpy(linux_dirent->d_name, bdp->d_name,
 	    linuxreclen - offsetof(struct l_dirent, d_name));
@@ -1052,6 +1052,9 @@ linux_readlink(struct thread *td, struct linux_readlink_args *args)
 	char *name;
 	int error;
 
+	if (args->count <= 0)
+		return (EINVAL);
+
 	if (!LUSECONVPATH(td)) {
 		return (kern_readlinkat(td, AT_FDCWD, args->name, UIO_USERSPACE,
 		    args->buf, UIO_USERSPACE, args->count));
@@ -1069,6 +1072,9 @@ linux_readlinkat(struct thread *td, struct linux_readlinkat_args *args)
 {
 	char *name;
 	int error, dfd;
+
+	if (args->bufsiz <= 0)
+		return (EINVAL);
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	if (!LUSECONVPATH(td)) {

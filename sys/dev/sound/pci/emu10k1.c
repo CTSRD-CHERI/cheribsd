@@ -869,14 +869,11 @@ emupchan_setblocksize(kobj_t obj, void *data, u_int32_t blocksize)
 {
 	struct sc_pchinfo *ch = data;
 	struct sc_info *sc = ch->parent;
-	int irqrate, blksz;
 
 	ch->blksz = blocksize;
 	snd_mtxlock(sc->lock);
 	emu_settimer(sc);
-	irqrate = 48000 / sc->timerinterval;
 	snd_mtxunlock(sc->lock);
-	blksz = (ch->spd * sndbuf_getalign(ch->buffer)) / irqrate;
 	return blocksize;
 }
 
@@ -1030,14 +1027,11 @@ emurchan_setblocksize(kobj_t obj, void *data, u_int32_t blocksize)
 {
 	struct sc_rchinfo *ch = data;
 	struct sc_info *sc = ch->parent;
-	int irqrate, blksz;
 
 	ch->blksz = blocksize;
 	snd_mtxlock(sc->lock);
 	emu_settimer(sc);
-	irqrate = 48000 / sc->timerinterval;
 	snd_mtxunlock(sc->lock);
-	blksz = (ch->spd * sndbuf_getalign(ch->buffer)) / irqrate;
 	return blocksize;
 }
 
@@ -2199,7 +2193,7 @@ static driver_t emu_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(snd_emu10k1, pci, emu_driver, pcm_devclass, NULL, NULL);
+DRIVER_MODULE(snd_emu10k1, pci, emu_driver, NULL, NULL);
 MODULE_DEPEND(snd_emu10k1, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_emu10k1, 1);
 MODULE_DEPEND(snd_emu10k1, midi, 1, 1, 1);
@@ -2253,6 +2247,4 @@ static driver_t emujoy_driver = {
 	1	/* no softc */
 };
 
-static devclass_t emujoy_devclass;
-
-DRIVER_MODULE(emujoy, pci, emujoy_driver, emujoy_devclass, NULL, NULL);
+DRIVER_MODULE(emujoy, pci, emujoy_driver, NULL, NULL);

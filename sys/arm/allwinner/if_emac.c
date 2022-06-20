@@ -284,10 +284,9 @@ emac_reset(struct emac_softc *sc)
 static void
 emac_drain_rxfifo(struct emac_softc *sc)
 {
-	uint32_t data;
 
 	while (EMAC_READ_REG(sc, EMAC_RX_FBC) > 0)
-		data = EMAC_READ_REG(sc, EMAC_RX_IO_DATA);
+		(void)EMAC_READ_REG(sc, EMAC_RX_IO_DATA);
 }
 
 static void
@@ -1172,7 +1171,7 @@ static driver_t emac_driver = {
 static devclass_t emac_devclass;
 
 DRIVER_MODULE(emac, simplebus, emac_driver, emac_devclass, 0, 0);
-DRIVER_MODULE(miibus, emac, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(miibus, emac, miibus_driver, 0, 0);
 MODULE_DEPEND(emac, miibus, 1, 1, 1);
 MODULE_DEPEND(emac, ether, 1, 1, 1);
 

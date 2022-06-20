@@ -477,7 +477,7 @@ exclude_efi_map_entry(struct efi_md *p)
 		 */
 		break;
 	default:
-		physmem_exclude_region(p->md_phys, p->md_pages * PAGE_SIZE,
+		physmem_exclude_region(p->md_phys, p->md_pages * EFI_PAGE_SIZE,
 		    EXFLAG_NOALLOC);
 	}
 }
@@ -494,6 +494,17 @@ add_efi_map_entry(struct efi_md *p)
 {
 
 	switch (p->md_type) {
+	case EFI_MD_TYPE_RECLAIM:
+		/*
+		 * The recomended location for ACPI tables. Map into the
+		 * DMAP so we can access them from userspace via /dev/mem.
+		 */
+	case EFI_MD_TYPE_RT_CODE:
+		/*
+		 * Some UEFI implementations put the system table in the
+		 * runtime code section. Include it in the DMAP, but will
+		 * be excluded from phys_avail later.
+		 */
 	case EFI_MD_TYPE_RT_DATA:
 		/*
 		 * Runtime data will be excluded after the DMAP
@@ -509,7 +520,7 @@ add_efi_map_entry(struct efi_md *p)
 		 * We're allowed to use any entry with these types.
 		 */
 		physmem_hardware_region(p->md_phys,
-		    p->md_pages * PAGE_SIZE);
+		    p->md_pages * EFI_PAGE_SIZE);
 		break;
 	}
 }

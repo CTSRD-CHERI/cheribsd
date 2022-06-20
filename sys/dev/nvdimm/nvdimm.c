@@ -246,7 +246,7 @@ static int
 read_labels(struct nvdimm_dev *nv)
 {
 	struct nvdimm_label_index *indices, *index1;
-	size_t bitfield_size, index_size, num_labels;
+	size_t index_size, num_labels;
 	int error, n;
 	bool index_0_valid, index_1_valid;
 
@@ -259,7 +259,6 @@ read_labels(struct nvdimm_dev *nv)
 	}
 	num_labels = (nv->label_area_size - index_size) /
 	    sizeof(struct nvdimm_label);
-	bitfield_size = roundup2(num_labels, 8) / 8;
 	indices = malloc(2 * index_size, M_NVDIMM, M_WAITOK);
 	index1 = (void *)((uint8_t *)indices + index_size);
 	error = read_label_area(nv, (void *)indices, 0, 2 * index_size);
@@ -302,27 +301,6 @@ read_labels(struct nvdimm_dev *nv)
 	return (0);
 }
 
-struct nvdimm_dev *
-nvdimm_find_by_handle(nfit_handle_t nv_handle)
-{
-	struct nvdimm_dev *res;
-	device_t *dimms;
-	int i, error, num_dimms;
-
-	res = NULL;
-	error = devclass_get_devices(nvdimm_devclass, &dimms, &num_dimms);
-	if (error != 0)
-		return (NULL);
-	for (i = 0; i < num_dimms; i++) {
-		if (nvdimm_root_get_device_handle(dimms[i]) == nv_handle) {
-			res = device_get_softc(dimms[i]);
-			break;
-		}
-	}
-	free(dimms, M_TEMP);
-	return (res);
-}
-
 static int
 nvdimm_probe(device_t dev)
 {
@@ -339,7 +317,6 @@ nvdimm_attach(device_t dev)
 	struct sysctl_oid_list *children;
 	struct sbuf *sb;
 	ACPI_TABLE_NFIT *nfitbl;
-	ACPI_HANDLE handle;
 	ACPI_STATUS status;
 	ACPI_NFIT_MEMORY_MAP **maps;
 	int error, i, num_maps;
@@ -349,8 +326,7 @@ nvdimm_attach(device_t dev)
 	ctx = device_get_sysctl_ctx(dev);
 	oid = device_get_sysctl_tree(dev);
 	children = SYSCTL_CHILDREN(oid);
-	handle = nvdimm_root_get_acpi_handle(dev);
-	MPASS(handle != NULL);
+	MPASS(nvdimm_root_get_acpi_handle(dev) != NULL);
 	nv->nv_dev = dev;
 	nv->nv_handle = nvdimm_root_get_device_handle(dev);
 
@@ -470,6 +446,28 @@ static driver_t	nvdimm_driver = {
 	nvdimm_methods,
 	sizeof(struct nvdimm_dev),
 };
+
+struct nvdimm_dev *
+nvdimm_find_by_handle(nfit_handle_t nv_handle)
+{
+	struct nvdimm_dev *res;
+	device_t *dimms;
+	int i, error, num_dimms;
+
+	res = NULL;
+	error = devclass_get_devices(devclass_find(nvdimm_driver.name), &dimms,
+	    &num_dimms);
+	if (error != 0)
+		return (NULL);
+	for (i = 0; i < num_dimms; i++) {
+		if (nvdimm_root_get_device_handle(dimms[i]) == nv_handle) {
+			res = device_get_softc(dimms[i]);
+			break;
+		}
+	}
+	free(dimms, M_TEMP);
+	return (res);
+}
 
 DRIVER_MODULE(nvdimm, nvdimm_acpi_root, nvdimm_driver, nvdimm_devclass, NULL,
     NULL);

@@ -245,7 +245,7 @@ nfsrv_lookupfilename(struct nameidata *ndp, char * __capability fname,
 	NDINIT(ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE, fname);
 	error = namei(ndp);
 	if (!error) {
-		NDFREE(ndp, NDF_ONLY_PNBUF);
+		NDFREE_PNBUF(ndp);
 	}
 	return (error);
 }
@@ -599,7 +599,7 @@ nfssvc_call(struct thread *p, struct nfssvc_args *uap, struct ucred *cred)
 					    nfsstatsv1.biocache_readdirs;
 					nfsstatsov1.readdir_bios =
 					    nfsstatsv1.readdir_bios;
-					for (i = 0; i < NFSV42_NPROCS; i++)
+					for (i = 0; i < NFSV42_OLDNPROCS; i++)
 						nfsstatsov1.rpccnt[i] =
 						    nfsstatsv1.rpccnt[i];
 					nfsstatsov1.rpcretries =

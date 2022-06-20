@@ -1179,7 +1179,11 @@ efx_mcdi_read_assertion(
 	efx_mcdi_req_t req;
 	EFX_MCDI_DECLARE_BUF(payload, MC_CMD_GET_ASSERTS_IN_LEN,
 		MC_CMD_GET_ASSERTS_OUT_LEN);
+#ifdef KDTRACE_HOOKS
 	const char *reason;
+#else
+	const char *reason __unused;
+#endif
 	unsigned int flags;
 	unsigned int index;
 	unsigned int ofst;
@@ -1269,7 +1273,7 @@ fail1:
 }
 
 /*
- * Internal routines for for specific MCDI requests.
+ * Internal routines for specific MCDI requests.
  */
 
 	__checkReturn	efx_rc_t

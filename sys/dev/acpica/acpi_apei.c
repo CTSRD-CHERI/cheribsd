@@ -563,7 +563,6 @@ hest_parse_table(struct apei_softc *sc)
 }
 
 static char *apei_ids[] = { "PNP0C33", NULL };
-static devclass_t apei_devclass;
 
 static ACPI_STATUS
 apei_find(ACPI_HANDLE handle, UINT32 level, void *context,
@@ -599,7 +598,7 @@ apei_identify(driver_t *driver, device_t parent)
 	AcpiPutTable(hest);
 
 	/* Only one APEI device can exist. */
-	if (devclass_get_device(apei_devclass, 0))
+	if (devclass_get_device(devclass_find("apei"), 0))
 		return;
 
 	/* Search for ACPI error device to be used. */
@@ -779,5 +778,5 @@ static driver_t	apei_driver = {
 	sizeof(struct apei_softc),
 };
 
-DRIVER_MODULE(apei, acpi, apei_driver, apei_devclass, 0, 0);
+DRIVER_MODULE(apei, acpi, apei_driver, 0, 0);
 MODULE_DEPEND(apei, acpi, 1, 1, 1);

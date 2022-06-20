@@ -121,16 +121,14 @@ static device_method_t lkpi_iicbb_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t lkpi_iicbb_devclass;
-
 driver_t lkpi_iicbb_driver = {
 	"lkpi_iicbb",
 	lkpi_iicbb_methods,
 	sizeof(struct lkpi_iicbb_softc),
 };
 
-DRIVER_MODULE(lkpi_iicbb, lkpi_iic, lkpi_iicbb_driver, lkpi_iicbb_devclass, 0, 0);
-DRIVER_MODULE(iicbb, lkpi_iicbb, iicbb_driver, iicbb_devclass, 0, 0);
+DRIVER_MODULE(lkpi_iicbb, lkpi_iic, lkpi_iicbb_driver, 0, 0);
+DRIVER_MODULE(iicbb, lkpi_iicbb, iicbb_driver, 0, 0);
 MODULE_DEPEND(lkpi_iicbb, iicbb, IICBB_MINVER, IICBB_PREFVER, IICBB_MAXVER);
 
 static void
@@ -210,9 +208,6 @@ lkpi_iicbb_getsda(device_t dev)
 static int
 lkpi_iicbb_reset(device_t dev, u_char speed, u_char addr, u_char *oldaddr)
 {
-	struct lkpi_iicbb_softc *sc;
-
-	sc = device_get_softc(dev);
 
 	return (0);
 }

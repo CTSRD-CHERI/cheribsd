@@ -3479,13 +3479,13 @@ xhci_roothub_exec(struct usb_device *udev,
 		i = UPS_PORT_LINK_STATE_SET(XHCI_PS_PLS_GET(v));
 
 		switch (XHCI_PS_SPEED_GET(v)) {
-		case 3:
+		case XHCI_PS_SPEED_HIGH:
 			i |= UPS_HIGH_SPEED;
 			break;
-		case 2:
+		case XHCI_PS_SPEED_LOW:
 			i |= UPS_LOW_SPEED;
 			break;
-		case 1:
+		case XHCI_PS_SPEED_FULL:
 			/* FULL speed */
 			break;
 		default:
@@ -3550,7 +3550,7 @@ xhci_roothub_exec(struct usb_device *udev,
 
 		switch (value) {
 		case UHF_PORT_U1_TIMEOUT:
-			if (XHCI_PS_SPEED_GET(v) != 4) {
+			if (XHCI_PS_SPEED_GET(v) < XHCI_PS_SPEED_SS) {
 				err = USB_ERR_IOERROR;
 				goto done;
 			}
@@ -3561,7 +3561,7 @@ xhci_roothub_exec(struct usb_device *udev,
 			XWRITE4(sc, oper, port, v);
 			break;
 		case UHF_PORT_U2_TIMEOUT:
-			if (XHCI_PS_SPEED_GET(v) != 4) {
+			if (XHCI_PS_SPEED_GET(v) < XHCI_PS_SPEED_SS) {
 				err = USB_ERR_IOERROR;
 				goto done;
 			}
@@ -3586,7 +3586,7 @@ xhci_roothub_exec(struct usb_device *udev,
 		case UHF_PORT_SUSPEND:
 			DPRINTFN(6, "suspend port %u (LPM=%u)\n", index, i);
 			j = XHCI_PS_SPEED_GET(v);
-			if ((j < 1) || (j > 3)) {
+			if (j == 0 || j >= XHCI_PS_SPEED_SS) {
 				/* non-supported speed */
 				err = USB_ERR_IOERROR;
 				goto done;
@@ -3772,6 +3772,7 @@ xhci_configure_reset_endpoint(struct usb_xfer *xfer)
 	uint32_t mask;
 	uint8_t index;
 	uint8_t epno;
+	uint8_t drop;
 
 	pepext = xhci_get_endpoint_ext(xfer->xroot->udev,
 	    xfer->endpoint->edesc);
@@ -3813,15 +3814,19 @@ xhci_configure_reset_endpoint(struct usb_xfer *xfer)
 	 */
 	switch (xhci_get_endpoint_state(udev, epno)) {
 	case XHCI_EPCTX_0_EPSTATE_DISABLED:
-                break;
+		drop = 0;
+		break;
 	case XHCI_EPCTX_0_EPSTATE_STOPPED:
+		drop = 1;
 		break;
 	case XHCI_EPCTX_0_EPSTATE_HALTED:
 		err = xhci_cmd_reset_ep(sc, 0, epno, index);
-		if (err != 0)
+		drop = (err != 0);
+		if (drop)
 			DPRINTF("Could not reset endpoint %u\n", epno);
 		break;
 	default:
+		drop = 1;
 		err = xhci_cmd_stop_ep(sc, 0, epno, index);
 		if (err != 0)
 			DPRINTF("Could not stop endpoint %u\n", epno);
@@ -3842,11 +3847,36 @@ xhci_configure_reset_endpoint(struct usb_xfer *xfer)
 	 */
 
 	mask = (1U << epno);
+
+	/*
+	 * So-called control and isochronous transfer types have
+	 * predefined data toggles (USB 2.0) or sequence numbers (USB
+	 * 3.0) and does not need to be dropped.
+	 */
+	if (drop != 0 &&
+	    (edesc->bmAttributes & UE_XFERTYPE) != UE_CONTROL &&
+	    (edesc->bmAttributes & UE_XFERTYPE) != UE_ISOCHRONOUS) {
+		/* drop endpoint context to reset data toggle value, if any. */
+		xhci_configure_mask(udev, mask, 1);
+		err = xhci_cmd_configure_ep(sc, buf_inp.physaddr, 0, index);
+		if (err != 0) {
+			DPRINTF("Could not drop "
+			    "endpoint %u at slot %u.\n", epno, index);
+		} else {
+			sc->sc_hw.devs[index].ep_configured &= ~mask;
+		}
+	}
+
+	/*
+	 * Always need to evaluate the slot context, because the maximum
+	 * number of endpoint contexts is stored there.
+	 */
 	xhci_configure_mask(udev, mask | 1U, 0);
 
 	if (!(sc->sc_hw.devs[index].ep_configured & mask)) {
-		sc->sc_hw.devs[index].ep_configured |= mask;
 		err = xhci_cmd_configure_ep(sc, buf_inp.physaddr, 0, index);
+		if (err == 0)
+			sc->sc_hw.devs[index].ep_configured |= mask;
 	} else {
 		err = xhci_cmd_evaluate_ctx(sc, buf_inp.physaddr, index);
 	}

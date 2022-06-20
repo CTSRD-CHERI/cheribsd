@@ -468,7 +468,7 @@ Enable the PC debug/test device.
 Each NVMe controller supports a single storage device.
 The device can be backed either by a memory disk described by the
 .Va ram
-variable, or a block device using the the block device settings described above.
+variable, or a block device using the block device settings described above.
 In addition, each controller supports the following settings:
 .Bl -column "ioslots" "Format" "Default"
 .It Sy Name Ta Sy Format Ta Sy Default Ta Sy Description
@@ -515,6 +515,8 @@ Host PCI bus address of device to pass through.
 Host PCI slot address of device to pass through.
 .It Va func Ta integer Ta Ta
 Host PCI function address of device to pass through.
+.It Va rom Ta path Ta Ta
+ROM file of the device which will be executed by OVMF to init the device.
 .El
 .Ss VirtIO 9p Settings
 Each VirtIO 9p device exposes a single filesystem from a host path.

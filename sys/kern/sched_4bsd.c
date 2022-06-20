@@ -987,13 +987,9 @@ sched_switch(struct thread *td, int flags)
 {
 	struct thread *newtd;
 	struct mtx *tmtx;
-	struct td_sched *ts;
-	struct proc *p;
 	int preempted;
 
 	tmtx = &sched_lock;
-	ts = td_get_sched(td);
-	p = td->td_proc;
 
 	THREAD_LOCK_ASSERT(td, MA_OWNED);
 
@@ -1530,12 +1526,12 @@ sched_userret_slowpath(struct thread *td)
 void
 sched_bind(struct thread *td, int cpu)
 {
-	struct td_sched *ts;
+#ifdef SMP
+	struct td_sched *ts = td_get_sched(td);
+#endif
 
 	THREAD_LOCK_ASSERT(td, MA_OWNED|MA_NOTRECURSED);
 	KASSERT(td == curthread, ("sched_bind: can only bind curthread"));
-
-	ts = td_get_sched(td);
 
 	td->td_flags |= TDF_BOUND;
 #ifdef SMP

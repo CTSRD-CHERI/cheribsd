@@ -1312,7 +1312,7 @@ smsc_phy_init(struct smsc_softc *sc)
 	smsc_miibus_writereg(sc->sc_ue.ue_dev, sc->sc_phyno, SMSC_PHY_INTR_MASK,
 	                     (SMSC_PHY_INTR_ANEG_COMP | SMSC_PHY_INTR_LINK_DOWN));
 
-	/* Restart auto-negotation */
+	/* Restart auto-negotiation */
 	bmcr = smsc_miibus_readreg(sc->sc_ue.ue_dev, sc->sc_phyno, MII_BMCR);
 	bmcr |= BMCR_STARTNEG;
 	smsc_miibus_writereg(sc->sc_ue.ue_dev, sc->sc_phyno, MII_BMCR, bmcr);
@@ -1769,10 +1769,8 @@ static driver_t smsc_driver = {
 	.size = sizeof(struct smsc_softc),
 };
 
-static devclass_t smsc_devclass;
-
-DRIVER_MODULE(smsc, uhub, smsc_driver, smsc_devclass, NULL, 0);
-DRIVER_MODULE(miibus, smsc, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(smsc, uhub, smsc_driver, NULL, NULL);
+DRIVER_MODULE(miibus, smsc, miibus_driver, 0, 0);
 MODULE_DEPEND(smsc, uether, 1, 1, 1);
 MODULE_DEPEND(smsc, usb, 1, 1, 1);
 MODULE_DEPEND(smsc, ether, 1, 1, 1);

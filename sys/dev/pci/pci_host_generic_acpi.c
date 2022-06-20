@@ -141,11 +141,9 @@ pci_host_generic_acpi_parse_resource(ACPI_RESOURCE *res, void *arg)
 {
 	device_t dev = (device_t)arg;
 	struct generic_pcie_acpi_softc *sc;
-	struct rman *rm;
 	rman_res_t min, max, off;
 	int r;
 
-	rm = NULL;
 	sc = device_get_softc(dev);
 	r = sc->base.nranges;
 	switch (res->Type) {
@@ -491,7 +489,4 @@ static device_method_t generic_pcie_acpi_methods[] = {
 DEFINE_CLASS_1(pcib, generic_pcie_acpi_driver, generic_pcie_acpi_methods,
     sizeof(struct generic_pcie_acpi_softc), generic_pcie_core_driver);
 
-static devclass_t generic_pcie_acpi_devclass;
-
-DRIVER_MODULE(pcib, acpi, generic_pcie_acpi_driver, generic_pcie_acpi_devclass,
-    0, 0);
+DRIVER_MODULE(pcib, acpi, generic_pcie_acpi_driver, 0, 0);

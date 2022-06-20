@@ -74,7 +74,6 @@ xendebug_filter(void *arg __unused)
 #if defined(STACK) && defined(DDB)
 	struct stack st;
 
-	stack_zero(&st);
 	stack_save(&st);
 
 	mtx_lock_spin(&lock);
@@ -151,7 +150,5 @@ static driver_t xendebug_driver = {
 	0,
 };
 
-devclass_t xendebug_devclass;
-
-DRIVER_MODULE(xendebug, xenpv, xendebug_driver, xendebug_devclass, 0, 0);
+DRIVER_MODULE(xendebug, xenpv, xendebug_driver, 0, 0);
 MODULE_DEPEND(xendebug, xenpv, 1, 1, 1);

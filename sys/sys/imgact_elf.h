@@ -42,7 +42,7 @@
 #if (__has_feature(capabilities) && !defined(__ELF_CHERI)) || \
     (defined(__LP64__) && __ELF_WORD_SIZE == 32)
 #define	AUXARGS_ENTRY_PTR(pos, id, ptr) \
-    {(pos)->a_type = (id); (pos)->a_un.a_val = (__cheri_addr vaddr_t)(ptr); (pos)++;}
+    {(pos)->a_type = (id); (pos)->a_un.a_val = (__cheri_addr ptraddr_t)(ptr); (pos)++;}
 #else
 #define	AUXARGS_ENTRY_PTR(pos, id, ptr) \
     {(pos)->a_type = (id); (pos)->a_un.a_ptr = (ptr); (pos)++;}

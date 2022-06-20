@@ -599,6 +599,7 @@ ad1816_attach(device_t dev)
 	struct ad1816_info *ad1816;
     	char status[SND_STATUSLEN], status2[SND_STATUSLEN];
 
+	gone_in_dev(dev, 14, "ISA sound driver");
 	ad1816 = malloc(sizeof(*ad1816), M_DEVBUF, M_WAITOK | M_ZERO);
 	ad1816->lock = snd_mtxcreate(device_get_nameunit(dev),
 	    "snd_ad1816 softc");
@@ -680,7 +681,7 @@ static driver_t ad1816_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(snd_ad1816, isa, ad1816_driver, pcm_devclass, 0, 0);
-DRIVER_MODULE(snd_ad1816, acpi, ad1816_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_ad1816, isa, ad1816_driver, 0, 0);
+DRIVER_MODULE(snd_ad1816, acpi, ad1816_driver, 0, 0);
 MODULE_DEPEND(snd_ad1816, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_ad1816, 1);

@@ -409,15 +409,90 @@ ffs_mount(struct mount *mp)
 	mp->mnt_kern_flag &= ~MNTK_FPLOOKUP;
 	mp->mnt_flag |= mntorflags;
 	MNT_IUNLOCK(mp);
+
 	/*
-	 * If updating, check whether changing from read-only to
-	 * read/write; if there is no device name, that's all we do.
+	 * If this is a snapshot request, take the snapshot.
 	 */
-	if (mp->mnt_flag & MNT_UPDATE) {
+	if (mp->mnt_flag & MNT_SNAPSHOT)
+		return (ffs_snapshot(mp, fspec));
+
+	/*
+	 * Must not call namei() while owning busy ref.
+	 */
+	if (mp->mnt_flag & MNT_UPDATE)
+		vfs_unbusy(mp);
+
+	/*
+	 * Not an update, or updating the name: look up the name
+	 * and verify that it refers to a sensible disk device.
+	 */
+	NDINIT(&ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, PTR2CAP(fspec));
+	error = namei(&ndp);
+	if ((mp->mnt_flag & MNT_UPDATE) != 0) {
+		/*
+		 * Unmount does not start if MNT_UPDATE is set.  Mount
+		 * update busies mp before setting MNT_UPDATE.  We
+		 * must be able to retain our busy ref successfully,
+		 * without sleep.
+		 */
+		error1 = vfs_busy(mp, MBF_NOWAIT);
+		MPASS(error1 == 0);
+	}
+	if (error != 0)
+		return (error);
+	NDFREE_PNBUF(&ndp);
+	if (!vn_isdisk_error(ndp.ni_vp, &error)) {
+		vput(ndp.ni_vp);
+		return (error);
+	}
+
+	/*
+	 * If mount by non-root, then verify that user has necessary
+	 * permissions on the device.
+	 */
+	accmode = VREAD;
+	if ((mp->mnt_flag & MNT_RDONLY) == 0)
+		accmode |= VWRITE;
+	error = VOP_ACCESS(ndp.ni_vp, accmode, td->td_ucred, td);
+	if (error)
+		error = priv_check(td, PRIV_VFS_MOUNT_PERM);
+	if (error) {
+		vput(ndp.ni_vp);
+		return (error);
+	}
+
+	/*
+	 * New mount
+	 *
+	 * We need the name for the mount point (also used for
+	 * "last mounted on") copied in. If an error occurs,
+	 * the mount point is discarded by the upper level code.
+	 * Note that vfs_mount_alloc() populates f_mntonname for us.
+	 */
+	if ((mp->mnt_flag & MNT_UPDATE) == 0) {
+		if ((error = ffs_mountfs(ndp.ni_vp, mp, td)) != 0) {
+			vrele(ndp.ni_vp);
+			return (error);
+		}
+	} else {
+		/*
+		 * When updating, check whether changing from read-only to
+		 * read/write; if there is no device name, that's all we do.
+		 */
 		ump = VFSTOUFS(mp);
 		fs = ump->um_fs;
 		odevvp = ump->um_odevvp;
 		devvp = ump->um_devvp;
+
+		/*
+		 * If it's not the same vnode, or at least the same device
+		 * then it's not correct.
+		 */
+		if (ndp.ni_vp->v_rdev != ump->um_odevvp->v_rdev)
+			error = EINVAL; /* needs translation */
+		vput(ndp.ni_vp);
+		if (error)
+			return (error);
 		if (fs->fs_ronly == 0 &&
 		    vfs_flagopt(mp->mnt_optnew, "ro", NULL, 0)) {
 			/*
@@ -615,84 +690,6 @@ ffs_mount(struct mount *mp)
 			MNT_IUNLOCK(mp);
 		}
 
-		/*
-		 * If this is a snapshot request, take the snapshot.
-		 */
-		if (mp->mnt_flag & MNT_SNAPSHOT)
-			return (ffs_snapshot(mp, fspec));
-
-		/*
-		 * Must not call namei() while owning busy ref.
-		 */
-		vfs_unbusy(mp);
-	}
-
-	/*
-	 * Not an update, or updating the name: look up the name
-	 * and verify that it refers to a sensible disk device.
-	 */
-	NDINIT(&ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, PTR2CAP(fspec));
-	error = namei(&ndp);
-	if ((mp->mnt_flag & MNT_UPDATE) != 0) {
-		/*
-		 * Unmount does not start if MNT_UPDATE is set.  Mount
-		 * update busies mp before setting MNT_UPDATE.  We
-		 * must be able to retain our busy ref succesfully,
-		 * without sleep.
-		 */
-		error1 = vfs_busy(mp, MBF_NOWAIT);
-		MPASS(error1 == 0);
-	}
-	if (error != 0)
-		return (error);
-	NDFREE(&ndp, NDF_ONLY_PNBUF);
-	devvp = ndp.ni_vp;
-	if (!vn_isdisk_error(devvp, &error)) {
-		vput(devvp);
-		return (error);
-	}
-
-	/*
-	 * If mount by non-root, then verify that user has necessary
-	 * permissions on the device.
-	 */
-	accmode = VREAD;
-	if ((mp->mnt_flag & MNT_RDONLY) == 0)
-		accmode |= VWRITE;
-	error = VOP_ACCESS(devvp, accmode, td->td_ucred, td);
-	if (error)
-		error = priv_check(td, PRIV_VFS_MOUNT_PERM);
-	if (error) {
-		vput(devvp);
-		return (error);
-	}
-
-	if (mp->mnt_flag & MNT_UPDATE) {
-		/*
-		 * Update only
-		 *
-		 * If it's not the same vnode, or at least the same device
-		 * then it's not correct.
-		 */
-
-		if (devvp->v_rdev != ump->um_devvp->v_rdev)
-			error = EINVAL;	/* needs translation */
-		vput(devvp);
-		if (error)
-			return (error);
-	} else {
-		/*
-		 * New mount
-		 *
-		 * We need the name for the mount point (also used for
-		 * "last mounted on") copied in. If an error occurs,
-		 * the mount point is discarded by the upper level code.
-		 * Note that vfs_mount_alloc() populates f_mntonname for us.
-		 */
-		if ((error = ffs_mountfs(devvp, mp, td)) != 0) {
-			vrele(devvp);
-			return (error);
-		}
 	}
 
 	MNT_ILOCK(mp);
@@ -1426,9 +1423,7 @@ ffs_unmount(mp, mntflags)
 	if (susp)
 		vfs_write_resume(mp, VR_START_WRITE);
 	if (ump->um_trim_tq != NULL) {
-		while (ump->um_trim_inflight != 0)
-			pause("ufsutr", hz);
-		taskqueue_drain_all(ump->um_trim_tq);
+		MPASS(ump->um_trim_inflight == 0);
 		taskqueue_free(ump->um_trim_tq);
 		free (ump->um_trimhash, M_TRIM);
 	}
@@ -1541,6 +1536,20 @@ ffs_flushfiles(mp, flags, td)
 	 */
 	if (qerror == 0 && (error = vflush(mp, 0, flags, td)) != 0)
 		return (error);
+
+	/*
+	 * If this is a forcible unmount and there were any files that
+	 * were unlinked but still open, then vflush() will have
+	 * truncated and freed those files, which might have started
+	 * some trim work.  Wait here for any trims to complete
+	 * and process the blkfrees which follow the trims.
+	 * This may create more dirty devvp buffers and softdep deps.
+	 */
+	if (ump->um_trim_tq != NULL) {
+		while (ump->um_trim_inflight != 0)
+			pause("ufsutr", hz);
+		taskqueue_drain_all(ump->um_trim_tq);
+	}
 
 	/*
 	 * Flush filesystem metadata.

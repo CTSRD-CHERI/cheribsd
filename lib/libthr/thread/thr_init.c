@@ -81,7 +81,7 @@ __FBSDID("$FreeBSD$");
  * and add guard pages on CHERIABI. In CHERIABI _usrstack is only used to
  * initialize stackaddr_attr for the main thread.
  */
-vaddr_t		_usrstack;
+ptraddr_t	_usrstack;
 struct pthread	*_thr_initial;
 int		_libthr_debug;
 int		_thread_event_mask;
@@ -511,7 +511,7 @@ init_private(void)
 		mib[0] = CTL_KERN;
 		mib[1] = KERN_USRSTACK;
 		/*
-		 * The sysctl returns a vaddr_t and not a pointer so _usrstack
+		 * The sysctl returns a ptraddr_t and not a pointer so _usrstack
 		 * must not be a pointer on CHERIABI
 		 */
 		len = sizeof (_usrstack);

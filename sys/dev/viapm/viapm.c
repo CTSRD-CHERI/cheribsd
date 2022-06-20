@@ -1005,8 +1005,8 @@ static driver_t viapropm_driver = {
 
 DRIVER_MODULE(viapm, pci, viapm_driver, viapm_devclass, 0, 0);
 DRIVER_MODULE(viapropm, pci, viapropm_driver, viapropm_devclass, 0, 0);
-DRIVER_MODULE(iicbb, viapm, iicbb_driver, iicbb_devclass, 0, 0);
-DRIVER_MODULE(smbus, viapropm, smbus_driver, smbus_devclass, 0, 0);
+DRIVER_MODULE(iicbb, viapm, iicbb_driver, 0, 0);
+DRIVER_MODULE(smbus, viapropm, smbus_driver, 0, 0);
 
 MODULE_DEPEND(viapm, pci, 1, 1, 1);
 MODULE_DEPEND(viapropm, pci, 1, 1, 1);
@@ -1015,8 +1015,8 @@ MODULE_DEPEND(viapropm, smbus, SMBUS_MINVER, SMBUS_PREFVER, SMBUS_MAXVER);
 MODULE_VERSION(viapm, 1);
 
 #ifdef DEV_ISA
-DRIVER_MODULE(isa, viapm, isa_driver, isa_devclass, 0, 0);
-DRIVER_MODULE(isa, viapropm, isa_driver, isa_devclass, 0, 0);
+DRIVER_MODULE(isa, viapm, isa_driver, 0, 0);
+DRIVER_MODULE(isa, viapropm, isa_driver, 0, 0);
 MODULE_DEPEND(viapm, isa, 1, 1, 1);
 MODULE_DEPEND(viapropm, isa, 1, 1, 1);
 #endif

@@ -247,15 +247,15 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	onstack = sigonstack(tf->tf_sp);
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
-	    (__cheri_addr vaddr_t) catcher, sig);
+	    (__cheri_addr ptraddr_t) catcher, sig);
 
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sp = ((__cheri_addr vaddr_t)td->td_sigstk.ss_sp +
+		sp = ((__cheri_addr ptraddr_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 	} else {
-		sp = (__cheri_addr vaddr_t)td->td_frame->tf_sp;
+		sp = (__cheri_addr ptraddr_t)td->td_frame->tf_sp;
 	}
 
 	/* Allocate room for the capability register context. */
@@ -276,7 +276,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	frame.sf_uc.uc_mcontext.mc_capregs = capregs;
 	siginfo_to_siginfo64(&ksi->ksi_info, &frame.sf_si);
 	frame.sf_uc.uc_sigmask = *mask;
-	frame.sf_uc.uc_stack.ss_sp = (__cheri_addr vaddr_t)td->td_sigstk.ss_sp;
+	frame.sf_uc.uc_stack.ss_sp = (__cheri_addr ptraddr_t)td->td_sigstk.ss_sp;
 	frame.sf_uc.uc_stack.ss_size = td->td_sigstk.ss_size;
 	frame.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK) != 0 ?
 	    (onstack ? SS_ONSTACK : 0) : SS_DISABLE;

@@ -42,7 +42,7 @@
 
 struct bus_dmamap;
 struct scatterlist {
-	unsigned long page_link;
+	uintptr_t page_link;
 #define	SG_PAGE_LINK_CHAIN	0x1UL
 #define	SG_PAGE_LINK_LAST	0x2UL
 #define	SG_PAGE_LINK_MASK	0x3UL
@@ -99,6 +99,12 @@ struct sg_dma_page_iter {
 #define	for_each_sg(sglist, sg, sgmax, iter)				\
 	for (iter = 0, sg = (sglist); iter < (sgmax); iter++, sg = sg_next(sg))
 
+#define	for_each_sgtable_dma_sg(sgt, sg, iter)				\
+	for_each_sg((sgt)->sgl, sg, (sgt)->nents, iter)
+
+#define	for_each_sgtable_dma_page(sgt, iter, pgoffset)			\
+	for_each_sg_dma_page((sgt)->sgl, iter, (sgt)->nents, pgoffset)
+
 typedef struct scatterlist *(sg_alloc_fn) (unsigned int, gfp_t);
 typedef void (sg_free_fn) (struct scatterlist *, unsigned int);
 
@@ -153,7 +159,7 @@ static inline void *
 sg_virt(struct scatterlist *sg)
 {
 
-	return ((void *)((unsigned long)page_address(sg_page(sg)) + sg->offset));
+	return ((void *)((uintptr_t)page_address(sg_page(sg)) + sg->offset));
 }
 
 static inline void

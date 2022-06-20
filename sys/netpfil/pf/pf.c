@@ -236,6 +236,9 @@ struct mtx_padalign pf_unlnkdrules_mtx;
 MTX_SYSINIT(pf_unlnkdrules_mtx, &pf_unlnkdrules_mtx, "pf unlinked rules",
     MTX_DEF);
 
+struct sx pf_config_lock;
+SX_SYSINIT(pf_config_lock, &pf_config_lock, "pf config");
+
 struct mtx_padalign pf_table_stats_lock;
 MTX_SYSINIT(pf_table_stats_lock, &pf_table_stats_lock, "pf table stats",
     MTX_DEF);
@@ -279,7 +282,7 @@ static u_int32_t	 pf_tcp_iss(struct pf_pdesc *);
 void			 pf_rule_to_actions(struct pf_krule *,
 			    struct pf_rule_actions *);
 static int		 pf_test_eth_rule(int, struct pfi_kkif *,
-			    struct mbuf *);
+			    struct mbuf **);
 static int		 pf_test_rule(struct pf_krule **, struct pf_kstate **,
 			    int, struct pfi_kkif *, struct mbuf *, int,
 			    struct pf_pdesc *, struct pf_krule **,
@@ -2201,12 +2204,14 @@ pf_purge_unlinked_rules()
 	PF_UNLNKDRULES_UNLOCK();
 
 	if (!TAILQ_EMPTY(&tmpq)) {
+		PF_CONFIG_LOCK();
 		PF_RULES_WLOCK();
 		TAILQ_FOREACH_SAFE(r, &tmpq, entries, r1) {
 			TAILQ_REMOVE(&tmpq, r, entries);
 			pf_free_rule(r);
 		}
 		PF_RULES_WUNLOCK();
+		PF_CONFIG_UNLOCK();
 	}
 }
 
@@ -3366,13 +3371,10 @@ pf_step_out_of_anchor(struct pf_kanchor_stackframe *stack, int *depth,
 		f = stack + *depth - 1;
 		fr = PF_ANCHOR_RULE(f);
 		if (f->child != NULL) {
-			struct pf_kanchor_node *parent;
-
 			/*
 			 * This block traverses through
 			 * a wildcard anchor.
 			 */
-			parent = &fr->anchor->children;
 			if (match != NULL && *match) {
 				/*
 				 * If any of "*" matched, then
@@ -3382,7 +3384,8 @@ pf_step_out_of_anchor(struct pf_kanchor_stackframe *stack, int *depth,
 				PF_ANCHOR_SET_MATCH(f);
 				*match = 0;
 			}
-			f->child = RB_NEXT(pf_kanchor_node, parent, f->child);
+			f->child = RB_NEXT(pf_kanchor_node,
+			    &fr->anchor->children, f->child);
 			if (f->child != NULL) {
 				*rs = &f->child->ruleset;
 				*r = TAILQ_FIRST((*rs)->rules[n].active.ptr);
@@ -3470,12 +3473,10 @@ pf_step_out_of_keth_anchor(struct pf_keth_anchor_stackframe *stack, int *depth,
 		f = stack + *depth - 1;
 		fr = PF_ETH_ANCHOR_RULE(f);
 		if (f->child != NULL) {
-			struct pf_keth_anchor_node *parent;
 			/*
 			 * This block traverses through
 			 * a wildcard anchor.
 			 */
-			parent = &fr->anchor->children;
 			if (match != NULL && *match) {
 				/*
 				 * If any of "*" matched, then
@@ -3485,8 +3486,8 @@ pf_step_out_of_keth_anchor(struct pf_keth_anchor_stackframe *stack, int *depth,
 				PF_ETH_ANCHOR_SET_MATCH(f);
 				*match = 0;
 			}
-			f->child = RB_NEXT(pf_keth_anchor_node, parent,
-			    f->child);
+			f->child = RB_NEXT(pf_keth_anchor_node,
+			    &fr->anchor->children, f->child);
 			if (f->child != NULL) {
 				*rs = &f->child->ruleset;
 				*r = TAILQ_FIRST((*rs)->active.rules);
@@ -3575,7 +3576,7 @@ pf_rule_to_actions(struct pf_krule *r, struct pf_rule_actions *a)
 	if (r->dnpipe)
 		a->dnpipe = r->dnpipe;
 	if (r->dnrpipe)
-		a->dnpipe = r->dnrpipe;
+		a->dnrpipe = r->dnrpipe;
 	if (r->free_flags & PFRULE_DN_IS_PIPE)
 		a->flags |= PFRULE_DN_IS_PIPE;
 }
@@ -3826,30 +3827,74 @@ pf_match_eth_addr(const uint8_t *a, const struct pf_keth_rule_addr *r)
 }
 
 static int
-pf_test_eth_rule(int dir, struct pfi_kkif *kif, struct mbuf *m)
+pf_test_eth_rule(int dir, struct pfi_kkif *kif, struct mbuf **m0)
 {
+	struct mbuf *m = *m0;
 	struct ether_header *e;
 	struct pf_keth_rule *r, *rm, *a = NULL;
 	struct pf_keth_ruleset *ruleset = NULL;
 	struct pf_mtag *mtag;
 	struct pf_keth_ruleq *rules;
+	struct pf_addr *src, *dst;
+	sa_family_t af = 0;
+	uint16_t proto;
 	int asd = 0, match = 0;
 	uint8_t action;
 	struct pf_keth_anchor_stackframe	anchor_stack[PF_ANCHOR_STACKSIZE];
 
-	NET_EPOCH_ASSERT();
-
 	MPASS(kif->pfik_ifp->if_vnet == curvnet);
 	NET_EPOCH_ASSERT();
 
-	SDT_PROBE3(pf, eth, test_rule, entry, dir, kif->pfik_ifp, m);
+	PF_RULES_RLOCK_TRACKER;
 
-	e = mtod(m, struct ether_header *);
+	SDT_PROBE3(pf, eth, test_rule, entry, dir, kif->pfik_ifp, m);
 
 	ruleset = V_pf_keth;
 	rules = ck_pr_load_ptr(&ruleset->active.rules);
 	r = TAILQ_FIRST(rules);
 	rm = NULL;
+
+	e = mtod(m, struct ether_header *);
+	proto = ntohs(e->ether_type);
+
+	switch (proto) {
+#ifdef INET
+	case ETHERTYPE_IP: {
+		struct ip *ip;
+		m = m_pullup(m, sizeof(struct ether_header) +
+		    sizeof(struct ip));
+		if (m == NULL) {
+			*m0 = NULL;
+			return (PF_DROP);
+		}
+		af = AF_INET;
+		ip = mtodo(m, sizeof(struct ether_header));
+		src = (struct pf_addr *)&ip->ip_src;
+		dst = (struct pf_addr *)&ip->ip_dst;
+		break;
+	}
+#endif /* INET */
+#ifdef INET6
+	case ETHERTYPE_IPV6: {
+		struct ip6_hdr *ip6;
+		m = m_pullup(m, sizeof(struct ether_header) +
+		    sizeof(struct ip6_hdr));
+		if (m == NULL) {
+			*m0 = NULL;
+			return (PF_DROP);
+		}
+		af = AF_INET6;
+		ip6 = mtodo(m, sizeof(struct ether_header));
+		src = (struct pf_addr *)&ip6->ip6_src;
+		dst = (struct pf_addr *)&ip6->ip6_dst;
+		break;
+	}
+#endif /* INET6 */
+	}
+	e = mtod(m, struct ether_header *);
+	*m0 = m;
+
+	PF_RULES_RLOCK();
 
 	while (r != NULL) {
 		counter_u64_add(r->evaluations, 1);
@@ -3865,7 +3910,7 @@ pf_test_eth_rule(int dir, struct pfi_kkif *kif, struct mbuf *m)
 			    "dir");
 			r = r->skip[PFE_SKIP_DIR].ptr;
 		}
-		else if (r->proto && r->proto != ntohs(e->ether_type)) {
+		else if (r->proto && r->proto != proto) {
 			SDT_PROBE3(pf, eth, test_rule, mismatch, r->nr, r,
 			    "proto");
 			r = r->skip[PFE_SKIP_PROTO].ptr;
@@ -3878,6 +3923,18 @@ pf_test_eth_rule(int dir, struct pfi_kkif *kif, struct mbuf *m)
 		else if (! pf_match_eth_addr(e->ether_dhost, &r->dst)) {
 			SDT_PROBE3(pf, eth, test_rule, mismatch, r->nr, r,
 			    "dst");
+			r = TAILQ_NEXT(r, entries);
+		}
+		else if (af != 0 && PF_MISMATCHAW(&r->ipsrc.addr, src, af,
+		    r->ipsrc.neg, kif, M_GETFIB(m))) {
+			SDT_PROBE3(pf, eth, test_rule, mismatch, r->nr, r,
+			    "ip_src");
+			r = TAILQ_NEXT(r, entries);
+		}
+		else if (af != 0 && PF_MISMATCHAW(&r->ipdst.addr, dst, af,
+		    r->ipdst.neg, kif, M_GETFIB(m))) {
+			SDT_PROBE3(pf, eth, test_rule, mismatch, r->nr, r,
+			    "ip_dst");
 			r = TAILQ_NEXT(r, entries);
 		}
 		else {
@@ -3906,20 +3963,26 @@ pf_test_eth_rule(int dir, struct pfi_kkif *kif, struct mbuf *m)
 	SDT_PROBE2(pf, eth, test_rule, final_match, (r != NULL ? r->nr : -1), r);
 
 	/* Default to pass. */
-	if (r == NULL)
+	if (r == NULL) {
+		PF_RULES_RUNLOCK();
 		return (PF_PASS);
+	}
 
 	/* Execute action. */
 	counter_u64_add(r->packets[dir == PF_OUT], 1);
 	counter_u64_add(r->bytes[dir == PF_OUT], m_length(m, NULL));
+	pf_update_timestamp(r);
 
 	/* Shortcut. Don't tag if we're just going to drop anyway. */
-	if (r->action == PF_DROP)
+	if (r->action == PF_DROP) {
+		PF_RULES_RUNLOCK();
 		return (PF_DROP);
+	}
 
 	if (r->tag > 0) {
 		mtag = pf_get_mtag(m);
 		if (mtag == NULL) {
+			PF_RULES_RUNLOCK();
 			counter_u64_add(V_pf_status.counters[PFRES_MEMORY], 1);
 			return (PF_DROP);
 		}
@@ -3929,6 +3992,7 @@ pf_test_eth_rule(int dir, struct pfi_kkif *kif, struct mbuf *m)
 	if (r->qid != 0) {
 		mtag = pf_get_mtag(m);
 		if (mtag == NULL) {
+			PF_RULES_RUNLOCK();
 			counter_u64_add(V_pf_status.counters[PFRES_MEMORY], 1);
 			return (PF_DROP);
 		}
@@ -3944,6 +4008,7 @@ pf_test_eth_rule(int dir, struct pfi_kkif *kif, struct mbuf *m)
 		 **/
 		mtag = pf_get_mtag(m);
 		if (mtag == NULL) {
+			PF_RULES_RUNLOCK();
 			counter_u64_add(V_pf_status.counters[PFRES_MEMORY], 1);
 			return (PF_DROP);
 		}
@@ -3952,6 +4017,8 @@ pf_test_eth_rule(int dir, struct pfi_kkif *kif, struct mbuf *m)
 	}
 
 	action = r->action;
+
+	PF_RULES_RUNLOCK();
 
 	return (action);
 }
@@ -6676,7 +6743,7 @@ pf_pdesc_to_dnflow(int dir, const struct pf_pdesc *pd,
 	if (dir != dndir && pd->act.dnrpipe) {
 		dnflow->rule.info = pd->act.dnrpipe;
 	}
-	else if (dir == dndir) {
+	else if (dir == dndir && pd->act.dnpipe) {
 		dnflow->rule.info = pd->act.dnpipe;
 	}
 	else {
@@ -6737,7 +6804,7 @@ pf_test_eth(int dir, int pflags, struct ifnet *ifp, struct mbuf **m0,
 		return (PF_PASS);
 
 	/* Stateless! */
-	return (pf_test_eth_rule(dir, kif, m));
+	return (pf_test_eth_rule(dir, kif, m0));
 }
 
 #ifdef INET
@@ -7132,6 +7199,8 @@ done:
 		dirndx = (dir == PF_OUT);
 		pf_counter_u64_add_protected(&r->packets[dirndx], 1);
 		pf_counter_u64_add_protected(&r->bytes[dirndx], pd.tot_len);
+		pf_update_timestamp(r);
+
 		if (a != NULL) {
 			pf_counter_u64_add_protected(&a->packets[dirndx], 1);
 			pf_counter_u64_add_protected(&a->bytes[dirndx], pd.tot_len);
@@ -7229,8 +7298,8 @@ done:
 			if (pf_pdesc_to_dnflow(dir, &pd, r, s, &dnflow)) {
 				pd.pf_mtag->flags |= PF_TAG_DUMMYNET;
 				ip_dn_io_ptr(m0, &dnflow);
-				if (*m0 == NULL)
-					action = PF_DROP;
+				if (*m0 != NULL)
+					pd.pf_mtag->flags &= ~PF_TAG_DUMMYNET;
 			}
 		}
 		break;
@@ -7687,8 +7756,8 @@ done:
 			if (pf_pdesc_to_dnflow(dir, &pd, r, s, &dnflow)) {
 				pd.pf_mtag->flags |= PF_TAG_DUMMYNET;
 				ip_dn_io_ptr(m0, &dnflow);
-				if (*m0 == NULL)
-					action = PF_DROP;
+				if (*m0 != NULL)
+					pd.pf_mtag->flags &= ~PF_TAG_DUMMYNET;
 			}
 		}
 		break;

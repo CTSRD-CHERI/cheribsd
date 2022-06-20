@@ -787,7 +787,7 @@ ng_rmnode(node_p node, hook_p dummy1, void *dummy2, int dummy3)
 
 /*
  * Remove a reference to the node, possibly the last.
- * deadnode always acts as it it were the last.
+ * deadnode always acts as it were the last.
  */
 void
 ng_unref_node(node_p node)
@@ -3374,10 +3374,8 @@ sysctl_debug_ng_dump_items(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	int val;
-	int i;
 
 	val = allocated;
-	i = 1;
 	error = sysctl_handle_int(oidp, &val, 0, req);
 	if (error != 0 || req->newptr == NULL)
 		return (error);

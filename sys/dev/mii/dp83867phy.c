@@ -145,7 +145,8 @@ dp_attach(device_t dev)
 	sc = device_get_softc(dev);
 	mii_sc = &sc->mii_sc;
 
-	size = device_get_property(dev, "max-speed", &maxspeed, sizeof(maxspeed));
+	size = device_get_property(dev, "max-speed", &maxspeed,
+	    sizeof(maxspeed), DEVICE_PROP_UINT32);
 	if (size <= 0)
 		maxspeed = 0;
 
@@ -284,12 +285,10 @@ static device_method_t dp_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t dp_devclass;
-
 static driver_t dp_driver = {
 	"dp83867phy",
 	dp_methods,
 	sizeof(struct dp83867_softc)
 };
 
-DRIVER_MODULE(dp83867phy, miibus, dp_driver, dp_devclass, 0, 0);
+DRIVER_MODULE(dp83867phy, miibus, dp_driver, 0, 0);

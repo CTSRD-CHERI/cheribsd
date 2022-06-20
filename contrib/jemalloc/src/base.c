@@ -121,7 +121,7 @@ base_unmap(tsdn_t *tsdn, extent_hooks_t *extent_hooks, unsigned ind, void *addr,
 label_done:
 	if (metadata_thp_madvise()) {
 		/* Set NOHUGEPAGE after unmap to avoid kernel defrag. */
-		assert(__builtin_is_aligned(addr, HUGEPAGE) &&
+		assert(((uintptr_t)addr & HUGEPAGE_MASK) == 0 &&
 		    (size & HUGEPAGE_MASK) == 0);
 		pages_nohuge(addr, size);
 	}
@@ -196,8 +196,8 @@ base_extent_bump_alloc_helper(extent_t *extent, size_t *gap_size, size_t size,
 	assert(alignment == ALIGNMENT_CEILING(alignment, QUANTUM));
 	assert(size == ALIGNMENT_CEILING(size, alignment));
 
-	*gap_size = ALIGNMENT_CEILING((vaddr_t)extent_addr_get(extent),
-	    alignment) - (vaddr_t)extent_addr_get(extent);
+	*gap_size = ALIGNMENT_CEILING((uintptr_t)extent_addr_get(extent),
+	    alignment) - (uintptr_t)extent_addr_get(extent);
 	ret = (void *)((uintptr_t)extent_addr_get(extent) + *gap_size);
 	assert(extent_bsize_get(extent) >= *gap_size + size);
 	extent_binit(extent, (void *)((uintptr_t)extent_addr_get(extent) +
@@ -226,14 +226,14 @@ base_extent_bump_alloc_post(base_t *base, extent_t *extent, size_t gap_size,
 		 * crossed by the new allocation. Adjust n_thp similarly when
 		 * metadata_thp is enabled.
 		 */
-		base->resident += PAGE_CEILING((vaddr_t)addr + size) -
-		    PAGE_CEILING((vaddr_t)addr - gap_size);
+		base->resident += PAGE_CEILING((uintptr_t)addr + size) -
+		    PAGE_CEILING((uintptr_t)addr - gap_size);
 		assert(base->allocated <= base->resident);
 		assert(base->resident <= base->mapped);
 		if (metadata_thp_madvise() && (opt_metadata_thp ==
 		    metadata_thp_always || base->auto_thp_switched)) {
-			base->n_thp += (HUGEPAGE_CEILING((vaddr_t)addr + size)
-			    - HUGEPAGE_CEILING((vaddr_t)addr - gap_size)) >>
+			base->n_thp += (HUGEPAGE_CEILING((uintptr_t)addr + size)
+			    - HUGEPAGE_CEILING((uintptr_t)addr - gap_size)) >>
 			    LG_HUGEPAGE;
 			assert(base->mapped >= base->n_thp << LG_HUGEPAGE);
 		}

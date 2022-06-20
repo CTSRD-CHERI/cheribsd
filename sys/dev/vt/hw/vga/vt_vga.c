@@ -1261,7 +1261,11 @@ vga_acpi_disabled(void)
 	uint16_t flags;
 	int ignore;
 
-	ignore = 0;
+	/*
+	 * Ignore the flag on real hardware: there's a lot of buggy firmware
+	 * that will wrongly set it.
+	 */
+	ignore = (vm_guest == VM_GUEST_NO);
 	TUNABLE_INT_FETCH("hw.vga.acpi_ignore_no_vga", &ignore);
 	if (ignore || !acpi_get_fadt_bootflags(&flags))
  		return (false);
@@ -1385,6 +1389,5 @@ static device_method_t vtvga_methods[] = {
 };
 
 DEFINE_CLASS_0(vtvga, vtvga_driver, vtvga_methods, 0);
-devclass_t vtvga_devclass;
 
-DRIVER_MODULE(vtvga, nexus, vtvga_driver, vtvga_devclass, NULL, NULL);
+DRIVER_MODULE(vtvga, nexus, vtvga_driver, NULL, NULL);

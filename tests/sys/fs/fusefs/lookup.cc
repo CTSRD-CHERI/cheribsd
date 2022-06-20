@@ -263,7 +263,6 @@ TEST_F(Lookup, dotdot_no_parent_nid)
 	).WillOnce(Invoke(ReturnImmediate([=](auto in __unused, auto& out) {
 		SET_OUT_HEADER_LEN(out, open);
 	})));
-	expect_forget(FUSE_ROOT_ID, 1, NULL);
 	expect_forget(foo_ino, 1, NULL);
 
 	fd = open("mountpoint/foo/bar", O_EXEC| O_DIRECTORY);
@@ -275,6 +274,27 @@ TEST_F(Lookup, dotdot_no_parent_nid)
 	nap();		// Because vnode reclamation is asynchronous
 	EXPECT_NE(0, faccessat(fd, "../..", F_OK, 0));
 	EXPECT_EQ(ESTALE, errno);
+}
+
+/*
+ * A daemon that returns an illegal error value should be handled gracefully.
+ * Regression test for https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=263220
+ */
+TEST_F(Lookup, ejustreturn)
+{
+	const char FULLPATH[] = "mountpoint/does_not_exist";
+	const char RELPATH[] = "does_not_exist";
+
+	EXPECT_LOOKUP(FUSE_ROOT_ID, RELPATH)
+	.WillOnce(Invoke(ReturnImmediate([=](auto in __unused, auto& out) {
+		out.header.len = sizeof(out.header);
+		out.header.error = 2;
+		m_mock->m_expected_write_errno = EINVAL;
+	})));
+
+	EXPECT_NE(0, access(FULLPATH, F_OK));
+
+	EXPECT_EQ(EIO, errno);
 }
 
 TEST_F(Lookup, enoent)
@@ -574,7 +594,6 @@ TEST_F(LookupExportable, dotdot_no_parent_nid)
 	).WillOnce(Invoke(ReturnImmediate([=](auto in __unused, auto& out) {
 		SET_OUT_HEADER_LEN(out, open);
 	})));
-	expect_forget(FUSE_ROOT_ID, 1, NULL);
 	expect_forget(foo_ino, 1, NULL);
 	EXPECT_LOOKUP(bar_ino, "..")
 	.WillOnce(Invoke(ReturnImmediate([=](auto in __unused, auto& out) {

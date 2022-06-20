@@ -329,11 +329,8 @@ static driver_t xl_driver = {
 	sizeof(struct xl_softc)
 };
 
-static devclass_t xl_devclass;
-
-DRIVER_MODULE_ORDERED(xl, pci, xl_driver, xl_devclass, NULL, NULL,
-    SI_ORDER_ANY);
-DRIVER_MODULE(miibus, xl, miibus_driver, miibus_devclass, NULL, NULL);
+DRIVER_MODULE_ORDERED(xl, pci, xl_driver, NULL, NULL, SI_ORDER_ANY);
+DRIVER_MODULE(miibus, xl, miibus_driver, NULL, NULL);
 MODULE_PNP_INFO("U16:vendor;U16:device;D:#", pci, xl, xl_devs,
     nitems(xl_devs) - 1);
 
@@ -1069,13 +1066,11 @@ xl_attach(device_t dev)
 	struct xl_softc		*sc;
 	struct ifnet		*ifp;
 	int			media, pmcap;
-	int			error = 0, phy, rid, res, unit;
+	int			error = 0, phy, rid, res;
 	uint16_t		did;
 
 	sc = device_get_softc(dev);
 	sc->xl_dev = dev;
-
-	unit = device_get_unit(dev);
 
 	mtx_init(&sc->xl_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);

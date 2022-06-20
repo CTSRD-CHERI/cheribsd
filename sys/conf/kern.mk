@@ -28,6 +28,9 @@ NO_WTAUTOLOGICAL_POINTER_COMPARE= -Wno-tautological-pointer-compare
 .if ${COMPILER_VERSION} >= 100000
 NO_WMISLEADING_INDENTATION=	-Wno-misleading-indentation
 .endif
+.if ${COMPILER_FEATURES:MWunused-but-set-variable}
+NO_WUNUSED_BUT_SET_VARIABLE=	-Wno-unused-but-set-variable
+.endif
 .if ${COMPILER_VERSION} >= 140000
 NO_WBITWISE_INSTEAD_OF_LOGICAL=	-Wno-bitwise-instead-of-logical
 .endif
@@ -39,9 +42,6 @@ CWARNEXTRA?=	-Wno-error=tautological-compare -Wno-error=empty-body \
 		-Wno-error=pointer-sign
 CWARNEXTRA+=	-Wno-error=shift-negative-value
 CWARNEXTRA+=	-Wno-address-of-packed-member
-.if ${COMPILER_FEATURES:MWunused-but-set-variable}
-CWARNFLAGS+=	-Wno-error=unused-but-set-variable
-.endif
 .endif	# clang
 
 .if ${COMPILER_TYPE} == "gcc"
@@ -90,10 +90,6 @@ CWARNFLAGS+=	-Wno-format-zero-length
 FORMAT_EXTENSIONS=	-Wno-format
 .elif ${COMPILER_TYPE} == "clang"
 FORMAT_EXTENSIONS=	-D__printf__=__freebsd_kprintf__
-# Only newer versions of clang have -Wno-unused-but-set-variable
-.if ${COMPILER_FEATURES:MWunused-but-set-variable}
-NO_WUNUSED_BUT_SET_VARIABLE=-Wno-unused-but-set-variable
-.endif
 .else
 FORMAT_EXTENSIONS=	-fformat-extensions
 .endif

@@ -49,7 +49,7 @@
 #endif
 
 /* Needed for initialization only. */
-#define RTREE_LEAFKEY_INVALID ((vaddr_t)1)
+#define RTREE_LEAFKEY_INVALID ((uintptr_t)1)
 
 typedef struct rtree_node_elm_s rtree_node_elm_t;
 struct rtree_node_elm_s {
@@ -152,20 +152,20 @@ extern rtree_leaf_dalloc_t *JET_MUTABLE rtree_leaf_dalloc;
 void rtree_delete(tsdn_t *tsdn, rtree_t *rtree);
 #endif
 rtree_leaf_elm_t *rtree_leaf_elm_lookup_hard(tsdn_t *tsdn, rtree_t *rtree,
-    rtree_ctx_t *rtree_ctx, vaddr_t key, bool dependent, bool init_missing);
+    rtree_ctx_t *rtree_ctx, uintptr_t key, bool dependent, bool init_missing);
 
-JEMALLOC_ALWAYS_INLINE vaddr_t
-rtree_leafkey(vaddr_t key) {
+JEMALLOC_ALWAYS_INLINE uintptr_t
+rtree_leafkey(uintptr_t key) {
 	unsigned ptrbits = ZU(1) << (LG_SIZEOF_PTR+3);
 	unsigned cumbits = (rtree_levels[RTREE_HEIGHT-1].cumbits -
 	    rtree_levels[RTREE_HEIGHT-1].bits);
 	unsigned maskbits = ptrbits - cumbits;
-	vaddr_t mask = ~((ZU(1) << maskbits) - 1);
+	ptraddr_t mask = ~((ZU(1) << maskbits) - 1);
 	return (key & mask);
 }
 
 JEMALLOC_ALWAYS_INLINE size_t
-rtree_cache_direct_map(vaddr_t key) {
+rtree_cache_direct_map(uintptr_t key) {
 	unsigned ptrbits = ZU(1) << (LG_SIZEOF_PTR+3);
 	unsigned cumbits = (rtree_levels[RTREE_HEIGHT-1].cumbits -
 	    rtree_levels[RTREE_HEIGHT-1].bits);
@@ -173,13 +173,13 @@ rtree_cache_direct_map(vaddr_t key) {
 	return (size_t)((key >> maskbits) & (RTREE_CTX_NCACHE - 1));
 }
 
-JEMALLOC_ALWAYS_INLINE vaddr_t
-rtree_subkey(vaddr_t key, unsigned level) {
+JEMALLOC_ALWAYS_INLINE uintptr_t
+rtree_subkey(uintptr_t key, unsigned level) {
 	unsigned ptrbits = ZU(1) << (LG_SIZEOF_PTR+3);
 	unsigned cumbits = rtree_levels[level].cumbits;
 	unsigned shiftbits = ptrbits - cumbits;
 	unsigned maskbits = rtree_levels[level].bits;
-	vaddr_t mask = (ZU(1) << maskbits) - 1;
+	ptraddr_t mask = (ZU(1) << maskbits) - 1;
 	return ((key >> shiftbits) & mask);
 }
 
@@ -206,9 +206,9 @@ JEMALLOC_ALWAYS_INLINE extent_t *
 rtree_leaf_elm_bits_extent_get(uintptr_t bits) {
 #    ifdef __CHERI_PURE_CAPABILITY__
 	/* We use the offset to store the other bits -> set offset to zero */
-	assert((vaddr_t)cheri_getoffset((void*)bits) < (1 << 10) &&
+	assert(cheri_getoffset(bits) < (1 << 10) &&
 	    "Should store at most 9 bits in the offset field!");
-	return (extent_t *)cheri_setoffset((void*)bits, 0);
+	return (extent_t *)cheri_setoffset(bits, 0);
 #    elif defined(__aarch64__)
 	/*
 	 * aarch64 doesn't sign extend the highest virtual address bit to set
@@ -221,7 +221,7 @@ rtree_leaf_elm_bits_extent_get(uintptr_t bits) {
 	return (extent_t *)(bits & mask);
 #    else
 	/* Restore sign-extended high bits, mask slab bit. */
-	return (extent_t *)((uintptr_t)((uintptr_t)(bits << RTREE_NHIB) >>
+	return (extent_t *)((uintptr_t)((intptr_t)(bits << RTREE_NHIB) >>
 	    RTREE_NHIB) & ~((uintptr_t)0x1));
 #    endif
 }
@@ -230,7 +230,7 @@ JEMALLOC_ALWAYS_INLINE szind_t
 rtree_leaf_elm_bits_szind_get(uintptr_t bits) {
 #    ifdef __CHERI_PURE_CAPABILITY__
 	/* Lowest bit of offset is the boolean flag -> shift by one for szind */
-	vaddr_t szind_raw = (vaddr_t)cheri_getoffset((void*)bits) >> 1;
+	uintptr_t szind_raw = cheri_getoffset((void*)bits) >> 1;
 	assert((szind_raw >> 8) == 0 && "All offset bits above szind should be zero!");
 	return (szind_t)szind_raw;
 #    else
@@ -244,7 +244,7 @@ rtree_leaf_elm_bits_slab_get(uintptr_t bits) {
 	/* Lowest bit of offset is the boolean flag */
 	return (bool)(cheri_getoffset((void*)bits) & 0x1);
 #    else
-	return (bool)(bits & (vaddr_t)0x1);
+	return (bool)(bits & (uintptr_t)0x1);
 #    endif
 }
 
@@ -302,7 +302,7 @@ rtree_leaf_elm_extent_write(tsdn_t *tsdn, rtree_t *rtree,
 	    cheri_getoffset((void*)old_bits));
 #else
 	uintptr_t bits = ((uintptr_t)rtree_leaf_elm_bits_szind_get(old_bits) <<
-	    LG_VADDR) | ((uintptr_t)extent & (((vaddr_t)0x1 << LG_VADDR) - 1))
+	    LG_VADDR) | ((uintptr_t)extent & (((uintptr_t)0x1 << LG_VADDR) - 1))
 	    | ((uintptr_t)rtree_leaf_elm_bits_slab_get(old_bits));
 #endif
 	atomic_store_p(&elm->le_bits, (void *)bits, ATOMIC_RELEASE);
@@ -321,7 +321,7 @@ rtree_leaf_elm_szind_write(tsdn_t *tsdn, rtree_t *rtree,
 	    true);
 #ifdef __CHERI_PURE_CAPABILITY__
 	uintptr_t bits = (uintptr_t)cheri_setoffset((void*)old_bits,
-	    (vaddr_t)szind << 1 | (vaddr_t)rtree_leaf_elm_bits_slab_get(old_bits));
+	    (uintptr_t)szind << 1 | (uintptr_t)rtree_leaf_elm_bits_slab_get(old_bits));
 #else
 	uintptr_t bits = ((uintptr_t)szind << LG_VADDR) |
 	    ((uintptr_t)rtree_leaf_elm_bits_extent_get(old_bits) &
@@ -342,7 +342,7 @@ rtree_leaf_elm_slab_write(tsdn_t *tsdn, rtree_t *rtree,
 	    true);
 #ifdef __CHERI_PURE_CAPABILITY__
 	uintptr_t bits = (uintptr_t)cheri_setoffset((void*)old_bits,
-	    (vaddr_t)rtree_leaf_elm_bits_szind_get(old_bits) << 1 | (vaddr_t)slab);
+	    (uintptr_t)rtree_leaf_elm_bits_szind_get(old_bits) << 1 | (uintptr_t)slab);
 #else
 	uintptr_t bits = ((uintptr_t)rtree_leaf_elm_bits_szind_get(old_bits) <<
 	    LG_VADDR) | ((uintptr_t)rtree_leaf_elm_bits_extent_get(old_bits) &
@@ -361,7 +361,7 @@ rtree_leaf_elm_write(tsdn_t *tsdn, rtree_t *rtree,
 #ifdef __CHERI_PURE_CAPABILITY__
 	assert(cheri_getoffset(extent) == 0 && "Offset must be zero for packing");
 	uintptr_t bits = (uintptr_t)cheri_setoffset((void*)extent,
-	    szind << 1 | (vaddr_t)slab);
+	    szind << 1 | (uintptr_t)slab);
 #else
 	uintptr_t bits = ((uintptr_t)szind << LG_VADDR) |
 	    ((uintptr_t)extent & (((uintptr_t)0x1 << LG_VADDR) - 1)) |
@@ -412,19 +412,19 @@ rtree_leaf_elm_szind_slab_update(tsdn_t *tsdn, rtree_t *rtree,
 
 JEMALLOC_ALWAYS_INLINE rtree_leaf_elm_t *
 rtree_leaf_elm_lookup(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
-    vaddr_t key, bool dependent, bool init_missing) {
+    uintptr_t key, bool dependent, bool init_missing) {
 	assert(key != 0);
 	assert(!dependent || !init_missing);
 
 	size_t slot = rtree_cache_direct_map(key);
-	vaddr_t leafkey = rtree_leafkey(key);
+	uintptr_t leafkey = rtree_leafkey(key);
 	assert(leafkey != RTREE_LEAFKEY_INVALID);
 
 	/* Fast path: L1 direct mapped cache. */
 	if (likely(rtree_ctx->cache[slot].leafkey == leafkey)) {
 		rtree_leaf_elm_t *leaf = rtree_ctx->cache[slot].leaf;
 		assert(leaf != NULL);
-		vaddr_t subkey = rtree_subkey(key, RTREE_HEIGHT-1);
+		uintptr_t subkey = rtree_subkey(key, RTREE_HEIGHT-1);
 		return &leaf[subkey];
 	}
 	/*
@@ -455,7 +455,7 @@ rtree_leaf_elm_lookup(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
 		}							\
 		rtree_ctx->cache[slot].leafkey = leafkey;		\
 		rtree_ctx->cache[slot].leaf = leaf;			\
-		vaddr_t subkey = rtree_subkey(key, RTREE_HEIGHT-1);	\
+		uintptr_t subkey = rtree_subkey(key, RTREE_HEIGHT-1);	\
 		return &leaf[subkey];					\
 	}								\
 } while (0)
@@ -472,7 +472,7 @@ rtree_leaf_elm_lookup(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
 }
 
 static inline bool
-rtree_write(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx, vaddr_t key,
+rtree_write(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx, uintptr_t key,
     extent_t *extent, szind_t szind, bool slab) {
 	/* Use rtree_clear() to set the extent to NULL. */
 	assert(extent != NULL);
@@ -490,7 +490,7 @@ rtree_write(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx, vaddr_t key,
 }
 
 JEMALLOC_ALWAYS_INLINE rtree_leaf_elm_t *
-rtree_read(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx, vaddr_t key,
+rtree_read(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx, uintptr_t key,
     bool dependent) {
 	rtree_leaf_elm_t *elm = rtree_leaf_elm_lookup(tsdn, rtree, rtree_ctx,
 	    key, dependent, false);
@@ -503,7 +503,7 @@ rtree_read(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx, vaddr_t key,
 
 JEMALLOC_ALWAYS_INLINE extent_t *
 rtree_extent_read(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
-    vaddr_t key, bool dependent) {
+    uintptr_t key, bool dependent) {
 	rtree_leaf_elm_t *elm = rtree_read(tsdn, rtree, rtree_ctx, key,
 	    dependent);
 	if (!dependent && elm == NULL) {
@@ -514,7 +514,7 @@ rtree_extent_read(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
 
 JEMALLOC_ALWAYS_INLINE szind_t
 rtree_szind_read(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
-    vaddr_t key, bool dependent) {
+    uintptr_t key, bool dependent) {
 	rtree_leaf_elm_t *elm = rtree_read(tsdn, rtree, rtree_ctx, key,
 	    dependent);
 	if (!dependent && elm == NULL) {
@@ -530,7 +530,7 @@ rtree_szind_read(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
 
 JEMALLOC_ALWAYS_INLINE bool
 rtree_extent_szind_read(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
-    vaddr_t key, bool dependent, extent_t **r_extent, szind_t *r_szind) {
+    uintptr_t key, bool dependent, extent_t **r_extent, szind_t *r_szind) {
 	rtree_leaf_elm_t *elm = rtree_read(tsdn, rtree, rtree_ctx, key,
 	    dependent);
 	if (!dependent && elm == NULL) {
@@ -579,7 +579,7 @@ rtree_szind_slab_read_fast(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
 }
 JEMALLOC_ALWAYS_INLINE bool
 rtree_szind_slab_read(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
-    vaddr_t key, bool dependent, szind_t *r_szind, bool *r_slab) {
+    uintptr_t key, bool dependent, szind_t *r_szind, bool *r_slab) {
 	rtree_leaf_elm_t *elm = rtree_read(tsdn, rtree, rtree_ctx, key,
 	    dependent);
 	if (!dependent && elm == NULL) {
@@ -598,7 +598,7 @@ rtree_szind_slab_read(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
 
 static inline void
 rtree_szind_slab_update(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
-    vaddr_t key, szind_t szind, bool slab) {
+    uintptr_t key, szind_t szind, bool slab) {
 	assert(!slab || szind < SC_NBINS);
 
 	rtree_leaf_elm_t *elm = rtree_read(tsdn, rtree, rtree_ctx, key, true);
@@ -607,7 +607,7 @@ rtree_szind_slab_update(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
 
 static inline void
 rtree_clear(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
-    vaddr_t key) {
+    uintptr_t key) {
 	rtree_leaf_elm_t *elm = rtree_read(tsdn, rtree, rtree_ctx, key, true);
 	assert(rtree_leaf_elm_extent_read(tsdn, rtree, elm, false) !=
 	    NULL);

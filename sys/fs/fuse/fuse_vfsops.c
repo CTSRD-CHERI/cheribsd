@@ -152,7 +152,7 @@ fuse_getdevice(const char *fspec, struct thread *td, struct cdev **fdevp)
 	NDINIT(ndp, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(fspec));
 	if ((err = namei(ndp)) != 0)
 		return err;
-	NDFREE(ndp, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(ndp);
 	devvp = ndp->ni_vp;
 
 	if (devvp->v_type != VCHR) {
@@ -308,7 +308,8 @@ fuse_vfsop_mount(struct mount *mp)
 	struct fuse_data *data = NULL;
 	struct thread *td;
 	struct file *fp, *fptmp;
-	char *fspec, *subtype;
+	char *fspec, *subtype, *fsname = NULL;
+	int fsnamelen;
 	struct vfsoptlist *opts;
 
 	subtype = NULL;
@@ -440,7 +441,9 @@ fuse_vfsop_mount(struct mount *mp)
 		strlcat(mp->mnt_stat.f_fstypename, subtype, MFSNAMELEN);
 	}
 	memset(mp->mnt_stat.f_mntfromname, 0, MNAMELEN);
-	strlcpy(mp->mnt_stat.f_mntfromname, fspec, MNAMELEN);
+	vfs_getopt(opts, "fsname=", (void**)&fsname, &fsnamelen);
+	strlcpy(mp->mnt_stat.f_mntfromname,
+		fsname == NULL ? fspec : fsname, MNAMELEN);
 	mp->mnt_iosize_max = maxphys;
 
 	/* Now handshaking with daemon */

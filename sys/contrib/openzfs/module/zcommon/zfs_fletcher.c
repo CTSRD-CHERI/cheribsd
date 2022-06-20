@@ -126,8 +126,8 @@
  * which has been filled either by:
  *
  *	1. a compression step, which will be mostly cached, or
- *	2. a bcopy() or copyin(), which will be uncached (because the
- *	   copy is cache-bypassing).
+ *	2. a memcpy() or copyin(), which will be uncached
+ *	   (because the copy is cache-bypassing).
  *
  * For both cached and uncached data, both fletcher checksums are much faster
  * than sha-256, and slower than 'off', which doesn't touch the data at all.
@@ -300,18 +300,21 @@ fletcher_2_byteswap(const void *buf, uint64_t size,
 	(void) fletcher_2_incremental_byteswap((void *) buf, size, zcp);
 }
 
+ZFS_NO_SANITIZE_UNDEFINED
 static void
 fletcher_4_scalar_init(fletcher_4_ctx_t *ctx)
 {
 	ZIO_SET_CHECKSUM(&ctx->scalar, 0, 0, 0, 0);
 }
 
+ZFS_NO_SANITIZE_UNDEFINED
 static void
 fletcher_4_scalar_fini(fletcher_4_ctx_t *ctx, zio_cksum_t *zcp)
 {
 	memcpy(zcp, &ctx->scalar, sizeof (zio_cksum_t));
 }
 
+ZFS_NO_SANITIZE_UNDEFINED
 static void
 fletcher_4_scalar_native(fletcher_4_ctx_t *ctx, const void *buf,
     uint64_t size)
@@ -335,6 +338,7 @@ fletcher_4_scalar_native(fletcher_4_ctx_t *ctx, const void *buf,
 	ZIO_SET_CHECKSUM(&ctx->scalar, a, b, c, d);
 }
 
+ZFS_NO_SANITIZE_UNDEFINED
 static void
 fletcher_4_scalar_byteswap(fletcher_4_ctx_t *ctx, const void *buf,
     uint64_t size)
@@ -968,11 +972,9 @@ fletcher_4_param(ZFS_MODULE_PARAM_ARGS)
  * Users can choose "cycle" to exercise all implementations, but this is
  * for testing purpose therefore it can only be set in user space.
  */
-/* BEGIN CSTYLED */
 ZFS_MODULE_VIRTUAL_PARAM_CALL(zfs, zfs_, fletcher_4_impl,
-	fletcher_4_param_set, fletcher_4_param_get, ZMOD_RW,
+    fletcher_4_param_set, fletcher_4_param_get, ZMOD_RW,
 	"Select fletcher 4 implementation.");
-/* END CSTYLED */
 
 EXPORT_SYMBOL(fletcher_init);
 EXPORT_SYMBOL(fletcher_2_incremental_native);

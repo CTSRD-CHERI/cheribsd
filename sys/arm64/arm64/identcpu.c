@@ -226,6 +226,7 @@ static const struct cpu_parts cpu_parts_none[] = {
  * Implementers table.
  */
 const struct cpu_implementers cpu_implementers[] = {
+	{ CPU_IMPL_AMPERE,	"Ampere",	cpu_parts_none },
 	{ CPU_IMPL_APPLE,	"Apple",	cpu_parts_none },
 	{ CPU_IMPL_APM,		"APM",		cpu_parts_apm },
 	{ CPU_IMPL_ARM,		"ARM",		cpu_parts_arm },
@@ -233,6 +234,7 @@ const struct cpu_implementers cpu_implementers[] = {
 	{ CPU_IMPL_CAVIUM,	"Cavium",	cpu_parts_cavium },
 	{ CPU_IMPL_DEC,		"DEC",		cpu_parts_none },
 	{ CPU_IMPL_FREESCALE,	"Freescale",	cpu_parts_none },
+	{ CPU_IMPL_FUJITSU,	"Fujitsu",	cpu_parts_none },
 	{ CPU_IMPL_INFINEON,	"IFX",		cpu_parts_none },
 	{ CPU_IMPL_INTEL,	"Intel",	cpu_parts_none },
 	{ CPU_IMPL_MARVELL,	"Marvell",	cpu_parts_none },
@@ -713,6 +715,10 @@ static struct mrs_field_value id_aa64isar1_api[] = {
 	MRS_FIELD_VALUE(ID_AA64ISAR1_API_NONE, ""),
 	MRS_FIELD_VALUE(ID_AA64ISAR1_API_PAC, "API PAC"),
 	MRS_FIELD_VALUE(ID_AA64ISAR1_API_EPAC, "API EPAC"),
+	MRS_FIELD_VALUE(ID_AA64ISAR1_API_EPAC2, "Impl PAuth+EPAC2"),
+	MRS_FIELD_VALUE(ID_AA64ISAR1_API_FPAC, "Impl PAuth+FPAC"),
+	MRS_FIELD_VALUE(ID_AA64ISAR1_API_FPAC_COMBINED,
+	    "Impl PAuth+FPAC+Combined"),
 	MRS_FIELD_VALUE_END,
 };
 
@@ -725,6 +731,10 @@ static struct mrs_field_value id_aa64isar1_apa[] = {
 	MRS_FIELD_VALUE(ID_AA64ISAR1_APA_NONE, ""),
 	MRS_FIELD_VALUE(ID_AA64ISAR1_APA_PAC, "APA PAC"),
 	MRS_FIELD_VALUE(ID_AA64ISAR1_APA_EPAC, "APA EPAC"),
+	MRS_FIELD_VALUE(ID_AA64ISAR1_APA_EPAC2, "PAuth+EPAC2"),
+	MRS_FIELD_VALUE(ID_AA64ISAR1_APA_FPAC, "PAuth+FPAC"),
+	MRS_FIELD_VALUE(ID_AA64ISAR1_APA_FPAC_COMBINED,
+	    "PAuth+FPAC+Combined"),
 	MRS_FIELD_VALUE_END,
 };
 

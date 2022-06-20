@@ -1228,9 +1228,9 @@ dump_bpobj(objset_t *os, uint64_t object, void *data, size_t size)
 	char bytes[32], comp[32], uncomp[32];
 
 	/* make sure the output won't get truncated */
-	CTASSERT(sizeof (bytes) >= NN_NUMBUF_SZ);
-	CTASSERT(sizeof (comp) >= NN_NUMBUF_SZ);
-	CTASSERT(sizeof (uncomp) >= NN_NUMBUF_SZ);
+	_Static_assert(sizeof (bytes) >= NN_NUMBUF_SZ, "bytes truncated");
+	_Static_assert(sizeof (comp) >= NN_NUMBUF_SZ, "comp truncated");
+	_Static_assert(sizeof (uncomp) >= NN_NUMBUF_SZ, "uncomp truncated");
 
 	if (bpop == NULL)
 		return;
@@ -1655,7 +1655,7 @@ dump_metaslab_stats(metaslab_t *msp)
 	int free_pct = range_tree_space(rt) * 100 / msp->ms_size;
 
 	/* max sure nicenum has enough space */
-	CTASSERT(sizeof (maxbuf) >= NN_NUMBUF_SZ);
+	_Static_assert(sizeof (maxbuf) >= NN_NUMBUF_SZ, "maxbuf truncated");
 
 	zdb_nicenum(metaslab_largest_allocatable(msp), maxbuf, sizeof (maxbuf));
 
@@ -2035,11 +2035,8 @@ dump_ddt(ddt_t *ddt, enum ddt_type type, enum ddt_class class)
 static void
 dump_all_ddts(spa_t *spa)
 {
-	ddt_histogram_t ddh_total;
-	ddt_stat_t dds_total;
-
-	bzero(&ddh_total, sizeof (ddh_total));
-	bzero(&dds_total, sizeof (dds_total));
+	ddt_histogram_t ddh_total = {{{0}}};
+	ddt_stat_t dds_total = {0};
 
 	for (enum zio_checksum c = 0; c < ZIO_CHECKSUM_FUNCTIONS; c++) {
 		ddt_t *ddt = spa->spa_ddt[c];
@@ -2490,7 +2487,7 @@ dump_dsl_dir(objset_t *os, uint64_t object, void *data, size_t size)
 	char nice[32];
 
 	/* make sure nicenum has enough space */
-	CTASSERT(sizeof (nice) >= NN_NUMBUF_SZ);
+	_Static_assert(sizeof (nice) >= NN_NUMBUF_SZ, "nice truncated");
 
 	if (dd == NULL)
 		return;
@@ -2548,10 +2545,12 @@ dump_dsl_dataset(objset_t *os, uint64_t object, void *data, size_t size)
 	char blkbuf[BP_SPRINTF_LEN];
 
 	/* make sure nicenum has enough space */
-	CTASSERT(sizeof (used) >= NN_NUMBUF_SZ);
-	CTASSERT(sizeof (compressed) >= NN_NUMBUF_SZ);
-	CTASSERT(sizeof (uncompressed) >= NN_NUMBUF_SZ);
-	CTASSERT(sizeof (unique) >= NN_NUMBUF_SZ);
+	_Static_assert(sizeof (used) >= NN_NUMBUF_SZ, "used truncated");
+	_Static_assert(sizeof (compressed) >= NN_NUMBUF_SZ,
+	    "compressed truncated");
+	_Static_assert(sizeof (uncompressed) >= NN_NUMBUF_SZ,
+	    "uncompressed truncated");
+	_Static_assert(sizeof (unique) >= NN_NUMBUF_SZ, "unique truncated");
 
 	if (ds == NULL)
 		return;
@@ -2622,7 +2621,7 @@ dump_bptree(objset_t *os, uint64_t obj, const char *name)
 	dmu_buf_t *db;
 
 	/* make sure nicenum has enough space */
-	CTASSERT(sizeof (bytes) >= NN_NUMBUF_SZ);
+	_Static_assert(sizeof (bytes) >= NN_NUMBUF_SZ, "bytes truncated");
 
 	if (dump_opt['d'] < 3)
 		return;
@@ -2663,9 +2662,9 @@ dump_full_bpobj(bpobj_t *bpo, const char *name, int indent)
 	uint64_t i;
 
 	/* make sure nicenum has enough space */
-	CTASSERT(sizeof (bytes) >= NN_NUMBUF_SZ);
-	CTASSERT(sizeof (comp) >= NN_NUMBUF_SZ);
-	CTASSERT(sizeof (uncomp) >= NN_NUMBUF_SZ);
+	_Static_assert(sizeof (bytes) >= NN_NUMBUF_SZ, "bytes truncated");
+	_Static_assert(sizeof (comp) >= NN_NUMBUF_SZ, "comp truncated");
+	_Static_assert(sizeof (uncomp) >= NN_NUMBUF_SZ, "uncomp truncated");
 
 	if (dump_opt['d'] < 3)
 		return;
@@ -2941,10 +2940,10 @@ dump_blkptr_list(dsl_deadlist_t *dl, char *name)
 	}
 
 	/* make sure nicenum has enough space */
-	CTASSERT(sizeof (bytes) >= NN_NUMBUF_SZ);
-	CTASSERT(sizeof (comp) >= NN_NUMBUF_SZ);
-	CTASSERT(sizeof (uncomp) >= NN_NUMBUF_SZ);
-	CTASSERT(sizeof (entries) >= NN_NUMBUF_SZ);
+	_Static_assert(sizeof (bytes) >= NN_NUMBUF_SZ, "bytes truncated");
+	_Static_assert(sizeof (comp) >= NN_NUMBUF_SZ, "comp truncated");
+	_Static_assert(sizeof (uncomp) >= NN_NUMBUF_SZ, "uncomp truncated");
+	_Static_assert(sizeof (entries) >= NN_NUMBUF_SZ, "entries truncated");
 
 	if (dump_opt['d'] < 3)
 		return;
@@ -3428,11 +3427,12 @@ dump_object(objset_t *os, uint64_t object, int verbosity,
 	int error;
 
 	/* make sure nicenum has enough space */
-	CTASSERT(sizeof (iblk) >= NN_NUMBUF_SZ);
-	CTASSERT(sizeof (dblk) >= NN_NUMBUF_SZ);
-	CTASSERT(sizeof (lsize) >= NN_NUMBUF_SZ);
-	CTASSERT(sizeof (asize) >= NN_NUMBUF_SZ);
-	CTASSERT(sizeof (bonus_size) >= NN_NUMBUF_SZ);
+	_Static_assert(sizeof (iblk) >= NN_NUMBUF_SZ, "iblk truncated");
+	_Static_assert(sizeof (dblk) >= NN_NUMBUF_SZ, "dblk truncated");
+	_Static_assert(sizeof (lsize) >= NN_NUMBUF_SZ, "lsize truncated");
+	_Static_assert(sizeof (asize) >= NN_NUMBUF_SZ, "asize truncated");
+	_Static_assert(sizeof (bonus_size) >= NN_NUMBUF_SZ,
+	    "bonus_size truncated");
 
 	if (*print_header) {
 		(void) printf("\n%10s  %3s  %5s  %5s  %5s  %6s  %5s  %6s  %s\n",
@@ -3581,7 +3581,8 @@ dump_object(objset_t *os, uint64_t object, int verbosity,
 		for (;;) {
 			char segsize[32];
 			/* make sure nicenum has enough space */
-			CTASSERT(sizeof (segsize) >= NN_NUMBUF_SZ);
+			_Static_assert(sizeof (segsize) >= NN_NUMBUF_SZ,
+			    "segsize truncated");
 			error = dnode_next_offset(dn,
 			    0, &start, minlvl, blkfill, 0);
 			if (error)
@@ -3770,7 +3771,7 @@ dump_objset(objset_t *os)
 	uint64_t flags;
 
 	/* make sure nicenum has enough space */
-	CTASSERT(sizeof (numbuf) >= NN_NUMBUF_SZ);
+	_Static_assert(sizeof (numbuf) >= NN_NUMBUF_SZ, "numbuf truncated");
 
 	dsl_pool_config_enter(dmu_objset_pool(os), FTAG);
 	dmu_objset_fast_stat(os, &dds);
@@ -4356,7 +4357,7 @@ dump_l2arc_log_blocks(int fd, l2arc_dev_hdr_phys_t l2dhdr,
 
 	if (!dump_opt['q'])
 		print_l2arc_log_blocks();
-	bcopy((&l2dhdr)->dh_start_lbps, lbps, sizeof (lbps));
+	memcpy(lbps, l2dhdr.dh_start_lbps, sizeof (lbps));
 
 	dev.l2ad_evict = l2dhdr.dh_evict;
 	dev.l2ad_start = l2dhdr.dh_start;
@@ -4456,11 +4457,8 @@ dump_l2arc_log_blocks(int fd, l2arc_dev_hdr_phys_t l2dhdr,
 static int
 dump_l2arc_header(int fd)
 {
-	l2arc_dev_hdr_phys_t l2dhdr, rebuild;
+	l2arc_dev_hdr_phys_t l2dhdr = {0}, rebuild = {0};
 	int error = B_FALSE;
-
-	bzero(&l2dhdr, sizeof (l2dhdr));
-	bzero(&rebuild, sizeof (rebuild));
 
 	if (pread64(fd, &l2dhdr, sizeof (l2dhdr),
 	    VDEV_LABEL_START_SIZE) != sizeof (l2dhdr)) {
@@ -4651,7 +4649,7 @@ dump_path_impl(objset_t *os, uint64_t obj, char *name, uint64_t *retobj)
 	case DMU_OT_DIRECTORY_CONTENTS:
 		if (s != NULL && *(s + 1) != '\0')
 			return (dump_path_impl(os, child_obj, s + 1, retobj));
-		fallthrough;
+		zfs_fallthrough;
 	case DMU_OT_PLAIN_FILE_CONTENTS:
 		if (retobj != NULL) {
 			*retobj = child_obj;
@@ -4816,7 +4814,7 @@ static int
 dump_label(const char *dev)
 {
 	char path[MAXPATHLEN];
-	zdb_label_t labels[VDEV_LABELS];
+	zdb_label_t labels[VDEV_LABELS] = {{{{0}}}};
 	uint64_t psize, ashift, l2cache;
 	struct stat64 statbuf;
 	boolean_t config_found = B_FALSE;
@@ -4826,8 +4824,6 @@ dump_label(const char *dev)
 	avl_tree_t uberblock_tree;
 	void *node, *cookie;
 	int fd;
-
-	bzero(labels, sizeof (labels));
 
 	/*
 	 * Check if we were given absolute path and use it as is.
@@ -5542,7 +5538,7 @@ zdb_blkptr_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 		    (zcb->zcb_totalasize - bytes) / 1024 / kb_per_sec;
 
 		/* make sure nicenum has enough space */
-		CTASSERT(sizeof (buf) >= NN_NUMBUF_SZ);
+		_Static_assert(sizeof (buf) >= NN_NUMBUF_SZ, "buf truncated");
 
 		zfs_nicebytes(bytes, buf, sizeof (buf));
 		(void) fprintf(stderr,
@@ -5742,14 +5738,13 @@ zdb_load_obsolete_counts(vdev_t *vd)
 static void
 zdb_ddt_leak_init(spa_t *spa, zdb_cb_t *zcb)
 {
-	ddt_bookmark_t ddb;
+	ddt_bookmark_t ddb = {0};
 	ddt_entry_t dde;
 	int error;
 	int p;
 
 	ASSERT(!dump_opt['L']);
 
-	bzero(&ddb, sizeof (ddb));
 	while ((error = ddt_walk(spa, &ddb, &dde)) == 0) {
 		blkptr_t blk;
 		ddt_phys_t *ddp = dde.dde_phys;
@@ -6409,7 +6404,7 @@ deleted_livelists_dump_mos(spa_t *spa)
 static int
 dump_block_stats(spa_t *spa)
 {
-	zdb_cb_t zcb;
+	zdb_cb_t zcb = {{{{0}}}};
 	zdb_blkstats_t *zb, *tzb;
 	uint64_t norm_alloc, norm_space, total_alloc, total_found;
 	int flags = TRAVERSE_PRE | TRAVERSE_PREFETCH_METADATA |
@@ -6418,7 +6413,6 @@ dump_block_stats(spa_t *spa)
 	int e, c, err;
 	bp_embedded_type_t i;
 
-	bzero(&zcb, sizeof (zcb));
 	(void) printf("\nTraversing all blocks %s%s%s%s%s...\n\n",
 	    (dump_opt['c'] || !dump_opt['L']) ? "to verify " : "",
 	    (dump_opt['c'] == 1) ? "metadata " : "",
@@ -6438,7 +6432,6 @@ dump_block_stats(spa_t *spa)
 	 * pool claiming each block we discover, but we skip opening any space
 	 * maps.
 	 */
-	bzero(&zcb, sizeof (zdb_cb_t));
 	zdb_leak_init(spa, &zcb);
 
 	/*
@@ -6651,12 +6644,18 @@ dump_block_stats(spa_t *spa)
 			const char *typename;
 
 			/* make sure nicenum has enough space */
-			CTASSERT(sizeof (csize) >= NN_NUMBUF_SZ);
-			CTASSERT(sizeof (lsize) >= NN_NUMBUF_SZ);
-			CTASSERT(sizeof (psize) >= NN_NUMBUF_SZ);
-			CTASSERT(sizeof (asize) >= NN_NUMBUF_SZ);
-			CTASSERT(sizeof (avg) >= NN_NUMBUF_SZ);
-			CTASSERT(sizeof (gang) >= NN_NUMBUF_SZ);
+			_Static_assert(sizeof (csize) >= NN_NUMBUF_SZ,
+			    "csize truncated");
+			_Static_assert(sizeof (lsize) >= NN_NUMBUF_SZ,
+			    "lsize truncated");
+			_Static_assert(sizeof (psize) >= NN_NUMBUF_SZ,
+			    "psize truncated");
+			_Static_assert(sizeof (asize) >= NN_NUMBUF_SZ,
+			    "asize truncated");
+			_Static_assert(sizeof (avg) >= NN_NUMBUF_SZ,
+			    "avg truncated");
+			_Static_assert(sizeof (gang) >= NN_NUMBUF_SZ,
+			    "gang truncated");
 
 			if (t < DMU_OT_NUMTYPES)
 				typename = dmu_ot[t].ot_name;
@@ -6805,11 +6804,9 @@ dump_simulated_ddt(spa_t *spa)
 	avl_tree_t t;
 	void *cookie = NULL;
 	zdb_ddt_entry_t *zdde;
-	ddt_histogram_t ddh_total;
-	ddt_stat_t dds_total;
+	ddt_histogram_t ddh_total = {{{0}}};
+	ddt_stat_t dds_total = {0};
 
-	bzero(&ddh_total, sizeof (ddh_total));
-	bzero(&dds_total, sizeof (dds_total));
 	avl_create(&t, ddt_entry_compare,
 	    sizeof (zdb_ddt_entry_t), offsetof(zdb_ddt_entry_t, zdde_node));
 
@@ -7644,8 +7641,7 @@ dump_log_spacemap_obsolete_stats(spa_t *spa)
 	if (!spa_feature_is_active(spa, SPA_FEATURE_LOG_SPACEMAP))
 		return;
 
-	log_sm_obsolete_stats_arg_t lsos;
-	bzero(&lsos, sizeof (lsos));
+	log_sm_obsolete_stats_arg_t lsos = {0};
 
 	(void) printf("Log Space Map Obsolete Entry Statistics:\n");
 
@@ -8040,7 +8036,7 @@ zdb_decompress_block(abd_t *pabd, void *buf, void *lbuf, uint64_t lsize,
 			    lbuf, psize, lsize, NULL) == 0 &&
 			    zio_decompress_data(*cfuncp, pabd,
 			    lbuf2, psize, lsize, NULL) == 0 &&
-			    bcmp(lbuf, lbuf2, lsize) == 0)
+			    memcmp(lbuf, lbuf2, lsize) == 0)
 				break;
 		}
 		if (*cfuncp != 0)
@@ -8358,12 +8354,11 @@ done:
 static void
 zdb_embedded_block(char *thing)
 {
-	blkptr_t bp;
+	blkptr_t bp = {{{{0}}}};
 	unsigned long long *words = (void *)&bp;
 	char *buf;
 	int err;
 
-	bzero(&bp, sizeof (bp));
 	err = sscanf(thing, "%llx:%llx:%llx:%llx:%llx:%llx:%llx:%llx:"
 	    "%llx:%llx:%llx:%llx:%llx:%llx:%llx:%llx",
 	    words + 0, words + 1, words + 2, words + 3,
@@ -8556,7 +8551,7 @@ main(int argc, char **argv)
 			} else {
 				char **tmp = umem_alloc((nsearch + 1) *
 				    sizeof (char *), UMEM_NOFAIL);
-				bcopy(searchdirs, tmp, nsearch *
+				memcpy(tmp, searchdirs, nsearch *
 				    sizeof (char *));
 				umem_free(searchdirs,
 				    nsearch * sizeof (char *));
@@ -8644,7 +8639,7 @@ main(int argc, char **argv)
 			dump_opt[c] += verbose;
 	}
 
-	libspl_assert_ok = (dump_opt['A'] == 1) || (dump_opt['A'] > 2);
+	libspl_set_assert_ok((dump_opt['A'] == 1) || (dump_opt['A'] > 2));
 	zfs_recover = (dump_opt['A'] > 1);
 
 	argc -= optind;

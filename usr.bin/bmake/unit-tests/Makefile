@@ -2,9 +2,9 @@
 # See contrib/bmake/bsd.after-import.mk
 #
 # $FreeBSD$
-# $Id: Makefile,v 1.174 2022/02/09 02:42:59 sjg Exp $
+# $Id: Makefile,v 1.180 2022/04/18 21:25:37 sjg Exp $
 #
-# $NetBSD: Makefile,v 1.303 2022/02/07 22:43:50 rillig Exp $
+# $NetBSD: Makefile,v 1.312 2022/04/18 15:06:28 rillig Exp $
 #
 # Unit tests for make(1)
 #
@@ -146,9 +146,11 @@ TESTS+=		deptgt-order
 TESTS+=		deptgt-path
 TESTS+=		deptgt-path-suffix
 TESTS+=		deptgt-phony
+TESTS+=		deptgt-posix
 TESTS+=		deptgt-precious
 TESTS+=		deptgt-shell
 TESTS+=		deptgt-silent
+TESTS+=		deptgt-silent-jobs
 TESTS+=		deptgt-stale
 TESTS+=		deptgt-suffixes
 TESTS+=		dir
@@ -262,6 +264,7 @@ TESTS+=		opt-jobs
 TESTS+=		opt-jobs-internal
 TESTS+=		opt-jobs-no-action
 TESTS+=		opt-keep-going
+TESTS+=		opt-keep-going-indirect
 TESTS+=		opt-keep-going-multiple
 TESTS+=		opt-m-include-dir
 TESTS+=		opt-no-action
@@ -442,31 +445,26 @@ TESTS+=		varparse-mod
 TESTS+=		varparse-undef-partial
 TESTS+=		varquote
 
-# for now at least
-.if ${.SHELL:T} == "ksh"
+# some shells have quirks
+_shell := ${.SHELL:tA:T}
+.if ${_shell} == "dash" 
+# dash fails -x output
+BROKEN_TESTS+= opt-debug-x-trace
+.elif ${_shell} == "ksh"
 BROKEN_TESTS+= sh-flags
 .endif
+
 .if ${.MAKE.OS:NDarwin} == ""
 BROKEN_TESTS+= shell-ksh
 .endif
-.if ${.MAKE.OS} == "Linux" && ${.SHELL:tA:T} != "bash"
-.if exists(/etc/os-release)
-distro!= . /etc/os-release && echo $$NAME
-.endif
-# dash fails -x output
-# .SHELL is not bash so may be dash
-# if distro is Ubuntu or we cannot tell, assume the worst
-.if ${distro:U:NUbuntu} == ""
-BROKEN_TESTS+= opt-debug-x-trace
-.endif
-.endif
+
 .if ${.MAKE.OS} == "SCO_SV"
 BROKEN_TESTS+= \
 	opt-debug-graph[23] \
 	varmod-localtime \
 	varmod-to-separator \
 
-.if ${.SHELL:T} == "bash"
+.if ${_shell} == "bash"
 BROKEN_TESTS+= job-output-null
 .else
 BROKEN_TESTS+= \
@@ -505,6 +503,8 @@ TESTS:= ${TESTS:${BROKEN_TESTS:S,^,N,:ts:}}
 # Additional environment variables for some of the tests.
 # The base environment is -i PATH="$PATH".
 ENV.depsrc-optional+=   TZ=UTC
+ENV.deptgt-phony+=	MAKESYSPATH=.
+ENV.directive-undef=	ENV_VAR=env-value
 ENV.envfirst=		FROM_ENV=value-from-env
 ENV.varmisc=		FROM_ENV=env
 ENV.varmisc+=		FROM_ENV_BEFORE=env
@@ -523,9 +523,8 @@ FLAGS.jobs-error-nested-make=	# none, especially not -k
 FLAGS.varname-empty=		-dv '$${:U}=cmdline-u' '=cmdline-plain'
 
 # Some tests need extra postprocessing.
-SED_CMDS.dir=		${:D remove output from -DCLEANUP mode }
-SED_CMDS.dir+=		-e '/^OpenDirs_Done:/d'
-SED_CMDS.dir+=		-e '/^CachedDir /d'
+SED_CMDS.deptgt-phony=	${STD_SED_CMDS.dd}
+SED_CMDS.dir=		${STD_SED_CMDS.dd}
 SED_CMDS.export=	-e '/^[^=_A-Za-z0-9]*=/d'
 SED_CMDS.export-all=	${SED_CMDS.export}
 SED_CMDS.export-env=	${SED_CMDS.export}
@@ -595,6 +594,11 @@ unexport-env.rawout: export.mk
 # End of the configuration section.
 
 # Some standard sed commands, to be used in the SED_CMDS above.
+
+# In tests that use the debugging option -dd, ignore debugging output that is
+# only logged in -DCLEANUP mode.
+STD_SED_CMDS.dd=		-e '/^OpenDirs_Done:/d'
+STD_SED_CMDS.dd+=		-e '/^CachedDir /d'
 
 # Omit details such as process IDs from the output of the -dg1 option.
 STD_SED_CMDS.dg1=	-e '/\#.* \.$$/d'
@@ -716,7 +720,7 @@ TMPDIR:=	/tmp/uid${.MAKE.UID}
 .endif
 # make sure it exists
 .if !exist(${TMPDIR})
-x!= echo; mkdir -p ${TMPDIR}
+_!= mkdir -p ${TMPDIR}
 .endif
 
 MAKE_TEST_ENV=	MALLOC_OPTIONS="JA"	# for jemalloc 100
@@ -728,7 +732,7 @@ LIMIT_RESOURCES?=	ulimit -v 200000
 .endif
 LIMIT_RESOURCES?=	:
 
-# Each test is run in a sub-make, to keep the tests for interfering with
+# Each test is run in a sub-make, to keep the tests from interfering with
 # each other, and because they use different environment variables and
 # command line options.
 .SUFFIXES: .mk .rawout .out
@@ -751,14 +755,13 @@ LIMIT_RESOURCES?=	:
 # always pretend .MAKE was called 'make'
 _SED_CMDS+=	-e 's,^${TEST_MAKE:T:S,.,\\.,g}[][0-9]*:,make:,'
 _SED_CMDS+=	-e 's,${TEST_MAKE:S,.,\\.,g},make,'
-_SED_CMDS+=	-e 's,${TEST_MAKE:T:S,.,\\.,g}[][0-9]* warning,make warning,'
 _SED_CMDS+=	-e 's,^usage: ${TEST_MAKE:T:S,.,\\.,g} ,usage: make ,'
 # replace anything after 'stopped in' with unit-tests
 _SED_CMDS+=	-e '/stopped/s, /.*, unit-tests,'
 # Allow the test files to be placed anywhere.
 _SED_CMDS+=	-e 's,\(\.PARSEDIR}\) = `'"/[^']*'"',\1 = <some-dir>,'
 _SED_CMDS+=	-e 's,\(\.INCLUDEDFROMDIR}\) = `'"/[^']*'"',\1 = <some-dir>,'
-_SED_CMDS+=	-e 's,${TMPDIR},TMPDIR,g'
+_SED_CMDS+=	-e 's,${TMPDIR},<tmpdir>,g'
 # canonicalize ${.OBJDIR} and ${.CURDIR}
 .if ${.OBJDIR} != ${.CURDIR}
 # yes this is inaccurate but none of the tests expect <objdir> anywhere

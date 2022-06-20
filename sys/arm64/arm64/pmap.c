@@ -297,8 +297,7 @@ void *dmap_base_cap;		/* Capability for the direct map region */
 CTASSERT((DMAP_MIN_ADDRESS  & ~L0_OFFSET) == DMAP_MIN_ADDRESS);
 CTASSERT((DMAP_MAX_ADDRESS  & ~L0_OFFSET) == DMAP_MAX_ADDRESS);
 
-#define	DMAP_TABLES	((DMAP_MAX_ADDRESS - DMAP_MIN_ADDRESS) >> L0_SHIFT)
-extern pt_entry_t pagetable_dmap[];
+extern pt_entry_t pagetable_l0_ttbr1[];
 
 #define	PHYSMAP_SIZE	(2 * (VM_PHYSSEG_MAX - 1))
 static vm_paddr_t physmap[PHYSMAP_SIZE];
@@ -366,6 +365,11 @@ void (*pmap_invalidate_vpipt_icache)(void);
 					    ((u_long)(epoch) << 32)))
 #define	COOKIE_TO_ASID(cookie)		((int)(cookie))
 #define	COOKIE_TO_EPOCH(cookie)		((int)((u_long)(cookie) >> 32))
+
+#define	TLBI_VA_SHIFT			12
+#define	TLBI_VA_MASK			((1ul << 44) - 1)
+#define	TLBI_VA(addr)			(((addr) >> TLBI_VA_SHIFT) & TLBI_VA_MASK)
+#define	TLBI_VA_L3_INCR			(L3_SIZE >> TLBI_VA_SHIFT)
 
 static int superpages_enabled = 1;
 SYSCTL_INT(_vm_pmap, OID_AUTO, superpages_enabled,
@@ -829,7 +833,7 @@ pmap_resident_count_dec(pmap_t pmap, int count)
 }
 
 static vm_paddr_t
-pmap_early_vtophys(vm_pointer_t l1pt, vm_offset_t va)
+pmap_early_vtophys(vm_offset_t va)
 {
 	vm_paddr_t pa_page;
 
@@ -837,117 +841,251 @@ pmap_early_vtophys(vm_pointer_t l1pt, vm_offset_t va)
 	return (pa_page | (va & PAR_LOW_MASK));
 }
 
+/* State of the bootstrapped DMAP page tables */
+struct dmap_bootstrap_state {
+	vm_offset_t	va;
+	vm_paddr_t	pa;
+	pt_entry_t	*l1;
+	pt_entry_t	*l2;
+	pt_entry_t	*l3;
+	u_int		l0_slot;
+	u_int		l1_slot;
+	u_int		l2_slot;
+	vm_pointer_t	freemempos;
+};
+
+static void
+pmap_bootstrap_dmap_l0_table(struct dmap_bootstrap_state *state)
+{
+	vm_paddr_t l1_pa;
+	u_int l0_slot;
+
+	/* Link the level 0 table to a level 1 table */
+	l0_slot = pmap_l0_index(state->va);
+	if (l0_slot != state->l0_slot) {
+		MPASS(state->l0_slot < l0_slot ||
+		    state->l0_slot == L0_ENTRIES);
+
+		/* Create a new L0 table entry */
+		state->l0_slot = l0_slot;
+		state->l1 = (pt_entry_t *)state->freemempos;
+		memset(state->l1, 0, PAGE_SIZE);
+		state->freemempos += PAGE_SIZE;
+
+		/* Reset lower levels */
+		state->l2 = NULL;
+		state->l3 = NULL;
+		state->l1_slot = Ln_ENTRIES;
+		state->l2_slot = Ln_ENTRIES;
+
+		l1_pa = pmap_early_vtophys((vm_offset_t)state->l1);
+		MPASS((l1_pa & Ln_TABLE_MASK) == 0);
+		MPASS(pagetable_l0_ttbr1[l0_slot] == 0);
+		pmap_store(&pagetable_l0_ttbr1[l0_slot], l1_pa |
+		    TATTR_UXN_TABLE | TATTR_AP_TABLE_NO_EL0 | L0_TABLE);
+	}
+	KASSERT(state->l1 != NULL, ("%s: NULL l1", __func__));
+}
+
+static void
+pmap_bootstrap_dmap_l1_table(struct dmap_bootstrap_state *state)
+{
+	vm_paddr_t l2_pa;
+	u_int l1_slot;
+
+	/* Make sure there is a valid L0 -> L1 table */
+	pmap_bootstrap_dmap_l0_table(state);
+
+	/* Link the level 1 table to a level 2 table */
+	l1_slot = pmap_l1_index(state->va);
+	if (l1_slot != state->l1_slot) {
+		MPASS(state->l1_slot < l1_slot ||
+		    state->l1_slot == Ln_ENTRIES);
+
+		/* Create a new L1 table entry */
+		state->l1_slot = l1_slot;
+		state->l2 = (pt_entry_t *)state->freemempos;
+		memset(state->l2, 0, PAGE_SIZE);
+		state->freemempos += PAGE_SIZE;
+
+		/* Reset lower levels */
+		state->l3 = NULL;
+		state->l2_slot = Ln_ENTRIES;
+
+		l2_pa = pmap_early_vtophys((vm_offset_t)state->l2);
+		MPASS((l2_pa & Ln_TABLE_MASK) == 0);
+		MPASS(state->l1[l1_slot] == 0);
+		pmap_store(&state->l1[l1_slot], l2_pa | TATTR_PXN_TABLE |
+		    L1_TABLE);
+	}
+	KASSERT(state->l2 != NULL, ("%s: NULL l2", __func__));
+}
+
+static void
+pmap_bootstrap_dmap_l2_table(struct dmap_bootstrap_state *state)
+{
+	vm_paddr_t l3_pa;
+	u_int l2_slot;
+
+	/* Make sure there is a valid L1 -> L2 table */
+	pmap_bootstrap_dmap_l1_table(state);
+
+	/* Link the level 2 table to a level 3 table */
+	l2_slot = pmap_l2_index(state->va);
+	if (l2_slot != state->l2_slot) {
+		MPASS(state->l2_slot < l2_slot ||
+		    state->l2_slot == Ln_ENTRIES);
+
+		/* Create a new L2 table entry */
+		state->l2_slot = l2_slot;
+		state->l3 = (pt_entry_t *)state->freemempos;
+		memset(state->l3, 0, PAGE_SIZE);
+		state->freemempos += PAGE_SIZE;
+
+		l3_pa = pmap_early_vtophys((vm_offset_t)state->l3);
+		MPASS((l3_pa & Ln_TABLE_MASK) == 0);
+		MPASS(state->l2[l2_slot] == 0);
+		pmap_store(&state->l2[l2_slot], l3_pa | TATTR_PXN_TABLE |
+		    L2_TABLE);
+	}
+	KASSERT(state->l3 != NULL, ("%s: NULL l3", __func__));
+}
+
+static void
+pmap_bootstrap_dmap_l2_block(struct dmap_bootstrap_state *state, int i)
+{
+	u_int l2_slot;
+	bool first;
+
+	if ((physmap[i + 1] - state->pa) < L2_SIZE)
+		return;
+
+	/* Make sure there is a valid L1 table */
+	pmap_bootstrap_dmap_l1_table(state);
+
+	MPASS((state->va & L2_OFFSET) == 0);
+	for (first = true;
+	    state->va < DMAP_MAX_ADDRESS &&
+	    (physmap[i + 1] - state->pa) >= L2_SIZE;
+	    state->va += L2_SIZE, state->pa += L2_SIZE) {
+		/*
+		 * Stop if we are about to walk off the end of what the
+		 * current L1 slot can address.
+		 */
+		if (!first && (state->pa & L1_OFFSET) == 0)
+			break;
+
+		first = false;
+		l2_slot = pmap_l2_index(state->va);
+		MPASS((state->pa & L2_OFFSET) == 0);
+		MPASS(state->l2[l2_slot] == 0);
+		pmap_store(&state->l2[l2_slot], state->pa | ATTR_DEFAULT |
+#if __has_feature(capabilities)
+		    ATTR_CAP_RW |
+#endif
+		    ATTR_S1_XN | ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) |
+		    L2_BLOCK);
+	}
+	MPASS(state->va == (state->pa - dmap_phys_base + DMAP_MIN_ADDRESS));
+}
+
+static void
+pmap_bootstrap_dmap_l3_page(struct dmap_bootstrap_state *state, int i)
+{
+	u_int l3_slot;
+	bool first;
+
+	if ((physmap[i + 1] - state->pa) < L3_SIZE)
+		return;
+
+	/* Make sure there is a valid L2 table */
+	pmap_bootstrap_dmap_l2_table(state);
+
+	MPASS((state->va & L3_OFFSET) == 0);
+	for (first = true;
+	    state->va < DMAP_MAX_ADDRESS &&
+	    (physmap[i + 1] - state->pa) >= L3_SIZE;
+	    state->va += L3_SIZE, state->pa += L3_SIZE) {
+		/*
+		 * Stop if we are about to walk off the end of what the
+		 * current L2 slot can address.
+		 */
+		if (!first && (state->pa & L2_OFFSET) == 0)
+			break;
+
+		first = false;
+		l3_slot = pmap_l3_index(state->va);
+		MPASS((state->pa & L3_OFFSET) == 0);
+		MPASS(state->l3[l3_slot] == 0);
+		pmap_store(&state->l3[l3_slot], state->pa | ATTR_DEFAULT |
+#if __has_feature(capabilities)
+		    ATTR_CAP_RW |
+#endif
+		    ATTR_S1_XN | ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) |
+		    L3_PAGE);
+	}
+	MPASS(state->va == (state->pa - dmap_phys_base + DMAP_MIN_ADDRESS));
+}
+
 static vm_pointer_t
 pmap_bootstrap_dmap(vm_pointer_t kern_l1, vm_paddr_t min_pa,
     vm_pointer_t freemempos)
 {
-	pt_entry_t *l2;
-	vm_offset_t va;
-	vm_paddr_t l2_pa, pa;
-	u_int l1_slot, l2_slot, prev_l1_slot;
+	struct dmap_bootstrap_state state;
 	int i;
 
 	dmap_phys_base = min_pa & ~L1_OFFSET;
 	dmap_phys_max = 0;
 	dmap_max_addr = 0;
-	l2 = NULL;
-	prev_l1_slot = -1;
 
-#define	DMAP_TABLES	((DMAP_MAX_ADDRESS - DMAP_MIN_ADDRESS) >> L0_SHIFT)
-	memset(pagetable_dmap, 0, PAGE_SIZE * DMAP_TABLES);
+	state.l1 = state.l2 = state.l3 = NULL;
+	state.l0_slot = L0_ENTRIES;
+	state.l1_slot = Ln_ENTRIES;
+	state.l2_slot = Ln_ENTRIES;
+	state.freemempos = freemempos;
 
 	for (i = 0; i < (physmap_idx * 2); i += 2) {
-		pa = physmap[i] & ~L2_OFFSET;
-		va = pa - dmap_phys_base + DMAP_MIN_ADDRESS;
+		state.pa = physmap[i] & ~L3_OFFSET;
+		state.va = state.pa - dmap_phys_base + DMAP_MIN_ADDRESS;
+
+		/* Create L3 mappings at the start of the region */
+		if ((state.pa & L2_OFFSET) != 0)
+			pmap_bootstrap_dmap_l3_page(&state, i);
+		MPASS(state.pa <= physmap[i + 1]);
 
 		/* Create L2 mappings at the start of the region */
-		if ((pa & L1_OFFSET) != 0) {
-			l1_slot = ((va - DMAP_MIN_ADDRESS) >> L1_SHIFT);
-			if (l1_slot != prev_l1_slot) {
-				prev_l1_slot = l1_slot;
-				l2 = (pt_entry_t *)freemempos;
-				l2_pa = pmap_early_vtophys(kern_l1,
-				    (vm_offset_t)l2);
-				freemempos += PAGE_SIZE;
+		if ((state.pa & L1_OFFSET) != 0)
+			pmap_bootstrap_dmap_l2_block(&state, i);
+		MPASS(state.pa <= physmap[i + 1]);
 
-				pmap_store(&pagetable_dmap[l1_slot],
-				    (l2_pa & ~Ln_TABLE_MASK) |
-				    TATTR_PXN_TABLE | L1_TABLE);
-
-				memset(l2, 0, PAGE_SIZE);
-			}
-			KASSERT(l2 != NULL,
-			    ("pmap_bootstrap_dmap: NULL l2 map"));
-			for (; va < DMAP_MAX_ADDRESS && pa < physmap[i + 1];
-			    pa += L2_SIZE, va += L2_SIZE) {
-				/*
-				 * We are on a boundary, stop to
-				 * create a level 1 block
-				 */
-				if ((pa & L1_OFFSET) == 0)
-					break;
-
-				l2_slot = pmap_l2_index(va);
-				KASSERT(l2_slot != 0, ("..."));
-				pmap_store(&l2[l2_slot],
-				    (pa & ~L2_OFFSET) | ATTR_DEFAULT |
-#if __has_feature(capabilities)
-				    ATTR_CAP_RW |
-#endif
-				    ATTR_S1_XN |
-				    ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) |
-				    L2_BLOCK);
-			}
-			KASSERT(va == (pa - dmap_phys_base + DMAP_MIN_ADDRESS),
-			    ("..."));
-		}
-
-		for (; va < DMAP_MAX_ADDRESS && pa < physmap[i + 1] &&
-		    (physmap[i + 1] - pa) >= L1_SIZE;
-		    pa += L1_SIZE, va += L1_SIZE) {
-			l1_slot = ((va - DMAP_MIN_ADDRESS) >> L1_SHIFT);
-			pmap_store(&pagetable_dmap[l1_slot],
-			    (pa & ~L1_OFFSET) | ATTR_DEFAULT | ATTR_S1_XN |
+		/* Create the main L1 block mappings */
+		for (; state.va < DMAP_MAX_ADDRESS &&
+		    (physmap[i + 1] - state.pa) >= L1_SIZE;
+		    state.va += L1_SIZE, state.pa += L1_SIZE) {
+			/* Make sure there is a valid L1 table */
+			pmap_bootstrap_dmap_l0_table(&state);
+			MPASS((state.pa & L1_OFFSET) == 0);
+			pmap_store(&state.l1[pmap_l1_index(state.va)],
+			    state.pa | ATTR_DEFAULT | ATTR_S1_XN |
 #if __has_feature(capabilities)
 			    ATTR_CAP_RW |
 #endif
-			    ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) | L1_BLOCK);
+			    ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) |
+			    L1_BLOCK);
 		}
+		MPASS(state.pa <= physmap[i + 1]);
 
 		/* Create L2 mappings at the end of the region */
-		if (pa < physmap[i + 1]) {
-			l1_slot = ((va - DMAP_MIN_ADDRESS) >> L1_SHIFT);
-			if (l1_slot != prev_l1_slot) {
-				prev_l1_slot = l1_slot;
-				l2 = (pt_entry_t *)freemempos;
-				l2_pa = pmap_early_vtophys(kern_l1,
-				    (vm_offset_t)l2);
-				freemempos += PAGE_SIZE;
+		pmap_bootstrap_dmap_l2_block(&state, i);
+		MPASS(state.pa <= physmap[i + 1]);
 
-				pmap_store(&pagetable_dmap[l1_slot],
-				    (l2_pa & ~Ln_TABLE_MASK) | L1_TABLE);
+		/* Create L3 mappings at the end of the region */
+		pmap_bootstrap_dmap_l3_page(&state, i);
+		MPASS(state.pa == physmap[i + 1]);
 
-				memset(l2, 0, PAGE_SIZE);
-			}
-			KASSERT(l2 != NULL,
-			    ("pmap_bootstrap_dmap: NULL l2 map"));
-			for (; va < DMAP_MAX_ADDRESS && pa < physmap[i + 1];
-			    pa += L2_SIZE, va += L2_SIZE) {
-				l2_slot = pmap_l2_index(va);
-				pmap_store(&l2[l2_slot],
-				    (pa & ~L2_OFFSET) | ATTR_DEFAULT |
-#if __has_feature(capabilities)
-				    ATTR_CAP_RW |
-#endif
-				    ATTR_S1_XN |
-				    ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) |
-				    L2_BLOCK);
-			}
-		}
-
-		if (pa > dmap_phys_max) {
-			dmap_phys_max = pa;
-			dmap_max_addr = va;
+		if (state.pa > dmap_phys_max) {
+			dmap_phys_max = state.pa;
+			dmap_max_addr = state.va;
 		}
 	}
 
@@ -961,7 +1099,7 @@ pmap_bootstrap_dmap(vm_pointer_t kern_l1, vm_paddr_t min_pa,
 
 	cpu_tlb_flushID();
 
-	return (freemempos);
+	return (state.freemempos);
 }
 
 static vm_pointer_t
@@ -981,7 +1119,7 @@ pmap_bootstrap_l2(vm_pointer_t l1pt, vm_offset_t va, vm_pointer_t l2_start)
 	for (; va < VM_MAX_KERNEL_ADDRESS; l1_slot++, va += L1_SIZE) {
 		KASSERT(l1_slot < Ln_ENTRIES, ("Invalid L1 index"));
 
-		pa = pmap_early_vtophys(l1pt, l2pt);
+		pa = pmap_early_vtophys(l2pt);
 		pmap_store(&l1[l1_slot],
 		    (pa & ~Ln_TABLE_MASK) | L1_TABLE);
 		l2pt += PAGE_SIZE;
@@ -1011,7 +1149,7 @@ pmap_bootstrap_l3(vm_pointer_t l1pt, vm_offset_t va, vm_pointer_t l3_start)
 	for (; va < VM_MAX_KERNEL_ADDRESS; l2_slot++, va += L2_SIZE) {
 		KASSERT(l2_slot < Ln_ENTRIES, ("Invalid L2 index"));
 
-		pa = pmap_early_vtophys(l1pt, l3pt);
+		pa = pmap_early_vtophys(l3pt);
 		pmap_store(&l2[l2_slot],
 		    (pa & ~Ln_TABLE_MASK) | ATTR_S1_UXN | L2_TABLE);
 		l3pt += PAGE_SIZE;
@@ -1129,7 +1267,7 @@ pmap_bootstrap(vm_pointer_t l0pt, vm_pointer_t l1pt, vm_paddr_t kernstart,
 	    VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE);
 	kernel_vm_end = virtual_avail;
 
-	pa = pmap_early_vtophys(l1pt, freemempos);
+	pa = pmap_early_vtophys(freemempos);
 
 	physmem_exclude_region(start_pa, pa - start_pa, EXFLAG_NOALLOC);
 
@@ -1330,11 +1468,11 @@ pmap_invalidate_page(pmap_t pmap, vm_offset_t va, bool final_only)
 	PMAP_ASSERT_STAGE1(pmap);
 
 	dsb(ishst);
+	r = TLBI_VA(va);
 	if (pmap == kernel_pmap) {
-		r = atop(va);
 		pmap_invalidate_kernel(r, final_only);
 	} else {
-		r = ASID_TO_OPERAND(COOKIE_TO_ASID(pmap->pm_cookie)) | atop(va);
+		r |= ASID_TO_OPERAND(COOKIE_TO_ASID(pmap->pm_cookie));
 		pmap_invalidate_user(r, final_only);
 	}
 	dsb(ish);
@@ -1355,15 +1493,15 @@ pmap_invalidate_range(pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 
 	dsb(ishst);
 	if (pmap == kernel_pmap) {
-		start = atop(sva);
-		end = atop(eva);
-		for (r = start; r < end; r++)
+		start = TLBI_VA(sva);
+		end = TLBI_VA(eva);
+		for (r = start; r < end; r += TLBI_VA_L3_INCR)
 			pmap_invalidate_kernel(r, final_only);
 	} else {
 		start = end = ASID_TO_OPERAND(COOKIE_TO_ASID(pmap->pm_cookie));
-		start |= atop(sva);
-		end |= atop(eva);
-		for (r = start; r < end; r++)
+		start |= TLBI_VA(sva);
+		end |= TLBI_VA(eva);
+		for (r = start; r < end; r += TLBI_VA_L3_INCR)
 			pmap_invalidate_user(r, final_only);
 	}
 	dsb(ish);
@@ -1464,7 +1602,6 @@ pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 
 		KASSERT(lvl > 0 && lvl <= 3,
 		    ("pmap_extract_and_hold: Invalid level %d", lvl));
-		CTASSERT(L1_BLOCK == L2_BLOCK);
 		KASSERT((lvl == 3 && (tpte & ATTR_DESCR_MASK) == L3_PAGE) ||
 		    (lvl < 3 && (tpte & ATTR_DESCR_MASK) == L1_BLOCK),
 		    ("pmap_extract_and_hold: Invalid pte at L%d: %lx", lvl,
@@ -2035,7 +2172,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
 		pd_entry_t tl0;
 
 		l1index = ptepindex - NUL2E;
-		l0index = l1index >> L0_ENTRIES_SHIFT;
+		l0index = l1index >> Ln_ENTRIES_SHIFT;
 
 		l0 = &pmap->pm_l0[l0index];
 		tl0 = pmap_load(l0);
@@ -2063,7 +2200,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex, struct rwlock **lockp)
 		pd_entry_t tl0, tl1;
 
 		l1index = ptepindex >> Ln_ENTRIES_SHIFT;
-		l0index = l1index >> L0_ENTRIES_SHIFT;
+		l0index = l1index >> Ln_ENTRIES_SHIFT;
 
 		l0 = &pmap->pm_l0[l0index];
 		tl0 = pmap_load(l0);

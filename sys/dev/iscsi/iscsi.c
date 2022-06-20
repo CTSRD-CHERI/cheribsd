@@ -33,6 +33,7 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
+#include <sys/bio.h>
 #include <sys/condvar.h>
 #include <sys/conf.h>
 #include <sys/endian.h>
@@ -75,6 +76,20 @@ __FBSDID("$FreeBSD$");
 
 #ifdef ICL_KERNEL_PROXY
 FEATURE(iscsi_kernel_proxy, "iSCSI initiator built with ICL_KERNEL_PROXY");
+#endif
+
+#ifdef COMPAT_FREEBSD13
+struct iscsi_daemon_request13 {
+	unsigned int			idr_session_id;
+	struct iscsi_session_conf	idr_conf;
+	uint8_t				idr_isid[6];
+	uint16_t			idr_tsih;
+	uint16_t			idr_spare_cid;
+	struct iscsi_session_limits	idr_limits;
+	int				idr_spare[4];
+};
+
+#define	ISCSIDWAIT13	_IOR('I', 0x01, struct iscsi_daemon_request13)
 #endif
 
 /*
@@ -1086,6 +1101,24 @@ iscsi_pdu_handle_task_response(struct icl_pdu *response)
 }
 
 static void
+iscsi_pdu_get_data_csio(struct icl_pdu *response, size_t pdu_offset,
+    struct ccb_scsiio *csio, size_t oreceived, size_t data_segment_len)
+{
+	switch (csio->ccb_h.flags & CAM_DATA_MASK) {
+	case CAM_DATA_BIO:
+		icl_pdu_get_bio(response, pdu_offset,
+		    (struct bio *)csio->data_ptr, oreceived, data_segment_len);
+		break;
+	case CAM_DATA_VADDR:
+		icl_pdu_get_data(response, pdu_offset,
+		    csio->data_ptr + oreceived, data_segment_len);
+		break;
+	default:
+		__assert_unreachable();
+	}
+}
+
+static void
 iscsi_pdu_handle_data_in(struct icl_pdu *response)
 {
 	struct iscsi_bhs_data_in *bhsdi;
@@ -1163,7 +1196,7 @@ iscsi_pdu_handle_data_in(struct icl_pdu *response)
 		iscsi_outstanding_remove(is, io);
 	ISCSI_SESSION_UNLOCK(is);
 
-	icl_pdu_get_data(response, 0, csio->data_ptr + oreceived, data_segment_len);
+	iscsi_pdu_get_data_csio(response, 0, csio, oreceived, data_segment_len);
 
 	/*
 	 * XXX: Check F.
@@ -1214,6 +1247,22 @@ iscsi_pdu_handle_logout_response(struct icl_pdu *response)
 	icl_pdu_free(response);
 }
 
+static int
+iscsi_pdu_append_data_csio(struct icl_pdu *request, struct ccb_scsiio *csio,
+    size_t off, size_t len, int how)
+{
+	switch (csio->ccb_h.flags & CAM_DATA_MASK) {
+	case CAM_DATA_BIO:
+		return (icl_pdu_append_bio(request,
+			(struct bio *)csio->data_ptr, off, len, how));
+	case CAM_DATA_VADDR:
+		return (icl_pdu_append_data(request, csio->data_ptr + off, len,
+		    how));
+	default:
+		__assert_unreachable();
+	}
+}
+
 static void
 iscsi_pdu_handle_r2t(struct icl_pdu *response)
 {
@@ -1255,7 +1304,7 @@ iscsi_pdu_handle_r2t(struct icl_pdu *response)
 	off = ntohl(bhsr2t->bhsr2t_buffer_offset);
 	if (off > csio->dxfer_len) {
 		ISCSI_SESSION_WARN(is, "target requested invalid offset "
-		    "%zd, buffer is is %d; reconnecting", off, csio->dxfer_len);
+		    "%zd, buffer is %d; reconnecting", off, csio->dxfer_len);
 		icl_pdu_free(response);
 		iscsi_session_reconnect(is);
 		return;
@@ -1308,8 +1357,8 @@ iscsi_pdu_handle_r2t(struct icl_pdu *response)
 		    bhsr2t->bhsr2t_target_transfer_tag;
 		bhsdo->bhsdo_datasn = htonl(datasn);
 		bhsdo->bhsdo_buffer_offset = htonl(off);
-		error = icl_pdu_append_data(request, csio->data_ptr + off, len,
-		    M_NOWAIT);
+		error = iscsi_pdu_append_data_csio(request, csio, off, len,
+		    M_NOWAIT | ICL_NOCOPY);
 		if (error != 0) {
 			ISCSI_SESSION_WARN(is, "failed to allocate memory; "
 			    "reconnecting");
@@ -1388,10 +1437,9 @@ iscsi_pdu_handle_reject(struct icl_pdu *response)
 
 static int
 iscsi_ioctl_daemon_wait(struct iscsi_softc *sc,
-    struct iscsi_daemon_request *request)
+    struct iscsi_daemon_request *request, bool freebsd13)
 {
 	struct iscsi_session *is;
-	struct icl_drv_limits idl;
 	int error;
 
 	sx_slock(&sc->sc_lock);
@@ -1437,27 +1485,76 @@ iscsi_ioctl_daemon_wait(struct iscsi_softc *sc,
 		memcpy(&request->idr_conf, &is->is_conf,
 		    sizeof(request->idr_conf));
 
-		error = icl_limits(is->is_conf.isc_offload,
-		    is->is_conf.isc_iser, &idl);
-		if (error != 0) {
-			ISCSI_SESSION_WARN(is, "icl_limits for offload \"%s\" "
-			    "failed with error %d", is->is_conf.isc_offload,
-			    error);
-			sx_sunlock(&sc->sc_lock);
-			return (error);
-		}
-		request->idr_limits.isl_max_recv_data_segment_length =
-		    idl.idl_max_recv_data_segment_length;
-		request->idr_limits.isl_max_send_data_segment_length =
-		    idl.idl_max_send_data_segment_length;
-		request->idr_limits.isl_max_burst_length =
-		    idl.idl_max_burst_length;
-		request->idr_limits.isl_first_burst_length =
-		    idl.idl_first_burst_length;
+#ifdef COMPAT_FREEBSD13
+		if (freebsd13) {
+			struct icl_drv_limits idl;
+			struct iscsi_daemon_request13 *request13;
 
+			error = icl_limits(is->is_conf.isc_offload,
+			    is->is_conf.isc_iser, 0, &idl);
+			if (error != 0) {
+				ISCSI_SESSION_WARN(is, "icl_limits for "
+				    "offload \"%s\" failed with error %d",
+				    is->is_conf.isc_offload, error);
+				sx_sunlock(&sc->sc_lock);
+				return (error);
+			}
+			request13 = (struct iscsi_daemon_request13 *)request;
+			request13->idr_limits.isl_max_recv_data_segment_length =
+			    idl.idl_max_recv_data_segment_length;
+			request13->idr_limits.isl_max_send_data_segment_length =
+			    idl.idl_max_send_data_segment_length;
+			request13->idr_limits.isl_max_burst_length =
+			    idl.idl_max_burst_length;
+			request13->idr_limits.isl_first_burst_length =
+			    idl.idl_first_burst_length;
+		}
+#endif
 		sx_sunlock(&sc->sc_lock);
 		return (0);
 	}
+}
+
+static int
+iscsi_ioctl_daemon_limits(struct iscsi_softc *sc,
+    struct iscsi_daemon_limits *limits)
+{
+	struct icl_drv_limits idl;
+	struct iscsi_session *is;
+	int error;
+
+	sx_slock(&sc->sc_lock);
+
+	/*
+	 * Find the session to fetch limits for.
+	 */
+	TAILQ_FOREACH(is, &sc->sc_sessions, is_next) {
+		if (is->is_id == limits->idl_session_id)
+			break;
+	}
+	if (is == NULL) {
+		sx_sunlock(&sc->sc_lock);
+		return (ESRCH);
+	}
+
+	error = icl_limits(is->is_conf.isc_offload, is->is_conf.isc_iser,
+	    limits->idl_socket, &idl);
+	sx_sunlock(&sc->sc_lock);
+	if (error != 0) {
+		ISCSI_SESSION_WARN(is, "icl_limits for offload \"%s\" "
+		    "failed with error %d", is->is_conf.isc_offload, error);
+		return (error);
+	}
+	limits->idl_limits.isl_max_recv_data_segment_length =
+	    idl.idl_max_recv_data_segment_length;
+	limits->idl_limits.isl_max_send_data_segment_length =
+	    idl.idl_max_send_data_segment_length;
+	limits->idl_limits.isl_max_burst_length =
+	    idl.idl_max_burst_length;
+	limits->idl_limits.isl_first_burst_length =
+	    idl.idl_first_burst_length;
+	
+	return (0);
 }
 
 static int
@@ -2146,7 +2243,15 @@ iscsi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int mode,
 	switch (cmd) {
 	case ISCSIDWAIT:
 		return (iscsi_ioctl_daemon_wait(sc,
-		    (struct iscsi_daemon_request *)arg));
+		    (struct iscsi_daemon_request *)arg, false));
+#ifdef COMPAT_FREEBSD13
+	case ISCSIDWAIT13:
+		return (iscsi_ioctl_daemon_wait(sc,
+		    (struct iscsi_daemon_request *)arg, true));
+#endif
+	case ISCSIDLIMITS:
+		return (iscsi_ioctl_daemon_limits(sc,
+		    (struct iscsi_daemon_limits *)arg));
 	case ISCSIDHANDOFF:
 		return (iscsi_ioctl_daemon_handoff(sc,
 		    (struct iscsi_daemon_handoff *)arg));
@@ -2429,7 +2534,8 @@ iscsi_action_scsiio(struct iscsi_session *is, union ccb *ccb)
 			len = is->is_conn->ic_max_send_data_segment_length;
 		}
 
-		error = icl_pdu_append_data(request, csio->data_ptr, len, M_NOWAIT);
+		error = iscsi_pdu_append_data_csio(request, csio, 0, len,
+		    M_NOWAIT | ICL_NOCOPY);
 		if (error != 0) {
 			iscsi_outstanding_remove(is, io);
 			icl_pdu_free(request);

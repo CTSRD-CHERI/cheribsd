@@ -261,7 +261,7 @@ cpu_set_user_tls(struct thread *td, void * __capability tls_base)
 {
 	struct pcb *pcb;
 
-	if ((__cheri_addr vaddr_t)tls_base >= VM_MAXUSER_ADDRESS)
+	if ((__cheri_addr ptraddr_t)tls_base >= VM_MAXUSER_ADDRESS)
 		return (EINVAL);
 
 	pcb = td->td_pcb;

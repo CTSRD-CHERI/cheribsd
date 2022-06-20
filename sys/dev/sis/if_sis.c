@@ -900,9 +900,8 @@ sis_attach(device_t dev)
 	u_char			eaddr[ETHER_ADDR_LEN];
 	struct sis_softc	*sc;
 	struct ifnet		*ifp;
-	int			error = 0, pmc, waittime = 0;
+	int			error = 0, pmc;
 
-	waittime = 0;
 	sc = device_get_softc(dev);
 
 	sc->sis_dev = dev;
@@ -1028,7 +1027,7 @@ sis_attach(device_t dev)
 			 * time we access it, we need to set SIS_EECMD_REQ.
 			 */
 			SIO_SET(SIS_EECMD_REQ);
-			for (waittime = 0; waittime < SIS_TIMEOUT;
+			for (int waittime = 0; waittime < SIS_TIMEOUT;
 			    waittime++) {
 				/* Force EEPROM to idle state. */
 				sis_eeprom_idle(sc);
@@ -2411,7 +2410,5 @@ static driver_t sis_driver = {
 	sizeof(struct sis_softc)
 };
 
-static devclass_t sis_devclass;
-
-DRIVER_MODULE(sis, pci, sis_driver, sis_devclass, 0, 0);
-DRIVER_MODULE(miibus, sis, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(sis, pci, sis_driver, 0, 0);
+DRIVER_MODULE(miibus, sis, miibus_driver, 0, 0);

@@ -179,6 +179,8 @@ sctp_is_there_unsent_data(struct sctp_tcb *stcb, int so_locked)
 	struct sctp_stream_queue_pending *sp;
 	struct sctp_association *asoc;
 
+	SCTP_TCB_LOCK_ASSERT(stcb);
+
 	/*
 	 * This function returns if any stream has true unsent data on it.
 	 * Note that as it looks through it will clean up any places that
@@ -186,7 +188,6 @@ sctp_is_there_unsent_data(struct sctp_tcb *stcb, int so_locked)
 	 */
 	asoc = &stcb->asoc;
 	unsent_data = 0;
-	SCTP_TCB_SEND_LOCK(stcb);
 	if (!stcb->asoc.ss_functions.sctp_ss_is_empty(stcb, asoc)) {
 		/* Check to see if some data queued */
 		for (i = 0; i < stcb->asoc.streamoutcnt; i++) {
@@ -234,7 +235,6 @@ sctp_is_there_unsent_data(struct sctp_tcb *stcb, int so_locked)
 			}
 		}
 	}
-	SCTP_TCB_SEND_UNLOCK(stcb);
 	return (unsent_data);
 }
 
@@ -245,6 +245,8 @@ sctp_process_init(struct sctp_init_chunk *cp, struct sctp_tcb *stcb)
 	struct sctp_association *asoc;
 	struct sctp_nets *lnet;
 	unsigned int i;
+
+	SCTP_TCB_LOCK_ASSERT(stcb);
 
 	init = &cp->init;
 	asoc = &stcb->asoc;
@@ -263,7 +265,6 @@ sctp_process_init(struct sctp_init_chunk *cp, struct sctp_tcb *stcb)
 			}
 		}
 	}
-	SCTP_TCB_SEND_LOCK(stcb);
 	if (asoc->pre_open_streams > ntohs(init->num_inbound_streams)) {
 		unsigned int newcnt;
 		struct sctp_stream_out *outs;
@@ -323,7 +324,6 @@ sctp_process_init(struct sctp_init_chunk *cp, struct sctp_tcb *stcb)
 		/* cut back the count */
 		asoc->pre_open_streams = newcnt;
 	}
-	SCTP_TCB_SEND_UNLOCK(stcb);
 	asoc->streamoutcnt = asoc->pre_open_streams;
 	if (asoc->strmout) {
 		for (i = 0; i < asoc->streamoutcnt; i++) {
@@ -1596,14 +1596,14 @@ sctp_process_cookie_existing(struct mbuf *m, int iphlen, int offset,
 			 * random number generator returned the same vtag
 			 * when we first sent our INIT-ACK and when we later
 			 * sent our INIT. The side with the seq numbers that
-			 * are different will be the one that normnally
-			 * would have hit case C. This in effect "extends"
-			 * our vtags in this collision case to be 64 bits.
-			 * The same collision could occur aka you get both
-			 * vtag and seq number the same twice in a row.. but
-			 * is much less likely. If it did happen then we
-			 * would proceed through and bring up the assoc.. we
-			 * may end up with the wrong stream setup however..
+			 * are different will be the one that normally would
+			 * have hit case C. This in effect "extends" our
+			 * vtags in this collision case to be 64 bits. The
+			 * same collision could occur aka you get both vtag
+			 * and seq number the same twice in a row.. but is
+			 * much less likely. If it did happen then we would
+			 * proceed through and bring up the assoc.. we may
+			 * end up with the wrong stream setup however..
 			 * which would be bad.. but there is no way to
 			 * tell.. until we send on a stream that does not
 			 * exist :-)
@@ -1808,8 +1808,6 @@ sctp_process_cookie_existing(struct mbuf *m, int iphlen, int offset,
 		SCTP_TCB_LOCK(stcb);
 		atomic_subtract_int(&stcb->asoc.refcnt, 1);
 		/* send up all the data */
-		SCTP_TCB_SEND_LOCK(stcb);
-
 		sctp_report_all_outbound(stcb, 0, SCTP_SO_LOCKED);
 		for (i = 0; i < stcb->asoc.streamoutcnt; i++) {
 			stcb->asoc.strmout[i].chunks_on_queues = 0;
@@ -1896,7 +1894,6 @@ sctp_process_cookie_existing(struct mbuf *m, int iphlen, int offset,
 		 */
 		LIST_INSERT_HEAD(head, stcb, sctp_asocs);
 
-		SCTP_TCB_SEND_UNLOCK(stcb);
 		SCTP_INP_WUNLOCK(stcb->sctp_ep);
 		SCTP_INP_INFO_WUNLOCK();
 		asoc->total_flight = 0;
@@ -2023,7 +2020,7 @@ sctp_process_cookie_new(struct mbuf *m, int iphlen, int offset,
 
 	/*
 	 * now that we know the INIT/INIT-ACK are in place, create a new TCB
-	 * and popluate
+	 * and populate
 	 */
 
 	/*
@@ -2329,15 +2326,22 @@ sctp_handle_cookie_echo(struct mbuf *m, int iphlen, int offset,
 	/*
 	 * compute the signature/digest for the cookie
 	 */
-	ep = &(*inp_p)->sctp_ep;
-	l_inp = *inp_p;
-	if (l_stcb) {
+	if (l_stcb != NULL) {
+		atomic_add_int(&l_stcb->asoc.refcnt, 1);
 		SCTP_TCB_UNLOCK(l_stcb);
 	}
+	l_inp = *inp_p;
 	SCTP_INP_RLOCK(l_inp);
-	if (l_stcb) {
+	if (l_stcb != NULL) {
 		SCTP_TCB_LOCK(l_stcb);
+		atomic_subtract_int(&l_stcb->asoc.refcnt, 1);
 	}
+	if (l_inp->sctp_flags & (SCTP_PCB_FLAGS_SOCKET_GONE | SCTP_PCB_FLAGS_SOCKET_ALLGONE)) {
+		SCTP_INP_RUNLOCK(l_inp);
+		sctp_m_freem(m_sig);
+		return (NULL);
+	}
+	ep = &(*inp_p)->sctp_ep;
 	/* which cookie is it? */
 	if ((cookie->time_entered.tv_sec < (long)ep->time_of_secret_change) &&
 	    (ep->current_secret_number != ep->last_secret_number)) {
@@ -4128,7 +4132,7 @@ strres_nochunk:
  * Handle a router or endpoints report of a packet loss, there are two ways
  * to handle this, either we get the whole packet and must disect it
  * ourselves (possibly with truncation and or corruption) or it is a summary
- * from a middle box that did the disectting for us.
+ * from a middle box that did the disecting for us.
  */
 static void
 sctp_handle_packet_dropped(struct sctp_pktdrop_chunk *cp,

@@ -1449,11 +1449,6 @@ camperiphdone(struct cam_periph *periph, union ccb *done_ccb)
 	 * blocking by that also any new recovery attempts for this CCB,
 	 * and the result will be the final one returned to the CCB owher.
 	 */
-
-	/*
-	 * Copy the CCB back, preserving the alloc_flags field.  Things
-	 * will crash horribly if the CCBs are not of the same size.
-	 */
 	saved_ccb = (union ccb *)done_ccb->ccb_h.saved_ccb_ptr;
 	KASSERT(saved_ccb->ccb_h.func_code == XPT_SCSI_IO,
 	    ("%s: saved_ccb func_code %#x != XPT_SCSI_IO",
@@ -1461,6 +1456,7 @@ camperiphdone(struct cam_periph *periph, union ccb *done_ccb)
 	KASSERT(done_ccb->ccb_h.func_code == XPT_SCSI_IO,
 	    ("%s: done_ccb func_code %#x != XPT_SCSI_IO",
 	     __func__, done_ccb->ccb_h.func_code));
+	saved_ccb->ccb_h.periph_links = done_ccb->ccb_h.periph_links;
 	done_flags = done_ccb->ccb_h.alloc_flags;
 	bcopy(saved_ccb, done_ccb, sizeof(struct ccb_scsiio));
 	done_ccb->ccb_h.alloc_flags = done_flags;
@@ -1627,7 +1623,7 @@ camperiphscsistatuserror(union ccb *ccb, union ccb **orig_ccb,
 		 */
 		periph = xpt_path_periph(ccb->ccb_h.path);
 		if (periph->flags & CAM_PERIPH_INVALID) {
-			error = EIO;
+			error = ENXIO;
 			*action_string = "Periph was invalidated";
 		} else if ((sense_flags & SF_RETRY_BUSY) != 0 ||
 		    ccb->ccb_h.retry_count > 0) {
@@ -1977,7 +1973,7 @@ cam_periph_error(union ccb *ccb, cam_flags camflags,
 		/* Unconditional requeue if device is still there */
 		if (periph->flags & CAM_PERIPH_INVALID) {
 			action_string = "Periph was invalidated";
-			error = EIO;
+			error = ENXIO;
 		} else if (sense_flags & SF_NO_RETRY) {
 			error = EIO;
 			action_string = "Retry was blocked";
@@ -2005,7 +2001,7 @@ cam_periph_error(union ccb *ccb, cam_flags camflags,
 	case CAM_DATA_RUN_ERR:
 	default:
 		if (periph->flags & CAM_PERIPH_INVALID) {
-			error = EIO;
+			error = ENXIO;
 			action_string = "Periph was invalidated";
 		} else if (ccb->ccb_h.retry_count == 0) {
 			error = EIO;

@@ -2956,7 +2956,7 @@
 		    off_t len
 		);
 	}
-531	AUE_POSIX_FADVISE	STD {
+531	AUE_POSIX_FADVISE	STD|CAPENABLED {
 		int posix_fadvise(
 		    int fd,
 		    off_t offset,
@@ -3322,6 +3322,4 @@
 		);
 	}
 
-; Please copy any additions and changes to the following compatability tables:
-; sys/compat/freebsd32/syscalls.master
 ; vim: syntax=off

@@ -24,7 +24,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dirent.h>
-#include <strings.h>
+#include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
@@ -136,7 +136,7 @@ main(int argc, char *argv[])
 		switch (sbuf.st_mode & S_IFMT) {
 			case S_IFDIR:
 				isdir = B_TRUE;
-				fallthrough;
+				zfs_fallthrough;
 			case S_IFLNK:
 			case S_IFCHR:
 			case S_IFBLK:

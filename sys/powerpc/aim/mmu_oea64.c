@@ -2449,7 +2449,7 @@ moea64_get_unique_vsid(void) {
 		u_int	n;
 
 		/*
-		 * Create a new value by mutiplying by a prime and adding in
+		 * Create a new value by multiplying by a prime and adding in
 		 * entropy from the timebase register.  This is to make the
 		 * VSID more random so that the PT hash function collides
 		 * less often.  (Note that the prime casues gcc to do shifts
@@ -3430,7 +3430,6 @@ moea64_page_array_startup(long pages)
 	vm_paddr_t pa;
 	vm_offset_t va, vm_page_base;
 	vm_size_t needed, size;
-	long page;
 	int domain;
 	int i;
 
@@ -3447,7 +3446,6 @@ moea64_page_array_startup(long pages)
 		return;
 	}
 
-	page = 0;
 	for (i = 0; i < MAXMEMDOM; i++)
 		dom_pages[i] = 0;
 
@@ -3685,7 +3683,7 @@ moea64_sp_enter(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	vm_paddr_t pa, spa;
 	bool sync;
 	struct pvo_dlist tofree;
-	int error, i;
+	int error __diagused, i;
 	uint16_t aflags;
 
 	KASSERT((va & HPT_SP_MASK) == 0, ("%s: va %#jx unaligned",
@@ -3926,7 +3924,7 @@ moea64_sp_demote_aligned(struct pvo_entry *sp)
 	vm_offset_t va, va_end;
 	vm_paddr_t pa;
 	vm_page_t m;
-	pmap_t pmap;
+	pmap_t pmap __diagused;
 	int64_t refchg;
 
 	CTR2(KTR_PMAP, "%s: va=%#jx", __func__, (uintmax_t)PVO_VADDR(sp));
@@ -4086,7 +4084,7 @@ moea64_sp_remove(struct pvo_entry *sp, struct pvo_dlist *tofree)
 {
 	struct pvo_entry *pvo, *tpvo;
 	vm_offset_t eva;
-	pmap_t pm;
+	pmap_t pm __diagused;
 
 	CTR2(KTR_PMAP, "%s: va=%#jx", __func__, (uintmax_t)PVO_VADDR(sp));
 

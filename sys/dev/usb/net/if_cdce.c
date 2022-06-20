@@ -259,7 +259,6 @@ static driver_t cdce_driver = {
 	.size = sizeof(struct cdce_softc),
 };
 
-static devclass_t cdce_devclass;
 static eventhandler_tag cdce_etag;
 
 static int  cdce_driver_loaded(struct module *, int, void *);
@@ -303,7 +302,7 @@ static const STRUCT_USB_DUAL_ID cdce_dual_devs[] = {
 	{USB_IF_CSI(UICLASS_CDC, UISUBCLASS_NETWORK_CONTROL_MODEL, 0)},
 };
 
-DRIVER_MODULE(cdce, uhub, cdce_driver, cdce_devclass, cdce_driver_loaded, 0);
+DRIVER_MODULE(cdce, uhub, cdce_driver, cdce_driver_loaded, NULL);
 MODULE_VERSION(cdce, 1);
 MODULE_DEPEND(cdce, uether, 1, 1, 1);
 MODULE_DEPEND(cdce, usb, 1, 1, 1);
@@ -1590,7 +1589,7 @@ cdce_ncm_bulk_read_callback(struct usb_xfer *xfer, usb_error_t error)
 	struct usb_page_cache *pc = usbd_xfer_get_frame(xfer, 0);
 	struct ifnet *ifp = uether_getifp(&sc->sc_ue);
 	struct mbuf *m;
-	int sumdata;
+	int sumdata __usbdebug_used;
 	int sumlen;
 	int actlen;
 	int aframes;

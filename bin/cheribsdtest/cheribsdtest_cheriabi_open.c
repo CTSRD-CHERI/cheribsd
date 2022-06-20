@@ -220,7 +220,7 @@ CHERIBSDTEST(test_cheriabi_open_bad_perm,
 
 CHERIBSDTEST(test_cheriabi_open_sealed, "Sealed path")
 {
-	char *path;
+	char *path, *sealed_path;
 	void *sealer;
 	size_t sealer_size;
 	int fd;
@@ -235,9 +235,9 @@ CHERIBSDTEST(test_cheriabi_open_sealed, "Sealed path")
 	if (path == NULL)
 		cheribsdtest_failure_err("calloc");
 	strcpy(path, "/dev/null");
-	path = cheri_seal(path, sealer);
+	sealed_path = cheri_seal(path, sealer);
 
-	fd = open(path, O_RDONLY);
+	fd = open(sealed_path, O_RDONLY);
 	free(path);
 	if (fd > 0)
 		cheribsdtest_failure_errx("open succeeded");

@@ -398,6 +398,17 @@ print_uptime(void)
 	printf("%lds\n", (long)ts.tv_sec);
 }
 
+/*
+ * Set up a context that can be extracted from the dump.
+ */
+void
+dump_savectx(void)
+{
+
+	savectx(&dumppcb);
+	dumptid = curthread->td_tid;
+}
+
 int
 doadump(boolean_t textdump)
 {
@@ -410,8 +421,7 @@ doadump(boolean_t textdump)
 	if (TAILQ_EMPTY(&dumper_configs))
 		return (ENXIO);
 
-	savectx(&dumppcb);
-	dumptid = curthread->td_tid;
+	dump_savectx();
 	dumping++;
 
 	coredump = TRUE;
@@ -673,7 +683,7 @@ shutdown_halt(void *junk, int howto)
 }
 
 /*
- * Check to see if the system paniced, pause and then reboot
+ * Check to see if the system panicked, pause and then reboot
  * according to the specified delay.
  */
 static void
@@ -1242,45 +1252,39 @@ kerneldumpcomp_destroy(struct dumperinfo *di)
 }
 
 /*
- * Must not be present on global list.
+ * Free a dumper. Must not be present on global list.
  */
-static void
-free_single_dumper(struct dumperinfo *di)
+void
+dumper_destroy(struct dumperinfo *di)
 {
 
 	if (di == NULL)
 		return;
 
 	zfree(di->blockbuf, M_DUMPER);
-
 	kerneldumpcomp_destroy(di);
-
 #ifdef EKCD
 	zfree(di->kdcrypto, M_EKCD);
 #endif
 	zfree(di, M_DUMPER);
 }
 
-/* Registration of dumpers */
+/*
+ * Allocate and set up a new dumper from the provided template.
+ */
 int
-dumper_insert(const struct dumperinfo *di_template, const char *devname,
-    const struct diocskerneldump_arg *kda)
+dumper_create(const struct dumperinfo *di_template, const char *devname,
+    const struct diocskerneldump_arg *kda, struct dumperinfo **dip)
 {
-	struct dumperinfo *newdi, *listdi;
-	bool inserted;
-	uint8_t index;
-	int error;
+	struct dumperinfo *newdi;
+	int error = 0;
 
-	index = kda->kda_index;
-	MPASS(index != KDA_REMOVE && index != KDA_REMOVE_DEV &&
-	    index != KDA_REMOVE_ALL);
+	if (dip == NULL)
+		return (EINVAL);
 
-	error = priv_check(curthread, PRIV_SETDUMPER);
-	if (error != 0)
-		return (error);
-
-	newdi = malloc(sizeof(*newdi) + strlen(devname) + 1, M_DUMPER, M_WAITOK
-	    | M_ZERO);
+	/* Allocate a new dumper */
+	newdi = malloc(sizeof(*newdi) + strlen(devname) + 1, M_DUMPER,
+	    M_WAITOK | M_ZERO);
 	memcpy(newdi, di_template, sizeof(*newdi));
 	newdi->blockbuf = NULL;
 	newdi->kdcrypto = NULL;
@@ -1289,7 +1293,7 @@ dumper_insert(const struct dumperinfo *di_template, const char *devname,
 
 	if (kda->kda_encryption != KERNELDUMP_ENC_NONE) {
 #ifdef EKCD
-		newdi->kdcrypto = kerneldumpcrypto_create(di_template->blocksize,
+		newdi->kdcrypto = kerneldumpcrypto_create(newdi->blocksize,
 		    kda->kda_encryption, kda->kda_key,
 		    kda->kda_encryptedkeysize, kda->kda_encryptedkey);
 		if (newdi->kdcrypto == NULL) {
@@ -1321,8 +1325,38 @@ dumper_insert(const struct dumperinfo *di_template, const char *devname,
 			goto cleanup;
 		}
 	}
-
 	newdi->blockbuf = malloc(newdi->blocksize, M_DUMPER, M_WAITOK | M_ZERO);
+
+	*dip = newdi;
+	return (0);
+cleanup:
+	dumper_destroy(newdi);
+	return (error);
+}
+
+/*
+ * Create a new dumper and register it in the global list.
+ */
+int
+dumper_insert(const struct dumperinfo *di_template, const char *devname,
+    const struct diocskerneldump_arg *kda)
+{
+	struct dumperinfo *newdi, *listdi;
+	bool inserted;
+	uint8_t index;
+	int error;
+
+	index = kda->kda_index;
+	MPASS(index != KDA_REMOVE && index != KDA_REMOVE_DEV &&
+	    index != KDA_REMOVE_ALL);
+
+	error = priv_check(curthread, PRIV_SETDUMPER);
+	if (error != 0)
+		return (error);
+
+	error = dumper_create(di_template, devname, kda, &newdi);
+	if (error != 0)
+		return (error);
 
 	/* Add the new configuration to the queue */
 	mtx_lock(&dumpconf_list_lk);
@@ -1340,10 +1374,6 @@ dumper_insert(const struct dumperinfo *di_template, const char *devname,
 	mtx_unlock(&dumpconf_list_lk);
 
 	return (0);
-
-cleanup:
-	free_single_dumper(newdi);
-	return (error);
 }
 
 #ifdef DDB
@@ -1398,6 +1428,9 @@ dumper_config_match(const struct dumperinfo *di, const char *devname,
 	return (true);
 }
 
+/*
+ * Remove and free the requested dumper(s) from the global list.
+ */
 int
 dumper_remove(const char *devname, const struct diocskerneldump_arg *kda)
 {
@@ -1421,7 +1454,7 @@ dumper_remove(const char *devname, const struct diocskerneldump_arg *kda)
 		if (dumper_config_match(di, devname, kda)) {
 			found = true;
 			TAILQ_REMOVE(&dumper_configs, di, di_next);
-			free_single_dumper(di);
+			dumper_destroy(di);
 		}
 	}
 	mtx_unlock(&dumpconf_list_lk);

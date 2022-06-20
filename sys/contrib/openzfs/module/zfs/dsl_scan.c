@@ -393,7 +393,7 @@ dsl_scan_resilvering(dsl_pool_t *dp)
 static inline void
 sio2bp(const scan_io_t *sio, blkptr_t *bp)
 {
-	bzero(bp, sizeof (*bp));
+	memset(bp, 0, sizeof (*bp));
 	bp->blk_prop = sio->sio_blk_prop;
 	bp->blk_phys_birth = sio->sio_phys_birth;
 	bp->blk_birth = sio->sio_birth;
@@ -403,7 +403,7 @@ sio2bp(const scan_io_t *sio, blkptr_t *bp)
 	ASSERT3U(sio->sio_nr_dvas, >, 0);
 	ASSERT3U(sio->sio_nr_dvas, <=, SPA_DVAS_PER_BP);
 
-	bcopy(sio->sio_dva, bp->blk_dva, sio->sio_nr_dvas * sizeof (dva_t));
+	memcpy(bp->blk_dva, sio->sio_dva, sio->sio_nr_dvas * sizeof (dva_t));
 }
 
 static inline void
@@ -508,7 +508,7 @@ dsl_scan_init(dsl_pool_t *dp, uint64_t txg)
 					return (EOVERFLOW);
 				}
 
-				bcopy(zaptmp, &scn->scn_phys,
+				memcpy(&scn->scn_phys, zaptmp,
 				    SCAN_PHYS_NUMINTS * sizeof (uint64_t));
 				scn->scn_phys.scn_flags = overflow;
 
@@ -567,7 +567,7 @@ dsl_scan_init(dsl_pool_t *dp, uint64_t txg)
 		}
 	}
 
-	bcopy(&scn->scn_phys, &scn->scn_phys_cached, sizeof (scn->scn_phys));
+	memcpy(&scn->scn_phys_cached, &scn->scn_phys, sizeof (scn->scn_phys));
 
 	/* reload the queue into the in-core state */
 	if (scn->scn_phys.scn_queue_obj != 0) {
@@ -689,7 +689,7 @@ dsl_scan_sync_state(dsl_scan_t *scn, dmu_tx_t *tx, state_sync_type_t sync_type)
 		    DMU_POOL_DIRECTORY_OBJECT,
 		    DMU_POOL_SCAN, sizeof (uint64_t), SCAN_PHYS_NUMINTS,
 		    &scn->scn_phys, tx));
-		bcopy(&scn->scn_phys, &scn->scn_phys_cached,
+		memcpy(&scn->scn_phys_cached, &scn->scn_phys,
 		    sizeof (scn->scn_phys));
 
 		if (scn->scn_checkpointing)
@@ -730,7 +730,7 @@ dsl_scan_setup_sync(void *arg, dmu_tx_t *tx)
 
 	ASSERT(!dsl_scan_is_running(scn));
 	ASSERT(*funcp > POOL_SCAN_NONE && *funcp < POOL_SCAN_FUNCS);
-	bzero(&scn->scn_phys, sizeof (scn->scn_phys));
+	memset(&scn->scn_phys, 0, sizeof (scn->scn_phys));
 	scn->scn_phys.scn_func = *funcp;
 	scn->scn_phys.scn_state = DSS_SCANNING;
 	scn->scn_phys.scn_min_txg = 0;
@@ -798,7 +798,8 @@ dsl_scan_setup_sync(void *arg, dmu_tx_t *tx)
 		mutex_init(&dp->dp_blkstats->zab_lock, NULL,
 		    MUTEX_DEFAULT, NULL);
 	}
-	bzero(&dp->dp_blkstats->zab_type, sizeof (dp->dp_blkstats->zab_type));
+	memset(&dp->dp_blkstats->zab_type, 0,
+	    sizeof (dp->dp_blkstats->zab_type));
 
 	if (spa_version(spa) < SPA_VERSION_DSL_SCRUB)
 		ot = DMU_OT_ZAP_OTHER;
@@ -806,7 +807,7 @@ dsl_scan_setup_sync(void *arg, dmu_tx_t *tx)
 	scn->scn_phys.scn_queue_obj = zap_create(dp->dp_meta_objset,
 	    ot ? ot : DMU_OT_SCAN_QUEUE, DMU_OT_NONE, 0, tx);
 
-	bcopy(&scn->scn_phys, &scn->scn_phys_cached, sizeof (scn->scn_phys));
+	memcpy(&scn->scn_phys_cached, &scn->scn_phys, sizeof (scn->scn_phys));
 
 	dsl_scan_sync_state(scn, tx, SYNC_MANDATORY);
 
@@ -1792,14 +1793,15 @@ dsl_scan_check_resume(dsl_scan_t *scn, const dnode_phys_t *dnp,
 		 * indicate that it's OK to start checking for suspending
 		 * again.
 		 */
-		if (bcmp(zb, &scn->scn_phys.scn_bookmark, sizeof (*zb)) == 0 ||
+		if (memcmp(zb, &scn->scn_phys.scn_bookmark,
+		    sizeof (*zb)) == 0 ||
 		    zb->zb_object > scn->scn_phys.scn_bookmark.zb_object) {
 			dprintf("resuming at %llx/%llx/%llx/%llx\n",
 			    (longlong_t)zb->zb_objset,
 			    (longlong_t)zb->zb_object,
 			    (longlong_t)zb->zb_level,
 			    (longlong_t)zb->zb_blkid);
-			bzero(&scn->scn_phys.scn_bookmark, sizeof (*zb));
+			memset(&scn->scn_phys.scn_bookmark, 0, sizeof (*zb));
 		}
 	}
 	return (B_FALSE);
@@ -1826,6 +1828,19 @@ dsl_scan_recurse(dsl_scan_t *scn, dsl_dataset_t *ds, dmu_objset_type_t ostype,
 	int err;
 
 	ASSERT(!BP_IS_REDACTED(bp));
+
+	/*
+	 * There is an unlikely case of encountering dnodes with contradicting
+	 * dn_bonuslen and DNODE_FLAG_SPILL_BLKPTR flag before in files created
+	 * or modified before commit 4254acb was merged. As it is not possible
+	 * to know which of the two is correct, report an error.
+	 */
+	if (dnp != NULL &&
+	    dnp->dn_bonuslen > DN_MAX_BONUS_LEN(dnp)) {
+		scn->scn_phys.scn_errors++;
+		spa_log_error(dp->dp_spa, zb);
+		return (SET_ERROR(EINVAL));
+	}
 
 	if (BP_GET_LEVEL(bp) > 0) {
 		arc_flags_t flags = ARC_FLAG_WAIT;
@@ -2638,11 +2653,9 @@ static void
 dsl_scan_ddt(dsl_scan_t *scn, dmu_tx_t *tx)
 {
 	ddt_bookmark_t *ddb = &scn->scn_phys.scn_ddt_bookmark;
-	ddt_entry_t dde;
+	ddt_entry_t dde = {{{{0}}}};
 	int error;
 	uint64_t n = 0;
-
-	bzero(&dde, sizeof (ddt_entry_t));
 
 	while ((error = ddt_walk(scn->scn_dp->dp_spa, ddb, &dde)) == 0) {
 		ddt_t *ddt;
@@ -2736,7 +2749,7 @@ dsl_scan_visit(dsl_scan_t *scn, dmu_tx_t *tx)
 	 * In case we suspended right at the end of the ds, zero the
 	 * bookmark so we don't think that we're still trying to resume.
 	 */
-	bzero(&scn->scn_phys.scn_bookmark, sizeof (zbookmark_phys_t));
+	memset(&scn->scn_phys.scn_bookmark, 0, sizeof (zbookmark_phys_t));
 
 	/*
 	 * Keep pulling things out of the dataset avl queue. Updates to the
@@ -4377,7 +4390,6 @@ dsl_scan_assess_vdev(dsl_pool_t *dp, vdev_t *vd)
 		spa_async_request(dp->dp_spa, SPA_ASYNC_RESILVER);
 }
 
-/* BEGIN CSTYLED */
 ZFS_MODULE_PARAM(zfs, zfs_, scan_vdev_limit, ULONG, ZMOD_RW,
 	"Max bytes in flight per leaf vdev for scrubs and resilvers");
 
@@ -4415,8 +4427,7 @@ ZFS_MODULE_PARAM(zfs, zfs_, scan_mem_lim_fact, INT, ZMOD_RW,
 	"Fraction of RAM for scan hard limit");
 
 ZFS_MODULE_PARAM(zfs, zfs_, scan_issue_strategy, INT, ZMOD_RW,
-	"IO issuing strategy during scrubbing. "
-	"0 = default, 1 = LBA, 2 = size");
+	"IO issuing strategy during scrubbing. 0 = default, 1 = LBA, 2 = size");
 
 ZFS_MODULE_PARAM(zfs, zfs_, scan_legacy, INT, ZMOD_RW,
 	"Scrub using legacy non-sequential method");
@@ -4438,4 +4449,3 @@ ZFS_MODULE_PARAM(zfs, zfs_, scan_fill_weight, INT, ZMOD_RW,
 
 ZFS_MODULE_PARAM(zfs, zfs_, resilver_disable_defer, INT, ZMOD_RW,
 	"Process all resilvers immediately");
-/* END CSTYLED */

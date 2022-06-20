@@ -134,7 +134,7 @@ struct mem_seg {
 	bool	sysmem;
 	struct vm_object *object;
 };
-#define	VM_MAX_MEMSEGS	3
+#define	VM_MAX_MEMSEGS	4
 
 struct mem_map {
 	vm_paddr_t	gpa;
@@ -938,10 +938,8 @@ vm_iommu_modify(struct vm *vm, bool map)
 			hpa = DMAP_TO_PHYS((uintptr_t)vp);
 			if (map) {
 				iommu_create_mapping(vm->iommu, gpa, hpa, sz);
-				iommu_remove_mapping(host_domain, hpa, sz);
 			} else {
 				iommu_remove_mapping(vm->iommu, gpa, sz);
-				iommu_create_mapping(host_domain, hpa, hpa, sz);
 			}
 
 			gpa += PAGE_SIZE;

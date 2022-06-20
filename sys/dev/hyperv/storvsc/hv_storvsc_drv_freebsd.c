@@ -371,8 +371,7 @@ static driver_t storvsc_driver = {
 	"storvsc", storvsc_methods, sizeof(struct storvsc_softc),
 };
 
-static devclass_t storvsc_devclass;
-DRIVER_MODULE(storvsc, vmbus, storvsc_driver, storvsc_devclass, 0, 0);
+DRIVER_MODULE(storvsc, vmbus, storvsc_driver, 0, 0);
 MODULE_VERSION(storvsc, 1);
 MODULE_DEPEND(storvsc, vmbus, 1, 1, 1);
 
@@ -381,12 +380,11 @@ storvsc_subchan_attach(struct storvsc_softc *sc,
     struct vmbus_channel *new_channel)
 {
 	struct vmstor_chan_props props;
-	int ret = 0;
 
 	memset(&props, 0, sizeof(props));
 
 	vmbus_chan_cpu_rr(new_channel);
-	ret = vmbus_chan_open(new_channel,
+	vmbus_chan_open(new_channel,
 	    sc->hs_drv_props->drv_ringbuffer_size,
   	    sc->hs_drv_props->drv_ringbuffer_size,
 	    (void *)&props,
@@ -407,7 +405,7 @@ storvsc_send_multichannel_request(struct storvsc_softc *sc, int max_subch)
 	struct hv_storvsc_request *request;
 	struct vstor_packet *vstor_packet;	
 	int request_subch;
-	int ret, i;
+	int i;
 
 	/* get sub-channel count that need to create */
 	request_subch = MIN(max_subch, mp_ncpus - 1);
@@ -425,7 +423,7 @@ storvsc_send_multichannel_request(struct storvsc_softc *sc, int max_subch)
 	vstor_packet->flags = REQUEST_COMPLETION_FLAG;
 	vstor_packet->u.multi_channels_cnt = request_subch;
 
-	ret = vmbus_chan_send(sc->hs_chan,
+	vmbus_chan_send(sc->hs_chan,
 	    VMBUS_CHANPKT_TYPE_INBAND, VMBUS_CHANPKT_FLAG_RC,
 	    vstor_packet, VSTOR_PKT_SIZE, (uint64_t)(uintptr_t)request);
 

@@ -59,7 +59,7 @@
 
 LIST_HEAD(sigev_list_head, sigev_node);
 #define HASH_QUEUES		17
-#define	HASH(t, id)		((((vaddr_t)(id) << 3) + (t)) % HASH_QUEUES)
+#define	HASH(t, id)		((((ptraddr_t)(id) << 3) + (t)) % HASH_QUEUES)
 
 static struct sigev_list_head	sigev_hash[HASH_QUEUES];
 static struct sigev_list_head	sigev_all;

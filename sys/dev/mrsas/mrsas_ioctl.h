@@ -88,7 +88,13 @@ __FBSDID("$FreeBSD$");
 
 #define	MEGAMFI_RAW_FRAME_SIZE	128
 
+#if !__CHERI_USER_ABI
+/*
+ * Packing is gratutious, but part of the ABI. Don't pack in CheriABI
+ * where it won't work.
+ */
 #pragma pack(1)
+#endif
 struct mrsas_iocpacket {
 	u_int16_t host_no;
 	u_int16_t __pad1;
