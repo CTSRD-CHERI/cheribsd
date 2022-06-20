@@ -1350,7 +1350,7 @@ linprocfs_doprocmaps(PFS_FILL_ARGS)
 				if (e_start == p->p_sysent->sv_shared_page_base +
 				    PAGE_SIZE)
 					name = vdso_str;
-				if (e_end == p->p_vmspace->vm_stacktop)
+				if (e_end == p->p_vm_stacktop)
 					name = stack_str;
 			}
 		}
