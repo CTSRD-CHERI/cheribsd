@@ -56,7 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <time.h>
 #include <unistd.h>
 
-bool Cflag = false, kflag = false, vflag = false;
+static bool Cflag = false, kflag = false, vflag = false;
 
 static void
 usage(void)
@@ -101,13 +101,14 @@ main(int argc, char **argv)
 		capv_clocks_t clocks;
 	} outbuf;
 	capv_clocks_t *out = &outbuf.clocks;
-	clockid_t clock_id;
+	struct sigaction sa;
 	void * __capability public;
 	void * __capability cookie;
 	void * __capability *capv = NULL;
 	char *ld_preload;
 	char *tmp = NULL;
 	ssize_t received;
+	clockid_t clock_id;
 	pid_t pid;
 	int capc, ch, error;
 
@@ -133,7 +134,7 @@ main(int argc, char **argv)
 	if (argc < 1)
 		usage();
 
-	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = sigchld_handler;
 	sigfillset(&sa.sa_mask);
 

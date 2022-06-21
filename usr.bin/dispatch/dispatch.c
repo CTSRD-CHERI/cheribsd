@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD$");
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 /*
@@ -79,6 +80,7 @@ sigchld_handler(int dummy __unused)
 int
 main(int argc, char **argv)
 {
+	struct sigaction sa;
 	void * __capability capv[] = { NULL };
 	void * __capability _cocall_code;
 	void * __capability _coaccept_code;
@@ -108,7 +110,7 @@ main(int argc, char **argv)
 	if (argc < 1)
 		usage();
 
-	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = sigchld_handler;
 	sigfillset(&sa.sa_mask);
 

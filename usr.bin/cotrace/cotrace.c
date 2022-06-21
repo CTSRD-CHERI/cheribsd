@@ -99,6 +99,7 @@ main(int argc, char **argv)
 	} inbuf, outbuf;
 	capv_t *in = &inbuf.cap;
 	capv_t *out = &outbuf.cap;
+	struct sigaction sa;
 	void * __capability target = NULL;
 	void * __capability public;
 	void * __capability cookie;
@@ -139,7 +140,7 @@ main(int argc, char **argv)
 	if (argc < 1 || chosen < 0)
 		usage();
 
-	struct sigaction sa;
+	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = sigchld_handler;
 	sigfillset(&sa.sa_mask);
 
