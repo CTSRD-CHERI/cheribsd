@@ -1,0 +1,119 @@
+.\"
+.\" Copyright (c) 2022 Edward Tomasz Napierala <en322@cl.cam.ac.uk>
+.\" All rights reserved.
+.\"
+.\" This software was developed by the University of Cambridge Computer
+.\" Laboratory as part of the CHERI for Hypervisors and Operating Systems
+.\" (CHaOS) project, funded by EPSRC grant EP/V000292/1.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" $FreeBSD$
+.\"
+.Dd May 25, 2022
+.Dt BINDS 1
+.Os
+.Sh NAME
+.Nm binds
+.Nd colocated socket bind service
+.Sh SYNOPSIS
+.Nm
+.Op Fl k
+.Op Fl p Ar port
+.Op Fl v
+.Ar command Op Ar args ...
+.Sh DESCRIPTION
+The
+.Nm
+utility is used to provide
+.Xr bind 2
+colocated service to its descendants.
+It spawns a child process, adjusts the
+.Ev LD_PRELOAD
+variable to make descendant processes use a wrapper which replaces
+every call to
+.Xr bind 2
+syscall with a
+.Xr cocall 2
+to
+.Nm
+service, and finally executes
+.Ar command
+with the sealed capability to
+.Nm
+service inserted into its inherited capability vector.
+.Pp
+The following options are available:
+.Bl -tag -width ".Fl s time"
+.It Fl k
+Use
+.Xr coaccept_slow 2
+instead of
+.Xr coaccept 2 .
+.It Fl p
+Specify the allowed IP port number.
+.It Fl v
+Be verbose.
+.El
+.Pp
+.Nm
+can be used as a template when implementing new
+.Xr cocall 2
+services that require file descriptor passing using
+.Xr capfromfd 2
+and
+.Xr captofd 2 .
+.Sh EXIT STATUS
+The
+.Nm
+utility exits 0 on success, and >0 if an error occurs.
+.Sh EXAMPLES
+To spawn a shell with
+.Nm
+service passed in the inherited capability vector, view the vector,
+and then make use of it:
+.Pp
+.Dl binds -vp 6666 sh
+.Dl nc -l 6667
+.Dl capv
+.Dl nc -l 6666
+.Pp
+.Sh SEE ALSO
+.Xr capv 1 ,
+.Xr coping 1 ,
+.Xr stdbuf 1 ,
+.Xr bind 2 ,
+.Xr coaccept 2
+.Sh HISTORY
+The
+.Nm
+command appeared in
+.Tn CheriBSD .
+.Sh AUTHORS
+.An -nosplit
+The
+.Nm
+utility was developed by
+.An Edward Tomasz Napierala Aq Mt trasz@FreeBSD.org
+at the University of Cambridge Computer Laboratory as part of the CHERI
+for Hypervisors and Operating Systems (CHaOS) project, funded by EPSRC
+grant EP/V000292/1.

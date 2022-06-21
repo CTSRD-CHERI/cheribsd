@@ -197,6 +197,7 @@ SUBDIR=	alias \
 
 .if ${MACHINE_ABI:Mpurecap}
 SUBDIR+= \
+	binds \
 	coping \
 	copong \
 	coregister \

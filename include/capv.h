@@ -56,8 +56,10 @@
 #define	CAPV_COINSERT	4
 #define	CAPV_COSELECT	6
 #define	CAPV_CLOCKS	8
+#define	CAPV_BINDS	10
 
-#include <time.h> // XXX timespec
+#include <sys/socket.h> // XXX binds
+#include <time.h> // XXX clocks
 
 typedef union {
 	/* Buffers used for cocall(2) need to be capability-aligned. */
@@ -79,6 +81,11 @@ typedef union {
 	};
 } capv_answerback_t;
 
+/*
+ * XXX: Those should eventually be split into separate headers,
+ *      but leave them here for the time being so we can maintain
+ *      some consistency.
+ */
 typedef union {
 	void * __capability aligner;
 	struct {
@@ -89,6 +96,27 @@ typedef union {
 		struct timespec	ts;
 	};
 } capv_clocks_t;
+
+typedef union {
+	void * __capability aligner;
+	struct {
+		size_t	len;
+		int	op;
+		void * __capability s;
+		struct sockaddr_storage addr;
+		socklen_t addrlen;
+	};
+} capv_binds_t;
+
+typedef union {
+	void * __capability aligner;
+	struct {
+		size_t	len;
+		int	op;
+		int	error;
+		int	errno_;
+	};
+} capv_binds_return_t;
 
 #endif /* !_CAPV_H_ */
 
