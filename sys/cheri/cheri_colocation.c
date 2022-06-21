@@ -34,6 +34,9 @@ __FBSDID("$FreeBSD$");
 #include "opt_ddb.h"
 
 #include <sys/param.h>
+#include <sys/capsicum.h>
+#include <sys/file.h>
+#include <sys/filedesc.h>
 #include <sys/kernel.h>
 #include <sys/mman.h>
 #include <sys/proc.h>
@@ -71,6 +74,11 @@ void * __capability	switcher_sealcap = (void * __capability)-1;
  * Capability used to seal capabilities returned by coregister(2)/colookup(2).
  */
 void * __capability	switcher_sealcap2 = (void * __capability)-1;
+
+/*
+ * Capability used to seal capabilities returned by capfromfd(2).
+ */
+void * __capability	capfd_sealcap = (void * __capability)-1;
 
 struct sx		switcher_lock;
 
@@ -1121,6 +1129,83 @@ sys_coaccept_slow(struct thread *td, struct coaccept_slow_args *uap)
 
 	return (kern_coaccept_slow(uap->cookiep,
 	    uap->outbuf, uap->outlen, uap->inbuf, uap->inlen));
+}
+
+/*
+ * XXX: Twose two seem a bit... too simple.  Proceed with caution.
+ *
+ * XXX: Perhaps we should make sure that both sides are running
+ *      in the same address space.  But if they're not, then
+ *      there is no way to pass the capability in the first place.
+ */
+int
+sys_capfromfd(struct thread *td, struct capfromfd_args *uap)
+{
+	void * __capability fcap;
+	struct file *fp;
+	cap_rights_t rights;
+	int error;
+
+	KASSERT(capfd_sealcap != (void * __capability)-1,
+             ("%s: uninitialized capfd_sealcap", __func__));
+	KASSERT(capfd_sealcap != switcher_sealcap,
+             ("%s: capfd_sealcap == switcher_sealcap", __func__));
+	KASSERT(capfd_sealcap != switcher_sealcap2,
+             ("%s: capfd_sealcap == switcher_sealcap2", __func__));
+
+	error = fget(curthread, uap->fd, cap_rights_init_one(&rights, CAP_SOCK_CLIENT), &fp);
+	if (error != 0) {
+		COLOCATION_DEBUG("fget error %d", error);
+		return (error);
+	}
+	if (!(fp->f_ops->fo_flags & DFLAG_PASSABLE)) {
+		COLOCATION_DEBUG("DFLAG_PASSABLE set; returning EOPNOTSUPP");
+		fdrop(fp, curthread);
+		return (EOPNOTSUPP);
+	}
+
+	fcap = (void * __capability)fp;
+	fcap = cheri_seal(fcap, capfd_sealcap);
+	error = sucap(uap->capp, (intcap_t)fcap);
+	if (error != 0)
+		COLOCATION_DEBUG("sucap error %d", error);
+
+	/*
+	 * XXX: We never free that fp.  Plan is to use garbage collection
+	 *      to reclaim the sealed cap.  In the meantime we could call
+	 *      fdrop(9) when the calling process exits, but we would still
+	 *      need a mechanism to prevent address reuse for the sealed cap.
+	 */
+
+	return (error);
+}
+
+int
+sys_captofd(struct thread *td, struct captofd_args *uap)
+{
+	void * __capability fcap;
+	struct file *fp;
+	int error, fd;
+
+	fcap = cheri_unseal(uap->cap, capfd_sealcap);
+	if (fcap == NULL) {
+		/*
+		 * XXX: This code path is completely untested
+		 *      due to cheri_unseal() trapping.
+		 */
+		COLOCATION_DEBUG("cheri_unseal failed");
+		return (EINVAL);
+	}
+
+	fp = (__cheri_fromcap struct file *)fcap;
+	error = finstall(td, fp, &fd, 0, NULL);
+	if (error != 0) {
+		COLOCATION_DEBUG("finstall error %d", error);
+		return (error);
+	}
+
+	error = copyout(&fd, uap->fdp, sizeof(fd));
+	return (0);
 }
 
 #ifdef DDB

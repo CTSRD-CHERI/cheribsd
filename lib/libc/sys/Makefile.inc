@@ -179,6 +179,8 @@ MAN+=	abort2.2 \
 	bind.2 \
 	bindat.2 \
 	brk.2 \
+	capfromfd.2 \
+	captofd.2 \
 	cap_enter.2 \
 	cap_fcntls_limit.2 \
 	cap_ioctls_limit.2 \

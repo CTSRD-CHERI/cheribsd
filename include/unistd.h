@@ -604,6 +604,9 @@ ssize_t	 write_c(int, const void * __capability, size_t);
  */
 #define	COACCEPT_RETURNS_SSIZE_T	1
 
+/*
+ * Process colocation.
+ */
 ssize_t	 coaccept(void * __capability * __capability,
 	     const void * __capability, size_t, void * __capability, size_t);
 ssize_t	 cocall(void * __capability,
@@ -617,7 +620,7 @@ int	 capvset(int *, void * __capability **, int, void * __capability);
 void	 capvfetch(int *, void * __capability **);
 
 /*
- * This is the interface between libc and the switcher.
+ * Interface between libc and the switcher.
  */
 ssize_t	 _coaccept(void * __capability, void * __capability,
 	    void * __capability * __capability,
@@ -635,6 +638,13 @@ ssize_t	 coaccept_slow(void * __capability * __capability,
 	    const void * __capability, size_t, void * __capability, size_t);
 ssize_t	 cocall_slow(void * __capability,
 	    const void * __capability, size_t, void * __capability, size_t);
+
+/*
+ * File descriptor over sealed capabilities.
+ */
+int	 capfromfd(void * __capability *capp, int fd);
+int	 captofd(void * __capability cap, int *fdp);
+
 #endif /* __has_feature(capabilities) */
 #endif /* __BSD_VISIBLE */
 __END_DECLS

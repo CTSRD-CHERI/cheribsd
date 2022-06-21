@@ -111,6 +111,7 @@ extern void * __capability kernel_root_sealcap;
  */
 extern void * __capability switcher_sealcap;
 extern void * __capability switcher_sealcap2;
+extern void * __capability capfd_sealcap;
 
 /*
  * Functions to create capabilities used in exec.

@@ -883,6 +883,22 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
+	/* capfromfd */
+	case 167: {
+		struct capfromfd_args *p = params;
+		uarg[a++] = (intptr_t)p->capp; /* void * __capability __capability * __capability */
+		iarg[a++] = p->fd; /* int */
+		*n_args = 2;
+		break;
+	}
+	/* captofd */
+	case 168: {
+		struct captofd_args *p = params;
+		uarg[a++] = (intptr_t)p->cap; /* void * __capability __capability */
+		uarg[a++] = (intptr_t)p->fdp; /* int * __capability */
+		*n_args = 2;
+		break;
+	}
 	/* semsys */
 	case 169: {
 		struct semsys_args *p = params;
@@ -4933,6 +4949,32 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 2:
 			p = "userland struct rtprio * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* capfromfd */
+	case 167:
+		switch (ndx) {
+		case 0:
+			p = "userland void * __capability __capability * __capability";
+			break;
+		case 1:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* captofd */
+	case 168:
+		switch (ndx) {
+		case 0:
+			p = "userland void * __capability __capability";
+			break;
+		case 1:
+			p = "userland int * __capability";
 			break;
 		default:
 			break;
@@ -9917,6 +9959,16 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* rtprio */
 	case 166:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* capfromfd */
+	case 167:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* captofd */
+	case 168:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

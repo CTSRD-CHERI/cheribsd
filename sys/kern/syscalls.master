@@ -1072,7 +1072,19 @@
 		    _Inout_ struct rtprio *rtp
 		);
 	}
-167-168	AUE_NULL	RESERVED
+167	AUE_NULL	STD|CAPENABLED {
+		int capfromfd(
+		    _Out_ void * __capability *capp,
+		    int fd
+		);
+	}
+168	AUE_NULL	STD|CAPENABLED {
+		int captofd(
+		    _In_ void * __capability cap,
+		    int *fdp
+		);
+	}
+
 169	AUE_SEMSYS	NOSTD|VARARG4 {
 		int semsys(
 		    int which,

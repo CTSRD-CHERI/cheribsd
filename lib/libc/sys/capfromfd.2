@@ -1,0 +1,89 @@
+.\"
+.\" Copyright (c) 2022 Edward Tomasz Napierala <en322@cl.cam.ac.uk>
+.\" All rights reserved.
+.\"
+.\" This software was developed by the University of Cambridge Computer
+.\" Laboratory as part of the CHERI for Hypervisors and Operating Systems
+.\" (CHaOS) project, funded by EPSRC grant EP/V000292/1.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" $FreeBSD$
+.\"
+.Dd June 22, 2022
+.Dt CAPFROMFD 2
+.Os
+.Sh NAME
+.Nm capfromfd
+.Nd obtain sealed capability to represent a file descriptor
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In unistd.h
+.Ft int
+.Fn capfromfd "void * _capability *capp" "int fd"
+.Sh DESCRIPTION
+The
+.Fn capfromfd
+function returns a sealed capability that can then be used with
+.Xr captofd 2
+system call to turn it back into a file descriptor,
+providing a bit more convenient alternative to SCM_RIGHTS
+mechanism.
+This makes it possible to pass file descriptors between different
+processes, by passing the sealed capability instead.
+The
+.Ar capp
+is a pointer to capability that will be filled in by
+.Nm .
+The
+.Ar fd
+must be an open file descriptor.
+.Sh RETURN VALUES
+.Rv -std capfromfd
+.Sh ERRORS
+The
+.Fn capfromfd
+system call
+will fail if:
+.Bl -tag -width Er
+.It Bq Er EINVAL
+The
+.Fa fd
+argument
+is not valid.
+.El
+.Sh SEE ALSO
+.Xr captofd 2
+.Sh HISTORY
+The
+.Fn capfromfd
+system call first appeared in
+.Tn CheriBSD .
+.Sh AUTHORS
+.An -nosplit
+.Nm
+was added by
+.An Edward Tomasz Napierala Aq Mt trasz@FreeBSD.org
+at the University of Cambridge Computer Laboratory as part of the CHERI
+for Hypervisors and Operating Systems (CHaOS) project, funded by EPSRC
+grant EP/V000292/1.

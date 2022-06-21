@@ -1,0 +1,86 @@
+.\"
+.\" Copyright (c) 2022 Edward Tomasz Napierala <en322@cl.cam.ac.uk>
+.\" All rights reserved.
+.\"
+.\" This software was developed by the University of Cambridge Computer
+.\" Laboratory as part of the CHERI for Hypervisors and Operating Systems
+.\" (CHaOS) project, funded by EPSRC grant EP/V000292/1.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" $FreeBSD$
+.\"
+.Dd June 22, 2022
+.Dt CAPTOFD 2
+.Os
+.Sh NAME
+.Nm captofd
+.Nd obtain a file descriptor from a sealed capability
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In unistd.h
+.Ft int
+.Fn captofd "void * _capability cap" "int *fdp"
+.Sh DESCRIPTION
+The
+.Fn captofd
+function takes a sealed capability and duplicates the file descriptor
+associated with it.
+.Pp
+The
+.Ar cap
+is a pointer to capability that will be filled in by
+is the sealed capability, obtained from
+.Xr capfromfd 2 .
+The
+.Ar fdp
+will be filled in with the number of the newly passed file descriptor.
+.Sh RETURN VALUES
+.Rv -std captofd
+.Sh ERRORS
+The
+.Fn captofd
+system call
+will fail if:
+.Bl -tag -width Er
+.It Bq Er EINVAL
+The
+.Fa fd
+argument
+is not valid.
+.El
+.Sh SEE ALSO
+.Xr capfromfd 2
+.Sh HISTORY
+The
+.Fn captofd
+system call first appeared in
+.Tn CheriBSD .
+.Sh AUTHORS
+.An -nosplit
+.Nm
+was added by
+.An Edward Tomasz Napierala Aq Mt trasz@FreeBSD.org
+at the University of Cambridge Computer Laboratory as part of the CHERI
+for Hypervisors and Operating Systems (CHaOS) project, funded by EPSRC
+grant EP/V000292/1.
