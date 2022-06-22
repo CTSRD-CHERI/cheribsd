@@ -2069,7 +2069,10 @@ ktrstruct(char *buf, size_t buflen)
 		ktrbitset(name, set, datalen);
 		free(set);
 	} else {
-		printf("unknown structure\n");
+#ifdef SYSDECODE_HAVE_LINUX
+		if (ktrstruct_linux(name, data, datalen) == false)
+#endif
+			printf("unknown structure\n");
 	}
 	return;
 invalid:
