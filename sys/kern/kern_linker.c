@@ -107,6 +107,9 @@ MALLOC_DEFINE(M_LINKER, "linker", "kernel linker");
 linker_file_t linker_kernel_file;
 
 static struct sx kld_sx;	/* kernel linker lock */
+#ifdef KPF_LOOKASIDE_TABLE
+static struct sx kld_kpf_sx;	/* linker lock for KPF tables */
+#endif
 static u_int kld_busy;
 static struct thread *kld_busy_owner;
 
@@ -118,6 +121,9 @@ static int loadcnt;
 
 static linker_class_list_t classes;
 static linker_file_list_t linker_files;
+#ifdef KPF_LOOKASIDE_TABLE
+static linker_file_list_t linker_files_kpf;
+#endif
 static int next_file_id = 1;
 static int linker_no_more_classes = 0;
 
@@ -163,6 +169,10 @@ linker_init(void *arg)
 	sx_init(&kld_sx, "kernel linker");
 	TAILQ_INIT(&classes);
 	TAILQ_INIT(&linker_files);
+#ifdef KPF_LOOKASIDE_TABLE
+	sx_init(&kld_kpf_sx, "kernel linker kpf");
+	TAILQ_INIT(&linker_files_kpf);
+#endif
 }
 
 SYSINIT(linker, SI_SUB_KLD, SI_ORDER_FIRST, linker_init, NULL);
@@ -613,6 +623,87 @@ linker_file_foreach(linker_predicate_t *predicate, void *context)
 	return (retval);
 }
 
+#ifdef KPF_LOOKASIDE_TABLE
+SET_DECLARE(kpf_lookaside_table, struct kpf_lookaside_entry);
+
+static int
+linker_file_kpf_lookup_in_set(vm_offset_t query, size_t *result,
+    struct kpf_lookaside_entry **tstart,
+    struct kpf_lookaside_entry **tlimit)
+{
+	struct kpf_lookaside_entry **lte;
+
+	for (lte = tstart; lte != tlimit; lte++) {
+		if ((*lte)->epc == query) {
+			*result = (*lte)->selector;
+			return 1;
+		}
+	}
+
+	return -1;
+}
+
+struct kpf_lookaside_search {
+	vm_offset_t query;
+	size_t *result;
+};
+
+static int
+linker_file_kpf_lookup_p(linker_file_t lf, void *_ctx)
+{
+	struct kpf_lookaside_search *search = _ctx;
+	vm_offset_t query = search->query;
+	vm_offset_t modstart = (vm_offset_t)lf->address;
+	vm_offset_t modlimit = modstart + lf->size;
+
+	if ((modstart <= query) && (modlimit > query)) {
+		struct kpf_lookaside_entry **tstart, **tlimit;
+		int error;
+
+		error = linker_file_lookup_set(lf, "kpf_lookaside_table",
+		    &tstart, &tlimit, NULL);
+
+		KASSERT(error == 0, ("kpf-linked module without kpf table"));
+
+		return linker_file_kpf_lookup_in_set(query, search->result,
+		    tstart, tlimit);
+	}
+
+	return 0;
+}
+
+int
+linker_kpf_lookup(vm_offset_t query, size_t *result)
+{
+	linker_file_t lf;
+	int retval = 0;
+
+	/*
+	 * Is this in the static part of the kernel?  We can avoid interlocking
+	 * with the rest of the loader at all, if so.
+	 */
+	vm_offset_t kern_end = (vm_offset_t)linker_kernel_file->address +
+	    linker_kernel_file->size;
+	if (query >= (vm_offset_t)linker_kernel_file->address
+	    && query < kern_end) {
+		return linker_file_kpf_lookup_in_set(query, result,
+		    SET_BEGIN(kpf_lookaside_table),
+		    SET_LIMIT(kpf_lookaside_table));
+	}
+
+	struct kpf_lookaside_search context = { query, result };
+
+	sx_slock(&kld_kpf_sx);
+	TAILQ_FOREACH(lf, &linker_files, link) {
+		retval = linker_file_kpf_lookup_p(lf, &context);
+		if (retval != 0)
+			break;
+	}
+	sx_sunlock(&kld_kpf_sx);
+	return (retval);
+}
+#endif
+
 linker_file_t
 linker_make_file(const char *pathname, linker_class_t lc)
 {
@@ -742,6 +833,12 @@ linker_file_unload(linker_file_t file, int flags)
 		file->flags &= ~LINKER_FILE_LINKED;
 		linker_file_unregister_sysctls(file);
 		linker_file_sysuninit(file);
+
+#ifdef KPF_LOOKASIDE_TABLE
+		sx_xlock(&kld_kpf_sx);
+		TAILQ_REMOVE(&linker_files_kpf, file, kpf_link);
+		sx_xunlock(&kld_kpf_sx);
+#endif
 	}
 	TAILQ_REMOVE(&linker_files, file, link);
 
@@ -1804,6 +1901,20 @@ restart:
 			sysinit_add(si_start, si_stop);
 		linker_file_register_sysctls(lf, true);
 		lf->flags |= LINKER_FILE_LINKED;
+
+#ifdef KPF_LOOKASIDE_TABLE
+		/*
+		 * If this module has a kpf_lookaside_table, add it to the link
+		 * for the fault handler.
+		 */
+		if (linker_file_lookup_set(lf, "kpf_lookaside_table", NULL,
+		    NULL, NULL)) {
+			sx_xlock(&kld_kpf_sx);
+			TAILQ_INSERT_TAIL(&linker_files_kpf, lf, kpf_link);
+			sx_xunlock(&kld_kpf_sx);
+		}
+#endif
+
 		continue;
 fail:
 		TAILQ_REMOVE(&depended_files, lf, loaded);

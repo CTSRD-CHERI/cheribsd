@@ -1034,6 +1034,9 @@ HIDRAW_MAKE_UHID_ALIAS	opt_hid.h
 # environment's contents are known to be safe.
 PRESERVE_EARLY_KENV	opt_global.h
 
+# KPF_LOOKASIDE_TABLE fast-path support infrastructure
+KPF_LOOKASIDE_TABLE	opt_global.h
+
 # CHERI
 CPU_CHERI	opt_global.h
 CHERI_PURECAP_KERNEL		opt_global.h
