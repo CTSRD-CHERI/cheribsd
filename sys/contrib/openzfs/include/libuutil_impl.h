@@ -52,10 +52,14 @@ void uu_panic(const char *format, ...) __attribute__((format(printf, 1, 2)));
  * storing them with swapped endianness;  this is not perfect, but it's about
  * the best we can do without wasting a lot of space.
  */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	UU_PTR_ENCODE(ptr)		(uintptr_t)(ptr)
+#else
 #ifdef _LP64
 #define	UU_PTR_ENCODE(ptr)		BSWAP_64((uintptr_t)(void *)(ptr))
 #else
 #define	UU_PTR_ENCODE(ptr)		BSWAP_32((uintptr_t)(void *)(ptr))
+#endif
 #endif
 
 #define	UU_PTR_DECODE(ptr)		((void *)UU_PTR_ENCODE(ptr))
