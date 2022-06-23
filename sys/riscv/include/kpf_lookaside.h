@@ -31,4 +31,7 @@
 #define KPF_LOOKASIDE(target, selector)
 #endif
 
+/* On fault, jump PC to fsu_fault_lookaside */
+#define KPF_SEL_FSU		0
+
 #endif /* _KFP_LOOKASIDE_H_ */

@@ -35,6 +35,7 @@
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$");
 
+#include <machine/kpf_lookaside.h>
 #include <machine/setjmp.h>
 #include <machine/riscvreg.h>
 
@@ -87,12 +88,26 @@ fsu_fault_nopcb:
 	RETURN
 END(fsu_fault)
 
+#ifdef KPF_LOOKASIDE_TABLE
+	/*
+	 * as fsu_fault, but we're using the kpf lookaside table mechanism, and
+	 * so have no need to clear out the fault handler.  This is "registered"
+	 * as lookaside response selector KPF_SEL_FSU.
+	 */
+ENTRY(fsu_fault_lookaside)
+	EXIT_USER_ACCESS(a1)
+	li	a0, -1
+	RETURN
+END(fsu_fault_lookaside)
+#endif
+
 /*
  * int casueword32(volatile uint32_t * __capability, uint32_t, uint32_t *, uint32_t)
  */
 ENTRY(casueword32)
 	li	a4, (VM_MAXUSER_ADDRESS-3)
 	bgeu	a0, a4, fsu_fault_nopcb
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca4)	/* And set it */
@@ -100,29 +115,47 @@ ENTRY(casueword32)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a4)	/* And set it */
 #endif
+#endif
 	ENTER_USER_ACCESS(a4)
+
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 #if __has_feature(capabilities)
 	CLR_W	a4, 0(ca0)		/* Load-exclusive the data */
 #else
 	lr.w	a4, 0(a0)		/* Load-exclusive the data */
 #endif
+
 	bne	a4, a1, 1f		/* If not equal then exit */
+
 #ifdef __CHERI_PURE_CAPABILITY__
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 	csc.w	a5, a3, 0(ca0)		/* Store the new data */
 #elif __has_feature(capabilities)
 	move	a5, a3
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 	sc.w.cap a5, 0(ca0)		/* Store the new data */
 #else
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 	sc.w	a5, a3, 0(a0)		/* Store the new data */
 #endif
+
 	beqz	a5, 2f			/* Success */
 1:	li	a5, 1			/* Normalize failure result */
 2:	EXIT_USER_ACCESS(a6)
+
 #ifdef __CHERI_PURE_CAPABILITY__
+#ifndef KPF_LOOKASIDE_TABLE
 	SET_FAULT_HANDLER(cnull, ca6)	/* Reset the fault handler */
+#endif
 	csw	a4, 0(ca2)		/* Store the read data */
 #else
+#ifndef KPF_LOOKASIDE_TABLE
 	SET_FAULT_HANDLER(x0, a6)	/* Reset the fault handler */
+#endif
 	sw	a4, 0(a2)		/* Store the read data */
 #endif
 	mv	a0, a5			/* Success indicator */
@@ -135,6 +168,7 @@ END(casueword32)
 ENTRY(casueword)
 	li	a4, (VM_MAXUSER_ADDRESS-7)
 	bgeu	a0, a4, fsu_fault_nopcb
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca4)	/* And set it */
@@ -142,29 +176,47 @@ ENTRY(casueword)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a4)	/* And set it */
 #endif
+#endif
 	ENTER_USER_ACCESS(a4)
+
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 #if __has_feature(capabilities)
 	CLR_D	a4, 0(ca0)		/* Load-exclusive the data */
 #else
 	lr.d	a4, 0(a0)		/* Load-exclusive the data */
 #endif
+
 	bne	a4, a1, 1f		/* If not equal then exit */
+
 #ifdef __CHERI_PURE_CAPABILITY__
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 	csc.d	a5, a3, 0(ca0)		/* Store the new data */
 #elif __has_feature(capabilities)
 	move	a5, a3
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 	sc.d.cap a5, 0(ca0)		/* Store the new data */
 #else
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 	sc.d	a5, a3, 0(a0)		/* Store the new data */
 #endif
+
 	beqz	a5, 2f			/* Success */
 1:	li	a5, 1			/* Normalize failure result */
 2:	EXIT_USER_ACCESS(a6)
+
 #ifdef __CHERI_PURE_CAPABILITY__
+#ifndef KPF_LOOKASIDE_TABLE
 	SET_FAULT_HANDLER(cnull, ca6)	/* Reset the fault handler */
+#endif
 	csd	a4, 0(ca2)		/* Store the read data */
 #else
+#ifndef KPF_LOOKASIDE_TABLE
 	SET_FAULT_HANDLER(x0, a6)	/* Reset the fault handler */
+#endif
 	sd	a4, 0(a2)		/* Store the read data */
 #endif
 	mv	a0, a5			/* Success indicator */
@@ -177,6 +229,7 @@ END(casueword)
 ENTRY(fubyte)
 	li	a1, VM_MAXUSER_ADDRESS
 	bgeu	a0, a1, fsu_fault_nopcb
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca1)	/* And set it */
@@ -184,17 +237,24 @@ ENTRY(fubyte)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a1)	/* And set it */
 #endif
+#endif
 	ENTER_USER_ACCESS(a1)
+
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 #if __has_feature(capabilities)
 	CLBU	a0, 0(ca0)		/* Try loading the data */
 #else
 	lbu	a0, 0(a0)		/* Try loading the data */
 #endif
 	EXIT_USER_ACCESS(a1)
+
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	SET_FAULT_HANDLER(cnull, ca1)	/* Reset the fault handler */
 #else
 	SET_FAULT_HANDLER(x0, a1)	/* Reset the fault handler */
+#endif
 #endif
 	RETURN				/* Return */
 END(fubyte)
@@ -205,6 +265,7 @@ END(fubyte)
 ENTRY(fuword16)
 	li	a1, (VM_MAXUSER_ADDRESS-1)
 	bgeu	a0, a1, fsu_fault_nopcb
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca1)	/* And set it */
@@ -212,17 +273,24 @@ ENTRY(fuword16)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a1)	/* And set it */
 #endif
+#endif
 	ENTER_USER_ACCESS(a1)
+
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 #if __has_feature(capabilities)
 	CLHU	a0, 0(ca0)		/* Try loading the data */
 #else
 	lhu	a0, 0(a0)		/* Try loading the data */
 #endif
 	EXIT_USER_ACCESS(a1)
+
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	SET_FAULT_HANDLER(cnull, ca1)	/* Reset the fault handler */
 #else
 	SET_FAULT_HANDLER(x0, a1)	/* Reset the fault handler */
+#endif
 #endif
 	RETURN				/* Return */
 END(fuword16)
@@ -233,6 +301,7 @@ END(fuword16)
 ENTRY(fueword32)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
 	bgeu	a0, a2, fsu_fault_nopcb
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
@@ -240,18 +309,27 @@ ENTRY(fueword32)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
+#endif
 	ENTER_USER_ACCESS(a2)
+
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 #if __has_feature(capabilities)
 	CLW	a0, 0(ca0)		/* Try loading the data */
 #else
 	lw	a0, 0(a0)		/* Try loading the data */
 #endif
 	EXIT_USER_ACCESS(a2)
+
 #ifdef __CHERI_PURE_CAPABILITY__
+#ifndef KPF_LOOKASIDE_TABLE
 	SET_FAULT_HANDLER(cnull, ca2)	/* Reset the fault handler */
+#endif
 	csw	a0, 0(ca1)		/* Save the data in kernel space */
 #else
+#ifndef KPF_LOOKASIDE_TABLE
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
+#endif
 	sw	a0, 0(a1)		/* Save the data in kernel space */
 #endif
 	li	a0, 0			/* Success */
@@ -266,6 +344,7 @@ ENTRY(fueword)
 EENTRY(fueword64)
 	li	a2, (VM_MAXUSER_ADDRESS-7)
 	bgeu	a0, a2, fsu_fault_nopcb
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
@@ -273,18 +352,27 @@ EENTRY(fueword64)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
+#endif
 	ENTER_USER_ACCESS(a2)
+
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 #if __has_feature(capabilities)
 	CLD	a0, 0(ca0)		/* Try loading the data */
 #else
 	ld	a0, 0(a0)		/* Try loading the data */
 #endif
 	EXIT_USER_ACCESS(a2)
+
 #ifdef __CHERI_PURE_CAPABILITY__
+#ifndef KPF_LOOKASIDE_TABLE
 	SET_FAULT_HANDLER(cnull, ca2)	/* Reset the fault handler */
+#endif
 	csd	a0, 0(ca1)		/* Save the data in kernel space */
 #else
+#ifndef KPF_LOOKASIDE_TABLE
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
+#endif
 	sd	a0, 0(a1)		/* Save the data in kernel space */
 #endif
 	li	a0, 0			/* Success */
@@ -299,6 +387,7 @@ END(fueword)
 ENTRY(fuecap)
 	li	a2, (VM_MAXUSER_ADDRESS-7)
 	bgeu	a0, a2, fsu_fault_nopcb
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
@@ -306,14 +395,23 @@ ENTRY(fuecap)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
+#endif
 	ENTER_USER_ACCESS(a2)
+
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 	CLC	ca0, 0(ca0)		/* Try loading the data */
 	EXIT_USER_ACCESS(a2)
+
 #ifdef __CHERI_PURE_CAPABILITY__
+#ifndef KPF_LOOKASIDE_TABLE
 	SET_FAULT_HANDLER(cnull, ca2)	/* Reset the fault handler */
+#endif
 	csc	ca0, 0(ca1)		/* Save the data in kernel space */
 #else
+#ifndef KPF_LOOKASIDE_TABLE
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
+#endif
 	sc.ddc	ca0, 0(a1)		/* Save the data in kernel space */
 #endif
 	li	a0, 0			/* Success */
@@ -327,6 +425,7 @@ END(fuecap)
 ENTRY(subyte)
 	li	a2, VM_MAXUSER_ADDRESS
 	bgeu	a0, a2, fsu_fault_nopcb
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
@@ -334,17 +433,24 @@ ENTRY(subyte)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
+#endif
 	ENTER_USER_ACCESS(a2)
+
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 #if __has_feature(capabilities)
 	CSB	a1, 0(ca0)		/* Try storing the data */
 #else
 	sb	a1, 0(a0)		/* Try storing the data */
 #endif
 	EXIT_USER_ACCESS(a2)
+
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	SET_FAULT_HANDLER(cnull, ca2)	/* Reset the fault handler */
 #else
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
+#endif
 #endif
 	li	a0, 0			/* Success */
 	RETURN				/* Return */
@@ -356,6 +462,7 @@ END(subyte)
 ENTRY(suword16)
 	li	a2, (VM_MAXUSER_ADDRESS-1)
 	bgeu	a0, a2, fsu_fault_nopcb
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
@@ -363,17 +470,24 @@ ENTRY(suword16)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
+#endif
 	ENTER_USER_ACCESS(a2)
+
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 #if __has_feature(capabilities)
 	CSH	a1, 0(ca0)		/* Try storing the data */
 #else
 	sh	a1, 0(a0)		/* Try storing the data */
 #endif
 	EXIT_USER_ACCESS(a2)
+
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	SET_FAULT_HANDLER(cnull, ca2)	/* Reset the fault handler */
 #else
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
+#endif
 #endif
 	li	a0, 0			/* Success */
 	RETURN				/* Return */
@@ -385,6 +499,7 @@ END(suword16)
 ENTRY(suword32)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
 	bgeu	a0, a2, fsu_fault_nopcb
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
@@ -392,17 +507,24 @@ ENTRY(suword32)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
+#endif
 	ENTER_USER_ACCESS(a2)
+
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 #if __has_feature(capabilities)
 	CSW	a1, 0(ca0)		/* Try storing the data */
 #else
 	sw	a1, 0(a0)		/* Try storing the data */
 #endif
 	EXIT_USER_ACCESS(a2)
+
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	SET_FAULT_HANDLER(cnull, ca2)	/* Reset the fault handler */
 #else
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
+#endif
 #endif
 	li	a0, 0			/* Success */
 	RETURN				/* Return */
@@ -415,6 +537,7 @@ ENTRY(suword)
 EENTRY(suword64)
 	li	a2, (VM_MAXUSER_ADDRESS-7)
 	bgeu	a0, a2, fsu_fault_nopcb
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
@@ -422,17 +545,24 @@ EENTRY(suword64)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
+#endif
 	ENTER_USER_ACCESS(a2)
+
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 #if __has_feature(capabilities)
 	CSD	a1, 0(ca0)		/* Try storing the data */
 #else
 	sd	a1, 0(a0)		/* Try storing the data */
 #endif
 	EXIT_USER_ACCESS(a2)
+
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	SET_FAULT_HANDLER(cnull, ca2)	/* Reset the fault handler */
 #else
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
+#endif
 #endif
 	li	a0, 0			/* Success */
 	RETURN				/* Return */
@@ -446,6 +576,7 @@ END(suword)
 ENTRY(sucap)
 	li	a2, (VM_MAXUSER_ADDRESS-3)
 	bgeu	a0, a2, fsu_fault_nopcb
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	clgc	ca6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(ca6, ca2)	/* And set it */
@@ -453,13 +584,20 @@ ENTRY(sucap)
 	la	a6, fsu_fault		/* Load the fault handler */
 	SET_FAULT_HANDLER(a6, a2)	/* And set it */
 #endif
+#endif
 	ENTER_USER_ACCESS(a2)
+
+	KPF_LOOKASIDE(1f, KPF_SEL_FSU)
+1:
 	CSC	ca1, 0(ca0)		/* Try storing the data */
 	EXIT_USER_ACCESS(a2)
+
+#ifndef KPF_LOOKASIDE_TABLE
 #ifdef __CHERI_PURE_CAPABILITY__
 	SET_FAULT_HANDLER(cnull, ca2)	/* Reset the fault handler */
 #else
 	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
+#endif
 #endif
 	li	a0, 0			/* Success */
 	RETURN				/* Return */

@@ -306,6 +306,7 @@ struct kpf_onfault {
 
 extern void fsu_fault_lookaside(void); /* support.S */
 struct kpf_onfault kpf_lookaside_onfault[] = {
+	[KPF_SEL_FSU] = { KPF_BEH_JUMP, (vm_offset_t)fsu_fault_lookaside },
 };
 #endif
 
