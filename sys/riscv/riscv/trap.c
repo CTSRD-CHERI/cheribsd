@@ -76,6 +76,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/dtrace_bsd.h>
 #endif
 
+#ifdef KPF_LOOKASIDE_TABLE
+#include <sys/linker.h>
+#include <machine/kpf_lookaside.h>
+#endif
+
 #if __has_feature(capabilities)
 int log_user_cheri_exceptions = 0;
 SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RWTUN,
@@ -291,6 +296,68 @@ ecall_handler(void)
 	syscallret(td);
 }
 
+#define KPF_BEH_JUMP	0
+struct kpf_onfault {
+	int behavior;
+	vm_offset_t param;
+};
+
+#ifdef KPF_LOOKASIDE_TABLE
+
+extern void fsu_fault_lookaside(void); /* support.S */
+struct kpf_onfault kpf_lookaside_onfault[] = {
+};
+#endif
+
+static bool
+page_fault_pcb_onfault(struct pcb *pcb, uintptr_t tf_sepc,
+    struct kpf_onfault *onfault)
+{
+	KASSERT(tf_sepc >= VM_MAX_USER_ADDRESS,
+		("pcb_onfault considered from non-kernel sepc?"));
+
+	vm_offset_t pcbonfault = pcb->pcb_onfault;
+	if (pcbonfault != 0) {
+		onfault->behavior = KPF_BEH_JUMP;
+		onfault->param = pcbonfault;
+		return 1;
+	}
+
+#ifdef KPF_LOOKASIDE_TABLE
+	size_t kpf_selector;
+	int found = linker_kpf_lookup((vm_offset_t)tf_sepc, &kpf_selector);
+
+	if (found == 1) {
+		*onfault = kpf_lookaside_onfault[kpf_selector];
+		return true;
+	}
+	/*
+	 * found == 0 if module not found; found == -1 if module found but no
+	 * linker set.  In either case, we have nothing useful to contribute.
+	 */
+#endif
+
+	return false;
+}
+
+static void
+page_fault_do_kpf(struct trapframe *frame, struct kpf_onfault *onfault, int err)
+{
+	switch(onfault->behavior) {
+	case KPF_BEH_JUMP:
+		frame->tf_a[0] = err;
+#if __has_feature(capabilities)
+		frame->tf_sepc = (uintcap_t)
+		    cheri_setaddress(cheri_getpcc(), onfault->param);
+#else
+		frame->tf_sepc = onfault->param;
+#endif
+		return;
+	default:
+		panic("Bad KPF behavior");
+	}
+}
+
 static void
 page_fault_handler(struct trapframe *frame, int usermode)
 {
@@ -300,8 +367,10 @@ page_fault_handler(struct trapframe *frame, int usermode)
 	struct pcb *pcb;
 	vm_prot_t ftype;
 	vm_offset_t va;
-	struct proc *p;
+	// struct proc *p;
 	int error, sig, ucode;
+	struct kpf_onfault kpf_onfault;
+	bool has_kpf = false;
 #ifdef KDB
 	bool handled;
 #endif
@@ -314,7 +383,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 #endif
 
 	td = curthread;
-	p = td->td_proc;
+	// p = td->td_proc;
 	pcb = td->td_pcb;
 	stval = frame->tf_stval;
 
@@ -329,7 +398,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 			    frame->tf_scause & SCAUSE_CODE, 0);
 			goto done;
 		}
-		map = &p->p_vmspace->vm_map;
+		map = &td->td_proc->p_vmspace->vm_map;
 	} else {
 		/*
 		 * Enable interrupts for the duration of the page fault. For
@@ -343,9 +412,11 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		if (stval >= VM_MAX_USER_ADDRESS) {
 			map = kernel_map;
 		} else {
-			if (pcb->pcb_onfault == 0)
+			has_kpf = page_fault_pcb_onfault(pcb, frame->tf_sepc,
+			    &kpf_onfault);
+			if (!has_kpf)
 				goto fatal;
-			map = &p->p_vmspace->vm_map;
+			map = &td->td_proc->p_vmspace->vm_map;
 		}
 	}
 
@@ -368,14 +439,8 @@ page_fault_handler(struct trapframe *frame, int usermode)
 			call_trapsignal(td, sig, ucode, stval,
 			    frame->tf_scause & SCAUSE_CODE, 0);
 		} else {
-			if (pcb->pcb_onfault != 0) {
-				frame->tf_a[0] = error;
-#if __has_feature(capabilities)
-				frame->tf_sepc = (uintcap_t)cheri_setaddress(
-				    cheri_getpcc(), pcb->pcb_onfault);
-#else
-				frame->tf_sepc = pcb->pcb_onfault;
-#endif
+			if (has_kpf) {
+				page_fault_do_kpf(frame, &kpf_onfault, error);
 				return;
 			}
 			goto fatal;
@@ -406,6 +471,9 @@ void
 do_trap_supervisor(struct trapframe *frame)
 {
 	uint64_t exception;
+#if __has_feature(capabilities)
+	struct kpf_onfault kpf_onfault;
+#endif
 
 	/* Ensure we came from supervisor mode, interrupts disabled */
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) ==
@@ -464,10 +532,9 @@ do_trap_supervisor(struct trapframe *frame)
 	case SCAUSE_LOAD_CAP_PAGE_FAULT:
 	case SCAUSE_STORE_AMO_CAP_PAGE_FAULT:
 	case SCAUSE_CHERI:
-		if (curthread->td_pcb->pcb_onfault != 0) {
-			frame->tf_a[0] = EPROT;
-			frame->tf_sepc = (uintcap_t)cheri_setaddress(
-			    cheri_getpcc(), curthread->td_pcb->pcb_onfault);
+		if (page_fault_pcb_onfault(curthread->td_pcb,
+		    frame->tf_sepc, &kpf_onfault)) {
+			page_fault_do_kpf(frame, &kpf_onfault, EPROT);
 			break;
 		}
 		dump_regs(frame);
