@@ -150,6 +150,8 @@
 #define	__CONCAT(x,y)	__CONCAT1(x,y)
 #define	__STRING(x)	#x		/* stringify without expanding x */
 #define	__XSTRING(x)	__STRING(x)	/* expand x, then stringify */
+#define	__VSTRING(...)	#__VA_ARGS__	/* stringify without expanding args */
+#define	__XVSTRING(x)	__VSTRING(x)	/* expand x, then stringify with ,s */
 
 #define	__const		const		/* define reserved names to standard */
 #define	__signed	signed
