@@ -112,6 +112,9 @@ END(fsu_fault)
 	 * as fsu_fault, but we're using the kpf lookaside table mechanism, and
 	 * so have no need to clear out the fault handler.  This is "registered"
 	 * as lookaside response selector KPF_SEL_FSU.
+	 *
+	 * This is also used by the inline variants in cpufunc.h; make sure it
+	 * remains compatible, or introduce another lookaside selector.
 	 */
 ENTRY(fsu_fault_lookaside)
 #if !__has_feature(capabilities) || !defined(FSU_CHERI_AS_USER)

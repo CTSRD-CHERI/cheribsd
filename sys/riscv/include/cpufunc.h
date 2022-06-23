@@ -47,6 +47,9 @@ breakpoint(void)
 #ifdef _KERNEL
 
 #include <machine/riscvreg.h>
+#if defined(KPF_LOOKASIDE_TABLE) && defined(FSU_CHERI_AS_USER)
+#include <machine/kpf_lookaside.h>
+#endif
 
 static __inline register_t
 intr_disable(void)
@@ -123,6 +126,31 @@ extern int64_t icache_line_size;
 #define	cpufunc_nullop()		riscv_nullop()
 
 void riscv_nullop(void);
+
+#if defined(KPF_LOOKASIDE_TABLE) && defined(FSU_CHERI_AS_USER)
+/*
+ * With both optimisations available to us, we need no prologue or epilogue to
+ * probe userspace memory, so long as we expect the answer in a particular
+ * register (a0), and so we can avoid even the overheads of call and return.
+ * This may still vector to fsu_fault_lookaside on fault, but that will just
+ * write to a0 and return, just as we would on the success path.
+ */
+static __inline int
+fubyte_inline(volatile const void * __capability p)
+{
+
+	register int ret __asm__("a0");
+
+	__asm__ __volatile(
+		__XVSTRING(KPF_LOOKASIDE(1f, KPF_SEL_A0_NEG_ONE);)
+		"1: lb.u.cap %0, 0(%1)"
+		: "=r" (ret)
+		: "C" (p)
+	);
+
+	return ret;
+}
+#endif
 
 #endif	/* _KERNEL */
 
