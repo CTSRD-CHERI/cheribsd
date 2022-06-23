@@ -34,4 +34,7 @@
 /* On fault, jump PC to fsu_fault_lookaside */
 #define KPF_SEL_FSU		0
 
+/* On fault, advance past offending instruction with register a0 holding -1 */
+#define KPF_SEL_A0_NEG_ONE	1
+
 #endif /* _KFP_LOOKASIDE_H_ */

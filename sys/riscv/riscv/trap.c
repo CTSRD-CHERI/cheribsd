@@ -303,10 +303,12 @@ struct kpf_onfault {
 };
 
 #ifdef KPF_LOOKASIDE_TABLE
+#define KPF_BEH_STORE_A0 1
 
 extern void fsu_fault_lookaside(void); /* support.S */
 struct kpf_onfault kpf_lookaside_onfault[] = {
 	[KPF_SEL_FSU] = { KPF_BEH_JUMP, (vm_offset_t)fsu_fault_lookaside },
+	[KPF_SEL_A0_NEG_ONE] = { KPF_BEH_STORE_A0, -1 },
 };
 #endif
 
@@ -354,6 +356,24 @@ page_fault_do_kpf(struct trapframe *frame, struct kpf_onfault *onfault, int err)
 		frame->tf_sepc = onfault->param;
 #endif
 		return;
+#ifdef KPF_LOOKASIDE_TABLE
+	case KPF_BEH_STORE_A0:
+		frame->tf_a[0] = onfault->param;
+#if __has_feature(capabilities)
+		uint16_t * __capability sepc =
+		    cheri_setaddress(cheri_getpcc(), frame->tf_sepc);
+#else
+		uint16_t *sepc = (uint16_t*)frame->tf_sepc;
+#endif
+		if ((*sepc & 0x3) != 0x3) {
+			frame->tf_sepc += 2;
+		} else {
+			KASSERT((*sepc & 0x1C) != 0x1C,
+			    ("Overlong fault instr"));
+			frame->tf_sepc += 4;
+		}
+		return;
+#endif
 	default:
 		panic("Bad KPF behavior");
 	}
