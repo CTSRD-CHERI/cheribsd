@@ -25,3 +25,5 @@ SANITIZER_LDFLAGS+=	-Wl,-rpath,${SANITIZER_LIBDIR}
 # as GCC.
 .error "Unknown link flags for -fsanitize=... COMPILER_TYPE=${COMPILER_TYPE}"
 .endif
+
+.include "Makefile.version"

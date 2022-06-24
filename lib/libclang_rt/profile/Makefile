@@ -30,6 +30,8 @@ SRCS+=		profile/InstrProfilingWriter.c
 .PATH:		${CRTSRC}/include/profile
 INCSDIR=	${CLANGDIR}/include/profile
 INCS+=		InstrProfData.inc
+.if ${CRT_VERSION} >= 14
 INCS+=		MemProfData.inc
+.endif
 
 .include <bsd.lib.mk>

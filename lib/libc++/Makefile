@@ -38,7 +38,9 @@ SRCS+=		hash.cpp
 SRCS+=		ios.cpp
 SRCS+=		ios.instantiations.cpp
 SRCS+=		iostream.cpp
+.if ${LIBCXX_VERSION} >= 14
 SRCS+=		legacy_pointer_safety.cpp
+.endif
 SRCS+=		locale.cpp
 SRCS+=		memory.cpp
 SRCS+=		mutex.cpp
@@ -48,9 +50,11 @@ SRCS+=		optional.cpp
 SRCS+=		random.cpp
 SRCS+=		random_shuffle.cpp
 SRCS+=		regex.cpp
+.if ${LIBCXX_VERSION} >= 14
 SRCS+=		ryu/d2fixed.cpp
 SRCS+=		ryu/d2s.cpp
 SRCS+=		ryu/f2s.cpp
+.endif
 SRCS+=		shared_mutex.cpp
 SRCS+=		stdexcept.cpp
 SRCS+=		string.cpp
@@ -91,7 +95,11 @@ CFLAGS+=	-D_LIBCPP_BUILDING_LIBRARY
 CFLAGS+=	-DLIBCXXRT
 CFLAGS+=	-ffunction-sections
 CFLAGS+=	-fdata-sections
+.if ${LIBCXX_VERSION} >= 14
 CXXSTD?=	c++20
+.else
+CXXSTD?=	c++14
+.endif
 
 LIBADD+=	cxxrt
 
@@ -105,11 +113,16 @@ STD_HEADERS+=	__bsd_locale_fallbacks.h
 STD_HEADERS+=	__config
 STD_HEADERS+=	__debug
 STD_HEADERS+=	__errc
+.if ${LIBCXX_VERSION} < 14
+STD_HEADERS+=	__function_like.h
+.endif
 STD_HEADERS+=	__functional_base
 STD_HEADERS+=	__hash_table
 STD_HEADERS+=	__libcpp_version
 STD_HEADERS+=	__locale
+.if ${LIBCXX_VERSION} >= 14
 STD_HEADERS+=	__mbstate_t.h
+.endif
 STD_HEADERS+=	__mutex_base
 STD_HEADERS+=	__node_handle
 STD_HEADERS+=	__nullptr
@@ -146,7 +159,9 @@ STD_HEADERS+=	complex
 STD_HEADERS+=	complex.h
 STD_HEADERS+=	concepts
 STD_HEADERS+=	condition_variable
+.if ${LIBCXX_VERSION} >= 14
 STD_HEADERS+=	coroutine
+.endif
 STD_HEADERS+=	csetjmp
 STD_HEADERS+=	csignal
 STD_HEADERS+=	cstdarg
@@ -279,9 +294,11 @@ ALG_HEADERS+=	for_each_n.h
 ALG_HEADERS+=	generate.h
 ALG_HEADERS+=	generate_n.h
 ALG_HEADERS+=	half_positive.h
+.if ${LIBCXX_VERSION} >= 14
 ALG_HEADERS+=	in_in_out_result.h
 ALG_HEADERS+=	in_in_result.h
 ALG_HEADERS+=	in_out_result.h
+.endif
 ALG_HEADERS+=	includes.h
 ALG_HEADERS+=	inplace_merge.h
 ALG_HEADERS+=	is_heap.h
@@ -352,6 +369,7 @@ ALG_HEADERS+=	upper_bound.h
 ALG+=		${HDRDIR}/__algorithm/${hdr}
 .endfor
 
+.if ${LIBCXX_VERSION} >= 14
 INCSGROUPS+=	BIT
 BITDIR=		${CXXINCLUDEDIR}/__bit
 BIT_HEADERS+=	bit_cast.h
@@ -461,15 +479,21 @@ FS_HEADERS+=	u8path.h
 .for hdr in ${FS_HEADERS}
 FS+=		${HDRDIR}/__filesystem/${hdr}
 .endfor
+.endif
 
 INCSGROUPS+=	FMT
 FMTDIR=		${CXXINCLUDEDIR}/__format
+.if ${LIBCXX_VERSION} >= 14
 FMT_HEADERS+=	format_arg.h
 FMT_HEADERS+=	format_args.h
 FMT_HEADERS+=	format_context.h
+.endif
 FMT_HEADERS+=	format_error.h
+.if ${LIBCXX_VERSION} >= 14
 FMT_HEADERS+=	format_fwd.h
+.endif
 FMT_HEADERS+=	format_parse_context.h
+.if ${LIBCXX_VERSION} >= 14
 FMT_HEADERS+=	format_string.h
 FMT_HEADERS+=	format_to_n_result.h
 FMT_HEADERS+=	formatter.h
@@ -481,6 +505,7 @@ FMT_HEADERS+=	formatter_integral.h
 FMT_HEADERS+=	formatter_pointer.h
 FMT_HEADERS+=	formatter_string.h
 FMT_HEADERS+=	parser_std_format_spec.h
+.endif
 .for hdr in ${FMT_HEADERS}
 FMT+=		${HDRDIR}/__format/${hdr}
 .endfor
@@ -490,11 +515,15 @@ FUNDIR=		${CXXINCLUDEDIR}/__functional
 FUN_HEADERS+=	binary_function.h
 FUN_HEADERS+=	binary_negate.h
 FUN_HEADERS+=	bind.h
+.if ${LIBCXX_VERSION} >= 14
 FUN_HEADERS+=	bind_back.h
+.endif
 FUN_HEADERS+=	bind_front.h
 FUN_HEADERS+=	binder1st.h
 FUN_HEADERS+=	binder2nd.h
+.if ${LIBCXX_VERSION} >= 14
 FUN_HEADERS+=	compose.h
+.endif
 FUN_HEADERS+=	default_searcher.h
 FUN_HEADERS+=	function.h
 FUN_HEADERS+=	hash.h
@@ -533,7 +562,9 @@ IT_HEADERS+=	empty.h
 IT_HEADERS+=	erase_if_container.h
 IT_HEADERS+=	front_insert_iterator.h
 IT_HEADERS+=	incrementable_traits.h
+.if ${LIBCXX_VERSION} >= 14
 IT_HEADERS+=	indirectly_comparable.h
+.endif
 IT_HEADERS+=	insert_iterator.h
 IT_HEADERS+=	istream_iterator.h
 IT_HEADERS+=	istreambuf_iterator.h
@@ -551,7 +582,9 @@ IT_HEADERS+=	readable_traits.h
 IT_HEADERS+=	reverse_access.h
 IT_HEADERS+=	reverse_iterator.h
 IT_HEADERS+=	size.h
+.if ${LIBCXX_VERSION} >= 14
 IT_HEADERS+=	unreachable_sentinel.h
+.endif
 IT_HEADERS+=	wrap_iter.h
 .for hdr in ${IT_HEADERS}
 IT+=		${HDRDIR}/__iterator/${hdr}
@@ -566,22 +599,32 @@ MEM_HEADERS+=	allocator_arg_t.h
 MEM_HEADERS+=	allocator_traits.h
 MEM_HEADERS+=	auto_ptr.h
 MEM_HEADERS+=	compressed_pair.h
+.if ${LIBCXX_VERSION} >= 14
 MEM_HEADERS+=	concepts.h
+.endif
 MEM_HEADERS+=	construct_at.h
+.if ${LIBCXX_VERSION} < 14
+MEM_HEADERS+=	pointer_safety.h
+.endif
 MEM_HEADERS+=	pointer_traits.h
+.if ${LIBCXX_VERSION} >= 14
 MEM_HEADERS+=	ranges_construct_at.h
 MEM_HEADERS+=	ranges_uninitialized_algorithms.h
+.endif
 MEM_HEADERS+=	raw_storage_iterator.h
 MEM_HEADERS+=	shared_ptr.h
 MEM_HEADERS+=	temporary_buffer.h
 MEM_HEADERS+=	uninitialized_algorithms.h
 MEM_HEADERS+=	unique_ptr.h
 MEM_HEADERS+=	uses_allocator.h
+.if ${LIBCXX_VERSION} >= 14
 MEM_HEADERS+=	voidify.h
+.endif
 .for hdr in ${MEM_HEADERS}
 MEM+=		${HDRDIR}/__memory/${hdr}
 .endfor
 
+.if ${LIBCXX_VERSION} >= 14
 INCSGROUPS+=    NUM
 NUMDIR=		${CXXINCLUDEDIR}/__numeric
 NUM_HEADERS+=	accumulate.h
@@ -600,9 +643,11 @@ NUM_HEADERS+=	transform_reduce.h
 .for hdr in ${NUM_HEADERS}
 NUM+=		${HDRDIR}/__numeric/${hdr}
 .endfor
+.endif
 
 INCSGROUPS+=	RND
 RNDDIR=		${CXXINCLUDEDIR}/__random
+.if ${LIBCXX_VERSION} >= 14
 RND_HEADERS+=	bernoulli_distribution.h
 RND_HEADERS+=	binomial_distribution.h
 RND_HEADERS+=	cauchy_distribution.h
@@ -635,10 +680,13 @@ RND_HEADERS+=	seed_seq.h
 RND_HEADERS+=	shuffle_order_engine.h
 RND_HEADERS+=	student_t_distribution.h
 RND_HEADERS+=	subtract_with_carry_engine.h
+.endif
 RND_HEADERS+=	uniform_int_distribution.h
+.if ${LIBCXX_VERSION} >= 14
 RND_HEADERS+=	uniform_random_bit_generator.h
 RND_HEADERS+=	uniform_real_distribution.h
 RND_HEADERS+=	weibull_distribution.h
+.endif
 .for hdr in ${RND_HEADERS}
 RND+=		${HDRDIR}/__random/${hdr}
 .endfor
@@ -650,7 +698,9 @@ RNG_HEADERS+=	all.h
 RNG_HEADERS+=	common_view.h
 RNG_HEADERS+=	concepts.h
 RNG_HEADERS+=	copyable_box.h
+.if ${LIBCXX_VERSION} >= 14
 RNG_HEADERS+=	counted.h
+.endif
 RNG_HEADERS+=	dangling.h
 RNG_HEADERS+=	data.h
 RNG_HEADERS+=	drop_view.h
@@ -658,24 +708,35 @@ RNG_HEADERS+=	empty.h
 RNG_HEADERS+=	empty_view.h
 RNG_HEADERS+=	enable_borrowed_range.h
 RNG_HEADERS+=	enable_view.h
+.if ${LIBCXX_VERSION} >= 14
 RNG_HEADERS+=	iota_view.h
 RNG_HEADERS+=	join_view.h
+.endif
 RNG_HEADERS+=	non_propagating_cache.h
+.if ${LIBCXX_VERSION} >= 14
 RNG_HEADERS+=	owning_view.h
 RNG_HEADERS+=	range_adaptor.h
+.endif
 RNG_HEADERS+=	ref_view.h
+.if ${LIBCXX_VERSION} >= 14
 RNG_HEADERS+=	reverse_view.h
 RNG_HEADERS+=	single_view.h
+.endif
 RNG_HEADERS+=	size.h
 RNG_HEADERS+=	subrange.h
+.if ${LIBCXX_VERSION} >= 14
 RNG_HEADERS+=	take_view.h
+.endif
 RNG_HEADERS+=	transform_view.h
 RNG_HEADERS+=	view_interface.h
+.if ${LIBCXX_VERSION} >= 14
 RNG_HEADERS+=	views.h
+.endif
 .for hdr in ${RNG_HEADERS}
 RNG+=		${HDRDIR}/__ranges/${hdr}
 .endfor
 
+.if ${LIBCXX_VERSION} >= 14
 INCSGROUPS+=	THR
 THRDIR=		${CXXINCLUDEDIR}/__thread
 THR_HEADERS+=	poll_with_backoff.h
@@ -683,11 +744,17 @@ THR_HEADERS+=	timed_backoff_policy.h
 .for hdr in ${THR_HEADERS}
 THR+=		${HDRDIR}/__thread/${hdr}
 .endfor
+.endif
 
 INCSGROUPS+=	UTL
 UTLDIR=		${CXXINCLUDEDIR}/__utility
+.if ${LIBCXX_VERSION} < 14
+UTL_HEADERS+=	__decay_copy.h
+.endif
 UTL_HEADERS+=	as_const.h
+.if ${LIBCXX_VERSION} >= 14
 UTL_HEADERS+=	auto_cast.h
+.endif
 UTL_HEADERS+=	cmp.h
 UTL_HEADERS+=	declval.h
 UTL_HEADERS+=	exchange.h
@@ -697,11 +764,15 @@ UTL_HEADERS+=	integer_sequence.h
 UTL_HEADERS+=	move.h
 UTL_HEADERS+=	pair.h
 UTL_HEADERS+=	piecewise_construct.h
+.if ${LIBCXX_VERSION} >= 14
 UTL_HEADERS+=	priority_tag.h
+.endif
 UTL_HEADERS+=	rel_ops.h
 UTL_HEADERS+=	swap.h
 UTL_HEADERS+=	to_underlying.h
+.if ${LIBCXX_VERSION} >= 14
 UTL_HEADERS+=	transaction.h
+.endif
 .for hdr in ${UTL_HEADERS}
 UTL+=		${HDRDIR}/__utility/${hdr}
 .endfor

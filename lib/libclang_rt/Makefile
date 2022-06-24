@@ -1,12 +1,16 @@
 # $FreeBSD$
 
+.include "Makefile.version"
+
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
 SUBDIR+=	include
 SUBDIR+=	asan
 SUBDIR+=	asan-preinit
 SUBDIR+=	asan_cxx
 SUBDIR+=	asan_dynamic
+.if ${CRT_VERSION} >= 14
 SUBDIR+=	asan_static
+.endif
 SUBDIR+=	cfi
 SUBDIR+=	cfi_diag
 SUBDIR+=	safestack
@@ -20,7 +24,9 @@ SUBDIR+=	ubsan_standalone_cxx
 .if ${MACHINE_CPUARCH} == "amd64"
 SUBDIR+=	dd
 SUBDIR+=	fuzzer
+.if ${CRT_VERSION} >= 14
 SUBDIR+=	fuzzer_interceptors
+.endif
 SUBDIR+=	fuzzer_no_main
 SUBDIR+=	msan
 SUBDIR+=	msan_cxx

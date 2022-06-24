@@ -21,6 +21,9 @@ SRCS+=		sanitizer_common/sanitizer_libignore.cpp
 SRCS+=		sanitizer_common/sanitizer_linux.cpp
 SRCS+=		sanitizer_common/sanitizer_linux_libcdep.cpp
 SRCS+=		sanitizer_common/sanitizer_mutex.cpp
+.if ${CRT_VERSION} < 14
+SRCS+=		sanitizer_common/sanitizer_persistent_allocator.cpp
+.endif
 SRCS+=		sanitizer_common/sanitizer_platform_limits_freebsd.cpp
 SRCS+=		sanitizer_common/sanitizer_platform_limits_linux.cpp
 SRCS+=		sanitizer_common/sanitizer_platform_limits_posix.cpp
