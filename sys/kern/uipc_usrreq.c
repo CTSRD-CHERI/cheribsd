@@ -1119,6 +1119,9 @@ release:
 
 /*
  * PF_UNIX/SOCK_DGRAM send
+ *
+ * Allocate a record consisting of 3 mbufs in the sequence of
+ * from -> control -> data and append it to the socket buffer.
  */
 static int
 uipc_sosend_dgram(struct socket *so, struct sockaddr *addr, struct uio *uio,
@@ -1127,11 +1130,14 @@ uipc_sosend_dgram(struct socket *so, struct sockaddr *addr, struct uio *uio,
 	struct unpcb *unp, *unp2;
 	const struct sockaddr *from;
 	struct socket *so2;
-	int error;
+	struct sockbuf *sb;
+	struct mbuf *f, *clast;
+	int cc, error;
 
 	MPASS((uio != NULL && m == NULL) || (m != NULL && uio == NULL));
 
 	error = 0;
+	f = NULL;
 
 	if (__predict_false(flags & MSG_OOB)) {
 		error = EOPNOTSUPP;
@@ -1147,6 +1153,7 @@ uipc_sosend_dgram(struct socket *so, struct sockaddr *addr, struct uio *uio,
 			error = EFAULT;
 			goto out;
 		}
+		f = m_get(M_WAITOK, MT_SONAME);
 		if (c != NULL && (error = unp_internalize(&c, td)))
 			goto out;
 	} else {
@@ -1158,6 +1165,10 @@ uipc_sosend_dgram(struct socket *so, struct sockaddr *addr, struct uio *uio,
 
 		if (__predict_false(m->m_pkthdr.len > unpdg_maxdgram)) {
 			error = EMSGSIZE;
+			goto out;
+		}
+		if ((f = m_get(M_NOWAIT, MT_SONAME)) == NULL) {
+			error = ENOBUFS;
 			goto out;
 		}
 		/* Condition the foreign mbuf to our standards. */
@@ -1226,11 +1237,38 @@ uipc_sosend_dgram(struct socket *so, struct sockaddr *addr, struct uio *uio,
 		from = (struct sockaddr *)unp->unp_addr;
 	else
 		from = &sun_noname;
+	f->m_len = from->sa_len;
+	MPASS(from->sa_len <= MLEN);
+	bcopy(from, mtod(f, void *), from->sa_len);
+	cc = f->m_len + m->m_pkthdr.len;
+	if (c != NULL)
+		cc += m_length(c, &clast);
 	so2 = unp2->unp_socket;
-	SOCKBUF_LOCK(&so2->so_rcv);
-	if (sbappendaddr_locked(&so2->so_rcv, from, m, c)) {
+	sb = &so2->so_rcv;
+	SOCKBUF_LOCK(sb);
+	if (cc <= sbspace(sb)) {
+		/* Concatenate: from -> control -> data. */
+		if (c != NULL) {
+			f->m_next = c;
+			clast->m_next = m;
+		} else
+			f->m_next = m;
+		m = f;
+		/* Reusing f as iterator. */
+		for (f = m; f->m_next != NULL; f = f->m_next)
+			sballoc(sb, f);
+		sballoc(sb, f);
+		sb->sb_mbtail = f;
+		/* SBLINKRECORD */
+		if (sb->sb_lastrecord != NULL)
+			sb->sb_lastrecord->m_nextpkt = m;
+		else
+			sb->sb_mb = m;
+		sb->sb_lastrecord = m;
+		SBLASTMBUFCHK(sb);
+		SBLASTRECORDCHK(sb);
 		sorwakeup_locked(so2);
-		m = c = NULL;
+		f = m = c = NULL;
 	} else {
 		soroverflow_locked(so2);
 		error = (so->so_state & SS_NBIO) ? EAGAIN : ENOBUFS;
@@ -1249,6 +1287,8 @@ out2:
 	if (c)
 		unp_scan(c, unp_freerights);
 out:
+	if (f)
+		m_free(f);
 	if (c)
 		m_freem(c);
 	if (m)
