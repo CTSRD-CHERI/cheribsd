@@ -385,7 +385,6 @@ struct __no_subobject_bounds {						\
 } while (/*CONSTCOND*/ 0)
 
 #define RB_ROTATE_LEFT(head, elm, tmp, field) do {			\
-	(tmp) = RB_RIGHT(elm, field);					\
 	if ((RB_RIGHT(elm, field) = RB_LEFT(tmp, field)) != NULL) {	\
 		RB_SET_PARENT(RB_RIGHT(elm, field), elm, field);	\
 	}								\
@@ -397,7 +396,6 @@ struct __no_subobject_bounds {						\
 } while (/*CONSTCOND*/ 0)
 
 #define RB_ROTATE_RIGHT(head, elm, tmp, field) do {			\
-	(tmp) = RB_LEFT(elm, field);					\
 	if ((RB_LEFT(elm, field) = RB_RIGHT(tmp, field)) != NULL) {	\
 		RB_SET_PARENT(RB_LEFT(elm, field), elm, field);		\
 	}								\
@@ -478,6 +476,7 @@ name##_RB_INSERT_COLOR(struct name *head, struct type *elm)		\
 			}						\
 			RB_FLIP_RIGHT(parent, field);			\
 			if (RB_RED_RIGHT(parent, field)) {		\
+				child = elm;				\
 				elm = parent;				\
 				continue;				\
 			}						\
@@ -498,6 +497,7 @@ name##_RB_INSERT_COLOR(struct name *head, struct type *elm)		\
 			}						\
 			RB_FLIP_LEFT(parent, field);			\
 			if (RB_RED_LEFT(parent, field)) {		\
+				child = elm;				\
 				elm = parent;				\
 				continue;				\
 			}						\
@@ -553,6 +553,7 @@ name##_RB_REMOVE_COLOR(struct name *head,				\
 				RB_FLIP_LEFT(parent, field);		\
 			else if (!RB_RED_RIGHT(sib, field)) {		\
 				RB_FLIP_LEFT(parent, field);		\
+				elm = RB_LEFT(sib, field);		\
 				RB_ROTATE_RIGHT(head, sib, elm, field);	\
 				if (RB_RED_RIGHT(elm, field))		\
 					RB_FLIP_LEFT(sib, field);	\
@@ -583,6 +584,7 @@ name##_RB_REMOVE_COLOR(struct name *head,				\
 				RB_FLIP_RIGHT(parent, field);		\
 			else if (!RB_RED_LEFT(sib, field)) {		\
 				RB_FLIP_RIGHT(parent, field);		\
+				elm = RB_RIGHT(sib, field);		\
 				RB_ROTATE_LEFT(head, sib, elm, field);	\
 				if (RB_RED_LEFT(elm, field))		\
 					RB_FLIP_RIGHT(sib, field);	\
