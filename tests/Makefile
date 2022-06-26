@@ -14,7 +14,6 @@ SUBDIR.${MK_LIB64C}+=	cheri
 SUBDIR+= etc
 SUBDIR+= sys
 SUBDIR+= atf_python
-SUBDIR+= freebsd_test_suite
 
 SUBDIR_PARALLEL=
 
