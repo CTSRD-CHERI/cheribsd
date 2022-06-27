@@ -3,7 +3,7 @@
 .include <src.opts.mk>
 
 PACKAGE=	clibs
-SRCDIR=		${SRCTOP}/contrib/llvm-project/libcxx
+SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++
 
 LIB=		c++experimental
 NO_PIC=
@@ -15,7 +15,7 @@ SRCS+=		memory_resource.cpp
 
 WARNS?=		0
 CXXFLAGS+=	${PICFLAG}
-CFLAGS+=	-isystem ${.CURDIR}/../libc++
+CFLAGS+=	-isystem ${.CURDIR}/../cheri-libc++
 CXXFLAGS+=	-isystem ${SRCDIR}/include
 CXXFLAGS+=	-nostdinc++
 CXXFLAGS+=	-nostdlib

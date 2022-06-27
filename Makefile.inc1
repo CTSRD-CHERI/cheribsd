@@ -3109,7 +3109,7 @@ _prebuild_libs+= lib/libregex
 .endif
 
 .if ${MK_CXX} != "no"
-_prebuild_libs+= lib/libc++
+_prebuild_libs+= lib/cheri-libc++
 .endif
 
 lib/libgeom__L: lib/libexpat__L lib/libsbuf__L

@@ -129,7 +129,7 @@ SUBDIR_DEPEND_libarchive= libz libbz2 libexpat liblzma libmd libzstd
 SUBDIR_DEPEND_libauditdm= libbsm
 SUBDIR_DEPEND_libbsddialog= ncurses
 SUBDIR_DEPEND_libbsnmp= ${_libnetgraph}
-SUBDIR_DEPEND_libc++:= libcxxrt
+SUBDIR_DEPEND_cheri-libc++:= libcxxrt
 # libssp_nonshared doesn't need to be linked into libc on every arch, but it is
 # small enough to build that this bit of serialization is likely insignificant.
 SUBDIR_DEPEND_libc= libcompiler_rt libssp_nonshared
@@ -217,8 +217,11 @@ _libclang_rt=	libclang_rt
 
 .if ${MK_CXX} != "no"
 _libcxxrt=	libcxxrt
-_libcplusplus=	libc++
-_libcplusplus+=	libc++experimental
+_libcplusplus=	cheri-libc++
+.if ${MK_CHERI} != "no"
+# libc++experimental currently causes crashes
+_libcplusplus+=	cheri-libc++experimental
+.endif
 .endif
 
 SUBDIR.${MK_EFI}+=	libefivar
@@ -266,11 +269,6 @@ SUBDIR.${MK_ZFS}+=	libbe
 
 .if !make(install)
 SUBDIR_PARALLEL=
-.endif
-
-.if ${MK_CHERI} != "no"
-# libc++experimental currently causes crashes
-SUBDIR:=	${SUBDIR:Nlibc++experimental}
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}
