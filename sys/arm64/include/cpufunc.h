@@ -249,4 +249,100 @@ void arm64_dcache_wb_range(vm_pointer_t, vm_size_t);
 bool arm64_get_writable_addr(vm_pointer_t, vm_pointer_t *);
 
 #endif	/* _KERNEL */
+
+#define CHERI_START_TRACE do {			\
+	__asm__ __volatile__("hlt #0xe003");	\
+} while (0)
+
+#define CHERI_STOP_TRACE do {			\
+	__asm__ __volatile__("hlt #0xe004");	\
+} while (0)
+
+#define CHERI_START_USER_TRACE do {		\
+	__asm__ __volatile__("hlt #0xe005");	\
+} while (0)
+
+#define CHERI_STOP_USER_TRACE do {		\
+	__asm__ __volatile__("hlt #0xe004");	\
+} while (0)
+
+#define	QEMU_SET_TRACE_BUFFERED_MODE	do {	\
+	__asm__ __volatile__("hlt #0xe000");	\
+} while(0)
+
+#define	QEMU_CLEAR_TRACE_BUFFERED_MODE	do {	\
+	__asm__ __volatile__("hlt #0xe001");	\
+} while(0)
+
+#define	QEMU_FLUSH_TRACE_BUFFER do {		\
+	__asm__ __volatile__("hlt #0xe002");	\
+} while(0)
+
+/*
+ * Update qemu notion of the current context
+ * pid: current pid
+ * tid: current thread id
+ * cid: compartment id
+ */
+#define	QEMU_EVENT_CONTEXT_UPDATE(pid, tid, cid)        \
+	__asm__ __volatile__(				\
+		"mov x0, #0x1\n"			\
+		"mov x1, #0x0\n"			\
+		"mov x2, %0\n"				\
+		"mov x3, %1\n"				\
+		"mov x4, %2\n"				\
+		"hlt #0xe006\n"				\
+		:: "r" (pid), "r" (tid), "r" (cid)	\
+		: "x0", "x1", "x2", "x3", "x4")
+/*
+ * Arbitrary marker event to emit to the trace.
+ * 0x00 - 0x9fff reserved for kernel-level markers
+ * 0xa000 - 0xffff reserved for benchmarks use
+ */
+#define	QEMU_EVENT_MARKER(trace_marker)		\
+	__asm__ __volatile__(			\
+	    "mov x0, #0x2\n"			\
+	    "mov x1, %0\n"			\
+	    "hlt #0xe006\n"			\
+	    :: "r" (trace_marker)		\
+	    : "x0", "x1")
+
+#define	QEMU_TRACE_MARKER_INTR_ENTRY	0x10
+#define	QEMU_TRACE_MARKER_INTR_RET	0x11
+#define	QEMU_TRACE_MARKER_BENCHMARK_ITERATION	0xbeef
+
+/*
+ * QEMU tracing counter event.
+ * This is an (hopefully) low overhead counter that only
+ * requires a NOP to be incremented/decremented.
+ */
+#define	QEMU_EVENT_COUNTER_FLAGS(slot, inc)			\
+	((((uint64_t)inc & 0x1) << 32) | (slot & 0xffff))
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	QEMU_EVENT_COUNTER(name, slot, value, incremental)		\
+	__asm__ __volatile__(						\
+	    "mov x0, #0x4\n"						\
+	    "mov c1, %0\n"						\
+	    "mov x2, %1\n"						\
+	    "mov x3, %2\n"						\
+	    "hlt #0xe006\n"						\
+	    :: "C" (name), "r" ((int64_t)value),			\
+	     "r" (QEMU_EVENT_COUNTER_FLAGS(slot, incremental))		\
+	    : "x0", "c1", "x2", "x3")
+#else
+#define	QEMU_EVENT_COUNTER(name, slot, value, incremental)	\
+	__asm__ __volatile__(					\
+	    "mov x0, #0x4\n"					\
+	    "mov x1, %0\n"					\
+	    "mov x2, %1\n"					\
+	    "mov x3, %2\n"					\
+	    "hlt #0xe006\n"					\
+	    :: "r" (name), "r" ((int64_t)value),		\
+	     "r" (QEMU_EVENT_COUNTER_FLAGS(slot, incremental))	\
+	    : "x0", "x1", "x2", "x3")
+#endif
+#define	QEMU_EVENT_ABS_COUNTER(name, slot, value)	\
+	QEMU_EVENT_COUNTER(name, slot, value, 0)
+#define	QEMU_EVENT_INC_COUNTER(name, slot, value)	\
+	QEMU_EVENT_COUNTER(name, slot, value, 1)
 #endif	/* _MACHINE_CPUFUNC_H_ */
