@@ -1904,9 +1904,6 @@ static void __elfN(putnote)(struct thread *td, struct note_info *, struct sbuf *
 
 static void __elfN(note_prpsinfo)(void *, struct sbuf *, size_t *);
 static void __elfN(note_threadmd)(void *, struct sbuf *, size_t *);
-#if __has_feature(capabilities)
-static void __elfN(note_capregs)(void *, struct sbuf *, size_t *);
-#endif
 static void __elfN(note_procstat_auxv)(void *, struct sbuf *, size_t *);
 static void __elfN(note_procstat_proc)(void *, struct sbuf *, size_t *);
 static void __elfN(note_procstat_psstrings)(void *, struct sbuf *, size_t *);
@@ -2217,10 +2214,6 @@ __elfN(prepare_notes)(struct thread *td, struct note_info_list *list,
 	thr = td;
 	while (thr != NULL) {
 		size += __elfN(prepare_register_notes)(td, list, thr);
-#if __has_feature(capabilities)
-		size += __elfN(register_note)(td, list, NT_CAPREGS,
-		    __elfN(note_capregs), thr);
-#endif
 		size += __elfN(register_note)(td, list, -1,
 		    __elfN(note_threadmd), thr);
 
@@ -2545,9 +2538,6 @@ typedef struct ptrace_lwpinfo elf_lwpinfo_t;
 typedef struct kinfo_proc elf_kinfo_proc_t;
 typedef vm_offset_t elf_ps_strings_t;
 #endif
-#if __has_feature(capabilities)
-typedef capregset_t elf_capregs_t;
-#endif
 
 static void
 __elfN(note_prpsinfo)(void *arg, struct sbuf *sb, size_t *sizep)
@@ -2706,6 +2696,44 @@ static struct regset __elfN(regset_fpregset) = {
 };
 ELF_REGSET(__elfN(regset_fpregset));
 
+#if __has_feature(capabilities)
+static bool
+__elfN(get_capregs)(struct regset *rs, struct thread *td, void *buf,
+    size_t *sizep)
+{
+	struct capreg *capregs;
+
+	if (buf != NULL) {
+		KASSERT(*sizep == sizeof(*capregs), ("%s: invalid size",
+		    __func__));
+		capregs = buf;
+		fill_capregs(td, capregs);
+	}
+	*sizep = sizeof(*capregs);
+	return (true);
+}
+
+static bool
+__elfN(set_capregs)(struct regset *rs, struct thread *td, void *buf,
+    size_t size)
+{
+	struct capreg *capregs;
+
+	capregs = buf;
+	KASSERT(size == sizeof(*capregs), ("%s: invalid size", __func__));
+	set_capregs(td, capregs);
+	return (true);
+}
+
+static struct regset __elfN(regset_cap) = {
+	.note = NT_CAPREGS,
+	.size = sizeof(struct capreg),
+	.get = __elfN(get_capregs),
+	.set = __elfN(set_capregs),
+};
+ELF_REGSET(__elfN(regset_cap));
+#endif
+
 static bool
 __elfN(get_thrmisc)(struct regset *rs, struct thread *td, void *buf,
     size_t *sizep)
@@ -2806,25 +2834,6 @@ __elfN(prepare_register_notes)(struct thread *td, struct note_info_list *list,
 	}
 	return (size);
 }
-
-#if __has_feature(capabilities)
-static void
-__elfN(note_capregs)(void *arg, struct sbuf *sb, size_t *sizep)
-{
-	struct thread *td;
-	elf_capregs_t *capregs;
-
-	td = (struct thread *)arg;
-	if (sb != NULL) {
-		KASSERT(*sizep == sizeof(*capregs), ("invalid size"));
-		capregs = malloc(sizeof(*capregs), M_TEMP, M_ZERO | M_WAITOK);
-		fill_capregs(td, capregs);
-		sbuf_bcat(sb, capregs, sizeof(*capregs));
-		free(capregs, M_TEMP);
-	}
-	*sizep = sizeof(*capregs);
-}
-#endif
 
 /*
  * Allow for MD specific notes, as well as any MD
