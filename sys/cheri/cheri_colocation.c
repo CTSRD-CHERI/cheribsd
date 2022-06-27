@@ -810,8 +810,23 @@ kern_cocall_slow(void * __capability target,
 	/*
 	 * Unseal the capability to the callee control block and load it.
 	 *
-	 * XXX: How to detect unsealing failure?  Would it trap?
+	 * XXX: We could drop those three checks once we have a non-trapping unseal.
 	 */
+	if (cheri_gettag(target) == 0) {
+		COLOCATION_DEBUG("untagged target %#lp; returning EINVAL", target);
+		return (EINVAL);
+	}
+	if (cheri_getsealed(target) == 0) {
+		COLOCATION_DEBUG("unsealed target %#lp; returning EINVAL", target);
+		return (EINVAL);
+	}
+	if (cheri_gettype(target) == cheri_gettype(switcher_sealcap2)) {
+		COLOCATION_DEBUG("target %#lp type %lu != %#lp type %lu; returning EINVAL",
+		    target, cheri_gettype(target),
+		    switcher_sealcap2, cheri_gettype(switcher_sealcap2));
+		return (EINVAL);
+	}
+
 	targetscb = cheri_unseal(target, switcher_sealcap2);
 
 	SWITCHER_LOCK();
