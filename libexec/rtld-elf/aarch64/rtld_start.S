@@ -237,9 +237,9 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	cmp	x3, x4
 	b.ne	1f			/* dtv[0] != tlsdec->dtv_gen */
 
-	ldr	w2, [c1, #16]		/* tlsdesc->tls_index */
-	add	w2, w2, #1
-	ldr     c3, [c0, w2, sxtw #4]	/* dtv[tlsdesc->tls_index + 1] */
+	ldr	w3, [c1, #16]		/* tlsdesc->tls_index */
+	add	w3, w3, #1
+	ldr     c3, [c0, w3, sxtw #4]	/* dtv[tlsdesc->tls_index + 1] */
 	cbz	x3, 1f
 
 	/* Return (dtv[tlsdesc->tls_index + 1] + tlsdesc->tls_offs) */
