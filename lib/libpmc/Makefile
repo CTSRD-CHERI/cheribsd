@@ -9,6 +9,7 @@ SRCS=	libpmc.c pmclog.c libpmc_pmu_util.c libpmc_json.cc
 INCS=	pmc.h pmclog.h pmcformat.h
 
 CFLAGS+= -I${SRCTOP}/${RELDIR:H}/libpmcstat
+
 LDADD+=	-lc++
 
 .if ${MACHINE_CPUARCH} == "aarch64"
@@ -17,6 +18,8 @@ EVENT_ARCH="arm64"
 EVENT_ARCH="x86"
 .elif ${MACHINE_CPUARCH} == "powerpc" && ${MACHINE_ARCH:Mpowerpc64*} != ""
 EVENT_ARCH="powerpc"
+.elif ${MACHINE_CPUARCH} == "riscv"
+EVENT_ARCH="riscv"
 .else
 # This will generate an empty events table
 EVENT_ARCH="none"

@@ -1,0 +1,17 @@
+[
+  {
+    "EventCode": "0x00",
+    "EventName": "CYCLES",
+    "BriefDescription": "CPU Cycles"
+  },
+  {
+    "EventCode": "0x01",
+    "EventName": "TIME",
+    "BriefDescription": "CPU Time"
+  },
+  {
+    "EventCode": "0x02",
+    "EventName": "INSTRET",
+    "BriefDescription": "Total instruction retired"
+  }
+]
