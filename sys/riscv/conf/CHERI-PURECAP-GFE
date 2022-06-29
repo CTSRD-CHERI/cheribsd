@@ -4,3 +4,7 @@ include "GFE"
 include "std.CHERI-PURECAP"
 
 ident CHERI-PURECAP-GFE
+
+options HWPMC_HOOKS
+device hwpmc
+device hwpmc_toooba
