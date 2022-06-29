@@ -29,8 +29,6 @@ SUBDIR=	alias \
 	column \
 	comm \
 	compress \
-	coping \
-	copong \
 	cpuset \
 	csplit \
 	ctlstat \
@@ -149,7 +147,6 @@ SUBDIR=	alias \
 	soelim \
 	sort \
 	split \
-	stevie \
 	stat \
 	stdbuf \
 	strings \
@@ -193,6 +190,13 @@ SUBDIR=	alias \
 	xzdec \
 	yes \
 	zstd
+
+.if ${MACHINE_ABI:Mpurecap}
+SUBDIR+= \
+	coping \
+	copong \
+	stevie
+.endif
 
 .if ${MACHINE_ARCH:Mriscv64*}
 SUBDIR+=	minimal_count_stats
