@@ -429,4 +429,5 @@ MIASM =  \
 	aio_readv.o \
 	fspacectl.o \
 	sched_getcpu.o \
-	swapoff.o
+	swapoff.o \
+	hwpmcctl.o

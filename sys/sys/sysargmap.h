@@ -408,6 +408,7 @@ static int sysargmask[] = {
 	[SYS_fspacectl] = (0x0 | 0x4 | 0x10),
 	[SYS_sched_getcpu] = (0x0),
 	[SYS_swapoff] = (0x0 | 0x1),
+	[SYS_hwpmcctl] = (0x0 | 0x2),
 };
 
 #endif /* !_SYSARGMAP_H_ */

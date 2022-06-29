@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/signalvar.h>
 #include <sys/smp.h>
 #include <sys/sx.h>
+#include <sys/syscall.h>
 #include <sys/sysctl.h>
 #include <sys/sysent.h>
 #include <sys/syslog.h>
@@ -79,6 +80,9 @@ __FBSDID("$FreeBSD$");
 
 #include "hwpmc_soft.h"
 
+#include <machine/cpufunc.h>
+#include <machine/cheri.h>
+
 #define PMC_EPOCH_ENTER() struct epoch_tracker pmc_et; epoch_enter_preempt(global_epoch_preempt, &pmc_et)
 #define PMC_EPOCH_EXIT() epoch_exit_preempt(global_epoch_preempt, &pmc_et)
 
@@ -97,7 +101,7 @@ enum pmc_flags {
  * The offset in sysent where the syscall is allocated.
  */
 
-static int pmc_syscall_num = NO_SYSCALL;
+static int pmc_syscall_num = SYS_hwpmcctl;
 struct pmc_cpu		**pmc_pcpu;	 /* per-cpu state */
 pmc_value_t		*pmc_pcpu_saved; /* saved PMC values: CSW handling */
 
@@ -3221,7 +3225,7 @@ pmc_start(struct pmc *pm)
 			atomic_add_rel_int(&pmc_ss_count, 1);
 			CK_LIST_INSERT_HEAD(&pmc_ss_owners, po, po_ssnext);
 			PMCDBG1(PMC,OPS,1, "po=%p in global list", po);
-		}
+			;		}
 	}
 
 	/*

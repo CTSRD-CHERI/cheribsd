@@ -1875,6 +1875,10 @@ struct swapoff_args {
 	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
 	char flags_l_[PADL_(u_int)]; u_int flags; char flags_r_[PADR_(u_int)];
 };
+struct hwpmcctl_args {
+	char pmop_code_l_[PADL_(int)]; int pmop_code; char pmop_code_r_[PADR_(int)];
+	char pmop_data_l_[PADL_(void * __capability)]; void * __capability pmop_data; char pmop_data_r_[PADR_(void * __capability)];
+};
 int	sys_exit(struct thread *, struct exit_args *);
 int	sys_fork(struct thread *, struct fork_args *);
 int	sys_read(struct thread *, struct read_args *);
@@ -2274,6 +2278,7 @@ int	sys_aio_readv(struct thread *, struct aio_readv_args *);
 int	sys_fspacectl(struct thread *, struct fspacectl_args *);
 int	sys_sched_getcpu(struct thread *, struct sched_getcpu_args *);
 int	sys_swapoff(struct thread *, struct swapoff_args *);
+int	sys_hwpmcctl(struct thread *, struct hwpmcctl_args *);
 
 #ifdef COMPAT_43
 
@@ -3247,6 +3252,7 @@ int	freebsd13_swapoff(struct thread *, struct freebsd13_swapoff_args *);
 #define	SYS_AUE_fspacectl	AUE_FSPACECTL
 #define	SYS_AUE_sched_getcpu	AUE_NULL
 #define	SYS_AUE_swapoff	AUE_SWAPOFF
+#define	SYS_AUE_hwpmcctl	AUE_NULL
 
 #undef PAD_
 #undef PADL_

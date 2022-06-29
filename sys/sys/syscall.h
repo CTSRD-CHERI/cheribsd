@@ -524,4 +524,5 @@
 #define	SYS_fspacectl	580
 #define	SYS_sched_getcpu	581
 #define	SYS_swapoff	582
-#define	SYS_MAXSYSCALL	583
+#define	SYS_hwpmcctl	583
+#define	SYS_MAXSYSCALL	584

@@ -82,3 +82,6 @@ riscv/riscv/vm_machdep.c	standard
 
 # Zstd
 contrib/zstd/lib/freebsd/zstd_kfreebsd.c		optional zstdio compile-with ${ZSTD_C}
+
+# hwpmc support
+dev/hwpmc/hwpmc_toooba.c	optional	hwpmc_toooba
