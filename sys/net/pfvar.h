@@ -286,6 +286,26 @@ pf_counter_u64_zero(struct pf_counter_u64 *pfcu64)
 }
 #endif
 
+#define pf_get_timestamp(prule)({					\
+	uint32_t _ts = 0;						\
+	uint32_t __ts;							\
+	int cpu;							\
+	CPU_FOREACH(cpu) {						\
+		__ts = *zpcpu_get_cpu(prule->timestamp, cpu);		\
+		if (__ts > _ts)						\
+			_ts = __ts;					\
+	}								\
+	_ts;								\
+})
+
+#define pf_update_timestamp(prule)					\
+	do {								\
+		critical_enter();					\
+		*zpcpu_get((prule)->timestamp) = time_second;		\
+		critical_exit();					\
+	} while (0)
+
+
 SYSCTL_DECL(_net_pf);
 MALLOC_DECLARE(M_PFHASH);
 
@@ -355,6 +375,12 @@ struct pfi_dynaddr {
 extern struct mtx_padalign pf_unlnkdrules_mtx;
 #define	PF_UNLNKDRULES_LOCK()	mtx_lock(&pf_unlnkdrules_mtx)
 #define	PF_UNLNKDRULES_UNLOCK()	mtx_unlock(&pf_unlnkdrules_mtx)
+#define	PF_UNLNKDRULES_ASSERT()	mtx_assert(&pf_unlnkdrules_mtx, MA_OWNED)
+
+extern struct sx pf_config_lock;
+#define	PF_CONFIG_LOCK()	sx_xlock(&pf_config_lock)
+#define	PF_CONFIG_UNLOCK()	sx_xunlock(&pf_config_lock)
+#define	PF_CONFIG_ASSERT()	sx_assert(&pf_config_lock, SA_XLOCKED)
 
 extern struct rmlock pf_rules_lock;
 #define	PF_RULES_RLOCK_TRACKER	struct rm_priotracker _pf_rules_tracker
@@ -645,11 +671,13 @@ struct pf_keth_rule {
 	uint8_t			 direction;
 	uint16_t		 proto;
 	struct pf_keth_rule_addr src, dst;
+	struct pf_rule_addr	 ipsrc, ipdst;
 
 	/* Stats */
 	counter_u64_t		 evaluations;
 	counter_u64_t		 packets[2];
 	counter_u64_t		 bytes[2];
+	uint32_t		*timestamp;
 
 	/* Action */
 	char			 qname[PF_QNAME_SIZE];
@@ -665,6 +693,9 @@ union pf_krule_ptr {
 	struct pf_krule		*ptr;
 	u_int32_t		 nr;
 };
+
+RB_HEAD(pf_krule_global, pf_krule);
+RB_PROTOTYPE(pf_krule_global, pf_krule, entry_global, pf_krule_compare);
 
 struct pf_krule {
 	struct pf_rule_addr	 src;
@@ -686,6 +717,7 @@ struct pf_krule {
 	struct pf_counter_u64	 evaluations;
 	struct pf_counter_u64	 packets[2];
 	struct pf_counter_u64	 bytes[2];
+	uint32_t		*timestamp;
 
 	struct pfi_kkif		*kif;
 	struct pf_kanchor	*anchor;
@@ -762,6 +794,8 @@ struct pf_krule {
 		struct pf_addr		addr;
 		u_int16_t		port;
 	}			divert;
+	u_int8_t		 md5sum[PF_MD5_DIGEST_LENGTH];
+	RB_ENTRY(pf_krule)	 entry_global;
 
 #ifdef PF_WANT_32_TO_64_COUNTER
 	LIST_ENTRY(pf_krule)	 allrulelist;
@@ -1132,6 +1166,7 @@ struct pf_kruleset {
 			u_int32_t		 rcount;
 			u_int32_t		 ticket;
 			int			 open;
+			struct pf_krule_global 	 *tree;
 		}			 active, inactive;
 	}			 rules[PF_RULESET_MAX];
 	struct pf_kanchor	*anchor;
@@ -1524,7 +1559,7 @@ struct pf_divert {
 
 /*
  * The number of entries in the fragment queue must be limited
- * to avoid DoS by linear seaching.  Instead of a global limit,
+ * to avoid DoS by linear searching.  Instead of a global limit,
  * use a limit per entry point.  For large packets these sum up.
  */
 #define PF_FRAG_ENTRY_LIMIT		64
@@ -1852,6 +1887,8 @@ struct pfioc_iface {
 #define	DIOCADDETHRULE		_IOWR('D', 97, struct pfioc_nv)
 #define	DIOCGETETHRULE		_IOWR('D', 98, struct pfioc_nv)
 #define	DIOCGETETHRULES		_IOWR('D', 99, struct pfioc_nv)
+#define	DIOCGETETHRULESETS	_IOWR('D', 100, struct pfioc_nv)
+#define	DIOCGETETHRULESET	_IOWR('D', 101, struct pfioc_nv)
 
 struct pf_ifspeed_v0 {
 	char			ifname[IFNAMSIZ];
@@ -2138,6 +2175,8 @@ int	pfr_pool_get(struct pfr_ktable *, int *, struct pf_addr *, sa_family_t);
 void	pfr_dynaddr_update(struct pfr_ktable *, struct pfi_dynaddr *);
 struct pfr_ktable *
 	pfr_attach_table(struct pf_kruleset *, char *);
+struct pfr_ktable *
+	pfr_eth_attach_table(struct pf_keth_ruleset *, char *);
 void	pfr_detach_table(struct pfr_ktable *);
 int	pfr_clr_tables(struct pfr_table *, int *, int);
 int	pfr_add_tables(struct pfr_table *, int, int *, int);

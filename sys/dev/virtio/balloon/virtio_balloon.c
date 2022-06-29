@@ -156,10 +156,8 @@ static driver_t vtballoon_driver = {
 	vtballoon_methods,
 	sizeof(struct vtballoon_softc)
 };
-static devclass_t vtballoon_devclass;
 
-VIRTIO_DRIVER_MODULE(virtio_balloon, vtballoon_driver,
-    vtballoon_devclass, 0, 0);
+VIRTIO_DRIVER_MODULE(virtio_balloon, vtballoon_driver, 0, 0);
 MODULE_VERSION(virtio_balloon, 1);
 MODULE_DEPEND(virtio_balloon, virtio, 1, 1, 1);
 
@@ -413,7 +411,7 @@ vtballoon_send_page_frames(struct vtballoon_softc *sc, struct virtqueue *vq,
 	struct sglist sg;
 	struct sglist_seg segs[1];
 	void *c;
-	int error;
+	int error __diagused;
 
 	sglist_init(&sg, 1, segs);
 

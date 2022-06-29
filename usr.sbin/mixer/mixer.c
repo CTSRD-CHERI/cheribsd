@@ -24,12 +24,17 @@
 
 #include <err.h>
 #include <errno.h>
+#include <mixer.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include <mixer.h>
+enum {
+	C_VOL = 0,
+	C_MUT,
+	C_SRC,
+};
 
 static void usage(void) __dead2;
 static void initctls(struct mixer *);
@@ -60,8 +65,8 @@ main(int argc, char *argv[])
 	struct mixer *m;
 	mix_ctl_t *cp;
 	char *name = NULL, buf[NAME_MAX];
-	char *p, *bufp, *devstr, *ctlstr, *valstr = NULL;
-	int dunit, i, n, pall = 1;
+	char *p, *q, *devstr, *ctlstr, *valstr = NULL;
+	int dunit, i, n, pall = 1, shorthand;
 	int aflag = 0, dflag = 0, oflag = 0, sflag = 0;
 	int ch;
 
@@ -85,7 +90,7 @@ main(int argc, char *argv[])
 		case 's':
 			sflag = 1;
 			break;
-		case 'h': /* FALLTROUGH */
+		case 'h': /* FALLTHROUGH */
 		case '?':
 		default:
 			usage();
@@ -130,10 +135,23 @@ main(int argc, char *argv[])
 
 parse:
 	while (argc > 0) {
-		if ((p = bufp = strdup(*argv)) == NULL)
+		if ((p = strdup(*argv)) == NULL)
 			err(1, "strdup(%s)", *argv);
+
+		/* Check if we're using the shorthand syntax for volume setting. */
+		shorthand = 0;
+		for (q = p; *q != '\0'; q++) {
+			if (*q == '=') {
+				q++;
+				shorthand = ((*q >= '0' && *q <= '9') ||
+				    *q == '+' || *q == '-' || *q == '.');
+				break;
+			} else if (*q == '.')
+				break;
+		}
+
 		/* Split the string into device, control and value. */
-		devstr = strsep(&p, ".");
+		devstr = strsep(&p, ".=");
 		if ((m->dev = mixer_get_dev_byname(m, devstr)) == NULL) {
 			warnx("%s: no such device", devstr);
 			goto next;
@@ -143,13 +161,23 @@ parse:
 			printdev(m, 1);
 			pall = 0;
 			goto next;
+		} else if (shorthand) {
+			/*
+			 * Input: `dev=N` -> shorthand for `dev.volume=N`.
+			 *
+			 * We don't care what the rest of the string contains as
+			 * long as we're sure the very beginning is right,
+			 * mod_volume() will take care of parsing it properly.
+			 */
+			cp = mixer_get_ctl(m->dev, C_VOL);
+			cp->mod(cp->parent_dev, p);
+			goto next;
 		}
 		ctlstr = strsep(&p, "=");
 		if ((cp = mixer_get_ctl_byname(m->dev, ctlstr)) == NULL) {
 			warnx("%s.%s: no such control", devstr, ctlstr);
 			goto next;
 		}
-
 		/* Input: `dev.control`. */
 		if (p == NULL) {
 			(void)cp->print(cp->parent_dev, cp->name);
@@ -187,9 +215,6 @@ initctls(struct mixer *m)
 	struct mix_dev *dp;
 	int rc = 0;
 
-#define C_VOL 0
-#define C_MUT 1
-#define C_SRC 2
 	TAILQ_FOREACH(dp, &m->devs, devs) {
 		rc += mixer_add_ctl(dp, C_VOL, "volume", mod_volume, print_volume);
 		rc += mixer_add_ctl(dp, C_MUT, "mute", mod_mute, print_mute);
@@ -249,12 +274,8 @@ printdev(struct mixer *m, int oflag)
 	mix_ctl_t *cp;
 
 	if (!oflag) {
-		char buffer[32];
-		(void)snprintf(buffer, sizeof(buffer),
-		    "%s.%s", d->name, "volume");
-
-		printf("    %-16s= %.2f:%.2f\t",
-		    buffer, d->vol.left, d->vol.right);
+		printf("    %-10s= %.2f:%.2f    ",
+		    d->name, d->vol.left, d->vol.right);
 		if (!MIX_ISREC(m, d->devno))
 			printf(" pbk");
 		if (MIX_ISREC(m, d->devno))
@@ -288,8 +309,7 @@ printrecsrc(struct mixer *m, int oflag)
 			printf("%s", dp->name);
 			if (oflag)
 				printf(".%s=+%s",
-				    mixer_get_ctl(dp, C_SRC)->name,
-				    n ? " " : "");
+				    mixer_get_ctl(dp, C_SRC)->name, n ? " " : "");
 		}
 	}
 	printf("\n");

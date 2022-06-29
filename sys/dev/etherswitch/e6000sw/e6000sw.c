@@ -188,7 +188,7 @@ DEFINE_CLASS_0(e6000sw, e6000sw_driver, e6000sw_methods,
 DRIVER_MODULE(e6000sw, mdio, e6000sw_driver, e6000sw_devclass, 0, 0);
 DRIVER_MODULE(etherswitch, e6000sw, etherswitch_driver, etherswitch_devclass, 0,
     0);
-DRIVER_MODULE(miibus, e6000sw, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(miibus, e6000sw, miibus_driver, 0, 0);
 MODULE_DEPEND(e6000sw, mdio, 1, 1, 1);
 
 
@@ -1529,9 +1529,8 @@ e6000sw_setup(device_t dev, e6000sw_softc_t *sc)
 static void
 e6000sw_set_atustat(device_t dev, e6000sw_softc_t *sc, int bin, int flag)
 {
-	uint16_t ret;
 
-	ret = e6000sw_readreg(sc, REG_GLOBAL2, ATU_STATS);
+	e6000sw_readreg(sc, REG_GLOBAL2, ATU_STATS);
 	e6000sw_writereg(sc, REG_GLOBAL2, ATU_STATS, (bin << ATU_STATS_BIN ) |
 	    (flag << ATU_STATS_FLAG));
 }

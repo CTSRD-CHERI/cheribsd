@@ -636,8 +636,7 @@ static driver_t ccp_driver = {
 	sizeof(struct ccp_softc)
 };
 
-static devclass_t ccp_devclass;
-DRIVER_MODULE(ccp, pci, ccp_driver, ccp_devclass, NULL, NULL);
+DRIVER_MODULE(ccp, pci, ccp_driver, NULL, NULL);
 MODULE_VERSION(ccp, 1);
 MODULE_DEPEND(ccp, crypto, 1, 1, 1);
 MODULE_DEPEND(ccp, random_device, 1, 1, 1);
@@ -766,7 +765,7 @@ DB_SHOW_COMMAND(ccp, db_show_ccp)
 
 	unit = (unsigned)addr;
 
-	sc = devclass_get_softc(ccp_devclass, unit);
+	sc = devclass_get_softc(devclass_find("ccp"), unit);
 	if (sc == NULL) {
 		db_printf("No such device ccp%u\n", unit);
 		goto usage;

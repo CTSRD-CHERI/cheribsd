@@ -1752,10 +1752,12 @@ product DLINK DWM157		0x7d02  DWM-157
 product DLINK DWM157_2		0x7d0e  DWM-157	
 product DLINK DWR510		0x7e12	DWR-510
 product DLINK DWM222		0x7e35	DWM-222
+product DLINK DWM222_2		0x7e3d	DWM-222
 product DLINK DWM157_CD_2	0xa407  DWM-157 CD-ROM Mode
 product DLINK DWM157_CD		0xa707  DWM-157 CD-ROM Mode
 product DLINK DWR510_CD		0xa805	DWR-510 CD-ROM Mode
 product DLINK DWM222_CD		0xab00	DWM-222 CD-ROM Mode
+product DLINK DWM222_CD_2	0xac01	DWM-222 CD-ROM Mode
 product DLINK DSB650		0xabc1	10/100 Ethernet
 product DLINK DUBH7		0xf103	DUB-H7 USB 2.0 7-Port Hub
 product DLINK2 RTL8192SU_1	0x3300	RTL8192SU
@@ -1939,6 +1941,7 @@ product EPSON 1270		0x0120	Perfection 1270 scanner
 product EPSON 2480		0x0121	Perfection 2480 scanner
 product EPSON 3590		0x0122	Perfection 3590 scanner
 product EPSON 4990		0x012a	Perfection 4990 Photo scanner
+product EPSON TMU220B		0x0202	TM-U220B
 product EPSON CRESSI_EDY	0x0521	Cressi Edy diving computer
 product EPSON N2ITION3		0x0522	Zeagle N2iTion3 diving computer
 product EPSON STYLUS_875DC	0x0601	Stylus Photo 875DC Card Reader
@@ -2554,6 +2557,7 @@ product HUAWEI ETS2055		0x1803	CDMA modem
 product HUAWEI E173		0x1c05	3G modem
 product HUAWEI E173_INIT	0x1c0b	3G modem initial
 product HUAWEI E3272		0x1c1e	LTE modem
+product HUAWEI E3372_INIT	0x1f01  LTE modem initial
 
 /* HUAWEI 3com products */
 product HUAWEI3COM WUB320G	0x0009	Aolynk WUB320g
@@ -3533,6 +3537,20 @@ product OLIMEX ARM_USB_OCD_H		0x002b	FTDI compatible adapter
 /* Olympus products */
 product OLYMPUS C1		0x0102	C-1 Digital Camera
 product OLYMPUS C700		0x0105	C-700 Ultra Zoom
+/* Current Olympus DSLRs and EVIL cameras reuse the same product code and
+ * bcdDevice for multiple models.  This may result in problems with newer
+ * cameras. */
+/* Olympus DSLRs */
+product OLYMPUS E_1		0x0102
+product OLYMPUS E_300		0x0118
+product OLYMPUS E_330		0x0118
+product OLYMPUS E_30		0x0118
+/* Olympus EVIL cameras */
+product OLYMPUS E_PM1		0x012c
+product OLYMPUS E_PM2		0x012e
+product OLYMPUS E_M1		0x012e
+product OLYMPUS E_M1MarkII	0x012e
+product OLYMPUS E_M5MarkIII	0x012e
 
 /* OmniVision Technologies, Inc. products */
 product OMNIVISION OV511	0x0511	OV511 Camera

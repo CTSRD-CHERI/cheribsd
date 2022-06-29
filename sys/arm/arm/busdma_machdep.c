@@ -535,11 +535,12 @@ bus_dma_tag_set_domain(bus_dma_tag_t dmat, int domain)
 int
 bus_dma_tag_destroy(bus_dma_tag_t dmat)
 {
-	bus_dma_tag_t dmat_copy;
+#ifdef KTR
+	bus_dma_tag_t dmat_copy = dmat;
+#endif
 	int error;
 
 	error = 0;
-	dmat_copy = dmat;
 
 	if (dmat != NULL) {
 		if (dmat->map_count != 0) {
@@ -1177,14 +1178,10 @@ _bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
 void
 bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 {
-	struct bounce_page *bpage;
 	struct bounce_zone *bz;
 
 	if ((bz = dmat->bounce_zone) != NULL) {
-		while ((bpage = STAILQ_FIRST(&map->bpages)) != NULL) {
-			STAILQ_REMOVE_HEAD(&map->bpages, links);
-			free_bounce_page(dmat, bpage);
-		}
+		free_bounce_pages(dmat, map);
 
 		bz = dmat->bounce_zone;
 		bz->free_bpages += map->pagesreserved;

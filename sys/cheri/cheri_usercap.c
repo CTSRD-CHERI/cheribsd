@@ -47,7 +47,7 @@ void * __capability userspace_root_cap = (void * __capability)(intcap_t)-1;
  */
 void * __capability
 _cheri_capability_build_user_code(struct thread *td, uint32_t perms,
-    vaddr_t basep, size_t length, off_t off, const char* func, int line)
+    ptraddr_t basep, size_t length, off_t off, const char* func, int line)
 {
 	void * __capability tmpcap;
 
@@ -71,8 +71,8 @@ _cheri_capability_build_user_code(struct thread *td, uint32_t perms,
  * not execute.
  */
 void * __capability
-_cheri_capability_build_user_data(uint32_t perms, vaddr_t basep, size_t length,
-    off_t off, const char* func, int line, bool exact)
+_cheri_capability_build_user_data(uint32_t perms, ptraddr_t basep,
+    size_t length, off_t off, const char* func, int line, bool exact)
 {
 
 	KASSERT((perms & ~CHERI_CAP_USER_DATA_PERMS) == 0,
@@ -92,7 +92,7 @@ _cheri_capability_build_user_data(uint32_t perms, vaddr_t basep, size_t length,
  * use should be documented in a comment when it is used.
  */
 void * __capability
-_cheri_capability_build_user_rwx(uint32_t perms, vaddr_t basep, size_t length,
+_cheri_capability_build_user_rwx(uint32_t perms, ptraddr_t basep, size_t length,
     off_t off, const char* func __unused, int line __unused, bool exact)
 {
 	void * __capability tmpcap;

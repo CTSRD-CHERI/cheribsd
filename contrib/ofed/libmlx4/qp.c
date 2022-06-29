@@ -375,7 +375,7 @@ int mlx4_post_send(struct ibv_qp *ibqp, struct ibv_send_wr *wr,
 
 			seg = wqe;
 			wqe += sizeof *seg;
-			off = ((vaddr_t) wqe) & (MLX4_INLINE_ALIGN - 1);
+			off = ((uintptr_t) wqe) & (MLX4_INLINE_ALIGN - 1);
 			num_seg = 0;
 			seg_len = 0;
 
@@ -774,11 +774,3 @@ void mlx4_clear_qp(struct mlx4_context *ctx, uint32_t qpn)
 	else
 		ctx->qp_table[tind].table[qpn & ctx->qp_table_mask] = NULL;
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20180907,
-//   "changes": [
-//     "pointer_alignment"
-//   ]
-// }
-// CHERI CHANGES END

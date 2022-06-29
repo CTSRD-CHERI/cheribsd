@@ -51,8 +51,8 @@ cheri_init_capabilities(void * __capability kroot)
 	void * __capability ctemp;
 
 	ctemp = cheri_setaddress(kroot, CHERI_SEALCAP_KERNEL_BASE);
-	ctemp = cheri_setbounds(kroot, CHERI_SEALCAP_KERNEL_LENGTH);
-	ctemp = cheri_andperm(kroot, CHERI_SEALCAP_KERNEL_PERMS);
+	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_KERNEL_LENGTH);
+	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_KERNEL_PERMS);
 	kernel_root_sealcap = ctemp;
 
 	ctemp = cheri_setaddress(kroot, CHERI_CAP_USER_DATA_BASE);

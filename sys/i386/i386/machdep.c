@@ -208,7 +208,6 @@ static void
 i386_clock_source_init(void)
 {
 	i8254_init();
-	tsc_init();
 }
 
 static void
@@ -904,7 +903,7 @@ getmemsize(int first)
 	u_long memtest;
 	vm_paddr_t physmap[PHYS_AVAIL_ENTRIES];
 	quad_t dcons_addr, dcons_size, physmem_tunable;
-	int hasbrokenint12, i, res;
+	int hasbrokenint12, i, res __diagused;
 	u_int extmem;
 	struct vm86frame vmf;
 	struct vm86context vmc;

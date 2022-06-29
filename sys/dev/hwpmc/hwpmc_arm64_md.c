@@ -119,13 +119,11 @@ pmc_save_user_callchain(uintptr_t *cc, int maxsamples,
 #ifdef COMPAT_FREEBSD64
 	int64_t r64;
 #endif
-	struct thread *td;
 	int count;
 
 	KASSERT(TRAPF_USERMODE(tf), ("[arm64,%d] Not a user trap frame tf=%p",
 	    __LINE__, (void *) tf));
 
-	td = curthread;
 	pc = PMC_TRAPFRAME_TO_PC(tf);
 	*cc++ = (uintptr_t)pc;
 

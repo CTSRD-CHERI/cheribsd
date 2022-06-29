@@ -136,6 +136,7 @@ extern int stclohz;
 #define	LINUX_P_ALL		0
 #define	LINUX_P_PID		1
 #define	LINUX_P_PGID		2
+#define	LINUX_P_PIDFD		3
 
 #define	LINUX_RLIMIT_LOCKS	10
 #define	LINUX_RLIMIT_SIGPENDING	11
@@ -155,6 +156,10 @@ extern int stclohz;
 
 /* Linux seccomp flags */
 #define	LINUX_SECCOMP_GET_ACTION_AVAIL	2
+
+/* Linux /proc/self/oom_score_adj */
+#define	LINUX_OOM_SCORE_ADJ_MIN	-1000
+#define	LINUX_OOM_SCORE_ADJ_MAX	1000
 
 #if defined(__aarch64__) || (defined(__amd64__) && !defined(COMPAT_LINUX32))
 int linux_ptrace_status(struct thread *td, int pid, int status);

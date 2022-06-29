@@ -475,7 +475,7 @@ vdev_add_child(vdev_t *pvd, vdev_t *cvd)
 
 	newchild = kmem_alloc(newsize, KM_SLEEP);
 	if (pvd->vdev_child != NULL) {
-		bcopy(pvd->vdev_child, newchild, oldsize);
+		memcpy(newchild, pvd->vdev_child, oldsize);
 		kmem_free(pvd->vdev_child, oldsize);
 	}
 
@@ -1426,7 +1426,7 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 	mspp = vmem_zalloc(newc * sizeof (*mspp), KM_SLEEP);
 
 	if (expanding) {
-		bcopy(vd->vdev_ms, mspp, oldc * sizeof (*mspp));
+		memcpy(mspp, vd->vdev_ms, oldc * sizeof (*mspp));
 		vmem_free(vd->vdev_ms, oldc * sizeof (*mspp));
 	}
 
@@ -4418,12 +4418,13 @@ vdev_get_stats_ex(vdev_t *vd, vdev_stat_t *vs, vdev_stat_ex_t *vsx)
 	vdev_t *tvd = vd->vdev_top;
 	mutex_enter(&vd->vdev_stat_lock);
 	if (vs) {
-		bcopy(&vd->vdev_stat, vs, sizeof (*vs));
+		memcpy(vs, &vd->vdev_stat, sizeof (*vs));
 		vs->vs_timestamp = gethrtime() - vs->vs_timestamp;
 		vs->vs_state = vd->vdev_state;
 		vs->vs_rsize = vdev_get_min_asize(vd);
 
 		if (vd->vdev_ops->vdev_op_leaf) {
+			vs->vs_pspace = vd->vdev_psize;
 			vs->vs_rsize += VDEV_LABEL_START_SIZE +
 			    VDEV_LABEL_END_SIZE;
 			/*
@@ -4531,8 +4532,8 @@ vdev_stat_update(zio_t *zio, uint64_t psize)
 	vdev_t *vd = zio->io_vd ? zio->io_vd : rvd;
 	vdev_t *pvd;
 	uint64_t txg = zio->io_txg;
-	vdev_stat_t *vs = &vd->vdev_stat;
-	vdev_stat_ex_t *vsx = &vd->vdev_stat_ex;
+	vdev_stat_t *vs = vd ? &vd->vdev_stat : NULL;
+	vdev_stat_ex_t *vsx = vd ? &vd->vdev_stat_ex : NULL;
 	zio_type_t type = zio->io_type;
 	int flags = zio->io_flags;
 
@@ -6038,7 +6039,6 @@ EXPORT_SYMBOL(vdev_online);
 EXPORT_SYMBOL(vdev_offline);
 EXPORT_SYMBOL(vdev_clear);
 
-/* BEGIN CSTYLED */
 ZFS_MODULE_PARAM(zfs_vdev, zfs_vdev_, default_ms_count, INT, ZMOD_RW,
 	"Target number of metaslabs per top-level vdev");
 
@@ -6054,9 +6054,11 @@ ZFS_MODULE_PARAM(zfs_vdev, zfs_vdev_, ms_count_limit, INT, ZMOD_RW,
 ZFS_MODULE_PARAM(zfs, zfs_, slow_io_events_per_second, UINT, ZMOD_RW,
 	"Rate limit slow IO (delay) events to this many per second");
 
+/* BEGIN CSTYLED */
 ZFS_MODULE_PARAM(zfs, zfs_, checksum_events_per_second, UINT, ZMOD_RW,
 	"Rate limit checksum events to this many checksum errors per second "
-	"(do not set below zed threshold).");
+	"(do not set below ZED threshold).");
+/* END CSTYLED */
 
 ZFS_MODULE_PARAM(zfs, zfs_, scan_ignore_errors, INT, ZMOD_RW,
 	"Ignore errors during resilver/scrub");
@@ -6070,6 +6072,7 @@ ZFS_MODULE_PARAM(zfs, zfs_, nocacheflush, INT, ZMOD_RW,
 ZFS_MODULE_PARAM(zfs, zfs_, embedded_slog_min_ms, INT, ZMOD_RW,
 	"Minimum number of metaslabs required to dedicate one for log blocks");
 
+/* BEGIN CSTYLED */
 ZFS_MODULE_PARAM_CALL(zfs_vdev, zfs_vdev_, min_auto_ashift,
 	param_set_min_auto_ashift, param_get_ulong, ZMOD_RW,
 	"Minimum ashift used when creating new top-level vdevs");

@@ -259,10 +259,8 @@ static void
 qla_watchdog(void *arg)
 {
 	qla_host_t *ha = arg;
-	qla_hw_t *hw;
 	struct ifnet *ifp;
 
-	hw = &ha->hw;
 	ifp = ha->ifp;
 
         if (ha->qla_watchdog_exit) {
@@ -1024,7 +1022,9 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	int ret = 0;
 	struct ifreq *ifr = (struct ifreq *)data;
+#ifdef INET
 	struct ifaddr *ifa = (struct ifaddr *)data;
+#endif
 	qla_host_t *ha;
 
 	ha = (qla_host_t *)ifp->if_softc;
@@ -1036,6 +1036,7 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		QL_DPRINT4(ha, (ha->pci_dev, "%s: SIOCSIFADDR (0x%lx)\n",
 			__func__, cmd));
 
+#ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET) {
 			ret = QLA_LOCK(ha, __func__,
 					QLA_LOCK_DEFAULT_MS_TIMEOUT,
@@ -1060,9 +1061,10 @@ qla_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				ntohl(IA_SIN(ifa)->sin_addr.s_addr)));
 
 			arp_ifinit(ifp, ifa);
-		} else {
-			ether_ioctl(ifp, cmd, data);
+			break;
 		}
+#endif
+		ether_ioctl(ifp, cmd, data);
 		break;
 
 	case SIOCSIFMTU:
@@ -1648,12 +1650,9 @@ static void
 qla_stop(qla_host_t *ha)
 {
 	struct ifnet *ifp = ha->ifp;
-	device_t	dev;
 	int i = 0;
 
 	ql_sp_log(ha, 13, 0, 0, 0, 0, 0, 0);
-
-	dev = ha->pci_dev;
 
 	ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 	ha->qla_watchdog_pause = 1;
@@ -1946,15 +1945,12 @@ int
 ql_get_mbuf(qla_host_t *ha, qla_rx_buf_t *rxb, struct mbuf *nmp)
 {
 	register struct mbuf *mp = nmp;
-	struct ifnet   		*ifp;
 	int            		ret = 0;
 	uint32_t		offset;
 	bus_dma_segment_t	segs[1];
 	int			nsegs, mbuf_size;
 
 	QL_DPRINT2(ha, (ha->pci_dev, "%s: enter\n", __func__));
-
-	ifp = ha->ifp;
 
         if (ha->hw.enable_9kb)
                 mbuf_size = MJUM9BYTES;

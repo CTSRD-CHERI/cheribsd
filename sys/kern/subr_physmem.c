@@ -29,8 +29,10 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#ifdef _KERNEL
 #include "opt_acpi.h"
 #include "opt_ddb.h"
+#endif
 
 /*
  * Routines for describing and initializing anything related to physical memory.
@@ -40,12 +42,19 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/physmem.h>
+
+#ifdef _KERNEL
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_page.h>
 #include <vm/vm_phys.h>
 #include <vm/vm_dumpset.h>
 #include <machine/md_var.h>
+#else
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+#endif
 
 /*
  * These structures are used internally to keep track of regions of physical
@@ -64,7 +73,7 @@ __FBSDID("$FreeBSD$");
 
 #if defined(__arm__)
 #define	MAX_PHYS_ADDR	0xFFFFFFFFull
-#elif defined(__aarch64__) || defined(__riscv)
+#elif defined(__aarch64__) || defined(__amd64__) || defined(__riscv)
 #define	MAX_PHYS_ADDR	0xFFFFFFFFFFFFFFFFull
 #endif
 
@@ -87,6 +96,20 @@ static size_t excnt;
 long realmem;
 long Maxmem;
 
+#ifndef _KERNEL
+static void
+panic(const char *fmt, ...)
+{
+	va_list va;
+
+	va_start(va, fmt);
+	vfprintf(stderr, fmt, va);
+	fprintf(stderr, "\n");
+	va_end(va);
+	__builtin_trap();
+}
+#endif
+
 /*
  * Print the contents of the physical and excluded region tables using the
  * provided printf-like output function (which will be either printf or
@@ -95,7 +118,8 @@ long Maxmem;
 static void
 physmem_dump_tables(int (*prfunc)(const char *, ...))
 {
-	int flags, i;
+	size_t i;
+	int flags;
 	uintmax_t addr, size;
 	const unsigned int mbyte = 1024 * 1024;
 
@@ -156,7 +180,7 @@ regions_to_avail(vm_paddr_t *avail, uint32_t exflags, size_t maxavail,
     uint64_t maxphyssz, long *pavail, long *prealmem)
 {
 	size_t acnt, exi, hwi;
-	uint64_t end, start, xend, xstart;
+	uint64_t adj, end, start, xend, xstart;
 	long availmem, totalmem;
 	const struct region *exp, *hwp;
 	uint64_t availsz;
@@ -166,8 +190,9 @@ regions_to_avail(vm_paddr_t *avail, uint32_t exflags, size_t maxavail,
 	availsz = 0;
 	acnt = 0;
 	for (hwi = 0, hwp = hwregions; hwi < hwcnt; ++hwi, ++hwp) {
-		start = hwp->addr;
-		end   = hwp->size + start;
+		adj   = round_page(hwp->addr) - hwp->addr;
+		start = round_page(hwp->addr);
+		end   = trunc_page(hwp->size + adj) + start;
 		totalmem += atop((vm_offset_t)(end - start));
 		for (exi = 0, exp = exregions; exi < excnt; ++exi, ++exp) {
 			/*
@@ -393,8 +418,6 @@ insert_region(struct region *regions, size_t rcnt, vm_paddr_t addr,
 void
 physmem_hardware_region(uint64_t pa, uint64_t sz)
 {
-	vm_offset_t adj;
-
 	/*
 	 * Filter out the page at PA 0x00000000.  The VM can't handle it, as
 	 * pmap_extract() == 0 means failure.
@@ -426,14 +449,6 @@ physmem_hardware_region(uint64_t pa, uint64_t sz)
 			return;
 		sz -= 1024 * 1024;
 	}
-
-	/*
-	 * Round the starting address up to a page boundary, and truncate the
-	 * ending page down to a page boundary.
-	 */
-	adj = round_page(pa) - pa;
-	pa  = round_page(pa);
-	sz  = trunc_page(sz - adj);
 
 	if (sz > 0 && hwcnt < nitems(hwregions))
 		hwcnt = insert_region(hwregions, hwcnt, pa, sz, 0);
@@ -468,6 +483,7 @@ physmem_avail(vm_paddr_t *avail, size_t maxavail)
 	return (regions_to_avail(avail, EXFLAG_NOALLOC, maxavail, 0, NULL, NULL));
 }
 
+#ifdef _KERNEL
 /*
  * Process all the regions added earlier into the global avail lists.
  *
@@ -494,6 +510,7 @@ physmem_init_kernel_globals(void)
 		panic("No memory entries in phys_avail");
 	Maxmem = atop(phys_avail[nextidx - 1]);
 }
+#endif
 
 #ifdef DDB
 #include <ddb/ddb.h>

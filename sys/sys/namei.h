@@ -183,7 +183,7 @@ int	cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
 #define	NOCAPCHECK	0x00100000 /* do not perform capability checks */
 #define	OPENREAD	0x00200000 /* open for reading */
 #define	OPENWRITE	0x00400000 /* open for writing */
-/* UNUSED		0x00800000 */
+#define	WANTIOCTLCAPS	0x00800000 /* leave ioctl caps for the caller */
 #define	HASBUF		0x01000000 /* has allocated pathname buffer */
 #define	NOEXECCHECK	0x02000000 /* do not perform exec check on dir */
 #define	MAKEENTRY	0x04000000 /* entry is to be added to name cache */
@@ -227,8 +227,11 @@ int	cache_fplookup(struct nameidata *ndp, enum cache_fpl_status *status,
 
 /*
  * Note the constant pattern may *hide* bugs.
+ * Note also that we enable debug checks for non-TIED KLDs
+ * so that they can run on an INVARIANTS kernel without tripping over
+ * assertions on ni_debugflags state.
  */
-#ifdef INVARIANTS
+#if defined(INVARIANTS) || (defined(KLD_MODULE) && !defined(KLD_TIED))
 #define NDINIT_PREFILL(arg)	memset(arg, 0xff, offsetof(struct nameidata,	\
     ni_dvp_seqc))
 #define NDINIT_DBG(arg)		{ (arg)->ni_debugflags = NAMEI_DBG_INITED; }
@@ -266,6 +269,7 @@ do {										\
 #define NDREINIT(ndp)	do {							\
 	struct nameidata *_ndp = (ndp);						\
 	NDREINIT_DBG(_ndp);							\
+	filecaps_free(&_ndp->ni_filecaps);					\
 	_ndp->ni_resflags = 0;							\
 	_ndp->ni_startdir = NULL;						\
 } while (0)
@@ -283,17 +287,13 @@ do {										\
 #define NDF_NO_VP_PUT		0x0000000c
 #define NDF_NO_STARTDIR_RELE	0x00000010
 #define NDF_NO_FREE_PNBUF	0x00000020
-#define NDF_ONLY_PNBUF		(~NDF_NO_FREE_PNBUF)
 
+#define NDFREE_IOCTLCAPS(ndp) do {						\
+	struct nameidata *_ndp = (ndp);						\
+	filecaps_free(&_ndp->ni_filecaps);					\
+} while (0)
 void NDFREE_PNBUF(struct nameidata *);
 void NDFREE(struct nameidata *, const u_int);
-#define NDFREE(ndp, flags) do {						\
-	struct nameidata *_ndp = (ndp);					\
-	if (__builtin_constant_p(flags) && flags == NDF_ONLY_PNBUF)	\
-		NDFREE_PNBUF(_ndp);					\
-	else								\
-		NDFREE(_ndp, flags);					\
-} while (0)
 
 #ifdef INVARIANTS
 void NDFREE_NOTHING(struct nameidata *);
@@ -304,8 +304,8 @@ void NDVALIDATE(struct nameidata *);
 #endif
 
 int	namei(struct nameidata *ndp);
-int	lookup(struct nameidata *ndp);
-int	relookup(struct vnode *dvp, struct vnode **vpp,
+int	vfs_lookup(struct nameidata *ndp);
+int	vfs_relookup(struct vnode *dvp, struct vnode **vpp,
 	    struct componentname *cnp);
 #endif
 

@@ -595,7 +595,7 @@ __END_DECLS
 
 #if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
 static inline bool
-is_magic_sighandler_constant(vaddr_t handler) {
+is_magic_sighandler_constant(ptraddr_t handler) {
 	/*
 	 * Instead of enumerating all the SIG_* constants, just check if
 	 * it is a small (positive or negative) integer so that this doesn't

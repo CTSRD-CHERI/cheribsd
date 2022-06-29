@@ -84,7 +84,7 @@ static driver_t acpi_isab_driver = {
 	sizeof(struct acpi_isab_softc),
 };
 
-DRIVER_MODULE(acpi_isab, acpi, acpi_isab_driver, isab_devclass, 0, 0);
+DRIVER_MODULE(acpi_isab, acpi, acpi_isab_driver, 0, 0);
 MODULE_DEPEND(acpi_isab, acpi, 1, 1, 1);
 
 static int
@@ -93,8 +93,7 @@ acpi_isab_probe(device_t dev)
 	static char *isa_ids[] = { "PNP0A05", "PNP0A06", NULL };
 	int rv;
 
-	if (acpi_disabled("isab") ||
-	    devclass_get_device(isab_devclass, 0) != dev)
+	if (acpi_disabled("isab") || device_get_unit(dev) != 0)
 		return (ENXIO);
 	rv = ACPI_ID_PROBE(device_get_parent(dev), dev, isa_ids, NULL);
 	if (rv <= 0)

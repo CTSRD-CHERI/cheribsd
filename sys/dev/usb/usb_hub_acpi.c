@@ -526,9 +526,9 @@ acpi_uhub_read_ivar(device_t dev, device_t child, int idx, uintptr_t *res)
 	struct acpi_uhub_softc *sc = device_get_softc(dev);
 	ACPI_HANDLE ah;
 
-	mtx_lock(&Giant);
+	bus_topo_lock();
 	uhub_find_iface_index(sc->usc.sc_udev->hub, child, &hres);
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 
 	if ((idx == ACPI_IVAR_HANDLE) &&
 	    (hres.portno > 0) &&
@@ -584,7 +584,6 @@ static device_method_t acpi_uhub_root_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t uhub_devclass;
 extern driver_t uhub_driver;
 static kobj_class_t uhub_baseclasses[] = {&uhub_driver, NULL};
 
@@ -602,8 +601,8 @@ static driver_t acpi_uhub_root_driver = {
 	.baseclasses = uhub_baseclasses,
 };
 
-DRIVER_MODULE(uacpi, uhub, acpi_uhub_driver, uhub_devclass, 0, 0);
-DRIVER_MODULE(uacpi, usbus, acpi_uhub_root_driver, uhub_devclass, 0, 0);
+DRIVER_MODULE(uacpi, uhub, acpi_uhub_driver, 0, 0);
+DRIVER_MODULE(uacpi, usbus, acpi_uhub_root_driver, 0, 0);
 
 MODULE_DEPEND(uacpi, acpi, 1, 1, 1);
 MODULE_DEPEND(uacpi, usb, 1, 1, 1);

@@ -1,14 +1,3 @@
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181113,
- *   "target_type": "lib",
- *   "changes": [
- *     "virtual_address"
- *   ]
- * }
- * CHERI CHANGES END
- */
 #define JEMALLOC_PROF_C_
 #include "jemalloc/internal/jemalloc_preamble.h"
 #include "jemalloc/internal/jemalloc_internal_includes.h"
@@ -2237,7 +2226,7 @@ prof_tdata_init_impl(tsd_t *tsd, uint64_t thr_uid, uint64_t thr_discrim,
 		return NULL;
 	}
 
-	tdata->prng_state = (uint64_t)(vaddr_t)tdata;
+	tdata->prng_state = (uint64_t)(uintptr_t)tdata;
 	prof_sample_threshold_update(tdata);
 
 	tdata->enq = false;

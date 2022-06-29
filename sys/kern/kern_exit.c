@@ -140,7 +140,7 @@ reaper_abandon_children(struct proc *p, bool exiting)
 {
 	struct proc *p1, *p2, *ptmp;
 
-	sx_assert(&proctree_lock, SX_LOCKED);
+	sx_assert(&proctree_lock, SX_XLOCKED);
 	KASSERT(p != initproc, ("reaper_abandon_children for initproc"));
 	if ((p->p_treeflag & P_TREE_REAPER) == 0)
 		return;
@@ -373,14 +373,13 @@ exit1(struct thread *td, int rval, int signo)
 	 * executing, prevent it from rearming itself and let it finish.
 	 */
 	if (timevalisset(&p->p_realtimer.it_value) &&
-	    _callout_stop_safe(&p->p_itcallout, CS_EXECUTING, NULL) == 0) {
+	    callout_stop(&p->p_itcallout) == 0) {
 		timevalclear(&p->p_realtimer.it_interval);
-		msleep(&p->p_itcallout, &p->p_mtx, PWAIT, "ritwait", 0);
-		KASSERT(!timevalisset(&p->p_realtimer.it_value),
-		    ("realtime timer is still armed"));
+		PROC_UNLOCK(p);
+		callout_drain(&p->p_itcallout);
+	} else {
+		PROC_UNLOCK(p);
 	}
-
-	PROC_UNLOCK(p);
 
 	if (p->p_sysent->sv_onexit != NULL)
 		p->p_sysent->sv_onexit(p);

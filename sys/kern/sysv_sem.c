@@ -84,8 +84,6 @@ static MALLOC_DEFINE(M_SEM, "sem", "SVID compatible semaphores");
 #define DPRINTF(a)
 #endif
 
-static int kern_semop(struct thread *td, int semid,
-    struct sembuf * __capability usops, size_t nsops);
 static int seminit(void);
 static int sysvsem_modload(struct module *, int, void *);
 static int semunload(void);
@@ -1127,12 +1125,12 @@ int
 sys_semop(struct thread *td, struct semop_args *uap)
 {
 
-	return (kern_semop(td, uap->semid, uap->sops, uap->nsops));
+	return (kern_semop(td, uap->semid, uap->sops, uap->nsops, NULL));
 }
 
-static int
+int
 kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
-    size_t nsops)
+    size_t nsops, struct timespec *timeout)
 {
 #define SMALL_SOPS	8
 	struct sembuf small_sops[SMALL_SOPS];
@@ -1143,6 +1141,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 	struct sem * __capability semptr = NULL;
 	struct sem_undo *suptr;
 	struct mtx *sema_mtxp;
+	sbintime_t sbt, precision;
 	size_t i, j, k;
 	int error;
 	int do_wakeup, do_undos;
@@ -1152,7 +1151,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 #ifdef SEM_DEBUG
 	sops = NULL;
 #endif
-	DPRINTF(("call to semop(%d, %p, %zu)\n", usemid, sops, nsops));
+	DPRINTF(("call to semop(%d, %lp, %zu)\n", usemid, usops, nsops));
 
 	AUDIT_ARG_SVIPC_ID(usemid);
 
@@ -1164,6 +1163,23 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 
 	if (semid < 0 || semid >= seminfo.semmni)
 		return (EINVAL);
+	if (timeout != NULL) {
+		if (!timespecvalid_interval(timeout))
+			return (EINVAL);
+		precision = 0;
+		if (timespecisset(timeout)) {
+			if (timeout->tv_sec < INT32_MAX / 2) {
+				precision = tstosbt(*timeout);
+				if (TIMESEL(&sbt, precision))
+					sbt += tc_tick_sbt;
+				sbt += precision;
+				precision >>= tc_precexp;
+			} else
+				sbt = 0;
+		} else
+			sbt = -1;
+	} else
+		precision = sbt = 0;
 
 	/* Allocate memory for sem_ops */
 	if (nsops <= SMALL_SOPS)
@@ -1188,9 +1204,8 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 		sops = malloc(nsops * sizeof(*sops), M_TEMP, M_WAITOK);
 	}
 	if ((error = copyin(usops, sops, nsops * sizeof(sops[0]))) != 0) {
-		DPRINTF(("error = %d from copyin(%p, %p, %zd)\n", error,
-		    (__cheri_fromcap struct sembuf *)usops, sops,
-		    nsops * sizeof(sops[0])));
+		DPRINTF(("error = %d from copyin(%lp, %p, %d)\n", error,
+		    usops, sops, nsops * sizeof(sops[0])));
 		if (sops != small_sops)
 			free(sops, M_TEMP);
 		return (error);
@@ -1322,8 +1337,8 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 			semptr->semncnt++;
 
 		DPRINTF(("semop:  good night!\n"));
-		error = msleep(semakptr, sema_mtxp, (PZERO - 4) | PCATCH,
-		    "semwait", 0);
+		error = msleep_sbt(semakptr, sema_mtxp, (PZERO - 4) | PCATCH,
+		    "semwait", sbt, precision, C_ABSOLUTE);
 		DPRINTF(("semop:  good morning (error=%d)!\n", error));
 		/* return code is checked below, after sem[nz]cnt-- */
 
@@ -1359,7 +1374,8 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 		 * need to decrement sem[nz]cnt either way.)
 		 */
 		if (error != 0) {
-			error = EINTR;
+			if (error == ERESTART)
+				error = EINTR;
 			goto done2;
 		}
 		DPRINTF(("semop:  good morning!\n"));
@@ -2236,7 +2252,7 @@ freebsd64_semop(struct thread *td, struct freebsd64_semop_args *uap)
 {
 
 	return (kern_semop(td, uap->semid,
-	    __USER_CAP_ARRAY(uap->sops, uap->nsops), uap->nsops));
+	    __USER_CAP_ARRAY(uap->sops, uap->nsops), uap->nsops, NULL));
 }
 #endif /* COMPAT_FREEBSD64 */
 // CHERI CHANGES START

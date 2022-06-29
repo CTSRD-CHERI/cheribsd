@@ -106,9 +106,7 @@ static struct ofw_compat_data tca6408_compat_data[] = {
 	{ NULL, 0}
 };
 
-devclass_t tca6408_devclass;
-
-DRIVER_MODULE(tca6408, iicbus, tca6408_driver, tca6408_devclass, 0, 0);
+DRIVER_MODULE(tca6408, iicbus, tca6408_driver, 0, 0);
 IICBUS_FDT_PNP_INFO(tca6408_compat_data);
 
 static int
@@ -211,14 +209,11 @@ tca6408_pin_max(device_t dev, int *pin)
 static int
 tca6408_pin_getflags(device_t dev, uint32_t pin, uint32_t *flags)
 {
-	struct tca6408_softc *sc;
 	uint8_t buffer;
 	int error;
 
 	if (pin >= PINS_NUM || flags == NULL)
 		return (EINVAL);
-
-	sc = device_get_softc(dev);
 
 	error = tca6408_read1(dev, TCA6408_CONFIG_REG, &buffer);
 	if (error != 0)

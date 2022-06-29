@@ -411,7 +411,7 @@ umtxq_hash(struct umtx_key *key)
 {
 	unsigned n;
 
-	n = (vaddr_t)key->info.both.a + (vaddr_t)key->info.both.b;
+	n = (ptraddr_t)key->info.both.a + (ptraddr_t)key->info.both.b;
 	key->hash = ((n * GOLDEN_RATIO_PRIME) >> UMTX_SHIFTS) % UMTX_CHAINS;
 }
 
@@ -840,8 +840,10 @@ umtxq_sleep(struct umtx_q *uq, const char *wmesg,
 			if (error != 0)
 				break;
 		}
-		error = msleep_sbt(uq, &uc->uc_lock, PCATCH, wmesg,
+		error = msleep_sbt(uq, &uc->uc_lock, PCATCH | PDROP, wmesg,
 		    sbt, 0, flags);
+		uc = umtxq_getchain(&uq->uq_key);
+		mtx_lock(&uc->uc_lock);
 		if (error == EINTR || error == ERESTART)
 			break;
 		if (error == EWOULDBLOCK && (flags & C_ABSOLUTE) != 0) {
@@ -879,7 +881,7 @@ umtx_key_get(const void * __capability addr, int type, int share,
 	if (share == THREAD_SHARE) {
 		key->shared = 0;
 		key->info.private.vs = td->td_proc->p_vmspace;
-		key->info.private.addr = (__cheri_addr vaddr_t)addr;
+		key->info.private.addr = (__cheri_addr ptraddr_t)addr;
 	} else {
 		MPASS(share == PROCESS_SHARE || share == AUTO_SHARE);
 		map = &td->td_proc->p_vmspace->vm_map;
@@ -899,7 +901,7 @@ umtx_key_get(const void * __capability addr, int type, int share,
 		} else {
 			key->shared = 0;
 			key->info.private.vs = td->td_proc->p_vmspace;
-			key->info.private.addr = (__cheri_addr vaddr_t)addr;
+			key->info.private.addr = (__cheri_addr ptraddr_t)addr;
 		}
 		vm_map_lookup_done(map, entry);
 	}
@@ -3817,9 +3819,7 @@ umtx_copyin_timeout(const void * __capability uaddr, struct timespec *tsp)
 
 	error = copyin(uaddr, tsp, sizeof(*tsp));
 	if (error == 0) {
-		if (tsp->tv_sec < 0 ||
-		    tsp->tv_nsec >= 1000000000 ||
-		    tsp->tv_nsec < 0)
+		if (!timespecvalid_interval(tsp))
 			error = EINVAL;
 	}
 	return (error);
@@ -3839,8 +3839,7 @@ umtx_copyin_umtx_time(const void * __capability uaddr, size_t size,
 		error = copyin(uaddr, tp, sizeof(*tp));
 	if (error != 0)
 		return (error);
-	if (tp->_timeout.tv_sec < 0 ||
-	    tp->_timeout.tv_nsec >= 1000000000 || tp->_timeout.tv_nsec < 0)
+	if (!timespecvalid_interval(&tp->_timeout))
 		return (EINVAL);
 	return (0);
 }
@@ -4505,7 +4504,7 @@ umtx_shm_alive(struct thread *td, void * __capability addr)
 	boolean_t wired;
 
 	map = &td->td_proc->p_vmspace->vm_map;
-	res = vm_map_lookup(&map, (__cheri_addr vaddr_t)addr, VM_PROT_READ, &entry,
+	res = vm_map_lookup(&map, (__cheri_addr ptraddr_t)addr, VM_PROT_READ, &entry,
 	    &object, &pindex, &prot, &wired);
 	if (res != KERN_SUCCESS)
 		return (EFAULT);
@@ -4689,9 +4688,7 @@ umtx_copyin_timeouti386(const void * __capability uaddr, struct timespec *tsp)
 
 	error = copyin(uaddr, &ts32, sizeof(ts32));
 	if (error == 0) {
-		if (ts32.tv_sec < 0 ||
-		    ts32.tv_nsec >= 1000000000 ||
-		    ts32.tv_nsec < 0)
+		if (!timespecvalid_interval(&ts32))
 			error = EINVAL;
 		else {
 			CP(ts32, *tsp, tv_sec);
@@ -4716,8 +4713,7 @@ umtx_copyin_umtx_timei386(const void * __capability uaddr, size_t size,
 		error = copyin(uaddr, &t32, sizeof(t32));
 	if (error != 0)
 		return (error);
-	if (t32._timeout.tv_sec < 0 ||
-	    t32._timeout.tv_nsec >= 1000000000 || t32._timeout.tv_nsec < 0)
+	if (!timespecvalid_interval(&t32._timeout))
 		return (EINVAL);
 	TS_CP(t32, *tp, _timeout);
 	CP(t32, *tp, _flags);
@@ -4755,9 +4751,7 @@ umtx_copyin_timeoutx32(const void * __capability uaddr, struct timespec *tsp)
 
 	error = copyin(uaddr, &ts32, sizeof(ts32));
 	if (error == 0) {
-		if (ts32.tv_sec < 0 ||
-		    ts32.tv_nsec >= 1000000000 ||
-		    ts32.tv_nsec < 0)
+		if (!timespecvalid_interval(&ts32))
 			error = EINVAL;
 		else {
 			CP(ts32, *tsp, tv_sec);
@@ -4782,8 +4776,7 @@ umtx_copyin_umtx_timex32(const void * __capability uaddr, size_t size,
 		error = copyin(uaddr, &t32, sizeof(t32));
 	if (error != 0)
 		return (error);
-	if (t32._timeout.tv_sec < 0 ||
-	    t32._timeout.tv_nsec >= 1000000000 || t32._timeout.tv_nsec < 0)
+	if (!timespecvalid_interval(&t32._timeout))
 		return (EINVAL);
 	TS_CP(t32, *tp, _timeout);
 	CP(t32, *tp, _flags);

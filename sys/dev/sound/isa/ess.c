@@ -788,14 +788,14 @@ MIXER_DECLARE(essmixer);
 static int
 ess_probe(device_t dev)
 {
-	uintptr_t func, ver, r, f;
+	uintptr_t func, ver, f;
 
 	/* The parent device has already been probed. */
-	r = BUS_READ_IVAR(device_get_parent(dev), dev, 0, &func);
+	BUS_READ_IVAR(device_get_parent(dev), dev, 0, &func);
 	if (func != SCF_PCM)
 		return (ENXIO);
 
-	r = BUS_READ_IVAR(device_get_parent(dev), dev, 1, &ver);
+	BUS_READ_IVAR(device_get_parent(dev), dev, 1, &ver);
 	f = (ver & 0xffff0000) >> 16;
 	if (!(f & BD_F_ESS))
 		return (ENXIO);
@@ -812,6 +812,7 @@ ess_attach(device_t dev)
     	char status[SND_STATUSLEN], buf[64];
 	int ver;
 
+	gone_in_dev(dev, 14, "ISA sound driver");
     	sc = malloc(sizeof(*sc), M_DEVBUF, M_WAITOK | M_ZERO);
 	sc->parent_dev = device_get_parent(dev);
 	sc->bufsize = pcm_getbuffersize(dev, 4096, ESS_BUFFSIZE, 65536);
@@ -938,14 +939,12 @@ static driver_t ess_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(snd_ess, sbc, ess_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_ess, sbc, ess_driver, 0, 0);
 MODULE_DEPEND(snd_ess, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_DEPEND(snd_ess, snd_sbc, 1, 1, 1);
 MODULE_VERSION(snd_ess, 1);
 
 /************************************************************/
-
-static devclass_t esscontrol_devclass;
 
 static struct isa_pnp_id essc_ids[] = {
 	{0x06007316, "ESS Control"},
@@ -1009,6 +1008,6 @@ static driver_t esscontrol_driver = {
 	1,
 };
 
-DRIVER_MODULE(esscontrol, isa, esscontrol_driver, esscontrol_devclass, 0, 0);
-DRIVER_MODULE(esscontrol, acpi, esscontrol_driver, esscontrol_devclass, 0, 0);
+DRIVER_MODULE(esscontrol, isa, esscontrol_driver, 0, 0);
+DRIVER_MODULE(esscontrol, acpi, esscontrol_driver, 0, 0);
 ISA_PNP_INFO(essc_ids);

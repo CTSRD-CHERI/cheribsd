@@ -404,6 +404,8 @@
         ..
         libsbuf
         ..
+        libsysdecode
+        ..
         libthr
             dlopen
             ..
@@ -875,12 +877,14 @@
         apply
         ..
         awk
-	    bugs-fixed
-	    ..
-	    netbsd
-	    ..
+            bugs-fixed
+            ..
+            netbsd
+            ..
         ..
         basename
+        ..
+        bintrans
         ..
         bmake
             archives
@@ -1085,10 +1089,6 @@
         truncate
         ..
         units
-        ..
-        uudecode
-        ..
-        uuencode
         ..
         unifdef
         ..

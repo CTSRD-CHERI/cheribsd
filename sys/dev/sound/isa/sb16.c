@@ -788,14 +788,14 @@ static int
 sb16_probe(device_t dev)
 {
     	char buf[64];
-	uintptr_t func, ver, r, f;
+	uintptr_t func, ver, f;
 
 	/* The parent device has already been probed. */
-	r = BUS_READ_IVAR(device_get_parent(dev), dev, 0, &func);
+	BUS_READ_IVAR(device_get_parent(dev), dev, 0, &func);
 	if (func != SCF_PCM)
 		return (ENXIO);
 
-	r = BUS_READ_IVAR(device_get_parent(dev), dev, 1, &ver);
+	BUS_READ_IVAR(device_get_parent(dev), dev, 1, &ver);
 	f = (ver & 0xffff0000) >> 16;
 	ver &= 0x0000ffff;
 	if (f & BD_F_SB16) {
@@ -814,6 +814,7 @@ sb16_attach(device_t dev)
 	uintptr_t ver;
     	char status[SND_STATUSLEN], status2[SND_STATUSLEN];
 
+	gone_in_dev(dev, 14, "ISA sound driver");
     	sb = malloc(sizeof(*sb), M_DEVBUF, M_WAITOK | M_ZERO);
 	sb->parent_dev = device_get_parent(dev);
 	BUS_READ_IVAR(sb->parent_dev, dev, 1, &ver);
@@ -905,7 +906,7 @@ static driver_t sb16_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(snd_sb16, sbc, sb16_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_sb16, sbc, sb16_driver, 0, 0);
 MODULE_DEPEND(snd_sb16, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_DEPEND(snd_sb16, snd_sbc, 1, 1, 1);
 MODULE_VERSION(snd_sb16, 1);

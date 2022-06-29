@@ -67,6 +67,8 @@ TIME_ENV ?= time env
 .if defined(CROSS_TOOLCHAIN)
 .if exists(${LOCALBASE}/share/toolchains/${CROSS_TOOLCHAIN}.mk)
 .include "${LOCALBASE}/share/toolchains/${CROSS_TOOLCHAIN}.mk"
+.elif exists(/usr/local64/share/toolchains/${CROSS_TOOLCHAIN}.mk)
+.include "/usr/local64/share/toolchains/${CROSS_TOOLCHAIN}.mk"
 .elif exists(/usr/share/toolchains/${CROSS_TOOLCHAIN}.mk)
 .include "/usr/share/toolchains/${CROSS_TOOLCHAIN}.mk"
 .elif exists(${CROSS_TOOLCHAIN})
@@ -162,10 +164,10 @@ TARGET_ABI=	gnueabi
 .endif
 _MACHINE_ABI?=	unknown
 MACHINE_MACHINE=${MACHINE_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:C/sf$//:S/riscv64c/riscv64/}
-MACHINE_TRIPLE?=${MACHINE_MACHINE}-${_MACHINE_ABI}-freebsd14.0
+MACHINE_TRIPLE?=${MACHINE_MACHINE}-${_MACHINE_ABI}-freebsd${OS_REVISION}
 TARGET_ABI?=	unknown
 TARGET_MACHINE=	${TARGET_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:C/sf$//:S/riscv64c/riscv64/}
-TARGET_TRIPLE?=	${TARGET_MACHINE}-${TARGET_ABI}-freebsd14.0
+TARGET_TRIPLE?=	${TARGET_MACHINE}-${TARGET_ABI}-freebsd${OS_REVISION}
 KNOWN_ARCHES?=	aarch64/arm64 \
 		aarch64c/arm64 \
 		amd64 \
@@ -1469,6 +1471,10 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	if [ -z "${CROSSBUILD_HOST}" ] ; then \
 		libs=$$(ldd -f "%o %p\n" -f "%o %p\n" $$progs 2>/dev/null | sort -u | \
 		    while read line; do \
+			case $$line in \
+			"["*"]") \
+				continue;; \
+			esac; \
 			set -- $$line; \
 			if [ "$$2 $$3" != "not found" ]; then \
 				echo $$2; \
@@ -2522,7 +2528,7 @@ _basic_bootstrap_tools_multilink+=usr.bin/awk awk,nawk
 # file2c is required for building usr.sbin/config:
 _basic_bootstrap_tools+=usr.bin/file2c
 # uuencode/uudecode required for share/tabset
-_basic_bootstrap_tools+=usr.bin/uuencode usr.bin/uudecode
+_basic_bootstrap_tools_multilink+=usr.bin/bintrans uuencode,uudecode
 # xargs is required by mkioctls
 _basic_bootstrap_tools+=usr.bin/xargs
 # cap_mkdb is required for share/termcap:
@@ -3356,7 +3362,8 @@ list-old-files: .PHONY
 	    -V "OLD_FILES:Mlib/*.so.*:S,^lib,usr/lib64," \
 	    -V "OLD_FILES:Musr/lib/*:S,^usr/lib,usr/lib64," \
 	    -V "OLD_FILES:Mlib/*.so.*:S,^lib,usr/lib64c," \
-	    -V "OLD_FILES:Musr/lib/*:S,^usr/lib,usr/lib64c," | xargs -n1 | sort
+	    -V "OLD_FILES:Musr/lib/*:S,^usr/lib,usr/lib64c," | \
+	    sed -E 's/[[:space:]]+/\n/g' | sort
 
 delete-old-files: .PHONY
 	@echo ">>> Removing old files (only deletes safe to delete libs)"
@@ -3430,6 +3437,7 @@ list-old-libs: .PHONY
 	    -V "OLD_LIBS:Musr/lib/*:S,^usr/lib,usr/lib64c," \
 	    -V "OLD_LIBS:Mlib/casper/*:S,^lib/casper,usr/lib64c," | \
 	    xargs -n1 | sort
+	    sed -E 's/[[:space:]]+/\n/g' | sort
 
 delete-old-libs: .PHONY
 	@echo ">>> Removing old libraries"
@@ -3470,7 +3478,7 @@ check-old-libs: .PHONY
 list-old-dirs: .PHONY
 	@cd ${.CURDIR}; \
 	${MAKE} -f ${.CURDIR}/Makefile.inc1 ${.MAKEFLAGS} ${.TARGET} \
-	    -V OLD_DIRS | xargs -n1 | sort -r
+	    -V OLD_DIRS | sed -E 's/[[:space:]]+/\n/g' | sort -r
 
 delete-old-dirs: .PHONY
 	@echo ">>> Removing old directories"

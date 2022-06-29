@@ -31,10 +31,6 @@
 #ifndef _MACHINE_PCPU_H_
 #define	_MACHINE_PCPU_H_
 
-#ifndef _SYS_CDEFS_H_
-#error "sys/cdefs.h is a prerequisite for this file"
-#endif
-
 #include <machine/segments.h>
 #include <machine/tss.h>
 
@@ -98,8 +94,6 @@ _Static_assert(sizeof(struct monitorbuf) == 128, "2x cache line");
 
 #define MONITOR_STOPSTATE_RUNNING	0
 #define MONITOR_STOPSTATE_STOPPED	1
-
-#if defined(__GNUCLIKE_ASM) && defined(__GNUCLIKE___TYPEOF)
 
 /*
  * Evaluates to the byte offset of the per-cpu variable name.
@@ -205,12 +199,6 @@ _Static_assert(sizeof(struct monitorbuf) == 128, "2x cache line");
 #define	PCPU_SET(member, val)	__PCPU_SET(pc_ ## member, val)
 
 #define	IS_BSP()	(PCPU_GET(cpuid) == 0)
-
-#else /* defined(__GNUCLIKE_ASM) && defined(__GNUCLIKE___TYPEOF) */
-
-#error "this file needs to be ported to your compiler"
-
-#endif /* __GNUCLIKE_ASM etc. */
 
 #endif /* _KERNEL */
 

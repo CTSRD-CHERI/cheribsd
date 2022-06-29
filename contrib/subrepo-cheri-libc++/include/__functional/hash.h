@@ -711,7 +711,7 @@ struct _LIBCPP_TEMPLATE_VIS hash<__intcap_t>
 {
   _LIBCPP_INLINE_VISIBILITY
   size_t operator()(__intcap_t x) const _NOEXCEPT {
-    return hash<vaddr_t>()(static_cast<vaddr_t>(x));
+    return hash<ptraddr_t>()(static_cast<ptraddr_t>(x));
   }
 };
 
@@ -721,7 +721,7 @@ struct _LIBCPP_TEMPLATE_VIS hash<__uintcap_t>
 {
   _LIBCPP_INLINE_VISIBILITY
   size_t operator()(__uintcap_t x) const _NOEXCEPT {
-    return hash<vaddr_t>()(static_cast<vaddr_t>(x));
+    return hash<ptraddr_t>()(static_cast<ptraddr_t>(x));
   }
 };
 #endif

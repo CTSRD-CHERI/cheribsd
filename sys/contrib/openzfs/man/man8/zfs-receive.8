@@ -29,7 +29,7 @@
 .\" Copyright 2018 Nexenta Systems, Inc.
 .\" Copyright 2019 Joyent, Inc.
 .\"
-.Dd February 16, 2020
+.Dd March 16, 2022
 .Dt ZFS-RECEIVE 8
 .Os
 .
@@ -319,7 +319,7 @@ received as an encryption root, specify encryption properties in the same
 manner as is required for
 .Nm zfs Cm create .
 For instance:
-.Dl # Nm zfs Cm send Pa tank/test@snap1 | Nm zfs Cm recv Fl o Sy encryption Ns = Ns Sy on Fl o keyformat=passphrase Fl o Sy keylocation Ns = Ns Pa file:///path/to/keyfile
+.Dl # Nm zfs Cm send Pa tank/test@snap1 | Nm zfs Cm recv Fl o Sy encryption Ns = Ns Sy on Fl o Sy keyformat Ns = Ns Sy passphrase Fl o Sy keylocation Ns = Ns Pa file:///path/to/keyfile
 .Pp
 Note that
 .Fl o Sy keylocation Ns = Ns Sy prompt
@@ -329,7 +329,7 @@ Once the receive has completed, you can use
 .Nm zfs Cm set
 to change this setting after the fact.
 Similarly, you can receive a dataset as an encrypted child by specifying
-.Op Fl x Ar encryption
+.Fl x Sy encryption
 to force the property to be inherited.
 Overriding encryption properties (except for
 .Sy keylocation )
@@ -394,6 +394,48 @@ Abort an interrupted
 .Nm zfs Cm receive Fl s ,
 deleting its saved partially received state.
 .El
+.
+.Sh EXAMPLES
+.\" These are, respectively, examples 12, 13 from zfs.8
+.\" Make sure to update them bidirectionally
+.Ss Example 1 : No Remotely Replicating ZFS Data
+The following commands send a full stream and then an incremental stream to a
+remote machine, restoring them into
+.Em poolB/received/fs@a
+and
+.Em poolB/received/fs@b ,
+respectively.
+.Em poolB
+must contain the file system
+.Em poolB/received ,
+and must not initially contain
+.Em poolB/received/fs .
+.Bd -literal -compact -offset Ds
+.No # Nm zfs Cm send Ar pool/fs@a |
+.No "   " Nm ssh Ar host Nm zfs Cm receive Ar poolB/received/fs Ns @ Ns Ar a
+.No # Nm zfs Cm send Fl i Ar a pool/fs@b |
+.No "   " Nm ssh Ar host Nm zfs Cm receive Ar poolB/received/fs
+.Ed
+.
+.Ss Example 2 : No Using the Nm zfs Cm receive Fl d No Option
+The following command sends a full stream of
+.Ar poolA/fsA/fsB@snap
+to a remote machine, receiving it into
+.Ar poolB/received/fsA/fsB@snap .
+The
+.Ar fsA/fsB@snap
+portion of the received snapshot's name is determined from the name of the sent
+snapshot.
+.Ar poolB
+must contain the file system
+.Ar poolB/received .
+If
+.Ar poolB/received/fsA
+does not exist, it is created as an empty file system.
+.Bd -literal -compact -offset Ds
+.No # Nm zfs Cm send Ar poolA/fsA/fsB@snap |
+.No "   " Nm ssh Ar host Nm zfs Cm receive Fl d Ar poolB/received
+.Ed
 .
 .Sh SEE ALSO
 .Xr zfs-send 8 ,

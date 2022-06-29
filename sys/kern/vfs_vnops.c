@@ -213,6 +213,8 @@ open2nameif(int fmode, u_int vn_open_flags)
 		res |= AUDITVNODE1;
 	if ((vn_open_flags & VN_OPEN_NOCAPCHECK) != 0)
 		res |= NOCAPCHECK;
+	if ((vn_open_flags & VN_OPEN_WANTIOCTLCAPS) != 0)
+		res |= WANTIOCTLCAPS;
 	return (res);
 }
 
@@ -266,7 +268,7 @@ restart:
 			if (fmode & O_EXCL)
 				vap->va_vaflags |= VA_EXCLUSIVE;
 			if (vn_start_write(ndp->ni_dvp, &mp, V_NOWAIT) != 0) {
-				NDFREE(ndp, NDF_ONLY_PNBUF);
+				NDFREE_PNBUF(ndp);
 				vput(ndp->ni_dvp);
 				if ((error = vn_start_write(NULL, &mp,
 				    V_XSLEEP | PCATCH)) != 0)
@@ -295,7 +297,7 @@ restart:
 			    false);
 			vn_finished_write(mp);
 			if (error) {
-				NDFREE(ndp, NDF_ONLY_PNBUF);
+				NDFREE_PNBUF(ndp);
 				if (error == ERELOOKUP) {
 					NDREINIT(ndp);
 					goto restart;
@@ -343,7 +345,7 @@ restart:
 	*flagp = fmode;
 	return (0);
 bad:
-	NDFREE(ndp, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(ndp);
 	vput(vp);
 	*flagp = fmode;
 	ndp->ni_vp = NULL;
@@ -631,7 +633,7 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base, int len, off_t offset,
 	if (segflg == UIO_USERSPACE)
 		IOVEC_INIT_C(&aiov,
 		    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
-			(vaddr_t)base, len, 0), len);
+			(ptraddr_t)base, len, 0), len);
 	else
 #endif
 		IOVEC_INIT(&aiov, base, len);

@@ -1,4 +1,4 @@
-/*      $NetBSD: meta.c,v 1.197 2022/02/08 22:36:02 sjg Exp $ */
+/*      $NetBSD: meta.c,v 1.200 2022/04/15 12:28:16 rillig Exp $ */
 
 /*
  * Implement 'meta' mode.
@@ -387,12 +387,10 @@ printCMDs(GNode *gn, FILE *fp)
 /*
  * Certain node types never get a .meta file
  */
-#define SKIP_META_TYPE(_type) do { \
-    if ((gn->type & __CONCAT(OP_, _type))) { \
-	if (verbose) { \
-	    debug_printf("Skipping meta for %s: .%s\n", \
-		    gn->name, __STRING(_type)); \
-	} \
+#define SKIP_META_TYPE(flag, str) do { \
+    if ((gn->type & (flag))) { \
+	if (verbose) \
+	    debug_printf("Skipping meta for %s: .%s\n", gn->name, str); \
 	return false; \
     } \
 } while (false)
@@ -413,12 +411,12 @@ meta_needed(GNode *gn, const char *dname,
     /* This may be a phony node which we don't want meta data for... */
     /* Skip .meta for .BEGIN, .END, .ERROR etc as well. */
     /* Or it may be explicitly flagged as .NOMETA */
-    SKIP_META_TYPE(NOMETA);
+    SKIP_META_TYPE(OP_NOMETA, "NOMETA");
     /* Unless it is explicitly flagged as .META */
     if (!(gn->type & OP_META)) {
-	SKIP_META_TYPE(PHONY);
-	SKIP_META_TYPE(SPECIAL);
-	SKIP_META_TYPE(MAKE);
+	SKIP_META_TYPE(OP_PHONY, "PHONY");
+	SKIP_META_TYPE(OP_SPECIAL, "SPECIAL");
+	SKIP_META_TYPE(OP_MAKE, "MAKE");
     }
 
     /* Check if there are no commands to execute. */
@@ -675,7 +673,7 @@ meta_job_start(Job *job, GNode *gn)
  * It does not disturb our state.
  */
 void
-meta_job_child(Job *job)
+meta_job_child(Job *job MAKE_ATTR_UNUSED)
 {
 #ifdef USE_FILEMON
     BuildMon *pbm;
@@ -700,7 +698,7 @@ meta_job_child(Job *job)
 }
 
 void
-meta_job_parent(Job *job, pid_t pid)
+meta_job_parent(Job *job MAKE_ATTR_UNUSED, pid_t pid MAKE_ATTR_UNUSED)
 {
 #if defined(USE_FILEMON) && !defined(USE_FILEMON_DEV)
     BuildMon *pbm;
@@ -717,7 +715,7 @@ meta_job_parent(Job *job, pid_t pid)
 }
 
 int
-meta_job_fd(Job *job)
+meta_job_fd(Job *job MAKE_ATTR_UNUSED)
 {
 #if defined(USE_FILEMON) && !defined(USE_FILEMON_DEV)
     BuildMon *pbm;
@@ -735,7 +733,7 @@ meta_job_fd(Job *job)
 }
 
 int
-meta_job_event(Job *job)
+meta_job_event(Job *job MAKE_ATTR_UNUSED)
 {
 #if defined(USE_FILEMON) && !defined(USE_FILEMON_DEV)
     BuildMon *pbm;
@@ -1167,8 +1165,7 @@ meta_oodate(GNode *gn, bool oodate)
 	/* we want to track all the .meta we read */
 	Global_Append(".MAKE.META.FILES", fname);
 
-	cmp_filter = metaCmpFilter ? metaCmpFilter :
-	    Var_Exists(gn, MAKE_META_CMP_FILTER);
+	cmp_filter = metaCmpFilter || Var_Exists(gn, MAKE_META_CMP_FILTER);
 
 	cmdNode = gn->commands.first;
 	while (!oodate && (x = fgetLine(&buf, &bufsz, 0, fp)) > 0) {

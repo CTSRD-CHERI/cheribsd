@@ -373,13 +373,12 @@ u_int8_t *nfscl_getmyip(struct nfsmount *, struct in6_addr *, int *);
 int nfsm_getfh(struct nfsrv_descript *, struct nfsfh **);
 int nfscl_mtofh(struct nfsrv_descript *, struct nfsfh **,
         struct nfsvattr *, int *);
-int nfscl_postop_attr(struct nfsrv_descript *, struct nfsvattr *, int *,
-    void *);
+int nfscl_postop_attr(struct nfsrv_descript *, struct nfsvattr *, int *);
 int nfscl_wcc_data(struct nfsrv_descript *, vnode_t,
-    struct nfsvattr *, int *, int *, void *);
+    struct nfsvattr *, int *, int *, uint64_t *);
 int nfsm_loadattr(struct nfsrv_descript *, struct nfsvattr *);
 int nfscl_request(struct nfsrv_descript *, vnode_t,
-         NFSPROC_T *, struct ucred *, void *);
+         NFSPROC_T *, struct ucred *);
 
 /* nfs_nfsdsubs.c */
 void nfsd_fhtovp(struct nfsrv_descript *, struct nfsrvfh *, int,
@@ -472,7 +471,7 @@ int nfsrpc_readlink(vnode_t, struct uio *, struct ucred *,
 int nfsrpc_read(vnode_t, struct uio *, struct ucred *, NFSPROC_T *,
     struct nfsvattr *, int *, void *);
 int nfsrpc_write(vnode_t, struct uio *, int *, int *,
-    struct ucred *, NFSPROC_T *, struct nfsvattr *, int *, void *, int);
+    struct ucred *, NFSPROC_T *, struct nfsvattr *, int *, int, int);
 int nfsrpc_mknod(vnode_t, char *, int, struct vattr *, u_int32_t,
     enum vtype, struct ucred *, NFSPROC_T *, struct nfsvattr *,
     struct nfsvattr *, struct nfsfh **, int *, int *, void *);
@@ -654,7 +653,7 @@ int nfscl_layoutcommit(vnode_t, NFSPROC_T *);
 
 /* nfs_clport.c */
 int nfscl_nget(mount_t, vnode_t, struct nfsfh *,
-    struct componentname *, NFSPROC_T *, struct nfsnode **, void *, int);
+    struct componentname *, NFSPROC_T *, struct nfsnode **, int);
 NFSPROC_T *nfscl_getparent(NFSPROC_T *);
 void nfscl_start_renewthread(struct nfsclclient *);
 void nfscl_loadsbinfo(struct nfsmount *, struct nfsstatfs *, void *);

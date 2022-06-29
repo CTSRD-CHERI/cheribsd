@@ -138,7 +138,8 @@ __FBSDID("$FreeBSD$");
 
 #define	DEVFN(b, s, f)	((b << 16) | (s << 8) | f)
 
-#define	FSL_NUM_MSIS		256	/* 8 registers of 32 bits (8 hardware IRQs) */
+#define	FSL_NUM_MSIS	256	/* 8 registers of 32 bits (8 hardware IRQs) */
+#define	PCI_SLOT_FIRST	0x1	/* used to be 0x11 but qemu-ppce500 starts from 0x1 */
 
 struct fsl_pcib_softc {
 	struct ofw_pci_softc pci_sc;
@@ -550,11 +551,10 @@ fsl_pcib_read_config(device_t dev, u_int bus, u_int slot, u_int func,
     u_int reg, int bytes)
 {
 	struct fsl_pcib_softc *sc = device_get_softc(dev);
-	u_int devfn;
 
-	if (bus == sc->sc_busnr && !sc->sc_pcie && slot < 10)
+	if (bus == sc->sc_busnr && !sc->sc_pcie &&
+	    slot < PCI_SLOT_FIRST)
 		return (~0);
-	devfn = DEVFN(bus, slot, func);
 
 	return (fsl_pcib_cfgread(sc, bus, slot, func, reg, bytes));
 }
@@ -565,7 +565,8 @@ fsl_pcib_write_config(device_t dev, u_int bus, u_int slot, u_int func,
 {
 	struct fsl_pcib_softc *sc = device_get_softc(dev);
 
-	if (bus == sc->sc_busnr && !sc->sc_pcie && slot < 10)
+	if (bus == sc->sc_busnr && !sc->sc_pcie &&
+	    slot < PCI_SLOT_FIRST)
 		return;
 	fsl_pcib_cfgwrite(sc, bus, slot, func, reg, val, bytes);
 }
@@ -767,11 +768,9 @@ fsl_pcib_decode_win(phandle_t node, struct fsl_pcib_softc *sc)
 static int fsl_pcib_alloc_msi(device_t dev, device_t child,
     int count, int maxcount, int *irqs)
 {
-	struct fsl_pcib_softc *sc;
 	vmem_addr_t start;
 	int err, i;
 
-	sc = device_get_softc(dev);
 	if (msi_vmem == NULL)
 		return (ENODEV);
 

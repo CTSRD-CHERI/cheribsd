@@ -356,7 +356,7 @@ static int
 get_nhop(struct rib_head *rnh, struct rt_addrinfo *info,
     struct nhop_priv **pnh_priv)
 {
-	const struct sockaddr *dst, *gateway, *netmask;
+	const struct sockaddr *dst, *netmask;
 	struct nhop_priv *nh_priv, *tmp_priv;
 	int error;
 
@@ -365,7 +365,6 @@ get_nhop(struct rib_head *rnh, struct rt_addrinfo *info,
 	/* Give the protocols chance to augment the request data */
 	dst = info->rti_info[RTAX_DST];
 	netmask = info->rti_info[RTAX_NETMASK];
-	gateway = info->rti_info[RTAX_GATEWAY];
 
 	error = rnh->rnh_preadd(rnh->rib_fibnum, dst, netmask, nh_priv->nh);
 	if (error != 0) {
@@ -477,6 +476,7 @@ nhop_create_from_nhop(struct rib_head *rnh, const struct nhop_object *nh_orig,
 	nh_priv->nh_neigh_family = nh_orig->nh_priv->nh_neigh_family;
 	nh_priv->rt_flags = nh_orig->nh_priv->rt_flags;
 	nh_priv->nh_type = nh_orig->nh_priv->nh_type;
+	nh_priv->nh_fibnum = nh_orig->nh_priv->nh_fibnum;
 
 	nh->nh_ifp = nh_orig->nh_ifp;
 	nh->nh_ifa = nh_orig->nh_ifa;
@@ -633,7 +633,7 @@ destroy_nhop_epoch(epoch_context_t ctx)
 void
 nhop_ref_object(struct nhop_object *nh)
 {
-	u_int old;
+	u_int old __diagused;
 
 	old = refcount_acquire(&nh->nh_priv->nh_refcnt);
 	KASSERT(old > 0, ("%s: nhop object %p has 0 refs", __func__, nh));

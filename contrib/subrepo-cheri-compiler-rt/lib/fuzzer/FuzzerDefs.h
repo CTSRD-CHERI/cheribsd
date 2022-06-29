@@ -21,7 +21,7 @@
 #include <vector>
 
 #ifdef __CHERI_PURE_CAPABILITY__
-using VirtAddr = vaddr_t;
+using VirtAddr = ptraddr_t;
 #else
 using VirtAddr = uintptr_t;
 #endif

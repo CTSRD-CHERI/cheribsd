@@ -744,7 +744,8 @@ void
 print_eth_rule(struct pfctl_eth_rule *r, const char *anchor_call,
     int rule_numbers)
 {
-	static const char *actiontypes[] = { "pass", "block" };
+	static const char *actiontypes[] = { "pass", "block", "", "", "", "",
+	    "", "", "", "", "", "", "match" };
 
 	if (rule_numbers)
 		printf("@%u ", r->nr);
@@ -782,7 +783,10 @@ print_eth_rule(struct pfctl_eth_rule *r, const char *anchor_call,
 		printf(" to ");
 		print_eth_addr(&r->dst);
 	}
-
+	printf(" l3");
+	print_fromto(&r->ipsrc, PF_OSFP_ANY, &r->ipdst,
+	    r->proto == ETHERTYPE_IP ? AF_INET : AF_INET6, 0,
+	    0, 0);
 	if (r->qname[0])
 		printf(" queue %s", r->qname);
 	if (r->tagname[0])

@@ -83,7 +83,6 @@ __FBSDID("$FreeBSD$");
 #define	DMAR_QI_IRQ_RID		1
 #define	DMAR_REG_RID		2
 
-static devclass_t dmar_devclass;
 static device_t *dmar_devs;
 static int dmar_devcnt;
 
@@ -405,6 +404,7 @@ dmar_attach(device_t dev)
 	struct dmar_unit *unit;
 	ACPI_DMAR_HARDWARE_UNIT *dmaru;
 	uint64_t timeout;
+	int disable_pmr;
 	int i, error;
 
 	unit = device_get_softc(dev);
@@ -528,6 +528,16 @@ dmar_attach(device_t dev)
 		dmar_release_resources(dev, unit);
 		return (error);
 	}
+
+	disable_pmr = 0;
+	TUNABLE_INT_FETCH("hw.dmar.pmr.disable", &disable_pmr);
+	if (disable_pmr) {
+		error = dmar_disable_protected_regions(unit);
+		if (error != 0)
+			device_printf(dev,
+			    "Failed to disable protected regions\n");
+	}
+
 	error = iommu_init_busdma(&unit->iommu);
 	if (error != 0) {
 		dmar_release_resources(dev, unit);
@@ -589,7 +599,7 @@ static driver_t	dmar_driver = {
 	sizeof(struct dmar_unit),
 };
 
-DRIVER_MODULE(dmar, acpi, dmar_driver, dmar_devclass, 0, 0);
+DRIVER_MODULE(dmar, acpi, dmar_driver, 0, 0);
 MODULE_DEPEND(dmar, acpi, 1, 1, 1);
 
 static void

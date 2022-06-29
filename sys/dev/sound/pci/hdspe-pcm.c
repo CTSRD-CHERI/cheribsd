@@ -263,7 +263,6 @@ buffer_copy(struct sc_chinfo *ch)
 	struct sc_info *sc;
 	int ssize, dsize;
 	int src, dst;
-	int length;
 	int n;
 	int i;
 
@@ -271,9 +270,6 @@ buffer_copy(struct sc_chinfo *ch)
 	sc = scp->sc;
 
 	n = AFMT_CHANNEL(ch->format); /* n channels */
-
-	length = sndbuf_getready(ch->buffer) /
-	    (4 /* Bytes per sample. */ * n);
 
 	if (ch->dir == PCMDIR_PLAY) {
 		src = sndbuf_getreadyptr(ch->buffer);
@@ -771,6 +767,6 @@ static driver_t hdspe_pcm_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(snd_hdspe_pcm, hdspe, hdspe_pcm_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_hdspe_pcm, hdspe, hdspe_pcm_driver, 0, 0);
 MODULE_DEPEND(snd_hdspe, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_hdspe, 1);

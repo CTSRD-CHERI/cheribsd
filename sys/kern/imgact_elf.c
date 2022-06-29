@@ -119,9 +119,12 @@ static bool __elfN(freebsd_trans_osrel)(const Elf_Note *note,
     int32_t *osrel);
 static bool kfreebsd_trans_osrel(const Elf_Note *note, int32_t *osrel);
 static bool __elfN(check_note)(struct image_params *imgp,
-    Elf_Brandnote *checknote, int32_t *osrel, bool *has_fctl0, uint32_t *fctl0);
+    Elf_Brandnote *checknote, int32_t *osrel, bool *has_fctl0,
+    uint32_t *fctl0);
 static vm_prot_t __elfN(trans_prot)(Elf_Word);
 static Elf_Word __elfN(untrans_prot)(vm_prot_t);
+static size_t __elfN(prepare_register_notes)(struct thread *td,
+    struct note_info_list *list, struct thread *target_td);
 
 SYSCTL_NODE(_kern, OID_AUTO, ELF_ABI_ID, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "");
@@ -991,7 +994,7 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 		nd->ni_vp = NULL;
 		goto fail;
 	}
-	NDFREE(nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(nd);
 	imgp->vp = nd->ni_vp;
 
 	/*
@@ -1107,21 +1110,19 @@ __elfN(enforce_limits)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 	struct vmspace *vmspace;
 	const char *err_str;
 	u_long text_size, data_size, total_size, text_addr, data_addr;
+	u_long seg_size, seg_addr;
 	int i;
 
 	err_str = NULL;
 	text_size = data_size = total_size = text_addr = data_addr = 0;
 
 	for (i = 0; i < hdr->e_phnum; i++) {
-		u_long seg_size, seg_addr, end_addr;
-
 		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
 			continue;
 
 		seg_addr = trunc_page(phdr[i].p_vaddr + et_dyn_addr);
 		seg_size = round_page(phdr[i].p_memsz +
 		    phdr[i].p_vaddr + et_dyn_addr - seg_addr);
-		end_addr = seg_addr + seg_size;
 
 		/*
 		 * Make the largest executable segment the official
@@ -1188,6 +1189,7 @@ __elfN(enforce_limits)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 	vmspace->vm_taddr = (caddr_t)(uintptr_t)text_addr;
 	vmspace->vm_dsize = data_size >> PAGE_SHIFT;
 	vmspace->vm_daddr = (caddr_t)(uintptr_t)data_addr;
+
 	return (0);
 }
 
@@ -1264,6 +1266,7 @@ __elfN(load_interp)(struct image_params *imgp, const Elf_Brandinfo *brand_info,
 	char *path;
 	int error;
 	u_long end_addr;
+
 	if (brand_info->emul_path != NULL &&
 	    brand_info->emul_path[0] != '\0') {
 		path = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
@@ -1929,6 +1932,7 @@ struct phdr_closure {
 
 struct note_info {
 	int		type;		/* Note type. */
+	struct regset	*regset;	/* Register set. */
 	outfunc_t 	outfunc; 	/* Output function. */
 	void		*outarg;	/* Argument for the output function. */
 	size_t		outsize;	/* Output size. */
@@ -1948,9 +1952,7 @@ static int __elfN(corehdr)(struct coredump_params *, int, void *, size_t,
     struct note_info_list *, size_t, int);
 static void __elfN(putnote)(struct thread *td, struct note_info *, struct sbuf *);
 
-static void __elfN(note_fpregset)(void *, struct sbuf *, size_t *);
 static void __elfN(note_prpsinfo)(void *, struct sbuf *, size_t *);
-static void __elfN(note_prstatus)(void *, struct sbuf *, size_t *);
 static void __elfN(note_threadmd)(void *, struct sbuf *, size_t *);
 static void __elfN(note_thrmisc)(void *, struct sbuf *, size_t *);
 static void __elfN(note_ptlwpinfo)(void *, struct sbuf *, size_t *);
@@ -2265,7 +2267,8 @@ __elfN(prepare_notes)(struct thread *td, struct note_info_list *list,
 	p = td->td_proc;
 	size = 0;
 
-	size += __elfN(register_note)(td, list, NT_PRPSINFO, __elfN(note_prpsinfo), p);
+	size += __elfN(register_note)(td, list, NT_PRPSINFO,
+	    __elfN(note_prpsinfo), p);
 
 	/*
 	 * To have the debugger select the right thread (LWP) as the initial
@@ -2275,10 +2278,7 @@ __elfN(prepare_notes)(struct thread *td, struct note_info_list *list,
 	 */
 	thr = td;
 	while (thr != NULL) {
-		size += __elfN(register_note)(td, list, NT_PRSTATUS,
-		    __elfN(note_prstatus), thr);
-		size += __elfN(register_note)(td, list, NT_FPREGSET,
-		    __elfN(note_fpregset), thr);
+		size += __elfN(prepare_register_notes)(td, list, thr);
 		size += __elfN(register_note)(td, list, NT_THRMISC,
 		    __elfN(note_thrmisc), thr);
 		size += __elfN(register_note)(td, list, NT_PTLWPINFO,
@@ -2404,6 +2404,34 @@ __elfN(puthdr)(struct thread *td, void *hdr, size_t hdrsize, int numsegs,
 	each_dumpable_segment(td, cb_put_phdr, &phc, flags);
 }
 
+static size_t
+__elfN(register_regset_note)(struct thread *td, struct note_info_list *list,
+    struct regset *regset, struct thread *target_td)
+{
+	const struct sysentvec *sv;
+	struct note_info *ninfo;
+	size_t size, notesize;
+
+	size = 0;
+	if (!regset->get(regset, target_td, NULL, &size) || size == 0)
+		return (0);
+
+	ninfo = malloc(sizeof(*ninfo), M_TEMP, M_ZERO | M_WAITOK);
+	ninfo->type = regset->note;
+	ninfo->regset = regset;
+	ninfo->outarg = target_td;
+	ninfo->outsize = size;
+	TAILQ_INSERT_TAIL(list, ninfo, link);
+
+	sv = td->td_proc->p_sysent;
+	notesize = sizeof(Elf_Note) +		/* note header */
+	    roundup2(strlen(sv->sv_elf_core_abi_vendor) + 1, ELF_NOTE_ROUNDSIZE) +
+						/* note name */
+	    roundup2(size, ELF_NOTE_ROUNDSIZE);	/* note description */
+
+	return (notesize);
+}
+
 size_t
 __elfN(register_note)(struct thread *td, struct note_info_list *list,
     int type, outfunc_t out, void *arg)
@@ -2502,7 +2530,16 @@ __elfN(putnote)(struct thread *td, struct note_info *ninfo, struct sbuf *sb)
 	if (note.n_descsz == 0)
 		return;
 	sbuf_start_section(sb, &old_len);
-	ninfo->outfunc(ninfo->outarg, sb, &ninfo->outsize);
+	if (ninfo->regset != NULL) {
+		struct regset *regset = ninfo->regset;
+		void *buf;
+
+		buf = malloc(ninfo->outsize, M_TEMP, M_ZERO | M_WAITOK);
+		(void)regset->get(regset, ninfo->outarg, buf, &ninfo->outsize);
+		sbuf_bcat(sb, buf, ninfo->outsize);
+		free(buf, M_TEMP);
+	} else
+		ninfo->outfunc(ninfo->outarg, sb, &ninfo->outsize);
 	sect_len = sbuf_end_section(sb, old_len, ELF_NOTE_ROUNDSIZE, 0);
 	if (sect_len < 0)
 		return;
@@ -2646,6 +2683,7 @@ __elfN(get_prstatus)(struct regset *rs, struct thread *td, void *buf,
 		KASSERT(*sizep == sizeof(*status), ("%s: invalid size",
 		    __func__));
 		status = buf;
+		memset(status, 0, *sizep);
 		status->pr_version = PRSTATUS_VERSION;
 		status->pr_statussz = sizeof(elf_prstatus_t);
 		status->pr_gregsetsz = sizeof(elf_gregset_t);
@@ -2686,24 +2724,6 @@ static struct regset __elfN(regset_prstatus) = {
 	.set = __elfN(set_prstatus),
 };
 ELF_REGSET(__elfN(regset_prstatus));
-
-static void
-__elfN(note_prstatus)(void *arg, struct sbuf *sb, size_t *sizep)
-{
-	struct thread *td;
-	elf_prstatus_t *status;
-
-	td = arg;
-	if (sb != NULL) {
-		KASSERT(*sizep == sizeof(*status), ("%s: invalid size",
-		    __func__));
-		status = malloc(sizeof(*status), M_TEMP, M_ZERO | M_WAITOK);
-		__elfN(get_prstatus)(NULL, td, status, sizep);
-		sbuf_bcat(sb, status, sizeof(*status));
-		free(status, M_TEMP);
-	}
-	*sizep = sizeof(*status);
-}
 
 static bool
 __elfN(get_fpregset)(struct regset *rs, struct thread *td, void *buf,
@@ -2749,21 +2769,37 @@ static struct regset __elfN(regset_fpregset) = {
 };
 ELF_REGSET(__elfN(regset_fpregset));
 
-static void
-__elfN(note_fpregset)(void *arg, struct sbuf *sb, size_t *sizep)
+static size_t
+__elfN(prepare_register_notes)(struct thread *td, struct note_info_list *list,
+    struct thread *target_td)
 {
-	struct thread *td;
-	elf_prfpregset_t *fpregset;
+	struct sysentvec *sv = td->td_proc->p_sysent;
+	struct regset **regsetp, **regset_end, *regset;
+	size_t size;
 
-	td = arg;
-	if (sb != NULL) {
-		KASSERT(*sizep == sizeof(*fpregset), ("invalid size"));
-		fpregset = malloc(sizeof(*fpregset), M_TEMP, M_ZERO | M_WAITOK);
-		__elfN(get_fpregset)(NULL, td, fpregset, sizep);
-		sbuf_bcat(sb, fpregset, sizeof(*fpregset));
-		free(fpregset, M_TEMP);
+	size = 0;
+
+	/* NT_PRSTATUS must be the first register set note. */
+	size += __elfN(register_regset_note)(td, list, &__elfN(regset_prstatus),
+	    target_td);
+
+	regsetp = sv->sv_regset_begin;
+	if (regsetp == NULL) {
+		/* XXX: This shouldn't be true for any FreeBSD ABIs. */
+		size += __elfN(register_regset_note)(td, list,
+		    &__elfN(regset_fpregset), target_td);
+		return (size);
 	}
-	*sizep = sizeof(*fpregset);
+	regset_end = sv->sv_regset_end;
+	MPASS(regset_end != NULL);
+	for (; regsetp < regset_end; regsetp++) {
+		regset = *regsetp;
+		if (regset->note == NT_PRSTATUS)
+			continue;
+		size += __elfN(register_regset_note)(td, list, regset,
+		    target_td);
+	}
+	return (size);
 }
 
 static void

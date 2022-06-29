@@ -226,9 +226,7 @@ static device_method_t pci_methods[] = {
 
 DEFINE_CLASS_0(pci, pci_driver, pci_methods, sizeof(struct pci_softc));
 
-static devclass_t pci_devclass;
-EARLY_DRIVER_MODULE(pci, pcib, pci_driver, pci_devclass, pci_modevent, NULL,
-    BUS_PASS_BUS);
+EARLY_DRIVER_MODULE(pci, pcib, pci_driver, pci_modevent, NULL, BUS_PASS_BUS);
 MODULE_VERSION(pci, 1);
 
 static char	*pci_vendordata;
@@ -5030,6 +5028,7 @@ static const struct
 	{PCIC_DASP,		PCIS_DASP_PERFCNTRS,	1, "performance counters"},
 	{PCIC_DASP,		PCIS_DASP_COMM_SYNC,	1, "communication synchronizer"},
 	{PCIC_DASP,		PCIS_DASP_MGMT_CARD,	1, "signal processing management"},
+	{PCIC_INSTRUMENT,	-1,			0, "non-essential instrumentation"},
 	{0, 0, 0,		NULL}
 };
 
@@ -5645,7 +5644,7 @@ pci_release_resource(device_t dev, device_t child, int type, int rid,
 {
 	struct pci_devinfo *dinfo;
 	struct resource_list *rl;
-	pcicfgregs *cfg;
+	pcicfgregs *cfg __unused;
 
 	if (device_get_parent(child) != dev)
 		return (BUS_RELEASE_RESOURCE(device_get_parent(dev), child,
@@ -5655,7 +5654,7 @@ pci_release_resource(device_t dev, device_t child, int type, int rid,
 	cfg = &dinfo->cfg;
 
 #ifdef PCI_IOV
-	if (dinfo->cfg.flags & PCICFG_VF) {
+	if (cfg->flags & PCICFG_VF) {
 		switch (type) {
 		/* VFs can't have I/O BARs. */
 		case SYS_RES_IOPORT:

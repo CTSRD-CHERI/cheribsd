@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.c,v 1.153 2021/07/05 00:50:25 dtucker Exp $ */
+/* $OpenBSD: auth.c,v 1.154 2022/02/23 11:17:10 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -24,7 +24,6 @@
  */
 
 #include "includes.h"
-__RCSID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -103,62 +102,18 @@ int
 allowed_user(struct ssh *ssh, struct passwd * pw)
 {
 	struct stat st;
-	const char *hostname = NULL, *ipaddr = NULL, *passwd = NULL;
+	const char *hostname = NULL, *ipaddr = NULL;
 	u_int i;
 	int r;
-#ifdef USE_SHADOW
-	struct spwd *spw = NULL;
-#endif
 
 	/* Shouldn't be called if pw is NULL, but better safe than sorry... */
 	if (!pw || !pw->pw_name)
 		return 0;
 
-#ifdef USE_SHADOW
-	if (!options.use_pam)
-		spw = getspnam(pw->pw_name);
-#ifdef HAS_SHADOW_EXPIRE
-	if (!options.use_pam && spw != NULL && auth_shadow_acctexpired(spw))
+	if (!options.use_pam && platform_locked_account(pw)) {
+		logit("User %.100s not allowed because account is locked",
+		    pw->pw_name);
 		return 0;
-#endif /* HAS_SHADOW_EXPIRE */
-#endif /* USE_SHADOW */
-
-	/* grab passwd field for locked account check */
-	passwd = pw->pw_passwd;
-#ifdef USE_SHADOW
-	if (spw != NULL)
-#ifdef USE_LIBIAF
-		passwd = get_iaf_password(pw);
-#else
-		passwd = spw->sp_pwdp;
-#endif /* USE_LIBIAF */
-#endif
-
-	/* check for locked account */
-	if (!options.use_pam && passwd && *passwd) {
-		int locked = 0;
-
-#ifdef LOCKED_PASSWD_STRING
-		if (strcmp(passwd, LOCKED_PASSWD_STRING) == 0)
-			 locked = 1;
-#endif
-#ifdef LOCKED_PASSWD_PREFIX
-		if (strncmp(passwd, LOCKED_PASSWD_PREFIX,
-		    strlen(LOCKED_PASSWD_PREFIX)) == 0)
-			 locked = 1;
-#endif
-#ifdef LOCKED_PASSWD_SUBSTR
-		if (strstr(passwd, LOCKED_PASSWD_SUBSTR))
-			locked = 1;
-#endif
-#ifdef USE_LIBIAF
-		free((void *) passwd);
-#endif /* USE_LIBIAF */
-		if (locked) {
-			logit("User %.100s not allowed because account is locked",
-			    pw->pw_name);
-			return 0;
-		}
 	}
 
 	/*
@@ -733,12 +688,21 @@ auth_debug_reset(void)
 struct passwd *
 fakepw(void)
 {
+	static int done = 0;
 	static struct passwd fake;
+	const char hashchars[] = "./ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	    "abcdefghijklmnopqrstuvwxyz0123456789"; /* from bcrypt.c */
+	char *cp;
+
+	if (done)
+		return (&fake);
 
 	memset(&fake, 0, sizeof(fake));
 	fake.pw_name = "NOUSER";
-	fake.pw_passwd =
-	    "$2a$06$r3.juUaHZDlIbQaO2dS9FuYxL1W9M81R1Tc92PoSNmzvpEqLkLGrK";
+	fake.pw_passwd = xstrdup("$2a$10$"
+	    "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+	for (cp = fake.pw_passwd + 7; *cp != '\0'; cp++)
+		*cp = hashchars[arc4random_uniform(sizeof(hashchars) - 1)];
 #ifdef HAVE_STRUCT_PASSWD_PW_GECOS
 	fake.pw_gecos = "NOUSER";
 #endif
@@ -749,6 +713,7 @@ fakepw(void)
 #endif
 	fake.pw_dir = "/nonexist";
 	fake.pw_shell = "/nonexist";
+	done = 1;
 
 	return (&fake);
 }

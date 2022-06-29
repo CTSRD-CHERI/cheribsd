@@ -60,7 +60,7 @@ static int lmpid = 0;
 static int last_hi = 0;		/* used in u_process and u_endscreen */
 static int lastline = 0;
 
-#define lineindex(l) ((l)*screen_width)
+#define lineindex(l) ((l)*(screen_width + 1))
 
 
 /* things initialized by display_init and used thruout */
@@ -144,7 +144,7 @@ display_resize(void)
 	lines = 0;
 
     /* now, allocate space for the screen buffer */
-    screenbuf = calloc(lines, screen_width);
+    screenbuf = calloc(lines, screen_width + 1);
     if (screenbuf == NULL)
     {
 	/* oops! */
@@ -825,7 +825,6 @@ u_header(const char *text __unused)
 void
 i_process(int line, char *thisline)
 {
-    char *p;
     char *base;
 
     /* make sure we are on the correct line */
@@ -847,19 +846,12 @@ i_process(int line, char *thisline)
 
     /* copy it in to our buffer */
     base = smart_terminal ? screenbuf + lineindex(line) : screenbuf;
-    p = stpcpy(base, thisline);
-
-    /* zero fill the rest of it */
-    if (p - base < screen_width)
-    {
-	memset(p, 0, screen_width - (p - base));
-    }
+    strncpy(base, thisline, screen_width);
 }
 
 void
 u_process(int line, char *newline)
 {
-    char *optr;
     int screen_line = line + Header_lines;
     char *bufferline;
 
@@ -893,13 +885,7 @@ u_process(int line, char *newline)
 	fputs(newline, stdout);
 
 	/* copy it in to the buffer */
-	optr = stpcpy(bufferline, newline);
-
-	/* zero fill the rest of it */
-	if (optr - bufferline < screen_width)
-	{
-	    memset(optr, 0, screen_width - (optr - bufferline));
-	}
+	strncpy(bufferline, newline, screen_width);
     }
     else
     {

@@ -1,16 +1,5 @@
 #ifndef JEMALLOC_INTERNAL_HASH_H
 #define JEMALLOC_INTERNAL_HASH_H
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181113,
- *   "target_type": "lib",
- *   "changes": [
- *     "virtual_address"
- *   ]
- * }
- * CHERI CHANGES END
- */
 
 #include "jemalloc/internal/assert.h"
 
@@ -35,7 +24,7 @@ hash_rotl_64(uint64_t x, int8_t r) {
 static inline uint32_t
 hash_get_block_32(const uint32_t *p, int i) {
 	/* Handle unaligned read. */
-	if (unlikely((vaddr_t)p & (sizeof(uint32_t)-1)) != 0) {
+	if (unlikely((uintptr_t)p & (sizeof(uint32_t)-1)) != 0) {
 		uint32_t ret;
 
 		memcpy(&ret, (uint8_t *)(p + i), sizeof(uint32_t));
@@ -48,7 +37,7 @@ hash_get_block_32(const uint32_t *p, int i) {
 static inline uint64_t
 hash_get_block_64(const uint64_t *p, int i) {
 	/* Handle unaligned read. */
-	if (unlikely((vaddr_t)p & (sizeof(uint64_t)-1)) != 0) {
+	if (unlikely((uintptr_t)p & (sizeof(uint64_t)-1)) != 0) {
 		uint64_t ret;
 
 		memcpy(&ret, (uint8_t *)(p + i), sizeof(uint64_t));

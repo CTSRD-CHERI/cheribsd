@@ -485,7 +485,6 @@ static int
 qls_pci_detach(device_t dev)
 {
 	qla_host_t *ha = NULL;
-	struct ifnet *ifp;
 
 	QL_DPRINT2((dev, "%s: enter\n", __func__));
 
@@ -493,8 +492,6 @@ qls_pci_detach(device_t dev)
                 device_printf(dev, "cannot get softc\n");
                 return (ENOMEM);
         }
-
-	ifp = ha->ifp;
 
 	(void)QLA_LOCK(ha, __func__, 0);
 	qls_stop(ha);
@@ -862,7 +859,9 @@ qls_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	int ret = 0;
 	struct ifreq *ifr = (struct ifreq *)data;
+#ifdef INET
 	struct ifaddr *ifa = (struct ifaddr *)data;
+#endif
 	qla_host_t *ha;
 
 	ha = (qla_host_t *)ifp->if_softc;
@@ -872,6 +871,7 @@ qls_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		QL_DPRINT4((ha->pci_dev, "%s: SIOCSIFADDR (0x%lx)\n",
 			__func__, cmd));
 
+#ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET) {
 			ifp->if_flags |= IFF_UP;
 			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
@@ -885,9 +885,10 @@ qls_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				ntohl(IA_SIN(ifa)->sin_addr.s_addr)));
 
 			arp_ifinit(ifp, ifa);
-		} else {
-			ether_ioctl(ifp, cmd, data);
+			break;
 		}
+#endif
+		ether_ioctl(ifp, cmd, data);
 		break;
 
 	case SIOCSIFMTU:
@@ -1207,9 +1208,6 @@ static void
 qls_stop(qla_host_t *ha)
 {
 	struct ifnet *ifp = ha->ifp;
-	device_t	dev;
-
-	dev = ha->pci_dev;
 
 	ifp->if_drv_flags &= ~(IFF_DRV_OACTIVE | IFF_DRV_RUNNING);
 
@@ -1372,15 +1370,12 @@ int
 qls_get_mbuf(qla_host_t *ha, qla_rx_buf_t *rxb, struct mbuf *nmp)
 {
 	struct mbuf *mp = nmp;
-	struct ifnet   		*ifp;
 	int            		ret = 0;
 	uint32_t		offset;
 	bus_dma_segment_t	segs[1];
 	int			nsegs;
 
 	QL_DPRINT2((ha->pci_dev, "%s: enter\n", __func__));
-
-	ifp = ha->ifp;
 
 	if (mp == NULL) {
 		mp = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, ha->msize);
@@ -1459,6 +1454,7 @@ qls_tx_done(void *context, int pending)
 static int
 qls_config_lro(qla_host_t *ha)
 {
+#if defined(INET) || defined(INET6)
         int i;
         struct lro_ctrl *lro;
 
@@ -1474,12 +1470,14 @@ qls_config_lro(qla_host_t *ha)
         ha->flags.lro_init = 1;
 
         QL_DPRINT2((ha->pci_dev, "%s: LRO initialized\n", __func__));
+#endif
         return (0);
 }
 
 static void
 qls_free_lro(qla_host_t *ha)
 {
+#if defined(INET) || defined(INET6)
         int i;
         struct lro_ctrl *lro;
 
@@ -1491,6 +1489,7 @@ qls_free_lro(qla_host_t *ha)
                 tcp_lro_free(lro);
         }
         ha->flags.lro_init = 0;
+#endif
 }
 
 static void

@@ -2017,7 +2017,6 @@ atp_reap_sibling_zombies(void *arg)
 	u_int8_t n_horizontal_scrolls = 0;
 	u_int8_t n_vertical_scrolls = 0;
 	int horizontal_scroll = 0;
-	int vertical_scroll = 0;
 	atp_stroke_t *strokep;
 	atp_stroke_t *strokep_next;
 
@@ -2037,7 +2036,6 @@ atp_reap_sibling_zombies(void *arg)
 				horizontal_scroll += strokep->cum_movement_x;
 			} else if (atp_is_vertical_scroll(strokep)) {
 				n_vertical_scrolls++;
-				vertical_scroll +=  strokep->cum_movement_y;
 			}
 		}
 
@@ -2617,8 +2615,6 @@ atp_sysctl_scale_factor_handler(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 
-static devclass_t atp_devclass;
-
 static device_method_t atp_methods[] = {
 	DEVMETHOD(device_probe,  atp_probe),
 	DEVMETHOD(device_attach, atp_attach),
@@ -2633,7 +2629,7 @@ static driver_t atp_driver = {
 	.size    = sizeof(struct atp_softc)
 };
 
-DRIVER_MODULE(atp, uhub, atp_driver, atp_devclass, NULL, 0);
+DRIVER_MODULE(atp, uhub, atp_driver, NULL, NULL);
 MODULE_DEPEND(atp, usb, 1, 1, 1);
 MODULE_DEPEND(atp, hid, 1, 1, 1);
 MODULE_VERSION(atp, 1);

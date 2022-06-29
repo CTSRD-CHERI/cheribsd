@@ -603,9 +603,10 @@ int
 in_pcballoc(struct socket *so, struct inpcbinfo *pcbinfo)
 {
 	struct inpcb *inp;
+#if defined(IPSEC) || defined(IPSEC_SUPPORT) || defined(MAC)
 	int error;
+#endif
 
-	error = 0;
 	inp = uma_zalloc_smr(pcbinfo->ipi_zone, M_NOWAIT);
 	if (inp == NULL)
 		return (ENOBUFS);
@@ -895,7 +896,7 @@ inp_so_options(const struct inpcb *inp)
  * Check if a new BINDMULTI socket is allowed to be created.
  *
  * ni points to the new inp.
- * oi points to the exisitng inp.
+ * oi points to the existing inp.
  *
  * This checks whether the existing inp also has BINDMULTI and
  * whether the credentials match.
@@ -3339,7 +3340,6 @@ in_pcboutput_txrtlmt(struct inpcb *inp, struct ifnet *ifp, struct mbuf *mb)
 	struct socket *socket;
 	uint32_t max_pacing_rate;
 	bool did_upgrade;
-	int error;
 
 	if (inp == NULL)
 		return;
@@ -3370,7 +3370,7 @@ in_pcboutput_txrtlmt(struct inpcb *inp, struct ifnet *ifp, struct mbuf *mb)
 	 */
 	max_pacing_rate = socket->so_max_pacing_rate;
 
-	error = in_pcboutput_txrtlmt_locked(inp, ifp, mb, max_pacing_rate);
+	in_pcboutput_txrtlmt_locked(inp, ifp, mb, max_pacing_rate);
 
 	if (did_upgrade)
 		INP_DOWNGRADE(inp);

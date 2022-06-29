@@ -134,11 +134,8 @@ rx8803_settime(device_t dev, struct timespec *ts)
 {
 	struct rx8803_time data;
 	struct bcd_clocktime bcd;
-	device_t bus;
 	uint8_t reg;
 	int rc;
-
-	bus = device_get_parent(dev);
 
 	ts->tv_sec -= utc_offset();
 	clock_ts_to_bcd(ts, &bcd, false);
@@ -240,7 +237,5 @@ static driver_t rx8803_driver = {
 	0,			/* We don't need softc for this one. */
 };
 
-static devclass_t rx8803_devclass;
-
-DRIVER_MODULE(rx8803, iicbus, rx8803_driver, rx8803_devclass, NULL, NULL);
+DRIVER_MODULE(rx8803, iicbus, rx8803_driver, NULL, NULL);
 MODULE_DEPEND(rx8803, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);

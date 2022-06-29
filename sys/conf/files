@@ -266,7 +266,7 @@ contrib/openzfs/module/zfs/dmu_send.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/dmu_traverse.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/dmu_tx.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/dmu_zfetch.c		optional zfs compile-with "${ZFS_C}"
-contrib/openzfs/module/zfs/dnode.c		optional zfs compile-with "${ZFS_C}" \
+contrib/openzfs/module/zfs/dnode.c		optional zfs compile-with "${ZFS_C} ${NO_WUNUSED_BUT_SET_VARIABLE}" \
 	warning "kernel contains CDDL licensed ZFS filesystem"
 contrib/openzfs/module/zfs/dnode_sync.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/dsl_bookmark.c		optional zfs compile-with "${ZFS_C}"
@@ -713,7 +713,7 @@ contrib/zstd/lib/common/xxhash.c		optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/compress/zstd_compress.c	optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/compress/zstd_compress_literals.c	optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/compress/zstd_compress_sequences.c	optional zstdio compile-with ${ZSTD_C}
-contrib/zstd/lib/compress/zstd_compress_superblock.c	optional zstdio compile-with ${ZSTD_C}
+contrib/zstd/lib/compress/zstd_compress_superblock.c	optional zstdio compile-with "${ZSTD_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 contrib/zstd/lib/compress/fse_compress.c	optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/compress/hist.c		optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/compress/huf_compress.c	optional zstdio compile-with ${ZSTD_C}
@@ -3130,7 +3130,6 @@ dev/sound/pci/cmi.c		optional snd_cmi pci
 dev/sound/pci/cs4281.c		optional snd_cs4281 pci
 dev/sound/pci/csa.c		optional snd_csa pci
 dev/sound/pci/csapcm.c		optional snd_csa pci
-dev/sound/pci/ds1.c		optional snd_ds1 pci
 dev/sound/pci/emu10k1.c		optional snd_emu10k1 pci
 dev/sound/pci/emu10kx.c		optional snd_emu10kx pci
 dev/sound/pci/emu10kx-pcm.c	optional snd_emu10kx pci
@@ -3140,7 +3139,6 @@ dev/sound/pci/envy24ht.c	optional snd_envy24ht pci
 dev/sound/pci/es137x.c		optional snd_es137x pci
 dev/sound/pci/fm801.c		optional snd_fm801 pci
 dev/sound/pci/ich.c		optional snd_ich pci
-dev/sound/pci/maestro.c		optional snd_maestro pci
 dev/sound/pci/maestro3.c	optional snd_maestro3 pci
 dev/sound/pci/neomagic.c	optional snd_neomagic pci
 dev/sound/pci/solo.c		optional snd_solo pci
@@ -3533,6 +3531,7 @@ dev/xen/blkback/blkback.c	optional xenhvm
 dev/xen/bus/xenpv.c		optional xenhvm
 dev/xen/console/xen_console.c	optional xenhvm
 dev/xen/control/control.c	optional xenhvm
+dev/xen/cpu/xen_acpi_cpu.c	optional xenhvm
 dev/xen/efi/pvefi.c		optional xenhvm efirt
 dev/xen/grant_table/grant_table.c	optional xenhvm
 dev/xen/netback/netback.c	optional xenhvm
@@ -3870,6 +3869,7 @@ kern/kern_tslog.c		optional tslog
 kern/kern_ubsan.c		optional kubsan
 kern/kern_umtx.c		standard
 kern/kern_uuid.c		standard
+kern/kern_vnodedumper.c		standard
 kern/kern_xxx.c			standard
 kern/link_elf.c			standard
 kern/linker_if.m		standard
@@ -4657,7 +4657,7 @@ ofed/drivers/infiniband/core/ib_device.c		optional ofed	\
 ofed/drivers/infiniband/core/ib_fmr_pool.c		optional ofed	\
 	compile-with "${OFED_C}"
 ofed/drivers/infiniband/core/ib_iwcm.c			optional ofed	\
-	compile-with "${OFED_C}"
+	compile-with "${OFED_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 ofed/drivers/infiniband/core/ib_iwpm_msg.c		optional ofed	\
 	compile-with "${OFED_C}"
 ofed/drivers/infiniband/core/ib_iwpm_util.c		optional ofed	\
@@ -4739,11 +4739,11 @@ ofed/drivers/infiniband/ulp/sdp/sdp_bcopy.c	optional sdp inet	\
 ofed/drivers/infiniband/ulp/sdp/sdp_main.c	optional sdp inet 	\
 	compile-with "${OFED_C} -I$S/ofed/drivers/infiniband/ulp/sdp/"
 ofed/drivers/infiniband/ulp/sdp/sdp_rx.c	optional sdp inet 	\
-	compile-with "${OFED_C} -I$S/ofed/drivers/infiniband/ulp/sdp/"
+	compile-with "${OFED_C} -I$S/ofed/drivers/infiniband/ulp/sdp/ ${NO_WUNUSED_BUT_SET_VARIABLE}"
 ofed/drivers/infiniband/ulp/sdp/sdp_cma.c	optional sdp inet 	\
 	compile-with "${OFED_C} -I$S/ofed/drivers/infiniband/ulp/sdp/"
 ofed/drivers/infiniband/ulp/sdp/sdp_tx.c	optional sdp inet 	\
-	compile-with "${OFED_C} -I$S/ofed/drivers/infiniband/ulp/sdp/"
+	compile-with "${OFED_C} -I$S/ofed/drivers/infiniband/ulp/sdp/ ${NO_WUNUSED_BUT_SET_VARIABLE}"
 
 dev/mthca/mthca_allocator.c		optional mthca pci ofed \
 	compile-with "${OFED_C}"

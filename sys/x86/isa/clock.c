@@ -42,6 +42,11 @@ __FBSDID("$FreeBSD$");
  * Routines to handle clock hardware.
  */
 
+#ifdef __amd64__
+#define	DEV_APIC
+#else
+#include "opt_apic.h"
+#endif
 #include "opt_clock.h"
 #include "opt_isa.h"
 
@@ -129,6 +134,7 @@ clock_init(void)
 	mtx_init(&clock_lock, "clk", NULL, MTX_SPIN | MTX_NOPROFILE);
 	/* Init the clock in order to use DELAY */
 	init_ops.early_clock_source_init();
+	tsc_init();
 }
 
 static int
@@ -414,7 +420,9 @@ cpu_initclocks(void)
 	td = curthread;
 
 	tsc_calibrate();
+#ifdef DEV_APIC
 	lapic_calibrate_timer();
+#endif
 	cpu_initclocks_bsp();
 	CPU_FOREACH(i) {
 		if (i == 0)
@@ -430,7 +438,9 @@ cpu_initclocks(void)
 	thread_unlock(td);
 #else
 	tsc_calibrate();
+#ifdef DEV_APIC
 	lapic_calibrate_timer();
+#endif
 	cpu_initclocks_bsp();
 #endif
 }
@@ -650,10 +660,8 @@ static driver_t attimer_driver = {
 	sizeof(struct attimer_softc),
 };
 
-static devclass_t attimer_devclass;
-
-DRIVER_MODULE(attimer, isa, attimer_driver, attimer_devclass, 0, 0);
-DRIVER_MODULE(attimer, acpi, attimer_driver, attimer_devclass, 0, 0);
+DRIVER_MODULE(attimer, isa, attimer_driver, 0, 0);
+DRIVER_MODULE(attimer, acpi, attimer_driver, 0, 0);
 ISA_PNP_INFO(attimer_ids);
 
 #endif /* DEV_ISA */

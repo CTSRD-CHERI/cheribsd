@@ -219,15 +219,9 @@ static driver_t bxe_driver = {
     sizeof(struct bxe_softc) /* extra data */
 };
 
-/*
- * FreeBSD dev class is needed to manage dev instances and
- * to associate with a bus type
- */
-static devclass_t bxe_devclass;
-
 MODULE_DEPEND(bxe, pci, 1, 1, 1);
 MODULE_DEPEND(bxe, ether, 1, 1, 1);
-DRIVER_MODULE(bxe, pci, bxe_driver, bxe_devclass, 0, 0);
+DRIVER_MODULE(bxe, pci, bxe_driver, 0, 0);
 
 DEBUGNET_DEFINE(bxe);
 
@@ -8688,7 +8682,7 @@ bxe_handle_fp_tq(void *context,
 {
     struct bxe_fastpath *fp = (struct bxe_fastpath *)context;
     struct bxe_softc *sc = fp->sc;
-    uint8_t more_tx = FALSE;
+    /* uint8_t more_tx = FALSE; */
     uint8_t more_rx = FALSE;
 
     BLOGD(sc, DBG_INTR, "---> FP TASK QUEUE (%d) <---\n", fp->index);
@@ -8712,7 +8706,7 @@ bxe_handle_fp_tq(void *context,
     /* fp->txdata[cos] */
     if (bxe_has_tx_work(fp)) {
         BXE_FP_TX_LOCK(fp);
-        more_tx = bxe_txeof(sc, fp);
+        /* more_tx = */ bxe_txeof(sc, fp);
         BXE_FP_TX_UNLOCK(fp);
     }
 
@@ -8734,7 +8728,7 @@ static void
 bxe_task_fp(struct bxe_fastpath *fp)
 {
     struct bxe_softc *sc = fp->sc;
-    uint8_t more_tx = FALSE;
+    /* uint8_t more_tx = FALSE; */
     uint8_t more_rx = FALSE;
 
     BLOGD(sc, DBG_INTR, "---> FP TASK ISR (%d) <---\n", fp->index);
@@ -8746,7 +8740,7 @@ bxe_task_fp(struct bxe_fastpath *fp)
     /* fp->txdata[cos] */
     if (bxe_has_tx_work(fp)) {
         BXE_FP_TX_LOCK(fp);
-        more_tx = bxe_txeof(sc, fp);
+        /* more_tx = */ bxe_txeof(sc, fp);
         BXE_FP_TX_UNLOCK(fp);
     }
 
@@ -12355,7 +12349,6 @@ bxe_parity_recover(struct bxe_softc *sc)
 {
     uint8_t global = FALSE;
     uint32_t error_recovered, error_unrecovered;
-    bool is_parity;
 
 
     if ((sc->recovery_state == BXE_RECOVERY_FAILED) &&
@@ -12374,7 +12367,7 @@ bxe_parity_recover(struct bxe_softc *sc)
         switch(sc->recovery_state) {
 
         case BXE_RECOVERY_INIT:
-            is_parity = bxe_chk_parity_attn(sc, &global, FALSE);
+            bxe_chk_parity_attn(sc, &global, FALSE);
 
             if ((CHIP_PORT_MODE(sc) == CHIP_4_PORT_MODE) ||
                 (sc->error_status & BXE_ERR_MCP_ASSERT) ||
@@ -15944,7 +15937,7 @@ bxe_sysctl_pauseparam(SYSCTL_HANDLER_ARGS)
                 return (error);
         }
         if ((sc->bxe_pause_param < 0) ||  (sc->bxe_pause_param > 8)) {
-                BLOGW(sc, "invalid pause param (%d) - use intergers between 1 & 8\n",sc->bxe_pause_param);
+                BLOGW(sc, "invalid pause param (%d) - use integers between 1 & 8\n",sc->bxe_pause_param);
                 sc->bxe_pause_param = 8;
         }
 

@@ -242,9 +242,10 @@ sys_clock_gettime(struct thread *td, struct clock_gettime_args *uap)
 static inline void
 cputick2timespec(uint64_t runtime, struct timespec *ats)
 {
-	runtime = cputick2usec(runtime);
-	ats->tv_sec = runtime / 1000000;
-	ats->tv_nsec = runtime % 1000000 * 1000;
+	uint64_t tr;
+	tr = cpu_tickrate();
+	ats->tv_sec = runtime / tr;
+	ats->tv_nsec = ((runtime % tr) * 1000000000ULL) / tr;
 }
 
 void
@@ -253,11 +254,11 @@ kern_thread_cputime(struct thread *targettd, struct timespec *ats)
 	uint64_t runtime, curtime, switchtime;
 
 	if (targettd == NULL) { /* current thread */
-		critical_enter();
+		spinlock_enter();
 		switchtime = PCPU_GET(switchtime);
 		curtime = cpu_ticks();
 		runtime = curthread->td_runtime;
-		critical_exit();
+		spinlock_exit();
 		runtime += curtime - switchtime;
 	} else {
 		PROC_LOCK_ASSERT(targettd->td_proc, MA_OWNED);
@@ -407,7 +408,7 @@ kern_clock_settime(struct thread *td, clockid_t clock_id, struct timespec *ats)
 		return (error);
 	if (clock_id != CLOCK_REALTIME)
 		return (EINVAL);
-	if (ats->tv_nsec < 0 || ats->tv_nsec >= NS_PER_SEC || ats->tv_sec < 0)
+	if (!timespecvalid_interval(ats))
 		return (EINVAL);
 	if (!allow_insane_settime &&
 	    (ats->tv_sec > 8000ULL * 365 * 24 * 60 * 60 ||
@@ -474,10 +475,7 @@ kern_clock_getres(struct thread *td, clockid_t clock_id, struct timespec *ts)
 	case CLOCK_THREAD_CPUTIME_ID:
 	case CLOCK_PROCESS_CPUTIME_ID:
 	cputime:
-		/* sync with cputick2usec */
-		ts->tv_nsec = 1000000 / cpu_tickrate();
-		if (ts->tv_nsec == 0)
-			ts->tv_nsec = 1000;
+		ts->tv_nsec = 1000000000 / cpu_tickrate() + 1;
 		break;
 	default:
 		if ((int)clock_id < 0)
@@ -966,8 +964,6 @@ realitexpire(void *arg)
 	kern_psignal(p, SIGALRM);
 	if (!timevalisset(&p->p_realtimer.it_interval)) {
 		timevalclear(&p->p_realtimer.it_value);
-		if (p->p_flag & P_WEXIT)
-			wakeup(&p->p_itcallout);
 		return;
 	}
 
@@ -1666,7 +1662,7 @@ static int
 itimespecfix(struct timespec *ts)
 {
 
-	if (ts->tv_sec < 0 || ts->tv_nsec < 0 || ts->tv_nsec >= NS_PER_SEC)
+	if (!timespecvalid_interval(ts))
 		return (EINVAL);
 	if ((UINT64_MAX - ts->tv_nsec) / NS_PER_SEC < ts->tv_sec)
 		return (EINVAL);

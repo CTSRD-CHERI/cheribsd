@@ -546,7 +546,7 @@ iichid_event_task(void *context, int pending)
 		} else
 			++sc->missing_samples;
 	} else
-		DPRINTF(sc, "read error occured: %d\n", error);
+		DPRINTF(sc, "read error occurred: %d\n", error);
 
 rearm:
 	if (sc->callout_setup && sc->sampling_rate_slow > 0) {
@@ -600,7 +600,7 @@ iichid_intr(void *context)
 				DPRINTF(sc, "no data received\n");
 		}
 	} else
-		DPRINTF(sc, "read error occured: %d\n", error);
+		DPRINTF(sc, "read error occurred: %d\n", error);
 
 	iicbus_release_bus(parent, sc->dev);
 }
@@ -1289,8 +1289,6 @@ iichid_resume(device_t dev)
 	return (0);
 }
 
-static devclass_t iichid_devclass;
-
 static device_method_t iichid_methods[] = {
 	DEVMETHOD(device_probe,		iichid_probe),
 	DEVMETHOD(device_attach,	iichid_attach),
@@ -1323,7 +1321,7 @@ static driver_t iichid_driver = {
 	.size = sizeof(struct iichid_softc),
 };
 
-DRIVER_MODULE(iichid, iicbus, iichid_driver, iichid_devclass, NULL, 0);
+DRIVER_MODULE(iichid, iicbus, iichid_driver, NULL, NULL);
 MODULE_DEPEND(iichid, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 MODULE_DEPEND(iichid, acpi, 1, 1, 1);
 MODULE_DEPEND(iichid, hid, 1, 1, 1);

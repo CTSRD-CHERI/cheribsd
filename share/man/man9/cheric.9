@@ -69,12 +69,12 @@
 .Ft void * __capability
 .Fn cheri_setbounds "void * __capability c" "size_t length"
 .Ft void * __capability
-.Fn cheri_fromint "vaddr_t"
+.Fn cheri_fromint "ptraddr_t"
 .Ft size_t
 .Fn cheri_get_low_ptr_bits "void * __capability c" "size_t mask"
-.Ft vaddr_t
+.Ft ptraddr_t
 .Fn cheri_getaddress "void * __capability c"
-.Ft vaddr_t
+.Ft ptraddr_t
 .Fn cheri_getbase "void * __capability c"
 .Ft void * __capability
 .Fn cheri_getdefault "void"
@@ -90,11 +90,11 @@
 .Fn cheri_getsealed "void * __capability c"
 .Ft void * __capability
 .Fn cheri_getstack "void"
-.Ft vaddr_t
+.Ft ptraddr_t
 .Fn cheri_gettop "void * __capability c"
 .Ft _Bool
 .Fn cheri_gettag "void * __capability c"
-.Ft vaddr_t
+.Ft ptraddr_t
 .Fn cheri_gettype "void * __capability c"
 .Ft void * __capability
 .Fn cheri_clearperm "void * __capability c" "size_t mask"
@@ -107,7 +107,7 @@
 .Ft void * __capability
 .Fn cheri_set_low_ptr_bits "void * __capability c" "size_t mask"
 .Ft void * __capability
-.Fn cheri_setaddress "void * __capability c" "vaddr_t address"
+.Fn cheri_setaddress "void * __capability c" "ptraddr_t address"
 .Ft void * __capability
 .Fn cheri_setoffset "void * __capability c" "size_t offset"
 .Ft void * __capability

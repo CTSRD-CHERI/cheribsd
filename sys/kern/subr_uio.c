@@ -521,7 +521,7 @@ copyin_implicit_cap(const void *uaddr, void *kaddr, size_t len)
 {
 
 	return (copyin(cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)uaddr, len, 0), kaddr, len));
+	    CHERI_CAP_USER_DATA_PERMS, (ptraddr_t)uaddr, len, 0), kaddr, len));
 }
 
 int
@@ -530,7 +530,7 @@ copyout_implicit_cap(const void *kaddr, void *uaddr, size_t len)
 
 	return (copyout(kaddr,
 	    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
-	    (vaddr_t)uaddr, len, 0), len));
+	    (ptraddr_t)uaddr, len, 0), len));
 }
 #else
 int

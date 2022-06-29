@@ -34,7 +34,7 @@
 #include "hdac_if.h"
 
 /****************************************************************************
- * Miscellanious defines
+ * Miscellaneous defines
  ****************************************************************************/
 
 /* Controller models */
@@ -503,6 +503,10 @@
 #define AOPEN_VENDORID	0xa0a0
 #define AOPEN_I915GMMHFS_SUBVENDOR HDA_MODEL_CONSTRUCT(AOPEN, 0x8202)
 
+/* Framework */
+#define FRAMEWORK_VENDORID	0xf111
+#define FRAMEWORK_LAPTOP_SUBVENDOR HDA_MODEL_CONSTRUCT(FRAMEWORK, 0x0001)
+
 /* All codecs you can eat... */
 #define HDA_CODEC_CONSTRUCT(vendor, id) \
 		(((uint32_t)(vendor##_VENDORID) << 16) | ((id) & 0xffff))
@@ -678,7 +682,7 @@
 #define HDA_CODEC_STAC9220_A1	HDA_CODEC_CONSTRUCT(SIGMATEL, 0x7882)
 #define HDA_CODEC_STACXXXX	HDA_CODEC_CONSTRUCT(SIGMATEL, 0xffff)
 
-/* IDT */
+/* IDT / Tempo Semiconductor */
 #define IDT_VENDORID		0x111d
 #define HDA_CODEC_IDT92HD75BX	HDA_CODEC_CONSTRUCT(IDT, 0x7603)
 #define HDA_CODEC_IDT92HD83C1X	HDA_CODEC_CONSTRUCT(IDT, 0x7604)
@@ -687,6 +691,7 @@
 #define HDA_CODEC_IDT92HD73D1	HDA_CODEC_CONSTRUCT(IDT, 0x7674)
 #define HDA_CODEC_IDT92HD73C1	HDA_CODEC_CONSTRUCT(IDT, 0x7675)
 #define HDA_CODEC_IDT92HD73E1	HDA_CODEC_CONSTRUCT(IDT, 0x7676)
+#define HDA_CODEC_IDT92HD95B	HDA_CODEC_CONSTRUCT(IDT, 0x7695)
 #define HDA_CODEC_IDT92HD71B8	HDA_CODEC_CONSTRUCT(IDT, 0x76b0)
 #define HDA_CODEC_IDT92HD71B8_2	HDA_CODEC_CONSTRUCT(IDT, 0x76b1)
 #define HDA_CODEC_IDT92HD71B7	HDA_CODEC_CONSTRUCT(IDT, 0x76b2)

@@ -40,7 +40,6 @@
 #include <machine/cherireg.h>
 
 #define	VIRT_BITS	48
-#define	DMAP_TABLES	((DMAP_MAX_ADDRESS - DMAP_MIN_ADDRESS) >> L0_SHIFT)
 
 	.globl	kernbase
 	.set	kernbase, KERNBASE
@@ -604,7 +603,6 @@ LEND(get_virt_delta)
  *    - The Kernel L0 table             (TTBR1)
  *    - The identity (PA = VA) L1 table
  *    - The identity (PA = VA) L0 table (TTBR0)
- *    - The DMAP L1 tables
  */
 LENTRY(create_pagetables)
 	/* Save the Link register */
@@ -694,7 +692,7 @@ common:
 	/* Create the kernel space L2 table */
 	mov	PTR(6), PTR(26)
 	mov	x7, #(ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK))
-	mov	x8, #(KERNBASE & L2_BLOCK_MASK)
+	mov	x8, #(KERNBASE)
 	mov	x9, x28
 	bl	build_l2_block_pagetable
 
@@ -713,12 +711,6 @@ common:
 	mov	x9, x6
 	mov	PTR(6), PTR(24)
 	mov	x10, #1
-	bl	link_l0_pagetable
-
-	/* Link the DMAP tables */
-	ldr	x8, =DMAP_MIN_ADDRESS
-	early_idmap_addr x9, pagetable_dmap, x29
-	mov	x10, #DMAP_TABLES
 	bl	link_l0_pagetable
 
 	/*
@@ -1012,7 +1004,7 @@ tcr:
 #else
 #define	TCR_MORELLO	0
 #endif
-	.quad (TCR_TxSZ(64 - VIRT_BITS) | TCR_TG1_4K | \
+	.quad (TCR_TxSZ(64 - VIRT_BITS) | TCR_TG1_4K | TCR_TG0_4K | \
 	    TCR_CACHE_ATTRS | TCR_SMP_ATTRS | TCR_MORELLO)
 sctlr_set:
 	/* Bits to set */
@@ -1045,8 +1037,11 @@ pagetable:
 	.space	PAGE_SIZE
 pagetable_l1_ttbr1:
 	.space	PAGE_SIZE
+	.globl pagetable_l0_ttbr1
+	.type	pagetable_l0_ttbr1,#object
 pagetable_l0_ttbr1:
 	.space	PAGE_SIZE
+	.size	pagetable_l0_ttbr1, . - pagetable_l0_ttbr1
 pagetable_l2_ttbr0_bootstrap:
 	.space	PAGE_SIZE
 pagetable_l1_ttbr0_bootstrap:
@@ -1056,12 +1051,7 @@ pagetable_l0_ttbr0_bootstrap:
 pagetable_l0_ttbr0:
 	.space	PAGE_SIZE
 
-	.globl	pagetable_dmap
-	.type	pagetable_dmap,#object
-pagetable_dmap:
-	.space	PAGE_SIZE * DMAP_TABLES
 pagetable_end:
-	.size	pagetable_dmap, pagetable_end - pagetable_dmap
 
 	.type	el2_pagetable,#object
 el2_pagetable:

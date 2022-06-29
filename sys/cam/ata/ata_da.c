@@ -1240,12 +1240,17 @@ adaoninvalidate(struct cam_periph *periph)
 #endif
 
 	/*
-	 * Return all queued I/O with ENXIO.
-	 * XXX Handle any transactions queued to the card
-	 *     with XPT_ABORT_CCB.
+	 * Return all queued I/O with ENXIO. Transactions may be queued up here
+	 * for retry (since we are called while there's other transactions
+	 * pending). Any requests in the hardware will drain before ndacleanup
+	 * is called.
 	 */
 	cam_iosched_flush(softc->cam_iosched, NULL, ENXIO);
 
+	/*
+	 * Tell GEOM that we've gone away, we'll get a callback when it is
+	 * done cleaning up its resources.
+	 */
 	disk_gone(softc->disk);
 }
 
@@ -1347,8 +1352,6 @@ adaasync(void *callback_arg, u_int32_t code,
 		adasetflags(softc, &cgd);
 		adasetgeom(softc, &cgd);
 		disk_resize(softc->disk, M_NOWAIT);
-
-		cam_periph_async(periph, code, path, arg);
 		break;
 	}
 	case AC_ADVINFO_CHANGED:
@@ -1369,13 +1372,8 @@ adaasync(void *callback_arg, u_int32_t code,
 	case AC_BUS_RESET:
 	{
 		softc = (struct ada_softc *)periph->softc;
-		cam_periph_async(periph, code, path, arg);
 		if (softc->state != ADA_STATE_NORMAL)
 			break;
-		memset(&cgd, 0, sizeof(cgd));
-		xpt_setup_ccb(&cgd.ccb_h, periph->path, CAM_PRIORITY_NORMAL);
-		cgd.ccb_h.func_code = XPT_GDEV_TYPE;
-		xpt_action((union ccb *)&cgd);
 		if (ADA_RA >= 0 && softc->flags & ADA_FLAG_CAN_RAHEAD)
 			softc->state = ADA_STATE_RAHEAD;
 		else if (ADA_WC >= 0 && softc->flags & ADA_FLAG_CAN_WCACHE)
@@ -1384,16 +1382,17 @@ adaasync(void *callback_arg, u_int32_t code,
 		      && (softc->zone_mode != ADA_ZONE_NONE))
 			softc->state = ADA_STATE_LOGDIR;
 		else
-		    break;
+			break;
 		if (cam_periph_acquire(periph) != 0)
 			softc->state = ADA_STATE_NORMAL;
 		else
 			xpt_schedule(periph, CAM_PRIORITY_DEV);
-	}
-	default:
-		cam_periph_async(periph, code, path, arg);
 		break;
 	}
+	default:
+		break;
+	}
+	cam_periph_async(periph, code, path, arg);
 }
 
 static int
@@ -2692,6 +2691,12 @@ adaprobedone(struct cam_periph *periph, union ccb *ccb)
 
 	softc = (struct ada_softc *)periph->softc;
 
+	/*
+	 * Since our peripheral may be invalidated by an error we must release
+	 * our CCB before releasing the reference on the peripheral.  The
+	 * peripheral will only go away once the last reference is removed, and
+	 * we need it around for the CCB release operation.
+	 */
 	if (ccb != NULL)
 		xpt_release_ccb(ccb);
 
@@ -2873,7 +2878,7 @@ adadone(struct cam_periph *periph, union ccb *done_ccb)
 		cam_periph_lock(periph);
 		bp = (struct bio *)done_ccb->ccb_h.ccb_bp;
 		if ((done_ccb->ccb_h.status & CAM_STATUS_MASK) != CAM_REQ_CMP) {
-			error = adaerror(done_ccb, 0, 0);
+			error = adaerror(done_ccb, CAM_RETRY_SELTO, 0);
 			if (error == ERESTART) {
 				/* A retry was scheduled, so just return. */
 				cam_periph_unlock(periph);
@@ -2987,15 +2992,6 @@ adadone(struct cam_periph *periph, union ccb *done_ccb)
 				    /*getcount_only*/0);
 			}
 		}
-
-		/*
-		 * Since our peripheral may be invalidated by an error
-		 * above or an external event, we must release our CCB
-		 * before releasing the reference on the peripheral.
-		 * The peripheral will only go away once the last reference
-		 * is removed, and we need it around for the CCB release
-		 * operation.
-		 */
 
 		xpt_release_ccb(done_ccb);
 		softc->state = ADA_STATE_WCACHE;
@@ -3563,7 +3559,7 @@ adaflush(void)
 	CAM_PERIPH_FOREACH(periph, &adadriver) {
 		softc = (struct ada_softc *)periph->softc;
 		if (SCHEDULER_STOPPED()) {
-			/* If we paniced with the lock held, do not recurse. */
+			/* If we panicked with the lock held, do not recurse. */
 			if (!cam_periph_owned(periph) &&
 			    (softc->flags & ADA_FLAG_OPEN)) {
 				adadump(softc->disk, NULL, 0, 0, 0);
@@ -3615,7 +3611,7 @@ adaspindown(uint8_t cmd, int flags)
 	int mode;
 
 	CAM_PERIPH_FOREACH(periph, &adadriver) {
-		/* If we paniced with lock held - not recurse here. */
+		/* If we panicked with lock held - not recurse here. */
 		if (cam_periph_owned(periph))
 			continue;
 		cam_periph_lock(periph);
@@ -3703,6 +3699,9 @@ static void
 adashutdown(void *arg, int howto)
 {
 	int how;
+
+	if ((howto & RB_NOSYNC) != 0)
+		return;
 
 	adaflush();
 

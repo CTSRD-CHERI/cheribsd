@@ -257,13 +257,11 @@ static int
 miibus_fdt_attach(device_t dev)
 {
 	struct mii_attach_args *ma;
-	struct mii_data *sc;
 	int i, error, nchildren;
 	device_t parent, *children;
 	phandle_t phy_node;
 
 	parent = device_get_parent(dev);
-	sc = device_get_softc(dev);
 
 	error = device_get_children(dev, &children, &nchildren);
 	if (error != 0 || nchildren == 0)
@@ -326,20 +324,6 @@ miibus_fdt_get_devinfo(device_t bus, device_t child)
 	return (&ma->obd);
 }
 
-static ssize_t
-miibus_fdt_get_property(device_t bus, device_t child, const char *propname,
-    void *buf, size_t size)
-{
-	struct mii_attach_args *ma;
-
-	ma = device_get_ivars(child);
-
-	if (ma->obd.obd_node == 0)
-		return (-1);
-
-	return (OF_getencprop(ma->obd.obd_node, propname, buf, size));
-}
-
 static device_method_t miibus_fdt_methods[] = {
 	DEVMETHOD(device_probe,		miibus_fdt_probe),
 	DEVMETHOD(device_attach,	miibus_fdt_attach),
@@ -362,11 +346,9 @@ static device_method_t miibus_fdt_methods[] = {
 	DEVMETHOD(bus_get_resource,		bus_generic_rl_get_resource),
 	DEVMETHOD(bus_set_resource,		bus_generic_rl_set_resource),
 	DEVMETHOD(bus_get_resource_list,	miibus_fdt_get_resource_list),
-	DEVMETHOD(bus_get_property,		miibus_fdt_get_property),
 
 	DEVMETHOD_END
 };
 
-devclass_t miibus_fdt_devclass;
 DEFINE_CLASS_1(miibus, miibus_fdt_driver, miibus_fdt_methods,
     sizeof(struct mii_data), miibus_driver);

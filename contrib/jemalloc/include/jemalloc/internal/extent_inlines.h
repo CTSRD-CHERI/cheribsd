@@ -23,27 +23,27 @@
 static inline void
 extent_lock(tsdn_t *tsdn, extent_t *extent) {
 	assert(extent != NULL);
-	mutex_pool_lock(tsdn, &extent_mutex_pool, (vaddr_t)extent);
+	mutex_pool_lock(tsdn, &extent_mutex_pool, (uintptr_t)extent);
 }
 
 static inline void
 extent_unlock(tsdn_t *tsdn, extent_t *extent) {
 	assert(extent != NULL);
-	mutex_pool_unlock(tsdn, &extent_mutex_pool, (vaddr_t)extent);
+	mutex_pool_unlock(tsdn, &extent_mutex_pool, (uintptr_t)extent);
 }
 
 static inline void
 extent_lock2(tsdn_t *tsdn, extent_t *extent1, extent_t *extent2) {
 	assert(extent1 != NULL && extent2 != NULL);
-	mutex_pool_lock2(tsdn, &extent_mutex_pool, (vaddr_t)extent1,
-	    (vaddr_t)extent2);
+	mutex_pool_lock2(tsdn, &extent_mutex_pool, (uintptr_t)extent1,
+	    (uintptr_t)extent2);
 }
 
 static inline void
 extent_unlock2(tsdn_t *tsdn, extent_t *extent1, extent_t *extent2) {
 	assert(extent1 != NULL && extent2 != NULL);
-	mutex_pool_unlock2(tsdn, &extent_mutex_pool, (vaddr_t)extent1,
-	    (vaddr_t)extent2);
+	mutex_pool_unlock2(tsdn, &extent_mutex_pool, (uintptr_t)extent1,
+	    (uintptr_t)extent2);
 }
 
 static inline unsigned
@@ -244,7 +244,7 @@ extent_addr_randomize(tsdn_t *tsdn, extent_t *extent, size_t alignment) {
 		extent->e_addr = (void *)((uintptr_t)extent->e_addr +
 		    random_offset);
 		assert(ALIGNMENT_ADDR2BASE(extent->e_addr, alignment) ==
-		    (vaddr_t)extent->e_addr);
+		    extent->e_addr);
 	}
 }
 
@@ -470,16 +470,16 @@ extent_esn_comp(const extent_t *a, const extent_t *b) {
 
 static inline int
 extent_ad_comp(const extent_t *a, const extent_t *b) {
-	vaddr_t a_addr = (vaddr_t)extent_addr_get(a);
-	vaddr_t b_addr = (vaddr_t)extent_addr_get(b);
+	uintptr_t a_addr = (uintptr_t)extent_addr_get(a);
+	uintptr_t b_addr = (uintptr_t)extent_addr_get(b);
 
 	return (a_addr > b_addr) - (a_addr < b_addr);
 }
 
 static inline int
 extent_ead_comp(const extent_t *a, const extent_t *b) {
-	vaddr_t a_eaddr = (vaddr_t)a;
-	vaddr_t b_eaddr = (vaddr_t)b;
+	uintptr_t a_eaddr = (uintptr_t)a;
+	uintptr_t b_eaddr = (uintptr_t)b;
 
 	return (a_eaddr > b_eaddr) - (a_eaddr < b_eaddr);
 }

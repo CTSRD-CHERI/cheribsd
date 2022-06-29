@@ -810,17 +810,12 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_x[1] = (register_t)&fp->sf_si;
 	tf->tf_x[2] = (register_t)&fp->sf_uc;
 #endif
-
-#if __has_feature(capabilities)
-	trapframe_set_elr(tf, (uintcap_t)catcher);
-#else
-	tf->tf_elr = (uintcap_t)catcher;
-#endif
+	tf->tf_x[8] = (uintcap_t)catcher;
 	tf->tf_sp = (uintcap_t)fp;
 #if __has_feature(capabilities)
-	tf->tf_lr = (uintcap_t)p->p_md.md_sigcode;
+	trapframe_set_elr(tf, (uintcap_t)p->p_md.md_sigcode);
 #else
-	tf->tf_lr = (register_t)p->p_sysent->sv_sigcode_base;
+	tf->tf_elr = (register_t)p->p_sysent->sv_sigcode_base;
 #endif
 
 	/* Clear the single step flag while in the signal handler */

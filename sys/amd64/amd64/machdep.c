@@ -816,7 +816,7 @@ add_efi_map_entries(struct efi_map_header *efihdr, vm_paddr_t *physmap,
 			continue;
 		}
 
-		if (!add_physmap_entry(p->md_phys, (p->md_pages * PAGE_SIZE),
+		if (!add_physmap_entry(p->md_phys, p->md_pages * EFI_PAGE_SIZE,
 		    physmap, physmap_idx))
 			break;
 	}
@@ -1167,7 +1167,6 @@ static void
 native_clock_source_init(void)
 {
 	i8254_init();
-	tsc_init();
 }
 
 static void

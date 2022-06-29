@@ -125,8 +125,7 @@ static driver_t iavf_driver = {
 	"iavf", iavf_methods, sizeof(struct iavf_sc),
 };
 
-devclass_t iavf_devclass;
-DRIVER_MODULE(iavf, pci, iavf_driver, iavf_devclass, 0, 0);
+DRIVER_MODULE(iavf, pci, iavf_driver, 0, 0);
 MODULE_VERSION(iavf, 1);
 
 MODULE_DEPEND(iavf, pci, 1, 1, 1);
@@ -463,13 +462,14 @@ iavf_setup_vc_tq(struct iavf_sc *sc)
 static int
 iavf_if_attach_post(if_ctx_t ctx)
 {
-	device_t dev;
+#ifdef IXL_DEBUG
+	device_t dev = iflib_get_dev(ctx);
+#endif
 	struct iavf_sc	*sc;
 	struct iavf_hw	*hw;
 	struct iavf_vsi *vsi;
 	int error = 0;
 
-	dev = iflib_get_dev(ctx);
 	INIT_DBG_DEV(dev, "begin");
 
 	sc = iavf_sc_from_ctx(ctx);
@@ -1767,10 +1767,6 @@ iavf_update_link_status(struct iavf_sc *sc)
 static void
 iavf_stop(struct iavf_sc *sc)
 {
-	struct ifnet *ifp;
-
-	ifp = sc->vsi.ifp;
-
 	iavf_clear_state(&sc->state, IAVF_STATE_RUNNING);
 
 	iavf_disable_intr(&sc->vsi);

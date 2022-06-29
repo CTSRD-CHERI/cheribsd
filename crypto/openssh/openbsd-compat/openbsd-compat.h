@@ -65,6 +65,10 @@ int bindresvport_sa(int sd, struct sockaddr *sa);
 void closefrom(int);
 #endif
 
+#if defined(HAVE_DECL_FTRUNCATE) && HAVE_DECL_FTRUNCATE == 0
+int ftruncate(int filedes, off_t length);
+#endif
+
 #ifndef HAVE_GETLINE
 #include <stdio.h>
 ssize_t getline(char **, size_t *, FILE *);
@@ -76,6 +80,10 @@ int getpagesize(void);
 
 #ifndef HAVE_GETCWD
 char *getcwd(char *pt, size_t size);
+#endif
+
+#ifndef HAVE_KILLPG
+int killpg(pid_t, int);
 #endif
 
 #if defined(HAVE_DECL_MEMMEM) && HAVE_DECL_MEMMEM == 0
@@ -315,8 +323,8 @@ int timingsafe_bcmp(const void *, const void *, size_t);
 #endif
 
 #ifndef HAVE_BCRYPT_PBKDF
-int	bcrypt_pbkdf(const char *, size_t, const u_int8_t *, size_t,
-    u_int8_t *, size_t, unsigned int);
+int	bcrypt_pbkdf(const char *, size_t, const uint8_t *, size_t,
+    uint8_t *, size_t, unsigned int);
 #endif
 
 #ifndef HAVE_EXPLICIT_BZERO

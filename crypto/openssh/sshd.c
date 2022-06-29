@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.578 2021/07/19 02:21:50 dtucker Exp $ */
+/* $OpenBSD: sshd.c,v 1.585 2022/03/18 04:04:11 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -43,7 +43,6 @@
  */
 
 #include "includes.h"
-__RCSID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
@@ -66,6 +65,9 @@ __RCSID("$FreeBSD$");
 #include <paths.h>
 #endif
 #include <grp.h>
+#ifdef HAVE_POLL_H
+#include <poll.h>
+#endif
 #include <pwd.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -291,7 +293,7 @@ close_listen_socks(void)
 
 	for (i = 0; i < num_listen_socks; i++)
 		close(listen_socks[i]);
-	num_listen_socks = -1;
+	num_listen_socks = 0;
 }
 
 static void
@@ -373,12 +375,9 @@ main_sigchld_handler(int sig)
 static void
 grace_alarm_handler(int sig)
 {
-	if (use_privsep && pmonitor != NULL && pmonitor->m_pid > 0)
-		kill(pmonitor->m_pid, SIGALRM);
-
 	/*
 	 * Try to kill any processes that we have spawned, E.g. authorized
-	 * keys command helpers.
+	 * keys command helpers or privsep children.
 	 */
 	if (getpgid(0) == getpid()) {
 		ssh_signal(SIGTERM, SIG_IGN);
@@ -388,13 +387,9 @@ grace_alarm_handler(int sig)
 	BLACKLIST_NOTIFY(the_active_state, BLACKLIST_AUTH_FAIL, "ssh");
 
 	/* Log error and exit. */
-	if (use_privsep && pmonitor != NULL && pmonitor->m_pid <= 0)
-		cleanup_exit(255); /* don't log in privsep child */
-	else {
-		sigdie("Timeout before authentication for %s port %d",
-		    ssh_remote_ipaddr(the_active_state),
-		    ssh_remote_port(the_active_state));
-	}
+	sigdie("Timeout before authentication for %s port %d",
+	    ssh_remote_ipaddr(the_active_state),
+	    ssh_remote_port(the_active_state));
 }
 
 /* Destroy the host and server keys.  They will no longer be needed. */
@@ -924,13 +919,14 @@ drop_connection(int sock, int startups, int notify_pipe)
 static void
 usage(void)
 {
-	if (options.version_addendum && *options.version_addendum != '\0')
+	if (options.version_addendum != NULL &&
+	    *options.version_addendum != '\0')
 		fprintf(stderr, "%s %s, %s\n",
 		    SSH_RELEASE,
-		    options.version_addendum, OPENSSL_VERSION_STRING);
+		    options.version_addendum, SSH_OPENSSL_VERSION);
 	else
 		fprintf(stderr, "%s, %s\n",
-		    SSH_RELEASE, OPENSSL_VERSION_STRING);
+		    SSH_RELEASE, SSH_OPENSSL_VERSION);
 	fprintf(stderr,
 "usage: sshd [-46DdeiqTt] [-C connection_spec] [-c host_cert_file]\n"
 "            [-E log_file] [-f config_file] [-g login_grace_time]\n"
@@ -1159,10 +1155,10 @@ server_listen(void)
 static void
 server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 {
-	fd_set *fdset;
-	int i, j, ret, maxfd;
+	struct pollfd *pfd = NULL;
+	int i, j, ret, npfd;
 	int ostartups = -1, startups = 0, listening = 0, lameduck = 0;
-	int startup_p[2] = { -1 , -1 };
+	int startup_p[2] = { -1 , -1 }, *startup_pollfd;
 	char c = 0;
 	struct sockaddr_storage from;
 	socklen_t fromlen;
@@ -1175,22 +1171,17 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 	request_init(&req, RQ_DAEMON, __progname, 0);
 #endif
 
-	/* setup fd set for accept */
-	fdset = NULL;
-	maxfd = 0;
-	for (i = 0; i < num_listen_socks; i++)
-		if (listen_socks[i] > maxfd)
-			maxfd = listen_socks[i];
 	/* pipes connected to unauthenticated child sshd processes */
 	startup_pipes = xcalloc(options.max_startups, sizeof(int));
 	startup_flags = xcalloc(options.max_startups, sizeof(int));
+	startup_pollfd = xcalloc(options.max_startups, sizeof(int));
 	for (i = 0; i < options.max_startups; i++)
 		startup_pipes[i] = -1;
 
 	/*
 	 * Prepare signal mask that we use to block signals that might set
 	 * received_sigterm or received_sighup, so that we are guaranteed
-	 * to immediately wake up the pselect if a signal is received after
+	 * to immediately wake up the ppoll if a signal is received after
 	 * the flag is checked.
 	 */
 	sigemptyset(&nsigset);
@@ -1198,6 +1189,10 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 	sigaddset(&nsigset, SIGCHLD);
 	sigaddset(&nsigset, SIGTERM);
 	sigaddset(&nsigset, SIGQUIT);
+
+	/* sized for worst-case */
+	pfd = xcalloc(num_listen_socks + options.max_startups,
+	    sizeof(struct pollfd));
 
 	/*
 	 * Stay listening for connections until the system crashes or
@@ -1230,27 +1225,36 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 				sighup_restart();
 			}
 		}
-		free(fdset);
-		fdset = xcalloc(howmany(maxfd + 1, NFDBITS),
-		    sizeof(fd_mask));
 
-		for (i = 0; i < num_listen_socks; i++)
-			FD_SET(listen_socks[i], fdset);
-		for (i = 0; i < options.max_startups; i++)
-			if (startup_pipes[i] != -1)
-				FD_SET(startup_pipes[i], fdset);
+		for (i = 0; i < num_listen_socks; i++) {
+			pfd[i].fd = listen_socks[i];
+			pfd[i].events = POLLIN;
+		}
+		npfd = num_listen_socks;
+		for (i = 0; i < options.max_startups; i++) {
+			startup_pollfd[i] = -1;
+			if (startup_pipes[i] != -1) {
+				pfd[npfd].fd = startup_pipes[i];
+				pfd[npfd].events = POLLIN;
+				startup_pollfd[i] = npfd++;
+			}
+		}
 
 		/* Wait until a connection arrives or a child exits. */
-		ret = pselect(maxfd+1, fdset, NULL, NULL, NULL, &osigset);
-		if (ret == -1 && errno != EINTR)
-			error("pselect: %.100s", strerror(errno));
+		ret = ppoll(pfd, npfd, NULL, &osigset);
+		if (ret == -1 && errno != EINTR) {
+			error("ppoll: %.100s", strerror(errno));
+			if (errno == EINVAL)
+				cleanup_exit(1); /* can't recover */
+		}
 		sigprocmask(SIG_SETMASK, &osigset, NULL);
 		if (ret == -1)
 			continue;
 
 		for (i = 0; i < options.max_startups; i++) {
 			if (startup_pipes[i] == -1 ||
-			    !FD_ISSET(startup_pipes[i], fdset))
+			    startup_pollfd[i] == -1 ||
+			    !(pfd[startup_pollfd[i]].revents & (POLLIN|POLLHUP)))
 				continue;
 			switch (read(startup_pipes[i], &c, sizeof(c))) {
 			case -1:
@@ -1281,7 +1285,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			}
 		}
 		for (i = 0; i < num_listen_socks; i++) {
-			if (!FD_ISSET(listen_socks[i], fdset))
+			if (!(pfd[i].revents & POLLIN))
 				continue;
 			fromlen = sizeof(from);
 			*newsock = accept(listen_socks[i],
@@ -1321,8 +1325,10 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			}
 #endif /* LIBWRAP */
 			if (unset_nonblock(*newsock) == -1 ||
-			    pipe(startup_p) == -1)
+			    pipe(startup_p) == -1) {
+				close(*newsock);
 				continue;
+			}
 			if (drop_connection(*newsock, startups, startup_p[0])) {
 				close(*newsock);
 				close(startup_p[0]);
@@ -1343,8 +1349,6 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			for (j = 0; j < options.max_startups; j++)
 				if (startup_pipes[j] == -1) {
 					startup_pipes[j] = startup_p[0];
-					if (maxfd < startup_p[0])
-						maxfd = startup_p[0];
 					startups++;
 					startup_flags[j] = 1;
 					break;
@@ -1372,6 +1376,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 					send_rexec_state(config_s[0], cfg);
 					close(config_s[0]);
 				}
+				free(pfd);
 				return;
 			}
 
@@ -1414,6 +1419,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 					(void)atomicio(vwrite, startup_pipe,
 					    "\0", 1);
 				}
+				free(pfd);
 				return;
 			}
 
@@ -1800,7 +1806,7 @@ main(int ac, char **av)
 		load_server_config(config_file_name, cfg);
 
 	parse_server_config(&options, rexeced_flag ? "rexec" : config_file_name,
-	    cfg, &includes, NULL);
+	    cfg, &includes, NULL, rexeced_flag);
 
 #ifdef WITH_OPENSSL
 	if (options.moduli_file != NULL)
@@ -2152,15 +2158,8 @@ main(int ac, char **av)
 	 * setlogin() affects the entire process group.  We don't
 	 * want the child to be able to affect the parent.
 	 */
-#if !defined(SSHD_ACQUIRES_CTTY)
-	/*
-	 * If setsid is called, on some platforms sshd will later acquire a
-	 * controlling terminal which will result in "could not set
-	 * controlling tty" errors.
-	 */
 	if (!debug_flag && !inetd_flag && setsid() == -1)
 		error("setsid: %.100s", strerror(errno));
-#endif
 
 	if (rexec_flag) {
 		debug("rexec start in %d out %d newsock %d pipe %d sock %d",

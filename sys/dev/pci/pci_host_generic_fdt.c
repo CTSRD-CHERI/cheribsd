@@ -166,10 +166,7 @@ pci_host_generic_setup_fdt(device_t dev)
 int
 pci_host_generic_attach(device_t dev)
 {
-	struct generic_pcie_fdt_softc *sc;
 	int error;
-
-	sc = device_get_softc(dev);
 
 	error = pci_host_generic_setup_fdt(dev);
 	if (error != 0)
@@ -484,9 +481,5 @@ static device_method_t generic_pcie_fdt_methods[] = {
 DEFINE_CLASS_1(pcib, generic_pcie_fdt_driver, generic_pcie_fdt_methods,
     sizeof(struct generic_pcie_fdt_softc), generic_pcie_core_driver);
 
-static devclass_t generic_pcie_fdt_devclass;
-
-DRIVER_MODULE(pcib, simplebus, generic_pcie_fdt_driver,
-    generic_pcie_fdt_devclass, 0, 0);
-DRIVER_MODULE(pcib, ofwbus, generic_pcie_fdt_driver, generic_pcie_fdt_devclass,
-    0, 0);
+DRIVER_MODULE(pcib, simplebus, generic_pcie_fdt_driver, 0, 0);
+DRIVER_MODULE(pcib, ofwbus, generic_pcie_fdt_driver, 0, 0);

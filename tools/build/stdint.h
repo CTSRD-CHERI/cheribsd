@@ -39,13 +39,11 @@
 #pragma once
 #include_next <stdint.h>
 
-#ifndef _VADDR_T_DECLARED
+#ifndef _PTRADDR_T_DECLARED
 #ifndef __CHERI_PURE_CAPABILITY__
-typedef	uintptr_t		vaddr_t;
 typedef	uintptr_t		ptraddr_t;
 #else
-typedef	unsigned long		vaddr_t;
 typedef	unsigned long		ptraddr_t;
 #endif
-#define _VADDR_T_DECLARED
+#define _PTRADDR_T_DECLARED
 #endif

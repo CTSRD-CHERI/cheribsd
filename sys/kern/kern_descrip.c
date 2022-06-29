@@ -155,6 +155,18 @@ static struct pwd *pwd_alloc(void);
 #define NDBIT(x)	((NDSLOTTYPE)1 << ((x) % NDENTRIES))
 #define	NDSLOTS(x)	(((x) + NDENTRIES - 1) / NDENTRIES)
 
+#define	FILEDESC_FOREACH_FDE(fdp, _iterator, _fde)				\
+	struct filedesc *_fdp = (fdp);						\
+	int _lastfile = fdlastfile_single(_fdp);				\
+	for (_iterator = 0; _iterator <= _lastfile; _iterator++)		\
+		if ((_fde = &_fdp->fd_ofiles[_iterator])->fde_file != NULL)
+
+#define	FILEDESC_FOREACH_FP(fdp, _iterator, _fp)				\
+	struct filedesc *_fdp = (fdp);						\
+	int _lastfile = fdlastfile_single(_fdp);				\
+	for (_iterator = 0; _iterator <= _lastfile; _iterator++)		\
+		if ((_fp = _fdp->fd_ofiles[_iterator].fde_file) != NULL)
+
 /*
  * SLIST entry used to keep track of ofiles which must be reclaimed when
  * the process exits.
@@ -1802,11 +1814,19 @@ filecaps_fill(struct filecaps *fcaps)
 /*
  * Free memory allocated within filecaps structure.
  */
+static void
+filecaps_free_ioctl(struct filecaps *fcaps)
+{
+
+	free(fcaps->fc_ioctls, M_FILECAPS);
+	fcaps->fc_ioctls = NULL;
+}
+
 void
 filecaps_free(struct filecaps *fcaps)
 {
 
-	free(fcaps->fc_ioctls, M_FILECAPS);
+	filecaps_free_ioctl(fcaps);
 	bzero(fcaps, sizeof(*fcaps));
 }
 
@@ -1841,9 +1861,14 @@ filecaps_validate(const struct filecaps *fcaps, const char *func)
 	KASSERT(fcaps->fc_fcntls == 0 ||
 	    cap_rights_is_set(&fcaps->fc_rights, CAP_FCNTL),
 	    ("%s: fcntls without CAP_FCNTL", func));
+	/*
+	 * open calls without WANTIOCTLCAPS free caps but leave the counter
+	 */
+#if 0
 	KASSERT(fcaps->fc_ioctls != NULL ? fcaps->fc_nioctls > 0 :
 	    (fcaps->fc_nioctls == -1 || fcaps->fc_nioctls == 0),
 	    ("%s: invalid ioctls", func));
+#endif
 	KASSERT(fcaps->fc_nioctls == 0 ||
 	    cap_rights_is_set(&fcaps->fc_rights, CAP_IOCTL),
 	    ("%s: ioctls without CAP_IOCTL", func));
@@ -3044,6 +3069,71 @@ fgetvp_lookup_smr(int fd, struct nameidata *ndp, struct vnode **vpp, bool *fsear
 }
 #endif
 
+int
+fgetvp_lookup(int fd, struct nameidata *ndp, struct vnode **vpp)
+{
+	struct thread *td;
+	struct file *fp;
+	struct vnode *vp;
+	struct componentname *cnp;
+	cap_rights_t rights;
+	int error;
+
+	td = curthread;
+	rights = *ndp->ni_rightsneeded;
+	cap_rights_set_one(&rights, CAP_LOOKUP);
+	cnp = &ndp->ni_cnd;
+
+	error = fget_cap(td, ndp->ni_dirfd, &rights, &fp, &ndp->ni_filecaps);
+	if (__predict_false(error != 0))
+		return (error);
+	if (__predict_false(fp->f_ops == &badfileops)) {
+		error = EBADF;
+		goto out_free;
+	}
+	vp = fp->f_vnode;
+	if (__predict_false(vp == NULL)) {
+		error = ENOTDIR;
+		goto out_free;
+	}
+	vrefact(vp);
+	/*
+	 * XXX does not check for VDIR, handled by namei_setup
+	 */
+	if ((fp->f_flag & FSEARCH) != 0)
+		cnp->cn_flags |= NOEXECCHECK;
+	fdrop(fp, td);
+
+#ifdef CAPABILITIES
+	/*
+	 * If file descriptor doesn't have all rights,
+	 * all lookups relative to it must also be
+	 * strictly relative.
+	 */
+	CAP_ALL(&rights);
+	if (!cap_rights_contains(&ndp->ni_filecaps.fc_rights, &rights) ||
+	    ndp->ni_filecaps.fc_fcntls != CAP_FCNTL_ALL ||
+	    ndp->ni_filecaps.fc_nioctls != -1) {
+		ndp->ni_lcf |= NI_LCF_STRICTRELATIVE;
+		ndp->ni_resflags |= NIRES_STRICTREL;
+	}
+#endif
+
+	/*
+	 * TODO: avoid copying ioctl caps if it can be helped to begin with
+	 */
+	if ((cnp->cn_flags & WANTIOCTLCAPS) == 0)
+		filecaps_free_ioctl(&ndp->ni_filecaps);
+
+	*vpp = vp;
+	return (0);
+
+out_free:
+	filecaps_free(&ndp->ni_filecaps);
+	fdrop(fp, td);
+	return (error);
+}
+
 /*
  * Fetch the descriptor locklessly.
  *
@@ -3456,7 +3546,7 @@ _fgetvp(struct thread *td, int fd, int flags, cap_rights_t *needrightsp,
 		error = EINVAL;
 	} else {
 		*vpp = fp->f_vnode;
-		vref(*vpp);
+		vrefact(*vpp);
 	}
 	fdrop(fp, td);
 
@@ -3492,7 +3582,7 @@ fgetvp_rights(struct thread *td, int fd, cap_rights_t *needrightsp,
 
 	*havecaps = caps;
 	*vpp = fp->f_vnode;
-	vref(*vpp);
+	vrefact(*vpp);
 	fdrop(fp, td);
 
 	return (0);
@@ -4203,9 +4293,9 @@ sysctl_kern_file(SYSCTL_HANDLER_ARGS)
 		if (fdp == NULL)
 			continue;
 		FILEDESC_SLOCK(fdp);
+		if (refcount_load(&fdp->fd_refcnt) == 0)
+			goto nextproc;
 		FILEDESC_FOREACH_FP(fdp, n, fp) {
-			if (refcount_load(&fdp->fd_refcnt) == 0)
-				break;
 			xf.xf_fd = n;
 			xf.xf_file = (uintptr_t)fp;
 			xf.xf_data = (uintptr_t)fp->f_data;
@@ -4216,9 +4306,16 @@ sysctl_kern_file(SYSCTL_HANDLER_ARGS)
 			xf.xf_offset = foffset_get(fp);
 			xf.xf_flag = fp->f_flag;
 			error = SYSCTL_OUT(req, &xf, sizeof(xf));
-			if (error)
+
+			/*
+			 * There is no need to re-check the fdtable refcount
+			 * here since the filedesc lock is not dropped in the
+			 * loop body.
+			 */
+			if (error != 0)
 				break;
 		}
+nextproc:
 		FILEDESC_SUNLOCK(fdp);
 		fddrop(fdp);
 		if (error)
@@ -4478,9 +4575,9 @@ kern_proc_filedesc_out(struct proc *p,  struct sbuf *sb, ssize_t maxlen,
 	if (pwd != NULL)
 		pwd_drop(pwd);
 	FILEDESC_SLOCK(fdp);
+	if (refcount_load(&fdp->fd_refcnt) == 0)
+		goto skip;
 	FILEDESC_FOREACH_FP(fdp, i, fp) {
-		if (refcount_load(&fdp->fd_refcnt) == 0)
-			break;
 #ifdef CAPABILITIES
 		rights = *cap_rights(fdp, i);
 #else /* !CAPABILITIES */
@@ -4493,9 +4590,10 @@ kern_proc_filedesc_out(struct proc *p,  struct sbuf *sb, ssize_t maxlen,
 		 * loop continues.
 		 */
 		error = export_file_to_sb(fp, i, &rights, efbuf);
-		if (error != 0)
+		if (error != 0 || refcount_load(&fdp->fd_refcnt) == 0)
 			break;
 	}
+skip:
 	FILEDESC_SUNLOCK(fdp);
 fail:
 	if (fdp != NULL)
@@ -4642,18 +4740,19 @@ sysctl_kern_proc_ofiledesc(SYSCTL_HANDLER_ARGS)
 	if (pwd != NULL)
 		pwd_drop(pwd);
 	FILEDESC_SLOCK(fdp);
+	if (refcount_load(&fdp->fd_refcnt) == 0)
+		goto skip;
 	FILEDESC_FOREACH_FP(fdp, i, fp) {
-		if (refcount_load(&fdp->fd_refcnt) == 0)
-			break;
 		export_file_to_kinfo(fp, i, NULL, kif, fdp,
 		    KERN_FILEDESC_PACK_KINFO);
 		FILEDESC_SUNLOCK(fdp);
 		kinfo_to_okinfo(kif, okif);
 		error = SYSCTL_OUT(req, okif, sizeof(*okif));
 		FILEDESC_SLOCK(fdp);
-		if (error)
+		if (error != 0 || refcount_load(&fdp->fd_refcnt) == 0)
 			break;
 	}
+skip:
 	FILEDESC_SUNLOCK(fdp);
 	fddrop(fdp);
 	pddrop(pdp);
@@ -5048,7 +5147,7 @@ path_close(struct file *fp, struct thread *td)
 {
 	MPASS(fp->f_type == DTYPE_VNODE);
 	fp->f_ops = &badfileops;
-	vdrop(fp->f_vnode);
+	vrele(fp->f_vnode);
 	return (0);
 }
 

@@ -85,9 +85,7 @@ static device_method_t xhci_device_methods[] = {
 DEFINE_CLASS_0(xhci, xhci_pci_driver, xhci_device_methods,
     sizeof(struct xhci_softc));
 
-static devclass_t xhci_devclass;
-
-DRIVER_MODULE(xhci, pci, xhci_pci_driver, xhci_devclass, NULL, NULL);
+DRIVER_MODULE(xhci, pci, xhci_pci_driver, NULL, NULL);
 MODULE_DEPEND(xhci, usb, 1, 1, 1);
 
 static const char *
@@ -287,6 +285,7 @@ xhci_pci_attach(device_t self)
 	sc->sc_io_size = rman_get_size(sc->sc_io_res);
 
 	switch (pci_get_devid(self)) {
+	case 0x10091b73:	/* Fresco Logic FL1009 USB3.0 xHCI Controller */
 	case 0x8241104c:	/* TUSB73x0 USB3.0 xHCI Controller */
 		sc->sc_no_deconfigure = 1;
 		break;

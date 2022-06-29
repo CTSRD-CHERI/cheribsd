@@ -165,8 +165,7 @@ static driver_t acpi_tz_driver = {
 
 static char *acpi_tz_tmp_name = "_TMP";
 
-static devclass_t acpi_tz_devclass;
-DRIVER_MODULE(acpi_tz, acpi, acpi_tz_driver, acpi_tz_devclass, 0, 0);
+DRIVER_MODULE(acpi_tz, acpi, acpi_tz_driver, 0, 0);
 MODULE_DEPEND(acpi_tz, acpi, 1, 1, 1);
 
 static struct sysctl_ctx_list	acpi_tz_sysctl_ctx;
@@ -331,7 +330,7 @@ acpi_tz_startup(void *arg __unused)
     device_t *devs;
     int devcount, error, i;
 
-    devclass_get_devices(acpi_tz_devclass, &devs, &devcount);
+    devclass_get_devices(devclass_find("acpi_tz"), &devs, &devcount);
     if (devcount == 0) {
 	free(devs, M_TEMP);
 	return;
@@ -949,6 +948,7 @@ acpi_tz_power_profile(void *arg)
 static void
 acpi_tz_thread(void *arg)
 {
+    devclass_t	acpi_tz_devclass;
     device_t	*devs;
     int		devcount, i;
     int		flags;
@@ -956,6 +956,7 @@ acpi_tz_thread(void *arg)
 
     ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
 
+    acpi_tz_devclass = devclass_find("acpi_tz");
     devs = NULL;
     devcount = 0;
     sc = NULL;
