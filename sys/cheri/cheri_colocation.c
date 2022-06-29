@@ -321,7 +321,7 @@ colocation_unborrow(struct thread *td)
 {
 	struct switchercb scb;
 	struct thread *peertd;
-	struct trapframe *trapframe, peertrapframe;
+	struct trapframe peertrapframe;
 #ifdef __mips__
 	trapf_pc_t peertpc;
 #endif
@@ -331,7 +331,6 @@ colocation_unborrow(struct thread *td)
 	if (!have_scb)
 		return;
 
-	trapframe = td->td_frame;
 	peertd = scb.scb_borrower_td;
 	if (peertd == NULL) {
 		/*
