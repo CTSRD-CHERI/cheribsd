@@ -239,7 +239,7 @@ sys_coexecve(struct thread *td, struct coexecve_args *uap)
 		return (error);
 	}
 	error = exec_copyin_args(&args, uap->fname,
-	    UIO_USERSPACE, uap->argv, uap->envv, NULL);
+	    UIO_USERSPACE, uap->argv, uap->envv);
 	if (error == 0)
 		error = kern_coexecve(td, &args, NULL, oldvmspace, p, false);
 	post_execve(td, error, oldvmspace);
@@ -273,7 +273,7 @@ sys_coexecvec(struct thread *td, struct coexecvec_args *uap)
 		PRELE(p);
 		return (error);
 	}
-	error = exec_copyin_args(&args, uap->fname,
+	error = exec_copyin_args_capv(&args, uap->fname,
 	    UIO_USERSPACE, uap->argv, uap->envv, uap->capv);
 	if (error == 0)
 		error = kern_coexecve(td, &args, NULL, oldvmspace, p, false);
@@ -302,7 +302,7 @@ sys_execve(struct thread *td, struct execve_args *uap)
 	if (error != 0)
 		return (error);
 	error = exec_copyin_args(&args, uap->fname, UIO_USERSPACE,
-	    uap->argv, uap->envv, NULL);
+	    uap->argv, uap->envv);
 	if (error == 0)
 		error = kern_execve(td, &args, NULL, oldvmspace);
 	post_execve(td, error, oldvmspace);
@@ -328,7 +328,7 @@ sys_fexecve(struct thread *td, struct fexecve_args *uap)
 	if (error != 0)
 		return (error);
 	error = exec_copyin_args(&args, NULL, UIO_SYSSPACE,
-	    uap->argv, uap->envv, NULL);
+	    uap->argv, uap->envv);
 	if (error == 0) {
 		args.fd = uap->fd;
 		error = kern_execve(td, &args, NULL, oldvmspace);
@@ -359,7 +359,7 @@ sys___mac_execve(struct thread *td, struct __mac_execve_args *uap)
 	if (error != 0)
 		return (error);
 	error = exec_copyin_args(&args, uap->fname, UIO_USERSPACE,
-	    uap->argv, uap->envv, NULL);
+	    uap->argv, uap->envv);
 	if (error == 0)
 		error = kern_execve(td, &args, uap->mac_p, oldvmspace);
 	post_execve(td, error, oldvmspace);
@@ -1624,12 +1624,19 @@ get_argcap_ptr(void * __capability *arrayp, void * __capability *ptrp)
 	return (0);
 }
 
+int
+exec_copyin_args(struct image_args *args, const char * __capability fname,
+    enum uio_seg segflg, void * __capability argv, void * __capability envv)
+{
+	return (exec_copyin_args_capv(args, fname, segflg, argv, envv, NULL));
+}
+
 /*
  * Copy out argument and environment strings from the old process address
  * space into the temporary string buffer.
  */
 int
-exec_copyin_args(struct image_args *args, const char * __capability fname,
+exec_copyin_args_capv(struct image_args *args, const char * __capability fname,
     enum uio_seg segflg, void * __capability argv, void * __capability envv,
     void * __capability capv)
 {

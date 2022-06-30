@@ -131,6 +131,8 @@ int	exec_new_vmspace(struct image_params *, struct sysentvec *);
 void	exec_setregs(struct thread *, struct image_params *, uintcap_t);
 int	exec_shell_imgact(struct image_params *);
 int	exec_copyin_args(struct image_args *, const char * __capability,
+	    enum uio_seg, void * __capability, void * __capability);
+int	exec_copyin_args_capv(struct image_args *, const char * __capability,
 	    enum uio_seg, void * __capability, void * __capability,
 	    void * __capability);
 int	pre_execve(struct thread *td, struct vmspace **oldvmspace);
