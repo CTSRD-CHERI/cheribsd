@@ -219,6 +219,8 @@ LIBCOMPAT${_var}?=	${LIB${_LIBCOMPAT}${_var}}
 .endif
 .endfor
 
+WORLDTMP?=		${SYSROOT}
+
 # Shared flags
 LIBCOMPAT_OBJTOP?=	${OBJTOP}/obj-lib${libcompat}
 
