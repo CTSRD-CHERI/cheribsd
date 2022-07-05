@@ -211,7 +211,7 @@ vm_page_init_cache_zones(void *dummy __unused)
 	char *zone_name;
 	struct vm_domain *vmd;
 	struct vm_pgcache *pgcache;
-	int cache, domain, maxcache, pool, cnt;
+	int cache, domain, maxcache, pool, cnt __unused;
 
 	maxcache = 0;
 	TUNABLE_INT_FETCH("vm.pgcache_zone_max_pcpu", &maxcache);

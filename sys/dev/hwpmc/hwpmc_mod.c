@@ -3415,7 +3415,7 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 	PMC_GET_SX_XLOCK(ENOSYS);
 	is_sx_downgraded = 0;
 	PMCDBG3(MOD,PMS,1, "syscall op=%d \"%s\" arg=%p", op,
-	    pmc_op_to_name[op], (void * __cheri_fromcap)arg);
+	    pmc_op_to_name[op], (__cheri_fromcap void *)arg);
 
 	error = 0;
 	counter_u64_add(pmc_stats.pm_syscalls, 1);

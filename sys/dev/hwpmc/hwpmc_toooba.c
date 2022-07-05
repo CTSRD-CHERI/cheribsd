@@ -332,7 +332,7 @@ riscv_write_pmc(int cpu, int ri, pmc_value_t v)
 static int
 riscv_release_pmc(int cpu, int ri, struct pmc *pmc)
 {
-	struct pmc_hw *phw;
+	struct pmc_hw *phw __unused;
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 		("[riscv,%d] illegal CPU value %d", __LINE__, cpu));
