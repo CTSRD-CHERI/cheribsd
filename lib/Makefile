@@ -201,6 +201,7 @@ SUBDIR.${MK_CUSE}+= 	libcuse
 SUBDIR.${MK_CXX}+=	libdevdctl
 SUBDIR.${MK_TOOLCHAIN}+=libpe
 SUBDIR.${MK_DIALOG}+=	libdpv
+SUBDIR.${MK_FDT}+=	libfdt
 SUBDIR.${MK_FILE}+=	libmagic
 SUBDIR.${MK_GPIO}+=	libgpio
 SUBDIR.${MK_GSSAPI}+=	libgssapi librpcsec_gss
