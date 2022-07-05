@@ -139,6 +139,30 @@ SYSINIT(freebsd64, SI_SUB_EXEC, SI_ORDER_ANY,
     (sysinit_cfunc_t) elf64_insert_brand_entry,
     &freebsd_freebsd64_brand_info);
 
+static bool
+get_arm64_tls(struct regset *rs, struct thread *td, void *buf,
+    size_t *sizep)
+{
+	uint64_t addr;
+
+	if (buf != NULL) {
+		KASSERT(*sizep == sizeof(addr),
+		    ("%s: invalid size", __func__));
+		addr = (ptraddr_t)td->td_pcb->pcb_tpidr_el0;
+		memcpy(buf, &addr, sizeof(addr));
+	}
+	*sizep = sizeof(addr);
+
+	return (true);
+}
+
+static struct regset regset_arm64_tls = {
+	.note = NT_ARM_TLS,
+	.size = sizeof(uint64_t),
+	.get = get_arm64_tls,
+};
+ELF_REGSET(regset_arm64_tls);
+
 /*
  * Number of registers in gpregs that are mirrored in capregs
  * up to, but not including elr.
