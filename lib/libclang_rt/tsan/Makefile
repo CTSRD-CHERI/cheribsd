@@ -25,9 +25,6 @@ SRCS+=		sanitizer_common/sanitizer_libignore.cpp
 SRCS+=		sanitizer_common/sanitizer_linux.cpp
 SRCS+=		sanitizer_common/sanitizer_linux_libcdep.cpp
 SRCS+=		sanitizer_common/sanitizer_mutex.cpp
-.if ${CRT_VERSION} < 14
-SRCS+=		sanitizer_common/sanitizer_persistent_allocator.cpp
-.endif
 SRCS+=		sanitizer_common/sanitizer_platform_limits_freebsd.cpp
 SRCS+=		sanitizer_common/sanitizer_platform_limits_linux.cpp
 SRCS+=		sanitizer_common/sanitizer_platform_limits_posix.cpp
@@ -36,9 +33,7 @@ SRCS+=		sanitizer_common/sanitizer_posix_libcdep.cpp
 SRCS+=		sanitizer_common/sanitizer_printf.cpp
 SRCS+=		sanitizer_common/sanitizer_procmaps_bsd.cpp
 SRCS+=		sanitizer_common/sanitizer_procmaps_common.cpp
-.if ${CRT_VERSION} >= 14
 SRCS+=		sanitizer_common/sanitizer_stack_store.cpp
-.endif
 SRCS+=		sanitizer_common/sanitizer_stackdepot.cpp
 SRCS+=		sanitizer_common/sanitizer_stacktrace.cpp
 SRCS+=		sanitizer_common/sanitizer_stacktrace_libcdep.cpp
@@ -54,9 +49,6 @@ SRCS+=		sanitizer_common/sanitizer_thread_registry.cpp
 SRCS+=		sanitizer_common/sanitizer_tls_get_addr.cpp
 SRCS+=		sanitizer_common/sanitizer_type_traits.cpp
 SRCS+=		sanitizer_common/sanitizer_unwind_linux_libcdep.cpp
-.if ${CRT_VERSION} < 14
-SRCS+=		tsan/rtl/tsan_clock.cpp
-.endif
 SRCS+=		tsan/rtl/tsan_debugging.cpp
 SRCS+=		tsan/rtl/tsan_external.cpp
 SRCS+=		tsan/rtl/tsan_fd.cpp
@@ -75,9 +67,7 @@ SRCS+=		tsan/rtl/tsan_platform_posix.cpp
 SRCS+=		tsan/rtl/tsan_preinit.cpp
 SRCS+=		tsan/rtl/tsan_report.cpp
 SRCS+=		tsan/rtl/tsan_rtl.cpp
-.if ${CRT_VERSION} >= 14
 SRCS+=		tsan/rtl/tsan_rtl_access.cpp
-.endif
 SRCS+=		tsan/rtl/tsan_rtl_amd64.S
 SRCS+=		tsan/rtl/tsan_rtl_mutex.cpp
 SRCS+=		tsan/rtl/tsan_rtl_proc.cpp
@@ -87,9 +77,7 @@ SRCS+=		tsan/rtl/tsan_stack_trace.cpp
 SRCS+=		tsan/rtl/tsan_suppressions.cpp
 SRCS+=		tsan/rtl/tsan_symbolize.cpp
 SRCS+=		tsan/rtl/tsan_sync.cpp
-.if ${CRT_VERSION} >= 14
 SRCS+=		tsan/rtl/tsan_vector_clock.cpp
-.endif
 SRCS+=		ubsan/ubsan_diag.cpp
 SRCS+=		ubsan/ubsan_flags.cpp
 SRCS+=		ubsan/ubsan_handlers.cpp
