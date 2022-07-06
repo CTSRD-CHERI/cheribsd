@@ -20,14 +20,9 @@ SRCS+=		asan/asan_interceptors_memintrinsics.cpp
 SRCS+=		asan/asan_linux.cpp
 SRCS+=		asan/asan_malloc_linux.cpp
 SRCS+=		asan/asan_memory_profile.cpp
-.if ${CRT_VERSION} < 14
-SRCS+=		asan/asan_new_delete.cpp
-.endif
 SRCS+=		asan/asan_poisoning.cpp
 SRCS+=		asan/asan_posix.cpp
-.if ${CRT_VERSION} >= 14
 SRCS+=		asan/asan_preinit.cpp
-.endif
 SRCS+=		asan/asan_premap_shadow.cpp
 SRCS+=		asan/asan_report.cpp
 SRCS+=		asan/asan_rtl.cpp
@@ -57,9 +52,6 @@ SRCS+=		sanitizer_common/sanitizer_libignore.cpp
 SRCS+=		sanitizer_common/sanitizer_linux.cpp
 SRCS+=		sanitizer_common/sanitizer_linux_libcdep.cpp
 SRCS+=		sanitizer_common/sanitizer_mutex.cpp
-.if ${CRT_VERSION} < 14
-SRCS+=		sanitizer_common/sanitizer_persistent_allocator.cpp
-.endif
 SRCS+=		sanitizer_common/sanitizer_platform_limits_freebsd.cpp
 SRCS+=		sanitizer_common/sanitizer_platform_limits_linux.cpp
 SRCS+=		sanitizer_common/sanitizer_platform_limits_posix.cpp
@@ -68,9 +60,7 @@ SRCS+=		sanitizer_common/sanitizer_posix_libcdep.cpp
 SRCS+=		sanitizer_common/sanitizer_printf.cpp
 SRCS+=		sanitizer_common/sanitizer_procmaps_bsd.cpp
 SRCS+=		sanitizer_common/sanitizer_procmaps_common.cpp
-.if ${CRT_VERSION} >= 14
 SRCS+=		sanitizer_common/sanitizer_stack_store.cpp
-.endif
 SRCS+=		sanitizer_common/sanitizer_stackdepot.cpp
 SRCS+=		sanitizer_common/sanitizer_stacktrace.cpp
 SRCS+=		sanitizer_common/sanitizer_stacktrace_libcdep.cpp
@@ -88,16 +78,9 @@ SRCS+=		sanitizer_common/sanitizer_type_traits.cpp
 SRCS+=		sanitizer_common/sanitizer_unwind_linux_libcdep.cpp
 SRCS+=		ubsan/ubsan_diag.cpp
 SRCS+=		ubsan/ubsan_flags.cpp
-.if ${CRT_VERSION} < 14
-SRCS+=		ubsan/ubsan_handlers_cxx.cpp
-.endif
 SRCS+=		ubsan/ubsan_handlers.cpp
 SRCS+=		ubsan/ubsan_init.cpp
 SRCS+=		ubsan/ubsan_monitor.cpp
-.if ${CRT_VERSION} < 14
-SRCS+=		ubsan/ubsan_type_hash.cpp
-SRCS+=		ubsan/ubsan_type_hash_itanium.cpp
-.endif
 SRCS+=		ubsan/ubsan_value.cpp
 
 # Kludge around a bsd.lib.mk shortcoming: when SHLIB_NAME is defined, but LIB
@@ -106,9 +89,4 @@ SRCS+=		ubsan/ubsan_value.cpp
 # this library are all C++ anyway, simply set CC to CXX.
 CC=		${CXX}
 
-.if ${CRT_VERSION} < 14
-CXXFLAGS.ubsan_handlers_cxx.cpp=		-frtti
-CXXFLAGS.ubsan_type_hash.cpp=		-frtti
-CXXFLAGS.ubsan_type_hash_itanium.cpp=	-frtti
-.endif
 .include <bsd.lib.mk>

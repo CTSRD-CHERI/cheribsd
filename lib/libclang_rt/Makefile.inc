@@ -2,7 +2,7 @@
 
 .include <bsd.compiler.mk>
 
-CRTSRC=		${SRCTOP}/contrib/subrepo-cheri-compiler-rt
+CRTSRC=		${SRCTOP}/contrib/llvm-project/compiler-rt
 .include "compiler-rt-vars.mk"
 
 .PATH:		${CRTSRC}/lib

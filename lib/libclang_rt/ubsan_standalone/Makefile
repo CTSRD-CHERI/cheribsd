@@ -25,9 +25,6 @@ SRCS+=		sanitizer_common/sanitizer_libignore.cpp
 SRCS+=		sanitizer_common/sanitizer_linux.cpp
 SRCS+=		sanitizer_common/sanitizer_linux_libcdep.cpp
 SRCS+=		sanitizer_common/sanitizer_mutex.cpp
-.if ${CRT_VERSION} < 14
-SRCS+=		sanitizer_common/sanitizer_persistent_allocator.cpp
-.endif
 SRCS+=		sanitizer_common/sanitizer_platform_limits_freebsd.cpp
 SRCS+=		sanitizer_common/sanitizer_platform_limits_linux.cpp
 SRCS+=		sanitizer_common/sanitizer_platform_limits_posix.cpp
@@ -36,9 +33,7 @@ SRCS+=		sanitizer_common/sanitizer_posix_libcdep.cpp
 SRCS+=		sanitizer_common/sanitizer_printf.cpp
 SRCS+=		sanitizer_common/sanitizer_procmaps_bsd.cpp
 SRCS+=		sanitizer_common/sanitizer_procmaps_common.cpp
-.if ${CRT_VERSION} >= 14
 SRCS+=		sanitizer_common/sanitizer_stack_store.cpp
-.endif
 SRCS+=		sanitizer_common/sanitizer_stackdepot.cpp
 SRCS+=		sanitizer_common/sanitizer_stacktrace.cpp
 SRCS+=		sanitizer_common/sanitizer_stacktrace_libcdep.cpp

@@ -202,18 +202,15 @@ SUBDIR.${MK_STATS}+=	libstats
 
 # The libraries under libclang_rt can only be built by clang and when we enable
 # C++ support.  Furthermore, they can only be built for certain architectures.
-.if ${COMPILER_TYPE} == "clang" && ${MK_CXX} != "no"
-.if (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
+.if ${COMPILER_TYPE} == "clang" && ${MK_CXX} != "no" && \
+    (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "i386" || \
     ${MACHINE_CPUARCH} == "powerpc") && \
     !${MACHINE_ABI:Mpurecap}
 _libclang_rt=	libclang_rt
 .elif (${MK_ASAN} != "no" || ${MK_UBSAN} != "no") && make(all)
 .error Requested build with sanitizers but cannot build runtime libraries!
-.elif !${MACHINE_ABI:Mpurecap} && ! ${MACHINE_ARCH:Mriscv*}
-.error NOT BUILDING libclang_rt for ${MACHINE_ARCH}
 .endif
-.endif # ${COMPILER_TYPE} == "clang"
 
 .if ${MK_CXX} != "no"
 _libcxxrt=	libcxxrt
