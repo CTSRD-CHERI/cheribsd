@@ -215,10 +215,7 @@ _libclang_rt=	libclang_rt
 .if ${MK_CXX} != "no"
 _libcxxrt=	libcxxrt
 _libcplusplus=	cheri-libc++
-.if ${MK_CHERI} != "no"
-# libc++experimental currently causes crashes
 _libcplusplus+=	cheri-libc++experimental
-.endif
 .endif
 
 SUBDIR.${MK_EFI}+=	libefivar
