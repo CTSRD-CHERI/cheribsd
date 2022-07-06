@@ -35,6 +35,7 @@ __DEFAULT_YES_OPTIONS = \
     CDDL \
     CRYPT \
     CUSE \
+    DTRACE \
     EFI \
     FORMAT_EXTENSIONS \
     INET \
@@ -200,6 +201,10 @@ CTFCONVERT_CMD=	@:
 
 .if ${MK_SPLIT_KERNEL_DEBUG} == "no"
 MK_KERNEL_SYMBOLS:=	no
+.endif
+
+.if ${MK_CDDL} == "no"
+MK_DTRACE:=	no
 .endif
 
 # Some modules only compile successfully if option FDT is set, due to #ifdef FDT
