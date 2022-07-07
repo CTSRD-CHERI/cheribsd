@@ -119,7 +119,7 @@ static void
 call(void)
 {
 	void * __capability lookedup;
-	char buf[8];
+	void * __capability buf[8];
 	ssize_t received;
 	int error, i;
 
@@ -133,7 +133,9 @@ call(void)
 	if (error != 0)
 		err(1, "colookup");
 
-	buf[0] = 42;
+	memset(buf, 0, sizeof(buf));
+	buf[0] = (void *)42;
+
 	for (i = 0; i < 2; i++) {
 		fprintf(stderr, "%s: calling %p, buf %p, we are thread %d...\n",
 		    __func__, (__cheri_fromcap void *)lookedup, buf, pthread_getthreadid_np());
@@ -141,8 +143,8 @@ call(void)
 		if (received < 0)
 			fprintf(stderr, "%s: cocall: %s\n", __func__, strerror(errno));
 		fprintf(stderr, "%s: done, we are thread %d, buf %p contains %d\n",
-		    __func__, pthread_getthreadid_np(), buf, buf[0]);
-		buf[0]++;
+		    __func__, pthread_getthreadid_np(), buf, (int)(intcap_t)buf[0]);
+		buf[0] = (void *)((intcap_t)buf[0] + 1);
 	}
 }
 
@@ -150,8 +152,8 @@ static void *
 service_proc(void *dummy __unused)
 {
 	void * __capability cookie;
+	void * __capability buf[8];
 	uint64_t *halfcookie;
-	char buf[8];
 	ssize_t received;
 	pid_t pid;
 	int error;
@@ -168,6 +170,9 @@ service_proc(void *dummy __unused)
 
 	fprintf(stderr, "%s: buf %p, we are thread %d, accepting...\n",
 	    __func__, buf, pthread_getthreadid_np());
+
+	memset(buf, 0, sizeof(buf));
+
 	for (;;) {
 		received = coaccept(&cookie, buf, sizeof(buf), buf, sizeof(buf));
 		if (received < 0)
@@ -177,8 +182,8 @@ service_proc(void *dummy __unused)
 			warn("cogetpid");
 		halfcookie = (uint64_t *)&cookie;
 		fprintf(stderr, "%s: accepted, cookie %#lx%lx, pid %d, we are thread %d, buf %p contains %d, looping...\n",
-		    __func__, halfcookie[0], halfcookie[1], pid, pthread_getthreadid_np(), buf, buf[0]);
-		buf[0]++;
+		    __func__, halfcookie[0], halfcookie[1], pid, pthread_getthreadid_np(), buf, (int)(intcap_t)buf[0]);
+		buf[0] = (void *)((intcap_t)buf[0] + 1);
 	}
 }
 
