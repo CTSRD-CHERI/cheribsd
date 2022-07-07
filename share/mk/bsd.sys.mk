@@ -80,7 +80,7 @@ CWARNFLAGS+=	-Wno-pointer-sign
 .if ${WARNS} <= 6
 CWARNFLAGS.clang+=	-Wno-empty-body -Wno-string-plus-int
 CWARNFLAGS.clang+=	-Wno-unused-const-variable
-.if ${COMPILER_TYPE} == "clang" && ${COMPILER_FEATURES:MWunused-but-set-variable}
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 130000
 CWARNFLAGS.clang+=	-Wno-error=unused-but-set-variable
 .endif
 .endif # WARNS <= 6
