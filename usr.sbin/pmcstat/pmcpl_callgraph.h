@@ -58,7 +58,7 @@ extern int pmcstat_cgnode_hash_count;
 
 /* Function prototypes */
 int pmcpl_cg_init(void);
-void pmcpl_cg_shutdown(FILE *mf);
+void pmcpl_cg_shutdown(xo_handle_t *mf);
 void pmcpl_cg_process(
     struct pmcstat_process *pp, struct pmcstat_pmcrecord *pmcr,
     uint32_t nsamples, uintfptr_t *cc, int usermode, uint32_t cpu);

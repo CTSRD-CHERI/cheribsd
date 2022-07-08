@@ -42,6 +42,7 @@
 #include <sysexits.h>
 #include <unistd.h>
 
+#include <libxo/xo.h>
 #include <libpmcstat.h>
 #include "cmd_pmc.h"
 
@@ -99,6 +100,7 @@ main(int argc, char **argv)
 	cmd_disp_t disp;
 
 	pmc_args.pa_printfile = stderr;
+	pmc_args.pa_xop = xo_create_to_file(stderr, XO_STYLE_TEXT, 0);
 	STAILQ_INIT(&pmc_args.pa_events);
 	SLIST_INIT(&pmc_args.pa_targets);
 	if (argc == 1)

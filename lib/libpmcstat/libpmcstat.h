@@ -36,6 +36,7 @@
 #include <sys/_cpuset.h>
 #include <sys/queue.h>
 
+#include <libxo/xo.h>
 #include <stdio.h>
 #include <gelf.h>
 
@@ -115,7 +116,10 @@ struct pmcstat_args {
 	int	pa_pplugin;		/* pre-processing plugin */
 	int	pa_plugin;		/* analysis plugin */
 	int	pa_verbosity;		/* verbosity level */
-	FILE	*pa_printfile;		/* where to send printed output */
+	FILE	*pa_printfile;		/* file backing libxo pa_xop or tty
+					 * file in top mode
+					 */
+	xo_handle_t	*pa_xop;	/* where to send printed output */
 	int	pa_logfd;		/* output log file */
 	char	*pa_inputpath;		/* path to input log */
 	char	*pa_outputpath;		/* path to output log */
@@ -279,7 +283,7 @@ struct pmc_plugins {
 
 	/* init and shutdown */
 	int (*pl_init)(void);
-	void (*pl_shutdown)(FILE *mf);
+	void (*pl_shutdown)(xo_handle_t *mf);
 
 	/* sample processing */
 	void (*pl_process)(struct pmcstat_process *pp,

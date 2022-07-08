@@ -50,10 +50,10 @@
 
 #define	PMCSTAT_LDD_COMMAND		"/usr/bin/ldd"
 
-#define	PMCSTAT_PRINT_ENTRY(T,...) do {					\
-		(void) fprintf(args.pa_printfile, "%-9s", T);		\
-		(void) fprintf(args.pa_printfile, " "  __VA_ARGS__);	\
-		(void) fprintf(args.pa_printfile, "\n");		\
+
+#define	PMCSTAT_PRINT_ENTRY(T, fmt, ...) do {				\
+		xo_emit_h(args.pa_xop, "{k:type/%-9s} " fmt "\n",	\
+		    T, __VA_ARGS__);					\
 	} while (0)
 
 #define PMCSTAT_PL_NONE		0

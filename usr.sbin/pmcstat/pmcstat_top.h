@@ -42,7 +42,7 @@
 	if (args.pa_toptty)				\
 		printw(__VA_ARGS__);			\
 	else						\
-		fprintf(args.pa_printfile, __VA_ARGS__);\
+		xo_emit_h(args.pa_xop, __VA_ARGS__);	\
 } while (0)
 
 /* If ncurses mode active set attributes. */
@@ -67,7 +67,7 @@
 #define PMCSTAT_PRINTEND() do {				\
 	if (!args.pa_toptty) {				\
 		PMCSTAT_PRINTW("---\n");		\
-		fflush(args.pa_printfile);		\
+		xo_flush_h(args.pa_xop);		\
 	} else						\
 		refresh();				\
 } while (0)

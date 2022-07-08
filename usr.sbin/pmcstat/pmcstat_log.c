@@ -391,29 +391,38 @@ pmcstat_print_log(void)
 	struct pmclog_ev ev;
 	uint32_t npc;
 
+	xo_open_list_h(args.pa_xop, "pmc-log-entry");
 	while (pmclog_read(args.pa_logparser, &ev) == 0) {
 		assert(ev.pl_state == PMCLOG_OK);
+		xo_open_instance_h(args.pa_xop, "pmc-log-entry");
 		switch (ev.pl_type) {
 		case PMCLOG_TYPE_CALLCHAIN:
-			PMCSTAT_PRINT_ENTRY("callchain",
-			    "%d 0x%x %d %d %c", ev.pl_u.pl_cc.pl_pid,
+			PMCSTAT_PRINT_ENTRY("callchain", 
+			    "{:pid/%d} {:pmcid/%#x} {:cpu/%d} {:npc/%d} "
+			    "{:mode/%c}",
+			    ev.pl_u.pl_cc.pl_pid,
 			    ev.pl_u.pl_cc.pl_pmcid,
 			    PMC_CALLCHAIN_CPUFLAGS_TO_CPU(ev.pl_u.pl_cc. \
 				pl_cpuflags), ev.pl_u.pl_cc.pl_npc,
 			    PMC_CALLCHAIN_CPUFLAGS_TO_USERMODE(ev.pl_u.pl_cc.\
 			        pl_cpuflags) ? 'u' : 's');
-			for (npc = 0; npc < ev.pl_u.pl_cc.pl_npc; npc++)
-				PMCSTAT_PRINT_ENTRY("...", "%p",
-				    (void *)(intptr_t) ev.pl_u.pl_cc.pl_pc[npc]);
+			xo_open_list_h(args.pa_xop, "stacktrace");
+			for (npc = 0; npc < ev.pl_u.pl_cc.pl_npc; npc++) {
+				xo_emit_h(args.pa_xop, "{Pd:/%-9s}{l:/%p}\n",
+				    "...",
+				    (void *)(intptr_t)ev.pl_u.pl_cc.pl_pc[npc]);
+			}
+			xo_close_list_h(args.pa_xop, "stacktrace");
 			break;
 		case PMCLOG_TYPE_CLOSELOG:
-			PMCSTAT_PRINT_ENTRY("closelog",);
+			xo_emit_h(args.pa_xop, "{k:type/%-9s}\n", "closelog");
 			break;
 		case PMCLOG_TYPE_DROPNOTIFY:
-			PMCSTAT_PRINT_ENTRY("drop",);
+			xo_emit_h(args.pa_xop, "{k:type/%-9s}\n", "drop");
 			break;
 		case PMCLOG_TYPE_INITIALIZE:
-			PMCSTAT_PRINT_ENTRY("initlog","0x%x \"%s\"",
+			PMCSTAT_PRINT_ENTRY("initlog",
+			    "{:version/%#x} \"{:cputype/%s}\"",
 			    ev.pl_u.pl_i.pl_version,
 			    pmc_name_of_cputype(ev.pl_u.pl_i.pl_arch));
 			if ((ev.pl_u.pl_i.pl_version & 0xFF000000) !=
@@ -423,94 +432,109 @@ pmcstat_print_log(void)
 				    ev.pl_u.pl_i.pl_version, PMC_VERSION);
 			break;
 		case PMCLOG_TYPE_MAP_IN:
-			PMCSTAT_PRINT_ENTRY("map-in","%d %p \"%s\"",
+			PMCSTAT_PRINT_ENTRY("map-in",
+			    "{:pid/%d} {:start/%p} \"{:path/%s}\"",
 			    ev.pl_u.pl_mi.pl_pid,
 			    (void *)(intptr_t) ev.pl_u.pl_mi.pl_start,
 			    ev.pl_u.pl_mi.pl_pathname);
 			break;
 		case PMCLOG_TYPE_MAP_OUT:
-			PMCSTAT_PRINT_ENTRY("map-out","%d %p %p",
+			PMCSTAT_PRINT_ENTRY("map-out",
+			    "{:pid/%d} {:start/%p} {:end/%p}",
 			    ev.pl_u.pl_mo.pl_pid,
 			    (void *)(intptr_t) ev.pl_u.pl_mo.pl_start,
 			    (void *)(intptr_t) ev.pl_u.pl_mo.pl_end);
 			break;
 		case PMCLOG_TYPE_PMCALLOCATE:
-			PMCSTAT_PRINT_ENTRY("allocate","0x%x \"%s\" 0x%x",
+			PMCSTAT_PRINT_ENTRY("allocate",
+			    "{:pmcid/%#x} \"{:evname/%s}\" {:flags/%#x}",
 			    ev.pl_u.pl_a.pl_pmcid,
 			    ev.pl_u.pl_a.pl_evname,
 			    ev.pl_u.pl_a.pl_flags);
 			break;
 		case PMCLOG_TYPE_PMCALLOCATEDYN:
-			PMCSTAT_PRINT_ENTRY("allocatedyn","0x%x \"%s\" 0x%x",
+			PMCSTAT_PRINT_ENTRY("allocatedyn",
+			    "{:pmcid/%#x} \"{:evname/%s}\" {:flags/%#x}",
 			    ev.pl_u.pl_ad.pl_pmcid,
 			    ev.pl_u.pl_ad.pl_evname,
 			    ev.pl_u.pl_ad.pl_flags);
 			break;
 		case PMCLOG_TYPE_PMCATTACH:
-			PMCSTAT_PRINT_ENTRY("attach","0x%x %d \"%s\"",
+			PMCSTAT_PRINT_ENTRY("attach",
+			    "{:pmcid/%#x} {:pid/%d} \"{:evname/%s}\"",
 			    ev.pl_u.pl_t.pl_pmcid,
 			    ev.pl_u.pl_t.pl_pid,
 			    ev.pl_u.pl_t.pl_pathname);
 			break;
 		case PMCLOG_TYPE_PMCDETACH:
-			PMCSTAT_PRINT_ENTRY("detach","0x%x %d",
+			PMCSTAT_PRINT_ENTRY("detach",
+			    "{:pmcid/%#x} {:pid/%d}",
 			    ev.pl_u.pl_d.pl_pmcid,
 			    ev.pl_u.pl_d.pl_pid);
 			break;
 		case PMCLOG_TYPE_PROCCSW:
-			PMCSTAT_PRINT_ENTRY("cswval","0x%x %d %jd",
+			PMCSTAT_PRINT_ENTRY("cswval",
+			    "{:pmcid/%#x} {:pid/%d} {:value/%jd}",
 			    ev.pl_u.pl_c.pl_pmcid,
 			    ev.pl_u.pl_c.pl_pid,
 			    ev.pl_u.pl_c.pl_value);
 			break;
 		case PMCLOG_TYPE_PROC_CREATE:
-			PMCSTAT_PRINT_ENTRY("create","%d %x \"%s\"",
+			PMCSTAT_PRINT_ENTRY("create",
+			    "{:pid/%d} {:flags/%x} \"{:value/%s}\"",
 			    ev.pl_u.pl_pc.pl_pid,
 			    ev.pl_u.pl_pc.pl_flags,
 			    ev.pl_u.pl_pc.pl_pcomm);
 			break;
 		case PMCLOG_TYPE_PROCEXEC:
-			PMCSTAT_PRINT_ENTRY("exec","0x%x %d %p \"%s\"",
+			PMCSTAT_PRINT_ENTRY("exec",
+			    "{:pmcid/%#x} {:pid/%d} {:entryaddr/%p} "
+			    "\"{:path/%s}\"",
 			    ev.pl_u.pl_x.pl_pmcid,
 			    ev.pl_u.pl_x.pl_pid,
 			    (void *)(intptr_t) ev.pl_u.pl_x.pl_entryaddr,
 			    ev.pl_u.pl_x.pl_pathname);
 			break;
 		case PMCLOG_TYPE_PROCEXIT:
-			PMCSTAT_PRINT_ENTRY("exitval","0x%x %d %jd",
+			PMCSTAT_PRINT_ENTRY("exitval",
+			    "{:pmcid/%#x} {:pid/%d} {:value/%jd}",
 			    ev.pl_u.pl_e.pl_pmcid,
 			    ev.pl_u.pl_e.pl_pid,
 			    ev.pl_u.pl_e.pl_value);
 			break;
 		case PMCLOG_TYPE_PROCFORK:
-			PMCSTAT_PRINT_ENTRY("fork","%d %d",
+			PMCSTAT_PRINT_ENTRY("fork",
+			    "{:oldpid/%d} {:newpid/%d}",
 			    ev.pl_u.pl_f.pl_oldpid,
 			    ev.pl_u.pl_f.pl_newpid);
 			break;
 		case PMCLOG_TYPE_USERDATA:
-			PMCSTAT_PRINT_ENTRY("userdata","0x%x",
+			PMCSTAT_PRINT_ENTRY("userdata","{:userdata/%#x}",
 			    ev.pl_u.pl_u.pl_userdata);
 			break;
 		case PMCLOG_TYPE_SYSEXIT:
-			PMCSTAT_PRINT_ENTRY("exit","%d",
+			PMCSTAT_PRINT_ENTRY("exit", "{:pid/%d}",
 			    ev.pl_u.pl_se.pl_pid);
 			break;
 		case PMCLOG_TYPE_THR_CREATE:
-			PMCSTAT_PRINT_ENTRY("thr-create","%d %d %x \"%s\"",
+			PMCSTAT_PRINT_ENTRY("thr-create",
+			    "{:tid/%d} {:pid/%d} {:flags/%x} \"{:tdname/%s}\"",
 			    ev.pl_u.pl_tc.pl_tid,
 			    ev.pl_u.pl_tc.pl_pid,
 			    ev.pl_u.pl_tc.pl_flags,
 			    ev.pl_u.pl_tc.pl_tdname);
 			break;
 		case PMCLOG_TYPE_THR_EXIT:
-			PMCSTAT_PRINT_ENTRY("thr-exit","%d",
+			PMCSTAT_PRINT_ENTRY("thr-exit","{:tid/%d}",
 			    ev.pl_u.pl_tc.pl_tid);
 			break;
 		default:
-			fprintf(args.pa_printfile, "unknown event (type %d).\n",
-			    ev.pl_type);
+			PMCSTAT_PRINT_ENTRY("unknown",
+			    "{d:event type} {:evtype/%d}\n", ev.pl_type);
 		}
+		xo_close_instance_h(args.pa_xop, "pmc-log-entry");
 	}
+	xo_close_list_h(args.pa_xop, "pmc-log-entry");
 
 	if (ev.pl_state == PMCLOG_EOF)
 		return (PMCSTAT_FINISHED);

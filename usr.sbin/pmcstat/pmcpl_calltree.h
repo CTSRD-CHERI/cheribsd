@@ -33,7 +33,7 @@
 
 /* Function prototypes */
 int pmcpl_ct_init(void);
-void pmcpl_ct_shutdown(FILE *mf);
+void pmcpl_ct_shutdown(xo_handle_t *mf);
 void pmcpl_ct_process(
     struct pmcstat_process *pp, struct pmcstat_pmcrecord *pmcr,
     uint32_t nsamples, uintfptr_t *cc, int usermode, uint32_t cpu);

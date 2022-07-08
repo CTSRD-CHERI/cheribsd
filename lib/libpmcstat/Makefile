@@ -7,6 +7,8 @@ PACKAGE=lib${LIB}
 LIB=	pmcstat
 INTERNALLIB=
 
+LIBADD+= xo
+
 SRCS=	\
 	libpmcstat_event.c	\
 	libpmcstat_image.c	\

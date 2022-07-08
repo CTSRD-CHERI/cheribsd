@@ -697,7 +697,7 @@ pmcpl_cg_init(void)
 }
 
 void
-pmcpl_cg_shutdown(FILE *mf)
+pmcpl_cg_shutdown(xo_handle_t *mf)
 {
 	int i;
 	struct pmcstat_cgnode_hash *pch, *pchtmp;

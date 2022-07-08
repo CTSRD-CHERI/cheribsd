@@ -126,7 +126,7 @@ usage(void)
 }
 
 static void
-showtime(FILE *out, struct timespec *before, struct timespec *after,
+showtime(xo_handle_t *out, struct timespec *before, struct timespec *after,
     struct rusage *ru)
 {
 	char decimal_point;
@@ -145,13 +145,16 @@ showtime(FILE *out, struct timespec *before, struct timespec *after,
 	real = (after->tv_sec * 1000000000 + after->tv_nsec) / 1000;
 	user = ru->ru_utime.tv_sec * 1000000 + ru->ru_utime.tv_usec;
 	sys = ru->ru_stime.tv_sec * 1000000 + ru->ru_stime.tv_usec;
-	fprintf(out, "%13jd%c%02ld  real\t\t\t#\t%2.02f%% cpu\n",
+	xo_emit_h(out,
+	    "{:time_sec/%13jd}{d:/%c}{:time_nsec/%02ld}  real\t\t\t#\t{:percent/%2.02f}{U:%} cpu\n",
 	    (intmax_t)after->tv_sec, decimal_point,
 	    after->tv_nsec / 10000000, 100 * (double)(sys + user + 1) / (double)(real + 1));
-	fprintf(out, "%13jd%c%02ld  user\t\t\t#\t%2.2f%% cpu\n",
+	xo_emit_h(out,
+	    "{:utime_sec/%13jd}{d:/%c}{:utime_nsec/%02ld}  user\t\t\t#\t{:percent/%2.2f}{U:%} cpu\n",
 	    (intmax_t)ru->ru_utime.tv_sec, decimal_point,
 	    ru->ru_utime.tv_usec / 10000, 100 * (double)(user + 1) / (double)(real + 1));
-	fprintf(out, "%13jd%c%02ld  sys\t\t\t#\t%2.02f%% cpu\n",
+	xo_emit_h(out,
+	    "{:stime_sec/%13jd}{d:/%c}{:stime_nsec/%02ld}  sys\t\t\t#\t{:percent/%2.02f}{U:%} cpu\n",
 	    (intmax_t)ru->ru_stime.tv_sec, decimal_point,
 	    ru->ru_stime.tv_usec / 10000, 100 * (double)(sys + 1) / (double)(real + 1));
 }
@@ -265,12 +268,15 @@ pmc_stat_print_stat(struct rusage *ru)
 		 */
 		if (ticks == 0)
 			ticks = 1;
-		fprintf(pmc_args.pa_printfile, "%16ld  %s\t\t#\t%02.03f M/sec\n",
-			ru->ru_minflt, "page faults", ((double)ru->ru_minflt / (double)ticks) / hz);
-		fprintf(pmc_args.pa_printfile, "%16ld  %s\t\t#\t%02.03f M/sec\n",
-			ru->ru_nvcsw, "voluntary csw", ((double)ru->ru_nvcsw / (double)ticks) / hz);
-		fprintf(pmc_args.pa_printfile, "%16ld  %s\t#\t%02.03f M/sec\n",
-			ru->ru_nivcsw, "involuntary csw", ((double)ru->ru_nivcsw / (double)ticks) / hz);
+		xo_emit_h(pmc_args.pa_xop,
+		    "{:minflt/%16ld}{Lw:page faults}{P:\t\t#\t}{:/%02.03f}{Uw:M\\/sec}\n",
+		    ru->ru_minflt, ((double)ru->ru_minflt / (double)ticks) / hz);
+		xo_emit_h(pmc_args.pa_xop,
+		    "{:nvcsw/%16ld}{Lw:voluntary csw}{P:\t\t#\t}{:/%02.03f}{Uw:M\\/sec}\n",
+		    ru->ru_nvcsw, ((double)ru->ru_nvcsw / (double)ticks) / hz);
+		xo_emit_h(pmc_args.pa_xop,
+		    "{:nivcsw/%16ld}{Lw:involuntary csw}{P:\t\t#\t}{:/%02.03f}{Uw:M\\/sec}\n",
+		    ru->ru_nivcsw, ((double)ru->ru_nivcsw / (double)ticks) / hz);
 	}
 
 	bzero(&cvals, sizeof(cvals));
@@ -283,30 +289,39 @@ pmc_stat_print_stat(struct rusage *ru)
 				cvals[i] += value;
 	}
 
-	fprintf(pmc_args.pa_printfile, "%16jd  %s\n", (uintmax_t)cvals[CYCLES], stat_mode_names[CYCLES]);
-	fprintf(pmc_args.pa_printfile, "%16jd  %s\t\t#\t%01.03f inst/cycle\n", (uintmax_t)cvals[INST], stat_mode_names[INST],
+	xo_emit_h(pmc_args.pa_xop, "{:cycles/%16jd}  {:name/%s}\n",
+	    (uintmax_t)cvals[CYCLES], stat_mode_names[CYCLES]);
+	xo_emit_h(pmc_args.pa_xop,
+	    "{:inst/%16jd}  {:name/%s}{P:\t\t#\t}{:ipc/%01.03f}{U:inst\\/cycle}\n",
+	    (uintmax_t)cvals[INST], stat_mode_names[INST],
 	    (double)cvals[INST] / cvals[CYCLES]);
-	fprintf(pmc_args.pa_printfile, "%16jd  %s\n", (uintmax_t)cvals[BR], stat_mode_names[BR]);
+	xo_emit_h(pmc_args.pa_xop, "{:branch/%16jd}  {:name/%s}\n",
+	    (uintmax_t)cvals[BR], stat_mode_names[BR]);
 	if (stat_mode_names[BR_MISS] == pmc_stat_mode_names[BR_MISS])
-		fprintf(pmc_args.pa_printfile, "%16jd  %s\t\t#\t%.03f%%\n",
+		xo_emit_h(pmc_args.pa_xop,
+		    "{:brmiss/%16jd}  {:name/%s}{P:\t\t#\t}{:brmiss_pct/%.03f%%}\n",
 		    (uintmax_t)cvals[BR_MISS], stat_mode_names[BR_MISS],
 		    100 * ((double)cvals[BR_MISS] / cvals[BR]));
 	else
-		fprintf(pmc_args.pa_printfile, "%16jd  %s\n",
+		xo_emit_h(pmc_args.pa_xop, "{:brmiss/%16jd}  {:name/%s}\n",
 		    (uintmax_t)cvals[BR_MISS], stat_mode_names[BR_MISS]);
-	fprintf(pmc_args.pa_printfile, "%16jd  %s%s", (uintmax_t)cvals[CACHE], stat_mode_names[CACHE],
+	xo_emit_h(pmc_args.pa_xop, "{:cache/%16jd}  {:name/%s}{d:%s}",
+	    (uintmax_t)cvals[CACHE], stat_mode_names[CACHE],
 	    stat_mode_names[CACHE] != pmc_stat_mode_names[CACHE] ? "\n" : "");
 	if (stat_mode_names[CACHE] == pmc_stat_mode_names[CACHE])
-		fprintf(pmc_args.pa_printfile, "\t#\t%.03f refs/inst\n",
+		xo_emit_h(pmc_args.pa_xop,
+		    "{P:\t#\t}{:cache_per_inst/%.03f} {U:refs\\/inst}\n",
 		    ((double)cvals[CACHE] / cvals[INST]));
-	fprintf(pmc_args.pa_printfile, "%16jd  %s%s", (uintmax_t)cvals[CACHE_MISS], stat_mode_names[CACHE_MISS],
+	xo_emit_h(pmc_args.pa_xop, "{:cache_miss/%16jd}  {:name/%s}{d:%s}",
+	    (uintmax_t)cvals[CACHE_MISS], stat_mode_names[CACHE_MISS],
 	    stat_mode_names[CACHE_MISS] != pmc_stat_mode_names[CACHE_MISS] ? "\n" : "");
 	if (stat_mode_names[CACHE_MISS] == pmc_stat_mode_names[CACHE_MISS])
-		fprintf(pmc_args.pa_printfile, "\t\t#\t%.03f%%\n",
+		xo_emit_h(pmc_args.pa_xop,
+		    "{P:\t\t#\t}{:cache_miss_pct/%.03f%%}\n",
 		    100 * ((double)cvals[CACHE_MISS] / cvals[CACHE]));
 
 	if (ru)
-		showtime(pmc_args.pa_printfile, &before_ts, &after, ru);
+		showtime(pmc_args.pa_xop, &before_ts, &after, ru);
 }
 
 static struct option longopts[] = {

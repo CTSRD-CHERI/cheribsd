@@ -434,6 +434,7 @@ _DP_be=		zfs spl nvpair zfsbootenv
 _DP_netmap=
 _DP_ifconfig=	m
 _DP_pfctl=	nv
+_DP_pmcstat=	xo
 
 # OFED support
 .if ${MK_OFED} != "no"

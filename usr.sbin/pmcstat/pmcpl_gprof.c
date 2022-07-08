@@ -530,7 +530,7 @@ pmcpl_gmon_process(struct pmcstat_process *pp, struct pmcstat_pmcrecord *pmcr,
  */
 
 void
-pmcpl_gmon_shutdown(FILE *mf)
+pmcpl_gmon_shutdown(xo_handle_t *mf)
 {
 	int i;
 	struct pmcstat_gmonfile *pgf;
@@ -539,22 +539,31 @@ pmcpl_gmon_shutdown(FILE *mf)
 	/*
 	 * Sync back all gprof flat profile data.
 	 */
+	if (mf)
+		xo_open_list_h(mf, "gmon");
 	for (i = 0; i < PMCSTAT_NHASH; i++) {
 		LIST_FOREACH(pi, &pmcstat_image_hash[i], pi_next) {
-			if (mf)
-				(void) fprintf(mf, " \"%s\" => \"%s\"",
+			if (mf) {
+				xo_open_instance_h(mf, "gmon");
+				xo_emit_h(mf,
+				    "\"{:path/%s}\" => \"{:samplename/%s}\"",
 				    pmcstat_string_unintern(pi->pi_execpath),
 				    pmcstat_string_unintern(
 				    pi->pi_samplename));
+				xo_open_list_h(mf, "gmon-sample");
+			}
 
 			/* flush gmon.out data to disk */
 			LIST_FOREACH(pgf, &pi->pi_gmlist, pgf_next) {
 				pmcstat_gmon_unmap_file(pgf);
-				if (mf)
-					(void) fprintf(mf, " %s/%d",
+				if (mf) {
+					xo_open_instance_h(mf, "gmon-sample");
+					xo_emit_h(mf, "{k:pmcid/%s}/{:nsamples/%d}",
 					    pmcstat_pmcid_to_name(
 					    pgf->pgf_pmcid),
 					    pgf->pgf_nsamples);
+					xo_close_instance_h(mf, "gmon-sample");
+				}
 				if (pgf->pgf_overflow && args.pa_verbosity >= 1)
 					warnx(
 "WARNING: profile \"%s\" overflowed.",
@@ -562,10 +571,14 @@ pmcpl_gmon_shutdown(FILE *mf)
 					        pgf->pgf_name));
 			}
 
-			if (mf)
-				(void) fprintf(mf, "\n");
+			if (mf) {
+				xo_open_list_h(mf, "gmon-sample");
+				xo_close_instance_h(mf, "gmon");
+			}
 		}
 	}
+	if (mf)
+		xo_close_list_h(mf, "gmon");
 
 	/*
 	 * Compute arcs and add these to the gprof files.

@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <fcntl.h>
 #include <kvm.h>
 #include <libgen.h>
+#include <libxo/xo.h>
 #include <limits.h>
 #include <math.h>
 #include <pmc.h>
@@ -274,28 +275,23 @@ pmcstat_print_headers(void)
 	struct pmcstat_ev *ev;
 	int c, w;
 
-	(void) fprintf(args.pa_printfile, PRINT_HEADER_PREFIX);
+	xo_emit_h(args.pa_xop, "{T:/%s}", PRINT_HEADER_PREFIX);
 
 	STAILQ_FOREACH(ev, &args.pa_events, ev_next) {
 		if (PMC_IS_SAMPLING_MODE(ev->ev_mode))
 			continue;
 
 		c = PMC_IS_SYSTEM_MODE(ev->ev_mode) ? 's' : 'p';
-
-		if (ev->ev_fieldskip != 0)
-			(void) fprintf(args.pa_printfile, "%*s",
-			    ev->ev_fieldskip, "");
 		w = ev->ev_fieldwidth - ev->ev_fieldskip - 2;
 
 		if (c == 's')
-			(void) fprintf(args.pa_printfile, "s/%02d/%-*s ",
-			    ev->ev_cpu, w-3, ev->ev_name);
+			xo_emit_h(args.pa_xop, "{[:/-%d}s/{T:/%02d}/{T:/%s}{]:}", w, ev->ev_cpu, ev->ev_name);
 		else
-			(void) fprintf(args.pa_printfile, "p/%*s ", w,
-			    ev->ev_name);
+			xo_emit_h(args.pa_xop, "{[:/-%d}p/{T:/%02d}/{T:/%s}{]:}", w, c, ev->ev_name);
 	}
+	xo_emit_h(args.pa_xop, "\n");
 
-	(void) fflush(args.pa_printfile);
+	xo_flush_h(args.pa_xop);
 }
 
 void
@@ -307,6 +303,7 @@ pmcstat_print_counters(void)
 
 	extra_width = sizeof(PRINT_HEADER_PREFIX) - 1;
 
+	xo_open_list_h(args.pa_xop, "pmc-counter");
 	STAILQ_FOREACH(ev, &args.pa_events, ev_next) {
 
 		/* skip sampling mode counters */
@@ -317,17 +314,20 @@ pmcstat_print_counters(void)
 			err(EX_OSERR, "ERROR: Cannot read pmc \"%s\"",
 			    ev->ev_name);
 
-		(void) fprintf(args.pa_printfile, "%*ju ",
-		    ev->ev_fieldwidth + extra_width,
+		xo_open_instance_h(args.pa_xop, "pmc-counter");
+		xo_emit_h(args.pa_xop, "{ke:name/%s}{[:/%d}{:/%ju}{]:} ",
+		    ev->ev_name, ev->ev_fieldwidth + extra_width,
 		    (uintmax_t) ev->ev_cumulative ? value :
 		    (value - ev->ev_saved));
+		xo_close_instance_h(args.pa_xop, "pmc-counter");
 
 		if (ev->ev_cumulative == 0)
 			ev->ev_saved = value;
 		extra_width = 0;
 	}
+	xo_close_list_h(args.pa_xop, "pmc-counter");
 
-	(void) fflush(args.pa_printfile);
+	xo_flush_h(args.pa_xop);
 }
 
 /*
@@ -339,16 +339,17 @@ pmcstat_print_pmcs(void)
 {
 	static int linecount = 0;
 
+	xo_open_container_h(args.pa_xop, "pmc-samples");
 	/* check if we need to print a header line */
-	if (++linecount > pmcstat_displayheight) {
-		(void) fprintf(args.pa_printfile, "\n");
-		linecount = 1;
-	}
-	if (linecount == 1)
+	/* if (++linecount > pmcstat_displayheight) { */
+	/* 	(void) fprintf(args.pa_printfile, "\n"); */
+	/* 	linecount = 1; */
+	/* } */
+	/* (void) fprintf(args.pa_printfile, "\n"); */
+	if (++linecount == 1)
 		pmcstat_print_headers();
-	(void) fprintf(args.pa_printfile, "\n");
-
 	pmcstat_print_counters();
+	xo_close_container_h(args.pa_xop, "pmc-samples");
 
 	return;
 }
@@ -489,6 +490,7 @@ main(int argc, char **argv)
 	args.pa_fsroot		= "";
 	args.pa_samplesdir	= ".";
 	args.pa_printfile	= stderr;
+	args.pa_xop		= NULL;
 	args.pa_graphdepth	= DEFAULT_CALLGRAPH_DEPTH;
 	args.pa_graphfile	= NULL;
 	args.pa_interval	= DEFAULT_WAIT_INTERVAL;
@@ -534,6 +536,10 @@ main(int argc, char **argv)
 	    sizeof(rootmask), &rootmask) == -1)
 		err(EX_OSERR, "ERROR: Cannot determine the root set of CPUs");
 	CPU_COPY(&rootmask, &cpumask);
+
+	argc = xo_parse_args(argc, argv);
+	if (argc < 0)
+		err(EX_USAGE, "ERROR: libxo failed to parse arguments");
 
 	while ((option = getopt(argc, argv,
 	    "ACD:EF:G:ILM:NO:P:R:S:TUWZa:c:def:gi:k:l:m:n:o:p:qr:s:t:u:vw:z:")) != -1)
@@ -1090,13 +1096,19 @@ main(int argc, char **argv)
 			    buffer);
 	}
 
+	args.pa_xop = xo_create_to_file(args.pa_printfile, xo_get_style(NULL),
+	    XOF_CLOSE_FP | XOF_WARN);
+	if (args.pa_xop == NULL)
+		err(EX_SOFTWARE, "ERROR: libxo initialization failed");
+
 	/*
 	 * If we have a callgraph be created, select the outputfile.
 	 */
 	if (args.pa_flags & FLAG_DO_CALLGRAPHS) {
-		if (strcmp(graphfilename, "-") == 0)
-		    args.pa_graphfile = args.pa_printfile;
-		else {
+		if (strcmp(graphfilename, "-") == 0) {
+			/* XXX-AM: Make pa_graphfile a libxo handle */
+			args.pa_graphfile = args.pa_printfile;
+		} else {
 			args.pa_graphfile = fopen(graphfilename, "w");
 			if (args.pa_graphfile == NULL)
 				err(EX_OSERR,
@@ -1383,6 +1395,7 @@ main(int argc, char **argv)
 	 */
 	runstate = PMCSTAT_RUNNING;
 	do_print = do_read = 0;
+	xo_open_container_h(args.pa_xop, "pmcstat");
 	do {
 		if ((c = kevent(pmcstat_kq, NULL, 0, &kev, 1, NULL)) <= 0) {
 			if (errno != EINTR)
@@ -1465,10 +1478,11 @@ main(int argc, char **argv)
 		if (do_print && !do_read) {
 			if ((args.pa_required & FLAG_HAS_OUTPUT_LOGFILE) == 0) {
 				pmcstat_print_pmcs();
-				if (runstate == PMCSTAT_FINISHED &&
-				    /* final newline */
-				    (args.pa_flags & FLAG_DO_PRINT) == 0)
-					(void) fprintf(args.pa_printfile, "\n");
+				/* XXX-AM possibly useless */
+				/* if (runstate == PMCSTAT_FINISHED && */
+				/*     /\* final newline *\/ */
+				/*     (args.pa_flags & FLAG_DO_PRINT) == 0) */
+				/* 	(void) fprintf(args.pa_printfile, "\n"); */
 			}
 			if (args.pa_flags & FLAG_DO_TOP)
 				pmcstat_display_log();
@@ -1487,6 +1501,9 @@ main(int argc, char **argv)
 		pmc_close_logfile();
 
 	pmcstat_cleanup();
+	xo_close_container_h(args.pa_xop, "pmcstat");
+	xo_finish_h(args.pa_xop);
+	xo_destroy(args.pa_xop);
 
 	/* check if the driver lost any samples or events */
 	if (check_driver_stats) {

@@ -603,30 +603,38 @@ pmcstat_shutdown_logging(struct pmcstat_args *args,
 	struct pmcstat_image *pi, *pitmp;
 	struct pmcstat_process *pp, *pptmp;
 	struct pmcstat_pcmap *ppm, *ppmtmp;
-	FILE *mf;
+	FILE *mf = NULL;
+	xo_handle_t *mf_xop = NULL;
 	int i;
 
 	/* determine where to send the map file */
-	mf = NULL;
-	if (args->pa_mapfilename != NULL)
-		mf = (strcmp(args->pa_mapfilename, "-") == 0) ?
-		    args->pa_printfile : fopen(args->pa_mapfilename, "w");
+	if (args->pa_mapfilename != NULL) {
+		if (strcmp(args->pa_mapfilename, "-") == 0) {
+			mf_xop = args->pa_xop;
+		} else {
+			mf = fopen(args->pa_mapfilename, "w");
+			if (mf != NULL)
+				mf_xop = xo_create_to_file(mf,
+				    xo_get_style(NULL), XOF_CLOSE_FP);
+		}
+	}
 
-	if (mf == NULL && args->pa_flags & FLAG_DO_GPROF &&
-	    args->pa_verbosity >= 2)
-		mf = args->pa_printfile;
+	/* XXX-AM: unsure what the purpose of this is */
+	/* if (mf == NULL && args->pa_flags & FLAG_DO_GPROF && */
+	/*     args->pa_verbosity >= 2) */
+	/* 	mf = args->pa_printfile; */
 
-	if (mf)
-		(void) fprintf(mf, "MAP:\n");
+	if (mf_xop)
+		xo_emit_h(mf_xop, "{T:MAP}:\n");
 
 	/*
 	 * Shutdown the plugins
 	 */
 
 	if (plugins[args->pa_plugin].pl_shutdown != NULL)
-		plugins[args->pa_plugin].pl_shutdown(mf);
+		plugins[args->pa_plugin].pl_shutdown(mf_xop);
 	if (plugins[args->pa_pplugin].pl_shutdown != NULL)
-		plugins[args->pa_pplugin].pl_shutdown(mf);
+		plugins[args->pa_pplugin].pl_shutdown(mf_xop);
 
 	for (i = 0; i < PMCSTAT_NHASH; i++) {
 		LIST_FOREACH_SAFE(pi, &pmcstat_image_hash[i], pi_next,
@@ -662,12 +670,13 @@ pmcstat_shutdown_logging(struct pmcstat_args *args,
 	 */
 #define	PRINT(N,V) do {							\
 		if (pmcstat_stats->ps_##V || args->pa_verbosity >= 2)	\
-			(void) fprintf(args->pa_printfile, " %-40s %d\n",\
-			    N, pmcstat_stats->ps_##V);			\
+			xo_emit_h(args->pa_xop, "{Lw:/%-40s}{a:/%d}\n",	\
+			    N, N, pmcstat_stats->ps_##V);		\
 	} while (0)
 
+	xo_open_container_h(args->pa_xop, "stats");
 	if (args->pa_verbosity >= 1 && (args->pa_flags & FLAG_DO_ANALYSIS)) {
-		(void) fprintf(args->pa_printfile, "CONVERSION STATISTICS:\n");
+		xo_emit_h(args->pa_xop, "{T:CONVERSION STATISTICS}:\n");
 		PRINT("#exec/a.out", exec_aout);
 		PRINT("#exec/elf", exec_elf);
 		PRINT("#exec/unknown", exec_indeterminable);
@@ -678,7 +687,9 @@ pmcstat_shutdown_logging(struct pmcstat_args *args,
 		PRINT("#samples/unknown-function", samples_unknown_function);
 		PRINT("#callchain/dubious-frames", callchain_dubious_frames);
 	}
+	xo_close_container_h(args->pa_xop, "stats");
 
-	if (mf)
-		(void) fclose(mf);
+	/* cleanup mf_xop if we created it here */
+	if (mf_xop && mf != NULL)
+		xo_destroy(mf_xop);
 }

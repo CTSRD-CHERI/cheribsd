@@ -1190,7 +1190,7 @@ pmcpl_ct_init(void)
 }
 
 void
-pmcpl_ct_shutdown(FILE *mf)
+pmcpl_ct_shutdown(xo_handle_t *mf)
 {
 	int i;
 	struct pmcpl_ct_node_hash *pch, *pchtmp;

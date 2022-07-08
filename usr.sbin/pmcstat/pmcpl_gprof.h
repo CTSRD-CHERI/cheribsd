@@ -37,7 +37,7 @@
 #define	_PMCSTAT_PL_GPROF_H_
 
 /* Function prototypes */
-void pmcpl_gmon_shutdown(FILE *mf);
+void pmcpl_gmon_shutdown(xo_handle_t *mf);
 void pmcpl_gmon_process(
     struct pmcstat_process *pp, struct pmcstat_pmcrecord *pmcr,
     uint32_t nsamples, uintfptr_t *cc, int usermode, uint32_t cpu);
