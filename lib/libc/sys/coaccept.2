@@ -57,7 +57,7 @@ Before returning to the caller,
 bytes pointed to by
 .Fa outbuf
 will be copied back to the caller.
-Any capabilities copied will have their tag bits cleared.
+Any capabilities copied will have their tag bits preserved.
 The
 .Fn coaccept_slow 2
 provides the same semantics, but implemented as a traditional system call.
