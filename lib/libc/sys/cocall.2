@@ -29,7 +29,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd November 19, 2020
+.Dd July 2, 2022
 .Dt COCALL 2
 .Os
 .Sh NAME
@@ -58,7 +58,13 @@ Before returning, at most
 .Fa inlen
 bytes will be copied from the callee's output buffer into
 .Fa inbuf .
-Any capabilities copied will have their tag bits cleared.
+Any capabilities copied will have their tag bits preserved.
+.Pp
+When the callee is already busy with another caller,
+.Fn cocall 2
+will spin retrying.
+If you are observing this, it usually means the service should keep
+separate threads - and thus separate targets - for each caller.
 .Pp
 .Fn cocall 2
 attempts to use the switcher-based
