@@ -32,6 +32,7 @@
 __FBSDID("$FreeBSD$");
 
 #include "namespace.h"
+#include <assert.h>
 #include <unistd.h>
 #include "cheri_private.h"
 #include "un-namespace.h"
@@ -43,6 +44,16 @@ coaccept(void * __capability * __capability cookiep,
 {
 
 	_trace_cocall(0, outlen, inlen);
+
+	if (outbuf != NULL) {
+		assert(__builtin_is_aligned(outbuf, sizeof(void * __capability)));
+		assert(__builtin_is_aligned(outlen, sizeof(void * __capability)));
+	}
+	if (inbuf != NULL) {
+		assert(__builtin_is_aligned(inbuf, sizeof(void * __capability)));
+		assert(__builtin_is_aligned(inlen, sizeof(void * __capability)));
+	}
+
 	return (_coaccept(_coaccept_code, _coaccept_data, cookiep,
 	    outbuf, outlen, inbuf, inlen));
 }

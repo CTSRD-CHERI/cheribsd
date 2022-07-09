@@ -32,6 +32,7 @@
 __FBSDID("$FreeBSD$");
 
 #include "namespace.h"
+#include <assert.h>
 #include <errno.h>
 #include <unistd.h>
 #include "cheri_private.h"
@@ -47,6 +48,16 @@ cocall(void * __capability target,
 	ssize_t received;
 
 	_trace_cocall((ptraddr_t)target, outlen, inlen);
+
+	assert(target != NULL);
+	if (outbuf != NULL) {
+		assert(__builtin_is_aligned(outbuf, sizeof(void * __capability)));
+		assert(__builtin_is_aligned(outlen, sizeof(void * __capability)));
+	}
+	if (inbuf != NULL) {
+		assert(__builtin_is_aligned(inbuf, sizeof(void * __capability)));
+		assert(__builtin_is_aligned(inlen, sizeof(void * __capability)));
+	}
 
 	/* XXX This loop is like this for no particular reason. */
 	for (;;) {
