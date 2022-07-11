@@ -112,6 +112,7 @@ main(int argc, char **argv)
 
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = sigchld_handler;
+	sa.sa_flags = SA_NOCLDSTOP;
 	sigfillset(&sa.sa_mask);
 
 	error = sigaction(SIGCHLD, &sa, NULL);
