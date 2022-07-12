@@ -322,7 +322,9 @@ struct thread {
 	size_t		td_vslock_sz;	/* (k) amount of vslock-ed space */
 	struct kcov_info *td_kcov_info;	/* (*) Kernel code coverage data */
 	u_int		td_ucredref;	/* (k) references on td_realucred */
+#if __has_feature(capabilities)
 	void * __capability td_scb;	/* (k) switcher control block */
+#endif
 #define	td_endzero td_sigmask
 
 /* Copied during fork1() or create_thread(). */
