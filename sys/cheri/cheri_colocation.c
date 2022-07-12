@@ -117,7 +117,7 @@ static void
 colocation_copyin_scb(const struct switchercb * __capability cap,
     struct switchercb *scbp)
 {
-	int error;
+	int error __diagused;
 
 	KASSERT(cap != NULL, ("%s: NULL addr", __func__));
 
@@ -144,7 +144,7 @@ colocation_fetch_scb(struct thread *td, struct switchercb *scbp)
 static void
 colocation_copyout_scb(void * __capability cap, const struct switchercb *scbp)
 {
-	int error;
+	int error __diagused;
 
 	KASSERT(cap != NULL, ("%s: NULL addr", __func__));
 
@@ -164,7 +164,7 @@ static void
 colocation_store_caller_scb(struct switchercb * __capability user_scbp,
     struct switchercb * __capability caller_scb)
 {
-	int error;
+	int error __diagused;
 
 	error = sucap(&user_scbp->scb_caller_scb, (intcap_t)caller_scb);
 	KASSERT(error == 0, ("%s: sucap to %#lp failed with error %d",
@@ -770,7 +770,7 @@ kern_cocall_slow(void * __capability target,
 {
 	struct switchercb scb, calleescb;
 	struct switchercb * __capability targetscb;
-	struct thread *calleetd;
+	struct thread *calleetd __diagused;
 	int error;
 	bool have_scb;
 
