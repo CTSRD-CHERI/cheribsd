@@ -1,5 +1,5 @@
 name: Check coding style with clang-format
-on: [pull_request]
+on: []
 defaults:
   run:
     shell: bash
