@@ -1603,6 +1603,7 @@ get_argenv_ptr(void * __capability *arrayp, void * __capability *ptrp)
 	return (0);
 }
 
+#if __has_feature(capabilities)
 static int
 get_argcap_ptr(void * __capability *arrayp, void * __capability *ptrp)
 {
@@ -1623,6 +1624,7 @@ get_argcap_ptr(void * __capability *arrayp, void * __capability *ptrp)
 
 	return (0);
 }
+#endif
 
 int
 exec_copyin_args(struct image_args *args, const char * __capability fname,
@@ -1692,6 +1694,7 @@ exec_copyin_args_capv(struct image_args *args, const char * __capability fname,
 		}
 	}
 
+#if __has_feature(capabilities)
 	/*
 	 * extract capability vector
 	 */
@@ -1707,6 +1710,7 @@ exec_copyin_args_capv(struct image_args *args, const char * __capability fname,
 				break;
 		}
 	}
+#endif
 
 	return (0);
 
@@ -1948,6 +1952,7 @@ exec_args_add_env(struct image_args *args, const char * __capability envp,
 	return (exec_args_add_str(args, envp, segflg, &args->envc));
 }
 
+#if __has_feature(capabilities)
 int
 exec_args_add_cap(struct image_args *args, void * __capability cap)
 {
@@ -1959,6 +1964,7 @@ exec_args_add_cap(struct image_args *args, void * __capability cap)
 
 	return (0);
 }
+#endif
 
 int
 exec_args_adjust_args(struct image_args *args, size_t consume, ssize_t extend)
@@ -2009,7 +2015,10 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	struct ps_strings * __capability arginfo;
 	struct proc *p;
 	struct sysentvec *sysent;
-	size_t capvlen, execpath_len, len;
+	size_t execpath_len, len;
+#if __has_feature(capabilities)
+	size_t capvlen;
+#endif
 	int error, szsigcode;
 	char canary[sizeof(long) * 8];
 	bool strings_on_stack;
@@ -2094,6 +2103,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	if (error != 0)
 		return (error);
 
+#if __has_feature(capabilities)
 	/*
 	 * Copy the capability vector.
 	 */
@@ -2108,6 +2118,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 		imgp->capv = (void * __capability)
 		    cheri_setboundsexact(destp, capvlen);
 	}
+#endif
 
 	/*
 	 * Allocate room for the argument and environment strings.
