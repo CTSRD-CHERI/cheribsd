@@ -44,6 +44,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysproto.h>
 #include <sys/unistd.h>
 
+#if __has_feature(capabilities)
+
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
@@ -1220,3 +1222,47 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 	}
 }
 #endif /* DDB */
+#else /* !__has_feature(capabilities) */
+int
+sys__cosetup(struct thread *td, struct _cosetup_args *uap)
+{
+	return (ENOSYS);
+}
+
+int
+sys_coregister(struct thread *td, struct coregister_args *uap)
+{
+	return (ENOSYS);
+}
+
+int
+sys_colookup(struct thread *td, struct colookup_args *uap)
+{
+	return (ENOSYS);
+}
+
+int
+sys_copark(struct thread *td, struct copark_args *uap)
+{
+	return (ENOSYS);
+}
+
+int
+sys_cogetpid(struct thread *td, struct cogetpid_args *uap)
+{
+	return (ENOSYS);
+}
+
+int
+sys_cocall_slow(struct thread *td, struct cocall_slow_args *uap)
+{
+	return (ENOSYS);
+}
+
+int
+sys_coaccept_slow(struct thread *td, struct coaccept_slow_args *uap)
+{
+	return (ENOSYS);
+}
+
+#endif /* __has_feature(capabilities) */

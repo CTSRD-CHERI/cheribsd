@@ -213,9 +213,12 @@ userret(struct thread *td, struct trapframe *frame)
 void
 ast(struct trapframe *framep)
 {
-	struct thread *td, *peertd;
+	struct thread *td;
+#if __has_feature(capabilities)
+	struct thread *peertd;
+#endif
 	struct proc *p;
-	bool borrowing;
+	bool borrowing = false;
 	int flags, sig;
 	bool resched_sigs;
 
@@ -327,6 +330,7 @@ ast(struct trapframe *framep)
 	}
 #endif
 
+#if __has_feature(capabilities)
 	/*
 	 * Check if we're borrowing a thread over a cocall; if so - just
 	 * ignore the signals, we can't deliver them here.
@@ -335,9 +339,8 @@ ast(struct trapframe *framep)
 	if (peertd != NULL) {
 		//printf("%s: bingo, td %p, peertd %p\n", __func__, td, peertd);
 		borrowing = true;
-	} else {
-		borrowing = false;
 	}
+#endif
 
 	/*
 	 * Check for signals. Unlocked reads of p_pendingcnt or

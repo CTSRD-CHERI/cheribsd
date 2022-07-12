@@ -86,6 +86,10 @@ SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RWTUN,
     "Print registers and process details on user CHERI exceptions");
 #endif
 
+#if !__has_feature(capabilities)
+#define	colocation_trap_in_switcher(t, f, s)
+#endif
+
 /* Called from exception.S */
 void do_el1h_sync(struct thread *, struct trapframe *);
 void do_el0_sync(struct thread *, struct trapframe *);
@@ -691,7 +695,9 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		break;
 	case EXCP_SVC32:
 	case EXCP_SVC64:
+#if __has_feature(capabilities)
 		colocation_unborrow(td);
+#endif
 		svc_handler(td, frame);
 		break;
 	case EXCP_INSN_ABORT_L:
@@ -824,6 +830,7 @@ unhandled_exception(struct trapframe *frame)
 	panic("Unhandled exception");
 }
 
+#if __has_feature(capabilities)
 void
 db_print_cap(struct thread *td, const char *name, const void * __capability value)
 {
@@ -838,3 +845,4 @@ db_print_cap(struct thread *td, const char *name, const void * __capability valu
 		(kdb_active ? db_printf : printf)("%s%#lp\n", name, value);
 	}
 }
+#endif

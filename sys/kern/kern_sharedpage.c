@@ -379,6 +379,7 @@ exec_sysvec_init(void *param)
 		sv->sv_fxrng_gen_base = sv->sv_shared_page_base + base;
 	}
 #endif
+#if __has_feature(capabilities)
 	if ((sv->sv_flags & SV_CHERI) != 0) {
 		sv->sv_cocall_base = sv->sv_shared_page_base +
 		    shared_page_fill(szswitcher_cocall, 16, switcher_cocall);
@@ -387,6 +388,7 @@ exec_sysvec_init(void *param)
 		    shared_page_fill(szswitcher_coaccept, 16, switcher_coaccept);
 		sv->sv_coaccept_len = szswitcher_coaccept;
 	}
+#endif
 }
 
 void

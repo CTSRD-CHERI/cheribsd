@@ -2092,11 +2092,14 @@ trapsignal(struct thread *td, ksiginfo_t *ksi)
 {
 	struct sigacts *ps;
 	struct proc *p;
+#if __has_feature(capabilities)
 	struct thread *origtd, *peertd;
+#endif
 	sigset_t sigmask;
-	bool borrowing;
+	bool borrowing = false;
 	int sig;
 
+#if __has_feature(capabilities)
 	/*
 	 * Check if we're borrowing a thread over a cocall; if so - figure
 	 * out which thread/process we're actually executing, and queue the
@@ -2108,11 +2111,10 @@ trapsignal(struct thread *td, ksiginfo_t *ksi)
 		//printf("%s: bingo, td %p, peertd %p\n", __func__, td, peertd);
 		borrowing = true;
 		td = peertd;
-	} else {
-		borrowing = false;
 	}
 
 retry:
+#endif
 	p = td->td_proc;
 	sig = ksi->ksi_signo;
 	KASSERT(_SIG_VALID(sig), ("invalid signal"));
@@ -2120,6 +2122,7 @@ retry:
 	sigfastblock_fetch(td);
 	PROC_LOCK(p);
 
+#if __has_feature(capabilities)
 	/*
 	 * XXX-JHB: If the peer process has exited, then deliver the
 	 * signal to the original thread.  We can't just ignore the
@@ -2132,6 +2135,7 @@ retry:
 		borrowing = false;
 		goto retry;
 	}
+#endif
 
 	ps = p->p_sigacts;
 	mtx_lock(&ps->ps_mtx);
