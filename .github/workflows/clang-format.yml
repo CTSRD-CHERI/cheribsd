@@ -1,10 +1,11 @@
 name: Check coding style with clang-format
-on: []
+on: [pull_request]
 defaults:
   run:
     shell: bash
 jobs:
   check-format:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
