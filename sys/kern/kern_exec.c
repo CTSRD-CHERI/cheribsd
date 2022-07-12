@@ -106,6 +106,10 @@ __FBSDID("$FreeBSD$");
 dtrace_execexit_func_t	dtrace_fasttrap_exec;
 #endif
 
+#ifndef VM_MINUSER_ADDRESS
+#define VM_MINUSER_ADDRESS 0ul
+#endif
+
 SDT_PROVIDER_DECLARE(proc);
 SDT_PROBE_DEFINE1(proc, , , exec, "char *");
 SDT_PROBE_DEFINE1(proc, , , exec__failure, "int");
