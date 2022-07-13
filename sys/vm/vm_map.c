@@ -1981,9 +1981,17 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	if (map->flags & MAP_RESERVATIONS) {
 		/* Make sure we fit into a single reservation entry. */
 #ifdef __CHERI_PURE_CAPABILITY__
-		if (cheri_gettag(start) == 0 ||
-		    cheri_getlen(start) < (ptraddr_t)end - (ptraddr_t)start)
+		if (cheri_gettag(start) == 0) {
+			printf("%s: untagged start %#p\n", __func__,
+			    (void *)start);
 			return (KERN_INVALID_ARGUMENT);
+		}
+		if (cheri_getlen(start) < (ptraddr_t)end - (ptraddr_t)start) {
+			printf("%s: length %#jx doesn't fit in %#p\n",
+			    __func__, (ptraddr_t)end - (ptraddr_t)start,
+			    (void *)start);
+			return (KERN_INVALID_ARGUMENT);
+		}
 #endif
 		if (vm_map_lookup_entry(map, start, &new_entry) == 0 ||
 		    new_entry->reservation != reservation)
