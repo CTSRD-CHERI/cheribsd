@@ -522,8 +522,8 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 {
 	vm_map_entry_t entry, prev, next;
 	vm_offset_t start, end;
-	boolean_t found, grown_down;
-	int rv;
+	boolean_t found __diagused, grown_down;
+	int rv __diagused;
 
 	next = vm_map_entry_succ(old_entry);
 	prev = vm_map_entry_pred(old_entry);
