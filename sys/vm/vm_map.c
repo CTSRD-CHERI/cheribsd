@@ -521,7 +521,8 @@ static void
 vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 {
 	vm_map_entry_t entry, prev, next;
-	vm_offset_t start, end;
+	vm_pointer_t start;
+	vm_offset_t end;
 	boolean_t found __diagused, grown_down;
 	int rv __diagused;
 
@@ -574,11 +575,18 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 		end = next->start;
 	}
 
-	if (map->flags & MAP_RESERVATIONS)
+	if (map->flags & MAP_RESERVATIONS) {
+		/*
+		 * XXX: we can't use vm_map_reservation_create() because
+		 * we use a reservation of -1.
+		 */
 		(void)vm_map_reservation_insert(map, start, end - start,
 		    PROT_NONE, (vm_offset_t)-1);
+		start = vm_map_buildcap(map, start, end - start, VM_PROT_NONE);
+	}
 	rv = vm_map_insert(map, NULL, 0, start, end,
-	    PROT_NONE, PROT_NONE, MAP_NOFAULT | MAP_DISABLE_SYNCER | MAP_DISABLE_COREDUMP,
+	    VM_PROT_NONE, VM_PROT_NONE,
+	    MAP_NOFAULT | MAP_DISABLE_SYNCER | MAP_DISABLE_COREDUMP,
 	    (vm_offset_t)-1);
 	KASSERT(rv == KERN_SUCCESS,
 	    ("%s: vm_map_insert() failed with error %d\n", __func__, rv));
