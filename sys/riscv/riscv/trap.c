@@ -80,6 +80,10 @@ __FBSDID("$FreeBSD$");
 
 #define	COCALL_OFFSET(x)	((x) - switcher_cocall)
 
+#if !__has_feature(capabilities)
+#define	colocation_trap_in_switcher(t, f, s)
+#endif
+
 #if __has_feature(capabilities)
 int log_user_cheri_exceptions = 1;
 SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RWTUN,
@@ -97,7 +101,11 @@ extern u_int qemu_trace_buffered;
 void do_trap_supervisor(struct trapframe *);
 void do_trap_user(struct trapframe *);
 
+#if __has_feature(capabilities)
 static void db_show_frame_td(struct thread *, struct trapframe *);
+#else
+#define db_show_frame_td(t, f)
+#endif
 
 static bool
 switcher_onfault(struct thread *td, struct trapframe *tf, const char *msg,
@@ -418,7 +426,9 @@ void
 do_trap_supervisor(struct trapframe *frame)
 {
 	uint64_t exception;
+#if __has_feature(capabilities)
 	uint64_t exccode;
+#endif
 
 	/* Ensure we came from supervisor mode, interrupts disabled */
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) ==
@@ -552,7 +562,9 @@ do_trap_user(struct trapframe *frame)
 		break;
 	case SCAUSE_ECALL_USER:
 		frame->tf_sepc += 4;	/* Next instruction */
+#if __has_feature(capabilities)
 		colocation_unborrow(td);
+#endif
 		ecall_handler();
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
@@ -625,6 +637,7 @@ do_trap_user(struct trapframe *frame)
 	}
 }
 
+#if __has_feature(capabilities)
 void
 db_print_cap(struct thread *td, const char *name, const void * __capability value)
 {
@@ -694,3 +707,4 @@ DB_SHOW_COMMAND(frame, db_show_frame)
 
 	db_show_frame_td(td, td->td_frame);
 }
+#endif /* __has_feature(capabilities) */
