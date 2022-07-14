@@ -889,7 +889,7 @@ filt_timerdetach(struct knote *kn)
 static void
 filt_timertouch(struct knote *kn, struct kevent *kev, u_long type)
 {
-	struct kq_timer_cb_data *kc;	
+	struct kq_timer_cb_data *kc;
 	struct kqueue *kq;
 	sbintime_t to;
 	int error;
@@ -926,7 +926,7 @@ filt_timertouch(struct knote *kn, struct kevent *kev, u_long type)
 			kn->kn_status &= ~KN_ACTIVE;
 			kn->kn_data = 0;
 			KQ_UNLOCK(kq);
-			
+
 			/* Reschedule timer based on new data/fflags */
 			kn->kn_sfflags = kev->fflags;
 			kn->kn_sdata = kev->data;
@@ -964,9 +964,9 @@ static int
 filt_userattach(struct knote *kn)
 {
 
-	/* 
+	/*
 	 * EVFILT_USER knotes are not attached to anything in the kernel.
-	 */ 
+	 */
 	kn->kn_hook = NULL;
 	if (kn->kn_fflags & NOTE_TRIGGER)
 		kn->kn_hookid = 1;
@@ -1572,7 +1572,7 @@ findkn:
 			 * note. Don't attempt to coalesce this with an
 			 * existing note.
 			 */
-			;			
+			;
 		} else if (kq->kq_knhashmask != 0) {
 			struct klist *list;
 
@@ -1698,7 +1698,7 @@ findkn:
 done_ev_add:
 	/*
 	 * We can get here with kn->kn_knlist == NULL.  This can happen when
-	 * the initial attach event decides that the event is "completed" 
+	 * the initial attach event decides that the event is "completed"
 	 * already, e.g., filt_procattach() is called on a zombie process.  It
 	 * will call filt_proc() which will remove it from the list, and NULL
 	 * kn_knlist.
@@ -2048,8 +2048,8 @@ retry:
 			KQ_LOCK(kq);
 			KQ_GLOBAL_UNLOCK(&kq_global, haskqglobal);
 			if (kn->kn_flags & (EV_CLEAR | EV_DISPATCH)) {
-				/* 
-				 * Manually clear knotes who weren't 
+				/*
+				 * Manually clear knotes who weren't
 				 * 'touch'ed.
 				 */
 				if (touch == 0 && kn->kn_flags & EV_CLEAR) {
@@ -2062,7 +2062,7 @@ retry:
 				kq->kq_count--;
 			} else
 				TAILQ_INSERT_TAIL(&kq->kq_head, kn, kn_tqe);
-			
+
 			kn->kn_status &= ~KN_SCAN;
 			kn_leave_flux(kn);
 			kn_list_unlock(knl);
@@ -2360,7 +2360,7 @@ knote(struct knlist *list, long hint, int lockflags)
 	KNL_ASSERT_LOCK(list, lockflags & KNF_LISTLOCKED);
 
 	if ((lockflags & KNF_LISTLOCKED) == 0)
-		list->kl_lock(list->kl_lockarg); 
+		list->kl_lock(list->kl_lockarg);
 
 	/*
 	 * If we unlock the list lock (and enter influx), we can
@@ -2398,7 +2398,7 @@ knote(struct knlist *list, long hint, int lockflags)
 		}
 	}
 	if ((lockflags & KNF_LISTLOCKED) == 0)
-		list->kl_unlock(list->kl_lockarg); 
+		list->kl_unlock(list->kl_lockarg);
 }
 
 /*
@@ -2818,7 +2818,7 @@ knote_free(struct knote *kn)
 /*
  * Register the kev w/ the kq specified by fd.
  */
-int 
+int
 kqfd_register(int fd, struct kevent *kev, struct thread *td, int mflag,
     void *kn_ptr_data)
 {

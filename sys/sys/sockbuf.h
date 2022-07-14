@@ -83,7 +83,6 @@ struct sockbuf {
 	struct	mtx *sb_mtx;		/* sockbuf lock */
 	struct	selinfo *sb_sel;	/* process selecting read/write */
 	short	sb_state;	/* (a) socket state on sockbuf */
-#define	sb_startzero	sb_flags
 	short	sb_flags;	/* (a) flags, see above */
 	struct	mbuf *sb_mb;	/* (a) the mbuf chain */
 	struct	mbuf *sb_mbtail; /* (a) the last mbuf in the chain */
@@ -108,7 +107,6 @@ struct sockbuf {
 	struct	mbuf *sb_mtlstail; /* (a) last mbuf in TLS chain */
 	int	(*sb_upcall)(struct socket *, void *, int); /* (a) */
 	void	*sb_upcallarg;	/* (a) */
-#define	sb_endzero	sb_tls_seqno
 	uint64_t sb_tls_seqno;	/* (a) TLS seqno */
 	struct	ktls_session *sb_tls_info; /* (a + b) TLS state */
 	TAILQ_HEAD(, kaiocb) sb_aiojobq; /* (a) pending AIO ops */
@@ -118,6 +116,9 @@ struct sockbuf {
 #endif	/* defined(_KERNEL) || defined(_WANT_SOCKET) */
 #ifdef _KERNEL
 
+/* 'which' values for KPIs that operate on one buffer of a socket. */
+typedef enum { SO_RCV, SO_SND } sb_which;
+
 /*
  * Per-socket buffer mutex used to protect most fields in the socket buffer.
  * These make use of the mutex pointer embedded in struct sockbuf, which
@@ -126,9 +127,6 @@ struct sockbuf {
  * these locking macros.
  */
 #define	SOCKBUF_MTX(_sb)		((_sb)->sb_mtx)
-#define	SOCKBUF_LOCK_INIT(_sb, _name) \
-	mtx_init(SOCKBUF_MTX(_sb), _name, NULL, MTX_DEF)
-#define	SOCKBUF_LOCK_DESTROY(_sb)	mtx_destroy(SOCKBUF_MTX(_sb))
 #define	SOCKBUF_LOCK(_sb)		mtx_lock(SOCKBUF_MTX(_sb))
 #define	SOCKBUF_OWNED(_sb)		mtx_owned(SOCKBUF_MTX(_sb))
 #define	SOCKBUF_UNLOCK(_sb)		mtx_unlock(SOCKBUF_MTX(_sb))
@@ -160,11 +158,9 @@ void	sbappendrecord(struct sockbuf *sb, struct mbuf *m0);
 void	sbappendrecord_locked(struct sockbuf *sb, struct mbuf *m0);
 void	sbcompress(struct sockbuf *sb, struct mbuf *m, struct mbuf *n);
 struct mbuf *
-	sbcreatecontrol(caddr_t p, int size, int type, int level);
-struct mbuf *
-	sbcreatecontrol_how(void *p, int size, int type, int level,
+	sbcreatecontrol(const void *p, u_int size, int type, int level,
 	    int wait);
-void	sbdestroy(struct sockbuf *sb, struct socket *so);
+void	sbdestroy(struct socket *, sb_which);
 void	sbdrop(struct sockbuf *sb, int len);
 void	sbdrop_locked(struct sockbuf *sb, int len);
 struct mbuf *
@@ -173,18 +169,17 @@ void	sbdroprecord(struct sockbuf *sb);
 void	sbdroprecord_locked(struct sockbuf *sb);
 void	sbflush(struct sockbuf *sb);
 void	sbflush_locked(struct sockbuf *sb);
-void	sbrelease(struct sockbuf *sb, struct socket *so);
-void	sbrelease_internal(struct sockbuf *sb, struct socket *so);
-void	sbrelease_locked(struct sockbuf *sb, struct socket *so);
+void	sbrelease(struct socket *, sb_which);
+void	sbrelease_locked(struct socket *, sb_which);
 int	sbsetopt(struct socket *so, int cmd, u_long cc);
-int	sbreserve_locked(struct sockbuf *sb, u_long cc, struct socket *so,
+bool	sbreserve_locked(struct socket *so, sb_which which, u_long cc,
 	    struct thread *td);
 void	sbsndptr_adv(struct sockbuf *sb, struct mbuf *mb, u_int len);
 struct mbuf *
 	sbsndptr_noadv(struct sockbuf *sb, u_int off, u_int *moff);
 struct mbuf *
 	sbsndmbuf(struct sockbuf *sb, u_int off, u_int *moff);
-int	sbwait(struct sockbuf *sb);
+int	sbwait(struct socket *, sb_which);
 void	sballoc(struct sockbuf *, struct mbuf *);
 void	sbfree(struct sockbuf *, struct mbuf *);
 void	sballoc_ktls_rx(struct sockbuf *sb, struct mbuf *m);

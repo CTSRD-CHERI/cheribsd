@@ -281,6 +281,11 @@ static int		 pf_state_key_ctor(void *, int, void *, int);
 static u_int32_t	 pf_tcp_iss(struct pf_pdesc *);
 void			 pf_rule_to_actions(struct pf_krule *,
 			    struct pf_rule_actions *);
+static int		 pf_dummynet(struct pf_pdesc *, int, struct pf_kstate *,
+			    struct pf_krule *, struct mbuf **);
+static int		 pf_dummynet_route(struct pf_pdesc *, int,
+			    struct pf_kstate *, struct pf_krule *,
+			    struct ifnet *, struct sockaddr *, struct mbuf **);
 static int		 pf_test_eth_rule(int, struct pfi_kkif *,
 			    struct mbuf **);
 static int		 pf_test_rule(struct pf_krule **, struct pf_kstate **,
@@ -3577,8 +3582,12 @@ pf_rule_to_actions(struct pf_krule *r, struct pf_rule_actions *a)
 		a->dnpipe = r->dnpipe;
 	if (r->dnrpipe)
 		a->dnrpipe = r->dnrpipe;
-	if (r->free_flags & PFRULE_DN_IS_PIPE)
-		a->flags |= PFRULE_DN_IS_PIPE;
+	if (r->dnpipe || r->dnrpipe) {
+		if (r->free_flags & PFRULE_DN_IS_PIPE)
+			a->flags |= PFRULE_DN_IS_PIPE;
+		else
+			a->flags &= ~PFRULE_DN_IS_PIPE;
+	}
 }
 
 int
@@ -3849,6 +3858,19 @@ pf_test_eth_rule(int dir, struct pfi_kkif *kif, struct mbuf **m0)
 
 	SDT_PROBE3(pf, eth, test_rule, entry, dir, kif->pfik_ifp, m);
 
+	mtag = pf_find_mtag(m);
+	if (mtag != NULL && mtag->flags & PF_TAG_DUMMYNET) {
+		/* Dummynet re-injects packets after they've
+		 * completed their delay. We've already
+		 * processed them, so pass unconditionally. */
+
+		/* But only once. We may see the packet multiple times (e.g.
+		 * PFIL_IN/PFIL_OUT). */
+		mtag->flags &= ~PF_TAG_DUMMYNET;
+
+		return (PF_PASS);
+	}
+
 	ruleset = V_pf_keth;
 	rules = ck_pr_load_ptr(&ruleset->active.rules);
 	r = TAILQ_FIRST(rules);
@@ -3980,7 +4002,8 @@ pf_test_eth_rule(int dir, struct pfi_kkif *kif, struct mbuf **m0)
 	}
 
 	if (r->tag > 0) {
-		mtag = pf_get_mtag(m);
+		if (mtag == NULL)
+			mtag = pf_get_mtag(m);
 		if (mtag == NULL) {
 			PF_RULES_RUNLOCK();
 			counter_u64_add(V_pf_status.counters[PFRES_MEMORY], 1);
@@ -3990,7 +4013,8 @@ pf_test_eth_rule(int dir, struct pfi_kkif *kif, struct mbuf **m0)
 	}
 
 	if (r->qid != 0) {
-		mtag = pf_get_mtag(m);
+		if (mtag == NULL)
+			mtag = pf_get_mtag(m);
 		if (mtag == NULL) {
 			PF_RULES_RUNLOCK();
 			counter_u64_add(V_pf_status.counters[PFRES_MEMORY], 1);
@@ -4001,19 +4025,64 @@ pf_test_eth_rule(int dir, struct pfi_kkif *kif, struct mbuf **m0)
 
 	/* Dummynet */
 	if (r->dnpipe) {
-		/** While dummynet supports handling Ethernet packets directly
-		 * it still wants some L3/L4 information, and we're not set up
-		 * to provide that here. Instead we'll do what we do for ALTQ
-		 * and merely mark the packet with the dummynet queue/pipe number.
-		 **/
-		mtag = pf_get_mtag(m);
+		struct ip_fw_args dnflow;
+
+		/* Drop packet if dummynet is not loaded. */
+		if (ip_dn_io_ptr == NULL) {
+			PF_RULES_RUNLOCK();
+			m_freem(m);
+			counter_u64_add(V_pf_status.counters[PFRES_MEMORY], 1);
+			return (PF_DROP);
+		}
+		if (mtag == NULL)
+			mtag = pf_get_mtag(m);
 		if (mtag == NULL) {
 			PF_RULES_RUNLOCK();
 			counter_u64_add(V_pf_status.counters[PFRES_MEMORY], 1);
 			return (PF_DROP);
 		}
-		mtag->dnpipe = r->dnpipe;
-		mtag->dnflags = r->dnflags;
+
+		bzero(&dnflow, sizeof(dnflow));
+
+		/* We don't have port numbers here, so we set 0.  That means
+		 * that we'll be somewhat limited in distinguishing flows (i.e.
+		 * only based on IP addresses, not based on port numbers), but
+		 * it's better than nothing. */
+		dnflow.f_id.dst_port = 0;
+		dnflow.f_id.src_port = 0;
+		dnflow.f_id.proto = 0;
+
+		dnflow.rule.info = r->dnpipe;
+		dnflow.rule.info |= IPFW_IS_DUMMYNET;
+		if (r->dnflags & PFRULE_DN_IS_PIPE)
+			dnflow.rule.info |= IPFW_IS_PIPE;
+
+		dnflow.f_id.extra = dnflow.rule.info;
+
+		dnflow.flags = dir == PF_IN ? IPFW_ARGS_IN : IPFW_ARGS_OUT;
+		dnflow.flags |= IPFW_ARGS_ETHER;
+		dnflow.ifp = kif->pfik_ifp;
+
+		switch (af) {
+		case AF_INET:
+			dnflow.f_id.addr_type = 4;
+			dnflow.f_id.src_ip = src->v4.s_addr;
+			dnflow.f_id.dst_ip = dst->v4.s_addr;
+			break;
+		case AF_INET6:
+			dnflow.flags |= IPFW_ARGS_IP6;
+			dnflow.f_id.addr_type = 6;
+			dnflow.f_id.src_ip6 = src->v6;
+			dnflow.f_id.dst_ip6 = dst->v6;
+			break;
+		default:
+			panic("Unknown address family");
+		}
+
+		mtag->flags |= PF_TAG_DUMMYNET;
+		ip_dn_io_ptr(m0, &dnflow);
+		if (*m0 != NULL)
+			mtag->flags &= ~PF_TAG_DUMMYNET;
 	}
 
 	action = r->action;
@@ -6247,7 +6316,7 @@ static void
 pf_route(struct mbuf **m, struct pf_krule *r, int dir, struct ifnet *oifp,
     struct pf_kstate *s, struct pf_pdesc *pd, struct inpcb *inp)
 {
-	struct mbuf		*m0, *m1;
+	struct mbuf		*m0, *m1, *md;
 	struct sockaddr_in	dst;
 	struct ip		*ip;
 	struct ifnet		*ifp = NULL;
@@ -6295,6 +6364,7 @@ pf_route(struct mbuf **m, struct pf_krule *r, int dir, struct ifnet *oifp,
 		}
 	} else {
 		if ((r->rt == PF_REPLYTO) == (r->direction == dir)) {
+			pf_dummynet(pd, dir, s, r, m);
 			if (s)
 				PF_STATE_UNLOCK(s);
 			return;
@@ -6377,7 +6447,11 @@ pf_route(struct mbuf **m, struct pf_krule *r, int dir, struct ifnet *oifp,
 			m0->m_pkthdr.csum_flags &= ~CSUM_IP;
 		}
 		m_clrprotoflags(m0);	/* Avoid confusing lower layers. */
-		error = (*ifp->if_output)(ifp, m0, sintosa(&dst), NULL);
+
+		md = m0;
+		error = pf_dummynet_route(pd, dir, s, r, ifp, sintosa(&dst), &md);
+		if (md != NULL)
+			error = (*ifp->if_output)(ifp, md, sintosa(&dst), NULL);
 		goto done;
 	}
 
@@ -6407,7 +6481,12 @@ pf_route(struct mbuf **m, struct pf_krule *r, int dir, struct ifnet *oifp,
 		m0->m_nextpkt = NULL;
 		if (error == 0) {
 			m_clrprotoflags(m0);
-			error = (*ifp->if_output)(ifp, m0, sintosa(&dst), NULL);
+			md = m0;
+			error = pf_dummynet_route(pd, dir, s, r, ifp,
+			    sintosa(&dst), &md);
+			if (md != NULL)
+				error = (*ifp->if_output)(ifp, md,
+				    sintosa(&dst), NULL);
 		} else
 			m_freem(m0);
 	}
@@ -6434,7 +6513,7 @@ static void
 pf_route6(struct mbuf **m, struct pf_krule *r, int dir, struct ifnet *oifp,
     struct pf_kstate *s, struct pf_pdesc *pd, struct inpcb *inp)
 {
-	struct mbuf		*m0;
+	struct mbuf		*m0, *md;
 	struct sockaddr_in6	dst;
 	struct ip6_hdr		*ip6;
 	struct ifnet		*ifp = NULL;
@@ -6480,6 +6559,7 @@ pf_route6(struct mbuf **m, struct pf_krule *r, int dir, struct ifnet *oifp,
 		}
 	} else {
 		if ((r->rt == PF_REPLYTO) == (r->direction == dir)) {
+			pf_dummynet(pd, dir, s, r, m);
 			if (s)
 				PF_STATE_UNLOCK(s);
 			return;
@@ -6551,8 +6631,12 @@ pf_route6(struct mbuf **m, struct pf_krule *r, int dir, struct ifnet *oifp,
 	 */
 	if (IN6_IS_SCOPE_EMBED(&dst.sin6_addr))
 		dst.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
-	if ((u_long)m0->m_pkthdr.len <= ifp->if_mtu)
-		nd6_output_ifp(ifp, ifp, m0, &dst, NULL);
+	if ((u_long)m0->m_pkthdr.len <= ifp->if_mtu) {
+		md = m0;
+		pf_dummynet_route(pd, dir, s, r, ifp, sintosa(&dst), &md);
+		if (md != NULL)
+			nd6_output_ifp(ifp, ifp, md, &dst, NULL);
+	}
 	else {
 		in6_ifstat_inc(ifp, ifs6_in_toobig);
 		if (r->rt != PF_DUPTO) {
@@ -6807,6 +6891,71 @@ pf_test_eth(int dir, int pflags, struct ifnet *ifp, struct mbuf **m0,
 	return (pf_test_eth_rule(dir, kif, m0));
 }
 
+static int
+pf_dummynet(struct pf_pdesc *pd, int dir, struct pf_kstate *s,
+    struct pf_krule *r, struct mbuf **m0)
+{
+	return (pf_dummynet_route(pd, dir, s, r, NULL, NULL, m0));
+}
+
+static int
+pf_dummynet_route(struct pf_pdesc *pd, int dir, struct pf_kstate *s,
+    struct pf_krule *r, struct ifnet *ifp, struct sockaddr *sa,
+    struct mbuf **m0)
+{
+	NET_EPOCH_ASSERT();
+
+	if (s && (s->dnpipe || s->dnrpipe)) {
+		pd->act.dnpipe = s->dnpipe;
+		pd->act.dnrpipe = s->dnrpipe;
+		pd->act.flags = s->state_flags;
+	} else if (r->dnpipe || r->dnrpipe) {
+		pd->act.dnpipe = r->dnpipe;
+		pd->act.dnrpipe = r->dnrpipe;
+		pd->act.flags = r->free_flags;
+	}
+	if (pd->act.dnpipe || pd->act.dnrpipe) {
+		struct ip_fw_args dnflow;
+		if (ip_dn_io_ptr == NULL) {
+			m_freem(*m0);
+			*m0 = NULL;
+			return (ENOMEM);
+		}
+
+		if (pd->pf_mtag == NULL &&
+		    ((pd->pf_mtag = pf_get_mtag(*m0)) == NULL)) {
+			m_freem(*m0);
+			*m0 = NULL;
+			return (ENOMEM);
+		}
+
+		if (ifp != NULL) {
+			pd->pf_mtag->flags |= PF_TAG_ROUTE_TO;
+
+			pd->pf_mtag->if_index = ifp->if_index;
+			pd->pf_mtag->if_idxgen = ifp->if_idxgen;
+
+			MPASS(sa != NULL);
+
+			if (pd->af == AF_INET)
+				memcpy(&pd->pf_mtag->dst, sa,
+				    sizeof(struct sockaddr_in));
+			else
+				memcpy(&pd->pf_mtag->dst, sa,
+				    sizeof(struct sockaddr_in6));
+		}
+
+		if (pf_pdesc_to_dnflow(dir, pd, r, s, &dnflow)) {
+			pd->pf_mtag->flags |= PF_TAG_DUMMYNET;
+			ip_dn_io_ptr(m0, &dnflow);
+			if (*m0 != NULL)
+				pd->pf_mtag->flags &= ~PF_TAG_DUMMYNET;
+		}
+	}
+
+	return (0);
+}
+
 #ifdef INET
 int
 pf_test(int dir, int pflags, struct ifnet *ifp, struct mbuf **m0, struct inpcb *inp)
@@ -6844,6 +6993,21 @@ pf_test(int dir, int pflags, struct ifnet *ifp, struct mbuf **m0, struct inpcb *
 
 	memset(&pd, 0, sizeof(pd));
 	pd.pf_mtag = pf_find_mtag(m);
+
+	if (pd.pf_mtag != NULL && (pd.pf_mtag->flags & PF_TAG_ROUTE_TO)) {
+		pd.pf_mtag->flags &= ~PF_TAG_ROUTE_TO;
+
+		ifp = ifnet_byindexgen(pd.pf_mtag->if_index,
+		    pd.pf_mtag->if_idxgen);
+		if (ifp == NULL || ifp->if_flags & IFF_DYING) {
+			m_freem(*m0);
+			*m0 = NULL;
+			return (PF_PASS);
+		}
+		(ifp->if_output)(ifp, m, sintosa(&pd.pf_mtag->dst), NULL);
+		*m0 = NULL;
+		return (PF_PASS);
+	}
 
 	if (pd.pf_mtag && pd.pf_mtag->dnpipe) {
 		pd.act.dnpipe = pd.pf_mtag->dnpipe;
@@ -7266,41 +7430,9 @@ done:
 			pf_route(m0, r, dir, kif->pfik_ifp, s, &pd, inp);
 			return (action);
 		}
-		/* Dummynet processing. */
-		if (s && (s->dnpipe || s->dnrpipe)) {
-			pd.act.dnpipe = s->dnpipe;
-			pd.act.dnrpipe = s->dnrpipe;
-			pd.act.flags = s->state_flags;
-		} else if (r->dnpipe || r->dnrpipe) {
-			pd.act.dnpipe = r->dnpipe;
-			pd.act.dnrpipe = r->dnrpipe;
-			pd.act.flags = r->free_flags;
-		}
-		if (pd.act.dnpipe || pd.act.dnrpipe) {
-			struct ip_fw_args dnflow;
-			if (ip_dn_io_ptr == NULL) {
-				m_freem(*m0);
-				*m0 = NULL;
-				action = PF_DROP;
-				REASON_SET(&reason, PFRES_MEMORY);
-				break;
-			}
-
-			if (pd.pf_mtag == NULL &&
-			    ((pd.pf_mtag = pf_get_mtag(m)) == NULL)) {
-				m_freem(*m0);
-				*m0 = NULL;
-				action = PF_DROP;
-				REASON_SET(&reason, PFRES_MEMORY);
-				break;
-			}
-
-			if (pf_pdesc_to_dnflow(dir, &pd, r, s, &dnflow)) {
-				pd.pf_mtag->flags |= PF_TAG_DUMMYNET;
-				ip_dn_io_ptr(m0, &dnflow);
-				if (*m0 != NULL)
-					pd.pf_mtag->flags &= ~PF_TAG_DUMMYNET;
-			}
+		if (pf_dummynet(&pd, dir, s, r, m0) != 0) {
+			action = PF_DROP;
+			REASON_SET(&reason, PFRES_MEMORY);
 		}
 		break;
 	}
@@ -7350,6 +7482,22 @@ pf_test6(int dir, int pflags, struct ifnet *ifp, struct mbuf **m0, struct inpcb 
 
 	memset(&pd, 0, sizeof(pd));
 	pd.pf_mtag = pf_find_mtag(m);
+
+	if (pd.pf_mtag != NULL && (pd.pf_mtag->flags & PF_TAG_ROUTE_TO)) {
+		pd.pf_mtag->flags &= ~PF_TAG_ROUTE_TO;
+
+		ifp = ifnet_byindexgen(pd.pf_mtag->if_index,
+		    pd.pf_mtag->if_idxgen);
+		if (ifp == NULL || ifp->if_flags & IFF_DYING) {
+			m_freem(*m0);
+			*m0 = NULL;
+			return (PF_PASS);
+		}
+		nd6_output_ifp(ifp, ifp, m,
+                    (struct sockaddr_in6 *)&pd.pf_mtag->dst, NULL);
+		*m0 = NULL;
+		return (PF_PASS);
+	}
 
 	if (pd.pf_mtag && pd.pf_mtag->dnpipe) {
 		pd.act.dnpipe = pd.pf_mtag->dnpipe;
@@ -7723,42 +7871,9 @@ done:
 			pf_route6(m0, r, dir, kif->pfik_ifp, s, &pd, inp);
 			return (action);
 		}
-		/* Dummynet processing. */
-		if (s && (s->dnpipe || s->dnrpipe)) {
-			pd.act.dnpipe = s->dnpipe;
-			pd.act.dnrpipe = s->dnrpipe;
-			pd.act.flags = s->state_flags;
-		} else {
-			pd.act.dnpipe = r->dnpipe;
-			pd.act.dnrpipe = r->dnrpipe;
-			pd.act.flags = r->free_flags;
-		}
-		if (pd.act.dnpipe || pd.act.dnrpipe) {
-			struct ip_fw_args dnflow;
-
-			if (ip_dn_io_ptr == NULL) {
-				m_freem(*m0);
-				*m0 = NULL;
-				action = PF_DROP;
-				REASON_SET(&reason, PFRES_MEMORY);
-				break;
-			}
-
-			if (pd.pf_mtag == NULL &&
-					((pd.pf_mtag = pf_get_mtag(m)) == NULL)) {
-				m_freem(*m0);
-				*m0 = NULL;
-				action = PF_DROP;
-				REASON_SET(&reason, PFRES_MEMORY);
-				break;
-			}
-
-			if (pf_pdesc_to_dnflow(dir, &pd, r, s, &dnflow)) {
-				pd.pf_mtag->flags |= PF_TAG_DUMMYNET;
-				ip_dn_io_ptr(m0, &dnflow);
-				if (*m0 != NULL)
-					pd.pf_mtag->flags &= ~PF_TAG_DUMMYNET;
-			}
+		if (pf_dummynet(&pd, dir, s, r, m0) != 0) {
+			action = PF_DROP;
+			REASON_SET(&reason, PFRES_MEMORY);
 		}
 		break;
 	}

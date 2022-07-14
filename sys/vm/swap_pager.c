@@ -2220,8 +2220,12 @@ cheri_restore_tag(void * __capability *cp)
 	newcap = cheri_incoffset(newcap, offset);
 
 	if (sealed) {
-		sealcap = cheri_setoffset(swap_restore_cap, type);
-		newcap = cheri_seal(newcap, sealcap);
+		if (type == CHERI_OTYPE_SENTRY) {
+			newcap = cheri_sealentry(newcap);
+		} else {
+			sealcap = cheri_setoffset(swap_restore_cap, type);
+			newcap = cheri_seal(newcap, sealcap);
+		}
 	}
 
 	/*

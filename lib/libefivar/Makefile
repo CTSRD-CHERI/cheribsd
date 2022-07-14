@@ -67,6 +67,6 @@ WARNS?=		9
 CWARNFLAGS+=	-Wno-cast-align
 CWARNFLAGS+=	-Wno-unused-parameter
 
-.if ${COMPILER_TYPE} == "clang" && ${COMPILER_FEATURES:MWunused-but-set-variable}
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 130000
 CWARNFLAGS+=	-Wno-unused-but-set-variable
 .endif

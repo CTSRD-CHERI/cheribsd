@@ -51,6 +51,8 @@ struct tls_record_layer {
 #define	TLS_CBC_IMPLICIT_IV_LEN	16
 
 /* Type values for the record layer */
+#define	TLS_RLTYPE_ALERT	21
+#define	TLS_RLTYPE_HANDSHAKE	22
 #define	TLS_RLTYPE_APP		23
 
 /*
