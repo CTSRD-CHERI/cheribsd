@@ -3190,12 +3190,14 @@ vm_map_check_owner_proc(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	for (; entry != &map->header && entry->start < end;
 	    entry = vm_map_entry_succ(entry)) {
 		if (entry->owner != p->p_pid) {
+#if __has_feature(capabilities)
 			printf("%s: requested range [%#lx, %#lx], "
 			    "owner %d (%s), map %#p, would overlap with "
 			    "existing entry [%#lx, %#lx], owner %d\n",
 			    __func__, start, end,
 			    p->p_pid, p->p_comm, &p->p_vmspace->vm_map,
 			    entry->start, entry->end, entry->owner);
+#endif
 			return (KERN_PROTECTION_FAILURE);
 		}
 	}
