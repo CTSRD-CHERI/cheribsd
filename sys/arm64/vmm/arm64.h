@@ -43,12 +43,29 @@ struct hypctx {
 	 * Be careful changing the layout of these as we access them from
 	 * assembly when switching between the host and guest.
 	 */
+#if __has_feature(capabilities)
+	uint64_t	cctlr_el0;
+	uint64_t	cctlr_el1;
+	uintcap_t	cid_el0;
+	uintcap_t	ddc_el0;
+	uintcap_t	rcsp_el0;
+	uintcap_t	rctpidr_el0;
+	uintcap_t	rddc_el0;
+
+	uintcap_t	elr_el1;	/* Exception Link Register */
+	uintcap_t	sp_el0;		/* Stack pointer */
+	uintcap_t	tpidr_el0;	/* EL0 Software ID Register */
+	uintcap_t	tpidrro_el0;	/* Read-only Thread ID Register */
+	uintcap_t	tpidr_el1;	/* EL1 Software ID Register */
+	uintcap_t	vbar_el1;	/* Vector Base Address Register */
+#else
 	uint64_t	elr_el1;	/* Exception Link Register */
 	uint64_t	sp_el0;		/* Stack pointer */
 	uint64_t	tpidr_el0;	/* EL0 Software ID Register */
 	uint64_t	tpidrro_el0;	/* Read-only Thread ID Register */
 	uint64_t	tpidr_el1;	/* EL1 Software ID Register */
 	uint64_t	vbar_el1;	/* Vector Base Address Register */
+#endif
 
 	uint64_t	actlr_el1;	/* Auxiliary Control Register */
 	uint64_t	afsr0_el1;	/* Auxiliary Fault Status Register 0 */

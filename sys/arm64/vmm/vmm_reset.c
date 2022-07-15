@@ -103,6 +103,11 @@ reset_vm_el01_regs(void *vcpu)
 	set_arch_unknown(el2ctx->pmuserenr_el0);
 	memset(el2ctx->pmevcntr_el0, 0, sizeof(el2ctx->pmevcntr_el0));
 	memset(el2ctx->pmevtyper_el0, 0, sizeof(el2ctx->pmevtyper_el0));
+
+	/* XXX: We should get this from somewhere */
+	el2ctx->tf.tf_ddc = (uintcap_t)cheri_getdefault();
+	el2ctx->ddc_el0 = (uintcap_t)cheri_getdefault();
+	el2ctx->rddc_el0 = (uintcap_t)cheri_getdefault();
 }
 
 void

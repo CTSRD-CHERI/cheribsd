@@ -282,20 +282,43 @@ vmm_hyp_reg_store(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	}
 
 	/* Store the special to from the trapframe */
+#if __has_feature(capabilities)
+	hypctx->tf.tf_sp = READ_SPECIALREG_CAP(csp_el1);
+	hypctx->tf.tf_elr = READ_SPECIALREG_CAP(celr_el2);
+	hypctx->tf.tf_ddc = READ_SPECIALREG_CAP(ddc_el1);
+#else
 	hypctx->tf.tf_sp = READ_SPECIALREG(sp_el1);
 	hypctx->tf.tf_elr = READ_SPECIALREG(elr_el2);
+#endif
 	hypctx->tf.tf_spsr = READ_SPECIALREG(spsr_el2);
 	if (guest) {
 		hypctx->tf.tf_esr = READ_SPECIALREG(esr_el2);
 	}
 
 	/* Store the guest special registers */
+#if __has_feature(capabilities)
+	hypctx->elr_el1 = READ_SPECIALREG_CAP(celr_el1);
+	hypctx->sp_el0 = READ_SPECIALREG_CAP(csp_el0);
+	hypctx->tpidr_el0 = READ_SPECIALREG_CAP(ctpidr_el0);
+	hypctx->tpidrro_el0 = READ_SPECIALREG_CAP(ctpidrro_el0);
+	hypctx->tpidr_el1 = READ_SPECIALREG_CAP(ctpidr_el1);
+	hypctx->vbar_el1 = READ_SPECIALREG_CAP(cvbar_el1);
+
+	hypctx->cctlr_el0 = READ_SPECIALREG(cctlr_el0);
+	hypctx->cctlr_el1 = READ_SPECIALREG(cctlr_el1);
+	hypctx->cid_el0 = READ_SPECIALREG_CAP(cid_el0);
+	hypctx->ddc_el0 = READ_SPECIALREG_CAP(ddc_el0);
+	hypctx->rcsp_el0 = READ_SPECIALREG_CAP(rcsp_el0);
+	hypctx->rctpidr_el0 = READ_SPECIALREG_CAP(rctpidr_el0);
+	hypctx->rddc_el0 = READ_SPECIALREG_CAP(rddc_el0);
+#else
 	hypctx->elr_el1 = READ_SPECIALREG(elr_el1);
 	hypctx->sp_el0 = READ_SPECIALREG(sp_el0);
 	hypctx->tpidr_el0 = READ_SPECIALREG(tpidr_el0);
 	hypctx->tpidrro_el0 = READ_SPECIALREG(tpidrro_el0);
 	hypctx->tpidr_el1 = READ_SPECIALREG(tpidr_el1);
 	hypctx->vbar_el1 = READ_SPECIALREG(vbar_el1);
+#endif
 
 	hypctx->actlr_el1 = READ_SPECIALREG(actlr_el1);
 	hypctx->afsr0_el1 = READ_SPECIALREG(afsr0_el1);
@@ -328,12 +351,29 @@ vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	uint64_t dfr0;
 
 	/* Restore the special registers */
+#if __has_feature(capabilities)
+	WRITE_SPECIALREG(cctlr_el0, hypctx->cctlr_el0);
+	WRITE_SPECIALREG(cctlr_el1, hypctx->cctlr_el1);
+	WRITE_SPECIALREG_CAP(cid_el0, hypctx->cid_el0);
+	WRITE_SPECIALREG_CAP(ddc_el0, hypctx->ddc_el0);
+	WRITE_SPECIALREG_CAP(rcsp_el0, hypctx->rcsp_el0);
+	WRITE_SPECIALREG_CAP(rctpidr_el0, hypctx->rctpidr_el0);
+	WRITE_SPECIALREG_CAP(rddc_el0, hypctx->rddc_el0);
+
+	WRITE_SPECIALREG_CAP(celr_el1, hypctx->elr_el1);
+	WRITE_SPECIALREG_CAP(csp_el0, hypctx->sp_el0);
+	WRITE_SPECIALREG_CAP(ctpidr_el0, hypctx->tpidr_el0);
+	WRITE_SPECIALREG_CAP(ctpidrro_el0, hypctx->tpidrro_el0);
+	WRITE_SPECIALREG_CAP(ctpidr_el1, hypctx->tpidr_el1);
+	WRITE_SPECIALREG_CAP(cvbar_el1, hypctx->vbar_el1);
+#else
 	WRITE_SPECIALREG(elr_el1, hypctx->elr_el1);
 	WRITE_SPECIALREG(sp_el0, hypctx->sp_el0);
 	WRITE_SPECIALREG(tpidr_el0, hypctx->tpidr_el0);
 	WRITE_SPECIALREG(tpidrro_el0, hypctx->tpidrro_el0);
 	WRITE_SPECIALREG(tpidr_el1, hypctx->tpidr_el1);
 	WRITE_SPECIALREG(vbar_el1, hypctx->vbar_el1);
+#endif
 
 	WRITE_SPECIALREG(actlr_el1, hypctx->actlr_el1);
 	WRITE_SPECIALREG(afsr0_el1, hypctx->afsr0_el1);
@@ -360,8 +400,14 @@ vmm_hyp_reg_restore(struct hypctx *hypctx, struct hyp *hyp, bool guest)
 	WRITE_SPECIALREG(vmpidr_el2, hypctx->vmpidr_el2);
 
 	/* Load the special regs from the trapframe */
+#if __has_feature(capabilities)
+	WRITE_SPECIALREG_CAP(ddc_el1, hypctx->tf.tf_ddc);
+	WRITE_SPECIALREG_CAP(csp_el1, hypctx->tf.tf_sp);
+	WRITE_SPECIALREG_CAP(celr_el2, hypctx->tf.tf_elr);
+#else
 	WRITE_SPECIALREG(sp_el1, hypctx->tf.tf_sp);
 	WRITE_SPECIALREG(elr_el2, hypctx->tf.tf_elr);
+#endif
 	WRITE_SPECIALREG(spsr_el2, hypctx->tf.tf_spsr);
 
 	/* Restore the PMU registers */
