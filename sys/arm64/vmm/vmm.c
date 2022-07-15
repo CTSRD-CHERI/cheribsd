@@ -142,6 +142,9 @@ struct vm {
 	uint16_t	cores;			/* (o) num of cores/socket */
 	uint16_t	threads;		/* (o) num of threads/core */
 	uint16_t	maxcpus;		/* (o) max pluggable cpus */
+#if __has_feature(capabilities)
+	uintcap_t	maxpcc;			/* (o) max guest capability */
+#endif
 };
 
 static bool vmm_initialized = false;
@@ -374,6 +377,9 @@ vm_create(const char *name, struct vm **retvm)
 	vm = malloc(sizeof(struct vm), M_VMM, M_WAITOK | M_ZERO);
 	strcpy(vm->name, name);
 	vm->vmspace = vmspace;
+#if __has_feature(capabilities)
+	vm->maxpcc = cheri_getpcc();
+#endif
 
 	vm->sockets = 1;
 	vm->cores = 1;			/* XXX backwards compatibility */
@@ -1330,9 +1336,18 @@ vm_gpa_hold(struct vm *vm, int vcpuid, vm_paddr_t gpa, size_t len, int reqprot,
 		mm = &vm->mem_maps[i];
 		if (sysmem_mapping(vm, mm) && gpa >= mm->gpa &&
 		    gpa < mm->gpa + mm->len) {
+			void * __capability addr;
+
+#if __has_feature(capabilities)
+			addr = (void * __capability)vm->maxpcc;
+			addr = cheri_setoffset(addr, trunc_page(gpa));
+			addr = cheri_setbounds(addr, PAGE_SIZE);
+#else
+			addr = trunc_page(gpa);
+#endif
 			/* TODO: gpa should be a capability to the guest IPA */
 			count = vm_fault_quick_hold_pages(&vm->vmspace->vm_map,
-			    trunc_page((void *)gpa), PAGE_SIZE, reqprot, &m, 1);
+			    addr, PAGE_SIZE, reqprot, &m, 1);
 			break;
 		}
 	}
