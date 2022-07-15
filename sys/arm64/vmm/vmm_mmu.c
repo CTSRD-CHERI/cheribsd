@@ -309,6 +309,12 @@ vmmpmap_enter(vm_offset_t va, vm_size_t size, vm_paddr_t pa, vm_prot_t prot)
 	if ((prot & VM_PROT_WRITE) == 0) {
 		l3e |= ATTR_S1_AP(ATTR_S1_AP_RO);
 	}
+	if ((prot & VM_PROT_READ_CAP) != 0) {
+		l3e |= ATTR_LC_ENABLED;
+	}
+	if ((prot & VM_PROT_WRITE_CAP) != 0) {
+		l3e |= ATTR_SC;
+	}
 
 	while (size > 0) {
 		l3 = vmmpmap_l3_table(va);

@@ -289,7 +289,7 @@ arm_init(int ipinum)
 	/* We need an physical identity mapping for when we activate the MMU */
 	hyp_code_base = vmm_base = vtophys(&vmm_hyp_code);
 	rv = vmmpmap_enter(vmm_base, hyp_code_len, vtophys(&vmm_hyp_code),
-	    VM_PROT_READ | VM_PROT_EXECUTE);
+	    VM_PROT_READ | VM_PROT_READ_CAP | VM_PROT_EXECUTE);
 	MPASS(rv);
 
 	next_hyp_va = roundup2(vtophys(&vmm_hyp_code) + hyp_code_len, L2_SIZE);
@@ -302,7 +302,8 @@ arm_init(int ipinum)
 		for (i = 0; i < VMM_STACK_PAGES; i++) {
 			rv = vmmpmap_enter(stack_hyp_va[cpu] + (i * PAGE_SIZE),
 			    PAGE_SIZE, vtophys(stack[cpu] + (i * PAGE_SIZE)),
-			    VM_PROT_READ | VM_PROT_WRITE);
+			    VM_PROT_READ | VM_PROT_WRITE | VM_PROT_READ_CAP |
+			    VM_PROT_WRITE_CAP);
 			MPASS(rv);
 		}
 		next_hyp_va += L2_SIZE;
@@ -322,6 +323,10 @@ arm_init(int ipinum)
 #endif
 #ifdef SMP
 	el2_regs.tcr_el2 |= TCR_EL2_SH0_IS;
+#endif
+
+#if __has_feature(capabilities)
+	el2_regs.tcr_el2 |= TCR_EL2_HWU | TCR_EL2_HPD;
 #endif
 
 	/*
@@ -469,7 +474,8 @@ arm_vminit(struct vm *vm, pmap_t pmap)
 	hyp->el2_addr = vm_addr;
 
 	rv = vmmpmap_enter(hyp->el2_addr, size, vtophys(hyp),
-	    VM_PROT_READ | VM_PROT_WRITE);
+	    VM_PROT_READ | VM_PROT_WRITE | VM_PROT_READ_CAP |
+	    VM_PROT_WRITE_CAP);
 	MPASS(rv);
 
 	return (hyp);
