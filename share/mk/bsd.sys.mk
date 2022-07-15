@@ -80,7 +80,7 @@ CWARNFLAGS+=	-Wno-pointer-sign
 .if ${WARNS} <= 6
 CWARNFLAGS.clang+=	-Wno-empty-body -Wno-string-plus-int
 CWARNFLAGS.clang+=	-Wno-unused-const-variable
-.if ${COMPILER_TYPE} == "clang" && ${COMPILER_FEATURES:MWunused-but-set-variable}
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 130000
 CWARNFLAGS.clang+=	-Wno-error=unused-but-set-variable
 .endif
 .endif # WARNS <= 6
@@ -344,7 +344,7 @@ LDFLAGS+=	--ld-path=${LD:[1]:S/^ld.//1W}
 .else
 LDFLAGS+=	-fuse-ld=${LD:[1]:S/^ld.//1W}
 .endif
-.else
+.elif ${COMPILER_TYPE} == "gcc"
 # GCC does not support an absolute path for -fuse-ld so we just print this
 # warning instead and let the user add the required symlinks.
 # However, we can avoid this warning if -B is set appropriately (e.g. for

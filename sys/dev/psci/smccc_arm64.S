@@ -31,6 +31,7 @@
  */
 
 #include <machine/asm.h>
+#include <machine/armreg.h>
 __FBSDID("$FreeBSD$");
 
 /*
@@ -65,6 +66,33 @@ __FBSDID("$FreeBSD$");
 #endif
 
 /*
+ * XXX: TF-A in Morello firmware versions up to at least 1.4 do not
+ * initialize DDC_EL0 and depend on the caller setting it to almighty
+ * capability.
+ */
+#if __has_feature(capabilities)
+.macro	reset_ddc_el0
+	sub	PTRN(sp), PTRN(sp), #16 * 2
+	mrs	c9, ddc_el0
+	mrs	x10, daif
+	stp	c9, c10, [PTRN(sp)]
+	adrp	PTR(9), smccc_ddc_el0
+	ldr	c9, [PTR(9), :lo12:smccc_ddc_el0]
+
+	/* Mask interrupts while DDC_EL0 is set. */
+	msr	daifset, #(DAIF_INTR)
+	msr	ddc_el0, c9
+.endmacro
+
+.macro restore_ddc_el0
+	ldp	c9, c10, [PTRN(sp)]
+	msr	ddc_el0, c9
+	msr	daif, x10
+	add	PTRN(sp), PTRN(sp), #16 * 2
+.endmacro
+#endif
+
+/*
  * int arm_smccc_hvc(register_t, register_t, register_t, register_t,
  *     register_t, register_t, register_t, register_t,
  *     struct arm_smccc_res *res)
@@ -73,7 +101,13 @@ ENTRY(arm_smccc_hvc)
 #ifdef __CHERI_PURE_CAPABILITY__
 	save_registers
 #endif
+#if __has_feature(capabilities)
+	reset_ddc_el0
+#endif
 	hvc	#0
+#if __has_feature(capabilities)
+	restore_ddc_el0
+#endif
 #ifdef __CHERI_PURE_CAPABILITY__
 	restore_registers
 #endif
@@ -93,7 +127,13 @@ ENTRY(arm_smccc_smc)
 #ifdef __CHERI_PURE_CAPABILITY__
 	save_registers
 #endif
+#if __has_feature(capabilities)
+	reset_ddc_el0
+#endif
 	smc	#0
+#if __has_feature(capabilities)
+	restore_ddc_el0
+#endif
 #ifdef __CHERI_PURE_CAPABILITY__
 	restore_registers
 #endif

@@ -1161,10 +1161,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 172: {
 		struct linux_prctl_args *p = params;
 		iarg[a++] = p->option; /* l_int */
-		iarg[a++] = p->arg2; /* l_int */
-		iarg[a++] = p->arg3; /* l_int */
-		iarg[a++] = p->arg4; /* l_int */
-		iarg[a++] = p->arg5; /* l_int */
+		uarg[a++] = (intptr_t)p->arg2; /* l_uintptr_t */
+		uarg[a++] = (intptr_t)p->arg3; /* l_uintptr_t */
+		uarg[a++] = (intptr_t)p->arg4; /* l_uintptr_t */
+		uarg[a++] = (intptr_t)p->arg5; /* l_uintptr_t */
 		*n_args = 5;
 		break;
 	}
@@ -3068,7 +3068,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct linux_ppoll_time64_args *p = params;
 		uarg[a++] = (intptr_t)p->fds; /* struct pollfd * */
 		uarg[a++] = p->nfds; /* uint32_t */
-		uarg[a++] = (intptr_t)p->tsp; /* struct l_timespec * */
+		uarg[a++] = (intptr_t)p->tsp; /* struct l_timespec64 * */
 		uarg[a++] = (intptr_t)p->sset; /* l_sigset_t * */
 		iarg[a++] = p->ssize; /* l_size_t */
 		*n_args = 5;
@@ -5031,16 +5031,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "l_int";
 			break;
 		case 1:
-			p = "l_int";
+			p = "l_uintptr_t";
 			break;
 		case 2:
-			p = "l_int";
+			p = "l_uintptr_t";
 			break;
 		case 3:
-			p = "l_int";
+			p = "l_uintptr_t";
 			break;
 		case 4:
-			p = "l_int";
+			p = "l_uintptr_t";
 			break;
 		default:
 			break;
@@ -8274,7 +8274,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "uint32_t";
 			break;
 		case 2:
-			p = "userland struct l_timespec *";
+			p = "userland struct l_timespec64 *";
 			break;
 		case 3:
 			p = "userland l_sigset_t *";

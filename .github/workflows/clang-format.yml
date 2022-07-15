@@ -5,6 +5,7 @@ defaults:
     shell: bash
 jobs:
   check-format:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

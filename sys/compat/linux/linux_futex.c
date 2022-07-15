@@ -56,10 +56,11 @@ __FBSDID("$FreeBSD$");
 #include <compat/linux/linux_util.h>
 
 #define	FUTEX_SHARED	0x8     /* shared futex */
+#define	FUTEX_UNOWNED	0
 
 #define	GET_SHARED(a)	(a->flags & FUTEX_SHARED) ? AUTO_SHARE : THREAD_SHARE
 
-static int futex_atomic_op(struct thread *, int, uint32_t *);
+static int futex_atomic_op(struct thread *, int, uint32_t *, int *);
 static int handle_futex_death(struct thread *td, struct linux_emuldata *,
     uint32_t *, unsigned int, bool);
 static int fetch_robust_entry(struct linux_robust_list **,
@@ -81,7 +82,7 @@ struct linux_futex_args {
 static inline int futex_key_get(const void *, int, int, struct umtx_key *);
 static void linux_umtx_abs_timeout_init(struct umtx_abs_timeout *,
 	    struct linux_futex_args *);
-static int	linux_futex(struct thread *, struct linux_futex_args *);
+static int linux_futex(struct thread *, struct linux_futex_args *);
 static int linux_futex_wait(struct thread *, struct linux_futex_args *);
 static int linux_futex_wake(struct thread *, struct linux_futex_args *);
 static int linux_futex_requeue(struct thread *, struct linux_futex_args *);
@@ -130,7 +131,8 @@ futex_wake_pi(struct thread *td, uint32_t *uaddr, bool shared)
 }
 
 static int
-futex_atomic_op(struct thread *td, int encoded_op, uint32_t *uaddr)
+futex_atomic_op(struct thread *td, int encoded_op, uint32_t *uaddr,
+    int *res)
 {
 	int op = (encoded_op >> 28) & 7;
 	int cmp = (encoded_op >> 24) & 15;
@@ -158,34 +160,34 @@ futex_atomic_op(struct thread *td, int encoded_op, uint32_t *uaddr)
 		ret = futex_xorl(oparg, uaddr, &oldval);
 		break;
 	default:
-		ret = -ENOSYS;
+		ret = ENOSYS;
 		break;
 	}
 
-	if (ret)
+	if (ret != 0)
 		return (ret);
 
 	switch (cmp) {
 	case FUTEX_OP_CMP_EQ:
-		ret = (oldval == cmparg);
+		*res = (oldval == cmparg);
 		break;
 	case FUTEX_OP_CMP_NE:
-		ret = (oldval != cmparg);
+		*res = (oldval != cmparg);
 		break;
 	case FUTEX_OP_CMP_LT:
-		ret = (oldval < cmparg);
+		*res = (oldval < cmparg);
 		break;
 	case FUTEX_OP_CMP_GE:
-		ret = (oldval >= cmparg);
+		*res = (oldval >= cmparg);
 		break;
 	case FUTEX_OP_CMP_LE:
-		ret = (oldval <= cmparg);
+		*res = (oldval <= cmparg);
 		break;
 	case FUTEX_OP_CMP_GT:
-		ret = (oldval > cmparg);
+		*res = (oldval > cmparg);
 		break;
 	default:
-		ret = -ENOSYS;
+		ret = ENOSYS;
 	}
 
 	return (ret);
@@ -398,7 +400,7 @@ linux_futex_lock_pi(struct thread *td, bool try, struct linux_futex_args *args)
 	umtxq_unlock(&uq->uq_key);
 	for (;;) {
 		/* Try uncontested case first. */
-		rv = casueword32(args->uaddr, 0, &owner, em->em_tid);
+		rv = casueword32(args->uaddr, FUTEX_UNOWNED, &owner, em->em_tid);
 		/* The acquire succeeded. */
 		if (rv == 0) {
 			error = 0;
@@ -407,6 +409,17 @@ linux_futex_lock_pi(struct thread *td, bool try, struct linux_futex_args *args)
 		if (rv == -1) {
 			error = EFAULT;
 			break;
+		}
+
+		/*
+		 * Nobody owns it, but the acquire failed. This can happen
+		 * with ll/sc atomic.
+		 */
+		if (owner == FUTEX_UNOWNED) {
+			error = thread_check_susp(td, true);
+			if (error != 0)
+				break;
+			continue;
 		}
 
 		/*
@@ -429,7 +442,7 @@ linux_futex_lock_pi(struct thread *td, bool try, struct linux_futex_args *args)
 		 * Futex owner died, handle_futex_death() set the OWNER_DIED bit
 		 * and clear tid. Try to acquire it.
 		 */
-		if ((owner & FUTEX_TID_MASK) == 0) {
+		if ((owner & FUTEX_TID_MASK) == FUTEX_UNOWNED) {
 			old_owner = owner;
 			owner = owner & (FUTEX_WAITERS | FUTEX_OWNER_DIED);
 			owner |= em->em_tid;
@@ -474,7 +487,7 @@ linux_futex_lock_pi(struct thread *td, bool try, struct linux_futex_args *args)
 		 * Linux does some checks of futex state, we return EINVAL,
 		 * as the user space can take care of this.
 		 */
-		if ((owner & FUTEX_OWNER_DIED) != 0) {
+		if ((owner & FUTEX_OWNER_DIED) != FUTEX_UNOWNED) {
 			error = EINVAL;
 			break;
 		}
@@ -596,7 +609,7 @@ linux_futex_unlock_pi(struct thread *td, bool rb, struct linux_futex_args *args)
 	if (count > 1)
 		new_owner = FUTEX_WAITERS;
 	else
-		new_owner = 0;
+		new_owner = FUTEX_UNOWNED;
 
 again:
 	error = casueword32(args->uaddr, owner, &old, new_owner);
@@ -635,13 +648,7 @@ linux_futex_wakeop(struct thread *td, struct linux_futex_args *args)
 	umtxq_lock(&key);
 	umtxq_busy(&key);
 	umtxq_unlock(&key);
-	op_ret = futex_atomic_op(td, args->val3, args->uaddr2);
-	if (op_ret < 0) {
-		if (op_ret == -ENOSYS)
-			error = ENOSYS;
-		else
-			error = EFAULT;
-	}
+	error = futex_atomic_op(td, args->val3, args->uaddr2, &op_ret);
 	umtxq_lock(&key);
 	umtxq_unbusy(&key);
 	if (error != 0)
@@ -779,8 +786,6 @@ linux_futex_wait(struct thread *td, struct linux_futex_args *args)
 	}
 	umtxq_unlock(&uq->uq_key);
 	umtx_key_release(&uq->uq_key);
-	if (error == ERESTART)
-		error = EINTR;
 	return (error);
 }
 
@@ -816,7 +821,6 @@ linux_sys_futex(struct thread *td, struct linux_sys_futex_args *args)
 		.val3 = args->val3,
 		.val3_compare = true,
 	};
-	struct l_timespec lts;
 	int error;
 
 	switch (args->op & LINUX_FUTEX_CMD_MASK) {
@@ -825,10 +829,7 @@ linux_sys_futex(struct thread *td, struct linux_sys_futex_args *args)
 	case LINUX_FUTEX_LOCK_PI:
 	case LINUX_FUTEX_LOCK_PI2:
 		if (args->timeout != NULL) {
-			error = copyin(args->timeout, &lts, sizeof(lts));
-			if (error != 0)
-				return (error);
-			error = linux_to_native_timespec(&fargs.kts, &lts);
+			error = linux_get_timespec(&fargs.kts, args->timeout);
 			if (error != 0)
 				return (error);
 			fargs.ts = &fargs.kts;
@@ -854,7 +855,6 @@ linux_sys_futex_time64(struct thread *td,
 		.val3 = args->val3,
 		.val3_compare = true,
 	};
-	struct l_timespec64 lts;
 	int error;
 
 	switch (args->op & LINUX_FUTEX_CMD_MASK) {
@@ -863,10 +863,7 @@ linux_sys_futex_time64(struct thread *td,
 	case LINUX_FUTEX_LOCK_PI:
 	case LINUX_FUTEX_LOCK_PI2:
 		if (args->timeout != NULL) {
-			error = copyin(args->timeout, &lts, sizeof(lts));
-			if (error != 0)
-				return (error);
-			error = linux_to_native_timespec64(&fargs.kts, &lts);
+			error = linux_get_timespec64(&fargs.kts, args->timeout);
 			if (error != 0)
 				return (error);
 			fargs.ts = &fargs.kts;

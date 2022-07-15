@@ -912,10 +912,10 @@
 172	AUE_PRCTL	STD {
 		int linux_prctl(
 		    l_int option,
-		    l_int arg2,
-		    l_int arg3,
-		    l_int arg4,
-		    l_int arg5
+		    l_uintptr_t arg2,
+		    l_uintptr_t arg3,
+		    l_uintptr_t arg4,
+		    l_uintptr_t arg5
 		);
 	}
 173	AUE_NULL	STD {
@@ -2424,7 +2424,7 @@
 		int linux_ppoll_time64(
 		    struct pollfd *fds,
 		    uint32_t nfds,
-		    struct l_timespec *tsp,
+		    struct l_timespec64 *tsp,
 		    l_sigset_t *sset,
 		    l_size_t ssize
 		);

@@ -536,10 +536,10 @@ struct linux_getresgid16_args {
 };
 struct linux_prctl_args {
 	char option_l_[PADL_(l_int)]; l_int option; char option_r_[PADR_(l_int)];
-	char arg2_l_[PADL_(l_int)]; l_int arg2; char arg2_r_[PADR_(l_int)];
-	char arg3_l_[PADL_(l_int)]; l_int arg3; char arg3_r_[PADR_(l_int)];
-	char arg4_l_[PADL_(l_int)]; l_int arg4; char arg4_r_[PADR_(l_int)];
-	char arg5_l_[PADL_(l_int)]; l_int arg5; char arg5_r_[PADR_(l_int)];
+	char arg2_l_[PADL_(l_uintptr_t)]; l_uintptr_t arg2; char arg2_r_[PADR_(l_uintptr_t)];
+	char arg3_l_[PADL_(l_uintptr_t)]; l_uintptr_t arg3; char arg3_r_[PADR_(l_uintptr_t)];
+	char arg4_l_[PADL_(l_uintptr_t)]; l_uintptr_t arg4; char arg4_r_[PADR_(l_uintptr_t)];
+	char arg5_l_[PADL_(l_uintptr_t)]; l_uintptr_t arg5; char arg5_r_[PADR_(l_uintptr_t)];
 };
 struct linux_rt_sigreturn_args {
 	char ucp_l_[PADL_(struct l_ucontext *)]; struct l_ucontext * ucp; char ucp_r_[PADR_(struct l_ucontext *)];
@@ -1584,7 +1584,7 @@ struct linux_pselect6_time64_args {
 struct linux_ppoll_time64_args {
 	char fds_l_[PADL_(struct pollfd *)]; struct pollfd * fds; char fds_r_[PADR_(struct pollfd *)];
 	char nfds_l_[PADL_(uint32_t)]; uint32_t nfds; char nfds_r_[PADR_(uint32_t)];
-	char tsp_l_[PADL_(struct l_timespec *)]; struct l_timespec * tsp; char tsp_r_[PADR_(struct l_timespec *)];
+	char tsp_l_[PADL_(struct l_timespec64 *)]; struct l_timespec64 * tsp; char tsp_r_[PADR_(struct l_timespec64 *)];
 	char sset_l_[PADL_(l_sigset_t *)]; l_sigset_t * sset; char sset_r_[PADR_(l_sigset_t *)];
 	char ssize_l_[PADL_(l_size_t)]; l_size_t ssize; char ssize_r_[PADR_(l_size_t)];
 };

@@ -363,11 +363,11 @@ static const struct asmc_model asmc_models[] = {
 	  ASMC_MP5_TEMPS, ASMC_MP5_TEMPNAMES, ASMC_MP5_TEMPDESCS
 	},
 
-	/* Idem for the MacPro 2013 (cylinder) */
+	/* Idem for the Mac Pro 2013 (cylinder) */
 	{
-	  "MacPro6,1", "Apple SMC MacPro (2013)",
+	  "MacPro6,1", "Apple SMC Mac Pro (2013)",
 	  ASMC_SMS_FUNCS_DISABLED,
-	  ASMC_FAN_FUNCS,
+	  ASMC_FAN_FUNCS2,
 	  ASMC_LIGHT_FUNCS_DISABLED,
 	  ASMC_MP6_TEMPS, ASMC_MP6_TEMPNAMES, ASMC_MP6_TEMPDESCS
 	},
@@ -471,11 +471,9 @@ ACPI_MODULE_NAME("ASMC")
 /* NB: can't be const */
 static char *asmc_ids[] = { "APP0001", NULL };
 
-static devclass_t asmc_devclass;
-
 static unsigned int light_control = 0;
 
-DRIVER_MODULE(asmc, acpi, asmc_driver, asmc_devclass, NULL, NULL);
+DRIVER_MODULE(asmc, acpi, asmc_driver, NULL, NULL);
 MODULE_DEPEND(asmc, acpi, 1, 1, 1);
 
 static const struct asmc_model *

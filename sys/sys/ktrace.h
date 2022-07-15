@@ -319,6 +319,8 @@ void	ktrsyserrcause(const char *format, ...) __printflike(1, 2);
 
 #define ktrstat_error(s, error) \
 	ktrstruct_error("stat", (s), sizeof(struct stat), error)
+#define ktrcpuset(s, l) \
+	ktrstruct("cpuset_t", (s), l)
 extern u_int ktr_geniosize;
 #ifdef	KTRACE
 extern int ktr_filesize_limit_signal;

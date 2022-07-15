@@ -28,15 +28,15 @@ def jobProperties = [
         copyArtifactPermission('*'), // Downstream jobs (may) need the kernels/disk images
         rateLimit,
 ]
-// Don't archive sysroot/disk image/kernel images for pull requests and non-default branches:
+// Don't archive sysroot/disk image/kernel images for pull requests and non-default/releng branches:
 def archiveBranches = ['main', 'master', 'dev']
-if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
+if (!env.CHANGE_ID && (archiveBranches.contains(env.BRANCH_NAME) || env.BRANCH_NAME.startsWith('releng/'))) {
     if (!GlobalVars.isTestSuiteJob) {
         // Don't archive disk images for the test suite job
         GlobalVars.archiveArtifacts = true
     }
-    // For branches other than the master/main branch, only keep the last two artifacts to save disk space
-    if (env.BRANCH_NAME != 'main' && env.BRANCH_NAME != 'master') {
+    // For branches other than the master/main and releng branches, only keep the last two artifacts to save disk space
+    if (env.BRANCH_NAME != 'main' && env.BRANCH_NAME != 'master' && !env.BRANCH_NAME.startsWith('releng/')) {
         jobProperties.add(buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '2')))
     }
 }

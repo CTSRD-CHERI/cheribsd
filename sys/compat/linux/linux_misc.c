@@ -61,6 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sched.h>
 #include <sys/sdt.h>
 #include <sys/signalvar.h>
+#include <sys/smp.h>
 #include <sys/stat.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
@@ -911,6 +912,9 @@ static int
 linux_utimensat_lts64_to_ts(struct l_timespec64 *l_times, struct timespec *times)
 {
 
+	/* Zero out the padding in compat mode. */
+	l_times->tv_nsec &= 0xFFFFFFFFUL;
+
 	if (l_times->tv_nsec != LINUX_UTIME_OMIT &&
 	    l_times->tv_nsec != LINUX_UTIME_NOW &&
 	    (l_times->tv_nsec < 0 || l_times->tv_nsec > 999999999))
@@ -1073,14 +1077,6 @@ linux_wait4(struct thread *td, struct linux_wait4_args *args)
 	 */
 	options |= WEXITED | WTRAPPED;
 
-	/*
-	 * As FreeBSD does not have __WALL option bit analogue explicitly set all
-	 * possible option bits to emulate Linux __WALL wait option bit. The same
-	 * for waitid system call.
-	 */
-	if ((args->options & __WALL) != 0)
-		options |= WUNTRACED | WCONTINUED | WLINUXCLONE;
-
 	if (args->pid == WAIT_ANY) {
 		idtype = P_ALL;
 		id = 0;
@@ -1116,9 +1112,6 @@ linux_waitid(struct thread *td, struct linux_waitid_args *args)
 
 	options = 0;
 	linux_to_bsd_waitopts(args->options, &options);
-	if ((args->options & __WALL) != 0)
-		options |= WEXITED | WTRAPPED | WUNTRACED |
-		    WCONTINUED | WLINUXCLONE;
 
 	id = args->id;
 	switch (args->idtype) {
@@ -2247,6 +2240,11 @@ linux_sched_getparam(struct thread *td,
 	return (error);
 }
 
+static const struct cpuset_copy_cb copy_set = {
+	.cpuset_copyin = copyin,
+	.cpuset_copyout = copyout
+};
+
 /*
  * Get affinity of a process.
  */
@@ -2254,22 +2252,22 @@ int
 linux_sched_getaffinity(struct thread *td,
     struct linux_sched_getaffinity_args *args)
 {
-	int error;
 	struct thread *tdt;
-
-	if (args->len < sizeof(cpuset_t))
-		return (EINVAL);
+	int error;
+	id_t tid;
 
 	tdt = linux_tdfind(td, args->pid, -1);
 	if (tdt == NULL)
 		return (ESRCH);
-
+	tid = tdt->td_tid;
 	PROC_UNLOCK(tdt->td_proc);
 
 	error = kern_cpuset_getaffinity(td, CPU_LEVEL_WHICH, CPU_WHICH_TID,
-	    tdt->td_tid, sizeof(cpuset_t), (cpuset_t *)args->user_mask_ptr);
+	    tid, args->len, (cpuset_t *)args->user_mask_ptr, &copy_set);
+	if (error == ERANGE)
+		error = EINVAL;
 	if (error == 0)
-		td->td_retval[0] = sizeof(cpuset_t);
+		td->td_retval[0] = min(args->len, sizeof(cpuset_t));
 
 	return (error);
 }
@@ -2282,18 +2280,34 @@ linux_sched_setaffinity(struct thread *td,
     struct linux_sched_setaffinity_args *args)
 {
 	struct thread *tdt;
-
-	if (args->len < sizeof(cpuset_t))
-		return (EINVAL);
+	cpuset_t *mask;
+	int cpu, error;
+	size_t len;
+	id_t tid;
 
 	tdt = linux_tdfind(td, args->pid, -1);
 	if (tdt == NULL)
 		return (ESRCH);
-
+	tid = tdt->td_tid;
 	PROC_UNLOCK(tdt->td_proc);
 
-	return (kern_cpuset_setaffinity(td, CPU_LEVEL_WHICH, CPU_WHICH_TID,
-	    tdt->td_tid, sizeof(cpuset_t), (cpuset_t *) args->user_mask_ptr));
+	len = min(args->len, sizeof(cpuset_t));
+	mask = malloc(sizeof(cpuset_t), M_TEMP, M_WAITOK | M_ZERO);;
+	error = copyin(args->user_mask_ptr, mask, len);
+	if (error != 0)
+		goto out;
+	/* Linux ignore high bits */
+	CPU_FOREACH_ISSET(cpu, mask)
+		if (cpu > mp_maxid)
+			CPU_CLR(cpu, mask);
+
+	error = kern_cpuset_setaffinity(td, CPU_LEVEL_WHICH, CPU_WHICH_TID,
+	    tid, mask);
+	if (error == EDEADLK)
+		error = EINVAL;
+out:
+	free(mask, M_TEMP);
+	return (error);
 }
 
 struct linux_rlimit64 {
@@ -2378,15 +2392,11 @@ linux_prlimit64(struct thread *td, struct linux_prlimit64_args *args)
 int
 linux_pselect6(struct thread *td, struct linux_pselect6_args *args)
 {
-	struct l_timespec lts;
 	struct timespec ts, *tsp;
-	int error, error2;
+	int error;
 
 	if (args->tsp != NULL) {
-		error = copyin(args->tsp, &lts, sizeof(lts));
-		if (error != 0)
-			return (error);
-		error = linux_to_native_timespec(&ts, &lts);
+		error = linux_get_timespec(&ts, args->tsp);
 		if (error != 0)
 			return (error);
 		tsp = &ts;
@@ -2396,11 +2406,8 @@ linux_pselect6(struct thread *td, struct linux_pselect6_args *args)
 	error = linux_common_pselect6(td, args->nfds, args->readfds,
 	    args->writefds, args->exceptfds, tsp, args->sig);
 
-	if (args->tsp != NULL) {
-		error2 = native_to_linux_timespec(&lts, tsp);
-		if (error2 == 0)
-			copyout(&lts, args->tsp, sizeof(lts));
-	}
+	if (args->tsp != NULL)
+		linux_put_timespec(&ts, args->tsp);
 	return (error);
 }
 
@@ -2474,15 +2481,11 @@ int
 linux_pselect6_time64(struct thread *td,
     struct linux_pselect6_time64_args *args)
 {
-	struct l_timespec64 lts;
 	struct timespec ts, *tsp;
-	int error, error2;
+	int error;
 
 	if (args->tsp != NULL) {
-		error = copyin(args->tsp, &lts, sizeof(lts));
-		if (error != 0)
-			return (error);
-		error = linux_to_native_timespec64(&ts, &lts);
+		error = linux_get_timespec64(&ts, args->tsp);
 		if (error != 0)
 			return (error);
 		tsp = &ts;
@@ -2492,11 +2495,8 @@ linux_pselect6_time64(struct thread *td,
 	error = linux_common_pselect6(td, args->nfds, args->readfds,
 	    args->writefds, args->exceptfds, tsp, args->sig);
 
-	if (args->tsp != NULL) {
-		error2 = native_to_linux_timespec64(&lts, tsp);
-		if (error2 == 0)
-			copyout(&lts, args->tsp, sizeof(lts));
-	}
+	if (args->tsp != NULL)
+		linux_put_timespec64(&ts, args->tsp);
 	return (error);
 }
 #endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
@@ -2505,14 +2505,10 @@ int
 linux_ppoll(struct thread *td, struct linux_ppoll_args *args)
 {
 	struct timespec uts, *tsp;
-	struct l_timespec lts;
 	int error;
 
 	if (args->tsp != NULL) {
-		error = copyin(args->tsp, &lts, sizeof(lts));
-		if (error)
-			return (error);
-		error = linux_to_native_timespec(&uts, &lts);
+		error = linux_get_timespec(&uts, args->tsp);
 		if (error != 0)
 			return (error);
 		tsp = &uts;
@@ -2521,13 +2517,8 @@ linux_ppoll(struct thread *td, struct linux_ppoll_args *args)
 
 	error = linux_common_ppoll(td, args->fds, args->nfds, tsp,
 	    args->sset, args->ssize);
-	if (error != 0)
-		return (error);
-	if (tsp != NULL) {
-		error = native_to_linux_timespec(&lts, tsp);
-		if (error == 0)
-			error = copyout(&lts, args->tsp, sizeof(lts));
-	}
+	if (error == 0 && args->tsp != NULL)
+		error = linux_put_timespec(&uts, args->tsp);
 	return (error);
 }
 
@@ -2592,14 +2583,10 @@ int
 linux_ppoll_time64(struct thread *td, struct linux_ppoll_time64_args *args)
 {
 	struct timespec uts, *tsp;
-	struct l_timespec64 lts;
 	int error;
 
 	if (args->tsp != NULL) {
-		error = copyin(args->tsp, &lts, sizeof(lts));
-		if (error != 0)
-			return (error);
-		error = linux_to_native_timespec64(&uts, &lts);
+		error = linux_get_timespec64(&uts, args->tsp);
 		if (error != 0)
 			return (error);
 		tsp = &uts;
@@ -2607,13 +2594,8 @@ linux_ppoll_time64(struct thread *td, struct linux_ppoll_time64_args *args)
  		tsp = NULL;
 	error = linux_common_ppoll(td, args->fds, args->nfds, tsp,
 	    args->sset, args->ssize);
-	if (error != 0)
-		return (error);
-	if (tsp != NULL) {
-		error = native_to_linux_timespec64(&lts, tsp);
-		if (error == 0)
-			error = copyout(&lts, args->tsp, sizeof(lts));
-	}
+	if (error == 0 && args->tsp != NULL)
+		error = linux_put_timespec64(&uts, args->tsp);
 	return (error);
 }
 #endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
@@ -2688,16 +2670,12 @@ linux_sched_rr_get_interval(struct thread *td,
     struct linux_sched_rr_get_interval_args *uap)
 {
 	struct timespec ts;
-	struct l_timespec lts;
 	int error;
 
 	error = linux_sched_rr_get_interval_common(td, uap->pid, &ts);
 	if (error != 0)
 		return (error);
-	error = native_to_linux_timespec(&lts, &ts);
-	if (error != 0)
-		return (error);
-	return (copyout(&lts, uap->interval, sizeof(lts)));
+	return (linux_put_timespec(&ts, uap->interval));
 }
 
 #if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
@@ -2706,16 +2684,12 @@ linux_sched_rr_get_interval_time64(struct thread *td,
     struct linux_sched_rr_get_interval_time64_args *uap)
 {
 	struct timespec ts;
-	struct l_timespec64 lts;
 	int error;
 
 	error = linux_sched_rr_get_interval_common(td, uap->pid, &ts);
 	if (error != 0)
 		return (error);
-	error = native_to_linux_timespec64(&lts, &ts);
-	if (error != 0)
-		return (error);
-	return (copyout(&lts, uap->interval, sizeof(lts)));
+	return (linux_put_timespec64(&ts, uap->interval));
 }
 #endif
 

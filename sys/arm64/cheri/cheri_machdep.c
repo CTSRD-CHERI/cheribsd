@@ -43,7 +43,10 @@
 #include <machine/vmparam.h>
 
 void * __capability sentry_unsealcap;
+void * __capability smccc_ddc_el0;
+#ifdef __CHERI_PURE_CAPABILITY__
 void *kernel_root_cap = (void *)(intcap_t)-1;
+#endif
 
 void
 cheri_init_capabilities(void * __capability kroot)
@@ -80,6 +83,8 @@ cheri_init_capabilities(void * __capability kroot)
 	ctemp = cheri_setbounds(ctemp, CHERI_SEALCAP_SWITCHER2_LENGTH);
 	ctemp = cheri_andperm(ctemp, CHERI_SEALCAP_SWITCHER2_PERMS);
 	switcher_sealcap2 = ctemp;
+
+	smccc_ddc_el0 = kroot;
 
 	swap_restore_cap = kroot;
 
