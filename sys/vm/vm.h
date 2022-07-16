@@ -98,8 +98,9 @@ typedef u_char vm_prot_t;	/* protection codes */
 	    (((prot) & VM_PROT_WRITE) != 0 ? VM_PROT_WRITE_CAP : 0))
 
 enum obj_type {
-	OBJT_DEFAULT,
+	OBJT_RESERVED = 0,	/* was OBJT_DEFAULT */
 	OBJT_SWAP,
+	OBJT_DEFAULT = OBJT_SWAP,
 	OBJT_VNODE,
 	OBJT_DEVICE,
 	OBJT_PHYS,
