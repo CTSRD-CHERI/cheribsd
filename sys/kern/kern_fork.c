@@ -510,7 +510,7 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	 * to avoid calling thread_lock() again.
 	 */
 	if ((fr->fr_flags & RFPPWAIT) != 0)
-		td->td_flags |= TDF_ASTPENDING;
+		ast_sched_locked(td, TDA_VFORK);
 	thread_unlock(td);
 
 	/*
@@ -825,8 +825,8 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	}
 }
 
-void
-fork_rfppwait(struct thread *td)
+static void
+ast_vfork(struct thread *td, int tda __unused)
 {
 	struct proc *p, *p2;
 
@@ -1192,6 +1192,14 @@ fork_return(struct thread *td, struct trapframe *frame)
 		ktrsysret(SYS_fork, 0, 0);
 #endif
 }
+
+static void
+fork_init(void *arg __unused)
+{
+	ast_register(TDA_VFORK, ASTR_ASTF_REQUIRED | ASTR_TDP, TDP_RFPPWAIT,
+	    ast_vfork);
+}
+SYSINIT(fork, SI_SUB_INTRINSIC, SI_ORDER_ANY, fork_init, NULL);
 // CHERI CHANGES START
 // {
 //   "updated": 20190812,
