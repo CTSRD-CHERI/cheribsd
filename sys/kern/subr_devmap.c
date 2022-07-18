@@ -397,7 +397,7 @@ devmap_init_capability(void * __capability cap)
 #ifdef DDB
 #include <ddb/ddb.h>
 
-DB_SHOW_COMMAND(devmap, db_show_devmap)
+DB_SHOW_COMMAND_FLAGS(devmap, db_show_devmap, DB_CMD_MEMSAFE)
 {
 	devmap_dump_table(db_printf);
 }

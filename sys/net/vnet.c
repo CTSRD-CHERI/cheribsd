@@ -773,7 +773,7 @@ db_show_vnet_print_vs(struct vnet_sysinit *vs, int ddb)
 #undef xprint
 }
 
-DB_SHOW_COMMAND(vnet_sysinit, db_show_vnet_sysinit)
+DB_SHOW_COMMAND_FLAGS(vnet_sysinit, db_show_vnet_sysinit, DB_CMD_MEMSAFE)
 {
 	struct vnet_sysinit *vs;
 
@@ -787,7 +787,7 @@ DB_SHOW_COMMAND(vnet_sysinit, db_show_vnet_sysinit)
 	}
 }
 
-DB_SHOW_COMMAND(vnet_sysuninit, db_show_vnet_sysuninit)
+DB_SHOW_COMMAND_FLAGS(vnet_sysuninit, db_show_vnet_sysuninit, DB_CMD_MEMSAFE)
 {
 	struct vnet_sysinit *vs;
 
@@ -803,7 +803,7 @@ DB_SHOW_COMMAND(vnet_sysuninit, db_show_vnet_sysuninit)
 }
 
 #ifdef VNET_DEBUG
-DB_SHOW_COMMAND(vnetrcrs, db_show_vnetrcrs)
+DB_SHOW_COMMAND_FLAGS(vnetrcrs, db_show_vnetrcrs, DB_CMD_MEMSAFE)
 {
 	struct vnet_recursion *vnr;
 
