@@ -1134,7 +1134,7 @@
 		    _Inout_ _Contains_long_ struct timex *tp
 		);
 	}
-177	AUE_NULL	STD	{
+177	AUE_NULL	STD|CAPENABLED {
 		int _cosetup(
 		    int what,
 		    _Out_ void * __capability *code,
