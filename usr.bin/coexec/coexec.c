@@ -49,11 +49,11 @@ usage(void)
 static pid_t
 parse_pid(const char *str)
 {
-	char *end;
+	char *tmp;
 	pid_t pid;
 
-	pid = strtoul(str, &end, 10);
-	if ((size_t)(end - str) != strlen(str))
+	pid = strtoul(str, &tmp, 10);
+	if (*tmp != '\0')
 		err(1, "invalid PID \"%s\"", str);
 
 	return (pid);
