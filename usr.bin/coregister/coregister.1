@@ -49,8 +49,6 @@ utility is used to publish one of the services found in the inherited
 capability vector using
 .Xr coregister 2 .
 .Pp
-XXX
-.Pp
 Differently from some other utilities, this one does not spawn
 any command; instead it just sits there, relaying the calls.
 It should probably be run in background.
@@ -74,9 +72,6 @@ instead of
 .Xr coaccept 2 .
 .It Fl v
 Be verbose.
-This also makes
-.Nm
-send its own answerback instead of relaying them.
 .El
 .Sh EXIT STATUS
 The
@@ -91,13 +86,14 @@ system call, eg using
 .Xr colookup 1
 utility:
 .Pp
-.Dl coregister -i5 fabulous
+.Dl coregister -i5 fabulous &
 .Dl coping -v fabulous
 .Pp
 .Sh SEE ALSO
 .Xr capv 1 ,
 .Xr colookup 1 ,
-.Xr coregister 2
+.Xr coregister 2 ,
+.Xr capv 7
 .Sh HISTORY
 The
 .Nm
