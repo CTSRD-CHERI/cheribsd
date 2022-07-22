@@ -228,11 +228,6 @@ CWARNFLAGS+=	-Wno-error=pass-failed
 CXXWARNFLAGS+=	-Wno-error=non-c-typedef-for-linkage
 .endif
 
-.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 130000
-# Work around c++/v1/__bit_reference warning until we update subrepocheri-libc++
-CXXWARNFLAGS+=  -Wno-error=deprecated-copy
-.endif
-
 # How to handle FreeBSD custom printf format specifiers.
 .if ${COMPILER_TYPE} == "clang"
 FORMAT_EXTENSIONS=	-D__printf__=__freebsd_kprintf__
