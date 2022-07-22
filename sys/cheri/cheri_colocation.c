@@ -784,28 +784,13 @@ kern_cocall_slow(void * __capability target,
 	int error;
 	bool have_scb;
 
-	if (outbuf == NULL) {
-		if (outlen != 0) {
-			COLOCATION_DEBUG("outbuf == NULL, but outlen != 0, returning EINVAL");
-			return (EINVAL);
-		}
-	} else {
-		if (outlen == 0) {
-			COLOCATION_DEBUG("outbuf != NULL, but outlen == 0, returning EINVAL");
-			return (EINVAL);
-		}
+	if (outbuf == NULL && outlen != 0) {
+		COLOCATION_DEBUG("outbuf == NULL, but outlen != 0, returning EINVAL");
+		return (EINVAL);
 	}
-
-	if (inbuf == NULL) {
-		if (inlen != 0) {
-			COLOCATION_DEBUG("inbuf == NULL, but inlen != 0, returning EINVAL");
-			return (EINVAL);
-		}
-	} else {
-		if (inlen == 0) {
-			COLOCATION_DEBUG("inbuf != NULL, but inlen == 0, returning EINVAL");
-			return (EINVAL);
-		}
+	if (inbuf == NULL && inlen != 0) {
+		COLOCATION_DEBUG("inbuf == NULL, but inlen != 0, returning EINVAL");
+		return (EINVAL);
 	}
 
 	have_scb = colocation_fetch_scb(curthread, &scb);
@@ -941,28 +926,13 @@ kern_coaccept_slow(void * __capability * __capability cookiep,
 	int error;
 	bool have_scb, is_callee;
 
-	if (outbuf == NULL) {
-		if (outlen != 0) {
-			COLOCATION_DEBUG("outbuf != NULL, but outlen != 0, returning EINVAL");
-			return (EINVAL);
-		}
-	} else {
-		if (outlen == 0) {
-			COLOCATION_DEBUG("outbuf != NULL, but outlen == 0, returning EINVAL");
-			return (EINVAL);
-		}
+	if (outbuf == NULL && outlen != 0) {
+		COLOCATION_DEBUG("outbuf == NULL, but outlen != 0, returning EINVAL");
+		return (EINVAL);
 	}
-
-	if (inbuf == NULL) {
-		if (inlen != 0) {
-			COLOCATION_DEBUG("inbuf != NULL, but inlen != 0, returning EINVAL");
-			return (EINVAL);
-		}
-	} else {
-		if (inlen == 0) {
-			COLOCATION_DEBUG("inbuf != NULL, but inlen == 0, returning EINVAL");
-			return (EINVAL);
-		}
+	if (inbuf == NULL && inlen != 0) {
+		COLOCATION_DEBUG("inbuf == NULL, but inlen != 0, returning EINVAL");
+		return (EINVAL);
 	}
 
 	SWITCHER_LOCK();
