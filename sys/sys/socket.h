@@ -624,6 +624,7 @@ struct sockcred2 {
 #define	SCM_MONOTONIC	0x06		/* timestamp (struct timespec) */
 #define	SCM_TIME_INFO	0x07		/* timestamp info */
 #define	SCM_CREDS2	0x08		/* process creds (struct sockcred2) */
+#define	SCM_CAPS	0x10		/* (array of void * __capability) */
 
 struct sock_timestamp_info {
 	__uint32_t	st_info_flags;

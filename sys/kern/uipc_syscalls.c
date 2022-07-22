@@ -1044,7 +1044,7 @@ kern_recvit(struct thread *td, int s, struct msghdr *mp, enum uio_seg fromseg,
 		len = mp->msg_controllen;
 		mp->msg_controllen = 0;
 		for (m = control; m != NULL && len >= m->m_len; m = m->m_next) {
-			if ((error = copyout(mtod(m, caddr_t), ctlbuf,
+			if ((error = copyoutcap(mtod(m, caddr_t), ctlbuf,
 			    m->m_len)) != 0)
 				goto out;
 
@@ -1570,7 +1570,11 @@ sockargs(struct mbuf **mp, char * __capability buf, socklen_t buflen, int type)
 	}
 	m = m_get2(buflen, M_WAITOK, type, 0);
 	m->m_len = buflen;
-	error = copyin(buf, mtod(m, void *), buflen);
+	/*
+	 * XXX: Not clearing tags here might have security implications.
+	 *      The problem is, we need to preserve the tag in case it's SCM_CAPS.
+	 */
+	error = copyincap(buf, mtod(m, void *), buflen);
 	if (error != 0)
 		(void) m_free(m);
 	else {
