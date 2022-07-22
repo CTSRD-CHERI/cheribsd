@@ -49,11 +49,10 @@ __FBSDID("$FreeBSD$");
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
+#include <vis.h>
 
 static bool Cflag = false, kflag = false, vflag = false;
-static int chosen = -1;
 
 static void
 usage(void)
@@ -74,19 +73,25 @@ static void
 answerback(capv_answerback_t *out, void * __capability target)
 {
 	int error, mode;
+	char *tmp;
 
 	mode = 0;
 	error = cap_getmode(&mode);
 	if (error != 0)
 		err(1, "cap_getmode");
 
+	/*
+	 * There's already a response in 'out'; we need to modify it a bit.
+	 */
+	tmp = strndup(out->answerback, sizeof(out->answerback) - 1);
+
 	memset(out, 0, sizeof(*out));
 	out->len = sizeof(*out);
 	out->op = 0;
 	snprintf(out->answerback, sizeof(out->answerback),
-	    "this is %s, pid %d, tracing service %d (%#lp), running as uid %d%s%s",
-	    getprogname(), getpid(), chosen, target, getuid(),
-	    kflag ? " (slow)" : "", mode ? "" : ", (capsicum disabled)");
+	    "%s -- via cotrace(1), pid %d, tracing %#lp%s%s",
+	    tmp, getpid(), target, kflag ? " (slow)" : "",
+	    mode ? "" : " (capsicum disabled)");
 }
 
 int
@@ -105,9 +110,11 @@ main(int argc, char **argv)
 	void * __capability cookie;
 	void * __capability *capv;
 	char *tmp = NULL;
+	char dumpbuf[MAXBSIZE * 4 + 1];
 	ssize_t received;
 	pid_t pid;
-	int capc, ch, error;
+	int chosen = -1;
+	int capc, ch, error, len;
 
 	while ((ch = getopt(argc, argv, "Ci:kv")) != -1) {
 		switch (ch) {
@@ -200,54 +207,56 @@ main(int argc, char **argv)
 	}
 
 	memset(out, 0, sizeof(*out));
-	//out->len = 0; /* Nothing to send at this point. */
-	out->len = 16; /* XXX */
+	received = 0; /* Nothing to send back at this point. */
 
 	for (;;) {
 		/*
 		 * Receive cocalls from the child process.
 		 */
 		if (kflag)
-			received = coaccept_slow(&cookie, out, out->len, in, sizeof(inbuf));
+			received = coaccept_slow(&cookie, out, received, in, sizeof(inbuf));
 		else
-			received = coaccept(&cookie, out, out->len, in, sizeof(inbuf));
+			received = coaccept(&cookie, out, received, in, sizeof(inbuf));
 		if (received < 0) {
 			warn("%s", kflag ? "coaccept_slow" : "coaccept");
-			out->len = 0;
+			/*
+			 * Don't really have a cocall to respond to; just go around.
+			 */
+			out->len = received = 0;
 			continue;
 		}
 
 		/*
-		 * Answered, print out a line and cocall into the service
-		 * we are interposing.
+		 * Answered; log it and cocall into the service we are interposing.
 		 */
+		len = strvisx(dumpbuf, (const char *)in, received,
+		    VIS_DQ | VIS_NL | VIS_CSTYLE | VIS_OCTAL);
+		if (len < 0)
+			err(1, "strvisx");
+
 		if (vflag) {
 			error = cocachedpid(&pid, cookie);
 			if (error != 0)
 				warn("cogetpid");
-			printf("%s: cocall op %d, len %zd from pid %d -> pid %d%s\n",
-			    getprogname(), in->op, in->len, pid, getpid(), kflag ? " (slow)" : "");
+			printf("%s: cocall len %zd, op %d, received %zd, from pid %d -> pid %d%s: \"%s\"\n",
+			    getprogname(), in->len, in->op, received, pid, getpid(), kflag ? " (slow)" : "",
+			    dumpbuf);
 		} else {
-			printf("%s: -> op %d, len %zd%s\n",
-			    getprogname(), in->op, in->len, kflag ? " (slow)" : "");
+			dumpbuf[56] = '.';
+			dumpbuf[57] = '.';
+			dumpbuf[58] = '.';
+			dumpbuf[59] = '\0';
+
+			printf("len %4zd, op %2d%s -> \"%s\"\n",
+			    in->len, in->op, kflag ? " (slow)" : "", dumpbuf);
 		}
 
-		if (in->op == 0 && vflag) {
-			answerback(&outbuf.answerback, capv[chosen]);
-			printf("%s: returning answerback to pid %d <- pid %d%s\n",
-			    getprogname(), pid, getpid(), kflag ? " (slow)" : "");
-			continue;
-		}
-
-		/*
-		 * Is this a proper packet?
-		 */
-		if ((size_t)received != in->len || in->len != sizeof(*in)) {
-			warnx("size mismatch: received %zd, in.len %zd, expected %zd",
+		if ((size_t)received != in->len) {
+			warnx("size mismatch: received %zd, in.len %zd, buflen %zd",
 			    (size_t)received, in->len, sizeof(*in));
 #ifdef inconvenient
 			memset(out, 0, sizeof(outbuf);
-			out->len = sizeof(outbuf);
+			out->len = received = sizeof(outbuf);
 			out->op = 0;
 			out->error = error;
 			out->_errno = ENOMSG;
@@ -264,21 +273,45 @@ main(int argc, char **argv)
 			received = cocall(target, in, received, out, sizeof(outbuf));
 		if (received < 0) {
 			warn("%s", kflag ? "coaccept_slow" : "coaccept");
-			out->len = 0;
-			continue;
+			out->len = received = 0;
+			// XXX we should send back error response
 		}
-
-		// XXX verify received vs out.len
 
 		/*
-		 * Send the response back and loop.
+		 * Got response from the service; log it.
 		 */
+		len = strvisx(dumpbuf, (const char *)out, received, VIS_DQ | VIS_NL | VIS_CSTYLE | VIS_OCTAL);
+		if (len < 0)
+			err(1, "strvisx");
+
 		if (vflag) {
-			printf("%s: returning op %d, len %zd to pid %d <- pid %d%s\n",
-			    getprogname(), out->op, out->len, pid, getpid(), kflag ? " (slow)" : "");
+			printf("%s: returning len %zd, op %d to pid %d <- pid %d%s: \"%s\"\n",
+			    getprogname(), out->len, out->op, pid, getpid(), kflag ? " (slow)" : "",
+			    dumpbuf);
 		} else {
-			printf("%s: <- op %d, len %zd%s\n",
-			    getprogname(), out->op, out->len, kflag ? " (slow)" : "");
+			dumpbuf[56] = '.';
+			dumpbuf[57] = '.';
+			dumpbuf[58] = '.';
+			dumpbuf[59] = '\0';
+
+			printf("len %4zd, op %2d%s <- \"%s\"\n",
+			    out->len, out->op, kflag ? " (slow)" : "", dumpbuf);
 		}
+
+		/*
+		 * If this was an answerback request, modify the answer to add our own info.
+		 */
+		if ((size_t)received >= sizeof(*in) && in->op == 0) {
+			answerback(&outbuf.answerback, target);
+			received = out->len;
+			if (vflag) {
+				printf("%s: returning answerback to pid %d <- pid %d%s\n",
+				    getprogname(), pid, getpid(), kflag ? " (slow)" : "");
+			}
+		}
+
+		/*
+		 * Now loop; coaccept(2) will send the response back and then wait for the next one.
+		 */
 	}
 }
