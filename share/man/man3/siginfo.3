@@ -110,7 +110,7 @@ for use as values of
 .Va si_code
 that are signal-specific or non-signal-specific reasons why the signal was
 generated:
-.Bl -column "SIGPOLL" "PROT_CHERI_STORELOCAL"
+.Bl -column "SIGPOLL" "PROT_CHERI_UNALIGNED_BASE"
 .It Sy Signal Ta Sy Code Ta Sy Reason
 .It Dv SIGILL Ta Dv ILL_ILLOPC Ta
 illegal opcode
@@ -170,12 +170,12 @@ capability permission fault
 imprecise bounds fault
 .It Ta Dv PROT_CHERI_STORELOCAL Ta
 store-local fault
-.It Ta Dv PROT_CHERI_CCALL Ta
-CCall fault
-.It Ta Dv PROT_CHERI_CRETURN Ta
-CReturn fault
+.It Ta Dv PROT_CHERI_CINVOKE Ta
+CInvoke fault
 .It Ta Dv PROT_CHERI_SYSREG Ta
 capability system register fault
+.It Ta Dv PROT_CHERI_UNALIGNED_BASE Ta
+unaligned base address
 .It Dv SIGTRAP Ta Dv TRAP_BRKPT Ta
 process breakpoint
 .It Ta Dv TRAP_TRACE Ta

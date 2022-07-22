@@ -42,8 +42,6 @@ static const char *cheri_exccode_descr[] = {
 	[CHERI_EXCCODE_TAG] = "tag violation",
 	[CHERI_EXCCODE_SEAL] = "seal violation",
 	[CHERI_EXCCODE_TYPE] = "type violation",
-	[CHERI_EXCCODE_CALL] = "call trap",
-	[CHERI_EXCCODE_RETURN] = "return trap",
 	[CHERI_EXCCODE_PERM_USER] = "user-defined permission violation",
 	[CHERI_EXCCODE_IMPRECISE] = "bounds cannot be represented precisely",
 	[CHERI_EXCCODE_UNALIGNED_BASE] = "Unaligned PCC base",
@@ -56,8 +54,7 @@ static const char *cheri_exccode_descr[] = {
 	[CHERI_EXCCODE_STORE_LOCALCAP] = "permit store local capability violation",
 	[CHERI_EXCCODE_PERM_SEAL] = "permit seal violation",
 	[CHERI_EXCCODE_SYSTEM_REGS] = "access system registers violation",
-	[CHERI_EXCCODE_PERM_CCALL] = "permit ccall violation",
-	[CHERI_EXCCODE_CCALL_IDC] = "access ccall IDC violation",
+	[CHERI_EXCCODE_PERM_CINVOKE] = "permit cinvoke violation",
 	[CHERI_EXCCODE_PERM_UNSEAL] = "permit unseal violation",
 	[CHERI_EXCCODE_PERM_SET_CID] = "permit CSetCID violation",
 };
@@ -68,10 +65,7 @@ cheri_exccode_string(uint8_t exccode)
 
 	if (exccode >= nitems(cheri_exccode_descr) ||
 	    cheri_exccode_descr[exccode] == NULL) {
-		if (exccode >= CHERI_EXCCODE_SW_BASE)
-			return ("unknown software exception");
-		else
-			return ("unknown ISA exception");
+		return ("unknown ISA exception");
 	}
 	return (cheri_exccode_descr[exccode]);
 }
@@ -109,15 +103,15 @@ cheri_stval_to_sicode(register_t stval)
 	case CHERI_EXCCODE_IMPRECISE:
 		return (PROT_CHERI_IMPRECISE);
 
+	case CHERI_EXCCODE_UNALIGNED_BASE:
+		return (PROT_CHERI_UNALIGNED_BASE);
+
 	case CHERI_EXCCODE_GLOBAL:
 	case CHERI_EXCCODE_STORE_LOCALCAP:
 		return (PROT_CHERI_STORELOCAL);
 
-	case CHERI_EXCCODE_CALL:
-		return (PROT_CHERI_CCALL);
-
-	case CHERI_EXCCODE_RETURN:
-		return (PROT_CHERI_CRETURN);
+	case CHERI_EXCCODE_PERM_CINVOKE:
+		return (PROT_CHERI_CINVOKE);
 
 	case CHERI_EXCCODE_SYSTEM_REGS:
 		return (PROT_CHERI_SYSREG);
