@@ -2,7 +2,7 @@
 
 .PATH: ${ZFSTOP}/lib/libuutil
 
-PACKAGE=	runtime
+PACKAGE=	zfs
 LIB=	uutil
 SRCS=\
 	uu_alloc.c \

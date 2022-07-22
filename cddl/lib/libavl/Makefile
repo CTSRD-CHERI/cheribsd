@@ -2,7 +2,7 @@
 
 .PATH: ${ZFSTOP}/module/avl
 
-PACKAGE=	runtime
+PACKAGE=	zfs
 LIB=	avl
 # The assert macro needs `int aok` (which is in nvpair)
 LIBADD=	nvpair spl

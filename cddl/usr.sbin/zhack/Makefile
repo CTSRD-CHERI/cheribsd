@@ -2,6 +2,7 @@
 
 .PATH: ${ZFSTOP}/cmd
 
+PACKAGE=	zfs
 PROG=	zhack
 MAN=
 

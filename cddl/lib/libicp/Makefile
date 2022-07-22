@@ -2,7 +2,7 @@
 
 .PATH: ${ZFSTOP}/module/icp
 
-PACKAGE=	utilities
+PACKAGE=	zfs
 LIB=	icp
 LIBADD=
 

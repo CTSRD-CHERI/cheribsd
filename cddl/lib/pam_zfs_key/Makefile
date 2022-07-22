@@ -1,7 +1,7 @@
 .PATH: ${ZFSTOP}/contrib/pam_zfs_key
 .PATH: ${ZFSTOP}/include
 
-PACKAGE=	utilities
+PACKAGE=	zfs
 LIB=		pam_zfs_key
 
 SHLIBDIR?=	/usr/lib
