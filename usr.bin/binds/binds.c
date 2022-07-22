@@ -104,9 +104,13 @@ capvreturn(capv_binds_return_t *out, int op, int error, int errno_)
 }
 
 static int
-sockaddr_denied(const struct sockaddr_storage *ss, size_t sslen, pid_t pid)
+check_if_denied(const struct sockaddr_storage *ss, size_t sslen, pid_t pid)
 {
 	const struct sockaddr_in *sin;
+
+	/*
+	 * XXX: Add filtering by something else than just a port.
+	 */
 
 	if (allowed_port < 0)
 		return (0);
@@ -314,11 +318,11 @@ main(int argc, char **argv)
 			 */
 			error = captofd(in.s, &fd);
 			if (error != 0) {
-				warnx("captofd(%#lp, &%d)", in.s, fd);
+				warn("captofd: %#lp", in.s);
 				capvreturn(out, -CAPV_BINDS, error, ENOMSG);
 				break;
 			}
-			error = sockaddr_denied(&in.addr, in.addrlen, pid);
+			error = check_if_denied(&in.addr, in.addrlen, pid);
 			if (error != 0) {
 				capvreturn(out, -CAPV_BINDS, -1, error);
 				break;
