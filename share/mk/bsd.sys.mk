@@ -221,13 +221,6 @@ CWARNFLAGS+=	-Wno-system-headers
 CWARNFLAGS+=	-Wno-error=pass-failed
 .endif
 
-.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 110000
-# This warning is no longer emitted by CHERI LLVM, but it does trigger with
-# the current Morello LLVM version.
-# TODO: remove this warning flag when the morello compiler has been updated.
-CXXWARNFLAGS+=	-Wno-error=non-c-typedef-for-linkage
-.endif
-
 # How to handle FreeBSD custom printf format specifiers.
 .if ${COMPILER_TYPE} == "clang"
 FORMAT_EXTENSIONS=	-D__printf__=__freebsd_kprintf__
