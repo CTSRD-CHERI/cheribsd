@@ -62,12 +62,11 @@ interrogate(void * __capability target, char **bufp, bool kflag, bool vflag)
 	capv_t out;
 	ssize_t received;
 	int len;
+	bool dump = false;
 
 	memset(&out, 0, sizeof(out));
 	out.len = sizeof(out);
 	out.op = 0;
-
-	//fprintf(stderr, "%s: out %#lp, outlen %zd, in %#lp, inlen %zd\n", __func__, &out, out.len, &in, sizeof(in));
 
 	if (kflag)
 		received = cocall_slow(target, &out, out.len, &in, sizeof(in));
@@ -78,12 +77,28 @@ interrogate(void * __capability target, char **bufp, bool kflag, bool vflag)
 
 	if ((size_t)received != in.len) {
 		warnx("truncated: received %zd, in.len %zd", (size_t)received, in.len);
+		dump = true;
 		/* Note that we're continuing despite of this, same below. */
 	}
-	if (in.len != sizeof(in))
-		warnx("size mismatch: in.len %zd, expected %zd", in.len, sizeof(in));
-	if (in.op != 0)
+	if (received != sizeof(in)) {
+		warnx("size mismatch: received %zd, expected %zd", received, sizeof(in));
+		dump = true;
+	}
+	if (in.op != 0) {
 		warnx("op mismatch: in.op %d, expected %d", in.op, 0);
+		dump = true;
+	}
+
+	if (dump) {
+		*bufp = calloc(4 * received + 1, 1);
+		if (*bufp == NULL)
+			err(1, "calloc");
+		//len = strvisx(*bufp, (const char *)&in, received, VIS_DQ | VIS_NL | VIS_HTTPSTYLE);
+		len = strvisx(*bufp, (const char *)&in, received, VIS_DQ | VIS_NL | VIS_CSTYLE | VIS_OCTAL);
+		if (len < 0)
+			err(1, "strvisx");
+		return (0);
+	}
 
 	if (vflag) {
 		in.answerback[sizeof(in.answerback) - 1] = '\0';

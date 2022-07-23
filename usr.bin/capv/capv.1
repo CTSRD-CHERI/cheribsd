@@ -50,7 +50,7 @@
 The
 .Nm
 utility is used to interrogate services found in the capability vector
-inherited from the parent process.
+inherited from the parent process, typically the shell.
 It can also display raw vector contents,
 and execute a command with only the selected entries inherited.
 .Pp
@@ -77,18 +77,15 @@ The
 .Nm
 utility exits 0 on success, and >0 if an error occurs.
 .Sh EXAMPLES
+Show the capability vector for the current shell:
+.Dl capv -v
+.Pp
 Execute
 .Xr sh 1
 with capability vector that includes only entries 0 and 42:
 .Dl capv -i 0 -i 42 sh
 .Pp
 .Sh SEE ALSO
-.Xr colookup 1 ,
-.Xr cocall 2 ,
-.Xr coexecvec 2 ,
-.Xr capvfetch 2 ,
-.Xr capvset 2 ,
-.Xr elf_aux_info 3 ,
 .Xr capv 7
 .Sh HISTORY
 The
