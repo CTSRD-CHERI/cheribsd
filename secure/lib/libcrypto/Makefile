@@ -121,6 +121,11 @@ SRCS+=	ppc.S ppc-mont.S
 SRCS+=	bn_asm.c
 .endif
 
+# Full of strict aliasing violations that LLVM has been seen to break with
+# optimisations, which can lead to ECDSA signatures not working. See
+# https://github.com/openssl/openssl/issues/12247 for the upstream bug report.
+CFLAGS.bn_nist.c+=	-fno-strict-aliasing
+
 # buffer
 SRCS+=	buf_err.c buffer.c
 
@@ -507,14 +512,6 @@ openssl_opensslconf.h: opensslconf.h
 opensslconf.h: opensslconf.h.in
 	sed '${_cmd1}; ${_cmd2}' ${.ALLSRC} > ${.TARGET}.tmp
 	mv -f ${.TARGET}.tmp ${.TARGET}
-
-# See https://github.com/CTSRD-CHERI/cheribsd/issues/526
-# I wasted many hours assuming this was an error in the GVN pass of the CHERI
-# clang compiler since it only affected pure-capability compilation, but it
-# looks like non-CHERI might also suffer from this issue with improved compiler
-# alias analysis.
-# See https://github.com/openssl/openssl/issues/12247 for the upstream bug report.
-CFLAGS.bn_nist.c+=	-fno-strict-aliasing
 
 .include <bsd.lib.mk>
 
