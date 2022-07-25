@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD$");
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 static void
@@ -58,7 +59,7 @@ main(int argc, char **argv)
 	void * __capability *lookedup;
 	char *registered, *tmp;
 	uint64_t *halfcookie;
-	ssize_t received;
+	ssize_t received, outlen;
 	pid_t pid;
 	float dt = 0.0;
 	bool kflag = false, vflag = false, xflag = false;
@@ -141,13 +142,19 @@ main(int argc, char **argv)
 	if (vflag)
 		fprintf(stderr, "%s: %s: coaccepting...\n", getprogname(), registered);
 
+	memset(inout, 0, sizeof(*inout));
+	received = 0; /* Nothing to send back at this point. */
+
 	for (;;) {
 		if (kflag)
-			received = coaccept_slow(&cookie, inout, sizeof(inout), inout, sizeof(inout));
+			received = coaccept_slow(&cookie, inout, received, inout, sizeof(inout));
 		else
-			received = coaccept(&cookie, inout, sizeof(inout), inout, sizeof(inout));
-		if (received < 0)
-			warn("coaccept");
+			received = coaccept(&cookie, inout, received, inout, sizeof(inout));
+		if (received < 0) {
+			warn("%s", kflag ? "coaccept_slow" : "coaccept");
+			received = 0;
+			continue;
+		}
 		if (vflag) {
 			halfcookie = (uint64_t *)&cookie;
 			error = cogetpid(&pid);
@@ -157,14 +164,18 @@ main(int argc, char **argv)
 			    getprogname(), registered, getpid(), pid, halfcookie[0], halfcookie[1]);
 		}
 
+		/*
+		 * XXX: Obviously only one of those responses will make it back to our caller.
+		 */
+		outlen = received;
 		for (c = 0; c < argc; c++) {
 			if (vflag)
 				fprintf(stderr, "%s: %s: cocalling \"%s\"...\n",
 				    getprogname(), registered, argv[c]);
 			if (kflag)
-				received = cocall_slow(lookedup[c], inout, sizeof(inout), inout, sizeof(inout));
+				received = cocall_slow(lookedup[c], inout, outlen, inout, sizeof(inout));
 			else
-				received = cocall(lookedup[c], inout, sizeof(inout), inout, sizeof(inout));
+				received = cocall(lookedup[c], inout, outlen, inout, sizeof(inout));
 			if (received < 0)
 				warn("cocall");
 			if (vflag)
