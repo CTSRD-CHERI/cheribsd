@@ -82,6 +82,11 @@ services that require file descriptor passing using
 .Xr capfromfd 2
 and
 .Xr captofd 2 .
+.Pp
+PROTIP: For unprivileged processes to bind to ports below 1024,
+run
+.Nm
+as root.
 .Sh EXIT STATUS
 The
 .Nm
@@ -99,8 +104,6 @@ and then make use of it:
 .Pp
 .Sh SEE ALSO
 .Xr capv 1 ,
-.Xr coping 1 ,
-.Xr stdbuf 1 ,
 .Xr bind 2 ,
 .Xr coaccept 2 ,
 .Xr capv 7

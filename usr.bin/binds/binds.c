@@ -53,7 +53,6 @@ __FBSDID("$FreeBSD$");
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
 
 static bool Cflag = false, kflag = false, vflag = false;
@@ -88,8 +87,8 @@ answerback(capv_answerback_t *out)
 	out->len = sizeof(*out);
 	out->op = 0;
 	snprintf(out->answerback, sizeof(out->answerback),
-	    "binds(1), allowed port %d, running as pid %d, uid %d%s%s",
-	    allowed_port, getpid(), getuid(), kflag ? " (slow)" : "",
+	    "binds(1), pid %d, allowed port %d%s%s",
+	    getpid(), allowed_port, kflag ? " (slow)" : "",
 	    mode ? "" : " (capsicum disabled)");
 }
 
@@ -272,8 +271,7 @@ main(int argc, char **argv)
 #endif
 
 	memset(out, 0, sizeof(*out));
-	//out->len = 0; /* Nothing to send at this point. */
-	out->len = 16; /* XXX */
+	out->len = 0; /* Nothing to send back at this point. */
 
 	for (;;) {
 		if (kflag)
