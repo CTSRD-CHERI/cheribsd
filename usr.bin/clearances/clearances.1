@@ -1,0 +1,151 @@
+.\"
+.\" Copyright (c) 2022 Edward Tomasz Napierala <en322@cl.cam.ac.uk>
+.\" All rights reserved.
+.\"
+.\" This software was developed by the University of Cambridge Computer
+.\" Laboratory as part of the CHERI for Hypervisors and Operating Systems
+.\" (CHaOS) project, funded by EPSRC grant EP/V000292/1.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" $FreeBSD$
+.\"
+.Dd May 25, 2022
+.Dt CLEARANCES 1
+.Os
+.Sh NAME
+.Nm clearances
+.Nd enforce certain security policy
+.Sh SYNOPSIS
+.Nm
+.Fl 1 | O | X
+.Op Fl C
+.Op Fl k
+.Op Fl v
+.Fl i Ar index
+.Ar command Op Ar args ...
+.Sh DESCRIPTION
+The
+.Nm
+command implements arbitrary security policies to restrict colocated calls
+to a service of choice.
+Every
+.Xr cocall 2
+performed by the child process and its descendants
+to the service indicated by
+.Ar index
+will be passed through to the service iff the security policy allows it,
+and returned with
+.Dv ECANCELED
+otherwise.
+.Pp
+Because
+.Nm
+is merely an interposer, it cannot elevate access rights, only restrict them down.
+It can be thought of as an alternative to restricting capability propagation,
+by restricting capability use instead.
+.Pp
+It must be noted that the service wrapped by
+.Nm
+will see all the calls as coming from that
+.Nm
+instance, not from its callers.
+This makes it impossible to transparently wrap stateful services,
+or to stack instances of
+.Nm .
+Implementing that with any non-trivial policy usually requires duplicating
+the state between
+.Nm
+and the service for service-specific reasons, and then it often turns out
+to be a rather poor idea because of what happens when those two go out of sync.
+A safer way to implement it is by introducing a separate "minder protocol"
+between them, to carry both the state and callers’ identities.
+Yet another is to implement those policy checks in the service itself;
+this also has the advantage of not introducing additional IPC overhead.
+Then there's
+.Xr dispatch 1 .
+.Pp
+The name might make more sense if you imagine holding a capability
+as an equivalent of the need-to-know.
+.Pp
+The following options are available:
+.Bl -tag -width ".Fl s time"
+.It Fl 1
+Allow calls by one of descendant processes - and only that one.
+This demonstrates how to make a capability effectively non-transferable.
+.\".It Fl E
+.\"Execute the command with the caller’s PID as an argument
+.\"and let the call through iff the exit status was 0.
+.\".It Fl G
+.\"Allow calls from processes that belong to the indicated group.
+.\"This can be used with SGID to restrict the capability use to specific set of binaries.
+.It Fl O
+Allow the call except for odd minutes.
+This demonstrates how a capability can be effectively revoked - and unrevoked.
+.It Fl X
+Your security policy goes here.
+Or an audit mechanism.
+Filtering by interfacing with
+.Xr mac 4
+would be cool.
+Or
+.Xr polkit 8 .
+.It Fl i
+Interpose the service found at offset
+.Ar index
+in the capability vector inherited from the parent process.
+.It Fl k
+Use
+.Xr coaccept_slow 2
+instead of
+.Xr coaccept 2 .
+.It Fl v
+Be verbose.
+.Sh EXIT STATUS
+The
+.Nm
+utility exits 0 on success, and >0 if an error occurs.
+.Sh EXAMPLES
+.Pp
+.Dl clocks clearances -O -i 8 sh
+.Dl while :; do date; sleep 10; done
+.Pp
+.Sh BUGS
+The
+.Fl O
+policy is not guaranteed to be compliant with Common Criteria EAL4 requirements.
+.Sh SEE ALSO
+.Xr capv 7
+.Sh HISTORY
+The
+.Nm
+command appeared in
+.Tn CheriBSD .
+.Sh AUTHORS
+.An -nosplit
+The
+.Nm
+utility was developed by
+.An Edward Tomasz Napierala Aq Mt trasz@FreeBSD.org
+at the University of Cambridge Computer Laboratory as part of the CHERI
+for Hypervisors and Operating Systems (CHaOS) project, funded by EPSRC
+grant EP/V000292/1.

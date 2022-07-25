@@ -108,6 +108,9 @@ typedef union {
 	};
 } capv_binds_t;
 
+/*
+ * XXX: Merge those two into an universal error return struct?
+ */
 typedef union {
 	void * __capability aligner;
 	struct {
@@ -117,6 +120,16 @@ typedef union {
 		int	errno_;
 	};
 } capv_binds_return_t;
+
+typedef union {
+	void * __capability aligner;
+	struct {
+		size_t	len;
+		int	op;
+		int	error;
+		int	errno_;
+	};
+} capv_clearances_return_t;
 
 #endif /* !_CAPV_H_ */
 
