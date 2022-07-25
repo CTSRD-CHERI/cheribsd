@@ -213,27 +213,6 @@ copyin_end:
 END(copyin)
 
 /*
- * Copies between two user addresses
- *
- * int copyuser(const void * __capability usrc, void * __capability udst,
- *     size_t len)
- */
-ENTRY(copyuser)
-	beqz	a2, copyuser_end	/* If len == 0 then skip loop */
-	add	a3, a0, a2
-	li	a4, VM_MAXUSER_ADDRESS
-	bgeu	a3, a4, copyio_fault_nopcb
-	add	a3, a1, a2
-	bgeu	a3, a4, copyio_fault_nopcb
-
-	copycommon
-
-copyuser_end:
-	li	a0, 0		/* return 0 */
-	RETURN
-END(copyuser)
-
-/*
  * Copies a string from a user to kernel address
  *
  * int copyinstr(const void * __capability udaddr, void *kaddr, size_t len,
@@ -415,6 +394,28 @@ copyincap_end:
 	li	a0, 0		/* return 0 */
 	RETURN
 END(copyincap)
+
+/*
+ * Copies between two user addresses
+ *
+ * int copyuser(const void * __capability usrc, void * __capability udst,
+ *     size_t len)
+ */
+ENTRY(copyuser)
+	beqz	a2, copyuser_end	/* If len == 0 then skip loop */
+	add	a3, a0, a2
+	li	a4, VM_MAXUSER_ADDRESS
+	bgeu	a3, a4, copyio_fault_nopcb
+	add	a3, a1, a2
+	bgeu	a3, a4, copyio_fault_nopcb
+
+	copycapcommon
+
+copyuser_end:
+	li	a0, 0		/* return 0 */
+	RETURN
+END(copyuser)
+
 #endif
 
 /*
