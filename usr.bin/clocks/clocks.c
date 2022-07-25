@@ -87,9 +87,9 @@ answerback(capv_answerback_t *out)
 	out->len = sizeof(*out);
 	out->op = 0;
 	snprintf(out->answerback, sizeof(out->answerback),
-	    "clocks(1), pid %d, %s%s responding to clock_gettime(), running as uid %d",
-	    getpid(), kflag ? "halfheartedly" : "merrily",
-	    mode ? "" : ", yet unsettlingly,", getuid());
+	    "clocks(1), pid %d, responding to clock_gettime()%s%s",
+	    getpid(), kflag ? " (slow)" : "",
+	    mode ? "" : " (capsicum disabled)");
 }
 
 int
@@ -204,8 +204,7 @@ main(int argc, char **argv)
 	}
 
 	memset(out, 0, sizeof(*out));
-	//out->len = 0; /* Nothing to send at this point. */
-	out->len = 16; /* XXX */
+	out->len = 0; /* Nothing to send at this point. */
 
 	for (;;) {
 		if (kflag)

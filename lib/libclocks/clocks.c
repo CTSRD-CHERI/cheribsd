@@ -107,9 +107,15 @@ clock_gettime(clockid_t clock_id, struct timespec *tp)
 
 	//fprintf(stderr, "%s: <- returned error %d, errno %d\n", __func__, in.error, in.errno_);
 	error = in.error;
-	if (error != 0)
+	if (error != 0) {
 		errno = in.errno_;
-	else
+		/*
+		 * Some callers doesn't bother to check the return value;
+		 * make sure to return something obviously wrong.
+		 */
+		memset(tp, 0, sizeof(*tp));
+	} else {
 		memcpy(tp, &in.ts, sizeof(*tp));
+	}
 	return (error);
 }
