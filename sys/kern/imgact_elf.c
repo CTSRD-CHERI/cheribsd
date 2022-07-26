@@ -1430,6 +1430,17 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		goto ret;
 	}
 	sv = brand_info->sysvec;
+#ifdef __ELF_CHERI
+	/*
+	 * CHERI binaries with a hope of working are all modern. If
+	 * the OS release note is missing just assume they are in sync
+	 * with the current tree.
+	 */
+	if (osrel == 0 && SV_PROC_FLAG(imgp->proc, SV_ABI_FREEBSD) &&
+	    SV_PROC_FLAG(imgp->proc, SV_CHERI))
+		osrel = __FreeBSD_version;
+#endif
+
 	et_dyn_addr = 0;
 	if (hdr->e_type == ET_DYN) {
 		if ((brand_info->flags & BI_CAN_EXEC_DYN) == 0) {
