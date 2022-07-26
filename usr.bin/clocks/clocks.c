@@ -190,7 +190,7 @@ main(int argc, char **argv)
 		/*
 		 * Shouldn't have returned.
 		 */
-		err(1, "coexecvpc");
+		err(1, "%s", argv[0]);
 	}
 
 	/*
