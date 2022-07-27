@@ -3169,7 +3169,7 @@ pmap_remove_l3_range(pmap_t pmap, pd_entry_t l2e, vm_offset_t sva,
 					 * released.  Otherwise, a concurrent
 					 * pmap_remove_all() on a physical page
 					 * could return while a stale TLB entry
-					 * still provides access to that page. 
+					 * still provides access to that page.
 					 */
 					if (va != eva) {
 						pmap_invalidate_range(pmap, va,
@@ -5012,7 +5012,7 @@ pmap_caploadgen_update(pmap_t pmap, vm_offset_t va, vm_page_t *mp, int flags)
 
 		m = NULL;
 		res = PMAP_CAPLOADGEN_CLEAN;
-	} else if ((flags & PMAP_CAPLOADGEN_WIRE) && !vm_page_wire_mapped(m)) {
+	} else if (!vm_page_wire_mapped(m)) {
 		/* Can't wire this one; give up */
 		res = PMAP_CAPLOADGEN_TEARDOWN;
 	} else if ((tpte & ATTR_CDBM) == 0) {
@@ -5070,12 +5070,8 @@ out_unlocked:
 	// printf("pcu exit pte=%016lx (%016lx) va=%016lx (%016lx) *mp=%p m=%p res=%d\n",
 	// 	oldpte, newpte, va, *pva, *mp, m, res);
 
-	if ((flags & PMAP_CAPLOADGEN_WIRE) && (*mp != NULL)) {
-		/*
-		 * Unwire any existing page we were given if we are asked to
-		 * wire the returned page.
-		 */
-		vm_page_unwire(*mp, PQ_INACTIVE);
+	if (*mp != NULL) {
+		vm_page_unwire_in_situ(*mp);
 	}
 	*mp = m;
 
@@ -5348,7 +5344,7 @@ pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vm_offset_t dst_addr, vm_size_t len,
 				pmap_abort_ptp(dst_pmap, addr, dstmpte);
 				goto out;
 			}
-			/* Have we copied all of the valid mappings? */ 
+			/* Have we copied all of the valid mappings? */
 			if (dstmpte->ref_count >= srcmpte->ref_count)
 				break;
 		}
@@ -5660,7 +5656,7 @@ pmap_remove_pages(pmap_t pmap)
 				switch(lvl) {
 				case 1:
 					pte = pmap_l1_to_l2(pde, pv->pv_va);
-					tpte = pmap_load(pte); 
+					tpte = pmap_load(pte);
 					KASSERT((tpte & ATTR_DESCR_MASK) ==
 					    L2_BLOCK,
 					    ("Attempting to remove an invalid "
