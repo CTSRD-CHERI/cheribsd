@@ -3960,7 +3960,7 @@ pmc_syscall_handler(struct thread *td, void *syscall_args)
 		pmc->pm_flags = pa.pm_flags;
 
 		/* XXX set lower bound on sampling for process counters */
-		if (PMC_IS_SAMPLING_MODE(mode)) {
+		if (PMC_IS_SAMPLING_MODE(mode) && !PMC_IS_SYSTEM_MODE(mode)) {
 			/*
 			 * Don't permit requested sample rate to be
 			 * less than pmc_mincount.
