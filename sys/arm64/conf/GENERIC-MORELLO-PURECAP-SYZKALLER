@@ -1,0 +1,20 @@
+#
+# Pure capability ABI kernel for syzkaller fuzzing
+#
+# $FreeBSD$
+
+include "GENERIC-MORELLO"
+
+ident		GENERIC-MORELLO-PURECAP
+
+machine 	arm64 aarch64c
+
+makeoptions	CHERI_SUBOBJECT_BOUNDS=subobject-safe
+
+options 	CHERI_PURECAP_KERNEL
+options 	COVERAGE
+options 	KCOV
+
+nooptions 	PERTHREAD_SSP		# Not relevant in purecap
+
+nodevice	armv8crypto	# No purecap assembly
