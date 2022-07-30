@@ -1071,29 +1071,32 @@ main(int argc, char **argv)
 	 * directory.  If so, use `dirname path` to determine the
 	 * kernel directory.
 	 */
-	(void) snprintf(buffer, sizeof(buffer), "%s%s", args.pa_fsroot,
-	    args.pa_kernel);
-	if (stat(buffer, &sb) < 0)
-		err(EX_OSERR, "ERROR: Cannot locate kernel \"%s\"",
-		    buffer);
-	if (!S_ISREG(sb.st_mode) && !S_ISDIR(sb.st_mode))
-		errx(EX_USAGE, "ERROR: \"%s\": Unsupported file type.",
-		    buffer);
-	if (!S_ISDIR(sb.st_mode)) {
-		tmp = args.pa_kernel;
-		args.pa_kernel = strdup(dirname(args.pa_kernel));
-		if (args.pa_kernel == NULL)
-			errx(EX_SOFTWARE, "ERROR: Out of memory");
-		free(tmp);
-		(void) snprintf(buffer, sizeof(buffer), "%s%s",
-		    args.pa_fsroot, args.pa_kernel);
+	if (args.pa_flags & (FLAG_DO_ANALYSIS | FLAG_DO_ANNOTATE |
+	    FLAG_DO_CALLGRAPHS)) {
+		(void) snprintf(buffer, sizeof(buffer), "%s%s", args.pa_fsroot,
+				args.pa_kernel);
 		if (stat(buffer, &sb) < 0)
-			err(EX_OSERR, "ERROR: Cannot stat \"%s\"",
+			err(EX_OSERR, "ERROR: Cannot locate kernel \"%s\"",
 			    buffer);
-		if (!S_ISDIR(sb.st_mode))
-			errx(EX_USAGE,
-			    "ERROR: \"%s\" is not a directory.",
-			    buffer);
+		if (!S_ISREG(sb.st_mode) && !S_ISDIR(sb.st_mode))
+			errx(EX_USAGE, "ERROR: \"%s\": Unsupported file type.",
+			     buffer);
+		if (!S_ISDIR(sb.st_mode)) {
+			tmp = args.pa_kernel;
+			args.pa_kernel = strdup(dirname(args.pa_kernel));
+			if (args.pa_kernel == NULL)
+				errx(EX_SOFTWARE, "ERROR: Out of memory");
+			free(tmp);
+			(void) snprintf(buffer, sizeof(buffer), "%s%s",
+					args.pa_fsroot, args.pa_kernel);
+			if (stat(buffer, &sb) < 0)
+				err(EX_OSERR, "ERROR: Cannot stat \"%s\"",
+				    buffer);
+			if (!S_ISDIR(sb.st_mode))
+				errx(EX_USAGE,
+				     "ERROR: \"%s\" is not a directory.",
+				     buffer);
+		}
 	}
 
 	args.pa_xop = xo_create_to_file(args.pa_printfile, xo_get_style(NULL),
