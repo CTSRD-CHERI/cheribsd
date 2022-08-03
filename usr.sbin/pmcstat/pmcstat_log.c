@@ -398,9 +398,10 @@ pmcstat_print_log(void)
 		switch (ev.pl_type) {
 		case PMCLOG_TYPE_CALLCHAIN:
 			PMCSTAT_PRINT_ENTRY("callchain", 
-			    "{:pid/%d} {:pmcid/%#x} {:cpu/%d} {:npc/%d} "
-			    "{:mode/%c}",
+			    "{:pid/%d} {:tid/%d} {:pmcid/%#x} {:cpu/%d} "
+			    "{:npc/%d} {:mode/%c}",
 			    ev.pl_u.pl_cc.pl_pid,
+			    ev.pl_u.pl_cc.pl_tid,
 			    ev.pl_u.pl_cc.pl_pmcid,
 			    PMC_CALLCHAIN_CPUFLAGS_TO_CPU(ev.pl_u.pl_cc. \
 				pl_cpuflags), ev.pl_u.pl_cc.pl_npc,
