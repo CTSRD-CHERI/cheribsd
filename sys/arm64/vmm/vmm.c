@@ -1398,7 +1398,12 @@ vm_set_register(struct vm *vm, int vcpuid, int reg, vmm_register_t val)
 		return (error);
 
 	vcpu = &vm->vcpu[vcpuid];
+#if __has_feature(capabilities)
+	/* XXX: We need a way for userspace to create a guest capability */
+	vcpu->nextpc = (uintcap_t)cheri_setaddress(cheri_getpcc(), val);
+#else
 	vcpu->nextpc = val;
+#endif
 
 	return(0);
 }
