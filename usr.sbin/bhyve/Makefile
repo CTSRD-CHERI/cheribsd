@@ -155,4 +155,10 @@ CFLAGS+=-DGDB_LOG
 WARNS?=	2
 
 SUBDIR=	kbdlayout
+
+.if !${MACHINE_ABI:Mpurecap}
+NEED_COMPAT=	64C
+.include <bsd.compat.mk>
+.endif
+
 .include <bsd.prog.mk>
