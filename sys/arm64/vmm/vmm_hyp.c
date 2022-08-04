@@ -70,7 +70,7 @@ vfp_store(struct vfpstate *state)
 	    "stp	q26, q27, [%2, #16 * 26]\n"
 	    "stp	q28, q29, [%2, #16 * 28]\n"
 	    "stp	q30, q31, [%2, #16 * 30]\n"
-	    : "=&r"(fpcr), "=&r"(fpsr) : "r"(vfp_state));
+	    : "=&r"(fpcr), "=&r"(fpsr) : ASM_PTR_CONSTR(vfp_state));
 
 	state->vfp_fpcr = fpcr;
 	state->vfp_fpsr = fpsr;
@@ -105,7 +105,7 @@ vfp_restore(struct vfpstate *state)
 	    "ldp	q30, q31, [%2, #16 * 30]\n"
 	    "msr	fpcr, %0		\n"
 	    "msr	fpsr, %1		\n"
-	    : : "r"(fpcr), "r"(fpsr), "r"(vfp_state));
+	    : : "r"(fpcr), "r"(fpsr), ASM_PTR_CONSTR(vfp_state));
 }
 
 static void
