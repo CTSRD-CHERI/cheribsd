@@ -357,6 +357,9 @@ arm_init(int ipinum)
 #ifdef SMP
 	el2_regs.vtcr_el2 |= VTCR_EL2_SH0_IS;
 #endif
+#if __has_feature(capabilities)
+	el2_regs.vtcr_el2 |= VTCR_EL2_HWU59 | VTCR_EL2_HWU60 | VTCR_EL2_HWU61;
+#endif
 
 	smp_rendezvous(NULL, arm_setup_vectors, NULL, &el2_regs);
 

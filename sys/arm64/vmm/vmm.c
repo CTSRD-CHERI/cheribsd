@@ -582,6 +582,8 @@ vm_alloc_memseg(struct vm *vm, int ident, size_t len, bool sysmem)
 	if (obj == NULL)
 		return (ENOMEM);
 
+	vm_object_set_flag(obj, OBJ_HASCAP);
+
 	seg->len = len;
 	seg->object = obj;
 	seg->sysmem = sysmem;
@@ -662,6 +664,13 @@ vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t first,
 
 	if (map == NULL)
 		return (ENOSPC);
+
+#if __has_feature(capabilities)
+	if ((prot & VM_PROT_READ) != 0)
+		prot |= VM_PROT_READ_CAP;
+	if ((prot & VM_PROT_WRITE) != 0)
+		prot |= VM_PROT_WRITE_CAP;
+#endif
 
 	error = vm_map_find(&vm->vmspace->vm_map, seg->object, first, &gpa,
 	    len, 0, VMFS_NO_SPACE, prot, prot, 0);
@@ -1519,7 +1528,8 @@ vm_handle_paging(struct vm *vm, int vcpuid, bool *retu)
 	switch (ESR_ELx_EXCEPTION(esr)) {
 	case EXCP_INSN_ABORT_L:
 	case EXCP_DATA_ABORT_L:
-		ftype = VM_PROT_EXECUTE | VM_PROT_READ | VM_PROT_WRITE;
+		ftype = VM_PROT_EXECUTE | VM_PROT_READ | VM_PROT_WRITE |
+		    VM_PROT_READ_CAP | VM_PROT_WRITE_CAP;
 		break;
 	default:
 		panic("%s: Invalid exception (esr = %lx)", __func__, esr);
