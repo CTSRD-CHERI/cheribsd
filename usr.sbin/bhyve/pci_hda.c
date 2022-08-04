@@ -762,7 +762,7 @@ hda_corb_start(struct hda_softc *sc)
 	corbubase = hda_get_reg_by_offset(sc, HDAC_CORBUBASE);
 
 	corbpaddr = corblbase | (corbubase << 32);
-	DPRINTF("CORB dma_paddr: %p", (void *)corbpaddr);
+	DPRINTF("CORB dma_paddr: 0x%016lx", corbpaddr);
 
 	corb->dma_vaddr = hda_dma_get_vaddr(sc, corbpaddr,
 			HDA_CORB_ENTRY_LEN * corb->size);
@@ -833,7 +833,7 @@ hda_rirb_start(struct hda_softc *sc)
 	rirbubase = hda_get_reg_by_offset(sc, HDAC_RIRBUBASE);
 
 	rirbpaddr = rirblbase | (rirbubase << 32);
-	DPRINTF("RIRB dma_paddr: %p", (void *)rirbpaddr);
+	DPRINTF("RIRB dma_paddr: 0x%016lx", rirbpaddr);
 
 	rirb->dma_vaddr = hda_dma_get_vaddr(sc, rirbpaddr,
 			HDA_RIRB_ENTRY_LEN * rirb->size);
@@ -983,8 +983,8 @@ hda_set_dpiblbase(struct hda_softc *sc, uint32_t offset, uint32_t old)
 			dpibubase = hda_get_reg_by_offset(sc, HDAC_DPIBUBASE);
 
 			dpibpaddr = dpiblbase | (dpibubase << 32);
-			DPRINTF("DMA Position In Buffer dma_paddr: %p",
-			    (void *)dpibpaddr);
+			DPRINTF("DMA Position In Buffer dma_paddr: 0x%016lx",
+			    dpibpaddr);
 
 			sc->dma_pib_vaddr = hda_dma_get_vaddr(sc, dpibpaddr,
 					HDA_DMA_PIB_ENTRY_LEN * HDA_IOSS_NO);
