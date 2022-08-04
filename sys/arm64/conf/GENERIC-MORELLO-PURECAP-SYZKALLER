@@ -3,18 +3,9 @@
 #
 # $FreeBSD$
 
-include "GENERIC-MORELLO"
+include "GENERIC-MORELLO-PURECAP"
 
-ident		GENERIC-MORELLO-PURECAP
+ident		GENERIC-MORELLO-PURECAP-SYZKALLER
 
-machine 	arm64 aarch64c
-
-makeoptions	CHERI_SUBOBJECT_BOUNDS=subobject-safe
-
-options 	CHERI_PURECAP_KERNEL
 options 	COVERAGE
 options 	KCOV
-
-nooptions 	PERTHREAD_SSP		# Not relevant in purecap
-
-nodevice	armv8crypto	# No purecap assembly
