@@ -806,7 +806,7 @@ vmexit_vmx(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 	fprintf(stderr, "vm exit[%d]\n", *pvcpu);
 	fprintf(stderr, "\treason\t\tVMX\n");
 	fprintf(stderr, "\t"VM_EXIT_PC_NAME"\t\t0x%016lx\n",
-	    VM_EXIT_PC(*vmexit));
+	    (uint64_t)VM_EXIT_PC(*vmexit));
 	fprintf(stderr, "\tinst_length\t%d\n", vmexit->inst_length);
 	fprintf(stderr, "\tstatus\t\t%d\n", vmexit->u.vmx.status);
 	fprintf(stderr, "\texit_reason\t%u (%s)\n", vmexit->u.vmx.exit_reason,
@@ -840,7 +840,7 @@ vmexit_svm(struct vmctx *ctx, struct vm_exit *vmexit, int *pvcpu)
 	fprintf(stderr, "vm exit[%d]\n", *pvcpu);
 	fprintf(stderr, "\treason\t\tSVM\n");
 	fprintf(stderr, "\t"VM_EXIT_PC_NAME"\t\t0x%016lx\n",
-	    VM_EXIT_PC(*vmexit));
+	    (uint64_t)VM_EXIT_PC(*vmexit));
 	fprintf(stderr, "\tinst_length\t%d\n", vmexit->inst_length);
 	fprintf(stderr, "\texitcode\t%#lx\n", vmexit->u.svm.exitcode);
 	fprintf(stderr, "\texitinfo1\t%#lx\n", vmexit->u.svm.exitinfo1);
@@ -970,7 +970,7 @@ fail:
 		fprintf(stderr, "%02x", vie->inst[i]);
 	fprintf(stderr, " ] ");
 #endif
-	FPRINTLN(stderr, "at 0x%lx", VM_EXIT_PC(*vmexit));
+	FPRINTLN(stderr, "at 0x%016lx", (uint64_t)VM_EXIT_PC(*vmexit));
 	return (VMEXIT_ABORT);
 }
 
