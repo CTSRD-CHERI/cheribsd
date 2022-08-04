@@ -652,7 +652,7 @@ vm_get_seg_desc(struct vmctx *ctx, int vcpu, int reg, struct seg_desc *seg_desc)
 #endif
 
 int
-vm_set_register(struct vmctx *ctx, int vcpu, int reg, uint64_t val)
+vm_set_register(struct vmctx *ctx, int vcpu, int reg, vmm_register_t val)
 {
 	int error;
 	struct vm_register vmreg;
@@ -667,7 +667,7 @@ vm_set_register(struct vmctx *ctx, int vcpu, int reg, uint64_t val)
 }
 
 int
-vm_get_register(struct vmctx *ctx, int vcpu, int reg, uint64_t *ret_val)
+vm_get_register(struct vmctx *ctx, int vcpu, int reg, vmm_register_t *ret_val)
 {
 	int error;
 	struct vm_register vmreg;
@@ -683,7 +683,7 @@ vm_get_register(struct vmctx *ctx, int vcpu, int reg, uint64_t *ret_val)
 
 int
 vm_set_register_set(struct vmctx *ctx, int vcpu, unsigned int count,
-    const int *regnums, uint64_t *regvals)
+    const int * __capability regnums, vmm_register_t * __capability regvals)
 {
 	int error;
 	struct vm_register_set vmregset;
@@ -700,7 +700,7 @@ vm_set_register_set(struct vmctx *ctx, int vcpu, unsigned int count,
 
 int
 vm_get_register_set(struct vmctx *ctx, int vcpu, unsigned int count,
-    const int *regnums, uint64_t *regvals)
+    const int * __capability regnums, vmm_register_t * __capability regvals)
 {
 	int error;
 	struct vm_register_set vmregset;
@@ -1605,7 +1605,7 @@ vm_copyout(struct vmctx *ctx __unused, int vcpu __unused, const void *vp,
 }
 
 static int
-vm_get_cpus(struct vmctx *ctx, int which, cpuset_t *cpus)
+vm_get_cpus(struct vmctx *ctx, int which, cpuset_t * __capability cpus)
 {
 	struct vm_cpuset vm_cpuset;
 	int error;
@@ -1620,21 +1620,21 @@ vm_get_cpus(struct vmctx *ctx, int which, cpuset_t *cpus)
 }
 
 int
-vm_active_cpus(struct vmctx *ctx, cpuset_t *cpus)
+vm_active_cpus(struct vmctx *ctx, cpuset_t * __capability cpus)
 {
 
 	return (vm_get_cpus(ctx, VM_ACTIVE_CPUS, cpus));
 }
 
 int
-vm_suspended_cpus(struct vmctx *ctx, cpuset_t *cpus)
+vm_suspended_cpus(struct vmctx *ctx, cpuset_t * __capability cpus)
 {
 
 	return (vm_get_cpus(ctx, VM_SUSPENDED_CPUS, cpus));
 }
 
 int
-vm_debug_cpus(struct vmctx *ctx, cpuset_t *cpus)
+vm_debug_cpus(struct vmctx *ctx, cpuset_t * __capability cpus)
 {
 
 	return (vm_get_cpus(ctx, VM_DEBUG_CPUS, cpus));

@@ -153,12 +153,12 @@ int	vm_get_desc(struct vmctx *ctx, int vcpu, int reg,
 int	vm_get_seg_desc(struct vmctx *ctx, int vcpu, int reg,
 			struct seg_desc *seg_desc);
 #endif
-int	vm_set_register(struct vmctx *ctx, int vcpu, int reg, uint64_t val);
-int	vm_get_register(struct vmctx *ctx, int vcpu, int reg, uint64_t *retval);
+int	vm_set_register(struct vmctx *ctx, int vcpu, int reg, vmm_register_t val);
+int	vm_get_register(struct vmctx *ctx, int vcpu, int reg, vmm_register_t *retval);
 int	vm_set_register_set(struct vmctx *ctx, int vcpu, unsigned int count,
-    const int *regnums, uint64_t *regvals);
+    const int * __capability regnums, vmm_register_t * __capability regvals);
 int	vm_get_register_set(struct vmctx *ctx, int vcpu, unsigned int count,
-    const int *regnums, uint64_t *regvals);
+    const int * __capability regnums, vmm_register_t * __capability regvals);
 int	vm_run(struct vmctx *ctx, int vcpu, struct vm_exit *ret_vmexit);
 int	vm_suspend(struct vmctx *ctx, enum vm_suspend_how how);
 int	vm_reinit(struct vmctx *ctx);
@@ -258,9 +258,9 @@ int	vm_rtc_gettime(struct vmctx *ctx, time_t *secs);
 /* Reset vcpu register state */
 int	vcpu_reset(struct vmctx *ctx, int vcpu);
 
-int	vm_active_cpus(struct vmctx *ctx, cpuset_t *cpus);
-int	vm_suspended_cpus(struct vmctx *ctx, cpuset_t *cpus);
-int	vm_debug_cpus(struct vmctx *ctx, cpuset_t *cpus);
+int	vm_active_cpus(struct vmctx *ctx, cpuset_t * __capability cpus);
+int	vm_suspended_cpus(struct vmctx *ctx, cpuset_t * __capability cpus);
+int	vm_debug_cpus(struct vmctx *ctx, cpuset_t * __capability cpus);
 int	vm_activate_cpu(struct vmctx *ctx, int vcpu);
 int	vm_suspend_cpu(struct vmctx *ctx, int vcpu);
 int	vm_resume_cpu(struct vmctx *ctx, int vcpu);
