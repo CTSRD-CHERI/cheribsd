@@ -48,7 +48,7 @@ void * __capability smccc_ddc_el0;
 void *kernel_root_cap = (void *)(intcap_t)-1;
 #endif
 
-void
+void __nosanitizecoverage
 cheri_init_capabilities(void * __capability kroot)
 {
 	void * __capability ctemp;
