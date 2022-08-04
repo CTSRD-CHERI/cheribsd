@@ -1272,7 +1272,7 @@ void
 spinup_vcpu(struct vmctx *ctx, int vcpu)
 {
 	int error;
-	uint64_t rip;
+	vmm_register_t rip;
 
 	error = vm_get_register(ctx, vcpu, VM_REG_GUEST_PC, &rip);
 	assert(error == 0);
