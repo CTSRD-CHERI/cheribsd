@@ -925,7 +925,7 @@ arm_tmr_fill_vdso_timehands(struct vdso_timehands *vdso_th,
     struct timecounter *tc)
 {
 
-	vdso_th->th_algo = VDSO_TH_ALGO_ARM_GENTIM;
+	vdso_th->th_algo = 0; //VDSO_TH_ALGO_ARM_GENTIM;
 	vdso_th->th_physical = arm_tmr_sc->physical;
 	bzero(vdso_th->th_res, sizeof(vdso_th->th_res));
 	return (1);
