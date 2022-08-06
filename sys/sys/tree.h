@@ -377,7 +377,7 @@ struct __no_subobject_bounds {						\
 #endif
 
 #define RB_UPDATE_AUGMENT(elm, field) do {				\
-		__typeof(elm) rb_update_tmp = (elm);			\
+	__typeof(elm) rb_update_tmp = (elm);				\
 	do {								\
 		RB_AUGMENT(rb_update_tmp);				\
 	} while ((rb_update_tmp = RB_PARENT(rb_update_tmp, field)) != NULL); \
@@ -400,7 +400,6 @@ struct __no_subobject_bounds {						\
 	RB_SWAP_CHILD(head, elm, tmp, field);				\
 	RB_LEFT(tmp, field) = (elm);					\
 	RB_SET_PARENT(elm, tmp, field);					\
-	RB_AUGMENT(elm);						\
 } while (/*CONSTCOND*/ 0)
 
 #define RB_ROTATE_RIGHT(head, elm, tmp, field) do {			\
@@ -411,7 +410,6 @@ struct __no_subobject_bounds {						\
 	RB_SWAP_CHILD(head, elm, tmp, field);				\
 	RB_RIGHT(tmp, field) = (elm);					\
 	RB_SET_PARENT(elm, tmp, field);					\
-	RB_AUGMENT(elm);						\
 } while (/*CONSTCOND*/ 0)
 
 /* Generates prototypes and inline functions */
@@ -499,7 +497,9 @@ name##_RB_INSERT_COLOR(struct name *head, struct type *elm)		\
 				elm = parent;				\
 				continue;				\
 			}						\
-			if (!RB_RED_RIGHT(elm, field)) {		\
+			if (RB_RED_RIGHT(elm, field))			\
+				child = elm;				\
+			else {						\
 				/* coverity[uninit_use] */		\
 				RB_ROTATE_LEFT(head, elm, child, field);\
 				if (RB_RED_RIGHT(child, field))		\
@@ -508,9 +508,11 @@ name##_RB_INSERT_COLOR(struct name *head, struct type *elm)		\
 					RB_FLIP_ALL(elm, field);	\
 				else					\
 					RB_FLIP_LEFT(elm, field);	\
-				elm = child;				\
+				if ((RB_BITS(child, field) &		\
+				    RB_RED_MASK) == 0)			\
+					elm = child;			\
 			}						\
-			RB_ROTATE_RIGHT(head, parent, elm, field);	\
+			RB_ROTATE_RIGHT(head, parent, child, field);	\
 		} else {						\
 			if (RB_RED_RIGHT(parent, field)) {		\
 				RB_FLIP_RIGHT(parent, field);		\
@@ -522,7 +524,9 @@ name##_RB_INSERT_COLOR(struct name *head, struct type *elm)		\
 				elm = parent;				\
 				continue;				\
 			}						\
-			if (!RB_RED_LEFT(elm, field)) {			\
+			if (RB_RED_LEFT(elm, field))			\
+				child = elm;				\
+			else {						\
 				/* coverity[uninit_use] */		\
 				RB_ROTATE_RIGHT(head, elm, child, field);\
 				if (RB_RED_LEFT(child, field))		\
@@ -531,11 +535,16 @@ name##_RB_INSERT_COLOR(struct name *head, struct type *elm)		\
 					RB_FLIP_ALL(elm, field);	\
 				else					\
 					RB_FLIP_RIGHT(elm, field);	\
-				elm = child;				\
+				if ((RB_BITS(child, field) &		\
+				    RB_RED_MASK) == 0)			\
+					elm = child;			\
 			}						\
-			RB_ROTATE_LEFT(head, parent, elm, field);	\
+			RB_ROTATE_LEFT(head, parent, child, field);	\
 		}							\
-		RB_BITS(elm, field) &= ~RB_RED_MASK;			\
+		RB_BITS(child, field) &= ~RB_RED_MASK;			\
+		if (elm != child)					\
+			RB_AUGMENT(elm);				\
+		RB_AUGMENT(parent);					\
 		break;							\
 	}								\
 }
@@ -594,21 +603,22 @@ name##_RB_REMOVE_COLOR(struct name *head,				\
 				else					\
 					RB_FLIP_RIGHT(sib, field);	\
 				RB_BITS(elm, field) |= RB_RED_MASK;	\
-				sib = elm;				\
 				break;					\
 			case RB_RED_L:					\
 				if (RB_STRICT_HST && elm != NULL) {	\
 					RB_FLIP_RIGHT(parent, field);	\
 					RB_FLIP_ALL(sib, field);	\
+					elm = sib;			\
 					break;				\
 				}					\
 				RB_FLIP_LEFT(parent, field);		\
 				/* FALLTHROUGH */			\
 			default:					\
 				RB_FLIP_RIGHT(sib, field);		\
+				elm = sib;				\
 				break;					\
 			}						\
-			RB_ROTATE_LEFT(head, parent, sib, field);	\
+			RB_ROTATE_LEFT(head, parent, elm, field);	\
 		} else {						\
 			if (!RB_RED_RIGHT(parent, field)) {		\
 				RB_FLIP_RIGHT(parent, field);		\
@@ -637,22 +647,25 @@ name##_RB_REMOVE_COLOR(struct name *head,				\
 				else					\
 					RB_FLIP_LEFT(sib, field);	\
 				RB_BITS(elm, field) |= RB_RED_MASK;	\
-				sib = elm;				\
 				break;					\
 			case RB_RED_R:					\
 				if (RB_STRICT_HST && elm != NULL) {	\
 					RB_FLIP_LEFT(parent, field);	\
 					RB_FLIP_ALL(sib, field);	\
+					elm = sib;			\
 					break;				\
 				}					\
 				RB_FLIP_RIGHT(parent, field);		\
 				/* FALLTHROUGH */			\
 			default:					\
 				RB_FLIP_LEFT(sib, field);		\
+				elm = sib;				\
 				break;					\
 			}						\
-			RB_ROTATE_RIGHT(head, parent, sib, field);	\
+			RB_ROTATE_RIGHT(head, parent, elm, field);	\
 		}							\
+		if (sib != elm)						\
+			RB_AUGMENT(sib);				\
 		break;							\
 	} while ((parent = RB_PARENT(elm, field)) != NULL);		\
 }
@@ -692,6 +705,8 @@ name##_RB_REMOVE(struct name *head, struct type *elm)			\
 		RB_SET_PARENT(child, parent, field);			\
 	if (parent != NULL) {						\
 		name##_RB_REMOVE_COLOR(head, parent, child);		\
+		if (parent == elm && RB_LEFT(parent, field) == NULL)	\
+			parent = RB_PARENT(parent, field);		\
 		RB_UPDATE_AUGMENT(parent, field);			\
 	}								\
 	return (old);							\
