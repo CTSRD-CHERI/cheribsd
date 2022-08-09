@@ -2,7 +2,7 @@
 
 .include <src.opts.mk>
 
-.PATH: ${SRCTOP}/sys/riscv/cheri
+.PATH: ${SRCTOP}/sys/${MACHINE}/cheri
 
 PROG=	dispatch
 SRCS=	dispatch.c eprototype.S cheri_cocall.S cheri_coaccept.S

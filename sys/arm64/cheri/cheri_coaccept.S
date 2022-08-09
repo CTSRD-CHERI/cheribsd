@@ -51,9 +51,13 @@
  *
  */
 
-.text
-.globl _C_LABEL(switcher_coaccept)
-_C_LABEL(switcher_coaccept):
+#define	SIGCODE(sym)						\
+	.text; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc
+
+#define CSYM(x)							\
+	.globl x; .type x,@object; x:
+
+SIGCODE(switcher_coaccept)
 	/*
 	 * Save the callee's CPU context in the callee's control block.
 	 *
@@ -259,10 +263,14 @@ _C_LABEL(switcher_coaccept):
 	 * Bye!
 	 */
 	rets	c30
-.globl _C_LABEL(eswitcher_coaccept)
-_C_LABEL(eswitcher_coaccept):
+END(switcher_coaccept)
 
-.data
-.globl szswitcher_coaccept
+eswitcher_coaccept:
+
+	.data
+	.align	3
+	.globl szswitcher_coaccept
+	.type szswitcher_coaccept,@object
 szswitcher_coaccept:
-.long eswitcher_coaccept-switcher_coaccept
+	.long eswitcher_coaccept - switcher_coaccept
+	.size szswitcher_coaccept, . - szswitcher_coaccept

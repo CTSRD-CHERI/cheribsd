@@ -32,16 +32,34 @@
 #include <sys/errno.h>
 #include <machine/asm.h>
 
+#if defined(__riscv)
 .option capmode
+#endif
 
 ENTRY(switcher_cocall_eprototype)
+#if defined(__riscv)
 	li	a0, EPROTOTYPE
 	li	t0, 1
 	cret
+#elif defined(__aarch64__)
+	mov	x0, EPROTOTYPE
+	subs	x0, x0, #0
+	rets	c30
+#else
+#error Unknown architecture
+#endif
 END(switcher_cocall_eprototype)
 
 ENTRY(switcher_coaccept_eprototype)
+#if defined(__riscv)
 	li	a0, EPROTOTYPE
 	li	t0, 1
 	cret
+#elif defined(__aarch64__)
+	mov	x0, EPROTOTYPE
+	subs	x0, x0, #0
+	rets	c30
+#else
+#error Unknown architecture
+#endif
 END(switcher_coaccept_eprototype)
