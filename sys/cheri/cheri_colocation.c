@@ -566,7 +566,7 @@ rederive(const void * __capability from)
 {
 	void * __capability codecap;
 
-	codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
+	codecap = cheri_capability_build_inexact_user_rwx(CHERI_CAP_USER_CODE_PERMS,
 	    cheri_getbase(from) + cheri_getoffset(from), cheri_getlength(from) - cheri_getoffset(from), 0);
 	if (SV_PROC_FLAG(curthread->td_proc, SV_CHERI))
 		codecap = cheri_capmode(codecap);
