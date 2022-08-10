@@ -25,10 +25,7 @@ __FBSDID("$FreeBSD$");
 
 // XXX This is very much a work in progress!
 
-static bool cheri_revoke_avoid_faults = 1;
-SYSCTL_BOOL(_vm, OID_AUTO, cheri_revoke_avoid_faults, CTLFLAG_RW,
-    &cheri_revoke_avoid_faults, 0,
-    "XXX");
+/***************************** PAGE VISITS ******************************/
 
 static inline int
 vm_cheri_revoke_should_visit_page(vm_page_t m, int flags)
@@ -62,24 +59,17 @@ vm_cheri_revoke_should_visit_page(vm_page_t m, int flags)
 enum vm_cro_visit {
 	VM_CHERI_REVOKE_VIS_DONE  = 0,
 	VM_CHERI_REVOKE_VIS_DIRTY = 1,
-	VM_CHERI_REVOKE_VIS_BUSY  = 2
 };
 
 /*
- * Given a writable, wired page in a wlocked object, visit it.
+ * Given a writable, xbusy page, visit it as part of the background scan, RW.
  */
-static enum vm_cro_visit
+static void
 vm_cheri_revoke_visit_rw(
     const struct vm_cheri_revoke_cookie *crc, int flags, vm_page_t m, bool *cap)
 {
 	int hascaps;
 	CHERI_REVOKE_STATS_FOR(crst, crc);
-
-	if (vm_page_sleep_if_busy(m, "CHERI revoke"))
-		return VM_CHERI_REVOKE_VIS_BUSY;
-		
-	vm_page_xbusy(m);
-	VM_OBJECT_WUNLOCK(m->object);
 
 	CHERI_REVOKE_STATS_BUMP(crst, pages_scan_rw);
 
@@ -150,23 +140,16 @@ vm_cheri_revoke_visit_rw(
 		vm_page_capdirty(m);
 	}
 
-	/*
-	 * m->object cannot have changed: the busy lock protects both the page's
-	 * contents (against pageout, not concurrent mutation) but also its
-	 * identity.
-	 */
-	VM_OBJECT_WLOCK(m->object);
-	vm_page_xunbusy(m);
-
 	*cap = !!(hascaps & VM_CHERI_REVOKE_PAGE_HASCAPS);
-	return VM_CHERI_REVOKE_VIS_DONE;
 }
 
 /*
- * The same thing, but for a *readable*, wired page.
+ * The same thing, but for a *readable*, wired page.  The page is not busied
+ * herein and there's no need for the caller to hold it busy either; the page's
+ * vm_object should be unlocked prior to calling.
  *
- * Returns 1 if the page must be visited read-write, 0 if it is clear to
- * advance and carry on.
+ * Returns VIS_DIRTY if the page must be visited read-write, or VIS_DONE if it
+ * is clear to advance and carry on.
  */
 static enum vm_cro_visit
 vm_cheri_revoke_visit_ro(
@@ -178,11 +161,6 @@ vm_cheri_revoke_visit_ro(
 #ifdef INVARIANTS
 	vm_page_astate_t mas = vm_page_astate_load(m);
 #endif
-
-	if (vm_page_sleep_if_busy(m, "CHERI revoke"))
-		return VM_CHERI_REVOKE_VIS_BUSY;
-	vm_page_xbusy(m);
-	VM_OBJECT_WUNLOCK(m->object);
 
 	CHERI_REVOKE_STATS_BUMP(crst, pages_scan_ro);
 
@@ -201,9 +179,6 @@ vm_cheri_revoke_visit_ro(
 	     " hc=%x m=%p, m->of=%x, m->af=%x",
 		hascaps, m, m->oflags, vm_page_astate_load(m).flags));
 
-	VM_OBJECT_WLOCK(m->object);
-	vm_page_xunbusy(m);
-
 	if (hascaps & VM_CHERI_REVOKE_PAGE_DIRTY) {
 		return VM_CHERI_REVOKE_VIS_DIRTY;
 	}
@@ -212,7 +187,6 @@ vm_cheri_revoke_visit_ro(
 	return VM_CHERI_REVOKE_VIS_DONE;
 }
 
-// XXX stats
 enum vm_cheri_revoke_fault_res
 vm_cheri_revoke_fault_visit(struct vmspace *uvms, vm_offset_t va)
 {
@@ -225,6 +199,7 @@ vm_cheri_revoke_fault_visit(struct vmspace *uvms, vm_offset_t va)
 	struct vm_cheri_revoke_cookie crc;
 	vm_page_t m = NULL;
 	bool hascap = false;
+	bool xbusied = false;
 
 	/*
 	 * Since faults may be spurious, avoid looking at VM data structures
@@ -236,26 +211,29 @@ vm_cheri_revoke_fault_visit(struct vmspace *uvms, vm_offset_t va)
 
 again:
 	pres = pmap_caploadgen_update(upmap, va, &m,
-	    PMAP_CAPLOADGEN_UPDATETLB | (hascap ? PMAP_CAPLOADGEN_HASCAPS : 0));
-	// printf("user VA caploadgen fault -> %lx %p %d\n", va, m, pres);
+	    PMAP_CAPLOADGEN_UPDATETLB
+	    | (xbusied ? PMAP_CAPLOADGEN_XBUSIED : 0)
+	    | (hascap ? PMAP_CAPLOADGEN_HASCAPS : 0));
 
 	switch (pres) {
+	case PMAP_CAPLOADGEN_OK:
+	case PMAP_CAPLOADGEN_ALREADY:
+	case PMAP_CAPLOADGEN_CLEAN:
+		res = VM_CHERI_REVOKE_FAULT_RESOLVED;
+		goto out;
+
 	case PMAP_CAPLOADGEN_UNABLE:
 	case PMAP_CAPLOADGEN_TEARDOWN:
 		res = VM_CHERI_REVOKE_FAULT_UNRESOLVED;
 		goto out;
 
-	case PMAP_CAPLOADGEN_ALREADY:
-	case PMAP_CAPLOADGEN_CLEAN:
-	case PMAP_CAPLOADGEN_OK:
-		res = VM_CHERI_REVOKE_FAULT_RESOLVED;
-		goto out;
+	case PMAP_CAPLOADGEN_SCAN_RO_WIRED:
+		xbusied = false;
+		break;
 
-	case PMAP_CAPLOADGEN_SCAN_CLEAN_RO:
-	case PMAP_CAPLOADGEN_SCAN_RO:
-	case PMAP_CAPLOADGEN_SCAN_CLEAN_RW:
-	case PMAP_CAPLOADGEN_SCAN_RW:
-		/* Grab a caprevoke cookie if we need one and then visit */
+	case PMAP_CAPLOADGEN_SCAN_RO_XBUSIED:
+	case PMAP_CAPLOADGEN_SCAN_RW_XBUSIED:
+		xbusied = true;
 		break;
 
 	default:
@@ -271,40 +249,37 @@ again:
 
 	/*
 	 * The following cases have the page wired so we can inspect it.  It's
-	 * therefore important that we always end with "goto again" (which
-	 * drops the wiring and possibly acquires a new one) or that we call
-	 * vm_page_unwire() ourselves.
+	 * therefore important that we always end with "goto again" (which drops
+	 * the wiring) or that we call vm_page_unwire() ourselves.  The page's
+	 * identity is not stable across the scan, but because it is wired we
+	 * know it won't be repurposed (through pageout or laundry), but it may
+	 * be removed from the pmap where we were looking.
 	 */
 	switch (pres) {
 	default:
 		panic("impossible");
 
-	case PMAP_CAPLOADGEN_SCAN_CLEAN_RO:
-		/*
-		 * This is a somewhat unexpected result but might happen if the
-		 * fault is tag-independent or there are aliased mappings.
-		 * This mapping has both cap-dirty and cap-dirtyable clear.
-		 */
-
-		/* FALLTHROUGH */
-	case PMAP_CAPLOADGEN_SCAN_RO:
+	case PMAP_CAPLOADGEN_SCAN_RO_WIRED:
+	case PMAP_CAPLOADGEN_SCAN_RO_XBUSIED:
 		vres = vm_cheri_revoke_page_ro(&crc, m);
 		if (vres & VM_CHERI_REVOKE_PAGE_DIRTY) {
-			vm_page_unwire(m, PQ_ACTIVE);
+			/*
+			 * Need to write but can't to current mapping.  We can't
+			 * use PGA_WRITEABLE because the page isn't busy, just
+			 * wired down.  Fall out and synchronize with the VM.
+			 */
+			if (xbusied) {
+				vm_page_xunbusy(m);
+			} else {
+				vm_page_unwire(m, PQ_ACTIVE);
+			}
 			res = VM_CHERI_REVOKE_FAULT_CAPSTORE;
-			break;
+			goto out;
 		}
 		hascap = vres & VM_CHERI_REVOKE_PAGE_HASCAPS;
-		goto again;
+		break;
 
-	case PMAP_CAPLOADGEN_SCAN_CLEAN_RW:
-		/*
-		 * Like PMAP_CAPLOADGEN_SCAN_CLEAN_RO, this mapping believes
-		 * itself clean (but writable).
-		 */
-
-		/* FALLTHROUGH */
-	case PMAP_CAPLOADGEN_SCAN_RW:
+	case PMAP_CAPLOADGEN_SCAN_RW_XBUSIED:
 		vres = vm_cheri_revoke_page_rw(&crc, m);
 
 		/*
@@ -314,8 +289,12 @@ again:
 		 */
 
 		hascap = vres & VM_CHERI_REVOKE_PAGE_HASCAPS;
-		goto again;
+		break;
 	}
+
+	goto again;
+
+out:
 
 #ifdef CHERI_CAPREVOKE_STATS
 	/*
@@ -341,12 +320,18 @@ again:
 	sx_sunlock(&uvms->vm_map.vm_cheri_revoke_stats_sx);
 #endif
 
-out:
 	if (hascookie)
 		vm_cheri_revoke_cookie_rele(&crc);
 
 	return res;
 }
+
+/******************************* VM ITERATION *******************************/
+
+static bool cheri_revoke_avoid_faults = 1;
+SYSCTL_BOOL(_vm, OID_AUTO, cheri_revoke_avoid_faults, CTLFLAG_RW,
+    &cheri_revoke_avoid_faults, 0,
+    "XXX");
 
 enum vm_cro_at {
 	VM_CHERI_REVOKE_AT_OK    = 0,
@@ -382,6 +367,7 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 	vm_offset_t addr = ioff - entry->offset + entry->start;
 	vm_page_t m = NULL;
 	bool mwired = false;
+	bool mxbusy = false;
 	bool mdidvm = false;
 	bool viscap = false;
 
@@ -389,10 +375,21 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 
 	/*
 	 * If we're on the load side, we can ask the pmap to help us out.  This
-	 * is functionally equivalent to pmap_extract_and_hold, but with a fast
-	 * out if LCLG == GCLG (PMAP_CAPLOADGEN_ALREADY, i.e., if this mapping
-	 * has already been visited by vm_cheri_revoke_fault_visit) or if
-	 * m->a.flags has PGA_CAPSTORE clear (PMAP_CAPLOADGEN_CLEAN).
+	 * will have one of the following outcomes:
+	 *
+	 *  * fast out if LCLG == GCLG (PMAP_CAPLOADGEN_ALREADY, i.e., if this
+	 *    mapping has already been visited by vm_cheri_revoke_fault_visit)
+	 *    or if m->a.flags has PGA_CAPSTORE clear (PMAP_CAPLOADGEN_CLEAN).
+	 *
+	 *  * returning an xbusied writeable page
+	 *
+	 *  * returning a wired page that may be either RO or RW but that we
+	 *    must scan as if it were RO, falling back to vm_fault() if we must
+	 *    mutate it.
+	 *
+	 *  * slow out if neither of the above are possible, triggering
+	 *    immediate fallback to the VM (vm_page_grab_valid or vm_fault).
+	 *
 	 */
 	if (flags & VM_CHERI_REVOKE_LOAD_SIDE) {
 		int pmres;
@@ -400,30 +397,42 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 		pmres = pmap_caploadgen_update(crc->map->pmap, addr, &m, 0);
 
 		switch (pmres) {
+		default:
 		case PMAP_CAPLOADGEN_OK:
 		case PMAP_CAPLOADGEN_TEARDOWN:
 			panic("Bad first return from pmap_caploadgen_update");
+
 		case PMAP_CAPLOADGEN_ALREADY:
 		case PMAP_CAPLOADGEN_CLEAN:
 			*ooff = ioff + PAGE_SIZE;
 			return VM_CHERI_REVOKE_AT_OK;
+
 		case PMAP_CAPLOADGEN_UNABLE:
+			/*
+			 * Fall back to VM lookup.  We either could not resolve
+			 * the page at this address (perhaps because there isn't
+			 * one) or we couldn't wire something being torn down.
+			 *
+			 * XXX In some eventuality it might be nice to have the
+			 * pmap able to definitely answer "there isn't a page
+			 * here even if you go ask the VM", a sort of analogy
+			 * to skipping to the next VM map entry.
+			 */
 			break;
-		case PMAP_CAPLOADGEN_SCAN_RO:
-		case PMAP_CAPLOADGEN_SCAN_CLEAN_RO:
+
+		case PMAP_CAPLOADGEN_SCAN_RO_WIRED:
+			VM_OBJECT_WUNLOCK(obj);
 			mwired = true;
-			if (m->object != obj) {
-				VM_OBJECT_WUNLOCK(obj);
-				VM_OBJECT_WLOCK(m->object);
-			}
 			goto visit_ro;
-		case PMAP_CAPLOADGEN_SCAN_RW:
-		case PMAP_CAPLOADGEN_SCAN_CLEAN_RW:
-			mwired = true;
-			if (m->object != obj) {
-				VM_OBJECT_WUNLOCK(obj);
-				VM_OBJECT_WLOCK(m->object);
-			}
+
+		case PMAP_CAPLOADGEN_SCAN_RO_XBUSIED:
+			VM_OBJECT_WUNLOCK(obj);
+			mxbusy = true;
+			goto visit_ro;
+
+		case PMAP_CAPLOADGEN_SCAN_RW_XBUSIED:
+			VM_OBJECT_WUNLOCK(obj);
+			mxbusy = true;
 			goto visit_rw;
 		}
 	}
@@ -431,17 +440,25 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 
 	KASSERT(m == NULL, ("Load side bad state arc"));
 	/*
+	 * Try to grab the page out of the VM, walking the shadow chain to find
+	 * the source of CoW, if any.  Do not materialize a (CoW or otherwise)
+	 * zero page that isn't already in some object.
+	 *
+	 * This routine internally xbusies the page regardless of what we ask,
+	 * so it's quite natural to let it return the page to us in that state,
+	 * as if we had gotten SCAN_R[OW]_XBUSIED above.
+	 */
+	/*
 	 * XXXMJ as VM_ALLOC_NOZERO is currently implemented, this can return an
 	 * invalid page, and in this case we fail to check the shadow chain.
 	 *
 	 * XXXNWF 20220802 is that still true?
 	 */
-	(void)vm_page_grab_valid(&m, obj, ipi,
-	    VM_ALLOC_WIRED | VM_ALLOC_NOBUSY | VM_ALLOC_NOZERO);
+	(void)vm_page_grab_valid(&m, obj, ipi, VM_ALLOC_NOZERO);
 
 	if (m == NULL) {
 		if (flags & VM_CHERI_REVOKE_QUICK_SUCCESSOR) {
-			/* Look forward in the object map */
+			/* Look forward in the object's collection of pages */
 			vm_page_t obj_next_pg = vm_page_find_least(obj, ipi);
 
 			vm_offset_t lastoff =
@@ -471,11 +488,15 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 		VM_OBJECT_WUNLOCK(obj);
 
 		vm_map_unlock_read(map);
-		res = vm_fault(map, addr, VM_PROT_READ, VM_FAULT_NOFILL, &m);
+		res = vm_fault(map, addr, VM_PROT_READ | VM_PROT_READ_CAP,
+		    VM_FAULT_NOFILL, &m);
 		vm_map_lock_read(map);
 
 		if (res == KERN_NOT_RECEIVER) {
-			/* NOFILL did its thing */
+			/*
+			 * NOFILL did its thing, and, as far as we know, there
+			 * is no pmap entry to update.  Just get out of here.
+			 */
 			CHERI_REVOKE_STATS_BUMP(crst, pages_skip_nofill);
 			*ooff = ioff + PAGE_SIZE;
 			VM_OBJECT_WLOCK(obj);
@@ -485,99 +506,63 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 			*vmres = res;
 			return VM_CHERI_REVOKE_AT_VMERR;
 		}
-		mwired = true;
 		if (last_timestamp != map->timestamp) {
 			/*
 			 * The map has changed out from under us; bail and
 			 * the caller will look up the new map entry.
 			 */
-			vm_page_unwire(m, PQ_INACTIVE);
 			return VM_CHERI_REVOKE_AT_TICK;
 		}
 
 		/*
-		 * XXXMJ while the page reference prevents it from being freed,
-		 * it may still be removed from its object (or migrated to a
-		 * different object, for example during shadow chain collapse).
-		 * We need something like this, unfortunately:
-		 *
-		 * obj = atomic_load_ptr(&m->object);
-		 * if (obj != NULL) {
-		 *     VM_OBJECT_WLOCK(obj);
-		 *     if (m->object != obj)
-		 *         ???
-		 * } else {
-		 *     ???
-		 * }
+		 * vm_fault will have scanned this page for us, so we're good
+		 * to jump out.  The pmap will have been updated by vm_fault.
 		 */
-		VM_OBJECT_WLOCK(m->object);
 		mdidvm = true;
-
-		/* vm_fault has handled it all for us */
-		goto ok;
-	} else {
-		KASSERT(m->object == obj, ("Page lookup bad object?"));
-		KASSERT(vm_page_all_valid(m), ("Page grab valid invalid?"));
 		mwired = true;
+		goto ok;
 	}
 
-	VM_OBJECT_ASSERT_WLOCKED(m->object);
-	KASSERT(vm_page_all_valid(m), ("Revocation invalid page"));
+	KASSERT(m->object == obj, ("Page lookup bad object?"));
+	mxbusy = true;
+	VM_OBJECT_WUNLOCK(obj);
 
 	if (!vm_cheri_revoke_should_visit_page(m, flags)) {
 		CHERI_REVOKE_STATS_BUMP(crst, pages_skip);
 		goto ok;
 	}
 
-visit_ro:
 	/*
-	 * XXXMJ I think the page needs to be busy for PGA_WRITEABLE to be
-	 * stable.
+	 * Because we hold the page xbusy, we can let PGA_WRITEABLE tell us if
+	 * there are any writeable mappings, and so the page is OK to mutate,
+	 * or not.
 	 */
 	if (pmap_page_is_write_mapped(m)) {
 visit_rw:
+		KASSERT(vm_page_all_valid(m), ("Page grab valid invalid?"));
+		vm_page_assert_xbusied(m);
+
 		if (m->object == obj) {
 			/* Visit the page RW in place */
-			switch (vm_cheri_revoke_visit_rw(crc, flags, m,
-			    &viscap)) {
-			case VM_CHERI_REVOKE_VIS_DONE:
-				goto ok;
-
-			case VM_CHERI_REVOKE_VIS_BUSY:
-				if (mwired)
-					vm_page_unwire_in_situ(m);
-				VM_OBJECT_WUNLOCK(obj);
-				return VM_CHERI_REVOKE_AT_TICK;
-			default:
-				panic(
-				    "bad result from vm_cheri_revoke_visit_rw");
-			}
+			vm_cheri_revoke_visit_rw(crc, flags, m, &viscap);
+			goto ok;
 		}
 
 		/*
-		 * XXX I don't quite understand how this is
-		 * possible, but something seems fishy about
-		 * this situation.  Just go force a RW fault
-		 * to copy up the page
+		 * The page may have changed identity while we were xbusying it
+		 * and in that case; something funny is going on, so just bail
+		 * out to the fault path.
 		 */
 		goto visit_rw_fault;
 	}
 
+visit_ro:
+	KASSERT(mxbusy || mwired, ("RO visit !busy !wired?"));
+
 	switch (vm_cheri_revoke_visit_ro(crc, flags, m, &viscap)) {
 	case VM_CHERI_REVOKE_VIS_DONE:
-		/* We were able to conclude that the page was clean */
+		/* We were able to conclude that the page was clean while RO*/
 		goto ok;
-	case VM_CHERI_REVOKE_VIS_BUSY:
-		/*
-		 * This is kind of awkward; the page is busy and it's
-		 * not clear by whom.  But whoever it is needs our
-		 * object lock to unbusy.  (XXXMJ this is not generally
-		 * true.)  So handle this like the map stepping forward.
-		 */
-		if (mwired)
-			vm_page_unwire_in_situ(m);
-		VM_OBJECT_WUNLOCK(obj);
-		return VM_CHERI_REVOKE_AT_TICK;
 	case VM_CHERI_REVOKE_VIS_DIRTY:
 		/* Dirty here means we need to upgrade to RW now */
 		break;
@@ -595,8 +580,15 @@ visit_rw_fault:
 		mwired = false;
 		vm_page_unwire_in_situ(m);
 	}
-	VM_OBJECT_WUNLOCK(m->object);
+	if (mxbusy) {
+		mxbusy = false;
+		vm_page_xunbusy(m);
+	}
+
 	vm_map_unlock_read(map);
+	VM_OBJECT_ASSERT_UNLOCKED(obj);
+	m = NULL;
+
 	res = vm_fault(map, addr, VM_PROT_WRITE | VM_PROT_WRITE_CAP,
 	    VM_FAULT_NORMAL, &m);
 	vm_map_lock_read(map);
@@ -605,34 +597,31 @@ visit_rw_fault:
 		VM_OBJECT_ASSERT_UNLOCKED(obj);
 		return VM_CHERI_REVOKE_AT_VMERR;
 	}
-	mwired = true;
 	if (last_timestamp != map->timestamp) {
 		vm_page_unwire(m, PQ_INACTIVE);
 		VM_OBJECT_ASSERT_UNLOCKED(obj);
 		return VM_CHERI_REVOKE_AT_TICK;
 	}
 
-	KASSERT(m->object == obj, ("Bad page object after FAULT WRITE"));
-
+	mwired = true;
 	mdidvm = true;
-	VM_OBJECT_WLOCK(m->object);
 
 ok:
-	VM_OBJECT_ASSERT_WLOCKED(m->object);
+	VM_OBJECT_ASSERT_UNLOCKED(obj);
+	KASSERT(mxbusy || mwired, ("caprevoke !xbusy !wired?"));
 
 	/*
 	 * If this is the load side and we hit the VM, then the LCLG bit should
 	 * already be up to date (if present; see the above INVARIANTS test).
-	 * Otherwise, the load side needs to update the LCLG bit now.
+	 * Otherwise, the load side should update the LCLG bit now.
 	 */
 	if (!mdidvm && (flags & VM_CHERI_REVOKE_LOAD_SIDE)) {
 		vm_page_t m2 = m;
 		int pmres;
 
-		KASSERT(mwired, ("LS !didvm !wired?"));
-
 		pmres = pmap_caploadgen_update(crc->map->pmap, addr, &m2,
-		    PMAP_CAPLOADGEN_EXCLUSIVE /* object locked */ |
+		    (mxbusy ? PMAP_CAPLOADGEN_XBUSIED : 0) |
+		    (mxbusy ? PMAP_CAPLOADGEN_NONEWMAPS : 0) |
 		    (viscap ? PMAP_CAPLOADGEN_HASCAPS : 0));
 
 		switch (pmres) {
@@ -646,17 +635,16 @@ ok:
 		case PMAP_CAPLOADGEN_UNABLE:
 			/* Page not installed in the pmap; that's fine */
 			break;
-		case PMAP_CAPLOADGEN_TEARDOWN:
-		case PMAP_CAPLOADGEN_SCAN_RO:
-		case PMAP_CAPLOADGEN_SCAN_CLEAN_RO:
-		case PMAP_CAPLOADGEN_SCAN_RW:
-		case PMAP_CAPLOADGEN_SCAN_CLEAN_RW:
-			panic("Bad second return from pmap_caploadgen_update");
+
+		default:
+			panic("Bad second return from caploadgen update: %d",
+			    pmres);
 		}
 
 		/* pmap_caploadgen_page will have unwired for us */
 		KASSERT(m2 == NULL, ("LS !didvm upd !NULL?"));
 		mwired = false;
+		mxbusy = false;
 	}
 #ifdef INVARIANTS
 	/*
@@ -667,25 +655,23 @@ ok:
 		int pmres;
 		vm_page_t m2 = m;
 
-		KASSERT(mwired, ("LS didvm !wired?"));
-
 		pmres = pmap_caploadgen_update(crc->map->pmap, addr, &m2,
-		    PMAP_CAPLOADGEN_EXCLUSIVE /* object locked */ |
-		    (viscap ? PMAP_CAPLOADGEN_HASCAPS : 0));
+		    (mxbusy ? PMAP_CAPLOADGEN_XBUSIED : 0));
 		switch(pmres) {
 		case PMAP_CAPLOADGEN_UNABLE:
 		case PMAP_CAPLOADGEN_ALREADY:
 			break;
+
 		default:
 			panic("Bad return from didvm caploadgen update: %d",
 			    pmres);
 		}
 
-		/* pmap_caploadgen_page will have unwired for us */
+		/* pmap_caploadgen_page will have unwired/unbusied for us */
 		KASSERT(m2 == NULL, ("LS didvm upd !NULL?"));
 		mwired = false;
+		mxbusy = false;
 	}
-#endif
 
 	/*
 	 * XXX In all the excitement for load-side, we've neglected store-side's
@@ -697,14 +683,16 @@ ok:
 	KASSERT(((mas.flags & PGA_CAPDIRTY) == 0) ||
 		!(flags & VM_CHERI_REVOKE_BARRIERED),
 	    ("Capdirty page after visit with world stopped?"));
+#endif
 
 	*ooff = ioff + PAGE_SIZE;
 	if (mwired)
 		vm_page_unwire_in_situ(m);
-	if (m->object != obj) {
-		VM_OBJECT_WUNLOCK(m->object);
-		VM_OBJECT_WLOCK(obj);
-	}
+	if (mxbusy)
+		vm_page_xunbusy(m);
+
+	VM_OBJECT_WLOCK(obj);
+
 	return VM_CHERI_REVOKE_AT_OK;
 }
 
@@ -881,14 +869,6 @@ out:
 	return res;
 }
 
-_Static_assert(VM_CHERI_REVOKE_PAD_SIZE >=
-	(VM_CHERI_REVOKE_BSZ_MEM_NOMAP + VM_CHERI_REVOKE_BSZ_MEM_MAP +
-	    VM_CHERI_REVOKE_BSZ_OTYPE + PAGE_SIZE),
-    "VM_CHERI_REVOKE_PAD_SIZE too small");
-_Static_assert(
-    (VM_CHERI_REVOKE_BM_BASE + VM_CHERI_REVOKE_PAD_SIZE) <= VM_MAXUSER_ADDRESS,
-    "VM_CHERI_REVOKE shadow exceeds max size");
-
 /*
  * XXX Should this encapsulate a barrier around epochs and stat collectio and
  * all that?  I don't think there are any meaningful races around epoch close,
@@ -899,10 +879,8 @@ vm_cheri_revoke_cookie_init(vm_map_t map, struct vm_cheri_revoke_cookie *crc)
 {
 	KASSERT(map == &curproc->p_vmspace->vm_map,
 	    ("cheri revoke does not support foreign maps (yet)"));
-	KASSERT(map->vm_cheri_revoke_shva == VM_CHERI_REVOKE_BM_BASE,
-	    ("cheri revoke shadow does not match definition"));
 
-	if (map->vm_cheri_revoke_sh == NULL)
+	if (!SV_CURPROC_FLAG(SV_CHERI))
 		return KERN_INVALID_ARGUMENT;
 
 	crc->map = map;
@@ -913,8 +891,10 @@ vm_cheri_revoke_cookie_init(vm_map_t map, struct vm_cheri_revoke_cookie *crc)
 	 * the remote one!
 	 */
 	crc->crshadow = cheri_capability_build_user_data(
-	    CHERI_PERM_LOAD | CHERI_PERM_GLOBAL, VM_CHERI_REVOKE_BM_BASE,
-	    VM_CHERI_REVOKE_PAD_SIZE, 0);
+	    CHERI_PERM_LOAD | CHERI_PERM_GLOBAL,
+	    curproc->p_sysent->sv_cheri_revoke_shadow_base,
+	    curproc->p_sysent->sv_cheri_revoke_shadow_length,
+	    curproc->p_sysent->sv_cheri_revoke_shadow_offset);
 
 	return KERN_SUCCESS;
 }
