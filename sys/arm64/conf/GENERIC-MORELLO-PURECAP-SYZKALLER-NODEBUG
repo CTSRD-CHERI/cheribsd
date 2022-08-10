@@ -1,0 +1,13 @@
+#
+# Pure capability ABI kernel for syzkaller fuzzing without debug options
+#
+# $FreeBSD$
+
+include "GENERIC-MORELLO-PURECAP-SYZKALLER"
+include "../../conf/std.nodebug"
+
+ident		GENERIC-MORELLO-PURECAP-SYZKALLER-NODEBUG
+
+# Re-enable options after being disabled in std.nodebug
+options 	COVERAGE
+options 	KCOV
