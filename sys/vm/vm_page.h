@@ -122,6 +122,12 @@
  *	re-evaluate its state.  vm_page_busy_acquire() will block until
  *	the lock is acquired.
  *
+ *	A page will always be xbusy when a writable mapping is being
+ *	pmap_enter()-ed, but creating a new read-only or read-execute mapping
+ *	is possible just holding the page's ->object busy (which prevents
+ *	additional [sx]busying, of pages within that object, but does not
+ *	interlock with existing page [sx]busies; see vm_page_try[sx]busy).
+ *
  *	The valid field is protected by the page busy lock (B) and object
  *	lock (O).  Transitions from invalid to valid are generally done
  *	via I/O or zero filling and do not require the object lock.
