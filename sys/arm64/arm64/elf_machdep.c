@@ -56,6 +56,11 @@ __FBSDID("$FreeBSD$");
 
 #include "linker_if.h"
 
+#ifdef CHERI_CAPREVOKE
+#include <cheri/revoke.h>
+#include <vm/vm_cheri_revoke.h>
+#endif
+
 u_long __read_frequently elf_hwcap;
 u_long __read_frequently elf_hwcap2;
 
@@ -112,6 +117,56 @@ static struct sysentvec elf64_freebsd_sysvec = {
 	.sv_regset_end	= SET_LIMIT(__elfN(regset)),
 };
 INIT_SYSENTVEC(elf64_sysvec, &elf64_freebsd_sysvec);
+
+#ifdef CHERI_CAPREVOKE
+static void
+caprevoke_sysvec_init(void *arg)
+{
+	struct sysentvec *sv = arg;
+
+	/*
+	 * How big do we need the fine-grained memory shadow bitmap to be?  This
+	 * will be 1 << 41 since VM_MAX_USER_ADDRESS is 1 << 48.
+	 */
+	const size_t shadow_fine_mem_size =
+	    sv->sv_maxuser / 8 / VM_CHERI_REVOKE_GSZ_MEM_NOMAP;
+
+	/* Land the shadow somewhere awkward but easy */
+	const vaddr_t shadow_fine_mem_top =
+	    sv->sv_usrstack & ~(shadow_fine_mem_size - 1);
+
+	/*
+	 * The coarse-grained memory bitmap will be either 1 << 33.
+	 */
+	const size_t shadow_coarse_mem_size =
+	    sv->sv_maxuser / 8 / VM_CHERI_REVOKE_GSZ_MEM_MAP;
+
+	const size_t shadow_required_size = shadow_fine_mem_size
+	    + shadow_coarse_mem_size
+	    + VM_CHERI_REVOKE_BSZ_OTYPE;
+
+	const size_t shadow_representable_size =
+	    CHERI_REPRESENTABLE_LENGTH(shadow_required_size);
+
+	sv->sv_cheri_revoke_shadow_length = shadow_representable_size;
+	sv->sv_cheri_revoke_shadow_base =
+	    shadow_fine_mem_top - shadow_representable_size;
+
+	/*
+	 * This places the fine-grained memory bitmap at the top, and so
+	 * naturally aligned, region within the representation-padded region
+	 * just defined.
+	 */
+	sv->sv_cheri_revoke_shadow_offset =
+	    shadow_representable_size - shadow_fine_mem_size;
+
+	/* It's ugly, but simple: manage the info page as a separate object */
+	sv->sv_cheri_revoke_info_page =
+	    sv->sv_cheri_revoke_shadow_base - PAGE_SIZE;
+}
+SYSINIT(caprevoke_sysvec, SI_SUB_VM, SI_ORDER_ANY, caprevoke_sysvec_init,
+    &elf64_freebsd_sysvec);
+#endif
 
 static __ElfN(Brandinfo) freebsd_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
