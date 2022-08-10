@@ -981,7 +981,7 @@ pmap_bootstrap_dmap_l2_block(struct dmap_bootstrap_state *state, int i)
 		MPASS(state->l2[l2_slot] == 0);
 		pmap_store(&state->l2[l2_slot], state->pa | ATTR_DEFAULT |
 #if __has_feature(capabilities)
-		    ATTR_CAP_RW |
+		    ATTR_CAP_RW | ATTR_SC |
 #endif
 		    ATTR_S1_XN | ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) |
 		    L2_BLOCK);
@@ -1019,7 +1019,7 @@ pmap_bootstrap_dmap_l3_page(struct dmap_bootstrap_state *state, int i)
 		MPASS(state->l3[l3_slot] == 0);
 		pmap_store(&state->l3[l3_slot], state->pa | ATTR_DEFAULT |
 #if __has_feature(capabilities)
-		    ATTR_CAP_RW |
+		    ATTR_CAP_RW | ATTR_SC |
 #endif
 		    ATTR_S1_XN | ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) |
 		    L3_PAGE);
@@ -1068,7 +1068,7 @@ pmap_bootstrap_dmap(vm_pointer_t kern_l1, vm_paddr_t min_pa,
 			pmap_store(&state.l1[pmap_l1_index(state.va)],
 			    state.pa | ATTR_DEFAULT | ATTR_S1_XN |
 #if __has_feature(capabilities)
-			    ATTR_CAP_RW |
+			    ATTR_CAP_RW | ATTR_SC |
 #endif
 			    ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK) |
 			    L1_BLOCK);
@@ -1853,7 +1853,7 @@ pmap_qenter(vm_offset_t sva, vm_page_t *ma, int count)
 		m = ma[i];
 		pa = VM_PAGE_TO_PHYS(m) | ATTR_DEFAULT |
 #if __has_feature(capabilities)
-		    ATTR_CAP_RW |
+		    ATTR_CAP_RW | ATTR_SC |
 #endif
 		    ATTR_S1_AP(ATTR_S1_AP_RW) | ATTR_S1_XN |
 		    ATTR_S1_IDX(m->md.pv_memattr) | L3_PAGE;
