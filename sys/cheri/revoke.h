@@ -33,6 +33,8 @@
 #ifndef __SYS_CHERI_REVOKE_H__
 #define	__SYS_CHERI_REVOKE_H__
 
+#include <cheri/cherireg.h> // CHERI_OTYPE_BITS
+
 typedef uint64_t cheri_revoke_epoch;
 #define CHERI_REVOKE_ST_EPOCH_WIDTH	61
 
@@ -160,6 +162,60 @@ cheri_revoke_is_revoked(const void * __capability cap)
 	return (__builtin_cheri_tag_get(cap) == 0);
 #endif
 }
+
+/*************************** SHADOW BITMAP LAYOUT ***************************/
+
+/*
+ * The shadow bitmap is defined in a way that allows a single capability to
+ * access three "variable"-sized structures in a way that depends only on static
+ * features of the architecture rather than dynamic behaviors thereof.
+ *
+ * In particular, we used to define the shadow as the (padded) concatenation of
+ * four structures: the fine-grained memory shadow, the coarse-grained memory
+ * shadow, the otype shadow, and the info page.  Unpleasantly, we did so
+ * identically for all supporting architectures.  Moreover, while this worked
+ * fine so long as each architecture had a fixed size for each of those, it
+ * broke as soon as RISC-V supported both RV39 and RV47, because now we needed
+ * to know the dynamic-at-boot size of the address space to offset into the
+ * amalgamated structure.
+ *
+ * So instead, we propose a more uniform, more-MI layout that "grows" in two
+ * directions and we pass a pointer to the middle of the structure.  This allows
+ * the MD tests to use constant offsets even as the AS size grows.  Concretely,
+ * the shadow is now the concatenation of
+ *
+ *  - the coarse-grained memory shadow bitmap (1 bit per page), with the bit
+ *    corresponding to the page 0x0...0 at the LSB of the *highest* address in
+ *    this region (that is, this region "grows down"),
+ *
+ *  - the otype memory shadow bitmap (1 bit per otype), with the bit
+ *    corresponding to otype 0 at the LSB of the *lowest* address in this
+ *    region,
+ *
+ *  - the fine-grained memory shadow bitmap (1 bit per cap), with the bit
+ *    corresponding to the granule at 0x0...0 as the LSB of the *lowest* address
+ *    in this region.
+ *
+ * This amalgam is aligned so that the fine-grained memory shadow within is
+ * naturally aligned, and the other structures are packed below, so that it's
+ * (relatively) easy to explain the implications for alignment of user address
+ * ranges.
+ *
+ * XXX Note that all of this is somewhat conjecture: we don't actually use the
+ * otype or coarse shadows at the moment, the coarse shadow seems like it might
+ * go away in favor of some other mechanism, and some architectures additionally
+ * have other namespaces, like CIDs, that we might want to track.  There's also
+ * the intense desire to have CHERI+MTE simplify this dance enormously, assuming
+ * we get there.
+ */
+
+static const size_t VM_CHERI_REVOKE_GSZ_MEM_NOMAP = sizeof(void * __capability);
+static const size_t VM_CHERI_REVOKE_GSZ_OTYPE = 1;
+
+static const size_t VM_CHERI_REVOKE_BSZ_OTYPE =
+  ((1 << CHERI_OTYPE_BITS) / VM_CHERI_REVOKE_GSZ_OTYPE / 8);
+
+/*************************** REVOKER CONTROL FLAGS ***************************/
 
 	/*
 	 * Finish the current revocation epoch this pass.
