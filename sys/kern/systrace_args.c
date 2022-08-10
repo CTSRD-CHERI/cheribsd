@@ -1339,6 +1339,24 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
+	/* cheri_revoke_get_shadow */
+	case 260: {
+		struct cheri_revoke_get_shadow_args *p = params;
+		iarg[a++] = p->flags; /* int */
+		uarg[a++] = (intptr_t)p->arena; /* void * __capability */
+		uarg[a++] = (intptr_t)p->shadow; /* void * __capability */
+		*n_args = 3;
+		break;
+	}
+	/* cheri_revoke */
+	case 261: {
+		struct cheri_revoke_args *p = params;
+		iarg[a++] = p->flags; /* int */
+		uarg[a++] = p->start_epoch; /* uint64_t */
+		uarg[a++] = (intptr_t)p->crsi; /* struct cheri_revoke_syscall_info * __capability */
+		*n_args = 3;
+		break;
+	}
 	/* lchmod */
 	case 274: {
 		struct lchmod_args *p = params;
@@ -5548,6 +5566,38 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 1:
 			p = "uint32_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheri_revoke_get_shadow */
+	case 260:
+		switch (ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland void * __capability";
+			break;
+		case 2:
+			p = "userland void * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheri_revoke */
+	case 261:
+		switch (ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "uint64_t";
+			break;
+		case 2:
+			p = "userland struct cheri_revoke_syscall_info * __capability";
 			break;
 		default:
 			break;
@@ -9959,6 +10009,16 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 259:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
+		break;
+	/* cheri_revoke_get_shadow */
+	case 260:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheri_revoke */
+	case 261:
+		if (ndx == 0 || ndx == 1)
+			p = "void *";
 		break;
 	/* lchmod */
 	case 274:
