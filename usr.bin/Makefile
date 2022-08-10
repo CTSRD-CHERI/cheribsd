@@ -18,17 +18,13 @@ SUBDIR=	alias \
 	bsdiff \
 	bzip2 \
 	bzip2recover \
-	capv \
 	cap_mkdb \
 	chat \
 	chpass \
 	cksum \
-	clearances \
-	clocks \
 	cmp \
 	coexec \
 	col \
-	colookup \
 	colrm \
 	column \
 	comm \
@@ -39,7 +35,6 @@ SUBDIR=	alias \
 	cut \
 	diff \
 	dirname \
-	dispatch \
 	du \
 	elfctl \
 	elfdump \
@@ -199,10 +194,15 @@ SUBDIR=	alias \
 .if ${MACHINE_ABI:Mpurecap}
 SUBDIR+= \
 	binds \
+	capv \
+	clearances \
+	clocks \
+	colookup \
 	coping \
 	copong \
 	coregister \
 	cotrace \
+	dispatch \
 	stevie
 .endif
 

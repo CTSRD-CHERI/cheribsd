@@ -1423,4 +1423,16 @@ sys_coaccept_slow(struct thread *td, struct coaccept_slow_args *uap)
 	return (ENOSYS);
 }
 
+int
+sys_capfromfd(struct thread *td, struct capfromfd_args *uap)
+{
+	return (ENOSYS);
+}
+
+int
+sys_captofd(struct thread *td, struct captofd_args *uap)
+{
+	return (ENOSYS);
+}
+
 #endif /* __has_feature(capabilities) */
