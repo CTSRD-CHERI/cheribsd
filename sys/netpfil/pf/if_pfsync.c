@@ -2430,7 +2430,6 @@ static struct protosw in_pfsync_protosw = {
 	.pr_protocol =		IPPROTO_PFSYNC,
 	.pr_flags =		PR_ATOMIC|PR_ADDR,
 	.pr_input =		pfsync_input,
-	.pr_output =		rip_output,
 	.pr_ctloutput =		rip_ctloutput,
 	.pr_usrreqs =		&rip_usrreqs
 };

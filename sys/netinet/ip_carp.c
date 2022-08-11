@@ -2183,7 +2183,6 @@ static struct protosw in_carp_protosw = {
 	.pr_protocol =		IPPROTO_CARP,
 	.pr_flags =		PR_ATOMIC|PR_ADDR,
 	.pr_input =		carp_input,
-	.pr_output =		rip_output,
 	.pr_ctloutput =		rip_ctloutput,
 	.pr_usrreqs =		&rip_usrreqs
 };
@@ -2197,7 +2196,6 @@ static struct protosw in6_carp_protosw = {
 	.pr_protocol =		IPPROTO_CARP,
 	.pr_flags =		PR_ATOMIC|PR_ADDR,
 	.pr_input =		carp6_input,
-	.pr_output =		rip6_output,
 	.pr_ctloutput =		rip6_ctloutput,
 	.pr_usrreqs =		&rip6_usrreqs
 };
