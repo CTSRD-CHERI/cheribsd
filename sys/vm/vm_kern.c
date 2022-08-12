@@ -150,12 +150,15 @@ kva_alloc(vm_size_t size)
 {
 	vmem_addr_t addr;
 
+	TSENTER();
 	size = round_page(size);
 	if (vmem_alloc(kernel_arena, size, M_BESTFIT | M_NOWAIT, &addr))
 		return (0);
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
 #endif
+	TSEXIT();
+
 	return (addr);
 }
 
