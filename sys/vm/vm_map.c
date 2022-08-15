@@ -2123,8 +2123,6 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	bool reservation_created = false;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(reservp != NULL || cheri_gettag(start),
-	    ("Expected valid capability"));
 	if (cheri_getlen(start) < length)
 		return (KERN_INVALID_ARGUMENT);
 #endif
@@ -2152,6 +2150,10 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 				goto err;
 			reservation_created = true;
 		} else {
+#ifdef __CHERI_PURE_CAPABILITY__
+			KASSERT(cheri_gettag(start),
+			    ("Expected valid capability"));
+#endif
 			result = vm_map_reservation_get(map, start, length,
 			    &reservation_id);
 			if (result != KERN_SUCCESS)
