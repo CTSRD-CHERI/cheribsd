@@ -283,17 +283,11 @@ PMODES="
 
 CURARCH=$( uname -m )
 case $CURARCH in
-	amd64|arm64|i386|riscv)	# Booting ZFS Supported if not CHERI
-		case `uname -p` in
-			aarch64*c*|riscv*c*)
-				;;
-			*)
-				PMODES="
-					'$msg_auto_zfs' '$msg_auto_zfs_desc' '$msg_auto_zfs_help'
-					$PMODES
-				" # END-QUOTE
-				;;
-		esac
+	amd64|arm64|i386|riscv)	# Booting ZFS Supported
+		PMODES="
+			'$msg_auto_zfs' '$msg_auto_zfs_desc' '$msg_auto_zfs_help'
+			$PMODES
+		" # END-QUOTE
 		;;
 	*)			# Booting ZFS Unsupported
 		;;
