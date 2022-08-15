@@ -40,7 +40,6 @@
 .Op Fl C
 .Op Fl k
 .Op Fl v
-.Fl i Ar index
 .Ar command Op Ar args ...
 .Sh DESCRIPTION
 The
@@ -52,9 +51,7 @@ and
 interactions with a service.
 .Pp
 It spawns a child process passing it the capability vector modified
-to interpose the service at offset
-.Ar index
-then executes
+to interpose the services and then executes
 .Ar command .
 The parent process transparently relays the calls.
 .Pp
@@ -70,10 +67,6 @@ Do not call
 thus do not enter
 .Xr capsicum 4
 capability mode.
-.It Fl i
-Interpose the service found at offset
-.Ar index
-in the capability vector inherited from the parent process.
 .It Fl k
 Use
 .Xr coaccept_slow 2
@@ -91,7 +84,7 @@ To trace a
 .Xr clocks 1
 service (note the answerback):
 .Pp
-.Dl clocks cotrace -i5 sh
+.Dl clocks cotrace sh
 .Dl capv -v
 .Dl date
 .Pp
