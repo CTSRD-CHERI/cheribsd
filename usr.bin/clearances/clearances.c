@@ -298,7 +298,7 @@ main(int argc, char **argv)
 	if (error != 0)
 		err(1, "capvset");
 	/*
-	 * We can't explicitely pass capv into another address space,
+	 * We can't explicitly pass capv into another address space,
 	 * so we need vfork(2) here, not fork(2).
 	 */
 	pid = vfork();
@@ -373,7 +373,7 @@ main(int argc, char **argv)
 			else
 				received = cocall(target, in, received, out, sizeof(outbuf));
 			if (received < 0) {
-				warn("%s", kflag ? "coaccept_slow" : "coaccept");
+				warn("%s", kflag ? "cocall_slow" : "cocall");
 				out->len = received = 0;
 				// XXX we should send back error response
 			}

@@ -109,6 +109,14 @@ Filtering by interfacing with
 would be cool.
 Or
 .Xr polkit 8 .
+Or checking if the caller's executable contains a valid signature.
+.Pp
+Or make it guard the Wayland service by verifying proximity to users'
+watch on each
+.Xr cocall 2 ,
+and observe sensitive app’s windows blank when they step away
+from the keyboard.
+(This one should probably be implemented as a separate utility.)
 .It Fl i
 Interpose the service found at offset
 .Ar index
