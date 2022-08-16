@@ -153,7 +153,7 @@ main(int argc, char **argv)
 		err(1, "COSETUP_TAKEOVER");
 
 	/*
-	 * We can't explicitely pass capv into another address space,
+	 * We can't explicitly pass capv into another address space,
 	 * so we need vfork(2) here, not fork(2).
 	 */
 	pid = vfork();
