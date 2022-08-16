@@ -452,12 +452,9 @@ zio_crypt_key_wrap(crypto_key_t *cwkey, zio_crypt_key_t *key, uint8_t *iv,
 	 */
 	memcpy(keydata_out, key->zk_master_keydata, keydata_len);
 	memcpy(hmac_keydata_out, key->zk_hmac_keydata, SHA512_HMAC_KEYLEN);
-	iovecs[1].iov_base = keydata_out;
-	iovecs[1].iov_len = keydata_len;
-	iovecs[2].iov_base = hmac_keydata_out;
-	iovecs[2].iov_len = SHA512_HMAC_KEYLEN;
-	iovecs[3].iov_base = mac;
-	iovecs[3].iov_len = WRAPPING_MAC_LEN;
+	IOVEC_INIT(&iovecs[1], keydata_out, keydata_len);
+	IOVEC_INIT(&iovecs[2], hmac_keydata_out, SHA512_HMAC_KEYLEN);
+	IOVEC_INIT(&iovecs[3], mac, WRAPPING_MAC_LEN);
 
 	/*
 	 * Although we don't support writing to the old format, we do
@@ -475,8 +472,7 @@ zio_crypt_key_wrap(crypto_key_t *cwkey, zio_crypt_key_t *key, uint8_t *iv,
 		aad[2] = LE_64(key->zk_version);
 	}
 
-	iovecs[0].iov_base = aad;
-	iovecs[0].iov_len = aad_len;
+	IOVEC_INIT(&iovecs[0], aad, aad_len);
 	enc_len = zio_crypt_table[crypt].ci_keylen + SHA512_HMAC_KEYLEN;
 
 	GET_UIO_STRUCT(&cuio)->uio_iov = iovecs;
@@ -534,12 +530,9 @@ zio_crypt_key_unwrap(crypto_key_t *cwkey, uint64_t crypt, uint64_t version,
 	src = hmac_keydata;
 	memcpy(dst, src, SHA512_HMAC_KEYLEN);
 
-	iovecs[1].iov_base = key->zk_master_keydata;
-	iovecs[1].iov_len = keydata_len;
-	iovecs[2].iov_base = key->zk_hmac_keydata;
-	iovecs[2].iov_len = SHA512_HMAC_KEYLEN;
-	iovecs[3].iov_base = mac;
-	iovecs[3].iov_len = WRAPPING_MAC_LEN;
+	IOVEC_INIT(&iovecs[1], key->zk_master_keydata, keydata_len);
+	IOVEC_INIT(&iovecs[2], key->zk_hmac_keydata, SHA512_HMAC_KEYLEN);
+	IOVEC_INIT(&iovecs[3], mac, WRAPPING_MAC_LEN);
 
 	if (version == 0) {
 		aad_len = sizeof (uint64_t);
@@ -553,8 +546,7 @@ zio_crypt_key_unwrap(crypto_key_t *cwkey, uint64_t crypt, uint64_t version,
 	}
 
 	enc_len = keydata_len + SHA512_HMAC_KEYLEN;
-	iovecs[0].iov_base = aad;
-	iovecs[0].iov_len = aad_len;
+	IOVEC_INIT(&iovecs[0], aad, aad_len);
 
 	GET_UIO_STRUCT(&cuio)->uio_iov = iovecs;
 	zfs_uio_iovcnt(&cuio) = 4;
@@ -1340,9 +1332,9 @@ zio_crypt_init_uios_zil(boolean_t encrypt, uint8_t *plainbuf,
 		if (txtype == TX_WRITE) {
 			crypt_len = sizeof (lr_write_t) -
 			    sizeof (lr_t) - sizeof (blkptr_t);
-			dst_iovecs[vec].iov_base = (char *)dlrp +
-			    sizeof (lr_t);
-			dst_iovecs[vec].iov_len = crypt_len;
+			IOVEC_INIT(&dst_iovecs[vec], (void *)
+			    ((uintptr_t)dlrp + sizeof (lr_t)),
+			    crypt_len);
 
 			/* copy the bp now since it will not be encrypted */
 			memcpy(dlrp + sizeof (lr_write_t) - sizeof (blkptr_t),
@@ -1358,17 +1350,16 @@ zio_crypt_init_uios_zil(boolean_t encrypt, uint8_t *plainbuf,
 
 			if (lr_len != sizeof (lr_write_t)) {
 				crypt_len = lr_len - sizeof (lr_write_t);
-				dst_iovecs[vec].iov_base = (char *)
-				    dlrp + sizeof (lr_write_t);
-				dst_iovecs[vec].iov_len = crypt_len;
+				IOVEC_INIT(&dst_iovecs[vec], (void *)
+				    ((uintptr_t)dlrp + sizeof (lr_write_t)),
+				    crypt_len);
 				vec++;
 				total_len += crypt_len;
 			}
 		} else {
 			crypt_len = lr_len - sizeof (lr_t);
-			dst_iovecs[vec].iov_base = (char *)dlrp +
-			    sizeof (lr_t);
-			dst_iovecs[vec].iov_len = crypt_len;
+			IOVEC_INIT(&dst_iovecs[vec], (void *)
+			    ((uintptr_t)dlrp + sizeof (lr_t)), crypt_len);
 			vec++;
 			total_len += crypt_len;
 		}
@@ -1378,11 +1369,9 @@ zio_crypt_init_uios_zil(boolean_t encrypt, uint8_t *plainbuf,
 	ASSERT3U(vec, ==, nr_iovecs - 1);
 
 	/* AAD */
-	dst_iovecs[0].iov_base = aadbuf;
-	dst_iovecs[0].iov_len = aad_len;
+	IOVEC_INIT(&dst_iovecs[0], aadbuf, aad_len);
 	/* MAC */
-	dst_iovecs[vec].iov_base = 0;
-	dst_iovecs[vec].iov_len = 0;
+	IOVEC_INIT(&dst_iovecs[vec], NULL, 0);
 
 	*no_crypt = (vec == 1);
 	*enc_len = total_len;
@@ -1511,8 +1500,8 @@ zio_crypt_init_uios_dnode(boolean_t encrypt, uint64_t version,
 		if (dnp->dn_type != DMU_OT_NONE &&
 		    DMU_OT_IS_ENCRYPTED(dnp->dn_bonustype) &&
 		    dnp->dn_bonuslen != 0) {
-			dst_iovecs[vec].iov_base = DN_BONUS(&ddnp[i]);
-			dst_iovecs[vec].iov_len = crypt_len;
+			IOVEC_INIT(&dst_iovecs[vec], DN_BONUS(&ddnp[i]),
+			    crypt_len);
 
 			vec++;
 			total_len += crypt_len;
@@ -1528,11 +1517,9 @@ zio_crypt_init_uios_dnode(boolean_t encrypt, uint64_t version,
 	ASSERT3U(vec, ==, nr_iovecs - 1);
 
 	/* AAD */
-	dst_iovecs[0].iov_base = aadbuf;
-	dst_iovecs[0].iov_len = aad_len;
+	IOVEC_INIT(&dst_iovecs[0], aadbuf, aad_len);
 	/* MAC */
-	dst_iovecs[vec].iov_base = 0;
-	dst_iovecs[vec].iov_len = 0;
+	IOVEC_INIT(&dst_iovecs[vec], NULL, 0);
 
 	*no_crypt = (vec == 1);
 	*enc_len = total_len;
@@ -1571,8 +1558,7 @@ zio_crypt_init_uios_normal(boolean_t encrypt, uint8_t *plainbuf,
 		dst = plainbuf;
 	}
 	memcpy(dst, src, datalen);
-	cipher_iovecs[0].iov_base = dst;
-	cipher_iovecs[0].iov_len = datalen;
+	IOVEC_INIT(&cipher_iovecs[0], dst, datalen);
 
 	*enc_len = datalen;
 	GET_UIO_STRUCT(out_uio)->uio_iov = cipher_iovecs;
@@ -1642,8 +1628,7 @@ zio_crypt_init_uios(boolean_t encrypt, uint64_t version, dmu_object_type_t ot,
 	mac_iov =
 	    ((iovec_t *)&(GET_UIO_STRUCT(cuio)->
 	    uio_iov[zfs_uio_iovcnt(cuio) - 1]));
-	mac_iov->iov_base = (void *)mac;
-	mac_iov->iov_len = ZIO_DATA_MAC_LEN;
+	IOVEC_INIT(mac_iov, mac, ZIO_DATA_MAC_LEN);
 
 	return (0);
 

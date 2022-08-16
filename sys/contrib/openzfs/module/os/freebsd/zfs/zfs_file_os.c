@@ -85,8 +85,7 @@ zfs_file_write_impl(zfs_file_t *fp, const void *buf, size_t count, loff_t *offp,
 	struct iovec aiov;
 
 	td = curthread;
-	aiov.iov_base = (void *)(uintptr_t)buf;
-	aiov.iov_len = count;
+	IOVEC_INIT(&aiov, __DECONST(void *, buf), count);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_segflg = UIO_SYSSPACE;
@@ -142,8 +141,7 @@ zfs_file_read_impl(zfs_file_t *fp, void *buf, size_t count, loff_t *offp,
 	struct iovec aiov;
 
 	td = curthread;
-	aiov.iov_base = (void *)(uintptr_t)buf;
-	aiov.iov_len = count;
+	IOVEC_INIT(&aiov, buf, count);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_segflg = UIO_SYSSPACE;

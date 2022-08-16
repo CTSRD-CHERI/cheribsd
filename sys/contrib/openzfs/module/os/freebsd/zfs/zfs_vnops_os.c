@@ -1742,7 +1742,7 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 	} else {
 		bufsize = bytes_wanted;
 		outbuf = NULL;
-		odp = (struct dirent64 *)iovp->iov_base;
+		odp = (__cheri_fromcap struct dirent64 *)iovp->iov_base;
 	}
 	eodp = (struct edirent *)odp;
 
@@ -5847,8 +5847,7 @@ zfs_listextattr_dir(struct vop_listextattr_args *ap, const char *attrprefix)
 	size_t plen = strlen(attrprefix);
 
 	do {
-		aiov.iov_base = (void *)dirbuf;
-		aiov.iov_len = sizeof (dirbuf);
+		IOVEC_INIT(&aiov, dirbuf, sizeof (dirbuf));
 		auio.uio_resid = sizeof (dirbuf);
 		error = VOP_READDIR(vp, &auio, ap->a_cred, &eof, NULL, NULL);
 		if (error != 0)
