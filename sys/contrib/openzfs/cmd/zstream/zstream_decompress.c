@@ -144,7 +144,7 @@ zstream_do_decompress(int argc, char *argv[])
 		p = hsearch(e, ENTER);
 		if (p == NULL)
 			errx(1, "hsearch");
-		p->data = (void*)type;
+		p->data = (void*)(uintptr_t)type;
 	}
 
 	if (isatty(STDIN_FILENO)) {
