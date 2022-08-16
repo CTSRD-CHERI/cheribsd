@@ -30,12 +30,12 @@
 
 static const blake3_impl_ops_t *const blake3_impls[] = {
 	&blake3_generic_impl,
-#if defined(__aarch64__) || \
+#if (defined(__aarch64__) && !defined(__CHERI_PURE_CAPABILITY__)) || \
 	(defined(__x86_64) && defined(HAVE_SSE2)) || \
 	(defined(__PPC64__) && defined(__LITTLE_ENDIAN__))
 	&blake3_sse2_impl,
 #endif
-#if defined(__aarch64__) || \
+#if (defined(__aarch64__) && !defined(__CHERI_PURE_CAPABILITY__)) || \
 	(defined(__x86_64) && defined(HAVE_SSE4_1)) || \
 	(defined(__PPC64__) && defined(__LITTLE_ENDIAN__))
 	&blake3_sse41_impl,

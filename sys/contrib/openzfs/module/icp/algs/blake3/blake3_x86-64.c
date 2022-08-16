@@ -25,7 +25,7 @@
 
 #include "blake3_impl.h"
 
-#if defined(__aarch64__) || \
+#if (defined(__aarch64__) && !defined(__CHERI_PURE_CAPABILITY__)) || \
 	(defined(__x86_64) && defined(HAVE_SSE2)) || \
 	(defined(__PPC64__) && defined(__LITTLE_ENDIAN__))
 
@@ -92,7 +92,7 @@ const blake3_impl_ops_t blake3_sse2_impl = {
 };
 #endif
 
-#if defined(__aarch64__) || \
+#if (defined(__aarch64__) && !defined(__CHERI_PURE_CAPABILITY__)) || \
 	(defined(__x86_64) && defined(HAVE_SSE2)) || \
 	(defined(__PPC64__) && defined(__LITTLE_ENDIAN__))
 

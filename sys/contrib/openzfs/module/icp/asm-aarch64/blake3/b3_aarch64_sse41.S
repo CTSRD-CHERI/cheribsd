@@ -28,7 +28,7 @@
  * Used tools: SIMDe https://github.com/simd-everywhere/simde
  */
 
-#if defined(__aarch64__)
+#if defined(__aarch64__) && !defined(__CHERI_PURE_CAPABILITY__)
 	.text
 	.section	.rodata.cst16,"aM",@progbits,16
 	.p2align	4
