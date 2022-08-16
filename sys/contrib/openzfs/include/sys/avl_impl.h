@@ -55,7 +55,7 @@ extern "C" {
  * bottom bits of the parent pointer on 64 bit machines to save on space.
  */
 
-#ifndef _LP64
+#if !defined(_LP64) && !defined(__CHERI_PURE_CAPABILITY__)
 
 struct avl_node {
 	struct avl_node *avl_child[2];	/* left/right children */
