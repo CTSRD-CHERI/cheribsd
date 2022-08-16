@@ -165,7 +165,24 @@ atomic_dec_64_nv(volatile uint64_t *target)
 	return (atomic_add_64_nv(target, -1));
 }
 
-#if !defined(COMPAT_32BIT) && defined(__LP64__)
+#if defined(__CHERI_PURE_CAPABILITY__)
+static __inline void *
+atomic_cas_ptr(volatile void *target, void *_cmp,  void *newval)
+{
+	uintptr_t cmp = (uintptr_t)_cmp;
+#ifdef STRONG_FCMPSET
+	(void) atomic_fcmpset_ptr(target, &cmp, (uintptr_t)newval);
+#else
+	uintptr_t expected = cmp;
+
+	do {
+		if (atomic_fcmpset_ptr(target, &cmp, (uintptr_t)newval))
+			break;
+	} while (cmp == expected);
+#endif
+	return ((void *)cmp);
+}
+#elif !defined(COMPAT_32BIT) && defined(__LP64__)
 static __inline void *
 atomic_cas_ptr(volatile void *target, void *cmp,  void *newval)
 {
