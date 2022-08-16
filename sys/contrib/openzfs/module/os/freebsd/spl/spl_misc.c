@@ -71,27 +71,27 @@ kmem_strdup(const char *s)
 }
 
 int
-ddi_copyin(const void *from, void *to, size_t len, int flags)
+ddi_copyin(const void * __capability from, void *to, size_t len, int flags)
 {
 	/* Fake ioctl() issued by kernel, 'from' is a kernel address */
 	if (flags & FKIOCTL) {
-		memcpy(to, from, len);
+		memcpy(to, (__cheri_fromcap const void *)from, len);
 		return (0);
 	}
 
-	return (copyin(from, to, len));
+	return (copyincap(from, to, len));
 }
 
 int
-ddi_copyout(const void *from, void *to, size_t len, int flags)
+ddi_copyout(const void *from, void * __capability to, size_t len, int flags)
 {
 	/* Fake ioctl() issued by kernel, 'from' is a kernel address */
 	if (flags & FKIOCTL) {
-		memcpy(to, from, len);
+		memcpy((__cheri_fromcap void *)to, from, len);
 		return (0);
 	}
 
-	return (copyout(from, to, len));
+	return (copyoutcap(from, to, len));
 }
 
 int

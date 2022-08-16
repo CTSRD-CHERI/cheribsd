@@ -282,7 +282,7 @@ static int zfs_check_clearable(const char *dataset, nvlist_t *props,
 static int zfs_fill_zplprops_root(uint64_t, nvlist_t *, nvlist_t *,
     boolean_t *);
 int zfs_set_prop_nvlist(const char *, zprop_source_t, nvlist_t *, nvlist_t *);
-static int get_nvlist(uint64_t nvl, uint64_t size, int iflag, nvlist_t **nvp);
+static int get_nvlist(uintcap_t nvl, uint64_t size, int iflag, nvlist_t **nvp);
 
 static void
 history_str_free(char *buf)
@@ -299,7 +299,7 @@ history_str_get(zfs_cmd_t *zc)
 		return (NULL);
 
 	buf = kmem_alloc(HIS_MAX_RECORD_LEN, KM_SLEEP);
-	if (copyinstr((void *)(uintptr_t)zc->zc_history,
+	if (copyinstr((const void * __capability)(uintcap_t)zc->zc_history,
 	    buf, HIS_MAX_RECORD_LEN, NULL) != 0) {
 		history_str_free(buf);
 		return (NULL);
@@ -1265,7 +1265,7 @@ zfs_secpolicy_change_key(zfs_cmd_t *zc, nvlist_t *innvl, cred_t *cr)
  * Returns the nvlist as specified by the user in the zfs_cmd_t.
  */
 static int
-get_nvlist(uint64_t nvl, uint64_t size, int iflag, nvlist_t **nvp)
+get_nvlist(uintcap_t nvl, uint64_t size, int iflag, nvlist_t **nvp)
 {
 	char *packed;
 	int error;
@@ -1279,7 +1279,7 @@ get_nvlist(uint64_t nvl, uint64_t size, int iflag, nvlist_t **nvp)
 
 	packed = vmem_alloc(size, KM_SLEEP);
 
-	if ((error = ddi_copyin((void *)(uintptr_t)nvl, packed, size,
+	if ((error = ddi_copyin((void * __capability)(uintcap_t)nvl, packed, size,
 	    iflag)) != 0) {
 		vmem_free(packed, size);
 		return (SET_ERROR(EFAULT));
@@ -1348,7 +1348,7 @@ put_nvlist(zfs_cmd_t *zc, nvlist_t *nvl)
 		error = SET_ERROR(ENOMEM);
 	} else {
 		packed = fnvlist_pack(nvl, &size);
-		if (ddi_copyout(packed, (void *)(uintptr_t)zc->zc_nvlist_dst,
+		if (ddi_copyout(packed, (void * __capability)(uintcap_t)zc->zc_nvlist_dst,
 		    size, zc->zc_iflags) != 0)
 			error = SET_ERROR(EFAULT);
 		fnvlist_pack_free(packed, size);
@@ -1744,7 +1744,7 @@ zfs_ioc_pool_get_history(zfs_cmd_t *zc)
 	if ((error = spa_history_get(spa, &zc->zc_history_offset,
 	    &zc->zc_history_len, hist_buf)) == 0) {
 		error = ddi_copyout(hist_buf,
-		    (void *)(uintptr_t)zc->zc_history,
+		    (void * __capability)(uintcap_t)zc->zc_history,
 		    zc->zc_history_len, zc->zc_iflags);
 	}
 
@@ -5676,7 +5676,7 @@ zfs_ioc_error_log(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
-	error = spa_get_errlog(spa, (void *)(uintptr_t)zc->zc_nvlist_dst,
+	error = spa_get_errlog(spa, (void * __capability)(uintcap_t)zc->zc_nvlist_dst,
 	    &count);
 	if (error == 0)
 		zc->zc_nvlist_dst_size = count;
@@ -5952,7 +5952,7 @@ zfs_ioc_userspace_many(zfs_cmd_t *zc)
 
 	if (error == 0) {
 		error = xcopyout(buf,
-		    (void *)(uintptr_t)zc->zc_nvlist_dst,
+		    (void * __capability)(uintcap_t)zc->zc_nvlist_dst,
 		    zc->zc_nvlist_dst_size);
 	}
 	vmem_free(buf, bufsize);

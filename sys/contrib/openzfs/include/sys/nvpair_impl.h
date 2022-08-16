@@ -50,7 +50,7 @@ typedef struct i_nvp i_nvp_t;
 struct i_nvp {
 	union {
 		/* ensure alignment */
-		uint64_t	_nvi_align;
+		kuint64cap_t	_nvi_align;
 
 		struct {
 			/* pointer to next nvpair */

@@ -285,7 +285,7 @@ pool_active(void *unused, const char *name, uint64_t guid, boolean_t *isactive)
 		zc = umem_zalloc(sizeof (zfs_cmd_t), UMEM_NOFAIL);
 
 		(void) strlcpy(zc->zc_name, name, sizeof (zc->zc_name));
-		zp.zfs_cmd = (uint64_t)(uintptr_t)zc;
+		zp.zfs_cmd = (uintptr_t)zc;
 		zp.zfs_cmd_size = sizeof (zfs_cmd_t);
 		zp.zfs_ioctl_version = ZFS_IOCVER_OZFS;
 
@@ -301,7 +301,7 @@ pool_active(void *unused, const char *name, uint64_t guid, boolean_t *isactive)
 		zcl = umem_zalloc(sizeof (zfs_cmd_legacy_t), UMEM_NOFAIL);
 
 		(void) strlcpy(zcl->zc_name, name, sizeof (zcl->zc_name));
-		zp.zfs_cmd = (uint64_t)(uintptr_t)zcl;
+		zp.zfs_cmd = (uintptr_t)zcl;
 		zp.zfs_cmd_size = sizeof (zfs_cmd_legacy_t);
 		zp.zfs_ioctl_version = ZFS_IOCVER_LEGACY;
 

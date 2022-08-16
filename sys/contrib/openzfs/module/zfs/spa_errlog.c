@@ -282,7 +282,7 @@ find_birth_txg(dsl_dataset_t *ds, zbookmark_err_phys_t *zep,
  */
 static int
 check_filesystem(spa_t *spa, uint64_t head_ds, zbookmark_err_phys_t *zep,
-    uint64_t *count, void *uaddr, boolean_t only_count)
+    uint64_t *count, void * __capability uaddr, boolean_t only_count)
 {
 	dsl_dataset_t *ds;
 	dsl_pool_t *dp = spa->spa_dsl_pool;
@@ -301,7 +301,7 @@ check_filesystem(spa_t *spa, uint64_t head_ds, zbookmark_err_phys_t *zep,
 			if (!only_count) {
 				zbookmark_phys_t zb;
 				zep_to_zb(head_ds, zep, &zb);
-				if (copyout(&zb, (char *)uaddr + (*count - 1)
+				if (copyout(&zb, (char * __capability)uaddr + (*count - 1)
 				    * sizeof (zbookmark_phys_t),
 				    sizeof (zbookmark_phys_t)) != 0) {
 					dsl_dataset_rele(ds, FTAG);
@@ -366,7 +366,7 @@ check_filesystem(spa_t *spa, uint64_t head_ds, zbookmark_err_phys_t *zep,
 			if (!only_count) {
 				zbookmark_phys_t zb;
 				zep_to_zb(snap_obj, zep, &zb);
-				if (copyout(&zb, (char *)uaddr + (*count - 1) *
+				if (copyout(&zb, (char * __capability)uaddr + (*count - 1) *
 				    sizeof (zbookmark_phys_t),
 				    sizeof (zbookmark_phys_t)) != 0) {
 					dsl_dataset_rele(ds, FTAG);
@@ -433,7 +433,7 @@ find_top_affected_fs(spa_t *spa, uint64_t head_ds, zbookmark_err_phys_t *zep,
 
 static int
 process_error_block(spa_t *spa, uint64_t head_ds, zbookmark_err_phys_t *zep,
-    uint64_t *count, void *uaddr, boolean_t only_count)
+    uint64_t *count, void * __capability uaddr, boolean_t only_count)
 {
 	dsl_pool_t *dp = spa->spa_dsl_pool;
 	dsl_pool_config_enter(dp, FTAG);
@@ -694,7 +694,7 @@ spa_upgrade_errlog(spa_t *spa, dmu_tx_t *tx)
  * detailed message see spa_get_errlog_size() above.
  */
 static int
-process_error_log(spa_t *spa, uint64_t obj, void *uaddr, uint64_t *count)
+process_error_log(spa_t *spa, uint64_t obj, void * __capability uaddr, uint64_t *count)
 {
 	zap_cursor_t zc;
 	zap_attribute_t za;
@@ -714,7 +714,7 @@ process_error_log(spa_t *spa, uint64_t obj, void *uaddr, uint64_t *count)
 			zbookmark_phys_t zb;
 			name_to_bookmark(za.za_name, &zb);
 
-			if (copyout(&zb, (char *)uaddr +
+			if (copyout(&zb, (char * __capability)uaddr +
 			    (*count - 1) * sizeof (zbookmark_phys_t),
 			    sizeof (zbookmark_phys_t)) != 0) {
 				zap_cursor_fini(&zc);
@@ -759,7 +759,7 @@ process_error_log(spa_t *spa, uint64_t obj, void *uaddr, uint64_t *count)
 }
 
 static int
-process_error_list(spa_t *spa, avl_tree_t *list, void *uaddr, uint64_t *count)
+process_error_list(spa_t *spa, avl_tree_t *list, void * __capability uaddr, uint64_t *count)
 {
 	spa_error_entry_t *se;
 
@@ -770,7 +770,7 @@ process_error_list(spa_t *spa, avl_tree_t *list, void *uaddr, uint64_t *count)
 			if (*count == 0)
 				return (SET_ERROR(ENOMEM));
 
-			if (copyout(&se->se_bookmark, (char *)uaddr +
+			if (copyout(&se->se_bookmark, (char * __capability)uaddr +
 			    (*count - 1) * sizeof (zbookmark_phys_t),
 			    sizeof (zbookmark_phys_t)) != 0)
 				return (SET_ERROR(EFAULT));
@@ -813,7 +813,7 @@ process_error_list(spa_t *spa, avl_tree_t *list, void *uaddr, uint64_t *count)
  * the error list lock when we are finished.
  */
 int
-spa_get_errlog(spa_t *spa, void *uaddr, uint64_t *count)
+spa_get_errlog(spa_t *spa, void * __capability uaddr, uint64_t *count)
 {
 	int ret = 0;
 

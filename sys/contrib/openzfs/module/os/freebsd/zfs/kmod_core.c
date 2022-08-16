@@ -128,12 +128,12 @@ zfsdev_ioctl(struct cdev *dev, ulong_t zcmd, caddr_t arg, int flag,
 	zfs_cmd_legacy_t *zcl;
 #endif
 	int rc, error;
-	void *uaddr;
+	void * __capability uaddr;
 
 	len = IOCPARM_LEN(zcmd);
 	vecnum = zcmd & 0xff;
 	zp = (void *)arg;
-	uaddr = (void *)zp->zfs_cmd;
+	uaddr = (void * __capability)zp->zfs_cmd;
 	error = 0;
 #ifdef ZFS_LEGACY_SUPPORT
 	zcl = NULL;
@@ -157,14 +157,14 @@ zfsdev_ioctl(struct cdev *dev, ulong_t zcmd, caddr_t arg, int flag,
 			return (ENOTSUP);
 		}
 		zcl = kmem_zalloc(sizeof (zfs_cmd_legacy_t), KM_SLEEP);
-		if (copyin(uaddr, zcl, sizeof (zfs_cmd_legacy_t))) {
+		if (copyincap(uaddr, zcl, sizeof (zfs_cmd_legacy_t))) {
 			error = SET_ERROR(EFAULT);
 			goto out;
 		}
 		zfs_cmd_legacy_to_ozfs(zcl, zc);
 	} else
 #endif
-	if (copyin(uaddr, zc, sizeof (zfs_cmd_t))) {
+	if (copyincap(uaddr, zc, sizeof (zfs_cmd_t))) {
 		error = SET_ERROR(EFAULT);
 		goto out;
 	}
@@ -172,11 +172,11 @@ zfsdev_ioctl(struct cdev *dev, ulong_t zcmd, caddr_t arg, int flag,
 #ifdef ZFS_LEGACY_SUPPORT
 	if (zcl) {
 		zfs_cmd_ozfs_to_legacy(zc, zcl);
-		rc = copyout(zcl, uaddr, sizeof (*zcl));
+		rc = copyoutcap(zcl, uaddr, sizeof (*zcl));
 	} else
 #endif
 	{
-		rc = copyout(zc, uaddr, sizeof (*zc));
+		rc = copyoutcap(zc, uaddr, sizeof (*zc));
 	}
 	if (error == 0 && rc != 0)
 		error = SET_ERROR(EFAULT);

@@ -153,10 +153,10 @@ lzc_ioctl_run(zfs_ioc_t ioc, const char *name, nvlist_t *innvl, int expected)
 	packed = fnvlist_pack(innvl, &size);
 	(void) strlcpy(zc.zc_name, name, sizeof (zc.zc_name));
 	zc.zc_name[sizeof (zc.zc_name) - 1] = '\0';
-	zc.zc_nvlist_src = (uint64_t)(uintptr_t)packed;
+	zc.zc_nvlist_src = (uintptr_t)packed;
 	zc.zc_nvlist_src_size = size;
 	zc.zc_nvlist_dst_size = MAX(size * 2, 128 * 1024);
-	zc.zc_nvlist_dst = (uint64_t)(uintptr_t)malloc(zc.zc_nvlist_dst_size);
+	zc.zc_nvlist_dst = (uintptr_t)malloc(zc.zc_nvlist_dst_size);
 
 	if (lzc_ioctl_fd(zfs_fd, ioc, &zc) != 0)
 		error = errno;

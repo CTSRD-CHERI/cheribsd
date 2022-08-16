@@ -1159,7 +1159,7 @@ zcmd_alloc_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, size_t len)
 		len = 256 * 1024;
 	zc->zc_nvlist_dst_size = len;
 	zc->zc_nvlist_dst =
-	    (uint64_t)(uintptr_t)zfs_alloc(hdl, zc->zc_nvlist_dst_size);
+	    (uintptr_t)zfs_alloc(hdl, zc->zc_nvlist_dst_size);
 }
 
 /*
@@ -1172,7 +1172,7 @@ zcmd_expand_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc)
 {
 	free((void *)(uintptr_t)zc->zc_nvlist_dst);
 	zc->zc_nvlist_dst =
-	    (uint64_t)(uintptr_t)zfs_alloc(hdl, zc->zc_nvlist_dst_size);
+	    (uintptr_t)zfs_alloc(hdl, zc->zc_nvlist_dst_size);
 }
 
 /*
@@ -1190,7 +1190,7 @@ zcmd_free_nvlists(zfs_cmd_t *zc)
 }
 
 static void
-zcmd_write_nvlist_com(libzfs_handle_t *hdl, uint64_t *outnv, uint64_t *outlen,
+zcmd_write_nvlist_com(libzfs_handle_t *hdl, uintptr_t *outnv, uint64_t *outlen,
     nvlist_t *nvl)
 {
 	char *packed;
@@ -1200,7 +1200,7 @@ zcmd_write_nvlist_com(libzfs_handle_t *hdl, uint64_t *outnv, uint64_t *outlen,
 
 	verify(nvlist_pack(nvl, &packed, &len, NV_ENCODE_NATIVE, 0) == 0);
 
-	*outnv = (uint64_t)(uintptr_t)packed;
+	*outnv = (uintptr_t)packed;
 	*outlen = len;
 }
 
@@ -1224,7 +1224,7 @@ zcmd_write_src_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t *nvl)
 int
 zcmd_read_dst_nvlist(libzfs_handle_t *hdl, zfs_cmd_t *zc, nvlist_t **nvlp)
 {
-	if (nvlist_unpack((void *)(uintptr_t)zc->zc_nvlist_dst,
+	if (nvlist_unpack((void *)zc->zc_nvlist_dst,
 	    zc->zc_nvlist_dst_size, nvlp, 0) != 0)
 		return (no_memory(hdl));
 

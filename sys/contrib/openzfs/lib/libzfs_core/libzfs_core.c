@@ -192,7 +192,7 @@ lzc_ioctl(zfs_ioc_t ioc, const char *name,
 
 	if (source != NULL) {
 		packed = fnvlist_pack(source, &size);
-		zc.zc_nvlist_src = (uint64_t)(uintptr_t)packed;
+		zc.zc_nvlist_src = (uintptr_t)packed;
 		zc.zc_nvlist_src_size = size;
 	}
 
@@ -204,9 +204,8 @@ lzc_ioctl(zfs_ioc_t ioc, const char *name,
 		} else {
 			zc.zc_nvlist_dst_size = MAX(size * 2, 128 * 1024);
 		}
-		zc.zc_nvlist_dst = (uint64_t)(uintptr_t)
-		    malloc(zc.zc_nvlist_dst_size);
-		if (zc.zc_nvlist_dst == (uint64_t)0) {
+		zc.zc_nvlist_dst = (uintptr_t)malloc(zc.zc_nvlist_dst_size);
+		if (zc.zc_nvlist_dst == (uintptr_t)0) {
 			error = ENOMEM;
 			goto out;
 		}
@@ -224,9 +223,9 @@ lzc_ioctl(zfs_ioc_t ioc, const char *name,
 		    ioc != ZFS_IOC_CHANNEL_PROGRAM) {
 			free((void *)(uintptr_t)zc.zc_nvlist_dst);
 			zc.zc_nvlist_dst_size *= 2;
-			zc.zc_nvlist_dst = (uint64_t)(uintptr_t)
+			zc.zc_nvlist_dst = (uintptr_t)
 			    malloc(zc.zc_nvlist_dst_size);
-			if (zc.zc_nvlist_dst == (uint64_t)0) {
+			if (zc.zc_nvlist_dst == (uintptr_t)0) {
 				error = ENOMEM;
 				goto out;
 			}
@@ -1113,13 +1112,13 @@ recv_impl(const char *snapname, nvlist_t *recvdprops, nvlist_t *localprops,
 
 		if (recvdprops != NULL) {
 			packed = fnvlist_pack(recvdprops, &size);
-			zc.zc_nvlist_src = (uint64_t)(uintptr_t)packed;
+			zc.zc_nvlist_src = (uintptr_t)packed;
 			zc.zc_nvlist_src_size = size;
 		}
 
 		if (localprops != NULL) {
 			packed = fnvlist_pack(localprops, &size);
-			zc.zc_nvlist_conf = (uint64_t)(uintptr_t)packed;
+			zc.zc_nvlist_conf = (uintptr_t)packed;
 			zc.zc_nvlist_conf_size = size;
 		}
 
@@ -1135,7 +1134,7 @@ recv_impl(const char *snapname, nvlist_t *recvdprops, nvlist_t *localprops,
 		zc.zc_action_handle = 0;
 
 		zc.zc_nvlist_dst_size = 128 * 1024;
-		zc.zc_nvlist_dst = (uint64_t)(uintptr_t)
+		zc.zc_nvlist_dst = (uintptr_t)
 		    malloc(zc.zc_nvlist_dst_size);
 
 		error = lzc_ioctl_fd(g_fd, ZFS_IOC_RECV, &zc);
