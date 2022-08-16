@@ -53,7 +53,7 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: coregister [-Ckv] -i entry new-name\n");
+	fprintf(stderr, "usage: coregister [-Ckv] -i entry -n new-name\n");
 	exit(0);
 }
 
@@ -109,7 +109,7 @@ main(int argc, char **argv)
 	pid_t pid;
 	int capc, ch, chosen = -1, error;
 
-	while ((ch = getopt(argc, argv, "Ci:kv")) != -1) {
+	while ((ch = getopt(argc, argv, "Ci:kn:v")) != -1) {
 		switch (ch) {
 		case 'C':
 			Cflag = true;
@@ -126,6 +126,11 @@ main(int argc, char **argv)
 		case 'k':
 			kflag = true;
 			break;
+		case 'n':
+			if (registered != NULL)
+				errx(-1, "-n specified more than once");
+			registered = optarg;
+			break;
 		case 'v':
 			vflag = true;
 			break;
@@ -137,7 +142,7 @@ main(int argc, char **argv)
 
 	argc -= optind;
 	argv += optind;
-	if (argc != 1 || chosen < 0)
+	if (argc != 0 || chosen < 0 || registered == NULL)
 		usage();
 
 	memset(&sa, 0, sizeof(sa));
@@ -157,7 +162,6 @@ main(int argc, char **argv)
 	if (error != 0)
 		err(1, "2nd cosetup");
 
-	registered = argv[0];
 	error = coregister(registered, &public);
 	if (error != 0)
 		err(1, "failed to coregister \"%s\"", registered);
@@ -233,7 +237,7 @@ main(int argc, char **argv)
 		else
 			received = cocall(target, in, received, out, sizeof(outbuf));
 		if (received < 0) {
-			warn("%s", kflag ? "coaccept_slow" : "coaccept");
+			warn("%s", kflag ? "cocall_slow" : "cocall");
 			out->len = received = 0;
 			// XXX we should send back error response
 		}
