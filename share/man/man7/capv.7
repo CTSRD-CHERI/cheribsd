@@ -82,6 +82,16 @@ by calling
 .Xr capfromfd 2
 to wrap them in a sealed capability.
 .Pp
+To share capabilities with processes that are colocated, but are not
+descendants, see
+.Xr coregister 1
+and
+.Xr colookup 1
+utilities.
+They also serve as an example of passing memory capabilities over
+.Xr unix 4
+domain sockets.
+.Pp
 The
 .Xr cotrace 1
 is an example of an interposer service - one that forwards received cocalls
@@ -115,7 +125,7 @@ transfer policies, see
 The idea of capability vector came from
 .An Peter Blandford-Baker Aq Mt psb34@cl.cam.ac.uk ,
 and was implemented by
-.An Edward Tomasz Napierala Aq Mt trasz@FreeBSD.org ,
+.An Edward Tomasz Napierala Aq Mt en322@cl.cam.ac.uk ,
 at the University of Cambridge Computer Laboratory as part of the CHERI
 for Hypervisors and Operating Systems (CHaOS) project, funded by EPSRC
 grant EP/V000292/1.

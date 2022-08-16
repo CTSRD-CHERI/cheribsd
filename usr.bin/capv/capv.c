@@ -68,6 +68,10 @@ interrogate(void * __capability target, char **bufp, bool kflag, bool vflag)
 	out.len = sizeof(out);
 	out.op = 0;
 
+	/*
+	 * XXX: We should register a SIGSEGV handler, and longjmp(3) from it
+	 *      to recover from 'target' being an invalid capability.
+	 */
 	if (kflag)
 		received = cocall_slow(target, &out, out.len, &in, sizeof(in));
 	else
@@ -81,11 +85,13 @@ interrogate(void * __capability target, char **bufp, bool kflag, bool vflag)
 		/* Note that we're continuing despite of this, same below. */
 	}
 	if (received != sizeof(in)) {
-		warnx("size mismatch: received %zd, expected %zd", received, sizeof(in));
+		if (vflag)
+			warnx("size mismatch: received %zd, expected %zd", received, sizeof(in));
 		dump = true;
 	}
 	if (in.op != 0) {
-		warnx("op mismatch: in.op %d, expected %d", in.op, 0);
+		if (vflag)
+			warnx("op mismatch: in.op %d, expected %d", in.op, 0);
 		dump = true;
 	}
 
