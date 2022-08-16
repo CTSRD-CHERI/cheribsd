@@ -58,7 +58,7 @@ zfs_file_open(const char *path, int flags, int mode, zfs_file_t **fpp)
 	td = curthread;
 	pwd_ensure_dirs();
 	/* 12.x doesn't take a const char * */
-	rc = kern_openat(td, AT_FDCWD, __DECONST(char *, path),
+	rc = kern_openat(td, AT_FDCWD, PTR2CAP(path),
 	    UIO_SYSSPACE, flags, mode);
 	if (rc)
 		return (SET_ERROR(rc));
@@ -289,7 +289,8 @@ zfs_file_unlink(const char *fnamep)
 	int rc;
 
 #if __FreeBSD_version >= 1300018
-	rc = kern_funlinkat(curthread, AT_FDCWD, fnamep, FD_NONE, seg, 0, 0);
+	rc = kern_funlinkat(curthread, AT_FDCWD, PTR2CAP(fnamep), FD_NONE,
+	    seg, 0, 0);
 #elif __FreeBSD_version >= 1202504 || defined(AT_BENEATH)
 	rc = kern_unlinkat(curthread, AT_FDCWD, __DECONST(char *, fnamep),
 	    seg, 0, 0);
