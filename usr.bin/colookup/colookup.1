@@ -39,8 +39,8 @@
 .Nm
 .Fl c Ar name
 .Nm
-.Fl i Ar index Ar name
-.Op Fl i Ar index Ar name Ar ...
+.Fl i Ar index Fl n Ar name
+.Op Fl i Ar index Fl n Ar name Ar ...
 .Ar command Op Ar args ...
 .Nm
 .Fl s
@@ -58,10 +58,10 @@ The following options are available:
 .It Fl c
 Instead of spawning anything, print out the capability value and exit.
 .It Fl i
-Lookup capability
-.Ar name
-and insert it at
-.Ar index .
+Capability vector table index to insert the new entry at.
+.It Fl n
+Name of the capability to insert; see
+.Xr coregister 1 .
 .It Fl s
 Instead of spawning anything, print out the sealed pairs returned by
 .Xr cosetup 2 .
@@ -78,7 +78,7 @@ public capability named
 inserted at offset 5 in its inherited capability vector,
 and then show the vector:
 .Pp
-.Dl colookup -i 5 fabulous sh
+.Dl colookup -i 5 -n fabulous sh
 .Dl capv
 .Pp
 .Sh SEE ALSO

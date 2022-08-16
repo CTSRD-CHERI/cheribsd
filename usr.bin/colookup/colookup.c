@@ -33,7 +33,6 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/auxv.h>
 #include <err.h>
-#include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,9 +45,29 @@ usage(void)
 
 	fprintf(stderr,
 	    "usage: colookup -c name\n"
-	    "       colookup -i index name [-i index name ...] command [args ...]\n"
+	    "       colookup -i index -n name [-i index -n name ...] command [args ...]\n"
 	    "       colookup -s\n");
 	exit(0);
+}
+
+static void
+maybe_add(int *capcp, void * __capability **capvp, int *chosenp, char **registeredp)
+{
+	void * __capability lookedup;
+	int error;
+
+	if (*chosenp < 0 || *registeredp == NULL)
+		return;
+
+	error = colookup(*registeredp, &lookedup);
+	if (error != 0)
+		err(1, "%s", *registeredp);
+	error = capvset(capcp, capvp, *chosenp, lookedup);
+	if (error != 0)
+		err(1, "capvset");
+
+	*chosenp = -1;
+	*registeredp = NULL;
 }
 
 int
@@ -58,49 +77,34 @@ main(int argc, char **argv)
 	void * __capability lookedup;
 	void * __capability code;
 	void * __capability data;
-	char *tmp;
-	int capc, ch, entry, error;
+	char *tmp = NULL, *registered = NULL;
+	int capc, ch, chosen = -1, error;
 
 	capvfetch(&capc, &capv);
-	if (capc <= 0) {
-		//warnx("no capability vector");
-	}
 
-	while ((ch = getopt(argc, argv, "c:i:s")) != -1) {
+	while ((ch = getopt(argc, argv, "c:i:n:s")) != -1) {
 		switch (ch) {
 		case 'c':
 			error = colookup(optarg, &lookedup);
-			if (error != 0) {
-				if (errno == ESRCH) {
-					warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", optarg);
-					warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
-				}
-				err(1, "colookup");
-			}
+			if (error != 0)
+				err(1, "%s", optarg);
 			printf("%s: %#lp\n", optarg, lookedup);
 			return (0);
 		case 'i':
-			entry = strtol(optarg, &tmp, 10);
+			if (chosen >= 0)
+				errx(-1, "-i specified more than once");
+			chosen = strtol(optarg, &tmp, 10);
 			if (*tmp != '\0')
 				errx(1, "argument to -i must be a number");
-			if (entry < 0)
+			if (chosen < 0)
 				usage();
-
-			if (argv[optind] == NULL)
-				errx(1, "missing name for colookup(2)");
-			error = colookup(argv[optind], &lookedup);
-			if (error != 0) {
-				if (errno == ESRCH) {
-					warnx("received ESRCH; this usually means there's nothing coregistered for \"%s\"", argv[optind]);
-					warnx("use coexec(1) to colocate; you might also find \"ps aux -o vmaddr\" useful");
-				}
-				err(1, "colookup");
-			}
-			optind++;
-
-			error = capvset(&capc, &capv, entry, lookedup);
-			if (error != 0)
-				err(1, "capvset");
+			maybe_add(&capc, &capv, &chosen, &registered);
+			break;
+		case 'n':
+			if (registered != NULL)
+				errx(-1, "-n specified more than once");
+			registered = optarg;
+			maybe_add(&capc, &capv, &chosen, &registered);
 			break;
 		case 's':
 			error = _cosetup(COSETUP_COCALL, &code, &data);
@@ -121,11 +125,9 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (argc < 1)
+	if (argc < 1 || chosen >= 0 || registered != NULL)
 		usage();
 
 	coexecvpc(getppid(), argv[0], argv, capv, capc);
 	err(1, "%s", argv[0]);
-
-	return (EDOOFUS);
 }
