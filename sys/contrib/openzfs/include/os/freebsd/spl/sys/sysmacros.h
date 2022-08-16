@@ -166,7 +166,7 @@ extern unsigned char bcd_to_byte[256];
 /*
  * Macro for checking power of 2 address alignment.
  */
-#define	IS_P2ALIGNED(v, a) ((((uintptr_t)(v)) & ((uintptr_t)(a) - 1)) == 0)
+#define	IS_P2ALIGNED(v, a) ((((ptraddr_t)(v)) & ((ptraddr_t)(a) - 1)) == 0)
 
 /*
  * Macros for counting and rounding.

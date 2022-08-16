@@ -144,7 +144,7 @@ typedef int enum_t;
 #define	P2PHASE(x, align)		((x) & ((align) - 1))
 #define	P2NPHASE(x, align)		(-(x) & ((align) - 1))
 #define	ISP2(x)			(((x) & ((x) - 1)) == 0)
-#define	IS_P2ALIGNED(v, a)	((((uintptr_t)(v)) & ((uintptr_t)(a) - 1)) == 0)
+#define	IS_P2ALIGNED(v, a)	((((ptraddr_t)(v)) & ((ptraddr_t)(a) - 1)) == 0)
 #define	P2BOUNDARY(off, len, align) \
 	(((off) ^ ((off) + (len) - 1)) > (align) - 1)
 

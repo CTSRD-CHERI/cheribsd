@@ -708,7 +708,7 @@ mzap_create_impl(dnode_t *dn, int normflags, zap_flags_t flags, dmu_tx_t *tx)
 	mzap_phys_t *zp = db->db_data;
 	zp->mz_block_type = ZBT_MICRO;
 	zp->mz_salt =
-	    ((uintptr_t)db ^ (uintptr_t)tx ^ (dn->dn_object << 1)) | 1ULL;
+	    ((ptraddr_t)db ^ (ptraddr_t)tx ^ (dn->dn_object << 1)) | 1ULL;
 	zp->mz_normflags = normflags;
 
 	if (flags != 0) {

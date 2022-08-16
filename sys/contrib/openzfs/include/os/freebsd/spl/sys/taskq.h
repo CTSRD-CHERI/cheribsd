@@ -44,7 +44,7 @@ typedef struct taskq {
 	struct taskqueue	*tq_queue;
 } taskq_t;
 
-typedef uintptr_t taskqid_t;
+typedef ptraddr_t taskqid_t;
 typedef void (task_func_t)(void *);
 
 typedef struct taskq_ent {

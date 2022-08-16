@@ -39,7 +39,7 @@ extern "C" {
 
 /* Similar to sysmacros.h IS_P2ALIGNED, but checks two pointers: */
 #define	IS_P2ALIGNED2(v, w, a) \
-	((((uintptr_t)(v) | (uintptr_t)(w)) & ((uintptr_t)(a) - 1)) == 0)
+	((((ptraddr_t)(v) | (ptraddr_t)(w)) & ((ptraddr_t)(a) - 1)) == 0)
 
 #define	AES_BLOCK_LEN	16	/* bytes */
 /* Round constant length, in number of 32-bit elements: */
