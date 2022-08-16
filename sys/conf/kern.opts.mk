@@ -112,7 +112,7 @@ __DEFAULT_YES_OPTIONS += FDT
 
 # Broken post OpenZFS import
 .if ${MACHINE_CPU:Mcheri}
-BROKEN_OPTIONS+= CDDL ZFS
+BROKEN_OPTIONS+=CDDL
 .endif
 
 # expanded inline from bsd.mkopt.mk to avoid share/mk dependency
