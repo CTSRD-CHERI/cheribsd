@@ -36,6 +36,7 @@
 #include <sys/queue.h>
 
 #include <bitstring.h>
+#include <stdalign.h>
 #include <stdbool.h>
 
 #include "makefs.h"
@@ -66,10 +67,13 @@ struct dataset_desc {
 };
 
 typedef struct {
-	bool		nowarn;
+	/*
+	 * Block buffer, needs to be aligned for various on-disk structures,
+	 * ZAPs, etc..
+	 */
+	char		filebuf[MAXBLOCKSIZE] __aligned(alignof(uint64_t));
 
-	/* I/O buffer, just for convenience. */
-	char		filebuf[MAXBLOCKSIZE];
+	bool		nowarn;
 
 	/* Pool parameters. */
 	const char	*poolname;
