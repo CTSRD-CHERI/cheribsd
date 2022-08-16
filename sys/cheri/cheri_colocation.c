@@ -85,6 +85,11 @@ static int counregister_on_exit = 1;
 SYSCTL_INT(_debug, OID_AUTO, counregister_on_exit, CTLFLAG_RWTUN,
     &counregister_on_exit, 0, "Remove dead conames on thread exit");
 
+bool allow_colookup = true;
+SYSCTL_BOOL(_security_bsd, OID_AUTO, allow_colookup, CTLFLAG_RWTUN,
+    &allow_colookup, 0,
+    "Deny colookup(2) use by returning ENOSYS");
+
 #ifdef DDB
 static int kdb_on_switcher_trap;
 SYSCTL_INT(_debug, OID_AUTO, kdb_on_switcher_trap, CTLFLAG_RWTUN,
@@ -690,6 +695,9 @@ kern_colookup(struct thread *td, const char * __capability namep,
 	intcap_t cap;
 	char name[PATH_MAX];
 	int error;
+
+	if (!allow_colookup)
+		return (ENOSYS);
 
 	vmspace = td->td_proc->p_vmspace;
 
