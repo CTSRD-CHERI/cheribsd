@@ -106,11 +106,6 @@ typedef struct pv_entry {
 /*
  * pv_entries are allocated in chunks per-process.  This avoids the
  * need to track per-pmap assignments.
- *
- * XXX-AM: The packing of pv_chunks in the purecap kernel is sub-optimal,
- * leading to wasted padding space. It seems that the TAILQ in
- * pv_entry can just be a STAILQ saving a pointer for each entry.
- * This would both allow more entries and also perfectly pack into PAGE_SIZE.
  */
 #if PAGE_SIZE == PAGE_SIZE_4K
 #ifdef __CHERI_PURE_CAPABILITY__
