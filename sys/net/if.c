@@ -3480,18 +3480,11 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	 * layer, and do not perform any credentials checks or input
 	 * validation.
 	 */
-	error = ((*so->so_proto->pr_usrreqs->pru_control)(so, cmd, data,
-	    ifp, td));
-	if (error == EOPNOTSUPP && ifp != NULL && ifp->if_ioctl != NULL)
-		switch (cmd) {
-		case SIOCSIFADDR:
-		case SIOCSIFBRDADDR:
-		case SIOCSIFDSTADDR:
-		case SIOCSIFNETMASK:
-			break;
-		default:
-			error = (*ifp->if_ioctl)(ifp, cmd, data);
-		}
+	error = so->so_proto->pr_control(so, cmd, data, ifp, td);
+	if (error == EOPNOTSUPP && ifp != NULL && ifp->if_ioctl != NULL &&
+	    cmd != SIOCSIFADDR && cmd != SIOCSIFBRDADDR &&
+	    cmd != SIOCSIFDSTADDR && cmd != SIOCSIFNETMASK)
+		error = (*ifp->if_ioctl)(ifp, cmd, data);
 
 	if ((oif_flags ^ ifp->if_flags) & IFF_UP) {
 #ifdef INET6
