@@ -4,3 +4,7 @@ include "GFE"
 include "std.CHERI"
 
 ident CHERI-GFE
+
+options HWPMC_HOOKS
+device hwpmc
+device hwpmc_toooba
