@@ -2523,23 +2523,6 @@ pmap_growkernel(vm_offset_t addr)
  * page management routines.
  ***************************************************/
 CTASSERT(sizeof(struct pv_chunk) == PAGE_SIZE);
-#if PAGE_SIZE == PAGE_SIZE_4K
-#ifdef __CHERI_PURE_CAPABILITY__
-CTASSERT(_NPCM == 2);
-CTASSERT(_NPCPV == 83);
-#else
-CTASSERT(_NPCM == 3);
-CTASSERT(_NPCPV == 168);
-#endif
-#else
-#ifdef __CHERI_PURE_CAPABILITY__
-CTASSERT(_NPCM == 6);
-CTASSERT(_NPCPV == 338);
-#else
-CTASSERT(_NPCM == 11);
-CTASSERT(_NPCPV == 677);
-#endif
-#endif
 
 static __inline struct pv_chunk *
 pv_to_chunk(pv_entry_t pv)
@@ -2580,7 +2563,7 @@ static const uint64_t pc_freemask[] = { PC_FREEN,
 CTASSERT(nitems(pc_freemask) == _NPCM);
 
 static __inline bool
-pmap_pvchunk_full(struct pv_chunk *pc)
+pc_is_full(struct pv_chunk *pc)
 {
 	for (u_int i = 0; i < _NPCM; i++)
 		if (pc->pc_map[i] != 0)
@@ -2882,7 +2865,7 @@ retry:
 			pv = &pc->pc_pventry[field * 64 + bit];
 			pc->pc_map[field] &= ~(1ul << bit);
 			/* If this was the last item, move it to tail */
-			if (pmap_pvchunk_full(pc)) {
+			if (pc_is_full(pc)) {
 				TAILQ_REMOVE(&pmap->pm_pvchunk, pc, pc_list);
 				TAILQ_INSERT_TAIL(&pmap->pm_pvchunk, pc,
 				    pc_list);
@@ -3049,7 +3032,7 @@ pmap_pv_demote_l2(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	va_last = va + L2_SIZE - PAGE_SIZE;
 	for (;;) {
 		pc = TAILQ_FIRST(&pmap->pm_pvchunk);
-		KASSERT(!pmap_pvchunk_full(pc),
+		KASSERT(!pc_is_full(pc),
 		    ("pmap_pv_demote_l2: missing spare"));
 		for (field = 0; field < _NPCM; field++) {
 			while (pc->pc_map[field]) {
@@ -3071,7 +3054,7 @@ pmap_pv_demote_l2(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 		TAILQ_INSERT_TAIL(&pmap->pm_pvchunk, pc, pc_list);
 	}
 out:
-	if (pmap_pvchunk_full(pc)) {
+	if (pc_is_full(pc)) {
 		TAILQ_REMOVE(&pmap->pm_pvchunk, pc, pc_list);
 		TAILQ_INSERT_TAIL(&pmap->pm_pvchunk, pc, pc_list);
 	}
