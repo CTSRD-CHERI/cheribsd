@@ -18,8 +18,6 @@ EVENT_ARCH="arm64"
 EVENT_ARCH="x86"
 .elif ${MACHINE_CPUARCH} == "powerpc" && ${MACHINE_ARCH:Mpowerpc64*} != ""
 EVENT_ARCH="powerpc"
-.elif ${MACHINE_CPUARCH} == "riscv"
-EVENT_ARCH="riscv"
 .else
 # This will generate an empty events table
 EVENT_ARCH="none"
