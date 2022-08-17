@@ -72,7 +72,12 @@ LIB32WMAKEFLAGS+= OBJCOPY="${XOBJCOPY}"
 LIB32CFLAGS=	-DCOMPAT_32BIT
 LIB32DTRACE=	${DTRACE} -32
 LIB32WMAKEFLAGS+=	-DCOMPAT_32BIT
-LIB32_MACHINE_ABI=	${MACHINE_ABI}
+LIB32_MACHINE_ABI=	${MACHINE_ABI:N*64:Nptr*:Npurecap} long32 ptr32
+.if ${COMPAT_ARCH} == "amd64"
+LIB32_MACHINE_ABI+=	time32
+.else
+LIB32_MACHINE_ABI+=	time64
+.endif
 .endif # ${MK_LIB32} != "no"
 
 # -------------------------------------------------------------------
@@ -109,7 +114,7 @@ LIB64WMAKEFLAGS+= NM="${XNM}" OBJCOPY="${XOBJCOPY}"
 LIB64CFLAGS=	-DCOMPAT_64BIT
 LIB64DTRACE=	${DTRACE} -64
 LIB64WMAKEFLAGS+=	-DCOMPAT_64BIT
-LIB64_MACHINE_ABI=	${MACHINE_ABI:Npurecap}
+LIB64_MACHINE_ABI=	${MACHINE_ABI:Npurecap:Nptr*} ptr64
 .endif # ${MK_LIB64} != "no"
 
 # -------------------------------------------------------------------
@@ -151,7 +156,7 @@ COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}xcheri
 .if defined(HAS_COMPAT) && ${HAS_COMPAT:M64C}
 LIB64CCFLAGS+=	-DCOMPAT_CHERI
 LIB64CWMAKEFLAGS+=	COMPAT_CHERI=yes
-LIB64C_MACHINE_ABI=	${MACHINE_ABI} purecap
+LIB64C_MACHINE_ABI=	${MACHINE_ABI:Nptr*} purecap ptr128c
 
 # This duplicates some logic in bsd.cpu.mk that is needed for the
 # WANT_COMPAT/NEED_COMPAT case.
