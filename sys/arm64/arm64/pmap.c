@@ -3032,8 +3032,7 @@ pmap_pv_demote_l2(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
 	va_last = va + L2_SIZE - PAGE_SIZE;
 	for (;;) {
 		pc = TAILQ_FIRST(&pmap->pm_pvchunk);
-		KASSERT(!pc_is_full(pc),
-		    ("pmap_pv_demote_l2: missing spare"));
+		KASSERT(!pc_is_full(pc), ("pmap_pv_demote_l2: missing spare"));
 		for (field = 0; field < _NPCM; field++) {
 			while (pc->pc_map[field]) {
 				bit = ffsl(pc->pc_map[field]) - 1;
