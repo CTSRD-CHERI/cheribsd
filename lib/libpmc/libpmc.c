@@ -1009,8 +1009,6 @@ powerpc_allocate_pmc(enum pmc_event pe, char *ctrspec __unused,
 
 #if defined(__riscv)
 static struct pmc_event_alias toooba_aliases[] = {
-	EV_ALIAS("instructions",	"INSTRET"),
-	EV_ALIAS("cycles",		"CYCLES"),
 	EV_ALIAS(NULL, NULL)
 };
 
