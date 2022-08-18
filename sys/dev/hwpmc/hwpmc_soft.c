@@ -82,6 +82,8 @@ static struct soft_descr soft_pmcdesc[SOFT_NPMCS] =
 	SOFT_PMCDESCR(SOFT15)
 };
 
+PMC_SOFT_DEFINE(, , dummy, dummy);
+
 /*
  * Per-CPU data structure.
  */
