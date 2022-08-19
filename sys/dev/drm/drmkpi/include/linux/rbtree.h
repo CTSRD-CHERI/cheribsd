@@ -62,6 +62,7 @@ int panic_cmp(struct rb_node *one, struct rb_node *two);
 RB_HEAD(drmcompat_root, rb_node);
 RB_PROTOTYPE(drmcompat_root, rb_node, __entry, panic_cmp);
 
+#define	rb_parent(r)	RB_PARENT(r, __entry)
 #define	rb_entry(ptr, type, member)	container_of(ptr, type, member)
 #define	rb_entry_safe(ptr, type, member) \
 	(ptr ? rb_entry(ptr, type, member) : NULL)
@@ -97,7 +98,8 @@ rb_replace_node(struct rb_node *victim, struct rb_node *new,
     struct rb_root *root)
 {
 
-	RB_SWAP_CHILD((struct drmcompat_root *)root, victim, new, __entry);
+	RB_SWAP_CHILD((struct drmcompat_root *)root, rb_parent(victim),
+	    victim, new, __entry);
 	if (victim->rb_left)
 		RB_SET_PARENT(victim->rb_left, new, __entry);
 	if (victim->rb_right)
