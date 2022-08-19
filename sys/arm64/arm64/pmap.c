@@ -192,8 +192,19 @@ __FBSDID("$FreeBSD$");
 #define	pmap_l1_pindex(v)	(NUL2E + ((v) >> L1_SHIFT))
 #define	pmap_l2_pindex(v)	((v) >> L2_SHIFT)
 
-static struct md_page *
-pa_to_pvh(vm_paddr_t pa)
+struct pmap_large_md_page {
+	struct rwlock   pv_lock;
+	struct md_page  pv_page;
+	/* Pad to a power of 2, see pmap_init_pv_table(). */
+#ifdef __CHERI_PURE_CAPABILITY__
+	int		pv_pad[4];
+#else
+	int		pv_pad[2];
+#endif
+};
+
+static struct pmap_large_md_page *
+_pa_to_pmdp(vm_paddr_t pa)
 {
 	struct vm_phys_seg *seg;
 	int segind;
@@ -201,26 +212,46 @@ pa_to_pvh(vm_paddr_t pa)
 	for (segind = 0; segind < vm_phys_nsegs; segind++) {
 		seg = &vm_phys_segs[segind];
 		if (pa >= seg->start && pa < seg->end)
-			return ((struct md_page *)seg->md_first +
+			return ((struct pmap_large_md_page *)seg->md_first +
 			    (pmap_l2_pindex(pa) - pmap_l2_pindex(seg->start)));
 	}
-	panic("pa 0x%jx not within vm_phys_segs", (uintmax_t)pa);
+	return (NULL);
 }
 
-static struct md_page *
-page_to_pvh(vm_page_t m)
+static struct pmap_large_md_page *
+pa_to_pmdp(vm_paddr_t pa)
+{
+	struct pmap_large_md_page *pvd;
+
+	pvd = _pa_to_pmdp(pa);
+	if (pvd == NULL)
+		panic("pa 0x%jx not within vm_phys_segs", (uintmax_t)pa);
+	return (pvd);
+}
+
+static struct pmap_large_md_page *
+page_to_pmdp(vm_page_t m)
 {
 	struct vm_phys_seg *seg;
 
 	seg = &vm_phys_segs[m->segind];
-	return ((struct md_page *)seg->md_first +
+	return ((struct pmap_large_md_page *)seg->md_first +
 	    (pmap_l2_pindex(VM_PAGE_TO_PHYS(m)) - pmap_l2_pindex(seg->start)));
 }
 
-#define	NPV_LIST_LOCKS	MAXCPU
+#define	pa_to_pvh(pa)	(&(pa_to_pmdp(pa)->pv_page))
+#define	page_to_pvh(m)	(&(page_to_pmdp(m)->pv_page))
 
-#define	PHYS_TO_PV_LIST_LOCK(pa)	\
-			(&pv_list_locks[pa_index(pa) % NPV_LIST_LOCKS])
+#define	PHYS_TO_PV_LIST_LOCK(pa)	({			\
+	struct pmap_large_md_page *_pvd;			\
+	struct rwlock *_lock;					\
+	_pvd = _pa_to_pmdp(pa);					\
+	if (__predict_false(_pvd == NULL))			\
+		_lock = &pv_dummy_large.pv_lock;		\
+	else							\
+		_lock = &(_pvd->pv_lock);			\
+	_lock;							\
+})
 
 #define	CHANGE_PV_LIST_LOCK_TO_PHYS(lockp, pa)	do {	\
 	struct rwlock **_lockp = (lockp);		\
@@ -308,9 +339,10 @@ struct pv_chunks_list {
 
 struct pv_chunks_list __exclusive_cache_line pv_chunks[PMAP_MEMDOM];
 
-static struct rwlock pv_list_locks[NPV_LIST_LOCKS];
-static struct md_page *pv_table;
-static struct md_page pv_dummy;
+__exclusive_cache_line static struct pmap_large_md_page pv_dummy_large;
+#define pv_dummy pv_dummy_large.pv_page
+__read_mostly static struct pmap_large_md_page *pv_table;
+__read_mostly vm_paddr_t pmap_last_pa;
 
 vm_paddr_t dmap_phys_base;	/* The start of the dmap region */
 vm_paddr_t dmap_phys_max;	/* The limit of the dmap region */
@@ -1376,6 +1408,106 @@ pmap_init_asids(struct asid_set *set, int bits)
 	mtx_init(&set->asid_set_mutex, "asid set", NULL, MTX_SPIN);
 }
 
+static void
+pmap_init_pv_table(void)
+{
+	struct vm_phys_seg *seg, *next_seg;
+	struct pmap_large_md_page *pvd;
+	vm_size_t used_pvd;
+	vm_size_t s;
+	long start, highest;
+	int domain, i, j, pages;
+
+	/*
+	 * We strongly depend on the size being a power of two, so the assert
+	 * is overzealous. However, should the struct be resized to a
+	 * different power of two, the code below needs to be revisited.
+	 */
+#ifdef __CHERI_PURE_CAPABILITY__
+	CTASSERT((sizeof(*pvd) == 128));
+#else
+	CTASSERT((sizeof(*pvd) == 64));
+#endif
+
+	/*
+	 * Calculate the size of the array.
+	 */
+	s = 0;
+	for (i = 0; i < vm_phys_nsegs; i++) {
+		seg = &vm_phys_segs[i];
+		pages = pmap_l2_pindex(roundup2(seg->end, L2_SIZE)) -
+		    pmap_l2_pindex(seg->start);
+		s += round_page(pages * sizeof(*pvd));
+	}
+	pv_table = (struct pmap_large_md_page *)kva_alloc(s);
+	if (pv_table == NULL)
+		panic("%s: kva_alloc failed\n", __func__);
+
+	/*
+	 * Iterate physical segments to allocate domain-local memory for PV
+	 * list headers.
+	 */
+	highest = -1;
+	s = 0;
+	for (i = 0; i < vm_phys_nsegs; i++) {
+		seg = &vm_phys_segs[i];
+		pages = pmap_l2_pindex(roundup2(seg->end, L2_SIZE)) -
+		    pmap_l2_pindex(seg->start);
+		domain = seg->domain;
+
+		start = highest + 1;
+		pvd = &pv_table[start];
+
+		s = round_page(pages * sizeof(*pvd));
+		highest = start + (s / sizeof(*pvd)) - 1;
+
+		for (j = 0; j < s; j += PAGE_SIZE) {
+			vm_page_t m = vm_page_alloc_noobj_domain(domain,
+			    VM_ALLOC_ZERO);
+			if (m == NULL)
+				panic("failed to allocate PV table page");
+			pmap_qenter((vm_offset_t)pvd + j, &m, 1);
+		}
+
+		for (j = 0; j < s / sizeof(*pvd); j++) {
+			rw_init_flags(&pvd->pv_lock, "pmap pv list", RW_NEW);
+			TAILQ_INIT(&pvd->pv_page.pv_list);
+			pvd++;
+		}
+	}
+	pvd = &pv_dummy_large;
+	memset(pvd, 0, sizeof(*pvd));
+	rw_init_flags(&pvd->pv_lock, "pmap pv list dummy", RW_NEW);
+	TAILQ_INIT(&pvd->pv_page.pv_list);
+
+	/*
+	 * Set pointers from vm_phys_segs to pv_table.
+	 */
+	for (i = 0, pvd = pv_table; i < vm_phys_nsegs; i++) {
+		seg = &vm_phys_segs[i];
+		used_pvd = pmap_l2_pindex(roundup2(seg->end, L2_SIZE)) -
+		    pmap_l2_pindex(seg->start);
+		seg->md_first = cheri_kern_setbounds(pvd,
+		    used_pvd * sizeof(*pvd));
+		pvd += used_pvd;
+
+		/*
+		 * If there is a following segment, and the final
+		 * superpage of this segment and the initial superpage
+		 * of the next segment are the same then adjust the
+		 * pv_table entry for that next segment down by one so
+		 * that the pv_table entries will be shared.
+		 */
+		if (i + 1 < vm_phys_nsegs) {
+			next_seg = &vm_phys_segs[i + 1];
+			if (pmap_l2_pindex(roundup2(seg->end, L2_SIZE)) - 1 ==
+			    pmap_l2_pindex(next_seg->start)) {
+				pvd--;
+			}
+		}
+	}
+}
+
 /*
  *	Initialize the pmap module.
  *	Called by vm_init, to initialize any structures that the pmap
@@ -1384,12 +1516,8 @@ pmap_init_asids(struct asid_set *set, int bits)
 void
 pmap_init(void)
 {
-	struct vm_phys_seg *seg, *next_seg;
-	struct md_page *pvh;
-	vm_size_t used_pvh;
-	vm_size_t s;
 	uint64_t mmfr1;
-	int i, pv_npg, vmid_bits;
+	int i, vmid_bits;
 
 	/*
 	 * Are large page mappings enabled?
@@ -1430,62 +1558,7 @@ pmap_init(void)
 		    MTX_DEF);
 		TAILQ_INIT(&pv_chunks[i].pvc_list);
 	}
-
-	/*
-	 * Initialize the pool of pv list locks.
-	 */
-	for (i = 0; i < NPV_LIST_LOCKS; i++)
-		rw_init(&pv_list_locks[i], "pmap pv list");
-
-	/*
-	 * Calculate the size of the pv head table for superpages.
-	 */
-	pv_npg = 0;
-	for (i = 0; i < vm_phys_nsegs; i++) {
-		seg = &vm_phys_segs[i];
-		pv_npg += pmap_l2_pindex(roundup2(seg->end, L2_SIZE)) -
-		    pmap_l2_pindex(seg->start);
-	}
-
-	/*
-	 * Allocate memory for the pv head table for superpages.
-	 */
-	s = (vm_size_t)(pv_npg * sizeof(struct md_page));
-	s = round_page(s);
-	pv_table = kmem_malloc(s, M_WAITOK | M_ZERO);
-	for (i = 0; i < pv_npg; i++)
-		TAILQ_INIT(&pv_table[i].pv_list);
-	TAILQ_INIT(&pv_dummy.pv_list);
-
-	/*
-	 * Set pointers from vm_phys_segs to pv_table.
-	 */
-	for (i = 0, pvh = pv_table; i < vm_phys_nsegs; i++) {
-		seg = &vm_phys_segs[i];
-		seg->md_first = pvh;
-		used_pvh = pmap_l2_pindex(roundup2(seg->end, L2_SIZE)) -
-		    pmap_l2_pindex(seg->start);
-		pvh += used_pvh;
-#ifdef __CHERI_PURE_CAPABILITY__
-		seg->md_first = cheri_setbounds(seg->md_first,
-		    used_pvh * sizeof(*pvh));
-#endif
-
-		/*
-		 * If there is a following segment, and the final
-		 * superpage of this segment and the initial superpage
-		 * of the next segment are the same then adjust the
-		 * pv_table entry for that next segment down by one so
-		 * that the pv_table entries will be shared.
-		 */
-		if (i + 1 < vm_phys_nsegs) {
-			next_seg = &vm_phys_segs[i + 1];
-			if (pmap_l2_pindex(roundup2(seg->end, L2_SIZE)) - 1 ==
-			    pmap_l2_pindex(next_seg->start)) {
-				pvh--;
-			}
-		}
-	}
+	pmap_init_pv_table();
 
 	vm_initialized = 1;
 }
