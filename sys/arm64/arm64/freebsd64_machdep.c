@@ -332,10 +332,10 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_x[0] = sig;
 	tf->tf_x[1] = (uintcap_t)fp + offsetof(struct sigframe64, sf_si);
 	tf->tf_x[2] = (uintcap_t)fp + offsetof(struct sigframe64, sf_uc);
-
-	trapframe_set_elr(tf, (uintcap_t)catcher);
+	tf->tf_x[8] = (uintcap_t)catcher;
 	tf->tf_sp = (uintcap_t)fp;
-	tf->tf_lr = (register_t)PROC_SIGCODE(p);
+	trapframe_set_elr(tf, (uintcap_t)cheri_setaddress(catcher,
+	    PROC_SIGCODE(p)));
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_elr,
 	    tf->tf_sp);
