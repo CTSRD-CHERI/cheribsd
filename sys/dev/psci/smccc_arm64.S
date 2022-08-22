@@ -92,19 +92,15 @@ __FBSDID("$FreeBSD$");
 .endmacro
 #endif
 
-/*
- * int arm_smccc_hvc(register_t, register_t, register_t, register_t,
- *     register_t, register_t, register_t, register_t,
- *     struct arm_smccc_res *res)
- */
-ENTRY(arm_smccc_hvc)
+.macro arm_smccc_1_0	insn
+ENTRY(arm_smccc_\insn)
 #ifdef __CHERI_PURE_CAPABILITY__
 	save_registers
 #endif
 #if __has_feature(capabilities)
 	reset_ddc_el0
 #endif
-	hvc	#0
+	\insn	#0
 #if __has_feature(capabilities)
 	restore_ddc_el0
 #endif
@@ -116,33 +112,16 @@ ENTRY(arm_smccc_hvc)
 	stp	x0, x1, [PTR(4), #16 * 0]
 	stp	x2, x3, [PTR(4), #16 * 1]
 1:	ret
-END(arm_smccc_hvc)
+END(arm_smccc_\insn)
+.endm
 
 /*
- * int arm_smccc_smc(register_t, register_t, register_t, register_t,
+ * int arm_smccc_*(register_t, register_t, register_t, register_t,
  *     register_t, register_t, register_t, register_t,
  *     struct arm_smccc_res *res)
  */
-ENTRY(arm_smccc_smc)
-#ifdef __CHERI_PURE_CAPABILITY__
-	save_registers
-#endif
-#if __has_feature(capabilities)
-	reset_ddc_el0
-#endif
-	smc	#0
-#if __has_feature(capabilities)
-	restore_ddc_el0
-#endif
-#ifdef __CHERI_PURE_CAPABILITY__
-	restore_registers
-#endif
-	ldr	x4, [PTRN(sp)]
-	cbz	x4, 1f
-	stp	x0, x1, [PTR(4), #16 * 0]
-	stp	x2, x3, [PTR(4), #16 * 1]
-1:	ret
-END(arm_smccc_smc)
+arm_smccc_1_0	hvc
+arm_smccc_1_0	smc
 // CHERI CHANGES START
 // {
 //   "updated": 20210407,
