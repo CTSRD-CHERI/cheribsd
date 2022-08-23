@@ -98,12 +98,12 @@ typedef struct pv_entry {
  * need to track per-pmap assignments.
  */
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	_NPCM	2
 #define	_NPCPV	83
 #else
-#define	_NPCM	3
 #define	_NPCPV	168
 #endif
+#define	_NPCM	howmany(_NPCPV, 64)
+
 struct pv_chunk {
 	struct pmap *		pc_pmap;
 	TAILQ_ENTRY(pv_chunk)	pc_list;

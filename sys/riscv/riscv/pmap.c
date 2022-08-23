@@ -1780,13 +1780,13 @@ pv_to_chunk(pv_entry_t pv)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	PC_FREE0	0xfffffffffffffffful
-#define	PC_FREE1	0x000000000007fffful
+#define	PC_FREE1	((1ul << (_NPCPV % 64)) - 1)
 
 static const uint64_t pc_freemask[_NPCM] = { PC_FREE0, PC_FREE1 };
 #else
 #define	PC_FREE0	0xfffffffffffffffful
 #define	PC_FREE1	0xfffffffffffffffful
-#define	PC_FREE2	0x000000fffffffffful
+#define	PC_FREE2	((1ul << (_NPCPV % 64)) - 1)
 
 static const uint64_t pc_freemask[_NPCM] = { PC_FREE0, PC_FREE1, PC_FREE2 };
 #endif
