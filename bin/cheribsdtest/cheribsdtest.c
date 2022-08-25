@@ -683,10 +683,6 @@ main(int argc, char *argv[])
 		warnx("-a and a list of test are incompatible");
 		usage();
 	}
-	if (argc == 1 && strcmp(argv[0], "all") == 0) {
-		warnx("'all' as a synonym for -a is deprecated");
-		run_all = 1;
-	}
 
 	/*
 	 * Allocate an alternative stack, required to safely process signals in
