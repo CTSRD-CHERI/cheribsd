@@ -74,6 +74,8 @@ struct efi_cfgtbl {
 #pragma pointer_interpretation pop
 #endif
 
+#define EFI_MEMORY_DESCRIPTOR_VERSION 1
+
 struct efi_md {
 	uint32_t	md_type;
 #define	EFI_MD_TYPE_NULL	0
