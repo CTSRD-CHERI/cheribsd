@@ -391,6 +391,8 @@ devmap_init_capability(void * __capability cap)
 	/* XXX: Too early to panic? */
 	KASSERT(cheri_gettop(cap) == DEVMAP_MAX_VADDR,
 	    ("devmap capability end doesn't match DEVMAP_MAX_VADDR"));
+	KASSERT(cheri_getlen(cap) == PMAP_MAPDEV_EARLY_SIZE,
+	    ("devmap capability length doesn't match PMAP_MAPDEV_EARLY_SIZE"));
 }
 #endif
 
