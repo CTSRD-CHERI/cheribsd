@@ -37,6 +37,7 @@
 #endif
 
 #include <sys/param.h>
+#include <sys/auxv.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/sysctl.h>
@@ -60,6 +61,7 @@
 #include <inttypes.h>
 #include <malloc_np.h>
 #include <signal.h>
+#include <spawn.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -88,6 +90,7 @@ static const struct cheri_test *running_test;
 static int tests_run, tests_skipped;
 static int tests_failed, tests_passed, tests_xfailed, tests_xpassed;
 static int expected_failures;
+static int is_execed_child;
 static int list;
 static int run_all;
 static int fast_tests_only;
@@ -103,6 +106,8 @@ const int malloc_revocation = MR_ENABLE;
 #endif
 
 int verbose;
+
+extern char **environ;
 
 static void
 usage(void)
@@ -626,6 +631,104 @@ cheribsdtest_run_test_name(const char *name)
 	errx(EX_USAGE, "unknown test: %s", name);
 }
 
+static void
+cheribsdtest_run_child(struct cheri_test *ctp)
+{
+	if (ctp->ct_child_func == NULL)
+		errx(EX_SOFTWARE, "%s has no child function", ctp->ct_name);
+	ctp->ct_child_func();
+	errx(EX_SOFTWARE, "%s child function returned", ctp->ct_name);
+}
+
+static void
+cheribsdtest_run_child_name(const char *name)
+{
+	struct cheri_test **ctpp, *ctp;
+
+	SET_FOREACH(ctpp, cheri_tests_set) {
+		ctp = *ctpp;
+		if (strcmp(name, ctp->ct_name) == 0)
+			cheribsdtest_run_child(ctp);
+	}
+	errx(EX_USAGE, "unknown test: %s", name);
+}
+
+static char **
+mk_exec_args(const struct cheri_test *ctp)
+{
+	char *execpath;
+	char const **exec_args;
+	int argc = 0, error;
+
+	execpath = malloc(MAXPATHLEN);
+	if (execpath == NULL)
+		err(EX_OSERR, "malloc");
+	exec_args = calloc(5, sizeof(*exec_args));
+	if (exec_args == NULL)
+		err(EX_OSERR, "calloc");
+
+	/*
+	 * XXX: This won't work for direct exec as an rtld argument.
+	 * (e.g., /libexec/ld-elf.so.1 /bin/cheribsdtest-purecap-dynamic)
+	 * If this becomes an issue we could alter rtld to update
+	 * AT_EXECPATH or add some sort of execve_self(3) implemented
+	 * by rtld for dynamic binaries and libc for static.
+	 */
+	error = elf_aux_info(AT_EXECPATH, execpath, MAXPATHLEN);
+	if (error != 0)
+		errx(EX_OSERR, "elf_aux_info: %s", strerror(error));
+	exec_args[argc++] = execpath;
+	exec_args[argc++] = "-E";
+	if (coredump_enabled)
+		exec_args[argc++] = "-c";
+	if (verbose)
+		exec_args[argc++] = "-v";
+	exec_args[argc++] = ctp->ct_name;
+	exec_args[argc++] = NULL;
+
+	return (__DECONST(char **, exec_args));
+}
+
+pid_t
+cheribsdtest_spawn_child(enum spawn_child_mode mode)
+{
+	char **exec_args;
+	int error;
+	pid_t pid;
+
+	exec_args = mk_exec_args(running_test);
+
+	switch (mode) {
+	case SC_MODE_POSIX_SPAWN:
+		error = posix_spawn(&pid, exec_args[0], NULL, NULL, exec_args,
+		    environ);
+		if (error != 0) {
+			errno = error;
+			pid = -1;
+		}
+		break;
+	case SC_MODE_FORK:
+		pid = fork();
+		break;
+	case SC_MODE_RFORK:
+		pid = rfork(RFPROC);
+		break;
+	case SC_MODE_VFORK:
+		pid = vfork();
+		break;
+	default:
+		errno = EDOOFUS;
+		pid = -1;
+		break;
+	}
+
+	if (pid == -1)
+		err(EX_OSERR, "%s: fork/spawn error (mode = %d)", __func__, mode);
+	if (mode != SC_MODE_POSIX_SPAWN && pid == 0)
+		execve(exec_args[0], exec_args, NULL);
+	return (pid);
+}
+
 __noinline void *
 cheribsdtest_memcpy(void *dst, const void *src, size_t n)
 {
@@ -654,7 +757,7 @@ main(int argc, char *argv[])
 	argc = xo_parse_args(argc, argv);
 	if (argc < 0)
 		errx(1, "xo_parse_args failed\n");
-	while ((opt = getopt(argc, argv, "acdfglQqsuvx")) != -1) {
+	while ((opt = getopt(argc, argv, "acdEfglQqsuvx")) != -1) {
 		switch (opt) {
 		case 'a':
 			run_all = 1;
@@ -664,6 +767,9 @@ main(int argc, char *argv[])
 			break;
 		case 'd':
 			debugger_enabled = 1;
+			break;
+		case 'E':
+			is_execed_child = 1;
 			break;
 		case 'f':
 			fast_tests_only = 1;
@@ -707,6 +813,16 @@ main(int argc, char *argv[])
 	}
 	argc -= optind;
 	argv += optind;
+	if (is_execed_child) {
+		if (run_all || glob || list) {
+			warnx("-E is incompatible with -a, -g, and -l");
+			usage();
+		}
+		if (argc != 1) {
+			warnx("-E requires exactly one test argument");
+			usage();
+		}
+	}
 	if (run_all && list) {
 		warnx("-a and -l are incompatible");
 		usage();
@@ -743,6 +859,12 @@ main(int argc, char *argv[])
 	stack.ss_flags = 0;
 	if (sigaltstack(&stack, NULL) < 0)
 		err(EX_OSERR, "sigaltstack");
+
+	/*
+	 * We've been execed so look up our child function and run it.
+	 */
+	if (is_execed_child)
+		cheribsdtest_run_child_name(argv[0]);
 
 	/*
 	 * Allocate a page shared with children processes to return success/
