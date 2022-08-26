@@ -146,6 +146,7 @@ struct cheri_test {
 	const char	*ct_name;
 	const char	*ct_desc;
 	void		(*ct_func)(void);
+	void		(*ct_child_func)(void);
 	const char *	(*ct_check_skip)(const char *);
 	const char *	(*ct_check_xfail)(const char *);
 	u_int		 ct_flags;
@@ -171,6 +172,14 @@ struct cheri_test {
 #define	CHERIBSDTEST(func, desc, ...)					\
 	_CHERIBSDTEST_DECLARE(func, (desc), __VA_ARGS__);		\
 	static void func(void)
+
+/* Enum for different modes of spawning a child process */
+enum spawn_child_mode {
+	SC_MODE_POSIX_SPAWN,
+	SC_MODE_FORK,
+	SC_MODE_VFORK,
+	SC_MODE_RFORK,
+};
 
 /*
  * Useful APIs for tests.  These terminate the process returning either
@@ -305,5 +314,11 @@ extern void *cheribsdtest_memcpy(void *dst, const void *src, size_t n);
 extern void *cheribsdtest_memmove(void *dst, const void *src, size_t n);
 
 extern ptraddr_t find_address_space_gap(size_t len, size_t align);
+
+/*
+ * Spawn a new copy of cheribsdtest and run the test's associated child
+ * function.
+ */
+extern pid_t cheribsdtest_spawn_child(enum spawn_child_mode mode);
 
 #endif /* !_CHERIBSDTEST_H_ */
