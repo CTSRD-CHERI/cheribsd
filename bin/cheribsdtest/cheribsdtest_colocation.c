@@ -42,6 +42,7 @@
 #include <errno.h>
 #include <kvm.h>
 #include <libprocstat.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <sysexits.h>
@@ -129,6 +130,136 @@ CHERIBSDTEST(colocation_coexec_child,
 		}
 	}
 }
+
+/*
+ * colocation_coaccept_slow - test runner, forks and
+ * coexecs a child, and then spins waiting for the child to register
+ * a service. Once it has done so, it cocall's into the service.
+ * The child registers a service and calls coaccept, does some
+ * validation, and then calls coaccept again to return to the caller.
+ * Both send their own pid and validate what they recieve.
+ */
+static void
+coaccept_slow_cf(const struct cheri_test *ctp)
+{
+	pid_t caller_pid, my_pid, parent_pid, recvd_pid;
+	int error;
+
+	if (!is_colocated_with_parent())
+		errx(EX_OSERR, "Not colocated with parent");
+
+	my_pid = getpid();
+	parent_pid = getppid();
+
+	error = cosetup(COSETUP_COACCEPT);
+	if (error != 0)
+		err(EX_OSERR, "cosetup");
+
+	error = coregister(ctp->ct_name, NULL);
+	if (error != 0)
+		err(EX_OSERR, "coregister");
+
+	error = coaccept_slow(NULL, NULL, 0, &recvd_pid, sizeof(recvd_pid));
+	if (error != 0)
+		err(EX_OSERR, "coaccept");
+
+	if (parent_pid != recvd_pid)
+		errx(EX_SOFTWARE, "parent_pid %d != recvd_pid %d", parent_pid,
+		    recvd_pid);
+
+	error = cogetpid(&caller_pid);
+	if (error != 0)
+		cheribsdtest_failure_err("cogetpid");
+	if (parent_pid != caller_pid)
+		errx(EX_SOFTWARE, "parent_pid %d != caller_pid %d", parent_pid,
+		    caller_pid);
+
+	/*
+	 * Return from cocall.  Should never return as there won't be
+	 * another cocall.
+	 */
+	(void) coaccept_slow(NULL, &my_pid, sizeof(my_pid), NULL, 0);
+	err(EX_SOFTWARE, "Second coaccept returned.");
+}
+
+CHERIBSDTEST(colocation_coaccept_slow,
+    "Configure the child to coaccept and handle one cocall",
+    .ct_child_func = coaccept_slow_cf)
+{
+	pid_t fork_pid, my_pid, recvd_pid;
+	int pfd;
+
+	if (is_colocated_with_parent())
+		cheribsdtest_failure_errx(
+		    "test runner colocated with main " PROG "process");
+
+	my_pid = getpid();
+
+	fork_pid = pdfork(&pfd, 0);
+	if (fork_pid == -1)
+		cheribsdtest_failure_err("Fork failed");
+
+	if (fork_pid == 0) {
+		cheribsdtest_coexec_child(ctp);
+	} else {
+		void *target;
+		int error;
+		int res;
+
+		error = cosetup(COSETUP_COCALL);
+		if (error != 0)
+			err(EX_OSERR, "cosetup");
+
+		/*
+		 * We need to wait for the child to coregister. Right
+		 * now the best we can do is spin unless we use a pipe/socket
+		 * to synchronize.
+		 *
+		 * XXX: set a timeout?
+		 */
+		while ((error = colookup(ctp->ct_name, &target)) != 0 &&
+		    errno == ESRCH && waitpid(fork_pid, &res, WNOHANG) == 0)
+			;
+		if (error != 0)
+			cheribsdtest_failure_err("colookup");
+
+		/*
+		 * There's potential race between a successful colookup
+		 * following the child's coregister and the child entering
+		 * coaccept so we loop if we lose the race.
+		 *
+		 * XXX: set a timeout?
+		 */
+		while ((error = cocall_slow(target, &my_pid, sizeof(my_pid),
+		    &recvd_pid, sizeof(recvd_pid))) != 0 && errno == EAGAIN)
+			;
+		if (error != 0)
+			cheribsdtest_failure_err("cocall");
+
+		if (recvd_pid != fork_pid) {
+			cheribsdtest_failure_errx("recvd_pid %d != fork_pid %d",
+			    recvd_pid, fork_pid);
+		}
+
+		/*
+		 * The child process is now back in coaccept so signal
+		 * the process to exit and wait for it.
+		 */
+		pdkill(pfd, SIGHUP);
+		waitpid(fork_pid, &res, 0);
+		if (WIFSIGNALED(res) && WTERMSIG(res) == SIGHUP) {
+			cheribsdtest_success();
+		} else if (WIFEXITED(res)) {
+			cheribsdtest_failure_errx(
+			    "coexecved process exited with %d",
+			    WEXITSTATUS(res));
+		} else {
+			cheribsdtest_failure_errx(
+			    "coexecved process failed with status 0x%x", res);
+		}
+	}
+}
+
 #endif
 
 static void
