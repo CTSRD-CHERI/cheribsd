@@ -387,7 +387,8 @@ BROKEN_OPTIONS+=CHERI
 BROKEN_OPTIONS+=LIB64C
 .endif
 
-.if ${__C} != "cheri" && ${__C} != "morello"
+.if ${__C} != "cheri" && ${__C} != "morello" && \
+    !${__T:Maarch64*c*} && !${__T:Mriscv64*c*}
 BROKEN_OPTIONS+=CHERI_CAPREVOKE
 .endif
 
