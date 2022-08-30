@@ -818,9 +818,6 @@ void vm_page_assert_pga_writeable(vm_page_t m, uint16_t bits);
 	    (_busy_lock & VPB_BIT_FLAGMASK) | VPB_CURTHREAD_EXCLUSIVE)); \
 } while (0)
 #if __has_feature(capabilities)
-void vm_page_assert_pga_capmeta_clear(vm_page_t m, uint16_t bits);
-#define	VM_PAGE_ASSERT_PGA_CAPMETA_CLEAR(m, bits)			\
-	vm_page_assert_pga_capmeta_clear(m, bits)
 
 void vm_page_assert_pga_capmeta_copy(vm_page_t msrc, vm_page_t mdst);
 #define	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst)			\
@@ -830,14 +827,12 @@ void vm_page_assert_pga_capmeta_pmap_enter(vm_page_t m, vm_prot_t prot);
 #define VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, p)                     \
 	vm_page_assert_pga_capmeta_pmap_enter(m, p)
 #else
-#define	VM_PAGE_ASSERT_PGA_CAPMETA_CLEAR(m, bits)	(void)0
 #define	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst)	(void)0
 #define	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, p)	(void)0
 #endif
 #else
 #define	VM_PAGE_OBJECT_BUSY_ASSERT(m)	(void)0
 #define	VM_PAGE_ASSERT_PGA_WRITEABLE(m, bits)	(void)0
-#define	VM_PAGE_ASSERT_PGA_CAPMETA_CLEAR(m, bits)	(void)0
 #define	VM_PAGE_ASSERT_PGA_CAPMETA_COPY(msrc, mdst)	(void)0
 #define	VM_PAGE_ASSERT_PGA_CAPMETA_PMAP_ENTER(m, p)	(void)0
 #define	vm_page_xbusy_claim(m)
@@ -885,8 +880,6 @@ static inline void
 vm_page_aflag_clear(vm_page_t m, uint16_t bits)
 {
 	uint32_t *addr, val;
-
-	VM_PAGE_ASSERT_PGA_CAPMETA_CLEAR(m, bits);
 
 	/*
 	 * Access the whole 32-bit word containing the aflags field with an
