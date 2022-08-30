@@ -133,16 +133,6 @@ def_lock_destroy(void *lock)
     free(l->base);
 }
 
-static __used void
-def_rlock_acquire(void *lock)
-{
-    Lock *l = (Lock *)lock;
-
-    atomic_add_acq_int(&l->lock, RC_INCR);
-    while (l->lock & WAFLAG)
-	    ;	/* Spin */
-}
-
 static void
 sig_fastunblock(void)
 {
@@ -154,17 +144,30 @@ sig_fastunblock(void)
 		__sys_sigfastblock(SIGFASTBLOCK_UNBLOCK, NULL);
 }
 
-static __used void
-def_wlock_acquire(void *lock)
+static bool
+def_lock_acquire_set(Lock *l, bool wlock)
 {
-	Lock *l;
+	if (wlock) {
+		if (atomic_cmpset_acq_int(&l->lock, 0, WAFLAG))
+			return (true);
+	} else {
+		atomic_add_acq_int(&l->lock, RC_INCR);
+		if ((l->lock & WAFLAG) == 0)
+			return (true);
+		atomic_add_int(&l->lock, -RC_INCR);
+	}
+	return (false);
+}
+
+static void
+def_lock_acquire(Lock *l, bool wlock)
+{
 	sigset_t tmp_oldsigmask;
 
-	l = (Lock *)lock;
 	if (ld_fast_sigblock) {
 		for (;;) {
 			atomic_add_32(&fsigblock, SIGFASTBLOCK_INC);
-			if (atomic_cmpset_acq_int(&l->lock, 0, WAFLAG))
+			if (def_lock_acquire_set(l, wlock))
 				break;
 			sig_fastunblock();
 		}
@@ -172,7 +175,7 @@ def_wlock_acquire(void *lock)
 		for (;;) {
 			__sys_sigprocmask(SIG_BLOCK, &fullsigmask,
 			   &tmp_oldsigmask);
-			if (atomic_cmpset_acq_int(&l->lock, 0, WAFLAG))
+			if (def_lock_acquire_set(l, wlock))
 				break;
 			__sys_sigprocmask(SIG_SETMASK, &tmp_oldsigmask, NULL);
 		}
@@ -182,20 +185,29 @@ def_wlock_acquire(void *lock)
 }
 
 static __used void
+def_rlock_acquire(void *lock)
+{
+	def_lock_acquire(lock, false);
+}
+
+static __used void
+def_wlock_acquire(void *lock)
+{
+	def_lock_acquire(lock, true);
+}
+
+static __used void
 def_lock_release(void *lock)
 {
 	Lock *l;
 
 	l = (Lock *)lock;
-	if ((l->lock & WAFLAG) == 0)
-		atomic_add_rel_int(&l->lock, -RC_INCR);
-	else {
-		atomic_add_rel_int(&l->lock, -WAFLAG);
-		if (ld_fast_sigblock)
-			sig_fastunblock();
-		else if (atomic_fetchadd_int(&wnested, -1) == 1)
-			__sys_sigprocmask(SIG_SETMASK, &oldsigmask, NULL);
-	}
+	atomic_add_rel_int(&l->lock, -((l->lock & WAFLAG) == 0 ?
+	    RC_INCR : WAFLAG));
+	if (ld_fast_sigblock)
+		sig_fastunblock();
+	else if (atomic_fetchadd_int(&wnested, -1) == 1)
+		__sys_sigprocmask(SIG_SETMASK, &oldsigmask, NULL);
 }
 
 static __used int
