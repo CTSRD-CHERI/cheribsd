@@ -1110,8 +1110,7 @@ vm_cheri_revoke_shadow_cap(struct sysentvec *sv, int sel, vm_offset_t base,
 
 		shadow_base = sv->sv_cheri_revoke_shadow_base
 		            + sv->sv_cheri_revoke_shadow_offset;
-		shadow_size = sv->sv_cheri_revoke_shadow_base
-		            + sv->sv_cheri_revoke_shadow_length
+		shadow_size = sv->sv_cheri_revoke_shadow_length
 		            - sv->sv_cheri_revoke_shadow_offset;
 
 		return cheri_capability_build_user_data(
