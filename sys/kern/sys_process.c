@@ -593,6 +593,80 @@ proc_read_cheri_tags(struct proc *p, struct uio *uio)
 
 	return (0);
 }
+
+static int
+proc_read_cheri_cap_page(vm_map_t map, vm_offset_t va, struct uio *uio)
+{
+	char capbuf[sizeof(uintcap_t) + 1];
+	uintcap_t *src;
+	vm_page_t m;
+	u_int pageoff, todo;
+	int error;
+
+	KASSERT(is_aligned(va, sizeof(uintcap_t)),
+	    ("%s: user address %lx is not capability-aligned", __func__, va));
+	pageoff = va & PAGE_MASK;
+	todo = min(PAGE_SIZE - pageoff, uio->uio_resid);
+	va = trunc_page(va);
+
+	error = vm_fault(map, va, VM_PROT_READ, VM_FAULT_NOFILL, &m);
+	if (error == KERN_PAGE_NOT_FILLED) {
+		memset(capbuf, 0, sizeof(capbuf));
+		while (todo > 0) {
+			error = uiomove(capbuf, sizeof(capbuf), uio);
+			if (error != 0)
+				return (error);
+			todo -= sizeof(capbuf);
+		}
+		return (0);
+	}
+	if (error != 0)
+		return (EFAULT);
+
+	src = (uintcap_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)) + pageoff /
+	    sizeof(uintcap_t);
+	while (todo > 0) {
+		capbuf[0] = cheri_gettag(*src);
+		memcpy(capbuf + 1, src, sizeof(*src));
+
+		error = uiomove(capbuf, sizeof(capbuf), uio);
+		if (error != 0)
+			break;
+		todo -= sizeof(capbuf);
+		src++;
+	}
+
+	vm_page_unwire(m, PQ_ACTIVE);
+	return (error);
+}
+
+static int
+proc_read_cheri_cap(struct proc *p, struct uio *uio)
+{
+	vm_map_t map = &p->p_vmspace->vm_map;
+	vm_offset_t va;
+	int error;
+
+	/*
+	 * Can't reuse uio_offset directly as uiomove increments it
+	 * based on the expanded capability size.
+	 */
+	va = uio->uio_offset;
+	if (!is_aligned(va, sizeof(uintcap_t)))
+		return (EINVAL);
+
+	if (uio->uio_resid % (sizeof(uintcap_t) + 1) != 0)
+		return (EINVAL);
+
+	error = 0;
+	while (uio->uio_resid > 0) {
+		error = proc_read_cheri_cap_page(map, va, uio);
+		if (error != 0)
+			break;
+		va = trunc_page(va) + PAGE_SIZE;
+	}
+	return (error);
+}
 #endif
 
 static int
@@ -1542,6 +1616,16 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			uio.uio_rw = UIO_READ;
 			PROC_UNLOCK(p);
 			error = proc_read_cheri_tags(p, &uio);
+			piod->piod_len -= uio.uio_resid;
+			PROC_LOCK(p);
+			goto out;
+		case PIOD_READ_CHERI_CAP:
+			CTR3(KTR_PTRACE,
+			    "PT_IO: pid %d: READ_CHERI_CAP (%p, %#x)",
+			    p->p_pid, (uintptr_t)uio.uio_offset, uio.uio_resid);
+			uio.uio_rw = UIO_READ;
+			PROC_UNLOCK(p);
+			error = proc_read_cheri_cap(p, &uio);
 			piod->piod_len -= uio.uio_resid;
 			PROC_LOCK(p);
 			goto out;
