@@ -381,6 +381,7 @@ vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 
 	res = vm_cheri_revoke_cookie_init(fs->map, &crc);
 	KASSERT(res == KERN_SUCCESS, ("cheri revoke cookie init WTF"));
+	(void) res; /* Placate !INVARIANT builds */
 
 	unlock_map(fs);
 

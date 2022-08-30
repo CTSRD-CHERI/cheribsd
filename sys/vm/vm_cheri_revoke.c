@@ -359,7 +359,9 @@ static enum vm_cro_at
 vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
     vm_map_entry_t entry, vm_offset_t ioff, vm_offset_t *ooff, int *vmres)
 {
+#ifdef INVARIANTS
 	vm_page_astate_t mas;
+#endif
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 	vm_map_t map = crc->map;
 	vm_object_t obj = entry->object.vm_object;
@@ -745,11 +747,12 @@ vm_cheri_revoke_map_entry(const struct vm_cheri_revoke_cookie *crc, int flags,
 
 	while (*addr < entry->end) {
 		int vmres;
-		vm_offset_t oaddr;
+#ifdef INVARIANTS
+		vm_offset_t oaddr = *addr;
+#endif
 
 		/* Find ourselves in this object */
 		ooffset = *addr - entry->start + entry->offset;
-		oaddr = *addr;
 
 		res = vm_cheri_revoke_object_at(
 		    crc, flags, entry, ooffset, &ooffset, &vmres);
@@ -1003,6 +1006,8 @@ out:
 			KASSERT(error2 == KERN_SUCCESS,
 			    ("vm_map_install_cheri_revoke_shadow can't undo"));
 		}
+
+		(void) error2; /* Placate !INVARIANTS build */
 	}
 
 	vm_map_unlock(map);
