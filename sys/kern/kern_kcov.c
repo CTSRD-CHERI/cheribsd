@@ -128,7 +128,7 @@ typedef enum {
 struct kcov_info {
 	struct thread	*thread;	/* (l) */
 	vm_object_t	bufobj;		/* (o) */
-	vm_offset_t	kvaddr;		/* (o) */
+	vm_pointer_t	kvaddr;		/* (o) */
 	size_t		entries;	/* (o) */
 	size_t		bufsize;	/* (o) */
 	kcov_state_t	state;		/* (s) */

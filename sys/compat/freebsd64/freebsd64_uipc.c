@@ -287,10 +287,10 @@ freebsd64_copyin_control(struct mbuf **mp, char * __capability buf,
 		newlen += CMSG_SPACE(datalen);
 	}
 
-	if (newlen > MCLBYTES)
+	m = m_get2(newlen, M_WAITOK, MT_CONTROL, 0);
+	if (m == NULL)
 		return (EINVAL);
 
-	m = m_get2(newlen, M_WAITOK, MT_CONTROL, 0);
 	m->m_len = newlen;
 
 	/* Copyin and realign the control data. */

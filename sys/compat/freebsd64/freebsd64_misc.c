@@ -745,7 +745,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * Install sigcode.
 	 */
-	if (sysent->sv_sigcode_base == 0 && sysent->sv_szsigcode != NULL) {
+	if (sysent->sv_shared_page_base == 0 && sysent->sv_szsigcode != NULL) {
 		szsigcode = *(sysent->sv_szsigcode);
 		destp -= szsigcode;
 		destp = rounddown2(destp, sizeof(uint64_t));

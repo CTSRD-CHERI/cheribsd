@@ -56,7 +56,10 @@ struct iommu_map_entry {
 	iommu_gaddr_t free_down;	/* Max free space below the
 					   current R/B tree node */
 	u_int flags;
-	TAILQ_ENTRY(iommu_map_entry) dmamap_link; /* Link for dmamap entries */
+	union {
+		TAILQ_ENTRY(iommu_map_entry) dmamap_link; /* DMA map entries */
+		struct iommu_map_entry *tlb_flush_next;
+	};
 	RB_ENTRY(iommu_map_entry) rb_entry;	 /* Links for domain entries */
 	struct iommu_domain *domain;
 	struct iommu_qi_genseq gseq;
@@ -151,7 +154,8 @@ void iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *ctx);
 struct iommu_ctx *iommu_get_ctx(struct iommu_unit *, device_t dev,
     uint16_t rid, bool id_mapped, bool rmrr_init);
 struct iommu_unit *iommu_find(device_t dev, bool verbose);
-void iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free);
+void iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free,
+    bool cansleep);
 void iommu_domain_unload(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool cansleep);
 

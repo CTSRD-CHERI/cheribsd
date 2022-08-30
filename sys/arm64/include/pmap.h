@@ -118,19 +118,27 @@ typedef struct pv_entry {
  * pv_entries are allocated in chunks per-process.  This avoids the
  * need to track per-pmap assignments.
  */
+#if PAGE_SIZE == PAGE_SIZE_4K
 #ifdef __CHERI_PURE_CAPABILITY__
-/*
- * XXX-AM: The packing of pv_chunks in the purecap kernel is sub-optimal,
- * leading to wasted padding space. It seems that the TAILQ in
- * pv_entry can just be a STAILQ saving a pointer for each entry.
- * This would both allow more entries and also perfectly pack into PAGE_SIZE.
- */
-#define	_NPCM	2
 #define	_NPCPV	83
+#define	_NPAD	2
 #else
-#define	_NPCM	3
 #define	_NPCPV	168
+#define	_NPAD	0
 #endif
+#elif PAGE_SIZE == PAGE_SIZE_16K
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	_NPCPV	338
+#define	_NPAD	4
+#else
+#define	_NPCPV	677
+#define	_NPAD	1
+#endif
+#else
+#error Unsupported page size
+#endif
+#define	_NPCM	howmany(_NPCPV, 64)
+
 #define	PV_CHUNK_HEADER							\
 	pmap_t			pc_pmap;				\
 	TAILQ_ENTRY(pv_chunk)	pc_list;				\
@@ -144,7 +152,8 @@ struct pv_chunk_header {
 struct pv_chunk {
 	PV_CHUNK_HEADER
 	struct pv_entry		pc_pventry[_NPCPV] __no_subobject_bounds;
-} __aligned(PAGE_SIZE);
+	uint64_t		pc_pad[_NPAD];
+};
 
 struct thread;
 
@@ -196,13 +205,13 @@ bool	pmap_klookup(vm_offset_t va, vm_paddr_t *pa);
 vm_paddr_t pmap_kextract(vm_offset_t va);
 void	pmap_kremove(vm_offset_t);
 void	pmap_kremove_device(vm_offset_t, vm_size_t);
-void	*pmap_mapdev_attr(vm_offset_t pa, vm_size_t size, vm_memattr_t ma);
+void	*pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma);
 bool	pmap_page_is_mapped(vm_page_t m);
 int	pmap_pinit_stage(pmap_t, enum pmap_stage, int);
 bool	pmap_ps_enabled(pmap_t pmap);
 uint64_t pmap_to_ttbr0(pmap_t pmap);
 
-void	*pmap_mapdev(vm_offset_t, vm_size_t);
+void	*pmap_mapdev(vm_paddr_t, vm_size_t);
 void	*pmap_mapbios(vm_paddr_t, vm_size_t);
 void	pmap_unmapdev(vm_pointer_t, vm_size_t);
 void	pmap_unmapbios(vm_pointer_t, vm_size_t);

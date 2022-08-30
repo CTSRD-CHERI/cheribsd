@@ -867,26 +867,38 @@ dmar_domain_free_entry(struct iommu_map_entry *entry, bool free)
 		entry->flags = 0;
 }
 
+/*
+ * If the given value for "free" is true, then the caller must not be using
+ * the entry's dmamap_link field.
+ */
 void
-dmar_domain_unload_entry(struct iommu_map_entry *entry, bool free)
+iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free,
+    bool cansleep)
 {
 	struct dmar_domain *domain;
 	struct dmar_unit *unit;
 
 	domain = IODOM2DOM(entry->domain);
 	unit = DOM2DMAR(domain);
+
+	/*
+	 * If "free" is false, then the IOTLB invalidation must be performed
+	 * synchronously.  Otherwise, the caller might free the entry before
+	 * dmar_qi_task() is finished processing it.
+	 */
 	if (unit->qi_enabled) {
-		DMAR_LOCK(unit);
-		dmar_qi_invalidate_locked(IODOM2DOM(entry->domain),
-		    entry->start, entry->end - entry->start, &entry->gseq,
-		    true);
-		if (!free)
-			entry->flags |= IOMMU_MAP_ENTRY_QI_NF;
-		TAILQ_INSERT_TAIL(&unit->tlb_flush_entries, entry, dmamap_link);
-		DMAR_UNLOCK(unit);
+		if (free) {
+			DMAR_LOCK(unit);
+			dmar_qi_invalidate_locked(domain, entry, true);
+			DMAR_UNLOCK(unit);
+		} else {
+			dmar_qi_invalidate_sync(domain, entry->start,
+			    entry->end - entry->start, cansleep);
+			dmar_domain_free_entry(entry, false);
+		}
 	} else {
-		domain_flush_iotlb_sync(IODOM2DOM(entry->domain),
-		    entry->start, entry->end - entry->start);
+		domain_flush_iotlb_sync(domain, entry->start, entry->end -
+		    entry->start);
 		dmar_domain_free_entry(entry, free);
 	}
 }
@@ -902,15 +914,15 @@ dmar_domain_unload_emit_wait(struct dmar_domain *domain,
 }
 
 void
-dmar_domain_unload(struct dmar_domain *domain,
+iommu_domain_unload(struct iommu_domain *iodom,
     struct iommu_map_entries_tailq *entries, bool cansleep)
 {
+	struct dmar_domain *domain;
 	struct dmar_unit *unit;
-	struct iommu_domain *iodom;
 	struct iommu_map_entry *entry, *entry1;
 	int error __diagused;
 
-	iodom = DOM2IODOM(domain);
+	domain = IODOM2DOM(iodom);
 	unit = DOM2DMAR(domain);
 
 	TAILQ_FOREACH_SAFE(entry, entries, dmamap_link, entry1) {
@@ -931,12 +943,11 @@ dmar_domain_unload(struct dmar_domain *domain,
 
 	KASSERT(unit->qi_enabled, ("loaded entry left"));
 	DMAR_LOCK(unit);
-	TAILQ_FOREACH(entry, entries, dmamap_link) {
-		dmar_qi_invalidate_locked(domain, entry->start, entry->end -
-		    entry->start, &entry->gseq,
+	while ((entry = TAILQ_FIRST(entries)) != NULL) {
+		TAILQ_REMOVE(entries, entry, dmamap_link);
+		dmar_qi_invalidate_locked(domain, entry,
 		    dmar_domain_unload_emit_wait(domain, entry));
 	}
-	TAILQ_CONCAT(&unit->tlb_flush_entries, entries, dmamap_link);
 	DMAR_UNLOCK(unit);
 }
 
@@ -974,22 +985,4 @@ iommu_free_ctx(struct iommu_ctx *context)
 	ctx = IOCTX2CTX(context);
 
 	dmar_free_ctx(ctx);
-}
-
-void
-iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
-{
-
-	dmar_domain_unload_entry(entry, free);
-}
-
-void
-iommu_domain_unload(struct iommu_domain *iodom,
-    struct iommu_map_entries_tailq *entries, bool cansleep)
-{
-	struct dmar_domain *domain;
-
-	domain = IODOM2DOM(iodom);
-
-	dmar_domain_unload(domain, entries, cansleep);
 }

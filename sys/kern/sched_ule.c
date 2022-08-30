@@ -871,7 +871,8 @@ sched_balance_group(struct cpu_group *cg)
 			 */
 			TDQ_LOCK(tdq);
 			td = tdq->tdq_curthread;
-			if ((td->td_flags & TDF_IDLETD) == 0 &&
+			if (td->td_lock == TDQ_LOCKPTR(tdq) &&
+			    (td->td_flags & TDF_IDLETD) == 0 &&
 			    THREAD_CAN_MIGRATE(td)) {
 				td->td_flags |= TDF_NEEDRESCHED | TDF_PICKCPU;
 				if (high != curcpu)
@@ -2137,7 +2138,9 @@ static struct mtx *
 sched_switch_migrate(struct tdq *tdq, struct thread *td, int flags)
 {
 	struct tdq *tdn;
+#ifdef SMP
 	int lowpri;
+#endif
 
 	KASSERT(THREAD_CAN_MIGRATE(td) ||
 	    (td_get_sched(td)->ts_flags & TSF_BOUND) != 0,

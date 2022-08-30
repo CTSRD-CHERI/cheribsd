@@ -350,7 +350,7 @@ contrib/openzfs/module/zfs/zcp_synctask.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/zfeature.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/zfs_byteswap.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/zfs_chksum.c		optional zfs compile-with "${ZFS_C}"
-contrib/openzfs/module/zfs/zfs_fm.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/zfs/zfs_fm.c		optional zfs compile-with "${ZFS_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 contrib/openzfs/module/zfs/zfs_fuid.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/zfs_ioctl.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/zfs_log.c		optional zfs compile-with "${ZFS_C}"
@@ -520,7 +520,8 @@ contrib/dev/acpica/components/hardware/hwtimer.c	optional acpi
 contrib/dev/acpica/components/hardware/hwvalid.c	optional acpi
 contrib/dev/acpica/components/hardware/hwxface.c	optional acpi
 contrib/dev/acpica/components/hardware/hwxfsleep.c	optional acpi
-contrib/dev/acpica/components/namespace/nsaccess.c	optional acpi
+contrib/dev/acpica/components/namespace/nsaccess.c	optional acpi \
+	compile-with "${NORMAL_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 contrib/dev/acpica/components/namespace/nsalloc.c	optional acpi
 contrib/dev/acpica/components/namespace/nsarguments.c	optional acpi
 contrib/dev/acpica/components/namespace/nsconvert.c	optional acpi
@@ -4117,7 +4118,8 @@ contrib/zlib/compress.c		optional crypto | geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib \
 	compile-with "${NORMAL_C} -Wno-cast-qual"
 contrib/zlib/crc32.c		optional crypto | geom_uzip | \
-	mxge | ddb_ctf | gzio | zfs | zlib
+	mxge | ddb_ctf | gzio | zfs | zlib \
+	compile-with "${NORMAL_C} ${NO_WSTRICT_PROTOTYPES}"
 contrib/zlib/deflate.c		optional crypto | geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib \
 	compile-with "${NORMAL_C} -Wno-cast-qual"
@@ -4128,12 +4130,14 @@ contrib/zlib/inflate.c		optional crypto | geom_uzip | \
 contrib/zlib/inftrees.c		optional crypto | geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib
 contrib/zlib/trees.c		optional crypto | geom_uzip | \
-	mxge | ddb_ctf | gzio | zfs | zlib
+	mxge | ddb_ctf | gzio | zfs | zlib \
+	compile-with "${NORMAL_C} ${NO_WSTRICT_PROTOTYPES}"
 contrib/zlib/uncompr.c		optional crypto | geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib \
 	compile-with "${NORMAL_C} -Wno-cast-qual"
 contrib/zlib/zutil.c		optional crypto | geom_uzip | \
-	mxge | ddb_ctf | gzio | zfs | zlib
+	mxge | ddb_ctf | gzio | zfs | zlib \
+	compile-with "${NORMAL_C} ${NO_WSTRICT_PROTOTYPES}"
 dev/zlib/zlib_mod.c		optional crypto | geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib
 dev/zlib/zcalloc.c		optional crypto | geom_uzip | \
@@ -5150,6 +5154,7 @@ security/audit/bsm_socket_type.c	optional audit
 security/audit/bsm_token.c	optional audit
 security/mac/mac_audit.c	optional mac audit
 security/mac/mac_cred.c		optional mac
+security/mac/mac_kdb.c		optional mac
 security/mac/mac_framework.c	optional mac
 security/mac/mac_inet.c		optional mac inet | mac inet6
 security/mac/mac_inet6.c	optional mac inet6
@@ -5168,6 +5173,7 @@ security/mac/mac_sysv_sem.c	optional mac
 security/mac/mac_sysv_shm.c	optional mac
 security/mac/mac_vfs.c		optional mac
 security/mac_biba/mac_biba.c	optional mac_biba
+security/mac_ddb/mac_ddb.c	optional mac_ddb
 security/mac_bsdextended/mac_bsdextended.c	optional mac_bsdextended
 security/mac_bsdextended/ugidfw_system.c	optional mac_bsdextended
 security/mac_bsdextended/ugidfw_vnode.c		optional mac_bsdextended
@@ -5213,7 +5219,6 @@ ufs/ufs/ufs_lookup.c		optional ffs
 ufs/ufs/ufs_quota.c		optional ffs
 ufs/ufs/ufs_vfsops.c		optional ffs
 ufs/ufs/ufs_vnops.c		optional ffs
-vm/default_pager.c		standard
 vm/device_pager.c		standard
 vm/phys_pager.c			standard
 vm/redzone.c			optional DEBUG_REDZONE

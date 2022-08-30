@@ -271,7 +271,7 @@ devmap_vtop(vm_pointer_t va, vm_size_t size)
  * pmap_kenter_device().
  */
 void *
-pmap_mapdev(vm_offset_t pa, vm_size_t size)
+pmap_mapdev(vm_paddr_t pa, vm_size_t size)
 {
 	vm_pointer_t va;
 	vm_offset_t offset;
@@ -318,7 +318,7 @@ pmap_mapdev(vm_offset_t pa, vm_size_t size)
 
 #if defined(__aarch64__) || defined(__riscv)
 void *
-pmap_mapdev_attr(vm_offset_t pa, vm_size_t size, vm_memattr_t ma)
+pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 {
 	vm_pointer_t va;
 	void * rva;
@@ -383,7 +383,7 @@ pmap_unmapdev(vm_pointer_t va, vm_size_t size)
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
-void
+void __nosanitizecoverage
 devmap_init_capability(void * __capability cap)
 {
 	devmap_capability = cap;
@@ -397,7 +397,7 @@ devmap_init_capability(void * __capability cap)
 #ifdef DDB
 #include <ddb/ddb.h>
 
-DB_SHOW_COMMAND(devmap, db_show_devmap)
+DB_SHOW_COMMAND_FLAGS(devmap, db_show_devmap, DB_CMD_MEMSAFE)
 {
 	devmap_dump_table(db_printf);
 }

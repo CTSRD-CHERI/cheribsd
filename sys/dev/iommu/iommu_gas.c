@@ -99,7 +99,7 @@ iommu_gas_alloc_entry(struct iommu_domain *domain, u_int flags)
 
 	res = uma_zalloc(iommu_map_entry_zone, ((flags & IOMMU_PGF_WAITOK) !=
 	    0 ? M_WAITOK : M_NOWAIT) | M_ZERO);
-	if (res != NULL) {
+	if (res != NULL && domain != NULL) {
 		res->domain = domain;
 		atomic_add_int(&domain->entries_cnt, 1);
 	}
@@ -113,7 +113,8 @@ iommu_gas_free_entry(struct iommu_domain *domain, struct iommu_map_entry *entry)
 	KASSERT(domain == entry->domain,
 	    ("mismatched free domain %p entry %p entry->domain %p", domain,
 	    entry, entry->domain));
-	atomic_subtract_int(&domain->entries_cnt, 1);
+	if (domain != NULL)
+		atomic_subtract_int(&domain->entries_cnt, 1);
 	uma_zfree(iommu_map_entry_zone, entry);
 }
 
@@ -638,7 +639,8 @@ iommu_gas_map(struct iommu_domain *domain,
 	    entry->end - entry->start, ma, eflags,
 	    ((flags & IOMMU_MF_CANWAIT) != 0 ? IOMMU_PGF_WAITOK : 0));
 	if (error == ENOMEM) {
-		iommu_domain_unload_entry(entry, true);
+		iommu_domain_unload_entry(entry, true,
+		    (flags & IOMMU_MF_CANWAIT) != 0);
 		return (error);
 	}
 	KASSERT(error == 0,
@@ -676,7 +678,8 @@ iommu_gas_map_region(struct iommu_domain *domain, struct iommu_map_entry *entry,
 	    entry->end - entry->start, ma + OFF_TO_IDX(start - entry->start),
 	    eflags, ((flags & IOMMU_MF_CANWAIT) != 0 ? IOMMU_PGF_WAITOK : 0));
 	if (error == ENOMEM) {
-		iommu_domain_unload_entry(entry, false);
+		iommu_domain_unload_entry(entry, false,
+		    (flags & IOMMU_MF_CANWAIT) != 0);
 		return (error);
 	}
 	KASSERT(error == 0,

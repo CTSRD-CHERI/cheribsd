@@ -64,6 +64,10 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/md_var.h>
 
+#include <vm/vm.h>
+#include <vm/pmap.h>
+#include <vm/vm_map.h>
+
 #include <cheri/cheric.h>
 
 #include <compat/freebsd64/freebsd64_proto.h>
@@ -331,7 +335,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	trapframe_set_elr(tf, (uintcap_t)catcher);
 	tf->tf_sp = (uintcap_t)fp;
-	tf->tf_lr = (register_t)p->p_sysent->sv_sigcode_base;
+	tf->tf_lr = (register_t)PROC_SIGCODE(p);
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_elr,
 	    tf->tf_sp);
