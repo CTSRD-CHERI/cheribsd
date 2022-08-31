@@ -279,7 +279,6 @@ func_ptr_type _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp);
 #endif
 uintptr_t _rtld_bind(Obj_Entry *obj, Elf_Size reloff);
 
-
 int npagesizes;
 static int osreldate;
 size_t *pagesizes;
