@@ -131,6 +131,8 @@ SYSCTL_NODE(_kern, OID_AUTO, ELF_ABI_ID, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
 
 #define	ELF_NODE_OID	__CONCAT(_kern_, ELF_ABI_ID)
 
+extern int opportunistic_coexecve;
+
 int __elfN(fallback_brand) = -1;
 SYSCTL_INT(ELF_NODE_OID, OID_AUTO,
     fallback_brand, CTLFLAG_RWTUN, &__elfN(fallback_brand), 0,
@@ -1500,12 +1502,16 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		}
 
 	} else if (imgp->cop != NULL) {
-#if 0
 		/*
-		 * Enabling this looks weird with kern.opportunistic_colocation=1.
+		 * We don't support coexec of static binaries. It could
+		 * work if we had PIE static binaries, but we don't
+		 * currently.
+		 *
+		 * XXX: Don't warn if opportunistic coexecve is enabled,
+		 * it's too spammy in that case.
 		 */
-		uprintf("Cannot coexecute an object that's not shared\n");
-#endif
+		if (!opportunistic_coexecve)
+			uprintf("Cannot coexecute a static binary\n");
 		error = EINVAL;
 		goto ret;
 	}

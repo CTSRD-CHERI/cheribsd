@@ -167,7 +167,7 @@ SYSCTL_INT(_kern, OID_AUTO, core_dump_can_intr, CTLFLAG_RWTUN,
     &core_dump_can_intr, 0,
     "Core dumping interruptible with SIGKILL");
 
-static int opportunistic_coexecve = 0;
+int opportunistic_coexecve = 0;
 SYSCTL_INT(_kern, OID_AUTO, opportunistic_coexecve, CTLFLAG_RW,
     &opportunistic_coexecve, 0,
     "Try to colocate binaries on execve(2)");
