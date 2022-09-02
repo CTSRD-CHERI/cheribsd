@@ -73,4 +73,4 @@ CFLAGS+= -I${SYSDIR}/compat/linuxkpi/common/include
 
 .include <bsd.kmod.mk>
 
-CWARNFLAGS += -Wno-pointer-sign -Wno-cast-qual
+CWARNFLAGS+= -Wno-cast-qual
