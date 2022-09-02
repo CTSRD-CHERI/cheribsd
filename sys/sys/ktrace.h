@@ -68,7 +68,7 @@ struct ktr_header {
 	pid_t	ktr_pid;		/* process id */
 	char	ktr_comm[MAXCOMLEN + 1];/* command name */
 	struct	timespec ktr_time;	/* timestamp */
-	intptr_t	ktr_tid;	/* thread id */
+	long	ktr_tid;		/* thread id */
 	int	ktr_cpu;		/* cpu id */
 };
 
