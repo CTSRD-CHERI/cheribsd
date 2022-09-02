@@ -91,24 +91,20 @@ ENTRY(cpu_throw)
 	set_step_flag w5, x6
 
 	/* Restore the registers */
-#if __has_feature(capabilities)
 	ldr	PTR(5), [PTR(4), #PCB_SP]
+	ldp	CAP(6), CAP(7), [PTR(4), #PCB_TPIDR]
+#if __has_feature(capabilities)
+	ldp	c8, c9, [PTR(4), #PCB_CID]
+	ldp	c10, c11, [PTR(4), #PCB_RDDC]
+#endif
 	mov	PTRN(sp), PTR(5)
-	ldp	c5, c6, [PTR(4), #PCB_TPIDR]
-	msr	ctpidr_el0, c5
-	msr	ctpidrro_el0, c6
-	ldp	c5, c6, [PTR(4), #PCB_CID]
-	msr	cid_el0, c5
-	msr	rcsp_el0, c6
-	ldp	c5, c6, [PTR(4), #PCB_RDDC]
-	msr	rddc_el0, c5
-	msr	rctpidr_el0, c6
-#else
-	ldp	x5, x6, [x4, #PCB_SP]
-	mov	sp, x5
-	msr	tpidr_el0, x6
-	ldr	x6, [x4, #PCB_TPIDRRO]
-	msr	tpidrro_el0, x6
+	msr	CAPN(tpidr_el0), CAP(6)
+	msr	CAPN(tpidrro_el0), CAP(7)
+#if __has_feature(capabilities)
+	msr	cid_el0, c8
+	msr	rcsp_el0, c9
+	msr	rddc_el0, c10
+	msr	rctpidr_el0, c11
 #endif
 	ldp	PTR(19), PTR(20), [PTR(4), #PCB_REGS + 19 * PTR_WIDTH]
 	ldp	PTR(21), PTR(22), [PTR(4), #PCB_REGS + 21 * PTR_WIDTH]
@@ -143,22 +139,19 @@ ENTRY(cpu_switch)
 	stp	PTR(29), PTRN(lr), [PTR(4), #PCB_REGS + 29 * PTR_WIDTH]
 	/* And the old stack pointer */
 	mov	PTR(5), PTRN(sp)
+	mrs	CAP(6), CAPN(tpidr_el0)
+	mrs	CAP(7), CAPN(tpidrro_el0)
 #if __has_feature(capabilities)
+	mrs	c8, cid_el0
+	mrs	c9, rcsp_el0
+	mrs	c10, rddc_el0
+	mrs	c11, rctpidr_el0
+#endif
 	str	PTR(5), [PTR(4), #PCB_SP]
-	mrs	c5, ctpidr_el0
-	mrs	c6, ctpidrro_el0
-	stp	c5, c6, [PTR(4), #PCB_TPIDR]
-	mrs	c5, cid_el0
-	mrs	c6, rcsp_el0
-	stp	c5, c6, [PTR(4), #PCB_CID]
-	mrs	c5, rddc_el0
-	mrs	c6, rctpidr_el0
-	stp	c5, c6, [PTR(4), #PCB_RDDC]
-#else
-	mrs	x6, tpidrro_el0
-	str	x6, [x4, #PCB_TPIDRRO]
-	mrs	x6, tpidr_el0
-	stp	x5, x6, [x4, #PCB_SP]
+	stp	CAP(6), CAP(7), [PTR(4), #PCB_TPIDR]
+#if __has_feature(capabilities)
+	stp	c8, c9, [PTR(4), #PCB_CID]
+	stp	c10, c11, [PTR(4), #PCB_RDDC]
 #endif
 
 	/* If we were single stepping, disable it */
@@ -209,24 +202,20 @@ ENTRY(cpu_switch)
 	set_step_flag w5, x6
 
 	/* Restore the registers */
-#if __has_feature(capabilities)
 	ldr	PTR(5), [PTR(4), #PCB_SP]
+	ldp	CAP(6), CAP(7), [PTR(4), #PCB_TPIDR]
+#if __has_feature(capabilities)
+	ldp	c8, c9, [PTR(4), #PCB_CID]
+	ldp	c10, c11, [PTR(4), #PCB_RDDC]
+#endif
 	mov	PTRN(sp), PTR(5)
-	ldp	c5, c6, [PTR(4), #PCB_TPIDR]
-	msr	ctpidr_el0, c5
-	msr	ctpidrro_el0, c6
-	ldp	c5, c6, [PTR(4), #PCB_CID]
-	msr	cid_el0, c5
-	msr	rcsp_el0, c6
-	ldp	c5, c6, [PTR(4), #PCB_RDDC]
-	msr	rddc_el0, c5
-	msr	rctpidr_el0, c6
-#else
-	ldp	x5, x6, [x4, #PCB_SP]
-	mov	sp, x5
-	msr	tpidr_el0, x6
-	ldr	x6, [x4, #PCB_TPIDRRO]
-	msr	tpidrro_el0, x6
+	msr	CAPN(tpidr_el0), CAP(6)
+	msr	CAPN(tpidrro_el0), CAP(7)
+#if __has_feature(capabilities)
+	msr	cid_el0, c8
+	msr	rcsp_el0, c9
+	msr	rddc_el0, c10
+	msr	rctpidr_el0, c11
 #endif
 	ldp	PTR(19), PTR(20), [PTR(4), #PCB_REGS + 19 * PTR_WIDTH]
 	ldp	PTR(21), PTR(22), [PTR(4), #PCB_REGS + 21 * PTR_WIDTH]
@@ -261,20 +250,17 @@ ENTRY(fork_trampoline)
 	/* Restore sp, lr, elr, and spsr */
 	ldp	CAP(18), CAPN(lr), [PTRN(sp), #TF_SP]
 #if __has_feature(capabilities)
-	ldr	CAP(10), [PTRN(sp), #TF_ELR]
+	ldp	CAP(10), CAP(12), [PTRN(sp), #TF_ELR]
 	ldr	x11, [PTRN(sp), #TF_SPSR]
 #else
 	ldp	CAP(10), CAP(11), [sp, #TF_ELR]
 #endif
 	msr	CAPN(sp_el0), CAP(18)
-	msr	spsr_el1, x11
 	msr	CAPN(elr_el1), CAP(10)
-
-	/* Restore ddc */
 #if __has_feature(capabilities)
-	ldr	c0, [PTRN(sp), #TF_DDC]
-	msr	ddc_el0, c0
+	msr	ddc_el0, c12
 #endif
+	msr	spsr_el1, x11
 
 	/* Restore the CPU registers */
 	ldp	CAP(0), CAP(1), [PTRN(sp), #TF_X + 0 * CAP_WIDTH]
@@ -311,22 +297,19 @@ ENTRY(savectx)
 	stp	PTR(29), PTRN(lr), [PTR(0), #PCB_REGS + 29 * PTR_WIDTH]
 	/* And the old stack pointer */
 	mov	PTR(5), PTRN(sp)
+	mrs	CAP(6), CAPN(tpidr_el0)
+	mrs	CAP(7), CAPN(tpidrro_el0)
 #if __has_feature(capabilities)
-	str	PTR(5), [PTR(0), #PCB_SP]
-	mrs	c5, ctpidr_el0
-	mrs	c6, ctpidrro_el0
-	stp	c5, c6, [PTR(0), #PCB_TPIDR]
-	mrs	c5, cid_el0
-	mrs	c6, rcsp_el0
-	stp	c5, c6, [PTR(0), #PCB_CID]
-	mrs	c5, rddc_el0
-	mrs	c6, rctpidr_el0
-	stp	c5, c6, [PTR(0), #PCB_RDDC]
-#else
-	mrs	x6, tpidrro_el0
-	str	x6, [x0, #PCB_TPIDRRO]
-	mrs	x6, tpidr_el0
-	stp	x5, x6, [x0, #PCB_SP]
+	mrs	c8, cid_el0
+	mrs	c9, rcsp_el0
+	mrs	c10, rddc_el0
+	mrs	c11, rctpidr_el0
+#endif
+	str	PTR(5), [PTR(4), #PCB_SP]
+	stp	CAP(6), CAP(7), [PTR(4), #PCB_TPIDR]
+#if __has_feature(capabilities)
+	stp	c8, c9, [PTR(4), #PCB_CID]
+	stp	c10, c11, [PTR(4), #PCB_RDDC]
 #endif
 
 	/* Store the VFP registers */

@@ -40,8 +40,8 @@ struct pcb {
 	uintptr_t	pcb_x[30];
 	uintptr_t	pcb_lr;
 	uintptr_t	_reserved;	/* Was pcb_pc */
-	/* These two need to be in order as we access them together */
 	uintptr_t	pcb_sp;
+	/* These two need to be in order as we access them together */
 	uintcap_t	pcb_tpidr_el0;
 	uintcap_t	pcb_tpidrro_el0;
 #if __has_feature(capabilities)
