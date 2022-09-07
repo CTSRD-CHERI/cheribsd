@@ -11,7 +11,7 @@ kern/subr_intr.c				optional intrng
 kern/subr_physmem.c				standard
 libkern/bcopy.c					optional cpu_cheri
 libkern/bcopy_c.c				optional cpu_cheri !cheri_purecap_kernel
-libkern/memcmp.c				standard	\
+libkern/memcmp.c				optional cpu_cheri	\
 	compile-with "${NORMAL_C:N-fsanitize*}"
 libkern/memset.c				standard	\
 	compile-with "${NORMAL_C:N-fsanitize*}"
@@ -68,6 +68,7 @@ arm64/arm64/locore.S				standard no-obj
 arm64/arm64/machdep.c				standard
 arm64/arm64/machdep_boot.c			standard
 arm64/arm64/mem.c				standard
+arm64/arm64/memcmp.S				optional !cpu_cheri
 arm64/arm64/memcpy.S				optional !cpu_cheri
 arm64/arm64/minidump_machdep.c			standard
 arm64/arm64/mp_machdep.c			optional smp
