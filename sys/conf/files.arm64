@@ -17,7 +17,9 @@ libkern/memset.c				standard	\
 	compile-with "${NORMAL_C:N-fsanitize*}"
 libkern/memset_c.c				optional cpu_cheri !cheri_purecap_kernel \
 	compile-with "${NORMAL_C:N-fsanitize*}"
+libkern/strcmp.c				optional cheri_purecap_kernel
 libkern/strlen.c		standard
+libkern/strncmp.c				optional cheri_purecap_kernel
 libkern/arm64/crc32c_armv8.S			standard
 
 arm/arm/generic_timer.c				standard
@@ -77,6 +79,8 @@ arm64/arm64/pmap.c				standard
 arm64/arm64/ptrace_machdep.c			standard
 arm64/arm64/sigtramp.S				standard
 arm64/arm64/stack_machdep.c			optional ddb | stack
+arm64/arm64/strcmp.S				optional !cheri_purecap_kernel
+arm64/arm64/strncmp.S				optional !cheri_purecap_kernel
 arm64/arm64/support_ifunc.c			standard
 arm64/arm64/support.S				standard
 arm64/arm64/swtch.S				standard
