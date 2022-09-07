@@ -2506,9 +2506,10 @@ kern_statat(struct thread *td, int flag, int fd, const char * __capability path,
 		return (error);
 	}
 	error = VOP_STAT(nd.ni_vp, sbp, td->td_ucred, NOCRED);
-	if (error == 0) {
-		if (__predict_false(hook != NULL))
+	if (__predict_false(hook != NULL)) {
+		if (error == 0) {
 			hook(nd.ni_vp, sbp);
+		}
 	}
 	NDFREE_NOTHING(&nd);
 	vput(nd.ni_vp);
