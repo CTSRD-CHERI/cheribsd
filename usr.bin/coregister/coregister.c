@@ -34,7 +34,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/auxv.h>
 #include <sys/capsicum.h>
 #include <sys/param.h>
+#include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/un.h>
 #include <assert.h>
 #include <capv.h>
 #include <ctype.h>
@@ -53,7 +55,8 @@ static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: coregister [-Ckv] -i entry -n new-name\n");
+	fprintf(stderr, "usage: coregister [-Ckv] -i entry -f path\n"
+			"       coregister [-Ckv] -i entry -n new-name\n");
 	exit(0);
 }
 
@@ -89,8 +92,15 @@ answerback(capv_answerback_t *out, void * __capability target, const char *regis
 	    mode ? "" : " (capsicum disabled)");
 }
 
-int
-main(int argc, char **argv)
+/*
+ * Loop on coaccept(2) until SIGCHLD.
+ *
+ * The whole reason for doing this is that we can't coregister(2)
+ * a capability that's not our own.  Which is silly and should be
+ * fixed by removing colookup(2).
+ */
+static void
+coaccept_loop(char *registered, void * __capability target)
 {
 	union {
 		capv_t		cap;
@@ -99,60 +109,11 @@ main(int argc, char **argv)
 	} inbuf, outbuf;
 	capv_t *in = &inbuf.cap;
 	capv_t *out = &outbuf.cap;
-	struct sigaction sa;
-	void * __capability target = NULL;
 	void * __capability public;
 	void * __capability cookie;
-	void * __capability *capv;
-	char *tmp = NULL, *registered = NULL;
 	ssize_t received;
 	pid_t pid;
-	int capc, ch, chosen = -1, error;
-
-	while ((ch = getopt(argc, argv, "Ci:kn:v")) != -1) {
-		switch (ch) {
-		case 'C':
-			Cflag = true;
-			break;
-		case 'i':
-			if (chosen >= 0)
-				errx(-1, "-i specified more than once");
-			chosen = strtol(optarg, &tmp, 10);
-			if (*tmp != '\0')
-				errx(1, "argument to -i must be a number");
-			if (chosen < 0)
-				usage();
-			break;
-		case 'k':
-			kflag = true;
-			break;
-		case 'n':
-			if (registered != NULL)
-				errx(-1, "-n specified more than once");
-			registered = optarg;
-			break;
-		case 'v':
-			vflag = true;
-			break;
-		case '?':
-		default:
-			usage();
-		}
-	}
-
-	argc -= optind;
-	argv += optind;
-	if (argc != 0 || chosen < 0 || registered == NULL)
-		usage();
-
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = sigchld_handler;
-	sa.sa_flags = SA_NOCLDSTOP;
-	sigfillset(&sa.sa_mask);
-
-	error = sigaction(SIGCHLD, &sa, NULL);
-	if (error != 0)
-		err(1, "sigaction");
+	int error;
 
 	error = cosetup(COSETUP_COACCEPT);
 	if (error != 0)
@@ -165,15 +126,6 @@ main(int argc, char **argv)
 	error = coregister(registered, &public);
 	if (error != 0)
 		err(1, "failed to coregister \"%s\"", registered);
-
-	capvfetch(&capc, &capv);
-	if (chosen >= capc || capv[chosen] == NULL)
-		errx(1, "capv[%d] is NULL", chosen);
-	target = capv[chosen];
-
-	/*
-	 * Loop on coaccept(2) until SIGCHLD.
-	 */
 
 	if (!Cflag) {
 		error = cap_enter();
@@ -263,4 +215,147 @@ main(int argc, char **argv)
 			    getprogname(), out->op, out->len, pid, getpid(), kflag ? " (slow)" : "");
 		}
 	}
+}
+
+/*
+ * Loop on a unix domain socket of choice, accepting connections from colookup(1)
+ * and sending back the target capability.
+ */
+static void
+socket_loop(char *filename, void * __capability target)
+{
+	struct msghdr msg;
+	union {
+		struct cmsghdr	hdr;
+		unsigned char	buf[CMSG_SPACE(sizeof(target))];
+	} cmsgbuf;
+	struct cmsghdr *cmsg;
+	struct sockaddr_un sun;
+	ssize_t sent;
+	int clientfd, fd, error;
+
+	fd = socket(PF_UNIX, SOCK_STREAM, 0);
+	if (fd < 0)
+		err(1, "socket");
+
+	memset(&sun, 0, sizeof(sun));
+	sun.sun_family = AF_UNIX;
+	strlcpy(sun.sun_path, filename, sizeof(sun.sun_path));
+	sun.sun_len = SUN_LEN(&sun);
+
+	error = bind(fd, (struct sockaddr *)&sun, sizeof(sun));
+	if (error != 0)
+		err(1, "%s", filename);
+	error = listen(fd, SOMAXCONN);
+	if (error != 0)
+		err(1, "listen");
+
+	for (;;) {
+		clientfd = accept(fd, NULL, NULL);
+		if (clientfd < 0)
+			err(1, "accept");
+
+		if (vflag)
+			printf("%s: accepted; will send back %#lp\n", getprogname(), target);
+
+		memset(&msg, 0, sizeof(msg));
+		msg.msg_control = &cmsgbuf.buf;
+		msg.msg_controllen = sizeof(cmsgbuf.buf);
+		msg.msg_iov = NULL;
+		msg.msg_iovlen = 0;
+
+		cmsg = CMSG_FIRSTHDR(&msg);
+		cmsg->cmsg_len = CMSG_LEN(sizeof(target));
+		cmsg->cmsg_level = SOL_SOCKET;
+		cmsg->cmsg_type = SCM_CAPS;
+#if 0 // XXX increases alignment
+		*(void * __capability *)CMSG_DATA(cmsg) = target;
+#else
+		memcpy(CMSG_DATA(cmsg), &target, sizeof(target));
+#endif
+
+		sent = sendmsg(clientfd, &msg, MSG_NOSIGNAL);
+		if (sent < 0)
+			warn("sendmsg");
+		error = close(clientfd);
+		if (error != 0)
+			err(1, "close");
+		if (vflag)
+			printf("%s: sent; waiting for another client\n", getprogname());
+	}
+}
+
+int
+main(int argc, char **argv)
+{
+	struct sigaction sa;
+	void * __capability *capv;
+	void * __capability target = NULL;
+	char *tmp = NULL, *registered = NULL, *filename = NULL;
+	int capc, ch, chosen = -1, error;
+
+	while ((ch = getopt(argc, argv, "Cf:i:kn:v")) != -1) {
+		switch (ch) {
+		case 'C':
+			Cflag = true;
+			break;
+		case 'f':
+			if (filename != NULL)
+				errx(-1, "-f specified more than once");
+			if (registered != NULL)
+				errx(-1, "-f and -n are mutually exclusive");
+			filename = optarg;
+			break;
+		case 'i':
+			if (chosen >= 0)
+				errx(-1, "-i specified more than once");
+			chosen = strtol(optarg, &tmp, 10);
+			if (*tmp != '\0')
+				errx(1, "argument to -i must be a number");
+			if (chosen < 0)
+				usage();
+			break;
+		case 'k':
+			kflag = true;
+			break;
+		case 'n':
+			if (registered != NULL)
+				errx(-1, "-n specified more than once");
+			if (filename != NULL)
+				errx(-1, "-n and -f are mutually exclusive");
+			registered = optarg;
+			break;
+		case 'v':
+			vflag = true;
+			break;
+		case '?':
+		default:
+			usage();
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+	if (argc != 0 || chosen < 0 || (registered == NULL && filename == NULL))
+		usage();
+
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = sigchld_handler;
+	sa.sa_flags = SA_NOCLDSTOP;
+	sigfillset(&sa.sa_mask);
+
+	error = sigaction(SIGCHLD, &sa, NULL);
+	if (error != 0)
+		err(1, "sigaction");
+
+	capvfetch(&capc, &capv);
+	if (chosen >= capc || capv[chosen] == NULL)
+		errx(1, "capv[%d] is NULL", chosen);
+	target = capv[chosen];
+
+	if (registered != NULL)
+		coaccept_loop(registered, target);
+	else
+		socket_loop(filename, target);
+	/* NOTREACHED */
 }

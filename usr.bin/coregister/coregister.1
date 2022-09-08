@@ -29,7 +29,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd May 25, 2022
+.Dd September 3, 2022
 .Dt COREGISTER 1
 .Os
 .Sh NAME
@@ -42,12 +42,23 @@
 .Op Fl v
 .Fl i Ar index
 .Fl n Ar new-name
+.Nm
+.Op Fl C
+.Op Fl k
+.Op Fl v
+.Fl i Ar index
+.Fl f Ar path
 .Sh DESCRIPTION
 The
 .Nm
 utility is used to publish one of the services found in the inherited
-capability vector using
-.Xr coregister 2 .
+capability vector using either
+.Xr coregister 2 ,
+or
+.Va SCM_CAPS
+over
+.Xr unix 4
+socket.
 .Pp
 Differently from some other utilities, this one does not spawn
 any command; instead it just sits there, relaying the calls.
@@ -61,6 +72,11 @@ Do not call
 thus do not enter
 .Xr capsicum 4
 capability mode.
+.It Fl f
+Publish the service via
+.Xr unix 4
+socket at
+.Ar path .
 .It Fl i
 Publish the service found at offset
 .Ar index
@@ -83,14 +99,15 @@ utility exits 0 on success, and >0 if an error occurs.
 .Sh EXAMPLES
 Publish a
 .Xr clock 1
-service as "fabulous", so it can be looked up by that name using
-.Xr colookup 2
-system call, eg using
+service via
+.Pa ./foo
+.Xr unix 4
+domain socket, so it can be fetched from it using
 .Xr colookup 1
 utility:
 .Pp
-.Dl coregister -i 5 -n fabulous &
-.Dl coping -v fabulous
+.Dl clocks coregister -i8 -f foo &
+.Dl colookup -f foo -i8 capv -v
 .Pp
 .Sh SEE ALSO
 .Xr capv 1 ,
