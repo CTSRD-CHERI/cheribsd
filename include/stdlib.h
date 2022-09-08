@@ -108,6 +108,10 @@ void	 malloc_revoke(void);
 int	 mblen(const char *, size_t);
 size_t	 mbstowcs(wchar_t * __restrict , const char * __restrict, size_t);
 int	 mbtowc(wchar_t * __restrict, const char * __restrict, size_t);
+#if __BSD_VISIBLE
+void	 bsort(void *, size_t, size_t,
+	    int (* _Nonnull)(const void *, const void *));
+#endif
 void	 qsort(void *, size_t, size_t,
 	    int (* _Nonnull)(const void *, const void *));
 int	 rand(void);
@@ -301,6 +305,8 @@ int	 heapsort(void *, size_t, size_t,
 #ifdef __BLOCKS__
 int	 heapsort_b(void *, size_t, size_t,
 	    int (^ _Nonnull)(const void *, const void *));
+void	 bsort_b(void *, size_t, size_t,
+	    int (^ _Nonnull)(const void *, const void *));
 void	 qsort_b(void *, size_t, size_t,
 	    int (^ _Nonnull)(const void *, const void *));
 #endif
@@ -313,6 +319,8 @@ int	 mkostemp(char *, int);
 int	 mkostemps(char *, int, int);
 int	 mkostempsat(int, char *, int, int);
 void	 qsort_r(void *, size_t, size_t,
+	    int (*)(const void *, const void *, void *), void *);
+void	 bsort_r(void *, size_t, size_t,
 	    int (*)(const void *, const void *, void *), void *);
 int	 radixsort(const unsigned char **, int, const unsigned char *,
 	    unsigned);
@@ -420,6 +428,11 @@ void ignore_handler_s(const char * __restrict, void * __restrict, errno_t);
 errno_t	 qsort_s(void *, rsize_t, rsize_t,
     int (*)(const void *, const void *, void *), void *);
 #endif /* __EXT1_VISIBLE */
+
+#if __BSD_VISIBLE
+errno_t	 bsort_s(void *, rsize_t, rsize_t,
+    int (*)(const void *, const void *, void *), void *);
+#endif /* __BSD_VISIBLE */
 
 __END_DECLS
 __NULLABILITY_PRAGMA_POP
