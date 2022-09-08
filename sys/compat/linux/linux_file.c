@@ -743,7 +743,7 @@ linux_unlink(struct thread *td, struct linux_unlink_args *args)
 		if (error == EPERM) {
 			/* Introduce POSIX noncompliant behaviour of Linux */
 			if (kern_statat(td, 0, AT_FDCWD,
-			    __USER_CAP_PATH(args->path), UIO_SYSSPACE, &st,
+			    __USER_CAP_PATH(args->path), UIO_USERSPACE, &st,
 			    NULL) == 0) {
 				if (S_ISDIR(st.st_mode))
 					error = EISDIR;
@@ -781,8 +781,8 @@ linux_unlinkat_impl(struct thread *td, enum uio_seg pathseg,
 		error = kern_funlinkat(td, dfd, path, FD_NONE, pathseg, 0, 0);
 	if (error == EPERM && !(args->flag & LINUX_AT_REMOVEDIR)) {
 		/* Introduce POSIX noncompliant behaviour of Linux */
-		if (kern_statat(td, AT_SYMLINK_NOFOLLOW, dfd, PTR2CAP(path),
-		    UIO_SYSSPACE, &st, NULL) == 0 && S_ISDIR(st.st_mode))
+		if (kern_statat(td, AT_SYMLINK_NOFOLLOW, dfd, path,
+		    pathseg, &st, NULL) == 0 && S_ISDIR(st.st_mode))
 			error = EISDIR;
 	}
 	return (error);
@@ -798,11 +798,11 @@ linux_unlinkat(struct thread *td, struct linux_unlinkat_args *args)
 		return (EINVAL);
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	if (!LUSECONVPATH(td)) {
-		return (linux_unlinkat_impl(td, UIO_USERSPACE, args->pathname,
-		    dfd, args));
+		return (linux_unlinkat_impl(td, UIO_USERSPACE,
+		    __USER_CAP_PATH(args->pathname), dfd, args));
 	}
 	LCONVPATHEXIST_AT(args->pathname, &path, dfd);
-	error = linux_unlinkat_impl(td, UIO_SYSSPACE, path, dfd, args);
+	error = linux_unlinkat_impl(td, UIO_SYSSPACE, PTR2CAP(path), dfd, args);
 	LFREEPATH(path);
 	return (error);
 }

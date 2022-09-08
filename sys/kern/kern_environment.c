@@ -49,7 +49,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/kenv.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
-#include <sys/sysent.h>
 #include <sys/sysproto.h>
 #include <sys/syscallsubr.h>
 #include <sys/libkern.h>

@@ -224,7 +224,7 @@ OBJS+=	${SRCS:N*.h:R:S/$/.o/g}
 PROG=	${KMOD}.ko
 .endif
 
-.if !defined(DEBUG_FLAGS) || ${MK_KERNEL_SYMBOLS} == "no"
+.if !defined(DEBUG_FLAGS) || ${MK_SPLIT_KERNEL_DEBUG} == "no"
 FULLPROG=	${PROG}
 .else
 FULLPROG=	${PROG}.full
@@ -290,6 +290,9 @@ _ILINKS=machine
 .if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
 _ILINKS+=x86
 .endif
+.if ${MACHINE_CPUARCH} == "amd64"
+_ILINKS+=i386
+.endif
 CLEANFILES+=${_ILINKS}
 
 all: ${PROG}
@@ -328,7 +331,7 @@ ${_ILINKS}:
 
 CLEANFILES+= ${PROG} ${KMOD}.kld ${OBJS}
 
-.if defined(DEBUG_FLAGS) && ${MK_KERNEL_SYMBOLS} != "no"
+.if defined(DEBUG_FLAGS) && ${MK_SPLIT_KERNEL_DEBUG} != "no"
 CLEANFILES+= ${FULLPROG} ${PROG}.debug
 .endif
 

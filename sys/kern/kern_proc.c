@@ -1014,7 +1014,7 @@ db_print_pgrp_one(struct pgrp *pgrp, struct proc *p)
 	    p->p_pptr == NULL ? 0 : isjobproc(p->p_pptr, pgrp));
 }
 
-DB_SHOW_COMMAND(pgrpdump, pgrpdump)
+DB_SHOW_COMMAND_FLAGS(pgrpdump, pgrpdump, DB_CMD_MEMSAFE)
 {
 	struct pgrp *pgrp;
 	struct proc *p;
@@ -3377,9 +3377,9 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 	if ((req->flags & SCTL_MASK32) != 0) {
 		bzero(&kst32, sizeof(kst32));
 		if (SV_PROC_FLAG(p, SV_ILP32)) {
-			if (sv->sv_sigcode_base != 0) {
-				kst32.ksigtramp_start = sv->sv_sigcode_base;
-				kst32.ksigtramp_end = sv->sv_sigcode_base +
+			if (PROC_HAS_SHP(p)) {
+				kst32.ksigtramp_start = PROC_SIGCODE(p);
+				kst32.ksigtramp_end = kst32.ksigtramp_start +
 				    ((sv->sv_flags & SV_DSO_SIG) == 0 ?
 				    *sv->sv_szsigcode :
 				    (uintptr_t)sv->sv_szsigcode);
@@ -3398,10 +3398,12 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 	if ((req->flags & SCTL_MASK64) != 0) {
 		bzero(&kst64, sizeof(kst64));
 		if (!SV_PROC_FLAG(p, SV_CHERI)) {
-			if (sv->sv_sigcode_base != 0) {
-				kst64.ksigtramp_start = sv->sv_sigcode_base;
-				kst64.ksigtramp_end = sv->sv_sigcode_base +
-				    *sv->sv_szsigcode;
+			if (PROC_HAS_SHP(p)) {
+				kst64.ksigtramp_start = PROC_SIGCODE(p);
+				kst64.ksigtramp_end = kst64.ksigtramp_start +
+				    ((sv->sv_flags & SV_DSO_SIG) == 0 ?
+				    *sv->sv_szsigcode :
+				    (uintptr_t)sv->sv_szsigcode);
 			} else {
 				kst64.ksigtramp_start = PROC_PS_STRINGS(p) -
 				    *sv->sv_szsigcode;
@@ -3414,11 +3416,11 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 	}
 #endif
 	bzero(&kst, sizeof(kst));
-	if (sv->sv_sigcode_base != 0) {
-		kst.ksigtramp_start = EXPORT_KPTR(sv->sv_sigcode_base);
-		kst.ksigtramp_end = EXPORT_KPTR(sv->sv_sigcode_base +
+	if (PROC_HAS_SHP(p)) {
+		kst.ksigtramp_start = EXPORT_KPTR(PROC_SIGCODE(p));
+		kst.ksigtramp_end = EXPORT_KPTR((intcap_t)kst.ksigtramp_start +
 		    ((sv->sv_flags & SV_DSO_SIG) == 0 ? *sv->sv_szsigcode :
-		    (uintptr_t)sv->sv_szsigcode));
+		    (ptraddr_t)sv->sv_szsigcode));
 	} else {
 		kst.ksigtramp_start = EXPORT_KPTR(PROC_PS_STRINGS(p) -
 		    *sv->sv_szsigcode);
@@ -3562,6 +3564,8 @@ sysctl_kern_proc_vm_layout(SYSCTL_HANDLER_ARGS)
 	 */
 	kvm.kvm_stack_addr = (ptraddr_t)p->p_vm_maxsaddr;
 	kvm.kvm_stack_size = p->p_vm_ssize;
+	kvm.kvm_shp_addr = vmspace->vm_shp_base;
+	kvm.kvm_shp_size = p->p_sysent->sv_shared_page_len;
 	if ((vmspace->vm_map.flags & MAP_WIREFUTURE) != 0)
 		kvm.kvm_map_flags |= KMAP_FLAG_WIREFUTURE;
 	if ((vmspace->vm_map.flags & MAP_ASLR) != 0)
@@ -3572,6 +3576,9 @@ sysctl_kern_proc_vm_layout(SYSCTL_HANDLER_ARGS)
 		kvm.kvm_map_flags |= KMAP_FLAG_WXORX;
 	if ((vmspace->vm_map.flags & MAP_ASLR_STACK) != 0)
 		kvm.kvm_map_flags |= KMAP_FLAG_ASLR_STACK;
+	if (vmspace->vm_shp_base != p->p_sysent->sv_shared_page_base &&
+	    PROC_HAS_SHP(p))
+		kvm.kvm_map_flags |= KMAP_FLAG_ASLR_SHARED_PAGE;
 
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32)) {
@@ -3586,6 +3593,8 @@ sysctl_kern_proc_vm_layout(SYSCTL_HANDLER_ARGS)
 		kvm32.kvm_data_size = (uint32_t)kvm.kvm_data_size;
 		kvm32.kvm_stack_addr = (uint32_t)kvm.kvm_stack_addr;
 		kvm32.kvm_stack_size = (uint32_t)kvm.kvm_stack_size;
+		kvm32.kvm_shp_addr = (uint32_t)kvm.kvm_shp_addr;
+		kvm32.kvm_shp_size = (uint32_t)kvm.kvm_shp_size;
 		kvm32.kvm_map_flags = kvm.kvm_map_flags;
 		vmspace_free(vmspace);
 		error = SYSCTL_OUT(req, &kvm32, sizeof(kvm32));
@@ -3726,10 +3735,10 @@ static SYSCTL_NODE(_kern_proc, KERN_PROC_VM_LAYOUT, vm_layout, CTLFLAG_RD |
 static struct sx stop_all_proc_blocker;
 SX_SYSINIT(stop_all_proc_blocker, &stop_all_proc_blocker, "sapblk");
 
-void
+bool
 stop_all_proc_block(void)
 {
-	sx_xlock(&stop_all_proc_blocker);
+	return (sx_xlock_sig(&stop_all_proc_blocker) == 0);
 }
 
 void
@@ -3753,7 +3762,8 @@ stop_all_proc(void)
 	int r, gen;
 	bool restart, seen_stopped, seen_exiting, stopped_some;
 
-	stop_all_proc_block();
+	if (!stop_all_proc_block())
+		return;
 
 	cp = curproc;
 allproc_loop:
@@ -3773,7 +3783,7 @@ allproc_loop:
 			PROC_UNLOCK(p);
 			continue;
 		}
-		if ((p->p_flag & P_WEXIT) != 0) {
+		if ((p->p_flag2 & P2_WEXIT) != 0) {
 			seen_exiting = true;
 			PROC_UNLOCK(p);
 			continue;

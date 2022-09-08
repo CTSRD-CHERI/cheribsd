@@ -33,19 +33,15 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/fcntl.h>
-#include <sys/imgact.h>
 #include <sys/ktr.h>
 #include <sys/proc.h>
 #include <sys/ptrace.h>
 #include <sys/reg.h>
 #include <sys/sdt.h>
 
-#include <security/audit/audit.h>
-
 #include <arm64/linux/linux.h>
 #include <arm64/linux/linux_proto.h>
 #include <compat/linux/linux_dtrace.h>
-#include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_fork.h>
 #include <compat/linux/linux_misc.h>
 #include <compat/linux/linux_mmap.h>
@@ -58,33 +54,6 @@ LIN_SDT_PROVIDER_DECLARE(LINUX_DTRACE);
 
 /* DTrace probes */
 LIN_SDT_PROBE_DEFINE0(machdep, linux_mmap2, todo);
-
-/*
- * LINUXTODO: deduplicate; linux_execve is common across archs.
- */
-int
-linux_execve(struct thread *td, struct linux_execve_args *uap)
-{
-	struct image_args eargs;
-	char *path;
-	int error;
-
-	if (!LUSECONVPATH(td)) {
-		error = exec_copyin_args(&eargs, __USER_CAP_PATH(uap->path),
-		    UIO_USERSPACE, __USER_CAP_UNBOUND(uap->argp),
-		    __USER_CAP_UNBOUND(uap->envp));
-	} else {
-		LCONVPATHEXIST(uap->path, &path);
-		error = exec_copyin_args(&eargs, PTR2CAP(path), UIO_SYSSPACE,
-		    __USER_CAP_UNBOUND(uap->argp),
-		    __USER_CAP_UNBOUND(uap->envp));
-		LFREEPATH(path);
-	}
-	if (error == 0)
-		error = linux_common_execve(td, &eargs);
-	AUDIT_SYSCALL_EXIT(error == EJUSTRETURN ? 0 : error, td);
-	return (error);
-}
 
 int
 linux_set_upcall(struct thread *td, register_t stack)

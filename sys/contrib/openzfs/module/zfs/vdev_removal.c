@@ -338,8 +338,8 @@ spa_vdev_alloc(spa_t *spa, uint64_t guid)
 }
 
 static void
-spa_vdev_remove_aux(nvlist_t *config, char *name, nvlist_t **dev, int count,
-    nvlist_t *dev_to_remove)
+spa_vdev_remove_aux(nvlist_t *config, const char *name, nvlist_t **dev,
+    int count, nvlist_t *dev_to_remove)
 {
 	nvlist_t **newdev = NULL;
 
@@ -1364,6 +1364,8 @@ vdev_remove_complete(spa_t *spa)
 	ASSERT3P(vd->vdev_initialize_thread, ==, NULL);
 	ASSERT3P(vd->vdev_trim_thread, ==, NULL);
 	ASSERT3P(vd->vdev_autotrim_thread, ==, NULL);
+	vdev_rebuild_stop_wait(vd);
+	ASSERT3P(vd->vdev_rebuild_thread, ==, NULL);
 	uint64_t vdev_space = spa_deflate(spa) ?
 	    vd->vdev_stat.vs_dspace : vd->vdev_stat.vs_space;
 
@@ -2382,7 +2384,8 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 	int error = 0, error_log;
 	boolean_t locked = MUTEX_HELD(&spa_namespace_lock);
 	sysevent_t *ev = NULL;
-	char *vd_type = NULL, *vd_path = NULL;
+	const char *vd_type = NULL;
+	char *vd_path = NULL;
 
 	ASSERT(spa_writeable(spa));
 

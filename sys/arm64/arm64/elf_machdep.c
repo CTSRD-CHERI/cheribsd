@@ -181,7 +181,7 @@ reloc_instr_imm(Elf32_Addr *where, Elf_Addr val, u_int msb, u_int lsb)
 }
 
 #if __has_feature(capabilities)
-static uintcap_t
+static uintcap_t __nosanitizecoverage
 build_cap_from_fragment(Elf_Addr *fragment, Elf_Addr relocbase,
     Elf_Addr offset, void * __capability data_cap,
     const void * __capability code_cap)
@@ -438,7 +438,7 @@ elf_cpu_parse_dynamic(caddr_t loadbase __unused, Elf_Dyn *dynamic __unused)
 /*
  * Handle boot-time kernel relocations, this is called by locore.
  */
-void
+void __nosanitizecoverage
 elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
 {
 	const Elf_Rela *rela = NULL, *rela_end;

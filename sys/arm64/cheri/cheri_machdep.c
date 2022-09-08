@@ -48,7 +48,7 @@ void * __capability smccc_ddc_el0;
 void *kernel_root_cap = (void *)(intcap_t)-1;
 #endif
 
-void
+void __nosanitizecoverage
 cheri_init_capabilities(void * __capability kroot)
 {
 	void * __capability ctemp;
@@ -79,8 +79,9 @@ cheri_init_capabilities(void * __capability kroot)
 	swap_restore_cap = kroot;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	ctemp = cheri_setaddress(kroot, VM_MAX_KERNEL_ADDRESS - L2_SIZE);
-	ctemp = cheri_setboundsexact(ctemp, L2_SIZE);
+	ctemp = cheri_setaddress(kroot, VM_MAX_KERNEL_ADDRESS -
+	    PMAP_MAPDEV_EARLY_SIZE);
+	ctemp = cheri_setboundsexact(ctemp, PMAP_MAPDEV_EARLY_SIZE);
 	ctemp = cheri_andperm(ctemp, CHERI_PERMS_KERNEL_DATA);
 	devmap_init_capability(ctemp);
 

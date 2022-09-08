@@ -251,6 +251,7 @@ _LIBRARIES+= \
 		ibnetdisc \
 		ibumad \
 		ibverbs \
+		irdma \
 		mlx4 \
 		mlx5 \
 		rdmacm \
@@ -339,7 +340,7 @@ _DP_proc=	cxxrt
 .if ${MK_CDDL} != "no"
 _DP_proc+=	ctf
 .endif
-_DP_proc+=	elf procstat rtld_db util
+_DP_proc+=	elf procstat rtld_db util z
 _DP_mp=	crypto
 _DP_memstat=	kvm
 _DP_magic=	z
@@ -441,6 +442,7 @@ _DP_ibmad=	ibumad
 _DP_ibnetdisc=	osmcomp ibmad ibumad
 _DP_ibumad=	
 _DP_ibverbs=
+_DP_irdma=	ibverbs pthread
 _DP_mlx4=	ibverbs pthread
 _DP_mlx5=	ibverbs pthread
 _DP_rdmacm=	ibverbs
@@ -577,6 +579,9 @@ LIBIFCONFIG?=	${LIBIFCONFIGDIR}/libifconfig${PIE_SUFFIX}.a
 LIBIPFDIR=	${_LIB_OBJTOP}/sbin/ipf/libipf
 LIBIPF?=	${LIBIPFDIR}/libipf${PIE_SUFFIX}.a
 
+LIBNVDIR=	${_LIB_OBJTOP}/lib/libnv
+LIBNV?=		${LIBNVDIR}/libnv${PIE_SUFFIX}.a
+
 LIBISCSIUTILDIR=	${_LIB_OBJTOP}/lib/libiscsiutil
 LIBISCSIUTIL?=	${LIBISCSIUTILDIR}/libiscsiutil${PIE_SUFFIX}.a
 
@@ -671,14 +676,23 @@ LIBAVLDIR=	${_LIB_OBJTOP}/cddl/lib/libavl
 LIBCTFDIR=	${_LIB_OBJTOP}/cddl/lib/libctf
 LIBDTRACEDIR=	${_LIB_OBJTOP}/cddl/lib/libdtrace
 LIBICPDIR=	${_LIB_OBJTOP}/cddl/lib/libicp
+LIBICP?=	${LIBICPDIR}/libicp${PIE_SUFFIX}.a
+LIBICP_RESCUEDIR=	${_LIB_OBJTOP}/cddl/lib/libicp_rescue
+LIBICP_RESCUE?=	${LIBICP_RESCUEDIR}/libicp_rescue${PIE_SUFFIX}.a
 LIBNVPAIRDIR=	${_LIB_OBJTOP}/cddl/lib/libnvpair
+LIBNVPAIR?=	${LIBNVPAIRDIR}/libnvpair${PIE_SUFFIX}.a
 LIBUMEMDIR=	${_LIB_OBJTOP}/cddl/lib/libumem
 LIBUUTILDIR=	${_LIB_OBJTOP}/cddl/lib/libuutil
 LIBZFSDIR=	${_LIB_OBJTOP}/cddl/lib/libzfs
+LIBZFS?=	${LIBZFSDIR}/libzfs${PIE_SUFFIX}.a
 LIBZFS_COREDIR=	${_LIB_OBJTOP}/cddl/lib/libzfs_core
+LIBZFS_CORE?=	${LIBZFS_COREDIR}/libzfs_core${PIE_SUFFIX}.a
 LIBZFSBOOTENVDIR=	${_LIB_OBJTOP}/cddl/lib/libzfsbootenv
+LIBZFSBOOTENV?=	${LIBZFSBOOTENVDIR}/libzfsbootenv${PIE_SUFFIX}.a
 LIBZPOOLDIR=	${_LIB_OBJTOP}/cddl/lib/libzpool
+LIBZPOOL?=	${LIBZPOOLDIR}/libzpool${PIE_SUFFIX}.a
 LIBZUTILDIR=	${_LIB_OBJTOP}/cddl/lib/libzutil
+LIBZUTIL?=	${LIBZUTILDIR}/libzutil${PIE_SUFFIX}.a
 LIBTPOOLDIR=	${_LIB_OBJTOP}/cddl/lib/libtpool
 
 # OFED support
@@ -688,6 +702,7 @@ LIBIBMADDIR=	${_LIB_OBJTOP}/lib/ofed/libibmad
 LIBIBNETDISCDIR=${_LIB_OBJTOP}/lib/ofed/libibnetdisc
 LIBIBUMADDIR=	${_LIB_OBJTOP}/lib/ofed/libibumad
 LIBIBVERBSDIR=	${_LIB_OBJTOP}/lib/ofed/libibverbs
+LIBIRDMADIR=	${_LIB_OBJTOP}/lib/ofed/libirdma
 LIBMLX4DIR=	${_LIB_OBJTOP}/lib/ofed/libmlx4
 LIBMLX5DIR=	${_LIB_OBJTOP}/lib/ofed/libmlx5
 LIBRDMACMDIR=	${_LIB_OBJTOP}/lib/ofed/librdmacm
