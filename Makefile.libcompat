@@ -84,7 +84,6 @@ build${libcompat}: .PHONY
 	@echo "--------------------------------------------------------------"
 	@echo ">>> stage 4.3: building lib${libcompat} shim libraries"
 	@echo "--------------------------------------------------------------"
-
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
 	    -p ${WORLDTMP}/usr >/dev/null
 .if ${MK_DEBUG_FILES} != "no"

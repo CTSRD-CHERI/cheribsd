@@ -234,6 +234,12 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, stack, CTLFLAG_RWTUN,
     ELF_ABI_NAME
     ": enable stack address randomization");
 
+static int __elfN(aslr_shared_page) = __ELF_WORD_SIZE == 64;
+SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, shared_page, CTLFLAG_RWTUN,
+    &__elfN(aslr_shared_page), 0,
+    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
+    ": enable shared page address randomization");
+
 #ifdef __ELF_CHERI
 static int __elfN(sigfastblock) = 0;
 #else
@@ -1478,6 +1484,17 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		}
 	}
 
+#ifdef __ELF_CHERI
+	/*
+	 * CHERI binaries with a hope of working are all modern. If
+	 * the OS release note is missing just assume they are in sync
+	 * with the current tree.
+	 */
+	if (osrel == 0 && SV_PROC_FLAG(imgp->proc, SV_ABI_FREEBSD) &&
+	    SV_PROC_FLAG(imgp->proc, SV_CHERI))
+		osrel = __FreeBSD_version;
+#endif
+
 	et_dyn_addr = 0;
 	if (hdr->e_type == ET_DYN) {
 		if ((brand_info->flags & BI_CAN_EXEC_DYN) == 0) {
@@ -1562,6 +1579,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			imgp->map_flags |= MAP_ASLR_IGNSTART;
 		if (__elfN(aslr_stack))
 			imgp->map_flags |= MAP_ASLR_STACK;
+		if (__elfN(aslr_shared_page))
+			imgp->imgp_flags |= IMGP_ASLR_SHARED_PAGE;
 	}
 
 	if ((!__elfN(allow_wx) && (fctl0 & NT_FREEBSD_FCTL_WXNEEDED) == 0 &&
@@ -1756,10 +1775,11 @@ interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
 static void * __capability
 timekeep_cap(struct image_params *imgp)
 {
+	struct vmspace *vmspace = imgp->proc->p_vmspace;
 	ptraddr_t timekeep_base;
 	size_t timekeep_len;
 
-	timekeep_base = imgp->sysent->sv_timekeep_base;
+	timekeep_base = vmspace->vm_shp_base + imgp->sysent->sv_timekeep_offset;
 	timekeep_len = sizeof(struct vdso_timekeep) +
 	    sizeof(struct vdso_timehands) * VDSO_TH_NUM;
 
@@ -1780,6 +1800,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
 	Elf_Auxinfo *argarray, *pos;
+	struct vmspace *vmspace;
 #ifdef __ELF_CHERI
 	void * __capability exec_base;
 	void * __capability entry;
@@ -1788,6 +1809,8 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 
 	argarray = pos = malloc(AT_COUNT * sizeof(*pos), M_TEMP,
 	    M_WAITOK | M_ZERO);
+
+	vmspace = imgp->proc->p_vmspace;
 
 	if (args->execfd != -1)
 		AUXARGS_ENTRY(pos, AT_EXECFD, args->execfd);
@@ -1867,11 +1890,12 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		AUXARGS_ENTRY_PTR(pos, AT_PAGESIZES, imgp->pagesizes);
 		AUXARGS_ENTRY(pos, AT_PAGESIZESLEN, imgp->pagesizeslen);
 	}
-	if (imgp->sysent->sv_timekeep_base != 0) {
+	if ((imgp->sysent->sv_flags & SV_TIMEKEEP) != 0) {
 #ifdef __ELF_CHERI
 		AUXARGS_ENTRY_PTR(pos, AT_TIMEKEEP, timekeep_cap(imgp));
 #else
-		AUXARGS_ENTRY(pos, AT_TIMEKEEP, imgp->sysent->sv_timekeep_base);
+		AUXARGS_ENTRY(pos, AT_TIMEKEEP,
+		    vmspace->vm_shp_base + imgp->sysent->sv_timekeep_offset);
 #endif
 	}
 	AUXARGS_ENTRY(pos, AT_STACKPROT, (imgp->sysent->sv_shared_page_obj
@@ -1888,10 +1912,16 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY(pos, AT_ENVC, imgp->args->envc);
 	AUXARGS_ENTRY_PTR(pos, AT_ENVV, imgp->envv);
 	AUXARGS_ENTRY_PTR(pos, AT_PS_STRINGS, imgp->ps_strings);
-	if (imgp->sysent->sv_fxrng_gen_base != 0)
-		AUXARGS_ENTRY(pos, AT_FXRNG, imgp->sysent->sv_fxrng_gen_base);
-	if (imgp->sysent->sv_vdso_base != 0 && __elfN(vdso) != 0)
-		AUXARGS_ENTRY(pos, AT_KPRELOAD, imgp->sysent->sv_vdso_base);
+#ifdef RANDOM_FENESTRASX
+	if ((imgp->sysent->sv_flags & SV_RNG_SEED_VER) != 0) {
+		AUXARGS_ENTRY(pos, AT_FXRNG,
+		    vmspace->vm_shp_base + imgp->sysent->sv_fxrng_gen_offset);
+	}
+#endif
+	if ((imgp->sysent->sv_flags & SV_DSO_SIG) != 0 && __elfN(vdso) != 0) {
+		AUXARGS_ENTRY(pos, AT_KPRELOAD,
+		    vmspace->vm_shp_base + imgp->sysent->sv_vdso_offset);
+	}
 	if (imgp->capv != NULL)
 		AUXARGS_ENTRY_PTR(pos, AT_CAPV, imgp->capv);
 	AUXARGS_ENTRY(pos, AT_NULL, 0);
@@ -1960,11 +1990,6 @@ static void __elfN(putnote)(struct thread *td, struct note_info *, struct sbuf *
 
 static void __elfN(note_prpsinfo)(void *, struct sbuf *, size_t *);
 static void __elfN(note_threadmd)(void *, struct sbuf *, size_t *);
-static void __elfN(note_thrmisc)(void *, struct sbuf *, size_t *);
-static void __elfN(note_ptlwpinfo)(void *, struct sbuf *, size_t *);
-#if __has_feature(capabilities)
-static void __elfN(note_capregs)(void *, struct sbuf *, size_t *);
-#endif
 static void __elfN(note_procstat_auxv)(void *, struct sbuf *, size_t *);
 static void __elfN(note_procstat_proc)(void *, struct sbuf *, size_t *);
 static void __elfN(note_procstat_psstrings)(void *, struct sbuf *, size_t *);
@@ -2285,14 +2310,6 @@ __elfN(prepare_notes)(struct thread *td, struct note_info_list *list,
 	thr = td;
 	while (thr != NULL) {
 		size += __elfN(prepare_register_notes)(td, list, thr);
-		size += __elfN(register_note)(td, list, NT_THRMISC,
-		    __elfN(note_thrmisc), thr);
-		size += __elfN(register_note)(td, list, NT_PTLWPINFO,
-		    __elfN(note_ptlwpinfo), thr);
-#if __has_feature(capabilities)
-		size += __elfN(register_note)(td, list, NT_CAPREGS,
-		    __elfN(note_capregs), thr);
-#endif
 		size += __elfN(register_note)(td, list, -1,
 		    __elfN(note_threadmd), thr);
 
@@ -2589,6 +2606,7 @@ typedef struct fpreg32 elf_prfpregset_t;
 typedef struct fpreg32 elf_fpregset_t;
 typedef struct reg32 elf_gregset_t;
 typedef struct thrmisc32 elf_thrmisc_t;
+typedef struct ptrace_lwpinfo32 elf_lwpinfo_t;
 #define ELF_KERN_PROC_MASK	KERN_PROC_MASK32
 typedef struct kinfo_proc32 elf_kinfo_proc_t;
 typedef uint32_t elf_ps_strings_t;
@@ -2600,6 +2618,7 @@ typedef prfpregset_t elf_prfpregset_t;
 typedef prfpregset_t elf_fpregset_t;
 typedef gregset_t elf_gregset_t;
 typedef thrmisc_t elf_thrmisc_t;
+typedef struct ptrace_lwpinfo64 elf_lwpinfo_t;
 #define ELF_KERN_PROC_MASK	KERN_PROC_MASK64
 typedef struct kinfo_proc64 elf_kinfo_proc_t;
 typedef vm_offset_t elf_ps_strings_t;
@@ -2610,12 +2629,10 @@ typedef prfpregset_t elf_prfpregset_t;
 typedef prfpregset_t elf_fpregset_t;
 typedef gregset_t elf_gregset_t;
 typedef thrmisc_t elf_thrmisc_t;
+typedef struct ptrace_lwpinfo elf_lwpinfo_t;
 #define ELF_KERN_PROC_MASK	0
 typedef struct kinfo_proc elf_kinfo_proc_t;
 typedef vm_offset_t elf_ps_strings_t;
-#endif
-#if __has_feature(capabilities)
-typedef capregset_t elf_capregs_t;
 #endif
 
 static void
@@ -2775,6 +2792,112 @@ static struct regset __elfN(regset_fpregset) = {
 };
 ELF_REGSET(__elfN(regset_fpregset));
 
+#if __has_feature(capabilities)
+static bool
+__elfN(get_capregs)(struct regset *rs, struct thread *td, void *buf,
+    size_t *sizep)
+{
+	struct capreg *capregs;
+
+	if (buf != NULL) {
+		KASSERT(*sizep == sizeof(*capregs), ("%s: invalid size",
+		    __func__));
+		capregs = buf;
+		fill_capregs(td, capregs);
+	}
+	*sizep = sizeof(*capregs);
+	return (true);
+}
+
+static bool
+__elfN(set_capregs)(struct regset *rs, struct thread *td, void *buf,
+    size_t size)
+{
+	struct capreg *capregs;
+
+	capregs = buf;
+	KASSERT(size == sizeof(*capregs), ("%s: invalid size", __func__));
+	set_capregs(td, capregs);
+	return (true);
+}
+
+static struct regset __elfN(regset_cap) = {
+	.note = NT_CAPREGS,
+	.size = sizeof(struct capreg),
+	.get = __elfN(get_capregs),
+	.set = __elfN(set_capregs),
+};
+ELF_REGSET(__elfN(regset_cap));
+#endif
+
+static bool
+__elfN(get_thrmisc)(struct regset *rs, struct thread *td, void *buf,
+    size_t *sizep)
+{
+	elf_thrmisc_t *thrmisc;
+
+	if (buf != NULL) {
+		KASSERT(*sizep == sizeof(*thrmisc),
+		    ("%s: invalid size", __func__));
+		thrmisc = buf;
+		bzero(thrmisc, sizeof(*thrmisc));
+		strcpy(thrmisc->pr_tname, td->td_name);
+	}
+	*sizep = sizeof(*thrmisc);
+	return (true);
+}
+
+static struct regset __elfN(regset_thrmisc) = {
+	.note = NT_THRMISC,
+	.size = sizeof(elf_thrmisc_t),
+	.get = __elfN(get_thrmisc),
+};
+ELF_REGSET(__elfN(regset_thrmisc));
+
+static bool
+__elfN(get_lwpinfo)(struct regset *rs, struct thread *td, void *buf,
+    size_t *sizep)
+{
+	elf_lwpinfo_t pl;
+	size_t size;
+	int structsize;
+
+	size = sizeof(structsize) + sizeof(pl);
+	if (buf != NULL) {
+		KASSERT(*sizep == size, ("%s: invalid size", __func__));
+		structsize = sizeof(pl);
+		memcpy(buf, &structsize, sizeof(structsize));
+		bzero(&pl, sizeof(pl));
+		pl.pl_lwpid = td->td_tid;
+		pl.pl_event = PL_EVENT_NONE;
+		pl.pl_sigmask = td->td_sigmask;
+		pl.pl_siglist = td->td_siglist;
+		if (td->td_si.si_signo != 0) {
+			pl.pl_event = PL_EVENT_SIGNAL;
+			pl.pl_flags |= PL_FLAG_SI;
+#if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
+			siginfo_to_siginfo32(&td->td_si, &pl.pl_siginfo);
+#elif defined(COMPAT_FREEBSD64) && __ELF_WORD_SIZE == 64 && !defined(__ELF_CHERI)
+			siginfo_to_siginfo64(&td->td_si, &pl.pl_siginfo);
+#else
+			pl.pl_siginfo = td->td_si;
+#endif
+		}
+		strcpy(pl.pl_tdname, td->td_name);
+		/* XXX TODO: supply more information in struct ptrace_lwpinfo*/
+		memcpy((int *)buf + 1, &pl, sizeof(pl));
+	}
+	*sizep = size;
+	return (true);
+}
+
+static struct regset __elfN(regset_lwpinfo) = {
+	.note = NT_PTLWPINFO,
+	.size = sizeof(int) + sizeof(elf_lwpinfo_t),
+	.get = __elfN(get_lwpinfo),
+};
+ELF_REGSET(__elfN(regset_lwpinfo));
+
 static size_t
 __elfN(prepare_register_notes)(struct thread *td, struct note_info_list *list,
     struct thread *target_td)
@@ -2806,84 +2929,6 @@ __elfN(prepare_register_notes)(struct thread *td, struct note_info_list *list,
 		    target_td);
 	}
 	return (size);
-}
-
-static void
-__elfN(note_thrmisc)(void *arg, struct sbuf *sb, size_t *sizep)
-{
-	struct thread *td;
-	elf_thrmisc_t thrmisc;
-
-	td = arg;
-	if (sb != NULL) {
-		KASSERT(*sizep == sizeof(thrmisc), ("invalid size"));
-		bzero(&thrmisc, sizeof(thrmisc));
-		strcpy(thrmisc.pr_tname, td->td_name);
-		sbuf_bcat(sb, &thrmisc, sizeof(thrmisc));
-	}
-	*sizep = sizeof(thrmisc);
-}
-
-#if __has_feature(capabilities)
-static void
-__elfN(note_capregs)(void *arg, struct sbuf *sb, size_t *sizep)
-{
-	struct thread *td;
-	elf_capregs_t *capregs;
-
-	td = (struct thread *)arg;
-	if (sb != NULL) {
-		KASSERT(*sizep == sizeof(*capregs), ("invalid size"));
-		capregs = malloc(sizeof(*capregs), M_TEMP, M_ZERO | M_WAITOK);
-		fill_capregs(td, capregs);
-		sbuf_bcat(sb, capregs, sizeof(*capregs));
-		free(capregs, M_TEMP);
-	}
-	*sizep = sizeof(*capregs);
-}
-#endif
-
-static void
-__elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
-{
-	struct thread *td;
-	size_t size;
-	int structsize;
-#if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
-	struct ptrace_lwpinfo32 pl;
-#elif defined(COMPAT_FREEBSD64) && __ELF_WORD_SIZE == 64 && !defined(__ELF_CHERI)
-	struct ptrace_lwpinfo64 pl;
-#else
-	struct ptrace_lwpinfo pl;
-#endif
-
-	td = arg;
-	structsize = sizeof(pl);
-	size = sizeof(structsize) + structsize;
-	if (sb != NULL) {
-		KASSERT(*sizep == size, ("invalid size"));
-		sbuf_bcat(sb, &structsize, sizeof(structsize));
-		bzero(&pl, sizeof(pl));
-		pl.pl_lwpid = td->td_tid;
-		pl.pl_event = PL_EVENT_NONE;
-		pl.pl_sigmask = td->td_sigmask;
-		pl.pl_siglist = td->td_siglist;
-		if (td->td_si.si_signo != 0) {
-			pl.pl_event = PL_EVENT_SIGNAL;
-			pl.pl_flags |= PL_FLAG_SI;
-#if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
-			siginfo_to_siginfo32(&td->td_si, &pl.pl_siginfo);
-#elif defined(COMPAT_FREEBSD64) && __ELF_WORD_SIZE == 64 && !defined(__ELF_CHERI)
-			siginfo_to_siginfo64(&td->td_si, &pl.pl_siginfo);
-#else
-			pl.pl_siginfo = td->td_si;
-#endif
-		}
-		strcpy(pl.pl_tdname, td->td_name);
-		/* XXX TODO: supply more information in struct ptrace_lwpinfo*/
-		sbuf_bcat(sb, &pl, sizeof(pl));
-	}
-	*sizep = size;
 }
 
 /*

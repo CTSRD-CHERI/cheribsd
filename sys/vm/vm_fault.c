@@ -86,6 +86,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/mman.h>
 #include <sys/mutex.h>
+#include <sys/pctrie.h>
 #include <sys/proc.h>
 #include <sys/racct.h>
 #include <sys/refcount.h>
@@ -219,6 +220,21 @@ fault_page_free(vm_page_t *mp)
 			vm_page_xunbusy(m);
 		*mp = NULL;
 	}
+}
+
+/*
+ * Return true if a vm_pager_get_pages() call is needed in order to check
+ * whether the pager might have a particular page, false if it can be determined
+ * immediately that the pager can not have a copy.  For swap objects, this can
+ * be checked quickly.
+ */
+static inline bool
+fault_object_needs_getpages(vm_object_t object)
+{
+	VM_OBJECT_ASSERT_LOCKED(object);
+
+	return ((object->flags & OBJ_SWAP) == 0 ||
+	    !pctrie_is_empty(&object->un_pager.swp.swp_blks));
 }
 
 static inline void
@@ -664,7 +680,7 @@ int
 vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
     int fault_flags, int *signo, int *ucode)
 {
-	int result;
+	int result, segv_ucode;
 
 	MPASS(signo == NULL || ucode != NULL);
 #ifdef KTRACE
@@ -699,6 +715,11 @@ vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 			*ucode = BUS_OBJERR;
 			break;
 		case KERN_PROTECTION_FAILURE:
+			if ((fault_type & VM_PROT_WRITE_CAP) != 0)
+				segv_ucode = SEGV_STORETAG;
+			else
+				segv_ucode = SEGV_ACCERR;
+
 			if (prot_fault_translation == 0) {
 				/*
 				 * Autodetect.  This check also covers
@@ -708,7 +729,7 @@ vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 				if (SV_CURPROC_ABI() == SV_ABI_FREEBSD &&
 				    curproc->p_osrel >= P_OSREL_SIGSEGV) {
 					*signo = SIGSEGV;
-					*ucode = SEGV_ACCERR;
+					*ucode = segv_ucode;
 				} else {
 					*signo = SIGBUS;
 					*ucode = UCODE_PAGEFLT;
@@ -720,7 +741,7 @@ vm_fault_trap(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 			} else {
 				/* Always SIGSEGV mode. */
 				*signo = SIGSEGV;
-				*ucode = SEGV_ACCERR;
+				*ucode = segv_ucode;
 			}
 			break;
 		default:
@@ -1447,10 +1468,9 @@ vm_fault_object(struct faultstate *fs, int *behindp, int *aheadp)
 	/*
 	 * Page is not resident.  If the pager might contain the page
 	 * or this is the beginning of the search, allocate a new
-	 * page.  (Default objects are zero-fill, so there is no real
-	 * pager for them.)
+	 * page.
 	 */
-	if (fs->m == NULL && (fs->object->type != OBJT_DEFAULT ||
+	if (fs->m == NULL && (fault_object_needs_getpages(fs->object) ||
 	    fs->object == fs->first_object)) {
 		res = vm_fault_allocate(fs);
 		if (res != FAULT_CONTINUE)
@@ -1463,7 +1483,7 @@ vm_fault_object(struct faultstate *fs, int *behindp, int *aheadp)
 	 * object without dropping the lock to preserve atomicity of
 	 * shadow faults.
 	 */
-	if (fs->object->type != OBJT_DEFAULT) {
+	if (fault_object_needs_getpages(fs->object)) {
 		/*
 		 * At this point, we have either allocated a new page
 		 * or found an existing page that is only partially
@@ -1884,7 +1904,7 @@ vm_fault_prefault(const struct faultstate *fs, vm_offset_t addra,
 		if (!obj_locked)
 			VM_OBJECT_RLOCK(lobject);
 		while ((m = vm_page_lookup(lobject, pindex)) == NULL &&
-		    lobject->type == OBJT_DEFAULT &&
+		    !fault_object_needs_getpages(lobject) &&
 		    (backing_object = lobject->backing_object) != NULL) {
 			KASSERT((lobject->backing_object_offset & PAGE_MASK) ==
 			    0, ("vm_fault_prefault: unaligned object offset"));
@@ -2011,10 +2031,10 @@ error:
  *	Routine:
  *		vm_fault_copy_entry
  *	Function:
- *		Create new shadow object backing dst_entry with private copy of
- *		all underlying pages. When src_entry is equal to dst_entry,
- *		function implements COW for wired-down map entry. Otherwise,
- *		it forks wired entry into dst_map.
+ *		Create new object backing dst_entry with private copy of all
+ *		underlying pages. When src_entry is equal to dst_entry, function
+ *		implements COW for wired-down map entry. Otherwise, it forks
+ *		wired entry into dst_map.
  *
  *	In/out conditions:
  *		The source and destination maps must be locked for write.
@@ -2022,7 +2042,7 @@ error:
  *		entry corresponding to a main map entry that is wired down).
  */
 void
-vm_fault_copy_entry(vm_map_t dst_map, vm_map_t src_map,
+vm_fault_copy_entry(vm_map_t dst_map, vm_map_t src_map __unused,
     vm_map_entry_t dst_entry, vm_map_entry_t src_entry,
     vm_ooffset_t *fork_charge)
 {
@@ -2032,14 +2052,25 @@ vm_fault_copy_entry(vm_map_t dst_map, vm_map_t src_map,
 	vm_offset_t vaddr;
 	vm_page_t dst_m;
 	vm_page_t src_m;
-	boolean_t upgrade;
-
-#ifdef	lint
-	src_map++;
-#endif	/* lint */
+	bool upgrade;
 
 	upgrade = src_entry == dst_entry;
+	KASSERT(upgrade || dst_entry->object.vm_object == NULL,
+	    ("vm_fault_copy_entry: vm_object not NULL"));
+
+	/*
+	 * If not an upgrade, then enter the mappings in the pmap as
+	 * read and/or execute accesses.  Otherwise, enter them as
+	 * write accesses.
+	 *
+	 * A writeable large page mapping is only created if all of
+	 * the constituent small page mappings are modified. Marking
+	 * PTEs as modified on inception allows promotion to happen
+	 * without taking potentially large number of soft faults.
+	 */
 	access = prot = dst_entry->protection;
+	if (!upgrade)
+		access &= ~VM_PROT_WRITE;
 
 	src_object = src_entry->object.vm_object;
 	src_pindex = OFF_TO_IDX(src_entry->offset);
@@ -2061,43 +2092,26 @@ vm_fault_copy_entry(vm_map_t dst_map, vm_map_t src_map,
 #endif
 		dst_object->domain = src_object->domain;
 		dst_object->charge = dst_entry->end - dst_entry->start;
-	}
 
-	VM_OBJECT_WLOCK(dst_object);
-	KASSERT(upgrade || dst_entry->object.vm_object == NULL,
-	    ("vm_fault_copy_entry: vm_object not NULL"));
-	if (src_object != dst_object) {
 		dst_entry->object.vm_object = dst_object;
 		dst_entry->offset = 0;
 		dst_entry->eflags &= ~MAP_ENTRY_VN_EXEC;
 	}
+
+	VM_OBJECT_WLOCK(dst_object);
 	if (fork_charge != NULL) {
 		KASSERT(dst_entry->cred == NULL,
 		    ("vm_fault_copy_entry: leaked swp charge"));
 		dst_object->cred = curthread->td_ucred;
 		crhold(dst_object->cred);
 		*fork_charge += dst_object->charge;
-	} else if ((dst_object->type == OBJT_DEFAULT ||
-	    (dst_object->flags & OBJ_SWAP) != 0) &&
+	} else if ((dst_object->flags & OBJ_SWAP) != 0 &&
 	    dst_object->cred == NULL) {
 		KASSERT(dst_entry->cred != NULL, ("no cred for entry %p",
 		    dst_entry));
 		dst_object->cred = dst_entry->cred;
 		dst_entry->cred = NULL;
 	}
-
-	/*
-	 * If not an upgrade, then enter the mappings in the pmap as
-	 * read and/or execute accesses.  Otherwise, enter them as
-	 * write accesses.
-	 *
-	 * A writeable large page mapping is only created if all of
-	 * the constituent small page mappings are modified. Marking
-	 * PTEs as modified on inception allows promotion to happen
-	 * without taking potentially large number of soft faults.
-	 */
-	if (!upgrade)
-		access &= ~VM_PROT_WRITE;
 
 	/*
 	 * Loop through all of the virtual pages within the entry's
@@ -2169,8 +2183,15 @@ again:
 			else
 #endif
 				pmap_copy_page(src_m, dst_m);
-			VM_OBJECT_RUNLOCK(object);
+
+			/*
+			 * The object lock does not guarantee that "src_m" will
+			 * transition from invalid to valid, but it does ensure
+			 * that "src_m" will not transition from valid to
+			 * invalid.
+			 */
 			dst_m->dirty = dst_m->valid = src_m->valid;
+			VM_OBJECT_RUNLOCK(object);
 		} else {
 			dst_m = src_m;
 			if (vm_page_busy_acquire(dst_m, VM_ALLOC_WAITFAIL) == 0)
@@ -2185,7 +2206,6 @@ again:
 				break;
 			}
 		}
-		VM_OBJECT_WUNLOCK(dst_object);
 
 		/*
 		 * Enter it in the pmap. If a wired, copy-on-write
@@ -2200,17 +2220,17 @@ again:
 		 * backing pages.
 		 */
 		if (vm_page_all_valid(dst_m)) {
+			VM_OBJECT_WUNLOCK(dst_object);
 			VM_OBJECT_ASSERT_CAP(dst_object, prot);
 			pmap_enter(dst_map->pmap, vaddr, dst_m,
 			    VM_OBJECT_MASK_CAP_PROT(dst_object, prot),
 			    access | (upgrade ? PMAP_ENTER_WIRED : 0), 0);
+			VM_OBJECT_WLOCK(dst_object);
 		}
 
 		/*
 		 * Mark it no longer busy, and put it on the active list.
 		 */
-		VM_OBJECT_WLOCK(dst_object);
-		
 		if (upgrade) {
 			if (src_m != dst_m) {
 				vm_page_unwire(src_m, PQ_INACTIVE);

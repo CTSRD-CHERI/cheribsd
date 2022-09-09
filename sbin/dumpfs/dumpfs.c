@@ -130,7 +130,13 @@ main(int argc, char *argv[])
 		usage();
 
 	while ((name = *argv++) != NULL) {
-		if (ufs_disk_fillout(&disk, name) == -1) {
+		if (ufs_disk_fillout_blank(&disk, name) == -1) {
+			ufserr(name);
+			eval |= 1;
+			continue;
+		}
+		disk.d_sblockloc = STDSB_NOHASHFAIL;
+		if (sbread(&disk) == -1) {
 			ufserr(name);
 			eval |= 1;
 			continue;
@@ -233,8 +239,8 @@ dumpfs(const char *name, int dosb)
 		printf("sbsize\t%d\tcgsize\t%d\tcgoffset %d\tcgmask\t0x%08x\n",
 		    afs.fs_sbsize, afs.fs_cgsize, afs.fs_old_cgoffset,
 		    afs.fs_old_cgmask);
-		printf("csaddr\t%d\tcssize\t%d\n",
-		    afs.fs_old_csaddr, afs.fs_cssize);
+		printf("csaddr\t%jd\tcssize\t%d\n",
+		    (intmax_t)afs.fs_csaddr, afs.fs_cssize);
 		printf("rotdelay %dms\trps\t%d\ttrackskew %d\tinterleave %d\n",
 		    afs.fs_old_rotdelay, afs.fs_old_rps, afs.fs_old_trackskew,
 		    afs.fs_old_interleave);

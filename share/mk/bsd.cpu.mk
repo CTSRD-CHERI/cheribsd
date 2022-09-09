@@ -410,20 +410,38 @@ CXXFLAGS += ${CXXFLAGS.${MACHINE_ARCH}}
 
 #
 # MACHINE_ABI is a list of properties about the ABI used for MACHINE_ARCH.
+# The following properties are indicated with one of the follow values:
+#
+# Floating point ABI:		soft-float, hard-float
+# Size of long (size_t, etc):	long32, long64
+# Pointer type:			ptr32, ptr64, ptr128c
+# Size of time_t:		time32, time64
+# Capability ABI:		purecap
 #
 .if ${MACHINE_ARCH:Mriscv*sf*}
 MACHINE_ABI+=	soft-float
 .else
 MACHINE_ABI+=	hard-float
 .endif
-.if (${MACHINE_ARCH:Maarch64*c*} || ${MACHINE_ARCH:Mriscv*c*})
-MACHINE_ABI+=	purecap
-.endif
 # Currently all 64-bit architectures include 64 in their name (see arch(7)).
 .if ${MACHINE_ARCH:M*64*}
+MACHINE_ABI+=	long64
+.else
+MACHINE_ABI+=	long32
+.endif
+.if (${MACHINE_ARCH:Maarch64*c*} || ${MACHINE_ARCH:Mriscv*c*})
+MACHINE_ABI+=	purecap ptr128c
+.else
+.if ${MACHINE_ABI:Mlong64}
 MACHINE_ABI+=	ptr64
 .else
 MACHINE_ABI+=	ptr32
+.endif
+.endif
+.if ${MACHINE_ARCH} == "i386"
+MACHINE_ABI+=	time32
+.else
+MACHINE_ABI+=	time64
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}

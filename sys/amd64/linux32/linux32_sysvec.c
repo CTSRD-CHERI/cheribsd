@@ -134,45 +134,6 @@ static void	linux_vdso_reloc(char *mapping, Elf_Addr offset);
 static void	linux32_set_fork_retval(struct thread *td);
 static void	linux32_set_syscall_retval(struct thread *td, int error);
 
-#define LINUX_T_UNKNOWN  255
-static int _bsd_to_linux_trapcode[] = {
-	LINUX_T_UNKNOWN,	/* 0 */
-	6,			/* 1  T_PRIVINFLT */
-	LINUX_T_UNKNOWN,	/* 2 */
-	3,			/* 3  T_BPTFLT */
-	LINUX_T_UNKNOWN,	/* 4 */
-	LINUX_T_UNKNOWN,	/* 5 */
-	16,			/* 6  T_ARITHTRAP */
-	254,			/* 7  T_ASTFLT */
-	LINUX_T_UNKNOWN,	/* 8 */
-	13,			/* 9  T_PROTFLT */
-	1,			/* 10 T_TRCTRAP */
-	LINUX_T_UNKNOWN,	/* 11 */
-	14,			/* 12 T_PAGEFLT */
-	LINUX_T_UNKNOWN,	/* 13 */
-	17,			/* 14 T_ALIGNFLT */
-	LINUX_T_UNKNOWN,	/* 15 */
-	LINUX_T_UNKNOWN,	/* 16 */
-	LINUX_T_UNKNOWN,	/* 17 */
-	0,			/* 18 T_DIVIDE */
-	2,			/* 19 T_NMI */
-	4,			/* 20 T_OFLOW */
-	5,			/* 21 T_BOUND */
-	7,			/* 22 T_DNA */
-	8,			/* 23 T_DOUBLEFLT */
-	9,			/* 24 T_FPOPFLT */
-	10,			/* 25 T_TSSFLT */
-	11,			/* 26 T_SEGNPFLT */
-	12,			/* 27 T_STKFLT */
-	18,			/* 28 T_MCHK */
-	19,			/* 29 T_XMMFLT */
-	15			/* 30 T_RESERVED */
-};
-#define bsd_to_linux_trapcode(code) \
-    ((code)<nitems(_bsd_to_linux_trapcode)? \
-     _bsd_to_linux_trapcode[(code)]: \
-     LINUX_T_UNKNOWN)
-
 struct linux32_ps_strings {
 	u_int32_t ps_argvstr;	/* first of 0 or more argument strings */
 	u_int ps_nargvstr;	/* the number of argument strings */
@@ -187,28 +148,6 @@ LINUX_VDSO_SYM_INTPTR(kern_timekeep_base);
 LINUX_VDSO_SYM_INTPTR(kern_tsc_selector);
 LINUX_VDSO_SYM_INTPTR(kern_cpu_selector);
 LINUX_VDSO_SYM_CHAR(linux_platform);
-
-/*
- * If FreeBSD & Linux have a difference of opinion about what a trap
- * means, deal with it here.
- *
- * MPSAFE
- */
-static int
-linux_translate_traps(int signal, int trap_code)
-{
-	if (signal != SIGBUS)
-		return (signal);
-	switch (trap_code) {
-	case T_PROTFLT:
-	case T_TSSFLT:
-	case T_DOUBLEFLT:
-	case T_PAGEFLT:
-		return (SIGSEGV);
-	default:
-		return (signal);
-	}
-}
 
 static int
 linux_copyout_auxargs(struct image_params *imgp, uintptr_t base)
@@ -432,7 +371,7 @@ linux_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	bzero(&frame, sizeof(frame));
 
 	frame.sf_sig = sig;
-
+	frame.sf_sigmask = *mask;
 	bsd_to_linux_sigset(mask, &lmask);
 
 	/* Build the signal context to be used by sigreturn. */
@@ -457,8 +396,6 @@ linux_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	frame.sf_sc.sc_err    = regs->tf_err;
 	frame.sf_sc.sc_cr2    = (u_int32_t)(uintptr_t)ksi->ksi_addr;
 	frame.sf_sc.sc_trapno = bsd_to_linux_trapcode(code);
-
-	frame.sf_extramask[0] = lmask.__mask;
 
 	if (copyout(&frame, fp, sizeof(frame)) != 0) {
 		/*
@@ -501,8 +438,6 @@ linux_sigreturn(struct thread *td, struct linux_sigreturn_args *args)
 {
 	struct l_sigframe frame;
 	struct trapframe *regs;
-	sigset_t bmask;
-	l_sigset_t lmask;
 	int eflags;
 	ksiginfo_t ksi;
 
@@ -536,10 +471,7 @@ linux_sigreturn(struct thread *td, struct linux_sigreturn_args *args)
 		return(EINVAL);
 	}
 
-	lmask.__mask = frame.sf_sc.sc_mask;
-	lmask.__mask = frame.sf_extramask[0];
-	linux_to_bsd_sigset(&lmask, &bmask);
-	kern_sigprocmask(td, SIG_SETMASK, &bmask, NULL, 0);
+	kern_sigprocmask(td, SIG_SETMASK, &frame.sf_sigmask, NULL, 0);
 
 	/* Restore signal context. */
 	regs->tf_rdi    = frame.sf_sc.sc_edi;
@@ -989,7 +921,7 @@ linux_exec_sysvec_init(void *param)
 
 	tkoff = kern_timekeep_base - linux_vdso_base;
 	ktimekeep_base = (l_uintptr_t *)(linux_vdso_mapping + tkoff);
-	*ktimekeep_base = sv->sv_timekeep_base;
+	*ktimekeep_base = sv->sv_shared_page_base + sv->sv_timekeep_offset;
 
 	tkoff = kern_tsc_selector - linux_vdso_base;
 	ktsc_selector = (l_uintptr_t *)(linux_vdso_mapping + tkoff);

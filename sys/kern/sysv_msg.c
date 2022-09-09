@@ -232,7 +232,7 @@ static struct syscall_helper_data msg64_syscalls[] = {
 #endif /* COMPAT_FREEBSD64 */
 
 static int
-msginit()
+msginit(void)
 {
 	struct prison *pr;
 	void **rsv;
@@ -341,7 +341,7 @@ msginit()
 }
 
 static int
-msgunload()
+msgunload(void)
 {
 	struct msqid_kernel *msqkptr;
 	int msqid;

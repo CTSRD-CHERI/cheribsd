@@ -259,7 +259,6 @@ CHERIBSDTEST(colocation_coaccept_slow,
 		}
 	}
 }
-
 #endif
 
 static void

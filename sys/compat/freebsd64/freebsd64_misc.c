@@ -745,7 +745,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * Install sigcode.
 	 */
-	if (sysent->sv_sigcode_base == 0 && sysent->sv_szsigcode != NULL) {
+	if (sysent->sv_shared_page_base == 0 && sysent->sv_szsigcode != NULL) {
 		szsigcode = *(sysent->sv_szsigcode);
 		destp -= szsigcode;
 		destp = rounddown2(destp, sizeof(uint64_t));
@@ -1156,7 +1156,7 @@ freebsd64_cpuset_getaffinity(struct thread *td,
     struct freebsd64_cpuset_getaffinity_args *uap)
 {
 
-	return (kern_cpuset_getaffinity(td, uap->level, uap->which,
+	return (user_cpuset_getaffinity(td, uap->level, uap->which,
 	    uap->id, uap->cpusetsize, __USER_CAP(uap->mask, uap->cpusetsize),
 	    &cpuset_copy64_cb));
 }
