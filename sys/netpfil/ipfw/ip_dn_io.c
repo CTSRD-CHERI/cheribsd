@@ -669,6 +669,11 @@ dummynet_task(void *context, int pending)
 		memset(&q, 0, sizeof(struct mq));
 		CURVNET_SET(vnet_iter);
 
+		if (! V_dn_cfg.init_done) {
+			CURVNET_RESTORE();
+			continue;
+		}
+
 		DN_BH_WLOCK();
 
 		/* Update number of lost(coalesced) ticks. */
@@ -767,7 +772,8 @@ dummynet_send(struct mbuf *m)
 			 * to carry reinject info.
 			 */
 			ifp = ifnet_byindexgen(pkt->if_index, pkt->if_idxgen);
-			if (pkt->dn_dir == (DIR_OUT | PROTO_LAYER2) &&
+			if (((pkt->dn_dir == (DIR_OUT | PROTO_LAYER2)) ||
+			    (pkt->dn_dir == (DIR_OUT | PROTO_LAYER2 | PROTO_IPV6))) &&
 				ifp == NULL) {
 				dst = DIR_DROP;
 			} else {
@@ -804,6 +810,7 @@ dummynet_send(struct mbuf *m)
 
 			break;
 
+		case DIR_IN | PROTO_LAYER2 | PROTO_IPV6:
 		case DIR_IN | PROTO_LAYER2: /* DN_TO_ETH_DEMUX: */
 			/*
 			 * The Ethernet code assumes the Ethernet header is
@@ -819,7 +826,9 @@ dummynet_send(struct mbuf *m)
 			ether_demux(m->m_pkthdr.rcvif, m);
 			break;
 
+		case DIR_OUT | PROTO_LAYER2 | PROTO_IPV6:
 		case DIR_OUT | PROTO_LAYER2: /* DN_TO_ETH_OUT: */
+			MPASS(ifp != NULL);
 			ether_output_frame(ifp, m);
 			break;
 

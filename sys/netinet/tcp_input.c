@@ -324,7 +324,7 @@ cc_ack_received(struct tcpcb *tp, struct tcphdr *th, uint16_t nsegs,
 			/*
 			 * Compute goodput in bits per millisecond.
 			 */
-			gput = (((int64_t)(th->th_ack - tp->gput_seq)) << 3) /
+			gput = (((int64_t)SEQ_SUB(th->th_ack, tp->gput_seq)) << 3) /
 			    max(1, tcp_ts_getticks() - tp->gput_ts);
 			stats_voi_update_abs_u32(tp->t_stats, VOI_TCP_GPUT,
 			    gput);
@@ -919,7 +919,7 @@ findpcb:
 		 * completely ignore the segment and drop it.
 		 */
 		if (((V_blackhole == 1 && (thflags & TH_SYN)) ||
-		    V_blackhole == 2) && (V_blackhole_local ||
+		    V_blackhole == 2) && (V_blackhole_local || (
 #ifdef INET6
 		    isipv6 ? !in6_localaddr(&ip6->ip6_src) :
 #endif
@@ -928,7 +928,7 @@ findpcb:
 #else
 		    true
 #endif
-		    ))
+		    )))
 			goto dropunlock;
 
 		rstreason = BANDLIM_RST_CLOSEDPORT;
@@ -2315,8 +2315,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	 * If new data are received on a connection after the
 	 * user processes are gone, then RST the other end.
 	 */
-	if ((so->so_state & SS_NOFDREF) &&
-	    tp->t_state > TCPS_CLOSE_WAIT && tlen) {
+	if ((tp->t_flags & TF_CLOSED) && tlen) {
 		if ((s = tcp_log_addrs(inc, th, NULL, NULL))) {
 			log(LOG_DEBUG, "%s; %s: %s: Received %d bytes of data "
 			    "after socket was closed, "

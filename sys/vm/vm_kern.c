@@ -77,6 +77,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/msan.h>
 #include <sys/proc.h>
 #include <sys/rwlock.h>
 #include <sys/sysctl.h>
@@ -175,6 +176,23 @@ kva_free(vm_pointer_t addr, vm_size_t size)
 	vmem_free(kernel_arena, addr, size);
 }
 
+/*
+ * Update sanitizer shadow state to reflect a new allocation.  Force inlining to
+ * help make KMSAN origin tracking more precise.
+ */
+static __always_inline void
+kmem_alloc_san(vm_offset_t addr, vm_size_t size, vm_size_t asize, int flags)
+{
+	if ((flags & M_ZERO) == 0) {
+		kmsan_mark((void *)addr, asize, KMSAN_STATE_UNINIT);
+		kmsan_orig((void *)addr, asize, KMSAN_TYPE_KMEM,
+		    KMSAN_RET_ADDR);
+	} else {
+		kmsan_mark((void *)addr, asize, KMSAN_STATE_INITED);
+	}
+	kasan_mark((void *)addr, size, asize, KASAN_KMEM_REDZONE);
+}
+
 static vm_page_t
 kmem_alloc_contig_pages(vm_object_t object, vm_pindex_t pindex, int domain,
     int pflags, u_long npages, vm_paddr_t low, vm_paddr_t high,
@@ -261,7 +279,7 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		    prot | PMAP_ENTER_WIRED, 0);
 	}
 	VM_OBJECT_WUNLOCK(object);
-	kasan_mark((void *)addr, size, asize, KASAN_KMEM_REDZONE);
+	kmem_alloc_san(addr, size, asize, flags);
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
 	KASSERT(cheri_getlen(addr) == asize,
@@ -355,7 +373,7 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		tmp += PAGE_SIZE;
 	}
 	VM_OBJECT_WUNLOCK(object);
-	kasan_mark((void *)addr, size, asize, KASAN_KMEM_REDZONE);
+	kmem_alloc_san(addr, size, asize, flags);
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
 	KASSERT(cheri_getlen(addr) == asize,
@@ -561,7 +579,7 @@ retry:
 			m->oflags |= VPO_KMEM_EXEC;
 	}
 	VM_OBJECT_WUNLOCK(object);
-
+	kmem_alloc_san(addr, size, size, flags);
 	return (KERN_SUCCESS);
 }
 

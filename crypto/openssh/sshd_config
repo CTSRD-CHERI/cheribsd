@@ -57,11 +57,12 @@ AuthorizedKeysFile	.ssh/authorized_keys
 #IgnoreRhosts yes
 
 # Change to yes to enable built-in password authentication.
+# Note that passwords may also be accepted via KbdInteractiveAuthentication.
 #PasswordAuthentication no
 #PermitEmptyPasswords no
 
 # Change to no to disable PAM authentication
-KbdInteractiveAuthentication no
+#KbdInteractiveAuthentication yes
 
 # Kerberos options
 #KerberosAuthentication no
@@ -82,7 +83,7 @@ KbdInteractiveAuthentication no
 # If you just want the PAM account and session checks to run without
 # PAM authentication, then enable this but set PasswordAuthentication
 # and KbdInteractiveAuthentication to 'no'.
-UsePAM no
+#UsePAM yes
 
 #AllowAgentForwarding yes
 #AllowTcpForwarding yes

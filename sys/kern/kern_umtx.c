@@ -55,7 +55,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sched.h>
 #include <sys/smp.h>
 #include <sys/sysctl.h>
-#include <sys/sysent.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
 #include <sys/syscallsubr.h>
@@ -82,6 +81,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #ifdef COMPAT_FREEBSD64
+#include <sys/sysent.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #endif
 
@@ -4419,7 +4419,7 @@ umtx_shm_unref_reg(struct umtx_shm_reg *reg, bool force)
 	if (force) {
 		object = reg->ushm_obj->shm_object;
 		VM_OBJECT_WLOCK(object);
-		object->flags |= OBJ_UMTXDEAD;
+		vm_object_set_flag(object, OBJ_UMTXDEAD);
 		VM_OBJECT_WUNLOCK(object);
 	}
 	mtx_lock(&umtx_shm_lock);

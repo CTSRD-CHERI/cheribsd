@@ -49,6 +49,13 @@ MK_DEBUG_FILES=	no
 .if ${MK_BIND_NOW} != "no"
 LDFLAGS+= -Wl,-znow
 .endif
+.if ${LINKER_TYPE} != "mac"
+.if ${MK_RELRO} == "no"
+LDFLAGS+= -Wl,-znorelro
+.else
+LDFLAGS+= -Wl,-zrelro
+.endif
+.endif
 .if ${MK_PIE} != "no"
 # Static PIE is not yet supported/tested.
 .if !defined(NO_SHARED) || ${NO_SHARED:tl} == "no"

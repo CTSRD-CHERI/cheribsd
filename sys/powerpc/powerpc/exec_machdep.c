@@ -94,7 +94,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/trap.h>
 #include <machine/vmparam.h>
 
+#include <vm/vm.h>
+#include <vm/vm_param.h>
 #include <vm/pmap.h>
+#include <vm/vm_map.h>
 
 #ifdef FPU_EMU
 #include <powerpc/fpu/fpu_extern.h>
@@ -310,7 +313,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
-	tf->srr0 = (register_t)p->p_sysent->sv_sigcode_base;
+	tf->srr0 = (register_t)PROC_SIGCODE(p);
 
 	/*
 	 * copy the frame out to userland.
@@ -688,7 +691,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 	tf->fixreg[3] = argc;
 	tf->fixreg[4] = stack + sizeof(register_t);
 	tf->fixreg[5] = stack + (2 + argc)*sizeof(register_t);
-	tf->fixreg[6] = 0;				/* auxillary vector */
+	tf->fixreg[6] = 0;				/* auxiliary vector */
 	tf->fixreg[7] = 0;				/* termination vector */
 	tf->fixreg[8] = (register_t)imgp->ps_strings;	/* NetBSD extension */
 
@@ -717,7 +720,7 @@ ppc32_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 	tf->fixreg[3] = argc;
 	tf->fixreg[4] = stack + sizeof(uint32_t);
 	tf->fixreg[5] = stack + (2 + argc)*sizeof(uint32_t);
-	tf->fixreg[6] = 0;				/* auxillary vector */
+	tf->fixreg[6] = 0;				/* auxiliary vector */
 	tf->fixreg[7] = 0;				/* termination vector */
 	tf->fixreg[8] = (register_t)imgp->ps_strings;	/* NetBSD extension */
 

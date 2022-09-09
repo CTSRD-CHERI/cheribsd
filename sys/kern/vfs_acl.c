@@ -58,7 +58,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/filedesc.h>
 #include <sys/proc.h>
 #include <sys/syscallsubr.h>
-#include <sys/sysent.h>
 #include <sys/acl.h>
 
 #include <security/audit/audit.h>

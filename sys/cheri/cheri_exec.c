@@ -32,6 +32,7 @@
 
 #include <sys/param.h>
 #include <sys/elf.h>
+#include <sys/exec.h>
 #include <sys/imgact.h>
 #include <sys/proc.h>
 #include <sys/sysent.h>
@@ -82,11 +83,12 @@ cheri_exec_pcc(struct thread *td, struct image_params *imgp)
 void * __capability
 cheri_sigcode_capability(struct thread *td)
 {
+	struct proc *p = td->td_proc;
 	struct sysentvec *sv;
 
-	sv = td->td_proc->p_sysent;
-	KASSERT(sv->sv_sigcode_base != 0,
+	sv = p->p_sysent;
+	KASSERT(PROC_HAS_SHP(p),
 	    ("CheriABI requires shared page for sigcode"));
 	return (cheri_capability_build_user_code(td, CHERI_CAP_USER_CODE_PERMS,
-	    sv->sv_sigcode_base, *sv->sv_szsigcode, 0));
+	    PROC_SIGCODE(p), *sv->sv_szsigcode, 0));
 }

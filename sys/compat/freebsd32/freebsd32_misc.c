@@ -3226,7 +3226,7 @@ freebsd32_cpuset_getaffinity(struct thread *td,
     struct freebsd32_cpuset_getaffinity_args *uap)
 {
 
-	return (kern_cpuset_getaffinity(td, uap->level, uap->which,
+	return (user_cpuset_getaffinity(td, uap->level, uap->which,
 	    PAIR32TO64(id_t,uap->id), uap->cpusetsize, uap->mask,
 	    &cpuset_copy32_cb));
 }
@@ -3340,7 +3340,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	/*
 	 * Install sigcode.
 	 */
-	if (sysent->sv_sigcode_base == 0) {
+	if (!PROC_HAS_SHP(imgp->proc)) {
 		szsigcode = *sysent->sv_szsigcode;
 		destp -= szsigcode;
 		destp = rounddown2(destp, sizeof(uint32_t));

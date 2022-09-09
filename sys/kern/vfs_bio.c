@@ -3437,7 +3437,7 @@ buf_daemon_shutdown(void *arg __unused, int howto __unused)
 }
 
 static void
-buf_daemon()
+buf_daemon(void)
 {
 	struct bufdomain *bd;
 	int speedupreq;
@@ -4863,7 +4863,8 @@ vfs_bio_set_valid(struct buf *bp, int base, int size)
 void
 vfs_bio_clrbuf(struct buf *bp) 
 {
-	int i, j, mask, sa, ea, slide;
+	int i, j, sa, ea, slide, zbits;
+	vm_page_bits_t mask;
 
 	if ((bp->b_flags & (B_VMIO | B_MALLOC)) != B_VMIO) {
 		clrbuf(bp);
@@ -4882,7 +4883,9 @@ vfs_bio_clrbuf(struct buf *bp)
 		if (bp->b_pages[i] == bogus_page)
 			continue;
 		j = sa / DEV_BSIZE;
-		mask = ((1 << ((ea - sa) / DEV_BSIZE)) - 1) << j;
+		zbits = (sizeof(vm_page_bits_t) * NBBY) -
+		    (ea - sa) / DEV_BSIZE;
+		mask = (VM_PAGE_BITS_ALL >> zbits) << j;
 		if ((bp->b_pages[i]->valid & mask) == mask)
 			continue;
 		if ((bp->b_pages[i]->valid & mask) == 0)
@@ -5493,7 +5496,7 @@ DB_SHOW_COMMAND(buffer, db_show_buffer)
 	db_printf(" ");
 }
 
-DB_SHOW_COMMAND(bufqueues, bufqueues)
+DB_SHOW_COMMAND_FLAGS(bufqueues, bufqueues, DB_CMD_MEMSAFE)
 {
 	struct bufdomain *bd;
 	struct buf *bp;
@@ -5559,7 +5562,7 @@ DB_SHOW_COMMAND(bufqueues, bufqueues)
 	}
 }
 
-DB_SHOW_COMMAND(lockedbufs, lockedbufs)
+DB_SHOW_COMMAND_FLAGS(lockedbufs, lockedbufs, DB_CMD_MEMSAFE)
 {
 	struct buf *bp;
 	int i;
@@ -5597,7 +5600,7 @@ DB_SHOW_COMMAND(vnodebufs, db_show_vnodebufs)
 	}
 }
 
-DB_COMMAND(countfreebufs, db_coundfreebufs)
+DB_COMMAND_FLAGS(countfreebufs, db_coundfreebufs, DB_CMD_MEMSAFE)
 {
 	struct buf *bp;
 	int i, used = 0, nfree = 0;

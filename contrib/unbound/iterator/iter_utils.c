@@ -367,6 +367,7 @@ iter_filter_order(struct iter_env* iter_env, struct module_env* env,
 	struct sock_list* blacklist, time_t prefetch)
 {
 	int got_num = 0, low_rtt = 0, swap_to_front, rtt_band = RTT_BAND, nth;
+	int alllame = 0;
 	size_t num_results;
 	struct delegpt_addr* a, *n, *prev=NULL;
 
@@ -376,7 +377,10 @@ iter_filter_order(struct iter_env* iter_env, struct module_env* env,
 	if(got_num == 0)
 		return 0;
 	if(low_rtt >= USEFUL_SERVER_TOP_TIMEOUT &&
-		(delegpt_count_missing_targets(dp) > 0 || open_target > 0)) {
+		/* If all missing (or not fully resolved) targets are lame,
+		 * then use the remaining lame address. */
+		((delegpt_count_missing_targets(dp, &alllame) > 0 && !alllame) ||
+		open_target > 0)) {
 		verbose(VERB_ALGO, "Bad choices, trying to get more choice");
 		return 0; /* we want more choice. The best choice is a bad one.
 			     return 0 to force the caller to fetch more */
@@ -743,9 +747,10 @@ iter_mark_pside_cycle_targets(struct module_qstate* qstate, struct delegpt* dp)
 
 int
 iter_dp_is_useless(struct query_info* qinfo, uint16_t qflags,
-	struct delegpt* dp)
+	struct delegpt* dp, int supports_ipv4, int supports_ipv6)
 {
 	struct delegpt_ns* ns;
+	struct delegpt_addr* a;
 	/* check:
 	 *      o RD qflag is on.
 	 *      o no addresses are provided.
@@ -758,13 +763,24 @@ iter_dp_is_useless(struct query_info* qinfo, uint16_t qflags,
 	 */
 	if(!(qflags&BIT_RD))
 		return 0;
-	/* either available or unused targets */
-	if(dp->usable_list || dp->result_list)
-		return 0;
+	/* either available or unused targets,
+	 * if they exist, the dp is not useless. */
+	for(a = dp->usable_list; a; a = a->next_usable) {
+		if(!addr_is_ip6(&a->addr, a->addrlen) && supports_ipv4)
+			return 0;
+		else if(addr_is_ip6(&a->addr, a->addrlen) && supports_ipv6)
+			return 0;
+	}
+	for(a = dp->result_list; a; a = a->next_result) {
+		if(!addr_is_ip6(&a->addr, a->addrlen) && supports_ipv4)
+			return 0;
+		else if(addr_is_ip6(&a->addr, a->addrlen) && supports_ipv6)
+			return 0;
+	}
 
 	/* see if query is for one of the nameservers, which is glue */
-	if( (qinfo->qtype == LDNS_RR_TYPE_A ||
-		qinfo->qtype == LDNS_RR_TYPE_AAAA) &&
+	if( ((qinfo->qtype == LDNS_RR_TYPE_A && supports_ipv4) ||
+		(qinfo->qtype == LDNS_RR_TYPE_AAAA && supports_ipv6)) &&
 		dname_subdomain_c(qinfo->qname, dp->name) &&
 		delegpt_find_ns(dp, qinfo->qname, qinfo->qname_len))
 		return 1;

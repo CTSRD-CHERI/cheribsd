@@ -2370,8 +2370,6 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	bool reservation_created = false;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	KASSERT(reservp != NULL || cheri_gettag(start),
-	    ("Expected valid capability"));
 	if (cheri_getlen(start) < length)
 		return (KERN_INVALID_ARGUMENT);
 #endif
@@ -2399,6 +2397,10 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 				goto err;
 			reservation_created = true;
 		} else {
+#ifdef __CHERI_PURE_CAPABILITY__
+			KASSERT(cheri_gettag(start),
+			    ("Expected valid capability"));
+#endif
 			result = vm_map_reservation_get(map, start, length,
 			    &reservation_id);
 			if (result != KERN_SUCCESS)
@@ -3459,12 +3461,8 @@ restart_checks:
 			continue;
 		}
 
-		if (obj->type != OBJT_DEFAULT &&
-		    (obj->flags & OBJ_SWAP) == 0)
-			continue;
 		VM_OBJECT_WLOCK(obj);
-		if (obj->type != OBJT_DEFAULT &&
-		    (obj->flags & OBJ_SWAP) == 0) {
+		if ((obj->flags & OBJ_SWAP) == 0) {
 			VM_OBJECT_WUNLOCK(obj);
 			continue;
 		}
@@ -5020,8 +5018,7 @@ vm_map_copy_entry(
 		 */
 		size = src_entry->end - src_entry->start;
 		if ((src_object = src_entry->object.vm_object) != NULL) {
-			if (src_object->type == OBJT_DEFAULT ||
-			    (src_object->flags & OBJ_SWAP) != 0) {
+			if ((src_object->flags & OBJ_SWAP) != 0) {
 				vm_map_copy_swap_object(src_entry, dst_entry,
 				    size, fork_charge);
 				/* May have split/collapsed, reload obj. */
@@ -5149,6 +5146,7 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 	vm2->vm_taddr = vm1->vm_taddr;
 	vm2->vm_daddr = vm1->vm_daddr;
+	vm2->vm_shp_base = vm1->vm_shp_base;
 	vm_map_lock(old_map);
 	if (old_map->busy)
 		vm_map_wait_busy(old_map);
@@ -6065,7 +6063,7 @@ RetryLookupLocked:
 		if (vm_map_lock_upgrade(map))
 			goto RetryLookup;
 		entry->object.vm_object = vm_object_allocate_anon(atop(size),
-		    NULL, entry->cred, entry->cred != NULL ? size : 0);
+		    NULL, entry->cred, size);
 		entry->offset = 0;
 		entry->cred = NULL;
 		vm_map_lock_downgrade(map);

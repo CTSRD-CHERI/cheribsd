@@ -419,8 +419,6 @@ soalloc(struct vnet *vnet)
 	 * a feature to change class of an existing lock, so we use DUPOK.
 	 */
 	mtx_init(&so->so_lock, "socket", NULL, MTX_DEF | MTX_DUPOK);
-	so->so_snd.sb_mtx = &so->so_snd_mtx;
-	so->so_rcv.sb_mtx = &so->so_rcv_mtx;
 	mtx_init(&so->so_snd_mtx, "so_snd", NULL, MTX_DEF);
 	mtx_init(&so->so_rcv_mtx, "so_rcv", NULL, MTX_DEF);
 	so->so_rcv.sb_sel = &so->so_rdsel;
@@ -501,8 +499,8 @@ sodealloc(struct socket *so)
 }
 
 /*
- * socreate returns a socket with a ref count of 1.  The socket should be
- * closed with soclose().
+ * socreate returns a socket with a ref count of 1 and a file descriptor
+ * reference.  The socket should be closed with soclose().
  */
 int
 socreate(int dom, struct socket **aso, int type, int proto,
@@ -558,6 +556,10 @@ socreate(int dom, struct socket **aso, int type, int proto,
 	    so_rdknl_assert_lock);
 	knlist_init(&so->so_wrsel.si_note, so, so_wrknl_lock, so_wrknl_unlock,
 	    so_wrknl_assert_lock);
+	if ((prp->pr_flags & PR_SOCKBUF) == 0) {
+		so->so_snd.sb_mtx = &so->so_snd_mtx;
+		so->so_rcv.sb_mtx = &so->so_rcv_mtx;
+	}
 	/*
 	 * Auto-sizing of socket buffers is managed by the protocols and
 	 * the appropriate flags must be set in the pru_attach function.
@@ -739,7 +741,7 @@ sonewconn(struct socket *head, int connstatus)
 	so->so_type = head->so_type;
 	so->so_options = head->so_options & ~SO_ACCEPTCONN;
 	so->so_linger = head->so_linger;
-	so->so_state = head->so_state | SS_NOFDREF;
+	so->so_state = head->so_state;
 	so->so_fibnum = head->so_fibnum;
 	so->so_proto = head->so_proto;
 	so->so_cred = crhold(head->so_cred);
@@ -757,7 +759,14 @@ sonewconn(struct socket *head, int connstatus)
 		    __func__, head->so_pcb);
 		return (NULL);
 	}
+	if ((so->so_proto->pr_flags & PR_SOCKBUF) == 0) {
+		so->so_snd.sb_mtx = &so->so_snd_mtx;
+		so->so_rcv.sb_mtx = &so->so_rcv_mtx;
+	}
+	/* Socket starts with a reference from the listen queue. */
+	refcount_init(&so->so_count, 1);
 	if ((*so->so_proto->pr_usrreqs->pru_attach)(so, 0, NULL)) {
+		MPASS(refcount_release(&so->so_count));
 		sodealloc(so);
 		log(LOG_DEBUG, "%s: pcb %p: pru_attach() failed\n",
 		    __func__, head->so_pcb);
@@ -943,8 +952,9 @@ solisten_proto_check(struct socket *so)
 	mtx_lock(&so->so_rcv_mtx);
 
 	/* Interlock with soo_aio_queue(). */
-	if ((so->so_snd.sb_flags & (SB_AIO | SB_AIO_RUNNING)) != 0 ||
-	   (so->so_rcv.sb_flags & (SB_AIO | SB_AIO_RUNNING)) != 0) {
+	if (!SOLISTENING(so) &&
+	   ((so->so_snd.sb_flags & (SB_AIO | SB_AIO_RUNNING)) != 0 ||
+	   (so->so_rcv.sb_flags & (SB_AIO | SB_AIO_RUNNING)) != 0)) {
 		solisten_proto_abort(so);
 		return (EINVAL);
 	}
@@ -1055,7 +1065,8 @@ solisten_wakeup(struct socket *sol)
 /*
  * Return single connection off a listening socket queue.  Main consumer of
  * the function is kern_accept4().  Some modules, that do their own accept
- * management also use the function.
+ * management also use the function.  The socket reference held by the
+ * listen queue is handed to the caller.
  *
  * Listening socket must be locked on entry and is returned unlocked on
  * return.
@@ -1093,7 +1104,6 @@ solisten_dequeue(struct socket *head, struct socket **ret, int flags)
 	SOCK_LOCK(so);
 	KASSERT(so->so_qstate == SQ_COMP,
 	    ("%s: so %p not SQ_COMP", __func__, so));
-	soref(so);
 	head->sol_qlen--;
 	so->so_qstate = SQ_NONE;
 	so->so_listen = NULL;
@@ -1110,86 +1120,19 @@ solisten_dequeue(struct socket *head, struct socket **ret, int flags)
 }
 
 /*
- * Evaluate the reference count and named references on a socket; if no
- * references remain, free it.  This should be called whenever a reference is
- * released, such as in sorele(), but also when named reference flags are
- * cleared in socket or protocol code.
- *
- * sofree() will free the socket if:
- *
- * - There are no outstanding file descriptor references or related consumers
- *   (so_count == 0).
- *
- * - The socket has been closed by user space, if ever open (SS_NOFDREF).
- *
- * - The protocol does not have an outstanding strong reference on the socket
- *   (SS_PROTOREF).
- *
- * - The socket is not in a completed connection queue, so a process has been
- *   notified that it is present.  If it is removed, the user process may
- *   block in accept() despite select() saying the socket was ready.
+ * Free socket upon release of the very last reference.
  */
-void
+static void
 sofree(struct socket *so)
 {
 	struct protosw *pr = so->so_proto;
-	bool last __diagused;
 
 	SOCK_LOCK_ASSERT(so);
+	KASSERT(refcount_load(&so->so_count) == 0,
+	    ("%s: so %p has references", __func__, so));
+	KASSERT(SOLISTENING(so) || so->so_qstate == SQ_NONE,
+	    ("%s: so %p is on listen queue", __func__, so));
 
-	if ((so->so_state & (SS_NOFDREF | SS_PROTOREF)) != SS_NOFDREF ||
-	    refcount_load(&so->so_count) != 0 || so->so_qstate == SQ_COMP) {
-		SOCK_UNLOCK(so);
-		return;
-	}
-
-	if (!SOLISTENING(so) && so->so_qstate == SQ_INCOMP) {
-		struct socket *sol;
-
-		sol = so->so_listen;
-		KASSERT(sol, ("%s: so %p on incomp of NULL", __func__, so));
-
-		/*
-		 * To solve race between close of a listening socket and
-		 * a socket on its incomplete queue, we need to lock both.
-		 * The order is first listening socket, then regular.
-		 * Since we don't have SS_NOFDREF neither SS_PROTOREF, this
-		 * function and the listening socket are the only pointers
-		 * to so.  To preserve so and sol, we reference both and then
-		 * relock.
-		 * After relock the socket may not move to so_comp since it
-		 * doesn't have PCB already, but it may be removed from
-		 * so_incomp. If that happens, we share responsiblity on
-		 * freeing the socket, but soclose() has already removed
-		 * it from queue.
-		 */
-		soref(sol);
-		soref(so);
-		SOCK_UNLOCK(so);
-		SOLISTEN_LOCK(sol);
-		SOCK_LOCK(so);
-		if (so->so_qstate == SQ_INCOMP) {
-			KASSERT(so->so_listen == sol,
-			    ("%s: so %p migrated out of sol %p",
-			    __func__, so, sol));
-			TAILQ_REMOVE(&sol->sol_incomp, so, so_list);
-			sol->sol_incqlen--;
-			last = refcount_release(&sol->so_count);
-			KASSERT(!last, ("%s: released last reference for %p",
-			    __func__, sol));
-			so->so_qstate = SQ_NONE;
-			so->so_listen = NULL;
-		} else
-			KASSERT(so->so_listen == NULL,
-			    ("%s: so %p not on (in)comp with so_listen",
-			    __func__, so));
-		sorele_locked(sol);
-		KASSERT(refcount_load(&so->so_count) == 1,
-		    ("%s: so %p count %u", __func__, so, so->so_count));
-		so->so_count = 0;
-	}
-	if (SOLISTENING(so))
-		so->so_error = ECONNABORTED;
 	SOCK_UNLOCK(so);
 
 	if (so->so_dtor != NULL)
@@ -1208,7 +1151,7 @@ sofree(struct socket *so)
 	 * socket exist anywhere else in the stack.  Therefore, no locks need
 	 * to be acquired or held.
 	 */
-	if (!SOLISTENING(so)) {
+	if (!(pr->pr_flags & PR_SOCKBUF) && !SOLISTENING(so)) {
 		sbdestroy(so, SO_SND);
 		sbdestroy(so, SO_RCV);
 	}
@@ -1247,8 +1190,6 @@ soclose(struct socket *so)
 	struct accept_queue lqueue;
 	int error = 0;
 	bool listening, last __diagused;
-
-	KASSERT(!(so->so_state & SS_NOFDREF), ("soclose: SS_NOFDREF on enter"));
 
 	CURVNET_SET(so->so_vnet);
 	funsetown(&so->so_sigio);
@@ -1300,23 +1241,12 @@ drop:
 			    __func__, so));
 		}
 	}
-	KASSERT((so->so_state & SS_NOFDREF) == 0, ("soclose: NOFDREF"));
-	so->so_state |= SS_NOFDREF;
 	sorele_locked(so);
 	if (listening) {
 		struct socket *sp, *tsp;
 
-		TAILQ_FOREACH_SAFE(sp, &lqueue, so_list, tsp) {
-			SOCK_LOCK(sp);
-			if (refcount_load(&sp->so_count) == 0) {
-				SOCK_UNLOCK(sp);
-				soabort(sp);
-			} else {
-				/* See the handling of queued sockets
-				   in sofree(). */
-				SOCK_UNLOCK(sp);
-			}
-		}
+		TAILQ_FOREACH_SAFE(sp, &lqueue, so_list, tsp)
+			soabort(sp);
 	}
 	CURVNET_RESTORE();
 	return (error);
@@ -1329,43 +1259,36 @@ drop:
  *
  * This interface is tricky, because it is called on an unreferenced socket,
  * and must be called only by a thread that has actually removed the socket
- * from the listen queue it was on, or races with other threads are risked.
+ * from the listen queue it was on.  Likely this thread holds the last
+ * reference on the socket and soabort() will proceed with sofree().  But
+ * it might be not the last, as the sockets on the listen queues are seen
+ * from the protocol side.
  *
  * This interface will call into the protocol code, so must not be called
  * with any socket locks held.  Protocols do call it while holding their own
  * recursible protocol mutexes, but this is something that should be subject
  * to review in the future.
+ *
+ * Usually socket should have a single reference left, but this is not a
+ * requirement.  In the past, when we have had named references for file
+ * descriptor and protocol, we asserted that none of them are being held.
  */
 void
 soabort(struct socket *so)
 {
 
-	/*
-	 * In as much as is possible, assert that no references to this
-	 * socket are held.  This is not quite the same as asserting that the
-	 * current thread is responsible for arranging for no references, but
-	 * is as close as we can get for now.
-	 */
-	KASSERT(so->so_count == 0, ("soabort: so_count"));
-	KASSERT((so->so_state & SS_PROTOREF) == 0, ("soabort: SS_PROTOREF"));
-	KASSERT(so->so_state & SS_NOFDREF, ("soabort: !SS_NOFDREF"));
 	VNET_SO_ASSERT(so);
 
 	if (so->so_proto->pr_usrreqs->pru_abort != NULL)
 		(*so->so_proto->pr_usrreqs->pru_abort)(so);
 	SOCK_LOCK(so);
-	sofree(so);
+	sorele_locked(so);
 }
 
 int
 soaccept(struct socket *so, struct sockaddr **nam)
 {
 	int error;
-
-	SOCK_LOCK(so);
-	KASSERT((so->so_state & SS_NOFDREF) != 0, ("soaccept: !NOFDREF"));
-	so->so_state &= ~SS_NOFDREF;
-	SOCK_UNLOCK(so);
 
 	CURVNET_SET(so->so_vnet);
 	error = (*so->so_proto->pr_usrreqs->pru_accept)(so, nam);
@@ -3052,7 +2975,7 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 	int	error, optval;
 	struct	linger l;
 	struct	timeval tv;
-	sbintime_t val;
+	sbintime_t val, *valp;
 	uint32_t val32;
 #ifdef MAC
 	struct mac extmac;
@@ -3191,14 +3114,14 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 				val = SBT_MAX;
 			else
 				val = tvtosbt(tv);
-			switch (sopt->sopt_name) {
-			case SO_SNDTIMEO:
-				so->so_snd.sb_timeo = val;
-				break;
-			case SO_RCVTIMEO:
-				so->so_rcv.sb_timeo = val;
-				break;
-			}
+			SOCK_LOCK(so);
+			valp = sopt->sopt_name == SO_SNDTIMEO ?
+			    (SOLISTENING(so) ? &so->sol_sbsnd_timeo :
+			    &so->so_snd.sb_timeo) :
+			    (SOLISTENING(so) ? &so->sol_sbrcv_timeo :
+			    &so->so_rcv.sb_timeo);
+			*valp = val;
+			SOCK_UNLOCK(so);
 			break;
 
 		case SO_LABEL:
@@ -3409,8 +3332,13 @@ integer:
 
 		case SO_SNDTIMEO:
 		case SO_RCVTIMEO:
+			SOCK_LOCK(so);
 			tv = sbttotv(sopt->sopt_name == SO_SNDTIMEO ?
-			    so->so_snd.sb_timeo : so->so_rcv.sb_timeo);
+			    (SOLISTENING(so) ? so->sol_sbsnd_timeo :
+			    so->so_snd.sb_timeo) :
+			    (SOLISTENING(so) ? so->sol_sbrcv_timeo :
+			    so->so_rcv.sb_timeo));
+			SOCK_UNLOCK(so);
 #ifdef COMPAT_FREEBSD32
 			if (SV_CURPROC_FLAG(SV_ILP32)) {
 				struct timeval32 tv32;
@@ -3739,6 +3667,7 @@ soo_kqfilter(struct file *fp, struct knote *kn)
 {
 	struct socket *so = kn->kn_fp->f_data;
 	struct sockbuf *sb;
+	sb_which which;
 	struct knlist *knl;
 
 	switch (kn->kn_filter) {
@@ -3746,16 +3675,19 @@ soo_kqfilter(struct file *fp, struct knote *kn)
 		kn->kn_fop = &soread_filtops;
 		knl = &so->so_rdsel.si_note;
 		sb = &so->so_rcv;
+		which = SO_RCV;
 		break;
 	case EVFILT_WRITE:
 		kn->kn_fop = &sowrite_filtops;
 		knl = &so->so_wrsel.si_note;
 		sb = &so->so_snd;
+		which = SO_SND;
 		break;
 	case EVFILT_EMPTY:
 		kn->kn_fop = &soempty_filtops;
 		knl = &so->so_wrsel.si_note;
 		sb = &so->so_snd;
+		which = SO_SND;
 		break;
 	default:
 		return (EINVAL);
@@ -3765,10 +3697,10 @@ soo_kqfilter(struct file *fp, struct knote *kn)
 	if (SOLISTENING(so)) {
 		knlist_add(knl, kn, 1);
 	} else {
-		SOCKBUF_LOCK(sb);
+		SOCK_BUF_LOCK(so, which);
 		knlist_add(knl, kn, 1);
 		sb->sb_flags |= SB_KNOTE;
-		SOCKBUF_UNLOCK(sb);
+		SOCK_BUF_UNLOCK(so, which);
 	}
 	SOCK_UNLOCK(so);
 	return (0);
@@ -3979,7 +3911,7 @@ filt_soread(struct knote *kn, long hint)
 		return (!TAILQ_EMPTY(&so->sol_comp));
 	}
 
-	SOCKBUF_LOCK_ASSERT(&so->so_rcv);
+	SOCK_RECVBUF_LOCK_ASSERT(so);
 
 	kn->kn_data = sbavail(&so->so_rcv) - so->so_rcv.sb_ctl;
 	if (so->so_rcv.sb_state & SBS_CANTRCVMORE) {
@@ -4022,7 +3954,7 @@ filt_sowrite(struct knote *kn, long hint)
 	if (SOLISTENING(so))
 		return (0);
 
-	SOCKBUF_LOCK_ASSERT(&so->so_snd);
+	SOCK_SENDBUF_LOCK_ASSERT(so);
 	kn->kn_data = sbspace(&so->so_snd);
 
 	hhook_run_socket(so, kn, HHOOK_FILT_SOWRITE);
@@ -4052,7 +3984,7 @@ filt_soempty(struct knote *kn, long hint)
 	if (SOLISTENING(so))
 		return (1);
 
-	SOCKBUF_LOCK_ASSERT(&so->so_snd);
+	SOCK_SENDBUF_LOCK_ASSERT(so);
 	kn->kn_data = sbused(&so->so_snd);
 
 	if (kn->kn_data == 0)
@@ -4164,7 +4096,7 @@ again:
 			SOCK_UNLOCK(so);
 			solisten_wakeup(head);	/* unlocks */
 		} else {
-			SOCKBUF_LOCK(&so->so_rcv);
+			SOCK_RECVBUF_LOCK(so);
 			soupcall_set(so, SO_RCV,
 			    head->sol_accept_filter->accf_callback,
 			    head->sol_accept_filter_arg);
@@ -4173,10 +4105,10 @@ again:
 			    head->sol_accept_filter_arg, M_NOWAIT);
 			if (ret == SU_ISCONNECTED) {
 				soupcall_clear(so, SO_RCV);
-				SOCKBUF_UNLOCK(&so->so_rcv);
+				SOCK_RECVBUF_UNLOCK(so);
 				goto again;
 			}
-			SOCKBUF_UNLOCK(&so->so_rcv);
+			SOCK_RECVBUF_UNLOCK(so);
 			SOCK_UNLOCK(so);
 			SOLISTEN_UNLOCK(head);
 		}
@@ -4197,9 +4129,9 @@ soisdisconnecting(struct socket *so)
 	so->so_state |= SS_ISDISCONNECTING;
 
 	if (!SOLISTENING(so)) {
-		SOCKBUF_LOCK(&so->so_rcv);
+		SOCK_RECVBUF_LOCK(so);
 		socantrcvmore_locked(so);
-		SOCKBUF_LOCK(&so->so_snd);
+		SOCK_SENDBUF_LOCK(so);
 		socantsendmore_locked(so);
 	}
 	SOCK_UNLOCK(so);
@@ -4225,9 +4157,9 @@ soisdisconnected(struct socket *so)
 
 	if (!SOLISTENING(so)) {
 		SOCK_UNLOCK(so);
-		SOCKBUF_LOCK(&so->so_rcv);
+		SOCK_RECVBUF_LOCK(so);
 		socantrcvmore_locked(so);
-		SOCKBUF_LOCK(&so->so_snd);
+		SOCK_SENDBUF_LOCK(so);
 		sbdrop_locked(&so->so_snd, sbused(&so->so_snd));
 		socantsendmore_locked(so);
 	} else
@@ -4310,10 +4242,8 @@ soupcall_set(struct socket *so, sb_which which, so_upcall_t func, void *arg)
 	case SO_SND:
 		sb = &so->so_snd;
 		break;
-	default:
-		panic("soupcall_set: bad which");
 	}
-	SOCKBUF_LOCK_ASSERT(sb);
+	SOCK_BUF_LOCK_ASSERT(so, which);
 	sb->sb_upcall = func;
 	sb->sb_upcallarg = arg;
 	sb->sb_flags |= SB_UPCALL;
@@ -4334,7 +4264,7 @@ soupcall_clear(struct socket *so, sb_which which)
 		sb = &so->so_snd;
 		break;
 	}
-	SOCKBUF_LOCK_ASSERT(sb);
+	SOCK_BUF_LOCK_ASSERT(so, which);
 	KASSERT(sb->sb_upcall != NULL,
 	    ("%s: so %p no upcall to clear", __func__, so));
 	sb->sb_upcall = NULL;
@@ -4356,10 +4286,16 @@ so_rdknl_lock(void *arg)
 {
 	struct socket *so = arg;
 
-	if (SOLISTENING(so))
-		SOCK_LOCK(so);
-	else
-		SOCKBUF_LOCK(&so->so_rcv);
+retry:
+	if (SOLISTENING(so)) {
+		SOLISTEN_LOCK(so);
+	} else {
+		SOCK_RECVBUF_LOCK(so);
+		if (__predict_false(SOLISTENING(so))) {
+			SOCK_RECVBUF_UNLOCK(so);
+			goto retry;
+		}
+	}
 }
 
 static void
@@ -4368,9 +4304,9 @@ so_rdknl_unlock(void *arg)
 	struct socket *so = arg;
 
 	if (SOLISTENING(so))
-		SOCK_UNLOCK(so);
+		SOLISTEN_UNLOCK(so);
 	else
-		SOCKBUF_UNLOCK(&so->so_rcv);
+		SOCK_RECVBUF_UNLOCK(so);
 }
 
 static void
@@ -4380,12 +4316,12 @@ so_rdknl_assert_lock(void *arg, int what)
 
 	if (what == LA_LOCKED) {
 		if (SOLISTENING(so))
-			SOCK_LOCK_ASSERT(so);
+			SOLISTEN_LOCK_ASSERT(so);
 		else
 			SOCK_RECVBUF_LOCK_ASSERT(so);
 	} else {
 		if (SOLISTENING(so))
-			SOCK_UNLOCK_ASSERT(so);
+			SOLISTEN_UNLOCK_ASSERT(so);
 		else
 			SOCK_RECVBUF_UNLOCK_ASSERT(so);
 	}
@@ -4396,10 +4332,16 @@ so_wrknl_lock(void *arg)
 {
 	struct socket *so = arg;
 
-	if (SOLISTENING(so))
-		SOCK_LOCK(so);
-	else
+retry:
+	if (SOLISTENING(so)) {
+		SOLISTEN_LOCK(so);
+	} else {
 		SOCK_SENDBUF_LOCK(so);
+		if (__predict_false(SOLISTENING(so))) {
+			SOCK_SENDBUF_UNLOCK(so);
+			goto retry;
+		}
+	}
 }
 
 static void
@@ -4408,7 +4350,7 @@ so_wrknl_unlock(void *arg)
 	struct socket *so = arg;
 
 	if (SOLISTENING(so))
-		SOCK_UNLOCK(so);
+		SOLISTEN_UNLOCK(so);
 	else
 		SOCK_SENDBUF_UNLOCK(so);
 }
@@ -4420,12 +4362,12 @@ so_wrknl_assert_lock(void *arg, int what)
 
 	if (what == LA_LOCKED) {
 		if (SOLISTENING(so))
-			SOCK_LOCK_ASSERT(so);
+			SOLISTEN_LOCK_ASSERT(so);
 		else
 			SOCK_SENDBUF_LOCK_ASSERT(so);
 	} else {
 		if (SOLISTENING(so))
-			SOCK_UNLOCK_ASSERT(so);
+			SOLISTEN_UNLOCK_ASSERT(so);
 		else
 			SOCK_SENDBUF_UNLOCK_ASSERT(so);
 	}

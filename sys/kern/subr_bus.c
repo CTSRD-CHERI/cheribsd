@@ -903,7 +903,7 @@ static kobj_method_t null_methods[] = {
 DEFINE_CLASS(null, null_methods, 0);
 
 void
-bus_topo_assert()
+bus_topo_assert(void)
 {
 
 	GIANT_REQUIRED;	
@@ -4753,7 +4753,7 @@ bus_generic_get_device_path(device_t bus, device_t child, const char *locator,
 int
 bus_null_rescan(device_t dev)
 {
-	return (ENXIO);
+	return (ENODEV);
 }
 
 /*
