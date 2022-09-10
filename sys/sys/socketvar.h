@@ -454,7 +454,7 @@ int	getsockaddr(struct sockaddr **namp,
 	    const struct sockaddr * __capability uaddr,
 	    size_t len);
 int	getsock_cap(struct thread *td, int fd, cap_rights_t *rightsp,
-	    struct file **fpp, u_int *fflagp, struct filecaps *havecaps);
+	    struct file **fpp, struct filecaps *havecaps);
 int	getsock(struct thread *td, int fd, cap_rights_t *rightsp,
 	    struct file **fpp);
 void	soabort(struct socket *so);

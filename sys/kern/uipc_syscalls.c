@@ -86,7 +86,7 @@ static int recvit(struct thread *td, int s, struct msghdr *mp,
  */
 int
 getsock_cap(struct thread *td, int fd, cap_rights_t *rightsp,
-    struct file **fpp, u_int *fflagp, struct filecaps *havecapsp)
+    struct file **fpp, struct filecaps *havecapsp)
 {
 	struct file *fp;
 	int error;
@@ -100,8 +100,6 @@ getsock_cap(struct thread *td, int fd, cap_rights_t *rightsp,
 			filecaps_free(havecapsp);
 		return (ENOTSOCK);
 	}
-	if (fflagp != NULL)
-		*fflagp = fp->f_flag;
 	*fpp = fp;
 	return (0);
 }
@@ -351,9 +349,10 @@ kern_accept4(struct thread *td, int s, struct sockaddr **name,
 
 	AUDIT_ARG_FD(s);
 	error = getsock_cap(td, s, &cap_accept_rights,
-	    &headfp, &fflag, &fcaps);
+	    &headfp, &fcaps);
 	if (error != 0)
 		return (error);
+	fflag = atomic_load_int(&fp->f_flag);
 	head = headfp->f_data;
 	if (!SOLISTENING(head)) {
 		error = EINVAL;
