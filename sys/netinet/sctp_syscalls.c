@@ -204,7 +204,7 @@ sys_sctp_peeloff(struct thread *td, struct sctp_peeloff_args *uap)
 	    &headfp);
 	if (error != 0)
 		goto done2;
-	fflag = atomic_load_int(&fp->f_flag);
+	fflag = atomic_load_int(&headfp->f_flag);
 	head = headfp->f_data;
 	if (head->so_proto->pr_protocol != IPPROTO_SCTP) {
 		error = EOPNOTSUPP;
