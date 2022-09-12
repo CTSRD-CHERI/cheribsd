@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 
 #include "namespace.h"
 #include <sys/param.h>
+#include <sys/auxv.h>
 #include <sys/signalvar.h>
 #include <sys/ioctl.h>
 #include <sys/link_elf.h>
@@ -506,23 +507,31 @@ init_private(void)
 	if (init_once == 0) {
 		__thr_pshared_init();
 		__thr_malloc_init();
+
 		/* Find the stack top */
 #ifndef __CHERI_PURE_CAPABILITY__
-		mib[0] = CTL_KERN;
-		mib[1] = KERN_USRSTACK;
 		/*
 		 * The sysctl returns a ptraddr_t and not a pointer so _usrstack
 		 * must not be a pointer on CHERIABI
 		 */
-		len = sizeof (_usrstack);
-		if (sysctl(mib, nitems(mib), &_usrstack, &len, NULL, 0) == -1)
-			PANIC("Cannot get kern.usrstack from sysctl");
+		if (elf_aux_info(AT_USRSTACKBASE, &_usrstack,
+		    sizeof(_usrstack)) != 0) {
+			mib[0] = CTL_KERN;
+			mib[1] = KERN_USRSTACK;
+			len = sizeof (_usrstack);
+			if (sysctl(mib, nitems(mib), &_usrstack, &len,
+			    NULL, 0) == -1)
+				PANIC("Cannot get kern.usrstack from sysctl");
+		}
 		env_bigstack = getenv("LIBPTHREAD_BIGSTACK_MAIN");
 		env_splitstack = getenv("LIBPTHREAD_SPLITSTACK_MAIN");
 		if (env_bigstack != NULL || env_splitstack == NULL) {
-			if (getrlimit(RLIMIT_STACK, &rlim) == -1)
-				PANIC("Cannot get stack rlimit");
-			_thr_stack_initial = rlim.rlim_cur;
+			if (elf_aux_info(AT_USRSTACKLIM, &_thr_stack_initial,
+			    sizeof(_thr_stack_initial)) != 0) {
+				if (getrlimit(RLIMIT_STACK, &rlim) == -1)
+					PANIC("Cannot get stack rlimit");
+				_thr_stack_initial = rlim.rlim_cur;
+			}
 		}
 #else
 		/*
