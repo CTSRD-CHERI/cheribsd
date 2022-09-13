@@ -431,7 +431,8 @@ struct __no_subobject_bounds {						\
 #define RB_PROTOTYPE_RANK(name, type, attr)
 #endif
 #define RB_PROTOTYPE_INSERT_COLOR(name, type, attr)			\
-	attr void name##_RB_INSERT_COLOR(struct name *, struct type *)
+	attr void name##_RB_INSERT_COLOR(struct name *,			\
+	    struct type *, struct type *)
 #define RB_PROTOTYPE_REMOVE_COLOR(name, type, attr)			\
 	attr void name##_RB_REMOVE_COLOR(struct name *,			\
 	    struct type *, struct type *)
@@ -500,7 +501,8 @@ name##_RB_RANK(struct type *elm)					\
 
 #define RB_GENERATE_INSERT_COLOR(name, type, field, attr)		\
 attr void								\
-name##_RB_INSERT_COLOR(struct name *head, struct type *elm)		\
+name##_RB_INSERT_COLOR(struct name *head,				\
+    struct type *parent, struct type *elm)				\
 {									\
 	/*								\
 	 * Initially, elm is a leaf.  Either its parent was previously	\
@@ -512,12 +514,11 @@ name##_RB_INSERT_COLOR(struct name *head, struct type *elm)		\
 	 * uninitialized 'child', and a later iteration can only happen \
 	 * when a value has been assigned to 'child' in the previous    \
 	 * one.								\
-	 */							\
-	struct type *child, *child_up, *gpar, *parent;			\
+	 */								\
+	struct type *child, *child_up, *gpar;				\
 	ptraddr_t elmdir, sibdir;					\
 									\
-	gpar = _RB_UP(elm, field);					\
-	while ((parent = gpar) != NULL) {				\
+	do {								\
 		/* the rank of the tree rooted at elm grew */		\
 		gpar = _RB_UP(parent, field);				\
 		elmdir = RB_RIGHT(parent, field) == elm ? _RB_R : _RB_L; \
@@ -593,7 +594,7 @@ name##_RB_INSERT_COLOR(struct name *head, struct type *elm)		\
 			RB_AUGMENT(elm);				\
 		RB_AUGMENT(parent);					\
 		break;							\
-	}								\
+	} while ((parent = gpar) != NULL);				\
 }
 
 #ifndef RB_STRICT_HST
@@ -783,7 +784,8 @@ name##_RB_INSERT(struct name *head, struct type *elm)			\
 	}								\
 	RB_SET(elm, parent, field);					\
 	*tmpp = elm;							\
-	name##_RB_INSERT_COLOR(head, elm);				\
+	if (parent != NULL)						\
+		name##_RB_INSERT_COLOR(head, parent, elm);		\
 	RB_UPDATE_AUGMENT(elm, field);					\
 	return (NULL);							\
 }

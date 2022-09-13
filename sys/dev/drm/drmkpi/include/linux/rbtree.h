@@ -71,10 +71,12 @@ RB_PROTOTYPE(drmcompat_root, rb_node, __entry, panic_cmp);
 #define RB_EMPTY_NODE(node)     (RB_PARENT(node, __entry) == node)
 #define RB_CLEAR_NODE(node)     RB_SET_PARENT(node, node, __entry)
 
-#define	rb_insert_color(node, root)					\
-	drmcompat_root_RB_INSERT_COLOR((struct drmcompat_root *)(root), (node))
-#define	rb_insert_color_cached(node, root, leftmost)			\
-	drmcompat_root_RB_INSERT_COLOR((struct drmcompat_root *)(root), (node))
+#define rb_insert_color(node, root) do {				\
+	if (rb_parent(node))						\
+		drmcompat_root_RB_INSERT_COLOR(				\
+		    (struct drmcompat_root *)(root), rb_parent(node),	\
+		    (node));						\
+} while (0)
 #define	rb_erase(node, root)						\
 	drmcompat_root_RB_REMOVE((struct drmcompat_root *)(root), (node))
 #define	rb_erase_cached(node, root)					\
@@ -105,6 +107,18 @@ rb_replace_node(struct rb_node *victim, struct rb_node *new,
 	if (RB_RIGHT(victim, __entry))
 		RB_SET_PARENT(RB_RIGHT(victim, __entry), new, __entry);
 	*new = *victim;
+}
+
+static inline void
+rb_insert_color_cached(struct rb_node *node, struct rb_root_cached *root,
+    bool leftmost)
+{
+	if (rb_parent(node))
+		drmcompat_root_RB_INSERT_COLOR(
+		    (struct drmcompat_root *)&root->rb_root,
+		    rb_parent(node), node);
+	if (leftmost)
+		root->rb_node = node;
 }
 
 static inline void
