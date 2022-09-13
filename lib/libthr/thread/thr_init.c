@@ -475,13 +475,45 @@ init_main_thread(struct pthread *thread)
 	/* Others cleared to zero by thr_alloc() */
 }
 
+bool
+__thr_get_main_stack_base(char **base)
+{
+	size_t len;
+	int mib[2];
+
+	if (elf_aux_info(AT_USRSTACKBASE, base, sizeof(*base)) == 0)
+		return (true);
+
+	mib[0] = CTL_KERN;
+	mib[1] = KERN_USRSTACK;
+	len = sizeof(*base);
+	if (sysctl(mib, nitems(mib), base, &len, NULL, 0) == 0)
+		return (true);
+
+	return (false);
+}
+
+bool
+__thr_get_main_stack_lim(size_t *lim)
+{
+	struct rlimit rlim;
+
+	if (elf_aux_info(AT_USRSTACKLIM, lim, sizeof(*lim)) == 0)
+		return (true);
+
+	if (getrlimit(RLIMIT_STACK, &rlim) == 0) {
+		*lim = rlim.rlim_cur;
+		return (true);
+	}
+
+	return (false);
+}
+
 static void
 init_private(void)
 {
 #ifndef __CHERI_PURE_CAPABILITY__
-	struct rlimit rlim;
-	size_t len;
-	int mib[2];
+	char *usrstack;
 	char *env_bigstack, *env_splitstack;
 #endif
 	char *env;
@@ -510,28 +542,14 @@ init_private(void)
 
 		/* Find the stack top */
 #ifndef __CHERI_PURE_CAPABILITY__
-		/*
-		 * The sysctl returns a ptraddr_t and not a pointer so _usrstack
-		 * must not be a pointer on CHERIABI
-		 */
-		if (elf_aux_info(AT_USRSTACKBASE, &_usrstack,
-		    sizeof(_usrstack)) != 0) {
-			mib[0] = CTL_KERN;
-			mib[1] = KERN_USRSTACK;
-			len = sizeof (_usrstack);
-			if (sysctl(mib, nitems(mib), &_usrstack, &len,
-			    NULL, 0) == -1)
-				PANIC("Cannot get kern.usrstack from sysctl");
-		}
+		if (!__thr_get_main_stack_base(&usrstack))
+			PANIC("Cannot get kern.usrstack");
+		_usrstack = (uintptr_t)usrstack;
 		env_bigstack = getenv("LIBPTHREAD_BIGSTACK_MAIN");
 		env_splitstack = getenv("LIBPTHREAD_SPLITSTACK_MAIN");
 		if (env_bigstack != NULL || env_splitstack == NULL) {
-			if (elf_aux_info(AT_USRSTACKLIM, &_thr_stack_initial,
-			    sizeof(_thr_stack_initial)) != 0) {
-				if (getrlimit(RLIMIT_STACK, &rlim) == -1)
-					PANIC("Cannot get stack rlimit");
-				_thr_stack_initial = rlim.rlim_cur;
-			}
+			if (!__thr_get_main_stack_lim(&_thr_stack_initial))
+				PANIC("Cannot get stack rlimit");
 		}
 #else
 		/*
