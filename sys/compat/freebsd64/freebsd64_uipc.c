@@ -286,15 +286,19 @@ freebsd64_copyin_control(struct mbuf **mp, char * __capability buf,
 			break;
 		}
 		cm = (struct cmsghdr *)in1;
-		if (cm->cmsg_len < FREEBSD64_ALIGN(sizeof(*cm))) {
+		if (cm->cmsg_len < FREEBSD64_ALIGN(sizeof(*cm)) ||
+		    cm->cmsg_len > buflen) {
 			error = EINVAL;
 			break;
 		}
 		msglen = FREEBSD64_ALIGN(cm->cmsg_len);
-		if (msglen > buflen || msglen < cm->cmsg_len) {
+		if (msglen < cm->cmsg_len) {
 			error = EINVAL;
 			break;
 		}
+		/* The native ABI permits the final padding to be omitted. */
+		if (msglen > buflen)
+			msglen = buflen;
 		buflen -= msglen;
 
 		in1 = (char *)in1 + msglen;
