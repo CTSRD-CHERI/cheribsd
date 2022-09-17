@@ -420,11 +420,7 @@ namei_getpath(struct nameidata *ndp)
 		    &ndp->ni_pathlen);
 	}
 
-	if (__predict_false(error != 0))
-		return (error);
-
-	cnp->cn_nameptr = cnp->cn_pnbuf;
-	return (0);
+	return (error);
 }
 
 static int
@@ -621,6 +617,8 @@ namei(struct nameidata *ndp)
 		return (error);
 	}
 
+	cnp->cn_nameptr = cnp->cn_pnbuf;
+
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_NAMEI)) {
 		ktrnamei(cnp->cn_pnbuf);
@@ -653,6 +651,7 @@ namei(struct nameidata *ndp)
 			namei_cleanup_cnp(cnp);
 			return (error);
 		}
+		cnp->cn_nameptr = cnp->cn_pnbuf;
 		/* FALLTHROUGH */
 	case CACHE_FPL_STATUS_ABORTED:
 		TAILQ_INIT(&ndp->ni_cap_tracker);
