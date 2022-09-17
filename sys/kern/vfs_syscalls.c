@@ -1429,7 +1429,7 @@ restart:
 	if (vn_start_write(nd.ni_dvp, &mp, V_NOWAIT) != 0) {
 		NDFREE_PNBUF(&nd);
 		vput(nd.ni_dvp);
-		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | PCATCH)) != 0)
+		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | V_PCATCH)) != 0)
 			return (error);
 		goto restart;
 	}
@@ -1516,7 +1516,7 @@ restart:
 	if (vn_start_write(nd.ni_dvp, &mp, V_NOWAIT) != 0) {
 		NDFREE_PNBUF(&nd);
 		vput(nd.ni_dvp);
-		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | PCATCH)) != 0)
+		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | V_PCATCH)) != 0)
 			return (error);
 		goto restart;
 	}
@@ -1701,7 +1701,7 @@ kern_linkat_vp(struct thread *td, struct vnode *vp, int fd,
 				vput(nd.ni_dvp);
 				NDFREE_PNBUF(&nd);
 				error = vn_start_write(NULL, &mp,
-				    V_XSLEEP | PCATCH);
+				    V_XSLEEP | V_PCATCH);
 				if (error != 0)
 					return (error);
 				return (EAGAIN);
@@ -1796,7 +1796,7 @@ restart:
 	if (vn_start_write(nd.ni_dvp, &mp, V_NOWAIT) != 0) {
 		NDFREE_PNBUF(&nd);
 		vput(nd.ni_dvp);
-		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | PCATCH)) != 0)
+		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | V_PCATCH)) != 0)
 			goto out;
 		goto restart;
 	}
@@ -1868,7 +1868,7 @@ restart:
 	if (vn_start_write(nd.ni_dvp, &mp, V_NOWAIT) != 0) {
 		NDFREE_PNBUF(&nd);
 		vput(nd.ni_dvp);
-		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | PCATCH)) != 0)
+		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | V_PCATCH)) != 0)
 			return (error);
 		goto restart;
 	}
@@ -2001,7 +2001,7 @@ restart:
 			else
 				vput(vp);
 			if ((error = vn_start_write(NULL, &mp,
-			    V_XSLEEP | PCATCH)) != 0) {
+			    V_XSLEEP | V_PCATCH)) != 0) {
 				goto fdout;
 			}
 			goto restart;
@@ -2785,7 +2785,7 @@ setfflags(struct thread *td, struct vnode *vp, u_long flags)
 			return (error);
 	}
 
-	if ((error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) != 0)
+	if ((error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH)) != 0)
 		return (error);
 	VATTR_NULL(&vattr);
 	vattr.va_flags = flags;
@@ -2916,7 +2916,7 @@ setfmode(struct thread *td, struct ucred *cred, struct vnode *vp, int mode)
 	struct vattr vattr;
 	int error;
 
-	if ((error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) != 0)
+	if ((error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH)) != 0)
 		return (error);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 	VATTR_NULL(&vattr);
@@ -3041,7 +3041,7 @@ setfown(struct thread *td, struct ucred *cred, struct vnode *vp, uid_t uid,
 	struct vattr vattr;
 	int error;
 
-	if ((error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) != 0)
+	if ((error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH)) != 0)
 		return (error);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 	VATTR_NULL(&vattr);
@@ -3255,7 +3255,7 @@ setutimes(struct thread *td, struct vnode *vp,
 	vattr.va_birthtime.tv_sec = VNOVAL;
 	vattr.va_birthtime.tv_nsec = 0;
 
-	if ((error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) != 0)
+	if ((error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH)) != 0)
 		return (error);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 	if (numtimes < 3 && VOP_GETATTR(vp, &vattr, td->td_ucred) == 0 &&
@@ -3529,7 +3529,7 @@ retry:
 	vp = nd.ni_vp;
 	NDFREE_PNBUF(&nd);
 	rl_cookie = vn_rangelock_wlock(vp, 0, OFF_MAX);
-	if ((error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) != 0) {
+	if ((error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH)) != 0) {
 		vn_rangelock_unlock(vp, rl_cookie);
 		vrele(vp);
 		return (error);
@@ -3612,7 +3612,7 @@ kern_fsync(struct thread *td, int fd, bool fullsync)
 		/* XXXKIB: compete outstanding aio writes */;
 #endif
 retry:
-	error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
+	error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH);
 	if (error != 0)
 		goto drop;
 	vn_lock(vp, vn_lktype_write(mp, vp) | LK_RETRY);
@@ -3775,7 +3775,7 @@ again:
 		vrele(tond.ni_startdir);
 		if (fromnd.ni_startdir != NULL)
 			vrele(fromnd.ni_startdir);
-		error = vn_start_write(NULL, &mp, V_XSLEEP | PCATCH);
+		error = vn_start_write(NULL, &mp, V_XSLEEP | V_PCATCH);
 		if (error != 0)
 			return (error);
 		goto again;
@@ -3898,7 +3898,7 @@ restart:
 	if (vn_start_write(nd.ni_dvp, &mp, V_NOWAIT) != 0) {
 		NDFREE_PNBUF(&nd);
 		vput(nd.ni_dvp);
-		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | PCATCH)) != 0)
+		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | V_PCATCH)) != 0)
 			return (error);
 		goto restart;
 	}
@@ -4007,7 +4007,7 @@ restart:
 			vrele(nd.ni_dvp);
 		else
 			vput(nd.ni_dvp);
-		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | PCATCH)) != 0)
+		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | V_PCATCH)) != 0)
 			goto fdout;
 		goto restart;
 	}
