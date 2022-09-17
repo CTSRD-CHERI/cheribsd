@@ -490,7 +490,7 @@ interpret:
 		 * pointer in ni_vp among other things.
 		 */
 		NDINIT(&nd, LOOKUP, ISOPEN | LOCKLEAF | LOCKSHARED | FOLLOW |
-		    SAVENAME | AUDITVNODE1 | WANTPARENT, UIO_SYSSPACE,
+		    AUDITVNODE1 | WANTPARENT, UIO_SYSSPACE,
 		    PTR2CAP(args->fname));
 
 		error = namei(&nd);

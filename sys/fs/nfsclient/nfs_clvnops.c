@@ -1249,10 +1249,6 @@ nfs_lookup(struct vop_lookup_args *ap)
 		 * associated locking bookkeeping, etc.
 		 */
 		if (cnp->cn_namelen == 1 && cnp->cn_nameptr[0] == '.') {
-			/* XXX: Is this really correct? */
-			if (cnp->cn_nameiop != LOOKUP &&
-			    (flags & ISLASTCN))
-				cnp->cn_flags |= SAVENAME;
 			return (0);
 		}
 
@@ -1287,9 +1283,6 @@ nfs_lookup(struct vop_lookup_args *ap)
 		    VOP_GETATTR(newvp, &vattr, cnp->cn_cred) == 0 &&
 		    timespeccmp(&vattr.va_ctime, &nctime, ==))) {
 			NFSINCRGLOBAL(nfsstatsv1.lookupcache_hits);
-			if (cnp->cn_nameiop != LOOKUP &&
-			    (flags & ISLASTCN))
-				cnp->cn_flags |= SAVENAME;
 			return (0);
 		}
 		cache_purge(newvp);
@@ -1371,7 +1364,6 @@ nfs_lookup(struct vop_lookup_args *ap)
 			 */
 			if (mp->mnt_flag & MNT_RDONLY)
 				return (EROFS);
-			cnp->cn_flags |= SAVENAME;
 			return (EJUSTRETURN);
 		}
 
@@ -1427,7 +1419,6 @@ nfs_lookup(struct vop_lookup_args *ap)
 		if (attrflag)
 			(void) nfscl_loadattrcache(&newvp, &nfsva, NULL, 0, 1);
 		*vpp = newvp;
-		cnp->cn_flags |= SAVENAME;
 		return (0);
 	}
 
@@ -1512,8 +1503,6 @@ nfs_lookup(struct vop_lookup_args *ap)
 			NFSUNLOCKNODE(np);
 		}
 	}
-	if (cnp->cn_nameiop != LOOKUP && (flags & ISLASTCN))
-		cnp->cn_flags |= SAVENAME;
 	if ((cnp->cn_flags & MAKEENTRY) && dvp != newvp &&
 	    (cnp->cn_nameiop != DELETE || !(flags & ISLASTCN)) &&
 	    attrflag != 0 && (newvp->v_type != VDIR || dattrflag != 0))
@@ -1880,7 +1869,6 @@ nfs_remove(struct vop_remove_args *ap)
 	int error = 0;
 	struct vattr vattr;
 
-	KASSERT((cnp->cn_flags & HASBUF) != 0, ("nfs_remove: no name"));
 	KASSERT(vrefcnt(vp) > 0, ("nfs_remove: bad v_usecount"));
 	if (vp->v_type == VDIR)
 		error = EPERM;
@@ -1993,8 +1981,6 @@ nfs_rename(struct vop_rename_args *ap)
 	struct nfsv4node *newv4 = NULL;
 	int error;
 
-	KASSERT((tcnp->cn_flags & HASBUF) != 0 &&
-	    (fcnp->cn_flags & HASBUF) != 0, ("nfs_rename: no name"));
 	/* Check for cross-device rename */
 	if ((fvp->v_mount != tdvp->v_mount) ||
 	    (tvp && (fvp->v_mount != tvp->v_mount))) {
