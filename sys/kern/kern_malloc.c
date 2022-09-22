@@ -522,7 +522,7 @@ contigfree(void *addr, unsigned long size, struct malloc_type *type)
 		panic("Expect unsealed capability");
 #endif
 
-	kmem_free((vm_pointer_t)addr, size);
+	kmem_free(addr, size);
 	malloc_type_freed(type, addr, round_page(size));
 }
 
@@ -616,23 +616,22 @@ static caddr_t __noinline
 malloc_large(size_t size, struct malloc_type *mtp, struct domainset *policy,
     int flags DEBUG_REDZONE_ARG_DEF)
 {
-	vm_pointer_t kva;
-	caddr_t va;
+	void *va;
 
 	size = roundup(size, PAGE_SIZE);
-	kva = kmem_malloc_domainset(policy, size, flags);
-	if (kva != 0) {
+	va = kmem_malloc_domainset(policy, size, flags);
+	if (va != NULL) {
 		/* The low bit is unused for slab pointers. */
-		vsetzoneslab(kva, NULL, (void *)(uintptr_t)((size << 1) | 1));
+		vsetzoneslab((uintptr_t)va, NULL,
+		    (void *)(uintptr_t)((size << 1) | 1));
 		uma_total_inc(size);
 #ifdef __CHERI_PURE_CAPABILITY__
-		KASSERT(cheri_getlen(kva) <= CHERI_REPRESENTABLE_LENGTH(size),
+		KASSERT(cheri_getlen(va) <= CHERI_REPRESENTABLE_LENGTH(size),
 		    ("Invalid bounds: expected %zx found %zx",
 		        (size_t)CHERI_REPRESENTABLE_LENGTH(size),
-		        (size_t)cheri_getlen(kva)));
+		        (size_t)cheri_getlen(va)));
 #endif
 	}
-	va = (caddr_t)kva;
 	malloc_type_allocated(mtp, va, va == NULL ? 0 : size);
 	if (__predict_false(va == NULL)) {
 		KASSERT((flags & M_WAITOK) == 0,
@@ -641,7 +640,7 @@ malloc_large(size_t size, struct malloc_type *mtp, struct domainset *policy,
 #ifdef DEBUG_REDZONE
 		va = redzone_setup(va, osize);
 #endif
-		kasan_mark((void *)va, osize, size, KASAN_MALLOC_REDZONE);
+		kasan_mark(va, osize, size, KASAN_MALLOC_REDZONE);
 	}
 	return (va);
 }
@@ -650,7 +649,7 @@ static void
 free_large(void *addr, size_t size)
 {
 
-	kmem_free((vm_pointer_t)addr, size);
+	kmem_free(addr, size);
 	uma_total_dec(size);
 }
 
