@@ -6194,15 +6194,17 @@ pmap_mapbios(vm_paddr_t pa, vm_size_t size)
 }
 
 void
-pmap_unmapbios(vm_pointer_t va, vm_size_t size)
+pmap_unmapbios(void *p, vm_size_t size)
 {
 	struct pmap_preinit_mapping *ppim;
+	vm_pointer_t va;
 	vm_offset_t offset, tmpsize, va_trunc;
 	pd_entry_t *pde;
 	pt_entry_t *l2;
 	int i, lvl, l2_blocks, block;
 	bool preinit_map;
 
+	va = (vm_pointer_t)p;
 	l2_blocks =
 	   ((ptraddr_t)roundup2(va + size, L2_SIZE) -
 	    (ptraddr_t)rounddown2(va, L2_SIZE)) >> L2_SHIFT;

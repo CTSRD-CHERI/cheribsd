@@ -244,13 +244,15 @@ devmap_ptov(vm_paddr_t pa, vm_size_t size)
  * corresponding physical address, or DEVMAP_PADDR_NOTFOUND if not found.
  */
 vm_paddr_t
-devmap_vtop(vm_pointer_t va, vm_size_t size)
+devmap_vtop(void * vpva, vm_size_t size)
 {
 	const struct devmap_entry *pd;
+	vm_pointer_t va;
 
 	if (devmap_table == NULL)
 		return (DEVMAP_PADDR_NOTFOUND);
 
+	va = (vm_pointer_t)vpva;
 	for (pd = devmap_table; pd->pd_size != 0; ++pd) {
 		if (va >= pd->pd_va && va + size <= pd->pd_va + pd->pd_size)
 			return ((vm_paddr_t)(pd->pd_pa + (va - pd->pd_va)));
@@ -366,14 +368,16 @@ pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
  * Unmap device memory and free the kva space.
  */
 void
-pmap_unmapdev(vm_pointer_t va, vm_size_t size)
+pmap_unmapdev(void *p, vm_size_t size)
 {
+	vm_pointer_t va;
 	vm_offset_t offset;
 
 	/* Nothing to do if we find the mapping in the static table. */
-	if (devmap_vtop(va, size) != DEVMAP_PADDR_NOTFOUND)
+	if (devmap_vtop(p, size) != DEVMAP_PADDR_NOTFOUND)
 		return;
 
+	va = (vm_pointer_t)p;
 	offset = va & PAGE_MASK;
 	va = trunc_page(va);
 	size = round_page(size + offset);
