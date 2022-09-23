@@ -662,6 +662,8 @@ bus_probe(void)
 				break;
 			}
 			order = strchr(order, ',');
+			if (order != NULL)
+				order++;	/* Skip comma */
 		}
 		freeenv(env);
 
