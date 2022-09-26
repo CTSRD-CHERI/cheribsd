@@ -851,7 +851,7 @@ pmap_early_vtophys(vm_offset_t va)
 }
 
 /* State of the bootstrapped DMAP page tables */
-struct dmap_bootstrap_state {
+struct pmap_bootstrap_state {
 	vm_offset_t	va;
 	vm_paddr_t	pa;
 	pt_entry_t	*l1;
@@ -864,7 +864,7 @@ struct dmap_bootstrap_state {
 };
 
 static void
-pmap_bootstrap_dmap_l0_table(struct dmap_bootstrap_state *state)
+pmap_bootstrap_l0_table(struct pmap_bootstrap_state *state)
 {
 	vm_paddr_t l1_pa;
 	u_int l0_slot;
@@ -897,13 +897,13 @@ pmap_bootstrap_dmap_l0_table(struct dmap_bootstrap_state *state)
 }
 
 static void
-pmap_bootstrap_dmap_l1_table(struct dmap_bootstrap_state *state)
+pmap_bootstrap_l1_table(struct pmap_bootstrap_state *state)
 {
 	vm_paddr_t l2_pa;
 	u_int l1_slot;
 
 	/* Make sure there is a valid L0 -> L1 table */
-	pmap_bootstrap_dmap_l0_table(state);
+	pmap_bootstrap_l0_table(state);
 
 	/* Link the level 1 table to a level 2 table */
 	l1_slot = pmap_l1_index(state->va);
@@ -931,13 +931,13 @@ pmap_bootstrap_dmap_l1_table(struct dmap_bootstrap_state *state)
 }
 
 static void
-pmap_bootstrap_dmap_l2_table(struct dmap_bootstrap_state *state)
+pmap_bootstrap_l2_table(struct pmap_bootstrap_state *state)
 {
 	vm_paddr_t l3_pa;
 	u_int l2_slot;
 
 	/* Make sure there is a valid L1 -> L2 table */
-	pmap_bootstrap_dmap_l1_table(state);
+	pmap_bootstrap_l1_table(state);
 
 	/* Link the level 2 table to a level 3 table */
 	l2_slot = pmap_l2_index(state->va);
@@ -961,7 +961,7 @@ pmap_bootstrap_dmap_l2_table(struct dmap_bootstrap_state *state)
 }
 
 static void
-pmap_bootstrap_dmap_l2_block(struct dmap_bootstrap_state *state, int i)
+pmap_bootstrap_l2_block(struct pmap_bootstrap_state *state, int i)
 {
 	u_int l2_slot;
 	bool first;
@@ -970,7 +970,7 @@ pmap_bootstrap_dmap_l2_block(struct dmap_bootstrap_state *state, int i)
 		return;
 
 	/* Make sure there is a valid L1 table */
-	pmap_bootstrap_dmap_l1_table(state);
+	pmap_bootstrap_l1_table(state);
 
 	MPASS((state->va & L2_OFFSET) == 0);
 	for (first = true;
@@ -999,7 +999,7 @@ pmap_bootstrap_dmap_l2_block(struct dmap_bootstrap_state *state, int i)
 }
 
 static void
-pmap_bootstrap_dmap_l3_page(struct dmap_bootstrap_state *state, int i)
+pmap_bootstrap_l3_page(struct pmap_bootstrap_state *state, int i)
 {
 	u_int l3_slot;
 	bool first;
@@ -1008,7 +1008,7 @@ pmap_bootstrap_dmap_l3_page(struct dmap_bootstrap_state *state, int i)
 		return;
 
 	/* Make sure there is a valid L2 table */
-	pmap_bootstrap_dmap_l2_table(state);
+	pmap_bootstrap_l2_table(state);
 
 	MPASS((state->va & L3_OFFSET) == 0);
 	for (first = true;
@@ -1040,7 +1040,7 @@ static vm_pointer_t
 pmap_bootstrap_dmap(vm_pointer_t kern_l1, vm_paddr_t min_pa,
     vm_pointer_t freemempos)
 {
-	struct dmap_bootstrap_state state;
+	struct pmap_bootstrap_state state;
 	int i;
 
 	dmap_phys_base = min_pa & ~L1_OFFSET;
@@ -1059,13 +1059,13 @@ pmap_bootstrap_dmap(vm_pointer_t kern_l1, vm_paddr_t min_pa,
 
 		/* Create L3 mappings at the start of the region */
 		if ((state.pa & L2_OFFSET) != 0)
-			pmap_bootstrap_dmap_l3_page(&state, i);
+			pmap_bootstrap_l3_page(&state, i);
 		MPASS(state.pa <= physmap[i + 1]);
 
 		if (L1_BLOCKS_SUPPORTED) {
 			/* Create L2 mappings at the start of the region */
 			if ((state.pa & L1_OFFSET) != 0)
-				pmap_bootstrap_dmap_l2_block(&state, i);
+				pmap_bootstrap_l2_block(&state, i);
 			MPASS(state.pa <= physmap[i + 1]);
 
 			/* Create the main L1 block mappings */
@@ -1073,7 +1073,7 @@ pmap_bootstrap_dmap(vm_pointer_t kern_l1, vm_paddr_t min_pa,
 			    (physmap[i + 1] - state.pa) >= L1_SIZE;
 			    state.va += L1_SIZE, state.pa += L1_SIZE) {
 				/* Make sure there is a valid L1 table */
-				pmap_bootstrap_dmap_l0_table(&state);
+				pmap_bootstrap_l0_table(&state);
 				MPASS((state.pa & L1_OFFSET) == 0);
 				pmap_store(&state.l1[pmap_l1_index(state.va)],
 				    state.pa | ATTR_DEFAULT | ATTR_S1_XN |
@@ -1086,12 +1086,17 @@ pmap_bootstrap_dmap(vm_pointer_t kern_l1, vm_paddr_t min_pa,
 			MPASS(state.pa <= physmap[i + 1]);
 
 			/* Create L2 mappings at the end of the region */
-			pmap_bootstrap_dmap_l2_block(&state, i);
+			pmap_bootstrap_l2_block(&state, i);
+		} else {
+			while (state.va < DMAP_MAX_ADDRESS &&
+			    (physmap[i + 1] - state.pa) >= L2_SIZE) {
+				pmap_bootstrap_l2_block(&state, i);
+			}
 		}
 		MPASS(state.pa <= physmap[i + 1]);
 
 		/* Create L3 mappings at the end of the region */
-		pmap_bootstrap_dmap_l3_page(&state, i);
+		pmap_bootstrap_l3_page(&state, i);
 		MPASS(state.pa == physmap[i + 1]);
 
 		if (state.pa > dmap_phys_max) {
