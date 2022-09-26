@@ -1097,17 +1097,14 @@ pmap_bootstrap_l3_page(struct pmap_bootstrap_state *state, int i)
 	MPASS(state->va == (state->pa - dmap_phys_base + DMAP_MIN_ADDRESS));
 }
 
-static vm_pointer_t
-pmap_bootstrap_dmap(vm_pointer_t kern_l1, vm_paddr_t min_pa,
-    vm_pointer_t freemempos)
+static void
+pmap_bootstrap_dmap(vm_paddr_t min_pa)
 {
 	int i;
 
 	dmap_phys_base = min_pa & ~L1_OFFSET;
 	dmap_phys_max = 0;
 	dmap_max_addr = 0;
-
-	bs_state.freemempos = freemempos;
 
 	for (i = 0; i < (physmap_idx * 2); i += 2) {
 		bs_state.pa = physmap[i] & ~L3_OFFSET;
@@ -1171,48 +1168,38 @@ pmap_bootstrap_dmap(vm_pointer_t kern_l1, vm_paddr_t min_pa,
 #endif
 
 	cpu_tlb_flushID();
-
-	return (bs_state.freemempos);
 }
 
-static vm_pointer_t
-pmap_bootstrap_l2(vm_pointer_t l1pt, vm_offset_t va, vm_pointer_t l2_start)
+static void
+pmap_bootstrap_l2(vm_offset_t va)
 {
 	KASSERT((va & L1_OFFSET) == 0, ("Invalid virtual address"));
 
 	/* Leave bs_state.pa as it's only needed to bootstrap blocks and pages*/
 	bs_state.va = va;
-	bs_state.freemempos = l2_start;
 
 	for (; bs_state.va < VM_MAX_KERNEL_ADDRESS; bs_state.va += L1_SIZE)
 		pmap_bootstrap_l1_table(&bs_state);
-
-	return (bs_state.freemempos);
 }
 
-static vm_pointer_t
-pmap_bootstrap_l3(vm_pointer_t l1pt, vm_offset_t va, vm_pointer_t l3_start)
+static void
+pmap_bootstrap_l3(vm_offset_t va)
 {
 	KASSERT((va & L2_OFFSET) == 0, ("Invalid virtual address"));
 
 	/* Leave bs_state.pa as it's only needed to bootstrap blocks and pages*/
 	bs_state.va = va;
-	bs_state.freemempos = l3_start;
 
 	for (; bs_state.va < VM_MAX_KERNEL_ADDRESS; bs_state.va += L2_SIZE)
 		pmap_bootstrap_l2_table(&bs_state);
-
-	return (bs_state.freemempos);
 }
 
 /*
  *	Bootstrap the system enough to run with virtual memory.
  */
 void
-pmap_bootstrap(vm_pointer_t l0pt, vm_pointer_t l1pt, vm_paddr_t kernstart,
-    vm_size_t kernlen)
+pmap_bootstrap(vm_paddr_t kernstart, vm_size_t kernlen)
 {
-	vm_pointer_t freemempos;
 	vm_pointer_t dpcpu, msgbufpv;
 	vm_paddr_t start_pa, pa, min_pa;
 	uint64_t kern_delta;
@@ -1224,15 +1211,14 @@ pmap_bootstrap(vm_pointer_t l0pt, vm_pointer_t l1pt, vm_paddr_t kernstart,
 
 	kern_delta = KERNBASE - kernstart;
 
-	printf("pmap_bootstrap %lx %lx %lx\n", (vm_offset_t)l1pt,
-	    (vm_offset_t)kernstart, kernlen);
-	printf("%lx\n", (vm_offset_t)l1pt);
+	printf("pmap_bootstrap %lx %lx\n", kernstart, kernlen);
 	printf("%lx\n", (KERNBASE >> L1_SHIFT) & Ln_ADDR_MASK);
 
 	/* Set this early so we can use the pagetable walking functions */
-	kernel_pmap_store.pm_l0 = (pd_entry_t *)l0pt;
+	kernel_pmap_store.pm_l0 = pagetable_l0_ttbr1;
 	PMAP_LOCK_INIT(kernel_pmap);
-	kernel_pmap->pm_l0_paddr = l0pt - kern_delta;
+	kernel_pmap->pm_l0_paddr =
+	    pmap_early_vtophys((vm_offset_t)kernel_pmap_store.pm_l0);
 	kernel_pmap->pm_cookie = COOKIE_FROM(-1, INT_MIN);
 	kernel_pmap->pm_stage = PM_STAGE1;
 	kernel_pmap->pm_levels = 4;
@@ -1256,17 +1242,17 @@ pmap_bootstrap(vm_pointer_t l0pt, vm_pointer_t l1pt, vm_paddr_t kernstart,
 			min_pa = physmap[i];
 	}
 
-	freemempos = KERNBASE;
+	bs_state.freemempos = KERNBASE;
 #ifdef __CHERI_PURE_CAPABILITY__
-	freemempos = (vm_pointer_t)cheri_setaddress(kernel_root_cap,
-	    freemempos);
-	freemempos = cheri_setbounds(freemempos,
+	bs_state.freemempos = (vm_pointer_t)cheri_setaddress(kernel_root_cap,
+	    bs_state.freemempos);
+	bs_state.freemempos = cheri_setbounds(bs_state.freemempos,
 	    VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE - KERNBASE);
 #endif
-	freemempos = roundup2(freemempos + kernlen, PAGE_SIZE);
+	bs_state.freemempos = roundup2(bs_state.freemempos + kernlen, PAGE_SIZE);
 
 	/* Create a direct map region early so we can use it for pa -> va */
-	freemempos = pmap_bootstrap_dmap(l1pt, min_pa, freemempos);
+	pmap_bootstrap_dmap(min_pa);
 	bs_state.dmap_valid = true;
 	/*
 	 * We only use PXN when we know nothing will be executed from it, e.g.
@@ -1281,22 +1267,21 @@ pmap_bootstrap(vm_pointer_t l0pt, vm_pointer_t l1pt, vm_paddr_t kernstart,
 	 * loader allocated the first and only l2 page table page used to map
 	 * the kernel, preloaded files and module metadata.
 	 */
-	freemempos = pmap_bootstrap_l2(l1pt, KERNBASE + L1_SIZE, freemempos);
+	pmap_bootstrap_l2(KERNBASE + L1_SIZE);
 	/* And the l3 tables for the early devmap */
-	freemempos = pmap_bootstrap_l3(l1pt,
-	    VM_MAX_KERNEL_ADDRESS - (PMAP_MAPDEV_EARLY_SIZE), freemempos);
+	pmap_bootstrap_l3(VM_MAX_KERNEL_ADDRESS - (PMAP_MAPDEV_EARLY_SIZE));
 
 	cpu_tlb_flushID();
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define alloc_pages(var, np)						\
-	(var) = cheri_setbounds(freemempos, (np * PAGE_SIZE));		\
-	freemempos += cheri_getlen((void *)(var));			\
+	(var) = cheri_setbounds(bs_state.freemempos, (np * PAGE_SIZE));	\
+	bs_state.freemempos += cheri_getlen((void *)(var));		\
 	memset((char *)(var), 0, ((np) * PAGE_SIZE));
 #else
 #define alloc_pages(var, np)						\
-	(var) = freemempos;						\
-	freemempos += (np * PAGE_SIZE);					\
+	(var) = bs_state.freemempos;					\
+	bs_state.freemempos += (np * PAGE_SIZE);			\
 	memset((char *)(var), 0, ((np) * PAGE_SIZE));
 #endif
 
@@ -1309,7 +1294,7 @@ pmap_bootstrap(vm_pointer_t l0pt, vm_pointer_t l1pt, vm_paddr_t kernstart,
 	msgbufp = (void *)msgbufpv;
 
 	/* Reserve some VA space for early BIOS/ACPI mapping */
-	preinit_map_va = roundup2(freemempos, L2_SIZE);
+	preinit_map_va = roundup2(bs_state.freemempos, L2_SIZE);
 
 	virtual_avail = preinit_map_va + PMAP_PREINIT_MAPPING_SIZE;
 	virtual_avail = roundup2(virtual_avail, L1_SIZE);
@@ -1317,7 +1302,7 @@ pmap_bootstrap(vm_pointer_t l0pt, vm_pointer_t l1pt, vm_paddr_t kernstart,
 	    VM_MAX_KERNEL_ADDRESS - PMAP_MAPDEV_EARLY_SIZE);
 	kernel_vm_end = virtual_avail;
 
-	pa = pmap_early_vtophys(freemempos);
+	pa = pmap_early_vtophys(bs_state.freemempos);
 
 	physmem_exclude_region(start_pa, pa - start_pa, EXFLAG_NOALLOC);
 
