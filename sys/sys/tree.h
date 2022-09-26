@@ -603,6 +603,10 @@ name##_RB_INSERT_COLOR(struct name *head,				\
 		RB_ROTATE(parent, child, sibdir, field);		\
 		_RB_UP(child, field) = gpar;				\
 		RB_SWAP_CHILD(head, gpar, parent, child, field);	\
+		/*							\
+		 * Elements rotated down have new, smaller subtrees,	\
+		 * so update augmentation for them.			\
+		 */							\
 		if (elm != child)					\
 			RB_AUGMENT_CHECK(elm);				\
 		RB_AUGMENT_CHECK(parent);				\
@@ -729,6 +733,11 @@ name##_RB_REMOVE_COLOR(struct name *head,				\
 		RB_ROTATE(parent, elm, elmdir, field);			\
 		RB_SET_PARENT(elm, gpar, field);			\
 		RB_SWAP_CHILD(head, gpar, parent, elm, field);		\
+		/*							\
+		 * An element rotated down, but not into the search	\
+		 * path has a new, smaller subtree, so update		\
+		 * augmentation for it.					\
+		 */							\
 		if (sib != elm)						\
 			RB_AUGMENT_CHECK(sib);				\
 		return (parent);					\
@@ -784,6 +793,11 @@ name##_RB_REMOVE(struct name *head, struct type *out)			\
 		}							\
 		_RB_AUGMENT_WALK(parent, opar, field);			\
 		if (opar != NULL) {					\
+			/*						\
+			 * Elements rotated into the search path have	\
+			 * changed subtrees, so update augmentation for	\
+			 * them if AUGMENT_WALK didn't.			\
+			 */						\
 			RB_AUGMENT_CHECK(opar);				\
 			RB_AUGMENT_CHECK(RB_PARENT(opar, field));	\
 		}							\
@@ -816,6 +830,11 @@ name##_RB_INSERT(struct name *head, struct type *elm)			\
 		tmp = name##_RB_INSERT_COLOR(head, parent, elm);	\
 	_RB_AUGMENT_WALK(elm, tmp, field);				\
 	if (tmp != NULL)						\
+		/*							\
+		 * An element rotated into the search path has a	\
+		 * changed subtree, so update augmentation for it if	\
+		 * AUGMENT_WALK didn't.					\
+		 */							\
 		RB_AUGMENT_CHECK(tmp);					\
 	return (NULL);							\
 }
