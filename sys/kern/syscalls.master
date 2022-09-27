@@ -1507,7 +1507,21 @@
 		    uint32_t key
 		);
 	}
-260-271	AUE_NULL	RESERVED
+260	AUE_NULL	STD|CAPENABLED	{
+		int cheri_revoke_get_shadow(
+			int flags,
+			_In_ void *arena,
+			_Out_ void *shadow,
+		);
+	}
+261	AUE_NULL	STD|CAPENABLED	{
+		void *cheri_revoke(
+		    int flags,
+		    uint64_t start_epoch,
+		    _Out_ struct cheri_revoke_syscall_info *crsi,
+		);
+	}
+262-271	AUE_NULL	RESERVED
 272	AUE_O_GETDENTS	COMPAT11|CAPENABLED {
 		int getdents(
 		    int fd,
