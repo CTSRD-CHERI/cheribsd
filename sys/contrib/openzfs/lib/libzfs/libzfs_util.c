@@ -299,6 +299,9 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	case EZFS_VDEV_NOTSUP:
 		return (dgettext(TEXT_DOMAIN, "operation not supported "
 		    "on this type of vdev"));
+	case EZFS_NOT_USER_NAMESPACE:
+		return (dgettext(TEXT_DOMAIN, "the provided file "
+		    "was not a user namespace file"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:
@@ -484,6 +487,9 @@ zfs_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 		break;
 	case ZFS_ERR_BADPROP:
 		zfs_verror(hdl, EZFS_BADPROP, fmt, ap);
+		break;
+	case ZFS_ERR_NOT_USER_NAMESPACE:
+		zfs_verror(hdl, EZFS_NOT_USER_NAMESPACE, fmt, ap);
 		break;
 	default:
 		zfs_error_aux(hdl, "%s", strerror(error));
@@ -993,16 +999,13 @@ libzfs_free_str_array(char **strs, int count)
  *
  * Returns 0 otherwise.
  */
-int
-libzfs_envvar_is_set(char *envvar)
+boolean_t
+libzfs_envvar_is_set(const char *envvar)
 {
 	char *env = getenv(envvar);
-	if (env && (strtoul(env, NULL, 0) > 0 ||
+	return (env && (strtoul(env, NULL, 0) > 0 ||
 	    (!strncasecmp(env, "YES", 3) && strnlen(env, 4) == 3) ||
-	    (!strncasecmp(env, "ON", 2) && strnlen(env, 3) == 2)))
-		return (1);
-
-	return (0);
+	    (!strncasecmp(env, "ON", 2) && strnlen(env, 3) == 2)));
 }
 
 libzfs_handle_t *
@@ -1276,7 +1279,7 @@ zprop_print_headers(zprop_get_cbdata_t *cbp, zfs_type_t type)
 		/*
 		 * 'PROPERTY' column
 		 */
-		if (pl->pl_prop != ZPROP_INVAL) {
+		if (pl->pl_prop != ZPROP_USERPROP) {
 			const char *propname = (type == ZFS_TYPE_POOL) ?
 			    zpool_prop_to_name(pl->pl_prop) :
 			    ((type == ZFS_TYPE_VDEV) ?
@@ -1749,7 +1752,7 @@ addlist(libzfs_handle_t *hdl, const char *propname, zprop_list_t **listp,
 	 * Return failure if no property table entry was found and this isn't
 	 * a user-defined property.
 	 */
-	if (prop == ZPROP_INVAL && ((type == ZFS_TYPE_POOL &&
+	if (prop == ZPROP_USERPROP && ((type == ZFS_TYPE_POOL &&
 	    !zpool_prop_feature(propname) &&
 	    !zpool_prop_unsupported(propname)) ||
 	    ((type == ZFS_TYPE_DATASET) && !zfs_prop_user(propname) &&
@@ -1764,7 +1767,7 @@ addlist(libzfs_handle_t *hdl, const char *propname, zprop_list_t **listp,
 	zprop_list_t *entry = zfs_alloc(hdl, sizeof (*entry));
 
 	entry->pl_prop = prop;
-	if (prop == ZPROP_INVAL) {
+	if (prop == ZPROP_USERPROP) {
 		entry->pl_user_prop = zfs_strdup(hdl, propname);
 		entry->pl_width = strlen(propname);
 	} else {
@@ -1910,37 +1913,30 @@ zprop_iter(zprop_func func, void *cb, boolean_t show_all, boolean_t ordered,
 	return (zprop_iter_common(func, cb, show_all, ordered, type));
 }
 
-/*
- * Fill given version buffer with zfs userland version
- */
-void
-zfs_version_userland(char *version, int len)
+const char *
+zfs_version_userland(void)
 {
-	(void) strlcpy(version, ZFS_META_ALIAS, len);
+	return (ZFS_META_ALIAS);
 }
 
 /*
  * Prints both zfs userland and kernel versions
- * Returns 0 on success, and -1 on error (with errno set)
+ * Returns 0 on success, and -1 on error
  */
 int
 zfs_version_print(void)
 {
-	char zver_userland[128];
-	char zver_kernel[128];
+	(void) puts(ZFS_META_ALIAS);
 
-	zfs_version_userland(zver_userland, sizeof (zver_userland));
-
-	(void) printf("%s\n", zver_userland);
-
-	if (zfs_version_kernel(zver_kernel, sizeof (zver_kernel)) == -1) {
+	char *kver = zfs_version_kernel();
+	if (kver == NULL) {
 		fprintf(stderr, "zfs_version_kernel() failed: %s\n",
 		    strerror(errno));
 		return (-1);
 	}
 
-	(void) printf("zfs-kmod-%s\n", zver_kernel);
-
+	(void) printf("zfs-kmod-%s\n", kver);
+	free(kver);
 	return (0);
 }
 
@@ -2003,22 +1999,22 @@ use_color(void)
  * color_end();
  */
 void
-color_start(char *color)
+color_start(const char *color)
 {
 	if (use_color())
-		printf("%s", color);
+		fputs(color, stdout);
 }
 
 void
 color_end(void)
 {
 	if (use_color())
-		printf(ANSI_RESET);
+		fputs(ANSI_RESET, stdout);
 }
 
 /* printf() with a color.  If color is NULL, then do a normal printf. */
 int
-printf_color(char *color, char *format, ...)
+printf_color(const char *color, const char *format, ...)
 {
 	va_list aptr;
 	int rc;

@@ -104,6 +104,8 @@ struct image_params {
 	bool textset;
 	u_int map_flags;
 	void * __capability imgact_capability;	/* copyout and mapping cap */
+#define IMGP_ASLR_SHARED_PAGE	0x1
+	uint32_t imgp_flags;
 };
 
 #ifdef _KERNEL

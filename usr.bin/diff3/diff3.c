@@ -112,6 +112,11 @@ struct diff {
 	struct range new;
 };
 
+#define EFLAG_NONE 	0
+#define EFLAG_OVERLAP 	1
+#define EFLAG_NOOVERLAP	2
+#define EFLAG_UNMERGED	3
+
 static size_t szchanges;
 
 static struct diff *d13;
@@ -155,12 +160,16 @@ static void edscript(int) __dead2;
 static void Ascript(int) __dead2;
 static void mergescript(int) __dead2;
 static void increase(void);
-static void usage(void) __dead2;
+static void usage(void);
 static void printrange(FILE *, struct range *);
+
+static const char diff3_version[] = "FreeBSD diff3 20220517";
 
 enum {
 	DIFFPROG_OPT,
 	STRIPCR_OPT,
+	HELP_OPT,
+	VERSION_OPT
 };
 
 #define DIFF_PATH "/usr/bin/diff"
@@ -178,6 +187,8 @@ static struct option longopts[] = {
 	{ "merge",		no_argument,		NULL,	'm' },
 	{ "label",		required_argument,	NULL,	'L' },
 	{ "diff-program",	required_argument,	NULL,	DIFFPROG_OPT },
+	{ "help",		no_argument,		NULL,	HELP_OPT},
+	{ "version",		no_argument,		NULL,	VERSION_OPT}
 };
 
 static void
@@ -185,7 +196,6 @@ usage(void)
 {
 	fprintf(stderr, "usage: diff3 [-3aAeEimTxX] [-L label1] [-L label2] "
 	    "[-L label3] file1 file2 file3\n");
-	exit(2);
 }
 
 static int
@@ -304,11 +314,11 @@ merge(int m1, int m2)
 	d2 = d23;
 	j = 0;
 
-	while ((t1 = d1 < d13 + m1) | (t2 = d2 < d23 + m2)) {
+	while (t1 = d1 < d13 + m1, t2 = d2 < d23 + m2, t1 || t2) {
 		/* first file is different from the others */
 		if (!t2 || (t1 && d1->new.to < d2->new.from)) {
 			/* stuff peculiar to 1st file */
-			if (eflag == 0) {
+			if (eflag == EFLAG_NONE) {
 				printf("====1\n");
 				change(1, &d1->old, false);
 				keep(2, &d1->new);
@@ -319,7 +329,7 @@ merge(int m1, int m2)
 		}
 		/* second file is different from others */
 		if (!t1 || (t2 && d2->new.to < d1->new.from)) {
-			if (eflag == 0) {
+			if (eflag == EFLAG_NONE) {
 				printf("====2\n");
 				keep(1, &d2->new);
 				change(3, &d2->new, false);
@@ -356,7 +366,7 @@ merge(int m1, int m2)
 			 * dup = 0 means all files differ
 			 * dup = 1 means files 1 and 2 identical
 			 */
-			if (eflag == 0) {
+			if (eflag == EFLAG_NONE) {
 				printf("====%s\n", dup ? "3" : "");
 				change(1, &d1->old, dup);
 				change(2, &d2->old, false);
@@ -525,9 +535,11 @@ repos(int nchar)
 static int
 edit(struct diff *diff, bool dup, int j, int difftype)
 {
-
-	if (((dup + 1) & eflag) == 0)
+	if (!(eflag == EFLAG_UNMERGED ||
+		(!dup && eflag == EFLAG_OVERLAP ) ||
+		(dup && eflag == EFLAG_NOOVERLAP))) {
 		return (j);
+	}
 	j++;
 	overlap[j] = !dup;
 	if (!dup)
@@ -535,7 +547,7 @@ edit(struct diff *diff, bool dup, int j, int difftype)
 
 	de[j].type = difftype;
 #if DEBUG
-	de[j].line = diff->line;
+	de[j].line = strdup(diff->line);
 #endif	/* DEBUG */
 
 	de[j].old.from = diff->old.from;
@@ -602,7 +614,7 @@ edscript(int n)
 	if (iflag)
 		printf("w\nq\n");
 
-	exit(eflag == 0 ? overlapcnt : 0);
+	exit(eflag == EFLAG_NONE ? overlapcnt : 0);
 }
 
 /*
@@ -820,13 +832,13 @@ main(int argc, char **argv)
 	struct kevent *e;
 
 	nblabels = 0;
-	eflag = 0;
+	eflag = EFLAG_NONE;
 	oflag = 0;
 	diffargv[diffargc++] = __DECONST(char *, diffprog);
 	while ((ch = getopt_long(argc, argv, OPTIONS, longopts, NULL)) != -1) {
 		switch (ch) {
 		case '3':
-			eflag = 2;
+			eflag = EFLAG_NOOVERLAP;
 			break;
 		case 'a':
 			diffargv[diffargc++] = __DECONST(char *, "-a");
@@ -835,10 +847,10 @@ main(int argc, char **argv)
 			Aflag = 1;
 			break;
 		case 'e':
-			eflag = 3;
+			eflag = EFLAG_UNMERGED;
 			break;
 		case 'E':
-			eflag = 3;
+			eflag = EFLAG_UNMERGED;
 			oflag = 1;
 			break;
 		case 'i':
@@ -859,11 +871,11 @@ main(int argc, char **argv)
 			Tflag = 1;
 			break;
 		case 'x':
-			eflag = 1;
+			eflag = EFLAG_OVERLAP;
 			break;
 		case 'X':
 			oflag = 1;
-			eflag = 1;
+			eflag = EFLAG_OVERLAP;
 			break;
 		case DIFFPROG_OPT:
 			diffprog = optarg;
@@ -872,18 +884,26 @@ main(int argc, char **argv)
 			strip_cr = 1;
 			diffargv[diffargc++] = __DECONST(char *, "--strip-trailing-cr");
 			break;
+		case HELP_OPT:
+			usage();
+			exit(0);
+		case VERSION_OPT:
+			printf("%s\n", diff3_version);
+			exit(0);
 		}
 	}
 	argc -= optind;
 	argv += optind;
 
 	if (Aflag) {
-		eflag = 3;
+		eflag = EFLAG_UNMERGED;
 		oflag = 1;
 	}
 
-	if (argc != 3)
+	if (argc != 3) {
 		usage();
+		exit(2);
+	}
 
 	if (caph_limit_stdio() == -1)
 		err(2, "unable to limit stdio");

@@ -1400,8 +1400,7 @@ retry:
 					object = current->object.vm_object;
 					VM_OBJECT_WLOCK(object);
 				}
-				if (object->type == OBJT_DEFAULT ||
-				    (object->flags & OBJ_SWAP) != 0 ||
+				if ((object->flags & OBJ_SWAP) != 0 ||
 				    object->type == OBJT_VNODE) {
 					pindex = OFF_TO_IDX(current->offset +
 					    (addr - current->start));
@@ -1838,9 +1837,7 @@ vm_mmap_vnode(struct thread *td, vm_size_t objsize,
 			goto done;
 		}
 	} else {
-		KASSERT(obj->type == OBJT_DEFAULT ||
-		    (obj->flags & OBJ_SWAP) != 0,
-		    ("wrong object type"));
+		KASSERT((obj->flags & OBJ_SWAP) != 0, ("wrong object type"));
 		vm_object_reference(obj);
 #if VM_NRESERVLEVEL > 0
 		if ((obj->flags & OBJ_COLORED) == 0) {
@@ -1928,13 +1925,6 @@ vm_mmap_cdev(struct thread *td, vm_size_t objsize, vm_prot_t *protp,
 	return (0);
 }
 
-/*
- * vm_mmap()
- *
- * Internal version of mmap used by exec, sys5 shared memory, and
- * various device drivers.  Handle is either a vnode pointer, a
- * character device, or NULL for MAP_ANON.
- */
 int
 vm_mmap(vm_map_t map, vm_pointer_t *addr, vm_size_t size, vm_prot_t prot,
 	vm_prot_t maxprot, int flags,
@@ -1956,9 +1946,6 @@ vm_mmap(vm_map_t map, vm_pointer_t *addr, vm_size_t size, vm_prot_t prot,
 	KASSERT((prot & VM_PROT_CAP) == 0, ("VM_PROT_CAP set in prot"));
 	KASSERT((maxprot & VM_PROT_CAP) == 0, ("VM_PROT_CAP set in maxprot"));
 
-	/*
-	 * Lookup/allocate object.
-	 */
 	switch (handle_type) {
 	case OBJT_DEVICE: {
 		struct cdevsw *dsw;
@@ -1978,14 +1965,6 @@ vm_mmap(vm_map_t map, vm_pointer_t *addr, vm_size_t size, vm_prot_t prot,
 		error = vm_mmap_vnode(td, size, prot, &maxprot, &flags,
 		    handle, &foff, &object, &writecounted);
 		break;
-	case OBJT_DEFAULT:
-		if (handle == NULL) {
-			prot = VM_PROT_ADD_CAP(prot);
-			maxprot = VM_PROT_ADD_CAP(prot);
-			error = 0;
-			break;
-		}
-		/* FALLTHROUGH */
 	default:
 		error = EINVAL;
 		break;
