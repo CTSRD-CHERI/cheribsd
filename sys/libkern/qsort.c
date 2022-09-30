@@ -48,7 +48,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/libkern.h>
 
 #ifdef I_AM_QSORT_R
-typedef int		 cmp_t(void *, const void *, const void *);
+typedef int		 cmp_t(const void *, const void *, void *);
 #else
 typedef int		 cmp_t(const void *, const void *);
 #endif
@@ -100,7 +100,7 @@ swapfunc(char *a, char *b, size_t n, int swaptype_intcap_t, int swaptype_int)
 	if ((n) > 0) swapfunc(a, b, n, swaptype_intcap_t, swaptype_int)
 
 #ifdef I_AM_QSORT_R
-#define	CMP(t, x, y) (cmp((t), (x), (y)))
+#define	CMP(t, x, y) (cmp((x), (y), (t)))
 #else
 #define	CMP(t, x, y) (cmp((x), (y)))
 #endif
@@ -119,7 +119,7 @@ __unused
 
 #ifdef I_AM_QSORT_R
 void
-qsort_r(void *a, size_t n, size_t es, void *thunk, cmp_t *cmp)
+(qsort_r)(void *a, size_t n, size_t es, cmp_t *cmp, void *thunk)
 #else
 #define	thunk NULL
 void
@@ -204,7 +204,7 @@ loop:	SWAPINIT(intcap_t, a, es);
 		/* Recurse on left partition, then iterate on right partition */
 		if (d1 > es) {
 #ifdef I_AM_QSORT_R
-			qsort_r(a, d1 / es, es, thunk, cmp);
+			qsort_r(a, d1 / es, es, cmp, thunk);
 #else
 			qsort(a, d1 / es, es, cmp);
 #endif
@@ -220,7 +220,7 @@ loop:	SWAPINIT(intcap_t, a, es);
 		/* Recurse on right partition, then iterate on left partition */
 		if (d2 > es) {
 #ifdef I_AM_QSORT_R
-			qsort_r(pn - d2, d2 / es, es, thunk, cmp);
+			qsort_r(pn - d2, d2 / es, es, cmp, thunk);
 #else
 			qsort(pn - d2, d2 / es, es, cmp);
 #endif
