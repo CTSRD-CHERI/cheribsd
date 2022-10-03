@@ -50,6 +50,15 @@ __FBSDID("$FreeBSD$");
 
 static bool aflag = false, kflag = false, vflag = false;
 
+/*
+ * kern/13326, by kbyanc@
+ */
+#define timespecdiv(tvp, uvp, x)					\
+	do {								\
+		(uvp)->tv_sec = (tvp)->tv_sec / x;			\
+		(uvp)->tv_nsec = (tvp)->tv_nsec / x;			\
+	} while(0)
+
 static void
 usage(void)
 {
@@ -81,12 +90,13 @@ humanize(long x)
 }
 
 static void
-ping(void * __capability target, const char *target_name)
+ping(void * __capability target, const char *target_name, int count)
 {
+	static const char *humanized;
 	capv_t in, out;
 	struct timespec before, after, took;
 	ssize_t received;
-	int error;
+	int error, i;
 
 	memset(&out, 0, sizeof(out));
 	out.len = sizeof(out);
@@ -100,12 +110,14 @@ ping(void * __capability target, const char *target_name)
 			warn("clock_gettime");
 	}
 
-	if (kflag)
-		received = cocall_slow(target, &out, out.len, &in, sizeof(in));
-	else
-		received = cocall(target, &out, out.len, &in, sizeof(in));
-	if (received < 0)
-		warn("cocall");
+	for (i = 0; i < count; i++) {
+		if (kflag)
+			received = cocall_slow(target, &out, out.len, &in, sizeof(in));
+		else
+			received = cocall(target, &out, out.len, &in, sizeof(in));
+		if (received < 0)
+			warn("cocall");
+	}
 
 	/*
 	 * We don't care about received data.  It's truncated anyway.
@@ -117,12 +129,21 @@ ping(void * __capability target, const char *target_name)
 			warn("clock_gettime");
 
 		timespecsub(&after, &before, &took);
+		humanized = humanize(took.tv_sec * 1000000000L + took.tv_nsec);
 		if (aflag && !vflag) {
-			printf("%s: %s: %s\n",
-			    getprogname(), target_name, humanize(took.tv_sec * 1000000000L + took.tv_nsec));
+			printf("%s: %s: %s",
+			    getprogname(), target_name, humanized);
 		} else {
-			printf("%s: returned from \"%s\" after %s, pid %d\n",
-			    getprogname(), target_name, humanize(took.tv_sec * 1000000000L + took.tv_nsec), getpid());
+			printf("%s: returned from \"%s\" after %s, pid %d",
+			    getprogname(), target_name, humanized, getpid());
+		}
+
+		if (count == 1) {
+			printf("\n");
+		} else {
+			timespecdiv(&took, &took, count);
+			humanized = humanize(took.tv_sec * 1000000000L + took.tv_nsec);
+			printf(" for %d iterations, %s each\n", count, humanized);
 		}
 	} else
 		printf(".");
@@ -137,7 +158,7 @@ main(int argc, char **argv)
 	char *target_name;
 	char *tmp;
 	float dt = 1.0;
-	int capc, count = 0, ch, error, index = -1, i = 0, c = 0;
+	int capc, c, count = 1, ch, error, i, index = -1;
 
 	while ((ch = getopt(argc, argv, "ac:i:ks:v")) != -1) {
 		switch (ch) {
@@ -235,7 +256,10 @@ main(int argc, char **argv)
 			setvbuf(stdout, NULL, _IONBF, 0);
 	}
 
-	c = 0;
+	/*
+	 * Iterate over capv; c is the index of the current target, i is the iteration number.
+	 */
+	c = i = 0;
 	for (;;) {
 		if (aflag) {
 			if (c == capc)
@@ -264,14 +288,17 @@ main(int argc, char **argv)
 				c = 0;
 		}
 
-		ping(target, target_name);
+		if (aflag) {
+			ping(target, target_name, count);
+		} else {
+			ping(target, target_name, 1);
 
-		i++;
-		if (count != 0 && i >= count)
-			break;
-
-		if (dt > 0 && !aflag)
-			usleep(dt * 1000000.0);
+			i++;
+			if (count != 1 && i >= count)
+				break;
+			if (dt > 0)
+				usleep(dt * 1000000.0);
+		}
 	}
 
 	if (!vflag && !aflag)

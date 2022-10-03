@@ -90,9 +90,10 @@ The
 .Nm
 utility exits 0 on success, and >0 if an error occurs.
 .Sh EXAMPLES
-Execute within the address space of the current
-shell process:
-.Dl coexec Ar $$ Ar coping target-name
+Measure the time for 1000 pings to each service found in
+.Xr capv 7 :
+.Pp
+.Dl coping -ac 1000
 .Pp
 .Sh SEE ALSO
 .Xr capv 1 ,
