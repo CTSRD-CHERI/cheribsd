@@ -822,7 +822,7 @@ cuse_server_write(struct cdev *dev, struct uio *uio, int ioflag)
 static int
 cuse_server_ioctl_copy_locked(struct cuse_server *pcs,
     struct cuse_client_command *pccmd,
-    struct cuse_data_chunk *pchk, int isread)
+    struct cuse_data_chunk *pchk, bool isread)
 {
 	struct proc *p_proc;
 	uint32_t offset;
@@ -850,7 +850,7 @@ cuse_server_ioctl_copy_locked(struct cuse_server *pcs,
 
 	cuse_server_unlock(pcs);
 
-	if (isread == 0) {
+	if (isread == false) {
 		error = copyin(
 		    (void * __capability)pchk->local_ptr,
 		    pccmd->client->ioctl_buffer + offset,
@@ -925,7 +925,7 @@ cuse_proc2proc_copy(struct proc *proc_s, uintcap_t data_s,
 static int
 cuse_server_data_copy_locked(struct cuse_server *pcs,
     struct cuse_client_command *pccmd,
-    struct cuse_data_chunk *pchk, int isread)
+    struct cuse_data_chunk *pchk, bool isread)
 {
 	struct proc *p_proc;
 	int error;
@@ -941,7 +941,7 @@ cuse_server_data_copy_locked(struct cuse_server *pcs,
 
 	cuse_server_unlock(pcs);
 
-	if (isread == 0) {
+	if (isread == false) {
 		error = cuse_proc2proc_copy(
 		    curthread->td_proc, pchk->local_ptr,
 		    p_proc, pchk->peer_ptr,
