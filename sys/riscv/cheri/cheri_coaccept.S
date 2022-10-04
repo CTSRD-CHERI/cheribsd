@@ -129,6 +129,13 @@ _C_LABEL(switcher_coaccept):
 	bnez	t1, 4f
 	cld	t3, SCB_TD(ct0)
 	csd	t3, SCB_BORROWER_TD(idc)
+	/*
+	 * Immediately swap back.
+	 */
+	cmove cs0, ct0
+	li	t0, SYS_getpid
+	ecall
+	cmove ct0, cs0
 	j	5f
 4:
 	csd	zero, SCB_BORROWER_TD(ct0)
