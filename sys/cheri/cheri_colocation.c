@@ -366,18 +366,18 @@ colocation_unborrow(struct thread *td)
 	    "md_tls %p, md_tls_tcb_offset %zd, "
 	    "with td %p, pid %d (%s), switchercb %lp, "
 	    "md_tls %p, md_tls_tcb_offset %zd "
-	     "due to syscall %u",
+	     "due to syscall %s",
 	    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_scb,
 	    (__cheri_fromcap void *)td->td_md.md_tls, td->td_proc->p_md.md_tls_tcb_offset,
 	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_scb,
 	    (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_proc->p_md.md_tls_tcb_offset,
-	     td->td_sa.code);
+	    syscallname(td->td_proc, td->td_frame->tf_t[0]));
 #else
 	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %lp, "
-	    "with td %p, pid %d (%s), switchercb %lp due to syscall %u",
+	    "with td %p, pid %d (%s), switchercb %lp due to syscall %s ",
 	    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_scb,
 	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_scb,
-	    td->td_sa.code);
+		syscallname(td->td_proc, td->td_frame->tf_t[0]));
 #endif
 
 #ifdef DDB
