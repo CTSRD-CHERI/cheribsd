@@ -430,7 +430,7 @@ __END_DECLS
 	KASSERT((ptraddr_t)((p)) == 0 ||			\
 	    (ptraddr_t)((p)) >= VM_MAXUSER_ADDRESS,		\
 	    ("PTR2CAP on user address: %p", (p)));		\
-	(__cheri_tocap __typeof__((*p)) * __capability)(p);	\
+	(__cheri_tocap __typeof__((*(p))) * __capability)(p);	\
 	})
 #else
 #define	PTR2CAP(p)	(p)
