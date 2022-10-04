@@ -94,7 +94,8 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Load the capability to the caller's control block.
 	 */
-	clc	ct0, SCB_CALLER_SCB(idc)
+6:
+	clr.c.aqrl	ct0, SCB_CALLER_SCB(idc)
 
 	/*
 	 * Is this the first invocation of coaccept, or rather a response
@@ -102,7 +103,8 @@ _C_LABEL(switcher_coaccept):
 	 */
 	cgetlen	t1, ct0
 	bnez	t1, 1f
-	csc	cnull, SCB_CALLER_SCB(idc)
+	csc.c.aqrl	t1, cnull, SCB_CALLER_SCB(idc)
+	bnez	t1, 6b
 	li	t0, SYS_copark
 	ecall
 
@@ -165,8 +167,9 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Zero out the scb_peer_scb variables, releasing the spinlock.
 	 */
-	csc	cnull, SCB_CALLEE_SCB(ct0)
-	csc	cnull, SCB_CALLER_SCB(idc)
+	cmove	ct2, cnull
+	csc		cnull, SCB_CALLEE_SCB(ct0)
+	camoswap.c.aqrl	ct4, ct2, SCB_CALLER_SCB(idc)
 
 	li	t0, 0
 	li	a0, 0

@@ -94,25 +94,15 @@ SIGCODE(switcher_cocall)
 	 */
 	csc	ct0, SCB_CALLEE_SCB(idc)
 1:
-#ifdef notyet
 	/*
 	 * Save the capability to the caller's control block in the callee
 	 * context.  This also serves as the callee's spinlock.
 	 */
-	clr.c	ct1, (ct0)
-	cgettag	t2, ct1
-	bnez	t2, 10f
-	csc.c	t3, idc, (ct0)
-	beqz	t3, 1b
-#else
-	/*
-	 * Implement a trivial almost-spinlock.
-	 */
-	clc	ct1, SCB_CALLER_SCB(ct0)
-	cgettag	t2, ct1
-	bnez	t2, 10f
-	csc	idc, SCB_CALLER_SCB(ct0)
-#endif
+	clr.c.aqrl	ct1, SCB_CALLER_SCB(ct0)
+	cgettag		t2, ct1
+	bnez		t2, 10f
+	csc.c.aqrl	t3, idc, SCB_CALLER_SCB(ct0)
+	bnez		t3, 1b
 
 	/*
 	 * If scb_borrower_td in the callee's scb is NULL, then
@@ -220,15 +210,20 @@ CSYM(switcher_cocall_copy_end)
 	cgetlen	t2, ct1
 
 	/*
-	 * It is, go around.
+	 * It is, return EAGAIN
 	 */
-	bnez	t2, 1b
+	bnez	t2, 11f
 	nop
 
 	/*
 	 * Nope - length zero means we need to return error encoded as offset.
 	 */
 	cgetoffset	a0, ct1
+	beqz	a0, 11f
+	li	t0, 1
+	j	4b
+11:
+	li	a0, EBUSY
 	li	t0, 1
 	j	4b
 
