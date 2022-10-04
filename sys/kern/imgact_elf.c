@@ -1713,8 +1713,9 @@ interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
 static void * __capability
 timekeep_cap(struct image_params *imgp)
 {
+	void * __capability tmpcap;
 	struct vmspace *vmspace = imgp->proc->p_vmspace;
-	ptraddr_t timekeep_base;
+	uintcap_t timekeep_base;
 	size_t timekeep_len;
 
 	timekeep_base = vmspace->vm_shp_base + imgp->sysent->sv_timekeep_offset;
@@ -1727,8 +1728,11 @@ timekeep_cap(struct image_params *imgp)
 	KASSERT(timekeep_len == CHERI_REPRESENTABLE_LENGTH(timekeep_len),
 	    ("timekeep_len needs rounding"));
 
-	return (cheri_capability_build_user_data(CHERI_PERMS_USERSPACE_RODATA,
-	    timekeep_base, timekeep_len, 0));
+	tmpcap = (void * __capability)cheri_setboundsexact(
+	    cheri_andperm(timekeep_base, CHERI_PERMS_USERSPACE_RODATA),
+	    timekeep_len);
+
+	return (tmpcap);
 }
 #endif
 
