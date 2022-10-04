@@ -650,7 +650,7 @@ zfs_write_simple(znode_t *zp, const void *data, size_t len,
 	int error = 0;
 	ssize_t resid;
 
-	error = vn_rdwr(UIO_WRITE, ZTOV(zp), __DECONST(void *, data), len, pos,
+	error = vn_rdwr(UIO_WRITE, ZTOV(zp), PTR2CAP(__DECONST(void *, data)), len, pos,
 	    UIO_SYSSPACE, IO_SYNC, kcred, NOCRED, &resid, curthread);
 
 	if (error) {

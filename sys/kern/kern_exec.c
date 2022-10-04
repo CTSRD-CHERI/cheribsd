@@ -2184,17 +2184,17 @@ compress_chunk(struct coredump_params *cp, char * __capability base, char *buf,
 }
 
 int
-core_write(struct coredump_params *cp, const void *base, size_t len,
+core_write(struct coredump_params *cp, const void * __capability base, size_t len,
     off_t offset, enum uio_seg seg, size_t *resid)
 {
 
-	return (vn_rdwr_inchunks(UIO_WRITE, cp->vp, __DECONST(void *, base),
+	return (vn_rdwr_inchunks(UIO_WRITE, cp->vp, __DECONST_CAP(void * __capability, base),
 	    len, offset, seg, IO_UNIT | IO_DIRECT | IO_RANGELOCKED,
 	    cp->active_cred, cp->file_cred, resid, cp->td));
 }
 
 int
-core_output(char * __capability base_cap, size_t len, off_t offset,
+core_output(char * __capability base, size_t len, off_t offset,
     struct coredump_params *cp, void *tmpbuf)
 {
 	vm_map_t map;
@@ -2202,13 +2202,13 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 	size_t resid, runlen;
 	int error;
 	bool success;
-	char *base = (char *)(uintptr_t)(uintcap_t)base_cap;
 
 	KASSERT(is_aligned(base, PAGE_SIZE),
-	    ("%s: user address %p is not page-aligned", __func__, base));
+	    ("%s: user address %zd is not page-aligned", __func__,
+	    (ptraddr_t)(uintcap_t)base));
 
 	if (cp->comp != NULL)
-		return (compress_chunk(cp, base_cap, tmpbuf, len));
+		return (compress_chunk(cp, base, tmpbuf, len));
 
 	map = &cp->td->td_proc->p_vmspace->vm_map;
 	for (; len > 0; base += runlen, offset += runlen, len -= runlen) {
@@ -2221,7 +2221,7 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 		for (runlen = 0; runlen < len; runlen += PAGE_SIZE) {
 			if (core_dump_can_intr && curproc_sigkilled())
 				return (EINTR);
-			error = vm_fault(map, (uintptr_t)base + runlen,
+			error = vm_fault(map, (ptraddr_t)(uintcap_t)base + runlen,
 			    VM_PROT_READ, VM_FAULT_NOFILL, NULL);
 			if (runlen == 0)
 				success = error == KERN_SUCCESS;
@@ -2230,10 +2230,6 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 		}
 
 		if (success) {
-			/*
-			 * NB: The hybrid kernel drops the capability here, it
-			 * will be re-derived in vn_rdwr().
-			 */
 			error = core_write(cp, base, runlen, offset,
 			    UIO_USERSPACE, &resid);
 			if (error != 0) {
@@ -2326,7 +2322,7 @@ core_output_memtag_cheri(char * __capability base, size_t mem_len,
 				    CORE_BUF_SIZE);
 			else {
 				if (hastags)
-					error = core_write(cp, tagbuf,
+					error = core_write(cp, PTR2CAP(tagbuf),
 					    CORE_BUF_SIZE, offset,
 					    UIO_SYSSPACE, NULL);
 				else
@@ -2346,8 +2342,8 @@ core_output_memtag_cheri(char * __capability base, size_t mem_len,
 			error = compressor_write(cp->comp, tagbuf, tagbuflen);
 		else {
 			if (hastags)
-				error = core_write(cp, tagbuf, tagbuflen,
-				    offset, UIO_SYSSPACE, NULL);
+				error = core_write(cp, PTR2CAP(tagbuf),
+				    tagbuflen, offset, UIO_SYSSPACE, NULL);
 			else
 				error = core_extend_file(cp, offset +
 				    tagbuflen);
@@ -2386,7 +2382,7 @@ sbuf_drain_core_output(void *arg, const char *data, int len)
 		error = compressor_write(cp->comp, __DECONST(char *, data),
 		    len);
 	else
-		error = core_write(cp, __DECONST(void *, data), len, cp->offset,
+		error = core_write(cp, PTR2CAP(__DECONST(void *, data)), len, cp->offset,
 		    UIO_SYSSPACE, NULL);
 	if (locked)
 		PROC_LOCK(p);
