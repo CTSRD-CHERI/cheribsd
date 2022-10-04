@@ -1403,7 +1403,17 @@ out:
 	vmspace->vm_maxsaddr = stack_addr;
 	vmspace->vm_stacktop = stack_top;
 	vmspace->vm_ssize = sgrowsiz >> PAGE_SHIFT;
+#if !__has_feature(capabilities) || defined(__CHERI_PURE_CAPABILITY__)
 	vmspace->vm_shp_base = sharedpage_addr;
+#else
+	/*
+	 * We use _rwx here because we need a capability with execute
+	 * permissions, not a sealed one.
+	 */
+	vmspace->vm_shp_base = (uintcap_t)cheri_capability_build_user_rwx(
+	    CHERI_CAP_USER_CODE_PERMS, sharedpage_addr,
+	    sv->sv_shared_page_len, 0);
+#endif
 
 	return (0);
 }
