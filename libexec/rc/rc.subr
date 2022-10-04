@@ -2061,6 +2061,31 @@ find_local_scripts_old() {
 	done
 }
 
+_add_local_script()
+{
+	local escaped_service file preferred service
+	file="$1"
+	service=${file##*/}
+	# Handle common non-variable characters.  All of of them are
+	# squished together and have the potential to collide, but
+	# only '-' appears common and ideally nothing would use these
+	# characters.
+	ltr "$file" " .-/+:" '_' escaped_service
+	if [ "$escaped_service" != "$service" ]; then
+		escaped_service="__$escaped_service"
+	fi
+	preferred="/etc/rc.d/${service}"
+	if [ ! -x "$preferred" ]; then
+		eval preferred=\$_local_script_${escaped_service}
+	fi
+	if [ -n "$preferred" -a "$preferred" != "$file" ]; then
+		warn "${service}: ignoring $file in favor of $preferred"
+		continue
+	fi
+	local_rc="${local_rc} ${file}"
+	eval _local_script_${escaped_service}="$file"
+}
+
 find_local_scripts_new() {
 	local_rc=''
 	for dir in ${local_startup}; do
@@ -2069,7 +2094,7 @@ find_local_scripts_new() {
 				case "$file" in
 				*.sample) ;;
 				*)	if [ -x "$file" ]; then
-						local_rc="${local_rc} ${file}"
+						_add_local_script $file
 					fi
 					;;
 				esac
