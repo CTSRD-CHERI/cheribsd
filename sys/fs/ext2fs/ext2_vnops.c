@@ -1087,7 +1087,7 @@ abortit:
 			ext2_dec_nlink(dp);
 			dp->i_flag |= IN_CHANGE;
 			dirbuf = malloc(dp->i_e2fs->e2fs_bsize, M_TEMP, M_WAITOK | M_ZERO);
-			error = vn_rdwr(UIO_READ, fvp, (caddr_t)dirbuf,
+			error = vn_rdwr(UIO_READ, fvp, PTR2CAP(dirbuf),
 			    ip->i_e2fs->e2fs_bsize, (off_t)0,
 			    UIO_SYSSPACE, IO_NODELOCKED | IO_NOMACCHECK,
 			    tcnp->cn_cred, NOCRED, NULL, NULL);
@@ -1110,7 +1110,7 @@ abortit:
 					ext2_dx_csum_set(ip,
 					    (struct ext2fs_direct_2 *)dirbuf);
 					(void)vn_rdwr(UIO_WRITE, fvp,
-					    (caddr_t)dirbuf,
+					    PTR2CAP(dirbuf),
 					    ip->i_e2fs->e2fs_bsize,
 					    (off_t)0, UIO_SYSSPACE,
 					    IO_NODELOCKED | IO_SYNC |
@@ -1404,7 +1404,7 @@ ext2_mkdir(struct vop_mkdir_args *ap)
 	}
 	memcpy(buf, &dirtemplate, sizeof(dirtemplate));
 	ext2_dirent_csum_set(ip, (struct ext2fs_direct_2 *)buf);
-	error = vn_rdwr(UIO_WRITE, tvp, (caddr_t)buf,
+	error = vn_rdwr(UIO_WRITE, tvp, PTR2CAP(buf),
 	    DIRBLKSIZ, (off_t)0, UIO_SYSSPACE,
 	    IO_NODELOCKED | IO_SYNC | IO_NOMACCHECK, cnp->cn_cred, NOCRED,
 	    NULL, NULL);
@@ -1537,7 +1537,7 @@ ext2_symlink(struct vop_symlink_args *ap)
 		ip->i_size = len;
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
 	} else
-		error = vn_rdwr(UIO_WRITE, vp, __DECONST(void *, ap->a_target),
+		error = vn_rdwr(UIO_WRITE, vp, PTR2CAP(__DECONST(void *, ap->a_target)),
 		    len, (off_t)0, UIO_SYSSPACE, IO_NODELOCKED | IO_NOMACCHECK,
 		    ap->a_cnp->cn_cred, NOCRED, NULL, NULL);
 	if (error)

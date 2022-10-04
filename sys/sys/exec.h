@@ -109,7 +109,7 @@ enum uio_seg;
 
 #define   CORE_BUF_SIZE   (16 * 1024)
 
-int core_write(struct coredump_params *, const void *, size_t, off_t,
+int core_write(struct coredump_params *, const void * __capability, size_t, off_t,
     enum uio_seg, size_t *);
 int core_output(char * __capability, size_t, off_t, struct coredump_params *,
     void *);
