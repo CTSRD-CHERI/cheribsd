@@ -1727,8 +1727,7 @@ timekeep_cap(struct image_params *imgp)
 	KASSERT(timekeep_len == CHERI_REPRESENTABLE_LENGTH(timekeep_len),
 	    ("timekeep_len needs rounding"));
 
-	/* XXX: Read-only? */
-	return (cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS,
+	return (cheri_capability_build_user_data(CHERI_PERMS_USERSPACE_RODATA,
 	    timekeep_base, timekeep_len, 0));
 }
 #endif
