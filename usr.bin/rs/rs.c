@@ -366,18 +366,17 @@ static char **
 getptrs(char **sp)
 {
 	char **p;
-	ptrdiff_t elem_offset;
+	ptrdiff_t offset;
 
-	allocsize *= 2;
+	offset = sp - elem;
+	allocsize += allocsize;
 	p = (char **)realloc(elem, allocsize * sizeof(char *));
 	if (p == NULL)
 		err(1, "no memory");
 
-	/* NB: sp is and must always be derived from elem. */
-	elem_offset = sp - elem;
-	elem = p;
-	endelem = p + allocsize;
-	return(p + elem_offset);
+	sp = p + offset;
+	endelem = (elem = p) + allocsize;
+	return(sp);
 }
 
 static void
