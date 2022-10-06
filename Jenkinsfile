@@ -281,7 +281,7 @@ selectedArchitectures.each { suffix ->
         def extraBuildOptions = '-s'
         if (GlobalVars.isTestSuiteJob) {
             // Enable additional debug checks when running the testsuite
-            extraBuildOptions += ' -DMALLOC_DEBUG'
+            extraBuildOptions += ' -DWITHOUT_MALLOC_PRODUCTION'
         }
         def cheribuildArgs = [
                 "'--cheribsd/build-options=${extraBuildOptions}'",
