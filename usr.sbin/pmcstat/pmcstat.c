@@ -452,6 +452,7 @@ main(int argc, char **argv)
 	int do_callchain, do_descendants, do_logproccsw, do_logprocexit;
 	int do_print, do_read, do_listcounters, do_descr, domains;
 	int do_userspace, i;
+	int exitcode;
 	size_t len;
 	int graphdepth;
 	int pipefd[2], rfd;
@@ -480,6 +481,7 @@ main(int argc, char **argv)
 	do_logprocexit          = 0;
 	do_listcounters         = 0;
 	domains			= 0;
+	exitcode		= EXIT_SUCCESS;
 	use_cumulative_counts   = 0;
 	graphfilename		= "-";
 	args.pa_required	= 0;
@@ -1420,6 +1422,8 @@ main(int argc, char **argv)
 				 * ourselves.
 				 */
 				(void) wait(&c);
+				if (!WIFEXITED(c) || WEXITSTATUS(c) != 0)
+					exitcode = EXIT_FAILURE;
 				runstate = PMCSTAT_FINISHED;
 			} else if (kev.ident == SIGIO) {
 				/*
@@ -1516,5 +1520,5 @@ main(int argc, char **argv)
 			    );
 	}
 
-	exit(EX_OK);
+	exit(exitcode);
 }
