@@ -541,12 +541,16 @@ int drm_release_noglobal(struct inode *inode, struct file *filp)
 EXPORT_SYMBOL(drm_release_noglobal);
 
 #ifdef COMPAT_FREEBSD64
-static uint32_t
-hybrid_process_event(struct drm_pending_event *e, void **ptr)
-{
+union drm_event_u64 {
 	struct drm_event_crtc_sequence64 crtc_seq64;
-	struct drm_event_crtc_sequence *crtc_seq;
 	struct drm_event_vblank64 vbl64;
+};
+
+static uint32_t
+hybrid_process_event(const struct drm_pending_event *e,
+    union drm_event_u64 *de64)
+{
+	struct drm_event_crtc_sequence *crtc_seq;
 	struct drm_event_vblank *vbl;
 	uint32_t length;
 
@@ -554,29 +558,26 @@ hybrid_process_event(struct drm_pending_event *e, void **ptr)
 	case DRM_EVENT_VBLANK:
 	case DRM_EVENT_FLIP_COMPLETE:
 		vbl = (struct drm_event_vblank *)e->event;
-		CP(*vbl, vbl64, base);
-		CP(*vbl, vbl64, user_data);
-		CP(*vbl, vbl64, tv_sec);
-		CP(*vbl, vbl64, tv_usec);
-		CP(*vbl, vbl64, sequence);
-		CP(*vbl, vbl64, crtc_id);
-		vbl64.base.length =
+		CP(*vbl, de64->vbl64, base);
+		CP(*vbl, de64->vbl64, user_data);
+		CP(*vbl, de64->vbl64, tv_sec);
+		CP(*vbl, de64->vbl64, tv_usec);
+		CP(*vbl, de64->vbl64, sequence);
+		CP(*vbl, de64->vbl64, crtc_id);
+		de64->vbl64.base.length =
 		    sizeof(struct drm_event_vblank64);
-		length = vbl64.base.length;
-		*ptr = (void *)&vbl64;
+		length = de64->vbl64.base.length;
 		break;
 
 	case DRM_EVENT_CRTC_SEQUENCE:
-		crtc_seq =
-		    (struct drm_event_crtc_sequence *)e->event;
-		CP(*crtc_seq, crtc_seq64, base);
-		CP(*crtc_seq, crtc_seq64, user_data);
-		CP(*crtc_seq, crtc_seq64, time_ns);
-		CP(*crtc_seq, crtc_seq64, sequence);
-		crtc_seq64.base.length =
+		crtc_seq = (struct drm_event_crtc_sequence *)e->event;
+		CP(*crtc_seq, de64->crtc_seq64, base);
+		CP(*crtc_seq, de64->crtc_seq64, user_data);
+		CP(*crtc_seq, de64->crtc_seq64, time_ns);
+		CP(*crtc_seq, de64->crtc_seq64, sequence);
+		de64->crtc_seq64.base.length =
 		    sizeof(struct drm_event_crtc_sequence64);
-		length = crtc_seq64.base.length;
-		*ptr = (void *)&crtc_seq64;
+		length = de64->crtc_seq64.base.length;
 		break;
 	default:
 		panic("unknown event %d", e->event->type);
@@ -655,12 +656,15 @@ ssize_t drm_read(struct file *filp, char __user * __capability buffer,
 		} else {
 			unsigned length = e->event->length;
 			void *ptr;
-
-			ptr = e->event;
 #ifdef COMPAT_FREEBSD64
-			if (!SV_CURPROC_FLAG(SV_CHERI))
-				length = hybrid_process_event(e, &ptr);
+			union drm_event_u64 de64;
+
+			if (!SV_CURPROC_FLAG(SV_CHERI)) {
+				length = hybrid_process_event(e, &de64);
+				ptr = &de64;
+			} else
 #endif
+				ptr = e->event;
 
 			if (length > count - ret) {
 put_back_event:
