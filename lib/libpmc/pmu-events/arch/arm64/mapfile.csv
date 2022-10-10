@@ -12,6 +12,8 @@
 #
 #
 #Family-model,Version,Filename,EventType
+# XXX: Use the Neoverse-N1 list for Morello until we have a dedicated file.
+0x000000003f0f4120,v1,arm/cortex-a76-n1,core
 0x00000000410fd020,v1,arm/cortex-a34,core
 0x00000000410fd030,v1,arm/cortex-a53,core
 0x00000000420f1000,v1,arm/cortex-a53,core
