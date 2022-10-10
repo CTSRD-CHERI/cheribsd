@@ -330,7 +330,6 @@ dmabuf_fop_mmap(struct file *file, vm_map_t map, vm_pointer_t *addr,
 	    struct thread *td)
 {
 	struct dma_buf *dmabuf;
-	struct vm_area_struct vma;
 
 	if (!file_is_dmabuf(file))
 		return (EINVAL);
@@ -343,11 +342,13 @@ dmabuf_fop_mmap(struct file *file, vm_map_t map, vm_pointer_t *addr,
 	if (*addr + size > max_addr)
 		return (EINVAL);
 
-	vma.vm_start = *addr;
-	vma.vm_end = *addr + size;
-	vma.vm_pgoff = foff;
-
-	return (-dmabuf->ops->mmap(dmabuf, &vma));
+	/*
+	 * XXX: The lack of initialization of the vm_flags member from
+	 * the flags and prot variables suggests this function is broken
+	 * and unused.
+	 */
+	return (-dmabuf->ops->mmap(dmabuf, &(struct vm_area_struct)
+	    {.vm_start = *addr, .vm_end = *addr + size, .vm_pgoff = foff}));
 }
 
 static int
