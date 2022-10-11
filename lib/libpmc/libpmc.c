@@ -1103,28 +1103,29 @@ pmc_allocate(const char *ctrspec, enum pmc_mode mode,
 		pmc_config.pm_caps = 0;
 		pmc_config.pm_class = 0;
 	}
-	free(spec_copy);
-	spec_copy = NULL;
 
 	/* replace an event alias with the canonical event specifier */
 	if (pmc_mdep_event_aliases)
 		for (alias = pmc_mdep_event_aliases; alias->pm_alias; alias++)
-			if (!strcasecmp(ctrspec, alias->pm_alias)) {
-				spec_copy = strdup(alias->pm_spec);
+			if (!strcasecmp(ctrname, alias->pm_alias)) {
+				/* Aliases must not contain a comma. */
+				if (strchr(alias->pm_alias, ',')) {
+					errno = EDOOFUS;
+					goto out;
+				}
+				ctrname = alias->pm_spec;
 				break;
 			}
-
-	/* Try pmu_alias_get as another generic fallback/ */
-	if (spec_copy == NULL) {
-		const char* alias_name = _pmu_alias_get(ctrspec);
-		if (alias_name)
-			spec_copy = strdup(alias_name);
+	/* Try pmu_alias_get as another generic fallback. */
+	const char* alias_name = _pmu_alias_get(ctrname);
+	if (alias_name != ctrname) {
+		/* Aliases must not contain a comma. */
+		if (strchr(alias_name, ',')) {
+			errno = EDOOFUS;
+			goto out;
+		}
+		ctrname = alias_name;
 	}
-	if (spec_copy == NULL)
-		spec_copy = strdup(ctrspec);
-
-	r = spec_copy;
-	ctrname = strsep(&r, ",");
 
 	/*
 	 * If a explicit class prefix was given by the user, restrict the
@@ -1173,8 +1174,7 @@ found:
 		retval = 0;
 	}
 out:
-	if (spec_copy)
-		free(spec_copy);
+	free(spec_copy);
 
 	return (retval);
 }
