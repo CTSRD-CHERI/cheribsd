@@ -42,6 +42,8 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #include <unistd.h>
 
+static bool vflag = false;
+
 static void
 usage(void)
 {
@@ -133,8 +135,16 @@ consider(int *capcp, void * __capability **capvp, int *chosenp,
 		error = colookup(*namep, &lookedup);
 		if (error != 0)
 			err(1, "%s", *namep);
+		if (vflag) {
+			printf("%s: %d: colookedup %#lp from %s\n",
+			    getprogname(), *chosenp, lookedup, *namep);
+		}
 	} else if (*filenamep != NULL) {
 		lookedup = receive_cap(*filenamep);
+		if (vflag) {
+			printf("%s: %d: received %#lp from %s\n",
+			    getprogname(), *chosenp, lookedup, *filenamep);
+		}
 	} else {
 		return;
 	}
@@ -160,7 +170,7 @@ main(int argc, char **argv)
 
 	capvfetch(&capc, &capv);
 
-	while ((ch = getopt(argc, argv, "c:f:i:n:s")) != -1) {
+	while ((ch = getopt(argc, argv, "c:f:i:n:sv")) != -1) {
 		switch (ch) {
 		case 'c':
 			error = colookup(optarg, &lookedup);
@@ -200,6 +210,9 @@ main(int argc, char **argv)
 				err(1, "cosetup");
 			printf("coaccept %#lp, %#lp\n", code, data);
 			return (0);
+		case 'v':
+			vflag = true;
+			break;
 		case '?':
 		default:
 			usage();

@@ -39,10 +39,12 @@
 .Nm
 .Fl c Ar name
 .Nm
+.Op Fl v
 .Fl n Ar name Fl i Ar index
 .Op Fl n Ar name Fl i Ar index Ar ...
 .Ar command Op Ar args ...
 .Nm
+.Op Fl v
 .Fl f Ar path Fl i Ar index
 .Op Fl f Ar path Fl i Ar index Ar ...
 .Ar command Op Ar args ...
@@ -56,6 +58,17 @@ utility uses
 to find named public capability and spawns
 .Ar command
 with that capability passed in its inherited capability vector.
+.Pp
+Note that for capability passing to work,
+.Nm
+must be colocated with the
+.Xr coregister 1
+instance on the other end.
+Typically this will happen automatically, but if not, one can manually
+colocate
+.Nm
+using
+.Xr coexec 1 .
 .Pp
 The following options are available:
 .Bl -tag -width ".Fl ii"
@@ -73,6 +86,8 @@ Name of the capability to insert; see
 .It Fl s
 Instead of spawning anything, print out the sealed pairs returned by
 .Xr cosetup 2 .
+.It Fl v
+Be verbose.
 .El
 .Sh EXIT STATUS
 The
@@ -86,11 +101,12 @@ public capability named
 inserted at offset 5 in its inherited capability vector,
 and then show the vector:
 .Pp
-.Dl colookup -i 5 -n fabulous sh
+.Dl colookup -n fabulous -i 5 sh
 .Dl capv
 .Pp
 .Sh SEE ALSO
 .Xr capv 1 ,
+.Xr coexec 1 ,
 .Xr coregister 1 ,
 .Xr colookup 2 ,
 .Xr capv 7
