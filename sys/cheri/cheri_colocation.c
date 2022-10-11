@@ -371,13 +371,13 @@ colocation_unborrow(struct thread *td)
 	    (__cheri_fromcap void *)td->td_md.md_tls, td->td_proc->p_md.md_tls_tcb_offset,
 	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_scb,
 	    (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_proc->p_md.md_tls_tcb_offset,
-	    syscallname(td->td_proc, td->td_frame->tf_t[0]));
+	    syscallname(td->td_proc, trapframe->tf_t[0]));
 #else
 	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %lp, "
 	    "with td %p, pid %d (%s), switchercb %lp due to syscall %s ",
 	    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_scb,
 	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_scb,
-		syscallname(td->td_proc, td->td_frame->tf_t[0]));
+		syscallname(td->td_proc, trapframe->tf_t[0]));
 #endif
 
 #ifdef DDB
@@ -787,7 +787,7 @@ kern_copark(struct thread *td)
 		//printf("%s: got switched to, td %p, returning ERESTART\n", __func__, td);
 		return (ERESTART);
 	} else {
-		//printf("%s: error %d, td %p\n", __func__, error, td);
+		COLOCATION_DEBUG("error %d, td %p, scb %lp \n", error, td, td->td_scb);
 	}
 
 	return (error);

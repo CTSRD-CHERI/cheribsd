@@ -113,6 +113,12 @@ _C_LABEL(switcher_coaccept):
 	 *
 	 * XXX: Wait for the spinlock to be released.
 	 */
+7:
+	clr.c.aqrl	ct0, SCB_CALLER_SCB(idc)
+	cgetlen	t1, ct0
+	bnez	t1, 7b
+	csc.c.aqrl	t1, cnull, SCB_CALLER_SCB(idc)
+	bnez	t1, 7b
 	j	3f
 
 1:

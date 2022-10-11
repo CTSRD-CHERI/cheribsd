@@ -88,11 +88,6 @@ SIGCODE(switcher_cocall)
 	clc	ct0, SCB_UNSEALCAP(idc)	/* Load the unsealing capability */
 	cunseal	ct0, ca2, ct0		/* Unseal the callee control block */
 
-	/*
-	 * Save the capability to the callee's control block in the caller
-	 * context.
-	 */
-	csc	ct0, SCB_CALLEE_SCB(idc)
 1:
 	/*
 	 * Save the capability to the caller's control block in the callee
@@ -103,6 +98,12 @@ SIGCODE(switcher_cocall)
 	bnez		t2, 10f
 	csc.c.aqrl	t3, idc, SCB_CALLER_SCB(ct0)
 	bnez		t3, 1b
+
+	/*
+	 * Save the capability to the callee's control block in the caller
+	 * context.
+	 */
+	csc	ct0, SCB_CALLEE_SCB(idc)
 
 	/*
 	 * If scb_borrower_td in the callee's scb is NULL, then
@@ -210,13 +211,14 @@ CSYM(switcher_cocall_copy_end)
 	cgetlen	t2, ct1
 
 	/*
-	 * It is, return EAGAIN
+	 * It is, return EBUSY
 	 */
 	bnez	t2, 11f
 	nop
 
 	/*
 	 * Nope - length zero means we need to return error encoded as offset.
+	 * (Unless there's nothing there...)
 	 */
 	cgetoffset	a0, ct1
 	beqz	a0, 11f
