@@ -176,6 +176,7 @@ static struct pmu_alias pmu_armv8_alias_table[] = {
 	{"BRANCH-INSTRUCTION-RETIRED", "BR_RETIRED"},
 	{"BRANCH_MISSES_RETIRED", "BR_MIS_PRED_RETIRED"},
 	{"BRANCH-MISSES-RETIRED", "BR_MIS_PRED_RETIRED"},
+	{"cycles", "CPU_CYCLES"},
 	{"unhalted-cycles", "CPU_CYCLES"},
 	{"instructions", "INST_RETIRED",},
 	{"branch-mispredicts", "BR_MIS_PRED_RETIRED"},
