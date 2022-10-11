@@ -45,6 +45,7 @@
 #include <pmclog.h>
 #include <assert.h>
 #include <libpmcstat.h>
+#include "libpmcinternal.h"
 #include "pmu-events/pmu-events.h"
 
 struct pmu_alias {
@@ -132,8 +133,8 @@ pmu_events_mfr(void)
  *
  */
 
-static const char *
-pmu_alias_get(const char *name)
+const char *
+_pmu_alias_get(const char *name)
 {
 	pmu_mfr_t mfr;
 	struct pmu_alias *pa;
@@ -156,8 +157,8 @@ pmu_alias_get(const char *name)
 }
 #elif defined(__powerpc64__)
 
-static const char *
-pmu_alias_get(const char *name)
+const char *
+_pmu_alias_get(const char *name)
 {
 	return (name);
 }
@@ -183,8 +184,8 @@ static struct pmu_alias pmu_armv8_alias_table[] = {
 	{NULL, NULL},
 };
 
-static const char *
-pmu_alias_get(const char *name)
+const char *
+_pmu_alias_get(const char *name)
 {
 	struct pmu_alias *pa;
 
@@ -197,8 +198,8 @@ pmu_alias_get(const char *name)
 
 #else
 
-static const char *
-pmu_alias_get(const char *name)
+const char *
+_pmu_alias_get(const char *name)
 {
 
 	return (name);
@@ -284,7 +285,7 @@ pmc_pmu_idx_get_by_event(const char *cpuid, const char *event)
 	int idx;
 	const char *realname;
 
-	realname = pmu_alias_get(event);
+	realname = _pmu_alias_get(event);
 	if (pmu_event_get(cpuid, realname, &idx) == NULL)
 		return (-1);
 	return (idx);
@@ -365,7 +366,7 @@ pmc_pmu_sample_rate_get(const char *event_name)
 	const struct pmu_event *pe;
 	struct pmu_event_desc ped;
 
-	event_name = pmu_alias_get(event_name);
+	event_name = _pmu_alias_get(event_name);
 	if ((pe = pmu_event_get(NULL, event_name, NULL)) == NULL)
 		return (DEFAULT_SAMPLE_COUNT);
 	if (pe->event == NULL)
@@ -587,7 +588,7 @@ pmc_pmu_pmcallocate(const char *event_name, struct pmc_op_pmcallocate *pm)
 
 	bzero(&pm->pm_md, sizeof(pm->pm_md));
 	pm->pm_caps |= (PMC_CAP_READ | PMC_CAP_WRITE);
-	event_name = pmu_alias_get(event_name);
+	event_name = _pmu_alias_get(event_name);
 	if ((pe = pmu_event_get(NULL, event_name, &idx)) == NULL)
 		return (ENOENT);
 	assert(idx >= 0);
@@ -615,7 +616,7 @@ pmc_pmu_pmcallocate(const char *event_name, struct pmc_op_pmcallocate *pm)
 
 	bzero(&pm->pm_md, sizeof(pm->pm_md));
 	pm->pm_caps |= (PMC_CAP_READ | PMC_CAP_WRITE);
-	event_name = pmu_alias_get(event_name);
+	event_name = _pmu_alias_get(event_name);
 
 	if ((pe = pmu_event_get(NULL, event_name, &idx)) == NULL)
 		return (ENOENT);
@@ -640,7 +641,7 @@ pmc_pmu_pmcallocate(const char *event_name, struct pmc_op_pmcallocate *pm)
 	struct pmu_event_desc ped;
 	int idx = -1;
 
-	event_name = pmu_alias_get(event_name);
+	event_name = _pmu_alias_get(event_name);
 	if ((pe = pmu_event_get(NULL, event_name, &idx)) == NULL)
 		return (ENOENT);
 	if (pe->event == NULL)

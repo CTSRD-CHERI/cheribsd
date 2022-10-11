@@ -1114,6 +1114,12 @@ pmc_allocate(const char *ctrspec, enum pmc_mode mode,
 				break;
 			}
 
+	/* Try pmu_alias_get as another generic fallback/ */
+	if (spec_copy == NULL) {
+		const char* alias_name = _pmu_alias_get(ctrspec);
+		if (alias_name)
+			spec_copy = strdup(alias_name);
+	}
 	if (spec_copy == NULL)
 		spec_copy = strdup(ctrspec);
 
