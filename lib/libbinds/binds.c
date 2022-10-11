@@ -32,6 +32,7 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
+#include <sys/syscall.h>
 #include <capv.h>
 #include <err.h>
 #include <errno.h>
@@ -41,36 +42,50 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <unistd.h>
 
+__thread static void * __capability target = NULL;
+
+/*
+ * We could turn this into a constructor, but then we would lose
+ * the advantage of this code never being run unless the thread
+ * actually makes an attempt to call clock_gettime().
+ */
+static inline int
+init_maybe(void)
+{
+	void * __capability *capv;
+	int capc, error;
+
+	if (__predict_true(target != NULL))
+		return (0);
+
+	capvfetch(&capc, &capv);
+	if (capc <= CAPV_BINDS || capv[CAPV_BINDS] == NULL) {
+		warn("%s: null capability %d", __func__, CAPV_BINDS);
+		errno = ENOLINK;
+		return (-1);
+	}
+	error = cosetup(COSETUP_COCALL);
+	if (error != 0) {
+		warn("%s: cosetup", __func__);
+		return (-1);
+	}
+	target = capv[CAPV_BINDS];
+
+	return (0);
+}
+
 int
 bind(int s, const struct sockaddr *addr, socklen_t addrlen)
 {
-	__thread static void * __capability target = NULL;
 	capv_binds_return_t in;
 	capv_binds_t out;
-	void * __capability *capv;
 	void * __capability fdcap;
 	ssize_t received;
-	int capc, error;
+	int error;
 
-	/*
-	 * We could turn this into a constructor, but then we would lose
-	 * the advantage of this code never being run unless the thread
-	 * actually makes an attempt to call clock_gettime().
-	 */
-	if (__predict_false(target == NULL)) {
-		capvfetch(&capc, &capv);
-		if (capc <= CAPV_BINDS || capv[CAPV_BINDS] == NULL) {
-			warn("%s: null capability %d", __func__, CAPV_BINDS);
-			errno = ENOLINK;
-			return (-1);
-		}
-		error = cosetup(COSETUP_COCALL);
-		if (error != 0) {
-			warn("%s: cosetup", __func__);
-			return (-1);
-		}
-		target = capv[CAPV_BINDS];
-	}
+	error = init_maybe();
+	if (error != 0)
+		return (error);
 
 	error = capfromfd(&fdcap, s);
 	if (error != 0)
@@ -81,7 +96,7 @@ bind(int s, const struct sockaddr *addr, socklen_t addrlen)
 	 */
 	memset(&out, 0, sizeof(out));
 	out.len = sizeof(out);
-	out.op = CAPV_BINDS;
+	out.op = SYS_bind;
 	out.s = fdcap;
 	memcpy(&out.addr, addr, addrlen);
 	out.addrlen = addrlen;
@@ -95,21 +110,62 @@ bind(int s, const struct sockaddr *addr, socklen_t addrlen)
 	/*
 	 * Handle the response.
 	 */
-	if ((size_t)received != in.len || in.len != sizeof(in)) {
-		warnx("%s: size mismatch: received %zd, in.len %zd, expected %zd; returning ENOMSG",
-		    __func__, (size_t)received, in.len, sizeof(in));
+	if ((size_t)received != sizeof(in)) {
+		warnx("%s: size mismatch: received %zd, expected %zd; returning ENOMSG",
+		    __func__, (size_t)received, sizeof(in));
 		errno = ENOMSG;
 		return (error);
 	}
 
-	if (in.op != -CAPV_BINDS) {
-		warnx("%s: id mismatch: in.op %d, expected %d; returning ENOMSG",
-		    __func__, in.op, -CAPV_BINDS);
+	fprintf(stderr, "%s: <- op %d returned error %d, errno %d\n", __func__, in.op, in.error, in.errno_);
+	error = in.error;
+	errno = in.errno_;
+	return (error);
+}
+
+int
+connect(int s, const struct sockaddr *addr, socklen_t addrlen)
+{
+	capv_binds_return_t in;
+	capv_binds_t out;
+	void * __capability fdcap;
+	ssize_t received;
+	int error;
+
+	error = init_maybe();
+	if (error != 0)
+		return (error);
+
+	error = capfromfd(&fdcap, s);
+	if (error != 0)
+		err(1, "capfromfd");
+
+	/*
+	 * Send our request.
+	 */
+	memset(&out, 0, sizeof(out));
+	out.len = sizeof(out);
+	out.op = SYS_connect;
+	out.s = fdcap;
+	memcpy(&out.addr, addr, addrlen);
+	out.addrlen = addrlen;
+
+	received = cocall(target, &out, out.len, &in, sizeof(in));
+	if (received < 0) {
+		warn("%s: cocall", __func__);
+		return (error);
+	}
+
+	/*
+	 * Handle the response.
+	 */
+	if ((size_t)received != sizeof(in)) {
+		warnx("%s: size mismatch: received %zd, expected %zd; returning ENOMSG",
+		    __func__, (size_t)received, sizeof(in));
 		errno = ENOMSG;
 		return (error);
 	}
 
-	//fprintf(stderr, "%s: <- returned error %d, errno %d\n", __func__, in.error, in.errno_);
 	error = in.error;
 	errno = in.errno_;
 	return (error);

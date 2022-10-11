@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/auxv.h>
 #include <sys/capsicum.h>
 #include <sys/param.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <assert.h>
@@ -201,6 +202,9 @@ main(int argc, char **argv)
 	sa.sa_flags = SA_NOCLDSTOP;
 	sigfillset(&sa.sa_mask);
 
+	/*
+	 * We are spawning child processes, so we'll need to handle SIGCHLD.
+	 */
 	error = sigaction(SIGCHLD, &sa, NULL);
 	if (error != 0)
 		err(1, "sigaction");
@@ -271,21 +275,23 @@ main(int argc, char **argv)
 #endif
 
 	memset(out, 0, sizeof(*out));
-	out->len = 0; /* Nothing to send back at this point. */
 
 	for (;;) {
+		/*
+		 * Send back a response, if any, and wait for the next call.
+		 */
 		if (kflag)
 			received = coaccept_slow(&cookie, out, out->len, &in, sizeof(in));
 		else
 			received = coaccept(&cookie, out, out->len, &in, sizeof(in));
 		if (received < 0) {
 			warn("%s", kflag ? "coaccept_slow" : "coaccept");
-			out->len = 0;
+			memset(out, 0, sizeof(*out));
 			continue;
 		}
 
 		/*
-		 * Answered, unmarshall the input buffer.
+		 * Answered.
 		 */
 		if (vflag) {
 			error = cocachedpid(&pid, cookie);
@@ -295,52 +301,91 @@ main(int argc, char **argv)
 			    getprogname(), in.op, in.len, pid, getpid(), kflag ? " (slow)" : "");
 		}
 
+		/*
+		 * Many syscalls are similar to one another; handle the similarities
+		 * here.
+		 */
 		error = errno = 0;
+
 		switch (in.op) {
 		case 0:
+			/*
+			 * Is this a proper packet?  Op 0 is answerback request, so the size
+			 * obviously won't match; just make sure that we've received the op field.
+			 */
+			if ((size_t)received < sizeof(capv_t)) {
+				warnx("size mismatch: received %zd, expected %zd",
+				    (size_t)received, sizeof(capv_t));
+				capvreturn(out, 0, -1, ENOMSG);
+				goto respond;
+			}
+
 			answerback(&outbuf.answerback);
-			break;
-		case CAPV_BINDS:
+			goto respond;
+		case SYS_bind:
+		case SYS_connect:
 			/*
 			 * Is this a proper packet?
 			 */
-			if ((size_t)received != in.len || in.len != sizeof(in)) {
-				warnx("size mismatch: received %zd, in.len %zd, expected %zd",
-				    (size_t)received, in.len, sizeof(in));
-				capvreturn(out, -CAPV_BINDS, error, ENOMSG);
-				break;
+			if ((size_t)received != sizeof(in)) {
+				warnx("size mismatch: received %zd, expected %zd",
+				    (size_t)received, sizeof(in));
+				capvreturn(out, 0, -1, ENOMSG);
+				goto respond;
 			}
 
 			/*
-			 * Do the thing.
+			 * Receive the socket descriptor.
 			 */
 			error = captofd(in.s, &fd);
 			if (error != 0) {
 				warn("captofd: %#lp", in.s);
-				capvreturn(out, -CAPV_BINDS, error, ENOMSG);
-				break;
+				capvreturn(out, -in.op, error, ENOMSG);
+				goto respond;
 			}
 			error = check_if_denied(&in.addr, in.addrlen, pid);
 			if (error != 0) {
-				capvreturn(out, -CAPV_BINDS, -1, error);
-				break;
+				capvreturn(out, -in.op, -1, error);
+				goto respond;
 			}
+			break;
+		default:
+			warnx("unknown op %d", in.op);
+			capvreturn(out, -in.op, -1, ENOMSG);
+			goto respond;
+		}
+
+		/*
+		 * Do the thing.
+		 */
+		switch (in.op) {
+		case SYS_bind:
 			error = bind(fd, (const struct sockaddr *)&in.addr, in.addrlen);
 			if (error != 0)
 				warn("bind(%d, ..., %u)", fd, in.addrlen);
+			break;
+		case SYS_connect:
+			error = connect(fd, (const struct sockaddr *)&in.addr, in.addrlen);
+			if (error != 0)
+				warn("connect(%d, ..., %u)", fd, in.addrlen);
+			break;
+		}
 
-			capvreturn(out, -CAPV_BINDS, error, ENOMSG);
+		/*
+		 * Cleanup, again supposed to be shared between multiple syscalls.
+		 */
+		switch (in.op) {
+		case SYS_bind:
+		case SYS_connect:
+			capvreturn(out, -in.op, error, errno);
 
 			error = close(fd);
 			if (error != 0)
 				warn("close(%d)", fd);
 			break;
-		default:
-			warnx("unknown op %d", in.op);
-			capvreturn(out, -CAPV_BINDS, -1, ENOMSG);
-			break;
 		}
 
+respond:
 		/*
 		 * Send the response back and loop.
 		 */
