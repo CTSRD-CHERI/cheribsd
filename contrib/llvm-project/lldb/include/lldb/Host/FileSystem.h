@@ -21,8 +21,8 @@
 
 #include "lldb/lldb-types.h"
 
-#include <stdint.h>
-#include <stdio.h>
+#include <cstdint>
+#include <cstdio>
 #include <sys/stat.h>
 
 namespace lldb_private {
@@ -31,15 +31,13 @@ public:
   static const char *DEV_NULL;
   static const char *PATH_CONVERSION_ERROR;
 
-  FileSystem()
-      : m_fs(llvm::vfs::getRealFileSystem()), m_collector(nullptr),
-        m_mapped(false) {}
-  FileSystem(std::shared_ptr<llvm::FileCollector> collector)
-      : m_fs(llvm::vfs::getRealFileSystem()), m_collector(collector),
+  FileSystem() : m_fs(llvm::vfs::getRealFileSystem()), m_collector(nullptr) {}
+  FileSystem(std::shared_ptr<llvm::FileCollectorBase> collector)
+      : m_fs(llvm::vfs::getRealFileSystem()), m_collector(std::move(collector)),
         m_mapped(false) {}
   FileSystem(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs,
              bool mapped = false)
-      : m_fs(fs), m_collector(nullptr), m_mapped(mapped) {}
+      : m_fs(std::move(fs)), m_collector(nullptr), m_mapped(mapped) {}
 
   FileSystem(const FileSystem &fs) = delete;
   FileSystem &operator=(const FileSystem &fs) = delete;
@@ -47,7 +45,7 @@ public:
   static FileSystem &Instance();
 
   static void Initialize();
-  static void Initialize(std::shared_ptr<llvm::FileCollector> collector);
+  static void Initialize(std::shared_ptr<llvm::FileCollectorBase> collector);
   static llvm::Error Initialize(const FileSpec &mapping);
   static void Initialize(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs);
   static void Terminate();
@@ -141,6 +139,14 @@ public:
   void Resolve(FileSpec &file_spec);
   /// \}
 
+  /// Remove a single file.
+  ///
+  /// The path must specify a file and not a directory.
+  /// \{
+  Status RemoveFile(const FileSpec &file_spec);
+  Status RemoveFile(const llvm::Twine &path);
+  /// \}
+
   //// Create memory buffer from path.
   /// \{
   std::shared_ptr<DataBufferLLVM> CreateDataBuffer(const llvm::Twine &path,
@@ -153,6 +159,10 @@ public:
 
   /// Call into the Host to see if it can help find the file.
   bool ResolveExecutableLocation(FileSpec &file_spec);
+
+  /// Get the user home directory.
+  bool GetHomeDirectory(llvm::SmallVectorImpl<char> &path) const;
+  bool GetHomeDirectory(FileSpec &file_spec) const;
 
   enum EnumerateDirectoryResult {
     /// Enumerate next entry in the current directory.
@@ -189,11 +199,14 @@ public:
   void Collect(const FileSpec &file_spec);
   void Collect(const llvm::Twine &file);
 
+  void SetHomeDirectory(std::string home_directory);
+
 private:
   static llvm::Optional<FileSystem> &InstanceImpl();
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> m_fs;
-  std::shared_ptr<llvm::FileCollector> m_collector;
-  bool m_mapped;
+  std::shared_ptr<llvm::FileCollectorBase> m_collector;
+  std::string m_home_directory;
+  bool m_mapped = false;
 };
 } // namespace lldb_private
 

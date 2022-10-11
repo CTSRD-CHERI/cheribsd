@@ -357,10 +357,6 @@ typedef struct {
 #define	EF_MIPS_ABI_O64		0x00002000
 #define	EF_MIPS_ABI_EABI32	0x00003000
 #define	EF_MIPS_ABI_EABI64	0x00004000
-#define	EF_MIPS_ABI_CHERIABI	0x0000C000
-#define	EF_MIPS_MACH_CHERI128	0x00C10000	/* 128 bit CHERI */
-#define	EF_MIPS_MACH_CHERI256	0x00C20000	/* 256 bit CHERI */
-#define	EF_MIPS_MACH		0x00FF0000	/* Machine mask */
 #define	EF_MIPS_ARCH_ASE	0x0F000000	/* Architectural extensions */
 #define	EF_MIPS_ARCH_ASE_MDMX	0x08000000	/* MDMX multimedia extension */
 #define	EF_MIPS_ARCH_ASE_M16	0x04000000	/* MIPS-16 ISA extensions */
@@ -624,6 +620,9 @@ typedef struct {
 #define	DT_PREINIT_ARRAYSZ 33	/* Size in bytes of the array of
 				   pre-initialization functions. */
 #define	DT_MAXPOSTAGS	34	/* number of positive tags */
+#define	DT_RELRSZ	35	/* Total size of ElfNN_Relr relocations. */
+#define	DT_RELR		36	/* Address of ElfNN_Relr relocations. */
+#define	DT_RELRENT	37	/* Size of each ElfNN_Relr relocation. */
 #define	DT_LOOS		0x6000000d	/* First OS-specific */
 #define	DT_SUNW_AUXILIARY	0x6000000d	/* symbol auxiliary name */
 #define	DT_SUNW_RTLDINF		0x6000000e	/* ld.so.1 info (private) */
@@ -685,6 +684,10 @@ typedef struct {
 
 #define	DT_LOPROC	0x70000000	/* First processor-specific type. */
 
+#define	DT_AARCH64_BTI_PLT		0x70000001
+#define	DT_AARCH64_PAC_PLT		0x70000003
+#define	DT_AARCH64_VARIANT_PCS		0x70000005
+
 #define	DT_ARM_SYMTABSZ			0x70000001
 #define	DT_ARM_PREEMPTMAP		0x70000002
 
@@ -737,28 +740,6 @@ typedef struct {
 #define	DT_MIPS_RLD_OBJ_UPDATE		0x70000033
 #define	DT_MIPS_RWPLT			0x70000034
 #define	DT_MIPS_RLD_MAP_REL		0x70000035
-
-#define	DT_MIPS_CHERI___CAPRELOCS	0x7000c000 /* start of __cap_relocs section */
-#define	DT_MIPS_CHERI___CAPRELOCSSZ	0x7000c001 /* size of __cap_relocs section */
-#define	DT_MIPS_CHERI_FLAGS		0x7000c002 /* various CHERI flags (e.g. ABI) */
-#define	DT_MIPS_CHERI_CAPTABLE		0x7000c003 /* start of .captable */
-#define	DT_MIPS_CHERI_CAPTABLESZ	0x7000c004 /* size of .captable */
-#define	DT_MIPS_CHERI_CAPTABLE_MAPPING	0x7000c005 /* start of .captable_mapping */
-#define	DT_MIPS_CHERI_CAPTABLE_MAPPINGSZ	0x7000c006 /* size of .captable_mapping */
-
-#ifndef LOCORE
-enum MipsCheriFlags {
-	DF_MIPS_CHERI_NONE		= 0x00000000,
-	DF_MIPS_CHERI_ABI_MASK		= 0x00000007,
-	DF_MIPS_CHERI_ABI_LEGACY	= 0x00000000, /* No longer supported. */
-	DF_MIPS_CHERI_ABI_PCREL		= 0x00000001,
-	DF_MIPS_CHERI_ABI_PLT		= 0x00000002,
-	DF_MIPS_CHERI_ABI_FNDESC	= 0x00000003,
-	DF_MIPS_CHERI_CAPTABLE_PER_FILE = 0x00000008,
-	DF_MIPS_CHERI_CAPTABLE_PER_FUNC = 0x00000010,
-	DF_MIPS_CHERI_RELATIVE_CAPRELOCS = 0x00000020
-};
-#endif
 
 #define	DT_PPC_GOT			0x70000000
 #define	DT_PPC_TLSOPT			0x70000001
@@ -823,13 +804,16 @@ enum MipsCheriFlags {
 #define	NT_FREEBSD_ARCH_TAG	3
 #define	NT_FREEBSD_FEATURE_CTL	4
 
+/* Values for n_type used in CheriBSD executables. */
+#define	NT_CHERIBSD_ABI_TAG	1
+
 /* NT_FREEBSD_FEATURE_CTL desc[0] bits */
 #define	NT_FREEBSD_FCTL_ASLR_DISABLE	0x00000001
 #define	NT_FREEBSD_FCTL_PROTMAX_DISABLE	0x00000002
 #define	NT_FREEBSD_FCTL_STKGAP_DISABLE	0x00000004
 #define	NT_FREEBSD_FCTL_WXNEEDED	0x00000008
 #define	NT_FREEBSD_FCTL_LA48		0x00000010
-#define	NT_FREEBSD_FCTL_ASG_DISABLE	0x00000020 /* ASLR STACK GAP Disable */
+/* was ASG_DISABLE, do not reuse	0x00000020 */
 
 /* Values for n_type.  Used in core files. */
 #define	NT_PRSTATUS	1	/* Process status. */
@@ -849,8 +833,11 @@ enum MipsCheriFlags {
 #define	NT_CAPREGS		20	/* Capability registers. */
 #define	NT_PPC_VMX	0x100	/* PowerPC Altivec/VMX registers */
 #define	NT_PPC_VSX	0x102	/* PowerPC VSX registers */
+#define	NT_X86_SEGBASES	0x200	/* x86 FS/GS base addresses. */
 #define	NT_X86_XSTATE	0x202	/* x86 XSAVE extended state. */
 #define	NT_ARM_VFP	0x400	/* ARM VFP registers */
+#define	NT_ARM_TLS	0x401	/* ARM TLS register */
+#define	NT_ARM_ADDR_MASK	0x406	/* arm64 address mask (e.g. for TBI) */
 
 /* GNU note types. */
 #define	NT_GNU_ABI_TAG		1
@@ -861,6 +848,11 @@ enum MipsCheriFlags {
 
 #define	GNU_PROPERTY_LOPROC			0xc0000000
 #define	GNU_PROPERTY_HIPROC			0xdfffffff
+
+#define	GNU_PROPERTY_AARCH64_FEATURE_1_AND	0xc0000000
+
+#define	GNU_PROPERTY_AARCH64_FEATURE_1_BTI	0x00000001
+#define	GNU_PROPERTY_AARCH64_FEATURE_1_PAC	0x00000002
 
 #define	GNU_PROPERTY_X86_FEATURE_1_AND		0xc0000002
 
@@ -962,6 +954,7 @@ enum MipsCheriFlags {
 
 /* Values for ch_type (compressed section headers). */
 #define	ELFCOMPRESS_ZLIB	1	/* ZLIB/DEFLATE */
+#define	ELFCOMPRESS_ZSTD	2	/* Zstandard */
 #define	ELFCOMPRESS_LOOS	0x60000000	/* OS-specific */
 #define	ELFCOMPRESS_HIOS	0x6fffffff
 #define	ELFCOMPRESS_LOPROC	0x70000000	/* Processor-specific */
@@ -1002,9 +995,10 @@ enum MipsCheriFlags {
 #define	AT_ENVV		31	/* Environment vector */
 #define	AT_PS_STRINGS	32	/* struct ps_strings */
 #define	AT_FXRNG	33	/* Pointer to root RNG seed version. */
-#define	AT_CAPV		34	/* Capability vector passed to coexecvec(2) */
+#define	AT_KPRELOAD	34	/* Base of vdso, preloaded by rtld */
+#define	AT_CAPV		35	/* Capability vector passed to coexecvec(2) */
 
-#define	AT_COUNT	35	/* Count of defined aux entry types. */
+#define	AT_COUNT	36	/* Count of defined aux entry types. */
 
 /*
  * Relocation types.
@@ -1082,6 +1076,8 @@ enum MipsCheriFlags {
 #define	R_MORELLO_JUMP_SLOT	59394
 #define	R_MORELLO_RELATIVE	59395
 #define	R_MORELLO_IRELATIVE	59396
+#define	R_MORELLO_TLSDESC	59397
+#define	R_MORELLO_TLS_TPREL128	59398
 
 #if __has_feature(capabilities)
 #define	MORELLO_FRAG_EXECUTABLE	0x4
@@ -1396,10 +1392,6 @@ enum MipsCheriFlags {
 #define	R_RISCV_RVC_BRANCH	44
 #define	R_RISCV_RVC_JUMP	45
 #define	R_RISCV_RVC_LUI		46
-#define	R_RISCV_GPREL_I		47
-#define	R_RISCV_GPREL_S		48
-#define	R_RISCV_TPREL_I		49
-#define	R_RISCV_TPREL_S		50
 #define	R_RISCV_RELAX		51
 #define	R_RISCV_SUB6		52
 #define	R_RISCV_SET6		53

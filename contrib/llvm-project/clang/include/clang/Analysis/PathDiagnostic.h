@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CLANG_STATICANALYZER_CORE_BUGREPORTER_PATHDIAGNOSTIC_H
-#define LLVM_CLANG_STATICANALYZER_CORE_BUGREPORTER_PATHDIAGNOSTIC_H
+#ifndef LLVM_CLANG_ANALYSIS_PATHDIAGNOSTIC_H
+#define LLVM_CLANG_ANALYSIS_PATHDIAGNOSTIC_H
 
 #include "clang/AST/Stmt.h"
 #include "clang/Analysis/AnalysisDeclContext.h"
@@ -41,10 +41,8 @@ class AnalysisDeclContext;
 class BinaryOperator;
 class CallEnter;
 class CallExitEnd;
-class CallExpr;
 class ConditionalOperator;
 class Decl;
-class Expr;
 class LocationContext;
 class MemberExpr;
 class ProgramPoint;
@@ -57,6 +55,39 @@ namespace ento {
 //===----------------------------------------------------------------------===//
 
 class PathDiagnostic;
+
+/// These options tweak the behavior of path diangostic consumers.
+/// Most of these options are currently supported by very few consumers.
+struct PathDiagnosticConsumerOptions {
+  /// Run-line of the tool that produced the diagnostic.
+  /// It can be included with the diagnostic for debugging purposes.
+  std::string ToolInvocation;
+
+  /// Whether to include additional information about macro expansions
+  /// with the diagnostics, because otherwise they can be hard to obtain
+  /// without re-compiling the program under analysis.
+  bool ShouldDisplayMacroExpansions = false;
+
+  /// Whether to include LLVM statistics of the process in the diagnostic.
+  /// Useful for profiling the tool on large real-world codebases.
+  bool ShouldSerializeStats = false;
+
+  /// If the consumer intends to produce multiple output files, should it
+  /// use a pseudo-random file name name or a human-readable file name.
+  bool ShouldWriteVerboseReportFilename = false;
+
+  /// Whether the consumer should treat consumed diagnostics as hard errors.
+  /// Useful for breaking your build when issues are found.
+  bool ShouldDisplayWarningsAsErrors = false;
+
+  /// Whether the consumer should attempt to rewrite the source file
+  /// with fix-it hints attached to the diagnostics it consumes.
+  bool ShouldApplyFixIts = false;
+
+  /// Whether the consumer should present the name of the entity that emitted
+  /// the diagnostic (eg., a checker) so that the user knew how to disable it.
+  bool ShouldDisplayDiagnosticName = false;
+};
 
 class PathDiagnosticConsumer {
 public:
@@ -112,11 +143,14 @@ public:
     /// Only runs visitors, no output generated.
     None,
 
-    /// Used for HTML, SARIF, and text output.
+    /// Used for SARIF and text output.
     Minimal,
 
     /// Used for plist output, used for "arrows" generation.
     Extensive,
+
+    /// Used for HTML, shows both "arrows" and control notes.
+    Everything
   };
 
   virtual PathGenerationScheme getGenerationScheme() const { return Minimal; }
@@ -125,7 +159,11 @@ public:
     return getGenerationScheme() != None;
   }
 
-  bool shouldAddPathEdges() const { return getGenerationScheme() == Extensive; }
+  bool shouldAddPathEdges() const { return getGenerationScheme() >= Extensive; }
+  bool shouldAddControlNotes() const {
+    return getGenerationScheme() == Minimal ||
+           getGenerationScheme() == Everything;
+  }
 
   virtual bool supportsLogicalOpControlFlow() const { return false; }
 
@@ -513,7 +551,7 @@ public:
 
   /// Return true if the diagnostic piece is prunable.
   bool isPrunable() const {
-    return IsPrunable.hasValue() ? IsPrunable.getValue() : false;
+    return IsPrunable.getValueOr(false);
   }
 
   void dump() const override;
@@ -865,4 +903,4 @@ public:
 } // namespace ento
 } // namespace clang
 
-#endif // LLVM_CLANG_STATICANALYZER_CORE_BUGREPORTER_PATHDIAGNOSTIC_H
+#endif // LLVM_CLANG_ANALYSIS_PATHDIAGNOSTIC_H

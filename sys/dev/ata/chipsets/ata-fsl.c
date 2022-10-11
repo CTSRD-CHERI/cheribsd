@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2012 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Oleksandr Rybalko under sponsorship
  * from the FreeBSD Foundation.
@@ -69,16 +68,12 @@ static int imx_ata_setmode(device_t dev, int target, int mode);
 static int
 imx_ata_probe(device_t dev)
 {
-	struct ata_pci_controller *ctrl;
-
 	if (!ofw_bus_status_okay(dev))
 		return (ENXIO);
 
 	if (!ofw_bus_is_compatible(dev, "fsl,imx51-ata") &&
 	    !ofw_bus_is_compatible(dev, "fsl,imx53-ata"))
 		return (ENXIO);
-
-	ctrl = device_get_softc(dev);
 
 	device_set_desc(dev, "Freescale Integrated PATA Controller");
 	return (BUS_PROBE_LOW_PRIORITY);
@@ -227,7 +222,7 @@ static device_method_t imx_ata_methods[] = {
 	DEVMETHOD(pci_read_config,	ata_pci_read_config),
 	DEVMETHOD(pci_write_config,	ata_pci_write_config),
 	DEVMETHOD(bus_print_child,	ata_pci_print_child),
-	DEVMETHOD(bus_child_location_str, ata_pci_child_location_str),
+	DEVMETHOD(bus_child_location,	ata_pci_child_location),
 	DEVMETHOD_END
 };
 static driver_t imx_ata_driver = {
@@ -235,8 +230,7 @@ static driver_t imx_ata_driver = {
         imx_ata_methods,
         sizeof(struct ata_pci_controller)
 };
-DRIVER_MODULE(imx_ata, simplebus, imx_ata_driver, ata_pci_devclass, NULL,
-    NULL);
+DRIVER_MODULE(imx_ata, simplebus, imx_ata_driver, NULL, NULL);
 MODULE_VERSION(imx_ata, 1);
 MODULE_DEPEND(imx_ata, ata, 1, 1, 1);
 MODULE_DEPEND(imx_ata, atapci, 1, 1, 1);

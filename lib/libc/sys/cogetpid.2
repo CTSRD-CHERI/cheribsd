@@ -29,12 +29,12 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd April 30, 2018
+.Dd March 17, 2022
 .Dt COGETPID 2
 .Os
 .Sh NAME
 .Nm COGETPID
-.Nd get calling proccess identification
+.Nd get calling process identification
 .Sh LIBRARY
 .Lb libc
 .Sh SYNOPSIS
@@ -48,10 +48,15 @@ The
 .Fn cogetpid
 writes PID of the calling process into the variable pointed at by
 .Ar pidp .
-It is intended to use at the callee side, identified by the
-.Ar cookie
-argument filled in by
+It is intended for use on the callee side, after successfully returning from
 .Xr coaccept 2 .
+.Pp
+It is a system call, so it is relatively slow.
+Users are expected to cache the PID, by keeping a dictionary of (cookie, pid) pairs, only calling
+.Fn cogetpid
+when the value of the cookie - filled in by
+.Xr coaccept 2 -
+cannot be found there.
 .Sh RETURN VALUES
 .Rv -std cogetpid
 .Sh ERRORS
@@ -60,15 +65,13 @@ The
 system call
 will fail if:
 .Bl -tag -width Er
-.It Bq Er EINVAL
-The
-.Fa cookie
-argument is invalid.
 .It Bq Er EFAULT
 The
 .Fa pidp
 argument
 points outside the process's allocated address space.
+.It Bq Er ESRCH
+Unable to determine identity of the caller.
 .El
 .Sh SEE ALSO
 .Xr copong 1 ,

@@ -42,49 +42,12 @@
 #define	_PTHREAD_MD_H_
 
 #include <sys/types.h>
-#include <stddef.h>
+#include <machine/tls.h>
 
 #define	CPU_SPINWAIT
-#define	DTV_OFFSET		offsetof(struct tcb, tcb_dtv)
-#define	TP_OFFSET		sizeof(struct tcb)
 
-/*
- * Variant I tcb. The structure layout is fixed, don't blindly
- * change it!
- */
-struct tcb {
-	void			*tcb_dtv;
-	struct pthread		*tcb_thread;
-};
-
-/* Called from the thread to set its private data. */
-static __inline void
-_tcb_set(struct tcb *tcb)
-{
-
-#ifdef __CHERI_PURE_CAPABILITY__
-	__asm __volatile("cincoffset ctp, %0, %1" :: "C"(tcb), "I"(TP_OFFSET));
-#else
-	__asm __volatile("addi tp, %0, %1" :: "r"(tcb), "I"(TP_OFFSET));
-#endif
-}
-
-/*
- * Get the current tcb.
- */
-static __inline struct tcb *
-_tcb_get(void)
-{
-	struct tcb *_tcb;
-
-#ifdef __CHERI_PURE_CAPABILITY__
-	__asm __volatile("cincoffset %0, ctp, %1" : "=C"(_tcb) : "I"(-TP_OFFSET));
-#else
-	__asm __volatile("addi %0, tp, %1" : "=r"(_tcb) : "I"(-TP_OFFSET));
-#endif
-
-	return (_tcb);
-}
+/* For use in _Static_assert to check structs will fit in a page */
+#define	THR_PAGE_SIZE_MIN	PAGE_SIZE
 
 static __inline struct pthread *
 _get_curthread(void)

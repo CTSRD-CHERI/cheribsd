@@ -262,6 +262,7 @@ ps3cdrom_attach(device_t dev)
 		goto fail_unregister_xpt_bus;
 	}
 
+	memset(&csa, 0, sizeof(csa));
 	xpt_setup_ccb(&csa.ccb_h, sc->sc_path, 5);
 	csa.ccb_h.func_code = XPT_SASYNC_CB;
 	csa.event_enable = AC_LOST_DEVICE;
@@ -704,7 +705,5 @@ static driver_t ps3cdrom_driver = {
 	sizeof(struct ps3cdrom_softc),
 };
 
-static devclass_t ps3cdrom_devclass;
-
-DRIVER_MODULE(ps3cdrom, ps3bus, ps3cdrom_driver, ps3cdrom_devclass, 0, 0);
+DRIVER_MODULE(ps3cdrom, ps3bus, ps3cdrom_driver, 0, 0);
 MODULE_DEPEND(ps3cdrom, cam, 1, 1, 1);

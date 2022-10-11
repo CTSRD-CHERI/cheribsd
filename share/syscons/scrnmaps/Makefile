@@ -1,5 +1,7 @@
 # $FreeBSD$
 
+PACKAGE=	syscons-data
+
 SCRMAPS = armscii8-2haik8.scm \
 	  iso-8859-1_to_cp437.scm iso-8859-4_for_vga9.scm \
 	  iso-8859-7_to_cp437.scm \
@@ -21,8 +23,7 @@ ${SCRMAPS}: ${.TARGET:R}.mk
 	rm -f ${.TARGET:R}.tmp
 
 ${SCRMAPS_MK}: ${.TARGET:R} mkscrfil.c ${BUILD_TOOLS_META}
-	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} -I${.CURDIR} \
-	    -DFIL=\"${.TARGET:R}\" ${BUILD_TOOLS_LDFLAGS} \
-	    -o ${.TARGET} ${.CURDIR}/mkscrfil.c
+	${CC:N${CCACHE_BIN}} ${CFLAGS} -I${.CURDIR} -DFIL=\"${.TARGET:R}\" \
+	    ${LDFLAGS} -o ${.TARGET} ${.CURDIR}/mkscrfil.c
 
 .include <bsd.prog.mk>

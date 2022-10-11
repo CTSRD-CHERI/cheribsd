@@ -81,6 +81,7 @@ __FBSDID("$FreeBSD$");
 #include "atkbdc.h"
 #include "debug.h"
 #include "inout.h"
+#include "ipc.h"
 #include "fwctl.h"
 #include "ioapic.h"
 #include "mem.h"
@@ -115,8 +116,6 @@ static sig_t old_winch_handler;
 
 #define	SNAPSHOT_CHUNK	(4 * MB)
 #define	PROG_BUF_SZ	(8192)
-
-#define	MAX_VMNAME 100
 
 #define	SNAPSHOT_BUFFER_SIZE (20 * MB)
 
@@ -181,10 +180,10 @@ strcat_extension(const char *base_str, const char *ext)
 	char *res;
 	size_t base_len, ext_len;
 
-	base_len = strnlen(base_str, MAX_VMNAME);
-	ext_len = strnlen(ext, MAX_VMNAME);
+	base_len = strnlen(base_str, NAME_MAX);
+	ext_len = strnlen(ext, NAME_MAX);
 
-	if (base_len + ext_len > MAX_VMNAME) {
+	if (base_len + ext_len > NAME_MAX) {
 		fprintf(stderr, "Filename exceeds maximum length.\n");
 		return (NULL);
 	}
@@ -1123,28 +1122,15 @@ err_vm_snapshot_kern_data:
 static int
 vm_snapshot_basic_metadata(struct vmctx *ctx, xo_handle_t *xop, size_t memsz)
 {
-	int error;
-	int memflags;
-	char vmname_buf[MAX_VMNAME];
-
-	memset(vmname_buf, 0, MAX_VMNAME);
-	error = vm_get_name(ctx, vmname_buf, MAX_VMNAME - 1);
-	if (error != 0) {
-		perror("Failed to get VM name");
-		goto err;
-	}
-
-	memflags = vm_get_memflags(ctx);
 
 	xo_open_container_h(xop, JSON_BASIC_METADATA_KEY);
 	xo_emit_h(xop, "{:" JSON_NCPUS_KEY "/%ld}\n", guest_ncpus);
-	xo_emit_h(xop, "{:" JSON_VMNAME_KEY "/%s}\n", vmname_buf);
+	xo_emit_h(xop, "{:" JSON_VMNAME_KEY "/%s}\n", vm_get_name(ctx));
 	xo_emit_h(xop, "{:" JSON_MEMSIZE_KEY "/%lu}\n", memsz);
-	xo_emit_h(xop, "{:" JSON_MEMFLAGS_KEY "/%d}\n", memflags);
+	xo_emit_h(xop, "{:" JSON_MEMFLAGS_KEY "/%d}\n", vm_get_memflags(ctx));
 	xo_close_container_h(xop, JSON_BASIC_METADATA_KEY);
 
-err:
-	return (error);
+	return (0);
 }
 
 static int
@@ -1325,7 +1311,7 @@ vm_vcpu_resume(struct vmctx *ctx)
 }
 
 static int
-vm_checkpoint(struct vmctx *ctx, char *checkpoint_file, bool stop_vm)
+vm_checkpoint(struct vmctx *ctx, const char *checkpoint_file, bool stop_vm)
 {
 	int fd_checkpoint = 0, kdata_fd = 0;
 	int ret = 0;
@@ -1440,27 +1426,22 @@ done:
 	return (error);
 }
 
-int
-handle_message(struct checkpoint_op *checkpoint_op, struct vmctx *ctx)
+static int
+handle_message(struct vmctx *ctx, nvlist_t *nvl)
 {
-	int err;
+	const char *cmd;
+	struct ipc_command **ipc_cmd;
 
-	switch (checkpoint_op->op) {
-		case START_CHECKPOINT:
-			err = vm_checkpoint(ctx, checkpoint_op->snapshot_filename, false);
-			break;
-		case START_SUSPEND:
-			err = vm_checkpoint(ctx, checkpoint_op->snapshot_filename, true);
-			break;
-		default:
-			EPRINTLN("Unrecognized checkpoint operation\n");
-			err = -1;
+	if (!nvlist_exists_string(nvl, "cmd"))
+		return (EINVAL);
+
+	cmd = nvlist_get_string(nvl, "cmd");
+	IPC_COMMAND_FOREACH(ipc_cmd, ipc_cmd_set) {
+		if (strcmp(cmd, (*ipc_cmd)->name) == 0)
+			return ((*ipc_cmd)->handler(ctx, nvl));
 	}
 
-	if (err != 0)
-		EPRINTLN("Unable to perform the requested operation\n");
-
-	return (err);
+	return (EOPNOTSUPP);
 }
 
 /*
@@ -1469,28 +1450,57 @@ handle_message(struct checkpoint_op *checkpoint_op, struct vmctx *ctx)
 void *
 checkpoint_thread(void *param)
 {
-	struct checkpoint_op op;
+	int fd;
 	struct checkpoint_thread_info *thread_info;
-	ssize_t n;
+	nvlist_t *nvl;
 
 	pthread_set_name_np(pthread_self(), "checkpoint thread");
 	thread_info = (struct checkpoint_thread_info *)param;
 
-	for (;;) {
-		n = recvfrom(thread_info->socket_fd, &op, sizeof(op), 0, NULL, 0);
-
-		/*
-		 * slight sanity check: see if there's enough data to at
-		 * least determine the type of message.
-		 */
-		if (n >= sizeof(op.op))
-			handle_message(&op, thread_info->ctx);
+	while ((fd = accept(thread_info->socket_fd, NULL, NULL)) != -1) {
+		nvl = nvlist_recv(fd, 0);
+		if (nvl != NULL)
+			handle_message(thread_info->ctx, nvl);
 		else
-			EPRINTLN("Failed to receive message: %s\n",
-			    n == -1 ? strerror(errno) : "unknown error");
+			EPRINTLN("nvlist_recv() failed: %s", strerror(errno));
+
+		close(fd);
+		nvlist_destroy(nvl);
 	}
 
 	return (NULL);
+}
+
+static int
+vm_do_checkpoint(struct vmctx *ctx, const nvlist_t *nvl)
+{
+	int error;
+
+	if (!nvlist_exists_string(nvl, "filename") ||
+	    !nvlist_exists_bool(nvl, "suspend"))
+		error = EINVAL;
+	else
+		error = vm_checkpoint(ctx, nvlist_get_string(nvl, "filename"),
+		    nvlist_get_bool(nvl, "suspend"));
+
+	return (error);
+}
+IPC_COMMAND(ipc_cmd_set, checkpoint, vm_do_checkpoint);
+
+void
+init_snapshot(void)
+{
+	int err;
+
+	err = pthread_mutex_init(&vcpu_lock, NULL);
+	if (err != 0)
+		errc(1, err, "checkpoint mutex init");
+	err = pthread_cond_init(&vcpus_idle, NULL);
+	if (err != 0)
+		errc(1, err, "checkpoint cv init (vcpus_idle)");
+	err = pthread_cond_init(&vcpus_can_run, NULL);
+	if (err != 0)
+		errc(1, err, "checkpoint cv init (vcpus_can_run)");
 }
 
 /*
@@ -1503,21 +1513,11 @@ init_checkpoint_thread(struct vmctx *ctx)
 	struct sockaddr_un addr;
 	int socket_fd;
 	pthread_t checkpoint_pthread;
-	char vmname_buf[MAX_VMNAME];
-	int ret, err = 0;
+	int err;
 
 	memset(&addr, 0, sizeof(addr));
 
-	err = pthread_mutex_init(&vcpu_lock, NULL);
-	if (err != 0)
-		errc(1, err, "checkpoint mutex init");
-	err = pthread_cond_init(&vcpus_idle, NULL);
-	if (err == 0)
-		err = pthread_cond_init(&vcpus_can_run, NULL);
-	if (err != 0)
-		errc(1, err, "checkpoint cv init");
-
-	socket_fd = socket(PF_UNIX, SOCK_DGRAM, 0);
+	socket_fd = socket(PF_UNIX, SOCK_STREAM, 0);
 	if (socket_fd < 0) {
 		EPRINTLN("Socket creation failed: %s", strerror(errno));
 		err = -1;
@@ -1526,14 +1526,8 @@ init_checkpoint_thread(struct vmctx *ctx)
 
 	addr.sun_family = AF_UNIX;
 
-	err = vm_get_name(ctx, vmname_buf, MAX_VMNAME - 1);
-	if (err != 0) {
-		perror("Failed to get VM name");
-		goto fail;
-	}
-
 	snprintf(addr.sun_path, sizeof(addr.sun_path), "%s%s",
-		 BHYVE_RUN_DIR, vmname_buf);
+		 BHYVE_RUN_DIR, vm_get_name(ctx));
 	addr.sun_len = SUN_LEN(&addr);
 	unlink(addr.sun_path);
 
@@ -1544,16 +1538,20 @@ init_checkpoint_thread(struct vmctx *ctx)
 		goto fail;
 	}
 
+	if (listen(socket_fd, 10) < 0) {
+		EPRINTLN("ipc socket listen: %s\n", strerror(errno));
+		err = errno;
+		goto fail;
+	}
+
 	checkpoint_info = calloc(1, sizeof(*checkpoint_info));
 	checkpoint_info->ctx = ctx;
 	checkpoint_info->socket_fd = socket_fd;
 
-	ret = pthread_create(&checkpoint_pthread, NULL, checkpoint_thread,
+	err = pthread_create(&checkpoint_pthread, NULL, checkpoint_thread,
 		checkpoint_info);
-	if (ret < 0) {
-		err = ret;
+	if (err != 0)
 		goto fail;
-	}
 
 	return (0);
 fail:

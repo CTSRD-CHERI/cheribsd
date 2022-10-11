@@ -119,14 +119,9 @@ ATF_TC_BODY(mlock_err, tc)
 #if !defined(__aarch64__) && !defined(__riscv) && !defined(__CHERI_PURE_CAPABILITY__)
 	void *invalid_ptr;
 #endif
-	int null_errno = ENOMEM;	/* error expected for NULL */
 	void *buf;
 
 #ifdef __FreeBSD__
-#ifdef VM_MIN_ADDRESS
-	if ((uintptr_t)VM_MIN_ADDRESS > 0)
-		null_errno = EINVAL;	/* NULL is not inside user VM */
-#endif
 	/* Set max_wired really really high to avoid EAGAIN */
 	set_vm_max_wired(INT_MAX);
 #else
@@ -137,9 +132,6 @@ ATF_TC_BODY(mlock_err, tc)
 	 */
 	errno = 0;
 	ATF_REQUIRE_ERRNO(ENOMEM, mlock(NULL, page) == -1);
-
-	if (vmin > 0)
-		null_errno = EINVAL;	/* NULL is not inside user VM */
 #endif
 
 	errno = 0;

@@ -174,8 +174,8 @@ char	*strchr(const char *, int);
 char	*strchrnul(const char *, int);
 int	 strcmp(const char *, const char *);
 char	*strcpy(char * __restrict, const char * __restrict);
-size_t	 strcspn(const char * __restrict, const char * __restrict) __pure;
 char	*strdup_flags(const char *__restrict, struct malloc_type *, int);
+size_t	 strcspn(const char *, const char *) __pure;
 char	*strdup(const char *__restrict, struct malloc_type *);
 char	*strncat(char *, const char *, size_t);
 char	*strndup(const char *__restrict, size_t, struct malloc_type *);
@@ -186,13 +186,18 @@ int	 strncasecmp(const char *, const char *, size_t);
 int	 strncmp(const char *, const char *, size_t);
 char	*strncpy(char * __restrict, const char * __restrict, size_t);
 size_t	 strnlen(const char *, size_t);
+char	*strnstr(const char *, const char *, size_t);
 char	*strrchr(const char *, int);
 char	*strsep(char **, const char *delim);
 size_t	 strspn(const char *, const char *);
 char	*strstr(const char *, const char *);
 int	 strvalid(const char *, size_t);
 
-#ifdef SAN_PREFIX
+#ifdef SAN_NEEDS_INTERCEPTORS
+#ifndef SAN_INTERCEPTOR
+#define	SAN_INTERCEPTOR(func)	\
+	__CONCAT(SAN_INTERCEPTOR_PREFIX, __CONCAT(_, func))
+#endif
 char	*SAN_INTERCEPTOR(strcpy)(char *, const char *);
 int	SAN_INTERCEPTOR(strcmp)(const char *, const char *);
 size_t	SAN_INTERCEPTOR(strlen)(const char *);
@@ -201,11 +206,11 @@ size_t	SAN_INTERCEPTOR(strlen)(const char *);
 #define	strcmp(s1, s2)	SAN_INTERCEPTOR(strcmp)((s1), (s2))
 #define	strlen(s)	SAN_INTERCEPTOR(strlen)(s)
 #endif /* !SAN_RUNTIME */
-#else
-#define strcpy(d, s) __builtin_strcpy((d), (s))
-#define strcmp(s1, s2) __builtin_strcmp((s1), (s2))
-#define strlen(s) __builtin_strlen((s))
-#endif /* SAN_PREFIX */
+#else /* !SAN_NEEDS_INTERCEPTORS */
+#define strcpy(d, s)	__builtin_strcpy((d), (s))
+#define strcmp(s1, s2)	__builtin_strcmp((s1), (s2))
+#define strlen(s)	__builtin_strlen((s))
+#endif /* SAN_NEEDS_INTERCEPTORS */
 
 static __inline char *
 index(const char *p, int ch)
@@ -219,6 +224,22 @@ rindex(const char *p, int ch)
 {
 
 	return (strrchr(p, ch));
+}
+
+static __inline int64_t
+signed_extend64(uint64_t bitmap, int lsb, int width)
+{
+
+	return ((int64_t)(bitmap << (63 - lsb - (width - 1)))) >>
+	    (63 - (width - 1));
+}
+
+static __inline int32_t
+signed_extend32(uint32_t bitmap, int lsb, int width)
+{
+
+	return ((int32_t)(bitmap << (31 - lsb - (width - 1)))) >>
+	    (31 - (width - 1));
 }
 
 /* fnmatch() return values. */

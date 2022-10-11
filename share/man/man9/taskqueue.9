@@ -28,7 +28,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd June 6, 2020
+.Dd April 25, 2022
 .Dt TASKQUEUE 9
 .Os
 .Sh NAME
@@ -84,6 +84,8 @@ struct timeout_task;
 .Fn taskqueue_free "struct taskqueue *queue"
 .Ft int
 .Fn taskqueue_enqueue "struct taskqueue *queue" "struct task *task"
+.Ft int
+.Fn taskqueue_enqueue_flags "struct taskqueue *queue" "struct task *task" "int flags"
 .Ft int
 .Fn taskqueue_enqueue_timeout "struct taskqueue *queue" "struct timeout_task *timeout_task" "int ticks"
 .Ft int
@@ -225,6 +227,28 @@ is called on the task pointer passed to
 .Fn taskqueue_enqueue .
 .Pp
 The
+.Fn taskqueue_enqueue_flags
+accepts an extra
+.Va flags
+parameter which specifies a set of optional flags to alter the behavior of
+.Fn taskqueue_enqueue .
+It contains one or more of the following flags:
+.Bl -tag -width TASKQUEUE_FAIL_IF_CANCELING
+.It Dv TASKQUEUE_FAIL_IF_PENDING
+.Fn taskqueue_enqueue_flags
+fails if the task is already scheduled for execution.
+.Er EEXIST
+is returned and the
+.Va ta_pending
+counter value remains unchanged.
+.It Dv TASKQUEUE_FAIL_IF_CANCELING
+.Fn taskqueue_enqueue_flags
+fails if the task is in the canceling state and
+.Er ECANCELED
+is returned.
+.El
+.Pp
+The
 .Fn taskqueue_enqueue_timeout
 function is used to schedule the enqueue after the specified number of
 .Va ticks .
@@ -237,9 +261,6 @@ and
 .Va flags ,
 as detailed in
 .Xr callout 9 .
-Only non-fast task queues can be used for
-.Va timeout_task
-scheduling.
 If the
 .Va ticks
 argument is negative, the already scheduled enqueueing is not re-scheduled.

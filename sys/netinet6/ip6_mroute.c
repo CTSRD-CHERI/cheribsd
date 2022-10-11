@@ -167,16 +167,13 @@ SYSCTL_STRUCT(_net_inet6_ip6, OID_AUTO, mrt6stat, CTLFLAG_RW,
 #define NO_RTE_FOUND	0x1
 #define RTE_FOUND	0x2
 
-static struct mtx mrouter6_mtx;
-#define	MROUTER6_LOCK()		mtx_lock(&mrouter6_mtx)
-#define	MROUTER6_UNLOCK()	mtx_unlock(&mrouter6_mtx)
-#define	MROUTER6_LOCK_ASSERT()	do {					\
-	mtx_assert(&mrouter6_mtx, MA_OWNED);				\
-	NET_ASSERT_GIANT();						\
-} while (0)
-#define	MROUTER6_LOCK_INIT()	\
-	mtx_init(&mrouter6_mtx, "IPv6 multicast forwarding", NULL, MTX_DEF)
-#define	MROUTER6_LOCK_DESTROY()	mtx_destroy(&mrouter6_mtx)
+static struct sx mrouter6_mtx;
+#define	MROUTER6_LOCKPTR()	(&mrouter6_mtx)
+#define	MROUTER6_LOCK()		sx_xlock(MROUTER6_LOCKPTR())
+#define	MROUTER6_UNLOCK()	sx_xunlock(MROUTER6_LOCKPTR())
+#define	MROUTER6_LOCK_ASSERT()	sx_assert(MROUTER6_LOCKPTR(), SA_XLOCKED
+#define	MROUTER6_LOCK_INIT()	sx_init(MROUTER6_LOCKPTR(), "mrouter6")
+#define	MROUTER6_LOCK_DESTROY()	sx_destroy(MROUTER6_LOCKPTR())
 
 static struct mf6c *mf6ctable[MF6CTBLSIZ];
 SYSCTL_OPAQUE(_net_inet6_ip6, OID_AUTO, mf6ctable, CTLFLAG_RD,
@@ -185,15 +182,14 @@ SYSCTL_OPAQUE(_net_inet6_ip6, OID_AUTO, mf6ctable, CTLFLAG_RD,
     "netinet6/ip6_mroute.h)");
 
 static struct mtx mfc6_mtx;
-#define	MFC6_LOCK()		mtx_lock(&mfc6_mtx)
-#define	MFC6_UNLOCK()		mtx_unlock(&mfc6_mtx)
-#define	MFC6_LOCK_ASSERT()	do {					\
-	mtx_assert(&mfc6_mtx, MA_OWNED);				\
-	NET_ASSERT_GIANT();						\
-} while (0)
-#define	MFC6_LOCK_INIT()		\
-	mtx_init(&mfc6_mtx, "IPv6 multicast forwarding cache", NULL, MTX_DEF)
-#define	MFC6_LOCK_DESTROY()	mtx_destroy(&mfc6_mtx)
+#define	MFC6_LOCKPTR()		(&mfc6_mtx)
+#define	MFC6_LOCK()		mtx_lock(MFC6_LOCKPTR())
+#define	MFC6_UNLOCK()		mtx_unlock(MFC6_LOCKPTR())
+#define	MFC6_LOCK_ASSERT()	mtx_assert(MFC6_LOCKPTR(), MA_OWNED)
+#define	MFC6_LOCK_INIT()	mtx_init(MFC6_LOCKPTR(),		\
+				    "IPv6 multicast forwarding cache",	\
+				    NULL, MTX_DEF)
+#define	MFC6_LOCK_DESTROY()	mtx_destroy(MFC6_LOCKPTR())
 
 static u_char n6expire[MF6CTBLSIZ];
 
@@ -230,12 +226,13 @@ SYSCTL_PROC(_net_inet6_ip6, OID_AUTO, mif6table,
     "netinet6/ip6_mroute.h)");
 
 static struct mtx mif6_mtx;
-#define	MIF6_LOCK()		mtx_lock(&mif6_mtx)
-#define	MIF6_UNLOCK()		mtx_unlock(&mif6_mtx)
-#define	MIF6_LOCK_ASSERT()	mtx_assert(&mif6_mtx, MA_OWNED)
+#define	MIF6_LOCKPTR()		(&mif6_mtx)
+#define	MIF6_LOCK()		mtx_lock(MIF6_LOCKPTR())
+#define	MIF6_UNLOCK()		mtx_unlock(MIF6_LOCKPTR())
+#define	MIF6_LOCK_ASSERT()	mtx_assert(MIF6_LOCKPTR(), MA_OWNED)
 #define	MIF6_LOCK_INIT()	\
-	mtx_init(&mif6_mtx, "IPv6 multicast interfaces", NULL, MTX_DEF)
-#define	MIF6_LOCK_DESTROY()	mtx_destroy(&mif6_mtx)
+	mtx_init(MIF6_LOCKPTR(), "IPv6 multicast interfaces", NULL, MTX_DEF)
+#define	MIF6_LOCK_DESTROY()	mtx_destroy(MIF6_LOCKPTR())
 
 #ifdef MRT6DEBUG
 VNET_DEFINE_STATIC(u_int, mrt6debug) = 0;	/* debug level */
@@ -583,11 +580,12 @@ ip6_mrouter_init(struct socket *so, int v, int cmd)
 
 	V_pim6 = 0;/* used for stubbing out/in pim stuff */
 
-	callout_init(&expire_upcalls_ch, 0);
+	callout_init_mtx(&expire_upcalls_ch, MFC6_LOCKPTR(), 0);
 	callout_reset(&expire_upcalls_ch, EXPIRE_TIMEOUT,
 	    expire_upcalls, NULL);
 
 	MROUTER6_UNLOCK();
+
 	MRT6_DLOG(DEBUG_ANY, "finished");
 
 	return (0);
@@ -626,8 +624,6 @@ X_ip6_mrouter_done(void)
 
 	V_pim6 = 0; /* used to stub out/in pim specific code */
 
-	callout_stop(&expire_upcalls_ch);
-
 	/*
 	 * Free all multicast forwarding cache entries.
 	 */
@@ -651,6 +647,8 @@ X_ip6_mrouter_done(void)
 	}
 	bzero((caddr_t)mf6ctable, sizeof(mf6ctable));
 	MFC6_UNLOCK();
+
+	callout_drain(&expire_upcalls_ch);
 
 	/*
 	 * Reset register interface
@@ -679,6 +677,7 @@ static struct sockaddr_in6 sin6 = { sizeof(sin6), AF_INET6 };
 static int
 add_m6if(struct mif6ctl *mifcp)
 {
+	struct epoch_tracker et;
 	struct mif6 *mifp;
 	struct ifnet *ifp;
 	int error;
@@ -694,12 +693,14 @@ add_m6if(struct mif6ctl *mifcp)
 		MIF6_UNLOCK();
 		return (EADDRINUSE); /* XXX: is it appropriate? */
 	}
-	if (mifcp->mif6c_pifi == 0 || mifcp->mif6c_pifi > V_if_index) {
+
+	NET_EPOCH_ENTER(et);
+	if ((ifp = ifnet_byindex(mifcp->mif6c_pifi)) == NULL) {
+		NET_EPOCH_EXIT(et);
 		MIF6_UNLOCK();
 		return (ENXIO);
 	}
-
-	ifp = ifnet_byindex(mifcp->mif6c_pifi);
+	NET_EPOCH_EXIT(et);	/* XXXGL: unsafe ifp */
 
 	if (mifcp->mif6c_flags & MIFF_REGISTER) {
 		if (reg_mif_num == (mifi_t)-1) {
@@ -1038,7 +1039,8 @@ socket_send(struct socket *s, struct mbuf *mm, struct sockaddr_in6 *src)
 				 mm, (struct mbuf *)0) != 0) {
 			sorwakeup(s);
 			return (0);
-		}
+		} else
+			soroverflow(s);
 	}
 	m_freem(mm);
 	return (-1);
@@ -1314,7 +1316,8 @@ expire_upcalls(void *unused)
 	struct mf6c *mfc, **nptr;
 	u_long i;
 
-	MFC6_LOCK();
+	MFC6_LOCK_ASSERT();
+
 	for (i = 0; i < MF6CTBLSIZ; i++) {
 		if (n6expire[i] == 0)
 			continue;
@@ -1352,7 +1355,6 @@ expire_upcalls(void *unused)
 			}
 		}
 	}
-	MFC6_UNLOCK();
 	callout_reset(&expire_upcalls_ch, EXPIRE_TIMEOUT,
 	    expire_upcalls, NULL);
 }
@@ -1531,7 +1533,7 @@ phyint_send(struct ip6_hdr *ip6, struct mif6 *mifp, struct mbuf *m)
 #endif
 	struct mbuf *mb_copy;
 	struct ifnet *ifp = mifp->m6_ifp;
-	int error = 0;
+	int error __unused = 0;
 	u_long linkmtu;
 
 	/*
@@ -1791,7 +1793,6 @@ pim6_input(struct mbuf *m, int off, int proto, void *arg __unused)
 		struct mbuf *mcp;
 		struct ip6_hdr *eip6;
 		u_int32_t *reghdr;
-		int rc;
 #ifdef MRT6DEBUG
 		char ip6bufs[INET6_ADDRSTRLEN], ip6bufd[INET6_ADDRSTRLEN];
 #endif
@@ -1869,7 +1870,7 @@ pim6_input(struct mbuf *m, int off, int proto, void *arg __unused)
 		    ip6_sprintf(ip6bufs, &eip6->ip6_src),
 		    ip6_sprintf(ip6bufd, &eip6->ip6_dst), reg_mif_num);
 
-		rc = if_simloop(mif6table[reg_mif_num].m6_ifp, m,
+		if_simloop(mif6table[reg_mif_num].m6_ifp, m,
 				dst.sin6_family, 0);
 
 		/* prepare the register head to send to the mrouting daemon */

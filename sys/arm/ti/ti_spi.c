@@ -366,11 +366,9 @@ ti_spi_drain_fifo(struct ti_spi_softc *sc)
 static void
 ti_spi_intr(void *arg)
 {
-	int eow;
 	struct ti_spi_softc *sc;
 	uint32_t status;
 
-	eow = 0;
 	sc = (struct ti_spi_softc *)arg;
 	TI_SPI_LOCK(sc);
 	status = TI_SPI_READ(sc, MCSPI_IRQSTATUS);
@@ -386,9 +384,6 @@ ti_spi_intr(void *arg)
 	if (status & MCSPI_IRQ_RX0_FULL)
 		ti_spi_drain_fifo(sc);
 
-	if (status & MCSPI_IRQ_EOW)
-		eow = 1;
-		
 	/* Clear interrupt status. */
 	TI_SPI_WRITE(sc, MCSPI_IRQSTATUS, status);
 
@@ -570,13 +565,11 @@ static device_method_t ti_spi_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t ti_spi_devclass;
-
 static driver_t ti_spi_driver = {
 	"spi",
 	ti_spi_methods,
 	sizeof(struct ti_spi_softc),
 };
 
-DRIVER_MODULE(ti_spi, simplebus, ti_spi_driver, ti_spi_devclass, 0, 0);
+DRIVER_MODULE(ti_spi, simplebus, ti_spi_driver, 0, 0);
 MODULE_DEPEND(ti_spi, ti_sysc, 1, 1, 1);

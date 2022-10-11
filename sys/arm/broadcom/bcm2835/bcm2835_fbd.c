@@ -137,12 +137,12 @@ bcm_fb_setup_fbd(struct bcmsc_softc *sc)
 	if (sc->fbswap) {
 		switch (sc->info.fb_bpp) {
 		case 24:
-			vt_generate_cons_palette(sc->info.fb_cmap,
+			vt_config_cons_colors(&sc->info,
 			    COLOR_FORMAT_RGB, 0xff, 0, 0xff, 8, 0xff, 16);
 			sc->info.fb_cmsize = 16;
 			break;
 		case 32:
-			vt_generate_cons_palette(sc->info.fb_cmap,
+			vt_config_cons_colors(&sc->info,
 			    COLOR_FORMAT_RGB, 0xff, 16, 0xff, 8, 0xff, 0);
 			sc->info.fb_cmsize = 16;
 			break;
@@ -275,13 +275,11 @@ static device_method_t bcm_fb_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t bcm_fb_devclass;
-
 static driver_t bcm_fb_driver = {
 	"fb",
 	bcm_fb_methods,
 	sizeof(struct bcmsc_softc),
 };
 
-DRIVER_MODULE(bcm2835fb, ofwbus, bcm_fb_driver, bcm_fb_devclass, 0, 0);
-DRIVER_MODULE(bcm2835fb, simplebus, bcm_fb_driver, bcm_fb_devclass, 0, 0);
+DRIVER_MODULE(bcm2835fb, ofwbus, bcm_fb_driver, 0, 0);
+DRIVER_MODULE(bcm2835fb, simplebus, bcm_fb_driver, 0, 0);

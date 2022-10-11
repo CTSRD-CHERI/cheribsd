@@ -95,8 +95,6 @@ struct vpd_softc {
 #define	RES2VPD(res)	((struct vpd *)rman_get_virtual(res))
 #define	ADDR2VPD(addr)	((struct vpd *)BIOS_PADDRTOVADDR(addr))
 
-static devclass_t vpd_devclass;
-
 static void	vpd_identify	(driver_t *, device_t);
 static int	vpd_probe	(device_t);
 static int	vpd_attach	(device_t);
@@ -252,10 +250,7 @@ vpd_detach (device_t dev)
 }
 
 static int
-vpd_modevent (mod, what, arg)
-        module_t        mod;
-        int             what;
-        void *          arg;
+vpd_modevent (module_t mod, int what, void *arg)
 {
 	device_t *	devs;
 	int		count;
@@ -265,7 +260,7 @@ vpd_modevent (mod, what, arg)
 	case MOD_LOAD:
 		break;
 	case MOD_UNLOAD:
-		devclass_get_devices(vpd_devclass, &devs, &count);
+		devclass_get_devices(devclass_find("vpd"), &devs, &count);
 		for (i = 0; i < count; i++) {
 			device_delete_child(device_get_parent(devs[i]), devs[i]);
 		}
@@ -292,7 +287,7 @@ static driver_t vpd_driver = {
 	sizeof(struct vpd_softc),
 };
 
-DRIVER_MODULE(vpd, nexus, vpd_driver, vpd_devclass, vpd_modevent, 0);
+DRIVER_MODULE(vpd, nexus, vpd_driver, vpd_modevent, 0);
 MODULE_VERSION(vpd, 1);
 
 /*

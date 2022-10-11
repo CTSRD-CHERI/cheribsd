@@ -2,6 +2,12 @@
  * Copyright (c) 2003 Peter Wemm <peter@FreeBSD.org>
  * All rights reserved.
  *
+ * Copyright (c) 2020, 2021 The FreeBSD Foundation
+ *
+ * Portions of this software were developed by
+ * Konstantin Belousov <kib@FreeBSD.org> under sponsorship from
+ * the FreeBSD Foundation.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -36,11 +42,13 @@
 /*
  * Compiled KERNBASE location
  */
-	.globl	kernbase, kernload, loc_PTmap, loc_PDmap, loc_PDPmap, dmapbase, dmapend
+	.globl	kernbase, kernload, dmapbase, dmapend
 	.set	kernbase,KERNBASE
 	.set    kernload,KERNLOAD
 	.set	dmapbase,DMAP_MIN_ADDRESS
 	.set	dmapend,DMAP_MAX_ADDRESS
+
+#define	BOOTSTACK_SIZE	4096
 
 	.text
 /**********************************************************************
@@ -56,21 +64,26 @@
  */
 ENTRY(btext)
 
-	/* Tell the bios to warmboot next time */
-	movw	$0x1234,0x472
-
 	/* Don't trust what the loader gives for rflags. */
 	pushq	$PSL_KERNEL
 	popfq
 
-	/* Find the metadata pointers before we lose them */
+	/* Get onto a stack that we can trust - there is no going back now. */
 	movq	%rsp, %rbp
+	movq	$bootstack,%rsp
+
+#ifdef KASAN
+	/* Bootstrap a shadow map for the boot stack. */
+	movq	$bootstack, %rdi
+	subq	$BOOTSTACK_SIZE, %rdi
+	movq	$BOOTSTACK_SIZE, %rsi
+	call	kasan_init_early
+#endif
+
+	/* Grab metadata pointers from the loader. */
 	movl	4(%rbp),%edi		/* modulep (arg 1) */
 	movl	8(%rbp),%esi		/* kernend (arg 2) */
-
-	/* Get onto a stack that we can trust - there is no going back now. */
-	movq	$bootstack,%rsp
-	xorl	%ebp, %ebp
+	xorq	%rbp, %rbp
 
 	call	hammer_time		/* set up cpu for unix operation */
 	movq	%rax,%rsp		/* set up kstack for mi_startup() */
@@ -137,5 +150,5 @@ ENTRY(la57_trampoline_end)
 	.bss
 	ALIGN_DATA			/* just to be sure */
 	.globl	bootstack
-	.space	0x1000			/* space for bootstack - temporary stack */
+	.space	BOOTSTACK_SIZE		/* space for bootstack - temporary stack */
 bootstack:

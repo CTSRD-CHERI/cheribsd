@@ -1,6 +1,9 @@
 # $FreeBSD$
 
-# Options set in the build system that affect the kernel somehow.
+# Options set in the build system which affect the building of kernel
+# modules. These select which parts to compile in or out (eg INET) or which
+# parts to omit (eg CDDL or SOURCELESS_HOST). Some of these will cause
+# config.mk to define symbols in various opt_*.h files.
 
 #
 # Define MK_* variables (which are either "yes" or "no") for users
@@ -32,6 +35,7 @@ __DEFAULT_YES_OPTIONS = \
     CDDL \
     CRYPT \
     CUSE \
+    DTRACE \
     EFI \
     FORMAT_EXTENSIONS \
     INET \
@@ -46,6 +50,7 @@ __DEFAULT_YES_OPTIONS = \
     SCTP_SUPPORT \
     SOURCELESS_HOST \
     SOURCELESS_UCODE \
+    SPLIT_KERNEL_DEBUG \
     TESTS \
     USB_GADGET_EXAMPLES \
     ZFS
@@ -79,10 +84,6 @@ BROKEN_OPTIONS+= CDDL ZFS
 . endif
 .endif
 
-.if ${MACHINE_CPUARCH} == "mips"
-BROKEN_OPTIONS+= ZFS SSP
-.endif
-
 .if ${MACHINE_CPUARCH} == "powerpc" && ${MACHINE_ARCH} == "powerpc"
 BROKEN_OPTIONS+= ZFS
 .endif
@@ -98,14 +99,20 @@ BROKEN_OPTIONS+= OFED
 BROKEN_OPTIONS+= KERNEL_RETPOLINE
 .endif
 
-# EFI doesn't exist on mips, powerpc, or riscv.
-.if ${MACHINE:Mmips} || ${MACHINE:Mpowerpc} || ${MACHINE:Mriscv}
+# EFI doesn't exist on powerpc, or riscv
+.if ${MACHINE:Mpowerpc} || ${MACHINE:Mriscv}
 BROKEN_OPTIONS+=EFI
 .endif
 
+.if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
+__DEFAULT_NO_OPTIONS += FDT
+.else
+__DEFAULT_YES_OPTIONS += FDT
+.endif
+
 # Broken post OpenZFS import
-.if ${MACHINE_CPU:Mcheri} || ${.MAKE.OS} == "Linux"
-BROKEN_OPTIONS=CDDL ZFS
+.if ${MACHINE_CPU:Mcheri}
+BROKEN_OPTIONS+= CDDL ZFS
 .endif
 
 # expanded inline from bsd.mkopt.mk to avoid share/mk dependency
@@ -192,10 +199,23 @@ CTFCONVERT_CMD=
 CTFCONVERT_CMD=	@:
 .endif
 
+.if ${MK_SPLIT_KERNEL_DEBUG} == "no"
+MK_KERNEL_SYMBOLS:=	no
+.endif
+
+.if ${MK_CDDL} == "no"
+MK_DTRACE:=	no
+.endif
+
 # Some modules only compile successfully if option FDT is set, due to #ifdef FDT
 # wrapped around declarations.  Module makefiles can optionally compile such
 # things using .if !empty(OPT_FDT)
 .if !defined(OPT_FDT) && defined(KERNBUILDDIR)
 OPT_FDT!= sed -n '/FDT/p' ${KERNBUILDDIR}/opt_platform.h
 .export OPT_FDT
+.if empty(OPT_FDT)
+MK_FDT:=no
+.else
+MK_FDT:=yes
+.endif
 .endif

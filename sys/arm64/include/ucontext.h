@@ -50,8 +50,7 @@ struct fpregs {
 	int		fp_pad;
 };
 
-#if (defined(_KERNEL) && __has_feature(capabilities)) || \
-    defined(__CHERI_PURE_CAPABILITY__)
+#if __CHERI_USER_ABI
 struct capregs {
 	__uintcap_t	cap_x[30];
 	__uintcap_t	cap_lr;
@@ -62,8 +61,7 @@ struct capregs {
 #endif
 
 struct __mcontext {
-#if (defined(_KERNEL) && __has_feature(capabilities)) || \
-    defined(__CHERI_PURE_CAPABILITY__)
+#if __CHERI_USER_ABI
 	struct capregs	mc_capregs;
 #else
 	struct gpregs	mc_gpregs;
@@ -72,8 +70,7 @@ struct __mcontext {
 	int		mc_flags;
 #define	_MC_FP_VALID	0x1		/* Set when mc_fpregs has valid data */
 #define	_MC_CAP_VALID	(1u<<31)	/* Set when mc_capregs has valid data */
-#if (defined(_KERNEL) && __has_feature(capabilities)) || \
-    defined(__CHERI_PURE_CAPABILITY__)
+#if __CHERI_USER_ABI
 	__uint32_t	mc_spsr;
 	__uint64_t	mc_spare[8];	/* Space for expansion, set to zero */
 #else

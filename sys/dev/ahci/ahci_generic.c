@@ -172,7 +172,6 @@ ahci_gen_detach(device_t dev)
 }
 
 #ifdef FDT
-static devclass_t ahci_gen_fdt_devclass;
 static device_method_t ahci_fdt_methods[] = {
 	DEVMETHOD(device_probe,     ahci_fdt_probe),
 	DEVMETHOD(device_attach,    ahci_gen_attach),
@@ -182,7 +181,7 @@ static device_method_t ahci_fdt_methods[] = {
 	DEVMETHOD(bus_release_resource,     ahci_release_resource),
 	DEVMETHOD(bus_setup_intr,   ahci_setup_intr),
 	DEVMETHOD(bus_teardown_intr,ahci_teardown_intr),
-	DEVMETHOD(bus_child_location_str, ahci_child_location_str),
+	DEVMETHOD(bus_child_location, ahci_child_location),
 	DEVMETHOD(bus_get_dma_tag,  ahci_get_dma_tag),
 	DEVMETHOD_END
 };
@@ -191,12 +190,10 @@ static driver_t ahci_fdt_driver = {
 	ahci_fdt_methods,
 	sizeof(struct ahci_controller)
 };
-DRIVER_MODULE(ahci_fdt, simplebus, ahci_fdt_driver, ahci_gen_fdt_devclass,
-    NULL, NULL);
+DRIVER_MODULE(ahci_fdt, simplebus, ahci_fdt_driver, NULL, NULL);
 #endif
 
 #ifdef DEV_ACPI
-static devclass_t ahci_gen_acpi_devclass;
 static device_method_t ahci_acpi_methods[] = {
 	DEVMETHOD(device_probe,     ahci_acpi_probe),
 	DEVMETHOD(device_attach,    ahci_gen_attach),
@@ -206,7 +203,7 @@ static device_method_t ahci_acpi_methods[] = {
 	DEVMETHOD(bus_release_resource,     ahci_release_resource),
 	DEVMETHOD(bus_setup_intr,   ahci_setup_intr),
 	DEVMETHOD(bus_teardown_intr,ahci_teardown_intr),
-	DEVMETHOD(bus_child_location_str, ahci_child_location_str),
+	DEVMETHOD(bus_child_location, ahci_child_location),
 	DEVMETHOD(bus_get_dma_tag,  ahci_get_dma_tag),
 	DEVMETHOD_END
 };
@@ -215,6 +212,5 @@ static driver_t ahci_acpi_driver = {
 	ahci_acpi_methods,
 	sizeof(struct ahci_controller)
 };
-DRIVER_MODULE(ahci_acpi, acpi, ahci_acpi_driver, ahci_gen_acpi_devclass,
-    NULL, NULL);
+DRIVER_MODULE(ahci_acpi, acpi, ahci_acpi_driver, NULL, NULL);
 #endif

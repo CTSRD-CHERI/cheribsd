@@ -33,6 +33,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/pmc.h>
 #include <sys/proc.h>
+#include <sys/sysent.h>
 #include <sys/systm.h>
 
 #include <machine/cpu.h>
@@ -66,7 +67,7 @@ pmc_save_kernel_callchain(uintptr_t *cc, int maxsamples,
 	struct thread *td;
 	int count;
 
-	KASSERT(TRAPF_USERMODE(tf) == 0,("[arm,%d] not a kernel backtrace",
+	KASSERT(TRAPF_USERMODE(tf) == 0,("[arm64,%d] not a kernel backtrace",
 	    __LINE__));
 
 	td = curthread;
@@ -90,6 +91,9 @@ pmc_save_kernel_callchain(uintptr_t *cc, int maxsamples,
 		if (!PMC_IN_KERNEL_STACK(r, stackstart, stackend))
 			break;
 		pc = *(uintptr_t *)r;
+#ifdef __CHERI_PURE_CAPABILITY__
+		pc &= ~1;
+#endif
 		if (!PMC_IN_KERNEL(pc))
 			break;
 
@@ -112,13 +116,14 @@ pmc_save_user_callchain(uintptr_t *cc, int maxsamples,
     struct trapframe *tf)
 {
 	uintcap_t pc, r, oldfp, fp;
-	struct thread *td;
+#ifdef COMPAT_FREEBSD64
+	int64_t r64;
+#endif
 	int count;
 
-	KASSERT(TRAPF_USERMODE(tf), ("[x86,%d] Not a user trap frame tf=%p",
+	KASSERT(TRAPF_USERMODE(tf), ("[arm64,%d] Not a user trap frame tf=%p",
 	    __LINE__, (void *) tf));
 
-	td = curthread;
 	pc = PMC_TRAPFRAME_TO_PC(tf);
 	*cc++ = (uintptr_t)pc;
 
@@ -133,9 +138,20 @@ pmc_save_user_callchain(uintptr_t *cc, int maxsamples,
 
 	for (count = 1; count < maxsamples; count++) {
 		/* Use saved lr as pc. */
-		r = fp + sizeof(uintcap_t);
-		if (copyin((void * __capability)r, &pc, sizeof(pc)) != 0)
-			break;
+#ifdef COMPAT_FREEBSD64
+		if (SV_CURPROC_FLAG(SV_CHERI | SV_LP64) == SV_LP64) {
+			r = fp + sizeof(r64);
+			if (fueword64(__USER_CAP(r, sizeof(r64)), &r64) != 0)
+				break;
+			pc = r64;
+		} else
+#endif
+		{
+			r = fp + sizeof(uintcap_t);
+			if (fueptr((void * __capability)r, &pc) != 0)
+				break;
+		}
+		pc &= ~1;
 		if (!PMC_IN_USERSPACE(pc))
 			break;
 
@@ -144,8 +160,17 @@ pmc_save_user_callchain(uintptr_t *cc, int maxsamples,
 		/* Switch to next frame up */
 		oldfp = fp;
 		r = fp;
-		if (copyin((void * __capability)r, &fp, sizeof(fp)) != 0)
-			break;
+#ifdef COMPAT_FREEBSD64
+		if (SV_CURPROC_FLAG(SV_CHERI | SV_LP64) == SV_LP64) {
+			if (fueword64(__USER_CAP(r, sizeof(r64)), &r64) != 0)
+				break;
+			fp = r64;
+		} else
+#endif
+		{
+			if (fueptr((void * __capability)r, &fp) != 0)
+				break;
+		}
 		if (fp < oldfp || !PMC_IN_USERSPACE(fp))
 			break;
 	}

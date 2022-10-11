@@ -9,6 +9,8 @@
 .include <bsd.compat.mk>
 .endif
 
+__<bsd.lib.mk>__:
+
 .if defined(LIB_CXX) || defined(SHLIB_CXX)
 _LD=	${CXX}
 .else
@@ -85,6 +87,13 @@ TAG_ARGS=	-T ${TAGS:[*]:S/ /,/g}
 .if ${MK_BIND_NOW} != "no"
 LDFLAGS+= -Wl,-znow
 .endif
+.if ${LINKER_TYPE} != "mac"
+.if ${MK_RELRO} == "no"
+LDFLAGS+= -Wl,-znorelro
+.else
+LDFLAGS+= -Wl,-zrelro
+.endif
+.endif
 .if ${MK_RETPOLINE} != "no"
 .if ${COMPILER_FEATURES:Mretpoline} && ${LINKER_FEATURES:Mretpoline}
 CFLAGS+= -mretpoline
@@ -114,25 +123,21 @@ CXXFLAGS+= -ftrivial-auto-var-init=pattern
 .endif
 .endif
 
+# bsd.sanitizer.mk is not installed, so don't require it (e.g. for ports).
+.sinclude "bsd.sanitizer.mk"
+
 .if ${MK_DEBUG_FILES} != "no" && empty(DEBUG_FLAGS:M-g) && \
     empty(DEBUG_FLAGS:M-gdwarf*)
+.if !${COMPILER_FEATURES:Mcompressed-debug}
+CFLAGS+= ${DEBUG_FILES_CFLAGS:N-gz*}
+CXXFLAGS+= ${DEBUG_FILES_CFLAGS:N-gz*}
+.else
 CFLAGS+= ${DEBUG_FILES_CFLAGS}
 CXXFLAGS+= ${DEBUG_FILES_CFLAGS}
+.endif
 CTFFLAGS+= -g
 STATIC_CFLAGS+= -g
 STATIC_CXXFLAGS+= -g
-.endif
-
-# clang currently defaults to dynamic TLS for object files without -fPIC
-.if ${MACHINE:Mmips} && ${COMPILER_TYPE} == "clang"
-STATIC_CFLAGS+= -ftls-model=initial-exec
-STATIC_CXXFLAGS+= -ftls-model=initial-exec
-.endif
-
-# clang currently defaults to dynamic TLS for mips64 object files without -fPIC
-.if ${MACHINE_ARCH:Mmips64*} && ${COMPILER_TYPE} == "clang"
-STATIC_CFLAGS+= -ftls-model=initial-exec
-STATIC_CXXFLAGS+= -ftls-model=initial-exec
 .endif
 
 .if ${MACHINE_CPUARCH} == "riscv" && ${LINKER_FEATURES:Mriscv-relaxations} == ""
@@ -155,17 +160,15 @@ PIEFLAG=-fpie
 PO_FLAG=-pg
 
 .c.po:
-	${CC.${.IMPSRC:T}:U${CC}} ${PO_FLAG} ${STATIC_CFLAGS} ${PO_CFLAGS} \
-	    -c ${.IMPSRC} -o ${.TARGET}
+	${CC} ${PO_FLAG} ${STATIC_CFLAGS} ${PO_CFLAGS} -c ${.IMPSRC} -o ${.TARGET}
 	${CTFCONVERT_CMD}
 
 .c.pico:
-	${CC.${.IMPSRC:T}:U${CC}} ${PICFLAG} -DPIC ${SHARED_CFLAGS} ${CFLAGS} \
-	    -c ${.IMPSRC} -o ${.TARGET}
+	${CC} ${PICFLAG} -DPIC ${SHARED_CFLAGS} ${CFLAGS} -c ${.IMPSRC} -o ${.TARGET}
 	${CTFCONVERT_CMD}
 
 .c.nossppico:
-	${CC.${.IMPSRC:T}:U${CC}} ${PICFLAG} -DPIC ${SHARED_CFLAGS:C/^-fstack-protector.*$//} ${CFLAGS:C/^-fstack-protector.*$//} -c ${.IMPSRC} -o ${.TARGET}
+	${CC} ${PICFLAG} -DPIC ${SHARED_CFLAGS:C/^-fstack-protector.*$//:C/^-fsanitize.*$//} ${CFLAGS:C/^-fstack-protector.*$//:C/^-fsanitize.*$//} -c ${.IMPSRC} -o ${.TARGET}
 	${CTFCONVERT_CMD}
 
 .c.pieo:
@@ -179,7 +182,7 @@ PO_FLAG=-pg
 	${CXX} ${PICFLAG} -DPIC ${SHARED_CXXFLAGS} ${CXXFLAGS} -c ${.IMPSRC} -o ${.TARGET}
 
 .cc.nossppico .C.nossppico .cpp.nossppico .cxx.nossppico:
-	${CXX} ${PICFLAG} -DPIC ${SHARED_CXXFLAGS:C/^-fstack-protector.*$//} ${CXXFLAGS:C/^-fstack-protector.*$//} -c ${.IMPSRC} -o ${.TARGET}
+	${CXX} ${PICFLAG} -DPIC ${SHARED_CXXFLAGS:C/^-fstack-protector.*$//:C/^-fsanitize.*$//} ${CXXFLAGS:C/^-fstack-protector.*$//:C/^-fsanitize.*$//} -c ${.IMPSRC} -o ${.TARGET}
 
 .cc.pieo .C.pieo .cpp.pieo .cxx.pieo:
 	${CXX} ${PIEFLAG} ${SHARED_CXXFLAGS} ${CXXFLAGS} -c ${.IMPSRC} -o ${.TARGET}
@@ -220,23 +223,18 @@ PO_FLAG=-pg
 	    ${CFLAGS} ${ACFLAGS} -c ${.IMPSRC} -o ${.TARGET}
 	${CTFCONVERT_CMD}
 
-.S.o:
-	${CC.${.IMPSRC:T}:U${CC}} ${STATIC_CFLAGS} ${CFLAGS} ${ACFLAGS} \
-	    -c ${.IMPSRC} -o ${.TARGET}
-	${CTFCONVERT_CMD}
-
 .S.po:
-	${CC.${.IMPSRC:T}:U${CC}:N${CCACHE_BIN}} -DPROF ${PO_CFLAGS} \
-	    ${ACFLAGS} -c ${.IMPSRC} -o ${.TARGET}
+	${CC:N${CCACHE_BIN}} -DPROF ${PO_CFLAGS} ${ACFLAGS} -c ${.IMPSRC} \
+	    -o ${.TARGET}
 	${CTFCONVERT_CMD}
 
 .S.pico:
-	${CC.${.IMPSRC:T}:U${CC}:N${CCACHE_BIN}} ${PICFLAG} -DPIC ${CFLAGS} \
-	    ${ACFLAGS} -c ${.IMPSRC} -o ${.TARGET}
+	${CC:N${CCACHE_BIN}} ${PICFLAG} -DPIC ${CFLAGS} ${ACFLAGS} \
+	    -c ${.IMPSRC} -o ${.TARGET}
 	${CTFCONVERT_CMD}
 
 .S.nossppico:
-	${CC.${.IMPSRC:T}:U${CC}:N${CCACHE_BIN}} ${PICFLAG} -DPIC ${CFLAGS:C/^-fstack-protector.*$//} ${ACFLAGS} \
+	${CC:N${CCACHE_BIN}} ${PICFLAG} -DPIC ${CFLAGS:C/^-fstack-protector.*$//} ${ACFLAGS} \
 	    -c ${.IMPSRC} -o ${.TARGET}
 	${CTFCONVERT_CMD}
 
@@ -254,7 +252,7 @@ SHLIB_NAME_FULL=${SHLIB_NAME}.full
 # Use ${DEBUGDIR} for base system debug files, else .debug subdirectory
 .if ${_SHLIBDIR} == "/boot" ||\
     ${SHLIBDIR:C%/lib(/.*)?$%/lib%} == "/lib" ||\
-    ${SHLIBDIR:C%/usr/(tests/)?lib(32|cheri|exec)?(/.*)?%/usr/lib%} == "/usr/lib"
+    ${SHLIBDIR:C%/usr/(tests/)?lib(32|64|64c|exec)?(/.*)?%/usr/lib%} == "/usr/lib"
 DEBUGFILEDIR=${DEBUGDIR}${_SHLIBDIR}
 .else
 DEBUGFILEDIR=${_SHLIBDIR}/.debug
@@ -264,11 +262,6 @@ DEBUGMKDIR=
 .endif
 .else
 SHLIB_NAME_FULL=${SHLIB_NAME}
-.endif
-.if defined(STRIP) && !empty(STRIP)
-SHLIB_NAME_INSTALL=${SHLIB_NAME}.stripped
-.else
-SHLIB_NAME_INSTALL=${SHLIB_NAME}
 .endif
 .endif
 
@@ -289,9 +282,12 @@ CLEANFILES+=	${OBJS} ${BCOBJS} ${LLOBJS} ${STATICOBJS}
 .endif
 
 .if defined(LIB) && !empty(LIB)
-_LIBS=		lib${LIB_PRIVATE}${LIB}.a
+.if defined(STATIC_LDSCRIPT)
+_STATICLIB_SUFFIX=	_real
+.endif
+_LIBS=		lib${LIB_PRIVATE}${LIB}${_STATICLIB_SUFFIX}.a
 
-lib${LIB_PRIVATE}${LIB}.a: ${OBJS} ${STATICOBJS}
+lib${LIB_PRIVATE}${LIB}${_STATICLIB_SUFFIX}.a: ${OBJS} ${STATICOBJS}
 	@${ECHO} building static ${LIB} library
 	@rm -f ${.TARGET}
 	${AR} ${ARFLAGS} ${.TARGET} ${OBJS} ${STATICOBJS} ${ARADD}
@@ -329,7 +325,7 @@ CLEANFILES+=	${SOBJS}
 .endif
 
 .if defined(SHLIB_NAME)
-_LIBS+=		${SHLIB_NAME_INSTALL}
+_LIBS+=		${SHLIB_NAME}
 
 SOLINKOPTS+=	-shared -Wl,-x
 .if !defined(ALLOW_SHARED_TEXTREL)
@@ -375,7 +371,7 @@ ${SHLIB_NAME_FULL}: ${SOBJS}
 .endif
 
 .if ${MK_DEBUG_FILES} != "no"
-CLEANFILES+=	${SHLIB_NAME_FULL} ${SHLIB_NAME}.debug ${SHLIB_NAME}.stripped
+CLEANFILES+=	${SHLIB_NAME_FULL} ${SHLIB_NAME}.debug
 ${SHLIB_NAME}: ${SHLIB_NAME_FULL} ${SHLIB_NAME}.debug
 	${OBJCOPY} --strip-debug --add-gnu-debuglink=${SHLIB_NAME}.debug \
 	    ${SHLIB_NAME_FULL} ${.TARGET}
@@ -386,11 +382,6 @@ ${SHLIB_NAME}: ${SHLIB_NAME_FULL} ${SHLIB_NAME}.debug
 
 ${SHLIB_NAME}.debug: ${SHLIB_NAME_FULL}
 	${OBJCOPY} --only-keep-debug ${SHLIB_NAME_FULL} ${.TARGET}
-.endif
-
-.if ${SHLIB_NAME} != ${SHLIB_NAME_INSTALL}
-${SHLIB_NAME_INSTALL}: ${SHLIB_NAME}
-	${STRIPBIN} -o ${.TARGET} ${STRIP_FLAGS} ${SHLIB_NAME}
 .endif
 .endif #defined(SHLIB_NAME)
 
@@ -417,7 +408,7 @@ lib${LIB_PRIVATE}${LIB}_nossp_pic.a: ${NOSSPSOBJS}
 
 .endif # !defined(INTERNALLIB)
 
-.if defined(INTERNALLIB) && ${MK_PIE} != "no"
+.if defined(INTERNALLIB) && ${MK_PIE} != "no" && defined(LIB) && !empty(LIB)
 PIEOBJS+=	${OBJS:.o=.pieo}
 DEPENDOBJS+=	${PIEOBJS}
 CLEANFILES+=	${PIEOBJS}
@@ -504,16 +495,16 @@ realinstall: _libinstall installpcfiles
 _libinstall:
 .if defined(LIB) && !empty(LIB) && ${MK_INSTALLLIB} != "no"
 	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},dev} -C -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
-	    ${_INSTALLFLAGS} lib${LIB_PRIVATE}${LIB}.a ${DESTDIR}${_LIBDIR}/
-.endif
-.if ${MK_PROFILE} != "no" && defined(LIB) && !empty(LIB)
+	    ${_INSTALLFLAGS} lib${LIB_PRIVATE}${LIB}${_STATICLIB_SUFFIX}.a ${DESTDIR}${_LIBDIR}/
+.if ${MK_PROFILE} != "no"
 	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},dev} -C -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
 	    ${_INSTALLFLAGS} lib${LIB_PRIVATE}${LIB}_p.a ${DESTDIR}${_LIBDIR}/
+.endif
 .endif
 .if defined(SHLIB_NAME)
 	${INSTALL} ${TAG_ARGS} -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
 	    ${_INSTALLFLAGS} ${_SHLINSTALLFLAGS} \
-	    ${SHLIB_NAME_INSTALL} ${DESTDIR}${_SHLIBDIR}/${SHLIB_NAME}
+	    ${SHLIB_NAME} ${DESTDIR}${_SHLIBDIR}
 .if ${MK_DEBUG_FILES} != "no"
 .if defined(DEBUGMKDIR)
 	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},dbg} -d ${DESTDIR}${DEBUGFILEDIR}/

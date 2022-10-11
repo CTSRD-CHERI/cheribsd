@@ -147,8 +147,6 @@ sbtoxsockbuf(struct sockbuf *sb, struct xsockbuf *xsb)
 	xsb->sb_cc = sb->sb_ccc;
 	xsb->sb_hiwat = sb->sb_hiwat;
 	xsb->sb_mbcnt = sb->sb_mbcnt;
-	xsb->sb_mcnt = sb->sb_mcnt;
-	xsb->sb_ccnt = sb->sb_ccnt;
 	xsb->sb_mbmax = sb->sb_mbmax;
 	xsb->sb_lowat = sb->sb_lowat;
 	xsb->sb_flags = sb->sb_flags;
@@ -296,14 +294,14 @@ protopr(u_long off, const char *name, int af1, int proto)
 		    (
 		     (istcp && tp->t_state == TCPS_LISTEN)
 		     || (af1 == AF_INET &&
-		      inet_lnaof(inp->inp_laddr) == INADDR_ANY)
+		      inp->inp_laddr.s_addr == INADDR_ANY)
 #ifdef INET6
 		     || (af1 == AF_INET6 &&
 			 IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
 #endif /* INET6 */
 		     || (af1 == AF_UNSPEC &&
 			 (((inp->inp_vflag & INP_IPV4) != 0 &&
-			   inet_lnaof(inp->inp_laddr) == INADDR_ANY)
+			   inp->inp_laddr.s_addr == INADDR_ANY)
 #ifdef INET6
 			  || ((inp->inp_vflag & INP_IPV6) != 0 &&
 			      IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
@@ -351,11 +349,9 @@ protopr(u_long off, const char *name, int af1, int proto)
 					xo_emit(" {T:/%-11.11s}", "(state)");
 			}
 			if (xflag) {
-				xo_emit(" {T:/%-6.6s} {T:/%-6.6s} {T:/%-6.6s} "
-				    "{T:/%-6.6s} {T:/%-6.6s} {T:/%-6.6s} "
+				xo_emit("{T:/%-6.6s} {T:/%-6.6s} "
 				    "{T:/%-6.6s} {T:/%-6.6s} {T:/%-6.6s} "
 				    "{T:/%-6.6s} {T:/%-6.6s} {T:/%-6.6s}",
-				    "R-MBUF", "S-MBUF", "R-CLUS", "S-CLUS",
 				    "R-HIWA", "S-HIWA", "R-LOWA", "S-LOWA",
 				    "R-BCNT", "S-BCNT", "R-BMAX", "S-BMAX");
 				xo_emit(" {T:/%7.7s} {T:/%7.7s} {T:/%7.7s} "
@@ -500,15 +496,12 @@ protopr(u_long off, const char *name, int af1, int proto)
 #endif /* INET6 */
 		}
 		if (xflag) {
-			xo_emit("{:receive-mbufs/%6u} {:send-mbufs/%6u} "
-			    "{:receive-clusters/%6u} {:send-clusters/%6u} "
-			    "{:receive-high-water/%6u} {:send-high-water/%6u} "
+			xo_emit("{:receive-high-water/%6u} "
+			    "{:send-high-water/%6u} "
 			    "{:receive-low-water/%6u} {:send-low-water/%6u} "
 			    "{:receive-mbuf-bytes/%6u} {:send-mbuf-bytes/%6u} "
 			    "{:receive-mbuf-bytes-max/%6u} "
 			    "{:send-mbuf-bytes-max/%6u}",
-			    so->so_rcv.sb_mcnt, so->so_snd.sb_mcnt,
-			    so->so_rcv.sb_ccnt, so->so_snd.sb_ccnt,
 			    so->so_rcv.sb_hiwat, so->so_snd.sb_hiwat,
 			    so->so_rcv.sb_lowat, so->so_snd.sb_lowat,
 			    so->so_rcv.sb_mbcnt, so->so_snd.sb_mbcnt,
@@ -695,6 +688,12 @@ tcp_stats(u_long off, const char *name, int af1 __unused, int proto __unused)
 	    "{N:/window probe%s}\n");
 	p(tcps_rcvwinupd, "\t\t{:receive-window-update-packets/%ju} "
 	    "{N:/window update packet%s}\n");
+	p(tcps_dsack_count, "\t\t{:received-with-dsack-packets/%ju} "
+	    "{N:/packet%s received with dsack}\n");
+	p(tcps_dsack_bytes, "\t\t{:received-with-dsack-bytes/%ju} "
+	    "{N:/dsack byte%s received (no TLP involved)}\n");
+	p(tcps_dsack_tlp_bytes, "\t\t{:received-with-dsack-bytes-tlp/%ju} "
+	    "{N:/dsack byte%s received (TLP responsible)}\n");
 	p(tcps_rcvafterclose, "\t\t{:received-after-close-packets/%ju} "
 	    "{N:/packet%s received after close}\n");
 	p(tcps_rcvbadsum, "\t\t{:discard-bad-checksum/%ju} "
@@ -809,6 +808,8 @@ tcp_stats(u_long off, const char *name, int af1 __unused, int proto __unused)
 	    "{N:/SACK option%s (SACK blocks) received}\n");
 	p(tcps_sack_send_blocks, "\t{:sent-option-blocks/%ju} "
 	    "{N:/SACK option%s (SACK blocks) sent}\n");
+	p(tcps_sack_lostrexmt, "\t{:lost-retransmissions/%ju} "
+	    "{N:/SACK retransmission%s lost}\n");
 	p1a(tcps_sack_sboverflow, "\t{:scoreboard-overflows/%ju} "
 	    "{N:/SACK scoreboard overflow}\n");
 
@@ -825,6 +826,15 @@ tcp_stats(u_long off, const char *name, int af1 __unused, int proto __unused)
 	    "{N:/successful ECN handshake%s}\n");
 	p(tcps_ecn_rcwnd, "\t{:congestion-reductions/%ju} "
 	    "{N:/time%s ECN reduced the congestion window}\n");
+
+	p(tcps_ace_nect, "\t{:ace-nonect-syn/%ju} "
+	    "{N:/ACE SYN packet%s with Non-ECT}\n");
+	p(tcps_ace_ect0, "\t{:ace-ect0-syn/%ju} "
+	    "{N:/ACE SYN packet%s with ECT0}\n");
+	p(tcps_ace_ect1, "\t{:ace-ect1-syn/%ju} "
+	    "{N:/ACE SYN packet%s with ECT1}\n");
+	p(tcps_ace_ce, "\t{:ace-ce-syn/%ju} "
+	    "{N:/ACE SYN packet%s with CE}\n");
 
 	xo_close_container("ecn");
 	xo_open_container("tcp-signature");
@@ -849,13 +859,23 @@ tcp_stats(u_long off, const char *name, int af1 __unused, int proto __unused)
 	    "{N:/Path MTU discovery black hole detection min MSS activation%s}\n");
 	p(tcps_pmtud_blackhole_failed, "\t{:pmtud-failed/%ju} "
 	    "{N:/Path MTU discovery black hole detection failure%s}\n");
+
+	xo_close_container("pmtud");
+	xo_open_container("tw");
+
+	p(tcps_tw_responds, "\t{:tw_responds/%ju} "
+	    "{N:/time%s connection in TIME-WAIT responded with ACK}\n");
+	p(tcps_tw_recycles, "\t{:tw_recycles/%ju} "
+	    "{N:/time%s connection in TIME-WAIT was actively recycled}\n");
+	p(tcps_tw_resets, "\t{:tw_resets/%ju} "
+	    "{N:/time%s connection in TIME-WAIT responded with RST}\n");
+
+	xo_close_container("tw");
  #undef p
  #undef p1a
  #undef p2
  #undef p2a
  #undef p3
-	xo_close_container("pmtud");
-
 
 	xo_open_container("TCP connection count by state");
 	xo_emit("{T:/TCP connection count by state}:\n");
@@ -1113,7 +1133,7 @@ arp_stats(u_long off, const char *name, int af1 __unused, int proto __unused)
 	    "{N:/ARP request%s received}\n");
 	p2(rxreplies, "{:received-replies/%ju} "
 	    "{N:/ARP repl%s received}\n");
-	p(received, "{:received-packers/%ju} "
+	p(received, "{:received-packets/%ju} "
 	    "{N:/ARP packet%s received}\n");
 	p(dropped, "{:dropped-no-entry/%ju} "
 	    "{N:/total packet%s dropped due to no ARP entry}\n");
@@ -1471,24 +1491,13 @@ inetname(struct in_addr *inp)
 	char *cp;
 	static char line[MAXHOSTNAMELEN];
 	struct hostent *hp;
-	struct netent *np;
 
 	cp = 0;
 	if (!numeric_addr && inp->s_addr != INADDR_ANY) {
-		int net = inet_netof(*inp);
-		int lna = inet_lnaof(*inp);
-
-		if (lna == INADDR_ANY) {
-			np = getnetbyaddr(net, AF_INET);
-			if (np)
-				cp = np->n_name;
-		}
-		if (cp == NULL) {
-			hp = gethostbyaddr((char *)inp, sizeof (*inp), AF_INET);
-			if (hp) {
-				cp = hp->h_name;
-				trimdomain(cp, strlen(cp));
-			}
+		hp = gethostbyaddr((char *)inp, sizeof (*inp), AF_INET);
+		if (hp) {
+			cp = hp->h_name;
+			trimdomain(cp, strlen(cp));
 		}
 	}
 	if (inp->s_addr == INADDR_ANY)

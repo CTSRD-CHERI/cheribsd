@@ -455,7 +455,8 @@ space_map_histogram_clear(space_map_t *sm)
 	if (sm->sm_dbuf->db_size != sizeof (space_map_phys_t))
 		return;
 
-	bzero(sm->sm_phys->smp_histogram, sizeof (sm->sm_phys->smp_histogram));
+	memset(sm->sm_phys->smp_histogram, 0,
+	    sizeof (sm->sm_phys->smp_histogram));
 }
 
 boolean_t
@@ -548,7 +549,7 @@ space_map_write_intro_debug(space_map_t *sm, maptype_t maptype, dmu_tx_t *tx)
 static void
 space_map_write_seg(space_map_t *sm, uint64_t rstart, uint64_t rend,
     maptype_t maptype, uint64_t vdev_id, uint8_t words, dmu_buf_t **dbp,
-    void *tag, dmu_tx_t *tx)
+    const void *tag, dmu_tx_t *tx)
 {
 	ASSERT3U(words, !=, 0);
 	ASSERT3U(words, <=, 2);
@@ -726,7 +727,7 @@ space_map_write_impl(space_map_t *sm, range_tree_t *rt, maptype_t maptype,
 		    length > SM_RUN_MAX ||
 		    vdev_id != SM_NO_VDEVID ||
 		    (zfs_force_some_double_word_sm_entries &&
-		    spa_get_random(100) == 0)))
+		    random_in_range(100) == 0)))
 			words = 2;
 
 		space_map_write_seg(sm, rs_get_start(rs, rt), rs_get_end(rs,
@@ -877,9 +878,11 @@ space_map_truncate(space_map_t *sm, int blocksize, dmu_tx_t *tx)
 	    doi.doi_data_block_size != blocksize ||
 	    doi.doi_metadata_block_size != 1 << space_map_ibs) {
 		zfs_dbgmsg("txg %llu, spa %s, sm %px, reallocating "
-		    "object[%llu]: old bonus %u, old blocksz %u",
-		    dmu_tx_get_txg(tx), spa_name(spa), sm, sm->sm_object,
-		    doi.doi_bonus_size, doi.doi_data_block_size);
+		    "object[%llu]: old bonus %llu, old blocksz %u",
+		    (u_longlong_t)dmu_tx_get_txg(tx), spa_name(spa), sm,
+		    (u_longlong_t)sm->sm_object,
+		    (u_longlong_t)doi.doi_bonus_size,
+		    doi.doi_data_block_size);
 
 		space_map_free(sm, tx);
 		dmu_buf_rele(sm->sm_dbuf, sm);
@@ -894,7 +897,7 @@ space_map_truncate(space_map_t *sm, int blocksize, dmu_tx_t *tx)
 		 * will be reset.  Do the same in the common case so that
 		 * bugs related to the uncommon case do not go unnoticed.
 		 */
-		bzero(sm->sm_phys->smp_histogram,
+		memset(sm->sm_phys->smp_histogram, 0,
 		    sizeof (sm->sm_phys->smp_histogram));
 	}
 

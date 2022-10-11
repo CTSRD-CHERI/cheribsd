@@ -74,6 +74,8 @@ SYSCTL_INT(_net_hvsock, OID_AUTO, hvs_dbg_level, CTLFLAG_RWTUN, &hvs_dbg_level,
 
 MALLOC_DEFINE(M_HVSOCK, "hyperv_socket", "hyperv socket control structures");
 
+static int hvs_dom_probe(void);
+
 /* The MTU is 16KB per host side's design */
 #define HVSOCK_MTU_SIZE		(1024 * 16)
 #define HVSOCK_SEND_BUF_SZ	(PAGE_SIZE - sizeof(struct vmpipe_proto_header))
@@ -116,7 +118,6 @@ static struct protosw		hv_socket_protosw[] = {
 	.pr_domain =		&hv_socket_domain,
 	.pr_protocol =		HYPERV_SOCK_PROTO_TRANS,
 	.pr_flags =		PR_CONNREQUIRED,
-	.pr_init =		hvs_trans_init,
 	.pr_usrreqs =		&hvs_trans_usrreqs,
 },
 };
@@ -124,11 +125,12 @@ static struct protosw		hv_socket_protosw[] = {
 static struct domain		hv_socket_domain = {
 	.dom_family =		AF_HYPERV,
 	.dom_name =		"hyperv",
+	.dom_probe =		hvs_dom_probe,
 	.dom_protosw =		hv_socket_protosw,
 	.dom_protoswNPROTOSW =	&hv_socket_protosw[nitems(hv_socket_protosw)]
 };
 
-VNET_DOMAIN_SET(hv_socket_);
+DOMAIN_SET(hv_socket_);
 
 #define MAX_PORT			((uint32_t)0xFFFFFFFF)
 #define MIN_PORT			((uint32_t)0x0)
@@ -300,6 +302,7 @@ hvs_addr_set(struct sockaddr_hvs *addr, unsigned int port)
 {
 	memset(addr, 0, sizeof(*addr));
 	addr->sa_family = AF_HYPERV;
+	addr->sa_len = sizeof(*addr);
 	addr->hvs_port = port;
 }
 
@@ -322,15 +325,19 @@ hvs_trans_unlock(void)
 	sx_xunlock(&hvs_trans_socks_sx);
 }
 
-void
-hvs_trans_init(void)
+static int
+hvs_dom_probe(void)
 {
-	/* Skip initialization of globals for non-default instances. */
-	if (!IS_DEFAULT_VNET(curvnet))
-		return;
 
+	/* Don't even give us a chance to attach on non-HyperV. */
 	if (vm_guest != VM_GUEST_HV)
-		return;
+		return (ENXIO);
+	return (0);
+}
+
+static void
+hvs_trans_init(void *arg __unused)
+{
 
 	HVSOCK_DBG(HVSOCK_DBG_VERBOSE,
 	    "%s: HyperV Socket hvs_trans_init called\n", __func__);
@@ -343,6 +350,8 @@ hvs_trans_init(void)
 	LIST_INIT(&hvs_trans_bound_socks);
 	LIST_INIT(&hvs_trans_connected_socks);
 }
+SYSINIT(hvs_trans_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_THIRD,
+    hvs_trans_init, NULL);
 
 /*
  * Called in two cases:
@@ -353,9 +362,6 @@ int
 hvs_trans_attach(struct socket *so, int proto, struct thread *td)
 {
 	struct hvs_pcb *pcb = so2hvspcb(so);
-
-	if (vm_guest != VM_GUEST_HV)
-		return (ESOCKTNOSUPPORT);
 
 	HVSOCK_DBG(HVSOCK_DBG_VERBOSE,
 	    "%s: HyperV Socket hvs_trans_attach called\n", __func__);
@@ -382,9 +388,6 @@ void
 hvs_trans_detach(struct socket *so)
 {
 	struct hvs_pcb *pcb;
-
-	if (vm_guest != VM_GUEST_HV)
-		return;
 
 	HVSOCK_DBG(HVSOCK_DBG_VERBOSE,
 	    "%s: HyperV Socket hvs_trans_detach called\n", __func__);
@@ -429,6 +432,12 @@ hvs_trans_bind(struct socket *so, struct sockaddr *addr, struct thread *td)
 		    "%s: Not supported, sa_family is %u\n",
 		    __func__, sa->sa_family);
 		return (EAFNOSUPPORT);
+	}
+	if (sa->sa_len != sizeof(*sa)) {
+		HVSOCK_DBG(HVSOCK_DBG_ERR,
+		    "%s: Not supported, sa_len is %u\n",
+		    __func__, sa->sa_len);
+		return (EINVAL);
 	}
 
 	HVSOCK_DBG(HVSOCK_DBG_VERBOSE,
@@ -521,6 +530,8 @@ hvs_trans_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 		return (EINVAL);
 	if (raddr->sa_family != AF_HYPERV)
 		return (EAFNOSUPPORT);
+	if (raddr->sa_len != sizeof(*raddr))
+		return (EINVAL);
 
 	mtx_lock(&hvs_trans_socks_mtx);
 	if (so->so_state &
@@ -595,9 +606,6 @@ hvs_trans_disconnect(struct socket *so)
 {
 	struct hvs_pcb *pcb;
 
-	if (vm_guest != VM_GUEST_HV)
-		return (ESOCKTNOSUPPORT);
-
 	HVSOCK_DBG(HVSOCK_DBG_VERBOSE,
 	    "%s: HyperV Socket hvs_trans_disconnect called\n", __func__);
 
@@ -617,7 +625,6 @@ hvs_trans_disconnect(struct socket *so)
 	return (0);
 }
 
-#define SBLOCKWAIT(f)	(((f) & MSG_DONTWAIT) ? 0 : SBL_WAIT)
 struct hvs_callback_arg {
 	struct uio *uio;
 	struct sockbuf *sb;
@@ -654,18 +661,17 @@ hvs_trans_soreceive(struct socket *so, struct sockaddr **paddr,
 	if (uio->uio_resid == 0 || uio->uio_rw != UIO_READ)
 		return (EINVAL);
 
-	sb = &so->so_rcv;
-
 	orig_resid = uio->uio_resid;
 
 	/* Prevent other readers from entering the socket. */
-	error = sblock(sb, SBLOCKWAIT(flags));
+	error = SOCK_IO_RECV_LOCK(so, SBLOCKWAIT(flags));
 	if (error) {
 		HVSOCK_DBG(HVSOCK_DBG_ERR,
-		    "%s: sblock returned error = %d\n", __func__, error);
+		    "%s: soiolock returned error = %d\n", __func__, error);
 		return (error);
 	}
 
+	sb = &so->so_rcv;
 	SOCKBUF_LOCK(sb);
 
 	cbarg.uio = uio;
@@ -757,7 +763,7 @@ hvs_trans_soreceive(struct socket *so, struct sockaddr **paddr,
 		 * Wait and block until (more) data comes in.
 		 * Note: Drops the sockbuf lock during wait.
 		 */
-		error = sbwait(sb);
+		error = sbwait(so, SO_RCV);
 
 		if (error)
 			break;
@@ -769,8 +775,7 @@ hvs_trans_soreceive(struct socket *so, struct sockaddr **paddr,
 
 out:
 	SOCKBUF_UNLOCK(sb);
-
-	sbunlock(sb);
+	SOCK_IO_RECV_UNLOCK(so);
 
 	/* We recieved a FIN in this call */
 	if (so->so_error == ESHUTDOWN) {
@@ -813,18 +818,17 @@ hvs_trans_sosend(struct socket *so, struct sockaddr *addr, struct uio *uio,
 	if (uio->uio_resid == 0 || uio->uio_rw != UIO_WRITE)
 		return (EINVAL);
 
-	sb = &so->so_snd;
-
 	orig_resid = uio->uio_resid;
 
 	/* Prevent other writers from entering the socket. */
-	error = sblock(sb, SBLOCKWAIT(flags));
+	error = SOCK_IO_SEND_LOCK(so, SBLOCKWAIT(flags));
 	if (error) {
 		HVSOCK_DBG(HVSOCK_DBG_ERR,
-		    "%s: sblock returned error = %d\n", __func__, error);
+		    "%s: soiolocak returned error = %d\n", __func__, error);
 		return (error);
 	}
 
+	sb = &so->so_snd;
 	SOCKBUF_LOCK(sb);
 
 	if ((sb->sb_state & SBS_CANTSENDMORE) ||
@@ -855,7 +859,7 @@ hvs_trans_sosend(struct socket *so, struct sockaddr *addr, struct uio *uio,
 				 * Sleep wait until space avaiable to send
 				 * Note: Drops the sockbuf lock during wait.
 				 */
-				error = sbwait(sb);
+				error = sbwait(so, SO_SND);
 
 				if (error)
 					break;
@@ -883,7 +887,7 @@ hvs_trans_sosend(struct socket *so, struct sockaddr *addr, struct uio *uio,
 
 out:
 	SOCKBUF_UNLOCK(sb);
-	sbunlock(sb);
+	SOCK_IO_SEND_UNLOCK(so);
 
 	return (error);
 }
@@ -925,9 +929,6 @@ hvs_trans_close(struct socket *so)
 {
 	struct hvs_pcb *pcb;
 
-	if (vm_guest != VM_GUEST_HV)
-		return;
-
 	HVSOCK_DBG(HVSOCK_DBG_VERBOSE,
 	    "%s: HyperV Socket hvs_trans_close called\n", __func__);
 
@@ -968,9 +969,6 @@ void
 hvs_trans_abort(struct socket *so)
 {
 	struct hvs_pcb *pcb = so2hvspcb(so);
-
-	if (vm_guest != VM_GUEST_HV)
-		return;
 
 	HVSOCK_DBG(HVSOCK_DBG_VERBOSE,
 	    "%s: HyperV Socket hvs_trans_abort called\n", __func__);
@@ -1473,7 +1471,7 @@ hvsock_open_conn_passive(struct vmbus_channel *chan, struct socket *so,
 	int error;
 
 	/* Do nothing if socket is not listening */
-	if ((so->so_options & SO_ACCEPTCONN) == 0) {
+	if (!SOLISTENING(so)) {
 		HVSOCK_DBG(HVSOCK_DBG_ERR,
 		    "%s: socket is not a listening one\n", __func__);
 		return;
@@ -1670,7 +1668,7 @@ hvsock_detach(device_t dev)
 {
 	struct hvsock_sc *sc = (struct hvsock_sc *)device_get_softc(dev);
 	struct socket *so;
-	int error, retry;
+	int retry;
 
 	if (bootverbose)
 		device_printf(dev, "hvsock_detach called.\n");
@@ -1699,8 +1697,7 @@ hvsock_detach(device_t dev)
 		 */
 		if (so) {
 			retry = 0;
-			while ((error = sblock(&so->so_rcv, 0)) ==
-			    EWOULDBLOCK) {
+			while (SOCK_IO_RECV_LOCK(so, 0) == EWOULDBLOCK) {
 				/*
 				 * Someone is reading, rx br is busy
 				 */
@@ -1711,8 +1708,7 @@ hvsock_detach(device_t dev)
 				    "retry = %d\n", retry++);
 			}
 			retry = 0;
-			while ((error = sblock(&so->so_snd, 0)) ==
-			    EWOULDBLOCK) {
+			while (SOCK_IO_SEND_LOCK(so, 0) == EWOULDBLOCK) {
 				/*
 				 * Someone is sending, tx br is busy
 				 */
@@ -1730,8 +1726,8 @@ hvsock_detach(device_t dev)
 		sc->pcb = NULL;
 
 		if (so) {
-			sbunlock(&so->so_rcv);
-			sbunlock(&so->so_snd);
+			SOCK_IO_RECV_UNLOCK(so);
+			SOCK_IO_SEND_UNLOCK(so);
 			so->so_pcb = NULL;
 		}
 
@@ -1757,8 +1753,6 @@ static driver_t hvsock_driver = {
 	sizeof(struct hvsock_sc)
 };
 
-static devclass_t hvsock_devclass;
-
-DRIVER_MODULE(hvsock, vmbus, hvsock_driver, hvsock_devclass, NULL, NULL);
+DRIVER_MODULE(hvsock, vmbus, hvsock_driver, NULL, NULL);
 MODULE_VERSION(hvsock, 1);
 MODULE_DEPEND(hvsock, vmbus, 1, 1, 1);

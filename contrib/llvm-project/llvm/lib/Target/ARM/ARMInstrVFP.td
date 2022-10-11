@@ -54,6 +54,16 @@ def vfp_f16imm : Operand<f16>,
   let ParserMatchClass = FPImmOperand;
 }
 
+def vfp_f32f16imm_xform : SDNodeXForm<fpimm, [{
+      APFloat InVal = N->getValueAPF();
+      uint32_t enc = ARM_AM::getFP32FP16Imm(InVal);
+      return CurDAG->getTargetConstant(enc, SDLoc(N), MVT::i32);
+    }]>;
+
+def vfp_f32f16imm : PatLeaf<(f32 fpimm), [{
+      return ARM_AM::getFP32FP16Imm(N->getValueAPF()) != -1;
+    }], vfp_f32f16imm_xform>;
+
 def vfp_f32imm_xform : SDNodeXForm<fpimm, [{
       APFloat InVal = N->getValueAPF();
       uint32_t enc = ARM_AM::getFP32Imm(InVal);
@@ -1066,6 +1076,9 @@ multiclass vrint_inst_anpm<string opc, bits<2> rm,
     }
   }
 
+  def : InstAlias<!strconcat("vrint", opc, ".f16.f16\t$Sd, $Sm"),
+                  (!cast<Instruction>(NAME#"H") HPR:$Sd, HPR:$Sm), 0>,
+        Requires<[HasFullFP16]>;
   def : InstAlias<!strconcat("vrint", opc, ".f32.f32\t$Sd, $Sm"),
                   (!cast<Instruction>(NAME#"S") SPR:$Sd, SPR:$Sm), 0>,
         Requires<[HasFPARMv8]>;
@@ -1116,9 +1129,12 @@ def VMOVH  : ASuInp<0b11101, 0b11, 0b0000, 0b01, 0,
              Requires<[HasFullFP16]>;
 
 def VINSH  : ASuInp<0b11101, 0b11, 0b0000, 0b11, 0,
-                  (outs SPR:$Sd), (ins SPR:$Sm),
+                  (outs SPR:$Sd), (ins SPR:$Sda, SPR:$Sm),
                   IIC_fpUNA16, "vins.f16\t$Sd, $Sm", []>,
-             Requires<[HasFullFP16]>;
+             Requires<[HasFullFP16]> {
+  let Constraints = "$Sd = $Sda";
+}
+
 } // PostEncoderMethod
 } // hasSideEffects
 
@@ -1551,6 +1567,8 @@ class AVConv1InsS_Encode<bits<5> opcod1, bits<2> opcod2, bits<4> opcod3,
   let Inst{5}     = Sm{0};
   let Inst{15-12} = Sd{4-1};
   let Inst{22}    = Sd{0};
+
+  let hasSideEffects = 0;
 }
 
 class AVConv1IsH_Encode<bits<5> opcod1, bits<2> opcod2, bits<4> opcod3,
@@ -1585,8 +1603,12 @@ def VTOSIZD : AVConv1IsD_Encode<0b11101, 0b11, 0b1101, 0b1011,
 let Predicates=[HasVFP2, HasDPVFP] in {
   def : VFPPat<(i32 (fp_to_sint (f64 DPR:$a))),
                (COPY_TO_REGCLASS (VTOSIZD DPR:$a), GPR)>;
+  def : VFPPat<(i32 (fp_to_sint_sat (f64 DPR:$a), i32)),
+               (COPY_TO_REGCLASS (VTOSIZD DPR:$a), GPR)>;
 
   def : VFPPat<(alignedstore32 (i32 (fp_to_sint (f64 DPR:$a))), addrmode5:$ptr),
+               (VSTRS (VTOSIZD DPR:$a), addrmode5:$ptr)>;
+  def : VFPPat<(alignedstore32 (i32 (fp_to_sint_sat (f64 DPR:$a), i32)), addrmode5:$ptr),
                (VSTRS (VTOSIZD DPR:$a), addrmode5:$ptr)>;
 }
 
@@ -1604,10 +1626,15 @@ def VTOSIZS : AVConv1InsS_Encode<0b11101, 0b11, 0b1101, 0b1010,
 
 def : VFPNoNEONPat<(i32 (fp_to_sint SPR:$a)),
                    (COPY_TO_REGCLASS (VTOSIZS SPR:$a), GPR)>;
+def : VFPPat<(i32 (fp_to_sint_sat SPR:$a, i32)),
+             (COPY_TO_REGCLASS (VTOSIZS SPR:$a), GPR)>;
 
 def : VFPNoNEONPat<(alignedstore32 (i32 (fp_to_sint (f32 SPR:$a))),
                                    addrmode5:$ptr),
                    (VSTRS (VTOSIZS SPR:$a), addrmode5:$ptr)>;
+def : VFPPat<(alignedstore32 (i32 (fp_to_sint_sat (f32 SPR:$a), i32)),
+                                   addrmode5:$ptr),
+             (VSTRS (VTOSIZS SPR:$a), addrmode5:$ptr)>;
 
 def VTOSIZH : AVConv1IsH_Encode<0b11101, 0b11, 0b1101, 0b1001,
                                  (outs SPR:$Sd), (ins HPR:$Sm),
@@ -1620,6 +1647,8 @@ def VTOSIZH : AVConv1IsH_Encode<0b11101, 0b11, 0b1101, 0b1001,
 
 def : VFPNoNEONPat<(i32 (fp_to_sint (f16 HPR:$a))),
                    (COPY_TO_REGCLASS (VTOSIZH (f16 HPR:$a)), GPR)>;
+def : VFPPat<(i32 (fp_to_sint_sat (f16 HPR:$a), i32)),
+             (COPY_TO_REGCLASS (VTOSIZH (f16 HPR:$a)), GPR)>;
 
 def VTOUIZD : AVConv1IsD_Encode<0b11101, 0b11, 0b1100, 0b1011,
                                (outs SPR:$Sd), (ins DPR:$Dm),
@@ -1632,8 +1661,12 @@ def VTOUIZD : AVConv1IsD_Encode<0b11101, 0b11, 0b1100, 0b1011,
 let Predicates=[HasVFP2, HasDPVFP] in {
   def : VFPPat<(i32 (fp_to_uint (f64 DPR:$a))),
                (COPY_TO_REGCLASS (VTOUIZD DPR:$a), GPR)>;
+  def : VFPPat<(i32 (fp_to_uint_sat (f64 DPR:$a), i32)),
+               (COPY_TO_REGCLASS (VTOUIZD DPR:$a), GPR)>;
 
   def : VFPPat<(alignedstore32 (i32 (fp_to_uint (f64 DPR:$a))), addrmode5:$ptr),
+               (VSTRS (VTOUIZD DPR:$a), addrmode5:$ptr)>;
+  def : VFPPat<(alignedstore32 (i32 (fp_to_uint_sat (f64 DPR:$a), i32)), addrmode5:$ptr),
                (VSTRS (VTOUIZD DPR:$a), addrmode5:$ptr)>;
 }
 
@@ -1651,10 +1684,15 @@ def VTOUIZS : AVConv1InsS_Encode<0b11101, 0b11, 0b1100, 0b1010,
 
 def : VFPNoNEONPat<(i32 (fp_to_uint SPR:$a)),
                    (COPY_TO_REGCLASS (VTOUIZS SPR:$a), GPR)>;
+def : VFPPat<(i32 (fp_to_uint_sat SPR:$a, i32)),
+             (COPY_TO_REGCLASS (VTOUIZS SPR:$a), GPR)>;
 
 def : VFPNoNEONPat<(alignedstore32 (i32 (fp_to_uint (f32 SPR:$a))),
                                    addrmode5:$ptr),
                   (VSTRS (VTOUIZS SPR:$a), addrmode5:$ptr)>;
+def : VFPPat<(alignedstore32 (i32 (fp_to_uint_sat (f32 SPR:$a), i32)),
+                                   addrmode5:$ptr),
+             (VSTRS (VTOUIZS SPR:$a), addrmode5:$ptr)>;
 
 def VTOUIZH : AVConv1IsH_Encode<0b11101, 0b11, 0b1100, 0b1001,
                                  (outs SPR:$Sd), (ins HPR:$Sm),
@@ -1667,6 +1705,8 @@ def VTOUIZH : AVConv1IsH_Encode<0b11101, 0b11, 0b1100, 0b1001,
 
 def : VFPNoNEONPat<(i32 (fp_to_uint (f16 HPR:$a))),
                    (COPY_TO_REGCLASS (VTOUIZH (f16 HPR:$a)), GPR)>;
+def : VFPPat<(i32 (fp_to_uint_sat (f16 HPR:$a), i32)),
+             (COPY_TO_REGCLASS (VTOUIZH (f16 HPR:$a)), GPR)>;
 
 // And the Z bit '0' variants, i.e. use the rounding mode specified by FPSCR.
 let Uses = [FPSCR] in {
@@ -2252,16 +2292,6 @@ def : Pat<(f32 (fma (fneg SPR:$Sn), SPR:$Sm, SPR:$Sdin)),
 def : Pat<(f16 (fma (fneg (f16 HPR:$Sn)), (f16 HPR:$Sm), (f16 HPR:$Sdin))),
           (VFMSH (f16 HPR:$Sdin), (f16 HPR:$Sn), (f16 HPR:$Sm))>,
       Requires<[HasFullFP16]>;
-// (fma x, (fneg y), z) -> (vfms z, x, y)
-def : Pat<(f64 (fma DPR:$Dn, (fneg DPR:$Dm), DPR:$Ddin)),
-          (VFMSD DPR:$Ddin, DPR:$Dn, DPR:$Dm)>,
-      Requires<[HasVFP4,HasDPVFP]>;
-def : Pat<(f32 (fma SPR:$Sn, (fneg SPR:$Sm), SPR:$Sdin)),
-          (VFMSS SPR:$Sdin, SPR:$Sn, SPR:$Sm)>,
-      Requires<[HasVFP4]>;
-def : Pat<(f16 (fma (f16 HPR:$Sn), (fneg (f16 HPR:$Sm)), (f16 HPR:$Sdin))),
-          (VFMSH (f16 HPR:$Sdin), (f16 HPR:$Sn), (f16 HPR:$Sm))>,
-      Requires<[HasFullFP16]>;
 
 def VFNMAD : ADbI<0b11101, 0b01, 1, 0,
                   (outs DPR:$Dd), (ins DPR:$Ddin, DPR:$Dn, DPR:$Dm),
@@ -2377,16 +2407,6 @@ def : Pat<(fneg (f32 (fma (fneg SPR:$Sn), SPR:$Sm, SPR:$Sdin))),
           (VFNMSS SPR:$Sdin, SPR:$Sn, SPR:$Sm)>,
       Requires<[HasVFP4]>;
 def : Pat<(fneg (f16 (fma (fneg (f16 HPR:$Sn)), (f16 HPR:$Sm), (f16 HPR:$Sdin)))),
-          (VFNMSH (f16 HPR:$Sdin), (f16 HPR:$Sn), (f16 HPR:$Sm))>,
-      Requires<[HasFullFP16]>;
-// (fneg (fma x, (fneg y), z) -> (vfnms z, x, y)
-def : Pat<(fneg (f64 (fma DPR:$Dn, (fneg DPR:$Dm), DPR:$Ddin))),
-          (VFNMSD DPR:$Ddin, DPR:$Dn, DPR:$Dm)>,
-      Requires<[HasVFP4,HasDPVFP]>;
-def : Pat<(fneg (f32 (fma SPR:$Sn, (fneg SPR:$Sm), SPR:$Sdin))),
-          (VFNMSS SPR:$Sdin, SPR:$Sn, SPR:$Sm)>,
-      Requires<[HasVFP4]>;
-def : Pat<(fneg (f16 (fma (f16 HPR:$Sn), (fneg (f16 HPR:$Sm)), (f16 HPR:$Sdin)))),
           (VFNMSH (f16 HPR:$Sdin), (f16 HPR:$Sn), (f16 HPR:$Sm))>,
       Requires<[HasFullFP16]>;
 
@@ -2634,6 +2654,11 @@ def FCONSTH : VFPAI<(outs HPR:$Sd), (ins vfp_f16imm:$imm),
 }
 }
 
+def : Pat<(f32 (vfp_f32f16imm:$imm)),
+          (f32 (COPY_TO_REGCLASS (f16 (FCONSTH (vfp_f32f16imm_xform (f32 $imm)))), SPR))> {
+  let Predicates = [HasFullFP16];
+}
+
 //===----------------------------------------------------------------------===//
 // Assembler aliases.
 //
@@ -2849,6 +2874,12 @@ let Predicates = [HasV8_1MMainline, HasMVEInt] in {
   }
   defm VSTR_P0             : vfp_vstrldr_sysreg<0b0,0b1101, "p0",
                                                 (outs), (ins VCCR:$P0)>;
+
+  let Defs = [VPR] in {
+    defm VLDR_VPR          : vfp_vstrldr_sysreg<0b1,0b1100, "vpr">;
+  }
+  defm VLDR_P0             : vfp_vstrldr_sysreg<0b1,0b1101, "p0",
+                                                (outs VCCR:$P0), (ins)>;
 }
 
 let Uses = [FPSCR] in {
@@ -2859,12 +2890,4 @@ let Uses = [FPSCR] in {
     defm VLDR_FPCXTNS      : vfp_vstrldr_sysreg<0b1,0b1110, "fpcxtns">;
     defm VLDR_FPCXTS       : vfp_vstrldr_sysreg<0b1,0b1111, "fpcxts">;
   }
-}
-
-let Predicates = [HasV8_1MMainline, HasMVEInt] in {
-  let Defs = [VPR] in {
-    defm VLDR_VPR          : vfp_vstrldr_sysreg<0b1,0b1100, "vpr">;
-  }
-  defm VLDR_P0             : vfp_vstrldr_sysreg<0b1,0b1101, "p0",
-                                                (outs VCCR:$P0), (ins)>;
 }

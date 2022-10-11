@@ -24,9 +24,9 @@
 #include "llvm/MC/MCSectionMachO.h"
 #include "llvm/MC/MCTargetOptions.h"
 #include "llvm/MC/MCValue.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/TargetRegistry.h"
 using namespace llvm;
 
 namespace {
@@ -67,8 +67,7 @@ public:
         {"fixup_aarch64_pcrel_branch14", 5, 14, PCRelFlagVal},
         {"fixup_aarch64_pcrel_branch19", 5, 19, PCRelFlagVal},
         {"fixup_aarch64_pcrel_branch26", 0, 26, PCRelFlagVal},
-        {"fixup_aarch64_pcrel_call26", 0, 26, PCRelFlagVal},
-        {"fixup_aarch64_tlsdesc_call", 0, 0, 0}};
+        {"fixup_aarch64_pcrel_call26", 0, 26, PCRelFlagVal}};
 
     // Fixup kinds from .reloc directive are like R_AARCH64_NONE. They do not
     // require any extra processing.
@@ -88,18 +87,13 @@ public:
                   uint64_t Value, bool IsResolved,
                   const MCSubtargetInfo *STI) const override;
 
-  bool mayNeedRelaxation(const MCInst &Inst,
-                         const MCSubtargetInfo &STI) const override;
   bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
                             const MCRelaxableFragment *DF,
                             const MCAsmLayout &Layout) const override;
   void relaxInstruction(MCInst &Inst,
                         const MCSubtargetInfo &STI) const override;
-  bool writeNopData(raw_ostream &OS, uint64_t Count) const override;
-
-  void HandleAssemblerFlag(MCAssemblerFlag Flag) {}
-
-  unsigned getPointerSize() const { return 8; }
+  bool writeNopData(raw_ostream &OS, uint64_t Count,
+                    const MCSubtargetInfo *STI) const override;
 
   unsigned getFixupKindContainereSizeInBytes(unsigned Kind) const;
 
@@ -114,9 +108,6 @@ static unsigned getFixupKindNumBytes(unsigned Kind) {
   switch (Kind) {
   default:
     llvm_unreachable("Unknown fixup kind!");
-
-  case AArch64::fixup_aarch64_tlsdesc_call:
-    return 0;
 
   case FK_Data_1:
     return 1;
@@ -156,19 +147,6 @@ static unsigned AdrImmBits(unsigned Value) {
   return (hi19 << 5) | (lo2 << 29);
 }
 
-static bool valueFitsIntoFixupKind(unsigned Kind, uint64_t Value) {
-  unsigned NumBits;
-  switch(Kind) {
-  case FK_Data_1: NumBits = 8; break;
-  case FK_Data_2: NumBits = 16; break;
-  case FK_Data_4: NumBits = 32; break;
-  case FK_Data_8: NumBits = 64; break;
-  default: return true;
-  }
-  return isUIntN(NumBits, Value) ||
-    isIntN(NumBits, static_cast<int64_t>(Value));
-}
-
 static uint64_t adjustFixupValue(const MCFixup &Fixup, const MCValue &Target,
                                  uint64_t Value, MCContext &Ctx,
                                  const Triple &TheTriple, bool IsResolved) {
@@ -182,8 +160,11 @@ static uint64_t adjustFixupValue(const MCFixup &Fixup, const MCValue &Target,
     return AdrImmBits(Value & 0x1fffffULL);
   case AArch64::fixup_aarch64_pcrel_adrp_imm21:
     assert(!IsResolved);
-    if (TheTriple.isOSBinFormatCOFF())
+    if (TheTriple.isOSBinFormatCOFF()) {
+      if (!isInt<21>(SignedValue))
+        Ctx.reportError(Fixup.getLoc(), "fixup value out of range");
       return AdrImmBits(Value & 0x1fffffULL);
+    }
     return AdrImmBits((Value & 0x1fffff000ULL) >> 12);
   case AArch64::fixup_aarch64_ldr_pcrel_imm19:
   case AArch64::fixup_aarch64_pcrel_branch19:
@@ -343,9 +324,6 @@ static uint64_t adjustFixupValue(const MCFixup &Fixup, const MCValue &Target,
   case FK_Data_2:
   case FK_Data_4:
   case FK_Data_8:
-    if (!valueFitsIntoFixupKind(Fixup.getTargetKind(), Value))
-      Ctx.reportError(Fixup.getLoc(), "fixup value too large for data type!");
-    LLVM_FALLTHROUGH;
   case FK_SecRel_2:
   case FK_SecRel_4:
     return Value;
@@ -360,6 +338,10 @@ Optional<MCFixupKind> AArch64AsmBackend::getFixupKind(StringRef Name) const {
 #define ELF_RELOC(X, Y)  .Case(#X, Y)
 #include "llvm/BinaryFormat/ELFRelocs/AArch64.def"
 #undef ELF_RELOC
+                      .Case("BFD_RELOC_NONE", ELF::R_AARCH64_NONE)
+                      .Case("BFD_RELOC_16", ELF::R_AARCH64_ABS16)
+                      .Case("BFD_RELOC_32", ELF::R_AARCH64_ABS32)
+                      .Case("BFD_RELOC_64", ELF::R_AARCH64_ABS64)
                       .Default(-1u);
   if (Type == -1u)
     return None;
@@ -385,7 +367,6 @@ unsigned AArch64AsmBackend::getFixupKindContainereSizeInBytes(unsigned Kind) con
   case FK_Data_8:
     return 8;
 
-  case AArch64::fixup_aarch64_tlsdesc_call:
   case AArch64::fixup_aarch64_movw:
   case AArch64::fixup_aarch64_pcrel_branch14:
   case AArch64::fixup_aarch64_add_imm12:
@@ -463,11 +444,6 @@ void AArch64AsmBackend::applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
   }
 }
 
-bool AArch64AsmBackend::mayNeedRelaxation(const MCInst &Inst,
-                                          const MCSubtargetInfo &STI) const {
-  return false;
-}
-
 bool AArch64AsmBackend::fixupNeedsRelaxation(const MCFixup &Fixup,
                                              uint64_t Value,
                                              const MCRelaxableFragment *DF,
@@ -484,7 +460,8 @@ void AArch64AsmBackend::relaxInstruction(MCInst &Inst,
   llvm_unreachable("AArch64AsmBackend::relaxInstruction() unimplemented");
 }
 
-bool AArch64AsmBackend::writeNopData(raw_ostream &OS, uint64_t Count) const {
+bool AArch64AsmBackend::writeNopData(raw_ostream &OS, uint64_t Count,
+                                     const MCSubtargetInfo *STI) const {
   // If the count is not 4-byte aligned, we must be writing data into the text
   // section (otherwise we have unaligned instructions, and thus have far
   // bigger problems), so just write zeros instead.
@@ -519,13 +496,6 @@ bool AArch64AsmBackend::shouldForceRelocation(const MCAssembler &Asm,
   if (Kind == AArch64::fixup_aarch64_pcrel_adrp_imm21)
     return true;
 
-  AArch64MCExpr::VariantKind RefKind =
-      static_cast<AArch64MCExpr::VariantKind>(Target.getRefKind());
-  AArch64MCExpr::VariantKind SymLoc = AArch64MCExpr::getSymbolLoc(RefKind);
-  // LDR GOT relocations need a relocation
-  if (Kind == AArch64::fixup_aarch64_ldr_pcrel_imm19 &&
-      SymLoc == AArch64MCExpr::VK_GOT)
-    return true;
   return false;
 }
 
@@ -602,6 +572,7 @@ public:
     unsigned StackSize = 0;
 
     uint32_t CompactUnwindEncoding = 0;
+    int CurOffset = 0;
     for (size_t i = 0, e = Instrs.size(); i != e; ++i) {
       const MCCFIInstruction &Inst = Instrs[i];
 
@@ -631,6 +602,9 @@ public:
         assert(FPPush.getOperation() == MCCFIInstruction::OpOffset &&
                "Frame pointer not pushed!");
 
+        assert(FPPush.getOffset() + 8 == LRPush.getOffset());
+        CurOffset = FPPush.getOffset();
+
         unsigned LRReg = *MRI.getLLVMRegNum(LRPush.getRegister(), true);
         unsigned FPReg = *MRI.getLLVMRegNum(FPPush.getRegister(), true);
 
@@ -657,10 +631,18 @@ public:
         if (i + 1 == e)
           return CU::UNWIND_ARM64_MODE_DWARF;
 
+        if (CurOffset != 0 && Inst.getOffset() != CurOffset - 8)
+          return CU::UNWIND_ARM64_MODE_DWARF;
+        CurOffset = Inst.getOffset();
+
         const MCCFIInstruction &Inst2 = Instrs[++i];
         if (Inst2.getOperation() != MCCFIInstruction::OpOffset)
           return CU::UNWIND_ARM64_MODE_DWARF;
         unsigned Reg2 = *MRI.getLLVMRegNum(Inst2.getRegister(), true);
+
+        if (Inst2.getOffset() != CurOffset - 8)
+          return CU::UNWIND_ARM64_MODE_DWARF;
+        CurOffset = Inst2.getOffset();
 
         // N.B. The encodings must be in register number order, and the X
         // registers before the D registers.
@@ -781,7 +763,7 @@ MCAsmBackend *llvm::createAArch64leAsmBackend(const Target &T,
   assert(TheTriple.isOSBinFormatELF() && "Invalid target");
 
   uint8_t OSABI = MCELFObjectTargetWriter::getOSABI(TheTriple.getOS());
-  bool IsILP32 = Options.getABIName() == "ilp32";
+  bool IsILP32 = STI.getTargetTriple().getEnvironment() == Triple::GNUILP32;
   return new ELFAArch64AsmBackend(T, TheTriple, OSABI, /*IsLittleEndian=*/true,
                                   IsILP32);
 }
@@ -794,7 +776,7 @@ MCAsmBackend *llvm::createAArch64beAsmBackend(const Target &T,
   assert(TheTriple.isOSBinFormatELF() &&
          "Big endian is only supported for ELF targets!");
   uint8_t OSABI = MCELFObjectTargetWriter::getOSABI(TheTriple.getOS());
-  bool IsILP32 = Options.getABIName() == "ilp32";
+  bool IsILP32 = STI.getTargetTriple().getEnvironment() == Triple::GNUILP32;
   return new ELFAArch64AsmBackend(T, TheTriple, OSABI, /*IsLittleEndian=*/false,
                                   IsILP32);
 }

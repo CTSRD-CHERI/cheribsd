@@ -302,9 +302,8 @@ static driver_t wpi_driver = {
 	wpi_methods,
 	sizeof (struct wpi_softc)
 };
-static devclass_t wpi_devclass;
 
-DRIVER_MODULE(wpi, pci, wpi_driver, wpi_devclass, NULL, NULL);
+DRIVER_MODULE(wpi, pci, wpi_driver, NULL, NULL);
 
 MODULE_VERSION(wpi, 1);
 
@@ -4547,6 +4546,7 @@ wpi_run(struct wpi_softc *sc, struct ieee80211vap *vap)
 	    sc->rxon.chan, sc->rxon.flags);
 
 	if ((error = wpi_send_rxon(sc, 0, 1)) != 0) {
+		WPI_RXON_UNLOCK(sc);
 		device_printf(sc->sc_dev, "%s: could not send RXON\n",
 		    __func__);
 		return error;

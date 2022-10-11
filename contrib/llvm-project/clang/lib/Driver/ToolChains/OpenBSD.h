@@ -10,6 +10,7 @@
 #define LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_OPENBSD_H
 
 #include "Gnu.h"
+#include "clang/Basic/LangOptions.h"
 #include "clang/Driver/Tool.h"
 #include "clang/Driver/ToolChain.h"
 
@@ -58,7 +59,9 @@ public:
 
   bool IsMathErrnoDefault() const override { return false; }
   bool IsObjCNonFragileABIDefault() const override { return true; }
-  bool isPIEDefault() const override { return true; }
+  bool isPIEDefault(const llvm::opt::ArgList &Args) const override {
+    return true;
+  }
 
   RuntimeLibType GetDefaultRuntimeLibType() const override {
     return ToolChain::RLT_CompilerRT;
@@ -79,8 +82,11 @@ public:
   std::string getCompilerRT(const llvm::opt::ArgList &Args, StringRef Component,
                             FileType Type = ToolChain::FT_Static) const override;
 
-  unsigned GetDefaultStackProtectorLevel(bool KernelOrKext) const override {
-    return 2;
+  bool IsUnwindTablesDefault(const llvm::opt::ArgList &Args) const override;
+
+  LangOptions::StackProtectorMode
+  GetDefaultStackProtectorLevel(bool KernelOrKext) const override {
+    return LangOptions::SSPStrong;
   }
   unsigned GetDefaultDwarfVersion() const override { return 2; }
 

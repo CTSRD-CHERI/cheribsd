@@ -121,12 +121,12 @@ thread_compare(struct thread *td, struct thread *td2)
 	 * Fetch running stats, pctcpu usage, and interruptable flag.
 	 */
 	thread_lock(td);
-	runa = TD_IS_RUNNING(td) | TD_ON_RUNQ(td);
+	runa = TD_IS_RUNNING(td) || TD_ON_RUNQ(td);
 	slpa = td->td_flags & TDF_SINTR;
 	esta = sched_pctcpu(td);
 	thread_unlock(td);
 	thread_lock(td2);
-	runb = TD_IS_RUNNING(td2) | TD_ON_RUNQ(td2);
+	runb = TD_IS_RUNNING(td2) || TD_ON_RUNQ(td2);
 	estb = sched_pctcpu(td2);
 	slpb = td2->td_flags & TDF_SINTR;
 	thread_unlock(td2);
@@ -239,7 +239,11 @@ sbuf_tty_drain(void *a, const char *d, int len)
 }
 
 #ifdef STACK
+#ifdef INVARIANTS
 static int tty_info_kstacks = STACK_SBUF_FMT_COMPACT;
+#else
+static int tty_info_kstacks = STACK_SBUF_FMT_NONE;
+#endif
 
 static int
 sysctl_tty_info_kstacks(SYSCTL_HANDLER_ARGS)
@@ -302,7 +306,7 @@ tty_info(struct tty *tp)
 	sbuf_set_drain(&sb, sbuf_tty_drain, tp);
 
 	/* Print load average. */
-	load = (averunnable.ldavg[0] * 100 + FSCALE / 2) >> FSHIFT;
+	load = ((int64_t)averunnable.ldavg[0] * 100 + FSCALE / 2) >> FSHIFT;
 	sbuf_printf(&sb, "%sload: %d.%02d ", tp->t_column == 0 ? "" : "\n",
 	    load / 100, load % 100);
 

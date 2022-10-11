@@ -27,7 +27,7 @@
 #include <sys/byteorder.h>
 #include <sys/frame.h>
 #include <sys/spa_checksum.h>
-#include <sys/strings.h>
+#include <sys/string.h>
 #include <sys/simd.h>
 #include <zfs_fletcher.h>
 
@@ -35,12 +35,14 @@
 #define	__asm __asm__ __volatile__
 #endif
 
+ZFS_NO_SANITIZE_UNDEFINED
 static void
 fletcher_4_avx512f_init(fletcher_4_ctx_t *ctx)
 {
-	bzero(ctx->avx512, 4 * sizeof (zfs_fletcher_avx512_t));
+	memset(ctx->avx512, 0, 4 * sizeof (zfs_fletcher_avx512_t));
 }
 
+ZFS_NO_SANITIZE_UNDEFINED
 static void
 fletcher_4_avx512f_fini(fletcher_4_ctx_t *ctx, zio_cksum_t *zcp)
 {
@@ -210,6 +212,12 @@ fletcher_4_avx512bw_byteswap(fletcher_4_ctx_t *ctx, const void *buf,
 }
 STACK_FRAME_NON_STANDARD(fletcher_4_avx512bw_byteswap);
 
+static boolean_t
+fletcher_4_avx512bw_valid(void)
+{
+	return (fletcher_4_avx512f_valid() && zfs_avx512bw_available());
+}
+
 const fletcher_4_ops_t fletcher_4_avx512bw_ops = {
 	.init_native = fletcher_4_avx512f_init,
 	.fini_native = fletcher_4_avx512f_fini,
@@ -217,7 +225,7 @@ const fletcher_4_ops_t fletcher_4_avx512bw_ops = {
 	.init_byteswap = fletcher_4_avx512f_init,
 	.fini_byteswap = fletcher_4_avx512f_fini,
 	.compute_byteswap = fletcher_4_avx512bw_byteswap,
-	.valid = fletcher_4_avx512f_valid,
+	.valid = fletcher_4_avx512bw_valid,
 	.name = "avx512bw"
 };
 #endif

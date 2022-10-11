@@ -151,8 +151,8 @@ gctl_new_arg(struct gctl_req *req)
 	return (ap);
 }
 
-static void
-gctl_param_add(struct gctl_req *req, const char *name, int len, void *value,
+void
+gctl_add_param(struct gctl_req *req, const char *name, int len, void *value,
     int flag)
 {
 	struct gctl_req_arg *ap;
@@ -181,20 +181,20 @@ void
 gctl_ro_param(struct gctl_req *req, const char *name, int len, const void* value)
 {
 
-	gctl_param_add(req, name, len, __DECONST(void *, value), GCTL_PARAM_RD);
+	gctl_add_param(req, name, len, __DECONST(void *, value), GCTL_PARAM_RD);
 }
 
 void
 gctl_rw_param(struct gctl_req *req, const char *name, int len, void *value)
 {
 
-	gctl_param_add(req, name, len, value, GCTL_PARAM_RW);
+	gctl_add_param(req, name, len, value, GCTL_PARAM_RW);
 }
 
 const char *
 gctl_issue(struct gctl_req *req)
 {
-	int fd, error;
+	int fd;
 
 	if (req == NULL)
 		return ("NULL request pointer");
@@ -212,11 +212,11 @@ gctl_issue(struct gctl_req *req)
 	fd = open(_PATH_DEV PATH_GEOM_CTL, O_RDONLY);
 	if (fd < 0)
 		return(strerror(errno));
-	error = ioctl(fd, GEOM_CTL, req);
+	req->nerror = ioctl(fd, GEOM_CTL, req);
 	close(fd);
 	if (req->error[0] != '\0')
 		return (req->error);
-	if (error != 0)
+	if (req->nerror == -1)
 		return(strerror(errno));
 	return (NULL);
 }

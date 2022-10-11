@@ -14,6 +14,8 @@
 
 // type_index(const type_info& rhs);
 
+// UNSUPPORTED: no-rtti
+
 #include <typeinfo>
 #include <typeindex>
 #include <cassert>

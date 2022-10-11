@@ -30,9 +30,9 @@ public:
 
   static void Terminate();
 
-  static lldb_private::ConstString GetPluginNameStatic();
+  static llvm::StringRef GetPluginNameStatic() { return "posix-dyld"; }
 
-  static const char *GetPluginDescriptionStatic();
+  static llvm::StringRef GetPluginDescriptionStatic();
 
   static lldb_private::DynamicLoader *
   CreateInstance(lldb_private::Process *process, bool force);
@@ -53,9 +53,7 @@ public:
                                   lldb::addr_t tls_file_addr) override;
 
   // PluginInterface protocol
-  lldb_private::ConstString GetPluginName() override;
-
-  uint32_t GetPluginVersion() override;
+  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
 
 protected:
   /// Runtime linker rendezvous structure.
@@ -81,6 +79,9 @@ protected:
   /// mapped to the address space
   lldb::addr_t m_interpreter_base;
 
+  /// Contains the pointer to the interpret module, if loaded.
+  std::weak_ptr<lldb_private::Module> m_interpreter_module;
+
   /// Loaded module list. (link map for each module)
   std::map<lldb::ModuleWP, lldb::addr_t, std::owner_less<lldb::ModuleWP>>
       m_loaded_modules;
@@ -94,6 +95,9 @@ protected:
   static bool RendezvousBreakpointHit(
       void *baton, lldb_private::StoppointCallbackContext *context,
       lldb::user_id_t break_id, lldb::user_id_t break_loc_id);
+
+  /// Indicates whether the initial set of modules was reported added.
+  bool m_initial_modules_added;
 
   /// Helper method for RendezvousBreakpointHit.  Updates LLDB's current set
   /// of loaded modules.

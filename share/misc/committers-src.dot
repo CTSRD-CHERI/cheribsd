@@ -15,7 +15,7 @@ digraph src {
 #   foo [label="Foo Bar\nfoo@FreeBSD.org\n????/??/??"]
 #
 # ????/??/?? is the date when the commit bit was obtained, usually the one you
-# can find looking at svn logs for the svnadmin/conf/access file.
+# can find in git logs for the access file in the internal/admin branch.
 # Use YYYY/MM/DD format.
 #
 # For returned commit bits, the node definition will follow this example:
@@ -23,7 +23,7 @@ digraph src {
 #   foo [label="Foo Bar\nfoo@FreeBSD.org\n????/??/??\n????/??/??"]
 #
 # The first date is the same as for an active committer, the second date is
-# the date when the commit bit has been returned. Again, check svn logs.
+# the date when the commit bit has been returned. Again, check git logs.
 
 node [color=grey62, style=filled, bgcolor=black];
 
@@ -118,6 +118,7 @@ arichardson [label="Alex Richardson\narichardson@FreeBSD.org\n2017/10/30"]
 ariff [label="Ariff Abdullah\nariff@FreeBSD.org\n2005/11/14"]
 art [label="Artem Belevich\nart@FreeBSD.org\n2011/03/29"]
 arybchik [label="Andrew Rybchenko\narybchik@FreeBSD.org\n2014/10/12"]
+asiciliano [label="Alfonso S. Siciliano\nasiciliano@FreeBSD.org\n2022/02/09"]
 asomers [label="Alan Somers\nasomers@FreeBSD.org\n2013/04/24"]
 avg [label="Andriy Gapon\navg@FreeBSD.org\n2009/02/18"]
 avos [label="Andriy Voskoboinyk\navos@FreeBSD.org\n2015/09/24"]
@@ -233,6 +234,7 @@ kaiw [label="Kai Wang\nkaiw@FreeBSD.org\n2007/09/26"]
 kaktus [label="Pawel Biernacki\nkaktus@FreeBSD.org\n2019/09/26"]
 kan [label="Alexander Kabaev\nkan@FreeBSD.org\n2002/07/21"]
 karels [label="Mike Karels\nkarels@FreeBSD.org\n2016/06/09"]
+kd [label="Kornel Dulęba\nkd@FreeBSD.org\n2022/06/22"]
 ken [label="Ken Merry\nken@FreeBSD.org\n1998/09/08"]
 kensmith [label="Ken Smith\nkensmith@FreeBSD.org\n2004/01/23"]
 kevans [label="Kyle Evans\nkevans@FreeBSD.org\n2017/06/20"]
@@ -353,6 +355,7 @@ thj [label="Tom Jones\nthj@FreeBSD.org\n2018/04/07"]
 thompsa [label="Andrew Thompson\nthompsa@FreeBSD.org\n2005/05/25"]
 ticso [label="Bernd Walter\nticso@FreeBSD.org\n2002/01/31"]
 tijl [label="Tijl Coosemans\ntijl@FreeBSD.org\n2010/07/16"]
+tmunro [label="Thomas Munro\ntmunro@FreeBSD.org\n2018/10/15"]
 tsoome [label="Toomas Soome\ntsoome@FreeBSD.org\n2016/08/10"]
 trasz [label="Edward Tomasz Napierala\ntrasz@FreeBSD.org\n2008/08/22"]
 trhodes [label="Tom Rhodes\ntrhodes@FreeBSD.org\n2002/05/28"]
@@ -410,6 +413,7 @@ adrian -> sgalabov
 ae -> melifaro
 
 allanjude -> rew
+allanjude -> tmunro
 allanjude -> tsoome
 
 alc -> davide
@@ -429,6 +433,7 @@ avg -> smh
 
 bapt -> allanjude
 bapt -> araujo
+bapt -> asiciliano
 bapt -> bdrewery
 bapt -> wulf
 
@@ -518,6 +523,7 @@ eivind -> rwatson
 emaste -> achim
 emaste -> bwidawsk
 emaste -> dteske
+emaste -> kd
 emaste -> kevans
 emaste -> lwhsu
 emaste -> markj
@@ -745,6 +751,7 @@ mdodd -> jake
 mike -> das
 
 mjg -> kaktus
+mjg -> tmunro
 
 mlaier -> benjsc
 mlaier -> dhartmei
@@ -761,6 +768,8 @@ murray -> delphij
 
 mux -> cognet
 mux -> dumbbell
+
+mw -> kd
 
 netchild -> ariff
 

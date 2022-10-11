@@ -71,14 +71,7 @@ __FBSDID("$FreeBSD$");
 #include <netgraph/bluetooth/include/ng_l2cap.h>
 #include <netgraph/bluetooth/include/ng_btsocket.h>
 
-/*
- * This is taken from the xlat tables originally in truss which were
- * in turn taken from strace.
- */
-struct name_table {
-	uintmax_t val;
-	const char *str;
-};
+#include "support.h"
 
 #define	X(a)	{ a, #a },
 #define	XEND	{ 0, NULL }
@@ -92,156 +85,6 @@ struct name_table {
 #undef TABLE_START
 #undef TABLE_ENTRY
 #undef TABLE_END
-
-/*
- * These are simple support macros. print_or utilizes a variable
- * defined in the calling function to track whether or not it should
- * print a logical-OR character ('|') before a string. if_print_or
- * simply handles the necessary "if" statement used in many lines
- * of this file.
- */
-#define print_or(fp,str,orflag) do {                     \
-	if (orflag) fputc(fp, '|'); else orflag = true;  \
-	fprintf(fp, str); }                              \
-	while (0)
-#define if_print_or(fp,i,flag,orflag) do {         \
-	if ((i & flag) == flag)                    \
-	print_or(fp,#flag,orflag); }               \
-	while (0)
-
-static const char *
-lookup_value(struct name_table *table, uintmax_t val)
-{
-
-	for (; table->str != NULL; table++)
-		if (table->val == val)
-			return (table->str);
-	return (NULL);
-}
-
-/*
- * Used when the value maps to a bitmask of #definition values in the
- * table.  This is a helper routine which outputs a symbolic mask of
- * matched masks.  Multiple masks are separated by a pipe ('|').
- * The value is modified on return to only hold unmatched bits.
- */
-static void
-print_mask_part(FILE *fp, struct name_table *table, uintmax_t *valp,
-    bool *printed)
-{
-	uintmax_t rem;
-
-	rem = *valp;
-	for (; table->str != NULL; table++) {
-		if ((table->val & rem) == table->val) {
-			/*
-			 * Only print a zero mask if the raw value is
-			 * zero.
-			 */
-			if (table->val == 0 && *valp != 0)
-				continue;
-			fprintf(fp, "%s%s", *printed ? "|" : "", table->str);
-			*printed = true;
-			rem &= ~table->val;
-		}
-	}
-
-	*valp = rem;
-}
-
-/*
- * Used when the value maps to a bitmask of #definition values in the
- * table.  The return value is true if something was printed.  If
- * rem is not NULL, *rem holds any bits not decoded if something was
- * printed.  If nothing was printed and rem is not NULL, *rem holds
- * the original value.
- */
-static bool
-print_mask_int(FILE *fp, struct name_table *table, int ival, int *rem)
-{
-	uintmax_t val;
-	bool printed;
-
-	printed = false;
-	val = (unsigned)ival;
-	print_mask_part(fp, table, &val, &printed);
-	if (rem != NULL)
-		*rem = val;
-	return (printed);
-}
-
-/*
- * Used for a mask of optional flags where a value of 0 is valid.
- */
-static bool
-print_mask_0(FILE *fp, struct name_table *table, int val, int *rem)
-{
-
-	if (val == 0) {
-		fputs("0", fp);
-		if (rem != NULL)
-			*rem = 0;
-		return (true);
-	}
-	return (print_mask_int(fp, table, val, rem));
-}
-
-/*
- * Like print_mask_0 but for a unsigned long instead of an int.
- */
-static bool
-print_mask_0ul(FILE *fp, struct name_table *table, u_long lval, u_long *rem)
-{
-	uintmax_t val;
-	bool printed;
-
-	if (lval == 0) {
-		fputs("0", fp);
-		if (rem != NULL)
-			*rem = 0;
-		return (true);
-	}
-
-	printed = false;
-	val = lval;
-	print_mask_part(fp, table, &val, &printed);
-	if (rem != NULL)
-		*rem = val;
-	return (printed);
-}
-
-static void
-print_integer(FILE *fp, int val, int base)
-{
-
-	switch (base) {
-	case 8:
-		fprintf(fp, "0%o", val);
-		break;
-	case 10:
-		fprintf(fp, "%d", val);
-		break;
-	case 16:
-		fprintf(fp, "0x%x", val);
-		break;
-	default:
-		abort2("bad base", 0, NULL);
-		break;
-	}
-}
-
-static bool
-print_value(FILE *fp, struct name_table *table, uintmax_t val)
-{
-	const char *str;
-
-	str = lookup_value(table, val);
-	if (str != NULL) {
-		fputs(str, fp);
-		return (true);
-	}
-	return (false);
-}
 
 const char *
 sysdecode_atfd(int fd)
@@ -398,6 +241,13 @@ sysdecode_cap_fcntlrights(FILE *fp, uint32_t rights, uint32_t *rem)
 {
 
 	return (print_mask_int(fp, capfcntl, rights, rem));
+}
+
+bool
+sysdecode_close_range_flags(FILE *fp, int flags, int *rem)
+{
+
+	return (print_mask_int(fp, closerangeflags, flags, rem));
 }
 
 const char *
@@ -1173,7 +1023,8 @@ sysdecode_umtx_rwlock_flags(FILE *fp, u_long flags, u_long *rem)
 void
 sysdecode_cap_rights(FILE *fp, cap_rights_t *rightsp)
 {
-	struct name_table *t;
+	cap_rights_t diff, sum, zero;
+	const struct name_table *t;
 	int i;
 	bool comma;
 
@@ -1183,13 +1034,59 @@ sysdecode_cap_rights(FILE *fp, cap_rights_t *rightsp)
 			return;
 		}
 	}
-	comma = false;
-	for (t = caprights; t->str != NULL; t++) {
+	cap_rights_init(&sum);
+	diff = *rightsp;
+	for (t = caprights, comma = false; t->str != NULL; t++) {
 		if (cap_rights_is_set(rightsp, t->val)) {
+			cap_rights_clear(&diff, t->val);
+			if (cap_rights_is_set(&sum, t->val)) {
+				/* Don't print redundant rights. */
+				continue;
+			}
+			cap_rights_set(&sum, t->val);
+
 			fprintf(fp, "%s%s", comma ? "," : "", t->str);
 			comma = true;
 		}
 	}
+	if (!comma)
+		fprintf(fp, "CAP_NONE");
+
+	/*
+	 * Provide a breadcrumb if some of the provided rights are not included
+	 * in the table, likely due to a bug in the mktables script.
+	 */
+	CAP_NONE(&zero);
+	if (!cap_rights_contains(&zero, &diff))
+		fprintf(fp, ",unknown rights");
+}
+
+/*
+ * Pre-sort the set of rights, which has a partial ordering defined by the
+ * subset relation.  This lets sysdecode_cap_rights() print a list of minimal
+ * length with a single pass over the "caprights" table.
+ */
+static void __attribute__((constructor))
+sysdecode_cap_rights_init(void)
+{
+	cap_rights_t tr, qr;
+	struct name_table *t, *q, tmp;
+	bool swapped;
+
+	do {
+		for (t = caprights, swapped = false; t->str != NULL; t++) {
+			cap_rights_init(&tr, t->val);
+			for (q = t + 1; q->str != NULL; q++) {
+				cap_rights_init(&qr, q->val);
+				if (cap_rights_contains(&qr, &tr)) {
+					tmp = *t;
+					*t = *q;
+					*q = tmp;
+					swapped = true;
+				}
+			}
+		}
+	} while (swapped);
 }
 
 static struct name_table cmsgtypeip[] = {
@@ -1306,4 +1203,11 @@ sysdecode_shmflags(FILE *fp, int flags, int *rem)
 {
 
 	return (print_mask_0(fp, shmflags, flags, rem));
+}
+
+const char *
+sysdecode_itimer(int which)
+{
+
+	return (lookup_value(itimerwhich, which));
 }

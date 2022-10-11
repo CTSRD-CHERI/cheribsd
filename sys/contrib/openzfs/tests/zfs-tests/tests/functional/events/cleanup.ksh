@@ -26,6 +26,8 @@
 
 . $STF_SUITE/include/libtest.shlib
 
-zed_cleanup all-debug.sh all-syslog.sh
+zed_cleanup all-debug.sh all-syslog.sh all-dumpfds
+
+zed_stop
 
 default_cleanup

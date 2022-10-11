@@ -112,6 +112,14 @@ typedef __uintptr_t	kuintcap_t;
 #endif
 #define	_KUINTCAP_T_DECLARED
 #endif
+#ifndef _KUINT64CAP_T_DECLARED
+#ifdef __ILP32__
+typedef	uint64_t	kuint64cap_t;
+#else
+typedef	kuintcap_t	kuint64cap_t;
+#endif
+#define	_KUINT64CAP_T_DECLARED
+#endif
 
 #ifndef _PTRADDR_T_DECLARED
 typedef	__ptraddr_t	ptraddr_t;

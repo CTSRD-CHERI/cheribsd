@@ -382,6 +382,7 @@ static struct clk_pll_def pll_clks[] = {
 
 static int tegra124_pll_init(struct clknode *clk, device_t dev);
 static int tegra124_pll_set_gate(struct clknode *clk, bool enable);
+static int tegra124_pll_get_gate(struct clknode *clk, bool *enabled);
 static int tegra124_pll_recalc(struct clknode *clk, uint64_t *freq);
 static int tegra124_pll_set_freq(struct clknode *clknode, uint64_t fin,
     uint64_t *fout, int flags, int *stop);
@@ -403,6 +404,7 @@ static clknode_method_t tegra124_pll_methods[] = {
 	/* Device interface */
 	CLKNODEMETHOD(clknode_init,		tegra124_pll_init),
 	CLKNODEMETHOD(clknode_set_gate,		tegra124_pll_set_gate),
+	CLKNODEMETHOD(clknode_get_gate,		tegra124_pll_get_gate),
 	CLKNODEMETHOD(clknode_recalc_freq,	tegra124_pll_recalc),
 	CLKNODEMETHOD(clknode_set_freq,		tegra124_pll_set_freq),
 	CLKNODEMETHOD_END
@@ -558,13 +560,10 @@ plle_enable(struct pll_sc *sc)
 {
 	uint32_t reg;
 	int rv;
-	struct mnp_bits *mnp_bits;
 	uint32_t pll_m = 1;
 	uint32_t pll_n = 200;
 	uint32_t pll_p = 13;
 	uint32_t pll_cml = 13;
-
-	mnp_bits = &sc->mnp_bits;
 
 	/* Disable lock override. */
 	RD4(sc, sc->base_reg, &reg);
@@ -686,6 +685,19 @@ tegra124_pll_set_gate(struct clknode *clknode, bool enable)
 	else
 		rv = pll_enable(sc);
 	return (rv);
+}
+
+static int
+tegra124_pll_get_gate(struct clknode *clknode, bool *enabled)
+{
+	uint32_t reg;
+	struct pll_sc *sc;
+
+	sc = clknode_get_softc(clknode);
+	RD4(sc, sc->base_reg, &reg);
+	*enabled = reg & PLL_BASE_ENABLE ? true: false;
+	WR4(sc, sc->base_reg, reg);
+	return (0);
 }
 
 static int
@@ -1015,7 +1027,6 @@ tegra124_pll_recalc(struct clknode *clk, uint64_t *freq)
 	struct pll_sc *sc;
 	uint32_t m, n, p, pr;
 	uint32_t reg, misc_reg;
-	int locked;
 
 	sc = clknode_get_softc(clk);
 
@@ -1027,13 +1038,12 @@ tegra124_pll_recalc(struct clknode *clk, uint64_t *freq)
 		p = reg_to_pdiv(sc, pr);
 	else
 		p = 2 * (pr - 1);
-	locked = is_locked(sc);
 
 	dprintf("%s: %s (0x%08x, 0x%08x) - m: %d, n: %d, p: %d (%d): "
 	    "e: %d, r: %d, o: %d - %s\n", __func__,
 	    clknode_get_name(clk), reg, misc_reg, m, n, p, pr,
 	    (reg >> 30) & 1, (reg >> 29) & 1, (reg >> 28) & 1,
-	    locked ? "locked" : "unlocked");
+	    is_locked(sc) ? "locked" : "unlocked");
 
 	if ((m == 0) || (n == 0) || (p == 0)) {
 		*freq = 0;

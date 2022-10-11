@@ -60,7 +60,7 @@ struct if_clone *
 	if_clone_simple(const char *, ifcs_create_t, ifcs_destroy_t, u_int);
 void	if_clone_detach(struct if_clone *);
 
-/* Unit (de)allocating fucntions. */
+/* Unit (de)allocating functions. */
 int	ifc_name2unit(const char *name, int *unit);
 int	ifc_alloc_unit(struct if_clone *, int *);
 void	ifc_free_unit(struct if_clone *, int);
@@ -77,8 +77,7 @@ void	vnet_if_clone_init(void);
 int	if_clone_create(char *, size_t, void * __capability);
 int	if_clone_destroy(const char *);
 int	if_clone_list(struct if_clonereq *);
-struct if_clone *if_clone_findifc(struct ifnet *);
-void	if_clone_addgroup(struct ifnet *, struct if_clone *);
+void	if_clone_restoregroup(struct ifnet *);
 
 /* The below interfaces are used only by epair(4). */
 void	if_clone_addif(struct if_clone *, struct ifnet *);

@@ -1,6 +1,6 @@
 
 #------------------------------------------------------------------------------
-# $File: sgml,v 1.41 2020/06/07 18:16:43 christos Exp $
+# $File: sgml,v 1.45 2022/03/21 21:36:55 christos Exp $
 # Type:	SVG Vectorial Graphics
 # From:	Noel Torres <tecnico@ejerciciosresueltos.com>
 0	string		\<?xml\ version=
@@ -43,7 +43,7 @@
 # sgml:  file(1) magic for Standard Generalized Markup Language
 # HyperText Markup Language (HTML) is an SGML document type,
 # from Daniel Quinlan (quinlan@yggdrasil.com)
-# adapted to string extenstions by Anthon van der Neut <anthon@mnt.org)
+# adapted to string extensions by Anthon van der Neut <anthon@mnt.org)
 0	search/4096/cWt	\<!doctype\ html	HTML document text
 !:mime	text/html
 !:strength + 5
@@ -52,66 +52,66 @@
 # https://www.w3.org/TR/SVG/single-page.html
 0	search/4096/cWbt	\<!doctype\ svg	SVG XML document
 !:mime  image/svg+xml
-!:strength + 5
+!:strength + 15
 
 0	search/4096/cwt	\<head\>		HTML document text
 !:mime	text/html
-!:strength + 5
+!:strength + 15
 0	search/4096/cWt	\<head\ 		HTML document text
 !:mime	text/html
-!:strength + 5
+!:strength + 15
 0	search/4096/cwt	\<title\>		HTML document text
 !:mime	text/html
-!:strength + 5
+!:strength + 15
 0	search/4096/cWt	\<title\ 		HTML document text
 !:mime	text/html
-!:strength + 5
+!:strength + 15
 0	search/4096/cwt	\<html\>		HTML document text
 !:mime	text/html
-!:strength + 5
+!:strength + 15
 0	search/4096/cWt	\<html\ 		HTML document text
 !:mime	text/html
-!:strength + 5
+!:strength + 15
 0	search/4096/cwt	\<script\> 		HTML document text
 !:mime	text/html
-!:strength + 5
+!:strength + 15
 0	search/4096/cWt	\<script\ 		HTML document text
 !:mime	text/html
-!:strength + 5
+!:strength + 15
 0	search/4096/cwt	\<style\> 		HTML document text
 !:mime	text/html
-!:strength + 5
+!:strength + 15
 0	search/4096/cWt	\<style\  		HTML document text
 !:mime	text/html
-!:strength + 5
+!:strength + 15
 0	search/4096/cwt	\<table\>		HTML document text
 !:mime	text/html
-!:strength + 5
+!:strength + 15
 0	search/4096/cWt	\<table\ 		HTML document text
 !:mime	text/html
-!:strength + 5
+!:strength + 15
 
 0	search/4096/cwt	\<a\ href=		HTML document text
 !:mime	text/html
-!:strength + 5
+!:strength + 15
 
 # Extensible markup language (XML), a subset of SGML
 # from Marc Prud'hommeaux (marc@apocalypse.org)
 0	search/1/cwt	\<?xml			XML document text
 !:mime	text/xml
-!:strength + 5
+!:strength + 15
 0	string/t		\<?xml\ version\ "	XML
 !:mime	text/xml
-!:strength + 5
+!:strength + 15
 0	string/t		\<?xml\ version="	XML
 !:mime	text/xml
-!:strength + 5
+!:strength + 15
 >15	string/t	>\0			%.3s document text
 >>23	search/1	\<xsl:stylesheet	(XSL stylesheet)
 >>24	search/1	\<xsl:stylesheet	(XSL stylesheet)
 0	string/t	\<?xml\ version='	XML
 !:mime	text/xml
-!:strength + 5
+!:strength + 15
 >15	string/t	>\0			%.3s document text
 >>23	search/1	\<xsl:stylesheet	(XSL stylesheet)
 >>24	search/1	\<xsl:stylesheet	(XSL stylesheet)
@@ -139,7 +139,10 @@
 # http://files.pef-format.org/specifications/pef-2008-1/pef-specification.html
 #
 # Simon Aittamaa <simon.aittamaa@gmail.com>
-0   string      \<?xml\ version=
->14 regex       ['"\ \t]*[0-9.]+['"\ \t]*
->>19    search/4096 \<pef           Portable Embosser Format
+0	string		\<?xml\ version=
+>14	regex		['"\ \t]*[0-9.]+['"\ \t]*
+>>19    search/4096	\<pef           Portable Embosser Format
 !:mime  application/x-pef+xml
+
+# https://www.qgis.org/en/site/
+0	string		\<!DOCTYPE\040qgis	QGIS XML document

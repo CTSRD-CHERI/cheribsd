@@ -261,10 +261,8 @@ static driver_t vtcon_driver = {
 	vtcon_methods,
 	sizeof(struct vtcon_softc)
 };
-static devclass_t vtcon_devclass;
 
-VIRTIO_DRIVER_MODULE(virtio_console, vtcon_driver, vtcon_devclass,
-    vtcon_modevent, 0);
+VIRTIO_DRIVER_MODULE(virtio_console, vtcon_driver, vtcon_modevent, NULL);
 MODULE_VERSION(virtio_console, 1);
 MODULE_DEPEND(virtio_console, virtio, 1, 1, 1);
 
@@ -616,7 +614,7 @@ vtcon_ctrl_event_enqueue(struct vtcon_softc *sc,
 	struct sglist_seg segs[2];
 	struct sglist sg;
 	struct virtqueue *vq;
-	int error;
+	int error __diagused;
 
 	vq = sc->vtcon_ctrl_rxvq;
 
@@ -649,7 +647,7 @@ static void
 vtcon_ctrl_event_requeue(struct vtcon_softc *sc,
     struct virtio_console_control *control)
 {
-	int error;
+	int error __diagused;
 
 	bzero(control, VTCON_CTRL_BUFSZ);
 
@@ -1048,7 +1046,7 @@ vtcon_port_create_buf(struct vtcon_port *port)
 static void
 vtcon_port_requeue_buf(struct vtcon_port *port, void *buf)
 {
-	int error;
+	int error __diagused;
 
 	error = vtcon_port_enqueue_buf(port, buf, VTCON_BULK_BUFSZ);
 	KASSERT(error == 0,

@@ -58,10 +58,6 @@ SYSCTL_NODE(_hw, OID_AUTO, hid, CTLFLAG_RW, 0, "HID debugging");
 SYSCTL_INT(_hw_hid, OID_AUTO, debug, CTLFLAG_RWTUN,
     &hid_debug, 0, "Debug level");
 
-#ifdef HIDRAW_MAKE_UHID_ALIAS
-devclass_t hidraw_devclass;
-#endif
-
 static void hid_clear_local(struct hid_item *);
 static uint8_t hid_get_byte(struct hid_data *s, const uint16_t wSize);
 
@@ -856,6 +852,7 @@ hid_item_resolution(struct hid_item *hi)
 		divisor = 10;
 		break;
 	case HUM_INCH:
+	case HUM_INCH_EGALAX:
 		multiplier = 10;
 		divisor = 254;
 		break;
@@ -1074,6 +1071,12 @@ int
 hid_set_protocol(device_t dev, uint16_t protocol)
 {
 	return (HID_SET_PROTOCOL(device_get_parent(dev), protocol));
+}
+
+int
+hid_ioctl(device_t dev, unsigned long cmd, uintptr_t data)
+{
+	return (HID_IOCTL(device_get_parent(dev), cmd, data));
 }
 
 MODULE_VERSION(hid, 1);

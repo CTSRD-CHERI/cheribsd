@@ -1,4 +1,4 @@
-# $NetBSD: cond-func-defined.mk,v 1.7 2020/11/15 14:07:53 rillig Exp $
+# $NetBSD: cond-func-defined.mk,v 1.9 2022/05/08 06:51:27 rillig Exp $
 #
 # Tests for the defined() function in .if conditions.
 
@@ -29,7 +29,7 @@ ${:UA B}=	variable name with spaces
 .  error
 .endif
 
-# Parse error: missing closing parenthesis; see ParseFuncArg.
+# Parse error: missing closing parenthesis; see ParseWord.
 .if defined(DEF
 .  error
 .else
@@ -48,5 +48,10 @@ ${:UA B}=	variable name with spaces
 .  endif
 .endfor
 
-all:
-	@:;
+# Neither of the conditions is true.  Before July 2020, the right-hand
+# condition was evaluated even though it was irrelevant.
+.if defined(UNDEF) && ${UNDEF:Mx} != ""
+.  error
+.endif
+
+all: .PHONY

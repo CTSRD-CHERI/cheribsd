@@ -1,5 +1,5 @@
 // -*- C++ -*-
-//===-------------------------- codecvt -----------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -56,6 +56,7 @@ class codecvt_utf8_utf16
 
 #include <__config>
 #include <__locale>
+#include <version>
 
 #if !defined(_LIBCPP_HAS_NO_PRAGMA_SYSTEM_HEADER)
 #pragma GCC system_header
@@ -74,6 +75,7 @@ enum codecvt_mode
 
 template <class _Elem> class __codecvt_utf8;
 
+#ifndef _LIBCPP_HAS_NO_WIDE_CHARACTERS
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf8<wchar_t>
     : public codecvt<wchar_t, char, mbstate_t>
@@ -108,7 +110,9 @@ protected:
                           size_t __mx) const;
     virtual int do_max_length() const _NOEXCEPT;
 };
+#endif // _LIBCPP_HAS_NO_WIDE_CHARACTERS
 
+_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf8<char16_t>
     : public codecvt<char16_t, char, mbstate_t>
@@ -125,6 +129,8 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char16_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
+_LIBCPP_SUPPRESS_DEPRECATED_POP
+
 protected:
     virtual result
         do_out(state_type& __st,
@@ -144,6 +150,7 @@ protected:
     virtual int do_max_length() const _NOEXCEPT;
 };
 
+_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf8<char32_t>
     : public codecvt<char32_t, char, mbstate_t>
@@ -160,6 +167,8 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char32_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
+_LIBCPP_SUPPRESS_DEPRECATED_POP
+
 protected:
     virtual result
         do_out(state_type& __st,
@@ -197,6 +206,7 @@ public:
 
 template <class _Elem, bool _LittleEndian> class __codecvt_utf16;
 
+#ifndef _LIBCPP_HAS_NO_WIDE_CHARACTERS
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf16<wchar_t, false>
     : public codecvt<wchar_t, char, mbstate_t>
@@ -266,7 +276,9 @@ protected:
                           size_t __mx) const;
     virtual int do_max_length() const _NOEXCEPT;
 };
+#endif // _LIBCPP_HAS_NO_WIDE_CHARACTERS
 
+_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf16<char16_t, false>
     : public codecvt<char16_t, char, mbstate_t>
@@ -283,6 +295,8 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char16_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
+_LIBCPP_SUPPRESS_DEPRECATED_POP
+
 protected:
     virtual result
         do_out(state_type& __st,
@@ -302,6 +316,7 @@ protected:
     virtual int do_max_length() const _NOEXCEPT;
 };
 
+_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf16<char16_t, true>
     : public codecvt<char16_t, char, mbstate_t>
@@ -318,6 +333,8 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char16_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
+_LIBCPP_SUPPRESS_DEPRECATED_POP
+
 protected:
     virtual result
         do_out(state_type& __st,
@@ -337,6 +354,7 @@ protected:
     virtual int do_max_length() const _NOEXCEPT;
 };
 
+_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf16<char32_t, false>
     : public codecvt<char32_t, char, mbstate_t>
@@ -353,6 +371,8 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char32_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
+_LIBCPP_SUPPRESS_DEPRECATED_POP
+
 protected:
     virtual result
         do_out(state_type& __st,
@@ -372,6 +392,7 @@ protected:
     virtual int do_max_length() const _NOEXCEPT;
 };
 
+_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf16<char32_t, true>
     : public codecvt<char32_t, char, mbstate_t>
@@ -388,6 +409,8 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char32_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
+_LIBCPP_SUPPRESS_DEPRECATED_POP
+
 protected:
     virtual result
         do_out(state_type& __st,
@@ -425,6 +448,7 @@ public:
 
 template <class _Elem> class __codecvt_utf8_utf16;
 
+#ifndef _LIBCPP_HAS_NO_WIDE_CHARACTERS
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf8_utf16<wchar_t>
     : public codecvt<wchar_t, char, mbstate_t>
@@ -459,7 +483,9 @@ protected:
                           size_t __mx) const;
     virtual int do_max_length() const _NOEXCEPT;
 };
+#endif // _LIBCPP_HAS_NO_WIDE_CHARACTERS
 
+_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf8_utf16<char32_t>
     : public codecvt<char32_t, char, mbstate_t>
@@ -476,6 +502,8 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char32_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
+_LIBCPP_SUPPRESS_DEPRECATED_POP
+
 protected:
     virtual result
         do_out(state_type& __st,
@@ -495,6 +523,7 @@ protected:
     virtual int do_max_length() const _NOEXCEPT;
 };
 
+_LIBCPP_SUPPRESS_DEPRECATED_PUSH
 template <>
 class _LIBCPP_TYPE_VIS __codecvt_utf8_utf16<char16_t>
     : public codecvt<char16_t, char, mbstate_t>
@@ -511,6 +540,8 @@ public:
                             codecvt_mode _Mode)
         : codecvt<char16_t, char, mbstate_t>(__refs), _Maxcode_(_Maxcode),
           _Mode_(_Mode) {}
+_LIBCPP_SUPPRESS_DEPRECATED_POP
+
 protected:
     virtual result
         do_out(state_type& __st,
@@ -546,4 +577,4 @@ public:
 
 _LIBCPP_END_NAMESPACE_STD
 
-#endif  // _LIBCPP_CODECVT
+#endif // _LIBCPP_CODECVT

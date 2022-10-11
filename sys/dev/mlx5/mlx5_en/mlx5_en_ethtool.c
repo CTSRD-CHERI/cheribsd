@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015-2019 Mellanox Technologies. All rights reserved.
+ * Copyright (c) 2015-2021 Mellanox Technologies. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,8 +25,11 @@
  * $FreeBSD$
  */
 
-#include "en.h"
-#include "port_buffer.h"
+#include "opt_rss.h"
+#include "opt_ratelimit.h"
+
+#include <dev/mlx5/mlx5_en/en.h>
+#include <dev/mlx5/mlx5_en/port_buffer.h>
 
 void
 mlx5e_create_stats(struct sysctl_ctx_list *ctx,
@@ -872,7 +875,7 @@ mlx5e_hw_temperature_update(struct mlx5e_priv *priv)
 		    MLX5_ACCESS_REG_SUMMARY_CTRL_ID_MTMP, 0, 0);
 		if (err)
 			goto done;
-		/* convert from 0.125 celcius to millicelcius */
+		/* convert from 0.125 celsius to millicelsius */
 		priv->params_ethtool.hw_val_temp[x] =
 		    (s16)MLX5_GET(mtmp_reg, out_sensor, temperature) * 125;
 	}
@@ -1227,10 +1230,16 @@ mlx5e_ethtool_handler(SYSCTL_HANDLER_ARGS)
 		break;
 
 	case MLX5_PARAM_OFFSET(mc_local_lb):
+		/* check if mlx5ib is managing this feature */
+		if (MLX5_CAP_GEN(priv->mdev, port_type) != MLX5_CAP_PORT_TYPE_ETH) {
+			error = EOPNOTSUPP;
+			break;
+		}
+
 		priv->params_ethtool.mc_local_lb =
 		    priv->params_ethtool.mc_local_lb ? 1 : 0;
 
-		if (MLX5_CAP_GEN(priv->mdev, disable_local_lb)) {
+		if (MLX5_CAP_GEN(priv->mdev, disable_local_lb_mc)) {
 			error = mlx5_nic_vport_modify_local_lb(priv->mdev,
 			    MLX5_LOCAL_MC_LB, priv->params_ethtool.mc_local_lb);
 		} else {
@@ -1239,14 +1248,29 @@ mlx5e_ethtool_handler(SYSCTL_HANDLER_ARGS)
 		break;
 
 	case MLX5_PARAM_OFFSET(uc_local_lb):
+		/* check if mlx5ib is managing this feature */
+		if (MLX5_CAP_GEN(priv->mdev, port_type) != MLX5_CAP_PORT_TYPE_ETH) {
+			error = EOPNOTSUPP;
+			break;
+		}
+
 		priv->params_ethtool.uc_local_lb =
 		    priv->params_ethtool.uc_local_lb ? 1 : 0;
 
-		if (MLX5_CAP_GEN(priv->mdev, disable_local_lb)) {
+		if (MLX5_CAP_GEN(priv->mdev, disable_local_lb_uc)) {
 			error = mlx5_nic_vport_modify_local_lb(priv->mdev,
 			    MLX5_LOCAL_UC_LB, priv->params_ethtool.uc_local_lb);
 		} else {
 			error = EOPNOTSUPP;
+		}
+		break;
+
+	case MLX5_PARAM_OFFSET(irq_cpu_base):
+	case MLX5_PARAM_OFFSET(irq_cpu_stride):
+		if (was_opened) {
+			/* network interface must toggled */
+			mlx5e_close_locked(priv->ifp);
+			mlx5e_open_locked(priv->ifp);
 		}
 		break;
 
@@ -1413,6 +1437,8 @@ mlx5e_create_ethtool(struct mlx5e_priv *priv)
 	int i;
 
 	/* set some defaults */
+	priv->params_ethtool.irq_cpu_base = -1;	/* disabled */
+	priv->params_ethtool.irq_cpu_stride = 1;
 	priv->params_ethtool.tx_queue_size_max = 1 << MLX5E_PARAMS_MAXIMUM_LOG_SQ_SIZE;
 	priv->params_ethtool.rx_queue_size_max = 1 << MLX5E_PARAMS_MAXIMUM_LOG_RQ_SIZE;
 	priv->params_ethtool.tx_queue_size = 1 << priv->params.log_sq_size;
@@ -1432,7 +1458,8 @@ mlx5e_create_ethtool(struct mlx5e_priv *priv)
 	mlx5e_ethtool_sync_tx_completion_fact(priv);
 
 	/* get default values for local loopback, if any */
-	if (MLX5_CAP_GEN(priv->mdev, disable_local_lb)) {
+	if (MLX5_CAP_GEN(priv->mdev, disable_local_lb_mc) ||
+	    MLX5_CAP_GEN(priv->mdev, disable_local_lb_uc)) {
 		int err;
 		u8 val;
 
@@ -1459,10 +1486,13 @@ mlx5e_create_ethtool(struct mlx5e_priv *priv)
 			    mlx5e_params_desc[2 * x], CTLTYPE_U64 | CTLFLAG_RD |
 			    CTLFLAG_MPSAFE, priv, x, &mlx5e_ethtool_handler, "QU",
 			    mlx5e_params_desc[2 * x + 1]);
+		} else if (strcmp(mlx5e_params_desc[2 * x], "hw_lro") == 0) {
+			/* read-only, but tunable parameters */
+			SYSCTL_ADD_PROC(&priv->sysctl_ctx, SYSCTL_CHILDREN(node), OID_AUTO,
+			    mlx5e_params_desc[2 * x], CTLTYPE_U64 | CTLFLAG_RDTUN |
+			    CTLFLAG_MPSAFE, priv, x, &mlx5e_ethtool_handler, "QU",
+			    mlx5e_params_desc[2 * x + 1]);
 		} else {
-#if (__FreeBSD_version < 1100000)
-			char path[64];
-#endif
 			/*
 			 * NOTE: In FreeBSD-11 and newer the
 			 * CTLFLAG_RWTUN flag will take care of
@@ -1473,17 +1503,6 @@ mlx5e_create_ethtool(struct mlx5e_priv *priv)
 			    mlx5e_params_desc[2 * x], CTLTYPE_U64 | CTLFLAG_RWTUN |
 			    CTLFLAG_MPSAFE, priv, x, &mlx5e_ethtool_handler, "QU",
 			    mlx5e_params_desc[2 * x + 1]);
-
-#if (__FreeBSD_version < 1100000)
-			/* compute path for sysctl */
-			snprintf(path, sizeof(path), "dev.mce.%d.conf.%s",
-			    device_get_unit(priv->mdev->pdev->dev.bsddev),
-			    mlx5e_params_desc[2 * x]);
-
-			/* try to fetch tunable, if any */
-			if (TUNABLE_QUAD_FETCH(path, &priv->params_ethtool.arg[x]))
-				mlx5e_ethtool_handler(NULL, priv, x, NULL);
-#endif
 		}
 	}
 
@@ -1628,6 +1647,6 @@ mlx5e_create_ethtool(struct mlx5e_priv *priv)
 		    OID_AUTO, "hw_temperature",
 		    CTLTYPE_S32 | CTLFLAG_RD | CTLFLAG_MPSAFE,
 		    priv, 0, mlx5e_hw_temperature_handler, "I",
-		    "HW temperature in millicelcius");
+		    "HW temperature in millicelsius");
 	}
 }

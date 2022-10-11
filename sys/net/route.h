@@ -350,7 +350,7 @@ struct rt_addrinfo {
 	struct	ifaddr *rti_ifa;		/* value of rt_ifa addr */
 	struct	ifnet *rti_ifp;			/* route interface */
 	rib_filter_f_t	*rti_filter;		/* filter function */
-	void	*rti_filterdata;		/* filter paramenters */
+	void	*rti_filterdata;		/* filter parameters */
 	u_long	rti_mflags;			/* metrics RTV_ flags */
 	u_long	rti_spare;			/* Will be used for fib */
 	struct	rt_metrics *rti_rmx;		/* Pointer to route metrics */
@@ -393,6 +393,10 @@ struct rt_addrinfo {
 			(ro)->ro_nh = NULL;				\
 		}							\
 	} while (0)
+
+#define RO_GET_FAMILY(ro, dst)	((ro) != NULL &&		\
+	(ro)->ro_flags & RT_HAS_GW				\
+	? (ro)->ro_dst.sa_family : (dst)->sa_family)
 
 /*
  * Validate a cached route based on a supplied cookie.  If there is an
@@ -444,6 +448,7 @@ void	rib_free_info(struct rt_addrinfo *info);
 void rib_flush_routes_family(int family);
 struct nhop_object *rib_lookup(uint32_t fibnum, const struct sockaddr *dst,
 	    uint32_t flags, uint32_t flowid);
+const char *rib_print_family(int family);
 #endif
 
 #endif

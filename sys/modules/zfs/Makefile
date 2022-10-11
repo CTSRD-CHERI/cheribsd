@@ -8,13 +8,20 @@ KMOD=	zfs
 .PATH:	${SRCDIR}/avl \
 	${SRCDIR}/lua \
 	${SRCDIR}/nvpair \
+        ${SRCDIR}/icp/algs/blake3 \
+        ${SRCDIR}/icp/asm-aarch64/blake3 \
+        ${SRCDIR}/icp/asm-ppc64/blake3 \
+        ${SRCDIR}/icp/asm-x86_64/blake3 \
+	${SRCDIR}/icp/algs/edonr \
 	${SRCDIR}/os/freebsd/spl \
 	${SRCDIR}/os/freebsd/zfs \
 	${SRCDIR}/unicode \
 	${SRCDIR}/zcommon \
 	${SRCDIR}/zfs	\
 	${SRCDIR}/zstd	\
-	${SRCDIR}/zstd/lib
+	${SRCDIR}/zstd/lib/common \
+	${SRCDIR}/zstd/lib/compress \
+	${SRCDIR}/zstd/lib/decompress
 
 
 CFLAGS+= -I${INCDIR}
@@ -22,14 +29,16 @@ CFLAGS+= -I${INCDIR}/os/freebsd
 CFLAGS+= -I${INCDIR}/os/freebsd/spl
 CFLAGS+= -I${INCDIR}/os/freebsd/zfs
 CFLAGS+= -I${SRCDIR}/zstd/include
+CFLAGS+= -I${SRCDIR}/icp/include
 CFLAGS+= -I${.CURDIR}
 
 CFLAGS+= -D__KERNEL__ -DFREEBSD_NAMECACHE -DBUILDING_ZFS \
 	-DHAVE_UIO_ZEROCOPY -DWITHOUT_NETDUMP -D__KERNEL -D_SYS_CONDVAR_H_ \
-	-D_SYS_VMEM_H_ -DIN_FREEBSD_BASE -DHAVE_KSID
+	-D_SYS_VMEM_H_ -DIN_FREEBSD_BASE
 
 .if ${MACHINE_ARCH} == "amd64"
-CFLAGS+= -DHAVE_AVX2 -DHAVE_AVX -D__x86_64 -DHAVE_SSE2 -DHAVE_AVX512F -DHAVE_AVX512BW -DHAVE_SSSE3
+CFLAGS+= -D__x86_64 -DHAVE_SSE2 -DHAVE_SSSE3 -DHAVE_SSE4_1 -DHAVE_SSE4_2 \
+	-DHAVE_AVX -DHAVE_AVX2 -DHAVE_AVX512F -DHAVE_AVX512VL -DHAVE_AVX512BW
 .endif
 
 .if ${MACHINE_ARCH} == "i386" || ${MACHINE_ARCH} == "powerpc" || \
@@ -43,6 +52,29 @@ SRCS=	vnode_if.h device_if.h bus_if.h
 
 # avl
 SRCS+=	avl.c
+
+# icp
+SRCS+=	edonr.c
+
+#icp/algs/blake3
+SRCS+=	blake3.c \
+	blake3_generic.c \
+	blake3_impl.c \
+	blake3_x86-64.c
+
+#icp/asm-aarch64/blake3
+SRCS+=	b3_aarch64_sse2.S \
+	b3_aarch64_sse41.S
+
+#icp/asm-ppc64/blake3
+SRCS+=	b3_ppc64le_sse2.S \
+	b3_ppc64le_sse41.S
+
+#icp/asm-x86_64/blake3
+SRCS+=	blake3_avx2.S \
+	blake3_avx512.S \
+	blake3_sse2.S \
+	blake3_sse41.S
 
 #lua
 SRCS+=	lapi.c \
@@ -156,6 +188,7 @@ SRCS+=	abd.c \
 	aggsum.c \
 	arc.c \
 	arc_os.c \
+        blake3_zfs.c \
 	blkptr.c \
 	bplist.c \
 	bpobj.c \
@@ -191,10 +224,12 @@ SRCS+=	abd.c \
 	dsl_scan.c \
 	dsl_synctask.c \
 	dsl_userhold.c \
+	edonr_zfs.c \
 	fm.c \
 	gzip.c \
 	lzjb.c \
 	lz4.c \
+	lz4_zfs.c \
 	metaslab.c \
 	mmp.c \
 	multilist.c \
@@ -255,6 +290,7 @@ SRCS+=	abd.c \
 	zcp_synctask.c \
 	zfeature.c \
 	zfs_byteswap.c \
+        zfs_chksum.c \
 	zfs_debug.c \
 	zfs_file_os.c \
 	zfs_fm.c \
@@ -277,7 +313,28 @@ SRCS+=	abd.c \
 	zvol.c
 
 SRCS+=	zfs_zstd.c \
-	zstd.c
+	entropy_common.c \
+	error_private.c \
+	fse_compress.c \
+	fse_decompress.c \
+	hist.c \
+	huf_compress.c \
+	huf_decompress.c \
+	pool.c \
+	xxhash.c \
+	zstd_common.c \
+	zstd_compress.c \
+	zstd_compress_literals.c \
+	zstd_compress_sequences.c \
+	zstd_compress_superblock.c \
+	zstd_ddict.c \
+	zstd_decompress.c \
+	zstd_decompress_block.c \
+	zstd_double_fast.c \
+	zstd_fast.c \
+	zstd_lazy.c \
+	zstd_ldm.c \
+	zstd_opt.c
 
 .include <bsd.kmod.mk>
 
@@ -310,11 +367,14 @@ CFLAGS.zprop_common.c= -Wno-cast-qual
 CFLAGS.ddt.c= -Wno-cast-qual
 CFLAGS.dmu.c= -Wno-cast-qual
 CFLAGS.dmu_traverse.c= -Wno-cast-qual
+CFLAGS.dnode.c+= ${NO_WUNUSED_BUT_SET_VARIABLE}
 CFLAGS.dsl_dir.c= -Wno-cast-qual
 CFLAGS.dsl_deadlist.c= -Wno-cast-qual
 CFLAGS.dsl_prop.c= -Wno-cast-qual
+CFLAGS.edonr.c= -Wno-cast-qual
 CFLAGS.fm.c= -Wno-cast-qual
 CFLAGS.lz4.c= -Wno-cast-qual
+CFLAGS.lz4_zfs.c= -Wno-cast-qual
 CFLAGS.spa.c= -Wno-cast-qual
 CFLAGS.spa_misc.c= -Wno-cast-qual
 CFLAGS.sysctl_os.c= -include ${SRCTOP}/sys/modules/zfs/zfs_config.h
@@ -328,13 +388,97 @@ CFLAGS.vdev_raidz_math_sse2.c= -Wno-cast-qual -Wno-duplicate-decl-specifier
 CFLAGS.zap_leaf.c= -Wno-cast-qual
 CFLAGS.zap_micro.c= -Wno-cast-qual
 CFLAGS.zcp.c= -Wno-cast-qual
-CFLAGS.zfs_fm.c= -Wno-cast-qual
+CFLAGS.zfs_fm.c= -Wno-cast-qual ${NO_WUNUSED_BUT_SET_VARIABLE}
 CFLAGS.zfs_ioctl.c= -Wno-cast-qual
 CFLAGS.zil.c= -Wno-cast-qual
 CFLAGS.zio.c= -Wno-cast-qual
 CFLAGS.zrlock.c= -Wno-cast-qual
 CFLAGS.zfs_zstd.c= -Wno-cast-qual -Wno-pointer-arith
+
 CFLAGS.zstd.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.entropy_common.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.error_private.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.fse_compress.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.fse_decompress.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.hist.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.huf_compress.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.huf_decompress.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.pool.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.xxhash.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.zstd_common.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.zstd_compress.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.zstd_compress_literals.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.zstd_compress_sequences.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.zstd_compress_superblock.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.zstd_ddict.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.zstd_decompress.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.zstd_decompress_block.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.zstd_double_fast.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.zstd_fast.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.zstd_lazy.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.zstd_ldm.c= -U__BMI__ -fno-tree-vectorize
+CFLAGS.zstd_opt.c= -U__BMI__ -fno-tree-vectorize
+
 .if ${MACHINE_CPUARCH} == "aarch64"
-CFLAGS.zstd.c+= -include ${SRCDIR}/zstd/include/aarch64_compat.h
+__ZFS_ZSTD_AARCH64_FLAGS= -include ${SRCDIR}/zstd/include/aarch64_compat.h
+CFLAGS.zstd.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.entropy_common.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.error_private.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.fse_compress.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.fse_decompress.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.hist.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.huf_compress.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.huf_decompress.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.pool.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.xxhash.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.zstd_common.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.zstd_compress.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.zstd_compress_literals.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.zstd_compress_sequences.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.zstd_compress_superblock.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.zstd_ddict.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.zstd_decompress.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.zstd_decompress_block.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.zstd_double_fast.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.zstd_fast.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.zstd_lazy.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.zstd_ldm.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+CFLAGS.zstd_opt.c+= ${__ZFS_ZSTD_AARCH64_FLAGS}
+
+b3_aarch64_sse2.o: b3_aarch64_sse2.S
+	${CC} -c ${CFLAGS:N-mgeneral-regs-only} ${WERROR} ${.IMPSRC} \
+	     -o ${.TARGET}
+	${CTFCONVERT_CMD}
+
+b3_aarch64_sse41.o: b3_aarch64_sse41.S
+	${CC} -c ${CFLAGS:N-mgeneral-regs-only} ${WERROR} ${.IMPSRC} \
+	     -o ${.TARGET}
+	${CTFCONVERT_CMD}
+
 .endif
+CFLAGS.zstd.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.entropy_common.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.error_private.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.fse_compress.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.fse_compress.c+= ${NO_WUNUSED_BUT_SET_VARIABLE}
+CFLAGS.fse_decompress.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.hist.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.huf_compress.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.huf_decompress.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.pool.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.xxhash.c+= -include ${SRCTOP}/sys/sys/_null.h
+CFLAGS.xxhash.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.zstd_common.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.zstd_compress.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.zstd_compress_literals.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.zstd_compress_sequences.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.zstd_compress_superblock.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.zstd_compress_superblock.c+= ${NO_WUNUSED_BUT_SET_VARIABLE}
+CFLAGS.zstd_ddict.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.zstd_decompress.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.zstd_decompress_block.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.zstd_double_fast.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.zstd_fast.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.zstd_lazy.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.zstd_ldm.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+CFLAGS.zstd_opt.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}

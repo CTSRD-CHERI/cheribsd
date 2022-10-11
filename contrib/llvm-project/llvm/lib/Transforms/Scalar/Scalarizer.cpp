@@ -66,6 +66,15 @@ static cl::opt<bool>
 
 namespace {
 
+BasicBlock::iterator skipPastPhiNodesAndDbg(BasicBlock::iterator Itr) {
+  BasicBlock *BB = Itr->getParent();
+  if (isa<PHINode>(Itr))
+    Itr = BB->getFirstInsertionPt();
+  if (Itr != BB->end())
+    Itr = skipDebugIntrinsics(Itr);
+  return Itr;
+}
+
 // Used to store the scattered form of a vector.
 using ValueVector = SmallVector<Value *, 8>;
 
@@ -261,7 +270,7 @@ Scatterer::Scatterer(BasicBlock *bb, BasicBlock::iterator bbi, Value *v,
   Type *Ty = V->getType();
   PtrTy = dyn_cast<PointerType>(Ty);
   if (PtrTy)
-    Ty = PtrTy->getElementType();
+    Ty = PtrTy->getPointerElementType();
   Size = cast<FixedVectorType>(Ty)->getNumElements();
   if (!CachePtr)
     Tmp.resize(Size, nullptr);
@@ -279,7 +288,8 @@ Value *Scatterer::operator[](unsigned I) {
     return CV[I];
   IRBuilder<> Builder(BB, BBI);
   if (PtrTy) {
-    Type *ElTy = cast<VectorType>(PtrTy->getElementType())->getElementType();
+    Type *ElTy =
+        cast<VectorType>(PtrTy->getPointerElementType())->getElementType();
     if (!CV[0]) {
       Type *NewPtrTy = PointerType::get(ElTy, PtrTy->getAddressSpace());
       CV[0] = Builder.CreateBitCast(V, NewPtrTy, V->getName() + ".i0");
@@ -371,10 +381,11 @@ Scatterer ScalarizerVisitor::scatter(Instruction *Point, Value *V) {
       return Scatterer(Point->getParent(), Point->getIterator(),
                        UndefValue::get(V->getType()));
     // Put the scattered form of an instruction directly after the
-    // instruction.
+    // instruction, skipping over PHI nodes and debug intrinsics.
     BasicBlock *BB = VOp->getParent();
-    return Scatterer(BB, std::next(BasicBlock::iterator(VOp)),
-                     V, &Scattered[V]);
+    return Scatterer(
+        BB, skipPastPhiNodesAndDbg(std::next(BasicBlock::iterator(VOp))), V,
+        &Scattered[V]);
   }
   // In the fallback case, just put the scattered before Point and
   // keep the result local to Point.
@@ -398,7 +409,8 @@ void ScalarizerVisitor::gather(Instruction *Op, const ValueVector &CV) {
         continue;
 
       Instruction *Old = cast<Instruction>(V);
-      CV[I]->takeName(Old);
+      if (isa<Instruction>(CV[I]))
+        CV[I]->takeName(Old);
       Old->replaceAllUsesWith(CV[I]);
       PotentiallyDeadInstrs.emplace_back(Old);
     }
@@ -509,8 +521,8 @@ static bool isTriviallyScalariable(Intrinsic::ID ID) {
 // All of the current scalarizable intrinsics only have one mangled type.
 static Function *getScalarIntrinsicDeclaration(Module *M,
                                                Intrinsic::ID ID,
-                                               VectorType *Ty) {
-  return Intrinsic::getDeclaration(M, ID, { Ty->getScalarType() });
+                                               ArrayRef<Type*> Tys) {
+  return Intrinsic::getDeclaration(M, ID, Tys);
 }
 
 /// If a call to a vector typed intrinsic function, split into a scalar call per
@@ -529,12 +541,15 @@ bool ScalarizerVisitor::splitCall(CallInst &CI) {
     return false;
 
   unsigned NumElems = cast<FixedVectorType>(VT)->getNumElements();
-  unsigned NumArgs = CI.getNumArgOperands();
+  unsigned NumArgs = CI.arg_size();
 
   ValueVector ScalarOperands(NumArgs);
   SmallVector<Scatterer, 8> Scattered(NumArgs);
 
   Scattered.resize(NumArgs);
+
+  SmallVector<llvm::Type *, 3> Tys;
+  Tys.push_back(VT->getScalarType());
 
   // Assumes that any vector type has the same number of elements as the return
   // vector type, which is true for all current intrinsics.
@@ -545,13 +560,15 @@ bool ScalarizerVisitor::splitCall(CallInst &CI) {
       assert(Scattered[I].size() == NumElems && "mismatched call operands");
     } else {
       ScalarOperands[I] = OpI;
+      if (hasVectorInstrinsicOverloadedScalarOpd(ID, I))
+        Tys.push_back(OpI->getType());
     }
   }
 
   ValueVector Res(NumElems);
   ValueVector ScalarCallOps(NumArgs);
 
-  Function *NewIntrin = getScalarIntrinsicDeclaration(F->getParent(), ID, VT);
+  Function *NewIntrin = getScalarIntrinsicDeclaration(F->getParent(), ID, Tys);
   IRBuilder<> Builder(&CI);
 
   // Perform actual scalarization, taking care to preserve any scalar operands.
@@ -732,7 +749,7 @@ bool ScalarizerVisitor::visitBitCastInst(BitCastInst &BCI) {
     auto *MidTy = FixedVectorType::get(SrcVT->getElementType(), FanIn);
     unsigned Op0I = 0;
     for (unsigned ResI = 0; ResI < DstNumElems; ++ResI) {
-      Value *V = UndefValue::get(MidTy);
+      Value *V = PoisonValue::get(MidTy);
       for (unsigned MidI = 0; MidI < FanIn; ++MidI)
         V = Builder.CreateInsertElement(V, Op0[Op0I++], Builder.getInt32(MidI),
                                         BCI.getName() + ".i" + Twine(ResI)
@@ -931,7 +948,7 @@ bool ScalarizerVisitor::finish() {
     if (!Op->use_empty()) {
       // The value is still needed, so recreate it using a series of
       // InsertElements.
-      Value *Res = UndefValue::get(Op->getType());
+      Value *Res = PoisonValue::get(Op->getType());
       if (auto *Ty = dyn_cast<VectorType>(Op->getType())) {
         BasicBlock *BB = Op->getParent();
         unsigned Count = cast<FixedVectorType>(Ty)->getNumElements();
@@ -941,13 +958,13 @@ bool ScalarizerVisitor::finish() {
         for (unsigned I = 0; I < Count; ++I)
           Res = Builder.CreateInsertElement(Res, CV[I], Builder.getInt32(I),
                                             Op->getName() + ".upto" + Twine(I));
+        Res->takeName(Op);
       } else {
         assert(CV.size() == 1 && Op->getType() == CV[0]->getType());
         Res = CV[0];
         if (Op == Res)
           continue;
       }
-      Res->takeName(Op);
       Op->replaceAllUsesWith(Res);
     }
     PotentiallyDeadInstrs.emplace_back(Op);

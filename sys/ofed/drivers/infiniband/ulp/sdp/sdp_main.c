@@ -308,13 +308,9 @@ sdp_closed(struct sdp_sock *ssk)
 	so = ssk->socket;
 	soisdisconnected(so);
 	if (ssk->flags & SDP_SOCKREF) {
-		KASSERT(so->so_state & SS_PROTOREF,
-		    ("sdp_closed: !SS_PROTOREF"));
 		ssk->flags &= ~SDP_SOCKREF;
 		SDP_WUNLOCK(ssk);
-		SOCK_LOCK(so);
-		so->so_state &= ~SS_PROTOREF;
-		sofree(so);
+		sorele(so);
 		return (NULL);
 	}
 	return (ssk);
@@ -519,9 +515,9 @@ sdp_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 	struct sockaddr_in *sin;
 
 	sin = (struct sockaddr_in *)nam;
-	if (nam->sa_len != sizeof (*sin))
-		return (EINVAL);
 	if (sin->sin_family != AF_INET)
+		return (EAFNOSUPPORT);
+	if (nam->sa_len != sizeof(*sin))
 		return (EINVAL);
 	if (IN_MULTICAST(ntohl(sin->sin_addr.s_addr)))
 		return (EAFNOSUPPORT);
@@ -617,10 +613,10 @@ sdp_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 	struct sockaddr_in *sin;
 
 	sin = (struct sockaddr_in *)nam;
-	if (nam->sa_len != sizeof (*sin))
+	if (nam->sa_len != sizeof(*sin))
 		return (EINVAL);
 	if (sin->sin_family != AF_INET)
-		return (EINVAL);
+		return (EAFNOSUPPORT);
 	if (IN_MULTICAST(ntohl(sin->sin_addr.s_addr)))
 		return (EAFNOSUPPORT);
 	if ((error = prison_remote_ip4(td->td_ucred, &sin->sin_addr)) != 0)
@@ -932,6 +928,21 @@ sdp_send(struct socket *so, int flags, struct mbuf *m,
 	int error;
 	int cnt;
 
+	if (nam != NULL) {
+		if (nam->sa_family != AF_INET) {
+			if (control)
+				m_freem(control);
+			m_freem(m);
+			return (EAFNOSUPPORT);
+		}
+		if (nam->sa_len != sizeof(struct sockaddr_in)) {
+			if (control)
+				m_freem(control);
+			m_freem(m);
+			return (EINVAL);
+		}
+	}
+
 	error = 0;
 	ssk = sdp_sk(so);
 	KASSERT(m->m_flags & M_PKTHDR,
@@ -1032,8 +1043,6 @@ out:
 	return (error);
 }
 
-#define	SBLOCKWAIT(f)	(((f) & MSG_DONTWAIT) ? 0 : SBL_WAIT)
-
 /*
  * Send on a socket.  If send must go all at once and message is larger than
  * send buffering, then hard error.  Lock against other senders.  If must go
@@ -1090,7 +1099,7 @@ sdp_sosend(struct socket *so, struct sockaddr *addr, struct uio *uio,
 		td->td_ru.ru_msgsnd++;
 
 	ssk = sdp_sk(so);
-	error = sblock(&so->so_snd, SBLOCKWAIT(flags));
+	error = SOCK_IO_SEND_LOCK(so, SBLOCKWAIT(flags));
 	if (error)
 		goto out;
 
@@ -1129,7 +1138,7 @@ restart:
 				error = EWOULDBLOCK;
 				goto release;
 			}
-			error = sbwait(&so->so_snd);
+			error = sbwait(so, SO_SND);
 			SOCKBUF_UNLOCK(&so->so_snd);
 			if (error)
 				goto release;
@@ -1181,7 +1190,7 @@ restart:
 	} while (resid);
 
 release:
-	sbunlock(&so->so_snd);
+	SOCK_IO_SEND_UNLOCK(so);
 out:
 	if (top != NULL)
 		m_freem(top);
@@ -1252,9 +1261,9 @@ sdp_sorecv(struct socket *so, struct sockaddr **psa, struct uio *uio,
 	ssk = sdp_sk(so);
 
 	/* Prevent other readers from entering the socket. */
-	error = sblock(sb, SBLOCKWAIT(flags));
+	error = SOCK_IO_RECV_LOCK(so, SBLOCKWAIT(flags));
 	if (error)
-		goto out;
+		return (error);
 	SOCKBUF_LOCK(sb);
 
 	/* Easy one, no space to copyout anything. */
@@ -1323,7 +1332,7 @@ restart:
 	 * Wait and block until (more) data comes in.
 	 * NB: Drops the sockbuf lock during wait.
 	 */
-	error = sbwait(sb);
+	error = sbwait(so, SO_RCV);
 	if (error)
 		goto out;
 	goto restart;
@@ -1408,11 +1417,10 @@ deliver:
 	if ((flags & MSG_WAITALL) && uio->uio_resid > 0)
 		goto restart;
 out:
-	SOCKBUF_LOCK_ASSERT(sb);
 	SBLASTRECORDCHK(sb);
 	SBLASTMBUFCHK(sb);
 	SOCKBUF_UNLOCK(sb);
-	sbunlock(sb);
+	SOCK_IO_RECV_UNLOCK(so);
 	return (error);
 }
 
@@ -1460,10 +1468,8 @@ sdp_close(struct socket *so)
 	 * holding on to the socket and pcb for a while.
 	 */
 	if (!(ssk->flags & SDP_DROPPED)) {
-		SOCK_LOCK(so);
-		so->so_state |= SS_PROTOREF;
-		SOCK_UNLOCK(so);
 		ssk->flags |= SDP_SOCKREF;
+		soref(so);
 	}
 	SDP_WUNLOCK(ssk);
 }
@@ -1895,7 +1901,7 @@ sdp_zone_change(void *tag)
 }
 
 static void
-sdp_init(void)
+sdp_init(void *arg __unused)
 {
 
 	LIST_INIT(&sdp_list);
@@ -1907,6 +1913,7 @@ sdp_init(void)
 	rx_comp_wq = create_singlethread_workqueue("rx_comp_wq");
 	ib_register_client(&sdp_client);
 }
+SYSINIT(sdp_init, SI_SUB_PROTO_DOMAIN, SI_ORDER_SECOND, sdp_init, NULL);
 
 extern struct domain sdpdomain;
 
@@ -1954,7 +1961,6 @@ struct protosw sdpsw[] = {
 struct domain sdpdomain = {
 	.dom_family =		AF_INET_SDP,
 	.dom_name =		"SDP",
-	.dom_init =		sdp_init,
 	.dom_protosw =		sdpsw,
 	.dom_protoswNPROTOSW =	&sdpsw[sizeof(sdpsw)/sizeof(sdpsw[0])],
 };

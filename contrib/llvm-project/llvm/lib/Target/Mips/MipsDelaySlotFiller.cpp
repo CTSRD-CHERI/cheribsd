@@ -182,7 +182,7 @@ namespace {
   /// memory instruction can be moved to a delay slot.
   class MemDefsUses : public InspectMemInstr {
   public:
-    MemDefsUses(const DataLayout &DL, const MachineFrameInfo *MFI);
+    explicit MemDefsUses(const MachineFrameInfo *MFI);
 
   private:
     using ValueType = PointerUnion<const Value *, const PseudoSourceValue *>;
@@ -200,7 +200,6 @@ namespace {
 
     const MachineFrameInfo *MFI;
     SmallPtrSet<ValueType, 4> Uses, Defs;
-    const DataLayout &DL;
 
     /// Flags indicating whether loads or stores with no underlying objects have
     /// been seen.
@@ -219,9 +218,8 @@ namespace {
     bool runOnMachineFunction(MachineFunction &F) override {
       TM = &F.getTarget();
       bool Changed = false;
-      for (MachineFunction::iterator FI = F.begin(), FE = F.end();
-           FI != FE; ++FI)
-        Changed |= runOnMachineBasicBlock(*FI);
+      for (MachineBasicBlock &MBB : F)
+        Changed |= runOnMachineBasicBlock(MBB);
 
       // This pass invalidates liveness information when it reorders
       // instructions to fill delay slot. Without this, -verify-machineinstrs
@@ -311,12 +309,12 @@ INITIALIZE_PASS(MipsDelaySlotFiller, DEBUG_TYPE,
 static void insertDelayFiller(Iter Filler, const BB2BrMap &BrMap) {
   MachineFunction *MF = Filler->getParent()->getParent();
 
-  for (BB2BrMap::const_iterator I = BrMap.begin(); I != BrMap.end(); ++I) {
-    if (I->second) {
-      MIBundleBuilder(I->second).append(MF->CloneMachineInstr(&*Filler));
+  for (const auto &I : BrMap) {
+    if (I.second) {
+      MIBundleBuilder(I.second).append(MF->CloneMachineInstr(&*Filler));
       ++UsefulSlots;
     } else {
-      I->first->insert(I->first->end(), MF->CloneMachineInstr(&*Filler));
+      I.first->push_back(MF->CloneMachineInstr(&*Filler));
     }
   }
 }
@@ -402,10 +400,9 @@ void RegDefsUses::setUnallocatableRegs(const MachineFunction &MF) {
 
 void RegDefsUses::addLiveOut(const MachineBasicBlock &MBB,
                              const MachineBasicBlock &SuccBB) {
-  for (MachineBasicBlock::const_succ_iterator SI = MBB.succ_begin(),
-       SE = MBB.succ_end(); SI != SE; ++SI)
-    if (*SI != &SuccBB)
-      for (const auto &LI : (*SI)->liveins())
+  for (const MachineBasicBlock *S : MBB.successors())
+    if (S != &SuccBB)
+      for (const auto &LI : S->liveins())
         Uses.set(LI.PhysReg);
 }
 
@@ -492,8 +489,8 @@ bool LoadFromStackOrConst::hasHazard_(const MachineInstr &MI) {
   return true;
 }
 
-MemDefsUses::MemDefsUses(const DataLayout &DL, const MachineFrameInfo *MFI_)
-    : InspectMemInstr(false), MFI(MFI_), DL(DL) {}
+MemDefsUses::MemDefsUses(const MachineFrameInfo *MFI_)
+    : InspectMemInstr(false), MFI(MFI_) {}
 
 bool MemDefsUses::hasHazard_(const MachineInstr &MI) {
   bool HasHazard = false;
@@ -542,7 +539,7 @@ getUnderlyingObjects(const MachineInstr &MI,
 
   if (const Value *V = MMO.getValue()) {
     SmallVector<const Value *, 4> Objs;
-    GetUnderlyingObjects(V, Objs, DL);
+    ::getUnderlyingObjects(V, Objs);
 
     for (const Value *UValue : Objs) {
       if (!isIdentifiedObject(V))
@@ -566,7 +563,11 @@ Iter MipsDelaySlotFiller::replaceWithCompactBranch(MachineBasicBlock &MBB,
   unsigned NewOpcode = TII->getEquivalentCompactForm(Branch);
   Branch = TII->genInstrWithNewOpc(NewOpcode, Branch);
 
-  std::next(Branch)->eraseFromParent();
+  auto *ToErase = cast<MachineInstr>(&*std::next(Branch));
+  // Update call site info for the Branch.
+  if (ToErase->shouldUpdateCallSiteInfo())
+    ToErase->getMF()->moveCallSiteInfo(ToErase, cast<MachineInstr>(&*Branch));
+  ToErase->eraseFromParent();
   return Branch;
 }
 
@@ -775,7 +776,7 @@ bool MipsDelaySlotFiller::searchBackward(MachineBasicBlock &MBB,
 
   auto *Fn = MBB.getParent();
   RegDefsUses RegDU(*Fn->getSubtarget().getRegisterInfo());
-  MemDefsUses MemDU(Fn->getDataLayout(), &Fn->getFrameInfo());
+  MemDefsUses MemDU(&Fn->getFrameInfo());
   ReverseIter Filler;
 
   RegDU.init(Slot);
@@ -836,9 +837,8 @@ bool MipsDelaySlotFiller::searchSuccBBs(MachineBasicBlock &MBB,
   auto *Fn = MBB.getParent();
 
   // Iterate over SuccBB's predecessor list.
-  for (MachineBasicBlock::pred_iterator PI = SuccBB->pred_begin(),
-       PE = SuccBB->pred_end(); PI != PE; ++PI)
-    if (!examinePred(**PI, *SuccBB, RegDU, HasMultipleSuccs, BrMap))
+  for (MachineBasicBlock *Pred : SuccBB->predecessors())
+    if (!examinePred(*Pred, *SuccBB, RegDU, HasMultipleSuccs, BrMap))
       return false;
 
   // Do not allow moving instructions which have unallocatable register operands
@@ -851,7 +851,7 @@ bool MipsDelaySlotFiller::searchSuccBBs(MachineBasicBlock &MBB,
     IM.reset(new LoadFromStackOrConst());
   } else {
     const MachineFrameInfo &MFI = Fn->getFrameInfo();
-    IM.reset(new MemDefsUses(Fn->getDataLayout(), &MFI));
+    IM.reset(new MemDefsUses(&MFI));
   }
 
   if (!searchRange(MBB, SuccBB->begin(), SuccBB->end(), RegDU, *IM, Slot,

@@ -26,6 +26,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "lld/Common/Driver.h"
+#include "lld/Common/ErrorHandler.h"
 #include "lld/Common/Memory.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -33,10 +34,12 @@
 #include "llvm/ADT/Triple.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/CrashRecoveryContext.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PluginLoader.h"
+#include "llvm/Support/Process.h"
 #include <cstdlib>
 
 using namespace lld;
@@ -45,14 +48,13 @@ using namespace llvm::sys;
 
 enum Flavor {
   Invalid,
-  Gnu,       // -flavor gnu
-  WinLink,   // -flavor link
-  Darwin,    // -flavor darwin
-  DarwinNew, // -flavor darwinnew
-  Wasm,      // -flavor wasm
+  Gnu,     // -flavor gnu
+  WinLink, // -flavor link
+  Darwin,  // -flavor darwin
+  Wasm,    // -flavor wasm
 };
 
-LLVM_ATTRIBUTE_NORETURN static void die(const Twine &s) {
+[[noreturn]] static void die(const Twine &s) {
   llvm::errs() << s << "\n";
   exit(1);
 }
@@ -63,7 +65,6 @@ static Flavor getFlavor(StringRef s) {
       .CasesLower("wasm", "ld-wasm", Wasm)
       .CaseLower("link", WinLink)
       .CasesLower("ld64", "ld64.lld", "darwin", Darwin)
-      .CaseLower("darwinnew", DarwinNew)
       .Default(Invalid);
 }
 
@@ -86,13 +87,20 @@ static bool isPETarget(std::vector<const char *> &v) {
   // Expand response files (arguments in the form of @<filename>)
   // to allow detecting the -m argument from arguments in them.
   SmallVector<const char *, 256> expandedArgs(v.data(), v.data() + v.size());
+  BumpPtrAllocator a;
+  StringSaver saver(a);
   cl::ExpandResponseFiles(saver, getDefaultQuotingStyle(), expandedArgs);
   for (auto it = expandedArgs.begin(); it + 1 != expandedArgs.end(); ++it) {
     if (StringRef(*it) != "-m")
       continue;
     return isPETargetName(*(it + 1));
   }
+
+#ifdef LLD_DEFAULT_LD_LLD_IS_MINGW
+  return true;
+#else
   return false;
+#endif
 }
 
 static Flavor parseProgname(StringRef progname) {
@@ -123,45 +131,117 @@ static Flavor parseFlavor(std::vector<const char *> &v) {
 
   // Deduct the flavor from argv[0].
   StringRef arg0 = path::filename(v[0]);
-  if (arg0.endswith_lower(".exe"))
+  if (arg0.endswith_insensitive(".exe"))
     arg0 = arg0.drop_back(4);
   return parseProgname(arg0);
 }
 
-// If this function returns true, lld calls _exit() so that it quickly
-// exits without invoking destructors of globally allocated objects.
-//
-// We don't want to do that if we are running tests though, because
-// doing that breaks leak sanitizer. So, lit sets this environment variable,
-// and we use it to detect whether we are running tests or not.
-static bool canExitEarly() { return StringRef(getenv("LLD_IN_TEST")) != "1"; }
+bool inTestOutputDisabled = false;
 
 /// Universal linker main(). This linker emulates the gnu, darwin, or
 /// windows linker based on the argv[0] or -flavor option.
+static int lldMain(int argc, const char **argv, llvm::raw_ostream &stdoutOS,
+                   llvm::raw_ostream &stderrOS, bool exitEarly = true) {
+  std::vector<const char *> args(argv, argv + argc);
+  auto link = [&args]() {
+#if 1
+    // On FreeBSD we only build the ELF linker.
+    return elf::link;
+#else
+    Flavor f = parseFlavor(args);
+    if (f == Gnu && isPETarget(args))
+      return mingw::link;
+    else if (f == Gnu)
+      return elf::link;
+    else if (f == WinLink)
+      return coff::link;
+    else if (f == Darwin)
+      return macho::link;
+    else if (f == Wasm)
+      return lld::wasm::link;
+    else
+      die("lld is a generic driver.\n"
+          "Invoke ld.lld (Unix), ld64.lld (macOS), lld-link (Windows), wasm-ld"
+          " (WebAssembly) instead");
+#endif
+  };
+  // Run the driver. If an error occurs, false will be returned.
+  bool r = link()(args, stdoutOS, stderrOS, exitEarly, inTestOutputDisabled);
+
+  // Call exit() if we can to avoid calling destructors.
+  if (exitEarly)
+    exitLld(!r ? 1 : 0);
+
+  // Delete the global context and clear the global context pointer, so that it
+  // cannot be accessed anymore.
+  CommonLinkerContext::destroy();
+
+  return !r ? 1 : 0;
+}
+
+// Similar to lldMain except that exceptions are caught.
+SafeReturn lld::safeLldMain(int argc, const char **argv,
+                            llvm::raw_ostream &stdoutOS,
+                            llvm::raw_ostream &stderrOS) {
+  int r = 0;
+  {
+    // The crash recovery is here only to be able to recover from arbitrary
+    // control flow when fatal() is called (through setjmp/longjmp or
+    // __try/__except).
+    llvm::CrashRecoveryContext crc;
+    if (!crc.RunSafely([&]() {
+          r = lldMain(argc, argv, stdoutOS, stderrOS, /*exitEarly=*/false);
+        }))
+      return {crc.RetCode, /*canRunAgain=*/false};
+  }
+
+  // Cleanup memory and reset everything back in pristine condition. This path
+  // is only taken when LLD is in test, or when it is used as a library.
+  llvm::CrashRecoveryContext crc;
+  if (!crc.RunSafely([&]() { CommonLinkerContext::destroy(); })) {
+    // The memory is corrupted beyond any possible recovery.
+    return {r, /*canRunAgain=*/false};
+  }
+  return {r, /*canRunAgain=*/true};
+}
+
+// When in lit tests, tells how many times the LLD tool should re-execute the
+// main loop with the same inputs. When not in test, returns a value of 0 which
+// signifies that LLD shall not release any memory after execution, to speed up
+// process destruction.
+static unsigned inTestVerbosity() {
+  unsigned v = 0;
+  StringRef(getenv("LLD_IN_TEST")).getAsInteger(10, v);
+  return v;
+}
+
 int main(int argc, const char **argv) {
   InitLLVM x(argc, argv);
+  sys::Process::UseANSIEscapeCodes(true);
 
-  std::vector<const char *> args(argv, argv + argc);
-#ifdef __FreeBSD__
-  return !elf::link(args, canExitEarly(), llvm::outs(), llvm::errs());
-#else
-  switch (parseFlavor(args)) {
-  case Gnu:
-    if (isPETarget(args))
-      return !mingw::link(args, canExitEarly(), llvm::outs(), llvm::errs());
-    return !elf::link(args, canExitEarly(), llvm::outs(), llvm::errs());
-  case WinLink:
-    return !coff::link(args, canExitEarly(), llvm::outs(), llvm::errs());
-  case Darwin:
-    return !mach_o::link(args, canExitEarly(), llvm::outs(), llvm::errs());
-  case DarwinNew:
-    return !macho::link(args, canExitEarly(), llvm::outs(), llvm::errs());
-  case Wasm:
-    return !wasm::link(args, canExitEarly(), llvm::outs(), llvm::errs());
-  default:
-    die("lld is a generic driver.\n"
-        "Invoke ld.lld (Unix), ld64.lld (macOS), lld-link (Windows), wasm-ld"
-        " (WebAssembly) instead");
+  // Not running in lit tests, just take the shortest codepath with global
+  // exception handling and no memory cleanup on exit.
+  if (!inTestVerbosity())
+    return lldMain(argc, argv, llvm::outs(), llvm::errs());
+
+  Optional<int> mainRet;
+  CrashRecoveryContext::Enable();
+
+  for (unsigned i = inTestVerbosity(); i > 0; --i) {
+    // Disable stdout/stderr for all iterations but the last one.
+    inTestOutputDisabled = (i != 1);
+
+    // Execute one iteration.
+    auto r = safeLldMain(argc, argv, llvm::outs(), llvm::errs());
+    if (!r.canRunAgain)
+      exitLld(r.ret); // Exit now, can't re-execute again.
+
+    if (!mainRet) {
+      mainRet = r.ret;
+    } else if (r.ret != *mainRet) {
+      // Exit now, to fail the tests if the result is different between runs.
+      return r.ret;
+    }
   }
-#endif
+  return *mainRet;
 }

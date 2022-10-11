@@ -31,8 +31,8 @@
 #define __HYPERCALL_H__
 
 #include <sys/systm.h>
-#include <xen/interface/xen.h>
-#include <xen/interface/sched.h>
+#include <contrib/xen/xen.h>
+#include <contrib/xen/sched.h>
 
 extern char *hypercall_page;
 
@@ -121,6 +121,9 @@ static inline long
 privcmd_hypercall(long op, long a1, long a2, long a3, long a4, long a5)
 {
 	long __res, __ign1, __ign2, __ign3, __ign4, __ign5, __call;
+
+	if (op >= PAGE_SIZE / 32)
+		return -EINVAL;
 
 	__call = (long)&hypercall_page + (op * 32);
 	__asm__ volatile (

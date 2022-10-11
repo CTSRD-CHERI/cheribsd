@@ -40,6 +40,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libauditd \
 	libbegemot \
 	libblocksruntime \
+	libbsddialog \
 	libbsdstat \
 	libbsm \
 	libbz2 \
@@ -65,6 +66,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libgeom \
 	libifconfig \
 	libipsec \
+	libiscsiutil \
 	libjail \
 	libkiconv \
 	libkvm \
@@ -73,6 +75,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libmemstat \
 	${_libstatcounters} \
 	libmd \
+	libmixer \
 	libmt \
 	lib80211 \
 	${_libnetmap} \
@@ -124,8 +127,9 @@ SUBDIR_DEPEND_geom=	libufs
 SUBDIR_DEPEND_googletest= libregex
 SUBDIR_DEPEND_libarchive= libz libbz2 libexpat liblzma libmd libzstd
 SUBDIR_DEPEND_libauditdm= libbsm
+SUBDIR_DEPEND_libbsddialog= ncurses
 SUBDIR_DEPEND_libbsnmp= ${_libnetgraph}
-SUBDIR_DEPEND_libc++:= libcxxrt
+SUBDIR_DEPEND_cheri-libc++:= libcxxrt
 # libssp_nonshared doesn't need to be linked into libc on every arch, but it is
 # small enough to build that this bit of serialization is likely insignificant.
 SUBDIR_DEPEND_libc= libcompiler_rt libssp_nonshared
@@ -171,15 +175,17 @@ SUBDIR.${MK_CHERI}+=	libsyscalls
 _libcheribsdtest_dynamic=	libcheribsdtest_dynamic
 .endif
 
-.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "mips" || \
-    ${MACHINE_CPUARCH} == "riscv"
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "riscv"
 .if !${MACHINE_ABI:Mptr32}
 SUBDIR+= libsimple_printf
 .endif
 .endif
 
 .if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !defined(COMPAT_SOFTFP) && !defined(COMPAT_CHERI)
-SUBDIR.${MK_CLANG}+=	clang
+.if ${MK_CLANG} != "no" || ${MK_LLD} != "no" || \
+    ${MK_LLDB} != "no" || ${MK_LLVM_BINUTILS} != "no"
+SUBDIR+=	clang
+.endif
 .endif
 
 SUBDIR.${MK_CUSE}+= 	libcuse
@@ -194,28 +200,19 @@ SUBDIR.${MK_KERBEROS_SUPPORT}+=	libcom_err
 SUBDIR.${MK_LDNS}+=	libldns
 SUBDIR.${MK_STATS}+=	libstats
 
-# The libraries under libclang_rt can only be built by clang, and only make
-# sense to build when clang is enabled at all.  Furthermore, they can only be
-# built for certain architectures.
-# XXXAR: This is not actually true, it makes sense to build them even if we
-# aren't building a native clang since we might be cross-compiling with clang
-.if ${COMPILER_TYPE} == "clang"
-.if (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
-    ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "i386" || \
-    ${MACHINE_CPUARCH} == "powerpc" || \
-    ${MACHINE_ARCH:Mmips64*}) && \
+# The libraries under libclang_rt can only be built by clang and when we enable
+# C++ support.
+.if ${COMPILER_TYPE} == "clang" && ${MK_CXX} != "no" && \
     !${MACHINE_ABI:Mpurecap}
 _libclang_rt=	libclang_rt
-.elif !${MACHINE_ABI:Mpurecap} && ${MACHINE_ARCH} != "mips" && \
-    ! ${MACHINE_ARCH:Mriscv*}
-.error "NOT BUILDING libclang_rt for ${MACHINE_ARCH}"
+.elif (${MK_ASAN} != "no" || ${MK_UBSAN} != "no") && make(all)
+.error Requested build with sanitizers but cannot build runtime libraries!
 .endif
-.endif # ${COMPILER_TYPE} == "clang"
 
 .if ${MK_CXX} != "no"
 _libcxxrt=	libcxxrt
-_libcplusplus=	libc++
-_libcplusplus+=	libc++experimental
+_libcplusplus=	cheri-libc++
+_libcplusplus+=	cheri-libc++experimental
 .endif
 
 SUBDIR.${MK_EFI}+=	libefivar
@@ -236,17 +233,15 @@ SUBDIR.${MK_PMC}+=	libipt
 SUBDIR.${MK_BHYVE}+=	libvmmapi
 .endif
 
-.if ${MACHINE_ARCH:Mmips64*} || ${MACHINE_ARCH:Mriscv*}
+.if ${MACHINE_ARCH:Mriscv*}
 _libstatcounters=	libstatcounters
-.endif
-
-.if ${MACHINE_ARCH:Mmips64*}
-# Used by ctsrd/lib/libterasic_mtl
-SUBDIR+=	libpng
 .endif
 
 .if ${MACHINE_ARCH} != "powerpc"
 SUBDIR.${MK_OPENMP}+=	libomp
+.endif
+.if !defined(COMPAT_32BIT) && ${MK_USB} != "no"
+SUBDIR.${MK_OPENSSH}+=	libcbor libfido2
 .endif
 SUBDIR.${MK_OPENSSL}+=	libmp
 SUBDIR.${MK_PF}+=	libpfctl
@@ -265,11 +260,6 @@ SUBDIR.${MK_ZFS}+=	libbe
 
 .if !make(install)
 SUBDIR_PARALLEL=
-.endif
-
-.if ${MK_CHERI} != "no"
-# libc++experimental currently causes crashes
-SUBDIR:=	${SUBDIR:Nlibc++experimental}
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}

@@ -38,10 +38,12 @@
 #include <sys/ioctl.h>
 #include <sys/memrange.h>
 #include <sys/mman.h>
+#include <sys/ptrace.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/uio.h>
+#include <sys/un.h>
 #include <sys/wait.h>
 
 #include <aio.h>
@@ -49,6 +51,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -203,6 +206,47 @@ ATF_TC_BODY(path_capsicum, tc)
 		_exit(4);
 	}
 	waitchild(child, 4);
+}
+
+/* Make sure that ptrace(PT_COREDUMP) cannot be used to write to a path fd. */
+ATF_TC_WITHOUT_HEAD(path_coredump);
+ATF_TC_BODY(path_coredump, tc)
+{
+	char path[PATH_MAX];
+	struct ptrace_coredump pc;
+	int error, pathfd, status;
+	pid_t child;
+
+	mktdir(path, "path_coredump.XXXXXX");
+
+	child = fork();
+	ATF_REQUIRE_MSG(child != -1, FMT_ERR("fork"));
+	if (child == 0) {
+		while (true)
+			(void)sleep(1);
+	}
+
+	pathfd = open(path, O_PATH);
+	ATF_REQUIRE_MSG(pathfd >= 0, FMT_ERR("open"));
+
+	error = ptrace(PT_ATTACH, child, 0, 0);
+	ATF_REQUIRE_MSG(error == 0, FMT_ERR("ptrace"));
+	error = waitpid(child, &status, 0);
+	ATF_REQUIRE_MSG(error != -1, FMT_ERR("waitpid"));
+	ATF_REQUIRE_MSG(WIFSTOPPED(status), "unexpected status %d", status);
+
+	pc.pc_fd = pathfd;
+	pc.pc_flags = 0;
+	pc.pc_limit = 0;
+	error = ptrace(PT_COREDUMP, child, (void *)&pc, sizeof(pc));
+	ATF_REQUIRE_ERRNO(EBADF, error == -1);
+
+	error = ptrace(PT_DETACH, child, 0, 0);
+	ATF_REQUIRE_MSG(error == 0, FMT_ERR("ptrace"));
+
+	ATF_REQUIRE_MSG(kill(child, SIGKILL) == 0, FMT_ERR("kill"));
+
+	CHECKED_CLOSE(pathfd);
 }
 
 /* Verify operations on directory path descriptors. */
@@ -408,14 +452,17 @@ ATF_TC_BODY(path_event, tc)
 	ATF_REQUIRE_MSG(kevent(kq, &ev, 1, NULL, 0, NULL) == 0,
 	    FMT_ERR("kevent"));
 
-	/* Try to get a EVFILT_VNODE/NOTE_LINK event through a path fd. */
-	EV_SET(&ev, pathfd, EVFILT_VNODE, EV_ADD | EV_ENABLE, NOTE_LINK, 0, 0);
+	/* Try to get a EVFILT_VNODE/NOTE_DELETE event through a path fd. */
+	EV_SET(&ev, pathfd, EVFILT_VNODE, EV_ADD | EV_ENABLE, NOTE_DELETE, 0,
+	    0);
 	ATF_REQUIRE_MSG(kevent(kq, &ev, 1, NULL, 0, NULL) == 0,
 	    FMT_ERR("kevent"));
 	ATF_REQUIRE_MSG(funlinkat(AT_FDCWD, path, pathfd, 0) == 0,
 	    FMT_ERR("funlinkat"));
 	ATF_REQUIRE_MSG(kevent(kq, NULL, 0, &ev, 1, NULL) == 1,
 	    FMT_ERR("kevent"));
+	ATF_REQUIRE_MSG(ev.fflags == NOTE_DELETE,
+	    "unexpected fflags %#x", ev.fflags);
 	EV_SET(&ev, pathfd, EVFILT_VNODE, EV_DELETE, 0, 0, 0);
 	ATF_REQUIRE_MSG(kevent(kq, &ev, 1, NULL, 0, NULL) == 0,
 	    FMT_ERR("kevent"));
@@ -506,6 +553,33 @@ ATF_TC_BODY(path_fexecve, tc)
 	ATF_REQUIRE_ERRNO(EACCES, pathfd < 0);
 }
 
+/* Make sure that O_PATH restrictions apply to named pipes as well. */
+ATF_TC_WITHOUT_HEAD(path_fifo);
+ATF_TC_BODY(path_fifo, tc)
+{
+	char path[PATH_MAX], buf[BUFSIZ];
+	struct kevent ev;
+	int kq, pathfd;
+
+	snprintf(path, sizeof(path), "path_fifo.XXXXXX");
+	ATF_REQUIRE_MSG(mktemp(path) == path, FMT_ERR("mktemp"));
+
+	ATF_REQUIRE_MSG(mkfifo(path, 0666) == 0, FMT_ERR("mkfifo"));
+
+	pathfd = open(path, O_PATH);
+	ATF_REQUIRE_MSG(pathfd >= 0, FMT_ERR("open"));
+	memset(buf, 0, sizeof(buf));
+	ATF_REQUIRE_ERRNO(EBADF, write(pathfd, buf, sizeof(buf)));
+	ATF_REQUIRE_ERRNO(EBADF, read(pathfd, buf, sizeof(buf)));
+
+	kq = kqueue();
+	ATF_REQUIRE_MSG(kq >= 0, FMT_ERR("kqueue"));
+	EV_SET(&ev, pathfd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, 0);
+	ATF_REQUIRE_ERRNO(EBADF, kevent(kq, &ev, 1, NULL, 0, NULL) == -1);
+
+	CHECKED_CLOSE(pathfd);
+}
+
 /* Files may be unlinked using a path fd. */
 ATF_TC_WITHOUT_HEAD(path_funlinkat);
 ATF_TC_BODY(path_funlinkat, tc)
@@ -533,6 +607,7 @@ ATF_TC_BODY(path_io, tc)
 	char path[PATH_MAX], path2[PATH_MAX];
 	char buf[BUFSIZ];
 	struct iovec iov;
+	size_t page_size;
 	int error, fd, pathfd, sd[2];
 
 	/* It shouldn't be possible to create new files with O_PATH. */
@@ -596,14 +671,15 @@ ATF_TC_BODY(path_io, tc)
 	ATF_REQUIRE_MSG(error == ESPIPE, "posix_fadvise() returned %d", error);
 
 	/* mmap() is not allowed. */
+	page_size = getpagesize();
 	ATF_REQUIRE_ERRNO(ENODEV,
-	    mmap(NULL, PAGE_SIZE, PROT_READ, MAP_SHARED, pathfd, 0) ==
+	    mmap(NULL, page_size, PROT_READ, MAP_SHARED, pathfd, 0) ==
 	    MAP_FAILED);
 	ATF_REQUIRE_ERRNO(ENODEV,
-	    mmap(NULL, PAGE_SIZE, PROT_NONE, MAP_SHARED, pathfd, 0) ==
+	    mmap(NULL, page_size, PROT_NONE, MAP_SHARED, pathfd, 0) ==
 	    MAP_FAILED);
 	ATF_REQUIRE_ERRNO(ENODEV,
-	    mmap(NULL, PAGE_SIZE, PROT_READ, MAP_PRIVATE, pathfd, 0) ==
+	    mmap(NULL, page_size, PROT_READ, MAP_PRIVATE, pathfd, 0) ==
 	    MAP_FAILED);
 
 	/* No fsync() or fdatasync(). */
@@ -686,6 +762,25 @@ ATF_TC_BODY(path_lock, tc)
 	CHECKED_CLOSE(pathfd);
 }
 
+/*
+ * Verify fstatat(AT_EMPTY_PATH) on non-regular dirfd.
+ * Verify that fstatat(AT_EMPTY_PATH) on NULL path returns EFAULT.
+ */
+ATF_TC_WITHOUT_HEAD(path_pipe_fstatat);
+ATF_TC_BODY(path_pipe_fstatat, tc)
+{
+	struct stat sb;
+	int fd[2];
+
+	ATF_REQUIRE_MSG(pipe(fd) == 0, FMT_ERR("pipe"));
+	ATF_REQUIRE_MSG(fstatat(fd[0], "", &sb, AT_EMPTY_PATH) == 0,
+	    FMT_ERR("fstatat pipe"));
+	ATF_REQUIRE_ERRNO(EFAULT, fstatat(fd[0], NULL, &sb,
+	    AT_EMPTY_PATH) == -1);
+	CHECKED_CLOSE(fd[0]);
+	CHECKED_CLOSE(fd[1]);
+}
+
 /* Verify that we can send an O_PATH descriptor over a unix socket. */
 ATF_TC_WITHOUT_HEAD(path_rights);
 ATF_TC_BODY(path_rights, tc)
@@ -755,11 +850,94 @@ ATF_TC_BODY(path_rights, tc)
 	CHECKED_CLOSE(sd[1]);
 }
 
+/* Verify that a local socket can be opened with O_PATH. */
+ATF_TC_WITHOUT_HEAD(path_unix);
+ATF_TC_BODY(path_unix, tc)
+{
+	char buf[BUFSIZ], path[PATH_MAX];
+	struct kevent ev;
+	struct sockaddr_un sun;
+	struct stat sb;
+	int kq, pathfd, sd;
+
+	snprintf(path, sizeof(path), "path_unix.XXXXXX");
+	ATF_REQUIRE_MSG(mktemp(path) == path, FMT_ERR("mktemp"));
+
+	sd = socket(PF_LOCAL, SOCK_STREAM, 0);
+	ATF_REQUIRE_MSG(sd >= 0, FMT_ERR("socket"));
+
+	memset(&sun, 0, sizeof(sun));
+	sun.sun_family = PF_LOCAL;
+	(void)strlcpy(sun.sun_path, path, sizeof(sun.sun_path));
+	ATF_REQUIRE_MSG(bind(sd, (struct sockaddr *)&sun, SUN_LEN(&sun)) == 0,
+	    FMT_ERR("bind"));
+
+	pathfd = open(path, O_PATH);
+	ATF_REQUIRE_MSG(pathfd >= 0, FMT_ERR("open"));
+
+	ATF_REQUIRE_MSG(fstatat(pathfd, "", &sb, AT_EMPTY_PATH) == 0,
+	    FMT_ERR("fstatat"));
+	ATF_REQUIRE_MSG(sb.st_mode & S_IFSOCK, "socket mode %#x", sb.st_mode);
+	ATF_REQUIRE_MSG(sb.st_ino != 0, "socket has inode number 0");
+
+	memset(buf, 0, sizeof(buf));
+	ATF_REQUIRE_ERRNO(EBADF, write(pathfd, buf, sizeof(buf)));
+	ATF_REQUIRE_ERRNO(EBADF, read(pathfd, buf, sizeof(buf)));
+
+	/* kevent() is disallowed with sockets. */
+	kq = kqueue();
+	ATF_REQUIRE_MSG(kq >= 0, FMT_ERR("kqueue"));
+	EV_SET(&ev, pathfd, EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, 0);
+	ATF_REQUIRE_ERRNO(EBADF, kevent(kq, &ev, 1, NULL, 0, NULL) == -1);
+
+	/* Should not be able to open a socket without O_PATH. */
+	ATF_REQUIRE_ERRNO(EOPNOTSUPP, openat(pathfd, "", O_EMPTY_PATH) == -1);
+
+	ATF_REQUIRE_MSG(funlinkat(AT_FDCWD, path, pathfd, 0) == 0,
+	    FMT_ERR("funlinkat"));
+
+	CHECKED_CLOSE(sd);
+	CHECKED_CLOSE(pathfd);
+}
+
+/*
+ * Check that we can perform operations using an O_PATH fd for an unlinked file.
+ */
+ATF_TC_WITHOUT_HEAD(path_unlinked);
+ATF_TC_BODY(path_unlinked, tc)
+{
+	char path[PATH_MAX];
+	struct stat sb;
+	int pathfd;
+
+	mktfile(path, "path_rights.XXXXXX");
+
+	pathfd = open(path, O_PATH);
+	ATF_REQUIRE_MSG(pathfd >= 0, FMT_ERR("open"));
+
+	ATF_REQUIRE_MSG(fstatat(pathfd, "", &sb, AT_EMPTY_PATH) == 0,
+	    FMT_ERR("fstatat"));
+	ATF_REQUIRE(sb.st_nlink == 1);
+	ATF_REQUIRE_MSG(fstat(pathfd, &sb) == 0, FMT_ERR("fstat"));
+	ATF_REQUIRE(sb.st_nlink == 1);
+
+	ATF_REQUIRE_MSG(unlink(path) == 0, FMT_ERR("unlink"));
+
+	ATF_REQUIRE_MSG(fstatat(pathfd, "", &sb, AT_EMPTY_PATH) == 0,
+	    FMT_ERR("fstatat"));
+	ATF_REQUIRE(sb.st_nlink == 0);
+	ATF_REQUIRE_MSG(fstat(pathfd, &sb) == 0, FMT_ERR("fstat"));
+	ATF_REQUIRE(sb.st_nlink == 0);
+
+	CHECKED_CLOSE(pathfd);
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, path_access);
 	ATF_TP_ADD_TC(tp, path_aio);
 	ATF_TP_ADD_TC(tp, path_capsicum);
+	ATF_TP_ADD_TC(tp, path_coredump);
 	ATF_TP_ADD_TC(tp, path_directory);
 	ATF_TP_ADD_TC(tp, path_directory_not_root);
 	ATF_TP_ADD_TC(tp, path_empty);
@@ -768,11 +946,15 @@ ATF_TP_ADD_TCS(tp)
 	ATF_TP_ADD_TC(tp, path_event);
 	ATF_TP_ADD_TC(tp, path_fcntl);
 	ATF_TP_ADD_TC(tp, path_fexecve);
+	ATF_TP_ADD_TC(tp, path_fifo);
 	ATF_TP_ADD_TC(tp, path_funlinkat);
 	ATF_TP_ADD_TC(tp, path_io);
 	ATF_TP_ADD_TC(tp, path_ioctl);
 	ATF_TP_ADD_TC(tp, path_lock);
+	ATF_TP_ADD_TC(tp, path_pipe_fstatat);
 	ATF_TP_ADD_TC(tp, path_rights);
+	ATF_TP_ADD_TC(tp, path_unix);
+	ATF_TP_ADD_TC(tp, path_unlinked);
 
 	return (atf_no_error());
 }

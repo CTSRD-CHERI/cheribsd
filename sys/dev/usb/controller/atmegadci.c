@@ -79,8 +79,7 @@
 #include <dev/usb/controller/atmegadci.h>
 
 #define	ATMEGA_BUS2SC(bus) \
-   ((struct atmegadci_softc *)(((uint8_t *)(bus)) - \
-    ((uint8_t *)&(((struct atmegadci_softc *)0)->sc_bus))))
+    __containerof(bus, struct atmegadci_softc, sc_bus)
 
 #define	ATMEGA_PC2SC(pc) \
    ATMEGA_BUS2SC(USB_DMATAG_TO_XROOT((pc)->tag_parent)->bus)
@@ -776,10 +775,8 @@ static void
 atmegadci_setup_standard_chain(struct usb_xfer *xfer)
 {
 	struct atmegadci_std_temp temp;
-	struct atmegadci_softc *sc;
 	struct atmegadci_td *td;
 	uint32_t x;
-	uint8_t ep_no;
 	uint8_t need_sync;
 
 	DPRINTFN(9, "addr=%d endpt=%d sumlen=%d speed=%d\n",
@@ -801,9 +798,6 @@ atmegadci_setup_standard_chain(struct usb_xfer *xfer)
 	temp.setup_alt_next = xfer->flags_int.short_frames_ok ||
 	    xfer->flags_int.isochronous_xfr;
 	temp.did_stall = !xfer->flags_int.control_stall;
-
-	sc = ATMEGA_BUS2SC(xfer->xroot->bus);
-	ep_no = (xfer->endpointno & UE_ADDR);
 
 	/* check if we should prepend a setup message */
 
@@ -1421,7 +1415,6 @@ static void
 atmegadci_device_isoc_fs_enter(struct usb_xfer *xfer)
 {
 	struct atmegadci_softc *sc = ATMEGA_BUS2SC(xfer->xroot->bus);
-	uint32_t temp;
 	uint32_t nframes;
 
 	DPRINTFN(6, "xfer=%p next=%d nframes=%d\n",
@@ -1433,41 +1426,9 @@ atmegadci_device_isoc_fs_enter(struct usb_xfer *xfer)
 	    (ATMEGA_READ_1(sc, ATMEGA_UDFNUMH) << 8) |
 	    (ATMEGA_READ_1(sc, ATMEGA_UDFNUML));
 
-	nframes &= ATMEGA_FRAME_MASK;
-
-	/*
-	 * check if the frame index is within the window where the frames
-	 * will be inserted
-	 */
-	temp = (nframes - xfer->endpoint->isoc_next) & ATMEGA_FRAME_MASK;
-
-	if ((xfer->endpoint->is_synced == 0) ||
-	    (temp < xfer->nframes)) {
-		/*
-		 * If there is data underflow or the pipe queue is
-		 * empty we schedule the transfer a few frames ahead
-		 * of the current frame position. Else two isochronous
-		 * transfers might overlap.
-		 */
-		xfer->endpoint->isoc_next = (nframes + 3) & ATMEGA_FRAME_MASK;
-		xfer->endpoint->is_synced = 1;
+	if (usbd_xfer_get_isochronous_start_frame(
+	    xfer, nframes, 0, 1, ATMEGA_FRAME_MASK, NULL))
 		DPRINTFN(3, "start next=%d\n", xfer->endpoint->isoc_next);
-	}
-	/*
-	 * compute how many milliseconds the insertion is ahead of the
-	 * current frame position:
-	 */
-	temp = (xfer->endpoint->isoc_next - nframes) & ATMEGA_FRAME_MASK;
-
-	/*
-	 * pre-compute when the isochronous transfer will be finished:
-	 */
-	xfer->isoc_time_complete =
-	    usb_isoc_time_expand(&sc->sc_bus, nframes) + temp +
-	    xfer->nframes;
-
-	/* compute frame number for next insertion */
-	xfer->endpoint->isoc_next += xfer->nframes;
 
 	/* setup TDs */
 	atmegadci_setup_standard_chain(xfer);
@@ -1990,14 +1951,12 @@ static void
 atmegadci_xfer_setup(struct usb_setup_params *parm)
 {
 	const struct usb_hw_ep_profile *pf;
-	struct atmegadci_softc *sc;
 	struct usb_xfer *xfer;
 	void *last_obj;
 	uint32_t ntd;
 	uint32_t n;
 	uint8_t ep_no;
 
-	sc = ATMEGA_BUS2SC(parm->udev->bus);
 	xfer = parm->curr_xfer;
 
 	/*

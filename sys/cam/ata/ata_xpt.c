@@ -148,7 +148,7 @@ typedef struct {
 	int		faults;
 	u_int		caps;
 	struct cam_periph *periph;
-} probe_softc;
+} aprobe_softc;
 
 static struct ata_quirk_entry ata_quirk_table[] =
 {
@@ -278,7 +278,7 @@ static cam_status
 aproberegister(struct cam_periph *periph, void *arg)
 {
 	union ccb *request_ccb;	/* CCB representing the probe request */
-	probe_softc *softc;
+	aprobe_softc *softc;
 
 	request_ccb = (union ccb *)arg;
 	if (request_ccb == NULL) {
@@ -287,7 +287,7 @@ aproberegister(struct cam_periph *periph, void *arg)
 		return(CAM_REQ_CMP_ERR);
 	}
 
-	softc = (probe_softc *)malloc(sizeof(*softc), M_CAMXPT, M_ZERO | M_NOWAIT);
+	softc = (aprobe_softc *)malloc(sizeof(*softc), M_CAMXPT, M_ZERO | M_NOWAIT);
 
 	if (softc == NULL) {
 		printf("proberegister: Unable to probe new device. "
@@ -314,9 +314,9 @@ static void
 aprobeschedule(struct cam_periph *periph)
 {
 	union ccb *ccb;
-	probe_softc *softc;
+	aprobe_softc *softc;
 
-	softc = (probe_softc *)periph->softc;
+	softc = (aprobe_softc *)periph->softc;
 	ccb = (union ccb *)TAILQ_FIRST(&softc->request_ccbs);
 
 	if ((periph->path->device->flags & CAM_DEV_UNCONFIGURED) ||
@@ -340,14 +340,14 @@ aprobestart(struct cam_periph *periph, union ccb *start_ccb)
 	struct ccb_trans_settings cts;
 	struct ccb_ataio *ataio;
 	struct ccb_scsiio *csio;
-	probe_softc *softc;
+	aprobe_softc *softc;
 	struct cam_path *path;
 	struct ata_params *ident_buf;
 	u_int oif;
 
 	CAM_DEBUG(start_ccb->ccb_h.path, CAM_DEBUG_TRACE, ("aprobestart\n"));
 
-	softc = (probe_softc *)periph->softc;
+	softc = (aprobe_softc *)periph->softc;
 	path = start_ccb->ccb_h.path;
 	ataio = &start_ccb->ataio;
 	csio = &start_ccb->csio;
@@ -745,7 +745,7 @@ aprobedone(struct cam_periph *periph, union ccb *done_ccb)
 	struct ccb_trans_settings cts;
 	struct ata_params *ident_buf;
 	struct scsi_inquiry_data *inq_buf;
-	probe_softc *softc;
+	aprobe_softc *softc;
 	struct cam_path *path;
 	cam_status status;
 	u_int32_t  priority;
@@ -757,7 +757,7 @@ aprobedone(struct cam_periph *periph, union ccb *done_ccb)
 
 	CAM_DEBUG(done_ccb->ccb_h.path, CAM_DEBUG_TRACE, ("aprobedone\n"));
 
-	softc = (probe_softc *)periph->softc;
+	softc = (aprobe_softc *)periph->softc;
 	path = done_ccb->ccb_h.path;
 	priority = done_ccb->ccb_h.pinfo.priority;
 	ident_buf = &path->device->ident_data;
@@ -1605,9 +1605,9 @@ ata_scan_lun(struct cam_periph *periph, struct cam_path *path,
 		xpt_path_lock(path);
 	if ((old_periph = cam_periph_find(path, "aprobe")) != NULL) {
 		if ((old_periph->flags & CAM_PERIPH_INVALID) == 0) {
-			probe_softc *softc;
+			aprobe_softc *softc;
 
-			softc = (probe_softc *)old_periph->softc;
+			softc = (aprobe_softc *)old_periph->softc;
 			TAILQ_INSERT_TAIL(&softc->request_ccbs,
 				&request_ccb->ccb_h, periph_links.tqe);
 			softc->restart = 1;
@@ -1758,9 +1758,11 @@ ata_dev_advinfo(union ccb *start_ccb)
 		break;
 	case CDAI_TYPE_PHYS_PATH:
 		if (cdai->flags & CDAI_FLAG_STORE) {
-			if (device->physpath != NULL)
+			if (device->physpath != NULL) {
 				free(device->physpath, M_CAMXPT);
-			device->physpath_len = cdai->bufsiz;
+				device->physpath = NULL;
+				device->physpath_len = 0;
+			}
 			/* Clear existing buffer if zero length */
 			if (cdai->bufsiz == 0)
 				break;
@@ -1769,6 +1771,7 @@ ata_dev_advinfo(union ccb *start_ccb)
 				start_ccb->ccb_h.status = CAM_REQ_ABORTED;
 				return;
 			}
+			device->physpath_len = cdai->bufsiz;
 			memcpy(device->physpath, cdai->buf, cdai->bufsiz);
 		} else {
 			cdai->provsiz = device->physpath_len;
@@ -1794,6 +1797,13 @@ ata_dev_advinfo(union ccb *start_ccb)
 static void
 ata_action(union ccb *start_ccb)
 {
+
+	if (start_ccb->ccb_h.func_code != XPT_ATA_IO) {
+		KASSERT((start_ccb->ccb_h.alloc_flags & CAM_CCB_FROM_UMA) == 0,
+		    ("%s: ccb %p, func_code %#x should not be allocated "
+		    "from UMA zone\n",
+		    __func__, start_ccb, start_ccb->ccb_h.func_code));
+	}
 
 	switch (start_ccb->ccb_h.func_code) {
 	case XPT_SET_TRAN_SETTINGS:
@@ -2029,52 +2039,46 @@ static void
 ata_dev_async(u_int32_t async_code, struct cam_eb *bus, struct cam_et *target,
 	      struct cam_ed *device, void *async_arg)
 {
-	cam_status status;
-	struct cam_path newpath;
-
 	/*
 	 * We only need to handle events for real devices.
 	 */
-	if (target->target_id == CAM_TARGET_WILDCARD
-	 || device->lun_id == CAM_LUN_WILDCARD)
+	if (target->target_id == CAM_TARGET_WILDCARD ||
+	    device->lun_id == CAM_LUN_WILDCARD)
 		return;
 
-	/*
-	 * We need our own path with wildcards expanded to
-	 * handle certain types of events.
-	 */
-	if ((async_code == AC_SENT_BDR)
-	 || (async_code == AC_BUS_RESET)
-	 || (async_code == AC_INQ_CHANGED))
+	switch (async_code) {
+	case AC_SENT_BDR:
+	case AC_BUS_RESET:
+	case AC_INQ_CHANGED: {
+		cam_status status;
+		struct cam_path newpath;
+		cam_flags flags;
+
+		/*
+		 * We need our own path with wildcards expanded to handle these
+		 * events.
+		 */
 		status = xpt_compile_path(&newpath, NULL,
 					  bus->path_id,
 					  target->target_id,
 					  device->lun_id);
-	else
-		status = CAM_REQ_CMP_ERR;
+		if (status != CAM_REQ_CMP)
+			break; /* fail safe and just drop it */
 
-	if (status == CAM_REQ_CMP) {
-		if (async_code == AC_INQ_CHANGED) {
-			/*
-			 * We've sent a start unit command, or
-			 * something similar to a device that
-			 * may have caused its inquiry data to
-			 * change. So we re-scan the device to
-			 * refresh the inquiry data for it.
-			 */
-			ata_scan_lun(newpath.periph, &newpath,
-				     CAM_EXPECT_INQ_CHANGE, NULL);
-		} else {
-			/* We need to reinitialize device after reset. */
-			ata_scan_lun(newpath.periph, &newpath,
-				     0, NULL);
-		}
+		/*
+		 * For AC_INQ_CHANGED, we've sent a start unit command, or
+		 * something similar to a device that may have caused its
+		 * inquiry data to change. So we re-scan the device to refresh
+		 * the inquiry data for it, allowing changes. Otherwise we rescan
+		 * without allowing changes to respond to the reset, not allowing
+		 * changes.
+		 */
+		flags = async_code == AC_INQ_CHANGED ? CAM_EXPECT_INQ_CHANGE : 0;
+		ata_scan_lun(newpath.periph, &newpath, flags, NULL);
 		xpt_release_path(&newpath);
-	} else if (async_code == AC_LOST_DEVICE &&
-	    (device->flags & CAM_DEV_UNCONFIGURED) == 0) {
-		device->flags |= CAM_DEV_UNCONFIGURED;
-		xpt_release_device(device);
-	} else if (async_code == AC_TRANSFER_NEG) {
+		break;
+	}
+	case AC_TRANSFER_NEG: {
 		struct ccb_trans_settings *settings;
 		struct cam_path path;
 
@@ -2084,6 +2088,14 @@ ata_dev_async(u_int32_t async_code, struct cam_eb *bus, struct cam_et *target,
 		ata_set_transfer_settings(settings, &path,
 					  /*async_update*/TRUE);
 		xpt_release_path(&path);
+		break;
+	}
+	case AC_LOST_DEVICE:
+		if ((device->flags & CAM_DEV_UNCONFIGURED) == 0) {
+			device->flags |= CAM_DEV_UNCONFIGURED;
+			xpt_release_device(device);
+		}
+		break;
 	}
 }
 
@@ -2180,6 +2192,7 @@ ata_announce_periph_sbuf(struct cam_periph *periph, struct sbuf *sb)
 	struct ccb_trans_settings cts;
 	u_int speed, mb;
 
+	bzero(&cts, sizeof(cts));
 	_ata_announce_periph(periph, &cts, &speed);
 	if ((cts.ccb_h.status & CAM_STATUS_MASK) != CAM_REQ_CMP)
 		return;

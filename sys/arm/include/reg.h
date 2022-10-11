@@ -3,6 +3,8 @@
 #ifndef MACHINE_REG_H
 #define MACHINE_REG_H
 
+#include <sys/_types.h>
+
 struct reg {
 	unsigned int r[13];
 	unsigned int r_sp;
@@ -12,9 +14,9 @@ struct reg {
 };
 
 struct fp_extended_precision {
-	u_int32_t fp_exponent;
-	u_int32_t fp_mantissa_hi;
-	u_int32_t fp_mantissa_lo;
+	__uint32_t fp_exponent;
+	__uint32_t fp_mantissa_hi;
+	__uint32_t fp_mantissa_lo;
 };
 
 typedef struct fp_extended_precision fp_reg_t;
@@ -29,14 +31,5 @@ struct dbreg {
 	unsigned int dbg_wcr[ARM_WR_MAX]; /* Watchpoint Control Registers */
 	unsigned int dbg_wvr[ARM_WR_MAX]; /* Watchpoint Value Registers */
 };
-
-#ifdef _KERNEL
-int     fill_regs(struct thread *, struct reg *);
-int     set_regs(struct thread *, struct reg *);
-int     fill_fpregs(struct thread *, struct fpreg *);
-int     set_fpregs(struct thread *, struct fpreg *);
-int     fill_dbregs(struct thread *, struct dbreg *);
-int     set_dbregs(struct thread *, struct dbreg *);
-#endif
 
 #endif /* !MACHINE_REG_H */

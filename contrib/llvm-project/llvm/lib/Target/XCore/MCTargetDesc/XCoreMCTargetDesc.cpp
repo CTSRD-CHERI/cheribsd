@@ -20,10 +20,10 @@
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FormattedStream.h"
-#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -51,7 +51,7 @@ static MCRegisterInfo *createXCoreMCRegisterInfo(const Triple &TT) {
 
 static MCSubtargetInfo *
 createXCoreMCSubtargetInfo(const Triple &TT, StringRef CPU, StringRef FS) {
-  return createXCoreMCSubtargetInfoImpl(TT, CPU, FS);
+  return createXCoreMCSubtargetInfoImpl(TT, CPU, /*TuneCPU*/ CPU, FS);
 }
 
 static MCAsmInfo *createXCoreMCAsmInfo(const MCRegisterInfo &MRI,

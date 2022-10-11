@@ -125,22 +125,18 @@ static int
 aw_gmacclk_set_mux(struct clknode *clk, int index)
 {
 	struct aw_gmacclk_sc *sc;
-	uint32_t val, clk_src, pit, txc_div;
-	int error;
+	uint32_t val, clk_src, pit;
 
 	sc = clknode_get_softc(clk);
-	error = 0;
 
 	switch (index) {
 	case CLK_IDX_MII:
 		clk_src = GMAC_CLK_SRC_MII;
 		pit = GMAC_CLK_PIT_MII;
-		txc_div = EMAC_TXC_DIV_CFG_25MHZ;
 		break;
 	case CLK_IDX_RGMII:
 		clk_src = GMAC_CLK_SRC_RGMII;
 		pit = GMAC_CLK_PIT_RGMII;
-		txc_div = EMAC_TXC_DIV_CFG_125MHZ;
 		break;
 	default:
 		return (ENXIO);
@@ -273,7 +269,5 @@ static driver_t aw_gmacclk_driver = {
 	0
 };
 
-static devclass_t aw_gmacclk_devclass;
-
-EARLY_DRIVER_MODULE(aw_gmacclk, simplebus, aw_gmacclk_driver,
-    aw_gmacclk_devclass, 0, 0, BUS_PASS_RESOURCE + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(aw_gmacclk, simplebus, aw_gmacclk_driver, 0, 0,
+    BUS_PASS_RESOURCE + BUS_PASS_ORDER_MIDDLE);

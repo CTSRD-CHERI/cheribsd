@@ -104,6 +104,8 @@ static uint64_t		rpctls_ssl_usec = 0;
 static bool		rpctls_cnuser = false;
 static char		*rpctls_dnsname;
 static const char	*rpctls_cnuseroid = "1.3.6.1.4.1.2238.1.1.1";
+static const char	*rpctls_ciphers = NULL;
+static int		rpctls_mintls = TLS1_3_VERSION;
 
 static void		rpctlssd_terminate(int);
 static SSL_CTX		*rpctls_setup_ssl(const char *certdir);
@@ -118,6 +120,8 @@ static void		rpctls_huphandler(int sig __unused);
 extern void		rpctlssd_1(struct svc_req *rqstp, SVCXPRT *transp);
 
 static struct option longopts[] = {
+	{ "allowtls1_2",	no_argument,		NULL,	'2' },
+	{ "ciphers",		required_argument,	NULL,	'C' },
 	{ "certdir",		required_argument,	NULL,	'D' },
 	{ "debuglevel",		no_argument,		NULL,	'd' },
 	{ "checkhost",		no_argument,		NULL,	'h' },
@@ -142,7 +146,7 @@ main(int argc, char **argv)
 	 * TLS handshake.
 	 */
 	struct sockaddr_un sun;
-	int ch, debug, fd, oldmask;
+	int ch, fd, oldmask;
 	SVCXPRT *xprt;
 	struct timeval tm;
 	struct timezone tz;
@@ -177,11 +181,16 @@ main(int argc, char **argv)
 		rpctls_dnsname = hostname;
 	}
 
-	debug = 0;
 	rpctls_verbose = false;
-	while ((ch = getopt_long(argc, argv, "D:dhl:n:mp:r:uvWw", longopts,
+	while ((ch = getopt_long(argc, argv, "2C:D:dhl:n:mp:r:uvWw", longopts,
 	    NULL)) != -1) {
 		switch (ch) {
+		case '2':
+			rpctls_mintls = TLS1_2_VERSION;
+			break;
+		case 'C':
+			rpctls_ciphers = optarg;
+			break;
 		case 'D':
 			rpctls_certdir = optarg;
 			break;
@@ -228,6 +237,8 @@ main(int argc, char **argv)
 			break;
 		default:
 			fprintf(stderr, "usage: %s "
+			    "[-2/--allowtls1_2] "
+			    "[-C/--ciphers available_ciphers] "
 			    "[-D/--certdir certdir] [-d/--debuglevel] "
 			    "[-h/--checkhost] "
 			    "[-l/--verifylocs CAfile] [-m/--mutualverf] "
@@ -559,14 +570,33 @@ rpctls_setup_ssl(const char *certdir)
 	}
 	SSL_CTX_set_ecdh_auto(ctx, 1);
 
-	/*
-	 * Set preferred ciphers, since KERN_TLS only supports a
-	 * few of them.
-	 */
-	ret = SSL_CTX_set_cipher_list(ctx, _PREFERRED_CIPHERS);
+	if (rpctls_ciphers != NULL) {
+		/*
+		 * Set available ciphers, since KERN_TLS only supports a
+		 * few of them.  Normally, not doing this should be ok,
+		 * since the library defaults will work.
+		 */
+		ret = SSL_CTX_set_ciphersuites(ctx, rpctls_ciphers);
+		if (ret == 0) {
+			rpctls_verbose_out("rpctls_setup_ssl: "
+			    "SSL_CTX_set_ciphersuites failed: %s\n",
+			    rpctls_ciphers);
+			SSL_CTX_free(ctx);
+			return (NULL);
+		}
+	}
+
+	ret = SSL_CTX_set_min_proto_version(ctx, rpctls_mintls);
 	if (ret == 0) {
 		rpctls_verbose_out("rpctls_setup_ssl: "
-		    "SSL_CTX_set_cipher_list failed to set any ciphers\n");
+		    "SSL_CTX_set_min_proto_version failed\n");
+		SSL_CTX_free(ctx);
+		return (NULL);
+	}
+	ret = SSL_CTX_set_max_proto_version(ctx, TLS1_3_VERSION);
+	if (ret == 0) {
+		rpctls_verbose_out("rpctls_setup_ssl: "
+		    "SSL_CTX_set_max_proto_version failed\n");
 		SSL_CTX_free(ctx);
 		return (NULL);
 	}
@@ -636,7 +666,12 @@ rpctls_setup_ssl(const char *certdir)
 		SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER,
 		    rpctls_verify_callback);
 	}
+#ifdef SSL_OP_ENABLE_KTLS
+	SSL_CTX_set_options(ctx, SSL_OP_ENABLE_KTLS);
+#endif
+#ifdef SSL_MODE_NO_KTLS_TX
 	SSL_CTX_clear_mode(ctx, SSL_MODE_NO_KTLS_TX | SSL_MODE_NO_KTLS_RX);
+#endif
 	return (ctx);
 }
 
@@ -674,13 +709,23 @@ rpctls_server(SSL_CTX *ctx, int s, uint32_t *flags, uint32_t *uidp,
 		return (NULL);
 	}
 	*flags |= RPCTLS_FLAGS_HANDSHAKE;
+	if (rpctls_verbose) {
+		gethostret = rpctls_gethost(s, sad, hostnam, sizeof(hostnam));
+		if (gethostret == 0)
+			hostnam[0] = '\0';
+		rpctls_verbose_out("rpctls_server: SSL handshake ok for host %s"
+		    " <%s %s>\n", hostnam, SSL_get_version(ssl),
+		    SSL_get_cipher(ssl));
+	}
 	if (rpctls_do_mutual) {
 		cert = SSL_get_peer_certificate(ssl);
 		if (cert != NULL) {
-			gethostret = rpctls_gethost(s, sad, hostnam,
-			    sizeof(hostnam));
-			if (gethostret == 0)
-				hostnam[0] = '\0';
+			if (!rpctls_verbose) {
+				gethostret = rpctls_gethost(s, sad, hostnam,
+				    sizeof(hostnam));
+				if (gethostret == 0)
+					hostnam[0] = '\0';
+			}
 			cp2 = X509_NAME_oneline(
 			    X509_get_subject_name(cert), NULL, 0);
 			*flags |= RPCTLS_FLAGS_GOTCERT;

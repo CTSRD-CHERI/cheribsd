@@ -51,6 +51,9 @@
 /* LLVM name for the native target MC init function, if available */
 /* #undef LLVM_NATIVE_TARGETMC */
 
+/* LLVM name for the native target MCA init function, if available */
+/* #undef LLVM_NATIVE_TARGETMCA */
+
 /* Define if this is Unixish platform */
 #define LLVM_ON_UNIX 1
 
@@ -64,16 +67,16 @@
 #define LLVM_USE_PERF 0
 
 /* Major version of the LLVM API */
-#define LLVM_VERSION_MAJOR 11
+#define LLVM_VERSION_MAJOR 14
 
 /* Minor version of the LLVM API */
 #define LLVM_VERSION_MINOR 0
 
 /* Patch version of the LLVM API */
-#define LLVM_VERSION_PATCH 1
+#define LLVM_VERSION_PATCH 5
 
 /* LLVM version string */
-#define LLVM_VERSION_STRING "11.0.1"
+#define LLVM_VERSION_STRING "14.0.5"
 
 /* Whether LLVM records statistics for use with GetStatistics(),
  * PrintStatistics() or PrintStatisticsJSON()
@@ -83,7 +86,33 @@
 /* Define if we have z3 and want to build it */
 /* #undef LLVM_WITH_Z3 */
 
+/* Define if we have curl and want to use it */
+/* #undef LLVM_ENABLE_CURL */
+
+/* Define if zlib compression is available */
+#define LLVM_ENABLE_ZLIB 1
+
 /* Define if LLVM was built with a dependency to the libtensorflow dynamic library */
 /* #undef LLVM_HAVE_TF_API */
+
+/* Define to 1 if you have the <sysexits.h> header file. */
+#define HAVE_SYSEXITS_H 1
+
+/* Define to 1 to enable the experimental new pass manager by default */
+#define LLVM_ENABLE_NEW_PASS_MANAGER 1
+
+/* Define if the xar_open() function is supported on this platform. */
+#if defined(__APPLE__)
+#define LLVM_HAVE_LIBXAR 1
+#endif
+
+/* Define if building libLLVM shared library */
+/* #undef LLVM_BUILD_LLVM_DYLIB */
+
+/* Define if building LLVM with BUILD_SHARED_LIBS */
+/* #undef LLVM_BUILD_SHARED_LIBS */
+
+/* Define if building LLVM with LLVM_FORCE_USE_OLD_TOOLCHAIN_LIBS */
+/* #undef LLVM_FORCE_USE_OLD_TOOLCHAIN */
 
 #endif

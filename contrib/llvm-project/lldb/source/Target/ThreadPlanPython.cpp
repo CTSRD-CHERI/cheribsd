@@ -25,19 +25,15 @@ using namespace lldb_private;
 
 // ThreadPlanPython
 
-ThreadPlanPython::ThreadPlanPython(Thread &thread, const char *class_name, 
-                                   StructuredDataImpl *args_data)
+ThreadPlanPython::ThreadPlanPython(Thread &thread, const char *class_name,
+                                   const StructuredDataImpl &args_data)
     : ThreadPlan(ThreadPlan::eKindPython, "Python based Thread Plan", thread,
                  eVoteNoOpinion, eVoteNoOpinion),
-      m_class_name(class_name), m_args_data(args_data), m_did_push(false) {
-  SetIsMasterPlan(true);
+      m_class_name(class_name), m_args_data(args_data), m_did_push(false),
+      m_stop_others(false) {
+  SetIsControllingPlan(true);
   SetOkayToDiscard(true);
   SetPrivate(false);
-}
-
-ThreadPlanPython::~ThreadPlanPython() {
-  // FIXME, do I need to decrement the ref count on this implementation object
-  // to make it go away?
 }
 
 bool ThreadPlanPython::ValidatePlan(Stream *error) {
@@ -162,13 +158,6 @@ lldb::StateType ThreadPlanPython::GetPlanRunState() {
 }
 
 // The ones below are not currently exported to Python.
-
-bool ThreadPlanPython::StopOthers() {
-  // For now Python plans run all threads, but we should add some controls for
-  // this.
-  return false;
-}
-
 void ThreadPlanPython::GetDescription(Stream *s, lldb::DescriptionLevel level) {
   s->Printf("Python thread plan implemented by class %s.",
             m_class_name.c_str());

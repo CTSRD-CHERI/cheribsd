@@ -368,7 +368,7 @@
 #define	FREEBSD64_SYS_freebsd64_getcontext	421
 #define	FREEBSD64_SYS_freebsd64_setcontext	422
 #define	FREEBSD64_SYS_freebsd64_swapcontext	423
-#define	FREEBSD64_SYS_freebsd64_swapoff	424
+#define	FREEBSD64_SYS_freebsd13_freebsd64_swapoff	424
 #define	FREEBSD64_SYS_freebsd64___acl_get_link	425
 #define	FREEBSD64_SYS_freebsd64___acl_set_link	426
 #define	FREEBSD64_SYS_freebsd64___acl_delete_link	427
@@ -378,6 +378,8 @@
 #define	FREEBSD64_SYS_freebsd64_thr_exit	431
 #define	FREEBSD64_SYS_freebsd64_thr_self	432
 #define	FREEBSD64_SYS_thr_kill	433
+#define	FREEBSD64_SYS_freebsd10_freebsd64__umtx_lock	434
+#define	FREEBSD64_SYS_freebsd10_freebsd64__umtx_unlock	435
 #define	FREEBSD64_SYS_jail_attach	436
 #define	FREEBSD64_SYS_freebsd64_extattr_list_fd	437
 #define	FREEBSD64_SYS_freebsd64_extattr_list_file	438
@@ -485,8 +487,6 @@
 #define	FREEBSD64_SYS_freebsd64_ppoll	545
 #define	FREEBSD64_SYS_freebsd64_futimens	546
 #define	FREEBSD64_SYS_freebsd64_utimensat	547
-				/* 548 is obsolete numa_getaffinity */
-				/* 549 is obsolete numa_setaffinity */
 #define	FREEBSD64_SYS_fdatasync	550
 #define	FREEBSD64_SYS_freebsd64_fstat	551
 #define	FREEBSD64_SYS_freebsd64_fstatat	552
@@ -517,4 +517,7 @@
 #define	FREEBSD64_SYS_freebsd64___specialfd	577
 #define	FREEBSD64_SYS_freebsd64_aio_writev	578
 #define	FREEBSD64_SYS_freebsd64_aio_readv	579
-#define	FREEBSD64_SYS_MAXSYSCALL	580
+#define	FREEBSD64_SYS_freebsd64_fspacectl	580
+#define	FREEBSD64_SYS_sched_getcpu	581
+#define	FREEBSD64_SYS_freebsd64_swapoff	582
+#define	FREEBSD64_SYS_MAXSYSCALL	583

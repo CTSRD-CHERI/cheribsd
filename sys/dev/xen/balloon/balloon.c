@@ -177,7 +177,7 @@ increase_reservation(unsigned long nr_pages)
 		XENMEM_populate_physmap, &reservation);
 	if (rc < nr_pages) {
 		if (rc > 0) {
-			int ret;
+			int ret __diagused;
 
 			/* We hit the Xen hard limit: reprobe. */
 			reservation.nr_extents = rc;
@@ -215,7 +215,7 @@ decrease_reservation(unsigned long nr_pages)
 	unsigned long  i;
 	vm_page_t      page;
 	int            need_sleep = 0;
-	int ret;
+	int ret __diagused;
 	struct xen_memory_reservation reservation = {
 		.address_bits = 0,
 		.extent_order = 0,
@@ -228,23 +228,16 @@ decrease_reservation(unsigned long nr_pages)
 		nr_pages = nitems(frame_list);
 
 	for (i = 0; i < nr_pages; i++) {
-		if ((page = vm_page_alloc(NULL, 0, 
-			    VM_ALLOC_NORMAL | VM_ALLOC_NOOBJ | 
-			    VM_ALLOC_ZERO)) == NULL) {
+		/*
+		 * Zero the page, or else we might be leaking important data to
+		 * other domains on the same host. Xen doesn't scrub ballooned
+		 * out memory pages, the guest is in charge of making sure that
+		 * no information is leaked.
+		 */
+		if ((page = vm_page_alloc_noobj(VM_ALLOC_ZERO)) == NULL) {
 			nr_pages = i;
 			need_sleep = 1;
 			break;
-		}
-
-		if ((page->flags & PG_ZERO) == 0) {
-			/*
-			 * Zero the page, or else we might be leaking
-			 * important data to other domains on the same
-			 * host. Xen doesn't scrub ballooned out memory
-			 * pages, the guest is in charge of making
-			 * sure that no information is leaked.
-			 */
-			pmap_zero_page(page);
 		}
 
 		frame_list[i] = (VM_PAGE_TO_PHYS(page) >> PAGE_SHIFT);
@@ -415,7 +408,5 @@ static device_method_t xenballoon_methods[] = {
 };
 
 DEFINE_CLASS_0(xenballoon, xenballoon_driver, xenballoon_methods, 0);
-devclass_t xenballoon_devclass;
 
-DRIVER_MODULE(xenballoon, xenstore, xenballoon_driver, xenballoon_devclass,
-    NULL, NULL);
+DRIVER_MODULE(xenballoon, xenstore, xenballoon_driver, NULL, NULL);

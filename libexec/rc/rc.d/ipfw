@@ -47,12 +47,25 @@ ipfw_prestart()
 
 ipfw_start()
 {
-	local   _firewall_type
+	local   _firewall_type _module _sysctl_reload
 
 	if [ -n "${1}" ]; then
 		_firewall_type=$1
 	else
 		_firewall_type=${firewall_type}
+	fi
+
+	_sysctl_reload=no
+	for _module in ${required_modules}
+	do
+		if kldstat -qn ${_module}; then
+			_sysctl_reload=yes
+			break
+		fi
+	done
+
+	if [ ${_sysctl_reload} = yes ]; then
+		/etc/rc.d/sysctl reload
 	fi
 
 	# set the firewall rules script if none was specified
@@ -74,8 +87,14 @@ ipfw_start()
 		${SYSCTL} net.inet.ip.fw.verbose=1 >/dev/null
 	fi
 	if checkyesno firewall_logif; then
-		ifconfig ipfw0 create
-		echo 'Firewall logging pseudo-interface (ipfw0) created.'
+		if ! ifconfig ipfw0 >/dev/null 2>&1; then
+			ifconfig ipfw0 create
+			echo 'Firewall logging pseudo-interface (ipfw0)' \
+			    'created.'
+		else
+			echo 'Firewall logging pseudo-interface (ipfw0)' \
+			    'already created.'
+		fi
 	fi
 }
 

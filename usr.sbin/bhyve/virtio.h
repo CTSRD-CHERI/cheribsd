@@ -168,9 +168,25 @@
 #define	VIRTIO_DEV_NET		0x1000
 #define	VIRTIO_DEV_BLOCK	0x1001
 #define	VIRTIO_DEV_CONSOLE	0x1003
+#define	VIRTIO_DEV_SCSI		0x1004
 #define	VIRTIO_DEV_RANDOM	0x1005
-#define	VIRTIO_DEV_SCSI		0x1008
 #define	VIRTIO_DEV_9P		0x1009
+#define VIRTIO_DEV_INPUT	0x1052
+
+/*
+ * PCI revision IDs
+ */
+#define VIRTIO_REV_INPUT	1
+
+/*
+ * PCI subvendor IDs
+ */
+#define VIRTIO_SUBVEN_INPUT	0x108E
+
+/*
+ * PCI subdevice IDs
+ */
+#define VIRTIO_SUBDEV_INPUT	0x1100
 
 /* From section 2.3, "Virtqueue Configuration", of the virtio specification */
 static inline int
@@ -332,22 +348,33 @@ vq_has_descs(struct vqueue_info *vq)
 }
 
 /*
- * Deliver an interrupt to guest on the given virtual queue
- * (if possible, or a generic MSI interrupt if not using MSI-X).
+ * Deliver an interrupt to the guest for a specific MSI-X queue or
+ * event.
+ */
+static inline void
+vi_interrupt(struct virtio_softc *vs, uint8_t isr, uint16_t msix_idx)
+{
+
+	if (pci_msix_enabled(vs->vs_pi))
+		pci_generate_msix(vs->vs_pi, msix_idx);
+	else {
+		VS_LOCK(vs);
+		vs->vs_isr |= isr;
+		pci_generate_msi(vs->vs_pi, 0);
+		pci_lintr_assert(vs->vs_pi);
+		VS_UNLOCK(vs);
+	}
+}
+
+/*
+ * Deliver an interrupt to the guest on the given virtual queue (if
+ * possible, or a generic MSI interrupt if not using MSI-X).
  */
 static inline void
 vq_interrupt(struct virtio_softc *vs, struct vqueue_info *vq)
 {
 
-	if (pci_msix_enabled(vs->vs_pi))
-		pci_generate_msix(vs->vs_pi, vq->vq_msix_idx);
-	else {
-		VS_LOCK(vs);
-		vs->vs_isr |= VIRTIO_PCI_ISR_INTR;
-		pci_generate_msi(vs->vs_pi, 0);
-		pci_lintr_assert(vs->vs_pi);
-		VS_UNLOCK(vs);
-	}
+	vi_interrupt(vs, VIRTIO_PCI_ISR_INTR, vq->vq_msix_idx);
 }
 
 static inline void

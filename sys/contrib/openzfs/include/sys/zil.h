@@ -162,7 +162,8 @@ typedef enum zil_create {
 #define	TX_MKDIR_ATTR		18	/* mkdir with attr */
 #define	TX_MKDIR_ACL_ATTR	19	/* mkdir with ACL + attrs */
 #define	TX_WRITE2		20	/* dmu_sync EALREADY write */
-#define	TX_MAX_TYPE		21	/* Max transaction type */
+#define	TX_SETSAXATTR		21	/* Set sa xattrs on file */
+#define	TX_MAX_TYPE		22	/* Max transaction type */
 
 /*
  * The transactions for mkdir, symlink, remove, rmdir, link, and rename
@@ -182,7 +183,8 @@ typedef enum zil_create {
 	(txtype) == TX_SETATTR ||	\
 	(txtype) == TX_ACL_V0 ||	\
 	(txtype) == TX_ACL ||		\
-	(txtype) == TX_WRITE2)
+	(txtype) == TX_WRITE2 ||	\
+	(txtype) == TX_SETSAXATTR)
 
 /*
  * The number of dnode slots consumed by the object is stored in the 8
@@ -222,6 +224,15 @@ typedef struct {
 } lr_ooo_t;
 
 /*
+ * Additional lr_attr_t fields.
+ */
+typedef struct {
+	uint64_t	lr_attr_attrs;		/* all of the attributes */
+	uint64_t	lr_attr_crtime[2];	/* create time */
+	uint8_t		lr_attr_scanstamp[32];
+} lr_attr_end_t;
+
+/*
  * Handle option extended vattr attributes.
  *
  * Whenever new attributes are added the version number
@@ -231,7 +242,7 @@ typedef struct {
 typedef struct {
 	uint32_t	lr_attr_masksize; /* number of elements in array */
 	uint32_t	lr_attr_bitmap; /* First entry of array */
-	/* remainder of array and any additional fields */
+	/* remainder of array and additional lr_attr_end_t fields */
 } lr_attr_t;
 
 /*
@@ -334,6 +345,13 @@ typedef struct {
 	uint64_t	lr_mtime[2];	/* modification time */
 	/* optional attribute lr_attr_t may be here */
 } lr_setattr_t;
+
+typedef struct {
+	lr_t		lr_common;	/* common portion of log record */
+	uint64_t	lr_foid;	/* file object to change attributes */
+	uint64_t	lr_size;
+	/* xattr name and value follows */
+} lr_setsaxattr_t;
 
 typedef struct {
 	lr_t		lr_common;	/* common portion of log record */
@@ -456,8 +474,6 @@ typedef struct zil_stats {
 	kstat_named_t zil_itx_metaslab_slog_bytes;
 } zil_stats_t;
 
-extern zil_stats_t zil_stats;
-
 #define	ZIL_STAT_INCR(stat, val) \
     atomic_add_64(&zil_stats.stat.value.ui64, (val));
 #define	ZIL_STAT_BUMP(stat) \
@@ -485,7 +501,7 @@ extern zilog_t	*zil_open(objset_t *os, zil_get_data_t *get_data);
 extern void	zil_close(zilog_t *zilog);
 
 extern void	zil_replay(objset_t *os, void *arg,
-    zil_replay_func_t *replay_func[TX_MAX_TYPE]);
+    zil_replay_func_t *const replay_func[TX_MAX_TYPE]);
 extern boolean_t zil_replaying(zilog_t *zilog, dmu_tx_t *tx);
 extern void	zil_destroy(zilog_t *zilog, boolean_t keep_first);
 extern void	zil_destroy_sync(zilog_t *zilog, dmu_tx_t *tx);

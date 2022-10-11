@@ -20,9 +20,9 @@ SRCS+=		asan/asan_interceptors_memintrinsics.cpp
 SRCS+=		asan/asan_linux.cpp
 SRCS+=		asan/asan_malloc_linux.cpp
 SRCS+=		asan/asan_memory_profile.cpp
-SRCS+=		asan/asan_new_delete.cpp
 SRCS+=		asan/asan_poisoning.cpp
 SRCS+=		asan/asan_posix.cpp
+SRCS+=		asan/asan_preinit.cpp
 SRCS+=		asan/asan_premap_shadow.cpp
 SRCS+=		asan/asan_report.cpp
 SRCS+=		asan/asan_rtl.cpp
@@ -37,6 +37,7 @@ SRCS+=		sanitizer_common/sancov_flags.cpp
 SRCS+=		sanitizer_common/sanitizer_allocator.cpp
 SRCS+=		sanitizer_common/sanitizer_allocator_checks.cpp
 SRCS+=		sanitizer_common/sanitizer_allocator_report.cpp
+SRCS+=		sanitizer_common/sanitizer_chained_origin_depot.cpp
 SRCS+=		sanitizer_common/sanitizer_common.cpp
 SRCS+=		sanitizer_common/sanitizer_common_libcdep.cpp
 SRCS+=		sanitizer_common/sanitizer_coverage_libcdep_new.cpp
@@ -50,7 +51,7 @@ SRCS+=		sanitizer_common/sanitizer_libc.cpp
 SRCS+=		sanitizer_common/sanitizer_libignore.cpp
 SRCS+=		sanitizer_common/sanitizer_linux.cpp
 SRCS+=		sanitizer_common/sanitizer_linux_libcdep.cpp
-SRCS+=		sanitizer_common/sanitizer_persistent_allocator.cpp
+SRCS+=		sanitizer_common/sanitizer_mutex.cpp
 SRCS+=		sanitizer_common/sanitizer_platform_limits_freebsd.cpp
 SRCS+=		sanitizer_common/sanitizer_platform_limits_linux.cpp
 SRCS+=		sanitizer_common/sanitizer_platform_limits_posix.cpp
@@ -59,6 +60,7 @@ SRCS+=		sanitizer_common/sanitizer_posix_libcdep.cpp
 SRCS+=		sanitizer_common/sanitizer_printf.cpp
 SRCS+=		sanitizer_common/sanitizer_procmaps_bsd.cpp
 SRCS+=		sanitizer_common/sanitizer_procmaps_common.cpp
+SRCS+=		sanitizer_common/sanitizer_stack_store.cpp
 SRCS+=		sanitizer_common/sanitizer_stackdepot.cpp
 SRCS+=		sanitizer_common/sanitizer_stacktrace.cpp
 SRCS+=		sanitizer_common/sanitizer_stacktrace_libcdep.cpp
@@ -77,11 +79,8 @@ SRCS+=		sanitizer_common/sanitizer_unwind_linux_libcdep.cpp
 SRCS+=		ubsan/ubsan_diag.cpp
 SRCS+=		ubsan/ubsan_flags.cpp
 SRCS+=		ubsan/ubsan_handlers.cpp
-SRCS+=		ubsan/ubsan_handlers_cxx.cpp
 SRCS+=		ubsan/ubsan_init.cpp
 SRCS+=		ubsan/ubsan_monitor.cpp
-SRCS+=		ubsan/ubsan_type_hash.cpp
-SRCS+=		ubsan/ubsan_type_hash_itanium.cpp
 SRCS+=		ubsan/ubsan_value.cpp
 
 # Kludge around a bsd.lib.mk shortcoming: when SHLIB_NAME is defined, but LIB
@@ -91,7 +90,3 @@ SRCS+=		ubsan/ubsan_value.cpp
 CC=		${CXX}
 
 .include <bsd.lib.mk>
-
-CXXFLAGS.ubsan_handlers_cxx.cpp=		-frtti
-CXXFLAGS.ubsan_type_hash.cpp=		-frtti
-CXXFLAGS.ubsan_type_hash_itanium.cpp=	-frtti

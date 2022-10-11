@@ -12,8 +12,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef LLVM_CODEGEN_COMMANDFLAGS_H
+#define LLVM_CODEGEN_COMMANDFLAGS_H
+
 #include "llvm/ADT/FloatingPointMode.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/MC/MCTargetOptionsCommandFlags.h"
@@ -44,12 +48,11 @@ Optional<CodeModel::Model> getExplicitCodeModel();
 
 llvm::ExceptionHandling getExceptionModel();
 
-CodeGenFileType getFileType();
 Optional<CodeGenFileType> getExplicitFileType();
 
 CodeGenFileType getFileType();
 
-llvm::FramePointer::FP getFramePointerUsage();
+FramePointerKind getFramePointerUsage();
 
 bool getEnableUnsafeFPMath();
 
@@ -70,9 +73,13 @@ llvm::FloatABI::ABIType getFloatABIForCalls();
 
 llvm::FPOpFusion::FPOpFusionMode getFuseFPOps();
 
+SwiftAsyncFramePointerMode getSwiftAsyncFramePointer();
+
 bool getDontPlaceZerosInBSS();
 
 bool getEnableGuaranteedTailCallOpt();
+
+bool getEnableAIXExtendedAltivecABI();
 
 bool getDisableTailCalls();
 
@@ -94,6 +101,10 @@ Optional<bool> getExplicitDataSections();
 bool getFunctionSections();
 Optional<bool> getExplicitFunctionSections();
 
+bool getIgnoreXCOFFVisibility();
+
+bool getXCOFFTracebackTable();
+
 std::string getBBSections();
 
 unsigned getTLSSize();
@@ -114,11 +125,20 @@ bool getEnableAddrsig();
 
 bool getEmitCallSiteInfo();
 
+bool getEnableMachineFunctionSplitter();
+
 bool getEnableDebugEntryValues();
+
+bool getValueTrackingVariableLocations();
+Optional<bool> getExplicitValueTrackingVariableLocations();
 
 bool getForceDwarfFrameSection();
 
 bool getXRayOmitFunctionIndex();
+
+bool getDebugStrictDwarf();
+
+unsigned getAlignLoops();
 
 /// Create this object with static storage to register codegen-related command
 /// line options.
@@ -128,9 +148,13 @@ struct RegisterCodeGenFlags {
 
 llvm::BasicBlockSection getBBSectionsMode(llvm::TargetOptions &Options);
 
-// Common utility function tightly tied to the options listed here. Initializes
-// a TargetOptions object with CodeGen flags and returns it.
-TargetOptions InitTargetOptionsFromCodeGenFlags();
+/// Common utility function tightly tied to the options listed here. Initializes
+/// a TargetOptions object with CodeGen flags and returns it.
+/// \p TheTriple is used to determine the default value for options if
+///    options are not explicitly specified. If those triple dependant options
+///    value do not have effect for your component, a default Triple() could be
+///    passed in.
+TargetOptions InitTargetOptionsFromCodeGenFlags(const llvm::Triple &TheTriple);
 
 std::string getCPUStr();
 
@@ -147,5 +171,11 @@ void setFunctionAttributes(StringRef CPU, StringRef Features, Function &F);
 /// Set function attributes of functions in Module M based on CPU,
 /// Features, and command line flags.
 void setFunctionAttributes(StringRef CPU, StringRef Features, Module &M);
+
+/// Should value-tracking variable locations / instruction referencing be
+/// enabled by default for this triple?
+bool getDefaultValueTrackingVariableLocations(const llvm::Triple &T);
 } // namespace codegen
 } // namespace llvm
+
+#endif // LLVM_CODEGEN_COMMANDFLAGS_H

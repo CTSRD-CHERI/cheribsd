@@ -58,7 +58,7 @@ void tools::CrossWindows::Assembler::ConstructJob(
   Exec = Args.MakeArgString(Assembler);
 
   C.addCommand(std::make_unique<Command>(JA, *this, ResponseFileSupport::None(),
-                                         Exec, CmdArgs, Inputs));
+                                         Exec, CmdArgs, Inputs, Output));
 }
 
 void tools::CrossWindows::Linker::ConstructJob(
@@ -185,7 +185,7 @@ void tools::CrossWindows::Linker::ConstructJob(
     }
   }
 
-  if (TC.getSanitizerArgs().needsAsanRt()) {
+  if (TC.getSanitizerArgs(Args).needsAsanRt()) {
     // TODO handle /MT[d] /MD[d]
     if (Args.hasArg(options::OPT_shared)) {
       CmdArgs.push_back(TC.getCompilerRTArgString(Args, "asan_dll_thunk"));
@@ -203,8 +203,9 @@ void tools::CrossWindows::Linker::ConstructJob(
 
   Exec = Args.MakeArgString(TC.GetLinkerPath());
 
-  C.addCommand(std::make_unique<Command>(
-      JA, *this, ResponseFileSupport::AtFileUTF8(), Exec, CmdArgs, Inputs));
+  C.addCommand(std::make_unique<Command>(JA, *this,
+                                         ResponseFileSupport::AtFileUTF8(),
+                                         Exec, CmdArgs, Inputs, Output));
 }
 
 CrossWindowsToolChain::CrossWindowsToolChain(const Driver &D,
@@ -222,7 +223,7 @@ bool CrossWindowsToolChain::isPICDefault() const {
   return getArch() == llvm::Triple::x86_64;
 }
 
-bool CrossWindowsToolChain::isPIEDefault() const {
+bool CrossWindowsToolChain::isPIEDefault(const llvm::opt::ArgList &Args) const {
   return getArch() == llvm::Triple::x86_64;
 }
 
@@ -270,10 +271,10 @@ AddClangCXXStdlibIncludeArgs(const llvm::opt::ArgList &DriverArgs,
 }
 
 void CrossWindowsToolChain::
-AddCXXStdlibLibArgs(const llvm::opt::ArgList &DriverArgs,
-                    llvm::opt::ArgStringList &CC1Args) const {
-  if (GetCXXStdlibType(DriverArgs) == ToolChain::CST_Libcxx)
-    CC1Args.push_back("-lc++");
+AddCXXStdlibLibArgs(const llvm::opt::ArgList &Args,
+                    llvm::opt::ArgStringList &CmdArgs) const {
+  if (GetCXXStdlibType(Args) == ToolChain::CST_Libcxx)
+    CmdArgs.push_back("-lc++");
 }
 
 clang::SanitizerMask CrossWindowsToolChain::getSupportedSanitizers() const {

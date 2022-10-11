@@ -52,7 +52,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
-#include <sys/module.h>
 #include <sys/mount.h>
 #include <sys/proc.h>
 #include <sys/socket.h>
@@ -119,7 +118,7 @@ static void	nfs_decode_args(struct mount *mp, struct nfsmount *nmp,
 static int	mountnfs(struct nfs_args *, struct mount *,
 		    struct sockaddr *, char *, u_char *, int, u_char *, int,
 		    u_char *, int, struct vnode **, struct ucred *,
-		    struct thread *, int, int, int, uint32_t, char *);
+		    struct thread *, int, int, int, uint32_t, char *, int);
 static void	nfs_getnlminfo(struct vnode *, uint8_t *, size_t *,
 		    struct sockaddr_storage *, int *, off_t *,
 		    struct timeval *);
@@ -148,14 +147,17 @@ static struct vfsops nfs_vfsops = {
 	.vfs_sysctl =		nfs_sysctl,
 	.vfs_purge =		nfs_purge,
 };
+/*
+ * This macro declares that the file system type is named "nfs".
+ * It also declares a module name of "nfs" and uses vfs_modevent()
+ * as the event handling function.
+ * The main module declaration is found in sys/fs/nfsclient/nfs_clport.c
+ * for "nfscl" and is needed so that a custom event handling
+ * function gets called.  MODULE_DEPEND() macros are found there.
+ */
 VFS_SET(nfs_vfsops, nfs, VFCF_NETWORK | VFCF_SBDRY);
 
-/* So that loader and kldload(2) can find us, wherever we are.. */
 MODULE_VERSION(nfs, 1);
-MODULE_DEPEND(nfs, nfscommon, 1, 1, 1);
-MODULE_DEPEND(nfs, krpc, 1, 1, 1);
-MODULE_DEPEND(nfs, nfssvc, 1, 1, 1);
-MODULE_DEPEND(nfs, xdr, 1, 1, 1);
 
 /*
  * This structure is now defined in sys/nfs/nfs_diskless.c so that it
@@ -307,14 +309,14 @@ nfs_statfs(struct mount *mp, struct statfs *sbp)
 	if (NFSHASNFSV3(nmp) && !NFSHASGOTFSINFO(nmp)) {
 		mtx_unlock(&nmp->nm_mtx);
 		error = nfsrpc_fsinfo(vp, &fs, td->td_ucred, td, &nfsva,
-		    &attrflag, NULL);
+		    &attrflag);
 		if (!error)
 			gotfsinfo = 1;
 	} else
 		mtx_unlock(&nmp->nm_mtx);
 	if (!error)
 		error = nfsrpc_statfs(vp, &sb, &fs, td->td_ucred, td, &nfsva,
-		    &attrflag, NULL);
+		    &attrflag);
 	if (error != 0)
 		NFSCL_DEBUG(2, "statfs=%d\n", error);
 	if (attrflag == 0) {
@@ -336,7 +338,7 @@ nfs_statfs(struct mount *mp, struct statfs *sbp)
 			nfsva.na_vattr.va_size = 512 * 1024;
 		}
 	}
-	(void) nfscl_loadattrcache(&vp, &nfsva, NULL, NULL, 0, 1);
+	(void) nfscl_loadattrcache(&vp, &nfsva, NULL, 0, 1);
 	if (!error) {
 	    mtx_lock(&nmp->nm_mtx);
 	    if (gotfsinfo || (nmp->nm_flag & NFSMNT_NFSV4))
@@ -368,11 +370,10 @@ ncl_fsinfo(struct nfsmount *nmp, struct vnode *vp, struct ucred *cred,
 	struct nfsvattr nfsva;
 	int error, attrflag;
 
-	error = nfsrpc_fsinfo(vp, &fs, cred, td, &nfsva, &attrflag, NULL);
+	error = nfsrpc_fsinfo(vp, &fs, cred, td, &nfsva, &attrflag);
 	if (!error) {
 		if (attrflag)
-			(void) nfscl_loadattrcache(&vp, &nfsva, NULL, NULL, 0,
-			    1);
+			(void) nfscl_loadattrcache(&vp, &nfsva, NULL, 0, 1);
 		mtx_lock(&nmp->nm_mtx);
 		nfscl_loadfsinfo(nmp, &fs);
 		mtx_unlock(&nmp->nm_mtx);
@@ -546,7 +547,7 @@ nfs_mountdiskless(char *path,
 	nam = sodupsockaddr((struct sockaddr *)sin, M_WAITOK);
 	if ((error = mountnfs(args, mp, nam, path, NULL, 0, dirpath, dirlen,
 	    NULL, 0, vpp, td->td_ucred, td, NFS_DEFAULT_NAMETIMEO, 
-	    NFS_DEFAULT_NEGNAMETIMEO, 0, 0, NULL)) != 0) {
+	    NFS_DEFAULT_NEGNAMETIMEO, 0, 0, NULL, 0)) != 0) {
 		printf("nfs_mountroot: mount %s on /: %d\n", path, error);
 		return (error);
 	}
@@ -713,14 +714,14 @@ nfs_decode_args(struct mount *mp, struct nfsmount *nmp, struct nfs_args *argp,
 				haslock = 1;
 		}
 		if (!error) {
-		    newnfs_disconnect(&nmp->nm_sockreq);
+		    newnfs_disconnect(nmp, &nmp->nm_sockreq);
 		    if (haslock)
 			newnfs_sndunlock(&nmp->nm_sockreq.nr_lock);
 		    nmp->nm_sotype = argp->sotype;
 		    nmp->nm_soproto = argp->proto;
 		    if (nmp->nm_sotype == SOCK_DGRAM)
 			while (newnfs_connect(nmp, &nmp->nm_sockreq,
-			    cred, td, 0, false)) {
+			    cred, td, 0, false, &nmp->nm_sockreq.nr_client)) {
 				printf("newnfs_args: retrying connect\n");
 				(void) nfs_catnap(PSOCK, 0, "nfscon");
 			}
@@ -748,7 +749,7 @@ static const char *nfs_opts[] = { "from", "nfs_args",
     "resvport", "readahead", "hostname", "timeo", "timeout", "addr", "fh",
     "nfsv3", "sec", "principal", "nfsv4", "gssname", "allgssname", "dirpath",
     "minorversion", "nametimeo", "negnametimeo", "nocto", "noncontigwr",
-    "pnfs", "wcommitsize", "oneopenown", "tls", "tlscertname",
+    "pnfs", "wcommitsize", "oneopenown", "tls", "tlscertname", "nconnect",
     NULL };
 
 /*
@@ -895,11 +896,12 @@ nfs_mount(struct mount *mp)
 	char *cp, *opt, *name, *secname, *tlscertname;
 	int nametimeo = NFS_DEFAULT_NAMETIMEO;
 	int negnametimeo = NFS_DEFAULT_NEGNAMETIMEO;
-	int minvers = 0;
+	int minvers = -1;
 	int dirlen, has_nfs_args_opt, has_nfs_from_opt,
 	    krbnamelen, srvkrbnamelen;
 	size_t hstlen;
 	uint32_t newflag;
+	int aconn = 0;
 
 	has_nfs_args_opt = 0;
 	has_nfs_from_opt = 0;
@@ -1190,6 +1192,20 @@ nfs_mount(struct mount *mp)
 			goto out;
 		}
 	}
+	if (vfs_getopt(mp->mnt_optnew, "nconnect", (void **)&opt, NULL) ==
+	    0) {
+		ret = sscanf(opt, "%d", &aconn);
+		if (ret != 1 || aconn < 1 || aconn > NFS_MAXNCONN) {
+			vfs_mount_error(mp, "illegal nconnect: %s", opt);
+			error = EINVAL;
+			goto out;
+		}
+		/*
+		 * Setting nconnect=1 is a no-op, allowed so that
+		 * the option can be used in a Linux compatible way.
+		 */
+		aconn--;
+	}
 	if (vfs_getopt(mp->mnt_optnew, "sec",
 		(void **) &secname, NULL) == 0)
 		nfs_sec_name(secname, &args.flags);
@@ -1357,10 +1373,25 @@ nfs_mount(struct mount *mp)
 		}
 	}
 
+	if (aconn > 0 && (args.sotype != SOCK_STREAM ||
+	    (args.flags & NFSMNT_NFSV4) == 0 || minvers == 0)) {
+		/*
+		 * RFC 5661 requires that an NFSv4.1/4.2 server
+		 * send an RPC reply on the same TCP connection
+		 * as the one it received the request on.
+		 * This property in required for "nconnect" and
+		 * might not be the case for NFSv3 or NFSv4.0 servers.
+		 */
+		vfs_mount_error(mp, "nconnect should only be used "
+		    "for NFSv4.1/4.2 mounts");
+		error = EINVAL;
+		goto out;
+	}
+
 	args.fh = nfh;
 	error = mountnfs(&args, mp, nam, hst, krbname, krbnamelen, dirpath,
 	    dirlen, srvkrbname, srvkrbnamelen, &vp, td->td_ucred, td,
-	    nametimeo, negnametimeo, minvers, newflag, tlscertname);
+	    nametimeo, negnametimeo, minvers, newflag, tlscertname, aconn);
 out:
 	if (!error) {
 		MNT_ILOCK(mp);
@@ -1408,7 +1439,7 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
     char *hst, u_char *krbname, int krbnamelen, u_char *dirpath, int dirlen,
     u_char *srvkrbname, int srvkrbnamelen, struct vnode **vpp,
     struct ucred *cred, struct thread *td, int nametimeo, int negnametimeo,
-    int minvers, uint32_t newflag, char *tlscertname)
+    int minvers, uint32_t newflag, char *tlscertname, int aconn)
 {
 	struct nfsmount *nmp;
 	struct nfsnode *np;
@@ -1417,6 +1448,7 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 	struct nfsclclient *clp;
 	struct nfsclds *dsp, *tdsp;
 	uint32_t lease;
+	bool tryminvers;
 	static u_int64_t clval = 0;
 #ifdef KERN_TLS
 	u_int maxlen;
@@ -1521,9 +1553,14 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 		nmp->nm_wcommitsize *= 2;
 	nmp->nm_wcommitsize *= 256;
 
-	if ((argp->flags & NFSMNT_NFSV4) != 0)
+	tryminvers = false;
+	if ((argp->flags & NFSMNT_NFSV4) != 0) {
+		if (minvers < 0) {
+			tryminvers = true;
+			minvers = NFSV42_MINORVERSION;
+		}
 		nmp->nm_minorvers = minvers;
-	else
+	} else
 		nmp->nm_minorvers = 0;
 
 	nfs_decode_args(mp, nmp, argp, hst, cred, td);
@@ -1556,7 +1593,7 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 	nmp->nm_fhsize = argp->fhsize;
 	if (nmp->nm_fhsize > 0)
 		bcopy((caddr_t)argp->fh, (caddr_t)nmp->nm_fh, argp->fhsize);
-	bcopy(hst, mp->mnt_stat.f_mntfromname, MNAMELEN);
+	strlcpy(mp->mnt_stat.f_mntfromname, hst, MNAMELEN);
 	nmp->nm_nam = nam;
 	/* Set up the sockets and per-host congestion */
 	nmp->nm_sotype = argp->sotype;
@@ -1569,15 +1606,22 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 	else
 		nmp->nm_sockreq.nr_vers = NFS_VER2;
 
-	if ((error = newnfs_connect(nmp, &nmp->nm_sockreq, cred, td, 0, false)))
+	if ((error = newnfs_connect(nmp, &nmp->nm_sockreq, cred, td, 0, false,
+	    &nmp->nm_sockreq.nr_client)))
 		goto bad;
-	/* For NFSv4.1, get the clientid now. */
-	if (nmp->nm_minorvers > 0) {
+	/* For NFSv4, get the clientid now. */
+	if ((argp->flags & NFSMNT_NFSV4) != 0) {
 		NFSCL_DEBUG(3, "at getcl\n");
-		error = nfscl_getcl(mp, cred, td, 0, &clp);
+		error = nfscl_getcl(mp, cred, td, tryminvers, true, &clp);
 		NFSCL_DEBUG(3, "aft getcl=%d\n", error);
 		if (error != 0)
 			goto bad;
+		if (aconn > 0 && nmp->nm_minorvers == 0) {
+			vfs_mount_error(mp, "nconnect should only be used "
+			    "for NFSv4.1/4.2 mounts");
+			error = EINVAL;
+			goto bad;
+		}
 	}
 
 	if (nmp->nm_fhsize == 0 && (nmp->nm_flag & NFSMNT_NFSV4) &&
@@ -1643,8 +1687,8 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 			nfsva.na_vattr.va_size = 512 * 1024;
 			lease = 60;
 		}
-		(void) nfscl_loadattrcache(vpp, &nfsva, NULL, NULL, 0, 1);
-		if (nmp->nm_minorvers > 0) {
+		(void) nfscl_loadattrcache(vpp, &nfsva, NULL, 0, 1);
+		if ((argp->flags & NFSMNT_NFSV4) != 0) {
 			NFSCL_DEBUG(3, "lease=%d\n", (int)lease);
 			NFSLOCKCLSTATE();
 			clp->nfsc_renew = NFSCL_RENEW(lease);
@@ -1672,6 +1716,10 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 			MNT_IUNLOCK(mp);
 		}
 
+		/* Can now allow additional connections. */
+		if (aconn > 0)
+			nmp->nm_aconnect = aconn;
+
 		/*
 		 * Lose the lock but keep the ref.
 		 */
@@ -1684,7 +1732,7 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 bad:
 	if (clp != NULL)
 		nfscl_clientrelease(clp);
-	newnfs_disconnect(&nmp->nm_sockreq);
+	newnfs_disconnect(NULL, &nmp->nm_sockreq);
 	crfree(nmp->nm_sockreq.nr_cred);
 	if (nmp->nm_sockreq.nr_auth != NULL)
 		AUTH_DESTROY(nmp->nm_sockreq.nr_auth);
@@ -1699,7 +1747,7 @@ bad:
 	TAILQ_FOREACH_SAFE(dsp, &nmp->nm_sess, nfsclds_list, tdsp) {
 		if (dsp != TAILQ_FIRST(&nmp->nm_sess) &&
 		    dsp->nfsclds_sockp != NULL)
-			newnfs_disconnect(dsp->nfsclds_sockp);
+			newnfs_disconnect(NULL, dsp->nfsclds_sockp);
 		nfscl_freenfsclds(dsp);
 	}
 	free(nmp->nm_tlscertname, M_NEWNFSMNT);
@@ -1718,8 +1766,11 @@ nfs_unmount(struct mount *mp, int mntflags)
 	struct nfsmount *nmp;
 	int error, flags = 0, i, trycnt = 0;
 	struct nfsclds *dsp, *tdsp;
+	struct nfscldeleg *dp, *ndp;
+	struct nfscldeleghead dh;
 
 	td = curthread;
+	TAILQ_INIT(&dh);
 
 	if (mntflags & MNT_FORCE)
 		flags |= FORCECLOSE;
@@ -1743,7 +1794,7 @@ nfs_unmount(struct mount *mp, int mntflags)
 		if (error)
 			goto out;
 		/* For a forced close, get rid of the renew thread now */
-		nfscl_umount(nmp, td);
+		nfscl_umount(nmp, td, &dh);
 	}
 	/* We hold 1 extra ref on the root vnode; see comment in mountnfs(). */
 	do {
@@ -1758,7 +1809,7 @@ nfs_unmount(struct mount *mp, int mntflags)
 	 * We are now committed to the unmount.
 	 */
 	if ((mntflags & MNT_FORCE) == 0)
-		nfscl_umount(nmp, td);
+		nfscl_umount(nmp, td, NULL);
 	else {
 		mtx_lock(&nmp->nm_mtx);
 		nmp->nm_privflag |= NFSMNTP_FORCEDISM;
@@ -1785,7 +1836,7 @@ nfs_unmount(struct mount *mp, int mntflags)
 		msleep(nmp, &nmp->nm_mtx, PVFS, "nfsfdism", 0);
 	mtx_unlock(&nmp->nm_mtx);
 
-	newnfs_disconnect(&nmp->nm_sockreq);
+	newnfs_disconnect(nmp, &nmp->nm_sockreq);
 	crfree(nmp->nm_sockreq.nr_cred);
 	free(nmp->nm_nam, M_SONAME);
 	if (nmp->nm_sockreq.nr_auth != NULL)
@@ -1795,11 +1846,17 @@ nfs_unmount(struct mount *mp, int mntflags)
 	TAILQ_FOREACH_SAFE(dsp, &nmp->nm_sess, nfsclds_list, tdsp) {
 		if (dsp != TAILQ_FIRST(&nmp->nm_sess) &&
 		    dsp->nfsclds_sockp != NULL)
-			newnfs_disconnect(dsp->nfsclds_sockp);
+			newnfs_disconnect(NULL, dsp->nfsclds_sockp);
 		nfscl_freenfsclds(dsp);
 	}
 	free(nmp->nm_tlscertname, M_NEWNFSMNT);
 	free(nmp, M_NEWNFSMNT);
+
+	/* Free up the delegation structures for forced dismounts. */
+	TAILQ_FOREACH_SAFE(dp, &dh, nfsdl_list, ndp) {
+		TAILQ_REMOVE(&dh, dp, nfsdl_list);
+		free(dp, M_NFSCLDELEG);
+	}
 out:
 	return (error);
 }
@@ -2059,6 +2116,7 @@ void nfscl_retopts(struct nfsmount *nmp, char *buffer, size_t buflen)
 	    &blen);
 	nfscl_printopt(nmp, (nmp->nm_flag & NFSMNT_NOCONN) != 0, ",noconn",
 	    &buf, &blen);
+	nfscl_printoptval(nmp, nmp->nm_aconnect + 1, ",nconnect", &buf, &blen);
 	nfscl_printopt(nmp, (nmp->nm_flag & NFSMNT_SOFT) == 0, ",hard", &buf,
 	    &blen);
 	nfscl_printopt(nmp, (nmp->nm_flag & NFSMNT_SOFT) != 0, ",soft", &buf,

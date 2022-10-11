@@ -146,6 +146,8 @@ static const STRUCT_USB_HOST_ID umodem_host_devs[] = {
 	{USB_VENDOR(USB_VENDOR_HUAWEI),USB_IFACE_CLASS(UICLASS_CDC),
 		USB_IFACE_SUBCLASS(UISUBCLASS_ABSTRACT_CONTROL_MODEL),
 		USB_IFACE_PROTOCOL(0xFF)},
+	{USB_VENDOR(USB_VENDOR_HUAWEI), USB_IFACE_CLASS(0xFF),
+		USB_IFACE_SUBCLASS(0xF), USB_IFACE_PROTOCOL(0xFF)},
 	/* Kyocera AH-K3001V */
 	{USB_VPI(USB_VENDOR_KYOCERA, USB_PRODUCT_KYOCERA_AHK3001V, 1)},
 	{USB_VPI(USB_VENDOR_SIERRA, USB_PRODUCT_SIERRA_MC5720, 1)},
@@ -301,15 +303,13 @@ static device_method_t umodem_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t umodem_devclass;
-
 static driver_t umodem_driver = {
 	.name = "umodem",
 	.methods = umodem_methods,
 	.size = sizeof(struct umodem_softc),
 };
 
-DRIVER_MODULE(umodem, uhub, umodem_driver, umodem_devclass, NULL, 0);
+DRIVER_MODULE(umodem, uhub, umodem_driver, NULL, NULL);
 MODULE_DEPEND(umodem, ucom, 1, 1, 1);
 MODULE_DEPEND(umodem, usb, 1, 1, 1);
 MODULE_VERSION(umodem, UMODEM_MODVER);

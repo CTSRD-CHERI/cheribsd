@@ -47,7 +47,7 @@ function cleanup
 {
 	del_user $HIST_USER
 	del_group $HIST_GROUP
-	datasetexists $root_testfs && log_must zfs destroy -rf $root_testfs
+	datasetexists $root_testfs && destroy_dataset $root_testfs -rf
 }
 
 log_assert "Verify internal long history information are correct."
@@ -66,10 +66,8 @@ add_user $HIST_GROUP $HIST_USER
 #
 # chmod 0750 $HOME
 #
-user_run $HIST_USER zfs list
-if [ $? -ne 0 ]; then
-        log_unsupported "Test user $HIST_USER cannot execute zfs utilities"
-fi
+user_run $HIST_USER zfs list ||
+    log_unsupported "Test user $HIST_USER cannot execute zfs utilities"
 
 run_and_verify "zfs create $root_testfs" "-l"
 run_and_verify "zfs allow $HIST_GROUP snapshot,mount $root_testfs" "-l"

@@ -82,10 +82,8 @@ static device_method_t al_pcib_methods[] = {
 DEFINE_CLASS_1(pcib, al_pcib_driver, al_pcib_methods,
     sizeof(struct generic_pcie_fdt_softc), generic_pcie_fdt_driver);
 
-static devclass_t anpa_pcib_devclass;
-
-DRIVER_MODULE(alpine_pcib, simplebus, al_pcib_driver, anpa_pcib_devclass, 0, 0);
-DRIVER_MODULE(alpine_pcib, ofwbus, al_pcib_driver, anpa_pcib_devclass, 0, 0);
+DRIVER_MODULE(alpine_pcib, simplebus, al_pcib_driver, 0, 0);
+DRIVER_MODULE(alpine_pcib, ofwbus, al_pcib_driver, 0, 0);
 
 static int
 al_pcib_probe(device_t dev)
@@ -107,7 +105,7 @@ al_pcib_attach(device_t dev)
 {
 	int rv;
 
-	rv = pci_host_generic_attach(dev);
+	rv = pci_host_generic_fdt_attach(dev);
 
 	/* Annapurna quirk: configure vendor-specific registers */
 	if (rv == 0)

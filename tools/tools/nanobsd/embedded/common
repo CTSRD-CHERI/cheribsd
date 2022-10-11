@@ -217,7 +217,7 @@ create_diskimage_mbr ( ) (
 		if [ -d ${NANO_FAT_DIR} ]; then
 			# Need to copy files from ${NANO_FATDIR} with mtools, or use
 			# makefs -t msdos once that's supported
-			mcopy -i ${NANO_LOG}/_.${NANO_SLICE_FAT} ${NANO_FAT_DIR}/* ::
+			mcopy -s -i ${NANO_LOG}/_.${NANO_SLICE_FAT} ${NANO_FAT_DIR}/* ::
 		fi
 	fi
 
@@ -297,7 +297,7 @@ create_diskimage_mbr ( ) (
 		# and p5 is alt-root (after resize)
 		mkimg -a 2 ${fmtarg} ${bootmbr} -s gpt \
 			-p efi:=${NANO_WORLDDIR}/boot/efiboot.img \
-			-p freebsd-boot:=${NAANO_WORLDDIR}/boot/gptboot \
+			-p freebsd-boot:=${NANO_WORLDDIR}/boot/gptboot \
 			-p ${p3}:=${NANO_LOG}/_.p3 \
 			-p ${p4}:=${NANO_LOG}/_.p4 \
 			-o ${out}
@@ -452,11 +452,6 @@ dos_boot_part ( ) (
 	chdir $f
 	cp ${d}/* .
 
-	# Also copy ubldr. u-boot will load it and it will load the kernel
-	# from the ufs partition
-	cp ${NANO_WORLDDIR}/boot/ubldr .
-	cp ${NANO_WORLDDIR}/boot/ubldr.bin .
-
 	# We have to touch the saveenv file
 	touch uEnv.txt
 
@@ -574,7 +569,7 @@ eval std_${NANO_ARCH}
 # Slice 4: FreeBSD partition (empty)
 # on first boot, we resize slice 3 & 4 to be 1/2 of what's
 # left over on the SD card after slice 1 and 2 are taken
-# off the top. We also resize the 'a' partion on first boot
+# off the top. We also resize the 'a' partition on first boot
 # to the size of the partition for the ping/pong upgrade.
 # This feature needs support in the rc.d bootup script.
 #
@@ -646,6 +641,14 @@ esac
 
 
 NANO_SLICE_DATA=		# Not included
+
+# These don't make any sense to this strategy, so stub them out.
+calculate_partitioning ( ) (
+)
+
+# These don't make any sense to this strategy, so stub them out.
+create_code_slice ( ) (
+)
 
 # Each major disk scheme has its own routine. Generally
 # this is for mbr, gpt, etc. These are generally are widely

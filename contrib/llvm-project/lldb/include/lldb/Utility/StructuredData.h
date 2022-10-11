@@ -271,9 +271,9 @@ public:
       return false;
     }
 
-    void Push(ObjectSP item) { m_items.push_back(item); }
+    void Push(const ObjectSP &item) { m_items.push_back(item); }
 
-    void AddItem(ObjectSP item) { m_items.push_back(item); }
+    void AddItem(const ObjectSP &item) { m_items.push_back(item); }
 
     void Serialize(llvm::json::OStream &s) const override;
 
@@ -351,7 +351,17 @@ public:
 
   class Dictionary : public Object {
   public:
-    Dictionary() : Object(lldb::eStructuredDataTypeDictionary), m_dict() {}
+    Dictionary() : Object(lldb::eStructuredDataTypeDictionary) {}
+
+    Dictionary(ObjectSP obj_sp) : Object(lldb::eStructuredDataTypeDictionary) {
+      if (!obj_sp || obj_sp->GetType() != lldb::eStructuredDataTypeDictionary) {
+        SetType(lldb::eStructuredDataTypeInvalid);
+        return;
+      }
+
+      Dictionary *dict = obj_sp->GetAsDictionary();
+      m_dict = dict->m_dict;
+    }
 
     ~Dictionary() override = default;
 
@@ -493,7 +503,7 @@ public:
 
     void AddItem(llvm::StringRef key, ObjectSP value_sp) {
       ConstString key_cs(key);
-      m_dict[key_cs] = value_sp;
+      m_dict[key_cs] = std::move(value_sp);
     }
 
     void AddIntegerItem(llvm::StringRef key, uint64_t value) {
@@ -547,7 +557,7 @@ public:
     void *m_object;
   };
 
-  static ObjectSP ParseJSON(std::string json_text);
+  static ObjectSP ParseJSON(const std::string &json_text);
   static ObjectSP ParseJSONFromFile(const FileSpec &file, Status &error);
 };
 

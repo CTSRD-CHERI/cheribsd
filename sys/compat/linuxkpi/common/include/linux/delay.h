@@ -2,7 +2,7 @@
  * Copyright (c) 2010 Isilon Systems, Inc.
  * Copyright (c) 2010 iX Systems, Inc.
  * Copyright (c) 2010 Panasas, Inc.
- * Copyright (c) 2013-2015 Mellanox Technologies, Ltd.
+ * Copyright (c) 2013-2021 Mellanox Technologies, Ltd.
  * Copyright (c) 2014 François Tigeot
  * All rights reserved.
  *
@@ -29,8 +29,8 @@
  *
  * $FreeBSD$
  */
-#ifndef _LINUX_DELAY_H_
-#define	_LINUX_DELAY_H_
+#ifndef _LINUXKPI_LINUX_DELAY_H_
+#define	_LINUXKPI_LINUX_DELAY_H_
 
 #include <linux/jiffies.h>
 #include <sys/systm.h>
@@ -68,9 +68,22 @@ ndelay(unsigned long x)
 static inline void
 usleep_range(unsigned long min, unsigned long max)
 {
-	DELAY(min);
+	/* guard against invalid values */
+	if (min == 0)
+		min = 1;
+	pause_sbt("lnxsleep", ustosbt(min), 0, C_HARDCLOCK);
 }
 
 extern unsigned int linux_msleep_interruptible(unsigned int ms);
 
-#endif	/* _LINUX_DELAY_H_ */
+static inline void
+fsleep(unsigned long us)
+{
+
+	if (us < 10)
+		udelay(us);
+	else
+		usleep_range(us, us);
+}
+
+#endif	/* _LINUXKPI_LINUX_DELAY_H_ */

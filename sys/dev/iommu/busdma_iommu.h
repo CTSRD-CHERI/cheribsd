@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2013 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Konstantin Belousov <kib@FreeBSD.org>
  * under sponsorship from the FreeBSD Foundation.
@@ -50,12 +49,22 @@ struct bus_dmamap_iommu {
 	struct memdesc mem;
 	bus_dmamap_callback_t *callback;
 	void *callback_arg;
+	struct mtx lock;
 	struct iommu_map_entries_tailq map_entries;
 	TAILQ_ENTRY(bus_dmamap_iommu) delay_link;
 	bool locked;
 	bool cansleep;
 	int flags;
+#ifdef KMSAN
+	struct memdesc kmsan_mem;
+#endif
 };
+
+#define	IOMMU_DMAMAP_INIT(map)		mtx_init(&(map)->lock, \
+					    "iommu dmamap", NULL, MTX_DEF)
+#define	IOMMU_DMAMAP_DESTROY(map)	mtx_destroy(&(map)->lock)
+#define	IOMMU_DMAMAP_LOCK(map)		mtx_lock(&(map)->lock)
+#define	IOMMU_DMAMAP_UNLOCK(map)	mtx_unlock(&(map)->lock)
 
 #define	BUS_DMAMAP_IOMMU_MALLOC	0x0001
 #define	BUS_DMAMAP_IOMMU_KMEM_ALLOC 0x0002

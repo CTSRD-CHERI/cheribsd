@@ -117,6 +117,7 @@ static int hash6_insert(priv_p, struct flow_hash_entry *, struct flow6_rec *,
 
 static void expire_flow(priv_p, fib_export_p, struct flow_entry *, int);
 
+#ifdef INET
 /*
  * Generate hash for a given flow record.
  *
@@ -140,6 +141,7 @@ ip_hash(struct flow_rec *r)
 		return ADDR_HASH(r->r_src.s_addr, r->r_dst.s_addr);
 	}
 }
+#endif
 
 #ifdef INET6
 /* Generate hash for a given flow6 record. Use lower 4 octets from v6 addresses */
@@ -360,8 +362,12 @@ hash_insert(priv_p priv, struct flow_hash_entry *hsh, struct flow_rec *r,
 
 			rt_get_inet_prefix_plen(rt, &addr, &plen, &scopeid);
 			fle->f.fle_o_ifx = nh->nh_ifp->if_index;
-			if (nh->gw_sa.sa_len == AF_INET)
+			if (nh->gw_sa.sa_family == AF_INET)
 				fle->f.next_hop = nh->gw4_sa.sin_addr;
+			/*
+			 * XXX we're leaving an empty gateway here for
+			 * IPv6 nexthops.
+			 */
 			fle->f.dst_mask = plen;
 		}
 	}
@@ -434,7 +440,7 @@ hash6_insert(priv_p priv, struct flow_hash_entry *hsh6, struct flow6_rec *r,
 
 			rt_get_inet6_prefix_plen(rt, &addr, &plen, &scopeid);
 			fle6->f.fle_o_ifx = nh->nh_ifp->if_index;
-			if (nh->gw_sa.sa_len == AF_INET6)
+			if (nh->gw_sa.sa_family == AF_INET6)
 				fle6->f.n.next_hop6 = nh->gw6_sa.sin6_addr;
 			fle6->f.dst_mask = plen;
 		}
@@ -654,7 +660,6 @@ ng_netflow_flow_add(priv_p priv, fib_export_p fe, struct ip *ip,
 	struct flow_rec		r;
 	int			hlen, plen;
 	int			error = 0;
-	uint16_t		eproto;
 	uint8_t			tcp_flags = 0;
 
 	bzero(&r, sizeof(r));
@@ -666,7 +671,6 @@ ng_netflow_flow_add(priv_p priv, fib_export_p fe, struct ip *ip,
 	if (hlen < sizeof(struct ip))
 		return (EINVAL);
 
-	eproto = ETHERTYPE_IP;
 	/* Assume L4 template by default */
 	r.flow_type = NETFLOW_V9_FLOW_V4_L4;
 

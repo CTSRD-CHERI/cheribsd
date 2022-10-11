@@ -442,6 +442,7 @@ pci_vtcon_sock_rx(int fd __unused, enum ev_type t __unused, void *arg)
 
 	do {
 		n = vq_getchain(vq, &iov, 1, &req);
+		assert(n == 1);
 		len = readv(sock->vss_conn_fd, &iov, n);
 
 		if (len == 0 || (len < 0 && errno == EWOULDBLOCK)) {
@@ -582,7 +583,6 @@ pci_vtcon_control_send(struct pci_vtcon_softc *sc,
 		return;
 
 	n = vq_getchain(vq, &iov, 1, &req);
-
 	assert(n == 1);
 
 	memcpy(iov.iov_base, ctrl, sizeof(struct pci_vtcon_control));
@@ -593,7 +593,7 @@ pci_vtcon_control_send(struct pci_vtcon_softc *sc,
 	vq_relchain(vq, req.idx, sizeof(struct pci_vtcon_control) + len);
 	vq_endchains(vq, 1);
 }
-    
+
 
 static void
 pci_vtcon_notify_tx(void *vsc, struct vqueue_info *vq)
@@ -602,14 +602,14 @@ pci_vtcon_notify_tx(void *vsc, struct vqueue_info *vq)
 	struct pci_vtcon_port *port;
 	struct iovec iov[1];
 	struct vi_req req;
-	uint16_t n;
+	int n;
 
 	sc = vsc;
 	port = pci_vtcon_vq_to_port(sc, vq);
 
 	while (vq_has_descs(vq)) {
 		n = vq_getchain(vq, iov, 1, &req);
-		assert(n >= 1);
+		assert(n == 1);
 		if (port != NULL)
 			port->vsp_cb(port, port->vsp_arg, iov, 1);
 
@@ -696,7 +696,9 @@ pci_vtcon_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	sc->vsc_config = calloc(1, sizeof(struct pci_vtcon_config));
 	sc->vsc_config->max_nr_ports = VTCON_MAXPORTS;
 	sc->vsc_config->cols = 80;
-	sc->vsc_config->rows = 25; 
+	sc->vsc_config->rows = 25;
+
+	pthread_mutex_init(&sc->vsc_mtx, NULL);
 
 	vi_softc_linkup(&sc->vsc_vs, &vtcon_vi_consts, sc, pi, sc->vsc_queues);
 	sc->vsc_vs.vs_mtx = &sc->vsc_mtx;
@@ -754,6 +756,7 @@ struct pci_devemu pci_de_vcon = {
 	.pe_emu =	"virtio-console",
 	.pe_init =	pci_vtcon_init,
 	.pe_barwrite =	vi_pci_write,
-	.pe_barread =	vi_pci_read
+	.pe_barread =	vi_pci_read,
+	.pe_legacy_config = pci_vtcon_legacy_config,
 };
 PCI_EMUL_SET(pci_de_vcon);

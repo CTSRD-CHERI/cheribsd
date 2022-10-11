@@ -154,11 +154,8 @@ static driver_t pmu_driver = {
 	sizeof(struct pmu_softc),
 };
 
-static devclass_t pmu_devclass;
-
-EARLY_DRIVER_MODULE(pmu, macio, pmu_driver, pmu_devclass, 0, 0,
-    BUS_PASS_RESOURCE);
-DRIVER_MODULE(adb, pmu, adb_driver, adb_devclass, 0, 0);
+EARLY_DRIVER_MODULE(pmu, macio, pmu_driver, 0, 0, BUS_PASS_RESOURCE);
+DRIVER_MODULE(adb, pmu, adb_driver, 0, 0);
 
 static int	pmuextint_probe(device_t);
 static int	pmuextint_attach(device_t);
@@ -176,10 +173,8 @@ static driver_t pmuextint_driver = {
 	0
 };
 
-static devclass_t pmuextint_devclass;
-
-EARLY_DRIVER_MODULE(pmuextint, macgpio, pmuextint_driver, pmuextint_devclass,
-    0, 0, BUS_PASS_RESOURCE);
+EARLY_DRIVER_MODULE(pmuextint, macgpio, pmuextint_driver, 0, 0,
+    BUS_PASS_RESOURCE);
 
 /* Make sure uhid is loaded, as it turns off some of the ADB emulation */
 MODULE_DEPEND(pmu, usb, 1, 1, 1);
@@ -577,9 +572,8 @@ pmu_send_byte(struct pmu_softc *sc, uint8_t data)
 static inline int
 pmu_read_byte(struct pmu_softc *sc, uint8_t *data)
 {
-	volatile uint8_t scratch;
 	pmu_in(sc);
-	scratch = pmu_read_reg(sc, vSR);
+	(void)pmu_read_reg(sc, vSR);
 	pmu_ack_off(sc);
 	/* wait for intr to come up */
 	do {} while (pmu_intr_state(sc) == 0);
@@ -764,7 +758,7 @@ pmu_adb_send(device_t dev, u_char command_byte, int len, u_char *data,
     u_char poll)
 {
 	struct pmu_softc *sc = device_get_softc(dev);
-	int i,replen;
+	int i;
 	uint8_t packet[16], resp[16];
 
 	/* construct an ADB command packet and send it */
@@ -777,7 +771,7 @@ pmu_adb_send(device_t dev, u_char command_byte, int len, u_char *data,
 		packet[i + 3] = data[i];
 
 	mtx_lock(&sc->sc_mutex);
-	replen = pmu_send(sc, PMU_ADB_CMD, len + 3, packet, 16, resp);
+	pmu_send(sc, PMU_ADB_CMD, len + 3, packet, 16, resp);
 	mtx_unlock(&sc->sc_mutex);
 
 	if (poll)
@@ -964,7 +958,7 @@ pmu_battery_notify(struct pmu_battstate *batt, struct pmu_battstate *old)
 }
 
 static void
-pmu_battquery_proc()
+pmu_battquery_proc(void)
 {
 	struct pmu_softc *sc;
 	struct pmu_battstate batt;
@@ -977,8 +971,10 @@ pmu_battquery_proc()
 	while (1) {
 		kproc_suspend_check(curproc);
 		error = pmu_query_battery(sc, 0, &batt);
-		pmu_battery_notify(&batt, &cur_batt);
-		cur_batt = batt;
+		if (error == 0) {
+			pmu_battery_notify(&batt, &cur_batt);
+			cur_batt = batt;
+		}
 		pause("pmu_batt", hz);
 	}
 }
@@ -986,10 +982,8 @@ pmu_battquery_proc()
 static int
 pmu_battmon(SYSCTL_HANDLER_ARGS)
 {
-	struct pmu_softc *sc;
 	int error, result;
 
-	sc = arg1;
 	result = pmu_battmon_enabled;
 
 	error = sysctl_handle_int(oidp, &result, 0, req);

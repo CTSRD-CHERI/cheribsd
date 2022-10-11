@@ -52,25 +52,22 @@ streamfile=$(mktemp $TESTDIR/file.XXXXXX)
 vdev=$(mktemp $TEST_BASE_DIR/file.XXXXXX)
 
 
-test_pool ()
+function test_pool
 {
 	POOL=$1
 	log_must zfs create -o recordsize=512 $POOL/fs
 	mntpnt=$(get_prop mountpoint "$POOL/fs")
-	log_must dd if=/dev/urandom of=${mntpnt}/file bs=512 count=1 2>/dev/null
+	log_must eval "dd if=/dev/urandom of=${mntpnt}/file bs=512 count=1 2>/dev/null"
 	object=$(ls -i $mntpnt | awk '{print $1}')
 	log_must zfs snapshot $POOL/fs@a
 	while true; do
 		log_must find $mntpnt/ -type f -delete
-		sync
+		sync_all_pools
 		log_must mkfiles "$mntpnt/" 4000
-		sync
+		sync_all_pools
 		# check if we started reusing objects
 		object=$(ls -i $mntpnt | sort -n | awk -v object=$object \
-		    '{if ($1 <= object) {exit 1}} END {print $1}')
-		if [[ $? -ne 0 ]]; then
-			break
-		fi
+		    '{if ($1 <= object) {exit 1}} END {print $1}') || break
 	done
 	dd if=/dev/urandom of=${mntpnt}/$FILE bs=512 count=1 seek=1 2>/dev/null
 
@@ -83,7 +80,7 @@ test_pool ()
 	cat $streamfile | log_must zfs receive $POOL/recvfs
 
 	recv_mntpnt=$(get_prop mountpoint "$POOL/recvfs")
-	log_must diff -r $mntpnt $recv_mntpnt
+	log_must directory_diff $mntpnt $recv_mntpnt
 	log_must zfs destroy -rf $POOL/fs
 	log_must zfs destroy -rf $POOL/recvfs
 }

@@ -21,9 +21,9 @@
 #include "llvm/MC/MCFixupKindInfo.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCObjectWriter.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/EndianStream.h"
-#include "llvm/Support/TargetRegistry.h"
 
 #include <sstream>
 
@@ -74,7 +74,7 @@ public:
 
   void setExtender(MCContext &Context) const {
     if (Extender == nullptr)
-      const_cast<HexagonAsmBackend *>(this)->Extender = new (Context) MCInst;
+      const_cast<HexagonAsmBackend *>(this)->Extender = Context.createMCInst();
   }
 
   MCInst *takeExtender() const {
@@ -686,10 +686,11 @@ public:
     assert(Update && "Didn't find relaxation target");
   }
 
-  bool writeNopData(raw_ostream &OS, uint64_t Count) const override {
-    static const uint32_t Nopcode  = 0x7f000000, // Hard-coded NOP.
-                          ParseIn  = 0x00004000, // In packet parse-bits.
-                          ParseEnd = 0x0000c000; // End of packet parse-bits.
+  bool writeNopData(raw_ostream &OS, uint64_t Count,
+                    const MCSubtargetInfo *STI) const override {
+    static const uint32_t Nopcode = 0x7f000000, // Hard-coded NOP.
+        ParseIn = 0x00004000,                   // In packet parse-bits.
+        ParseEnd = 0x0000c000;                  // End of packet parse-bits.
 
     while (Count % HEXAGON_INSTR_SIZE) {
       LLVM_DEBUG(dbgs() << "Alignment not a multiple of the instruction size:"
@@ -736,7 +737,7 @@ public:
               auto &Inst = const_cast<MCInst &>(RF.getInst());
               while (Size > 0 &&
                      HexagonMCInstrInfo::bundleSize(Inst) < MaxPacketSize) {
-                MCInst *Nop = new (Context) MCInst;
+                MCInst *Nop = Context.createMCInst();
                 Nop->setOpcode(Hexagon::A2_nop);
                 Inst.addOperand(MCOperand::createInst(Nop));
                 Size -= 4;

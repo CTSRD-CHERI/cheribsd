@@ -657,11 +657,11 @@ static int
 rpc_marshal_func(char *buffer, size_t *buffer_size, void *retval, va_list ap,
     void *cache_mdata)
 {
-	char *name;
-	int num;
+	char *name __unused;
+	int num __unused;
 	struct rpcent *rpc;
-	char *orig_buf;
-	size_t orig_buf_size;
+	char *orig_buf __unused;
+	size_t orig_buf_size __unused;
 
 	struct rpcent new_rpc;
 	size_t desired_size, size, aliases_size;
@@ -746,8 +746,8 @@ static int
 rpc_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
     void *cache_mdata)
 {
-	char *name;
-	int num;
+	char *name __unused;
+	int num __unused;
 	struct rpcent *rpc;
 	char *orig_buf;
 	size_t orig_buf_size;
@@ -788,9 +788,9 @@ rpc_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
 
 	orig_buf = (char *)_ALIGN(orig_buf);
 	memcpy(orig_buf, buffer + sizeof(struct rpcent) + sizeof(char *) +
-	    (vaddr_t)_ALIGN(p) - (vaddr_t)p,
+	    ((char *)_ALIGN(p) - p),
 	    buffer_size - sizeof(struct rpcent) - sizeof(char *) -
-	    (vaddr_t)_ALIGN(p) + (vaddr_t)p);
+	    ((char *)_ALIGN(p) - p));
 	p = (char *)_ALIGN(p);
 
 	NS_APPLY_OFFSET(rpc->r_name, orig_buf, p, char *);

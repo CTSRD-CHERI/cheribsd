@@ -38,12 +38,14 @@ __FBSDID("$FreeBSD$");
 #include "bootstrap.h"
 
 extern EFI_GUID gop_guid;
+
+bool boot_services_active = true; /* boot services active first thing in main */
+
 static EFI_GUID simple_input_ex_guid = EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL_GUID;
 static SIMPLE_TEXT_OUTPUT_INTERFACE	*conout;
 static SIMPLE_INPUT_INTERFACE		*conin;
 static EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *coninex;
 static bool efi_started;
-
 static int mode;		/* Does ConOut have serial console? */
 
 static uint32_t utf8_left;
@@ -176,6 +178,9 @@ efi_text_cursor(void *arg, const teken_pos_t *p)
 	teken_gfx_t *state = arg;
 	UINTN col, row;
 
+	if (!boot_services_active)
+		return;
+
 	row = p->tp_row;
 	if (p->tp_row >= state->tg_tp.tp_row)
 		row = state->tg_tp.tp_row - 1;
@@ -234,6 +239,9 @@ efi_text_putchar(void *s, const teken_pos_t *p, teken_char_t c,
 	EFI_STATUS status;
 	int idx;
 
+	if (!boot_services_active)
+		return;
+
 	idx = p->tp_col + p->tp_row * state->tg_tp.tp_col;
 	if (idx >= state->tg_tp.tp_col * state->tg_tp.tp_row)
 		return;
@@ -250,6 +258,9 @@ efi_text_fill(void *arg, const teken_rect_t *r, teken_char_t c,
 {
 	teken_gfx_t *state = arg;
 	teken_pos_t p;
+
+	if (!boot_services_active)
+		return;
 
 	if (state->tg_cursor_visible)
 		conout->EnableCursor(conout, FALSE);
@@ -303,6 +314,9 @@ efi_text_copy(void *arg, const teken_rect_t *r, const teken_pos_t *p)
 	int nrow, ncol, x, y; /* Has to be signed - >= 0 comparison */
 	bool scroll = false;
 
+	if (!boot_services_active)
+		return;
+
 	/*
 	 * Copying is a little tricky. We must make sure we do it in
 	 * correct order, to make sure we don't overwrite our own data.
@@ -355,6 +369,9 @@ static void
 efi_text_param(void *arg, int cmd, unsigned int value)
 {
 	teken_gfx_t *state = arg;
+
+	if (!boot_services_active)
+		return;
 
 	switch (cmd) {
 	case TP_SETLOCALCURSOR:
@@ -420,36 +437,44 @@ efi_cons_probe(struct console *cp)
 static bool
 color_name_to_teken(const char *name, int *val)
 {
+	int light = 0;
+	if (strncasecmp(name, "light", 5) == 0) {
+		name += 5;
+		light = TC_LIGHT;
+	} else if (strncasecmp(name, "bright", 6) == 0) {
+		name += 6;
+		light = TC_LIGHT;
+	}
 	if (strcasecmp(name, "black") == 0) {
-		*val = TC_BLACK;
+		*val = TC_BLACK | light;
 		return (true);
 	}
 	if (strcasecmp(name, "red") == 0) {
-		*val = TC_RED;
+		*val = TC_RED | light;
 		return (true);
 	}
 	if (strcasecmp(name, "green") == 0) {
-		*val = TC_GREEN;
+		*val = TC_GREEN | light;
 		return (true);
 	}
-	if (strcasecmp(name, "brown") == 0) {
-		*val = TC_BROWN;
+	if (strcasecmp(name, "yellow") == 0 || strcasecmp(name, "brown") == 0) {
+		*val = TC_YELLOW | light;
 		return (true);
 	}
 	if (strcasecmp(name, "blue") == 0) {
-		*val = TC_BLUE;
+		*val = TC_BLUE | light;
 		return (true);
 	}
 	if (strcasecmp(name, "magenta") == 0) {
-		*val = TC_MAGENTA;
+		*val = TC_MAGENTA | light;
 		return (true);
 	}
 	if (strcasecmp(name, "cyan") == 0) {
-		*val = TC_CYAN;
+		*val = TC_CYAN | light;
 		return (true);
 	}
 	if (strcasecmp(name, "white") == 0) {
-		*val = TC_WHITE;
+		*val = TC_WHITE | light;
 		return (true);
 	}
 	return (false);
@@ -459,7 +484,7 @@ static int
 efi_set_colors(struct env_var *ev, int flags, const void *value)
 {
 	int val = 0;
-	char buf[2];
+	char buf[3];
 	const void *evalue;
 	const teken_attr_t *ap;
 	teken_attr_t a;
@@ -472,14 +497,16 @@ efi_set_colors(struct env_var *ev, int flags, const void *value)
 		evalue = buf;
 	} else {
 		char *end;
+		long lval;
 
 		errno = 0;
-		val = (int)strtol(value, &end, 0);
-		if (errno != 0 || *end != '\0') {
+		lval = strtol(value, &end, 0);
+		if (errno != 0 || *end != '\0' || lval < 0 || lval > 15) {
 			printf("Allowed values are either ansi color name or "
-			    "number from range [0-7].\n");
+			    "number from range [0-15].\n");
 			return (CMD_OK);
 		}
+		val = (int)lval;
 		evalue = value;
 	}
 
@@ -723,6 +750,8 @@ get_arg(int c)
 static void
 efi_term_emu(int c)
 {
+	if (!boot_services_active)
+		return;
 #ifdef TERM_EMU
 	static int ansi_col[] = {
 		0, 4, 2, 6, 1, 5, 3, 7
@@ -1333,6 +1362,9 @@ efi_cons_getchar(void)
 	if ((c = keybuf_getchar()) != 0)
 		return (c);
 
+	if (!boot_services_active)
+		return (-1);
+
 	key_pending = 0;
 
 	if (coninex == NULL) {
@@ -1353,6 +1385,9 @@ efi_cons_poll(void)
 
 	if (keybuf_ischar() || key_pending)
 		return (1);
+
+	if (!boot_services_active)
+		return (0);
 
 	/*
 	 * Some EFI implementation (u-boot for example) do not support

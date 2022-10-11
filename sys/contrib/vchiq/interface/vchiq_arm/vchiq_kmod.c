@@ -83,6 +83,7 @@ static struct bcm_vchiq_softc *bcm_vchiq_sc = NULL;
 static struct ofw_compat_data compat_data[] = {
 	{"broadcom,bcm2835-vchiq",	BSD_DTB},
 	{"brcm,bcm2835-vchiq",		UPSTREAM_DTB},
+	{"brcm,bcm2711-vchiq",		UPSTREAM_DTB},
 	{NULL,				0}
 };
 
@@ -234,7 +235,5 @@ static driver_t bcm_vchiq_driver = {
 	sizeof(struct bcm_vchiq_softc),
 };
 
-static devclass_t bcm_vchiq_devclass;
-
-DRIVER_MODULE(vchiq, simplebus, bcm_vchiq_driver, bcm_vchiq_devclass, 0, 0);
+DRIVER_MODULE(vchiq, simplebus, bcm_vchiq_driver, 0, 0);
 MODULE_VERSION(vchiq, 1);

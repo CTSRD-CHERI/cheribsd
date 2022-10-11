@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/sbuf.h>
 #include <sys/sysctl.h>
 #include <machine/stdarg.h>
 #include <machine/resource.h>
@@ -375,7 +376,10 @@ ahci_attach(device_t dev)
 		device_set_ivars(child, (void *)(intptr_t)(unit | AHCI_REMAPPED_UNIT));
 	}
 
-	if (ctlr->caps & AHCI_CAP_EMS) {
+	int em = (ctlr->caps & AHCI_CAP_EMS) != 0;
+	resource_int_value(device_get_name(dev), device_get_unit(dev),
+	    "em", &em);
+	if (em) {
 		child = device_add_child(dev, "ahciem", -1);
 		if (child == NULL)
 			device_printf(dev, "failed to add enclosure device\n");
@@ -601,6 +605,8 @@ ahci_alloc_resource(device_t dev, device_t child, int type, int *rid,
 		} else if (!is_em) {
 			offset = AHCI_OFFSET + (unit << 7);
 			size = 128;
+		} else if ((ctlr->caps & AHCI_CAP_EMS) == 0) {
+			break;
 		} else if (*rid == 0) {
 			offset = AHCI_EM_CTL;
 			size = 4;
@@ -697,14 +703,13 @@ ahci_print_child(device_t dev, device_t child)
 }
 
 int
-ahci_child_location_str(device_t dev, device_t child, char *buf,
-    size_t buflen)
+ahci_child_location(device_t dev, device_t child, struct sbuf *sb)
 {
 	intptr_t ivars;
 
 	ivars = (intptr_t)device_get_ivars(child);
 	if ((ivars & AHCI_EM_UNIT) == 0)
-		snprintf(buf, buflen, "channel=%d", (int)ivars & AHCI_UNIT);
+		sbuf_printf(sb, "channel=%d", (int)ivars & AHCI_UNIT);
 	return (0);
 }
 
@@ -922,7 +927,7 @@ ahci_ch_attach(device_t dev)
 	ctx = device_get_sysctl_ctx(dev);
 	tree = device_get_sysctl_tree(dev);
 	SYSCTL_ADD_PROC(ctx, SYSCTL_CHILDREN(tree), OID_AUTO, "disable_phy",
-	    CTLFLAG_RW | CTLTYPE_UINT | CTLFLAG_NEEDGIANT, ch,
+	    CTLFLAG_RW | CTLTYPE_UINT | CTLFLAG_MPSAFE, ch,
 	    0, ahci_ch_disablephy_proc, "IU", "Disable PHY");
 	return (0);
 
@@ -1051,7 +1056,6 @@ ahci_ch_resume(device_t dev)
 	return (0);
 }
 
-devclass_t ahcich_devclass;
 static device_method_t ahcich_methods[] = {
 	DEVMETHOD(device_probe,     ahci_ch_probe),
 	DEVMETHOD(device_attach,    ahci_ch_attach),
@@ -1065,7 +1069,7 @@ static driver_t ahcich_driver = {
         ahcich_methods,
         sizeof(struct ahci_channel)
 };
-DRIVER_MODULE(ahcich, ahci, ahcich_driver, ahcich_devclass, NULL, NULL);
+DRIVER_MODULE(ahcich, ahci, ahcich_driver, NULL, NULL);
 
 struct ahci_dc_cb_args {
 	bus_addr_t maddr;
@@ -2173,7 +2177,8 @@ completeall:
 		ahci_reset(ch);
 		return;
 	}
-	ccb->ccb_h = ch->hold[i]->ccb_h;	/* Reuse old header. */
+	xpt_setup_ccb(&ccb->ccb_h, ch->hold[i]->ccb_h.path,
+	    ch->hold[i]->ccb_h.pinfo.priority);
 	if (ccb->ccb_h.func_code == XPT_ATA_IO) {
 		/* READ LOG */
 		ccb->ccb_h.recovery_type = RECOVERY_READ_LOG;
@@ -2899,8 +2904,6 @@ ahcipoll(struct cam_sim *sim)
 		ahci_reset_to(ch);
 	}
 }
-
-devclass_t ahci_devclass;
 
 MODULE_VERSION(ahci, 1);
 MODULE_DEPEND(ahci, cam, 1, 1, 1);

@@ -23,6 +23,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Option/OptSpecifier.h"
+#include "llvm/Support/FileCollector.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <cstdint>
 #include <memory>
@@ -30,12 +31,6 @@
 #include <system_error>
 #include <utility>
 #include <vector>
-
-namespace llvm {
-
-class Triple;
-
-} // namespace llvm
 
 namespace clang {
 
@@ -45,19 +40,10 @@ class CompilerInvocation;
 class DiagnosticsEngine;
 class ExternalSemaSource;
 class FrontendOptions;
-class HeaderSearch;
-class HeaderSearchOptions;
-class LangOptions;
 class PCHContainerReader;
 class Preprocessor;
 class PreprocessorOptions;
 class PreprocessorOutputOptions;
-
-/// Apply the header search options to get given HeaderSearch object.
-void ApplyHeaderSearchOptions(HeaderSearch &HS,
-                              const HeaderSearchOptions &HSOpts,
-                              const LangOptions &Lang,
-                              const llvm::Triple &triple);
 
 /// InitializePreprocessor - Initialize the preprocessor getting it and the
 /// environment ready to process a single file.
@@ -151,9 +137,8 @@ class ModuleDependencyCollector : public DependencyCollector {
   bool HasErrors = false;
   llvm::StringSet<> Seen;
   llvm::vfs::YAMLVFSWriter VFSWriter;
-  llvm::StringMap<std::string> SymLinkMap;
+  llvm::FileCollector::PathCanonicalizer Canonicalizer;
 
-  bool getRealPath(StringRef SrcPath, SmallVectorImpl<char> &Result);
   std::error_code copyToRoot(StringRef Src, StringRef Dst = {});
 
 public:
@@ -226,10 +211,6 @@ std::unique_ptr<CompilerInvocation> createInvocationFromCommandLine(
     std::vector<std::string> *CC1Args = nullptr);
 
 // Frontend timing utils
-
-/// If the user specifies the -ftime-report argument on an Clang command line
-/// then the value of this boolean will be true, otherwise false.
-extern bool FrontendTimesIsEnabled;
 
 } // namespace clang
 

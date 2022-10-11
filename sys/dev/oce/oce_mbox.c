@@ -118,7 +118,7 @@ oce_reset_fun(POCE_SOFTC sc)
 }
 
 /**
- * @brief  		This funtions tells firmware we are
+ * @brief  		This functions tells firmware we are
  *			done with commands.
  * @param sc            software handle to the device
  * @returns             0 on success, ETIMEDOUT on failure
@@ -373,7 +373,6 @@ oce_mbox_post(POCE_SOFTC sc, struct oce_mbx *mbx, struct oce_mbx_ctx *mbxctx)
 	int rc = 0;
 	uint32_t tmo = 0;
 	uint32_t cstatus = 0;
-	uint32_t xstatus = 0;
 
 	LOCK(&sc->bmbx_lock);
 
@@ -402,7 +401,6 @@ oce_mbox_post(POCE_SOFTC sc, struct oce_mbx *mbx, struct oce_mbx_ctx *mbxctx)
 
 		/* pick up the mailbox status */
 		cstatus = mb_cqe->u0.s.completion_status;
-		xstatus = mb_cqe->u0.s.extended_status;
 
 		/*
 		 * store the mbx context in the cqe tag section so that

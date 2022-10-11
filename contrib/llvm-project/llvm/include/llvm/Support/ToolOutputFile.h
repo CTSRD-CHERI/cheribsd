@@ -29,12 +29,14 @@ class ToolOutputFile {
   /// raw_fd_ostream is destructed. It installs cleanups in its constructor and
   /// uninstalls them in its destructor.
   class CleanupInstaller {
+  public:
     /// The name of the file.
     std::string Filename;
-  public:
+
     /// The flag which indicates whether we should not delete the file.
     bool Keep;
 
+    StringRef getFilename() { return Filename; }
     explicit CleanupInstaller(StringRef Filename);
     ~CleanupInstaller();
   } Installer;
@@ -57,9 +59,14 @@ public:
   /// Return the contained raw_fd_ostream.
   raw_fd_ostream &os() { return *OS; }
 
+  /// Return the filename initialized with.
+  StringRef getFilename() { return Installer.getFilename(); }
+
   /// Indicate that the tool's job wrt this output file has been successful and
   /// the file should not be deleted.
   void keep() { Installer.Keep = true; }
+
+  const std::string &outputFilename() { return Installer.Filename; }
 };
 
 } // end llvm namespace

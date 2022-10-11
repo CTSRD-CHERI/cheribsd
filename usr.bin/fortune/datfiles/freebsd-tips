@@ -62,8 +62,7 @@ If you need a reminder to leave your terminal, type "leave +hhmm" where
 %
 If you need to ask a question on the FreeBSD-questions mailing list then
 
-	https://www.FreeBSD.org/doc/en_US.ISO8859-1/articles/\
-		freebsd-questions/index.html
+	https://docs.freebsd.org/en/articles/freebsd-questions
 
 contains lots of useful advice to help you get the best results.
 %
@@ -340,8 +339,8 @@ If you have sudo(8) installed and permissions to use it, type
 ``<ESC>w ! sudo tee %'' to force a write.
 %
 You can adjust the volume of various parts of the sound system in your
-computer by typing 'mixer <type> <volume>'.  To get a list of what you can
-adjust, just type 'mixer'.
+computer by typing 'mixer <type>.volume=<volume>%'.  To get a list of what
+you can adjust, just type 'mixer'.
 %
 You can automatically download and install binary packages by doing
 
@@ -440,9 +439,9 @@ You can use "pkg info" to see a list of packages you have installed.
 %
 You can use the 'fetch' command to retrieve files over ftp, http or https.
 
-	 fetch https://www.FreeBSD.org/index.html
+	 fetch https://www.FreeBSD.org/images/beastie.png
 
-will download the front page of the FreeBSD web site.
+will download the beastie image from the FreeBSD web site.
 %
 You can use "whereis" to search standard binary, manual page and source
 directories for the specified programs. This can be particularly handy
@@ -836,4 +835,11 @@ nothing more than cu(1) is needed:
 $ cu -s 9600 -l /dev/ttyU0
 
 		-- Daniel Ebdrup Jensen <debdrup@FreeBSD.org>
+%
+You can control kernel stack(9) traces on ^T (tty info) by setting
+kern.tty_info_kstacks to 0 (off), 1 (on), or 2 (verbose), e.g.:
+
+# sysctl kern.tty_info_kstacks=2
+
+		-- Michael Gmelin <grembo@FreeBSD.org>
 %

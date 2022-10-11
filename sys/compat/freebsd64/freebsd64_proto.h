@@ -195,7 +195,7 @@ struct freebsd64_munmap_args {
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 };
 struct freebsd64_mprotect_args {
-	char addr_l_[PADL_(const void *)]; const void * addr; char addr_r_[PADR_(const void *)];
+	char addr_l_[PADL_(void *)]; void * addr; char addr_r_[PADR_(void *)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char prot_l_[PADL_(int)]; int prot; char prot_r_[PADR_(int)];
 };
@@ -210,11 +210,11 @@ struct freebsd64_mincore_args {
 	char vec_l_[PADL_(char *)]; char * vec; char vec_r_[PADR_(char *)];
 };
 struct freebsd64_getgroups_args {
-	char gidsetsize_l_[PADL_(u_int)]; u_int gidsetsize; char gidsetsize_r_[PADR_(u_int)];
+	char gidsetsize_l_[PADL_(int)]; int gidsetsize; char gidsetsize_r_[PADR_(int)];
 	char gidset_l_[PADL_(gid_t *)]; gid_t * gidset; char gidset_r_[PADR_(gid_t *)];
 };
 struct freebsd64_setgroups_args {
-	char gidsetsize_l_[PADL_(u_int)]; u_int gidsetsize; char gidsetsize_r_[PADR_(u_int)];
+	char gidsetsize_l_[PADL_(int)]; int gidsetsize; char gidsetsize_r_[PADR_(int)];
 	char gidset_l_[PADL_(const gid_t *)]; const gid_t * gidset; char gidset_r_[PADR_(const gid_t *)];
 };
 struct freebsd64_setitimer_args {
@@ -385,11 +385,11 @@ struct freebsd64_pathconf_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
 	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
 };
-struct freebsd64___getrlimit_args {
+struct freebsd64_getrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
 	char rlp_l_[PADL_(struct rlimit *)]; struct rlimit * rlp; char rlp_r_[PADR_(struct rlimit *)];
 };
-struct freebsd64___setrlimit_args {
+struct freebsd64_setrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
 	char rlp_l_[PADL_(struct rlimit *)]; struct rlimit * rlp; char rlp_r_[PADR_(struct rlimit *)];
 };
@@ -873,9 +873,6 @@ struct freebsd64_setcontext_args {
 struct freebsd64_swapcontext_args {
 	char oucp_l_[PADL_(struct __ucontext64 *)]; struct __ucontext64 * oucp; char oucp_r_[PADR_(struct __ucontext64 *)];
 	char ucp_l_[PADL_(const struct __ucontext64 *)]; const struct __ucontext64 * ucp; char ucp_r_[PADR_(const struct __ucontext64 *)];
-};
-struct freebsd64_swapoff_args {
-	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
 };
 struct freebsd64___acl_get_link_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
@@ -1505,10 +1502,21 @@ struct freebsd64___specialfd_args {
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 };
 struct freebsd64_aio_writev_args {
-	char aiocbp_l_[PADL_(struct aiocb *)]; struct aiocb * aiocbp; char aiocbp_r_[PADR_(struct aiocb *)];
+	char aiocbp_l_[PADL_(struct aiocb64 *)]; struct aiocb64 * aiocbp; char aiocbp_r_[PADR_(struct aiocb64 *)];
 };
 struct freebsd64_aio_readv_args {
-	char aiocbp_l_[PADL_(struct aiocb *)]; struct aiocb * aiocbp; char aiocbp_r_[PADR_(struct aiocb *)];
+	char aiocbp_l_[PADL_(struct aiocb64 *)]; struct aiocb64 * aiocbp; char aiocbp_r_[PADR_(struct aiocb64 *)];
+};
+struct freebsd64_fspacectl_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
+	char rqsr_l_[PADL_(const struct spacectl_range *)]; const struct spacectl_range * rqsr; char rqsr_r_[PADR_(const struct spacectl_range *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char rmsr_l_[PADL_(struct spacectl_range *)]; struct spacectl_range * rmsr; char rmsr_r_[PADR_(struct spacectl_range *)];
+};
+struct freebsd64_swapoff_args {
+	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
+	char flags_l_[PADL_(u_int)]; u_int flags; char flags_r_[PADR_(u_int)];
 };
 int	freebsd64_read(struct thread *, struct freebsd64_read_args *);
 int	freebsd64_write(struct thread *, struct freebsd64_write_args *);
@@ -1584,8 +1592,8 @@ int	freebsd64_msgsys(struct thread *, struct freebsd64_msgsys_args *);
 int	freebsd64_shmsys(struct thread *, struct freebsd64_shmsys_args *);
 int	freebsd64_ntp_adjtime(struct thread *, struct freebsd64_ntp_adjtime_args *);
 int	freebsd64_pathconf(struct thread *, struct freebsd64_pathconf_args *);
-int	freebsd64_getrlimit(struct thread *, struct freebsd64___getrlimit_args *);
-int	freebsd64_setrlimit(struct thread *, struct freebsd64___setrlimit_args *);
+int	freebsd64_getrlimit(struct thread *, struct freebsd64_getrlimit_args *);
+int	freebsd64_setrlimit(struct thread *, struct freebsd64_setrlimit_args *);
 int	freebsd64___sysctl(struct thread *, struct freebsd64___sysctl_args *);
 int	freebsd64_mlock(struct thread *, struct freebsd64_mlock_args *);
 int	freebsd64_munlock(struct thread *, struct freebsd64_munlock_args *);
@@ -1691,7 +1699,6 @@ int	freebsd64_sigreturn(struct thread *, struct freebsd64_sigreturn_args *);
 int	freebsd64_getcontext(struct thread *, struct freebsd64_getcontext_args *);
 int	freebsd64_setcontext(struct thread *, struct freebsd64_setcontext_args *);
 int	freebsd64_swapcontext(struct thread *, struct freebsd64_swapcontext_args *);
-int	freebsd64_swapoff(struct thread *, struct freebsd64_swapoff_args *);
 int	freebsd64___acl_get_link(struct thread *, struct freebsd64___acl_get_link_args *);
 int	freebsd64___acl_set_link(struct thread *, struct freebsd64___acl_set_link_args *);
 int	freebsd64___acl_delete_link(struct thread *, struct freebsd64___acl_delete_link_args *);
@@ -1814,6 +1821,8 @@ int	freebsd64_rpctls_syscall(struct thread *, struct freebsd64_rpctls_syscall_ar
 int	freebsd64___specialfd(struct thread *, struct freebsd64___specialfd_args *);
 int	freebsd64_aio_writev(struct thread *, struct freebsd64_aio_writev_args *);
 int	freebsd64_aio_readv(struct thread *, struct freebsd64_aio_readv_args *);
+int	freebsd64_fspacectl(struct thread *, struct freebsd64_fspacectl_args *);
+int	freebsd64_swapoff(struct thread *, struct freebsd64_swapoff_args *);
 
 #ifdef COMPAT_43
 
@@ -1907,6 +1916,14 @@ int	freebsd7_freebsd64_shmctl(struct thread *, struct freebsd7_freebsd64_shmctl_
 
 #ifdef COMPAT_FREEBSD10
 
+struct freebsd10_freebsd64__umtx_lock_args {
+	char umtx_l_[PADL_(struct umtx *)]; struct umtx * umtx; char umtx_r_[PADR_(struct umtx *)];
+};
+struct freebsd10_freebsd64__umtx_unlock_args {
+	char umtx_l_[PADL_(struct umtx *)]; struct umtx * umtx; char umtx_r_[PADR_(struct umtx *)];
+};
+int	freebsd10_freebsd64__umtx_lock(struct thread *, struct freebsd10_freebsd64__umtx_lock_args *);
+int	freebsd10_freebsd64__umtx_unlock(struct thread *, struct freebsd10_freebsd64__umtx_unlock_args *);
 
 #endif /* COMPAT_FREEBSD10 */
 
@@ -1959,9 +1976,9 @@ struct freebsd11_freebsd64_fhstat_args {
 };
 struct freebsd11_freebsd64_kevent_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char changelist_l_[PADL_(struct kevent_freebsd1164 *)]; struct kevent_freebsd1164 * changelist; char changelist_r_[PADR_(struct kevent_freebsd1164 *)];
+	char changelist_l_[PADL_(const struct freebsd11_kevent64 *)]; const struct freebsd11_kevent64 * changelist; char changelist_r_[PADR_(const struct freebsd11_kevent64 *)];
 	char nchanges_l_[PADL_(int)]; int nchanges; char nchanges_r_[PADR_(int)];
-	char eventlist_l_[PADL_(struct kevent_freebsd1164 *)]; struct kevent_freebsd1164 * eventlist; char eventlist_r_[PADR_(struct kevent_freebsd1164 *)];
+	char eventlist_l_[PADL_(struct freebsd11_kevent64 *)]; struct freebsd11_kevent64 * eventlist; char eventlist_r_[PADR_(struct freebsd11_kevent64 *)];
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
 };
@@ -2025,6 +2042,16 @@ struct freebsd12_freebsd64_shm_open_args {
 int	freebsd12_freebsd64_shm_open(struct thread *, struct freebsd12_freebsd64_shm_open_args *);
 
 #endif /* COMPAT_FREEBSD12 */
+
+
+#ifdef COMPAT_FREEBSD13
+
+struct freebsd13_freebsd64_swapoff_args {
+	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
+};
+int	freebsd13_freebsd64_swapoff(struct thread *, struct freebsd13_freebsd64_swapoff_args *);
+
+#endif /* COMPAT_FREEBSD13 */
 
 #define	FREEBSD64_SYS_AUE_freebsd64_read	AUE_READ
 #define	FREEBSD64_SYS_AUE_freebsd64_write	AUE_WRITE
@@ -2232,7 +2259,7 @@ int	freebsd12_freebsd64_shm_open(struct thread *, struct freebsd12_freebsd64_shm
 #define	FREEBSD64_SYS_AUE_freebsd64_getcontext	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_setcontext	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_swapcontext	AUE_NULL
-#define	FREEBSD64_SYS_AUE_freebsd64_swapoff	AUE_SWAPOFF
+#define	FREEBSD64_SYS_AUE_freebsd13_freebsd64_swapoff	AUE_SWAPOFF
 #define	FREEBSD64_SYS_AUE_freebsd64___acl_get_link	AUE_ACL_GET_LINK
 #define	FREEBSD64_SYS_AUE_freebsd64___acl_set_link	AUE_ACL_SET_LINK
 #define	FREEBSD64_SYS_AUE_freebsd64___acl_delete_link	AUE_ACL_DELETE_LINK
@@ -2241,6 +2268,8 @@ int	freebsd12_freebsd64_shm_open(struct thread *, struct freebsd12_freebsd64_shm
 #define	FREEBSD64_SYS_AUE_freebsd64_thr_create	AUE_THR_CREATE
 #define	FREEBSD64_SYS_AUE_freebsd64_thr_exit	AUE_THR_EXIT
 #define	FREEBSD64_SYS_AUE_freebsd64_thr_self	AUE_NULL
+#define	FREEBSD64_SYS_AUE_freebsd10_freebsd64__umtx_lock	AUE_NULL
+#define	FREEBSD64_SYS_AUE_freebsd10_freebsd64__umtx_unlock	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_extattr_list_fd	AUE_EXTATTR_LIST_FD
 #define	FREEBSD64_SYS_AUE_freebsd64_extattr_list_file	AUE_EXTATTR_LIST_FILE
 #define	FREEBSD64_SYS_AUE_freebsd64_extattr_list_link	AUE_EXTATTR_LIST_LINK
@@ -2358,6 +2387,8 @@ int	freebsd12_freebsd64_shm_open(struct thread *, struct freebsd12_freebsd64_shm
 #define	FREEBSD64_SYS_AUE_freebsd64___specialfd	AUE_SPECIALFD
 #define	FREEBSD64_SYS_AUE_freebsd64_aio_writev	AUE_AIO_WRITEV
 #define	FREEBSD64_SYS_AUE_freebsd64_aio_readv	AUE_AIO_READV
+#define	FREEBSD64_SYS_AUE_freebsd64_fspacectl	AUE_FSPACECTL
+#define	FREEBSD64_SYS_AUE_freebsd64_swapoff	AUE_SWAPOFF
 
 #undef PAD_
 #undef PADL_

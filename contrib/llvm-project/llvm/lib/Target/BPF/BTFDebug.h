@@ -16,7 +16,8 @@
 
 #include "llvm/ADT/StringMap.h"
 #include "llvm/CodeGen/DebugHandlerBase.h"
-#include "llvm/CodeGen/MachineInstr.h"
+#include <cstdint>
+#include <map>
 #include <set>
 #include <unordered_map>
 #include "BTF.h"
@@ -27,9 +28,12 @@ class AsmPrinter;
 class BTFDebug;
 class DIType;
 class GlobalVariable;
+class MachineFunction;
+class MachineInstr;
+class MachineOperand;
+class MCInst;
 class MCStreamer;
 class MCSymbol;
-class MachineFunction;
 
 /// The base class for BTF type generation.
 class BTFTypeBase {
@@ -60,9 +64,11 @@ public:
 class BTFTypeDerived : public BTFTypeBase {
   const DIDerivedType *DTy;
   bool NeedsFixup;
+  StringRef Name;
 
 public:
   BTFTypeDerived(const DIDerivedType *Ty, unsigned Tag, bool NeedsFixup);
+  BTFTypeDerived(unsigned NextTypeId, unsigned Tag, StringRef Name);
   void completeType(BTFDebug &BDebug) override;
   void emitType(MCStreamer &OS) override;
   void setPointeeType(uint32_t PointeeType);
@@ -183,12 +189,43 @@ public:
   uint32_t getSize() override {
     return BTFTypeBase::getSize() + BTF::BTFDataSecVarSize * Vars.size();
   }
-  void addVar(uint32_t Id, const MCSymbol *Sym, uint32_t Size) {
+  void addDataSecEntry(uint32_t Id, const MCSymbol *Sym, uint32_t Size) {
     Vars.push_back(std::make_tuple(Id, Sym, Size));
   }
   std::string getName() { return Name; }
   void completeType(BTFDebug &BDebug) override;
   void emitType(MCStreamer &OS) override;
+};
+
+/// Handle binary floating point type.
+class BTFTypeFloat : public BTFTypeBase {
+  StringRef Name;
+
+public:
+  BTFTypeFloat(uint32_t SizeInBits, StringRef TypeName);
+  void completeType(BTFDebug &BDebug) override;
+};
+
+/// Handle decl tags.
+class BTFTypeDeclTag : public BTFTypeBase {
+  uint32_t Info;
+  StringRef Tag;
+
+public:
+  BTFTypeDeclTag(uint32_t BaseTypeId, int ComponentId, StringRef Tag);
+  uint32_t getSize() override { return BTFTypeBase::getSize() + 4; }
+  void completeType(BTFDebug &BDebug) override;
+  void emitType(MCStreamer &OS) override;
+};
+
+class BTFTypeTypeTag : public BTFTypeBase {
+  const DIDerivedType *DTy;
+  StringRef Tag;
+
+public:
+  BTFTypeTypeTag(uint32_t NextTypeId, StringRef Tag);
+  BTFTypeTypeTag(const DIDerivedType *DTy, StringRef Tag);
+  void completeType(BTFDebug &BDebug) override;
 };
 
 /// String table.
@@ -251,7 +288,7 @@ class BTFDebug : public DebugHandlerBase {
   StringMap<std::vector<std::string>> FileContent;
   std::map<std::string, std::unique_ptr<BTFKindDataSec>> DataSecEntries;
   std::vector<BTFTypeStruct *> StructTypes;
-  std::map<const GlobalVariable *, uint32_t> PatchImms;
+  std::map<const GlobalVariable *, std::pair<int64_t, uint32_t>> PatchImms;
   std::map<StringRef, std::pair<bool, std::vector<BTFTypeDerived *>>>
       FixupDerivedTypes;
   std::set<const Function *>ProtoFunctions;
@@ -300,6 +337,10 @@ class BTFDebug : public DebugHandlerBase {
   /// Generate types for function prototypes.
   void processFuncPrototypes(const Function *);
 
+  /// Generate types for decl annotations.
+  void processDeclAnnotations(DINodeArray Annotations, uint32_t BaseTypeId,
+                              int ComponentId);
+
   /// Generate one field relocation record.
   void generatePatchImmReloc(const MCSymbol *ORSym, uint32_t RootId,
                              const GlobalVariable *, bool IsAma);
@@ -307,8 +348,9 @@ class BTFDebug : public DebugHandlerBase {
   /// Populating unprocessed type on demand.
   unsigned populateType(const DIType *Ty);
 
-  /// Process relocation instructions.
-  void processReloc(const MachineOperand &MO);
+  /// Process global variables referenced by relocation instructions
+  /// and extern function references.
+  void processGlobalValue(const MachineOperand &MO);
 
   /// Emit common header of .BTF and .BTF.ext sections.
   void emitCommonHeader();

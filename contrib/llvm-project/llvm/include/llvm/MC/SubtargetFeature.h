@@ -18,6 +18,7 @@
 #define LLVM_MC_SUBTARGETFEATURE_H
 
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/MathExtras.h"
 #include <array>
 #include <bitset>
@@ -30,7 +31,7 @@ namespace llvm {
 class raw_ostream;
 class Triple;
 
-const unsigned MAX_SUBTARGET_WORDS = 3;
+const unsigned MAX_SUBTARGET_WORDS = 4;
 const unsigned MAX_SUBTARGET_FEATURES = MAX_SUBTARGET_WORDS * 64;
 
 /// Container class for subtarget features.

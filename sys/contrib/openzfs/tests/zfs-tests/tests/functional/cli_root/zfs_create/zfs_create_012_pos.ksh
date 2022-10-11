@@ -41,16 +41,14 @@
 # 2. Verify only the leaf filesystem to be version=1, others use the current version
 #
 
-ZFS_VERSION=$(zfs upgrade | head -1 | awk '{print $NF}' \
-	| sed -e 's/\.//g')
+ZFS_VERSION=$(zfs upgrade | grep -wom1 '[[:digit:]]*')
 
 verify_runnable "both"
 
 function cleanup
 {
-	if datasetexists $TESTPOOL/$TESTFS1 ; then
-		log_must zfs destroy -rf $TESTPOOL/$TESTFS1
-	fi
+	datasetexists $TESTPOOL/$TESTFS1 && \
+		destroy_dataset $TESTPOOL/$TESTFS1 -rf
 }
 
 log_onexit cleanup

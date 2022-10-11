@@ -74,8 +74,7 @@ gpiopower_attach(device_t dev)
 	if ((node = ofw_bus_get_node(dev)) == -1)
 		return (ENXIO);
 
-	ofw_gpiobus_parse_gpios(dev, "gpios", &sc->sc_pin);
-	if (sc->sc_pin == NULL) {
+	if (ofw_gpiobus_parse_gpios(dev, "gpios", &sc->sc_pin) <= 0) {
 		device_printf(dev, "failed to map GPIO pin\n");
 		return (ENXIO);
 	}
@@ -117,8 +116,6 @@ gpiopower_assert(device_t dev, int howto)
 	DELAY(10000000);
 }
 
-static devclass_t gpiopower_devclass;
-
 static device_method_t gpiopower_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		gpiopower_probe),
@@ -133,5 +130,5 @@ static driver_t gpiopower_driver = {
 	sizeof(struct gpiopower_softc)
 };
 
-DRIVER_MODULE(gpiopower, simplebus, gpiopower_driver, gpiopower_devclass, 0, 0);
+DRIVER_MODULE(gpiopower, simplebus, gpiopower_driver, 0, 0);
 MODULE_DEPEND(gpiopower, gpiobus, 1, 1, 1);

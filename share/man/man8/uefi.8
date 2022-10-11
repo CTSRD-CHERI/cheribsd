@@ -1,5 +1,4 @@
 .\" Copyright (c) 2014 The FreeBSD Foundation
-.\" All rights reserved.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
@@ -24,7 +23,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd February 22, 2021
+.Dd March 18, 2022
 .Dt UEFI 8
 .Os
 .Sh NAME
@@ -37,11 +36,11 @@ Unified Extensible Firmware Interface provides boot- and run-time services
 to operating systems.
 .Nm
 is a replacement for the legacy BIOS on the i386 and amd64 CPU architectures,
-and is also used on arm, arm64 and ia64.
+and is also used on arm, arm64 and riscv architectures.
 .Pp
 The UEFI specification is the successor to the Extensible Firmware Interface
 (EFI) specification.
-The terms are often used interchangeably.
+The terms UEFI and EFI are often used interchangeably.
 .Pp
 The
 .Nm
@@ -50,7 +49,7 @@ boot process loads system bootstrap code located in an EFI System Partition
 The ESP is a GPT or MBR partition with a specific identifier that contains an
 .Xr msdosfs 5
 FAT file system with a specified file hierarchy.
-.Bl -column -offset indent ".Sy Partition Scheme" ".Sy ESP Identifier"
+.Bl -column -offset indent "Partition Scheme" "ESP Identifier"
 .It Sy "Partition Scheme" Ta Sy "ESP Identifier"
 .It GPT Ta C12A7328-F81F-11D2-BA4B-00A0C93EC93B
 .It MBR Ta 0xEF
@@ -64,13 +63,16 @@ boot process proceeds as follows:
 .Nm
 firmware runs at power up and searches for an OS loader in the EFI system
 partition.
-The path to the loader may be set by an EFI environment variable.
+The path to the loader may be set by an EFI environment variable managed by
+.Xr efibootmgr 8 .
 If not set, an architecture-specific default is used.
 .Bl -column -offset indent "Architecture" "Default Path"
 .It Sy Architecture Ta Sy Default Path
 .It amd64 Ta Pa /EFI/BOOT/BOOTX64.EFI
 .It arm Ta Pa /EFI/BOOT/BOOTARM.EFI
 .It arm64 Ta Pa /EFI/BOOT/BOOTAA64.EFI
+.It i386 Ta Pa /EFI/BOOT/BOOTIA32.EFI
+.It riscv Ta Pa /EFI/BOOT/BOOTRISCV64.EFI
 .El
 .Pp
 The default
@@ -88,24 +90,6 @@ or
 .Pa /boot/config .
 .It
 .Pa loader.efi
-searches partitions of type
-.Li freebsd-ufs
-and
-.Li freebsd-zfs
-for
-.Pa loader.efi .
-The search begins with partitions on the device from which
-.Pa loader.efi
-was loaded, and continues with other available partitions.
-If both
-.Li freebsd-ufs
-and
-.Li freebsd-zfs
-partitions exist on the same device the
-.Li freebsd-zfs
-partition is preferred.
-.It
-.Pa loader.efi
 loads and boots the kernel, as described in
 .Xr loader 8 .
 .El
@@ -121,9 +105,9 @@ bootstrap
 .It Pa /boot/loader.efi
 Final stage bootstrap
 .It Pa /boot/kernel/kernel
-default kernel
+Default kernel
 .It Pa /boot/kernel.old/kernel
-typical non-default kernel (optional)
+Typical non-default kernel (optional)
 .El
 .Sh SEE ALSO
 .Xr vt 4 ,
@@ -147,3 +131,5 @@ for armv6 and armv7 in
 .Fx 12.0 ;
 and for riscv in
 .Fx 13.0 .
+.Sh BUGS
+There is no support for 32-bit i386 booting via UEFI.

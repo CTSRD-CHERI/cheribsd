@@ -19,6 +19,6 @@
 # $FreeBSD$
 
 include GENERIC-MORELLO
-include	std.MFS-ROOT
+include	"std.MFS-ROOT"
 
 ident	GENERIC-MORELLO-MFS-ROOT

@@ -2,7 +2,8 @@
 
 BINDIR= ${LIBEXECDIR}/bsdinstall
 PROG=	distextract
-LIBADD=	archive dpv figpar ncursesw dialog m
+CFLAGS+= -I${SRCTOP}/contrib/bsddialog/lib -I${.OBJDIR}/..
+LIBADD=	archive bsddialog m
 
 MAN=
 

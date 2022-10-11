@@ -96,7 +96,7 @@ typedef int malloc_cpuid_t;
 
 /* Return the nearest aligned address at or below a. */
 #define ALIGNMENT_ADDR2BASE(a, alignment)				\
-	((vaddr_t)(a) & (vaddr_t)((~(alignment)) + 1))
+	((void *)((uintptr_t)(a) & ((~(alignment)) + 1)))
 
 /* Return the offset between a and the nearest aligned address at or below a. */
 #if __has_builtin(__builtin_align_down)

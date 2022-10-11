@@ -35,7 +35,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/mutex.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
 #include <sys/poll.h>
@@ -98,13 +100,11 @@ kbd_realloc_array(void)
 {
 	keyboard_t **new_kbd;
 	int newsize;
-	int s;
 
-	s = spltty();
+	GIANT_REQUIRED;
 	newsize = rounddown(keyboards + ARRAY_DELTA, ARRAY_DELTA);
 	new_kbd = malloc(sizeof(*new_kbd)*newsize, M_DEVBUF, M_NOWAIT|M_ZERO);
 	if (new_kbd == NULL) {
-		splx(s);
 		return (ENOMEM);
 	}
 	bcopy(keyboard, new_kbd, sizeof(*keyboard)*keyboards);
@@ -112,7 +112,6 @@ kbd_realloc_array(void)
 		free(keyboard, M_DEVBUF);
 	keyboard = new_kbd;
 	keyboards = newsize;
-	splx(s);
 
 	if (bootverbose)
 		printf("kbd: new array size %d\n", keyboards);
@@ -246,30 +245,26 @@ int
 kbd_unregister(keyboard_t *kbd)
 {
 	int error;
-	int s;
 
+	GIANT_REQUIRED;
 	if ((kbd->kb_index < 0) || (kbd->kb_index >= keyboards))
 		return (ENOENT);
 	if (keyboard[kbd->kb_index] != kbd)
 		return (ENOENT);
 
-	s = spltty();
 	if (KBD_IS_BUSY(kbd)) {
 		error = (*kbd->kb_callback.kc_func)(kbd, KBDIO_UNLOADING,
 		    kbd->kb_callback.kc_arg);
 		if (error) {
-			splx(s);
 			return (error);
 		}
 		if (KBD_IS_BUSY(kbd)) {
-			splx(s);
 			return (EBUSY);
 		}
 	}
 	KBD_INVALID(kbd);
 	keyboard[kbd->kb_index] = NULL;
 
-	splx(s);
 	return (0);
 }
 
@@ -334,16 +329,14 @@ kbd_allocate(char *driver, int unit, void *id, kbd_callback_func_t *func,
 	     void *arg)
 {
 	int index;
-	int s;
 
+	GIANT_REQUIRED;
 	if (func == NULL)
 		return (-1);
 
-	s = spltty();
 	index = kbd_find_keyboard(driver, unit);
 	if (index >= 0) {
 		if (KBD_IS_BUSY(keyboard[index])) {
-			splx(s);
 			return (-1);
 		}
 		keyboard[index]->kb_token = id;
@@ -352,7 +345,6 @@ kbd_allocate(char *driver, int unit, void *id, kbd_callback_func_t *func,
 		keyboard[index]->kb_callback.kc_arg = arg;
 		kbdd_clear_state(keyboard[index]);
 	}
-	splx(s);
 	return (index);
 }
 
@@ -360,9 +352,8 @@ int
 kbd_release(keyboard_t *kbd, void *id)
 {
 	int error;
-	int s;
 
-	s = spltty();
+	GIANT_REQUIRED;
 	if (!KBD_IS_VALID(kbd) || !KBD_IS_BUSY(kbd)) {
 		error = EINVAL;
 	} else if (kbd->kb_token != id) {
@@ -375,7 +366,6 @@ kbd_release(keyboard_t *kbd, void *id)
 		kbdd_clear_state(kbd);
 		error = 0;
 	}
-	splx(s);
 	return (error);
 }
 
@@ -384,9 +374,8 @@ kbd_change_callback(keyboard_t *kbd, void *id, kbd_callback_func_t *func,
 		    void *arg)
 {
 	int error;
-	int s;
 
-	s = spltty();
+	GIANT_REQUIRED;
 	if (!KBD_IS_VALID(kbd) || !KBD_IS_BUSY(kbd)) {
 		error = EINVAL;
 	} else if (kbd->kb_token != id) {
@@ -398,7 +387,6 @@ kbd_change_callback(keyboard_t *kbd, void *id, kbd_callback_func_t *func,
 		kbd->kb_callback.kc_arg = arg;
 		error = 0;
 	}
-	splx(s);
 	return (error);
 }
 
@@ -454,7 +442,7 @@ static d_poll_t		genkbdpoll;
 
 static struct cdevsw kbd_cdevsw = {
 	.d_version =	D_VERSION,
-	.d_flags =	D_NEEDGIANT,
+	.d_flags =	D_NEEDGIANT | D_GIANTOK,
 	.d_open =	genkbdopen,
 	.d_close =	genkbdclose,
 	.d_read =	genkbdread,
@@ -543,20 +531,17 @@ genkbdopen(struct cdev *dev, int mode, int flag, struct thread *td)
 {
 	keyboard_t *kbd;
 	genkbd_softc_t *sc;
-	int s;
 	int i;
 
-	s = spltty();
+	GIANT_REQUIRED;
 	sc = dev->si_drv1;
 	kbd = kbd_get_keyboard(KBD_INDEX(dev));
 	if ((sc == NULL) || (kbd == NULL) || !KBD_IS_VALID(kbd)) {
-		splx(s);
 		return (ENXIO);
 	}
 	i = kbd_allocate(kbd->kb_name, kbd->kb_unit, sc,
 	    genkbd_event, (void *)sc);
 	if (i < 0) {
-		splx(s);
 		return (EBUSY);
 	}
 	/* assert(i == kbd->kb_index) */
@@ -568,7 +553,6 @@ genkbdopen(struct cdev *dev, int mode, int flag, struct thread *td)
 	 */
 
 	sc->gkb_q_length = 0;
-	splx(s);
 
 	return (0);
 }
@@ -578,13 +562,12 @@ genkbdclose(struct cdev *dev, int mode, int flag, struct thread *td)
 {
 	keyboard_t *kbd;
 	genkbd_softc_t *sc;
-	int s;
 
+	GIANT_REQUIRED;
 	/*
 	 * NOTE: the device may have already become invalid.
 	 * kbd == NULL || !KBD_IS_VALID(kbd)
 	 */
-	s = spltty();
 	sc = dev->si_drv1;
 	kbd = kbd_get_keyboard(KBD_INDEX(dev));
 	if ((sc == NULL) || (kbd == NULL) || !KBD_IS_VALID(kbd)) {
@@ -592,7 +575,6 @@ genkbdclose(struct cdev *dev, int mode, int flag, struct thread *td)
 	} else {
 		kbd_release(kbd, (void *)sc);
 	}
-	splx(s);
 	return (0);
 }
 
@@ -604,35 +586,29 @@ genkbdread(struct cdev *dev, struct uio *uio, int flag)
 	u_char buffer[KB_BUFSIZE];
 	int len;
 	int error;
-	int s;
 
+	GIANT_REQUIRED;
 	/* wait for input */
-	s = spltty();
 	sc = dev->si_drv1;
 	kbd = kbd_get_keyboard(KBD_INDEX(dev));
 	if ((sc == NULL) || (kbd == NULL) || !KBD_IS_VALID(kbd)) {
-		splx(s);
 		return (ENXIO);
 	}
 	while (sc->gkb_q_length == 0) {
 		if (flag & O_NONBLOCK) {
-			splx(s);
 			return (EWOULDBLOCK);
 		}
 		sc->gkb_flags |= KB_ASLEEP;
 		error = tsleep(sc, PZERO | PCATCH, "kbdrea", 0);
 		kbd = kbd_get_keyboard(KBD_INDEX(dev));
 		if ((kbd == NULL) || !KBD_IS_VALID(kbd)) {
-			splx(s);
 			return (ENXIO);	/* our keyboard has gone... */
 		}
 		if (error) {
 			sc->gkb_flags &= ~KB_ASLEEP;
-			splx(s);
 			return (error);
 		}
 	}
-	splx(s);
 
 	/* copy as much input as possible */
 	error = 0;
@@ -681,10 +657,9 @@ genkbdpoll(struct cdev *dev, int events, struct thread *td)
 	keyboard_t *kbd;
 	genkbd_softc_t *sc;
 	int revents;
-	int s;
 
+	GIANT_REQUIRED;
 	revents = 0;
-	s = spltty();
 	sc = dev->si_drv1;
 	kbd = kbd_get_keyboard(KBD_INDEX(dev));
 	if ((sc == NULL) || (kbd == NULL) || !KBD_IS_VALID(kbd)) {
@@ -695,7 +670,6 @@ genkbdpoll(struct cdev *dev, int events, struct thread *td)
 		else
 			selrecord(td, &sc->gkb_rsel);
 	}
-	splx(s);
 	return (revents);
 }
 
@@ -820,11 +794,10 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 	okeymap_t *omapp;
 	keyarg_t *keyp;
 	fkeyarg_t *fkeyp;
-	int s;
 	int i, j;
 	int error;
 
-	s = spltty();
+	GIANT_REQUIRED;
 	switch (cmd) {
 
 	case KDGKBINFO:		/* get keyboard information */
@@ -855,7 +828,6 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 #endif
 			data = *(void * __capability *)arg;
 		error = copyout(kbd->kb_keymap, data, sizeof(keymap_t));
-		splx(s);
 		return (error);
 	case OGIO_KEYMAP:	/* get keyboard translation table (compat) */
 		mapp = kbd->kb_keymap;
@@ -892,7 +864,6 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 				data = *(void * __capability *)arg;
 			error = copyin(data, mapp, sizeof *mapp);
 			if (error != 0) {
-				splx(s);
 				free(mapp, M_TEMP);
 				return (error);
 			}
@@ -900,7 +871,6 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 
 		error = keymap_change_ok(kbd->kb_keymap, mapp, curthread);
 		if (error != 0) {
-			splx(s);
 			free(mapp, M_TEMP);
 			return (error);
 		}
@@ -909,7 +879,6 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		free(mapp, M_TEMP);
 		break;
 #else
-		splx(s);
 		return (ENODEV);
 #endif
 
@@ -917,7 +886,6 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		keyp = (keyarg_t *)arg;
 		if (keyp->keynum >= sizeof(kbd->kb_keymap->key) /
 		    sizeof(kbd->kb_keymap->key[0])) {
-			splx(s);
 			return (EINVAL);
 		}
 		bcopy(&kbd->kb_keymap->key[keyp->keynum], &keyp->key,
@@ -928,20 +896,17 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		keyp = (keyarg_t *)arg;
 		if (keyp->keynum >= sizeof(kbd->kb_keymap->key) /
 		    sizeof(kbd->kb_keymap->key[0])) {
-			splx(s);
 			return (EINVAL);
 		}
 		error = key_change_ok(&kbd->kb_keymap->key[keyp->keynum],
 		    &keyp->key, curthread);
 		if (error != 0) {
-			splx(s);
 			return (error);
 		}
 		bcopy(&keyp->key, &kbd->kb_keymap->key[keyp->keynum],
 		    sizeof(keyp->key));
 		break;
 #else
-		splx(s);
 		return (ENODEV);
 #endif
 
@@ -953,20 +918,17 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		error = accent_change_ok(kbd->kb_accentmap,
 		    (accentmap_t *)arg, curthread);
 		if (error != 0) {
-			splx(s);
 			return (error);
 		}
 		bcopy(arg, kbd->kb_accentmap, sizeof(*kbd->kb_accentmap));
 		break;
 #else
-		splx(s);
 		return (ENODEV);
 #endif
 
 	case GETFKEY:		/* get functionkey string */
 		fkeyp = (fkeyarg_t *)arg;
 		if (fkeyp->keynum >= kbd->kb_fkeytab_size) {
-			splx(s);
 			return (EINVAL);
 		}
 		bcopy(kbd->kb_fkeytab[fkeyp->keynum].str, fkeyp->keydef,
@@ -977,13 +939,11 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 #ifndef KBD_DISABLE_KEYMAP_LOAD
 		fkeyp = (fkeyarg_t *)arg;
 		if (fkeyp->keynum >= kbd->kb_fkeytab_size) {
-			splx(s);
 			return (EINVAL);
 		}
 		error = fkey_change_ok(&kbd->kb_fkeytab[fkeyp->keynum],
 		    fkeyp, curthread);
 		if (error != 0) {
-			splx(s);
 			return (error);
 		}
 		kbd->kb_fkeytab[fkeyp->keynum].len = min(fkeyp->flen, MAXFK);
@@ -991,16 +951,13 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		    kbd->kb_fkeytab[fkeyp->keynum].len);
 		break;
 #else
-		splx(s);
 		return (ENODEV);
 #endif
 
 	default:
-		splx(s);
 		return (ENOIOCTL);
 	}
 
-	splx(s);
 	return (0);
 }
 

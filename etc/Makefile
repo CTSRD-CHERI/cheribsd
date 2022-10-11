@@ -76,10 +76,10 @@ distribution:
 
 .if ${MK_MAIL} != "no"
 	cd ${.CURDIR}/mail; ${INSTALL} -o ${BINOWN} -g ${BINGRP} -m 644 \
-	    -T "package=runtime" ${ETCMAIL} ${DESTDIR}/etc/mail
+	    -T "package=sendmail" ${ETCMAIL} ${DESTDIR}/etc/mail
 	if [ -d ${DESTDIR}/etc/mail -a -f ${DESTDIR}/etc/mail/aliases -a \
 	      ! -f ${DESTDIR}/etc/aliases ]; then \
-		${INSTALL_SYMLINK} -T "package=runtime" \
+		${INSTALL_SYMLINK} -T "package=sendmail" \
 		mail/aliases ${DESTDIR}/etc/aliases; \
 	fi
 .endif
@@ -103,7 +103,7 @@ MTREES=		mtree/BSD.root.dist		/		\
 		mtree/BSD.usr.dist		/usr		\
 		mtree/BSD.include.dist		/usr/include	\
 		mtree/BSD.debug.dist		/usr/lib
-.if ${MK_COMPAT_CHERIABI} != "no"
+.if ${MK_LIB64C} != "no"
 MTREES+=	mtree/BSD.lib64c.dist		/usr
 MTREES+=	mtree/BSD.lib64c.dist		/usr/lib/debug/usr
 .endif
@@ -112,17 +112,16 @@ MTREES+=	mtree/BSD.lib32.dist		/usr
 MTREES+=	mtree/BSD.lib32.dist		/usr/lib/debug/usr
 .endif
 .if ${MK_LIB64} != "no"
+.if ${MK_PKGBOOTSTRAP} != "no"
+MTREES+=	mtree/BSD.pkg64.dist		/
+.endif
 MTREES+=	mtree/BSD.lib64.dist		/usr
 MTREES+=	mtree/BSD.lib64.dist		/usr/lib/debug/usr
-.endif
-.if ${MK_LIBSOFT} != "no"
-MTREES+=	mtree/BSD.libsoft.dist		/usr
-MTREES+=	mtree/BSD.libsoft.dist		/usr/lib/debug/usr
 .endif
 .if ${MK_TESTS} != "no"
 MTREES+=	mtree/BSD.tests.dist		${TESTSBASE}
 MTREES+=	mtree/BSD.tests.dist		/usr/lib/debug/${TESTSBASE}
-.if ${MK_COMPAT_CHERIABI} != "no"
+.if ${MK_LIB64C} != "no"
 MTREES+=	mtree/BSD.tests.dist		${TESTSBASE}/cheri
 MTREES+=	mtree/BSD.tests.dist		/usr/lib/debug/${TESTSBASE}/cheri
 .endif
@@ -161,7 +160,7 @@ distrib-dirs: ${MTREES:N/*} distrib-cleanup .PHONY
 .for _m _d in ${MTREES}
 	@m=${.CURDIR}/${_m}; \
 	d=${_d}; \
-	test "$$d" == "/" && d=""; \
+	test "$$d" = "/" && d=""; \
 	d=${DISTBASE}$$d; \
 	test -d ${DESTDIR}/$$d || mkdir -p ${DESTDIR}/$$d; \
 	${ECHO} "${MTREE_CMD:N-W} -C -f $$m -K all | " \

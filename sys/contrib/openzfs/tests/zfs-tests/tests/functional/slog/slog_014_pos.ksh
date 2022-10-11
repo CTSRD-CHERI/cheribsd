@@ -58,7 +58,7 @@ for type in "mirror" "raidz" "raidz2"; do
                 # Ensure the file has been synced out before attempting to
                 # corrupt its contents.
                 #
-                sync
+                sync_all_pools
 
 		#
 		# Corrupt a pool device to make the pool DEGRADED
@@ -76,11 +76,7 @@ for type in "mirror" "raidz" "raidz2"; do
 		log_must zpool offline $TESTPOOL $VDIR/a
 		log_must wait_for_degraded $TESTPOOL
 
-		zpool status -v $TESTPOOL | grep logs | \
-			grep "DEGRADED" 2>&1 >/dev/null
-		if (( $? == 0 )); then
-			log_fail "log device should display correct status"
-		fi
+		log_mustnot eval "zpool status -v $TESTPOOL | grep logs | grep -q \"DEGRADED\""
 
 		log_must zpool online $TESTPOOL $VDIR/a
 		log_must zpool destroy -f $TESTPOOL

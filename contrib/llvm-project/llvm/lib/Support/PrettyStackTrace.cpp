@@ -13,7 +13,6 @@
 
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm-c/ErrorHandling.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -21,10 +20,15 @@
 #include "llvm/Support/Watchdog.h"
 #include "llvm/Support/raw_ostream.h"
 
+#ifdef __APPLE__
+#include "llvm/ADT/SmallString.h"
+#endif
+
 #include <atomic>
 #include <cassert>
 #include <cstdarg>
 #include <cstdio>
+#include <cstring>
 #include <tuple>
 
 #ifdef HAVE_CRASHREPORTERCLIENT_H
@@ -72,7 +76,7 @@ PrettyStackTraceEntry *ReverseStackTrace(PrettyStackTraceEntry *Head) {
         std::make_tuple(Head, Head->NextEntry, Prev);
   return Prev;
 }
-}
+} // namespace llvm
 
 static void PrintStack(raw_ostream &OS) {
   // Print out the stack in reverse order. To avoid recursion (which is likely
@@ -253,8 +257,16 @@ void PrettyStackTraceFormat::print(raw_ostream &OS) const { OS << Str << "\n"; }
 void PrettyStackTraceProgram::print(raw_ostream &OS) const {
   OS << "Program arguments: ";
   // Print the argument list.
-  for (unsigned i = 0, e = ArgC; i != e; ++i)
-    OS << ArgV[i] << ' ';
+  for (int I = 0; I < ArgC; ++I) {
+    const bool HaveSpace = ::strchr(ArgV[I], ' ');
+    if (I)
+      OS << ' ';
+    if (HaveSpace)
+      OS << '"';
+    OS.write_escaped(ArgV[I]);
+    if (HaveSpace)
+      OS << '"';
+  }
   OS << '\n';
 }
 

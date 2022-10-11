@@ -49,24 +49,21 @@ log_must zfs snapshot $TESTPOOL/$TESTFS@snap
 #
 log_note "Writing files until ENOSPC."
 
-for i in $(seq 30); do
+for i in $(seq 100); do
 	file_write -o create -f $TESTDIR/file.$i -b $BLOCKSZ \
 	    -c $NUM_WRITES -d $DATA
 	ret=$?
 	(( $ret != $ENOSPC )) && \
 	    log_fail "file.$i returned: $ret rather than ENOSPC."
 
-	log_must zpool sync -f
+	sync_all_pools true
 done
 
 log_mustnot_expect space zfs create $TESTPOOL/$TESTFS/subfs
 log_mustnot_expect space zfs clone $TESTPOOL/$TESTFS@snap $TESTPOOL/clone
-log_mustnot_expect space zfs snapshot $TESTPOOL/$TESTFS@snap2
-log_mustnot_expect space zfs bookmark \
-    $TESTPOOL/$TESTFS@snap $TESTPOOL/$TESTFS#bookmark
 
-log_must zfs send $TESTPOOL/$TESTFS@snap > $TEST_BASE_DIR/stream.$$
-log_mustnot_expect space zfs receive $TESTPOOL/$TESTFS/recvd < $TEST_BASE_DIR/stream.$$
+log_must eval "zfs send $TESTPOOL/$TESTFS@snap > $TEST_BASE_DIR/stream.$$"
+log_mustnot_expect space eval "zfs receive $TESTPOOL/$TESTFS/recvd < $TEST_BASE_DIR/stream.$$"
 log_must rm $TEST_BASE_DIR/stream.$$
 
 log_must zfs rename $TESTPOOL/$TESTFS@snap $TESTPOOL/$TESTFS@snap_newname

@@ -428,10 +428,3 @@ freebsd4_setdomainname(struct thread *td,
 	    __USER_CAP(uap->domainname, uap->len), uap->len, 0, 0));
 }
 #endif /* COMPAT_FREEBSD4 */
-
-void evil_hack(void *liveptr);
-
-void
-evil_hack(void *liveptr __unused)
-{
-}

@@ -128,11 +128,12 @@ static device_method_t cpufreq_methods[] = {
         DEVMETHOD(cpufreq_levels,	cf_levels_method),
 	{0, 0}
 };
+
 static driver_t cpufreq_driver = {
 	"cpufreq", cpufreq_methods, sizeof(struct cpufreq_softc)
 };
-static devclass_t cpufreq_dc;
-DRIVER_MODULE(cpufreq, cpu, cpufreq_driver, cpufreq_dc, 0, 0);
+
+DRIVER_MODULE(cpufreq, cpu, cpufreq_driver, 0, 0);
 
 static int		cf_lowest_freq;
 static int		cf_verbose;
@@ -957,7 +958,7 @@ cpufreq_curr_sysctl(SYSCTL_HANDLER_ARGS)
 	 * CPUs have equal levels), we call cpufreq_set() on all CPUs.
 	 * This is needed for some MP systems.
 	 */
-	error = devclass_get_devices(cpufreq_dc, &devs, &devcount);
+	error = devclass_get_devices(devclass_find("cpufreq"), &devs, &devcount);
 	if (error)
 		goto out;
 	for (n = 0; n < devcount; n++) {
@@ -1103,7 +1104,7 @@ cpufreq_register(device_t dev)
 	}
 
 	/* Add the child device and possibly sysctls. */
-	cf_dev = BUS_ADD_CHILD(cpu_dev, 0, "cpufreq", -1);
+	cf_dev = BUS_ADD_CHILD(cpu_dev, 0, "cpufreq", device_get_unit(cpu_dev));
 	if (cf_dev == NULL)
 		return (ENOMEM);
 	device_quiet(cf_dev);
@@ -1122,7 +1123,7 @@ int
 cpufreq_unregister(device_t dev)
 {
 	device_t cf_dev;
-	struct cpufreq_softc *sc;
+	struct cpufreq_softc *sc __diagused;
 
 	/*
 	 * If this is the last cpufreq child device, remove the control

@@ -394,6 +394,12 @@ g_multipath_done(struct bio *bp)
 			mtx_unlock(&sc->sc_mtx);
 		} else
 			mtx_unlock(&sc->sc_mtx);
+		if (bp->bio_error == 0 &&
+			bp->bio_cmd == BIO_GETATTR &&
+			!strcmp(bp->bio_attribute, "GEOM::physpath"))
+		{
+			strlcat(bp->bio_data, "/mp", bp->bio_length);
+		}
 		g_std_done(bp);
 	}
 }
@@ -576,7 +582,7 @@ static int
 g_multipath_add_disk(struct g_geom *gp, struct g_provider *pp)
 {
 	struct g_multipath_softc *sc;
-	struct g_consumer *cp, *nxtcp;
+	struct g_consumer *cp;
 	int error, acr, acw, ace;
 
 	g_topology_assert();
@@ -596,7 +602,6 @@ g_multipath_add_disk(struct g_geom *gp, struct g_provider *pp)
 		    pp->name, gp->name);
 		return (EEXIST);
 	}
-	nxtcp = LIST_FIRST(&gp->consumer);
 	cp = g_new_consumer(gp);
 	cp->flags |= G_CF_DIRECT_SEND | G_CF_DIRECT_RECEIVE;
 	cp->private = NULL;
@@ -823,6 +828,7 @@ g_multipath_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	gp->access = g_multipath_access;
 	gp->orphan = g_multipath_orphan;
 	cp = g_new_consumer(gp);
+	cp->flags |= G_CF_DIRECT_SEND | G_CF_DIRECT_RECEIVE;
 	error = g_attach(cp, pp);
 	if (error == 0) {
 		error = g_multipath_read_metadata(cp, &md);
@@ -1076,7 +1082,6 @@ g_multipath_ctl_prefer(struct gctl_req *req, struct g_class *mp)
 static void
 g_multipath_ctl_add(struct gctl_req *req, struct g_class *mp)
 {
-	struct g_multipath_softc *sc;
 	struct g_geom *gp;
 	const char *mpname, *name;
 
@@ -1090,7 +1095,6 @@ g_multipath_ctl_add(struct gctl_req *req, struct g_class *mp)
 		gctl_error(req, "Device %s not found", mpname);
 		return;
 	}
-	sc = gp->softc;
 
 	name = gctl_get_asciiparam(req, "arg1");
 	if (name == NULL) {

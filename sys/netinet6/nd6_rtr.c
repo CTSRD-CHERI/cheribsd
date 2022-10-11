@@ -972,7 +972,7 @@ defrouter_select_fib(int fibnum)
 	TAILQ_FOREACH(dr, &V_nd6_defrouter, dr_entry) {
 		NET_EPOCH_ENTER(et);
 		if (selected_dr == NULL && dr->ifp->if_fib == fibnum &&
-		    (ln = nd6_lookup(&dr->rtaddr, 0, dr->ifp)) &&
+		    (ln = nd6_lookup(&dr->rtaddr, LLE_SF(AF_INET6, 0), dr->ifp)) &&
 		    ND6_IS_LLINFO_PROBREACH(ln)) {
 			selected_dr = dr;
 			defrouter_ref(selected_dr);
@@ -1814,7 +1814,8 @@ find_pfxlist_reachable_router(struct nd_prefix *pr)
 
 	NET_EPOCH_ENTER(et);
 	LIST_FOREACH(pfxrtr, &pr->ndpr_advrtrs, pfr_entry) {
-		ln = nd6_lookup(&pfxrtr->router->rtaddr, 0, pfxrtr->router->ifp);
+		ln = nd6_lookup(&pfxrtr->router->rtaddr, LLE_SF(AF_INET6, 0),
+		    pfxrtr->router->ifp);
 		if (ln == NULL)
 			continue;
 		canreach = ND6_IS_LLINFO_PROBREACH(ln);
@@ -2165,7 +2166,6 @@ nd6_prefix_offlink(struct nd_prefix *pr)
 	int error = 0;
 	struct ifnet *ifp = pr->ndpr_ifp;
 	struct nd_prefix *opr;
-	struct sockaddr_in6 sa6;
 	char ip6buf[INET6_ADDRSTRLEN];
 	uint64_t genid;
 	int a_failure;
@@ -2240,7 +2240,8 @@ restart:
 	}
 
 	if (a_failure)
-		lltable_prefix_free(AF_INET6, (struct sockaddr *)&sa6,
+		lltable_prefix_free(AF_INET6,
+		    (struct sockaddr *)&pr->ndpr_prefix,
 		    (struct sockaddr *)&mask6, LLE_STATIC);
 
 	return (error);
@@ -2424,29 +2425,32 @@ rt6_flush(struct in6_addr *gateway, struct ifnet *ifp)
 int
 nd6_setdefaultiface(int ifindex)
 {
-	int error = 0;
-
-	if (ifindex < 0 || V_if_index < ifindex)
-		return (EINVAL);
-	if (ifindex != 0 && !ifnet_byindex(ifindex))
-		return (EINVAL);
 
 	if (V_nd6_defifindex != ifindex) {
 		V_nd6_defifindex = ifindex;
-		if (V_nd6_defifindex > 0)
+		if (V_nd6_defifindex != 0) {
+			struct epoch_tracker et;
+
+			/*
+			 * XXXGL: this function should use ifnet_byindex_ref!
+			 */
+			NET_EPOCH_ENTER(et);
 			V_nd6_defifp = ifnet_byindex(V_nd6_defifindex);
-		else
+			NET_EPOCH_EXIT(et);
+			if (V_nd6_defifp == NULL)
+				return (EINVAL);
+		} else
 			V_nd6_defifp = NULL;
 
 		/*
-		 * Our current implementation assumes one-to-one maping between
+		 * Our current implementation assumes one-to-one mapping between
 		 * interfaces and links, so it would be natural to use the
 		 * default interface as the default link.
 		 */
 		scope6_setdefault(V_nd6_defifp);
 	}
 
-	return (error);
+	return (0);
 }
 
 bool

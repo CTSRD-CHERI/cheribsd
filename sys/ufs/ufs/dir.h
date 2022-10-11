@@ -81,6 +81,12 @@ struct	direct {
 	u_int16_t d_reclen;		/* length of this record */
 	u_int8_t  d_type; 		/* file type, see below */
 	u_int8_t  d_namlen;		/* length of string in d_name */
+	/*
+	 * XXX: As with struct dirent we'd like to use d_namlen, since
+	 * otherwise you can overflow into any struct direct's after this one
+	 * in the array.
+	 */
+	__subobject_variable_length_maxsize(UFS_MAXNAMLEN + 1)
 	char	  d_name[UFS_MAXNAMLEN + 1];
 					/* name with length <= UFS_MAXNAMLEN */
 };

@@ -6,8 +6,8 @@ __<${_this:T}>__:
 .include <src.libnames.mk>
 
 # Makefile for the compatibility libraries.
-# - 32-bit compat libraries on MIPS, PowerPC, and AMD64.
-# - 64-bit compat on CHERI MIPS
+# - 32-bit compat libraries on PowerPC, and AMD64.
+# - 64-bit compat on CHERI RISC-V and Morello.
 
 _LC_LIBDIRS.yes=		lib
 _LC_LIBDIRS.yes+=		gnu/lib
@@ -44,8 +44,8 @@ LIBCOMPATWMAKEFLAGS+= \
 		${LIBCOMPAT_COMPILERS} \
 		DESTDIR=${WORLDTMP} \
 		-DNO_CPU_CFLAGS \
+		MK_BOOT=no \
 		MK_CTF=no \
-		-DNO_LINT \
 		MK_TESTS=no MK_TESTS_SUPPORT=${MK_TESTS} \
 		WORLDTMP_MTREE="${WORLDTMP_MTREE}"
 # Avoid re-computing COMPILER_VERSION, etc. values:
@@ -61,7 +61,7 @@ LIBCOMPATWMAKEFLAGS+=	${_var}="${X_${_var}}"
 .endfor
 LIBCOMPATWMAKEFLAGS+=_NO_INCLUDE_LINKERMK=yes _NO_INCLUDE_COMPILERMK=yes
 
-LIBCOMPATWMAKE+=	${LIBCOMPATWMAKEENV} ${MAKE} ${LIBCOMPATWMAKEFLAGS} \
+LIBCOMPATWMAKE+=	${TIME_ENV} ${LIBCOMPATWMAKEENV} ${MAKE} ${LIBCOMPATWMAKEFLAGS} \
 			OBJTOP=${LIBCOMPAT_OBJTOP} \
 			OBJROOT='$${OBJTOP}/' \
 			MAKEOBJDIRPREFIX= \
@@ -73,7 +73,7 @@ LIBCOMPATIMAKE+=	${LIBCOMPATWMAKE:NINSTALL=*:NDESTDIR=*} \
 .if ${MK_FILE} != "no"
 _libmagic=	lib/libmagic
 .endif
-.if ${MK_PMC} != "no" && (${TARGET_ARCH} == "amd64" || ${TARGET} == "arm64")
+.if ${MK_PMC} != "no"
 _jevents=	lib/libpmc/pmu-events
 .endif
 
@@ -84,47 +84,41 @@ build${libcompat}: .PHONY
 	@echo "--------------------------------------------------------------"
 	@echo ">>> stage 4.3: building lib${libcompat} shim libraries"
 	@echo "--------------------------------------------------------------"
-
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
 	    -p ${WORLDTMP}/usr >/dev/null
 .if ${MK_DEBUG_FILES} != "no"
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
 	    -p ${WORLDTMP}/usr/lib/debug/usr >/dev/null
 .endif
-# XXX: Remove this hack once morello-llvm supports lib64c
-.if ${libcompat} == "64c" && ${COMPAT_ARCH} == "aarch64"
-	@echo "Morello: creating libcheri link in WORLDTMP"
-	ln -sfnv lib64c ${WORLDTMP}/usr/libcheri
-.endif
-.for _dir in lib/ncurses/ncurses ${_libmagic} ${_jevents}
+.for _dir in lib/ncurses/tinfo ${_libmagic} ${_jevents}
 .for _t in ${_obj} build-tools
 	${_+_}cd ${.CURDIR}/${_dir}; \
 	    WORLDTMP=${WORLDTMP} \
 	    MAKEFLAGS="-m ${.CURDIR}/tools/build/mk ${.MAKEFLAGS}" \
-	    ${MAKE} SSP_CFLAGS= DESTDIR= \
+	    ${MAKE} DESTDIR= \
 	    OBJTOP=${LIBCOMPAT_OBJTOP} \
 	    OBJROOT='$${OBJTOP}/' \
 	    MAKEOBJDIRPREFIX= \
-	    DIRPRFX=${_dir}/ -DNO_LINT -DNO_CPU_CFLAGS \
-	    MK_CTF=no MK_RETPOLINE=no MK_WERROR=no \
+	    DIRPRFX=${_dir}/ \
+	    -DNO_LINT \
+	    -DNO_CPU_CFLAGS \
+	    MK_ASAN=no \
+	    MK_CTF=no \
+	    MK_RETPOLINE=no \
+	    MK_SSP=no \
+	    MK_UBSAN=no \
+	    MK_WERROR=no \
 	    ${_t}
 .endfor
 .endfor
 	${_+_}cd ${.CURDIR}; \
 	    ${LIBCOMPATWMAKE} -f Makefile.inc1 -DNO_FSCHG libraries
-.if ${MK_COMPAT_CHERIABI} == "yes" && ${MK_CHERI_PURE} == "yes"
-# To build a purecap world against /usr/lib64c, we need internal libs.
-.for _lib in ${_INTERNALLIBS}
-	${_+_}cd ${.CURDIR}${LIB${_lib:tu}DIR:S|${_LIB_OBJTOP}||}; \
-	    ${LIBCOMPATWMAKE} all
-.endfor
-.endif
 
 distribute${libcompat} install${libcompat}: .PHONY
 	${_+_}cd ${.CURDIR}; \
 	    ${LIBCOMPATIMAKE} -f Makefile.inc1 _lc_${.TARGET:S/${libcompat}$//}
 
-.if ${.TARGETS:Mlib${libcompat}buildenv} || ${.TARGETS:Mlibcheribuildenv}
+.if ${.TARGETS:Mlib${libcompat}buildenv}
 .if ${.MAKEFLAGS:M-j}
 .error The lib${libcompat}buildenv target is incompatible with -j
 .endif
@@ -142,10 +136,6 @@ lib${libcompat}buildenv: .PHONY
 	    INSTALL="${INSTALL_CMD} ${INSTALLFLAGS}" \
 	    MTREE_CMD="${MTREE_CMD} ${MTREEFLAGS}" \
 	    "MAKEFLAGS=${MAKEFLAGS:NTARGET*}" ${BUILDENV_SHELL} || true
-
-.if ${libcompat} == "64c"
-libcheribuildenv: lib64cbuildenv
-.endif
 .endif
 
 .endif # defined(_LIBCOMPAT)

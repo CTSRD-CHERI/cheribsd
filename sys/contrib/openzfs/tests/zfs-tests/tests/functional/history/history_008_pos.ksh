@@ -47,9 +47,7 @@ verify_runnable "global"
 
 function cleanup
 {
-	if datasetexists $root_testfs; then
-		log_must zfs destroy -rf $root_testfs
-	fi
+	datasetexists $root_testfs && destroy_dataset $root_testfs -rf
 	log_must zfs create $root_testfs
 }
 
@@ -57,8 +55,7 @@ log_assert "Pool history records all recursive operations."
 log_onexit cleanup
 
 root_testfs=$TESTPOOL/$TESTFS
-fs1=$root_testfs/fs1; fs2=$root_testfs/fs2; fs3=$root_testfs/fs3
-for fs in $fs1 $fs2 $fs3; do
+for fs in $root_testfs/fs{1..3}; do
 	log_must zfs create $fs
 done
 

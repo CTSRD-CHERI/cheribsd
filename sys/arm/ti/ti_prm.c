@@ -146,12 +146,10 @@ ti_prm_reset(device_t dev)
 int
 ti_prm_write_4(device_t dev, bus_addr_t addr, uint32_t val)
 {
-	struct ti_prm_softc *sc;
 	device_t parent;
 
 	parent = device_get_parent(dev);
-	sc = device_get_softc(dev);
-	DPRINTF(sc->dev, "offset=%lx write %x\n", addr, val);
+	DPRINTF(dev, "offset=%lx write %x\n", addr, val);
 	ti_prcm_device_lock(parent);
 	ti_prcm_write_4(parent, addr, val);
 	ti_prcm_device_unlock(parent);
@@ -161,32 +159,28 @@ ti_prm_write_4(device_t dev, bus_addr_t addr, uint32_t val)
 int
 ti_prm_read_4(device_t dev, bus_addr_t addr, uint32_t *val)
 {
-	struct ti_prm_softc *sc;
 	device_t parent;
 
 	parent = device_get_parent(dev);
-	sc = device_get_softc(dev);
 
 	ti_prcm_device_lock(parent);
 	ti_prcm_read_4(parent, addr, val);
 	ti_prcm_device_unlock(parent);
-	DPRINTF(sc->dev, "offset=%lx Read %x\n", addr, *val);
+	DPRINTF(dev, "offset=%lx Read %x\n", addr, *val);
 	return (0);
 }
 
 int
 ti_prm_modify_4(device_t dev, bus_addr_t addr, uint32_t clr, uint32_t set)
 {
-	struct ti_prm_softc *sc;
 	device_t parent;
 
 	parent = device_get_parent(dev);
-	sc = device_get_softc(dev);
 
 	ti_prcm_device_lock(parent);
 	ti_prcm_modify_4(parent, addr, clr, set);
 	ti_prcm_device_unlock(parent);
-	DPRINTF(sc->dev, "offset=%lx (clr %x set %x)\n", addr, clr, set);
+	DPRINTF(dev, "offset=%lx (clr %x set %x)\n", addr, clr, set);
 
 	return (0);
 }
@@ -202,9 +196,7 @@ static device_method_t ti_prm_methods[] = {
 DEFINE_CLASS_1(ti_prm, ti_prm_driver, ti_prm_methods,
     sizeof(struct ti_prm_softc), simplebus_driver);
 
-static devclass_t ti_prm_devclass;
-
-EARLY_DRIVER_MODULE(ti_prm, simplebus, ti_prm_driver,
-    ti_prm_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(ti_prm, simplebus, ti_prm_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
 MODULE_VERSION(ti_prm, 1);
 MODULE_DEPEND(ti_prm, ti_sysc, 1, 1, 1);

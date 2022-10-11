@@ -468,6 +468,7 @@ zfs_avx512vbmi_available(void)
 static jmp_buf env;
 static void sigillhandler(int x)
 {
+	(void) x;
 	longjmp(env, 1);
 }
 #endif
@@ -489,6 +490,24 @@ zfs_altivec_available(void)
 	}
 #endif
 	return (has_altivec);
+}
+static inline boolean_t
+zfs_vsx_available(void)
+{
+	boolean_t has_vsx = B_FALSE;
+#if defined(__ALTIVEC__) && !defined(__FreeBSD__)
+	sighandler_t savesig;
+	savesig = signal(SIGILL, sigillhandler);
+	if (setjmp(env)) {
+		signal(SIGILL, savesig);
+		has_vsx = B_FALSE;
+	} else {
+		__asm__ __volatile__("xssubsp 0,0,0\n");
+		signal(SIGILL, savesig);
+		has_vsx = B_TRUE;
+	}
+#endif
+	return (has_vsx);
 }
 #else
 

@@ -29,6 +29,9 @@
 
 # Fixed by r368462
 
+# May change policy for random threads to to domainset_fixed
+exit 0
+
 . ../default.cfg
 cat > /tmp/syzkaller30.c <<EOF
 // https://syzkaller.appspot.com/bug?id=6652adb41773e5c471c98342fefcbfb041af9ac8
@@ -63,5 +66,5 @@ mycc -o /tmp/syzkaller30 -Wall -Wextra -O0 /tmp/syzkaller30.c ||
 
 (cd /tmp; timeout 3m ./syzkaller30)
 
-rm -rf /tmp/syzkaller30 syzkaller30.c /tmp/syzkaller.*
+rm -rf /tmp/syzkaller30 /tmp/syzkaller30.c /tmp/syzkaller.*
 exit 0

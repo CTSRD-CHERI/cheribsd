@@ -59,8 +59,11 @@
  */
 #define NVME_GLOBAL_NAMESPACE_TAG	((uint32_t)0xFFFFFFFF)
 
-/* Cap transfers by the maximum addressable by page-sized PRP (4KB -> 2MB). */
-#define NVME_MAX_XFER_SIZE		MIN(maxphys, (PAGE_SIZE/8*PAGE_SIZE))
+/* Host memory buffer sizes are always in 4096 byte chunks */
+#define	NVME_HMB_UNITS			4096
+
+/* Many items are expressed in terms of power of two times MPS */
+#define NVME_MPS_SHIFT			12
 
 /* Register field definitions */
 #define NVME_CAP_LO_REG_MQES_SHIFT			(0)
@@ -236,6 +239,35 @@
 /* Asymmetric Namespace Access Reporting */
 #define NVME_CTRLR_DATA_MIC_ANAR_SHIFT			(3)
 #define NVME_CTRLR_DATA_MIC_ANAR_MASK			(0x1)
+
+/** OAES - Optional Asynchronous Events Supported */
+/* supports Namespace Attribute Notices event */
+#define NVME_CTRLR_DATA_OAES_NS_ATTR_SHIFT		(8)
+#define NVME_CTRLR_DATA_OAES_NS_ATTR_MASK		(0x1)
+/* supports Firmware Activation Notices event */
+#define NVME_CTRLR_DATA_OAES_FW_ACTIVATE_SHIFT		(9)
+#define NVME_CTRLR_DATA_OAES_FW_ACTIVATE_MASK		(0x1)
+/* supports Asymmetric Namespace Access Change Notices event */
+#define NVME_CTRLR_DATA_OAES_ASYM_NS_CHANGE_SHIFT	(11)
+#define NVME_CTRLR_DATA_OAES_ASYM_NS_CHANGE_MASK	(0x1)
+/* supports Predictable Latency Event Aggregate Log Change Notices event */
+#define NVME_CTRLR_DATA_OAES_PREDICT_LATENCY_SHIFT	(12)
+#define NVME_CTRLR_DATA_OAES_PREDICT_LATENCY_MASK	(0x1)
+/* supports LBA Status Information Notices event */
+#define NVME_CTRLR_DATA_OAES_LBA_STATUS_SHIFT		(13)
+#define NVME_CTRLR_DATA_OAES_LBA_STATUS_MASK		(0x1)
+/* supports Endurance Group Event Aggregate Log Page Changes Notices event */
+#define NVME_CTRLR_DATA_OAES_ENDURANCE_GROUP_SHIFT	(14)
+#define NVME_CTRLR_DATA_OAES_ENDURANCE_GROUP_MASK	(0x1)
+/* supports Normal NVM Subsystem Shutdown event */
+#define NVME_CTRLR_DATA_OAES_NORMAL_SHUTDOWN_SHIFT	(15)
+#define NVME_CTRLR_DATA_OAES_NORMAL_SHUTDOWN_MASK	(0x1)
+/* supports Zone Descriptor Changed Notices event */
+#define NVME_CTRLR_DATA_OAES_ZONE_DESC_CHANGE_SHIFT	(27)
+#define NVME_CTRLR_DATA_OAES_ZONE_DESC_CHANGE_MASK	(0x1)
+/* supports Discovery Log Page Change Notification event */
+#define NVME_CTRLR_DATA_OAES_LOG_PAGE_CHANGE_SHIFT	(31)
+#define NVME_CTRLR_DATA_OAES_LOG_PAGE_CHANGE_MASK	(0x1)
 
 /** OACS - optional admin command support */
 /* supports security send/receive commands */
@@ -533,6 +565,9 @@ enum nvme_critical_warning_state {
 #define	NVME_SS_PAGE_SSTAT_GDE_SHIFT			(8)
 #define	NVME_SS_PAGE_SSTAT_GDE_MASK			(0x1)
 
+/* Helper macro to combine *_MASK and *_SHIFT defines */
+#define NVMEB(name)	(name##_MASK << name##_SHIFT)
+
 /* CC register SHN field values */
 enum shn_value {
 	NVME_SHN_NORMAL		= 0x1,
@@ -546,8 +581,7 @@ enum shst_value {
 	NVME_SHST_COMPLETE	= 0x2,
 };
 
-struct nvme_registers
-{
+struct nvme_registers {
 	uint32_t	cap_lo; /* controller capabilities */
 	uint32_t	cap_hi;
 	uint32_t	vs;	/* version */
@@ -579,13 +613,12 @@ struct nvme_registers
 	struct {
 	    uint32_t	sq_tdbl; /* submission queue tail doorbell */
 	    uint32_t	cq_hdbl; /* completion queue head doorbell */
-	} doorbell[1] __packed;
-} __packed;
+	} doorbell[1];
+};
 
 _Static_assert(sizeof(struct nvme_registers) == 0x1008, "bad size for nvme_registers");
 
-struct nvme_command
-{
+struct nvme_command {
 	/* dword 0 */
 	uint8_t opc;		/* opcode */
 	uint8_t fuse;		/* fused operation */
@@ -614,7 +647,7 @@ struct nvme_command
 	uint32_t cdw13;		/* command-specific */
 	uint32_t cdw14;		/* command-specific */
 	uint32_t cdw15;		/* command-specific */
-} __packed;
+};
 
 _Static_assert(sizeof(struct nvme_command) == 16 * 4, "bad size for nvme_command");
 
@@ -632,7 +665,7 @@ struct nvme_completion {
 	/* dword 3 */
 	uint16_t		cid;	/* command identifier */
 	uint16_t		status;
-} __packed;
+} __aligned(8);	/* riscv: nvme_qpair_process_completions has better code gen */
 
 _Static_assert(sizeof(struct nvme_completion) == 4 * 4, "bad size for nvme_completion");
 
@@ -640,7 +673,7 @@ struct nvme_dsm_range {
 	uint32_t attributes;
 	uint32_t length;
 	uint64_t starting_lba;
-} __packed;
+};
 
 /* Largest DSM Trim that can be done */
 #define NVME_MAX_DSM_TRIM		4096
@@ -1283,7 +1316,7 @@ enum nvme_log_page {
 	NVME_LOG_ENDURANCE_GROUP_INFORMATION = 0x09,
 	NVME_LOG_PREDICTABLE_LATENCY_PER_NVM_SET = 0x0a,
 	NVME_LOG_PREDICTABLE_LATENCY_EVENT_AGGREGATE = 0x0b,
-	NVME_LOG_ASYMMETRIC_NAMESPAVE_ACCESS = 0x0c,
+	NVME_LOG_ASYMMETRIC_NAMESPACE_ACCESS = 0x0c,
 	NVME_LOG_PERSISTENT_EVENT_LOG	= 0x0d,
 	NVME_LOG_LBA_STATUS_INFORMATION	= 0x0e,
 	NVME_LOG_ENDURANCE_GROUP_EVENT_AGGREGATE = 0x0f,
@@ -1446,8 +1479,7 @@ struct nvme_sanitize_status_page {
 _Static_assert(sizeof(struct nvme_sanitize_status_page) == 512,
     "bad size for nvme_sanitize_status_page");
 
-struct intel_log_temp_stats
-{
+struct intel_log_temp_stats {
 	uint64_t	current;
 	uint64_t	overtemp_flag_last;
 	uint64_t	overtemp_flag_life;
@@ -1461,8 +1493,7 @@ struct intel_log_temp_stats
 
 _Static_assert(sizeof(struct intel_log_temp_stats) == 13 * 8, "bad size for intel_log_temp_stats");
 
-struct nvme_resv_reg_ctrlr
-{
+struct nvme_resv_reg_ctrlr {
 	uint16_t		ctrlr_id;	/* Controller ID */
 	uint8_t			rcsts;		/* Reservation Status */
 	uint8_t			reserved3[5];
@@ -1472,8 +1503,7 @@ struct nvme_resv_reg_ctrlr
 
 _Static_assert(sizeof(struct nvme_resv_reg_ctrlr) == 24, "bad size for nvme_resv_reg_ctrlr");
 
-struct nvme_resv_reg_ctrlr_ext
-{
+struct nvme_resv_reg_ctrlr_ext {
 	uint16_t		ctrlr_id;	/* Controller ID */
 	uint8_t			rcsts;		/* Reservation Status */
 	uint8_t			reserved3[5];
@@ -1484,8 +1514,7 @@ struct nvme_resv_reg_ctrlr_ext
 
 _Static_assert(sizeof(struct nvme_resv_reg_ctrlr_ext) == 64, "bad size for nvme_resv_reg_ctrlr_ext");
 
-struct nvme_resv_status
-{
+struct nvme_resv_status {
 	uint32_t		gen;		/* Generation */
 	uint8_t			rtype;		/* Reservation Type */
 	uint8_t			regctl[2];	/* Number of Registered Controllers */
@@ -1497,8 +1526,7 @@ struct nvme_resv_status
 
 _Static_assert(sizeof(struct nvme_resv_status) == 24, "bad size for nvme_resv_status");
 
-struct nvme_resv_status_ext
-{
+struct nvme_resv_status_ext {
 	uint32_t		gen;		/* Generation */
 	uint8_t			rtype;		/* Reservation Type */
 	uint8_t			regctl[2];	/* Number of Registered Controllers */

@@ -45,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/bus.h>
 #include <sys/module.h>
+#include <sys/sbuf.h>
 #include <sys/systm.h>
 
 #include <machine/bus.h>
@@ -145,11 +146,8 @@ bhndb_probe_nomatch(device_t dev, device_t child)
 static int
 bhndb_print_child(device_t dev, device_t child)
 {
-	struct bhndb_softc	*sc;
 	struct resource_list	*rl;
 	int			 retval = 0;
-
-	sc = device_get_softc(dev);
 
 	retval += bus_print_child_header(dev, child);
 
@@ -168,22 +166,13 @@ bhndb_print_child(device_t dev, device_t child)
 }
 
 static int
-bhndb_child_pnpinfo_str(device_t bus, device_t child, char *buf,
-    size_t buflen)
-{
-	*buf = '\0';
-	return (0);
-}
-
-static int
-bhndb_child_location_str(device_t dev, device_t child, char *buf,
-    size_t buflen)
+bhndb_child_location(device_t dev, device_t child, struct sbuf *sb)
 {
 	struct bhndb_softc *sc;
 
 	sc = device_get_softc(dev);
 
-	snprintf(buf, buflen, "base=0x%llx",
+	sbuf_printf(sb, "base=0x%llx",
 	    (unsigned long long) sc->chipid.enum_addr);
 	return (0);
 }
@@ -1902,11 +1891,8 @@ bhndb_bus_barrier(device_t dev, device_t child, struct bhnd_resource *r,
 static int
 bhndb_bhnd_map_intr(device_t dev, device_t child, u_int intr, rman_res_t *irq)
 {
-	struct bhndb_softc	*sc;
 	u_int			 ivec;
 	int			 error;
-
-	sc = device_get_softc(dev);
 
 	/* Is the intr valid? */
 	if (intr >= bhnd_get_intr_count(child))
@@ -2215,8 +2201,7 @@ static device_method_t bhndb_methods[] = {
 	/* Bus interface */
 	DEVMETHOD(bus_probe_nomatch,		bhndb_probe_nomatch),
 	DEVMETHOD(bus_print_child,		bhndb_print_child),
-	DEVMETHOD(bus_child_pnpinfo_str,	bhndb_child_pnpinfo_str),
-	DEVMETHOD(bus_child_location_str,	bhndb_child_location_str),
+	DEVMETHOD(bus_child_location,		bhndb_child_location),
 	DEVMETHOD(bus_add_child,		bhndb_add_child),
 	DEVMETHOD(bus_child_deleted,		bhndb_child_deleted),
 
@@ -2318,8 +2303,6 @@ static device_method_t bhndb_methods[] = {
 
 	DEVMETHOD_END
 };
-
-devclass_t bhndb_devclass;
 
 DEFINE_CLASS_0(bhndb, bhndb_driver, bhndb_methods, sizeof(struct bhndb_softc));
 

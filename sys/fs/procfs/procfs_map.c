@@ -51,6 +51,7 @@
 #include <sys/sysent.h>
 #endif
 #include <sys/uio.h>
+#include <sys/user.h>
 #include <sys/vnode.h>
 
 #include <fs/pseudofs/pseudofs.h>
@@ -85,7 +86,8 @@ procfs_doprocmap(PFS_FILL_ARGS)
 	char *fullpath, *freepath, *type;
 	struct ucred *cred;
 	vm_object_t lobj, nobj, obj, tobj;
-	int error, privateresident, ref_count, resident, shadow_count, flags;
+	int error, flags, kvme, privateresident, ref_count, resident;
+	int shadow_count;
 	vm_offset_t e_start, e_end;
 	vm_eflags_t e_eflags;
 	vm_prot_t e_prot;
@@ -155,30 +157,28 @@ procfs_doprocmap(PFS_FILL_ARGS)
 		freepath = NULL;
 		fullpath = "-";
 		if (lobj) {
-			vp = NULL;
-			switch (lobj->type) {
-			default:
-			case OBJT_DEFAULT:
-				type = "default";
-				break;
-			case OBJT_VNODE:
-				type = "vnode";
-				vp = lobj->handle;
+			kvme = vm_object_kvme_type(lobj, &vp);
+			if (vp != NULL)
 				vref(vp);
+			switch (kvme) {
+			default:
+				type = "unknown";
 				break;
-			case OBJT_SWAP:
-				if ((lobj->flags & OBJ_TMPFS_NODE) != 0) {
-					type = "vnode";
-					if ((lobj->flags & OBJ_TMPFS) != 0) {
-						vp = lobj->un_pager.swp.swp_tmpfs;
-						vref(vp);
-					}
-				} else {
-					type = "swap";
-				}
+			case KVME_TYPE_PHYS:
+				type = "phys";
 				break;
-			case OBJT_SG:
-			case OBJT_DEVICE:
+			case KVME_TYPE_SWAP:
+				type = "swap";
+				break;
+			case KVME_TYPE_DEAD:
+				type = "dead";
+				break;
+			case KVME_TYPE_VNODE:
+				type = "vnode";
+				break;
+			case KVME_TYPE_SG:
+			case KVME_TYPE_DEVICE:
+			case KVME_TYPE_MGTDEVICE:
 				type = "device";
 				break;
 			}

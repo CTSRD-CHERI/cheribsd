@@ -166,7 +166,7 @@ struct dn_pipe7 {        /* a pipe */
 	SLIST_ENTRY(dn_pipe7)    next;   /* linked list in a hash slot */
 
 	int pipe_nr ;       /* number   */
-	int bandwidth;      /* really, bytes/tick.  */
+	uint32_t bandwidth;      /* really, bytes/tick.  */
 	int delay ;         /* really, ticks    */
 
 	struct  mbuf *head, *tail ; /* packets in delay line */
@@ -231,7 +231,7 @@ struct dn_pipe8 {        /* a pipe */
 	SLIST_ENTRY(dn_pipe8)    next;   /* linked list in a hash slot */
 
 	int pipe_nr ;       /* number   */
-	int bandwidth;      /* really, bytes/tick.  */
+	uint32_t bandwidth;      /* really, bytes/tick.  */
 	int delay ;         /* really, ticks    */
 
 	struct  mbuf *head, *tail ; /* packets in delay line */
@@ -567,10 +567,10 @@ dn_compat_calc_size(void)
 	 * - all flowset queues:	queue_count
 	 * - all pipe queue:		si_count
 	 */
-	need += dn_cfg.schk_count * sizeof(struct dn_pipe8) / 2;
-	need += dn_cfg.fsk_count * sizeof(struct dn_flow_set);
-	need += dn_cfg.si_count * sizeof(struct dn_flow_queue8);
-	need += dn_cfg.queue_count * sizeof(struct dn_flow_queue8);
+	need += V_dn_cfg.schk_count * sizeof(struct dn_pipe8) / 2;
+	need += V_dn_cfg.fsk_count * sizeof(struct dn_flow_set);
+	need += V_dn_cfg.si_count * sizeof(struct dn_flow_queue8);
+	need += V_dn_cfg.queue_count * sizeof(struct dn_flow_queue8);
 
 	return need;
 }
@@ -814,7 +814,11 @@ ip_dummynet_compat(struct sockopt *sopt)
 		break;
 
 	case IP_DUMMYNET_CONFIGURE:
-		v = malloc(len, M_TEMP, M_WAITOK);
+		v = malloc(len, M_TEMP, M_NOWAIT);
+		if (v == NULL) {
+			error = ENOMEM;
+			break;
+		}
 		error = sooptcopyin(sopt, v, len, len);
 		if (error)
 			break;

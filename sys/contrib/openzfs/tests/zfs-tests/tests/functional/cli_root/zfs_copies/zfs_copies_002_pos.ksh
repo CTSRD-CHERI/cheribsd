@@ -50,9 +50,8 @@ function cleanup
 	typeset val
 
 	for val in 1 2 3; do
-		if datasetexists $TESTPOOL/fs_$val; then
-			log_must zfs destroy $TESTPOOL/fs_$val
-		fi
+		datasetexists $TESTPOOL/fs_$val && \
+			destroy_dataset $TESTPOOL/fs_$val
 	done
 }
 
@@ -60,7 +59,7 @@ log_assert "Verify that the space used by multiple copies is charged correctly."
 log_onexit cleanup
 
 for val in 1 2 3; do
-	log_must zfs create -o copies=$val $TESTPOOL/fs_$val
+	log_must zfs create -o compression=off -o copies=$val $TESTPOOL/fs_$val
 
 	log_must mkfile $FILESIZE /$TESTPOOL/fs_$val/$FILE
 done
@@ -68,7 +67,7 @@ done
 #
 # Sync up the filesystem
 #
-sync
+sync_all_pools
 
 #
 # Verify 'zfs list' can correctly list the space charged
@@ -95,11 +94,9 @@ done
 log_note "Verify df(1) can correctly display the space charged."
 for val in 1 2 3; do
 	if is_freebsd; then
-		used=`df -m /$TESTPOOL/fs_$val | grep $TESTPOOL/fs_$val \
-			| awk -v fs=fs_$val '$4 ~ fs {print $3}'`
+		used=`df -m /$TESTPOOL/fs_$val | awk -v pa=$TESTPOOL/fs_$val -v fs=fs_$val '$0 ~ pa && $4 ~ fs {print $3}'`
 	else
-		used=`df -F zfs -k /$TESTPOOL/fs_$val/$FILE | grep $TESTPOOL/fs_$val \
-			| awk '{print $3}'`
+		used=`df -F zfs -k /$TESTPOOL/fs_$val/$FILE | awk -v pa=$TESTPOOL/fs_$val '$0 ~ pa {print $3}'`
 		(( used = used * 1024 )) # kb -> bytes
 	fi
 	check_used $used $val

@@ -38,6 +38,7 @@
 #include <sysexits.h>
 #include <wchar.h>
 
+#include "sort.h"
 #include "mem.h"
 
 extern bool byte_sort;
@@ -45,17 +46,25 @@ extern bool byte_sort;
 /* wchar_t is of 4 bytes: */
 #define	SIZEOF_WCHAR_STRING(LEN) ((LEN)*sizeof(wchar_t))
 
+struct wstr {
+	size_t len;
+	wchar_t str[];
+};
+
+struct cstr {
+	size_t len;
+	char str[];
+};
+
 /*
  * Binary "wide" string
  */
 struct bwstring
 {
-	size_t				len;
-	union
-	{
-		wchar_t		wstr[0] __subobject_variable_length; /* FIXME: compiler should do this automatically */
-		unsigned char	cstr[0] __subobject_variable_length; /* FIXME: compiler should do this automatically */ 
-	}				data;
+	union {
+		struct wstr wdata;
+		struct cstr cdata;
+	};
 };
 
 struct reader_buffer
@@ -66,8 +75,7 @@ struct reader_buffer
 
 typedef void *bwstring_iterator;
 
-#define	BWSLEN(s) ((s)->len)
-
+#define	BWSLEN(s) ((mb_cur_max == 1) ? (s)->cdata.len : (s)->wdata.len)
 struct bwstring *bwsalloc(size_t sz);
 
 size_t bwsrawlen(const struct bwstring *bws);
@@ -102,23 +110,23 @@ static inline bwstring_iterator
 bws_begin(struct bwstring *bws)
 {
 
-	return (bwstring_iterator) (&(bws->data));
+	return ((bwstring_iterator)bws->wdata.str);
 }
 
 static inline bwstring_iterator
 bws_end(struct bwstring *bws)
 {
 
-	return ((MB_CUR_MAX == 1) ?
-	    (bwstring_iterator) (bws->data.cstr + bws->len) :
-	    (bwstring_iterator) (bws->data.wstr + bws->len));
+	return ((mb_cur_max == 1) ?
+	    (bwstring_iterator) (bws->cdata.str + bws->cdata.len) :
+	    (bwstring_iterator) (bws->wdata.str + bws->wdata.len));
 }
 
 static inline bwstring_iterator
 bws_iterator_inc(bwstring_iterator iter, size_t pos)
 {
 
-	if (MB_CUR_MAX == 1)
+	if (mb_cur_max == 1)
 		return ((unsigned char *) iter) + pos;
 	else
 		return ((wchar_t*) iter) + pos;
@@ -128,7 +136,7 @@ static inline wchar_t
 bws_get_iter_value(bwstring_iterator iter)
 {
 
-	if (MB_CUR_MAX == 1)
+	if (mb_cur_max == 1)
 		return *((unsigned char *) iter);
 	else
 		return *((wchar_t*) iter);
@@ -137,7 +145,7 @@ bws_get_iter_value(bwstring_iterator iter)
 int
 bws_iterator_cmp(bwstring_iterator iter1, bwstring_iterator iter2, size_t len);
 
-#define	BWS_GET(bws, pos) ((MB_CUR_MAX == 1) ? ((bws)->data.cstr[(pos)]) : (bws)->data.wstr[(pos)])
+#define	BWS_GET(bws, pos) ((mb_cur_max == 1) ? (bws->cdata.str[(pos)]) : bws->wdata.str[(pos)])
 
 void initialise_months(void);
 

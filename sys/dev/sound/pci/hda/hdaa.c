@@ -605,7 +605,7 @@ hdaa_eld_dump(struct hdaa_widget *w)
 	struct hdaa_devinfo *devinfo = w->devinfo;
 	device_t dev = devinfo->dev;
 	uint8_t *sad;
-	int len, mnl, i, sadc, fmt;
+	int mnl, i, sadc, fmt;
 
 	if (w->eld == NULL || w->eld_len < 4)
 		return;
@@ -614,7 +614,6 @@ hdaa_eld_dump(struct hdaa_widget *w)
 	    w->nid, w->eld[0] >> 3, w->eld[2]);
 	if ((w->eld[0] >> 3) != 0x02)
 		return;
-	len = min(w->eld_len, (u_int)w->eld[2] * 4);
 	mnl = w->eld[4] & 0x1f;
 	device_printf(dev,
 	    "ELD nid=%d: CEA_EDID_Ver=%u MNL=%u\n",
@@ -2191,7 +2190,7 @@ hdaa_channel_getptr(kobj_t obj, void *data)
 	hdaa_unlock(devinfo);
 
 	/*
-	 * Round to available space and force 128 bytes aligment.
+	 * Round to available space and force 128 bytes alignment.
 	 */
 	ptr %= ch->blksz * ch->blkcnt;
 	ptr &= HDA_BLK_ALIGN;
@@ -2712,7 +2711,7 @@ hdaa_audio_ctl_recsel_comm(struct hdaa_pcm_devinfo *pdevinfo, uint32_t src, nid_
 		if (w->type == HDA_PARAM_AUDIO_WIDGET_CAP_TYPE_AUDIO_MIXER) {
 			ctl = hdaa_audio_ctl_amp_get(devinfo,
 			    w->nid, HDAA_CTL_IN, i, 1);
-			if (ctl == NULL) 
+			if (ctl == NULL)
 				continue;
 			/* If we have input control on this node mute them
 			 * according to requested sources. */
@@ -3080,7 +3079,7 @@ hdaa_audio_ctl_parse(struct hdaa_devinfo *devinfo)
 			if (w->type == HDA_PARAM_AUDIO_WIDGET_CAP_TYPE_PIN_COMPLEX ||
 			    w->waspin)
 				ctls[cnt].ndir = HDAA_CTL_IN;
-			else 
+			else
 				ctls[cnt].ndir = HDAA_CTL_OUT;
 			ctls[cnt++].dir = HDAA_CTL_OUT;
 		}
@@ -3145,7 +3144,7 @@ hdaa_audio_ctl_parse(struct hdaa_devinfo *devinfo)
 				if (w->type ==
 				    HDA_PARAM_AUDIO_WIDGET_CAP_TYPE_PIN_COMPLEX)
 					ctls[cnt].ndir = HDAA_CTL_OUT;
-				else 
+				else
 					ctls[cnt].ndir = HDAA_CTL_IN;
 				ctls[cnt++].dir = HDAA_CTL_IN;
 				break;
@@ -3711,7 +3710,7 @@ hdaa_audio_adddac(struct hdaa_devinfo *devinfo, int asid)
 		    asid, as->index);
 	);
 
-	/* Find the exisitng DAC position and return if found more the one. */
+	/* Find the existing DAC position and return if found more the one. */
 	pos = -1;
 	for (i = 0; i < 16; i++) {
 		if (as->dacs[0][i] <= 0)
@@ -4138,7 +4137,7 @@ hdaa_audio_disable_nonaudio(struct hdaa_devinfo *devinfo)
 		    w->type == HDA_PARAM_AUDIO_WIDGET_CAP_TYPE_VOLUME_WIDGET) {
 			w->enable = 0;
 			HDA_BOOTHVERBOSE(
-				device_printf(devinfo->dev, 
+				device_printf(devinfo->dev,
 				    " Disabling nid %d due to it's"
 				    " non-audio type.\n",
 				    w->nid);
@@ -4165,7 +4164,7 @@ hdaa_audio_disable_useless(struct hdaa_devinfo *devinfo)
 			    HDA_CONFIG_DEFAULTCONF_CONNECTIVITY_NONE) {
 				w->enable = 0;
 				HDA_BOOTHVERBOSE(
-					device_printf(devinfo->dev, 
+					device_printf(devinfo->dev,
 					    " Disabling pin nid %d due"
 					    " to None connectivity.\n",
 					    w->nid);
@@ -4174,7 +4173,7 @@ hdaa_audio_disable_useless(struct hdaa_devinfo *devinfo)
 			    HDA_CONFIG_DEFAULTCONF_ASSOCIATION_MASK) == 0) {
 				w->enable = 0;
 				HDA_BOOTHVERBOSE(
-					device_printf(devinfo->dev, 
+					device_printf(devinfo->dev,
 					    " Disabling unassociated"
 					    " pin nid %d.\n",
 					    w->nid);
@@ -4201,7 +4200,7 @@ hdaa_audio_disable_useless(struct hdaa_devinfo *devinfo)
 					ctl->widget->connsenable[ctl->index] = 0;
 				done = 0;
 				HDA_BOOTHVERBOSE(
-					device_printf(devinfo->dev, 
+					device_printf(devinfo->dev,
 					    " Disabling ctl %d nid %d cnid %d due"
 					    " to disabled widget.\n", i,
 					    ctl->widget->nid,
@@ -4222,7 +4221,7 @@ hdaa_audio_disable_useless(struct hdaa_devinfo *devinfo)
 					if (cw == NULL || cw->enable == 0) {
 						w->connsenable[j] = 0;
 						HDA_BOOTHVERBOSE(
-							device_printf(devinfo->dev, 
+							device_printf(devinfo->dev,
 							    " Disabling nid %d connection %d due"
 							    " to disabled child widget.\n",
 							    i, j);
@@ -4245,7 +4244,7 @@ hdaa_audio_disable_useless(struct hdaa_devinfo *devinfo)
 				w->enable = 0;
 				done = 0;
 				HDA_BOOTHVERBOSE(
-					device_printf(devinfo->dev, 
+					device_printf(devinfo->dev,
 					    " Disabling nid %d due to all it's"
 					    " inputs disabled.\n", w->nid);
 				);
@@ -4270,7 +4269,7 @@ hdaa_audio_disable_useless(struct hdaa_devinfo *devinfo)
 				w->enable = 0;
 				done = 0;
 				HDA_BOOTHVERBOSE(
-					device_printf(devinfo->dev, 
+					device_printf(devinfo->dev,
 					    " Disabling nid %d due to all it's"
 					    " consumers disabled.\n", w->nid);
 				);
@@ -4296,7 +4295,7 @@ hdaa_audio_disable_unas(struct hdaa_devinfo *devinfo)
 		if (w->bindas == -1) {
 			w->enable = 0;
 			HDA_BOOTHVERBOSE(
-				device_printf(devinfo->dev, 
+				device_printf(devinfo->dev,
 				    " Disabling unassociated nid %d.\n",
 				    w->nid);
 			);
@@ -4318,7 +4317,7 @@ hdaa_audio_disable_unas(struct hdaa_devinfo *devinfo)
 					continue;
 				w->connsenable[j] = 0;
 				HDA_BOOTHVERBOSE(
-					device_printf(devinfo->dev, 
+					device_printf(devinfo->dev,
 					    " Disabling connection to input pin "
 					    "nid %d conn %d.\n",
 					    i, j);
@@ -4351,7 +4350,7 @@ hdaa_audio_disable_unas(struct hdaa_devinfo *devinfo)
 					if (cw->connsenable[j] && cw->conns[j] == i) {
 						cw->connsenable[j] = 0;
 						HDA_BOOTHVERBOSE(
-							device_printf(devinfo->dev, 
+							device_printf(devinfo->dev,
 							    " Disabling connection from output pin "
 							    "nid %d conn %d cnid %d.\n",
 							    k, j, i);
@@ -4400,7 +4399,7 @@ hdaa_audio_disable_notselected(struct hdaa_devinfo *devinfo)
 				continue;
 			w->connsenable[j] = 0;
 			HDA_BOOTHVERBOSE(
-				device_printf(devinfo->dev, 
+				device_printf(devinfo->dev,
 				    " Disabling unselected connection "
 				    "nid %d conn %d.\n",
 				    i, j);
@@ -4455,7 +4454,7 @@ hdaa_audio_disable_crossas(struct hdaa_devinfo *devinfo)
 				continue;
 			w->connsenable[j] = 0;
 			HDA_BOOTHVERBOSE(
-				device_printf(devinfo->dev, 
+				device_printf(devinfo->dev,
 				    " Disabling crossassociatement connection "
 				    "nid %d conn %d cnid %d.\n",
 				    i, j, cw->nid);
@@ -4497,7 +4496,7 @@ hdaa_audio_disable_crossas(struct hdaa_devinfo *devinfo)
 		if (ctl->ndir == HDAA_CTL_IN)
 			ctl->widget->connsenable[ctl->index] = 0;
 		HDA_BOOTHVERBOSE(
-			device_printf(devinfo->dev, 
+			device_printf(devinfo->dev,
 			    " Disabling crossassociatement connection "
 			    "ctl %d nid %d cnid %d.\n", i,
 			    ctl->widget->nid,
@@ -4719,7 +4718,7 @@ hdaa_audio_assign_names(struct hdaa_devinfo *devinfo)
 	int i, j;
 	int type = -1, use, used = 0;
 	static const int types[7][13] = {
-	    { SOUND_MIXER_LINE, SOUND_MIXER_LINE1, SOUND_MIXER_LINE2, 
+	    { SOUND_MIXER_LINE, SOUND_MIXER_LINE1, SOUND_MIXER_LINE2,
 	      SOUND_MIXER_LINE3, -1 },	/* line */
 	    { SOUND_MIXER_MONITOR, SOUND_MIXER_MIC, -1 }, /* int mic */
 	    { SOUND_MIXER_MIC, SOUND_MIXER_MONITOR, -1 }, /* ext mic */
@@ -5034,10 +5033,10 @@ hdaa_audio_prepare_pin_ctrl(struct hdaa_devinfo *devinfo)
 		/* Disable everything. */
 		if (devinfo->init_clear) {
 			w->wclass.pin.ctrl &= ~(
-		    	HDA_CMD_SET_PIN_WIDGET_CTRL_HPHN_ENABLE |
-		    	HDA_CMD_SET_PIN_WIDGET_CTRL_OUT_ENABLE |
-		    	HDA_CMD_SET_PIN_WIDGET_CTRL_IN_ENABLE |
-		    	HDA_CMD_SET_PIN_WIDGET_CTRL_VREF_ENABLE_MASK);
+			HDA_CMD_SET_PIN_WIDGET_CTRL_HPHN_ENABLE |
+			HDA_CMD_SET_PIN_WIDGET_CTRL_OUT_ENABLE |
+			HDA_CMD_SET_PIN_WIDGET_CTRL_IN_ENABLE |
+			HDA_CMD_SET_PIN_WIDGET_CTRL_VREF_ENABLE_MASK);
 		}
 
 		if (w->enable == 0) {
@@ -5917,7 +5916,7 @@ hdaa_dump_dst_nid(struct hdaa_pcm_devinfo *pdevinfo, nid_t nid, int depth)
 			printf("\n");
 			return;
 		}
-		printf(" [src: %s]", 
+		printf(" [src: %s]",
 		    hdaa_audio_ctl_ossmixer_mask2allname(
 			w->ossmask, buf, sizeof(buf)));
 		if (w->ossdev >= 0) {
@@ -6246,10 +6245,10 @@ hdaa_configure(device_t dev)
 				printf("         ");
 			printf(" ossmask=0x%08x\n",
 			    ctl->ossmask);
-			device_printf(dev, 
+			device_printf(dev,
 			    "       mute: %d step: %3d size: %3d off: %3d%s\n",
 			    ctl->mute, ctl->step, ctl->size, ctl->offset,
-			    (ctl->enable == 0) ? " [DISABLED]" : 
+			    (ctl->enable == 0) ? " [DISABLED]" :
 			    ((ctl->ossmask == 0) ? " [UNUSED]" : ""));
 		}
 		device_printf(dev, "\n");
@@ -6463,8 +6462,13 @@ hdaa_sysctl_reconfig(SYSCTL_HANDLER_ARGS)
 	HDA_BOOTHVERBOSE(
 		device_printf(dev, "Reconfiguration...\n");
 	);
-	if ((error = device_delete_children(dev)) != 0)
+
+	bus_topo_lock();
+
+	if ((error = device_delete_children(dev)) != 0) {
+		bus_topo_unlock();
 		return (error);
+	}
 	hdaa_lock(devinfo);
 	hdaa_unconfigure(dev);
 	hdaa_configure(dev);
@@ -6473,6 +6477,9 @@ hdaa_sysctl_reconfig(SYSCTL_HANDLER_ARGS)
 	HDA_BOOTHVERBOSE(
 		device_printf(dev, "Reconfiguration done\n");
 	);
+
+	bus_topo_unlock();
+
 	return (0);
 }
 
@@ -6669,7 +6676,7 @@ hdaa_attach(device_t dev)
 	    devinfo, 0, hdaa_sysctl_gpo_config, "A", "GPO configuration");
 	SYSCTL_ADD_PROC(device_get_sysctl_ctx(dev),
 	    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)), OID_AUTO,
-	    "reconfig", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+	    "reconfig", CTLTYPE_INT | CTLFLAG_RW,
 	    dev, 0, hdaa_sysctl_reconfig, "I", "Reprocess configuration");
 	SYSCTL_ADD_INT(device_get_sysctl_ctx(dev),
 	    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)), OID_AUTO,
@@ -6738,23 +6745,21 @@ hdaa_print_child(device_t dev, device_t child)
 }
 
 static int
-hdaa_child_location_str(device_t dev, device_t child, char *buf,
-    size_t buflen)
+hdaa_child_location(device_t dev, device_t child, struct sbuf *sb)
 {
 	struct hdaa_devinfo *devinfo = device_get_softc(dev);
 	struct hdaa_pcm_devinfo *pdevinfo =
 	    (struct hdaa_pcm_devinfo *)device_get_ivars(child);
 	struct hdaa_audio_as *as;
-	int first = 1, i, len = 0;
+	int first = 1, i;
 
-	len += snprintf(buf + len, buflen - len, "nid=");
+	sbuf_printf(sb, "nid=");
 	if (pdevinfo->playas >= 0) {
 		as = &devinfo->as[pdevinfo->playas];
 		for (i = 0; i < 16; i++) {
 			if (as->pins[i] <= 0)
 				continue;
-			len += snprintf(buf + len, buflen - len,
-			    "%s%d", first ? "" : ",", as->pins[i]);
+			sbuf_printf(sb, "%s%d", first ? "" : ",", as->pins[i]);
 			first = 0;
 		}
 	}
@@ -6763,8 +6768,7 @@ hdaa_child_location_str(device_t dev, device_t child, char *buf,
 		for (i = 0; i < 16; i++) {
 			if (as->pins[i] <= 0)
 				continue;
-			len += snprintf(buf + len, buflen - len,
-			    "%s%d", first ? "" : ",", as->pins[i]);
+			sbuf_printf(sb, "%s%d", first ? "" : ",", as->pins[i]);
 			first = 0;
 		}
 	}
@@ -6830,7 +6834,7 @@ static device_method_t hdaa_methods[] = {
 	DEVMETHOD(device_resume,	hdaa_resume),
 	/* Bus interface */
 	DEVMETHOD(bus_print_child,	hdaa_print_child),
-	DEVMETHOD(bus_child_location_str, hdaa_child_location_str),
+	DEVMETHOD(bus_child_location,	hdaa_child_location),
 	DEVMETHOD(hdac_stream_intr,	hdaa_stream_intr),
 	DEVMETHOD(hdac_unsol_intr,	hdaa_unsol_intr),
 	DEVMETHOD(hdac_pindump,		hdaa_pindump),
@@ -6843,9 +6847,7 @@ static driver_t hdaa_driver = {
 	sizeof(struct hdaa_devinfo),
 };
 
-static devclass_t hdaa_devclass;
-
-DRIVER_MODULE(snd_hda, hdacc, hdaa_driver, hdaa_devclass, NULL, NULL);
+DRIVER_MODULE(snd_hda, hdacc, hdaa_driver, NULL, NULL);
 
 static void
 hdaa_chan_formula(struct hdaa_devinfo *devinfo, int asid,
@@ -7046,7 +7048,7 @@ hdaa_pcm_attach(device_t dev)
 	} else
 		pdevinfo->chan_blkcnt = HDA_BDL_DEFAULT;
 
-	/* 
+	/*
 	 * We don't register interrupt handler with snd_setup_intr
 	 * in pcm device. Mark pcm device as MPSAFE manually.
 	 */
@@ -7152,6 +7154,6 @@ static driver_t hdaa_pcm_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(snd_hda_pcm, hdaa, hdaa_pcm_driver, pcm_devclass, NULL, NULL);
+DRIVER_MODULE(snd_hda_pcm, hdaa, hdaa_pcm_driver, NULL, NULL);
 MODULE_DEPEND(snd_hda, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_hda, 1);

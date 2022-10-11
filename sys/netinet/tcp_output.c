@@ -84,8 +84,9 @@ __FBSDID("$FreeBSD$");
 #include <netinet/tcp_fsm.h>
 #include <netinet/tcp_log_buf.h>
 #include <netinet/tcp_seq.h>
-#include <netinet/tcp_timer.h>
 #include <netinet/tcp_var.h>
+#include <netinet/tcp_syncache.h>
+#include <netinet/tcp_timer.h>
 #include <netinet/tcpip.h>
 #include <netinet/cc/cc.h>
 #include <netinet/tcp_fastopen.h>
@@ -98,6 +99,7 @@ __FBSDID("$FreeBSD$");
 #ifdef TCP_OFFLOAD
 #include <netinet/tcp_offload.h>
 #endif
+#include <netinet/tcp_ecn.h>
 
 #include <netipsec/ipsec_support.h>
 
@@ -194,12 +196,13 @@ cc_after_idle(struct tcpcb *tp)
  * Tcp output routine: figure out what should be sent and send it.
  */
 int
-tcp_output(struct tcpcb *tp)
+tcp_default_output(struct tcpcb *tp)
 {
 	struct socket *so = tp->t_inpcb->inp_socket;
 	int32_t len;
 	uint32_t recwin, sendwin;
-	int off, flags, error = 0;	/* Keep compiler happy */
+	uint16_t flags;
+	int off, error = 0;	/* Keep compiler happy */
 	u_int if_hw_tsomaxsegcount = 0;
 	u_int if_hw_tsomaxsegsize = 0;
 	struct mbuf *m;
@@ -325,13 +328,16 @@ again:
 				 */
 				p = NULL;
 				goto after_sack_rexmit;
-			} else
+			} else {
 				/* Can rexmit part of the current hole */
 				len = ((int32_t)ulmin(cwin,
-						   tp->snd_recover - p->rxmit));
-		} else
-			len = ((int32_t)ulmin(cwin, p->end - p->rxmit));
-		off = p->rxmit - tp->snd_una;
+				    SEQ_SUB(tp->snd_recover, p->rxmit)));
+			}
+		} else {
+			len = ((int32_t)ulmin(cwin,
+			    SEQ_SUB(p->end, p->rxmit)));
+		}
+		off = SEQ_SUB(p->rxmit, tp->snd_una);
 		KASSERT(off >= 0,("%s: sack block to the left of una : %d",
 		    __func__, off));
 		if (len > 0) {
@@ -1154,7 +1160,7 @@ send:
 	if (isipv6) {
 		ip6 = mtod(m, struct ip6_hdr *);
 		if (tp->t_port) {
-			udp = (struct udphdr *)((caddr_t)ip6 + ipoptlen + sizeof(struct ip6_hdr));
+			udp = (struct udphdr *)((caddr_t)ip6 + sizeof(struct ip6_hdr));
 			udp->uh_sport = htons(V_tcp_udp_tunneling_port);
 			udp->uh_dport = tp->t_port;
 			ulen = hdrlen + len - sizeof(struct ip6_hdr);
@@ -1172,7 +1178,7 @@ send:
 		ipov = (struct ipovly *)ip;
 #endif
 		if (tp->t_port) {
-			udp = (struct udphdr *)((caddr_t)ip + ipoptlen + sizeof(struct ip));
+			udp = (struct udphdr *)((caddr_t)ip + sizeof(struct ip));
 			udp->uh_sport = htons(V_tcp_udp_tunneling_port);
 			udp->uh_dport = tp->t_port;
 			ulen = hdrlen + len - sizeof(struct ip);
@@ -1197,49 +1203,27 @@ send:
 	 * resend those bits a number of times as per
 	 * RFC 3168.
 	 */
-	if (tp->t_state == TCPS_SYN_SENT && V_tcp_do_ecn == 1) {
-		if (tp->t_rxtshift >= 1) {
-			if (tp->t_rxtshift <= V_tcp_ecn_maxretries)
-				flags |= TH_ECE|TH_CWR;
-		} else
-			flags |= TH_ECE|TH_CWR;
+	if (tp->t_state == TCPS_SYN_SENT && V_tcp_do_ecn) {
+		flags |= tcp_ecn_output_syn_sent(tp);
 	}
-	/* Handle parallel SYN for ECN */
-	if ((tp->t_state == TCPS_SYN_RECEIVED) &&
-	    (tp->t_flags2 & TF2_ECN_SND_ECE)) {
-			flags |= TH_ECE;
-			tp->t_flags2 &= ~TF2_ECN_SND_ECE;
-	}
-
-	if (TCPS_HAVEESTABLISHED(tp->t_state) &&
+	/* Also handle parallel SYN for ECN */
+	if ((TCPS_HAVERCVDSYN(tp->t_state)) &&
 	    (tp->t_flags2 & TF2_ECN_PERMIT)) {
-		/*
-		 * If the peer has ECN, mark data packets with
-		 * ECN capable transmission (ECT).
-		 * Ignore pure ack packets, retransmissions and window probes.
-		 */
-		if (len > 0 && SEQ_GEQ(tp->snd_nxt, tp->snd_max) &&
-		    (sack_rxmit == 0) &&
-		    !((tp->t_flags & TF_FORCEDATA) && len == 1 &&
-		    SEQ_LT(tp->snd_una, tp->snd_max))) {
+		int ect = tcp_ecn_output_established(tp, &flags, len, sack_rxmit);
+		if ((tp->t_state == TCPS_SYN_RECEIVED) &&
+		    (tp->t_flags2 & TF2_ECN_SND_ECE))
+			tp->t_flags2 &= ~TF2_ECN_SND_ECE;
 #ifdef INET6
-			if (isipv6)
-				ip6->ip6_flow |= htonl(IPTOS_ECN_ECT0 << 20);
-			else
-#endif
-				ip->ip_tos |= IPTOS_ECN_ECT0;
-			TCPSTAT_INC(tcps_ecn_ect0);
-			/*
-			 * Reply with proper ECN notifications.
-			 * Only set CWR on new data segments.
-			 */
-			if (tp->t_flags2 & TF2_ECN_SND_CWR) {
-				flags |= TH_CWR;
-				tp->t_flags2 &= ~TF2_ECN_SND_CWR;
-			}
+		if (isipv6) {
+			ip6->ip6_flow &= ~htonl(IPTOS_ECN_MASK << 20);
+			ip6->ip6_flow |= htonl(ect << 20);
 		}
-		if (tp->t_flags2 & TF2_ECN_SND_ECE)
-			flags |= TH_ECE;
+		else
+#endif
+		{
+			ip->ip_tos &= ~IPTOS_ECN_MASK;
+			ip->ip_tos |= ect;
+		}
 	}
 
 	/*
@@ -1264,6 +1248,14 @@ send:
 	} else {
 		th->th_seq = htonl(p->rxmit);
 		p->rxmit += len;
+		/*
+		 * Lost Retransmission Detection
+		 * trigger resending of a (then
+		 * still existing) hole, when
+		 * fack acks recoverypoint.
+		 */
+		if ((tp->t_flags & TF_LRD) && SEQ_GEQ(p->rxmit, p->end))
+			p->rxmit = tp->snd_recover;
 		tp->sackhint.sack_bytes_rexmit += len;
 	}
 	if (IN_RECOVERY(tp->t_flags)) {
@@ -1279,7 +1271,7 @@ send:
 		bcopy(opt, th + 1, optlen);
 		th->th_off = (sizeof (struct tcphdr) + optlen) >> 2;
 	}
-	th->th_flags = flags;
+	tcp_set_flags(th, flags);
 	/*
 	 * Calculate receive window.  Don't shrink window,
 	 * but avoid silly window syndrome.
@@ -1551,6 +1543,8 @@ send:
 #endif /* INET */
 
 out:
+	if (error == 0)
+		tcp_account_for_send(tp, len, (tp->snd_nxt != tp->snd_max), 0, hw_tls);
 	/*
 	 * In transmit state, time the transmission and arrange for
 	 * the retransmit.  In persist state, just set snd_max.
@@ -1687,8 +1681,13 @@ timer:
 				tp->sackhint.sack_bytes_rexmit -= len;
 				KASSERT(tp->sackhint.sack_bytes_rexmit >= 0,
 				    ("sackhint bytes rtx >= 0"));
-			} else
+				KASSERT((flags & TH_FIN) == 0,
+				    ("error while FIN with SACK rxmit"));
+			} else {
 				tp->snd_nxt -= len;
+				if (flags & TH_FIN)
+					tp->snd_nxt--;
+			}
 		}
 		SOCKBUF_UNLOCK_ASSERT(&so->so_snd);	/* Check gotos. */
 		switch (error) {
@@ -1965,7 +1964,7 @@ tcp_m_copym(struct mbuf *m, int32_t off0, int32_t *plen,
 {
 #ifdef KERN_TLS
 	struct ktls_session *tls, *ntls;
-	struct mbuf *start;
+	struct mbuf *start __diagused;
 #endif
 	struct mbuf *n, **np;
 	struct mbuf *top;
@@ -2175,9 +2174,9 @@ tcp_sndbuf_autoscale(struct tcpcb *tp, struct socket *so, uint32_t sendwin)
 		    sbused(&so->so_snd) < V_tcp_autosndbuf_max &&
 		    sendwin >= (sbused(&so->so_snd) -
 		    (tp->snd_nxt - tp->snd_una))) {
-			if (!sbreserve_locked(&so->so_snd,
+			if (!sbreserve_locked(so, SO_SND,
 			    min(so->so_snd.sb_hiwat + V_tcp_autosndbuf_inc,
-			     V_tcp_autosndbuf_max), so, curthread))
+			     V_tcp_autosndbuf_max), curthread))
 				so->so_snd.sb_flags &= ~SB_AUTOSIZE;
 		}
 	}

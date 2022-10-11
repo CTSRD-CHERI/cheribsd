@@ -71,7 +71,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <inttypes.h>
-#include <libzfs_impl.h>
+#include <libzfs.h>
 
 #define	POOL_MEASUREMENT	"zpool_stats"
 #define	SCAN_MEASUREMENT	"zpool_scan_stats"
@@ -90,7 +90,7 @@ char metric_data_type = 'u';
 uint64_t metric_value_mask = UINT64_MAX;
 uint64_t timestamp = 0;
 int complained_about_sync = 0;
-char *tags = "";
+const char *tags = "";
 
 typedef int (*stat_printer_f)(nvlist_t *, const char *, const char *);
 
@@ -101,9 +101,10 @@ typedef int (*stat_printer_f)(nvlist_t *, const char *, const char *);
  * caller is responsible for freeing result
  */
 static char *
-escape_string(char *s)
+escape_string(const char *s)
 {
-	char *c, *d;
+	const char *c;
+	char *d;
 	char *t = (char *)malloc(ZFS_MAX_DATASET_NAME_LEN * 2);
 	if (t == NULL) {
 		fprintf(stderr, "error: cannot allocate memory\n");
@@ -117,6 +118,7 @@ escape_string(char *s)
 		case '=':
 		case '\\':
 			*d++ = '\\';
+			zfs_fallthrough;
 		default:
 			*d = *c;
 		}
@@ -129,7 +131,7 @@ escape_string(char *s)
  * print key=value where value is a uint64_t
  */
 static void
-print_kv(char *key, uint64_t value)
+print_kv(const char *key, uint64_t value)
 {
 	printf("%s=%llu%c", key,
 	    (u_longlong_t)value & metric_value_mask, metric_data_type);
@@ -150,9 +152,9 @@ print_scan_status(nvlist_t *nvroot, const char *pool_name)
 	uint64_t remaining_time;
 	pool_scan_stat_t *ps = NULL;
 	double pct_done;
-	char *state[DSS_NUM_STATES] = {
+	const char *const state[DSS_NUM_STATES] = {
 	    "none", "scanning", "finished", "canceled"};
-	char *func;
+	const char *func;
 
 	(void) nvlist_lookup_uint64_array(nvroot,
 	    ZPOOL_CONFIG_SCAN_STATS,
@@ -260,23 +262,21 @@ static char *
 get_vdev_name(nvlist_t *nvroot, const char *parent_name)
 {
 	static char vdev_name[256];
-	char *vdev_type = NULL;
 	uint64_t vdev_id = 0;
 
-	if (nvlist_lookup_string(nvroot, ZPOOL_CONFIG_TYPE,
-	    &vdev_type) != 0) {
-		vdev_type = "unknown";
-	}
+	char *vdev_type = (char *)"unknown";
+	nvlist_lookup_string(nvroot, ZPOOL_CONFIG_TYPE, &vdev_type);
+
 	if (nvlist_lookup_uint64(
-	    nvroot, ZPOOL_CONFIG_ID, &vdev_id) != 0) {
+	    nvroot, ZPOOL_CONFIG_ID, &vdev_id) != 0)
 		vdev_id = UINT64_MAX;
-	}
+
 	if (parent_name == NULL) {
 		(void) snprintf(vdev_name, sizeof (vdev_name), "%s",
 		    vdev_type);
 	} else {
 		(void) snprintf(vdev_name, sizeof (vdev_name),
-		    "%s/%s-%llu",
+		    "%.220s/%s-%llu",
 		    parent_name, vdev_type, (u_longlong_t)vdev_id);
 	}
 	return (vdev_name);
@@ -296,22 +296,15 @@ static char *
 get_vdev_desc(nvlist_t *nvroot, const char *parent_name)
 {
 	static char vdev_desc[2 * MAXPATHLEN];
-	char *vdev_type = NULL;
-	uint64_t vdev_id = 0;
 	char vdev_value[MAXPATHLEN];
-	char *vdev_path = NULL;
 	char *s, *t;
 
-	if (nvlist_lookup_string(nvroot, ZPOOL_CONFIG_TYPE, &vdev_type) != 0) {
-		vdev_type = "unknown";
-	}
-	if (nvlist_lookup_uint64(nvroot, ZPOOL_CONFIG_ID, &vdev_id) != 0) {
-		vdev_id = UINT64_MAX;
-	}
-	if (nvlist_lookup_string(
-	    nvroot, ZPOOL_CONFIG_PATH, &vdev_path) != 0) {
-		vdev_path = NULL;
-	}
+	char *vdev_type = (char *)"unknown";
+	uint64_t vdev_id = UINT64_MAX;
+	char *vdev_path = NULL;
+	nvlist_lookup_string(nvroot, ZPOOL_CONFIG_TYPE, &vdev_type);
+	nvlist_lookup_uint64(nvroot, ZPOOL_CONFIG_ID, &vdev_id);
+	nvlist_lookup_string(nvroot, ZPOOL_CONFIG_PATH, &vdev_path);
 
 	if (parent_name == NULL) {
 		s = escape_string(vdev_type);
@@ -391,8 +384,8 @@ print_vdev_latency_stats(nvlist_t *nvroot, const char *pool_name,
 
 	/* short_names become part of the metric name and are influxdb-ready */
 	struct lat_lookup {
-	    char *name;
-	    char *short_name;
+	    const char *name;
+	    const char *short_name;
 	    uint64_t sum;
 	    uint64_t *array;
 	};
@@ -409,6 +402,7 @@ print_vdev_latency_stats(nvlist_t *nvroot, const char *pool_name,
 #ifdef ZPOOL_CONFIG_VDEV_TRIM_LAT_HISTO
 	    {ZPOOL_CONFIG_VDEV_TRIM_LAT_HISTO,    "trim", 0},
 #endif
+	    {ZPOOL_CONFIG_VDEV_REBUILD_LAT_HISTO,    "rebuild", 0},
 	    {NULL,	NULL}
 	};
 
@@ -484,8 +478,8 @@ print_vdev_size_stats(nvlist_t *nvroot, const char *pool_name,
 
 	/* short_names become the field name */
 	struct size_lookup {
-	    char *name;
-	    char *short_name;
+	    const char *name;
+	    const char *short_name;
 	    uint64_t sum;
 	    uint64_t *array;
 	};
@@ -504,6 +498,8 @@ print_vdev_size_stats(nvlist_t *nvroot, const char *pool_name,
 	    {ZPOOL_CONFIG_VDEV_IND_TRIM_HISTO,    "trim_write_ind"},
 	    {ZPOOL_CONFIG_VDEV_AGG_TRIM_HISTO,    "trim_write_agg"},
 #endif
+	    {ZPOOL_CONFIG_VDEV_IND_REBUILD_HISTO,    "rebuild_write_ind"},
+	    {ZPOOL_CONFIG_VDEV_AGG_REBUILD_HISTO,    "rebuild_write_agg"},
 	    {NULL,	NULL}
 	};
 
@@ -574,8 +570,8 @@ print_queue_stats(nvlist_t *nvroot, const char *pool_name,
 
 	/* short_names are used for the field name */
 	struct queue_lookup {
-	    char *name;
-	    char *short_name;
+	    const char *name;
+	    const char *short_name;
 	};
 	struct queue_lookup queue_type[] = {
 	    {ZPOOL_CONFIG_VDEV_SYNC_R_ACTIVE_QUEUE,	"sync_r_active"},
@@ -583,11 +579,13 @@ print_queue_stats(nvlist_t *nvroot, const char *pool_name,
 	    {ZPOOL_CONFIG_VDEV_ASYNC_R_ACTIVE_QUEUE,	"async_r_active"},
 	    {ZPOOL_CONFIG_VDEV_ASYNC_W_ACTIVE_QUEUE,	"async_w_active"},
 	    {ZPOOL_CONFIG_VDEV_SCRUB_ACTIVE_QUEUE,	"async_scrub_active"},
+	    {ZPOOL_CONFIG_VDEV_REBUILD_ACTIVE_QUEUE,	"rebuild_active"},
 	    {ZPOOL_CONFIG_VDEV_SYNC_R_PEND_QUEUE,	"sync_r_pend"},
 	    {ZPOOL_CONFIG_VDEV_SYNC_W_PEND_QUEUE,	"sync_w_pend"},
 	    {ZPOOL_CONFIG_VDEV_ASYNC_R_PEND_QUEUE,	"async_r_pend"},
 	    {ZPOOL_CONFIG_VDEV_ASYNC_W_PEND_QUEUE,	"async_w_pend"},
 	    {ZPOOL_CONFIG_VDEV_SCRUB_PEND_QUEUE,	"async_scrub_pend"},
+	    {ZPOOL_CONFIG_VDEV_REBUILD_PEND_QUEUE,	"rebuild_pend"},
 	    {NULL,	NULL}
 	};
 
@@ -625,8 +623,8 @@ print_top_level_vdev_stats(nvlist_t *nvroot, const char *pool_name)
 
 	/* short_names become part of the metric name */
 	struct queue_lookup {
-	    char *name;
-	    char *short_name;
+	    const char *name;
+	    const char *short_name;
 	};
 	struct queue_lookup queue_type[] = {
 	    {ZPOOL_CONFIG_VDEV_SYNC_R_ACTIVE_QUEUE, "sync_r_active_queue"},
@@ -634,11 +632,13 @@ print_top_level_vdev_stats(nvlist_t *nvroot, const char *pool_name)
 	    {ZPOOL_CONFIG_VDEV_ASYNC_R_ACTIVE_QUEUE, "async_r_active_queue"},
 	    {ZPOOL_CONFIG_VDEV_ASYNC_W_ACTIVE_QUEUE, "async_w_active_queue"},
 	    {ZPOOL_CONFIG_VDEV_SCRUB_ACTIVE_QUEUE, "async_scrub_active_queue"},
+	    {ZPOOL_CONFIG_VDEV_REBUILD_ACTIVE_QUEUE, "rebuild_active_queue"},
 	    {ZPOOL_CONFIG_VDEV_SYNC_R_PEND_QUEUE, "sync_r_pend_queue"},
 	    {ZPOOL_CONFIG_VDEV_SYNC_W_PEND_QUEUE, "sync_w_pend_queue"},
 	    {ZPOOL_CONFIG_VDEV_ASYNC_R_PEND_QUEUE, "async_r_pend_queue"},
 	    {ZPOOL_CONFIG_VDEV_ASYNC_W_PEND_QUEUE, "async_w_pend_queue"},
 	    {ZPOOL_CONFIG_VDEV_SCRUB_PEND_QUEUE, "async_scrub_pend_queue"},
+	    {ZPOOL_CONFIG_VDEV_REBUILD_PEND_QUEUE, "rebuild_pend_queue"},
 	    {NULL, NULL}
 	};
 
@@ -683,9 +683,8 @@ print_recursive_stats(stat_printer_f func, nvlist_t *nvroot,
 
 	if (descend && nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN,
 	    &child, &children) == 0) {
-		(void) strncpy(vdev_name, get_vdev_name(nvroot, parent_name),
+		(void) strlcpy(vdev_name, get_vdev_name(nvroot, parent_name),
 		    sizeof (vdev_name));
-		vdev_name[sizeof (vdev_name) - 1] = '\0';
 
 		for (c = 0; c < children; c++) {
 			print_recursive_stats(func, child[c], pool_name,
@@ -714,7 +713,7 @@ print_stats(zpool_handle_t *zhp, void *data)
 
 	/* if not this pool return quickly */
 	if (data &&
-	    strncmp(data, zhp->zpool_name, ZFS_MAX_DATASET_NAME_LEN) != 0) {
+	    strncmp(data, zpool_get_name(zhp), ZFS_MAX_DATASET_NAME_LEN) != 0) {
 		zpool_close(zhp);
 		return (0);
 	}
@@ -742,7 +741,7 @@ print_stats(zpool_handle_t *zhp, void *data)
 		return (3);
 	}
 
-	pool_name = escape_string(zhp->zpool_name);
+	pool_name = escape_string(zpool_get_name(zhp));
 	err = print_recursive_stats(print_summary_stats, nvroot,
 	    pool_name, NULL, 1);
 	/* if any of these return an error, skip the rest */
@@ -781,7 +780,7 @@ main(int argc, char *argv[])
 {
 	int opt;
 	int ret = 8;
-	char *line = NULL;
+	char *line = NULL, *ttags = NULL;
 	size_t len, tagslen = 0;
 	struct option long_options[] = {
 	    {"execd", no_argument, NULL, 'e'},
@@ -809,15 +808,17 @@ main(int argc, char *argv[])
 			sum_histogram_buckets = 1;
 			break;
 		case 't':
+			free(ttags);
 			tagslen = strlen(optarg) + 2;
-			tags = calloc(tagslen, 1);
-			if (tags == NULL) {
+			ttags = calloc(1, tagslen);
+			if (ttags == NULL) {
 				fprintf(stderr,
 				    "error: cannot allocate memory "
 				    "for tags\n");
 				exit(1);
 			}
-			(void) snprintf(tags, tagslen, ",%s", optarg);
+			(void) snprintf(ttags, tagslen, ",%s", optarg);
+			tags = ttags;
 			break;
 		default:
 			usage(argv[0]);

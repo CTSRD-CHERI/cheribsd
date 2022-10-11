@@ -14,6 +14,8 @@
 #include "lldb/Target/Thread.h"
 #include "lldb/Utility/StructuredData.h"
 
+#include "GDBRemoteRegisterContext.h"
+
 class StringExtractor;
 
 namespace lldb_private {
@@ -101,6 +103,8 @@ protected:
       m_queue_serial_number; // Queue info from stop reply/stop info for thread
   lldb_private::LazyBool m_associated_with_libdispatch_queue;
 
+  GDBRemoteDynamicRegisterInfoSP m_reg_info_sp;
+
   bool PrivateSetRegisterValue(uint32_t reg, llvm::ArrayRef<uint8_t> data);
 
   bool PrivateSetRegisterValue(uint32_t reg, uint64_t regval);
@@ -111,6 +115,9 @@ protected:
   void SetStopInfoFromPacket(StringExtractor &stop_packet, uint32_t stop_id);
 
   bool CalculateStopInfo() override;
+
+  llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>>
+  GetSiginfo(size_t max_size) const override;
 };
 
 } // namespace process_gdb_remote

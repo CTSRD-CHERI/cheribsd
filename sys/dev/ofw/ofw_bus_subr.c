@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/errno.h>
 #include <sys/libkern.h>
+#include <sys/sbuf.h>
 
 #include <machine/resource.h>
 
@@ -86,22 +87,18 @@ ofw_bus_gen_destroy_devinfo(struct ofw_bus_devinfo *obd)
 }
 
 int
-ofw_bus_gen_child_pnpinfo_str(device_t cbdev, device_t child, char *buf,
-    size_t buflen)
+ofw_bus_gen_child_pnpinfo(device_t cbdev, device_t child, struct sbuf *sb)
 {
 
-	*buf = '\0';
 	if (!ofw_bus_status_okay(child))
 		return (0);
 
 	if (ofw_bus_get_name(child) != NULL) {
-		strlcat(buf, "name=", buflen);
-		strlcat(buf, ofw_bus_get_name(child), buflen);
+		sbuf_printf(sb, "name=%s ", ofw_bus_get_name(child));
 	}
 
 	if (ofw_bus_get_compat(child) != NULL) {
-		strlcat(buf, " compat=", buflen);
-		strlcat(buf, ofw_bus_get_compat(child), buflen);
+		sbuf_printf(sb, "compat=%s ", ofw_bus_get_compat(child));
 	}
 
 	return (0);
@@ -147,7 +144,7 @@ ofw_bus_gen_get_node(device_t bus, device_t dev)
 
 	obd = OFW_BUS_GET_DEVINFO(bus, dev);
 	if (obd == NULL)
-		return (0);
+		return ((phandle_t)-1);
 	return (obd->obd_node);
 }
 
@@ -485,6 +482,48 @@ ofw_bus_msimap(phandle_t node, uint16_t pci_rid, phandle_t *msi_parent,
 			*msi_parent = map[i + 1];
 		if (msi_rid != NULL)
 			*msi_rid = masked_rid - rid_base + msi_base;
+		err = 0;
+		break;
+	}
+
+	free(map, M_OFWPROP);
+
+	return (err);
+}
+
+int
+ofw_bus_iommu_map(phandle_t node, uint16_t pci_rid, phandle_t *iommu_parent,
+    uint32_t *iommu_rid)
+{
+	pcell_t *map, mask, iommu_base, rid_base, rid_length;
+	ssize_t len;
+	uint32_t masked_rid;
+	int err, i;
+
+	len = OF_getencprop_alloc_multi(node, "iommu-map", sizeof(*map),
+	    (void **)&map);
+	if (len <= 0)
+		return (ENOENT);
+
+	err = ENOENT;
+	mask = 0xffffffff;
+	OF_getencprop(node, "iommu-map-mask", &mask, sizeof(mask));
+
+	masked_rid = pci_rid & mask;
+	for (i = 0; i < len; i += 4) {
+		rid_base = map[i + 0];
+		rid_length = map[i + 3];
+
+		if (masked_rid < rid_base ||
+		    masked_rid >= (rid_base + rid_length))
+			continue;
+
+		iommu_base = map[i + 2];
+
+		if (iommu_parent != NULL)
+			*iommu_parent = map[i + 1];
+		if (iommu_rid != NULL)
+			*iommu_rid = masked_rid - rid_base + iommu_base;
 		err = 0;
 		break;
 	}

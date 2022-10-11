@@ -16,11 +16,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/WebAssemblyMCTargetDesc.h"
+#include "Utils/WebAssemblyUtilities.h"
 #include "WebAssembly.h"
 #include "WebAssemblyDebugValueManager.h"
 #include "WebAssemblyMachineFunctionInfo.h"
 #include "WebAssemblySubtarget.h"
-#include "WebAssemblyUtilities.h"
 #include "llvm/CodeGen/MachineBlockFrequencyInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
@@ -96,8 +96,10 @@ static unsigned getDropOpcode(const TargetRegisterClass *RC) {
     return WebAssembly::DROP_F64;
   if (RC == &WebAssembly::V128RegClass)
     return WebAssembly::DROP_V128;
-  if (RC == &WebAssembly::EXNREFRegClass)
-    return WebAssembly::DROP_EXNREF;
+  if (RC == &WebAssembly::FUNCREFRegClass)
+    return WebAssembly::DROP_FUNCREF;
+  if (RC == &WebAssembly::EXTERNREFRegClass)
+    return WebAssembly::DROP_EXTERNREF;
   llvm_unreachable("Unexpected register class");
 }
 
@@ -113,8 +115,10 @@ static unsigned getLocalGetOpcode(const TargetRegisterClass *RC) {
     return WebAssembly::LOCAL_GET_F64;
   if (RC == &WebAssembly::V128RegClass)
     return WebAssembly::LOCAL_GET_V128;
-  if (RC == &WebAssembly::EXNREFRegClass)
-    return WebAssembly::LOCAL_GET_EXNREF;
+  if (RC == &WebAssembly::FUNCREFRegClass)
+    return WebAssembly::LOCAL_GET_FUNCREF;
+  if (RC == &WebAssembly::EXTERNREFRegClass)
+    return WebAssembly::LOCAL_GET_EXTERNREF;
   llvm_unreachable("Unexpected register class");
 }
 
@@ -130,8 +134,10 @@ static unsigned getLocalSetOpcode(const TargetRegisterClass *RC) {
     return WebAssembly::LOCAL_SET_F64;
   if (RC == &WebAssembly::V128RegClass)
     return WebAssembly::LOCAL_SET_V128;
-  if (RC == &WebAssembly::EXNREFRegClass)
-    return WebAssembly::LOCAL_SET_EXNREF;
+  if (RC == &WebAssembly::FUNCREFRegClass)
+    return WebAssembly::LOCAL_SET_FUNCREF;
+  if (RC == &WebAssembly::EXTERNREFRegClass)
+    return WebAssembly::LOCAL_SET_EXTERNREF;
   llvm_unreachable("Unexpected register class");
 }
 
@@ -147,8 +153,10 @@ static unsigned getLocalTeeOpcode(const TargetRegisterClass *RC) {
     return WebAssembly::LOCAL_TEE_F64;
   if (RC == &WebAssembly::V128RegClass)
     return WebAssembly::LOCAL_TEE_V128;
-  if (RC == &WebAssembly::EXNREFRegClass)
-    return WebAssembly::LOCAL_TEE_EXNREF;
+  if (RC == &WebAssembly::FUNCREFRegClass)
+    return WebAssembly::LOCAL_TEE_FUNCREF;
+  if (RC == &WebAssembly::EXTERNREFRegClass)
+    return WebAssembly::LOCAL_TEE_EXTERNREF;
   llvm_unreachable("Unexpected register class");
 }
 
@@ -164,8 +172,10 @@ static MVT typeForRegClass(const TargetRegisterClass *RC) {
     return MVT::f64;
   if (RC == &WebAssembly::V128RegClass)
     return MVT::v16i8;
-  if (RC == &WebAssembly::EXNREFRegClass)
-    return MVT::exnref;
+  if (RC == &WebAssembly::FUNCREFRegClass)
+    return MVT::funcref;
+  if (RC == &WebAssembly::EXTERNREFRegClass)
+    return MVT::externref;
   llvm_unreachable("unrecognized register class");
 }
 
@@ -221,12 +231,18 @@ bool WebAssemblyExplicitLocals::runOnMachineFunction(MachineFunction &MF) {
     auto Local = static_cast<unsigned>(MI.getOperand(1).getImm());
     Reg2Local[Reg] = Local;
     checkFrameBase(MFI, Local, Reg);
+
+    // Update debug value to point to the local before removing.
+    WebAssemblyDebugValueManager(&MI).replaceWithLocal(Local);
+
     MI.eraseFromParent();
     Changed = true;
   }
 
-  // Start assigning local numbers after the last parameter.
+  // Start assigning local numbers after the last parameter and after any
+  // already-assigned locals.
   unsigned CurLocal = static_cast<unsigned>(MFI.getParams().size());
+  CurLocal += static_cast<unsigned>(MFI.getLocals().size());
 
   // Precompute the set of registers that are unused, so that we can insert
   // drops to their defs.
@@ -236,8 +252,7 @@ bool WebAssemblyExplicitLocals::runOnMachineFunction(MachineFunction &MF) {
 
   // Visit each instruction in the function.
   for (MachineBasicBlock &MBB : MF) {
-    for (MachineBasicBlock::iterator I = MBB.begin(), E = MBB.end(); I != E;) {
-      MachineInstr &MI = *I++;
+    for (MachineInstr &MI : llvm::make_early_inc_range(MBB)) {
       assert(!WebAssembly::isArgument(MI.getOpcode()));
 
       if (MI.isDebugInstr() || MI.isLabel())
@@ -364,9 +379,14 @@ bool WebAssemblyExplicitLocals::runOnMachineFunction(MachineFunction &MF) {
         const TargetRegisterClass *RC = MRI.getRegClass(OldReg);
         Register NewReg = MRI.createVirtualRegister(RC);
         unsigned Opc = getLocalGetOpcode(RC);
-        InsertPt =
-            BuildMI(MBB, InsertPt, MI.getDebugLoc(), TII->get(Opc), NewReg)
-                .addImm(LocalId);
+        // Use a InsertPt as our DebugLoc, since MI may be discontinuous from
+        // the where this local is being inserted, causing non-linear stepping
+        // in the debugger or function entry points where variables aren't live
+        // yet. Alternative is previous instruction, but that is strictly worse
+        // since it can point at the previous statement.
+        // See crbug.com/1251909, crbug.com/1249745
+        InsertPt = BuildMI(MBB, InsertPt, InsertPt->getDebugLoc(),
+                           TII->get(Opc), NewReg).addImm(LocalId);
         MO.setReg(NewReg);
         MFI.stackifyVReg(MRI, NewReg);
         Changed = true;
@@ -386,7 +406,7 @@ bool WebAssemblyExplicitLocals::runOnMachineFunction(MachineFunction &MF) {
   // TODO: Sort the locals for better compression.
   MFI.setNumLocals(CurLocal - MFI.getParams().size());
   for (unsigned I = 0, E = MRI.getNumVirtRegs(); I < E; ++I) {
-    unsigned Reg = Register::index2VirtReg(I);
+    Register Reg = Register::index2VirtReg(I);
     auto RL = Reg2Local.find(Reg);
     if (RL == Reg2Local.end() || RL->second < MFI.getParams().size())
       continue;

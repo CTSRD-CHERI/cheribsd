@@ -36,7 +36,7 @@
 #    a. Replace a vdev with a spare & suspend resilver immediately
 #    b. Verify resilver starts properly
 #    c. Offline / online another vdev to introduce a new DTL range
-#    d. Verify resilver restart restart or defer
+#    d. Verify resilver restart or defer
 #    e. Inject read errors on vdev that was offlined / onlned
 #    f. Verify that resilver did not restart
 #    g. Unsuspend resilver and wait for it to finish
@@ -153,16 +153,16 @@ do
 	# offline then online a vdev to introduce a new DTL range after current
 	# scan, which should restart (or defer) the resilver
 	log_must zpool offline $TESTPOOL1 ${VDEV_FILES[2]}
-	log_must zpool sync $TESTPOOL1
+	sync_pool $TESTPOOL1
 	log_must zpool online $TESTPOOL1 ${VDEV_FILES[2]}
-	log_must zpool sync $TESTPOOL1
+	sync_pool $TESTPOOL1
 
 	# there should now be 2 resilver starts w/o defer, 1 with defer
 	verify_restarts ' after offline/online' "${RESTARTS[1]}" "${VDEVS[1]}"
 
 	# inject read io errors on vdev and verify resilver does not restart
 	log_must zinject -a -d ${VDEV_FILES[2]} -e io -T read -f 0.25 $TESTPOOL1
-	log_must cat ${DATAPATHS[1]} > /dev/null
+	log_must cp ${DATAPATHS[1]} /dev/null
 	log_must zinject -c all
 
 	# there should still be 2 resilver starts w/o defer, 1 with defer
@@ -177,8 +177,8 @@ do
 	log_must is_pool_resilvered $TESTPOOL1
 
 	# wait for a few txg's to see if a resilver happens
-	log_must zpool sync $TESTPOOL1
-	log_must zpool sync $TESTPOOL1
+	sync_pool $TESTPOOL1
+	sync_pool $TESTPOOL1
 
 	# there should now be 2 resilver starts
 	verify_restarts ' after resilver' "${RESTARTS[3]}" "${VDEVS[3]}"

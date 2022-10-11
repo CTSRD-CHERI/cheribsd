@@ -48,11 +48,8 @@ verify_runnable "both"
 
 function cleanup
 {
-	snapexists $snap && \
-		log_must zfs destroy $snap
-
-	datasetexists $ctr && \
-		log_must zfs destroy -r $ctr
+	snapexists $snap && destroy_dataset $snap
+	datasetexists $ctr && destroy_dataset $ctr -r
 
 	[[ -e $origfile ]] && \
 		log_must rm -f $origfile
@@ -69,12 +66,8 @@ function do_testing # <prop> <prop_value>
 	log_must zfs set $property=$prop_val $fs
 	file_write -o create -f $origfile -b $BLOCK_SIZE -c $WRITE_COUNT
 	log_must zfs snapshot $snap
-	zfs send $snap > $stream
-	(( $? != 0 )) && \
-		log_fail "'zfs send' fails to create send streams."
-	zfs receive -d $ctr <$stream
-	(( $? != 0 )) && \
-		log_fail "'zfs receive' fails to receive send streams."
+	log_must eval "zfs send $snap > $stream"
+	log_must eval "zfs receive -d $ctr <$stream"
 
 	#verify receive result
 	! datasetexists $rstfs && \

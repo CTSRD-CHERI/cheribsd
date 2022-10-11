@@ -35,6 +35,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
+#include <sys/sched.h>
 #include <sys/smp.h>
 
 #include <machine/bus.h>
@@ -134,6 +135,7 @@ cpudep_ap_bootstrap(void)
 #endif
 	pcpup->pc_curpcb = pcpup->pc_curthread->td_pcb;
 	sp = pcpup->pc_curpcb->pcb_sp;
+	schedinit_ap();
 
 	return (sp);
 }
@@ -305,8 +307,10 @@ cpudep_save_config(void *dummy)
 
 void
 cpudep_ap_setup()
-{ 
+{
+#ifndef __powerpc64__
 	register_t	reg;
+#endif
 	uint16_t	vers;
 
 	vers = mfpvr() >> 16;
@@ -388,14 +392,14 @@ cpudep_ap_setup()
 		case MPC7455:
 		case MPC7457:
 			/* Only MPC745x CPUs have an L3 cache. */
-			reg = mpc745x_l3_enable(bsp_state[3]);
+			mpc745x_l3_enable(bsp_state[3]);
 		default:
 			break;
 		}
 		
-		reg = mpc74xx_l2_enable(bsp_state[2]);
-		reg = mpc74xx_l1d_enable();
-		reg = mpc74xx_l1i_enable();
+		mpc74xx_l2_enable(bsp_state[2]);
+		mpc74xx_l1d_enable();
+		mpc74xx_l1i_enable();
 
 		break;
 	case IBMPOWER7:

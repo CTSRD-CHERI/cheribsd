@@ -63,7 +63,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/protosw.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
-#include <sys/rmlock.h>
 #include <sys/sysctl.h>
 #include <sys/ktr.h>
 #include <sys/condvar.h>
@@ -382,7 +381,7 @@ sysctl_igmp_stat(SYSCTL_HANDLER_ARGS)
 		 * igps0 must be "all zero".
 		 */
 		p = (char *)&igps0;
-		while (*p == '\0' && p < (char *)&igps0 + sizeof(igps0))
+		while (p < (char *)&igps0 + sizeof(igps0) && *p == '\0')
 			p++;
 		if (p != (char *)&igps0 + sizeof(igps0)) {
 			error = EINVAL;
@@ -483,6 +482,7 @@ out_locked:
 static int
 sysctl_igmp_ifinfo(SYSCTL_HANDLER_ARGS)
 {
+	struct epoch_tracker	 et;
 	int			*name;
 	int			 error;
 	u_int			 namelen;
@@ -505,14 +505,11 @@ sysctl_igmp_ifinfo(SYSCTL_HANDLER_ARGS)
 	IN_MULTI_LIST_LOCK();
 	IGMP_LOCK();
 
-	if (name[0] <= 0 || name[0] > V_if_index) {
-		error = ENOENT;
-		goto out_locked;
-	}
-
 	error = ENOENT;
 
+	NET_EPOCH_ENTER(et);
 	ifp = ifnet_byindex(name[0]);
+	NET_EPOCH_EXIT(et);
 	if (ifp == NULL)
 		goto out_locked;
 
@@ -1259,7 +1256,6 @@ static int
 igmp_input_v1_report(struct ifnet *ifp, /*const*/ struct ip *ip,
     /*const*/ struct igmp *igmp)
 {
-	struct rm_priotracker in_ifa_tracker;
 	struct in_ifaddr *ia;
 	struct in_multi *inm;
 
@@ -1282,7 +1278,7 @@ igmp_input_v1_report(struct ifnet *ifp, /*const*/ struct ip *ip,
 	 * Replace 0.0.0.0 with the subnet address if told to do so.
 	 */
 	if (V_igmp_recvifkludge && in_nullhost(ip->ip_src)) {
-		IFP_TO_IA(ifp, ia, &in_ifa_tracker);
+		IFP_TO_IA(ifp, ia);
 		if (ia != NULL)
 			ip->ip_src.s_addr = htonl(ia->ia_subnet);
 	}
@@ -1368,7 +1364,6 @@ static int
 igmp_input_v2_report(struct ifnet *ifp, /*const*/ struct ip *ip,
     /*const*/ struct igmp *igmp)
 {
-	struct rm_priotracker in_ifa_tracker;
 	struct in_ifaddr *ia;
 	struct in_multi *inm;
 
@@ -1377,7 +1372,7 @@ igmp_input_v2_report(struct ifnet *ifp, /*const*/ struct ip *ip,
 	 * leave requires knowing that we are the only member of a
 	 * group.
 	 */
-	IFP_TO_IA(ifp, ia, &in_ifa_tracker);
+	IFP_TO_IA(ifp, ia);
 	if (ia != NULL && in_hosteq(ip->ip_src, IA_SIN(ia)->sin_addr)) {
 		return (0);
 	}
@@ -2806,7 +2801,7 @@ igmp_v3_enqueue_group_record(struct mbufq *mq, struct in_multi *inm,
 	m0 = mbufq_last(mq);
 	if (!is_group_query &&
 	    m0 != NULL &&
-	    (m0->m_pkthdr.PH_vt.vt_nrecs + 1 <= IGMP_V3_REPORT_MAXRECS) &&
+	    (m0->m_pkthdr.vt_nrecs + 1 <= IGMP_V3_REPORT_MAXRECS) &&
 	    (m0->m_pkthdr.len + minrec0len) <
 	     (ifp->if_mtu - IGMP_LEADINGSPACE)) {
 		m0srcs = (ifp->if_mtu - m0->m_pkthdr.len -
@@ -2926,10 +2921,10 @@ igmp_v3_enqueue_group_record(struct mbufq *mq, struct in_multi *inm,
 	 */
 	if (m != m0) {
 		CTR1(KTR_IGMPV3, "%s: enqueueing first packet", __func__);
-		m->m_pkthdr.PH_vt.vt_nrecs = 1;
+		m->m_pkthdr.vt_nrecs = 1;
 		mbufq_enqueue(mq, m);
 	} else
-		m->m_pkthdr.PH_vt.vt_nrecs++;
+		m->m_pkthdr.vt_nrecs++;
 
 	/*
 	 * No further work needed if no source list in packet(s).
@@ -2968,7 +2963,7 @@ igmp_v3_enqueue_group_record(struct mbufq *mq, struct in_multi *inm,
 			CTR1(KTR_IGMPV3, "%s: m_append() failed.", __func__);
 			return (-ENOMEM);
 		}
-		m->m_pkthdr.PH_vt.vt_nrecs = 1;
+		m->m_pkthdr.vt_nrecs = 1;
 		nbytes += sizeof(struct igmp_grouprec);
 
 		m0srcs = (ifp->if_mtu - IGMP_LEADINGSPACE -
@@ -3057,7 +3052,9 @@ igmp_v3_enqueue_filter_change(struct mbufq *mq, struct in_multi *inm)
 	struct mbuf		*m, *m0, *md;
 	in_addr_t		 naddr;
 	int			 m0srcs, nbytes, npbytes, off, rsrcs, schanged;
+#ifdef KTR
 	int			 nallow, nblock;
+#endif
 	uint8_t			 mode, now, then;
 	rectype_t		 crt, drt, nrt;
 
@@ -3077,8 +3074,10 @@ igmp_v3_enqueue_filter_change(struct mbufq *mq, struct in_multi *inm)
 	npbytes = 0;	/* # of bytes appended this packet */
 	rsrcs = 0;	/* # sources encoded in current record */
 	schanged = 0;	/* # nodes encoded in overall filter change */
+#ifdef KTR
 	nallow = 0;	/* # of source entries in ALLOW_NEW */
 	nblock = 0;	/* # of source entries in BLOCK_OLD */
+#endif
 	nims = NULL;	/* next tree node pointer */
 
 	/*
@@ -3092,7 +3091,7 @@ igmp_v3_enqueue_filter_change(struct mbufq *mq, struct in_multi *inm)
 		do {
 			m0 = mbufq_last(mq);
 			if (m0 != NULL &&
-			    (m0->m_pkthdr.PH_vt.vt_nrecs + 1 <=
+			    (m0->m_pkthdr.vt_nrecs + 1 <=
 			     IGMP_V3_REPORT_MAXRECS) &&
 			    (m0->m_pkthdr.len + MINRECLEN) <
 			     (ifp->if_mtu - IGMP_LEADINGSPACE)) {
@@ -3116,7 +3115,7 @@ igmp_v3_enqueue_filter_change(struct mbufq *mq, struct in_multi *inm)
 					    "%s: m_get*() failed", __func__);
 					return (-ENOMEM);
 				}
-				m->m_pkthdr.PH_vt.vt_nrecs = 0;
+				m->m_pkthdr.vt_nrecs = 0;
 				igmp_save_context(m, ifp);
 				m0srcs = (ifp->if_mtu - IGMP_LEADINGSPACE -
 				    sizeof(struct igmp_grouprec)) /
@@ -3202,8 +3201,10 @@ igmp_v3_enqueue_filter_change(struct mbufq *mq, struct in_multi *inm)
 					    "%s: m_append() failed", __func__);
 					return (-ENOMEM);
 				}
+#ifdef KTR
 				nallow += !!(crt == REC_ALLOW);
 				nblock += !!(crt == REC_BLOCK);
+#endif
 				if (++rsrcs == m0srcs)
 					break;
 			}
@@ -3235,7 +3236,7 @@ igmp_v3_enqueue_filter_change(struct mbufq *mq, struct in_multi *inm)
 			 * Count the new group record, and enqueue this
 			 * packet if it wasn't already queued.
 			 */
-			m->m_pkthdr.PH_vt.vt_nrecs++;
+			m->m_pkthdr.vt_nrecs++;
 			if (m != m0)
 				mbufq_enqueue(mq, m);
 			nbytes += npbytes;
@@ -3297,8 +3298,8 @@ igmp_v3_merge_state_changes(struct in_multi *inm, struct mbufq *scq)
 		if (mt != NULL) {
 			recslen = m_length(m, NULL);
 
-			if ((mt->m_pkthdr.PH_vt.vt_nrecs +
-			    m->m_pkthdr.PH_vt.vt_nrecs <=
+			if ((mt->m_pkthdr.vt_nrecs +
+			    m->m_pkthdr.vt_nrecs <=
 			    IGMP_V3_REPORT_MAXRECS) &&
 			    (mt->m_pkthdr.len + recslen <=
 			    (inm->inm_ifp->if_mtu - IGMP_LEADINGSPACE)))
@@ -3342,8 +3343,8 @@ igmp_v3_merge_state_changes(struct in_multi *inm, struct mbufq *scq)
 			mtl = m_last(mt);
 			m0->m_flags &= ~M_PKTHDR;
 			mt->m_pkthdr.len += recslen;
-			mt->m_pkthdr.PH_vt.vt_nrecs +=
-			    m0->m_pkthdr.PH_vt.vt_nrecs;
+			mt->m_pkthdr.vt_nrecs +=
+			    m0->m_pkthdr.vt_nrecs;
 
 			mtl->m_next = m0;
 		}
@@ -3535,7 +3536,6 @@ out:
 static struct mbuf *
 igmp_v3_encap_report(struct ifnet *ifp, struct mbuf *m)
 {
-	struct rm_priotracker	in_ifa_tracker;
 	struct igmp_report	*igmp;
 	struct ip		*ip;
 	int			 hdrlen, igmpreclen;
@@ -3564,10 +3564,10 @@ igmp_v3_encap_report(struct ifnet *ifp, struct mbuf *m)
 	igmp->ir_type = IGMP_v3_HOST_MEMBERSHIP_REPORT;
 	igmp->ir_rsv1 = 0;
 	igmp->ir_rsv2 = 0;
-	igmp->ir_numgrps = htons(m->m_pkthdr.PH_vt.vt_nrecs);
+	igmp->ir_numgrps = htons(m->m_pkthdr.vt_nrecs);
 	igmp->ir_cksum = 0;
 	igmp->ir_cksum = in_cksum(m, sizeof(struct igmp_report) + igmpreclen);
-	m->m_pkthdr.PH_vt.vt_nrecs = 0;
+	m->m_pkthdr.vt_nrecs = 0;
 
 	m->m_data -= sizeof(struct ip);
 	m->m_len += sizeof(struct ip);
@@ -3584,7 +3584,7 @@ igmp_v3_encap_report(struct ifnet *ifp, struct mbuf *m)
 	if (m->m_flags & M_IGMP_LOOP) {
 		struct in_ifaddr *ia;
 
-		IFP_TO_IA(ifp, ia, &in_ifa_tracker);
+		IFP_TO_IA(ifp, ia);
 		if (ia != NULL)
 			ip->ip_src = ia->ia_addr.sin_addr;
 	}

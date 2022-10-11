@@ -67,12 +67,13 @@
 #define	BIO_UNMAPPED	0x10
 #define	BIO_TRANSIENT_MAPPING	0x20
 #define	BIO_VLIST	0x40
-
-#define	PRINT_BIO_FLAGS "\20\7vlist\6transient_mapping\5unmapped" \
-	"\4ordered\3onqueue\2done\1error"
-
+#define	BIO_SWAP	0x200	/* Swap-related I/O */
 #define BIO_SPEEDUP_WRITE	0x4000	/* Resource shortage at upper layers */
 #define BIO_SPEEDUP_TRIM	0x8000	/* Resource shortage at upper layers */
+
+#define	PRINT_BIO_FLAGS "\20\20speedup_trim\17speedup_write\12swap\7vlist\6transient_mapping\5unmapped" \
+	"\4ordered\3onqueue\2done\1error"
+
 
 #ifdef _KERNEL
 struct disk;
@@ -125,7 +126,7 @@ struct bio {
 #ifdef DIAGNOSTIC
 	void	*_bio_caller1;
 	void	*_bio_caller2;
-	uint8_t	_bio_cflags;
+	uint16_t _bio_cflags;
 #endif
 #if defined(BUF_TRACKING) || defined(FULL_BUF_TRACKING)
 	struct buf *bio_track_bp;	/* Parent buf for tracking */
@@ -151,7 +152,7 @@ extern int bio_transient_maxcnt;
 
 void biodone(struct bio *bp);
 void biofinish(struct bio *bp, struct devstat *stat, int error);
-int biowait(struct bio *bp, const char *wchan);
+int biowait(struct bio *bp, const char *wmesg);
 
 #if defined(BUF_TRACKING) || defined(FULL_BUF_TRACKING)
 void biotrack_buf(struct bio *bp, const char *location);

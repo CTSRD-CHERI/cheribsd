@@ -223,13 +223,14 @@ infiniband_resolve_addr(struct ifnet *ifp, struct mbuf *m,
     const struct sockaddr *dst, struct route *ro, uint8_t *phdr,
     uint32_t *pflags, struct llentry **plle)
 {
-	struct infiniband_header *ih;
+#if defined(INET) || defined(INET6)
+	struct infiniband_header *ih = (struct infiniband_header *)phdr;
+#endif
 	uint32_t lleflags = 0;
 	int error = 0;
 
 	if (plle)
 		*plle = NULL;
-	ih = (struct infiniband_header *)phdr;
 
 	switch (dst->sa_family) {
 #ifdef INET
@@ -253,7 +254,9 @@ infiniband_resolve_addr(struct ifnet *ifp, struct mbuf *m,
 #ifdef INET6
 	case AF_INET6:
 		if ((m->m_flags & M_MCAST) == 0) {
-			error = nd6_resolve(ifp, 0, m, dst, phdr, &lleflags, plle);
+			int af = RO_GET_FAMILY(ro, dst);
+			error = nd6_resolve(ifp, LLE_SF(af, 0), m, dst, phdr,
+			    &lleflags, plle);
 		} else {
 			infiniband_ipv6_multicast_map(
 			    &((const struct sockaddr_in6 *)dst)->sin6_addr,
@@ -329,7 +332,7 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 					 * the entry was used
 					 * by datapath.
 					 */
-					llentry_mark_used(lle);
+					llentry_provide_feedback(lle);
 			}
 			if (lle != NULL) {
 				phdr = lle->r_linkdata;
@@ -370,7 +373,7 @@ infiniband_output(struct ifnet *ifp, struct mbuf *m,
 
 	if ((pflags & RT_L2_ME) != 0) {
 		update_mbuf_csumflags(m, m);
-		return (if_simloop(ifp, m, dst->sa_family, 0));
+		return (if_simloop(ifp, m, RO_GET_FAMILY(ro, dst), 0));
 	}
 
 	/*

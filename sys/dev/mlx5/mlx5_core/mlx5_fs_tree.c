@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013-2017, Mellanox Technologies, Ltd.  All rights reserved.
+ * Copyright (c) 2013-2021, Mellanox Technologies, Ltd.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,10 +25,13 @@
  * $FreeBSD$
  */
 
+#include "opt_rss.h"
+#include "opt_ratelimit.h"
+
 #include <linux/module.h>
 #include <dev/mlx5/driver.h>
-#include "mlx5_core.h"
-#include "fs_core.h"
+#include <dev/mlx5/mlx5_core/mlx5_core.h>
+#include <dev/mlx5/mlx5_core/fs_core.h>
 #include <linux/string.h>
 #include <linux/compiler.h>
 
@@ -64,13 +67,19 @@
 #define FS_REQUIRED_CAPS(...) {.arr_sz = INIT_CAPS_ARRAY_SIZE(__VA_ARGS__), \
 			       .caps = (long[]) {__VA_ARGS__}}
 
-#define BYPASS_MAX_FT 5
-#define BYPASS_PRIO_MAX_FT 1
-#define KERNEL_MAX_FT 3
-#define LEFTOVER_MAX_FT 1
-#define KENREL_MIN_LEVEL 3
-#define LEFTOVER_MIN_LEVEL KENREL_MIN_LEVEL + 1
-#define BYPASS_MIN_LEVEL MLX5_NUM_BYPASS_FTS + LEFTOVER_MIN_LEVEL
+/* Flowtable sizes: */
+#define	BYPASS_MAX_FT 5
+#define	BYPASS_PRIO_MAX_FT 1
+#define	OFFLOADS_MAX_FT 2
+#define	KERNEL_MAX_FT 5
+#define	LEFTOVER_MAX_FT 1
+
+/* Flowtable levels: */
+#define	OFFLOADS_MIN_LEVEL 3
+#define	KERNEL_MIN_LEVEL (OFFLOADS_MIN_LEVEL + 1)
+#define	LEFTOVER_MIN_LEVEL (KERNEL_MIN_LEVEL + 1)
+#define	BYPASS_MIN_LEVEL (MLX5_NUM_BYPASS_FTS + LEFTOVER_MIN_LEVEL)
+
 struct node_caps {
 	size_t	arr_sz;
 	long	*caps;
@@ -89,7 +98,7 @@ struct init_tree_node {
 } root_fs = {
 	.type = FS_TYPE_NAMESPACE,
 	.name = "root",
-	.ar_size = 3,
+	.ar_size = 4,
 	.children = (struct init_tree_node[]) {
 		ADD_PRIO("by_pass_prio", 0, BYPASS_MIN_LEVEL, 0,
 			 FS_REQUIRED_CAPS(FS_CAP(flow_table_properties_nic_receive.flow_modify_en),
@@ -113,7 +122,11 @@ struct init_tree_node {
 					    BYPASS_PRIO_MAX_FT),
 				ADD_FT_PRIO("prio-mcast", 0,
 					    BYPASS_PRIO_MAX_FT))),
-		ADD_PRIO("kernel_prio", 0, KENREL_MIN_LEVEL, 0, {},
+		ADD_PRIO("offloads_prio", 0, OFFLOADS_MIN_LEVEL, 0, {},
+			 ADD_NS("offloads_ns",
+				ADD_FT_PRIO("prio_offloads-0", 0,
+					    OFFLOADS_MAX_FT))),
+		ADD_PRIO("kernel_prio", 0, KERNEL_MIN_LEVEL, 0, {},
 			 ADD_NS("kernel_ns",
 				ADD_FT_PRIO("prio_kernel-0", 0,
 					    KERNEL_MAX_FT))),
@@ -1050,14 +1063,12 @@ static struct mlx5_flow_group *fs_create_fg(struct mlx5_core_dev *dev,
 {
 	struct mlx5_flow_group *fg;
 	int err;
-	unsigned int end_index;
 	char name[20];
 
 	fg = fs_alloc_fg(fg_in);
 	if (IS_ERR(fg))
 		return fg;
 
-	end_index = fg->start_index + fg->max_ftes - 1;
 	err =  mlx5_cmd_fs_create_fg(dev, fg_in,
 				     ft->vport, ft->type, ft->id,
 				     &fg->id);
@@ -1394,7 +1405,6 @@ static struct mlx5_flow_group *create_autogroup(struct mlx5_flow_table *ft,
 {
 	unsigned int group_size;
 	unsigned int candidate_index = 0;
-	unsigned int candidate_group_num = 0;
 	struct mlx5_flow_group *g;
 	struct mlx5_flow_group *ret;
 	struct list_head *prev = &ft->fgs;
@@ -1431,7 +1441,6 @@ static struct mlx5_flow_group *create_autogroup(struct mlx5_flow_table *ft,
 
 	/* sorted by start_index */
 	fs_for_each_fg(g, ft) {
-		candidate_group_num++;
 		if (candidate_index + group_size > g->start_index)
 			candidate_index = g->start_index + g->max_ftes;
 		else
@@ -1510,7 +1519,7 @@ static void call_to_add_rule_notifiers(struct mlx5_flow_rule *dst,
 			mutex_unlock(&dst->clients_lock);
 			err  = iter_handler->add_dst_cb(dst,
 							is_new_rule,
-							NULL,
+							data,
 							iter_handler->client_context);
 			if (err)
 				break;
@@ -2372,11 +2381,14 @@ struct mlx5_flow_namespace *mlx5_get_flow_namespace(struct mlx5_core_dev *dev,
 	case MLX5_FLOW_NAMESPACE_BYPASS:
 		prio = 0;
 		break;
-	case MLX5_FLOW_NAMESPACE_KERNEL:
+	case MLX5_FLOW_NAMESPACE_OFFLOADS:
 		prio = 1;
 		break;
-	case MLX5_FLOW_NAMESPACE_LEFTOVERS:
+	case MLX5_FLOW_NAMESPACE_KERNEL:
 		prio = 2;
+		break;
+	case MLX5_FLOW_NAMESPACE_LEFTOVERS:
+		prio = 3;
 		break;
 	case MLX5_FLOW_NAMESPACE_FDB:
 		if (dev->fdb_root_ns)

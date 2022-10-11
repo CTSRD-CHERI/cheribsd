@@ -115,9 +115,7 @@ static driver_t iobus_driver = {
         sizeof(struct iobus_softc)
 };
 
-devclass_t iobus_devclass;
-
-DRIVER_MODULE(iobus, ofwbus, iobus_driver, iobus_devclass, 0, 0);
+DRIVER_MODULE(iobus, ofwbus, iobus_driver, 0, 0);
 
 static int
 iobus_probe(device_t dev)
@@ -374,7 +372,7 @@ iobus_activate_resource(device_t bus, device_t child, int type, int rid,
                 return (bus_activate_resource(bus, type, rid, res));
 
 	if ((type == SYS_RES_MEMORY) || (type == SYS_RES_IOPORT)) {
-		p = pmap_mapdev((vm_offset_t)rman_get_start(res) + sc->sc_addr,
+		p = pmap_mapdev((vm_paddr_t)rman_get_start(res) + sc->sc_addr,
 				(vm_size_t)rman_get_size(res));
 		if (p == NULL)
 			return (ENOMEM);

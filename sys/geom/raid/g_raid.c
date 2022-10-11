@@ -726,7 +726,7 @@ u_int
 g_raid_nsubdisks(struct g_raid_volume *vol, int state)
 {
 	struct g_raid_subdisk *subdisk;
-	struct g_raid_softc *sc;
+	struct g_raid_softc *sc __diagused;
 	u_int i, n ;
 
 	sc = vol->v_softc;
@@ -751,7 +751,7 @@ struct g_raid_subdisk *
 g_raid_get_subdisk(struct g_raid_volume *vol, int state)
 {
 	struct g_raid_subdisk *sd;
-	struct g_raid_softc *sc;
+	struct g_raid_softc *sc __diagused;
 	u_int i;
 
 	sc = vol->v_softc;
@@ -1033,8 +1033,7 @@ g_raid_tr_kerneldump_common(struct g_raid_tr_object *tr,
 }
 
 static int
-g_raid_dump(void *arg,
-    void *virtual, vm_offset_t physical, off_t offset, size_t length)
+g_raid_dump(void *arg, void *virtual, off_t offset, size_t length)
 {
 	struct g_raid_volume *vol;
 	int error;
@@ -1043,8 +1042,7 @@ g_raid_dump(void *arg,
 	G_RAID_DEBUG1(3, vol->v_softc, "Dumping at off %llu len %llu.",
 	    (long long unsigned)offset, (long long unsigned)length);
 
-	error = G_RAID_TR_KERNELDUMP(vol->v_tr,
-	    virtual, physical, offset, length);
+	error = G_RAID_TR_KERNELDUMP(vol->v_tr, virtual, offset, length);
 	return (error);
 }
 
@@ -1181,7 +1179,7 @@ g_raid_is_in_locked_range(struct g_raid_volume *vol, const struct bio *bp)
 static void
 g_raid_start_request(struct bio *bp)
 {
-	struct g_raid_softc *sc;
+	struct g_raid_softc *sc __diagused;
 	struct g_raid_volume *vol;
 
 	sc = bp->bio_to->geom->softc;
@@ -1258,7 +1256,7 @@ g_raid_finish_with_locked_ranges(struct g_raid_volume *vol, struct bio *bp)
 void
 g_raid_iodone(struct bio *bp, int error)
 {
-	struct g_raid_softc *sc;
+	struct g_raid_softc *sc __diagused;
 	struct g_raid_volume *vol;
 
 	sc = bp->bio_to->geom->softc;
@@ -1397,7 +1395,7 @@ nodisk:
 		G_RAID_LOGREQ(3, bp, "Sending dumping request.");
 		if (bp->bio_cmd == BIO_WRITE) {
 			bp->bio_error = g_raid_subdisk_kerneldump(sd,
-			    bp->bio_data, 0, bp->bio_offset, bp->bio_length);
+			    bp->bio_data, bp->bio_offset, bp->bio_length);
 		} else
 			bp->bio_error = EOPNOTSUPP;
 		g_raid_disk_done(bp);
@@ -1410,18 +1408,16 @@ nodisk:
 }
 
 int
-g_raid_subdisk_kerneldump(struct g_raid_subdisk *sd,
-    void *virtual, vm_offset_t physical, off_t offset, size_t length)
+g_raid_subdisk_kerneldump(struct g_raid_subdisk *sd, void *virtual,
+    off_t offset, size_t length)
 {
 
 	if (sd->sd_disk == NULL)
 		return (ENXIO);
 	if (sd->sd_disk->d_kd.di.dumper == NULL)
 		return (EOPNOTSUPP);
-	return (dump_write(&sd->sd_disk->d_kd.di,
-	    virtual, physical,
-	    sd->sd_disk->d_kd.di.mediaoffset + sd->sd_offset + offset,
-	    length));
+	return (dump_write(&sd->sd_disk->d_kd.di, virtual,
+	    sd->sd_disk->d_kd.di.mediaoffset + sd->sd_offset + offset, length));
 }
 
 static void
@@ -2227,7 +2223,7 @@ g_raid_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	 */
 	gp->orphan = g_raid_taste_orphan;
 	cp = g_new_consumer(gp);
-	cp->flags |= G_CF_DIRECT_RECEIVE;
+	cp->flags |= G_CF_DIRECT_SEND | G_CF_DIRECT_RECEIVE;
 	if (g_attach(cp, pp) != 0)
 		goto ofail2;
 	if (g_access(cp, 1, 0, 0) != 0)

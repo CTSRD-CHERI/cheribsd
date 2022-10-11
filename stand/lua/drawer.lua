@@ -261,7 +261,7 @@ local function drawbox()
 	local y = menu_position.y - 1
 	local w = frame_size.w
 	local menu_header = loader.getenv("loader_menu_title") or
-	    "Welcome to FreeBSD"
+	    "Welcome to CheriBSD"
 	local menu_header_align = loader.getenv("loader_menu_title_align")
 	local menu_header_x
 
@@ -308,6 +308,11 @@ local function drawbrand()
 
 	x = x + shift.x
 	y = y + shift.y
+	if branddef.shift ~= nil then
+		x = x +	branddef.shift.x
+		y = y + branddef.shift.y
+	end
+
 	if core.isFramebufferConsole() and
 	    loader.term_putimage ~= nil and
 	    branddef.image ~= nil then
@@ -377,7 +382,6 @@ end
 
 local function drawitem(func)
 	local console = loader.getenv("console")
-	local c
 
 	for c in string.gmatch(console, "%w+") do
 		loader.setenv("console", c)
@@ -386,6 +390,14 @@ local function drawitem(func)
 	loader.setenv("console", console)
 end
 
+cbsd_brand = {
+"   _____ _               _ ____   _____ _____",
+"  / ____| |             (_)  _ \\ / ____|  __ \\",
+" | |    | |__   ___ _ __ _| |_) | (___ | |  | |",
+" | |    | '_ \\ / _ \\ '__| |  _ < \\___ \\| |  | |",
+" | |____| | | |  __/ |  | | |_) |____) | |__| |",
+"  \\_____|_| |_|\\___|_|  |_|____/|_____/|_____/"
+}
 fbsd_brand = {
 "  ______               ____   _____ _____  ",
 " |  ____|             |  _ \\ / ____|  __ \\ ",
@@ -429,6 +441,10 @@ menu_name_handlers = {
 branddefs = {
 	-- Indexed by valid values for loader_brand in loader.conf(5). Valid
 	-- keys are: graphic (table depicting graphic)
+	["cbsd"] = {
+		graphic = cbsd_brand,
+		image = "/boot/images/freebsd-brand-rev.png",
+	},
 	["fbsd"] = {
 		graphic = fbsd_brand,
 		image = "/boot/images/freebsd-brand-rev.png",
@@ -462,7 +478,7 @@ default_shift = {x = 0, y = 0}
 shift = default_shift
 
 -- Module exports
-drawer.default_brand = 'fbsd'
+drawer.default_brand = 'cbsd'
 drawer.default_color_logodef = 'orb'
 drawer.default_bw_logodef = 'orbbw'
 -- For when things go terribly wrong; this def should be present here in the

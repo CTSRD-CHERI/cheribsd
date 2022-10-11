@@ -1114,6 +1114,14 @@ ixl_reconfigure_filters(struct ixl_vsi *vsi)
 
 	ixl_add_hw_filters(vsi, &tmp, cnt);
 
+	/*
+	 * When the vsi is allocated for the VFs, both vsi->hw and vsi->ifp
+	 * will be NULL. Furthermore, the ftl of such vsi already contains
+	 * IXL_VLAN_ANY filter so we can skip that as well.
+	 */
+	if (hw == NULL)
+		return;
+
 	/* Filter could be removed if MAC address was changed */
 	ixl_add_filter(vsi, hw->mac.addr, IXL_VLAN_ANY);
 
@@ -2190,14 +2198,12 @@ void
 ixl_update_vsi_stats(struct ixl_vsi *vsi)
 {
 	struct ixl_pf		*pf;
-	struct ifnet		*ifp;
 	struct i40e_eth_stats	*es;
 	u64			tx_discards, csum_errs;
 
 	struct i40e_hw_port_stats *nsd;
 
 	pf = vsi->back;
-	ifp = vsi->ifp;
 	es = &vsi->eth_stats;
 	nsd = &pf->stats;
 

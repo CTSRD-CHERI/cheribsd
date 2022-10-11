@@ -775,7 +775,7 @@ PLIST(uart3_p)= {"clk_uart3_div", "clk_uart3_frac", "xin24m"};
 static struct rk_clk rk3399_clks[] = {
 	/* External clocks */
 	LINK("xin24m"),
-	FRATE(0, "xin32k", 32768),
+	LINK("xin32k"),
 	FFACT(0, "xin12m", "xin24m", 1, 2),
 	FRATE(0, "clkin_i2s", 0),
 	FRATE(0, "pclkin_cif", 0),
@@ -1269,10 +1269,8 @@ static device_method_t rk3399_cru_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t rk3399_cru_devclass;
-
 DEFINE_CLASS_1(rk3399_cru, rk3399_cru_driver, rk3399_cru_methods,
   sizeof(struct rk_cru_softc), rk_cru_driver);
 
-EARLY_DRIVER_MODULE(rk3399_cru, simplebus, rk3399_cru_driver,
-    rk3399_cru_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(rk3399_cru, simplebus, rk3399_cru_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_MIDDLE);

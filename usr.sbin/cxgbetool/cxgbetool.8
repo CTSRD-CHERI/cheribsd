@@ -31,7 +31,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd Sep 21, 2018
+.Dd April 14, 2022
 .Dt CXGBETOOL 8
 .Os
 .Sh NAME
@@ -45,6 +45,10 @@
 .Pp
 .It
 .Nm Ar nexus Cm clearstats Ar port_id
+.It
+.Nm Ar nexus Cm clip Bro Cm hold | release Brc Ar ipv6-address
+.It
+.Nm Ar nexus Cm clip Cm list
 .It
 .Nm Ar nexus Cm context Bro Cm ingress | egress | fl | cong Brc Ar cntxt_id
 .It
@@ -116,6 +120,30 @@ The total number of ports attached to a nexus is listed in
 and the 0 based
 .Ar port_id
 identifies a port within this range.
+.Pp
+.Bl -item -compact
+.It
+.Cm clip hold Ar ipv6-address
+.El
+Install a reference on the given
+.Ar ipv6-address
+in the CLIP (Compressed Local IPv6) table.
+The address is added to the CLIP table if it is not present there already.
+.Pp
+.Bl -item -compact
+.It
+.Cm clip list
+.El
+List the contents of the CLIP table.
+.Pp
+.Bl -item -compact
+.It
+.Cm clip release Ar ipv6-address
+.El
+Release a reference on the given
+.Ar ipv6-address
+in the CLIP table.
+A reference on the address must have been acquired previously.
 .Pp
 .Bl -item -compact
 .It
@@ -539,7 +567,7 @@ for any kind of offload based on the hardware TOE.
 .It YES Ta Don't Care Ta Rule based offload
 .El
 .Pp
-The policy file consists of empty lines, comments (lines begining with #) and
+The policy file consists of empty lines, comments (lines beginning with #) and
 any number of rules.
 Rules are applied in the order they appear in the file and processing stops at
 the first match.
@@ -621,18 +649,22 @@ must be one of
 .It Cm class Ar sc
 Bind the connection to the specified tx scheduling class.
 Valid range is 0 to 14 (for T4) and 0 to 15 (T5 onwards).
-.It Cm rxq Ar qid
+.It Cm rxq Ar qnum
 Use the specified offload rx queue.
-.Ar qid
-should be between 0 and nofldrxq for the ifnet.
+.Ar qnum
+should be
+.Cm random Ns , Cm roundrobin Ns ,
+or a number between 0 and nofldrxq for the ifnet.
 .It Cm txq Ar qnum
 Use the specified offload tx queue.
-.Ar qid
-should be between 0 and nofldtxq for the ifnet.
+.Ar qnum
+should be
+.Cm random Ns , Cm roundrobin Ns ,
+or a number between 0 and nofldtxq for the ifnet.
 .It Cm bind Ar qnum
 Shorthand for
 .Cm rxq Ar qnum Cm txq Ar qnum Ns .
-Use only when nofldrxq is the same as nofldtxq.
+Use when nofldrxq is the same as nofldtxq.
 .It Cm mss Ar val
 Set the advertised TCP MSS in the SYN for this connection to
 .Ar val

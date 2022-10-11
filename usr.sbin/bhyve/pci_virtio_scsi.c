@@ -559,15 +559,16 @@ pci_vtscsi_controlq_notify(void *vsc, struct vqueue_info *vq)
 	struct pci_vtscsi_softc *sc;
 	struct iovec iov[VTSCSI_MAXSEG];
 	struct vi_req req;
-	uint16_t n;
 	void *buf = NULL;
 	size_t bufsize;
-	int iolen;
+	int iolen, n;
 
 	sc = vsc;
 
 	while (vq_has_descs(vq)) {
 		n = vq_getchain(vq, iov, VTSCSI_MAXSEG, &req);
+		assert(n >= 1 && n <= VTSCSI_MAXSEG);
+
 		bufsize = iov_to_buf(iov, n, &buf);
 		iolen = pci_vtscsi_control_handle(sc, buf, bufsize);
 		buf_to_iov(buf + bufsize - iolen, iolen, iov, n,
@@ -597,13 +598,14 @@ pci_vtscsi_requestq_notify(void *vsc, struct vqueue_info *vq)
 	struct pci_vtscsi_request *req;
 	struct iovec iov[VTSCSI_MAXSEG];
 	struct vi_req vireq;
-	uint16_t n;
+	int n;
 
 	sc = vsc;
 	q = &sc->vss_queues[vq->vq_num - 2];
 
 	while (vq_has_descs(vq)) {
 		n = vq_getchain(vq, iov, VTSCSI_MAXSEG, &vireq);
+		assert(n >= 1 && n <= VTSCSI_MAXSEG);
 
 		req = calloc(1, sizeof(struct pci_vtscsi_request));
 		req->vsr_idx = vireq.idx;
@@ -626,7 +628,7 @@ pci_vtscsi_requestq_notify(void *vsc, struct vqueue_info *vq)
 }
 
 static int
-pci_vtscsi_init_queue(struct pci_vtscsi_softc *sc, 
+pci_vtscsi_init_queue(struct pci_vtscsi_softc *sc,
     struct pci_vtscsi_queue *queue, int num)
 {
 	struct pci_vtscsi_worker *worker;
@@ -680,7 +682,7 @@ static int
 pci_vtscsi_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 {
 	struct pci_vtscsi_softc *sc;
-	const char *devname, *value;;
+	const char *devname, *value;
 	int i;
 
 	sc = calloc(1, sizeof(struct pci_vtscsi_softc));
@@ -697,6 +699,8 @@ pci_vtscsi_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 		free(sc);
 		return (1);
 	}
+
+	pthread_mutex_init(&sc->vss_mtx, NULL);
 
 	vi_softc_linkup(&sc->vss_vs, &vtscsi_vi_consts, sc, pi, sc->vss_vq);
 	sc->vss_vs.vs_mtx = &sc->vss_mtx;

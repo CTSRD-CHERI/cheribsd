@@ -48,7 +48,7 @@ __unused static void cheri_init_globals(void);
 static __attribute__((always_inline))
 void _do___caprelocs(const struct capreloc *start_relocs,
     const struct capreloc *stop_relocs, void * __capability gdc,
-    const void * __capability pcc, vaddr_t base_addr, bool tight_pcc_bounds)
+    const void * __capability pcc, ptraddr_t base_addr, bool tight_pcc_bounds)
 {
 	cheri_init_globals_impl(start_relocs, stop_relocs, /*data_cap=*/gdc,
 	    /*code_cap=*/pcc, /*rodata_cap=*/pcc,

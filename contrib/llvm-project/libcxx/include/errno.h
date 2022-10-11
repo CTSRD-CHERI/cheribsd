@@ -1,5 +1,5 @@
 // -*- C++ -*-
-//===-------------------------- errno.h -----------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -428,4 +428,4 @@ static const int __elast3 = 106;
 
 #endif // __cplusplus
 
-#endif  // _LIBCPP_ERRNO_H
+#endif // _LIBCPP_ERRNO_H

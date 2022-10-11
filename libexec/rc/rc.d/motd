@@ -19,6 +19,37 @@ COMPAT_MOTD="/etc/motd"
 TARGET="/var/run/motd"
 TEMPLATE="/etc/motd.template"
 PERMS="644"
+WORLD_OPTIONS="/usr/share/misc/perf_options"
+
+append_perf_warnings()
+{
+	local _t _kernel_options _world_options _opt_type
+	_t="$1"
+
+	for _opt in DIAGNOSTIC INVARIANTS WITNESS; do
+		if check_kern_features $(echo $_opt | tr A-Z a-z); then
+			_kernel_options="${_kernel_options} $_opt"
+		fi
+	done
+	if [ -e ${WORLD_OPTIONS} ]; then
+		_world_options="$(grep -v "^#" "$WORLD_OPTIONS")"
+	fi
+	if [ -n "$_kernel_options" -o -n "$_world_options" ]; then
+		_opt_type="kernel"
+		echo >> "$_t"
+		for _opt in $_kernel_options WORLD $_world_options; do
+			case $_opt in
+			WORLD)
+				_opt_type="world"
+				;;
+			*)
+				echo -n " ${_opt}"
+				echo "WARNING: $_opt $_opt_type option defined, expect reduced performance" >> $_t
+				;;
+			esac
+		done
+	fi
+}
 
 motd_start()
 {
@@ -26,7 +57,7 @@ motd_start()
 	#	Must be done *before* interactive logins are possible
 	#	to prevent possible race conditions.
 	#
-	check_startmsgs && echo -n 'Updating motd:'
+	startmsg -n 'Updating motd:'
 	if [ ! -f "${TEMPLATE}" ]; then
 		# Create missing template from existing regular motd file, if
 		# one exists.
@@ -47,11 +78,12 @@ motd_start()
 	T=`mktemp -t motd`
 	uname -v | sed -e 's,^\([^#]*\) #\(.* [1-2][0-9][0-9][0-9]\).*/\([^\]*\) $,\1 (\3) #\2,' > ${T}
 	cat "${TEMPLATE}" >> ${T}
+	checkyesno motd_perf_warnings && append_perf_warnings ${T}
 
 	install -C -o root -g wheel -m "${PERMS}" "$T" "${TARGET}"
 	rm -f "$T"
 
-	check_startmsgs && echo '.'
+	startmsg '.'
 }
 
 load_rc_config $name

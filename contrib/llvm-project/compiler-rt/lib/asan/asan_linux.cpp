@@ -55,6 +55,7 @@ extern Elf_Dyn _DYNAMIC;
 #else
 #include <sys/ucontext.h>
 #include <link.h>
+extern ElfW(Dyn) _DYNAMIC[];
 #endif
 
 // x86-64 FreeBSD 9.2 and older define 'ucontext_t' incorrectly in
@@ -84,28 +85,15 @@ bool IsSystemHeapAddress (uptr addr) { return false; }
 
 void *AsanDoesNotSupportStaticLinkage() {
   // This will fail to link with -static.
-  return &_DYNAMIC;  // defined in link.h
-}
-
-static void UnmapFromTo(uptr from, uptr to) {
-  CHECK(to >= from);
-  if (to == from) return;
-  uptr res = internal_munmap(reinterpret_cast<void *>(from), to - from);
-  if (UNLIKELY(internal_iserror(res))) {
-    Report(
-        "ERROR: AddresSanitizer failed to unmap 0x%zx (%zd) bytes at address "
-        "%p\n",
-        to - from, to - from, from);
-    CHECK("unable to unmap" && 0);
-  }
+  return &_DYNAMIC;
 }
 
 #if ASAN_PREMAP_SHADOW
-uptr FindPremappedShadowStart() {
+uptr FindPremappedShadowStart(uptr shadow_size_bytes) {
   uptr granularity = GetMmapGranularity();
   uptr shadow_start = reinterpret_cast<uptr>(&__asan_shadow);
   uptr premap_shadow_size = PremapShadowSize();
-  uptr shadow_size = RoundUpTo(kHighShadowEnd, granularity);
+  uptr shadow_size = RoundUpTo(shadow_size_bytes, granularity);
   // We may have mapped too much. Release extra memory.
   UnmapFromTo(shadow_start + shadow_size, shadow_start + premap_shadow_size);
   return shadow_start;
@@ -113,29 +101,24 @@ uptr FindPremappedShadowStart() {
 #endif
 
 uptr FindDynamicShadowStart() {
+  uptr shadow_size_bytes = MemToShadowSize(kHighMemEnd);
 #if ASAN_PREMAP_SHADOW
   if (!PremapShadowFailed())
-    return FindPremappedShadowStart();
+    return FindPremappedShadowStart(shadow_size_bytes);
 #endif
 
-  uptr granularity = GetMmapGranularity();
-  uptr alignment = granularity * 8;
-  uptr left_padding = granularity;
-  uptr shadow_size = RoundUpTo(kHighShadowEnd, granularity);
-  uptr map_size = shadow_size + left_padding + alignment;
-
-  uptr map_start = (uptr)MmapNoAccess(map_size);
-  CHECK_NE(map_start, ~(uptr)0);
-
-  uptr shadow_start = RoundUpTo(map_start + left_padding, alignment);
-  UnmapFromTo(map_start, shadow_start - left_padding);
-  UnmapFromTo(shadow_start + shadow_size, map_start + map_size);
-
-  return shadow_start;
+  return MapDynamicShadow(shadow_size_bytes, ASAN_SHADOW_SCALE,
+                          /*min_shadow_base_alignment*/ 0, kHighMemEnd);
 }
 
 void AsanApplyToGlobals(globals_op_fptr op, const void *needle) {
   UNIMPLEMENTED();
+}
+
+void FlushUnneededASanShadowMemory(uptr p, uptr size) {
+  // Since asan's mapping is compacting, the shadow chunk may be
+  // not page-aligned, so we only flush the page-aligned portion.
+  ReleaseMemoryPagesToOS(MemToShadow(p), MemToShadow(p + size));
 }
 
 #if SANITIZER_ANDROID
@@ -145,33 +128,27 @@ void AsanCheckIncompatibleRT() {}
 #else
 static int FindFirstDSOCallback(struct dl_phdr_info *info, size_t size,
                                 void *data) {
-  VReport(2, "info->dlpi_name = %s\tinfo->dlpi_addr = %p\n",
-          info->dlpi_name, info->dlpi_addr);
+  VReport(2, "info->dlpi_name = %s\tinfo->dlpi_addr = %p\n", info->dlpi_name,
+          (void *)info->dlpi_addr);
 
-  // Continue until the first dynamic library is found
-  if (!info->dlpi_name || info->dlpi_name[0] == 0)
-    return 0;
+  const char **name = (const char **)data;
 
-  // Ignore vDSO
-  if (internal_strncmp(info->dlpi_name, "linux-", sizeof("linux-") - 1) == 0)
-    return 0;
-
-#if SANITIZER_FREEBSD || SANITIZER_NETBSD
   // Ignore first entry (the main program)
-  char **p = (char **)data;
-  if (!(*p)) {
-    *p = (char *)-1;
+  if (!*name) {
+    *name = "";
     return 0;
   }
-#endif
 
-#if SANITIZER_SOLARIS
-  // Ignore executable on Solaris
-  if (info->dlpi_addr == 0)
+#    if SANITIZER_LINUX
+  // Ignore vDSO. glibc versions earlier than 2.15 (and some patched
+  // by distributors) return an empty name for the vDSO entry, so
+  // detect this as well.
+  if (!info->dlpi_name[0] ||
+      internal_strncmp(info->dlpi_name, "linux-", sizeof("linux-") - 1) == 0)
     return 0;
-#endif
+#    endif
 
-  *(const char **)data = info->dlpi_name;
+  *name = info->dlpi_name;
   return 1;
 }
 
@@ -192,7 +169,7 @@ void AsanCheckDynamicRTPrereqs() {
   // Ensure that dynamic RT is the first DSO in the list
   const char *first_dso_name = nullptr;
   dl_iterate_phdr(FindFirstDSOCallback, &first_dso_name);
-  if (first_dso_name && !IsDynamicRTName(first_dso_name)) {
+  if (first_dso_name && first_dso_name[0] && !IsDynamicRTName(first_dso_name)) {
     Report("ASan runtime does not come first in initial library list; "
            "you should either link runtime to your application or "
            "manually preload it with LD_PRELOAD.\n");

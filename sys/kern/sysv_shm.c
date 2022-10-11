@@ -164,7 +164,7 @@ static void shm_prison_cleanup(struct prison *);
  * Tuneable values.
  */
 #ifndef SHMMAXPGS
-#define	SHMMAXPGS	131072	/* Note: sysv shared memory is swap backed. */
+#define	SHMMAXPGS	131072ul /* Note: sysv shared memory is swap backed. */
 #endif
 #ifndef SHMMAX
 #define	SHMMAX	(SHMMAXPGS*PAGE_SIZE)
@@ -408,7 +408,7 @@ sys_shmdt(struct thread *td, struct shmdt_args *uap)
 	 */
 	if (shmaddr != NULL &&
 	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||
-	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0))
+	    (cheri_getperm(shmaddr) & CHERI_PERM_SW_VMEM) == 0))
 		return (EPROT);
 #endif
 	return (kern_shmdt(td, shmaddr));
@@ -437,9 +437,6 @@ kern_shmat_locked(struct thread *td, int shmid,
 	vm_prot_t prot;
 	vm_size_t size;
 	int cow, error, find_space, i, rv;
-#if __has_feature(capabilities)
-	int reqperm;
-#endif
 
 	AUDIT_ARG_SVIPC_ID(shmid);
 	AUDIT_ARG_VALUE(shmflg);
@@ -502,12 +499,21 @@ kern_shmat_locked(struct thread *td, int shmid,
 		if (CHERI_REPRESENTABLE_BASE(attach_va, size) != attach_va)
 			return (EINVAL);
 		if (cheri_gettag(shmaddr)) {
+			int reqperm;
+
 			/*
 			 * Fixed mapping through a capability only makes
 			 * sense if we're knowingly remapping.
 			 */
 			if ((shmflg & SHM_REMAP) == 0)
 				return (EINVAL);
+
+			reqperm = CHERI_PERM_LOAD;
+			if ((shmflg & SHM_RDONLY) == 0)
+				reqperm |= CHERI_PERM_STORE;
+			if ((cheri_getperm(shmaddr) & reqperm) != reqperm)
+				return (EPROT);
+
 			/* XXX: require that a reservation exists. */
 			/* Handle any rounding above */
 			shmaddr = cheri_setaddress(shmaddr, attach_va);
@@ -551,11 +557,6 @@ kern_shmat_locked(struct thread *td, int shmid,
 			find_space = VMFS_OPTIMAL_SPACE;
 	}
 #if __has_feature(capabilities)
-	reqperm = CHERI_PERM_LOAD;
-	reqperm |= (shmflg & SHM_RDONLY) != 0 ? 0 : CHERI_PERM_STORE;
-	if ((cheri_getperm(shmaddr) & reqperm) != reqperm)
-	    return (EPROT);
-
 	max_va = cheri_gettop(shmaddr);
 #else
 	max_va = 0;
@@ -631,7 +632,7 @@ sys_shmat(struct thread *td, struct shmat_args *uap)
 	 */
 	if (!cheri_is_null_derived(shmaddr) &&
 	    (!cheri_gettag(shmaddr) || cheri_getsealed(shmaddr) ||
-	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0))
+	    (cheri_getperm(shmaddr) & CHERI_PERM_SW_VMEM) == 0))
 		return (EPROT);
 #endif
 	return (kern_shmat(td, uap->shmid, shmaddr, uap->shmflg));
@@ -1064,56 +1065,6 @@ static struct syscall_helper_data shm_syscalls[] = {
 #include <compat/freebsd32/freebsd32_syscall.h>
 #include <compat/freebsd32/freebsd32_util.h>
 
-struct shmid_ds32 {
-	struct ipc_perm32 shm_perm;
-	int32_t		shm_segsz;
-	pid_t		shm_lpid;
-	pid_t		shm_cpid;
-	unsigned int	shm_nattch;
-	int32_t		shm_atime;
-	int32_t		shm_dtime;
-	int32_t		shm_ctime;
-};
-
-#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
-    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
-struct shmid_ds32_old {
-	struct ipc_perm32_old shm_perm;
-	int32_t		shm_segsz;
-	pid_t		shm_lpid;
-	pid_t		shm_cpid;
-	int16_t		shm_nattch;
-	int32_t		shm_atime;
-	int32_t		shm_dtime;
-	int32_t		shm_ctime;
-	uint32_t	shm_internal;
-};
-#endif
-
-struct shmid_kernel32 {
-	struct shmid_ds32	 u;
-	int32_t			*object;
-	int32_t			*label;
-	int32_t			*cred;
-};
-
-struct shm_info32 {
-	int32_t		used_ids;
-	uint32_t	shm_tot;
-	uint32_t	shm_rss;
-	uint32_t	shm_swp;
-	uint32_t	swap_attempts;
-	uint32_t	swap_successes;
-};
-
-struct shminfo32 {
-	uint32_t	shmmax;
-	uint32_t	shmmin;
-	uint32_t	shmmni;
-	uint32_t	shmseg;
-	uint32_t	shmall;
-};
-
 static struct syscall_helper_data shm32_syscalls[] = {
 	SYSCALL32_INIT_HELPER_COMPAT(shmat),
 	SYSCALL32_INIT_HELPER_COMPAT(shmdt),
@@ -1130,42 +1081,10 @@ static struct syscall_helper_data shm32_syscalls[] = {
 
 #ifdef COMPAT_FREEBSD64
 #include <compat/freebsd64/freebsd64.h>
+#include <compat/freebsd64/freebsd64_ipc.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
-
-struct shmid_ds64 {
-	struct ipc_perm	shm_perm;
-	size_t		shm_segsz;
-	pid_t		shm_lpid;
-	pid_t		shm_cpid;
-	shmatt_t	shm_nattch;
-	time_t		shm_atime;
-	time_t		shm_dtime;
-	time_t		shm_ctime;
-};
-
-#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
-    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
-struct shmid_ds_old64 {
-	struct ipc_perm_old shm_perm;
-	int		shm_segsz;
-	pid_t		shm_lpid;
-	pid_t		shm_cpid;
-	short		shm_nattch;
-	time_t		shm_atime;
-	time_t		shm_dtime;
-	time_t		shm_ctime;
-	void		*shm_internal;
-};
-#endif
-
-struct shmid_kernel64 {
-	struct shmid_ds64	 u;
-	struct vm_object	*object;
-	struct label		*label;
-	struct ucred		*cred;
-};
 
 static struct syscall_helper_data shm64_syscalls[] = {
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_shmat),
@@ -1721,7 +1640,7 @@ freebsd7_freebsd32_shmctl(struct thread *td,
 		struct shminfo shminfo;
 	} u;
 	union {
-		struct shmid_ds32_old shmid_ds32;
+		struct shmid_ds_old32 shmid_ds32;
 		struct shm_info32 shm_info32;
 		struct shminfo32 shminfo32;
 	} u32;

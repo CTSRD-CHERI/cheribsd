@@ -36,6 +36,7 @@
 #define	_UFS_FFS_FS_H_
 
 #include <sys/mount.h>
+#include <sys/stdint.h>
 #include <ufs/ufs/dinode.h>
 
 /*
@@ -77,6 +78,28 @@
 #define	SBLOCKSIZE	  8192
 #define	SBLOCKSEARCH \
 	{ SBLOCK_UFS2, SBLOCK_UFS1, SBLOCK_FLOPPY, SBLOCK_PIGGY, -1 }
+/*
+ * Request standard superblock location in ffs_sbget().
+ *
+ * STDSB will fail if the superblock has a check hash and it is wrong.
+ *
+ * STDSB_NOHASHFAIL will note that the check hash is wrong but will
+ *    still return the superblock. This is used by the bootstrap code
+ *    to give the system a chance to come up so that fsck can be run
+ *    to correct the problem.
+ *
+ * STDSB_NOMSG is the same as STDSB but the kernel does not print an 
+ *    error message. It is used by programs like fsck that want to
+ *    print their own error message.
+ *
+ * STDSB_NOHASHFAIL_NOMSG is the same as STDSB_NOHASHFAIL but the kernel
+ *    does not print an error message. It is used by clients like glabel
+ *    that just want to check for possible filesystem types.
+ */
+#define	STDSB			-1	/* Fail if check-hash is bad */
+#define	STDSB_NOHASHFAIL	-2	/* Ignore check-hash failure */
+#define	STDSB_NOMSG		-3	/* STDSB with no kernel message */
+#define	STDSB_NOHASHFAIL_NOMSG	-4	/* STDSB_NOHASHFAIL with no message */
 
 /*
  * Max number of fragments per block. This value is NOT tweakable.
@@ -227,6 +250,7 @@
 #define	FFS_SET_SIZE		17	/* set inode size */
 #define	FFS_MAXID		17	/* number of valid ffs ids */
 
+#ifndef MAKEFS
 /*
  * Command structure passed in to the filesystem to adjust filesystem values.
  */
@@ -234,10 +258,15 @@
 struct fsck_cmd {
 	int32_t	version;	/* version of command structure */
 	int32_t	handle;		/* reference to filesystem to be changed */
-	int64_t	value;		/* inode or block number to be affected */
+#ifdef __ILP32__
+	int64_t value;		/* inode or block number to be affected */
+#else
+	kintcap_t value;
+#endif
 	int64_t	size;		/* amount or range to be adjusted */
 	int64_t	spare;		/* reserved for future use */
 };
+#endif
 
 /*
  * A recovery structure placed at the end of the boot block area by newfs

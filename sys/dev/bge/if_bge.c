@@ -532,12 +532,10 @@ static driver_t bge_driver = {
 	sizeof(struct bge_softc)
 };
 
-static devclass_t bge_devclass;
-
-DRIVER_MODULE(bge, pci, bge_driver, bge_devclass, 0, 0);
+DRIVER_MODULE(bge, pci, bge_driver, 0, 0);
 MODULE_PNP_INFO("U16:vendor;U16:device", pci, bge, bge_devs,
     nitems(bge_devs) - 1);
-DRIVER_MODULE(miibus, bge, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(miibus, bge, miibus_driver, 0, 0);
 
 static int bge_allow_asf = 1;
 
@@ -4811,11 +4809,9 @@ bge_tick(void *xsc)
 static void
 bge_stats_update_regs(struct bge_softc *sc)
 {
-	if_t ifp;
 	struct bge_mac_stats *stats;
 	uint32_t val;
 
-	ifp = sc->bge_ifp;
 	stats = &sc->bge_mac_stats;
 
 	stats->ifHCOutOctets +=
@@ -6236,7 +6232,6 @@ bge_add_sysctls(struct bge_softc *sc)
 {
 	struct sysctl_ctx_list *ctx;
 	struct sysctl_oid_list *children;
-	int unit;
 
 	ctx = device_get_sysctl_ctx(sc->bge_dev);
 	children = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->bge_dev));
@@ -6260,7 +6255,6 @@ bge_add_sysctls(struct bge_softc *sc)
 
 #endif
 
-	unit = device_get_unit(sc->bge_dev);
 	/*
 	 * A common design characteristic for many Broadcom client controllers
 	 * is that they only support a single outstanding DMA read operation
@@ -6787,7 +6781,14 @@ bge_debugnet_init(if_t ifp, int *nrxr, int *ncl, int *clsize)
 
 	sc = if_getsoftc(ifp);
 	BGE_LOCK(sc);
-	*nrxr = sc->bge_return_ring_cnt;
+	/*
+	 * There is only one logical receive ring, but it is backed
+	 * by two actual rings, for cluster- and jumbo-sized mbufs.
+	 * Debugnet expects only one size, so if jumbo is in use,
+	 * this says we have two rings of jumbo mbufs, but that's
+	 * only a little wasteful.
+	 */
+	*nrxr = 2;
 	*ncl = DEBUGNET_MAX_IN_FLIGHT;
 	if ((sc->bge_flags & BGE_FLAG_JUMBO_STD) != 0 &&
 	    (if_getmtu(sc->bge_ifp) + ETHER_HDR_LEN + ETHER_CRC_LEN +

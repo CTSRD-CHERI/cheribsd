@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
+#include <sys/reg.h>
 #include <sys/smr.h>
 #include <sys/sysctl.h>
 
@@ -50,7 +51,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/psl.h>
 #include <machine/cpufunc.h>
 #include <machine/md_var.h>
-#include <machine/reg.h>
 #include <machine/segments.h>
 #include <machine/smp.h>
 #include <machine/specialreg.h>
@@ -167,6 +167,10 @@ SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, halt_exit, CTLFLAG_RD, &cap_halt_exit, 0,
 static int cap_pause_exit;
 SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, pause_exit, CTLFLAG_RD, &cap_pause_exit,
     0, "PAUSE triggers a VM-exit");
+
+static int cap_wbinvd_exit;
+SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, wbinvd_exit, CTLFLAG_RD, &cap_wbinvd_exit,
+    0, "WBINVD triggers a VM-exit");
 
 static int cap_rdpid;
 SYSCTL_INT(_hw_vmm_vmx_cap, OID_AUTO, rdpid, CTLFLAG_RD, &cap_rdpid, 0,
@@ -777,6 +781,12 @@ vmx_modinit(int ipinum)
 					 PROCBASED_PAUSE_EXITING, 0,
 					 &tmp) == 0);
 
+	cap_wbinvd_exit = (vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS2,
+					MSR_VMX_PROCBASED_CTLS2,
+					PROCBASED2_WBINVD_EXITING,
+					0,
+					&tmp) == 0);
+
 	/*
 	 * Check support for RDPID and/or RDTSCP.
 	 *
@@ -1117,6 +1127,10 @@ vmx_init(struct vm *vm, pmap_t pmap)
 		error += vmwrite(VMCS_EPTP, vmx->eptp);
 		error += vmwrite(VMCS_PIN_BASED_CTLS, pinbased_ctls);
 		error += vmwrite(VMCS_PRI_PROC_BASED_CTLS, procbased_ctls);
+		if (vcpu_trap_wbinvd(vm, i)) {
+			KASSERT(cap_wbinvd_exit, ("WBINVD trap not available"));
+			procbased_ctls2 |= PROCBASED2_WBINVD_EXITING;
+		}
 		error += vmwrite(VMCS_SEC_PROC_BASED_CTLS, procbased_ctls2);
 		error += vmwrite(VMCS_EXIT_CTLS, exit_ctls);
 		error += vmwrite(VMCS_ENTRY_CTLS, entry_ctls);
@@ -1389,7 +1403,7 @@ vmx_set_tsc_offset(struct vmx *vmx, int vcpu, uint64_t offset)
 static void
 vmx_inject_nmi(struct vmx *vmx, int vcpu)
 {
-	uint32_t gi, info;
+	uint32_t gi __diagused, info;
 
 	gi = vmcs_read(VMCS_GUEST_INTERRUPTIBILITY);
 	KASSERT((gi & NMI_BLOCKING) == 0, ("vmx_inject_nmi: invalid guest "
@@ -1634,7 +1648,7 @@ vmx_clear_nmi_blocking(struct vmx *vmx, int vcpuid)
 static void
 vmx_assert_nmi_blocking(struct vmx *vmx, int vcpuid)
 {
-	uint32_t gi;
+	uint32_t gi __diagused;
 
 	gi = vmcs_read(VMCS_GUEST_INTERRUPTIBILITY);
 	KASSERT(gi & VMCS_INTERRUPTIBILITY_NMI_BLOCKING,
@@ -1958,7 +1972,7 @@ static uint64_t
 inout_str_index(struct vmx *vmx, int vcpuid, int in)
 {
 	uint64_t val;
-	int error;
+	int error __diagused;
 	enum vm_reg_name reg;
 
 	reg = in ? VM_REG_GUEST_RDI : VM_REG_GUEST_RSI;
@@ -1971,7 +1985,7 @@ static uint64_t
 inout_str_count(struct vmx *vmx, int vcpuid, int rep)
 {
 	uint64_t val;
-	int error;
+	int error __diagused;
 
 	if (rep) {
 		error = vmx_getreg(vmx, vcpuid, VM_REG_GUEST_RCX, &val);
@@ -2004,7 +2018,7 @@ static void
 inout_str_seginfo(struct vmx *vmx, int vcpuid, uint32_t inst_info, int in,
     struct vm_inout_str *vis)
 {
-	int error, s;
+	int error __diagused, s;
 
 	if (in) {
 		vis->seg_name = VM_REG_GUEST_ES;
@@ -2776,6 +2790,11 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		SDT_PROBE3(vmm, vmx, exit, vminsn, vmx, vcpu, vmexit);
 		vmexit->exitcode = VM_EXITCODE_VMINSN;
 		break;
+	case EXIT_REASON_INVD:
+	case EXIT_REASON_WBINVD:
+		/* ignore exit */
+		handled = HANDLED;
+		break;
 	default:
 		SDT_PROBE4(vmm, vmx, exit, unknown,
 		    vmx, vcpu, vmexit, reason);
@@ -3165,9 +3184,6 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 		panic("Mismatch between handled (%d) and exitcode (%d)",
 		      handled, vmexit->exitcode);
 	}
-
-	if (!handled)
-		vmm_stat_incr(vm, vcpu, VMEXIT_USERSPACE, 1);
 
 	VCPU_CTR1(vm, vcpu, "returning from vmx_run: exitcode %d",
 	    vmexit->exitcode);
@@ -3860,7 +3876,7 @@ vmx_enable_x2apic_mode_vid(struct vlapic *vlapic)
 	struct vmx *vmx;
 	struct vmcs *vmcs;
 	uint32_t proc_ctls2;
-	int vcpuid, error;
+	int vcpuid, error __diagused;
 
 	vcpuid = vlapic->vcpuid;
 	vmx = ((struct vlapic_vtx *)vlapic)->vmx;

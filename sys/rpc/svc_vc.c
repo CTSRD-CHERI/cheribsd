@@ -105,7 +105,7 @@ static int svc_vc_accept(struct socket *head, struct socket **sop);
 static int svc_vc_soupcall(struct socket *so, void *arg, int waitflag);
 static int svc_vc_rendezvous_soupcall(struct socket *, void *, int);
 
-static struct xp_ops svc_vc_rendezvous_ops = {
+static const struct xp_ops svc_vc_rendezvous_ops = {
 	.xp_recv =	svc_vc_rendezvous_recv,
 	.xp_stat =	svc_vc_rendezvous_stat,
 	.xp_reply =	(bool_t (*)(SVCXPRT *, struct rpc_msg *,
@@ -114,7 +114,7 @@ static struct xp_ops svc_vc_rendezvous_ops = {
 	.xp_control =	svc_vc_rendezvous_control
 };
 
-static struct xp_ops svc_vc_ops = {
+static const struct xp_ops svc_vc_ops = {
 	.xp_recv =	svc_vc_recv,
 	.xp_stat =	svc_vc_stat,
 	.xp_ack =	svc_vc_ack,
@@ -123,7 +123,7 @@ static struct xp_ops svc_vc_ops = {
 	.xp_control =	svc_vc_control
 };
 
-static struct xp_ops svc_vc_backchannel_ops = {
+static const struct xp_ops svc_vc_backchannel_ops = {
 	.xp_recv =	svc_vc_backchannel_recv,
 	.xp_stat =	svc_vc_backchannel_stat,
 	.xp_reply =	svc_vc_backchannel_reply,
@@ -328,11 +328,9 @@ svc_vc_accept(struct socket *head, struct socket **sop)
 	int error = 0;
 	short nbio;
 
-	/* XXXGL: shouldn't that be an assertion? */
-	if ((head->so_options & SO_ACCEPTCONN) == 0) {
-		error = EINVAL;
-		goto done;
-	}
+	KASSERT(SOLISTENING(head),
+	    ("%s: socket %p is not listening", __func__, head));
+
 #ifdef MAC
 	error = mac_socket_check_accept(curthread->td_ucred, head);
 	if (error != 0)
@@ -451,7 +449,6 @@ svc_vc_rendezvous_stat(SVCXPRT *xprt)
 static void
 svc_vc_destroy_common(SVCXPRT *xprt)
 {
-	enum clnt_stat stat;
 	uint32_t reterr;
 
 	if (xprt->xp_socket) {
@@ -464,13 +461,12 @@ svc_vc_destroy_common(SVCXPRT *xprt)
 				 * daemon having crashed or been
 				 * restarted, so just ignore returned stat.
 				 */
-				stat = rpctls_srv_disconnect(xprt->xp_sslsec,
+				rpctls_srv_disconnect(xprt->xp_sslsec,
 				    xprt->xp_sslusec, xprt->xp_sslrefno,
 				    &reterr);
 			}
 			/* Must sorele() to get rid of reference. */
 			CURVNET_SET(xprt->xp_socket->so_vnet);
-			SOCK_LOCK(xprt->xp_socket);
 			sorele(xprt->xp_socket);
 			CURVNET_RESTORE();
 		} else
@@ -500,6 +496,7 @@ static void
 svc_vc_destroy(SVCXPRT *xprt)
 {
 	struct cf_conn *cd = (struct cf_conn *)xprt->xp_p1;
+	CLIENT *cl = (CLIENT *)xprt->xp_p2;
 
 	SOCKBUF_LOCK(&xprt->xp_socket->so_rcv);
 	if (xprt->xp_upcallset) {
@@ -508,6 +505,9 @@ svc_vc_destroy(SVCXPRT *xprt)
 			soupcall_clear(xprt->xp_socket, SO_RCV);
 	}
 	SOCKBUF_UNLOCK(&xprt->xp_socket->so_rcv);
+
+	if (cl != NULL)
+		CLNT_RELEASE(cl);
 
 	svc_vc_destroy_common(xprt);
 
@@ -804,8 +804,8 @@ tryagain:
 		}
 
 		/*
-		 * A return of ENXIO indicates that there is a
-		 * non-application data record at the head of the
+		 * A return of ENXIO indicates that there is an
+		 * alert record at the head of the
 		 * socket's receive queue, for TLS connections.
 		 * This record needs to be handled in userland
 		 * via an SSL_read() call, so do an upcall to the daemon.
@@ -863,10 +863,10 @@ tryagain:
 			    cmsg->cmsg_len == CMSG_LEN(sizeof(tgr))) {
 				memcpy(&tgr, CMSG_DATA(cmsg), sizeof(tgr));
 				/*
-				 * This should have been handled by
-				 * the rpctls_svc_handlerecord()
-				 * upcall.  If not, all we can do is
-				 * toss it away.
+				 * TLS_RLTYPE_ALERT records should be handled
+				 * since soreceive() would have returned
+				 * ENXIO.  Just throw any other
+				 * non-TLS_RLTYPE_APP records away.
 				 */
 				if (tgr.tls_type != TLS_RLTYPE_APP) {
 					m_freem(m);
@@ -1075,7 +1075,7 @@ svc_vc_backchannel_reply(SVCXPRT *xprt, struct rpc_msg *msg,
 }
 
 static bool_t
-svc_vc_null()
+svc_vc_null(void)
 {
 
 	return (FALSE);

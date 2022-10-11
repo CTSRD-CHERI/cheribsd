@@ -251,7 +251,7 @@ static int
 tegra210_cpufreq_settings(device_t dev, struct cf_setting *sets, int *count)
 {
 	struct tegra210_cpufreq_softc *sc;
-	int i, j, max_cnt;
+	int i, j;
 
 	if (sets == NULL || count == NULL)
 		return (EINVAL);
@@ -259,7 +259,6 @@ tegra210_cpufreq_settings(device_t dev, struct cf_setting *sets, int *count)
 	sc = device_get_softc(dev);
 	memset(sets, CPUFREQ_VAL_UNKNOWN, sizeof(*sets) * (*count));
 
-	max_cnt = min(sc->nspeed_points, *count);
 	for (i = 0, j = sc->nspeed_points - 1; j >= 0; j--) {
 		if (sc->cpu_max_freq < sc->speed_points[j].freq)
 			continue;
@@ -495,8 +494,6 @@ static device_method_t tegra210_cpufreq_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t tegra210_cpufreq_devclass;
 static DEFINE_CLASS_0(tegra210_cpufreq, tegra210_cpufreq_driver,
     tegra210_cpufreq_methods, sizeof(struct tegra210_cpufreq_softc));
-DRIVER_MODULE(tegra210_cpufreq, cpu, tegra210_cpufreq_driver,
-    tegra210_cpufreq_devclass, NULL, NULL);
+DRIVER_MODULE(tegra210_cpufreq, cpu, tegra210_cpufreq_driver, NULL, NULL);

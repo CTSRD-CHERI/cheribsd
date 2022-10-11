@@ -369,7 +369,7 @@ mrsas_action(struct cam_sim *sim, union ccb *ccb)
 			else
 				ccb->cpi.max_target = MRSAS_MAX_LD_IDS - 1;
 #if (__FreeBSD_version > 704000)
-			ccb->cpi.maxio = sc->max_num_sge * MRSAS_PAGE_SIZE;
+			ccb->cpi.maxio = sc->max_sectors_per_req * 512;
 #endif
 			ccb->ccb_h.status = CAM_REQ_CMP;
 			xpt_done(ccb);
@@ -513,21 +513,11 @@ mrsas_startio(struct mrsas_softc *sc, struct cam_sim *sim,
 		ccb_h->status = CAM_REQ_INVALID;
 		goto done;
 	case CAM_DATA_VADDR:
-		if (csio->dxfer_len > (sc->max_num_sge * MRSAS_PAGE_SIZE)) {
-			mrsas_release_mpt_cmd(cmd);
-			ccb_h->status = CAM_REQ_TOO_BIG;
-			goto done;
-		}
 		cmd->length = csio->dxfer_len;
 		if (cmd->length)
 			cmd->data = csio->data_ptr;
 		break;
 	case CAM_DATA_BIO:
-		if (csio->dxfer_len > (sc->max_num_sge * MRSAS_PAGE_SIZE)) {
-			mrsas_release_mpt_cmd(cmd);
-			ccb_h->status = CAM_REQ_TOO_BIG;
-			goto done;
-		}
 		cmd->length = csio->dxfer_len;
 		if (cmd->length)
 			cmd->data = csio->data_ptr;
@@ -539,11 +529,6 @@ mrsas_startio(struct mrsas_softc *sc, struct cam_sim *sim,
 #else
 	if (!(ccb_h->flags & CAM_DATA_PHYS)) {	/* Virtual data address */
 		if (!(ccb_h->flags & CAM_SCATTER_VALID)) {
-			if (csio->dxfer_len > (sc->max_num_sge * MRSAS_PAGE_SIZE)) {
-				mrsas_release_mpt_cmd(cmd);
-				ccb_h->status = CAM_REQ_TOO_BIG;
-				goto done;
-			}
 			cmd->length = csio->dxfer_len;
 			if (cmd->length)
 				cmd->data = csio->data_ptr;
@@ -867,11 +852,6 @@ mrsas_build_ldio_rw(struct mrsas_softc *sc, struct mrsas_mpt_cmd *cmd,
 	io_request->DataLength = htole32(cmd->length);
 
 	if (mrsas_map_request(sc, cmd, ccb) == SUCCESS) {
-		if (cmd->sge_count > sc->max_num_sge) {
-			device_printf(sc->mrsas_dev, "Error: sge_count (0x%x) exceeds"
-			    "max (0x%x) allowed\n", cmd->sge_count, sc->max_num_sge);
-			return (FAIL);
-		}
 		if (sc->is_ventura || sc->is_aero)
 			io_request->RaidContext.raid_context_g35.numSGE = cmd->sge_count;
 		else {
@@ -1095,7 +1075,6 @@ mrsas_setup_io(struct mrsas_softc *sc, struct mrsas_mpt_cmd *cmd,
 		if (fp_possible &&
 				(io_info.r1_alt_dev_handle != MR_DEVHANDLE_INVALID) &&
 				(raid->level == 1) && !io_info.isRead) {
-			r1_cmd = mrsas_get_mpt_cmd(sc);
 			if (mrsas_atomic_inc_return(&sc->fw_outstanding) > sc->max_scsi_cmds) {
 				fp_possible = FALSE;
 				mrsas_atomic_dec(&sc->fw_outstanding); 
@@ -1208,7 +1187,6 @@ mrsas_build_ldio_nonrw(struct mrsas_softc *sc, struct mrsas_mpt_cmd *cmd,
 	u_int32_t device_id, ld;
 	MR_DRV_RAID_MAP_ALL *map_ptr;
 	MR_LD_RAID *raid;
-	RAID_CONTEXT *pRAID_Context;
 	MRSAS_RAID_SCSI_IO_REQUEST *io_request;
 
 	io_request = cmd->io_request;
@@ -1217,8 +1195,6 @@ mrsas_build_ldio_nonrw(struct mrsas_softc *sc, struct mrsas_mpt_cmd *cmd,
 	map_ptr = sc->ld_drv_map[(sc->map_id & 1)];
 	ld = MR_TargetIdToLdGet(device_id, map_ptr);
 	raid = MR_LdRaidGet(ld, map_ptr);
-	/* get RAID_Context pointer */
-	pRAID_Context = &io_request->RaidContext.raid_context;
 	/* Store the TM capability value in cmd */
 	cmd->tmCapable = raid->capability.tmCapable;
 
@@ -1234,11 +1210,6 @@ mrsas_build_ldio_nonrw(struct mrsas_softc *sc, struct mrsas_mpt_cmd *cmd,
 	io_request->DataLength = cmd->length;
 
 	if (mrsas_map_request(sc, cmd, ccb) == SUCCESS) {
-		if (cmd->sge_count > sc->max_num_sge) {
-			device_printf(sc->mrsas_dev, "Error: sge_count (0x%x) exceeds"
-			    "max (0x%x) allowed\n", cmd->sge_count, sc->max_num_sge);
-			return (1);
-		}
 		if (sc->is_ventura || sc->is_aero)
 			io_request->RaidContext.raid_context_g35.numSGE = cmd->sge_count;
 		else {
@@ -1273,12 +1244,9 @@ mrsas_build_syspdio(struct mrsas_softc *sc, struct mrsas_mpt_cmd *cmd,
 	u_int32_t device_id;
 	MR_DRV_RAID_MAP_ALL *local_map_ptr;
 	MRSAS_RAID_SCSI_IO_REQUEST *io_request;
-	RAID_CONTEXT *pRAID_Context;
 	struct MR_PD_CFG_SEQ_NUM_SYNC *pd_sync;
 
 	io_request = cmd->io_request;
-	/* get RAID_Context pointer */
-	pRAID_Context = &io_request->RaidContext.raid_context;
 	device_id = ccb_h->target_id;
 	local_map_ptr = sc->ld_drv_map[(sc->map_id & 1)];
 	io_request->RaidContext.raid_context.RAIDFlags = MR_RAID_FLAGS_IO_SUB_TYPE_SYSTEM_PD
@@ -1364,11 +1332,6 @@ mrsas_build_syspdio(struct mrsas_softc *sc, struct mrsas_mpt_cmd *cmd,
 	io_request->DataLength = htole32(cmd->length);
 
 	if (mrsas_map_request(sc, cmd, ccb) == SUCCESS) {
-		if (cmd->sge_count > sc->max_num_sge) {
-			device_printf(sc->mrsas_dev, "Error: sge_count (0x%x) exceeds"
-			    "max (0x%x) allowed\n", cmd->sge_count, sc->max_num_sge);
-			return (1);
-		}
 		if (sc->is_ventura || sc->is_aero)
 			io_request->RaidContext.raid_context_g35.numSGE = cmd->sge_count;
 		else {
@@ -1714,10 +1677,6 @@ mrsas_data_load_cb(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 	if (cmd->flags & MRSAS_DIR_OUT)
 		bus_dmamap_sync(cmd->sc->data_tag, cmd->data_dmamap,
 		    BUS_DMASYNC_PREWRITE);
-	if (nseg > sc->max_num_sge) {
-		device_printf(sc->mrsas_dev, "SGE count is too large or 0.\n");
-		return;
-	}
 
 	/* Check for whether PRPs should be built or IEEE SGLs*/
 	if ((cmd->io_request->IoFlags & MPI25_SAS_DEVICE0_FLAGS_ENABLED_FAST_PATH) &&

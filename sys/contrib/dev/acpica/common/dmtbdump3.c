@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2022, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -338,6 +338,11 @@ AcpiDmDumpSrat (
             InfoTable = AcpiDmTableInfoSrat5;
             break;
 
+        case ACPI_SRAT_TYPE_GENERIC_PORT_AFFINITY:
+
+            InfoTable = AcpiDmTableInfoSrat6;
+            break;
+
         default:
             AcpiOsPrintf ("\n**** Unknown SRAT subtable type 0x%X\n",
                 Subtable->Type);
@@ -416,6 +421,65 @@ AcpiDmDumpStao (
         /* Point to next namepath */
 
         Offset += StringLength;
+    }
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiDmDumpSvkl
+ *
+ * PARAMETERS:  Table               - A SVKL table
+ *
+ * RETURN:      None
+ *
+ * DESCRIPTION: Format the contents of a SVKL. This is a variable-length
+ *              table that contains an open-ended number of key subtables at
+ *              the end of the header.
+ *
+ * NOTES: SVKL is essentially a flat table, with a small main table and
+ *          a variable number of a single type of subtable.
+ *
+ ******************************************************************************/
+
+void
+AcpiDmDumpSvkl (
+    ACPI_TABLE_HEADER       *Table)
+{
+    ACPI_STATUS             Status;
+    UINT32                  Length = Table->Length;
+    UINT32                  Offset = sizeof (ACPI_TABLE_SVKL);
+    ACPI_SVKL_KEY           *Subtable;
+
+
+    /* Main table */
+
+    Status = AcpiDmDumpTable (Length, 0, Table, 0, AcpiDmTableInfoSvkl);
+    if (ACPI_FAILURE (Status))
+    {
+        return;
+    }
+
+    /* The rest of the table consists of subtables (single type) */
+
+    Subtable = ACPI_ADD_PTR (ACPI_SVKL_KEY, Table, Offset);
+    while (Offset < Table->Length)
+    {
+        /* Dump the subtable */
+
+        AcpiOsPrintf ("\n");
+        Status = AcpiDmDumpTable (Table->Length, Offset, Subtable,
+            sizeof (ACPI_SVKL_KEY), AcpiDmTableInfoSvkl0);
+        if (ACPI_FAILURE (Status))
+        {
+            return;
+        }
+
+        /* Point to next subtable */
+
+        Offset += sizeof (ACPI_SVKL_KEY);
+        Subtable = ACPI_ADD_PTR (ACPI_SVKL_KEY, Subtable,
+            sizeof (ACPI_SVKL_KEY));
     }
 }
 
@@ -502,6 +566,7 @@ AcpiDmDumpTcpa (
  * DESCRIPTION: Format the contents of a TPM2.
  *
  ******************************************************************************/
+
 static void
 AcpiDmDumpTpm2Rev3 (
     ACPI_TABLE_HEADER       *Table)
@@ -621,7 +686,7 @@ AcpiDmDumpViot (
     ACPI_TABLE_VIOT         *Viot;
     ACPI_VIOT_HEADER        *ViotHeader;
     UINT16                  Length;
-    UINT16                  Offset;
+    UINT32                  Offset;
     ACPI_DMTABLE_INFO       *InfoTable;
 
     /* Main table */
@@ -773,13 +838,12 @@ AcpiDmDumpWpbt (
 {
     ACPI_STATUS             Status;
     ACPI_TABLE_WPBT         *Subtable;
-    UINT32                  Length = Table->Length;
     UINT16                  ArgumentsLength;
 
 
     /* Dump the main table */
 
-    Status = AcpiDmDumpTable (Length, 0, Table, 0, AcpiDmTableInfoWpbt);
+    Status = AcpiDmDumpTable (Table->Length, 0, Table, 0, AcpiDmTableInfoWpbt);
     if (ACPI_FAILURE (Status))
     {
         return;
@@ -790,8 +854,11 @@ AcpiDmDumpWpbt (
     Subtable = ACPI_CAST_PTR (ACPI_TABLE_WPBT, Table);
     ArgumentsLength = Subtable->ArgumentsLength;
 
-    /* Dump the arguments buffer */
+    /* Dump the arguments buffer if present */
 
-    (void) AcpiDmDumpTable (Table->Length, 0, Table, ArgumentsLength,
-        AcpiDmTableInfoWpbt0);
+    if (ArgumentsLength)
+    {
+        (void) AcpiDmDumpTable (Table->Length, 0, Table, ArgumentsLength,
+            AcpiDmTableInfoWpbt0);
+    }
 }

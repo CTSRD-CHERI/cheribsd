@@ -441,10 +441,12 @@ x86_emulate_cpuid(struct vm *vm, int vcpu_id, uint64_t *rax, uint64_t *rbx,
 				 */
 				regs[1] &= (CPUID_STDEXT_FSGSBASE |
 				    CPUID_STDEXT_BMI1 | CPUID_STDEXT_HLE |
-				    CPUID_STDEXT_AVX2 | CPUID_STDEXT_BMI2 |
+				    CPUID_STDEXT_AVX2 | CPUID_STDEXT_SMEP |
+				    CPUID_STDEXT_BMI2 |
 				    CPUID_STDEXT_ERMS | CPUID_STDEXT_RTM |
 				    CPUID_STDEXT_AVX512F |
 				    CPUID_STDEXT_RDSEED |
+				    CPUID_STDEXT_SMAP |
 				    CPUID_STDEXT_AVX512PF |
 				    CPUID_STDEXT_AVX512ER |
 				    CPUID_STDEXT_AVX512CD | CPUID_STDEXT_SHA);
@@ -574,6 +576,24 @@ x86_emulate_cpuid(struct vm *vm, int vcpu_id, uint64_t *rax, uint64_t *rbx,
 			}
 			break;
 
+		case CPUID_0000_000F:
+		case CPUID_0000_0010:
+			/*
+			 * Do not report any Resource Director Technology
+			 * capabilities.  Exposing control of cache or memory
+			 * controller resource partitioning to the guest is not
+			 * at all sensible.
+			 *
+			 * This is already hidden at a high level by masking of
+			 * leaf 0x7.  Even still, a guest may look here for
+			 * detailed capability information.
+			 */
+			regs[0] = 0;
+			regs[1] = 0;
+			regs[2] = 0;
+			regs[3] = 0;
+			break;
+
 		case CPUID_0000_0015:
 			/*
 			 * Don't report CPU TSC/Crystal ratio and clock
@@ -645,4 +665,86 @@ vm_cpuid_capability(struct vm *vm, int vcpuid, enum vm_cpuid_capability cap)
 		panic("%s: unknown vm_cpu_capability %d", __func__, cap);
 	}
 	return (rv);
+}
+
+int
+vm_rdmtrr(struct vm_mtrr *mtrr, u_int num, uint64_t *val)
+{
+	switch (num) {
+	case MSR_MTRRcap:
+		*val = MTRR_CAP_WC | MTRR_CAP_FIXED | VMM_MTRR_VAR_MAX;
+		break;
+	case MSR_MTRRdefType:
+		*val = mtrr->def_type;
+		break;
+	case MSR_MTRR4kBase ... MSR_MTRR4kBase + 7:
+		*val = mtrr->fixed4k[num - MSR_MTRR4kBase];
+		break;
+	case MSR_MTRR16kBase ... MSR_MTRR16kBase + 1:
+		*val = mtrr->fixed16k[num - MSR_MTRR16kBase];
+		break;
+	case MSR_MTRR64kBase:
+		*val = mtrr->fixed64k;
+		break;
+	case MSR_MTRRVarBase ... MSR_MTRRVarBase + (VMM_MTRR_VAR_MAX * 2) - 1: {
+		u_int offset = num - MSR_MTRRVarBase;
+		if (offset % 2 == 0) {
+			*val = mtrr->var[offset / 2].base;
+		} else {
+			*val = mtrr->var[offset / 2].mask;
+		}
+		break;
+	}
+	default:
+		return (-1);
+	}
+
+	return (0);
+}
+
+int
+vm_wrmtrr(struct vm_mtrr *mtrr, u_int num, uint64_t val)
+{
+	switch (num) {
+	case MSR_MTRRcap:
+		/* MTRRCAP is read only */
+		return (-1);
+	case MSR_MTRRdefType:
+		if (val & ~VMM_MTRR_DEF_MASK) {
+			/* generate #GP on writes to reserved fields */
+			return (-1);
+		}
+		mtrr->def_type = val;
+		break;
+	case MSR_MTRR4kBase ... MSR_MTRR4kBase + 7:
+		mtrr->fixed4k[num - MSR_MTRR4kBase] = val;
+		break;
+	case MSR_MTRR16kBase ... MSR_MTRR16kBase + 1:
+		mtrr->fixed16k[num - MSR_MTRR16kBase] = val;
+		break;
+	case MSR_MTRR64kBase:
+		mtrr->fixed64k = val;
+		break;
+	case MSR_MTRRVarBase ... MSR_MTRRVarBase + (VMM_MTRR_VAR_MAX * 2) - 1: {
+		u_int offset = num - MSR_MTRRVarBase;
+		if (offset % 2 == 0) {
+			if (val & ~VMM_MTRR_PHYSBASE_MASK) {
+				/* generate #GP on writes to reserved fields */
+				return (-1);
+			}
+			mtrr->var[offset / 2].base = val;
+		} else {
+			if (val & ~VMM_MTRR_PHYSMASK_MASK) {
+				/* generate #GP on writes to reserved fields */
+				return (-1);
+			}
+			mtrr->var[offset / 2].mask = val;
+		}
+		break;
+	}
+	default:
+		return (-1);
+	}
+
+	return (0);
 }

@@ -84,10 +84,9 @@ struct cfiscsi_session {
 	int				cs_timeout;
 	struct cv			cs_maintenance_cv;
 	bool				cs_terminating;
+	bool				cs_terminating_tasks;
 	bool				cs_handoff_in_progress;
 	bool				cs_tasks_aborted;
-	int				cs_max_recv_data_segment_length;
-	int				cs_max_send_data_segment_length;
 	int				cs_max_burst_length;
 	int				cs_first_burst_length;
 	bool				cs_immediate_data;

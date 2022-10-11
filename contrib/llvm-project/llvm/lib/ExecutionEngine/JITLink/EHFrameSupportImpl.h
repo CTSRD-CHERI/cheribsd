@@ -40,8 +40,9 @@ private:
 /// edges.
 class EHFrameEdgeFixer {
 public:
-  EHFrameEdgeFixer(StringRef EHFrameSectionName, Edge::Kind FDEToCIE,
-                   Edge::Kind FDEToPCBegin, Edge::Kind FDEToLSDA);
+  EHFrameEdgeFixer(StringRef EHFrameSectionName, unsigned PointerSize,
+                   Edge::Kind Delta64, Edge::Kind Delta32,
+                   Edge::Kind NegDelta32);
   Error operator()(LinkGraph &G);
 
 private:
@@ -57,6 +58,8 @@ private:
     CIEInformation(Symbol &CIESymbol) : CIESymbol(&CIESymbol) {}
     Symbol *CIESymbol = nullptr;
     bool FDEsHaveLSDAField = false;
+    uint8_t FDEPointerEncoding = 0;
+    uint8_t LSDAPointerEncoding = 0;
   };
 
   struct EdgeTarget {
@@ -68,12 +71,12 @@ private:
   };
 
   using BlockEdgeMap = DenseMap<Edge::OffsetT, EdgeTarget>;
-  using CIEInfosMap = DenseMap<JITTargetAddress, CIEInformation>;
+  using CIEInfosMap = DenseMap<orc::ExecutorAddr, CIEInformation>;
 
   struct ParseContext {
     ParseContext(LinkGraph &G) : G(G) {}
 
-    Expected<CIEInformation *> findCIEInfo(JITTargetAddress Address) {
+    Expected<CIEInformation *> findCIEInfo(orc::ExecutorAddr Address) {
       auto I = CIEInfos.find(Address);
       if (I == CIEInfos.end())
         return make_error<JITLinkError>("No CIE found at address " +
@@ -96,14 +99,33 @@ private:
 
   Expected<AugmentationInfo>
   parseAugmentationString(BinaryStreamReader &RecordReader);
-  Expected<JITTargetAddress>
-  readAbsolutePointer(LinkGraph &G, BinaryStreamReader &RecordReader);
-  Expected<Symbol &> getOrCreateSymbol(ParseContext &PC, JITTargetAddress Addr);
+
+  static bool isSupportedPointerEncoding(uint8_t PointerEncoding);
+  unsigned getPointerEncodingDataSize(uint8_t PointerEncoding);
+  Expected<std::pair<orc::ExecutorAddr, Edge::Kind>>
+  readEncodedPointer(uint8_t PointerEncoding,
+                     orc::ExecutorAddr PointerFieldAddress,
+                     BinaryStreamReader &RecordReader);
+
+  Expected<Symbol &> getOrCreateSymbol(ParseContext &PC,
+                                       orc::ExecutorAddr Addr);
 
   StringRef EHFrameSectionName;
-  Edge::Kind FDEToCIE;
-  Edge::Kind FDEToPCBegin;
-  Edge::Kind FDEToLSDA;
+  unsigned PointerSize;
+  Edge::Kind Delta64;
+  Edge::Kind Delta32;
+  Edge::Kind NegDelta32;
+};
+
+/// Add a 32-bit null-terminator to the end of the eh-frame section.
+class EHFrameNullTerminator {
+public:
+  EHFrameNullTerminator(StringRef EHFrameSectionName);
+  Error operator()(LinkGraph &G);
+
+private:
+  static char NullTerminatorBlockContent[];
+  StringRef EHFrameSectionName;
 };
 
 } // end namespace jitlink

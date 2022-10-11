@@ -16,6 +16,7 @@
 #include "lldb/Host/OptionParser.h"
 #include "lldb/Interpreter/CommandReturnObject.h"
 #include "lldb/Interpreter/OptionArgParser.h"
+#include "lldb/Interpreter/OptionValueFileColonLine.h"
 #include "lldb/Interpreter/Options.h"
 #include "lldb/Symbol/CompileUnit.h"
 #include "lldb/Symbol/Function.h"
@@ -35,7 +36,7 @@ using namespace lldb_private;
 class CommandObjectSourceInfo : public CommandObjectParsed {
   class CommandOptions : public Options {
   public:
-    CommandOptions() : Options() {}
+    CommandOptions() {}
 
     ~CommandOptions() override = default;
 
@@ -117,8 +118,7 @@ public:
             "Display source line information for the current target "
             "process.  Defaults to instruction pointer in current stack "
             "frame.",
-            nullptr, eCommandRequiresTarget),
-        m_options() {}
+            nullptr, eCommandRequiresTarget) {}
 
   ~CommandObjectSourceInfo() override = default;
 
@@ -373,13 +373,16 @@ protected:
     Target *target = m_exe_ctx.GetTargetPtr();
     uint32_t addr_byte_size = target->GetArchitecture().GetAddressByteSize();
 
+    ModuleFunctionSearchOptions function_options;
+    function_options.include_symbols = false;
+    function_options.include_inlines = true;
+
     // Note: module_list can't be const& because FindFunctionSymbols isn't
     // const.
     ModuleList module_list =
         (m_module_list.GetSize() > 0) ? m_module_list : target->GetImages();
-    module_list.FindFunctions(name, eFunctionNameTypeAuto,
-                              /*include_symbols=*/false,
-                              /*include_inlines=*/true, sc_list_funcs);
+    module_list.FindFunctions(name, eFunctionNameTypeAuto, function_options,
+                              sc_list_funcs);
     size_t num_matches = sc_list_funcs.GetSize();
 
     if (!num_matches) {
@@ -540,7 +543,6 @@ protected:
     if (argc != 0) {
       result.AppendErrorWithFormat("'%s' takes no arguments, only flags.\n",
                                    GetCommandName().str().c_str());
-      result.SetStatus(eReturnStatusFailed);
       return false;
     }
 
@@ -550,7 +552,6 @@ protected:
       if (target == nullptr) {
         result.AppendError("invalid target, create a debug target using the "
                            "'target create' command.");
-        result.SetStatus(eReturnStatusFailed);
         return false;
       }
     }
@@ -574,12 +575,10 @@ protected:
       }
       if (!m_module_list.GetSize()) {
         result.AppendError("No modules match the input.");
-        result.SetStatus(eReturnStatusFailed);
         return false;
       }
     } else if (target->GetImages().GetSize() == 0) {
       result.AppendError("The target has no associated executable images.");
-      result.SetStatus(eReturnStatusFailed);
       return false;
     }
 
@@ -624,7 +623,7 @@ protected:
 class CommandObjectSourceList : public CommandObjectParsed {
   class CommandOptions : public Options {
   public:
-    CommandOptions() : Options() {}
+    CommandOptions() {}
 
     ~CommandOptions() override = default;
 
@@ -667,6 +666,22 @@ class CommandObjectSourceList : public CommandObjectParsed {
       case 'r':
         reverse = true;
         break;
+      case 'y':
+      {
+        OptionValueFileColonLine value;
+        Status fcl_err = value.SetValueFromString(option_arg);
+        if (!fcl_err.Success()) {
+          error.SetErrorStringWithFormat(
+              "Invalid value for file:line specifier: %s",
+              fcl_err.AsCString());
+        } else {
+          file_name = value.GetFileSpec().GetPath();
+          start_line = value.GetLineNumber();
+          // I don't see anything useful to do with a column number, but I don't
+          // want to complain since someone may well have cut and pasted a
+          // listing from somewhere that included a column.
+        }
+      } break;
       default:
         llvm_unreachable("Unimplemented option");
       }
@@ -707,8 +722,7 @@ public:
       : CommandObjectParsed(interpreter, "source list",
                             "Display source code for the current target "
                             "process as specified by options.",
-                            nullptr, eCommandRequiresTarget),
-        m_options() {}
+                            nullptr, eCommandRequiresTarget) {}
 
   ~CommandObjectSourceList() override = default;
 
@@ -741,7 +755,7 @@ protected:
     SourceInfo(ConstString name, const LineEntry &line_entry)
         : function(name), line_entry(line_entry) {}
 
-    SourceInfo() : function(), line_entry() {}
+    SourceInfo() {}
 
     bool IsValid() const { return (bool)function && line_entry.IsValid(); }
 
@@ -794,7 +808,6 @@ protected:
           result.AppendErrorWithFormat("Could not find line information for "
                                        "start of function: \"%s\".\n",
                                        source_info.function.GetCString());
-          result.SetStatus(eReturnStatusFailed);
           return 0;
         }
         sc.function->GetEndLineSourceInfo(end_file, end_line);
@@ -862,11 +875,12 @@ protected:
   void FindMatchingFunctions(Target *target, ConstString name,
                              SymbolContextList &sc_list) {
     // Displaying the source for a symbol:
-    bool include_inlines = true;
-    bool include_symbols = false;
-
     if (m_options.num_lines == 0)
       m_options.num_lines = 10;
+
+    ModuleFunctionSearchOptions function_options;
+    function_options.include_symbols = true;
+    function_options.include_inlines = false;
 
     const size_t num_modules = m_options.modules.size();
     if (num_modules > 0) {
@@ -877,15 +891,14 @@ protected:
           ModuleSpec module_spec(module_file_spec);
           matching_modules.Clear();
           target->GetImages().FindModules(module_spec, matching_modules);
+
           matching_modules.FindFunctions(name, eFunctionNameTypeAuto,
-                                         include_symbols, include_inlines,
-                                         sc_list);
+                                         function_options, sc_list);
         }
       }
     } else {
       target->GetImages().FindFunctions(name, eFunctionNameTypeAuto,
-                                        include_symbols, include_inlines,
-                                        sc_list);
+                                        function_options, sc_list);
     }
   }
 
@@ -916,7 +929,6 @@ protected:
     if (argc != 0) {
       result.AppendErrorWithFormat("'%s' takes no arguments, only flags.\n",
                                    GetCommandName().str().c_str());
-      result.SetStatus(eReturnStatusFailed);
       return false;
     }
 
@@ -954,7 +966,6 @@ protected:
       if (num_matches == 0) {
         result.AppendErrorWithFormat("Could not find function named: \"%s\".\n",
                                      m_options.symbol_name.c_str());
-        result.SetStatus(eReturnStatusFailed);
         return false;
       }
 
@@ -1021,7 +1032,6 @@ protected:
               "no modules have source information for file address 0x%" PRIx64
               ".\n",
               m_options.address);
-          result.SetStatus(eReturnStatusFailed);
           return false;
         }
       } else {
@@ -1044,7 +1054,6 @@ protected:
                                            "is no line table information "
                                            "available for this address.\n",
                                            error_strm.GetData());
-              result.SetStatus(eReturnStatusFailed);
               return false;
             }
           }
@@ -1054,7 +1063,6 @@ protected:
           result.AppendErrorWithFormat(
               "no modules contain load address 0x%" PRIx64 ".\n",
               m_options.address);
-          result.SetStatus(eReturnStatusFailed);
           return false;
         }
       }
@@ -1174,7 +1182,6 @@ protected:
       if (num_matches == 0) {
         result.AppendErrorWithFormat("Could not find source file \"%s\".\n",
                                      m_options.file_name.c_str());
-        result.SetStatus(eReturnStatusFailed);
         return false;
       }
 
@@ -1198,7 +1205,6 @@ protected:
           result.AppendErrorWithFormat(
               "Multiple source files found matching: \"%s.\"\n",
               m_options.file_name.c_str());
-          result.SetStatus(eReturnStatusFailed);
           return false;
         }
       }
@@ -1228,7 +1234,6 @@ protected:
         } else {
           result.AppendErrorWithFormat("No comp unit found for: \"%s.\"\n",
                                        m_options.file_name.c_str());
-          result.SetStatus(eReturnStatusFailed);
           return false;
         }
       }

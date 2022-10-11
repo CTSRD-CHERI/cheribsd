@@ -632,8 +632,8 @@ fm801_pci_attach(device_t dev)
 		/*highaddr*/BUS_SPACE_MAXADDR,
 		/*filter*/NULL, /*filterarg*/NULL,
 		/*maxsize*/fm801->bufsz, /*nsegments*/1, /*maxsegz*/0x3ffff,
-		/*flags*/0, /*lockfunc*/busdma_lock_mutex,
-		/*lockarg*/&Giant, &fm801->parent_dmat) != 0) {
+		/*flags*/0, /*lockfunc*/NULL, /*lockarg*/NULL,
+		&fm801->parent_dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto oops;
 	}
@@ -759,6 +759,6 @@ static driver_t fm801_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(snd_fm801, pci, fm801_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_fm801, pci, fm801_driver, 0, 0);
 MODULE_DEPEND(snd_fm801, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_fm801, 1);

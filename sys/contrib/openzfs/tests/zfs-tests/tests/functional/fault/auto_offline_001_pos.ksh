@@ -30,7 +30,7 @@
 # STRATEGY:
 # 1. Create a pool
 # 2. Simulate physical removal of one device
-# 3. Verify the device is unvailable
+# 3. Verify the device is unavailable
 # 4. Reattach the device
 # 5. Verify the device is onlined
 # 6. Repeat the same tests with a spare device:
@@ -96,15 +96,14 @@ do
 	log_must zpool create -f $TESTPOOL $conf
 	block_device_wait ${DEV_DSKDIR}/${removedev}
 
-	mntpnt=$(get_prop mountpoint /$TESTPOOL) ||
-	    log_fail "get_prop mountpoint /$TESTPOOL"
+	mntpnt=$(get_prop mountpoint /$TESTPOOL)
 
 	# 2. Simulate physical removal of one device
 	remove_disk $removedev
 	log_must mkfile 1m $mntpnt/file
-	log_must zpool sync $TESTPOOL
+	sync_pool $TESTPOOL
 
-	# 3. Verify the device is unvailable.
+	# 3. Verify the device is unavailable.
 	log_must wait_vdev_state $TESTPOOL $removedev "UNAVAIL"
 
 	# 4. Reattach the device
@@ -128,13 +127,12 @@ do
 	block_device_wait ${DEV_DSKDIR}/${removedev}
 	log_must zpool add $TESTPOOL spare $sparedev
 
-	mntpnt=$(get_prop mountpoint /$TESTPOOL) ||
-	    log_fail "get_prop mountpoint /$TESTPOOL"
+	mntpnt=$(get_prop mountpoint /$TESTPOOL)
 
 	# 2. Simulate physical removal of one device
 	remove_disk $removedev
 	log_must mkfile 1m $mntpnt/file
-	log_must zpool sync $TESTPOOL
+	sync_pool $TESTPOOL
 
 	# 3. Verify the device is handled by the spare.
 	log_must wait_hotspare_state $TESTPOOL $sparedev "INUSE"
@@ -161,8 +159,7 @@ do
 	block_device_wait ${DEV_DSKDIR}/${removedev}
 	log_must zpool add $TESTPOOL spare $sparedev
 
-	mntpnt=$(get_prop mountpoint /$TESTPOOL) ||
-	    log_fail "get_prop mountpoint /$TESTPOOL"
+	mntpnt=$(get_prop mountpoint /$TESTPOOL)
 
 	# 2. Fault the spare device making it unavailable
 	log_must zpool offline -f $TESTPOOL $sparedev
@@ -171,7 +168,7 @@ do
 	# 3. Simulate physical removal of one device
 	remove_disk $removedev
 	log_must mkfile 1m $mntpnt/file
-	log_must zpool sync $TESTPOOL
+	sync_pool $TESTPOOL
 
 	# 4. Verify the device is unavailable
 	log_must wait_vdev_state $TESTPOOL $removedev "UNAVAIL"

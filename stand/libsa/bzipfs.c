@@ -70,14 +70,14 @@ static int	bzf_stat(struct open_file *f, struct stat *sb);
 
 #ifndef REGRESSION
 struct fs_ops bzipfs_fsops = {
-    "bzip",
-    bzf_open, 
-    bzf_close, 
-    bzf_read,
-    null_write,
-    bzf_seek,
-    bzf_stat,
-    null_readdir
+	.fs_name = "bzip",
+	.fo_open = bzf_open,
+	.fo_close = bzf_close,
+	.fo_read = bzf_read,
+	.fo_write = null_write,
+	.fo_seek = bzf_seek,
+	.fo_stat = bzf_stat,
+	.fo_readdir = null_readdir,
 };
 #endif
 
@@ -340,6 +340,9 @@ bzf_seek(struct open_file *f, off_t offset, int where)
 	    target - bzf->bzf_bzstream.total_out_lo32), NULL);
 	if (errno)
 	    return(-1);
+	/* Break out of loop if end of file has been reached. */
+	if (bzf->bzf_endseen)
+	    break;
     }
     /* This is where we are (be honest if we overshot) */
     return(bzf->bzf_bzstream.total_out_lo32);
@@ -360,7 +363,7 @@ bzf_stat(struct open_file *f, struct stat *sb)
 void
 bz_internal_error(int errorcode)
 {
-    panic("bzipfs: critical error %d in bzip2 library occured", errorcode);
+    panic("bzipfs: critical error %d in bzip2 library occurred", errorcode);
 }
 
 #ifdef REGRESSION

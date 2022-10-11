@@ -56,17 +56,26 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/proc.h>
+#include <sys/reg.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysent.h>
 #include <sys/ucontext.h>
 
 #include <machine/md_var.h>
 
+#include <vm/vm.h>
+#include <vm/pmap.h>
+#include <vm/vm_map.h>
+
 #include <cheri/cheric.h>
 
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
+
+_Static_assert(sizeof(mcontext64_t) == 864, "mcontext64_t size incorrect");
+_Static_assert(sizeof(ucontext64_t) == 936, "ucontext64_t size incorrect");
+_Static_assert(sizeof(struct siginfo64) == 80, "struct siginfo64 size incorrect");
 
 static const char *freebsd64_riscv_machine_arch(struct proc *p);
 static void	freebsd64_sendsig(sig_t, ksiginfo_t *, sigset_t *);
@@ -76,36 +85,43 @@ extern const char *freebsd64_syscallnames[];
 struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_size	= FREEBSD64_SYS_MAXSYSCALL,
 	.sv_table	= freebsd64_sysent,
-	.sv_transtrap	= NULL,
 	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_sendsig	= freebsd64_sendsig,
 	.sv_sigcode	= freebsd64_sigcode,
 	.sv_szsigcode	= &freebsd64_szsigcode,
 	.sv_name	= "FreeBSD ELF64",
 	.sv_coredump	= __elfN(coredump),
+	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
+	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
+	.sv_elf_core_prepare_notes = __elfN(prepare_notes),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
-	.sv_maxuser	= VM_MAXUSER_ADDRESS,
-	.sv_usrstack	= USRSTACK,
-	.sv_szpsstrings	= sizeof(struct freebsd64_ps_strings),
+	.sv_maxuser	= 0,	/* Filled in during boot. */
+	.sv_usrstack	= 0,	/* Filled in during boot. */
+	.sv_psstringssz	= sizeof(struct freebsd64_ps_strings),
 	.sv_stackprot	= VM_PROT_RW_CAP,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = freebsd64_copyout_strings,
 	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP | SV_ASLR,
+	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP | SV_TIMEKEEP |
+	    SV_ASLR | SV_RNG_SEED_VER,
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = freebsd64_syscallnames,
-	.sv_shared_page_base = SHAREDPAGE,
+	.sv_shared_page_base = 0,	/* Filled in during boot. */
 	.sv_shared_page_len = PAGE_SIZE,
 	.sv_schedtail	= NULL,
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
 	.sv_hwcap	= &elf_hwcap,
 	.sv_machine_arch = freebsd64_riscv_machine_arch,
+	.sv_onexec_old	= exec_onexec_old,
+	.sv_onexit	= exit_onexit,
+	.sv_regset_begin = SET_BEGIN(__elfN(regset)),
+	.sv_regset_end	= SET_LIMIT(__elfN(regset)),
 };
 INIT_SYSENTVEC(freebsd64_sysent, &elf_freebsd_freebsd64_sysvec);
 
@@ -134,6 +150,9 @@ static Elf64_Brandinfo freebsd_freebsd64_brand_info = {
 SYSINIT(freebsd64, SI_SUB_EXEC, SI_ORDER_ANY,
     (sysinit_cfunc_t) elf64_insert_brand_entry,
     &freebsd_freebsd64_brand_info);
+
+SYSINIT(freebsd64_register_sysvec, SI_SUB_VM, SI_ORDER_ANY,
+    elf64_register_sysvec, &elf_freebsd_freebsd64_sysvec);
 
 /*
  * Number of GPRs in mc_gpregs that are mirrored in mc_capregs up to,
@@ -242,15 +261,15 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	onstack = sigonstack(tf->tf_sp);
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
-	    (__cheri_addr vaddr_t)catcher, sig);
+	    (__cheri_addr ptraddr_t)catcher, sig);
 
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sp = ((__cheri_addr vaddr_t)td->td_sigstk.ss_sp +
+		sp = ((__cheri_addr ptraddr_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 	} else {
-		sp = (__cheri_addr vaddr_t)td->td_frame->tf_sp;
+		sp = (__cheri_addr ptraddr_t)td->td_frame->tf_sp;
 	}
 
 	/* Allocate room for the capability register context. */
@@ -271,7 +290,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	frame.sf_uc.uc_mcontext.mc_capregs = capregs;
 	siginfo_to_siginfo64(&ksi->ksi_info, &frame.sf_si);
 	frame.sf_uc.uc_sigmask = *mask;
-	frame.sf_uc.uc_stack.ss_sp = (__cheri_addr vaddr_t)td->td_sigstk.ss_sp;
+	frame.sf_uc.uc_stack.ss_sp = (__cheri_addr ptraddr_t)td->td_sigstk.ss_sp;
 	frame.sf_uc.uc_stack.ss_size = td->td_sigstk.ss_size;
 	frame.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK) != 0 ?
 	    (onstack ? SS_ONSTACK : 0) : SS_DISABLE;
@@ -305,10 +324,10 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_sp = (register_t)fp;
 
 	sysent = p->p_sysent;
-	if (sysent->sv_sigcode_base != 0)
-		tf->tf_ra = (register_t)sysent->sv_sigcode_base;
+	if (PROC_HAS_SHP(p))
+		tf->tf_ra = (register_t)PROC_SIGCODE(p);
 	else
-		tf->tf_ra = (register_t)(p->p_psstrings -
+		tf->tf_ra = (register_t)(PROC_PS_STRINGS(p) -
 		    *(sysent->sv_szsigcode));
 
 	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_sepc,

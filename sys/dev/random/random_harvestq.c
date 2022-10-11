@@ -72,10 +72,15 @@ __FBSDID("$FreeBSD$");
 #define _RANDOM_HARVEST_UMA_OFF (1u << RANDOM_UMA)
 #endif
 
+/*
+ * Note that random_sources_feed() will also use this to try and split up
+ * entropy into a subset of pools per iteration with the goal of feeding
+ * HARVESTSIZE into every pool at least once per second.
+ */
+#define	RANDOM_KTHREAD_HZ	10
+
 static void random_kthread(void);
 static void random_sources_feed(void);
-
-static u_int read_rate;
 
 /*
  * Random must initialize much earlier than epoch, but we can initialize the
@@ -201,16 +206,8 @@ random_kthread(void)
 			}
 		}
 		/* XXX: FIX!! This is a *great* place to pass hardware/live entropy to random(9) */
-#if defined(CPU_QEMU_MALTA) || defined(CPU_CHERI) || defined(CPU_BERI)
-		/*
-		 * XXXAR: reading randomness from virtio 10 times per second is way too much when
-		 * runnning under QEMU CHERI. Also we don't need that much so just stop after the
-		 * initial seeding has completed.
-		 */
-		kproc_suspend(harvest_context.hc_kthread_proc, 0);
-#else
-		tsleep_sbt(&harvest_context.hc_kthread_proc, 0, "-", SBT_1S/10, 0, C_PREL(1));
-#endif
+		tsleep_sbt(&harvest_context.hc_kthread_proc, 0, "-",
+		    SBT_1S/RANDOM_KTHREAD_HZ, 0, C_PREL(1));
 	}
 	random_kthread_control = -1;
 	wakeup(&harvest_context.hc_kthread_proc);
@@ -240,24 +237,53 @@ random_sources_feed(void)
 	uint32_t entropy[HARVESTSIZE];
 	struct epoch_tracker et;
 	struct random_sources *rrs;
-	u_int i, n, local_read_rate;
+	u_int i, n, npools;
 	bool rse_warm;
 
 	rse_warm = epoch_inited;
 
 	/*
+	 * Evenly-ish distribute pool population across the second based on how
+	 * frequently random_kthread iterates.
+	 *
+	 * For Fortuna, the math currently works out as such:
+	 *
+	 * 64 bits * 4 pools = 256 bits per iteration
+	 * 256 bits * 10 Hz = 2560 bits per second, 320 B/s
+	 *
+	 */
+	npools = howmany(p_random_alg_context->ra_poolcount, RANDOM_KTHREAD_HZ);
+
+	/*-
+	 * If we're not seeded yet, attempt to perform a "full seed", filling
+	 * all of the PRNG's pools with entropy; if there is enough entropy
+	 * available from "fast" entropy sources this will allow us to finish
+	 * seeding and unblock the boot process immediately rather than being
+	 * stuck for a few seconds with random_kthread gradually collecting a
+	 * small chunk of entropy every 1 / RANDOM_KTHREAD_HZ seconds.
+	 *
+	 * The value 64 below is RANDOM_FORTUNA_DEFPOOLSIZE, i.e. chosen to
+	 * fill Fortuna's pools in the default configuration.  With another
+	 * PRNG or smaller pools for Fortuna, we might collect more entropy
+	 * than needed to fill the pools, but this is harmless; alternatively,
+	 * a different PRNG, larger pools, or fast entropy sources which are
+	 * not able to provide as much entropy as we request may result in the
+	 * not being fully seeded (and thus remaining blocked) but in that
+	 * case we will return here after 1 / RANDOM_KTHREAD_HZ seconds and
+	 * try again for a large amount of entropy.
+	 */
+	if (!p_random_alg_context->ra_seeded())
+		npools = howmany(p_random_alg_context->ra_poolcount * 64,
+		    sizeof(entropy));
+
+	/*
 	 * Step over all of live entropy sources, and feed their output
 	 * to the system-wide RNG.
 	 */
-	local_read_rate = atomic_readandclear_32(&read_rate);
-	/* Perform at least one read per round */
-	local_read_rate = MAX(local_read_rate, 1);
-	/* But not exceeding RANDOM_KEYSIZE_WORDS */
-	local_read_rate = MIN(local_read_rate, RANDOM_KEYSIZE_WORDS);
 	if (rse_warm)
 		epoch_enter_preempt(rs_epoch, &et);
 	CK_LIST_FOREACH(rrs, &source_list, rrs_entries) {
-		for (i = 0; i < p_random_alg_context->ra_poolcount*local_read_rate; i++) {
+		for (i = 0; i < npools; i++) {
 			n = rrs->rrs_source->rs_read(entropy, sizeof(entropy));
 			KASSERT((n <= sizeof(entropy)), ("%s: rs_read returned too much data (%u > %zu)", __func__, n, sizeof(entropy)));
 			/*
@@ -279,17 +305,6 @@ random_sources_feed(void)
 	if (rse_warm)
 		epoch_exit_preempt(rs_epoch, &et);
 	explicit_bzero(entropy, sizeof(entropy));
-}
-
-void
-read_rate_increment(u_int chunk)
-{
-
-	atomic_add_32(&read_rate, chunk);
-#if defined(CPU_QEMU_MALTA) || defined(CPU_CHERI) || defined(CPU_BERI)
-	if (harvest_context.hc_kthread_proc)
-		kproc_resume(harvest_context.hc_kthread_proc);
-#endif
 }
 
 /* ARGSUSED */
@@ -356,7 +371,8 @@ static const char *random_source_descr[ENTROPYSOURCE] = {
 	[RANDOM_INTERRUPT] = "INTERRUPT",
 	[RANDOM_SWI] = "SWI",
 	[RANDOM_FS_ATIME] = "FS_ATIME",
-	[RANDOM_UMA] = "UMA", /* ENVIRONMENTAL_END */
+	[RANDOM_UMA] = "UMA",
+	[RANDOM_CALLOUT] = "CALLOUT", /* ENVIRONMENTAL_END */
 	[RANDOM_PURE_OCTEON] = "PURE_OCTEON", /* PURE_START */
 	[RANDOM_PURE_SAFE] = "PURE_SAFE",
 	[RANDOM_PURE_GLXSB] = "PURE_GLXSB",
@@ -369,7 +385,8 @@ static const char *random_source_descr[ENTROPYSOURCE] = {
 	[RANDOM_PURE_CCP] = "PURE_CCP",
 	[RANDOM_PURE_DARN] = "PURE_DARN",
 	[RANDOM_PURE_TPM] = "PURE_TPM",
-	[RANDOM_PURE_VMGENID] = "VMGENID",
+	[RANDOM_PURE_VMGENID] = "PURE_VMGENID",
+	[RANDOM_PURE_QUALCOMM] = "PURE_QUALCOMM",
 	/* "ENTROPYSOURCE" */
 };
 
@@ -493,6 +510,14 @@ random_harvestq_prime(void *unused __unused)
 			    size);
 		else
 			printf("random: no preloaded entropy cache\n");
+	}
+	size = random_prime_loader_file(RANDOM_PLATFORM_BOOT_ENTROPY_MODULE);
+	if (bootverbose) {
+		if (size > 0)
+			printf("random: read %zu bytes from platform bootloader\n",
+			    size);
+		else
+			printf("random: no platform bootloader entropy\n");
 	}
 }
 SYSINIT(random_device_prime, SI_SUB_RANDOM, SI_ORDER_MIDDLE, random_harvestq_prime, NULL);

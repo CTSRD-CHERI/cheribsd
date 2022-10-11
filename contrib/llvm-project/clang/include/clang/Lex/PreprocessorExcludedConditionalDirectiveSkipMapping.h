@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CLANG_LEX_PREPROCESSOR_EXCLUDED_COND_DIRECTIVE_SKIP_MAPPING_H
-#define LLVM_CLANG_LEX_PREPROCESSOR_EXCLUDED_COND_DIRECTIVE_SKIP_MAPPING_H
+#ifndef LLVM_CLANG_LEX_PREPROCESSOREXCLUDEDCONDITIONALDIRECTIVESKIPMAPPING_H
+#define LLVM_CLANG_LEX_PREPROCESSOREXCLUDEDCONDITIONALDIRECTIVESKIPMAPPING_H
 
 #include "clang/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
@@ -23,9 +23,8 @@ using PreprocessorSkippedRangeMapping = llvm::DenseMap<unsigned, unsigned>;
 /// The datastructure that holds the mapping between the active memory buffers
 /// and the individual skip mappings.
 using ExcludedPreprocessorDirectiveSkipMapping =
-    llvm::DenseMap<const llvm::MemoryBuffer *,
-                   const PreprocessorSkippedRangeMapping *>;
+    llvm::DenseMap<const char *, const PreprocessorSkippedRangeMapping *>;
 
 } // end namespace clang
 
-#endif // LLVM_CLANG_LEX_PREPROCESSOR_EXCLUDED_COND_DIRECTIVE_SKIP_MAPPING_H
+#endif // LLVM_CLANG_LEX_PREPROCESSOREXCLUDEDCONDITIONALDIRECTIVESKIPMAPPING_H

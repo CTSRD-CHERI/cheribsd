@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck disable=SC2154
 #
 # Send notification in response to a given zevent.
 #
@@ -23,7 +24,7 @@
 
 # Rate-limit the notification based in part on the filename.
 #
-rate_limit_tag="${ZEVENT_POOL};${ZEVENT_SUBCLASS};$(basename -- "$0")"
+rate_limit_tag="${ZEVENT_POOL};${ZEVENT_SUBCLASS};${0##*/}"
 rate_limit_interval="${ZED_NOTIFY_INTERVAL_SECS}"
 zed_rate_limit "${rate_limit_tag}" "${rate_limit_interval}" || exit 3
 
@@ -31,7 +32,7 @@ umask 077
 pool_str="${ZEVENT_POOL:+" for ${ZEVENT_POOL}"}"
 host_str=" on $(hostname)"
 note_subject="ZFS ${ZEVENT_SUBCLASS} event${pool_str}${host_str}"
-note_pathname="${TMPDIR:="/tmp"}/$(basename -- "$0").${ZEVENT_EID}.$$"
+note_pathname="$(mktemp)"
 {
     echo "ZFS has posted the following event:"
     echo

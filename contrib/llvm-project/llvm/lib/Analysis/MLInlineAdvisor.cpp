@@ -11,26 +11,43 @@
 // 'release' mode) or a runtime-loaded model (the 'development' case).
 //
 //===----------------------------------------------------------------------===//
-#include <limits>
-#include <unordered_map>
-#include <unordered_set>
-
+#include "llvm/Analysis/MLInlineAdvisor.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Analysis/CallGraph.h"
+#include "llvm/Analysis/FunctionPropertiesAnalysis.h"
 #include "llvm/Analysis/InlineCost.h"
-#include "llvm/Analysis/InlineFeaturesAnalysis.h"
-#include "llvm/Analysis/MLInlineAdvisor.h"
+#include "llvm/Analysis/InlineModelFeatureMaps.h"
+#include "llvm/Analysis/LazyCallGraph.h"
 #include "llvm/Analysis/MLModelRunner.h"
 #include "llvm/Analysis/OptimizationRemarkEmitter.h"
+#include "llvm/Analysis/ReleaseModeModelRunner.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/Config/config.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Path.h"
 
+#include <limits>
+#include <unordered_map>
+#include <unordered_set>
+
 using namespace llvm;
+
+#if defined(LLVM_HAVE_TF_AOT_INLINERSIZEMODEL)
+// codegen-ed file
+#include "InlinerSizeModel.h" // NOLINT
+
+std::unique_ptr<InlineAdvisor>
+llvm::getReleaseModeAdvisor(Module &M, ModuleAnalysisManager &MAM) {
+  auto AOTRunner =
+      std::make_unique<ReleaseModeModelRunner<llvm::InlinerSizeModel>>(
+          M.getContext(), FeatureNameMap, DecisionName);
+  return std::make_unique<MLInlineAdvisor>(M, MAM, std::move(AOTRunner));
+}
+#endif
 
 #define DEBUG_TYPE "inline-ml"
 
@@ -40,11 +57,19 @@ static cl::opt<float> SizeIncreaseThreshold(
              "blocking any further inlining."),
     cl::init(2.0));
 
+// clang-format off
 const std::array<std::string, NumberOfFeatures> llvm::FeatureNameMap{
+// InlineCost features - these must come first
+#define POPULATE_NAMES(INDEX_NAME, NAME) NAME,
+  INLINE_COST_FEATURE_ITERATOR(POPULATE_NAMES)
+#undef POPULATE_NAMES
+
+// Non-cost features
 #define POPULATE_NAMES(INDEX_NAME, NAME, COMMENT) NAME,
-    INLINE_FEATURE_ITERATOR(POPULATE_NAMES)
+  INLINE_FEATURE_ITERATOR(POPULATE_NAMES)
 #undef POPULATE_NAMES
 };
+// clang-format on
 
 const char *const llvm::DecisionName = "inlining_decision";
 const char *const llvm::DefaultDecisionName = "inlining_default";
@@ -63,8 +88,9 @@ CallBase *getInlinableCS(Instruction &I) {
 MLInlineAdvisor::MLInlineAdvisor(Module &M, ModuleAnalysisManager &MAM,
                                  std::unique_ptr<MLModelRunner> Runner)
     : InlineAdvisor(
-          MAM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager()),
-      M(M), ModelRunner(std::move(Runner)), CG(new CallGraph(M)),
+          M, MAM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager()),
+      ModelRunner(std::move(Runner)),
+      CG(MAM.getResult<LazyCallGraphAnalysis>(M)),
       InitialIRSize(getModuleIRSize()), CurrentIRSize(InitialIRSize) {
   assert(ModelRunner);
 
@@ -74,7 +100,8 @@ MLInlineAdvisor::MLInlineAdvisor(Module &M, ModuleAnalysisManager &MAM,
   // critical in behavioral cloning - i.e. training a model to mimic the manual
   // heuristic's decisions - and, thus, equally important for training for
   // improvement.
-  for (auto I = scc_begin(CG.get()); !I.isAtEnd(); ++I) {
+  CallGraph CGraph(M);
+  for (auto I = scc_begin(&CGraph); !I.isAtEnd(); ++I) {
     const std::vector<CallGraphNode *> &CGNodes = *I;
     unsigned Level = 0;
     for (auto *CGNode : CGNodes) {
@@ -84,7 +111,7 @@ MLInlineAdvisor::MLInlineAdvisor(Module &M, ModuleAnalysisManager &MAM,
       for (auto &I : instructions(F)) {
         if (auto *CS = getInlinableCS(I)) {
           auto *Called = CS->getCalledFunction();
-          auto Pos = FunctionLevels.find(Called);
+          auto Pos = FunctionLevels.find(&CG.get(*Called));
           // In bottom up traversal, an inlinable callee is either in the
           // same SCC, or to a function in a visited SCC. So not finding its
           // level means we haven't visited it yet, meaning it's in this SCC.
@@ -97,25 +124,78 @@ MLInlineAdvisor::MLInlineAdvisor(Module &M, ModuleAnalysisManager &MAM,
     for (auto *CGNode : CGNodes) {
       Function *F = CGNode->getFunction();
       if (F && !F->isDeclaration())
-        FunctionLevels[F] = Level;
+        FunctionLevels[&CG.get(*F)] = Level;
     }
   }
+  for (auto KVP : FunctionLevels) {
+    AllNodes.insert(KVP.first);
+    EdgeCount += getLocalCalls(KVP.first->getFunction());
+  }
+  NodeCount = AllNodes.size();
+}
+
+unsigned MLInlineAdvisor::getInitialFunctionLevel(const Function &F) const {
+  return CG.lookup(F) ? FunctionLevels.at(CG.lookup(F)) : 0;
 }
 
 void MLInlineAdvisor::onPassEntry() {
   // Function passes executed between InlinerPass runs may have changed the
   // module-wide features.
-  NodeCount = 0;
-  EdgeCount = 0;
-  for (auto &F : M)
-    if (!F.isDeclaration()) {
-      ++NodeCount;
-      EdgeCount += getLocalCalls(F);
+  // The cgscc pass manager rules are such that:
+  // - if a pass leads to merging SCCs, then the pipeline is restarted on the
+  // merged SCC
+  // - if a pass leads to splitting the SCC, then we continue with one of the
+  // splits
+  // This means that the NodesInLastSCC is a superset (not strict) of the nodes
+  // that subsequent passes would have processed
+  // - in addition, if new Nodes were created by a pass (e.g. CoroSplit),
+  // they'd be adjacent to Nodes in the last SCC. So we just need to check the
+  // boundary of Nodes in NodesInLastSCC for Nodes we haven't seen. We don't
+  // care about the nature of the Edge (call or ref).
+  NodeCount -= static_cast<int64_t>(NodesInLastSCC.size());
+  while (!NodesInLastSCC.empty()) {
+    const auto *N = NodesInLastSCC.front();
+    NodesInLastSCC.pop_front();
+    // The Function wrapped by N could have been deleted since we last saw it.
+    if (N->isDead()) {
+      assert(!N->getFunction().isDeclaration());
+      continue;
     }
+    ++NodeCount;
+    EdgeCount += getLocalCalls(N->getFunction());
+    for (const auto &E : *(*N)) {
+      const auto *AdjNode = &E.getNode();
+      assert(!AdjNode->isDead() && !AdjNode->getFunction().isDeclaration());
+      auto I = AllNodes.insert(AdjNode);
+      if (I.second)
+        NodesInLastSCC.push_back(AdjNode);
+    }
+  }
+
+  EdgeCount -= EdgesOfLastSeenNodes;
+  EdgesOfLastSeenNodes = 0;
+}
+
+void MLInlineAdvisor::onPassExit(LazyCallGraph::SCC *LastSCC) {
+  if (!LastSCC)
+    return;
+  // Keep track of the nodes and edges we last saw. Then, in onPassEntry,
+  // we update the node count and edge count from the subset of these nodes that
+  // survived.
+  assert(NodesInLastSCC.empty());
+  assert(NodeCount >= LastSCC->size());
+  EdgesOfLastSeenNodes = 0;
+  for (const auto &N : *LastSCC) {
+    assert(!N.isDead());
+    EdgesOfLastSeenNodes += getLocalCalls(N.getFunction());
+    NodesInLastSCC.push_back(&N);
+  }
+  assert(EdgeCount >= EdgesOfLastSeenNodes);
 }
 
 int64_t MLInlineAdvisor::getLocalCalls(Function &F) {
-  return FAM.getResult<InlineFeaturesAnalysis>(F).DirectCallsToDefinedFunctions;
+  return FAM.getResult<FunctionPropertiesAnalysis>(F)
+      .DirectCallsToDefinedFunctions;
 }
 
 // Update the internal state of the advisor, and force invalidate feature
@@ -130,7 +210,11 @@ void MLInlineAdvisor::onSuccessfulInlining(const MLInlineAdvice &Advice,
   Function *Callee = Advice.getCallee();
 
   // The caller features aren't valid anymore.
-  FAM.invalidate<InlineFeaturesAnalysis>(*Caller);
+  {
+    PreservedAnalyses PA = PreservedAnalyses::all();
+    PA.abandon<FunctionPropertiesAnalysis>();
+    FAM.invalidate(*Caller, PA);
+  }
   int64_t IRSizeAfter =
       getIRSize(*Caller) + (CalleeWasDeleted ? 0 : Advice.CalleeIRSize);
   CurrentIRSize += IRSizeAfter - (Advice.CallerIRSize + Advice.CalleeIRSize);
@@ -143,52 +227,48 @@ void MLInlineAdvisor::onSuccessfulInlining(const MLInlineAdvice &Advice,
   // For edges, we 'forget' the edges that the caller and callee used to have
   // before inlining, and add back what they currently have together.
   int64_t NewCallerAndCalleeEdges =
-      FAM.getResult<InlineFeaturesAnalysis>(*Caller)
+      FAM.getResult<FunctionPropertiesAnalysis>(*Caller)
           .DirectCallsToDefinedFunctions;
 
   if (CalleeWasDeleted)
     --NodeCount;
   else
-    NewCallerAndCalleeEdges += FAM.getResult<InlineFeaturesAnalysis>(*Callee)
-                                   .DirectCallsToDefinedFunctions;
+    NewCallerAndCalleeEdges +=
+        FAM.getResult<FunctionPropertiesAnalysis>(*Callee)
+            .DirectCallsToDefinedFunctions;
   EdgeCount += (NewCallerAndCalleeEdges - Advice.CallerAndCalleeEdges);
   assert(CurrentIRSize >= 0 && EdgeCount >= 0 && NodeCount >= 0);
 }
 
 int64_t MLInlineAdvisor::getModuleIRSize() const {
   int64_t Ret = 0;
-  for (auto &F : CG->getModule())
+  for (auto &F : M)
     if (!F.isDeclaration())
       Ret += getIRSize(F);
   return Ret;
 }
 
-std::unique_ptr<InlineAdvice> MLInlineAdvisor::getAdvice(CallBase &CB) {
+std::unique_ptr<InlineAdvice> MLInlineAdvisor::getAdviceImpl(CallBase &CB) {
   auto &Caller = *CB.getCaller();
   auto &Callee = *CB.getCalledFunction();
 
   auto GetAssumptionCache = [&](Function &F) -> AssumptionCache & {
     return FAM.getResult<AssumptionAnalysis>(F);
   };
-  auto GetTLI = [&](Function &F) -> const TargetLibraryInfo & {
-    return FAM.getResult<TargetLibraryAnalysis>(F);
-  };
-
   auto &TIR = FAM.getResult<TargetIRAnalysis>(Callee);
   auto &ORE = FAM.getResult<OptimizationRemarkEmitterAnalysis>(Caller);
 
-  auto TrivialDecision =
-      llvm::getAttributeBasedInliningDecision(CB, &Callee, TIR, GetTLI);
-
+  auto MandatoryKind = InlineAdvisor::getMandatoryKind(CB, FAM, ORE);
   // If this is a "never inline" case, there won't be any changes to internal
   // state we need to track, so we can just return the base InlineAdvice, which
   // will do nothing interesting.
   // Same thing if this is a recursive case.
-  if ((TrivialDecision.hasValue() && !TrivialDecision->isSuccess()) ||
+  if (MandatoryKind == InlineAdvisor::MandatoryInliningKind::Never ||
       &Caller == &Callee)
-    return std::make_unique<InlineAdvice>(this, CB, ORE, false);
+    return getMandatoryAdvice(CB, false);
 
-  bool Mandatory = TrivialDecision.hasValue() && TrivialDecision->isSuccess();
+  bool Mandatory =
+      MandatoryKind == InlineAdvisor::MandatoryInliningKind::Always;
 
   // If we need to stop, we won't want to track anymore any state changes, so
   // we just return the base InlineAdvice, which acts as a noop.
@@ -213,46 +293,77 @@ std::unique_ptr<InlineAdvice> MLInlineAdvisor::getAdvice(CallBase &CB) {
     CostEstimate = *IsCallSiteInlinable;
   }
 
+  const auto CostFeatures =
+      llvm::getInliningCostFeatures(CB, TIR, GetAssumptionCache);
+  if (!CostFeatures) {
+    return std::make_unique<InlineAdvice>(this, CB, ORE, false);
+  }
+
   if (Mandatory)
-    return getMandatoryAdvice(CB, ORE);
+    return getMandatoryAdvice(CB, true);
 
   auto NrCtantParams = 0;
   for (auto I = CB.arg_begin(), E = CB.arg_end(); I != E; ++I) {
     NrCtantParams += (isa<Constant>(*I));
   }
 
-  auto &CallerBefore = FAM.getResult<InlineFeaturesAnalysis>(Caller);
-  auto &CalleeBefore = FAM.getResult<InlineFeaturesAnalysis>(Callee);
+  auto &CallerBefore = FAM.getResult<FunctionPropertiesAnalysis>(Caller);
+  auto &CalleeBefore = FAM.getResult<FunctionPropertiesAnalysis>(Callee);
 
-  ModelRunner->setFeature(FeatureIndex::CalleeBasicBlockCount,
-                          CalleeBefore.BasicBlockCount);
-  ModelRunner->setFeature(FeatureIndex::CallSiteHeight,
-                          FunctionLevels[&Caller]);
-  ModelRunner->setFeature(FeatureIndex::NodeCount, NodeCount);
-  ModelRunner->setFeature(FeatureIndex::NrCtantParams, NrCtantParams);
-  ModelRunner->setFeature(FeatureIndex::CostEstimate, CostEstimate);
-  ModelRunner->setFeature(FeatureIndex::EdgeCount, EdgeCount);
-  ModelRunner->setFeature(FeatureIndex::CallerUsers, CallerBefore.Uses);
-  ModelRunner->setFeature(FeatureIndex::CallerConditionallyExecutedBlocks,
-                          CallerBefore.BlocksReachedFromConditionalInstruction);
-  ModelRunner->setFeature(FeatureIndex::CallerBasicBlockCount,
-                          CallerBefore.BasicBlockCount);
-  ModelRunner->setFeature(FeatureIndex::CalleeConditionallyExecutedBlocks,
-                          CalleeBefore.BlocksReachedFromConditionalInstruction);
-  ModelRunner->setFeature(FeatureIndex::CalleeUsers, CalleeBefore.Uses);
+  *ModelRunner->getTensor<int64_t>(FeatureIndex::CalleeBasicBlockCount) =
+      CalleeBefore.BasicBlockCount;
+  *ModelRunner->getTensor<int64_t>(FeatureIndex::CallSiteHeight) =
+      getInitialFunctionLevel(Caller);
+  *ModelRunner->getTensor<int64_t>(FeatureIndex::NodeCount) = NodeCount;
+  *ModelRunner->getTensor<int64_t>(FeatureIndex::NrCtantParams) = NrCtantParams;
+  *ModelRunner->getTensor<int64_t>(FeatureIndex::EdgeCount) = EdgeCount;
+  *ModelRunner->getTensor<int64_t>(FeatureIndex::CallerUsers) =
+      CallerBefore.Uses;
+  *ModelRunner->getTensor<int64_t>(
+      FeatureIndex::CallerConditionallyExecutedBlocks) =
+      CallerBefore.BlocksReachedFromConditionalInstruction;
+  *ModelRunner->getTensor<int64_t>(FeatureIndex::CallerBasicBlockCount) =
+      CallerBefore.BasicBlockCount;
+  *ModelRunner->getTensor<int64_t>(
+      FeatureIndex::CalleeConditionallyExecutedBlocks) =
+      CalleeBefore.BlocksReachedFromConditionalInstruction;
+  *ModelRunner->getTensor<int64_t>(FeatureIndex::CalleeUsers) =
+      CalleeBefore.Uses;
+  *ModelRunner->getTensor<int64_t>(FeatureIndex::CostEstimate) = CostEstimate;
+
+  // Add the cost features
+  for (size_t I = 0;
+       I < static_cast<size_t>(InlineCostFeatureIndex::NumberOfFeatures); ++I) {
+    *ModelRunner->getTensor<int64_t>(inlineCostFeatureToMlFeature(
+        static_cast<InlineCostFeatureIndex>(I))) = CostFeatures->at(I);
+  }
+
   return getAdviceFromModel(CB, ORE);
 }
 
 std::unique_ptr<MLInlineAdvice>
 MLInlineAdvisor::getAdviceFromModel(CallBase &CB,
                                     OptimizationRemarkEmitter &ORE) {
-  return std::make_unique<MLInlineAdvice>(this, CB, ORE, ModelRunner->run());
+  return std::make_unique<MLInlineAdvice>(
+      this, CB, ORE, static_cast<bool>(ModelRunner->evaluate<int64_t>()));
+}
+
+std::unique_ptr<InlineAdvice> MLInlineAdvisor::getMandatoryAdvice(CallBase &CB,
+                                                                  bool Advice) {
+  // Make sure we track inlinings in all cases - mandatory or not.
+  if (Advice && !ForceStop)
+    return getMandatoryAdviceImpl(CB);
+
+  // If this is a "never inline" case, there won't be any changes to internal
+  // state we need to track, so we can just return the base InlineAdvice, which
+  // will do nothing interesting.
+  // Same if we are forced to stop - we don't track anymore.
+  return std::make_unique<InlineAdvice>(this, CB, getCallerORE(CB), Advice);
 }
 
 std::unique_ptr<MLInlineAdvice>
-MLInlineAdvisor::getMandatoryAdvice(CallBase &CB,
-                                    OptimizationRemarkEmitter &ORE) {
-  return std::make_unique<MLInlineAdvice>(this, CB, ORE, true);
+MLInlineAdvisor::getMandatoryAdviceImpl(CallBase &CB) {
+  return std::make_unique<MLInlineAdvice>(this, CB, getCallerORE(CB), true);
 }
 
 void MLInlineAdvice::reportContextForRemark(
@@ -260,7 +371,8 @@ void MLInlineAdvice::reportContextForRemark(
   using namespace ore;
   OR << NV("Callee", Callee->getName());
   for (size_t I = 0; I < NumberOfFeatures; ++I)
-    OR << NV(FeatureNameMap[I], getAdvisor()->getModelRunner().getFeature(I));
+    OR << NV(FeatureNameMap[I],
+             *getAdvisor()->getModelRunner().getTensor<int64_t>(I));
   OR << NV("ShouldInline", isInliningRecommended());
 }
 

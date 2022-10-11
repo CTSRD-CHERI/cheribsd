@@ -70,6 +70,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/buf.h>
 #include <sys/lock.h>
 #include <sys/mount.h>
+#include <sys/stat.h>
 #include <sys/vnode.h>
 #include <sys/vmmeter.h>
 
@@ -128,6 +129,8 @@ ffs_balloc_ufs1(struct vnode *vp, off_t startoffset, int size,
 		return (EFBIG);
 	gbflags = (flags & BA_UNMAPPED) != 0 ? GB_UNMAPPED : 0;
 
+	vn_seqc_write_begin(vp);
+
 	/*
 	 * If the next write will extend the file into a new block,
 	 * and the file is currently composed of a fragment
@@ -144,7 +147,7 @@ ffs_balloc_ufs1(struct vnode *vp, off_t startoffset, int size,
 			   &dp->di_db[0]), osize, (int)fs->fs_bsize, flags,
 			   cred, &bp);
 			if (error)
-				return (error);
+				goto done;
 			if (DOINGSOFTDEP(vp))
 				softdep_setup_allocdirect(ip, nb,
 				    dbtofsb(fs, bp->b_blkno), dp->di_db[nb],
@@ -174,17 +177,20 @@ ffs_balloc_ufs1(struct vnode *vp, off_t startoffset, int size,
 				error = bread(vp, lbn, fs->fs_bsize, NOCRED,
 				    &bp);
 				if (error != 0)
-					return (error);
+					goto done;
 			} else {
 				bp = getblk(vp, lbn, fs->fs_bsize, 0, 0,
 				    gbflags);
-				if (bp == NULL)
-					return (EIO);
+				if (bp == NULL) {
+					error = EIO;
+					goto done;
+				}
 				vfs_bio_clrbuf(bp);
 			}
 			bp->b_blkno = fsbtodb(fs, nb);
 			*bpp = bp;
-			return (0);
+			error = 0;
+			goto done;
 		}
 		if (nb != 0) {
 			/*
@@ -194,9 +200,8 @@ ffs_balloc_ufs1(struct vnode *vp, off_t startoffset, int size,
 			nsize = fragroundup(fs, size);
 			if (nsize <= osize) {
 				error = bread(vp, lbn, osize, NOCRED, &bp);
-				if (error) {
-					return (error);
-				}
+				if (error)
+					goto done;
 				bp->b_blkno = fsbtodb(fs, nb);
 			} else {
 				UFS_LOCK(ump);
@@ -205,7 +210,7 @@ ffs_balloc_ufs1(struct vnode *vp, off_t startoffset, int size,
 				    &dp->di_db[0]), osize, nsize, flags,
 				    cred, &bp);
 				if (error)
-					return (error);
+					goto done;
 				if (DOINGSOFTDEP(vp))
 					softdep_setup_allocdirect(ip, lbn,
 					    dbtofsb(fs, bp->b_blkno), nb,
@@ -221,7 +226,7 @@ ffs_balloc_ufs1(struct vnode *vp, off_t startoffset, int size,
 			    ffs_blkpref_ufs1(ip, lbn, (int)lbn, &dp->di_db[0]),
 			    nsize, flags, cred, &newb);
 			if (error)
-				return (error);
+				goto done;
 			bp = getblk(vp, lbn, nsize, 0, 0, gbflags);
 			bp->b_blkno = fsbtodb(fs, newb);
 			if (flags & BA_CLRBUF)
@@ -233,14 +238,15 @@ ffs_balloc_ufs1(struct vnode *vp, off_t startoffset, int size,
 		dp->di_db[lbn] = dbtofsb(fs, bp->b_blkno);
 		UFS_INODE_SET_FLAG(ip, IN_CHANGE | IN_UPDATE | IN_IBLKDATA);
 		*bpp = bp;
-		return (0);
+		error = 0;
+		goto done;
 	}
 	/*
 	 * Determine the number of levels of indirection.
 	 */
 	pref = 0;
 	if ((error = ufs_getlbns(vp, lbn, indirs, &num)) != 0)
-		return(error);
+		goto done;
 #ifdef INVARIANTS
 	if (num < 1)
 		panic ("ffs_balloc_ufs1: ufs_getlbns returned indirect block");
@@ -261,7 +267,7 @@ ffs_balloc_ufs1(struct vnode *vp, off_t startoffset, int size,
 		if ((error = ffs_alloc(ip, lbn, pref, (int)fs->fs_bsize,
 		    flags, cred, &newb)) != 0) {
 			curthread_pflags_restore(saved_inbdflush);
-			return (error);
+			goto done;
 		}
 		pref = newb + fs->fs_frag;
 		nb = newb;
@@ -387,7 +393,8 @@ retry:
 	if (flags & BA_METAONLY) {
 		curthread_pflags_restore(saved_inbdflush);
 		*bpp = bp;
-		return (0);
+		error = 0;
+		goto done;
 	}
 	/*
 	 * Get the data block, allocating if necessary.
@@ -453,7 +460,8 @@ retry:
 		}
 		curthread_pflags_restore(saved_inbdflush);
 		*bpp = nbp;
-		return (0);
+		error = 0;
+		goto done;
 	}
 	brelse(bp);
 	if (flags & BA_CLRBUF) {
@@ -478,7 +486,8 @@ retry:
 	}
 	curthread_pflags_restore(saved_inbdflush);
 	*bpp = nbp;
-	return (0);
+	error = 0;
+	goto done;
 fail:
 	curthread_pflags_restore(saved_inbdflush);
 	/*
@@ -486,7 +495,7 @@ fail:
 	 * This is the usual case and avoids the need to fsync the file.
 	 */
 	if (allocblk == allociblk && allocib == NULL && unwindidx == -1)
-		return (error);
+		goto done;
 	/*
 	 * If we have failed part way through block allocation, we
 	 * have to deallocate any indirect blocks that we have allocated.
@@ -574,6 +583,8 @@ fail:
 		ffs_blkfree(ump, fs, ump->um_devvp, *blkp, fs->fs_bsize,
 		    ip->i_number, vp->v_type, NULL, SINGLETON_KEY);
 	}
+done:
+	vn_seqc_write_end(vp);
 	return (error);
 }
 
@@ -602,7 +613,7 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 	int deallocated, osize, nsize, num, i, error;
 	int unwindidx = -1;
 	int saved_inbdflush;
-	int gbflags, reclaimed;
+	int gbflags, gbwflag, reclaimed;
 
 	ip = VTOI(vp);
 	dp = ip->i_din2;
@@ -618,13 +629,24 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 	if (lbn < 0)
 		return (EFBIG);
 	gbflags = (flags & BA_UNMAPPED) != 0 ? GB_UNMAPPED : 0;
+#ifdef WITNESS
+	gbwflag = IS_SNAPSHOT(ip) ? GB_NOWITNESS : 0;
+	gbflags |= gbwflag;
+#else
+	gbwflag = 0;
+#endif
+
+	vn_seqc_write_begin(vp);
 
 	/*
 	 * Check for allocating external data.
 	 */
 	if (flags & IO_EXT) {
-		if (lbn >= UFS_NXADDR)
-			return (EFBIG);
+		if (lbn >= UFS_NXADDR) {
+			error = EFBIG;
+			goto done;
+		}
+
 		/*
 		 * If the next write will extend the data into a new block,
 		 * and the data is currently composed of a fragment
@@ -642,7 +664,7 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 				    &dp->di_extb[0]), osize,
 				    (int)fs->fs_bsize, flags, cred, &bp);
 				if (error)
-					return (error);
+					goto done;
 				if (DOINGSOFTDEP(vp))
 					softdep_setup_allocext(ip, nb,
 					    dbtofsb(fs, bp->b_blkno),
@@ -668,13 +690,12 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 		if (nb != 0 && dp->di_extsize >= smalllblktosize(fs, lbn + 1)) {
 			error = bread_gb(vp, -1 - lbn, fs->fs_bsize, NOCRED,
 			    gbflags, &bp);
-			if (error) {
-				return (error);
-			}
+			if (error)
+				goto done;
 			bp->b_blkno = fsbtodb(fs, nb);
 			bp->b_xflags |= BX_ALTDATA;
 			*bpp = bp;
-			return (0);
+			goto done;
 		}
 		if (nb != 0) {
 			/*
@@ -685,9 +706,8 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 			if (nsize <= osize) {
 				error = bread_gb(vp, -1 - lbn, osize, NOCRED,
 				    gbflags, &bp);
-				if (error) {
-					return (error);
-				}
+				if (error)
+					goto done;
 				bp->b_blkno = fsbtodb(fs, nb);
 				bp->b_xflags |= BX_ALTDATA;
 			} else {
@@ -698,7 +718,7 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 				    &dp->di_extb[0]), osize, nsize, flags,
 				    cred, &bp);
 				if (error)
-					return (error);
+					goto done;
 				bp->b_xflags |= BX_ALTDATA;
 				if (DOINGSOFTDEP(vp))
 					softdep_setup_allocext(ip, lbn,
@@ -715,7 +735,7 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 			   ffs_blkpref_ufs2(ip, lbn, (int)lbn, &dp->di_extb[0]),
 			   nsize, flags, cred, &newb);
 			if (error)
-				return (error);
+				goto done;
 			bp = getblk(vp, -1 - lbn, nsize, 0, 0, gbflags);
 			bp->b_blkno = fsbtodb(fs, newb);
 			bp->b_xflags |= BX_ALTDATA;
@@ -728,7 +748,8 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 		dp->di_extb[lbn] = dbtofsb(fs, bp->b_blkno);
 		UFS_INODE_SET_FLAG(ip, IN_CHANGE | IN_IBLKDATA);
 		*bpp = bp;
-		return (0);
+		error = 0;
+		goto done;
 	}
 	/*
 	 * If the next write will extend the file into a new block,
@@ -746,7 +767,7 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 			    &dp->di_db[0]), osize, (int)fs->fs_bsize,
 			    flags, cred, &bp);
 			if (error)
-				return (error);
+				goto done;
 			if (DOINGSOFTDEP(vp))
 				softdep_setup_allocdirect(ip, nb,
 				    dbtofsb(fs, bp->b_blkno),
@@ -775,17 +796,20 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 				error = bread_gb(vp, lbn, fs->fs_bsize, NOCRED,
 				    gbflags, &bp);
 				if (error != 0)
-					return (error);
+					goto done;
 			} else {
 				bp = getblk(vp, lbn, fs->fs_bsize, 0, 0,
 				    gbflags);
-				if (bp == NULL)
-					return (EIO);
+				if (bp == NULL) {
+					error = EIO;
+					goto done;
+				}
 				vfs_bio_clrbuf(bp);
 			}
 			bp->b_blkno = fsbtodb(fs, nb);
 			*bpp = bp;
-			return (0);
+			error = 0;
+			goto done;
 		}
 		if (nb != 0) {
 			/*
@@ -796,9 +820,8 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 			if (nsize <= osize) {
 				error = bread_gb(vp, lbn, osize, NOCRED,
 				    gbflags, &bp);
-				if (error) {
-					return (error);
-				}
+				if (error)
+					goto done;
 				bp->b_blkno = fsbtodb(fs, nb);
 			} else {
 				UFS_LOCK(ump);
@@ -807,7 +830,7 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 				    &dp->di_db[0]), osize, nsize, flags,
 				    cred, &bp);
 				if (error)
-					return (error);
+					goto done;
 				if (DOINGSOFTDEP(vp))
 					softdep_setup_allocdirect(ip, lbn,
 					    dbtofsb(fs, bp->b_blkno), nb,
@@ -823,7 +846,7 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 			    ffs_blkpref_ufs2(ip, lbn, (int)lbn,
 				&dp->di_db[0]), nsize, flags, cred, &newb);
 			if (error)
-				return (error);
+				goto done;
 			bp = getblk(vp, lbn, nsize, 0, 0, gbflags);
 			bp->b_blkno = fsbtodb(fs, newb);
 			if (flags & BA_CLRBUF)
@@ -835,14 +858,15 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 		dp->di_db[lbn] = dbtofsb(fs, bp->b_blkno);
 		UFS_INODE_SET_FLAG(ip, IN_CHANGE | IN_UPDATE | IN_IBLKDATA);
 		*bpp = bp;
-		return (0);
+		error = 0;
+		goto done;
 	}
 	/*
 	 * Determine the number of levels of indirection.
 	 */
 	pref = 0;
 	if ((error = ufs_getlbns(vp, lbn, indirs, &num)) != 0)
-		return(error);
+		goto done;
 #ifdef INVARIANTS
 	if (num < 1)
 		panic ("ffs_balloc_ufs2: ufs_getlbns returned indirect block");
@@ -863,7 +887,7 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 		if ((error = ffs_alloc(ip, lbn, pref, (int)fs->fs_bsize,
 		    flags, cred, &newb)) != 0) {
 			curthread_pflags_restore(saved_inbdflush);
-			return (error);
+			goto done;
 		}
 		pref = newb + fs->fs_frag;
 		nb = newb;
@@ -872,7 +896,7 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 		*allocblk++ = nb;
 		*lbns_remfree++ = indirs[1].in_lbn;
 		bp = getblk(vp, indirs[1].in_lbn, fs->fs_bsize, 0, 0,
-		    GB_UNMAPPED);
+		    GB_UNMAPPED | gbwflag);
 		bp->b_blkno = fsbtodb(fs, nb);
 		vfs_bio_clrbuf(bp);
 		if (DOINGSOFTDEP(vp)) {
@@ -897,8 +921,8 @@ ffs_balloc_ufs2(struct vnode *vp, off_t startoffset, int size,
 	 */
 retry:
 	for (i = 1;;) {
-		error = bread(vp,
-		    indirs[i].in_lbn, (int)fs->fs_bsize, NOCRED, &bp);
+		error = bread_gb(vp, indirs[i].in_lbn, (int)fs->fs_bsize,
+		    NOCRED, gbwflag, &bp);
 		if (error) {
 			goto fail;
 		}
@@ -991,7 +1015,8 @@ retry:
 	if (flags & BA_METAONLY) {
 		curthread_pflags_restore(saved_inbdflush);
 		*bpp = bp;
-		return (0);
+		error = 0;
+		goto done;
 	}
 	/*
 	 * Get the data block, allocating if necessary.
@@ -1057,7 +1082,8 @@ retry:
 		}
 		curthread_pflags_restore(saved_inbdflush);
 		*bpp = nbp;
-		return (0);
+		error = 0;
+		goto done;
 	}
 	brelse(bp);
 	/*
@@ -1088,7 +1114,8 @@ retry:
 	}
 	curthread_pflags_restore(saved_inbdflush);
 	*bpp = nbp;
-	return (0);
+	error = 0;
+	goto done;
 fail:
 	curthread_pflags_restore(saved_inbdflush);
 	/*
@@ -1096,7 +1123,7 @@ fail:
 	 * This is the usual case and avoids the need to fsync the file.
 	 */
 	if (allocblk == allociblk && allocib == NULL && unwindidx == -1)
-		return (error);
+		goto done;
 	/*
 	 * If we have failed part way through block allocation, we
 	 * have to deallocate any indirect blocks that we have allocated.
@@ -1118,7 +1145,7 @@ fail:
 		 * buffer object lists.
 		 */
 		bp = getblk(vp, *lbns_remfree, fs->fs_bsize, 0, 0,
-		    GB_NOCREAT | GB_UNMAPPED);
+		    GB_NOCREAT | GB_UNMAPPED | gbwflag);
 		if (bp != NULL) {
 			KASSERT(bp->b_blkno == fsbtodb(fs, *blkp),
 			    ("mismatch2 l %jd %jd b %ju %ju",
@@ -1136,8 +1163,8 @@ fail:
 	} else if (unwindidx >= 0) {
 		int r;
 
-		r = bread(vp, indirs[unwindidx].in_lbn, 
-		    (int)fs->fs_bsize, NOCRED, &bp);
+		r = bread_gb(vp, indirs[unwindidx].in_lbn,
+		    (int)fs->fs_bsize, NOCRED, gbwflag, &bp);
 		if (r) {
 			panic("Could not unwind indirect block, error %d", r);
 			brelse(bp);
@@ -1173,7 +1200,7 @@ fail:
 		if (blkp == allociblk)
 			lbns_remfree = lbns;
 		bp = getblk(vp, *lbns_remfree, fs->fs_bsize, 0, 0,
-		    GB_NOCREAT | GB_UNMAPPED);
+		    GB_NOCREAT | GB_UNMAPPED | gbwflag);
 		if (bp != NULL) {
 			panic("zombie2 %jd %ju %ju",
 			    (intmax_t)bp->b_lblkno, (uintmax_t)bp->b_blkno,
@@ -1184,5 +1211,7 @@ fail:
 		ffs_blkfree(ump, fs, ump->um_devvp, *blkp, fs->fs_bsize,
 		    ip->i_number, vp->v_type, NULL, SINGLETON_KEY);
 	}
+done:
+	vn_seqc_write_end(vp);
 	return (error);
 }

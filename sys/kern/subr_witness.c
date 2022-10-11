@@ -541,7 +541,6 @@ static struct witness_order_list_entry order_lists[] = {
 	{ "udpinp", &lock_class_rw },
 	{ "in_multi_list_mtx", &lock_class_mtx_sleep },
 	{ "igmp_mtx", &lock_class_mtx_sleep },
-	{ "ifnet_rw", &lock_class_rw },
 	{ "if_addr_lock", &lock_class_mtx_sleep },
 	{ NULL, NULL },
 	/*
@@ -552,7 +551,6 @@ static struct witness_order_list_entry order_lists[] = {
 	{ "udpinp", &lock_class_rw },
 	{ "in6_multi_list_mtx", &lock_class_mtx_sleep },
 	{ "mld_mtx", &lock_class_mtx_sleep },
-	{ "ifnet_rw", &lock_class_rw },
 	{ "if_addr_lock", &lock_class_mtx_sleep },
 	{ NULL, NULL },
 	/*
@@ -566,15 +564,15 @@ static struct witness_order_list_entry order_lists[] = {
 	/*
 	 * UDP/IP
 	 */
-	{ "udp", &lock_class_mtx_sleep },
 	{ "udpinp", &lock_class_rw },
+	{ "udp", &lock_class_mtx_sleep },
 	{ "so_snd", &lock_class_mtx_sleep },
 	{ NULL, NULL },
 	/*
 	 * TCP/IP
 	 */
-	{ "tcp", &lock_class_mtx_sleep },
 	{ "tcpinp", &lock_class_rw },
+	{ "tcp", &lock_class_mtx_sleep },
 	{ "so_snd", &lock_class_mtx_sleep },
 	{ NULL, NULL },
 	/*
@@ -2606,9 +2604,9 @@ DB_SHOW_ALL_COMMAND(locks, db_witness_list_all)
 		}
 	}
 }
-DB_SHOW_ALIAS(alllocks, db_witness_list_all)
+DB_SHOW_ALIAS_FLAGS(alllocks, db_witness_list_all, DB_CMD_MEMSAFE)
 
-DB_SHOW_COMMAND(witness, db_witness_display)
+DB_SHOW_COMMAND_FLAGS(witness, db_witness_display, DB_CMD_MEMSAFE)
 {
 
 	witness_ddb_display(db_printf);
@@ -2784,7 +2782,7 @@ sbuf_db_printf_drain(void *arg __unused, const char *data, int len)
 	return (db_printf("%.*s", len, data));
 }
 
-DB_SHOW_COMMAND(badstacks, db_witness_badstacks)
+DB_SHOW_COMMAND_FLAGS(badstacks, db_witness_badstacks, DB_CMD_MEMSAFE)
 {
 	struct sbuf sb;
 	char buffer[128];
@@ -3083,7 +3081,6 @@ witness_lock_order_add(struct witness *parent, struct witness *child)
 	data->wlod_key = key;
 	w_lohash.wloh_array[hash] = data;
 	w_lohash.wloh_count++;
-	stack_zero(&data->wlod_stack);
 	stack_save(&data->wlod_stack);
 	return (1);
 }
@@ -3120,7 +3117,6 @@ witness_debugger(int cond, const char *msg)
 		sbuf_new(&sb, buf, sizeof(buf), SBUF_FIXEDLEN);
 		sbuf_set_drain(&sb, witness_output_drain, NULL);
 
-		stack_zero(&st);
 		stack_save(&st);
 		witness_output("stack backtrace:\n");
 		stack_sbuf_print_ddb(&sb, &st);

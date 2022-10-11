@@ -37,7 +37,7 @@
 
 static int
 dsl_bookmark_hold_ds(dsl_pool_t *dp, const char *fullname,
-    dsl_dataset_t **dsp, void *tag, char **shortnamep)
+    dsl_dataset_t **dsp, const void *tag, char **shortnamep)
 {
 	char buf[ZFS_MAX_DATASET_NAME_LEN];
 	char *hashp;
@@ -82,7 +82,7 @@ dsl_bookmark_lookup_impl(dsl_dataset_t *ds, const char *shortname,
 	 * Zero out the bookmark in case the one stored on disk
 	 * is in an older, shorter format.
 	 */
-	bzero(bmark_phys, sizeof (*bmark_phys));
+	memset(bmark_phys, 0, sizeof (*bmark_phys));
 
 	err = zap_lookup_norm(mos, bmark_zapobj, shortname, sizeof (uint64_t),
 	    sizeof (*bmark_phys) / sizeof (uint64_t), bmark_phys, mt, NULL, 0,
@@ -160,10 +160,9 @@ dsl_bookmark_create_nvl_validate_pair(const char *bmark, const char *source)
 int
 dsl_bookmark_create_nvl_validate(nvlist_t *bmarks)
 {
-	char *first;
-	size_t first_len;
+	char *first = NULL;
+	size_t first_len = 0;
 
-	first = NULL;
 	for (nvpair_t *pair = nvlist_next_nvpair(bmarks, NULL);
 	    pair != NULL; pair = nvlist_next_nvpair(bmarks, pair)) {
 
@@ -236,7 +235,7 @@ dsl_bookmark_create_check_impl(dsl_pool_t *dp,
 		error = SET_ERROR(EEXIST);
 		goto eholdnewbmds;
 	default:
-		/* dsl_bookmark_lookup_impl already did SET_ERRROR */
+		/* dsl_bookmark_lookup_impl already did SET_ERROR */
 		goto eholdnewbmds;
 	}
 
@@ -271,7 +270,7 @@ dsl_bookmark_create_check_impl(dsl_pool_t *dp,
 			error = SET_ERROR(ZFS_ERR_BOOKMARK_SOURCE_NOT_ANCESTOR);
 			break;
 		default:
-			/* dsl_bookmark_lookup already did SET_ERRROR */
+			/* dsl_bookmark_lookup already did SET_ERROR */
 			break;
 		}
 	} else {
@@ -347,6 +346,8 @@ dsl_bookmark_set_phys(zfs_bookmark_phys_t *zbm, dsl_dataset_t *snap)
 	spa_t *spa = dsl_dataset_get_spa(snap);
 	objset_t *mos = spa_get_dsl(spa)->dp_meta_objset;
 	dsl_dataset_phys_t *dsp = dsl_dataset_phys(snap);
+
+	memset(zbm, 0, sizeof (zfs_bookmark_phys_t));
 	zbm->zbm_guid = dsp->ds_guid;
 	zbm->zbm_creation_txg = dsp->ds_creation_txg;
 	zbm->zbm_creation_time = dsp->ds_creation_time;
@@ -380,10 +381,6 @@ dsl_bookmark_set_phys(zfs_bookmark_phys_t *zbm, dsl_dataset_t *snap)
 		    &zbm->zbm_compressed_freed_before_next_snap,
 		    &zbm->zbm_uncompressed_freed_before_next_snap);
 		dsl_dataset_rele(nextds, FTAG);
-	} else {
-		bzero(&zbm->zbm_flags,
-		    sizeof (zfs_bookmark_phys_t) -
-		    offsetof(zfs_bookmark_phys_t, zbm_flags));
 	}
 }
 
@@ -426,8 +423,8 @@ dsl_bookmark_node_add(dsl_dataset_t *hds, dsl_bookmark_node_t *dbn,
 		spa_feature_incr(dp->dp_spa, SPA_FEATURE_BOOKMARK_V2, tx);
 	}
 
-	__attribute__((unused)) zfs_bookmark_phys_t zero_phys = { 0 };
-	ASSERT0(bcmp(((char *)&dbn->dbn_phys) + bookmark_phys_size,
+	zfs_bookmark_phys_t zero_phys = { 0 };
+	ASSERT0(memcmp(((char *)&dbn->dbn_phys) + bookmark_phys_size,
 	    &zero_phys, sizeof (zfs_bookmark_phys_t) - bookmark_phys_size));
 
 	VERIFY0(zap_add(mos, hds->ds_bookmarks_obj, dbn->dbn_name,
@@ -441,8 +438,8 @@ dsl_bookmark_node_add(dsl_dataset_t *hds, dsl_bookmark_node_t *dbn,
  */
 static void
 dsl_bookmark_create_sync_impl_snap(const char *bookmark, const char *snapshot,
-    dmu_tx_t *tx, uint64_t num_redact_snaps, uint64_t *redact_snaps, void *tag,
-    redaction_list_t **redaction_list)
+    dmu_tx_t *tx, uint64_t num_redact_snaps, uint64_t *redact_snaps,
+    const void *tag, redaction_list_t **redaction_list)
 {
 	dsl_pool_t *dp = dmu_tx_pool(tx);
 	objset_t *mos = dp->dp_meta_objset;
@@ -482,7 +479,7 @@ dsl_bookmark_create_sync_impl_snap(const char *bookmark, const char *snapshot,
 		    sizeof (redaction_list_phys_t) + num_redact_snaps *
 		    sizeof (uint64_t));
 		dmu_buf_will_dirty(local_rl->rl_dbuf, tx);
-		bcopy(redact_snaps, local_rl->rl_phys->rlp_snaps,
+		memcpy(local_rl->rl_phys->rlp_snaps, redact_snaps,
 		    sizeof (uint64_t) * num_redact_snaps);
 		local_rl->rl_phys->rlp_num_snaps = num_redact_snaps;
 		if (bookmark_redacted) {
@@ -536,7 +533,7 @@ dsl_bookmark_create_sync_impl_book(
 	 * Reasoning:
 	 * - The zbm_redaction_obj would be referred to by both source and new
 	 *   bookmark, but would be destroyed once either source or new is
-	 *   destroyed, resulting in use-after-free of the referrred object.
+	 *   destroyed, resulting in use-after-free of the referred object.
 	 * - User expectation when issuing the `zfs bookmark` command is that
 	 *   a normal bookmark of the source is created
 	 *
@@ -667,7 +664,8 @@ dsl_bookmark_create_redacted_sync(void *arg, dmu_tx_t *tx)
 
 int
 dsl_bookmark_create_redacted(const char *bookmark, const char *snapshot,
-    uint64_t numsnaps, uint64_t *snapguids, void *tag, redaction_list_t **rl)
+    uint64_t numsnaps, uint64_t *snapguids, const void *tag,
+    redaction_list_t **rl)
 {
 	dsl_bookmark_create_redacted_arg_t dbcra;
 
@@ -1191,19 +1189,19 @@ dsl_redaction_list_long_held(redaction_list_t *rl)
 }
 
 void
-dsl_redaction_list_long_hold(dsl_pool_t *dp, redaction_list_t *rl, void *tag)
+dsl_redaction_list_long_hold(dsl_pool_t *dp, redaction_list_t *rl,
+    const void *tag)
 {
 	ASSERT(dsl_pool_config_held(dp));
 	(void) zfs_refcount_add(&rl->rl_longholds, tag);
 }
 
 void
-dsl_redaction_list_long_rele(redaction_list_t *rl, void *tag)
+dsl_redaction_list_long_rele(redaction_list_t *rl, const void *tag)
 {
 	(void) zfs_refcount_remove(&rl->rl_longholds, tag);
 }
 
-/* ARGSUSED */
 static void
 redaction_list_evict_sync(void *rlu)
 {
@@ -1214,13 +1212,13 @@ redaction_list_evict_sync(void *rlu)
 }
 
 void
-dsl_redaction_list_rele(redaction_list_t *rl, void *tag)
+dsl_redaction_list_rele(redaction_list_t *rl, const void *tag)
 {
 	dmu_buf_rele(rl->rl_dbuf, tag);
 }
 
 int
-dsl_redaction_list_hold_obj(dsl_pool_t *dp, uint64_t rlobj, void *tag,
+dsl_redaction_list_hold_obj(dsl_pool_t *dp, uint64_t rlobj, const void *tag,
     redaction_list_t **rlp)
 {
 	objset_t *mos = dp->dp_meta_objset;
@@ -1295,7 +1293,7 @@ dsl_bookmark_ds_destroyed(dsl_dataset_t *ds, dmu_tx_t *tx)
 	 * The empty-string name can't be in the AVL, and it compares
 	 * before any entries with this TXG.
 	 */
-	search.dbn_name = "";
+	search.dbn_name = (char *)"";
 	VERIFY3P(avl_find(&head->ds_bookmarks, &search, &idx), ==, NULL);
 	dsl_bookmark_node_t *dbn =
 	    avl_nearest(&head->ds_bookmarks, idx, AVL_AFTER);
@@ -1422,7 +1420,7 @@ dsl_bookmark_next_changed(dsl_dataset_t *head, dsl_dataset_t *origin,
 	 * The empty-string name can't be in the AVL, and it compares
 	 * before any entries with this TXG.
 	 */
-	search.dbn_name = "";
+	search.dbn_name = (char *)"";
 	VERIFY3P(avl_find(&head->ds_bookmarks, &search, &idx), ==, NULL);
 	dsl_bookmark_node_t *dbn =
 	    avl_nearest(&head->ds_bookmarks, idx, AVL_AFTER);
@@ -1470,10 +1468,11 @@ dsl_bookmark_next_changed(dsl_dataset_t *head, dsl_dataset_t *origin,
  * Adjust the FBN of any bookmarks that reference this block, whose "next"
  * is the head dataset.
  */
-/* ARGSUSED */
 void
 dsl_bookmark_block_killed(dsl_dataset_t *ds, const blkptr_t *bp, dmu_tx_t *tx)
 {
+	(void) tx;
+
 	/*
 	 * Iterate over bookmarks whose "next" is the head dataset.
 	 */

@@ -1,14 +1,3 @@
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20180629,
- *   "target_type": "lib",
- *   "changes": [
- *     "virtual_address"
- *   ]
- * }
- * CHERI CHANGES END
- */
 #define JEMALLOC_RTREE_C_
 #include "jemalloc/internal/jemalloc_preamble.h"
 #include "jemalloc/internal/jemalloc_internal_includes.h"
@@ -164,12 +153,12 @@ rtree_leaf_init(tsdn_t *tsdn, rtree_t *rtree, atomic_p_t *elmp) {
 
 static bool
 rtree_node_valid(rtree_node_elm_t *node) {
-	return ((vaddr_t)node != (vaddr_t)0);
+	return ((uintptr_t)node != (uintptr_t)0);
 }
 
 static bool
 rtree_leaf_valid(rtree_leaf_elm_t *leaf) {
-	return ((vaddr_t)leaf != (vaddr_t)0);
+	return ((uintptr_t)leaf != (uintptr_t)0);
 }
 
 static rtree_node_elm_t *
@@ -232,7 +221,7 @@ rtree_child_leaf_read(tsdn_t *tsdn, rtree_t *rtree, rtree_node_elm_t *elm,
 
 rtree_leaf_elm_t *
 rtree_leaf_elm_lookup_hard(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
-    vaddr_t key, bool dependent, bool init_missing) {
+    uintptr_t key, bool dependent, bool init_missing) {
 	rtree_node_elm_t *node;
 	rtree_leaf_elm_t *leaf;
 #if RTREE_HEIGHT > 1
@@ -242,7 +231,7 @@ rtree_leaf_elm_lookup_hard(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
 #endif
 
 	if (config_debug) {
-		vaddr_t leafkey = rtree_leafkey(key);
+		uintptr_t leafkey = rtree_leafkey(key);
 		for (unsigned i = 0; i < RTREE_CTX_NCACHE; i++) {
 			assert(rtree_ctx->cache[i].leafkey != leafkey);
 		}
@@ -257,7 +246,7 @@ rtree_leaf_elm_lookup_hard(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
 		    unlikely(!rtree_node_valid(node))) {		\
 			return NULL;					\
 		}							\
-		vaddr_t subkey = rtree_subkey(key, level);		\
+		uintptr_t subkey = rtree_subkey(key, level);		\
 		if (level + 2 < RTREE_HEIGHT) {				\
 			node = init_missing ?				\
 			    rtree_child_node_read(tsdn, rtree,		\
@@ -293,10 +282,10 @@ rtree_leaf_elm_lookup_hard(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
 		    rtree_ctx->cache[slot].leafkey;			\
 		rtree_ctx->l2_cache[0].leaf =				\
 		    rtree_ctx->cache[slot].leaf;			\
-		vaddr_t leafkey = rtree_leafkey(key);			\
+		uintptr_t leafkey = rtree_leafkey(key);			\
 		rtree_ctx->cache[slot].leafkey = leafkey;		\
 		rtree_ctx->cache[slot].leaf = leaf;			\
-		vaddr_t subkey = rtree_subkey(key, level);		\
+		uintptr_t subkey = rtree_subkey(key, level);		\
 		return &leaf[subkey];					\
 	}
 	if (RTREE_HEIGHT > 1) {

@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/reg.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
@@ -52,8 +53,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/syscall.h>
 #include <sys/malloc.h>
 #include <sys/signalvar.h>
-
-#include <machine/reg.h>
+#include <sys/caprights.h>
+#include <sys/filedesc.h>
 
 #include <security/audit/audit.h>
 
@@ -69,6 +70,9 @@ __FBSDID("$FreeBSD$");
 #ifdef COMPAT_FREEBSD32
 #include <sys/procfs.h>
 #endif
+
+/* Assert it's safe to unlock a process, e.g. to allocate working memory */
+#define	PROC_ASSERT_TRACEREQ(p)	MPASS(((p)->p_flag2 & P2_PTRACEREQ) != 0)
 
 /*
  * Functions implemented using PROC_ACTION():
@@ -167,6 +171,125 @@ proc_write_capregs(struct thread *td, struct capreg *capregs)
 }
 #endif
 
+static struct regset *
+proc_find_regset(struct thread *td, int note)
+{
+	struct regset **regsetp, **regset_end, *regset;
+	struct sysentvec *sv;
+
+	sv = td->td_proc->p_sysent;
+	regsetp = sv->sv_regset_begin;
+	if (regsetp == NULL)
+		return (NULL);
+	regset_end = sv->sv_regset_end;
+	MPASS(regset_end != NULL);
+	for (; regsetp < regset_end; regsetp++) {
+		regset = *regsetp;
+		if (regset->note != note)
+			continue;
+
+		return (regset);
+	}
+
+	return (NULL);
+}
+
+static int
+proc_read_regset(struct thread *td, int note, struct iovec *iov)
+{
+	struct regset *regset;
+	struct proc *p;
+	void *buf;
+	size_t size;
+	int error;
+
+	regset = proc_find_regset(td, note);
+	if (regset == NULL)
+		return (EINVAL);
+
+	if (iov->iov_base == NULL) {
+		iov->iov_len = regset->size;
+		if (iov->iov_len == 0)
+			return (EINVAL);
+
+		return (0);
+	}
+
+	/* The length is wrong, return an error */
+	if (iov->iov_len != regset->size)
+		return (EINVAL);
+
+	if (regset->get == NULL)
+		return (EINVAL);
+
+	error = 0;
+	size = regset->size;
+	p = td->td_proc;
+
+	/* Drop the proc lock while allocating the temp buffer */
+	PROC_ASSERT_TRACEREQ(p);
+	PROC_UNLOCK(p);
+	buf = malloc(size, M_TEMP, M_WAITOK);
+	PROC_LOCK(p);
+
+	if (!regset->get(regset, td, buf, &size)) {
+		error = EINVAL;
+	} else {
+		KASSERT(size == regset->size,
+		    ("%s: Getter function changed the size", __func__));
+
+		iov->iov_len = size;
+		PROC_UNLOCK(p);
+		error = copyout(buf, iov->iov_base, size);
+		PROC_LOCK(p);
+	}
+
+	free(buf, M_TEMP);
+
+	return (error);
+}
+
+static int
+proc_write_regset(struct thread *td, int note, struct iovec *iov)
+{
+	struct regset *regset;
+	struct proc *p;
+	void *buf;
+	size_t size;
+	int error;
+
+	regset = proc_find_regset(td, note);
+	if (regset == NULL)
+		return (EINVAL);
+
+	/* The length is wrong, return an error */
+	if (iov->iov_len != regset->size)
+		return (EINVAL);
+
+	if (regset->set == NULL)
+		return (EINVAL);
+
+	size = regset->size;
+	p = td->td_proc;
+
+	/* Drop the proc lock while allocating the temp buffer */
+	PROC_ASSERT_TRACEREQ(p);
+	PROC_UNLOCK(p);
+	buf = malloc(size, M_TEMP, M_WAITOK);
+	error = copyin(iov->iov_base, buf, size);
+	PROC_LOCK(p);
+
+	if (error == 0) {
+		if (!regset->set(regset, td, buf, size)) {
+			error = EINVAL;
+		}
+	}
+
+	free(buf, M_TEMP);
+
+	return (error);
+}
+
 #ifdef COMPAT_FREEBSD32
 /* For 32 bit binaries, we need to expose the 32 bit regs layouts. */
 int
@@ -242,11 +365,10 @@ proc_rwmem(struct proc *p, struct uio *uio)
 	int error, fault_flags, page_offset, writing;
 
 	/*
-	 * Assert that someone has locked this vmspace.  (Should be
-	 * curthread but we can't assert that.)  This keeps the process
-	 * from exiting out from under us until this operation completes.
+	 * Make sure that the process' vmspace remains live.
 	 */
-	PROC_ASSERT_HELD(p);
+	if (p != curproc)
+		PROC_ASSERT_HELD(p);
 	PROC_LOCK_ASSERT(p, MA_NOTOWNED);
 
 	/*
@@ -513,18 +635,24 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		struct ptrace_io_desc piod;
 		struct ptrace_lwpinfo pl;
 		struct ptrace_vm_entry pve;
+		struct ptrace_coredump pc;
 #if __has_feature(capabilities)
 		struct capreg capreg;
 #endif
 		struct dbreg dbreg;
 		struct fpreg fpreg;
 		struct reg reg;
+		struct iovec vec;
 		syscallarg_t args[nitems(td->td_sa.args)];
 		struct ptrace_sc_ret psr;
 		int ptevents;
 	} r;
 	void * __capability addr;
-	int error = 0;
+	int error;
+
+	if (!allow_ptrace)
+		return (ENOSYS);
+	error = 0;
 
 	AUDIT_ARG_PID(uap->pid);
 	AUDIT_ARG_CMD(uap->req);
@@ -549,6 +677,10 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 #endif
 	case PT_GETDBREGS:
 		bzero(&r.dbreg, sizeof(r.dbreg));
+		break;
+	case PT_GETREGSET:
+	case PT_SETREGSET:
+		error = copyincap(uap->addr, &r.vec, sizeof(r.vec));
 		break;
 	case PT_SETREGS:
 		error = copyin(uap->addr, &r.reg, sizeof(r.reg));
@@ -575,6 +707,12 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		break;
 	case PT_VM_ENTRY:
 		error = copyincap(uap->addr, &r.pve, sizeof(r.pve));
+		break;
+	case PT_COREDUMP:
+		if (uap->data != sizeof(r.pc))
+			error = EINVAL;
+		else
+			error = copyin(uap->addr, &r.pc, uap->data);
 		break;
 	default:
 		addr = uap->addr;
@@ -619,6 +757,11 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		error = copyout(&r.capreg, uap->addr, sizeof(r.capreg));
 		break;
 #endif
+	case PT_GETREGSET:
+		error = suword(
+		    &((struct iovec * __capability)uap->addr)->iov_len,
+		    r.vec.iov_len);
+		break;
 	case PT_GET_EVENT_MASK:
 		/* NB: The size in uap->data is validated in kern_ptrace(). */
 		error = copyout(&r.ptevents, uap->addr, uap->data);
@@ -674,6 +817,66 @@ proc_set_traced(struct proc *p, bool stop)
 	p->p_ptevents = PTRACE_DEFAULT;
 }
 
+void
+ptrace_unsuspend(struct proc *p)
+{
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	PROC_SLOCK(p);
+	p->p_flag &= ~(P_STOPPED_TRACE | P_STOPPED_SIG | P_WAITED);
+	thread_unsuspend(p);
+	PROC_SUNLOCK(p);
+	itimer_proc_continue(p);
+	kqtimer_proc_continue(p);
+}
+
+static int
+proc_can_ptrace(struct thread *td, struct proc *p)
+{
+	int error;
+
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	if ((p->p_flag & P_WEXIT) != 0)
+		return (ESRCH);
+
+	if ((error = p_cansee(td, p)) != 0)
+		return (error);
+	if ((error = p_candebug(td, p)) != 0)
+		return (error);
+
+	/* not being traced... */
+	if ((p->p_flag & P_TRACED) == 0)
+		return (EPERM);
+
+	/* not being traced by YOU */
+	if (p->p_pptr != td->td_proc)
+		return (EBUSY);
+
+	/* not currently stopped */
+	if ((p->p_flag & P_STOPPED_TRACE) == 0 ||
+	    p->p_suspcount != p->p_numthreads  ||
+	    (p->p_flag & P_WAITED) == 0)
+		return (EBUSY);
+
+	return (0);
+}
+
+static struct thread *
+ptrace_sel_coredump_thread(struct proc *p)
+{
+	struct thread *td2;
+
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	MPASS((p->p_flag & P_STOPPED_TRACE) != 0);
+
+	FOREACH_THREAD_IN_PROC(p, td2) {
+		if ((td2->td_dbgflags & TDB_SSWITCH) != 0)
+			return (td2);
+	}
+	return (NULL);
+}
+
 int
 kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int data)
 {
@@ -684,14 +887,19 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	struct ptrace_io_desc *piod = NULL;
 	struct ptrace_lwpinfo *pl;
 	struct ptrace_sc_ret *psr;
+	struct file *fp;
+	struct ptrace_coredump *pc;
+	struct thr_coredump_req *tcq;
 	int error, num, tmp;
-	int proctree_locked = 0;
 	lwpid_t tid = 0, *buf;
 #ifdef COMPAT_FREEBSD32
 	int wrap32 = 0, safe = 0;
 #endif
+	bool proctree_locked, p2_req_set;
 
 	curp = td->td_proc;
+	proctree_locked = false;
+	p2_req_set = false;
 
 	/* Lock proctree before locking the process. */
 	switch (req) {
@@ -709,7 +917,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	case PT_DETACH:
 	case PT_GET_SC_ARGS:
 		sx_xlock(&proctree_lock);
-		proctree_locked = 1;
+		proctree_locked = true;
 		break;
 	default:
 		break;
@@ -830,31 +1038,47 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 
 		/* FALLTHROUGH */
 	default:
-		/* not being traced... */
-		if ((p->p_flag & P_TRACED) == 0) {
-			error = EPERM;
+		/*
+		 * Check for ptrace eligibility before waiting for
+		 * holds to drain.
+		 */
+		error = proc_can_ptrace(td, p);
+		if (error != 0)
 			goto fail;
+
+		/*
+		 * Block parallel ptrace requests.  Most important, do
+		 * not allow other thread in debugger to continue the
+		 * debuggee until coredump finished.
+		 */
+		while ((p->p_flag2 & P2_PTRACEREQ) != 0) {
+			if (proctree_locked)
+				sx_xunlock(&proctree_lock);
+			error = msleep(&p->p_flag2, &p->p_mtx, PPAUSE | PCATCH |
+			    (proctree_locked ? PDROP : 0), "pptrace", 0);
+			if (proctree_locked) {
+				sx_xlock(&proctree_lock);
+				PROC_LOCK(p);
+			}
+			if (error == 0 && td2->td_proc != p)
+				error = ESRCH;
+			if (error == 0)
+				error = proc_can_ptrace(td, p);
+			if (error != 0)
+				goto fail;
 		}
 
-		/* not being traced by YOU */
-		if (p->p_pptr != td->td_proc) {
-			error = EBUSY;
-			goto fail;
-		}
-
-		/* not currently stopped */
-		if ((p->p_flag & P_STOPPED_TRACE) == 0 ||
-		    p->p_suspcount != p->p_numthreads  ||
-		    (p->p_flag & P_WAITED) == 0) {
-			error = EBUSY;
-			goto fail;
-		}
-
-		/* OK */
+		/* Ok */
 		break;
 	}
 
-	/* Keep this process around until we finish this request. */
+	/*
+	 * Keep this process around and request parallel ptrace()
+	 * request to wait until we finish this request.
+	 */
+	MPASS((p->p_flag2 & P2_PTRACEREQ) == 0);
+	p->p_flag2 |= P2_PTRACEREQ;
+	p2_req_set = true;
 	_PHOLD(p);
 
 	/*
@@ -889,7 +1113,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		    p->p_oppid);
 
 		sx_xunlock(&proctree_lock);
-		proctree_locked = 0;
+		proctree_locked = false;
 		MPASS(p->p_xthread == NULL);
 		MPASS((p->p_flag & P_STOPPED_TRACE) == 0);
 
@@ -991,7 +1215,10 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			break;
 		}
 		bzero((__cheri_fromcap void *)addr, sizeof(td2->td_sa.args));
+		/* See the explanation in linux_ptrace_get_syscall_info(). */
 		bcopy(td2->td_sa.args, (__cheri_fromcap void *)addr,
+		    SV_PROC_ABI(td->td_proc) == SV_ABI_LINUX ?
+		    sizeof(td2->td_sa.args) :
 		    td2->td_sa.callp->sy_narg * sizeof(syscallarg_t));
 		break;
 
@@ -1123,10 +1350,10 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		}
 
 		sx_xunlock(&proctree_lock);
-		proctree_locked = 0;
+		proctree_locked = false;
 
 	sendsig:
-		MPASS(proctree_locked == 0);
+		MPASS(!proctree_locked);
 
 		/*
 		 * Clear the pending event for the thread that just
@@ -1157,12 +1384,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		 * suspended, use PT_SUSPEND to suspend it before
 		 * continuing the process.
 		 */
-		PROC_SLOCK(p);
-		p->p_flag &= ~(P_STOPPED_TRACE | P_STOPPED_SIG | P_WAITED);
-		thread_unsuspend(p);
-		PROC_SUNLOCK(p);
-		itimer_proc_continue(p);
-		kqtimer_proc_continue(p);
+		ptrace_unsuspend(p);
 		break;
 
 	case PT_WRITE_I:
@@ -1285,6 +1507,20 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		break;
 #endif
 
+	case PT_SETREGSET:
+		CTR2(KTR_PTRACE, "PT_SETREGSET: tid %d (pid %d)", td2->td_tid,
+		    p->p_pid);
+		error = proc_write_regset(td2, data,
+		    (__cheri_fromcap void *)addr);
+		break;
+
+	case PT_GETREGSET:
+		CTR2(KTR_PTRACE, "PT_GETREGSET: tid %d (pid %d)", td2->td_tid,
+		    p->p_pid);
+		error = proc_read_regset(td2, data,
+		    (__cheri_fromcap void *)addr);
+		break;
+
 	case PT_LWPINFO:
 		if (data <= 0 || data > sizeof(*pl)) {
 			error = EINVAL;
@@ -1384,6 +1620,62 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		PROC_LOCK(p);
 		break;
 
+	case PT_COREDUMP:
+		pc = (__cheri_fromcap void *)addr;
+		CTR2(KTR_PTRACE, "PT_COREDUMP: pid %d, fd %d",
+		    p->p_pid, pc->pc_fd);
+
+		if ((pc->pc_flags & ~(PC_COMPRESS | PC_ALL)) != 0) {
+			error = EINVAL;
+			break;
+		}
+		PROC_UNLOCK(p);
+
+		tcq = malloc(sizeof(*tcq), M_TEMP, M_WAITOK | M_ZERO);
+		fp = NULL;
+		error = fget_write(td, pc->pc_fd, &cap_write_rights, &fp);
+		if (error != 0)
+			goto coredump_cleanup_nofp;
+		if (fp->f_type != DTYPE_VNODE || fp->f_vnode->v_type != VREG) {
+			error = EPIPE;
+			goto coredump_cleanup;
+		}
+
+		PROC_LOCK(p);
+		error = proc_can_ptrace(td, p);
+		if (error != 0)
+			goto coredump_cleanup_locked;
+
+		td2 = ptrace_sel_coredump_thread(p);
+		if (td2 == NULL) {
+			error = EBUSY;
+			goto coredump_cleanup_locked;
+		}
+		KASSERT((td2->td_dbgflags & TDB_COREDUMPRQ) == 0,
+		    ("proc %d tid %d req coredump", p->p_pid, td2->td_tid));
+
+		tcq->tc_vp = fp->f_vnode;
+		tcq->tc_limit = pc->pc_limit == 0 ? OFF_MAX : pc->pc_limit;
+		tcq->tc_flags = SVC_PT_COREDUMP;
+		if ((pc->pc_flags & PC_COMPRESS) == 0)
+			tcq->tc_flags |= SVC_NOCOMPRESS;
+		if ((pc->pc_flags & PC_ALL) != 0)
+			tcq->tc_flags |= SVC_ALL;
+		td2->td_coredump = tcq;
+		td2->td_dbgflags |= TDB_COREDUMPRQ;
+		thread_run_flash(td2);
+		while ((td2->td_dbgflags & TDB_COREDUMPRQ) != 0)
+			msleep(p, &p->p_mtx, PPAUSE, "crdmp", 0);
+		error = tcq->tc_error;
+coredump_cleanup_locked:
+		PROC_UNLOCK(p);
+coredump_cleanup:
+		fdrop(fp, td);
+coredump_cleanup_nofp:
+		free(tcq, M_TEMP);
+		PROC_LOCK(p);
+		break;
+
 	default:
 #ifdef __HAVE_PTRACE_MACHDEP
 		if (req >= PT_FIRSTMACH) {
@@ -1397,11 +1689,15 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			error = EINVAL;
 		break;
 	}
-
 out:
 	/* Drop our hold on this process now that the request has completed. */
 	_PRELE(p);
 fail:
+	if (p2_req_set) {
+		if ((p->p_flag2 & P2_PTRACEREQ) != 0)
+			wakeup(&p->p_flag2);
+		p->p_flag2 &= ~P2_PTRACEREQ;
+	}
 	PROC_UNLOCK(p);
 	if (proctree_locked)
 		sx_xunlock(&proctree_lock);

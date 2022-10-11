@@ -366,10 +366,6 @@ pl330_attach(device_t dev)
 static int
 pl330_detach(device_t dev)
 {
-	struct pl330_softc *sc;
-
-	sc = device_get_softc(dev);
-
 	return (0);
 }
 
@@ -408,9 +404,6 @@ static int
 pl330_channel_free(device_t dev, struct xdma_channel *xchan)
 {
 	struct pl330_channel *chan;
-	struct pl330_softc *sc;
-
-	sc = device_get_softc(dev);
 
 	chan = (struct pl330_channel *)xchan->chan;
 	chan->used = 0;
@@ -576,9 +569,6 @@ static int
 pl330_channel_prep_sg(device_t dev, struct xdma_channel *xchan)
 {
 	struct pl330_channel *chan;
-	struct pl330_softc *sc;
-
-	sc = device_get_softc(dev);
 
 	dprintf("%s(%d)\n", __func__, device_get_unit(dev));
 
@@ -591,13 +581,6 @@ pl330_channel_prep_sg(device_t dev, struct xdma_channel *xchan)
 static int
 pl330_channel_control(device_t dev, xdma_channel_t *xchan, int cmd)
 {
-	struct pl330_channel *chan;
-	struct pl330_softc *sc;
-
-	sc = device_get_softc(dev);
-
-	chan = (struct pl330_channel *)xchan->chan;
-
 	switch (cmd) {
 	case XDMA_CMD_BEGIN:
 	case XDMA_CMD_TERMINATE:
@@ -657,9 +640,7 @@ static driver_t pl330_driver = {
 	sizeof(struct pl330_softc),
 };
 
-static devclass_t pl330_devclass;
-
-EARLY_DRIVER_MODULE(pl330, simplebus, pl330_driver, pl330_devclass, 0, 0,
+EARLY_DRIVER_MODULE(pl330, simplebus, pl330_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
 // CHERI CHANGES START
 // {

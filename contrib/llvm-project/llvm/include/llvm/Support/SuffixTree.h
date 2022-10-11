@@ -109,7 +109,7 @@ struct SuffixTreeNode {
   SuffixTreeNode(unsigned StartIdx, unsigned *EndIdx, SuffixTreeNode *Link)
       : StartIdx(StartIdx), EndIdx(EndIdx), Link(Link) {}
 
-  SuffixTreeNode() {}
+  SuffixTreeNode() = default;
 };
 
 /// A data structure for fast substring queries.
@@ -322,10 +322,10 @@ public:
       return It;
     }
 
-    bool operator==(const RepeatedSubstringIterator &Other) {
+    bool operator==(const RepeatedSubstringIterator &Other) const {
       return N == Other.N;
     }
-    bool operator!=(const RepeatedSubstringIterator &Other) {
+    bool operator!=(const RepeatedSubstringIterator &Other) const {
       return !(*this == Other);
     }
 

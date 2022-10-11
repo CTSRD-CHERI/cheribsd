@@ -95,9 +95,7 @@ ffs_inode_bwrite(struct vnode *vp, struct buf *bp, int flags)
  * for the write to complete.
  */
 int
-ffs_update(vp, waitfor)
-	struct vnode *vp;
-	int waitfor;
+ffs_update(struct vnode *vp, int waitfor)
 {
 	struct fs *fs;
 	struct buf *bp;
@@ -132,7 +130,7 @@ ffs_update(vp, waitfor)
 	if (waitfor)
 		ip->i_flag &= ~(IN_SIZEMOD | IN_IBLKDATA);
 	fs = ITOFS(ip);
-	if (fs->fs_ronly && ITOUMP(ip)->um_fsckpid == 0)
+	if (fs->fs_ronly)
 		return (0);
 	/*
 	 * If we are updating a snapshot and another process is currently
@@ -145,17 +143,22 @@ ffs_update(vp, waitfor)
 	 * snapshot vnode to prevent it from being removed while we are
 	 * waiting for the buffer.
 	 */
+loop:
 	flags = 0;
 	if (IS_SNAPSHOT(ip))
 		flags = GB_LOCK_NOWAIT;
-loop:
 	bn = fsbtodb(fs, ino_to_fsba(fs, ip->i_number));
 	error = ffs_breadz(VFSTOUFS(vp->v_mount), ITODEVVP(ip), bn, bn,
 	     (int) fs->fs_bsize, NULL, NULL, 0, NOCRED, flags, NULL, &bp);
 	if (error != 0) {
-		if (error != EBUSY)
+		/*
+		 * If EBUSY was returned without GB_LOCK_NOWAIT (which
+		 * requests trylock for buffer lock), it is for some
+		 * other reason and we should not handle it specially.
+		 */
+		if (error != EBUSY || (flags & GB_LOCK_NOWAIT) == 0)
 			return (error);
-		KASSERT((IS_SNAPSHOT(ip)), ("EBUSY from non-snapshot"));
+
 		/*
 		 * Wait for our inode block to become available.
 		 *
@@ -174,8 +177,13 @@ loop:
 		pause("ffsupd", 1);
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		vrele(vp);
-		if (VN_IS_DOOMED(vp))
+		if (!IS_UFS(vp))
 			return (ENOENT);
+
+		/*
+		 * Recalculate flags, because the vnode was relocked and
+		 * could no longer be a snapshot.
+		 */
 		goto loop;
 	}
 	if (DOINGSOFTDEP(vp))
@@ -224,18 +232,17 @@ loop:
  * disk blocks.
  */
 int
-ffs_truncate(vp, length, flags, cred)
-	struct vnode *vp;
-	off_t length;
-	int flags;
-	struct ucred *cred;
+ffs_truncate(struct vnode *vp,
+	off_t length,
+	int flags,
+	struct ucred *cred)
 {
 	struct inode *ip;
 	ufs2_daddr_t bn, lbn, lastblock, lastiblock[UFS_NIADDR];
 	ufs2_daddr_t indir_lbn[UFS_NIADDR], oldblks[UFS_NDADDR + UFS_NIADDR];
 	ufs2_daddr_t newblks[UFS_NDADDR + UFS_NIADDR];
-	ufs2_daddr_t count, blocksreleased = 0, datablocks, blkno;
-	struct bufobj *bo;
+	ufs2_daddr_t count, blocksreleased = 0, blkno;
+	struct bufobj *bo __diagused;
 	struct fs *fs;
 	struct buf *bp;
 	struct ufsmount *ump;
@@ -287,10 +294,8 @@ ffs_truncate(vp, length, flags, cred)
 	if (journaltrunc == 0 && DOINGSOFTDEP(vp) && length == 0)
 		softdeptrunc = !softdep_slowdown(vp);
 	extblocks = 0;
-	datablocks = DIP(ip, i_blocks);
 	if (fs->fs_magic == FS_UFS2_MAGIC && ip->i_din2->di_extsize > 0) {
 		extblocks = btodb(fragroundup(fs, ip->i_din2->di_extsize));
-		datablocks -= extblocks;
 	}
 	if ((flags & IO_EXT) && extblocks > 0) {
 		if (length != 0)
@@ -329,14 +334,12 @@ ffs_truncate(vp, length, flags, cred)
 	}
 	if ((flags & IO_NORMAL) == 0)
 		return (0);
-	if (vp->v_type == VLNK &&
-	    (ip->i_size < vp->v_mount->mnt_maxsymlinklen ||
-	     datablocks == 0)) {
+	if (vp->v_type == VLNK && ip->i_size < ump->um_maxsymlinklen) {
 #ifdef INVARIANTS
 		if (length != 0)
 			panic("ffs_truncate: partial truncate of symlink");
 #endif
-		bzero(SHORTLINK(ip), (u_int)ip->i_size);
+		bzero(DIP(ip, i_shortlink), (u_int)ip->i_size);
 		ip->i_size = 0;
 		DIP_SET(ip, i_size, 0);
 		UFS_INODE_SET_FLAG(ip, IN_SIZEMOD | IN_CHANGE | IN_UPDATE);
@@ -689,12 +692,12 @@ extclean:
  * blocks.
  */
 static int
-ffs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
-	struct inode *ip;
-	ufs2_daddr_t lbn, lastbn;
-	ufs2_daddr_t dbn;
-	int level;
-	ufs2_daddr_t *countp;
+ffs_indirtrunc(struct inode *ip,
+	ufs2_daddr_t lbn,
+	ufs2_daddr_t dbn,
+	ufs2_daddr_t lastbn,
+	int level,
+	ufs2_daddr_t *countp)
 {
 	struct buf *bp;
 	struct fs *fs;

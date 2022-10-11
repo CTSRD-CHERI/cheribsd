@@ -62,8 +62,6 @@ __FBSDID("$FreeBSD$");
 
 #include <isa/isavar.h>
 
-static devclass_t	sc_devclass;
-
 static sc_softc_t	main_softc;
 
 static void
@@ -97,7 +95,7 @@ int
 sc_max_unit(void)
 {
 
-	return (devclass_get_maxunit(sc_devclass));
+	return (devclass_get_maxunit(devclass_find("sc")));
 }
 
 sc_softc_t
@@ -111,7 +109,8 @@ sc_softc_t
 		/* FIXME: clear if it is wired to another unit! */
 		sc = &main_softc;
 	} else {
-	        sc = device_get_softc(devclass_get_device(sc_devclass, unit));
+	        sc = device_get_softc(devclass_get_device(devclass_find("sc"),
+		    unit));
 		if (sc == NULL)
 			return (NULL);
 	}
@@ -127,6 +126,7 @@ sc_softc_t
 sc_softc_t
 *sc_find_softc(struct video_adapter *adp, struct keyboard *kbd)
 {
+	devclass_t dc;
 	sc_softc_t *sc;
 	int i;
 	int units;
@@ -135,9 +135,10 @@ sc_softc_t
 	if ((adp == NULL || adp == sc->adp) &&
 	    (kbd == NULL || kbd == sc->kbd))
 		return (sc);
-	units = devclass_get_maxunit(sc_devclass);
+	dc = devclass_find("sc");
+	units = devclass_get_maxunit(dc);
 	for (i = 0; i < units; ++i) {
-	        sc = device_get_softc(devclass_get_device(sc_devclass, i));
+	        sc = device_get_softc(devclass_get_device(dc, i));
 		if (sc == NULL)
 			continue;
 		if ((adp == NULL || adp == sc->adp) &&
@@ -227,4 +228,4 @@ static driver_t sc_driver = {
 	sizeof(sc_softc_t),
 };
 
-DRIVER_MODULE(sc, isa, sc_driver, sc_devclass, 0, 0);
+DRIVER_MODULE(sc, isa, sc_driver, 0, 0);

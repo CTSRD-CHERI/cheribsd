@@ -208,6 +208,9 @@ static MALLOC_DEFINE(M_VNET_DATA_FREE, "vnet_data_free",
 static TAILQ_HEAD(, vnet_data_free) vnet_data_free_head =
 	    TAILQ_HEAD_INITIALIZER(vnet_data_free_head);
 static struct sx vnet_data_free_lock;
+#ifdef __CHERI_PURE_CAPABILITY__
+uintptr_t vnet_start = VNET_START;
+#endif
 
 SDT_PROVIDER_DEFINE(vnet);
 SDT_PROBE_DEFINE1(vnet, functions, vnet_alloc, entry, "int");
@@ -770,7 +773,7 @@ db_show_vnet_print_vs(struct vnet_sysinit *vs, int ddb)
 #undef xprint
 }
 
-DB_SHOW_COMMAND(vnet_sysinit, db_show_vnet_sysinit)
+DB_SHOW_COMMAND_FLAGS(vnet_sysinit, db_show_vnet_sysinit, DB_CMD_MEMSAFE)
 {
 	struct vnet_sysinit *vs;
 
@@ -784,7 +787,7 @@ DB_SHOW_COMMAND(vnet_sysinit, db_show_vnet_sysinit)
 	}
 }
 
-DB_SHOW_COMMAND(vnet_sysuninit, db_show_vnet_sysuninit)
+DB_SHOW_COMMAND_FLAGS(vnet_sysuninit, db_show_vnet_sysuninit, DB_CMD_MEMSAFE)
 {
 	struct vnet_sysinit *vs;
 
@@ -800,7 +803,7 @@ DB_SHOW_COMMAND(vnet_sysuninit, db_show_vnet_sysuninit)
 }
 
 #ifdef VNET_DEBUG
-DB_SHOW_COMMAND(vnetrcrs, db_show_vnetrcrs)
+DB_SHOW_COMMAND_FLAGS(vnetrcrs, db_show_vnetrcrs, DB_CMD_MEMSAFE)
 {
 	struct vnet_recursion *vnr;
 

@@ -54,11 +54,7 @@ ProgramState::ProgramState(ProgramStateManager *mgr, const Environment& env,
 }
 
 ProgramState::ProgramState(const ProgramState &RHS)
-    : llvm::FoldingSetNode(),
-      stateMgr(RHS.stateMgr),
-      Env(RHS.Env),
-      store(RHS.store),
-      GDM(RHS.GDM),
+    : stateMgr(RHS.stateMgr), Env(RHS.Env), store(RHS.store), GDM(RHS.GDM),
       refCount(0) {
   stateMgr->getStoreManager().incrementReferenceCount(store);
 }
@@ -580,9 +576,6 @@ bool ScanReachableSymbols::scan(SVal val) {
     return scan(X->getLoc());
 
   if (SymbolRef Sym = val.getAsSymbol())
-    return scan(Sym);
-
-  if (const SymExpr *Sym = val.getAsSymbolicExpression())
     return scan(Sym);
 
   if (Optional<nonloc::CompoundVal> X = val.getAs<nonloc::CompoundVal>())

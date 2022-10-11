@@ -31,7 +31,7 @@ EDK2INC=${SRCTOP}/sys/contrib/edk2/Include
 
 .PATH:	${EFIBOOT}/libefi
 
-PACKAGE=lib${LIB}
+PACKAGE=	efi-tools
 LIB=		efivar
 SRCS=		efivar.c efichar.c efivar-dp-format.c \
 		efivar-dp-parse.c \
@@ -45,7 +45,7 @@ CFLAGS+=	-I${EFIBOOT}/include
 CFLAGS+=	-I${.CURDIR} -I${EDK2INC}
 CFLAGS+=	-fno-strict-aliasing
 
-MLINKS+=efivar.3 efi_set_variables_supported.3 \
+MLINKS+=efivar.3 efi_variables_supported.3 \
 	efivar.3 efi_del_variable.3 \
 	efivar.3 efi_get_variable.3 \
 	efivar.3 efi_get_variable_attributes.3 \
@@ -67,6 +67,6 @@ WARNS?=		9
 CWARNFLAGS+=	-Wno-cast-align
 CWARNFLAGS+=	-Wno-unused-parameter
 
-.if ${COMPILER_TYPE} == "clang" && ${COMPILER_FEATURES:MWunused-but-set-variable}
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 130000
 CWARNFLAGS+=	-Wno-unused-but-set-variable
 .endif

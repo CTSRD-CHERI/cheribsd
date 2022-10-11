@@ -64,8 +64,6 @@ static int idad_detach(device_t dev);
 static	d_strategy_t	idad_strategy;
 static	dumper_t	idad_dump;
 
-static devclass_t	idad_devclass;
-
 static device_method_t idad_methods[] = {
 	DEVMETHOD(device_probe,		idad_probe),
 	DEVMETHOD(device_attach,	idad_attach),
@@ -79,7 +77,7 @@ static driver_t idad_driver = {
 	sizeof(struct idad_softc)
 };
 
-DRIVER_MODULE(idad, ida, idad_driver, idad_devclass, 0, 0);
+DRIVER_MODULE(idad, ida, idad_driver, 0, 0);
 
 /*
  * Read/write routine for a buffer.  Finds the proper unit, range checks
@@ -127,7 +125,7 @@ bad:
 }
 
 static int
-idad_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t length)
+idad_dump(void *arg, void *virtual, off_t offset, size_t length)
 {
 
 	struct idad_softc *drv;
@@ -152,9 +150,6 @@ idad_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t l
 void
 idad_intr(struct bio *bp)
 {
-	struct idad_softc *drv;
-
-	drv = bp->bio_disk->d_drv1;
 
 	if (bp->bio_flags & BIO_ERROR)
 		bp->bio_error = EIO;

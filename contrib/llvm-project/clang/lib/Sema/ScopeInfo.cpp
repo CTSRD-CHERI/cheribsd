@@ -29,6 +29,7 @@ void FunctionScopeInfo::Clear() {
   HasDroppedStmt = false;
   HasOMPDeclareReductionCombiner = false;
   HasFallthroughStmt = false;
+  UsesFPIntrin = false;
   HasPotentialAvailabilityViolations = false;
   ObjCShouldCallSuper = false;
   ObjCIsDesignatedInit = false;
@@ -36,7 +37,7 @@ void FunctionScopeInfo::Clear() {
   ObjCIsSecondaryInit = false;
   ObjCWarnForNoInitDelegation = false;
   FirstReturnLoc = SourceLocation();
-  FirstCXXTryLoc = SourceLocation();
+  FirstCXXOrObjCTryLoc = SourceLocation();
   FirstSEHTryLoc = SourceLocation();
 
   // Coroutine state

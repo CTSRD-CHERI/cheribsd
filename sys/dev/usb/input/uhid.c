@@ -218,6 +218,12 @@ uhid_intr_read_callback(struct usb_xfer *xfer, usb_error_t error)
 				actlen = sc->sc_isize;
 			usb_fifo_put_data(sc->sc_fifo.fp[USB_FIFO_RX], pc,
 			    0, actlen, 1);
+
+			/*
+			 * Do not do read-ahead, because this may lead
+			 * to data loss!
+			 */
+			return;
 		} else {
 			/* ignore it */
 			DPRINTF("ignored transfer, %d bytes\n", actlen);
@@ -550,13 +556,47 @@ uhid_ioctl(struct usb_fifo *fifo, u_long cmd, void *addr,
 {
 	struct uhid_softc *sc = usb_fifo_softc(fifo);
 	struct usb_gen_descriptor *ugd;
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
+	struct usb_gen_descriptor local_ugd;
+#endif
+#ifdef COMPAT_FREEBSD32
+	struct usb_gen_descriptor32 *ugd32 = NULL;
+#endif
+#ifdef COMPAT_FREEBSD64
+	struct usb_gen_descriptor64 *ugd64 = NULL;
+#endif
 	uint32_t size;
 	int error = 0;
 	uint8_t id;
 
+	ugd = addr;
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
+	switch (cmd) {
+#ifdef COMPAT_FREEBSD32
+	case USB_GET_REPORT_DESC32:
+	case USB_GET_REPORT32:
+	case USB_SET_REPORT32:
+		ugd32 = addr;
+		ugd = &local_ugd;
+		usb_gen_descriptor_from32(ugd, ugd32);
+		cmd = _IOC_NEWTYPE(cmd, struct usb_gen_descriptor);
+		break;
+#endif
+#ifdef COMPAT_FREEBSD64
+	case USB_GET_REPORT_DESC64:
+	case USB_GET_REPORT64:
+	case USB_SET_REPORT64:
+		ugd64 = addr;
+		ugd = &local_ugd;
+		usb_gen_descriptor_from64(ugd, ugd64);
+		cmd = _IOC_NEWTYPE(cmd, struct usb_gen_descriptor);
+		break;
+#endif
+	}
+#endif
+
 	switch (cmd) {
 	case USB_GET_REPORT_DESC:
-		ugd = addr;
 		if (sc->sc_repdesc_size > ugd->ugd_maxlen) {
 			size = ugd->ugd_maxlen;
 		} else {
@@ -596,7 +636,6 @@ uhid_ioctl(struct usb_fifo *fifo, u_long cmd, void *addr,
 			error = EPERM;
 			break;
 		}
-		ugd = addr;
 		switch (ugd->ugd_report_type) {
 		case UHID_INPUT_REPORT:
 			size = sc->sc_isize;
@@ -624,7 +663,6 @@ uhid_ioctl(struct usb_fifo *fifo, u_long cmd, void *addr,
 			error = EPERM;
 			break;
 		}
-		ugd = addr;
 		switch (ugd->ugd_report_type) {
 		case UHID_INPUT_REPORT:
 			size = sc->sc_isize;
@@ -655,6 +693,14 @@ uhid_ioctl(struct usb_fifo *fifo, u_long cmd, void *addr,
 		error = ENOIOCTL;
 		break;
 	}
+#ifdef COMPAT_FREEBSD32
+	if (ugd32 != NULL)
+		update_usb_gen_descriptor32(ugd32, ugd);
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (ugd64 != NULL)
+		update_usb_gen_descriptor64(ugd64, ugd);
+#endif
 	return (error);
 }
 
@@ -893,10 +939,6 @@ uhid_detach(device_t dev)
 	return (0);
 }
 
-#ifndef HIDRAW_MAKE_UHID_ALIAS
-static devclass_t uhid_devclass;
-#endif
-
 static device_method_t uhid_methods[] = {
 	DEVMETHOD(device_probe, uhid_probe),
 	DEVMETHOD(device_attach, uhid_attach),
@@ -915,11 +957,7 @@ static driver_t uhid_driver = {
 	.size = sizeof(struct uhid_softc),
 };
 
-#ifdef HIDRAW_MAKE_UHID_ALIAS
-DRIVER_MODULE(uhid, uhub, uhid_driver, hidraw_devclass, NULL, 0);
-#else
-DRIVER_MODULE(uhid, uhub, uhid_driver, uhid_devclass, NULL, 0);
-#endif
+DRIVER_MODULE(uhid, uhub, uhid_driver, NULL, NULL);
 MODULE_DEPEND(uhid, usb, 1, 1, 1);
 MODULE_DEPEND(uhid, hid, 1, 1, 1);
 MODULE_VERSION(uhid, 1);

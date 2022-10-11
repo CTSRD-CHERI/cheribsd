@@ -117,7 +117,7 @@ freq_triggered(uint32_t frequency)
 	 */
 	uint32_t maximum = (frequency <= 100) ? 100 : ZI_PERCENTAGE_MAX;
 
-	return (spa_get_random(maximum) < frequency);
+	return (random_in_range(maximum) < frequency);
 }
 
 /*
@@ -148,7 +148,8 @@ zio_match_handler(const zbookmark_phys_t *zb, uint64_t type, int dva,
 	    zb->zb_level == record->zi_level &&
 	    zb->zb_blkid >= record->zi_start &&
 	    zb->zb_blkid <= record->zi_end &&
-	    (record->zi_dvas == 0 || (record->zi_dvas & (1ULL << dva))) &&
+	    (record->zi_dvas == 0 ||
+	    (dva != ZI_NO_DVA && (record->zi_dvas & (1ULL << dva)))) &&
 	    error == record->zi_error) {
 		return (freq_triggered(record->zi_freq));
 	}
@@ -161,7 +162,7 @@ zio_match_handler(const zbookmark_phys_t *zb, uint64_t type, int dva,
  * specified by tag.
  */
 void
-zio_handle_panic_injection(spa_t *spa, char *tag, uint64_t type)
+zio_handle_panic_injection(spa_t *spa, const char *tag, uint64_t type)
 {
 	inject_handler_t *handler;
 
@@ -341,18 +342,17 @@ zio_handle_label_injection(zio_t *zio, int error)
 	return (ret);
 }
 
-/*ARGSUSED*/
 static int
 zio_inject_bitflip_cb(void *data, size_t len, void *private)
 {
-	zio_t *zio __maybe_unused = private;
+	zio_t *zio = private;
 	uint8_t *buffer = data;
-	uint_t byte = spa_get_random(len);
+	uint_t byte = random_in_range(len);
 
-	ASSERT(zio->io_type == ZIO_TYPE_READ);
+	ASSERT3U(zio->io_type, ==, ZIO_TYPE_READ);
 
 	/* flip a single random bit in an abd data buffer */
-	buffer[byte] ^= 1 << spa_get_random(8);
+	buffer[byte] ^= 1 << random_in_range(8);
 
 	return (1);	/* stop after first flip */
 }
@@ -493,7 +493,7 @@ zio_handle_ignored_writes(zio_t *zio)
 		}
 
 		/* Have a "problem" writing 60% of the time */
-		if (spa_get_random(100) < 60)
+		if (random_in_range(100) < 60)
 			zio->io_pipeline &= ~ZIO_VDEV_IO_STAGES;
 		break;
 	}

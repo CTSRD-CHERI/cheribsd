@@ -2,7 +2,7 @@
  * Copyright (c) 2010 Isilon Systems, Inc.
  * Copyright (c) 2010 iX Systems, Inc.
  * Copyright (c) 2010 Panasas, Inc.
- * Copyright (c) 2013-2018 Mellanox Technologies, Ltd.
+ * Copyright (c) 2013-2021 Mellanox Technologies, Ltd.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -51,6 +51,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/rwlock.h>
 #include <sys/mman.h>
 #include <sys/stack.h>
+#include <sys/sysent.h>
 #include <sys/time.h>
 #include <sys/user.h>
 
@@ -67,6 +68,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #include <linux/kobject.h>
+#include <linux/cpu.h>
 #include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/module.h>
@@ -85,9 +87,13 @@ __FBSDID("$FreeBSD$");
 #include <linux/kthread.h>
 #include <linux/kernel.h>
 #include <linux/compat.h>
+#include <linux/io-mapping.h>
 #include <linux/poll.h>
 #include <linux/smp.h>
 #include <linux/wait_bit.h>
+#include <linux/rcupdate.h>
+#include <linux/interval_tree.h>
+#include <linux/interval_tree_generic.h>
 
 #if defined(__i386__) || defined(__amd64__)
 #include <asm/smp.h>
@@ -100,13 +106,18 @@ int linuxkpi_debug;
 SYSCTL_INT(_compat_linuxkpi, OID_AUTO, debug, CTLFLAG_RWTUN,
     &linuxkpi_debug, 0, "Set to enable pr_debug() prints. Clear to disable.");
 
+int linuxkpi_warn_dump_stack = 0;
+SYSCTL_INT(_compat_linuxkpi, OID_AUTO, warn_dump_stack, CTLFLAG_RWTUN,
+    &linuxkpi_warn_dump_stack, 0,
+    "Set to enable stack traces from WARN_ON(). Clear to disable.");
+
 static struct timeval lkpi_net_lastlog;
 static int lkpi_net_curpps;
 static int lkpi_net_maxpps = 99;
 SYSCTL_INT(_compat_linuxkpi, OID_AUTO, net_ratelimit, CTLFLAG_RWTUN,
     &lkpi_net_maxpps, 0, "Limit number of LinuxKPI net messages per second.");
 
-MALLOC_DEFINE(M_KMALLOC, "linux", "Linux kmalloc compat");
+MALLOC_DEFINE(M_KMALLOC, "lkpikmalloc", "Linux kmalloc compat");
 
 #include <linux/rbtree.h>
 /* Undo Linux compat changes. */
@@ -115,9 +126,11 @@ MALLOC_DEFINE(M_KMALLOC, "linux", "Linux kmalloc compat");
 #undef cdev
 #define	RB_ROOT(head)	(head)->rbh_root
 
+static void linux_destroy_dev(struct linux_cdev *);
 static void linux_cdev_deref(struct linux_cdev *ldev);
 static struct vm_area_struct *linux_cdev_handle_find(void *handle);
 
+cpumask_t cpu_online_mask;
 struct kobject linux_class_root;
 struct device linux_root_device;
 struct class linux_class_misc;
@@ -137,6 +150,26 @@ panic_cmp(struct rb_node *one, struct rb_node *two)
 }
 
 RB_GENERATE(linux_root, rb_node, __entry, panic_cmp);
+
+#define	START(node)	((node)->start)
+#define	LAST(node)	((node)->last)
+
+INTERVAL_TREE_DEFINE(struct interval_tree_node, rb, unsigned long,, START,
+    LAST,, lkpi_interval_tree)
+
+struct kobject *
+kobject_create(void)
+{
+	struct kobject *kobj;
+
+	kobj = kzalloc(sizeof(*kobj), GFP_KERNEL);
+	if (kobj == NULL)
+		return (NULL);
+	kobject_init(kobj, &linux_kfree_type);
+
+	return (kobj);
+}
+
 
 int
 kobject_set_name_vargs(struct kobject *kobj, const char *fmt, va_list args)
@@ -262,6 +295,36 @@ linux_kobject_kfree_name(struct kobject *kobj)
 
 const struct kobj_type linux_kfree_type = {
 	.release = linux_kobject_kfree
+};
+
+static ssize_t
+lkpi_kobj_attr_show(struct kobject *kobj, struct attribute *attr, char *buf)
+{
+	struct kobj_attribute *ka =
+	    container_of(attr, struct kobj_attribute, attr);
+
+	if (ka->show == NULL)
+		return (-EIO);
+
+	return (ka->show(kobj, ka, buf));
+}
+
+static ssize_t
+lkpi_kobj_attr_store(struct kobject *kobj, struct attribute *attr,
+    const char *buf, size_t count)
+{
+	struct kobj_attribute *ka =
+	    container_of(attr, struct kobj_attribute, attr);
+
+	if (ka->store == NULL)
+		return (-EIO);
+
+	return (ka->store(kobj, ka, buf, count));
+}
+
+const struct sysfs_ops kobj_sysfs_ops = {
+	.show	= lkpi_kobj_attr_show,
+	.store	= lkpi_kobj_attr_store,
 };
 
 static void
@@ -393,6 +456,66 @@ device_create(struct class *class, struct device *parent, dev_t devt,
 	return (dev);
 }
 
+struct device *
+device_create_groups_vargs(struct class *class, struct device *parent,
+    dev_t devt, void *drvdata, const struct attribute_group **groups,
+    const char *fmt, va_list args)
+{
+	struct device *dev = NULL;
+	int retval = -ENODEV;
+
+	if (class == NULL || IS_ERR(class))
+		goto error;
+
+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+	if (!dev) {
+		retval = -ENOMEM;
+		goto error;
+	}
+
+	dev->devt = devt;
+	dev->class = class;
+	dev->parent = parent;
+	dev->groups = groups;
+	dev->release = device_create_release;
+	/* device_initialize() needs the class and parent to be set */
+	device_initialize(dev);
+	dev_set_drvdata(dev, drvdata);
+
+	retval = kobject_set_name_vargs(&dev->kobj, fmt, args);
+	if (retval)
+		goto error;
+
+	retval = device_add(dev);
+	if (retval)
+		goto error;
+
+	return dev;
+
+error:
+	put_device(dev);
+	return ERR_PTR(retval);
+}
+
+struct class *
+class_create(struct module *owner, const char *name)
+{
+	struct class *class;
+	int error;
+
+	class = kzalloc(sizeof(*class), M_WAITOK);
+	class->owner = owner;
+	class->name = name;
+	class->class_release = linux_class_kfree;
+	error = class_register(class);
+	if (error) {
+		kfree(class);
+		return (NULL);
+	}
+
+	return (class);
+}
+
 int
 kobject_init_and_add(struct kobject *kobj, const struct kobj_type *ktype,
     struct kobject *parent, const char *fmt, ...)
@@ -466,9 +589,11 @@ void
 linux_file_free(struct linux_file *filp)
 {
 	if (filp->_file == NULL) {
+		if (filp->f_op != NULL && filp->f_op->release != NULL)
+			filp->f_op->release(filp->f_vnode, filp);
 		if (filp->f_shmem != NULL)
 			vm_object_deallocate(filp->f_shmem);
-		kfree(filp);
+		kfree_rcu(filp, rcu);
 	} else {
 		/*
 		 * The close method of the character device or file
@@ -476,6 +601,17 @@ linux_file_free(struct linux_file *filp)
 		 */
 		_fdrop(filp->_file, curthread);
 	}
+}
+
+struct linux_cdev *
+cdev_alloc(void)
+{
+	struct linux_cdev *cdev;
+
+	cdev = kzalloc(sizeof(struct linux_cdev), M_WAITOK);
+	kobject_init(&cdev->kobj, &linux_cdev_ktype);
+	cdev->refs = 1;
+	return (cdev);
 }
 
 static int
@@ -553,11 +689,11 @@ linux_cdev_pager_populate(vm_object_t vm_obj, vm_pindex_t pidx, int fault_type,
 		vmap->vm_pfn_pcount = &vmap->vm_pfn_count;
 		vmap->vm_obj = vm_obj;
 
-		err = vmap->vm_ops->fault(vmap, &vmf);
+		err = vmap->vm_ops->fault(&vmf);
 
 		while (vmap->vm_pfn_count == 0 && err == VM_FAULT_NOPAGE) {
 			kern_yield(PRI_USER);
-			err = vmap->vm_ops->fault(vmap, &vmf);
+			err = vmap->vm_ops->fault(&vmf);
 		}
 	}
 
@@ -811,7 +947,7 @@ linux_dev_fdopen(struct cdev *dev, int fflags, struct thread *td,
 static inline int
 linux_remap_address(void * __capability *uaddr, size_t len)
 {
-	vaddr_t uaddr_val = (__cheri_addr vaddr_t)(*uaddr);
+	ptraddr_t uaddr_val = (__cheri_addr ptraddr_t)(*uaddr);
 
 	if (unlikely(uaddr_val >= LINUX_IOCTL_MIN_PTR &&
 	    uaddr_val < LINUX_IOCTL_MAX_PTR)) {
@@ -904,12 +1040,12 @@ linux_clear_user(void * __capability _uaddr, size_t _len)
 int
 linux_access_ok(const void * __capability uaddr, size_t len)
 {
-	vaddr_t saddr;
-	vaddr_t eaddr;
+	ptraddr_t saddr;
+	ptraddr_t eaddr;
 
 	/* get start and end address */
-	saddr = (__cheri_addr vaddr_t)uaddr;
-	eaddr = (__cheri_addr vaddr_t)uaddr + len;
+	saddr = (__cheri_addr ptraddr_t)uaddr;
+	eaddr = (__cheri_addr ptraddr_t)uaddr + len;
 
 	/* verify addresses are valid for userspace */
 	return ((saddr == eaddr) ||
@@ -958,8 +1094,8 @@ linux_file_ioctl_sub(struct file *fp, struct linux_file *filp,
 		/* fetch user-space pointer */
 		udata = *(void * __capability *)data;
 	}
-#if defined(__amd64__)
-	if (td->td_proc->p_elf_machine == EM_386) {
+#ifdef COMPAT_FREEBSD32
+	if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
 		/* try the compat IOCTL handler first */
 		if (fop->compat_ioctl != NULL) {
 			error = -OPW(fp, td, fop->compat_ioctl(filp,
@@ -1230,7 +1366,7 @@ linux_file_kqfilter(struct file *file, struct knote *kn)
 static int
 linux_file_mmap_single(struct file *fp, const struct file_operations *fop,
     vm_ooffset_t *offset, vm_size_t size, struct vm_object **object,
-    int nprot, struct thread *td)
+    int nprot, bool is_shared, struct thread *td)
 {
 	struct task_struct *task;
 	struct vm_area_struct *vmap;
@@ -1265,6 +1401,8 @@ linux_file_mmap_single(struct file *fp, const struct file_operations *fop,
 	vmap->vm_pgoff = *offset / PAGE_SIZE;
 	vmap->vm_pfn = 0;
 	vmap->vm_flags = vmap->vm_page_prot = (nprot & VM_PROT_ALL);
+	if (is_shared)
+		vmap->vm_flags |= VM_SHARED;
 	vmap->vm_ops = NULL;
 	vmap->vm_file = get_file(filp);
 	vmap->vm_mm = mm;
@@ -1528,6 +1666,7 @@ linux_file_close(struct file *file, struct thread *td)
 	ldev = filp->f_cdev;
 	if (ldev != NULL)
 		linux_cdev_deref(ldev);
+	linux_synchronize_rcu(RCU_TYPE_REGULAR);
 	kfree(filp);
 
 	return (error);
@@ -1597,21 +1736,21 @@ linux_file_ioctl(struct file *fp, u_long cmd, void *data, struct ucred *cred,
 
 static int
 linux_file_mmap_sub(struct thread *td, vm_size_t objsize, vm_prot_t prot,
-    vm_prot_t *maxprotp, int *flagsp, struct file *fp,
+    vm_prot_t maxprot, int flags, struct file *fp,
     vm_ooffset_t *foff, const struct file_operations *fop, vm_object_t *objp)
 {
 	/*
 	 * Character devices do not provide private mappings
 	 * of any kind:
 	 */
-	if ((*maxprotp & VM_PROT_WRITE) == 0 &&
+	if ((maxprot & VM_PROT_WRITE) == 0 &&
 	    (prot & VM_PROT_WRITE) != 0)
 		return (EACCES);
-	if ((*flagsp & (MAP_PRIVATE | MAP_COPY)) != 0)
+	if ((flags & (MAP_PRIVATE | MAP_COPY)) != 0)
 		return (EINVAL);
 
 	return (linux_file_mmap_single(fp, fop, foff, objsize, objp,
-	    (int)prot, td));
+	    (int)prot, (flags & MAP_SHARED) ? true : false, td));
 }
 
 static int
@@ -1669,7 +1808,7 @@ linux_file_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
 	maxprot &= cap_maxprot;
 
 	linux_get_fop(filp, &fop, &ldev);
-	error = linux_file_mmap_sub(td, size, prot, &maxprot, &flags, fp,
+	error = linux_file_mmap_sub(td, size, prot, maxprot, flags, fp,
 	    &foff, fop, &object);
 	if (error != 0)
 		goto out;
@@ -1684,8 +1823,7 @@ out:
 }
 
 static int
-linux_file_stat(struct file *fp, struct stat *sb, struct ucred *active_cred,
-    struct thread *td)
+linux_file_stat(struct file *fp, struct stat *sb, struct ucred *active_cred)
 {
 	struct linux_file *filp;
 	struct vnode *vp;
@@ -1698,7 +1836,7 @@ linux_file_stat(struct file *fp, struct stat *sb, struct ucred *active_cred,
 	vp = filp->f_vnode;
 
 	vn_lock(vp, LK_SHARED | LK_RETRY);
-	error = VOP_STAT(vp, sb, td->td_ucred, NOCRED, td);
+	error = VOP_STAT(vp, sb, curthread->td_ucred, NOCRED);
 	VOP_UNLOCK(vp);
 
 	return (error);
@@ -1809,7 +1947,7 @@ vmmap_remove(void *addr)
 	return (vmmap);
 }
 
-#if defined(__i386__) || defined(__amd64__) || defined(__powerpc__) || defined(__aarch64__)
+#if defined(__i386__) || defined(__amd64__) || defined(__powerpc__) || defined(__aarch64__) || defined(__riscv)
 void *
 _ioremap_attr(vm_paddr_t phys_addr, unsigned long size, int attr)
 {
@@ -1832,7 +1970,7 @@ iounmap(void *addr)
 	vmmap = vmmap_remove(addr);
 	if (vmmap == NULL)
 		return;
-#if defined(__i386__) || defined(__amd64__) || defined(__powerpc__) || defined(__aarch64__)
+#if defined(__i386__) || defined(__amd64__) || defined(__powerpc__) || defined(__aarch64__) || defined(__riscv)
 	pmap_unmapdev((vm_offset_t)addr, vmmap->vm_size);
 #endif
 	kfree(vmmap);
@@ -2237,7 +2375,43 @@ linux_cdev_static_release(struct kobject *kobj)
 	kobject_put(kobj->parent);
 }
 
+int
+linux_cdev_device_add(struct linux_cdev *ldev, struct device *dev)
+{
+	int ret;
+
+	if (dev->devt != 0) {
+		/* Set parent kernel object. */
+		ldev->kobj.parent = &dev->kobj;
+
+		/*
+		 * Unlike Linux we require the kobject of the
+		 * character device structure to have a valid name
+		 * before calling this function:
+		 */
+		if (ldev->kobj.name == NULL)
+			return (-EINVAL);
+
+		ret = cdev_add(ldev, dev->devt, 1);
+		if (ret)
+			return (ret);
+	}
+	ret = device_add(dev);
+	if (ret != 0 && dev->devt != 0)
+		cdev_del(ldev);
+	return (ret);
+}
+
 void
+linux_cdev_device_del(struct linux_cdev *ldev, struct device *dev)
+{
+	device_del(dev);
+
+	if (dev->devt != 0)
+		cdev_del(ldev);
+}
+
+static void
 linux_destroy_dev(struct linux_cdev *ldev)
 {
 
@@ -2270,6 +2444,7 @@ linux_handle_ifnet_link_event(void *arg, struct ifnet *ifp, int linkstate)
 	struct netdev_notifier_info ni;
 
 	nb = arg;
+	ni.ifp = ifp;
 	ni.dev = (struct net_device *)ifp;
 	if (linkstate == LINK_STATE_UP)
 		nb->notifier_call(nb, NETDEV_UP, &ni);
@@ -2284,6 +2459,7 @@ linux_handle_ifnet_arrival_event(void *arg, struct ifnet *ifp)
 	struct netdev_notifier_info ni;
 
 	nb = arg;
+	ni.ifp = ifp;
 	ni.dev = (struct net_device *)ifp;
 	nb->notifier_call(nb, NETDEV_REGISTER, &ni);
 }
@@ -2295,6 +2471,7 @@ linux_handle_ifnet_departure_event(void *arg, struct ifnet *ifp)
 	struct netdev_notifier_info ni;
 
 	nb = arg;
+	ni.ifp = ifp;
 	ni.dev = (struct net_device *)ifp;
 	nb->notifier_call(nb, NETDEV_UNREGISTER, &ni);
 }
@@ -2306,6 +2483,7 @@ linux_handle_iflladdr_event(void *arg, struct ifnet *ifp)
 	struct netdev_notifier_info ni;
 
 	nb = arg;
+	ni.ifp = ifp;
 	ni.dev = (struct net_device *)ifp;
 	nb->notifier_call(nb, NETDEV_CHANGEADDR, &ni);
 }
@@ -2317,6 +2495,7 @@ linux_handle_ifaddr_event(void *arg, struct ifnet *ifp)
 	struct netdev_notifier_info ni;
 
 	nb = arg;
+	ni.ifp = ifp;
 	ni.dev = (struct net_device *)ifp;
 	nb->notifier_call(nb, NETDEV_CHANGEIFADDR, &ni);
 }
@@ -2411,18 +2590,6 @@ list_sort(void *priv, struct list_head *head, int (*cmp)(void *priv,
 	for (i = 0; i < count; i++)
 		list_add_tail(ar[i], head);
 	free(ar, M_KMALLOC);
-}
-
-void
-linux_irq_handler(void *ent)
-{
-	struct irq_ent *irqe;
-
-	if (linux_set_current_flags(curthread, M_NOWAIT))
-		return;
-
-	irqe = ent;
-	irqe->handler(irqe->irq, irqe->arg);
 }
 
 #if defined(__i386__) || defined(__amd64__)
@@ -2533,7 +2700,6 @@ linux_dump_stack(void)
 #ifdef STACK
 	struct stack st;
 
-	stack_zero(&st);
 	stack_save(&st);
 	stack_print(&st);
 #endif
@@ -2545,6 +2711,17 @@ linuxkpi_net_ratelimit(void)
 
 	return (ppsratecheck(&lkpi_net_lastlog, &lkpi_net_curpps,
 	   lkpi_net_maxpps));
+}
+
+struct io_mapping *
+io_mapping_create_wc(resource_size_t base, unsigned long size)
+{
+	struct io_mapping *mapping;
+
+	mapping = kmalloc(sizeof(*mapping), GFP_KERNEL);
+	if (mapping == NULL)
+		return (NULL);
+	return (io_mapping_init_wc(mapping, base, size));
 }
 
 #if defined(__i386__) || defined(__amd64__)
@@ -2584,6 +2761,8 @@ linux_compat_init(void *arg)
 		LIST_INIT(&vmmaphead[i]);
 	init_waitqueue_head(&linux_bit_waitq);
 	init_waitqueue_head(&linux_var_waitq);
+
+	CPU_COPY(&all_cpus, &cpu_online_mask);
 }
 SYSINIT(linux_compat, SI_SUB_DRIVERS, SI_ORDER_SECOND, linux_compat_init, NULL);
 

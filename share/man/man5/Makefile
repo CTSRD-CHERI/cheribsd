@@ -78,6 +78,8 @@ MLINKS+=fs.5 inode.5
 MLINKS+=hosts.equiv.5 rhosts.5
 MLINKS+=msdosfs.5 msdos.5
 MLINKS+=passwd.5 master.passwd.5
+MLINKS+=passwd.5 pwd.db.5
+MLINKS+=passwd.5 spwd.db.5
 MLINKS+=portindex.5 INDEX.5
 MLINKS+=quota.user.5 quota.group.5
 MLINKS+=rc.conf.5 rc.conf.local.5
@@ -107,8 +109,8 @@ MAN+=	pf.conf.5 \
 	pf.os.5
 .endif
 
-.if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
+# This makes more sense for amd64 and i386 but
+# we decide to install all manpages in all architectures
 _boot.config.5=	boot.config.5
-.endif
 
 .include <bsd.prog.mk>

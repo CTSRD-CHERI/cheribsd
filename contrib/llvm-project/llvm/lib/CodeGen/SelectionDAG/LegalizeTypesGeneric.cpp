@@ -175,7 +175,8 @@ void DAGTypeLegalizer::ExpandRes_BITCAST(SDNode *N, SDValue &Lo, SDValue &Hi) {
 
   // Increment the pointer to the other half.
   unsigned IncrementSize = NOutVT.getSizeInBits() / 8;
-  StackPtr = DAG.getMemBasePlusOffset(StackPtr, IncrementSize, dl);
+  StackPtr =
+      DAG.getMemBasePlusOffset(StackPtr, TypeSize::Fixed(IncrementSize), dl);
 
   // Load the second half from the stack slot.
   Hi = DAG.getLoad(NOutVT, dl, Store, StackPtr,
@@ -266,7 +267,7 @@ void DAGTypeLegalizer::ExpandRes_NormalLoad(SDNode *N, SDValue &Lo,
 
   // Increment the pointer to the other half.
   unsigned IncrementSize = NVT.getSizeInBits() / 8;
-  Ptr = DAG.getMemBasePlusOffset(Ptr, IncrementSize, dl);
+  Ptr = DAG.getMemBasePlusOffset(Ptr, TypeSize::Fixed(IncrementSize), dl);
   Hi = DAG.getLoad(
       NVT, dl, Chain, Ptr, LD->getPointerInfo().getWithOffset(IncrementSize),
       LD->getOriginalAlign(), LD->getMemOperand()->getFlags(), AAInfo);
@@ -481,7 +482,7 @@ SDValue DAGTypeLegalizer::ExpandOp_NormalStore(SDNode *N, unsigned OpNo) {
                     St->getOriginalAlign(), St->getMemOperand()->getFlags(),
                     AAInfo);
 
-  Ptr = DAG.getObjectPtrOffset(dl, Ptr, IncrementSize);
+  Ptr = DAG.getObjectPtrOffset(dl, Ptr, TypeSize::Fixed(IncrementSize));
   Hi = DAG.getStore(
       Chain, dl, Hi, Ptr, St->getPointerInfo().getWithOffset(IncrementSize),
       St->getOriginalAlign(), St->getMemOperand()->getFlags(), AAInfo);
@@ -505,17 +506,18 @@ void DAGTypeLegalizer::SplitRes_MERGE_VALUES(SDNode *N, unsigned ResNo,
   GetSplitOp(Op, Lo, Hi);
 }
 
-void DAGTypeLegalizer::SplitRes_SELECT(SDNode *N, SDValue &Lo, SDValue &Hi) {
+void DAGTypeLegalizer::SplitRes_Select(SDNode *N, SDValue &Lo, SDValue &Hi) {
   SDValue LL, LH, RL, RH, CL, CH;
   SDLoc dl(N);
+  unsigned Opcode = N->getOpcode();
   GetSplitOp(N->getOperand(1), LL, LH);
   GetSplitOp(N->getOperand(2), RL, RH);
 
   SDValue Cond = N->getOperand(0);
   CL = CH = Cond;
   if (Cond.getValueType().isVector()) {
-    if (SDValue Res = WidenVSELECTAndMask(N))
-      std::tie(CL, CH) = DAG.SplitVector(Res->getOperand(0), dl);
+    if (SDValue Res = WidenVSELECTMask(N))
+      std::tie(CL, CH) = DAG.SplitVector(Res, dl);
     // Check if there are already splitted versions of the vector available and
     // use those instead of splitting the mask operand again.
     else if (getTypeAction(Cond.getValueType()) ==
@@ -538,8 +540,18 @@ void DAGTypeLegalizer::SplitRes_SELECT(SDNode *N, SDValue &Lo, SDValue &Hi) {
       std::tie(CL, CH) = DAG.SplitVector(Cond, dl);
   }
 
-  Lo = DAG.getNode(N->getOpcode(), dl, LL.getValueType(), CL, LL, RL);
-  Hi = DAG.getNode(N->getOpcode(), dl, LH.getValueType(), CH, LH, RH);
+  if (Opcode != ISD::VP_SELECT && Opcode != ISD::VP_MERGE) {
+    Lo = DAG.getNode(Opcode, dl, LL.getValueType(), CL, LL, RL);
+    Hi = DAG.getNode(Opcode, dl, LH.getValueType(), CH, LH, RH);
+    return;
+  }
+
+  SDValue EVLLo, EVLHi;
+  std::tie(EVLLo, EVLHi) =
+      DAG.SplitEVL(N->getOperand(3), N->getValueType(0), dl);
+
+  Lo = DAG.getNode(Opcode, dl, LL.getValueType(), CL, LL, RL, EVLLo);
+  Hi = DAG.getNode(Opcode, dl, LH.getValueType(), CH, LH, RH, EVLHi);
 }
 
 void DAGTypeLegalizer::SplitRes_SELECT_CC(SDNode *N, SDValue &Lo,
@@ -569,4 +581,14 @@ void DAGTypeLegalizer::SplitRes_FREEZE(SDNode *N, SDValue &Lo, SDValue &Hi) {
 
   Lo = DAG.getNode(ISD::FREEZE, dl, L.getValueType(), L);
   Hi = DAG.getNode(ISD::FREEZE, dl, H.getValueType(), H);
+}
+
+void DAGTypeLegalizer::SplitRes_ARITH_FENCE(SDNode *N, SDValue &Lo,
+                                            SDValue &Hi) {
+  SDValue L, H;
+  SDLoc DL(N);
+  GetSplitOp(N->getOperand(0), L, H);
+
+  Lo = DAG.getNode(ISD::ARITH_FENCE, DL, L.getValueType(), L);
+  Hi = DAG.getNode(ISD::ARITH_FENCE, DL, H.getValueType(), H);
 }

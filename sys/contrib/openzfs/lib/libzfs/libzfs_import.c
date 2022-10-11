@@ -36,7 +36,7 @@
 #include <unistd.h>
 #include <sys/vdev_impl.h>
 #include <libzfs.h>
-#include <libzfs_impl.h>
+#include "libzfs_impl.h"
 #include <libzutil.h>
 #include <sys/arc_impl.h>
 
@@ -48,7 +48,6 @@ pool_active(libzfs_handle_t *hdl, const char *name, uint64_t guid,
     boolean_t *isactive)
 {
 	zpool_handle_t *zhp;
-	uint64_t theguid;
 
 	if (zpool_open_silent(hdl, name, &zhp) != 0)
 		return (-1);
@@ -58,8 +57,8 @@ pool_active(libzfs_handle_t *hdl, const char *name, uint64_t guid,
 		return (0);
 	}
 
-	verify(nvlist_lookup_uint64(zhp->zpool_config, ZPOOL_CONFIG_POOL_GUID,
-	    &theguid) == 0);
+	uint64_t theguid = fnvlist_lookup_uint64(zhp->zpool_config,
+	    ZPOOL_CONFIG_POOL_GUID);
 
 	zpool_close(zhp);
 
@@ -74,23 +73,15 @@ refresh_config(libzfs_handle_t *hdl, nvlist_t *config)
 	zfs_cmd_t zc = {"\0"};
 	int err, dstbuf_size;
 
-	if (zcmd_write_conf_nvlist(hdl, &zc, config) != 0)
-		return (NULL);
+	zcmd_write_conf_nvlist(hdl, &zc, config);
 
 	dstbuf_size = MAX(CONFIG_BUF_MINSIZE, zc.zc_nvlist_conf_size * 32);
 
-	if (zcmd_alloc_dst_nvlist(hdl, &zc, dstbuf_size) != 0) {
-		zcmd_free_nvlists(&zc);
-		return (NULL);
-	}
+	zcmd_alloc_dst_nvlist(hdl, &zc, dstbuf_size);
 
 	while ((err = zfs_ioctl(hdl, ZFS_IOC_POOL_TRYIMPORT,
-	    &zc)) != 0 && errno == ENOMEM) {
-		if (zcmd_expand_dst_nvlist(hdl, &zc) != 0) {
-			zcmd_free_nvlists(&zc);
-			return (NULL);
-		}
-	}
+	    &zc)) != 0 && errno == ENOMEM)
+		zcmd_expand_dst_nvlist(hdl, &zc);
 
 	if (err) {
 		zcmd_free_nvlists(&zc);
@@ -146,10 +137,9 @@ zpool_clear_label(int fd)
 	struct stat64 statbuf;
 	int l;
 	vdev_label_t *label;
-	l2arc_dev_hdr_phys_t *l2dhdr;
 	uint64_t size;
-	int labels_cleared = 0, header_cleared = 0;
-	boolean_t clear_l2arc_header = B_FALSE;
+	boolean_t labels_cleared = B_FALSE, clear_l2arc_header = B_FALSE,
+	    header_cleared = B_FALSE;
 
 	if (fstat64_blk(fd, &statbuf) == -1)
 		return (0);
@@ -158,11 +148,6 @@ zpool_clear_label(int fd)
 
 	if ((label = calloc(1, sizeof (vdev_label_t))) == NULL)
 		return (-1);
-
-	if ((l2dhdr = calloc(1, sizeof (l2arc_dev_hdr_phys_t))) == NULL) {
-		free(label);
-		return (-1);
-	}
 
 	for (l = 0; l < VDEV_LABELS; l++) {
 		uint64_t state, guid, l2cache;
@@ -213,24 +198,22 @@ zpool_clear_label(int fd)
 		size_t label_size = sizeof (vdev_label_t) - (2 * VDEV_PAD_SIZE);
 
 		if (pwrite64(fd, label, label_size, label_offset(size, l) +
-		    (2 * VDEV_PAD_SIZE)) == label_size) {
-			labels_cleared++;
-		}
+		    (2 * VDEV_PAD_SIZE)) == label_size)
+			labels_cleared = B_TRUE;
 	}
 
-	/* Clear the L2ARC header. */
 	if (clear_l2arc_header) {
-		memset(l2dhdr, 0, sizeof (l2arc_dev_hdr_phys_t));
-		if (pwrite64(fd, l2dhdr, sizeof (l2arc_dev_hdr_phys_t),
-		    VDEV_LABEL_START_SIZE) == sizeof (l2arc_dev_hdr_phys_t)) {
-			header_cleared++;
-		}
+		_Static_assert(sizeof (*label) >= sizeof (l2arc_dev_hdr_phys_t),
+		    "label < l2arc_dev_hdr_phys_t");
+		memset(label, 0, sizeof (l2arc_dev_hdr_phys_t));
+		if (pwrite64(fd, label, sizeof (l2arc_dev_hdr_phys_t),
+		    VDEV_LABEL_START_SIZE) == sizeof (l2arc_dev_hdr_phys_t))
+			header_cleared = B_TRUE;
 	}
 
 	free(label);
-	free(l2dhdr);
 
-	if (labels_cleared == 0)
+	if (!labels_cleared || (clear_l2arc_header && !header_cleared))
 		return (-1);
 
 	return (0);
@@ -239,12 +222,10 @@ zpool_clear_label(int fd)
 static boolean_t
 find_guid(nvlist_t *nv, uint64_t guid)
 {
-	uint64_t tmp;
 	nvlist_t **child;
 	uint_t c, children;
 
-	verify(nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID, &tmp) == 0);
-	if (tmp == guid)
+	if (fnvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID) == guid)
 		return (B_TRUE);
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
@@ -268,18 +249,16 @@ find_aux(zpool_handle_t *zhp, void *data)
 {
 	aux_cbdata_t *cbp = data;
 	nvlist_t **list;
-	uint_t i, count;
-	uint64_t guid;
-	nvlist_t *nvroot;
+	uint_t count;
 
-	verify(nvlist_lookup_nvlist(zhp->zpool_config, ZPOOL_CONFIG_VDEV_TREE,
-	    &nvroot) == 0);
+	nvlist_t *nvroot = fnvlist_lookup_nvlist(zhp->zpool_config,
+	    ZPOOL_CONFIG_VDEV_TREE);
 
 	if (nvlist_lookup_nvlist_array(nvroot, cbp->cb_type,
 	    &list, &count) == 0) {
-		for (i = 0; i < count; i++) {
-			verify(nvlist_lookup_uint64(list[i],
-			    ZPOOL_CONFIG_GUID, &guid) == 0);
+		for (uint_t i = 0; i < count; i++) {
+			uint64_t guid = fnvlist_lookup_uint64(list[i],
+			    ZPOOL_CONFIG_GUID);
 			if (guid == cbp->cb_guid) {
 				cbp->cb_zhp = zhp;
 				return (1);
@@ -301,9 +280,9 @@ zpool_in_use(libzfs_handle_t *hdl, int fd, pool_state_t *state, char **namestr,
     boolean_t *inuse)
 {
 	nvlist_t *config;
-	char *name;
+	char *name = NULL;
 	boolean_t ret;
-	uint64_t guid, vdev_guid;
+	uint64_t guid = 0, vdev_guid;
 	zpool_handle_t *zhp;
 	nvlist_t *pool_config;
 	uint64_t stateval, isspare;
@@ -320,16 +299,12 @@ zpool_in_use(libzfs_handle_t *hdl, int fd, pool_state_t *state, char **namestr,
 	if (config == NULL)
 		return (0);
 
-	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE,
-	    &stateval) == 0);
-	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_GUID,
-	    &vdev_guid) == 0);
+	stateval = fnvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE);
+	vdev_guid = fnvlist_lookup_uint64(config, ZPOOL_CONFIG_GUID);
 
 	if (stateval != POOL_STATE_SPARE && stateval != POOL_STATE_L2CACHE) {
-		verify(nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_NAME,
-		    &name) == 0);
-		verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID,
-		    &guid) == 0);
+		name = fnvlist_lookup_string(config, ZPOOL_CONFIG_POOL_NAME);
+		guid = fnvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID);
 	}
 
 	switch (stateval) {
@@ -378,10 +353,8 @@ zpool_in_use(libzfs_handle_t *hdl, int fd, pool_state_t *state, char **namestr,
 			if ((zhp = zpool_open_canfail(hdl, name)) != NULL &&
 			    (pool_config = zpool_get_config(zhp, NULL))
 			    != NULL) {
-				nvlist_t *nvroot;
-
-				verify(nvlist_lookup_nvlist(pool_config,
-				    ZPOOL_CONFIG_VDEV_TREE, &nvroot) == 0);
+				nvlist_t *nvroot = fnvlist_lookup_nvlist(
+				    pool_config, ZPOOL_CONFIG_VDEV_TREE);
 				ret = find_guid(nvroot, vdev_guid);
 			} else {
 				ret = B_FALSE;
@@ -453,12 +426,7 @@ zpool_in_use(libzfs_handle_t *hdl, int fd, pool_state_t *state, char **namestr,
 
 
 	if (ret) {
-		if ((*namestr = zfs_strdup(hdl, name)) == NULL) {
-			if (cb.cb_zhp)
-				zpool_close(cb.cb_zhp);
-			nvlist_free(config);
-			return (-1);
-		}
+		*namestr = zfs_strdup(hdl, name);
 		*state = (pool_state_t)stateval;
 	}
 

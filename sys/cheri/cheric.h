@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2013-2016 Robert N. M. Watson
+ * Copyright (c) 2021 Microsoft Corp.
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -76,6 +77,29 @@
 #define	cheri_setbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
 #define	cheri_setboundsexact(x, y)	__builtin_cheri_bounds_set_exact((x), (y))
 
+/* Compare capabilities including bounds and perms etc. */
+#define cheri_equal_exact(x, y) __builtin_cheri_equal_exact(x, y)
+
+/*
+ * Return whether the two pointers are equal, including capability metadata if
+ * in purecap mode.
+ */
+#ifdef __cplusplus
+static inline bool
+#else
+static inline _Bool
+#endif
+cheri_ptr_equal_exact(void *x, void *y)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* For purecap compare the entire capability including metadata */
+	return (cheri_equal_exact(x, y));
+#else
+	/* In hybrid mode void * is just an address */
+	return (x == y);
+#endif
+}
+
 /*
  * Soft implementation of cheri_subset_test().
  * Test whether a capability is a subset of another.
@@ -109,7 +133,7 @@ static inline bool
 #else
 static inline _Bool
 #endif
-cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
+cheri_is_address_inbounds(const void * __capability cap, ptraddr_t addr)
 {
 	return (addr >= cheri_getbase(cap) && addr < cheri_gettop(cap));
 }
@@ -211,7 +235,8 @@ cheri_bytes_remaining(const void * __capability cap)
 
 #endif	/* __has_feature(capabilities) */
 
-#if defined(_KERNEL) && defined(__CHERI_PURE_CAPABILITY__)
+#ifdef _KERNEL
+#ifdef __CHERI_PURE_CAPABILITY__
 #define	cheri_kern_gettag(x)		cheri_gettag(x)
 #define	cheri_kern_setbounds(x, y)	cheri_setbounds(x, y)
 #define	cheri_kern_setboundsexact(x, y)	cheri_setboundsexact(x, y)
@@ -225,7 +250,8 @@ cheri_bytes_remaining(const void * __capability cap)
 #define	cheri_kern_setaddress(x, y)	((__typeof__(x))(y))
 #define	cheri_kern_getaddress(x)	((uintptr_t)(x))
 #define	cheri_kern_andperm(x, y)	(x)
-#endif
+#endif	/* __CHERI_PURE_CAPABILITY__ */
+#endif	/* _KERNEL */
 
 /*
  * The cheri_{get,set,clear}_low_pointer_bits() functions work both with and

@@ -263,14 +263,13 @@ static device_method_t pn_methods[] = {
 	{0, 0}
 };
 
-static devclass_t pn_devclass;
 static driver_t pn_driver = {
 	"powernow",
 	pn_methods,
 	sizeof(struct pn_softc),
 };
 
-DRIVER_MODULE(powernow, cpu, pn_driver, pn_devclass, 0, 0);
+DRIVER_MODULE(powernow, cpu, pn_driver, 0, 0);
 
 static int
 pn7_setfidvid(struct pn_softc *sc, int fid, int vid)
@@ -876,7 +875,8 @@ pn_identify(driver_t *driver, device_t parent)
 	}
 	if (device_find_child(parent, "powernow", -1) != NULL)
 		return;
-	if (BUS_ADD_CHILD(parent, 10, "powernow", -1) == NULL)
+	if (BUS_ADD_CHILD(parent, 10, "powernow", device_get_unit(parent))
+	    == NULL)
 		device_printf(parent, "powernow: add child failed\n");
 }
 
@@ -912,7 +912,7 @@ pn_probe(device_t dev)
 		 * mobile processor.  If not, it is a low powered desktop
 		 * processor.
 		 */
-		if (PN7_STA_SFID(status) != PN7_STA_MFID(status)) {
+		if (sfid != mfid) {
 			sc->vid_to_volts = pn7_mobile_vid_to_volts;
 			device_set_desc(dev, "PowerNow! K7");
 		} else {
@@ -929,7 +929,7 @@ pn_probe(device_t dev)
 		sc->vid_to_volts = pn8_vid_to_volts;
 		sc->fsb = rate / 100000 / pn8_fid_to_mult[cfid];
 
-		if (PN8_STA_SFID(status) != PN8_STA_MFID(status))
+		if (sfid != mfid)
 			device_set_desc(dev, "PowerNow! K8");
 		else
 			device_set_desc(dev, "Cool`n'Quiet K8");

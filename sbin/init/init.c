@@ -59,20 +59,25 @@ static const char rcsid[] =
 #endif /* not lint */
 
 #include <sys/param.h>
+#include <sys/boottrace.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
-#include <sys/sysctl.h>
-#include <sys/wait.h>
+#include <sys/reboot.h>
 #include <sys/stat.h>
+#include <sys/sysctl.h>
 #include <sys/uio.h>
+#include <sys/wait.h>
 
+#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <kenv.h>
 #include <libutil.h>
 #include <paths.h>
 #include <signal.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -81,10 +86,6 @@ static const char rcsid[] =
 #include <ttyent.h>
 #include <uthash.h>
 #include <unistd.h>
-#include <sys/reboot.h>
-#include <err.h>
-
-#include <stdarg.h>
 
 #ifdef SECURE
 #include <pwd.h>
@@ -121,6 +122,7 @@ static void disaster(int);
 static void revoke_ttys(void);
 static int  runshutdown(void);
 static char *strk(char *);
+static void runfinal(void);
 
 /*
  * We really need a recursive typedef...
@@ -144,13 +146,11 @@ static state_func_t reroot_phase_two(void);
 static state_func_t run_script(const char *);
 
 static enum { AUTOBOOT, FASTBOOT } runcom_mode = AUTOBOOT;
-#define FALSE	0
-#define TRUE	1
 
-static int Reboot = FALSE;
+static bool Reboot = false;
 static int howto = RB_AUTOBOOT;
 
-static int devfs;
+static bool devfs = false;
 static char *init_path_argv0;
 
 static void transition(state_t);
@@ -201,7 +201,7 @@ static int setupargv(session_t *, struct ttyent *);
 #ifdef LOGIN_CAP
 static void setprocresources(const char *);
 #endif
-static int clang;
+static bool clang;
 
 static void add_session(session_t *);
 static void del_session(session_t *);
@@ -223,6 +223,8 @@ main(int argc, char *argv[])
 	/* Dispose of random users. */
 	if (getuid() != 0)
 		errx(1, "%s", strerror(EPERM));
+
+	BOOTTRACE("init(8) starting...");
 
 	/* System V users like to reexec init. */
 	if (getpid() != 1) {
@@ -295,7 +297,7 @@ invalid:
 	while ((c = getopt(argc, argv, "dsfr")) != -1)
 		switch (c) {
 		case 'd':
-			devfs = 1;
+			devfs = true;
 			break;
 		case 's':
 			initial_transition = single_user;
@@ -353,15 +355,6 @@ invalid:
 	close(1);
 	close(2);
 
-#ifdef __DEBUG_CHERI_TRAP_DURING_INIT__
-	warning("RAISING a CHERI violation:\n");
-	void * __capability cap = __builtin_cheri_global_data_get();
-	cap = __builtin_cheri_offset_set(cap, (vaddr_t)&Reboot);
-	cap = __builtin_cheri_perms_and(cap, ~__CHERI_CAP_PERMISSION_PERMIT_LOAD__);
-	Reboot = *((int * __capability)cap);
-	__builtin_trap();
-#endif
-
 	if (kenv(KENV_GET, "init_exec", kenv_value, sizeof(kenv_value)) > 0) {
 		replace_init(kenv_value);
 		_exit(0); /* reboot */
@@ -393,7 +386,7 @@ invalid:
 		if (stat("/dev", &stst) != 0)
 			warning("Can't stat /dev: %m");
 		else if (stst.st_dev == root_devno)
-			devfs++;
+			devfs = true;
 	}
 
 	if (devfs) {
@@ -908,7 +901,10 @@ single_user(void)
 
 	if (Reboot) {
 		/* Instead of going single user, let's reboot the machine */
+		BOOTTRACE("shutting down the system");
 		sync();
+		/* Run scripts after all processes have been terminated. */
+		runfinal();
 		if (reboot(howto) == -1) {
 			emergency("reboot(%#x) failed, %m", howto);
 			_exit(1); /* panic and reboot */
@@ -917,6 +913,7 @@ single_user(void)
 		_exit(0); /* panic as well */
 	}
 
+	BOOTTRACE("going to single user mode");
 	shell = get_shell();
 
 	if ((pid = fork()) == 0) {
@@ -1058,8 +1055,10 @@ runcom(void)
 {
 	state_func_t next_transition;
 
+	BOOTTRACE("/etc/rc starting...");
 	if ((next_transition = run_script(_PATH_RUNCOM)) != NULL)
 		return next_transition;
+	BOOTTRACE("/etc/rc finished");
 
 	runcom_mode = AUTOBOOT;		/* the default */
 	return (state_func_t) read_ttys;
@@ -1595,6 +1594,59 @@ collect_child(pid_t pid)
 	add_session(sp);
 }
 
+static const char *
+get_current_state(void)
+{
+
+	if (current_state == single_user)
+		return ("single-user");
+	if (current_state == runcom)
+		return ("runcom");
+	if (current_state == read_ttys)
+		return ("read-ttys");
+	if (current_state == multi_user)
+		return ("multi-user");
+	if (current_state == clean_ttys)
+		return ("clean-ttys");
+	if (current_state == catatonia)
+		return ("catatonia");
+	if (current_state == death)
+		return ("death");
+	if (current_state == death_single)
+		return ("death-single");
+	return ("unknown");
+}
+
+static void
+boottrace_transition(int sig)
+{
+	const char *action;
+
+	switch (sig) {
+	case SIGUSR2:
+		action = "halt & poweroff";
+		break;
+	case SIGUSR1:
+		action = "halt";
+		break;
+	case SIGINT:
+		action = "reboot";
+		break;
+	case SIGWINCH:
+		action = "powercycle";
+		break;
+	case SIGTERM:
+		action = Reboot ? "reboot" : "single-user";
+		break;
+	default:
+		BOOTTRACE("signal %d from %s", sig, get_current_state());
+		return;
+	}
+
+	/* Trace the shutdown reason. */
+	SHUTTRACE("%s from %s", action, get_current_state());
+}
+
 /*
  * Catch a signal and request a state transition.
  */
@@ -1602,6 +1654,7 @@ static void
 transition_handler(int sig)
 {
 
+	boottrace_transition(sig);
 	switch (sig) {
 	case SIGHUP:
 		if (current_state == read_ttys || current_state == multi_user ||
@@ -1616,7 +1669,7 @@ transition_handler(int sig)
 	case SIGINT:
 		if (sig == SIGWINCH)
 			howto |= RB_POWERCYCLE;
-		Reboot = TRUE;
+		Reboot = true;
 	case SIGTERM:
 		if (current_state == read_ttys || current_state == multi_user ||
 		    current_state == clean_ttys || current_state == catatonia)
@@ -1645,6 +1698,7 @@ transition_handler(int sig)
 static state_func_t
 multi_user(void)
 {
+	static bool inmultiuser = false;
 	pid_t pid;
 	session_t *sp;
 
@@ -1674,6 +1728,11 @@ multi_user(void)
 		add_session(sp);
 	}
 
+	if (requested_transition == 0 && !inmultiuser) {
+		inmultiuser = true;
+		/* This marks the change from boot-time tracing to run-time. */
+		RUNTRACE("multi-user start");
+	}
 	while (!requested_transition)
 		if ((pid = waitpid(-1, (int *) 0, 0)) != -1)
 			collect_child(pid);
@@ -1789,7 +1848,7 @@ alrm_handler(int sig)
 {
 
 	(void)sig;
-	clang = 1;
+	clang = true;
 }
 
 /*
@@ -1840,16 +1899,17 @@ death_single(void)
 
 	revoke(_PATH_CONSOLE);
 
+	BOOTTRACE("start killing user processes");
 	for (i = 0; i < 2; ++i) {
 		if (kill(-1, death_sigs[i]) == -1 && errno == ESRCH)
 			return (state_func_t) single_user;
 
-		clang = 0;
+		clang = false;
 		alarm(DEATH_WATCH);
 		do
 			if ((pid = waitpid(-1, (int *)0, 0)) != -1)
 				collect_child(pid);
-		while (clang == 0 && errno != ECHILD);
+		while (!clang && errno != ECHILD);
 
 		if (errno == ECHILD)
 			return (state_func_t) single_user;
@@ -1891,6 +1951,8 @@ runshutdown(void)
 	char *argv[4];
 	struct stat sb;
 
+	BOOTTRACE("init(8): start rc.shutdown");
+
 	/*
 	 * rc.shutdown is optional, so to prevent any unnecessary
 	 * complaints from the shell we simply don't run it if the
@@ -1928,7 +1990,7 @@ runshutdown(void)
 	    NULL, 0) == -1 || shutdowntimeout < 2)
 		shutdowntimeout = DEATH_SCRIPT;
 	alarm(shutdowntimeout);
-	clang = 0;
+	clang = false;
 	/*
 	 * Copied from single_user().  This is a bit paranoid.
 	 * Use the same ALRM handler.
@@ -1936,11 +1998,13 @@ runshutdown(void)
 	do {
 		if ((wpid = waitpid(-1, &status, WUNTRACED)) != -1)
 			collect_child(wpid);
-		if (clang == 1) {
+		if (clang) {
 			/* we were waiting for the sub-shell */
 			kill(wpid, SIGTERM);
 			warning("timeout expired for %s: %m; going to "
 			    "single user mode", _PATH_RUNDOWN);
+			BOOTTRACE("rc.shutdown's %d sec timeout expired",
+				  shutdowntimeout);
 			return -1;
 		}
 		if (wpid == -1) {
@@ -2039,3 +2103,51 @@ setprocresources(const char *cname)
 	}
 }
 #endif
+
+/*
+ * Run /etc/rc.final to execute scripts after all user processes have been
+ * terminated.
+ */
+static void
+runfinal(void)
+{
+	struct stat sb;
+	pid_t other_pid, pid;
+	sigset_t mask;
+
+	/* Avoid any surprises. */
+	alarm(0);
+
+	/* rc.final is optional. */
+	if (stat(_PATH_RUNFINAL, &sb) == -1 && errno == ENOENT)
+		return;
+	if (access(_PATH_RUNFINAL, X_OK) != 0) {
+		warning("%s exists, but not executable", _PATH_RUNFINAL);
+		return;
+	}
+
+	pid = fork();
+	if (pid == 0) {
+		/*
+		 * Reopen stdin/stdout/stderr so that scripts can write to
+		 * console.
+		 */
+		close(0);
+		open(_PATH_DEVNULL, O_RDONLY);
+		close(1);
+		close(2);
+		open_console();
+		dup2(1, 2);
+		sigemptyset(&mask);
+		sigprocmask(SIG_SETMASK, &mask, NULL);
+		signal(SIGCHLD, SIG_DFL);
+		execl(_PATH_RUNFINAL, _PATH_RUNFINAL, NULL);
+		perror("execl(" _PATH_RUNFINAL ") failed");
+		exit(1);
+	}
+
+	/* Wait for rc.final script to exit */
+	while ((other_pid = waitpid(-1, NULL, 0)) != pid && other_pid > 0) {
+		continue;
+	}
+}

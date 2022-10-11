@@ -400,11 +400,8 @@ ti_sysc_attach_clocks(struct ti_sysc_softc *sc) {
 	clk_t *clk;
 	struct clk_list *clkp;
 	int index, err;
-	phandle_t cnode;
 
 	clk = malloc(sc->num_clocks*sizeof(clk_t), M_DEVBUF, M_WAITOK | M_ZERO);
-
-	cnode = ofw_bus_get_node(sc->dev);
 
 	/* Check if all clocks can be found */
 	for (index = 0; index < sc->num_clocks; index++) {
@@ -616,7 +613,5 @@ static device_method_t ti_sysc_methods[] = {
 DEFINE_CLASS_1(ti_sysc, ti_sysc_driver, ti_sysc_methods,
 	sizeof(struct ti_sysc_softc), simplebus_driver);
 
-static devclass_t ti_sysc_devclass;
-
-EARLY_DRIVER_MODULE(ti_sysc, simplebus, ti_sysc_driver,
-    ti_sysc_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_FIRST);
+EARLY_DRIVER_MODULE(ti_sysc, simplebus, ti_sysc_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_FIRST);

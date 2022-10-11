@@ -106,8 +106,6 @@ static int usb_no_shutdown_wait = 0;
 SYSCTL_INT(_hw_usb, OID_AUTO, no_shutdown_wait, CTLFLAG_RWTUN,
     &usb_no_shutdown_wait, 0, "No USB device waiting at system shutdown.");
 
-static devclass_t usb_devclass;
-
 static device_method_t usb_methods[] = {
 	DEVMETHOD(device_probe, usb_probe),
 	DEVMETHOD(device_attach, usb_attach),
@@ -126,19 +124,19 @@ static driver_t usb_driver = {
 };
 
 /* Host Only Drivers */
-DRIVER_MODULE(usbus, ohci, usb_driver, usb_devclass, 0, 0);
-DRIVER_MODULE(usbus, uhci, usb_driver, usb_devclass, 0, 0);
-DRIVER_MODULE(usbus, ehci, usb_driver, usb_devclass, 0, 0);
-DRIVER_MODULE(usbus, xhci, usb_driver, usb_devclass, 0, 0);
+DRIVER_MODULE(usbus, ohci, usb_driver, 0, 0);
+DRIVER_MODULE(usbus, uhci, usb_driver, 0, 0);
+DRIVER_MODULE(usbus, ehci, usb_driver, 0, 0);
+DRIVER_MODULE(usbus, xhci, usb_driver, 0, 0);
 
 /* Device Only Drivers */
-DRIVER_MODULE(usbus, musbotg, usb_driver, usb_devclass, 0, 0);
-DRIVER_MODULE(usbus, uss820dci, usb_driver, usb_devclass, 0, 0);
-DRIVER_MODULE(usbus, octusb, usb_driver, usb_devclass, 0, 0);
+DRIVER_MODULE(usbus, musbotg, usb_driver, 0, 0);
+DRIVER_MODULE(usbus, uss820dci, usb_driver, 0, 0);
+DRIVER_MODULE(usbus, octusb, usb_driver, 0, 0);
 
 /* Dual Mode Drivers */
-DRIVER_MODULE(usbus, dwcotg, usb_driver, usb_devclass, 0, 0);
-DRIVER_MODULE(usbus, saf1761otg, usb_driver, usb_devclass, 0, 0);
+DRIVER_MODULE(usbus, dwcotg, usb_driver, 0, 0);
+DRIVER_MODULE(usbus, saf1761otg, usb_driver, 0, 0);
 
 /*------------------------------------------------------------------------*
  *	usb_probe
@@ -438,9 +436,9 @@ usb_bus_detach(struct usb_proc_msg *pm)
 	USB_BUS_UNLOCK(bus);
 
 	/* detach children first */
-	mtx_lock(&Giant);
+	bus_topo_lock();
 	bus_generic_detach(dev);
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 
 	/*
 	 * Free USB device and all subdevices, if any.
@@ -803,10 +801,10 @@ usb_bus_attach(struct usb_proc_msg *pm)
 static void
 usb_attach_sub(device_t dev, struct usb_bus *bus)
 {
-	mtx_lock(&Giant);
+	bus_topo_lock();
 	if (usb_devclass_ptr == NULL)
 		usb_devclass_ptr = devclass_find("usbus");
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 
 #if USB_HAVE_PF
 	usbpf_attach(bus);

@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/libkern.h>
 #include <sys/module.h>
 #include <sys/pciio.h>
+#include <sys/sbuf.h>
 #include <sys/smp.h>
 
 #include <dev/ofw/ofw_bus.h>
@@ -66,8 +67,8 @@ static pci_alloc_devinfo_t ofw_pcibus_alloc_devinfo;
 static pci_assign_interrupt_t ofw_pcibus_assign_interrupt;
 static ofw_bus_get_devinfo_t ofw_pcibus_get_devinfo;
 static bus_child_deleted_t ofw_pcibus_child_deleted;
-static int ofw_pcibus_child_pnpinfo_str_method(device_t cbdev, device_t child,
-    char *buf, size_t buflen);
+static int ofw_pcibus_child_pnpinfo_method(device_t cbdev, device_t child,
+    struct sbuf *sb);
 
 static void ofw_pcibus_enum_devtree(device_t dev, u_int domain, u_int busno);
 static void ofw_pcibus_enum_bus(device_t dev, u_int domain, u_int busno);
@@ -79,7 +80,7 @@ static device_method_t ofw_pcibus_methods[] = {
 
 	/* Bus interface */
 	DEVMETHOD(bus_child_deleted,	ofw_pcibus_child_deleted),
-	DEVMETHOD(bus_child_pnpinfo_str, ofw_pcibus_child_pnpinfo_str_method),
+	DEVMETHOD(bus_child_pnpinfo,	ofw_pcibus_child_pnpinfo_method),
 	DEVMETHOD(bus_rescan,		bus_null_rescan),
 	DEVMETHOD(bus_get_cpus,		ofw_pcibus_get_cpus),
 	DEVMETHOD(bus_get_domain,	ofw_pcibus_get_domain),
@@ -99,12 +100,9 @@ static device_method_t ofw_pcibus_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t pci_devclass;
-
 DEFINE_CLASS_1(pci, ofw_pcibus_driver, ofw_pcibus_methods,
     sizeof(struct pci_softc), pci_driver);
-EARLY_DRIVER_MODULE(ofw_pcibus, pcib, ofw_pcibus_driver, pci_devclass, 0, 0,
-    BUS_PASS_BUS);
+EARLY_DRIVER_MODULE(ofw_pcibus, pcib, ofw_pcibus_driver, 0, 0, BUS_PASS_BUS);
 MODULE_VERSION(ofw_pcibus, 1);
 MODULE_DEPEND(ofw_pcibus, pci, 1, 1, 1);
 
@@ -300,14 +298,13 @@ ofw_pcibus_child_deleted(device_t dev, device_t child)
 }
 
 static int
-ofw_pcibus_child_pnpinfo_str_method(device_t cbdev, device_t child, char *buf,
-    size_t buflen)
+ofw_pcibus_child_pnpinfo_method(device_t cbdev, device_t child, struct sbuf *sb)
 {
-	pci_child_pnpinfo_str_method(cbdev, child, buf, buflen);
+	pci_child_pnpinfo_method(cbdev, child, sb);
 
 	if (ofw_bus_get_node(child) != -1)  {
-		strlcat(buf, " ", buflen); /* Separate info */
-		ofw_bus_gen_child_pnpinfo_str(cbdev, child, buf, buflen);
+		sbuf_cat(sb, " "); /* Separate info */
+		ofw_bus_gen_child_pnpinfo(cbdev, child, sb);
 	}
 
 	return (0);
@@ -405,7 +402,7 @@ ofw_pcibus_get_cpus(device_t dev, device_t child, enum cpu_sets op, size_t setsi
 			return (error);
 		if (setsize != sizeof(cpuset_t))
 			return (EINVAL);
-		CPU_AND(cpuset, &cpuset_domain[d]);
+		CPU_AND(cpuset, cpuset, &cpuset_domain[d]);
 		return (0);
 	default:
 		return (bus_generic_get_cpus(dev, child, op, setsize, cpuset));

@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 //
 // UNSUPPORTED: libcpp-has-no-threads
-//  ... test crashes clang
 
 // <atomic>
 
@@ -40,16 +39,14 @@ struct TestFn {
   void operator()() const {
     {
         typedef std::atomic<T> A;
-        A t;
-        std::atomic_init(&t, T(3));
+        A t(T(3));
         assert(std::atomic_fetch_sub_explicit(&t, T(2),
                                             std::memory_order_seq_cst) == T(3));
         assert(t == T(1));
     }
     {
         typedef std::atomic<T> A;
-        volatile A t;
-        std::atomic_init(&t, T(3));
+        volatile A t(T(3));
         assert(std::atomic_fetch_sub_explicit(&t, T(2),
                                             std::memory_order_seq_cst) == T(3));
         assert(t == T(1));
@@ -63,19 +60,27 @@ void testp()
     {
         typedef std::atomic<T> A;
         typedef typename std::remove_pointer<T>::type X;
-        A t;
-        std::atomic_init(&t, T(3*sizeof(X)));
+        A t(T(3 * sizeof(X)));
         assert(std::atomic_fetch_sub_explicit(&t, 2,
                                   std::memory_order_seq_cst) == T(3*sizeof(X)));
+#ifdef _LIBCPP_VERSION // libc++ is nonconforming
+        std::atomic_fetch_sub_explicit<X>(&t, 0, std::memory_order_relaxed);
+#else
+        std::atomic_fetch_sub_explicit<T>(&t, 0, std::memory_order_relaxed);
+#endif // _LIBCPP_VERSION
         assert(t == T(1*sizeof(X)));
     }
     {
         typedef std::atomic<T> A;
         typedef typename std::remove_pointer<T>::type X;
-        volatile A t;
-        std::atomic_init(&t, T(3*sizeof(X)));
+        volatile A t(T(3 * sizeof(X)));
         assert(std::atomic_fetch_sub_explicit(&t, 2,
                                   std::memory_order_seq_cst) == T(3*sizeof(X)));
+#ifdef _LIBCPP_VERSION // libc++ is nonconforming
+        std::atomic_fetch_sub_explicit<X>(&t, 0, std::memory_order_relaxed);
+#else
+        std::atomic_fetch_sub_explicit<T>(&t, 0, std::memory_order_relaxed);
+#endif // _LIBCPP_VERSION
         assert(t == T(1*sizeof(X)));
     }
 }

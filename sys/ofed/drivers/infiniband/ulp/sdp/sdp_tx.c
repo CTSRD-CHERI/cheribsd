@@ -69,7 +69,7 @@ sdp_post_send(struct sdp_sock *ssk, struct mbuf *mb)
 	struct sdp_bsdh *h;
 	unsigned long mseq;
 	struct ib_device *dev;
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	struct ib_sge ibsge[SDP_MAX_SEND_SGES];
 	struct ib_sge *sge;
 	struct ib_send_wr tx_wr = { NULL };
@@ -390,7 +390,8 @@ void
 sdp_post_keepalive(struct sdp_sock *ssk)
 {
 	int rc;
-	struct ib_send_wr wr, *bad_wr;
+	struct ib_send_wr wr;
+	const struct ib_send_wr *bad_wr;
 
 	sdp_dbg(ssk->socket, "%s\n", __func__);
 
@@ -475,12 +476,8 @@ sdp_tx_ring_destroy(struct sdp_sock *ssk)
 	}
 
 	if (ssk->tx_ring.cq) {
-		if (ib_destroy_cq(ssk->tx_ring.cq)) {
-			sdp_warn(ssk->socket, "destroy cq(%p) failed\n",
-					ssk->tx_ring.cq);
-		} else {
-			ssk->tx_ring.cq = NULL;
-		}
+		ib_destroy_cq(ssk->tx_ring.cq);
+		ssk->tx_ring.cq = NULL;
 	}
 
 	WARN_ON(ring_head(ssk->tx_ring) != ring_tail(ssk->tx_ring));

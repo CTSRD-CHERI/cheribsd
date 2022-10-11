@@ -20,7 +20,7 @@ TESTS_SUBDIRS+=		kqueue
 TESTS_SUBDIRS+=		mac
 TESTS_SUBDIRS+=		mqueue
 TESTS_SUBDIRS+=		net
-TESTS_SUBDIRS+=		netgraph
+TESTS_SUBDIRS+=		${_netgraph}
 TESTS_SUBDIRS+=		netinet
 TESTS_SUBDIRS+=		netinet6
 TESTS_SUBDIRS+=		netipsec
@@ -30,9 +30,11 @@ TESTS_SUBDIRS+=		netmap
 TESTS_SUBDIRS+=		netpfil
 TESTS_SUBDIRS+=		opencrypto
 TESTS_SUBDIRS+=		posixshm
+TESTS_SUBDIRS+=		ses
 TESTS_SUBDIRS+=		sys
 TESTS_SUBDIRS+=		vfs
 TESTS_SUBDIRS+=		vm
+TESTS_SUBDIRS+=		vmm
 
 
 # XXXAR: the audit tests are flaky when running on QEMU CHERI and often time out
@@ -45,6 +47,10 @@ _audit=	audit
 
 .if ${MK_CDDL} != "no"
 _cddl=	cddl
+.endif
+
+.if ${MK_NETGRAPH} != "no"
+_netgraph= netgraph
 .endif
 
 # Items not integrated into kyua runs by default

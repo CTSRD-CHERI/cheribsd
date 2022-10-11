@@ -70,6 +70,18 @@ delay(int usec)
 	CALLBACK(delay, usec);
 }
 
+time_t
+getsecs(void)
+{
+
+	/*
+	 * userboot can't do netboot, so this implementation isn't strictly
+	 * required.  Defining it avoids issues with BIND_NOW, and it doesn't
+	 * hurt to do it.
+	 */
+	return (time(NULL));
+}
+
 void
 exit(int v)
 {
@@ -158,6 +170,10 @@ loader_main(struct loader_callbacks *cb, void *arg, int version, int ndisks)
 	 * Hook up the console
 	 */
 	cons_probe();
+
+	/* Set up currdev variable to have hooks in place. */
+	env_setenv("currdev", EV_VOLATILE, "",
+	    userboot_setcurrdev, env_nounset);
 
 	printf("\n%s", bootprog_info);
 #if 0

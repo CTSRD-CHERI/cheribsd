@@ -209,14 +209,17 @@ static int
 rk_gpio_pin_getname(device_t dev, uint32_t pin, char *name)
 {
 	struct rk_gpio_softc *sc;
+	uint32_t bank;
 
 	sc = device_get_softc(dev);
 
 	if (pin >= 32)
 		return (EINVAL);
 
+	bank = pin / 8;
+	pin = pin - (bank * 8);
 	RK_GPIO_LOCK(sc);
-	snprintf(name, GPIOMAXNAME, "gpio%d", pin);
+	snprintf(name, GPIOMAXNAME, "P%c%d", bank + 'A', pin);
 	RK_GPIO_UNLOCK(sc);
 
 	return (0);
@@ -463,12 +466,10 @@ static driver_t rk_gpio_driver = {
 	sizeof(struct rk_gpio_softc),
 };
 
-static devclass_t rk_gpio_devclass;
-
 /*
  * GPIO driver is always a child of rk_pinctrl driver and should be probed
  * and attached within rk_pinctrl_attach function. Due to this, bus pass order
  * must be same as bus pass order of rk_pinctrl driver.
  */
-EARLY_DRIVER_MODULE(rk_gpio, simplebus, rk_gpio_driver,
-    rk_gpio_devclass, 0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(rk_gpio, simplebus, rk_gpio_driver, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);

@@ -1,4 +1,4 @@
-/* $OpenBSD: sftp-glob.c,v 1.27 2015/01/14 13:54:13 djm Exp $ */
+/* $OpenBSD: sftp-glob.c,v 1.30 2022/02/25 09:46:24 dtucker Exp $ */
 /*
  * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
  *
@@ -25,7 +25,7 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdlib.h>
+#include <stdarg.h>
 
 #include "xmalloc.h"
 #include "sftp.h"
@@ -51,7 +51,7 @@ fudge_opendir(const char *path)
 
 	r = xcalloc(1, sizeof(*r));
 
-	if (do_readdir(cur.conn, (char *)path, &r->dir)) {
+	if (do_readdir(cur.conn, path, &r->dir)) {
 		free(r);
 		return(NULL);
 	}
@@ -112,7 +112,7 @@ fudge_lstat(const char *path, struct stat *st)
 {
 	Attrib *a;
 
-	if (!(a = do_lstat(cur.conn, (char *)path, 1)))
+	if (!(a = do_lstat(cur.conn, path, 1)))
 		return(-1);
 
 	attrib_to_stat(a, st);
@@ -125,7 +125,7 @@ fudge_stat(const char *path, struct stat *st)
 {
 	Attrib *a;
 
-	if (!(a = do_stat(cur.conn, (char *)path, 1)))
+	if (!(a = do_stat(cur.conn, path, 1)))
 		return(-1);
 
 	attrib_to_stat(a, st);

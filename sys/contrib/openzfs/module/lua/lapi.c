@@ -1,4 +1,3 @@
-/* BEGIN CSTYLED */
 /*
 ** $Id: lapi.c,v 2.171.1.1 2013/04/12 18:48:47 roberto Exp $
 ** Lua API
@@ -1278,30 +1277,6 @@ LUA_API void lua_upvaluejoin (lua_State *L, int fidx1, int n1,
   *up1 = *up2;
   luaC_objbarrier(L, f1, *up2);
 }
-
-#if defined(_KERNEL)
-
-static int __init
-lua_init(void)
-{
-        return (0);
-}
-
-static void __exit
-lua_fini(void)
-{
-}
-
-module_init(lua_init);
-module_exit(lua_fini);
-
-#endif
-/* END CSTYLED */
-
-ZFS_MODULE_DESCRIPTION("Lua Interpreter for ZFS");
-ZFS_MODULE_AUTHOR("Lua.org");
-ZFS_MODULE_LICENSE("Dual MIT/GPL");
-ZFS_MODULE_VERSION(ZFS_META_VERSION "-" ZFS_META_RELEASE);
 
 EXPORT_SYMBOL(lua_absindex);
 EXPORT_SYMBOL(lua_atpanic);

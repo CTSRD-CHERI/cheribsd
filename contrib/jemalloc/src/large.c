@@ -197,7 +197,7 @@ large_ralloc_no_move_expand(tsdn_t *tsdn, extent_t *extent, size_t usize,
 	szind_t szind = sz_size2index(usize);
 	extent_szind_set(extent, szind);
 	rtree_szind_slab_update(tsdn, &extents_rtree, rtree_ctx,
-	    (vaddr_t)extent_addr_get(extent), szind, false);
+	    (uintptr_t)extent_addr_get(extent), szind, false);
 
 	if (config_stats && new_mapping) {
 		arena_stats_mapped_add(tsdn, &arena->stats, trailsize);

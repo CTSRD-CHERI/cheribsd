@@ -495,8 +495,7 @@ static driver_t uhso_driver = {
 	.size = sizeof(struct uhso_softc)
 };
 
-static devclass_t uhso_devclass;
-DRIVER_MODULE(uhso, uhub, uhso_driver, uhso_devclass, uhso_driver_loaded, 0);
+DRIVER_MODULE(uhso, uhub, uhso_driver, uhso_driver_loaded, NULL);
 MODULE_DEPEND(uhso, ucom, 1, 1, 1);
 MODULE_DEPEND(uhso, usb, 1, 1, 1);
 MODULE_VERSION(uhso, 1);
@@ -691,10 +690,10 @@ uhso_detach(device_t self)
 		free_unr(uhso_ifnet_unit, sc->sc_ifp->if_dunit);
 		mtx_lock(&sc->sc_mtx);
 		uhso_if_stop(sc);
+		mtx_unlock(&sc->sc_mtx);
 		bpfdetach(sc->sc_ifp);
 		if_detach(sc->sc_ifp);
 		if_free(sc->sc_ifp);
-		mtx_unlock(&sc->sc_mtx);
 		usbd_transfer_unsetup(sc->sc_if_xfer, UHSO_IFNET_MAX);
 	}
 

@@ -136,6 +136,7 @@ struct mlx5e_rl_channel {
 	uint64_t new_rate;
 	uint64_t init_rate;
 	uint64_t last_rate;
+	uint32_t refcount;
 	uint16_t last_burst;
 	uint16_t state;
 };
@@ -168,8 +169,5 @@ void mlx5e_rl_cleanup(struct mlx5e_priv *priv);
 void mlx5e_rl_refresh_sq_inline(struct mlx5e_rl_priv_data *rl);
 
 if_snd_tag_alloc_t mlx5e_rl_snd_tag_alloc;
-if_snd_tag_modify_t mlx5e_rl_snd_tag_modify;
-if_snd_tag_query_t mlx5e_rl_snd_tag_query;
-if_snd_tag_free_t mlx5e_rl_snd_tag_free;
 
 #endif		/* __MLX5_EN_RL_H__ */

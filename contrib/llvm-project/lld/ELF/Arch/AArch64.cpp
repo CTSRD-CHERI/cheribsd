@@ -34,6 +34,7 @@ public:
   RelExpr getRelExpr(RelType type, const Symbol &s,
                      const uint8_t *loc) const override;
   RelType getDynRel(RelType type) const override;
+  int64_t getImplicitAddend(const uint8_t *buf, RelType type) const override;
   void writeGotPlt(uint8_t *buf, const Symbol &s) const override;
   void writePltHeader(uint8_t *buf) const override;
   void writePlt(uint8_t *buf, const Symbol &sym,
@@ -46,8 +47,7 @@ public:
   bool usesOnlyLowPageBits(RelType type) const override;
   void relocate(uint8_t *loc, const Relocation &rel,
                 uint64_t val) const override;
-  RelExpr adjustRelaxExpr(RelType type, const uint8_t *data,
-                          RelExpr expr) const override;
+  RelExpr adjustTlsExpr(RelType type, RelExpr expr) const override;
   void relaxTlsGdToLe(uint8_t *loc, const Relocation &rel,
                       uint64_t val) const override;
   void relaxTlsGdToIe(uint8_t *loc, const Relocation &rel,
@@ -62,7 +62,6 @@ AArch64::AArch64() {
   relativeRel = R_AARCH64_RELATIVE;
   iRelativeRel = R_AARCH64_IRELATIVE;
   gotRel = R_AARCH64_GLOB_DAT;
-  noneRel = R_AARCH64_NONE;
   pltRel = R_AARCH64_JUMP_SLOT;
   symbolicRel = R_AARCH64_ABS64;
   tlsDescRel = R_AARCH64_TLSDESC;
@@ -121,7 +120,7 @@ RelExpr AArch64::getRelExpr(RelType type, const Symbol &s,
   case R_AARCH64_TLSLE_MOVW_TPREL_G1:
   case R_AARCH64_TLSLE_MOVW_TPREL_G1_NC:
   case R_AARCH64_TLSLE_MOVW_TPREL_G2:
-    return R_TLS;
+    return R_TPREL;
   case R_AARCH64_CALL26:
   case R_AARCH64_CONDBR19:
   case R_AARCH64_JUMP26:
@@ -147,6 +146,8 @@ RelExpr AArch64::getRelExpr(RelType type, const Symbol &s,
   case R_AARCH64_LD64_GOT_LO12_NC:
   case R_AARCH64_TLSIE_LD64_GOTTPREL_LO12_NC:
     return R_GOT;
+  case R_AARCH64_LD64_GOTPAGE_LO15:
+    return R_AARCH64_GOT_PAGE;
   case R_AARCH64_ADR_GOT_PAGE:
   case R_AARCH64_TLSIE_ADR_GOTTPREL_PAGE21:
     return R_AARCH64_GOT_PAGE_PC;
@@ -159,8 +160,7 @@ RelExpr AArch64::getRelExpr(RelType type, const Symbol &s,
   }
 }
 
-RelExpr AArch64::adjustRelaxExpr(RelType type, const uint8_t *data,
-                                 RelExpr expr) const {
+RelExpr AArch64::adjustTlsExpr(RelType type, RelExpr expr) const {
   if (expr == R_RELAX_TLS_GD_TO_IE) {
     if (type == R_AARCH64_TLSDESC_ADR_PAGE21)
       return R_AARCH64_RELAX_TLS_GD_TO_IE_PAGE_PC;
@@ -193,8 +193,26 @@ RelType AArch64::getDynRel(RelType type) const {
   return R_AARCH64_NONE;
 }
 
+int64_t AArch64::getImplicitAddend(const uint8_t *buf, RelType type) const {
+  switch (type) {
+  case R_AARCH64_TLSDESC:
+    return read64(buf + 8);
+  case R_AARCH64_NONE:
+    return 0;
+  case R_AARCH64_PREL32:
+    return SignExtend64<32>(read32(buf));
+  case R_AARCH64_ABS64:
+  case R_AARCH64_PREL64:
+    return read64(buf);
+  default:
+    internalLinkerError(getErrorLocation(buf),
+                        "cannot read addend for relocation " + toString(type));
+    return 0;
+  }
+}
+
 void AArch64::writeGotPlt(uint8_t *buf, const Symbol &) const {
-  write64le(buf, in.plt->getVA());
+  write64(buf, in.plt->getVA());
 }
 
 void AArch64::writePltHeader(uint8_t *buf) const {
@@ -238,9 +256,11 @@ void AArch64::writePlt(uint8_t *buf, const Symbol &sym,
 bool AArch64::needsThunk(RelExpr expr, RelType type, const InputFile *file,
                          uint64_t branchAddr, const Symbol &s,
                          int64_t a) const {
-  // If s is an undefined weak symbol and does not have a PLT entry then it
-  // will be resolved as a branch to the next instruction.
-  if (s.isUndefWeak() && !s.isInPlt())
+  // If s is an undefined weak symbol and does not have a PLT entry then it will
+  // be resolved as a branch to the next instruction. If it is hidden, its
+  // binding has been converted to local, so we just check isUndefined() here. A
+  // undefined non-weak symbol will have been errored.
+  if (s.isUndefined() && !s.isInPlt())
     return false;
   // ELF for the ARM 64-bit architecture, section Call and Jump relocations
   // only permits range extension thunks for R_AARCH64_CALL26 and
@@ -322,20 +342,20 @@ void AArch64::relocate(uint8_t *loc, const Relocation &rel,
   case R_AARCH64_ABS16:
   case R_AARCH64_PREL16:
     checkIntUInt(loc, val, 16, rel);
-    write16le(loc, val);
+    write16(loc, val);
     break;
   case R_AARCH64_ABS32:
   case R_AARCH64_PREL32:
     checkIntUInt(loc, val, 32, rel);
-    write32le(loc, val);
+    write32(loc, val);
     break;
   case R_AARCH64_PLT32:
     checkInt(loc, val, 32, rel);
-    write32le(loc, val);
+    write32(loc, val);
     break;
   case R_AARCH64_ABS64:
   case R_AARCH64_PREL64:
-    write64le(loc, val);
+    write64(loc, val);
     break;
   case R_AARCH64_ADD_ABS_LO12_NC:
     or32AArch64Imm(loc, val);
@@ -400,6 +420,10 @@ void AArch64::relocate(uint8_t *loc, const Relocation &rel,
     checkAlignment(loc, val, 16, rel);
     or32AArch64Imm(loc, getBits(val, 4, 11));
     break;
+  case R_AARCH64_LD64_GOTPAGE_LO15:
+    checkAlignment(loc, val, 8, rel);
+    or32AArch64Imm(loc, getBits(val, 3, 14));
+    break;
   case R_AARCH64_MOVW_UABS_G0:
     checkUInt(loc, val, 16, rel);
     LLVM_FALLTHROUGH;
@@ -461,6 +485,10 @@ void AArch64::relocate(uint8_t *loc, const Relocation &rel,
   case R_AARCH64_TLSLE_ADD_TPREL_LO12_NC:
   case R_AARCH64_TLSDESC_ADD_LO12:
     or32AArch64Imm(loc, val);
+    break;
+  case R_AARCH64_TLSDESC:
+    // For R_AARCH64_TLSDESC the addend is stored in the second 64-bit word.
+    write64(loc + 8, val);
     break;
   default:
     llvm_unreachable("unknown relocation");
@@ -549,6 +577,148 @@ void AArch64::relaxTlsIeToLe(uint8_t *loc, const Relocation &rel,
   llvm_unreachable("invalid relocation for TLS IE to LE relaxation");
 }
 
+AArch64Relaxer::AArch64Relaxer(ArrayRef<Relocation> relocs) {
+  if (!config->relax || config->emachine != EM_AARCH64) {
+    safeToRelaxAdrpLdr = false;
+    return;
+  }
+  // Check if R_AARCH64_ADR_GOT_PAGE and R_AARCH64_LD64_GOT_LO12_NC
+  // always appear in pairs.
+  size_t i = 0;
+  const size_t size = relocs.size();
+  for (; i != size; ++i) {
+    if (relocs[i].type == R_AARCH64_ADR_GOT_PAGE) {
+      if (i + 1 < size && relocs[i + 1].type == R_AARCH64_LD64_GOT_LO12_NC) {
+        ++i;
+        continue;
+      }
+      break;
+    } else if (relocs[i].type == R_AARCH64_LD64_GOT_LO12_NC) {
+      break;
+    }
+  }
+  safeToRelaxAdrpLdr = i == size;
+}
+
+bool AArch64Relaxer::tryRelaxAdrpAdd(const Relocation &adrpRel,
+                                     const Relocation &addRel, uint64_t secAddr,
+                                     uint8_t *buf) const {
+  // When the address of sym is within the range of ADR then
+  // we may relax
+  // ADRP xn, sym
+  // ADD  xn, xn, :lo12: sym
+  // to
+  // NOP
+  // ADR xn, sym
+  if (!config->relax || adrpRel.type != R_AARCH64_ADR_PREL_PG_HI21 ||
+      addRel.type != R_AARCH64_ADD_ABS_LO12_NC)
+    return false;
+  // Check if the relocations apply to consecutive instructions.
+  if (adrpRel.offset + 4 != addRel.offset)
+    return false;
+  if (adrpRel.sym != addRel.sym)
+    return false;
+  if (adrpRel.addend != 0 || addRel.addend != 0)
+    return false;
+
+  uint32_t adrpInstr = read32le(buf + adrpRel.offset);
+  uint32_t addInstr = read32le(buf + addRel.offset);
+  // Check if the first instruction is ADRP and the second instruction is ADD.
+  if ((adrpInstr & 0x9f000000) != 0x90000000 ||
+      (addInstr & 0xffc00000) != 0x91000000)
+    return false;
+  uint32_t adrpDestReg = adrpInstr & 0x1f;
+  uint32_t addDestReg = addInstr & 0x1f;
+  uint32_t addSrcReg = (addInstr >> 5) & 0x1f;
+  if (adrpDestReg != addDestReg || adrpDestReg != addSrcReg)
+    return false;
+
+  Symbol &sym = *adrpRel.sym;
+  // Check if the address difference is within 1MiB range.
+  int64_t val = sym.getVA() - (secAddr + addRel.offset);
+  if (val < -1024 * 1024 || val >= 1024 * 1024)
+    return false;
+
+  Relocation adrRel = {R_ABS, R_AARCH64_ADR_PREL_LO21, addRel.offset,
+                       /*addend=*/0, &sym};
+  // nop
+  write32le(buf + adrpRel.offset, 0xd503201f);
+  // adr x_<dest_reg>
+  write32le(buf + adrRel.offset, 0x10000000 | adrpDestReg);
+  target->relocate(buf + adrRel.offset, adrRel, val);
+  return true;
+}
+
+bool AArch64Relaxer::tryRelaxAdrpLdr(const Relocation &adrpRel,
+                                     const Relocation &ldrRel, uint64_t secAddr,
+                                     uint8_t *buf) const {
+  if (!safeToRelaxAdrpLdr)
+    return false;
+
+  // When the definition of sym is not preemptible then we may
+  // be able to relax
+  // ADRP xn, :got: sym
+  // LDR xn, [ xn :got_lo12: sym]
+  // to
+  // ADRP xn, sym
+  // ADD xn, xn, :lo_12: sym
+
+  if (adrpRel.type != R_AARCH64_ADR_GOT_PAGE ||
+      ldrRel.type != R_AARCH64_LD64_GOT_LO12_NC)
+    return false;
+  // Check if the relocations apply to consecutive instructions.
+  if (adrpRel.offset + 4 != ldrRel.offset)
+    return false;
+  // Check if the relocations reference the same symbol and
+  // skip undefined, preemptible and STT_GNU_IFUNC symbols.
+  if (!adrpRel.sym || adrpRel.sym != ldrRel.sym || !adrpRel.sym->isDefined() ||
+      adrpRel.sym->isPreemptible || adrpRel.sym->isGnuIFunc())
+    return false;
+  // Check if the addends of the both relocations are zero.
+  if (adrpRel.addend != 0 || ldrRel.addend != 0)
+    return false;
+  uint32_t adrpInstr = read32le(buf + adrpRel.offset);
+  uint32_t ldrInstr = read32le(buf + ldrRel.offset);
+  // Check if the first instruction is ADRP and the second instruction is LDR.
+  if ((adrpInstr & 0x9f000000) != 0x90000000 ||
+      (ldrInstr & 0x3b000000) != 0x39000000)
+    return false;
+  // Check the value of the sf bit.
+  if (!(ldrInstr >> 31))
+    return false;
+  uint32_t adrpDestReg = adrpInstr & 0x1f;
+  uint32_t ldrDestReg = ldrInstr & 0x1f;
+  uint32_t ldrSrcReg = (ldrInstr >> 5) & 0x1f;
+  // Check if ADPR and LDR use the same register.
+  if (adrpDestReg != ldrDestReg || adrpDestReg != ldrSrcReg)
+    return false;
+
+  Symbol &sym = *adrpRel.sym;
+  // Check if the address difference is within 4GB range.
+  int64_t val =
+      getAArch64Page(sym.getVA()) - getAArch64Page(secAddr + adrpRel.offset);
+  if (val != llvm::SignExtend64(val, 33))
+    return false;
+
+  Relocation adrpSymRel = {R_AARCH64_PAGE_PC, R_AARCH64_ADR_PREL_PG_HI21,
+                           adrpRel.offset, /*addend=*/0, &sym};
+  Relocation addRel = {R_ABS, R_AARCH64_ADD_ABS_LO12_NC, ldrRel.offset,
+                       /*addend=*/0, &sym};
+
+  // adrp x_<dest_reg>
+  write32le(buf + adrpSymRel.offset, 0x90000000 | adrpDestReg);
+  // add x_<dest reg>, x_<dest reg>
+  write32le(buf + addRel.offset, 0x91000000 | adrpDestReg | (adrpDestReg << 5));
+
+  target->relocate(buf + adrpSymRel.offset, adrpSymRel,
+                   SignExtend64(getAArch64Page(sym.getVA()) -
+                                    getAArch64Page(secAddr + adrpSymRel.offset),
+                                64));
+  target->relocate(buf + addRel.offset, addRel, SignExtend64(sym.getVA(), 64));
+  tryRelaxAdrpAdd(adrpSymRel, addRel, secAddr, buf);
+  return true;
+}
+
 // AArch64 may use security features in variant PLT sequences. These are:
 // Pointer Authentication (PAC), introduced in armv8.3-a and Branch Target
 // Indicator (BTI) introduced in armv8.5-a. The additional instructions used
@@ -593,8 +763,7 @@ public:
                 uint64_t pltEntryAddr) const override;
 
 private:
-  bool btiHeader; // bti instruction needed in PLT Header
-  bool btiEntry;  // bti instruction needed in PLT Entry
+  bool btiHeader; // bti instruction needed in PLT Header and Entry
   bool pacEntry;  // autia1716 instruction needed in PLT Entry
 };
 } // namespace
@@ -605,15 +774,14 @@ AArch64BtiPac::AArch64BtiPac() {
   // address of the PLT entry can be taken by the program, which permits an
   // indirect jump to the PLT entry. This can happen when the address
   // of the PLT entry for a function is canonicalised due to the address of
-  // the function in an executable being taken by a shared library.
-  // FIXME: There is a potential optimization to omit the BTI if we detect
-  // that the address of the PLT entry isn't taken.
+  // the function in an executable being taken by a shared library, or
+  // non-preemptible ifunc referenced by non-GOT-generating, non-PLT-generating
+  // relocations.
   // The PAC PLT entries require dynamic loader support and this isn't known
   // from properties in the objects, so we use the command line flag.
-  btiEntry = btiHeader && !config->shared;
   pacEntry = config->zPacPlt;
 
-  if (btiEntry || pacEntry) {
+  if (btiHeader || pacEntry) {
     pltEntrySize = 24;
     ipltEntrySize = 24;
   }
@@ -673,7 +841,12 @@ void AArch64BtiPac::writePlt(uint8_t *buf, const Symbol &sym,
   };
   const uint8_t nopData[] = { 0x1f, 0x20, 0x03, 0xd5 }; // nop
 
-  if (btiEntry) {
+  // needsCopy indicates a non-ifunc canonical PLT entry whose address may
+  // escape to shared objects. isInIplt indicates a non-preemptible ifunc. Its
+  // address may escape if referenced by a direct relocation. The condition is
+  // conservative.
+  bool hasBti = btiHeader && (sym.needsCopy || sym.isInIplt);
+  if (hasBti) {
     memcpy(buf, btiData, sizeof(btiData));
     buf += sizeof(btiData);
     pltEntryAddr += sizeof(btiData);
@@ -690,7 +863,7 @@ void AArch64BtiPac::writePlt(uint8_t *buf, const Symbol &sym,
     memcpy(buf + sizeof(addrInst), pacBr, sizeof(pacBr));
   else
     memcpy(buf + sizeof(addrInst), stdBr, sizeof(stdBr));
-  if (!btiEntry)
+  if (!hasBti)
     // We didn't add the BTI c instruction so round out size with NOP.
     memcpy(buf + sizeof(addrInst) + sizeof(stdBr), nopData, sizeof(nopData));
 }

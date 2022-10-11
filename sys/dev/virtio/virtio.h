@@ -68,9 +68,9 @@ struct virtio_feature_desc {
 	const char	*vfd_str;
 };
 
-#define VIRTIO_DRIVER_MODULE(name, driver, devclass, evh, arg)		\
-	DRIVER_MODULE(name, virtio_mmio, driver, devclass, evh, arg);	\
-	DRIVER_MODULE(name, virtio_pci, driver, devclass, evh, arg)
+#define VIRTIO_DRIVER_MODULE(name, driver, evh, arg)			\
+	DRIVER_MODULE(name, virtio_mmio, driver, evh, arg);		\
+	DRIVER_MODULE(name, virtio_pci, driver, evh, arg)
 
 struct virtio_pnp_match {
 	uint32_t	 device_type;
@@ -113,8 +113,7 @@ void	 virtio_stop(device_t dev);
 int	 virtio_config_generation(device_t dev);
 int	 virtio_reinit(device_t dev, uint64_t features);
 void	 virtio_reinit_complete(device_t dev);
-int	 virtio_child_pnpinfo_str(device_t busdev, device_t child, char *buf,
-	     size_t buflen);
+int	 virtio_child_pnpinfo(device_t busdev, device_t child, struct sbuf *sb);
 
 /*
  * Read/write a variable amount from the device specific (ie, network)
@@ -124,7 +123,7 @@ int	 virtio_child_pnpinfo_str(device_t busdev, device_t child, char *buf,
 void	 virtio_read_device_config(device_t dev, bus_size_t offset,
 	     void *dst, int length);
 void	 virtio_write_device_config(device_t dev, bus_size_t offset,
-	     void *src, int length);
+	     const void *src, int length);
 
 /* Inlined device specific read/write functions for common lengths. */
 #define VIRTIO_RDWR_DEVICE_CONFIG(size, type)				\

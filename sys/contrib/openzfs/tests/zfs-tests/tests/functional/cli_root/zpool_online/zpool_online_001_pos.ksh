@@ -54,10 +54,7 @@ function cleanup
 	#
 	for disk in $DISKLIST; do
 		log_must zpool online $TESTPOOL $disk
-		check_state $TESTPOOL $disk "online"
-		if [[ $? != 0 ]]; then
-			log_fail "Unable to online $disk"
-		fi
+		log_must check_state $TESTPOOL $disk "online"
 
 	done
 }
@@ -77,18 +74,12 @@ for disk in $DISKLIST; do
 	i=0
 	while [[ $i -lt ${#args[*]} ]]; do
 
-		log_must sync_pool $TESTPOOL
+		sync_pool $TESTPOOL
 		log_must zpool offline $TESTPOOL $disk
-		check_state $TESTPOOL $disk "offline"
-		if [[ $? != 0 ]]; then
-			log_fail "$disk of $TESTPOOL did not match offline state"
-		fi
+		log_must check_state $TESTPOOL $disk "offline"
 
 		log_must zpool online ${args[$i]} $TESTPOOL $disk
-		check_state $TESTPOOL $disk "online"
-		if [[ $? != 0 ]]; then
-			log_fail "$disk of $TESTPOOL did not match online state"
-		fi
+		log_must check_state $TESTPOOL $disk "online"
 
 		while [[ $j -lt 20 ]]; do
 			is_pool_resilvered $TESTPOOL && break
@@ -112,10 +103,7 @@ for disk in $DISKLIST; do
         while [[ $i -lt $iters ]]; do
 		index=`expr $RANDOM % ${#args[*]}`
                 log_must zpool online ${args[$index]} $TESTPOOL $disk
-                check_state $TESTPOOL $disk "online"
-                if [[ $? != 0 ]]; then
-                        log_fail "$disk of $TESTPOOL did not match online state"
-                fi
+                log_must check_state $TESTPOOL $disk "online"
 
                 (( i = i + 1 ))
         done

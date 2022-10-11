@@ -27,6 +27,9 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
+#ifdef COMPAT_FREEBSD64
+#include <sys/abi_compat.h>
+#endif
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/bus.h>
@@ -34,9 +37,39 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/module.h>
+#include <sys/proc.h>
 
 #include <machine/efi.h>
 #include <sys/efiio.h>
+
+#ifdef COMPAT_FREEBSD64
+struct efi_get_table_ioc64
+{
+	uint64_t buf;	/* void * */
+	struct uuid uuid;
+	uint64_t table_len;
+	uint64_t buf_len;
+};
+
+struct efi_var_ioc64
+{
+	uint64_t name;		/* efi_char * */
+	uint64_t namesize;
+	struct uuid vendor;
+	uint32_t attrib;
+	uint64_t data;		/* void * */
+	uint64_t datasize;
+};
+
+#define	EFIIOC_GET_TABLE64 \
+    _IOC_NEWTYPE(EFIIOC_GET_TABLE, struct efi_get_table_ioc64)
+#define	EFIIOC_VAR_GET64 \
+    _IOC_NEWTYPE(EFIIOC_VAR_GET, struct efi_var_ioc64)
+#define	EFIIOC_VAR_NEXT64 \
+    _IOC_NEWTYPE(EFIIOC_VAR_NEXT, struct efi_var_ioc64)
+#define	EFIIOC_VAR_SET64 \
+    _IOC_NEWTYPE(EFIIOC_VAR_SET, struct efi_var_ioc64)
+#endif
 
 static d_ioctl_t efidev_ioctl;
 
@@ -51,8 +84,75 @@ efidev_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t addr,
     int flags __unused, struct thread *td __unused)
 {
 	int error;
+#ifdef COMPAT_FREEBSD64
+	u_long orig_cmd;
+	caddr_t orig_addr;
+	struct efi_get_table_ioc local_egtioc;
+	struct efi_var_ioc local_ev;
+#endif
+
+#ifdef COMPAT_FREEBSD64
+	orig_cmd = cmd;
+	orig_addr = addr;
+	switch (cmd) {
+	case EFIIOC_GET_TABLE64:
+	{
+		struct efi_get_table_ioc64 *egtioc64 =
+		    (struct efi_get_table_ioc64 *)addr;
+		struct efi_get_table_ioc *egtioc = &local_egtioc;
+
+		cmd = _IOC_NEWTYPE(cmd, struct efi_get_table_ioc);
+		addr = (caddr_t)egtioc;
+		egtioc->buf = __USER_CAP(egtioc64->buf, egtioc64->buf_len);
+		CP(*egtioc64, *egtioc, uuid);
+		CP(*egtioc64, *egtioc, table_len);
+		CP(*egtioc64, *egtioc, buf_len);
+		break;
+	}
+	case EFIIOC_VAR_GET64:
+	case EFIIOC_VAR_NEXT64:
+	case EFIIOC_VAR_SET64:
+	{
+		struct efi_var_ioc64 *ev64 = (struct efi_var_ioc64 *)addr;
+		struct efi_var_ioc *ev = &local_ev;
+
+		cmd = _IOC_NEWTYPE(cmd, struct efi_var_ioc);
+		addr = (caddr_t)ev;
+		ev->name = __USER_CAP(ev64->name, ev64->namesize);
+		CP(*ev64, *ev, namesize);
+		CP(*ev64, *ev, vendor);
+		CP(*ev64, *ev, attrib);
+		ev->data = __USER_CAP(ev64->data, ev64->datasize);
+		CP(*ev64, *ev, datasize);
+		break;
+	}
+	}
+#endif
 
 	switch (cmd) {
+	case EFIIOC_GET_TABLE:
+	{
+		struct efi_get_table_ioc *egtioc =
+		    (struct efi_get_table_ioc *)addr;
+		void *buf = NULL;
+
+		error = efi_copy_table(&egtioc->uuid, egtioc->buf ? &buf : NULL,
+		    egtioc->buf_len, &egtioc->table_len);
+
+		if (error != 0 || egtioc->buf == NULL)
+			break;
+
+		if (egtioc->buf_len < egtioc->table_len) {
+			error = EINVAL;
+			free(buf, M_TEMP);
+			break;
+		}
+
+		error = copyout(buf, egtioc->buf, egtioc->buf_len);
+		free(buf, M_TEMP);
+
+		break;
+	}
 	case EFIIOC_GET_TIME:
 	{
 		struct efi_tm *tm = (struct efi_tm *)addr;
@@ -159,6 +259,44 @@ vs_out:
 		error = ENOTTY;
 		break;
 	}
+
+#ifdef COMPAT_FREEBSD64
+	cmd = orig_cmd;
+	addr = orig_addr;
+	switch (cmd) {
+	case EFIIOC_GET_TABLE64:
+	{
+		struct efi_get_table_ioc64 *egtioc64 =
+		    (struct efi_get_table_ioc64 *)addr;
+		struct efi_get_table_ioc *egtioc = &local_egtioc;
+
+		CP(*egtioc, *egtioc64, table_len);
+		break;
+	}
+	case EFIIOC_VAR_GET64:
+	{
+		struct efi_var_ioc64 *ev64 = (struct efi_var_ioc64 *)addr;
+		struct efi_var_ioc *ev = &local_ev;
+
+		CP(*ev, *ev64, attrib);
+		/* Can be replaced with NULL */
+		ev64->data = (__cheri_addr uint64_t)ev->data;
+		CP(*ev, *ev64, datasize);
+		break;
+	}
+	case EFIIOC_VAR_NEXT64:
+	{
+		struct efi_var_ioc64 *ev64 = (struct efi_var_ioc64 *)addr;
+		struct efi_var_ioc *ev = &local_ev;
+
+		/* Can be replaced with NULL */
+		ev64->name = (__cheri_addr uint64_t)ev->name;
+		CP(*ev, *ev64, namesize);
+		CP(*ev, *ev64, vendor);
+		break;
+	}
+	}
+#endif
 
 	return (error);
 }

@@ -32,6 +32,10 @@
  * $FreeBSD$
  */
 
+#ifdef __i386__
+#include <i386/proc.h>
+#else /* !__i386__ */
+
 #ifndef _MACHINE_PROC_H_
 #define	_MACHINE_PROC_H_
 
@@ -75,6 +79,7 @@ struct mdthread {
 	int	md_efirt_dis_pf;	/* (k) */
 	struct pcb md_pcb;
 	vm_offset_t md_stack_base;
+	void *md_usr_fpu_save;
 };
 
 struct mdproc {
@@ -89,12 +94,6 @@ struct mdproc {
 
 #define	KINFO_PROC_SIZE 1088
 #define	KINFO_PROC32_SIZE 768
-
-struct syscall_args {
-	u_int code;
-	struct sysent *callp;
-	register_t args[8];
-};
 
 #ifdef	_KERNEL
 
@@ -122,3 +121,5 @@ extern int max_ldt_segment;
 #endif  /* _KERNEL */
 
 #endif /* !_MACHINE_PROC_H_ */
+
+#endif /* __i386__ */

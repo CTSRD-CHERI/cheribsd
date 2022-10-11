@@ -85,27 +85,28 @@ typedef struct prog {
 
 /* global state */
 
-strlst_t *buildopts = NULL;
-strlst_t *srcdirs   = NULL;
-strlst_t *libs      = NULL;
-strlst_t *libs_so   = NULL;
-prog_t   *progs     = NULL;
+static strlst_t *buildopts = NULL;
+static strlst_t *srcdirs   = NULL;
+static strlst_t *libs      = NULL;
+static strlst_t *libs_so   = NULL;
+static prog_t   *progs     = NULL;
 
-char confname[MAXPATHLEN], infilename[MAXPATHLEN];
-char outmkname[MAXPATHLEN], outcfname[MAXPATHLEN], execfname[MAXPATHLEN];
-char tempfname[MAXPATHLEN], cachename[MAXPATHLEN], curfilename[MAXPATHLEN];
-bool tempfname_initialized = false;
-char outhdrname[MAXPATHLEN] ;	/* user-supplied header for *.mk */
-char *objprefix;		/* where are the objects ? */
-char *path_make;
-int linenum = -1;
-int goterror = 0;
+static char confname[MAXPATHLEN], infilename[MAXPATHLEN];
+static char outmkname[MAXPATHLEN], outcfname[MAXPATHLEN], execfname[MAXPATHLEN];
+static char tempfname[MAXPATHLEN], cachename[MAXPATHLEN];
+static char curfilename[MAXPATHLEN];
+static bool tempfname_initialized = false;
+static char outhdrname[MAXPATHLEN] ;	/* user-supplied header for *.mk */
+static const char *objprefix;		/* where are the objects ? */
+static const char *path_make;
+static int linenum = -1;
+static int goterror = 0;
 
-int verbose, readcache;		/* options */
-int reading_cache;
-int makeobj = 0;		/* add 'make obj' rules to the makefile */
+static int verbose, readcache;	/* options */
+static int reading_cache;
+static int makeobj = 0;		/* add 'make obj' rules to the makefile */
 
-int list_mode;
+static int list_mode;
 
 /* general library routines */
 
@@ -123,7 +124,7 @@ void usage(void);
 void parse_conf_file(void);
 void gen_outputs(void);
 
-extern char *crunched_skel[];
+extern const char *crunched_skel[];
 
 
 int
@@ -638,7 +639,6 @@ fillin_program(prog_t *p)
 {
 	char path[MAXPATHLEN];
 	char line[MAXLINELEN];
-	FILE *f;
 
 	snprintf(line, MAXLINELEN, "filling in parms for %s", p->name);
 	status(line);
@@ -653,22 +653,9 @@ fillin_program(prog_t *p)
 
 	/* Determine the actual srcdir (maybe symlinked). */
 	if (p->srcdir) {
-		snprintf(line, MAXLINELEN, "cd %s && pwd -P", p->srcdir);
-		f = popen(line,"r");
-		if (!f)
-			errx(1, "Can't execute: %s\n", line);
-
-		path[0] = '\0';
-		fgets(path, sizeof path, f);
-		if (pclose(f))
-			errx(1, "Can't execute: %s\n", line);
-
-		if (!*path)
-			errx(1, "Can't perform pwd on: %s\n", p->srcdir);
-
-		/* Chop off trailing newline. */
-		path[strlen(path) - 1] = '\0';
-		p->realsrcdir = strdup(path);
+		p->realsrcdir = realpath(p->srcdir, NULL);
+		if (p->realsrcdir == NULL)
+			errx(1, "Can't resolve path: %s\n", p->srcdir);
 	}
 
 	/* Unless the option to make object files was specified the
@@ -721,7 +708,7 @@ fillin_program_objs(prog_t *p, char *path)
 	char *obj, *cp;
 	int fd, rc;
 	FILE *f;
-	char *objvar="OBJS";
+	const char *objvar="OBJS";
 	strlst_t *s;
 	char line[MAXLINELEN];
 
@@ -912,7 +899,7 @@ gen_output_makefile(void)
 void
 gen_output_cfile(void)
 {
-	char **cp;
+	const char **cp;
 	FILE *outcf;
 	prog_t *p;
 	strlst_t *s;
@@ -1136,7 +1123,7 @@ prog_makefile_rules(FILE *outmk, prog_t *p)
 		fprintf(outmk, " $(%s_LIBS)", p->ident);
 
 	fprintf(outmk, "\n");
-	fprintf(outmk, "\t$(CC) -nostdlib -Wl,-dc -r -o %s.lo %s_stub.o $(%s_OBJPATHS)",
+	fprintf(outmk, "\t$(CC) -nostdlib -r -o %s.lo %s_stub.o $(%s_OBJPATHS)",
 	    p->name, p->name, p->ident);
 	if (p->libs)
 		fprintf(outmk, " $(%s_LIBS)", p->ident);

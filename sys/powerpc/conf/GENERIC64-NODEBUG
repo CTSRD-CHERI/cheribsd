@@ -1,5 +1,5 @@
 #
-# GENERIC64-NODEBUG -- WITNESS and INVARIANTS free kernel configuration file 
+# GENERIC64-NODEBUG -- WITNESS and INVARIANTS free kernel configuration file
 #		     for FreeBSD/powerpc
 #
 # This configuration file removes several debugging options, including
@@ -12,7 +12,7 @@
 # For more information on this file, please read the config(5) manual page,
 # and/or the handbook section on Kernel Configuration Files:
 #
-#    https://www.FreeBSD.org/doc/en_US.ISO8859-1/books/handbook/kernelconfig-config.html
+#    https://docs.freebsd.org/en/books/handbook/kernelconfig/#kernelconfig-config
 #
 # The handbook is also available locally in /usr/share/doc/handbook
 # if you've installed the doc distribution, otherwise always see the
@@ -27,12 +27,6 @@
 # $FreeBSD$
 
 include GENERIC64
+include "../../conf/std.nodebug"
 
 ident   GENERIC64-NODEBUG
-
-nooptions       INVARIANTS
-nooptions       INVARIANT_SUPPORT
-nooptions       WITNESS
-nooptions       WITNESS_SKIPSPIN
-nooptions       DEADLKRES
-nooptions       MALLOC_DEBUG_MAXZONES

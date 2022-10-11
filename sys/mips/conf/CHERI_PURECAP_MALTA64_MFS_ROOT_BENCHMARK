@@ -1,7 +1,0 @@
-# Inherit base config
-include "CHERI_PURECAP_MALTA64_MFS_ROOT"
-
-ident CHERI_PURECAP_MALTA64_MFS_ROOT_BENCHMARK
-
-# Disable slow things
-include "std.BENCHMARK"

@@ -147,6 +147,7 @@ static const struct {
 	{ HDA_CODEC_ALC888, 0,		"Realtek ALC888" },
 	{ HDA_CODEC_ALC889, 0,		"Realtek ALC889" },
 	{ HDA_CODEC_ALC892, 0,		"Realtek ALC892" },
+	{ HDA_CODEC_ALC897, 0,		"Realtek ALC897" },
 	{ HDA_CODEC_ALC899, 0,		"Realtek ALC899" },
 	{ HDA_CODEC_ALC1150, 0,		"Realtek ALC1150" },
 	{ HDA_CODEC_ALCS1200A, 0,	"Realtek ALCS1200A" },
@@ -196,19 +197,19 @@ static const struct {
 	{ HDA_CODEC_STAC9229D, 0,	"Sigmatel STAC9229D" },
 	{ HDA_CODEC_STAC9230X, 0,	"Sigmatel STAC9230X" },
 	{ HDA_CODEC_STAC9230D, 0,	"Sigmatel STAC9230D" },
-	{ HDA_CODEC_STAC9250, 0, 	"Sigmatel STAC9250" },
-	{ HDA_CODEC_STAC9251, 0, 	"Sigmatel STAC9251" },
-	{ HDA_CODEC_STAC9255, 0, 	"Sigmatel STAC9255" },
-	{ HDA_CODEC_STAC9255D, 0, 	"Sigmatel STAC9255D" },
-	{ HDA_CODEC_STAC9254, 0, 	"Sigmatel STAC9254" },
-	{ HDA_CODEC_STAC9254D, 0, 	"Sigmatel STAC9254D" },
+	{ HDA_CODEC_STAC9250, 0,	"Sigmatel STAC9250" },
+	{ HDA_CODEC_STAC9251, 0,	"Sigmatel STAC9251" },
+	{ HDA_CODEC_STAC9255, 0,	"Sigmatel STAC9255" },
+	{ HDA_CODEC_STAC9255D, 0,	"Sigmatel STAC9255D" },
+	{ HDA_CODEC_STAC9254, 0,	"Sigmatel STAC9254" },
+	{ HDA_CODEC_STAC9254D, 0,	"Sigmatel STAC9254D" },
 	{ HDA_CODEC_STAC9271X, 0,	"Sigmatel STAC9271X" },
 	{ HDA_CODEC_STAC9271D, 0,	"Sigmatel STAC9271D" },
 	{ HDA_CODEC_STAC9272X, 0,	"Sigmatel STAC9272X" },
 	{ HDA_CODEC_STAC9272D, 0,	"Sigmatel STAC9272D" },
 	{ HDA_CODEC_STAC9273X, 0,	"Sigmatel STAC9273X" },
 	{ HDA_CODEC_STAC9273D, 0,	"Sigmatel STAC9273D" },
-	{ HDA_CODEC_STAC9274, 0, 	"Sigmatel STAC9274" },
+	{ HDA_CODEC_STAC9274, 0,	"Sigmatel STAC9274" },
 	{ HDA_CODEC_STAC9274D, 0,	"Sigmatel STAC9274D" },
 	{ HDA_CODEC_STAC9274X5NH, 0,	"Sigmatel STAC9274X5NH" },
 	{ HDA_CODEC_STAC9274D5NH, 0,	"Sigmatel STAC9274D5NH" },
@@ -268,6 +269,7 @@ static const struct {
 	{ HDA_CODEC_IDT92HD90BXX, 0,	"IDT 92HD90BXX" },
 	{ HDA_CODEC_IDT92HD91BXX, 0,	"IDT 92HD91BXX" },
 	{ HDA_CODEC_IDT92HD93BXX, 0,	"IDT 92HD93BXX" },
+	{ HDA_CODEC_IDT92HD95B, 0,	"Tempo 92HD95B" },
 	{ HDA_CODEC_IDT92HD98BXX, 0,	"IDT 92HD98BXX" },
 	{ HDA_CODEC_IDT92HD99BXX, 0,	"IDT 92HD99BXX" },
 	{ HDA_CODEC_CX20549, 0,		"Conexant CX20549 (Venice)" },
@@ -392,6 +394,7 @@ static const struct {
 	{ HDA_CODEC_INTELGMLK1, 0,	"Intel Gemini Lake" },
 	{ HDA_CODEC_INTELICLK, 0,	"Intel Ice Lake" },
 	{ HDA_CODEC_INTELTGLK, 0,	"Intel Tiger Lake" },
+	{ HDA_CODEC_INTELALLK, 0,	"Intel Alder Lake" },
 	{ HDA_CODEC_SII1390, 0,		"Silicon Image SiI1390" },
 	{ HDA_CODEC_SII1392, 0,		"Silicon Image SiI1392" },
 	/* Unknown CODECs */
@@ -542,21 +545,20 @@ hdacc_detach(device_t dev)
 }
 
 static int
-hdacc_child_location_str(device_t dev, device_t child, char *buf, size_t buflen)
+hdacc_child_location(device_t dev, device_t child, struct sbuf *sb)
 {
 	struct hdacc_fg *fg = device_get_ivars(child);
 
-	snprintf(buf, buflen, "nid=%d", fg->nid);
+	sbuf_printf(sb, "nid=%d", fg->nid);
 	return (0);
 }
 
 static int
-hdacc_child_pnpinfo_str_method(device_t dev, device_t child, char *buf,
-    size_t buflen)
+hdacc_child_pnpinfo_method(device_t dev, device_t child, struct sbuf *sb)
 {
 	struct hdacc_fg *fg = device_get_ivars(child);
 
-	snprintf(buf, buflen, "type=0x%02x subsystem=0x%08x",
+	sbuf_printf(sb, "type=0x%02x subsystem=0x%08x",
 	    fg->type, fg->subsystem_id);
 	return (0);
 }
@@ -766,8 +768,8 @@ static device_method_t hdacc_methods[] = {
 	DEVMETHOD(device_suspend,	hdacc_suspend),
 	DEVMETHOD(device_resume,	hdacc_resume),
 	/* Bus interface */
-	DEVMETHOD(bus_child_location_str, hdacc_child_location_str),
-	DEVMETHOD(bus_child_pnpinfo_str, hdacc_child_pnpinfo_str_method),
+	DEVMETHOD(bus_child_location,	hdacc_child_location),
+	DEVMETHOD(bus_child_pnpinfo,	hdacc_child_pnpinfo_method),
 	DEVMETHOD(bus_print_child,	hdacc_print_child),
 	DEVMETHOD(bus_probe_nomatch,	hdacc_probe_nomatch),
 	DEVMETHOD(bus_read_ivar,	hdacc_read_ivar),
@@ -793,6 +795,4 @@ static driver_t hdacc_driver = {
 	sizeof(struct hdacc_softc),
 };
 
-static devclass_t hdacc_devclass;
-
-DRIVER_MODULE(snd_hda, hdac, hdacc_driver, hdacc_devclass, NULL, NULL);
+DRIVER_MODULE(snd_hda, hdac, hdacc_driver, NULL, NULL);

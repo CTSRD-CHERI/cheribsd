@@ -73,6 +73,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileOutputBuffer.h"
+#include <mutex>
 
 namespace llvm {
 class DiagnosticInfo;
@@ -81,30 +82,40 @@ class raw_ostream;
 
 namespace lld {
 
-// We wrap stdout and stderr so that you can pass alternative stdout/stderr as
-// arguments to lld::*::link() functions.
-extern llvm::raw_ostream *stdoutOS;
-extern llvm::raw_ostream *stderrOS;
-
 llvm::raw_ostream &outs();
 llvm::raw_ostream &errs();
 
+enum class ErrorTag { LibNotFound, SymbolNotFound };
+
 class ErrorHandler {
 public:
+  ~ErrorHandler();
+
+  void initialize(llvm::raw_ostream &stdoutOS, llvm::raw_ostream &stderrOS,
+                  bool exitEarly, bool disableOutput);
+
   uint64_t errorCount = 0;
   uint64_t errorLimit = 20;
   StringRef errorLimitExceededMsg = "too many errors emitted, stopping now";
+  StringRef errorHandlingScript;
   StringRef logName = "lld";
   bool exitEarly = true;
   bool fatalWarnings = false;
   bool verbose = false;
   bool vsDiagnostics = false;
+  bool disableOutput = false;
+  std::function<void()> cleanupCallback;
 
   void error(const Twine &msg);
-  LLVM_ATTRIBUTE_NORETURN void fatal(const Twine &msg);
+  void error(const Twine &msg, ErrorTag tag, ArrayRef<StringRef> args);
+  [[noreturn]] void fatal(const Twine &msg);
   void log(const Twine &msg);
-  void message(const Twine &msg);
+  void message(const Twine &msg, llvm::raw_ostream &s);
   void warn(const Twine &msg);
+
+  raw_ostream &outs();
+  raw_ostream &errs();
+  void flushStreams();
 
   std::unique_ptr<llvm::FileOutputBuffer> outputBuffer;
 
@@ -112,21 +123,39 @@ private:
   using Colors = raw_ostream::Colors;
 
   std::string getLocation(const Twine &msg);
+  void reportDiagnostic(StringRef location, Colors c, StringRef diagKind,
+                        const Twine &msg);
+
+  // We want to separate multi-line messages with a newline. `sep` is "\n"
+  // if the last messages was multi-line. Otherwise "".
+  llvm::StringRef sep;
+
+  // We wrap stdout and stderr so that you can pass alternative stdout/stderr as
+  // arguments to lld::*::link() functions. Since lld::outs() or lld::errs() can
+  // be indirectly called from multiple threads, we protect them using a mutex.
+  // In the future, we plan on supporting several concurent linker contexts,
+  // which explains why the mutex is not a global but part of this context.
+  std::mutex mu;
+  llvm::raw_ostream *stdoutOS{};
+  llvm::raw_ostream *stderrOS{};
 };
 
 /// Returns the default error handler.
 ErrorHandler &errorHandler();
 
 inline void error(const Twine &msg) { errorHandler().error(msg); }
-inline LLVM_ATTRIBUTE_NORETURN void fatal(const Twine &msg) {
-  errorHandler().fatal(msg);
+inline void error(const Twine &msg, ErrorTag tag, ArrayRef<StringRef> args) {
+  errorHandler().error(msg, tag, args);
 }
+[[noreturn]] inline void fatal(const Twine &msg) { errorHandler().fatal(msg); }
 inline void log(const Twine &msg) { errorHandler().log(msg); }
-inline void message(const Twine &msg) { errorHandler().message(msg); }
+inline void message(const Twine &msg, llvm::raw_ostream &s = outs()) {
+  errorHandler().message(msg, s);
+}
 inline void warn(const Twine &msg) { errorHandler().warn(msg); }
 inline uint64_t errorCount() { return errorHandler().errorCount; }
 
-LLVM_ATTRIBUTE_NORETURN void exitLld(int val);
+[[noreturn]] void exitLld(int val);
 
 void diagnosticHandler(const llvm::DiagnosticInfo &di);
 void checkError(Error e);
@@ -143,6 +172,13 @@ template <class T> T check(Expected<T> e) {
   if (!e)
     fatal(llvm::toString(e.takeError()));
   return std::move(*e);
+}
+
+// Don't move from Expected wrappers around references.
+template <class T> T &check(Expected<T &> e) {
+  if (!e)
+    fatal(llvm::toString(e.takeError()));
+  return *e;
 }
 
 template <class T>

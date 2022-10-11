@@ -278,7 +278,7 @@ MIASM =  \
 	freebsd64_getcontext.o \
 	freebsd64_setcontext.o \
 	freebsd64_swapcontext.o \
-	freebsd64_swapoff.o \
+	freebsd13_freebsd64_swapoff.o \
 	freebsd64___acl_get_link.o \
 	freebsd64___acl_set_link.o \
 	freebsd64___acl_delete_link.o \
@@ -288,6 +288,8 @@ MIASM =  \
 	freebsd64_thr_exit.o \
 	freebsd64_thr_self.o \
 	thr_kill.o \
+	freebsd10_freebsd64__umtx_lock.o \
+	freebsd10_freebsd64__umtx_unlock.o \
 	jail_attach.o \
 	freebsd64_extattr_list_fd.o \
 	freebsd64_extattr_list_file.o \
@@ -422,4 +424,7 @@ MIASM =  \
 	freebsd64_rpctls_syscall.o \
 	freebsd64___specialfd.o \
 	freebsd64_aio_writev.o \
-	freebsd64_aio_readv.o
+	freebsd64_aio_readv.o \
+	freebsd64_fspacectl.o \
+	sched_getcpu.o \
+	freebsd64_swapoff.o

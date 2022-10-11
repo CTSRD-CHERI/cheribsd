@@ -80,7 +80,7 @@ __FBSDID("$FreeBSD$");
 /* Each TWL device typically has more than one I2C address */
 #define TWL_MAX_SUBADDRS            4
 
-/* The maxium number of bytes that can be written in one call */
+/* The maximum number of bytes that can be written in one call */
 #define TWL_MAX_IIC_DATA_SIZE       63
 
 /* The TWL devices typically use 4 I2C address for the different internal
@@ -452,7 +452,6 @@ static driver_t twl_driver = {
 	twl_methods,
 	sizeof(struct twl_softc),
 };
-static devclass_t twl_devclass;
 
-DRIVER_MODULE(twl, iicbus, twl_driver, twl_devclass, 0, 0);
+DRIVER_MODULE(twl, iicbus, twl_driver, 0, 0);
 MODULE_VERSION(twl, 1);

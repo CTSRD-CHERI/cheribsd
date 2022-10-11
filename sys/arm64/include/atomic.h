@@ -55,7 +55,7 @@
 #define	wmb()	dmb(st)	/* Full system memory barrier store */
 #define	rmb()	dmb(ld)	/* Full system memory barrier load */
 
-#if defined(KCSAN) && !defined(KCSAN_RUNTIME)
+#if defined(SAN_NEEDS_INTERCEPTORS) && !defined(SAN_RUNTIME)
 #include <sys/atomic_san.h>
 #else
 
@@ -410,19 +410,19 @@ _ATOMIC_READANDCLEAR_PROTO(t, )						\
 _ATOMIC_SWAP_IMPL(32, w, wzr)
 _ATOMIC_SWAP_IMPL(64,  , xzr)
 
-#define	_ATOMIC_TEST_OP_PROTO(t, op, flav)				\
+#define	_ATOMIC_TEST_OP_PROTO(t, op, bar, flav)				\
 static __inline int							\
-atomic_testand##op##_##t##flav(volatile uint##t##_t *p, u_int val)
+atomic_testand##op##_##bar##t##flav(volatile uint##t##_t *p, u_int val)
 
-#define	_ATOMIC_TEST_OP_IMPL(t, w, op, llsc_asm_op, lse_asm_op)		\
-_ATOMIC_TEST_OP_PROTO(t, op, _llsc)					\
+#define	_ATOMIC_TEST_OP_IMPL(t, w, op, llsc_asm_op, lse_asm_op, bar, a)	\
+_ATOMIC_TEST_OP_PROTO(t, op, bar, _llsc)				\
 {									\
 	uint##t##_t mask, old, tmp;					\
 	int res;							\
 									\
 	mask = ((uint##t##_t)1) << (val & (t - 1));			\
 	__asm __volatile(						\
-	    "1: ldxr		%"#w"2, [%3]\n"				\
+	    "1: ld"#a"xr	%"#w"2, [%3]\n"				\
 	    "  "#llsc_asm_op"	%"#w"0, %"#w"2, %"#w"4\n"		\
 	    "   stxr		%w1, %"#w"0, [%3]\n"			\
 	    "   cbnz		%w1, 1b\n"				\
@@ -434,14 +434,14 @@ _ATOMIC_TEST_OP_PROTO(t, op, _llsc)					\
 	return ((old & mask) != 0);					\
 }									\
 									\
-_ATOMIC_TEST_OP_PROTO(t, op, _lse)					\
+_ATOMIC_TEST_OP_PROTO(t, op, bar, _lse)					\
 {									\
 	uint##t##_t mask, old;						\
 									\
 	mask = ((uint##t##_t)1) << (val & (t - 1));			\
 	__asm __volatile(						\
 	    ".arch_extension lse\n"					\
-	    "ld"#lse_asm_op"	%"#w"2, %"#w"0, [%1]\n"			\
+	    "ld"#lse_asm_op#a"	%"#w"2, %"#w"0, [%1]\n"			\
 	    ".arch_extension nolse\n"					\
 	    : "=r" (old)						\
 	    : ASM_PTR_CONSTR (p), "r" (mask)			\
@@ -451,17 +451,19 @@ _ATOMIC_TEST_OP_PROTO(t, op, _lse)					\
 	return ((old & mask) != 0);					\
 }									\
 									\
-_ATOMIC_TEST_OP_PROTO(t, op, )						\
+_ATOMIC_TEST_OP_PROTO(t, op, bar, )					\
 {									\
 	if (_ATOMIC_LSE_SUPPORTED)					\
-		return (atomic_testand##op##_##t##_lse(p, val));	\
+		return (atomic_testand##op##_##bar##t##_lse(p, val));	\
 	else								\
-		return (atomic_testand##op##_##t##_llsc(p, val));	\
+		return (atomic_testand##op##_##bar##t##_llsc(p, val));	\
 }
 
 #define	_ATOMIC_TEST_OP(op, llsc_asm_op, lse_asm_op)			\
-	_ATOMIC_TEST_OP_IMPL(32, w, op, llsc_asm_op, lse_asm_op)	\
-	_ATOMIC_TEST_OP_IMPL(64,  , op, llsc_asm_op, lse_asm_op)
+	_ATOMIC_TEST_OP_IMPL(32, w, op, llsc_asm_op, lse_asm_op,     ,  ) \
+	_ATOMIC_TEST_OP_IMPL(32, w, op, llsc_asm_op, lse_asm_op, acq_, a) \
+	_ATOMIC_TEST_OP_IMPL(64,  , op, llsc_asm_op, lse_asm_op,     ,  ) \
+	_ATOMIC_TEST_OP_IMPL(64,  , op, llsc_asm_op, lse_asm_op, acq_, a)
 
 _ATOMIC_TEST_OP(clear, bic, clr)
 _ATOMIC_TEST_OP(set,   orr, set)
@@ -504,6 +506,64 @@ _ATOMIC_STORE_REL_IMPL(16, w, h)
 _ATOMIC_STORE_REL_IMPL(32, w,  )
 _ATOMIC_STORE_REL_IMPL(64,  ,  )
 
+#define	atomic_add_char			atomic_add_8
+#define	atomic_fcmpset_char		atomic_fcmpset_8
+#define	atomic_clear_char		atomic_clear_8
+#define	atomic_cmpset_char		atomic_cmpset_8
+#define	atomic_fetchadd_char		atomic_fetchadd_8
+#define	atomic_readandclear_char	atomic_readandclear_8
+#define	atomic_set_char			atomic_set_8
+#define	atomic_swap_char		atomic_swap_8
+#define	atomic_subtract_char		atomic_subtract_8
+#define	atomic_testandclear_char	atomic_testandclear_8
+#define	atomic_testandset_char		atomic_testandset_8
+
+#define	atomic_add_acq_char		atomic_add_acq_8
+#define	atomic_fcmpset_acq_char		atomic_fcmpset_acq_8
+#define	atomic_clear_acq_char		atomic_clear_acq_8
+#define	atomic_cmpset_acq_char		atomic_cmpset_acq_8
+#define	atomic_load_acq_char		atomic_load_acq_8
+#define	atomic_set_acq_char		atomic_set_acq_8
+#define	atomic_subtract_acq_char	atomic_subtract_acq_8
+#define	atomic_testandset_acq_char	atomic_testandset_acq_8
+
+#define	atomic_add_rel_char		atomic_add_rel_8
+#define	atomic_fcmpset_rel_char		atomic_fcmpset_rel_8
+#define	atomic_clear_rel_char		atomic_clear_rel_8
+#define	atomic_cmpset_rel_char		atomic_cmpset_rel_8
+#define	atomic_set_rel_char		atomic_set_rel_8
+#define	atomic_subtract_rel_char	atomic_subtract_rel_8
+#define	atomic_store_rel_char		atomic_store_rel_8
+
+#define	atomic_add_short		atomic_add_16
+#define	atomic_fcmpset_short		atomic_fcmpset_16
+#define	atomic_clear_short		atomic_clear_16
+#define	atomic_cmpset_short		atomic_cmpset_16
+#define	atomic_fetchadd_short		atomic_fetchadd_16
+#define	atomic_readandclear_short	atomic_readandclear_16
+#define	atomic_set_short		atomic_set_16
+#define	atomic_swap_short		atomic_swap_16
+#define	atomic_subtract_short		atomic_subtract_16
+#define	atomic_testandclear_short	atomic_testandclear_16
+#define	atomic_testandset_short		atomic_testandset_16
+
+#define	atomic_add_acq_short		atomic_add_acq_16
+#define	atomic_fcmpset_acq_short	atomic_fcmpset_acq_16
+#define	atomic_clear_acq_short		atomic_clear_acq_16
+#define	atomic_cmpset_acq_short		atomic_cmpset_acq_16
+#define	atomic_load_acq_short		atomic_load_acq_16
+#define	atomic_set_acq_short		atomic_set_acq_16
+#define	atomic_subtract_acq_short	atomic_subtract_acq_16
+#define	atomic_testandset_acq_short	atomic_testandset_acq_16
+
+#define	atomic_add_rel_short		atomic_add_rel_16
+#define	atomic_fcmpset_rel_short	atomic_fcmpset_rel_16
+#define	atomic_clear_rel_short		atomic_clear_rel_16
+#define	atomic_cmpset_rel_short		atomic_cmpset_rel_16
+#define	atomic_set_rel_short		atomic_set_rel_16
+#define	atomic_subtract_rel_short	atomic_subtract_rel_16
+#define	atomic_store_rel_short		atomic_store_rel_16
+
 #define	atomic_add_int			atomic_add_32
 #define	atomic_fcmpset_int		atomic_fcmpset_32
 #define	atomic_clear_int		atomic_clear_32
@@ -523,6 +583,7 @@ _ATOMIC_STORE_REL_IMPL(64,  ,  )
 #define	atomic_load_acq_int		atomic_load_acq_32
 #define	atomic_set_acq_int		atomic_set_acq_32
 #define	atomic_subtract_acq_int		atomic_subtract_acq_32
+#define	atomic_testandset_acq_int	atomic_testandset_acq_32
 
 #define	atomic_add_rel_int		atomic_add_rel_32
 #define	atomic_fcmpset_rel_int		atomic_fcmpset_rel_32
@@ -563,6 +624,7 @@ _ATOMIC_STORE_REL_IMPL(64,  ,  )
 #define	atomic_load_acq_long		atomic_load_acq_64
 #define	atomic_set_acq_long		atomic_set_acq_64
 #define	atomic_subtract_acq_long	atomic_subtract_acq_64
+#define	atomic_testandset_acq_long	atomic_testandset_acq_64
 
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	atomic_add_acq_ptr		atomic_add_acq_64
@@ -755,8 +817,6 @@ atomic_thread_fence_seq_cst(void)
 
 	dmb(sy);
 }
-
-#include <sys/_atomic_subword.h>
 
 #endif /* KCSAN && !KCSAN_RUNTIME */
 #endif /* _MACHINE_ATOMIC_H_ */

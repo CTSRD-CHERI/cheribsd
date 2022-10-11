@@ -9,6 +9,7 @@
 #ifndef LLD_COFF_DRIVER_H
 #define LLD_COFF_DRIVER_H
 
+#include "COFFLinkerContext.h"
 #include "Config.h"
 #include "SymbolTable.h"
 #include "lld/Common/LLVM.h"
@@ -29,8 +30,7 @@
 namespace lld {
 namespace coff {
 
-class LinkerDriver;
-extern LinkerDriver *driver;
+extern std::unique_ptr<class LinkerDriver> driver;
 
 using llvm::COFF::MachineTypes;
 using llvm::COFF::WindowsSubsystem;
@@ -78,7 +78,9 @@ private:
 
 class LinkerDriver {
 public:
-  void link(llvm::ArrayRef<const char *> args);
+  LinkerDriver(COFFLinkerContext &c) : ctx(c) {}
+
+  void linkerMain(llvm::ArrayRef<const char *> args);
 
   // Used by the resolver to parse .drectve section contents.
   void parseDirectives(InputFile *file);
@@ -93,18 +95,17 @@ public:
 
   void enqueuePath(StringRef path, bool wholeArchive, bool lazy);
 
-private:
   std::unique_ptr<llvm::TarWriter> tar; // for /linkrepro
 
-  // Opens a file. Path has to be resolved already.
-  MemoryBufferRef openFile(StringRef path);
-
+private:
   // Searches a file from search paths.
   Optional<StringRef> findFile(StringRef filename);
   Optional<StringRef> findLib(StringRef filename);
   StringRef doFindFile(StringRef filename);
   StringRef doFindLib(StringRef filename);
   StringRef doFindLibMinGW(StringRef filename);
+
+  bool findUnderscoreMangle(StringRef sym);
 
   // Parses LIB environment which contains a list of search paths.
   void addLibSearchPaths();
@@ -151,6 +152,8 @@ private:
   std::vector<MemoryBufferRef> resources;
 
   llvm::StringSet<> directivesExports;
+
+  COFFLinkerContext &ctx;
 };
 
 // Functions below this line are defined in DriverUtils.cpp.
@@ -168,10 +171,11 @@ void parseVersion(StringRef arg, uint32_t *major, uint32_t *minor);
 
 // Parses a string in the form of "<subsystem>[,<integer>[.<integer>]]".
 void parseSubsystem(StringRef arg, WindowsSubsystem *sys, uint32_t *major,
-                    uint32_t *minor);
+                    uint32_t *minor, bool *gotVersion = nullptr);
 
 void parseAlternateName(StringRef);
 void parseMerge(StringRef);
+void parsePDBPageSize(StringRef);
 void parseSection(StringRef);
 void parseAligncomm(StringRef);
 
@@ -205,8 +209,6 @@ void checkFailIfMismatch(StringRef arg, InputFile *source);
 // Convert Windows resource files (.res files) to a .obj file.
 MemoryBufferRef convertResToCOFF(ArrayRef<MemoryBufferRef> mbs,
                                  ArrayRef<ObjFile *> objs);
-
-void runMSVCLinker(std::string rsp, ArrayRef<StringRef> objects);
 
 // Create enum with OPT_xxx values for each option in Options.td
 enum {

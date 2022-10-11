@@ -261,9 +261,6 @@ as3722_parse_fdt(struct as3722_softc *sc, phandle_t node)
 static void
 as3722_intr(void *arg)
 {
-	struct as3722_softc *sc;
-
-	sc = (struct as3722_softc *)arg;
 	/* XXX Finish temperature alarms. */
 }
 
@@ -285,16 +282,13 @@ static int
 as3722_attach(device_t dev)
 {
 	struct as3722_softc *sc;
-	const char *dname;
-	int dunit, rv, rid;
+	int rv, rid;
 	phandle_t node;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 	sc->bus_addr = iicbus_get_addr(dev);
 	node = ofw_bus_get_node(sc->dev);
-	dname = device_get_name(dev);
-	dunit = device_get_unit(dev);
 	rv = 0;
 	LOCK_INIT(sc);
 
@@ -404,8 +398,6 @@ static device_method_t as3722_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t as3722_devclass;
 static DEFINE_CLASS_0(gpio, as3722_driver, as3722_methods,
     sizeof(struct as3722_softc));
-EARLY_DRIVER_MODULE(as3722, iicbus, as3722_driver, as3722_devclass,
-    NULL, NULL, 74);
+EARLY_DRIVER_MODULE(as3722, iicbus, as3722_driver, NULL, NULL, 74);

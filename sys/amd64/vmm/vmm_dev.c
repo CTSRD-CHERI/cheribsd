@@ -69,6 +69,18 @@ __FBSDID("$FreeBSD$");
 #include "io/vhpet.h"
 #include "io/vrtc.h"
 
+#ifdef COMPAT_FREEBSD13
+struct vm_stats_old {
+	int		cpuid;				/* in */
+	int		num_entries;			/* out */
+	struct timeval	tv;
+	uint64_t	statbuf[MAX_VM_STATS];
+};
+
+#define	VM_STATS_OLD \
+	_IOWR('v', IOCNUM_VM_STATS, struct vm_stats_old)
+#endif
+
 struct devmem_softc {
 	int	segid;
 	char	*name;
@@ -80,6 +92,7 @@ struct devmem_softc {
 struct vmmdev_softc {
 	struct vm	*vm;		/* vm instance cookie */
 	struct cdev	*cdev;
+	struct ucred	*ucred;
 	SLIST_ENTRY(vmmdev_softc) link;
 	SLIST_HEAD(, devmem_softc) devmem;
 	int		flags;
@@ -181,6 +194,12 @@ vmmdev_lookup(const char *name)
 		if (strcmp(name, vm_name(sc->vm)) == 0)
 			break;
 	}
+
+	if (sc == NULL)
+		return (NULL);
+
+	if (cr_cansee(curthread->td_ucred, sc->ucred))
+		return (NULL);
 
 	return (sc);
 }
@@ -369,6 +388,9 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	struct vm_pptdev_msi *pptmsi;
 	struct vm_pptdev_msix *pptmsix;
 	struct vm_nmi *vmnmi;
+#ifdef COMPAT_FREEBSD13
+	struct vm_stats_old *vmstats_old;
+#endif
 	struct vm_stats *vmstats;
 	struct vm_stat_desc *statdesc;
 	struct vm_x2apic *x2apic;
@@ -494,11 +516,21 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 					statdesc->desc, sizeof(statdesc->desc));
 		break;
 	}
+#ifdef COMPAT_FREEBSD13
+	case VM_STATS_OLD:
+		vmstats_old = (struct vm_stats_old *)data;
+		getmicrotime(&vmstats_old->tv);
+		error = vmm_stat_copy(sc->vm, vmstats_old->cpuid, 0,
+				      nitems(vmstats_old->statbuf),
+				      &vmstats_old->num_entries,
+				      vmstats_old->statbuf);
+		break;
+#endif
 	case VM_STATS: {
-		CTASSERT(MAX_VM_STATS >= MAX_VMM_STAT_ELEMS);
 		vmstats = (struct vm_stats *)data;
 		getmicrotime(&vmstats->tv);
-		error = vmm_stat_copy(sc->vm, vmstats->cpuid,
+		error = vmm_stat_copy(sc->vm, vmstats->cpuid, vmstats->index,
+				      nitems(vmstats->statbuf),
 				      &vmstats->num_entries, vmstats->statbuf);
 		break;
 	}
@@ -961,7 +993,7 @@ vmmdev_destroy(void *arg)
 {
 	struct vmmdev_softc *sc = arg;
 	struct devmem_softc *dsc;
-	int error;
+	int error __diagused;
 
 	error = vcpu_lock_all(sc);
 	KASSERT(error == 0, ("%s: error %d freezing vcpus", __func__, error));
@@ -978,6 +1010,9 @@ vmmdev_destroy(void *arg)
 
 	if (sc->vm != NULL)
 		vm_destroy(sc->vm);
+
+	if (sc->ucred != NULL)
+		crfree(sc->ucred);
 
 	if ((sc->flags & VSC_LINKED) != 0) {
 		mtx_lock(&vmmdev_mtx);
@@ -1017,10 +1052,7 @@ sysctl_vmm_destroy(SYSCTL_HANDLER_ARGS)
 	}
 
 	/*
-	 * The 'cdev' will be destroyed asynchronously when 'si_threadcount'
-	 * goes down to 0 so we should not do it again in the callback.
-	 *
-	 * Setting 'sc->cdev' to NULL is also used to indicate that the VM
+	 * Setting 'sc->cdev' to NULL is used to indicate that the VM
 	 * is scheduled for destruction.
 	 */
 	cdev = sc->cdev;
@@ -1028,21 +1060,19 @@ sysctl_vmm_destroy(SYSCTL_HANDLER_ARGS)
 	mtx_unlock(&vmmdev_mtx);
 
 	/*
-	 * Schedule all cdevs to be destroyed:
+	 * Destroy all cdevs:
 	 *
 	 * - any new operations on the 'cdev' will return an error (ENXIO).
-	 *
-	 * - when the 'si_threadcount' dwindles down to zero the 'cdev' will
-	 *   be destroyed and the callback will be invoked in a taskqueue
-	 *   context.
 	 *
 	 * - the 'devmem' cdevs are destroyed before the virtual machine 'cdev'
 	 */
 	SLIST_FOREACH(dsc, &sc->devmem, link) {
 		KASSERT(dsc->cdev != NULL, ("devmem cdev already destroyed"));
-		destroy_dev_sched_cb(dsc->cdev, devmem_destroy, dsc);
+		destroy_dev(dsc->cdev);
+		devmem_destroy(dsc);
 	}
-	destroy_dev_sched_cb(cdev, vmmdev_destroy, sc);
+	destroy_dev(cdev);
+	vmmdev_destroy(sc);
 	error = 0;
 
 out:
@@ -1096,6 +1126,7 @@ sysctl_vmm_create(SYSCTL_HANDLER_ARGS)
 		goto out;
 
 	sc = malloc(sizeof(struct vmmdev_softc), M_VMMDEV, M_WAITOK | M_ZERO);
+	sc->ucred = crhold(curthread->td_ucred);
 	sc->vm = vm;
 	SLIST_INIT(&sc->devmem);
 
@@ -1117,8 +1148,8 @@ sysctl_vmm_create(SYSCTL_HANDLER_ARGS)
 		goto out;
 	}
 
-	error = make_dev_p(MAKEDEV_CHECKNAME, &cdev, &vmmdevsw, NULL,
-			   UID_ROOT, GID_WHEEL, 0600, "vmm/%s", buf);
+	error = make_dev_p(MAKEDEV_CHECKNAME, &cdev, &vmmdevsw, sc->ucred,
+	    UID_ROOT, GID_WHEEL, 0600, "vmm/%s", buf);
 	if (error != 0) {
 		vmmdev_destroy(sc);
 		goto out;

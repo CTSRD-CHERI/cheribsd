@@ -18,7 +18,6 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.\"
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 2012, 2018 by Delphix. All rights reserved.
 .\" Copyright (c) 2012 Cyril Plisko. All Rights Reserved.
@@ -27,27 +26,20 @@
 .\" Copyright 2017 Nexenta Systems, Inc.
 .\" Copyright (c) 2017 Open-E, Inc. All Rights Reserved.
 .\"
-.Dd February 16, 2020
+.Dd March 16, 2022
 .Dt ZPOOL-EXPORT 8
 .Os
+.
 .Sh NAME
 .Nm zpool-export
-.Nd Exports the given ZFS storage pools from the system
+.Nd export ZFS storage pools
 .Sh SYNOPSIS
 .Nm zpool
 .Cm export
-.Op Fl a
 .Op Fl f
-.Ar pool Ns ...
+.Fl a Ns | Ns Ar pool Ns …
+.
 .Sh DESCRIPTION
-.Bl -tag -width Ds
-.It Xo
-.Nm zpool
-.Cm export
-.Op Fl a
-.Op Fl f
-.Ar pool Ns ...
-.Xc
 Exports the given pools from the system.
 All devices are marked as exported, but are still considered in use by other
 subsystems.
@@ -69,15 +61,21 @@ the disks.
 .It Fl a
 Exports all pools imported on the system.
 .It Fl f
-Forcefully unmount all datasets, using the
-.Nm unmount Fl f
-command.
-This option is not supported on Linux.
+Forcefully unmount all datasets, and allow export of pools with active shared spares.
 .Pp
 This command will forcefully export the pool even if it has a shared spare that
 is currently being used.
 This may lead to potential data corruption.
 .El
-.El
+.
+.Sh EXAMPLES
+.\" These are, respectively, examples 8 from zpool.8
+.\" Make sure to update them bidirectionally
+.Ss Example 1 : No Exporting a ZFS Storage Pool
+The following command exports the devices in pool
+.Ar tank
+so that they can be relocated or later imported:
+.Dl # Nm zpool Cm export Ar tank
+.
 .Sh SEE ALSO
 .Xr zpool-import 8

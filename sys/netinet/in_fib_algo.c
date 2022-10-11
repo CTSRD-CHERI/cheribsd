@@ -509,7 +509,7 @@ struct fib_lookup_module flm_bsearch4= {
 #define KEY_LEN_INET	(offsetof(struct sockaddr_in, sin_addr) + sizeof(in_addr_t))
 #define OFF_LEN_INET	(8 * offsetof(struct sockaddr_in, sin_addr))
 struct radix4_addr_entry {
-	struct radix_node	rn[2];
+	struct radix_node	rn[2] __subobject_use_container_bounds;
 	struct sockaddr_in	addr;
 	struct nhop_object	*nhop;
 };

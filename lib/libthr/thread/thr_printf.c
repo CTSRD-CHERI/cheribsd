@@ -77,7 +77,7 @@ void
 _thread_vfdprintf(int fd, const char *fmt, va_list ap)
 {
 	static const char digits[16] = "0123456789abcdef";
-	/* XXX_AR: we should print capabilities not vaddr_t -> increase size */
+	/* XXX_AR: we should print capabilities not ptraddr_t -> increase size */
 	char buf[40];
 	char *s;
 	uint64_t r, u;
@@ -131,7 +131,7 @@ next:			c = *fmt++;
 				} else {
 					if (isptr) {
 						pointer = va_arg(ap, void*);
-						u = (vaddr_t)pointer;
+						u = (ptraddr_t)pointer;
 					} else if (islong) {
 						u = va_arg(ap, uint64_t);
 					} else {

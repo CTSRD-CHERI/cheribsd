@@ -30,9 +30,11 @@
 #ifndef _SYS_EPOCH_H_
 #define _SYS_EPOCH_H_
 
+#include <sys/cdefs.h>
+
 struct epoch_context {
 	void   *data[2];
-} __aligned(sizeof(void *));
+} __aligned(sizeof(void *)) __subobject_use_container_bounds;
 
 typedef struct epoch_context *epoch_context_t;
 typedef	void epoch_callback_t(epoch_context_t);
@@ -55,11 +57,14 @@ struct epoch_tracker {
 	TAILQ_ENTRY(epoch_tracker) et_link;
 	struct thread *et_td;
 	ck_epoch_section_t et_section;
+	uint8_t et_old_priority;
 #ifdef EPOCH_TRACE
 	struct epoch *et_epoch;
 	SLIST_ENTRY(epoch_tracker) et_tlink;
 	const char *et_file;
 	int et_line;
+	int et_flags;
+#define	ET_REPORT_EXIT	0x1
 #endif
 }  __aligned(sizeof(void *));
 typedef struct epoch_tracker *epoch_tracker_t;
@@ -85,6 +90,7 @@ void _epoch_enter_preempt(epoch_t epoch, epoch_tracker_t et EPOCH_FILE_LINE);
 void _epoch_exit_preempt(epoch_t epoch, epoch_tracker_t et EPOCH_FILE_LINE);
 #ifdef EPOCH_TRACE
 void epoch_trace_list(struct thread *);
+void epoch_where_report(epoch_t);
 #define	epoch_enter_preempt(epoch, et)	_epoch_enter_preempt(epoch, et, __FILE__, __LINE__)
 #define	epoch_exit_preempt(epoch, et)	_epoch_exit_preempt(epoch, et, __FILE__, __LINE__)
 #else
@@ -103,6 +109,7 @@ extern epoch_t net_epoch_preempt;
 #define	NET_EPOCH_EXIT(et)	epoch_exit_preempt(net_epoch_preempt, &(et))
 #define	NET_EPOCH_WAIT()	epoch_wait_preempt(net_epoch_preempt)
 #define	NET_EPOCH_CALL(f, c)	epoch_call(net_epoch_preempt, (f), (c))
+#define	NET_EPOCH_DRAIN_CALLBACKS() epoch_drain_callbacks(net_epoch_preempt)
 #define	NET_EPOCH_ASSERT()	MPASS(in_epoch(net_epoch_preempt))
 #define	NET_TASK_INIT(t, p, f, c) TASK_INIT_FLAGS(t, p, f, c, TASK_NETWORK)
 #define	NET_GROUPTASK_INIT(gtask, prio, func, ctx)			\

@@ -71,7 +71,7 @@ SDT_PROVIDER_DEFINE(geom);
 
 struct class_list_head g_classes = LIST_HEAD_INITIALIZER(g_classes);
 static struct g_tailq_head geoms = TAILQ_HEAD_INITIALIZER(geoms);
-char *g_wait_event, *g_wait_up, *g_wait_down, *g_wait_sim;
+char *g_wait_event, *g_wait_up, *g_wait_down;
 
 struct g_hh00 {
 	struct g_class		*mp;
@@ -222,7 +222,6 @@ retry:
 
 	/* Bar new entries */
 	mp->taste = NULL;
-	mp->config = NULL;
 
 	LIST_FOREACH(gp, &mp->geom, geom) {
 		error = mp->destroy_geom(NULL, mp, gp);
@@ -482,7 +481,7 @@ g_wither_geom_close(struct g_geom *gp, int error)
  * withered bits at present.
  */
 void
-g_wither_washer()
+g_wither_washer(void)
 {
 	struct g_class *mp;
 	struct g_geom *gp, *gp2;

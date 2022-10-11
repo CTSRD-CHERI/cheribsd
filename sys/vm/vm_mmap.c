@@ -141,7 +141,7 @@ cap_covers_pages(const void * __capability cap, size_t size)
 	size_t pageoff;
 
 	addr = cap;
-	pageoff = ((__cheri_addr vaddr_t)addr & PAGE_MASK);
+	pageoff = ((__cheri_addr ptraddr_t)addr & PAGE_MASK);
 	addr -= pageoff;
 	size += pageoff;
 	size = (vm_size_t)round_page(size);
@@ -149,13 +149,14 @@ cap_covers_pages(const void * __capability cap, size_t size)
 	return (__CAP_CHECK(__DECONST_CAP(void * __capability, addr), size));
 }
 
-static void * __capability
+static uintcap_t
 mmap_retcap(struct thread *td, vm_pointer_t addr,
     const struct mmap_req *mrp)
 {
-	void * __capability newcap;
+	uintcap_t newcap;
 #ifndef __CHERI_PURE_CAPABILITY__
-	size_t cap_base, cap_len;
+	ptraddr_t cap_base __diagused;
+	size_t cap_len __diagused;
 #endif
 	register_t perms, cap_prot;
 
@@ -164,18 +165,47 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 	 *
 	 * NB: This means no permission changes.
 	 * The assumption is that the larger capability has the correct
-	 * permissions and we're only intrested in adjusting page mappings.
+	 * permissions and we're only interested in adjusting page mappings.
 	 */
 	if (mrp->mr_flags & MAP_CHERI_NOSETBOUNDS)
-		return (mrp->mr_source_cap);
+		return ((uintcap_t)mrp->mr_source_cap);
 
+	/*
+	 * The purecap kernel returns a properly bounded capability
+	 * from the vm_map API.  Hybrid kernels need to use the
+	 * address 'addr' to derive a valid capability.
+	 */
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
-	newcap = (void *)addr;
+	newcap = addr;
 	/* Enforce per-thread mmap capability permission */
 	newcap = cheri_andperm(newcap, cheri_getperm(mrp->mr_source_cap));
 #else
-	newcap = mrp->mr_source_cap;
+	newcap = (uintcap_t)mrp->mr_source_cap;
+	if (mrp->mr_flags & MAP_FIXED) {
+		/*
+		 * If hint was under aligned, we need to return a
+		 * capability to the whole, properly-aligned region
+		 * with the offset pointing to hint.
+		 */
+		newcap = cheri_setaddress(newcap, rounddown2(addr, PAGE_SIZE));
+		newcap = cheri_setbounds(newcap,
+		    roundup2(mrp->mr_len + (addr - rounddown2(addr, PAGE_SIZE)),
+		    PAGE_SIZE));
+		/* Shift address up if required */
+		newcap = cheri_setaddress(newcap, addr);
+	} else {
+		cap_base = cheri_getbase(newcap);
+		cap_len = cheri_getlen(newcap);
+		KASSERT(addr >= cap_base &&
+		    addr + mrp->mr_len <= cap_base + cap_len,
+		    ("Allocated range (%zx - %zx) is not within source "
+		    "capability (%zx - %zx)", addr, addr + mrp->mr_len,
+		    cap_base, cap_base + cap_len));
+		newcap = cheri_setbounds(
+		    cheri_setaddress(newcap, addr),
+		    roundup2(mrp->mr_len, PAGE_SIZE));
+	}
 #endif
 
 	/*
@@ -191,38 +221,6 @@ mmap_retcap(struct thread *td, vm_pointer_t addr,
 	 */
 	perms = ~CHERI_PROT2PERM_MASK | vm_map_prot2perms(cap_prot);
 	newcap = cheri_andperm(newcap, perms);
-
-#ifndef __CHERI_PURE_CAPABILITY__
-	/* Reservations in the kernel ensure this */
-	if (mrp->mr_flags & MAP_FIXED) {
-		/*
-		 * If hint was under aligned, we need to return a
-		 * capability to the whole, properly aligned region
-		 * with the offset pointing to hint.
-		 */
-		cap_base = cheri_getbase(newcap);
-		/* TODO: use cheri_setaddress? */
-		/* Set offset to vaddr of page */
-		newcap = cheri_setoffset(newcap,
-		    rounddown2(addr, PAGE_SIZE) - cap_base);
-		newcap = cheri_setbounds(newcap,
-		    roundup2(mrp->mr_len + (addr - rounddown2(addr, PAGE_SIZE)),
-		    PAGE_SIZE));
-		/* Shift offset up if required */
-		newcap = cheri_setaddress(newcap, addr);
-	} else {
-		cap_base = cheri_getbase(newcap);
-		cap_len = cheri_getlen(newcap);
-		KASSERT(addr >= cap_base &&
-		    addr + mrp->mr_len <= cap_base + cap_len,
-		    ("Allocated range (%zx - %zx) is not within source "
-		    "capability (%zx - %zx)", addr, addr + mrp->mr_len,
-		    cap_base, cap_base + cap_len));
-		newcap = cheri_setbounds(
-		    cheri_setaddress(newcap, addr),
-		    roundup2(mrp->mr_len, PAGE_SIZE));
-	}
-#endif
 
 	return (newcap);
 }
@@ -345,7 +343,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	if (cheri_gettag(uap->addr)) {
 		if ((flags & MAP_FIXED) == 0)
 			return (EPROT);
-		else if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP))
+		else if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM))
 			source_cap = uap->addr;
 		else
 			return (EACCES);
@@ -804,11 +802,10 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	if (error == 0) {
 #if __has_feature(capabilities)
 		if (SV_CURPROC_FLAG(SV_CHERI))
-			td->td_retval[0] = (uintcap_t)mmap_retcap(td,
-			    addr + pageoff,  mrp);
+			td->td_retval[0] = mmap_retcap(td, addr + pageoff, mrp);
 		else
 #endif
-			td->td_retval[0] = (syscallarg_t)(addr + pageoff);
+			td->td_retval[0] = addr + pageoff;
 	}
 done:
 	if (fp)
@@ -846,6 +843,14 @@ struct ommap_args {
 int
 ommap(struct thread *td, struct ommap_args *uap)
 {
+	return (kern_ommap(td, (uintptr_t)uap->addr, uap->len, uap->prot,
+	    uap->flags, uap->fd, uap->pos));
+}
+
+int
+kern_ommap(struct thread *td, uintptr_t hint, int len, int oprot,
+    int oflags, int fd, long pos)
+{
 	static const char cvtbsdprot[8] = {
 		0,
 		PROT_EXEC,
@@ -858,35 +863,38 @@ ommap(struct thread *td, struct ommap_args *uap)
 	};
 	int flags, prot;
 
+	if (len < 0)
+		return (EINVAL);
+
 #define	OMAP_ANON	0x0002
 #define	OMAP_COPY	0x0020
 #define	OMAP_SHARED	0x0010
 #define	OMAP_FIXED	0x0100
 
-	prot = cvtbsdprot[uap->prot & 0x7];
+	prot = cvtbsdprot[oprot & 0x7];
 #if (defined(COMPAT_FREEBSD32) && defined(__amd64__)) || defined(__i386__)
 	if (i386_read_exec && SV_PROC_FLAG(td->td_proc, SV_ILP32) &&
 	    prot != 0)
 		prot |= PROT_EXEC;
 #endif
 	flags = 0;
-	if (uap->flags & OMAP_ANON)
+	if (oflags & OMAP_ANON)
 		flags |= MAP_ANON;
-	if (uap->flags & OMAP_COPY)
+	if (oflags & OMAP_COPY)
 		flags |= MAP_COPY;
-	if (uap->flags & OMAP_SHARED)
+	if (oflags & OMAP_SHARED)
 		flags |= MAP_SHARED;
 	else
 		flags |= MAP_PRIVATE;
-	if (uap->flags & OMAP_FIXED)
+	if (oflags & OMAP_FIXED)
 		flags |= MAP_FIXED;
 	return (kern_mmap(td, &(struct mmap_req){
-		.mr_hint = (uintptr_t)uap->addr,
-		.mr_len = uap->len,
+		.mr_hint = hint,
+		.mr_len = len,
 		.mr_prot = prot,
 		.mr_flags = flags,
-		.mr_fd = uap->fd,
-		.mr_pos = uap->pos,
+		.mr_fd = fd,
+		.mr_pos = pos,
 	    }));
 }
 #endif				/* COMPAT_43 */
@@ -976,7 +984,7 @@ sys_munmap(struct thread *td, struct munmap_args *uap)
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
 		return (EPROT);
-	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+	if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
 		return (EPROT);
 #endif
 
@@ -1062,7 +1070,7 @@ sys_mprotect(struct thread *td, struct mprotect_args *uap)
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
 		return (EPROT);
-	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+	if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
 		return (EPROT);
 #endif
 
@@ -1138,7 +1146,7 @@ sys_minherit(struct thread *td, struct minherit_args *uap)
 #if __has_feature(capabilities)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
 		return (EPROT);
-	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+	if ((cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
 		return (EPROT);
 #endif
 	return (kern_minherit(td, (uintptr_t)(uintcap_t)uap->addr, uap->len,
@@ -1191,10 +1199,10 @@ sys_madvise(struct thread *td, struct madvise_args *uap)
 
 	/*
 	 * MADV_FREE may change the page contents so require
-	 * CHERI_PERM_CHERIABI_VMMAP.
+	 * CHERI_PERM_SW_VMEM.
 	 */
 	if (uap->behav == MADV_FREE &&
-	    (cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+	    (cheri_getperm(uap->addr) & CHERI_PERM_SW_VMEM) == 0)
 		return (EPROT);
 #endif
 
@@ -1254,7 +1262,12 @@ sys_mincore(struct thread *td, struct mincore_args *uap)
 {
 
 #if __has_feature(capabilities)
-	if (cap_covers_pages(uap->addr, uap->len) == 0)
+	/*
+	 * Since this is a read-only query that does not modify any mappings
+	 * or raise faults, we do not require the cap to cover
+	 * the full page, just to overlap at least part of the page.
+	 */
+	if (__CAP_CHECK(uap->addr, uap->len) == 0)
 		return (EPROT);
 #endif
 
@@ -1387,8 +1400,7 @@ retry:
 					object = current->object.vm_object;
 					VM_OBJECT_WLOCK(object);
 				}
-				if (object->type == OBJT_DEFAULT ||
-				    object->type == OBJT_SWAP ||
+				if ((object->flags & OBJ_SWAP) != 0 ||
 				    object->type == OBJT_VNODE) {
 					pindex = OFF_TO_IDX(current->offset +
 					    (addr - current->start));
@@ -1825,8 +1837,7 @@ vm_mmap_vnode(struct thread *td, vm_size_t objsize,
 			goto done;
 		}
 	} else {
-		KASSERT(obj->type == OBJT_DEFAULT || obj->type == OBJT_SWAP,
-		    ("wrong object type"));
+		KASSERT((obj->flags & OBJ_SWAP) != 0, ("wrong object type"));
 		vm_object_reference(obj);
 #if VM_NRESERVLEVEL > 0
 		if ((obj->flags & OBJ_COLORED) == 0) {
@@ -1914,13 +1925,6 @@ vm_mmap_cdev(struct thread *td, vm_size_t objsize, vm_prot_t *protp,
 	return (0);
 }
 
-/*
- * vm_mmap()
- *
- * Internal version of mmap used by exec, sys5 shared memory, and
- * various device drivers.  Handle is either a vnode pointer, a
- * character device, or NULL for MAP_ANON.
- */
 int
 vm_mmap(vm_map_t map, vm_pointer_t *addr, vm_size_t size, vm_prot_t prot,
 	vm_prot_t maxprot, int flags,
@@ -1942,9 +1946,6 @@ vm_mmap(vm_map_t map, vm_pointer_t *addr, vm_size_t size, vm_prot_t prot,
 	KASSERT((prot & VM_PROT_CAP) == 0, ("VM_PROT_CAP set in prot"));
 	KASSERT((maxprot & VM_PROT_CAP) == 0, ("VM_PROT_CAP set in maxprot"));
 
-	/*
-	 * Lookup/allocate object.
-	 */
 	switch (handle_type) {
 	case OBJT_DEVICE: {
 		struct cdevsw *dsw;
@@ -1964,14 +1965,6 @@ vm_mmap(vm_map_t map, vm_pointer_t *addr, vm_size_t size, vm_prot_t prot,
 		error = vm_mmap_vnode(td, size, prot, &maxprot, &flags,
 		    handle, &foff, &object, &writecounted);
 		break;
-	case OBJT_DEFAULT:
-		if (handle == NULL) {
-			prot = VM_PROT_ADD_CAP(prot);
-			maxprot = VM_PROT_ADD_CAP(prot);
-			error = 0;
-			break;
-		}
-		/* FALLTHROUGH */
 	default:
 		error = EINVAL;
 		break;
@@ -2036,10 +2029,9 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
     vm_prot_t maxprot, int flags, vm_object_t object, vm_ooffset_t foff,
     boolean_t writecounted, struct thread *td)
 {
+	vm_pointer_t *reservp;
 	int docow, error, findspace, rv;
-	bool curmap, fitit, new_reservation;
-	vm_size_t padded_size;
-	vm_pointer_t reservation;
+	bool curmap, fitit;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_getlen(addr) == sizeof(void *),
@@ -2049,7 +2041,6 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 
 	curmap = map == &td->td_proc->p_vmspace->vm_map;
 	if (curmap) {
-		padded_size = CHERI_REPRESENTABLE_LENGTH(size);
 		error = kern_mmap_racct_check(td, map, size);
 		if (error != 0)
 			return (error);
@@ -2074,11 +2065,6 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 			return (EINVAL);
 		fitit = FALSE;
 	}
-
-	if (flags & MAP_RESERVATION_CREATE)
-		new_reservation = true;
-	else
-		new_reservation = false;
 
 	if (flags & MAP_ANON) {
 		if (object != NULL || foff != 0)
@@ -2132,20 +2118,12 @@ vm_mmap_object(vm_map_t map, vm_pointer_t *addr, vm_offset_t max_addr,
 			return (ENOMEM);
 		if (docow & MAP_GUARD)
 			maxprot = PROT_NONE;
-		reservation = *addr;
-		if (new_reservation) {
-			rv = vm_map_reservation_create(map, &reservation,
-			    size, PAGE_SIZE, maxprot);
-			if (rv != KERN_SUCCESS)
-				return (vm_mmap_to_errno(rv));
-		}
-
-		rv = vm_map_fixed(map, object, foff, reservation, size,
-		    prot, maxprot, docow);
-		if (rv != KERN_SUCCESS && new_reservation)
-			vm_map_reservation_delete(map, reservation);
+		if ((flags & MAP_RESERVATION_CREATE) != 0)
+			reservp = addr;
 		else
-			*addr = reservation;
+			reservp = NULL;
+		rv = vm_map_fixed(map, object, foff, *addr, reservp, size,
+		    prot, maxprot, docow);
 	}
 
 	if (rv == KERN_SUCCESS) {

@@ -199,7 +199,6 @@ FBSD_1.3 {
 	__istype_l;
 	__runes_for_locale;
 	_ThreadRuneLocale;
-	__emutls_v._ThreadRuneLocale;
 	c16rtomb;
 	c16rtomb_l;
 	c32rtomb;

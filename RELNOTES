@@ -10,6 +10,109 @@ newline.  Entries should be separated by a newline.
 
 Changes to this file should not be MFCed.
 
-76681661be28
+78ee8d1c4cda,f4f56ff43dbd:
+	The in-tree qat(4) driver has been replaced with Intel's QAT driver.
+	The new version provides additional interfaces to the chipset's
+	cryptographic and compression offload functionality.
+
+	This will have no visible change for most users; however, the new
+	driver does not support Atom C2000 chipsets.  To preserve support for
+	those chipsets, the old driver has been renamed to qat_c2xxx and kept
+	in the tree.  Users of qat(4) on C2000 hardware will thus need to
+	ensure that qat_c2xxx(4) is loaded instead of qat(4).
+
+da5b7e90e740,5a8fceb3bd9f,7b0a665d72c0,13ec1e3155c7,318d0db5fe8a,1ae2c59bcf21:
+	Boottrace is a new kernel-userspace interface for capturing trace
+	events during system boot and shutdown. Event annotations are
+	present in:
+
+	- The boot and shutdown paths in the kernel
+	- Some key system utilities (init(8), shutdown(8), reboot(8))
+	- rc(8) scripts (via boottrace(8))
+
+	In contrast to other existing boot-time tracing facilities like TSLOG,
+	Boottrace focuses on the ease of use and is aimed primarily at system
+	administrators.
+
+	It is available in the default GENERIC kernel and can be enabled by
+	toggling a single sysctl(8) variable.
+
+	See boottrace(4) for more details.
+
+05a1d0f5d7ac:
+	Kernel TLS offload now supports receive-side offload of TLS 1.3.
+
+19dc64451179:
+	if_stf now supports 6rd (RFC5969).
+
+c1d255d3ffdb, 3968b47cd974, bd452dcbede6:
+	Add WiFi 6 support to wpa.
+
+ba48d52ca6c8,4ac3d08a9693,2533eca1c2b9:
+	The default bell tone is now 800Hz. It may be set with kbdcontrol
+	again. There's devd integration for people wishing to use their sound
+	cards for the beep.
+
+92b3e07229ba:
+	net.inet.tcp.nolocaltimewait enabled by default.  It prevents
+	creation of timewait entries for TCP connections that were
+	terminated locally.
+
+d410b585b6f0:
+	sh(1) is now the default shell for the root user.
+
+396851c20aeb:
+	libncursesw has been split into libtinfow and libncursesw, linker
+	scripts should make it transparent for consumers. pkg-config files
+	are also now installed to ease ports detecting the ncurses setup from
+	base.
+
+a422084abbda:
+	LLVM's MemorySanitizer can now be used in amd64 kernels.  See the
+	kmsan(9) manual page for more information.
+
+38da497a4dfc:
+	LLVM's AddressSanitizer can now be used in amd64 kernels.  See the
+	kasan(9) manual page for more information.
+
+f39dd6a97844,23f24377b1a9,628bd30ab5a4:
+	One True Awk has been updated to the latest from upstream
+	(20210727). All the FreeBSD patches, but one, have now been
+	either up streamed or discarded.  Notable changes include:
+		o Locale is no longer used for ranges
+		o Various bugs fixed
+		o Better compatibility with gawk and mawk
+
+	The one FreeBSD change, likely to be removed in FreeBSD 14, is that
+	we still allow hex numbers, prefixed with 0x, to be parsed and
+	interpreted as hex numbers while all other awks (including one
+	true awk now) interpret them as 0 in line with awk's historic
+	behavior.
+
+	A second change, less likely to be noticed, is the historic wart
+	if -Ft meaning to use hard tab characters as the field separator
+	is deprecated and will likely be removed in FreeBSD 14.
+
+ee29e6f31111:
+	Commit ee29e6f31111 added a new sysctl called vfs.nfsd.srvmaxio
+	that can be used to increase the maximum I/O size for the NFS
+	server to any power of 2 up to 1Mbyte while the nfsd(8) is not running.
+	The FreeBSD NFS client can now be set to use a 1Mbyte I/O size
+	via the vfs.maxbcachebuf tunable and the Linux NFS client
+	can also do 1Mbyte I/O.
+	kern.ipc.maxsockbuf will need to be increased.  A console
+	message will suggest a setting for it.
+
+d575e81fbcfa:
+	gconcat(8) has added support for appending devices to the device
+	not present at creation time.
+
+76681661be28:
 	Remove support for asymmetric cryptographic operations from
 	the kernel open cryptographic framework (OCF).
+
+a145cf3f73c7:
+	The NFSv4 client now uses the highest minor version of NFSv4
+	supported by the NFSv4 server by default instead of minor version 0,
+	for NFSv4 mounts.
+	The "minorversion" mount option may be used to override this default.

@@ -43,12 +43,16 @@ init_cap_relocs(void *data_cap, void *code_cap)
 }
 
 /* Can't include <sys/cheri.h>. */
-void	init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
-	    void *data_cap, void *code_cap, ptraddr_t base_addr);
+typedef void (cap_relocs_cb)(void *arg, bool function, bool constant,
+    ptraddr_t object, void **src);
+
+void	init_linker_file_cap_relocs(const void *start_relocs,
+	    const void *stop_relocs, void *data_cap, ptraddr_t base_addr,
+	    cap_relocs_cb *cb, void *cb_arg);
 
 void
 init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
-    void *data_cap, void *code_cap, ptraddr_t base_addr)
+    void *data_cap, ptraddr_t base_addr, cap_relocs_cb *cb, void *cb_arg)
 {
 	/*
 	 * Set code bounds if the ABI allows it.
@@ -60,6 +64,37 @@ init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
 #else
 	bool can_set_code_bounds = true;
 #endif
-	cheri_init_globals_impl(start_relocs, stop_relocs, data_cap, code_cap,
-	    data_cap, can_set_code_bounds, base_addr);
+
+	/*
+	 * This cannot use cheri_init_globals_impl directly as symbols
+	 * for kernel modules in the vnet and dpcpu sets need to use
+	 * alternate base addresses and capabilities.  Instead, we
+	 * invoke a caller-supplied callback on each capability to
+	 * request the base address and source capability.
+	 */
+	for (const struct capreloc *reloc = start_relocs;
+	     reloc < (const struct capreloc *)stop_relocs; reloc++) {
+		const void **dest = __builtin_cheri_address_set(data_cap,
+		    reloc->capability_location + base_addr);
+		void *src;
+		bool function, constant;
+
+		if (reloc->object == 0) {
+			*dest = 0;
+			continue;
+		}
+		function = (reloc->permissions & function_reloc_flag) ==
+		    function_reloc_flag;
+		constant = (reloc->permissions & constant_reloc_flag) ==
+		    constant_reloc_flag;
+		cb(cb_arg, function, constant, reloc->object, &src);
+		if ((!function || can_set_code_bounds) && reloc->size != 0)
+			src = __builtin_cheri_bounds_set(src, reloc->size);
+		src = (char *)src + reloc->offset;
+		if (function) {
+			/* Convert function pointers to sentries: */
+			src = __builtin_cheri_seal_entry(src);
+		}
+		*dest = src;	
+	}
 }

@@ -1,10 +1,9 @@
 /*-
  * Copyright (c) 2013, 2014 Andrew Turner
- * Copyright (c) 2015 The FreeBSD Foundation
- * All rights reserved.
+ * Copyright (c) 2015,2021 The FreeBSD Foundation
  *
- * This software was developed by Andrew Turner under
- * sponsorship from the FreeBSD Foundation.
+ * Portions of this software were developed by Andrew Turner
+ * under sponsorship from the FreeBSD Foundation.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -51,10 +50,20 @@
 #define	 MRS_Op2_MASK			0x000000e0
 #define	 MRS_Rt_SHIFT			0
 #define	 MRS_Rt_MASK			0x0000001f
-#define	MRS_REG(op0, op1, crn, crm, op2)				\
+#define	__MRS_REG(op0, op1, crn, crm, op2)				\
     (((op0) << MRS_Op0_SHIFT) | ((op1) << MRS_Op1_SHIFT) |		\
      ((crn) << MRS_CRn_SHIFT) | ((crm) << MRS_CRm_SHIFT) |		\
      ((op2) << MRS_Op2_SHIFT))
+#define	MRS_REG(reg)							\
+    __MRS_REG(reg##_op0, reg##_op1, reg##_CRn, reg##_CRm, reg##_op2)
+
+#define	__MRS_REG_ALT_NAME(op0, op1, crn, crm, op2)			\
+    S##op0##_##op1##_C##crn##_C##crm##_##op2
+#define	_MRS_REG_ALT_NAME(op0, op1, crn, crm, op2)			\
+    __MRS_REG_ALT_NAME(op0, op1, crn, crm, op2)
+#define	MRS_REG_ALT_NAME(reg)						\
+    _MRS_REG_ALT_NAME(reg##_op0, reg##_op1, reg##_CRn, reg##_CRm, reg##_op2)
+
 
 #define	READ_SPECIALREG(reg)						\
 ({	uint64_t _val;							\
@@ -76,6 +85,32 @@
 
 #define	UL(x)	UINT64_C(x)
 
+/* CCSIDR_EL1 - Cache Size ID Register */
+#define	CCSIDR_NumSets_MASK	0x0FFFE000
+#define	CCSIDR_NumSets64_MASK	0x00FFFFFF00000000
+#define	CCSIDR_NumSets_SHIFT	13
+#define	CCSIDR_NumSets64_SHIFT	32
+#define	CCSIDR_Assoc_MASK	0x00001FF8
+#define	CCSIDR_Assoc64_MASK	0x0000000000FFFFF8
+#define	CCSIDR_Assoc_SHIFT	3
+#define	CCSIDR_Assoc64_SHIFT	3
+#define	CCSIDR_LineSize_MASK	0x7
+#define	CCSIDR_NSETS(idr)						\
+	(((idr) & CCSIDR_NumSets_MASK) >> CCSIDR_NumSets_SHIFT)
+#define	CCSIDR_ASSOC(idr)						\
+	(((idr) & CCSIDR_Assoc_MASK) >> CCSIDR_Assoc_SHIFT)
+#define	CCSIDR_NSETS_64(idr)						\
+	(((idr) & CCSIDR_NumSets64_MASK) >> CCSIDR_NumSets64_SHIFT)
+#define	CCSIDR_ASSOC_64(idr)						\
+	(((idr) & CCSIDR_Assoc64_MASK) >> CCSIDR_Assoc64_SHIFT)
+
+/* CLIDR_EL1 - Cache level ID register */
+#define	CLIDR_CTYPE_MASK	0x7	/* Cache type mask bits */
+#define	CLIDR_CTYPE_IO		0x1	/* Instruction only */
+#define	CLIDR_CTYPE_DO		0x2	/* Data only */
+#define	CLIDR_CTYPE_ID		0x3	/* Split instruction and data */
+#define	CLIDR_CTYPE_UNIFIED	0x4	/* Unified */
+
 /* CNTHCTL_EL2 - Counter-timer Hypervisor Control register */
 #define	CNTHCTL_EVNTI_MASK	(0xf << 4) /* Bit to trigger event stream */
 #define	CNTHCTL_EVNTDIR		(1 << 3) /* Control transition trigger bit */
@@ -84,11 +119,46 @@
 #define	CNTHCTL_EL1PCTEN	(1 << 0) /*Allow EL0/1 physical counter access*/
 
 /* CNTP_CTL_EL0 - Counter-timer Physical Timer Control register */
+#define	CNTP_CTL_EL0		MRS_REG(CNTP_CTL_EL0)
+#define	CNTP_CTL_EL0_op0	3
+#define	CNTP_CTL_EL0_op1	3
+#define	CNTP_CTL_EL0_CRn	14
+#define	CNTP_CTL_EL0_CRm	2
+#define	CNTP_CTL_EL0_op2	1
 #define	CNTP_CTL_ENABLE		(1 << 0)
 #define	CNTP_CTL_IMASK		(1 << 1)
 #define	CNTP_CTL_ISTATUS	(1 << 2)
 
+/* CNTP_CVAL_EL0 - Counter-timer Physical Timer CompareValue register */
+#define	CNTP_CVAL_EL0		MRS_REG(CNTP_CVAL_EL0)
+#define	CNTP_CVAL_EL0_op0	3
+#define	CNTP_CVAL_EL0_op1	3
+#define	CNTP_CVAL_EL0_CRn	14
+#define	CNTP_CVAL_EL0_CRm	2
+#define	CNTP_CVAL_EL0_op2	2
+
+/* CNTP_TVAL_EL0 - Counter-timer Physical Timer TimerValue register */
+#define	CNTP_TVAL_EL0		MRS_REG(CNTP_TVAL_EL0)
+#define	CNTP_TVAL_EL0_op0	3
+#define	CNTP_TVAL_EL0_op1	3
+#define	CNTP_TVAL_EL0_CRn	14
+#define	CNTP_TVAL_EL0_CRm	2
+#define	CNTP_TVAL_EL0_op2	0
+
+/* CNTPCT_EL0 - Counter-timer Physical Count register */
+#define	CNTPCT_EL0		MRS_REG(CNTPCT_EL0)
+#define	CNTPCT_EL0_op0		3
+#define	CNTPCT_EL0_op1		3
+#define	CNTPCT_EL0_CRn		14
+#define	CNTPCT_EL0_CRm		0
+#define	CNTPCT_EL0_op2		1
+
 /* CPACR_EL1 */
+#define	CPACR_ZEN_MASK		(0x3 << 16)
+#define	 CPACR_ZEN_TRAP_ALL1	(0x0 << 16) /* Traps from EL0 and EL1 */
+#define	 CPACR_ZEN_TRAP_EL0	(0x1 << 16) /* Traps from EL0 */
+#define	 CPACR_ZEN_TRAP_ALL2	(0x2 << 16) /* Traps from EL0 and EL1 */
+#define	 CPACR_ZEN_TRAP_NONE	(0x3 << 16) /* No traps */
 #if __has_feature(capabilities)
 #define	CPACR_CEN_MASK		(0x3 << 18)
 #define	 CPACR_CEN_TRAP_ALL1	(0x0 << 18) /* Traps from EL0 and EL1 */
@@ -116,6 +186,10 @@
  */
 #define	CCTLR_EL1_C64E_MASK	(0x1 << 5) /* Enable C64 mode upon exception */
 #endif
+
+/* CSSELR_EL1 - Cache size selection register */
+#define	CSSELR_Level(i)		(i << 1)
+#define	CSSELR_InD		0x00000001
 
 /* CTR_EL0 - Cache Type Register */
 #define	CTR_RES1		(1 << 31)
@@ -152,11 +226,76 @@
 #define	CTR_ILINE_VAL(reg)	((reg) & CTR_ILINE_MASK)
 #define	CTR_ILINE_SIZE(reg)	(4 << (CTR_ILINE_VAL(reg) >> CTR_ILINE_SHIFT))
 
-/* DAIF - Interrupt Mask Bits */
-#define	DAIF_D_MASKED		(1 << 9)
-#define	DAIF_A_MASKED		(1 << 8)
-#define	DAIF_I_MASKED		(1 << 7)
-#define	DAIF_F_MASKED		(1 << 6)
+/* DAIFSet/DAIFClear */
+#define	DAIF_D			(1 << 3)
+#define	DAIF_A			(1 << 2)
+#define	DAIF_I			(1 << 1)
+#define	DAIF_F			(1 << 0)
+#define	DAIF_ALL		(DAIF_D | DAIF_A | DAIF_I | DAIF_F)
+#define	DAIF_INTR		(DAIF_I)	/* All exceptions that pass */
+						/* through the intr framework */
+
+/* DBGBCR<n>_EL1 - Debug Breakpoint Control Registers */
+#define	DBGBCR_EL1_op0		2
+#define	DBGBCR_EL1_op1		0
+#define	DBGBCR_EL1_CRn		0
+/* DBGBCR_EL1_CRm indicates which watchpoint this register is for */
+#define	DBGBCR_EL1_op2		5
+#define	DBGBCR_EN		0x1
+#define	DBGBCR_PMC_SHIFT	1
+#define	DBGBCR_PMC		(0x3 << DBGBCR_PMC_SHIFT)
+#define	 DBGBCR_PMC_EL1		(0x1 << DBGBCR_PMC_SHIFT)
+#define	 DBGBCR_PMC_EL0		(0x2 << DBGBCR_PMC_SHIFT)
+#define	DBGBCR_BAS_SHIFT	5
+#define	DBGBCR_BAS		(0xf << DBGBCR_BAS_SHIFT)
+#define	DBGBCR_HMC_SHIFT	13
+#define	DBGBCR_HMC		(0x1 << DBGBCR_HMC_SHIFT)
+#define	DBGBCR_SSC_SHIFT	14
+#define	DBGBCR_SSC		(0x3 << DBGBCR_SSC_SHIFT)
+#define	DBGBCR_LBN_SHIFT	16
+#define	DBGBCR_LBN		(0xf << DBGBCR_LBN_SHIFT)
+#define	DBGBCR_BT_SHIFT		20
+#define	DBGBCR_BT		(0xf << DBGBCR_BT_SHIFT)
+
+/* DBGBVR<n>_EL1 - Debug Breakpoint Value Registers */
+#define	DBGBVR_EL1_op0		2
+#define	DBGBVR_EL1_op1		0
+#define	DBGBVR_EL1_CRn		0
+/* DBGBVR_EL1_CRm indicates which watchpoint this register is for */
+#define	DBGBVR_EL1_op2		4
+
+/* DBGWCR<n>_EL1 - Debug Watchpoint Control Registers */
+#define	DBGWCR_EL1_op0		2
+#define	DBGWCR_EL1_op1		0
+#define	DBGWCR_EL1_CRn		0
+/* DBGWCR_EL1_CRm indicates which watchpoint this register is for */
+#define	DBGWCR_EL1_op2		7
+#define	DBGWCR_EN		0x1
+#define	DBGWCR_PAC_SHIFT	1
+#define	DBGWCR_PAC		(0x3 << DBGWCR_PAC_SHIFT)
+#define	 DBGWCR_PAC_EL1		(0x1 << DBGWCR_PAC_SHIFT)
+#define	 DBGWCR_PAC_EL0		(0x2 << DBGWCR_PAC_SHIFT)
+#define	DBGWCR_LSC_SHIFT	3
+#define	DBGWCR_LSC		(0x3 << DBGWCR_LSC_SHIFT)
+#define	DBGWCR_BAS_SHIFT	5
+#define	DBGWCR_BAS		(0xff << DBGWCR_BAS_SHIFT)
+#define	DBGWCR_HMC_SHIFT	13
+#define	DBGWCR_HMC		(0x1 << DBGWCR_HMC_SHIFT)
+#define	DBGWCR_SSC_SHIFT	14
+#define	DBGWCR_SSC		(0x3 << DBGWCR_SSC_SHIFT)
+#define	DBGWCR_LBN_SHIFT	16
+#define	DBGWCR_LBN		(0xf << DBGWCR_LBN_SHIFT)
+#define	DBGWCR_WT_SHIFT		20
+#define	DBGWCR_WT		(0x1 << DBGWCR_WT_SHIFT)
+#define	DBGWCR_MASK_SHIFT	24
+#define	DBGWCR_MASK		(0x1f << DBGWCR_MASK_SHIFT)
+
+/* DBGWVR<n>_EL1 - Debug Watchpoint Value Registers */
+#define	DBGWVR_EL1_op0		2
+#define	DBGWVR_EL1_op1		0
+#define	DBGWVR_EL1_CRn		0
+/* DBGWVR_EL1_CRm indicates which watchpoint this register is for */
+#define	DBGWVR_EL1_op2		6
 
 /* DCZID_EL0 - Data Cache Zero ID register */
 #define DCZID_DZP		(1 << 4) /* DC ZVA prohibited if non-0 */
@@ -164,8 +303,48 @@
 #define DCZID_BS_MASK		(0xf << DCZID_BS_SHIFT)
 #define	DCZID_BS_SIZE(reg)	(((reg) & DCZID_BS_MASK) >> DCZID_BS_SHIFT)
 
+/* DBGAUTHSTATUS_EL1 */
+#define	DBGAUTHSTATUS_EL1		MRS_REG(DBGAUTHSTATUS_EL1)
+#define	DBGAUTHSTATUS_EL1_op0		2
+#define	DBGAUTHSTATUS_EL1_op1		0
+#define	DBGAUTHSTATUS_EL1_CRn		7
+#define	DBGAUTHSTATUS_EL1_CRm		14
+#define	DBGAUTHSTATUS_EL1_op2		6
+
+/* DBGCLAIMCLR_EL1 */
+#define	DBGCLAIMCLR_EL1			MRS_REG(DBGCLAIMCLR_EL1)
+#define	DBGCLAIMCLR_EL1_op0		2
+#define	DBGCLAIMCLR_EL1_op1		0
+#define	DBGCLAIMCLR_EL1_CRn		7
+#define	DBGCLAIMCLR_EL1_CRm		9
+#define	DBGCLAIMCLR_EL1_op2		6
+
+/* DBGCLAIMSET_EL1 */
+#define	DBGCLAIMSET_EL1			MRS_REG(DBGCLAIMSET_EL1)
+#define	DBGCLAIMSET_EL1_op0		2
+#define	DBGCLAIMSET_EL1_op1		0
+#define	DBGCLAIMSET_EL1_CRn		7
+#define	DBGCLAIMSET_EL1_CRm		8
+#define	DBGCLAIMSET_EL1_op2		6
+
+/* DBGPRCR_EL1 */
+#define	DBGPRCR_EL1			MRS_REG(DBGPRCR_EL1)
+#define	DBGPRCR_EL1_op0			2
+#define	DBGPRCR_EL1_op1			0
+#define	DBGPRCR_EL1_CRn			1
+#define	DBGPRCR_EL1_CRm			4
+#define	DBGPRCR_EL1_op2			4
+
 /* ESR_ELx */
 #define	ESR_ELx_ISS_MASK	0x01ffffff
+#define	 ISS_FP_TFV_SHIFT	23
+#define	 ISS_FP_TFV		(0x01 << ISS_FP_TFV_SHIFT)
+#define	 ISS_FP_IOF		0x01
+#define	 ISS_FP_DZF		0x02
+#define	 ISS_FP_OFF		0x04
+#define	 ISS_FP_UFF		0x08
+#define	 ISS_FP_IXF		0x10
+#define	 ISS_FP_IDF		0x80
 #define	 ISS_INSN_FnV		(0x01 << 10)
 #define	 ISS_INSN_EA		(0x01 << 9)
 #define	 ISS_INSN_S1PTW		(0x01 << 7)
@@ -255,6 +434,8 @@
 #define	 EXCP_SVC64		0x15	/* SVC trap for AArch64 */
 #define	 EXCP_HVC		0x16	/* HVC trap */
 #define	 EXCP_MSR		0x18	/* MSR/MRS trap */
+#define	 EXCP_SVE		0x19	/* SVE trap */
+#define	 EXCP_FPAC		0x1c	/* Faulting PAC trap */
 #define	 EXCP_INSN_ABORT_L	0x20	/* Instruction abort, from lower EL */
 #define	 EXCP_INSN_ABORT	0x21	/* Instruction abort, from same EL */ 
 #define	 EXCP_PC_ALIGN		0x22	/* PC alignment fault */
@@ -268,6 +449,7 @@
 #define	 EXCP_SOFTSTP_EL1	0x33	/* Software Step, from same EL */
 #define	 EXCP_WATCHPT_EL0	0x34	/* Watchpoint, from lower EL */
 #define	 EXCP_WATCHPT_EL1	0x35	/* Watchpoint, from same EL */
+#define	 EXCP_BRKPT_32		0x38    /* 32bits breakpoint */
 #define	 EXCP_BRK		0x3c	/* Breakpoint */
 
 /* ICC_CTLR_EL1 */
@@ -283,6 +465,12 @@
 #define	ICC_PMR_EL1_PRIO_MASK	(0xFFUL)
 
 /* ICC_SGI1R_EL1 */
+#define	ICC_SGI1R_EL1			MRS_REG(ICC_SGI1R_EL1)
+#define	ICC_SGI1R_EL1_op0		3
+#define	ICC_SGI1R_EL1_op1		0
+#define	ICC_SGI1R_EL1_CRn		12
+#define	ICC_SGI1R_EL1_CRm		11
+#define	ICC_SGI1R_EL1_op2		5
 #define	ICC_SGI1R_EL1_TL_MASK		0xffffUL
 #define	ICC_SGI1R_EL1_AFF1_SHIFT	16
 #define	ICC_SGI1R_EL1_SGIID_SHIFT	24
@@ -295,13 +483,19 @@
 #define	ICC_SRE_EL1_SRE		(1U << 0)
 
 /* ID_AA64DFR0_EL1 */
-#define	ID_AA64DFR0_EL1			MRS_REG(3, 0, 0, 5, 0)
+#define	ID_AA64DFR0_EL1			MRS_REG(ID_AA64DFR0_EL1)
+#define	ID_AA64DFR0_EL1_op0		0x3
+#define	ID_AA64DFR0_EL1_op1		0x0
+#define	ID_AA64DFR0_EL1_CRn		0x0
+#define	ID_AA64DFR0_EL1_CRm		0x5
+#define	ID_AA64DFR0_EL1_op2		0x0
 #define	ID_AA64DFR0_DebugVer_SHIFT	0
 #define	ID_AA64DFR0_DebugVer_MASK	(UL(0xf) << ID_AA64DFR0_DebugVer_SHIFT)
 #define	ID_AA64DFR0_DebugVer_VAL(x)	((x) & ID_AA64DFR0_DebugVer_MASK)
 #define	 ID_AA64DFR0_DebugVer_8		(UL(0x6) << ID_AA64DFR0_DebugVer_SHIFT)
 #define	 ID_AA64DFR0_DebugVer_8_VHE	(UL(0x7) << ID_AA64DFR0_DebugVer_SHIFT)
 #define	 ID_AA64DFR0_DebugVer_8_2	(UL(0x8) << ID_AA64DFR0_DebugVer_SHIFT)
+#define	 ID_AA64DFR0_DebugVer_8_4	(UL(0x9) << ID_AA64DFR0_DebugVer_SHIFT)
 #define	ID_AA64DFR0_TraceVer_SHIFT	4
 #define	ID_AA64DFR0_TraceVer_MASK	(UL(0xf) << ID_AA64DFR0_TraceVer_SHIFT)
 #define	ID_AA64DFR0_TraceVer_VAL(x)	((x) & ID_AA64DFR0_TraceVer_MASK)
@@ -313,6 +507,8 @@
 #define	 ID_AA64DFR0_PMUVer_NONE	(UL(0x0) << ID_AA64DFR0_PMUVer_SHIFT)
 #define	 ID_AA64DFR0_PMUVer_3		(UL(0x1) << ID_AA64DFR0_PMUVer_SHIFT)
 #define	 ID_AA64DFR0_PMUVer_3_1		(UL(0x4) << ID_AA64DFR0_PMUVer_SHIFT)
+#define	 ID_AA64DFR0_PMUVer_3_4		(UL(0x5) << ID_AA64DFR0_PMUVer_SHIFT)
+#define	 ID_AA64DFR0_PMUVer_3_5		(UL(0x6) << ID_AA64DFR0_PMUVer_SHIFT)
 #define	 ID_AA64DFR0_PMUVer_IMPL	(UL(0xf) << ID_AA64DFR0_PMUVer_SHIFT)
 #define	ID_AA64DFR0_BRPs_SHIFT		12
 #define	ID_AA64DFR0_BRPs_MASK		(UL(0xf) << ID_AA64DFR0_BRPs_SHIFT)
@@ -330,10 +526,26 @@
 #define	ID_AA64DFR0_PMSVer_MASK		(UL(0xf) << ID_AA64DFR0_PMSVer_SHIFT)
 #define	ID_AA64DFR0_PMSVer_VAL(x)	((x) & ID_AA64DFR0_PMSVer_MASK)
 #define	 ID_AA64DFR0_PMSVer_NONE	(UL(0x0) << ID_AA64DFR0_PMSVer_SHIFT)
-#define	 ID_AA64DFR0_PMSVer_V1		(UL(0x1) << ID_AA64DFR0_PMSVer_SHIFT)
+#define	 ID_AA64DFR0_PMSVer_SPE		(UL(0x1) << ID_AA64DFR0_PMSVer_SHIFT)
+#define	 ID_AA64DFR0_PMSVer_SPE_8_3	(UL(0x2) << ID_AA64DFR0_PMSVer_SHIFT)
+#define	ID_AA64DFR0_DoubleLock_SHIFT	36
+#define	ID_AA64DFR0_DoubleLock_MASK	(UL(0xf) << ID_AA64DFR0_DoubleLock_SHIFT)
+#define	ID_AA64DFR0_DoubleLock_VAL(x)	((x) & ID_AA64DFR0_DoubleLock_MASK)
+#define	 ID_AA64DFR0_DoubleLock_IMPL	(UL(0x0) << ID_AA64DFR0_DoubleLock_SHIFT)
+#define	 ID_AA64DFR0_DoubleLock_NONE	(UL(0xf) << ID_AA64DFR0_DoubleLock_SHIFT)
+#define	ID_AA64DFR0_TraceFilt_SHIFT	40
+#define	ID_AA64DFR0_TraceFilt_MASK	(UL(0xf) << ID_AA64DFR0_TraceFilt_SHIFT)
+#define	ID_AA64DFR0_TraceFilt_VAL(x)	((x) & ID_AA64DFR0_TraceFilt_MASK)
+#define	 ID_AA64DFR0_TraceFilt_NONE	(UL(0x0) << ID_AA64DFR0_TraceFilt_SHIFT)
+#define	 ID_AA64DFR0_TraceFilt_8_4	(UL(0x1) << ID_AA64DFR0_TraceFilt_SHIFT)
 
 /* ID_AA64ISAR0_EL1 */
-#define	ID_AA64ISAR0_EL1		MRS_REG(3, 0, 0, 6, 0)
+#define	ID_AA64ISAR0_EL1		MRS_REG(ID_AA64ISAR0_EL1)
+#define	ID_AA64ISAR0_EL1_op0		0x3
+#define	ID_AA64ISAR0_EL1_op1		0x0
+#define	ID_AA64ISAR0_EL1_CRn		0x0
+#define	ID_AA64ISAR0_EL1_CRm		0x6
+#define	ID_AA64ISAR0_EL1_op2		0x0
 #define	ID_AA64ISAR0_AES_SHIFT		4
 #define	ID_AA64ISAR0_AES_MASK		(UL(0xf) << ID_AA64ISAR0_AES_SHIFT)
 #define	ID_AA64ISAR0_AES_VAL(x)		((x) & ID_AA64ISAR0_AES_MASK)
@@ -410,7 +622,12 @@
 #define	 ID_AA64ISAR0_RNDR_IMPL		(UL(0x1) << ID_AA64ISAR0_RNDR_SHIFT)
 
 /* ID_AA64ISAR1_EL1 */
-#define	ID_AA64ISAR1_EL1		MRS_REG(3, 0, 0, 6, 1)
+#define	ID_AA64ISAR1_EL1		MRS_REG(ID_AA64ISAR1_EL1)
+#define	ID_AA64ISAR1_EL1_op0		0x3
+#define	ID_AA64ISAR1_EL1_op1		0x0
+#define	ID_AA64ISAR1_EL1_CRn		0x0
+#define	ID_AA64ISAR1_EL1_CRm		0x6
+#define	ID_AA64ISAR1_EL1_op2		0x1
 #define	ID_AA64ISAR1_DPB_SHIFT		0
 #define	ID_AA64ISAR1_DPB_MASK		(UL(0xf) << ID_AA64ISAR1_DPB_SHIFT)
 #define	ID_AA64ISAR1_DPB_VAL(x)		((x) & ID_AA64ISAR1_DPB_MASK)
@@ -421,12 +638,20 @@
 #define	ID_AA64ISAR1_APA_MASK		(UL(0xf) << ID_AA64ISAR1_APA_SHIFT)
 #define	ID_AA64ISAR1_APA_VAL(x)		((x) & ID_AA64ISAR1_APA_MASK)
 #define	 ID_AA64ISAR1_APA_NONE		(UL(0x0) << ID_AA64ISAR1_APA_SHIFT)
-#define	 ID_AA64ISAR1_APA_IMPL		(UL(0x1) << ID_AA64ISAR1_APA_SHIFT)
+#define	 ID_AA64ISAR1_APA_PAC		(UL(0x1) << ID_AA64ISAR1_APA_SHIFT)
+#define	 ID_AA64ISAR1_APA_EPAC		(UL(0x2) << ID_AA64ISAR1_APA_SHIFT)
+#define	 ID_AA64ISAR1_APA_EPAC2		(UL(0x3) << ID_AA64ISAR1_APA_SHIFT)
+#define	 ID_AA64ISAR1_APA_FPAC		(UL(0x4) << ID_AA64ISAR1_APA_SHIFT)
+#define	 ID_AA64ISAR1_APA_FPAC_COMBINED	(UL(0x5) << ID_AA64ISAR1_APA_SHIFT)
 #define	ID_AA64ISAR1_API_SHIFT		8
 #define	ID_AA64ISAR1_API_MASK		(UL(0xf) << ID_AA64ISAR1_API_SHIFT)
 #define	ID_AA64ISAR1_API_VAL(x)		((x) & ID_AA64ISAR1_API_MASK)
 #define	 ID_AA64ISAR1_API_NONE		(UL(0x0) << ID_AA64ISAR1_API_SHIFT)
-#define	 ID_AA64ISAR1_API_IMPL		(UL(0x1) << ID_AA64ISAR1_API_SHIFT)
+#define	 ID_AA64ISAR1_API_PAC		(UL(0x1) << ID_AA64ISAR1_API_SHIFT)
+#define	 ID_AA64ISAR1_API_EPAC		(UL(0x2) << ID_AA64ISAR1_API_SHIFT)
+#define	 ID_AA64ISAR1_API_EPAC2		(UL(0x3) << ID_AA64ISAR1_API_SHIFT)
+#define	 ID_AA64ISAR1_API_FPAC		(UL(0x4) << ID_AA64ISAR1_API_SHIFT)
+#define	 ID_AA64ISAR1_API_FPAC_COMBINED	(UL(0x5) << ID_AA64ISAR1_API_SHIFT)
 #define	ID_AA64ISAR1_JSCVT_SHIFT	12
 #define	ID_AA64ISAR1_JSCVT_MASK		(UL(0xf) << ID_AA64ISAR1_JSCVT_SHIFT)
 #define	ID_AA64ISAR1_JSCVT_VAL(x)	((x) & ID_AA64ISAR1_JSCVT_MASK)
@@ -485,7 +710,12 @@
 #define	 ID_AA64ISAR1_I8MM_IMPL		(UL(0x1) << ID_AA64ISAR1_I8MM_SHIFT)
 
 /* ID_AA64MMFR0_EL1 */
-#define	ID_AA64MMFR0_EL1		MRS_REG(3, 0, 0, 7, 0)
+#define	ID_AA64MMFR0_EL1		MRS_REG(ID_AA64MMFR0_EL1)
+#define	ID_AA64MMFR0_EL1_op0		0x3
+#define	ID_AA64MMFR0_EL1_op1		0x0
+#define	ID_AA64MMFR0_EL1_CRn		0x0
+#define	ID_AA64MMFR0_EL1_CRm		0x7
+#define	ID_AA64MMFR0_EL1_op2		0x0
 #define	ID_AA64MMFR0_PARange_SHIFT	0
 #define	ID_AA64MMFR0_PARange_MASK	(UL(0xf) << ID_AA64MMFR0_PARange_SHIFT)
 #define	ID_AA64MMFR0_PARange_VAL(x)	((x) & ID_AA64MMFR0_PARange_MASK)
@@ -531,9 +761,37 @@
 #define	ID_AA64MMFR0_TGran4_VAL(x)	((x) & ID_AA64MMFR0_TGran4_MASK)
 #define	 ID_AA64MMFR0_TGran4_IMPL	(UL(0x0) << ID_AA64MMFR0_TGran4_SHIFT)
 #define	 ID_AA64MMFR0_TGran4_NONE	(UL(0xf) << ID_AA64MMFR0_TGran4_SHIFT)
+#define	ID_AA64MMFR0_TGran16_2_SHIFT	32
+#define	ID_AA64MMFR0_TGran16_2_MASK	(UL(0xf) << ID_AA64MMFR0_TGran16_2_SHIFT)
+#define	ID_AA64MMFR0_TGran16_2_VAL(x)	((x) & ID_AA64MMFR0_TGran16_2_MASK)
+#define	 ID_AA64MMFR0_TGran16_2_TGran16	(UL(0x0) << ID_AA64MMFR0_TGran16_2_SHIFT)
+#define	 ID_AA64MMFR0_TGran16_2_NONE	(UL(0x1) << ID_AA64MMFR0_TGran16_2_SHIFT)
+#define	 ID_AA64MMFR0_TGran16_2_IMPL	(UL(0x2) << ID_AA64MMFR0_TGran16_2_SHIFT)
+#define	ID_AA64MMFR0_TGran64_2_SHIFT	36
+#define	ID_AA64MMFR0_TGran64_2_MASK	(UL(0xf) << ID_AA64MMFR0_TGran64_2_SHIFT)
+#define	ID_AA64MMFR0_TGran64_2_VAL(x)	((x) & ID_AA64MMFR0_TGran64_2_MASK)
+#define	 ID_AA64MMFR0_TGran64_2_TGran64	(UL(0x0) << ID_AA64MMFR0_TGran64_2_SHIFT)
+#define	 ID_AA64MMFR0_TGran64_2_NONE	(UL(0x1) << ID_AA64MMFR0_TGran64_2_SHIFT)
+#define	 ID_AA64MMFR0_TGran64_2_IMPL	(UL(0x2) << ID_AA64MMFR0_TGran64_2_SHIFT)
+#define	ID_AA64MMFR0_TGran4_2_SHIFT	40
+#define	ID_AA64MMFR0_TGran4_2_MASK	(UL(0xf) << ID_AA64MMFR0_TGran4_2_SHIFT)
+#define	ID_AA64MMFR0_TGran4_2_VAL(x)	((x) & ID_AA64MMFR0_TGran4_2_MASK)
+#define	 ID_AA64MMFR0_TGran4_2_TGran4	(UL(0x0) << ID_AA64MMFR0_TGran4_2_SHIFT)
+#define	 ID_AA64MMFR0_TGran4_2_NONE	(UL(0x1) << ID_AA64MMFR0_TGran4_2_SHIFT)
+#define	 ID_AA64MMFR0_TGran4_2_IMPL	(UL(0x2) << ID_AA64MMFR0_TGran4_2_SHIFT)
+#define	ID_AA64MMFR0_ExS_SHIFT		44
+#define	ID_AA64MMFR0_ExS_MASK		(UL(0xf) << ID_AA64MMFR0_ExS_SHIFT)
+#define	ID_AA64MMFR0_ExS_VAL(x)		((x) & ID_AA64MMFR0_ExS_MASK)
+#define	 ID_AA64MMFR0_ExS_ALL		(UL(0x0) << ID_AA64MMFR0_ExS_SHIFT)
+#define	 ID_AA64MMFR0_ExS_IMPL		(UL(0x1) << ID_AA64MMFR0_ExS_SHIFT)
 
 /* ID_AA64MMFR1_EL1 */
-#define	ID_AA64MMFR1_EL1		MRS_REG(3, 0, 0, 7, 1)
+#define	ID_AA64MMFR1_EL1		MRS_REG(ID_AA64MMFR1_EL1)
+#define	ID_AA64MMFR1_EL1_op0		0x3
+#define	ID_AA64MMFR1_EL1_op1		0x0
+#define	ID_AA64MMFR1_EL1_CRn		0x0
+#define	ID_AA64MMFR1_EL1_CRm		0x7
+#define	ID_AA64MMFR1_EL1_op2		0x1
 #define	ID_AA64MMFR1_HAFDBS_SHIFT	0
 #define	ID_AA64MMFR1_HAFDBS_MASK	(UL(0xf) << ID_AA64MMFR1_HAFDBS_SHIFT)
 #define	ID_AA64MMFR1_HAFDBS_VAL(x)	((x) & ID_AA64MMFR1_HAFDBS_MASK)
@@ -579,7 +837,12 @@
 #define	 ID_AA64MMFR1_XNX_IMPL		(UL(0x1) << ID_AA64MMFR1_XNX_SHIFT)
 
 /* ID_AA64MMFR2_EL1 */
-#define	ID_AA64MMFR2_EL1		MRS_REG(3, 0, 0, 7, 2)
+#define	ID_AA64MMFR2_EL1		MRS_REG(ID_AA64MMFR2_EL1)
+#define	ID_AA64MMFR2_EL1_op0		0x3
+#define	ID_AA64MMFR2_EL1_op1		0x0
+#define	ID_AA64MMFR2_EL1_CRn		0x0
+#define	ID_AA64MMFR2_EL1_CRm		0x7
+#define	ID_AA64MMFR2_EL1_op2		0x2
 #define	ID_AA64MMFR2_CnP_SHIFT		0
 #define	ID_AA64MMFR2_CnP_MASK		(UL(0xf) << ID_AA64MMFR2_CnP_SHIFT)
 #define	ID_AA64MMFR2_CnP_VAL(x)		((x) & ID_AA64MMFR2_CnP_MASK)
@@ -614,7 +877,8 @@
 #define	ID_AA64MMFR2_NV_MASK		(UL(0xf) << ID_AA64MMFR2_NV_SHIFT)
 #define	ID_AA64MMFR2_NV_VAL(x)		((x) & ID_AA64MMFR2_NV_MASK)
 #define	 ID_AA64MMFR2_NV_NONE		(UL(0x0) << ID_AA64MMFR2_NV_SHIFT)
-#define	 ID_AA64MMFR2_NV_IMPL		(UL(0x1) << ID_AA64MMFR2_NV_SHIFT)
+#define	 ID_AA64MMFR2_NV_8_3		(UL(0x1) << ID_AA64MMFR2_NV_SHIFT)
+#define	 ID_AA64MMFR2_NV_8_4		(UL(0x2) << ID_AA64MMFR2_NV_SHIFT)
 #define	ID_AA64MMFR2_ST_SHIFT		28
 #define	ID_AA64MMFR2_ST_MASK		(UL(0xf) << ID_AA64MMFR2_ST_SHIFT)
 #define	ID_AA64MMFR2_ST_VAL(x)		((x) & ID_AA64MMFR2_ST_MASK)
@@ -659,7 +923,12 @@
 #define	 ID_AA64MMFR2_E0PD_IMPL		(UL(0x1) << ID_AA64MMFR2_E0PD_SHIFT)
 
 /* ID_AA64PFR0_EL1 */
-#define	ID_AA64PFR0_EL1			MRS_REG(3, 0, 0, 4, 0)
+#define	ID_AA64PFR0_EL1			MRS_REG(ID_AA64PFR0_EL1)
+#define	ID_AA64PFR0_EL1_op0		0x3
+#define	ID_AA64PFR0_EL1_op1		0x0
+#define	ID_AA64PFR0_EL1_CRn		0x0
+#define	ID_AA64PFR0_EL1_CRm		0x4
+#define	ID_AA64PFR0_EL1_op2		0x0
 #define	ID_AA64PFR0_EL0_SHIFT		0
 #define	ID_AA64PFR0_EL0_MASK		(UL(0xf) << ID_AA64PFR0_EL0_SHIFT)
 #define	ID_AA64PFR0_EL0_VAL(x)		((x) & ID_AA64PFR0_EL0_MASK)
@@ -700,11 +969,13 @@
 #define	ID_AA64PFR0_GIC_VAL(x)		((x) & ID_AA64PFR0_GIC_MASK)
 #define	 ID_AA64PFR0_GIC_CPUIF_NONE	(UL(0x0) << ID_AA64PFR0_GIC_SHIFT)
 #define	 ID_AA64PFR0_GIC_CPUIF_EN	(UL(0x1) << ID_AA64PFR0_GIC_SHIFT)
+#define	 ID_AA64PFR0_GIC_CPUIF_4_1	(UL(0x3) << ID_AA64PFR0_GIC_SHIFT)
 #define	ID_AA64PFR0_RAS_SHIFT		28
 #define	ID_AA64PFR0_RAS_MASK		(UL(0xf) << ID_AA64PFR0_RAS_SHIFT)
 #define	ID_AA64PFR0_RAS_VAL(x)		((x) & ID_AA64PFR0_RAS_MASK)
 #define	 ID_AA64PFR0_RAS_NONE		(UL(0x0) << ID_AA64PFR0_RAS_SHIFT)
-#define	 ID_AA64PFR0_RAS_V1		(UL(0x1) << ID_AA64PFR0_RAS_SHIFT)
+#define	 ID_AA64PFR0_RAS_IMPL		(UL(0x1) << ID_AA64PFR0_RAS_SHIFT)
+#define	 ID_AA64PFR0_RAS_8_4		(UL(0x2) << ID_AA64PFR0_RAS_SHIFT)
 #define	ID_AA64PFR0_SVE_SHIFT		32
 #define	ID_AA64PFR0_SVE_MASK		(UL(0xf) << ID_AA64PFR0_SVE_SHIFT)
 #define	ID_AA64PFR0_SVE_VAL(x)		((x) & ID_AA64PFR0_SVE_MASK)
@@ -743,7 +1014,12 @@
 #define	 ID_AA64PFR0_CSV3_ISOLATED	(UL(0x1) << ID_AA64PFR0_CSV3_SHIFT)
 
 /* ID_AA64PFR1_EL1 */
-#define	ID_AA64PFR1_EL1			MRS_REG(3, 0, 0, 4, 1)
+#define	ID_AA64PFR1_EL1			MRS_REG(ID_AA64PFR1_EL1)
+#define	ID_AA64PFR1_EL1_op0		0x3
+#define	ID_AA64PFR1_EL1_op1		0x0
+#define	ID_AA64PFR1_EL1_CRn		0x0
+#define	ID_AA64PFR1_EL1_CRm		0x4
+#define	ID_AA64PFR1_EL1_op2		0x1
 #define	ID_AA64PFR1_BT_SHIFT		0
 #define	ID_AA64PFR1_BT_MASK		(UL(0xf) << ID_AA64PFR1_BT_SHIFT)
 #define	ID_AA64PFR1_BT_VAL(x)		((x) & ID_AA64PFR1_BT_MASK)
@@ -772,6 +1048,106 @@
 #define	 ID_AA64PFR1_CE_NONE		(UL(0x0) << ID_AA64PFR1_CE_SHIFT)
 #define	 ID_AA64PFR1_CE_MORELLO		(UL(0x1) << ID_AA64PFR1_CE_SHIFT)
 
+/* ID_AA64ZFR0_EL1 */
+#define	ID_AA64ZFR0_EL1			MRS_REG(ID_AA64ZFR0_EL1)
+#define	ID_AA64ZFR0_EL1_REG		MRS_REG_ALT_NAME(ID_AA64ZFR0_EL1)
+#define	ID_AA64ZFR0_EL1_op0		3
+#define	ID_AA64ZFR0_EL1_op1		0
+#define	ID_AA64ZFR0_EL1_CRn		0
+#define	ID_AA64ZFR0_EL1_CRm		4
+#define	ID_AA64ZFR0_EL1_op2		4
+#define	ID_AA64ZFR0_SVEver_SHIFT	0
+#define	ID_AA64ZFR0_SVEver_MASK		(UL(0xf) << ID_AA64ZFR0_SVEver_SHIFT)
+#define	ID_AA64ZFR0_SVEver_VAL(x)	((x) & ID_AA64ZFR0_SVEver_MASK
+#define	ID_AA64ZFR0_SVEver_SVE1		(UL(0x0) << ID_AA64ZFR0_SVEver_SHIFT)
+#define	ID_AA64ZFR0_SVEver_SVE2		(UL(0x1) << ID_AA64ZFR0_SVEver_SHIFT)
+#define	ID_AA64ZFR0_AES_SHIFT		4
+#define	ID_AA64ZFR0_AES_MASK		(UL(0xf) << ID_AA64ZFR0_AES_SHIFT)
+#define	ID_AA64ZFR0_AES_VAL(x)		((x) & ID_AA64ZFR0_AES_MASK
+#define	ID_AA64ZFR0_AES_NONE		(UL(0x0) << ID_AA64ZFR0_AES_SHIFT)
+#define	ID_AA64ZFR0_AES_BASE		(UL(0x1) << ID_AA64ZFR0_AES_SHIFT)
+#define	ID_AA64ZFR0_AES_PMULL		(UL(0x2) << ID_AA64ZFR0_AES_SHIFT)
+#define	ID_AA64ZFR0_BitPerm_SHIFT	16
+#define	ID_AA64ZFR0_BitPerm_MASK	(UL(0xf) << ID_AA64ZFR0_BitPerm_SHIFT)
+#define	ID_AA64ZFR0_BitPerm_VAL(x)	((x) & ID_AA64ZFR0_BitPerm_MASK
+#define	ID_AA64ZFR0_BitPerm_NONE	(UL(0x0) << ID_AA64ZFR0_BitPerm_SHIFT)
+#define	ID_AA64ZFR0_BitPerm_IMPL	(UL(0x1) << ID_AA64ZFR0_BitPerm_SHIFT)
+#define	ID_AA64ZFR0_BF16_SHIFT		20
+#define	ID_AA64ZFR0_BF16_MASK		(UL(0xf) << ID_AA64ZFR0_BF16_SHIFT)
+#define	ID_AA64ZFR0_BF16_VAL(x)		((x) & ID_AA64ZFR0_BF16_MASK
+#define	ID_AA64ZFR0_BF16_NONE		(UL(0x0) << ID_AA64ZFR0_BF16_SHIFT)
+#define	ID_AA64ZFR0_BF16_BASE		(UL(0x1) << ID_AA64ZFR0_BF16_SHIFT)
+#define	ID_AA64ZFR0_BF16_EBF		(UL(0x1) << ID_AA64ZFR0_BF16_SHIFT)
+#define	ID_AA64ZFR0_SHA3_SHIFT		32
+#define	ID_AA64ZFR0_SHA3_MASK		(UL(0xf) << ID_AA64ZFR0_SHA3_SHIFT)
+#define	ID_AA64ZFR0_SHA3_VAL(x)		((x) & ID_AA64ZFR0_SHA3_MASK
+#define	ID_AA64ZFR0_SHA3_NONE		(UL(0x0) << ID_AA64ZFR0_SHA3_SHIFT)
+#define	ID_AA64ZFR0_SHA3_IMPL		(UL(0x1) << ID_AA64ZFR0_SHA3_SHIFT)
+#define	ID_AA64ZFR0_SM4_SHIFT		40
+#define	ID_AA64ZFR0_SM4_MASK		(UL(0xf) << ID_AA64ZFR0_SM4_SHIFT)
+#define	ID_AA64ZFR0_SM4_VAL(x)		((x) & ID_AA64ZFR0_SM4_MASK
+#define	ID_AA64ZFR0_SM4_NONE		(UL(0x0) << ID_AA64ZFR0_SM4_SHIFT)
+#define	ID_AA64ZFR0_SM4_IMPL		(UL(0x1) << ID_AA64ZFR0_SM4_SHIFT)
+#define	ID_AA64ZFR0_I8MM_SHIFT		44
+#define	ID_AA64ZFR0_I8MM_MASK		(UL(0xf) << ID_AA64ZFR0_I8MM_SHIFT)
+#define	ID_AA64ZFR0_I8MM_VAL(x)		((x) & ID_AA64ZFR0_I8MM_MASK
+#define	ID_AA64ZFR0_I8MM_NONE		(UL(0x0) << ID_AA64ZFR0_I8MM_SHIFT)
+#define	ID_AA64ZFR0_I8MM_IMPL		(UL(0x1) << ID_AA64ZFR0_I8MM_SHIFT)
+#define	ID_AA64ZFR0_F32MM_SHIFT		52
+#define	ID_AA64ZFR0_F32MM_MASK		(UL(0xf) << ID_AA64ZFR0_F32MM_SHIFT)
+#define	ID_AA64ZFR0_F32MM_VAL(x)	((x) & ID_AA64ZFR0_F32MM_MASK
+#define	ID_AA64ZFR0_F32MM_NONE		(UL(0x0) << ID_AA64ZFR0_F32MM_SHIFT)
+#define	ID_AA64ZFR0_F32MM_IMPL		(UL(0x1) << ID_AA64ZFR0_F32MM_SHIFT)
+#define	ID_AA64ZFR0_F64MM_SHIFT		56
+#define	ID_AA64ZFR0_F64MM_MASK		(UL(0xf) << ID_AA64ZFR0_F64MM_SHIFT)
+#define	ID_AA64ZFR0_F64MM_VAL(x)	((x) & ID_AA64ZFR0_F64MM_MASK
+#define	ID_AA64ZFR0_F64MM_NONE		(UL(0x0) << ID_AA64ZFR0_F64MM_SHIFT)
+#define	ID_AA64ZFR0_F64MM_IMPL		(UL(0x1) << ID_AA64ZFR0_F64MM_SHIFT)
+
+/* ID_ISAR5_EL1 */
+#define	ID_ISAR5_EL1			MRS_REG(ID_ISAR5_EL1)
+#define	ID_ISAR5_EL1_op0		0x3
+#define	ID_ISAR5_EL1_op1		0x0
+#define	ID_ISAR5_EL1_CRn		0x0
+#define	ID_ISAR5_EL1_CRm		0x2
+#define	ID_ISAR5_EL1_op2		0x5
+#define	ID_ISAR5_SEVL_SHIFT		0
+#define	ID_ISAR5_SEVL_MASK		(UL(0xf) << ID_ISAR5_SEVL_SHIFT)
+#define	ID_ISAR5_SEVL_VAL(x)		((x) & ID_ISAR5_SEVL_MASK)
+#define	 ID_ISAR5_SEVL_NOP		(UL(0x0) << ID_ISAR5_SEVL_SHIFT)
+#define	 ID_ISAR5_SEVL_IMPL		(UL(0x1) << ID_ISAR5_SEVL_SHIFT)
+#define	ID_ISAR5_AES_SHIFT		4
+#define	ID_ISAR5_AES_MASK		(UL(0xf) << ID_ISAR5_AES_SHIFT)
+#define	ID_ISAR5_AES_VAL(x)		((x) & ID_ISAR5_AES_MASK)
+#define	 ID_ISAR5_AES_NONE		(UL(0x0) << ID_ISAR5_AES_SHIFT)
+#define	 ID_ISAR5_AES_BASE		(UL(0x1) << ID_ISAR5_AES_SHIFT)
+#define	 ID_ISAR5_AES_VMULL		(UL(0x2) << ID_ISAR5_AES_SHIFT)
+#define	ID_ISAR5_SHA1_SHIFT		8
+#define	ID_ISAR5_SHA1_MASK		(UL(0xf) << ID_ISAR5_SHA1_SHIFT)
+#define	ID_ISAR5_SHA1_VAL(x)		((x) & ID_ISAR5_SHA1_MASK)
+#define	 ID_ISAR5_SHA1_NONE		(UL(0x0) << ID_ISAR5_SHA1_SHIFT)
+#define	 ID_ISAR5_SHA1_IMPL		(UL(0x1) << ID_ISAR5_SHA1_SHIFT)
+#define	ID_ISAR5_SHA2_SHIFT		12
+#define	ID_ISAR5_SHA2_MASK		(UL(0xf) << ID_ISAR5_SHA2_SHIFT)
+#define	ID_ISAR5_SHA2_VAL(x)		((x) & ID_ISAR5_SHA2_MASK)
+#define	 ID_ISAR5_SHA2_NONE		(UL(0x0) << ID_ISAR5_SHA2_SHIFT)
+#define	 ID_ISAR5_SHA2_IMPL		(UL(0x1) << ID_ISAR5_SHA2_SHIFT)
+#define	ID_ISAR5_CRC32_SHIFT		16
+#define	ID_ISAR5_CRC32_MASK		(UL(0xf) << ID_ISAR5_CRC32_SHIFT)
+#define	ID_ISAR5_CRC32_VAL(x)		((x) & ID_ISAR5_CRC32_MASK)
+#define	 ID_ISAR5_CRC32_NONE		(UL(0x0) << ID_ISAR5_CRC32_SHIFT)
+#define	 ID_ISAR5_CRC32_IMPL		(UL(0x1) << ID_ISAR5_CRC32_SHIFT)
+#define	ID_ISAR5_RDM_SHIFT		24
+#define	ID_ISAR5_RDM_MASK		(UL(0xf) << ID_ISAR5_RDM_SHIFT)
+#define	ID_ISAR5_RDM_VAL(x)		((x) & ID_ISAR5_RDM_MASK)
+#define	 ID_ISAR5_RDM_NONE		(UL(0x0) << ID_ISAR5_RDM_SHIFT)
+#define	 ID_ISAR5_RDM_IMPL		(UL(0x1) << ID_ISAR5_RDM_SHIFT)
+#define	ID_ISAR5_VCMA_SHIFT		28
+#define	ID_ISAR5_VCMA_MASK		(UL(0xf) << ID_ISAR5_VCMA_SHIFT)
+#define	ID_ISAR5_VCMA_VAL(x)		((x) & ID_ISAR5_VCMA_MASK)
+#define	 ID_ISAR5_VCMA_NONE		(UL(0x0) << ID_ISAR5_VCMA_SHIFT)
+#define	 ID_ISAR5_VCMA_IMPL		(UL(0x1) << ID_ISAR5_VCMA_SHIFT)
+
 /* MAIR_EL1 - Memory Attribute Indirection Register */
 #define	MAIR_ATTR_MASK(idx)	(0xff << ((n)* 8))
 #define	MAIR_ATTR(attr, idx) ((attr) << ((idx) * 8))
@@ -780,6 +1156,162 @@
 #define	 MAIR_NORMAL_NC		0x44
 #define	 MAIR_NORMAL_WT		0xbb
 #define	 MAIR_NORMAL_WB		0xff
+
+/* MDCCINT_EL1 */
+#define	MDCCINT_EL1			MRS_REG(MDCCINT_EL1)
+#define	MDCCINT_EL1_op0			2
+#define	MDCCINT_EL1_op1			0
+#define	MDCCINT_EL1_CRn			0
+#define	MDCCINT_EL1_CRm			2
+#define	MDCCINT_EL1_op2			0
+
+/* MDCCSR_EL0 */
+#define	MDCCSR_EL0			MRS_REG(MDCCSR_EL0)
+#define	MDCCSR_EL0_op0			2
+#define	MDCCSR_EL0_op1			3
+#define	MDCCSR_EL0_CRn			0
+#define	MDCCSR_EL0_CRm			1
+#define	MDCCSR_EL0_op2			0
+
+/* MDSCR_EL1 - Monitor Debug System Control Register */
+#define	MDSCR_EL1			MRS_REG(MDSCR_EL1)
+#define	MDSCR_EL1_op0			2
+#define	MDSCR_EL1_op1			0
+#define	MDSCR_EL1_CRn			0
+#define	MDSCR_EL1_CRm			2
+#define	MDSCR_EL1_op2			2
+#define	MDSCR_SS_SHIFT			0
+#define	MDSCR_SS			(UL(0x1) << MDSCR_SS_SHIFT)
+#define	MDSCR_KDE_SHIFT			13
+#define	MDSCR_KDE			(UL(0x1) << MDSCR_KDE_SHIFT)
+#define	MDSCR_MDE_SHIFT			15
+#define	MDSCR_MDE			(UL(0x1) << MDSCR_MDE_SHIFT)
+
+/* MVFR0_EL1 */
+#define	MVFR0_EL1			MRS_REG(MVFR0_EL1)
+#define	MVFR0_EL1_op0			0x3
+#define	MVFR0_EL1_op1			0x0
+#define	MVFR0_EL1_CRn			0x0
+#define	MVFR0_EL1_CRm			0x3
+#define	MVFR0_EL1_op2			0x0
+#define	MVFR0_SIMDReg_SHIFT		0
+#define	MVFR0_SIMDReg_MASK		(UL(0xf) << MVFR0_SIMDReg_SHIFT)
+#define	MVFR0_SIMDReg_VAL(x)		((x) & MVFR0_SIMDReg_MASK)
+#define	 MVFR0_SIMDReg_NONE		(UL(0x0) << MVFR0_SIMDReg_SHIFT)
+#define	 MVFR0_SIMDReg_FP		(UL(0x1) << MVFR0_SIMDReg_SHIFT)
+#define	 MVFR0_SIMDReg_AdvSIMD		(UL(0x2) << MVFR0_SIMDReg_SHIFT)
+#define	MVFR0_FPSP_SHIFT		4
+#define	MVFR0_FPSP_MASK			(UL(0xf) << MVFR0_FPSP_SHIFT)
+#define	MVFR0_FPSP_VAL(x)		((x) & MVFR0_FPSP_MASK)
+#define	 MVFR0_FPSP_NONE		(UL(0x0) << MVFR0_FPSP_SHIFT)
+#define	 MVFR0_FPSP_VFP_v2		(UL(0x1) << MVFR0_FPSP_SHIFT)
+#define	 MVFR0_FPSP_VFP_v3_v4		(UL(0x2) << MVFR0_FPSP_SHIFT)
+#define	MVFR0_FPDP_SHIFT		8
+#define	MVFR0_FPDP_MASK			(UL(0xf) << MVFR0_FPDP_SHIFT)
+#define	MVFR0_FPDP_VAL(x)		((x) & MVFR0_FPDP_MASK)
+#define	 MVFR0_FPDP_NONE		(UL(0x0) << MVFR0_FPDP_SHIFT)
+#define	 MVFR0_FPDP_VFP_v2		(UL(0x1) << MVFR0_FPDP_SHIFT)
+#define	 MVFR0_FPDP_VFP_v3_v4		(UL(0x2) << MVFR0_FPDP_SHIFT)
+#define	MVFR0_FPTrap_SHIFT		12
+#define	MVFR0_FPTrap_MASK		(UL(0xf) << MVFR0_FPTrap_SHIFT)
+#define	MVFR0_FPTrap_VAL(x)		((x) & MVFR0_FPTrap_MASK)
+#define	 MVFR0_FPTrap_NONE		(UL(0x0) << MVFR0_FPTrap_SHIFT)
+#define	 MVFR0_FPTrap_IMPL		(UL(0x1) << MVFR0_FPTrap_SHIFT)
+#define	MVFR0_FPDivide_SHIFT		16
+#define	MVFR0_FPDivide_MASK		(UL(0xf) << MVFR0_FPDivide_SHIFT)
+#define	MVFR0_FPDivide_VAL(x)		((x) & MVFR0_FPDivide_MASK)
+#define	 MVFR0_FPDivide_NONE		(UL(0x0) << MVFR0_FPDivide_SHIFT)
+#define	 MVFR0_FPDivide_IMPL		(UL(0x1) << MVFR0_FPDivide_SHIFT)
+#define	MVFR0_FPSqrt_SHIFT		20
+#define	MVFR0_FPSqrt_MASK		(UL(0xf) << MVFR0_FPSqrt_SHIFT)
+#define	MVFR0_FPSqrt_VAL(x)		((x) & MVFR0_FPSqrt_MASK)
+#define	 MVFR0_FPSqrt_NONE		(UL(0x0) << MVFR0_FPSqrt_SHIFT)
+#define	 MVFR0_FPSqrt_IMPL		(UL(0x1) << MVFR0_FPSqrt_SHIFT)
+#define	MVFR0_FPShVec_SHIFT		24
+#define	MVFR0_FPShVec_MASK		(UL(0xf) << MVFR0_FPShVec_SHIFT)
+#define	MVFR0_FPShVec_VAL(x)		((x) & MVFR0_FPShVec_MASK)
+#define	 MVFR0_FPShVec_NONE		(UL(0x0) << MVFR0_FPShVec_SHIFT)
+#define	 MVFR0_FPShVec_IMPL		(UL(0x1) << MVFR0_FPShVec_SHIFT)
+#define	MVFR0_FPRound_SHIFT		28
+#define	MVFR0_FPRound_MASK		(UL(0xf) << MVFR0_FPRound_SHIFT)
+#define	MVFR0_FPRound_VAL(x)		((x) & MVFR0_FPRound_MASK)
+#define	 MVFR0_FPRound_NONE		(UL(0x0) << MVFR0_FPRound_SHIFT)
+#define	 MVFR0_FPRound_IMPL		(UL(0x1) << MVFR0_FPRound_SHIFT)
+
+/* MVFR1_EL1 */
+#define	MVFR1_EL1			MRS_REG(MVFR1_EL1)
+#define	MVFR1_EL1_op0			0x3
+#define	MVFR1_EL1_op1			0x0
+#define	MVFR1_EL1_CRn			0x0
+#define	MVFR1_EL1_CRm			0x3
+#define	MVFR1_EL1_op2			0x1
+#define	MVFR1_FPFtZ_SHIFT		0
+#define	MVFR1_FPFtZ_MASK		(UL(0xf) << MVFR1_FPFtZ_SHIFT)
+#define	MVFR1_FPFtZ_VAL(x)		((x) & MVFR1_FPFtZ_MASK)
+#define	 MVFR1_FPFtZ_NONE		(UL(0x0) << MVFR1_FPFtZ_SHIFT)
+#define	 MVFR1_FPFtZ_IMPL		(UL(0x1) << MVFR1_FPFtZ_SHIFT)
+#define	MVFR1_FPDNaN_SHIFT		4
+#define	MVFR1_FPDNaN_MASK		(UL(0xf) << MVFR1_FPDNaN_SHIFT)
+#define	MVFR1_FPDNaN_VAL(x)		((x) & MVFR1_FPDNaN_MASK)
+#define	 MVFR1_FPDNaN_NONE		(UL(0x0) << MVFR1_FPDNaN_SHIFT)
+#define	 MVFR1_FPDNaN_IMPL		(UL(0x1) << MVFR1_FPDNaN_SHIFT)
+#define	MVFR1_SIMDLS_SHIFT		8
+#define	MVFR1_SIMDLS_MASK		(UL(0xf) << MVFR1_SIMDLS_SHIFT)
+#define	MVFR1_SIMDLS_VAL(x)		((x) & MVFR1_SIMDLS_MASK)
+#define	 MVFR1_SIMDLS_NONE		(UL(0x0) << MVFR1_SIMDLS_SHIFT)
+#define	 MVFR1_SIMDLS_IMPL		(UL(0x1) << MVFR1_SIMDLS_SHIFT)
+#define	MVFR1_SIMDInt_SHIFT		12
+#define	MVFR1_SIMDInt_MASK		(UL(0xf) << MVFR1_SIMDInt_SHIFT)
+#define	MVFR1_SIMDInt_VAL(x)		((x) & MVFR1_SIMDInt_MASK)
+#define	 MVFR1_SIMDInt_NONE		(UL(0x0) << MVFR1_SIMDInt_SHIFT)
+#define	 MVFR1_SIMDInt_IMPL		(UL(0x1) << MVFR1_SIMDInt_SHIFT)
+#define	MVFR1_SIMDSP_SHIFT		16
+#define	MVFR1_SIMDSP_MASK		(UL(0xf) << MVFR1_SIMDSP_SHIFT)
+#define	MVFR1_SIMDSP_VAL(x)		((x) & MVFR1_SIMDSP_MASK)
+#define	 MVFR1_SIMDSP_NONE		(UL(0x0) << MVFR1_SIMDSP_SHIFT)
+#define	 MVFR1_SIMDSP_IMPL		(UL(0x1) << MVFR1_SIMDSP_SHIFT)
+#define	MVFR1_SIMDHP_SHIFT		20
+#define	MVFR1_SIMDHP_MASK		(UL(0xf) << MVFR1_SIMDHP_SHIFT)
+#define	MVFR1_SIMDHP_VAL(x)		((x) & MVFR1_SIMDHP_MASK)
+#define	 MVFR1_SIMDHP_NONE		(UL(0x0) << MVFR1_SIMDHP_SHIFT)
+#define	 MVFR1_SIMDHP_CONV_SP		(UL(0x1) << MVFR1_SIMDHP_SHIFT)
+#define	 MVFR1_SIMDHP_ARITH		(UL(0x2) << MVFR1_SIMDHP_SHIFT)
+#define	MVFR1_FPHP_SHIFT		24
+#define	MVFR1_FPHP_MASK			(UL(0xf) << MVFR1_FPHP_SHIFT)
+#define	MVFR1_FPHP_VAL(x)		((x) & MVFR1_FPHP_MASK)
+#define	 MVFR1_FPHP_NONE		(UL(0x0) << MVFR1_FPHP_SHIFT)
+#define	 MVFR1_FPHP_CONV_SP		(UL(0x1) << MVFR1_FPHP_SHIFT)
+#define	 MVFR1_FPHP_CONV_DP		(UL(0x2) << MVFR1_FPHP_SHIFT)
+#define	 MVFR1_FPHP_ARITH		(UL(0x3) << MVFR1_FPHP_SHIFT)
+#define	MVFR1_SIMDFMAC_SHIFT		28
+#define	MVFR1_SIMDFMAC_MASK		(UL(0xf) << MVFR1_SIMDFMAC_SHIFT)
+#define	MVFR1_SIMDFMAC_VAL(x)		((x) & MVFR1_SIMDFMAC_MASK)
+#define	 MVFR1_SIMDFMAC_NONE		(UL(0x0) << MVFR1_SIMDFMAC_SHIFT)
+#define	 MVFR1_SIMDFMAC_IMPL		(UL(0x1) << MVFR1_SIMDFMAC_SHIFT)
+
+/* OSDLR_EL1 */
+#define	OSDLR_EL1			MRS_REG(OSDLR_EL1)
+#define	OSDLR_EL1_op0			2
+#define	OSDLR_EL1_op1			0
+#define	OSDLR_EL1_CRn			1
+#define	OSDLR_EL1_CRm			3
+#define	OSDLR_EL1_op2			4
+
+/* OSLAR_EL1 */
+#define	OSLAR_EL1			MRS_REG(OSLAR_EL1)
+#define	OSLAR_EL1_op0			2
+#define	OSLAR_EL1_op1			0
+#define	OSLAR_EL1_CRn			1
+#define	OSLAR_EL1_CRm			0
+#define	OSLAR_EL1_op2			4
+
+/* OSLSR_EL1 */
+#define	OSLSR_EL1			MRS_REG(OSLSR_EL1)
+#define	OSLSR_EL1_op0			2
+#define	OSLSR_EL1_op1			0
+#define	OSLSR_EL1_CRn			1
+#define	OSLSR_EL1_CRm			1
+#define	OSLSR_EL1_op2			4
 
 /* PAR_EL1 - Physical Address Register */
 #define	PAR_F_SHIFT		0
@@ -803,42 +1335,437 @@
 #define	PAR_S_SHIFT		9
 #define	PAR_S_MASK		(0x1 << PAR_S_SHIFT)
 
-/* SCTLR_EL1 - System Control Register */
-#define	SCTLR_RES0	0xc8222440	/* Reserved ARMv8.0, write 0 */
-#define	SCTLR_RES1	0x30d00800	/* Reserved ARMv8.0, write 1 */
+/* PMBIDR_EL1 */
+#define	PMBIDR_EL1			MRS_REG(PMBIDR_EL1)
+#define	PMBIDR_EL1_op0			0x3
+#define	PMBIDR_EL1_op1			0x0
+#define	PMBIDR_EL1_CRn			0x9
+#define	PMBIDR_EL1_CRm			0xa
+#define	PMBIDR_EL1_op2			0x7
+#define	PMBIDR_Align_SHIFT		0
+#define	PMBIDR_Align_MASK		(UL(0xf) << PMBIDR_Align_SHIFT)
+#define	PMBIDR_P_SHIFT			4
+#define	PMBIDR_P			(UL(0x1) << PMBIDR_P_SHIFT)
+#define	PMBIDR_F_SHIFT			5
+#define	PMBIDR_F			(UL(0x1) << PMBIDR_F_SHIFT)
 
-#define	SCTLR_M		0x00000001
-#define	SCTLR_A		0x00000002
-#define	SCTLR_C		0x00000004
-#define	SCTLR_SA	0x00000008
-#define	SCTLR_SA0	0x00000010
-#define	SCTLR_CP15BEN	0x00000020
-/* Bit 6 is reserved */
-#define	SCTLR_ITD	0x00000080
-#define	SCTLR_SED	0x00000100
-#define	SCTLR_UMA	0x00000200
-/* Bit 10 is reserved */
-/* Bit 11 is reserved */
-#define	SCTLR_I		0x00001000
-#define	SCTLR_EnDB	0x00002000 /* ARMv8.3 */
-#define	SCTLR_DZE	0x00004000
-#define	SCTLR_UCT	0x00008000
-#define	SCTLR_nTWI	0x00010000
+/* PMBLIMITR_EL1 */
+#define	PMBLIMITR_EL1			MRS_REG(PMBLIMITR_EL1)
+#define	PMBLIMITR_EL1_op0		0x3
+#define	PMBLIMITR_EL1_op1		0x0
+#define	PMBLIMITR_EL1_CRn		0x9
+#define	PMBLIMITR_EL1_CRm		0xa
+#define	PMBLIMITR_EL1_op2		0x0
+#define	PMBLIMITR_E_SHIFT		0
+#define	PMBLIMITR_E			(UL(0x1) << PMBLIMITR_E_SHIFT)
+#define	PMBLIMITR_FM_SHIFT		1
+#define	PMBLIMITR_FM_MASK		(UL(0x3) << PMBLIMITR_FM_SHIFT)
+#define	PMBLIMITR_PMFZ_SHIFT		5
+#define	PMBLIMITR_PMFZ			(UL(0x1) << PMBLIMITR_PMFZ_SHIFT)
+#define	PMBLIMITR_LIMIT_SHIFT		12
+#define	PMBLIMITR_LIMIT_MASK		\
+    (UL(0xfffffffffffff) << PMBLIMITR_LIMIT_SHIFT)
+
+/* PMBPTR_EL1 */
+#define	PMBPTR_EL1			MRS_REG(PMBPTR_EL1)
+#define	PMBPTR_EL1_op0			0x3
+#define	PMBPTR_EL1_op1			0x0
+#define	PMBPTR_EL1_CRn			0x9
+#define	PMBPTR_EL1_CRm			0xa
+#define	PMBPTR_EL1_op2			0x1
+#define	PMBPTR_PTR_SHIFT		0
+#define	PMBPTR_PTR_MASK			\
+    (UL(0xffffffffffffffff) << PMBPTR_PTR_SHIFT)
+
+/* PMBSR_EL1 */
+#define	PMBSR_EL1			MRS_REG(PMBSR_EL1)
+#define	PMBSR_EL1_op0			0x3
+#define	PMBSR_EL1_op1			0x0
+#define	PMBSR_EL1_CRn			0x9
+#define	PMBSR_EL1_CRm			0xa
+#define	PMBSR_EL1_op2			0x3
+#define	PMBSR_MSS_SHIFT			0
+#define	PMBSR_MSS_MASK			(UL(0xffff) << PMBSR_MSS_SHIFT)
+#define	PMBSR_COLL_SHIFT		16
+#define	PMBSR_COLL			(UL(0x1) << PMBSR_COLL_SHIFT)
+#define	PMBSR_S_SHIFT			17
+#define	PMBSR_S				(UL(0x1) << PMBSR_S_SHIFT)
+#define	PMBSR_EA_SHIFT			18
+#define	PMBSR_EA			(UL(0x1) << PMBSR_EA_SHIFT)
+#define	PMBSR_DL_SHIFT			19
+#define	PMBSR_DL			(UL(0x1) << PMBSR_DL_SHIFT)
+#define	PMBSR_EC_SHIFT			26
+#define	PMBSR_EC_MASK			(UL(0x3f) << PMBSR_EC_SHIFT)
+
+/* PMCCFILTR_EL0 */
+#define	PMCCFILTR_EL0			MRS_REG(PMCCFILTR_EL0)
+#define	PMCCFILTR_EL0_op0		3
+#define	PMCCFILTR_EL0_op1		3
+#define	PMCCFILTR_EL0_CRn		14
+#define	PMCCFILTR_EL0_CRm		15
+#define	PMCCFILTR_EL0_op2		7
+
+/* PMCCNTR_EL0 */
+#define	PMCCNTR_EL0			MRS_REG(PMCCNTR_EL0)
+#define	PMCCNTR_EL0_op0			3
+#define	PMCCNTR_EL0_op1			3
+#define	PMCCNTR_EL0_CRn			9
+#define	PMCCNTR_EL0_CRm			13
+#define	PMCCNTR_EL0_op2			0
+
+/* PMCEID0_EL0 */
+#define	PMCEID0_EL0			MRS_REG(PMCEID0_EL0)
+#define	PMCEID0_EL0_op0			3
+#define	PMCEID0_EL0_op1			3
+#define	PMCEID0_EL0_CRn			9
+#define	PMCEID0_EL0_CRm			12
+#define	PMCEID0_EL0_op2			6
+
+/* PMCEID1_EL0 */
+#define	PMCEID1_EL0			MRS_REG(PMCEID1_EL0)
+#define	PMCEID1_EL0_op0			3
+#define	PMCEID1_EL0_op1			3
+#define	PMCEID1_EL0_CRn			9
+#define	PMCEID1_EL0_CRm			12
+#define	PMCEID1_EL0_op2			7
+
+/* PMCNTENCLR_EL0 */
+#define	PMCNTENCLR_EL0			MRS_REG(PMCNTENCLR_EL0)
+#define	PMCNTENCLR_EL0_op0		3
+#define	PMCNTENCLR_EL0_op1		3
+#define	PMCNTENCLR_EL0_CRn		9
+#define	PMCNTENCLR_EL0_CRm		12
+#define	PMCNTENCLR_EL0_op2		2
+
+/* PMCNTENSET_EL0 */
+#define	PMCNTENSET_EL0			MRS_REG(PMCNTENSET_EL0)
+#define	PMCNTENSET_EL0_op0		3
+#define	PMCNTENSET_EL0_op1		3
+#define	PMCNTENSET_EL0_CRn		9
+#define	PMCNTENSET_EL0_CRm		12
+#define	PMCNTENSET_EL0_op2		1
+
+/* PMCR_EL0 - Perfomance Monitoring Counters */
+#define	PMCR_EL0			MRS_REG(PMCR_EL0)
+#define	PMCR_EL0_op0			3
+#define	PMCR_EL0_op1			3
+#define	PMCR_EL0_CRn			9
+#define	PMCR_EL0_CRm			12
+#define	PMCR_EL0_op2			0
+#define	PMCR_E				(1 << 0) /* Enable all counters */
+#define	PMCR_P				(1 << 1) /* Reset all counters */
+#define	PMCR_C				(1 << 2) /* Clock counter reset */
+#define	PMCR_D				(1 << 3) /* CNTR counts every 64 clk cycles */
+#define	PMCR_X				(1 << 4) /* Export to ext. monitoring (ETM) */
+#define	PMCR_DP				(1 << 5) /* Disable CCNT if non-invasive debug*/
+#define	PMCR_LC				(1 << 6) /* Long cycle count enable */
+#define	PMCR_IMP_SHIFT			24	/* Implementer code */
+#define	PMCR_IMP_MASK			(0xff << PMCR_IMP_SHIFT)
+#define	 PMCR_IMP_RESEARCH		0x3f
+#define	 PMCR_IMP_ARM			0x41
+#define	PMCR_IDCODE_SHIFT		16	/* Identification code */
+#define	PMCR_IDCODE_MASK		(0xff << PMCR_IDCODE_SHIFT)
+/* PMCR_IMP_RESEARCH */
+#define	 PMCR_IDCODE_RAINIER		0x0c
+/* PMCR_IMP_ARM */
+#define	 PMCR_IDCODE_CORTEX_A57		0x01
+#define	 PMCR_IDCODE_CORTEX_A72		0x02
+#define	 PMCR_IDCODE_CORTEX_A53		0x03
+#define	 PMCR_IDCODE_CORTEX_A73		0x04
+#define	 PMCR_IDCODE_CORTEX_A35		0x0a
+#define	 PMCR_IDCODE_CORTEX_A76		0x0b
+#define	 PMCR_IDCODE_NEOVERSE_N1	0x0c
+#define	 PMCR_IDCODE_CORTEX_A77		0x10
+#define	 PMCR_IDCODE_CORTEX_A55		0x45
+#define	 PMCR_IDCODE_NEOVERSE_E1	0x46
+#define	 PMCR_IDCODE_CORTEX_A75		0x4a
+#define	PMCR_N_SHIFT			11  /* Number of counters implemented */
+#define	PMCR_N_MASK			(0x1f << PMCR_N_SHIFT)
+
+/* PMEVCNTR<n>_EL0 */
+#define	PMEVCNTR_EL0_op0		3
+#define	PMEVCNTR_EL0_op1		3
+#define	PMEVCNTR_EL0_CRn		14
+#define	PMEVCNTR_EL0_CRm		8
+/*
+ * PMEVCNTRn_EL0_CRm[1:0] holds the upper 2 bits of 'n'
+ * PMEVCNTRn_EL0_op2 holds the lower 3 bits of 'n'
+ */
+
+/* PMEVTYPER<n>_EL0 - Performance Monitoring Event Type */
+#define	PMEVTYPER_EL0_op0		3
+#define	PMEVTYPER_EL0_op1		3
+#define	PMEVTYPER_EL0_CRn		14
+#define	PMEVTYPER_EL0_CRm		12
+/*
+ * PMEVTYPERn_EL0_CRm[1:0] holds the upper 2 bits of 'n'
+ * PMEVTYPERn_EL0_op2 holds the lower 3 bits of 'n'
+ */
+#define	PMEVTYPER_EVTCOUNT_MASK		0x000003ff /* ARMv8.0 */
+#define	PMEVTYPER_EVTCOUNT_8_1_MASK	0x0000ffff /* ARMv8.1+ */
+#define	PMEVTYPER_MT			(1 << 25) /* Multithreading */
+#define	PMEVTYPER_M			(1 << 26) /* Secure EL3 filtering */
+#define	PMEVTYPER_NSH			(1 << 27) /* Non-secure hypervisor filtering */
+#define	PMEVTYPER_NSU			(1 << 28) /* Non-secure user filtering */
+#define	PMEVTYPER_NSK			(1 << 29) /* Non-secure kernel filtering */
+#define	PMEVTYPER_U			(1 << 30) /* User filtering */
+#define	PMEVTYPER_P			(1 << 31) /* Privileged filtering */
+
+/* PMINTENCLR_EL1 */
+#define	PMINTENCLR_EL1			MRS_REG(PMINTENCLR_EL1)
+#define	PMINTENCLR_EL1_op0		3
+#define	PMINTENCLR_EL1_op1		0
+#define	PMINTENCLR_EL1_CRn		9
+#define	PMINTENCLR_EL1_CRm		14
+#define	PMINTENCLR_EL1_op2		2
+
+/* PMINTENSET_EL1 */
+#define	PMINTENSET_EL1			MRS_REG(PMINTENSET_EL1)
+#define	PMINTENSET_EL1_op0		3
+#define	PMINTENSET_EL1_op1		0
+#define	PMINTENSET_EL1_CRn		9
+#define	PMINTENSET_EL1_CRm		14
+#define	PMINTENSET_EL1_op2		1
+
+/* PMMIR_EL1 */
+#define	PMMIR_EL1			MRS_REG(PMMIR_EL1)
+#define	PMMIR_EL1_op0			3
+#define	PMMIR_EL1_op1			0
+#define	PMMIR_EL1_CRn			9
+#define	PMMIR_EL1_CRm			14
+#define	PMMIR_EL1_op2			6
+
+/* PMOVSCLR_EL0 */
+#define	PMOVSCLR_EL0			MRS_REG(PMOVSCLR_EL0)
+#define	PMOVSCLR_EL0_op0		3
+#define	PMOVSCLR_EL0_op1		3
+#define	PMOVSCLR_EL0_CRn		9
+#define	PMOVSCLR_EL0_CRm		12
+#define	PMOVSCLR_EL0_op2		3
+
+/* PMOVSSET_EL0 */
+#define	PMOVSSET_EL0			MRS_REG(PMOVSSET_EL0)
+#define	PMOVSSET_EL0_op0		3
+#define	PMOVSSET_EL0_op1		3
+#define	PMOVSSET_EL0_CRn		9
+#define	PMOVSSET_EL0_CRm		14
+#define	PMOVSSET_EL0_op2		3
+
+/* PMSCR_EL1 */
+#define	PMSCR_EL1			MRS_REG(PMSCR_EL1)
+#define	PMSCR_EL1_op0			0x3
+#define	PMSCR_EL1_op1			0x0
+#define	PMSCR_EL1_CRn			0x9
+#define	PMSCR_EL1_CRm			0x9
+#define	PMSCR_EL1_op2			0x0
+#define	PMSCR_E0SPE_SHIFT		0
+#define	PMSCR_E0SPE			(UL(0x1) << PMSCR_E0SPE_SHIFT)
+#define	PMSCR_E1SPE_SHIFT		1
+#define	PMSCR_E1SPE			(UL(0x1) << PMSCR_E1SPE_SHIFT)
+#define	PMSCR_CX_SHIFT			3
+#define	PMSCR_CX			(UL(0x1) << PMSCR_CX_SHIFT)
+#define	PMSCR_PA_SHIFT			4
+#define	PMSCR_PA			(UL(0x1) << PMSCR_PA_SHIFT)
+#define	PMSCR_TS_SHIFT			5
+#define	PMSCR_TS			(UL(0x1) << PMSCR_TS_SHIFT)
+#define	PMSCR_PCT_SHIFT			6
+#define	PMSCR_PCT_MASK			(UL(0x3) << PMSCR_PCT_SHIFT)
+
+/* PMSELR_EL0 */
+#define	PMSELR_EL0			MRS_REG(PMSELR_EL0)
+#define	PMSELR_EL0_op0			3
+#define	PMSELR_EL0_op1			3
+#define	PMSELR_EL0_CRn			9
+#define	PMSELR_EL0_CRm			12
+#define	PMSELR_EL0_op2			5
+#define	PMSELR_SEL_MASK			0x1f
+
+/* PMSEVFR_EL1 */
+#define	PMSEVFR_EL1			MRS_REG(PMSEVFR_EL1)
+#define	PMSEVFR_EL1_op0			0x3
+#define	PMSEVFR_EL1_op1			0x0
+#define	PMSEVFR_EL1_CRn			0x9
+#define	PMSEVFR_EL1_CRm			0x9
+#define	PMSEVFR_EL1_op2			0x5
+
+/* PMSFCR_EL1 */
+#define	PMSFCR_EL1			MRS_REG(PMSFCR_EL1)
+#define	PMSFCR_EL1_op0			0x3
+#define	PMSFCR_EL1_op1			0x0
+#define	PMSFCR_EL1_CRn			0x9
+#define	PMSFCR_EL1_CRm			0x9
+#define	PMSFCR_EL1_op2			0x4
+#define	PMSFCR_FE_SHIFT			0
+#define	PMSFCR_FE			(UL(0x1) << PMSFCR_FE_SHIFT)
+#define	PMSFCR_FT_SHIFT			1
+#define	PMSFCR_FT			(UL(0x1) << PMSFCR_FT_SHIFT)
+#define	PMSFCR_FL_SHIFT			2
+#define	PMSFCR_FL			(UL(0x1) << PMSFCR_FL_SHIFT)
+#define	PMSFCR_FnE_SHIFT		3
+#define	PMSFCR_FnE			(UL(0x1) << PMSFCR_FnE_SHIFT)
+#define	PMSFCR_B_SHIFT			16
+#define	PMSFCR_B			(UL(0x1) << PMSFCR_B_SHIFT)
+#define	PMSFCR_LD_SHIFT			17
+#define	PMSFCR_LD			(UL(0x1) << PMSFCR_LD_SHIFT)
+#define	PMSFCR_ST_SHIFT			18
+#define	PMSFCR_ST			(UL(0x1) << PMSFCR_ST_SHIFT)
+
+/* PMSICR_EL1 */
+#define	PMSICR_EL1			MRS_REG(PMSICR_EL1)
+#define	PMSICR_EL1_op0			0x3
+#define	PMSICR_EL1_op1			0x0
+#define	PMSICR_EL1_CRn			0x9
+#define	PMSICR_EL1_CRm			0x9
+#define	PMSICR_EL1_op2			0x2
+#define	PMSICR_COUNT_SHIFT		0
+#define	PMSICR_COUNT_MASK		(UL(0xffffffff) << PMSICR_COUNT_SHIFT)
+#define	PMSICR_ECOUNT_SHIFT		56
+#define	PMSICR_ECOUNT_MASK		(UL(0xff) << PMSICR_ECOUNT_SHIFT)
+
+/* PMSIDR_EL1 */
+#define	PMSIDR_EL1			MRS_REG(PMSIDR_EL1)
+#define	PMSIDR_EL1_op0			0x3
+#define	PMSIDR_EL1_op1			0x0
+#define	PMSIDR_EL1_CRn			0x9
+#define	PMSIDR_EL1_CRm			0x9
+#define	PMSIDR_EL1_op2			0x7
+#define	PMSIDR_FE_SHIFT			0
+#define	PMSIDR_FE			(UL(0x1) << PMSIDR_FE_SHIFT)
+#define	PMSIDR_FT_SHIFT			1
+#define	PMSIDR_FT			(UL(0x1) << PMSIDR_FT_SHIFT)
+#define	PMSIDR_FL_SHIFT			2
+#define	PMSIDR_FL			(UL(0x1) << PMSIDR_FL_SHIFT)
+#define	PMSIDR_ArchInst_SHIFT		3
+#define	PMSIDR_ArchInst			(UL(0x1) << PMSIDR_ArchInst_SHIFT)
+#define	PMSIDR_LDS_SHIFT		4
+#define	PMSIDR_LDS			(UL(0x1) << PMSIDR_LDS_SHIFT)
+#define	PMSIDR_ERnd_SHIFT		5
+#define	PMSIDR_ERnd			(UL(0x1) << PMSIDR_ERnd_SHIFT)
+#define	PMSIDR_FnE_SHIFT		6
+#define	PMSIDR_FnE			(UL(0x1) << PMSIDR_FnE_SHIFT)
+#define	PMSIDR_Interval_SHIFT		8
+#define	PMSIDR_Interval_MASK		(UL(0xf) << PMSIDR_Interval_SHIFT)
+#define	PMSIDR_MaxSize_SHIFT		12
+#define	PMSIDR_MaxSize_MASK		(UL(0xf) << PMSIDR_MaxSize_SHIFT)
+#define	PMSIDR_CountSize_SHIFT		16
+#define	PMSIDR_CountSize_MASK		(UL(0xf) << PMSIDR_CountSize_SHIFT)
+#define	PMSIDR_Format_SHIFT		20
+#define	PMSIDR_Format_MASK		(UL(0xf) << PMSIDR_Format_SHIFT)
+#define	PMSIDR_PBT_SHIFT		24
+#define	PMSIDR_PBT			(UL(0x1) << PMSIDR_PBT_SHIFT)
+
+/* PMSIRR_EL1 */
+#define	PMSIRR_EL1			MRS_REG(PMSIRR_EL1)
+#define	PMSIRR_EL1_op0			0x3
+#define	PMSIRR_EL1_op1			0x0
+#define	PMSIRR_EL1_CRn			0x9
+#define	PMSIRR_EL1_CRm			0x9
+#define	PMSIRR_EL1_op2			0x3
+#define	PMSIRR_RND_SHIFT		0
+#define	PMSIRR_RND			(UL(0x1) << PMSIRR_RND_SHIFT)
+#define	PMSIRR_INTERVAL_SHIFT		8
+#define	PMSIRR_INTERVAL_MASK		(UL(0xffffff) << PMSIRR_INTERVAL_SHIFT)
+
+/* PMSLATFR_EL1 */
+#define	PMSLATFR_EL1			MRS_REG(PMSLATFR_EL1)
+#define	PMSLATFR_EL1_op0		0x3
+#define	PMSLATFR_EL1_op1		0x0
+#define	PMSLATFR_EL1_CRn		0x9
+#define	PMSLATFR_EL1_CRm		0x9
+#define	PMSLATFR_EL1_op2		0x6
+#define	PMSLATFR_MINLAT_SHIFT		0
+#define	PMSLATFR_MINLAT_MASK		(UL(0xfff) << PMSLATFR_MINLAT_SHIFT)
+
+/* PMSNEVFR_EL1 */
+#define	PMSNEVFR_EL1			MRS_REG(PMSNEVFR_EL1)
+#define	PMSNEVFR_EL1_op0		0x3
+#define	PMSNEVFR_EL1_op1		0x0
+#define	PMSNEVFR_EL1_CRn		0x9
+#define	PMSNEVFR_EL1_CRm		0x9
+#define	PMSNEVFR_EL1_op2		0x1
+
+/* PMSWINC_EL0 */
+#define	PMSWINC_EL0			MRS_REG(PMSWINC_EL0)
+#define	PMSWINC_EL0_op0			3
+#define	PMSWINC_EL0_op1			3
+#define	PMSWINC_EL0_CRn			9
+#define	PMSWINC_EL0_CRm			12
+#define	PMSWINC_EL0_op2			4
+
+/* PMUSERENR_EL0 */
+#define	PMUSERENR_EL0			MRS_REG(PMUSERENR_EL0)
+#define	PMUSERENR_EL0_op0		3
+#define	PMUSERENR_EL0_op1		3
+#define	PMUSERENR_EL0_CRn		9
+#define	PMUSERENR_EL0_CRm		14
+#define	PMUSERENR_EL0_op2		0
+
+/* PMXEVCNTR_EL0 */
+#define	PMXEVCNTR_EL0			MRS_REG(PMXEVCNTR_EL0)
+#define	PMXEVCNTR_EL0_op0		3
+#define	PMXEVCNTR_EL0_op1		3
+#define	PMXEVCNTR_EL0_CRn		9
+#define	PMXEVCNTR_EL0_CRm		13
+#define	PMXEVCNTR_EL0_op2		2
+
+/* PMXEVTYPER_EL0 */
+#define	PMXEVTYPER_EL0			MRS_REG(PMXEVTYPER_EL0)
+#define	PMXEVTYPER_EL0_op0		3
+#define	PMXEVTYPER_EL0_op1		3
+#define	PMXEVTYPER_EL0_CRn		9
+#define	PMXEVTYPER_EL0_CRm		13
+#define	PMXEVTYPER_EL0_op2		1
+
+/* SCTLR_EL1 - System Control Register */
+#define	SCTLR_RES1	0x30d00800	/* Reserved ARMv8.0, write 1 */
+#define	SCTLR_M				(UL(0x1) << 0)
+#define	SCTLR_A				(UL(0x1) << 1)
+#define	SCTLR_C				(UL(0x1) << 2)
+#define	SCTLR_SA			(UL(0x1) << 3)
+#define	SCTLR_SA0			(UL(0x1) << 4)
+#define	SCTLR_CP15BEN			(UL(0x1) << 5)
+#define	SCTLR_nAA			(UL(0x1) << 6)
+#define	SCTLR_ITD			(UL(0x1) << 7)
+#define	SCTLR_SED			(UL(0x1) << 8)
+#define	SCTLR_UMA			(UL(0x1) << 9)
+#define	SCTLR_EnRCTX			(UL(0x1) << 10)
+#define	SCTLR_EOS			(UL(0x1) << 11)
+#define	SCTLR_I				(UL(0x1) << 12)
+#define	SCTLR_EnDB			(UL(0x1) << 13)
+#define	SCTLR_DZE			(UL(0x1) << 14)
+#define	SCTLR_UCT			(UL(0x1) << 15)
+#define	SCTLR_nTWI			(UL(0x1) << 16)
 /* Bit 17 is reserved */
-#define	SCTLR_nTWE	0x00040000
-#define	SCTLR_WXN	0x00080000
-/* Bit 20 is reserved */
-#define	SCTLR_IESB	0x00200000 /* ARMv8.2 */
-/* Bit 22 is reserved */
-#define	SCTLR_SPAN	0x00800000 /* ARMv8.1 */
-#define	SCTLR_EOE	0x01000000
-#define	SCTLR_EE	0x02000000
-#define	SCTLR_UCI	0x04000000
-#define	SCTLR_EnDA	0x08000000 /* ARMv8.3 */
-#define	SCTLR_nTLSMD	0x10000000 /* ARMv8.2 */
-#define	SCTLR_LSMAOE	0x20000000 /* ARMv8.2 */
-#define	SCTLR_EnIB	0x40000000 /* ARMv8.3 */
-#define	SCTLR_EnIA	0x80000000 /* ARMv8.3 */
+#define	SCTLR_nTWE			(UL(0x1) << 18)
+#define	SCTLR_WXN			(UL(0x1) << 19)
+#define	SCTLR_TSCXT			(UL(0x1) << 20)
+#define	SCTLR_IESB			(UL(0x1) << 21)
+#define	SCTLR_EIS			(UL(0x1) << 22)
+#define	SCTLR_SPAN			(UL(0x1) << 23)
+#define	SCTLR_E0E			(UL(0x1) << 24)
+#define	SCTLR_EE			(UL(0x1) << 25)
+#define	SCTLR_UCI			(UL(0x1) << 26)
+#define	SCTLR_EnDA			(UL(0x1) << 27)
+#define	SCTLR_nTLSMD			(UL(0x1) << 28)
+#define	SCTLR_LSMAOE			(UL(0x1) << 29)
+#define	SCTLR_EnIB			(UL(0x1) << 30)
+#define	SCTLR_EnIA			(UL(0x1) << 31)
+/* Bits 34:32 are reserved */
+#define	SCTLR_BT0			(UL(0x1) << 35)
+#define	SCTLR_BT1			(UL(0x1) << 36)
+#define	SCTLR_ITFSB			(UL(0x1) << 37)
+#define	SCTLR_TCF0_MASK			(UL(0x3) << 38)
+#define	SCTLR_TCF_MASK			(UL(0x3) << 40)
+#define	SCTLR_ATA0			(UL(0x1) << 42)
+#define	SCTLR_ATA			(UL(0x1) << 43)
+#define	SCTLR_DSSBS			(UL(0x1) << 44)
+#define	SCTLR_TWEDEn			(UL(0x1) << 45)
+#define	SCTLR_TWEDEL_MASK		(UL(0xf) << 46)
+/* Bits 53:50 are reserved */
+#define	SCTLR_EnASR			(UL(0x1) << 54)
+#define	SCTLR_EnAS0			(UL(0x1) << 55)
+#define	SCTLR_EnALS			(UL(0x1) << 56)
+#define	SCTLR_EPAN			(UL(0x1) << 57)
 
 /* SPSR_EL1 */
 /*
@@ -866,6 +1793,8 @@
 #define	PSR_A		0x00000100
 #define	PSR_D		0x00000200
 #define	PSR_DAIF	(PSR_D | PSR_A | PSR_I | PSR_F)
+/* The default DAIF mask. These bits are valid in spsr_el1 and daif */
+#define	PSR_DAIF_DEFAULT (PSR_F)
 #define	PSR_IL		0x00100000
 #define	PSR_SS		0x00200000
 #define	PSR_C64		0x04000000
@@ -874,6 +1803,9 @@
 #define	PSR_Z		0x40000000
 #define	PSR_N		0x80000000
 #define	PSR_FLAGS	0xf0000000
+/* PSR fields that can be set from 32-bit and 64-bit processes */
+#define	PSR_SETTABLE_32	PSR_FLAGS
+#define	PSR_SETTABLE_64	(PSR_FLAGS | PSR_SS)
 
 /* TCR_EL1 - Translation Control Register */
 /* Bits 63:59 are reserved */
@@ -954,9 +1886,9 @@
 #define	TCR_T1SZ_SHIFT		16
 #define	TCR_T1SZ(x)		((x) << TCR_T1SZ_SHIFT)
 #define	TCR_TG0_SHIFT		14
-#define	TCR_TG0_16K		(1UL << TCR_TG0_SHIFT)
-#define	TCR_TG0_4K		(2UL << TCR_TG0_SHIFT)
-#define	TCR_TG0_64K		(3UL << TCR_TG0_SHIFT)
+#define	TCR_TG0_4K		(0UL << TCR_TG0_SHIFT)
+#define	TCR_TG0_64K		(1UL << TCR_TG0_SHIFT)
+#define	TCR_TG0_16K		(2UL << TCR_TG0_SHIFT)
 #define	TCR_SH0_SHIFT		12
 #define	TCR_SH0_IS		(3UL << TCR_SH0_SHIFT)
 #define	TCR_ORGN0_SHIFT		10
@@ -979,78 +1911,16 @@
 #define	TCR_SMP_ATTRS	0
 #endif
 
-/* Saved Program Status Register */
-#define	DBG_SPSR_SS	(0x1 << 21)
+/* TTBR0_EL1 & TTBR1_EL1 - Translation Table Base Register 0 & 1 */
+#define	TTBR_ASID_SHIFT		48
+#define	TTBR_ASID_MASK		(0xfffful << TTBR_ASID_SHIFT)
+#define	TTBR_BADDR		0x0000fffffffffffeul
+#define	TTBR_CnP_SHIFT		0
+#define	TTBR_CnP		(1ul << TTBR_CnP_SHIFT)
 
-/* Monitor Debug System Control Register */
-#define	DBG_MDSCR_SS	(0x1 << 0)
-#define	DBG_MDSCR_KDE	(0x1 << 13)
-#define	DBG_MDSCR_MDE	(0x1 << 15)
-
-/* Debug Breakpoint Control Registers */
-#define	DBG_BCR_EN		0x1
-#define	DBG_BCR_PMC_SHIFT	1
-#define	DBG_BCR_PMC		(0x3 << DBG_BCR_PMC_SHIFT)
-#define	 DBG_BCR_PMC_EL1	(0x1 << DBG_BCR_PMC_SHIFT)
-#define	 DBG_BCR_PMC_EL0	(0x2 << DBG_BCR_PMC_SHIFT)
-#define	DBG_BCR_BAS_SHIFT	5
-#define	DBG_BCR_BAS		(0xf << DBG_BCR_BAS_SHIFT)
-#define	DBG_BCR_HMC_SHIFT	13
-#define	DBG_BCR_HMC		(0x1 << DBG_BCR_HMC_SHIFT)
-#define	DBG_BCR_SSC_SHIFT	14
-#define	DBG_BCR_SSC		(0x3 << DBG_BCR_SSC_SHIFT)
-#define	DBG_BCR_LBN_SHIFT	16
-#define	DBG_BCR_LBN		(0xf << DBG_BCR_LBN_SHIFT)
-#define	DBG_BCR_BT_SHIFT	20
-#define	DBG_BCR_BT		(0xf << DBG_BCR_BT_SHIFT)
-
-/* Debug Watchpoint Control Registers */
-#define	DBG_WCR_EN		0x1
-#define	DBG_WCR_PAC_SHIFT	1
-#define	DBG_WCR_PAC		(0x3 << DBG_WCR_PAC_SHIFT)
-#define	 DBG_WCR_PAC_EL1	(0x1 << DBG_WCR_PAC_SHIFT)
-#define	 DBG_WCR_PAC_EL0	(0x2 << DBG_WCR_PAC_SHIFT)
-#define	DBG_WCR_LSC_SHIFT	3
-#define	DBG_WCR_LSC		(0x3 << DBG_WCR_LSC_SHIFT)
-#define	DBG_WCR_BAS_SHIFT	5
-#define	DBG_WCR_BAS		(0xff << DBG_WCR_BAS_SHIFT)
-#define	 DBG_WCR_BAS_MASK	DBG_WCR_BAS
-#define	DBG_WCR_HMC_SHIFT	13
-#define	DBG_WCR_HMC		(0x1 << DBG_WCR_HMC_SHIFT)
-#define	DBG_WCR_SSC_SHIFT	14
-#define	DBG_WCR_SSC		(0x3 << DBG_WCR_SSC_SHIFT)
-#define	DBG_WCR_LBN_SHIFT	16
-#define	DBG_WCR_LBN		(0xf << DBG_WCR_LBN_SHIFT)
-#define	DBG_WCR_WT_SHIFT	20
-#define	DBG_WCR_WT		(0x1 << DBG_WCR_WT_SHIFT)
-#define	DBG_WCR_MASK_SHIFT	24
-#define	DBG_WCR_MASK		(0x1f << DBG_WCR_MASK_SHIFT)
-
-/* Perfomance Monitoring Counters */
-#define	PMCR_E		(1 << 0) /* Enable all counters */
-#define	PMCR_P		(1 << 1) /* Reset all counters */
-#define	PMCR_C		(1 << 2) /* Clock counter reset */
-#define	PMCR_D		(1 << 3) /* CNTR counts every 64 clk cycles */
-#define	PMCR_X		(1 << 4) /* Export to ext. monitoring (ETM) */
-#define	PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
-#define	PMCR_LC		(1 << 6) /* Long cycle count enable */
-#define	PMCR_IMP_SHIFT	24 /* Implementer code */
-#define	PMCR_IMP_MASK	(0xff << PMCR_IMP_SHIFT)
-#define	 PMCR_IMP_ARM			0x41
-#define	PMCR_IDCODE_SHIFT	16 /* Identification code */
-#define	PMCR_IDCODE_MASK	(0xff << PMCR_IDCODE_SHIFT)
-#define	 PMCR_IDCODE_CORTEX_A57		0x01
-#define	 PMCR_IDCODE_CORTEX_A72		0x02
-#define	 PMCR_IDCODE_CORTEX_A53		0x03
-#define	 PMCR_IDCODE_CORTEX_A73		0x04
-#define	 PMCR_IDCODE_CORTEX_A35		0x0a
-#define	 PMCR_IDCODE_CORTEX_A76		0x0b
-#define	 PMCR_IDCODE_NEOVERSE_N1	0x0c
-#define	 PMCR_IDCODE_CORTEX_A77		0x10
-#define	 PMCR_IDCODE_CORTEX_A55		0x45
-#define	 PMCR_IDCODE_NEOVERSE_E1	0x46
-#define	 PMCR_IDCODE_CORTEX_A75		0x4a
-#define	PMCR_N_SHIFT	11       /* Number of counters implemented */
-#define	PMCR_N_MASK	(0x1f << PMCR_N_SHIFT)
+/* ZCR_EL1 - SVE Control Register */
+#define	ZCR_LEN_SHIFT		0
+#define	ZCR_LEN_MASK		(0xf << ZCR_LEN_SHIFT)
+#define	ZCR_LEN_BYTES(x)	((((x) & ZCR_LEN_MASK) + 1) * 16)
 
 #endif /* !_MACHINE_ARMREG_H_ */

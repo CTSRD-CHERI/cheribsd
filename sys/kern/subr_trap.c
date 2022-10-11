@@ -53,8 +53,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/capsicum.h>
+#include <sys/event.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
+#include <sys/msan.h>
 #include <sys/mutex.h>
 #include <sys/pmckern.h>
 #include <sys/proc.h>
@@ -141,6 +143,16 @@ userret(struct thread *td, struct trapframe *frame)
 	if (PMC_THREAD_HAS_SAMPLES(td))
 		PMC_CALL_HOOK(td, PMC_FN_THR_USERRET, NULL);
 #endif
+#ifdef TCPHPTS
+	/*
+	 * @gallatin is adament that this needs to go here, I
+	 * am not so sure. Running hpts is a lot like
+	 * a lro_flush() that happens while a user process
+	 * is running. But he may know best so I will go
+	 * with his view of accounting. :-)
+	 */
+	tcp_run_hpts();
+#endif
 	/*
 	 * Let the scheduler adjust our priority etc.
 	 */
@@ -201,11 +213,16 @@ userret(struct thread *td, struct trapframe *frame)
 void
 ast(struct trapframe *framep)
 {
-	struct thread *td, *peertd;
+	struct thread *td;
+#if __has_feature(capabilities)
+	struct thread *peertd;
+#endif
 	struct proc *p;
-	bool borrowing;
+	bool borrowing = false;
 	int flags, sig;
 	bool resched_sigs;
+
+	kmsan_mark(framep, sizeof(*framep), KMSAN_STATE_INITED);
 
 	td = curthread;
 	p = td->td_proc;
@@ -229,11 +246,12 @@ ast(struct trapframe *framep)
 	thread_lock(td);
 	flags = td->td_flags;
 	td->td_flags &= ~(TDF_ASTPENDING | TDF_NEEDSIGCHK | TDF_NEEDSUSPCHK |
-	    TDF_NEEDRESCHED | TDF_ALRMPEND | TDF_PROFPEND | TDF_MACPEND);
+	    TDF_NEEDRESCHED | TDF_ALRMPEND | TDF_PROFPEND | TDF_MACPEND |
+	    TDF_KQTICKLED);
 	thread_unlock(td);
 	VM_CNT_INC(v_trap);
 
-	if (td->td_cowgen != p->p_cowgen)
+	if (td->td_cowgen != atomic_load_int(&p->p_cowgen))
 		thread_cow_update(td);
 	if (td->td_pflags & TDP_OWEUPC && p->p_flag & P_PROFIL) {
 		addupc_task(td, td->td_profil_addr, td->td_profil_ticks);
@@ -245,6 +263,8 @@ ast(struct trapframe *framep)
 	if (PMC_IS_PENDING_CALLCHAIN(td))
 		PMC_CALL_HOOK_UNLOCKED(td, PMC_FN_USER_CALLCHAIN_SOFT, (void *) framep);
 #endif
+	if ((td->td_pflags & TDP_RFPPWAIT) != 0)
+		fork_rfppwait(td);
 	if (flags & TDF_ALRMPEND) {
 		PROC_LOCK(p);
 		kern_psignal(p, SIGVTALRM);
@@ -310,6 +330,7 @@ ast(struct trapframe *framep)
 	}
 #endif
 
+#if __has_feature(capabilities)
 	/*
 	 * Check if we're borrowing a thread over a cocall; if so - just
 	 * ignore the signals, we can't deliver them here.
@@ -318,9 +339,8 @@ ast(struct trapframe *framep)
 	if (peertd != NULL) {
 		//printf("%s: bingo, td %p, peertd %p\n", __func__, td, peertd);
 		borrowing = true;
-	} else {
-		borrowing = false;
 	}
+#endif
 
 	/*
 	 * Check for signals. Unlocked reads of p_pendingcnt or
@@ -342,6 +362,9 @@ ast(struct trapframe *framep)
 	} else {
 		resched_sigs = false;
 	}
+
+	if ((flags & TDF_KQTICKLED) != 0)
+		kqueue_drain_schedtask();
 
 	/*
 	 * Handle deferred update of the fast sigblock value, after

@@ -187,10 +187,7 @@ static driver_t acpi_video_driver = {
 	sizeof(struct acpi_video_softc),
 };
 
-static devclass_t acpi_video_devclass;
-
-DRIVER_MODULE(acpi_video, vgapci, acpi_video_driver, acpi_video_devclass,
-	      acpi_video_modevent, NULL);
+DRIVER_MODULE(acpi_video, vgapci, acpi_video_driver, acpi_video_modevent, NULL);
 MODULE_DEPEND(acpi_video, acpi, 1, 1, 1);
 #ifdef EVDEV_SUPPORT
 MODULE_DEPEND(acpi_video, evdev, 1, 1, 1);
@@ -233,7 +230,7 @@ acpi_video_push_evdev_event(struct evdev_dev *evdev, UINT32 notify)
 	int i;
 	uint16_t key;
 
-	/* Do not allow to execute 2 instances this routine concurently */
+	/* Do not allow to execute 2 instances this routine concurrently */
 	ACPI_SERIAL_ASSERT(video_output);
 
 	for (i = 0; i < nitems(acpi_video_evdev_map); i++) {
@@ -650,33 +647,33 @@ acpi_video_vo_init(UINT32 adr)
 			SYSCTL_ADD_PROC(&vo->vo_sysctl_ctx,
 			    SYSCTL_CHILDREN(vo->vo_sysctl_tree),
 			    OID_AUTO, "active",
-			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, vo,
+			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, vo,
 			    0, acpi_video_vo_active_sysctl, "I",
 			    "current activity of this device");
 			SYSCTL_ADD_PROC(&vo->vo_sysctl_ctx,
 			    SYSCTL_CHILDREN(vo->vo_sysctl_tree),
 			    OID_AUTO, "brightness",
-			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, vo,
+			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, vo,
 			    0, acpi_video_vo_bright_sysctl, "I",
 			    "current brightness level");
 			SYSCTL_ADD_PROC(&vo->vo_sysctl_ctx,
 			    SYSCTL_CHILDREN(vo->vo_sysctl_tree),
 			    OID_AUTO, "fullpower",
-			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, vo,
+			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, vo,
 			    POWER_PROFILE_PERFORMANCE,
 			    acpi_video_vo_presets_sysctl, "I",
 			    "preset level for full power mode");
 			SYSCTL_ADD_PROC(&vo->vo_sysctl_ctx,
 			    SYSCTL_CHILDREN(vo->vo_sysctl_tree),
 			    OID_AUTO, "economy",
-			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, vo,
+			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, vo,
 			    POWER_PROFILE_ECONOMY,
 			    acpi_video_vo_presets_sysctl, "I",
 			    "preset level for economy mode");
 			SYSCTL_ADD_PROC(&vo->vo_sysctl_ctx,
 			    SYSCTL_CHILDREN(vo->vo_sysctl_tree),
 			    OID_AUTO, "levels",
-			    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, vo,
+			    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, vo,
 			    0, acpi_video_vo_levels_sysctl, "I",
 			    "supported brightness levels");
 		} else

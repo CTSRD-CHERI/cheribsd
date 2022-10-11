@@ -54,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/disk.h>
 #include <sys/fcntl.h>
 #include <sys/limits.h>
+#include <sys/selinfo.h>
 #include <sys/sysctl.h>
 #include <geom/geom.h>
 #include <geom/geom_int.h>
@@ -65,6 +66,7 @@ struct g_dev_softc {
 	struct cdev	*sc_alias;
 	int		 sc_open;
 	u_int		 sc_active;
+	struct selinfo	 sc_selinfo;
 #define	SC_A_DESTROY	(1 << 31)
 #define	SC_A_OPEN	(1 << 30)
 #define	SC_A_ACTIVE	(SC_A_OPEN - 1)
@@ -74,6 +76,16 @@ static d_open_t		g_dev_open;
 static d_close_t	g_dev_close;
 static d_strategy_t	g_dev_strategy;
 static d_ioctl_t	g_dev_ioctl;
+static d_kqfilter_t	g_dev_kqfilter;
+
+static void		gdev_filter_detach(struct knote *kn);
+static int		gdev_filter_vnode(struct knote *kn, long hint);
+
+static struct filterops gdev_filterops_vnode = {
+	.f_isfd = 1,
+	.f_detach = gdev_filter_detach,
+	.f_event = gdev_filter_vnode,
+};
 
 static struct cdevsw g_dev_cdevsw = {
 	.d_version =	D_VERSION,
@@ -85,6 +97,7 @@ static struct cdevsw g_dev_cdevsw = {
 	.d_strategy =	g_dev_strategy,
 	.d_name =	"g_dev",
 	.d_flags =	D_DISK | D_TRACKCLOSE,
+	.d_kqfilter =	g_dev_kqfilter,
 };
 
 static g_init_t g_dev_init;
@@ -214,6 +227,8 @@ g_dev_destroy(void *arg, int flags __unused)
 	g_trace(G_T_TOPOLOGY, "g_dev_destroy(%p(%s))", cp, gp->name);
 	snprintf(buf, sizeof(buf), "cdev=%s", gp->name);
 	devctl_notify("GEOM", "DEV", "DESTROY", buf);
+	knlist_clear(&sc->sc_selinfo.si_note, 0);
+	knlist_destroy(&sc->sc_selinfo.si_note);
 	if (cp->acr > 0 || cp->acw > 0 || cp->ace > 0)
 		g_access(cp, -cp->acr, -cp->acw, -cp->ace);
 	g_detach(cp);
@@ -258,8 +273,8 @@ g_dev_set_physpath(struct g_consumer *cp)
 		dev = sc->sc_dev;
 		old_alias_dev = sc->sc_alias;
 		alias_devp = (struct cdev **)&sc->sc_alias;
-		make_dev_physpath_alias(MAKEDEV_WAITOK, alias_devp, dev,
-		    old_alias_dev, physpath);
+		make_dev_physpath_alias(MAKEDEV_WAITOK | MAKEDEV_CHECKNAME,
+		    alias_devp, dev, old_alias_dev, physpath);
 	} else if (sc->sc_alias) {
 		destroy_dev((struct cdev *)sc->sc_alias);
 		sc->sc_alias = NULL;
@@ -305,7 +320,11 @@ g_dev_attrchanged(struct g_consumer *cp, const char *attr)
 static void
 g_dev_resize(struct g_consumer *cp)
 {
+	struct g_dev_softc *sc;
 	char buf[SPECNAMELEN + 6];
+
+	sc = cp->private;
+	KNOTE_UNLOCKED(&sc->sc_selinfo.si_note, NOTE_ATTRIB);
 
 	snprintf(buf, sizeof(buf), "cdev=%s", cp->provider->name);
 	devctl_notify("GEOM", "DEV", "SIZECHANGE", buf);
@@ -378,6 +397,7 @@ g_dev_taste(struct g_class *mp, struct g_provider *pp, int insist __unused)
 	dev = sc->sc_dev;
 	dev->si_flags |= SI_UNMAPPED;
 	dev->si_iosize_max = maxphys;
+	knlist_init_mtx(&sc->sc_selinfo.si_note, &sc->sc_mtx);
 	error = init_dumpdev(dev);
 	if (error != 0)
 		printf("%s: init_dumpdev() failed (gp->name=%s, error=%d)\n",
@@ -451,6 +471,7 @@ g_dev_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 			atomic_clear_int(&sc->sc_active, SC_A_OPEN);
 		else
 			atomic_set_int(&sc->sc_active, SC_A_OPEN);
+		KNOTE_LOCKED(&sc->sc_selinfo.si_note, NOTE_OPEN);
 		mtx_unlock(&sc->sc_mtx);
 	}
 	return (error);
@@ -497,6 +518,7 @@ g_dev_close(struct cdev *dev, int flags, int fmt, struct thread *td)
 		atomic_set_int(&sc->sc_active, SC_A_OPEN);
 	while (sc->sc_open == 0 && (sc->sc_active & SC_A_ACTIVE) != 0)
 		msleep(&sc->sc_active, &sc->sc_mtx, 0, "g_dev_close", hz / 10);
+	KNOTE_LOCKED(&sc->sc_selinfo.si_note, NOTE_CLOSE | (w ? NOTE_CLOSE_WRITE : 0));
 	mtx_unlock(&sc->sc_mtx);
 	g_topology_lock();
 	error = g_access(cp, r, w, e);
@@ -511,9 +533,6 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 	struct g_provider *pp;
 	off_t offset, length, chunk, odd;
 	int i, error;
-#ifdef COMPAT_FREEBSD12
-	struct diocskerneldump_arg kda_copy;
-#endif
 
 	cp = dev->si_drv2;
 	pp = cp->provider;
@@ -550,41 +569,6 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 		if (error == 0 && *(u_int *)data == 0)
 			error = ENOENT;
 		break;
-#ifdef COMPAT_FREEBSD11
-	case DIOCSKERNELDUMP_FREEBSD11:
-	    {
-		struct diocskerneldump_arg kda;
-
-		gone_in(13, "FreeBSD 11.x ABI compat");
-
-		bzero(&kda, sizeof(kda));
-		kda.kda_encryption = KERNELDUMP_ENC_NONE;
-		kda.kda_index = (*(u_int *)data ? 0 : KDA_REMOVE_ALL);
-		if (kda.kda_index == KDA_REMOVE_ALL)
-			error = dumper_remove(devtoname(dev), &kda);
-		else
-			error = g_dev_setdumpdev(dev, &kda);
-		break;
-	    }
-#endif
-#ifdef COMPAT_FREEBSD12
-	case DIOCSKERNELDUMP_FREEBSD12:
-	    {
-		struct diocskerneldump_arg_freebsd12 *kda12;
-
-		gone_in(14, "FreeBSD 12.x ABI compat");
-
-		kda12 = (void *)data;
-		memcpy(&kda_copy, kda12, sizeof(kda_copy));
-		kda_copy.kda_index = (kda12->kda12_enable ?
-		    0 : KDA_REMOVE_ALL);
-
-		explicit_bzero(kda12, sizeof(*kda12));
-		/* Kludge to pass kda_copy to kda in fallthrough. */
-		data = (void *)&kda_copy;
-	    }
-	    /* FALLTHROUGH */
-#endif
 	case DIOCSKERNELDUMP:
 	    {
 		struct diocskerneldump_arg *kda;
@@ -632,19 +616,6 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 			printf("%s: offset=%jd length=%jd\n", __func__, offset,
 			    length);
 			error = EINVAL;
-			break;
-		}
-		if ((pp->mediasize > 0) && (offset >= pp->mediasize)) {
-			/*
-			 * Catch out-of-bounds requests here. The problem is
-			 * that due to historical GEOM I/O implementation
-			 * peculatities, g_delete_data() would always return
-			 * success for requests starting just the next byte
-			 * after providers media boundary. Condition check on
-			 * non-zero media size, since that condition would
-			 * (most likely) cause ENXIO instead.
-			 */
-			error = EIO;
 			break;
 		}
 		while (length > 0) {
@@ -768,6 +739,10 @@ g_dev_done(struct bio *bp2)
 		    bp2, bp2->bio_error);
 		bp->bio_flags |= BIO_ERROR;
 	} else {
+		if (bp->bio_cmd == BIO_READ)
+			KNOTE_UNLOCKED(&sc->sc_selinfo.si_note, NOTE_READ);
+		if (bp->bio_cmd == BIO_WRITE)
+			KNOTE_UNLOCKED(&sc->sc_selinfo.si_note, NOTE_WRITE);
 		g_trace(G_T_BIO, "g_dev_done(%p/%p) resid %ld completed %jd",
 		    bp2, bp, bp2->bio_resid, (intmax_t)bp2->bio_completed);
 	}
@@ -895,6 +870,46 @@ g_dev_orphan(struct g_consumer *cp)
 	/* Destroy the struct cdev *so we get no more requests */
 	delist_dev(dev);
 	destroy_dev_sched_cb(dev, g_dev_callback, cp);
+}
+
+static void
+gdev_filter_detach(struct knote *kn)
+{
+	struct g_dev_softc *sc;
+
+	sc = kn->kn_hook;
+
+	knlist_remove(&sc->sc_selinfo.si_note, kn, 0);
+}
+
+static int
+gdev_filter_vnode(struct knote *kn, long hint)
+{
+	kn->kn_fflags |= kn->kn_sfflags & hint;
+
+	return (kn->kn_fflags != 0);
+}
+
+static int
+g_dev_kqfilter(struct cdev *dev, struct knote *kn)
+{
+	struct g_dev_softc *sc;
+
+	sc = dev->si_drv1;
+
+	if (kn->kn_filter != EVFILT_VNODE)
+		return (EINVAL);
+
+#define SUPPORTED_EVENTS (NOTE_ATTRIB | NOTE_OPEN | NOTE_CLOSE | \
+    NOTE_CLOSE_WRITE | NOTE_READ | NOTE_WRITE)
+	if (kn->kn_sfflags & ~SUPPORTED_EVENTS)
+		return (EOPNOTSUPP);
+
+	kn->kn_fop = &gdev_filterops_vnode;
+	kn->kn_hook = sc;
+	knlist_add(&sc->sc_selinfo.si_note, kn, 0);
+
+	return (0);
 }
 
 DECLARE_GEOM_CLASS(g_dev_class, g_dev);

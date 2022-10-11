@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2013 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Konstantin Belousov <kib@FreeBSD.org>
  * under sponsorship from the FreeBSD Foundation.
@@ -487,6 +486,36 @@ dmar_flush_write_bufs(struct dmar_unit *unit)
 	dmar_write4(unit, DMAR_GCMD_REG, unit->hw_gcmd | DMAR_GCMD_WBF);
 	DMAR_WAIT_UNTIL(((dmar_read4(unit, DMAR_GSTS_REG) & DMAR_GSTS_WBFS)
 	    != 0));
+	return (error);
+}
+
+/*
+ * Some BIOSes protect memory region they reside in by using DMAR to
+ * prevent devices from doing any DMA transactions to that part of RAM.
+ * AMI refers to this as "DMA Control Guarantee".
+ * We need to disable this when address translation is enabled.
+ */
+int
+dmar_disable_protected_regions(struct dmar_unit *unit)
+{
+	uint32_t reg;
+	int error;
+
+	DMAR_ASSERT_LOCKED(unit);
+
+	/* Check if we support the feature. */
+	if ((unit->hw_cap & (DMAR_CAP_PLMR | DMAR_CAP_PHMR)) == 0)
+		return (0);
+
+	reg = dmar_read4(unit, DMAR_PMEN_REG);
+	if ((reg & DMAR_PMEN_EPM) == 0)
+		return (0);
+
+	reg &= ~DMAR_PMEN_EPM;
+	dmar_write4(unit, DMAR_PMEN_REG, reg);
+	DMAR_WAIT_UNTIL(((dmar_read4(unit, DMAR_PMEN_REG) & DMAR_PMEN_PRS)
+	    != 0));
+
 	return (error);
 }
 

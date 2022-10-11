@@ -45,8 +45,6 @@ __FBSDID("$FreeBSD$");
  * to include the code here.
  */
 #ifndef PIC
-#define DONT_EXPORT_CRT_INIT_GLOBALS
-#define CRT_INIT_GLOBALS_GDC_ONLY
 #include "crt_init_globals.c"
 #endif
 
@@ -66,7 +64,7 @@ Elf_Auxinfo *__auxargs;
  *
  * Note: If we want to support tight function bounds, it is important that
  * function calls and global variable accesses are only be made after
- * do_crt_init_globals() has completed (as this initializes the capabilities to
+ * crt_init_globals() has completed (as this initializes the capabilities to
  * globals and functions in the captable, which is used for all function calls).
  * This restriction only applies to statically linked binaries since the dynamic
  * linker takes care of initialization otherwise.
@@ -95,7 +93,7 @@ _start(void *auxv,
 	 * Digest the auxiliary vector for local use.
 	 *
 	 * Note: this file must be compile with -fno-jump-tables to avoid use
-	 * of the captable before do_crt_init_globals() has been called.
+	 * of the captable before crt_init_globals() has been called.
 	 */
 	for (Elf_Auxinfo *auxp = auxv; auxp->a_type != AT_NULL;  auxp++) {
 		if (auxp->a_type == AT_ARGV) {
@@ -116,13 +114,13 @@ _start(void *auxv,
 	/* For -pie executables rtld will initialize the __cap_relocs */
 #ifndef PIC
 	/*
-	 * crt_init_globals_3 must be called before accessing any globals.
+	 * crt_init_globals must be called before accessing any globals.
 	 *
 	 * Note: We parse the phdrs to ensure that the global data cap does
 	 * not span the readonly segment or text segment.
 	 */
 	if (!has_dynamic_linker)
-		do_crt_init_globals(at_phdr, at_phnum);
+		crt_init_globals(at_phdr, at_phnum, NULL, NULL, NULL);
 #endif
 	/* We can access global variables/make function calls now. */
 

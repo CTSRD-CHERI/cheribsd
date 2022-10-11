@@ -152,6 +152,9 @@ static struct mx25l_flash_ident flash_devices[] = {
 	/* GigaDevice */
 	{ "gd25q64",	0xc8, 0x4017, 64 * 1024, 128, FL_ERASE_4K },
 	{ "gd25q128",	0xc8, 0x4018, 64 * 1024, 256, FL_ERASE_4K },
+
+	/* Integrated Silicon Solution */
+	{ "is25wp256",	0x9d, 0x7019, 64 * 1024, 512, FL_ERASE_4K | FL_ENABLE_4B_ADDR},
 };
 
 static int
@@ -630,10 +633,8 @@ mx25l_task(void *arg)
 {
 	struct mx25l_softc *sc = (struct mx25l_softc*)arg;
 	struct bio *bp;
-	device_t dev;
 
 	for (;;) {
-		dev = sc->sc_dev;
 		M25PXX_LOCK(sc);
 		do {
 			if (sc->sc_taskstate == TSTATE_STOPPING) {
@@ -667,8 +668,6 @@ mx25l_task(void *arg)
 	}
 }
 
-static devclass_t mx25l_devclass;
-
 static device_method_t mx25l_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		mx25l_probe),
@@ -684,7 +683,7 @@ static driver_t mx25l_driver = {
 	sizeof(struct mx25l_softc),
 };
 
-DRIVER_MODULE(mx25l, spibus, mx25l_driver, mx25l_devclass, 0, 0);
+DRIVER_MODULE(mx25l, spibus, mx25l_driver, 0, 0);
 MODULE_DEPEND(mx25l, spibus, 1, 1, 1);
 #ifdef	FDT
 MODULE_DEPEND(mx25l, fdt_slicer, 1, 1, 1);

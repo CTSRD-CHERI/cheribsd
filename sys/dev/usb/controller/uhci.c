@@ -1295,7 +1295,6 @@ static uint8_t
 uhci_check_transfer(struct usb_xfer *xfer)
 {
 	uint32_t status;
-	uint32_t token;
 	uhci_td_t *td;
 
 	DPRINTFN(16, "xfer=%p checking transfer\n", xfer);
@@ -1332,7 +1331,6 @@ uhci_check_transfer(struct usb_xfer *xfer)
 		while (1) {
 			usb_pc_cpu_invalidate(td->page_cache);
 			status = le32toh(td->td_status);
-			token = le32toh(td->td_token);
 
 			/*
 			 * if there is an active TD the transfer isn't done
@@ -2111,7 +2109,7 @@ uhci_device_isoc_enter(struct usb_xfer *xfer)
 	struct uhci_mem_layout ml;
 	uhci_softc_t *sc = UHCI_BUS2SC(xfer->xroot->bus);
 	uint32_t nframes;
-	uint32_t temp;
+	uint32_t startframe;
 	uint32_t *plen;
 
 #ifdef USB_DEBUG
@@ -2127,34 +2125,9 @@ uhci_device_isoc_enter(struct usb_xfer *xfer)
 
 	nframes = UREAD2(sc, UHCI_FRNUM);
 
-	temp = (nframes - xfer->endpoint->isoc_next) &
-	    (UHCI_VFRAMELIST_COUNT - 1);
-
-	if ((xfer->endpoint->is_synced == 0) ||
-	    (temp < xfer->nframes)) {
-		/*
-		 * If there is data underflow or the pipe queue is empty we
-		 * schedule the transfer a few frames ahead of the current
-		 * frame position. Else two isochronous transfers might
-		 * overlap.
-		 */
-		xfer->endpoint->isoc_next = (nframes + 3) & (UHCI_VFRAMELIST_COUNT - 1);
-		xfer->endpoint->is_synced = 1;
-		DPRINTFN(3, "start next=%d\n", xfer->endpoint->isoc_next);
-	}
-	/*
-	 * compute how many milliseconds the insertion is ahead of the
-	 * current frame position:
-	 */
-	temp = (xfer->endpoint->isoc_next - nframes) &
-	    (UHCI_VFRAMELIST_COUNT - 1);
-
-	/*
-	 * pre-compute when the isochronous transfer will be finished:
-	 */
-	xfer->isoc_time_complete =
-	    usb_isoc_time_expand(&sc->sc_bus, nframes) + temp +
-	    xfer->nframes;
+	if (usbd_xfer_get_isochronous_start_frame(
+	    xfer, nframes, 0, 1, UHCI_VFRAMELIST_COUNT - 1, &startframe))
+		DPRINTFN(3, "start next=%d\n", startframe);
 
 	/* get the real number of frames */
 
@@ -2171,11 +2144,11 @@ uhci_device_isoc_enter(struct usb_xfer *xfer)
 	td = xfer->td_start[xfer->flags_int.curr_dma_set];
 	xfer->td_transfer_first = td;
 
-	pp_last = &sc->sc_isoc_p_last[xfer->endpoint->isoc_next];
+	pp_last = &sc->sc_isoc_p_last[startframe];
 
 	/* store starting position */
 
-	xfer->qh_pos = xfer->endpoint->isoc_next;
+	xfer->qh_pos = startframe;
 
 	while (nframes--) {
 		if (td == NULL) {
@@ -2252,10 +2225,6 @@ uhci_device_isoc_enter(struct usb_xfer *xfer)
 	}
 
 	xfer->td_transfer_last = td_last;
-
-	/* update isoc_next */
-	xfer->endpoint->isoc_next = (pp_last - &sc->sc_isoc_p_last[0]) &
-	    (UHCI_VFRAMELIST_COUNT - 1);
 }
 
 static void
@@ -2801,7 +2770,6 @@ uhci_xfer_setup(struct usb_setup_params *parm)
 {
 	struct usb_page_search page_info;
 	struct usb_page_cache *pc;
-	uhci_softc_t *sc;
 	struct usb_xfer *xfer;
 	void *last_obj;
 	uint32_t ntd;
@@ -2810,7 +2778,6 @@ uhci_xfer_setup(struct usb_setup_params *parm)
 	uint32_t n;
 	uint16_t align;
 
-	sc = UHCI_BUS2SC(parm->udev->bus);
 	xfer = parm->curr_xfer;
 
 	parm->hc_max_packet_size = 0x500;
@@ -2898,7 +2865,7 @@ uhci_xfer_setup(struct usb_setup_params *parm)
 	 * We don't allow alignments of
 	 * less than 8 bytes:
 	 *
-	 * NOTE: Allocating using an aligment
+	 * NOTE: Allocating using an alignment 
 	 * of 1 byte has special meaning!
 	 */
 	if (n < 3) {

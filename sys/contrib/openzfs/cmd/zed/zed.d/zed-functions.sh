@@ -1,5 +1,5 @@
 #!/bin/sh
-# shellcheck disable=SC2039
+# shellcheck disable=SC2154,SC3043
 # zed-functions.sh
 #
 # ZED helper functions for use in ZEDLETs
@@ -76,8 +76,7 @@ zed_log_msg()
 #
 zed_log_err()
 {
-    logger -p "${ZED_SYSLOG_PRIORITY}" -t "${ZED_SYSLOG_TAG}" -- "error:" \
-        "$(basename -- "$0"):""${ZEVENT_EID:+" eid=${ZEVENT_EID}:"}" "$@"
+    zed_log_msg "error: ${0##*/}:""${ZEVENT_EID:+" eid=${ZEVENT_EID}:"}" "$@"
 }
 
 
@@ -126,10 +125,8 @@ zed_lock()
 
     # Obtain a lock on the file bound to the given file descriptor.
     #
-    eval "exec ${fd}> '${lockfile}'"
-    err="$(flock --exclusive "${fd}" 2>&1)"
-    # shellcheck disable=SC2181
-    if [ $? -ne 0 ]; then
+    eval "exec ${fd}>> '${lockfile}'"
+    if ! err="$(flock --exclusive "${fd}" 2>&1)"; then
         zed_log_err "failed to lock \"${lockfile}\": ${err}"
     fi
 
@@ -165,9 +162,7 @@ zed_unlock()
     fi
 
     # Release the lock and close the file descriptor.
-    err="$(flock --unlock "${fd}" 2>&1)"
-    # shellcheck disable=SC2181
-    if [ $? -ne 0 ]; then
+    if ! err="$(flock --unlock "${fd}" 2>&1)"; then
         zed_log_err "failed to unlock \"${lockfile}\": ${err}"
     fi
     eval "exec ${fd}>&-"
@@ -206,6 +201,10 @@ zed_notify()
     [ "${rv}" -eq 0 ] && num_success=$((num_success + 1))
     [ "${rv}" -eq 1 ] && num_failure=$((num_failure + 1))
 
+    zed_notify_pushover "${subject}" "${pathname}"; rv=$?
+    [ "${rv}" -eq 0 ] && num_success=$((num_success + 1))
+    [ "${rv}" -eq 1 ] && num_failure=$((num_failure + 1))
+
     [ "${num_success}" -gt 0 ] && return 0
     [ "${num_failure}" -gt 0 ] && return 1
     return 2
@@ -224,6 +223,8 @@ zed_notify()
 # ZED_EMAIL_OPTS.  This undergoes the following keyword substitutions:
 # - @ADDRESS@ is replaced with the space-delimited recipient email address(es)
 # - @SUBJECT@ is replaced with the notification subject
+#   If @SUBJECT@ was omited here, a "Subject: ..." header will be added to notification
+#
 #
 # Arguments
 #   subject: notification subject
@@ -241,7 +242,7 @@ zed_notify()
 #
 zed_notify_email()
 {
-    local subject="$1"
+    local subject="${1:-"ZED notification"}"
     local pathname="${2:-"/dev/null"}"
 
     : "${ZED_EMAIL_PROG:="mail"}"
@@ -258,19 +259,30 @@ zed_notify_email()
     [ -n "${subject}" ] || return 1
     if [ ! -r "${pathname}" ]; then
         zed_log_err \
-                "$(basename "${ZED_EMAIL_PROG}") cannot read \"${pathname}\""
+                "${ZED_EMAIL_PROG##*/} cannot read \"${pathname}\""
         return 1
     fi
 
-    ZED_EMAIL_OPTS="$(echo "${ZED_EMAIL_OPTS}" \
+    # construct cmdline options
+    ZED_EMAIL_OPTS_PARSED="$(echo "${ZED_EMAIL_OPTS}" \
         | sed   -e "s/@ADDRESS@/${ZED_EMAIL_ADDR}/g" \
                 -e "s/@SUBJECT@/${subject}/g")"
 
-    # shellcheck disable=SC2086
-    eval "${ZED_EMAIL_PROG}" ${ZED_EMAIL_OPTS} < "${pathname}" >/dev/null 2>&1
+    # pipe message to email prog
+    # shellcheck disable=SC2086,SC2248
+    {
+        # no subject passed as option?
+        if [ "${ZED_EMAIL_OPTS%@SUBJECT@*}" = "${ZED_EMAIL_OPTS}" ] ; then
+            # inject subject header
+            printf "Subject: %s\n" "${subject}"
+        fi
+        # output message
+        cat "${pathname}"
+    } |
+    eval ${ZED_EMAIL_PROG} ${ZED_EMAIL_OPTS_PARSED} >/dev/null 2>&1
     rv=$?
     if [ "${rv}" -ne 0 ]; then
-        zed_log_err "$(basename "${ZED_EMAIL_PROG}") exit=${rv}"
+        zed_log_err "${ZED_EMAIL_PROG##*/} exit=${rv}"
         return 1
     fi
     return 0
@@ -367,7 +379,7 @@ zed_notify_pushbullet()
 #
 # Notification via Slack Webhook <https://api.slack.com/incoming-webhooks>.
 # The Webhook URL (ZED_SLACK_WEBHOOK_URL) identifies this client to the
-# Slack channel. 
+# Slack channel.
 #
 # Requires awk, curl, and sed executables to be installed in the standard PATH.
 #
@@ -417,7 +429,7 @@ zed_notify_slack_webhook()
 
     # Construct the JSON message for posting.
     #
-    msg_json="$(printf '{"text": "*%s*\n%s"}' "${subject}" "${msg_body}" )"
+    msg_json="$(printf '{"text": "*%s*\\n%s"}' "${subject}" "${msg_body}" )"
 
     # Send the POST request and check for errors.
     #
@@ -436,6 +448,84 @@ zed_notify_slack_webhook()
     fi
     return 0
 }
+
+# zed_notify_pushover (subject, pathname)
+#
+# Send a notification via Pushover <https://pushover.net/>.
+# The access token (ZED_PUSHOVER_TOKEN) identifies this client to the
+# Pushover server. The user token (ZED_PUSHOVER_USER) defines the user or
+# group to which the notification will be sent.
+#
+# Requires curl and sed executables to be installed in the standard PATH.
+#
+# References
+#   https://pushover.net/api
+#
+# Arguments
+#   subject: notification subject
+#   pathname: pathname containing the notification message (OPTIONAL)
+#
+# Globals
+#   ZED_PUSHOVER_TOKEN
+#   ZED_PUSHOVER_USER
+#
+# Return
+#   0: notification sent
+#   1: notification failed
+#   2: not configured
+#
+zed_notify_pushover()
+{
+    local subject="$1"
+    local pathname="${2:-"/dev/null"}"
+    local msg_body
+    local msg_out
+    local msg_err
+    local url="https://api.pushover.net/1/messages.json"
+
+    [ -n "${ZED_PUSHOVER_TOKEN}" ] && [ -n "${ZED_PUSHOVER_USER}" ] || return 2
+
+    if [ ! -r "${pathname}" ]; then
+        zed_log_err "pushover cannot read \"${pathname}\""
+        return 1
+    fi
+
+    zed_check_cmd "curl" "sed" || return 1
+
+    # Read the message body in.
+    #
+    msg_body="$(cat "${pathname}")"
+
+    if [ -z "${msg_body}" ]
+    then
+        msg_body=$subject
+        subject=""
+    fi
+
+    # Send the POST request and check for errors.
+    #
+    msg_out="$( \
+        curl \
+        --form-string "token=${ZED_PUSHOVER_TOKEN}" \
+        --form-string "user=${ZED_PUSHOVER_USER}" \
+        --form-string "message=${msg_body}" \
+        --form-string "title=${subject}" \
+        "${url}" \
+        2>/dev/null \
+        )"; rv=$?
+    if [ "${rv}" -ne 0 ]; then
+        zed_log_err "curl exit=${rv}"
+        return 1
+    fi
+    msg_err="$(echo "${msg_out}" \
+        | sed -n -e 's/.*"errors" *:.*\[\(.*\)\].*/\1/p')"
+    if [ -n "${msg_err}" ]; then
+        zed_log_err "pushover \"${msg_err}"\"
+        return 1
+    fi
+    return 0
+}
+
 
 # zed_rate_limit (tag, [interval])
 #
@@ -511,10 +601,8 @@ zed_guid_to_pool()
 		return
 	fi
 
-	guid=$(printf "%llu" "$1")
-	if [ -n "$guid" ] ; then
-		$ZPOOL get -H -ovalue,name guid | awk '$1=='"$guid"' {print $2}'
-	fi
+	guid="$(printf "%u" "$1")"
+	$ZPOOL get -H -ovalue,name guid | awk '$1 == '"$guid"' {print $2; exit}'
 }
 
 # zed_exit_if_ignoring_this_event

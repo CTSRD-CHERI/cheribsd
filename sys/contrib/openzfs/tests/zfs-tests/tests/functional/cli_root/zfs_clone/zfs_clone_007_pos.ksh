@@ -40,16 +40,13 @@
 # 2. Verify it succeed while upgrade, but fails while the version downgraded.
 #
 
-ZFS_VERSION=$(zfs upgrade | head -1 | awk '{print $NF}' \
-	| sed -e 's/\.//g')
+ZFS_VERSION=$(zfs upgrade | grep -wom1 '[[:digit:]]*')
 
 verify_runnable "both"
 
 function cleanup
 {
-	if snapexists $SNAPFS ; then
-			log_must zfs destroy -Rf $SNAPFS
-	fi
+	snapexists $SNAPFS && destroy_dataset $SNAPFS -Rf
 }
 
 log_onexit cleanup

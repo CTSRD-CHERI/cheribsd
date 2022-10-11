@@ -2,11 +2,18 @@
 Welcome to CheriBSD!
 
 CheriBSD extends FreeBSD to implement memory protection and software
-compartmentalization features supported by the CHERI ISA.
+compartmentalization features enabled by CHERI-extended CPUs.
 
-CheriBSD source may be found at https://github.com/CTSRD-CHERI/cheribsd/
+The CheriBSD front page:
+  https://www.cheribsd.org/
 
-We provide support via mailing list
-https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/cheri-lists.html.
+We provide support via a mailing list:
+  https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/cheri-lists.html
 
-Find out more about about CHERI at http://cheri-cpu.org/
+And also via the CHERI-CPU Slack:
+  https://www.cl.cam.ac.uk/research/security/ctsrd/cheri/cheri-slack.html
+
+CheriBSD source may be found at:
+  https://github.com/CTSRD-CHERI/cheribsd/
+
+Find out more about about CHERI at https://cheri-cpu.org/

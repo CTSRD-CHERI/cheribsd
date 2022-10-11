@@ -48,8 +48,7 @@ function cleanup
 	typeset snap f
 
 	for snap in $snap1 $snap2 $snap3; do
-		snapexists $snap && \
-			log_must zfs destroy -f $snap
+		snapexists $snap && destroy_dataset $snap -f
 	done
 
 	for f in $tmpfile1 $tmpfile2; do
@@ -96,7 +95,7 @@ log_must zfs snapshot $snap3
 typeset -i i=0
 while (( i < ${#badargs[*]} ))
 do
-	log_mustnot eval "zfs send ${badargs[i]} >$TEST_BASE_DIR/devnull"
+	log_mustnot eval "zfs send ${badargs[i]} > /dev/null"
 
 	(( i = i + 1 ))
 done

@@ -213,7 +213,7 @@ iblock(struct inodesc *idesc, off_t isize, int type)
 				idesc->id_lbn++;
 				n = (*func)(idesc);
 			} else {
-				n = iblock(idesc, isize, type);
+				n = iblock(idesc, isize, type - 1);
 				idesc->id_level++;
 			}
 			if (n & STOP) {
@@ -264,6 +264,8 @@ ino_blkatoff(union dinode *dp, ino_t ino, ufs_lbn_t lbn, int *frags,
 	int i;
 
 	*frags = 0;
+	if (bpp != NULL)
+		*bpp = NULL;
 	/*
 	 * Handle extattr blocks first.
 	 */
@@ -300,6 +302,8 @@ ino_blkatoff(union dinode *dp, ino_t ino, ufs_lbn_t lbn, int *frags,
 			continue;
 		if (lbn > 0 && lbn >= next)
 			continue;
+		if (DIP(dp, di_ib[i]) == 0)
+			return (0);
 		return (indir_blkatoff(DIP(dp, di_ib[i]), ino, -cur - i, lbn,
 		    bpp));
 	}
@@ -321,8 +325,6 @@ indir_blkatoff(ufs2_daddr_t blk, ino_t ino, ufs_lbn_t cur, ufs_lbn_t lbn,
 	ufs_lbn_t base;
 	int i, level;
 
-	if (blk == 0)
-		return (0);
 	level = lbn_level(cur);
 	if (level == -1)
 		pfatal("Invalid indir lbn %jd in ino %ju\n",
@@ -352,12 +354,14 @@ indir_blkatoff(ufs2_daddr_t blk, ino_t ino, ufs_lbn_t cur, ufs_lbn_t lbn,
 		return (0);
 	blk = IBLK(bp, i);
 	bp->b_index = i;
-	if (bpp != NULL)
-		*bpp = bp;
-	else
-		brelse(bp);
-	if (cur == lbn)
+	if (cur == lbn || blk == 0) {
+		if (bpp != NULL)
+			*bpp = bp;
+		else
+			brelse(bp);
 		return (blk);
+	}
+	brelse(bp);
 	if (level == 0)
 		pfatal("Invalid lbn %jd at level 0 for ino %ju\n", lbn,
 		    (uintmax_t)ino);
@@ -416,14 +420,14 @@ void
 ginode(ino_t inumber, struct inode *ip)
 {
 	ufs2_daddr_t iblk;
-	static ino_t startinum = -1;
 
 	if (inumber < UFS_ROOTINO || inumber > maxino)
 		errx(EEXIT, "bad inode number %ju to ginode",
 		    (uintmax_t)inumber);
 	ip->i_number = inumber;
-	if (startinum != -1 &&
-	    inumber >= startinum && inumber < startinum + INOPB(&sblock)) {
+	if (icachebp != NULL &&
+	    inumber >= icachebp->b_index &&
+	    inumber < icachebp->b_index + INOPB(&sblock)) {
 		/* take an additional reference for the returned inode */
 		icachebp->b_refcnt++;
 	} else {
@@ -433,14 +437,14 @@ ginode(ino_t inumber, struct inode *ip)
 			brelse(icachebp);
 		icachebp = getdatablk(iblk, sblock.fs_bsize, BT_INODES);
 		if (icachebp->b_errs != 0) {
+			icachebp = NULL;
 			ip->i_bp = NULL;
 			ip->i_dp = &zino;
 			return;
 		}
-		startinum = rounddown(inumber, INOPB(&sblock));
 		/* take a cache-hold reference on new icachebp */
 		icachebp->b_refcnt++;
-		icachebp->b_index = startinum;
+		icachebp->b_index = rounddown(inumber, INOPB(&sblock));
 	}
 	ip->i_bp = icachebp;
 	if (sblock.fs_magic == FS_UFS1_MAGIC) {

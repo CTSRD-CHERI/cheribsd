@@ -1,13 +1,3 @@
-/* $FreeBSD$ */
-
-/* Get __FreeBSD_version. */
-#include <osreldate.h>
-
-/* Only specific versions of FreeBSD support xlocale */
-#if __FreeBSD_version >= 1000002 || (__FreeBSD_version < 1000000 && __FreeBSD_version >= 900506)
-#define FREEBSD_XLOCALE_SUPPORT 1
-#endif
-
 /* config.h.  Generated from config.h.in by configure.  */
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
@@ -17,6 +7,9 @@
 /* Define in built-in ELF support is used */
 #define BUILTIN_ELF 1
 
+/* Enable bzlib compression support */
+/* #undef BZLIBSUPPORT */
+
 /* Define for ELF core file support */
 #define ELFCORE 1
 
@@ -25,6 +18,12 @@
 
 /* Define to 1 if you have the `asprintf' function. */
 #define HAVE_ASPRINTF 1
+
+/* Define to 1 if you have the <byteswap.h> header file. */
+/* #undef HAVE_BYTESWAP_H */
+
+/* Define to 1 if you have the <bzlib.h> header file. */
+/* #undef HAVE_BZLIB_H */
 
 /* Define to 1 if you have the `ctime_r' function. */
 #define HAVE_CTIME_R 1
@@ -59,9 +58,7 @@
 #define HAVE_FORK 1
 
 /* Define to 1 if you have the `freelocale' function. */
-#ifdef FREEBSD_XLOCALE_SUPPORT
 #define HAVE_FREELOCALE 1
-#endif
 
 /* Define to 1 if fseeko (and presumably ftello) exists and is declared. */
 #define HAVE_FSEEKO 1
@@ -87,8 +84,14 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
 
+/* Define to 1 if you have the `bz2' library (-lbz2). */
+/* #undef HAVE_LIBBZ2 */
+
 /* Define to 1 if you have the `gnurx' library (-lgnurx). */
 /* #undef HAVE_LIBGNURX */
+
+/* Define to 1 if you have the `lzma' library (-llzma). */
+/* #undef HAVE_LIBLZMA */
 
 /* Define to 1 if you have the `seccomp' library (-lseccomp). */
 /* #undef HAVE_LIBSECCOMP */
@@ -98,6 +101,9 @@
 
 /* Define to 1 if you have the `localtime_r' function. */
 #define HAVE_LOCALTIME_R 1
+
+/* Define to 1 if you have the <lzma.h> header file. */
+/* #undef HAVE_LZMA_H */
 
 /* Define to 1 if mbrtowc and mbstate_t are properly declared. */
 #define HAVE_MBRTOWC 1
@@ -121,15 +127,24 @@
 #define HAVE_MMAP 1
 
 /* Define to 1 if you have the `newlocale' function. */
-#ifdef FREEBSD_XLOCALE_SUPPORT
 #define HAVE_NEWLOCALE 1
+
+/* Define to 1 if you have the `pipe2' function. */
+#ifndef __APPLE__ /* Cross building tools on macOS */
+#define HAVE_PIPE2 1
 #endif
+
+/* Define to 1 if you have the `posix_spawnp' function. */
+#define HAVE_POSIX_SPAWNP 1
 
 /* Define to 1 if you have the `pread' function. */
 #define HAVE_PREAD 1
 
 /* Have sig_t type */
 #define HAVE_SIG_T 1
+
+/* Define to 1 if you have the <spawn.h> header file. */
+#define HAVE_SPAWN_H 1
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
@@ -169,6 +184,12 @@
 
 /* Define to 1 if `tm_zone' is a member of `struct tm'. */
 #define HAVE_STRUCT_TM_TM_ZONE 1
+
+/* Define to 1 if you have the <sys/bswap.h> header file. */
+/* #undef HAVE_SYS_BSWAP_H */
+
+/* Define to 1 if you have the <sys/ioctl.h> header file. */
+#define HAVE_SYS_IOCTL_H 1
 
 /* Define to 1 if you have the <sys/mman.h> header file. */
 #define HAVE_SYS_MMAN_H 1
@@ -210,9 +231,7 @@
 #define HAVE_UNISTD_H 1
 
 /* Define to 1 if you have the `uselocale' function. */
-#ifdef FREEBSD_XLOCALE_SUPPORT
 #define HAVE_USELOCALE 1
-#endif
 
 /* Define to 1 if you have the `utime' function. */
 #define HAVE_UTIME 1
@@ -252,7 +271,7 @@
 #define HAVE_WORKING_VFORK 1
 
 /* Define to 1 if you have the <xlocale.h> header file. */
-#ifdef FREEBSD_XLOCALE_SUPPORT
+#ifndef __linux__ /* Cross building tools build with glibc on linux */
 #define HAVE_XLOCALE_H 1
 #endif
 
@@ -280,7 +299,7 @@
 #define PACKAGE_NAME "file"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "file 5.39"
+#define PACKAGE_STRING "file 5.42"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "file"
@@ -289,7 +308,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "5.39"
+#define PACKAGE_VERSION "5.42"
 
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
@@ -320,7 +339,7 @@
 
 
 /* Version number of package */
-#define VERSION "5.39"
+#define VERSION "5.42"
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
@@ -333,6 +352,9 @@
 /* #  undef WORDS_BIGENDIAN */
 # endif
 #endif
+
+/* Enable xzlib compression support */
+/* #undef XZLIBSUPPORT */
 
 /* Enable zlib compression support */
 #define ZLIBSUPPORT 1

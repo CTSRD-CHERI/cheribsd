@@ -55,32 +55,26 @@ struct image_args {
 	int argc;		/* count of argument strings */
 	int envc;		/* count of environment strings */
 	int fd;			/* file descriptor of the executable */
-	struct filedesc *fdp;	/* new file descriptor table */
 	int capc;		/* number of capabilities passed to coexecvec(2) */
 	void * __capability capv[42];	/* capabilities passed to coexecvec(2) */
 };
 
 struct image_params {
-	struct proc *proc;	/* our process struct */
+	struct proc *proc;		/* our process */
 	struct label *execlabel;	/* optional exec label */
-	struct vnode *vp;	/* pointer to vnode of file to exec */
+	struct vnode *vp;		/* pointer to vnode of file to exec */
 	struct vm_object *object;	/* The vm object for this vp */
-	struct vattr *attr;	/* attributes of file */
-	struct proc *cop;	/* process we're coexecing into */
-	const char *image_header; /* head of file to exec */
-	unsigned long entry_addr; /* entry address of target executable */
-	unsigned long start_addr; /* start of mapped image (including bss) */
-	unsigned long end_addr;   /* end of mapped image (including bss) */
-	unsigned long reloc_base; /* load address of image */
-	unsigned long interp_start; /* start of RTLD mapping (or zero) */
-	unsigned long interp_end;   /* end address of RTLD mapping (or zero) */
-	char vmspace_destroyed;	/* flag - we've blown away original vm space */
-#define IMGACT_SHELL	0x1
-#define IMGACT_BINMISC	0x2
-	unsigned char interpreted;	/* mask of interpreters that have run */
-	char opened;		/* flag - we have opened executable vnode */
-	char *interpreter_name;	/* name of the interpreter */
-	void *auxargs;		/* ELF Auxinfo structure pointer */
+	struct vattr *attr;		/* attributes of file */
+	struct proc *cop;		/* process we're coexecing into */
+	const char *image_header;	/* header of file to exec */
+	unsigned long entry_addr;	/* entry address of target executable */
+	unsigned long start_addr;	/* start of mapped image (including bss) */
+	unsigned long end_addr;		/* end of mapped image (including bss) */
+	unsigned long reloc_base;	/* load address of image */
+	unsigned long interp_start;	/* start of RTLD mapping (or zero) */
+	unsigned long interp_end;	/* end of RTLD mapping (or zero) */
+	char *interpreter_name;		/* name of the interpreter */
+	void *auxargs;			/* ELF Auxinfo structure pointer */
 	struct sf_buf *firstpage;	/* first page that we mapped */
 	void * __capability strings;	/* pointer to string space (user) */
 	void * __capability ps_strings;	/* pointer to ps_string (user space) */
@@ -100,12 +94,18 @@ struct image_params {
 	void * __capability stack;
 	vm_prot_t stack_prot;
 	u_long stack_sz;
-	u_long eff_stack_sz;
 	struct ucred *newcred;		/* new credentials if changing */
+#define IMGACT_SHELL	0x1
+#define IMGACT_BINMISC	0x2
+	unsigned char interpreted;	/* mask of interpreters that have run */
 	bool credential_setid;		/* true if becoming setid */
+	bool vmspace_destroyed;		/* we've blown away original vm space */
+	bool opened;			/* we have opened executable vnode */
 	bool textset;
 	u_int map_flags;
 	void * __capability imgact_capability;	/* copyout and mapping cap */
+#define IMGP_ASLR_SHARED_PAGE	0x1
+	uint32_t imgp_flags;
 };
 
 #ifdef _KERNEL
@@ -128,16 +128,15 @@ int	exec_check_permissions(struct image_params *);
 void	exec_cleanup(struct thread *td, struct vmspace *);
 int	exec_copyout_strings(struct image_params *, uintcap_t *);
 void	exec_free_args(struct image_args *);
+int	exec_map_stack(struct image_params *);
 int	exec_new_vmspace(struct image_params *, struct sysentvec *);
 void	exec_setregs(struct thread *, struct image_params *, uintcap_t);
 int	exec_shell_imgact(struct image_params *);
 int	exec_copyin_args(struct image_args *, const char * __capability,
+	    enum uio_seg, void * __capability, void * __capability);
+int	exec_copyin_args_capv(struct image_args *, const char * __capability,
 	    enum uio_seg, void * __capability, void * __capability,
 	    void * __capability);
-int	exec_copyin_data_fds(struct thread *, struct image_args *,
-	    const void * __capability, size_t, const int * __capability,
-	    size_t);
-void	exec_stackgap(struct image_params *imgp, uintcap_t *dp);
 int	pre_execve(struct thread *td, struct vmspace **oldvmspace);
 void	post_execve(struct thread *td, int error, struct vmspace *oldvmspace);
 #endif

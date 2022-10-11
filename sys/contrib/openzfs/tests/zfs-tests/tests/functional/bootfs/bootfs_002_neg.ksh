@@ -51,25 +51,14 @@
 verify_runnable "global"
 
 function cleanup {
-	if datasetexists $TESTPOOL/vol
-	then
-		log_must zfs destroy $TESTPOOL/vol
-	fi
-	if poolexists $TESTPOOL
-	then
-		log_must zpool destroy $TESTPOOL
-	fi
+	datasetexists $TESTPOOL/vol && destroy_dataset $TESTPOOL/vol
+	poolexists $TESTPOOL && log_must zpool destroy $TESTPOOL
+
 	if [[ -f $VDEV ]]; then
 		log_must rm -f $VDEV
 	fi
 }
 
-
-zpool set 2>&1 | grep bootfs > /dev/null
-if [ $? -ne 0 ]
-then
-	log_unsupported "bootfs pool property not supported on this release."
-fi
 
 log_assert "Invalid datasets are rejected as boot property values"
 log_onexit cleanup

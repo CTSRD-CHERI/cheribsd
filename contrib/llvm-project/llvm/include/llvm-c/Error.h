@@ -18,6 +18,13 @@
 
 LLVM_C_EXTERN_C_BEGIN
 
+/**
+ * @defgroup LLVMCError Error Handling
+ * @ingroup LLVMC
+ *
+ * @{
+ */
+
 #define LLVMErrorSuccess 0
 
 /**
@@ -61,6 +68,15 @@ void LLVMDisposeErrorMessage(char *ErrMsg);
  * Returns the type id for llvm StringError.
  */
 LLVMErrorTypeId LLVMGetStringErrorTypeId(void);
+
+/**
+ * Create a StringError.
+ */
+LLVMErrorRef LLVMCreateStringError(const char *ErrMsg);
+
+/**
+ * @}
+ */
 
 LLVM_C_EXTERN_C_END
 

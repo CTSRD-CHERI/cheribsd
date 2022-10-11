@@ -165,6 +165,7 @@ rd_loadobj_iter(rd_agent_t *rdap, rl_iter_f *cb, void *clnt_data)
 	rd_loadobj_t rdl;
 	rd_err_e ret;
 	uintptr_t base;
+	uint32_t offset;
 	int cnt, i;
 
 	DPRINTF("%s\n", __func__);
@@ -190,11 +191,12 @@ rd_loadobj_iter(rd_agent_t *rdap, rl_iter_f *cb, void *clnt_data)
 			if (kve->kve_vn_fileid != fileid) {
 				base = kve->kve_start;
 				fileid = kve->kve_vn_fileid;
-				path = kve->kve_path;
 			}
+			path = kve->kve_path;
+			offset = kve->kve_start - base;
 		} else {
-			base = 0;
 			path = NULL;
+			offset = 0;
 		}
 		memset(&rdl, 0, sizeof(rdl));
 		/*
@@ -202,7 +204,7 @@ rd_loadobj_iter(rd_agent_t *rdap, rl_iter_f *cb, void *clnt_data)
 		 */
 		rdl.rdl_saddr = kve->kve_start;
 		rdl.rdl_eaddr = kve->kve_end;
-		rdl.rdl_offset = kve->kve_start - base;
+		rdl.rdl_offset = offset;
 		if (kve->kve_protection & KVME_PROT_READ)
 			rdl.rdl_prot |= RD_RDL_R;
 		if (kve->kve_protection & KVME_PROT_WRITE)
@@ -371,7 +373,7 @@ rd_reset(rd_agent_t *rdap)
 	base = 0;
 	for (i = 0; i < count; i++) {
 		if (auxv[i].a_type == AT_BASE) {
-			base = (vaddr_t)auxv[i].a_un.a_ptr;
+			base = (ptraddr_t)auxv[i].a_un.a_ptr;
 			break;
 		}
 	}

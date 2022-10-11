@@ -15,7 +15,9 @@
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalValue.h"
+#include "llvm/Remarks/RemarkStreamer.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/ToolOutputFile.h"
 
 using namespace llvm;
 
@@ -92,12 +94,11 @@ char LLVMRemarkSetupFormatError::ID = 0;
 Expected<std::unique_ptr<ToolOutputFile>> llvm::setupLLVMOptimizationRemarks(
     LLVMContext &Context, StringRef RemarksFilename, StringRef RemarksPasses,
     StringRef RemarksFormat, bool RemarksWithHotness,
-    unsigned RemarksHotnessThreshold) {
+    Optional<uint64_t> RemarksHotnessThreshold) {
   if (RemarksWithHotness)
     Context.setDiagnosticsHotnessRequested(true);
 
-  if (RemarksHotnessThreshold)
-    Context.setDiagnosticsHotnessThreshold(RemarksHotnessThreshold);
+  Context.setDiagnosticsHotnessThreshold(RemarksHotnessThreshold);
 
   if (RemarksFilename.empty())
     return nullptr;
@@ -107,7 +108,7 @@ Expected<std::unique_ptr<ToolOutputFile>> llvm::setupLLVMOptimizationRemarks(
     return make_error<LLVMRemarkSetupFormatError>(std::move(E));
 
   std::error_code EC;
-  auto Flags = *Format == remarks::Format::YAML ? sys::fs::OF_Text
+  auto Flags = *Format == remarks::Format::YAML ? sys::fs::OF_TextWithCRLF
                                                 : sys::fs::OF_None;
   auto RemarksFile =
       std::make_unique<ToolOutputFile>(RemarksFilename, EC, Flags);
@@ -137,16 +138,14 @@ Expected<std::unique_ptr<ToolOutputFile>> llvm::setupLLVMOptimizationRemarks(
   return std::move(RemarksFile);
 }
 
-Error llvm::setupLLVMOptimizationRemarks(LLVMContext &Context, raw_ostream &OS,
-                                         StringRef RemarksPasses,
-                                         StringRef RemarksFormat,
-                                         bool RemarksWithHotness,
-                                         unsigned RemarksHotnessThreshold) {
+Error llvm::setupLLVMOptimizationRemarks(
+    LLVMContext &Context, raw_ostream &OS, StringRef RemarksPasses,
+    StringRef RemarksFormat, bool RemarksWithHotness,
+    Optional<uint64_t> RemarksHotnessThreshold) {
   if (RemarksWithHotness)
     Context.setDiagnosticsHotnessRequested(true);
 
-  if (RemarksHotnessThreshold)
-    Context.setDiagnosticsHotnessThreshold(RemarksHotnessThreshold);
+  Context.setDiagnosticsHotnessThreshold(RemarksHotnessThreshold);
 
   Expected<remarks::Format> Format = remarks::parseFormat(RemarksFormat);
   if (Error E = Format.takeError())

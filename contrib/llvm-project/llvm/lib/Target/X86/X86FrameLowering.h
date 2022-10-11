@@ -13,7 +13,9 @@
 #ifndef LLVM_LIB_TARGET_X86_X86FRAMELOWERING_H
 #define LLVM_LIB_TARGET_X86_X86FRAMELOWERING_H
 
+#include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/TargetFrameLowering.h"
+#include "llvm/Support/TypeSize.h"
 
 namespace llvm {
 
@@ -50,22 +52,25 @@ public:
   /// Emit target stack probe code. This is required for all
   /// large stack allocations on Windows. The caller is required to materialize
   /// the number of bytes to probe in RAX/EAX.
-  void emitStackProbe(MachineFunction &MF, MachineBasicBlock &MBB,
-                      MachineBasicBlock::iterator MBBI, const DebugLoc &DL,
-                      bool InProlog) const;
+  /// \p InstrNum optionally contains a debug-info instruction number for the
+  ///    new stack pointer.
+  void emitStackProbe(
+      MachineFunction &MF, MachineBasicBlock &MBB,
+      MachineBasicBlock::iterator MBBI, const DebugLoc &DL, bool InProlog,
+      Optional<MachineFunction::DebugInstrOperandPair> InstrNum = None) const;
+
+  bool stackProbeFunctionModifiesSP() const override;
 
   /// Replace a StackProbe inline-stub with the actual probe code inline.
   void inlineStackProbe(MachineFunction &MF,
                         MachineBasicBlock &PrologMBB) const override;
 
-  void
-  emitCalleeSavedFrameMoves(MachineBasicBlock &MBB,
-                            MachineBasicBlock::iterator MBBI) const override;
+  void emitCalleeSavedFrameMovesFullCFA(
+      MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI) const override;
 
   void emitCalleeSavedFrameMoves(MachineBasicBlock &MBB,
                                  MachineBasicBlock::iterator MBBI,
-                                 const DebugLoc &DL,
-                                 bool IsPrologue) const override;
+                                 const DebugLoc &DL, bool IsPrologue) const;
 
   /// emitProlog/emitEpilog - These methods insert prolog and epilog code into
   /// the function.
@@ -102,16 +107,17 @@ public:
   bool canSimplifyCallFramePseudos(const MachineFunction &MF) const override;
   bool needsFrameIndexResolution(const MachineFunction &MF) const override;
 
-  int getFrameIndexReference(const MachineFunction &MF, int FI,
-                             Register &FrameReg) const override;
+  StackOffset getFrameIndexReference(const MachineFunction &MF, int FI,
+                                     Register &FrameReg) const override;
 
   int getWin64EHFrameIndexRef(const MachineFunction &MF, int FI,
                               Register &SPReg) const;
-  int getFrameIndexReferenceSP(const MachineFunction &MF, int FI,
-                               Register &SPReg, int Adjustment) const;
-  int getFrameIndexReferencePreferSP(const MachineFunction &MF, int FI,
-                                     Register &FrameReg,
-                                     bool IgnoreSPUpdates) const override;
+  StackOffset getFrameIndexReferenceSP(const MachineFunction &MF, int FI,
+                                       Register &SPReg, int Adjustment) const;
+  StackOffset
+  getFrameIndexReferencePreferSP(const MachineFunction &MF, int FI,
+                                 Register &FrameReg,
+                                 bool IgnoreSPUpdates) const override;
 
   MachineBasicBlock::iterator
   eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
@@ -190,12 +196,17 @@ public:
   bool has128ByteRedZone(const MachineFunction& MF) const;
 
 private:
+  bool isWin64Prologue(const MachineFunction &MF) const;
+
+  bool needsDwarfCFI(const MachineFunction &MF) const;
+
   uint64_t calculateMaxStackAlign(const MachineFunction &MF) const;
 
   /// Emit target stack probe as a call to a helper function
-  void emitStackProbeCall(MachineFunction &MF, MachineBasicBlock &MBB,
-                          MachineBasicBlock::iterator MBBI, const DebugLoc &DL,
-                          bool InProlog) const;
+  void emitStackProbeCall(
+      MachineFunction &MF, MachineBasicBlock &MBB,
+      MachineBasicBlock::iterator MBBI, const DebugLoc &DL, bool InProlog,
+      Optional<MachineFunction::DebugInstrOperandPair> InstrNum) const;
 
   /// Emit target stack probe as an inline sequence.
   void emitStackProbeInline(MachineFunction &MF, MachineBasicBlock &MBB,
@@ -222,12 +233,7 @@ private:
                                        const DebugLoc &DL, uint64_t Offset,
                                        uint64_t Align) const;
 
-  /// Emit a stub to later inline the target stack probe.
-  MachineInstr *emitStackProbeInlineStub(MachineFunction &MF,
-                                         MachineBasicBlock &MBB,
-                                         MachineBasicBlock::iterator MBBI,
-                                         const DebugLoc &DL,
-                                         bool InProlog) const;
+  void adjustFrameForMsvcCxxEh(MachineFunction &MF) const;
 
   /// Aligns the stack pointer by ANDing it with -MaxAlign.
   void BuildStackAlignAND(MachineBasicBlock &MBB,

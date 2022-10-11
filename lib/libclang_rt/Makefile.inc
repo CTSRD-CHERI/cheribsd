@@ -2,7 +2,7 @@
 
 .include <bsd.compiler.mk>
 
-CRTSRC=		${SRCTOP}/contrib/subrepo-cheri-compiler-rt
+CRTSRC=		${SRCTOP}/contrib/llvm-project/compiler-rt
 .include "compiler-rt-vars.mk"
 
 .PATH:		${CRTSRC}/lib
@@ -12,10 +12,12 @@ SHLIBDIR=	${LIBDIR}
 
 NO_PIC=
 MK_PROFILE=	no
+MK_ASAN:=	no
+MK_SSP=		no
+MK_UBSAN:=	no
 
 WARNS?=		0
 
-SSP_CFLAGS=
 CFLAGS+=	-DNDEBUG
 CFLAGS+=	-DHAVE_RPC_XDR_H=0
 CFLAGS+=	-DSANITIZER_SUPPORTS_WEAK_HOOKS=0

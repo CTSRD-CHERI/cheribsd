@@ -364,15 +364,12 @@ aw_sid_read(device_t dev, uint32_t offset, uint32_t size, uint8_t *buffer)
 static int
 aw_sid_sysctl(SYSCTL_HANDLER_ARGS)
 {
-	struct aw_sid_softc *sc;
 	device_t dev = arg1;
 	enum aw_sid_fuse_id fuse = arg2;
 	uint8_t data[32];
 	char out[128];
 	uint32_t size;
 	int ret, i;
-
-	sc = device_get_softc(dev);
 
 	/* Get the size of the efuse data */
 	size = 0;
@@ -407,9 +404,7 @@ static driver_t aw_sid_driver = {
 	sizeof(struct aw_sid_softc),
 };
 
-static devclass_t aw_sid_devclass;
-
-EARLY_DRIVER_MODULE(aw_sid, simplebus, aw_sid_driver, aw_sid_devclass, 0, 0,
+EARLY_DRIVER_MODULE(aw_sid, simplebus, aw_sid_driver, 0, 0,
     BUS_PASS_SUPPORTDEV + BUS_PASS_ORDER_FIRST);
 MODULE_VERSION(aw_sid, 1);
 SIMPLEBUS_PNP_INFO(compat_data);

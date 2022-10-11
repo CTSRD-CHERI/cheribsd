@@ -332,10 +332,8 @@ mdioproxy_rendezvous_callback(enum rendezvous_op op, struct rendezvous_entry *re
 static void
 mdioproxy_identify(driver_t *driver, device_t parent)
 {
-	device_t child;
-
 	if (device_find_child(parent, driver->name, -1) == NULL) {
-		child = BUS_ADD_CHILD(parent, 0, driver->name, -1);
+		BUS_ADD_CHILD(parent, 0, driver->name, -1);
 	}
 }
 
@@ -434,10 +432,7 @@ DEFINE_CLASS_0(miiproxy, miiproxy_driver, miiproxy_methods,
 DEFINE_CLASS_0(mdioproxy, mdioproxy_driver, mdioproxy_methods,
     sizeof(struct mdioproxy_softc));
 
-devclass_t miiproxy_devclass;
-static devclass_t mdioproxy_devclass;
-
-DRIVER_MODULE(mdioproxy, mdio, mdioproxy_driver, mdioproxy_devclass, 0, 0);
-DRIVER_MODULE(miibus, miiproxy, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(mdioproxy, mdio, mdioproxy_driver, 0, 0);
+DRIVER_MODULE(miibus, miiproxy, miibus_driver, 0, 0);
 MODULE_VERSION(miiproxy, 1);
 MODULE_DEPEND(miiproxy, miibus, 1, 1, 1);

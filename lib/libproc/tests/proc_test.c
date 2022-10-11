@@ -39,7 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <libelf.h>
 #include <libproc.h>
 
-#include "../../../libexec/rtld-elf/paths.h"
+#include "../../../libexec/rtld-elf/rtld_paths.h"
 
 static const char *aout_object = "a.out";
 static const char *ldelf_object = _BASENAME_RTLD;

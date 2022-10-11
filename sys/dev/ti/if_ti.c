@@ -53,7 +53,7 @@
  *
  * The Tigon 2 contains 2 R4000 CPUs and requires a newer firmware
  * revision, which supports new features such as extended commands,
- * extended jumbo receive ring desciptors and a mini receive ring.
+ * extended jumbo receive ring descriptors and a mini receive ring.
  *
  * Alteon Networks is to be commended for releasing such a vast amount
  * of development material for the Tigon NIC without requiring an NDA
@@ -272,9 +272,7 @@ static driver_t ti_driver = {
 	sizeof(struct ti_softc)
 };
 
-static devclass_t ti_devclass;
-
-DRIVER_MODULE(ti, pci, ti_driver, ti_devclass, 0, 0);
+DRIVER_MODULE(ti, pci, ti_driver, 0, 0);
 MODULE_DEPEND(ti, pci, 1, 1, 1);
 MODULE_DEPEND(ti, ether, 1, 1, 1);
 
@@ -1609,8 +1607,7 @@ ti_newbuf_jumbo(struct ti_softc *sc, int idx, struct mbuf *m_old)
 				    "failed -- packet dropped!\n");
 				goto nobufs;
 			}
-			frame = vm_page_alloc(NULL, 0,
-			    VM_ALLOC_INTERRUPT | VM_ALLOC_NOOBJ |
+			frame = vm_page_alloc_noobj(VM_ALLOC_INTERRUPT |
 			    VM_ALLOC_WIRED);
 			if (frame == NULL) {
 				device_printf(sc->ti_dev, "buffer allocation "
@@ -2221,10 +2218,10 @@ ti_gibinit(struct ti_softc *sc)
 	ti_hostaddr64(&rcb->ti_hostaddr, sc->ti_rdata.ti_rx_std_ring_paddr);
 	rcb->ti_max_len = TI_FRAMELEN;
 	rcb->ti_flags = 0;
-	if (sc->ti_ifp->if_capenable & IFCAP_RXCSUM)
+	if (ifp->if_capenable & IFCAP_RXCSUM)
 		rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM |
 		     TI_RCB_FLAG_IP_CKSUM | TI_RCB_FLAG_NO_PHDR_CKSUM;
-	if (sc->ti_ifp->if_capenable & IFCAP_VLAN_HWTAGGING)
+	if (ifp->if_capenable & IFCAP_VLAN_HWTAGGING)
 		rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
 
 	/* Set up the jumbo receive ring. */
@@ -2238,10 +2235,10 @@ ti_gibinit(struct ti_softc *sc)
 	rcb->ti_max_len = PAGE_SIZE;
 	rcb->ti_flags = TI_RCB_FLAG_USE_EXT_RX_BD;
 #endif
-	if (sc->ti_ifp->if_capenable & IFCAP_RXCSUM)
+	if (ifp->if_capenable & IFCAP_RXCSUM)
 		rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM |
 		     TI_RCB_FLAG_IP_CKSUM | TI_RCB_FLAG_NO_PHDR_CKSUM;
-	if (sc->ti_ifp->if_capenable & IFCAP_VLAN_HWTAGGING)
+	if (ifp->if_capenable & IFCAP_VLAN_HWTAGGING)
 		rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
 
 	/*
@@ -2256,10 +2253,10 @@ ti_gibinit(struct ti_softc *sc)
 		rcb->ti_flags = TI_RCB_FLAG_RING_DISABLED;
 	else
 		rcb->ti_flags = 0;
-	if (sc->ti_ifp->if_capenable & IFCAP_RXCSUM)
+	if (ifp->if_capenable & IFCAP_RXCSUM)
 		rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM |
 		     TI_RCB_FLAG_IP_CKSUM | TI_RCB_FLAG_NO_PHDR_CKSUM;
-	if (sc->ti_ifp->if_capenable & IFCAP_VLAN_HWTAGGING)
+	if (ifp->if_capenable & IFCAP_VLAN_HWTAGGING)
 		rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
 
 	/*
@@ -2290,9 +2287,9 @@ ti_gibinit(struct ti_softc *sc)
 		rcb->ti_flags = 0;
 	else
 		rcb->ti_flags = TI_RCB_FLAG_HOST_RING;
-	if (sc->ti_ifp->if_capenable & IFCAP_VLAN_HWTAGGING)
+	if (ifp->if_capenable & IFCAP_VLAN_HWTAGGING)
 		rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
-	if (sc->ti_ifp->if_capenable & IFCAP_TXCSUM)
+	if (ifp->if_capenable & IFCAP_TXCSUM)
 		rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM |
 		     TI_RCB_FLAG_IP_CKSUM | TI_RCB_FLAG_NO_PHDR_CKSUM;
 	rcb->ti_max_len = TI_TX_RING_CNT;

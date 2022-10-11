@@ -70,7 +70,7 @@ static void os_pages_unmap(void *addr, size_t size);
 
 static void *
 os_pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
-	assert(ALIGNMENT_ADDR2BASE(addr, os_page) == (vaddr_t)addr);
+	assert(ALIGNMENT_ADDR2BASE(addr, os_page) == addr);
 	assert(ALIGNMENT_CEILING(size, os_page) == size);
 	assert(size != 0);
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -149,7 +149,7 @@ os_pages_trim(void *addr, size_t alloc_size, size_t leadsize, size_t size,
 
 static void
 os_pages_unmap(void *addr, size_t size) {
-	assert(ALIGNMENT_ADDR2BASE(addr, os_page) == (vaddr_t)addr);
+	assert(ALIGNMENT_ADDR2BASE(addr, os_page) == addr);
 	assert(ALIGNMENT_CEILING(size, os_page) == size);
 
 #ifdef _WIN32
@@ -188,8 +188,8 @@ pages_map_slow(size_t size, size_t alignment, bool *commit) {
 		if (pages == NULL) {
 			return NULL;
 		}
-		size_t leadsize = ALIGNMENT_CEILING((vaddr_t)pages, alignment)
-		    - (vaddr_t)pages;
+		size_t leadsize = ALIGNMENT_CEILING((uintptr_t)pages, alignment)
+		    - (uintptr_t)pages;
 		ret = os_pages_trim(pages, alloc_size, leadsize, size, commit);
 	} while (ret == NULL);
 
@@ -201,7 +201,7 @@ pages_map_slow(size_t size, size_t alignment, bool *commit) {
 void *
 pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
 	assert(alignment >= PAGE);
-	assert(ALIGNMENT_ADDR2BASE(addr, alignment) == (vaddr_t)addr);
+	assert(ALIGNMENT_ADDR2BASE(addr, alignment) == addr);
 
 #if defined(__FreeBSD__) && defined(MAP_EXCL)
 	/*
@@ -256,7 +256,7 @@ pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
 		return ret;
 	}
 	assert(addr == NULL);
-	if (ALIGNMENT_ADDR2OFFSET((vaddr_t)ret, alignment) != 0) {
+	if (ALIGNMENT_ADDR2OFFSET(ret, alignment) != 0) {
 		os_pages_unmap(ret, size);
 		return pages_map_slow(size, alignment, commit);
 	}
@@ -318,7 +318,7 @@ pages_decommit(void *addr, size_t size) {
 
 bool
 pages_purge_lazy(void *addr, size_t size) {
-	assert(ALIGNMENT_ADDR2BASE(addr, os_page) == (vaddr_t)addr);
+	assert(ALIGNMENT_ADDR2BASE(addr, os_page) == addr);
 	assert(PAGE_CEILING(size) == size);
 
 	if (!pages_can_purge_lazy) {

@@ -90,19 +90,17 @@ void
 set_top_of_stack_td(struct thread *td)
 {
 	td->td_md.md_stack_base = td->td_kstack +
-	    td->td_kstack_pages * PAGE_SIZE -
-	    roundup2(cpu_max_ext_state_size, XSAVE_AREA_ALIGN);
+	    td->td_kstack_pages * PAGE_SIZE;
 }
 
 struct savefpu *
 get_pcb_user_save_td(struct thread *td)
 {
-	vm_offset_t p;
-
-	p = td->td_md.md_stack_base;
-	KASSERT((p % XSAVE_AREA_ALIGN) == 0,
-	    ("Unaligned pcb_user_save area ptr %#lx td %p", p, td));
-	return ((struct savefpu *)p);
+	KASSERT(((vm_offset_t)td->td_md.md_usr_fpu_save %
+	    XSAVE_AREA_ALIGN) == 0,
+	    ("Unaligned pcb_user_save area ptr %p td %p",
+	    td->td_md.md_usr_fpu_save, td));
+	return (td->td_md.md_usr_fpu_save);
 }
 
 struct pcb *
@@ -189,10 +187,30 @@ copy_thread(struct thread *td1, struct thread *td2)
 	 * pcb2->pcb_[fg]sbase:	cloned above
 	 */
 
+	pcb2->pcb_tssp = NULL;
+
 	/* Setup to release spin count in fork_exit(). */
 	td2->td_md.md_spinlock_count = 1;
 	td2->td_md.md_saved_flags = PSL_KERNEL | PSL_I;
 	pmap_thread_init_invl_gen(td2);
+
+	/*
+	 * Copy the trap frame for the return to user mode as if from a syscall.
+	 * This copies most of the user mode register values.  Some of these
+	 * registers are rewritten by cpu_set_upcall() and linux_set_upcall().
+	 */
+	if ((td1->td_proc->p_flag & P_KPROC) == 0) {
+		bcopy(td1->td_frame, td2->td_frame, sizeof(struct trapframe));
+
+		/*
+		 * If the current thread has the trap bit set (i.e. a debugger
+		 * had single stepped the process to the system call), we need
+		 * to clear the trap flag from the new frame. Otherwise, the new
+		 * thread will receive a (likely unexpected) SIGTRAP when it
+		 * executes the first instruction after returning to userland.
+		 */
+		td2->td_frame->tf_rflags &= ~PSL_T;
+	}
 }
 
 /*
@@ -236,23 +254,8 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	mdp2 = &p2->p_md;
 	bcopy(&p1->p_md, mdp2, sizeof(*mdp2));
 
-	/*
-	 * Copy the trap frame for the return to user mode as if from a
-	 * syscall.  This copies most of the user mode register values.
-	 */
-	td2->td_frame = (struct trapframe *)td2->td_md.md_stack_base - 1;
-	bcopy(td1->td_frame, td2->td_frame, sizeof(struct trapframe));
-
-	td2->td_frame->tf_rax = 0;		/* Child returns zero */
-	td2->td_frame->tf_rflags &= ~PSL_C;	/* success */
-	td2->td_frame->tf_rdx = 1;
-
-	/*
-	 * If the parent process has the trap bit set (i.e. a debugger
-	 * had single stepped the process to the system call), we need
-	 * to clear the trap flag from the new frame.
-	 */
-	td2->td_frame->tf_rflags &= ~PSL_T;
+	/* Set child return values. */
+	p2->p_sysent->sv_set_fork_retval(td2);
 
 	/* As on i386, do not copy io permission bitmap. */
 	pcb2->pcb_tssp = NULL;
@@ -296,6 +299,16 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	 * will set up a stack to call fork_return(p, frame); to complete
 	 * the return to user-mode.
 	 */
+}
+
+void
+x86_set_fork_retval(struct thread *td)
+{
+	struct trapframe *frame = td->td_frame;
+
+	frame->tf_rax = 0;		/* Child returns zero */
+	frame->tf_rflags &= ~PSL_C;	/* success */
+	frame->tf_rdx = 1;		/* System V emulation */
 }
 
 /*
@@ -382,6 +395,7 @@ cpu_thread_alloc(struct thread *td)
 	set_top_of_stack_td(td);
 	td->td_pcb = pcb = get_pcb_td(td);
 	td->td_frame = (struct trapframe *)td->td_md.md_stack_base - 1;
+	td->td_md.md_usr_fpu_save = fpu_save_area_alloc();
 	pcb->pcb_save = get_pcb_user_save_pcb(pcb);
 	if (use_xsave) {
 		xhdr = (struct xstate_hdr *)(pcb->pcb_save + 1);
@@ -393,8 +407,10 @@ cpu_thread_alloc(struct thread *td)
 void
 cpu_thread_free(struct thread *td)
 {
-
 	cpu_thread_clean(td);
+
+	fpu_save_area_free(td->td_md.md_usr_fpu_save);
+	td->td_md.md_usr_fpu_save = NULL;
 }
 
 bool
@@ -590,22 +606,6 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 {
 	copy_thread(td0, td);
 
-	/*
-	 * Copy user general-purpose registers.
-	 *
-	 * Some of these registers are rewritten by cpu_set_upcall()
-	 * and linux_set_upcall().
-	 */
-	bcopy(td0->td_frame, td->td_frame, sizeof(struct trapframe));
-
-	/* If the current thread has the trap bit set (i.e. a debugger had
-	 * single stepped the process to the system call), we need to clear
-	 * the trap flag from the new frame. Otherwise, the new thread will
-	 * receive a (likely unexpected) SIGTRAP when it executes the first
-	 * instruction after returning to userland.
-	 */
-	td->td_frame->tf_rflags &= ~PSL_T;
-
 	set_pcb_flags_raw(td->td_pcb, PCB_FULL_IRET);
 }
 
@@ -689,39 +689,4 @@ cpu_set_user_tls(struct thread *td, void *tls_base)
 #endif
 	pcb->pcb_fsbase = (register_t)tls_base;
 	return (0);
-}
-
-/*
- * Software interrupt handler for queued VM system processing.
- */   
-void  
-swi_vm(void *dummy) 
-{     
-	if (busdma_swi_pending != 0)
-		busdma_swi();
-}
-
-/*
- * Tell whether this address is in some physical memory region.
- * Currently used by the kernel coredump code in order to avoid
- * dumping the ``ISA memory hole'' which could cause indefinite hangs,
- * or other unpredictable behaviour.
- */
-
-int
-is_physical_memory(vm_paddr_t addr)
-{
-
-#ifdef DEV_ISA
-	/* The ISA ``memory hole''. */
-	if (addr >= 0xa0000 && addr < 0x100000)
-		return 0;
-#endif
-
-	/*
-	 * stuff other tests for known memory-mapped devices (PCI?)
-	 * here
-	 */
-
-	return 1;
 }

@@ -279,6 +279,12 @@ typedef	struct __siginfo {
 			long	_band;		/* band event for SIGPOLL */
 		} _poll;			/* was this ever used ? */
 		struct {
+			int	_syscall;	/* Syscall number for signals
+						 * delivered as a result of
+						 * system calls denied by
+						 * Capsicum. */
+		} _capsicum;
+		struct {
 			long	__spare1__;
 			int	__spare2__[7];
 		} __spare__;
@@ -295,6 +301,7 @@ typedef int (copyout_siginfo_t)(const siginfo_t *si, void * __capability info);
 #define si_overrun	_reason._timer._overrun
 #define si_mqd		_reason._mesgq._mqd
 #define si_band		_reason._poll._band
+#define si_syscall	_reason._capsicum._syscall
 
 #if defined(_WANT_LWPINFO32) || (defined(_KERNEL) && defined(__LP64__))
 struct siginfo32 {
@@ -396,6 +403,7 @@ struct siginfo64 {
 #define FPE_FLTRES	6	/* Floating point inexact result.	*/
 #define FPE_FLTINV	7	/* Invalid floating point operation.	*/
 #define FPE_FLTSUB	8	/* Subscript out of range.		*/
+#define FPE_FLTIDO	9	/* Input denormal operation		*/
 
 /* codes for SIGTRAP */
 #define TRAP_BRKPT	1	/* Process breakpoint.			*/
@@ -429,9 +437,9 @@ struct siginfo64 {
 #define	PROT_CHERI_PERM		5	/* Capability permission fault	*/
 #define	PROT_CHERI_IMPRECISE	7	/* Imprecise bounds fault	*/
 #define	PROT_CHERI_STORELOCAL	8	/* Store-local fault		*/
-#define	PROT_CHERI_CCALL	9	/* CCall fault			*/
-#define	PROT_CHERI_CRETURN	10	/* CReturn fault		*/
+#define	PROT_CHERI_CINVOKE	9	/* CInvoke fault		*/
 #define	PROT_CHERI_SYSREG	11	/* Capability system register fault */
+#define	PROT_CHERI_UNALIGNED_BASE 12	/* Unaligned base address.      */
 #endif
 
 #if __POSIX_VISIBLE || __XSI_VISIBLE
@@ -588,7 +596,7 @@ __END_DECLS
 
 #if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
 static inline bool
-is_magic_sighandler_constant(vaddr_t handler) {
+is_magic_sighandler_constant(ptraddr_t handler) {
 	/*
 	 * Instead of enumerating all the SIG_* constants, just check if
 	 * it is a small (positive or negative) integer so that this doesn't

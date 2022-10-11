@@ -42,14 +42,14 @@
 
 function cleanup
 {
-	datasetexists $FS && log_must zfs destroy -r $FS
+	datasetexists $FS && destroy_dataset $FS -r
 }
 
 function count_snap_cmds
 {
 	typeset expected_count=$1
-	count=$(grep -E "command: (lt-)?zfs snapshot $FS@testsnapshot" | wc -l)
-	log_must eval "[[ $count -eq $expected_count ]]"
+	count=$(grep -cE "command: (lt-)?zfs snapshot $FS@testsnapshot")
+	log_must [ "$count" -eq "$expected_count" ]
 }
 
 typeset -r ZFS_DBGMSG=/proc/spl/kstat/zfs/dbgmsg
@@ -65,7 +65,7 @@ log_must zfs create $FS
 for i in {1..20}; do
 	log_must zfs snapshot "$FS@testsnapshot$i"
 done
-log_must zpool sync $TESTPOOL
+sync_pool $TESTPOOL
 
 #
 # Read the debug message file in small chunks to make sure that the read is
@@ -85,7 +85,7 @@ done
 
 # Clear out old messages and check that they really are gone
 echo 0 >$ZFS_DBGMSG || log_fail "failed to write to $ZFS_DBGMSG"
-cat $ZFS_DBGMSG | count_snap_cmds 0
+count_snap_cmds 0 < $ZFS_DBGMSG
 #
 # Even though we don't expect any messages in the file, reading should still
 # succeed.

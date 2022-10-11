@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CLANG_FRONTEND_PRECOMPILED_PREAMBLE_H
-#define LLVM_CLANG_FRONTEND_PRECOMPILED_PREAMBLE_H
+#ifndef LLVM_CLANG_FRONTEND_PRECOMPILEDPREAMBLE_H
+#define LLVM_CLANG_FRONTEND_PRECOMPILEDPREAMBLE_H
 
 #include "clang/Lex/Lexer.h"
 #include "clang/Lex/Preprocessor.h"
@@ -26,6 +26,7 @@
 
 namespace llvm {
 class MemoryBuffer;
+class MemoryBufferRef;
 namespace vfs {
 class FileSystem;
 }
@@ -40,7 +41,7 @@ class PCHContainerOperations;
 
 /// Runs lexer to compute suggested preamble bounds.
 PreambleBounds ComputePreambleBounds(const LangOptions &LangOpts,
-                                     const llvm::MemoryBuffer *Buffer,
+                                     const llvm::MemoryBufferRef &Buffer,
                                      unsigned MaxLines);
 
 class PreambleCallbacks;
@@ -104,8 +105,8 @@ public:
   /// Check whether PrecompiledPreamble can be reused for the new contents(\p
   /// MainFileBuffer) of the main file.
   bool CanReuse(const CompilerInvocation &Invocation,
-                const llvm::MemoryBuffer *MainFileBuffer, PreambleBounds Bounds,
-                llvm::vfs::FileSystem *VFS) const;
+                const llvm::MemoryBufferRef &MainFileBuffer,
+                PreambleBounds Bounds, llvm::vfs::FileSystem &VFS) const;
 
   /// Changes options inside \p CI to use PCH from this preamble. Also remaps
   /// main file to \p MainFileBuffer and updates \p VFS to ensure the preamble
@@ -216,7 +217,7 @@ private:
 
     static PreambleFileHash createForFile(off_t Size, time_t ModTime);
     static PreambleFileHash
-    createForMemoryBuffer(const llvm::MemoryBuffer *Buffer);
+    createForMemoryBuffer(const llvm::MemoryBufferRef &Buffer);
 
     friend bool operator==(const PreambleFileHash &LHS,
                            const PreambleFileHash &RHS) {
@@ -273,7 +274,7 @@ class PreambleCallbacks {
 public:
   virtual ~PreambleCallbacks() = default;
 
-  /// Called before FrontendAction::BeginSourceFile.
+  /// Called before FrontendAction::Execute.
   /// Can be used to store references to various CompilerInstance fields
   /// (e.g. SourceManager) that may be interesting to the consumers of other
   /// callbacks.
@@ -290,7 +291,7 @@ public:
   /// used instead, but having only this method allows a simpler API.
   virtual void HandleTopLevelDecl(DeclGroupRef DG);
   /// Creates wrapper class for PPCallbacks so we can also process information
-  /// about includes that are inside of a preamble
+  /// about includes that are inside of a preamble. Called after BeforeExecute.
   virtual std::unique_ptr<PPCallbacks> createPPCallbacks();
   /// The returned CommentHandler will be added to the preprocessor if not null.
   virtual CommentHandler *getCommentHandler();

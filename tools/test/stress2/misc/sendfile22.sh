@@ -45,7 +45,6 @@ set -e
 mount | grep "on $mntpoint " | grep -q /dev/md && umount -f $mntpoint
 [ -c /dev/md$mdstart ] &&  mdconfig -d -u $mdstart
 mdconfig -a -t swap -s 1g -u $mdstart
-bsdlabel -w md$mdstart auto
 newfs_flags=""
 newfs $newfs_flags -n md$mdstart > /dev/null
 mount /dev/md$mdstart $mntpoint
@@ -63,6 +62,8 @@ while [ $((` date +%s` - start)) -lt 180 ]; do
 	umount $mntpoint 2>/dev/null # busy umount
 	$dir/sendfile22
 	s=$?
+	[ $s -ne 0 ] &&
+	    pkill sendfile22
 	cmp -s input output || break
 	[ `stat -f '%z' input` -ne ` stat -f '%z' output` ] && break
 	n=$((n + 1))

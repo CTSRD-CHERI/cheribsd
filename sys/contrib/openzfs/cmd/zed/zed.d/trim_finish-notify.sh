@@ -1,4 +1,5 @@
 #!/bin/sh
+# shellcheck disable=SC2154
 #
 # Send notification in response to a TRIM_FINISH. The event
 # will be received for each vdev in the pool which was trimmed.
@@ -19,7 +20,7 @@ zed_check_cmd "${ZPOOL}" || exit 9
 
 umask 077
 note_subject="ZFS ${ZEVENT_SUBCLASS} event for ${ZEVENT_POOL} on $(hostname)"
-note_pathname="${TMPDIR:="/tmp"}/$(basename -- "$0").${ZEVENT_EID}.$$"
+note_pathname="$(mktemp)"
 {
     echo "ZFS has finished a trim:"
     echo

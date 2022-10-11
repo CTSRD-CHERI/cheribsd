@@ -256,10 +256,10 @@ zfs_is_readonly(zfsvfs_t *zfsvfs)
 	return (!!(zfsvfs->z_sb->s_flags & SB_RDONLY));
 }
 
-/*ARGSUSED*/
 int
 zfs_sync(struct super_block *sb, int wait, cred_t *cr)
 {
+	(void) cr;
 	zfsvfs_t *zfsvfs = sb->s_fs_info;
 
 	/*
@@ -434,12 +434,6 @@ snapdir_changed_cb(void *arg, uint64_t newval)
 }
 
 static void
-vscan_changed_cb(void *arg, uint64_t newval)
-{
-	((zfsvfs_t *)arg)->z_vscan = newval;
-}
-
-static void
 acl_mode_changed_cb(void *arg, uint64_t newval)
 {
 	zfsvfs_t *zfsvfs = arg;
@@ -511,8 +505,6 @@ zfs_register_callbacks(vfs_t *vfsp)
 	error = error ? error : dsl_prop_register(ds,
 	    zfs_prop_to_name(ZFS_PROP_ACLINHERIT), acl_inherit_changed_cb,
 	    zfsvfs);
-	error = error ? error : dsl_prop_register(ds,
-	    zfs_prop_to_name(ZFS_PROP_VSCAN), vscan_changed_cb, zfsvfs);
 	error = error ? error : dsl_prop_register(ds,
 	    zfs_prop_to_name(ZFS_PROP_NBMAND), nbmand_changed_cb, zfsvfs);
 	dsl_pool_config_exit(dmu_objset_pool(os), FTAG);
@@ -1145,7 +1137,7 @@ zfs_statvfs(struct inode *ip, struct kstatfs *statp)
 	 * We have all of 40 characters to stuff a string here.
 	 * Is there anything useful we could/should provide?
 	 */
-	bzero(statp->f_spare, sizeof (statp->f_spare));
+	memset(statp->f_spare, 0, sizeof (statp->f_spare));
 
 	if (dmu_objset_projectquota_enabled(zfsvfs->z_os) &&
 	    dmu_objset_projectquota_present(zfsvfs->z_os)) {
@@ -1259,6 +1251,11 @@ zfs_prune(struct super_block *sb, unsigned long nr_to_scan, int *objects)
 		*objects = 0;
 		for_each_online_node(sc.nid) {
 			*objects += (*shrinker->scan_objects)(shrinker, &sc);
+			/*
+			 * reset sc.nr_to_scan, modified by
+			 * scan_objects == super_cache_scan
+			 */
+			sc.nr_to_scan = nr_to_scan;
 		}
 	} else {
 			*objects = (*shrinker->scan_objects)(shrinker, &sc);
@@ -1456,13 +1453,33 @@ zfs_domount(struct super_block *sb, zfs_mnt_t *zm, int silent)
 	int error = 0;
 	zfsvfs_t *zfsvfs = NULL;
 	vfs_t *vfs = NULL;
+	int canwrite;
+	int dataset_visible_zone;
 
 	ASSERT(zm);
 	ASSERT(osname);
 
+	dataset_visible_zone = zone_dataset_visible(osname, &canwrite);
+
+	/*
+	 * Refuse to mount a filesystem if we are in a namespace and the
+	 * dataset is not visible or writable in that namespace.
+	 */
+	if (!INGLOBALZONE(curproc) &&
+	    (!dataset_visible_zone || !canwrite)) {
+		return (SET_ERROR(EPERM));
+	}
+
 	error = zfsvfs_parse_options(zm->mnt_data, &vfs);
 	if (error)
 		return (error);
+
+	/*
+	 * If a non-writable filesystem is being mounted without the
+	 * read-only flag, pretend it was set, as done for snapshots.
+	 */
+	if (!canwrite)
+		vfs->vfs_readonly = true;
 
 	error = zfsvfs_create(osname, vfs->vfs_readonly, &zfsvfs);
 	if (error) {
@@ -1603,7 +1620,6 @@ zfs_preumount(struct super_block *sb)
  * Called once all other unmount released tear down has occurred.
  * It is our responsibility to release any remaining infrastructure.
  */
-/*ARGSUSED*/
 int
 zfs_umount(struct super_block *sb)
 {
@@ -2131,7 +2147,6 @@ zfs_get_vfs_flag_unmounted(objset_t *os)
 	return (unmounted);
 }
 
-/*ARGSUSED*/
 void
 zfsvfs_update_fromname(const char *oldname, const char *newname)
 {
@@ -2139,6 +2154,7 @@ zfsvfs_update_fromname(const char *oldname, const char *newname)
 	 * We don't need to do anything here, the devname is always current by
 	 * virtue of zfsvfs->z_sb->s_op->show_devname.
 	 */
+	(void) oldname, (void) newname;
 }
 
 void

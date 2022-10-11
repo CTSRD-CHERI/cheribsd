@@ -285,18 +285,13 @@ static driver_t bcm_systimer_driver = {
 	sizeof(struct bcm_systimer_softc),
 };
 
-static devclass_t bcm_systimer_devclass;
-
-DRIVER_MODULE(bcm_systimer, simplebus, bcm_systimer_driver, bcm_systimer_devclass, 0, 0);
+DRIVER_MODULE(bcm_systimer, simplebus, bcm_systimer_driver, 0, 0);
 
 static void
 bcm_systimer_delay(int usec, void *arg)
 {
-	struct bcm_systimer_softc *sc;
 	int32_t counts;
 	uint32_t first, last;
-
-	sc = (struct bcm_systimer_softc *) arg;
 
 	/* Get the number of times to count */
 	counts = usec * (bcm_systimer_tc.tc_frequency / 1000000) + 1;

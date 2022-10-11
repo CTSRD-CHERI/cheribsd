@@ -52,6 +52,8 @@ __FBSDID("$FreeBSD$");
 	{ HIDMAP_KEY_RANGE(HUP_BUTTON, number_from, number_to, code) }
 #define HGAME_MAP_ABS(usage, code)	\
 	{ HIDMAP_ABS(HUP_GENERIC_DESKTOP, HUG_##usage, code) }
+#define HGAME_MAP_GCB(usage, callback)	\
+	{ HIDMAP_ANY_CB(HUP_GENERIC_DESKTOP, HUG_##usage, callback) }
 #define HGAME_MAP_CRG(usage_from, usage_to, callback)	\
 	{ HIDMAP_ANY_CB_RANGE(HUP_GENERIC_DESKTOP,	\
 	    HUG_##usage_from, HUG_##usage_to, callback) }
@@ -66,7 +68,7 @@ static const struct hidmap_item hgame_map[] = {
 	HGAME_MAP_ABS(RX,		ABS_RX),
 	HGAME_MAP_ABS(RY,		ABS_RY),
 	HGAME_MAP_ABS(RZ,		ABS_RZ),
-	HGAME_MAP_ABS(HAT_SWITCH,	ABS_HAT0X),
+	HGAME_MAP_GCB(HAT_SWITCH,	hgame_hat_switch_cb),
 	HGAME_MAP_CRG(D_PAD_UP, D_PAD_LEFT, hgame_dpad_cb),
 	HGAME_MAP_BRG(17, 57,		BTN_TRIGGER_HAPPY),
 	HGAME_FINALCB(			hgame_final_cb),
@@ -78,6 +80,36 @@ static const struct hid_device_id hgame_devs[] = {
 	{ HID_TLC(HUP_GENERIC_DESKTOP, HUG_GAME_PAD),
 	  HID_DRIVER_INFO(HUG_GAME_PAD) },
 };
+
+int
+hgame_hat_switch_cb(HIDMAP_CB_ARGS)
+{
+	static const struct { int32_t x; int32_t y; } hat_switch_map[] = {
+	    {0, -1}, {1, -1}, {1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0},
+	    {-1, -1},{0, 0}
+	};
+	struct evdev_dev *evdev = HIDMAP_CB_GET_EVDEV();
+	u_int idx;
+
+	switch (HIDMAP_CB_GET_STATE()) {
+	case HIDMAP_CB_IS_ATTACHING:
+		evdev_support_event(evdev, EV_ABS);
+		evdev_support_abs(evdev, ABS_HAT0X, -1, 1, 0, 0, 0);
+		evdev_support_abs(evdev, ABS_HAT0Y, -1, 1, 0, 0, 0);
+		break;
+
+	case HIDMAP_CB_IS_RUNNING:
+		idx = MIN(nitems(hat_switch_map) - 1, (u_int)ctx.data);
+		evdev_push_abs(evdev, ABS_HAT0X, hat_switch_map[idx].x);
+		evdev_push_abs(evdev, ABS_HAT0Y, hat_switch_map[idx].y);
+		break;
+
+	default:
+		break;
+	}
+
+	return (0);
+}
 
 /*
  * Emulate the hat switch report via the D-pad usages
@@ -185,7 +217,6 @@ hgame_detach(device_t dev)
 	return (hidmap_detach(&sc->hm));
 }
 
-static devclass_t hgame_devclass;
 static device_method_t hgame_methods[] = {
 	DEVMETHOD(device_probe,		hgame_probe),
 	DEVMETHOD(device_attach,	hgame_attach),
@@ -195,7 +226,7 @@ static device_method_t hgame_methods[] = {
 };
 
 DEFINE_CLASS_0(hgame, hgame_driver, hgame_methods, sizeof(struct hgame_softc));
-DRIVER_MODULE(hgame, hidbus, hgame_driver, hgame_devclass, NULL, 0);
+DRIVER_MODULE(hgame, hidbus, hgame_driver, NULL, NULL);
 MODULE_DEPEND(hgame, hid, 1, 1, 1);
 MODULE_DEPEND(hgame, hidbus, 1, 1, 1);
 MODULE_DEPEND(hgame, hidmap, 1, 1, 1);

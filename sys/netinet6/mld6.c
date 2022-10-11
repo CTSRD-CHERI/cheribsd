@@ -104,8 +104,6 @@ __FBSDID("$FreeBSD$");
 #define KTR_MLD KTR_INET6
 #endif
 
-static struct mld_ifsoftc *
-		mli_alloc_locked(struct ifnet *);
 static void	mli_delete_locked(const struct ifnet *);
 static void	mld_dispatch_packet(struct mbuf *);
 static void	mld_dispatch_queue(struct mbufq *, int);
@@ -356,13 +354,13 @@ out_locked:
  * Expose struct mld_ifsoftc to userland, keyed by ifindex.
  * For use by ifmcstat(8).
  *
- * SMPng: NOTE: Does an unlocked ifindex space read.
  * VIMAGE: Assume curvnet set by caller. The node handler itself
  * is not directly virtualized.
  */
 static int
 sysctl_mld_ifinfo(SYSCTL_HANDLER_ARGS)
 {
+	struct epoch_tracker	 et;
 	int			*name;
 	int			 error;
 	u_int			 namelen;
@@ -385,14 +383,9 @@ sysctl_mld_ifinfo(SYSCTL_HANDLER_ARGS)
 	IN6_MULTI_LOCK();
 	IN6_MULTI_LIST_LOCK();
 	MLD_LOCK();
-
-	if (name[0] <= 0 || name[0] > V_if_index) {
-		error = ENOENT;
-		goto out_locked;
-	}
+	NET_EPOCH_ENTER(et);
 
 	error = ENOENT;
-
 	ifp = ifnet_byindex(name[0]);
 	if (ifp == NULL)
 		goto out_locked;
@@ -415,6 +408,7 @@ sysctl_mld_ifinfo(SYSCTL_HANDLER_ARGS)
 	}
 
 out_locked:
+	NET_EPOCH_EXIT(et);
 	MLD_UNLOCK();
 	IN6_MULTI_LIST_UNLOCK();
 	IN6_MULTI_UNLOCK();
@@ -470,45 +464,17 @@ mld_is_addr_reported(const struct in6_addr *addr)
 }
 
 /*
- * Attach MLD when PF_INET6 is attached to an interface.
- *
- * SMPng: Normally called with IF_AFDATA_LOCK held.
+ * Attach MLD when PF_INET6 is attached to an interface.  Assumes that the
+ * current VNET is set by the caller.
  */
 struct mld_ifsoftc *
 mld_domifattach(struct ifnet *ifp)
 {
 	struct mld_ifsoftc *mli;
 
-	CTR3(KTR_MLD, "%s: called for ifp %p(%s)",
-	    __func__, ifp, if_name(ifp));
+	CTR3(KTR_MLD, "%s: called for ifp %p(%s)", __func__, ifp, if_name(ifp));
 
-	MLD_LOCK();
-
-	mli = mli_alloc_locked(ifp);
-	if (!(ifp->if_flags & IFF_MULTICAST))
-		mli->mli_flags |= MLIF_SILENT;
-	if (mld_use_allow)
-		mli->mli_flags |= MLIF_USEALLOW;
-
-	MLD_UNLOCK();
-
-	return (mli);
-}
-
-/*
- * VIMAGE: assume curvnet set by caller.
- */
-static struct mld_ifsoftc *
-mli_alloc_locked(/*const*/ struct ifnet *ifp)
-{
-	struct mld_ifsoftc *mli;
-
-	MLD_LOCK_ASSERT();
-
-	mli = malloc(sizeof(struct mld_ifsoftc), M_MLD, M_NOWAIT|M_ZERO);
-	if (mli == NULL)
-		goto out;
-
+	mli = malloc(sizeof(struct mld_ifsoftc), M_MLD, M_WAITOK | M_ZERO);
 	mli->mli_ifp = ifp;
 	mli->mli_version = MLD_VERSION_2;
 	mli->mli_flags = 0;
@@ -517,13 +483,15 @@ mli_alloc_locked(/*const*/ struct ifnet *ifp)
 	mli->mli_qri = MLD_QRI_INIT;
 	mli->mli_uri = MLD_URI_INIT;
 	mbufq_init(&mli->mli_gq, MLD_MAX_RESPONSE_PACKETS);
+	if ((ifp->if_flags & IFF_MULTICAST) == 0)
+		mli->mli_flags |= MLIF_SILENT;
+	if (mld_use_allow)
+		mli->mli_flags |= MLIF_USEALLOW;
 
+	MLD_LOCK();
 	LIST_INSERT_HEAD(&V_mli_head, mli, mli_link);
+	MLD_UNLOCK();
 
-	CTR2(KTR_MLD, "allocate mld_ifsoftc for ifp %p(%s)",
-	     ifp, if_name(ifp));
-
-out:
 	return (mli);
 }
 
@@ -1572,7 +1540,7 @@ mld_v2_process_group_timers(struct in6_multi_head *inmh,
 		 * immediate transmission.
 		 */
 		if (query_response_timer_expired) {
-			int retval;
+			int retval __unused;
 
 			retval = mld_v2_enqueue_group_record(qrq, inm, 0, 1,
 			    (inm->in6m_state == MLD_SG_QUERY_PENDING_MEMBER),
@@ -2246,7 +2214,7 @@ mld_final_leave(struct in6_multi *inm, struct mld_ifsoftc *mli)
 				inm->in6m_state = MLD_NOT_MEMBER;
 				inm->in6m_sctimer = 0;
 			} else {
-				int retval;
+				int retval __diagused;
 
 				in6m_acquire_locked(inm);
 
@@ -2459,7 +2427,7 @@ mld_v2_enqueue_group_record(struct mbufq *mq, struct in6_multi *inm,
 	m0 = mbufq_last(mq);
 	if (!is_group_query &&
 	    m0 != NULL &&
-	    (m0->m_pkthdr.PH_vt.vt_nrecs + 1 <= MLD_V2_REPORT_MAXRECS) &&
+	    (m0->m_pkthdr.vt_nrecs + 1 <= MLD_V2_REPORT_MAXRECS) &&
 	    (m0->m_pkthdr.len + minrec0len) <
 	     (ifp->if_mtu - MLD_MTUSPACE)) {
 		m0srcs = (ifp->if_mtu - m0->m_pkthdr.len -
@@ -2580,10 +2548,10 @@ mld_v2_enqueue_group_record(struct mbufq *mq, struct in6_multi *inm,
 	 */
 	if (m != m0) {
 		CTR1(KTR_MLD, "%s: enqueueing first packet", __func__);
-		m->m_pkthdr.PH_vt.vt_nrecs = 1;
+		m->m_pkthdr.vt_nrecs = 1;
 		mbufq_enqueue(mq, m);
 	} else
-		m->m_pkthdr.PH_vt.vt_nrecs++;
+		m->m_pkthdr.vt_nrecs++;
 
 	/*
 	 * No further work needed if no source list in packet(s).
@@ -2617,7 +2585,7 @@ mld_v2_enqueue_group_record(struct mbufq *mq, struct in6_multi *inm,
 			CTR1(KTR_MLD, "%s: m_append() failed.", __func__);
 			return (-ENOMEM);
 		}
-		m->m_pkthdr.PH_vt.vt_nrecs = 1;
+		m->m_pkthdr.vt_nrecs = 1;
 		nbytes += sizeof(struct mldv2_record);
 
 		m0srcs = (ifp->if_mtu - MLD_MTUSPACE -
@@ -2706,10 +2674,10 @@ mld_v2_enqueue_filter_change(struct mbufq *mq, struct in6_multi *inm)
 	struct ip6_msource	*ims, *nims;
 	struct mbuf		*m, *m0, *md;
 	int			 m0srcs, nbytes, npbytes, off, rsrcs, schanged;
-	int			 nallow, nblock;
 	uint8_t			 mode, now, then;
 	rectype_t		 crt, drt, nrt;
 #ifdef KTR
+	int			 nallow, nblock;
 	char			 ip6tbuf[INET6_ADDRSTRLEN];
 #endif
 
@@ -2729,8 +2697,10 @@ mld_v2_enqueue_filter_change(struct mbufq *mq, struct in6_multi *inm)
 	nbytes = 0;	/* # of bytes appended to group's state-change queue */
 	rsrcs = 0;	/* # sources encoded in current record */
 	schanged = 0;	/* # nodes encoded in overall filter change */
+#ifdef KTR
 	nallow = 0;	/* # of source entries in ALLOW_NEW */
 	nblock = 0;	/* # of source entries in BLOCK_OLD */
+#endif
 	nims = NULL;	/* next tree node pointer */
 
 	/*
@@ -2744,7 +2714,7 @@ mld_v2_enqueue_filter_change(struct mbufq *mq, struct in6_multi *inm)
 		do {
 			m0 = mbufq_last(mq);
 			if (m0 != NULL &&
-			    (m0->m_pkthdr.PH_vt.vt_nrecs + 1 <=
+			    (m0->m_pkthdr.vt_nrecs + 1 <=
 			     MLD_V2_REPORT_MAXRECS) &&
 			    (m0->m_pkthdr.len + MINRECLEN) <
 			     (ifp->if_mtu - MLD_MTUSPACE)) {
@@ -2763,7 +2733,7 @@ mld_v2_enqueue_filter_change(struct mbufq *mq, struct in6_multi *inm)
 					    "%s: m_get*() failed", __func__);
 					return (-ENOMEM);
 				}
-				m->m_pkthdr.PH_vt.vt_nrecs = 0;
+				m->m_pkthdr.vt_nrecs = 0;
 				mld_save_context(m, ifp);
 				m0srcs = (ifp->if_mtu - MLD_MTUSPACE -
 				    sizeof(struct mldv2_record)) /
@@ -2851,8 +2821,10 @@ mld_v2_enqueue_filter_change(struct mbufq *mq, struct in6_multi *inm)
 					    "%s: m_append() failed", __func__);
 					return (-ENOMEM);
 				}
+#ifdef KTR
 				nallow += !!(crt == REC_ALLOW);
 				nblock += !!(crt == REC_BLOCK);
+#endif
 				if (++rsrcs == m0srcs)
 					break;
 			}
@@ -2884,7 +2856,7 @@ mld_v2_enqueue_filter_change(struct mbufq *mq, struct in6_multi *inm)
 			 * Count the new group record, and enqueue this
 			 * packet if it wasn't already queued.
 			 */
-			m->m_pkthdr.PH_vt.vt_nrecs++;
+			m->m_pkthdr.vt_nrecs++;
 			if (m != m0)
 				mbufq_enqueue(mq, m);
 			nbytes += npbytes;
@@ -2946,8 +2918,8 @@ mld_v2_merge_state_changes(struct in6_multi *inm, struct mbufq *scq)
 		if (mt != NULL) {
 			recslen = m_length(m, NULL);
 
-			if ((mt->m_pkthdr.PH_vt.vt_nrecs +
-			    m->m_pkthdr.PH_vt.vt_nrecs <=
+			if ((mt->m_pkthdr.vt_nrecs +
+			    m->m_pkthdr.vt_nrecs <=
 			    MLD_V2_REPORT_MAXRECS) &&
 			    (mt->m_pkthdr.len + recslen <=
 			    (inm->in6m_ifp->if_mtu - MLD_MTUSPACE)))
@@ -2991,8 +2963,8 @@ mld_v2_merge_state_changes(struct in6_multi *inm, struct mbufq *scq)
 			mtl = m_last(mt);
 			m0->m_flags &= ~M_PKTHDR;
 			mt->m_pkthdr.len += recslen;
-			mt->m_pkthdr.PH_vt.vt_nrecs +=
-			    m0->m_pkthdr.PH_vt.vt_nrecs;
+			mt->m_pkthdr.vt_nrecs +=
+			    m0->m_pkthdr.vt_nrecs;
 
 			mtl->m_next = m0;
 		}
@@ -3010,7 +2982,7 @@ mld_v2_dispatch_general_query(struct mld_ifsoftc *mli)
 	struct ifmultiaddr	*ifma;
 	struct ifnet		*ifp;
 	struct in6_multi	*inm;
-	int			 retval;
+	int			 retval __unused;
 
 	NET_EPOCH_ASSERT();
 	IN6_MULTI_LIST_LOCK_ASSERT();
@@ -3244,8 +3216,8 @@ mld_v2_encap_report(struct ifnet *ifp, struct mbuf *m)
 	mld->mld_code = 0;
 	mld->mld_cksum = 0;
 	mld->mld_v2_reserved = 0;
-	mld->mld_v2_numrecs = htons(m->m_pkthdr.PH_vt.vt_nrecs);
-	m->m_pkthdr.PH_vt.vt_nrecs = 0;
+	mld->mld_v2_numrecs = htons(m->m_pkthdr.vt_nrecs);
+	m->m_pkthdr.vt_nrecs = 0;
 
 	mh->m_next = m;
 	mld->mld_cksum = in6_cksum(mh, IPPROTO_ICMPV6,

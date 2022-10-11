@@ -994,11 +994,29 @@ netmap_mem_restore(struct netmap_adapter *na)
 static void
 netmap_mem_drop(struct netmap_adapter *na)
 {
-	/* if the native allocator had been overridden on regif,
-	 * restore it now and drop the temporary one
-	 */
-	if (netmap_mem_deref(na->nm_mem, na)) {
+	netmap_mem_deref(na->nm_mem, na);
+
+	if (na->active_fds <= 0) {
+		/* if the native allocator had been overridden on regif,
+		 * restore it now and drop the temporary one
+		 */
 		netmap_mem_restore(na);
+	}
+}
+
+static void
+netmap_update_hostrings_mode(struct netmap_adapter *na)
+{
+	enum txrx t;
+	struct netmap_kring *kring;
+	int i;
+
+	for_rx_tx(t) {
+		for (i = nma_get_nrings(na, t);
+		     i < netmap_real_rings(na, t); i++) {
+			kring = NMR(na, t)[i];
+			kring->nr_mode = kring->nr_pending_mode;
+		}
 	}
 }
 
@@ -1032,7 +1050,9 @@ netmap_do_unregif(struct netmap_priv_d *priv)
 #endif
 
 	if (na->active_fds <= 0 || nm_kring_pending(priv)) {
+		netmap_set_all_rings(na, NM_KR_LOCKED);
 		na->nm_register(na, 0);
+		netmap_set_all_rings(na, 0);
 	}
 
 	/* delete rings and buffers that are no longer needed */
@@ -2630,7 +2650,9 @@ netmap_do_regif(struct netmap_priv_d *priv, struct netmap_adapter *na,
 	if (nm_kring_pending(priv)) {
 		/* Some kring is switching mode, tell the adapter to
 		 * react on this. */
+		netmap_set_all_rings(na, NM_KR_LOCKED);
 		error = na->nm_register(na, 1);
+		netmap_set_all_rings(na, 0);
 		if (error)
 			goto err_del_if;
 	}
@@ -2858,6 +2880,8 @@ netmap_ioctl(struct netmap_priv_d *priv, u_long cmd, caddr_t data,
 						&nifp->ni_bufs_head, req->nr_extra_bufs);
 					if (netmap_verbose)
 						nm_prinf("got %d extra buffers", req->nr_extra_bufs);
+				} else {
+					nifp->ni_bufs_head = 0;
 				}
 				req->nr_offset = netmap_mem_if_offset(na->nm_mem, nifp);
 
@@ -3342,7 +3366,6 @@ nmreq_copyin(struct nmreq_header *hdr, int nr_body_is_user)
 	int error = 0;
 	char *ker = NULL, *p;
 	struct nmreq_option **next, *src, **opt_tab;
-	struct nmreq_option buf;
 	uint64_t *ptrs;
 
 	if (hdr->nr_reserved) {
@@ -3372,29 +3395,14 @@ nmreq_copyin(struct nmreq_header *hdr, int nr_body_is_user)
 		goto out_err;
 	}
 
-	bufsz = 2 * sizeof(void *) + rqsz +
-		NETMAP_REQ_OPT_MAX * sizeof(opt_tab);
-	/* compute the size of the buf below the option table.
-	 * It must contain a copy of every received option structure.
-	 * For every option we also need to store a copy of the user
-	 * list pointer.
+	/*
+	 * The buffer size must be large enough to store the request body,
+	 * all the possible options and the additional user pointers
+	 * (2+NETMAP_REQ_OPT_MAX). Note that the maximum size of body plus
+	 * options can not exceed NETMAP_REQ_MAXSIZE;
 	 */
-	optsz = 0;
-	for (src = (struct nmreq_option *)(uintptr_t)hdr->nr_options; src;
-	     src = (struct nmreq_option *)(uintptr_t)buf.nro_next)
-	{
-		error = copyin(src, &buf, sizeof(*src));
-		if (error)
-			goto out_err;
-		optsz += sizeof(*src);
-		optsz += nmreq_opt_size_by_type(buf.nro_reqtype, buf.nro_size);
-		if (rqsz + optsz > NETMAP_REQ_MAXSIZE) {
-			error = EMSGSIZE;
-			goto out_err;
-		}
-		bufsz += sizeof(void *);
-	}
-	bufsz += optsz;
+	bufsz = (2 + NETMAP_REQ_OPT_MAX) * sizeof(void *) + NETMAP_REQ_MAXSIZE +
+		NETMAP_REQ_OPT_MAX * sizeof(opt_tab);
 
 	ker = nm_os_malloc(bufsz);
 	if (ker == NULL) {
@@ -3432,6 +3440,7 @@ nmreq_copyin(struct nmreq_header *hdr, int nr_body_is_user)
 		error = copyin(src, opt, sizeof(*src));
 		if (error)
 			goto out_restore;
+		rqsz += sizeof(*src);
 		/* make a copy of the user next pointer */
 		*ptrs = opt->nro_next;
 		/* overwrite the user pointer with the in-kernel one */
@@ -3475,6 +3484,14 @@ nmreq_copyin(struct nmreq_header *hdr, int nr_body_is_user)
 		/* copy the option body */
 		optsz = nmreq_opt_size_by_type(opt->nro_reqtype,
 						opt->nro_size);
+		/* check optsz and nro_size to avoid for possible integer overflows of rqsz */
+		if ((optsz > NETMAP_REQ_MAXSIZE) || (opt->nro_size > NETMAP_REQ_MAXSIZE)
+				|| (rqsz + optsz > NETMAP_REQ_MAXSIZE)
+				|| (optsz > 0 && rqsz + optsz <= rqsz)) {
+			error = EMSGSIZE;
+			goto out_restore;
+		}
+		rqsz += optsz;
 		if (optsz) {
 			/* the option body follows the option header */
 			error = copyin(src + 1, p, optsz);
@@ -4178,12 +4195,16 @@ netmap_hw_krings_create(struct netmap_adapter *na)
 void
 netmap_detach(struct ifnet *ifp)
 {
-	struct netmap_adapter *na = NA(ifp);
-
-	if (!na)
-		return;
+	struct netmap_adapter *na;
 
 	NMG_LOCK();
+
+	if (!NM_NA_VALID(ifp)) {
+		NMG_UNLOCK();
+		return;
+	}
+
+	na = NA(ifp);
 	netmap_set_all_rings(na, NM_KR_LOCKED);
 	/*
 	 * if the netmap adapter is not native, somebody
@@ -4491,7 +4512,7 @@ nm_set_native_flags(struct netmap_adapter *na)
 
 	na->na_flags |= NAF_NETMAP_ON;
 	nm_os_onenter(ifp);
-	nm_update_hostrings_mode(na);
+	netmap_update_hostrings_mode(na);
 }
 
 void
@@ -4505,7 +4526,7 @@ nm_clear_native_flags(struct netmap_adapter *na)
 		return;
 	}
 
-	nm_update_hostrings_mode(na);
+	netmap_update_hostrings_mode(na);
 	nm_os_onexit(ifp);
 
 	na->na_flags &= ~NAF_NETMAP_ON;

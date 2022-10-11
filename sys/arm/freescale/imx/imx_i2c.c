@@ -73,7 +73,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/fdt/fdt_pinctrl.h>
 #include <dev/gpio/gpiobusvar.h>
 
-#if defined(EXT_RESOURCES) && defined(__aarch64__)
+#if defined(__aarch64__)
 #define	IMX_ENABLE_CLOCKS
 #endif
 
@@ -200,10 +200,9 @@ static driver_t i2c_driver = {
 	i2c_methods,
 	sizeof(struct i2c_softc),
 };
-static devclass_t  i2c_devclass;
 
-DRIVER_MODULE(imx_i2c, simplebus, i2c_driver, i2c_devclass, 0, 0);
-DRIVER_MODULE(ofw_iicbus, imx_i2c, ofw_iicbus_driver, ofw_iicbus_devclass, 0, 0);
+DRIVER_MODULE(imx_i2c, simplebus, i2c_driver, 0, 0);
+DRIVER_MODULE(ofw_iicbus, imx_i2c, ofw_iicbus_driver, 0, 0);
 MODULE_DEPEND(imx_i2c, iicbus, 1, 1, 1);
 SIMPLEBUS_PNP_INFO(compat_data);
 

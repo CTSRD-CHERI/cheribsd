@@ -202,46 +202,6 @@ CHERIBSDTEST(test_fault_tag, "Store via untagged capability",
 	*chp = '\0';
 }
 
-#ifdef __mips__
-CHERIBSDTEST(test_fault_ccheck_user_fail,
-    "Exercise CCheckPerm failure",
-    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
-    .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_PERM,
-    .ct_si_trapno = TRAPNO_CHERI)
-{
-	void * __capability cp;
-	char ch;
-
-	cp = cheri_ptrperm(&ch, sizeof(ch), 0);
-	cheri_ccheckperm(cp, CHERI_PERM_SW0);
-}
-
-CHERIBSDTEST(test_nofault_ccheck_user_pass,
-    "Exercise CCheckPerm success")
-{
-	void * __capability cp;
-	char ch;
-
-	cp = cheri_ptrperm(&ch, sizeof(ch), CHERI_PERM_SW0);
-	cheri_ccheckperm(cp, CHERI_PERM_SW0);
-	cheribsdtest_success();
-}
-
-CHERIBSDTEST(test_fault_cgetcause,
-    "Ensure CGetCause is unavailable in userspace",
-    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
-    .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_SYSREG,
-    .ct_si_trapno = TRAPNO_CHERI)
-{
-	register_t cause;
-
-	cause = cheri_getcause();
-	printf("CP2 cause register: %ju\n", (uintmax_t)cause);
-}
-#endif
-
 CHERIBSDTEST(test_nofault_cfromptr, "Exercise CFromPtr success")
 {
 	char buf[256];
@@ -256,7 +216,7 @@ CHERIBSDTEST(test_nofault_cfromptr, "Exercise CFromPtr success")
 	 * has an offset interpretation).
 	 * https://git.morello-project.org/morello/llvm-project/-/issues/16
 	 */
-	cd = __builtin_cheri_cap_from_pointer(cb, (vaddr_t)buf + 10);
+	cd = __builtin_cheri_cap_from_pointer(cb, (ptraddr_t)buf + 10);
 #else
 	/*
 	 * This pragma is require to allow compiling this file both with and
@@ -270,60 +230,3 @@ CHERIBSDTEST(test_nofault_cfromptr, "Exercise CFromPtr success")
 	*cd = '\0';
 	cheribsdtest_success();
 }
-
-#ifdef __mips__
-CHERIBSDTEST(test_fault_read_kr1c,
-    "Ensure KR1C is unavailable in userspace",
-    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
-    .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_SYSREG,
-    .ct_si_trapno = TRAPNO_CHERI)
-{
-
-	CHERI_CAP_PRINT(cheri_getkr1c());
-}
-
-CHERIBSDTEST(test_fault_read_kr2c,
-    "Ensure KR2C is unavailable in userspace",
-    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
-    .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_SYSREG,
-    .ct_si_trapno = TRAPNO_CHERI)
-{
-
-	CHERI_CAP_PRINT(cheri_getkr2c());
-}
-
-CHERIBSDTEST(test_fault_read_kcc,
-    "Ensure KCC is unavailable in userspace",
-    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
-    .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_SYSREG,
-    .ct_si_trapno = TRAPNO_CHERI)
-{
-
-	CHERI_CAP_PRINT(cheri_getkcc());
-}
-
-CHERIBSDTEST(test_fault_read_kdc,
-    "Ensure KDC is unavailable in userspace",
-    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
-    .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_SYSREG,
-    .ct_si_trapno = TRAPNO_CHERI)
-{
-
-	CHERI_CAP_PRINT(cheri_getkdc());
-}
-
-CHERIBSDTEST(test_fault_read_epcc,
-    "Ensure EPCC is unavailable in userspace",
-    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
-    .ct_signum = SIGPROT,
-    .ct_si_code = PROT_CHERI_SYSREG,
-    .ct_si_trapno = TRAPNO_CHERI)
-{
-
-	CHERI_CAP_PRINT(cheri_getepcc());
-}
-#endif	/* __mips__ */

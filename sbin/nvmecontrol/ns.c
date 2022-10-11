@@ -198,7 +198,7 @@ static struct delete_options {
 	uint32_t	nsid;
 	const char	*dev;
 } delete_opt = {
-	.nsid = NONE,
+	.nsid = NONE - 1,
 	.dev = NULL,
 };
 
@@ -371,8 +371,8 @@ static struct ns_result_str ns_result[] = {
 	{ 0x2,  "Invalid Field"},
 	{ 0xa,  "Invalid Format"},
 	{ 0xb,  "Invalid Namespace or format"},
-	{ 0x15, "Namespace insufficent capacity"},
-	{ 0x16, "Namespace ID unavaliable"},
+	{ 0x15, "Namespace insufficient capacity"},
+	{ 0x16, "Namespace ID unavailable"},
 	{ 0x18, "Namespace already attached"},
 	{ 0x19, "Namespace is private"},
 	{ 0x1a, "Namespace is not attached"},
@@ -639,12 +639,12 @@ nsdelete(const struct cmd *f, int argc, char *argv[])
 	if (nsid != 0) {
 		close(fd);
 		open_dev(path, &fd, 1, 1);
-	} else if (delete_opt.nsid == NONE) {
+	} else if (delete_opt.nsid == NONE - 1) {
 		close(fd);
 		fprintf(stderr, "No NSID specified");
 		arg_help(argc, argv, f);
 	}
-	if (delete_opt.nsid != NONE)
+	if (delete_opt.nsid != NONE - 1)
 		nsid = delete_opt.nsid;
 	free(path);
 	if (read_controller_data(fd, &cd))

@@ -20,6 +20,9 @@ using namespace llvm::ELF;
 using namespace lld;
 using namespace lld::elf;
 
+// Undefine the macro predefined by GCC powerpc32.
+#undef PPC
+
 namespace {
 class PPC final : public TargetInfo {
 public:
@@ -27,6 +30,7 @@ public:
   RelExpr getRelExpr(RelType type, const Symbol &s,
                      const uint8_t *loc) const override;
   RelType getDynRel(RelType type) const override;
+  int64_t getImplicitAddend(const uint8_t *buf, RelType type) const override;
   void writeGotHeader(uint8_t *buf) const override;
   void writePltHeader(uint8_t *buf) const override {
     llvm_unreachable("should call writePPC32GlinkSection() instead");
@@ -45,8 +49,7 @@ public:
   bool inBranchRange(RelType type, uint64_t src, uint64_t dst) const override;
   void relocate(uint8_t *loc, const Relocation &rel,
                 uint64_t val) const override;
-  RelExpr adjustRelaxExpr(RelType type, const uint8_t *data,
-                          RelExpr expr) const override;
+  RelExpr adjustTlsExpr(RelType type, RelExpr expr) const override;
   int getTlsGdRelaxSkip(RelType type) const override;
   void relaxTlsGdToIe(uint8_t *loc, const Relocation &rel,
                       uint64_t val) const override;
@@ -75,7 +78,7 @@ void elf::writePPC32GlinkSection(uint8_t *buf, size_t numEntries) {
   // non-GOT-non-PLT relocations referencing external functions for -fpie/-fPIE.
   uint32_t glink = in.plt->getVA(); // VA of .glink
   if (!config->isPic) {
-    for (const Symbol *sym : cast<PPC32GlinkSection>(in.plt)->canonical_plts) {
+    for (const Symbol *sym : cast<PPC32GlinkSection>(*in.plt).canonical_plts) {
       writePPC32PltCallStub(buf, sym->getGotPltVA(), nullptr, 0);
       buf += 16;
       glink += 16;
@@ -152,12 +155,10 @@ void elf::writePPC32GlinkSection(uint8_t *buf, size_t numEntries) {
 PPC::PPC() {
   copyRel = R_PPC_COPY;
   gotRel = R_PPC_GLOB_DAT;
-  noneRel = R_PPC_NONE;
   pltRel = R_PPC_JMP_SLOT;
   relativeRel = R_PPC_RELATIVE;
   iRelativeRel = R_PPC_IRELATIVE;
   symbolicRel = R_PPC_ADDR32;
-  gotBaseSymInGotPlt = false;
   gotHeaderEntriesNum = 3;
   gotPltHeaderEntriesNum = 0;
   pltHeaderSize = 0;
@@ -192,7 +193,7 @@ void PPC::writeGotHeader(uint8_t *buf) const {
 
 void PPC::writeGotPlt(uint8_t *buf, const Symbol &s) const {
   // Address of the symbol resolver stub in .glink .
-  write32(buf, in.plt->getVA() + in.plt->headerSize + 4 * s.pltIndex);
+  write32(buf, in.plt->getVA() + in.plt->headerSize + 4 * s.getPltIdx());
 }
 
 bool PPC::needsThunk(RelExpr expr, RelType type, const InputFile *file,
@@ -223,6 +224,7 @@ RelExpr PPC::getRelExpr(RelType type, const Symbol &s,
   case R_PPC_ADDR16_HA:
   case R_PPC_ADDR16_HI:
   case R_PPC_ADDR16_LO:
+  case R_PPC_ADDR24:
   case R_PPC_ADDR32:
     return R_ABS;
   case R_PPC_DTPREL16:
@@ -260,7 +262,7 @@ RelExpr PPC::getRelExpr(RelType type, const Symbol &s,
   case R_PPC_TPREL16_HA:
   case R_PPC_TPREL16_LO:
   case R_PPC_TPREL16_HI:
-    return R_TLS;
+    return R_TPREL;
   default:
     error(getErrorLocation(loc) + "unknown relocation (" + Twine(type) +
           ") against symbol " + toString(s));
@@ -272,6 +274,20 @@ RelType PPC::getDynRel(RelType type) const {
   if (type == R_PPC_ADDR32)
     return type;
   return R_PPC_NONE;
+}
+
+int64_t PPC::getImplicitAddend(const uint8_t *buf, RelType type) const {
+  switch (type) {
+  case R_PPC_NONE:
+    return 0;
+  case R_PPC_ADDR32:
+  case R_PPC_REL32:
+    return SignExtend64<32>(read32(buf));
+  default:
+    internalLinkerError(getErrorLocation(buf),
+                        "cannot read addend for relocation " + toString(type));
+    return 0;
+  }
 }
 
 static std::pair<RelType, uint64_t> fromDTPREL(RelType type, uint64_t val) {
@@ -346,6 +362,7 @@ void PPC::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
     write32(loc, (read32(loc) & ~mask) | (val & mask));
     break;
   }
+  case R_PPC_ADDR24:
   case R_PPC_REL24:
   case R_PPC_LOCAL24PC:
   case R_PPC_PLTREL24: {
@@ -360,8 +377,7 @@ void PPC::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   }
 }
 
-RelExpr PPC::adjustRelaxExpr(RelType type, const uint8_t *data,
-                             RelExpr expr) const {
+RelExpr PPC::adjustTlsExpr(RelType type, RelExpr expr) const {
   if (expr == R_RELAX_TLS_GD_TO_IE)
     return R_RELAX_TLS_GD_TO_IE_GOT_OFF;
   if (expr == R_RELAX_TLS_LD_TO_LE)

@@ -27,7 +27,7 @@ SRCS+=	rtld_libc.c
 
 # Now build the remaining files from libc:
 .PATH: ${LIBC_SRCTOP}/stdlib
-SRCS+=	reallocf.c realpath.c getenv.c merge.c reallocarray.c
+SRCS+=	reallocf.c realpath.c merge.c reallocarray.c
 # TODO: fix merge.c to build with WARNS=6
 .if ${COMPILER_TYPE} == "clang"
 CFLAGS.merge.c+=-Wno-error=null-pointer-arithmetic -Wno-error=unused-function
@@ -66,13 +66,6 @@ _libc_other_objects+=syncicache abs
 .elif ${LIBC_ARCH} == "powerpc64"
 # ppc64 needs __syncicache for reloc.c
 _libc_other_objects+=syncicache
-.elif ${LIBC_ARCH} == "mips"
-# For CHERI we also use sysctlbyname
-_libc_other_objects+=sysctlbyname
-.if ${MACHINE_ABI:Mpurecap}
-# Instead of setjmp/_setjmp we use setjmp_c/_setjmp_c
-_libc_other_objects:=${_libc_other_objects:Nsetjmp:N_setjmp} setjmp_c _setjmp_c
-.endif
 .endif
 
 .if ${MACHINE_ABI:Mpurecap}
@@ -87,8 +80,6 @@ _libc_pic_path=${LIBC_PIC}
 _libc_obj_suffix=nossppico
 _libc_pic_path=${LIBC_NOSSP_PIC}
 .endif
-
-_libc_other_objects+=_get_tp
 
 # Extract all the .o files from libc_nossp_pic.a. This ensures that
 # we don't accidentally pull in the interposing table or similar by linking

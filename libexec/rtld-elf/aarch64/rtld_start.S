@@ -115,7 +115,7 @@ ENTRY(_rtld_bind_start)
 	stp	CAP(2), CAP(3), [PTRN(sp), #-(CAP_WIDTH * 2)]!
 	stp	CAP(4), CAP(5), [PTRN(sp), #-(CAP_WIDTH * 2)]!
 	stp	CAP(6), CAP(7), [PTRN(sp), #-(CAP_WIDTH * 2)]!
-	stp	CAP(8), CAP(zr), [PTRN(sp), #-(CAP_WIDTH * 2)]!
+	stp	CAP(8), CAP(9), [PTRN(sp), #-(CAP_WIDTH * 2)]!
 
 	/* Save any floating-point arguments */
 	stp	q0, q1, [PTRN(sp), #-32]!
@@ -156,7 +156,7 @@ ENTRY(_rtld_bind_start)
 	ldp	q4, q5, [PTRN(sp)], #32
 	ldp	q2, q3, [PTRN(sp)], #32
 	ldp	q0, q1, [PTRN(sp)], #32
-	ldp	CAP(8), CAP(zr), [PTRN(sp)], #(CAP_WIDTH * 2)
+	ldp	CAP(8), CAP(9), [PTRN(sp)], #(CAP_WIDTH * 2)
 	ldp	CAP(6), CAP(7), [PTRN(sp)], #(CAP_WIDTH * 2)
 	ldp	CAP(4), CAP(5), [PTRN(sp)], #(CAP_WIDTH * 2)
 	ldp	CAP(2), CAP(3), [PTRN(sp)], #(CAP_WIDTH * 2)
@@ -184,8 +184,10 @@ END(_rtld_bind_start)
  */
 ENTRY(_rtld_tlsdesc_static)
 #ifdef __CHERI_PURE_CAPABILITY__
-	/* Currently unused and unimplemented for pure-capability code */
-	brk #0x1
+	ldp	x0, x1, [c0, #16]
+	add	c0, c2, x0
+	scbnds	c0, c0, x1
+	ret
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	ldr	x0, [x0, #8]
 	ret
@@ -199,8 +201,8 @@ END(_rtld_tlsdesc_static)
  */
 ENTRY(_rtld_tlsdesc_undef)
 #ifdef __CHERI_PURE_CAPABILITY__
-	/* Currently unused and unimplemented for pure-capability code */
-	brk #0x1
+	ldr	x0, [c0, #16]
+	ret
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	str	x1, [sp, #-16]!
 	.cfi_adjust_cfa_offset	16
@@ -222,8 +224,104 @@ END(_rtld_tlsdesc_undef)
  */
 ENTRY(_rtld_tlsdesc_dynamic)
 #ifdef __CHERI_PURE_CAPABILITY__
-	/* Currently unused and unimplemented for pure-capability code */
-	brk #0x1
+	stp	c3, c4, [csp, #-32]!
+	.cfi_adjust_cfa_offset	2 * 16
+	.cfi_rel_offset		c3, 0
+	.cfi_rel_offset		c4, 16
+
+	/* Test fastpath - inlined version of tls_get_addr_common(). */
+	ldr	c1, [c0, #16]
+	ldr	c0, [c2]		/* DTV pointer */
+	ldr	x3, [c0]		/* dtv[0] (generation count) */
+	ldr	x4, [c1]		/* tlsdesc->dtv_gen */
+	cmp	x3, x4
+	b.ne	1f			/* dtv[0] != tlsdec->dtv_gen */
+
+	ldr	w3, [c1, #16]		/* tlsdesc->tls_index */
+	add	w3, w3, #1
+	ldr     c3, [c0, w3, sxtw #4]	/* dtv[tlsdesc->tls_index + 1] */
+	cbz	x3, 1f
+
+	/* Return (dtv[tlsdesc->tls_index + 1] + tlsdesc->tls_offs) */
+	ldr	x4, [c1, #24]		/* tlsdesc->tls_offs */
+	add 	c3, c3, x4
+	ldr	x4, [c1, #32]		/* tlsdesc->tls_size */
+	scbnds	c0, c3, x4
+
+	/* Restore registers and return */
+	ldp	 c3,  c4, [csp], #32
+	.cfi_adjust_cfa_offset 	-2 * 16
+	ret
+
+	/*
+	 * Slow path
+	 * return(
+	 *    tls_get_addr_common(tp, tlsdesc->tls_index, tlsdesc->tls_offs));
+	 *
+	 */
+1:
+	/* Save non-callee-saved capability registers as well as c19 */
+	stp	c29, c30, [csp, #-(10 * 32)]!
+	.cfi_adjust_cfa_offset	10 * 32
+	.cfi_rel_offset		c29, 0
+	.cfi_rel_offset		c30, 16
+
+	mov	c29, csp
+	stp	c1,   c2, [csp, #(1 * 32)]
+	stp	c5,   c6, [csp, #(2 * 32)]
+	stp	c7,   c8, [csp, #(3 * 32)]
+	stp	c9,  c10, [csp, #(4 * 32)]
+	stp	c11, c12, [csp, #(5 * 32)]
+	stp	c13, c14, [csp, #(6 * 32)]
+	stp	c15, c16, [csp, #(7 * 32)]
+	stp	c17, c18, [csp, #(8 * 32)]
+	str	c19,	  [csp, #(9 * 32)]
+	.cfi_rel_offset		 c1, 32
+	.cfi_rel_offset		 c2, 48
+	.cfi_rel_offset		 c5, 64
+	.cfi_rel_offset		 c6, 80
+	.cfi_rel_offset		 c7, 96
+	.cfi_rel_offset		 c8, 112
+	.cfi_rel_offset		 c9, 128
+	.cfi_rel_offset		c10, 144
+	.cfi_rel_offset		c11, 160
+	.cfi_rel_offset		c12, 176
+	.cfi_rel_offset		c13, 192
+	.cfi_rel_offset		c14, 208
+	.cfi_rel_offset		c15, 224
+	.cfi_rel_offset		c16, 240
+	.cfi_rel_offset		c17, 256
+	.cfi_rel_offset		c18, 272
+	.cfi_rel_offset		c19, 288
+
+	/* Find the tls offset */
+	mov	c0, c2			/* tp */
+	mov	c3, c1			/* tlsdesc ptr */
+	ldr	w1, [c3, #16]		/* tlsdesc->tls_index */
+	ldr	x2, [c3, #24]		/* tlsdesc->tls_offs */
+	ldr	x19, [c3, #32]		/* tlsdesc->tls_size */
+	bl	tls_get_addr_common
+	scbnds	c0, c0, x19
+
+	/* Restore slow path registers */
+	ldr	c19,	  [csp, #(9 * 32)]
+	ldp	c17, c18, [csp, #(8 * 32)]
+	ldp	c15, c16, [csp, #(7 * 32)]
+	ldp	c13, c14, [csp, #(6 * 32)]
+	ldp	c11, c12, [csp, #(5 * 32)]
+	ldp	c9, c10,  [csp, #(5 * 32)]
+	ldp	c7, c8,   [csp, #(3 * 32)]
+	ldp	c5, c6,   [csp, #(2 * 32)]
+	ldp	c1, c2,   [csp, #(1 * 32)]
+	ldp	c29, c30, [csp], #(10 * 32)
+	.cfi_adjust_cfa_offset 	-10 * 32
+	.cfi_restore		c29
+	.cfi_restore		c30
+
+	/* Restore fast path registers and return */
+	ldp	 c3,  c4, [csp], #32
+	.cfi_adjust_cfa_offset 	-2 * 16
+	ret
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	/* Save registers used in fast path */
 	stp	x1,  x2, [sp, #(-2 * 16)]!

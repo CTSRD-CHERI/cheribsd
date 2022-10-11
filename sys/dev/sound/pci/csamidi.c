@@ -81,7 +81,6 @@ struct csa_midi_softc {
 };
 
 static struct kobj_class csamidi_mpu_class;
-static devclass_t midicsa_devclass;
 
 static u_int32_t
 csamidi_readio(struct csa_midi_softc *scp, u_long offset)
@@ -202,11 +201,9 @@ static int
 midicsa_attach(device_t dev)
 {
 	struct csa_midi_softc *scp;
-	struct sndcard_func *func;
 	int rc = ENXIO;
 
 	scp = device_get_softc(dev);
-	func = device_get_ivars(dev);
 
 	bzero(scp, sizeof(struct csa_midi_softc));
 	scp->dev = dev;
@@ -284,7 +281,7 @@ static driver_t midicsa_driver = {
 	midicsa_methods,
 	sizeof(struct csa_midi_softc),
 };
-DRIVER_MODULE(snd_csa_midi, csa, midicsa_driver, midicsa_devclass, 0, 0);
+DRIVER_MODULE(snd_csa_midi, csa, midicsa_driver, 0, 0);
 MODULE_DEPEND(snd_csa_midi, snd_csa, 1, 1, 1);
 MODULE_DEPEND(snd_csa_midi, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_csa_midi, 1);

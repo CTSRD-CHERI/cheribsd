@@ -46,10 +46,6 @@ static MALLOC_DEFINE(M_CAMQ, "CAM queue", "CAM queue buffers");
 static MALLOC_DEFINE(M_CAMDEVQ, "CAM dev queue", "CAM dev queue buffers");
 static MALLOC_DEFINE(M_CAMCCBQ, "CAM ccb queue", "CAM ccb queue buffers");
 
-static __inline int
-		queue_cmp(cam_pinfo **queue_array, int i, int j);
-static __inline void
-		swap(cam_pinfo **queue_array, int i, int j);
 static void	heap_up(cam_pinfo **queue_array, int new_index);
 static void	heap_down(cam_pinfo **queue_array, int index,
 			  int last_index);
@@ -60,24 +56,23 @@ camq_init(struct camq *camq, int size)
 	bzero(camq, sizeof(*camq));
 	camq->array_size = size;
 	if (camq->array_size != 0) {
-		camq->queue_array = (cam_pinfo**)malloc(size*sizeof(cam_pinfo*),
-							M_CAMQ, M_NOWAIT);
+		/*
+		 * Heap algorithms like everything numbered from 1, so
+		 * allocate one more to account for 0 base.
+		 */
+		camq->queue_array = malloc((size + 1) * sizeof(cam_pinfo*),
+		    M_CAMQ, M_NOWAIT);
 		if (camq->queue_array == NULL) {
 			printf("camq_init: - cannot malloc array!\n");
 			return (1);
 		}
-		/*
-		 * Heap algorithms like everything numbered from 1, so
-		 * offset our pointer into the heap array by one element.
-		 */
-		camq->queue_array--;
 	}
 	return (0);
 }
 
 /*
  * Free a camq structure.  This should only be called if a controller
- * driver failes somehow during its attach routine or is unloaded and has
+ * driver fails somehow during its attach routine or is unloaded and has
  * obtained a camq structure.  The XPT should ensure that the queue
  * is empty before calling this routine.
  */
@@ -85,11 +80,6 @@ void
 camq_fini(struct camq *queue)
 {
 	if (queue->queue_array != NULL) {
-		/*
-		 * Heap algorithms like everything numbered from 1, so
-		 * our pointer into the heap array is offset by one element.
-		 */
-		queue->queue_array++;
 		free(queue->queue_array, M_CAMQ);
 	}
 }
@@ -102,8 +92,8 @@ camq_resize(struct camq *queue, int new_size)
 	KASSERT(new_size >= queue->entries, ("camq_resize: "
 	    "New queue size can't accommodate queued entries (%d < %d).",
 	    new_size, queue->entries));
-	new_array = (cam_pinfo **)malloc(new_size * sizeof(cam_pinfo *),
-					 M_CAMQ, M_NOWAIT);
+	new_array = malloc((new_size + 1) * sizeof(cam_pinfo *), M_CAMQ,
+	    M_NOWAIT);
 	if (new_array == NULL) {
 		/* Couldn't satisfy request */
 		return (CAM_RESRC_UNAVAIL);
@@ -114,12 +104,11 @@ camq_resize(struct camq *queue, int new_size)
 	 * by one element.
 	 */
 	if (queue->queue_array != NULL) {
-		queue->queue_array++;
 		bcopy(queue->queue_array, new_array,
-		      queue->entries * sizeof(cam_pinfo *));
+		    (queue->entries + 1) * sizeof(cam_pinfo *));
 		free(queue->queue_array, M_CAMQ);
 	}
-	queue->queue_array = new_array-1;
+	queue->queue_array = new_array;
 	queue->array_size = new_size;
 	return (CAM_REQ_CMP);
 }

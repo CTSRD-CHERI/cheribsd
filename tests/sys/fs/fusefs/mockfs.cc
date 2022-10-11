@@ -207,6 +207,14 @@ void MockFS::debug_request(const mockfs_buf_in &in, ssize_t buflen)
 			printf(" flags=%#x name=%s",
 				in.body.open.flags, name);
 			break;
+		case FUSE_FALLOCATE:
+			printf(" fh=%#" PRIx64 " offset=%" PRIu64
+				" length=%" PRIx64 " mode=%#x",
+				in.body.fallocate.fh,
+				in.body.fallocate.offset,
+				in.body.fallocate.length,
+				in.body.fallocate.mode);
+			break;
 		case FUSE_FLUSH:
 			printf(" fh=%#" PRIx64 " lock_owner=%" PRIu64,
 				in.body.flush.fh,
@@ -289,6 +297,15 @@ void MockFS::debug_request(const mockfs_buf_in &in, ssize_t buflen)
 				in.body.release.fh,
 				in.body.release.flags,
 				in.body.release.lock_owner);
+			break;
+		case FUSE_RENAME:
+			{
+				const char *src = (const char*)in.body.bytes +
+					sizeof(fuse_rename_in);
+				const char *dst = src + strlen(src) + 1;
+				printf(" src=%s newdir=%" PRIu64 " dst=%s",
+					src, in.body.rename.newdir, dst);
+			}
 			break;
 		case FUSE_SETATTR:
 			if (verbosity <= 1) {
@@ -392,7 +409,8 @@ void MockFS::debug_response(const mockfs_buf_out &out) {
 MockFS::MockFS(int max_readahead, bool allow_other, bool default_permissions,
 	bool push_symlinks_in, bool ro, enum poll_method pm, uint32_t flags,
 	uint32_t kernel_minor_version, uint32_t max_write, bool async,
-	bool noclusterr, unsigned time_gran, bool nointr)
+	bool noclusterr, unsigned time_gran, bool nointr, bool noatime,
+	const char *fsname, const char *subtype)
 {
 	struct sigaction sa;
 	struct iovec *iov = NULL;
@@ -401,6 +419,7 @@ MockFS::MockFS(int max_readahead, bool allow_other, bool default_permissions,
 	const bool trueval = true;
 
 	m_daemon_id = NULL;
+	m_expected_write_errno = 0;
 	m_kernel_minor_version = kernel_minor_version;
 	m_maxreadahead = max_readahead;
 	m_maxwrite = MIN(max_write, max_max_write);
@@ -408,6 +427,7 @@ MockFS::MockFS(int max_readahead, bool allow_other, bool default_permissions,
 	m_pm = pm;
 	m_time_gran = time_gran;
 	m_quit = false;
+	m_last_unique = 0;
 	if (m_pm == KQ)
 		m_kq = kqueue();
 	else
@@ -466,6 +486,10 @@ MockFS::MockFS(int max_readahead, bool allow_other, bool default_permissions,
 		build_iovec(&iov, &iovlen, "async", __DECONST(void*, &trueval),
 			sizeof(bool));
 	}
+	if (noatime) {
+		build_iovec(&iov, &iovlen, "noatime",
+			__DECONST(void*, &trueval), sizeof(bool));
+	}
 	if (noclusterr) {
 		build_iovec(&iov, &iovlen, "noclusterr",
 			__DECONST(void*, &trueval), sizeof(bool));
@@ -476,6 +500,14 @@ MockFS::MockFS(int max_readahead, bool allow_other, bool default_permissions,
 	} else {
 		build_iovec(&iov, &iovlen, "intr",
 			__DECONST(void*, &trueval), sizeof(bool));
+	}
+	if (*fsname) {
+		build_iovec(&iov, &iovlen, "fsname=",
+			__DECONST(void*, fsname), -1);
+	}
+	if (*subtype) {
+		build_iovec(&iov, &iovlen, "subtype=",
+			__DECONST(void*, subtype), -1);
 	}
 	if (nmount(iov, iovlen, 0))
 		throw(std::system_error(errno, std::system_category(),
@@ -670,6 +702,10 @@ void MockFS::audit_request(const mockfs_buf_in &in, ssize_t buflen) {
 		EXPECT_EQ(inlen, fih + sizeof(in.body.interrupt));
 		EXPECT_EQ((size_t)buflen, inlen);
 		break;
+	case FUSE_FALLOCATE:
+		EXPECT_EQ(inlen, fih + sizeof(in.body.fallocate));
+		EXPECT_EQ((size_t)buflen, inlen);
+		break;
 	case FUSE_BMAP:
 		EXPECT_EQ(inlen, fih + sizeof(in.body.bmap));
 		EXPECT_EQ((size_t)buflen, inlen);
@@ -685,7 +721,6 @@ void MockFS::audit_request(const mockfs_buf_in &in, ssize_t buflen) {
 		break;
 	case FUSE_NOTIFY_REPLY:
 	case FUSE_BATCH_FORGET:
-	case FUSE_FALLOCATE:
 	case FUSE_IOCTL:
 	case FUSE_POLL:
 	case FUSE_READDIRPLUS:
@@ -693,6 +728,14 @@ void MockFS::audit_request(const mockfs_buf_in &in, ssize_t buflen) {
 	default:
 		FAIL() << "Unknown opcode " << in.header.opcode;
 	}
+	/*
+	 * Check that the ticket's unique value is sequential.  Technically it
+	 * doesn't need to be sequential, merely unique.  But the current
+	 * fusefs driver _does_ make it sequential, and that's easy to check
+	 * for.
+	 */
+	if (in.header.unique != ++m_last_unique)
+		FAIL() << "Non-sequential unique value";
 }
 
 void MockFS::init(uint32_t flags) {
@@ -702,6 +745,8 @@ void MockFS::init(uint32_t flags) {
 	std::unique_ptr<mockfs_buf_out> out(new mockfs_buf_out);
 
 	read_request(*in, buflen);
+	if (verbosity > 0)
+		debug_request(*in, buflen);
 	audit_request(*in, buflen);
 	ASSERT_EQ(FUSE_INIT, in->header.opcode);
 
@@ -744,6 +789,7 @@ void MockFS::loop() {
 
 		bzero(in.get(), sizeof(*in));
 		read_request(*in, buflen);
+		m_expected_write_errno = 0;
 		if (m_quit)
 			break;
 		if (verbosity > 0)
@@ -859,6 +905,7 @@ void MockFS::read_request(mockfs_buf_in &in, ssize_t &res) {
 	struct timeval timeout_tv;
 	const int timeout_ms = 999;
 	int timeout_int, nfds;
+	int fuse_fd;
 
 	switch (m_pm) {
 	case BLOCKING:
@@ -867,8 +914,8 @@ void MockFS::read_request(mockfs_buf_in &in, ssize_t &res) {
 		timeout_ts.tv_sec = 0;
 		timeout_ts.tv_nsec = timeout_ms * 1'000'000;
 		while (nready == 0) {
-			EV_SET(&changes[0], m_fuse_fd, EVFILT_READ, EV_ADD, 0,
-				0, 0);
+			EV_SET(&changes[0], m_fuse_fd, EVFILT_READ,
+				EV_ADD | EV_ONESHOT, 0, 0, 0);
 			nready = kevent(m_kq, &changes[0], 1, &events[0], 1,
 				&timeout_ts);
 			if (m_quit)
@@ -895,19 +942,22 @@ void MockFS::read_request(mockfs_buf_in &in, ssize_t &res) {
 		ASSERT_TRUE(fds[0].revents & POLLIN);
 		break;
 	case SELECT:
+		fuse_fd = m_fuse_fd;
+		if (fuse_fd < 0)
+			break;
 		timeout_tv.tv_sec = 0;
 		timeout_tv.tv_usec = timeout_ms * 1'000;
-		nfds = m_fuse_fd + 1;
+		nfds = fuse_fd + 1;
 		while (nready == 0) {
 			FD_ZERO(&readfds);
-			FD_SET(m_fuse_fd, &readfds);
+			FD_SET(fuse_fd, &readfds);
 			nready = select(nfds, &readfds, NULL, NULL,
 				&timeout_tv);
 			if (m_quit)
 				return;
 		}
 		ASSERT_LE(0, nready) << strerror(errno);
-		ASSERT_TRUE(FD_ISSET(m_fuse_fd, &readfds));
+		ASSERT_TRUE(FD_ISSET(fuse_fd, &readfds));
 		break;
 	default:
 		FAIL() << "not yet implemented";
@@ -930,12 +980,26 @@ void MockFS::read_request(mockfs_buf_in &in, ssize_t &res) {
 void MockFS::write_response(const mockfs_buf_out &out) {
 	fd_set writefds;
 	pollfd fds[1];
+	struct kevent changes[1];
+	struct kevent events[1];
 	int nready, nfds;
 	ssize_t r;
 
 	switch (m_pm) {
 	case BLOCKING:
-	case KQ:	/* EVFILT_WRITE is not supported */
+		break;
+	case KQ:
+		EV_SET(&changes[0], m_fuse_fd, EVFILT_WRITE,
+			EV_ADD | EV_ONESHOT, 0, 0, 0);
+		nready = kevent(m_kq, &changes[0], 1, &events[0], 1,
+			NULL);
+		ASSERT_LE(0, nready) << strerror(errno);
+		ASSERT_EQ(events[0].ident, (uintptr_t)m_fuse_fd);
+		if (events[0].flags & EV_ERROR)
+			FAIL() << strerror(events[0].data);
+		else if (events[0].flags & EV_EOF)
+			FAIL() << strerror(events[0].fflags);
+		m_nready = events[0].data;
 		break;
 	case POLL:
 		fds[0].fd = m_fuse_fd;
@@ -958,7 +1022,12 @@ void MockFS::write_response(const mockfs_buf_out &out) {
 		FAIL() << "not yet implemented";
 	}
 	r = write(m_fuse_fd, &out, out.header.len);
-	ASSERT_TRUE(r > 0 || errno == EAGAIN) << strerror(errno);
+	if (m_expected_write_errno) {
+		ASSERT_EQ(-1, r);
+		ASSERT_EQ(m_expected_write_errno, errno) << strerror(errno);
+	} else {
+		ASSERT_TRUE(r > 0 || errno == EAGAIN) << strerror(errno);
+	}
 }
 
 void* MockFS::service(void *pthr_data) {

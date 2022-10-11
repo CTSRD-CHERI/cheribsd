@@ -77,8 +77,6 @@ __FBSDID("$FreeBSD$");
 static const char driver_name[] = "hptiop";
 static const char driver_version[] = "v1.9";
 
-static devclass_t hptiop_devclass;
-
 static int hptiop_send_sync_msg(struct hpt_iop_hba *hba,
 				u_int32_t msg, u_int32_t millisec);
 static void hptiop_request_callback_itl(struct hpt_iop_hba *hba,
@@ -166,7 +164,7 @@ static struct cdevsw hptiop_cdevsw = {
 };
 
 #define hba_from_dev(dev) \
-	((struct hpt_iop_hba *)devclass_get_softc(hptiop_devclass, dev2unit(dev)))
+	((struct hpt_iop_hba *)((dev)->si_drv1))
 
 #define BUS_SPACE_WRT4_ITL(offset, value) bus_space_write_4(hba->bar0t,\
 		hba->bar0h, offsetof(struct hpt_iopmu_itl, offset), (value))
@@ -214,8 +212,6 @@ static int hptiop_ioctl(ioctl_dev_t dev, u_long cmd, caddr_t data,
 	int ret = EFAULT;
 	struct hpt_iop_hba *hba = hba_from_dev(dev);
 
-	mtx_lock(&Giant);
-
 	switch (cmd) {
 	case HPT_DO_IOCONTROL:
 		ret = hba->ops->do_ioctl(hba,
@@ -225,9 +221,6 @@ static int hptiop_ioctl(ioctl_dev_t dev, u_long cmd, caddr_t data,
 		ret = hptiop_rescan_bus(hba);
 		break;
 	}
-
-	mtx_unlock(&Giant);
-
 	return ret;
 }
 
@@ -473,10 +466,6 @@ static void hptiop_drain_outbound_queue_itl(struct hpt_iop_hba *hba)
 		if (req & IOPMU_QUEUE_MASK_HOST_BITS)
 			hptiop_request_callback_itl(hba, req);
 		else {
-			struct hpt_iop_request_header *p;
-
-			p = (struct hpt_iop_request_header *)
-				((char *)hba->u.itl.mu + req);
 			temp = bus_space_read_4(hba->bar0t,
 					hba->bar0h,req +
 					offsetof(struct hpt_iop_request_header,
@@ -1805,7 +1794,7 @@ static driver_t hptiop_pci_driver = {
 	sizeof(struct hpt_iop_hba)
 };
 
-DRIVER_MODULE(hptiop, pci, hptiop_pci_driver, hptiop_devclass, 0, 0);
+DRIVER_MODULE(hptiop, pci, hptiop_pci_driver, 0, 0);
 MODULE_DEPEND(hptiop, cam, 1, 1, 1);
 
 static int hptiop_probe(device_t dev)
@@ -1879,6 +1868,7 @@ static int hptiop_probe(device_t dev)
 
 static int hptiop_attach(device_t dev)
 {
+	struct make_dev_args args;
 	struct hpt_iop_hba *hba = (struct hpt_iop_hba *)device_get_softc(dev);
 	struct hpt_iop_request_get_config  iop_config;
 	struct hpt_iop_request_set_config  set_config;
@@ -2046,6 +2036,7 @@ static int hptiop_attach(device_t dev)
 		goto free_hba_path;
 	}
 
+	memset(&ccb, 0, sizeof(ccb));
 	xpt_setup_ccb(&ccb.ccb_h, hba->path, /*priority*/5);
 	ccb.ccb_h.func_code = XPT_SASYNC_CB;
 	ccb.event_enable = (AC_FOUND_DEVICE | AC_LOST_DEVICE);
@@ -2076,10 +2067,14 @@ static int hptiop_attach(device_t dev)
 	hba->ops->enable_intr(hba);
 	hba->initialized = 1;
 
-	hba->ioctl_dev = make_dev(&hptiop_cdevsw, unit,
-				UID_ROOT, GID_WHEEL /*GID_OPERATOR*/,
-				S_IRUSR | S_IWUSR, "%s%d", driver_name, unit);
+	make_dev_args_init(&args);
+	args.mda_devsw = &hptiop_cdevsw;
+	args.mda_uid = UID_ROOT;
+	args.mda_gid = GID_WHEEL /*GID_OPERATOR*/;
+	args.mda_mode = S_IRUSR | S_IWUSR;
+	args.mda_si_drv1 = hba;
 
+	make_dev_s(&args, &hba->ioctl_dev, "%s%d", driver_name, unit);
 
 	return 0;
 
@@ -2797,6 +2792,7 @@ static void hptiop_release_resource(struct hpt_iop_hba *hba)
 	if (hba->path) {
 		struct ccb_setasync ccb;
 
+		memset(&ccb, 0, sizeof(ccb));
 		xpt_setup_ccb(&ccb.ccb_h, hba->path, /*priority*/5);
 		ccb.ccb_h.func_code = XPT_SASYNC_CB;
 		ccb.event_enable = 0;

@@ -363,9 +363,7 @@ static driver_t	acpi_ibm_driver = {
 	sizeof(struct acpi_ibm_softc),
 };
 
-static devclass_t acpi_ibm_devclass;
-
-DRIVER_MODULE(acpi_ibm, acpi, acpi_ibm_driver, acpi_ibm_devclass, 0, 0);
+DRIVER_MODULE(acpi_ibm, acpi, acpi_ibm_driver, 0, 0);
 MODULE_DEPEND(acpi_ibm, acpi, 1, 1, 1);
 static char    *ibm_ids[] = {"IBM0068", "LEN0068", "LEN0268", NULL};
 
@@ -546,14 +544,14 @@ acpi_ibm_attach(device_t dev)
 			SYSCTL_ADD_PROC(sc->sysctl_ctx,
 			    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO,
 			    acpi_ibm_sysctls[i].name,
-			    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
+			    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE,
 			    sc, i, acpi_ibm_sysctl, "I",
 			    acpi_ibm_sysctls[i].description);
 		} else {
 			SYSCTL_ADD_PROC(sc->sysctl_ctx,
 			    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO,
 			    acpi_ibm_sysctls[i].name,
-			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
 			    sc, i, acpi_ibm_sysctl, "I",
 			    acpi_ibm_sysctls[i].description);
 		}
@@ -563,7 +561,7 @@ acpi_ibm_attach(device_t dev)
 	if (acpi_ibm_sysctl_init(sc, ACPI_IBM_METHOD_THERMAL)) {
 		SYSCTL_ADD_PROC(sc->sysctl_ctx,
 		    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO, "thermal",
-		    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT, sc, 0,
+		    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, 0,
 		    acpi_ibm_thermal_sysctl, "I", "Thermal zones");
 	}
 
@@ -571,7 +569,7 @@ acpi_ibm_attach(device_t dev)
 	if (acpi_ibm_sysctl_init(sc, ACPI_IBM_METHOD_HANDLEREVENTS)) {
 		SYSCTL_ADD_PROC(sc->sysctl_ctx,
 		    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO, "handlerevents",
-		    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+		    CTLTYPE_STRING | CTLFLAG_RW | CTLFLAG_MPSAFE, sc, 0,
 		    acpi_ibm_handlerevents_sysctl, "I",
 		    "devd(8) events handled by acpi_ibm");
 	}

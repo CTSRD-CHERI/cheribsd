@@ -156,14 +156,13 @@ static device_method_t hwpstate_methods[] = {
 	{0, 0}
 };
 
-static devclass_t hwpstate_devclass;
 static driver_t hwpstate_driver = {
 	"hwpstate",
 	hwpstate_methods,
 	sizeof(struct hwpstate_softc),
 };
 
-DRIVER_MODULE(hwpstate, cpu, hwpstate_driver, hwpstate_devclass, 0, 0);
+DRIVER_MODULE(hwpstate, cpu, hwpstate_driver, 0, 0);
 
 /*
  * Go to Px-state on all cpus, considering the limit register (if so
@@ -341,7 +340,8 @@ hwpstate_identify(driver_t *driver, device_t parent)
 	if (resource_disabled("hwpstate", 0))
 		return;
 
-	if (BUS_ADD_CHILD(parent, 10, "hwpstate", -1) == NULL)
+	if (BUS_ADD_CHILD(parent, 10, "hwpstate", device_get_unit(parent))
+	    == NULL)
 		device_printf(parent, "hwpstate: add child failed\n");
 }
 

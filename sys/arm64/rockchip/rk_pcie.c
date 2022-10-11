@@ -336,7 +336,7 @@ rk_pcie_map_out_atu(struct rk_pcie_softc *sc, int idx, int type,
    int num_bits, uint64_t pa)
 {
 	uint32_t addr0;
-	uint64_t max_size;
+	uint64_t max_size __diagused;
 
 	/* Check HW constrains */
 	max_size = idx == 0 ? ATU_OB_REGION_0_SIZE: ATU_OB_REGION_SIZE;
@@ -405,17 +405,17 @@ rk_pcie_decode_ranges(struct rk_pcie_softc *sc, struct ofw_pci_range *ranges,
 	int i;
 
 	for (i = 0; i < nranges; i++) {
-		if ((ranges[i].pci_hi & OFW_PCI_PHYS_HI_SPACEMASK)  ==
-		    OFW_PCI_PHYS_HI_SPACE_IO) {
+		switch(ranges[i].pci_hi & OFW_PCI_PHYS_HI_SPACEMASK) {
+		case OFW_PCI_PHYS_HI_SPACE_IO:
 			if (sc->io_range.size != 0) {
 				device_printf(sc->dev,
 				    "Duplicated IO range found in DT\n");
 				return (ENXIO);
 			}
 			sc->io_range = ranges[i];
-		}
-		if (((ranges[i].pci_hi & OFW_PCI_PHYS_HI_SPACEMASK) ==
-		    OFW_PCI_PHYS_HI_SPACE_MEM64))  {
+			break;
+		case OFW_PCI_PHYS_HI_SPACE_MEM32:
+		case OFW_PCI_PHYS_HI_SPACE_MEM64:
 			if (ranges[i].pci_hi & OFW_PCI_PHYS_HI_PREFETCHABLE) {
 				if (sc->pref_mem_range.size != 0) {
 					device_printf(sc->dev,
@@ -1162,7 +1162,7 @@ rk_pcie_attach(device_t dev)
 	/* Read FDT properties */
 	rv = rk_pcie_parse_fdt_resources(sc);
 	if (rv != 0)
-		return (rv);
+		goto out;
 
 	sc->coherent = OF_hasprop(sc->node, "dma-coherent");
 	sc->no_l0s = OF_hasprop(sc->node, "aspm-no-l0s");
@@ -1276,28 +1276,28 @@ rk_pcie_attach(device_t dev)
 	if (rv != 0)
 		goto out;
 
-	rv = ofw_pci_init(dev);
+	rv = ofw_pcib_init(dev);
 	if (rv != 0)
 		goto out;
 
 	rv = rk_pcie_decode_ranges(sc, sc->ofw_pci.sc_range,
 	    sc->ofw_pci.sc_nrange);
 	if (rv != 0)
-		goto out;
+		goto out_full;
 	rv = rk_pcie_setup_hw(sc);
 	if (rv != 0)
-		goto out;
+		goto out_full;
 
 	rv = rk_pcie_setup_sw(sc);
 	if (rv != 0)
-		goto out;
+		goto out_full;
 
 	rv = bus_setup_intr(dev, sc->client_irq_res, INTR_TYPE_BIO | INTR_MPSAFE,
 	   rk_pcie_client_irq, NULL, sc, &sc->client_irq_cookie);
 	if (rv != 0) {
 		device_printf(dev, "cannot setup client interrupt handler\n");
 		rv = ENXIO;
-		goto out;
+		goto out_full;
 	}
 
 	rv = bus_setup_intr(dev, sc->legacy_irq_res, INTR_TYPE_BIO | INTR_MPSAFE,
@@ -1305,7 +1305,7 @@ rk_pcie_attach(device_t dev)
 	if (rv != 0) {
 		device_printf(dev, "cannot setup client interrupt handler\n");
 		rv = ENXIO;
-		goto out;
+		goto out_full;
 	}
 
 	rv = bus_setup_intr(dev, sc->sys_irq_res, INTR_TYPE_BIO | INTR_MPSAFE,
@@ -1313,7 +1313,7 @@ rk_pcie_attach(device_t dev)
 	if (rv != 0) {
 		device_printf(dev, "cannot setup client interrupt handler\n");
 		rv = ENXIO;
-		goto out;
+		goto out_full;
 	}
 
 	/* Enable interrupts */
@@ -1344,8 +1344,42 @@ rk_pcie_attach(device_t dev)
 	DELAY(250000);
 	device_add_child(dev, "pci", -1);
 	return (bus_generic_attach(dev));
+
+out_full:
+	bus_teardown_intr(dev, sc->sys_irq_res, sc->sys_irq_cookie);
+	bus_teardown_intr(dev, sc->legacy_irq_res, sc->legacy_irq_cookie);
+	bus_teardown_intr(dev, sc->client_irq_res, sc->client_irq_cookie);
+	ofw_pcib_fini(dev);
 out:
-	/* XXX Cleanup */
+	bus_dma_tag_destroy(sc->dmat);
+	bus_free_resource(dev, SYS_RES_IRQ, sc->sys_irq_res);
+	bus_free_resource(dev, SYS_RES_IRQ, sc->legacy_irq_res);
+	bus_free_resource(dev, SYS_RES_IRQ, sc->client_irq_res);
+	bus_free_resource(dev, SYS_RES_MEMORY, sc->apb_mem_res);
+	bus_free_resource(dev, SYS_RES_MEMORY, sc->axi_mem_res);
+	/* GPIO */
+	gpio_pin_release(sc->gpio_ep);
+	/* Phys */
+	for (int i = 0; i < MAX_LANES; i++) {
+		phy_release(sc->phys[i]);
+	}
+	/* Clocks */
+	clk_release(sc->clk_aclk);
+	clk_release(sc->clk_aclk_perf);
+	clk_release(sc->clk_hclk);
+	clk_release(sc->clk_pm);
+	/* Resets */
+	hwreset_release(sc->hwreset_core);
+	hwreset_release(sc->hwreset_mgmt);
+	hwreset_release(sc->hwreset_pipe);
+	hwreset_release(sc->hwreset_pm);
+	hwreset_release(sc->hwreset_aclk);
+	hwreset_release(sc->hwreset_pclk);
+	/* Regulators */
+	regulator_release(sc->supply_12v);
+	regulator_release(sc->supply_3v3);
+	regulator_release(sc->supply_1v8);
+	regulator_release(sc->supply_0v9);
 	return (rv);
 }
 
@@ -1383,7 +1417,5 @@ static device_method_t rk_pcie_methods[] = {
 };
 
 DEFINE_CLASS_1(pcib, rk_pcie_driver, rk_pcie_methods,
-    sizeof(struct rk_pcie_softc), ofw_pci_driver);
-static devclass_t rk_pcie_devclass;
-DRIVER_MODULE( rk_pcie, simplebus, rk_pcie_driver, rk_pcie_devclass,
-    NULL, NULL);
+    sizeof(struct rk_pcie_softc), ofw_pcib_driver);
+DRIVER_MODULE( rk_pcie, simplebus, rk_pcie_driver, NULL, NULL);

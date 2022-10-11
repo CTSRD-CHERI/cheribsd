@@ -1,0 +1,34 @@
+name: Check coding style with clang-format
+on: [pull_request]
+defaults:
+  run:
+    shell: bash
+jobs:
+  check-format:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Try to fetch required commits
+        run: |
+          set -xe
+          echo "base_ref=${{ github.base_ref }}"
+          echo "github.event.pull_request.head.sha=${{ github.event.pull_request.head.sha }}"
+          # Based on https://stackoverflow.com/questions/54181901/fetching-only-the-range-of-commits-not-present-in-base-branch
+          for ((depth = 8; depth <= 65536; depth *= 2)); do
+              echo "trying depth $depth ..."
+              git fetch "--depth=$depth" origin "${{ github.base_ref }}:${{ github.base_ref }}"
+              git fetch "--depth=$depth" origin "+${{ github.event.pull_request.head.sha }}"
+              if git merge-base "${{ github.base_ref }}" "${{ github.event.pull_request.head.sha }}"; then
+                  echo "found with depth=$depth"
+                  break
+              fi
+          done
+      - name: List commits
+        run: git log --oneline "${{ github.base_ref }}..${{ github.event.pull_request.head.sha }}"
+      - name: Run clang-format
+        uses: wolletd/clang-format-checker@v1
+        with:
+          source-ref: "${{ github.event.pull_request.head.sha }}"
+          target-ref: "${{ github.base_ref }}"

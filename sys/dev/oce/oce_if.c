@@ -209,7 +209,6 @@ static driver_t oce_driver = {
 	oce_dispatch,
 	sizeof(OCE_SOFTC)
 };
-static devclass_t oce_devclass;
 
 /* global vars */
 const char component_revision[32] = {"///" COMPONENT_REVISION "///"};
@@ -232,7 +231,7 @@ static uint32_t supportedDevices[] =  {
 	(PCI_VENDOR_EMULEX << 16) | PCI_PRODUCT_SH
 };
 
-DRIVER_MODULE(oce, pci, oce_driver, oce_devclass, 0, 0);
+DRIVER_MODULE(oce, pci, oce_driver, 0, 0);
 MODULE_PNP_INFO("W32:vendor/device", pci, oce, supportedDevices,
     nitems(supportedDevices));
 MODULE_DEPEND(oce, pci, 1, 1, 1);
@@ -1330,11 +1329,8 @@ oce_tso_setup(POCE_SOFTC sc, struct mbuf **mpp)
 	}
 
 	m = m_pullup(m, total_len);
-	if (!m)
-		return NULL;
 	*mpp = m;
 	return m;
-
 }
 #endif /* INET6 || INET */
 
@@ -1871,7 +1867,7 @@ int
 oce_alloc_rx_bufs(struct oce_rq *rq, int count)
 {
 	POCE_SOFTC sc = (POCE_SOFTC) rq->parent;
-	int i, in, rc;
+	int i, rc;
 	struct oce_packet_desc *pd;
 	bus_dma_segment_t segs[6];
 	int nsegs, added = 0;
@@ -1882,8 +1878,6 @@ oce_alloc_rx_bufs(struct oce_rq *rq, int count)
 
 	bzero(&rxdb_reg, sizeof(pd_rxulp_db_t));
 	for (i = 0; i < count; i++) {
-		in = (rq->ring->pidx + 1) % OCE_RQ_PACKET_ARRAY_SIZE;
-
 		pd = &rq->pckts[rq->ring->pidx];
 		pd->mbuf = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, oce_rq_buf_size);
 		if (pd->mbuf == NULL) {
@@ -2042,14 +2036,17 @@ exit_rq_handler_lro:
 uint16_t
 oce_rq_handler(void *arg)
 {
+	struct epoch_tracker et;
 	struct oce_rq *rq = (struct oce_rq *)arg;
 	struct oce_cq *cq = rq->cq;
 	POCE_SOFTC sc = rq->parent;
 	struct oce_nic_rx_cqe *cqe;
 	int num_cqes = 0;
 
+	NET_EPOCH_ENTER(et);
 	if(rq->islro) {
 		oce_rq_handler_lro(arg);
+		NET_EPOCH_EXIT(et);
 		return 0;
 	}
 	LOCK(&rq->rx_lock);
@@ -2093,6 +2090,7 @@ oce_rq_handler(void *arg)
 
 	oce_check_rx_bufs(sc, num_cqes, rq);
 	UNLOCK(&rq->rx_lock);
+	NET_EPOCH_EXIT(et);
 	return 0;
 
 }
@@ -2113,7 +2111,7 @@ oce_attach_ifp(POCE_SOFTC sc)
 	ifmedia_add(&sc->media, IFM_ETHER | IFM_AUTO, 0, NULL);
 	ifmedia_set(&sc->media, IFM_ETHER | IFM_AUTO);
 
-	sc->ifp->if_flags = IFF_BROADCAST | IFF_MULTICAST;
+	sc->ifp->if_flags = IFF_BROADCAST | IFF_MULTICAST | IFF_KNOWSEPOCH;
 	sc->ifp->if_ioctl = oce_ioctl;
 	sc->ifp->if_start = oce_start;
 	sc->ifp->if_init = oce_init;

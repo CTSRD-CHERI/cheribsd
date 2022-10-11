@@ -1,8 +1,13 @@
-SUBDIRS = bash_completion.d pyzfs zcp
+include $(srcdir)/%D%/bash_completion.d/Makefile.am
+include $(srcdir)/%D%/pyzfs/Makefile.am
+include $(srcdir)/%D%/zcp/Makefile.am
+
 if BUILD_LINUX
-SUBDIRS += bpftrace dracut initramfs
+include $(srcdir)/%D%/bpftrace/Makefile.am
+include $(srcdir)/%D%/dracut/Makefile.am
+include $(srcdir)/%D%/initramfs/Makefile.am
 endif
+
 if PAM_ZFS_ENABLED
-SUBDIRS += pam_zfs_key
+include $(srcdir)/%D%/pam_zfs_key/Makefile.am
 endif
-DIST_SUBDIRS = bash_completion.d bpftrace dracut initramfs pam_zfs_key pyzfs zcp

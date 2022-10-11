@@ -189,12 +189,10 @@ n25q_get_device_ident(struct n25q_softc *sc)
 static int
 n25q_write(device_t dev, struct bio *bp, off_t offset, caddr_t data, off_t count)
 {
-	struct n25q_softc *sc;
 	device_t pdev;
 	int err;
 
 	pdev = device_get_parent(dev);
-	sc = device_get_softc(dev);
 
 	dprintf("%s: offset 0x%llx count %lld bytes\n", __func__, offset, count);
 
@@ -239,12 +237,10 @@ n25q_read(device_t dev, struct bio *bp, off_t offset, caddr_t data, off_t count)
 static int
 n25q_set_4b_mode(device_t dev, uint8_t command)
 {
-	struct n25q_softc *sc;
 	device_t pdev;
 	int err;
 
 	pdev = device_get_parent(dev);
-	sc = device_get_softc(dev);
 
 	err = QSPI_WRITE_REG(pdev, dev, command, 0, 0);
 
@@ -469,8 +465,6 @@ n25q_task(void *arg)
 	}
 }
 
-static devclass_t n25q_devclass;
-
 static device_method_t n25q_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		n25q_probe),
@@ -486,4 +480,4 @@ static driver_t n25q_driver = {
 	sizeof(struct n25q_softc),
 };
 
-DRIVER_MODULE(n25q, simplebus, n25q_driver, n25q_devclass, 0, 0);
+DRIVER_MODULE(n25q, simplebus, n25q_driver, 0, 0);

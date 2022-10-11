@@ -38,7 +38,6 @@
 
 #include <machine/armreg.h>
 
-#define	TRAPNO_CHERI		0
 #define	TRAPNO_STORE_CAP_PF	EXCP_DATA_ABORT_L
 #define	TRAPNO_LOAD_STORE	EXCP_DATA_ABORT_L
 
@@ -54,7 +53,7 @@
 #endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#define	XFAIL_VARARG_BOUNDS	"varargs bounds known to be unimplemented"
+#define	TLS_EXACT_BOUNDS
 #endif
 
 #endif /* !_CHERIBSDTEST_H_ */

@@ -1,6 +1,7 @@
 /*-
  * Copyright (c) 2012-2018, 2020 Robert N. M. Watson
  * Copyright (c) 2014-2016 SRI International
+ * Copyright (c) 2021 Microsoft Corp.
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -36,6 +37,7 @@
 #endif
 
 #include <sys/param.h>
+#include <sys/auxv.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/sysctl.h>
@@ -80,8 +82,11 @@ static StringList* cheri_xpassed_tests;
 /* Shared memory page with child process. */
 struct cheribsdtest_child_state *ccsp;
 
+static char *argv0;
+
 static int tests_run;
 static int tests_failed, tests_passed, tests_xfailed, tests_xpassed;
+static int execed;
 static int expected_failures;
 static int list;
 static int run_all;
@@ -157,38 +162,12 @@ list_tests(void)
 }
 
 static void
-signal_handler(int signum, siginfo_t *info, void *vuap)
+signal_handler(int signum, siginfo_t *info, void *vuap __unused)
 {
-#ifdef __mips__
-	struct cheri_frame *cfp;
-#endif
-	ucontext_t *uap;
-
-	uap = (ucontext_t *)vuap;
-#ifdef __mips__
-	if (uap->uc_mcontext.mc_regs[0] != /* UCONTEXT_MAGIC */ 0xACEDBADE) {
-		ccsp->ccs_signum = -1;
-		fprintf(stderr, "%s: missing UCONTEXT_MAGIC\n", __func__);
-		_exit(EX_OSERR);
-	}
-#ifdef __CHERI_PURE_CAPABILITY__
-	cfp = &uap->uc_mcontext.mc_cheriframe;
-	if (cfp == NULL) {
-#else
-	cfp = (struct cheri_frame *)uap->uc_mcontext.mc_cp2state;
-	if (cfp == NULL || uap->uc_mcontext.mc_cp2state_len != sizeof(*cfp)) {
-#endif
-		fprintf(stderr, "%s: NULL cfp or mc_cp2state", __func__);
-		ccsp->ccs_signum = -1;
-		_exit(EX_OSERR);
-	}
-#endif	/* __mips__ */
 	ccsp->ccs_signum = signum;
 	ccsp->ccs_si_code = info->si_code;
 	ccsp->ccs_si_trapno = info->si_trapno;
-#ifdef __mips__
-	ccsp->ccs_cp2_cause = cfp->cf_capcause;
-#endif
+	ccsp->ccs_si_addr = info->si_addr;
 
 	/*
 	 * Signal delivered outside of a sandbox; catch but terminate
@@ -374,7 +353,25 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 	(void)waitpid(childpid, &status, 0);
 
 	/*
-	 * First, check for errors from the test framework: successful process
+	 * If the test explicitly signalled failure for some reason, report
+	 * this first rather than reporting an expected failure that has
+	 * not yet been triggered.
+	 */
+	if (ccsp->ccs_testresult == TESTRESULT_FAILURE) {
+		/*
+		 * Ensure string is nul-terminated, as we will print
+		 * it in due course, and a failed test might have left
+		 * a corrupted string.
+		 */
+		ccsp->ccs_testresult_str[sizeof(ccsp->ccs_testresult_str) - 1] =
+		    '\0';
+		memcpy(reason, ccsp->ccs_testresult_str,
+		    sizeof(ccsp->ccs_testresult_str));
+		goto fail;
+	}
+
+	/*
+	 * Check for errors from the test framework: successful process
 	 * termination, signal disposition/exception codes/etc.  Analyse
 	 * child's signal state returned via shared memory.
 	 */
@@ -431,6 +428,12 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		    ccsp->ccs_si_trapno);
 		goto fail;
 	}
+	if ((ctp->ct_flags & CT_FLAG_SI_ADDR) &&
+	    !cheri_ptr_equal_exact(ccsp->ccs_si_addr_expected, ccsp->ccs_si_addr)) {
+		snprintf(reason, sizeof(reason), "Expected si_addr %#p, got %#p",
+		    ccsp->ccs_si_addr_expected, ccsp->ccs_si_addr);
+		goto fail;
+	}
 
 	/*
 	 * Next, we are concerned with whether the test itself reports a
@@ -443,18 +446,6 @@ cheribsdtest_run_test(const struct cheri_test *ctp)
 		if (ccsp->ccs_testresult == TESTRESULT_UNKNOWN) {
 			snprintf(reason, sizeof(reason),
 			    "Test failed to set a success/failure status");
-			goto fail;
-		}
-		if (ccsp->ccs_testresult == TESTRESULT_FAILURE) {
-			/*
-			 * Ensure string is nul-terminated, as we will print
-			 * it in due course, and a failed test might have left
-			 * a corrupted string.
-			 */
-			ccsp->ccs_testresult_str[
-			    sizeof(ccsp->ccs_testresult_str) - 1] = '\0';
-			memcpy(reason, ccsp->ccs_testresult_str,
-			    sizeof(ccsp->ccs_testresult_str));
 			goto fail;
 		}
 		if (ccsp->ccs_testresult != TESTRESULT_SUCCESS) {
@@ -591,6 +582,80 @@ cheribsdtest_run_test_name(const char *name)
 	errx(EX_USAGE, "unknown test: %s", name);
 }
 
+static void
+cheribsdtest_run_child(struct cheri_test *ctp)
+{
+	if (ctp->ct_child_func == NULL)
+		errx(EX_SOFTWARE, "%s has no child function", ctp->ct_name);
+	ctp->ct_child_func(ctp);
+	errx(EX_SOFTWARE, "%s child function returned", ctp->ct_name);
+}
+
+static void
+cheribsdtest_run_child_name(const char *name)
+{
+	struct cheri_test **ctpp, *ctp;
+
+	SET_FOREACH(ctpp, cheri_tests_set) {
+		ctp = *ctpp;
+		if (strcmp(name, ctp->ct_name) == 0) {
+			cheribsdtest_run_child(ctp);
+		}
+	}
+	errx(EX_USAGE, "unknown test: %s", name);
+}
+
+static char **
+mk_exec_args(const struct cheri_test *ctp)
+{
+	char *execpath;
+	char const **exec_args;
+	int argc = 0, error;
+
+	execpath = malloc(MAXPATHLEN);
+	if (execpath == NULL)
+		err(EX_OSERR, "malloc");
+	exec_args = calloc(5, sizeof(*exec_args));
+	if (exec_args == NULL)
+		err(EX_OSERR, "calloc");
+
+	/*
+	 * XXXBD: it would be nice if there was a way to say "coexecve
+	 * myself".
+	 */
+	error = elf_aux_info(AT_EXECPATH, execpath, MAXPATHLEN);
+	if (error != 0)
+		errx(EX_OSERR, "elf_aux_info: %s", strerror(error));
+	exec_args[argc++] = execpath;
+	exec_args[argc++] = "-E";
+	if (coredump_enabled)
+		exec_args[argc++] = "-c";
+	exec_args[argc++] = ctp->ct_name;
+	exec_args[argc++] = NULL;
+
+	return (__DECONST(char **, exec_args));
+}
+
+void
+cheribsdtest_coexec_child(const struct cheri_test *ctp)
+{
+	char **exec_args;
+
+	exec_args = mk_exec_args(ctp);
+	coexecve(getppid(), exec_args[0], exec_args, NULL);
+	err(EX_OSERR, "%s: coexecve", __func__);
+}
+
+void
+cheribsdtest_exec_child(const struct cheri_test *ctp)
+{
+	char **exec_args;
+
+	exec_args = mk_exec_args(ctp);
+	execve(exec_args[0], exec_args, NULL);
+	err(EX_OSERR, "%s: execve", __func__);
+}
+
 __noinline void *
 cheribsdtest_memcpy(void *dst, const void *src, size_t n)
 {
@@ -616,10 +681,11 @@ main(int argc, char *argv[])
 	const char *sep;
 	struct cheri_test **ctp, *ct;
 
+	argv0 = argv[0];
 	argc = xo_parse_args(argc, argv);
 	if (argc < 0)
 		errx(1, "xo_parse_args failed\n");
-	while ((opt = getopt(argc, argv, "acdfglQqsuvx")) != -1) {
+	while ((opt = getopt(argc, argv, "acdEfglQqsuvx")) != -1) {
 		switch (opt) {
 		case 'a':
 			run_all = 1;
@@ -629,6 +695,9 @@ main(int argc, char *argv[])
 			break;
 		case 'd':
 			debugger_enabled = 1;
+			break;
+		case 'E':
+			execed = 1;
 			break;
 		case 'f':
 			fast_tests_only = 1;
@@ -672,6 +741,16 @@ main(int argc, char *argv[])
 	}
 	argc -= optind;
 	argv += optind;
+	if (execed) {
+		if (run_all || glob || list) {
+			warnx("-E is incompatbile with -a, -g, and -l");
+			usage();
+		}
+		if (argc != 1) {
+			warnx("-E requires exactly one test argument");
+			usage();
+		}
+	}
 	if (run_all && list) {
 		warnx("-a and -l are incompatible");
 		usage();
@@ -693,10 +772,6 @@ main(int argc, char *argv[])
 		warnx("-a and a list of test are incompatible");
 		usage();
 	}
-	if (argc == 1 && strcmp(argv[0], "all") == 0) {
-		warnx("'all' as a synonym for -a is deprecated");
-		run_all = 1;
-	}
 
 	/*
 	 * Allocate an alternative stack, required to safely process signals in
@@ -712,6 +787,12 @@ main(int argc, char *argv[])
 	stack.ss_flags = 0;
 	if (sigaltstack(&stack, NULL) < 0)
 		err(EX_OSERR, "sigaltstack");
+
+	/*
+	 * We've been (co)execed so look up our child function and run it.
+	 */
+	if (execed)
+		cheribsdtest_run_child_name(argv[0]);
 
 	/*
 	 * Allocate a page shared with children processes to return success/

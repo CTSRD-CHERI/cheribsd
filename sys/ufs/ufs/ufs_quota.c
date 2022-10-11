@@ -492,7 +492,8 @@ chkdquot(struct inode *ip)
  * Q_QUOTAON - set up a quota file for a particular filesystem.
  */
 int
-quotaon(struct thread *td, struct mount *mp, int type, void * __capability fname)
+quotaon(struct thread *td, struct mount *mp, int type, void * __capability fname,
+    bool *mp_busy)
 {
 	struct ufsmount *ump;
 	struct vnode *vp, **vpp;
@@ -502,37 +503,34 @@ quotaon(struct thread *td, struct mount *mp, int type, void * __capability fname
 	struct nameidata nd;
 
 	error = priv_check(td, PRIV_UFS_QUOTAON);
-	if (error != 0) {
-		vfs_unbusy(mp);
+	if (error != 0)
 		return (error);
-	}
 
-	if ((mp->mnt_flag & MNT_RDONLY) != 0) {
-		vfs_unbusy(mp);
+	if ((mp->mnt_flag & MNT_RDONLY) != 0)
 		return (EROFS);
-	}
 
 	ump = VFSTOUFS(mp);
 	dq = NODQUOT;
 
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, fname, td);
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, fname);
 	flags = FREAD | FWRITE;
 	vfs_ref(mp);
+	KASSERT(*mp_busy, ("%s called without busied mount", __func__));
 	vfs_unbusy(mp);
+	*mp_busy = false;
 	error = vn_open(&nd, &flags, 0, NULL);
 	if (error != 0) {
 		vfs_rel(mp);
 		return (error);
 	}
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 	vp = nd.ni_vp;
 	error = vfs_busy(mp, MBF_NOWAIT);
 	vfs_rel(mp);
 	if (error == 0) {
-		if (vp->v_type != VREG) {
+		*mp_busy = true;
+		if (vp->v_type != VREG)
 			error = EACCES;
-			vfs_unbusy(mp);
-		}
 	}
 	if (error != 0) {
 		VOP_UNLOCK(vp);
@@ -545,7 +543,6 @@ quotaon(struct thread *td, struct mount *mp, int type, void * __capability fname
 		UFS_UNLOCK(ump);
 		VOP_UNLOCK(vp);
 		(void) vn_close(vp, FREAD|FWRITE, td->td_ucred, td);
-		vfs_unbusy(mp);
 		return (EALREADY);
 	}
 	ump->um_qflags[type] |= QTF_OPENING|QTF_CLOSING;
@@ -556,7 +553,6 @@ quotaon(struct thread *td, struct mount *mp, int type, void * __capability fname
 		ump->um_qflags[type] &= ~(QTF_OPENING|QTF_CLOSING);
 		UFS_UNLOCK(ump);
 		(void) vn_close(vp, FREAD|FWRITE, td->td_ucred, td);
-		vfs_unbusy(mp);
 		return (error);
 	}
 	VOP_UNLOCK(vp);
@@ -640,7 +636,6 @@ again:
 		("quotaon: leaking flags"));
 	UFS_UNLOCK(ump);
 
-	vfs_unbusy(mp);
 	return (error);
 }
 
@@ -1691,9 +1686,7 @@ dqflush(struct vnode *vp)
  * Return count of number of quota structures found.
  */
 int
-quotaref(vp, qrp)
-	struct vnode *vp;
-	struct dquot **qrp;
+quotaref(struct vnode *vp, struct dquot **qrp)
 {
 	struct inode *ip;
 	struct dquot *dq;
@@ -1728,8 +1721,7 @@ quotaref(vp, qrp)
  * Release a set of quota structures obtained from a vnode.
  */
 void
-quotarele(qrp)
-	struct dquot **qrp;
+quotarele(struct dquot **qrp)
 {
 	struct dquot *dq;
 	int i;
@@ -1746,10 +1738,7 @@ quotarele(qrp)
  * Positive numbers when adding blocks; negative numbers when freeing blocks.
  */
 void
-quotaadj(qrp, ump, blkcount)
-	struct dquot **qrp;
-	struct ufsmount *ump;
-	int64_t blkcount;
+quotaadj(struct dquot **qrp, struct ufsmount *ump, int64_t blkcount)
 {
 	struct dquot *dq;
 	ufs2_daddr_t ncurblocks;

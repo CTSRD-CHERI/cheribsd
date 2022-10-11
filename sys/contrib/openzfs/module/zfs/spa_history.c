@@ -248,7 +248,6 @@ spa_history_log_notify(spa_t *spa, nvlist_t *nvl)
 /*
  * Write out a history event.
  */
-/*ARGSUSED*/
 static void
 spa_history_log_sync(void *arg, dmu_tx_t *tx)
 {
@@ -296,14 +295,17 @@ spa_history_log_sync(void *arg, dmu_tx_t *tx)
 	} else if (nvlist_exists(nvl, ZPOOL_HIST_INT_NAME)) {
 		if (nvlist_exists(nvl, ZPOOL_HIST_DSNAME)) {
 			zfs_dbgmsg("txg %lld %s %s (id %llu) %s",
-			    fnvlist_lookup_uint64(nvl, ZPOOL_HIST_TXG),
+			    (longlong_t)fnvlist_lookup_uint64(nvl,
+			    ZPOOL_HIST_TXG),
 			    fnvlist_lookup_string(nvl, ZPOOL_HIST_INT_NAME),
 			    fnvlist_lookup_string(nvl, ZPOOL_HIST_DSNAME),
-			    fnvlist_lookup_uint64(nvl, ZPOOL_HIST_DSID),
+			    (u_longlong_t)fnvlist_lookup_uint64(nvl,
+			    ZPOOL_HIST_DSID),
 			    fnvlist_lookup_string(nvl, ZPOOL_HIST_INT_STR));
 		} else {
 			zfs_dbgmsg("txg %lld %s %s",
-			    fnvlist_lookup_uint64(nvl, ZPOOL_HIST_TXG),
+			    (longlong_t)fnvlist_lookup_uint64(nvl,
+			    ZPOOL_HIST_TXG),
 			    fnvlist_lookup_string(nvl, ZPOOL_HIST_INT_NAME),
 			    fnvlist_lookup_string(nvl, ZPOOL_HIST_INT_STR));
 		}

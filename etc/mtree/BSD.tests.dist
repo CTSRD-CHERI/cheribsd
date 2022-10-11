@@ -404,6 +404,8 @@
         ..
         libsbuf
         ..
+        libsysdecode
+        ..
         libthr
             dlopen
             ..
@@ -419,8 +421,12 @@
         atf
             atf-check
             ..
+            atf-pytest-wrapper
+            ..
             atf-sh
             ..
+        ..
+        rc
         ..
         rtld-elf
         ..
@@ -438,7 +444,11 @@
         ..
         ifconfig
         ..
+        md5
+        ..
         mdconfig
+        ..
+        newfs_msdos
         ..
         nvmecontrol
         ..
@@ -797,6 +807,10 @@
         mqueue
         ..
         net
+            if_ovpn
+            ..
+            routing
+            ..
         ..
         netgraph
         ..
@@ -864,13 +878,21 @@
         ..
         vm
         ..
+        vmm
+        ..
     ..
     usr.bin
         apply
         ..
         awk
+            bugs-fixed
+            ..
+            netbsd
+            ..
         ..
         basename
+        ..
+        bintrans
         ..
         bmake
             archives
@@ -992,11 +1014,15 @@
         ..
         diff
         ..
+        diff3
+        ..
         dirname
         ..
         du
         ..
         file2c
+        ..
+        file
         ..
         find
         ..
@@ -1056,6 +1082,8 @@
         ..
         soelim
         ..
+        sort
+        ..
         stat
         ..
         tail
@@ -1069,10 +1097,6 @@
         truncate
         ..
         units
-        ..
-        uudecode
-        ..
-        uuencode
         ..
         unifdef
         ..
@@ -1093,6 +1117,8 @@
     ..
     usr.sbin
         chown
+        ..
+        daemon
         ..
         etcupdate
         ..

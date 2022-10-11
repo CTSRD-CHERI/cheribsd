@@ -28,7 +28,7 @@
 .\"	@(#)getdirentries.2	8.2 (Berkeley) 5/3/95
 .\" $FreeBSD$
 .\"
-.Dd February 14, 2021
+.Dd April 11, 2022
 .Dt GETDIRENTRIES 2
 .Os
 .Sh NAME
@@ -193,6 +193,8 @@ An
 error occurred while reading from or writing to the file system.
 .It Bq Er EINTEGRITY
 Corrupted data was detected while reading from the file system.
+.It Bq Er ENOENT
+Directory unlinked but still open.
 .El
 .Sh SEE ALSO
 .Xr lseek 2 ,

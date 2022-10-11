@@ -79,6 +79,7 @@ MTX_SYSINIT(atrtc_time_lock_init, &atrtc_time_lock, "atrtc_time", MTX_DEF);
 
 int	atrtcclock_disable = 0;
 
+static	int	rtc_century = 0;
 static	int	rtc_reg = -1;
 static	u_char	rtc_statusa = RTCSA_DIVIDER | RTCSA_NOPROF;
 static	u_char	rtc_statusb = RTCSB_24HR;
@@ -370,7 +371,10 @@ atrtc_reg_acpi_cmos_handler(device_t dev)
 	if (acpi_disabled("atrtc"))
 		return (ENXIO);
 
-	sc->acpi_handle = acpi_get_handle(dev);
+	if (ACPI_FAILURE(AcpiGetHandle(ACPI_ROOT_OBJECT, "\\_SB_", &sc->acpi_handle))) {
+		return (ENXIO);
+	}
+
 	if (sc->acpi_handle == NULL ||
 	    ACPI_FAILURE(AcpiInstallAddressSpaceHandler(sc->acpi_handle,
 	      ACPI_ADR_SPACE_CMOS, atrtc_acpi_cmos_handler, NULL, dev))) {
@@ -421,6 +425,31 @@ atrtc_acpi_disabled(void)
 }
 
 static int
+rtc_acpi_century_get(void)
+{
+#ifdef DEV_ACPI
+	ACPI_TABLE_FADT *fadt;
+	vm_paddr_t physaddr;
+	int century;
+
+	physaddr = acpi_find_table(ACPI_SIG_FADT);
+	if (physaddr == 0)
+		return (0);
+
+	fadt = acpi_map_table(physaddr, ACPI_SIG_FADT);
+	if (fadt == NULL)
+		return (0);
+
+	century = fadt->Century;
+	acpi_unmap_table(fadt);
+
+	return (century);
+#else
+	return (0);
+#endif
+}
+
+static int
 atrtc_probe(device_t dev)
 {
 	int result;
@@ -435,6 +464,7 @@ atrtc_probe(device_t dev)
 		device_set_desc(dev, "AT realtime clock");
 		return (BUS_PROBE_LOW_PRIORITY);
 	}
+	rtc_century = rtc_acpi_century_get();
 	return (result);
 }
 
@@ -548,9 +578,8 @@ atrtc_settime(device_t dev __unused, struct timespec *ts)
 	rtcout_locked(RTC_DAY,   bct.day);
 	rtcout_locked(RTC_MONTH, bct.mon);
 	rtcout_locked(RTC_YEAR,  bct.year & 0xff);
-#ifdef USE_RTC_CENTURY
-	rtcout_locked(RTC_CENTURY, bct.year >> 8);
-#endif
+	if (rtc_century)
+		rtcout_locked(rtc_century, bct.year >> 8);
 
 	/*
 	 * Re-enable RTC updates and interrupts.
@@ -592,9 +621,8 @@ atrtc_gettime(device_t dev, struct timespec *ts)
 	bct.day  = rtcin_locked(RTC_DAY);
 	bct.mon  = rtcin_locked(RTC_MONTH);
 	bct.year = rtcin_locked(RTC_YEAR);
-#ifdef USE_RTC_CENTURY
-	bct.year |= rtcin_locked(RTC_CENTURY) << 8;
-#endif
+	if (rtc_century)
+		bct.year |= rtcin_locked(rtc_century) << 8;
 	mtx_unlock_spin(&atrtc_lock);
 	mtx_unlock(&atrtc_time_lock);
 	/* dow is unused in timespec conversion and we have no nsec info. */
@@ -648,10 +676,8 @@ static driver_t atrtc_acpi_driver = {
 };
 #endif	/* DEV_ACPI */
 
-static devclass_t atrtc_devclass;
-
-DRIVER_MODULE(atrtc, isa, atrtc_isa_driver, atrtc_devclass, 0, 0);
+DRIVER_MODULE(atrtc, isa, atrtc_isa_driver, 0, 0);
 #ifdef DEV_ACPI
-DRIVER_MODULE(atrtc, acpi, atrtc_acpi_driver, atrtc_devclass, 0, 0);
+DRIVER_MODULE(atrtc, acpi, atrtc_acpi_driver, 0, 0);
 #endif
 ISA_PNP_INFO(atrtc_ids);

@@ -119,11 +119,13 @@ static void
 edma_err_intr(void *arg)
 {
 	struct edma_softc *sc;
+#if 0
 	int reg;
+#endif
 
 	sc = arg;
 
-	reg = READ4(sc, DMA_ERR);
+	/* reg = */ READ4(sc, DMA_ERR);
 
 #if 0
 	device_printf(sc->dev, "DMA_ERR 0x%08x, ES 0x%08x\n",
@@ -333,6 +335,4 @@ static driver_t edma_driver = {
 	sizeof(struct edma_softc),
 };
 
-static devclass_t edma_devclass;
-
-DRIVER_MODULE(edma, simplebus, edma_driver, edma_devclass, 0, 0);
+DRIVER_MODULE(edma, simplebus, edma_driver, 0, 0);

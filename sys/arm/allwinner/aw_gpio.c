@@ -820,14 +820,13 @@ aw_gpio_pin_config_32(device_t dev, uint32_t first_pin, uint32_t num_pins,
     uint32_t *pin_flags)
 {
 	struct aw_gpio_softc *sc;
-	uint32_t bank, pin;
+	uint32_t pin;
 	int err;
 
 	sc = device_get_softc(dev);
 	if (first_pin > sc->conf->padconf->npins)
 		return (EINVAL);
 
-	bank = sc->conf->padconf->pins[first_pin].port;
 	if (sc->conf->padconf->pins[first_pin].pin != 0)
 		return (EINVAL);
 
@@ -1309,20 +1308,21 @@ aw_gpio_pic_setup_intr(device_t dev, struct intr_irqsrc *isrc,
     struct resource *res, struct intr_map_data *data)
 {
 	struct aw_gpio_softc *sc;
-	struct gpio_irqsrc *gi;
 	uint32_t irqcfg;
 	uint32_t pinidx, reg;
 	u_int irq, mode;
 	int err;
 
 	sc = device_get_softc(dev);
-	gi = (struct gpio_irqsrc *)isrc;
 
+	err = 0;
 	switch (data->type) {
 	case INTR_MAP_DATA_GPIO:
 		err = aw_gpio_pic_map_gpio(sc,
 		    (struct intr_map_data_gpio *)data,
 		  &irq, &mode);
+		if (err != 0)
+			return (err);
 		break;
 	default:
 		return (ENOTSUP);
@@ -1475,13 +1475,11 @@ static device_method_t aw_gpio_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t aw_gpio_devclass;
-
 static driver_t aw_gpio_driver = {
 	"gpio",
 	aw_gpio_methods,
 	sizeof(struct aw_gpio_softc),
 };
 
-EARLY_DRIVER_MODULE(aw_gpio, simplebus, aw_gpio_driver, aw_gpio_devclass, 0, 0,
+EARLY_DRIVER_MODULE(aw_gpio, simplebus, aw_gpio_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);

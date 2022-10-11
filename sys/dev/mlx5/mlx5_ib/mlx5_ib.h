@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013-2015, Mellanox Technologies, Ltd.  All rights reserved.
+ * Copyright (c) 2013-2020, Mellanox Technologies, Ltd.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,6 +33,7 @@
 #include <linux/printk.h>
 #include <linux/netdevice.h>
 #include <rdma/ib_verbs.h>
+#include <rdma/ib_umem.h>
 #include <rdma/ib_smi.h>
 #include <dev/mlx5/cq.h>
 #include <dev/mlx5/qp.h>
@@ -41,6 +42,7 @@
 #include <dev/mlx5/mlx5_core/transobj.h>
 #include <rdma/ib_user_verbs.h>
 #include <rdma/mlx5-abi.h>
+#include <rdma/uverbs_ioctl.h>
 
 #define mlx5_ib_dbg(dev, format, arg...)				\
 pr_debug("%s:%s:%d:(pid %d): " format, (dev)->ib_dev.name, __func__,	\
@@ -59,18 +61,11 @@ pr_warn("%s: WARN: %s:%d:(pid %d): " format, (dev)->ib_dev.name, __func__,	\
 #define MLX5_IB_DEFAULT_UIDX 0xffffff
 #define MLX5_USER_ASSIGNED_UIDX_MASK __mlx5_mask(qpc, user_index)
 
+#define MLX5_MKEY_PAGE_SHIFT_MASK __mlx5_mask(mkc, log_page_size)
+
 enum {
 	MLX5_IB_MMAP_CMD_SHIFT	= 8,
 	MLX5_IB_MMAP_CMD_MASK	= 0xff,
-};
-
-enum mlx5_ib_mmap_cmd {
-	MLX5_IB_MMAP_REGULAR_PAGE		= 0,
-	MLX5_IB_MMAP_GET_CONTIGUOUS_PAGES	= 1,
-	MLX5_IB_MMAP_WC_PAGE			= 2,
-	MLX5_IB_MMAP_NC_PAGE			= 3,
-	/* 5 is chosen in order to be compatible with old versions of libmlx5 */
-	MLX5_IB_MMAP_CORE_CLOCK			= 5,
 };
 
 enum {
@@ -107,9 +102,11 @@ enum {
 	MLX5_IB_INVALID_BFREG		= BIT(31),
 };
 
-struct mlx5_ib_vma_private_data {
-	struct list_head list;
-	struct vm_area_struct *vma;
+enum mlx5_ib_mmap_type {
+	MLX5_IB_MMAP_TYPE_MEMIC = 1,
+	MLX5_IB_MMAP_TYPE_VAR = 2,
+	MLX5_IB_MMAP_TYPE_UAR_WC = 3,
+	MLX5_IB_MMAP_TYPE_UAR_NC = 4,
 };
 
 struct mlx5_bfreg_info {
@@ -141,7 +138,9 @@ struct mlx5_ib_ucontext {
 	u8			cqe_version;
 	/* Transport Domain number */
 	u32			tdn;
-	struct list_head	vma_private_list;
+
+	u64			lib_caps;
+	u16			devx_uid;
 };
 
 static inline struct mlx5_ib_ucontext *to_mucontext(struct ib_ucontext *ibucontext)
@@ -152,6 +151,7 @@ static inline struct mlx5_ib_ucontext *to_mucontext(struct ib_ucontext *ibuconte
 struct mlx5_ib_pd {
 	struct ib_pd		ibpd;
 	u32			pdn;
+	u16			uid;
 };
 
 #define MLX5_IB_FLOW_MCAST_PRIO		(MLX5_BY_PASS_NUM_PRIOS - 1)
@@ -205,6 +205,8 @@ struct mlx5_ib_flow_db {
  * creates the actual hardware QP.
  */
 #define MLX5_IB_QPT_HW_GSI	IB_QPT_RESERVED2
+#define MLX5_IB_QPT_DCI		IB_QPT_RESERVED3
+#define MLX5_IB_QPT_DCT		IB_QPT_RESERVED4
 #define MLX5_IB_WR_UMR		IB_WR_RESERVED1
 
 /* Private QP creation flags to be passed in ib_qp_init_attr.create_flags.
@@ -275,6 +277,7 @@ enum {
 struct mlx5_ib_rwq_ind_table {
 	struct ib_rwq_ind_table ib_rwq_ind_tbl;
 	u32			rqtn;
+	u16			uid;
 };
 
 /*
@@ -354,12 +357,18 @@ struct mlx5_bf {
 	spinlock_t		lock32;
 };
 
+struct mlx5_ib_dct {
+	struct mlx5_core_dct    mdct;
+	u32                     *in;
+};
+
 struct mlx5_ib_qp {
 	struct ib_qp		ibqp;
 	union {
 		struct mlx5_ib_qp_trans trans_qp;
 		struct mlx5_ib_raw_packet_qp raw_packet_qp;
 		struct mlx5_ib_rss_qp rss_qp;
+		struct mlx5_ib_dct dct;
 	};
 	struct mlx5_buf		buf;
 
@@ -429,6 +438,7 @@ enum mlx5_ib_qp_flags {
 	MLX5_IB_QP_SQPN_QP1			= 1 << 6,
 	MLX5_IB_QP_CAP_SCATTER_FCS		= 1 << 7,
 	MLX5_IB_QP_RSS				= 1 << 8,
+	MLX5_IB_QP_UNDERLAY			= 1 << 10,
 };
 
 struct mlx5_umr_wr {
@@ -445,7 +455,7 @@ struct mlx5_umr_wr {
 	u32				mkey;
 };
 
-static inline struct mlx5_umr_wr *umr_wr(struct ib_send_wr *wr)
+static inline const struct mlx5_umr_wr *umr_wr(const struct ib_send_wr *wr)
 {
 	return container_of(wr, struct mlx5_umr_wr, wr);
 }
@@ -513,6 +523,13 @@ enum mlx5_ib_mtt_access_flags {
 	MLX5_IB_MTT_WRITE = (1 << 1),
 };
 
+struct mlx5_user_mmap_entry {
+	struct rdma_user_mmap_entry rdma_entry;
+	u8 mmap_flag;
+	u64 address;
+	u32 page_idx;
+};
+
 #define MLX5_IB_MTT_PRESENT (MLX5_IB_MTT_READ | MLX5_IB_MTT_WRITE)
 
 struct mlx5_ib_mr {
@@ -523,7 +540,7 @@ struct mlx5_ib_mr {
 	int			max_descs;
 	int			desc_size;
 	int			access_mode;
-	struct mlx5_core_mr	mmkey;
+	struct mlx5_core_mkey	mmkey;
 	struct ib_umem	       *umem;
 	struct mlx5_shared_mr_info	*smr_info;
 	struct list_head	list;
@@ -541,7 +558,12 @@ struct mlx5_ib_mr {
 
 struct mlx5_ib_mw {
 	struct ib_mw		ibmw;
-	struct mlx5_core_mr	mmkey;
+	struct mlx5_core_mkey	mmkey;
+};
+
+struct mlx5_ib_devx_mr {
+	struct mlx5_core_mkey	mmkey;
+	int			ndescs;
 };
 
 struct mlx5_ib_umr_context {
@@ -633,46 +655,84 @@ struct mlx5_roce {
 	atomic_t		next_port;
 };
 
-#define	MLX5_IB_STATS_COUNT(a,b,c,d) a
-#define	MLX5_IB_STATS_VAR(a,b,c,d) b;
-#define	MLX5_IB_STATS_DESC(a,b,c,d) c, d,
+#define	MLX5_IB_STATS_COUNT(a,...) a
+#define	MLX5_IB_STATS_VAR(a,b,c,...) b c;
+#define	MLX5_IB_STATS_DESC(a,b,c,d,e,...) d, e,
 
 #define	MLX5_IB_CONG_PARAMS(m) \
   /* ECN RP */ \
-  m(+1, u64 rp_clamp_tgt_rate, "rp_clamp_tgt_rate", "If set, whenever a CNP is processed, the target rate is updated to be the current rate") \
-  m(+1, u64 rp_clamp_tgt_rate_ati, "rp_clamp_tgt_rate_ati", "If set, when receiving a CNP, the target rate should be updated if the transission rate was increased due to the timer, and not only due to the byte counter") \
-  m(+1, u64 rp_time_reset, "rp_time_reset", "Time in microseconds between rate increases if no CNPs are received") \
-  m(+1, u64 rp_byte_reset, "rp_byte_reset", "Transmitted data in bytes between rate increases if no CNP's are received. A value of zero means disabled.") \
-  m(+1, u64 rp_threshold, "rp_threshold", "The number of times rpByteStage or rpTimeStage can count before the RP rate control state machine advances states") \
-  m(+1, u64 rp_ai_rate, "rp_ai_rate", "The rate, in Mbits per second, used to increase rpTargetRate in the active increase state") \
-  m(+1, u64 rp_hai_rate, "rp_hai_rate", "The rate, in Mbits per second, used to increase rpTargetRate in the hyper increase state") \
-  m(+1, u64 rp_min_dec_fac, "rp_min_dec_fac", "The minimum factor by which the current transmit rate can be changed when processing a CNP. Value is given as a percentage, [1 .. 100]") \
-  m(+1, u64 rp_min_rate, "rp_min_rate", "The minimum value, in Mbps per second, for rate to limit") \
-  m(+1, u64 rp_rate_to_set_on_first_cnp, "rp_rate_to_set_on_first_cnp", "The rate that is set for the flow when a rate limiter is allocated to it upon first CNP received, in Mbps. A value of zero means use full port speed") \
-  m(+1, u64 rp_dce_tcp_g, "rp_dce_tcp_g", "Used to update the congestion estimator, alpha, once every dce_tcp_rtt once every dce_tcp_rtt microseconds") \
-  m(+1, u64 rp_dce_tcp_rtt, "rp_dce_tcp_rtt", "The time between updates of the aolpha value, in microseconds") \
-  m(+1, u64 rp_rate_reduce_monitor_period, "rp_rate_reduce_monitor_period", "The minimum time between two consecutive rate reductions for a single flow") \
-  m(+1, u64 rp_initial_alpha_value, "rp_initial_alpha_value", "The initial value of alpha to use when receiving the first CNP for a flow") \
-  m(+1, u64 rp_gd, "rp_gd", "If a CNP is received, the flow rate is reduced at the beginning of the next rate_reduce_monitor_period interval") \
+  m(+1, u64, rp_clamp_tgt_rate, "rp_clamp_tgt_rate", "If set, whenever a CNP is processed, the target rate is updated to be the current rate") \
+  m(+1, u64, rp_clamp_tgt_rate_ati, "rp_clamp_tgt_rate_ati", "If set, when receiving a CNP, the target rate should be updated if the transission rate was increased due to the timer, and not only due to the byte counter") \
+  m(+1, u64, rp_time_reset, "rp_time_reset", "Time in microseconds between rate increases if no CNPs are received") \
+  m(+1, u64, rp_byte_reset, "rp_byte_reset", "Transmitted data in bytes between rate increases if no CNP's are received. A value of zero means disabled.") \
+  m(+1, u64, rp_threshold, "rp_threshold", "The number of times rpByteStage or rpTimeStage can count before the RP rate control state machine advances states") \
+  m(+1, u64, rp_ai_rate, "rp_ai_rate", "The rate, in Mbits per second, used to increase rpTargetRate in the active increase state") \
+  m(+1, u64, rp_hai_rate, "rp_hai_rate", "The rate, in Mbits per second, used to increase rpTargetRate in the hyper increase state") \
+  m(+1, u64, rp_min_dec_fac, "rp_min_dec_fac", "The minimum factor by which the current transmit rate can be changed when processing a CNP. Value is given as a percentage, [1 .. 100]") \
+  m(+1, u64, rp_min_rate, "rp_min_rate", "The minimum value, in Mbps per second, for rate to limit") \
+  m(+1, u64, rp_rate_to_set_on_first_cnp, "rp_rate_to_set_on_first_cnp", "The rate that is set for the flow when a rate limiter is allocated to it upon first CNP received, in Mbps. A value of zero means use full port speed") \
+  m(+1, u64, rp_dce_tcp_g, "rp_dce_tcp_g", "Used to update the congestion estimator, alpha, once every dce_tcp_rtt once every dce_tcp_rtt microseconds") \
+  m(+1, u64, rp_dce_tcp_rtt, "rp_dce_tcp_rtt", "The time between updates of the aolpha value, in microseconds") \
+  m(+1, u64, rp_rate_reduce_monitor_period, "rp_rate_reduce_monitor_period", "The minimum time between two consecutive rate reductions for a single flow") \
+  m(+1, u64, rp_initial_alpha_value, "rp_initial_alpha_value", "The initial value of alpha to use when receiving the first CNP for a flow") \
+  m(+1, u64, rp_gd, "rp_gd", "If a CNP is received, the flow rate is reduced at the beginning of the next rate_reduce_monitor_period interval") \
   /* ECN NP */ \
-  m(+1, u64 np_cnp_dscp, "np_cnp_dscp", "The DiffServ Code Point of the generated CNP for this port") \
-  m(+1, u64 np_cnp_prio_mode, "np_cnp_prio_mode", "The 802.1p priority value of the generated CNP for this port") \
-  m(+1, u64 np_cnp_prio, "np_cnp_prio", "The 802.1p priority value of the generated CNP for this port")
+  m(+1, u64, np_cnp_dscp, "np_cnp_dscp", "The DiffServ Code Point of the generated CNP for this port") \
+  m(+1, u64, np_cnp_prio_mode, "np_cnp_prio_mode", "The 802.1p priority value of the generated CNP for this port") \
+  m(+1, u64, np_cnp_prio, "np_cnp_prio", "The 802.1p priority value of the generated CNP for this port")
 
 #define	MLX5_IB_CONG_PARAMS_NUM (0 MLX5_IB_CONG_PARAMS(MLX5_IB_STATS_COUNT))
 
 #define	MLX5_IB_CONG_STATS(m) \
-  m(+1, u64 syndrome, "syndrome", "Syndrome number") \
-  m(+1, u64 rp_cur_flows, "rp_cur_flows", "Number of flows limited") \
-  m(+1, u64 sum_flows, "sum_flows", "Sum of the number of flows limited over time") \
-  m(+1, u64 rp_cnp_ignored, "rp_cnp_ignored", "Number of CNPs and CNMs ignored") \
-  m(+1, u64 rp_cnp_handled, "rp_cnp_handled", "Number of CNPs and CNMs successfully handled") \
-  m(+1, u64 time_stamp, "time_stamp", "Time stamp in microseconds") \
-  m(+1, u64 accumulators_period, "accumulators_period", "The value of X variable for accumulating counters") \
-  m(+1, u64 np_ecn_marked_roce_packets, "np_ecn_marked_roce_packets", "Number of ECN marked packets seen") \
-  m(+1, u64 np_cnp_sent, "np_cnp_sent", "Number of CNPs sent")
+  m(+1, u64, syndrome, "syndrome", "Syndrome number") \
+  m(+1, u64, rp_cur_flows, "rp_cur_flows", "Number of flows limited") \
+  m(+1, u64, sum_flows, "sum_flows", "Sum of the number of flows limited over time") \
+  m(+1, u64, rp_cnp_ignored, "rp_cnp_ignored", "Number of CNPs and CNMs ignored") \
+  m(+1, u64, rp_cnp_handled, "rp_cnp_handled", "Number of CNPs and CNMs successfully handled") \
+  m(+1, u64, time_stamp, "time_stamp", "Time stamp in microseconds") \
+  m(+1, u64, accumulators_period, "accumulators_period", "The value of X variable for accumulating counters") \
+  m(+1, u64, np_ecn_marked_roce_packets, "np_ecn_marked_roce_packets", "Number of ECN marked packets seen") \
+  m(+1, u64, np_cnp_sent, "np_cnp_sent", "Number of CNPs sent")
 
 #define	MLX5_IB_CONG_STATS_NUM (0 MLX5_IB_CONG_STATS(MLX5_IB_STATS_COUNT))
+
+#define	MLX5_IB_CONG_STATUS(m) \
+  /* ECN RP */ \
+  m(+1, u64, rp_0_enable, "rp_0_enable", "Enable reaction point, priority 0", MLX5_IB_RROCE_ECN_RP, 0, enable) \
+  m(+1, u64, rp_1_enable, "rp_1_enable", "Enable reaction point, priority 1", MLX5_IB_RROCE_ECN_RP, 1, enable) \
+  m(+1, u64, rp_2_enable, "rp_2_enable", "Enable reaction point, priority 2", MLX5_IB_RROCE_ECN_RP, 2, enable) \
+  m(+1, u64, rp_3_enable, "rp_3_enable", "Enable reaction point, priority 3", MLX5_IB_RROCE_ECN_RP, 3, enable) \
+  m(+1, u64, rp_4_enable, "rp_4_enable", "Enable reaction point, priority 4", MLX5_IB_RROCE_ECN_RP, 4, enable) \
+  m(+1, u64, rp_5_enable, "rp_5_enable", "Enable reaction point, priority 5", MLX5_IB_RROCE_ECN_RP, 5, enable) \
+  m(+1, u64, rp_6_enable, "rp_6_enable", "Enable reaction point, priority 6", MLX5_IB_RROCE_ECN_RP, 6, enable) \
+  m(+1, u64, rp_7_enable, "rp_7_enable", "Enable reaction point, priority 7", MLX5_IB_RROCE_ECN_RP, 7, enable) \
+  m(+1, u64, rp_8_enable, "rp_8_enable", "Enable reaction point, priority 8", MLX5_IB_RROCE_ECN_RP, 8, enable) \
+  m(+1, u64, rp_9_enable, "rp_9_enable", "Enable reaction point, priority 9", MLX5_IB_RROCE_ECN_RP, 9, enable) \
+  m(+1, u64, rp_10_enable, "rp_10_enable", "Enable reaction point, priority 10", MLX5_IB_RROCE_ECN_RP, 10, enable) \
+  m(+1, u64, rp_11_enable, "rp_11_enable", "Enable reaction point, priority 11", MLX5_IB_RROCE_ECN_RP, 11, enable) \
+  m(+1, u64, rp_12_enable, "rp_12_enable", "Enable reaction point, priority 12", MLX5_IB_RROCE_ECN_RP, 12, enable) \
+  m(+1, u64, rp_13_enable, "rp_13_enable", "Enable reaction point, priority 13", MLX5_IB_RROCE_ECN_RP, 13, enable) \
+  m(+1, u64, rp_14_enable, "rp_14_enable", "Enable reaction point, priority 14", MLX5_IB_RROCE_ECN_RP, 14, enable) \
+  m(+1, u64, rp_15_enable, "rp_15_enable", "Enable reaction point, priority 15", MLX5_IB_RROCE_ECN_RP, 15, enable) \
+  /* ECN NP */ \
+  m(+1, u64, np_0_enable, "np_0_enable", "Enable notification point, priority 0", MLX5_IB_RROCE_ECN_NP, 0, enable) \
+  m(+1, u64, np_1_enable, "np_1_enable", "Enable notification point, priority 1", MLX5_IB_RROCE_ECN_NP, 1, enable) \
+  m(+1, u64, np_2_enable, "np_2_enable", "Enable notification point, priority 2", MLX5_IB_RROCE_ECN_NP, 2, enable) \
+  m(+1, u64, np_3_enable, "np_3_enable", "Enable notification point, priority 3", MLX5_IB_RROCE_ECN_NP, 3, enable) \
+  m(+1, u64, np_4_enable, "np_4_enable", "Enable notification point, priority 4", MLX5_IB_RROCE_ECN_NP, 4, enable) \
+  m(+1, u64, np_5_enable, "np_5_enable", "Enable notification point, priority 5", MLX5_IB_RROCE_ECN_NP, 5, enable) \
+  m(+1, u64, np_6_enable, "np_6_enable", "Enable notification point, priority 6", MLX5_IB_RROCE_ECN_NP, 6, enable) \
+  m(+1, u64, np_7_enable, "np_7_enable", "Enable notification point, priority 7", MLX5_IB_RROCE_ECN_NP, 7, enable) \
+  m(+1, u64, np_8_enable, "np_8_enable", "Enable notification point, priority 8", MLX5_IB_RROCE_ECN_NP, 8, enable) \
+  m(+1, u64, np_9_enable, "np_9_enable", "Enable notification point, priority 9", MLX5_IB_RROCE_ECN_NP, 9, enable) \
+  m(+1, u64, np_10_enable, "np_10_enable", "Enable notification point, priority 10", MLX5_IB_RROCE_ECN_NP, 10, enable) \
+  m(+1, u64, np_11_enable, "np_11_enable", "Enable notification point, priority 11", MLX5_IB_RROCE_ECN_NP, 11, enable) \
+  m(+1, u64, np_12_enable, "np_12_enable", "Enable notification point, priority 12", MLX5_IB_RROCE_ECN_NP, 12, enable) \
+  m(+1, u64, np_13_enable, "np_13_enable", "Enable notification point, priority 13", MLX5_IB_RROCE_ECN_NP, 13, enable) \
+  m(+1, u64, np_14_enable, "np_14_enable", "Enable notification point, priority 14", MLX5_IB_RROCE_ECN_NP, 14, enable) \
+  m(+1, u64, np_15_enable, "np_15_enable", "Enable notification point, priority 15", MLX5_IB_RROCE_ECN_NP, 15, enable) \
+
+#define	MLX5_IB_CONG_STATUS_NUM (0 MLX5_IB_CONG_STATUS(MLX5_IB_STATS_COUNT))
 
 struct mlx5_ib_congestion {
 	struct sysctl_ctx_list ctx;
@@ -683,8 +743,15 @@ struct mlx5_ib_congestion {
 		struct {
 			MLX5_IB_CONG_PARAMS(MLX5_IB_STATS_VAR)
 			MLX5_IB_CONG_STATS(MLX5_IB_STATS_VAR)
+			MLX5_IB_CONG_STATUS(MLX5_IB_STATS_VAR)
 		};
 	};
+};
+
+struct mlx5_devx_event_table {
+	/* serialize updating the event_xa */
+	struct mutex event_xa_lock;
+	struct xarray event_xa;
 };
 
 struct mlx5_ib_dev {
@@ -696,7 +763,8 @@ struct mlx5_ib_dev {
 	/* serialize update of capability mask
 	 */
 	struct mutex			cap_mask_mutex;
-	bool				ib_active;
+	u8				ib_active:1;
+	u8				wc_support:1;
 	struct umr_common		umrc;
 	/* sync used page count stats
 	 */
@@ -723,9 +791,14 @@ struct mlx5_ib_dev {
 	struct mlx5_sq_bfreg	bfreg;
 	struct mlx5_sq_bfreg	wc_bfreg;
 	struct mlx5_sq_bfreg	fp_bfreg;
+	struct mlx5_devx_event_table devx_event_table;
 	struct mlx5_ib_congestion congestion;
 
 	struct mlx5_async_ctx	async_ctx;
+
+	/* protect the user_td */
+	struct mutex		lb_mutex;
+	u32			user_td;
 };
 
 static inline struct mlx5_ib_cq *to_mibcq(struct mlx5_core_cq *mcq)
@@ -743,6 +816,14 @@ static inline struct mlx5_ib_dev *to_mdev(struct ib_device *ibdev)
 	return container_of(ibdev, struct mlx5_ib_dev, ib_dev);
 }
 
+static inline struct mlx5_ib_dev *mlx5_udata_to_mdev(struct ib_udata *udata)
+{
+	struct mlx5_ib_ucontext *context = rdma_udata_to_drv_context(
+		udata, struct mlx5_ib_ucontext, ibucontext);
+
+	return to_mdev(context->ibucontext.device);
+}
+
 static inline struct mlx5_ib_cq *to_mcq(struct ib_cq *ibcq)
 {
 	return container_of(ibcq, struct mlx5_ib_cq, ibcq);
@@ -758,7 +839,7 @@ static inline struct mlx5_ib_rwq *to_mibrwq(struct mlx5_core_qp *core_qp)
 	return container_of(core_qp, struct mlx5_ib_rwq, core_qp);
 }
 
-static inline struct mlx5_ib_mr *to_mibmr(struct mlx5_core_mr *mmkey)
+static inline struct mlx5_ib_mr *to_mibmr(struct mlx5_core_mkey *mmkey)
 {
 	return container_of(mmkey, struct mlx5_ib_mr, mmkey);
 }
@@ -813,6 +894,13 @@ static inline struct mlx5_ib_ah *to_mah(struct ib_ah *ibah)
 	return container_of(ibah, struct mlx5_ib_ah, ibah);
 }
 
+static inline struct mlx5_user_mmap_entry *
+to_mmmap(struct rdma_user_mmap_entry *rdma_entry)
+{
+	return container_of(rdma_entry,
+		struct mlx5_user_mmap_entry, rdma_entry);
+}
+
 int mlx5_ib_db_map_user(struct mlx5_ib_ucontext *context, unsigned long virt,
 			struct mlx5_db *db);
 void mlx5_ib_db_unmap_user(struct mlx5_ib_ucontext *context, struct mlx5_db *db);
@@ -822,19 +910,18 @@ void mlx5_ib_free_srq_wqe(struct mlx5_ib_srq *srq, int wqe_index);
 int mlx5_MAD_IFC(struct mlx5_ib_dev *dev, int ignore_mkey, int ignore_bkey,
 		 u8 port, const struct ib_wc *in_wc, const struct ib_grh *in_grh,
 		 const void *in_mad, void *response_mad);
-struct ib_ah *mlx5_ib_create_ah(struct ib_pd *pd, struct ib_ah_attr *ah_attr,
+int mlx5_ib_create_ah(struct ib_ah *ah, struct ib_ah_attr *ah_attr, u32 flags,
 				struct ib_udata *udata);
 int mlx5_ib_query_ah(struct ib_ah *ibah, struct ib_ah_attr *ah_attr);
-int mlx5_ib_destroy_ah(struct ib_ah *ah);
-struct ib_srq *mlx5_ib_create_srq(struct ib_pd *pd,
-				  struct ib_srq_init_attr *init_attr,
-				  struct ib_udata *udata);
+void mlx5_ib_destroy_ah(struct ib_ah *ah, u32 flags);
+int mlx5_ib_create_srq(struct ib_srq *srq, struct ib_srq_init_attr *init_attr,
+		       struct ib_udata *udata);
 int mlx5_ib_modify_srq(struct ib_srq *ibsrq, struct ib_srq_attr *attr,
 		       enum ib_srq_attr_mask attr_mask, struct ib_udata *udata);
 int mlx5_ib_query_srq(struct ib_srq *ibsrq, struct ib_srq_attr *srq_attr);
-int mlx5_ib_destroy_srq(struct ib_srq *srq);
-int mlx5_ib_post_srq_recv(struct ib_srq *ibsrq, struct ib_recv_wr *wr,
-			  struct ib_recv_wr **bad_wr);
+void mlx5_ib_destroy_srq(struct ib_srq *srq, struct ib_udata *udata);
+int mlx5_ib_post_srq_recv(struct ib_srq *ibsrq, const struct ib_recv_wr *wr,
+			  const struct ib_recv_wr **bad_wr);
 struct ib_qp *mlx5_ib_create_qp(struct ib_pd *pd,
 				struct ib_qp_init_attr *init_attr,
 				struct ib_udata *udata);
@@ -842,20 +929,18 @@ int mlx5_ib_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 		      int attr_mask, struct ib_udata *udata);
 int mlx5_ib_query_qp(struct ib_qp *ibqp, struct ib_qp_attr *qp_attr, int qp_attr_mask,
 		     struct ib_qp_init_attr *qp_init_attr);
-int mlx5_ib_destroy_qp(struct ib_qp *qp);
-int mlx5_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
-		      struct ib_send_wr **bad_wr);
-int mlx5_ib_post_recv(struct ib_qp *ibqp, struct ib_recv_wr *wr,
-		      struct ib_recv_wr **bad_wr);
+int mlx5_ib_destroy_qp(struct ib_qp *qp, struct ib_udata *udata);
+int mlx5_ib_post_send(struct ib_qp *ibqp, const struct ib_send_wr *wr,
+		      const struct ib_send_wr **bad_wr);
+int mlx5_ib_post_recv(struct ib_qp *ibqp, const struct ib_recv_wr *wr,
+		      const struct ib_recv_wr **bad_wr);
 void *mlx5_get_send_wqe(struct mlx5_ib_qp *qp, int n);
 int mlx5_ib_read_user_wqe(struct mlx5_ib_qp *qp, int send, int wqe_index,
 			  void *buffer, u32 length,
 			  struct mlx5_ib_qp_base *base);
-struct ib_cq *mlx5_ib_create_cq(struct ib_device *ibdev,
-				const struct ib_cq_init_attr *attr,
-				struct ib_ucontext *context,
-				struct ib_udata *udata);
-int mlx5_ib_destroy_cq(struct ib_cq *cq);
+int mlx5_ib_create_cq(struct ib_cq *ibcq, const struct ib_cq_init_attr *attr,
+		      struct ib_udata *udata);
+void mlx5_ib_destroy_cq(struct ib_cq *cq, struct ib_udata *udata);
 int mlx5_ib_poll_cq(struct ib_cq *ibcq, int num_entries, struct ib_wc *wc);
 int mlx5_ib_arm_cq(struct ib_cq *ibcq, enum ib_cq_notify_flags flags);
 int mlx5_ib_modify_cq(struct ib_cq *cq, u16 cq_count, u16 cq_period);
@@ -872,10 +957,9 @@ int mlx5_ib_update_mtt(struct mlx5_ib_mr *mr, u64 start_page_index,
 int mlx5_ib_rereg_user_mr(struct ib_mr *ib_mr, int flags, u64 start,
 			  u64 length, u64 virt_addr, int access_flags,
 			  struct ib_pd *pd, struct ib_udata *udata);
-int mlx5_ib_dereg_mr(struct ib_mr *ibmr);
-struct ib_mr *mlx5_ib_alloc_mr(struct ib_pd *pd,
-			       enum ib_mr_type mr_type,
-			       u32 max_num_sg);
+int mlx5_ib_dereg_mr(struct ib_mr *ibmr, struct ib_udata *udata);
+struct ib_mr *mlx5_ib_alloc_mr(struct ib_pd *pd, enum ib_mr_type mr_type,
+			       u32 max_num_sg, struct ib_udata *udata);
 int mlx5_ib_map_mr_sg(struct ib_mr *ibmr, struct scatterlist *sg, int sg_nents,
 		      unsigned int *sg_offset);
 int mlx5_ib_process_mad(struct ib_device *ibdev, int mad_flags, u8 port_num,
@@ -884,9 +968,8 @@ int mlx5_ib_process_mad(struct ib_device *ibdev, int mad_flags, u8 port_num,
 			struct ib_mad_hdr *out, size_t *out_mad_size,
 			u16 *out_mad_pkey_index);
 struct ib_xrcd *mlx5_ib_alloc_xrcd(struct ib_device *ibdev,
-					  struct ib_ucontext *context,
-					  struct ib_udata *udata);
-int mlx5_ib_dealloc_xrcd(struct ib_xrcd *xrcd);
+				   struct ib_udata *udata);
+int mlx5_ib_dealloc_xrcd(struct ib_xrcd *xrcd, struct ib_udata *udata);
 int mlx5_ib_get_buf_offset(u64 addr, int page_shift, u32 *offset);
 int mlx5_query_ext_port_caps(struct mlx5_ib_dev *dev, u8 port);
 int mlx5_query_mad_ifc_smp_attr_node_info(struct ib_device *ibdev,
@@ -909,7 +992,9 @@ int mlx5_ib_query_port(struct ib_device *ibdev, u8 port,
 		       struct ib_port_attr *props);
 int mlx5_ib_init_fmr(struct mlx5_ib_dev *dev);
 void mlx5_ib_cleanup_fmr(struct mlx5_ib_dev *dev);
-void mlx5_ib_cont_pages(struct ib_umem *umem, u64 addr, int *count, int *shift,
+void mlx5_ib_cont_pages(struct ib_umem *umem, u64 addr,
+			unsigned long max_page_shift,
+			int *count, int *shift,
 			int *ncont, int *order);
 void __mlx5_ib_populate_pas(struct mlx5_ib_dev *dev, struct ib_umem *umem,
 			    int page_shift, size_t offset, size_t num_pages,
@@ -926,7 +1011,7 @@ int mlx5_ib_check_mr_status(struct ib_mr *ibmr, u32 check_mask,
 struct ib_wq *mlx5_ib_create_wq(struct ib_pd *pd,
 				struct ib_wq_init_attr *init_attr,
 				struct ib_udata *udata);
-int mlx5_ib_destroy_wq(struct ib_wq *wq);
+void mlx5_ib_destroy_wq(struct ib_wq *wq, struct ib_udata *udata);
 int mlx5_ib_modify_wq(struct ib_wq *wq, struct ib_wq_attr *wq_attr,
 		      u32 wq_attr_mask, struct ib_udata *udata);
 struct ib_rwq_ind_table *mlx5_ib_create_rwq_ind_table(struct ib_device *device,
@@ -988,16 +1073,38 @@ int mlx5_ib_gsi_modify_qp(struct ib_qp *qp, struct ib_qp_attr *attr,
 int mlx5_ib_gsi_query_qp(struct ib_qp *qp, struct ib_qp_attr *qp_attr,
 			 int qp_attr_mask,
 			 struct ib_qp_init_attr *qp_init_attr);
-int mlx5_ib_gsi_post_send(struct ib_qp *qp, struct ib_send_wr *wr,
-			  struct ib_send_wr **bad_wr);
-int mlx5_ib_gsi_post_recv(struct ib_qp *qp, struct ib_recv_wr *wr,
-			  struct ib_recv_wr **bad_wr);
+int mlx5_ib_gsi_post_send(struct ib_qp *qp, const struct ib_send_wr *wr,
+			  const struct ib_send_wr **bad_wr);
+int mlx5_ib_gsi_post_recv(struct ib_qp *qp, const struct ib_recv_wr *wr,
+			  const struct ib_recv_wr **bad_wr);
 void mlx5_ib_gsi_pkey_change(struct mlx5_ib_gsi_qp *gsi);
 
 int mlx5_ib_generate_wc(struct ib_cq *ibcq, struct ib_wc *wc);
 
 void mlx5_ib_free_bfreg(struct mlx5_ib_dev *dev, struct mlx5_bfreg_info *bfregi,
 			int bfregn);
+
+#if 1 /* IS_ENABLED(CONFIG_INFINIBAND_USER_ACCESS) */
+int mlx5_ib_devx_create(struct mlx5_ib_dev *dev, bool is_user);
+void mlx5_ib_devx_destroy(struct mlx5_ib_dev *dev, u16 uid);
+void mlx5_ib_devx_init_event_table(struct mlx5_ib_dev *dev);
+void mlx5_ib_devx_cleanup_event_table(struct mlx5_ib_dev *dev);
+bool mlx5_ib_devx_is_flow_dest(void *obj, int *dest_id, int *dest_type);
+bool mlx5_ib_devx_is_flow_counter(void *obj, u32 offset, u32 *counter_id);
+#else
+static inline int
+mlx5_ib_devx_create(struct mlx5_ib_dev *dev,
+			   bool is_user) { return -EOPNOTSUPP; }
+static inline void mlx5_ib_devx_destroy(struct mlx5_ib_dev *dev, u16 uid) {}
+static inline void mlx5_ib_devx_init_event_table(struct mlx5_ib_dev *dev) {}
+static inline void mlx5_ib_devx_cleanup_event_table(struct mlx5_ib_dev *dev) {}
+static inline bool mlx5_ib_devx_is_flow_dest(void *obj, int *dest_id,
+					     int *dest_type)
+{
+	return false;
+}
+#endif
+
 static inline void init_query_mad(struct ib_smp *mad)
 {
 	mad->base_version  = 1;

@@ -164,8 +164,7 @@ static int
 arm64_allocate_pmc(int cpu, int ri, struct pmc *pm,
   const struct pmc_op_pmcallocate *a)
 {
-	uint32_t caps, config;
-	struct arm64_cpu *pac;
+	uint32_t config;
 	enum pmc_event pe;
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
@@ -173,22 +172,39 @@ arm64_allocate_pmc(int cpu, int ri, struct pmc *pm,
 	KASSERT(ri >= 0 && ri < arm64_npmcs,
 	    ("[arm64,%d] illegal row index %d", __LINE__, ri));
 
-	pac = arm64_pcpu[cpu];
-
-	caps = a->pm_caps;
 	if (a->pm_class != PMC_CLASS_ARMV8) {
 		return (EINVAL);
 	}
 	pe = a->pm_ev;
 
-	config = (uint32_t)pe - PMC_EV_ARMV8_FIRST;
-	if (config > (PMC_EV_ARMV8_LAST - PMC_EV_ARMV8_FIRST))
-		return (EINVAL);
-	pm->pm_md.pm_arm64.pm_arm64_evsel = config;
+	/* Adjust the config value if needed. */
+	config = a->pm_md.pm_md_config;
+	if ((a->pm_md.pm_md_flags & PM_MD_RAW_EVENT) == 0) {
+		config = (uint32_t)pe - PMC_EV_ARMV8_FIRST;
+		if (config > (PMC_EV_ARMV8_LAST - PMC_EV_ARMV8_FIRST))
+			return (EINVAL);
+	}
 
+	switch (a->pm_caps & (PMC_CAP_SYSTEM | PMC_CAP_USER)) {
+	case PMC_CAP_SYSTEM:
+		config |= PMEVTYPER_U;
+		break;
+	case PMC_CAP_USER:
+		config |= PMEVTYPER_P;
+		break;
+	default:
+		/*
+		 * Trace both USER and SYSTEM if none are specified
+		 * (default setting) or if both flags are specified
+		 * (user explicitly requested both qualifiers).
+		 */
+		break;
+	}
+
+	pm->pm_md.pm_arm64.pm_arm64_evsel = config;
 	PMCDBG2(MDP, ALL, 2, "arm64-allocate ri=%d -> config=0x%x", ri, config);
 
-	return 0;
+	return (0);
 }
 
 
@@ -216,8 +232,7 @@ arm64_read_pmc(int cpu, int ri, pmc_value_t *v)
 	if ((READ_SPECIALREG(pmovsclr_el0) & reg) != 0) {
 		/* Clear Overflow Flag */
 		WRITE_SPECIALREG(pmovsclr_el0, reg);
-		if (!PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)))
-			pm->pm_pcpu_state[cpu].pps_overflowcnt++;
+		pm->pm_pcpu_state[cpu].pps_overflowcnt++;
 
 		/* Reread counter in case we raced. */
 		tmp = arm64_pmcn_read(ri);
@@ -226,12 +241,20 @@ arm64_read_pmc(int cpu, int ri, pmc_value_t *v)
 	intr_restore(s);
 
 	PMCDBG2(MDP, REA, 2, "arm64-read id=%d -> %jd", ri, tmp);
-	if (PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)))
-		*v = ARMV8_PERFCTR_VALUE_TO_RELOAD_COUNT(tmp);
-	else
-		*v = tmp;
+	if (PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm))) {
+		/*
+		 * Clamp value to 0 if the counter just overflowed,
+		 * otherwise the returned reload count would wrap to a
+		 * huge value.
+		 */
+		if ((tmp & (1ull << 63)) == 0)
+			tmp = 0;
+		else
+			tmp = ARMV8_PERFCTR_VALUE_TO_RELOAD_COUNT(tmp);
+	}
+	*v = tmp;
 
-	return 0;
+	return (0);
 }
 
 static int
@@ -254,7 +277,7 @@ arm64_write_pmc(int cpu, int ri, pmc_value_t v)
 	pm->pm_pcpu_state[cpu].pps_overflowcnt = v >> 32;
 	arm64_pmcn_write(ri, v);
 
-	return 0;
+	return (0);
 }
 
 static int
@@ -277,7 +300,7 @@ arm64_config_pmc(int cpu, int ri, struct pmc *pm)
 
 	phw->phw_pmc = pm;
 
-	return 0;
+	return (0);
 }
 
 static int
@@ -305,31 +328,25 @@ arm64_start_pmc(int cpu, int ri)
 	arm64_interrupt_enable(ri);
 	arm64_counter_enable(ri);
 
-	return 0;
+	return (0);
 }
 
 static int
 arm64_stop_pmc(int cpu, int ri)
 {
-	struct pmc_hw *phw;
-	struct pmc *pm;
-
-	phw    = &arm64_pcpu[cpu]->pc_arm64pmcs[ri];
-	pm     = phw->phw_pmc;
-
 	/*
 	 * Disable the PMCs.
 	 */
 	arm64_counter_disable(ri);
 	arm64_interrupt_disable(ri);
 
-	return 0;
+	return (0);
 }
 
 static int
 arm64_release_pmc(int cpu, int ri, struct pmc *pmc)
 {
-	struct pmc_hw *phw;
+	struct pmc_hw *phw __diagused;
 
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[arm64,%d] illegal CPU value %d", __LINE__, cpu));
@@ -340,13 +357,12 @@ arm64_release_pmc(int cpu, int ri, struct pmc *pmc)
 	KASSERT(phw->phw_pmc == NULL,
 	    ("[arm64,%d] PHW pmc %p non-NULL", __LINE__, phw->phw_pmc));
 
-	return 0;
+	return (0);
 }
 
 static int
 arm64_intr(struct trapframe *tf)
 {
-	struct arm64_cpu *pc;
 	int retval, ri;
 	struct pmc *pm;
 	int error;
@@ -356,8 +372,10 @@ arm64_intr(struct trapframe *tf)
 	KASSERT(cpu >= 0 && cpu < pmc_cpu_max(),
 	    ("[arm64,%d] CPU %d out of range", __LINE__, cpu));
 
+	PMCDBG3(MDP,INT,1, "cpu=%d tf=%p um=%d", cpu, (void *)tf,
+	    TRAPF_USERMODE(tf));
+
 	retval = 0;
-	pc = arm64_pcpu[cpu];
 
 	for (ri = 0; ri < arm64_npmcs; ri++) {
 		pm = arm64_pcpu[cpu]->pc_arm64pmcs[ri].phw_pmc;
@@ -374,10 +392,10 @@ arm64_intr(struct trapframe *tf)
 
 		retval = 1; /* Found an interrupting PMC. */
 
-		if (!PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm))) {
-			pm->pm_pcpu_state[cpu].pps_overflowcnt += 1;
+		pm->pm_pcpu_state[cpu].pps_overflowcnt += 1;
+
+		if (!PMC_IS_SAMPLING_MODE(PMC_TO_MODE(pm)))
 			continue;
-		}
 
 		if (pm->pm_state != PMC_STATE_RUNNING)
 			continue;
@@ -478,6 +496,16 @@ arm64_pcpu_init(struct pmc_mdep *md, int cpu)
 		pc->pc_hwpmcs[i + first_ri] = phw;
 	}
 
+	/*
+	 * Disable all counters and overflow interrupts. Upon reset they are in
+	 * an undefined state.
+	 *
+	 * Don't issue an isb here, just wait for the one in arm64_pmcr_write()
+	 * to make the writes visible.
+	 */
+	WRITE_SPECIALREG(pmcntenclr_el0, 0xffffffff);
+	WRITE_SPECIALREG(pmintenclr_el1, 0xffffffff);
+
 	/* Enable unit */
 	pmcr = arm64_pmcr_read();
 	pmcr |= PMCR_E;
@@ -503,8 +531,9 @@ pmc_arm64_initialize()
 {
 	struct pmc_mdep *pmc_mdep;
 	struct pmc_classdep *pcd;
-	int idcode, impcode;
+	int classes, idcode, impcode;
 	int reg;
+	uint64_t midr;
 
 	reg = arm64_pmcr_read();
 	arm64_npmcs = (reg & PMCR_N_MASK) >> PMCR_N_SHIFT;
@@ -514,14 +543,34 @@ pmc_arm64_initialize()
 	PMCDBG1(MDP, INI, 1, "arm64-init npmcs=%d", arm64_npmcs);
 
 	/*
+	 * Write the CPU model to kern.hwpmc.cpuid.
+	 *
+	 * We zero the variant and revision fields.
+	 *
+	 * TODO: how to handle differences between cores due to big.LITTLE?
+	 * For now, just use MIDR from CPU 0.
+	 */
+	midr = (uint64_t)(pcpu_find(0)->pc_midr);
+	midr &= ~(CPU_VAR_MASK | CPU_REV_MASK);
+	snprintf(pmc_cpuid, sizeof(pmc_cpuid), "0x%016lx", midr);
+
+	/*
 	 * Allocate space for pointers to PMC HW descriptors and for
 	 * the MDEP structure used by MI code.
 	 */
 	arm64_pcpu = malloc(sizeof(struct arm64_cpu *) * pmc_cpu_max(),
 		M_PMC, M_WAITOK | M_ZERO);
 
-	/* Just one class */
-	pmc_mdep = pmc_mdep_alloc(1);
+	/* One AArch64 CPU class */
+	classes = 1;
+
+	/* Query presence of optional classes and set max class. */
+	if (pmc_cmn600_nclasses() > 0)
+		classes = MAX(classes, PMC_MDEP_CLASS_INDEX_CMN600);
+	if (pmc_dmc620_nclasses() > 0)
+		classes = MAX(classes, PMC_MDEP_CLASS_INDEX_DMC620_C);
+
+	pmc_mdep = pmc_mdep_alloc(classes);
 
 	switch(impcode) {
 	case PMCR_IMP_ARM:
@@ -536,6 +585,16 @@ pmc_arm64_initialize()
 			break;
 		default:
 		case PMCR_IDCODE_CORTEX_A53:
+			pmc_mdep->pmd_cputype = PMC_CPU_ARMV8_CORTEX_A53;
+			break;
+		}
+		break;
+	case PMCR_IMP_RESEARCH:
+		switch (idcode) {
+		case PMCR_IDCODE_RAINIER:
+			pmc_mdep->pmd_cputype = PMC_CPU_ARMV8_RAINIER;
+			break;
+		default:
 			pmc_mdep->pmd_cputype = PMC_CPU_ARMV8_CORTEX_A53;
 			break;
 		}
@@ -569,6 +628,13 @@ pmc_arm64_initialize()
 	pmc_mdep->pmd_switch_out = arm64_switch_out;
 
 	pmc_mdep->pmd_npmc   += arm64_npmcs;
+
+	if (pmc_cmn600_nclasses() > 0)
+		pmc_cmn600_initialize(pmc_mdep);
+	if (pmc_dmc620_nclasses() > 0) {
+		pmc_dmc620_initialize_cd2(pmc_mdep);
+		pmc_dmc620_initialize_c(pmc_mdep);
+	}
 
 	return (pmc_mdep);
 }

@@ -38,7 +38,11 @@ __FBSDID("$FreeBSD$");
 #include <unistd.h>
 
 #ifndef _PATH_LOCALBASE
+#ifdef COMPAT_64BIT
+#define	_PATH_LOCALBASE	"/usr/local64"
+#else
 #define _PATH_LOCALBASE "/usr/local"
+#endif
 #endif
 
 #ifndef LOCALBASE_CTL_LEN

@@ -1,9 +1,9 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2013 Dmitry Chagin
  * Copyright (c) 1994-1996 Søren Schmidt
  * All rights reserved.
+ * Copyright (c) 2013 Dmitry Chagin <dchagin@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -73,6 +73,8 @@ typedef l_int		l_timer_t;
 typedef l_int		l_mqd_t;
 typedef l_size_t	l_socklen_t;
 typedef	l_ulong		l_fd_mask;
+
+#include <compat/linux/linux_siginfo.h>
 
 typedef struct {
 	l_int		val[2];
@@ -159,11 +161,6 @@ struct l_newstat {
 #define	LINUX_SA_NOMASK		0x40000000
 #define	LINUX_SA_ONESHOT	0x80000000
 
-/* sigprocmask actions */
-#define	LINUX_SIG_BLOCK		0
-#define	LINUX_SIG_UNBLOCK	1
-#define	LINUX_SIG_SETMASK	2
-
 /* sigaltstack */
 #define	LINUX_MINSIGSTKSZ	2048
 
@@ -181,141 +178,6 @@ typedef struct {
 	l_int		ss_flags;
 	l_size_t	ss_size;
 } l_stack_t;
-
-struct l_fpstate {
-	u_int16_t cwd;
-	u_int16_t swd;
-	u_int16_t twd;
-	u_int16_t fop;
-	u_int64_t rip;
-	u_int64_t rdp;
-	u_int32_t mxcsr;
-	u_int32_t mxcsr_mask;
-	u_int32_t st_space[32];
-	u_int32_t xmm_space[64];
-	u_int32_t reserved2[24];
-};
-
-struct l_sigcontext {
-	l_ulong		sc_r8;
-	l_ulong		sc_r9;
-	l_ulong		sc_r10;
-	l_ulong		sc_r11;
-	l_ulong		sc_r12;
-	l_ulong		sc_r13;
-	l_ulong		sc_r14;
-	l_ulong		sc_r15;
-	l_ulong		sc_rdi;
-	l_ulong		sc_rsi;
-	l_ulong		sc_rbp;
-	l_ulong		sc_rbx;
-	l_ulong		sc_rdx;
-	l_ulong		sc_rax;
-	l_ulong		sc_rcx;
-	l_ulong		sc_rsp;
-	l_ulong		sc_rip;
-	l_ulong		sc_rflags;
-	l_ushort	sc_cs;
-	l_ushort	sc_gs;
-	l_ushort	sc_fs;
-	l_ushort	sc___pad0;
-	l_ulong		sc_err;
-	l_ulong		sc_trapno;
-	l_sigset_t	sc_mask;
-	l_ulong		sc_cr2;
-	struct l_fpstate *sc_fpstate;
-	l_ulong		sc_reserved1[8];
-};
-
-struct l_ucontext {
-	l_ulong		uc_flags;
-	l_uintptr_t	uc_link;
-	l_stack_t	uc_stack;
-	struct l_sigcontext	uc_mcontext;
-	l_sigset_t	uc_sigmask;
-};
-
-#define LINUX_SI_PREAMBLE_SIZE	(4 * sizeof(int))
-#define	LINUX_SI_MAX_SIZE	128
-#define	LINUX_SI_PAD_SIZE	((LINUX_SI_MAX_SIZE - \
-				    LINUX_SI_PREAMBLE_SIZE) / sizeof(l_int))
-typedef union l_sigval {
-	l_int		sival_int;
-	l_uintptr_t	sival_ptr;
-} l_sigval_t;
-
-typedef struct l_siginfo {
-	l_int		lsi_signo;
-	l_int		lsi_errno;
-	l_int		lsi_code;
-	union {
-		l_int	_pad[LINUX_SI_PAD_SIZE];
-
-		struct {
-			l_pid_t		_pid;
-			l_uid_t		_uid;
-		} _kill;
-
-		struct {
-			l_timer_t	_tid;
-			l_int		_overrun;
-			char		_pad[sizeof(l_uid_t) - sizeof(int)];
-			union l_sigval	_sigval;
-			l_uint		_sys_private;
-		} _timer;
-
-		struct {
-			l_pid_t		_pid;		/* sender's pid */
-			l_uid_t		_uid;		/* sender's uid */
-			union l_sigval	_sigval;
-		} _rt;
-
-		struct {
-			l_pid_t		_pid;		/* which child */
-			l_uid_t		_uid;		/* sender's uid */
-			l_int		_status;	/* exit code */
-			l_clock_t	_utime;
-			l_clock_t	_stime;
-		} _sigchld;
-
-		struct {
-			l_uintptr_t	_addr;	/* Faulting insn/memory ref. */
-		} _sigfault;
-
-		struct {
-			l_long		_band;	/* POLL_IN,POLL_OUT,POLL_MSG */
-			l_int		_fd;
-		} _sigpoll;
-	} _sifields;
-} l_siginfo_t;
-
-#define	lsi_pid		_sifields._kill._pid
-#define	lsi_uid		_sifields._kill._uid
-#define	lsi_tid		_sifields._timer._tid
-#define	lsi_overrun	_sifields._timer._overrun
-#define	lsi_sys_private	_sifields._timer._sys_private
-#define	lsi_status	_sifields._sigchld._status
-#define	lsi_utime	_sifields._sigchld._utime
-#define	lsi_stime	_sifields._sigchld._stime
-#define	lsi_value	_sifields._rt._sigval
-#define	lsi_int		_sifields._rt._sigval.sival_int
-#define	lsi_ptr		_sifields._rt._sigval.sival_ptr
-#define	lsi_addr	_sifields._sigfault._addr
-#define	lsi_band	_sifields._sigpoll._band
-#define	lsi_fd		_sifields._sigpoll._fd
-
-/*
- * We make the stack look like Linux expects it when calling a signal
- * handler, but use the BSD way of calling the handler and sigreturn().
- * This means that we need to pass the pointer to the handler too.
- * It is appended to the frame to not interfere with the rest of it.
- */
-
-struct l_rt_sigframe {
-	struct l_ucontext	sf_sc;
-	struct l_siginfo	sf_si;
-	l_handler_t		sf_handler;
-};
 
 /*
  * mount flags
@@ -369,7 +231,8 @@ struct l_ifmap {
 	u_char		irq;
 	u_char		dma;
 	u_char		port;
-} __packed;
+	/* 3 bytes spare */
+};
 
 struct l_ifreq {
 	union {
@@ -389,7 +252,7 @@ struct l_ifreq {
 		char		ifru_slave[LINUX_IFNAMSIZ];
 		l_uintptr_t	ifru_data;
 	} ifr_ifru;
-} __packed;
+};
 
 #define	ifr_name	ifr_ifrn.ifrn_name	/* Interface name */
 #define	ifr_hwaddr	ifr_ifru.ifru_hwaddr	/* MAC address */
@@ -406,31 +269,11 @@ struct l_ifconf {
 #define	ifc_buf		ifc_ifcu.ifcu_buf
 #define	ifc_req		ifc_ifcu.ifcu_req
 
-/*
- * poll()
- */
-#define	LINUX_POLLIN		0x0001
-#define	LINUX_POLLPRI		0x0002
-#define	LINUX_POLLOUT		0x0004
-#define	LINUX_POLLERR		0x0008
-#define	LINUX_POLLHUP		0x0010
-#define	LINUX_POLLNVAL		0x0020
-#define	LINUX_POLLRDNORM	0x0040
-#define	LINUX_POLLRDBAND	0x0080
-#define	LINUX_POLLWRNORM	0x0100
-#define	LINUX_POLLWRBAND	0x0200
-#define	LINUX_POLLMSG		0x0400
-
-struct l_pollfd {
-	l_int		fd;
-	l_short		events;
-	l_short		revents;
-};
-
 #define LINUX_ARCH_SET_GS		0x1001
 #define LINUX_ARCH_SET_FS		0x1002
 #define LINUX_ARCH_GET_FS		0x1003
 #define LINUX_ARCH_GET_GS		0x1004
+#define LINUX_ARCH_CET_STATUS		0x3001
 
 #define	linux_copyout_rusage(r, u)	copyout(r, u, sizeof(*r))
 
@@ -444,5 +287,50 @@ struct linux_robust_list_head {
 	l_long				futex_offset;
 	l_uintptr_t			pending_list;
 };
+
+/* This corresponds to 'struct user_regs_struct' in Linux. */
+struct linux_pt_regset {
+	l_ulong	r15;
+	l_ulong	r14;
+	l_ulong	r13;
+	l_ulong	r12;
+	l_ulong	rbp;
+	l_ulong	rbx;
+	l_ulong	r11;
+	l_ulong	r10;
+	l_ulong	r9;
+	l_ulong	r8;
+	l_ulong	rax;
+	l_ulong	rcx;
+	l_ulong	rdx;
+	l_ulong	rsi;
+	l_ulong	rdi;
+	l_ulong	orig_rax;
+	l_ulong	rip;
+	l_ulong	cs;
+	l_ulong	eflags;
+	l_ulong	rsp;
+	l_ulong	ss;
+	l_ulong fs_base;
+	l_ulong gs_base;
+	l_ulong ds;
+	l_ulong es;
+	l_ulong fs;
+	l_ulong gs;
+};
+
+#ifdef _KERNEL
+struct reg;
+struct syscall_info;
+
+void	bsd_to_linux_regset(const struct reg *b_reg,
+	    struct linux_pt_regset *l_regset);
+void	linux_to_bsd_regset(struct reg *b_reg,
+	    const struct linux_pt_regset *l_regset);
+void	linux_ptrace_get_syscall_info_machdep(const struct reg *reg,
+	    struct syscall_info *si);
+int	linux_ptrace_getregs_machdep(struct thread *td, pid_t pid,
+	    struct linux_pt_regset *l_regset);
+#endif /* _KERNEL */
 
 #endif /* !_AMD64_LINUX_H_ */

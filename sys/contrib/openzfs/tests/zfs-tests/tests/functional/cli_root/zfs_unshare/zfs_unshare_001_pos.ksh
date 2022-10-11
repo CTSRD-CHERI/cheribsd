@@ -62,17 +62,14 @@ function cleanup
 	[[ -d $TESTDIR2 ]] && \
 		log_must rm -rf $TESTDIR2
 
-	if datasetexists "$TESTPOOL/$TESTCLONE"; then
-		log_must zfs destroy -f $TESTPOOL/$TESTCLONE
-	fi
+	datasetexists "$TESTPOOL/$TESTCLONE" && \
+		destroy_dataset $TESTPOOL/$TESTCLONE -f
 
-	if snapexists "$TESTPOOL/$TESTFS2@snapshot"; then
-		log_must zfs destroy -f $TESTPOOL/$TESTFS2@snapshot
-	fi
+	snapexists "$TESTPOOL/$TESTFS2@snapshot" && \
+		destroy_dataset $TESTPOOL/$TESTFS2@snapshot -f
 
-	if datasetexists "$TESTPOOL/$TESTFS2"; then
-		log_must zfs destroy -f $TESTPOOL/$TESTFS2
-	fi
+	datasetexists "$TESTPOOL/$TESTFS2" && \
+		destroy_dataset $TESTPOOL/$TESTFS2 -f
 }
 
 #
@@ -152,7 +149,7 @@ while (( i < ${#mntp_fs[*]} )); do
 	else
 		log_must zfs set sharenfs=on ${mntp_fs[((i+1))]}
 		is_shared ${mntp_fs[i]} || \
-			log_fail "'zfs set sharenfs=on' fails to share filesystem."
+			log_fail "'zfs set sharenfs=on' fails to share filesystem: ${mntp_fs[i]} not shared."
 	fi
 
         ((i = i + 2))
@@ -169,7 +166,7 @@ log_must zfs unshare -a
 i=0
 while (( i < ${#mntp_fs[*]} )); do
         not_shared ${mntp_fs[i]} || \
-                log_fail "'zfs unshare -a' fails to unshare all shared zfs filesystems."
+                log_fail "'zfs unshare -a' fails to unshare all shared zfs filesystems: ${mntp_fs[i]} still shared."
 
         ((i = i + 2))
 done

@@ -85,19 +85,20 @@
 #undef CONFIG_X86_DEBUG_FPU
 #endif
 
-#if defined(HAVE_KERNEL_FPU_API_HEADER)
-#include <asm/fpu/api.h>
-#include <asm/fpu/internal.h>
-#else
-#include <asm/i387.h>
-#include <asm/xcr.h>
-#endif
-
 /*
  * The following cases are for kernels which export either the
  * kernel_fpu_* or __kernel_fpu_* functions.
  */
 #if defined(KERNEL_EXPORTS_X86_FPU)
+
+#if defined(HAVE_KERNEL_FPU_API_HEADER)
+#include <asm/fpu/api.h>
+#if defined(HAVE_KERNEL_FPU_INTERNAL_HEADER)
+#include <asm/fpu/internal.h>
+#endif
+#else
+#include <asm/i387.h>
+#endif
 
 #define	kfpu_allowed()		1
 #define	kfpu_init()		0
@@ -135,9 +136,72 @@
  */
 #if defined(HAVE_KERNEL_FPU_INTERNAL)
 
-#include <linux/mm.h>
+/*
+ * For kernels not exporting *kfpu_{begin,end} we have to use inline assembly
+ * with the XSAVE{,OPT,S} instructions, so we need the toolchain to support at
+ * least XSAVE.
+ */
+#if !defined(HAVE_XSAVE)
+#error "Toolchain needs to support the XSAVE assembler instruction"
+#endif
 
-extern union fpregs_state **zfs_kfpu_fpregs;
+#include <linux/mm.h>
+#include <linux/slab.h>
+
+extern uint8_t **zfs_kfpu_fpregs;
+
+/*
+ * Return the size in bytes required by the XSAVE instruction for an
+ * XSAVE area containing all the user state components supported by this CPU.
+ * See: Intel 64 and IA-32 Architectures Software Developer’s Manual.
+ * Dec. 2021. Vol. 2A p. 3-222.
+ */
+static inline uint32_t
+get_xsave_area_size(void)
+{
+	if (!boot_cpu_has(X86_FEATURE_OSXSAVE)) {
+		return (0);
+	}
+	/*
+	 * Call CPUID with leaf 13 and subleaf 0. The size is in ecx.
+	 * We don't need to check for cpuid_max here, since if this CPU has
+	 * OSXSAVE set, it has leaf 13 (0x0D) as well.
+	 */
+	uint32_t eax, ebx, ecx, edx;
+
+	eax = 13U;
+	ecx = 0U;
+	__asm__ __volatile__("cpuid"
+	    : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
+	    : "a" (eax), "c" (ecx));
+
+	return (ecx);
+}
+
+/*
+ * Return the allocation order of the maximum buffer size required to save the
+ * FPU state on this architecture. The value returned is the same as Linux'
+ * get_order() function would return (i.e. 2^order = nr. of pages required).
+ * Currently this will always return 0 since the save area is below 4k even for
+ * a full fledged AVX-512 implementation.
+ */
+static inline int
+get_fpuregs_save_area_order(void)
+{
+	size_t area_size = (size_t)get_xsave_area_size();
+
+	/*
+	 * If we are dealing with a CPU not supporting XSAVE,
+	 * get_xsave_area_size() will return 0. Thus the maximum memory
+	 * required is the FXSAVE area size which is 512 bytes. See: Intel 64
+	 * and IA-32 Architectures Software Developer’s Manual. Dec. 2021.
+	 * Vol. 2A p. 3-451.
+	 */
+	if (area_size == 0) {
+		area_size = 512;
+	}
+	return (get_order(area_size));
+}
 
 /*
  * Initialize per-cpu variables to store FPU state.
@@ -146,11 +210,11 @@ static inline void
 kfpu_fini(void)
 {
 	int cpu;
+	int order = get_fpuregs_save_area_order();
 
 	for_each_possible_cpu(cpu) {
 		if (zfs_kfpu_fpregs[cpu] != NULL) {
-			free_pages((unsigned long)zfs_kfpu_fpregs[cpu],
-			    get_order(sizeof (union fpregs_state)));
+			free_pages((unsigned long)zfs_kfpu_fpregs[cpu], order);
 		}
 	}
 
@@ -160,8 +224,9 @@ kfpu_fini(void)
 static inline int
 kfpu_init(void)
 {
-	zfs_kfpu_fpregs = kzalloc(num_possible_cpus() *
-	    sizeof (union fpregs_state *), GFP_KERNEL);
+	zfs_kfpu_fpregs = kzalloc(num_possible_cpus() * sizeof (uint8_t *),
+	    GFP_KERNEL);
+
 	if (zfs_kfpu_fpregs == NULL)
 		return (-ENOMEM);
 
@@ -170,8 +235,8 @@ kfpu_init(void)
 	 * the target memory. Since kmalloc() provides no alignment
 	 * guarantee instead use alloc_pages_node().
 	 */
-	unsigned int order = get_order(sizeof (union fpregs_state));
 	int cpu;
+	int order = get_fpuregs_save_area_order();
 
 	for_each_possible_cpu(cpu) {
 		struct page *page = alloc_pages_node(cpu_to_node(cpu),
@@ -188,7 +253,6 @@ kfpu_init(void)
 }
 
 #define	kfpu_allowed()		1
-#define	ex_handler_fprestore	ex_handler_default
 
 /*
  * FPU save and restore instructions.
@@ -203,20 +267,20 @@ kfpu_init(void)
 #define	kfpu_fxsr_clean(rval)	__asm("fnclex; emms; fildl %P[addr]" \
 				    : : [addr] "m" (rval));
 
-static inline void
-kfpu_save_xsave(struct xregs_state *addr, uint64_t mask)
-{
-	uint32_t low, hi;
-	int err;
-
-	low = mask;
-	hi = mask >> 32;
-	XSTATE_XSAVE(addr, low, hi, err);
-	WARN_ON_ONCE(err);
+#define	kfpu_do_xsave(instruction, addr, mask)			\
+{								\
+	uint32_t low, hi;					\
+								\
+	low = mask;						\
+	hi = (uint64_t)(mask) >> 32;				\
+	__asm(instruction " %[dst]\n\t"				\
+	    :							\
+	    : [dst] "m" (*(addr)), "a" (low), "d" (hi)		\
+	    : "memory");					\
 }
 
 static inline void
-kfpu_save_fxsr(struct fxregs_state *addr)
+kfpu_save_fxsr(uint8_t  *addr)
 {
 	if (IS_ENABLED(CONFIG_X86_32))
 		kfpu_fxsave(addr);
@@ -225,7 +289,7 @@ kfpu_save_fxsr(struct fxregs_state *addr)
 }
 
 static inline void
-kfpu_save_fsave(struct fregs_state *addr)
+kfpu_save_fsave(uint8_t *addr)
 {
 	kfpu_fnsave(addr);
 }
@@ -246,29 +310,42 @@ kfpu_begin(void)
 	 * per-cpu variable, not in the task struct, this allows any user
 	 * FPU state to be correctly preserved and restored.
 	 */
-	union fpregs_state *state = zfs_kfpu_fpregs[smp_processor_id()];
-
+	uint8_t *state = zfs_kfpu_fpregs[smp_processor_id()];
+#if defined(HAVE_XSAVES)
+	if (static_cpu_has(X86_FEATURE_XSAVES)) {
+		kfpu_do_xsave("xsaves", state, ~0);
+		return;
+	}
+#endif
+#if defined(HAVE_XSAVEOPT)
+	if (static_cpu_has(X86_FEATURE_XSAVEOPT)) {
+		kfpu_do_xsave("xsaveopt", state, ~0);
+		return;
+	}
+#endif
 	if (static_cpu_has(X86_FEATURE_XSAVE)) {
-		kfpu_save_xsave(&state->xsave, ~0);
+		kfpu_do_xsave("xsave", state, ~0);
 	} else if (static_cpu_has(X86_FEATURE_FXSR)) {
-		kfpu_save_fxsr(&state->fxsave);
+		kfpu_save_fxsr(state);
 	} else {
-		kfpu_save_fsave(&state->fsave);
+		kfpu_save_fsave(state);
 	}
 }
 
-static inline void
-kfpu_restore_xsave(struct xregs_state *addr, uint64_t mask)
-{
-	uint32_t low, hi;
-
-	low = mask;
-	hi = mask >> 32;
-	XSTATE_XRESTORE(addr, low, hi);
+#define	kfpu_do_xrstor(instruction, addr, mask)			\
+{								\
+	uint32_t low, hi;					\
+								\
+	low = mask;						\
+	hi = (uint64_t)(mask) >> 32;				\
+	__asm(instruction " %[src]"				\
+	    :							\
+	    : [src] "m" (*(addr)), "a" (low), "d" (hi)		\
+	    : "memory");					\
 }
 
 static inline void
-kfpu_restore_fxsr(struct fxregs_state *addr)
+kfpu_restore_fxsr(uint8_t *addr)
 {
 	/*
 	 * On AuthenticAMD K7 and K8 processors the fxrstor instruction only
@@ -286,7 +363,7 @@ kfpu_restore_fxsr(struct fxregs_state *addr)
 }
 
 static inline void
-kfpu_restore_fsave(struct fregs_state *addr)
+kfpu_restore_fsave(uint8_t *addr)
 {
 	kfpu_frstor(addr);
 }
@@ -294,32 +371,32 @@ kfpu_restore_fsave(struct fregs_state *addr)
 static inline void
 kfpu_end(void)
 {
-	union fpregs_state *state = zfs_kfpu_fpregs[smp_processor_id()];
-
-	if (static_cpu_has(X86_FEATURE_XSAVE)) {
-		kfpu_restore_xsave(&state->xsave, ~0);
-	} else if (static_cpu_has(X86_FEATURE_FXSR)) {
-		kfpu_restore_fxsr(&state->fxsave);
-	} else {
-		kfpu_restore_fsave(&state->fsave);
+	uint8_t  *state = zfs_kfpu_fpregs[smp_processor_id()];
+#if defined(HAVE_XSAVES)
+	if (static_cpu_has(X86_FEATURE_XSAVES)) {
+		kfpu_do_xrstor("xrstors", state, ~0);
+		goto out;
 	}
-
+#endif
+	if (static_cpu_has(X86_FEATURE_XSAVE)) {
+		kfpu_do_xrstor("xrstor", state, ~0);
+	} else if (static_cpu_has(X86_FEATURE_FXSR)) {
+		kfpu_restore_fxsr(state);
+	} else {
+		kfpu_restore_fsave(state);
+	}
+out:
 	local_irq_enable();
 	preempt_enable();
+
 }
 
 #else
 
-/*
- * FPU support is unavailable.
- */
-#define	kfpu_allowed()		0
-#define	kfpu_begin()		do {} while (0)
-#define	kfpu_end()		do {} while (0)
-#define	kfpu_init()		0
-#define	kfpu_fini()		((void) 0)
+#error	"Exactly one of KERNEL_EXPORTS_X86_FPU or HAVE_KERNEL_FPU_INTERNAL" \
+	" must be defined"
 
-#endif /* defined(HAVE_KERNEL_FPU_INTERNAL) */
+#endif /* defined(HAVE_KERNEL_FPU_INTERNAL */
 #endif /* defined(KERNEL_EXPORTS_X86_FPU) */
 
 /*
@@ -329,6 +406,25 @@ kfpu_end(void)
 /*
  * Detect register set support
  */
+
+/*
+ * Check if OS supports AVX and AVX2 by checking XCR0
+ * Only call this function if CPUID indicates that AVX feature is
+ * supported by the CPU, otherwise it might be an illegal instruction.
+ */
+static inline uint64_t
+zfs_xgetbv(uint32_t index)
+{
+	uint32_t eax, edx;
+	/* xgetbv - instruction byte code */
+	__asm__ __volatile__(".byte 0x0f; .byte 0x01; .byte 0xd0"
+	    : "=a" (eax), "=d" (edx)
+	    : "c" (index));
+
+	return ((((uint64_t)edx)<<32) | (uint64_t)eax);
+}
+
+
 static inline boolean_t
 __simd_state_enabled(const uint64_t state)
 {
@@ -343,7 +439,7 @@ __simd_state_enabled(const uint64_t state)
 	if (!has_osxsave)
 		return (B_FALSE);
 
-	xcr0 = xgetbv(0);
+	xcr0 = zfs_xgetbv(0);
 	return ((xcr0 & state) == state);
 }
 

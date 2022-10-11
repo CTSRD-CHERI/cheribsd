@@ -41,7 +41,6 @@ bool MipsTargetInfo::processorSupportsGPR64() const {
       .Case("octeon", true)
       .Case("octeon+", true)
       .Default(false);
-  return false;
 }
 
 static constexpr llvm::StringLiteral ValidCPUNames[] = {
@@ -51,7 +50,7 @@ static constexpr llvm::StringLiteral ValidCPUNames[] = {
     {"octeon"}, {"octeon+"}, {"p5600"}};
 
 bool MipsTargetInfo::isValidCPUName(StringRef Name) const {
-  return llvm::find(ValidCPUNames, Name) != std::end(ValidCPUNames);
+  return llvm::is_contained(ValidCPUNames, Name);
 }
 
 void MipsTargetInfo::fillValidCPUList(

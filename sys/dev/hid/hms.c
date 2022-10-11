@@ -109,6 +109,7 @@ static const struct hidmap_item hms_map_wheel_rev[] = {
 
 /* A match on these entries will load hms */
 static const struct hid_device_id hms_devs[] = {
+	{ HID_TLC(HUP_GENERIC_DESKTOP, HUG_POINTER) },
 	{ HID_TLC(HUP_GENERIC_DESKTOP, HUG_MOUSE) },
 };
 
@@ -228,7 +229,7 @@ hms_probe(device_t dev)
 	else
 		hidbus_set_desc(dev, "Mouse");
 
-	return (BUS_PROBE_DEFAULT);
+	return (BUS_PROBE_GENERIC);
 }
 
 static int
@@ -271,7 +272,7 @@ hms_attach(device_t dev)
 		SYSCTL_ADD_U32(device_get_sysctl_ctx(dev),
 		    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)), OID_AUTO,
 		    "drift_thresh", CTLFLAG_RW, &sc->drift_thresh, 0,
-		    "drift detection threshhold");
+		    "drift detection threshold");
 	}
 #endif
 
@@ -316,7 +317,6 @@ hms_detach(device_t dev)
 	return (error);
 }
 
-static devclass_t hms_devclass;
 static device_method_t hms_methods[] = {
 	DEVMETHOD(device_identify,	hms_identify),
 	DEVMETHOD(device_probe,		hms_probe),
@@ -327,7 +327,7 @@ static device_method_t hms_methods[] = {
 };
 
 DEFINE_CLASS_0(hms, hms_driver, hms_methods, sizeof(struct hms_softc));
-DRIVER_MODULE(hms, hidbus, hms_driver, hms_devclass, NULL, 0);
+DRIVER_MODULE(hms, hidbus, hms_driver, NULL, NULL);
 MODULE_DEPEND(hms, hid, 1, 1, 1);
 MODULE_DEPEND(hms, hidbus, 1, 1, 1);
 MODULE_DEPEND(hms, hidmap, 1, 1, 1);

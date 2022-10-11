@@ -58,6 +58,14 @@ int FunctionComparator::cmpNumbers(uint64_t L, uint64_t R) const {
   return 0;
 }
 
+int FunctionComparator::cmpAligns(Align L, Align R) const {
+  if (L.value() < R.value())
+    return -1;
+  if (L.value() > R.value())
+    return 1;
+  return 0;
+}
+
 int FunctionComparator::cmpOrderings(AtomicOrdering L, AtomicOrdering R) const {
   if ((int)L < (int)R)
     return -1;
@@ -110,7 +118,7 @@ int FunctionComparator::cmpAttrs(const AttributeList L,
   if (int Res = cmpNumbers(L.getNumAttrSets(), R.getNumAttrSets()))
     return Res;
 
-  for (unsigned i = L.index_begin(), e = L.index_end(); i != e; ++i) {
+  for (unsigned i : L.indexes()) {
     AttributeSet LAS = L.getAttributes(i);
     AttributeSet RAS = R.getAttributes(i);
     AttributeSet::iterator LI = LAS.begin(), LE = LAS.end();
@@ -124,12 +132,17 @@ int FunctionComparator::cmpAttrs(const AttributeList L,
 
         Type *TyL = LA.getValueAsType();
         Type *TyR = RA.getValueAsType();
-        if (TyL && TyR)
-          return cmpTypes(TyL, TyR);
+        if (TyL && TyR) {
+          if (int Res = cmpTypes(TyL, TyR))
+            return Res;
+          continue;
+        }
 
         // Two pointers, at least one null, so the comparison result is
         // independent of the value of a real pointer.
-        return cmpNumbers((uint64_t)TyL, (uint64_t)TyR);
+        if (int Res = cmpNumbers((uint64_t)TyL, (uint64_t)TyR))
+          return Res;
+        continue;
       }
       if (LA < RA)
         return -1;
@@ -286,6 +299,7 @@ int FunctionComparator::cmpConstants(const Constant *L,
 
   switch (L->getValueID()) {
   case Value::UndefValueVal:
+  case Value::PoisonValueVal:
   case Value::ConstantTokenNoneVal:
     return TypesRes;
   case Value::ConstantIntVal: {
@@ -488,12 +502,13 @@ int FunctionComparator::cmpTypes(Type *TyL, Type *TyR) const {
   case Type::ScalableVectorTyID: {
     auto *STyL = cast<VectorType>(TyL);
     auto *STyR = cast<VectorType>(TyR);
-    if (STyL->getElementCount().Scalable != STyR->getElementCount().Scalable)
-      return cmpNumbers(STyL->getElementCount().Scalable,
-                        STyR->getElementCount().Scalable);
-    if (STyL->getElementCount().Min != STyR->getElementCount().Min)
-      return cmpNumbers(STyL->getElementCount().Min,
-                        STyR->getElementCount().Min);
+    if (STyL->getElementCount().isScalable() !=
+        STyR->getElementCount().isScalable())
+      return cmpNumbers(STyL->getElementCount().isScalable(),
+                        STyR->getElementCount().isScalable());
+    if (STyL->getElementCount() != STyR->getElementCount())
+      return cmpNumbers(STyL->getElementCount().getKnownMinValue(),
+                        STyR->getElementCount().getKnownMinValue());
     return cmpTypes(STyL->getElementType(), STyR->getElementType());
   }
   }
@@ -549,13 +564,12 @@ int FunctionComparator::cmpOperations(const Instruction *L,
     if (int Res = cmpTypes(AI->getAllocatedType(),
                            cast<AllocaInst>(R)->getAllocatedType()))
       return Res;
-    return cmpNumbers(AI->getAlignment(), cast<AllocaInst>(R)->getAlignment());
+    return cmpAligns(AI->getAlign(), cast<AllocaInst>(R)->getAlign());
   }
   if (const LoadInst *LI = dyn_cast<LoadInst>(L)) {
     if (int Res = cmpNumbers(LI->isVolatile(), cast<LoadInst>(R)->isVolatile()))
       return Res;
-    if (int Res =
-            cmpNumbers(LI->getAlignment(), cast<LoadInst>(R)->getAlignment()))
+    if (int Res = cmpAligns(LI->getAlign(), cast<LoadInst>(R)->getAlign()))
       return Res;
     if (int Res =
             cmpOrderings(LI->getOrdering(), cast<LoadInst>(R)->getOrdering()))
@@ -571,8 +585,7 @@ int FunctionComparator::cmpOperations(const Instruction *L,
     if (int Res =
             cmpNumbers(SI->isVolatile(), cast<StoreInst>(R)->isVolatile()))
       return Res;
-    if (int Res =
-            cmpNumbers(SI->getAlignment(), cast<StoreInst>(R)->getAlignment()))
+    if (int Res = cmpAligns(SI->getAlign(), cast<StoreInst>(R)->getAlign()))
       return Res;
     if (int Res =
             cmpOrderings(SI->getOrdering(), cast<StoreInst>(R)->getOrdering()))

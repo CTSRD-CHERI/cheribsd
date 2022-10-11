@@ -529,9 +529,7 @@ static driver_t acpi_asus_driver = {
 	sizeof(struct acpi_asus_softc)
 };
 
-static devclass_t acpi_asus_devclass;
-
-DRIVER_MODULE(acpi_asus, acpi, acpi_asus_driver, acpi_asus_devclass, 0, 0);
+DRIVER_MODULE(acpi_asus, acpi, acpi_asus_driver, 0, 0);
 MODULE_DEPEND(acpi_asus, acpi, 1, 1, 1);
 
 static int
@@ -737,13 +735,13 @@ acpi_asus_attach(device_t dev)
 			    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO,
 			    acpi_asus_sysctls[i].name,
 			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_ANYBODY |
-			    CTLFLAG_NEEDGIANT, sc, i, acpi_asus_sysctl, "I",
+			    CTLFLAG_MPSAFE, sc, i, acpi_asus_sysctl, "I",
 			    acpi_asus_sysctls[i].description);
 		} else {
 			SYSCTL_ADD_PROC(&sc->sysctl_ctx,
 			    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO,
 			    acpi_asus_sysctls[i].name,
-			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
 			    sc, i, acpi_asus_sysctl, "I",
 			    acpi_asus_sysctls[i].description);
 		}

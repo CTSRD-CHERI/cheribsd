@@ -49,7 +49,7 @@
  *********************************************************************/
 #define IXL_DRIVER_VERSION_MAJOR	2
 #define IXL_DRIVER_VERSION_MINOR	3
-#define IXL_DRIVER_VERSION_BUILD	0
+#define IXL_DRIVER_VERSION_BUILD	2
 
 #define IXL_DRIVER_VERSION_STRING			\
     __XSTRING(IXL_DRIVER_VERSION_MAJOR) "."		\
@@ -86,6 +86,7 @@ static pci_vendor_info_t ixl_vendor_info_array[] =
 	PVIDV(I40E_INTEL_VENDOR_ID, I40E_DEV_ID_10G_SFP, "Intel(R) Ethernet Controller X710 for 10GbE SFP+"),
 	PVIDV(I40E_INTEL_VENDOR_ID, I40E_DEV_ID_10G_B, "Intel(R) Ethernet Controller X710 for 10GbE backplane"),
 	PVIDV(I40E_INTEL_VENDOR_ID, I40E_DEV_ID_5G_BASE_T_BC, "Intel(R) Ethernet Controller V710 for 5GBASE-T"),
+	PVIDV(I40E_INTEL_VENDOR_ID, I40E_DEV_ID_1G_BASE_T_BC, "Intel(R) Ethernet Controller I710 for 1GBASE-T"),
 	/* required last entry */
 	PVID_END
 };
@@ -155,8 +156,7 @@ static driver_t ixl_driver = {
 	"ixl", ixl_methods, sizeof(struct ixl_pf),
 };
 
-devclass_t ixl_devclass;
-DRIVER_MODULE(ixl, pci, ixl_driver, ixl_devclass, 0, 0);
+DRIVER_MODULE(ixl, pci, ixl_driver, 0, 0);
 IFLIB_PNP_INFO(pci, ixl, ixl_vendor_info_array);
 MODULE_VERSION(ixl, 3);
 
@@ -235,7 +235,7 @@ TUNABLE_INT("hw.ixl.debug_recovery_mode",
     &ixl_debug_recovery_mode);
 SYSCTL_INT(_hw_ixl, OID_AUTO, debug_recovery_mode, CTLFLAG_RDTUN,
     &ixl_debug_recovery_mode, 0,
-    "Act like when FW entered recovery mode (for debuging)");
+    "Act like when FW entered recovery mode (for debugging)");
 #endif
 
 static int ixl_i2c_access_method = 0;
@@ -1514,11 +1514,11 @@ ixl_if_media_status(if_ctx_t ctx, struct ifmediareq *ifmr)
 			ifmr->ifm_active |= IFM_1000_T;
 			break;
 		/* 2.5 G */
-		case I40E_PHY_TYPE_2_5GBASE_T:
+		case I40E_PHY_TYPE_2_5GBASE_T_LINK_STATUS:
 			ifmr->ifm_active |= IFM_2500_T;
 			break;
 		/* 5 G */
-		case I40E_PHY_TYPE_5GBASE_T:
+		case I40E_PHY_TYPE_5GBASE_T_LINK_STATUS:
 			ifmr->ifm_active |= IFM_5000_T;
 			break;
 		/* 10 G */

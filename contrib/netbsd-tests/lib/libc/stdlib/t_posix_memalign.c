@@ -85,7 +85,7 @@ ATF_TC_BODY(posix_memalign_basic, tc)
 		else {
 			ATF_REQUIRE_EQ_MSG(ret, 0,
 			    "posix_memalign: %s", strerror(ret));
-			ATF_REQUIRE_EQ_MSG(((vaddr_t)p) & (align[i] - 1), 0,
+			ATF_REQUIRE_EQ_MSG(((ptraddr_t)p) & (align[i] - 1), 0,
 			    "p = %p", p);
 			free(p);
 		}
@@ -145,7 +145,7 @@ ATF_TC_BODY(aligned_alloc_basic, tc)
 			    "aligned_alloc: success when size was not an "
 			    "integer multiple of alignment");
 #endif
-			ATF_REQUIRE_EQ_MSG(((vaddr_t)p) & (vaddr_t)(align[i] - 1), 0,
+			ATF_REQUIRE_EQ_MSG(((ptraddr_t)p) & (ptraddr_t)(align[i] - 1), 0,
 			    "p = %p", p);
 			free(p);
 		}

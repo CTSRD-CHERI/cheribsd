@@ -2031,7 +2031,8 @@ repeat_set_config:
 			goto repeat_set_config;
 		}
 #if USB_HAVE_MSCTEST
-		if (config_index == 0) {
+		if (config_index == 0 &&
+		    usb_test_quirk(&uaa, UQ_MSC_NO_INQUIRY) == 0) {
 			/*
 			 * Try to figure out if we have an
 			 * auto-install disk there:
@@ -2047,13 +2048,17 @@ repeat_set_config:
 	}
 #if USB_HAVE_MSCTEST
 	if (set_config_failed == 0 && config_index == 0 &&
+	    usb_test_quirk(&uaa, UQ_MSC_NO_START_STOP) == 0 &&
+	    usb_test_quirk(&uaa, UQ_MSC_NO_PREVENT_ALLOW) == 0 &&
 	    usb_test_quirk(&uaa, UQ_MSC_NO_SYNC_CACHE) == 0 &&
-	    usb_test_quirk(&uaa, UQ_MSC_NO_GETMAXLUN) == 0) {
+	    usb_test_quirk(&uaa, UQ_MSC_NO_TEST_UNIT_READY) == 0 &&
+	    usb_test_quirk(&uaa, UQ_MSC_NO_GETMAXLUN) == 0 &&
+	    usb_test_quirk(&uaa, UQ_MSC_NO_INQUIRY) == 0) {
 		/*
 		 * Try to figure out if there are any MSC quirks we
 		 * should apply automatically:
 		 */
-		err = usb_msc_auto_quirk(udev, 0);
+		err = usb_msc_auto_quirk(udev, 0, &uaa);
 
 		if (err != 0) {
 			set_config_failed = 1;
@@ -2902,7 +2907,7 @@ usbd_enum_lock(struct usb_device *udev)
 	 * are locked before locking Giant. Else the lock can be
 	 * locked multiple times.
 	 */
-	mtx_lock(&Giant);
+	bus_topo_lock();
 	return (1);
 }
 
@@ -2922,7 +2927,7 @@ usbd_enum_lock_sig(struct usb_device *udev)
 		sx_xunlock(&udev->enum_sx);
 		return (255);
 	}
-	mtx_lock(&Giant);
+	bus_topo_lock();
 	return (1);
 }
 #endif
@@ -2932,7 +2937,7 @@ usbd_enum_lock_sig(struct usb_device *udev)
 void
 usbd_enum_unlock(struct usb_device *udev)
 {
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 	sx_xunlock(&udev->enum_sx);
 	sx_xunlock(&udev->sr_sx);
 }
@@ -2948,7 +2953,7 @@ usbd_sr_lock(struct usb_device *udev)
 	 * are locked before locking Giant. Else the lock can be
 	 * locked multiple times.
 	 */
-	mtx_lock(&Giant);
+	bus_topo_lock();
 }
 
 /* The following function unlocks suspend and resume. */
@@ -2956,7 +2961,7 @@ usbd_sr_lock(struct usb_device *udev)
 void
 usbd_sr_unlock(struct usb_device *udev)
 {
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 	sx_xunlock(&udev->sr_sx);
 }
 

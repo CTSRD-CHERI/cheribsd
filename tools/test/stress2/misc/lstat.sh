@@ -44,9 +44,8 @@ cd $odir
 mount | grep "on $mntpoint " | grep -q /dev/md && umount -f $mntpoint
 mdconfig -l | grep -q md$mdstart &&  mdconfig -d -u $mdstart
 mdconfig -a -t swap -s 1g -u $mdstart || exit 1
-bsdlabel -w md$mdstart auto
-newfs -n -b 4096 -f 512 -i 1024 md${mdstart}$part > /dev/null
-mount -o async /dev/md${mdstart}$part $mntpoint || exit 1
+newfs -n -b 4096 -f 512 -i 1024 md$mdstart > /dev/null
+mount -o async /dev/md$mdstart $mntpoint || exit 1
 
 path=$mntpoint/a/b/c
 mkdir -p $path
@@ -129,7 +128,7 @@ test(int idx)
 	struct stat sb;
 	pid_t fpid, pd, pid;
 	size_t len;
-	int i, n, r;
+	int i, r;
 	char dir[128], path[128];
 
 	atomic_add_int(&share[R1], 1);
@@ -156,7 +155,6 @@ test(int idx)
 		while (share[R2] == 0) {
 			snprintf(path, sizeof(path), "%s/d.%d.%d", arg, pid,
 			    i);
-			n = 0;
 			while (dirs[0] > MXDIRS && share[R2] == 0)
 				usleep(SLPTIME);
 			while ((r = mkdir(path, 0777)) == -1) {
@@ -179,7 +177,6 @@ test(int idx)
 	i = 0;
 	setproctitle("rmdir");
 	while (dirs[0] > 0 || share[R2] == 0) {
-		n = 0;
 		if (dirs[0] < MXDIRS / 2)
 			usleep(SLPTIME);
 		snprintf(path, sizeof(path), "%s/d.%d.%d", arg, pid, i);

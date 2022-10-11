@@ -33,12 +33,16 @@ __FBSDID("$FreeBSD$");
 
 	.text
 
-.macro	save_registers el
+/*
+ * This is limited to 28 instructions as it's placed in the exception vector
+ * slot that is 32 instructions long. We need one for the branch, and three
+ * for the prologue.
+ */
+.macro	save_registers_head el
 .if \el == 1
 	mov	PTR(18), PTRN(sp)
 	sub	PTRN(sp), PTRN(sp), #128
 .endif
-	stp	PTR(29), PTRN(lr), [PTRN(sp), #(-2 * PTR_WIDTH)]!
 	sub	PTRN(sp), PTRN(sp), #(TF_SIZE)
 	stp	CAP(28), CAP(29), [PTRN(sp), #(TF_X + 28 * CAP_WIDTH)]
 	stp	CAP(26), CAP(27), [PTRN(sp), #(TF_X + 26 * CAP_WIDTH)]
@@ -72,8 +76,18 @@ __FBSDID("$FreeBSD$");
 	stp	w11, w12, [PTRN(sp), #(TF_SPSR)]
 	stp	CAP(18), CAPN(lr), [PTRN(sp), #(TF_SP)]
 	mrs	PTR(18), PTRN(tpidr_el1)
+.endm
+
+.macro	save_registers el
 	add	PTR(29), PTRN(sp), #(TF_SIZE)
 .if \el == 0
+#if defined(PERTHREAD_SSP)
+	/* Load the SSP canary to sp_el0 */
+	ldr	x1, [x18, #(PC_CURTHREAD)]
+	add	x1, x1, #(TD_MD_CANARY)
+	msr	sp_el0, x1
+#endif
+
 	/* Apply the SSBD (CVE-2018-3639) workaround if needed */
 	ldr	PTR(1), [PTR(18), #PC_SSBD]
 	cbz	x1, 1f
@@ -81,29 +95,41 @@ __FBSDID("$FreeBSD$");
 	blr	PTR(1)
 1:
 
+#ifdef PAC
+	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
+	bl	ptrauth_exit_el0
+#endif
+
 	ldr	PTR(0), [PTR(18), #(PC_CURTHREAD)]
 	bl	dbg_monitor_enter
-	msr	daifclr, #8	/* Enable the debug exception */
-.endif
+
+	/* Unmask debug and SError exceptions */
+	msr	daifclr, #(DAIF_D | DAIF_A)
+.else
 	/*
+	 * Unmask debug and SError exceptions.
 	 * For EL1, debug exceptions are conditionally unmasked in
 	 * do_el1h_sync().
 	 */
+	msr	daifclr, #(DAIF_A)
+.endif
 .endm
 
 .macro	restore_registers el
-.if \el == 1
 	/*
-	 * Disable interrupts and debug exceptions, x18 may change in the
-	 * interrupt exception handler.  For EL0 exceptions, do_ast already
-	 * did this.
+	 * Mask all exceptions, x18 may change in the interrupt exception
+	 * handler.
 	 */
-	msr	daifset, #10
-.endif
+	msr	daifset, #(DAIF_ALL)
 .if \el == 0
 	ldr	PTR(0), [PTR(18), #PC_CURTHREAD]
 	mov	PTR(1), PTRN(sp)
 	bl	dbg_monitor_exit
+
+#ifdef PAC
+	ldr	x0, [x18, #PC_CURTHREAD]
+	bl	ptrauth_enter_el0
+#endif
 
 	/* Remove the SSBD (CVE-2018-3639) workaround if needed */
 	ldr	PTR(1), [PTR(18), #PC_SSBD]
@@ -157,7 +183,7 @@ __FBSDID("$FreeBSD$");
 .endif
 #endif
 .if \el == 0
-	add	PTRN(sp), PTRN(sp), #(TF_SIZE + 2 * PTR_WIDTH)
+	add	PTRN(sp), PTRN(sp), #(TF_SIZE)
 .else
 	mov	PTRN(sp), PTR(18)
 	mrs	PTR(18), PTRN(tpidr_el1)
@@ -169,8 +195,10 @@ __FBSDID("$FreeBSD$");
 	/* Make sure the IRQs are enabled before calling ast() */
 	bic	x19, x19, #PSR_I
 1:
-	/* Disable interrupts */
-	msr	daifset, #10
+	/*
+	 * Mask interrupts while checking the ast pending flag
+	 */
+	msr	daifset, #(DAIF_INTR)
 
 	/* Read the current thread flags */
 	ldr	PTR(1), [PTR(18), #PC_CURTHREAD]	/* Load curthread */
@@ -243,38 +271,42 @@ ENTRY(handle_empty_exception)
 	mov	PTR(0), PTRN(sp)
 1:	bl	unhandled_exception
 	b	1b
-END(handle_unhandled_exception)
+END(handle_empty_exception)
 
-.macro	vempty
+.macro	vector	name, el
 	.align 7
-	b	handle_empty_exception
+	save_registers_head \el
+	b	handle_\name
+	dsb	sy
+	isb
+	/* Break instruction to ensure we aren't executing code here. */
+	brk	0x42
 .endm
 
-.macro	vector	name
-	.align 7
-	b	handle_\name
+.macro	vempty el
+	vector	empty_exception \el
 .endm
 
 	.align 11
 	.globl exception_vectors
 exception_vectors:
-	vempty			/* Synchronous EL1t */
-	vempty			/* IRQ EL1t */
-	vempty			/* FIQ EL1t */
-	vempty			/* Error EL1t */
+	vempty 1		/* Synchronous EL1t */
+	vempty 1		/* IRQ EL1t */
+	vempty 1		/* FIQ EL1t */
+	vempty 1		/* Error EL1t */
 
-	vector el1h_sync	/* Synchronous EL1h */
-	vector el1h_irq		/* IRQ EL1h */
-	vempty			/* FIQ EL1h */
-	vector serror		/* Error EL1h */
+	vector el1h_sync 1	/* Synchronous EL1h */
+	vector el1h_irq 1	/* IRQ EL1h */
+	vempty 1		/* FIQ EL1h */
+	vector serror 1		/* Error EL1h */
 
-	vector el0_sync		/* Synchronous 64-bit EL0 */
-	vector el0_irq		/* IRQ 64-bit EL0 */
-	vempty			/* FIQ 64-bit EL0 */
-	vector serror		/* Error 64-bit EL0 */
+	vector el0_sync 0	/* Synchronous 64-bit EL0 */
+	vector el0_irq 0	/* IRQ 64-bit EL0 */
+	vempty 0		/* FIQ 64-bit EL0 */
+	vector serror 0		/* Error 64-bit EL0 */
 
-	vector el0_sync		/* Synchronous 32-bit EL0 */
-	vector el0_irq		/* IRQ 32-bit EL0 */
-	vempty			/* FIQ 32-bit EL0 */
-	vector serror		/* Error 32-bit EL0 */
+	vector el0_sync 0	/* Synchronous 32-bit EL0 */
+	vector el0_irq 0	/* IRQ 32-bit EL0 */
+	vempty 0		/* FIQ 32-bit EL0 */
+	vector serror 0		/* Error 32-bit EL0 */
 

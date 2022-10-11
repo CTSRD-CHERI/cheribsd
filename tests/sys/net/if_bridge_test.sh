@@ -275,6 +275,10 @@ span_body()
 	set -x
 	vnet_init
 
+	if [ "$(atf_config_get ci false)" = "true" ]; then
+		atf_skip "https://bugs.freebsd.org/260461"
+	fi
+
 	epair=$(vnet_mkepair)
 	epair_span=$(vnet_mkepair)
 	bridge=$(vnet_mkbridge)
@@ -452,6 +456,151 @@ stp_validation_cleanup()
 	vnet_cleanup
 }
 
+atf_test_case "gif" "cleanup"
+gif_head()
+{
+	atf_set descr 'gif as a bridge member'
+	atf_set require.user root
+}
+
+gif_body()
+{
+	vnet_init
+
+	epair=$(vnet_mkepair)
+
+	vnet_mkjail one ${epair}a
+	vnet_mkjail two ${epair}b
+
+	jexec one sysctl net.link.gif.max_nesting=2
+	jexec two sysctl net.link.gif.max_nesting=2
+
+	jexec one ifconfig ${epair}a 192.0.2.1/24 up
+	jexec two ifconfig ${epair}b 192.0.2.2/24 up
+
+	# Tunnel
+	gif_one=$(jexec one ifconfig gif create)
+	gif_two=$(jexec two ifconfig gif create)
+
+	jexec one ifconfig ${gif_one} tunnel 192.0.2.1 192.0.2.2
+	jexec one ifconfig ${gif_one} up
+	jexec two ifconfig ${gif_two} tunnel 192.0.2.2 192.0.2.1
+	jexec two ifconfig ${gif_two} up
+
+	bridge_one=$(jexec one ifconfig bridge create)
+	bridge_two=$(jexec two ifconfig bridge create)
+	jexec one ifconfig ${bridge_one} 198.51.100.1/24 up
+	jexec one ifconfig ${bridge_one} addm ${gif_one}
+	jexec two ifconfig ${bridge_two} 198.51.100.2/24 up
+	jexec two ifconfig ${bridge_two} addm ${gif_two}
+
+	# Sanity check
+	atf_check -s exit:0 -o ignore \
+		jexec one ping -c 1 192.0.2.2
+
+	# Test tunnel
+	atf_check -s exit:0 -o ignore \
+		jexec one ping -c 1 198.51.100.2
+	atf_check -s exit:0 -o ignore \
+		jexec one ping -c 1 -s 1200 198.51.100.2
+	atf_check -s exit:0 -o ignore \
+		jexec one ping -c 1 -s 2000 198.51.100.2
+
+	# Higher MTU on the tunnel than on the underlying interface
+	jexec one ifconfig ${epair}a mtu 1000
+	jexec two ifconfig ${epair}b mtu 1000
+
+	atf_check -s exit:0 -o ignore \
+		jexec one ping -c 1 -s 1200 198.51.100.2
+	atf_check -s exit:0 -o ignore \
+		jexec one ping -c 1 -s 2000 198.51.100.2
+}
+
+gif_cleanup()
+{
+	vnet_cleanup
+}
+
+atf_test_case "mtu" "cleanup"
+mtu_head()
+{
+	atf_set descr 'Bridge MTU changes'
+	atf_set require.user root
+}
+
+get_mtu()
+{
+	intf=$1
+
+	ifconfig ${intf} ether | awk '$5 == "mtu" { print $6 }'
+}
+
+check_mtu()
+{
+	intf=$1
+	expected=$2
+
+	mtu=$(get_mtu $intf)
+	if [ $mtu -ne $expected ];
+	then
+		atf_fail "Expected MTU of $expected on $intf but found $mtu"
+	fi
+}
+
+mtu_body()
+{
+	vnet_init
+
+	epair=$(vnet_mkepair)
+	gif=$(ifconfig gif create)
+	echo ${gif} >> created_interfaces.lst
+	bridge=$(vnet_mkbridge)
+
+	atf_check -s exit:0 \
+		ifconfig ${bridge} addm ${epair}a
+
+	ifconfig ${gif} mtu 1500
+	atf_check -s exit:0 \
+		ifconfig ${bridge} addm ${gif}
+
+	# Changing MTU changes it for all member interfaces
+	atf_check -s exit:0 \
+		ifconfig ${bridge} mtu 2000
+
+	check_mtu ${bridge} 2000
+	check_mtu ${gif} 2000
+	check_mtu ${epair}a 2000
+
+	# Rejected MTUs mean none of the MTUs change
+	atf_check -s exit:1 -e ignore \
+		ifconfig ${bridge} mtu 9000
+
+	check_mtu ${bridge} 2000
+	check_mtu ${gif} 2000
+	check_mtu ${epair}a 2000
+
+	# We're not allowed to change the MTU of a member interface
+	atf_check -s exit:1 -e ignore \
+		ifconfig ${epair}a mtu 1900
+	check_mtu ${epair}a 2000
+
+	# Test adding an interface with a different MTU
+	new_epair=$(vnet_mkepair)
+	check_mtu ${new_epair}a 1500
+	atf_check -s exit:0 -e ignore \
+		ifconfig ${bridge} addm ${new_epair}a
+
+	check_mtu ${bridge} 2000
+	check_mtu ${gif} 2000
+	check_mtu ${epair}a 2000
+	check_mtu ${new_epair}a 2000
+}
+
+mtu_cleanup()
+{
+	vnet_cleanup
+}
+
 atf_init_test_cases()
 {
 	atf_add_test_case "bridge_transmit_ipv4_unicast"
@@ -463,4 +612,6 @@ atf_init_test_cases()
 	atf_add_test_case "delete_with_members"
 	atf_add_test_case "mac_conflict"
 	atf_add_test_case "stp_validation"
+	atf_add_test_case "gif"
+	atf_add_test_case "mtu"
 }

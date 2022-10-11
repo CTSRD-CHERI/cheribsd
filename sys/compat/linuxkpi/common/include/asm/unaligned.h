@@ -30,11 +30,18 @@
  * $FreeBSD$
  */
 
-#ifndef	_ASM_UNALIGNED_H
-#define	_ASM_UNALIGNED_H
+#ifndef	_LINUXKPI_ASM_UNALIGNED_H
+#define	_LINUXKPI_ASM_UNALIGNED_H
 
 #include <linux/types.h>
 #include <asm/byteorder.h>
+
+static __inline uint16_t
+get_unaligned_le16(const void *p)
+{
+
+	return (le16_to_cpup((const __le16 *)p));
+}
 
 static __inline uint32_t
 get_unaligned_le32(const void *p)
@@ -75,4 +82,4 @@ get_unaligned_be32(const void *p)
 	return (be32_to_cpup((const __be32 *)p));
 }
 
-#endif	/* _ASM_UNALIGNED_H */
+#endif	/* _LINUXKPI_ASM_UNALIGNED_H */

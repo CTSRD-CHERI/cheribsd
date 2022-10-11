@@ -673,8 +673,6 @@ __FBSDID("$FreeBSD$");
 /* amount peer is obligated to have in rwnd or I will abort */
 #define SCTP_MIN_RWND	1500
 
-#define SCTP_DEFAULT_MAXSEGMENT 65535
-
 #define SCTP_CHUNK_BUFFER_SIZE	512
 #define SCTP_PARAM_BUFFER_SIZE	512
 
@@ -716,6 +714,7 @@ __FBSDID("$FreeBSD$");
 #define SCTP_NOTIFY_NO_PEER_AUTH                25
 #define SCTP_NOTIFY_SENDER_DRY                  26
 #define SCTP_NOTIFY_REMOTE_ERROR                27
+#define SCTP_NOTIFY_ASSOC_TIMEDOUT              28
 
 /* This is the value for messages that are NOT completely
  * copied down where we will start to split the message.
@@ -969,7 +968,7 @@ __FBSDID("$FreeBSD$");
 #define sctp_sowwakeup(inp, so) \
 do { \
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_DONT_WAKE) { \
-		inp->sctp_flags |= SCTP_PCB_FLAGS_WAKEOUTPUT; \
+		sctp_pcb_add_flags(inp, SCTP_PCB_FLAGS_WAKEOUTPUT); \
 	} else { \
 		sowwakeup(so); \
 	} \
@@ -978,8 +977,8 @@ do { \
 #define sctp_sowwakeup_locked(inp, so) \
 do { \
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_DONT_WAKE) { \
+		sctp_pcb_add_flags(inp, SCTP_PCB_FLAGS_WAKEOUTPUT); \
 		SOCKBUF_UNLOCK(&((so)->so_snd)); \
-		inp->sctp_flags |= SCTP_PCB_FLAGS_WAKEOUTPUT; \
 	} else { \
 		sowwakeup_locked(so); \
 	} \
@@ -988,7 +987,7 @@ do { \
 #define sctp_sorwakeup(inp, so) \
 do { \
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_DONT_WAKE) { \
-		inp->sctp_flags |= SCTP_PCB_FLAGS_WAKEINPUT; \
+		sctp_pcb_add_flags(inp, SCTP_PCB_FLAGS_WAKEINPUT); \
 	} else { \
 		sorwakeup(so); \
 	} \
@@ -997,7 +996,7 @@ do { \
 #define sctp_sorwakeup_locked(inp, so) \
 do { \
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_DONT_WAKE) { \
-		inp->sctp_flags |= SCTP_PCB_FLAGS_WAKEINPUT; \
+		sctp_pcb_add_flags(inp, SCTP_PCB_FLAGS_WAKEINPUT); \
 		SOCKBUF_UNLOCK(&((so)->so_rcv)); \
 	} else { \
 		sorwakeup_locked(so); \

@@ -408,6 +408,7 @@ struct	in6_rrenumreq {
 #define IA6_DSTSIN6(ia)	(&((ia)->ia_dstaddr))
 #define IFA_IN6(x)	(&((struct sockaddr_in6 *)((x)->ifa_addr))->sin6_addr)
 #define IFA_DSTIN6(x)	(&((struct sockaddr_in6 *)((x)->ifa_dstaddr))->sin6_addr)
+#define IFA_MASKIN6(x)	(&((struct sockaddr_in6 *)((x)->ifa_netmask))->sin6_addr)
 
 #define IFPR_IN6(x)	(&((struct sockaddr_in6 *)((x)->ifpr_prefix))->sin6_addr)
 
@@ -916,6 +917,8 @@ int	in6_is_addr_deprecated(struct sockaddr_in6 *);
 int	in6_src_ioctl(u_long, caddr_t);
 
 void	in6_newaddrmsg(struct in6_ifaddr *, int);
+
+void	in6_purge_proxy_ndp(struct ifnet *);
 /*
  * Extended API for IPv6 FIB support.
  */

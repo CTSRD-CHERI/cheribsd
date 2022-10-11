@@ -30,9 +30,16 @@ clean_dep()
 {
 	if [ -e "$OBJTOP"/$1/.depend.$2.pico ] && \
 	    egrep -qw "$2\.$3" "$OBJTOP"/$1/.depend.$2.pico; then \
-		echo "Removing stale dependencies for $2.$3"; \
-		rm -f "$OBJTOP"/$1/.depend.$2.* \
-		    "$OBJTOP"/obj-lib32/$1/.depend.$2.*
+		echo "Removing stale dependencies and objects for $2.$3"; \
+		rm -f \
+		    "$OBJTOP"/$1/.depend.$2.* \
+		    "$OBJTOP"/$1/$2.*o \
+		    "$OBJTOP"/obj-lib64/$1/.depend.$2.* \
+		    "$OBJTOP"/obj-lib64/$1/$2.*o \
+		    "$OBJTOP"/obj-lib64c/$1/.depend.$2.* \
+		    "$OBJTOP"/obj-lib64c/$1/$2.*o \
+		    "$OBJTOP"/obj-lib32/$1/.depend.$2.* \
+		    "$OBJTOP"/obj-lib32/$1/$2.*o
 	fi
 }
 
@@ -41,13 +48,15 @@ clean_dep()
 clean_dep lib/libomp ittnotify_static c
 # 20200414  r359930  closefrom
 clean_dep lib/libc   closefrom S
+clean_dep lib/libsyscalls closefrom S
 
 # 20200826  r364746  OpenZFS merge, apply a big hammer (remove whole tree)
 if [ -e "$OBJTOP"/cddl/lib/libzfs/.depend.libzfs_changelist.o ] && \
     egrep -qw "cddl/contrib/opensolaris/lib/libzfs/common/libzfs_changelist.c" \
     "$OBJTOP"/cddl/lib/libzfs/.depend.libzfs_changelist.o; then
 	echo "Removing old ZFS tree"
-	rm -rf "$OBJTOP"/cddl "$OBJTOP"/obj-lib32/cddl
+	rm -rf "$OBJTOP"/cddl "$OBJTOP"/obj-lib32/cddl \
+	   "$OBJTOP"/obj-lib64/cddl "$OBJTOP"/obj-lib64c/cddl
 fi
 
 # 20200916  WARNS bumped, need bootstrapped crunchgen stubs
@@ -68,5 +77,32 @@ fi
 # 20210108  821aa63a0940   non-widechar version of ncurses removed
 if [ -e "$OBJTOP"/lib/ncurses/ncursesw ]; then
 	echo "Removing stale ncurses objects"
-	rm -rf "$OBJTOP"/lib/ncurses "$OBJTOP"/obj-lib32/lib/ncurses
+	rm -rf "$OBJTOP"/lib/ncurses "$OBJTOP"/obj-lib32/lib/ncurses \
+	   "$OBJTOP"/obj-lib64/lib/ncurses "$OBJTOP"/obj-lib64c/lib/ncurses
+fi
+
+# 20210608  f20893853e8e    move from atomic.S to atomic.c
+clean_dep   cddl/lib/libspl atomic S
+# 20211207  cbdec8db18b5    switch to libthr-friendly pdfork
+clean_dep   lib/libc        pdfork S
+clean_dep   lib/libsyscalls pdfork S
+
+# 20211230  5e6a2d6eb220    libc++.so.1 path changed in ldscript
+if [ -e "$OBJTOP"/lib/libc++/libc++.ld ] && \
+    fgrep -q "/usr/lib/libc++.so" "$OBJTOP"/lib/libc++/libc++.ld; then
+	echo "Removing old libc++ linker script"
+	rm -f "$OBJTOP"/lib/libc++/libc++.ld
+fi
+
+# 20220326  fbc002cb72d2    move from bcmp.c to bcmp.S
+if [ "$MACHINE_ARCH" = "amd64" ]; then
+    clean_dep lib/libc bcmp c
+fi
+
+# 20220524  68fe988a40ca    kqueue_test binary replaced shell script
+if stat "$OBJTOP"/tests/sys/kqueue/libkqueue/*kqtest* \
+    "$OBJTOP"/tests/sys/kqueue/libkqueue/.depend.kqtest* >/dev/null 2>&1; then
+	echo "Removing old kqtest"
+	rm -f "$OBJTOP"/tests/sys/kqueue/libkqueue/.depend.* \
+	   "$OBJTOP"/tests/sys/kqueue/libkqueue/*
 fi

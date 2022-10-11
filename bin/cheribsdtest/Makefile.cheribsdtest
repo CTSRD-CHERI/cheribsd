@@ -26,8 +26,11 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 	cheribsdtest_vm.c						\
 	cheribsdtest_zlib.c
 .if ${MACHINE_ABI:Mpurecap}
-SRCS+=	cheribsdtest_bounds_varargs.c					\
+SRCS+=	cheribsdtest_bounds_subobject.c					\
+	cheribsdtest_bounds_varargs.c					\
 	cheribsdtest_sentries.c
+
+SRCS+=		cheribsdtest_colocation.c
 .endif
 
 CHERIBSDTEST_DIR:=	${.PARSEDIR}
@@ -46,39 +49,10 @@ SRCS+=	cheribsdtest_cheriabi_open.c
 #SRCS+=	cheribsdtest_vm_swap.c
 #CFLAGS.cheribsdtest_vm_swap.c+=-Wno-cheri-capability-misuse
 
-.if ${MACHINE} == mips
-.PATH: ${SRCTOP}/sys/mips/cheri
-SRCS+=	cheri_memcpy_c.S
-CFLAGS.cheri_memcpy_c.S=-D__KERN_FUNC_PREFIX -D_KERNEL -DINVARIANTS
-CFLAGS+=	-DKERNEL_MEMCPY_TESTS
-.endif
+.sinclude "${CHERIBSDTEST_DIR}/${MACHINE}/Makefile.cheribsdtest"
 
-.if ${MACHINE} == "mips"
-.ifdef CHERI_C_TESTS
-CHERI_C_TESTS_DIR=	${SRCTOP}/contrib/subrepo-cheri-c-tests
-.if exists(${CHERI_C_TESTS_DIR}/Makefile)
-.PATH: ${CHERI_C_TESTS_DIR} \
-		${CHERI_C_TESTS_DIR}/clang-hybrid \
-		${CHERI_C_TESTS_DIR}/clang-purecap \
-		${CHERI_C_TESTS_DIR}/libc
-CFLAGS+=	-DCHERI_C_TESTS \
-		-I${CHERI_C_TESTS_DIR}
-
-CFLAGS+=	-DTEST_CUSTOM_FRAMEWORK -I${CHERIBSDTEST_DIR} \
-		-DHAVE_MALLOC_USUABLE_SIZE
-TEST_SRCS!=	grep ^DECLARE_TEST ${CHERI_C_TESTS_DIR}/cheri_c_testdecls.h | \
-		    sed -e 's/.*(\([^,]*\),.*/\1.c/'
-SRCS+=	test_runtime.c	\
-	${TEST_SRCS}
-
-.for test in ${TEST_SRCS}
-# Avoid the need for extern declarations for variables/functions that are
-# declared global so that the compiler emits them
-CFLAGS.${test}+=-Wno-missing-prototypes -Wno-missing-variable-declarations
-.endfor
-.endif
-.endif
-.endif
+# Enable sub-object bounds only in tests specifically designed for them.
+CFLAGS.cheribsdtest_bounds_subobject.c+=-cheri-bounds=subobject-safe
 
 .ifdef CHERIBSD_THREAD_TESTS
 CFLAGS+=	-DCHERIBSD_THREAD_TESTS
@@ -88,6 +62,9 @@ MAN=
 
 LIBADD= 	z
 LIBADD+=	xo util
+.if ${MACHINE_ABI:Mpurecap}
+LIBADD+=	procstat
+.endif
 
 .ifdef CHERIBSD_DYNAMIC_TESTS
 CFLAGS+=	-DCHERIBSD_DYNAMIC_TESTS
@@ -97,6 +74,10 @@ LIBADD+=	cheribsdtest_dynamic
 SRCS+=		cheribsdtest_lazy_bind.c
 .else
 NO_SHARED?=	YES
+.endif
+
+.ifdef CHERIBSD_IFUNC_TESTS
+SRCS+=		cheribsdtest_ifunc.c
 .endif
 
 .ifdef CHERIBSD_THREAD_TESTS

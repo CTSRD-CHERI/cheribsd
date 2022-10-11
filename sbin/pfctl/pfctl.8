@@ -26,7 +26,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd October 3, 2016
+.Dd February 22, 2021
 .Dt PFCTL 8
 .Os
 .Sh NAME
@@ -35,7 +35,7 @@
 .Sh SYNOPSIS
 .Nm pfctl
 .Bk -words
-.Op Fl AdeghmNnOPqRrvz
+.Op Fl AdeghMmNnOPqRrvz
 .Op Fl a Ar anchor
 .Oo Fl D Ar macro Ns =
 .Ar value Oc
@@ -45,7 +45,7 @@
 .Op Fl K Ar host | network
 .Xo
 .Oo Fl k
-.Ar host | network | label | id
+.Ar host | network | label | id | gateway
 .Oc Xc
 .Op Fl o Ar level
 .Op Fl p Ar device
@@ -212,6 +212,8 @@ Flush the filter parameters specified by
 Flush the NAT rules.
 .It Fl F Cm queue
 Flush the queue rules.
+.It Fl F Cm ethernet
+Flush the Ethernet filter rules.
 .It Fl F Cm rules
 Flush the filter rules.
 .It Fl F Cm states
@@ -256,14 +258,15 @@ option may be specified, which will kill all the source tracking
 entries from the first host/network to the second.
 .It Xo
 .Fl k
-.Ar host | network | label | id
+.Ar host | network | label | id | gateway
 .Xc
 Kill all of the state entries matching the specified
 .Ar host ,
 .Ar network ,
 .Ar label ,
+.Ar id ,
 or
-.Ar id .
+.Ar gateway.
 .Pp
 For example, to kill all of the state entries originating from
 .Dq host :
@@ -317,6 +320,30 @@ To kill a state with ID 4823e84500000018 created from a backup
 firewall with hostid 00000002 use:
 .Pp
 .Dl # pfctl -k id -k 4823e84500000018/2
+.Pp
+It is also possible to kill states created from a rule with the route-to/reply-to
+parameter set to route the connection through a particular gateway.
+Note that rules routing via the default routing table (not via a route-to
+rule) will have their rt_addr set as 0.0.0.0 or ::.
+To kill all states using a gateway of 192.168.0.1 use:
+.Pp
+.Dl # pfctl -k gateway -k 192.168.0.1
+.Pp
+A network prefix length can also be specified.
+To kill all states using a gateway in 192.168.0.0/24:
+.Pp
+.Dl # pfctl -k gateway -k 192.168.0.0/24
+.Pp
+.It Fl M
+Kill matching states in the opposite direction (on other interfaces) when
+killing states.
+This applies to states killed using the -k option and also will apply to the
+flush command when flushing states.
+This is useful when an interface is specified when flushing states.
+Example:
+.Pp
+.Dl # pfctl -M -i interface -Fs
+.Pp
 .It Fl m
 Merge in explicitly given options without resetting those
 which are omitted.
@@ -379,12 +406,18 @@ When used together with
 .Nm
 will loop and show updated queue statistics every five seconds, including
 measured bandwidth and packets per second.
+.It Fl s Cm ether
+Show the currently loaded Ethernet rules.
+When used together with
+.Fl v ,
+the per-rule statistics (number of evaluations,
+packets, and bytes) are also shown.
 .It Fl s Cm rules
 Show the currently loaded filter rules.
 When used together with
 .Fl v ,
 the per-rule statistics (number of evaluations,
-packets and bytes) are also shown.
+packets, and bytes) are also shown.
 Note that the
 .Dq skip step
 optimization done automatically by the kernel

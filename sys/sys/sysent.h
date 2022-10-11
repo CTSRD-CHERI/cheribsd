@@ -98,30 +98,33 @@ struct proc;
 struct __sigset;
 struct trapframe;
 struct vnode;
+struct note_info_list;
 
 struct sysentvec {
 	int		sv_size;	/* number of entries */
 	struct sysent	*sv_table;	/* pointer to sysent */
-	int		(*sv_transtrap)(int, int);
-					/* translate trap-to-signal mapping */
 	int		(*sv_fixup)(uintcap_t *, struct image_params *);
 					/* stack fixup function */
 	void		(*sv_sendsig)(void (* __capability)(int), struct ksiginfo *, struct __sigset *);
 			    		/* send signal */
-	char 		*sv_sigcode;	/* start of sigtramp code */
+	const char 	*sv_sigcode;	/* start of sigtramp code */
 	int 		*sv_szsigcode;	/* size of sigtramp code */
+	int		sv_sigcodeoff;
 	char		*sv_name;	/* name of binary type */
 	int		(*sv_coredump)(struct thread *, struct vnode *, off_t, int);
 					/* function to dump core, or NULL */
+	int		sv_elf_core_osabi;
+	const char	*sv_elf_core_abi_vendor;
+	void		(*sv_elf_core_prepare_notes)(struct thread *,
+			    struct note_info_list *, size_t *);
 	int		(*sv_imgact_try)(struct image_params *);
-	void		(*sv_stackgap)(struct image_params *, uintcap_t *);
 	int		(*sv_copyout_auxargs)(struct image_params *,
 			    uintcap_t);
 	int		sv_minsigstksz;	/* minimum signal stack size */
 	vm_offset_t	sv_minuser;	/* VM_MIN_ADDRESS */
 	vm_offset_t	sv_maxuser;	/* VM_MAXUSER_ADDRESS */
 	vm_offset_t	sv_usrstack;	/* USRSTACK */
-	size_t		sv_szpsstrings;	/* sizeof(struct ps_strings) */
+	size_t		sv_psstringssz;	/* PS_STRINGS size */
 	int		sv_stackprot;	/* vm protection for stack */
 	int		(*sv_copyout_strings)(struct image_params *,
 			    uintcap_t *);
@@ -133,10 +136,10 @@ struct sysentvec {
 	void		(*sv_set_syscall_retval)(struct thread *, int);
 	int		(*sv_fetch_syscall_args)(struct thread *);
 	const char	**sv_syscallnames;
-	vm_offset_t	sv_timekeep_base;
+	vm_offset_t	sv_timekeep_offset;
 	vm_offset_t	sv_shared_page_base;
 	vm_offset_t	sv_shared_page_len;
-	vm_offset_t	sv_sigcode_base;
+	vm_offset_t	sv_sigcode_offset;
 	void		*sv_shared_page_obj;
 	vm_offset_t	sv_cocall_base;
 	vm_offset_t	sv_cocall_len;
@@ -146,16 +149,24 @@ struct sysentvec {
 	vm_offset_t	sv_cogetpid_len;
 	vm_offset_t	sv_cogettid_base;
 	vm_offset_t	sv_cogettid_len;
+	vm_offset_t	sv_vdso_offset;
 	void		(*sv_schedtail)(struct thread *);
 	void		(*sv_thread_detach)(struct thread *);
 	int		(*sv_trap)(struct thread *);
 	u_long		*sv_hwcap;	/* Value passed in AT_HWCAP. */
 	u_long		*sv_hwcap2;	/* Value passed in AT_HWCAP2. */
 	const char	*(*sv_machine_arch)(struct proc *);
-	vm_offset_t	sv_fxrng_gen_base;
-	void		(*sv_onexec)(struct proc *, struct image_params *);
+	vm_offset_t	sv_fxrng_gen_offset;
+	void		(*sv_onexec_old)(struct thread *td);
+	int		(*sv_onexec)(struct proc *, struct image_params *);
 	void		(*sv_onexit)(struct proc *);
 	void		(*sv_ontdexit)(struct thread *td);
+	int		(*sv_setid_allowed)(struct thread *td,
+			    struct image_params *imgp);
+	void		(*sv_set_fork_retval)(struct thread *);
+					/* Only used on x86 */
+	struct regset	**sv_regset_begin;
+	struct regset	**sv_regset_end;
 };
 
 #define	SV_ILP32	0x000100	/* 32-bit executable. */
@@ -163,10 +174,13 @@ struct sysentvec {
 #define	SV_IA32		0x004000	/* Intel 32-bit executable. */
 #define	SV_AOUT		0x008000	/* a.out executable. */
 #define	SV_SHP		0x010000	/* Shared page. */
-#define	SV_CAPSICUM	0x020000	/* Force cap_enter() on startup. */
+#define	SV_AVAIL1	0x020000	/* Unused */
 #define	SV_TIMEKEEP	0x040000	/* Shared page timehands. */
 #define	SV_ASLR		0x080000	/* ASLR allowed. */
 #define	SV_RNG_SEED_VER	0x100000	/* random(4) reseed generation. */
+#define	SV_SIG_DISCIGN	0x200000	/* Do not discard ignored signals */
+#define	SV_SIG_WAITNDQ	0x400000	/* Wait does not dequeue SIGCHLD */
+#define	SV_DSO_SIG	0x800000	/* Signal trampoline packed in dso */
 #define	SV_CHERI	0x08000000	/* CheriABI executable. */
 
 #define	SV_ABI_MASK	0xff
@@ -177,13 +191,23 @@ struct sysentvec {
 /* same as ELFOSABI_XXX, to prevent header pollution */
 #define	SV_ABI_LINUX	3
 #define	SV_ABI_FREEBSD 	9
-#define	SV_ABI_CLOUDABI	17
 #define	SV_ABI_UNDEF	255
+
+/* sv_coredump flags */
+#define	SVC_PT_COREDUMP	0x00000001	/* dump requested by ptrace(2) */
+#define	SVC_NOCOMPRESS	0x00000002	/* disable compression. */
+#define	SVC_ALL		0x00000004	/* dump everything */
 
 #ifdef _KERNEL
 extern struct sysentvec aout_sysvec;
 extern struct sysent sysent[];
 extern const char *syscallnames[];
+
+struct nosys_args {
+	register_t dummy;
+};
+
+int	nosys(struct thread *, struct nosys_args *);
 
 #define	NO_SYSCALL (-1)
 
@@ -315,6 +339,10 @@ void shared_page_write(int base, int size, const void *data);
 void exec_sysvec_init(void *param);
 void exec_sysvec_init_secondary(struct sysentvec *sv, struct sysentvec *sv2);
 void exec_inittk(void);
+
+void exit_onexit(struct proc *p);
+void exec_free_abi_mappings(struct proc *p);
+void exec_onexec_old(struct thread *td);
 
 #define INIT_SYSENTVEC(name, sv)					\
     SYSINIT(name, SI_SUB_EXEC, SI_ORDER_ANY,				\

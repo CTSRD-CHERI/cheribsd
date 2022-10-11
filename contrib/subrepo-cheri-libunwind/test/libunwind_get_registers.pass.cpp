@@ -78,10 +78,6 @@ int main() {
     // The address of context should have been captured as the argument passed
     // to unw_getcontext (in a0/x10):
     CHECK_REG(UNW_RISCV_X10, (uintptr_t)context);
-#ifdef __CHERI_PURE_CAPABILITY__
-    CHECK_REG(UNW_RISCV_DDC, (uintptr_t)NULL);
-#else
-#endif
   };
 #define ASM_SETUP_CONTEXT()                                                    \
   __asm__ volatile("mv s10, %0\n\t"                                            \

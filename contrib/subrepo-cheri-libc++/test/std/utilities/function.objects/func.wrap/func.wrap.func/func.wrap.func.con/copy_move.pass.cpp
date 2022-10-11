@@ -6,6 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// XFAIL: LIBCXX-WINDOWS-FIXME
+
 // <functional>
 
 // class function<R(ArgTypes...)>
@@ -61,63 +63,47 @@ int main(int, char**)
     std::function<int(int)> f = A();
     assert(A::count == 1);
     assert(globalMemCounter.checkOutstandingNewEq(1));
-#ifndef _LIBCPP_NO_RTTI
-    assert(f.target<A>());
-    assert(f.target<int(*)(int)>() == 0);
-#endif
+    RTTI_ASSERT(f.target<A>());
+    RTTI_ASSERT(f.target<int(*)(int)>() == 0);
     std::function<int(int)> f2 = f;
     assert(A::count == 2);
     assert(globalMemCounter.checkOutstandingNewEq(2));
-#ifndef _LIBCPP_NO_RTTI
-    assert(f2.target<A>());
-    assert(f2.target<int(*)(int)>() == 0);
-#endif
+    RTTI_ASSERT(f2.target<A>());
+    RTTI_ASSERT(f2.target<int(*)(int)>() == 0);
     }
     assert(A::count == 0);
     assert(globalMemCounter.checkOutstandingNewEq(0));
     {
     std::function<int(int)> f = g;
     assert(globalMemCounter.checkOutstandingNewEq(0));
-#ifndef _LIBCPP_NO_RTTI
-    assert(f.target<int(*)(int)>());
-    assert(f.target<A>() == 0);
-#endif
+    RTTI_ASSERT(f.target<int(*)(int)>());
+    RTTI_ASSERT(f.target<A>() == 0);
     std::function<int(int)> f2 = f;
     assert(globalMemCounter.checkOutstandingNewEq(0));
-#ifndef _LIBCPP_NO_RTTI
-    assert(f2.target<int(*)(int)>());
-    assert(f2.target<A>() == 0);
-#endif
+    RTTI_ASSERT(f2.target<int(*)(int)>());
+    RTTI_ASSERT(f2.target<A>() == 0);
     }
     assert(globalMemCounter.checkOutstandingNewEq(0));
     {
     std::function<int(int)> f;
     assert(globalMemCounter.checkOutstandingNewEq(0));
-#ifndef _LIBCPP_NO_RTTI
-    assert(f.target<int(*)(int)>() == 0);
-    assert(f.target<A>() == 0);
-#endif
+    RTTI_ASSERT(f.target<int(*)(int)>() == 0);
+    RTTI_ASSERT(f.target<A>() == 0);
     std::function<int(int)> f2 = f;
     assert(globalMemCounter.checkOutstandingNewEq(0));
-#ifndef _LIBCPP_NO_RTTI
-    assert(f2.target<int(*)(int)>() == 0);
-    assert(f2.target<A>() == 0);
-#endif
+    RTTI_ASSERT(f2.target<int(*)(int)>() == 0);
+    RTTI_ASSERT(f2.target<A>() == 0);
     }
     {
     std::function<int(int)> f;
     assert(globalMemCounter.checkOutstandingNewEq(0));
-#ifndef _LIBCPP_NO_RTTI
-    assert(f.target<int(*)(int)>() == 0);
-    assert(f.target<A>() == 0);
-#endif
+    RTTI_ASSERT(f.target<int(*)(int)>() == 0);
+    RTTI_ASSERT(f.target<A>() == 0);
     assert(!f);
     std::function<long(int)> g = f;
     assert(globalMemCounter.checkOutstandingNewEq(0));
-#ifndef _LIBCPP_NO_RTTI
-    assert(g.target<long(*)(int)>() == 0);
-    assert(g.target<A>() == 0);
-#endif
+    RTTI_ASSERT(g.target<long(*)(int)>() == 0);
+    RTTI_ASSERT(g.target<A>() == 0);
     assert(!g);
     }
 #if TEST_STD_VER >= 11
@@ -126,10 +112,8 @@ int main(int, char**)
         std::function<int(int)> f = A();
         assert(A::count == 1);
         assert(globalMemCounter.checkOutstandingNewEq(1));
-#ifndef _LIBCPP_NO_RTTI
-        assert(f.target<A>());
-        assert(f.target<int(*)(int)>() == 0);
-#endif
+        RTTI_ASSERT(f.target<A>());
+        RTTI_ASSERT(f.target<int(*)(int)>() == 0);
 		LIBCPP_ASSERT_NOEXCEPT(std::function<int(int)>(std::move(f)));
 #if TEST_STD_VER > 17
 		ASSERT_NOEXCEPT(std::function<int(int)>(std::move(f)));
@@ -137,12 +121,10 @@ int main(int, char**)
         std::function<int(int)> f2 = std::move(f);
         assert(A::count == 1);
         assert(globalMemCounter.checkOutstandingNewEq(1));
-#ifndef _LIBCPP_NO_RTTI
-        assert(f2.target<A>());
-        assert(f2.target<int(*)(int)>() == 0);
-        assert(f.target<A>() == 0);
-        assert(f.target<int(*)(int)>() == 0);
-#endif
+        RTTI_ASSERT(f2.target<A>());
+        RTTI_ASSERT(f2.target<int(*)(int)>() == 0);
+        RTTI_ASSERT(f.target<A>() == 0);
+        RTTI_ASSERT(f.target<int(*)(int)>() == 0);
     }
     assert(globalMemCounter.checkOutstandingNewEq(0));
     {
@@ -154,20 +136,18 @@ int main(int, char**)
         Ref aref(a);
         std::function<int(int)> f(aref);
         assert(A::count == 1);
-#ifndef _LIBCPP_NO_RTTI
-        assert(f.target<A>() == nullptr);
-        assert(f.target<Ref>());
-#endif
+        RTTI_ASSERT(f.target<A>() == nullptr);
+        RTTI_ASSERT(f.target<Ref>());
 		LIBCPP_ASSERT_NOEXCEPT(std::function<int(int)>(std::move(f)));
 #if TEST_STD_VER > 17
 		ASSERT_NOEXCEPT(std::function<int(int)>(std::move(f)));
 #endif
         std::function<int(int)> f2(std::move(f));
         assert(A::count == 1);
-#ifndef _LIBCPP_NO_RTTI
-        assert(f2.target<A>() == nullptr);
-        assert(f2.target<Ref>());
-        LIBCPP_ASSERT(f.target<Ref>()); // f is unchanged because the target is small
+        RTTI_ASSERT(f2.target<A>() == nullptr);
+        RTTI_ASSERT(f2.target<Ref>());
+#if defined(_LIBCPP_VERSION)
+        RTTI_ASSERT(f.target<Ref>()); // f is unchanged because the target is small
 #endif
     }
     {
@@ -177,22 +157,20 @@ int main(int, char**)
         using Ptr = int(*)(int);
         Ptr p = g;
         std::function<int(int)> f(p);
-#ifndef _LIBCPP_NO_RTTI
-        assert(f.target<A>() == nullptr);
-        assert(f.target<Ptr>());
-#endif
+        RTTI_ASSERT(f.target<A>() == nullptr);
+        RTTI_ASSERT(f.target<Ptr>());
 		LIBCPP_ASSERT_NOEXCEPT(std::function<int(int)>(std::move(f)));
 #if TEST_STD_VER > 17
 		ASSERT_NOEXCEPT(std::function<int(int)>(std::move(f)));
 #endif
         std::function<int(int)> f2(std::move(f));
-#ifndef _LIBCPP_NO_RTTI
-        assert(f2.target<A>() == nullptr);
-        assert(f2.target<Ptr>());
-        LIBCPP_ASSERT(f.target<Ptr>()); // f is unchanged because the target is small
+        RTTI_ASSERT(f2.target<A>() == nullptr);
+        RTTI_ASSERT(f2.target<Ptr>());
+#if defined(_LIBCPP_VERSION)
+        RTTI_ASSERT(f.target<Ptr>()); // f is unchanged because the target is small
 #endif
     }
-#endif  // TEST_STD_VER >= 11
+#endif // TEST_STD_VER >= 11
 
   return 0;
 }

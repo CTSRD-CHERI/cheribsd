@@ -74,7 +74,6 @@ static int	aout_fixup(uintptr_t *stack_base, struct image_params *imgp);
 struct sysentvec aout_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
-	.sv_transtrap	= NULL,
 	.sv_fixup	= aout_fixup,
 	.sv_sendsig	= sendsig,
 	.sv_sigcode	= sigcode,
@@ -86,7 +85,7 @@ struct sysentvec aout_sysvec = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= AOUT32_USRSTACK,
 	.sv_usrstack	= AOUT32_USRSTACK,
-	.sv_szpsstrings	= sizeof(struct ps_strings),
+	.sv_psstringssz	= sizeof(struct ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_strings	= exec_copyout_strings,
 	.sv_setregs	= exec_setregs,
@@ -99,23 +98,33 @@ struct sysentvec aout_sysvec = {
 	.sv_schedtail	= NULL,
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
+	.sv_onexec_old = exec_onexec_old,
+	.sv_onexit =  exit_onexit,
+	.sv_set_fork_retval = x86_set_fork_retval,
 };
 
 #elif defined(__amd64__)
+
+#include "vdso_ia32_offsets.h"
+
+extern const char _binary_elf_vdso32_so_1_start[];
+extern const char _binary_elf_vdso32_so_1_end[];
+extern char _binary_elf_vdso32_so_1_size;
 
 #define	AOUT32_MINUSER		FREEBSD32_MINUSER
 
 extern const char *freebsd32_syscallnames[];
 extern u_long ia32_maxssiz;
 
+static int aout_szsigcode;
+
 struct sysentvec aout_sysvec = {
 	.sv_size	= FREEBSD32_SYS_MAXSYSCALL,
 	.sv_table	= freebsd32_sysent,
-	.sv_transtrap	= NULL,
 	.sv_fixup	= aout_fixup,
 	.sv_sendsig	= ia32_sendsig,
-	.sv_sigcode	= ia32_sigcode,
-	.sv_szsigcode	= &sz_ia32_sigcode,
+	.sv_sigcode	= _binary_elf_vdso32_so_1_start,
+	.sv_szsigcode	= &aout_szsigcode,
 	.sv_name	= "FreeBSD a.out",
 	.sv_coredump	= NULL,
 	.sv_imgact_try	= NULL,
@@ -123,7 +132,7 @@ struct sysentvec aout_sysvec = {
 	.sv_minuser	= AOUT32_MINUSER,
 	.sv_maxuser	= AOUT32_USRSTACK,
 	.sv_usrstack	= AOUT32_USRSTACK,
-	.sv_szpsstrings	= sizeof(struct freebsd32_ps_strings),
+	.sv_psstringssz	= sizeof(struct freebsd32_ps_strings),
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_strings	= freebsd32_copyout_strings,
 	.sv_setregs	= ia32_setregs,
@@ -133,9 +142,19 @@ struct sysentvec aout_sysvec = {
 	.sv_set_syscall_retval = ia32_set_syscall_retval,
 	.sv_fetch_syscall_args = ia32_fetch_syscall_args,
 	.sv_syscallnames = freebsd32_syscallnames,
+	.sv_onexec_old	= exec_onexec_old,
+	.sv_onexit	= exit_onexit,
+	.sv_set_fork_retval = x86_set_fork_retval,
 };
+
+static void
+aout_sysent(void *arg __unused)
+{
+	aout_szsigcode = (int)(uintptr_t)&_binary_elf_vdso32_so_1_size;
+}
+SYSINIT(aout_sysent, SI_SUB_EXEC, SI_ORDER_ANY, aout_sysent, NULL);
 #else
-#error "Port me"
+#error "Only ia32 arch is supported"
 #endif
 
 static int
@@ -151,7 +170,7 @@ aout_fixup(uintptr_t *stack_base, struct image_params *imgp)
 static int
 exec_aout_imgact(struct image_params *imgp)
 {
-	const struct exec *a_out = (const struct exec *) imgp->image_header;
+	const struct exec *a_out;
 	struct vmspace *vmspace;
 	vm_map_t map;
 	vm_object_t object;
@@ -163,6 +182,8 @@ exec_aout_imgact(struct image_params *imgp)
 	vm_pointer_t reservation;
 	vm_size_t reserv_size;
 
+	a_out = (const struct exec *)imgp->image_header;
+
 	/*
 	 * Linux and *BSD binaries look very much alike,
 	 * only the machine id is different:
@@ -172,7 +193,7 @@ exec_aout_imgact(struct image_params *imgp)
 	if (((a_out->a_midmag >> 16) & 0xff) != 0x86 &&
 	    ((a_out->a_midmag >> 16) & 0xff) != 0 &&
 	    ((((int)ntohl(a_out->a_midmag)) >> 16) & 0xff) != 0x86)
-                return -1;
+                return (-1);
 
 	/*
 	 * Set file/virtual offset based on a.out variant.
@@ -199,7 +220,7 @@ exec_aout_imgact(struct image_params *imgp)
 		 */
 		if (N_GETMID(*a_out) == MID_ZERO)
 			imgp->ps_strings = (void *)(aout_sysvec.sv_usrstack -
-			    aout_sysvec.sv_szpsstrings);
+			    aout_sysvec.sv_psstringssz);
 		break;
 	default:
 		/* NetBSD compatibility */
@@ -341,6 +362,10 @@ exec_aout_imgact(struct image_params *imgp)
 	vmspace->vm_taddr = (caddr_t) (uintptr_t) virtual_offset;
 	vmspace->vm_daddr = (caddr_t) (uintptr_t)
 			    (virtual_offset + a_out->a_text);
+
+	error = exec_map_stack(imgp);
+	if (error != 0)
+		return (error);
 
 	/* Fill in image_params */
 	imgp->interpreted = 0;

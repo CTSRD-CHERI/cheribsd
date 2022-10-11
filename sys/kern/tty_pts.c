@@ -60,7 +60,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/syscall.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
-#include <sys/sysent.h>
 #include <sys/sysproto.h>
 #include <sys/systm.h>
 #include <sys/tty.h>
@@ -538,8 +537,7 @@ ptsdev_kqfilter(struct file *fp, struct knote *kn)
 }
 
 static int
-ptsdev_stat(struct file *fp, struct stat *sb, struct ucred *active_cred,
-    struct thread *td)
+ptsdev_stat(struct file *fp, struct stat *sb, struct ucred *active_cred)
 {
 	struct tty *tp = fp->f_data;
 #ifdef PTS_EXTERNAL

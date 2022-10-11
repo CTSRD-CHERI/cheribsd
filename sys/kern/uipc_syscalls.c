@@ -57,7 +57,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/syscallsubr.h>
+#ifdef COMPAT_43
 #include <sys/sysent.h>
+#endif
 #include <sys/uio.h>
 #include <sys/un.h>
 #include <sys/unpcb.h>
@@ -338,7 +340,7 @@ kern_accept4(struct thread *td, int s, struct sockaddr **name,
 	if (error != 0)
 		return (error);
 	head = headfp->f_data;
-	if ((head->so_options & SO_ACCEPTCONN) == 0) {
+	if (!SOLISTENING(head)) {
 		error = EINVAL;
 		goto done;
 	}
@@ -489,7 +491,7 @@ kern_connectat(struct thread *td, int dirfd, int fd, struct sockaddr *sa)
 {
 	struct socket *so;
 	struct file *fp;
-	int error, interrupted = 0;
+	int error;
 
 #ifdef CAPABILITY_MODE
 	if (IN_CAPABILITY_MODE(td) && (dirfd == AT_FDCWD))
@@ -516,10 +518,7 @@ kern_connectat(struct thread *td, int dirfd, int fd, struct sockaddr *sa)
 	if (error != 0)
 		goto bad;
 #endif
-	if (dirfd == AT_FDCWD)
-		error = soconnect(so, sa, td);
-	else
-		error = soconnectat(dirfd, so, sa, td);
+	error = soconnectat(dirfd, so, sa, td);
 	if (error != 0)
 		goto bad;
 	if ((so->so_state & SS_NBIO) && (so->so_state & SS_ISCONNECTING)) {
@@ -530,11 +529,8 @@ kern_connectat(struct thread *td, int dirfd, int fd, struct sockaddr *sa)
 	while ((so->so_state & SS_ISCONNECTING) && so->so_error == 0) {
 		error = msleep(&so->so_timeo, &so->so_lock, PSOCK | PCATCH,
 		    "connec", 0);
-		if (error != 0) {
-			if (error == EINTR || error == ERESTART)
-				interrupted = 1;
+		if (error != 0)
 			break;
-		}
 	}
 	if (error == 0) {
 		error = so->so_error;
@@ -542,8 +538,6 @@ kern_connectat(struct thread *td, int dirfd, int fd, struct sockaddr *sa)
 	}
 	SOCK_UNLOCK(so);
 bad:
-	if (!interrupted)
-		so->so_state &= ~SS_ISCONNECTING;
 	if (error == ERESTART)
 		error = EINTR;
 done1:
@@ -805,8 +799,10 @@ kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 	error = sosend(so, (__cheri_fromcap struct sockaddr *)mp->msg_name,
 	    &auio, 0, control, flags, td);
 	if (error != 0) {
-		if (auio.uio_resid != len && (error == ERESTART ||
-		    error == EINTR || error == EWOULDBLOCK))
+		if (auio.uio_resid != len &&
+		    (so->so_proto->pr_flags & PR_ATOMIC) == 0 &&
+		    (error == ERESTART || error == EINTR ||
+		    error == EWOULDBLOCK))
 			error = 0;
 		/* Generation of SIGPIPE can be controlled per socket */
 		if (error == EPIPE && !(so->so_options & SO_NOSIGPIPE) &&
@@ -1104,14 +1100,6 @@ recvit(struct thread *td, int s, struct msghdr *mp,
 }
 
 int
-sys_recvfrom(struct thread *td, struct recvfrom_args *uap)
-{
-
-	return (kern_recvfrom(td, uap->s, uap->buf,
-	    uap->len, uap->flags, uap->from, uap->fromlenaddr));
-}
-
-int
 kern_recvfrom(struct thread *td, int s, void * __capability buf, size_t len,
     int flags, struct sockaddr * __capability __restrict from,
     socklen_t * __capability __restrict fromlenaddr)
@@ -1139,13 +1127,19 @@ done2:
 	return (error);
 }
 
+int
+sys_recvfrom(struct thread *td, struct recvfrom_args *uap)
+{
+	return (kern_recvfrom(td, uap->s, uap->buf, uap->len,
+	    uap->flags, uap->from, uap->fromlenaddr));
+}
+
 #ifdef COMPAT_OLDSOCK
 int
-orecvfrom(struct thread *td, struct recvfrom_args *uap)
+orecvfrom(struct thread *td, struct orecvfrom_args *uap)
 {
-
-	uap->flags |= MSG_COMPAT;
-	return (sys_recvfrom(td, uap));
+	return (kern_recvfrom(td, uap->s, uap->buf, uap->len,
+	    uap->flags | MSG_COMPAT, uap->from, uap->fromlenaddr));
 }
 #endif
 
@@ -1391,7 +1385,7 @@ kern_getsockopt(struct thread *td, int s, int level, int name,
 int
 user_getsockname(struct thread *td, int fdes,
     struct sockaddr * __restrict __capability asa,
-    socklen_t * __capability alen, int compat)
+    socklen_t * __capability alen, bool compat)
 {
 	struct sockaddr *sa;
 	socklen_t len;
@@ -1460,23 +1454,21 @@ bad:
 int
 sys_getsockname(struct thread *td, struct getsockname_args *uap)
 {
-
-	return (user_getsockname(td, uap->fdes, uap->asa, uap->alen, 0));
+	return (user_getsockname(td, uap->fdes, uap->asa, uap->alen, false));
 }
 
 #ifdef COMPAT_OLDSOCK
 int
-ogetsockname(struct thread *td, struct getsockname_args *uap)
+ogetsockname(struct thread *td, struct ogetsockname_args *uap)
 {
-
-	return (user_getsockname(td, uap->fdes, uap->asa, uap->alen, 1));
+	return (user_getsockname(td, uap->fdes, uap->asa, uap->alen, true));
 }
 #endif /* COMPAT_OLDSOCK */
 
 int
 user_getpeername(struct thread *td, int fdes,
     struct sockaddr * __restrict __capability asa,
-    socklen_t * __capability alen, int compat)
+    socklen_t * __capability alen, bool compat)
 {
 	struct sockaddr *sa;
 	socklen_t len;
@@ -1550,16 +1542,14 @@ done:
 int
 sys_getpeername(struct thread *td, struct getpeername_args *uap)
 {
-
-	return (user_getpeername(td, uap->fdes, uap->asa, uap->alen, 0));
+	return (user_getpeername(td, uap->fdes, uap->asa, uap->alen, false));
 }
 
 #ifdef COMPAT_OLDSOCK
 int
 ogetpeername(struct thread *td, struct ogetpeername_args *uap)
 {
-
-	return (user_getpeername(td, uap->fdes, uap->asa, uap->alen, 1));
+	return (user_getpeername(td, uap->fdes, uap->asa, uap->alen, true));
 }
 #endif /* COMPAT_OLDSOCK */
 
@@ -1578,7 +1568,7 @@ sockargs(struct mbuf **mp, char * __capability buf, socklen_t buflen, int type)
 		else
 #endif
 			if (buflen > MCLBYTES)
-				return (EINVAL);
+				return (EMSGSIZE);
 	}
 	m = m_get2(buflen, M_WAITOK, type, 0);
 	m->m_len = buflen;

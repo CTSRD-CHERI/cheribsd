@@ -52,13 +52,13 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #if defined(INET) && defined(INET6)
-#define	OPTSTR ":46"
+#define	OPTSTR PING6OPTS PING4OPTS
 #elif defined(INET)
-#define OPTSTR ":4"
+#define	OPTSTR PING4OPTS
 #elif defined(INET6)
-#define	OPTSTR ":6"
+#define	OPTSTR PING6OPTS
 #else
-#define OPTSTR ""
+#error At least one of INET and INET6 is required
 #endif
 
 int
@@ -82,7 +82,7 @@ main(int argc, char *argv[])
 		ipv6 = true;
 #endif
 
-	while ((ch = getopt(argc, argv, OPTSTR)) != -1) {
+	while ((ch = getopt(argc, argv, ":" OPTSTR)) != -1) {
 		switch(ch) {
 #ifdef INET
 		case '4':
@@ -92,6 +92,18 @@ main(int argc, char *argv[])
 #ifdef INET6
 		case '6':
 			ipv6 = true;
+			break;
+#endif
+#if defined(INET) && defined(INET6)
+		case 'S':
+			/*
+			 * If -S is given with a numeric parameter,
+			 * force use of the corresponding version.
+			 */
+			if (inet_pton(AF_INET, optarg, &a) == 1)
+				ipv4 = true;
+			else if (inet_pton(AF_INET6, optarg, &a) == 1)
+				ipv6 = true;
 			break;
 #endif
 		default:
@@ -170,7 +182,7 @@ usage(void)
 	    "[-G sweepmaxsize]\n"
 	    "	    [-g sweepminsize] [-h sweepincrsize] [-i wait] "
 	    "[-l preload]\n"
-	    "	    [-M mask | time] [-m ttl]" 
+	    "	    [-M mask | time] [-m ttl] "
 #ifdef IPSEC
 	    "[-P policy] "
 #endif
@@ -188,7 +200,7 @@ usage(void)
 	    "            [-z tos] IPv4-mcast-group\n"
 #endif /* INET */
 #ifdef INET6
-            "\tping [-6aADd"
+            "\tping [-6AaDd"
 #if defined(IPSEC) && !defined(IPSEC_POLICY_IPSEC)
             "E"
 #endif

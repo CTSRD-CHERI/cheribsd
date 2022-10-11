@@ -240,6 +240,8 @@ SourceLocation TypeLoc::getEndLoc() const {
     case IncompleteArray:
     case VariableArray:
     case FunctionNoProto:
+      // The innermost type with suffix syntax always determines the end of the
+      // type.
       Last = Cur;
       break;
     case FunctionProto:
@@ -248,12 +250,19 @@ SourceLocation TypeLoc::getEndLoc() const {
       else
         Last = Cur;
       break;
+    case ObjCObjectPointer:
+      // `id` and `id<...>` have no star location.
+      if (Cur.castAs<ObjCObjectPointerTypeLoc>().getStarLoc().isInvalid())
+        break;
+      LLVM_FALLTHROUGH;
     case Pointer:
     case BlockPointer:
     case MemberPointer:
     case LValueReference:
     case RValueReference:
     case PackExpansion:
+      // Types with prefix syntax only determine the end of the type if there
+      // is no suffix type.
       if (!Last)
         Last = Cur;
       break;
@@ -351,6 +360,7 @@ TypeSpecifierType BuiltinTypeLoc::getWrittenTypeSpec() const {
   case BuiltinType::LongDouble:
   case BuiltinType::Float16:
   case BuiltinType::Float128:
+  case BuiltinType::Ibm128:
   case BuiltinType::ShortAccum:
   case BuiltinType::Accum:
   case BuiltinType::LongAccum:
@@ -403,6 +413,11 @@ TypeSpecifierType BuiltinTypeLoc::getWrittenTypeSpec() const {
 #define SVE_TYPE(Name, Id, SingletonId) \
   case BuiltinType::Id:
 #include "clang/Basic/AArch64SVEACLETypes.def"
+#define PPC_VECTOR_TYPE(Name, Id, Size) \
+  case BuiltinType::Id:
+#include "clang/Basic/PPCTypes.def"
+#define RVV_TYPE(Name, Id, SingletonId) case BuiltinType::Id:
+#include "clang/Basic/RISCVVTypes.def"
   case BuiltinType::BuiltinFn:
   case BuiltinType::IncompleteMatrixIdx:
   case BuiltinType::OMPArraySection:
@@ -582,7 +597,7 @@ void TemplateSpecializationTypeLoc::initializeArgLocs(ASTContext &Context,
         Builder.MakeTrivial(Context, QTN->getQualifier(), Loc);
 
       ArgInfos[i] = TemplateArgumentLocInfo(
-          Builder.getWithLocInContext(Context), Loc,
+          Context, Builder.getWithLocInContext(Context), Loc,
           Args[i].getKind() == TemplateArgument::Template ? SourceLocation()
                                                           : Loc);
       break;
@@ -607,6 +622,7 @@ void AutoTypeLoc::initializeLocal(ASTContext &Context, SourceLocation Loc) {
   setFoundDecl(nullptr);
   setRAngleLoc(Loc);
   setLAngleLoc(Loc);
+  setRParenLoc(Loc);
   TemplateSpecializationTypeLoc::initializeArgLocs(Context, getNumArgs(),
                                                    getTypePtr()->getArgs(),
                                                    getArgInfos(), Loc);

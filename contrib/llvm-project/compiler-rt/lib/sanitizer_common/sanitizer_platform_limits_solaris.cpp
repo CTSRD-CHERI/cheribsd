@@ -89,7 +89,7 @@ namespace __sanitizer {
   unsigned struct_sched_param_sz = sizeof(struct sched_param);
   unsigned struct_statfs_sz = sizeof(struct statfs);
   unsigned struct_sockaddr_sz = sizeof(struct sockaddr);
-  unsigned ucontext_t_sz = sizeof(ucontext_t);
+  unsigned ucontext_t_sz(void *ctx) { return sizeof(ucontext_t); }
   unsigned struct_timespec_sz = sizeof(struct timespec);
 #if SANITIZER_SOLARIS32
   unsigned struct_statvfs64_sz = sizeof(struct statvfs64);
@@ -123,6 +123,7 @@ namespace __sanitizer {
   unsigned struct_ElfW_Phdr_sz = sizeof(ElfW(Phdr));
 
   int glob_nomatch = GLOB_NOMATCH;
+  const int wordexp_wrde_dooffs = WRDE_DOOFFS;
 
   unsigned path_max = PATH_MAX;
 
@@ -202,7 +203,8 @@ CHECK_SIZE_AND_OFFSET(dl_phdr_info, dlpi_name);
 CHECK_SIZE_AND_OFFSET(dl_phdr_info, dlpi_phdr);
 CHECK_SIZE_AND_OFFSET(dl_phdr_info, dlpi_phnum);
 
-CHECK_TYPE_SIZE(glob_t);
+// There are additional fields we are not interested in.
+COMPILER_CHECK(sizeof(__sanitizer_glob_t) <= sizeof(glob_t));
 CHECK_SIZE_AND_OFFSET(glob_t, gl_pathc);
 CHECK_SIZE_AND_OFFSET(glob_t, gl_pathv);
 CHECK_SIZE_AND_OFFSET(glob_t, gl_offs);

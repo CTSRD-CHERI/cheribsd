@@ -70,7 +70,7 @@ static bool_t authnone_validate (AUTH *, uint32_t, struct opaque_auth *,
 static bool_t authnone_refresh (AUTH *, void *);
 static void authnone_destroy (AUTH *);
 
-static struct auth_ops authnone_ops = {
+static const struct auth_ops authnone_ops = {
 	.ah_nextverf =		authnone_verf,
 	.ah_marshal =		authnone_marshal,
 	.ah_validate =		authnone_validate,
@@ -103,7 +103,7 @@ authnone_init(void *dummy)
 SYSINIT(authnone_init, SI_SUB_KMEM, SI_ORDER_ANY, authnone_init, NULL);
 
 AUTH *
-authnone_create()
+authnone_create(void)
 {
 	struct authnone_private *ap = &authnone_private;
 

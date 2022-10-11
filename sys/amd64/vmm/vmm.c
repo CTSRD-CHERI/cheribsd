@@ -134,7 +134,7 @@ struct mem_seg {
 	bool	sysmem;
 	struct vm_object *object;
 };
-#define	VM_MAX_MEMSEGS	3
+#define	VM_MAX_MEMSEGS	4
 
 struct mem_map {
 	vm_paddr_t	gpa;
@@ -174,7 +174,7 @@ struct vm {
 	struct mem_map	mem_maps[VM_MAX_MEMMAPS]; /* (i) guest address space */
 	struct mem_seg	mem_segs[VM_MAX_MEMSEGS]; /* (o) guest memory regions */
 	struct vmspace	*vmspace;		/* (o) guest's address space */
-	char		name[VM_MAX_NAMELEN];	/* (o) virtual machine name */
+	char		name[VM_MAX_NAMELEN+1];	/* (o) virtual machine name */
 	struct vcpu	vcpu[VM_MAXCPU];	/* (i) guest vcpus */
 	/* The following describe the vm cpu topology */
 	uint16_t	sockets;		/* (o) num of sockets */
@@ -265,6 +265,10 @@ SYSCTL_INT(_hw_vmm, OID_AUTO, trace_guest_exceptions, CTLFLAG_RDTUN,
     &trace_guest_exceptions, 0,
     "Trap into hypervisor on all guest exceptions and reflect them back");
 
+static int trap_wbinvd;
+SYSCTL_INT(_hw_vmm, OID_AUTO, trap_wbinvd, CTLFLAG_RDTUN, &trap_wbinvd, 0,
+    "WBINVD triggers a VM-exit");
+
 static void vm_free_memmap(struct vm *vm, int ident);
 static bool sysmem_mapping(struct vm *vm, struct mem_map *mm);
 static void vcpu_notify_event_locked(struct vcpu *vcpu, bool lapic_intr);
@@ -339,6 +343,12 @@ vcpu_trace_exceptions(struct vm *vm, int vcpuid)
 {
 
 	return (trace_guest_exceptions);
+}
+
+int
+vcpu_trap_wbinvd(struct vm *vm, int vcpuid)
+{
+	return (trap_wbinvd);
 }
 
 struct vm_exit *
@@ -480,7 +490,8 @@ vm_create(const char *name, struct vm **retvm)
 	if (!vmm_initialized)
 		return (ENXIO);
 
-	if (name == NULL || strlen(name) >= VM_MAX_NAMELEN)
+	if (name == NULL || strnlen(name, VM_MAX_NAMELEN + 1) ==
+	    VM_MAX_NAMELEN + 1)
 		return (EINVAL);
 
 	vmspace = vmmops_vmspace_alloc(0, VM_MAXUSER_ADDRESS_LA48);
@@ -686,7 +697,7 @@ vm_alloc_memseg(struct vm *vm, int ident, size_t len, bool sysmem)
 			return (EINVAL);
 	}
 
-	obj = vm_object_allocate(OBJT_DEFAULT, len >> PAGE_SHIFT);
+	obj = vm_object_allocate(OBJT_SWAP, len >> PAGE_SHIFT);
 	if (obj == NULL)
 		return (ENOMEM);
 
@@ -853,7 +864,7 @@ static void
 vm_free_memmap(struct vm *vm, int ident)
 {
 	struct mem_map *mm;
-	int error;
+	int error __diagused;
 
 	mm = &vm->mem_maps[ident];
 	if (mm->len) {
@@ -937,10 +948,8 @@ vm_iommu_modify(struct vm *vm, bool map)
 			hpa = DMAP_TO_PHYS((uintptr_t)vp);
 			if (map) {
 				iommu_create_mapping(vm->iommu, gpa, hpa, sz);
-				iommu_remove_mapping(host_domain, hpa, sz);
 			} else {
 				iommu_remove_mapping(vm->iommu, gpa, sz);
-				iommu_create_mapping(host_domain, hpa, hpa, sz);
 			}
 
 			gpa += PAGE_SIZE;
@@ -1303,7 +1312,7 @@ vm_handle_rendezvous(struct vm *vm, int vcpuid)
 	mtx_lock(&vm->rendezvous_mtx);
 	while (vm->rendezvous_func != NULL) {
 		/* 'rendezvous_req_cpus' must be a subset of 'active_cpus' */
-		CPU_AND(&vm->rendezvous_req_cpus, &vm->active_cpus);
+		CPU_AND(&vm->rendezvous_req_cpus, &vm->rendezvous_req_cpus, &vm->active_cpus);
 
 		if (vcpuid != -1 &&
 		    CPU_ISSET(vcpuid, &vm->rendezvous_req_cpus) &&
@@ -1812,6 +1821,7 @@ restart:
 	if (error == 0 && retu == false)
 		goto restart;
 
+	vmm_stat_incr(vm, vcpuid, VMEXIT_USERSPACE, 1);
 	VCPU_CTR2(vm, vcpuid, "retu %d/%d", error, vme->exitcode);
 
 	/* copy the exit information */
@@ -1826,7 +1836,7 @@ vm_restart_instruction(void *arg, int vcpuid)
 	struct vcpu *vcpu;
 	enum vcpu_state state;
 	uint64_t rip;
-	int error;
+	int error __diagused;
 
 	vm = arg;
 	if (vcpuid < 0 || vcpuid >= vm->maxcpus)
@@ -2065,7 +2075,7 @@ vm_inject_exception(struct vm *vm, int vcpuid, int vector, int errcode_valid,
 {
 	struct vcpu *vcpu;
 	uint64_t regval;
-	int error;
+	int error __diagused;
 
 	if (vcpuid < 0 || vcpuid >= vm->maxcpus)
 		return (EINVAL);
@@ -2125,7 +2135,7 @@ vm_inject_fault(void *vmarg, int vcpuid, int vector, int errcode_valid,
     int errcode)
 {
 	struct vm *vm;
-	int error, restart_instruction;
+	int error __diagused, restart_instruction;
 
 	vm = vmarg;
 	restart_instruction = 1;
@@ -2139,7 +2149,7 @@ void
 vm_inject_pf(void *vmarg, int vcpuid, int error_code, uint64_t cr2)
 {
 	struct vm *vm;
-	int error;
+	int error __diagused;
 
 	vm = vmarg;
 	VCPU_CTR2(vm, vcpuid, "Injecting page fault: error_code %#x, cr2 %#lx",

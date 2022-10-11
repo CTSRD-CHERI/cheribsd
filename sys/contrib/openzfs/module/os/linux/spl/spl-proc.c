@@ -35,6 +35,7 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <linux/version.h>
+#include "zfs_gitrev.h"
 
 #if defined(CONSTIFY_PLUGIN) && LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
 typedef struct ctl_table __no_const spl_ctl_table;
@@ -53,73 +54,19 @@ static struct proc_dir_entry *proc_spl_taskq_all = NULL;
 static struct proc_dir_entry *proc_spl_taskq = NULL;
 struct proc_dir_entry *proc_spl_kstat = NULL;
 
-static int
-proc_copyin_string(char *kbuffer, int kbuffer_size, const char *ubuffer,
-    int ubuffer_size)
-{
-	int size;
-
-	if (ubuffer_size > kbuffer_size)
-		return (-EOVERFLOW);
-
-	if (copy_from_user((void *)kbuffer, (void *)ubuffer, ubuffer_size))
-		return (-EFAULT);
-
-	/* strip trailing whitespace */
-	size = strnlen(kbuffer, ubuffer_size);
-	while (size-- >= 0)
-		if (!isspace(kbuffer[size]))
-			break;
-
-	/* empty string */
-	if (size < 0)
-		return (-EINVAL);
-
-	/* no space to terminate */
-	if (size == kbuffer_size)
-		return (-EOVERFLOW);
-
-	kbuffer[size + 1] = 0;
-	return (0);
-}
-
-static int
-proc_copyout_string(char *ubuffer, int ubuffer_size, const char *kbuffer,
-    char *append)
-{
-	/*
-	 * NB if 'append' != NULL, it's a single character to append to the
-	 * copied out string - usually "\n", for /proc entries and
-	 * (i.e. a terminating zero byte) for sysctl entries
-	 */
-	int size = MIN(strlen(kbuffer), ubuffer_size);
-
-	if (copy_to_user(ubuffer, kbuffer, size))
-		return (-EFAULT);
-
-	if (append != NULL && size < ubuffer_size) {
-		if (copy_to_user(ubuffer + size, append, 1))
-			return (-EFAULT);
-
-		size++;
-	}
-
-	return (size);
-}
-
 #ifdef DEBUG_KMEM
 static int
 proc_domemused(struct ctl_table *table, int write,
     void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	int rc = 0;
-	unsigned long min = 0, max = ~0, val;
+	unsigned long val;
 	spl_ctl_table dummy = *table;
 
 	dummy.data = &val;
 	dummy.proc_handler = &proc_dointvec;
-	dummy.extra1 = &min;
-	dummy.extra2 = &max;
+	dummy.extra1 = &table_min;
+	dummy.extra2 = &table_max;
 
 	if (write) {
 		*ppos += *lenp;
@@ -141,14 +88,14 @@ proc_doslab(struct ctl_table *table, int write,
     void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	int rc = 0;
-	unsigned long min = 0, max = ~0, val = 0, mask;
+	unsigned long val = 0, mask;
 	spl_ctl_table dummy = *table;
 	spl_kmem_cache_t *skc = NULL;
 
 	dummy.data = &val;
 	dummy.proc_handler = &proc_dointvec;
-	dummy.extra1 = &min;
-	dummy.extra2 = &max;
+	dummy.extra1 = &table_min;
+	dummy.extra2 = &table_max;
 
 	if (write) {
 		*ppos += *lenp;
@@ -187,39 +134,34 @@ static int
 proc_dohostid(struct ctl_table *table, int write,
     void __user *buffer, size_t *lenp, loff_t *ppos)
 {
-	int len, rc = 0;
 	char *end, str[32];
+	unsigned long hid;
+	spl_ctl_table dummy = *table;
+
+	dummy.data = str;
+	dummy.maxlen = sizeof (str) - 1;
+
+	if (!write)
+		snprintf(str, sizeof (str), "%lx",
+		    (unsigned long) zone_get_hostid(NULL));
+
+	/* always returns 0 */
+	proc_dostring(&dummy, write, buffer, lenp, ppos);
 
 	if (write) {
 		/*
 		 * We can't use proc_doulongvec_minmax() in the write
-		 * case here because hostid while a hex value has no
-		 * leading 0x which confuses the helper function.
+		 * case here because hostid, while a hex value, has no
+		 * leading 0x, which confuses the helper function.
 		 */
-		rc = proc_copyin_string(str, sizeof (str), buffer, *lenp);
-		if (rc < 0)
-			return (rc);
 
-		spl_hostid = simple_strtoul(str, &end, 16);
+		hid = simple_strtoul(str, &end, 16);
 		if (str == end)
 			return (-EINVAL);
-
-	} else {
-		len = snprintf(str, sizeof (str), "%lx",
-		    (unsigned long) zone_get_hostid(NULL));
-		if (*ppos >= len)
-			rc = 0;
-		else
-			rc = proc_copyout_string(buffer,
-			    *lenp, str + *ppos, "\n");
-
-		if (rc >= 0) {
-			*lenp = rc;
-			*ppos += rc;
-		}
+		spl_hostid = hid;
 	}
 
-	return (rc);
+	return (0);
 }
 
 static void
@@ -238,11 +180,10 @@ taskq_seq_show_headers(struct seq_file *f)
 #define	LHEAD_ACTIVE	4
 #define	LHEAD_SIZE	5
 
-/* BEGIN CSTYLED */
 static unsigned int spl_max_show_tasks = 512;
+/* CSTYLED */
 module_param(spl_max_show_tasks, uint, 0644);
 MODULE_PARM_DESC(spl_max_show_tasks, "Max number of tasks shown in taskq proc");
-/* END CSTYLED */
 
 static int
 taskq_seq_show_impl(struct seq_file *f, void *p, boolean_t allflag)
@@ -520,7 +461,7 @@ slab_seq_stop(struct seq_file *f, void *v)
 	up_read(&spl_kmem_cache_sem);
 }
 
-static struct seq_operations slab_seq_ops = {
+static const struct seq_operations slab_seq_ops = {
 	.show  = slab_seq_show,
 	.start = slab_seq_start,
 	.next  = slab_seq_next,
@@ -553,14 +494,14 @@ taskq_seq_stop(struct seq_file *f, void *v)
 	up_read(&tq_list_sem);
 }
 
-static struct seq_operations taskq_all_seq_ops = {
+static const struct seq_operations taskq_all_seq_ops = {
 	.show	= taskq_all_seq_show,
 	.start	= taskq_seq_start,
 	.next	= taskq_seq_next,
 	.stop	= taskq_seq_stop,
 };
 
-static struct seq_operations taskq_seq_ops = {
+static const struct seq_operations taskq_seq_ops = {
 	.show	= taskq_seq_show,
 	.start	= taskq_seq_start,
 	.next	= taskq_seq_next,
@@ -671,8 +612,8 @@ static struct ctl_table spl_table[] = {
 	 */
 	{
 		.procname	= "gitrev",
-		.data		= spl_gitrev,
-		.maxlen		= sizeof (spl_gitrev),
+		.data		= (char *)ZFS_META_GITREV,
+		.maxlen		= sizeof (ZFS_META_GITREV),
 		.mode		= 0444,
 		.proc_handler	= &proc_dostring,
 	},

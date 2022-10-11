@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd April 26, 2018
+.Dd September 22, 2021
 .Dt SYSDECODE 3
 .Os
 .Sh NAME
@@ -33,8 +33,6 @@
 .Sh LIBRARY
 .Lb libsysdecode
 .Sh SYNOPSIS
-.In sys/types.h
-.In stdbool.h
 .In sysdecode.h
 .Sh DESCRIPTION
 The
@@ -47,7 +45,7 @@ The supported ABIs are named by the
 .Vt enum sysdecode_abi
 enumeration.
 .Pp
-.Bl -tag -width "Li SYSDECODE_ABI_CLOUDABI64" -compact
+.Bl -tag -width "Li SYSDECODE_ABI_FREEBSD32" -compact
 .It Li SYSDECODE_ABI_FREEBSD
 Native FreeBSD binaries.
 Supported on all platforms.
@@ -56,19 +54,13 @@ Supported on all platforms.
 Supported on amd64 and powerpc64.
 .It Li SYSDECODE_ABI_FREEBSD64
 64-bit FreeBSD binaries.
-Supported on mips64c128 and riscv64c.
+Supported on aarch64c and riscv64c.
 .It Li SYSDECODE_ABI_LINUX
 Linux binaries of the same platform.
 Supported on amd64, i386, and arm64.
 .It Li SYSDECODE_ABI_LINUX32
 32-bit Linux binaries.
 Supported on amd64.
-.It Li SYSDECODE_ABI_CLOUDABI32
-32-bit CloudABI binaries.
-Supported on all platforms.
-.It Li SYSDECODE_ABI_CLOUDABI64
-64-bit CloudABI binaries.
-Supported on all platforms.
 .It Li SYSDECODE_ABI_UNKNOWN
 A placeholder for use when the ABI is not known.
 .El

@@ -406,7 +406,6 @@ static int
 musbotg_detach(device_t dev)
 {
 	struct musbotg_super_softc *sc = device_get_softc(dev);
-	int err;
 
 	/* during module unload there are lots of children leftover */
 	device_delete_children(dev);
@@ -417,7 +416,7 @@ musbotg_detach(device_t dev)
 		 */
 		musbotg_uninit(&sc->sc_otg);
 
-		err = bus_teardown_intr(dev, sc->sc_otg.sc_irq_res,
+		bus_teardown_intr(dev, sc->sc_otg.sc_irq_res,
 		    sc->sc_otg.sc_intr_hdl);
 		sc->sc_otg.sc_intr_hdl = NULL;
 	}
@@ -454,9 +453,7 @@ static driver_t musbotg_driver = {
 	.size = sizeof(struct musbotg_super_softc),
 };
 
-static devclass_t musbotg_devclass;
-
-DRIVER_MODULE(musbotg, ti_sysc, musbotg_driver, musbotg_devclass, 0, 0);
+DRIVER_MODULE(musbotg, ti_sysc, musbotg_driver, 0, 0);
 MODULE_DEPEND(musbotg, ti_sysc, 1, 1, 1);
 MODULE_DEPEND(musbotg, ti_am3359_cppi41, 1, 1, 1);
 MODULE_DEPEND(usbss, usb, 1, 1, 1);

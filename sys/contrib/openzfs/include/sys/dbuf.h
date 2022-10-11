@@ -321,16 +321,15 @@ typedef struct dmu_buf_impl {
 	uint8_t db_dirtycnt;
 } dmu_buf_impl_t;
 
-/* Note: the dbuf hash table is exposed only for the mdb module */
-#define	DBUF_MUTEXES 8192
-#define	DBUF_HASH_MUTEX(h, idx) (&(h)->hash_mutexes[(idx) & (DBUF_MUTEXES-1)])
+#define	DBUF_RWLOCKS 8192
+#define	DBUF_HASH_RWLOCK(h, idx) (&(h)->hash_rwlocks[(idx) & (DBUF_RWLOCKS-1)])
 typedef struct dbuf_hash_table {
 	uint64_t hash_table_mask;
 	dmu_buf_impl_t **hash_table;
-	kmutex_t hash_mutexes[DBUF_MUTEXES];
+	krwlock_t hash_rwlocks[DBUF_RWLOCKS] ____cacheline_aligned;
 } dbuf_hash_table_t;
 
-typedef void (*dbuf_prefetch_fn)(void *, boolean_t);
+typedef void (*dbuf_prefetch_fn)(void *, uint64_t, uint64_t, boolean_t);
 
 uint64_t dbuf_whichblock(const struct dnode *di, const int64_t level,
     const uint64_t offset);
@@ -340,12 +339,12 @@ int dbuf_spill_set_blksz(dmu_buf_t *db, uint64_t blksz, dmu_tx_t *tx);
 
 void dbuf_rm_spill(struct dnode *dn, dmu_tx_t *tx);
 
-dmu_buf_impl_t *dbuf_hold(struct dnode *dn, uint64_t blkid, void *tag);
+dmu_buf_impl_t *dbuf_hold(struct dnode *dn, uint64_t blkid, const void *tag);
 dmu_buf_impl_t *dbuf_hold_level(struct dnode *dn, int level, uint64_t blkid,
-    void *tag);
+    const void *tag);
 int dbuf_hold_impl(struct dnode *dn, uint8_t level, uint64_t blkid,
     boolean_t fail_sparse, boolean_t fail_uncached,
-    void *tag, dmu_buf_impl_t **dbp);
+    const void *tag, dmu_buf_impl_t **dbp);
 
 int dbuf_prefetch_impl(struct dnode *dn, int64_t level, uint64_t blkid,
     zio_priority_t prio, arc_flags_t aflags, dbuf_prefetch_fn cb,
@@ -353,13 +352,14 @@ int dbuf_prefetch_impl(struct dnode *dn, int64_t level, uint64_t blkid,
 int dbuf_prefetch(struct dnode *dn, int64_t level, uint64_t blkid,
     zio_priority_t prio, arc_flags_t aflags);
 
-void dbuf_add_ref(dmu_buf_impl_t *db, void *tag);
+void dbuf_add_ref(dmu_buf_impl_t *db, const void *tag);
 boolean_t dbuf_try_add_ref(dmu_buf_t *db, objset_t *os, uint64_t obj,
-    uint64_t blkid, void *tag);
+    uint64_t blkid, const void *tag);
 uint64_t dbuf_refcount(dmu_buf_impl_t *db);
 
-void dbuf_rele(dmu_buf_impl_t *db, void *tag);
-void dbuf_rele_and_unlock(dmu_buf_impl_t *db, void *tag, boolean_t evicting);
+void dbuf_rele(dmu_buf_impl_t *db, const void *tag);
+void dbuf_rele_and_unlock(dmu_buf_impl_t *db, const void *tag,
+    boolean_t evicting);
 
 dmu_buf_impl_t *dbuf_find(struct objset *os, uint64_t object, uint8_t level,
     uint64_t blkid);
@@ -386,8 +386,10 @@ void dbuf_destroy(dmu_buf_impl_t *db);
 void dbuf_unoverride(dbuf_dirty_record_t *dr);
 void dbuf_sync_list(list_t *list, int level, dmu_tx_t *tx);
 void dbuf_release_bp(dmu_buf_impl_t *db);
-db_lock_type_t dmu_buf_lock_parent(dmu_buf_impl_t *db, krw_t rw, void *tag);
-void dmu_buf_unlock_parent(dmu_buf_impl_t *db, db_lock_type_t type, void *tag);
+db_lock_type_t dmu_buf_lock_parent(dmu_buf_impl_t *db, krw_t rw,
+    const void *tag);
+void dmu_buf_unlock_parent(dmu_buf_impl_t *db, db_lock_type_t type,
+    const void *tag);
 
 void dbuf_free_range(struct dnode *dn, uint64_t start, uint64_t end,
     struct dmu_tx *);
@@ -442,16 +444,7 @@ dbuf_find_dirty_eq(dmu_buf_impl_t *db, uint64_t txg)
 	(dbuf_is_metadata(_db) &&					\
 	((_db)->db_objset->os_primary_cache == ZFS_CACHE_METADATA)))
 
-#define	DBUF_IS_L2CACHEABLE(_db)					\
-	((_db)->db_objset->os_secondary_cache == ZFS_CACHE_ALL ||	\
-	(dbuf_is_metadata(_db) &&					\
-	((_db)->db_objset->os_secondary_cache == ZFS_CACHE_METADATA)))
-
-#define	DNODE_LEVEL_IS_L2CACHEABLE(_dn, _level)				\
-	((_dn)->dn_objset->os_secondary_cache == ZFS_CACHE_ALL ||	\
-	(((_level) > 0 ||						\
-	DMU_OT_IS_METADATA((_dn)->dn_handle->dnh_dnode->dn_type)) &&	\
-	((_dn)->dn_objset->os_secondary_cache == ZFS_CACHE_METADATA)))
+boolean_t dbuf_is_l2cacheable(dmu_buf_impl_t *db);
 
 #ifdef ZFS_DEBUG
 
@@ -465,7 +458,7 @@ dbuf_find_dirty_eq(dmu_buf_impl_t *db, uint64_t txg)
 	char __db_buf[32]; \
 	uint64_t __db_obj = (dbuf)->db.db_object; \
 	if (__db_obj == DMU_META_DNODE_OBJECT) \
-		(void) strcpy(__db_buf, "mdn"); \
+		(void) strlcpy(__db_buf, "mdn", sizeof (__db_buf));	\
 	else \
 		(void) snprintf(__db_buf, sizeof (__db_buf), "%lld", \
 		    (u_longlong_t)__db_obj); \
@@ -474,7 +467,7 @@ dbuf_find_dirty_eq(dmu_buf_impl_t *db, uint64_t txg)
 	    __db_buf, (dbuf)->db_level, \
 	    (u_longlong_t)(dbuf)->db_blkid, __VA_ARGS__); \
 	} \
-_NOTE(CONSTCOND) } while (0)
+} while (0)
 
 #define	dprintf_dbuf_bp(db, bp, fmt, ...) do {			\
 	if (zfs_flags & ZFS_DEBUG_DPRINTF) {			\
@@ -483,7 +476,7 @@ _NOTE(CONSTCOND) } while (0)
 	dprintf_dbuf(db, fmt " %s\n", __VA_ARGS__, __blkbuf);	\
 	kmem_free(__blkbuf, BP_SPRINTF_LEN);			\
 	}							\
-_NOTE(CONSTCOND) } while (0)
+} while (0)
 
 #define	DBUF_VERIFY(db)	dbuf_verify(db)
 

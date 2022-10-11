@@ -4,7 +4,7 @@
  *
  * Copyright (c) 1998 The NetBSD Foundation, Inc. All rights reserved.
  * Copyright (c) 1998 Lennart Augustsson. All rights reserved.
- * Copyright (c) 2008-2010 Hans Petter Selasky. All rights reserved.
+ * Copyright (c) 2008-2022 Hans Petter Selasky
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -47,6 +47,7 @@
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/condvar.h>
+#include <sys/sbuf.h>
 #include <sys/sysctl.h>
 #include <sys/sx.h>
 #include <sys/unistd.h>
@@ -117,7 +118,7 @@ static device_suspend_t uhub_suspend;
 static device_resume_t uhub_resume;
 
 static bus_driver_added_t uhub_driver_added;
-static bus_child_pnpinfo_str_t uhub_child_pnpinfo_string;
+static bus_child_pnpinfo_t uhub_child_pnpinfo;
 
 static usb_callback_t uhub_intr_callback;
 #if USB_HAVE_TT_SUPPORT
@@ -156,8 +157,6 @@ static const struct usb_config uhub_config[UHUB_N_TRANSFER] = {
  * driver instance for "hub" connected to "usb"
  * and "hub" connected to "hub"
  */
-static devclass_t uhub_devclass;
-
 static device_method_t uhub_methods[] = {
 	DEVMETHOD(device_probe, uhub_probe),
 	DEVMETHOD(device_attach, uhub_attach),
@@ -166,8 +165,9 @@ static device_method_t uhub_methods[] = {
 	DEVMETHOD(device_suspend, uhub_suspend),
 	DEVMETHOD(device_resume, uhub_resume),
 
-	DEVMETHOD(bus_child_location_str, uhub_child_location_string),
-	DEVMETHOD(bus_child_pnpinfo_str, uhub_child_pnpinfo_string),
+	DEVMETHOD(bus_child_location, uhub_child_location),
+	DEVMETHOD(bus_child_pnpinfo, uhub_child_pnpinfo),
+	DEVMETHOD(bus_get_device_path, uhub_get_device_path),
 	DEVMETHOD(bus_driver_added, uhub_driver_added),
 	DEVMETHOD_END
 };
@@ -178,8 +178,8 @@ driver_t uhub_driver = {
 	.size = sizeof(struct uhub_softc)
 };
 
-DRIVER_MODULE(uhub, usbus, uhub_driver, uhub_devclass, 0, 0);
-DRIVER_MODULE(uhub, uhub, uhub_driver, uhub_devclass, NULL, 0);
+DRIVER_MODULE(uhub, usbus, uhub_driver, 0, 0);
+DRIVER_MODULE(uhub, uhub, uhub_driver, 0, 0);
 MODULE_VERSION(uhub, 1);
 
 static void
@@ -513,7 +513,7 @@ uhub_explore_sub(struct uhub_softc *sc, struct usb_port *up)
 	usb_error_t err;
 
 	bus = sc->sc_udev->bus;
-	err = 0;
+	err = USB_ERR_NORMAL_COMPLETION;
 
 	/* get driver added refcount from USB bus */
 	refcount = bus->driver_added_refcount;
@@ -720,7 +720,7 @@ repeat:
 		if ((sc->sc_st.port_change & UPS_C_CONNECT_STATUS) ||
 		    (!(sc->sc_st.port_status & UPS_CURRENT_CONNECT_STATUS))) {
 			if (timeout) {
-				DPRINTFN(0, "giving up port %d reset - "
+				DPRINTFN(1, "giving up port %d reset - "
 				   "device vanished: change %#x status %#x\n",
 				   portno, sc->sc_st.port_change,
 				   sc->sc_st.port_status);
@@ -995,6 +995,7 @@ uhub_explore(struct usb_device *udev)
 	struct usb_hub *hub;
 	struct uhub_softc *sc;
 	struct usb_port *up;
+	usb_error_t retval;
 	usb_error_t err;
 	uint8_t portno;
 	uint8_t x;
@@ -1013,7 +1014,7 @@ uhub_explore(struct usb_device *udev)
 	if (udev->flags.self_suspended) {
 		/* need to wait until the child signals resume */
 		DPRINTF("Device is suspended!\n");
-		return (0);
+		return (USB_ERR_NORMAL_COMPLETION);
 	}
 
 	/*
@@ -1022,23 +1023,26 @@ uhub_explore(struct usb_device *udev)
 	 */
 	do_unlock = usbd_enum_lock(udev);
 
+	/*
+	 * Set default error code to avoid compiler warnings.
+	 * Note that hub->nports cannot be zero.
+	 */
+	retval = USB_ERR_NORMAL_COMPLETION;
+
 	for (x = 0; x != hub->nports; x++) {
 		up = hub->ports + x;
 		portno = x + 1;
 
 		err = uhub_read_port_status(sc, portno);
-		if (err) {
-			/* most likely the HUB is gone */
-			break;
-		}
+		if (err != USB_ERR_NORMAL_COMPLETION)
+			retval = err;
+
 		if (sc->sc_st.port_change & UPS_C_OVERCURRENT_INDICATOR) {
 			DPRINTF("Overcurrent on port %u.\n", portno);
 			err = usbd_req_clear_port_feature(
 			    udev, NULL, portno, UHF_C_PORT_OVER_CURRENT);
-			if (err) {
-				/* most likely the HUB is gone */
-				break;
-			}
+			if (err != USB_ERR_NORMAL_COMPLETION)
+				retval = err;
 		}
 		if (!(sc->sc_flags & UHUB_FLAG_DID_EXPLORE)) {
 			/*
@@ -1051,10 +1055,8 @@ uhub_explore(struct usb_device *udev)
 		if (sc->sc_st.port_change & UPS_C_PORT_ENABLED) {
 			err = usbd_req_clear_port_feature(
 			    udev, NULL, portno, UHF_C_PORT_ENABLE);
-			if (err) {
-				/* most likely the HUB is gone */
-				break;
-			}
+			if (err != USB_ERR_NORMAL_COMPLETION)
+				retval = err;
 			if (sc->sc_st.port_change & UPS_C_CONNECT_STATUS) {
 				/*
 				 * Ignore the port error if the device
@@ -1077,26 +1079,35 @@ uhub_explore(struct usb_device *udev)
 		}
 		if (sc->sc_st.port_change & UPS_C_CONNECT_STATUS) {
 			err = uhub_reattach_port(sc, portno);
-			if (err) {
-				/* most likely the HUB is gone */
-				break;
-			}
+			if (err != USB_ERR_NORMAL_COMPLETION)
+				retval = err;
 		}
 		if (sc->sc_st.port_change & (UPS_C_SUSPEND |
 		    UPS_C_PORT_LINK_STATE)) {
 			err = uhub_suspend_resume_port(sc, portno);
-			if (err) {
-				/* most likely the HUB is gone */
-				break;
-			}
+			if (err != USB_ERR_NORMAL_COMPLETION)
+				retval = err;
 		}
-		err = uhub_explore_sub(sc, up);
-		if (err) {
-			/* no device(s) present */
-			continue;
+		if (udev->speed == USB_SPEED_SUPER &&
+		    (sc->sc_st.port_change & UPS_C_BH_PORT_RESET) != 0) {
+			DPRINTF("Warm reset finished on port %u.\n", portno);
+			err = usbd_req_clear_port_feature(
+			    udev, NULL, portno, UHF_C_BH_PORT_RESET);
+			if (err != USB_ERR_NORMAL_COMPLETION)
+				retval = err;
 		}
-		/* explore succeeded - reset restart counter */
-		up->restartcnt = 0;
+		if (sc->sc_st.port_change & UPS_C_PORT_RESET) {
+			DPRINTF("Port reset finished on port %u.\n", portno);
+			err = usbd_req_clear_port_feature(
+			    udev, NULL, portno, UHF_C_PORT_RESET);
+			if (err != USB_ERR_NORMAL_COMPLETION)
+				retval = err;
+		}
+
+		if (uhub_explore_sub(sc, up) == USB_ERR_NORMAL_COMPLETION) {
+			/* explore succeeded - reset restart counter */
+			up->restartcnt = 0;
+		}
 	}
 
 	if (do_unlock)
@@ -1105,8 +1116,7 @@ uhub_explore(struct usb_device *udev)
 	/* initial status checked */
 	sc->sc_flags |= UHUB_FLAG_DID_EXPLORE;
 
-	/* return success */
-	return (USB_ERR_NORMAL_COMPLETION);
+	return (retval);
 }
 
 int
@@ -1638,32 +1648,25 @@ uhub_find_iface_index(struct usb_hub *hub, device_t child,
 }
 
 int
-uhub_child_location_string(device_t parent, device_t child,
-    char *buf, size_t buflen)
+uhub_child_location(device_t parent, device_t child, struct sbuf *sb)
 {
 	struct uhub_softc *sc;
 	struct usb_hub *hub;
 	struct hub_result res;
 
-	if (!device_is_attached(parent)) {
-		if (buflen)
-			buf[0] = 0;
+	if (!device_is_attached(parent))
 		return (0);
-	}
 
 	sc = device_get_softc(parent);
 	hub = sc->sc_udev->hub;
 
-	mtx_lock(&Giant);
+	bus_topo_lock();
 	uhub_find_iface_index(hub, child, &res);
 	if (!res.udev) {
 		DPRINTF("device not on hub\n");
-		if (buflen) {
-			buf[0] = '\0';
-		}
 		goto done;
 	}
-	snprintf(buf, buflen, "bus=%u hubaddr=%u port=%u devaddr=%u"
+	sbuf_printf(sb, "bus=%u hubaddr=%u port=%u devaddr=%u"
 	    " interface=%u"
 #if USB_HAVE_UGEN
 	    " ugen=%s"
@@ -1677,14 +1680,46 @@ uhub_child_location_string(device_t parent, device_t child,
 #endif
 	    );
 done:
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 
 	return (0);
 }
 
+int
+uhub_get_device_path(device_t bus, device_t child, const char *locator,
+    struct sbuf *sb)
+{
+	struct uhub_softc *sc;
+	struct usb_hub *hub;
+	struct hub_result res;
+	int rv;
+
+	if (strcmp(locator, BUS_LOCATOR_UEFI) == 0) {
+		rv = bus_generic_get_device_path(device_get_parent(bus), bus, locator, sb);
+		if (rv != 0)
+			return (rv);
+
+		sc = device_get_softc(bus);
+		hub = sc->sc_udev->hub;
+
+		bus_topo_lock();
+		uhub_find_iface_index(hub, child, &res);
+		if (!res.udev) {
+			printf("device not on hub\n");
+			goto done;
+		}
+		sbuf_printf(sb, "/USB(0x%x,0x%x)", res.portno - 1, res.iface_index);
+	done:
+		bus_topo_unlock();
+		return (0);
+	}
+
+	/* For the rest, punt to the default handler */
+	return (bus_generic_get_device_path(bus, child, locator, sb));
+}
+
 static int
-uhub_child_pnpinfo_string(device_t parent, device_t child,
-    char *buf, size_t buflen)
+uhub_child_pnpinfo(device_t parent, device_t child, struct sbuf*sb)
 {
 	struct uhub_softc *sc;
 	struct usb_hub *hub;
@@ -1692,22 +1727,16 @@ uhub_child_pnpinfo_string(device_t parent, device_t child,
 	struct hub_result res;
 	uint8_t do_unlock;
 
-	if (!device_is_attached(parent)) {
-		if (buflen)
-			buf[0] = 0;
+	if (!device_is_attached(parent))
 		return (0);
-	}
 
 	sc = device_get_softc(parent);
 	hub = sc->sc_udev->hub;
 
-	mtx_lock(&Giant);
+	bus_topo_lock();
 	uhub_find_iface_index(hub, child, &res);
 	if (!res.udev) {
 		DPRINTF("device not on hub\n");
-		if (buflen) {
-			buf[0] = '\0';
-		}
 		goto done;
 	}
 	iface = usbd_get_iface(res.udev, res.iface_index);
@@ -1715,7 +1744,7 @@ uhub_child_pnpinfo_string(device_t parent, device_t child,
 		/* Make sure device information is not changed during the print. */
 		do_unlock = usbd_ctrl_lock(res.udev);
 
-		snprintf(buf, buflen, "vendor=0x%04x product=0x%04x "
+		sbuf_printf(sb, "vendor=0x%04x product=0x%04x "
 		    "devclass=0x%02x devsubclass=0x%02x "
 		    "devproto=0x%02x "
 		    "sernum=\"%s\" "
@@ -1739,14 +1768,9 @@ uhub_child_pnpinfo_string(device_t parent, device_t child,
 
 		if (do_unlock)
 			usbd_ctrl_unlock(res.udev);
-	} else {
-		if (buflen) {
-			buf[0] = '\0';
-		}
-		goto done;
 	}
 done:
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 
 	return (0);
 }
@@ -2666,18 +2690,15 @@ usb_dev_resume_peer(struct usb_device *udev)
 		/* resume current port (Valid in Host and Device Mode) */
 		err = usbd_req_clear_port_feature(udev->parent_hub,
 		    NULL, udev->port_no, UHF_PORT_SUSPEND);
-		if (err) {
-			DPRINTFN(0, "Resuming port failed\n");
-			return;
-		}
 	} else {
 		/* resume current port (Valid in Host and Device Mode) */
 		err = usbd_req_set_port_link_state(udev->parent_hub,
 		    NULL, udev->port_no, UPS_PORT_LS_U0);
-		if (err) {
-			DPRINTFN(0, "Resuming port failed\n");
-			return;
-		}
+	}
+
+	if (err != 0) {
+		DPRINTFN(0, "Resuming port failed: %s (ignored)\n",
+		    usbd_errstr(err));
 	}
 
 	/* resume settle time */

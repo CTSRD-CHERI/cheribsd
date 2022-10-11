@@ -48,12 +48,7 @@ builtins.c builtins.h: mkbuiltins builtins.def
 	sh ${SRCDIR}/mkbuiltins ${SRCDIR}
 
 DEPENDOBJS+= mknodes mksyntax
-mknodes: mknodes.c ${BUILD_TOOLS_META}
-	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} ${BUILD_TOOLS_LDFLAGS} \
-	    ${.ALLSRC:[1]} -o ${.TARGET}
-mksyntax: mksyntax.c ${BUILD_TOOLS_META}
-	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} ${BUILD_TOOLS_LDFLAGS} \
-	    ${.ALLSRC:[1]} -o ${.TARGET}
+mknodes mksyntax: ${BUILD_TOOLS_META}
 
 .ORDER: nodes.c nodes.h
 nodes.h: .NOMETA

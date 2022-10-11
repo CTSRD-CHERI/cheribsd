@@ -42,11 +42,13 @@ while [ `date '+%s'` -lt $((start + 5 * 60)) ]; do
 	./mmap3
 done
 echo "Expect Segmentation faults"
+trap "ls /tmp/mmap3* 2>/dev/null | grep -E 'mmap3\.[0-9]{6}\.[0-9]{4}$' | \
+    xargs rm -v" EXIT INT
 start=`date '+%s'`
 while [ `date '+%s'` -lt $((start + 5 * 60)) ]; do
 	./mmap3 random
 done
-rm -f mmap3 mmap3.core /tmp/mmap.0*
+rm -f /tmp/mmap3 mmap3.core
 exit
 
 EOF
@@ -102,7 +104,7 @@ work(int nr)
 	p = (void *)STARTADDR;
 	len = ADRSPACE;
 
-	sprintf(path, "/tmp/mmap.%06d.%04d", getpid(), nr);
+	sprintf(path, "/tmp/mmap3.%06d.%04d", getpid(), nr);
 	if ((fd = open(path, O_CREAT | O_TRUNC | O_RDWR, 0622)) == -1)
 		err(1,"open()");
 	if (ftruncate(fd, len) == -1)

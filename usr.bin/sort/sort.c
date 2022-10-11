@@ -57,7 +57,7 @@ __FBSDID("$FreeBSD$");
 
 #ifndef WITHOUT_NLS
 #include <nl_types.h>
-nl_catd catalog;
+nl_catd catalog = (nl_catd)-1;
 #endif
 
 #define	OPTIONS	"bcCdfghik:Mmno:RrsS:t:T:uVz"
@@ -98,6 +98,8 @@ struct sort_opts sort_opts_vals;
 
 bool debug_sort;
 bool need_hint;
+
+size_t mb_cur_max;
 
 #if defined(SORT_THREADS)
 unsigned int ncpu = 1;
@@ -305,7 +307,7 @@ conv_mbtowc(wchar_t *wc, const char *c, const wchar_t def)
 	if (wc && c) {
 		int res;
 
-		res = mbtowc(wc, c, MB_CUR_MAX);
+		res = mbtowc(wc, c, mb_cur_max);
 		if (res < 1)
 			*wc = def;
 	}
@@ -321,6 +323,8 @@ set_locale(void)
 	const char *locale;
 
 	setlocale(LC_ALL, "");
+
+	mb_cur_max = MB_CUR_MAX;
 
 	lc = localeconv();
 
@@ -858,6 +862,11 @@ fix_obsolete_keys(int *argc, char **argv)
 
 		arg1 = argv[i];
 
+		if (strcmp(arg1, "--") == 0) {
+			/* Following arguments are treated as filenames. */
+			break;
+		}
+
 		if (strlen(arg1) > 1 && arg1[0] == '+') {
 			int c1, f1;
 			char sopts1[128];
@@ -1001,6 +1010,10 @@ main(int argc, char **argv)
 	set_locale();
 	set_tmpdir();
 	set_sort_opts();
+
+#ifndef WITHOUT_NLS
+	catalog = catopen("sort", NL_CAT_LOCALE);
+#endif
 
 	fix_obsolete_keys(&argc, argv);
 
@@ -1185,16 +1198,8 @@ main(int argc, char **argv)
 		argv = argv_from_file0;
 	}
 
-#ifndef WITHOUT_NLS
-	catalog = catopen("sort", NL_CAT_LOCALE);
-#endif
-
 	if (sort_opts_vals.cflag && sort_opts_vals.mflag)
 		errx(1, "%c:%c: %s", 'm', 'c', getstr(1));
-
-#ifndef WITHOUT_NLS
-	catclose(catalog);
-#endif
 
 	if (keys_num == 0) {
 		keys_num = 1;
@@ -1333,6 +1338,11 @@ main(int argc, char **argv)
 	}
 
 	sort_free(outfile);
+
+#ifndef WITHOUT_NLS
+	if (catalog != (nl_catd)-1)
+		catclose(catalog);
+#endif
 
 	return (result);
 }

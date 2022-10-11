@@ -48,9 +48,8 @@ verify_runnable "both"
 
 function cleanup
 {
-	if snapexists $SNAPFS ; then
-		log_must zfs destroy -Rf $SNAPFS
-	fi
+	snapexists $SNAPFS && destroy_dataset $SNAPFS -Rf
+	log_must rm -df "/tmp/mnt$$"
 }
 
 log_onexit cleanup

@@ -80,6 +80,10 @@ __FBSDID("$FreeBSD$");
 
 #define	COCALL_OFFSET(x)	((x) - switcher_cocall)
 
+#if !__has_feature(capabilities)
+#define	colocation_trap_in_switcher(t, f, s)
+#endif
+
 #if __has_feature(capabilities)
 int log_user_cheri_exceptions = 1;
 SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RWTUN,
@@ -89,8 +93,6 @@ SYSCTL_INT(_machdep, OID_AUTO, log_user_cheri_exceptions, CTLFLAG_RWTUN,
 
 int (*dtrace_invop_jump_addr)(struct trapframe *);
 
-extern register_t fsu_intr_fault;
-
 #ifdef CPU_QEMU_RISCV
 extern u_int qemu_trace_buffered;
 #endif
@@ -99,7 +101,11 @@ extern u_int qemu_trace_buffered;
 void do_trap_supervisor(struct trapframe *);
 void do_trap_user(struct trapframe *);
 
+#if __has_feature(capabilities)
 static void db_show_frame_td(struct thread *, struct trapframe *);
+#else
+#define db_show_frame_td(t, f)
+#endif
 
 static bool
 switcher_onfault(struct thread *td, struct trapframe *tf, const char *msg,
@@ -172,6 +178,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	dst_ap = &sa->args[0];
 
 	sa->code = td->td_frame->tf_t[0];
+	sa->original_code = sa->code;
 
 	if (__predict_false(sa->code == SYS_syscall || sa->code == SYS___syscall)) {
 		sa->code = *ap++;
@@ -225,7 +232,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	} else
 #endif
 	{
-		memcpy(dst_ap, ap, (NARGREG - 1) * sizeof(syscallarg_t));
+		memcpy(dst_ap, ap, (NARGREG - 1) * sizeof(*dst_ap));
 	}
 
 	td->td_retval[0] = 0;
@@ -335,7 +342,12 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		goto fatal;
 
 	if (usermode) {
-		map = &td->td_proc->p_vmspace->vm_map;
+		if (!VIRT_IS_VALID(stval)) {
+			call_trapsignal(td, SIGSEGV, SEGV_MAPERR, stval,
+			    frame->tf_scause & SCAUSE_CODE, 0);
+			goto done;
+		}
+		map = &p->p_vmspace->vm_map;
 	} else {
 		/*
 		 * Enable interrupts for the duration of the page fault. For
@@ -343,12 +355,12 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		 */
 		intr_enable();
 
-		if (stval >= VM_MAX_USER_ADDRESS) {
+		if (stval >= VM_MIN_KERNEL_ADDRESS) {
 			map = kernel_map;
 		} else {
 			if (pcb->pcb_onfault == 0)
 				goto fatal;
-			map = &td->td_proc->p_vmspace->vm_map;
+			map = &p->p_vmspace->vm_map;
 		}
 	}
 
@@ -362,7 +374,7 @@ page_fault_handler(struct trapframe *frame, int usermode)
 		ftype = VM_PROT_READ;
 	}
 
-	if (pmap_fault_fixup(map->pmap, va, ftype))
+	if (VIRT_IS_VALID(va) && pmap_fault(map->pmap, va, ftype))
 		goto done;
 
 	error = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL, &sig, &ucode);
@@ -411,7 +423,9 @@ void
 do_trap_supervisor(struct trapframe *frame)
 {
 	uint64_t exception;
+#if __has_feature(capabilities)
 	uint64_t exccode;
+#endif
 
 	/* Ensure we came from supervisor mode, interrupts disabled */
 	KASSERT((csr_read(sstatus) & (SSTATUS_SPP | SSTATUS_SIE)) ==
@@ -545,7 +559,9 @@ do_trap_user(struct trapframe *frame)
 		break;
 	case SCAUSE_ECALL_USER:
 		frame->tf_sepc += 4;	/* Next instruction */
+#if __has_feature(capabilities)
 		colocation_unborrow(td);
+#endif
 		ecall_handler();
 		break;
 	case SCAUSE_ILLEGAL_INSTRUCTION:
@@ -618,6 +634,7 @@ do_trap_user(struct trapframe *frame)
 	}
 }
 
+#if __has_feature(capabilities)
 void
 db_print_cap(struct thread *td, const char *name, const void * __capability value)
 {
@@ -687,3 +704,4 @@ DB_SHOW_COMMAND(frame, db_show_frame)
 
 	db_show_frame_td(td, td->td_frame);
 }
+#endif /* __has_feature(capabilities) */

@@ -160,6 +160,9 @@ class Sema;
     /// Vector conversions
     ICK_Vector_Conversion,
 
+    /// Arm SVE Vector conversions
+    ICK_SVE_Vector_Conversion,
+
     /// A vector splat from an arithmetic type
     ICK_Vector_Splat,
 
@@ -466,7 +469,9 @@ class Sema;
       unrelated_class,
       bad_qualifiers,
       lvalue_ref_to_rvalue,
-      rvalue_ref_to_lvalue
+      rvalue_ref_to_lvalue,
+      too_few_initializers,
+      too_many_initializers,
     };
 
     // This can be null, e.g. for implicit object arguments.
@@ -530,11 +535,17 @@ class Sema;
     };
 
     /// ConversionKind - The kind of implicit conversion sequence.
-    unsigned ConversionKind : 30;
+    unsigned ConversionKind : 31;
 
-    /// Whether the target is really a std::initializer_list, and the
-    /// sequence only represents the worst element conversion.
-    unsigned StdInitializerListElement : 1;
+    // Whether the initializer list was of an incomplete array.
+    unsigned InitializerListOfIncompleteArray : 1;
+
+    /// When initializing an array or std::initializer_list from an
+    /// initializer-list, this is the array or std::initializer_list type being
+    /// initialized. The remainder of the conversion sequence, including ToType,
+    /// describe the worst conversion of an initializer to an element of the
+    /// array or std::initializer_list. (Note, 'worst' is not well defined.)
+    QualType InitializerListContainerType;
 
     void setKind(Kind K) {
       destruct();
@@ -565,13 +576,16 @@ class Sema;
     };
 
     ImplicitConversionSequence()
-        : ConversionKind(Uninitialized), StdInitializerListElement(false) {
+        : ConversionKind(Uninitialized),
+          InitializerListOfIncompleteArray(false) {
       Standard.setAsIdentityConversion();
     }
 
     ImplicitConversionSequence(const ImplicitConversionSequence &Other)
         : ConversionKind(Other.ConversionKind),
-          StdInitializerListElement(Other.StdInitializerListElement) {
+          InitializerListOfIncompleteArray(
+              Other.InitializerListOfIncompleteArray),
+          InitializerListContainerType(Other.InitializerListContainerType) {
       switch (ConversionKind) {
       case Uninitialized: break;
       case StandardConversion: Standard = Other.Standard; break;
@@ -667,14 +681,22 @@ class Sema;
       Standard.setAllToTypes(T);
     }
 
-    /// Whether the target is really a std::initializer_list, and the
-    /// sequence only represents the worst element conversion.
-    bool isStdInitializerListElement() const {
-      return StdInitializerListElement;
+    // True iff this is a conversion sequence from an initializer list to an
+    // array or std::initializer.
+    bool hasInitializerListContainerType() const {
+      return !InitializerListContainerType.isNull();
     }
-
-    void setStdInitializerListElement(bool V = true) {
-      StdInitializerListElement = V;
+    void setInitializerListContainerType(QualType T, bool IA) {
+      InitializerListContainerType = T;
+      InitializerListOfIncompleteArray = IA;
+    }
+    bool isInitializerListOfIncompleteArray() const {
+      return InitializerListOfIncompleteArray;
+    }
+    QualType getInitializerListContainerType() const {
+      assert(hasInitializerListContainerType() &&
+             "not initializer list container");
+      return InitializerListContainerType;
     }
 
     /// Form an "implicit" conversion sequence from nullptr_t to bool, for a
@@ -756,9 +778,6 @@ class Sema;
 
     /// This candidate was not viable because its address could not be taken.
     ovl_fail_addr_not_available,
-
-    /// This candidate was not viable because its OpenCL extension is disabled.
-    ovl_fail_ext_disabled,
 
     /// This inherited constructor is not viable because it would slice the
     /// argument.
@@ -1060,6 +1079,9 @@ class Sema;
     CandidateSetKind getKind() const { return Kind; }
     OperatorRewriteInfo getRewriteInfo() const { return RewriteInfo; }
 
+    /// Whether diagnostics should be deferred.
+    bool shouldDeferDiags(Sema &S, ArrayRef<Expr *> Args, SourceLocation OpLoc);
+
     /// Determine when this overload candidate will be new to the
     /// overload set.
     bool isNewCandidate(Decl *F, OverloadCandidateParamOrder PO =
@@ -1180,6 +1202,20 @@ class Sema;
     Info.Constructor = dyn_cast<CXXConstructorDecl>(D);
     return Info;
   }
+
+  // Returns false if signature help is relevant despite number of arguments
+  // exceeding parameters. Specifically, it returns false when
+  // PartialOverloading is true and one of the following:
+  // * Function is variadic
+  // * Function is template variadic
+  // * Function is an instantiation of template variadic function
+  // The last case may seem strange. The idea is that if we added one more
+  // argument, we'd end up with a function similar to Function. Since, in the
+  // context of signature help and/or code completion, we do not know what the
+  // type of the next argument (that the user is typing) will be, this is as
+  // good candidate as we can get, despite the fact that it takes one less
+  // parameter.
+  bool shouldEnforceArgLimit(bool PartialOverloading, FunctionDecl *Function);
 
 } // namespace clang
 

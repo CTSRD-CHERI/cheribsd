@@ -63,8 +63,9 @@ public:
   static ConstString GetStaticPluginName() {
     return ConstString("placeholder");
   }
-  ConstString GetPluginName() override { return GetStaticPluginName(); }
-  uint32_t GetPluginVersion() override { return 1; }
+  llvm::StringRef GetPluginName() override {
+    return GetStaticPluginName().GetStringRef();
+  }
   bool ParseHeader() override { return true; }
   Type CalculateType() override { return eTypeUnknown; }
   Strata CalculateStrata() override { return eStrataUnknown; }
@@ -72,7 +73,7 @@ public:
   bool IsExecutable() const override { return false; }
   ArchSpec GetArchitecture() override { return m_arch; }
   UUID GetUUID() override { return m_uuid; }
-  Symtab *GetSymtab() override { return m_symtab_up.get(); }
+  void ParseSymtab(lldb_private::Symtab &symtab) override {}
   bool IsStripped() override { return true; }
   ByteOrder GetByteOrder() const override { return m_arch.GetByteOrder(); }
 
@@ -138,10 +139,10 @@ private:
 ///
 /// \param[in] module_sp The module to grab the .text section from.
 ///
-/// \param[in/out] breakpad_uuid A vector that will receive the calculated
+/// \param[in,out] breakpad_uuid A vector that will receive the calculated
 ///                breakpad .text hash.
 ///
-/// \param[in/out] facebook_uuid A vector that will receive the calculated
+/// \param[in,out] facebook_uuid A vector that will receive the calculated
 ///                facebook .text hash.
 ///
 void HashElfTextSection(ModuleSP module_sp, std::vector<uint8_t> &breakpad_uuid,
@@ -189,19 +190,15 @@ void HashElfTextSection(ModuleSP module_sp, std::vector<uint8_t> &breakpad_uuid,
 
 } // namespace
 
-ConstString ProcessMinidump::GetPluginNameStatic() {
-  static ConstString g_name("minidump");
-  return g_name;
-}
-
-const char *ProcessMinidump::GetPluginDescriptionStatic() {
+llvm::StringRef ProcessMinidump::GetPluginDescriptionStatic() {
   return "Minidump plug-in.";
 }
 
 lldb::ProcessSP ProcessMinidump::CreateInstance(lldb::TargetSP target_sp,
                                                 lldb::ListenerSP listener_sp,
-                                                const FileSpec *crash_file) {
-  if (!crash_file)
+                                                const FileSpec *crash_file,
+                                                bool can_connect) {
+  if (!crash_file || can_connect)
     return nullptr;
 
   lldb::ProcessSP process_sp;
@@ -234,7 +231,7 @@ ProcessMinidump::ProcessMinidump(lldb::TargetSP target_sp,
                                  lldb::ListenerSP listener_sp,
                                  const FileSpec &core_file,
                                  DataBufferSP core_data)
-    : Process(target_sp, listener_sp), m_core_file(core_file),
+    : PostMortemProcess(target_sp, listener_sp), m_core_file(core_file),
       m_core_data(std::move(core_data)), m_is_wow64(false) {}
 
 ProcessMinidump::~ProcessMinidump() {
@@ -303,10 +300,6 @@ Status ProcessMinidump::DoLoadCore() {
 
   return error;
 }
-
-ConstString ProcessMinidump::GetPluginName() { return GetPluginNameStatic(); }
-
-uint32_t ProcessMinidump::GetPluginVersion() { return 1; }
 
 Status ProcessMinidump::DoDestroy() { return Status(); }
 
@@ -404,32 +397,6 @@ ArchSpec ProcessMinidump::GetArchitecture() {
   return ArchSpec(triple);
 }
 
-static MemoryRegionInfo GetMemoryRegionInfo(const MemoryRegionInfos &regions,
-                                            lldb::addr_t load_addr) {
-  MemoryRegionInfo region;
-  auto pos = llvm::upper_bound(regions, load_addr);
-  if (pos != regions.begin() &&
-      std::prev(pos)->GetRange().Contains(load_addr)) {
-    return *std::prev(pos);
-  }
-
-  if (pos == regions.begin())
-    region.GetRange().SetRangeBase(0);
-  else
-    region.GetRange().SetRangeBase(std::prev(pos)->GetRange().GetRangeEnd());
-
-  if (pos == regions.end())
-    region.GetRange().SetRangeEnd(UINT64_MAX);
-  else
-    region.GetRange().SetRangeEnd(pos->GetRange().GetRangeBase());
-
-  region.SetReadable(MemoryRegionInfo::eNo);
-  region.SetWritable(MemoryRegionInfo::eNo);
-  region.SetExecutable(MemoryRegionInfo::eNo);
-  region.SetMapped(MemoryRegionInfo::eNo);
-  return region;
-}
-
 void ProcessMinidump::BuildMemoryRegions() {
   if (m_memory_regions)
     return;
@@ -454,7 +421,7 @@ void ProcessMinidump::BuildMemoryRegions() {
       MemoryRegionInfo::RangeType section_range(load_addr,
                                                 section_sp->GetByteSize());
       MemoryRegionInfo region =
-          ::GetMemoryRegionInfo(*m_memory_regions, load_addr);
+          MinidumpParser::GetMemoryRegionInfo(*m_memory_regions, load_addr);
       if (region.GetMapped() != MemoryRegionInfo::eYes &&
           region.GetRange().GetRangeBase() <= section_range.GetRangeBase() &&
           section_range.GetRangeEnd() <= region.GetRange().GetRangeEnd()) {
@@ -472,10 +439,10 @@ void ProcessMinidump::BuildMemoryRegions() {
   llvm::sort(*m_memory_regions);
 }
 
-Status ProcessMinidump::GetMemoryRegionInfo(lldb::addr_t load_addr,
-                                            MemoryRegionInfo &region) {
+Status ProcessMinidump::DoGetMemoryRegionInfo(lldb::addr_t load_addr,
+                                              MemoryRegionInfo &region) {
   BuildMemoryRegions();
-  region = ::GetMemoryRegionInfo(*m_memory_regions, load_addr);
+  region = MinidumpParser::GetMemoryRegionInfo(*m_memory_regions, load_addr);
   return Status();
 }
 
@@ -487,8 +454,8 @@ Status ProcessMinidump::GetMemoryRegions(MemoryRegionInfos &region_list) {
 
 void ProcessMinidump::Clear() { Process::m_thread_list.Clear(); }
 
-bool ProcessMinidump::UpdateThreadList(ThreadList &old_thread_list,
-                                       ThreadList &new_thread_list) {
+bool ProcessMinidump::DoUpdateThreadList(ThreadList &old_thread_list,
+                                         ThreadList &new_thread_list) {
   for (const minidump::Thread &thread : m_thread_list) {
     LocationDescriptor context_location = thread.Context;
 
@@ -573,7 +540,7 @@ void ProcessMinidump::ReadModuleList() {
 
     // check if the process is wow64 - a 32 bit windows process running on a
     // 64 bit windows
-    if (llvm::StringRef(name).endswith_lower("wow64.dll")) {
+    if (llvm::StringRef(name).endswith_insensitive("wow64.dll")) {
       m_is_wow64 = true;
     }
 
@@ -609,8 +576,9 @@ void ProcessMinidump::ReadModuleList() {
       // we don't then we will end up setting the load address of a different
       // PlaceholderObjectFile and an assertion will fire.
       auto *objfile = module_sp->GetObjectFile();
-      if (objfile && objfile->GetPluginName() ==
-          PlaceholderObjectFile::GetStaticPluginName()) {
+      if (objfile &&
+          objfile->GetPluginName() ==
+              PlaceholderObjectFile::GetStaticPluginName().GetStringRef()) {
         if (((PlaceholderObjectFile *)objfile)->GetBaseImageAddress() !=
             load_addr)
           module_sp.reset();
@@ -896,7 +864,7 @@ public:
     m_option_group.Finalize();
   }
 
-  ~CommandObjectProcessMinidumpDump() override {}
+  ~CommandObjectProcessMinidumpDump() override = default;
 
   Options *GetOptions() override { return &m_option_group; }
 
@@ -905,7 +873,6 @@ public:
     if (argc > 0) {
       result.AppendErrorWithFormat("'%s' take no arguments, only options",
                                    m_cmd_name.c_str());
-      result.SetStatus(eReturnStatusFailed);
       return false;
     }
     SetDefaultOptionsIfNoneAreSet();
@@ -1026,7 +993,7 @@ public:
         CommandObjectSP(new CommandObjectProcessMinidumpDump(interpreter)));
   }
 
-  ~CommandObjectMultiwordProcessMinidump() override {}
+  ~CommandObjectMultiwordProcessMinidump() override = default;
 };
 
 CommandObject *ProcessMinidump::GetPluginCommandObject() {

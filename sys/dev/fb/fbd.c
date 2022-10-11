@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2013 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Aleksandr Rybalko under sponsorship from the
  * FreeBSD Foundation.
@@ -203,7 +202,7 @@ fb_init(struct fb_list_entry *entry, int unit)
 }
 
 int
-fbd_list()
+fbd_list(void)
 {
 	struct fb_list_entry *entry;
 
@@ -363,10 +362,8 @@ driver_t fbd_driver = {
 	sizeof(struct fbd_softc)
 };
 
-devclass_t	fbd_devclass;
-
-DRIVER_MODULE(fbd, fb, fbd_driver, fbd_devclass, 0, 0);
-DRIVER_MODULE(fbd, drmn, fbd_driver, fbd_devclass, 0, 0);
-DRIVER_MODULE(fbd, udl, fbd_driver, fbd_devclass, 0, 0);
+DRIVER_MODULE(fbd, fb, fbd_driver, 0, 0);
+DRIVER_MODULE(fbd, drmn, fbd_driver, 0, 0);
+DRIVER_MODULE(fbd, udl, fbd_driver, 0, 0);
 MODULE_VERSION(fbd, 1);
 

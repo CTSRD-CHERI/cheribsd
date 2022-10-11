@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2009-2010 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Semihalf under sponsorship from
  * the FreeBSD Foundation.
@@ -294,5 +293,5 @@ uart_fdt_probe(device_t dev)
 	return (uart_bus_probe(dev, (int)shift, (int)iowidth, (int)clock, 0, 0, 0));
 }
 
-DRIVER_MODULE(uart, simplebus, uart_fdt_driver, uart_devclass, 0, 0);
-DRIVER_MODULE(uart, ofwbus, uart_fdt_driver, uart_devclass, 0, 0);
+DRIVER_MODULE(uart, simplebus, uart_fdt_driver, 0, 0);
+DRIVER_MODULE(uart, ofwbus, uart_fdt_driver, 0, 0);

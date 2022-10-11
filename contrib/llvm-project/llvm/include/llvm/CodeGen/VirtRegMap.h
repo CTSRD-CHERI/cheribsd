@@ -19,6 +19,7 @@
 #include "llvm/ADT/IndexedMap.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/TargetRegisterInfo.h"
+#include "llvm/CodeGen/TileShapeInfo.h"
 #include "llvm/Pass.h"
 #include <cassert>
 
@@ -38,10 +39,10 @@ class TargetInstrInfo;
     };
 
   private:
-    MachineRegisterInfo *MRI;
-    const TargetInstrInfo *TII;
-    const TargetRegisterInfo *TRI;
-    MachineFunction *MF;
+    MachineRegisterInfo *MRI = nullptr;
+    const TargetInstrInfo *TII = nullptr;
+    const TargetRegisterInfo *TRI = nullptr;
+    MachineFunction *MF = nullptr;
 
     /// Virt2PhysMap - This is a virtual to physical register
     /// mapping. Each virtual register is required to have an entry in
@@ -60,6 +61,10 @@ class TargetInstrInfo;
     /// mapping.
     IndexedMap<unsigned, VirtReg2IndexFunctor> Virt2SplitMap;
 
+    /// Virt2ShapeMap - For X86 AMX register whose register is bound shape
+    /// information.
+    DenseMap<unsigned, ShapeT> Virt2ShapeMap;
+
     /// createSpillSlot - Allocate a spill slot for RC from MFI.
     unsigned createSpillSlot(const TargetRegisterClass *RC);
 
@@ -67,8 +72,7 @@ class TargetInstrInfo;
     static char ID;
 
     VirtRegMap()
-        : MachineFunctionPass(ID), MRI(nullptr), TII(nullptr), TRI(nullptr),
-          MF(nullptr), Virt2PhysMap(NO_PHYS_REG),
+        : MachineFunctionPass(ID), Virt2PhysMap(NO_PHYS_REG),
           Virt2StackSlotMap(NO_STACK_SLOT), Virt2SplitMap(0) {}
     VirtRegMap(const VirtRegMap &) = delete;
     VirtRegMap &operator=(const VirtRegMap &) = delete;
@@ -98,14 +102,29 @@ class TargetInstrInfo;
 
     /// returns the physical register mapped to the specified
     /// virtual register
-    Register getPhys(Register virtReg) const {
+    MCRegister getPhys(Register virtReg) const {
       assert(virtReg.isVirtual());
-      return Virt2PhysMap[virtReg.id()];
+      return MCRegister::from(Virt2PhysMap[virtReg.id()]);
     }
 
     /// creates a mapping for the specified virtual register to
     /// the specified physical register
     void assignVirt2Phys(Register virtReg, MCPhysReg physReg);
+
+    bool isShapeMapEmpty() const { return Virt2ShapeMap.empty(); }
+
+    bool hasShape(Register virtReg) const {
+      return getShape(virtReg).isValid();
+    }
+
+    ShapeT getShape(Register virtReg) const {
+      assert(virtReg.isVirtual());
+      return Virt2ShapeMap.lookup(virtReg);
+    }
+
+    void assignVirt2Shape(Register virtReg, ShapeT shape) {
+      Virt2ShapeMap[virtReg.id()] = shape;
+    }
 
     /// clears the specified virtual register's, physical
     /// register mapping
@@ -123,20 +142,23 @@ class TargetInstrInfo;
     }
 
     /// returns true if VirtReg is assigned to its preferred physreg.
-    bool hasPreferredPhys(Register VirtReg);
+    bool hasPreferredPhys(Register VirtReg) const;
 
     /// returns true if VirtReg has a known preferred register.
     /// This returns false if VirtReg has a preference that is a virtual
     /// register that hasn't been assigned yet.
-    bool hasKnownPreference(Register VirtReg);
+    bool hasKnownPreference(Register VirtReg) const;
 
     /// records virtReg is a split live interval from SReg.
-    void setIsSplitFromReg(Register virtReg, unsigned SReg) {
+    void setIsSplitFromReg(Register virtReg, Register SReg) {
       Virt2SplitMap[virtReg.id()] = SReg;
+      if (hasShape(SReg)) {
+        Virt2ShapeMap[virtReg.id()] = getShape(SReg);
+      }
     }
 
     /// returns the live interval virtReg is split from.
-    unsigned getPreSplitReg(Register virtReg) const {
+    Register getPreSplitReg(Register virtReg) const {
       return Virt2SplitMap[virtReg.id()];
     }
 
@@ -144,8 +166,8 @@ class TargetInstrInfo;
     /// from through splitting.
     /// A register that was not created by splitting is its own original.
     /// This operation is idempotent.
-    unsigned getOriginal(unsigned VirtReg) const {
-      unsigned Orig = getPreSplitReg(VirtReg);
+    Register getOriginal(Register VirtReg) const {
+      Register Orig = getPreSplitReg(VirtReg);
       return Orig ? Orig : VirtReg;
     }
 

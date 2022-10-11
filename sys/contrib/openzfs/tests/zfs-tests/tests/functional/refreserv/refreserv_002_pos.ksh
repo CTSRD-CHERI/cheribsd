@@ -50,11 +50,9 @@ function cleanup
 	if is_global_zone ; then
 		log_must zfs set refreservation=none $TESTPOOL
 
-		if datasetexists $TESTPOOL@snap ; then
-			log_must zfs destroy -f $TESTPOOL@snap
-		fi
+		datasetexists $TESTPOOL@snap && destroy_dataset $TESTPOOL@snap -f
 	fi
-	log_must zfs destroy -rf $TESTPOOL/$TESTFS
+	destroy_dataset $TESTPOOL/$TESTFS -rf
 	log_must zfs create $TESTPOOL/$TESTFS
 	log_must zfs set mountpoint=$TESTDIR $TESTPOOL/$TESTFS
 }
@@ -70,8 +68,7 @@ function max_refreserv
 
 	log_must zfs set refreserv=$rr $ds
 	while :; do
-		zfs set refreserv=$((rr + incsize)) $ds >/dev/null 2>&1
-		if [[ $? == 0 ]]; then
+		if zfs set refreserv=$((rr + incsize)) $ds >/dev/null 2>&1; then
 			((rr += incsize))
 			continue
 		else

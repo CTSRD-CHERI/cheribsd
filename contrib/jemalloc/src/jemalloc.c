@@ -809,11 +809,6 @@ init_opt_stats_print_opts(const char *v, size_t vlen) {
 	assert(opts_len == strlen(opt_stats_print_opts));
 }
 
-static inline ptrdiff_t
-pointer_distance(const void* end, const void* start) {
-	return (const uint8_t*)end - (const uint8_t*)start;
-}
-
 /* Reads the next size pair in a multi-sized option. */
 static bool
 malloc_conf_multi_sizes_next(const char **slab_size_segment_cur,
@@ -885,7 +880,7 @@ malloc_conf_next(char const **opts_p, char const **k_p, size_t *klen_p,
 			break;
 		case ':':
 			opts++;
-			*klen_p = pointer_distance(opts, *k_p) - 1;
+			*klen_p = (uintptr_t)opts - 1 - (uintptr_t)*k_p;
 			*v_p = opts;
 			accept = true;
 			break;
@@ -916,11 +911,11 @@ malloc_conf_next(char const **opts_p, char const **k_p, size_t *klen_p,
 				malloc_write("<jemalloc>: Conf string ends "
 				    "with comma\n");
 			}
-			*vlen_p = pointer_distance(opts, *v_p) - 1;
+			*vlen_p = (uintptr_t)opts - 1 - (uintptr_t)*v_p;
 			accept = true;
 			break;
 		case '\0':
-			*vlen_p = pointer_distance(opts, *v_p);
+			*vlen_p = (uintptr_t)opts - (uintptr_t)*v_p;
 			accept = true;
 			break;
 		default:
@@ -1141,8 +1136,8 @@ malloc_conf_init_helper(sc_data_t *sc_data, unsigned bin_shard_sizes[SC_NBINS],
 									\
 				set_errno(0);				\
 				um = malloc_strtoumax(v, &end, 0);	\
-				if (get_errno() != 0 || 		\
-				    pointer_distance(end, v) != vlen) {	\
+				if (get_errno() != 0 || (uintptr_t)end -\
+				    (uintptr_t)v != vlen) {	\
 					CONF_ERROR("Invalid conf value",\
 					    k, klen, v, vlen);		\
 				} else if (clip) {			\
@@ -1181,8 +1176,8 @@ malloc_conf_init_helper(sc_data_t *sc_data, unsigned bin_shard_sizes[SC_NBINS],
 									\
 				set_errno(0);				\
 				l = strtol(v, &end, 0);			\
-				if (get_errno() != 0 || 		\
-				    pointer_distance(end, v) != vlen) {	\
+				if (get_errno() != 0 || (uintptr_t)end -\
+				    (uintptr_t)v != vlen) {		\
 					CONF_ERROR("Invalid conf value",\
 					    k, klen, v, vlen);		\
 				} else if (l < (ssize_t)(min) || l >	\
@@ -2199,7 +2194,7 @@ imalloc_body(static_opts_t *sopts, dynamic_opts_t *dopts, tsd_t *tsd) {
 	 * post-allocation work to do though.
 	 */
 	assert(dopts->alignment == 0
-	    || ((vaddr_t)allocation & (dopts->alignment - 1)) == ZU(0));
+	    || ((uintptr_t)allocation & (dopts->alignment - 1)) == ZU(0));
 
 	if (config_stats) {
 		assert(usize == isalloc(tsd_tsdn(tsd), allocation));
@@ -2638,7 +2633,7 @@ ifree(tsd_t *tsd, void *ptr, tcache_t *tcache, bool slow_path) {
 	alloc_ctx_t alloc_ctx;
 	rtree_ctx_t *rtree_ctx = tsd_rtree_ctx(tsd);
 	rtree_szind_slab_read(tsd_tsdn(tsd), &extents_rtree, rtree_ctx,
-	    (vaddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
+	    (uintptr_t)(ptraddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
 	assert(alloc_ctx.szind != SC_NSIZES);
 
 	size_t usize;
@@ -2696,7 +2691,7 @@ isfree(tsd_t *tsd, void *ptr, size_t usize, tcache_t *tcache, bool slow_path) {
 	} else if (config_prof && opt_prof) {
 		rtree_ctx_t *rtree_ctx = tsd_rtree_ctx(tsd);
 		rtree_szind_slab_read(tsd_tsdn(tsd), &extents_rtree, rtree_ctx,
-		    (vaddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
+		    (uintptr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
 		assert(alloc_ctx.szind == sz_size2index(usize));
 		ctx = &alloc_ctx;
 	} else {
@@ -2747,7 +2742,7 @@ je_realloc(void *ptr, size_t arg_size) {
 		alloc_ctx_t alloc_ctx;
 		rtree_ctx_t *rtree_ctx = tsd_rtree_ctx(tsd);
 		rtree_szind_slab_read(tsd_tsdn(tsd), &extents_rtree, rtree_ctx,
-		    (vaddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
+		    (uintptr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
 		assert(alloc_ctx.szind != SC_NSIZES);
 		old_usize = sz_index2size(alloc_ctx.szind);
 		assert(old_usize == isalloc(tsd_tsdn(tsd), ptr));
@@ -3310,7 +3305,7 @@ je_rallocx(void *ptr, size_t size, int flags) {
 	alloc_ctx_t alloc_ctx;
 	rtree_ctx_t *rtree_ctx = tsd_rtree_ctx(tsd);
 	rtree_szind_slab_read(tsd_tsdn(tsd), &extents_rtree, rtree_ctx,
-	    (vaddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
+	    (uintptr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
 	assert(alloc_ctx.szind != SC_NSIZES);
 	old_usize = sz_index2size(alloc_ctx.szind);
 	assert(old_usize == isalloc(tsd_tsdn(tsd), ptr));
@@ -3339,7 +3334,7 @@ je_rallocx(void *ptr, size_t size, int flags) {
 			usize = isalloc(tsd_tsdn(tsd), p);
 		}
 	}
-	assert(alignment == 0 || ((vaddr_t)p & (alignment - 1)) == ZU(0));
+	assert(alignment == 0 || ((uintptr_t)p & (alignment - 1)) == ZU(0));
 
 	if (config_stats) {
 		*tsd_thread_allocatedp_get(tsd) += usize;
@@ -3460,7 +3455,7 @@ je_xallocx(void *ptr, size_t size, size_t extra, int flags) {
 	alloc_ctx_t alloc_ctx;
 	rtree_ctx_t *rtree_ctx = tsd_rtree_ctx(tsd);
 	rtree_szind_slab_read(tsd_tsdn(tsd), &extents_rtree, rtree_ctx,
-	    (vaddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
+	    (uintptr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
 	assert(alloc_ctx.szind != SC_NSIZES);
 	old_usize = sz_index2size(alloc_ctx.szind);
 	assert(old_usize == isalloc(tsd_tsdn(tsd), ptr));

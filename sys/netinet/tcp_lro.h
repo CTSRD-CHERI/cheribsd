@@ -34,6 +34,7 @@
 #define _TCP_LRO_H_
 
 #include <sys/time.h>
+#include <netinet/in.h>
 
 #ifndef TCP_LRO_ENTRIES
 /* Define default number of LRO entries per RX queue */
@@ -42,51 +43,50 @@
 
 /*
  * Flags for ACK entry for compression
- * the bottom 8 bits has the th_flags.
+ * the bottom 12 bits has the th_x2|th_flags.
  * LRO itself adds only the TSTMP flags
  * to indicate if either of the types
  * of timestamps are filled and the
  * HAS_TSTMP option to indicate if the
  * TCP timestamp option is valid.
  *
- * The other 5 flag bits are for processing
+ * The other 1 flag bits are for processing
  * by a stack.
  *
  */
-#define TSTMP_LRO		0x0100
-#define TSTMP_HDWR		0x0200
-#define HAS_TSTMP		0x0400
+#define TSTMP_LRO		0x1000
+#define TSTMP_HDWR		0x2000
+#define HAS_TSTMP		0x4000
+/*
+ * Default number of interrupts on the same cpu in a row
+ * that will cause us to declare a "affinity cpu".
+ */
+#define TCP_LRO_CPU_DECLARATION_THRESH 50
 
 struct inpcb;
 
 union lro_address {
 	u_long raw[1];
 	struct {
-		uint16_t lro_type;	/* internal */
+		uint8_t lro_type;	/* internal */
 #define	LRO_TYPE_NONE     0
 #define	LRO_TYPE_IPV4_TCP 1
 #define	LRO_TYPE_IPV6_TCP 2
 #define	LRO_TYPE_IPV4_UDP 3
 #define	LRO_TYPE_IPV6_UDP 4
+		uint8_t lro_flags;
+#define	LRO_FLAG_DECRYPTED 1
 		uint16_t vlan_id;	/* VLAN identifier */
 		uint16_t s_port;	/* source TCP/UDP port */
 		uint16_t d_port;	/* destination TCP/UDP port */
 		uint32_t vxlan_vni;	/* VXLAN virtual network identifier */
 		union {
-#ifdef INET
 			struct in_addr v4;
-#endif
-#ifdef INET6
 			struct in6_addr v6;
-#endif
 		} s_addr;	/* source IPv4/IPv6 address */
 		union {
-#ifdef INET
 			struct in_addr v4;
-#endif
-#ifdef INET6
 			struct in6_addr v6;
-#endif
 		} d_addr;	/* destination IPv4/IPv6 address */
 	};
 } __aligned(sizeof(u_long));
@@ -139,8 +139,11 @@ struct lro_entry {
 	uint16_t		compressed;
 	uint16_t		uncompressed;
 	uint16_t		window;
-	uint16_t		timestamp;	/* flag, not a TCP hdr field. */
-	sbintime_t		alloc_time;	/* time when entry was allocated */
+	uint16_t		flags : 12,	/* 12 TCP header bits */
+				timestamp : 1,
+				needs_merge : 1,
+				reserved : 2;	/* unused */
+	struct bintime		alloc_time;	/* time when entry was allocated */
 };
 
 LIST_HEAD(lro_head, lro_entry);
@@ -154,7 +157,7 @@ struct lro_mbuf_sort {
 struct lro_ctrl {
 	struct ifnet	*ifp;
 	struct lro_mbuf_sort *lro_mbuf_data;
-	sbintime_t	lro_last_queue_time;	/* last time data was queued */
+	struct bintime	lro_last_queue_time;	/* last time data was queued */
 	uint64_t	lro_queued;
 	uint64_t	lro_flushed;
 	uint64_t	lro_bad_csum;
@@ -162,12 +165,15 @@ struct lro_ctrl {
 	unsigned	lro_mbuf_count;
 	unsigned	lro_mbuf_max;
 	unsigned short	lro_ackcnt_lim;		/* max # of aggregated ACKs */
+	unsigned short	lro_cpu;		/* Guess at the cpu we have affinity too */
 	unsigned 	lro_length_lim;		/* max len of aggregated data */
-
 	u_long		lro_hashsz;
+	uint32_t	lro_last_cpu;
+	uint32_t 	lro_cnt_of_same_cpu;
 	struct lro_head	*lro_hash;
 	struct lro_head	lro_active;
 	struct lro_head	lro_free;
+	uint8_t		lro_cpu_is_set;		/* Flag to say its ok to set the CPU on the inp */
 };
 
 struct tcp_ackent {

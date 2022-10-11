@@ -146,21 +146,6 @@ static void RawInternalFree(void *ptr, InternalAllocatorCache *cache) {
 
 #endif  // SANITIZER_GO || defined(SANITIZER_USE_MALLOC)
 
-const u64 kBlockMagic = 0x6A6CB03ABCEBC041ull;
-
-// TODO: should just use two u32 members to save some space
-struct InternalAllocMetaData {
-  u64 magic;
-  u64 offset_to_real_allocation;
-};
-
-static usize InteralAllocRequiredSize(usize requested_size, usize requested_align) {
-  // If alignment is zero, assume that we want the result to be at least sizeof(void*) aligned
-  if (requested_align == 0)
-    requested_align = InternalDefaultAlign;
-  return requested_size + RoundUpTo(sizeof(InternalAllocMetaData), requested_align);
-}
-
 static void NORETURN ReportInternalAllocatorOutOfMemory(usize requested_size) {
   SetAllocatorOutOfMemory();
   Report("FATAL: %s: internal allocator is out of memory trying to allocate "
@@ -168,44 +153,18 @@ static void NORETURN ReportInternalAllocatorOutOfMemory(usize requested_size) {
   Die();
 }
 
-void *InternalAlloc(usize size, InternalAllocatorCache *cache, usize alignment) {
-  usize real_size = InteralAllocRequiredSize(size, alignment);
-  usize difference = real_size - size;
-  if (real_size < size) // integer overflow
-    return nullptr;
-  void *p = RawInternalAlloc(real_size, cache, alignment);
+void *InternalAlloc(uptr size, InternalAllocatorCache *cache, usize alignment) {
+  void *p = RawInternalAlloc(size, cache, alignment);
   if (UNLIKELY(!p))
-    ReportInternalAllocatorOutOfMemory(real_size);
-  char* result = (char*)p + difference;
-  InternalAllocMetaData* metadata = ((InternalAllocMetaData*)result - 1);
-  DCHECK_GE((vaddr)metadata, (vaddr)p);
-  metadata->magic = kBlockMagic;
-  metadata->offset_to_real_allocation = difference;
-  // Report("%s: result=%p (real=%p), offset=%zd, req_align=%zd\n", __func__, result, p, difference, alignment);
-  DCHECK(IsAligned(result, Max(alignment, InternalDefaultAlign)));
-  return result;
+    ReportInternalAllocatorOutOfMemory(size);
+  return p;
 }
 
 void *InternalRealloc(void *addr, usize size, InternalAllocatorCache *cache) {
-  if (!addr)
-    return InternalAlloc(size, cache);
-  usize real_size = InteralAllocRequiredSize(size, 0);
-  if (real_size < size) // integer overflow
-    return nullptr;
-  // Load the original metadata
-  InternalAllocMetaData* metadata = (InternalAllocMetaData*)addr - 1;
-  CHECK_EQ(kBlockMagic, metadata->magic);
-  // Must load this value now since it might be clobbered by realloc()
-  const usize offset_to_alloc = metadata->offset_to_real_allocation;
-  void *p = RawInternalRealloc((char*)addr - offset_to_alloc, real_size, cache);
+  void *p = RawInternalRealloc(addr, size, cache);
   if (UNLIKELY(!p))
     ReportInternalAllocatorOutOfMemory(size);
-  // Check that the metadata is still valid after realloc():
-  char* result = (char*)p + offset_to_alloc;
-  metadata = (InternalAllocMetaData*)result - 1;
-  CHECK_EQ(kBlockMagic, metadata->magic);
-  // Report("%s: result=%p (real=%p), offset=%zd\n", __func__, result, p, offset_to_alloc);
-  return result;
+  return p;
 }
 
 void *InternalReallocArray(void *addr, usize count, usize size,
@@ -234,13 +193,7 @@ void *InternalCalloc(usize count, usize size, InternalAllocatorCache *cache) {
 }
 
 void InternalFree(void *addr, InternalAllocatorCache *cache) {
-  if (!addr)
-    return;
-  InternalAllocMetaData* metadata = (InternalAllocMetaData*)addr - 1;
-  CHECK_EQ(kBlockMagic, metadata->magic);
-  char* real_addr = (char*)addr - metadata->offset_to_real_allocation;
-  // Report("%s: addr=%p (real=%p), offset=%zd\n", __func__, addr, real_addr, metadata->offset_to_real_allocation);
-  RawInternalFree(real_addr, cache);
+  RawInternalFree(addr, cache);
 }
 
 // LowLevelAllocator

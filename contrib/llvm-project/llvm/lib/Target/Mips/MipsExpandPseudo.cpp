@@ -733,10 +733,10 @@ bool MipsExpandPseudo::expandAtomicBinOp(MachineBasicBlock &BB,
 
     assert(I->getNumOperands() == 5 &&
            "Atomics min|max|umin|umax use an additional register");
-    Register Scratch2 = I->getOperand(4).getReg();
+    MCRegister Scratch2 = I->getOperand(4).getReg().asMCReg();
 
     // On Mips64 result of slt is GPR32.
-    Register Scratch2_32 =
+    MCRegister Scratch2_32 =
         (Size == 8) ? STI->getRegisterInfo()->getSubReg(Scratch2, Mips::sub_32)
                     : Scratch2;
 
@@ -896,9 +896,8 @@ bool MipsExpandPseudo::runOnMachineFunction(MachineFunction &MF) {
   TII = STI->getInstrInfo();
 
   bool Modified = false;
-  for (MachineFunction::iterator MFI = MF.begin(), E = MF.end(); MFI != E;
-       ++MFI)
-    Modified |= expandMBB(*MFI);
+  for (MachineBasicBlock &MBB : MF)
+    Modified |= expandMBB(MBB);
 
   if (Modified)
     MF.RenumberBlocks();

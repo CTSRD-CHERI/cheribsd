@@ -40,8 +40,6 @@ struct ManualMapEntry {
       : RegInstStr(RegInstStr), MemInstStr(MemInstStr), Strategy(Strategy) {}
 };
 
-class IsMatch;
-
 // List of instructions requiring explicitly aligned memory.
 const char *ExplicitAlign[] = {"MOVDQA",  "MOVAPS",  "MOVAPD",  "MOVNTPS",
                                "MOVNTPD", "MOVNTDQ", "MOVNTDQA"};
@@ -79,13 +77,13 @@ const ManualMapEntry ManualMapSet[] = {
 
 static bool isExplicitAlign(const CodeGenInstruction *Inst) {
   return any_of(ExplicitAlign, [Inst](const char *InstStr) {
-    return Inst->TheDef->getName().find(InstStr) != StringRef::npos;
+    return Inst->TheDef->getName().contains(InstStr);
   });
 }
 
 static bool isExplicitUnalign(const CodeGenInstruction *Inst) {
   return any_of(ExplicitUnalign, [Inst](const char *InstStr) {
-    return Inst->TheDef->getName().find(InstStr) != StringRef::npos;
+    return Inst->TheDef->getName().contains(InstStr);
   });
 }
 
@@ -126,6 +124,15 @@ class X86FoldTablesEmitter {
         OS << "TB_ALIGN_" << Alignment << " | ";
 
       OS << "0 },\n";
+    }
+
+    bool operator<(const X86FoldTableEntry &RHS) const {
+      bool LHSpseudo = RegInst->TheDef->getValueAsBit("isPseudo");
+      bool RHSpseudo = RHS.RegInst->TheDef->getValueAsBit("isPseudo");
+      if (LHSpseudo != RHSpseudo)
+        return LHSpseudo;
+
+      return RegInst->TheDef->getName() < RHS.RegInst->TheDef->getName();
     }
   };
 
@@ -225,14 +232,8 @@ static inline unsigned int getRegOperandSize(const Record *RegRec) {
 }
 
 // Return the size of the memory operand
-static inline unsigned int
-getMemOperandSize(const Record *MemRec, const bool IntrinsicSensitive = false) {
+static inline unsigned getMemOperandSize(const Record *MemRec) {
   if (MemRec->isSubClassOf("Operand")) {
-    // Intrinsic memory instructions use ssmem/sdmem.
-    if (IntrinsicSensitive &&
-        (MemRec->getName() == "sdmem" || MemRec->getName() == "ssmem"))
-      return 128;
-
     StringRef Name =
         MemRec->getValueAsDef("ParserMatchClass")->getValueAsString("Name");
     if (Name == "Mem8")
@@ -275,7 +276,7 @@ static inline bool hasMemoryFormat(const Record *Inst) {
 }
 
 static inline bool isNOREXRegClass(const Record *Op) {
-  return Op->getName().find("_NOREX") != StringRef::npos;
+  return Op->getName().contains("_NOREX");
 }
 
 static inline bool isRegisterOperand(const Record *Rec) {
@@ -568,8 +569,6 @@ void X86FoldTablesEmitter::updateTables(const CodeGenInstruction *RegInstr,
         getRegOperandSize(RegOpRec) == getMemOperandSize(MemOpRec))
       addEntryWithFlags(Table0, RegInstr, MemInstr, S, 0);
   }
-
-  return;
 }
 
 void X86FoldTablesEmitter::run(formatted_raw_ostream &OS) {
@@ -652,6 +651,14 @@ void X86FoldTablesEmitter::run(formatted_raw_ostream &OS) {
     updateTables(&(Target.getInstruction(RegInstIter)),
                  &(Target.getInstruction(MemInstIter)), Entry.Strategy);
   }
+
+  // Sort the tables before printing.
+  llvm::sort(Table2Addr);
+  llvm::sort(Table0);
+  llvm::sort(Table1);
+  llvm::sort(Table2);
+  llvm::sort(Table3);
+  llvm::sort(Table4);
 
   // Print all tables.
   printTable(Table2Addr, "Table2Addr", OS);

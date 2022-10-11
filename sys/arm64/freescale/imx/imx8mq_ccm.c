@@ -233,6 +233,8 @@ static struct imx_clk imx_clks[] = {
 	ROOT_GATE(IMX8MQ_CLK_USDHC1_ROOT, "usdhc1_root_clk", "usdhc1", 0x4510),
 	ROOT_GATE(IMX8MQ_CLK_USDHC2_ROOT, "usdhc2_root_clk", "usdhc2", 0x4520),
 
+	ROOT_GATE(IMX8MQ_CLK_TMU_ROOT, "tmu_root_clk", "ipg_root", 0x4620),
+
 	COMPOSITE(IMX8MQ_CLK_ENET_AXI, "enet_axi", enet_axi_p, 0x8800, 0),
 	COMPOSITE(IMX8MQ_CLK_ENET_REF, "enet_ref", enet_ref_p, 0xa980, 0),
 	COMPOSITE(IMX8MQ_CLK_ENET_TIMER, "enet_timer", enet_timer_p, 0xaa00, 0),
@@ -478,7 +480,5 @@ static driver_t ccm_driver = {
 	sizeof(struct ccm_softc)
 };
 
-static devclass_t ccm_devclass;
-
-EARLY_DRIVER_MODULE(ccm, simplebus, ccm_driver, ccm_devclass, 0, 0, 
+EARLY_DRIVER_MODULE(ccm, simplebus, ccm_driver, 0, 0, 
     BUS_PASS_CPU + BUS_PASS_ORDER_EARLY);

@@ -44,6 +44,10 @@
  * $FreeBSD$
  */
 
+#ifdef __i386__
+#include <i386/pmap.h>
+#else /* !__i386__ */
+
 #ifndef _MACHINE_PMAP_H_
 #define	_MACHINE_PMAP_H_
 
@@ -202,6 +206,13 @@
 #define	NKASANPML4E	((NKPML4E + 7) / 8)
 
 /*
+ * Number of PML4 slots for the KMSAN shadow and origin maps.  These are
+ * one-to-one with the kernel map.
+ */
+#define	NKMSANSHADPML4E	NKPML4E
+#define	NKMSANORIGPML4E	NKPML4E
+
+/*
  * We use the same numbering of the page table pages for 5-level and
  * 4-level paging structures.
  */
@@ -250,6 +261,9 @@
 #define	KPDPI		(NPDPEPG-2)	/* kernbase at -2GB */
 
 #define	KASANPML4I	(DMPML4I - NKASANPML4E) /* Below the direct map */
+
+#define	KMSANSHADPML4I	(KPML4BASE - NKMSANSHADPML4E)
+#define	KMSANORIGPML4I	(DMPML4I - NKMSANORIGPML4E)
 
 /* Large map: index of the first and max last pml4 entry */
 #define	LMSPML4I	(PML4PML4I + 1)
@@ -456,6 +470,12 @@ extern int invpcid_works;
 #define	pmap_page_is_write_mapped(m)	(((m)->a.flags & PGA_WRITEABLE) != 0)
 #define	pmap_unmapbios(va, sz)		pmap_unmapdev((va), (sz))
 
+#define	pmap_vm_page_alloc_check(m)					\
+	KASSERT(m->phys_addr < kernphys ||				\
+	    m->phys_addr >= kernphys + (vm_offset_t)&_end - KERNSTART,	\
+	    ("allocating kernel page %p pa %#lx kernphys %#lx end %p", \
+	    m, m->phys_addr, kernphys, &_end));
+
 struct thread;
 
 void	pmap_activate_boot(pmap_t pmap);
@@ -483,6 +503,7 @@ void	*pmap_mapdev_pciecfg(vm_paddr_t pa, vm_size_t size);
 bool	pmap_not_in_di(void);
 boolean_t pmap_page_is_mapped(vm_page_t m);
 void	pmap_page_set_memattr(vm_page_t m, vm_memattr_t ma);
+void	pmap_page_set_memattr_noflush(vm_page_t m, vm_memattr_t ma);
 void	pmap_pinit_pml4(vm_page_t);
 void	pmap_pinit_pml5(vm_page_t);
 bool	pmap_ps_enabled(pmap_t pmap);
@@ -509,10 +530,23 @@ int	pmap_pkru_set(pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 void	pmap_thread_init_invl_gen(struct thread *td);
 int	pmap_vmspace_copy(pmap_t dst_pmap, pmap_t src_pmap);
 void	pmap_page_array_startup(long count);
+vm_page_t pmap_page_alloc_below_4g(bool zeroed);
 
-#ifdef KASAN
-void	pmap_kasan_enter(vm_offset_t);
+#if defined(KASAN) || defined(KMSAN)
+void	pmap_san_bootstrap(void);
+void	pmap_san_enter(vm_offset_t);
 #endif
+
+/*
+ * Returns a pointer to a set of CPUs on which the pmap is currently active.
+ * Note that the set can be modified without any mutual exclusion, so a copy
+ * must be made if a stable value is required.
+ */
+static __inline volatile cpuset_t *
+pmap_invalidate_cpu_mask(pmap_t pmap)
+{
+	return (&pmap->pm_active);
+}
 
 #endif /* _KERNEL */
 
@@ -555,3 +589,5 @@ pmap_pml5e_index(vm_offset_t va)
 #endif /* !LOCORE */
 
 #endif /* !_MACHINE_PMAP_H_ */
+
+#endif /* __i386__ */

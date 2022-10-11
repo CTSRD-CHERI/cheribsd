@@ -37,6 +37,8 @@ public:
 
   void Clear();
 
+  bool IsFileBacked() const;
+
   /// Get const accessor for the module file specification.
   ///
   /// This function returns the file for the module on the host system
@@ -291,12 +293,16 @@ public:
   /// Get the number of global modules.
   static uint32_t GetNumberAllocatedModules();
 
+  /// Remove any global modules which are no longer needed.
+  static void GarbageCollectAllocatedModules();
+
 private:
   friend class SBAddress;
   friend class SBFrame;
   friend class SBSection;
   friend class SBSymbolContext;
   friend class SBTarget;
+  friend class SBType;
 
   explicit SBModule(const lldb::ModuleSP &module_sp);
 

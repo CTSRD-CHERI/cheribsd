@@ -20,6 +20,7 @@
 #include "clang/StaticAnalyzer/Checkers/BuiltinCheckerRegistration.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
 #include "clang/StaticAnalyzer/Core/CheckerManager.h"
+#include "clang/StaticAnalyzer/Core/PathSensitive/CallDescription.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CallEvent.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/DynamicType.h"
@@ -107,7 +108,7 @@ static const NoteTag *getNoteTag(CheckerContext &C,
                                  bool CastSucceeds, bool IsKnownCast) {
   std::string CastToName =
       CastInfo ? CastInfo->to()->getAsCXXRecordDecl()->getNameAsString()
-               : CastToTy->getPointeeCXXRecordDecl()->getNameAsString();
+               : CastToTy.getAsString();
   Object = Object->IgnoreParenImpCasts();
 
   return C.getNoteTag(
@@ -119,10 +120,10 @@ static const NoteTag *getNoteTag(CheckerContext &C,
           Out << "Assuming ";
 
         if (const auto *DRE = dyn_cast<DeclRefExpr>(Object)) {
-          Out << '\'' << DRE->getDecl()->getNameAsString() << '\'';
+          Out << '\'' << DRE->getDecl()->getDeclName() << '\'';
         } else if (const auto *ME = dyn_cast<MemberExpr>(Object)) {
           Out << (IsKnownCast ? "Field '" : "field '")
-              << ME->getMemberDecl()->getNameAsString() << '\'';
+              << ME->getMemberDecl()->getDeclName() << '\'';
         } else {
           Out << (IsKnownCast ? "The object" : "the object");
         }
@@ -162,9 +163,9 @@ static const NoteTag *getNoteTag(CheckerContext &C,
         bool First = true;
         for (QualType CastToTy: CastToTyVec) {
           std::string CastToName =
-            CastToTy->getAsCXXRecordDecl() ?
-            CastToTy->getAsCXXRecordDecl()->getNameAsString() :
-            CastToTy->getPointeeCXXRecordDecl()->getNameAsString();
+              CastToTy->getAsCXXRecordDecl()
+                  ? CastToTy->getAsCXXRecordDecl()->getNameAsString()
+                  : CastToTy.getAsString();
           Out << ' ' << ((CastToTyVec.size() == 1) ? "not" :
                          (First ? "neither" : "nor")) << " a '" << CastToName
               << '\'';

@@ -1,6 +1,7 @@
 # $FreeBSD$
 
 .include <src.opts.mk>
+.include "${SRCTOP}/secure/ssh.mk"
 
 CONFS=	moduli sshd_config
 CONFSDIR=	/etc/ssh
@@ -14,8 +15,8 @@ SRCS=	sshd.c auth-rhosts.c auth-passwd.c \
 	auth2-none.c auth2-passwd.c auth2-pubkey.c \
 	monitor.c monitor_wrap.c auth-krb5.c \
 	auth2-gss.c gss-serv.c gss-serv-krb5.c \
-	loginrec.c auth-pam.c auth-shadow.c auth-sia.c md5crypt.c \
-	sftp-server.c sftp-common.c \
+	loginrec.c auth-pam.c auth-shadow.c auth-sia.c \
+	srclimit.c sftp-server.c sftp-common.c \
 	sandbox-null.c sandbox-rlimit.c sandbox-systrace.c sandbox-darwin.c \
 	sandbox-seccomp-filter.c sandbox-capsicum.c sandbox-pledge.c \
 	sandbox-solaris.c uidswap.c
@@ -25,8 +26,6 @@ PACKAGE=	ssh
 SRCS+=	gss-genr.c
 
 MAN=	sshd.8 sshd_config.5
-CFLAGS+=-I${SSHDIR} -include ssh_namespace.h
-SRCS+=	ssh_namespace.h
 
 # Don't rebuild based on moduli.c
 moduli: .MADE

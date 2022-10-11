@@ -1,27 +1,50 @@
 # $FreeBSD$
 
-freebsd_instance:
+compute_engine_instance:
   # Image list available via
   # gcloud compute images list --project freebsd-org-cloud-dev --no-standard-images
-  image: freebsd-13-0-release-amd64
+  platform: freebsd
+  image_project: freebsd-org-cloud-dev
+  image: freebsd-13-1-release-amd64
   cpu: 8
-  memory: 24G
-
-env:
-  CIRRUS_CLONE_DEPTH: 1
+  memory: 8G
+  disk: 40
 
 task:
+  matrix:
+  - name: World and kernel amd64 build and boot smoke test
+    env:
+      TARGET: amd64
+      TARGET_ARCH: amd64
+      TOOLCHAIN_PKG: llvm14
+  - name: World and kernel arm64 build and boot smoke test
+    trigger_type: manual
+    env:
+      TARGET: arm64
+      TARGET_ARCH: aarch64
+      TOOLCHAIN_PKG: llvm14
+  - name: World and kernel gcc9 amd64 build and boot smoke test
+    trigger_type: manual
+    env:
+      TARGET: amd64
+      TARGET_ARCH: amd64
+      TOOLCHAIN_PKG: amd64-gcc9
   timeout_in: 120m
   install_script:
-  - pkg install -y llvm11
+  - sh .cirrus-ci/pkg-install.sh qemu-nox11 ${TOOLCHAIN_PKG}
   setup_script:
   - uname -a
   - df -m
+  - pkg --version
   - pw useradd user
   - mkdir -p /usr/obj/$(pwd -P)
   - chown user:user /usr/obj/$(pwd -P)
   script:
-  - su user -c "make -j$(sysctl -n hw.ncpu) CROSS_TOOLCHAIN=llvm11 WITHOUT_TOOLCHAIN=yes buildworld buildkernel"
+  - su user -c "make -j$(sysctl -n hw.ncpu) CROSS_TOOLCHAIN=${TOOLCHAIN_PKG} WITHOUT_TOOLCHAIN=yes buildworld buildkernel"
+  package_script:
+  - su user -c "make CROSS_TOOLCHAIN=${TOOLCHAIN_PKG} WITHOUT_TOOLCHAIN=yes PKG_FORMAT=tar packages"
+  test_script:
+  - sh tools/boot/ci-qemu-test.sh
   post_script:
   - df -m
   - du -m -s /usr/obj

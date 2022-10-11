@@ -29,9 +29,11 @@
 #ifndef _SYS_KTLS_H_
 #define	_SYS_KTLS_H_
 
+#ifdef _KERNEL
 #include <sys/refcount.h>
 #include <sys/_iovec.h>
 #include <sys/_task.h>
+#endif
 
 struct tls_record_layer {
 	uint8_t  tls_type;
@@ -49,6 +51,8 @@ struct tls_record_layer {
 #define	TLS_CBC_IMPLICIT_IV_LEN	16
 
 /* Type values for the record layer */
+#define	TLS_RLTYPE_ALERT	21
+#define	TLS_RLTYPE_HANDSHAKE	22
 #define	TLS_RLTYPE_APP		23
 
 /*
@@ -165,67 +169,71 @@ struct tls_session_params {
 #define	KTLS_TX		1
 #define	KTLS_RX		2
 
-#define	KTLS_API_VERSION 8
-
+struct iovec;
+struct ktls_ocf_encrypt_state;
+struct ktls_ocf_session;
 struct ktls_session;
 struct m_snd_tag;
 struct mbuf;
 struct sockbuf;
 struct socket;
 
-struct ktls_crypto_backend {
-	LIST_ENTRY(ktls_crypto_backend) next;
-	int (*try)(struct socket *so, struct ktls_session *tls, int direction);
-	int prio;
-	int api_version;
-	int use_count;
-	const char *name;
-};
-
 struct ktls_session {
-	union {
-		int	(*sw_encrypt)(struct ktls_session *tls,
-		    const struct tls_record_layer *hdr, uint8_t *trailer,
-		    struct iovec *src, struct iovec *dst, int srciovcnt,
-		    int dstiovcnt, uint64_t seqno, uint8_t record_type);
-		int	(*sw_decrypt)(struct ktls_session *tls,
-		    const struct tls_record_layer *hdr, struct mbuf *m,
-		    uint64_t seqno, int *trailer_len);
-	};
-	union {
-		void *cipher;
-		struct m_snd_tag *snd_tag;
-	};
-	struct ktls_crypto_backend *be;
-	void (*free)(struct ktls_session *tls);
+	struct ktls_ocf_session *ocf_session;
+	struct m_snd_tag *snd_tag;
 	struct tls_session_params params;
 	u_int	wq_index;
 	volatile u_int refcount;
 	int mode;
 
 	struct task reset_tag_task;
-	struct inpcb *inp;
+	struct task disable_ifnet_task;
+	union {
+		struct inpcb *inp;	/* Used by transmit tasks. */
+		struct socket *so;	/* Used by receive task. */
+	};
+	struct ifnet *rx_ifp;
+	u_short rx_vlan_id;
 	bool reset_pending;
+	bool disable_ifnet_pending;
+	bool sync_dispatch;
+	bool sequential_records;
+
+	/* Only used for TLS 1.0. */
+	uint64_t next_seqno;
+	STAILQ_HEAD(, mbuf) pending_records;
 } __aligned(CACHE_LINE_SIZE);
 
+extern unsigned int ktls_ifnet_max_rexmit_pct;
+
+typedef enum {
+	KTLS_MBUF_CRYPTO_ST_MIXED = 0,
+	KTLS_MBUF_CRYPTO_ST_ENCRYPTED = 1,
+	KTLS_MBUF_CRYPTO_ST_DECRYPTED = -1,
+} ktls_mbuf_crypto_st_t;
+
 void ktls_check_rx(struct sockbuf *sb);
-int ktls_crypto_backend_register(struct ktls_crypto_backend *be);
-int ktls_crypto_backend_deregister(struct ktls_crypto_backend *be);
+ktls_mbuf_crypto_st_t ktls_mbuf_crypto_state(struct mbuf *mb, int offset, int len);
+void ktls_disable_ifnet(void *arg);
 int ktls_enable_rx(struct socket *so, struct tls_enable *en);
 int ktls_enable_tx(struct socket *so, struct tls_enable *en);
 void ktls_destroy(struct ktls_session *tls);
 void ktls_frame(struct mbuf *m, struct ktls_session *tls, int *enqueue_cnt,
     uint8_t record_type);
+bool ktls_permit_empty_frames(struct ktls_session *tls);
 void ktls_seq(struct sockbuf *sb, struct mbuf *m);
 void ktls_enqueue(struct mbuf *m, struct socket *so, int page_count);
 void ktls_enqueue_to_free(struct mbuf *m);
-int ktls_get_rx_mode(struct socket *so);
+int ktls_get_rx_mode(struct socket *so, int *modep);
 int ktls_set_tx_mode(struct socket *so, int mode);
-int ktls_get_tx_mode(struct socket *so);
+int ktls_get_tx_mode(struct socket *so, int *modep);
+int ktls_get_rx_sequence(struct inpcb *inp, uint32_t *tcpseq, uint64_t *tlsseq);
+void ktls_input_ifp_mismatch(struct sockbuf *sb, struct ifnet *ifp);
 int ktls_output_eagain(struct inpcb *inp, struct ktls_session *tls);
 #ifdef RATELIMIT
 int ktls_modify_txrtlmt(struct ktls_session *tls, uint64_t max_pacing_rate);
 #endif
+bool ktls_pending_rx_info(struct sockbuf *sb, uint64_t *seqnop, size_t *residp);
 
 static inline struct ktls_session *
 ktls_hold(struct ktls_session *tls)

@@ -142,7 +142,7 @@ device		isa
 #
 # AUTO_EOI_2 enables the `automatic EOI' feature for the slave 8259A
 # interrupt controller.  This saves about 0.7-1.25 usec for each interrupt.
-# Automatic EOI is documented not to work for for the slave with the
+# Automatic EOI is documented not to work for the slave with the
 # original i8259A, but it works for some clones and some integrated
 # versions.
 #
@@ -261,11 +261,8 @@ device		s3pci
 # linked to /dev/3dfx and /dev/voodoo.  Note that this is not the same as
 # the tdfx DRI module from XFree86 and is completely unrelated.
 #
-# To enable Linuxulator support, one must also include COMPAT_LINUX in the
-# config as well.  The other option is to load both as modules.
 
 device		tdfx			# Enable 3Dfx Voodoo support
-#XXX#device 	tdfx_linux		# Enable Linuxulator support
 
 #
 # ACPI support using the Intel ACPI Component Architecture reference
@@ -286,12 +283,17 @@ device		cpufreq
 # Network interfaces:
 #
 
+# axp: AMD EPYC integrated NIC
+#	Requires the miibus module
 # bxe:  Broadcom NetXtreme II (BCM5771X/BCM578XX) PCIe 10Gb Ethernet
 #       adapters.
 # ice:	Intel 800 Series Physical Function
 #	Requires the ice_ddp module for full functionality
+# igc:	Intel I225 2.5Gb Ethernet adapter
 # ipw:	Intel PRO/Wireless 2100 IEEE 802.11 adapter
 #	Requires the ipw firmware module
+# irdma: Intel 800 Series RDMA driver
+#        Requires the ice module
 # iwi:	Intel PRO/Wireless 2200BG/2225BG/2915ABG IEEE 802.11 adapters
 #	Requires the iwi firmware module
 # iwn:	Intel Wireless WiFi Link 1000/105/135/2000/4965/5000/6000/6050 abgn
@@ -301,17 +303,17 @@ device		cpufreq
 # mlx4ib: Mellanox ConnectX HCA InfiniBand
 # mlx4en: Mellanox ConnectX HCA Ethernet
 # nfe:	nVidia nForce MCP on-board Ethernet Networking (BSD open source)
+# qlxgb: QLogic 3200 and 8200 series 10 Gigabit Ethernet & CNA Adapter
+# qlxgbe: QLogic 8300 series 10 Gigabit Ethernet & CNA Adapter
+# qlxge: QLogic 8100 series 10 Gigabit Ethernet & CNA Adapter
 # sfxge: Solarflare SFC9000 family 10Gb Ethernet adapters
 # vmx:	VMware VMXNET3 Ethernet (BSD open source)
 # wpi:	Intel 3945ABG Wireless LAN controller
 #	Requires the wpi firmware module
-# axp: AMD EPYC integrated NIC
-#   Requires the miibus module
 
+device		axp		# AMD EPYC integrated NIC
 device		bxe		# Broadcom NetXtreme II BCM5771X/BCM578XX 10GbE
-options 	ED_3C503
-options 	ED_HPP
-options 	ED_SIC
+device		igc		# Intel I225 2.5G Ethernet
 device		ipw		# Intel 2100 wireless NICs.
 device		iwi		# Intel 2200BG/2225BG/2915ABG wireless NICs.
 device		iwn		# Intel 4965/1000/5000/6000 wireless NICs.
@@ -319,15 +321,18 @@ device		ixl		# Intel 700 Series Physical Function
 device		iavf		# Intel Adaptive Virtual Function
 device		ice		# Intel 800 Series Physical Function
 device		ice_ddp		# Intel 800 Series DDP Package
+device		irdma		# Intel 800 Series RDMA driver
 device  	mthca		# Mellanox HCA InfiniBand
 device  	mlx4		# Shared code module between IB and Ethernet
 device  	mlx4ib		# Mellanox ConnectX HCA InfiniBand
 device  	mlx4en		# Mellanox ConnectX HCA Ethernet
 device		nfe		# nVidia nForce MCP on-board Ethernet
+device		qlxgb		# QLogic 3200/8200 Ethernet
+device		qlxgbe		# QLogic 8300 Ethernet
+device		qlxge		# QLogic 8100 Ethernet
 device		sfxge		# Solarflare SFC9000 10Gb Ethernet
 device		vmx		# VMware VMXNET3 Ethernet
 device		wpi		# Intel 3945ABG wireless NICs.
-device		axp		# AMD EPYC integrated NIC
 
 # IEEE 802.11 adapter firmware modules
 
@@ -408,13 +413,6 @@ device		arcmsr		# Areca SATA II RAID
 device		smartpqi
 
 #
-# 3ware 9000 series PATA/SATA RAID controller driver and options.
-# The driver is implemented as a SIM, and so, needs the CAM infrastructure.
-#
-options 	TWA_DEBUG		# 0-10; 10 prints the most messages.
-device		twa			# 3ware 9000 series PATA/SATA RAID
-
-#
 # Adaptec FSA RAID controllers, including integrated DELL controllers,
 # the Dell PERC 2/QC and the HP NetRAID-4M
 device		aac
@@ -462,16 +460,17 @@ device         nvd     # expose NVMe namespaces as disks, depends on nvme
 
 #
 # Intel Volume Management Device (VMD) support
-device		vmd		# base VMD device
-device		vmd_bus		# bus for VMD children
+device		vmd
 
 #
 # PMC-Sierra SAS/SATA controller
 device		pmspcv
 
 #
-# Intel QuickAssist
-device		qat
+# Intel QuickAssist driver with OpenCrypto support
+#
+# Only for legacy Atom C2XXX chipsets.
+device		qat_c2xxx
 
 #
 # SafeNet crypto driver: can be moved to the MI NOTES as soon as
@@ -499,12 +498,16 @@ device		virtio_balloon	# VirtIO Memory Balloon device
 device		virtio_random	# VirtIO Entropy device
 device		virtio_console	# VirtIO Console device
 
+# Linux KVM paravirtualization support
+device		kvm_clock	# KVM paravirtual clock driver
+
 # Microsoft Hyper-V enhancement support
 device 		hyperv		# HyperV drivers
 
 # Xen HVM Guest Optimizations
 options 	XENHVM		# Xen HVM kernel infrastructure
 device 		xenpci		# Xen HVM Hypervisor services driver
+device		xentimer	# Xen x86 PV timer device
 
 #####################################################################
 
@@ -624,26 +627,6 @@ options 	COMPAT_FREEBSD32
 # Enable (32-bit) a.out binary support
 options 	COMPAT_AOUT
 
-# Enable 32-bit runtime support for CloudABI binaries.
-options 	COMPAT_CLOUDABI32
-
-# Enable 64-bit runtime support for CloudABI binaries.
-options 	COMPAT_CLOUDABI64
-
-# Enable Linux ABI emulation
-#XXX#options 	COMPAT_LINUX
-
-# Enable 32-bit Linux ABI emulation (requires COMPAT_FREEBSD32).
-options 	COMPAT_LINUX32
-
-# Enable the linux-like proc filesystem support (requires COMPAT_LINUX32
-# and PSEUDOFS)
-options 	LINPROCFS
-
-#Enable the linux-like sys filesystem support (requires COMPAT_LINUX32
-# and PSEUDOFS)
-options 	LINSYSFS
-
 #####################################################################
 # ZFS support
 
@@ -666,8 +649,6 @@ options 	PV_STATS
 
 # More undocumented options for linting.
 # Note that documenting these are not considered an affront.
-
-options 	FB_INSTALL_CDEV		# install a CDEV entry in /dev
 
 options 	KBDIO_DEBUG=2
 options 	KBD_MAXRETRY=4

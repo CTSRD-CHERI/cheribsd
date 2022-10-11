@@ -26,17 +26,13 @@
 #include "ABIInfo.h"
 
 namespace llvm {
-class AttributeList;
-class Function;
 class Type;
 class Value;
 } // namespace llvm
 
 namespace clang {
-class ASTContext;
 class Decl;
 class FunctionDecl;
-class ObjCMethodDecl;
 class VarDecl;
 
 namespace CodeGen {
@@ -49,11 +45,11 @@ class CGCalleeInfo {
   GlobalDecl CalleeDecl;
 
 public:
-  explicit CGCalleeInfo() : CalleeProtoTy(nullptr), CalleeDecl() {}
+  explicit CGCalleeInfo() : CalleeProtoTy(nullptr) {}
   CGCalleeInfo(const FunctionProtoType *calleeProtoTy, GlobalDecl calleeDecl)
       : CalleeProtoTy(calleeProtoTy), CalleeDecl(calleeDecl) {}
   CGCalleeInfo(const FunctionProtoType *calleeProtoTy)
-      : CalleeProtoTy(calleeProtoTy), CalleeDecl() {}
+      : CalleeProtoTy(calleeProtoTy) {}
   CGCalleeInfo(GlobalDecl calleeDecl)
       : CalleeProtoTy(nullptr), CalleeDecl(calleeDecl) {}
 
@@ -110,11 +106,14 @@ public:
   /// Construct a callee.  Call this constructor directly when this
   /// isn't a direct call.
   CGCallee(const CGCalleeInfo &abstractInfo, llvm::Value *functionPtr)
-      : KindOrFunctionPointer(SpecialKind(uintptr_t(functionPtr))) {
+      : KindOrFunctionPointer(
+            SpecialKind(reinterpret_cast<uintptr_t>(functionPtr))) {
     AbstractInfo = abstractInfo;
     assert(functionPtr && "configuring callee without function pointer");
     assert(functionPtr->getType()->isPointerTy());
-    assert(functionPtr->getType()->getPointerElementType()->isFunctionTy());
+    assert(functionPtr->getType()->isOpaquePointerTy() ||
+           functionPtr->getType()->getNonOpaquePointerElementType()
+               ->isFunctionTy());
   }
 
   static CGCallee forBuiltin(unsigned builtinID,
@@ -186,7 +185,8 @@ public:
   }
   void setFunctionPointer(llvm::Value *functionPtr) {
     assert(isOrdinary());
-    KindOrFunctionPointer = SpecialKind(uintptr_t(functionPtr));
+    KindOrFunctionPointer =
+        SpecialKind(reinterpret_cast<uintptr_t>(functionPtr));
   }
 
   bool isVirtual() const {

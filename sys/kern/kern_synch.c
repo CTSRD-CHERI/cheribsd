@@ -87,7 +87,7 @@ struct loadavg averunnable =
  * Constants for averages over 1, 5, and 15 minutes
  * when sampling at 5 second intervals.
  */
-static fixpt_t cexp[3] = {
+static uint64_t cexp[3] = {
 	0.9200444146293232 * FSCALE,	/* exp(-1/12) */
 	0.9834714538216174 * FSCALE,	/* exp(-1/60) */
 	0.9944598480048967 * FSCALE,	/* exp(-1/180) */
@@ -141,6 +141,7 @@ _sleep(const void *ident, struct lock_object *lock, int priority,
 	int catch, pri, rval, sleepq_flags;
 	WITNESS_SAVE_DECL(lock_witness);
 
+	TSENTER();
 	td = curthread;
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_CSW))
@@ -148,7 +149,8 @@ _sleep(const void *ident, struct lock_object *lock, int priority,
 #endif
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, lock,
 	    "Sleeping on \"%s\"", wmesg);
-	KASSERT(sbt != 0 || mtx_owned(&Giant) || lock != NULL,
+	KASSERT(sbt != 0 || mtx_owned(&Giant) || lock != NULL ||
+	    (priority & PNOLOCK) != 0,
 	    ("sleeping without a lock"));
 	KASSERT(ident != NULL, ("_sleep: NULL ident"));
 	KASSERT(TD_IS_RUNNING(td), ("_sleep: curthread not running"));
@@ -187,6 +189,8 @@ _sleep(const void *ident, struct lock_object *lock, int priority,
 	DROP_GIANT();
 	if (lock != NULL && lock != &Giant.lock_object &&
 	    !(class->lc_flags & LC_SLEEPABLE)) {
+		KASSERT(!(class->lc_flags & LC_SPINLOCK),
+		    ("spin locks can only use msleep_spin"));
 		WITNESS_SAVE(lock, lock_witness);
 		lock_state = class->lc_unlock(lock);
 	} else
@@ -230,6 +234,7 @@ _sleep(const void *ident, struct lock_object *lock, int priority,
 		class->lc_lock(lock, lock_state);
 		WITNESS_RESTORE(lock, lock_witness);
 	}
+	TSEXIT();
 	return (rval);
 }
 
@@ -366,8 +371,7 @@ wakeup_one(const void *ident)
 	int wakeup_swapper;
 
 	sleepq_lock(ident);
-	wakeup_swapper = sleepq_signal(ident, SLEEPQ_SLEEP, 0, 0);
-	sleepq_release(ident);
+	wakeup_swapper = sleepq_signal(ident, SLEEPQ_SLEEP | SLEEPQ_DROP, 0, 0);
 	if (wakeup_swapper)
 		kick_proc0();
 }
@@ -378,9 +382,8 @@ wakeup_any(const void *ident)
 	int wakeup_swapper;
 
 	sleepq_lock(ident);
-	wakeup_swapper = sleepq_signal(ident, SLEEPQ_SLEEP | SLEEPQ_UNFAIR,
-	    0, 0);
-	sleepq_release(ident);
+	wakeup_swapper = sleepq_signal(ident, SLEEPQ_SLEEP | SLEEPQ_UNFAIR |
+	    SLEEPQ_DROP, 0, 0);
 	if (wakeup_swapper)
 		kick_proc0();
 }
@@ -608,14 +611,15 @@ setrunnable(struct thread *td, int srqflags)
 static void
 loadav(void *arg)
 {
-	int i, nrun;
+	int i;
+	uint64_t nrun;
 	struct loadavg *avg;
 
-	nrun = sched_load();
+	nrun = (uint64_t)sched_load();
 	avg = &averunnable;
 
 	for (i = 0; i < 3; i++)
-		avg->ldavg[i] = (cexp[i] * avg->ldavg[i] +
+		avg->ldavg[i] = (cexp[i] * (uint64_t)avg->ldavg[i] +
 		    nrun * FSCALE * (FSCALE - cexp[i])) >> FSHIFT;
 
 	/*
@@ -681,5 +685,12 @@ sys_yield(struct thread *td, struct yield_args *uap)
 		sched_prio(td, PRI_MAX_TIMESHARE);
 	mi_switch(SW_VOL | SWT_RELINQUISH);
 	td->td_retval[0] = 0;
+	return (0);
+}
+
+int
+sys_sched_getcpu(struct thread *td, struct sched_getcpu_args *uap)
+{
+	td->td_retval[0] = td->td_oncpu;
 	return (0);
 }

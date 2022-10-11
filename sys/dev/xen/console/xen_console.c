@@ -54,7 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <xen/xen-os.h>
 #include <xen/hypervisor.h>
 #include <xen/xen_intr.h>
-#include <xen/interface/io/console.h>
+#include <contrib/xen/io/console.h>
 
 #include "opt_ddb.h"
 #include "opt_printf.h"
@@ -273,7 +273,7 @@ static void
 xencons_early_init_ring(struct xencons_priv *cons)
 {
 	cons->intf = pmap_mapdev_attr(ptoa(xen_get_console_mfn()), PAGE_SIZE,
-	    VM_MEMATTR_WRITE_BACK);
+	    VM_MEMATTR_XEN);
 	cons->evtchn = xen_get_console_evtchn();
 }
 
@@ -701,7 +701,7 @@ static struct ttydevsw xencons_ttydevsw = {
 static void
 xencons_identify(driver_t *driver, device_t parent)
 {
-	device_t child;
+	device_t child __unused;
 
 	if (main_cons.ops == NULL)
 		return;
@@ -771,8 +771,6 @@ xencons_resume(device_t dev)
 	return (0);
 }
 
-static devclass_t xencons_devclass;
-
 static device_method_t xencons_methods[] = {
 	DEVMETHOD(device_identify, xencons_identify),
 	DEVMETHOD(device_probe, xencons_probe),
@@ -788,4 +786,4 @@ static driver_t xencons_driver = {
 	0,
 };
 
-DRIVER_MODULE(xc, xenpv, xencons_driver, xencons_devclass, 0, 0);
+DRIVER_MODULE(xc, xenpv, xencons_driver, 0, 0);

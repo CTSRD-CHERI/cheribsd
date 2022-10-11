@@ -6,8 +6,6 @@
 # other libraries or applications which link with libssh, either directly
 # or indirectly (e.g. through PAM loading pam_ssh).
 #
-# $FreeBSD$
-#
 
 set -e
 
@@ -46,9 +44,10 @@ libssh_builddir=$(realpath $(ssh_make -V.OBJDIR))
 libssh=libprivatessh.a
 
 # Clear the existing header
+generated="@""generated"
 cat >${header} <<EOF
 /*
- * This file was machine-generated.  Do not edit manually.
+ * This file was machine-$generated.  Do not edit manually.
  * Run crypto/openssh/freebsd-namespace.sh to regenerate.
  */
 EOF

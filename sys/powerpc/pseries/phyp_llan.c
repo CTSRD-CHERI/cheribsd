@@ -127,19 +127,20 @@ static void	llan_rx_load_cb(void *xsc, bus_dma_segment_t *segs, int nsegs,
 static int	llan_add_rxbuf(struct llan_softc *sc, struct llan_xfer *rx);
 static int	llan_set_multicast(struct llan_softc *sc);
 
-static devclass_t       llan_devclass;
 static device_method_t  llan_methods[] = {
         DEVMETHOD(device_probe,         llan_probe),
         DEVMETHOD(device_attach,        llan_attach),
         
         DEVMETHOD_END
 };
+
 static driver_t llan_driver = {
         "llan",
         llan_methods,
         sizeof(struct llan_softc)
 };
-DRIVER_MODULE(llan, vdevice, llan_driver, llan_devclass, 0, 0);
+
+DRIVER_MODULE(llan, vdevice, llan_driver, 0, 0);
 
 static int
 llan_probe(device_t dev)
@@ -156,7 +157,7 @@ llan_attach(device_t dev)
 {
 	struct llan_softc *sc;
 	phandle_t node;
-	int error, i;
+	int i;
 	ssize_t len;
 
 	sc = device_get_softc(dev);
@@ -193,22 +194,22 @@ llan_attach(device_t dev)
 	    INTR_ENTROPY, NULL, llan_intr, sc, &sc->irq_cookie);
 
 	/* Setup DMA */
-	error = bus_dma_tag_create(bus_get_dma_tag(dev), 16, 0,
+	bus_dma_tag_create(bus_get_dma_tag(dev), 16, 0,
             BUS_SPACE_MAXADDR, BUS_SPACE_MAXADDR, NULL, NULL,
 	    LLAN_RX_BUF_LEN, 1, BUS_SPACE_MAXSIZE_32BIT,
 	    0, NULL, NULL, &sc->rx_dma_tag);
-	error = bus_dma_tag_create(bus_get_dma_tag(dev), 4, 0,
+	bus_dma_tag_create(bus_get_dma_tag(dev), 4, 0,
             BUS_SPACE_MAXADDR, BUS_SPACE_MAXADDR, NULL, NULL,
 	    BUS_SPACE_MAXSIZE, 1, BUS_SPACE_MAXSIZE_32BIT,
 	    0, NULL, NULL, &sc->rxbuf_dma_tag);
-	error = bus_dma_tag_create(bus_get_dma_tag(dev), 1, 0,
+	bus_dma_tag_create(bus_get_dma_tag(dev), 1, 0,
             BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
 	    BUS_SPACE_MAXSIZE, 6, BUS_SPACE_MAXSIZE_32BIT, 0,
 	    busdma_lock_mutex, &sc->io_lock, &sc->tx_dma_tag);
 
-	error = bus_dmamem_alloc(sc->rx_dma_tag, (void **)&sc->rx_buf,
+	bus_dmamem_alloc(sc->rx_dma_tag, (void **)&sc->rx_buf,
 	    BUS_DMA_WAITOK | BUS_DMA_ZERO, &sc->rx_buf_map);
-	error = bus_dmamap_load(sc->rx_dma_tag, sc->rx_buf_map, sc->rx_buf,
+	bus_dmamap_load(sc->rx_dma_tag, sc->rx_buf_map, sc->rx_buf,
 	    LLAN_RX_BUF_LEN, llan_rx_load_cb, sc, 0);
 
 	/* TX DMA maps */
@@ -216,7 +217,7 @@ llan_attach(device_t dev)
 
 	/* RX DMA */
 	for (i = 0; i < LLAN_MAX_RX_PACKETS; i++) {
-		error = bus_dmamap_create(sc->rxbuf_dma_tag, 0,
+		bus_dmamap_create(sc->rxbuf_dma_tag, 0,
 		    &sc->rx_xfer[i].rx_dmamap);
 		sc->rx_xfer[i].rx_mbuf = NULL;
 	}
@@ -291,7 +292,7 @@ llan_init(void *xsc)
 	struct llan_softc *sc = xsc;
 	uint64_t rx_buf_desc;
 	uint64_t macaddr;
-	int err, i;
+	int i;
 
 	mtx_lock(&sc->io_lock);
 
@@ -305,7 +306,7 @@ llan_init(void *xsc)
 	rx_buf_desc |= (sc->rx_buf_len << 32);
 	rx_buf_desc |= sc->rx_buf_phys;
 	memcpy(&macaddr, sc->mac_address, 8);
-	err = phyp_hcall(H_REGISTER_LOGICAL_LAN, sc->unit, sc->input_buf_phys,
+	phyp_hcall(H_REGISTER_LOGICAL_LAN, sc->unit, sc->input_buf_phys,
 	    rx_buf_desc, sc->filter_buf_phys, macaddr);
 
 	for (i = 0; i < LLAN_MAX_RX_PACKETS; i++)
@@ -462,12 +463,10 @@ static void
 llan_start_locked(struct ifnet *ifp)
 {
 	struct llan_softc *sc = ifp->if_softc;
-	bus_addr_t first;
 	int nsegs;
 	struct mbuf *mb_head, *m;
 
 	mtx_assert(&sc->io_lock, MA_OWNED);
-	first = 0;
 
 	if ((ifp->if_drv_flags & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) !=
 	    IFF_DRV_RUNNING)

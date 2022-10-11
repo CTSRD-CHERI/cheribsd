@@ -122,9 +122,7 @@ static driver_t usb_linux_driver = {
 	.size = sizeof(struct usb_linux_softc),
 };
 
-static devclass_t usb_linux_devclass;
-
-DRIVER_MODULE(usb_linux, uhub, usb_linux_driver, usb_linux_devclass, NULL, 0);
+DRIVER_MODULE(usb_linux, uhub, usb_linux_driver, NULL, NULL);
 MODULE_VERSION(usb_linux, 1);
 
 /*------------------------------------------------------------------------*
@@ -221,7 +219,7 @@ usb_linux_probe(device_t dev)
 	mtx_lock(&Giant);
 	LIST_FOREACH(udrv, &usb_linux_driver_list, linux_driver_list) {
 		if (usb_linux_lookup_id(udrv->id_table, uaa)) {
-			err = 0;
+			err = BUS_PROBE_DEFAULT;
 			break;
 		}
 	}
@@ -341,12 +339,15 @@ usb_linux_suspend(device_t dev)
 {
 	struct usb_linux_softc *sc = device_get_softc(dev);
 	struct usb_driver *udrv = usb_linux_get_usb_driver(sc);
+	pm_message_t pm_msg;
 	int err;
 
+	err = 0;
 	if (udrv && udrv->suspend) {
-		err = (udrv->suspend) (sc->sc_ui, 0);
+		pm_msg.event = 0;				/* XXX */
+		err = (udrv->suspend) (sc->sc_ui, pm_msg);
 	}
-	return (0);
+	return (-err);
 }
 
 /*------------------------------------------------------------------------*
@@ -361,10 +362,10 @@ usb_linux_resume(device_t dev)
 	struct usb_driver *udrv = usb_linux_get_usb_driver(sc);
 	int err;
 
-	if (udrv && udrv->resume) {
+	err = 0;
+	if (udrv && udrv->resume)
 		err = (udrv->resume) (sc->sc_ui);
-	}
-	return (0);
+	return (-err);
 }
 
 /*------------------------------------------------------------------------*
@@ -1166,7 +1167,9 @@ repeat:
 	LIST_FOREACH(sc, &usb_linux_attached_list, sc_attached_list) {
 		if (sc->sc_udrv == drv) {
 			mtx_unlock(&Giant);
+			bus_topo_lock();
 			device_detach(sc->sc_fbsd_dev);
+			bus_topo_unlock();
 			goto repeat;
 		}
 	}
@@ -1185,15 +1188,14 @@ usb_linux_free_device(struct usb_device *dev)
 {
 	struct usb_host_endpoint *uhe;
 	struct usb_host_endpoint *uhe_end;
-	int err;
 
 	uhe = dev->linux_endpoint_start;
 	uhe_end = dev->linux_endpoint_end;
 	while (uhe != uhe_end) {
-		err = usb_setup_endpoint(dev, uhe, 0);
+		usb_setup_endpoint(dev, uhe, 0);
 		uhe++;
 	}
-	err = usb_setup_endpoint(dev, &dev->ep0, 0);
+	usb_setup_endpoint(dev, &dev->ep0, 0);
 	free(dev->linux_endpoint_start, M_USBDEV);
 }
 
@@ -1276,7 +1278,6 @@ usb_linux_cleanup_interface(struct usb_device *dev, struct usb_interface *iface)
 	struct usb_host_interface *uhi_end;
 	struct usb_host_endpoint *uhe;
 	struct usb_host_endpoint *uhe_end;
-	int err;
 
 	uhi = iface->altsetting;
 	uhi_end = iface->altsetting + iface->num_altsetting;
@@ -1284,7 +1285,7 @@ usb_linux_cleanup_interface(struct usb_device *dev, struct usb_interface *iface)
 		uhe = uhi->endpoint;
 		uhe_end = uhi->endpoint + uhi->desc.bNumEndpoints;
 		while (uhe != uhe_end) {
-			err = usb_setup_endpoint(dev, uhe, 0);
+			usb_setup_endpoint(dev, uhe, 0);
 			uhe++;
 		}
 		uhi++;

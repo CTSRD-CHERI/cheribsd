@@ -44,6 +44,8 @@ struct Section {
   std::string CanonicalName;
   uint64_t Addr = 0;
   uint64_t Size = 0;
+  // Offset in the input file.
+  Optional<uint32_t> OriginalOffset;
   uint32_t Offset = 0;
   uint32_t Align = 0;
   uint32_t RelOff = 0;
@@ -73,6 +75,10 @@ struct Section {
             getType() == MachO::S_GB_ZEROFILL ||
             getType() == MachO::S_THREAD_LOCAL_ZEROFILL);
   }
+
+  bool hasValidOffset() const {
+    return !(isVirtualSection() || (OriginalOffset && *OriginalOffset == 0));
+  }
 };
 
 struct LoadCommand {
@@ -94,6 +100,9 @@ struct LoadCommand {
 
   // Returns the segment name if the load command is a segment command.
   Optional<StringRef> getSegmentName() const;
+
+  // Returns the segment vm address if the load command is a segment command.
+  Optional<uint64_t> getSegmentVMAddr() const;
 };
 
 // A symbol information. Fields which starts with "n_" are same as them in the
@@ -171,6 +180,9 @@ struct RelocationInfo {
   Optional<const Section *> Sec;
   // True if Info is a scattered_relocation_info.
   bool Scattered;
+  // True if the type is an ADDEND. r_symbolnum holds the addend instead of a
+  // symbol index.
+  bool IsAddend;
   // True if the r_symbolnum points to a section number (i.e. r_extern=0).
   bool Extern;
   MachO::any_relocation_info Info;
@@ -301,8 +313,10 @@ struct Object {
   ExportInfo Exports;
   IndirectSymbolTable IndirectSymTable;
   LinkData DataInCode;
+  LinkData LinkerOptimizationHint;
   LinkData FunctionStarts;
-  LinkData CodeSignature;
+  LinkData ExportsTrie;
+  LinkData ChainedFixups;
 
   Optional<uint32_t> SwiftVersion;
 
@@ -312,12 +326,21 @@ struct Object {
   Optional<size_t> SymTabCommandIndex;
   /// The index of LC_DYLD_INFO or LC_DYLD_INFO_ONLY load command if present.
   Optional<size_t> DyLdInfoCommandIndex;
-  /// The index LC_DYSYMTAB load comamnd if present.
+  /// The index LC_DYSYMTAB load command if present.
   Optional<size_t> DySymTabCommandIndex;
-  /// The index LC_DATA_IN_CODE load comamnd if present.
+  /// The index LC_DATA_IN_CODE load command if present.
   Optional<size_t> DataInCodeCommandIndex;
-  /// The index LC_FUNCTION_STARTS load comamnd if present.
+  /// The index of LC_LINKER_OPTIMIZATIN_HINT load command if present.
+  Optional<size_t> LinkerOptimizationHintCommandIndex;
+  /// The index LC_FUNCTION_STARTS load command if present.
   Optional<size_t> FunctionStartsCommandIndex;
+  /// The index LC_DYLD_CHAINED_FIXUPS load command if present.
+  Optional<size_t> ChainedFixupsCommandIndex;
+  /// The index LC_DYLD_EXPORTS_TRIE load command if present.
+  Optional<size_t> ExportsTrieCommandIndex;
+  /// The index of the LC_SEGMENT or LC_SEGMENT_64 load command
+  /// corresponding to the __TEXT segment.
+  Optional<size_t> TextSegmentCommandIndex;
 
   BumpPtrAllocator Alloc;
   StringSaver NewSectionsContents;
@@ -331,17 +354,17 @@ struct Object {
 
   void updateLoadCommandIndexes();
 
-  void addLoadCommand(LoadCommand LC);
-
   /// Creates a new segment load command in the object and returns a reference
   /// to the newly created load command. The caller should verify that SegName
   /// is not too long (SegName.size() should be less than or equal to 16).
-  LoadCommand &addSegment(StringRef SegName);
+  LoadCommand &addSegment(StringRef SegName, uint64_t SegVMSize);
 
   bool is64Bit() const {
     return Header.Magic == MachO::MH_MAGIC_64 ||
            Header.Magic == MachO::MH_CIGAM_64;
   }
+
+  uint64_t nextAvailableSegmentAddress() const;
 };
 
 } // end namespace macho

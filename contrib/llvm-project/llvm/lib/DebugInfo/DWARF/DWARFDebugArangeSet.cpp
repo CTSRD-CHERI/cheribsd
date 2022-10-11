@@ -8,6 +8,8 @@
 
 #include "llvm/DebugInfo/DWARF/DWARFDebugArangeSet.h"
 #include "llvm/BinaryFormat/Dwarf.h"
+#include "llvm/DebugInfo/DWARF/DWARFContext.h"
+#include "llvm/DebugInfo/DWARF/DWARFFormValue.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
@@ -20,9 +22,11 @@ using namespace llvm;
 
 void DWARFDebugArangeSet::Descriptor::dump(raw_ostream &OS,
                                            uint32_t AddressSize) const {
-  OS << format("[0x%*.*" PRIx64 ", ", AddressSize * 2, AddressSize * 2, Address)
-     << format(" 0x%*.*" PRIx64 ")", AddressSize * 2, AddressSize * 2,
-               getEndAddress());
+  OS << '[';
+  DWARFFormValue::dumpAddress(OS, AddressSize, Address);
+  OS << ", ";
+  DWARFFormValue::dumpAddress(OS, AddressSize, getEndAddress());
+  OS << ')';
 }
 
 void DWARFDebugArangeSet::clear() {
@@ -32,7 +36,8 @@ void DWARFDebugArangeSet::clear() {
 }
 
 Error DWARFDebugArangeSet::extract(DWARFDataExtractor data,
-                                   uint64_t *offset_ptr) {
+                                   uint64_t *offset_ptr,
+                                   function_ref<void(Error)> WarningHandler) {
   assert(data.isValidOffset(*offset_ptr));
   ArangeDescriptors.clear();
   Offset = *offset_ptr;
@@ -83,12 +88,10 @@ Error DWARFDebugArangeSet::extract(DWARFDataExtractor data,
                              "the length of address range table at offset "
                              "0x%" PRIx64 " exceeds section size",
                              Offset);
-  if (HeaderData.AddrSize != 4 && HeaderData.AddrSize != 8)
-    return createStringError(errc::invalid_argument,
-                             "address range table at offset 0x%" PRIx64
-                             " has unsupported address size: %d "
-                             "(4 and 8 supported)",
-                             Offset, HeaderData.AddrSize);
+  if (Error SizeErr = DWARFContext::checkAddressSizeSupported(
+          HeaderData.AddrSize, errc::invalid_argument,
+          "address range table at offset 0x%" PRIx64, Offset))
+    return SizeErr;
   if (HeaderData.SegSize != 0)
     return createStringError(errc::not_supported,
                              "non-zero segment selector size in address range "
@@ -141,11 +144,11 @@ Error DWARFDebugArangeSet::extract(DWARFDataExtractor data,
     if (arangeDescriptor.Length == 0 && arangeDescriptor.Address == 0) {
       if (*offset_ptr == end_offset)
         return ErrorSuccess();
-      return createStringError(
+      WarningHandler(createStringError(
           errc::invalid_argument,
           "address range table at offset 0x%" PRIx64
           " has a premature terminator entry at offset 0x%" PRIx64,
-          Offset, EntryOffset);
+          Offset, EntryOffset));
     }
 
     ArangeDescriptors.push_back(arangeDescriptor);

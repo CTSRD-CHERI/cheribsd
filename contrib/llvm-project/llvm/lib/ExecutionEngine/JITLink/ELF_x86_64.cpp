@@ -11,397 +11,261 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ExecutionEngine/JITLink/ELF_x86_64.h"
-#include "JITLinkGeneric.h"
 #include "llvm/ExecutionEngine/JITLink/JITLink.h"
+#include "llvm/ExecutionEngine/JITLink/TableManager.h"
+#include "llvm/ExecutionEngine/JITLink/x86_64.h"
 #include "llvm/Object/ELFObjectFile.h"
+#include "llvm/Support/Endian.h"
+
+#include "DefineExternalSectionStartAndEndSymbols.h"
+#include "EHFrameSupportImpl.h"
+#include "ELFLinkGraphBuilder.h"
+#include "JITLinkGeneric.h"
 
 #define DEBUG_TYPE "jitlink"
 
 using namespace llvm;
 using namespace llvm::jitlink;
+using namespace llvm::jitlink::ELF_x86_64_Edges;
 
-static const char *CommonSectionName = "__common";
+namespace {
+
+constexpr StringRef ELFGOTSymbolName = "_GLOBAL_OFFSET_TABLE_";
+constexpr StringRef ELFTLSInfoSectionName = "$__TLSINFO";
+
+class TLSInfoTableManager_ELF_x86_64
+    : public TableManager<TLSInfoTableManager_ELF_x86_64> {
+public:
+  static const uint8_t TLSInfoEntryContent[16];
+
+  static StringRef getSectionName() { return ELFTLSInfoSectionName; }
+
+  bool visitEdge(LinkGraph &G, Block *B, Edge &E) {
+    if (E.getKind() == x86_64::RequestTLSDescInGOTAndTransformToDelta32) {
+      LLVM_DEBUG({
+        dbgs() << "  Fixing " << G.getEdgeKindName(E.getKind()) << " edge at "
+               << formatv("{0:x}", B->getFixupAddress(E)) << " ("
+               << formatv("{0:x}", B->getAddress()) << " + "
+               << formatv("{0:x}", E.getOffset()) << ")\n";
+      });
+      E.setKind(x86_64::Delta32);
+      E.setTarget(getEntryForTarget(G, E.getTarget()));
+      return true;
+    }
+    return false;
+  }
+
+  Symbol &createEntry(LinkGraph &G, Symbol &Target) {
+    // the TLS Info entry's key value will be written by the fixTLVSectionByName
+    // pass, so create mutable content.
+    auto &TLSInfoEntry = G.createMutableContentBlock(
+        getTLSInfoSection(G), G.allocateContent(getTLSInfoEntryContent()),
+        orc::ExecutorAddr(), 8, 0);
+    TLSInfoEntry.addEdge(x86_64::Pointer64, 8, Target, 0);
+    return G.addAnonymousSymbol(TLSInfoEntry, 0, 16, false, false);
+  }
+
+private:
+  Section &getTLSInfoSection(LinkGraph &G) {
+    if (!TLSInfoTable)
+      TLSInfoTable = &G.createSection(ELFTLSInfoSectionName, MemProt::Read);
+    return *TLSInfoTable;
+  }
+
+  ArrayRef<char> getTLSInfoEntryContent() const {
+    return {reinterpret_cast<const char *>(TLSInfoEntryContent),
+            sizeof(TLSInfoEntryContent)};
+  }
+
+  Section *TLSInfoTable = nullptr;
+};
+
+const uint8_t TLSInfoTableManager_ELF_x86_64::TLSInfoEntryContent[16] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, /*pthread key */
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00  /*data address*/
+};
+
+Error buildTables_ELF_x86_64(LinkGraph &G) {
+  LLVM_DEBUG(dbgs() << "Visiting edges in graph:\n");
+
+  x86_64::GOTTableManager GOT;
+  x86_64::PLTTableManager PLT(GOT);
+  TLSInfoTableManager_ELF_x86_64 TLSInfo;
+  visitExistingEdges(G, GOT, PLT, TLSInfo);
+  return Error::success();
+}
+} // namespace
+
+static const char *getELFX86_64RelocName(uint32_t Type) {
+  switch (Type) {
+#define ELF_RELOC(Name, Number)                                                \
+  case Number:                                                                 \
+    return #Name;
+#include "llvm/BinaryFormat/ELFRelocs/x86_64.def"
+#undef ELF_RELOC
+  }
+  return "Unrecognized ELF/x86-64 relocation type";
+}
 
 namespace llvm {
 namespace jitlink {
 
 // This should become a template as the ELFFile is so a lot of this could become
 // generic
-class ELFLinkGraphBuilder_x86_64 {
-
+class ELFLinkGraphBuilder_x86_64 : public ELFLinkGraphBuilder<object::ELF64LE> {
 private:
-  Section *CommonSection = nullptr;
-  // TODO hack to get this working
-  // Find a better way
-  using SymbolTable = object::ELFFile<object::ELF64LE>::Elf_Shdr;
-  // For now we just assume
-  std::map<int32_t, Symbol *> JITSymbolTable;
-
-  Section &getCommonSection() {
-    if (!CommonSection) {
-      auto Prot = static_cast<sys::Memory::ProtectionFlags>(
-          sys::Memory::MF_READ | sys::Memory::MF_WRITE);
-      CommonSection = &G->createSection(CommonSectionName, Prot);
-    }
-    return *CommonSection;
-  }
+  using ELFT = object::ELF64LE;
 
   static Expected<ELF_x86_64_Edges::ELFX86RelocationKind>
   getRelocationKind(const uint32_t Type) {
     switch (Type) {
+    case ELF::R_X86_64_32S:
+      return ELF_x86_64_Edges::ELFX86RelocationKind::Pointer32Signed;
     case ELF::R_X86_64_PC32:
       return ELF_x86_64_Edges::ELFX86RelocationKind::PCRel32;
+    case ELF::R_X86_64_PC64:
+    case ELF::R_X86_64_GOTPC64:
+      return ELF_x86_64_Edges::ELFX86RelocationKind::Delta64;
+    case ELF::R_X86_64_64:
+      return ELF_x86_64_Edges::ELFX86RelocationKind::Pointer64;
+    case ELF::R_X86_64_GOTPCREL:
+      return ELF_x86_64_Edges::ELFX86RelocationKind::PCRel32GOTLoad;
+    case ELF::R_X86_64_GOTPCRELX:
+      return ELF_x86_64_Edges::ELFX86RelocationKind::PCRel32GOTLoadRelaxable;
+    case ELF::R_X86_64_REX_GOTPCRELX:
+      return ELF_x86_64_Edges::ELFX86RelocationKind::PCRel32REXGOTLoadRelaxable;
+    case ELF::R_X86_64_GOTPCREL64:
+      return ELF_x86_64_Edges::ELFX86RelocationKind::PCRel64GOT;
+    case ELF::R_X86_64_GOT64:
+      return ELF_x86_64_Edges::ELFX86RelocationKind::GOT64;
+    case ELF::R_X86_64_GOTOFF64:
+      return ELF_x86_64_Edges::ELFX86RelocationKind::GOTOFF64;
+    case ELF::R_X86_64_PLT32:
+      return ELF_x86_64_Edges::ELFX86RelocationKind::Branch32;
+    case ELF::R_X86_64_TLSGD:
+      return ELF_x86_64_Edges::ELFX86RelocationKind::PCRel32TLV;
     }
-    return make_error<JITLinkError>("Unsupported x86-64 relocation:" +
-                                    formatv("{0:d}", Type));
+    return make_error<JITLinkError>("Unsupported x86-64 relocation type " +
+                                    formatv("{0:d}: ", Type) +
+                                    getELFX86_64RelocName(Type));
   }
 
-  std::unique_ptr<LinkGraph> G;
-  // This could be a template
-  const object::ELFFile<object::ELF64LE> &Obj;
-  object::ELFFile<object::ELF64LE>::Elf_Shdr_Range sections;
-  SymbolTable SymTab;
+  Error addRelocations() override {
+    LLVM_DEBUG(dbgs() << "Processing relocations:\n");
 
-  bool isRelocatable() { return Obj.getHeader()->e_type == llvm::ELF::ET_REL; }
+    using Base = ELFLinkGraphBuilder<ELFT>;
+    using Self = ELFLinkGraphBuilder_x86_64;
+    for (const auto &RelSect : Base::Sections) {
+      // Validate the section to read relocation entries from.
+      if (RelSect.sh_type == ELF::SHT_REL)
+        return make_error<StringError>(
+            "No SHT_REL in valid x64 ELF object files",
+            inconvertibleErrorCode());
 
-  support::endianness
-  getEndianness(const object::ELFFile<object::ELF64LE> &Obj) {
-    return Obj.isLE() ? support::little : support::big;
-  }
-
-  // This could also just become part of a template
-  unsigned getPointerSize(const object::ELFFile<object::ELF64LE> &Obj) {
-    return Obj.getHeader()->getFileClass() == ELF::ELFCLASS64 ? 8 : 4;
-  }
-
-  // We don't technically need this right now
-  // But for now going to keep it as it helps me to debug things
-
-  Error createNormalizedSymbols() {
-    LLVM_DEBUG(dbgs() << "Creating normalized symbols...\n");
-
-    for (auto SecRef : sections) {
-      if (SecRef.sh_type != ELF::SHT_SYMTAB &&
-          SecRef.sh_type != ELF::SHT_DYNSYM)
-        continue;
-
-      auto Symbols = Obj.symbols(&SecRef);
-      // TODO: Currently I use this function to test things 
-      // I also want to leave it to see if its common between MACH and elf
-      // so for now I just want to continue even if there is an error
-      if (errorToBool(Symbols.takeError()))
-        continue;
-
-      auto StrTabSec = Obj.getSection(SecRef.sh_link);
-      if (!StrTabSec)
-        return StrTabSec.takeError();
-      auto StringTable = Obj.getStringTable(*StrTabSec);
-      if (!StringTable)
-        return StringTable.takeError();
-
-      for (auto SymRef : *Symbols) {
-        Optional<StringRef> Name;
-        uint64_t Size = 0;
-
-        // FIXME: Read size.
-        (void)Size;
-
-        if (auto NameOrErr = SymRef.getName(*StringTable))
-          Name = *NameOrErr;
-        else
-          return NameOrErr.takeError();
-
-        LLVM_DEBUG({
-          dbgs() << "  ";
-          if (!Name)
-            dbgs() << "<anonymous symbol>";
-          else
-            dbgs() << *Name;
-          dbgs() << ": value = " << formatv("{0:x16}", SymRef.getValue())
-                 << ", type = " << formatv("{0:x2}", SymRef.getType())
-                 << ", binding = " << SymRef.getBinding()
-                 << ", size =" << Size;
-          dbgs() << "\n";
-        });
-      }
-    }
-    return Error::success();
-  }
-
-  Error createNormalizedSections() {
-    LLVM_DEBUG(dbgs() << "Creating normalized sections...\n");
-    for (auto &SecRef : sections) {
-      auto Name = Obj.getSectionName(&SecRef);
-      if (!Name)
-        return Name.takeError();
-      sys::Memory::ProtectionFlags Prot;
-      if (SecRef.sh_flags & ELF::SHF_EXECINSTR) {
-        Prot = static_cast<sys::Memory::ProtectionFlags>(sys::Memory::MF_READ |
-                                                         sys::Memory::MF_EXEC);
-      } else {
-        Prot = static_cast<sys::Memory::ProtectionFlags>(sys::Memory::MF_READ |
-                                                         sys::Memory::MF_WRITE);
-      }
-      uint64_t Address = SecRef.sh_addr;
-      uint64_t Size = SecRef.sh_size;
-      uint64_t Flags = SecRef.sh_flags;
-      uint64_t Alignment = SecRef.sh_addralign;
-      const char *Data = nullptr;
-      // TODO: figure out what it is that has 0 size no name and address
-      // 0000-0000
-      if (Size == 0)
-        continue;
-
-      // FIXME: Use flags.
-      (void)Flags;
-
-      LLVM_DEBUG({
-        dbgs() << "  " << *Name << ": " << formatv("{0:x16}", Address) << " -- "
-               << formatv("{0:x16}", Address + Size) << ", align: " << Alignment
-               << " Flags:" << Flags << "\n";
-      });
-
-      if (SecRef.sh_type != ELF::SHT_NOBITS) {
-        // .sections() already checks that the data is not beyond the end of
-        // file
-        auto contents = Obj.getSectionContentsAsArray<char>(&SecRef);
-        if (!contents)
-          return contents.takeError();
-
-        Data = contents->data();
-        // TODO protection flags.
-        // for now everything is
-        auto &section = G->createSection(*Name, Prot);
-        // Do this here because we have it, but move it into graphify later
-        G->createContentBlock(section, StringRef(Data, Size), Address,
-                              Alignment, 0);
-        if (SecRef.sh_type == ELF::SHT_SYMTAB)
-          // TODO: Dynamic?
-          SymTab = SecRef;
-      }
+      if (Error Err = Base::forEachRelocation(RelSect, this,
+                                              &Self::addSingleRelocation))
+        return Err;
     }
 
     return Error::success();
   }
 
-  Error addRelocations() {
-    LLVM_DEBUG(dbgs() << "Adding relocations\n");
-    // TODO a partern is forming of iterate some sections but only give me
-    // ones I am interested, i should abstract that concept some where
-    for (auto &SecRef : sections) {
-      if (SecRef.sh_type != ELF::SHT_RELA && SecRef.sh_type != ELF::SHT_REL)
-        continue;
-      // TODO can the elf obj file do this for me?
-      if (SecRef.sh_type == ELF::SHT_REL)
-        return make_error<llvm::StringError>("Shouldn't have REL in x64",
-                                             llvm::inconvertibleErrorCode());
+  Error addSingleRelocation(const typename ELFT::Rela &Rel,
+                            const typename ELFT::Shdr &FixupSection,
+                            Block &BlockToFix) {
+    using Base = ELFLinkGraphBuilder<ELFT>;
 
-      auto RelSectName = Obj.getSectionName(&SecRef);
-      if (!RelSectName)
-        return RelSectName.takeError();
-      // Deal with .eh_frame later
-      if (*RelSectName == StringRef(".rela.eh_frame"))
-        continue;
+    uint32_t SymbolIndex = Rel.getSymbol(false);
+    auto ObjSymbol = Base::Obj.getRelocationSymbol(Rel, Base::SymTabSec);
+    if (!ObjSymbol)
+      return ObjSymbol.takeError();
 
-      auto UpdateSection = Obj.getSection(SecRef.sh_info);
-      if (!UpdateSection)
-        return UpdateSection.takeError();
+    Symbol *GraphSymbol = Base::getGraphSymbol(SymbolIndex);
+    if (!GraphSymbol)
+      return make_error<StringError>(
+          formatv("Could not find symbol at given index, did you add it to "
+                  "JITSymbolTable? index: {0}, shndx: {1} Size of table: {2}",
+                  SymbolIndex, (*ObjSymbol)->st_shndx,
+                  Base::GraphSymbols.size()),
+          inconvertibleErrorCode());
 
-      auto UpdateSectionName = Obj.getSectionName(*UpdateSection);
-      if (!UpdateSectionName)
-        return UpdateSectionName.takeError();
+    // Validate the relocation kind.
+    auto ELFRelocKind = getRelocationKind(Rel.getType(false));
+    if (!ELFRelocKind)
+      return ELFRelocKind.takeError();
 
-      auto JITSection = G->findSectionByName(*UpdateSectionName);
-      if (!JITSection)
-        return make_error<llvm::StringError>(
-            "Refencing a a section that wasn't added to graph" +
-                *UpdateSectionName,
-            llvm::inconvertibleErrorCode());
-
-      auto Relocations = Obj.relas(&SecRef);
-      if (!Relocations)
-        return Relocations.takeError();
-
-      for (const auto &Rela : *Relocations) {
-        auto Type = Rela.getType(false);
-
-        LLVM_DEBUG({
-          dbgs() << "Relocation Type: " << Type << "\n"
-                 << "Name: " << Obj.getRelocationTypeName(Type) << "\n";
-        });
-
-        auto Symbol = Obj.getRelocationSymbol(&Rela, &SymTab);
-        if (!Symbol)
-          return Symbol.takeError();
-
-        auto BlockToFix = *(JITSection->blocks().begin());
-        auto TargetSymbol = JITSymbolTable[(*Symbol)->st_shndx];
-        uint64_t Addend = Rela.r_addend;
-        JITTargetAddress FixupAddress =
-            (*UpdateSection)->sh_addr + Rela.r_offset;
-
-        LLVM_DEBUG({
-          dbgs() << "Processing relocation at "
-                 << format("0x%016" PRIx64, FixupAddress) << "\n";
-        });
-        auto Kind = getRelocationKind(Type);
-        if (!Kind)
-          return Kind.takeError();
-
-        LLVM_DEBUG({
-          Edge GE(*Kind, FixupAddress - BlockToFix->getAddress(), *TargetSymbol,
-                  Addend);
-          // TODO a mapping of KIND => type then call getRelocationTypeName4
-          printEdge(dbgs(), *BlockToFix, GE, StringRef(""));
-          dbgs() << "\n";
-        });
-        BlockToFix->addEdge(*Kind, FixupAddress - BlockToFix->getAddress(),
-                            *TargetSymbol, Addend);
-      }
+    int64_t Addend = Rel.r_addend;
+    Edge::Kind Kind = Edge::Invalid;
+    switch (*ELFRelocKind) {
+    case PCRel32:
+      Kind = x86_64::Delta32;
+      break;
+    case Delta64:
+      Kind = x86_64::Delta64;
+      break;
+    case Pointer32Signed:
+      Kind = x86_64::Pointer32Signed;
+      break;
+    case Pointer64:
+      Kind = x86_64::Pointer64;
+      break;
+    case PCRel32GOTLoad: {
+      Kind = x86_64::RequestGOTAndTransformToDelta32;
+      break;
     }
-    return Error::success();
-  }
-
-  Error graphifyRegularSymbols() {
-
-    // TODO: ELF supports beyond SHN_LORESERVE,
-    // need to perf test how a vector vs map handles those cases
-
-    std::vector<std::vector<object::ELFFile<object::ELF64LE>::Elf_Shdr_Range *>>
-        SecIndexToSymbols;
-
-    LLVM_DEBUG(dbgs() << "Creating graph symbols...\n");
-
-    for (auto SecRef : sections) {
-
-      if (SecRef.sh_type != ELF::SHT_SYMTAB &&
-          SecRef.sh_type != ELF::SHT_DYNSYM)
-        continue;
-      auto Symbols = Obj.symbols(&SecRef);
-      if (!Symbols)
-        return Symbols.takeError();
-
-      auto StrTabSec = Obj.getSection(SecRef.sh_link);
-      if (!StrTabSec)
-        return StrTabSec.takeError();
-      auto StringTable = Obj.getStringTable(*StrTabSec);
-      if (!StringTable)
-        return StringTable.takeError();
-      auto Name = Obj.getSectionName(&SecRef);
-      if (!Name)
-        return Name.takeError();
-      auto Section = G->findSectionByName(*Name);
-      if (!Section)
-        return make_error<llvm::StringError>("Could not find a section",
-                                             llvm::inconvertibleErrorCode());
-      // we only have one for now
-      auto blocks = Section->blocks();
-      if (blocks.empty())
-        return make_error<llvm::StringError>("Section has no block",
-                                             llvm::inconvertibleErrorCode());
-
-      for (auto SymRef : *Symbols) {
-        auto Type = SymRef.getType();
-        if (Type == ELF::STT_NOTYPE || Type == ELF::STT_FILE)
-          continue;
-        // these should do it for now
-        // if(Type != ELF::STT_NOTYPE &&
-        //   Type != ELF::STT_OBJECT &&
-        //   Type != ELF::STT_FUNC    &&
-        //   Type != ELF::STT_SECTION &&
-        //   Type != ELF::STT_COMMON) {
-        //     continue;
-        //   }
-        std::pair<Linkage, Scope> bindings;
-        auto Name = SymRef.getName(*StringTable);
-        // I am not sure on If this is going to hold as an invariant. Revisit.
-        if (!Name)
-          return Name.takeError();
-        // TODO: weak and hidden
-        if (SymRef.isExternal())
-          bindings = {Linkage::Strong, Scope::Default};
-        else
-          bindings = {Linkage::Strong, Scope::Local};
-
-        if (SymRef.isDefined() &&
-            (Type == ELF::STT_FUNC || Type == ELF::STT_OBJECT)) {
-
-          auto DefinedSection = Obj.getSection(SymRef.st_shndx);
-          if (!DefinedSection)
-            return DefinedSection.takeError();
-          auto sectName = Obj.getSectionName(*DefinedSection);
-          if (!sectName)
-            return Name.takeError();
-
-          auto JitSection = G->findSectionByName(*sectName);
-          if (!JitSection)
-            return make_error<llvm::StringError>(
-                "Could not find a section", llvm::inconvertibleErrorCode());
-          auto bs = JitSection->blocks();
-          if (bs.empty())
-            return make_error<llvm::StringError>(
-                "Section has no block", llvm::inconvertibleErrorCode());
-
-          auto B = *bs.begin();
-          LLVM_DEBUG({ dbgs() << "  " << *Name << ": "; });
-
-          auto &S = G->addDefinedSymbol(
-              *B, SymRef.getValue(), *Name, SymRef.st_size, bindings.first,
-              bindings.second, SymRef.getType() == ELF::STT_FUNC, false);
-          JITSymbolTable[SymRef.st_shndx] = &S;
-        }
-        //TODO: The following has to be implmented.
-        // leaving commented out to save time for future patchs
-        /*
-          G->addAbsoluteSymbol(*Name, SymRef.getValue(), SymRef.st_size,
-          Linkage::Strong, Scope::Default, false);
-
-          if(SymRef.isCommon()) {
-            G->addCommonSymbol(*Name, Scope::Default, getCommonSection(), 0, 0,
-          SymRef.getValue(), false);
-          }
-
-
-          //G->addExternalSymbol(*Name, SymRef.st_size, Linkage::Strong);
-  */
-      }
+    case PCRel32REXGOTLoadRelaxable: {
+      Kind = x86_64::RequestGOTAndTransformToPCRel32GOTLoadREXRelaxable;
+      Addend = 0;
+      break;
     }
+    case PCRel32TLV: {
+      Kind = x86_64::RequestTLSDescInGOTAndTransformToDelta32;
+      break;
+    }
+    case PCRel32GOTLoadRelaxable: {
+      Kind = x86_64::RequestGOTAndTransformToPCRel32GOTLoadRelaxable;
+      Addend = 0;
+      break;
+    }
+    case PCRel64GOT: {
+      Kind = x86_64::RequestGOTAndTransformToDelta64;
+      break;
+    }
+    case GOT64: {
+      Kind = x86_64::RequestGOTAndTransformToDelta64FromGOT;
+      break;
+    }
+    case GOTOFF64: {
+      Kind = x86_64::Delta64FromGOT;
+      break;
+    }
+    case Branch32: {
+      Kind = x86_64::BranchPCRel32;
+      // BranchPCRel32 implicitly handles the '-4' PC adjustment, so we have to
+      // adjust the addend by '+4' to compensate.
+      Addend += 4;
+      break;
+    }
+    }
+
+    auto FixupAddress = orc::ExecutorAddr(FixupSection.sh_addr) + Rel.r_offset;
+    Edge::OffsetT Offset = FixupAddress - BlockToFix.getAddress();
+    Edge GE(Kind, Offset, *GraphSymbol, Addend);
+    LLVM_DEBUG({
+      dbgs() << "    ";
+      printEdge(dbgs(), BlockToFix, GE, x86_64::getEdgeKindName(Kind));
+      dbgs() << "\n";
+    });
+
+    BlockToFix.addEdge(std::move(GE));
     return Error::success();
   }
 
 public:
-  ELFLinkGraphBuilder_x86_64(std::string filename,
+  ELFLinkGraphBuilder_x86_64(StringRef FileName,
                              const object::ELFFile<object::ELF64LE> &Obj)
-      : G(std::make_unique<LinkGraph>(filename, getPointerSize(Obj),
-                                      getEndianness(Obj))),
-        Obj(Obj) {}
-
-  Expected<std::unique_ptr<LinkGraph>> buildGraph() {
-    // Sanity check: we only operate on relocatable objects.
-    if (!isRelocatable())
-      return make_error<JITLinkError>("Object is not a relocatable ELF");
-
-    auto Secs = Obj.sections();
-
-    if (!Secs) {
-      return Secs.takeError();
-    }
-    sections = *Secs;
-
-    if (auto Err = createNormalizedSections())
-      return std::move(Err);
-
-    if (auto Err = createNormalizedSymbols())
-      return std::move(Err);
-
-    if (auto Err = graphifyRegularSymbols())
-      return std::move(Err);
-
-    if (auto Err = addRelocations())
-      return std::move(Err);
-
-    return std::move(G);
-  }
+      : ELFLinkGraphBuilder(Obj, Triple("x86_64-unknown-linux"), FileName,
+                            x86_64::getEdgeKindName) {}
 };
 
 class ELFJITLinker_x86_64 : public JITLinker<ELFJITLinker_x86_64> {
@@ -409,55 +273,168 @@ class ELFJITLinker_x86_64 : public JITLinker<ELFJITLinker_x86_64> {
 
 public:
   ELFJITLinker_x86_64(std::unique_ptr<JITLinkContext> Ctx,
+                      std::unique_ptr<LinkGraph> G,
                       PassConfiguration PassConfig)
-      : JITLinker(std::move(Ctx), std::move(PassConfig)) {}
-
-private:
-  StringRef getEdgeKindName(Edge::Kind R) const override { return StringRef(); }
-
-  Expected<std::unique_ptr<LinkGraph>>
-  buildGraph(MemoryBufferRef ObjBuffer) override {
-    auto ELFObj = object::ObjectFile::createELFObjectFile(ObjBuffer);
-    if (!ELFObj)
-      return ELFObj.takeError();
-
-    auto &ELFObjFile = cast<object::ELFObjectFile<object::ELF64LE>>(**ELFObj);
-    std::string fileName(ELFObj->get()->getFileName());
-    return ELFLinkGraphBuilder_x86_64(std::move(fileName),
-                                      *ELFObjFile.getELFFile())
-        .buildGraph();
+      : JITLinker(std::move(Ctx), std::move(G), std::move(PassConfig)) {
+    getPassConfig().PostAllocationPasses.push_back(
+        [this](LinkGraph &G) { return getOrCreateGOTSymbol(G); });
   }
 
-  Error applyFixup(Block &B, const Edge &E, char *BlockWorkingMem) const {
-    using namespace ELF_x86_64_Edges;
-    char *FixupPtr = BlockWorkingMem + E.getOffset();
-    JITTargetAddress FixupAddress = B.getAddress() + E.getOffset();
-    switch (E.getKind()) {
+private:
+  Symbol *GOTSymbol = nullptr;
 
-    case ELFX86RelocationKind::PCRel32:
-      int64_t Value = E.getTarget().getAddress() + E.getAddend() - FixupAddress;
-      // verify
-      *(support::little32_t *)FixupPtr = Value;
-      break;
+  Error getOrCreateGOTSymbol(LinkGraph &G) {
+    auto DefineExternalGOTSymbolIfPresent =
+        createDefineExternalSectionStartAndEndSymbolsPass(
+            [&](LinkGraph &LG, Symbol &Sym) -> SectionRangeSymbolDesc {
+              if (Sym.getName() == ELFGOTSymbolName)
+                if (auto *GOTSection = G.findSectionByName(
+                        x86_64::GOTTableManager::getSectionName())) {
+                  GOTSymbol = &Sym;
+                  return {*GOTSection, true};
+                }
+              return {};
+            });
+
+    // Try to attach _GLOBAL_OFFSET_TABLE_ to the GOT if it's defined as an
+    // external.
+    if (auto Err = DefineExternalGOTSymbolIfPresent(G))
+      return Err;
+
+    // If we succeeded then we're done.
+    if (GOTSymbol)
+      return Error::success();
+
+    // Otherwise look for a GOT section: If it already has a start symbol we'll
+    // record it, otherwise we'll create our own.
+    // If there's a GOT section but we didn't find an external GOT symbol...
+    if (auto *GOTSection =
+            G.findSectionByName(x86_64::GOTTableManager::getSectionName())) {
+
+      // Check for an existing defined symbol.
+      for (auto *Sym : GOTSection->symbols())
+        if (Sym->getName() == ELFGOTSymbolName) {
+          GOTSymbol = Sym;
+          return Error::success();
+        }
+
+      // If there's no defined symbol then create one.
+      SectionRange SR(*GOTSection);
+      if (SR.empty())
+        GOTSymbol =
+            &G.addAbsoluteSymbol(ELFGOTSymbolName, orc::ExecutorAddr(), 0,
+                                 Linkage::Strong, Scope::Local, true);
+      else
+        GOTSymbol =
+            &G.addDefinedSymbol(*SR.getFirstBlock(), 0, ELFGOTSymbolName, 0,
+                                Linkage::Strong, Scope::Local, false, true);
     }
+
     return Error::success();
+  }
+
+  Error applyFixup(LinkGraph &G, Block &B, const Edge &E) const {
+    return x86_64::applyFixup(G, B, E, GOTSymbol);
   }
 };
 
-void jitLink_ELF_x86_64(std::unique_ptr<JITLinkContext> Ctx) {
-  PassConfiguration Config;
-  Triple TT("x86_64-linux");
-  // Construct a JITLinker and run the link function.
-  // Add a mark-live pass.
-  if (auto MarkLive = Ctx->getMarkLivePass(TT))
-    Config.PrePrunePasses.push_back(std::move(MarkLive));
-  else
-    Config.PrePrunePasses.push_back(markAllSymbolsLive);
+Expected<std::unique_ptr<LinkGraph>>
+createLinkGraphFromELFObject_x86_64(MemoryBufferRef ObjectBuffer) {
+  LLVM_DEBUG({
+    dbgs() << "Building jitlink graph for new input "
+           << ObjectBuffer.getBufferIdentifier() << "...\n";
+  });
 
-  if (auto Err = Ctx->modifyPassConfig(TT, Config))
+  auto ELFObj = object::ObjectFile::createELFObjectFile(ObjectBuffer);
+  if (!ELFObj)
+    return ELFObj.takeError();
+
+  auto &ELFObjFile = cast<object::ELFObjectFile<object::ELF64LE>>(**ELFObj);
+  return ELFLinkGraphBuilder_x86_64((*ELFObj)->getFileName(),
+                                    ELFObjFile.getELFFile())
+      .buildGraph();
+}
+
+static SectionRangeSymbolDesc
+identifyELFSectionStartAndEndSymbols(LinkGraph &G, Symbol &Sym) {
+  constexpr StringRef StartSymbolPrefix = "__start";
+  constexpr StringRef EndSymbolPrefix = "__end";
+
+  auto SymName = Sym.getName();
+  if (SymName.startswith(StartSymbolPrefix)) {
+    if (auto *Sec =
+            G.findSectionByName(SymName.drop_front(StartSymbolPrefix.size())))
+      return {*Sec, true};
+  } else if (SymName.startswith(EndSymbolPrefix)) {
+    if (auto *Sec =
+            G.findSectionByName(SymName.drop_front(EndSymbolPrefix.size())))
+      return {*Sec, false};
+  }
+  return {};
+}
+
+void link_ELF_x86_64(std::unique_ptr<LinkGraph> G,
+                     std::unique_ptr<JITLinkContext> Ctx) {
+  PassConfiguration Config;
+
+  if (Ctx->shouldAddDefaultTargetPasses(G->getTargetTriple())) {
+
+    Config.PrePrunePasses.push_back(EHFrameSplitter(".eh_frame"));
+    Config.PrePrunePasses.push_back(
+        EHFrameEdgeFixer(".eh_frame", x86_64::PointerSize, x86_64::Delta64,
+                         x86_64::Delta32, x86_64::NegDelta32));
+    Config.PrePrunePasses.push_back(EHFrameNullTerminator(".eh_frame"));
+
+    // Construct a JITLinker and run the link function.
+    // Add a mark-live pass.
+    if (auto MarkLive = Ctx->getMarkLivePass(G->getTargetTriple()))
+      Config.PrePrunePasses.push_back(std::move(MarkLive));
+    else
+      Config.PrePrunePasses.push_back(markAllSymbolsLive);
+
+    // Add an in-place GOT/Stubs/TLSInfoEntry build pass.
+    Config.PostPrunePasses.push_back(buildTables_ELF_x86_64);
+
+    // Resolve any external section start / end symbols.
+    Config.PostAllocationPasses.push_back(
+        createDefineExternalSectionStartAndEndSymbolsPass(
+            identifyELFSectionStartAndEndSymbols));
+
+    // Add GOT/Stubs optimizer pass.
+    Config.PreFixupPasses.push_back(x86_64::optimizeGOTAndStubAccesses);
+  }
+
+  if (auto Err = Ctx->modifyPassConfig(*G, Config))
     return Ctx->notifyFailed(std::move(Err));
 
-  ELFJITLinker_x86_64::link(std::move(Ctx), std::move(Config));
+  ELFJITLinker_x86_64::link(std::move(Ctx), std::move(G), std::move(Config));
+}
+const char *getELFX86RelocationKindName(Edge::Kind R) {
+  switch (R) {
+  case Branch32:
+    return "Branch32";
+  case Pointer32Signed:
+    return "Pointer32Signed";
+  case Pointer64:
+    return "Pointer64";
+  case PCRel32:
+    return "PCRel32";
+  case PCRel32GOTLoad:
+    return "PCRel32GOTLoad";
+  case PCRel32GOTLoadRelaxable:
+    return "PCRel32GOTLoadRelaxable";
+  case PCRel32REXGOTLoadRelaxable:
+    return "PCRel32REXGOTLoad";
+  case PCRel64GOT:
+    return "PCRel64GOT";
+  case Delta64:
+    return "Delta64";
+  case GOT64:
+    return "GOT64";
+  case GOTOFF64:
+    return "GOTOFF64";
+  }
+  return getGenericEdgeKindName(static_cast<Edge::Kind>(R));
 }
 } // end namespace jitlink
 } // end namespace llvm

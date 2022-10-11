@@ -55,9 +55,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/smp.h>
 #include <sys/sx.h>
 #include <sys/sysctl.h>
-#include <sys/sysent.h>
 #include <sys/sysproto.h>
-#include <sys/umtx.h>
+#include <sys/umtxvar.h>
 #include <machine/smp.h>
 
 #ifdef RCTL
@@ -535,7 +534,7 @@ racct_adjust_resource(struct racct *racct, int resource,
 	 * many processes terminated in a short time span, the ucred %cpu
 	 * resource could grow too much.  Also, the 4BSD scheduler sometimes
 	 * returns for a thread more than 100% cpu usage. So we set a sane
-	 * boundary here to 100% * the maxumum number of CPUs.
+	 * boundary here to 100% * the maximum number of CPUs.
 	 */
 	if ((resource == RACCT_PCTCPU) &&
 	    (racct->r_resources[RACCT_PCTCPU] > 100 * 1000000 * (int64_t)MAXCPU))

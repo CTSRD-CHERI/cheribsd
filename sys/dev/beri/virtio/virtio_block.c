@@ -241,12 +241,11 @@ open_file(struct beri_vtblk_softc *sc, struct thread *td)
 	int flags;
 
 	flags = (FREAD | FWRITE);
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE,
-		sc->mdio->md_file, td);
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, sc->mdio->md_file);
 	error = vn_open(&nd, &flags, 0, NULL);
 	if (error != 0)
 		return (error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 
 	if (nd.ni_vp->v_type != VREG) {
 		return (EINVAL);
@@ -554,7 +553,4 @@ static driver_t beri_vtblk_driver = {
 	sizeof(struct beri_vtblk_softc),
 };
 
-static devclass_t beri_vtblk_devclass;
-
-DRIVER_MODULE(beri_vtblk, simplebus, beri_vtblk_driver,
-    beri_vtblk_devclass, 0, 0);
+DRIVER_MODULE(beri_vtblk, simplebus, beri_vtblk_driver, 0, 0);

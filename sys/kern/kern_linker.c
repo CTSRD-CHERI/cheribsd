@@ -34,27 +34,27 @@ __FBSDID("$FreeBSD$");
 #include "opt_hwpmc_hooks.h"
 
 #include <sys/param.h>
-#include <sys/kernel.h>
 #include <sys/systm.h>
-#include <sys/malloc.h>
-#include <sys/sysproto.h>
-#include <sys/sysent.h>
-#include <sys/priv.h>
-#include <sys/proc.h>
-#include <sys/lock.h>
-#include <sys/mutex.h>
-#include <sys/sx.h>
-#include <sys/module.h>
-#include <sys/mount.h>
-#include <sys/linker.h>
+#include <sys/boottrace.h>
 #include <sys/eventhandler.h>
 #include <sys/fcntl.h>
 #include <sys/jail.h>
+#include <sys/kernel.h>
 #include <sys/libkern.h>
+#include <sys/linker.h>
+#include <sys/lock.h>
+#include <sys/malloc.h>
+#include <sys/module.h>
+#include <sys/mount.h>
+#include <sys/mutex.h>
 #include <sys/namei.h>
-#include <sys/vnode.h>
+#include <sys/priv.h>
+#include <sys/proc.h>
+#include <sys/sx.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
+#include <sys/sysproto.h>
+#include <sys/vnode.h>
 
 #ifdef DDB
 #include <ddb/ddb.h>
@@ -106,6 +106,8 @@ MALLOC_DEFINE(M_LINKER, "linker", "kernel linker");
 linker_file_t linker_kernel_file;
 
 static struct sx kld_sx;	/* kernel linker lock */
+static u_int kld_busy;
+static struct thread *kld_busy_owner;
 
 /*
  * Load counter used by clients to determine if a linker file has been
@@ -194,6 +196,7 @@ static void
 linker_file_sysinit(linker_file_t lf)
 {
 	struct sysinit **start, **stop, **sipp, **xipp, *save;
+	int last;
 
 	KLD_DPF(FILE, ("linker_file_sysinit: calling SYSINITs for %s\n",
 	    lf->filename));
@@ -225,14 +228,20 @@ linker_file_sysinit(linker_file_t lf)
 	 * Traverse the (now) ordered list of system initialization tasks.
 	 * Perform each task, and continue on to the next task.
 	 */
+	last = SI_SUB_DUMMY;
 	sx_xunlock(&kld_sx);
 	mtx_lock(&Giant);
 	for (sipp = start; sipp < stop; sipp++) {
 		if ((*sipp)->subsystem == SI_SUB_DUMMY)
 			continue;	/* skip dummy task(s) */
 
+		if ((*sipp)->subsystem > last)
+			BOOTTRACE("%s: sysinit 0x%7x", lf->filename,
+			    (*sipp)->subsystem);
+
 		/* Call function */
 		(*((*sipp)->func)) ((*sipp)->udata);
+		last = (*sipp)->subsystem;
 	}
 	mtx_unlock(&Giant);
 	sx_xlock(&kld_sx);
@@ -242,6 +251,7 @@ static void
 linker_file_sysuninit(linker_file_t lf)
 {
 	struct sysinit **start, **stop, **sipp, **xipp, *save;
+	int last;
 
 	KLD_DPF(FILE, ("linker_file_sysuninit: calling SYSUNINITs for %s\n",
 	    lf->filename));
@@ -277,12 +287,18 @@ linker_file_sysuninit(linker_file_t lf)
 	 */
 	sx_xunlock(&kld_sx);
 	mtx_lock(&Giant);
+	last = SI_SUB_DUMMY;
 	for (sipp = start; sipp < stop; sipp++) {
 		if ((*sipp)->subsystem == SI_SUB_DUMMY)
 			continue;	/* skip dummy task(s) */
 
+		if ((*sipp)->subsystem > last)
+			BOOTTRACE("%s: sysuninit 0x%7x", lf->filename,
+			    (*sipp)->subsystem);
+
 		/* Call function */
 		(*((*sipp)->func)) ((*sipp)->udata);
+		last = (*sipp)->subsystem;
 	}
 	mtx_unlock(&Giant);
 	sx_xlock(&kld_sx);
@@ -612,6 +628,8 @@ linker_make_file(const char *pathname, linker_class_t lc)
 		return (NULL);
 	lf->ctors_addr = 0;
 	lf->ctors_size = 0;
+	lf->dtors_addr = 0;
+	lf->dtors_size = 0;
 	lf->refs = 1;
 	lf->userrefs = 0;
 	lf->flags = 0;
@@ -908,7 +926,7 @@ linker_debug_lookup(const char *symstr, c_linker_sym_t *sym)
 	linker_file_t lf;
 
 	TAILQ_FOREACH(lf, &linker_files, link) {
-		if (LINKER_LOOKUP_SYMBOL(lf, symstr, sym) == 0)
+		if (LINKER_LOOKUP_DEBUG_SYMBOL(lf, symstr, sym) == 0)
 			return (0);
 	}
 	return (ENOENT);
@@ -952,7 +970,7 @@ linker_debug_symbol_values(c_linker_sym_t sym, linker_symval_t *symval)
 	linker_file_t lf;
 
 	TAILQ_FOREACH(lf, &linker_files, link) {
-		if (LINKER_SYMBOL_VALUES(lf, sym, symval) == 0)
+		if (LINKER_DEBUG_SYMBOL_VALUES(lf, sym, symval) == 0)
 			return (0);
 	}
 	return (ENOENT);
@@ -1050,6 +1068,58 @@ linker_search_symbol_name(ptraddr_t value, char *buf, u_int buflen,
 	    M_WAITOK));
 }
 
+int
+linker_kldload_busy(int flags)
+{
+	int error;
+
+	MPASS((flags & ~(LINKER_UB_UNLOCK | LINKER_UB_LOCKED |
+	    LINKER_UB_PCATCH)) == 0);
+	if ((flags & LINKER_UB_LOCKED) != 0)
+		sx_assert(&kld_sx, SA_XLOCKED);
+
+	if ((flags & LINKER_UB_LOCKED) == 0)
+		sx_xlock(&kld_sx);
+	while (kld_busy > 0) {
+		if (kld_busy_owner == curthread)
+			break;
+		error = sx_sleep(&kld_busy, &kld_sx,
+		    (flags & LINKER_UB_PCATCH) != 0 ? PCATCH : 0,
+		    "kldbusy", 0);
+		if (error != 0) {
+			if ((flags & LINKER_UB_UNLOCK) != 0)
+				sx_xunlock(&kld_sx);
+			return (error);
+		}
+	}
+	kld_busy++;
+	kld_busy_owner = curthread;
+	if ((flags & LINKER_UB_UNLOCK) != 0)
+		sx_xunlock(&kld_sx);
+	return (0);
+}
+
+void
+linker_kldload_unbusy(int flags)
+{
+	MPASS((flags & ~LINKER_UB_LOCKED) == 0);
+	if ((flags & LINKER_UB_LOCKED) != 0)
+		sx_assert(&kld_sx, SA_XLOCKED);
+
+	if ((flags & LINKER_UB_LOCKED) == 0)
+		sx_xlock(&kld_sx);
+	MPASS(kld_busy > 0);
+	if (kld_busy_owner != curthread)
+		panic("linker_kldload_unbusy done by not owning thread %p",
+		    kld_busy_owner);
+	kld_busy--;
+	if (kld_busy == 0) {
+		kld_busy_owner = NULL;
+		wakeup(&kld_busy);
+	}
+	sx_xunlock(&kld_sx);
+}
+
 /*
  * Syscalls.
  */
@@ -1067,12 +1137,6 @@ kern_kldload(struct thread *td, const char *file, int *fileid)
 		return (error);
 
 	/*
-	 * It is possible that kldloaded module will attach a new ifnet,
-	 * so vnet context must be set when this ocurs.
-	 */
-	CURVNET_SET(TD_TO_VNET(td));
-
-	/*
 	 * If file does not contain a qualified name or any dot in it
 	 * (kldname.ko, or kldname.ver.ko) treat it as an interface
 	 * name.
@@ -1085,19 +1149,27 @@ kern_kldload(struct thread *td, const char *file, int *fileid)
 		modname = file;
 	}
 
-	sx_xlock(&kld_sx);
-	error = linker_load_module(kldname, modname, NULL, NULL, &lf);
-	if (error) {
+	error = linker_kldload_busy(LINKER_UB_PCATCH);
+	if (error != 0) {
 		sx_xunlock(&kld_sx);
-		goto done;
+		return (error);
 	}
-	lf->userrefs++;
-	if (fileid != NULL)
-		*fileid = lf->id;
-	sx_xunlock(&kld_sx);
 
-done:
+	/*
+	 * It is possible that kldloaded module will attach a new ifnet,
+	 * so vnet context must be set when this ocurs.
+	 */
+	CURVNET_SET(TD_TO_VNET(td));
+
+	error = linker_load_module(kldname, modname, NULL, NULL, &lf);
 	CURVNET_RESTORE();
+
+	if (error == 0) {
+		lf->userrefs++;
+		if (fileid != NULL)
+			*fileid = lf->id;
+	}
+	linker_kldload_unbusy(LINKER_UB_LOCKED);
 	return (error);
 }
 
@@ -1139,8 +1211,13 @@ kern_kldunload(struct thread *td, int fileid, int flags)
 	if ((error = priv_check(td, PRIV_KLD_UNLOAD)) != 0)
 		return (error);
 
+	error = linker_kldload_busy(LINKER_UB_PCATCH);
+	if (error != 0) {
+		sx_xunlock(&kld_sx);
+		return (error);
+	}
+
 	CURVNET_SET(TD_TO_VNET(td));
-	sx_xlock(&kld_sx);
 	lf = linker_find_file_by_id(fileid);
 	if (lf) {
 		KLD_DPF(FILE, ("kldunload: lf->userrefs=%d\n", lf->userrefs));
@@ -1160,9 +1237,8 @@ kern_kldunload(struct thread *td, int fileid, int flags)
 		}
 	} else
 		error = ENOENT;
-	sx_xunlock(&kld_sx);
-
 	CURVNET_RESTORE();
+	linker_kldload_unbusy(LINKER_UB_LOCKED);
 	return (error);
 }
 
@@ -1325,7 +1401,7 @@ kern_kldstat(struct thread *td, int fileid, struct kld_file_stat *stat)
 }
 
 #ifdef DDB
-DB_COMMAND(kldstat, db_kldstat)
+DB_COMMAND_FLAGS(kldstat, db_kldstat, DB_CMD_MEMSAFE)
 {
 	linker_file_t lf;
 
@@ -1834,11 +1910,11 @@ linker_lookup_file(const char *path, int pathlen, const char *name,
 		 * Attempt to open the file, and return the path if
 		 * we succeed and it's a regular file.
 		 */
-		NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(result), td);
+		NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(result));
 		flags = FREAD;
 		error = vn_open(&nd, &flags, 0, NULL);
 		if (error == 0) {
-			NDFREE(&nd, NDF_ONLY_PNBUF);
+			NDFREE_PNBUF(&nd);
 			type = nd.ni_vp->v_type;
 			if (vap)
 				VOP_GETATTR(nd.ni_vp, vap, td->td_ucred);
@@ -1884,12 +1960,12 @@ linker_hints_lookup(const char *path, int pathlen, const char *modname,
 	snprintf(pathbuf, reclen, "%.*s%s%s", pathlen, path, sep,
 	    linker_hintfile);
 
-	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, PTR2CAP(pathbuf), td);
+	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, PTR2CAP(pathbuf));
 	flags = FREAD;
 	error = vn_open(&nd, &flags, 0, NULL);
 	if (error)
 		goto bad;
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 	if (nd.ni_vp->v_type != VREG)
 		goto bad;
 	best = cp = NULL;

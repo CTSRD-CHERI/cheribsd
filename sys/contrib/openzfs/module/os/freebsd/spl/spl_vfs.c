@@ -85,7 +85,7 @@ vfs_setmntopt(vfs_t *vfsp, const char *name, const char *arg,
 	} else {
 		opt->len = strlen(arg) + 1;
 		opt->value = malloc(opt->len, M_MOUNT, M_WAITOK);
-		bcopy(arg, opt->value, opt->len);
+		memcpy(opt->value, arg, opt->len);
 	}
 
 	MNT_ILOCK(vfsp);
@@ -125,7 +125,7 @@ mount_snapshot(kthread_t *td, vnode_t **vpp, const char *fstype, char *fspath,
 	struct vfsconf *vfsp;
 	struct mount *mp;
 	vnode_t *vp, *mvp;
-	struct ucred *cr;
+	struct ucred *pcr, *tcr;
 	int error;
 
 	ASSERT_VOP_ELOCKED(*vpp, "mount_snapshot");
@@ -194,14 +194,18 @@ mount_snapshot(kthread_t *td, vnode_t **vpp, const char *fstype, char *fspath,
 	 * mount(8) and df(1) output.
 	 */
 	mp->mnt_flag |= MNT_IGNORE;
+
 	/*
 	 * XXX: This is evil, but we can't mount a snapshot as a regular user.
 	 * XXX: Is is safe when snapshot is mounted from within a jail?
 	 */
-	cr = td->td_ucred;
+	tcr = td->td_ucred;
+	pcr = td->td_proc->p_ucred;
 	td->td_ucred = kcred;
+	td->td_proc->p_ucred = kcred;
 	error = VFS_MOUNT(mp);
-	td->td_ucred = cr;
+	td->td_ucred = tcr;
+	td->td_proc->p_ucred = pcr;
 
 	if (error != 0) {
 		/*
@@ -275,13 +279,13 @@ mount_snapshot(kthread_t *td, vnode_t **vpp, const char *fstype, char *fspath,
 void
 vn_rele_async(vnode_t *vp, taskq_t *taskq)
 {
-	VERIFY(vp->v_count > 0);
+	VERIFY3U(vp->v_usecount, >, 0);
 	if (refcount_release_if_not_last(&vp->v_usecount)) {
 #if __FreeBSD_version < 1300045
 		vdrop(vp);
 #endif
 		return;
 	}
-	VERIFY(taskq_dispatch((taskq_t *)taskq,
-	    (task_func_t *)vrele, vp, TQ_SLEEP) != 0);
+	VERIFY3U(taskq_dispatch((taskq_t *)taskq,
+	    (task_func_t *)vrele, vp, TQ_SLEEP), !=, 0);
 }

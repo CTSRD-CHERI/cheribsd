@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd April 4, 2019
+.Dd October 31, 2021
 .Dt DEVCTL 8
 .Os
 .Sh NAME
@@ -67,8 +67,16 @@
 .Op Fl f
 .Ar device
 .Nm
+.Cm freeze
+.Nm
+.Cm thaw
+.Nm
 .Cm reset
 .Op Fl d
+.Ar device
+.Nm
+.Cm getpath
+.Ar locator
 .Ar device
 .Sh DESCRIPTION
 The
@@ -170,6 +178,23 @@ the device will be deleted even if it is physically present.
 This command should be used with care as a device that is deleted but present
 can no longer be used unless the parent bus device rediscovers the device via
 a rescan request.
+.It Cm freeze
+Freeze probe and attach processing initiated in response to drivers being
+loaded.
+Drivers are placed on a
+.Do
+frozen list
+.Dc
+and processed when a later
+.Do
+thaw
+.Dc
+occurs.
+.It Cm thaw
+Resume (thaw the freeze) probe and attach initiated in response to drivers
+being loaded.
+In addition to resuming, all pending actions that were frozen during the freeze
+are performed.
 .It Xo Cm reset
 .Op Fl d
 .Ar device
@@ -193,6 +218,24 @@ tried first; if failed or not implemented, power reset is tried.
 .Pp
 If you have detached or suspended a child device explicitly and then
 do a reset, the child device will end up attached.
+.It Xo Cm getpath
+.Ar locator
+.Ar device
+.Xc
+Prints the full path to the
+.Ar device
+using the
+.Ar locator
+method to get the path name.
+Currently, only the
+.Dq UEFI
+and
+.Dq FreeBSD
+locators are implemented.
+The UEFI locator constructs a path to the device using the rules
+outlines for DEVICE_PATH in the UEFI standard.
+The FreeBSD locator constructs a path back to the root of the tree
+with the nodes separated by slashes.
 .El
 .Sh SEE ALSO
 .Xr devctl 3 ,
@@ -205,5 +248,5 @@ utility first appeared in
 .Sh BUGS
 Currently there is no administrative flag to prevent re-attach or resume
 of the manually detached or suspended devices after reset.
-Similarly, there is no flag to prevent un-suspending of the the manually
+Similarly, there is no flag to prevent un-suspending of the manually
 suspended devices after system resume.

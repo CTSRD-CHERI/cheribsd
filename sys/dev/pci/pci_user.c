@@ -623,7 +623,7 @@ pci_list_vpd(device_t dev, struct pci_list_vpd_io *lvio)
 {
 	struct pci_vpd_element vpd_element, * __capability vpd_user;
 	struct pcicfg_vpd *vpd;
-	size_t len;
+	size_t len, datalen;
 	int error, i;
 
 	vpd = pci_fetch_vpd_list(dev);
@@ -654,16 +654,17 @@ pci_list_vpd(device_t dev, struct pci_list_vpd_io *lvio)
 	 * Copyout the identifier string followed by each keyword and
 	 * value.
 	 */
+	datalen = strlen(vpd->vpd_ident);
+	KASSERT(datalen <= 255, ("invalid VPD ident length"));
 	vpd_user = lvio->plvi_data;
 	vpd_element.pve_keyword[0] = '\0';
 	vpd_element.pve_keyword[1] = '\0';
 	vpd_element.pve_flags = PVE_FLAG_IDENT;
-	vpd_element.pve_datalen = strlen(vpd->vpd_ident);
+	vpd_element.pve_datalen = datalen;
 	error = copyout(&vpd_element, vpd_user, sizeof(vpd_element));
 	if (error)
 		return (error);
-	error = copyout(vpd->vpd_ident, vpd_user->pve_data,
-	    strlen(vpd->vpd_ident));
+	error = copyout(vpd->vpd_ident, vpd_user->pve_data, datalen);
 	if (error)
 		return (error);
 	vpd_user = PVE_NEXT_LEN(vpd_user, vpd_element.pve_datalen);
@@ -982,7 +983,7 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 		return (EBUSY); /* XXXKIB enable if _ACTIVATE */
 	if (!PCI_BAR_MEM(pm->pm_value))
 		return (EIO);
-	error = BUS_TRANSLATE_RESOURCE(pcidev, SYS_RES_MEMORY,
+	error = bus_translate_resource(pcidev, SYS_RES_MEMORY,
 	    pm->pm_value & PCIM_BAR_MEM_BASE, &membase);
 	if (error != 0)
 		return (error);
@@ -1000,7 +1001,7 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 		if ((pbm->pbm_flags & PCIIO_BAR_MMAP_FIXED) == 0)
 			return (EPROT);
 		if ((cheri_getperm(pbm->pbm_map_base) &
-		    CHERI_PERM_CHERIABI_VMMAP) == 0)
+		    CHERI_PERM_SW_VMEM) == 0)
 			return (EACCES);
 	} else {
 		if (!cheri_is_null_derived(pbm->pbm_map_base))
@@ -1051,6 +1052,92 @@ out:
 }
 
 static int
+pci_bar_io(device_t pcidev, struct pci_bar_ioreq *pbi)
+{
+	struct pci_map *pm;
+	struct resource *res;
+	uint32_t offset, width;
+	int bar, error, type;
+
+	if (pbi->pbi_op != PCIBARIO_READ &&
+	    pbi->pbi_op != PCIBARIO_WRITE)
+		return (EINVAL);
+
+	bar = PCIR_BAR(pbi->pbi_bar);
+	pm = pci_find_bar(pcidev, bar);
+	if (pm == NULL)
+		return (EINVAL);
+
+	offset = pbi->pbi_offset;
+	width = pbi->pbi_width;
+
+	if (offset + width < offset ||
+	    ((pci_addr_t)1 << pm->pm_size) < offset + width)
+		return (EINVAL);
+
+	type = PCI_BAR_MEM(pm->pm_value) ? SYS_RES_MEMORY : SYS_RES_IOPORT;
+
+	/*
+	 * This will fail if a driver has allocated the resource.  This could be
+	 * worked around by detecting that case and using bus_map_resource() to
+	 * populate the handle, but so far this is not needed.
+	 */
+	res = bus_alloc_resource_any(pcidev, type, &bar, RF_ACTIVE);
+	if (res == NULL)
+		return (ENOENT);
+
+	error = 0;
+	switch (pbi->pbi_op) {
+	case PCIBARIO_READ:
+		switch (pbi->pbi_width) {
+		case 1:
+			pbi->pbi_value = bus_read_1(res, offset);
+			break;
+		case 2:
+			pbi->pbi_value = bus_read_2(res, offset);
+			break;
+		case 4:
+			pbi->pbi_value = bus_read_4(res, offset);
+			break;
+#ifndef __i386__
+		case 8:
+			pbi->pbi_value = bus_read_8(res, offset);
+			break;
+#endif
+		default:
+			error = EINVAL;
+			break;
+		}
+		break;
+	case PCIBARIO_WRITE:
+		switch (pbi->pbi_width) {
+		case 1:
+			bus_write_1(res, offset, pbi->pbi_value);
+			break;
+		case 2:
+			bus_write_2(res, offset, pbi->pbi_value);
+			break;
+		case 4:
+			bus_write_4(res, offset, pbi->pbi_value);
+			break;
+#ifndef __i386__
+		case 8:
+			bus_write_8(res, offset, pbi->pbi_value);
+			break;
+#endif
+		default:
+			error = EINVAL;
+			break;
+		}
+		break;
+	}
+
+	bus_release_resource(pcidev, type, bar, res);
+
+	return (error);
+}
+
+static int
 pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
 	device_t pcidev;
@@ -1059,6 +1146,7 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 	struct pci_conf_io *cio = NULL;
 	struct pci_devinfo *dinfo;
 	struct pci_io *io;
+	struct pci_bar_ioreq *pbi;
 	struct pci_bar_io *bio;
 	struct pci_list_vpd_io *lvio;
 #ifdef COMPAT_FREEBSD64
@@ -1082,7 +1170,12 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 	io_old = NULL;
 #endif
 
-	if (!(flag & FWRITE)) {
+	/*
+	 * Interpret read-only opened /dev/pci as a promise that no
+	 * operation of the file descriptor could modify system state,
+	 * including side-effects due to reading devices registers.
+	 */
+	if ((flag & FWRITE) == 0) {
 		switch (cmd) {
 		case PCIOCGETCONF:
 #ifdef COMPAT_FREEBSD32
@@ -1108,8 +1201,11 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 		}
 	}
 
-	/* Giant because newbus is Giant locked revisit with newbus locking */
-	mtx_lock(&Giant);
+	/*
+	 * Use bus topology lock to ensure that the pci list of devies doesn't
+	 * change while we're traversing the list, in some cases multiple times.
+	 */
+	bus_topo_lock();
 
 	switch (cmd) {
 	case PCIOCGETCONF:
@@ -1486,12 +1582,25 @@ getconfexit:
 #endif
 		break;
 
+	case PCIOCBARIO:
+		pbi = (struct pci_bar_ioreq *)data;
+
+		pcidev = pci_find_dbsf(pbi->pbi_sel.pc_domain,
+		    pbi->pbi_sel.pc_bus, pbi->pbi_sel.pc_dev,
+		    pbi->pbi_sel.pc_func);
+		if (pcidev == NULL) {
+			error = ENODEV;
+			break;
+		}
+		error = pci_bar_io(pcidev, pbi);
+		break;
+
 	default:
 		error = ENOTTY;
 		break;
 	}
 
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 
 	return (error);
 }

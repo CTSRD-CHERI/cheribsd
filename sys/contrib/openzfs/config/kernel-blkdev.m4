@@ -120,7 +120,7 @@ AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV_BDEV_CHECK_MEDIA_CHANGE], [
 ])
 
 AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_BDEV_CHECK_MEDIA_CHANGE], [
-	AC_MSG_CHECKING([whether bdev_disk_changed() exists])
+	AC_MSG_CHECKING([whether bdev_check_media_change() exists])
 	ZFS_LINUX_TEST_RESULT([bdev_check_media_change], [
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_BDEV_CHECK_MEDIA_CHANGE, 1,
@@ -294,6 +294,78 @@ AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_BDEV_WHOLE], [
 	])
 ])
 
+dnl #
+dnl # 5.19 API: blkdev_issue_secure_erase()
+dnl # 3.10 API: blkdev_issue_discard(..., BLKDEV_DISCARD_SECURE)
+dnl #
+AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV_ISSUE_SECURE_ERASE], [
+	ZFS_LINUX_TEST_SRC([blkdev_issue_secure_erase], [
+		#include <linux/blkdev.h>
+	],[
+		struct block_device *bdev = NULL;
+		sector_t sector = 0;
+		sector_t nr_sects = 0;
+		int error __attribute__ ((unused));
+
+		error = blkdev_issue_secure_erase(bdev,
+		    sector, nr_sects, GFP_KERNEL);
+	])
+
+	ZFS_LINUX_TEST_SRC([blkdev_issue_discard_flags], [
+		#include <linux/blkdev.h>
+	],[
+		struct block_device *bdev = NULL;
+		sector_t sector = 0;
+		sector_t nr_sects = 0;
+		unsigned long flags = 0;
+		int error __attribute__ ((unused));
+
+		error = blkdev_issue_discard(bdev,
+		    sector, nr_sects, GFP_KERNEL, flags);
+	])
+])
+
+AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_ISSUE_SECURE_ERASE], [
+	AC_MSG_CHECKING([whether blkdev_issue_secure_erase() is available])
+	ZFS_LINUX_TEST_RESULT([blkdev_issue_secure_erase], [
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_BLKDEV_ISSUE_SECURE_ERASE, 1,
+		    [blkdev_issue_secure_erase() is available])
+	],[
+		AC_MSG_RESULT(no)
+
+		AC_MSG_CHECKING([whether blkdev_issue_discard() is available])
+		ZFS_LINUX_TEST_RESULT([blkdev_issue_discard_flags], [
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_BLKDEV_ISSUE_DISCARD, 1,
+			    [blkdev_issue_discard() is available])
+		],[
+			ZFS_LINUX_TEST_ERROR([blkdev_issue_discard()])
+		])
+	])
+])
+
+dnl #
+dnl # 5.13 API change
+dnl # blkdev_get_by_path() no longer handles ERESTARTSYS
+dnl #
+dnl # Unfortunately we're forced to rely solely on the kernel version
+dnl # number in order to determine the expected behavior.  This was an
+dnl # internal change to blkdev_get_by_dev(), see commit a8ed1a0607.
+dnl #
+AC_DEFUN([ZFS_AC_KERNEL_BLKDEV_GET_ERESTARTSYS], [
+	AC_MSG_CHECKING([whether blkdev_get_by_path() handles ERESTARTSYS])
+	AS_VERSION_COMPARE([$LINUX_VERSION], [5.13.0], [
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_BLKDEV_GET_ERESTARTSYS, 1,
+			[blkdev_get_by_path() handles ERESTARTSYS])
+	],[
+		AC_MSG_RESULT(no)
+	],[
+		AC_MSG_RESULT(no)
+	])
+])
+
 AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV], [
 	ZFS_AC_KERNEL_SRC_BLKDEV_GET_BY_PATH
 	ZFS_AC_KERNEL_SRC_BLKDEV_PUT
@@ -305,6 +377,7 @@ AC_DEFUN([ZFS_AC_KERNEL_SRC_BLKDEV], [
 	ZFS_AC_KERNEL_SRC_BLKDEV_CHECK_DISK_CHANGE
 	ZFS_AC_KERNEL_SRC_BLKDEV_BDEV_CHECK_MEDIA_CHANGE
 	ZFS_AC_KERNEL_SRC_BLKDEV_BDEV_WHOLE
+	ZFS_AC_KERNEL_SRC_BLKDEV_ISSUE_SECURE_ERASE
 ])
 
 AC_DEFUN([ZFS_AC_KERNEL_BLKDEV], [
@@ -318,4 +391,6 @@ AC_DEFUN([ZFS_AC_KERNEL_BLKDEV], [
 	ZFS_AC_KERNEL_BLKDEV_CHECK_DISK_CHANGE
 	ZFS_AC_KERNEL_BLKDEV_BDEV_CHECK_MEDIA_CHANGE
 	ZFS_AC_KERNEL_BLKDEV_BDEV_WHOLE
+	ZFS_AC_KERNEL_BLKDEV_GET_ERESTARTSYS
+	ZFS_AC_KERNEL_BLKDEV_ISSUE_SECURE_ERASE
 ])

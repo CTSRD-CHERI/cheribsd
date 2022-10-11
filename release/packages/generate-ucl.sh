@@ -34,17 +34,19 @@ main() {
 	vital="false"
 
 	case "${outname}" in
+		bootloader)
+			pkgdeps=""
+			;;
 		clibs)
 			vital="true"
 			# clibs should not have any dependencies or anything
 			# else imposed on it.
 			;;
 		caroot)
-			pkgdeps="utilities"
+			pkgdeps="openssl"
 			;;
 		utilities)
 			uclfile="${uclfile}"
-			vital="true"
 			;;
 		runtime)
 			outname="runtime"

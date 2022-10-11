@@ -94,7 +94,6 @@ do_extract_helper() {
   )
 }
 
-# XXX-CHERI: hack configure.ac to add 5 to LG_QUANTA
 do_autogen() {
   ./autogen.sh --enable-xmalloc --enable-utrace \
     --with-malloc-conf=abort_conf:false \

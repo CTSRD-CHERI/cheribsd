@@ -40,19 +40,11 @@ function get_estimated_size
 {
 	typeset cmd=$1
 	typeset ds=${cmd##* }
-	if is_freebsd; then
-		mkdir -p $BACKDIR
-		typeset tmpfile=$(TMPDIR=$BACKDIR mktemp)
-	else
-		typeset tmpfile=$(mktemp -p $BACKDIR)
-	fi
+	typeset tmpfile=$(mktemp $BACKDIR/size_estimate.XXXXXXXX)
 
-	eval "$cmd >$tmpfile"
-	[[ $? -eq 0 ]] || log_fail "get_estimated_size: $cmd"
-	typeset size=$(eval "awk '\$2 == \"$ds\" {print \$3}' $tmpfile")
+	eval "$cmd >$tmpfile" || log_fail "$cmd: $?"
+	awk -v ds="$ds" '$2 == ds {print $3}' $tmpfile
 	rm -f $tmpfile
-
-	echo $size
 }
 
 log_assert "Verify the stream size given by -P accounts for compressed send."
@@ -61,11 +53,11 @@ log_onexit cleanup_pool $POOL2
 write_compressible $BACKDIR ${megs}m
 
 for compress in "${compress_prop_vals[@]}"; do
-	datasetexists $send_ds && log_must_busy zfs destroy -r $send_ds
-	datasetexists $send_vol && log_must_busy zfs destroy -r $send_vol
+	datasetexists $send_ds && destroy_dataset $send_ds -r
+	datasetexists $send_vol && destroy_dataset $send_vol -r
 	log_must zfs create -o compress=$compress $send_ds
 	log_must zfs create -V 1g -o compress=$compress $send_vol
-	block_device_wait
+	block_device_wait $send_voldev
 
 	typeset dir=$(get_prop mountpoint $send_ds)
 	log_must cp $file $dir
@@ -75,23 +67,19 @@ for compress in "${compress_prop_vals[@]}"; do
 
 	typeset ds_size=$(get_estimated_size "zfs send -nP $send_ds@snap")
 	typeset ds_lrefer=$(get_prop lrefer $send_ds)
-	within_percent $ds_size $ds_lrefer 90 || log_fail \
-	    "$ds_size and $ds_lrefer differed by too much"
+	log_must within_percent $ds_size $ds_lrefer 90
 
 	typeset vol_size=$(get_estimated_size "zfs send -nP $send_vol@snap")
 	typeset vol_lrefer=$(get_prop lrefer $send_vol)
-	within_percent $vol_size $vol_lrefer 90 || log_fail \
-	    "$vol_size and $vol_lrefer differed by too much"
+	log_must within_percent $vol_size $vol_lrefer 90
 
 	typeset ds_csize=$(get_estimated_size "zfs send -nP -c $send_ds@snap")
 	typeset ds_refer=$(get_prop refer $send_ds)
-	within_percent $ds_csize $ds_refer 90 || log_fail \
-	    "$ds_csize and $ds_refer differed by too much"
+	log_must within_percent $ds_csize $ds_refer 90
 
 	typeset vol_csize=$(get_estimated_size "zfs send -nP -c $send_vol@snap")
 	typeset vol_refer=$(get_prop refer $send_vol)
-	within_percent $vol_csize $vol_refer 90 || log_fail \
-	    "$vol_csize and $vol_refer differed by too much"
+	log_must within_percent $vol_csize $vol_refer 90
 done
 
 log_pass "The stream size given by -P accounts for compressed send."

@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd October 8, 2020
+.Dd May 14, 2022
 .Dt KQUEUE 2
 .Os
 .Sh NAME
@@ -267,16 +267,17 @@ Causes
 .Fn kevent
 to leave unchanged any
 .Fa udata
-associated with an existing event.  This allows other aspects of the
-event to be modified without requiring the caller to know the
+associated with an existing event.
+This allows other aspects of the event to be modified without requiring the
+caller to know the
 .Fa udata
 value presently associated.
 This is especially useful with
 .Dv NOTE_TRIGGER
 or flags like
-.Dv EV_ENABLE.
+.Dv EV_ENABLE .
 This flag may not be used with
-.Dv EV_ADD.
+.Dv EV_ADD .
 .El
 .Pp
 The predefined system filters are listed below.
@@ -294,7 +295,7 @@ on the descriptor type.
 .Bl -tag -width 2n
 .It Sockets
 Sockets which have previously been passed to
-.Fn listen
+.Xr listen 2
 return when there is an incoming connection pending.
 .Va data
 contains the size of the listen backlog.
@@ -361,6 +362,10 @@ Returns when the counter is greater than 0;
 .Va data
 contains the counter value, which must be cast to
 .Vt uint64_t .
+.It Kqueues
+Returns when pending events are present on the queue;
+.Va data
+contains the number of events available.
 .El
 .It Dv EVFILT_WRITE
 Takes a descriptor as the identifier, and returns whenever
@@ -373,7 +378,7 @@ The filter will set
 .Dv EV_EOF
 when the reader disconnects, and for the fifo case, this will be cleared
 when a new reader connects.
-Note that this filter is not supported for vnodes or BPF devices.
+Note that this filter is not supported for vnodes.
 .Pp
 For sockets, the low water mark and socket error handling is
 identical to the
@@ -384,6 +389,11 @@ For eventfds,
 .Va data
 will contain the maximum value that can be added to the counter
 without blocking.
+.Pp
+For BPF devices, when the descriptor is attached to an interface the filter
+always indicates that it is possible to write and
+.Va data
+will contain the MTU size of the underlying interface.
 .It Dv EVFILT_EMPTY
 Takes a descriptor as the identifier, and returns whenever
 there is no remaining data in the write buffer.
@@ -469,7 +479,9 @@ The events to monitor are:
 .It Dv NOTE_EXIT
 The process has exited.
 The exit status will be stored in
-.Va data .
+.Va data
+in the same format as the status returned by
+.Xr wait 2 .
 .It Dv NOTE_FORK
 The process has called
 .Fn fork .
@@ -594,6 +606,12 @@ is not set, the default is milliseconds.
 On return,
 .Va fflags
 contains the events which triggered the filter.
+.Pp
+Periodic timers with a specified timeout of 0 will be silently adjusted to
+timeout after 1 of the time units specified by the requested precision in
+.Va fflags .
+If an absolute time is specified that has already passed, then it is treated as
+if the current time were specified and the event will fire as soon as possible.
 .Pp
 If an existing timer is re-added, the existing timer will be
 effectively canceled (throwing away any undelivered record of previous
@@ -724,8 +742,6 @@ main(int argc, char **argv)
     ret = kevent(kq, &event, 1, NULL, 0, NULL);
     if (ret == -1)
 	err(EXIT_FAILURE, "kevent register");
-    if (event.flags & EV_ERROR)
-	errx(EXIT_FAILURE, "Event error: %s", strerror(event.data));
 
     for (;;) {
 	/* Sleep until something happens. */
@@ -733,8 +749,12 @@ main(int argc, char **argv)
 	if (ret == -1) {
 	    err(EXIT_FAILURE, "kevent wait");
 	} else if (ret > 0) {
-	    printf("Something was written in '%s'\en", argv[1]);
-	}
+	    if (tevent.flags & EV_ERROR)
+		errx(EXIT_FAILURE, "Event error: %s", strerror(event.data));
+	    else
+		printf("Something was written in '%s'\en", argv[1]);
+}
+
     }
 }
 .Ed
@@ -777,6 +797,8 @@ events were placed on the kqueue for return.
 A cancellation request was delivered to the thread, but not yet handled.
 .It Bq Er EINVAL
 The specified time limit or filter is invalid.
+.It Bq Er EINVAL
+The specified length of the event or change lists is negative.
 .It Bq Er ENOENT
 The event could not be found to be modified or deleted.
 .It Bq Er ENOMEM
@@ -829,10 +851,6 @@ The
 system and this manual page were written by
 .An Jonathan Lemon Aq Mt jlemon@FreeBSD.org .
 .Sh BUGS
-The
-.Fa timeout
-value is limited to 24 hours; longer timeouts will be silently
-reinterpreted as 24 hours.
 .Pp
 In versions older than
 .Fx 12.0 ,

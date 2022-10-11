@@ -122,8 +122,6 @@ static usb_proc_callback_t ugold_readout_msg;
 
 static usb_callback_t ugold_intr_callback;
 
-static devclass_t ugold_devclass;
-
 static device_method_t ugold_methods[] = {
 	DEVMETHOD(device_probe, ugold_probe),
 	DEVMETHOD(device_attach, ugold_attach),
@@ -142,7 +140,7 @@ static const STRUCT_USB_HOST_ID ugold_devs[] = {
 	{USB_VPI(USB_VENDOR_CHICONY2, USB_PRODUCT_CHICONY2_TEMPER, 0)},
 };
 
-DRIVER_MODULE(ugold, uhub, ugold_driver, ugold_devclass, NULL, NULL);
+DRIVER_MODULE(ugold, uhub, ugold_driver, NULL, NULL);
 MODULE_DEPEND(ugold, usb, 1, 1, 1);
 MODULE_DEPEND(ugold, hid, 1, 1, 1);
 MODULE_VERSION(ugold, 1);
@@ -250,7 +248,7 @@ ugold_attach(device_t dev)
 	SYSCTL_ADD_INT(device_get_sysctl_ctx(dev),
 	    SYSCTL_CHILDREN(sensor_tree),
 	    OID_AUTO, "inner", CTLFLAG_RD, &sc->sc_sensor[UGOLD_INNER], 0,
-	    "Inner temperature in microCelcius");
+	    "Inner temperature in microCelsius");
 
 	SYSCTL_ADD_INT(device_get_sysctl_ctx(dev),
 	    SYSCTL_CHILDREN(sensor_tree),
@@ -260,17 +258,17 @@ ugold_attach(device_t dev)
 	SYSCTL_ADD_INT(device_get_sysctl_ctx(dev),
 	    SYSCTL_CHILDREN(sensor_tree),
 	    OID_AUTO, "inner_calib", CTLFLAG_RWTUN, &sc->sc_calib[UGOLD_INNER], 0,
-	    "Inner calibration temperature in microCelcius");
+	    "Inner calibration temperature in microCelsius");
 
 	SYSCTL_ADD_INT(device_get_sysctl_ctx(dev),
 	    SYSCTL_CHILDREN(sensor_tree),
 	    OID_AUTO, "outer", CTLFLAG_RD, &sc->sc_sensor[UGOLD_OUTER], 0,
-	    "Outer temperature in microCelcius");
+	    "Outer temperature in microCelsius");
 
 	SYSCTL_ADD_INT(device_get_sysctl_ctx(dev),
 	    SYSCTL_CHILDREN(sensor_tree),
 	    OID_AUTO, "outer_calib", CTLFLAG_RWTUN, &sc->sc_calib[UGOLD_OUTER], 0,
-	    "Outer calibration temperature in microCelcius");
+	    "Outer calibration temperature in microCelsius");
 
 	SYSCTL_ADD_INT(device_get_sysctl_ctx(dev),
 	    SYSCTL_CHILDREN(sensor_tree),

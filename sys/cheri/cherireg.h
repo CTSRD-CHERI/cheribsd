@@ -60,8 +60,13 @@
  * the page mapping underlying a capability.  This can't be the same
  * permission bit as CHERI_PERM_SYSCALL because $pcc should not confer the
  * right rewrite or remap executable memory.
+ *
+ * This permission was historically named CHERI_PERM_CHERIABI_VMMAP.
  */
-#define	CHERI_PERM_CHERIABI_VMMAP		CHERI_PERM_SW1
+#define	CHERI_PERM_SW_VMEM			CHERI_PERM_SW1
+#define	CHERI_PERM_CHERIABI_VMMAP \
+    _Pragma("GCC warning \"CHERI_PERM_CHERIABI_VMMAP is deprecated, use CHERI_PERM_SW_VMEM\"") \
+    CHERI_PERM_SW_VMEM
 
 /*
  * Definition for a highly privileged kernel capability able to name the

@@ -27,7 +27,6 @@ class ProcessGDBRemote;
 
 class GDBRemoteCommunicationServer : public GDBRemoteCommunication {
 public:
-  using PortMap = std::map<uint16_t, lldb::pid_t>;
   using PacketHandler =
       std::function<PacketResult(StringExtractorGDBRemote &packet,
                                  Status &error, bool &interrupt, bool &quit)>;
@@ -44,10 +43,6 @@ public:
   PacketResult GetPacketAndSendResponse(Timeout<std::micro> timeout,
                                         Status &error, bool &interrupt,
                                         bool &quit);
-
-  // After connecting, do a little handshake with the client to make sure
-  // we are at least communicating
-  bool HandshakeWithClient();
 
 protected:
   std::map<StringExtractorGDBRemote::ServerPacketType, PacketHandler>
@@ -73,22 +68,17 @@ protected:
 
   PacketResult SendOKResponse();
 
+  /// Serialize and send a JSON object response.
+  PacketResult SendJSONResponse(const llvm::json::Value &value);
+
+  /// Serialize and send a JSON object response, or respond with an error if the
+  /// input object is an \a llvm::Error.
+  PacketResult SendJSONResponse(llvm::Expected<llvm::json::Value> value);
+
 private:
   GDBRemoteCommunicationServer(const GDBRemoteCommunicationServer &) = delete;
   const GDBRemoteCommunicationServer &
   operator=(const GDBRemoteCommunicationServer &) = delete;
-};
-
-class PacketUnimplementedError
-    : public llvm::ErrorInfo<PacketUnimplementedError, llvm::StringError> {
-public:
-  static char ID;
-  using llvm::ErrorInfo<PacketUnimplementedError,
-                        llvm::StringError>::ErrorInfo; // inherit constructors
-  PacketUnimplementedError(const llvm::Twine &S)
-      : ErrorInfo(S, llvm::errc::not_supported) {}
-
-  PacketUnimplementedError() : ErrorInfo(llvm::errc::not_supported) {}
 };
 
 } // namespace process_gdb_remote

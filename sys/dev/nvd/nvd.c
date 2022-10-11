@@ -147,7 +147,7 @@ MODULE_VERSION(nvd, 1);
 MODULE_DEPEND(nvd, nvme, 1, 1, 1);
 
 static int
-nvd_load()
+nvd_load(void)
 {
 	if (!nvme_use_nvd)
 		return 0;
@@ -163,7 +163,7 @@ nvd_load()
 }
 
 static void
-nvd_unload()
+nvd_unload(void)
 {
 	struct nvd_controller	*ctrlr;
 	struct nvd_disk		*ndisk;
@@ -291,7 +291,7 @@ nvd_ioctl(struct disk *dp, u_long cmd, void *data, int fflag,
 }
 
 static int
-nvd_dump(void *arg, void *virt, vm_offset_t phys, off_t offset, size_t len)
+nvd_dump(void *arg, void *virt, off_t offset, size_t len)
 {
 	struct disk *dp = arg;
 	struct nvd_disk *ndisk = dp->d_drv1;
@@ -484,6 +484,13 @@ nvd_new_disk(struct nvme_namespace *ns, void *ctrlr_arg)
 	    NVME_MODEL_NUMBER_LENGTH);
 	strlcpy(disk->d_descr, descr, sizeof(descr));
 
+	/*
+	 * For devices that are reported as children of the AHCI controller,
+	 * which has no access to the config space for this controller, report
+	 * the AHCI controller's data.
+	 */
+	if (ctrlr->ctrlr->quirks & QUIRK_AHCI)
+		dev = device_get_parent(dev);
 	disk->d_hba_vendor = pci_get_vendor(dev);
 	disk->d_hba_device = pci_get_device(dev);
 	disk->d_hba_subvendor = pci_get_subvendor(dev);

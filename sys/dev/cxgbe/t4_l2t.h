@@ -78,7 +78,7 @@ struct l2t_entry {
 	uint8_t ipv6;			/* entry is for an IPv6 address */
 	uint8_t lport;			/* associated offload logical port */
 	uint8_t dmac[ETHER_ADDR_LEN];	/* next hop's MAC address */
-};
+} __subobject_use_container_bounds;
 
 struct l2t_data {
 	struct rwlock lock;

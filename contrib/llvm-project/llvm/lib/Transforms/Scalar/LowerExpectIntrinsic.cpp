@@ -27,7 +27,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Transforms/Scalar.h"
-#include "llvm/Transforms/Utils/MisExpect.h"
 
 using namespace llvm;
 
@@ -43,11 +42,11 @@ STATISTIC(ExpectIntrinsicsHandled,
 // only be used in extreme cases, we could make this ratio higher. As it stands,
 // programmers may be using __builtin_expect() / llvm.expect to annotate that a
 // branch is likely or unlikely to be taken.
-//
-// There is a known dependency on this ratio in CodeGenPrepare when transforming
-// 'select' instructions. It may be worthwhile to hoist these values to some
-// shared space, so they can be used directly by other passes.
 
+// WARNING: these values are internal implementation detail of the pass.
+// They should not be exposed to the outside of the pass, front-end codegen
+// should emit @llvm.expect intrinsics instead of using these weights directly.
+// Transforms should use TargetTransformInfo's getPredictableBranchThreshold().
 static cl::opt<uint32_t> LikelyBranchWeight(
     "likely-branch-weight", cl::Hidden, cl::init(2000),
     cl::desc("Weight of the branch likely to be taken (default = 2000)"));
@@ -65,7 +64,7 @@ getBranchWeight(Intrinsic::ID IntrinsicID, CallInst *CI, int BranchCount) {
     // __builtin_expect_with_probability
     assert(CI->getNumOperands() >= 3 &&
            "expect with probability must have 3 arguments");
-    ConstantFP *Confidence = dyn_cast<ConstantFP>(CI->getArgOperand(2));
+    auto *Confidence = cast<ConstantFP>(CI->getArgOperand(2));
     double TrueProb = Confidence->getValueAPF().convertToDouble();
     assert((TrueProb >= 0.0 && TrueProb <= 1.0) &&
            "probability value must be in the range [0.0, 1.0]");
@@ -102,13 +101,7 @@ static bool handleSwitchExpect(SwitchInst &SI) {
   uint64_t Index = (Case == *SI.case_default()) ? 0 : Case.getCaseIndex() + 1;
   Weights[Index] = LikelyBranchWeightVal;
 
-  SI.setMetadata(LLVMContext::MD_misexpect,
-                 MDBuilder(CI->getContext())
-                     .createMisExpect(Index, LikelyBranchWeightVal,
-                                      UnlikelyBranchWeightVal));
-
   SI.setCondition(ArgValue);
-  misexpect::checkFrontendInstrumentation(SI);
 
   SI.setMetadata(LLVMContext::MD_prof,
                  MDBuilder(CI->getContext()).createBranchWeights(Weights));
@@ -317,7 +310,6 @@ template <class BrSelInst> static bool handleBrSelExpect(BrSelInst &BSI) {
 
   MDBuilder MDB(CI->getContext());
   MDNode *Node;
-  MDNode *ExpNode;
 
   uint32_t LikelyBranchWeightVal, UnlikelyBranchWeightVal;
   std::tie(LikelyBranchWeightVal, UnlikelyBranchWeightVal) =
@@ -327,23 +319,15 @@ template <class BrSelInst> static bool handleBrSelExpect(BrSelInst &BSI) {
       (Predicate == CmpInst::ICMP_EQ)) {
     Node =
         MDB.createBranchWeights(LikelyBranchWeightVal, UnlikelyBranchWeightVal);
-    ExpNode =
-        MDB.createMisExpect(0, LikelyBranchWeightVal, UnlikelyBranchWeightVal);
   } else {
     Node =
         MDB.createBranchWeights(UnlikelyBranchWeightVal, LikelyBranchWeightVal);
-    ExpNode =
-        MDB.createMisExpect(1, LikelyBranchWeightVal, UnlikelyBranchWeightVal);
   }
-
-  BSI.setMetadata(LLVMContext::MD_misexpect, ExpNode);
 
   if (CmpI)
     CmpI->setOperand(0, ArgValue);
   else
     BSI.setCondition(ArgValue);
-
-  misexpect::checkFrontendInstrumentation(BSI);
 
   BSI.setMetadata(LLVMContext::MD_prof, Node);
 
@@ -373,11 +357,10 @@ static bool lowerExpectIntrinsic(Function &F) {
     // Remove llvm.expect intrinsics. Iterate backwards in order
     // to process select instructions before the intrinsic gets
     // removed.
-    for (auto BI = BB.rbegin(), BE = BB.rend(); BI != BE;) {
-      Instruction *Inst = &*BI++;
-      CallInst *CI = dyn_cast<CallInst>(Inst);
+    for (Instruction &Inst : llvm::make_early_inc_range(llvm::reverse(BB))) {
+      CallInst *CI = dyn_cast<CallInst>(&Inst);
       if (!CI) {
-        if (SelectInst *SI = dyn_cast<SelectInst>(Inst)) {
+        if (SelectInst *SI = dyn_cast<SelectInst>(&Inst)) {
           if (handleBrSelExpect(*SI))
             ExpectIntrinsicsHandled++;
         }

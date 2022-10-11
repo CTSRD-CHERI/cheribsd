@@ -39,8 +39,9 @@
 #include <sys/callb.h>
 #include <sys/zfeature.h>
 
-int32_t zfs_pd_bytes_max = 50 * 1024 * 1024;	/* 50MB */
-int32_t send_holes_without_birth_time = 1;
+static int32_t zfs_pd_bytes_max = 50 * 1024 * 1024;	/* 50MB */
+static int32_t send_holes_without_birth_time = 1;
+static int32_t zfs_traverse_indirect_prefetch_limit = 32;
 
 typedef struct prefetch_data {
 	kmutex_t pd_mtx;
@@ -167,8 +168,8 @@ resume_skip_check(traverse_data_t *td, const dnode_phys_t *dnp,
 		 * If we found the block we're trying to resume from, zero
 		 * the bookmark out to indicate that we have resumed.
 		 */
-		if (bcmp(zb, td->td_resume, sizeof (*zb)) == 0) {
-			bzero(td->td_resume, sizeof (*zb));
+		if (memcmp(zb, td->td_resume, sizeof (*zb)) == 0) {
+			memset(td->td_resume, 0, sizeof (*zb));
 			if (td->td_flags & TRAVERSE_POST)
 				return (RESUME_SKIP_CHILDREN);
 		}
@@ -176,7 +177,10 @@ resume_skip_check(traverse_data_t *td, const dnode_phys_t *dnp,
 	return (RESUME_SKIP_NONE);
 }
 
-static void
+/*
+ * Returns B_TRUE, if prefetch read is issued, otherwise B_FALSE.
+ */
+static boolean_t
 traverse_prefetch_metadata(traverse_data_t *td,
     const blkptr_t *bp, const zbookmark_phys_t *zb)
 {
@@ -184,18 +188,18 @@ traverse_prefetch_metadata(traverse_data_t *td,
 	int zio_flags = ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE;
 
 	if (!(td->td_flags & TRAVERSE_PREFETCH_METADATA))
-		return;
+		return (B_FALSE);
 	/*
 	 * If we are in the process of resuming, don't prefetch, because
 	 * some children will not be needed (and in fact may have already
 	 * been freed).
 	 */
 	if (td->td_resume != NULL && !ZB_IS_ZERO(td->td_resume))
-		return;
+		return (B_FALSE);
 	if (BP_IS_HOLE(bp) || bp->blk_birth <= td->td_min_txg)
-		return;
+		return (B_FALSE);
 	if (BP_GET_LEVEL(bp) == 0 && BP_GET_TYPE(bp) != DMU_OT_DNODE)
-		return;
+		return (B_FALSE);
 	ASSERT(!BP_IS_REDACTED(bp));
 
 	if ((td->td_flags & TRAVERSE_NO_DECRYPT) && BP_IS_PROTECTED(bp))
@@ -203,6 +207,7 @@ traverse_prefetch_metadata(traverse_data_t *td,
 
 	(void) arc_read(NULL, td->td_spa, bp, NULL, NULL,
 	    ZIO_PRIORITY_ASYNC_READ, zio_flags, &flags, zb);
+	return (B_TRUE);
 }
 
 static boolean_t
@@ -295,7 +300,8 @@ traverse_visitbp(traverse_data_t *td, const dnode_phys_t *dnp,
 
 	if (BP_GET_LEVEL(bp) > 0) {
 		uint32_t flags = ARC_FLAG_WAIT;
-		int32_t i;
+		int32_t i, ptidx, pidx;
+		uint32_t prefetchlimit;
 		int32_t epb = BP_GET_LSIZE(bp) >> SPA_BLKPTRSHIFT;
 		zbookmark_phys_t *czb;
 
@@ -308,16 +314,46 @@ traverse_visitbp(traverse_data_t *td, const dnode_phys_t *dnp,
 
 		czb = kmem_alloc(sizeof (zbookmark_phys_t), KM_SLEEP);
 
+		/*
+		 * When performing a traversal it is beneficial to
+		 * asynchronously read-ahead the upcoming indirect
+		 * blocks since they will be needed shortly. However,
+		 * since a 128k indirect (non-L0) block may contain up
+		 * to 1024 128-byte block pointers, its preferable to not
+		 * prefetch them all at once. Issuing a large number of
+		 * async reads may effect performance, and the earlier
+		 * the indirect blocks are prefetched the less likely
+		 * they are to still be resident in the ARC when needed.
+		 * Therefore, prefetching indirect blocks is limited to
+		 * zfs_traverse_indirect_prefetch_limit=32 blocks by
+		 * default.
+		 *
+		 * pidx: Index for which next prefetch to be issued.
+		 * ptidx: Index at which next prefetch to be triggered.
+		 */
+		ptidx = 0;
+		pidx = 1;
+		prefetchlimit = zfs_traverse_indirect_prefetch_limit;
 		for (i = 0; i < epb; i++) {
-			SET_BOOKMARK(czb, zb->zb_objset, zb->zb_object,
-			    zb->zb_level - 1,
-			    zb->zb_blkid * epb + i);
-			traverse_prefetch_metadata(td,
-			    &((blkptr_t *)buf->b_data)[i], czb);
-		}
+			if (prefetchlimit && i == ptidx) {
+				ASSERT3S(ptidx, <=, pidx);
+				for (uint32_t  prefetched = 0; pidx < epb &&
+				    prefetched < prefetchlimit; pidx++) {
+					SET_BOOKMARK(czb, zb->zb_objset,
+					    zb->zb_object, zb->zb_level - 1,
+					    zb->zb_blkid * epb + pidx);
+					if (traverse_prefetch_metadata(td,
+					    &((blkptr_t *)buf->b_data)[pidx],
+					    czb) == B_TRUE) {
+						prefetched++;
+						if (prefetched ==
+						    MAX(prefetchlimit / 2, 1))
+							ptidx = pidx;
+					}
+				}
+			}
 
-		/* recursively visitbp() blocks below this */
-		for (i = 0; i < epb; i++) {
+			/* recursively visitbp() blocks below this */
 			SET_BOOKMARK(czb, zb->zb_objset, zb->zb_object,
 			    zb->zb_level - 1,
 			    zb->zb_blkid * epb + i);
@@ -524,11 +560,11 @@ traverse_dnode(traverse_data_t *td, const blkptr_t *bp, const dnode_phys_t *dnp,
 	return (err);
 }
 
-/* ARGSUSED */
 static int
 traverse_prefetcher(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
     const zbookmark_phys_t *zb, const dnode_phys_t *dnp, void *arg)
 {
+	(void) zilog, (void) dnp;
 	prefetch_data_t *pfd = arg;
 	int zio_flags = ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE;
 	arc_flags_t aflags = ARC_FLAG_NOWAIT | ARC_FLAG_PREFETCH |
@@ -773,9 +809,11 @@ traverse_pool(spa_t *spa, uint64_t txg_start, int flags,
 EXPORT_SYMBOL(traverse_dataset);
 EXPORT_SYMBOL(traverse_pool);
 
-/* BEGIN CSTYLED */
 ZFS_MODULE_PARAM(zfs, zfs_, pd_bytes_max, INT, ZMOD_RW,
 	"Max number of bytes to prefetch");
+
+ZFS_MODULE_PARAM(zfs, zfs_, traverse_indirect_prefetch_limit, INT, ZMOD_RW,
+	"Traverse prefetch number of blocks pointed by indirect block");
 
 #if defined(_KERNEL)
 module_param_named(ignore_hole_birth, send_holes_without_birth_time, int, 0644);
@@ -783,6 +821,6 @@ MODULE_PARM_DESC(ignore_hole_birth,
 	"Alias for send_holes_without_birth_time");
 #endif
 
+/* CSTYLED */
 ZFS_MODULE_PARAM(zfs, , send_holes_without_birth_time, INT, ZMOD_RW,
 	"Ignore hole_birth txg for zfs send");
-/* END CSTYLED */

@@ -80,7 +80,7 @@ void test_no_info() {
     abort();
 }
 
-int main() {
+int main(int, char**) {
   test1(3);
   test2(3, 4);
   test3(3, 4, 5);

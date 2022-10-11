@@ -23,7 +23,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd February 9, 2020
+.Dd October 28, 2021
 .Dt CONFIG 5
 .Os
 .Sh NAME
@@ -329,7 +329,9 @@ A value of 0 indicates that the kernel should configure
 its data structures according to the size of available
 physical memory.
 If auto configuration is requested, the kernel will set
-this tunable to a value between 32 and 384.
+this tunable to a value between 32 and 384 for 32-bit systems,
+or scale the value higher based on available memory for 64-bit
+systems.
 .Pp
 As explained in
 .Xr tuning 7 ,
@@ -401,18 +403,6 @@ Options specific to architecture
 .Ar arch
 are specified in the file
 .Pa sys/conf/options . Ns Aq Ar arch .
-.El
-.Ss Obsolete Directives
-The following kernel configuration directives are obsolete.
-.Bl -tag -width indent
-.\" -------- CONFIG --------
-.It Ic config
-This directive was used to specify the device to be used for the root
-file system.
-From
-.Fx 4.0
-onwards, this information is passed to a booting kernel by
-.Xr loader 8 .
 .El
 .Sh FILES
 .Bl -tag -width ".Pa sys/conf/Makefile. Ns Ar arch" -compact

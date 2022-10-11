@@ -70,7 +70,7 @@ struct ipoib_ah *ipoib_create_ah(struct ipoib_dev_priv *priv,
 	ah->last_send = 0;
 	kref_init(&ah->ref);
 
-	ah->ah = ib_create_ah(pd, attr);
+	ah->ah = ib_create_ah(pd, attr, RDMA_CREATE_AH_SLEEPABLE);
 	if (IS_ERR(ah->ah)) {
 		kfree(ah);
 		ah = NULL;
@@ -149,7 +149,7 @@ error:
 static int ipoib_ib_post_receive(struct ipoib_dev_priv *priv, int id)
 {
 	struct ipoib_rx_buf *rx_req;
-	struct ib_recv_wr *bad_wr;
+	const struct ib_recv_wr *bad_wr;
 	struct mbuf *m;
 	int ret;
 	int i;
@@ -452,7 +452,7 @@ post_send(struct ipoib_dev_priv *priv, unsigned int wr_id,
     struct ib_ah *address, u32 qpn, struct ipoib_tx_buf *tx_req, void *head,
     int hlen)
 {
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	struct mbuf *mb = tx_req->mb;
 	u64 *mapping = tx_req->mapping;
 	struct mbuf *m;
@@ -572,7 +572,7 @@ static void __ipoib_reap_ah(struct ipoib_dev_priv *priv)
 	list_for_each_entry_safe(ah, tah, &priv->dead_ahs, list)
 		if ((int) priv->tx_tail - (int) ah->last_send >= 0) {
 			list_del(&ah->list);
-			ib_destroy_ah(ah->ah);
+			ib_destroy_ah(ah->ah, 0);
 			kfree(ah);
 		}
 

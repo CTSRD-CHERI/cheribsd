@@ -41,7 +41,9 @@ __FBSDID("$FreeBSD$");
 #include "opt_vm.h"
 
 #include <sys/param.h>
+#include <sys/systm.h>
 #include <sys/ktr.h>
+#include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/rwlock.h>
 
@@ -387,17 +389,12 @@ iommu_pmap_pinit_levels(pmap_t pmap, int levels)
 	/*
 	 * allocate the l0 page
 	 */
-	while ((m = vm_page_alloc(NULL, 0, VM_ALLOC_NORMAL |
-	    VM_ALLOC_NOOBJ | VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL)
-		vm_wait(NULL);
-
+	m = vm_page_alloc_noobj(VM_ALLOC_WAITOK | VM_ALLOC_WIRED |
+	    VM_ALLOC_ZERO);
 	pmap->pm_l0_paddr = VM_PAGE_TO_PHYS(m);
 	pmap->pm_l0 = (pd_entry_t *)PHYS_TO_DMAP(pmap->pm_l0_paddr);
 
-	if ((m->flags & PG_ZERO) == 0)
-		pagezero(pmap->pm_l0);
-
-	pmap->pm_root.rt_root = 0;
+	vm_radix_init(&pmap->pm_root);
 	bzero(&pmap->pm_stats, sizeof(pmap->pm_stats));
 
 	MPASS(levels == 3 || levels == 4);
@@ -446,16 +443,14 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 	/*
 	 * Allocate a page table page.
 	 */
-	if ((m = vm_page_alloc(NULL, ptepindex, VM_ALLOC_NOOBJ |
-	    VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL) {
+	if ((m = vm_page_alloc_noobj(VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL) {
 		/*
 		 * Indicate the need to retry.  While waiting, the page table
 		 * page may have been allocated.
 		 */
 		return (NULL);
 	}
-	if ((m->flags & PG_ZERO) == 0)
-		pmap_zero_page(m);
+	m->pindex = ptepindex;
 
 	/*
 	 * Because of AArch64's weak memory consistency model, we must have a
@@ -565,7 +560,7 @@ _pmap_alloc_l3(pmap_t pmap, vm_pindex_t ptepindex)
 void
 iommu_pmap_release(pmap_t pmap)
 {
-	boolean_t rv;
+	boolean_t rv __diagused;
 	struct spglist free;
 	vm_page_t m;
 
@@ -608,7 +603,8 @@ pmap_gpu_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
     vm_prot_t prot, u_int flags)
 {
 	pd_entry_t *pde;
-	pt_entry_t new_l3, orig_l3;
+	pt_entry_t new_l3;
+	pt_entry_t orig_l3 __diagused;
 	pt_entry_t *l3;
 	vm_page_t mpte;
 	pd_entry_t *l1p;
@@ -725,7 +721,8 @@ pmap_smmu_enter(pmap_t pmap, vm_offset_t va, vm_paddr_t pa,
     vm_prot_t prot, u_int flags)
 {
 	pd_entry_t *pde;
-	pt_entry_t new_l3, orig_l3;
+	pt_entry_t new_l3;
+	pt_entry_t orig_l3 __diagused;
 	pt_entry_t *l3;
 	vm_page_t mpte;
 	int lvl;

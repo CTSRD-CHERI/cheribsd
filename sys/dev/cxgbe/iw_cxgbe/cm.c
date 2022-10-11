@@ -938,8 +938,7 @@ static inline int c4iw_zero_addr(struct sockaddr *addr)
 	struct in6_addr *ip6;
 
 	if (addr->sa_family == AF_INET)
-		return IN_ZERONET(
-			ntohl(((struct sockaddr_in *)addr)->sin_addr.s_addr));
+		return (((struct sockaddr_in *)addr)->sin_addr.s_addr == 0);
 	else {
 		ip6 = &((struct sockaddr_in6 *) addr)->sin6_addr;
 		return (ip6->s6_addr32[0] | ip6->s6_addr32[1] |
@@ -1029,7 +1028,7 @@ process_newconn(struct c4iw_listen_ep *master_lep, struct socket *new_so)
 
 	/* MPA request might have been queued up on the socket already, so we
 	 * initialize the socket/upcall_handler under lock to prevent processing
-	 * MPA request on another thread(via process_req()) simultaniously.
+	 * MPA request on another thread(via process_req()) simultaneously.
 	 */
 	c4iw_get_ep(&new_ep->com); /* Dereferenced at the end below, this is to
 				      avoid freeing of ep before ep unlock. */
@@ -1322,10 +1321,14 @@ alloc_ep(int size, gfp_t gfp)
 void _c4iw_free_ep(struct kref *kref)
 {
 	struct c4iw_ep *ep;
+#if defined(KTR) || defined(INVARIANTS)
 	struct c4iw_ep_common *epc;
+#endif
 
 	ep = container_of(kref, struct c4iw_ep, com.kref);
+#if defined(KTR) || defined(INVARIANTS)
 	epc = &ep->com;
+#endif
 	KASSERT(!epc->entry.tqe_prev, ("%s epc %p still on req list",
 	    __func__, epc));
 	if (test_bit(QP_REFERENCED, &ep->com.flags))
@@ -2352,7 +2355,9 @@ err_out:
  */
 int c4iw_reject_cr(struct iw_cm_id *cm_id, const void *pdata, u8 pdata_len)
 {
+#ifdef KTR
 	int err;
+#endif
 	struct c4iw_ep *ep = to_ep(cm_id);
 	int abort = 0;
 
@@ -2380,7 +2385,11 @@ int c4iw_reject_cr(struct iw_cm_id *cm_id, const void *pdata, u8 pdata_len)
 		abort = send_mpa_reject(ep, pdata, pdata_len);
 	}
 	STOP_EP_TIMER(ep);
+#ifdef KTR
 	err = c4iw_ep_disconnect(ep, abort != 0, GFP_KERNEL);
+#else
+	c4iw_ep_disconnect(ep, abort != 0, GFP_KERNEL);
+#endif
 	mutex_unlock(&ep->com.mutex);
 	c4iw_put_ep(&ep->com);
 	CTR3(KTR_IW_CXGBE, "%s:crc4 %p, err: %d", __func__, ep, err);
@@ -2728,7 +2737,7 @@ c4iw_create_listen(struct iw_cm_id *cm_id, int backlog)
 	if (c4iw_any_addr((struct sockaddr *)&lep->com.local_addr)) {
 		port_info = add_ep_to_listenlist(lep);
 		/* skip solisten() if refcnt > 1, as the listeners were
-		 * alredy created by 'Master lep'
+		 * already created by 'Master lep'
 		 */
 		if (port_info->refcnt > 1) {
 			/* As there will be only one listener socket for a TCP

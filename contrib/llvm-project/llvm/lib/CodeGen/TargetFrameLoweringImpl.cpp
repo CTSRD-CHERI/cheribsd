@@ -41,9 +41,9 @@ bool TargetFrameLowering::enableCalleeSaveSkip(const MachineFunction &MF) const 
 /// frame of the specified index, along with the frame register used
 /// (in output arg FrameReg). This is the default implementation which
 /// is overridden for some targets.
-int TargetFrameLowering::getFrameIndexReference(const MachineFunction &MF,
-                                                int FI,
-                                                Register &FrameReg) const {
+StackOffset
+TargetFrameLowering::getFrameIndexReference(const MachineFunction &MF, int FI,
+                                            Register &FrameReg) const {
   const MachineFrameInfo &MFI = MF.getFrameInfo();
   const TargetRegisterInfo *RI = MF.getSubtarget().getRegisterInfo();
 
@@ -52,8 +52,9 @@ int TargetFrameLowering::getFrameIndexReference(const MachineFunction &MF,
   // something different.
   FrameReg = RI->getFrameRegister(MF);
 
-  return MFI.getObjectOffset(FI) + MFI.getStackSize() -
-         getOffsetOfLocalArea() + MFI.getOffsetAdjustment();
+  return StackOffset::getFixed(MFI.getObjectOffset(FI) + MFI.getStackSize() -
+                               getOffsetOfLocalArea() +
+                               MFI.getOffsetAdjustment());
 }
 
 bool TargetFrameLowering::needsFrameIndexResolution(
@@ -133,6 +134,16 @@ unsigned TargetFrameLowering::getStackAlignmentSkew(
     return MF.getTarget().getAllocaPointerSize();
 
   return 0;
+}
+
+bool TargetFrameLowering::allocateScavengingFrameIndexesNearIncomingSP(
+  const MachineFunction &MF) const {
+  if (!hasFP(MF))
+    return false;
+
+  const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
+  return RegInfo->useFPForScavengingIndex(MF) &&
+         !RegInfo->hasStackRealignment(MF);
 }
 
 bool TargetFrameLowering::isSafeForNoCSROpt(const Function &F) {

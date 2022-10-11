@@ -85,6 +85,7 @@ extern volatile int nfsrv_devidcnt;
 extern int nfscl_debuglevel;
 extern struct nfsdevicehead nfsrv_devidhead;
 extern struct nfsstatsv1 nfsstatsv1;
+extern uint32_t nfs_srvmaxio;
 
 SYSCTL_DECL(_vfs_nfs);
 SYSCTL_INT(_vfs_nfs, OID_AUTO, enable_uidtostring, CTLFLAG_RW,
@@ -93,10 +94,6 @@ SYSCTL_INT(_vfs_nfs, OID_AUTO, enable_uidtostring, CTLFLAG_RW,
 int nfsrv_maxpnfsmirror = 1;
 SYSCTL_INT(_vfs_nfs, OID_AUTO, pnfsmirror, CTLFLAG_RD,
     &nfsrv_maxpnfsmirror, 0, "Mirror level for pNFS service");
-
-int nfs_maxcopyrange = 10 * 1024 * 1024;
-SYSCTL_INT(_vfs_nfs, OID_AUTO, maxcopyrange, CTLFLAG_RW,
-    &nfs_maxcopyrange, 0, "Max size of a Copy so RPC times reasonable");
 
 /*
  * This array of structures indicates, for V4:
@@ -153,7 +150,7 @@ struct nfsv4_opflag nfsv4_opflag[NFSV42_NOPS] = {
 	{ 0, 2, 1, 1, LK_EXCLUSIVE, 1, 0 },		/* Setattr */
 	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* SetClientID */
 	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* SetClientIDConfirm */
-	{ 0, 1, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Verify */
+	{ 0, 2, 0, 0, LK_EXCLUSIVE, 1, 0 },		/* Verify (AppWrite) */
 	{ 0, 2, 1, 1, LK_EXCLUSIVE, 1, 0 },		/* Write */
 	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 0 },		/* ReleaseLockOwner */
 	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Backchannel Ctrl */
@@ -168,7 +165,7 @@ struct nfsv4_opflag nfsv4_opflag[NFSV42_NOPS] = {
 	{ 0, 1, 0, 1, LK_EXCLUSIVE, 1, 1 },		/* Layout Commit */
 	{ 0, 1, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Layout Get */
 	{ 0, 1, 0, 1, LK_EXCLUSIVE, 1, 0 },		/* Layout Return */
-	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Secinfo No name */
+	{ 0, 1, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Secinfo No name */
 	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 0 },		/* Sequence */
 	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Set SSV */
 	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Test StateID */
@@ -178,7 +175,7 @@ struct nfsv4_opflag nfsv4_opflag[NFSV42_NOPS] = {
 	{ 0, 1, 1, 1, LK_EXCLUSIVE, 1, 0 },		/* Allocate */
 	{ 2, 1, 1, 0, LK_SHARED, 1, 0 },		/* Copy */
 	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Copy Notify */
-	{ 0, 0, 0, 0, LK_EXCLUSIVE, 1, 1 },		/* Deallocate */
+	{ 0, 2, 1, 1, LK_EXCLUSIVE, 1, 0 },		/* Deallocate */
 	{ 0, 1, 0, 0, LK_SHARED, 1, 0 },		/* IO Advise */
 	{ 0, 1, 0, 0, LK_EXCLUSIVE, 1, 0 },		/* Layout Error */
 	{ 0, 1, 0, 0, LK_EXCLUSIVE, 1, 0 },		/* Layout Stats */
@@ -218,11 +215,12 @@ static struct nfsrv_lughash	*nfsgroupnamehash;
 static int nfs_bigreply[NFSV42_NPROCS] = { 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
-    1, 0, 0, 1, 0 };
+    1, 0, 0, 1, 0, 0, 0, 0, 0 };
 
 /* local functions */
 static int nfsrv_skipace(struct nfsrv_descript *nd, int *acesizep);
 static void nfsv4_wanted(struct nfsv4lock *lp);
+static uint32_t nfsv4_filesavail(struct statfs *, struct mount *);
 static int nfsrv_cmpmixedcase(u_char *cp, u_char *cp2, int len);
 static int nfsrv_getuser(int procnum, uid_t uid, gid_t gid, char *name);
 static void nfsrv_removeuser(struct nfsusrgrp *usrp, int isuser);
@@ -302,6 +300,10 @@ static struct {
 	{ NFSV4OP_REMOVEXATTR, 2, "Rmxattr", 7, },
 	{ NFSV4OP_LISTXATTRS, 2, "Listxattr", 9, },
 	{ NFSV4OP_BINDCONNTOSESS, 1, "BindConSess", 11, },
+	{ NFSV4OP_LOOKUP, 5, "LookupOpen", 10, },
+	{ NFSV4OP_DEALLOCATE, 2, "Deallocate", 10, },
+	{ NFSV4OP_LAYOUTERROR, 1, "LayoutError", 11, },
+	{ NFSV4OP_VERIFY, 3, "AppendWrite", 11, },
 };
 
 /*
@@ -310,7 +312,8 @@ static struct {
 static int nfs_bigrequest[NFSV42_NPROCS] = {
 	0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0
+	0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
+	0, 1
 };
 
 /*
@@ -320,7 +323,7 @@ static int nfs_bigrequest[NFSV42_NPROCS] = {
 void
 nfscl_reqstart(struct nfsrv_descript *nd, int procnum, struct nfsmount *nmp,
     u_int8_t *nfhp, int fhlen, u_int32_t **opcntpp, struct nfsclsession *sep,
-    int vers, int minorvers)
+    int vers, int minorvers, struct ucred *cred)
 {
 	struct mbuf *mb;
 	u_int32_t *tl;
@@ -413,11 +416,17 @@ nfscl_reqstart(struct nfsrv_descript *nd, int procnum, struct nfsmount *nmp,
 			*tl = txdr_unsigned(NFSV4OP_SEQUENCE);
 			if (sep == NULL) {
 				sep = nfsmnt_mdssession(nmp);
+				/*
+				 * For MDS mount sessions, check for bad
+				 * slots.  If the caller does not want this
+				 * check to be done, the "cred" argument can
+				 * be passed in as NULL.
+				 */
 				nfsv4_setsequence(nmp, nd, sep,
-				    nfs_bigreply[procnum]);
+				    nfs_bigreply[procnum], cred);
 			} else
 				nfsv4_setsequence(nmp, nd, sep,
-				    nfs_bigreply[procnum]);
+				    nfs_bigreply[procnum], NULL);
 		}
 		if (nfsv4_opflag[nfsv4_opmap[procnum].op].needscfh > 0) {
 			NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
@@ -433,10 +442,15 @@ nfscl_reqstart(struct nfsrv_descript *nd, int procnum, struct nfsmount *nmp,
 				 * attributes, so we can load the name cache.
 				 */
 				if (procnum == NFSPROC_LOOKUP ||
-				    procnum == NFSPROC_LOOKUPP)
+				    procnum == NFSPROC_LOOKUPP ||
+				    procnum == NFSPROC_LOOKUPOPEN)
 					NFSGETATTR_ATTRBIT(&attrbits);
 				else {
 					NFSWCCATTR_ATTRBIT(&attrbits);
+					/* For AppendWrite, get the size. */
+					if (procnum == NFSPROC_APPENDWRITE)
+						NFSSETBIT_ATTRBIT(&attrbits,
+						    NFSATTRBIT_SIZE);
 					nd->nd_flag |= ND_V4WCCATTR;
 				}
 				(void) nfsrv_putattrbit(nd, &attrbits);
@@ -617,7 +631,6 @@ nfscl_fillsattr(struct nfsrv_descript *nd, struct vattr *vap,
 	}
 }
 
-#ifndef APPLE
 /*
  * copies mbuf chain to the uio scatter/gather list
  */
@@ -697,7 +710,6 @@ out:
 	NFSEXITCODE2(error, nd);
 	return (error);
 }
-#endif	/* !APPLE */
 
 /*
  * Help break down an mbuf chain by setting the first siz bytes contiguous
@@ -926,7 +938,6 @@ newnfs_init(void)
 	 * Initialize reply list and start timer
 	 */
 	TAILQ_INIT(&nfsd_reqq);
-	NFS_TIMERINIT;
 }
 
 /*
@@ -940,7 +951,7 @@ nfsm_fhtom(struct nfsrv_descript *nd, u_int8_t *fhp, int size, int set_true)
 {
 	u_int32_t *tl;
 	u_int8_t *cp;
-	int fullsiz, rem, bytesize = 0;
+	int fullsiz, bytesize = 0;
 
 	if (size == 0)
 		size = NFSX_MYFH;
@@ -957,7 +968,6 @@ nfsm_fhtom(struct nfsrv_descript *nd, u_int8_t *fhp, int size, int set_true)
 	case ND_NFSV3:
 	case ND_NFSV4:
 		fullsiz = NFSM_RNDUP(size);
-		rem = fullsiz - size;
 		if (set_true) {
 		    bytesize = 2 * NFSX_UNSIGNED + fullsiz;
 		    NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
@@ -1088,8 +1098,8 @@ nfsmout:
  * If the aclp == NULL or won't fit in an acl, just discard the acl info.
  */
 int
-nfsrv_dissectacl(struct nfsrv_descript *nd, NFSACL_T *aclp, int *aclerrp,
-    int *aclsizep, __unused NFSPROC_T *p)
+nfsrv_dissectacl(struct nfsrv_descript *nd, NFSACL_T *aclp, bool server,
+    int *aclerrp, int *aclsizep, __unused NFSPROC_T *p)
 {
 	u_int32_t *tl;
 	int i, aclsize;
@@ -1105,6 +1115,14 @@ nfsrv_dissectacl(struct nfsrv_descript *nd, NFSACL_T *aclp, int *aclerrp,
 	NFSM_DISSECT(tl, u_int32_t *, NFSX_UNSIGNED);
 	aclsize = NFSX_UNSIGNED;
 	acecnt = fxdr_unsigned(int, *tl);
+	/*
+	 * The RFCs do not define a fixed limit to the number of ACEs in
+	 * an ACL, but 10240 should be more than sufficient.
+	 */
+	if (acecnt < 0 || acecnt > 10240) {
+		error = NFSERR_BADXDR;
+		goto nfsmout;
+	}
 	if (acecnt > ACL_MAX_ENTRIES)
 		aceerr = NFSERR_ATTRNOTSUPP;
 	if (nfsrv_useacl == 0)
@@ -1112,7 +1130,7 @@ nfsrv_dissectacl(struct nfsrv_descript *nd, NFSACL_T *aclp, int *aclerrp,
 	for (i = 0; i < acecnt; i++) {
 		if (aclp && !aceerr)
 			error = nfsrv_dissectace(nd, &aclp->acl_entry[i],
-			    &aceerr, &acesize, p);
+			    server, &aceerr, &acesize, p);
 		else
 			error = nfsrv_skipace(nd, &acesize);
 		if (error)
@@ -1247,6 +1265,8 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			nap->na_rdev = (NFSDEV_T)0;
 			nap->na_mtime.tv_sec = 0;
 			nap->na_mtime.tv_nsec = 0;
+			nap->na_btime.tv_sec = -1;
+			nap->na_btime.tv_nsec = 0;
 			nap->na_gen = 0;
 			nap->na_flags = 0;
 			nap->na_blocksize = NFS_FABLKSIZE;
@@ -1475,8 +1495,8 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 				NFSACL_T *naclp;
 
 				naclp = acl_alloc(M_WAITOK);
-				error = nfsrv_dissectacl(nd, naclp, &aceerr,
-				    &cnt, p);
+				error = nfsrv_dissectacl(nd, naclp, true,
+				    &aceerr, &cnt, p);
 				if (error) {
 				    acl_free(naclp);
 				    goto nfsmout;
@@ -1486,18 +1506,20 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 				    *retcmpp = NFSERR_NOTSAME;
 				acl_free(naclp);
 			    } else {
-				error = nfsrv_dissectacl(nd, NULL, &aceerr,
-				    &cnt, p);
+				error = nfsrv_dissectacl(nd, NULL, true,
+				    &aceerr, &cnt, p);
+				if (error)
+				    goto nfsmout;
 				*retcmpp = NFSERR_ATTRNOTSUPP;
 			    }
 			  }
 			} else {
 				if (vp != NULL && aclp != NULL)
-				    error = nfsrv_dissectacl(nd, aclp, &aceerr,
-					&cnt, p);
+				    error = nfsrv_dissectacl(nd, aclp, false,
+					&aceerr, &cnt, p);
 				else
-				    error = nfsrv_dissectacl(nd, NULL, &aceerr,
-					&cnt, p);
+				    error = nfsrv_dissectacl(nd, NULL, false,
+					&aceerr, &cnt, p);
 				if (error)
 				    goto nfsmout;
 			}
@@ -1615,8 +1637,8 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 		case NFSATTRBIT_FILESAVAIL:
 			NFSM_DISSECT(tl, u_int32_t *, NFSX_HYPER);
 			if (compare) {
-				if (!(*retcmpp) &&
-				    sfp->sf_afiles != fxdr_hyper(tl))
+				uquad = nfsv4_filesavail(sbp, vp->v_mount);
+				if (!(*retcmpp) && uquad != fxdr_hyper(tl))
 					*retcmpp = NFSERR_NOTSAME;
 			} else if (sfp != NULL) {
 				sfp->sf_afiles = fxdr_hyper(tl);
@@ -1626,8 +1648,8 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 		case NFSATTRBIT_FILESFREE:
 			NFSM_DISSECT(tl, u_int32_t *, NFSX_HYPER);
 			if (compare) {
-				if (!(*retcmpp) &&
-				    sfp->sf_ffiles != fxdr_hyper(tl))
+				uquad = (uint64_t)sbp->f_ffree;
+				if (!(*retcmpp) && uquad != fxdr_hyper(tl))
 					*retcmpp = NFSERR_NOTSAME;
 			} else if (sfp != NULL) {
 				sfp->sf_ffiles = fxdr_hyper(tl);
@@ -1637,8 +1659,8 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 		case NFSATTRBIT_FILESTOTAL:
 			NFSM_DISSECT(tl, u_int32_t *, NFSX_HYPER);
 			if (compare) {
-				if (!(*retcmpp) &&
-				    sfp->sf_tfiles != fxdr_hyper(tl))
+				uquad = sbp->f_files;
+				if (!(*retcmpp) && uquad != fxdr_hyper(tl))
 					*retcmpp = NFSERR_NOTSAME;
 			} else if (sfp != NULL) {
 				sfp->sf_tfiles = fxdr_hyper(tl);
@@ -1824,7 +1846,7 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 		case NFSATTRBIT_OWNER:
 			NFSM_DISSECT(tl, u_int32_t *, NFSX_UNSIGNED);
 			j = fxdr_unsigned(int, *tl);
-			if (j < 0) {
+			if (j < 0 || j > NFSV4_MAXOWNERGROUPLEN) {
 				error = NFSERR_BADXDR;
 				goto nfsmout;
 			}
@@ -1857,7 +1879,7 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 		case NFSATTRBIT_OWNERGROUP:
 			NFSM_DISSECT(tl, u_int32_t *, NFSX_UNSIGNED);
 			j = fxdr_unsigned(int, *tl);
-			if (j < 0) {
+			if (j < 0 || j > NFSV4_MAXOWNERGROUPLEN) {
 				error =  NFSERR_BADXDR;
 				goto nfsmout;
 			}
@@ -1988,8 +2010,13 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 		case NFSATTRBIT_SPACEAVAIL:
 			NFSM_DISSECT(tl, u_int32_t *, NFSX_HYPER);
 			if (compare) {
-				if (!(*retcmpp) &&
-				    sfp->sf_abytes != fxdr_hyper(tl))
+				if (priv_check_cred(cred,
+				    PRIV_VFS_BLOCKRESERVE))
+					uquad = sbp->f_bfree;
+				else
+					uquad = (uint64_t)sbp->f_bavail;
+				uquad *= sbp->f_bsize;
+				if (!(*retcmpp) && uquad != fxdr_hyper(tl))
 					*retcmpp = NFSERR_NOTSAME;
 			} else if (sfp != NULL) {
 				sfp->sf_abytes = fxdr_hyper(tl);
@@ -1999,8 +2026,9 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 		case NFSATTRBIT_SPACEFREE:
 			NFSM_DISSECT(tl, u_int32_t *, NFSX_HYPER);
 			if (compare) {
-				if (!(*retcmpp) &&
-				    sfp->sf_fbytes != fxdr_hyper(tl))
+				uquad = sbp->f_bfree;
+				uquad *= sbp->f_bsize;
+				if (!(*retcmpp) && uquad != fxdr_hyper(tl))
 					*retcmpp = NFSERR_NOTSAME;
 			} else if (sfp != NULL) {
 				sfp->sf_fbytes = fxdr_hyper(tl);
@@ -2010,8 +2038,9 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 		case NFSATTRBIT_SPACETOTAL:
 			NFSM_DISSECT(tl, u_int32_t *, NFSX_HYPER);
 			if (compare) {
-				if (!(*retcmpp) &&
-				    sfp->sf_tbytes != fxdr_hyper(tl))
+				uquad = sbp->f_blocks;
+				uquad *= sbp->f_bsize;
+				if (!(*retcmpp) && uquad != fxdr_hyper(tl))
 					*retcmpp = NFSERR_NOTSAME;
 			} else if (sfp != NULL) {
 				sfp->sf_tbytes = fxdr_hyper(tl);
@@ -2172,6 +2201,15 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			NFSM_DISSECT(tl, u_int32_t *, NFSX_UNSIGNED);
 			attrsum += NFSX_UNSIGNED;
 			i = fxdr_unsigned(int, *tl);
+			/*
+			 * The RFCs do not define an upper limit for the
+			 * number of layout types, but 32 should be more
+			 * than enough.
+			 */
+			if (i < 0 || i > 32) {
+				error = NFSERR_BADXDR;
+				goto nfsmout;
+			}
 			if (i > 0) {
 				NFSM_DISSECT(tl, u_int32_t *, i *
 				    NFSX_UNSIGNED);
@@ -2198,7 +2236,7 @@ nfsv4_loadattr(struct nfsrv_descript *nd, vnode_t vp,
 			NFSM_DISSECT(tl, u_int32_t *, NFSX_UNSIGNED);
 			attrsum += NFSX_UNSIGNED;
 			i = fxdr_unsigned(int, *tl);
-			if (compare && !(*retcmpp) && i != NFS_SRVMAXIO)
+			if (compare && !(*retcmpp) && i != nfs_srvmaxio)
 				*retcmpp = NFSERR_NOTSAME;
 			break;
 		default:
@@ -2496,7 +2534,6 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 		aclp = naclp;
 	}
 	nfsvno_getfs(&fsinf, isdgram);
-#ifndef APPLE
 	/*
 	 * Get the VFS_STATFS(), since some attributes need them.
 	 */
@@ -2511,8 +2548,18 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			}
 			NFSCLRSTATFS_ATTRBIT(retbitp);
 		}
+		/*
+		 * Since NFS handles these values as unsigned on the
+		 * wire, there is no way to represent negative values,
+		 * so set them to 0. Without this, they will appear
+		 * to be very large positive values for clients like
+		 * Solaris10.
+		 */
+		if (fs->f_bavail < 0)
+			fs->f_bavail = 0;
+		if (fs->f_ffree < 0)
+			fs->f_ffree = 0;
 	}
-#endif
 
 	/*
 	 * And the NFSv4 ACL...
@@ -2649,7 +2696,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 		 * Recommended Attributes. (Only the supported ones.)
 		 */
 		case NFSATTRBIT_ACL:
-			retnum += nfsrv_buildacl(nd, aclp, vnode_vtype(vp), p);
+			retnum += nfsrv_buildacl(nd, aclp, vp->v_type, p);
 			break;
 		case NFSATTRBIT_ACLSUPPORT:
 			NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
@@ -2689,24 +2736,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 			retnum += NFSX_HYPER;
 			break;
 		case NFSATTRBIT_FILESAVAIL:
-			/*
-			 * Check quota and use min(quota, f_ffree).
-			 */
-			freenum = fs->f_ffree;
-#ifdef QUOTA
-			/*
-			 * ufs_quotactl() insists that the uid argument
-			 * equal p_ruid for non-root quota access, so
-			 * we'll just make sure that's the case.
-			 */
-			savuid = p->p_cred->p_ruid;
-			p->p_cred->p_ruid = cred->cr_uid;
-			if (!VFS_QUOTACTL(mp, QCMD(Q_GETQUOTA,USRQUOTA),
-			    cred->cr_uid, (struct dqblk * __capability)&dqb))
-			    freenum = min(dqb.dqb_isoftlimit-dqb.dqb_curinodes,
-				freenum);
-			p->p_cred->p_ruid = savuid;
-#endif	/* QUOTA */
+			freenum = nfsv4_filesavail(fs, mp);
 			NFSM_BUILD(tl, u_int32_t *, NFSX_HYPER);
 			*tl++ = 0;
 			*tl = txdr_unsigned(freenum);
@@ -3009,7 +3039,7 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 		case NFSATTRBIT_LAYOUTALIGNMENT:
 		case NFSATTRBIT_LAYOUTBLKSIZE:
 			NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
-			*tl = txdr_unsigned(NFS_SRVMAXIO);
+			*tl = txdr_unsigned(nfs_srvmaxio);
 			retnum += NFSX_UNSIGNED;
 			break;
 		case NFSATTRBIT_XATTRSUPPORT:
@@ -3030,6 +3060,46 @@ nfsv4_fillattr(struct nfsrv_descript *nd, struct mount *mp, vnode_t vp,
 	free(fs, M_STATFS);
 	*retnump = txdr_unsigned(retnum);
 	return (retnum + prefixnum);
+}
+
+/*
+ * Calculate the files available attribute value.
+ */
+static uint32_t
+nfsv4_filesavail(struct statfs *fs, struct mount *mp)
+{
+	uint32_t freenum;
+#ifdef QUOTA
+	struct dqblk dqb;
+	uid_t savuid;
+	NFSPROC_T *p;
+#endif
+
+	/*
+	 * Check quota and use min(quota, f_ffree).
+	 */
+	freenum = fs->f_ffree;
+#ifdef QUOTA
+	/*
+	 * This is old OpenBSD code that does not build
+	 * for FreeBSD.  I do not know if doing this is
+	 * useful, so I will just leave the code here.
+	 */
+	p = curthread();
+	/*
+	 * ufs_quotactl() insists that the uid argument
+	 * equal p_ruid for non-root quota access, so
+	 * we'll just make sure that's the case.
+	 */
+	savuid = p->p_cred->p_ruid;
+	p->p_cred->p_ruid = cred->cr_uid;
+	if (!VFS_QUOTACTL(mp, QCMD(Q_GETQUOTA,USRQUOTA),
+	    cred->cr_uid, PTR2CAP(&dqb)))
+	    freenum = min(dqb.dqb_isoftlimit-dqb.dqb_curinodes,
+		freenum);
+	p->p_cred->p_ruid = savuid;
+#endif	/* QUOTA */
+	return (freenum);
 }
 
 /*
@@ -3621,7 +3691,8 @@ nfsrv_nfsuserdport(struct nfsuserd_args *nargs, NFSPROC_T *p)
  	}
 	rp->nr_vers = RPCNFSUSERD_VERS;
 	if (error == 0)
-		error = newnfs_connect(NULL, rp, NFSPROCCRED(p), p, 0, false);
+		error = newnfs_connect(NULL, rp, NFSPROCCRED(p), p, 0, false,
+		    &rp->nr_client);
 	if (error == 0) {
 		NFSLOCKNAMEID();
 		nfsrv_nfsuserd = RUNNING;
@@ -3655,7 +3726,7 @@ nfsrv_nfsuserddelport(void)
 		msleep(&nfsrv_userdupcalls, NFSNAMEIDMUTEXPTR, PVFS,
 		    "nfsupcalls", 0);
 	NFSUNLOCKNAMEID();
-	newnfs_disconnect(&nfsrv_nfsuserdsock);
+	newnfs_disconnect(NULL, &nfsrv_nfsuserdsock);
 	free(nfsrv_nfsuserdsock.nr_nam, M_SONAME);
 	NFSLOCKNAMEID();
 	nfsrv_nfsuserd = NOTRUNNING;
@@ -4703,14 +4774,23 @@ nfsv4_seqsess_cacherep(uint32_t slotid, struct nfsslot *slots, int repstat,
  */
 void
 nfsv4_setsequence(struct nfsmount *nmp, struct nfsrv_descript *nd,
-    struct nfsclsession *sep, int dont_replycache)
+    struct nfsclsession *sep, int dont_replycache, struct ucred *cred)
 {
 	uint32_t *tl, slotseq = 0;
 	int error, maxslot, slotpos;
 	uint8_t sessionid[NFSX_V4SESSIONID];
 
-	error = nfsv4_sequencelookup(nmp, sep, &slotpos, &maxslot, &slotseq,
-	    sessionid);
+	if (cred != NULL) {
+		error = nfsv4_sequencelookup(nmp, sep, &slotpos, &maxslot,
+		    &slotseq, sessionid, false);
+		if (error == NFSERR_SEQMISORDERED) {
+			/* If all slots are bad, Destroy the session. */
+			nfsrpc_destroysession(nmp, sep, cred, curthread);
+			error = 0;
+		}
+	} else
+		error = nfsv4_sequencelookup(nmp, sep, &slotpos, &maxslot,
+		    &slotseq, sessionid, true);
 	nd->nd_maxreq = sep->nfsess_maxreq;
 	nd->nd_maxresp = sep->nfsess_maxresp;
 
@@ -4747,12 +4827,18 @@ nfsv4_setsequence(struct nfsmount *nmp, struct nfsrv_descript *nd,
 	nd->nd_flag |= ND_HASSEQUENCE;
 }
 
+/*
+ * If fnd_init is true, ignore the badslots.
+ * If fnd_init is false, return NFSERR_SEQMISORDERED if all slots are bad.
+ */
 int
 nfsv4_sequencelookup(struct nfsmount *nmp, struct nfsclsession *sep,
-    int *slotposp, int *maxslotp, uint32_t *slotseqp, uint8_t *sessionid)
+    int *slotposp, int *maxslotp, uint32_t *slotseqp, uint8_t *sessionid,
+    bool fnd_init)
 {
 	int i, maxslot, slotpos;
 	uint64_t bitval;
+	bool fnd_ok;
 
 	/* Find an unused slot. */
 	slotpos = -1;
@@ -4766,14 +4852,18 @@ nfsv4_sequencelookup(struct nfsmount *nmp, struct nfsclsession *sep,
 			mtx_unlock(&sep->nfsess_mtx);
 			return (NFSERR_BADSESSION);
 		}
+		fnd_ok = fnd_init;
 		bitval = 1;
 		for (i = 0; i < sep->nfsess_foreslots; i++) {
-			if ((bitval & sep->nfsess_slots) == 0) {
-				slotpos = i;
-				sep->nfsess_slots |= bitval;
-				sep->nfsess_slotseq[i]++;
-				*slotseqp = sep->nfsess_slotseq[i];
-				break;
+			if ((bitval & sep->nfsess_badslots) == 0 || fnd_init) {
+				fnd_ok = true;
+				if ((bitval & sep->nfsess_slots) == 0) {
+					slotpos = i;
+					sep->nfsess_slots |= bitval;
+					sep->nfsess_slotseq[i]++;
+					*slotseqp = sep->nfsess_slotseq[i];
+					break;
+				}
 			}
 			bitval <<= 1;
 		}
@@ -4788,10 +4878,19 @@ nfsv4_sequencelookup(struct nfsmount *nmp, struct nfsclsession *sep,
 				return (ESTALE);
 			}
 			/* Wake up once/sec, to check for a forced dismount. */
-			(void)mtx_sleep(&sep->nfsess_slots, &sep->nfsess_mtx,
-			    PZERO, "nfsclseq", hz);
+			if (fnd_ok)
+				mtx_sleep(&sep->nfsess_slots, &sep->nfsess_mtx,
+				    PZERO, "nfsclseq", hz);
 		}
-	} while (slotpos == -1);
+	} while (slotpos == -1 && fnd_ok);
+	/*
+	 * If all slots are bad, just return slot 0 and NFSERR_SEQMISORDERED.
+	 * The caller will do a DestroySession, so that the session's use
+	 * will get a NFSERR_BADSESSION reply from the server.
+	 */
+	if (!fnd_ok)
+		slotpos = 0;
+
 	/* Now, find the highest slot in use. (nfsc_slots is 64bits) */
 	bitval = 1;
 	for (i = 0; i < 64; i++) {
@@ -4803,6 +4902,9 @@ nfsv4_sequencelookup(struct nfsmount *nmp, struct nfsclsession *sep,
 	mtx_unlock(&sep->nfsess_mtx);
 	*slotposp = slotpos;
 	*maxslotp = maxslot;
+
+	if (!fnd_ok)
+		return (NFSERR_SEQMISORDERED);
 	return (0);
 }
 
@@ -4909,13 +5011,8 @@ nfsm_add_ext_pgs(struct mbuf *m, int maxextsiz, int *bextpg)
 		*bextpg = 0;
 		m->m_next = mp;
 	} else {
-		do {
-			pg = vm_page_alloc(NULL, 0, VM_ALLOC_NORMAL |
-			    VM_ALLOC_NOOBJ | VM_ALLOC_NODUMP |
-			    VM_ALLOC_WIRED);
-			if (pg == NULL)
-				vm_wait(NULL);
-		} while (pg == NULL);
+		pg = vm_page_alloc_noobj(VM_ALLOC_WAITOK | VM_ALLOC_NODUMP |
+		    VM_ALLOC_WIRED);
 		m->m_epg_pa[m->m_epg_npgs] = VM_PAGE_TO_PHYS(pg);
 		*bextpg = m->m_epg_npgs;
 		m->m_epg_npgs++;
@@ -4923,6 +5020,34 @@ nfsm_add_ext_pgs(struct mbuf *m, int maxextsiz, int *bextpg)
 		mp = m;
 	}
 	return (mp);
+}
+
+/*
+ * Do the NFSv4.1 Destroy Session.
+ */
+int
+nfsrpc_destroysession(struct nfsmount *nmp, struct nfsclsession *tsep,
+    struct ucred *cred, NFSPROC_T *p)
+{
+	uint32_t *tl;
+	struct nfsrv_descript nfsd;
+	struct nfsrv_descript *nd = &nfsd;
+	int error;
+
+	nfscl_reqstart(nd, NFSPROC_DESTROYSESSION, nmp, NULL, 0, NULL, NULL, 0,
+	    0, NULL);
+	NFSM_BUILD(tl, uint32_t *, NFSX_V4SESSIONID);
+	if (tsep == NULL)
+		tsep = nfsmnt_mdssession(nmp);
+	bcopy(tsep->nfsess_sessionid, tl, NFSX_V4SESSIONID);
+	nd->nd_flag |= ND_USEGSSNAME;
+	error = newnfs_request(nd, nmp, NULL, &nmp->nm_sockreq, NULL, p, cred,
+	    NFS_PROG, NFS_VER4, NULL, 1, NULL, NULL);
+	if (error != 0)
+		return (error);
+	error = nd->nd_repstat;
+	m_freem(nd->nd_mrep);
+	return (error);
 }
 // CHERI CHANGES START
 // {

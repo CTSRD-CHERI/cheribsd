@@ -45,9 +45,9 @@
  * be modified appropriately.
  */
 struct mtx {
-	struct lock_object	lock_object;	/* Common lock properties. */
-	volatile uintptr_t	mtx_lock;	/* Owner and flags. */
-} __no_subobject_bounds;
+	struct lock_object	lock_object __subobject_member_used_for_c_inheritance;	/* Common lock properties. */
+	volatile uintptr_t	mtx_lock __subobject_use_container_bounds;	/* Owner and flags. */
+};
 
 /*
  * Members of struct mtx_padalign must mirror members of struct mtx.
@@ -59,9 +59,9 @@ struct mtx {
  * the mutex.
  */
 struct mtx_padalign {
-	struct lock_object	lock_object;	/* Common lock properties. */
-	volatile uintptr_t	mtx_lock;	/* Owner and flags. */
-} __aligned(CACHE_LINE_SIZE) __no_subobject_bounds;
+	struct lock_object	lock_object __subobject_member_used_for_c_inheritance;	/* Common lock properties. */
+	volatile uintptr_t	mtx_lock __subobject_use_container_bounds;	/* Owner and flags. */
+} __aligned(CACHE_LINE_SIZE);
 
 #endif /* !_SYS__MUTEX_H_ */
 // CHERI CHANGES START

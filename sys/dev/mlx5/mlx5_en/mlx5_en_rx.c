@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015 Mellanox Technologies. All rights reserved.
+ * Copyright (c) 2015-2021 Mellanox Technologies. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,7 +25,10 @@
  * $FreeBSD$
  */
 
-#include "en.h"
+#include "opt_rss.h"
+#include "opt_ratelimit.h"
+
+#include <dev/mlx5/mlx5_en/en.h>
 #include <machine/in_cksum.h>
 
 static inline int
@@ -307,13 +310,40 @@ mlx5e_build_rx_mbuf(struct mlx5_cqe64 *cqe,
 #else
 		M_HASHTYPE_SET(mb, M_HASHTYPE_OPAQUE_HASH);
 #endif
+#ifdef M_HASHTYPE_SETINNER
+		if (cqe_is_tunneled(cqe))
+			M_HASHTYPE_SETINNER(mb);
+#endif
 	} else {
 		mb->m_pkthdr.flowid = rq->ix;
 		M_HASHTYPE_SET(mb, M_HASHTYPE_OPAQUE);
 	}
 	mb->m_pkthdr.rcvif = ifp;
+	mb->m_pkthdr.leaf_rcvif = ifp;
 
-	if (likely(ifp->if_capenable & (IFCAP_RXCSUM | IFCAP_RXCSUM_IPV6)) &&
+	if (cqe_is_tunneled(cqe)) {
+		/*
+		 * CQE can be tunneled only if TIR is configured to
+		 * enable parsing of tunneled payload, so no need to
+		 * check for capabilities.
+		 */
+		if (((cqe->hds_ip_ext & (CQE_L2_OK | CQE_L3_OK)) ==
+		    (CQE_L2_OK | CQE_L3_OK))) {
+			mb->m_pkthdr.csum_flags |=
+			    CSUM_INNER_L3_CALC | CSUM_INNER_L3_VALID |
+			    CSUM_IP_CHECKED | CSUM_IP_VALID |
+			    CSUM_DATA_VALID | CSUM_PSEUDO_HDR;
+			mb->m_pkthdr.csum_data = htons(0xffff);
+
+			if (likely((cqe->hds_ip_ext & CQE_L4_OK) == CQE_L4_OK)) {
+				mb->m_pkthdr.csum_flags |=
+				    CSUM_INNER_L4_CALC | CSUM_INNER_L4_VALID;
+			}
+		} else {
+			rq->stats.csum_none++;
+		}
+	} else if (likely((ifp->if_capenable & (IFCAP_RXCSUM |
+	    IFCAP_RXCSUM_IPV6)) != 0) &&
 	    ((cqe->hds_ip_ext & (CQE_L2_OK | CQE_L3_OK | CQE_L4_OK)) ==
 	    (CQE_L2_OK | CQE_L3_OK | CQE_L4_OK))) {
 		mb->m_pkthdr.csum_flags =
@@ -342,6 +372,19 @@ mlx5e_build_rx_mbuf(struct mlx5_cqe64 *cqe,
 		}
 		mb->m_pkthdr.rcv_tstmp = tstmp;
 		mb->m_flags |= M_TSTMP;
+	}
+
+	switch (get_cqe_tls_offload(cqe)) {
+	case CQE_TLS_OFFLOAD_DECRYPTED:
+		/* set proper checksum flag for decrypted packets */
+		mb->m_pkthdr.csum_flags |= CSUM_TLS_DECRYPTED;
+		rq->stats.decrypted_ok_packets++;
+		break;
+	case CQE_TLS_OFFLOAD_ERROR:
+		rq->stats.decrypted_error_packets++;
+		break;
+	default:
+		break;
 	}
 }
 
@@ -453,6 +496,7 @@ mlx5e_poll_rx_cq(struct mlx5e_rq *rq, int budget)
 		    BUS_DMASYNC_POSTREAD);
 
 		if (unlikely((cqe->op_own >> 4) != MLX5_CQE_RESP_SEND)) {
+			mlx5e_dump_err_cqe(&rq->cq, rq->rqn, (const void *)cqe);
 			rq->stats.wqe_err++;
 			goto wq_ll_pop;
 		}
@@ -539,6 +583,7 @@ wq_ll_pop:
 void
 mlx5e_rx_cq_comp(struct mlx5_core_cq *mcq, struct mlx5_eqe *eqe __unused)
 {
+	struct mlx5e_channel *c = container_of(mcq, struct mlx5e_channel, rq.cq.mcq);
 	struct mlx5e_rq *rq = container_of(mcq, struct mlx5e_rq, cq.mcq);
 	int i = 0;
 
@@ -554,9 +599,19 @@ mlx5e_rx_cq_comp(struct mlx5_core_cq *mcq, struct mlx5_eqe *eqe __unused)
 		memset(mb->m_data, 255, 14);
 		mb->m_data[14] = rq->ix;
 		mb->m_pkthdr.rcvif = rq->ifp;
+		mb->m_pkthdr.leaf_rcvif = rq->ifp;
 		rq->ifp->if_input(rq->ifp, mb);
 	}
 #endif
+	for (int j = 0; j != MLX5E_MAX_TX_NUM_TC; j++) {
+		mtx_lock(&c->sq[j].lock);
+		c->sq[j].db_inhibit++;
+		mtx_unlock(&c->sq[j].lock);
+	}
+
+	mtx_lock(&c->iq.lock);
+	c->iq.db_inhibit++;
+	mtx_unlock(&c->iq.lock);
 
 	mtx_lock(&rq->mtx);
 
@@ -580,4 +635,17 @@ mlx5e_rx_cq_comp(struct mlx5_core_cq *mcq, struct mlx5_eqe *eqe __unused)
 	mlx5e_cq_arm(&rq->cq, MLX5_GET_DOORBELL_LOCK(&rq->channel->priv->doorbell_lock));
 	tcp_lro_flush_all(&rq->lro);
 	mtx_unlock(&rq->mtx);
+
+	for (int j = 0; j != MLX5E_MAX_TX_NUM_TC; j++) {
+		mtx_lock(&c->sq[j].lock);
+		c->sq[j].db_inhibit--;
+		/* Update the doorbell record, if any. */
+		mlx5e_tx_notify_hw(c->sq + j, true);
+		mtx_unlock(&c->sq[j].lock);
+	}
+
+	mtx_lock(&c->iq.lock);
+	c->iq.db_inhibit--;
+	mlx5e_iq_notify_hw(&c->iq);
+	mtx_unlock(&c->iq.lock);
 }

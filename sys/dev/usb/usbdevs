@@ -777,6 +777,7 @@ vendor ARDUINO		0x2341	Arduino SA
 vendor TPLINK		0x2357	TP-Link
 vendor WESTMOUNTAIN	0x2405	West Mountain Radio
 vendor TRIPPLITE	0x2478	Tripp-Lite
+vendor TENDA2		0x2604	Tenda
 vendor HIROSE		0x2631	Hirose Electric
 vendor NHJ		0x2770	NHJ
 vendor THINGM		0x27b8	ThingM
@@ -1266,6 +1267,8 @@ product ASUS USBN66		0x17ad	USB-N66
 product ASUS USBN10NANO		0x17ba	USB-N10 Nano
 product ASUS USBAC51		0x17d1	USB-AC51
 product ASUS USBAC56		0x17d2	USB-AC56
+product ASUS USBN14		0x17e8	USB-N14
+product ASUS USBN10NANOB1	0x18f0	USB-N10 Nano rev B1
 product ASUS A730W		0x4202	ASUS MyPal A730W
 product ASUS P535		0x420f	ASUS P535 PDA
 product ASUS GMSC		0x422f	ASUS Generic Mass Storage
@@ -1638,6 +1641,8 @@ product CYPRESS FMRADIO		0x1002	FM Radio
 product CYPRESS IKARILASER	0x121f	Ikari Laser SteelSeries ApS
 
 product CYPRESS USBRS232	0x5500	USB-RS232 Interface
+product	CYPRESS CYUSB330x	0x6500	HX3 USB 3.0 Hub
+product	CYPRESS CYUSB330x_2	0x6502	HX3 USB 3.0 Hub (USB 2.0)
 product CYPRESS SLIM_HUB	0x6560	Slim Hub
 product CYPRESS XX6830XX	0x6830	PATA Storage Device
 product CYPRESS SILVERSHIELD	0xfd13	Gembird Silver Shield PM
@@ -1735,6 +1740,7 @@ product DLINK DWA160B2		0x3c1a	DWA-160 rev B2
 product DLINK DWA127		0x3c1b	DWA-127 Wireless Adapter
 product DLINK DWA162		0x3c1f	DWA-162 Wireless Adapter
 product DLINK DWA140D1		0x3c20	DWA-140 rev D1
+product DLINK DWA130F1		0x3c25	DWA-130 rev F1
 product DLINK DSB650C		0x4000	10Mbps Ethernet
 product DLINK DSB650TX1		0x4001	10/100 Ethernet
 product DLINK DSB650TX		0x4002	10/100 Ethernet
@@ -1746,10 +1752,12 @@ product DLINK DWM157		0x7d02  DWM-157
 product DLINK DWM157_2		0x7d0e  DWM-157	
 product DLINK DWR510		0x7e12	DWR-510
 product DLINK DWM222		0x7e35	DWM-222
+product DLINK DWM222_2		0x7e3d	DWM-222
 product DLINK DWM157_CD_2	0xa407  DWM-157 CD-ROM Mode
 product DLINK DWM157_CD		0xa707  DWM-157 CD-ROM Mode
 product DLINK DWR510_CD		0xa805	DWR-510 CD-ROM Mode
 product DLINK DWM222_CD		0xab00	DWM-222 CD-ROM Mode
+product DLINK DWM222_CD_2	0xac01	DWM-222 CD-ROM Mode
 product DLINK DSB650		0xabc1	10/100 Ethernet
 product DLINK DUBH7		0xf103	DUB-H7 USB 2.0 7-Port Hub
 product DLINK2 RTL8192SU_1	0x3300	RTL8192SU
@@ -1838,6 +1846,7 @@ product	EDIMAX RTL8192CU	0x7822	RTL8192CU
 product EDIMAX EW7811UTC_1	0xa811	EW-7811UTC
 product EDIMAX EW7811UTC_2	0xa812	EW-7811UTC
 product EDIMAX EW7822UAC	0xa822	EW-7822UAC
+product EDIMAX EW7811UN_V2	0xb811	EW-7811UN V2
 
 /* eGalax Products */
 product EGALAX TPANEL		0x0001	Touch Panel
@@ -1932,6 +1941,7 @@ product EPSON 1270		0x0120	Perfection 1270 scanner
 product EPSON 2480		0x0121	Perfection 2480 scanner
 product EPSON 3590		0x0122	Perfection 3590 scanner
 product EPSON 4990		0x012a	Perfection 4990 Photo scanner
+product EPSON TMU220B		0x0202	TM-U220B
 product EPSON CRESSI_EDY	0x0521	Cressi Edy diving computer
 product EPSON N2ITION3		0x0522	Zeagle N2iTion3 diving computer
 product EPSON STYLUS_875DC	0x0601	Stylus Photo 875DC Card Reader
@@ -2445,6 +2455,7 @@ product HP HN210E		0x811c	Ethernet HN210E
 product HP2 C500		0x6002	PhotoSmart C500
 product HP EV2200		0x1b1d  ev2200 HSDPA (aka MC5720)
 product HP HS2300		0x1e1d  hs2300 HSDPA (aka MC8775)
+product HP LT4132		0xa31d  lt4132 LTEHSPA+ (aka ME906s)
 
 /* HTC products */
 product HTC WINMOBILE		0x00ce	HTC USB Sync
@@ -2546,6 +2557,7 @@ product HUAWEI ETS2055		0x1803	CDMA modem
 product HUAWEI E173		0x1c05	3G modem
 product HUAWEI E173_INIT	0x1c0b	3G modem initial
 product HUAWEI E3272		0x1c1e	LTE modem
+product HUAWEI E3372_INIT	0x1f01  LTE modem initial
 
 /* HUAWEI 3com products */
 product HUAWEI3COM WUB320G	0x0009	Aolynk WUB320g
@@ -3525,6 +3537,20 @@ product OLIMEX ARM_USB_OCD_H		0x002b	FTDI compatible adapter
 /* Olympus products */
 product OLYMPUS C1		0x0102	C-1 Digital Camera
 product OLYMPUS C700		0x0105	C-700 Ultra Zoom
+/* Current Olympus DSLRs and EVIL cameras reuse the same product code and
+ * bcdDevice for multiple models.  This may result in problems with newer
+ * cameras. */
+/* Olympus DSLRs */
+product OLYMPUS E_1		0x0102
+product OLYMPUS E_300		0x0118
+product OLYMPUS E_330		0x0118
+product OLYMPUS E_30		0x0118
+/* Olympus EVIL cameras */
+product OLYMPUS E_PM1		0x012c
+product OLYMPUS E_PM2		0x012e
+product OLYMPUS E_M1		0x012e
+product OLYMPUS E_M1MarkII	0x012e
+product OLYMPUS E_M5MarkIII	0x012e
 
 /* OmniVision Technologies, Inc. products */
 product OMNIVISION OV511	0x0511	OV511 Camera
@@ -3633,6 +3659,8 @@ product PANASONIC KXLRW32AN	0x0d09	CD-R Drive KXL-RW32AN
 product PANASONIC KXLCB20AN	0x0d0a	CD-R Drive KXL-CB20AN
 product PANASONIC KXLCB35AN	0x0d0e	DVD-ROM & CD-R/RW
 product PANASONIC SDCAAE	0x1b00	MultiMediaCard
+product PANASONIC CFF9_3G_QDL	0x250e	ToughBook CF-F9 GOBI 3G Modem Loader
+product PANASONIC CFF9_3G	0x250f	ToughBook CF-F9 GOBI 3G Modem
 product PANASONIC TYTP50P6S	0x3900	TY-TP50P6-S 50in Touch Panel
 
 /* Papouch products */
@@ -3943,6 +3971,8 @@ product QUANTA RW6815R		0xf003	HP iPAQ rw6815 RNDIS
 
 /* Quectel products */
 product QUECTEL EC25		0x0125	LTE modem
+product QUECTEL EM05		0x0127	LTE modem
+product QUECTEL EM12_G          0x0512  LTE modem
 
 /* Quickshot products */
 product QUICKSHOT STRIKEPAD	0x6238	USB StrikePad
@@ -4657,6 +4687,9 @@ product TELIT UC864G		0x1004	UC864G 3G modem
 /* Ten X Technology, Inc. */
 product TENX UAUDIO0		0xf211	USB audio headset
 
+/* Tenda products */
+product TENDA2 U12		0x0012	Tenda U12
+
 /* ThingM products */
 product THINGM BLINK1		0x01ed	USB notification light
 
@@ -4698,6 +4731,7 @@ product TPLINK T4UV2		0x010d	Archer T4U ver 2
 product TPLINK T4UHV1		0x0103	Archer T4UH ver 1
 product TPLINK T4UHV2		0x010e	Archer T4UH ver 2
 product TPLINK T2UNANO		0x011e	Archer T2U Nano
+product TPLINK T2UV3		0x011f	Archer T2U ver 3
 product TPLINK T2UPLUS		0x0120	Archer T2U Plus
 product TPLINK RTL8153		0x0601	RTL8153 USB 10/100/1000 LAN
 
@@ -4827,6 +4861,7 @@ product WAVESENSE JAZZ		0xaaaa	Jazz blood glucose meter
 product WCH CH341SER		0x5523	CH341/CH340 USB-Serial Bridge
 product WCH2 DUMMY		0x0000	Dummy product
 product WCH2 CH341SER_2		0x5523	CH341/CH340 USB-Serial Bridge
+product WCH2 CH341SER_3		0x7522	CH341/CH340 USB-Serial Bridge
 product WCH2 CH341SER		0x7523	CH341/CH340 USB-Serial Bridge
 product WCH2 U2M		0X752d	CH345 USB2.0-MIDI
 

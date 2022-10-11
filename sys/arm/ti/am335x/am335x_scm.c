@@ -141,7 +141,7 @@ am335x_scm_attach(device_t dev)
 	SYSCON_WRITE_4(sc->syscon, SCM_BGAP_CTRL, 0);
 	reg = SYSCON_READ_4(sc->syscon, SCM_BGAP_CTRL);
 	DELAY(500);
-	/* Set continous mode. */
+	/* Set continuous mode. */
 	SYSCON_WRITE_4(sc->syscon, SCM_BGAP_CTRL, SCM_BGAP_CONTCONV);
 	reg = SYSCON_READ_4(sc->syscon, SCM_BGAP_CTRL);
 	DELAY(500);
@@ -191,8 +191,6 @@ static driver_t am335x_scm_driver = {
 	sizeof(struct am335x_scm_softc),
 };
 
-static devclass_t am335x_scm_devclass;
-
-DRIVER_MODULE(am335x_scm, ti_scm, am335x_scm_driver, am335x_scm_devclass, 0, 0);
+DRIVER_MODULE(am335x_scm, ti_scm, am335x_scm_driver, 0, 0);
 MODULE_VERSION(am335x_scm, 1);
 MODULE_DEPEND(am335x_scm, ti_scm_syscon, 1, 1, 1);

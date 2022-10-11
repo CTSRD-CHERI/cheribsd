@@ -34,9 +34,148 @@
 #ifndef	_MACHINE_PROC_H_
 #define	_MACHINE_PROC_H_
 
+#include <machine/frame.h>
+
+#ifdef CPU_CHERI
+/*
+ * When modifying this, make sure to update <machine/switcher.h>
+ */
+struct switchercb {
+	/*
+	 * Caller context: context of the thread that cocalled us.
+	 * This also serves as the callee's spinlock.  Must be first,
+	 * as the cllc instruction doesn't take an offset.
+	 *
+	 * This can also be set to a zero-length capability, with the offset
+	 * equal to errno to be returned by cocall(2).
+	 */
+	struct switchercb * __capability	scb_caller_scb;
+
+	/*
+	 * Callee context, context of the thread we're cocalling into.
+	 */
+	struct switchercb * __capability	scb_callee_scb;
+
+	/*
+	 * Thread owning the context; the same thread that called cosetup(2).
+	 */
+	struct thread				*scb_td;
+
+	/*
+	 * Thread owning the context we're lending our thread to.  When
+	 * calling cocall(), this will be the callee thread.  NULL when
+	 * not lending.
+	 */
+	struct thread				*scb_borrower_td;
+
+	/*
+	 * Capability to unseal peer context.
+	 */
+	void * __capability			scb_unsealcap;
+
+	/*
+	 * Floating point.  The reason for this being here and not
+	 * below is that the immediate offset range for ldr/str
+	 * instructions is smaller when used with vector registers.
+	 */
+	__uint128_t				scb_q8;
+	__uint128_t				scb_q9;
+	__uint128_t				scb_q10;
+	__uint128_t				scb_q11;
+	__uint128_t				scb_q12;
+	__uint128_t				scb_q13;
+	__uint128_t				scb_q14;
+	__uint128_t				scb_q15;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_csp;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_cra;
+
+	/*
+	 * XXX
+	 */
+	const void * __capability		scb_outbuf;
+
+	/*
+	 * XXX
+	 */
+	size_t					scb_outlen;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_inbuf;
+
+	/*
+	 * XXX
+	 */
+	size_t					scb_inlen;
+
+	/*
+	 * XXX
+	 */
+	void * __capability			scb_cookiep;
+
+	/*
+	 * Remaining calee-saved part of CPU context.
+	 */
+	void * __capability			scb_c19;
+	void * __capability			scb_c20;
+	void * __capability			scb_c21;
+	void * __capability			scb_c22;
+	void * __capability			scb_c23;
+	void * __capability			scb_c24;
+	void * __capability			scb_c25;
+	void * __capability			scb_c26;
+	void * __capability			scb_c27;
+	void * __capability			scb_c28;
+
+	/*
+	 * RCTPIDR_EL0
+	 */
+	void * __capability			scb_tls;
+
+	void * __capability			scb_fpcr;
+	void * __capability			scb_fpsr;
+
+};
+#endif
+
+struct ptrauth_key {
+	uint64_t pa_key_lo;
+	uint64_t pa_key_hi;
+};
+
 struct mdthread {
 	int	md_spinlock_count;	/* (k) */
 	register_t md_saved_daif;	/* (k) */
+	uintptr_t md_canary;
+
+	/*
+	 * The pointer authentication keys. These are shared within a process,
+	 * however this may change for some keys as the PAuth ABI Extension to
+	 * ELF for the Arm 64-bit Architecture [1] is currently (July 2021) at
+	 * an Alpha release quality so may change.
+	 *
+	 * [1] https://github.com/ARM-software/abi-aa/blob/main/pauthabielf64/pauthabielf64.rst
+	 */
+	struct {
+		struct ptrauth_key apia;
+		struct ptrauth_key apib;
+		struct ptrauth_key apda;
+		struct ptrauth_key apdb;
+		struct ptrauth_key apga;
+	} md_ptrauth_user;
+
+	struct {
+		struct ptrauth_key apia;
+	} md_ptrauth_kern;
 };
 
 struct mdproc {
@@ -54,13 +193,6 @@ struct mdproc {
 #endif
 #define	KINFO_PROC32_SIZE 816
 
-#define	MAXARGS		8
-struct syscall_args {
-	u_int code;
-	struct sysent *callp;
-	syscallarg_t args[MAXARGS];
-};
-
 #ifdef _KERNEL
 
 #include <machine/pcb.h>
@@ -68,9 +200,7 @@ struct syscall_args {
 #define	GET_STACK_USAGE(total, used) do {				\
 	struct thread *td = curthread;					\
 	(total) = td->td_kstack_pages * PAGE_SIZE - sizeof(struct pcb);	\
-	(used) = (char *)td->td_kstack +				\
-	    td->td_kstack_pages * PAGE_SIZE -				\
-	    (char *)&td;						\
+	(used) = td->td_kstack + (total) - (vm_offset_t)&td;		\
 } while (0)
 
 #endif

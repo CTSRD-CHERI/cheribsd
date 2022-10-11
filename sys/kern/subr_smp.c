@@ -500,8 +500,8 @@ smp_rendezvous_action(void)
 	 * function before moving on to the action function.
 	 */
 	if (local_setup_func != smp_no_rendezvous_barrier) {
-		if (smp_rv_setup_func != NULL)
-			smp_rv_setup_func(smp_rv_func_arg);
+		if (local_setup_func != NULL)
+			local_setup_func(local_func_arg);
 		atomic_add_int(&smp_rv_waiters[1], 1);
 		while (smp_rv_waiters[1] < smp_rv_ncpus)
                 	cpu_spinwait();
@@ -630,6 +630,17 @@ smp_rendezvous(void (* setup_func)(void *),
 
 static struct cpu_group group[MAXCPU * MAX_CACHE_LEVELS + 1];
 
+static void
+smp_topo_fill(struct cpu_group *cg)
+{
+	int c;
+
+	for (c = 0; c < cg->cg_children; c++)
+		smp_topo_fill(&cg->cg_child[c]);
+	cg->cg_first = CPU_FFS(&cg->cg_mask) - 1;
+	cg->cg_last = CPU_FLS(&cg->cg_mask) - 1;
+}
+
 struct cpu_group *
 smp_topo(void)
 {
@@ -693,6 +704,7 @@ smp_topo(void)
 		top = &top->cg_child[0];
 		top->cg_parent = NULL;
 	}
+	smp_topo_fill(top);
 	return (top);
 }
 
@@ -749,7 +761,7 @@ smp_topo_addleaf(struct cpu_group *parent, struct cpu_group *child, int share,
 			    parent,
 			    cpusetobj_strprint(cpusetbuf, &parent->cg_mask),
 			    cpusetobj_strprint(cpusetbuf2, &child->cg_mask));
-		CPU_OR(&parent->cg_mask, &child->cg_mask);
+		CPU_OR(&parent->cg_mask, &parent->cg_mask, &child->cg_mask);
 		parent->cg_count += child->cg_count;
 	}
 
@@ -895,6 +907,8 @@ smp_rendezvous_cpus_retry(cpuset_t map,
 {
 	int cpu;
 
+	CPU_COPY(&map, &arg->cpus);
+
 	/*
 	 * Only one CPU to execute on.
 	 */
@@ -914,7 +928,6 @@ smp_rendezvous_cpus_retry(cpuset_t map,
 	 * Execute an action on all specified CPUs while retrying until they
 	 * all acknowledge completion.
 	 */
-	CPU_COPY(&map, &arg->cpus);
 	for (;;) {
 		smp_rendezvous_cpus(
 		    arg->cpus,
@@ -942,25 +955,31 @@ smp_rendezvous_cpus_done(struct smp_rendezvous_cpus_retry_arg *arg)
 }
 
 /*
+ * If (prio & PDROP) == 0:
  * Wait for specified idle threads to switch once.  This ensures that even
  * preempted threads have cycled through the switch function once,
  * exiting their codepaths.  This allows us to change global pointers
  * with no other synchronization.
+ * If (prio & PDROP) != 0:
+ * Force the specified CPUs to switch context at least once.
  */
 int
 quiesce_cpus(cpuset_t map, const char *wmesg, int prio)
 {
 	struct pcpu *pcpu;
-	u_int gen[MAXCPU];
+	u_int *gen;
 	int error;
 	int cpu;
 
 	error = 0;
-	for (cpu = 0; cpu <= mp_maxid; cpu++) {
-		if (!CPU_ISSET(cpu, &map) || CPU_ABSENT(cpu))
-			continue;
-		pcpu = pcpu_find(cpu);
-		gen[cpu] = pcpu->pc_idlethread->td_generation;
+	if ((prio & PDROP) == 0) {
+		gen = malloc(sizeof(u_int) * MAXCPU, M_TEMP, M_WAITOK);
+		for (cpu = 0; cpu <= mp_maxid; cpu++) {
+			if (!CPU_ISSET(cpu, &map) || CPU_ABSENT(cpu))
+				continue;
+			pcpu = pcpu_find(cpu);
+			gen[cpu] = pcpu->pc_idlethread->td_generation;
+		}
 	}
 	for (cpu = 0; cpu <= mp_maxid; cpu++) {
 		if (!CPU_ISSET(cpu, &map) || CPU_ABSENT(cpu))
@@ -969,8 +988,10 @@ quiesce_cpus(cpuset_t map, const char *wmesg, int prio)
 		thread_lock(curthread);
 		sched_bind(curthread, cpu);
 		thread_unlock(curthread);
+		if ((prio & PDROP) != 0)
+			continue;
 		while (gen[cpu] == pcpu->pc_idlethread->td_generation) {
-			error = tsleep(quiesce_cpus, prio, wmesg, 1);
+			error = tsleep(quiesce_cpus, prio & ~PDROP, wmesg, 1);
 			if (error != EWOULDBLOCK)
 				goto out;
 			error = 0;
@@ -980,6 +1001,8 @@ out:
 	thread_lock(curthread);
 	sched_unbind(curthread);
 	thread_unlock(curthread);
+	if ((prio & PDROP) == 0)
+		free(gen, M_TEMP);
 
 	return (error);
 }

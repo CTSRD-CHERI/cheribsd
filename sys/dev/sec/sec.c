@@ -138,8 +138,7 @@ static driver_t sec_driver = {
 	sizeof(struct sec_softc),
 };
 
-static devclass_t sec_devclass;
-DRIVER_MODULE(sec, simplebus, sec_driver, sec_devclass, 0, 0);
+DRIVER_MODULE(sec, simplebus, sec_driver, 0, 0);
 MODULE_DEPEND(sec, crypto, 1, 1, 1);
 
 static struct sec_eu_methods sec_eus[] = {
@@ -849,6 +848,9 @@ sec_desc_map_dma(struct sec_softc *sc, struct sec_dma_mem *dma_mem,
 		break;
 	case CRYPTO_BUF_MBUF:
 		size = m_length(crp->crp_buf.cb_mbuf, NULL);
+		break;
+	case CRYPTO_BUF_SINGLE_MBUF:
+		size = crp->crp_buf.cb_mbuf->m_len;
 		break;
 	case CRYPTO_BUF_VMPAGE:
 		size = PAGE_SIZE - crp->crp_buf.cb_vm_page_offset;

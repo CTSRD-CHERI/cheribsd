@@ -39,6 +39,8 @@
 
 verify_runnable "global"
 
+command -v fio > /dev/null || log_unsupported "fio missing"
+
 log_assert "l2arc_mfuonly does not cache MRU buffers."
 
 function cleanup
@@ -84,7 +86,7 @@ log_must zpool import -d $VDIR $TESTPOOL
 # from ARC, accessed later on as prefetches and transition to MRU as
 # prefetches.
 # If accessed again they are counted as MRU and the l2arc_mru_asize arcstat
-# will not be 0 (mentioned also in zfs-module-parameters.5)
+# will not be 0 (mentioned also in zfs.4)
 # For the purposes of this test we mitigate this by disabling (predictive)
 # ZFS prefetches with zfs_prefetch_disable=1.
 log_must test $(get_arcstat l2_mru_asize) -eq 0

@@ -67,13 +67,10 @@ struct inodedep;
 TAILQ_HEAD(inodedeplst, inodedep);
 LIST_HEAD(bmsafemaphd, bmsafemap);
 LIST_HEAD(trimlist_hashhead, ffs_blkfree_trim_params);
-struct fsfail_task {
-	struct task task;
-	fsid_t fsid;
-};
 
 #include <sys/_lock.h>
 #include <sys/_mutex.h>
+#include <sys/_sx.h>
 
 /*
  * This structure describes the UFS specific mount structure data.
@@ -85,7 +82,6 @@ struct fsfail_task {
  *	i - ufsmount interlock (UFS_LOCK / UFS_UNLOCK)
  *	q - associated quota file is locked
  *	r - ref to parent mount structure is held (vfs_busy / vfs_unbusy)
- *	u - managed by user process fsck_ufs
  */
 struct ufsmount {
 	struct	mount *um_mountp;		/* (r) filesystem vfs struct */
@@ -100,8 +96,12 @@ struct ufsmount {
 	u_long	um_nindir;			/* (c) indirect ptrs per blk */
 	u_long	um_bptrtodb;			/* (c) indir disk block ptr */
 	u_long	um_seqinc;			/* (c) inc between seq blocks */
+	u_long	um_bsize;			/* (c) fs block size */
+	uint64_t um_maxsymlinklen;		/* (c) max size of short
+						       symlink */
 	struct	mtx um_lock;			/* (c) Protects ufsmount & fs */
-	pid_t	um_fsckpid;			/* (u) PID can do fsck sysctl */
+	struct	sx um_checkpath_lock;		/* (c) Protects ufs_checkpath()
+						       result */
 	struct	mount_softdeps *um_softdep;	/* (c) softdep mgmt structure */
 	struct	vnode *um_quotas[MAXQUOTAS];	/* (q) pointer to quota files */
 	struct	ucred *um_cred[MAXQUOTAS];	/* (q) quota file access cred */
@@ -121,7 +121,6 @@ struct ufsmount {
 	struct	taskqueue *um_trim_tq;		/* (c) trim request queue */
 	struct	trimlist_hashhead *um_trimhash;	/* (i) trimlist hash table */
 	u_long	um_trimlisthashsize;		/* (i) trim hash table size-1 */
-	struct	fsfail_task *um_fsfail_task;	/* (i) task for fsfail cleanup*/
 						/* (c) - below function ptrs */
 	int	(*um_balloc)(struct vnode *, off_t, int, struct ucred *,
 		    int, struct buf **);
@@ -193,5 +192,8 @@ struct ufsmount {
 #define	MNINDIR(ump)			((ump)->um_nindir)
 #define	blkptrtodb(ump, b)		((b) << (ump)->um_bptrtodb)
 #define	is_sequential(ump, a, b)	((b) == (a) + ump->um_seqinc)
+
+/* true if old FS format...*/
+#define OFSFMT(vp)	(VFSTOUFS((vp)->v_mount)->um_maxsymlinklen <= 0)
 
 #endif

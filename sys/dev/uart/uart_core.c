@@ -54,7 +54,6 @@ __FBSDID("$FreeBSD$");
 
 #include "uart_if.h"
 
-devclass_t uart_devclass;
 const char uart_driver_name[] = "uart";
 
 SLIST_HEAD(uart_devinfo_list, uart_devinfo) uart_sysdevs =
@@ -209,7 +208,7 @@ uart_pps_init(struct uart_softc *sc)
 #endif
 	TUNABLE_INT_FETCH("hw.uart.pps_mode", &sc->sc_pps_mode);
 	SYSCTL_ADD_PROC(ctx, SYSCTL_CHILDREN(tree), OID_AUTO, "pps_mode",
-	    CTLTYPE_INT | CTLFLAG_RWTUN | CTLFLAG_NEEDGIANT, sc, 0, 
+	    CTLTYPE_INT | CTLFLAG_RWTUN | CTLFLAG_MPSAFE, sc, 0,
 	    uart_pps_mode_sysctl, "I", "pulse mode: 0/1/2=disabled/CTS/DCD; "
 	    "add 0x10 to invert, 0x20 for narrow pulse");
 
@@ -345,9 +344,11 @@ static __inline int
 uart_intr_rxready(void *arg)
 {
 	struct uart_softc *sc = arg;
+#if defined(KDB)
 	int rxp;
 
 	rxp = sc->sc_rxput;
+#endif
 	UART_RECEIVE(sc);
 #if defined(KDB)
 	if (sc->sc_sysdev != NULL && sc->sc_sysdev->type == UART_DEV_CONSOLE) {

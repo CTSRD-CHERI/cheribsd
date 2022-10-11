@@ -29,16 +29,17 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/FormatCommon.h"
 #include "llvm/Support/FormatProviders.h"
 #include "llvm/Support/FormatVariadicDetails.h"
 #include "llvm/Support/raw_ostream.h"
+#include <array>
 #include <cstddef>
 #include <string>
 #include <tuple>
 #include <utility>
-#include <vector>
 
 namespace llvm {
 
@@ -94,7 +95,7 @@ public:
         continue;
       }
 
-      auto W = Adapters[R.Index];
+      auto *W = Adapters[R.Index];
 
       FmtAlign Align(*W, R.Where, R.Align, R.Pad);
       Align.format(S, R.Options);
@@ -205,10 +206,10 @@ public:
 //
 // The characters '{' and '}' are reserved and cannot appear anywhere within a
 // replacement sequence.  Outside of a replacement sequence, in order to print
-// a literal '{' or '}' it must be doubled -- "{{" to print a literal '{' and
-// "}}" to print a literal '}'.
+// a literal '{' it must be doubled as "{{".
 //
 // ===Parameter Indexing===
+//
 // `index` specifies the index of the parameter in the parameter pack to format
 // into the output.  Note that it is possible to refer to the same parameter
 // index multiple times in a given format string.  This makes it possible to

@@ -56,7 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/sx.h>
 #include <sys/turnstile.h>
-#include <sys/umtx.h>
+#include <sys/umtxvar.h>
 #include <machine/pcb.h>
 #include <machine/smp.h>
 
@@ -678,6 +678,13 @@ schedinit(void)
 	mtx_init(&sched_lock, "sched lock", NULL, MTX_SPIN);
 }
 
+void
+schedinit_ap(void)
+{
+
+	/* Nothing needed. */
+}
+
 int
 sched_runnable(void)
 {
@@ -695,6 +702,10 @@ sched_rr_interval(void)
 	/* Convert sched_slice from stathz to hz. */
 	return (imax(1, (sched_slice * hz + realstathz / 2) / realstathz));
 }
+
+SCHED_STAT_DEFINE(ithread_demotions, "Interrupt thread priority demotions");
+SCHED_STAT_DEFINE(ithread_preemptions,
+    "Interrupt thread preemptions due to time-sharing");
 
 /*
  * We adjust the priority of the current process.  The priority of a
@@ -732,7 +743,20 @@ sched_clock_tick(struct thread *td)
 	 */
 	if (!TD_IS_IDLETHREAD(td) && --ts->ts_slice <= 0) {
 		ts->ts_slice = sched_slice;
-		td->td_flags |= TDF_NEEDRESCHED | TDF_SLICEEND;
+
+		/*
+		 * If an ithread uses a full quantum, demote its
+		 * priority and preempt it.
+		 */
+		if (PRI_BASE(td->td_pri_class) == PRI_ITHD) {
+			SCHED_STAT_INC(ithread_preemptions);
+			td->td_owepreempt = 1;
+			if (td->td_base_pri + RQ_PPQ < PRI_MAX_ITHD) {
+				SCHED_STAT_INC(ithread_demotions);
+				sched_prio(td, td->td_base_pri + RQ_PPQ);
+			}
+		} else
+			td->td_flags |= TDF_NEEDRESCHED | TDF_SLICEEND;
 	}
 
 	stat = DPCPU_PTR(idlestat);
@@ -918,6 +942,15 @@ sched_prio(struct thread *td, u_char prio)
 }
 
 void
+sched_ithread_prio(struct thread *td, u_char prio)
+{
+	THREAD_LOCK_ASSERT(td, MA_OWNED);
+	MPASS(td->td_pri_class == PRI_ITHD);
+	td->td_base_ithread_pri = prio;
+	sched_prio(td, prio);
+}
+
+void
 sched_user_prio(struct thread *td, u_char prio)
 {
 
@@ -980,13 +1013,9 @@ sched_switch(struct thread *td, int flags)
 {
 	struct thread *newtd;
 	struct mtx *tmtx;
-	struct td_sched *ts;
-	struct proc *p;
 	int preempted;
 
 	tmtx = &sched_lock;
-	ts = td_get_sched(td);
-	p = td->td_proc;
 
 	THREAD_LOCK_ASSERT(td, MA_OWNED);
 
@@ -1053,7 +1082,7 @@ sched_switch(struct thread *td, int flags)
 		SDT_PROBE2(sched, , , off__cpu, newtd, newtd->td_proc);
 
                 /* I feel sleepy */
-		lock_profile_release_lock(&sched_lock.lock_object);
+		lock_profile_release_lock(&sched_lock.lock_object, true);
 #ifdef KDTRACE_HOOKS
 		/*
 		 * If DTrace has set the active vtime enum to anything
@@ -1065,7 +1094,7 @@ sched_switch(struct thread *td, int flags)
 #endif
 
 		cpu_switch(td, newtd, tmtx);
-		lock_profile_obtain_lock_success(&sched_lock.lock_object,
+		lock_profile_obtain_lock_success(&sched_lock.lock_object, true,
 		    0, 0, __FILE__, __LINE__);
 		/*
 		 * Where am I?  What year is it?
@@ -1122,6 +1151,15 @@ sched_wakeup(struct thread *td, int srqflags)
 	td->td_slptick = 0;
 	ts->ts_slptime = 0;
 	ts->ts_slice = sched_slice;
+
+	/*
+	 * When resuming an idle ithread, restore its base ithread
+	 * priority.
+	 */
+	if (PRI_BASE(td->td_pri_class) == PRI_ITHD &&
+	    td->td_base_pri != td->td_base_ithread_pri)
+		sched_prio(td, td->td_base_ithread_pri);
+
 	sched_add(td, srqflags);
 }
 
@@ -1158,8 +1196,8 @@ forward_wakeup(int cpunum)
 		return (0);
 
 	CPU_SETOF(me, &dontuse);
-	CPU_OR(&dontuse, &stopped_cpus);
-	CPU_OR(&dontuse, &hlt_cpus_mask);
+	CPU_OR(&dontuse, &dontuse, &stopped_cpus);
+	CPU_OR(&dontuse, &dontuse, &hlt_cpus_mask);
 	CPU_ZERO(&map2);
 	if (forward_wakeup_use_loop) {
 		STAILQ_FOREACH(pc, &cpuhead, pc_allcpu) {
@@ -1173,7 +1211,7 @@ forward_wakeup(int cpunum)
 
 	if (forward_wakeup_use_mask) {
 		map = idle_cpus_mask;
-		CPU_ANDNOT(&map, &dontuse);
+		CPU_ANDNOT(&map, &map, &dontuse);
 
 		/* If they are both on, compare and use loop if different. */
 		if (forward_wakeup_use_loop) {
@@ -1360,7 +1398,7 @@ sched_add(struct thread *td, int flags)
 	} else {
 		if (!single_cpu) {
 			tidlemsk = idle_cpus_mask;
-			CPU_ANDNOT(&tidlemsk, &hlt_cpus_mask);
+			CPU_ANDNOT(&tidlemsk, &tidlemsk, &hlt_cpus_mask);
 			CPU_CLR(cpuid, &tidlemsk);
 
 			if (!CPU_ISSET(cpuid, &idle_cpus_mask) &&
@@ -1523,12 +1561,12 @@ sched_userret_slowpath(struct thread *td)
 void
 sched_bind(struct thread *td, int cpu)
 {
-	struct td_sched *ts;
+#ifdef SMP
+	struct td_sched *ts = td_get_sched(td);
+#endif
 
 	THREAD_LOCK_ASSERT(td, MA_OWNED|MA_NOTRECURSED);
 	KASSERT(td == curthread, ("sched_bind: can only bind curthread"));
-
-	ts = td_get_sched(td);
 
 	td->td_flags |= TDF_BOUND;
 #ifdef SMP
@@ -1655,12 +1693,22 @@ sched_idletd(void *dummy)
 	}
 }
 
+static void
+sched_throw_tail(struct thread *td)
+{
+
+	mtx_assert(&sched_lock, MA_OWNED);
+	KASSERT(curthread->td_md.md_spinlock_count == 1, ("invalid count"));
+	cpu_throw(td, choosethread());	/* doesn't return */
+}
+
 /*
- * A CPU is entering for the first time or a thread is exiting.
+ * A CPU is entering for the first time.
  */
 void
-sched_throw(struct thread *td)
+sched_ap_entry(void)
 {
+
 	/*
 	 * Correct spinlock nesting.  The idle thread context that we are
 	 * borrowing was created so that it would start out with a single
@@ -1670,20 +1718,29 @@ sched_throw(struct thread *td)
 	 * spinlock_exit() will simply adjust the counts without allowing
 	 * spin lock using code to interrupt us.
 	 */
-	if (td == NULL) {
-		mtx_lock_spin(&sched_lock);
-		spinlock_exit();
-		PCPU_SET(switchtime, cpu_ticks());
-		PCPU_SET(switchticks, ticks);
-	} else {
-		lock_profile_release_lock(&sched_lock.lock_object);
-		MPASS(td->td_lock == &sched_lock);
-		td->td_lastcpu = td->td_oncpu;
-		td->td_oncpu = NOCPU;
-	}
-	mtx_assert(&sched_lock, MA_OWNED);
-	KASSERT(curthread->td_md.md_spinlock_count == 1, ("invalid count"));
-	cpu_throw(td, choosethread());	/* doesn't return */
+	mtx_lock_spin(&sched_lock);
+	spinlock_exit();
+	PCPU_SET(switchtime, cpu_ticks());
+	PCPU_SET(switchticks, ticks);
+
+	sched_throw_tail(NULL);
+}
+
+/*
+ * A thread is exiting.
+ */
+void
+sched_throw(struct thread *td)
+{
+
+	MPASS(td != NULL);
+	MPASS(td->td_lock == &sched_lock);
+
+	lock_profile_release_lock(&sched_lock.lock_object, true);
+	td->td_lastcpu = td->td_oncpu;
+	td->td_oncpu = NOCPU;
+
+	sched_throw_tail(td);
 }
 
 void
@@ -1696,7 +1753,7 @@ sched_fork_exit(struct thread *td)
 	 */
 	td->td_oncpu = PCPU_GET(cpuid);
 	sched_lock.mtx_lock = (uintptr_t)td;
-	lock_profile_obtain_lock_success(&sched_lock.lock_object,
+	lock_profile_obtain_lock_success(&sched_lock.lock_object, true,
 	    0, 0, __FILE__, __LINE__);
 	THREAD_LOCK_ASSERT(td, MA_OWNED | MA_NOTRECURSED);
 

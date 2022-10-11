@@ -115,7 +115,7 @@ pnp_write(int d, u_char r)
  * Intel May 94.
  */
 static void
-pnp_send_initiation_key()
+pnp_send_initiation_key(void)
 {
 	int cur, i;
 
@@ -767,6 +767,4 @@ static driver_t pnp_driver = {
 	1,			/* no softc */
 };
 
-static devclass_t pnp_devclass;
-
-DRIVER_MODULE(pnp, isa, pnp_driver, pnp_devclass, 0, 0);
+DRIVER_MODULE(pnp, isa, pnp_driver, 0, 0);

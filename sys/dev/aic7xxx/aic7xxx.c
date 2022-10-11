@@ -3632,7 +3632,7 @@ ahc_handle_msg_reject(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 }
 
 /*
- * Process an ingnore wide residue message.
+ * Process an ignore wide residue message.
  */
 static void
 ahc_handle_ign_wide_residue(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
@@ -3674,7 +3674,6 @@ ahc_handle_ign_wide_residue(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 		} else {
 			struct ahc_dma_seg *sg;
 			uint32_t data_cnt;
-			uint32_t data_addr;
 			uint32_t sglen;
 
 			/* Pull in all of the sgptr */
@@ -3690,10 +3689,7 @@ ahc_handle_ign_wide_residue(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 				data_cnt &= ~AHC_SG_LEN_MASK;
 			}
 
-			data_addr = ahc_inl(ahc, SHADDR);
-
 			data_cnt += 1;
-			data_addr -= 1;
 			sgptr &= SG_PTR_MASK;
 
 			sg = ahc_sg_bus_to_virt(scb, sgptr);
@@ -3713,8 +3709,6 @@ ahc_handle_ign_wide_residue(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 				 * while setting the count to 1.
 				 */
 				data_cnt = 1 | (sglen & (~AHC_SG_LEN_MASK));
-				data_addr = aic_le32toh(sg->addr)
-					  + (sglen & AHC_SG_LEN_MASK) - 1;
 
 				/*
 				 * Increment sg so it points to the
@@ -6059,7 +6053,7 @@ ahc_reset_channel(struct ahc_softc *ahc, char channel, int initiate_reset)
 	 *	 we have run out of ATIO resources to drain that
 	 *	 queue, we may not get them all out here.  Further,
 	 *	 the blocked transactions for the reset channel
-	 *	 should just be killed off, irrespecitve of whether
+	 *	 should just be killed off, irrespective of whether
 	 *	 we are blocked on ATIO resources.  Write a routine
 	 *	 to compact the tqinfifo appropriately.
 	 */

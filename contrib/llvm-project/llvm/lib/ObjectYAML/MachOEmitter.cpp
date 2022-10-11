@@ -29,7 +29,7 @@ namespace {
 
 class MachOWriter {
 public:
-  MachOWriter(MachOYAML::Object &Obj) : Obj(Obj), is64Bit(true), fileStart(0) {
+  MachOWriter(MachOYAML::Object &Obj) : Obj(Obj), fileStart(0) {
     is64Bit = Obj.Header.magic == MachO::MH_MAGIC_64 ||
               Obj.Header.magic == MachO::MH_CIGAM_64;
     memset(reinterpret_cast<void *>(&Header), 0, sizeof(MachO::mach_header_64));
@@ -54,6 +54,7 @@ private:
   void writeNameList(raw_ostream &OS);
   void writeStringTable(raw_ostream &OS);
   void writeExportTrie(raw_ostream &OS);
+  void writeDynamicSymbolTable(raw_ostream &OS);
 
   void dumpExportEntry(raw_ostream &OS, MachOYAML::ExportEntry &Entry);
   void ZeroToOffset(raw_ostream &OS, size_t offset);
@@ -155,9 +156,9 @@ size_t writeLoadCommandData<MachO::segment_command_64>(
 
 size_t writePayloadString(MachOYAML::LoadCommand &LC, raw_ostream &OS) {
   size_t BytesWritten = 0;
-  if (!LC.PayloadString.empty()) {
-    OS.write(LC.PayloadString.c_str(), LC.PayloadString.length());
-    BytesWritten = LC.PayloadString.length();
+  if (!LC.Content.empty()) {
+    OS.write(LC.Content.c_str(), LC.Content.length());
+    BytesWritten = LC.Content.length();
   }
   return BytesWritten;
 }
@@ -184,6 +185,30 @@ size_t writeLoadCommandData<MachO::rpath_command>(MachOYAML::LoadCommand &LC,
 }
 
 template <>
+size_t writeLoadCommandData<MachO::sub_framework_command>(
+    MachOYAML::LoadCommand &LC, raw_ostream &OS, bool IsLittleEndian) {
+  return writePayloadString(LC, OS);
+}
+
+template <>
+size_t writeLoadCommandData<MachO::sub_umbrella_command>(
+    MachOYAML::LoadCommand &LC, raw_ostream &OS, bool IsLittleEndian) {
+  return writePayloadString(LC, OS);
+}
+
+template <>
+size_t writeLoadCommandData<MachO::sub_client_command>(
+    MachOYAML::LoadCommand &LC, raw_ostream &OS, bool IsLittleEndian) {
+  return writePayloadString(LC, OS);
+}
+
+template <>
+size_t writeLoadCommandData<MachO::sub_library_command>(
+    MachOYAML::LoadCommand &LC, raw_ostream &OS, bool IsLittleEndian) {
+  return writePayloadString(LC, OS);
+}
+
+template <>
 size_t writeLoadCommandData<MachO::build_version_command>(
     MachOYAML::LoadCommand &LC, raw_ostream &OS, bool IsLittleEndian) {
   size_t BytesWritten = 0;
@@ -199,14 +224,12 @@ size_t writeLoadCommandData<MachO::build_version_command>(
 }
 
 void ZeroFillBytes(raw_ostream &OS, size_t Size) {
-  std::vector<uint8_t> FillData;
-  FillData.insert(FillData.begin(), Size, 0);
+  std::vector<uint8_t> FillData(Size, 0);
   OS.write(reinterpret_cast<char *>(FillData.data()), Size);
 }
 
 void Fill(raw_ostream &OS, size_t Size, uint32_t Data) {
-  std::vector<uint32_t> FillData;
-  FillData.insert(FillData.begin(), (Size / 4) + 1, Data);
+  std::vector<uint32_t> FillData((Size / 4) + 1, Data);
   OS.write(reinterpret_cast<char *>(FillData.data()), Size);
 }
 
@@ -266,6 +289,7 @@ void MachOWriter::writeLoadCommands(raw_ostream &OS) {
 }
 
 Error MachOWriter::writeSectionData(raw_ostream &OS) {
+  uint64_t LinkEditOff = 0;
   for (auto &LC : Obj.LoadCommands) {
     switch (LC.Data.load_command_data.cmd) {
     case MachO::LC_SEGMENT:
@@ -275,6 +299,9 @@ Error MachOWriter::writeSectionData(raw_ostream &OS) {
       if (0 ==
           strncmp(&LC.Data.segment_command_data.segname[0], "__LINKEDIT", 16)) {
         FoundLinkEditSeg = true;
+        LinkEditOff = segOff;
+        if (Obj.RawLinkEditSegment)
+          continue;
         writeLinkEditData(OS);
       }
       for (auto &Sec : LC.Sections) {
@@ -285,34 +312,20 @@ Error MachOWriter::writeSectionData(raw_ostream &OS) {
           return createStringError(
               errc::invalid_argument,
               "wrote too much data somewhere, section offsets don't line up");
-        if (0 == strncmp(&Sec.segname[0], "__DWARF", 16)) {
-          Error Err = Error::success();
-          cantFail(std::move(Err));
 
-          if (0 == strncmp(&Sec.sectname[0], "__debug_str", 16))
-            Err = DWARFYAML::emitDebugStr(OS, Obj.DWARF);
-          else if (0 == strncmp(&Sec.sectname[0], "__debug_abbrev", 16))
-            Err = DWARFYAML::emitDebugAbbrev(OS, Obj.DWARF);
-          else if (0 == strncmp(&Sec.sectname[0], "__debug_aranges", 16))
-            Err = DWARFYAML::emitDebugAranges(OS, Obj.DWARF);
-          else if (0 == strncmp(&Sec.sectname[0], "__debug_ranges", 16))
-            Err = DWARFYAML::emitDebugRanges(OS, Obj.DWARF);
-          else if (0 == strncmp(&Sec.sectname[0], "__debug_pubnames", 16)) {
-            if (Obj.DWARF.PubNames)
-              Err = DWARFYAML::emitPubSection(OS, *Obj.DWARF.PubNames,
-                                              Obj.IsLittleEndian);
-          } else if (0 == strncmp(&Sec.sectname[0], "__debug_pubtypes", 16)) {
-            if (Obj.DWARF.PubTypes)
-              Err = DWARFYAML::emitPubSection(OS, *Obj.DWARF.PubTypes,
-                                              Obj.IsLittleEndian);
-          } else if (0 == strncmp(&Sec.sectname[0], "__debug_info", 16))
-            Err = DWARFYAML::emitDebugInfo(OS, Obj.DWARF);
-          else if (0 == strncmp(&Sec.sectname[0], "__debug_line", 16))
-            Err = DWARFYAML::emitDebugLine(OS, Obj.DWARF);
-
-          if (Err)
+        StringRef SectName(Sec.sectname,
+                           strnlen(Sec.sectname, sizeof(Sec.sectname)));
+        // If the section's content is specified in the 'DWARF' entry, we will
+        // emit it regardless of the section's segname.
+        if (Obj.DWARF.getNonEmptySectionNames().count(SectName.substr(2))) {
+          if (Sec.content)
+            return createStringError(errc::invalid_argument,
+                                     "cannot specify section '" + SectName +
+                                         "' contents in the 'DWARF' entry and "
+                                         "the 'content' at the same time");
+          auto EmitFunc = DWARFYAML::getDWARFEmitterByName(SectName.substr(2));
+          if (Error Err = EmitFunc(OS, Obj.DWARF))
             return Err;
-
           continue;
         }
 
@@ -336,6 +349,13 @@ Error MachOWriter::writeSectionData(raw_ostream &OS) {
     }
   }
 
+  if (Obj.RawLinkEditSegment) {
+    ZeroToOffset(OS, LinkEditOff);
+    if (OS.tell() - fileStart > LinkEditOff || !LinkEditOff)
+      return createStringError(errc::invalid_argument,
+                               "section offsets don't line up");
+    Obj.RawLinkEditSegment->writeAsBinary(OS);
+  }
   return Error::success();
 }
 
@@ -461,8 +481,9 @@ void MachOWriter::writeLinkEditData(raw_ostream &OS) {
   typedef std::pair<uint64_t, writeHandler> writeOperation;
   std::vector<writeOperation> WriteQueue;
 
-  MachO::dyld_info_command *DyldInfoOnlyCmd = 0;
-  MachO::symtab_command *SymtabCmd = 0;
+  MachO::dyld_info_command *DyldInfoOnlyCmd = nullptr;
+  MachO::symtab_command *SymtabCmd = nullptr;
+  MachO::dysymtab_command *DSymtabCmd = nullptr;
   for (auto &LC : Obj.LoadCommands) {
     switch (LC.Data.load_command_data.cmd) {
     case MachO::LC_SYMTAB:
@@ -484,6 +505,11 @@ void MachOWriter::writeLinkEditData(raw_ostream &OS) {
                                           &MachOWriter::writeLazyBindOpcodes));
       WriteQueue.push_back(std::make_pair(DyldInfoOnlyCmd->export_off,
                                           &MachOWriter::writeExportTrie));
+      break;
+    case MachO::LC_DYSYMTAB:
+      DSymtabCmd = &LC.Data.dysymtab_command_data;
+      WriteQueue.push_back(std::make_pair(
+          DSymtabCmd->indirectsymoff, &MachOWriter::writeDynamicSymbolTable));
       break;
     }
   }
@@ -535,6 +561,12 @@ void MachOWriter::writeStringTable(raw_ostream &OS) {
     OS.write(Str.data(), Str.size());
     OS.write('\0');
   }
+}
+
+void MachOWriter::writeDynamicSymbolTable(raw_ostream &OS) {
+  for (auto Data : Obj.LinkEdit.IndirectSymbols)
+    OS.write(reinterpret_cast<const char *>(&Data),
+             sizeof(yaml::Hex32::BaseType));
 }
 
 class UniversalWriter {

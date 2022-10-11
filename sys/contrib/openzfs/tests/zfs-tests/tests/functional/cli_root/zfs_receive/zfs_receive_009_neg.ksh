@@ -48,13 +48,10 @@ function cleanup
 {
 	typeset ds
 
-	if snapexists $snap; then
-		log_must zfs destroy $snap
-	fi
+	snapexists $snap && destroy_dataset $snap
+
 	for ds in $ctr1 $ctr2 $fs1; do
-		if datasetexists $ds; then
-			log_must zfs destroy -rf $ds
-		fi
+		datasetexists $ds && destroy_dataset $ds -rf
 	done
 	if [[ -d $TESTDIR2 ]]; then
 		rm -rf $TESTDIR2
@@ -95,11 +92,10 @@ typeset -i i=0
 while (( i < ${#validopts[*]} )); do
 	log_mustnot eval "zfs recv < $bkup"
 
-	echo ${validopts[i]} | grep "d" >/dev/null 2>&1
-	if (( $? != 0 )); then
-		log_mustnot eval "zfs recv ${validopts[i]} $fs2 $fs3 < $bkup"
-	else
+	if echo ${validopts[i]} | grep -q "d"; then
 		log_mustnot eval "zfs recv ${validopts[i]} $ctr1 $ctr2 < $bkup"
+	else
+		log_mustnot eval "zfs recv ${validopts[i]} $fs2 $fs3 < $bkup"
 	fi
 
 	(( i += 1 ))

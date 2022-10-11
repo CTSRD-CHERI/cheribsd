@@ -42,6 +42,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/openfirm.h>
 
 #include "iicbus_if.h"
+#include "ofw_iicbus_if.h"
 
 /* Methods */
 static device_probe_t ofw_iicbus_probe;
@@ -50,6 +51,8 @@ static device_t ofw_iicbus_add_child(device_t dev, u_int order,
     const char *name, int unit);
 static const struct ofw_bus_devinfo *ofw_iicbus_get_devinfo(device_t bus,
     device_t dev);
+static int ofw_iicbus_set_devinfo(device_t bus, device_t dev,
+    phandle_t ofw_node, char *ofw_name, char *ofw_compat, uint32_t i2c_addr);
 
 static device_method_t ofw_iicbus_methods[] = {
 	/* Device interface */
@@ -57,7 +60,7 @@ static device_method_t ofw_iicbus_methods[] = {
 	DEVMETHOD(device_attach,	ofw_iicbus_attach),
 
 	/* Bus interface */
-	DEVMETHOD(bus_child_pnpinfo_str, ofw_bus_gen_child_pnpinfo_str),
+	DEVMETHOD(bus_child_pnpinfo,	ofw_bus_gen_child_pnpinfo),
 	DEVMETHOD(bus_add_child,	ofw_iicbus_add_child),
 
 	/* ofw_bus interface */
@@ -68,6 +71,9 @@ static device_method_t ofw_iicbus_methods[] = {
 	DEVMETHOD(ofw_bus_get_node,	ofw_bus_gen_get_node),
 	DEVMETHOD(ofw_bus_get_type,	ofw_bus_gen_get_type),
 
+	/* ofw_iicbus interface */
+	DEVMETHOD(ofw_iicbus_set_devinfo, ofw_iicbus_set_devinfo),
+
 	DEVMETHOD_END
 };
 
@@ -76,16 +82,11 @@ struct ofw_iicbus_devinfo {
 	struct ofw_bus_devinfo	opd_obdinfo;
 };
 
-devclass_t ofw_iicbus_devclass;
-
 DEFINE_CLASS_1(iicbus, ofw_iicbus_driver, ofw_iicbus_methods,
     sizeof(struct iicbus_softc), iicbus_driver);
-EARLY_DRIVER_MODULE(ofw_iicbus, iicbb, ofw_iicbus_driver, ofw_iicbus_devclass,
-    0, 0, BUS_PASS_BUS);
-EARLY_DRIVER_MODULE(ofw_iicbus, iichb, ofw_iicbus_driver, ofw_iicbus_devclass,
-    0, 0, BUS_PASS_BUS);
-EARLY_DRIVER_MODULE(ofw_iicbus, twsi, ofw_iicbus_driver, ofw_iicbus_devclass,
-    0, 0, BUS_PASS_BUS);
+EARLY_DRIVER_MODULE(ofw_iicbus, iicbb, ofw_iicbus_driver, 0, 0, BUS_PASS_BUS);
+EARLY_DRIVER_MODULE(ofw_iicbus, iichb, ofw_iicbus_driver, 0, 0, BUS_PASS_BUS);
+EARLY_DRIVER_MODULE(ofw_iicbus, twsi, ofw_iicbus_driver, 0, 0, BUS_PASS_BUS);
 MODULE_VERSION(ofw_iicbus, 1);
 MODULE_DEPEND(ofw_iicbus, iicbus, 1, 1, 1);
 
@@ -237,4 +238,27 @@ ofw_iicbus_get_devinfo(device_t bus, device_t dev)
 
 	dinfo = device_get_ivars(dev);
 	return (&dinfo->opd_obdinfo);
+}
+
+static int
+ofw_iicbus_set_devinfo(device_t bus, device_t dev, phandle_t ofw_node,
+    char *ofw_name, char *ofw_compat, uint32_t i2c_addr)
+{
+	struct ofw_iicbus_devinfo *devi;
+
+	/*
+	 * Setup OFW-related parts of the ivars for manually
+	 * created ofw_iicbus childern.
+	 */
+	devi = device_get_ivars(dev);
+	if (devi == NULL)
+		return (ENXIO);
+
+	devi->opd_obdinfo.obd_node = ofw_node;
+	if (ofw_name != NULL)
+		devi->opd_obdinfo.obd_name = strdup(ofw_name, M_OFWPROP);
+	if (ofw_compat != NULL)
+		devi->opd_obdinfo.obd_compat = strdup(ofw_compat, M_OFWPROP);
+	devi->opd_dinfo.addr = i2c_addr;
+	return (0);
 }

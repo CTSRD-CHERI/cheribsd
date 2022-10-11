@@ -110,7 +110,6 @@ invalidate(struct Test *t1)
 		*x = 0xa5;
 }
 
-#ifdef __mips__
 CHERIBSDTEST(test_string_memcpy_c, "Test explicit capability memcpy")
 {
 	int i;
@@ -211,7 +210,6 @@ CHERIBSDTEST(test_string_memcpy_c, "Test explicit capability memcpy")
 
 	cheribsdtest_success();
 }
-#endif	/* __mips__ */
 
 CHERIBSDTEST(test_string_memcpy, "Test implicit capability memcpy")
 {
@@ -273,7 +271,6 @@ CHERIBSDTEST(test_string_memcpy, "Test implicit capability memcpy")
 	cheribsdtest_success();
 }
 
-#ifdef __mips__
 CHERIBSDTEST(test_string_memmove_c, "Test explicit capability memmove")
 {
 	int i;
@@ -373,7 +370,6 @@ CHERIBSDTEST(test_string_memmove_c, "Test explicit capability memmove")
 
 	cheribsdtest_success();
 }
-#endif	/* __mips__ */
 
 CHERIBSDTEST(test_string_memmove, "Test implicit capability memmove")
 {

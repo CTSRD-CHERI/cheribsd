@@ -113,6 +113,9 @@ command_boot(int argc, char *argv[])
 #endif
 #endif
 
+	/* Pass the tslog buffer to the kernel as a preloaded module. */
+	tslog_publish();
+
 	/* Call the exec handler from the loader matching the kernel */
 	file_formats[fp->f_loader]->l_exec(fp);
 	return(CMD_ERROR);
@@ -307,7 +310,7 @@ getbootfile(int try)
 
 /*
  * Try to find the /etc/fstab file on the filesystem (rootdev),
- * which should be be the root filesystem, and parse it to find
+ * which should be the root filesystem, and parse it to find
  * out what the kernel ought to think the root filesystem is.
  *
  * If we're successful, set vfs.root.mountfrom to <vfstype>:<path>

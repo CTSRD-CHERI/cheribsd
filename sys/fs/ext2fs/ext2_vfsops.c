@@ -240,11 +240,10 @@ ext2_mount(struct mount *mp)
 	 */
 	if (fspec == NULL)
 		return (EINVAL);
-	NDINIT(ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, PTR2CAP(fspec),
-	    td);
+	NDINIT(ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, PTR2CAP(fspec));
 	if ((error = namei(ndp)) != 0)
 		return (error);
-	NDFREE(ndp, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(ndp);
 	devvp = ndp->ni_vp;
 
 	if (!vn_isdisk_error(devvp, &error)) {
@@ -435,7 +434,7 @@ ext2_cg_validate(struct m_ext2fs *fs)
 		}
 		if (i_tables <= last_cg_block) {
 			SDT_PROBE2(ext2fs, , vfsops, ext2_cg_validate_error,
-			    "inode talbes overlaps gds", i);
+			    "inode tables overlaps gds", i);
 			return (EINVAL);
 		}
 		if (i_tables < first_block ||
@@ -612,7 +611,8 @@ ext2_compute_sb_data(struct vnode *devvp, struct ext2fs *es,
 		return (EINVAL);
 	}
 
-	if (le32toh(es->e2fs_first_dblock) >= fs->e2fs_bcount) {
+	if (le32toh(es->e2fs_first_dblock) != (fs->e2fs_bsize > 1024 ? 0 : 1) ||
+	    le32toh(es->e2fs_first_dblock) >= fs->e2fs_bcount) {
 		SDT_PROBE1(ext2fs, , vfsops, ext2_compute_sb_data_error,
 		    "first data block out of range");
 		return (EINVAL);
@@ -925,6 +925,7 @@ ext2_mountfs(struct vnode *devvp, struct mount *mp)
 	 */
 	e2fs_maxcontig = MAX(1, maxphys / ump->um_e2fs->e2fs_bsize);
 	ump->um_e2fs->e2fs_contigsumsize = MIN(e2fs_maxcontig, EXT2_MAXCONTIG);
+	ump->um_e2fs->e2fs_maxsymlinklen = EXT2_MAXSYMLINKLEN;
 	if (ump->um_e2fs->e2fs_contigsumsize > 0) {
 		size = ump->um_e2fs->e2fs_gcount * sizeof(int32_t);
 		ump->um_e2fs->e2fs_maxcluster = malloc(size, M_EXT2MNT, M_WAITOK);
@@ -958,7 +959,6 @@ ext2_mountfs(struct vnode *devvp, struct mount *mp)
 	mp->mnt_data = ump;
 	mp->mnt_stat.f_fsid.val[0] = dev2udev(dev);
 	mp->mnt_stat.f_fsid.val[1] = mp->mnt_vfc->vfc_typenum;
-	mp->mnt_maxsymlinklen = EXT2_MAXSYMLINKLEN;
 	MNT_ILOCK(mp);
 	mp->mnt_flag |= MNT_LOCAL;
 	MNT_IUNLOCK(mp);
@@ -1284,11 +1284,18 @@ ext2_vget(struct mount *mp, ino_t ino, int flags, struct vnode **vpp)
 		for (i = used_blocks; i < EXT2_NDIR_BLOCKS; i++)
 			ip->i_db[i] = 0;
 	}
+
+	bqrelse(bp);
+
 #ifdef EXT2FS_PRINT_EXTENTS
 	ext2_print_inode(ip);
-	ext4_ext_print_extent_tree_status(ip);
+	error = ext4_ext_walk(ip);
+	if (error) {
+		vput(vp);
+		*vpp = NULL;
+		return (error);
+	}
 #endif
-	bqrelse(bp);
 
 	/*
 	 * Initialize the vnode from the inode, check for aliases.

@@ -37,6 +37,9 @@
 #include <linux/blkpg.h>
 #include <linux/msdos_fs.h>
 #include <linux/vfs_compat.h>
+#ifdef HAVE_LINUX_BLK_CGROUP_HEADER
+#include <linux/blk-cgroup.h>
+#endif
 
 typedef struct vdev_disk {
 	struct block_device		*vd_bdev;
@@ -265,6 +268,11 @@ vdev_disk_open(vdev_t *v, uint64_t *psize, uint64_t *max_psize,
 	 * a ENOENT failure at this point is highly likely to be transient
 	 * and it is reasonable to sleep and retry before giving up.  In
 	 * practice delays have been observed to be on the order of 100ms.
+	 *
+	 * When ERESTARTSYS is returned it indicates the block device is
+	 * a zvol which could not be opened due to the deadlock detection
+	 * logic in zvol_open().  Extend the timeout and retry the open
+	 * subsequent attempts are expected to eventually succeed.
 	 */
 	hrtime_t start = gethrtime();
 	bdev = ERR_PTR(-ENXIO);
@@ -273,6 +281,9 @@ vdev_disk_open(vdev_t *v, uint64_t *psize, uint64_t *max_psize,
 		    zfs_vdev_holder);
 		if (unlikely(PTR_ERR(bdev) == -ENOENT)) {
 			schedule_timeout(MSEC_TO_TICK(10));
+		} else if (unlikely(PTR_ERR(bdev) == -ERESTARTSYS)) {
+			timeout = MSEC2NSEC(zfs_vdev_open_timeout_ms * 10);
+			continue;
 		} else if (IS_ERR(bdev)) {
 			break;
 		}
@@ -293,8 +304,6 @@ vdev_disk_open(vdev_t *v, uint64_t *psize, uint64_t *max_psize,
 		rw_exit(&vd->vd_lock);
 	}
 
-	struct request_queue *q = bdev_get_queue(vd->vd_bdev);
-
 	/*  Determine the physical block size */
 	int physical_block_size = bdev_physical_block_size(vd->vd_bdev);
 
@@ -305,13 +314,13 @@ vdev_disk_open(vdev_t *v, uint64_t *psize, uint64_t *max_psize,
 	v->vdev_nowritecache = B_FALSE;
 
 	/* Set when device reports it supports TRIM. */
-	v->vdev_has_trim = !!blk_queue_discard(q);
+	v->vdev_has_trim = bdev_discard_supported(vd->vd_bdev);
 
 	/* Set when device reports it supports secure TRIM. */
-	v->vdev_has_securetrim = !!blk_queue_discard_secure(q);
+	v->vdev_has_securetrim = bdev_secure_discard_supported(vd->vd_bdev);
 
 	/* Inform the ZIO pipeline that we are non-rotational */
-	v->vdev_nonrot = blk_queue_nonrot(q);
+	v->vdev_nonrot = blk_queue_nonrot(bdev_get_queue(vd->vd_bdev));
 
 	/* Physical volume size in bytes for the partition */
 	*psize = bdev_capacity(vd->vd_bdev);
@@ -433,9 +442,9 @@ static inline void
 vdev_submit_bio_impl(struct bio *bio)
 {
 #ifdef HAVE_1ARG_SUBMIT_BIO
-	submit_bio(bio);
+	(void) submit_bio(bio);
 #else
-	submit_bio(0, bio);
+	(void) submit_bio(bio_data_dir(bio), bio);
 #endif
 }
 
@@ -449,6 +458,13 @@ vdev_submit_bio_impl(struct bio *bio)
 #define	preempt_schedule_notrace(x) preempt_schedule(x)
 #endif
 
+/*
+ * As for the Linux 5.18 kernel bio_alloc() expects a block_device struct
+ * as an argument removing the need to set it with bio_set_dev().  This
+ * removes the need for all of the following compatibility code.
+ */
+#if !defined(HAVE_BIO_ALLOC_4ARG)
+
 #ifdef HAVE_BIO_SET_DEV
 #if defined(CONFIG_BLK_CGROUP) && defined(HAVE_BIO_SET_DEV_GPL_ONLY)
 /*
@@ -456,8 +472,11 @@ vdev_submit_bio_impl(struct bio *bio)
  * blkg_tryget() to use rcu_read_lock() instead of rcu_read_lock_sched().
  * As a side effect the function was converted to GPL-only.  Define our
  * own version when needed which uses rcu_read_lock_sched().
+ *
+ * The Linux 5.17 kernel split linux/blk-cgroup.h into a private and a public
+ * part, moving blkg_tryget into the private one. Define our own version.
  */
-#if defined(HAVE_BLKG_TRYGET_GPL_ONLY)
+#if defined(HAVE_BLKG_TRYGET_GPL_ONLY) || !defined(HAVE_BLKG_TRYGET)
 static inline bool
 vdev_blkg_tryget(struct blkcg_gq *blkg)
 {
@@ -482,9 +501,10 @@ vdev_blkg_tryget(struct blkcg_gq *blkg)
 
 	return (rc);
 }
-#elif defined(HAVE_BLKG_TRYGET)
+#else
 #define	vdev_blkg_tryget(bg)	blkg_tryget(bg)
 #endif
+#ifdef HAVE_BIO_SET_DEV_MACRO
 /*
  * The Linux 5.0 kernel updated the bio_set_dev() macro so it calls the
  * GPL-only bio_associate_blkg() symbol thus inadvertently converting
@@ -506,7 +526,30 @@ vdev_bio_associate_blkg(struct bio *bio)
 	if (q->root_blkg && vdev_blkg_tryget(q->root_blkg))
 		bio->bi_blkg = q->root_blkg;
 }
+
 #define	bio_associate_blkg vdev_bio_associate_blkg
+#else
+static inline void
+vdev_bio_set_dev(struct bio *bio, struct block_device *bdev)
+{
+#if defined(HAVE_BIO_BDEV_DISK)
+	struct request_queue *q = bdev->bd_disk->queue;
+#else
+	struct request_queue *q = bio->bi_disk->queue;
+#endif
+	bio_clear_flag(bio, BIO_REMAPPED);
+	if (bio->bi_bdev != bdev)
+		bio_clear_flag(bio, BIO_THROTTLED);
+	bio->bi_bdev = bdev;
+
+	ASSERT3P(q, !=, NULL);
+	ASSERT3P(bio->bi_blkg, ==, NULL);
+
+	if (q->root_blkg && vdev_blkg_tryget(q->root_blkg))
+		bio->bi_blkg = q->root_blkg;
+}
+#define	bio_set_dev		vdev_bio_set_dev
+#endif
 #endif
 #else
 /*
@@ -518,6 +561,7 @@ bio_set_dev(struct bio *bio, struct block_device *bdev)
 	bio->bi_bdev = bdev;
 }
 #endif /* HAVE_BIO_SET_DEV */
+#endif /* !HAVE_BIO_ALLOC_4ARG */
 
 static inline void
 vdev_submit_bio(struct bio *bio)
@@ -526,6 +570,36 @@ vdev_submit_bio(struct bio *bio)
 	current->bio_list = NULL;
 	vdev_submit_bio_impl(bio);
 	current->bio_list = bio_list;
+}
+
+static inline struct bio *
+vdev_bio_alloc(struct block_device *bdev, gfp_t gfp_mask,
+    unsigned short nr_vecs)
+{
+	struct bio *bio;
+
+#ifdef HAVE_BIO_ALLOC_4ARG
+	bio = bio_alloc(bdev, nr_vecs, 0, gfp_mask);
+#else
+	bio = bio_alloc(gfp_mask, nr_vecs);
+	if (likely(bio != NULL))
+		bio_set_dev(bio, bdev);
+#endif
+
+	return (bio);
+}
+
+static inline unsigned int
+vdev_bio_max_segs(zio_t *zio, int bio_size, uint64_t abd_offset)
+{
+	unsigned long nr_segs = abd_nr_pages_off(zio->io_abd,
+	    bio_size, abd_offset);
+
+#ifdef HAVE_BIO_MAX_SEGS
+	return (bio_max_segs(nr_segs));
+#else
+	return (MIN(nr_segs, BIO_MAX_PAGES));
+#endif
 }
 
 static int
@@ -539,6 +613,7 @@ __vdev_disk_physio(struct block_device *bdev, zio_t *zio,
 	int bio_count = 16;
 	int error = 0;
 	struct blk_plug plug;
+	unsigned short nr_vecs;
 
 	/*
 	 * Accessing outside the block device is never allowed.
@@ -546,7 +621,9 @@ __vdev_disk_physio(struct block_device *bdev, zio_t *zio,
 	if (io_offset + io_size > bdev->bd_inode->i_size) {
 		vdev_dbgmsg(zio->io_vd,
 		    "Illegal access %llu size %llu, device size %llu",
-		    io_offset, io_size, i_size_read(bdev->bd_inode));
+		    (u_longlong_t)io_offset,
+		    (u_longlong_t)io_size,
+		    (u_longlong_t)i_size_read(bdev->bd_inode));
 		return (SET_ERROR(EIO));
 	}
 
@@ -588,15 +665,8 @@ retry:
 			goto retry;
 		}
 
-		/* bio_alloc() with __GFP_WAIT never returns NULL */
-#ifdef HAVE_BIO_MAX_SEGS
-		dr->dr_bio[i] = bio_alloc(GFP_NOIO, bio_max_segs(
-		    abd_nr_pages_off(zio->io_abd, bio_size, abd_offset)));
-#else
-		dr->dr_bio[i] = bio_alloc(GFP_NOIO,
-		    MIN(abd_nr_pages_off(zio->io_abd, bio_size, abd_offset),
-		    BIO_MAX_PAGES));
-#endif
+		nr_vecs = vdev_bio_max_segs(zio, bio_size, abd_offset);
+		dr->dr_bio[i] = vdev_bio_alloc(bdev, GFP_NOIO, nr_vecs);
 		if (unlikely(dr->dr_bio[i] == NULL)) {
 			vdev_disk_dio_free(dr);
 			return (SET_ERROR(ENOMEM));
@@ -605,7 +675,6 @@ retry:
 		/* Matching put called by vdev_disk_physio_completion */
 		vdev_disk_dio_get(dr);
 
-		bio_set_dev(dr->dr_bio[i], bdev);
 		BIO_BI_SECTOR(dr->dr_bio[i]) = bio_offset >> 9;
 		dr->dr_bio[i]->bi_end_io = vdev_disk_physio_completion;
 		dr->dr_bio[i]->bi_private = dr;
@@ -669,14 +738,12 @@ vdev_disk_io_flush(struct block_device *bdev, zio_t *zio)
 	if (!q)
 		return (SET_ERROR(ENXIO));
 
-	bio = bio_alloc(GFP_NOIO, 0);
-	/* bio_alloc() with __GFP_WAIT never returns NULL */
+	bio = vdev_bio_alloc(bdev, GFP_NOIO, 0);
 	if (unlikely(bio == NULL))
 		return (SET_ERROR(ENOMEM));
 
 	bio->bi_end_io = vdev_disk_io_flush_completion;
 	bio->bi_private = zio;
-	bio_set_dev(bio, bdev);
 	bio_set_flush(bio);
 	vdev_submit_bio(bio);
 	invalidate_bdev(bdev);
@@ -684,12 +751,38 @@ vdev_disk_io_flush(struct block_device *bdev, zio_t *zio)
 	return (0);
 }
 
+static int
+vdev_disk_io_trim(zio_t *zio)
+{
+	vdev_t *v = zio->io_vd;
+	vdev_disk_t *vd = v->vdev_tsd;
+
+#if defined(HAVE_BLKDEV_ISSUE_SECURE_ERASE)
+	if (zio->io_trim_flags & ZIO_TRIM_SECURE) {
+		return (-blkdev_issue_secure_erase(vd->vd_bdev,
+		    zio->io_offset >> 9, zio->io_size >> 9, GFP_NOFS));
+	} else {
+		return (-blkdev_issue_discard(vd->vd_bdev,
+		    zio->io_offset >> 9, zio->io_size >> 9, GFP_NOFS));
+	}
+#elif defined(HAVE_BLKDEV_ISSUE_DISCARD)
+	unsigned long trim_flags = 0;
+#if defined(BLKDEV_DISCARD_SECURE)
+	if (zio->io_trim_flags & ZIO_TRIM_SECURE)
+		trim_flags |= BLKDEV_DISCARD_SECURE;
+#endif
+	return (-blkdev_issue_discard(vd->vd_bdev,
+	    zio->io_offset >> 9, zio->io_size >> 9, GFP_NOFS, trim_flags));
+#else
+#error "Unsupported kernel"
+#endif
+}
+
 static void
 vdev_disk_io_start(zio_t *zio)
 {
 	vdev_t *v = zio->io_vd;
 	vdev_disk_t *vd = v->vdev_tsd;
-	unsigned long trim_flags = 0;
 	int rw, error;
 
 	/*
@@ -762,14 +855,7 @@ vdev_disk_io_start(zio_t *zio)
 		break;
 
 	case ZIO_TYPE_TRIM:
-#if defined(BLKDEV_DISCARD_SECURE)
-		if (zio->io_trim_flags & ZIO_TRIM_SECURE)
-			trim_flags |= BLKDEV_DISCARD_SECURE;
-#endif
-		zio->io_error = -blkdev_issue_discard(vd->vd_bdev,
-		    zio->io_offset >> 9, zio->io_size >> 9, GFP_NOFS,
-		    trim_flags);
-
+		zio->io_error = vdev_disk_io_trim(zio);
 		rw_exit(&vd->vd_lock);
 		zio_interrupt(zio);
 		return;
@@ -882,7 +968,7 @@ param_set_vdev_scheduler(const char *val, zfs_kernel_param_t *kp)
 	return (error);
 }
 
-char *zfs_vdev_scheduler = "unused";
+static const char *zfs_vdev_scheduler = "unused";
 module_param_call(zfs_vdev_scheduler, param_set_vdev_scheduler,
     param_get_charp, &zfs_vdev_scheduler, 0644);
 MODULE_PARM_DESC(zfs_vdev_scheduler, "I/O scheduler");

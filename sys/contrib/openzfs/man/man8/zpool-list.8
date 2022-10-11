@@ -18,7 +18,6 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.\"
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 2012, 2018 by Delphix. All rights reserved.
 .\" Copyright (c) 2012 Cyril Plisko. All Rights Reserved.
@@ -27,31 +26,23 @@
 .\" Copyright 2017 Nexenta Systems, Inc.
 .\" Copyright (c) 2017 Open-E, Inc. All Rights Reserved.
 .\"
-.Dd August 9, 2019
+.Dd March 16, 2022
 .Dt ZPOOL-LIST 8
 .Os
+.
 .Sh NAME
 .Nm zpool-list
-.Nd Lists ZFS storage pools along with a health status and space usage
+.Nd list information about ZFS storage pools
 .Sh SYNOPSIS
 .Nm zpool
 .Cm list
 .Op Fl HgLpPv
-.Op Fl o Ar property Ns Oo , Ns Ar property Oc Ns ...
+.Op Fl o Ar property Ns Oo , Ns Ar property Oc Ns …
 .Op Fl T Sy u Ns | Ns Sy d
-.Oo Ar pool Oc Ns ...
+.Oo Ar pool Oc Ns …
 .Op Ar interval Op Ar count
+.
 .Sh DESCRIPTION
-.Bl -tag -width Ds
-.It Xo
-.Nm zpool
-.Cm list
-.Op Fl HgLpPv
-.Op Fl o Ar property Ns Oo , Ns Ar property Oc Ns ...
-.Op Fl T Sy u Ns | Ns Sy d
-.Oo Ar pool Oc Ns ...
-.Op Ar interval Op Ar count
-.Xc
 Lists the given pools along with a health status and space usage.
 If no
 .Ar pool Ns s
@@ -60,7 +51,7 @@ When given an
 .Ar interval ,
 the information is printed every
 .Ar interval
-seconds until ^C is pressed.
+seconds until killed.
 If
 .Ar count
 is specified, the command exits after
@@ -68,8 +59,8 @@ is specified, the command exits after
 reports are printed.
 .Bl -tag -width Ds
 .It Fl g
-Display vdev GUIDs instead of the normal device names. These GUIDs
-can be used in place of device names for the zpool
+Display vdev GUIDs instead of the normal device names.
+These GUIDs can be used in place of device names for the zpool
 detach/offline/remove/replace commands.
 .It Fl H
 Scripted mode.
@@ -78,22 +69,24 @@ space.
 .It Fl o Ar property
 Comma-separated list of properties to display.
 See the
-.Xr zpoolprops
+.Xr zpoolprops 7
 manual page for a list of valid properties.
 The default list is
-.Cm name , size , allocated , free , checkpoint, expandsize , fragmentation ,
-.Cm capacity , dedupratio , health , altroot .
+.Sy name , size , allocated , free , checkpoint, expandsize , fragmentation ,
+.Sy capacity , dedupratio , health , altroot .
 .It Fl L
-Display real paths for vdevs resolving all symbolic links. This can
-be used to look up the current block device name regardless of the
-/dev/disk/ path used to open it.
+Display real paths for vdevs resolving all symbolic links.
+This can be used to look up the current block device name regardless of the
+.Pa /dev/disk
+path used to open it.
 .It Fl p
 Display numbers in parsable
 .Pq exact
 values.
 .It Fl P
 Display full paths for vdevs instead of only the last component of
-the path. This can be used in conjunction with the
+the path.
+This can be used in conjunction with the
 .Fl L
 flag.
 .It Fl T Sy u Ns | Ns Sy d
@@ -113,7 +106,41 @@ Verbose statistics.
 Reports usage statistics for individual vdevs within the pool, in addition to
 the pool-wide statistics.
 .El
-.El
+.
+.Sh EXAMPLES
+.\" These are, respectively, examples 6, 15 from zpool.8
+.\" Make sure to update them bidirectionally
+.Ss Example 1 : No Listing Available ZFS Storage Pools
+The following command lists all available pools on the system.
+In this case, the pool
+.Ar zion
+is faulted due to a missing device.
+The results from this command are similar to the following:
+.Bd -literal -compact -offset Ds
+.No # Nm zpool Cm list
+NAME    SIZE  ALLOC   FREE  EXPANDSZ   FRAG    CAP  DEDUP  HEALTH  ALTROOT
+rpool  19.9G  8.43G  11.4G         -    33%    42%  1.00x  ONLINE  -
+tank   61.5G  20.0G  41.5G         -    48%    32%  1.00x  ONLINE  -
+zion       -      -      -         -      -      -      -  FAULTED -
+.Ed
+.
+.Ss Example 2 : No Displaying expanded space on a device
+The following command displays the detailed information for the pool
+.Ar data .
+This pool is comprised of a single raidz vdev where one of its devices
+increased its capacity by 10 GiB.
+In this example, the pool will not be able to utilize this extra capacity until
+all the devices under the raidz vdev have been expanded.
+.Bd -literal -compact -offset Ds
+.No # Nm zpool Cm list Fl v Ar data
+NAME         SIZE  ALLOC   FREE  EXPANDSZ   FRAG    CAP  DEDUP  HEALTH  ALTROOT
+data        23.9G  14.6G  9.30G         -    48%    61%  1.00x  ONLINE  -
+  raidz1    23.9G  14.6G  9.30G         -    48%
+    sda         -      -      -         -      -
+    sdb         -      -      -       10G      -
+    sdc         -      -      -         -      -
+.Ed
+.
 .Sh SEE ALSO
 .Xr zpool-import 8 ,
 .Xr zpool-status 8

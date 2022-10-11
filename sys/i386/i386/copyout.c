@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2018 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Konstantin Belousov <kib@FreeBSD.org>
  * under sponsorship from the FreeBSD Foundation.
@@ -104,7 +103,7 @@ cp_slow0(vm_offset_t uva, size_t len, bool write,
 	plen = howmany(uva - trunc_page(uva) + len, PAGE_SIZE);
 	MPASS(plen <= nitems(m));
 	error = 0;
-	i = vm_fault_quick_hold_pages(&curproc->p_vmspace->vm_map, uva, len,
+	i = vm_fault_quick_hold_pages(&curproc->p_vmspace->vm_map, (void *)uva, len,
 	    (write ? VM_PROT_WRITE : VM_PROT_READ) | VM_PROT_QUICK_NOFAULT,
 	    m, nitems(m));
 	if (i != plen)

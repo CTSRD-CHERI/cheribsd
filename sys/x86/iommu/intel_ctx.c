@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2013 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Konstantin Belousov <kib@FreeBSD.org>
  * under sponsorship from the FreeBSD Foundation.
@@ -246,7 +245,7 @@ domain_init_rmrr(struct dmar_domain *domain, device_t dev, int bus,
 	TAILQ_INIT(&rmrr_entries);
 	dmar_dev_parse_rmrr(domain, dev_domain, dev_busno, dev_path,
 	    dev_path_len, &rmrr_entries);
-	TAILQ_FOREACH_SAFE(entry, &rmrr_entries, unroll_link, entry1) {
+	TAILQ_FOREACH_SAFE(entry, &rmrr_entries, dmamap_link, entry1) {
 		/*
 		 * VT-d specification requires that the start of an
 		 * RMRR entry is 4k-aligned.  Buggy BIOSes put
@@ -307,7 +306,7 @@ domain_init_rmrr(struct dmar_domain *domain, device_t dev, int bus,
 				    error1);
 				error = error1;
 			}
-			TAILQ_REMOVE(&rmrr_entries, entry, unroll_link);
+			TAILQ_REMOVE(&rmrr_entries, entry, dmamap_link);
 			iommu_gas_free_entry(DOM2IODOM(domain), entry);
 		}
 		for (i = 0; i < size; i++)
@@ -522,7 +521,7 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 {
 	struct dmar_domain *domain, *domain1;
 	struct dmar_ctx *ctx, *ctx1;
-	struct iommu_unit *unit;
+	struct iommu_unit *unit __diagused;
 	dmar_ctx_entry_t *ctxp;
 	struct sf_buf *sf;
 	int bus, slot, func, error;
@@ -562,7 +561,7 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 			error = domain_init_rmrr(domain1, dev, bus,
 			    slot, func, dev_domain, dev_busno, dev_path,
 			    dev_path_len);
-			if (error == 0)
+			if (error == 0 && dev != NULL)
 				error = dmar_reserve_pci_regions(domain1, dev);
 			if (error != 0) {
 				dmar_domain_destroy(domain1);
@@ -632,6 +631,10 @@ dmar_get_ctx_for_dev1(struct dmar_unit *dmar, device_t dev, uint16_t rid,
 	 * to avoid unneeded command.
 	 */
 	if (enable && !rmrr_init && (dmar->hw_gcmd & DMAR_GCMD_TE) == 0) {
+		error = dmar_disable_protected_regions(dmar);
+		if (error != 0)
+			printf("dmar%d: Failed to disable protected regions\n",
+			    dmar->iommu.unit);
 		error = dmar_enable_translation(dmar);
 		if (error == 0) {
 			if (bootverbose) {
@@ -864,26 +867,38 @@ dmar_domain_free_entry(struct iommu_map_entry *entry, bool free)
 		entry->flags = 0;
 }
 
+/*
+ * If the given value for "free" is true, then the caller must not be using
+ * the entry's dmamap_link field.
+ */
 void
-dmar_domain_unload_entry(struct iommu_map_entry *entry, bool free)
+iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free,
+    bool cansleep)
 {
 	struct dmar_domain *domain;
 	struct dmar_unit *unit;
 
 	domain = IODOM2DOM(entry->domain);
 	unit = DOM2DMAR(domain);
+
+	/*
+	 * If "free" is false, then the IOTLB invalidation must be performed
+	 * synchronously.  Otherwise, the caller might free the entry before
+	 * dmar_qi_task() is finished processing it.
+	 */
 	if (unit->qi_enabled) {
-		DMAR_LOCK(unit);
-		dmar_qi_invalidate_locked(IODOM2DOM(entry->domain),
-		    entry->start, entry->end - entry->start, &entry->gseq,
-		    true);
-		if (!free)
-			entry->flags |= IOMMU_MAP_ENTRY_QI_NF;
-		TAILQ_INSERT_TAIL(&unit->tlb_flush_entries, entry, dmamap_link);
-		DMAR_UNLOCK(unit);
+		if (free) {
+			DMAR_LOCK(unit);
+			dmar_qi_invalidate_locked(domain, entry, true);
+			DMAR_UNLOCK(unit);
+		} else {
+			dmar_qi_invalidate_sync(domain, entry->start,
+			    entry->end - entry->start, cansleep);
+			dmar_domain_free_entry(entry, false);
+		}
 	} else {
-		domain_flush_iotlb_sync(IODOM2DOM(entry->domain),
-		    entry->start, entry->end - entry->start);
+		domain_flush_iotlb_sync(domain, entry->start, entry->end -
+		    entry->start);
 		dmar_domain_free_entry(entry, free);
 	}
 }
@@ -899,15 +914,15 @@ dmar_domain_unload_emit_wait(struct dmar_domain *domain,
 }
 
 void
-dmar_domain_unload(struct dmar_domain *domain,
+iommu_domain_unload(struct iommu_domain *iodom,
     struct iommu_map_entries_tailq *entries, bool cansleep)
 {
+	struct dmar_domain *domain;
 	struct dmar_unit *unit;
-	struct iommu_domain *iodom;
 	struct iommu_map_entry *entry, *entry1;
-	int error;
+	int error __diagused;
 
-	iodom = DOM2IODOM(domain);
+	domain = IODOM2DOM(iodom);
 	unit = DOM2DMAR(domain);
 
 	TAILQ_FOREACH_SAFE(entry, entries, dmamap_link, entry1) {
@@ -928,12 +943,11 @@ dmar_domain_unload(struct dmar_domain *domain,
 
 	KASSERT(unit->qi_enabled, ("loaded entry left"));
 	DMAR_LOCK(unit);
-	TAILQ_FOREACH(entry, entries, dmamap_link) {
-		dmar_qi_invalidate_locked(domain, entry->start, entry->end -
-		    entry->start, &entry->gseq,
+	while ((entry = TAILQ_FIRST(entries)) != NULL) {
+		TAILQ_REMOVE(entries, entry, dmamap_link);
+		dmar_qi_invalidate_locked(domain, entry,
 		    dmar_domain_unload_emit_wait(domain, entry));
 	}
-	TAILQ_CONCAT(&unit->tlb_flush_entries, entries, dmamap_link);
 	DMAR_UNLOCK(unit);
 }
 
@@ -971,22 +985,4 @@ iommu_free_ctx(struct iommu_ctx *context)
 	ctx = IOCTX2CTX(context);
 
 	dmar_free_ctx(ctx);
-}
-
-void
-iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free)
-{
-
-	dmar_domain_unload_entry(entry, free);
-}
-
-void
-iommu_domain_unload(struct iommu_domain *iodom,
-    struct iommu_map_entries_tailq *entries, bool cansleep)
-{
-	struct dmar_domain *domain;
-
-	domain = IODOM2DOM(iodom);
-
-	dmar_domain_unload(domain, entries, cansleep);
 }

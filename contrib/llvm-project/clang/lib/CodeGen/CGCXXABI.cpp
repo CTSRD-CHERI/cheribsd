@@ -135,8 +135,8 @@ void CGCXXABI::buildThisParam(CodeGenFunction &CGF, FunctionArgList &params) {
   // down to whether we know it's a complete object or not.
   auto &Layout = CGF.getContext().getASTRecordLayout(MD->getParent());
   if (MD->getParent()->getNumVBases() == 0 || // avoid vcall in common case
-      MD->getParent()->hasAttr<FinalAttr>() ||
-      !isThisCompleteObject(CGF.CurGD)) {
+      MD->getParent()->isEffectivelyFinal() ||
+      isThisCompleteObject(CGF.CurGD)) {
     CGF.CXXABIThisAlignment = Layout.getAlignment();
   } else {
     CGF.CXXABIThisAlignment = Layout.getNonVirtualAlignment();
@@ -152,6 +152,51 @@ void CGCXXABI::setCXXABIThisValue(CodeGenFunction &CGF, llvm::Value *ThisPtr) {
   /// Initialize the 'this' slot.
   assert(getThisDecl(CGF) && "no 'this' variable for function");
   CGF.CXXABIThisValue = ThisPtr;
+}
+
+bool CGCXXABI::mayNeedDestruction(const VarDecl *VD) const {
+  if (VD->needsDestruction(getContext()))
+    return true;
+
+  // If the variable has an incomplete class type (or array thereof), it
+  // might need destruction.
+  const Type *T = VD->getType()->getBaseElementTypeUnsafe();
+  if (T->getAs<RecordType>() && T->isIncompleteType())
+    return true;
+
+  return false;
+}
+
+bool CGCXXABI::isEmittedWithConstantInitializer(
+    const VarDecl *VD, bool InspectInitForWeakDef) const {
+  VD = VD->getMostRecentDecl();
+  if (VD->hasAttr<ConstInitAttr>())
+    return true;
+
+  // All later checks examine the initializer specified on the variable. If
+  // the variable is weak, such examination would not be correct.
+  if (!InspectInitForWeakDef && (VD->isWeak() || VD->hasAttr<SelectAnyAttr>()))
+    return false;
+
+  const VarDecl *InitDecl = VD->getInitializingDeclaration();
+  if (!InitDecl)
+    return false;
+
+  // If there's no initializer to run, this is constant initialization.
+  if (!InitDecl->hasInit())
+    return true;
+
+  // If we have the only definition, we don't need a thread wrapper if we
+  // will emit the value as a constant.
+  if (isUniqueGVALinkage(getContext().GetGVALinkageForVariable(VD)))
+    return !mayNeedDestruction(VD) && InitDecl->evaluateValue();
+
+  // Otherwise, we need a thread wrapper unless we know that every
+  // translation unit will emit the value as a constant. We rely on the
+  // variable being constant-initialized in every translation unit if it's
+  // constant-initialized in any translation unit, which isn't actually
+  // guaranteed by the standard but is necessary for sanity.
+  return InitDecl->hasConstantInitialization();
 }
 
 void CGCXXABI::EmitReturnFromThunk(CodeGenFunction &CGF,
@@ -249,28 +294,6 @@ llvm::Constant *CGCXXABI::getMemberPointerAdjustment(const CastExpr *E) {
   return CGM.GetNonVirtualBaseClassOffset(derivedClass,
                                           E->path_begin(),
                                           E->path_end());
-}
-
-CharUnits CGCXXABI::getMemberPointerPathAdjustment(const APValue &MP) {
-  // TODO: Store base specifiers in APValue member pointer paths so we can
-  // easily reuse CGM.GetNonVirtualBaseClassOffset().
-  const ValueDecl *MPD = MP.getMemberPointerDecl();
-  CharUnits ThisAdjustment = CharUnits::Zero();
-  ArrayRef<const CXXRecordDecl*> Path = MP.getMemberPointerPath();
-  bool DerivedMember = MP.isMemberPointerToDerivedMember();
-  const CXXRecordDecl *RD = cast<CXXRecordDecl>(MPD->getDeclContext());
-  for (unsigned I = 0, N = Path.size(); I != N; ++I) {
-    const CXXRecordDecl *Base = RD;
-    const CXXRecordDecl *Derived = Path[I];
-    if (DerivedMember)
-      std::swap(Base, Derived);
-    ThisAdjustment +=
-      getContext().getASTRecordLayout(Derived).getBaseClassOffset(Base);
-    RD = Path[I];
-  }
-  if (DerivedMember)
-    ThisAdjustment = -ThisAdjustment;
-  return ThisAdjustment;
 }
 
 llvm::BasicBlock *

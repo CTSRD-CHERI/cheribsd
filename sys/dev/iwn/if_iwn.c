@@ -374,9 +374,8 @@ static driver_t iwn_driver = {
 	iwn_methods,
 	sizeof(struct iwn_softc)
 };
-static devclass_t iwn_devclass;
 
-DRIVER_MODULE(iwn, pci, iwn_driver, iwn_devclass, NULL, NULL);
+DRIVER_MODULE(iwn, pci, iwn_driver, NULL, NULL);
 MODULE_PNP_INFO("U16:vendor;U16:device;D:#", pci, iwn, iwn_ident_table,
     nitems(iwn_ident_table) - 1);
 MODULE_VERSION(iwn, 1);
@@ -1688,13 +1687,13 @@ iwn_read_prom_data(struct iwn_softc *sc, uint32_t addr, void *data, int count)
 	addr += sc->prom_base;
 	for (; count > 0; count -= 2, addr++) {
 		IWN_WRITE(sc, IWN_EEPROM, addr << 2);
-		for (ntries = 0; ntries < 10; ntries++) {
+		for (ntries = 0; ntries < 20; ntries++) {
 			val = IWN_READ(sc, IWN_EEPROM);
 			if (val & IWN_EEPROM_READ_VALID)
 				break;
 			DELAY(5);
 		}
-		if (ntries == 10) {
+		if (ntries == 20) {
 			device_printf(sc->sc_dev,
 			    "timeout reading ROM at 0x%x\n", addr);
 			return ETIMEDOUT;
@@ -7026,7 +7025,7 @@ iwn_scan(struct iwn_softc *sc, struct ieee80211vap *vap,
 	int buflen, error;
 	int is_active;
 	uint16_t dwell_active, dwell_passive;
-	uint32_t extra, scan_service_time;
+	uint32_t scan_service_time;
 
 	DPRINTF(sc, IWN_DEBUG_TRACE, "->%s begin\n", __func__);
 
@@ -7070,9 +7069,12 @@ iwn_scan(struct iwn_softc *sc, struct ieee80211vap *vap,
 	 * suspend_time: 100 (TU)
 	 *
 	 */
+#if 0
 	extra = (100 /* suspend_time */ / 100 /* beacon interval */) << 22;
-	//scan_service_time = extra | ((100 /* susp */ % 100 /* int */) * 1024);
+	scan_service_time = extra | ((100 /* susp */ % 100 /* int */) * 1024);
+#else
 	scan_service_time = (4 << 22) | (100 * 1024);	/* Hardcode for now! */
+#endif
 	hdr->pause_svc = htole32(scan_service_time);
 
 	/* Select antennas for scanning. */

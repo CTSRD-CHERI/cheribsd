@@ -93,12 +93,10 @@ sysctl_vfs_zfs_arc_free_target(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 SYSCTL_DECL(_vfs_zfs);
-/* BEGIN CSTYLED */
 SYSCTL_PROC(_vfs_zfs, OID_AUTO, arc_free_target,
     CTLTYPE_UINT | CTLFLAG_MPSAFE | CTLFLAG_RW, 0, sizeof (uint_t),
     sysctl_vfs_zfs_arc_free_target, "IU",
-    "Desired number of free pages below which ARC triggers reclaim");
-/* END CSTYLED */
+	"Desired number of free pages below which ARC triggers reclaim");
 
 int64_t
 arc_available_memory(void)
@@ -158,11 +156,7 @@ arc_default_max(uint64_t min, uint64_t allmem)
 static void
 arc_prune_task(void *arg)
 {
-#ifdef __LP64__
-	int64_t nr_scan = (int64_t)arg;
-#else
-	int64_t nr_scan = (int32_t)arg;
-#endif
+	int64_t nr_scan = (intptr_t)arg;
 
 	arc_reduce_target_size(ptob(nr_scan));
 #if __FreeBSD_version >= 1300139
@@ -188,15 +182,13 @@ arc_prune_task(void *arg)
 void
 arc_prune_async(int64_t adjust)
 {
-	int64_t *adjustptr;
 
 #ifndef __LP64__
-	if (adjust > __LONG_MAX)
-		adjust = __LONG_MAX;
+	if (adjust > INTPTR_MAX)
+		adjust = INTPTR_MAX;
 #endif
-
-	adjustptr = (void *)adjust;
-	taskq_dispatch(arc_prune_taskq, arc_prune_task, adjustptr, TQ_SLEEP);
+	taskq_dispatch(arc_prune_taskq, arc_prune_task,
+	    (void *)(intptr_t)adjust, TQ_SLEEP);
 	ARCSTAT_BUMP(arcstat_prune);
 }
 
@@ -239,9 +231,7 @@ arc_lowmem(void *arg __unused, int howto __unused)
 	 * with ARC reclaim thread.
 	 */
 	if (curproc == pageproc)
-		arc_wait_for_eviction(to_free);
-	else
-		arc_wait_for_eviction(0);
+		arc_wait_for_eviction(to_free, B_FALSE);
 }
 
 void

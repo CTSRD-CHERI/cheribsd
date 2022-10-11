@@ -273,10 +273,7 @@ qla_init_cntxt_regions(qla_host_t *ha)
 	q80_rcv_cntxt_req_t	*rx_cntxt_req;
 	bus_addr_t		phys_addr;
 	uint32_t		i;
-        device_t                dev;
 	uint32_t		size;
-
-        dev = ha->pci_dev;
 
 	hw = &ha->hw;
 
@@ -1150,13 +1147,10 @@ qla_del_hw_if(qla_host_t *ha)
 int
 qla_init_hw_if(qla_host_t *ha)
 {
-	device_t	dev;
 	int		i;
 	uint8_t		bcast_mac[6];
 
 	qla_get_hw_caps(ha);
-
-	dev = ha->pci_dev;
 
 	for (i = 0; i < ha->hw.num_sds_rings; i++) {
 		bzero(ha->hw.dma_buf.sds_ring[i].dma_b,
@@ -1776,6 +1770,7 @@ qla_update_link_state(qla_host_t *ha)
 int
 qla_config_lro(qla_host_t *ha)
 {
+#if defined(INET) || defined(INET6)
 	int i;
         qla_hw_t *hw = &ha->hw;
 	struct lro_ctrl *lro;
@@ -1792,12 +1787,14 @@ qla_config_lro(qla_host_t *ha)
 	ha->flags.lro_init = 1;
 
 	QL_DPRINT2((ha->pci_dev, "%s: LRO initialized\n", __func__));
+#endif
 	return (0);
 }
 
 void
 qla_free_lro(qla_host_t *ha)
 {
+#if defined(INET) || defined(INET6)
 	int i;
         qla_hw_t *hw = &ha->hw;
 	struct lro_ctrl *lro;
@@ -1810,6 +1807,7 @@ qla_free_lro(qla_host_t *ha)
 		tcp_lro_free(lro);
 	}
 	ha->flags.lro_init = 0;
+#endif
 }
 
 void

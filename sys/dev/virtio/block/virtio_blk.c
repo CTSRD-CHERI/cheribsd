@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/bio.h>
 #include <sys/malloc.h>
 #include <sys/module.h>
+#include <sys/msan.h>
 #include <sys/sglist.h>
 #include <sys/sysctl.h>
 #include <sys/lock.h>
@@ -126,13 +127,14 @@ static int	vtblk_detach(device_t);
 static int	vtblk_suspend(device_t);
 static int	vtblk_resume(device_t);
 static int	vtblk_shutdown(device_t);
+static int	vtblk_attach_completed(device_t);
 static int	vtblk_config_change(device_t);
 
 static int	vtblk_open(struct disk *);
 static int	vtblk_close(struct disk *);
 static int	vtblk_ioctl(struct disk *, u_long, void *, int,
 		    struct thread *);
-static int	vtblk_dump(void *, void *, vm_offset_t, off_t, size_t);
+static int	vtblk_dump(void *, void *, off_t, size_t);
 static void	vtblk_strategy(struct bio *);
 
 static int	vtblk_negotiate_features(struct vtblk_softc *);
@@ -255,6 +257,7 @@ static device_method_t vtblk_methods[] = {
 	DEVMETHOD(device_shutdown,	vtblk_shutdown),
 
 	/* VirtIO methods. */
+	DEVMETHOD(virtio_attach_completed, vtblk_attach_completed),
 	DEVMETHOD(virtio_config_change,	vtblk_config_change),
 
 	DEVMETHOD_END
@@ -265,10 +268,8 @@ static driver_t vtblk_driver = {
 	vtblk_methods,
 	sizeof(struct vtblk_softc)
 };
-static devclass_t vtblk_devclass;
 
-VIRTIO_DRIVER_MODULE(virtio_blk, vtblk_driver, vtblk_devclass,
-    vtblk_modevent, 0);
+VIRTIO_DRIVER_MODULE(virtio_blk, vtblk_driver, vtblk_modevent, NULL);
 MODULE_VERSION(virtio_blk, 1);
 MODULE_DEPEND(virtio_blk, virtio, 1, 1, 1);
 
@@ -378,8 +379,6 @@ vtblk_attach(device_t dev)
 		goto fail;
 	}
 
-	vtblk_create_disk(sc);
-
 	virtqueue_enable_intr(sc->vtblk_vq);
 
 fail:
@@ -462,6 +461,22 @@ vtblk_shutdown(device_t dev)
 }
 
 static int
+vtblk_attach_completed(device_t dev)
+{
+	struct vtblk_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	/*
+	 * Create disk after attach as VIRTIO_BLK_T_GET_ID can only be
+	 * processed after the device acknowledged
+	 * VIRTIO_CONFIG_STATUS_DRIVER_OK.
+	 */
+	vtblk_create_disk(sc);
+	return (0);
+}
+
+static int
 vtblk_config_change(device_t dev)
 {
 	struct vtblk_softc *sc;
@@ -516,8 +531,7 @@ vtblk_ioctl(struct disk *dp, u_long cmd, void *addr, int flag,
 }
 
 static int
-vtblk_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset,
-    size_t length)
+vtblk_dump(void *arg, void *virtual, off_t offset, size_t length)
 {
 	struct disk *dp;
 	struct vtblk_softc *sc;
@@ -1135,6 +1149,8 @@ vtblk_bio_done(struct vtblk_softc *sc, struct bio *bp, int error)
 		bp->bio_resid = bp->bio_bcount;
 		bp->bio_error = error;
 		bp->bio_flags |= BIO_ERROR;
+	} else {
+		kmsan_mark_bio(bp, KMSAN_STATE_INITED);
 	}
 
 	if (bp->bio_driver1 != NULL) {

@@ -86,7 +86,7 @@ int linux_ignore_ip_recverr = 1;
 SYSCTL_INT(_compat_linux, OID_AUTO, ignore_ip_recverr, CTLFLAG_RWTUN,
     &linux_ignore_ip_recverr, 0, "Ignore enabling IP_RECVERR");
 
-int linux_preserve_vstatus = 0;
+int linux_preserve_vstatus = 1;
 SYSCTL_INT(_compat_linux, OID_AUTO, preserve_vstatus, CTLFLAG_RWTUN,
     &linux_preserve_vstatus, 0, "Preserve VSTATUS termios(4) flag");
 
@@ -98,6 +98,18 @@ SYSCTL_BOOL(_compat_linux, OID_AUTO, map_sched_prio, CTLFLAG_RDTUN,
 int linux_use_emul_path = 1;
 SYSCTL_INT(_compat_linux, OID_AUTO, use_emul_path, CTLFLAG_RWTUN,
     &linux_use_emul_path, 0, "Use linux.compat.emul_path");
+
+static bool linux_setid_allowed = true;
+SYSCTL_BOOL(_compat_linux, OID_AUTO, setid_allowed, CTLFLAG_RWTUN,
+    &linux_setid_allowed, 0,
+    "Allow setuid/setgid on execve of Linux binary");
+
+int
+linux_setid_allowed_query(struct thread *td __unused,
+    struct image_params *imgp __unused)
+{
+	return (linux_setid_allowed);
+}
 
 static int	linux_set_osname(struct thread *td, char *osname);
 static int	linux_set_osrelease(struct thread *td, char *osrelease);

@@ -749,6 +749,7 @@ g_mirror_fill_metadata(struct g_mirror_softc *sc, struct g_mirror_disk *disk,
     struct g_mirror_metadata *md)
 {
 
+	bzero(md, sizeof(*md));
 	strlcpy(md->md_magic, G_MIRROR_MAGIC, sizeof(md->md_magic));
 	md->md_version = G_MIRROR_VERSION;
 	strlcpy(md->md_name, sc->sc_name, sizeof(md->md_name));
@@ -760,14 +761,8 @@ g_mirror_fill_metadata(struct g_mirror_softc *sc, struct g_mirror_disk *disk,
 	md->md_mediasize = sc->sc_mediasize;
 	md->md_sectorsize = sc->sc_sectorsize;
 	md->md_mflags = (sc->sc_flags & G_MIRROR_DEVICE_FLAG_MASK);
-	bzero(md->md_provider, sizeof(md->md_provider));
 	if (disk == NULL) {
 		md->md_did = arc4random();
-		md->md_priority = 0;
-		md->md_syncid = 0;
-		md->md_dflags = 0;
-		md->md_sync_offset = 0;
-		md->md_provsize = 0;
 	} else {
 		md->md_did = disk->d_id;
 		md->md_priority = disk->d_priority;
@@ -775,8 +770,6 @@ g_mirror_fill_metadata(struct g_mirror_softc *sc, struct g_mirror_disk *disk,
 		md->md_dflags = (disk->d_flags & G_MIRROR_DISK_FLAG_MASK);
 		if (disk->d_state == G_MIRROR_DISK_STATE_SYNCHRONIZING)
 			md->md_sync_offset = disk->d_sync.ds_offset_done;
-		else
-			md->md_sync_offset = 0;
 		if ((disk->d_flags & G_MIRROR_DISK_FLAG_HARDCODED) != 0) {
 			strlcpy(md->md_provider,
 			    disk->d_consumer->provider->name,
@@ -1042,9 +1035,19 @@ g_mirror_regular_request(struct g_mirror_softc *sc, struct bio *bp)
 	case BIO_READ:
 		if (pbp->bio_inbed < pbp->bio_children)
 			break;
-		if (g_mirror_ndisks(sc, G_MIRROR_DISK_STATE_ACTIVE) == 1)
+
+		/*
+		 * If there is only one active disk we want to double-check that
+		 * it is, in fact, the disk that we already tried.  This is
+		 * necessary because we might have just lost a race with a
+		 * removal of the tried disk (likely because of the same error)
+		 * and the only remaining disk is still viable for a retry.
+		 */
+		if (g_mirror_ndisks(sc, G_MIRROR_DISK_STATE_ACTIVE) == 1 &&
+		    disk != NULL &&
+		    disk->d_state == G_MIRROR_DISK_STATE_ACTIVE) {
 			g_io_deliver(pbp, pbp->bio_error);
-		else {
+		} else {
 			pbp->bio_error = 0;
 			mtx_lock(&sc->sc_queue_mtx);
 			TAILQ_INSERT_TAIL(&sc->sc_queue, pbp, bio_queue);
@@ -1612,7 +1615,7 @@ g_mirror_request_split(struct g_mirror_softc *sc, struct bio *bp)
 {
 	struct bio_queue queue;
 	struct g_mirror_disk *disk;
-	struct g_consumer *cp;
+	struct g_consumer *cp __diagused;
 	struct bio *cbp;
 	off_t left, mod, offset, slice;
 	u_char *data;
@@ -2090,7 +2093,7 @@ g_mirror_sync_start(struct g_mirror_disk *disk)
 	struct g_mirror_disk_sync *sync;
 	struct g_consumer *cp;
 	struct bio *bp;
-	int error, i;
+	int error __diagused, i;
 
 	g_topology_assert_not();
 	sc = disk->d_softc;
@@ -3266,6 +3269,7 @@ g_mirror_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
 	 */
 	gp->orphan = g_mirror_taste_orphan;
 	cp = g_new_consumer(gp);
+	cp->flags |= G_CF_DIRECT_SEND | G_CF_DIRECT_RECEIVE;
 	error = g_attach(cp, pp);
 	if (error == 0) {
 		error = g_mirror_read_metadata(cp, &md);

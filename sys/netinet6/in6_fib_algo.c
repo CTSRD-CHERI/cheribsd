@@ -80,7 +80,7 @@ struct sa_in6 {
 	struct in6_addr		sin6_addr;
 };
 struct radix6_addr_entry {
-	struct radix_node	rn[2];
+	struct radix_node	rn[2] __subobject_use_container_bounds;
 	struct sa_in6		addr;
 	struct nhop_object	*nhop;
 };

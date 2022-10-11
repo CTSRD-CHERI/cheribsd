@@ -197,7 +197,7 @@ extern void	nd6_setmtu(struct ifnet *);
  *  - BRIDGE_RT_LOCK, for any change to bridge_rtnodes
  *  - BRIDGE_LOCK, for any other change
  *
- * The BRIDGE_LOCK is a sleepable lock, because it is held accross ioctl()
+ * The BRIDGE_LOCK is a sleepable lock, because it is held across ioctl()
  * calls to bridge member interfaces and these ioctl()s can sleep.
  * The BRIDGE_RT_LOCK is a non-sleepable mutex, because it is sometimes
  * required while we're in NET_EPOCH and then we're not allowed to sleep.
@@ -299,6 +299,10 @@ static void	bridge_init(void *);
 static void	bridge_dummynet(struct mbuf *, struct ifnet *);
 static void	bridge_stop(struct ifnet *, int);
 static int	bridge_transmit(struct ifnet *, struct mbuf *);
+#ifdef ALTQ
+static void	bridge_altq_start(if_t);
+static int	bridge_altq_transmit(if_t, struct mbuf *);
+#endif
 static void	bridge_qflush(struct ifnet *);
 static struct mbuf *bridge_input(struct ifnet *, struct mbuf *);
 static int	bridge_output(struct ifnet *, struct mbuf *, struct sockaddr *,
@@ -597,7 +601,7 @@ vnet_bridge_uninit(const void *unused __unused)
 	BRIDGE_LIST_LOCK_DESTROY();
 
 	/* Callbacks may use the UMA zone. */
-	epoch_drain_callbacks(net_epoch_preempt);
+	NET_EPOCH_DRAIN_CALLBACKS();
 
 	uma_zdestroy(V_bridge_rtnode_zone);
 }
@@ -727,7 +731,15 @@ bridge_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 	if_initname(ifp, bridge_name, unit);
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = bridge_ioctl;
+#ifdef ALTQ
+	ifp->if_start = bridge_altq_start;
+	ifp->if_transmit = bridge_altq_transmit;
+	IFQ_SET_MAXLEN(&ifp->if_snd, ifqmaxlen);
+	ifp->if_snd.ifq_drv_maxlen = 0;
+	IFQ_SET_READY(&ifp->if_snd);
+#else
 	ifp->if_transmit = bridge_transmit;
+#endif
 	ifp->if_qflush = bridge_qflush;
 	ifp->if_init = bridge_init;
 	ifp->if_type = IFT_BRIDGE;
@@ -799,6 +811,9 @@ bridge_clone_destroy(struct ifnet *ifp)
 	BRIDGE_LIST_UNLOCK();
 
 	bstp_detach(&sc->sc_stp);
+#ifdef ALTQ
+	IFQ_PURGE(&ifp->if_snd);
+#endif
 	NET_EPOCH_EXIT(et);
 
 	ether_ifdetach(ifp);
@@ -918,6 +933,8 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case SIOCSIFMTU:
+		oldmtu = sc->sc_ifp->if_mtu;
+
 		if (ifr->ifr_mtu < 576) {
 			error = EINVAL;
 			break;
@@ -927,17 +944,27 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 		CK_LIST_FOREACH(bif, &sc->sc_iflist, bif_next) {
-			if (bif->bif_ifp->if_mtu != ifr->ifr_mtu) {
-				log(LOG_NOTICE, "%s: invalid MTU: %u(%s)"
-				    " != %d\n", sc->sc_ifp->if_xname,
-				    bif->bif_ifp->if_mtu,
-				    bif->bif_ifp->if_xname, ifr->ifr_mtu);
+			error = (*bif->bif_ifp->if_ioctl)(bif->bif_ifp,
+			    SIOCSIFMTU, (caddr_t)ifr);
+			if (error != 0) {
+				log(LOG_NOTICE, "%s: invalid MTU: %u for"
+				    " member %s\n", sc->sc_ifp->if_xname,
+				    ifr->ifr_mtu,
+				    bif->bif_ifp->if_xname);
 				error = EINVAL;
 				break;
 			}
 		}
-		if (!error)
+		if (error) {
+			/* Restore the previous MTU on all member interfaces. */
+			ifr->ifr_mtu = oldmtu;
+			CK_LIST_FOREACH(bif, &sc->sc_iflist, bif_next) {
+				(*bif->bif_ifp->if_ioctl)(bif->bif_ifp,
+				    SIOCSIFMTU, (caddr_t)ifr);
+			}
+		} else {
 			sc->sc_ifp->if_mtu = ifr->ifr_mtu;
+		}
 		break;
 	default:
 		/*
@@ -1240,9 +1267,21 @@ bridge_ioctl_add(struct bridge_softc *sc, void *arg)
 	if (CK_LIST_EMPTY(&sc->sc_iflist))
 		sc->sc_ifp->if_mtu = ifs->if_mtu;
 	else if (sc->sc_ifp->if_mtu != ifs->if_mtu) {
-		if_printf(sc->sc_ifp, "invalid MTU: %u(%s) != %u\n",
-		    ifs->if_mtu, ifs->if_xname, sc->sc_ifp->if_mtu);
-		return (EINVAL);
+		struct ifreq ifr;
+
+		snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s",
+		    ifs->if_xname);
+		ifr.ifr_mtu = sc->sc_ifp->if_mtu;
+
+		error = (*ifs->if_ioctl)(ifs,
+		    SIOCSIFMTU, (caddr_t)&ifr);
+		if (error != 0) {
+			log(LOG_NOTICE, "%s: invalid MTU: %u for"
+			    " new member %s\n", sc->sc_ifp->if_xname,
+			    ifr.ifr_mtu,
+			    ifs->if_xname);
+			return (EINVAL);
+		}
 	}
 
 	bif = malloc(sizeof(*bif), M_DEVBUF, M_NOWAIT|M_ZERO);
@@ -2150,7 +2189,7 @@ bridge_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *sa,
 				used = 1;
 				mc = m;
 			} else {
-				mc = m_copypacket(m, M_NOWAIT);
+				mc = m_dup(m, M_NOWAIT);
 				if (mc == NULL) {
 					if_inc_counter(bifp, IFCOUNTER_OERRORS, 1);
 					continue;
@@ -2207,6 +2246,38 @@ bridge_transmit(struct ifnet *ifp, struct mbuf *m)
 
 	return (error);
 }
+
+#ifdef ALTQ
+static void
+bridge_altq_start(if_t ifp)
+{
+	struct ifaltq *ifq = &ifp->if_snd;
+	struct mbuf *m;
+
+	IFQ_LOCK(ifq);
+	IFQ_DEQUEUE_NOLOCK(ifq, m);
+	while (m != NULL) {
+		bridge_transmit(ifp, m);
+		IFQ_DEQUEUE_NOLOCK(ifq, m);
+	}
+	IFQ_UNLOCK(ifq);
+}
+
+static int
+bridge_altq_transmit(if_t ifp, struct mbuf *m)
+{
+	int err;
+
+	if (ALTQ_IS_ENABLED(&ifp->if_snd)) {
+		IFQ_ENQUEUE(&ifp->if_snd, m, err);
+		if (err == 0)
+			bridge_altq_start(ifp);
+	} else
+		err = bridge_transmit(ifp, m);
+
+	return (err);
+}
+#endif	/* ALTQ */
 
 /*
  * The ifp->if_qflush entry point for if_bridge(4) is no-op.
@@ -2679,7 +2750,7 @@ bridge_span(struct bridge_softc *sc, struct mbuf *m)
 		if ((dst_if->if_drv_flags & IFF_DRV_RUNNING) == 0)
 			continue;
 
-		mc = m_copypacket(m, M_NOWAIT);
+		mc = m_dup(m, M_NOWAIT);
 		if (mc == NULL) {
 			if_inc_counter(sc->sc_ifp, IFCOUNTER_OERRORS, 1);
 			continue;

@@ -14,9 +14,9 @@
 #include "clang/StaticAnalyzer/Checkers/BuiltinCheckerRegistration.h"
 #include "clang/StaticAnalyzer/Core/BugReporter/BugType.h"
 #include "clang/StaticAnalyzer/Core/Checker.h"
+#include "clang/StaticAnalyzer/Core/PathSensitive/CallDescription.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CallEvent.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/CheckerContext.h"
-
 
 #include "Iterator.h"
 
@@ -169,6 +169,8 @@ void IteratorRangeChecker::checkPreStmt(const BinaryOperator *BO,
     verifyDereference(C, LVal);
   } else if (isRandomIncrOrDecrOperator(OK)) {
     SVal RVal = State->getSVal(BO->getRHS(), C.getLocationContext());
+    if (!BO->getRHS()->getType()->isIntegralOrEnumerationType())
+      return;
     verifyRandomIncrOrDecr(C, BinaryOperator::getOverloadedOperator(OK), LVal,
                            RVal);
   }
@@ -226,7 +228,7 @@ void IteratorRangeChecker::verifyRandomIncrOrDecr(CheckerContext &C,
     Value = State->getRawSVal(*ValAsLoc);
   }
 
-  if (Value.isUnknown())
+  if (Value.isUnknownOrUndef())
     return;
 
   // Incremention or decremention by 0 is never a bug.

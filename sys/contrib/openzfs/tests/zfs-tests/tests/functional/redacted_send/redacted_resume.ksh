@@ -53,7 +53,7 @@ log_must mount_redacted -f $recvfs
 log_must set_tunable32 ALLOW_REDACTED_DATASET_MOUNT 1
 log_must diff $send_mnt/f1 $recv_mnt/f1
 log_must eval "get_diff $send_mnt/f2 $recv_mnt/f2 >$tmpdir/get_diff.out"
-typeset range=$(cat $tmpdir/get_diff.out)
+typeset range=$(<$tmpdir/get_diff.out)
 [[ "$RANGE9" = "$range" ]] || log_fail "Unexpected range: $range"
 
 log_must dd if=/dev/urandom of=$send_mnt/f3 bs=1024k count=3
@@ -70,7 +70,7 @@ resume_test "zfs send --redact book2 -i $sendfs#book1 $sendfs@snap2" \
 log_must diff $send_mnt/f1 $recv_mnt/f1
 log_must diff $send_mnt/f2 $recv_mnt/f2
 log_must eval "get_diff $send_mnt/f3 $recv_mnt/f3 >$tmpdir/get_diff.out"
-range=$(cat $tmpdir/get_diff.out)
+range=$(<$tmpdir/get_diff.out)
 [[ "$RANGE10" = "$range" ]] || log_fail "Unexpected range: $range"
 
 # Test recv -A works properly and verify saved sends are not allowed
@@ -81,7 +81,7 @@ log_must eval "zfs send --redact book1 $sendfs@snap >$stream"
 dd if=$stream bs=64k count=1 | log_mustnot zfs receive -s $recvfs
 [[ "-" = $(get_prop receive_resume_token $recvfs) ]] && \
     log_fail "Receive token not found."
-log_mustnot eval "zfs send --saved --redact book1 $recvfs >$TEST_BASE_DIR/devnull"
+log_mustnot eval "zfs send --saved --redact book1 $recvfs > /dev/null"
 log_must zfs recv -A $recvfs
 log_must datasetnonexists $recvfs
 

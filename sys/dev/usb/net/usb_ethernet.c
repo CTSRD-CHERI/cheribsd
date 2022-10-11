@@ -249,12 +249,11 @@ ue_attach_post_task(struct usb_proc_msg *_task)
 
 		if (ue->ue_methods->ue_mii_upd != NULL &&
 		    ue->ue_methods->ue_mii_sts != NULL) {
-			/* device_xxx() depends on this */
-			mtx_lock(&Giant);
+			bus_topo_lock();
 			error = mii_attach(ue->ue_dev, &ue->ue_miibus, ifp,
 			    ue_ifmedia_upd, ue->ue_methods->ue_mii_sts,
 			    BMSR_DEFCAPMASK, MII_PHY_ANY, MII_OFFSET_ANY, 0);
-			mtx_unlock(&Giant);
+			bus_topo_unlock();
 		}
 	}
 
@@ -319,15 +318,18 @@ uether_ifdetach(struct usb_ether *ue)
 		/* drain any callouts */
 		usb_callout_drain(&ue->ue_watchdog);
 
+		/*
+		 * Detach ethernet first to stop miibus calls from
+		 * user-space:
+		 */
+		ether_ifdetach(ifp);
+
 		/* detach miibus */
 		if (ue->ue_miibus != NULL) {
-			mtx_lock(&Giant);	/* device_xxx() depends on this */
+			bus_topo_lock();
 			device_delete_child(ue->ue_dev, ue->ue_miibus);
-			mtx_unlock(&Giant);
+			bus_topo_unlock();
 		}
-
-		/* detach ethernet */
-		ether_ifdetach(ifp);
 
 		/* free interface instance */
 		if_free(ifp);

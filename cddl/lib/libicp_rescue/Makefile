@@ -14,11 +14,24 @@ ASM_SOURCES_AS = \
         asm-x86_64/aes/aes_aesni.S \
         asm-x86_64/modes/gcm_pclmulqdq.S \
         asm-x86_64/modes/aesni-gcm-x86_64.S \
-        asm-x86_64/sha1/sha1-x86_64.S \
         asm-x86_64/sha2/sha256_impl.S \
-        asm-x86_64/sha2/sha512_impl.S
+        asm-x86_64/sha2/sha512_impl.S \
+        asm-x86_64/blake3/blake3_avx2.S \
+        asm-x86_64/blake3/blake3_avx512.S \
+        asm-x86_64/blake3/blake3_sse2.S \
+        asm-x86_64/blake3/blake3_sse41.S
 
 CFLAGS+= -D__amd64 -D_SYS_STACK_H
+.elif ${MACHINE_ARCH} == "aarch64"
+ASM_SOURCES_C =
+ASM_SOURCES_AS = \
+        asm-aarch64/blake3/b3_aarch64_sse2.S \
+        asm-aarch64/blake3/b3_aarch64_sse41.S
+.elif ${MACHINE_ARCH} == "powerpc64le"
+ASM_SOURCES_C =
+ASM_SOURCES_AS = \
+        asm-ppc64/blake3/b3_ppc64le_sse2.S \
+        asm-ppc64/blake3/b3_ppc64le_sse41.S
 .else
 ASM_SOURCES_C =
 ASM_SOURCES_AS =
@@ -28,15 +41,17 @@ ASM_SOURCES_AS =
 KERNEL_C = \
         spi/kcf_spi.c \
         api/kcf_ctxops.c \
-        api/kcf_digest.c \
         api/kcf_cipher.c \
-        api/kcf_miscapi.c \
         api/kcf_mac.c \
         algs/aes/aes_impl_aesni.c \
         algs/aes/aes_impl_generic.c \
         algs/aes/aes_impl_x86-64.c \
         algs/aes/aes_impl.c \
         algs/aes/aes_modes.c \
+        algs/blake3/blake3.c \
+        algs/blake3/blake3_generic.c \
+        algs/blake3/blake3_impl.c \
+        algs/blake3/blake3_x86-64.c \
         algs/edonr/edonr.c \
         algs/modes/modes.c \
         algs/modes/cbc.c \
@@ -46,28 +61,18 @@ KERNEL_C = \
         algs/modes/ctr.c \
         algs/modes/ccm.c \
         algs/modes/ecb.c \
-        algs/sha1/sha1.c \
         algs/sha2/sha2.c \
         algs/skein/skein_block.c \
         illumos-crypto.c \
         io/aes.c \
-        io/edonr_mod.c \
-        io/sha1_mod.c \
         io/sha2_mod.c \
         io/skein_mod.c \
-        os/modhash.c \
-        os/modconf.c \
         core/kcf_sched.c \
         core/kcf_prov_lib.c \
         core/kcf_callprov.c \
         core/kcf_mech_tabs.c \
         core/kcf_prov_tabs.c \
         $(ASM_SOURCES_C)
-
-
-
-
-
 
 SRCS= $(ASM_SOURCES_AS) $(KERNEL_C)
 
@@ -91,9 +96,17 @@ CFLAGS.aes_aesni.S+= -DLOCORE
 CFLAGS.gcm_pclmulqdq.S+= -DLOCORE
 CFLAGS.aesni-gcm-x86_64.S+= -DLOCORE
 CFLAGS.ghash-x86_64.S+= -DLOCORE
-CFLAGS.sha1-x86_64.S+= -DLOCORE
 CFLAGS.sha256_impl.S+= -DLOCORE
 CFLAGS.sha512_impl.S+= -DLOCORE
 CFLAGS.gcm.c+= -UCAN_USE_GCM_ASM
+CFLAGS.blake3_avx2.S = -DLOCORE
+CFLAGS.blake3_avx512.S = -DLOCORE
+CFLAGS.blake3_sse2.S = -DLOCORE
+CFLAGS.blake3_sse41.S = -DLOCORE
+CFLAGS.b3_aarch64_sse2.S = -DLOCORE
+CFLAGS.b3_aarch64_sse41.S = -DLOCORE
+CFLAGS.b3_ppc64le_sse2.S = -DLOCORE
+CFLAGS.b3_ppc64le_sse41.S = -DLOCORE
+
 
 .include <bsd.lib.mk>

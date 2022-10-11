@@ -55,11 +55,7 @@ function cleanup
 	#
 	for disk in $DISKLIST; do
 		log_must zpool online $TESTPOOL $disk
-		check_state $TESTPOOL $disk "online"
-		if [[ $? != 0 ]]; then
-			log_fail "Unable to online $disk"
-		fi
-
+		log_must check_state $TESTPOOL $disk "online"
 	done
 
 	kill $killpid >/dev/null 2>&1
@@ -129,7 +125,8 @@ while [[ $i -lt ${#disks[*]} ]]; do
 done
 
 log_must kill $killpid
-sync
+sync_all_pools
+log_must sync
 
 typeset dir=$(get_device_dir $DISKS)
 verify_filesys "$TESTPOOL" "$TESTPOOL/$TESTFS" "$dir"

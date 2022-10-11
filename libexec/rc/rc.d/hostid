@@ -50,9 +50,9 @@ hostid_set()
 
 	# Set both kern.hostuuid and kern.hostid.
 	#
-	check_startmsgs && echo "Setting hostuuid: ${uuid}."
+	startmsg "Setting hostuuid: ${uuid}."
 	${SYSCTL} kern.hostuuid="${uuid}" >/dev/null
-	check_startmsgs && echo "Setting hostid: ${id}."
+	startmsg "Setting hostid: ${id}."
 	${SYSCTL} kern.hostid=${id} >/dev/null
 }
 
@@ -138,7 +138,7 @@ hostid_start()
 	if [ -r ${hostid_file} ]; then
 		read saved_hostid < ${hostid_file}
 		if valid_hostid ${saved_hostid}; then
-			hostid_set `cat ${hostid_file}`
+			hostid_set ${saved_hostid}
 			exit 0
 		fi
 	fi

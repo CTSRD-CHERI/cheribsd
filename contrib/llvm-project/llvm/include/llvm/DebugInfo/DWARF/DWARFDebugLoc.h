@@ -15,6 +15,7 @@
 #include "llvm/DebugInfo/DWARF/DWARFDataExtractor.h"
 #include "llvm/DebugInfo/DWARF/DWARFLocationExpression.h"
 #include "llvm/DebugInfo/DWARF/DWARFRelocMap.h"
+#include "llvm/Support/Errc.h"
 #include <cstdint>
 
 namespace llvm {
@@ -71,6 +72,8 @@ public:
       uint64_t Offset, Optional<object::SectionedAddress> BaseAddr,
       std::function<Optional<object::SectionedAddress>(uint32_t)> LookupAddr,
       function_ref<bool(Expected<DWARFLocationExpression>)> Callback) const;
+
+  const DWARFDataExtractor &getData() { return Data; }
 
 protected:
   DWARFDataExtractor Data;
@@ -138,6 +141,22 @@ protected:
 
 private:
   uint16_t Version;
+};
+
+class ResolverError : public ErrorInfo<ResolverError> {
+public:
+  static char ID;
+
+  ResolverError(uint32_t Index, dwarf::LoclistEntries Kind) : Index(Index), Kind(Kind) {}
+
+  void log(raw_ostream &OS) const override;
+  std::error_code convertToErrorCode() const override {
+    return llvm::errc::invalid_argument;
+  }
+
+private:
+  uint32_t Index;
+  dwarf::LoclistEntries Kind;
 };
 
 } // end namespace llvm

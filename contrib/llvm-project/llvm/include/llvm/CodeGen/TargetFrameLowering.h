@@ -14,6 +14,7 @@
 #define LLVM_CODEGEN_TARGETFRAMELOWERING_H
 
 #include "llvm/CodeGen/MachineBasicBlock.h"
+#include "llvm/Support/TypeSize.h"
 #include <vector>
 
 namespace llvm {
@@ -23,12 +24,13 @@ namespace llvm {
   class RegScavenger;
 
 namespace TargetStackID {
-  enum Value {
-    Default = 0,
-    SGPRSpill = 1,
-    SVEVector = 2,
-    NoAlloc = 255
-  };
+enum Value {
+  Default = 0,
+  SGPRSpill = 1,
+  ScalableVector = 2,
+  WasmLocal = 3,
+  NoAlloc = 255
+};
 }
 
 /// Information about stack frame layout on the target.  It holds the direction
@@ -113,14 +115,6 @@ public:
   /// which the stack pointer must be aligned at all times, even between
   /// calls.
   ///
-  LLVM_ATTRIBUTE_DEPRECATED(unsigned getTransientStackAlignment() const,
-                            "Use getTransientStackAlign instead") {
-    return TransientStackAlignment.value();
-  }
-  /// getTransientStackAlignment - This method returns the number of bytes to
-  /// which the stack pointer must be aligned at all times, even between
-  /// calls.
-  ///
   Align getTransientStackAlign() const { return TransientStackAlignment; }
 
   /// isStackRealignable - This method returns whether the stack can be
@@ -145,10 +139,13 @@ public:
   ///
   int getOffsetOfLocalArea() const { return LocalAreaOffset; }
 
-  /// isFPCloseToIncomingSP - Return true if the frame pointer is close to
-  /// the incoming stack pointer, false if it is close to the post-prologue
-  /// stack pointer.
-  virtual bool isFPCloseToIncomingSP() const { return true; }
+  /// Control the placement of special register scavenging spill slots when
+  /// allocating a stack frame.
+  ///
+  /// If this returns true, the frame indexes used by the RegScavenger will be
+  /// allocated closest to the incoming stack pointer.
+  virtual bool allocateScavengingFrameIndexesNearIncomingSP(
+    const MachineFunction &MF) const;
 
   /// assignCalleeSavedSpillSlots - Allows target to override spill slot
   /// assignment logic.  If implemented, assignCalleeSavedSpillSlots() should
@@ -156,6 +153,14 @@ public:
   /// returns false, spill slots will be assigned using generic implementation.
   /// assignCalleeSavedSpillSlots() may add, delete or rearrange elements of
   /// CSI.
+  virtual bool assignCalleeSavedSpillSlots(MachineFunction &MF,
+                                           const TargetRegisterInfo *TRI,
+                                           std::vector<CalleeSavedInfo> &CSI,
+                                           unsigned &MinCSFrameIndex,
+                                           unsigned &MaxCSFrameIndex) const {
+    return assignCalleeSavedSpillSlots(MF, TRI, CSI);
+  }
+
   virtual bool
   assignCalleeSavedSpillSlots(MachineFunction &MF,
                               const TargetRegisterInfo *TRI,
@@ -211,17 +216,15 @@ public:
   /// With basic block sections, emit callee saved frame moves for basic blocks
   /// that are in a different section.
   virtual void
-  emitCalleeSavedFrameMoves(MachineBasicBlock &MBB,
-                            MachineBasicBlock::iterator MBBI) const {}
-
-  virtual void emitCalleeSavedFrameMoves(MachineBasicBlock &MBB,
-                                         MachineBasicBlock::iterator MBBI,
-                                         const DebugLoc &DL,
-                                         bool IsPrologue) const {}
+  emitCalleeSavedFrameMovesFullCFA(MachineBasicBlock &MBB,
+                                   MachineBasicBlock::iterator MBBI) const {}
 
   /// Replace a StackProbe stub (if any) with the actual probe code inline
   virtual void inlineStackProbe(MachineFunction &MF,
                                 MachineBasicBlock &PrologueMBB) const {}
+
+  /// Does the stack probe function call return with a modified stack pointer?
+  virtual bool stackProbeFunctionModifiesSP() const { return false; }
 
   /// Adjust the prologue to have the function use segmented stacks. This works
   /// by adding a check even before the "normal" function prologue.
@@ -297,8 +300,8 @@ public:
   /// getFrameIndexReference - This method should return the base register
   /// and offset used to reference a frame index location. The offset is
   /// returned directly, and the base register is returned via FrameReg.
-  virtual int getFrameIndexReference(const MachineFunction &MF, int FI,
-                                     Register &FrameReg) const;
+  virtual StackOffset getFrameIndexReference(const MachineFunction &MF, int FI,
+                                             Register &FrameReg) const;
 
   /// Same as \c getFrameIndexReference, except that the stack pointer (as
   /// opposed to the frame pointer) will be the preferred value for \p
@@ -306,9 +309,10 @@ public:
   /// use offsets from RSP.  If \p IgnoreSPUpdates is true, the returned
   /// offset is only guaranteed to be valid with respect to the value of SP at
   /// the end of the prologue.
-  virtual int getFrameIndexReferencePreferSP(const MachineFunction &MF, int FI,
-                                             Register &FrameReg,
-                                             bool IgnoreSPUpdates) const {
+  virtual StackOffset
+  getFrameIndexReferencePreferSP(const MachineFunction &MF, int FI,
+                                 Register &FrameReg,
+                                 bool IgnoreSPUpdates) const {
     // Always safe to dispatch to getFrameIndexReference.
     return getFrameIndexReference(MF, FI, FrameReg);
   }
@@ -316,8 +320,8 @@ public:
   /// getNonLocalFrameIndexReference - This method returns the offset used to
   /// reference a frame index location. The offset can be from either FP/BP/SP
   /// based on which base register is returned by llvm.localaddress.
-  virtual int getNonLocalFrameIndexReference(const MachineFunction &MF,
-                                       int FI) const {
+  virtual StackOffset getNonLocalFrameIndexReference(const MachineFunction &MF,
+                                                     int FI) const {
     // By default, dispatch to getFrameIndexReference. Interested targets can
     // override this.
     Register FrameReg;

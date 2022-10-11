@@ -456,8 +456,6 @@ static int cyapa_attach(device_t);
 static int cyapa_detach(device_t);
 static void cyapa_cdevpriv_dtor(void*);
 
-static devclass_t cyapa_devclass;
-
 static device_method_t cyapa_methods[] = {
 	/* device interface */
 	DEVMETHOD(device_probe,		cyapa_probe),
@@ -1336,7 +1334,6 @@ cyapa_raw_input(struct cyapa_softc *sc, struct cyapa_regs *regs, int freq)
 	int afingers;	/* actual fingers after culling */
 	int i;
 	int j;
-	int k;
 	int isidle;
 	int thumbarea_begin;
 	int seen_thumb;
@@ -1377,7 +1374,7 @@ cyapa_raw_input(struct cyapa_softc *sc, struct cyapa_regs *regs, int freq)
 #ifdef EVDEV_SUPPORT
 	if (evdev_rcpt_mask & EVDEV_RCPT_HW_MOUSE) {
 		for (i = 0; i < nfingers; ++i) {
-			int32_t slot = evdev_get_mt_slot_by_tracking_id(
+			int slot = evdev_mt_id_to_slot(
 			    sc->evdev, regs->touch[i].id);
 			if (slot == -1) {
 				if (cyapa_debug)
@@ -1485,7 +1482,6 @@ cyapa_raw_input(struct cyapa_softc *sc, struct cyapa_regs *regs, int freq)
 		sc->track_but = 0;
 		i = 0;
 		j = 0;
-		k = 0;
 	} else {
 		/*
 		 * The id assigned on touch can move around in the array,
@@ -1816,7 +1812,7 @@ cyapa_fuzz(int delta, int *fuzzp)
 	return (delta);
 }
 
-DRIVER_MODULE(cyapa, iicbus, cyapa_driver, cyapa_devclass, NULL, NULL);
+DRIVER_MODULE(cyapa, iicbus, cyapa_driver, NULL, NULL);
 MODULE_DEPEND(cyapa, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 #ifdef EVDEV_SUPPORT
 MODULE_DEPEND(cyapa, evdev, 1, 1, 1);

@@ -12,6 +12,7 @@
 
 #include "sanitizer_allocator_internal.h"
 #include "sanitizer_internal_defs.h"
+#include "sanitizer_platform.h"
 #include "sanitizer_symbolizer_internal.h"
 
 namespace __sanitizer {
@@ -82,16 +83,13 @@ const char *ExtractTokenUpToDelimiter(const char *str, const char *delimiter,
 }
 
 SymbolizedStack *Symbolizer::SymbolizePC(uptr addr) {
-  BlockingMutexLock l(&mu_);
-  const char *module_name = nullptr;
-  uptr module_offset;
-  ModuleArch arch;
+  Lock l(&mu_);
   SymbolizedStack *res = SymbolizedStack::New(addr);
-  if (!FindModuleNameAndOffsetForAddress(addr, &module_name, &module_offset,
-                                         &arch))
+  auto *mod = FindModuleForAddress(addr);
+  if (!mod)
     return res;
   // Always fill data about module name and offset.
-  res->info.FillModuleInfo(module_name, module_offset, arch);
+  res->info.FillModuleInfo(*mod);
   for (auto &tool : tools_) {
     SymbolizerScope sym_scope(this);
     if (tool.SymbolizePC(addr, res)) {
@@ -102,7 +100,7 @@ SymbolizedStack *Symbolizer::SymbolizePC(uptr addr) {
 }
 
 bool Symbolizer::SymbolizeData(uptr addr, DataInfo *info) {
-  BlockingMutexLock l(&mu_);
+  Lock l(&mu_);
   const char *module_name = nullptr;
   uptr module_offset;
   ModuleArch arch;
@@ -123,7 +121,7 @@ bool Symbolizer::SymbolizeData(uptr addr, DataInfo *info) {
 }
 
 bool Symbolizer::SymbolizeFrame(uptr addr, FrameInfo *info) {
-  BlockingMutexLock l(&mu_);
+  Lock l(&mu_);
   const char *module_name = nullptr;
   if (!FindModuleNameAndOffsetForAddress(
           addr, &module_name, &info->module_offset, &info->module_arch))
@@ -140,7 +138,7 @@ bool Symbolizer::SymbolizeFrame(uptr addr, FrameInfo *info) {
 
 bool Symbolizer::GetModuleNameAndOffsetForPC(uptr pc, const char **module_name,
                                              uptr *module_address) {
-  BlockingMutexLock l(&mu_);
+  Lock l(&mu_);
   const char *internal_module_name = nullptr;
   ModuleArch arch;
   if (!FindModuleNameAndOffsetForAddress(pc, &internal_module_name,
@@ -153,7 +151,7 @@ bool Symbolizer::GetModuleNameAndOffsetForPC(uptr pc, const char **module_name,
 }
 
 void Symbolizer::Flush() {
-  BlockingMutexLock l(&mu_);
+  Lock l(&mu_);
   for (auto &tool : tools_) {
     SymbolizerScope sym_scope(this);
     tool.Flush();
@@ -161,7 +159,7 @@ void Symbolizer::Flush() {
 }
 
 const char *Symbolizer::Demangle(const char *name) {
-  BlockingMutexLock l(&mu_);
+  Lock l(&mu_);
   for (auto &tool : tools_) {
     SymbolizerScope sym_scope(this);
     if (const char *demangled = tool.Demangle(name))
@@ -236,7 +234,7 @@ const LoadedModule *Symbolizer::FindModuleForAddress(uptr address) {
 //   <file_name>:<line_number>:<column_number>
 //   ...
 //   <empty line>
-class LLVMSymbolizerProcess : public SymbolizerProcess {
+class LLVMSymbolizerProcess final : public SymbolizerProcess {
  public:
   explicit LLVMSymbolizerProcess(const char *path)
       : SymbolizerProcess(path, /*use_posix_spawn=*/SANITIZER_MAC) {}
@@ -258,6 +256,8 @@ class LLVMSymbolizerProcess : public SymbolizerProcess {
     const char* const kSymbolizerArch = "--default-arch=x86_64";
 #elif defined(__i386__)
     const char* const kSymbolizerArch = "--default-arch=i386";
+#elif SANITIZER_RISCV64
+    const char *const kSymbolizerArch = "--default-arch=riscv64";
 #elif defined(__aarch64__)
     const char* const kSymbolizerArch = "--default-arch=arm64";
 #elif defined(__arm__)
@@ -274,14 +274,17 @@ class LLVMSymbolizerProcess : public SymbolizerProcess {
     const char* const kSymbolizerArch = "--default-arch=unknown";
 #endif
 
-    const char *const inline_flag = common_flags()->symbolize_inline_frames
-                                        ? "--inlining=true"
-                                        : "--inlining=false";
+    const char *const demangle_flag =
+        common_flags()->demangle ? "--demangle" : "--no-demangle";
+    const char *const inline_flag =
+        common_flags()->symbolize_inline_frames ? "--inlines" : "--no-inlines";
     int i = 0;
     argv[i++] = path_to_binary;
+    argv[i++] = demangle_flag;
     argv[i++] = inline_flag;
     argv[i++] = kSymbolizerArch;
     argv[i++] = nullptr;
+    CHECK_LE(i, kArgVMax);
   }
 };
 
@@ -353,7 +356,7 @@ void ParseSymbolizePCOutput(const char *str, SymbolizedStack *res) {
       InternalFree(info->function);
       info->function = 0;
     }
-    if (0 == internal_strcmp(info->file, "??")) {
+    if (info->file && 0 == internal_strcmp(info->file, "??")) {
       InternalFree(info->file);
       info->file = 0;
     }

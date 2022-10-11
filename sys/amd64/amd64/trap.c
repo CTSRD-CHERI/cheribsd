@@ -54,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_kdb.h"
 
 #include <sys/param.h>
+#include <sys/asan.h>
 #include <sys/bus.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -62,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
+#include <sys/msan.h>
 #include <sys/mutex.h>
 #include <sys/resourcevar.h>
 #include <sys/signalvar.h>
@@ -173,6 +175,39 @@ SYSCTL_INT(_machdep, OID_AUTO, nmi_flush_l1d_sw, CTLFLAG_RWTUN,
     "Flush L1 Data Cache on NMI exit, software bhyve L1TF mitigation assist");
 
 /*
+ * Table of handlers for various segment load faults.
+ */
+static const struct {
+	uintptr_t	faddr;
+	uintptr_t	fhandler;
+} sfhandlers[] = {
+	{
+		.faddr = (uintptr_t)ld_ds,
+		.fhandler = (uintptr_t)ds_load_fault,
+	},
+	{
+		.faddr = (uintptr_t)ld_es,
+		.fhandler = (uintptr_t)es_load_fault,
+	},
+	{
+		.faddr = (uintptr_t)ld_fs,
+		.fhandler = (uintptr_t)fs_load_fault,
+	},
+	{
+		.faddr = (uintptr_t)ld_gs,
+		.fhandler = (uintptr_t)gs_load_fault,
+	},
+	{
+		.faddr = (uintptr_t)ld_gsbase,
+		.fhandler = (uintptr_t)gsbase_load_fault
+	},
+	{
+		.faddr = (uintptr_t)ld_fsbase,
+		.fhandler = (uintptr_t)fsbase_load_fault,
+	},
+};
+
+/*
  * Exception, fault, and trap interface to the FreeBSD kernel.
  * This common code is called from assembly language IDT gate entry
  * routines that prepare a suitable stack frame, and restore this
@@ -186,12 +221,16 @@ trap(struct trapframe *frame)
 	struct thread *td;
 	struct proc *p;
 	register_t addr, dr6;
+	size_t i;
 	int pf, signo, ucode;
 	u_int type;
 
 	td = curthread;
 	p = td->td_proc;
 	dr6 = 0;
+
+	kasan_mark(frame, sizeof(*frame), sizeof(*frame), 0);
+	kmsan_mark(frame, sizeof(*frame), KMSAN_STATE_INITED);
 
 	VM_CNT_INC(v_trap);
 	type = frame->tf_trapno;
@@ -236,25 +275,31 @@ trap(struct trapframe *frame)
 		 * interrupts disabled until they are accidentally
 		 * enabled later.
 		 */
-		if (TRAPF_USERMODE(frame))
+		if (TRAPF_USERMODE(frame)) {
 			uprintf(
 			    "pid %ld (%s): trap %d with interrupts disabled\n",
 			    (long)curproc->p_pid, curthread->td_name, type);
-		else if (type != T_NMI && type != T_BPTFLT &&
-		    type != T_TRCTRAP) {
-			/*
-			 * XXX not quite right, since this may be for a
-			 * multiple fault in user mode.
-			 */
-			printf("kernel trap %d with interrupts disabled\n",
-			    type);
+		} else {
+			switch (type) {
+			case T_NMI:
+			case T_BPTFLT:
+			case T_TRCTRAP:
+			case T_PROTFLT:
+			case T_SEGNPFLT:
+			case T_STKFLT:
+				break;
+			default:
+				printf(
+				    "kernel trap %d with interrupts disabled\n",
+				    type);
 
-			/*
-			 * We shouldn't enable interrupts while holding a
-			 * spin lock.
-			 */
-			if (td->td_md.md_spinlock_count == 0)
-				enable_intr();
+				/*
+				 * We shouldn't enable interrupts while holding a
+				 * spin lock.
+				 */
+				if (td->td_md.md_spinlock_count == 0)
+					enable_intr();
+			}
 		}
 	}
 
@@ -264,7 +309,7 @@ trap(struct trapframe *frame)
 		td->td_pticks = 0;
 		td->td_frame = frame;
 		addr = frame->tf_rip;
-		if (td->td_cowgen != p->p_cowgen)
+		if (td->td_cowgen != atomic_load_int(&p->p_cowgen))
 			thread_cow_update(td);
 
 		switch (type) {
@@ -445,6 +490,8 @@ trap(struct trapframe *frame)
 			 * the hardware trap frame.
 			 */
 			if (frame->tf_rip == (long)doreti_iret) {
+				KASSERT((read_rflags() & PSL_I) == 0,
+				    ("interrupts enabled"));
 				frame->tf_rip = (long)doreti_iret_fault;
 				if ((PCPU_GET(curpmap)->pm_ucr3 !=
 				    PMAP_NO_CR3) &&
@@ -455,30 +502,16 @@ trap(struct trapframe *frame)
 				}
 				return;
 			}
-			if (frame->tf_rip == (long)ld_ds) {
-				frame->tf_rip = (long)ds_load_fault;
-				return;
+
+			for (i = 0; i < nitems(sfhandlers); i++) {
+				if (frame->tf_rip == sfhandlers[i].faddr) {
+					KASSERT((read_rflags() & PSL_I) == 0,
+					    ("interrupts enabled"));
+					frame->tf_rip = sfhandlers[i].fhandler;
+					return;
+				}
 			}
-			if (frame->tf_rip == (long)ld_es) {
-				frame->tf_rip = (long)es_load_fault;
-				return;
-			}
-			if (frame->tf_rip == (long)ld_fs) {
-				frame->tf_rip = (long)fs_load_fault;
-				return;
-			}
-			if (frame->tf_rip == (long)ld_gs) {
-				frame->tf_rip = (long)gs_load_fault;
-				return;
-			}
-			if (frame->tf_rip == (long)ld_gsbase) {
-				frame->tf_rip = (long)gsbase_load_fault;
-				return;
-			}
-			if (frame->tf_rip == (long)ld_fsbase) {
-				frame->tf_rip = (long)fsbase_load_fault;
-				return;
-			}
+
 			if (curpcb->pcb_onfault != NULL) {
 				frame->tf_rip = (long)curpcb->pcb_onfault;
 				return;
@@ -586,10 +619,6 @@ trap(struct trapframe *frame)
 		trap_fatal(frame, 0);
 		return;
 	}
-
-	/* Translate fault for emulators (e.g. Linux) */
-	if (*p->p_sysent->sv_transtrap != NULL)
-		signo = (*p->p_sysent->sv_transtrap)(signo, type);
 
 	ksiginfo_init_trap(&ksi);
 	ksi.ksi_signo = signo;
@@ -843,9 +872,7 @@ after_vmfault:
 }
 
 static void
-trap_fatal(frame, eva)
-	struct trapframe *frame;
-	vm_offset_t eva;
+trap_fatal(struct trapframe *frame, vm_offset_t eva)
 {
 	int code, ss;
 	u_int type;
@@ -944,6 +971,7 @@ trap_user_dtrace(struct trapframe *frame, int (**hookp)(struct trapframe *))
 void
 dblfault_handler(struct trapframe *frame)
 {
+	kmsan_mark(frame, sizeof(*frame), KMSAN_STATE_INITED);
 #ifdef KDTRACE_HOOKS
 	if (dtrace_doubletrap_func != NULL)
 		(*dtrace_doubletrap_func)();
@@ -979,7 +1007,7 @@ cpu_fetch_syscall_args_fallback(struct thread *td, struct syscall_args *sa)
 {
 	struct proc *p;
 	struct trapframe *frame;
-	register_t *argp;
+	syscallarg_t *argp;
 	caddr_t params;
 	int reg, regcnt, error;
 
@@ -1030,6 +1058,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	sa = &td->td_sa;
 
 	sa->code = frame->tf_rax;
+	sa->original_code = sa->code;
 
 	if (__predict_false(sa->code == SYS_syscall ||
 	    sa->code == SYS___syscall ||
@@ -1146,6 +1175,8 @@ void
 amd64_syscall(struct thread *td, int traced)
 {
 	ksiginfo_t ksi;
+
+	kmsan_mark(td->td_frame, sizeof(*td->td_frame), KMSAN_STATE_INITED);
 
 #ifdef DIAGNOSTIC
 	if (!TRAPF_USERMODE(td->td_frame)) {

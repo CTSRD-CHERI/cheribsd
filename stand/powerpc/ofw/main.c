@@ -28,11 +28,14 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <sys/endian.h>
+
 #include <stand.h>
 #include "openfirm.h"
 #include "libofw.h"
 #include "bootstrap.h"
 
+#include <machine/asm.h>
 #include <machine/psl.h>
 
 struct arch_switch	archsw;		/* MI/MD interface boundary */
@@ -77,7 +80,7 @@ memsize(void)
 	memsz = 0;
 	memoryp = OF_instance_to_package(memory);
 
-	sz = OF_getprop(memoryp, "reg", &reg, sizeof(reg));
+	sz = OF_getencprop(memoryp, "reg", &reg[0], sizeof(reg));
 	sz /= sizeof(reg[0]);
 
 	for (i = 0; i < sz; i += (acells + scells)) {
@@ -104,6 +107,26 @@ ppc64_autoload(void)
 }
 #endif
 
+#if BYTE_ORDER == LITTLE_ENDIAN
+/*
+ * In Little-endian, we cannot just branch to the client interface. Since
+ * the client interface is big endian, we have to rfid to it.
+ * Likewise, when execution resumes, we are in the wrong endianness so
+ * we must do a fixup before returning to the caller.
+ */
+static int (*openfirmware_entry)(void *);
+extern int openfirmware_trampoline(void *buf, int (*cb)(void *));
+
+/*
+ * Wrapper to pass the real entry point to our trampoline.
+ */
+static int
+openfirmware_docall(void *buf)
+{
+	return openfirmware_trampoline(buf, openfirmware_entry);
+}
+#endif
+
 int
 main(int (*openfirm)(void *))
 {
@@ -117,13 +140,21 @@ main(int (*openfirm)(void *))
 	/*
 	 * Initialise the Open Firmware routines by giving them the entry point.
 	 */
+#if BYTE_ORDER == LITTLE_ENDIAN
+	/*
+	 * Use a trampoline entry point for endian fixups.
+	 */
+	openfirmware_entry = openfirm;
+	OF_init(openfirmware_docall);
+#else
 	OF_init(openfirm);
+#endif
 
 	root = OF_finddevice("/");
 
 	scells = acells = 1;
-	OF_getprop(root, "#address-cells", &acells, sizeof(acells));
-	OF_getprop(root, "#size-cells", &scells, sizeof(scells));
+	OF_getencprop(root, "#address-cells", &acells, sizeof(acells));
+	OF_getencprop(root, "#size-cells", &scells, sizeof(scells));
 
 	/*
 	 * Initialise the heap as early as possible.  Once this is done,
@@ -136,6 +167,20 @@ main(int (*openfirm)(void *))
          * Set up console.
          */
 	cons_probe();
+
+	archsw.arch_getdev = ofw_getdev;
+	archsw.arch_copyin = ofw_copyin;
+	archsw.arch_copyout = ofw_copyout;
+	archsw.arch_readin = ofw_readin;
+#ifdef CAS
+	setenv("cas", "1", 0);
+	archsw.arch_autoload = ppc64_autoload;
+#else
+	archsw.arch_autoload = ofw_autoload;
+#endif
+
+	/* Set up currdev variable to have hooks in place. */
+	env_setenv("currdev", EV_VOLATILE, "", ofw_setcurrdev, env_nounset);
 
 	/*
 	 * March through the device switch probing for things.
@@ -179,17 +224,6 @@ main(int (*openfirm)(void *))
 	 */
 	if (!(mfmsr() & PSL_DR))
 		setenv("usefdt", "1", 1);
-
-	archsw.arch_getdev = ofw_getdev;
-	archsw.arch_copyin = ofw_copyin;
-	archsw.arch_copyout = ofw_copyout;
-	archsw.arch_readin = ofw_readin;
-#ifdef CAS
-	setenv("cas", "1", 0);
-	archsw.arch_autoload = ppc64_autoload;
-#else
-	archsw.arch_autoload = ofw_autoload;
-#endif
 
 	interact();				/* doesn't return */
 

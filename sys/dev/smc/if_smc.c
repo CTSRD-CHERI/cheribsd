@@ -90,8 +90,6 @@ __FBSDID("$FreeBSD$");
 #define	SMC_RX_PRIORITY		5
 #define	SMC_TX_PRIORITY		10
 
-devclass_t	smc_devclass;
-
 static const char *smc_chip_ids[16] = {
 	NULL, NULL, NULL,
 	/* 3 */ "SMSC LAN91C90 or LAN91C92",
@@ -500,7 +498,7 @@ driver_t smc_driver = {
 	sizeof(struct smc_softc),
 };
 
-DRIVER_MODULE(miibus, smc, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(miibus, smc, miibus_driver, 0, 0);
 
 static void
 smc_start(struct ifnet *ifp)
@@ -1175,9 +1173,9 @@ smc_reset(struct smc_softc *sc)
 	 * Set up the control register.
 	 */
 	smc_select_bank(sc, 1);
-	ctr = smc_read_2(sc, CTR);
-	ctr |= CTR_LE_ENABLE | CTR_AUTO_RELEASE;
-	smc_write_2(sc, CTR, ctr);
+	ctr = smc_read_2(sc, CTRL);
+	ctr |= CTRL_LE_ENABLE | CTRL_AUTO_RELEASE;
+	smc_write_2(sc, CTRL, ctr);
 
 	/*
 	 * Reset the MMU.

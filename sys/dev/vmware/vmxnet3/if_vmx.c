@@ -207,8 +207,7 @@ static driver_t vmxnet3_driver = {
 	"vmx", vmxnet3_methods, sizeof(struct vmxnet3_softc)
 };
 
-static devclass_t vmxnet3_devclass;
-DRIVER_MODULE(vmx, pci, vmxnet3_driver, vmxnet3_devclass, 0, 0);
+DRIVER_MODULE(vmx, pci, vmxnet3_driver, 0, 0);
 IFLIB_PNP_INFO(pci, vmx, vmxnet3_vendor_info_array);
 MODULE_VERSION(vmx, 2);
 
@@ -540,12 +539,10 @@ vmxnet3_free_irqs(struct vmxnet3_softc *sc)
 static int
 vmxnet3_attach_post(if_ctx_t ctx)
 {
-	device_t dev;
 	if_softc_ctx_t scctx;
 	struct vmxnet3_softc *sc;
 	int error;
 
-	dev = iflib_get_dev(ctx);
 	scctx = iflib_get_softc_ctx(ctx);
 	sc = iflib_get_softc(ctx);
 
@@ -1047,7 +1044,6 @@ static void
 vmxnet3_init_shared_data(struct vmxnet3_softc *sc)
 {
 	struct vmxnet3_driver_shared *ds;
-	if_shared_ctx_t sctx;
 	if_softc_ctx_t scctx;
 	struct vmxnet3_txqueue *txq;
 	struct vmxnet3_txq_shared *txs;
@@ -1056,7 +1052,6 @@ vmxnet3_init_shared_data(struct vmxnet3_softc *sc)
 	int i;
 
 	ds = sc->vmx_ds;
-	sctx = sc->vmx_sctx;
 	scctx = sc->vmx_scctx;
 
 	/*
@@ -1157,7 +1152,6 @@ vmxnet3_reinit_rss_shared_data(struct vmxnet3_softc *sc)
 	    0x96, 0xa6, 0x9f, 0x8f, 0x9e, 0x8c, 0x90, 0xc9,
 	};
 
-	struct vmxnet3_driver_shared *ds;
 	if_softc_ctx_t scctx;
 	struct vmxnet3_rss_shared *rss;
 #ifdef RSS
@@ -1165,7 +1159,6 @@ vmxnet3_reinit_rss_shared_data(struct vmxnet3_softc *sc)
 #endif
 	int i;
 
-	ds = sc->vmx_ds;
 	scctx = sc->vmx_scctx;
 	rss = sc->vmx_rss;
 
@@ -1503,8 +1496,6 @@ vmxnet3_isc_rxd_pkt_get(void *vsc, if_rxd_info_t ri)
 	struct vmxnet3_rxqueue *rxq;
 	struct vmxnet3_comp_ring *rxc;
 	struct vmxnet3_rxcompdesc *rxcd;
-	struct vmxnet3_rxring *rxr;
-	struct vmxnet3_rxdesc *rxd;
 	if_rxd_frag_t frag;
 	int cqidx;
 	uint16_t total_len;
@@ -1604,16 +1595,19 @@ vmxnet3_isc_rxd_pkt_get(void *vsc, if_rxd_info_t ri)
 		rxcd = &rxc->vxcr_u.rxcd[cqidx];
 		KASSERT(rxcd->gen == rxc->vxcr_gen,
 		    ("%s: generation mismatch", __func__));
-		flid = (rxcd->qid >= scctx->isc_nrxqsets) ? 1 : 0;
-		rxr = &rxq->vxrxq_cmd_ring[flid];
-		rxd = &rxr->vxrxr_rxd[rxcd->rxd_idx];
-
-		frag = &ri->iri_frags[nfrags];
-		frag->irf_flid = flid;
-		frag->irf_idx = rxcd->rxd_idx;
-		frag->irf_len = rxcd->len;
-		total_len += rxcd->len;
-		nfrags++;
+		KASSERT(nfrags < IFLIB_MAX_RX_SEGS,
+		    ("%s: too many fragments", __func__));
+		if (__predict_true(rxcd->len != 0)) {
+			frag = &ri->iri_frags[nfrags];
+			flid = (rxcd->qid >= scctx->isc_nrxqsets) ? 1 : 0;
+			frag->irf_flid = flid;
+			frag->irf_idx = rxcd->rxd_idx;
+			frag->irf_len = rxcd->len;
+			total_len += rxcd->len;
+			nfrags++;
+		} else {
+			rxc->vcxr_zero_length_frag++;
+		}
 		if (++cqidx == rxc->vxcr_ndesc) {
 			cqidx = 0;
 			rxc->vxcr_gen ^= 1;
@@ -1729,13 +1723,9 @@ static void
 vmxnet3_isc_rxd_flush(void *vsc, uint16_t rxqid, uint8_t flid, qidx_t pidx)
 {
 	struct vmxnet3_softc *sc;
-	struct vmxnet3_rxqueue *rxq;
-	struct vmxnet3_rxring *rxr;
 	bus_size_t r;
 
 	sc = vsc;
-	rxq = &sc->vmx_rxq[rxqid];
-	rxr = &rxq->vxrxq_cmd_ring[flid];
 
 	if (flid == 0)
 		r = VMXNET3_BAR0_RXH1(rxqid);
@@ -1885,6 +1875,7 @@ vmxnet3_rxinit(struct vmxnet3_softc *sc, struct vmxnet3_rxqueue *rxq)
 	rxc->vxcr_next = 0;
 	rxc->vxcr_gen = VMXNET3_INIT_GEN;
 	rxc->vxcr_zero_length = 0;
+	rxc->vcxr_zero_length_frag = 0;
 	rxc->vxcr_pkt_errors = 0;
 	/*
 	 * iflib has zeroed out the descriptor array during the prior attach
@@ -2365,6 +2356,9 @@ vmxnet3_setup_debug_sysctl(struct vmxnet3_softc *sc,
 		    &rxq->vxrxq_comp_ring.vxcr_gen, 0, "");
 		SYSCTL_ADD_U64(ctx, list, OID_AUTO, "comp_zero_length", CTLFLAG_RD,
 		    &rxq->vxrxq_comp_ring.vxcr_zero_length, 0, "");
+		SYSCTL_ADD_U64(ctx, list, OID_AUTO, "comp_zero_length_frag",
+		    CTLFLAG_RD, &rxq->vxrxq_comp_ring.vcxr_zero_length_frag,
+		    0, "");
 		SYSCTL_ADD_U64(ctx, list, OID_AUTO, "comp_pkt_errors", CTLFLAG_RD,
 		    &rxq->vxrxq_comp_ring.vxcr_pkt_errors, 0, "");
 	}

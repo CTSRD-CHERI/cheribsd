@@ -63,9 +63,9 @@
 
 #define DRV_NAME	MLX4_IB_DRV_NAME
 #ifndef DRV_VERSION
-#define DRV_VERSION	"3.6.0"
+#define DRV_VERSION	"3.7.1"
 #endif
-#define DRV_RELDATE	"December 2020"
+#define DRV_RELDATE	"November 2021"
 
 #define MLX4_IB_FLOW_MAX_PRIO 0xFFF
 #define MLX4_IB_FLOW_QPN_MASK 0xFFFFFF
@@ -131,10 +131,10 @@ static int num_ib_ports(struct mlx4_dev *dev)
 	return ib_ports;
 }
 
-static struct net_device *mlx4_ib_get_netdev(struct ib_device *device, u8 port_num)
+static struct ifnet *mlx4_ib_get_netdev(struct ib_device *device, u8 port_num)
 {
 	struct mlx4_ib_dev *ibdev = to_mdev(device);
-	struct net_device *dev;
+	struct ifnet *dev;
 
 	rcu_read_lock();
 	dev = mlx4_get_protocol_dev(ibdev->dev, MLX4_PROT_ETH, port_num);
@@ -142,13 +142,13 @@ static struct net_device *mlx4_ib_get_netdev(struct ib_device *device, u8 port_n
 #if 0
 	if (dev) {
 		if (mlx4_is_bonded(ibdev->dev)) {
-			struct net_device *upper = NULL;
+			struct ifnet *upper = NULL;
 
 			upper = netdev_master_upper_dev_get_rcu(dev);
 			if (upper) {
-				struct net_device *active;
+				struct ifnet *active;
 
-				active = bond_option_active_slave_get_rcu(netdev_priv(upper));
+				active = bond_option_active_slave_get_rcu(mlx4_netdev_priv(upper));
 				if (active)
 					dev = active;
 			}
@@ -156,7 +156,7 @@ static struct net_device *mlx4_ib_get_netdev(struct ib_device *device, u8 port_n
 	}
 #endif
 	if (dev)
-		dev_hold(dev);
+		if_ref(dev);
 
 	rcu_read_unlock();
 	return dev;
@@ -415,7 +415,7 @@ int mlx4_ib_gid_index_to_real_index(struct mlx4_ib_dev *ibdev,
 		return ret;
 
 	if (attr.ndev)
-		dev_put(attr.ndev);
+		if_rele(attr.ndev);
 
 	if (!memcmp(&gid, &zgid, sizeof(gid)))
 		return -EINVAL;
@@ -560,12 +560,9 @@ static int mlx4_ib_query_device(struct ib_device *ibdev,
 	props->hca_core_clock = dev->dev->caps.hca_core_clock * 1000UL;
 	props->timestamp_mask = 0xFFFFFFFFFFFFULL;
 
-	if (!mlx4_is_slave(dev->dev))
-		err = mlx4_get_internal_clock_params(dev->dev, &clock_params);
-
 	if (uhw->outlen >= resp.response_length + sizeof(resp.hca_core_clock_offset)) {
 		resp.response_length += sizeof(resp.hca_core_clock_offset);
-		if (!err && !mlx4_is_slave(dev->dev)) {
+		if (!mlx4_get_internal_clock_params(dev->dev, &clock_params)) {
 			resp.comp_mask |= QUERY_DEVICE_RESP_MASK_TIMESTAMP;
 			resp.hca_core_clock_offset = clock_params.offset % PAGE_SIZE;
 		}
@@ -684,7 +681,8 @@ out:
 
 static u8 state_to_phys_state(enum ib_port_state state)
 {
-	return state == IB_PORT_ACTIVE ? 5 : 3;
+	return state == IB_PORT_ACTIVE ?
+		IB_PORT_PHYS_STATE_LINK_UP : IB_PORT_PHYS_STATE_DISABLED;
 }
 
 static int eth_link_query_port(struct ib_device *ibdev, u8 port,
@@ -693,7 +691,7 @@ static int eth_link_query_port(struct ib_device *ibdev, u8 port,
 
 	struct mlx4_ib_dev *mdev = to_mdev(ibdev);
 	struct mlx4_ib_iboe *iboe = &mdev->iboe;
-	struct net_device *ndev;
+	struct ifnet *ndev;
 	enum ib_mtu tmp;
 	struct mlx4_cmd_mailbox *mailbox;
 	int err = 0;
@@ -736,7 +734,8 @@ static int eth_link_query_port(struct ib_device *ibdev, u8 port,
 	tmp = iboe_get_mtu(ndev->if_mtu);
 	props->active_mtu = tmp ? min(props->max_mtu, tmp) : IB_MTU_256;
 
-	props->state		= (netif_running(ndev) && netif_carrier_ok(ndev)) ?
+	props->state		= ((ndev->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
+				   ndev->if_link_state == LINK_STATE_UP) ?
 					IB_PORT_ACTIVE : IB_PORT_DOWN;
 	props->phys_state	= state_to_phys_state(props->state);
 out_unlock:
@@ -1040,17 +1039,18 @@ out:
 	return err;
 }
 
-static struct ib_ucontext *mlx4_ib_alloc_ucontext(struct ib_device *ibdev,
-						  struct ib_udata *udata)
+static int mlx4_ib_alloc_ucontext(struct ib_ucontext *uctx,
+				  struct ib_udata *udata)
 {
+	struct ib_device *ibdev = uctx->device;
 	struct mlx4_ib_dev *dev = to_mdev(ibdev);
-	struct mlx4_ib_ucontext *context;
+	struct mlx4_ib_ucontext *context = to_mucontext(uctx);
 	struct mlx4_ib_alloc_ucontext_resp_v3 resp_v3;
 	struct mlx4_ib_alloc_ucontext_resp resp;
 	int err;
 
 	if (!dev->ib_active)
-		return ERR_PTR(-EAGAIN);
+		return -EAGAIN;
 
 	if (ibdev->uverbs_abi_ver == MLX4_IB_UVERBS_NO_DEV_CAPS_ABI_VERSION) {
 		resp_v3.qp_tab_size      = dev->dev->caps.num_qps;
@@ -1064,15 +1064,9 @@ static struct ib_ucontext *mlx4_ib_alloc_ucontext(struct ib_device *ibdev,
 		resp.cqe_size	      = dev->dev->caps.cqe_size;
 	}
 
-	context = kzalloc(sizeof(*context), GFP_KERNEL);
-	if (!context)
-		return ERR_PTR(-ENOMEM);
-
 	err = mlx4_uar_alloc(to_mdev(ibdev)->dev, &context->uar);
-	if (err) {
-		kfree(context);
-		return ERR_PTR(err);
-	}
+	if (err)
+		return err;
 
 	INIT_LIST_HEAD(&context->db_page_list);
 	mutex_init(&context->db_page_mutex);
@@ -1084,176 +1078,87 @@ static struct ib_ucontext *mlx4_ib_alloc_ucontext(struct ib_device *ibdev,
 
 	if (err) {
 		mlx4_uar_free(to_mdev(ibdev)->dev, &context->uar);
-		kfree(context);
-		return ERR_PTR(-EFAULT);
+		return -EFAULT;
 	}
 
-	return &context->ibucontext;
+	return err;
 }
 
-static int mlx4_ib_dealloc_ucontext(struct ib_ucontext *ibcontext)
+static void mlx4_ib_dealloc_ucontext(struct ib_ucontext *ibcontext)
 {
 	struct mlx4_ib_ucontext *context = to_mucontext(ibcontext);
 
 	mlx4_uar_free(to_mdev(ibcontext->device)->dev, &context->uar);
-	kfree(context);
-
-	return 0;
-}
-
-static void  mlx4_ib_vma_open(struct vm_area_struct *area)
-{
-	/* vma_open is called when a new VMA is created on top of our VMA.
-	 * This is done through either mremap flow or split_vma (usually due
-	 * to mlock, madvise, munmap, etc.). We do not support a clone of the
-	 * vma, as this VMA is strongly hardware related. Therefore we set the
-	 * vm_ops of the newly created/cloned VMA to NULL, to prevent it from
-	 * calling us again and trying to do incorrect actions. We assume that
-	 * the original vma size is exactly a single page that there will be no
-	 * "splitting" operations on.
-	 */
-	area->vm_ops = NULL;
-}
-
-static void  mlx4_ib_vma_close(struct vm_area_struct *area)
-{
-	struct mlx4_ib_vma_private_data *mlx4_ib_vma_priv_data;
-
-	/* It's guaranteed that all VMAs opened on a FD are closed before the
-	 * file itself is closed, therefore no sync is needed with the regular
-	 * closing flow. (e.g. mlx4_ib_dealloc_ucontext) However need a sync
-	 * with accessing the vma as part of mlx4_ib_disassociate_ucontext.
-	 * The close operation is usually called under mm->mmap_sem except when
-	 * process is exiting.  The exiting case is handled explicitly as part
-	 * of mlx4_ib_disassociate_ucontext.
-	 */
-	mlx4_ib_vma_priv_data = (struct mlx4_ib_vma_private_data *)
-				area->vm_private_data;
-
-	/* set the vma context pointer to null in the mlx4_ib driver's private
-	 * data to protect against a race condition in mlx4_ib_dissassociate_ucontext().
-	 */
-	mlx4_ib_vma_priv_data->vma = NULL;
-}
-
-static const struct vm_operations_struct mlx4_ib_vm_ops = {
-	.open = mlx4_ib_vma_open,
-	.close = mlx4_ib_vma_close
-};
-
-static void mlx4_ib_set_vma_data(struct vm_area_struct *vma,
-				 struct mlx4_ib_vma_private_data *vma_private_data)
-{
-	vma_private_data->vma = vma;
-	vma->vm_private_data = vma_private_data;
-	vma->vm_ops =  &mlx4_ib_vm_ops;
 }
 
 static int mlx4_ib_mmap(struct ib_ucontext *context, struct vm_area_struct *vma)
 {
 	struct mlx4_ib_dev *dev = to_mdev(context->device);
-	struct mlx4_ib_ucontext *mucontext = to_mucontext(context);
 
-	if (vma->vm_end - vma->vm_start != PAGE_SIZE)
-		return -EINVAL;
+	switch (vma->vm_pgoff) {
+	case 0:
+		return rdma_user_mmap_io(context, vma,
+					 to_mucontext(context)->uar.pfn,
+					 PAGE_SIZE,
+					 pgprot_noncached(vma->vm_page_prot),
+					 NULL);
 
-	if (vma->vm_pgoff == 0) {
-		/* We prevent double mmaping on same context */
-		if (mucontext->hw_bar_info[HW_BAR_DB].vma)
+	case 1:
+		if (dev->dev->caps.bf_reg_size == 0)
 			return -EINVAL;
+		return rdma_user_mmap_io(
+			context, vma,
+			to_mucontext(context)->uar.pfn +
+				dev->dev->caps.num_uars,
+			PAGE_SIZE, pgprot_writecombine(vma->vm_page_prot),
+			NULL);
 
-		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-
-		if (io_remap_pfn_range(vma, vma->vm_start,
-				       to_mucontext(context)->uar.pfn,
-				       PAGE_SIZE, vma->vm_page_prot))
-			return -EAGAIN;
-
-		mlx4_ib_set_vma_data(vma, &mucontext->hw_bar_info[HW_BAR_DB]);
-
-	} else if (vma->vm_pgoff == 1 && dev->dev->caps.bf_reg_size != 0) {
-		/* We prevent double mmaping on same context */
-		if (mucontext->hw_bar_info[HW_BAR_BF].vma)
-			return -EINVAL;
-
-		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-
-		if (io_remap_pfn_range(vma, vma->vm_start,
-				       to_mucontext(context)->uar.pfn +
-				       dev->dev->caps.num_uars,
-				       PAGE_SIZE, vma->vm_page_prot))
-			return -EAGAIN;
-
-		mlx4_ib_set_vma_data(vma, &mucontext->hw_bar_info[HW_BAR_BF]);
-
-	} else if (vma->vm_pgoff == 3) {
+	case 3: {
 		struct mlx4_clock_params params;
 		int ret;
 
-		/* We prevent double mmaping on same context */
-		if (mucontext->hw_bar_info[HW_BAR_CLOCK].vma)
-			return -EINVAL;
-
 		ret = mlx4_get_internal_clock_params(dev->dev, &params);
-
 		if (ret)
 			return ret;
 
-		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-		if (io_remap_pfn_range(vma, vma->vm_start,
-				       (pci_resource_start(dev->dev->persist->pdev,
-							   params.bar) +
-					params.offset)
-				       >> PAGE_SHIFT,
-				       PAGE_SIZE, vma->vm_page_prot))
-			return -EAGAIN;
+		return rdma_user_mmap_io(
+			context, vma,
+			(pci_resource_start(dev->dev->persist->pdev,
+					    params.bar) +
+			 params.offset) >>
+				PAGE_SHIFT,
+			PAGE_SIZE, pgprot_noncached(vma->vm_page_prot),
+			NULL);
+	}
 
-		mlx4_ib_set_vma_data(vma,
-				     &mucontext->hw_bar_info[HW_BAR_CLOCK]);
-	} else {
+	default:
 		return -EINVAL;
 	}
-
-	return 0;
 }
 
-static struct ib_pd *mlx4_ib_alloc_pd(struct ib_device *ibdev,
-				      struct ib_ucontext *context,
-				      struct ib_udata *udata)
+static int mlx4_ib_alloc_pd(struct ib_pd *ibpd, struct ib_udata *udata)
 {
-	struct mlx4_ib_pd *pd;
+	struct mlx4_ib_pd *pd = to_mpd(ibpd);
+	struct ib_device *ibdev = ibpd->device;
 	int err;
 
-	pd = kmalloc(sizeof *pd, GFP_KERNEL);
-	if (!pd)
-		return ERR_PTR(-ENOMEM);
-
 	err = mlx4_pd_alloc(to_mdev(ibdev)->dev, &pd->pdn);
-	if (err) {
-		kfree(pd);
-		return ERR_PTR(err);
+	if (err)
+		return err;
+
+	if (udata && ib_copy_to_udata(udata, &pd->pdn, sizeof(__u32))) {
+		mlx4_pd_free(to_mdev(ibdev)->dev, pd->pdn);
+		return -EFAULT;
 	}
-
-	if (context)
-		if (ib_copy_to_udata(udata, &pd->pdn, sizeof (__u32))) {
-			mlx4_pd_free(to_mdev(ibdev)->dev, pd->pdn);
-			kfree(pd);
-			return ERR_PTR(-EFAULT);
-		}
-
-	return &pd->ibpd;
+	return 0;
 }
 
-static int mlx4_ib_dealloc_pd(struct ib_pd *pd)
+static void mlx4_ib_dealloc_pd(struct ib_pd *pd, struct ib_udata *udata)
 {
 	mlx4_pd_free(to_mdev(pd->device)->dev, to_mpd(pd)->pdn);
-	kfree(pd);
-
-	return 0;
 }
 
 static struct ib_xrcd *mlx4_ib_alloc_xrcd(struct ib_device *ibdev,
-					  struct ib_ucontext *context,
 					  struct ib_udata *udata)
 {
 	struct mlx4_ib_xrcd *xrcd;
@@ -1295,7 +1200,7 @@ err1:
 	return ERR_PTR(err);
 }
 
-static int mlx4_ib_dealloc_xrcd(struct ib_xrcd *xrcd)
+static int mlx4_ib_dealloc_xrcd(struct ib_xrcd *xrcd, struct ib_udata *udata)
 {
 	ib_destroy_cq(to_mxrcd(xrcd)->cq);
 	ib_dealloc_pd(to_mxrcd(xrcd)->pd);
@@ -1347,7 +1252,7 @@ static void mlx4_ib_delete_counters_table(struct mlx4_ib_dev *ibdev,
 int mlx4_ib_add_mc(struct mlx4_ib_dev *mdev, struct mlx4_ib_qp *mqp,
 		   union ib_gid *gid)
 {
-	struct net_device *ndev;
+	struct ifnet *ndev;
 	int ret = 0;
 
 	if (!mqp->port)
@@ -1356,12 +1261,12 @@ int mlx4_ib_add_mc(struct mlx4_ib_dev *mdev, struct mlx4_ib_qp *mqp,
 	spin_lock_bh(&mdev->iboe.lock);
 	ndev = mdev->iboe.netdevs[mqp->port - 1];
 	if (ndev)
-		dev_hold(ndev);
+		if_ref(ndev);
 	spin_unlock_bh(&mdev->iboe.lock);
 
 	if (ndev) {
 		ret = 1;
-		dev_put(ndev);
+		if_rele(ndev);
 	}
 
 	return ret;
@@ -1733,7 +1638,7 @@ static int mlx4_ib_add_dont_trap_rule(struct mlx4_dev *dev,
 
 static struct ib_flow *mlx4_ib_create_flow(struct ib_qp *qp,
 				    struct ib_flow_attr *flow_attr,
-				    int domain)
+				    int domain, struct ib_udata *udata)
 {
 	int err = 0, i = 0, j = 0;
 	struct mlx4_ib_flow *mflow;
@@ -1746,6 +1651,10 @@ static struct ib_flow *mlx4_ib_create_flow(struct ib_qp *qp,
 
 	if ((flow_attr->flags & IB_FLOW_ATTR_FLAGS_DONT_TRAP) &&
 	    (flow_attr->type != IB_FLOW_ATTR_NORMAL))
+		return ERR_PTR(-EOPNOTSUPP);
+
+	if (udata &&
+	    udata->inlen && !ib_is_udata_cleared(udata, 0, udata->inlen))
 		return ERR_PTR(-EOPNOTSUPP);
 
 	memset(type, 0, sizeof(type));
@@ -1959,7 +1868,7 @@ static int mlx4_ib_mcg_detach(struct ib_qp *ibqp, union ib_gid *gid, u16 lid)
 	struct mlx4_ib_dev *mdev = to_mdev(ibqp->device);
 	struct mlx4_dev *dev = mdev->dev;
 	struct mlx4_ib_qp *mqp = to_mqp(ibqp);
-	struct net_device *ndev;
+	struct ifnet *ndev;
 	struct mlx4_ib_gid_entry *ge;
 	struct mlx4_flow_reg_id reg_id = {0, 0};
 	enum mlx4_protocol prot =  MLX4_PROT_IB_IPV6;
@@ -2002,10 +1911,10 @@ static int mlx4_ib_mcg_detach(struct ib_qp *ibqp, union ib_gid *gid, u16 lid)
 		spin_lock_bh(&mdev->iboe.lock);
 		ndev = ge->added ? mdev->iboe.netdevs[ge->port - 1] : NULL;
 		if (ndev)
-			dev_hold(ndev);
+			if_ref(ndev);
 		spin_unlock_bh(&mdev->iboe.lock);
 		if (ndev)
-			dev_put(ndev);
+			if_rele(ndev);
 		list_del(&ge->list);
 		kfree(ge);
 	} else
@@ -2283,7 +2192,7 @@ static void mlx4_ib_diag_cleanup(struct mlx4_ib_dev *ibdev)
 
 #define MLX4_IB_INVALID_MAC	((u64)-1)
 static void mlx4_ib_update_qps(struct mlx4_ib_dev *ibdev,
-			       struct net_device *dev,
+			       struct ifnet *dev,
 			       int port)
 {
 	u64 new_smac = 0;
@@ -2338,7 +2247,7 @@ unlock:
 }
 
 static void mlx4_ib_scan_netdevs(struct mlx4_ib_dev *ibdev,
-				 struct net_device *dev,
+				 struct ifnet *dev,
 				 unsigned long event)
 
 {
@@ -2369,10 +2278,10 @@ static void mlx4_ib_scan_netdevs(struct mlx4_ib_dev *ibdev,
 static int mlx4_ib_netdev_event(struct notifier_block *this,
 				unsigned long event, void *ptr)
 {
-	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
+	struct ifnet *dev = netdev_notifier_info_to_ifp(ptr);
 	struct mlx4_ib_dev *ibdev;
 
-	if (!net_eq(dev_net(dev), &init_net))
+	if (dev->if_vnet != &init_net)
 		return NOTIFY_DONE;
 
 	ibdev = container_of(this, struct mlx4_ib_dev, iboe.nb);
@@ -2551,6 +2460,7 @@ static void *mlx4_ib_add(struct mlx4_dev *dev)
 	ibdev->dev = dev;
 	ibdev->bond_next_port	= 0;
 
+	INIT_IB_DEVICE_OPS(&ibdev->ib_dev.ops, mlx4, MLX4);
 	strlcpy(ibdev->ib_dev.name, "mlx4_%d", IB_DEVICE_NAME_MAX);
 	ibdev->ib_dev.owner		= THIS_MODULE;
 	ibdev->ib_dev.node_type		= RDMA_NODE_IB_CA;
@@ -3104,15 +3014,15 @@ static void handle_bonded_port_state_event(struct work_struct *work)
 	kfree(ew);
 	spin_lock_bh(&ibdev->iboe.lock);
 	for (i = 0; i < MLX4_MAX_PORTS; ++i) {
-		struct net_device *curr_netdev = ibdev->iboe.netdevs[i];
+		struct ifnet *curr_netdev = ibdev->iboe.netdevs[i];
 		enum ib_port_state curr_port_state;
 
 		if (!curr_netdev)
 			continue;
 
 		curr_port_state =
-			(netif_running(curr_netdev) &&
-			 netif_carrier_ok(curr_netdev)) ?
+			((curr_netdev->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
+			 curr_netdev->if_link_state == LINK_STATE_UP) ?
 			IB_PORT_ACTIVE : IB_PORT_DOWN;
 
 		bonded_port_state = (bonded_port_state != IB_PORT_ACTIVE) ?

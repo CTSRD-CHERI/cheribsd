@@ -29,6 +29,7 @@
  *
  * $FreeBSD$
  */
+
 #include <sys/param.h>
 
 #include <bitstring.h>
@@ -321,26 +322,72 @@ BITSTRING_TC_DEFINE(bit_ffc_at)
 			nbits, memloc, nbits + 3, found_clear_bit);
 }
 
-BITSTRING_TC_DEFINE(bit_ffc_area_no_match)
+BITSTRING_TC_DEFINE(bit_ffc_area_at_all_or_nothing)
 /* bitstr_t *bitstr, int nbits, const char *memloc */
 {
-	int found_clear_bits;
-
-	memset(bitstr, 0xFF, bitstr_size(nbits));
-	bit_ffc_area(bitstr, nbits, 2, &found_clear_bits);
-	ATF_REQUIRE_EQ_MSG(-1, found_clear_bits,
-		"bit_ffc_area_%d_%s: Failed all set bits.", nbits, memloc);
-}
-
-BITSTRING_TC_DEFINE(bit_ffs_area_no_match)
-/* bitstr_t *bitstr, int nbits, const char *memloc */
-{
-	int found_clear_bits;
+	int found;
 
 	memset(bitstr, 0, bitstr_size(nbits));
-	bit_ffs_area(bitstr, nbits, 2, &found_clear_bits);
-	ATF_REQUIRE_EQ_MSG(-1, found_clear_bits,
-		"bit_ffs_area_%d_%s: Failed all clear bits.", nbits, memloc);
+	if (nbits % _BITSTR_BITS != 0)
+		bit_nset(bitstr, nbits, roundup2(nbits, _BITSTR_BITS) - 1);
+
+	for (int start = 0; start < nbits; start++) {
+		for (int size = 1; size < nbits - start; size++) {
+			bit_ffc_area_at(bitstr, start, nbits, size, &found);
+			ATF_REQUIRE_EQ_MSG(start, found,
+			    "bit_ffc_area_at_%d_%s: "
+			    "Did not find %d clear bits at %d",
+			    nbits, memloc, size, start);
+		}
+	}
+
+	memset(bitstr, 0xff, bitstr_size(nbits));
+	if (nbits % _BITSTR_BITS != 0)
+		bit_nclear(bitstr, nbits, roundup2(nbits, _BITSTR_BITS) - 1);
+
+	for (int start = 0; start < nbits; start++) {
+		for (int size = 1; size < nbits - start; size++) {
+			bit_ffc_area_at(bitstr, start, nbits, size, &found);
+			ATF_REQUIRE_EQ_MSG(-1, found,
+			    "bit_ffc_area_at_%d_%s: "
+			    "Found %d clear bits at %d",
+			    nbits, memloc, size, start);
+		}
+	}
+}
+
+BITSTRING_TC_DEFINE(bit_ffs_area_at_all_or_nothing)
+/* bitstr_t *bitstr, int nbits, const char *memloc */
+{
+	int found;
+
+	memset(bitstr, 0, bitstr_size(nbits));
+	if (nbits % _BITSTR_BITS != 0)
+		bit_nset(bitstr, nbits, roundup2(nbits, _BITSTR_BITS) - 1);
+
+	for (int start = 0; start < nbits; start++) {
+		for (int size = 1; size < nbits - start; size++) {
+			bit_ffs_area_at(bitstr, start, nbits, size, &found);
+			ATF_REQUIRE_EQ_MSG(-1, found,
+			    "bit_ffs_area_at_%d_%s: "
+			    "Found %d set bits at %d",
+			    nbits, memloc, size, start);
+		}
+	}
+
+	memset(bitstr, 0xff, bitstr_size(nbits));
+	if (nbits % _BITSTR_BITS != 0)
+		bit_nclear(bitstr, nbits, roundup2(nbits, _BITSTR_BITS) - 1);
+
+	for (int start = 0; start < nbits; start++) {
+		for (int size = 1; size < nbits - start; size++) {
+			bit_ffs_area_at(bitstr, start, nbits, size, &found);
+			ATF_REQUIRE_EQ_MSG(start, found,
+			    "bit_ffs_area_at_%d_%s: "
+			    "Did not find %d set bits at %d",
+			    nbits, memloc, size, start);
+		}
+	}
 }
 
 ATF_TC_WITHOUT_HEAD(bit_ffs_area);
@@ -352,20 +399,23 @@ ATF_TC_BODY(bit_ffs_area, tc)
 
 	memset(bitstr, 0, bitstr_size(nbits));
 
-	bit_set(bitstr, 5);
-	bit_set(bitstr, 6);
+	bit_nset(bitstr, 5, 6);
 
 	location = 0;
 	bit_ffs_area(bitstr, nbits, 3, &location);
 	ATF_REQUIRE_EQ_MSG(-1, location,
-			"bit_ffs_area: found location of size 3 when only 2 bits are set");
+	    "bit_ffs_area: found location of size 3 when only 2 bits are set");
+	ATF_REQUIRE_EQ_MSG(0, bit_ntest(bitstr, 5, 7, 1),
+	    "bit_ntest: found location of size 3 when only 2 bits are set");
 
 	bit_set(bitstr, 7);
 
 	location = 0;
 	bit_ffs_area(bitstr, nbits, 3, &location);
 	ATF_REQUIRE_EQ_MSG(5, location,
-			"bit_ffs_area: failed to find location of size 3");
+	    "bit_ffs_area: failed to find location of size 3 %d", location);
+	ATF_REQUIRE_EQ_MSG(1, bit_ntest(bitstr, 5, 7, 1),
+	    "bit_ntest: failed to find all 3 bits set");
 
 	bit_set(bitstr, 8);
 
@@ -389,9 +439,7 @@ ATF_TC_BODY(bit_ffs_area, tc)
 	ATF_REQUIRE_EQ_MSG(-1, location,
 			"bit_ffs_area_at: found invalid location");
 
-	bit_set(bitstr, 69);
-	bit_set(bitstr, 70);
-	bit_set(bitstr, 71);
+	bit_nset(bitstr, 69, 71);
 
 	location = 0;
 	bit_ffs_area_at(bitstr, 8, nbits, 3, &location);
@@ -412,6 +460,18 @@ ATF_TC_BODY(bit_ffs_area, tc)
 	bit_ffs_area_at(bitstr, 72, nbits, 3, &location);
 	ATF_REQUIRE_EQ_MSG(-1, location,
 			"bit_ffs_area_at: found invalid location");
+
+	bit_nset(bitstr, 59, 67);
+
+	location = 0;
+	bit_ffs_area(bitstr, nbits, 9, &location);
+	ATF_REQUIRE_EQ_MSG(59, location,
+			"bit_ffs_area: failed to find location of size 9");
+
+	location = 0;
+	bit_ffs_area(bitstr, nbits, 10, &location);
+	ATF_REQUIRE_EQ_MSG(-1, location,
+			"bit_ffs_area: found invalid location");
 }
 
 ATF_TC_WITHOUT_HEAD(bit_ffc_area);
@@ -601,6 +661,209 @@ BITSTRING_TC_DEFINE(bit_count)
 
 }
 
+BITSTRING_TC_DEFINE(bit_foreach)
+/* bitstr_t *bitstr, int nbits, const char *memloc */
+{
+	int i, set_bit;
+
+	/* Empty bitstr */
+	memset(bitstr, 0x00, bitstr_size(nbits));
+	bit_foreach (bitstr, nbits, set_bit) {
+		atf_tc_fail("bit_foreach_%d_%s_%s: Failed at location %d",
+		    nbits, "clear", memloc, set_bit);
+	}
+
+	/* Full bitstr */
+	i = 0;
+	memset(bitstr, 0xFF, bitstr_size(nbits));
+	bit_foreach(bitstr, nbits, set_bit) {
+		ATF_REQUIRE_MSG(set_bit == i,
+		    "bit_foreach_%d_%s_%s: Failed on turn %d at location %d",
+		    nbits, "set", memloc, i, set_bit);
+		i++;
+	}
+	ATF_REQUIRE_MSG(i == nbits,
+	    "bit_foreach_%d_%s_%s: Invalid number of turns %d",
+	    nbits, "set", memloc, i);
+
+	/* Alternating bitstr, starts with 0 */
+	i = 0;
+	memset(bitstr, 0xAA, bitstr_size(nbits));
+	bit_foreach(bitstr, nbits, set_bit) {
+		ATF_REQUIRE_MSG(set_bit == i * 2 + 1,
+		    "bit_foreach_%d_%s_%d_%s: "
+		    "Failed on turn %d at location %d",
+		    nbits, "alternating", 0,  memloc, i, set_bit);
+		i++;
+	}
+	ATF_REQUIRE_MSG(i == nbits / 2,
+	    "bit_foreach_%d_%s_%d_%s: Invalid number of turns %d",
+	    nbits, "alternating", 0, memloc, i);
+
+	/* Alternating bitstr, starts with 1 */
+	i = 0;
+	memset(bitstr, 0x55, bitstr_size(nbits));
+	bit_foreach(bitstr, nbits, set_bit) {
+		ATF_REQUIRE_MSG(set_bit == i * 2,
+		    "bit_foreach_%d_%s_%d_%s: "
+		    "Failed on turn %d at location %d",
+		    nbits, "alternating", 1, memloc, i, set_bit);
+		i++;
+	}
+	ATF_REQUIRE_MSG(i == (nbits + 1) / 2,
+	    "bit_foreach_%d_%s_%d_%s: Invalid number of turns %d",
+	    nbits, "alternating", 1, memloc, i);
+}
+
+BITSTRING_TC_DEFINE(bit_foreach_at)
+/* bitstr_t *bitstr, int nbits, const char *memloc */
+{
+	int i, s, e, set_bit;
+
+	/* Invalid _start value */
+	memset(bitstr, 0xFF, bitstr_size(nbits));
+	bit_foreach_at(bitstr, nbits, nbits, set_bit) {
+		atf_tc_fail("bit_foreach_at_%d_%s_%s: Failed at location %d",
+		    nbits, "invalid_start", memloc, set_bit);
+	}
+
+	/* Varying start location */
+	memset(bitstr, 0xAA, bitstr_size(nbits));
+	for (s = 0; s < nbits; s++) {
+		i = 0;
+		bit_foreach_at(bitstr, s, nbits, set_bit) {
+			ATF_REQUIRE_MSG(set_bit == (i + s / 2) * 2 + 1,
+			    "bit_foreach_at_%d_%s_%d_%s: "
+			    "Failed on turn %d at location %d",
+			    nbits, "vary_start", s,  memloc, i, set_bit);
+			i++;
+		}
+		ATF_REQUIRE_MSG(i == nbits / 2 - s / 2,
+		    "bit_foreach_at_%d_%s_%d_%s: Invalid number of turns %d",
+		    nbits, "vary_start", s, memloc, i);
+	}
+
+	/* Varying end location */
+	memset(bitstr, 0xAA, bitstr_size(nbits));
+	for (e = 0; e < nbits; e++) {
+		i = 0;
+		bit_foreach_at(bitstr, 0, e, set_bit) {
+			ATF_REQUIRE_MSG(set_bit == i * 2 + 1,
+			    "bit_foreach_at_%d_%s_%d_%s: "
+			    "Failed on turn %d at location %d",
+			    nbits, "vary_end", e,  memloc, i, set_bit);
+			i++;
+		}
+		ATF_REQUIRE_MSG(i == e / 2,
+		    "bit_foreach_at_%d_%s_%d_%s: Invalid number of turns %d",
+		    nbits, "vary_end", e, memloc, i);
+	}
+}
+
+BITSTRING_TC_DEFINE(bit_foreach_unset)
+/* bitstr_t *bitstr, int nbits, const char *memloc */
+{
+	int i, unset_bit;
+
+	/* Empty bitstr */
+	i = 0;
+	memset(bitstr, 0, bitstr_size(nbits));
+	bit_foreach_unset(bitstr, nbits, unset_bit) {
+		ATF_REQUIRE_MSG(unset_bit == i,
+		    "bit_foreach_unset_%d_%s_%s: "
+		    "Failed on turn %d at location %d",
+		    nbits, "clear", memloc, i, unset_bit);
+		i++;
+	}
+	ATF_REQUIRE_MSG(i == nbits,
+	    "bit_foreach_unset_%d_%s_%s: Invalid number of turns %d",
+	    nbits, "set", memloc, i);
+
+	/* Full bitstr */
+	memset(bitstr, 0xFF, bitstr_size(nbits));
+	bit_foreach_unset(bitstr, nbits, unset_bit) {
+		atf_tc_fail("bit_foreach_unset_%d_%s_%s: "
+		    "Failed at location %d",
+		    nbits, "set", memloc, unset_bit);
+	}
+
+	/* Alternating bitstr, starts with 0 */
+	i = 0;
+	memset(bitstr, 0xAA, bitstr_size(nbits));
+	bit_foreach_unset(bitstr, nbits, unset_bit) {
+		ATF_REQUIRE_MSG(unset_bit == i * 2,
+		    "bit_foreach_unset_%d_%s_%d_%s: "
+		    "Failed on turn %d at location %d",
+		    nbits, "alternating", 0,  memloc, i, unset_bit);
+		i++;
+	}
+	ATF_REQUIRE_MSG(i == (nbits + 1) / 2,
+	    "bit_foreach_unset_%d_%s_%d_%s: Invalid number of turns %d",
+	    nbits, "alternating", 0, memloc, i);
+
+	/* Alternating bitstr, starts with 1 */
+	i = 0;
+	memset(bitstr, 0x55, bitstr_size(nbits));
+	bit_foreach_unset(bitstr, nbits, unset_bit) {
+		ATF_REQUIRE_MSG(unset_bit == i * 2 + 1,
+		    "bit_foreach_unset_%d_%s_%d_%s: "
+		    "Failed on turn %d at location %d",
+		    nbits, "alternating", 1, memloc, i, unset_bit);
+		i++;
+	}
+	ATF_REQUIRE_MSG(i == nbits / 2,
+	    "bit_foreach_unset_%d_%s_%d_%s: Invalid number of turns %d",
+	    nbits, "alternating", 1, memloc, i);
+}
+
+BITSTRING_TC_DEFINE(bit_foreach_unset_at)
+/* bitstr_t *bitstr, int nbits, const char *memloc */
+{
+	int i, s, e, unset_bit;
+
+	/* Invalid _start value */
+	memset(bitstr, 0, bitstr_size(nbits));
+	bit_foreach_unset_at(bitstr, nbits, nbits, unset_bit) {
+		atf_tc_fail("bit_foreach_unset_at_%d_%s_%s: "
+		    "Failed at location %d",
+		    nbits, "invalid_start", memloc, unset_bit);
+	}
+
+	/* Varying start location */
+	memset(bitstr, 0xAA, bitstr_size(nbits));
+	for (s = 0; s < nbits; s++) {
+		i = 0;
+		bit_foreach_unset_at(bitstr, s, nbits, unset_bit) {
+			ATF_REQUIRE_MSG(unset_bit == (i + (s + 1) / 2) * 2,
+			    "bit_foreach_unset_at_%d_%s_%d_%s: "
+			    "Failed on turn %d at location %d",
+			    nbits, "vary_start", s,  memloc, i, unset_bit);
+			i++;
+		}
+		ATF_REQUIRE_MSG(i == (nbits + 1) / 2 - (s + 1) / 2,
+		    "bit_foreach_unset_at_%d_%s_%d_%s: "
+		    "Invalid number of turns %d",
+		    nbits, "vary_start", s, memloc, i);
+	}
+
+	/* Varying end location */
+	memset(bitstr, 0xAA, bitstr_size(nbits));
+	for (e = 0; e < nbits; e++) {
+		i = 0;
+		bit_foreach_unset_at(bitstr, 0, e, unset_bit) {
+			ATF_REQUIRE_MSG(unset_bit == i * 2,
+			    "bit_foreach_unset_at_%d_%s_%d_%s: "
+			    "Failed on turn %d at location %d",
+			    nbits, "vary_end", e,  memloc, i, unset_bit);
+			i++;
+		}
+		ATF_REQUIRE_MSG(i == (e + 1) / 2,
+		    "bit_foreach_unset_at_%d_%s_%d_%s: "
+		    "Invalid number of turns %d",
+		    nbits, "vary_end", e, memloc, i);
+	}
+}
+
 ATF_TP_ADD_TCS(tp)
 {
 
@@ -617,8 +880,12 @@ ATF_TP_ADD_TCS(tp)
 	BITSTRING_TC_ADD(tp, bit_nclear);
 	BITSTRING_TC_ADD(tp, bit_nset);
 	BITSTRING_TC_ADD(tp, bit_count);
-	BITSTRING_TC_ADD(tp, bit_ffs_area_no_match);
-	BITSTRING_TC_ADD(tp, bit_ffc_area_no_match);
+	BITSTRING_TC_ADD(tp, bit_ffs_area_at_all_or_nothing);
+	BITSTRING_TC_ADD(tp, bit_ffc_area_at_all_or_nothing);
+	BITSTRING_TC_ADD(tp, bit_foreach);
+	BITSTRING_TC_ADD(tp, bit_foreach_at);
+	BITSTRING_TC_ADD(tp, bit_foreach_unset);
+	BITSTRING_TC_ADD(tp, bit_foreach_unset_at);
 
 	return (atf_no_error());
 }

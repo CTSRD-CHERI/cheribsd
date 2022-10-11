@@ -14,20 +14,9 @@
 //===----------------------------------------------------------------------===//
 //
 #include "AMDGPU.h"
-#include "AMDGPUInstrInfo.h"
-#include "AMDGPUSubtarget.h"
-#include "SIInstrInfo.h"
-#include "SIMachineFunctionInfo.h"
+#include "GCNSubtarget.h"
+#include "MCTargetDesc/AMDGPUMCTargetDesc.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/CodeGen/MachineFunctionPass.h"
-#include "llvm/CodeGen/MachineInstrBuilder.h"
-#include "llvm/CodeGen/MachineRegisterInfo.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Target/TargetMachine.h"
 #include <queue>
 
 #define DEBUG_TYPE "si-mode-register"
@@ -199,7 +188,7 @@ void SIModeRegister::insertSetreg(MachineBasicBlock &MBB, MachineInstr *MI,
     unsigned Offset = countTrailingZeros<unsigned>(InstrMode.Mask);
     unsigned Width = countTrailingOnes<unsigned>(InstrMode.Mask >> Offset);
     unsigned Value = (InstrMode.Mode >> Offset) & ((1 << Width) - 1);
-    BuildMI(MBB, MI, 0, TII->get(AMDGPU::S_SETREG_IMM32_B32))
+    BuildMI(MBB, MI, nullptr, TII->get(AMDGPU::S_SETREG_IMM32_B32))
         .addImm(Value)
         .addImm(((Width - 1) << AMDGPU::Hwreg::WIDTH_M1_SHIFT_) |
                 (Offset << AMDGPU::Hwreg::OFFSET_SHIFT_) |
@@ -236,14 +225,16 @@ void SIModeRegister::processBlockPhase1(MachineBasicBlock &MBB,
   // RequirePending is used to indicate whether we are collecting the initial
   // requirements for the block, and need to defer the first InsertionPoint to
   // Phase 3. It is set to false once we have set FirstInsertionPoint, or when
-  // we discover an explict setreg that means this block doesn't have any
+  // we discover an explicit setreg that means this block doesn't have any
   // initial requirements.
   bool RequirePending = true;
   Status IPChange;
   for (MachineInstr &MI : MBB) {
     Status InstrMode = getInstructionMode(MI, TII);
-    if ((MI.getOpcode() == AMDGPU::S_SETREG_B32) ||
-        (MI.getOpcode() == AMDGPU::S_SETREG_IMM32_B32)) {
+    if (MI.getOpcode() == AMDGPU::S_SETREG_B32 ||
+        MI.getOpcode() == AMDGPU::S_SETREG_B32_mode ||
+        MI.getOpcode() == AMDGPU::S_SETREG_IMM32_B32 ||
+        MI.getOpcode() == AMDGPU::S_SETREG_IMM32_B32_mode) {
       // We preserve any explicit mode register setreg instruction we encounter,
       // as we assume it has been inserted by a higher authority (this is
       // likely to be a very rare occurrence).
@@ -267,7 +258,8 @@ void SIModeRegister::processBlockPhase1(MachineBasicBlock &MBB,
       // If this is an immediate then we know the value being set, but if it is
       // not an immediate then we treat the modified bits of the mode register
       // as unknown.
-      if (MI.getOpcode() == AMDGPU::S_SETREG_IMM32_B32) {
+      if (MI.getOpcode() == AMDGPU::S_SETREG_IMM32_B32 ||
+          MI.getOpcode() == AMDGPU::S_SETREG_IMM32_B32_mode) {
         unsigned Val = TII->getNamedOperand(MI, AMDGPU::OpName::imm)->getImm();
         unsigned Mode = (Val << Offset) & Mask;
         Status Setreg = Status(Mask, Mode);
@@ -381,12 +373,8 @@ void SIModeRegister::processBlockPhase2(MachineBasicBlock &MBB,
     BlockInfo[ThisBlock]->Exit = TmpStatus;
     // Add the successors to the work list so we can propagate the changed exit
     // status.
-    for (MachineBasicBlock::succ_iterator S = MBB.succ_begin(),
-                                          E = MBB.succ_end();
-         S != E; S = std::next(S)) {
-      MachineBasicBlock &B = *(*S);
-      Phase2List.push(&B);
-    }
+    for (MachineBasicBlock *Succ : MBB.successors())
+      Phase2List.push(Succ);
   }
   BlockInfo[ThisBlock]->ExitSet = ExitSet;
   if (RevisitRequired)

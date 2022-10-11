@@ -52,6 +52,7 @@ class raw_ostream;
 /// information parsing. The actual data is supplied through DWARFObj.
 class DWARFContext : public DIContext {
   DWARFUnitVector NormalUnits;
+  Optional<DenseMap<uint64_t, DWARFTypeUnit*>> NormalTypeUnits;
   std::unique_ptr<DWARFUnitIndex> CUIndex;
   std::unique_ptr<DWARFGdbIndex> GdbIndex;
   std::unique_ptr<DWARFUnitIndex> TUIndex;
@@ -70,6 +71,7 @@ class DWARFContext : public DIContext {
   std::unique_ptr<AppleAcceleratorTable> AppleObjC;
 
   DWARFUnitVector DWOUnits;
+  Optional<DenseMap<uint64_t, DWARFTypeUnit*>> DWOTypeUnits;
   std::unique_ptr<DWARFDebugAbbrev> AbbrevDWO;
   std::unique_ptr<DWARFDebugMacro> MacinfoDWO;
   std::unique_ptr<DWARFDebugMacro> MacroDWO;
@@ -146,6 +148,7 @@ public:
   bool verify(raw_ostream &OS, DIDumpOptions DumpOpts = {}) override;
 
   using unit_iterator_range = DWARFUnitVector::iterator_range;
+  using compile_unit_range = DWARFUnitVector::compile_unit_range;
 
   /// Get units from .debug_info in this context.
   unit_iterator_range info_section_units() {
@@ -153,6 +156,11 @@ public:
     return unit_iterator_range(NormalUnits.begin(),
                                NormalUnits.begin() +
                                    NormalUnits.getNumInfoUnits());
+  }
+
+  const DWARFUnitVector &getNormalUnitsVector() {
+    parseNormalUnits();
+    return NormalUnits;
   }
 
   /// Get units from .debug_types in this context.
@@ -163,10 +171,12 @@ public:
   }
 
   /// Get compile units in this context.
-  unit_iterator_range compile_units() { return info_section_units(); }
+  compile_unit_range compile_units() {
+    return make_filter_range(info_section_units(), isCompileUnit);
+  }
 
-  /// Get type units in this context.
-  unit_iterator_range type_units() { return types_section_units(); }
+  // If you want type_units(), it'll need to be a concat iterator of a filter of
+  // TUs in info_section + all the (all type) units in types_section
 
   /// Get all normal compile/type units in this context.
   unit_iterator_range normal_units() {
@@ -181,6 +191,11 @@ public:
                                DWOUnits.begin() + DWOUnits.getNumInfoUnits());
   }
 
+  const DWARFUnitVector &getDWOUnitsVector() {
+    parseDWOUnits();
+    return DWOUnits;
+  }
+
   /// Get units from .debug_types.dwo in the DWO context.
   unit_iterator_range dwo_types_section_units() {
     parseDWOUnits();
@@ -189,10 +204,13 @@ public:
   }
 
   /// Get compile units in the DWO context.
-  unit_iterator_range dwo_compile_units() { return dwo_info_section_units(); }
+  compile_unit_range dwo_compile_units() {
+    return make_filter_range(dwo_info_section_units(), isCompileUnit);
+  }
 
-  /// Get type units in the DWO context.
-  unit_iterator_range dwo_type_units() { return dwo_types_section_units(); }
+  // If you want dwo_type_units(), it'll need to be a concat iterator of a
+  // filter of TUs in dwo_info_section + all the (all type) units in
+  // dwo_types_section.
 
   /// Get all units in the DWO context.
   unit_iterator_range dwo_units() {
@@ -237,6 +255,7 @@ public:
   }
 
   DWARFCompileUnit *getDWOCompileUnitForHash(uint64_t Hash);
+  DWARFTypeUnit *getTypeUnitForHash(uint16_t Version, uint64_t Hash, bool IsDWO);
 
   /// Return the compile unit that includes an offset (relative to .debug_info).
   DWARFCompileUnit *getCompileUnitForOffset(uint64_t Offset);
@@ -358,12 +377,33 @@ public:
   getLocalsForAddress(object::SectionedAddress Address) override;
 
   bool isLittleEndian() const { return DObj->isLittleEndian(); }
+  static unsigned getMaxSupportedVersion() { return 5; }
   static bool isSupportedVersion(unsigned version) {
-    return version == 2 || version == 3 || version == 4 || version == 5;
+    return version >= 2 && version <= getMaxSupportedVersion();
   }
 
+  static SmallVector<uint8_t, 3> getSupportedAddressSizes() {
+    return {2, 4, 8};
+  }
   static bool isAddressSizeSupported(unsigned AddressSize) {
-    return AddressSize == 2 || AddressSize == 4 || AddressSize == 8;
+    return llvm::is_contained(getSupportedAddressSizes(), AddressSize);
+  }
+  template <typename... Ts>
+  static Error checkAddressSizeSupported(unsigned AddressSize,
+                                         std::error_code EC, char const *Fmt,
+                                         const Ts &...Vals) {
+    if (isAddressSizeSupported(AddressSize))
+      return Error::success();
+    std::string Buffer;
+    raw_string_ostream Stream(Buffer);
+    Stream << format(Fmt, Vals...)
+           << " has unsupported address size: " << AddressSize
+           << " (supported are ";
+    ListSeparator LS;
+    for (unsigned Size : DWARFContext::getSupportedAddressSizes())
+      Stream << LS << Size;
+    Stream << ')';
+    return make_error<StringError>(Stream.str(), EC);
   }
 
   std::shared_ptr<DWARFContext> getDWOContext(StringRef AbsolutePath);
@@ -376,9 +416,12 @@ public:
 
   function_ref<void(Error)> getWarningHandler() { return WarningHandler; }
 
+  enum class ProcessDebugRelocations { Process, Ignore };
+
   static std::unique_ptr<DWARFContext>
-  create(const object::ObjectFile &Obj, const LoadedObjectInfo *L = nullptr,
-         std::string DWPName = "",
+  create(const object::ObjectFile &Obj,
+         ProcessDebugRelocations RelocAction = ProcessDebugRelocations::Process,
+         const LoadedObjectInfo *L = nullptr, std::string DWPName = "",
          std::function<void(Error)> RecoverableErrorHandler =
              WithColor::defaultErrorHandler,
          std::function<void(Error)> WarningHandler =

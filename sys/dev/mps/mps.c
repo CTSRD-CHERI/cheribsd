@@ -1112,7 +1112,8 @@ mps_enqueue_request(struct mps_softc *sc, struct mps_command *cm)
 	rd.u.high = cm->cm_desc.Words.High;
 	rd.word = htole64(rd.word);
 
-	KASSERT(cm->cm_state == MPS_CM_STATE_BUSY, ("command not busy\n"));
+	KASSERT(cm->cm_state == MPS_CM_STATE_BUSY,
+	    ("command not busy, state = %u\n", cm->cm_state));
 	cm->cm_state = MPS_CM_STATE_INQUEUE;
 
 	/* TODO-We may need to make below regwrite atomic */
@@ -1381,6 +1382,9 @@ mps_load_chains_cb(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
 		return;
 
 	for (i = 0, o = 0, s = 0; s < nsegs; s++) {
+		KASSERT(segs[s].ds_addr + segs[s].ds_len - 1 <= BUS_SPACE_MAXADDR_32BIT,
+		    ("mps: Bad segment address %#jx len %#jx\n", (uintmax_t)segs[s].ds_addr,
+			(uintmax_t)segs[s].ds_len));
 		for (bo = 0; bo + sc->reqframesz <= segs[s].ds_len;
 		    bo += sc->reqframesz) {
 			chain = &sc->chains[i++];
@@ -1761,18 +1765,23 @@ mps_setup_sysctl(struct mps_softc *sc)
 
 	SYSCTL_ADD_PROC(sysctl_ctx, SYSCTL_CHILDREN(sysctl_tree),
 	    OID_AUTO, "mapping_table_dump",
-	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, sc, 0,
+	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, 0,
 	    mps_mapping_dump, "A", "Mapping Table Dump");
 
 	SYSCTL_ADD_PROC(sysctl_ctx, SYSCTL_CHILDREN(sysctl_tree),
 	    OID_AUTO, "encl_table_dump",
-	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, sc, 0,
+	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, 0,
 	    mps_mapping_encl_dump, "A", "Enclosure Table Dump");
 
 	SYSCTL_ADD_PROC(sysctl_ctx, SYSCTL_CHILDREN(sysctl_tree),
 	    OID_AUTO, "dump_reqs",
-	    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_SKIP | CTLFLAG_NEEDGIANT,
+	    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_SKIP | CTLFLAG_MPSAFE,
 	    sc, 0, mps_dump_reqs, "I", "Dump Active Requests");
+
+	SYSCTL_ADD_INT(sysctl_ctx, SYSCTL_CHILDREN(sysctl_tree),
+	    OID_AUTO, "dump_reqs_alltypes", CTLFLAG_RW,
+	    &sc->dump_reqs_alltypes, 0,
+	    "dump all request types not just inqueue");
 
 	SYSCTL_ADD_INT(sysctl_ctx, SYSCTL_CHILDREN(sysctl_tree),
 	    OID_AUTO, "use_phy_num", CTLFLAG_RD, &sc->use_phynum, 0,
@@ -1947,7 +1956,7 @@ mps_dump_reqs(SYSCTL_HANDLER_ARGS)
 	/* Best effort, no locking */
 	for (i = smid; i < numreqs; i++) {
 		cm = &sc->commands[i];
-		if (cm->cm_state != state)
+		if ((sc->dump_reqs_alltypes == 0) && (cm->cm_state != state))
 			continue;
 		hdr.smid = i;
 		hdr.state = cm->cm_state;
@@ -2086,7 +2095,8 @@ mps_periodic(void *arg)
 		mps_reinit(sc);
 	}
 
-	callout_reset(&sc->periodic, MPS_PERIODIC_DELAY * hz, mps_periodic, sc);
+	callout_reset_sbt(&sc->periodic, MPS_PERIODIC_DELAY * SBT_1S, 0,
+	    mps_periodic, sc, C_PREL(1));
 }
 
 static void
@@ -2206,6 +2216,9 @@ mps_complete_command(struct mps_softc *sc, struct mps_command *cm)
 		return;
 	}
 
+	KASSERT(cm->cm_state == MPS_CM_STATE_INQUEUE,
+	    ("command not inqueue, state = %u\n", cm->cm_state));
+	cm->cm_state = MPS_CM_STATE_BUSY; 
 	if (cm->cm_flags & MPS_CM_FLAGS_POLLED)
 		cm->cm_flags |= MPS_CM_FLAGS_COMPLETE;
 
@@ -2382,9 +2395,6 @@ mps_intr_locked(void *data)
 		switch (flags) {
 		case MPI2_RPY_DESCRIPT_FLAGS_SCSI_IO_SUCCESS:
 			cm = &sc->commands[le16toh(desc->SCSIIOSuccess.SMID)];
-			KASSERT(cm->cm_state == MPS_CM_STATE_INQUEUE,
-			    ("command not inqueue\n"));
-			cm->cm_state = MPS_CM_STATE_BUSY;
 			cm->cm_reply = NULL;
 			break;
 		case MPI2_RPY_DESCRIPT_FLAGS_ADDRESS_REPLY:
@@ -2460,7 +2470,6 @@ mps_intr_locked(void *data)
 				cm = &sc->commands[
 				    le16toh(desc->AddressReply.SMID)];
 				if (cm->cm_state == MPS_CM_STATE_INQUEUE) {
-					cm->cm_state = MPS_CM_STATE_BUSY;
 					cm->cm_reply = reply;
 					cm->cm_reply_data = le32toh(
 					    desc->AddressReply.ReplyFrameAddress);
@@ -2690,7 +2699,7 @@ mps_deregister_events(struct mps_softc *sc, struct mps_event_handle *handle)
 static int
 mps_add_chain(struct mps_command *cm)
 {
-	MPI2_SGE_CHAIN32 *sgc;
+	MPI2_SGE_CHAIN64 *sgc;
 	struct mps_chain *chain;
 	u_int space;
 
@@ -2709,17 +2718,18 @@ mps_add_chain(struct mps_command *cm)
 	 */
 	TAILQ_INSERT_TAIL(&cm->cm_chain_list, chain, chain_link);
 
-	sgc = (MPI2_SGE_CHAIN32 *)&cm->cm_sge->MpiChain;
+	sgc = (MPI2_SGE_CHAIN64 *)&cm->cm_sge->MpiChain;
 	sgc->Length = htole16(space);
 	sgc->NextChainOffset = 0;
 	/* TODO Looks like bug in Setting sgc->Flags. 
 	 *	sgc->Flags = ( MPI2_SGE_FLAGS_CHAIN_ELEMENT | MPI2_SGE_FLAGS_64_BIT_ADDRESSING |
 	 *	            MPI2_SGE_FLAGS_SYSTEM_ADDRESS) << MPI2_SGE_FLAGS_SHIFT
 	 *	This is fine.. because we are not using simple element. In case of 
-	 *	MPI2_SGE_CHAIN32, we have separate Length and Flags feild.
+	 *	MPI2_SGE_CHAIN64, we have separate Length and Flags feild.
  	 */
-	sgc->Flags = MPI2_SGE_FLAGS_CHAIN_ELEMENT;
-	sgc->Address = htole32(chain->chain_busaddr);
+	sgc->Flags = MPI2_SGE_FLAGS_CHAIN_ELEMENT | MPI2_SGE_FLAGS_64_BIT_ADDRESSING;
+	sgc->Address.High = htole32(chain->chain_busaddr >> 32);
+	sgc->Address.Low = htole32(chain->chain_busaddr);
 
 	cm->cm_sge = (MPI2_SGE_IO_UNION *)&chain->chain->MpiSimple;
 	cm->cm_sglsize = space;
@@ -2751,7 +2761,7 @@ mps_push_sge(struct mps_command *cm, void *sgep, size_t len, int segsleft)
 		}
 		break;
 	case MPI2_SGE_FLAGS_CHAIN_ELEMENT:
-		/* Driver only uses 32-bit chain elements */
+		/* Driver only uses 64-bit chain elements */
 		if (len != MPS_SGC_SIZE)
 			panic("CHAIN %p length %u or %zu?", sgep,
 			    MPS_SGC_SIZE, len);
@@ -2973,6 +2983,13 @@ mps_data_cb(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
 				mps_dprint(sc, MPS_INFO, "Out of chain frames, "
 				    "consider increasing hw.mps.max_chains.\n");
 			cm->cm_flags |= MPS_CM_FLAGS_CHAIN_FAILED;
+			/*
+			 * mpr_complete_command can only be called on commands
+			 * that are in the queue. Since this is an error path
+			 * which gets called before we enqueue, update the state
+			 * to meet this requirement before we complete it.
+			 */
+			cm->cm_state = MPS_CM_STATE_INQUEUE;
 			mps_complete_command(sc, cm);
 			return;
 		}

@@ -28,12 +28,13 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_SCHED_H_
-#define	_LINUX_SCHED_H_
+#ifndef	_LINUXKPI_LINUX_SCHED_H_
+#define	_LINUXKPI_LINUX_SCHED_H_
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#include <sys/rtprio.h>
 #include <sys/sched.h>
 #include <sys/sleepqueue.h>
 #include <sys/time.h>
@@ -41,10 +42,12 @@
 #include <linux/bitmap.h>
 #include <linux/compat.h>
 #include <linux/completion.h>
+#include <linux/hrtimer.h>
 #include <linux/mm_types.h>
 #include <linux/pid.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/spinlock.h>
 #include <linux/time.h>
 
 #include <asm/atomic.h>
@@ -59,6 +62,8 @@
 #define	TASK_PARKED		0x0200
 
 #define	TASK_COMM_LEN		(MAXCOMLEN + 1)
+
+struct seq_file;
 
 struct work_struct;
 struct task_struct {
@@ -82,7 +87,8 @@ struct task_struct {
 	int bsd_interrupt_value;
 	struct work_struct *work;	/* current work struct, if set */
 	struct task_struct *group_leader;
-  	unsigned rcu_section[TS_RCU_TYPE_MAX];
+	unsigned rcu_section[TS_RCU_TYPE_MAX];
+	unsigned int fpu_ctx_level;
 };
 
 #define	current	({ \
@@ -126,6 +132,18 @@ put_task_struct(struct task_struct *task)
 
 #define	need_resched() (curthread->td_flags & TDF_NEEDRESCHED)
 
+static inline int
+cond_resched_lock(spinlock_t *lock)
+{
+
+	if (need_resched() == 0)
+		return (0);
+	spin_unlock(lock);
+	cond_resched();
+	spin_lock(lock);
+	return (1);
+}
+
 bool linux_signal_pending(struct task_struct *task);
 bool linux_fatal_signal_pending(struct task_struct *task);
 bool linux_signal_pending_state(long state, struct task_struct *task);
@@ -161,8 +179,12 @@ linux_schedule_get_interrupt_value(struct task_struct *task)
 	return (value);
 }
 
-#define	schedule()					\
-	(void)linux_schedule_timeout(MAX_SCHEDULE_TIMEOUT)
+static inline void
+schedule(void)
+{
+	(void)linux_schedule_timeout(MAX_SCHEDULE_TIMEOUT);
+}
+
 #define	schedule_timeout(timeout)			\
 	linux_schedule_timeout(timeout)
 #define	schedule_timeout_killable(timeout)		\
@@ -196,4 +218,24 @@ get_task_comm(char *buf, struct task_struct *task)
 	return (task->comm);
 }
 
-#endif	/* _LINUX_SCHED_H_ */
+static inline void
+sched_set_fifo(struct task_struct *t)
+{
+	struct rtprio rtp;
+
+	rtp.prio = (RTP_PRIO_MIN + RTP_PRIO_MAX) / 2;
+	rtp.type = RTP_PRIO_FIFO;
+	rtp_to_pri(&rtp, t->task_thread);
+}
+
+static inline void
+sched_set_fifo_low(struct task_struct *t)
+{
+	struct rtprio rtp;
+
+	rtp.prio = RTP_PRIO_MAX;	/* lowest priority */
+	rtp.type = RTP_PRIO_FIFO;
+	rtp_to_pri(&rtp, t->task_thread);
+}
+
+#endif	/* _LINUXKPI_LINUX_SCHED_H_ */

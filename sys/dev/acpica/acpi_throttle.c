@@ -123,9 +123,7 @@ static driver_t acpi_throttle_driver = {
 	sizeof(struct acpi_throttle_softc),
 };
 
-static devclass_t acpi_throttle_devclass;
-DRIVER_MODULE(acpi_throttle, cpu, acpi_throttle_driver, acpi_throttle_devclass,
-    0, 0);
+DRIVER_MODULE(acpi_throttle, cpu, acpi_throttle_driver, 0, 0);
 
 static void
 acpi_throttle_identify(driver_t *driver, device_t parent)
@@ -157,7 +155,8 @@ acpi_throttle_identify(driver_t *driver, device_t parent)
 	obj = (ACPI_OBJECT *)buf.Pointer;
 	if ((obj->Processor.PblkAddress && obj->Processor.PblkLength >= 4) ||
 	    ACPI_SUCCESS(AcpiEvaluateObject(handle, "_PTC", NULL, NULL))) {
-		if (BUS_ADD_CHILD(parent, 0, "acpi_throttle", -1) == NULL)
+		if (BUS_ADD_CHILD(parent, 0, "acpi_throttle",
+		    device_get_unit(parent)) == NULL)
 			device_printf(parent, "add throttle child failed\n");
 	}
 	AcpiOsFree(obj);

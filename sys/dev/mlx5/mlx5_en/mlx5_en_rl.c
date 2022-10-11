@@ -25,7 +25,10 @@
  * $FreeBSD$
  */
 
-#include "en.h"
+#include "opt_rss.h"
+#include "opt_ratelimit.h"
+
+#include <dev/mlx5/mlx5_en/en.h>
 
 #ifdef RATELIMIT
 
@@ -38,6 +41,16 @@ static void mlx5e_rl_sysctl_add_stats_u64_oid(struct mlx5e_rl_priv_data *rl, uns
       struct sysctl_oid *node, const char *name, const char *desc);
 static int mlx5e_rl_tx_limit_add(struct mlx5e_rl_priv_data *, uint64_t value);
 static int mlx5e_rl_tx_limit_clr(struct mlx5e_rl_priv_data *, uint64_t value);
+static if_snd_tag_modify_t mlx5e_rl_snd_tag_modify;
+static if_snd_tag_query_t mlx5e_rl_snd_tag_query;
+static if_snd_tag_free_t mlx5e_rl_snd_tag_free;
+
+static const struct if_snd_tag_sw mlx5e_rl_snd_tag_sw = {
+	.snd_tag_modify = mlx5e_rl_snd_tag_modify,
+	.snd_tag_query = mlx5e_rl_snd_tag_query,
+	.snd_tag_free = mlx5e_rl_snd_tag_free,
+	.type = IF_SND_TAG_TYPE_RATE_LIMIT
+};
 
 static void
 mlx5e_rl_build_sq_param(struct mlx5e_rl_priv_data *rl,
@@ -51,8 +64,6 @@ mlx5e_rl_build_sq_param(struct mlx5e_rl_priv_data *rl,
 	MLX5_SET(wq, wq, log_wq_stride, ilog2(MLX5_SEND_WQE_BB));
 	MLX5_SET(wq, wq, pd, rl->priv->pdn);
 
-	param->wq.buf_numa_node = 0;
-	param->wq.db_numa_node = 0;
 	param->wq.linear = 1;
 }
 
@@ -116,8 +127,9 @@ mlx5e_rl_create_sq(struct mlx5e_priv *priv, struct mlx5e_sq *sq,
 	    &sq->dma_tag)))
 		goto done;
 
-	/* use shared UAR */
-	sq->uar_map = priv->bfreg.map;
+	sq->mkey_be = cpu_to_be32(priv->mr.key);
+	sq->ifp = priv->ifp;
+	sq->priv = priv;
 
 	err = mlx5_wq_cyc_create(mdev, &param->wq, sqc_wq, &sq->wq,
 	    &sq->wq_ctrl);
@@ -129,10 +141,6 @@ mlx5e_rl_create_sq(struct mlx5e_priv *priv, struct mlx5e_sq *sq,
 	err = mlx5e_alloc_sq_db(sq);
 	if (err)
 		goto err_sq_wq_destroy;
-
-	sq->mkey_be = cpu_to_be32(priv->mr.key);
-	sq->ifp = priv->ifp;
-	sq->priv = priv;
 
 	mlx5e_update_sq_inline(sq);
 
@@ -156,6 +164,29 @@ mlx5e_rl_destroy_sq(struct mlx5e_sq *sq)
 }
 
 static int
+mlx5e_rl_query_sq(struct mlx5e_sq *sq)
+{
+	void *out;
+        int inlen;
+        int err;
+
+        inlen = MLX5_ST_SZ_BYTES(query_sq_out);
+        out = mlx5_vzalloc(inlen);
+        if (!out)
+                return -ENOMEM;
+
+        err = mlx5_core_query_sq(sq->priv->mdev, sq->sqn, out);
+        if (err)
+                goto out;
+
+        sq->queue_handle = MLX5_GET(query_sq_out, out, sq_context.queue_handle);
+
+out:
+        kvfree(out);
+        return err;
+}
+
+static int
 mlx5e_rl_open_sq(struct mlx5e_priv *priv, struct mlx5e_sq *sq,
     struct mlx5e_sq_param *param, int ix)
 {
@@ -165,13 +196,23 @@ mlx5e_rl_open_sq(struct mlx5e_priv *priv, struct mlx5e_sq *sq,
 	if (err)
 		return (err);
 
-	err = mlx5e_enable_sq(sq, param, priv->rl.tisn);
+	err = mlx5e_enable_sq(sq, param, &priv->channel[ix].bfreg, priv->rl.tisn);
 	if (err)
 		goto err_destroy_sq;
 
 	err = mlx5e_modify_sq(sq, MLX5_SQC_STATE_RST, MLX5_SQC_STATE_RDY);
 	if (err)
 		goto err_disable_sq;
+
+	if (MLX5_CAP_QOS(priv->mdev, qos_remap_pp)) {
+		err = mlx5e_rl_query_sq(sq);
+		if (err) {
+			mlx5_en_err(priv->ifp, "Failed retrieving send queue handle for"
+			    "SQ remap - sqn=%u, err=(%d)\n", sq->sqn, err);
+			sq->queue_handle = MLX5_INVALID_QUEUE_HANDLE;
+		}
+	} else
+		sq->queue_handle = MLX5_INVALID_QUEUE_HANDLE;
 
 	WRITE_ONCE(sq->running, 1);
 
@@ -382,6 +423,74 @@ mlx5e_rl_find_best_rate_locked(struct mlx5e_rl_priv_data *rl, uint64_t user_rate
 	return (retval);
 }
 
+static int
+mlx5e_rl_post_sq_remap_wqe(struct mlx5e_iq *iq, u32 scq_handle, u32 sq_handle,
+    struct mlx5e_rl_channel *sq_channel)
+{
+	const u32 ds_cnt = DIV_ROUND_UP(sizeof(struct mlx5e_tx_qos_remap_wqe),
+	            MLX5_SEND_WQE_DS);
+	struct mlx5e_tx_qos_remap_wqe *wqe;
+	int pi;
+
+	mtx_lock(&iq->lock);
+	pi = mlx5e_iq_get_producer_index(iq);
+	if (pi < 0) {
+		mtx_unlock(&iq->lock);
+		return (-ENOMEM);
+	}
+	wqe = mlx5_wq_cyc_get_wqe(&iq->wq, pi);
+
+	memset(wqe, 0, sizeof(*wqe));
+
+	wqe->qos_remap.qos_handle = cpu_to_be32(scq_handle);
+	wqe->qos_remap.queue_handle = cpu_to_be32(sq_handle);
+
+	wqe->ctrl.opmod_idx_opcode = cpu_to_be32((iq->pc << 8) |
+	    MLX5_OPCODE_QOS_REMAP);
+	wqe->ctrl.qpn_ds = cpu_to_be32((iq->sqn << 8) | ds_cnt);
+	wqe->ctrl.imm = cpu_to_be32(iq->priv->tisn[0] << 8);
+	wqe->ctrl.fm_ce_se = MLX5_WQE_CTRL_CQ_UPDATE | MLX5_FENCE_MODE_INITIATOR_SMALL;
+
+	/* copy data for doorbell */
+	memcpy(iq->doorbell.d32, &wqe->ctrl, sizeof(iq->doorbell.d32));
+
+	iq->data[pi].num_wqebbs = DIV_ROUND_UP(ds_cnt, MLX5_SEND_WQEBB_NUM_DS);
+	iq->data[pi].p_refcount = &sq_channel->refcount;
+	atomic_add_int(iq->data[pi].p_refcount, 1);
+	iq->pc += iq->data[pi].num_wqebbs;
+
+	mlx5e_iq_notify_hw(iq);
+
+	mtx_unlock(&iq->lock);
+
+	return (0); /* success */
+}
+
+static int
+mlx5e_rl_remap_sq(struct mlx5e_sq *sq, uint16_t index,
+    struct mlx5e_rl_channel *sq_channel)
+{
+	struct mlx5e_channel *iq_channel;
+	u32	scq_handle;
+	u32	sq_handle;
+	int 	error;
+
+	/* Specific SQ remap operations should be handled by same IQ */
+	iq_channel = &sq->priv->channel[sq->sqn % sq->priv->params.num_channels];
+
+	sq_handle = sq->queue_handle;
+	scq_handle = mlx5_rl_get_scq_handle(sq->priv->mdev, index);
+
+	if (sq_handle == MLX5_INVALID_QUEUE_HANDLE ||
+	    scq_handle == MLX5_INVALID_QUEUE_HANDLE)
+		error = -1;
+	else
+		error = mlx5e_rl_post_sq_remap_wqe(&iq_channel->iq, scq_handle,
+		    sq_handle, sq_channel);
+
+	return (error);
+}
+
 /*
  * This function sets the requested rate for a rate limit channel, in
  * bits per second. The requested rate will be filtered through the
@@ -397,6 +506,7 @@ mlx5e_rlw_channel_set_rate_locked(struct mlx5e_rl_worker *rlw,
 	uint16_t index;
 	uint16_t burst;
 	int error;
+	bool use_sq_remap;
 
 	if (rate != 0) {
 		MLX5E_RL_WORKER_UNLOCK(rlw);
@@ -440,6 +550,10 @@ mlx5e_rlw_channel_set_rate_locked(struct mlx5e_rl_worker *rlw,
 		burst = 0;	/* default */
 	}
 
+	/* paced <--> non-paced transitions must go via FW */
+	use_sq_remap = MLX5_CAP_QOS(rlw->priv->mdev, qos_remap_pp) &&
+	    channel->last_rate != 0 && rate != 0;
+
 	/* atomically swap rates */
 	temp = channel->last_rate;
 	channel->last_rate = rate;
@@ -460,11 +574,18 @@ mlx5e_rlw_channel_set_rate_locked(struct mlx5e_rl_worker *rlw,
 	/* set new rate, if SQ is running */
 	sq = channel->sq;
 	if (sq != NULL && READ_ONCE(sq->running) != 0) {
-		error = mlx5e_rl_modify_sq(sq, index);
-		if (error != 0)
-			atomic_add_64(&rlw->priv->rl.stats.tx_modify_rate_failure, 1ULL);
+		if (!use_sq_remap || mlx5e_rl_remap_sq(sq, index, channel)) {
+			while (atomic_load_int(&channel->refcount) != 0 &&
+			    rlw->priv->mdev->state != MLX5_DEVICE_STATE_INTERNAL_ERROR &&
+		            pci_channel_offline(rlw->priv->mdev->pdev) == 0)
+				pause("W", 1);
+			error = mlx5e_rl_modify_sq(sq, index);
+			if (error != 0)
+				atomic_add_64(&rlw->priv->rl.stats.tx_modify_rate_failure, 1ULL);
+		}
 	} else
 		error = 0;
+
 	MLX5E_RL_WORKER_LOCK(rlw);
 
 	return (-error);
@@ -639,7 +760,7 @@ mlx5e_rl_open_tis(struct mlx5e_priv *priv)
 static void
 mlx5e_rl_close_tis(struct mlx5e_priv *priv)
 {
-	mlx5_core_destroy_tis(priv->mdev, priv->rl.tisn);
+	mlx5_core_destroy_tis(priv->mdev, priv->rl.tisn, 0);
 }
 
 static void
@@ -835,7 +956,6 @@ mlx5e_rl_init(struct mlx5e_priv *priv)
 		for (i = 0; i < rl->param.tx_channels_per_worker_def; i++) {
 			struct mlx5e_rl_channel *channel = rlw->channels + i;
 			channel->worker = rlw;
-			channel->tag.type = IF_SND_TAG_TYPE_RATE_LIMIT;
 			STAILQ_INSERT_TAIL(&rlw->index_list_head, channel, entry);
 		}
 		MLX5E_RL_WORKER_UNLOCK(rlw);
@@ -1115,14 +1235,14 @@ mlx5e_rl_snd_tag_alloc(struct ifnet *ifp,
 
 	/* store pointer to mbuf tag */
 	MPASS(channel->tag.refcount == 0);
-	m_snd_tag_init(&channel->tag, ifp, IF_SND_TAG_TYPE_RATE_LIMIT);
+	m_snd_tag_init(&channel->tag, ifp, &mlx5e_rl_snd_tag_sw);
 	*ppmt = &channel->tag;
 done:
 	return (error);
 }
 
 
-int
+static int
 mlx5e_rl_snd_tag_modify(struct m_snd_tag *pmt, union if_snd_tag_modify_params *params)
 {
 	struct mlx5e_rl_channel *channel =
@@ -1131,7 +1251,7 @@ mlx5e_rl_snd_tag_modify(struct m_snd_tag *pmt, union if_snd_tag_modify_params *p
 	return (mlx5e_rl_modify(channel->worker, channel, params->rate_limit.max_rate));
 }
 
-int
+static int
 mlx5e_rl_snd_tag_query(struct m_snd_tag *pmt, union if_snd_tag_query_params *params)
 {
 	struct mlx5e_rl_channel *channel =
@@ -1140,7 +1260,7 @@ mlx5e_rl_snd_tag_query(struct m_snd_tag *pmt, union if_snd_tag_query_params *par
 	return (mlx5e_rl_query(channel->worker, channel, params));
 }
 
-void
+static void
 mlx5e_rl_snd_tag_free(struct m_snd_tag *pmt)
 {
 	struct mlx5e_rl_channel *channel =
@@ -1328,7 +1448,6 @@ mlx5e_rl_sysctl_handler(SYSCTL_HANDLER_ARGS)
 	unsigned mode_modify;
 	unsigned was_opened;
 	uint64_t value;
-	uint64_t old;
 	int error;
 
 	PRIV_LOCK(priv);
@@ -1338,13 +1457,11 @@ mlx5e_rl_sysctl_handler(SYSCTL_HANDLER_ARGS)
 	MLX5E_RL_RUNLOCK(rl);
 
 	if (req != NULL) {
-		old = value;
 		error = sysctl_handle_64(oidp, &value, 0, req);
 		if (error || req->newptr == NULL ||
 		    value == rl->param.arg[arg2])
 			goto done;
 	} else {
-		old = 0;
 		error = 0;
 	}
 

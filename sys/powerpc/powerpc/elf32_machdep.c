@@ -42,6 +42,7 @@
 #include <sys/sysent.h>
 #include <sys/imgact_elf.h>
 #include <sys/jail.h>
+#include <sys/reg.h>
 #include <sys/smp.h>
 #include <sys/syscall.h>
 #include <sys/sysctl.h>
@@ -51,12 +52,13 @@
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
+#include <vm/pmap.h>
+#include <vm/vm_map.h>
 
 #include <machine/altivec.h>
 #include <machine/cpu.h>
 #include <machine/fpu.h>
 #include <machine/elf.h>
-#include <machine/reg.h>
 #include <machine/md_var.h>
 
 #include <powerpc/powerpc/elf_common.c>
@@ -90,7 +92,6 @@ struct sysentvec elf32_freebsd_sysvec = {
 #else
 	.sv_table	= sysent,
 #endif
-	.sv_transtrap	= NULL,
 	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_copyout_auxargs = __elfN(powerpc_copyout_auxargs),
 	.sv_sendsig	= sendsig,
@@ -98,6 +99,9 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_szsigcode	= &szsigcode32,
 	.sv_name	= "FreeBSD ELF32",
 	.sv_coredump	= __elfN(coredump),
+	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
+	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
+	.sv_elf_core_prepare_notes = __elfN(prepare_notes),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
@@ -105,7 +109,7 @@ struct sysentvec elf32_freebsd_sysvec = {
 #ifdef __powerpc64__
 	.sv_maxuser	= VM_MAXUSER_ADDRESS32,
 	.sv_usrstack	= FREEBSD32_USRSTACK,
-	.sv_szpsstrings	= sizeof(struct freebsd32_ps_strings),
+	.sv_psstringssz	= sizeof(struct freebsd32_ps_strings),
 	.sv_copyout_strings = freebsd32_copyout_strings,
 	.sv_setregs	= ppc32_setregs,
 	.sv_syscallnames = freebsd32_syscallnames,
@@ -113,7 +117,7 @@ struct sysentvec elf32_freebsd_sysvec = {
 #else
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
-	.sv_szpsstrings	= sizeof(struct ps_strings),
+	.sv_psstringssz	= sizeof(struct ps_strings),
 	.sv_copyout_strings = exec_copyout_strings,
 	.sv_setregs	= exec_setregs,
 	.sv_syscallnames = syscallnames,
@@ -131,6 +135,10 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_trap	= NULL,
 	.sv_hwcap	= &cpu_features,
 	.sv_hwcap2	= &cpu_features2,
+	.sv_onexec_old	= exec_onexec_old,
+	.sv_onexit	= exit_onexit,
+	.sv_regset_begin = SET_BEGIN(__elfN(regset)),
+	.sv_regset_end  = SET_LIMIT(__elfN(regset)),
 };
 INIT_SYSENTVEC(elf32_sysvec, &elf32_freebsd_sysvec);
 

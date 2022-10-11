@@ -33,6 +33,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
+#include <sys/conf.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -70,6 +71,8 @@ __FBSDID("$FreeBSD$");
 
 #include "mmc_sim_if.h"
 #endif
+
+#include "mmc_pwrseq_if.h"
 
 #define	AW_MMC_MEMRES		0
 #define	AW_MMC_IRQRES		1
@@ -128,7 +131,7 @@ struct aw_mmc_softc {
 	int			aw_timeout;
 	struct callout		aw_timeoutc;
 	struct mmc_host		aw_host;
-	struct mmc_fdt_helper	mmc_helper;
+	struct mmc_helper	mmc_helper;
 #ifdef MMCCAM
 	union ccb *		ccb;
 	struct mmc_sim		mmc_sim;
@@ -301,6 +304,15 @@ aw_mmc_cam_request(device_t dev, union ccb *ccb)
 	aw_mmc_request(sc->aw_dev, NULL, NULL);
 
 	return (0);
+}
+
+static void
+aw_mmc_cam_poll(device_t dev)
+{
+	struct aw_mmc_softc *sc;
+
+	sc = device_get_softc(dev);
+	aw_mmc_intr(sc);
 }
 #endif /* MMCCAM */
 
@@ -786,7 +798,8 @@ aw_mmc_req_done(struct aw_mmc_softc *sc)
 		aw_mmc_update_clock(sc, 1);
 	}
 
-	callout_stop(&sc->aw_timeoutc);
+	if (!dumping)
+		callout_stop(&sc->aw_timeoutc);
 	sc->aw_intr = 0;
 	sc->aw_resid = 0;
 	sc->aw_dma_map_err = 0;
@@ -1076,8 +1089,10 @@ aw_mmc_request(device_t bus, device_t child, struct mmc_request *req)
 		AW_MMC_WRITE_4(sc, AW_MMC_CMDR, cmdreg | cmd->opcode);
 	}
 
-	callout_reset(&sc->aw_timeoutc, sc->aw_timeout * hz,
-	    aw_mmc_timeout, sc);
+	if (!dumping) {
+		callout_reset(&sc->aw_timeoutc, sc->aw_timeout * hz,
+		    aw_mmc_timeout, sc);
+	}
 	AW_MMC_UNLOCK(sc);
 
 	return (0);
@@ -1285,6 +1300,8 @@ aw_mmc_update_ios(device_t bus, device_t child)
 	struct mmc_ios *ios;
 	unsigned int clock;
 	uint32_t reg, div = 1;
+	int reg_status;
+	int rv;
 
 	sc = device_get_softc(bus);
 
@@ -1310,10 +1327,19 @@ aw_mmc_update_ios(device_t bus, device_t child)
 		if (__predict_false(aw_mmc_debug & AW_MMC_DEBUG_CARD))
 			device_printf(sc->aw_dev, "Powering down sd/mmc\n");
 
-		if (sc->mmc_helper.vmmc_supply)
-			regulator_disable(sc->mmc_helper.vmmc_supply);
-		if (sc->mmc_helper.vqmmc_supply)
-			regulator_disable(sc->mmc_helper.vqmmc_supply);
+		if (sc->mmc_helper.vmmc_supply) {
+			rv = regulator_status(sc->mmc_helper.vmmc_supply, &reg_status);
+			if (rv == 0 && reg_status == REGULATOR_STATUS_ENABLED)
+				regulator_disable(sc->mmc_helper.vmmc_supply);
+		}
+		if (sc->mmc_helper.vqmmc_supply) {
+			rv = regulator_status(sc->mmc_helper.vqmmc_supply, &reg_status);
+			if (rv == 0 && reg_status == REGULATOR_STATUS_ENABLED)
+				regulator_disable(sc->mmc_helper.vqmmc_supply);
+		}
+
+		if (sc->mmc_helper.mmc_pwrseq)
+			MMC_PWRSEQ_SET_POWER(sc->mmc_helper.mmc_pwrseq, false);
 
 		aw_mmc_reset(sc);
 		break;
@@ -1321,10 +1347,19 @@ aw_mmc_update_ios(device_t bus, device_t child)
 		if (__predict_false(aw_mmc_debug & AW_MMC_DEBUG_CARD))
 			device_printf(sc->aw_dev, "Powering up sd/mmc\n");
 
-		if (sc->mmc_helper.vmmc_supply)
-			regulator_enable(sc->mmc_helper.vmmc_supply);
-		if (sc->mmc_helper.vqmmc_supply)
-			regulator_enable(sc->mmc_helper.vqmmc_supply);
+		if (sc->mmc_helper.vmmc_supply) {
+			rv = regulator_status(sc->mmc_helper.vmmc_supply, &reg_status);
+			if (rv == 0 && reg_status != REGULATOR_STATUS_ENABLED)
+				regulator_enable(sc->mmc_helper.vmmc_supply);
+		}
+		if (sc->mmc_helper.vqmmc_supply) {
+			rv = regulator_status(sc->mmc_helper.vqmmc_supply, &reg_status);
+			if (rv == 0 && reg_status != REGULATOR_STATUS_ENABLED)
+				regulator_enable(sc->mmc_helper.vqmmc_supply);
+		}
+
+		if (sc->mmc_helper.mmc_pwrseq)
+			MMC_PWRSEQ_SET_POWER(sc->mmc_helper.mmc_pwrseq, true);
 		aw_mmc_init(sc);
 		break;
 	};
@@ -1469,12 +1504,11 @@ static device_method_t aw_mmc_methods[] = {
 	DEVMETHOD(mmc_sim_get_tran_settings,	aw_mmc_get_tran_settings),
 	DEVMETHOD(mmc_sim_set_tran_settings,	aw_mmc_set_tran_settings),
 	DEVMETHOD(mmc_sim_cam_request,		aw_mmc_cam_request),
+	DEVMETHOD(mmc_sim_cam_poll,		aw_mmc_cam_poll),
 #endif
 
 	DEVMETHOD_END
 };
-
-static devclass_t aw_mmc_devclass;
 
 static driver_t aw_mmc_driver = {
 	"aw_mmc",
@@ -1482,8 +1516,7 @@ static driver_t aw_mmc_driver = {
 	sizeof(struct aw_mmc_softc),
 };
 
-DRIVER_MODULE(aw_mmc, simplebus, aw_mmc_driver, aw_mmc_devclass, NULL,
-    NULL);
+DRIVER_MODULE(aw_mmc, simplebus, aw_mmc_driver, NULL, NULL);
 #ifndef MMCCAM
 MMC_DECLARE_BRIDGE(aw_mmc);
 #endif

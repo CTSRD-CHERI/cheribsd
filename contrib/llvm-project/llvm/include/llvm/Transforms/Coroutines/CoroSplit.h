@@ -22,8 +22,14 @@
 namespace llvm {
 
 struct CoroSplitPass : PassInfoMixin<CoroSplitPass> {
+  CoroSplitPass(bool OptimizeFrame = false) : OptimizeFrame(OptimizeFrame) {}
+
   PreservedAnalyses run(LazyCallGraph::SCC &C, CGSCCAnalysisManager &AM,
                         LazyCallGraph &CG, CGSCCUpdateResult &UR);
+  static bool isRequired() { return true; }
+
+  // Would be true if the Optimization level isn't O0.
+  bool OptimizeFrame;
 };
 } // end namespace llvm
 

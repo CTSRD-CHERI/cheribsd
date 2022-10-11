@@ -46,7 +46,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/syscall.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
-#include <sys/sysent.h>
 #include <sys/sysproto.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
@@ -75,19 +74,7 @@ freebsd32_ioctl_memrange(struct thread *td,
 	CP(mro32, mro, mo_arg[0]);
 	CP(mro32, mro, mo_arg[1]);
 
-	com = 0;
-	switch (uap->com) {
-	case MEMRANGE_GET32:
-		com = MEMRANGE_GET;
-		break;
-
-	case MEMRANGE_SET32:
-		com = MEMRANGE_SET;
-		break;
-
-	default:
-		panic("%s: unknown MEMRANGE %#x", __func__, uap->com);
-	}
+	com = _IOC_NEWTYPE(uap->com, struct mem_range_op);
 
 	if ((error = fo_ioctl(fp, com, (caddr_t)&mro, td->td_ucred, td)) != 0)
 		return (error);

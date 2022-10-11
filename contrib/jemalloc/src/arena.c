@@ -351,13 +351,13 @@ arena_slab_regind(extent_t *slab, szind_t binind, const void *ptr) {
 	size_t diff, regind;
 
 	/* Freeing a pointer outside the slab can cause assertion failure. */
-	assert((vaddr_t)ptr >= (vaddr_t)extent_addr_get(slab));
-	assert((vaddr_t)ptr < (vaddr_t)extent_past_get(slab));
+	assert((uintptr_t)ptr >= (uintptr_t)extent_addr_get(slab));
+	assert((uintptr_t)ptr < (uintptr_t)extent_past_get(slab));
 	/* Freeing an interior pointer can cause assertion failure. */
-	assert(((vaddr_t)ptr - (vaddr_t)extent_addr_get(slab)) %
-	    (vaddr_t)bin_infos[binind].reg_size == 0);
+	assert(((uintptr_t)ptr - (uintptr_t)extent_addr_get(slab)) %
+	    (uintptr_t)bin_infos[binind].reg_size == 0);
 
-	diff = (size_t)((vaddr_t)ptr - (vaddr_t)extent_addr_get(slab));
+	diff = (size_t)((uintptr_t)ptr - (uintptr_t)extent_addr_get(slab));
 
 	/* Avoid doing division with a variable divisor. */
 	regind = div_compute(&arena_binind_div_info[binind], diff);
@@ -685,7 +685,7 @@ arena_decay_reinit(arena_decay_t *decay, ssize_t decay_ms) {
 
 	nstime_init(&decay->epoch, 0);
 	nstime_update(&decay->epoch);
-	decay->jitter_state = (uint64_t)(vaddr_t)decay;
+	decay->jitter_state = (uint64_t)(uintptr_t)decay;
 	arena_decay_deadline_init(decay);
 	decay->nunpurged = 0;
 	memset(decay->backlog, 0, SMOOTHSTEP_NSTEPS * sizeof(size_t));
@@ -1135,7 +1135,7 @@ arena_reset(tsd_t *tsd, arena_t *arena) {
 		alloc_ctx_t alloc_ctx;
 		rtree_ctx_t *rtree_ctx = tsd_rtree_ctx(tsd);
 		rtree_szind_slab_read(tsd_tsdn(tsd), &extents_rtree, rtree_ctx,
-		    (vaddr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
+		    (uintptr_t)ptr, true, &alloc_ctx.szind, &alloc_ctx.slab);
 		assert(alloc_ctx.szind != SC_NSIZES);
 
 		if (config_stats || (config_prof && opt_prof)) {
@@ -1579,12 +1579,12 @@ arena_prof_promote(tsdn_t *tsdn, void *ptr, size_t usize) {
 	rtree_ctx_t *rtree_ctx = tsdn_rtree_ctx(tsdn, &rtree_ctx_fallback);
 
 	extent_t *extent = rtree_extent_read(tsdn, &extents_rtree, rtree_ctx,
-	    (vaddr_t)ptr, true);
+	    (uintptr_t)ptr, true);
 	arena_t *arena = extent_arena_get(extent);
 
 	szind_t szind = sz_size2index(usize);
 	extent_szind_set(extent, szind);
-	rtree_szind_slab_update(tsdn, &extents_rtree, rtree_ctx, (vaddr_t)ptr,
+	rtree_szind_slab_update(tsdn, &extents_rtree, rtree_ctx, (uintptr_t)ptr,
 	    szind, false);
 
 	prof_accum_cancel(tsdn, &arena->prof_accum, usize);
@@ -1600,7 +1600,7 @@ arena_prof_demote(tsdn_t *tsdn, extent_t *extent, const void *ptr) {
 	extent_szind_set(extent, SC_NBINS);
 	rtree_ctx_t rtree_ctx_fallback;
 	rtree_ctx_t *rtree_ctx = tsdn_rtree_ctx(tsdn, &rtree_ctx_fallback);
-	rtree_szind_slab_update(tsdn, &extents_rtree, rtree_ctx, (vaddr_t)ptr,
+	rtree_szind_slab_update(tsdn, &extents_rtree, rtree_ctx, (uintptr_t)ptr,
 	    SC_NBINS, false);
 
 	assert(isalloc(tsdn, ptr) == SC_LARGE_MINCLASS);
@@ -2015,7 +2015,7 @@ arena_new(tsdn_t *tsdn, unsigned ind, extent_hooks_t *extent_hooks) {
 		 * deterministic seed.
 		 */
 		atomic_store_zu(&arena->offset_state, config_debug ? ind :
-		    (size_t)(vaddr_t)arena, ATOMIC_RELAXED);
+		    (size_t)(uintptr_t)arena, ATOMIC_RELAXED);
 	}
 
 	atomic_store_zu(&arena->extent_sn_next, 0, ATOMIC_RELAXED);

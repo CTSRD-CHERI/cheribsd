@@ -122,13 +122,14 @@ vm_create(const char *name)
 	/* Try to load vmm(4) module before creating a guest. */
 	if (modfind("vmm") < 0)
 		kldload("vmm");
-	return (CREATE((char *)name));
+	return (CREATE(name));
 }
 
 struct vmctx *
 vm_open(const char *name)
 {
 	struct vmctx *vm;
+	int saved_errno;
 
 	vm = malloc(sizeof(struct vmctx) + strlen(name) + 1);
 	assert(vm != NULL);
@@ -144,8 +145,19 @@ vm_open(const char *name)
 
 	return (vm);
 err:
+	saved_errno = errno;
 	free(vm);
+	errno = saved_errno;
 	return (NULL);
+}
+
+void
+vm_close(struct vmctx *vm)
+{
+	assert(vm != NULL);
+
+	close(vm->fd);
+	free(vm);
 }
 
 void
@@ -161,14 +173,14 @@ vm_destroy(struct vmctx *vm)
 }
 
 int
-vm_parse_memsize(const char *optarg, size_t *ret_memsize)
+vm_parse_memsize(const char *opt, size_t *ret_memsize)
 {
 	char *endptr;
 	size_t optval;
 	int error;
 
-	optval = strtoul(optarg, &endptr, 0);
-	if (*optarg != '\0' && *endptr == '\0') {
+	optval = strtoul(opt, &endptr, 0);
+	if (*opt != '\0' && *endptr == '\0') {
 		/*
 		 * For the sake of backward compatibility if the memory size
 		 * specified on the command line is less than a megabyte then
@@ -179,7 +191,7 @@ vm_parse_memsize(const char *optarg, size_t *ret_memsize)
 		*ret_memsize = optval;
 		error = 0;
 	} else
-		error = expand_number(optarg, ret_memsize);
+		error = expand_number(opt, ret_memsize);
 
 	return (error);
 }
@@ -495,7 +507,7 @@ vm_rev_map_gpa(struct vmctx *ctx, void *addr)
 	offaddr = (char *)addr - ctx->baseaddr;
 
 	if (ctx->lowmem > 0)
-		if (offaddr >= 0 && offaddr <= ctx->lowmem)
+		if (offaddr <= ctx->lowmem)
 			return (offaddr);
 
 	if (ctx->highmem > 0)
@@ -505,14 +517,11 @@ vm_rev_map_gpa(struct vmctx *ctx, void *addr)
 	return ((vm_paddr_t)-1);
 }
 
-/* TODO: maximum size for vmname */
-int
-vm_get_name(struct vmctx *ctx, char *buf, size_t max_len)
+const char *
+vm_get_name(struct vmctx *ctx)
 {
 
-	if (strlcpy(buf, ctx->name, max_len) >= max_len)
-		return (EINVAL);
-	return (0);
+	return (ctx->name);
 }
 
 size_t
@@ -738,7 +747,7 @@ vm_inject_exception(struct vmctx *ctx, int vcpu, int vector, int errcode_valid,
 }
 
 int
-vm_apicid2vcpu(struct vmctx *ctx, int apicid)
+vm_apicid2vcpu(struct vmctx *ctx __unused, int apicid)
 {
 	/*
 	 * The apic id associated with the 'vcpu' has the same numerical value
@@ -916,7 +925,7 @@ vm_capability_name2type(const char *capname)
 {
 	int i;
 
-	for (i = 0; i < nitems(capstrmap); i++) {
+	for (i = 0; i < (int)nitems(capstrmap); i++) {
 		if (strcmp(capstrmap[i], capname) == 0)
 			return (i);
 	}
@@ -927,7 +936,7 @@ vm_capability_name2type(const char *capname)
 const char *
 vm_capability_type2name(int type)
 {
-	if (type >= 0 && type < nitems(capstrmap))
+	if (type >= 0 && type < (int)nitems(capstrmap))
 		return (capstrmap[type]);
 
 	return (NULL);
@@ -1075,19 +1084,44 @@ uint64_t *
 vm_get_stats(struct vmctx *ctx, int vcpu, struct timeval *ret_tv,
 	     int *ret_entries)
 {
-	int error;
+	static _Thread_local uint64_t *stats_buf;
+	static _Thread_local u_int stats_count;
+	uint64_t *new_stats;
+	struct vm_stats vmstats;
+	u_int count, index;
+	bool have_stats;
 
-	static struct vm_stats vmstats;
-
+	have_stats = false;
 	vmstats.cpuid = vcpu;
+	count = 0;
+	for (index = 0;; index += nitems(vmstats.statbuf)) {
+		vmstats.index = index;
+		if (ioctl(ctx->fd, VM_STATS, &vmstats) != 0)
+			break;
+		if (stats_count < index + vmstats.num_entries) {
+			new_stats = realloc(stats_buf,
+			    (index + vmstats.num_entries) * sizeof(uint64_t));
+			if (new_stats == NULL) {
+				errno = ENOMEM;
+				return (NULL);
+			}
+			stats_count = index + vmstats.num_entries;
+			stats_buf = new_stats;
+		}
+		memcpy(stats_buf + index, vmstats.statbuf,
+		    vmstats.num_entries * sizeof(uint64_t));
+		count += vmstats.num_entries;
+		have_stats = true;
 
-	error = ioctl(ctx->fd, VM_STATS, &vmstats);
-	if (error == 0) {
+		if (vmstats.num_entries != nitems(vmstats.statbuf))
+			break;
+	}
+	if (have_stats) {
 		if (ret_entries)
-			*ret_entries = vmstats.num_entries;
+			*ret_entries = count;
 		if (ret_tv)
 			*ret_tv = vmstats.tv;
-		return (vmstats.statbuf);
+		return (stats_buf);
 	} else
 		return (NULL);
 }
@@ -1156,13 +1190,21 @@ vcpu_reset(struct vmctx *vmctx, int vcpu)
 	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_RIP, rip)) != 0)
 		goto done;
 
+	/*
+	 * According to Intels Software Developer Manual CR0 should be
+	 * initialized with CR0_ET | CR0_NW | CR0_CD but that crashes some
+	 * guests like Windows.
+	 */
 	cr0 = CR0_NE;
 	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_CR0, cr0)) != 0)
 		goto done;
 
+	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_CR2, zero)) != 0)
+		goto done;
+
 	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_CR3, zero)) != 0)
 		goto done;
-	
+
 	cr4 = 0;
 	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_CR4, cr4)) != 0)
 		goto done;
@@ -1225,6 +1267,9 @@ vcpu_reset(struct vmctx *vmctx, int vcpu)
 	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_GS, sel)) != 0)
 		goto done;
 
+	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_EFER, zero)) != 0)
+		goto done;
+
 	/* General purpose registers */
 	rdx = 0xf00;
 	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_RAX, zero)) != 0)
@@ -1242,6 +1287,22 @@ vcpu_reset(struct vmctx *vmctx, int vcpu)
 	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_RBP, zero)) != 0)
 		goto done;
 	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_RSP, zero)) != 0)
+		goto done;
+	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_R8, zero)) != 0)
+		goto done;
+	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_R9, zero)) != 0)
+		goto done;
+	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_R10, zero)) != 0)
+		goto done;
+	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_R11, zero)) != 0)
+		goto done;
+	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_R12, zero)) != 0)
+		goto done;
+	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_R13, zero)) != 0)
+		goto done;
+	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_R14, zero)) != 0)
+		goto done;
+	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_R15, zero)) != 0)
 		goto done;
 
 	/* GDTR, IDTR */
@@ -1283,7 +1344,16 @@ vcpu_reset(struct vmctx *vmctx, int vcpu)
 	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_LDTR, 0)) != 0)
 		goto done;
 
-	/* XXX cr2, debug registers */
+	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_DR6,
+		 0xffff0ff0)) != 0)
+		goto done;
+	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_DR7, 0x400)) !=
+	    0)
+		goto done;
+
+	if ((error = vm_set_register(vmctx, vcpu, VM_REG_GUEST_INTR_SHADOW,
+		 zero)) != 0)
+		goto done;
 
 	error = 0;
 done:
@@ -1375,8 +1445,8 @@ vm_copy_setup(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
     int *fault)
 {
 	void *va;
-	uint64_t gpa;
-	int error, i, n, off;
+	uint64_t gpa, off;
+	int error, i, n;
 
 	for (i = 0; i < iovcnt; i++) {
 		iov[i].iov_base = 0;
@@ -1390,7 +1460,7 @@ vm_copy_setup(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
 			return (error);
 
 		off = gpa & PAGE_MASK;
-		n = min(len, PAGE_SIZE - off);
+		n = MIN(len, PAGE_SIZE - off);
 
 		va = vm_map_gpa(ctx, gpa, n);
 		if (va == NULL)
@@ -1408,14 +1478,14 @@ vm_copy_setup(struct vmctx *ctx, int vcpu, struct vm_guest_paging *paging,
 }
 
 void
-vm_copy_teardown(struct vmctx *ctx, int vcpu, struct iovec *iov, int iovcnt)
+vm_copy_teardown(struct vmctx *ctx __unused, int vcpu __unused,
+    struct iovec *iov __unused, int iovcnt __unused)
 {
-
-	return;
 }
 
 void
-vm_copyin(struct vmctx *ctx, int vcpu, struct iovec *iov, void *vp, size_t len)
+vm_copyin(struct vmctx *ctx __unused, int vcpu __unused, struct iovec *iov,
+    void *vp, size_t len)
 {
 	const char *src;
 	char *dst;
@@ -1435,8 +1505,8 @@ vm_copyin(struct vmctx *ctx, int vcpu, struct iovec *iov, void *vp, size_t len)
 }
 
 void
-vm_copyout(struct vmctx *ctx, int vcpu, const void *vp, struct iovec *iov,
-    size_t len)
+vm_copyout(struct vmctx *ctx __unused, int vcpu __unused, const void *vp,
+    struct iovec *iov, size_t len)
 {
 	const char *src;
 	char *dst;

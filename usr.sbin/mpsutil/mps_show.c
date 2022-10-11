@@ -59,16 +59,22 @@ MPS_TABLE(top, show);
 static int
 show_adapter(int ac, char **av)
 {
+	const char* pcie_speed[] = { "2.5", "5.0", "8.0" };
+	const char* temp_units[] = { "", "F", "C" };
+	const char* ioc_speeds[] = { "", "Full", "Half", "Quarter", "Eighth" };
+
 	MPI2_CONFIG_PAGE_SASIOUNIT_0	*sas0;
 	MPI2_CONFIG_PAGE_SASIOUNIT_1	*sas1;
 	MPI2_SAS_IO_UNIT0_PHY_DATA	*phy0;
 	MPI2_SAS_IO_UNIT1_PHY_DATA	*phy1;
 	MPI2_CONFIG_PAGE_MAN_0 *man0;
 	MPI2_CONFIG_PAGE_BIOS_3 *bios3;
+	MPI2_CONFIG_PAGE_IO_UNIT_1 *iounit1;
+	MPI2_CONFIG_PAGE_IO_UNIT_7 *iounit7;
 	MPI2_IOC_FACTS_REPLY *facts;
 	U16 IOCStatus;
 	char *speed, *minspeed, *maxspeed, *isdisabled, *type;
-	char devhandle[5], ctrlhandle[5];
+	char devhandle[8], ctrlhandle[8];
 	int error, fd, v, i;
 
 	if (ac != 1) {
@@ -126,6 +132,34 @@ show_adapter(int ac, char **av)
 	    ? "yes" : "no");
 	free(facts);
 
+	iounit1 = mps_read_config_page(fd, MPI2_CONFIG_PAGETYPE_IO_UNIT, 1, 0, NULL);
+	if (iounit1 == NULL) {
+		error = errno;
+		warn("Failed to get IOUNIT page 1 info");
+		return (error);
+	}
+	printf("         SATA NCQ: %s\n",
+		((iounit1->Flags & MPI2_IOUNITPAGE1_NATIVE_COMMAND_Q_DISABLE) == 0) ?
+		"ENABLED" : "DISABLED");
+	free(iounit1);
+
+	iounit7 = mps_read_config_page(fd, MPI2_CONFIG_PAGETYPE_IO_UNIT, 7, 0, NULL);
+	if (iounit7 == NULL) {
+		error = errno;
+		warn("Failed to get IOUNIT page 7 info");
+		return (error);
+	}
+	printf(" PCIe Width/Speed: x%d (%s GB/sec)\n", iounit7->PCIeWidth,
+		pcie_speed[iounit7->PCIeSpeed]);
+	printf("        IOC Speed: %s\n", ioc_speeds[iounit7->IOCSpeed]);
+	printf("      Temperature: ");
+	if (iounit7->IOCTemperatureUnits == MPI2_IOUNITPAGE7_IOC_TEMP_NOT_PRESENT)
+		printf("Unknown/Unsupported\n");
+	else
+		printf("%d %s\n", iounit7->IOCTemperature,
+			temp_units[iounit7->IOCTemperatureUnits]);
+	free(iounit7);
+
 	fd = mps_open(mps_unit);
 	if (fd < 0) {
 		error = errno;
@@ -176,13 +210,14 @@ show_adapter(int ac, char **av)
 		type = get_device_type(le32toh(phy0->ControllerPhyDeviceInfo));
 
 		if (le16toh(phy0->AttachedDevHandle) != 0) {
-			snprintf(devhandle, 5, "%04x", le16toh(phy0->AttachedDevHandle));
-			snprintf(ctrlhandle, 5, "%04x",
+			snprintf(devhandle, sizeof(devhandle), "%04x",
+			    le16toh(phy0->AttachedDevHandle));
+			snprintf(ctrlhandle, sizeof(ctrlhandle), "%04x",
 			    le16toh(phy0->ControllerDevHandle));
 			speed = get_device_speed(phy0->NegotiatedLinkRate);
 		} else {
-			snprintf(devhandle, 5, "    ");
-			snprintf(ctrlhandle, 5, "    ");
+			snprintf(devhandle, sizeof(devhandle), "    ");
+			snprintf(ctrlhandle, sizeof(ctrlhandle), "    ");
 			speed = "     ";
 		}
 		printf("%-8d%-12s%-11s%-10s%-8s%-7s%-7s%s\n",
@@ -482,7 +517,7 @@ show_devices(int ac, char **av)
 	MPI2_CONFIG_PAGE_SAS_DEV_0	*device;
 	MPI2_CONFIG_PAGE_EXPANDER_1	*exp1;
 	uint16_t IOCStatus, handle, bus, target;
-	char *type, *speed, enchandle[5], slot[3], bt[8];
+	char *type, *speed, enchandle[8], slot[8], bt[16];
 	char buf[256];
 	int fd, error, nphys;
 
@@ -542,9 +577,12 @@ show_devices(int ac, char **av)
 
 		type = get_device_type(le32toh(device->DeviceInfo));
 
-		if (device->PhyNum < nphys) {
-			phydata = &sas0->PhyData[device->PhyNum];
-			speed = get_device_speed(phydata->NegotiatedLinkRate);
+		if (device->DeviceInfo & 0x800) {	/* Direct Attached */
+			if (device->PhyNum < nphys) {
+				phydata = &sas0->PhyData[device->PhyNum];
+				speed = get_device_speed(phydata->NegotiatedLinkRate);
+			} else
+				speed = "";
 		} else if (device->ParentDevHandle > 0) {
 			exp1 = mps_read_extended_config_page(fd,
 			    MPI2_CONFIG_EXTPAGETYPE_SAS_EXPANDER,
@@ -562,20 +600,20 @@ show_devices(int ac, char **av)
 					free(device);
 					return (error);
 				}
-				speed = " ";
+				speed = "";
 			} else {
 				speed = get_device_speed(exp1->NegotiatedLinkRate);
 				free(exp1);
 			}
 		} else
-			speed = " ";
+			speed = "";
 
 		if (device->EnclosureHandle != 0) {
-			snprintf(enchandle, 5, "%04x", le16toh(device->EnclosureHandle));
-			snprintf(slot, 3, "%02d", le16toh(device->Slot));
+			snprintf(enchandle, sizeof(enchandle), "%04x", le16toh(device->EnclosureHandle));
+			snprintf(slot, sizeof(slot), "%02d", le16toh(device->Slot));
 		} else {
-			snprintf(enchandle, 5, "    ");
-			snprintf(slot, 3, "  ");
+			snprintf(enchandle, sizeof(enchandle), "    ");
+			snprintf(slot, sizeof(slot), "  ");
 		}
 		printf("%-10s", bt);
 		snprintf(buf, sizeof(buf), "%08x%08x", le32toh(device->SASAddress.High),
@@ -600,7 +638,7 @@ static int
 show_enclosures(int ac, char **av)
 {
 	MPI2_CONFIG_PAGE_SAS_ENCLOSURE_0 *enc;
-	char *type, sepstr[5];
+	char *type, sepstr[8];
 	uint16_t IOCStatus, handle;
 	int fd, error, issep;
 
@@ -629,9 +667,9 @@ show_enclosures(int ac, char **av)
 		}
 		type = get_enc_type(le16toh(enc->Flags), &issep);
 		if (issep == 0)
-			snprintf(sepstr, 5, "    ");
+			snprintf(sepstr, sizeof(sepstr), "    ");
 		else
-			snprintf(sepstr, 5, "%04x", le16toh(enc->SEPDevHandle));
+			snprintf(sepstr, sizeof(sepstr), "%04x", le16toh(enc->SEPDevHandle));
 		printf("  %.2d    %08x%08x    %s       %04x     %s\n",
 		    le16toh(enc->NumSlots), le32toh(enc->EnclosureLogicalID.High),
 		    le32toh(enc->EnclosureLogicalID.Low), sepstr, le16toh(enc->EnclosureHandle),
@@ -651,7 +689,7 @@ show_expanders(int ac, char **av)
 	MPI2_CONFIG_PAGE_EXPANDER_0	*exp0;
 	MPI2_CONFIG_PAGE_EXPANDER_1	*exp1;
 	uint16_t IOCStatus, handle;
-	char enchandle[5], parent[5], rphy[3], rhandle[5];
+	char enchandle[8], parent[8], rphy[4], rhandle[8];
 	char *speed, *min, *max, *type;
 	int fd, error, nphys, i;
 
@@ -683,19 +721,19 @@ show_expanders(int ac, char **av)
 		handle = le16toh(exp0->DevHandle);
 
 		if (exp0->EnclosureHandle == 0x00)
-			snprintf(enchandle, 5, "    ");
+			snprintf(enchandle, sizeof(enchandle), "    ");
 		else
-			snprintf(enchandle, 5, "%04d", le16toh(exp0->EnclosureHandle));
+			snprintf(enchandle, sizeof(enchandle), "%04d", le16toh(exp0->EnclosureHandle));
 		if (exp0->ParentDevHandle == 0x0)
-			snprintf(parent, 5, "    ");
+			snprintf(parent, sizeof(parent), "    ");
 		else
-			snprintf(parent, 5, "%04x", le16toh(exp0->ParentDevHandle));
+			snprintf(parent, sizeof(parent), "%04x", le16toh(exp0->ParentDevHandle));
 		printf("  %02d    %08x%08x    %04x       %s     %s       %d\n",
 		    exp0->NumPhys, le32toh(exp0->SASAddress.High), le32toh(exp0->SASAddress.Low),
 		    le16toh(exp0->DevHandle), parent, enchandle, exp0->SASLevel);
 
 		printf("\n");
-		printf("     Phy  RemotePhy  DevHandle  Speed   Min    Max    Device\n");
+		printf("     Phy  RemotePhy  DevHandle  Speed  Min   Max    Device\n");
 		for (i = 0; i < nphys; i++) {
 			exp1 = mps_read_extended_config_page(fd,
 			    MPI2_CONFIG_EXTPAGETYPE_SAS_EXPANDER,
@@ -711,20 +749,20 @@ show_expanders(int ac, char **av)
 			}
 			type = get_device_type(le32toh(exp1->AttachedDeviceInfo));
 			if ((le32toh(exp1->AttachedDeviceInfo) &0x7) == 0) {
-				speed = "     ";
-				snprintf(rphy, 3, "  ");
-				snprintf(rhandle, 5, "     ");
+				speed = "   ";
+				snprintf(rphy, sizeof(rphy), "  ");
+				snprintf(rhandle, sizeof(rhandle), "    ");
 			} else {
 				speed = get_device_speed(
 				    exp1->NegotiatedLinkRate);
-				snprintf(rphy, 3, "%02d",
+				snprintf(rphy, sizeof(rphy), "%02d",
 				    exp1->AttachedPhyIdentifier);
-				snprintf(rhandle, 5, "%04x",
+				snprintf(rhandle, sizeof(rhandle), "%04x",
 				    le16toh(exp1->AttachedDevHandle));
 			}
 			min = get_device_speed(exp1->HwLinkRate);
 			max = get_device_speed(exp1->HwLinkRate >> 4);
-			printf("     %02d     %s         %s     %s  %s  %s  %s\n", exp1->Phy, rphy, rhandle, speed, min, max, type);
+			printf("     %02d      %s        %s      %s   %s   %s   %s\n", exp1->Phy, rphy, rhandle, speed, min, max, type);
 
 			free(exp1);
 		}

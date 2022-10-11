@@ -1,4 +1,5 @@
 #!@DEFAULT_INIT_SHELL@
+# shellcheck disable=SC2154
 #
 # zfs-mount     This script will mount/umount the zfs filesystems.
 #
@@ -23,10 +24,8 @@
 #
 # Released under the 2-clause BSD license.
 #
-# The original script that acted as a template for this script came from
-# the Debian GNU/Linux kFreeBSD ZFS packages (which did not include a
-# licensing stansa) in the commit dated Mar 24, 2011:
-#   https://github.com/zfsonlinux/pkg-zfs/commit/80a3ae582b59c0250d7912ba794dca9e669e605a
+# This script is based on debian/zfsutils.zfs.init from the
+# Debian GNU/kFreeBSD zfsutils 8.1-3 package, written by Aurelien Jarno.
 
 # Source the common init script
 . @sysconfdir@/zfs/zfs-functions
@@ -34,9 +33,8 @@
 # ----------------------------------------------------
 
 chkroot() {
-	while read line; do
-		set -- $line
-		if [ "$2" = "/" ]; then
+	while read -r _ mp _; do
+		if [ "$mp" = "/" ]; then
 			return 0
 		fi
 	done < /proc/self/mounts
@@ -65,57 +63,13 @@ do_depend()
 # Mount all datasets/filesystems
 do_mount()
 {
-	local verbose overlay i mntpt val
+	local verbose overlay
 
 	check_boolean "$VERBOSE_MOUNT" && verbose=v
 	check_boolean "$DO_OVERLAY_MOUNTS" && overlay=O
 
 	zfs_action "Mounting ZFS filesystem(s)" \
-	    "$ZFS" mount -a$verbose$overlay "$MOUNT_EXTRA_OPTIONS"
-
-	# Require each volume/filesystem to have 'noauto' and no fsck
-	# option. This shouldn't really be necessary, as long as one
-	# can get zfs-import to run sufficiently early on in the boot
-	# process - before local mounts. This is just here in case/if
-	# this isn't possible.
-	check_boolean "$VERBOSE_MOUNT" && \
-	    zfs_log_begin_msg "Mounting volumes and filesystems registered in fstab"
-
-	read_mtab  "^/dev/(zd|zvol)"
-	read_fstab "^/dev/(zd|zvol)"
-	i=0; var=$(eval echo FSTAB_$i)
-	while [ -n "$(eval echo "$""$var")" ]
-	do
-		mntpt=$(eval echo "$""$var")
-		dev=$(eval echo "$"FSTAB_dev_$i)
-		if ! in_mtab "$mntpt" && ! is_mounted "$mntpt" && [ -e "$dev" ]
-		then
-			check_boolean "$VERBOSE_MOUNT" && \
-				zfs_log_progress_msg "$mntpt "
-			fsck "$dev" && mount "$mntpt"
-		fi
-
-		i=$((i + 1))
-		var=$(eval echo FSTAB_$i)
-	done
-
-	read_mtab  "[[:space:]]zfs[[:space:]]"
-	read_fstab "[[:space:]]zfs[[:space:]]"
-	i=0; var=$(eval echo FSTAB_$i)
-	while [ -n "$(eval echo "$""$var")" ]
-	do
-		mntpt=$(eval echo "$""$var")
-		if ! in_mtab "$mntpt" && ! is_mounted "$mntpt"
-		then
-			check_boolean "$VERBOSE_MOUNT" && \
-				zfs_log_progress_msg "$mntpt "
-			mount "$mntpt"
-		fi
-
-		i=$((i + 1))
-		var=$(eval echo FSTAB_$i)
-	done
-	check_boolean "$VERBOSE_MOUNT" && zfs_log_end_msg 0
+	    "$ZFS" mount "-a$verbose$overlay" "$MOUNT_EXTRA_OPTIONS"
 
 	return 0
 }
@@ -123,51 +77,11 @@ do_mount()
 # Unmount all filesystems
 do_unmount()
 {
-	local i var mntpt
-
 	# This shouldn't really be necessary, as long as one can get
 	# zfs-import to run sufficiently late in the shutdown/reboot process
 	# - after unmounting local filesystems. This is just here in case/if
 	# this isn't possible.
 	zfs_action "Unmounting ZFS filesystems" "$ZFS" unmount -a
-
-	check_boolean "$VERBOSE_MOUNT" && \
-	    zfs_log_begin_msg "Unmounting volumes and filesystems registered in fstab"
-
-	read_mtab  "^/dev/(zd|zvol)"
-	read_fstab "^/dev/(zd|zvol)"
-	i=0; var=$(eval echo FSTAB_$i)
-	while [ -n "$(eval echo "$""$var")" ]
-	do
-		mntpt=$(eval echo "$""$var")
-		dev=$(eval echo "$"FSTAB_dev_$i)
-		if in_mtab "$mntpt"
-		then
-			check_boolean "$VERBOSE_MOUNT" && \
-				zfs_log_progress_msg "$mntpt "
-			umount "$mntpt"
-		fi
-
-		i=$((i + 1))
-		var=$(eval echo FSTAB_$i)
-	done
-
-	read_mtab  "[[:space:]]zfs[[:space:]]"
-	read_fstab "[[:space:]]zfs[[:space:]]"
-	i=0; var=$(eval echo FSTAB_$i)
-	while [ -n "$(eval echo "$""$var")" ]
-	do
-		mntpt=$(eval echo "$""$var")
-		if in_mtab "$mntpt"; then
-			check_boolean "$VERBOSE_MOUNT" && \
-			    zfs_log_progress_msg "$mntpt "
-			umount "$mntpt"
-		fi
-
-		i=$((i + 1))
-		var=$(eval echo FSTAB_$i)
-	done
-	check_boolean "$VERBOSE_MOUNT" && zfs_log_end_msg 0
 
 	return 0
 }

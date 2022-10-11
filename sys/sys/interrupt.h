@@ -138,13 +138,13 @@ struct intr_event {
 #define	SWI_DELAY	0x2
 
 /*
- * Software interrupt numbers in priority order.  The priority determines
- * the priority of the corresponding interrupt thread.
+ * Software interrupt numbers.  Historically this was used to determine
+ * the relative priority of SWI ithreads.
  */
 #define	SWI_TTY		0
 #define	SWI_NET		1
 #define	SWI_CAMBIO	2
-#define	SWI_VM		3
+#define	SWI_BUSDMA	3
 #define	SWI_CLOCK	4
 #define	SWI_TQ_FAST	5
 #define	SWI_TQ		6
@@ -157,7 +157,7 @@ extern struct	intr_event *tty_intr_event;
 extern void	*vm_ih;
 
 /* Counts and names for statistics (defined in MD code). */
-extern u_long 	*intrcnt;	/* counts for for each device and stray */
+extern u_long 	*intrcnt;	/* counts for each device and stray */
 extern char 	*intrnames;	/* string table containing device names */
 extern size_t	sintrcnt;	/* size of intrcnt table */
 extern size_t	sintrnames;	/* size of intrnames table */

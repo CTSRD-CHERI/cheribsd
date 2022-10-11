@@ -5,6 +5,7 @@ makeoptions MKMODULESENV+="WITHOUT_INET_SUPPORT="
 makeoptions MKMODULESENV+="WITHOUT_INET6_SUPPORT="
 nooptions INET
 nooptions INET6
+nooptions KERN_TLS
 nodevice age
 nodevice alc
 nodevice ale
@@ -12,6 +13,7 @@ nodevice bxe
 nodevice em
 nodevice fxp
 nodevice jme
+nodevice lio
 nodevice msk
 nodevice mxge
 nodevice sge

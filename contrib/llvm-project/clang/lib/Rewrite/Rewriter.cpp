@@ -223,6 +223,7 @@ std::string Rewriter::getRewrittenText(CharSourceRange Range) const {
   RewriteBuffer::iterator Start = RB.begin();
   std::advance(Start, StartOff);
   RewriteBuffer::iterator End = Start;
+  assert(EndOff >= StartOff && "Invalid iteration distance");
   std::advance(End, EndOff-StartOff);
 
   return std::string(Start, End);
@@ -259,12 +260,12 @@ bool Rewriter::InsertText(SourceLocation Loc, StringRef Str,
   unsigned StartOffs = getLocationOffsetAndFileID(Loc, FID);
 
   SmallString<128> indentedStr;
-  if (indentNewLines && Str.find('\n') != StringRef::npos) {
+  if (indentNewLines && Str.contains('\n')) {
     StringRef MB = SourceMgr->getBufferData(FID);
 
     unsigned lineNo = SourceMgr->getLineNumber(FID, StartOffs) - 1;
-    const SrcMgr::ContentCache *
-        Content = SourceMgr->getSLocEntry(FID).getFile().getContentCache();
+    const SrcMgr::ContentCache *Content =
+        &SourceMgr->getSLocEntry(FID).getFile().getContentCache();
     unsigned lineOffs = Content->SourceLineCache[lineNo];
 
     // Find the whitespace at the start of the line.
@@ -367,8 +368,8 @@ bool Rewriter::IncreaseIndentation(CharSourceRange range,
   unsigned startLineNo = SourceMgr->getLineNumber(FID, StartOff) - 1;
   unsigned endLineNo = SourceMgr->getLineNumber(FID, EndOff) - 1;
 
-  const SrcMgr::ContentCache *
-      Content = SourceMgr->getSLocEntry(FID).getFile().getContentCache();
+  const SrcMgr::ContentCache *Content =
+      &SourceMgr->getSLocEntry(FID).getFile().getContentCache();
 
   // Find where the lines start.
   unsigned parentLineOffs = Content->SourceLineCache[parentLineNo];

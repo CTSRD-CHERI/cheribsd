@@ -28,6 +28,7 @@
 #define	CSU_COMMON_NOTES_H
 
 #define NOTE_FREEBSD_VENDOR	"FreeBSD"
+#define NOTE_CHERIBSD_VENDOR	"CheriBSD"
 
 #define NOTE_SECTION		".note.tag"
 

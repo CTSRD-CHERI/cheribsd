@@ -245,7 +245,7 @@ test_clock_gettime(uintmax_t num, uintmax_t int_arg __unused, const char *path _
 	return (i);
 }
 
-#ifdef __CHERI__
+#ifdef __CHERI_PURE_CAPABILITY__
 static uintmax_t
 test_coping(uintmax_t num, uintmax_t int_arg, const char *path)
 {
@@ -1081,7 +1081,7 @@ static const struct test tests[] = {
 	{ "bad_open", test_bad_open, .t_flags = 0 },
 	{ "chroot", test_chroot, .t_flags = 0 },
 	{ "clock_gettime", test_clock_gettime, .t_flags = 0 },
-#ifdef __CHERI__
+#ifdef __CHERI_PURE_CAPABILITY__
 	{ "coping_8", test_coping, .t_flags = FLAG_NAME, .t_int = 8 },
 	{ "coping_80", test_coping, .t_flags = FLAG_NAME, .t_int = 80 },
 	{ "coping_800", test_coping, .t_flags = FLAG_NAME, .t_int = 800 },

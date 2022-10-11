@@ -71,7 +71,7 @@ struct key_cb {
 	int key_count;
 	int any_count;
 };
-VNET_DEFINE_STATIC(struct key_cb, key_cb);
+VNET_DEFINE_STATIC(struct key_cb, key_cb) = {};
 #define	V_key_cb		VNET(key_cb)
 
 static struct sockaddr key_src = { 2, PF_KEY, };
@@ -141,7 +141,6 @@ end:
 static int
 key_sendup0(struct rawcb *rp, struct mbuf *m, int promisc)
 {
-	int error;
 
 	if (promisc) {
 		struct sadb_msg *pmsg;
@@ -165,11 +164,12 @@ key_sendup0(struct rawcb *rp, struct mbuf *m, int promisc)
 	    m, NULL)) {
 		PFKEYSTAT_INC(in_nomem);
 		m_freem(m);
-		error = ENOBUFS;
-	} else
-		error = 0;
+		soroverflow(rp->rcb_socket);
+		return ENOBUFS;
+	}
+
 	sorwakeup(rp->rcb_socket);
-	return error;
+	return 0;
 }
 
 /* so can be NULL if target != KEY_SENDUP_ONE */
@@ -322,7 +322,7 @@ key_attach(struct socket *so, int proto, struct thread *td)
 static int
 key_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 {
-  return EINVAL;
+	return EINVAL;
 }
 
 /*
@@ -448,28 +448,14 @@ struct protosw keysw[] = {
 	.pr_flags =		PR_ATOMIC|PR_ADDR,
 	.pr_output =		key_output,
 	.pr_ctlinput =		raw_ctlinput,
-	.pr_init =		raw_init,
 	.pr_usrreqs =		&key_usrreqs
 }
 };
 
-static void
-key_init0(void)
-{
-
-	bzero((caddr_t)&V_key_cb, sizeof(V_key_cb));
-	key_init();
-}
-
 struct domain keydomain = {
 	.dom_family =		PF_KEY,
 	.dom_name =		"key",
-	.dom_init =		key_init0,
-#ifdef VIMAGE
-	.dom_destroy =		key_destroy,
-#endif
 	.dom_protosw =		keysw,
 	.dom_protoswNPROTOSW =	&keysw[nitems(keysw)]
 };
-
-VNET_DOMAIN_SET(key);
+DOMAIN_SET(key);

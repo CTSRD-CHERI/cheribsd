@@ -79,6 +79,8 @@ static int	acpi_timer_sysctl_freq(SYSCTL_HANDLER_ARGS);
 static void	acpi_timer_boot_test(void);
 
 static int	acpi_timer_test(void);
+static int	acpi_timer_test_enabled = 0;
+TUNABLE_INT("hw.acpi.timer_test_enabled", &acpi_timer_test_enabled);
 
 static device_method_t acpi_timer_methods[] = {
     DEVMETHOD(device_identify,	acpi_timer_identify),
@@ -94,8 +96,7 @@ static driver_t acpi_timer_driver = {
     0,
 };
 
-static devclass_t acpi_timer_devclass;
-DRIVER_MODULE(acpi_timer, acpi, acpi_timer_driver, acpi_timer_devclass, 0, 0);
+DRIVER_MODULE(acpi_timer, acpi, acpi_timer_driver, 0, 0);
 MODULE_DEPEND(acpi_timer, acpi, 1, 1, 1);
 
 static struct timecounter acpi_timer_timecounter = {
@@ -368,7 +369,7 @@ acpi_timer_sysctl_freq(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_machdep, OID_AUTO, acpi_timer_freq,
-    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, 0, sizeof(u_int),
+    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, 0, 0,
     acpi_timer_sysctl_freq, "I",
     "ACPI timer frequency");
 
@@ -398,11 +399,17 @@ SYSCTL_PROC(_machdep, OID_AUTO, acpi_timer_freq,
  */
 #define N 2000
 static int
-acpi_timer_test()
+acpi_timer_test(void)
 {
     uint32_t last, this;
     int delta, max, max2, min, n;
     register_t s;
+
+    /* Skip the test based on the hw.acpi.timer_test_enabled tunable. */
+    if (!acpi_timer_test_enabled)
+	return (1);
+
+    TSENTER();
 
     min = INT32_MAX;
     max = max2 = 0;
@@ -433,6 +440,8 @@ acpi_timer_test()
 	n = 1;
     if (bootverbose)
 	printf(" %d/%d", n, delta);
+
+    TSEXIT();
 
     return (n);
 }

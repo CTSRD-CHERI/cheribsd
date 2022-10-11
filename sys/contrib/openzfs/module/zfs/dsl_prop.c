@@ -88,7 +88,7 @@ dsl_prop_get_dd(dsl_dir_t *dd, const char *propname,
 		setpoint[0] = '\0';
 
 	prop = zfs_name_to_prop(propname);
-	inheritable = (prop == ZPROP_INVAL || zfs_prop_inheritable(prop));
+	inheritable = (prop == ZPROP_USERPROP || zfs_prop_inheritable(prop));
 	inheritstr = kmem_asprintf("%s%s", propname, ZPROP_INHERIT_SUFFIX);
 	recvdstr = kmem_asprintf("%s%s", propname, ZPROP_RECVD_SUFFIX);
 
@@ -168,7 +168,7 @@ dsl_prop_get_ds(dsl_dataset_t *ds, const char *propname,
 	uint64_t zapobj;
 
 	ASSERT(dsl_pool_config_held(ds->ds_dir->dd_pool));
-	inheritable = (prop == ZPROP_INVAL || zfs_prop_inheritable(prop));
+	inheritable = (prop == ZPROP_USERPROP || zfs_prop_inheritable(prop));
 	zapobj = dsl_dataset_phys(ds)->ds_props_obj;
 
 	if (zapobj != 0) {
@@ -504,10 +504,10 @@ dsl_prop_hascb(dsl_dataset_t *ds)
 	return (!list_is_empty(&ds->ds_prop_cbs));
 }
 
-/* ARGSUSED */
 static int
 dsl_prop_notify_all_cb(dsl_pool_t *dp, dsl_dataset_t *ds, void *arg)
 {
+	(void) arg;
 	dsl_dir_t *dd = ds->ds_dir;
 	dsl_prop_record_t *pr;
 	dsl_prop_cb_record_t *cbr;
@@ -749,7 +749,7 @@ dsl_prop_set_sync_impl(dsl_dataset_t *ds, const char *propname,
 		ASSERT(err == 0 || err == ENOENT);
 		err = zap_remove(mos, zapobj, inheritstr, tx);
 		ASSERT(err == 0 || err == ENOENT);
-		/* FALLTHRU */
+		zfs_fallthrough;
 	case (ZPROP_SRC_NONE | ZPROP_SRC_RECEIVED):
 		/*
 		 * remove propname$recvd
@@ -1055,12 +1055,12 @@ dsl_prop_get_all_impl(objset_t *mos, uint64_t propobj,
 		prop = zfs_name_to_prop(propname);
 
 		/* Skip non-inheritable properties. */
-		if ((flags & DSL_PROP_GET_INHERITING) && prop != ZPROP_INVAL &&
-		    !zfs_prop_inheritable(prop))
+		if ((flags & DSL_PROP_GET_INHERITING) &&
+		    prop != ZPROP_USERPROP && !zfs_prop_inheritable(prop))
 			continue;
 
 		/* Skip properties not valid for this type. */
-		if ((flags & DSL_PROP_GET_SNAPSHOT) && prop != ZPROP_INVAL &&
+		if ((flags & DSL_PROP_GET_SNAPSHOT) && prop != ZPROP_USERPROP &&
 		    !zfs_prop_valid_for_type(prop, ZFS_TYPE_SNAPSHOT, B_FALSE))
 			continue;
 

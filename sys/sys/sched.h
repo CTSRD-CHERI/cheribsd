@@ -91,9 +91,11 @@ void	sched_nice(struct proc *p, int nice);
  * Threads are switched in and out, block on resources, have temporary
  * priorities inherited from their procs, and use up cpu time.
  */
+void	sched_ap_entry(void);
 void	sched_exit_thread(struct thread *td, struct thread *child);
 u_int	sched_estcpu(struct thread *td);
 void	sched_fork_thread(struct thread *td, struct thread *child);
+void	sched_ithread_prio(struct thread *td, u_char prio);
 void	sched_lend_prio(struct thread *td, u_char prio);
 void	sched_lend_user_prio(struct thread *td, u_char pri);
 void	sched_lend_user_prio_cond(struct thread *td, u_char pri);
@@ -226,6 +228,11 @@ SYSINIT(name, SI_SUB_LAST, SI_ORDER_MIDDLE, name ## _add_proc, NULL);
  * Fixup scheduler state for proc0 and thread0
  */
 void schedinit(void);
+
+/*
+ * Fixup scheduler state for secondary APs
+ */
+void schedinit_ap(void);
 #endif /* _KERNEL */
 
 /* POSIX 1003.1b Process Scheduling */

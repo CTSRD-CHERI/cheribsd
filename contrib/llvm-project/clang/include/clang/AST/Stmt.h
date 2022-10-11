@@ -20,6 +20,7 @@
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/LLVM.h"
 #include "clang/Basic/SourceLocation.h"
+#include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/BitmaskEnum.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -160,8 +161,8 @@ protected:
 
     unsigned : NumStmtBits;
 
-    /// True if this if statement is a constexpr if.
-    unsigned IsConstexpr : 1;
+    /// Whether this is a constexpr if, or a consteval if, or neither.
+    unsigned Kind : 3;
 
     /// True if this if statement has storage for an else statement.
     unsigned HasElse : 1;
@@ -464,8 +465,11 @@ protected:
     /// True if the callee of the call expression was found using ADL.
     unsigned UsesADL : 1;
 
+    /// True if the call expression has some floating-point features.
+    unsigned HasFPFeatures : 1;
+
     /// Padding used to align OffsetToTrailingObjects to a byte multiple.
-    unsigned : 24 - 2 - NumExprBits;
+    unsigned : 24 - 3 - NumExprBits;
 
     /// The offset in bytes from the this pointer to the start of the
     /// trailing objects belonging to CallExpr. Intentionally byte sized
@@ -515,8 +519,11 @@ protected:
 
     unsigned : NumExprBits;
 
-    unsigned Kind : 6;
+    unsigned Kind : 7;
     unsigned PartOfExplicitCast : 1; // Only set for ImplicitCastExpr.
+
+    /// True if the call expression has some floating-point features.
+    unsigned HasFPFeatures : 1;
 
     /// The number of CXXBaseSpecifiers in the cast. 14 bits would be enough
     /// here. ([implimits] Direct and indirect base classes [16384]).
@@ -1095,6 +1102,14 @@ public:
   /// de-serialization).
   struct EmptyShell {};
 
+  /// The likelihood of a branch being taken.
+  enum Likelihood {
+    LH_Unlikely = -1, ///< Branch has the [[unlikely]] attribute.
+    LH_None,          ///< No attribute set or branches of the IfStmt have
+                      ///< the same attribute.
+    LH_Likely         ///< Branch has the [[likely]] attribute.
+  };
+
 protected:
   /// Iterator for iterating over Stmt * arrays that contain only T *.
   ///
@@ -1163,6 +1178,26 @@ public:
   static void EnableStatistics();
   static void PrintStats();
 
+  /// \returns the likelihood of a set of attributes.
+  static Likelihood getLikelihood(ArrayRef<const Attr *> Attrs);
+
+  /// \returns the likelihood of a statement.
+  static Likelihood getLikelihood(const Stmt *S);
+
+  /// \returns the likelihood attribute of a statement.
+  static const Attr *getLikelihoodAttr(const Stmt *S);
+
+  /// \returns the likelihood of the 'then' branch of an 'if' statement. The
+  /// 'else' branch is required to determine whether both branches specify the
+  /// same likelihood, which affects the result.
+  static Likelihood getLikelihood(const Stmt *Then, const Stmt *Else);
+
+  /// \returns whether the likelihood of the branches of an if statement are
+  /// conflicting. When the first element is \c true there's a conflict and
+  /// the Attr's are the conflicting attributes of the Then and Else Stmt.
+  static std::tuple<bool, const Attr *, const Attr *>
+  determineLikelihoodConflict(const Stmt *Then, const Stmt *Else);
+
   /// Dumps the specified AST fragment and all subtrees to
   /// \c llvm::errs().
   void dump() const;
@@ -1181,6 +1216,11 @@ public:
                    const PrintingPolicy &Policy, unsigned Indentation = 0,
                    StringRef NewlineSymbol = "\n",
                    const ASTContext *Context = nullptr) const;
+  void printPrettyControlled(raw_ostream &OS, PrinterHelper *Helper,
+                             const PrintingPolicy &Policy,
+                             unsigned Indentation = 0,
+                             StringRef NewlineSymbol = "\n",
+                             const ASTContext *Context = nullptr) const;
 
   /// Pretty-prints in JSON format.
   void printJson(raw_ostream &Out, PrinterHelper *Helper,
@@ -1764,6 +1804,7 @@ public:
 class LabelStmt : public ValueStmt {
   LabelDecl *TheDecl;
   Stmt *SubStmt;
+  bool SideEntry = false;
 
 public:
   /// Build a label statement.
@@ -1799,6 +1840,8 @@ public:
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == LabelStmtClass;
   }
+  bool isSideEntry() const { return SideEntry; }
+  void setSideEntry(bool SE) { SideEntry = SE; }
 };
 
 /// Represents an attribute applied to a statement.
@@ -1892,6 +1935,8 @@ class IfStmt final
   //    Present if and only if hasElseStorage().
   enum { InitOffset = 0, ThenOffsetFromCond = 1, ElseOffsetFromCond = 2 };
   enum { NumMandatoryStmtPtr = 2 };
+  SourceLocation LParenLoc;
+  SourceLocation RParenLoc;
 
   unsigned numTrailingObjects(OverloadToken<Stmt *>) const {
     return NumMandatoryStmtPtr + hasElseStorage() + hasVarStorage() +
@@ -1911,8 +1956,9 @@ class IfStmt final
   unsigned elseOffset() const { return condOffset() + ElseOffsetFromCond; }
 
   /// Build an if/then/else statement.
-  IfStmt(const ASTContext &Ctx, SourceLocation IL, bool IsConstexpr, Stmt *Init,
-         VarDecl *Var, Expr *Cond, Stmt *Then, SourceLocation EL, Stmt *Else);
+  IfStmt(const ASTContext &Ctx, SourceLocation IL, IfStatementKind Kind,
+         Stmt *Init, VarDecl *Var, Expr *Cond, SourceLocation LParenLoc,
+         SourceLocation RParenLoc, Stmt *Then, SourceLocation EL, Stmt *Else);
 
   /// Build an empty if/then/else statement.
   explicit IfStmt(EmptyShell Empty, bool HasElse, bool HasVar, bool HasInit);
@@ -1920,7 +1966,8 @@ class IfStmt final
 public:
   /// Create an IfStmt.
   static IfStmt *Create(const ASTContext &Ctx, SourceLocation IL,
-                        bool IsConstexpr, Stmt *Init, VarDecl *Var, Expr *Cond,
+                        IfStatementKind Kind, Stmt *Init, VarDecl *Var,
+                        Expr *Cond, SourceLocation LPL, SourceLocation RPL,
                         Stmt *Then, SourceLocation EL = SourceLocation(),
                         Stmt *Else = nullptr);
 
@@ -2036,12 +2083,35 @@ public:
     *getTrailingObjects<SourceLocation>() = ElseLoc;
   }
 
-  bool isConstexpr() const { return IfStmtBits.IsConstexpr; }
-  void setConstexpr(bool C) { IfStmtBits.IsConstexpr = C; }
+  bool isConsteval() const {
+    return getStatementKind() == IfStatementKind::ConstevalNonNegated ||
+           getStatementKind() == IfStatementKind::ConstevalNegated;
+  }
+
+  bool isNonNegatedConsteval() const {
+    return getStatementKind() == IfStatementKind::ConstevalNonNegated;
+  }
+
+  bool isNegatedConsteval() const {
+    return getStatementKind() == IfStatementKind::ConstevalNegated;
+  }
+
+  bool isConstexpr() const {
+    return getStatementKind() == IfStatementKind::Constexpr;
+  }
+
+  void setStatementKind(IfStatementKind Kind) {
+    IfStmtBits.Kind = static_cast<unsigned>(Kind);
+  }
+
+  IfStatementKind getStatementKind() const {
+    return static_cast<IfStatementKind>(IfStmtBits.Kind);
+  }
 
   /// If this is an 'if constexpr', determine which substatement will be taken.
   /// Otherwise, or if the condition is value-dependent, returns None.
   Optional<const Stmt*> getNondiscardedCase(const ASTContext &Ctx) const;
+  Optional<Stmt *> getNondiscardedCase(const ASTContext &Ctx);
 
   bool isObjCAvailabilityCheck() const;
 
@@ -2051,17 +2121,27 @@ public:
       return getElse()->getEndLoc();
     return getThen()->getEndLoc();
   }
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+  SourceLocation getRParenLoc() const { return RParenLoc; }
+  void setRParenLoc(SourceLocation Loc) { RParenLoc = Loc; }
 
   // Iterators over subexpressions.  The iterators will include iterating
   // over the initialization expression referenced by the condition variable.
   child_range children() {
-    return child_range(getTrailingObjects<Stmt *>(),
+    // We always store a condition, but there is none for consteval if
+    // statements, so skip it.
+    return child_range(getTrailingObjects<Stmt *>() +
+                           (isConsteval() ? thenOffset() : 0),
                        getTrailingObjects<Stmt *>() +
                            numTrailingObjects(OverloadToken<Stmt *>()));
   }
 
   const_child_range children() const {
-    return const_child_range(getTrailingObjects<Stmt *>(),
+    // We always store a condition, but there is none for consteval if
+    // statements, so skip it.
+    return const_child_range(getTrailingObjects<Stmt *>() +
+                                 (isConsteval() ? thenOffset() : 0),
                              getTrailingObjects<Stmt *>() +
                                  numTrailingObjects(OverloadToken<Stmt *>()));
   }
@@ -2077,7 +2157,7 @@ class SwitchStmt final : public Stmt,
   friend TrailingObjects;
 
   /// Points to a linked list of case and default statements.
-  SwitchCase *FirstCase;
+  SwitchCase *FirstCase = nullptr;
 
   // SwitchStmt is followed by several trailing objects,
   // some of which optional. Note that it would be more convenient to
@@ -2098,6 +2178,8 @@ class SwitchStmt final : public Stmt,
   //    Always present.
   enum { InitOffset = 0, BodyOffsetFromCond = 1 };
   enum { NumMandatoryStmtPtr = 2 };
+  SourceLocation LParenLoc;
+  SourceLocation RParenLoc;
 
   unsigned numTrailingObjects(OverloadToken<Stmt *>) const {
     return NumMandatoryStmtPtr + hasInitStorage() + hasVarStorage();
@@ -2111,7 +2193,8 @@ class SwitchStmt final : public Stmt,
   unsigned bodyOffset() const { return condOffset() + BodyOffsetFromCond; }
 
   /// Build a switch statement.
-  SwitchStmt(const ASTContext &Ctx, Stmt *Init, VarDecl *Var, Expr *Cond);
+  SwitchStmt(const ASTContext &Ctx, Stmt *Init, VarDecl *Var, Expr *Cond,
+             SourceLocation LParenLoc, SourceLocation RParenLoc);
 
   /// Build a empty switch statement.
   explicit SwitchStmt(EmptyShell Empty, bool HasInit, bool HasVar);
@@ -2119,7 +2202,8 @@ class SwitchStmt final : public Stmt,
 public:
   /// Create a switch statement.
   static SwitchStmt *Create(const ASTContext &Ctx, Stmt *Init, VarDecl *Var,
-                            Expr *Cond);
+                            Expr *Cond, SourceLocation LParenLoc,
+                            SourceLocation RParenLoc);
 
   /// Create an empty switch statement optionally with storage for
   /// an init expression and a condition variable.
@@ -2207,6 +2291,10 @@ public:
 
   SourceLocation getSwitchLoc() const { return SwitchStmtBits.SwitchLoc; }
   void setSwitchLoc(SourceLocation L) { SwitchStmtBits.SwitchLoc = L; }
+  SourceLocation getLParenLoc() const { return LParenLoc; }
+  void setLParenLoc(SourceLocation Loc) { LParenLoc = Loc; }
+  SourceLocation getRParenLoc() const { return RParenLoc; }
+  void setRParenLoc(SourceLocation Loc) { RParenLoc = Loc; }
 
   void setBody(Stmt *S, SourceLocation SL) {
     setBody(S);

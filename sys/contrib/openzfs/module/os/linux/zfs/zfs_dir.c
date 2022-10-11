@@ -297,7 +297,7 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name,
 		 */
 		dl->dl_namesize = strlen(dl->dl_name) + 1;
 		name = kmem_alloc(dl->dl_namesize, KM_SLEEP);
-		bcopy(dl->dl_name, name, dl->dl_namesize);
+		memcpy(name, dl->dl_name, dl->dl_namesize);
 		dl->dl_name = name;
 	}
 
@@ -625,7 +625,7 @@ zfs_purgedir(znode_t *dzp)
 			skipped += 1;
 			continue;
 		}
-		bzero(&dl, sizeof (dl));
+		memset(&dl, 0, sizeof (dl));
 		dl.dl_dzp = dzp;
 		dl.dl_name = zap.za_name;
 
@@ -1106,8 +1106,8 @@ zfs_make_xattrdir(znode_t *zp, vattr_t *vap, znode_t **xzpp, cred_t *cr)
 	    sizeof (xzp->z_id), tx));
 
 	if (!zp->z_unlinked)
-		(void) zfs_log_create(zfsvfs->z_log, tx, TX_MKXATTR, zp,
-		    xzp, "", NULL, acl_ids.z_fuidp, vap);
+		zfs_log_create(zfsvfs->z_log, tx, TX_MKXATTR, zp, xzp, "", NULL,
+		    acl_ids.z_fuidp, vap);
 
 	zfs_acl_ids_free(&acl_ids);
 	dmu_tx_commit(tx);

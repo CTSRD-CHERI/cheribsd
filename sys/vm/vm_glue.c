@@ -73,6 +73,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/msan.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/racct.h>
@@ -315,19 +316,7 @@ vm_thread_stack_create(struct domainset *ds, int pages)
 	/*
 	 * Get a kernel virtual address for this thread's kstack.
 	 */
-#if defined(__mips__)
-	/*
-	 * We need to align the kstack's mapped address to fit within
-	 * a single TLB entry.
-	 */
-	if (vmem_xalloc(kernel_arena, (pages + KSTACK_GUARD_PAGES) * PAGE_SIZE,
-	    KSTACK_PAGE_SIZE * 2, 0, 0, VMEM_ADDR_MIN, VMEM_ADDR_MAX,
-	    M_BESTFIT | M_NOWAIT, &ks)) {
-		ks = 0;
-	}
-#else
 	ks = kva_alloc((pages + KSTACK_GUARD_PAGES) * PAGE_SIZE);
-#endif
 	if (ks == 0) {
 		printf("%s: kstack allocation failed\n", __func__);
 		return (0);
@@ -405,6 +394,7 @@ vm_thread_new(struct thread *td, int pages)
 	td->td_kstack = ks;
 	td->td_kstack_pages = pages;
 	kasan_mark((void *)ks, ptoa(pages), ptoa(pages), 0);
+	kmsan_mark((void *)ks, ptoa(pages), KMSAN_STATE_UNINIT);
 	return (1);
 }
 
@@ -437,43 +427,11 @@ vm_thread_stack_back(struct domainset *ds, vm_offset_t ks, vm_page_t ma[],
     int npages, int req_class)
 {
 	vm_pindex_t pindex;
-#if defined(__mips__) && defined(KSTACK_LARGE_PAGE)
-	vm_page_t m;
-#endif
 	int n;
 
 	pindex = atop(ks - VM_MIN_KERNEL_ADDRESS);
 
 	VM_OBJECT_WLOCK(kstack_object);
-#if defined(__mips__) && defined(KSTACK_LARGE_PAGE)
-#ifndef NO_SWAPPING
-	/*
-	 * Swapping adds races where some of the backing store might
-	 * be swapped out when swapping back in, but then we'd need to
-	 * make sure new pages are physically contiguous.  Without
-	 * swapping, this is only called for new kstacks for which
-	 * there should never be any existing backing store.
-	 */
-#error "KSTACK_LARGE_PAGE requires NO_SWAPPING"
-#endif
-	KASSERT(npages == atop(KSTACK_SIZE),
-	    ("%s: request for %d pages != KSTACK_SIZE", __func__, npages));
-
-	for (;;) {
-		m = vm_page_alloc_contig(kstack_object, pindex, req_class |
-		    VM_ALLOC_WIRED | VM_ALLOC_NOWAIT, atop(KSTACK_SIZE),
-		    0ul, ~0ul, KSTACK_PAGE_SIZE, 0, VM_MEMATTR_DEFAULT);
-		if (m != NULL)
-			break;
-		VM_OBJECT_WUNLOCK(kstack_object);
-		if (!vm_page_reclaim_contig(req_class,
-		    atop(KSTACK_SIZE), 0ul, ~0ul, KSTACK_PAGE_SIZE, 0))
-			vm_wait(kstack_object);
-		VM_OBJECT_WLOCK(kstack_object);
-	}
-	for (n = 0; n < atop(KSTACK_SIZE); m++, n++)
-		ma[n] = m;
-#else
 	for (n = 0; n < npages;) {
 		if (vm_ndomains > 1)
 			kstack_object->domain.dr_policy = ds;
@@ -486,7 +444,6 @@ vm_thread_stack_back(struct domainset *ds, vm_offset_t ks, vm_page_t ma[],
 		    req_class | VM_ALLOC_WIRED | VM_ALLOC_WAITFAIL,
 		    &ma[n], npages - n);
 	}
-#endif
 	VM_OBJECT_WUNLOCK(kstack_object);
 }
 
@@ -545,7 +502,7 @@ static int max_kstack_used;
 
 SYSCTL_INT(_debug, OID_AUTO, max_kstack_used, CTLFLAG_RD,
     &max_kstack_used, 0,
-    "Maxiumum stack depth used by a thread in kernel");
+    "Maximum stack depth used by a thread in kernel");
 
 void
 intr_prof_stack_use(struct thread *td, struct trapframe *frame)
@@ -618,11 +575,9 @@ vm_forkproc(struct thread *td, struct proc *p2, struct thread *td2,
 		 * COW locally.
 		 */
 		if ((flags & RFMEM) == 0) {
-			if (refcount_load(&p1->p_vmspace->vm_refcnt) > 1) {
-				error = vmspace_unshare(p1);
-				if (error)
-					return (error);
-			}
+			error = vmspace_unshare(p1);
+			if (error)
+				return (error);
 		}
 		cpu_fork(td, p2, td2, flags);
 		return (0);

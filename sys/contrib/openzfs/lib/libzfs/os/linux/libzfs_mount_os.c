@@ -37,7 +37,7 @@
 #include <libintl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <strings.h>
+#include <string.h>
 #include <unistd.h>
 #include <zone.h>
 #include <sys/mntent.h>
@@ -47,7 +47,7 @@
 #include <sys/dsl_crypt.h>
 #include <libzfs.h>
 
-#include "libzfs_impl.h"
+#include "../../libzfs_impl.h"
 #include <thread_pool.h>
 
 #define	ZS_COMMENT	0x00000000	/* comment */
@@ -180,7 +180,7 @@ out:
  * otherwise they are considered fatal are copied in to badopt.
  */
 int
-zfs_parse_mount_options(char *mntopts, unsigned long *mntflags,
+zfs_parse_mount_options(const char *mntopts, unsigned long *mntflags,
     unsigned long *zfsflags, int sloppy, char *badopt, char *mtabopt)
 {
 	int error = 0, quote = 0, flag = 0, count = 0;
@@ -320,14 +320,14 @@ zfs_adjust_mount_options(zfs_handle_t *zhp, const char *mntpoint,
  * make due with return value from the mount process.
  */
 int
-do_mount(zfs_handle_t *zhp, const char *mntpt, char *opts, int flags)
+do_mount(zfs_handle_t *zhp, const char *mntpt, const char *opts, int flags)
 {
 	const char *src = zfs_get_name(zhp);
 	int error = 0;
 
 	if (!libzfs_envvar_is_set("ZFS_MOUNT_HELPER")) {
 		char badopt[MNT_LINE_MAX] = {0};
-		unsigned long mntflags = flags, zfsflags;
+		unsigned long mntflags = flags, zfsflags = 0;
 		char myopts[MNT_LINE_MAX] = {0};
 
 		if (zfs_parse_mount_options(opts, &mntflags,
@@ -341,10 +341,10 @@ do_mount(zfs_handle_t *zhp, const char *mntpt, char *opts, int flags)
 		}
 	} else {
 		char *argv[9] = {
-		    "/bin/mount",
-		    "--no-canonicalize",
-		    "-t", MNTTYPE_ZFS,
-		    "-o", opts,
+		    (char *)"/bin/mount",
+		    (char *)"--no-canonicalize",
+		    (char *)"-t", (char *)MNTTYPE_ZFS,
+		    (char *)"-o", (char *)opts,
 		    (char *)src,
 		    (char *)mntpt,
 		    (char *)NULL };
@@ -374,31 +374,27 @@ do_mount(zfs_handle_t *zhp, const char *mntpt, char *opts, int flags)
 }
 
 int
-do_unmount(const char *mntpt, int flags)
+do_unmount(zfs_handle_t *zhp, const char *mntpt, int flags)
 {
+	(void) zhp;
+
 	if (!libzfs_envvar_is_set("ZFS_MOUNT_HELPER")) {
 		int rv = umount2(mntpt, flags);
 
 		return (rv < 0 ? errno : 0);
 	}
 
-	char force_opt[] = "-f";
-	char lazy_opt[] = "-l";
 	char *argv[7] = {
-	    "/bin/umount",
-	    "-t", MNTTYPE_ZFS,
+	    (char *)"/bin/umount",
+	    (char *)"-t", (char *)MNTTYPE_ZFS,
 	    NULL, NULL, NULL, NULL };
 	int rc, count = 3;
 
-	if (flags & MS_FORCE) {
-		argv[count] = force_opt;
-		count++;
-	}
+	if (flags & MS_FORCE)
+		argv[count++] = (char *)"-f";
 
-	if (flags & MS_DETACH) {
-		argv[count] = lazy_opt;
-		count++;
-	}
+	if (flags & MS_DETACH)
+		argv[count++] = (char *)"-l";
 
 	argv[count] = (char *)mntpt;
 	rc = libzfs_run_process(argv[0], argv, STDOUT_VERBOSE|STDERR_VERBOSE);
@@ -410,4 +406,18 @@ int
 zfs_mount_delegation_check(void)
 {
 	return ((geteuid() != 0) ? EACCES : 0);
+}
+
+/* Called from the tail end of zpool_disable_datasets() */
+void
+zpool_disable_datasets_os(zpool_handle_t *zhp, boolean_t force)
+{
+	(void) zhp, (void) force;
+}
+
+/* Called from the tail end of zfs_unmount() */
+void
+zpool_disable_volume_os(const char *name)
+{
+	(void) name;
 }

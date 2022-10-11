@@ -69,7 +69,7 @@ __FBSDID("$FreeBSD$");
  * Enable debugging by defining ICHSMB_DEBUG to a non-zero value.
  */
 #define ICHSMB_DEBUG	0
-#if ICHSMB_DEBUG != 0 && defined(__CC_SUPPORTS___FUNC__)
+#if ICHSMB_DEBUG != 0
 #define DBG(fmt, args...)	\
 	do { printf("%s: " fmt, __func__ , ## args); } while (0)
 #else
@@ -690,4 +690,4 @@ ichsmb_detach(device_t dev)
 	return 0;
 }
 
-DRIVER_MODULE(smbus, ichsmb, smbus_driver, smbus_devclass, 0, 0);
+DRIVER_MODULE(smbus, ichsmb, smbus_driver, 0, 0);

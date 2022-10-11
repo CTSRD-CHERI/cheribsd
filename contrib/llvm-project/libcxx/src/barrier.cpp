@@ -1,4 +1,4 @@
-//===------------------------- barrier.cpp ---------------------------------===//
+//===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -15,32 +15,26 @@
 
 _LIBCPP_BEGIN_NAMESPACE_STD
 
-#if !defined(_LIBCPP_HAS_NO_TREE_BARRIER) && (_LIBCPP_STD_VER > 11)
+#if !defined(_LIBCPP_HAS_NO_TREE_BARRIER)
 
 class __barrier_algorithm_base {
 public:
     struct alignas(64) /* naturally-align the heap state */ __state_t
     {
         struct {
-            __atomic_base<__barrier_phase_t> __phase = ATOMIC_VAR_INIT(0);
+          __atomic_base<__barrier_phase_t> __phase{0};
         } __tickets[64];
     };
 
-    ptrdiff_t&         __expected;
-    unique_ptr<char[]> __state_allocation;
-    __state_t*         __state;
+    ptrdiff_t&              __expected;
+    unique_ptr<__state_t[]> __state;
 
     _LIBCPP_HIDDEN
     __barrier_algorithm_base(ptrdiff_t& __expected)
         : __expected(__expected)
     {
         size_t const __count = (__expected + 1) >> 1;
-        size_t const __size = sizeof(__state_t) * __count;
-        size_t __allocation_size = __size + alignof(__state_t);
-        __state_allocation = unique_ptr<char[]>(new char[__allocation_size]);
-        void* __allocation = __state_allocation.get();
-        void* const __state_ = align(alignof(__state_t), __size, __allocation, __allocation_size);
-        __state = new (__state_) __barrier_algorithm_base::__state_t[__count];
+        __state = unique_ptr<__state_t[]>(new __state_t[__count]);
     }
     _LIBCPP_HIDDEN
     bool __arrive(__barrier_phase_t __old_phase)
@@ -96,7 +90,7 @@ void __destroy_barrier_algorithm_base(__barrier_algorithm_base* __barrier)
     delete __barrier;
 }
 
-#endif //!defined(_LIBCPP_HAS_NO_TREE_BARRIER) && (_LIBCPP_STD_VER >= 11)
+#endif //!defined(_LIBCPP_HAS_NO_TREE_BARRIER)
 
 _LIBCPP_END_NAMESPACE_STD
 

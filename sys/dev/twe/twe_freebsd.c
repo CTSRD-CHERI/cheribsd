@@ -44,8 +44,6 @@ __FBSDID("$FreeBSD$");
 
 #include <vm/vm.h>
 
-static devclass_t	twe_devclass;
-
 #ifdef TWE_DEBUG
 static u_int32_t	twed_bio_in;
 #define TWED_BIO_IN	twed_bio_in++
@@ -154,7 +152,7 @@ static driver_t twe_pci_driver = {
 	sizeof(struct twe_softc)
 };
 
-DRIVER_MODULE(twe, pci, twe_pci_driver, twe_devclass, 0, 0);
+DRIVER_MODULE(twe, pci, twe_pci_driver, 0, 0);
 
 /********************************************************************************
  * Match a 3ware Escalade ATA RAID controller.
@@ -583,10 +581,10 @@ twe_attach_drive(struct twe_softc *sc, struct twe_drive *dr)
     char	buf[80];
     int		error;
 
-    mtx_lock(&Giant);
+    bus_topo_lock();
     dr->td_disk =  device_add_child(sc->twe_dev, NULL, -1);
     if (dr->td_disk == NULL) {
-	mtx_unlock(&Giant);
+	    bus_topo_unlock();
 	twe_printf(sc, "Cannot add unit\n");
 	return (EIO);
     }
@@ -603,7 +601,7 @@ twe_attach_drive(struct twe_softc *sc, struct twe_drive *dr)
     device_set_desc_copy(dr->td_disk, buf);
 
     error = device_probe_and_attach(dr->td_disk);
-    mtx_unlock(&Giant);
+    bus_topo_unlock();
     if (error != 0) {
 	twe_printf(sc, "Cannot attach unit to controller. error = %d\n", error);
 	return (EIO);
@@ -622,9 +620,9 @@ twe_detach_drive(struct twe_softc *sc, int unit)
     int error = 0;
 
     TWE_CONFIG_ASSERT_LOCKED(sc);
-    mtx_lock(&Giant);
+    bus_topo_lock();
     error = device_delete_child(sc->twe_dev, sc->twe_drive[unit].td_disk);
-    mtx_unlock(&Giant);
+    bus_topo_unlock();
     if (error != 0) {
 	twe_printf(sc, "failed to delete unit %d\n", unit);
 	return(error);
@@ -690,8 +688,7 @@ static driver_t twed_driver = {
     sizeof(struct twed_softc)
 };
 
-static devclass_t	twed_devclass;
-DRIVER_MODULE(twed, twe, twed_driver, twed_devclass, 0, 0);
+DRIVER_MODULE(twed, twe, twed_driver, 0, 0);
 
 /*
  * Disk device control interface.
@@ -919,7 +916,7 @@ twe_free_request(struct twe_request *tr)
  * Map/unmap (tr)'s command and data in the controller's addressable space.
  *
  * These routines ensure that the data which the controller is going to try to
- * access is actually visible to the controller, in a machine-independant 
+ * access is actually visible to the controller, in a machine-independent
  * fashion.  Due to a hardware limitation, I/O buffers must be 512-byte aligned
  * and we take care of that here as well.
  */
@@ -1166,7 +1163,7 @@ twe_report(void)
     struct twe_softc	*sc;
     int			i;
 
-    for (i = 0; (sc = devclass_get_softc(twe_devclass, i)) != NULL; i++)
+    for (i = 0; (sc = devclass_get_softc(devclass_find("twe"), i)) != NULL; i++)
 	twe_print_controller(sc);
     printf("twed: total bio count in %u  out %u\n", twed_bio_in, twed_bio_out);
 }

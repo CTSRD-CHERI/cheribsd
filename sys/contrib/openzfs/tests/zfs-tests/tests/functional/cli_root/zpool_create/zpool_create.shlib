@@ -69,28 +69,13 @@ function create_blockfile
 #
 function find_vfstab_dev
 {
-	typeset vfstabdev
-	typeset vfstabdevs=""
-	typeset line
-
 	if is_illumos; then
 		vfstab="/etc/vfstab"
-		tmpfile="$TEST_BASE_DIR/vfstab.tmp"
 	else
 		vfstab="/etc/fstab"
-		tmpfile="$TEST_BASE_DIR/fstab.tmp"
 	fi
 
-	cat $vfstab | grep "^${DEV_DSKDIR}" >$tmpfile
-	while read -r line
-	do
-		vfstabdev=`echo "$line" | awk '{print $1}'`
-		vfstabdev=${vfstabdev%%:}
-		vfstabdevs="$vfstabdev $vfstabdevs"
-	done <$tmpfile
-
-	rm -f $tmpfile
-	echo $vfstabdevs
+	awk -v pat="^${DEV_DSKDIR}" '$0 ~ pat {sub(/:$/, "", $1); print $1}' $vfstab
 }
 
 #
@@ -98,14 +83,9 @@ function find_vfstab_dev
 #
 function save_dump_dev
 {
-	typeset dumpdev=""
-
 	if is_illumos; then
-		typeset fnd="Dump device"
-		dumpdev=`dumpadm | grep "$fnd" | cut -f2 -d : | \
-			awk '{print $1}'`
+		dumpadm | grep "Dump device" | cut -f2 -d : | awk '{print $1}'
 	fi
-	echo $dumpdev
 }
 
 #

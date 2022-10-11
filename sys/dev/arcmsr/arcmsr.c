@@ -85,6 +85,8 @@
 ** 1.50.00.01   02/26/2021  Ching Huang     Fixed no action of hot plugging device on type_F adapter
 ** 1.50.00.02   04/16/2021  Ching Huang     Fixed scsi command timeout on ARC-1886 when
 **                                          scatter-gather count large than some number
+** 1.50.00.03   05/04/2021  Ching Huang     Fixed doorbell status arrived late on ARC-1886
+** 1.50.00.04   12/08/2021  Ching Huang     Fixed boot up hung under ARC-1886 with no volume created
 ******************************************************************************************
 */
 
@@ -142,7 +144,7 @@ __FBSDID("$FreeBSD$");
 
 #define arcmsr_callout_init(a)	callout_init(a, /*mpsafe*/1);
 
-#define ARCMSR_DRIVER_VERSION	"arcmsr version 1.50.00.02 2021-04-16"
+#define ARCMSR_DRIVER_VERSION	"arcmsr version 1.50.00.04 2021-12-08"
 #include <dev/arcmsr/arcmsr.h>
 /*
 **************************************************************************
@@ -218,8 +220,7 @@ static driver_t arcmsr_driver={
 	"arcmsr", arcmsr_methods, sizeof(struct AdapterControlBlock)
 };
 
-static devclass_t arcmsr_devclass;
-DRIVER_MODULE(arcmsr, pci, arcmsr_driver, arcmsr_devclass, 0, 0);
+DRIVER_MODULE(arcmsr, pci, arcmsr_driver, 0, 0);
 MODULE_DEPEND(arcmsr, pci, 1, 1, 1);
 MODULE_DEPEND(arcmsr, cam, 1, 1, 1);
 #ifndef BUS_DMA_COHERENT		
@@ -238,12 +239,6 @@ static struct cdevsw arcmsr_cdevsw={
 */
 static int arcmsr_open(struct cdev *dev, int flags, int fmt, struct thread *proc)
 {
-	int	unit = dev2unit(dev);
-	struct AdapterControlBlock *acb = devclass_get_softc(arcmsr_devclass, unit);
-
-	if (acb == NULL) {
-		return ENXIO;
-	}
 	return (0);
 }
 /*
@@ -252,12 +247,6 @@ static int arcmsr_open(struct cdev *dev, int flags, int fmt, struct thread *proc
 */
 static int arcmsr_close(struct cdev *dev, int flags, int fmt, struct thread *proc)
 {
-	int	unit = dev2unit(dev);
-	struct AdapterControlBlock *acb = devclass_get_softc(arcmsr_devclass, unit);
-
-	if (acb == NULL) {
-		return ENXIO;
-	}
 	return 0;
 }
 /*
@@ -266,12 +255,8 @@ static int arcmsr_close(struct cdev *dev, int flags, int fmt, struct thread *pro
 */
 static int arcmsr_ioctl(struct cdev *dev, u_long ioctl_cmd, caddr_t arg, int flags, struct thread *proc)
 {
-	int	unit = dev2unit(dev);
-	struct AdapterControlBlock *acb = devclass_get_softc(arcmsr_devclass, unit);
+	struct AdapterControlBlock *acb = dev->si_drv1;
 
-	if (acb == NULL) {
-		return ENXIO;
-	}
 	return (arcmsr_iop_ioctlcmd(acb, ioctl_cmd, arg));
 }
 /*
@@ -622,12 +607,8 @@ static int arcmsr_resume(device_t dev)
 */
 static void arcmsr_async(void *cb_arg, u_int32_t code, struct cam_path *path, void *arg)
 {
-	struct AdapterControlBlock *acb;
 	u_int8_t target_id, target_lun;
-	struct cam_sim *sim;
 
-	sim = (struct cam_sim *) cb_arg;
-	acb =(struct AdapterControlBlock *) cam_sim_softc(sim);
 	switch (code) {
 	case AC_LOST_DEVICE:
 		target_id = xpt_path_target_id(path);
@@ -635,7 +616,6 @@ static void arcmsr_async(void *cb_arg, u_int32_t code, struct cam_path *path, vo
 		if((target_id > ARCMSR_MAX_TARGETID) || (target_lun > ARCMSR_MAX_TARGETLUN)) {
 			break;
 		}
-	//	printf("%s:scsi id=%d lun=%d device lost \n", device_get_name(acb->pci_dev), target_id, target_lun);
 		break;
 	default:
 		break;
@@ -2033,6 +2013,39 @@ static void arcmsr_hbe_doorbell_isr(struct AdapterControlBlock *acb)
 **************************************************************************
 **************************************************************************
 */
+static void arcmsr_hbf_doorbell_isr(struct AdapterControlBlock *acb)
+{
+	u_int32_t doorbell_status, in_doorbell;
+
+	/*
+	*******************************************************************
+	**  Maybe here we need to check wrqbuffer_lock is lock or not
+	**  DOORBELL: din! don!
+	**  check if there are any mail need to pack from firmware
+	*******************************************************************
+	*/
+	while(1) {
+		in_doorbell = CHIP_REG_READ32(HBE_MessageUnit, 0, iobound_doorbell);
+		if ((in_doorbell != 0) && (in_doorbell != 0xFFFFFFFF))
+			break;
+	}
+	CHIP_REG_WRITE32(HBE_MessageUnit, 0, host_int_status, 0); /* clear doorbell interrupt */
+	doorbell_status = in_doorbell ^ acb->in_doorbell;
+	if(doorbell_status & ARCMSR_HBEMU_IOP2DRV_DATA_WRITE_OK) {
+		arcmsr_iop2drv_data_wrote_handle(acb);
+	}
+	if(doorbell_status & ARCMSR_HBEMU_IOP2DRV_DATA_READ_OK) {
+		arcmsr_iop2drv_data_read_handle(acb);
+	}
+	if(doorbell_status & ARCMSR_HBEMU_IOP2DRV_MESSAGE_CMD_DONE) {
+		arcmsr_hbe_message_isr(acb);    /* messenger of "driver to iop commands" */
+	}
+	acb->in_doorbell = in_doorbell;
+}
+/*
+**************************************************************************
+**************************************************************************
+*/
 static void arcmsr_hba_postqueue_isr(struct AdapterControlBlock *acb)
 {
 	u_int32_t flag_srb;
@@ -2406,7 +2419,7 @@ static void arcmsr_handle_hbf_isr( struct AdapterControlBlock *acb)
 	do {
 		/* MU doorbell interrupts*/
 		if(host_interrupt_status & ARCMSR_HBEMU_OUTBOUND_DOORBELL_ISR) {
-			arcmsr_hbe_doorbell_isr(acb);
+			arcmsr_hbf_doorbell_isr(acb);
 		}
 		/* MU post queue interrupts*/
 		if(host_interrupt_status & ARCMSR_HBEMU_OUTBOUND_POSTQUEUE_ISR) {
@@ -4832,9 +4845,9 @@ static u_int32_t arcmsr_initialize(device_t dev)
 		acb->in_doorbell = 0;
 		acb->out_doorbell = 0;
 		acb->rid[0] = rid0;
-		arcmsr_wait_firmware_ready(acb);
 		CHIP_REG_WRITE32(HBF_MessageUnit, 0, host_int_status, 0); /*clear interrupt*/
 		CHIP_REG_WRITE32(HBF_MessageUnit, 0, iobound_doorbell, ARCMSR_HBEMU_DOORBELL_SYNC); /* synchronize doorbell to 0 */
+		arcmsr_wait_firmware_ready(acb);
 		host_buffer_dma = acb->completeQ_phys + COMPLETION_Q_POOL_SIZE;
 		CHIP_REG_WRITE32(HBF_MessageUnit, 0, inbound_msgaddr0, (u_int32_t)(host_buffer_dma | 1));  /* host buffer low addr, bit0:1 all buffer active */
 		CHIP_REG_WRITE32(HBF_MessageUnit, 0, inbound_msgaddr1, (u_int32_t)((host_buffer_dma >> 16) >> 16));/* host buffer high addr */
@@ -4897,6 +4910,7 @@ irq_alloc_failed:
 */
 static int arcmsr_attach(device_t dev)
 {
+	struct make_dev_args args;
 	struct AdapterControlBlock *acb=(struct AdapterControlBlock *)device_get_softc(dev);
 	u_int32_t unit=device_get_unit(dev);
 	struct ccb_setasync csa;
@@ -4957,6 +4971,7 @@ irqx:
 	/*
 	****************************************************
 	*/
+	memset(&csa, 0, sizeof(csa));
 	xpt_setup_ccb(&csa.ccb_h, acb->ppath, /*priority*/5);
 	csa.ccb_h.func_code = XPT_SASYNC_CB;
 	csa.event_enable = AC_FOUND_DEVICE|AC_LOST_DEVICE;
@@ -4965,7 +4980,13 @@ irqx:
 	xpt_action((union ccb *)&csa);
 	ARCMSR_LOCK_RELEASE(&acb->isr_lock);
 	/* Create the control device.  */
-	acb->ioctl_dev = make_dev(&arcmsr_cdevsw, unit, UID_ROOT, GID_WHEEL /* GID_OPERATOR */, S_IRUSR | S_IWUSR, "arcmsr%d", unit);
+	make_dev_args_init(&args);
+	args.mda_devsw = &arcmsr_cdevsw;
+	args.mda_uid = UID_ROOT;
+	args.mda_gid = GID_WHEEL /* GID_OPERATOR */;
+	args.mda_mode = S_IRUSR | S_IWUSR;
+	args.mda_si_drv1 = acb;
+	(void)make_dev_s(&args, &acb->ioctl_dev, "arcmsr%d", unit);
 		
 	(void)make_dev_alias(acb->ioctl_dev, "arc%d", unit);
 	arcmsr_callout_init(&acb->devmap_callout);
@@ -5072,14 +5093,13 @@ static int arcmsr_probe(device_t dev)
 static int arcmsr_shutdown(device_t dev)
 {
 	u_int32_t  i;
-	u_int32_t intmask_org;
 	struct CommandControlBlock *srb;
 	struct AdapterControlBlock *acb=(struct AdapterControlBlock *)device_get_softc(dev);
 
 	/* stop adapter background rebuild */
 	ARCMSR_LOCK_ACQUIRE(&acb->isr_lock);
 	/* disable all outbound interrupt */
-	intmask_org = arcmsr_disable_allintr(acb);
+	arcmsr_disable_allintr(acb);
 	arcmsr_stop_adapter_bgrb(acb);
 	arcmsr_flush_adapter_cache(acb);
 	/* abort all outstanding command */

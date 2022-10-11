@@ -58,7 +58,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/filedesc.h>
 #include <sys/proc.h>
 #include <sys/syscallsubr.h>
-#include <sys/sysent.h>
 #include <sys/acl.h>
 
 #include <security/audit/audit.h>
@@ -372,7 +371,7 @@ kern___acl_get_path(struct thread *td, const char *__capability path,
 	struct nameidata nd;
 	int error;
 
-	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
+	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path);
 	error = namei(&nd);
 	if (error == 0) {
 		error = vacl_get_acl(td, nd.ni_vp, type, aclp);
@@ -410,7 +409,7 @@ kern___acl_set_path(struct thread *td, const char * __capability path,
 	struct nameidata nd;
 	int error;
 
-	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
+	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path);
 	error = namei(&nd);
 	if (error == 0) {
 		error = vacl_set_acl(td, nd.ni_vp, type, aclp);
@@ -502,7 +501,7 @@ kern___acl_delete_path(struct thread *td, const char * __capability path,
 	struct nameidata nd;
 	int error;
 
-	NDINIT(&nd, LOOKUP, follow, UIO_USERSPACE, path, td);
+	NDINIT(&nd, LOOKUP, follow, UIO_USERSPACE, path);
 	error = namei(&nd);
 	if (error == 0) {
 		error = vacl_delete(td, nd.ni_vp, type);
@@ -560,7 +559,7 @@ kern___acl_aclcheck_path(struct thread *td, const char * __capability path,
 	struct nameidata nd;
 	int error;
 
-	NDINIT(&nd, LOOKUP, follow, UIO_USERSPACE, path, td);
+	NDINIT(&nd, LOOKUP, follow, UIO_USERSPACE, path);
 	error = namei(&nd);
 	if (error == 0) {
 		error = vacl_aclcheck(td, nd.ni_vp, type, aclp);

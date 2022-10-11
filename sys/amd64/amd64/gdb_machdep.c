@@ -34,6 +34,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/proc.h>
+#include <sys/reg.h>
 #include <sys/signal.h>
 
 #include <machine/cpufunc.h>
@@ -42,7 +43,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/pcb.h>
 #include <machine/psl.h>
-#include <machine/reg.h>
 #include <machine/specialreg.h>
 #include <machine/trap.h>
 #include <machine/frame.h>
@@ -136,7 +136,7 @@ int
 gdb_cpu_signal(int type, int code)
 {
 
-	switch (type & ~T_USER) {
+	switch (type) {
 	case T_BPTFLT: return (SIGTRAP);
 	case T_ARITHTRAP: return (SIGFPE);
 	case T_PROTFLT: return (SIGSEGV);

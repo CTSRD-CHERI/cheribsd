@@ -421,7 +421,7 @@ cmichan_setspeed(kobj_t obj, void *data, u_int32_t speed)
 {
 	struct sc_chinfo *ch = data;
 	struct sc_info	*sc = ch->parent;
-	u_int32_t r, rsp;
+	u_int32_t r, rsp __unused;
 
 	r = cmpci_rate_to_regvalue(speed);
 	snd_mtxlock(sc->lock);
@@ -1106,7 +1106,7 @@ static driver_t cmi_driver = {
 	PCM_SOFTC_SIZE
 };
 
-DRIVER_MODULE(snd_cmi, pci, cmi_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_cmi, pci, cmi_driver, 0, 0);
 MODULE_DEPEND(snd_cmi, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_DEPEND(snd_cmi, midi, 1,1,1);
 MODULE_VERSION(snd_cmi, 1);

@@ -1,6 +1,7 @@
 /*-
- * Copyright (c) 2012-2018, 2020 Robert N. M. Watson
+ * Copyright (c) 2012-2018, 2020-2021 Robert N. M. Watson
  * Copyright (c) 2014 SRI International
+ * Copyright (c) 2021 Microsoft Corp.
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -69,6 +70,12 @@
 } while (0)
 
 /*
+ * Convert a pointer to a null-derived void * with the same address. This is
+ * useful for getting the correct value for ccs_si_addr_expected.
+ */
+#define	NULL_DERIVED_VOIDP(x) ((void *)(uintptr_t)(ptraddr_t)(x))
+
+/*
  * Shared memory interface between tests and the test controller process.
  */
 #define	TESTRESULT_STR_LEN	1024
@@ -77,13 +84,12 @@ struct cheribsdtest_child_state {
 	int		ccs_signum;
 	int		ccs_si_code;
 	int		ccs_si_trapno;
-#ifdef __mips__
-	register_t	ccs_cp2_cause;
-#endif
+	void		*ccs_si_addr;
 
 	/* Fields filled in by the test itself. */
 	int		ccs_testresult;
 	char		ccs_testresult_str[TESTRESULT_STR_LEN];
+	void		*ccs_si_addr_expected;
 };
 extern struct cheribsdtest_child_state *ccsp;
 
@@ -111,6 +117,7 @@ extern struct cheribsdtest_child_state *ccsp;
 #define	CT_FLAG_SI_CODE		0x00000200  /* Check signal si_code. */
 #define	CT_FLAG_SIGEXIT		0x00000400  /* Exits with uncaught signal;
 					       checks status signum. */
+#define	CT_FLAG_SI_ADDR		0x00000800  /* Check signal si_addr. */
 
 /*
  * Macros defined in one or more cheribsdtest_md.h to indicate the
@@ -156,6 +163,7 @@ struct cheri_test {
 	const char	*ct_name;
 	const char	*ct_desc;
 	void		(*ct_func)(const struct cheri_test *);
+	void		(*ct_child_func)(const struct cheri_test *);
 	const char *	(*ct_check_xfail)(const char *);
 	u_int		 ct_flags;
 	int		 ct_signum;
@@ -192,6 +200,7 @@ void	cheribsdtest_failure_errc(int code, const char *msg, ...) __dead2
 void	cheribsdtest_failure_errx(const char *msg, ...) __dead2  __printflike(1, 2);
 void	cheribsdtest_success(void) __dead2;
 void	signal_handler_clear(int sig);
+void	cheribsdtest_set_expected_si_addr(void *addr);
 
 /**
  * Like CHERIBSDTEST_VERIFY but instead of printing condition details prints
@@ -243,6 +252,26 @@ _cheribsdtest_check_cap_eq(void *__capability a, void *__capability b,
 #define CHERIBSDTEST_CHECK_EQ_CAP(a, b)	\
 	_cheribsdtest_check_cap_eq(a, b, __STRING(a), __STRING(b))
 
+static inline void
+_cheribsdtest_check_cap_bounds_precise(void *__capability c,
+    size_t expected_len)
+{
+	size_t len, offset;
+
+	offset = cheri_getoffset(c);
+	len = cheri_getlen(c);
+
+	/* Confirm precise lower bound: offset of zero. */
+	CHERIBSDTEST_VERIFY2(offset == 0,
+	    "offset (%jd) not zero: %#lp", offset, c);
+
+	/* Confirm precise upper bound: length of expected size for type. */
+	CHERIBSDTEST_VERIFY2(len == expected_len,
+	    "length (%jd) not expected %jd: %#lp", len, expected_len, c);
+}
+#define	CHERIBSDTEST_CHECK_CAP_BOUNDS_PRECISE(c, expected_len) \
+	_cheribsdtest_check_cap_bounds_precise((c), (expected_len))
+
 /**
  * Like CHERIBSDTEST_CHECK_SYSCALL but instead of printing call details prints
  * the provided printf-like message @p fmtargs
@@ -291,5 +320,12 @@ _cheribsdtest_check_errno(const char *context, int actual, int expected)
 /* For libc_memcpy and libc_memset tests and the unaligned copy tests: */
 extern void *cheribsdtest_memcpy(void *dst, const void *src, size_t n);
 extern void *cheribsdtest_memmove(void *dst, const void *src, size_t n);
+
+/*
+ * (co)exec a new copy of cheribsdtest and run the test's associated child
+ * function.
+ */
+extern void cheribsdtest_coexec_child(const struct cheri_test *ctp);
+extern void cheribsdtest_exec_child(const struct cheri_test *ctp);
 
 #endif /* !_CHERIBSDTEST_H_ */

@@ -8,8 +8,8 @@ AC_DEFUN([ZFS_AC_CONFIG_KERNEL], [
 		ZFS_AC_QAT
 
 		dnl # Sanity checks for module building and CONFIG_* defines
-		ZFS_AC_KERNEL_TEST_MODULE
 		ZFS_AC_KERNEL_CONFIG_DEFINED
+		ZFS_AC_MODULE_SYMVERS
 
 		dnl # Sequential ZFS_LINUX_TRY_COMPILE tests
 		ZFS_AC_KERNEL_FPU_HEADER
@@ -61,6 +61,7 @@ AC_DEFUN([ZFS_AC_KERNEL_TEST_SRC], [
 	ZFS_AC_KERNEL_SRC_BIO
 	ZFS_AC_KERNEL_SRC_BLKDEV
 	ZFS_AC_KERNEL_SRC_BLK_QUEUE
+	ZFS_AC_KERNEL_SRC_GENHD_FLAGS
 	ZFS_AC_KERNEL_SRC_REVALIDATE_DISK
 	ZFS_AC_KERNEL_SRC_GET_DISK_RO
 	ZFS_AC_KERNEL_SRC_GENERIC_READLINK_GLOBAL
@@ -82,6 +83,7 @@ AC_DEFUN([ZFS_AC_KERNEL_TEST_SRC], [
 	ZFS_AC_KERNEL_SRC_MKDIR
 	ZFS_AC_KERNEL_SRC_LOOKUP_FLAGS
 	ZFS_AC_KERNEL_SRC_CREATE
+	ZFS_AC_KERNEL_SRC_PERMISSION
 	ZFS_AC_KERNEL_SRC_GET_LINK
 	ZFS_AC_KERNEL_SRC_PUT_LINK
 	ZFS_AC_KERNEL_SRC_TMPFILE
@@ -99,10 +101,14 @@ AC_DEFUN([ZFS_AC_KERNEL_TEST_SRC], [
 	ZFS_AC_KERNEL_SRC_SET_NLINK
 	ZFS_AC_KERNEL_SRC_SGET
 	ZFS_AC_KERNEL_SRC_LSEEK_EXECUTE
+	ZFS_AC_KERNEL_SRC_VFS_FILEMAP_DIRTY_FOLIO
+	ZFS_AC_KERNEL_SRC_VFS_READ_FOLIO
 	ZFS_AC_KERNEL_SRC_VFS_GETATTR
 	ZFS_AC_KERNEL_SRC_VFS_FSYNC_2ARGS
 	ZFS_AC_KERNEL_SRC_VFS_ITERATE
 	ZFS_AC_KERNEL_SRC_VFS_DIRECT_IO
+	ZFS_AC_KERNEL_SRC_VFS_READPAGES
+	ZFS_AC_KERNEL_SRC_VFS_SET_PAGE_DIRTY_NOBUFFERS
 	ZFS_AC_KERNEL_SRC_VFS_RW_ITERATE
 	ZFS_AC_KERNEL_SRC_VFS_GENERIC_WRITE_CHECKS
 	ZFS_AC_KERNEL_SRC_VFS_IOV_ITER
@@ -129,6 +135,17 @@ AC_DEFUN([ZFS_AC_KERNEL_TEST_SRC], [
 	ZFS_AC_KERNEL_SRC_MKNOD
 	ZFS_AC_KERNEL_SRC_SYMLINK
 	ZFS_AC_KERNEL_SRC_BIO_MAX_SEGS
+	ZFS_AC_KERNEL_SRC_SIGNAL_STOP
+	ZFS_AC_KERNEL_SRC_SIGINFO
+	ZFS_AC_KERNEL_SRC_SYSFS
+	ZFS_AC_KERNEL_SRC_SET_SPECIAL_STATE
+	ZFS_AC_KERNEL_SRC_STANDALONE_LINUX_STDARG
+	ZFS_AC_KERNEL_SRC_PAGEMAP_FOLIO_WAIT_BIT
+	ZFS_AC_KERNEL_SRC_ADD_DISK
+	ZFS_AC_KERNEL_SRC_KTHREAD
+	ZFS_AC_KERNEL_SRC_ZERO_PAGE
+	ZFS_AC_KERNEL_SRC___COPY_FROM_USER_INATOMIC
+	ZFS_AC_KERNEL_SRC_USER_NS_COMMON_INUM
 
 	AC_MSG_CHECKING([for available kernel interfaces])
 	ZFS_LINUX_TEST_COMPILE_ALL([kabi])
@@ -163,6 +180,7 @@ AC_DEFUN([ZFS_AC_KERNEL_TEST_RESULT], [
 	ZFS_AC_KERNEL_BIO
 	ZFS_AC_KERNEL_BLKDEV
 	ZFS_AC_KERNEL_BLK_QUEUE
+	ZFS_AC_KERNEL_GENHD_FLAGS
 	ZFS_AC_KERNEL_REVALIDATE_DISK
 	ZFS_AC_KERNEL_GET_DISK_RO
 	ZFS_AC_KERNEL_GENERIC_READLINK_GLOBAL
@@ -184,6 +202,7 @@ AC_DEFUN([ZFS_AC_KERNEL_TEST_RESULT], [
 	ZFS_AC_KERNEL_MKDIR
 	ZFS_AC_KERNEL_LOOKUP_FLAGS
 	ZFS_AC_KERNEL_CREATE
+	ZFS_AC_KERNEL_PERMISSION
 	ZFS_AC_KERNEL_GET_LINK
 	ZFS_AC_KERNEL_PUT_LINK
 	ZFS_AC_KERNEL_TMPFILE
@@ -201,10 +220,14 @@ AC_DEFUN([ZFS_AC_KERNEL_TEST_RESULT], [
 	ZFS_AC_KERNEL_SET_NLINK
 	ZFS_AC_KERNEL_SGET
 	ZFS_AC_KERNEL_LSEEK_EXECUTE
+	ZFS_AC_KERNEL_VFS_FILEMAP_DIRTY_FOLIO
+	ZFS_AC_KERNEL_VFS_READ_FOLIO
 	ZFS_AC_KERNEL_VFS_GETATTR
 	ZFS_AC_KERNEL_VFS_FSYNC_2ARGS
 	ZFS_AC_KERNEL_VFS_ITERATE
 	ZFS_AC_KERNEL_VFS_DIRECT_IO
+	ZFS_AC_KERNEL_VFS_READPAGES
+	ZFS_AC_KERNEL_VFS_SET_PAGE_DIRTY_NOBUFFERS
 	ZFS_AC_KERNEL_VFS_RW_ITERATE
 	ZFS_AC_KERNEL_VFS_GENERIC_WRITE_CHECKS
 	ZFS_AC_KERNEL_VFS_IOV_ITER
@@ -231,6 +254,17 @@ AC_DEFUN([ZFS_AC_KERNEL_TEST_RESULT], [
 	ZFS_AC_KERNEL_MKNOD
 	ZFS_AC_KERNEL_SYMLINK
 	ZFS_AC_KERNEL_BIO_MAX_SEGS
+	ZFS_AC_KERNEL_SIGNAL_STOP
+	ZFS_AC_KERNEL_SIGINFO
+	ZFS_AC_KERNEL_SYSFS
+	ZFS_AC_KERNEL_SET_SPECIAL_STATE
+	ZFS_AC_KERNEL_STANDALONE_LINUX_STDARG
+	ZFS_AC_KERNEL_PAGEMAP_FOLIO_WAIT_BIT
+	ZFS_AC_KERNEL_ADD_DISK
+	ZFS_AC_KERNEL_KTHREAD
+	ZFS_AC_KERNEL_ZERO_PAGE
+	ZFS_AC_KERNEL___COPY_FROM_USER_INATOMIC
+	ZFS_AC_KERNEL_USER_NS_COMMON_INUM
 ])
 
 dnl #
@@ -264,6 +298,35 @@ AC_DEFUN([ZFS_AC_MODULE_SYMVERS], [
 dnl #
 dnl # Detect the kernel to be built against
 dnl #
+dnl # Most modern Linux distributions have separate locations for bare
+dnl # source (source) and prebuilt (build) files. Additionally, there are
+dnl # `source` and `build` symlinks in `/lib/modules/$(KERNEL_VERSION)`
+dnl # pointing to them. The directory search order is now:
+dnl # 
+dnl # - `configure` command line values if both `--with-linux` and
+dnl #   `--with-linux-obj` were defined
+dnl # 
+dnl # - If only `--with-linux` was defined, `--with-linux-obj` is assumed
+dnl #   to have the same value as `--with-linux`
+dnl # 
+dnl # - If neither `--with-linux` nor `--with-linux-obj` were defined
+dnl #   autodetection is used:
+dnl # 
+dnl #   - `/lib/modules/$(uname -r)/{source,build}` respectively, if exist.
+dnl # 
+dnl #   - If only `/lib/modules/$(uname -r)/build` exists, it is assumed
+dnl #     to be both source and build directory.
+dnl # 
+dnl #   - The first directory in `/lib/modules` with the highest version
+dnl #     number according to `sort -V` which contains both `source` and
+dnl #     `build` symlinks/directories. If module directory contains only
+dnl #     `build` component, it is assumed to be both source and build
+dnl #     directory.
+dnl # 
+dnl #   - Last resort: the first directory matching `/usr/src/kernels/*`
+dnl #     and `/usr/src/linux-*` with the highest version number according
+dnl #     to `sort -V` is assumed to be both source and build directory.
+dnl #
 AC_DEFUN([ZFS_AC_KERNEL], [
 	AC_ARG_WITH([linux],
 		AS_HELP_STRING([--with-linux=PATH],
@@ -275,24 +338,51 @@ AC_DEFUN([ZFS_AC_KERNEL], [
 		[Path to kernel build objects]),
 		[kernelbuild="$withval"])
 
-	AC_MSG_CHECKING([kernel source directory])
-	AS_IF([test -z "$kernelsrc"], [
-		AS_IF([test -e "/lib/modules/$(uname -r)/source"], [
-			headersdir="/lib/modules/$(uname -r)/source"
-			sourcelink=$(readlink -f "$headersdir")
+	AC_MSG_CHECKING([kernel source and build directories])
+	AS_IF([test -n "$kernelsrc" && test -z "$kernelbuild"], [
+		kernelbuild="$kernelsrc"
+	], [test -z "$kernelsrc"], [
+		AS_IF([test -e "/lib/modules/$(uname -r)/source" && \
+		       test -e "/lib/modules/$(uname -r)/build"], [
+			src="/lib/modules/$(uname -r)/source"
+			build="/lib/modules/$(uname -r)/build"
 		], [test -e "/lib/modules/$(uname -r)/build"], [
-			headersdir="/lib/modules/$(uname -r)/build"
-			sourcelink=$(readlink -f "$headersdir")
+			build="/lib/modules/$(uname -r)/build"
+			src="$build"
 		], [
-			sourcelink=$(ls -1d /usr/src/kernels/* \
-			             /usr/src/linux-* \
-			             2>/dev/null | grep -v obj | tail -1)
+			src=
+
+			for d in $(ls -1d /lib/modules/* 2>/dev/null | sort -Vr); do
+				if test -e "$d/source" && test -e "$d/build"; then
+					src="$d/source"
+					build="$d/build"
+					break
+				fi
+
+				if test -e "$d/build"; then
+					src="$d/build"
+					build="$d/build"
+					break
+				fi
+			done
+
+			# the least reliable method
+			if test -z "$src"; then
+				src=$(ls -1d /usr/src/kernels/* /usr/src/linux-* \
+				      2>/dev/null | grep -v obj | sort -Vr | head -1)
+				build="$src"
+			fi
 		])
 
-		AS_IF([test -n "$sourcelink" && test -e ${sourcelink}], [
-			kernelsrc=`readlink -f ${sourcelink}`
+		AS_IF([test -n "$src" && test -e "$src"], [
+			kernelsrc=$(readlink -e "$src")
 		], [
 			kernelsrc="[Not found]"
+		])
+		AS_IF([test -n "$build" && test -e "$build"], [
+			kernelbuild=$(readlink -e "$build")
+		], [
+			kernelbuild="[Not found]"
 		])
 	], [
 		AS_IF([test "$kernelsrc" = "NONE"], [
@@ -301,39 +391,28 @@ AC_DEFUN([ZFS_AC_KERNEL], [
 		withlinux=yes
 	])
 
+	AC_MSG_RESULT([done])
+	AC_MSG_CHECKING([kernel source directory])
 	AC_MSG_RESULT([$kernelsrc])
-	AS_IF([test ! -d "$kernelsrc"], [
+	AC_MSG_CHECKING([kernel build directory])
+	AC_MSG_RESULT([$kernelbuild])
+	AS_IF([test ! -d "$kernelsrc" || test ! -d "$kernelbuild"], [
 		AC_MSG_ERROR([
 	*** Please make sure the kernel devel package for your distribution
 	*** is installed and then try again.  If that fails, you can specify the
-	*** location of the kernel source with the '--with-linux=PATH' option.])
+	*** location of the kernel source and build with the '--with-linux=PATH' and
+	*** '--with-linux-obj=PATH' options respectively.])
 	])
-
-	AC_MSG_CHECKING([kernel build directory])
-	AS_IF([test -z "$kernelbuild"], [
-		AS_IF([test x$withlinux != xyes -a -e "/lib/modules/$(uname -r)/build"], [
-			kernelbuild=`readlink -f /lib/modules/$(uname -r)/build`
-		], [test -d ${kernelsrc}-obj/${target_cpu}/${target_cpu}], [
-			kernelbuild=${kernelsrc}-obj/${target_cpu}/${target_cpu}
-		], [test -d ${kernelsrc}-obj/${target_cpu}/default], [
-			kernelbuild=${kernelsrc}-obj/${target_cpu}/default
-		], [test -d `dirname ${kernelsrc}`/build-${target_cpu}], [
-			kernelbuild=`dirname ${kernelsrc}`/build-${target_cpu}
-		], [
-			kernelbuild=${kernelsrc}
-		])
-	])
-	AC_MSG_RESULT([$kernelbuild])
 
 	AC_MSG_CHECKING([kernel source version])
 	utsrelease1=$kernelbuild/include/linux/version.h
 	utsrelease2=$kernelbuild/include/linux/utsrelease.h
 	utsrelease3=$kernelbuild/include/generated/utsrelease.h
-	AS_IF([test -r $utsrelease1 && fgrep -q UTS_RELEASE $utsrelease1], [
+	AS_IF([test -r $utsrelease1 && grep -qF UTS_RELEASE $utsrelease1], [
 		utsrelease=$utsrelease1
-	], [test -r $utsrelease2 && fgrep -q UTS_RELEASE $utsrelease2], [
+	], [test -r $utsrelease2 && grep -qF UTS_RELEASE $utsrelease2], [
 		utsrelease=$utsrelease2
-	], [test -r $utsrelease3 && fgrep -q UTS_RELEASE $utsrelease3], [
+	], [test -r $utsrelease3 && grep -qF UTS_RELEASE $utsrelease3], [
 		utsrelease=$utsrelease3
 	])
 
@@ -374,8 +453,6 @@ AC_DEFUN([ZFS_AC_KERNEL], [
 	AC_SUBST(LINUX)
 	AC_SUBST(LINUX_OBJ)
 	AC_SUBST(LINUX_VERSION)
-
-	ZFS_AC_MODULE_SYMVERS
 ])
 
 dnl #
@@ -467,27 +544,6 @@ AC_DEFUN([ZFS_AC_QAT], [
 	$QAT_SYMBOLS
 			])
 		])
-	])
-])
-
-dnl #
-dnl # Basic toolchain sanity check.
-dnl #
-AC_DEFUN([ZFS_AC_KERNEL_TEST_MODULE], [
-	AC_MSG_CHECKING([whether modules can be built])
-	ZFS_LINUX_TRY_COMPILE([], [], [
-		AC_MSG_RESULT([yes])
-	],[
-		AC_MSG_RESULT([no])
-		if test "x$enable_linux_builtin" != xyes; then
-			AC_MSG_ERROR([
-	*** Unable to build an empty module.
-			])
-		else
-			AC_MSG_ERROR([
-	*** Unable to build an empty module.
-	*** Please run 'make scripts' inside the kernel source tree.])
-		fi
 	])
 ])
 
@@ -585,10 +641,18 @@ dnl #
 dnl # Used internally by ZFS_LINUX_TEST_{COMPILE,MODPOST}
 dnl #
 AC_DEFUN([ZFS_LINUX_COMPILE], [
+	AC_ARG_VAR([KERNEL_CC], [C compiler for
+		building kernel modules])
+	AC_ARG_VAR([KERNEL_LD], [Linker for
+		building kernel modules])
+	AC_ARG_VAR([KERNEL_LLVM], [Binary option to
+		build kernel modules with LLVM/CLANG toolchain])
 	AC_TRY_COMMAND([
 	    KBUILD_MODPOST_NOFINAL="$5" KBUILD_MODPOST_WARN="$6"
-	    make modules -k -j$TEST_JOBS -C $LINUX_OBJ $ARCH_UM
-	    M=$PWD/$1 >$1/build.log 2>&1])
+	    make modules -k -j$TEST_JOBS ${KERNEL_CC:+CC=$KERNEL_CC}
+	    ${KERNEL_LD:+LD=$KERNEL_LD} ${KERNEL_LLVM:+LLVM=$KERNEL_LLVM}
+	    CONFIG_MODULES=y CFLAGS_MODULE=-DCONFIG_MODULES
+	    -C $LINUX_OBJ $ARCH_UM M=$PWD/$1 >$1/build.log 2>&1])
 	AS_IF([AC_TRY_COMMAND([$2])], [$3], [$4])
 ])
 

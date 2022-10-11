@@ -175,7 +175,7 @@ ENTRY(copyout)
 	beqz	a2, copyout_end	/* If len == 0 then skip loop */
 	add	a3, a1, a2
 	li	a4, VM_MAXUSER_ADDRESS
-	bgt	a3, a4, copyio_fault_nopcb
+	bgeu	a3, a4, copyio_fault_nopcb
 
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 	cspecialr	ca3, ddc
@@ -199,7 +199,7 @@ ENTRY(copyin)
 	beqz	a2, copyin_end	/* If len == 0 then skip loop */
 	add	a3, a0, a2
 	li	a4, VM_MAXUSER_ADDRESS
-	bgt	a3, a4, copyio_fault_nopcb
+	bgeu	a3, a4, copyio_fault_nopcb
 
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 	cspecialr	ca3, ddc
@@ -242,7 +242,7 @@ ENTRY(copyinstr)
 #endif
 
 	li	a7, VM_MAXUSER_ADDRESS
-1:	bgt	a0, a7, copyio_fault
+1:	bgeu	a0, a7, copyio_fault
 #if __has_feature(capabilities)
 	CLB	a4, 0(ca0)	/* Load from uaddr */
 	cincoffset	ca0, ca0, 1
@@ -360,7 +360,7 @@ ENTRY(copyoutcap)
 	beqz	a2, copyoutcap_end	/* If len == 0 then skip loop */
 	add	a3, a1, a2
 	li	a4, VM_MAXUSER_ADDRESS
-	bgt	a3, a4, copyio_fault_nopcb
+	bgeu	a3, a4, copyio_fault_nopcb
 
 #ifndef __CHERI_PURE_CAPABILITY__
 	cspecialr	ca3, ddc
@@ -384,7 +384,7 @@ ENTRY(copyincap)
 	beqz	a2, copyincap_end	/* If len == 0 then skip loop */
 	add	a3, a0, a2
 	li	a4, VM_MAXUSER_ADDRESS
-	bgt	a3, a4, copyio_fault_nopcb
+	bgeu	a3, a4, copyio_fault_nopcb
 
 #ifndef __CHERI_PURE_CAPABILITY__
 	cspecialr	ca3, ddc

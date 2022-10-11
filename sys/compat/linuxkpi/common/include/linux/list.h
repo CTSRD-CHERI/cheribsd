@@ -28,8 +28,8 @@
  *
  * $FreeBSD$
  */
-#ifndef _LINUX_LIST_H_
-#define _LINUX_LIST_H_
+#ifndef _LINUXKPI_LINUX_LIST_H_
+#define _LINUXKPI_LINUX_LIST_H_
 
 #ifndef _STANDALONE
 /*
@@ -270,6 +270,13 @@ list_move_tail(struct list_head *entry, struct list_head *head)
 }
 
 static inline void
+list_rotate_to_front(struct list_head *entry, struct list_head *head)
+{
+
+	list_move_tail(entry, head);
+}
+
+static inline void
 list_bulk_move_tail(struct list_head *head, struct list_head *first,
     struct list_head *last)
 {
@@ -500,4 +507,4 @@ static inline int list_is_last(const struct list_head *list,
 extern void list_sort(void *priv, struct list_head *head, int (*cmp)(void *priv,
     struct list_head *a, struct list_head *b));
 
-#endif /* _LINUX_LIST_H_ */
+#endif /* _LINUXKPI_LINUX_LIST_H_ */

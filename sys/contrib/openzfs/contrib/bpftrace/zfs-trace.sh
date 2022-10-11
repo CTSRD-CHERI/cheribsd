@@ -1,9 +1,10 @@
 #!/bin/sh
 
-ZVER=$(cat /sys/module/zfs/version | cut -f 1 -d '-')
+read -r ZVER < /sys/module/zfs/version
+ZVER="${ZVER%%-*}"
 KVER=$(uname -r)
 
-bpftrace \
+exec bpftrace \
 	--include "/usr/src/zfs-$ZVER/$KVER/zfs_config.h" \
 	-I "/usr/src/zfs-$ZVER/include" \
 	-I "/usr/src/zfs-$ZVER/include/spl" \

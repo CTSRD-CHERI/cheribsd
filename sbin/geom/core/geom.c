@@ -75,6 +75,8 @@ static struct g_command *class_commands = NULL;
 static struct g_command *find_command(const char *cmdstr, int flags);
 static void list_one_geom_by_provider(const char *provider_name);
 static int std_available(const char *name);
+static int std_list_available(void);
+static int std_load_available(void);
 
 static void std_help(struct gctl_req *req, unsigned flags);
 static void std_list(struct gctl_req *req, unsigned flags);
@@ -314,7 +316,7 @@ parse_arguments(struct g_command *cmd, struct gctl_req *req, int *argc,
 	struct g_option *opt;
 	char opts[64];
 	unsigned i;
-	int ch;
+	int ch, vcount;
 
 	*opts = '\0';
 	if ((cmd->gc_flags & G_FLAG_VERBOSE) != 0)
@@ -336,17 +338,22 @@ parse_arguments(struct g_command *cmd, struct gctl_req *req, int *argc,
 	/*
 	 * Add specified arguments.
 	 */
+	vcount = 0;
 	while ((ch = getopt(*argc, *argv, opts)) != -1) {
 		/* Standard (not passed to kernel) options. */
-		switch (ch) {
-		case 'v':
+		if (ch == 'v' && (cmd->gc_flags & G_FLAG_VERBOSE) != 0)
 			verbose = 1;
-			continue;
-		}
 		/* Options passed to kernel. */
 		opt = find_option(cmd, ch);
-		if (opt == NULL)
+		if (opt == NULL) {
+			if (ch == 'v' && (cmd->gc_flags & G_FLAG_VERBOSE) != 0){
+				if (++vcount < 2)
+					continue;
+				else
+					warnx("Option 'v' specified twice.");
+			}
 			usage();
+		}
 		if (!G_OPT_ISMULTI(opt) && G_OPT_ISDONE(opt)) {
 			warnx("Option '%c' specified twice.", opt->go_char);
 			usage();
@@ -482,7 +489,7 @@ run_command(int argc, char *argv[])
 		gctl_ro_param(req, "version", sizeof(*version), version);
 	parse_arguments(cmd, req, &argc, &argv);
 
-	bzero(buf, sizeof(buf));
+	buf[0] = '\0';
 	if (cmd->gc_func != NULL) {
 		unsigned flags;
 
@@ -490,12 +497,16 @@ run_command(int argc, char *argv[])
 		cmd->gc_func(req, flags);
 		errstr = req->error;
 	} else {
-		gctl_rw_param(req, "output", sizeof(buf), buf);
+		gctl_add_param(req, "output", sizeof(buf), buf,
+		    GCTL_PARAM_WR | GCTL_PARAM_ASCII);
 		errstr = gctl_issue(req);
 	}
 	if (errstr != NULL && errstr[0] != '\0') {
 		warnx("%s", errstr);
-		if (strncmp(errstr, "warning: ", strlen("warning: ")) != 0) {
+		/* Suppress EXIT_FAILURE for warnings */
+		if (strncmp(errstr, "warning: ", strlen("warning: ")) == 0)
+			req->nerror = 0;
+		if (req->nerror != 0) {
 			gctl_free(req);
 			exit(EXIT_FAILURE);
 		}
@@ -651,7 +662,7 @@ get_class(int *argc, char ***argv)
 	set_class_name();
 
 	/* If we can't load or list, it's not a class. */
-	if (!std_available("load") && !std_available("list"))
+	if (!std_load_available() && !std_list_available())
 		errx(EXIT_FAILURE, "Invalid class name '%s'.", class_name);
 
 	if (*argc < 1)
@@ -988,7 +999,7 @@ std_list_available(void)
 	struct gclass *classp;
 	int error;
 
-	error = geom_gettree(&mesh);
+	error = geom_gettree_geom(&mesh, gclass_name, "", 0);
 	if (error != 0)
 		errc(EXIT_FAILURE, error, "Cannot get GEOM tree");
 	classp = find_class(&mesh, gclass_name);
@@ -1007,7 +1018,12 @@ std_list(struct gctl_req *req, unsigned flags __unused)
 	const char *name;
 	int all, error, i, nargs;
 
-	error = geom_gettree(&mesh);
+	nargs = gctl_get_int(req, "nargs");
+	if (nargs == 1) {
+		error = geom_gettree_geom(&mesh, gclass_name,
+		    gctl_get_ascii(req, "arg0"), 1);
+	} else
+		error = geom_gettree(&mesh);
 	if (error != 0)
 		errc(EXIT_FAILURE, error, "Cannot get GEOM tree");
 	classp = find_class(&mesh, gclass_name);
@@ -1015,7 +1031,6 @@ std_list(struct gctl_req *req, unsigned flags __unused)
 		geom_deletetree(&mesh);
 		errx(EXIT_FAILURE, "Class '%s' not found.", gclass_name);
 	}
-	nargs = gctl_get_int(req, "nargs");
 	all = gctl_get_int(req, "all");
 	if (nargs > 0) {
 		for (i = 0; i < nargs; i++) {
@@ -1313,10 +1328,10 @@ std_load_available(void)
 
 	snprintf(name, sizeof(name), "g_%s", class_name);
 	/*
-	 * If already in kernel, "load" command is not available.
+	 * If already in kernel, "load" command is NOP.
 	 */
 	if (modfind(name) >= 0)
-		return (0);
+		return (1);
 	bzero(paths, sizeof(paths));
 	len = sizeof(paths);
 	if (sysctlbyname("kern.module_path", paths, &len, NULL, 0) < 0)

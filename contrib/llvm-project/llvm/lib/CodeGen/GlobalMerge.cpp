@@ -223,8 +223,9 @@ bool GlobalMerge::doMerge(SmallVectorImpl<GlobalVariable*> &Globals,
   // FIXME: Find better heuristics
   llvm::stable_sort(
       Globals, [&DL](const GlobalVariable *GV1, const GlobalVariable *GV2) {
-        return DL.getTypeAllocSize(GV1->getValueType()) <
-               DL.getTypeAllocSize(GV2->getValueType());
+        // We don't support scalable global variables.
+        return DL.getTypeAllocSize(GV1->getValueType()).getFixedSize() <
+               DL.getTypeAllocSize(GV2->getValueType()).getFixedSize();
       });
 
   // If we want to just blindly group all globals together, do so.
@@ -398,8 +399,7 @@ bool GlobalMerge::doMerge(SmallVectorImpl<GlobalVariable*> &Globals,
   // having a single global, but is aggressive enough for any other case.
   if (GlobalMergeIgnoreSingleUse) {
     BitVector AllGlobals(Globals.size());
-    for (size_t i = 0, e = UsedGlobalSets.size(); i != e; ++i) {
-      const UsedGlobalSet &UGS = UsedGlobalSets[e - i - 1];
+    for (const UsedGlobalSet &UGS : llvm::reverse(UsedGlobalSets)) {
       if (UGS.UsageCount == 0)
         continue;
       if (UGS.Globals.count() > 1)
@@ -417,8 +417,7 @@ bool GlobalMerge::doMerge(SmallVectorImpl<GlobalVariable*> &Globals,
   BitVector PickedGlobals(Globals.size());
   bool Changed = false;
 
-  for (size_t i = 0, e = UsedGlobalSets.size(); i != e; ++i) {
-    const UsedGlobalSet &UGS = UsedGlobalSets[e - i - 1];
+  for (const UsedGlobalSet &UGS : llvm::reverse(UsedGlobalSets)) {
     if (UGS.UsageCount == 0)
       continue;
     if (PickedGlobals.anyCommon(UGS.Globals))

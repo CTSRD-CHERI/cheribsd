@@ -402,12 +402,6 @@ static int
 plic_setup_intr(device_t dev, struct intr_irqsrc *isrc,
     struct resource *res, struct intr_map_data *data)
 {
-	struct plic_softc *sc;
-	struct plic_irqsrc *src;
-
-	sc = device_get_softc(dev);
-	src = (struct plic_irqsrc *)isrc;
-
 	CPU_ZERO(&isrc->isrc_cpu);
 	plic_bind_intr(dev, isrc);
 
@@ -473,11 +467,8 @@ static driver_t plic_driver = {
 	sizeof(struct plic_softc),
 };
 
-static devclass_t plic_devclass;
-
-EARLY_DRIVER_MODULE(plic, simplebus, plic_driver, plic_devclass,
-    0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
-
+EARLY_DRIVER_MODULE(plic, simplebus, plic_driver, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
 // CHERI CHANGES START
 // {
 //   "updated": 20200804,

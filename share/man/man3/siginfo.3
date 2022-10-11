@@ -87,6 +87,8 @@ timer overrun count
 .It Vt int Ta Va si_mqd Ta
 .Tn POSIX
 message queue ID
+.It Vt int Ta Va si_syscall Ta
+system-call number for system calls blocked by Capsicum
 .El
 .Pp
 The
@@ -108,7 +110,7 @@ for use as values of
 .Va si_code
 that are signal-specific or non-signal-specific reasons why the signal was
 generated:
-.Bl -column ".Dv SIGPOLL" ".Dv CLD_CONTINUED"
+.Bl -column "SIGPOLL" "PROT_CHERI_UNALIGNED_BASE"
 .It Sy Signal Ta Sy Code Ta Sy Reason
 .It Dv SIGILL Ta Dv ILL_ILLOPC Ta
 illegal opcode
@@ -164,30 +166,16 @@ capability sealed fault
 type mismatch fault
 .It Ta Dv PROT_CHERI_PERM Ta
 capability permission fault
-.It Ta Dv PROT_CHERI_STORETAG Ta
-tag-store page fault
 .It Ta Dv PROT_CHERI_IMPRECISE Ta
 imprecise bounds fault
 .It Ta Dv PROT_CHERI_STORELOCAL Ta
 store-local fault
-.It Ta Dv PROT_CHERI_CCALL Ta
-CCall fault
-.It Ta Dv PROT_CHERI_CRETURN Ta
-CReturn fault
+.It Ta Dv PROT_CHERI_CINVOKE Ta
+CInvoke fault
 .It Ta Dv PROT_CHERI_SYSREG Ta
 capability system register fault
-.It Ta Dv PROT_CHERI_UNSEALED Ta
-CCall unsealed argument fault
-.It Ta Dv PROT_CHERI_OVERFLOW Ta
-trusted stack oveflow fault
-.It Ta Dv PROT_CHERI_UNDERFLOW Ta
-trusted stack underflow fault
-.It Ta Dv PROT_CHERI_CCALLREGS Ta
-CCall argument fault
-.It Ta Dv PROT_CHERI_LOCALARG Ta
-CCall local argument fault
-.It Ta Dv PROT_CHERI_LOCALRET Ta
-CReturn local retval fault
+.It Ta Dv PROT_CHERI_UNALIGNED_BASE Ta
+unaligned base address
 .It Dv SIGTRAP Ta Dv TRAP_BRKPT Ta
 process breakpoint
 .It Ta Dv TRAP_TRACE Ta

@@ -229,6 +229,12 @@ struct flag_desc {
 	const char *desc;
 };
 
+struct flag_desc_list {
+	uint32_t type;
+	const char *desc_str;
+	struct flag_desc *desc;
+};
+
 struct mips_option {
 	uint64_t flag;
 	const char *desc;
@@ -367,8 +373,9 @@ static const char *note_type(const char *note_name, unsigned int et,
     unsigned int nt);
 static const char *note_type_freebsd(unsigned int nt);
 static const char *note_type_freebsd_core(unsigned int nt);
-static const char *note_type_linux_core(unsigned int nt);
+static const char *note_type_go(unsigned int nt);
 static const char *note_type_gnu(unsigned int nt);
+static const char *note_type_linux_core(unsigned int nt);
 static const char *note_type_netbsd(unsigned int nt);
 static const char *note_type_openbsd(unsigned int nt);
 static const char *note_type_unknown(unsigned int nt);
@@ -1147,6 +1154,8 @@ note_type(const char *name, unsigned int et, unsigned int nt)
 			return note_type_freebsd(nt);
 	else if (strcmp(name, "GNU") == 0 && et != ET_CORE)
 		return note_type_gnu(nt);
+	else if (strcmp(name, "Go") == 0 && et != ET_CORE)
+		return note_type_go(nt);
 	else if (strcmp(name, "NetBSD") == 0 && et != ET_CORE)
 		return note_type_netbsd(nt);
 	else if (strcmp(name, "OpenBSD") == 0 && et != ET_CORE)
@@ -1188,8 +1197,11 @@ note_type_freebsd_core(unsigned int nt)
 	case 17: return "NT_PTLWPINFO";
 	case 0x100: return "NT_PPC_VMX (ppc Altivec registers)";
 	case 0x102: return "NT_PPC_VSX (ppc VSX registers)";
+	case 0x200: return "NT_X86_SEGBASES (x86 segment base registers)";
 	case 0x202: return "NT_X86_XSTATE (x86 XSAVE extended state)";
 	case 0x400: return "NT_ARM_VFP (arm VFP registers)";
+	case 0x401: return "NT_ARM_TLS (arm TLS register)";
+	case 0x406: return "NT_ARM_ADDR_MASK (arm address mask)";
 	default: return (note_type_unknown(nt));
 	}
 }
@@ -1219,6 +1231,16 @@ note_type_linux_core(unsigned int nt)
 	case 0x304: return "NT_S390_CTRS (s390 control registers)";
 	case 0x305: return "NT_S390_PREFIX (s390 prefix register)";
 	case 0x400: return "NT_ARM_VFP (arm VFP registers)";
+	case 0x401: return "NT_ARM_TLS (arm TLS register)";
+	case 0x402: return "NT_ARM_HW_BREAK (arm hardware breakpoint registers)";
+	case 0x403: return "NT_ARM_HW_WATCH (arm hardware watchpoint registers)";
+	case 0x404: return "NT_ARM_SYSTEM_CALL (arm system call number)";
+	case 0x405: return "NT_ARM_SVE (arm scalable vector extension registers)";
+	case 0x406: return "NT_ARM_PAC_MASK (arm pointer authentication code mask)";
+	case 0x407: return "NT_ARM_PACA_KEYS (arm pointer authentication address keys)";
+	case 0x408: return "NT_ARM_PACG_KEYS (arm pointer authentication generic keys)";
+	case 0x409: return "NT_ARM_TAGGED_ADDR_CTRL (arm64 tagged address control)";
+	case 0x40a: return "NT_ARM_PAC_ENABLED_KEYS (arm64 ptr auth enabled keys)";
 	case 0x46494c45UL: return "NT_FILE (mapped files)";
 	case 0x46E62B7FUL: return "NT_PRXFPREG (Linux user_xfpregs structure)";
 	case 0x53494749UL: return "NT_SIGINFO (siginfo_t data)";
@@ -1235,6 +1257,15 @@ note_type_gnu(unsigned int nt)
 	case 3: return "NT_GNU_BUILD_ID (Build id set by ld(1))";
 	case 4: return "NT_GNU_GOLD_VERSION (GNU gold version)";
 	case 5: return "NT_GNU_PROPERTY_TYPE_0";
+	default: return (note_type_unknown(nt));
+	}
+}
+
+static const char *
+note_type_go(unsigned int nt)
+{
+	switch (nt) {
+	case 4: return "elfGoBuildIDTag";
 	default: return (note_type_unknown(nt));
 	}
 }
@@ -3544,15 +3575,50 @@ dump_gnu_hash(struct readelf *re, struct section *s)
 	free(bl);
 }
 
+static struct flag_desc gnu_property_aarch64_feature_1_and_bits[] = {
+	{ GNU_PROPERTY_AARCH64_FEATURE_1_BTI,	"BTI" },
+	{ GNU_PROPERTY_AARCH64_FEATURE_1_PAC,	"PAC" },
+	{ 0, NULL }
+};
+
+static struct flag_desc_list gnu_property_aarch64[] = {
+	{
+	    GNU_PROPERTY_AARCH64_FEATURE_1_AND,
+	    "AArch64 features",
+	    gnu_property_aarch64_feature_1_and_bits
+	},
+	{ 0, NULL, NULL }
+};
+
 static struct flag_desc gnu_property_x86_feature_1_and_bits[] = {
 	{ GNU_PROPERTY_X86_FEATURE_1_IBT,	"IBT" },
 	{ GNU_PROPERTY_X86_FEATURE_1_SHSTK,	"SHSTK" },
 	{ 0, NULL }
 };
 
+static struct flag_desc_list gnu_property_x86[] = {
+	{
+	    GNU_PROPERTY_X86_FEATURE_1_AND,
+	    "x64 features",
+	    gnu_property_x86_feature_1_and_bits
+	},
+	{ 0, NULL, NULL }
+};
+
+static struct {
+	unsigned int emachine;
+	struct flag_desc_list *flag_list;
+} gnu_property_archs[] = {
+	{ EM_AARCH64, gnu_property_aarch64 },
+	{ EM_X86_64, gnu_property_x86 },
+	{ 0, NULL }
+};
+
 static void
 dump_gnu_property_type_0(struct readelf *re, const char *buf, size_t sz)
 {
+	struct flag_desc_list *desc_list;
+	struct flag_desc *desc;
 	size_t i;
 	uint32_t type, prop_sz;
 
@@ -3571,19 +3637,35 @@ dump_gnu_property_type_0(struct readelf *re, const char *buf, size_t sz)
 
 		if (type >= GNU_PROPERTY_LOPROC &&
 		    type <= GNU_PROPERTY_HIPROC) {
-			if (re->ehdr.e_machine != EM_X86_64) {
+			desc_list = NULL;
+			for (i = 0; gnu_property_archs[i].flag_list != NULL;
+			    i++) {
+				if (gnu_property_archs[i].emachine ==
+				    re->ehdr.e_machine) {
+					desc_list =
+					    gnu_property_archs[i].flag_list;
+					break;
+				}
+			}
+			if (desc_list == NULL) {
 				printf("machine type %x unknown\n",
 				    re->ehdr.e_machine);
 				goto unknown;
 			}
-			switch (type) {
-			case GNU_PROPERTY_X86_FEATURE_1_AND:
-				printf("x86 features:");
+
+			desc = NULL;
+			for (i = 0; desc_list[i].desc != NULL; i++) {
+				if (desc_list[i].type == type) {
+					desc = desc_list[i].desc;
+					break;
+				}
+			}
+			if (desc != NULL) {
+				printf("%s:", desc_list[i].desc_str);
 				if (prop_sz != 4)
 					goto bad;
-				dump_flags(gnu_property_x86_feature_1_and_bits,
+				dump_flags(desc,
 				    *(const uint32_t *)(const void *)buf);
-				break;
 			}
 		}
 
@@ -3691,7 +3773,6 @@ static struct flag_desc note_feature_ctl_flags[] = {
 	{ NT_FREEBSD_FCTL_STKGAP_DISABLE,	"STKGAP_DISABLE" },
 	{ NT_FREEBSD_FCTL_WXNEEDED,		"WXNEEDED" },
 	{ NT_FREEBSD_FCTL_LA48,			"LA48" },
-	{ NT_FREEBSD_FCTL_ASG_DISABLE,		"ASG_DISABLE" },
 	{ 0, NULL }
 };
 
@@ -3760,6 +3841,16 @@ dump_notes_data(struct readelf *re, const char *name, uint32_t type,
 				goto unknown;
 			printf("   Features:");
 			dump_flags(note_feature_ctl_flags, ubuf[0]);
+			return;
+		}
+	} else if (strcmp(name, "Go") == 0) {
+		if (type == 4) {
+			printf("   Build ID: ");
+			for (i = 0; i < sz; i++) {
+				printf(isprint(buf[i]) ? "%c" : "<%02x>",
+				    buf[i]);
+			}
+			printf("\n");
 			return;
 		}
 	} else if (strcmp(name, "GNU") == 0) {
@@ -7793,7 +7884,7 @@ main(int argc, char **argv)
 			break;
 		case 'a':
 			re->options |= RE_AA | RE_D | RE_G | RE_H | RE_II |
-			    RE_L | RE_R | RE_SS | RE_S | RE_VV;
+			    RE_L | RE_N | RE_R | RE_SS | RE_S | RE_U | RE_VV;
 			break;
 		case 'c':
 			re->options |= RE_C;

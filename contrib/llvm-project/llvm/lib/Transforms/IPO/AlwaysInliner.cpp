@@ -13,8 +13,10 @@
 
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/InlineCost.h"
+#include "llvm/Analysis/ProfileSummaryInfo.h"
 #include "llvm/Analysis/TargetLibraryInfo.h"
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/DataLayout.h"
@@ -39,33 +41,65 @@ PreservedAnalyses AlwaysInlinerPass::run(Module &M,
   auto GetAssumptionCache = [&](Function &F) -> AssumptionCache & {
     return FAM.getResult<AssumptionAnalysis>(F);
   };
-  InlineFunctionInfo IFI(/*cg=*/nullptr, GetAssumptionCache);
+  auto &PSI = MAM.getResult<ProfileSummaryAnalysis>(M);
 
   SmallSetVector<CallBase *, 16> Calls;
   bool Changed = false;
   SmallVector<Function *, 16> InlinedFunctions;
-  for (Function &F : M)
-    if (!F.isDeclaration() && F.hasFnAttribute(Attribute::AlwaysInline) &&
-        isInlineViable(F).isSuccess()) {
+  for (Function &F : M) {
+    // When callee coroutine function is inlined into caller coroutine function
+    // before coro-split pass,
+    // coro-early pass can not handle this quiet well.
+    // So we won't inline the coroutine function if it have not been unsplited
+    if (F.isPresplitCoroutine())
+      continue;
+
+    if (!F.isDeclaration() && isInlineViable(F).isSuccess()) {
       Calls.clear();
 
       for (User *U : F.users())
         if (auto *CB = dyn_cast<CallBase>(U))
-          if (CB->getCalledFunction() == &F)
+          if (CB->getCalledFunction() == &F &&
+              CB->hasFnAttr(Attribute::AlwaysInline))
             Calls.insert(CB);
 
-      for (CallBase *CB : Calls)
-        // FIXME: We really shouldn't be able to fail to inline at this point!
-        // We should do something to log or check the inline failures here.
-        Changed |=
-            InlineFunction(*CB, IFI, /*CalleeAAR=*/nullptr, InsertLifetime)
-                .isSuccess();
+      for (CallBase *CB : Calls) {
+        Function *Caller = CB->getCaller();
+        OptimizationRemarkEmitter ORE(Caller);
+        auto OIC = shouldInline(
+            *CB,
+            [&](CallBase &CB) {
+              return InlineCost::getAlways("always inline attribute");
+            },
+            ORE);
+        assert(OIC);
+        emitInlinedIntoBasedOnCost(ORE, CB->getDebugLoc(), CB->getParent(), F,
+                                   *Caller, *OIC, false, DEBUG_TYPE);
 
-      // Remember to try and delete this function afterward. This both avoids
-      // re-walking the rest of the module and avoids dealing with any iterator
-      // invalidation issues while deleting functions.
-      InlinedFunctions.push_back(&F);
+        InlineFunctionInfo IFI(
+            /*cg=*/nullptr, GetAssumptionCache, &PSI,
+            &FAM.getResult<BlockFrequencyAnalysis>(*(CB->getCaller())),
+            &FAM.getResult<BlockFrequencyAnalysis>(F));
+
+        InlineResult Res = InlineFunction(
+            *CB, IFI, &FAM.getResult<AAManager>(F), InsertLifetime);
+        assert(Res.isSuccess() && "unexpected failure to inline");
+        (void)Res;
+
+        // Merge the attributes based on the inlining.
+        AttributeFuncs::mergeAttributesForInlining(*Caller, F);
+
+        Changed = true;
+      }
+
+      if (F.hasFnAttribute(Attribute::AlwaysInline)) {
+        // Remember to try and delete this function afterward. This both avoids
+        // re-walking the rest of the module and avoids dealing with any
+        // iterator invalidation issues while deleting functions.
+        InlinedFunctions.push_back(&F);
+      }
     }
+  }
 
   // Remove any live functions.
   erase_if(InlinedFunctions, [&](Function *F) {
@@ -76,17 +110,21 @@ PreservedAnalyses AlwaysInlinerPass::run(Module &M,
   // Delete the non-comdat ones from the module and also from our vector.
   auto NonComdatBegin = partition(
       InlinedFunctions, [&](Function *F) { return F->hasComdat(); });
-  for (Function *F : make_range(NonComdatBegin, InlinedFunctions.end()))
+  for (Function *F : make_range(NonComdatBegin, InlinedFunctions.end())) {
     M.getFunctionList().erase(F);
+    Changed = true;
+  }
   InlinedFunctions.erase(NonComdatBegin, InlinedFunctions.end());
 
   if (!InlinedFunctions.empty()) {
     // Now we just have the comdat functions. Filter out the ones whose comdats
     // are not actually dead.
-    filterDeadComdatFunctions(M, InlinedFunctions);
+    filterDeadComdatFunctions(InlinedFunctions);
     // The remaining functions are actually dead.
-    for (Function *F : InlinedFunctions)
+    for (Function *F : InlinedFunctions) {
       M.getFunctionList().erase(F);
+      Changed = true;
+    }
   }
 
   return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
@@ -157,6 +195,13 @@ InlineCost AlwaysInlinerLegacyPass::getInlineCost(CallBase &CB) {
   // that are viable for inlining.
   if (!Callee)
     return InlineCost::getNever("indirect call");
+
+  // When callee coroutine function is inlined into caller coroutine function
+  // before coro-split pass,
+  // coro-early pass can not handle this quiet well.
+  // So we won't inline the coroutine function if it have not been unsplited
+  if (Callee->isPresplitCoroutine())
+    return InlineCost::getNever("unsplited coroutine call");
 
   // FIXME: We shouldn't even get here for declarations.
   if (Callee->isDeclaration())

@@ -153,7 +153,7 @@ struct objset {
 	/* no lock needed: */
 	struct dmu_tx *os_synctx; /* XXX sketchy */
 	zil_header_t os_zil_header;
-	multilist_t *os_synced_dnodes;
+	multilist_t os_synced_dnodes;
 	uint64_t os_flags;
 	uint64_t os_freed_dnodes;
 	boolean_t os_rescan_dnodes;
@@ -172,7 +172,7 @@ struct objset {
 
 	/* Protected by os_lock */
 	kmutex_t os_lock;
-	multilist_t *os_dirty_dnodes[TXG_SIZE];
+	multilist_t os_dirty_dnodes[TXG_SIZE];
 	list_t os_dnodes;
 	list_t os_downgraded_dbufs;
 
@@ -200,24 +200,20 @@ struct objset {
 #define	DMU_GROUPUSED_DNODE(os)	((os)->os_groupused_dnode.dnh_dnode)
 #define	DMU_PROJECTUSED_DNODE(os) ((os)->os_projectused_dnode.dnh_dnode)
 
-#define	DMU_OS_IS_L2CACHEABLE(os)				\
-	((os)->os_secondary_cache == ZFS_CACHE_ALL ||		\
-	(os)->os_secondary_cache == ZFS_CACHE_METADATA)
-
 /* called from zpl */
-int dmu_objset_hold(const char *name, void *tag, objset_t **osp);
-int dmu_objset_hold_flags(const char *name, boolean_t decrypt, void *tag,
+int dmu_objset_hold(const char *name, const void *tag, objset_t **osp);
+int dmu_objset_hold_flags(const char *name, boolean_t decrypt, const void *tag,
     objset_t **osp);
 int dmu_objset_own(const char *name, dmu_objset_type_t type,
-    boolean_t readonly, boolean_t decrypt, void *tag, objset_t **osp);
+    boolean_t readonly, boolean_t decrypt, const void *tag, objset_t **osp);
 int dmu_objset_own_obj(struct dsl_pool *dp, uint64_t obj,
     dmu_objset_type_t type, boolean_t readonly, boolean_t decrypt,
-    void *tag, objset_t **osp);
+    const void *tag, objset_t **osp);
 void dmu_objset_refresh_ownership(struct dsl_dataset *ds,
-    struct dsl_dataset **newds, boolean_t decrypt, void *tag);
-void dmu_objset_rele(objset_t *os, void *tag);
-void dmu_objset_rele_flags(objset_t *os, boolean_t decrypt, void *tag);
-void dmu_objset_disown(objset_t *os, boolean_t decrypt, void *tag);
+    struct dsl_dataset **newds, boolean_t decrypt, const void *tag);
+void dmu_objset_rele(objset_t *os, const void *tag);
+void dmu_objset_rele_flags(objset_t *os, boolean_t decrypt, const void *tag);
+void dmu_objset_disown(objset_t *os, boolean_t decrypt, const void *tag);
 int dmu_objset_from_ds(struct dsl_dataset *ds, objset_t **osp);
 
 void dmu_objset_stats(objset_t *os, nvlist_t *nv);

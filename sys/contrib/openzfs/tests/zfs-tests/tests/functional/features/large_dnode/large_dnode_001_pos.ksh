@@ -47,7 +47,7 @@ verify_runnable "both"
 
 function cleanup
 {
-	datasetexists $TEST_FS && log_must zfs destroy $TEST_FS
+	datasetexists $TEST_FS && destroy_dataset $TEST_FS
 }
 
 log_onexit cleanup
@@ -73,7 +73,7 @@ log_must zfs umount $TEST_FS
 
 for ((i=0; i < ${#dnsizes[*]}; i++)) ; do
 	dnsize=$(zdb -dddd $TEST_FS ${inodes[$i]} |
-	    awk '/ZFS plain file/ {print $6}' | tr K k)
+	    awk '/ZFS plain file/ {gsub(/K/, "k", $6); print $6}')
 	if [[ "$dnsize" != "${dnsizes[$i]}" ]]; then
 		log_fail "dnode size is $dnsize (expected ${dnsizes[$i]})"
 	fi

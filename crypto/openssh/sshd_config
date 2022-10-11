@@ -1,5 +1,4 @@
-#	$OpenBSD: sshd_config,v 1.103 2018/04/09 20:41:22 tj Exp $
-#	$FreeBSD$
+#	$OpenBSD: sshd_config,v 1.104 2021/07/02 05:11:21 dtucker Exp $
 
 # This is the sshd server system-wide configuration file.  See
 # sshd_config(5) for more information.
@@ -58,11 +57,12 @@ AuthorizedKeysFile	.ssh/authorized_keys
 #IgnoreRhosts yes
 
 # Change to yes to enable built-in password authentication.
+# Note that passwords may also be accepted via KbdInteractiveAuthentication.
 #PasswordAuthentication no
 #PermitEmptyPasswords no
 
 # Change to no to disable PAM authentication
-ChallengeResponseAuthentication no
+#KbdInteractiveAuthentication yes
 
 # Kerberos options
 #KerberosAuthentication no
@@ -76,14 +76,14 @@ ChallengeResponseAuthentication no
 
 # Set this to 'no' to disable PAM authentication, account processing,
 # and session processing. If this is enabled, PAM authentication will
-# be allowed through the ChallengeResponseAuthentication and
+# be allowed through the KbdInteractiveAuthentication and
 # PasswordAuthentication.  Depending on your PAM configuration,
-# PAM authentication via ChallengeResponseAuthentication may bypass
-# the setting of "PermitRootLogin without-password".
+# PAM authentication via KbdInteractiveAuthentication may bypass
+# the setting of "PermitRootLogin prohibit-password".
 # If you just want the PAM account and session checks to run without
 # PAM authentication, then enable this but set PasswordAuthentication
-# and ChallengeResponseAuthentication to 'no'.
-UsePAM no
+# and KbdInteractiveAuthentication to 'no'.
+#UsePAM yes
 
 #AllowAgentForwarding yes
 #AllowTcpForwarding yes
@@ -105,7 +105,7 @@ UsePAM no
 #PermitTunnel no
 #ChrootDirectory none
 #UseBlacklist no
-#VersionAddendum FreeBSD-20200214
+#VersionAddendum FreeBSD-20220415
 
 # no default banner path
 #Banner none

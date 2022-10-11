@@ -20,6 +20,6 @@
 # $FreeBSD$
 
 include GENERIC-MORELLO-PURECAP
-include	std.MFS-ROOT
+include	"std.MFS-ROOT"
 
 ident	GENERIC-MORELLO-PURECAP-MFS-ROOT

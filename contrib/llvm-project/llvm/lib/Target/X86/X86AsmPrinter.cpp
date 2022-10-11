@@ -37,10 +37,10 @@
 #include "llvm/MC/MCSectionMachO.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MachineValueType.h"
-#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetMachine.h"
 
 using namespace llvm;
@@ -190,6 +190,7 @@ void X86AsmPrinter::PrintSymbolOperand(const MachineOperand &MO,
   case X86II::MO_NTPOFF:    O << "@NTPOFF";    break;
   case X86II::MO_GOTNTPOFF: O << "@GOTNTPOFF"; break;
   case X86II::MO_GOTPCREL:  O << "@GOTPCREL";  break;
+  case X86II::MO_GOTPCREL_NORELAX: O << "@GOTPCREL_NORELAX"; break;
   case X86II::MO_GOT:       O << "@GOT";       break;
   case X86II::MO_GOTOFF:    O << "@GOTOFF";    break;
   case X86II::MO_PLT:       O << "@PLT";       break;
@@ -404,7 +405,7 @@ void X86AsmPrinter::PrintIntelMemReference(const MachineInstr *MI,
   O << ']';
 }
 
-static bool printAsmMRegister(X86AsmPrinter &P, const MachineOperand &MO,
+static bool printAsmMRegister(const X86AsmPrinter &P, const MachineOperand &MO,
                               char Mode, raw_ostream &O) {
   Register Reg = MO.getReg();
   bool EmitPercent = MO.getParent()->getInlineAsmDialect() == InlineAsm::AD_ATT;
@@ -446,9 +447,9 @@ static bool printAsmMRegister(X86AsmPrinter &P, const MachineOperand &MO,
   return false;
 }
 
-static bool printAsmVRegister(X86AsmPrinter &P, const MachineOperand &MO,
-                              char Mode, raw_ostream &O) {
-  unsigned Reg = MO.getReg();
+static bool printAsmVRegister(const MachineOperand &MO, char Mode,
+                              raw_ostream &O) {
+  Register Reg = MO.getReg();
   bool EmitPercent = MO.getParent()->getInlineAsmDialect() == InlineAsm::AD_ATT;
 
   unsigned Index;
@@ -560,7 +561,7 @@ bool X86AsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
     case 't': // Print V8SFmode register
     case 'g': // Print V16SFmode register
       if (MO.isReg())
-        return printAsmVRegister(*this, MO, ExtraCode[0], O);
+        return printAsmVRegister(MO, ExtraCode[0], O);
       PrintOperand(MI, OpNo, O);
       return false;
 
@@ -643,7 +644,7 @@ void X86AsmPrinter::emitStartOfAsmFile(Module &M) {
       OutStreamer->SwitchSection(Nt);
 
       // Emitting note header.
-      int WordSize = TT.isArch64Bit() ? 8 : 4;
+      const int WordSize = TT.isArch64Bit() && !TT.isX32() ? 8 : 4;
       emitAlignment(WordSize == 4 ? Align(4) : Align(8));
       OutStreamer->emitIntValue(4, 4 /*size*/); // data size for "GNU\0"
       OutStreamer->emitIntValue(8 + WordSize, 4 /*size*/); // Elf_Prop size
@@ -683,8 +684,13 @@ void X86AsmPrinter::emitStartOfAsmFile(Module &M) {
       Feat00Flags |= 1;
     }
 
-    if (M.getModuleFlag("cfguard"))
+    if (M.getModuleFlag("cfguard")) {
       Feat00Flags |= 0x800; // Object is CFG-aware.
+    }
+
+    if (M.getModuleFlag("ehcontguard")) {
+      Feat00Flags |= 0x4000; // Object also has EHCont.
+    }
 
     OutStreamer->emitSymbolAttribute(S, MCSA_Global);
     OutStreamer->emitAssignment(

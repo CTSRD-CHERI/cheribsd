@@ -32,11 +32,13 @@
 #include <sys/zfs_vnops.h>
 #include <sys/zfs_ctldir.h>
 #include <sys/zpl.h>
+#include <sys/dmu.h>
+#include <sys/dsl_dataset.h>
+#include <sys/zap.h>
 
 /*
  * Common open routine.  Disallow any write access.
  */
-/* ARGSUSED */
 static int
 zpl_common_open(struct inode *ip, struct file *filp)
 {
@@ -99,7 +101,6 @@ zpl_root_readdir(struct file *filp, void *dirent, filldir_t filldir)
 /*
  * Get root directory attributes.
  */
-/* ARGSUSED */
 static int
 #ifdef HAVE_USERNS_IOPS_GETATTR
 zpl_root_getattr_impl(struct user_namespace *user_ns,
@@ -110,10 +111,15 @@ zpl_root_getattr_impl(const struct path *path, struct kstat *stat,
     u32 request_mask, unsigned int query_flags)
 #endif
 {
+	(void) request_mask, (void) query_flags;
 	struct inode *ip = path->dentry->d_inode;
 
-#if defined(HAVE_GENERIC_FILLATTR_USERNS) && defined(HAVE_USERNS_IOPS_GETATTR)
+#ifdef HAVE_USERNS_IOPS_GETATTR
+#ifdef HAVE_GENERIC_FILLATTR_USERNS
 	generic_fillattr(user_ns, ip, stat);
+#else
+	(void) user_ns;
+#endif
 #else
 	generic_fillattr(ip, stat);
 #endif
@@ -201,7 +207,7 @@ zpl_snapdir_revalidate(struct dentry *dentry, unsigned int flags)
 	return (!!dentry->d_inode);
 }
 
-dentry_operations_t zpl_dops_snapdirs = {
+static const dentry_operations_t zpl_dops_snapdirs = {
 /*
  * Auto mounting of snapshots is only supported for 2.6.37 and
  * newer kernels.  Prior to this kernel the ops->follow_link()
@@ -382,7 +388,6 @@ zpl_snapdir_mkdir(struct inode *dip, struct dentry *dentry, umode_t mode)
 /*
  * Get snapshot directory attributes.
  */
-/* ARGSUSED */
 static int
 #ifdef HAVE_USERNS_IOPS_GETATTR
 zpl_snapdir_getattr_impl(struct user_namespace *user_ns,
@@ -393,17 +398,36 @@ zpl_snapdir_getattr_impl(const struct path *path, struct kstat *stat,
     u32 request_mask, unsigned int query_flags)
 #endif
 {
+	(void) request_mask, (void) query_flags;
 	struct inode *ip = path->dentry->d_inode;
 	zfsvfs_t *zfsvfs = ITOZSB(ip);
 
 	ZPL_ENTER(zfsvfs);
-#if defined(HAVE_GENERIC_FILLATTR_USERNS) && defined(HAVE_USERNS_IOPS_GETATTR)
+#ifdef HAVE_USERNS_IOPS_GETATTR
+#ifdef HAVE_GENERIC_FILLATTR_USERNS
 	generic_fillattr(user_ns, ip, stat);
+#else
+	(void) user_ns;
+#endif
 #else
 	generic_fillattr(ip, stat);
 #endif
 
 	stat->nlink = stat->size = 2;
+
+	dsl_dataset_t *ds = dmu_objset_ds(zfsvfs->z_os);
+	if (dsl_dataset_phys(ds)->ds_snapnames_zapobj != 0) {
+		uint64_t snap_count;
+		int err = zap_count(
+		    dmu_objset_pool(ds->ds_objset)->dp_meta_objset,
+		    dsl_dataset_phys(ds)->ds_snapnames_zapobj, &snap_count);
+		if (err != 0) {
+			ZPL_EXIT(zfsvfs);
+			return (-err);
+		}
+		stat->nlink += snap_count;
+	}
+
 	stat->ctime = stat->mtime = dmu_objset_snap_cmtime(zfsvfs->z_os);
 	stat->atime = current_time(ip);
 	ZPL_EXIT(zfsvfs);
@@ -524,7 +548,6 @@ zpl_shares_readdir(struct file *filp, void *dirent, filldir_t filldir)
 }
 #endif /* !HAVE_VFS_ITERATE && !HAVE_VFS_ITERATE_SHARED */
 
-/* ARGSUSED */
 static int
 #ifdef HAVE_USERNS_IOPS_GETATTR
 zpl_shares_getattr_impl(struct user_namespace *user_ns,
@@ -535,6 +558,7 @@ zpl_shares_getattr_impl(const struct path *path, struct kstat *stat,
     u32 request_mask, unsigned int query_flags)
 #endif
 {
+	(void) request_mask, (void) query_flags;
 	struct inode *ip = path->dentry->d_inode;
 	zfsvfs_t *zfsvfs = ITOZSB(ip);
 	znode_t *dzp;
@@ -543,8 +567,12 @@ zpl_shares_getattr_impl(const struct path *path, struct kstat *stat,
 	ZPL_ENTER(zfsvfs);
 
 	if (zfsvfs->z_shares_dir == 0) {
-#if defined(HAVE_GENERIC_FILLATTR_USERNS) && defined(HAVE_USERNS_IOPS_GETATTR)
+#ifdef HAVE_USERNS_IOPS_GETATTR
+#ifdef HAVE_GENERIC_FILLATTR_USERNS
 		generic_fillattr(user_ns, path->dentry->d_inode, stat);
+#else
+		(void) user_ns;
+#endif
 #else
 		generic_fillattr(path->dentry->d_inode, stat);
 #endif
@@ -556,8 +584,12 @@ zpl_shares_getattr_impl(const struct path *path, struct kstat *stat,
 
 	error = -zfs_zget(zfsvfs, zfsvfs->z_shares_dir, &dzp);
 	if (error == 0) {
-#if defined(HAVE_GENERIC_FILLATTR_USERNS) && defined(HAVE_USERNS_IOPS_GETATTR)
+#ifdef HAVE_USERNS_IOPS_GETATTR
+#ifdef HAVE_GENERIC_FILLATTR_USERNS
 		error = -zfs_getattr_fast(user_ns, ZTOI(dzp), stat);
+#else
+		(void) user_ns;
+#endif
 #else
 		error = -zfs_getattr_fast(kcred->user_ns, ZTOI(dzp), stat);
 #endif

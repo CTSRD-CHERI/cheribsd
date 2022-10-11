@@ -36,7 +36,7 @@
  */
 
 #include <sys/types.h>
-#include <sys/strings.h>
+#include <sys/string.h>
 #include <sys/param.h>
 #include <sys/sysmacros.h>
 #include <sys/debug.h>
@@ -200,7 +200,7 @@ typedef enum {
 #define	I_				U8_ILLEGAL_CHAR
 #define	O_				U8_OUT_OF_RANGE_CHAR
 
-const int8_t u8_number_of_bytes[0x100] = {
+static const int8_t u8_number_of_bytes[0x100] = {
 	1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
 	1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
 	1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
@@ -238,7 +238,7 @@ const int8_t u8_number_of_bytes[0x100] = {
 #undef	I_
 #undef	O_
 
-const uint8_t u8_valid_min_2nd_byte[0x100] = {
+static const uint8_t u8_valid_min_2nd_byte[0x100] = {
 	0,    0,    0,    0,    0,    0,    0,    0,
 	0,    0,    0,    0,    0,    0,    0,    0,
 	0,    0,    0,    0,    0,    0,    0,    0,
@@ -280,7 +280,7 @@ const uint8_t u8_valid_min_2nd_byte[0x100] = {
 	0,    0,    0,    0,    0,    0,    0,    0,
 };
 
-const uint8_t u8_valid_max_2nd_byte[0x100] = {
+static const uint8_t u8_valid_max_2nd_byte[0x100] = {
 	0,    0,    0,    0,    0,    0,    0,    0,
 	0,    0,    0,    0,    0,    0,    0,    0,
 	0,    0,    0,    0,    0,    0,    0,    0,
@@ -865,7 +865,9 @@ do_decomp(size_t uv, uchar_t *u8s, uchar_t *s, int sz,
 		start_id = u8_decomp_b4_16bit_tbl[uv][b3_tbl][b4];
 		end_id = u8_decomp_b4_16bit_tbl[uv][b3_tbl][b4 + 1];
 	} else {
+		// cppcheck-suppress arrayIndexOutOfBoundsCond
 		start_id = u8_decomp_b4_tbl[uv][b3_tbl][b4];
+		// cppcheck-suppress arrayIndexOutOfBoundsCond
 		end_id = u8_decomp_b4_tbl[uv][b3_tbl][b4 + 1];
 	}
 
@@ -884,7 +886,7 @@ do_decomp(size_t uv, uchar_t *u8s, uchar_t *s, int sz,
 	 *	| B0| B1| ... | Bm|
 	 *	+---+---+-...-+---+
 	 *
-	 *	The first byte, B0, is always less then 0xF5 (U8_DECOMP_BOTH).
+	 *	The first byte, B0, is always less than 0xF5 (U8_DECOMP_BOTH).
 	 *
 	 * (2) Canonical decomposition mappings:
 	 *
@@ -1012,7 +1014,9 @@ find_composition_start(size_t uv, uchar_t *s, size_t sz)
 		start_id = u8_composition_b4_16bit_tbl[uv][b3_tbl][b4];
 		end_id = u8_composition_b4_16bit_tbl[uv][b3_tbl][b4 + 1];
 	} else {
+		// cppcheck-suppress arrayIndexOutOfBoundsCond
 		start_id = u8_composition_b4_tbl[uv][b3_tbl][b4];
+		// cppcheck-suppress arrayIndexOutOfBoundsCond
 		end_id = u8_composition_b4_tbl[uv][b3_tbl][b4 + 1];
 	}
 
@@ -2124,27 +2128,6 @@ u8_textprep_str(char *inarray, size_t *inlen, char *outarray, size_t *outlen,
 
 	return (ret_val);
 }
-
-#if defined(_KERNEL)
-static int __init
-unicode_init(void)
-{
-	return (0);
-}
-
-static void __exit
-unicode_fini(void)
-{
-}
-
-module_init(unicode_init);
-module_exit(unicode_fini);
-#endif
-
-ZFS_MODULE_DESCRIPTION("Unicode implementation");
-ZFS_MODULE_AUTHOR(ZFS_META_AUTHOR);
-ZFS_MODULE_LICENSE(ZFS_META_LICENSE);
-ZFS_MODULE_VERSION(ZFS_META_VERSION "-" ZFS_META_RELEASE);
 
 EXPORT_SYMBOL(u8_validate);
 EXPORT_SYMBOL(u8_strcmp);

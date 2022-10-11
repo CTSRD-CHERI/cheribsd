@@ -515,14 +515,12 @@ static driver_t bce_driver = {
 	sizeof(struct bce_softc)
 };
 
-static devclass_t bce_devclass;
-
 MODULE_DEPEND(bce, pci, 1, 1, 1);
 MODULE_DEPEND(bce, ether, 1, 1, 1);
 MODULE_DEPEND(bce, miibus, 1, 1, 1);
 
-DRIVER_MODULE(bce, pci, bce_driver, bce_devclass, NULL, NULL);
-DRIVER_MODULE(miibus, bce, miibus_driver, miibus_devclass, NULL, NULL);
+DRIVER_MODULE(bce, pci, bce_driver, NULL, NULL);
+DRIVER_MODULE(miibus, bce, miibus_driver, NULL, NULL);
 MODULE_PNP_INFO("U16:vendor;U16:device;U16:#;U16:#;D:#", pci, bce,
     bce_devs, nitems(bce_devs) - 1);
 
@@ -625,7 +623,7 @@ static int bce_rx_quick_cons_trip_int = DEFAULT_RX_QUICK_CONS_TRIP_INT;
 #endif
 SYSCTL_UINT(_hw_bce, OID_AUTO, rx_quick_cons_trip_int, CTLFLAG_RDTUN,
     &bce_rx_quick_cons_trip_int, 0,
-    "Receive BD trip point duirng interrupts");
+    "Receive BD trip point during interrupts");
 
 /* Allowable values are 1 ... 100 */
 #ifdef BCE_DEBUG
@@ -3163,7 +3161,7 @@ bce_init_media(struct bce_softc *sc)
 /****************************************************************************/
 /* Free any DMA memory owned by the driver.                                 */
 /*                                                                          */
-/* Scans through each data structre that requires DMA memory and frees      */
+/* Scans through each data structure that requires DMA memory and frees     */
 /* the memory if allocated.                                                 */
 /*                                                                          */
 /* Returns:                                                                 */
@@ -5553,7 +5551,7 @@ bce_init_tx_chain(struct bce_softc *sc)
 	DBRUN(sc->tx_full_count = 0);
 
 	/*
-	 * The NetXtreme II supports a linked-list structre called
+	 * The NetXtreme II supports a linked-list structure called
 	 * a Buffer Descriptor Chain (or BD chain).  A BD chain
 	 * consists of a series of 1 or more chain pages, each of which
 	 * consists of a fixed number of BD entries.
@@ -7119,10 +7117,11 @@ bce_tso_setup(struct bce_softc *sc, struct mbuf **m_head, u16 *flags)
 	struct ip *ip;
 	struct tcphdr *th;
 	u16 etype;
-	int hdr_len, ip_hlen = 0, tcp_hlen = 0, ip_len = 0;
+	int hdr_len __unused, ip_len __unused, ip_hlen = 0, tcp_hlen = 0;
 
 	DBRUN(sc->tso_frames_requested++);
 
+	ip_len = 0;
 	/* Controller may modify mbuf chains. */
 	if (M_WRITABLE(*m_head) == 0) {
 		m = m_dup(*m_head, M_NOWAIT);
@@ -7431,7 +7430,7 @@ bce_start_locked(struct ifnet *ifp)
 	struct bce_softc *sc = ifp->if_softc;
 	struct mbuf *m_head = NULL;
 	int count = 0;
-	u16 tx_prod, tx_chain_prod;
+	u16 tx_prod, tx_chain_prod __unused;
 
 	DBENTER(BCE_VERBOSE_SEND | BCE_VERBOSE_CTX);
 
@@ -7995,7 +7994,7 @@ bce_set_rx_mode(struct bce_softc *sc)
 		REG_WR(sc, BCE_EMAC_RX_MODE, rx_mode);
 	}
 
-	/* Disable and clear the exisitng sort before enabling a new sort. */
+	/* Disable and clear the existing sort before enabling a new sort. */
 	REG_WR(sc, BCE_RPM_SORT_USER0, 0x0);
 	REG_WR(sc, BCE_RPM_SORT_USER0, sort_mode);
 	REG_WR(sc, BCE_RPM_SORT_USER0, sort_mode | BCE_RPM_SORT_USER0_ENA);

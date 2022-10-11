@@ -97,6 +97,10 @@
 
 VFS_SMR_DECLARE;
 
+#if __FreeBSD_version < 1300103
+#define	NDFREE_PNBUF(ndp)	NDFREE((ndp), NDF_ONLY_PNBUF)
+#endif
+
 #if __FreeBSD_version >= 1300047
 #define	vm_page_wire_lock(pp)
 #define	vm_page_wire_unlock(pp)
@@ -111,6 +115,12 @@ VFS_SMR_DECLARE;
 	    ("%s: wrong ref counts", __func__));
 #else
 #define	VNCHECKREF(vp)
+#endif
+
+#if __FreeBSD_version >= 1400045
+typedef uint64_t cookie_t;
+#else
+typedef ulong_t cookie_t;
 #endif
 
 /*
@@ -214,11 +224,10 @@ VFS_SMR_DECLARE;
  *	ZFS_EXIT(zfsvfs);		// finished in zfs
  *	return (error);			// done, report error
  */
-
-/* ARGSUSED */
 static int
 zfs_open(vnode_t **vpp, int flag, cred_t *cr)
 {
+	(void) cr;
 	znode_t	*zp = VTOZ(*vpp);
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
 
@@ -231,27 +240,18 @@ zfs_open(vnode_t **vpp, int flag, cred_t *cr)
 		return (SET_ERROR(EPERM));
 	}
 
-	if (!zfs_has_ctldir(zp) && zp->z_zfsvfs->z_vscan &&
-	    ZTOV(zp)->v_type == VREG &&
-	    !(zp->z_pflags & ZFS_AV_QUARANTINED) && zp->z_size > 0) {
-		if (fs_vscan(*vpp, cr, 0) != 0) {
-			ZFS_EXIT(zfsvfs);
-			return (SET_ERROR(EACCES));
-		}
-	}
-
 	/* Keep a count of the synchronous opens in the znode */
-	if (flag & (FSYNC | FDSYNC))
+	if (flag & O_SYNC)
 		atomic_inc_32(&zp->z_sync_cnt);
 
 	ZFS_EXIT(zfsvfs);
 	return (0);
 }
 
-/* ARGSUSED */
 static int
 zfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
 {
+	(void) offset, (void) cr;
 	znode_t	*zp = VTOZ(vp);
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
 
@@ -259,23 +259,18 @@ zfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
 	ZFS_VERIFY_ZP(zp);
 
 	/* Decrement the synchronous opens in the znode */
-	if ((flag & (FSYNC | FDSYNC)) && (count == 1))
+	if ((flag & O_SYNC) && (count == 1))
 		atomic_dec_32(&zp->z_sync_cnt);
-
-	if (!zfs_has_ctldir(zp) && zp->z_zfsvfs->z_vscan &&
-	    ZTOV(zp)->v_type == VREG &&
-	    !(zp->z_pflags & ZFS_AV_QUARANTINED) && zp->z_size > 0)
-		VERIFY(fs_vscan(vp, cr, 1) == 0);
 
 	ZFS_EXIT(zfsvfs);
 	return (0);
 }
 
-/* ARGSUSED */
 static int
 zfs_ioctl(vnode_t *vp, ulong_t com, intptr_t data, int flag, cred_t *cred,
     int *rvalp)
 {
+	(void) flag, (void) cred, (void) rvalp;
 	loff_t off;
 	int error;
 
@@ -473,9 +468,9 @@ update_pages(znode_t *zp, int64_t start, int len, objset_t *os)
 	caddr_t va;
 	int off;
 
-	ASSERT(vp->v_mount != NULL);
+	ASSERT3P(vp->v_mount, !=, NULL);
 	obj = vp->v_object;
-	ASSERT(obj != NULL);
+	ASSERT3P(obj, !=, NULL);
 
 	off = start & PAGEOFFSET;
 	zfs_vmobject_wlock_12(obj);
@@ -530,11 +525,11 @@ mappedread_sf(znode_t *zp, int nbytes, zfs_uio_t *uio)
 	int len = nbytes;
 	int error = 0;
 
-	ASSERT(zfs_uio_segflg(uio) == UIO_NOCOPY);
-	ASSERT(vp->v_mount != NULL);
+	ASSERT3U(zfs_uio_segflg(uio), ==, UIO_NOCOPY);
+	ASSERT3P(vp->v_mount, !=, NULL);
 	obj = vp->v_object;
-	ASSERT(obj != NULL);
-	ASSERT((zfs_uio_offset(uio) & PAGEOFFSET) == 0);
+	ASSERT3P(obj, !=, NULL);
+	ASSERT0(zfs_uio_offset(uio) & PAGEOFFSET);
 
 	zfs_vmobject_wlock_12(obj);
 	for (start = zfs_uio_offset(uio); len > 0; start += PAGESIZE) {
@@ -548,7 +543,7 @@ mappedread_sf(znode_t *zp, int nbytes, zfs_uio_t *uio)
 			error = dmu_read(os, zp->z_id, start, bytes, va,
 			    DMU_READ_PREFETCH);
 			if (bytes != PAGESIZE && error == 0)
-				bzero(va + bytes, PAGESIZE - bytes);
+				memset(va + bytes, 0, PAGESIZE - bytes);
 			zfs_unmap_page(sf);
 			zfs_vmobject_wlock_12(obj);
 #if  __FreeBSD_version >= 1300081
@@ -611,9 +606,9 @@ mappedread(znode_t *zp, int nbytes, zfs_uio_t *uio)
 	int off;
 	int error = 0;
 
-	ASSERT(vp->v_mount != NULL);
+	ASSERT3P(vp->v_mount, !=, NULL);
 	obj = vp->v_object;
-	ASSERT(obj != NULL);
+	ASSERT3P(obj, !=, NULL);
 
 	start = zfs_uio_offset(uio);
 	off = start & PAGEOFFSET;
@@ -772,16 +767,17 @@ zfs_lookup_lock(vnode_t *dvp, vnode_t *vp, const char *name, int lkflags)
  * Timestamps:
  *	NA
  */
-/* ARGSUSED */
 static int
 zfs_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp,
-    struct componentname *cnp, int nameiop, cred_t *cr, kthread_t *td,
-    int flags, boolean_t cached)
+    struct componentname *cnp, int nameiop, cred_t *cr, int flags,
+    boolean_t cached)
 {
 	znode_t *zdp = VTOZ(dvp);
 	znode_t *zp;
 	zfsvfs_t *zfsvfs = zdp->z_zfsvfs;
+#if	__FreeBSD_version > 1300124
 	seqc_t dvp_seqc;
+#endif
 	int	error = 0;
 
 	/*
@@ -807,7 +803,9 @@ zfs_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp,
 	ZFS_ENTER(zfsvfs);
 	ZFS_VERIFY_ZP(zdp);
 
+#if	__FreeBSD_version > 1300124
 	dvp_seqc = vn_seqc_read_notmodify(dvp);
+#endif
 
 	*vpp = NULL;
 
@@ -970,7 +968,7 @@ zfs_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp,
 				cnp->cn_flags |= SAVENAME;
 				break;
 			}
-			/* FALLTHROUGH */
+			zfs_fallthrough;
 		case DELETE:
 			if (error == 0)
 				cnp->cn_flags |= SAVENAME;
@@ -978,6 +976,7 @@ zfs_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp,
 		}
 	}
 
+#if	__FreeBSD_version > 1300124
 	if ((cnp->cn_flags & ISDOTDOT) != 0) {
 		/*
 		 * FIXME: zfs_lookup_lock relocks vnodes and does nothing to
@@ -995,6 +994,7 @@ zfs_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp,
 			cnp->cn_flags &= ~MAKEENTRY;
 		}
 	}
+#endif
 
 	/* Insert name into cache (as non-existent) if appropriate. */
 	if (zfsvfs->z_use_namecache && !zfsvfs->z_replay &&
@@ -1036,20 +1036,18 @@ zfs_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp,
  *	dvp - ctime|mtime updated if new entry created
  *	 vp - ctime|mtime always, atime if new
  */
-
-/* ARGSUSED */
 int
 zfs_create(znode_t *dzp, const char *name, vattr_t *vap, int excl, int mode,
     znode_t **zpp, cred_t *cr, int flag, vsecattr_t *vsecp)
 {
+	(void) excl, (void) mode, (void) flag;
 	znode_t		*zp;
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zilog_t		*zilog;
 	objset_t	*os;
 	dmu_tx_t	*tx;
 	int		error;
-	ksid_t		*ksid;
-	uid_t		uid;
+	uid_t		uid = crgetuid(cr);
 	gid_t		gid = crgetgid(cr);
 	uint64_t	projid = ZFS_DEFAULT_PROJID;
 	zfs_acl_ids_t   acl_ids;
@@ -1063,13 +1061,6 @@ zfs_create(znode_t *dzp, const char *name, vattr_t *vap, int excl, int mode,
 	 * If we have an ephemeral id, ACL, or XVATTR then
 	 * make sure file system is at proper version
 	 */
-
-	ksid = crgetsid(cr, KSID_OWNER);
-	if (ksid)
-		uid = ksid_getid(ksid);
-	else
-		uid = crgetuid(cr);
-
 	if (zfsvfs->z_use_fuids == B_FALSE &&
 	    (vsecp || (vap->va_mask & AT_XVATTR) ||
 	    IS_EPHEMERAL(uid) || IS_EPHEMERAL(gid)))
@@ -1203,8 +1194,6 @@ out:
  *	dvp - ctime|mtime
  *	 vp - ctime (if nlink > 0)
  */
-
-/*ARGSUSED*/
 static int
 zfs_remove_(vnode_t *dvp, vnode_t *vp, const char *name, cred_t *cr)
 {
@@ -1332,7 +1321,9 @@ zfs_lookup_internal(znode_t *dzp, const char *name, vnode_t **vpp,
 	cnp->cn_flags = ISLASTCN | SAVENAME;
 	cnp->cn_lkflags = LK_EXCLUSIVE | LK_RETRY;
 	cnp->cn_cred = kcred;
+#if __FreeBSD_version < 1400037
 	cnp->cn_thread = curthread;
+#endif
 
 	if (zfsvfs->z_use_namecache && !zfsvfs->z_replay) {
 		struct vop_lookup_args a;
@@ -1343,8 +1334,8 @@ zfs_lookup_internal(znode_t *dzp, const char *name, vnode_t **vpp,
 		a.a_cnp = cnp;
 		error = vfs_cache_lookup(&a);
 	} else {
-		error = zfs_lookup(ZTOV(dzp), name, vpp, cnp, nameiop, kcred,
-		    curthread, 0, B_FALSE);
+		error = zfs_lookup(ZTOV(dzp), name, vpp, cnp, nameiop, kcred, 0,
+		    B_FALSE);
 	}
 #ifdef ZFS_DEBUG
 	if (error) {
@@ -1390,35 +1381,28 @@ zfs_remove(znode_t *dzp, const char *name, cred_t *cr, int flags)
  *	dvp - ctime|mtime updated
  *	 vp - ctime|mtime|atime updated
  */
-/*ARGSUSED*/
 int
 zfs_mkdir(znode_t *dzp, const char *dirname, vattr_t *vap, znode_t **zpp,
     cred_t *cr, int flags, vsecattr_t *vsecp)
 {
+	(void) flags, (void) vsecp;
 	znode_t		*zp;
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
 	zilog_t		*zilog;
 	uint64_t	txtype;
 	dmu_tx_t	*tx;
 	int		error;
-	ksid_t		*ksid;
-	uid_t		uid;
+	uid_t		uid = crgetuid(cr);
 	gid_t		gid = crgetgid(cr);
 	zfs_acl_ids_t   acl_ids;
 	boolean_t	fuid_dirtied;
 
-	ASSERT(vap->va_type == VDIR);
+	ASSERT3U(vap->va_type, ==, VDIR);
 
 	/*
 	 * If we have an ephemeral id, ACL, or XVATTR then
 	 * make sure file system is at proper version
 	 */
-
-	ksid = crgetsid(cr, KSID_OWNER);
-	if (ksid)
-		uid = ksid_getid(ksid);
-	else
-		uid = crgetuid(cr);
 	if (zfsvfs->z_use_fuids == B_FALSE &&
 	    ((vap->va_mask & AT_XVATTR) ||
 	    IS_EPHEMERAL(uid) || IS_EPHEMERAL(gid)))
@@ -1567,7 +1551,6 @@ cache_vop_rmdir(struct vnode *dvp, struct vnode *vp)
  * Timestamps:
  *	dvp - ctime|mtime updated
  */
-/*ARGSUSED*/
 static int
 zfs_rmdir_(vnode_t *dvp, vnode_t *vp, const char *name, cred_t *cr)
 {
@@ -1668,10 +1651,9 @@ zfs_rmdir(znode_t *dzp, const char *name, znode_t *cwd, cred_t *cr, int flags)
  * We use 0 for '.', and 1 for '..'.  If this is the root of the filesystem,
  * we use the offset 2 for the '.zfs' directory.
  */
-/* ARGSUSED */
 static int
 zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
-    int *ncookies, ulong_t **cookies)
+    int *ncookies, cookie_t **cookies)
 {
 	znode_t		*zp = VTOZ(vp);
 	iovec_t		*iovp;
@@ -1693,7 +1675,7 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 	boolean_t	check_sysattrs;
 	uint8_t		type;
 	int		ncooks;
-	ulong_t		*cooks = NULL;
+	cookie_t	*cooks = NULL;
 	int		flags = 0;
 
 	ZFS_ENTER(zfsvfs);
@@ -1770,7 +1752,7 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 		 */
 		ncooks = zfs_uio_resid(uio) / (sizeof (struct dirent) -
 		    sizeof (((struct dirent *)NULL)->d_name) + 1);
-		cooks = malloc(ncooks * sizeof (ulong_t), M_TEMP, M_WAITOK);
+		cooks = malloc(ncooks * sizeof (*cooks), M_TEMP, M_WAITOK);
 		*cookies = cooks;
 		*ncookies = ncooks;
 	}
@@ -1915,7 +1897,7 @@ zfs_readdir(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, int *eofp,
 		}
 		outcount += reclen;
 
-		ASSERT(outcount <= bufsize);
+		ASSERT3S(outcount, <=, bufsize);
 
 		/* Prefetch znode */
 		if (prefetch)
@@ -1994,7 +1976,6 @@ update:
  *
  *	RETURN:	0 (always succeeds).
  */
-/* ARGSUSED */
 static int
 zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 {
@@ -2057,7 +2038,7 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 	vap->va_size = zp->z_size;
 	if (vp->v_type == VBLK || vp->v_type == VCHR)
 		vap->va_rdev = zfs_cmpldev(rdev);
-	vap->va_seq = zp->z_seq;
+	vap->va_gen = zp->z_gen;
 	vap->va_flags = 0;	/* FreeBSD: Reset chflags(2) flags. */
 	vap->va_filerev = zp->z_seq;
 
@@ -2208,13 +2189,12 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
  * Timestamps:
  *	vp - ctime updated, mtime updated if size changed.
  */
-/* ARGSUSED */
 int
 zfs_setattr(znode_t *zp, vattr_t *vap, int flags, cred_t *cr)
 {
 	vnode_t		*vp = ZTOV(zp);
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
-	objset_t	*os = zfsvfs->z_os;
+	objset_t	*os;
 	zilog_t		*zilog;
 	dmu_tx_t	*tx;
 	vattr_t		oldva;
@@ -2249,6 +2229,7 @@ zfs_setattr(znode_t *zp, vattr_t *vap, int flags, cred_t *cr)
 	ZFS_ENTER(zfsvfs);
 	ZFS_VERIFY_ZP(zp);
 
+	os = zfsvfs->z_os;
 	zilog = zfsvfs->z_log;
 
 	/*
@@ -2775,12 +2756,12 @@ zfs_setattr(znode_t *zp, vattr_t *vap, int flags, cred_t *cr)
 			new_mode = zp->z_mode;
 		}
 		err = zfs_acl_chown_setattr(zp);
-		ASSERT(err == 0);
+		ASSERT0(err);
 		if (attrzp) {
 			vn_seqc_write_begin(ZTOV(attrzp));
 			err = zfs_acl_chown_setattr(attrzp);
 			vn_seqc_write_end(ZTOV(attrzp));
-			ASSERT(err == 0);
+			ASSERT0(err);
 		}
 	}
 
@@ -2788,7 +2769,7 @@ zfs_setattr(znode_t *zp, vattr_t *vap, int flags, cred_t *cr)
 		SA_ADD_BULK_ATTR(bulk, count, SA_ZPL_MODE(zfsvfs), NULL,
 		    &new_mode, sizeof (new_mode));
 		zp->z_mode = new_mode;
-		ASSERT3U((uintptr_t)aclp, !=, 0);
+		ASSERT3P(aclp, !=, NULL);
 		err = zfs_aclset_common(zp, aclp, cr, tx);
 		ASSERT0(err);
 		if (zp->z_acl_cached)
@@ -2874,7 +2855,7 @@ zfs_setattr(znode_t *zp, vattr_t *vap, int flags, cred_t *cr)
 		}
 
 		if (XVA_ISSET_REQ(xvap, XAT_AV_SCANSTAMP))
-			ASSERT(vp->v_type == VREG);
+			ASSERT3S(vp->v_type, ==, VREG);
 
 		zfs_xvattr_set(zp, xvap, tx);
 	}
@@ -2896,7 +2877,7 @@ out:
 	if (err == 0 && attrzp) {
 		err2 = sa_bulk_update(attrzp->z_sa_hdl, xattr_bulk,
 		    xattr_count, tx);
-		ASSERT(err2 == 0);
+		ASSERT0(err2);
 	}
 
 	if (attrzp)
@@ -2926,47 +2907,17 @@ out2:
 }
 
 /*
- * We acquire all but fdvp locks using non-blocking acquisitions.  If we
- * fail to acquire any lock in the path we will drop all held locks,
- * acquire the new lock in a blocking fashion, and then release it and
- * restart the rename.  This acquire/release step ensures that we do not
- * spin on a lock waiting for release.  On error release all vnode locks
- * and decrement references the way tmpfs_rename() would do.
+ * Look up the directory entries corresponding to the source and target
+ * directory/name pairs.
  */
 static int
-zfs_rename_relock(struct vnode *sdvp, struct vnode **svpp,
-    struct vnode *tdvp, struct vnode **tvpp,
-    const struct componentname *scnp, const struct componentname *tcnp)
+zfs_rename_relock_lookup(znode_t *sdzp, const struct componentname *scnp,
+    znode_t **szpp, znode_t *tdzp, const struct componentname *tcnp,
+    znode_t **tzpp)
 {
-	zfsvfs_t	*zfsvfs;
-	struct vnode	*nvp, *svp, *tvp;
-	znode_t		*sdzp, *tdzp, *szp, *tzp;
-	const char	*snm = scnp->cn_nameptr;
-	const char	*tnm = tcnp->cn_nameptr;
+	zfsvfs_t *zfsvfs;
+	znode_t *szp, *tzp;
 	int error;
-
-	VOP_UNLOCK1(tdvp);
-	if (*tvpp != NULL && *tvpp != tdvp)
-		VOP_UNLOCK1(*tvpp);
-
-relock:
-	error = vn_lock(sdvp, LK_EXCLUSIVE);
-	if (error)
-		goto out;
-	sdzp = VTOZ(sdvp);
-
-	error = vn_lock(tdvp, LK_EXCLUSIVE | LK_NOWAIT);
-	if (error != 0) {
-		VOP_UNLOCK1(sdvp);
-		if (error != EBUSY)
-			goto out;
-		error = vn_lock(tdvp, LK_EXCLUSIVE);
-		if (error)
-			goto out;
-		VOP_UNLOCK1(tdvp);
-		goto relock;
-	}
-	tdzp = VTOZ(tdvp);
 
 	/*
 	 * Before using sdzp and tdzp we must ensure that they are live.
@@ -2982,59 +2933,86 @@ relock:
 	zfsvfs = sdzp->z_zfsvfs;
 	ASSERT3P(zfsvfs, ==, tdzp->z_zfsvfs);
 	ZFS_ENTER(zfsvfs);
-
-	/*
-	 * We can not use ZFS_VERIFY_ZP() here because it could directly return
-	 * bypassing the cleanup code in the case of an error.
-	 */
-	if (tdzp->z_sa_hdl == NULL || sdzp->z_sa_hdl == NULL) {
-		ZFS_EXIT(zfsvfs);
-		VOP_UNLOCK1(sdvp);
-		VOP_UNLOCK1(tdvp);
-		error = SET_ERROR(EIO);
-		goto out;
-	}
+	ZFS_VERIFY_ZP(sdzp);
+	ZFS_VERIFY_ZP(tdzp);
 
 	/*
 	 * Re-resolve svp to be certain it still exists and fetch the
 	 * correct vnode.
 	 */
-	error = zfs_dirent_lookup(sdzp, snm, &szp, ZEXISTS);
+	error = zfs_dirent_lookup(sdzp, scnp->cn_nameptr, &szp, ZEXISTS);
 	if (error != 0) {
 		/* Source entry invalid or not there. */
-		ZFS_EXIT(zfsvfs);
-		VOP_UNLOCK1(sdvp);
-		VOP_UNLOCK1(tdvp);
 		if ((scnp->cn_flags & ISDOTDOT) != 0 ||
 		    (scnp->cn_namelen == 1 && scnp->cn_nameptr[0] == '.'))
 			error = SET_ERROR(EINVAL);
 		goto out;
 	}
-	svp = ZTOV(szp);
+	*szpp = szp;
 
 	/*
 	 * Re-resolve tvp, if it disappeared we just carry on.
 	 */
-	error = zfs_dirent_lookup(tdzp, tnm, &tzp, 0);
+	error = zfs_dirent_lookup(tdzp, tcnp->cn_nameptr, &tzp, 0);
 	if (error != 0) {
-		ZFS_EXIT(zfsvfs);
-		VOP_UNLOCK1(sdvp);
-		VOP_UNLOCK1(tdvp);
-		vrele(svp);
+		vrele(ZTOV(szp));
 		if ((tcnp->cn_flags & ISDOTDOT) != 0)
 			error = SET_ERROR(EINVAL);
 		goto out;
 	}
-	if (tzp != NULL)
-		tvp = ZTOV(tzp);
-	else
-		tvp = NULL;
-
-	/*
-	 * At present the vnode locks must be acquired before z_teardown_lock,
-	 * although it would be more logical to use the opposite order.
-	 */
+	*tzpp = tzp;
+out:
 	ZFS_EXIT(zfsvfs);
+	return (error);
+}
+
+/*
+ * We acquire all but fdvp locks using non-blocking acquisitions.  If we
+ * fail to acquire any lock in the path we will drop all held locks,
+ * acquire the new lock in a blocking fashion, and then release it and
+ * restart the rename.  This acquire/release step ensures that we do not
+ * spin on a lock waiting for release.  On error release all vnode locks
+ * and decrement references the way tmpfs_rename() would do.
+ */
+static int
+zfs_rename_relock(struct vnode *sdvp, struct vnode **svpp,
+    struct vnode *tdvp, struct vnode **tvpp,
+    const struct componentname *scnp, const struct componentname *tcnp)
+{
+	struct vnode	*nvp, *svp, *tvp;
+	znode_t		*sdzp, *tdzp, *szp, *tzp;
+	int		error;
+
+	VOP_UNLOCK1(tdvp);
+	if (*tvpp != NULL && *tvpp != tdvp)
+		VOP_UNLOCK1(*tvpp);
+
+relock:
+	error = vn_lock(sdvp, LK_EXCLUSIVE);
+	if (error)
+		goto out;
+	error = vn_lock(tdvp, LK_EXCLUSIVE | LK_NOWAIT);
+	if (error != 0) {
+		VOP_UNLOCK1(sdvp);
+		if (error != EBUSY)
+			goto out;
+		error = vn_lock(tdvp, LK_EXCLUSIVE);
+		if (error)
+			goto out;
+		VOP_UNLOCK1(tdvp);
+		goto relock;
+	}
+	tdzp = VTOZ(tdvp);
+	sdzp = VTOZ(sdvp);
+
+	error = zfs_rename_relock_lookup(sdzp, scnp, &szp, tdzp, tcnp, &tzp);
+	if (error != 0) {
+		VOP_UNLOCK1(sdvp);
+		VOP_UNLOCK1(tdvp);
+		goto out;
+	}
+	svp = ZTOV(szp);
+	tvp = tzp != NULL ? ZTOV(tzp) : NULL;
 
 	/*
 	 * Now try acquire locks on svp and tvp.
@@ -3171,37 +3149,38 @@ cache_vop_rename(struct vnode *fdvp, struct vnode *fvp, struct vnode *tdvp,
 }
 #endif
 
+static int
+zfs_do_rename_impl(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
+    vnode_t *tdvp, vnode_t **tvpp, struct componentname *tcnp,
+    cred_t *cr);
+
 /*
  * Move an entry from the provided source directory to the target
  * directory.  Change the entry name as indicated.
  *
  *	IN:	sdvp	- Source directory containing the "old entry".
- *		snm	- Old entry name.
+ *		scnp	- Old entry name.
  *		tdvp	- Target directory to contain the "new entry".
- *		tnm	- New entry name.
+ *		tcnp	- New entry name.
  *		cr	- credentials of caller.
- *		ct	- caller context
- *		flags	- case flags
+ *	INOUT:	svpp	- Source file
+ *		tvpp	- Target file, may point to NULL initially
  *
  *	RETURN:	0 on success, error code on failure.
  *
  * Timestamps:
  *	sdvp,tdvp - ctime|mtime updated
  */
-/*ARGSUSED*/
 static int
-zfs_rename_(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
+zfs_do_rename(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
     vnode_t *tdvp, vnode_t **tvpp, struct componentname *tcnp,
-    cred_t *cr, int log)
+    cred_t *cr)
 {
-	zfsvfs_t	*zfsvfs;
-	znode_t		*sdzp, *tdzp, *szp, *tzp;
-	zilog_t		*zilog = NULL;
-	dmu_tx_t	*tx;
-	const char	*snm = scnp->cn_nameptr;
-	const char	*tnm = tcnp->cn_nameptr;
-	int		error = 0;
-	bool	want_seqc_end __maybe_unused = false;
+	int	error;
+
+	ASSERT_VOP_ELOCKED(tdvp, __func__);
+	if (*tvpp != NULL)
+		ASSERT_VOP_ELOCKED(*tvpp, __func__);
 
 	/* Reject renames across filesystems. */
 	if ((*svpp)->v_mount != tdvp->v_mount ||
@@ -3224,51 +3203,64 @@ zfs_rename_(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
 		return (error);
 	}
 
+	error = zfs_do_rename_impl(sdvp, svpp, scnp, tdvp, tvpp, tcnp, cr);
+	VOP_UNLOCK1(sdvp);
+	VOP_UNLOCK1(*svpp);
+out:
+	if (*tvpp != NULL)
+		VOP_UNLOCK1(*tvpp);
+	if (tdvp != *tvpp)
+		VOP_UNLOCK1(tdvp);
+
+	return (error);
+}
+
+static int
+zfs_do_rename_impl(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
+    vnode_t *tdvp, vnode_t **tvpp, struct componentname *tcnp,
+    cred_t *cr)
+{
+	dmu_tx_t	*tx;
+	zfsvfs_t	*zfsvfs;
+	zilog_t		*zilog;
+	znode_t		*tdzp, *sdzp, *tzp, *szp;
+	const char	*snm = scnp->cn_nameptr;
+	const char	*tnm = tcnp->cn_nameptr;
+	int		error;
+
 	tdzp = VTOZ(tdvp);
 	sdzp = VTOZ(sdvp);
 	zfsvfs = tdzp->z_zfsvfs;
-	zilog = zfsvfs->z_log;
 
-	/*
-	 * After we re-enter ZFS_ENTER() we will have to revalidate all
-	 * znodes involved.
-	 */
 	ZFS_ENTER(zfsvfs);
+	ZFS_VERIFY_ZP(tdzp);
+	ZFS_VERIFY_ZP(sdzp);
+	zilog = zfsvfs->z_log;
 
 	if (zfsvfs->z_utf8 && u8_validate(tnm,
 	    strlen(tnm), NULL, U8_VALIDATE_ENTIRE, &error) < 0) {
 		error = SET_ERROR(EILSEQ);
-		goto unlockout;
+		goto out;
 	}
 
 	/* If source and target are the same file, there is nothing to do. */
 	if ((*svpp) == (*tvpp)) {
 		error = 0;
-		goto unlockout;
+		goto out;
 	}
 
 	if (((*svpp)->v_type == VDIR && (*svpp)->v_mountedhere != NULL) ||
 	    ((*tvpp) != NULL && (*tvpp)->v_type == VDIR &&
 	    (*tvpp)->v_mountedhere != NULL)) {
 		error = SET_ERROR(EXDEV);
-		goto unlockout;
-	}
-
-	/*
-	 * We can not use ZFS_VERIFY_ZP() here because it could directly return
-	 * bypassing the cleanup code in the case of an error.
-	 */
-	if (tdzp->z_sa_hdl == NULL || sdzp->z_sa_hdl == NULL) {
-		error = SET_ERROR(EIO);
-		goto unlockout;
+		goto out;
 	}
 
 	szp = VTOZ(*svpp);
+	ZFS_VERIFY_ZP(szp);
 	tzp = *tvpp == NULL ? NULL : VTOZ(*tvpp);
-	if (szp->z_sa_hdl == NULL || (tzp != NULL && tzp->z_sa_hdl == NULL)) {
-		error = SET_ERROR(EIO);
-		goto unlockout;
-	}
+	if (tzp != NULL)
+		ZFS_VERIFY_ZP(tzp);
 
 	/*
 	 * This is to prevent the creation of links into attribute space
@@ -3277,7 +3269,7 @@ zfs_rename_(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
 	 */
 	if ((tdzp->z_pflags & ZFS_XATTR) != (sdzp->z_pflags & ZFS_XATTR)) {
 		error = SET_ERROR(EINVAL);
-		goto unlockout;
+		goto out;
 	}
 
 	/*
@@ -3290,7 +3282,7 @@ zfs_rename_(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
 	if (tdzp->z_pflags & ZFS_PROJINHERIT &&
 	    tdzp->z_projid != szp->z_projid) {
 		error = SET_ERROR(EXDEV);
-		goto unlockout;
+		goto out;
 	}
 
 	/*
@@ -3300,7 +3292,7 @@ zfs_rename_(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
 	 * done in a single check.
 	 */
 	if ((error = zfs_zaccess_rename(sdzp, szp, tdzp, tzp, cr)))
-		goto unlockout;
+		goto out;
 
 	if ((*svpp)->v_type == VDIR) {
 		/*
@@ -3310,7 +3302,7 @@ zfs_rename_(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
 		    sdzp == szp ||
 		    (scnp->cn_flags | tcnp->cn_flags) & ISDOTDOT) {
 			error = EINVAL;
-			goto unlockout;
+			goto out;
 		}
 
 		/*
@@ -3318,7 +3310,7 @@ zfs_rename_(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
 		 * Can't do a move like this: /usr/a/b to /usr/a/b/c/d
 		 */
 		if ((error = zfs_rename_check(szp, sdzp, tdzp)))
-			goto unlockout;
+			goto out;
 	}
 
 	/*
@@ -3331,7 +3323,7 @@ zfs_rename_(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
 		if ((*svpp)->v_type == VDIR) {
 			if ((*tvpp)->v_type != VDIR) {
 				error = SET_ERROR(ENOTDIR);
-				goto unlockout;
+				goto out;
 			} else {
 				cache_purge(tdvp);
 				if (sdvp != tdvp)
@@ -3340,7 +3332,7 @@ zfs_rename_(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
 		} else {
 			if ((*tvpp)->v_type == VDIR) {
 				error = SET_ERROR(EISDIR);
-				goto unlockout;
+				goto out;
 			}
 		}
 	}
@@ -3351,9 +3343,7 @@ zfs_rename_(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
 		vn_seqc_write_begin(*tvpp);
 	if (tdvp != *tvpp)
 		vn_seqc_write_begin(tdvp);
-#if	__FreeBSD_version >= 1300102
-	want_seqc_end = true;
-#endif
+
 	vnevent_rename_src(*svpp, sdvp, scnp->cn_nameptr, ct);
 	if (tzp)
 		vnevent_rename_dest(*tvpp, tdvp, tnm, ct);
@@ -3385,9 +3375,8 @@ zfs_rename_(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
 	error = dmu_tx_assign(tx, TXG_WAIT);
 	if (error) {
 		dmu_tx_abort(tx);
-		goto unlockout;
+		goto out_seq;
 	}
-
 
 	if (tzp)	/* Attempt to remove the existing target */
 		error = zfs_link_destroy(tdzp, tnm, tzp, tx, 0, NULL);
@@ -3424,8 +3413,8 @@ zfs_rename_(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
 				 * succeed; fortunately, it is very unlikely to
 				 * fail, since we just created it.
 				 */
-				VERIFY3U(zfs_link_destroy(tdzp, tnm, szp, tx,
-				    ZRENAMING, NULL), ==, 0);
+				VERIFY0(zfs_link_destroy(tdzp, tnm, szp, tx,
+				    ZRENAMING, NULL));
 			}
 		}
 		if (error == 0) {
@@ -3435,29 +3424,19 @@ zfs_rename_(vnode_t *sdvp, vnode_t **svpp, struct componentname *scnp,
 
 	dmu_tx_commit(tx);
 
-unlockout:			/* all 4 vnodes are locked, ZFS_ENTER called */
-	ZFS_EXIT(zfsvfs);
-	if (want_seqc_end) {
-		vn_seqc_write_end(*svpp);
-		vn_seqc_write_end(sdvp);
-		if (*tvpp != NULL)
-			vn_seqc_write_end(*tvpp);
-		if (tdvp != *tvpp)
-			vn_seqc_write_end(tdvp);
-		want_seqc_end = false;
-	}
-	VOP_UNLOCK1(*svpp);
-	VOP_UNLOCK1(sdvp);
+out_seq:
+	vn_seqc_write_end(*svpp);
+	vn_seqc_write_end(sdvp);
+	if (*tvpp != NULL)
+		vn_seqc_write_end(*tvpp);
+	if (tdvp != *tvpp)
+		vn_seqc_write_end(tdvp);
 
-out:				/* original two vnodes are locked */
-	MPASS(!want_seqc_end);
+out:
 	if (error == 0 && zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
 		zil_commit(zilog, 0);
+	ZFS_EXIT(zfsvfs);
 
-	if (*tvpp != NULL)
-		VOP_UNLOCK1(*tvpp);
-	if (tdvp != *tvpp)
-		VOP_UNLOCK1(tdvp);
 	return (error);
 }
 
@@ -3489,7 +3468,7 @@ zfs_rename(znode_t *sdzp, const char *sname, znode_t *tdzp, const char *tname,
 		goto fail;
 	}
 
-	error = zfs_rename_(sdvp, &svp, &scn, tdvp, &tvp, &tcn, cr, 0);
+	error = zfs_do_rename(sdvp, &svp, &scn, tdvp, &tvp, &tcn, cr);
 fail:
 	if (svp != NULL)
 		vrele(svp);
@@ -3514,11 +3493,11 @@ fail:
  * Timestamps:
  *	dvp - ctime|mtime updated
  */
-/*ARGSUSED*/
 int
 zfs_symlink(znode_t *dzp, const char *name, vattr_t *vap,
     const char *link, znode_t **zpp, cred_t *cr, int flags)
 {
+	(void) flags;
 	znode_t		*zp;
 	dmu_tx_t	*tx;
 	zfsvfs_t	*zfsvfs = dzp->z_zfsvfs;
@@ -3529,7 +3508,7 @@ zfs_symlink(znode_t *dzp, const char *name, vattr_t *vap,
 	boolean_t	fuid_dirtied;
 	uint64_t	txtype = TX_SYMLINK;
 
-	ASSERT(vap->va_type == VLNK);
+	ASSERT3S(vap->va_type, ==, VLNK);
 
 	ZFS_ENTER(zfsvfs);
 	ZFS_VERIFY_ZP(dzp);
@@ -3600,7 +3579,7 @@ zfs_symlink(znode_t *dzp, const char *name, vattr_t *vap,
 
 	/*
 	 * Create a new object for the symlink.
-	 * for version 4 ZPL datsets the symlink will be an SA attribute
+	 * for version 4 ZPL datasets the symlink will be an SA attribute
 	 */
 	zfs_mknode(dzp, vap, tx, cr, 0, &zp, &acl_ids);
 
@@ -3653,10 +3632,10 @@ zfs_symlink(znode_t *dzp, const char *name, vattr_t *vap,
  * Timestamps:
  *	vp - atime updated
  */
-/* ARGSUSED */
 static int
 zfs_readlink(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, caller_context_t *ct)
 {
+	(void) cr, (void) ct;
 	znode_t		*zp = VTOZ(vp);
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
 	int		error;
@@ -3690,11 +3669,11 @@ zfs_readlink(vnode_t *vp, zfs_uio_t *uio, cred_t *cr, caller_context_t *ct)
  *	tdvp - ctime|mtime updated
  *	 svp - ctime updated
  */
-/* ARGSUSED */
 int
 zfs_link(znode_t *tdzp, znode_t *szp, const char *name, cred_t *cr,
     int flags)
 {
+	(void) flags;
 	znode_t		*tzp;
 	zfsvfs_t	*zfsvfs = tdzp->z_zfsvfs;
 	zilog_t		*zilog;
@@ -3703,7 +3682,7 @@ zfs_link(znode_t *tdzp, znode_t *szp, const char *name, cred_t *cr,
 	uint64_t	parent;
 	uid_t		owner;
 
-	ASSERT(ZTOV(tdzp)->v_type == VDIR);
+	ASSERT3S(ZTOV(tdzp)->v_type, ==, VDIR);
 
 	ZFS_ENTER(zfsvfs);
 	ZFS_VERIFY_ZP(tdzp);
@@ -3839,11 +3818,11 @@ zfs_link(znode_t *tdzp, znode_t *szp, const char *name, cred_t *cr,
  * Timestamps:
  *	ip - ctime|mtime updated
  */
-/* ARGSUSED */
 int
 zfs_space(znode_t *zp, int cmd, flock64_t *bfp, int flag,
     offset_t offset, cred_t *cr)
 {
+	(void) offset;
 	zfsvfs_t	*zfsvfs = ZTOZSB(zp);
 	uint64_t	off, len;
 	int		error;
@@ -3890,10 +3869,10 @@ zfs_space(znode_t *zp, int cmd, flock64_t *bfp, int flag,
 	return (error);
 }
 
-/*ARGSUSED*/
 static void
 zfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 {
+	(void) cr, (void) ct;
 	znode_t	*zp = VTOZ(vp);
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
 	int error;
@@ -3937,13 +3916,15 @@ zfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 }
 
 
-CTASSERT(sizeof (struct zfid_short) <= sizeof (struct fid));
-CTASSERT(sizeof (struct zfid_long) <= sizeof (struct fid));
+_Static_assert(sizeof (struct zfid_short) <= sizeof (struct fid),
+	"struct zfid_short bigger than struct fid");
+_Static_assert(sizeof (struct zfid_long) <= sizeof (struct fid),
+	"struct zfid_long bigger than struct fid");
 
-/*ARGSUSED*/
 static int
 zfs_fid(vnode_t *vp, fid_t *fidp, caller_context_t *ct)
 {
+	(void) ct;
 	znode_t		*zp = VTOZ(vp);
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
 	uint32_t	gen;
@@ -4052,7 +4033,6 @@ zfs_getpages(struct vnode *vp, vm_page_t *ma, int count, int *rbehind,
 {
 	znode_t *zp = VTOZ(vp);
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
-	objset_t *os = zp->z_zfsvfs->z_os;
 	zfs_locked_range_t *lr;
 	vm_object_t object;
 	off_t start, end, obj_size;
@@ -4060,8 +4040,8 @@ zfs_getpages(struct vnode *vp, vm_page_t *ma, int count, int *rbehind,
 	int pgsin_b, pgsin_a;
 	int error;
 
-	ZFS_ENTER(zfsvfs);
-	ZFS_VERIFY_ZP(zp);
+	ZFS_ENTER_ERROR(zfsvfs, zfs_vm_pagerret_error);
+	ZFS_VERIFY_ZP_ERROR(zp, zfs_vm_pagerret_error);
 
 	start = IDX_TO_OFF(ma[0]->pindex);
 	end = IDX_TO_OFF(ma[count - 1]->pindex + 1);
@@ -4122,12 +4102,15 @@ zfs_getpages(struct vnode *vp, vm_page_t *ma, int count, int *rbehind,
 	 * ZFS will panic if we request DMU to read beyond the end of the last
 	 * allocated block.
 	 */
-	error = dmu_read_pages(os, zp->z_id, ma, count, &pgsin_b, &pgsin_a,
-	    MIN(end, obj_size) - (end - PAGE_SIZE));
+	error = dmu_read_pages(zfsvfs->z_os, zp->z_id, ma, count, &pgsin_b,
+	    &pgsin_a, MIN(end, obj_size) - (end - PAGE_SIZE));
 
 	if (lr != NULL)
 		zfs_rangelock_exit(lr);
 	ZFS_ACCESSTIME_STAMP(zfsvfs, zp);
+
+	dataset_kstats_update_read_kstats(&zfsvfs->z_kstat, count*PAGE_SIZE);
+
 	ZFS_EXIT(zfsvfs);
 
 	if (error != 0)
@@ -4182,18 +4165,17 @@ zfs_putpages(struct vnode *vp, vm_page_t *ma, size_t len, int flags,
 	int		err;
 	int		i;
 
-	ZFS_ENTER(zfsvfs);
-	ZFS_VERIFY_ZP(zp);
-
 	object = vp->v_object;
-	pcount = btoc(len);
-	ncount = pcount;
-
 	KASSERT(ma[0]->object == object, ("mismatching object"));
 	KASSERT(len > 0 && (len & PAGE_MASK) == 0, ("unexpected length"));
 
+	pcount = btoc(len);
+	ncount = pcount;
 	for (i = 0; i < pcount; i++)
 		rtvals[i] = zfs_vm_pagerret_error;
+
+	ZFS_ENTER_ERROR(zfsvfs, zfs_vm_pagerret_error);
+	ZFS_VERIFY_ZP_ERROR(zp, zfs_vm_pagerret_error);
 
 	off = IDX_TO_OFF(ma[0]->pindex);
 	blksz = zp->z_blksz;
@@ -4305,6 +4287,9 @@ out:
 	if ((flags & (zfs_vm_pagerput_sync | zfs_vm_pagerput_inval)) != 0 ||
 	    zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS)
 		zil_commit(zfsvfs->z_log, zp->z_id);
+
+	dataset_kstats_update_write_kstats(&zfsvfs->z_kstat, len);
+
 	ZFS_EXIT(zfsvfs);
 	return (rtvals[0]);
 }
@@ -4417,11 +4402,11 @@ ioflags(int ioflags)
 	int flags = 0;
 
 	if (ioflags & IO_APPEND)
-		flags |= FAPPEND;
+		flags |= O_APPEND;
 	if (ioflags & IO_NDELAY)
-		flags |= FNONBLOCK;
+		flags |= O_NONBLOCK;
 	if (ioflags & IO_SYNC)
-		flags |= (FSYNC | FDSYNC | FRSYNC);
+		flags |= O_SYNC;
 
 	return (flags);
 }
@@ -4489,6 +4474,7 @@ zfs_freebsd_fplookup_vexec(struct vop_fplookup_vexec_args *v)
 }
 #endif
 
+#if __FreeBSD_version >= 1300139
 static int
 zfs_freebsd_fplookup_symlink(struct vop_fplookup_symlink_args *v)
 {
@@ -4508,6 +4494,7 @@ zfs_freebsd_fplookup_symlink(struct vop_fplookup_symlink_args *v)
 	}
 	return (cache_symlink_resolve(v->a_fpl, target, strlen(target)));
 }
+#endif
 
 #ifndef _SYS_SYSPROTO_H_
 struct vop_access_args {
@@ -4581,11 +4568,11 @@ zfs_freebsd_lookup(struct vop_lookup_args *ap, boolean_t cached)
 	struct componentname *cnp = ap->a_cnp;
 	char nm[NAME_MAX + 1];
 
-	ASSERT(cnp->cn_namelen < sizeof (nm));
+	ASSERT3U(cnp->cn_namelen, <, sizeof (nm));
 	strlcpy(nm, cnp->cn_nameptr, MIN(cnp->cn_namelen + 1, sizeof (nm)));
 
 	return (zfs_lookup(ap->a_dvp, nm, ap->a_vpp, cnp, cnp->cn_nameiop,
-	    cnp->cn_cred, cnp->cn_thread, 0, cached));
+	    cnp->cn_cred, 0, cached));
 }
 
 static int
@@ -4640,7 +4627,7 @@ zfs_freebsd_create(struct vop_create_args *ap)
 	zfsvfs = ap->a_dvp->v_mount->mnt_data;
 	*ap->a_vpp = NULL;
 
-	rc = zfs_create(VTOZ(ap->a_dvp), cnp->cn_nameptr, vap, !EXCL, mode,
+	rc = zfs_create(VTOZ(ap->a_dvp), cnp->cn_nameptr, vap, 0, mode,
 	    &zp, cnp->cn_cred, 0 /* flag */, NULL /* vsecattr */);
 	if (rc == 0)
 		*ap->a_vpp = ZTOV(zp);
@@ -4723,7 +4710,7 @@ struct vop_readdir_args {
 	struct ucred *a_cred;
 	int *a_eofflag;
 	int *a_ncookies;
-	ulong_t **a_cookies;
+	cookie_t **a_cookies;
 };
 #endif
 
@@ -4968,8 +4955,8 @@ zfs_freebsd_rename(struct vop_rename_args *ap)
 	ASSERT(ap->a_fcnp->cn_flags & (SAVENAME|SAVESTART));
 	ASSERT(ap->a_tcnp->cn_flags & (SAVENAME|SAVESTART));
 
-	error = zfs_rename_(fdvp, &fvp, ap->a_fcnp, tdvp, &tvp,
-	    ap->a_tcnp, ap->a_fcnp->cn_cred, 1);
+	error = zfs_do_rename(fdvp, &fvp, ap->a_fcnp, tdvp, &tvp,
+	    ap->a_tcnp, ap->a_fcnp->cn_cred);
 
 	vrele(fdvp);
 	vrele(fvp);
@@ -4996,8 +4983,10 @@ zfs_freebsd_symlink(struct vop_symlink_args *ap)
 	struct componentname *cnp = ap->a_cnp;
 	vattr_t *vap = ap->a_vap;
 	znode_t *zp = NULL;
+#if __FreeBSD_version >= 1300139
 	char *symlink;
 	size_t symlink_len;
+#endif
 	int rc;
 
 	ASSERT(cnp->cn_flags & SAVENAME);
@@ -5011,6 +5000,7 @@ zfs_freebsd_symlink(struct vop_symlink_args *ap)
 	if (rc == 0) {
 		*ap->a_vpp = ZTOV(zp);
 		ASSERT_VOP_ELOCKED(ZTOV(zp), __func__);
+#if __FreeBSD_version >= 1300139
 		MPASS(zp->z_cached_symlink == NULL);
 		symlink_len = strlen(ap->a_target);
 		symlink = cache_symlink_alloc(symlink_len + 1, M_WAITOK);
@@ -5020,6 +5010,7 @@ zfs_freebsd_symlink(struct vop_symlink_args *ap)
 			atomic_store_rel_ptr((uintptr_t *)&zp->z_cached_symlink,
 			    (uintptr_t)symlink);
 		}
+#endif
 	}
 	return (rc);
 }
@@ -5036,13 +5027,16 @@ static int
 zfs_freebsd_readlink(struct vop_readlink_args *ap)
 {
 	zfs_uio_t uio;
+	int error;
+#if __FreeBSD_version >= 1300139
 	znode_t	*zp = VTOZ(ap->a_vp);
 	char *symlink, *base;
 	size_t symlink_len;
-	int error;
 	bool trycache;
+#endif
 
 	zfs_uio_init(&uio, ap->a_uio);
+#if __FreeBSD_version >= 1300139
 	trycache = false;
 	if (zfs_uio_segflg(&uio) == UIO_SYSSPACE &&
 	    zfs_uio_iovcnt(&uio) == 1) {
@@ -5050,7 +5044,9 @@ zfs_freebsd_readlink(struct vop_readlink_args *ap)
 		symlink_len = zfs_uio_iovlen(&uio, 0);
 		trycache = true;
 	}
+#endif
 	error = zfs_readlink(ap->a_vp, &uio, ap->a_cred, NULL);
+#if __FreeBSD_version >= 1300139
 	if (atomic_load_ptr(&zp->z_cached_symlink) != NULL ||
 	    error != 0 || !trycache) {
 		return (error);
@@ -5065,6 +5061,7 @@ zfs_freebsd_readlink(struct vop_readlink_args *ap)
 			cache_symlink_free(symlink, symlink_len + 1);
 		}
 	}
+#endif
 	return (error);
 }
 
@@ -5116,6 +5113,7 @@ zfs_freebsd_inactive(struct vop_inactive_args *ap)
 #ifndef _SYS_SYSPROTO_H_
 struct vop_need_inactive_args {
 	struct vnode *a_vp;
+	struct thread *a_td;
 };
 #endif
 
@@ -5153,7 +5151,7 @@ zfs_freebsd_reclaim(struct vop_reclaim_args *ap)
 	znode_t	*zp = VTOZ(vp);
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
 
-	ASSERT(zp != NULL);
+	ASSERT3P(zp, !=, NULL);
 
 #if __FreeBSD_version < 1300042
 	/* Destroy the vm object and flush associated pages. */
@@ -5217,6 +5215,11 @@ zfs_freebsd_pathconf(struct vop_pathconf_args *ap)
 	case _PC_NAME_MAX:
 		*ap->a_retval = NAME_MAX;
 		return (0);
+#if __FreeBSD_version >= 1400032
+	case _PC_DEALLOC_PRESENT:
+		*ap->a_retval = 1;
+		return (0);
+#endif
 	case _PC_PIPE_BUF:
 		if (ap->a_vp->v_type == VDIR || ap->a_vp->v_type == VFIFO) {
 			*ap->a_retval = PIPE_BUF;
@@ -5228,43 +5231,56 @@ zfs_freebsd_pathconf(struct vop_pathconf_args *ap)
 	}
 }
 
+static int zfs_xattr_compat = 1;
+
+static int
+zfs_check_attrname(const char *name)
+{
+	/* We don't allow '/' character in attribute name. */
+	if (strchr(name, '/') != NULL)
+		return (SET_ERROR(EINVAL));
+	/* We don't allow attribute names that start with a namespace prefix. */
+	if (ZFS_XA_NS_PREFIX_FORBIDDEN(name))
+		return (SET_ERROR(EINVAL));
+	return (0);
+}
+
 /*
  * FreeBSD's extended attributes namespace defines file name prefix for ZFS'
  * extended attribute name:
  *
- *	NAMESPACE	PREFIX
- *	system		freebsd:system:
- *	user		(none, can be used to access ZFS fsattr(5) attributes
- *			created on Solaris)
+ *	NAMESPACE	XATTR_COMPAT	PREFIX
+ *	system		*		freebsd:system:
+ *	user		1		(none, can be used to access ZFS
+ *					fsattr(5) attributes created on Solaris)
+ *	user		0		user.
  */
 static int
 zfs_create_attrname(int attrnamespace, const char *name, char *attrname,
-    size_t size)
+    size_t size, boolean_t compat)
 {
 	const char *namespace, *prefix, *suffix;
 
-	/* We don't allow '/' character in attribute name. */
-	if (strchr(name, '/') != NULL)
-		return (EINVAL);
-	/* We don't allow attribute names that start with "freebsd:" string. */
-	if (strncmp(name, "freebsd:", 8) == 0)
-		return (EINVAL);
-
-	bzero(attrname, size);
+	memset(attrname, 0, size);
 
 	switch (attrnamespace) {
 	case EXTATTR_NAMESPACE_USER:
-#if 0
-		prefix = "freebsd:";
-		namespace = EXTATTR_NAMESPACE_USER_STRING;
-		suffix = ":";
-#else
-		/*
-		 * This is the default namespace by which we can access all
-		 * attributes created on Solaris.
-		 */
-		prefix = namespace = suffix = "";
-#endif
+		if (compat) {
+			/*
+			 * This is the default namespace by which we can access
+			 * all attributes created on Solaris.
+			 */
+			prefix = namespace = suffix = "";
+		} else {
+			/*
+			 * This is compatible with the user namespace encoding
+			 * on Linux prior to xattr_compat, but nothing
+			 * else.
+			 */
+			prefix = "";
+			namespace = "user";
+			suffix = ".";
+		}
 		break;
 	case EXTATTR_NAMESPACE_SYSTEM:
 		prefix = "freebsd:";
@@ -5273,13 +5289,36 @@ zfs_create_attrname(int attrnamespace, const char *name, char *attrname,
 		break;
 	case EXTATTR_NAMESPACE_EMPTY:
 	default:
-		return (EINVAL);
+		return (SET_ERROR(EINVAL));
 	}
 	if (snprintf(attrname, size, "%s%s%s%s", prefix, namespace, suffix,
 	    name) >= size) {
-		return (ENAMETOOLONG);
+		return (SET_ERROR(ENAMETOOLONG));
 	}
 	return (0);
+}
+
+static int
+zfs_ensure_xattr_cached(znode_t *zp)
+{
+	int error = 0;
+
+	ASSERT(RW_LOCK_HELD(&zp->z_xattr_lock));
+
+	if (zp->z_xattr_cached != NULL)
+		return (0);
+
+	if (rw_write_held(&zp->z_xattr_lock))
+		return (zfs_sa_get_xattr(zp));
+
+	if (!rw_tryupgrade(&zp->z_xattr_lock)) {
+		rw_exit(&zp->z_xattr_lock);
+		rw_enter(&zp->z_xattr_lock, RW_WRITER);
+	}
+	if (zp->z_xattr_cached == NULL)
+		error = zfs_sa_get_xattr(zp);
+	rw_downgrade(&zp->z_xattr_lock);
+	return (error);
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -5294,58 +5333,32 @@ struct vop_getextattr {
 };
 #endif
 
-/*
- * Vnode operating to retrieve a named extended attribute.
- */
 static int
-zfs_getextattr(struct vop_getextattr_args *ap)
+zfs_getextattr_dir(struct vop_getextattr_args *ap, const char *attrname)
 {
-	zfsvfs_t *zfsvfs = VTOZ(ap->a_vp)->z_zfsvfs;
 	struct thread *td = ap->a_td;
 	struct nameidata nd;
-	char attrname[255];
 	struct vattr va;
 	vnode_t *xvp = NULL, *vp;
 	int error, flags;
 
-	/*
-	 * If the xattr property is off, refuse the request.
-	 */
-	if (!(zfsvfs->z_flags & ZSB_XATTR)) {
-		return (SET_ERROR(EOPNOTSUPP));
-	}
-
-	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
-	    ap->a_cred, ap->a_td, VREAD);
-	if (error != 0)
-		return (error);
-
-	error = zfs_create_attrname(ap->a_attrnamespace, ap->a_name, attrname,
-	    sizeof (attrname));
-	if (error != 0)
-		return (error);
-
-	ZFS_ENTER(zfsvfs);
-
-	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred, td,
+	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred,
 	    LOOKUP_XATTR, B_FALSE);
-	if (error != 0) {
-		ZFS_EXIT(zfsvfs);
+	if (error != 0)
 		return (error);
-	}
 
 	flags = FREAD;
+#if __FreeBSD_version < 1400043
 	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, attrname,
 	    xvp, td);
+#else
+	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, attrname, xvp);
+#endif
 	error = vn_open_cred(&nd, &flags, 0, VN_OPEN_INVFS, ap->a_cred, NULL);
 	vp = nd.ni_vp;
-	NDFREE(&nd, NDF_ONLY_PNBUF);
-	if (error != 0) {
-		ZFS_EXIT(zfsvfs);
-		if (error == ENOENT)
-			error = ENOATTR;
-		return (error);
-	}
+	NDFREE_PNBUF(&nd);
+	if (error != 0)
+		return (SET_ERROR(error));
 
 	if (ap->a_size != NULL) {
 		error = VOP_GETATTR(vp, &va, ap->a_cred);
@@ -5356,7 +5369,104 @@ zfs_getextattr(struct vop_getextattr_args *ap)
 
 	VOP_UNLOCK1(vp);
 	vn_close(vp, flags, ap->a_cred, td);
+	return (error);
+}
+
+static int
+zfs_getextattr_sa(struct vop_getextattr_args *ap, const char *attrname)
+{
+	znode_t *zp = VTOZ(ap->a_vp);
+	uchar_t *nv_value;
+	uint_t nv_size;
+	int error;
+
+	error = zfs_ensure_xattr_cached(zp);
+	if (error != 0)
+		return (error);
+
+	ASSERT(RW_LOCK_HELD(&zp->z_xattr_lock));
+	ASSERT3P(zp->z_xattr_cached, !=, NULL);
+
+	error = nvlist_lookup_byte_array(zp->z_xattr_cached, attrname,
+	    &nv_value, &nv_size);
+	if (error != 0)
+		return (SET_ERROR(error));
+
+	if (ap->a_size != NULL)
+		*ap->a_size = nv_size;
+	else if (ap->a_uio != NULL)
+		error = uiomove(nv_value, nv_size, ap->a_uio);
+	if (error != 0)
+		return (SET_ERROR(error));
+
+	return (0);
+}
+
+static int
+zfs_getextattr_impl(struct vop_getextattr_args *ap, boolean_t compat)
+{
+	znode_t *zp = VTOZ(ap->a_vp);
+	zfsvfs_t *zfsvfs = ZTOZSB(zp);
+	char attrname[EXTATTR_MAXNAMELEN+1];
+	int error;
+
+	error = zfs_create_attrname(ap->a_attrnamespace, ap->a_name, attrname,
+	    sizeof (attrname), compat);
+	if (error != 0)
+		return (error);
+
+	error = ENOENT;
+	if (zfsvfs->z_use_sa && zp->z_is_sa)
+		error = zfs_getextattr_sa(ap, attrname);
+	if (error == ENOENT)
+		error = zfs_getextattr_dir(ap, attrname);
+	return (error);
+}
+
+/*
+ * Vnode operation to retrieve a named extended attribute.
+ */
+static int
+zfs_getextattr(struct vop_getextattr_args *ap)
+{
+	znode_t *zp = VTOZ(ap->a_vp);
+	zfsvfs_t *zfsvfs = ZTOZSB(zp);
+	int error;
+
+	/*
+	 * If the xattr property is off, refuse the request.
+	 */
+	if (!(zfsvfs->z_flags & ZSB_XATTR))
+		return (SET_ERROR(EOPNOTSUPP));
+
+	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
+	    ap->a_cred, ap->a_td, VREAD);
+	if (error != 0)
+		return (SET_ERROR(error));
+
+	error = zfs_check_attrname(ap->a_name);
+	if (error != 0)
+		return (error);
+
+	error = ENOENT;
+	ZFS_ENTER(zfsvfs);
+	ZFS_VERIFY_ZP(zp);
+	rw_enter(&zp->z_xattr_lock, RW_READER);
+
+	error = zfs_getextattr_impl(ap, zfs_xattr_compat);
+	if ((error == ENOENT || error == ENOATTR) &&
+	    ap->a_attrnamespace == EXTATTR_NAMESPACE_USER) {
+		/*
+		 * Fall back to the alternate namespace format if we failed to
+		 * find a user xattr.
+		 */
+		error = zfs_getextattr_impl(ap, !zfs_xattr_compat);
+	}
+
+	rw_exit(&zp->z_xattr_lock);
 	ZFS_EXIT(zfsvfs);
+	if (error == ENOENT)
+		error = SET_ERROR(ENOATTR);
 	return (error);
 }
 
@@ -5370,67 +5480,135 @@ struct vop_deleteextattr {
 };
 #endif
 
-/*
- * Vnode operation to remove a named attribute.
- */
 static int
-zfs_deleteextattr(struct vop_deleteextattr_args *ap)
+zfs_deleteextattr_dir(struct vop_deleteextattr_args *ap, const char *attrname)
 {
-	zfsvfs_t *zfsvfs = VTOZ(ap->a_vp)->z_zfsvfs;
-	struct thread *td = ap->a_td;
 	struct nameidata nd;
-	char attrname[255];
 	vnode_t *xvp = NULL, *vp;
 	int error;
 
-	/*
-	 * If the xattr property is off, refuse the request.
-	 */
-	if (!(zfsvfs->z_flags & ZSB_XATTR)) {
-		return (SET_ERROR(EOPNOTSUPP));
-	}
-
-	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
-	    ap->a_cred, ap->a_td, VWRITE);
-	if (error != 0)
-		return (error);
-
-	error = zfs_create_attrname(ap->a_attrnamespace, ap->a_name, attrname,
-	    sizeof (attrname));
-	if (error != 0)
-		return (error);
-
-	ZFS_ENTER(zfsvfs);
-
-	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred, td,
+	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred,
 	    LOOKUP_XATTR, B_FALSE);
-	if (error != 0) {
-		ZFS_EXIT(zfsvfs);
+	if (error != 0)
 		return (error);
-	}
 
+#if __FreeBSD_version < 1400043
 	NDINIT_ATVP(&nd, DELETE, NOFOLLOW | LOCKPARENT | LOCKLEAF,
-	    UIO_SYSSPACE, attrname, xvp, td);
+	    UIO_SYSSPACE, attrname, xvp, ap->a_td);
+#else
+	NDINIT_ATVP(&nd, DELETE, NOFOLLOW | LOCKPARENT | LOCKLEAF,
+	    UIO_SYSSPACE, attrname, xvp);
+#endif
 	error = namei(&nd);
 	vp = nd.ni_vp;
 	if (error != 0) {
-		ZFS_EXIT(zfsvfs);
-		NDFREE(&nd, NDF_ONLY_PNBUF);
-		if (error == ENOENT)
-			error = ENOATTR;
-		return (error);
+		NDFREE_PNBUF(&nd);
+		return (SET_ERROR(error));
 	}
 
 	error = VOP_REMOVE(nd.ni_dvp, vp, &nd.ni_cnd);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 
 	vput(nd.ni_dvp);
 	if (vp == nd.ni_dvp)
 		vrele(vp);
 	else
 		vput(vp);
-	ZFS_EXIT(zfsvfs);
 
+	return (error);
+}
+
+static int
+zfs_deleteextattr_sa(struct vop_deleteextattr_args *ap, const char *attrname)
+{
+	znode_t *zp = VTOZ(ap->a_vp);
+	nvlist_t *nvl;
+	int error;
+
+	error = zfs_ensure_xattr_cached(zp);
+	if (error != 0)
+		return (error);
+
+	ASSERT(RW_WRITE_HELD(&zp->z_xattr_lock));
+	ASSERT3P(zp->z_xattr_cached, !=, NULL);
+
+	nvl = zp->z_xattr_cached;
+	error = nvlist_remove(nvl, attrname, DATA_TYPE_BYTE_ARRAY);
+	if (error != 0)
+		error = SET_ERROR(error);
+	else
+		error = zfs_sa_set_xattr(zp, attrname, NULL, 0);
+	if (error != 0) {
+		zp->z_xattr_cached = NULL;
+		nvlist_free(nvl);
+	}
+	return (error);
+}
+
+static int
+zfs_deleteextattr_impl(struct vop_deleteextattr_args *ap, boolean_t compat)
+{
+	znode_t *zp = VTOZ(ap->a_vp);
+	zfsvfs_t *zfsvfs = ZTOZSB(zp);
+	char attrname[EXTATTR_MAXNAMELEN+1];
+	int error;
+
+	error = zfs_create_attrname(ap->a_attrnamespace, ap->a_name, attrname,
+	    sizeof (attrname), compat);
+	if (error != 0)
+		return (error);
+
+	error = ENOENT;
+	if (zfsvfs->z_use_sa && zp->z_is_sa)
+		error = zfs_deleteextattr_sa(ap, attrname);
+	if (error == ENOENT)
+		error = zfs_deleteextattr_dir(ap, attrname);
+	return (error);
+}
+
+/*
+ * Vnode operation to remove a named attribute.
+ */
+static int
+zfs_deleteextattr(struct vop_deleteextattr_args *ap)
+{
+	znode_t *zp = VTOZ(ap->a_vp);
+	zfsvfs_t *zfsvfs = ZTOZSB(zp);
+	int error;
+
+	/*
+	 * If the xattr property is off, refuse the request.
+	 */
+	if (!(zfsvfs->z_flags & ZSB_XATTR))
+		return (SET_ERROR(EOPNOTSUPP));
+
+	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
+	    ap->a_cred, ap->a_td, VWRITE);
+	if (error != 0)
+		return (SET_ERROR(error));
+
+	error = zfs_check_attrname(ap->a_name);
+	if (error != 0)
+		return (error);
+
+	ZFS_ENTER(zfsvfs);
+	ZFS_VERIFY_ZP(zp);
+	rw_enter(&zp->z_xattr_lock, RW_WRITER);
+
+	error = zfs_deleteextattr_impl(ap, zfs_xattr_compat);
+	if ((error == ENOENT || error == ENOATTR) &&
+	    ap->a_attrnamespace == EXTATTR_NAMESPACE_USER) {
+		/*
+		 * Fall back to the alternate namespace format if we failed to
+		 * find a user xattr.
+		 */
+		error = zfs_deleteextattr_impl(ap, !zfs_xattr_compat);
+	}
+
+	rw_exit(&zp->z_xattr_lock);
+	ZFS_EXIT(zfsvfs);
+	if (error == ENOENT)
+		error = SET_ERROR(ENOATTR);
 	return (error);
 }
 
@@ -5445,56 +5623,32 @@ struct vop_setextattr {
 };
 #endif
 
-/*
- * Vnode operation to set a named attribute.
- */
 static int
-zfs_setextattr(struct vop_setextattr_args *ap)
+zfs_setextattr_dir(struct vop_setextattr_args *ap, const char *attrname)
 {
-	zfsvfs_t *zfsvfs = VTOZ(ap->a_vp)->z_zfsvfs;
 	struct thread *td = ap->a_td;
 	struct nameidata nd;
-	char attrname[255];
 	struct vattr va;
 	vnode_t *xvp = NULL, *vp;
 	int error, flags;
 
-	/*
-	 * If the xattr property is off, refuse the request.
-	 */
-	if (!(zfsvfs->z_flags & ZSB_XATTR)) {
-		return (SET_ERROR(EOPNOTSUPP));
-	}
-
-	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
-	    ap->a_cred, ap->a_td, VWRITE);
-	if (error != 0)
-		return (error);
-	error = zfs_create_attrname(ap->a_attrnamespace, ap->a_name, attrname,
-	    sizeof (attrname));
-	if (error != 0)
-		return (error);
-
-	ZFS_ENTER(zfsvfs);
-
-	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred, td,
+	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred,
 	    LOOKUP_XATTR | CREATE_XATTR_DIR, B_FALSE);
-	if (error != 0) {
-		ZFS_EXIT(zfsvfs);
+	if (error != 0)
 		return (error);
-	}
 
 	flags = FFLAGS(O_WRONLY | O_CREAT);
-	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, attrname,
-	    xvp, td);
+#if __FreeBSD_version < 1400043
+	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, attrname, xvp, td);
+#else
+	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, attrname, xvp);
+#endif
 	error = vn_open_cred(&nd, &flags, 0600, VN_OPEN_INVFS, ap->a_cred,
 	    NULL);
 	vp = nd.ni_vp;
-	NDFREE(&nd, NDF_ONLY_PNBUF);
-	if (error != 0) {
-		ZFS_EXIT(zfsvfs);
-		return (error);
-	}
+	NDFREE_PNBUF(&nd);
+	if (error != 0)
+		return (SET_ERROR(error));
 
 	VATTR_NULL(&va);
 	va.va_size = 0;
@@ -5504,6 +5658,134 @@ zfs_setextattr(struct vop_setextattr_args *ap)
 
 	VOP_UNLOCK1(vp);
 	vn_close(vp, flags, ap->a_cred, td);
+	return (error);
+}
+
+static int
+zfs_setextattr_sa(struct vop_setextattr_args *ap, const char *attrname)
+{
+	znode_t *zp = VTOZ(ap->a_vp);
+	nvlist_t *nvl;
+	size_t sa_size;
+	int error;
+
+	error = zfs_ensure_xattr_cached(zp);
+	if (error != 0)
+		return (error);
+
+	ASSERT(RW_WRITE_HELD(&zp->z_xattr_lock));
+	ASSERT3P(zp->z_xattr_cached, !=, NULL);
+
+	nvl = zp->z_xattr_cached;
+	size_t entry_size = ap->a_uio->uio_resid;
+	if (entry_size > DXATTR_MAX_ENTRY_SIZE)
+		return (SET_ERROR(EFBIG));
+	error = nvlist_size(nvl, &sa_size, NV_ENCODE_XDR);
+	if (error != 0)
+		return (SET_ERROR(error));
+	if (sa_size > DXATTR_MAX_SA_SIZE)
+		return (SET_ERROR(EFBIG));
+	uchar_t *buf = kmem_alloc(entry_size, KM_SLEEP);
+	error = uiomove(buf, entry_size, ap->a_uio);
+	if (error != 0) {
+		error = SET_ERROR(error);
+	} else {
+		error = nvlist_add_byte_array(nvl, attrname, buf, entry_size);
+		if (error != 0)
+			error = SET_ERROR(error);
+	}
+	if (error == 0)
+		error = zfs_sa_set_xattr(zp, attrname, buf, entry_size);
+	kmem_free(buf, entry_size);
+	if (error != 0) {
+		zp->z_xattr_cached = NULL;
+		nvlist_free(nvl);
+	}
+	return (error);
+}
+
+static int
+zfs_setextattr_impl(struct vop_setextattr_args *ap, boolean_t compat)
+{
+	znode_t *zp = VTOZ(ap->a_vp);
+	zfsvfs_t *zfsvfs = ZTOZSB(zp);
+	char attrname[EXTATTR_MAXNAMELEN+1];
+	int error;
+
+	error = zfs_create_attrname(ap->a_attrnamespace, ap->a_name, attrname,
+	    sizeof (attrname), compat);
+	if (error != 0)
+		return (error);
+
+	struct vop_deleteextattr_args vda = {
+		.a_vp = ap->a_vp,
+		.a_attrnamespace = ap->a_attrnamespace,
+		.a_name = ap->a_name,
+		.a_cred = ap->a_cred,
+		.a_td = ap->a_td,
+	};
+	error = ENOENT;
+	if (zfsvfs->z_use_sa && zp->z_is_sa && zfsvfs->z_xattr_sa) {
+		error = zfs_setextattr_sa(ap, attrname);
+		if (error == 0) {
+			/*
+			 * Successfully put into SA, we need to clear the one
+			 * in dir if present.
+			 */
+			zfs_deleteextattr_dir(&vda, attrname);
+		}
+	}
+	if (error != 0) {
+		error = zfs_setextattr_dir(ap, attrname);
+		if (error == 0 && zp->z_is_sa) {
+			/*
+			 * Successfully put into dir, we need to clear the one
+			 * in SA if present.
+			 */
+			zfs_deleteextattr_sa(&vda, attrname);
+		}
+	}
+	if (error == 0 && ap->a_attrnamespace == EXTATTR_NAMESPACE_USER) {
+		/*
+		 * Also clear all versions of the alternate compat name.
+		 */
+		zfs_deleteextattr_impl(&vda, !compat);
+	}
+	return (error);
+}
+
+/*
+ * Vnode operation to set a named attribute.
+ */
+static int
+zfs_setextattr(struct vop_setextattr_args *ap)
+{
+	znode_t *zp = VTOZ(ap->a_vp);
+	zfsvfs_t *zfsvfs = ZTOZSB(zp);
+	int error;
+
+	/*
+	 * If the xattr property is off, refuse the request.
+	 */
+	if (!(zfsvfs->z_flags & ZSB_XATTR))
+		return (SET_ERROR(EOPNOTSUPP));
+
+	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
+	    ap->a_cred, ap->a_td, VWRITE);
+	if (error != 0)
+		return (SET_ERROR(error));
+
+	error = zfs_check_attrname(ap->a_name);
+	if (error != 0)
+		return (error);
+
+	ZFS_ENTER(zfsvfs);
+	ZFS_VERIFY_ZP(zp);
+	rw_enter(&zp->z_xattr_lock, RW_WRITER);
+
+	error = zfs_setextattr_impl(ap, zfs_xattr_compat);
+
+	rw_exit(&zp->z_xattr_lock);
 	ZFS_EXIT(zfsvfs);
 	return (error);
 }
@@ -5519,55 +5801,20 @@ struct vop_listextattr {
 };
 #endif
 
-/*
- * Vnode operation to retrieve extended attributes on a vnode.
- */
 static int
-zfs_listextattr(struct vop_listextattr_args *ap)
+zfs_listextattr_dir(struct vop_listextattr_args *ap, const char *attrprefix)
 {
-	zfsvfs_t *zfsvfs = VTOZ(ap->a_vp)->z_zfsvfs;
 	struct thread *td = ap->a_td;
 	struct nameidata nd;
-	char attrprefix[16];
 	uint8_t dirbuf[sizeof (struct dirent)];
-	struct dirent *dp;
 	struct iovec aiov;
 	struct uio auio;
-	size_t *sizep = ap->a_size;
-	size_t plen;
 	vnode_t *xvp = NULL, *vp;
-	int done, error, eof, pos;
-	zfs_uio_t uio;
+	int error, eof;
 
-	zfs_uio_init(&uio, ap->a_uio);
-
-	/*
-	 * If the xattr property is off, refuse the request.
-	 */
-	if (!(zfsvfs->z_flags & ZSB_XATTR)) {
-		return (SET_ERROR(EOPNOTSUPP));
-	}
-
-	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
-	    ap->a_cred, ap->a_td, VREAD);
-	if (error != 0)
-		return (error);
-
-	error = zfs_create_attrname(ap->a_attrnamespace, "", attrprefix,
-	    sizeof (attrprefix));
-	if (error != 0)
-		return (error);
-	plen = strlen(attrprefix);
-
-	ZFS_ENTER(zfsvfs);
-
-	if (sizep != NULL)
-		*sizep = 0;
-
-	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred, td,
+	error = zfs_lookup(ap->a_vp, NULL, &xvp, NULL, 0, ap->a_cred,
 	    LOOKUP_XATTR, B_FALSE);
 	if (error != 0) {
-		ZFS_EXIT(zfsvfs);
 		/*
 		 * ENOATTR means that the EA directory does not yet exist,
 		 * i.e. there are no extended attributes there.
@@ -5577,15 +5824,18 @@ zfs_listextattr(struct vop_listextattr_args *ap)
 		return (error);
 	}
 
+#if __FreeBSD_version < 1400043
 	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW | LOCKLEAF | LOCKSHARED,
 	    UIO_SYSSPACE, ".", xvp, td);
+#else
+	NDINIT_ATVP(&nd, LOOKUP, NOFOLLOW | LOCKLEAF | LOCKSHARED,
+	    UIO_SYSSPACE, ".", xvp);
+#endif
 	error = namei(&nd);
 	vp = nd.ni_vp;
-	NDFREE(&nd, NDF_ONLY_PNBUF);
-	if (error != 0) {
-		ZFS_EXIT(zfsvfs);
-		return (error);
-	}
+	NDFREE_PNBUF(&nd);
+	if (error != 0)
+		return (SET_ERROR(error));
 
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
@@ -5594,18 +5844,18 @@ zfs_listextattr(struct vop_listextattr_args *ap)
 	auio.uio_rw = UIO_READ;
 	auio.uio_offset = 0;
 
-	do {
-		uint8_t nlen;
+	size_t plen = strlen(attrprefix);
 
+	do {
 		aiov.iov_base = (void *)dirbuf;
 		aiov.iov_len = sizeof (dirbuf);
 		auio.uio_resid = sizeof (dirbuf);
 		error = VOP_READDIR(vp, &auio, ap->a_cred, &eof, NULL, NULL);
-		done = sizeof (dirbuf) - auio.uio_resid;
 		if (error != 0)
 			break;
-		for (pos = 0; pos < done; ) {
-			dp = (struct dirent *)(dirbuf + pos);
+		int done = sizeof (dirbuf) - auio.uio_resid;
+		for (int pos = 0; pos < done; ) {
+			struct dirent *dp = (struct dirent *)(dirbuf + pos);
 			pos += dp->d_reclen;
 			/*
 			 * XXX: Temporarily we also accept DT_UNKNOWN, as this
@@ -5613,34 +5863,138 @@ zfs_listextattr(struct vop_listextattr_args *ap)
 			 */
 			if (dp->d_type != DT_REG && dp->d_type != DT_UNKNOWN)
 				continue;
-			if (plen == 0 &&
-			    strncmp(dp->d_name, "freebsd:", 8) == 0)
+			else if (plen == 0 &&
+			    ZFS_XA_NS_PREFIX_FORBIDDEN(dp->d_name))
 				continue;
 			else if (strncmp(dp->d_name, attrprefix, plen) != 0)
 				continue;
-			nlen = dp->d_namlen - plen;
-			if (sizep != NULL)
-				*sizep += 1 + nlen;
-			else if (GET_UIO_STRUCT(&uio) != NULL) {
+			uint8_t nlen = dp->d_namlen - plen;
+			if (ap->a_size != NULL) {
+				*ap->a_size += 1 + nlen;
+			} else if (ap->a_uio != NULL) {
 				/*
 				 * Format of extattr name entry is one byte for
 				 * length and the rest for name.
 				 */
-				error = zfs_uiomove(&nlen, 1, zfs_uio_rw(&uio),
-				    &uio);
+				error = uiomove(&nlen, 1, ap->a_uio);
 				if (error == 0) {
-					error = zfs_uiomove(dp->d_name + plen,
-					    nlen, zfs_uio_rw(&uio), &uio);
+					char *namep = dp->d_name + plen;
+					error = uiomove(namep, nlen, ap->a_uio);
 				}
-				if (error != 0)
+				if (error != 0) {
+					error = SET_ERROR(error);
 					break;
+				}
 			}
 		}
 	} while (!eof && error == 0);
 
 	vput(vp);
-	ZFS_EXIT(zfsvfs);
+	return (error);
+}
 
+static int
+zfs_listextattr_sa(struct vop_listextattr_args *ap, const char *attrprefix)
+{
+	znode_t *zp = VTOZ(ap->a_vp);
+	int error;
+
+	error = zfs_ensure_xattr_cached(zp);
+	if (error != 0)
+		return (error);
+
+	ASSERT(RW_LOCK_HELD(&zp->z_xattr_lock));
+	ASSERT3P(zp->z_xattr_cached, !=, NULL);
+
+	size_t plen = strlen(attrprefix);
+	nvpair_t *nvp = NULL;
+	while ((nvp = nvlist_next_nvpair(zp->z_xattr_cached, nvp)) != NULL) {
+		ASSERT3U(nvpair_type(nvp), ==, DATA_TYPE_BYTE_ARRAY);
+
+		const char *name = nvpair_name(nvp);
+		if (plen == 0 && ZFS_XA_NS_PREFIX_FORBIDDEN(name))
+			continue;
+		else if (strncmp(name, attrprefix, plen) != 0)
+			continue;
+		uint8_t nlen = strlen(name) - plen;
+		if (ap->a_size != NULL) {
+			*ap->a_size += 1 + nlen;
+		} else if (ap->a_uio != NULL) {
+			/*
+			 * Format of extattr name entry is one byte for
+			 * length and the rest for name.
+			 */
+			error = uiomove(&nlen, 1, ap->a_uio);
+			if (error == 0) {
+				char *namep = __DECONST(char *, name) + plen;
+				error = uiomove(namep, nlen, ap->a_uio);
+			}
+			if (error != 0) {
+				error = SET_ERROR(error);
+				break;
+			}
+		}
+	}
+
+	return (error);
+}
+
+static int
+zfs_listextattr_impl(struct vop_listextattr_args *ap, boolean_t compat)
+{
+	znode_t *zp = VTOZ(ap->a_vp);
+	zfsvfs_t *zfsvfs = ZTOZSB(zp);
+	char attrprefix[16];
+	int error;
+
+	error = zfs_create_attrname(ap->a_attrnamespace, "", attrprefix,
+	    sizeof (attrprefix), compat);
+	if (error != 0)
+		return (error);
+
+	if (zfsvfs->z_use_sa && zp->z_is_sa)
+		error = zfs_listextattr_sa(ap, attrprefix);
+	if (error == 0)
+		error = zfs_listextattr_dir(ap, attrprefix);
+	return (error);
+}
+
+/*
+ * Vnode operation to retrieve extended attributes on a vnode.
+ */
+static int
+zfs_listextattr(struct vop_listextattr_args *ap)
+{
+	znode_t *zp = VTOZ(ap->a_vp);
+	zfsvfs_t *zfsvfs = ZTOZSB(zp);
+	int error;
+
+	if (ap->a_size != NULL)
+		*ap->a_size = 0;
+
+	/*
+	 * If the xattr property is off, refuse the request.
+	 */
+	if (!(zfsvfs->z_flags & ZSB_XATTR))
+		return (SET_ERROR(EOPNOTSUPP));
+
+	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
+	    ap->a_cred, ap->a_td, VREAD);
+	if (error != 0)
+		return (SET_ERROR(error));
+
+	ZFS_ENTER(zfsvfs);
+	ZFS_VERIFY_ZP(zp);
+	rw_enter(&zp->z_xattr_lock, RW_READER);
+
+	error = zfs_listextattr_impl(ap, zfs_xattr_compat);
+	if (error == 0 && ap->a_attrnamespace == EXTATTR_NAMESPACE_USER) {
+		/* Also list user xattrs with the alternate format. */
+		error = zfs_listextattr_impl(ap, !zfs_xattr_compat);
+	}
+
+	rw_exit(&zp->z_xattr_lock);
+	ZFS_EXIT(zfsvfs);
 	return (error);
 }
 
@@ -5776,7 +6130,7 @@ zfs_vptocnp(struct vop_vptocnp_args *ap)
 		}
 		if (error == 0) {
 			*ap->a_buflen -= len;
-			bcopy(name, ap->a_buf + *ap->a_buflen, len);
+			memcpy(ap->a_buf + *ap->a_buflen, name, len);
 			*ap->a_vpp = ZTOV(dzp);
 		}
 		ZFS_EXIT(zfsvfs);
@@ -5813,6 +6167,55 @@ zfs_vptocnp(struct vop_vptocnp_args *ap)
 	return (error);
 }
 
+#if __FreeBSD_version >= 1400032
+static int
+zfs_deallocate(struct vop_deallocate_args *ap)
+{
+	znode_t *zp = VTOZ(ap->a_vp);
+	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
+	zilog_t *zilog;
+	off_t off, len, file_sz;
+	int error;
+
+	ZFS_ENTER(zfsvfs);
+	ZFS_VERIFY_ZP(zp);
+
+	/*
+	 * Callers might not be able to detect properly that we are read-only,
+	 * so check it explicitly here.
+	 */
+	if (zfs_is_readonly(zfsvfs)) {
+		ZFS_EXIT(zfsvfs);
+		return (SET_ERROR(EROFS));
+	}
+
+	zilog = zfsvfs->z_log;
+	off = *ap->a_offset;
+	len = *ap->a_len;
+	file_sz = zp->z_size;
+	if (off + len > file_sz)
+		len = file_sz - off;
+	/* Fast path for out-of-range request. */
+	if (len <= 0) {
+		*ap->a_len = 0;
+		ZFS_EXIT(zfsvfs);
+		return (0);
+	}
+
+	error = zfs_freesp(zp, off, len, O_RDWR, TRUE);
+	if (error == 0) {
+		if (zfsvfs->z_os->os_sync == ZFS_SYNC_ALWAYS ||
+		    (ap->a_ioflag & IO_SYNC) != 0)
+			zil_commit(zilog, zp->z_id);
+		*ap->a_offset = off + len;
+		*ap->a_len = 0;
+	}
+
+	ZFS_EXIT(zfsvfs);
+	return (error);
+}
+#endif
+
 struct vop_vector zfs_vnodeops;
 struct vop_vector zfs_fifoops;
 struct vop_vector zfs_shareops;
@@ -5827,9 +6230,14 @@ struct vop_vector zfs_vnodeops = {
 #if __FreeBSD_version >= 1300102
 	.vop_fplookup_vexec = zfs_freebsd_fplookup_vexec,
 #endif
+#if __FreeBSD_version >= 1300139
 	.vop_fplookup_symlink = zfs_freebsd_fplookup_symlink,
+#endif
 	.vop_access =		zfs_freebsd_access,
 	.vop_allocate =		VOP_EINVAL,
+#if __FreeBSD_version >= 1400032
+	.vop_deallocate =	zfs_deallocate,
+#endif
 	.vop_lookup =		zfs_cache_lookup,
 	.vop_cachedlookup =	zfs_freebsd_cachedlookup,
 	.vop_getattr =		zfs_freebsd_getattr,
@@ -5868,6 +6276,9 @@ struct vop_vector zfs_vnodeops = {
 	.vop_unlock =		vop_unlock,
 	.vop_islocked =		vop_islocked,
 #endif
+#if __FreeBSD_version >= 1400043
+	.vop_add_writecount =	vop_stdadd_writecount_nomsync,
+#endif
 };
 VFS_VOP_VECTOR_REGISTER(zfs_vnodeops);
 
@@ -5877,7 +6288,9 @@ struct vop_vector zfs_fifoops = {
 #if __FreeBSD_version >= 1300102
 	.vop_fplookup_vexec = zfs_freebsd_fplookup_vexec,
 #endif
+#if __FreeBSD_version >= 1300139
 	.vop_fplookup_symlink = zfs_freebsd_fplookup_symlink,
+#endif
 	.vop_access =		zfs_freebsd_access,
 	.vop_getattr =		zfs_freebsd_getattr,
 	.vop_inactive =		zfs_freebsd_inactive,
@@ -5890,6 +6303,9 @@ struct vop_vector zfs_fifoops = {
 	.vop_getacl =		zfs_freebsd_getacl,
 	.vop_setacl =		zfs_freebsd_setacl,
 	.vop_aclcheck =		zfs_freebsd_aclcheck,
+#if __FreeBSD_version >= 1400043
+	.vop_add_writecount =	vop_stdadd_writecount_nomsync,
+#endif
 };
 VFS_VOP_VECTOR_REGISTER(zfs_fifoops);
 
@@ -5901,11 +6317,19 @@ struct vop_vector zfs_shareops = {
 #if __FreeBSD_version >= 1300121
 	.vop_fplookup_vexec =	VOP_EAGAIN,
 #endif
+#if __FreeBSD_version >= 1300139
 	.vop_fplookup_symlink =	VOP_EAGAIN,
+#endif
 	.vop_access =		zfs_freebsd_access,
 	.vop_inactive =		zfs_freebsd_inactive,
 	.vop_reclaim =		zfs_freebsd_reclaim,
 	.vop_fid =		zfs_freebsd_fid,
 	.vop_pathconf =		zfs_freebsd_pathconf,
+#if __FreeBSD_version >= 1400043
+	.vop_add_writecount =	vop_stdadd_writecount_nomsync,
+#endif
 };
 VFS_VOP_VECTOR_REGISTER(zfs_shareops);
+
+ZFS_MODULE_PARAM(zfs, zfs_, xattr_compat, INT, ZMOD_RW,
+	"Use legacy ZFS xattr naming for writing new user namespace xattrs");

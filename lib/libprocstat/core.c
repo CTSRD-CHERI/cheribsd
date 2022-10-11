@@ -61,19 +61,6 @@ __FBSDID("$FreeBSD$");
 
 #include "core.h"
 
-#ifndef EF_MIPS_ABI
-#define	EF_MIPS_ABI		0x0000f000
-#endif
-#ifndef EF_MIPS_ABI_CHERIABI
-#define	EF_MIPS_ABI_CHERIABI	0x0000c000
-#endif
-#ifndef EF_MIPS_MACH_CHERI128
-#define	EF_MIPS_MACH_CHERI128	0x00C10000
-#endif
-#ifndef EF_MIPS_MACH
-#define	EF_MIPS_MACH		0x00FF0000
-#endif
-
 #define PROCSTAT_CORE_MAGIC	0x012DADB8
 struct procstat_core
 {
@@ -84,41 +71,14 @@ struct procstat_core
 	GElf_Phdr	pc_phdr;
 };
 
-/*
- * XXXss The following is dependent on how capabilities are stored
- * in the core image (and memory) and in the ELF Notes by the
- * kernel. This is subject to changes in the CHERI architecture spec.
- * The procstat code, however, needs to know the offset to the cursor
- * value.
- */
-struct _cap128 {
-	uint64_t cursor;
-	uint64_t base;
-} __packed;
-typedef struct _cap128 cap128_t;
-
-/* XXXss Should be moved to elf.h? */
-typedef struct {
-	long	a_type;
-	union {
-		long		a_val;			/* Integer value */
-		cap128_t	a_ptr __aligned(16);	/* Address. */
-	} a_un;
-} ElfCheriABI128_Auxinfo;
-
-struct _cap128_ps_strings {
-	cap128_t	ps_argvstr __aligned(16);
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+struct cheri_ps_strings {
+	void * __capability ps_argvstr;
 	int		ps_nargvstr;
-	cap128_t	ps_envstr __aligned(16);
+	void * __capability ps_envstr;
 	int		ps_nenvstr;
-	cap128_t	ps_sbclasses __aligned(16);
-	size_t		ps_sbclasseslen;
-	cap128_t	ps_sbmethods __aligned(16);
-	size_t		ps_sbmethodslen;
-	cap128_t	ps_sbobjects __aligned(16);
-	size_t		ps_sbobjectslen;
 };
-typedef struct _cap128_ps_strings cap128_ps_strings_t;
+#endif
 
 static struct psc_type_info {
 	unsigned int	n_type;
@@ -138,7 +98,8 @@ static struct psc_type_info {
 	{ .n_type = NT_PTLWPINFO, .structsize = sizeof(struct ptrace_lwpinfo) },
 };
 
-static struct psc_type_info cheri128_type_info[PSC_TYPE_MAX] = {
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+static struct psc_type_info cheri_type_info[PSC_TYPE_MAX] = {
 	{ .n_type = NT_PROCSTAT_PROC, .structsize = sizeof(struct kinfo_proc) },
 	{ .n_type = NT_PROCSTAT_FILES, .structsize = sizeof(struct kinfo_file) },
 	{ .n_type = NT_PROCSTAT_VMMAP, .structsize = sizeof(struct kinfo_vmentry) },
@@ -149,9 +110,10 @@ static struct psc_type_info cheri128_type_info[PSC_TYPE_MAX] = {
 	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
 	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
 	{ .n_type = NT_PROCSTAT_PSSTRINGS, .structsize = sizeof(vm_offset_t) },
-	{ .n_type = NT_PROCSTAT_AUXV, .structsize = sizeof(ElfCheriABI128_Auxinfo) },
+	{ .n_type = NT_PROCSTAT_AUXV, .structsize = sizeof(Elf64C_Auxinfo) },
 	{ .n_type = NT_PTLWPINFO, .structsize = sizeof(struct ptrace_lwpinfo) },
 };
+#endif
 
 static bool	core_offset(struct procstat_core *core, off_t offset);
 static bool	core_read(struct procstat_core *core, void *buf, size_t len);
@@ -161,20 +123,23 @@ static void	*get_args(struct procstat_core *core, vm_offset_t psstrings,
     enum psc_type type, void *buf, size_t *lenp);
 static void	*get_auxv(struct procstat_core *core, void *buf, size_t *lenp);
 
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 static bool
-core_is_cheri128(struct procstat_core *core)
+core_is_cheri(struct procstat_core *core)
 {
 
-	return ((core->pc_ehdr.e_flags & (EF_MIPS_ABI | EF_MIPS_MACH)) ==
-	    (EF_MIPS_ABI_CHERIABI | EF_MIPS_MACH_CHERI128));
+	return (ELF_IS_CHERI(&core->pc_ehdr));
 }
+#endif
 
 static struct psc_type_info *
-core_psc_type_info(struct procstat_core *core)
+core_psc_type_info(struct procstat_core *core __unused)
 {
 
-	if (core_is_cheri128(core))
-		return (cheri128_type_info);
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+	if (core_is_cheri(core))
+		return (cheri_type_info);
+#endif
 	return (default_type_info);
 }
 
@@ -445,18 +410,21 @@ core_read_ps_strings(struct procstat_core *core, vm_offset_t psstrings,
 
 	assert(type == PSC_TYPE_ARGV || type == PSC_TYPE_ENVV);
 
-	if (core_is_cheri128(core)) {
-		cap128_ps_strings_t pss;
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+	if (core_is_cheri(core)) {
+		struct cheri_ps_strings pss;
 
 		if (core_read_mem(core, &pss, sizeof(pss), psstrings, true) ==
 		    -1)
 			return ((vm_offset_t)0);
 		nargstr = pss.ps_nargvstr;
 		nenvstr = pss.ps_nenvstr;
-		argaddr = (vm_offset_t)pss.ps_argvstr.cursor;
-		envaddr = (vm_offset_t)pss.ps_envstr.cursor;
-		*size = sizeof(cap128_t);
-	} else {
+		argaddr = (__cheri_addr vm_offset_t)pss.ps_argvstr;
+		envaddr = (__cheri_addr vm_offset_t)pss.ps_envstr;
+		*size = sizeof(uintcap_t);
+	} else
+#endif
+	{
 		struct ps_strings pss;
 
 		if (core_read_mem(core, &pss, sizeof(pss), psstrings, true) ==
@@ -479,14 +447,16 @@ core_read_ps_strings(struct procstat_core *core, vm_offset_t psstrings,
 }
 
 static inline vm_offset_t
-core_image_off(struct procstat_core *core, char **ptr, int i)
+core_image_off(struct procstat_core *core __unused, char **ptr, int i)
 {
 
-	if (core_is_cheri128(core)) {
-		cap128_t *cap = (cap128_t *)(ptr + (i * sizeof(cap128_t) / 8));
-
-		return (cap->cursor);
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+	if (core_is_cheri(core)) {
+		char * __capability *cap = (char * __capability *)
+		    __builtin_assume_aligned(ptr, sizeof(char * __capability));
+		return ((__cheri_addr vm_offset_t)cap[i]);
 	} else
+#endif
 		return ((vm_offset_t)ptr[i]);
 }
 
@@ -567,6 +537,7 @@ done:
 	return (args);
 }
 
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
 static bool
 is_auxv_ptr(long type)
 {
@@ -583,17 +554,18 @@ is_auxv_ptr(long type)
 		return (false);
 	}
 }
+#endif
 
 static void *
-get_auxv(struct procstat_core *core, void *auxv, size_t *lenp)
+get_auxv(struct procstat_core *core __unused, void *auxv, size_t *lenp __unused)
 {
-	Elf_Auxinfo *buf;
-	unsigned count, i;
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+	if (core_is_cheri(core)) {
+		Elf64C_Auxinfo *auxv_cheri = auxv;
+		Elf_Auxinfo *buf;
+		unsigned count, i;
 
-	if (core_is_cheri128(core)) {
-		ElfCheriABI128_Auxinfo *auxv_cheri = auxv;
-
-		count = *lenp / sizeof(ElfCheriABI128_Auxinfo);
+		count = *lenp / sizeof(Elf64C_Auxinfo);
 		*lenp = count * sizeof(Elf_Auxinfo);
 		buf = (Elf_Auxinfo *)malloc(*lenp);
 		if (buf == NULL) {
@@ -604,17 +576,17 @@ get_auxv(struct procstat_core *core, void *auxv, size_t *lenp)
 		for (i = 0; i < count; i++) {
 			buf[i].a_type = auxv_cheri[i].a_type;
 			if (is_auxv_ptr(auxv_cheri[i].a_type))
-				buf[i].a_un.a_ptr = (void *)(uintptr_t)
-				    auxv_cheri[i].a_un.a_ptr.cursor;
+				buf[i].a_un.a_ptr = (void *)(__cheri_addr uintptr_t)
+				    auxv_cheri[i].a_un.a_ptr;
 			else
 				buf[i].a_un.a_val = auxv_cheri[i].a_un.a_val;
 		}
 		free(auxv);
 		return ((void *)buf);
-	} else {
-		/* Nothing needs to be done so just pass the buffer back. */
-		return (auxv);
 	}
+#endif
+	/* Nothing needs to be done so just pass the buffer back. */
+	return (auxv);
 }
 
 int

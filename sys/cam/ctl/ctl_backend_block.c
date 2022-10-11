@@ -3,11 +3,14 @@
  *
  * Copyright (c) 2003 Silicon Graphics International Corp.
  * Copyright (c) 2009-2011 Spectra Logic Corporation
- * Copyright (c) 2012 The FreeBSD Foundation
- * Copyright (c) 2014-2015 Alexander Motin <mav@FreeBSD.org>
+ * Copyright (c) 2012,2021 The FreeBSD Foundation
+ * Copyright (c) 2014-2021 Alexander Motin <mav@FreeBSD.org>
  * All rights reserved.
  *
  * Portions of this software were developed by Edward Tomasz Napierala
+ * under sponsorship from the FreeBSD Foundation.
+ *
+ * Portions of this software were developed by Ka Ho Ng <khng@FreeBSD.org>
  * under sponsorship from the FreeBSD Foundation.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -81,6 +84,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/nv.h>
 #include <sys/dnv.h>
 #include <sys/sx.h>
+#include <sys/unistd.h>
 
 #include <geom/geom.h>
 
@@ -97,16 +101,15 @@ __FBSDID("$FreeBSD$");
 #include <cam/ctl/ctl_error.h>
 
 /*
- * The idea here is that we'll allocate enough S/G space to hold a 1MB
- * I/O.  If we get an I/O larger than that, we'll split it.
+ * The idea here is to allocate enough S/G space to handle at least 1MB I/Os.
+ * On systems with small maxphys it can be 8 128KB segments.  On large systems
+ * it can be up to 8 1MB segments.  I/Os larger than that we'll split.
  */
-#define	CTLBLK_HALF_IO_SIZE	(512 * 1024)
-#define	CTLBLK_MAX_IO_SIZE	(CTLBLK_HALF_IO_SIZE * 2)
+#define	CTLBLK_MAX_SEGS		8
+#define	CTLBLK_HALF_SEGS	(CTLBLK_MAX_SEGS / 2)
 #define	CTLBLK_MIN_SEG		(128 * 1024)
-#define	CTLBLK_MAX_SEG		MIN(CTLBLK_HALF_IO_SIZE, maxphys)
-#define	CTLBLK_HALF_SEGS	MAX(CTLBLK_HALF_IO_SIZE / CTLBLK_MIN_SEG, 1)
-#define	CTLBLK_MAX_SEGS		(CTLBLK_HALF_SEGS * 2)
-#define	CTLBLK_NUM_SEGS		(CTLBLK_MAX_IO_SIZE / CTLBLK_MAX_SEG)
+#define	CTLBLK_MAX_SEG		MIN(1024 * 1024, MAX(CTLBLK_MIN_SEG, maxphys))
+#define	CTLBLK_MAX_IO_SIZE	(CTLBLK_MAX_SEG * CTLBLK_MAX_SEGS)
 
 #ifdef CTLBLK_DEBUG
 #define DPRINTF(fmt, args...) \
@@ -245,6 +248,8 @@ static void ctl_be_block_gls_file(struct ctl_be_block_lun *be_lun,
 				  struct ctl_be_block_io *beio);
 static uint64_t ctl_be_block_getattr_file(struct ctl_be_block_lun *be_lun,
 					 const char *attrname);
+static void ctl_be_block_unmap_file(struct ctl_be_block_lun *be_lun,
+				    struct ctl_be_block_io *beio);
 static void ctl_be_block_flush_dev(struct ctl_be_block_lun *be_lun,
 				   struct ctl_be_block_io *beio);
 static void ctl_be_block_unmap_dev(struct ctl_be_block_lun *be_lun,
@@ -588,7 +593,7 @@ ctl_be_block_flush_file(struct ctl_be_block_lun *be_lun,
 {
 	union ctl_io *io = beio->io;
 	struct mount *mountpoint;
-	int error, lock_flags;
+	int error;
 
 	DPRINTF("entered\n");
 
@@ -597,12 +602,8 @@ ctl_be_block_flush_file(struct ctl_be_block_lun *be_lun,
 
 	(void) vn_start_write(be_lun->vn, &mountpoint, V_WAIT);
 
-	if (MNT_SHARED_WRITES(mountpoint) ||
-	    ((mountpoint == NULL) && MNT_SHARED_WRITES(be_lun->vn->v_mount)))
-		lock_flags = LK_SHARED;
-	else
-		lock_flags = LK_EXCLUSIVE;
-	vn_lock(be_lun->vn, lock_flags | LK_RETRY);
+	vn_lock(be_lun->vn, vn_lktype_write(mountpoint, be_lun->vn) |
+	    LK_RETRY);
 	error = VOP_FSYNC(be_lun->vn, beio->io_arg ? MNT_NOWAIT : MNT_WAIT,
 	    curthread);
 	VOP_UNLOCK(be_lun->vn);
@@ -720,16 +721,10 @@ ctl_be_block_dispatch_file(struct ctl_be_block_lun *be_lun,
 		}
 	} else {
 		struct mount *mountpoint;
-		int lock_flags;
 
 		(void)vn_start_write(be_lun->vn, &mountpoint, V_WAIT);
-
-		if (MNT_SHARED_WRITES(mountpoint) || ((mountpoint == NULL)
-		  && MNT_SHARED_WRITES(be_lun->vn->v_mount)))
-			lock_flags = LK_SHARED;
-		else
-			lock_flags = LK_EXCLUSIVE;
-		vn_lock(be_lun->vn, lock_flags | LK_RETRY);
+		vn_lock(be_lun->vn, vn_lktype_write(mountpoint,
+		    be_lun->vn) | LK_RETRY);
 
 		/*
 		 * UFS pays attention to IO_DIRECT for writes.  The write
@@ -860,6 +855,84 @@ ctl_be_block_getattr_file(struct ctl_be_block_lun *be_lun, const char *attrname)
 	}
 	VOP_UNLOCK(be_lun->vn);
 	return (val);
+}
+
+static void
+ctl_be_block_unmap_file(struct ctl_be_block_lun *be_lun,
+		        struct ctl_be_block_io *beio)
+{
+	struct ctl_be_block_filedata *file_data;
+	union ctl_io *io;
+	struct ctl_ptr_len_flags *ptrlen;
+	struct scsi_unmap_desc *buf, *end;
+	struct mount *mp;
+	off_t off, len;
+	int error;
+
+	io = beio->io;
+	file_data = &be_lun->backend.file;
+	mp = NULL;
+	error = 0;
+
+	binuptime(&beio->ds_t0);
+	devstat_start_transaction(be_lun->disk_stats, &beio->ds_t0);
+
+	(void)vn_start_write(be_lun->vn, &mp, V_WAIT);
+	vn_lock(be_lun->vn, vn_lktype_write(mp, be_lun->vn) | LK_RETRY);
+	if (beio->io_offset == -1) {
+		beio->io_len = 0;
+		ptrlen = (struct ctl_ptr_len_flags *)
+		    &io->io_hdr.ctl_private[CTL_PRIV_LBA_LEN];
+		buf = (struct scsi_unmap_desc *)ptrlen->ptr;
+		end = buf + ptrlen->len / sizeof(*buf);
+		for (; buf < end; buf++) {
+			off = (off_t)scsi_8btou64(buf->lba) *
+			    be_lun->cbe_lun.blocksize;
+			len = (off_t)scsi_4btoul(buf->length) *
+			    be_lun->cbe_lun.blocksize;
+			beio->io_len += len;
+			error = vn_deallocate(be_lun->vn, &off, &len,
+			    0, IO_NOMACCHECK | IO_NODELOCKED, file_data->cred,
+			    NOCRED);
+			if (error != 0)
+				break;
+		}
+	} else {
+		/* WRITE_SAME */
+		off = beio->io_offset;
+		len = beio->io_len;
+		error = vn_deallocate(be_lun->vn, &off, &len, 0,
+		    IO_NOMACCHECK | IO_NODELOCKED, file_data->cred, NOCRED);
+	}
+	VOP_UNLOCK(be_lun->vn);
+	vn_finished_write(mp);
+
+	mtx_lock(&be_lun->io_lock);
+	devstat_end_transaction(beio->lun->disk_stats, beio->io_len,
+	    beio->ds_tag_type, beio->ds_trans_type,
+	    /*now*/ NULL, /*then*/&beio->ds_t0);
+	mtx_unlock(&be_lun->io_lock);
+
+	/*
+	 * If we got an error, set the sense data to "MEDIUM ERROR" and
+	 * return the I/O to the user.
+	 */
+	switch (error) {
+	case 0:
+		ctl_set_success(&io->scsiio);
+		break;
+	case ENOSPC:
+	case EDQUOT:
+		ctl_set_space_alloc_fail(&io->scsiio);
+		break;
+	case EROFS:
+	case EACCES:
+		ctl_set_hw_write_protected(&io->scsiio);
+		break;
+	default:
+		ctl_set_medium_error(&io->scsiio, false);
+	}
+	ctl_complete_beio(beio);
 }
 
 static void
@@ -1152,10 +1225,10 @@ ctl_be_block_dispatch_dev(struct ctl_be_block_lun *be_lun,
 	 */
 	if (csw) {
 		max_iosize = dev->si_iosize_max;
-		if (max_iosize < PAGE_SIZE)
+		if (max_iosize <= 0)
 			max_iosize = DFLTPHYS;
 	} else
-		max_iosize = DFLTPHYS;
+		max_iosize = maxphys;
 
 	cur_offset = beio->io_offset;
 	for (i = 0; i < beio->num_segs; i++) {
@@ -1323,7 +1396,7 @@ ctl_be_block_cw_dispatch_ws(struct ctl_be_block_lun *be_lun,
 	else
 		pbo = 0;
 	len_left = (uint64_t)lbalen->len * cbe_lun->blocksize;
-	for (i = 0, lba = 0; i < CTLBLK_NUM_SEGS && len_left > 0; i++) {
+	for (i = 0, lba = 0; i < CTLBLK_MAX_SEGS && len_left > 0; i++) {
 		/*
 		 * Setup the S/G entry for this chunk.
 		 */
@@ -1591,11 +1664,10 @@ ctl_be_block_dispatch(struct ctl_be_block_lun *be_lun,
 	DPRINTF("%s at LBA %jx len %u @%ju\n",
 	       (beio->bio_cmd == BIO_READ) ? "READ" : "WRITE",
 	       (uintmax_t)lbalen->lba, lbalen->len, bptrlen->len);
+	lbas = CTLBLK_MAX_IO_SIZE;
 	if (lbalen->flags & CTL_LLF_COMPARE) {
 		beio->two_sglists = 1;
-		lbas = CTLBLK_HALF_IO_SIZE;
-	} else {
-		lbas = CTLBLK_MAX_IO_SIZE;
+		lbas /= 2;
 	}
 	lbas = MIN(lbalen->len - bptrlen->len, lbas / cbe_lun->blocksize);
 	beio->io_offset = (lbalen->lba + bptrlen->len) * cbe_lun->blocksize;
@@ -1810,6 +1882,7 @@ ctl_be_block_open_file(struct ctl_be_block_lun *be_lun, struct ctl_lun_req *req)
 	struct vattr		      vattr;
 	off_t			      ps, pss, po, pos, us, uss, uo, uos;
 	int			      error;
+	long			      pconf;
 
 	cbe_lun = &be_lun->cbe_lun;
 	file_data = &be_lun->backend.file;
@@ -1820,7 +1893,7 @@ ctl_be_block_open_file(struct ctl_be_block_lun *be_lun, struct ctl_lun_req *req)
 	be_lun->lun_flush = ctl_be_block_flush_file;
 	be_lun->get_lba_status = ctl_be_block_gls_file;
 	be_lun->getattr = ctl_be_block_getattr_file;
-	be_lun->unmap = NULL;
+	be_lun->unmap = ctl_be_block_unmap_file;
 	cbe_lun->flags &= ~CTL_LUN_FLAG_UNMAP;
 
 	error = VOP_GETATTR(be_lun->vn, &vattr, curthread->td_ucred);
@@ -1830,6 +1903,16 @@ ctl_be_block_open_file(struct ctl_be_block_lun *be_lun, struct ctl_lun_req *req)
 			 be_lun->dev_path);
 		return (error);
 	}
+
+	error = VOP_PATHCONF(be_lun->vn, _PC_DEALLOC_PRESENT, &pconf);
+	if (error != 0) {
+		snprintf(req->error_str, sizeof(req->error_str),
+		    "error calling VOP_PATHCONF() for file %s",
+		    be_lun->dev_path);
+		return (error);
+	}
+	if (pconf == 1)
+		cbe_lun->flags |= CTL_LUN_FLAG_UNMAP;
 
 	file_data->cred = crhold(curthread->td_ucred);
 	if (params->lun_size_bytes != 0)
@@ -2143,8 +2226,7 @@ ctl_be_block_open(struct ctl_be_block_lun *be_lun, struct ctl_lun_req *req)
 		flags |= FWRITE;
 
 again:
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(be_lun->dev_path),
-	    curthread);
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, PTR2CAP(be_lun->dev_path));
 	error = vn_open(&nd, &flags, 0, NULL);
 	if ((error == EROFS || error == EACCES) && (flags & FWRITE)) {
 		flags &= ~FWRITE;
@@ -2175,7 +2257,7 @@ again:
 	else
 		cbe_lun->flags |= CTL_LUN_FLAG_READONLY;
 
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 	be_lun->vn = nd.ni_vp;
 
 	/* We only support disks and files. */

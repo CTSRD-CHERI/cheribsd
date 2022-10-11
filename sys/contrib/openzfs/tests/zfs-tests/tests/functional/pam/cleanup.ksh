@@ -22,11 +22,8 @@
 
 . $STF_SUITE/tests/functional/pam/utilities.kshlib
 
+rmconfig
 destroy_pool $TESTPOOL
 del_user ${username}
 del_group pamtestgroup
-
-rm -rf "$runstatedir"
-for dir in $TESTDIRS; do
-	rm -rf $dir
-done
+log_must rm -rf "$runstatedir" $TESTDIRS

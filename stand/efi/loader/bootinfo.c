@@ -63,8 +63,6 @@ __FBSDID("$FreeBSD$");
 int bi_load(char *args, vm_offset_t *modulep, vm_offset_t *kernendp,
     bool exit_bs);
 
-extern EFI_SYSTEM_TABLE	*ST;
-
 static int
 bi_getboothowto(char *kargs)
 {
@@ -349,6 +347,7 @@ bi_load_efi_data(struct preloaded_file *kfp, bool exit_bs)
 	 */
 
 	sz = 0;
+	mm = NULL;
 
 	/*
 	 * Matthew Garrett has observed at least one system changing the
@@ -395,7 +394,7 @@ bi_load_efi_data(struct preloaded_file *kfp, bool exit_bs)
 
 		if (!exit_bs)
 			break;
-		status = BS->ExitBootServices(IH, efi_mapkey);
+		status = efi_exit_boot_services(efi_mapkey);
 		if (!EFI_ERROR(status))
 			break;
 	}

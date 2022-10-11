@@ -83,7 +83,7 @@ ofw_bus_get_node_t	ofw_bus_gen_get_node;
 ofw_bus_get_type_t	ofw_bus_gen_get_type;
 
 /* Helper method to report interesting OF properties in pnpinfo */
-bus_child_pnpinfo_str_t	ofw_bus_gen_child_pnpinfo_str;
+bus_child_pnpinfo_t	ofw_bus_gen_child_pnpinfo;
 
 /* Routines for processing firmware interrupt maps */
 void	ofw_bus_setup_iinfo(phandle_t, struct ofw_bus_iinfo *, int);
@@ -92,8 +92,9 @@ int	ofw_bus_lookup_imap(phandle_t, struct ofw_bus_iinfo *, void *, int,
 int	ofw_bus_search_intrmap(void *, int, void *, int, void *, int, void *,
 	    void *, void *, int, phandle_t *);
 
-/* Routines for processing msi maps */
+/* Routines for processing msi and iommu maps. */
 int ofw_bus_msimap(phandle_t, uint16_t, phandle_t *, uint32_t *);
+int ofw_bus_iommu_map(phandle_t, uint16_t, phandle_t *, uint32_t *);
 
 /* Routines for parsing device-tree data into resource lists. */
 int ofw_bus_reg_to_rl(device_t, phandle_t, pcell_t, pcell_t,

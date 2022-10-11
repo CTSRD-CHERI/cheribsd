@@ -54,13 +54,43 @@
  *
  *	documentation/content/en/books/porters-handbook/versions/_index.adoc
  *
- * scheme is:  <major><two digit minor>Rxx
+ * Encoding:	<major><two digit minor>Rxx
  *		'R' is in the range 0 to 4 if this is a release branch or
  *		X.0-CURRENT before releng/X.0 is created, otherwise 'R' is
  *		in the range 5 to 9.
+ * Short hand: MMmmXXX
+ *
+ * __FreeBSD_version is bumped every time there's a change in the base system
+ * that's noteworthy. A noteworthy change is any change which changes the
+ * kernel's KBI in -CURRENT, one that changes some detail about the system that
+ * external software (or the ports system) would want to know about, one that
+ * adds a system call, one that adds or deletes a shipped library, a security
+ * fix, or similar change not specifically noted here. Bumps should be limited
+ * to one per day / a couple per week except for security fixes.
+ *
+ * The approved way to obtain this from a shell script is:
+ *	awk '/^\#define[[:space:]]*__FreeBSD_version/ {print $3}'
+ * Other methods to parse this file may work, but are not guaranteed against
+ * future changes. The above script works back to FreeBSD 3.x when this macro
+ * was introduced. This number is propagated to other places needing it that
+ * cannot include sys/param.h and should only be updated here.
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 1400013	/* Master, propagated to newvers */
+#define __FreeBSD_version 1400064
+
+/*
+ * __CheriBSD_version numbers describe CheriBSD ABIs.
+ *
+ * Encoding:	<YYYY><MM><DD>
+ *
+ * __CheriBSD_version is bumped with every ABI change. This includes the
+ * kernel's KBI and the base system's ABI, similarly to __FreeBSD_version.
+ * The separate __CheriBSD_version counter was introduced to allow external
+ * software still use __FreeBSD_version which is independently incremented in
+ * FreeBSD.
+ */
+#undef __CheriBSD_version
+#define __CheriBSD_version 20220828
 
 /*
  * __FreeBSD_kernel__ indicates that this system uses the kernel of FreeBSD,
@@ -245,7 +275,8 @@
 #define	PRIMASK		0x0ff
 #define	PCATCH		0x100	/* OR'd with pri for tsleep to check signals */
 #define	PDROP		0x200	/* OR'd with pri to stop re-entry of interlock mutex */
-#define	PRILASTFLAG	0x200	/* Last flag defined above */
+#define	PNOLOCK		0x400	/* OR'd with pri to allow sleeping w/o a lock */
+#define	PRILASTFLAG	0x400	/* Last flag defined above */
 
 #define	NZERO	0		/* default "nice" */
 
@@ -360,12 +391,12 @@ __END_DECLS
  * Scale factor for scaled integers used to count %cpu time and load avgs.
  *
  * The number of CPU `tick's that map to a unique `%age' can be expressed
- * by the formula (1 / (2 ^ (FSHIFT - 11))).  The maximum load average that
- * can be calculated (assuming 32 bits) can be closely approximated using
- * the formula (2 ^ (2 * (16 - FSHIFT))) for (FSHIFT < 15).
+ * by the formula (1 / (2 ^ (FSHIFT - 11))).  Since the intermediate
+ * calculation is done with 64-bit precision, the maximum load average that can
+ * be calculated is approximately 2^32 / FSCALE.
  *
  * For the scheduler to maintain a 1:1 mapping of CPU `tick' to `%age',
- * FSHIFT must be at least 11; this gives us a maximum load avg of ~1024.
+ * FSHIFT must be at least 11.  This gives a maximum load avg of 2 million.
  */
 #define	FSHIFT	11		/* bits to right of fixed binary point */
 #define FSCALE	(1<<FSHIFT)
@@ -396,10 +427,10 @@ __END_DECLS
  * capability.  NB: For purecap kernels this is a no-op.
  */
 #define	PTR2CAP(p)	({					\
-	KASSERT((vaddr_t)((p)) == 0 ||				\
-	    (vaddr_t)((p)) >= VM_MAXUSER_ADDRESS,		\
+	KASSERT((ptraddr_t)((p)) == 0 ||			\
+	    (ptraddr_t)((p)) >= VM_MAXUSER_ADDRESS,		\
 	    ("PTR2CAP on user address: %p", (p)));		\
-	(__cheri_tocap __typeof__((p)) __capability)(p);	\
+	(__cheri_tocap __typeof__((*p)) * __capability)(p);	\
 	})
 #else
 #define	PTR2CAP(p)	(p)

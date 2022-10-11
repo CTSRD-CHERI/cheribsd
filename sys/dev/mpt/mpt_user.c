@@ -734,6 +734,10 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 	case MPTIO_READ_CFG_PAGE64:
 #endif
 	case MPTIO_READ_CFG_PAGE:
+		if (page_req->len < (int)sizeof(CONFIG_PAGE_HEADER)) {
+			error = EINVAL;
+			break;
+		}
 		error = mpt_alloc_buffer(mpt, &mpt_page, page_req->len);
 		if (error)
 			break;
@@ -766,6 +770,11 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 	case MPTIO_READ_EXT_CFG_PAGE64:
 #endif
 	case MPTIO_READ_EXT_CFG_PAGE:
+		if (ext_page_req->len <
+		    (int)sizeof(CONFIG_EXTENDED_PAGE_HEADER)) {
+			error = EINVAL;
+			break;
+		}
 		error = mpt_alloc_buffer(mpt, &mpt_page, ext_page_req->len);
 		if (error)
 			break;
@@ -788,6 +797,10 @@ mpt_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 	case MPTIO_WRITE_CFG_PAGE64:
 #endif
 	case MPTIO_WRITE_CFG_PAGE:
+		if (page_req->len < (int)sizeof(CONFIG_PAGE_HEADER)) {
+			error = EINVAL;
+			break;
+		}
 		error = mpt_alloc_buffer(mpt, &mpt_page, page_req->len);
 		if (error)
 			break;

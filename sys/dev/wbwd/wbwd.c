@@ -295,10 +295,9 @@ static int
 sysctl_wb_force_test_nmi(SYSCTL_HANDLER_ARGS)
 {
 	struct wb_softc *sc;
-	int error, test, val;
+	int error, val;
 
 	sc = arg1;
-	test = arg2;
 
 #ifdef notyet
 	val = sc->test_nmi;
@@ -310,6 +309,8 @@ sysctl_wb_force_test_nmi(SYSCTL_HANDLER_ARGS)
                 return (error);
 
 #ifdef notyet
+	int test = arg2;
+
 	/* Manually clear the test for a value of 0 and do nothing else. */
 	if (test && val == 0) {
 		sc->test_nmi = 0;
@@ -627,15 +628,15 @@ wb_attach(device_t dev)
 	    "debug_verbose", CTLFLAG_RW, &sc->debug_verbose, 0,
             "Enables extra debugging information");
         SYSCTL_ADD_PROC(sctx, SYSCTL_CHILDREN(soid), OID_AUTO, "debug",
-	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_NEEDGIANT, sc, 0,
+	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, 0,
 	    sysctl_wb_debug, "A",
             "Selected register information from last change by driver");
         SYSCTL_ADD_PROC(sctx, SYSCTL_CHILDREN(soid), OID_AUTO, "debug_current",
-	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_SKIP | CTLFLAG_NEEDGIANT,
+	    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_SKIP | CTLFLAG_MPSAFE,
 	    sc, 0, sysctl_wb_debug_current, "A",
 	     "Selected register information (may interfere)");
 	SYSCTL_ADD_PROC(sctx, SYSCTL_CHILDREN(soid), OID_AUTO, "force_timeout",
-	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SKIP | CTLFLAG_NEEDGIANT, sc, 0,
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_SKIP | CTLFLAG_MPSAFE, sc, 0,
 	    sysctl_wb_force_test_nmi, "I", "Enable to force watchdog to fire.");
 
 	/* Register watchdog. */
@@ -680,8 +681,6 @@ static driver_t wb_driver = {
 	sizeof(struct wb_softc)
 };
 
-static devclass_t wb_devclass;
-
-DRIVER_MODULE(wb, superio, wb_driver, wb_devclass, NULL, NULL);
+DRIVER_MODULE(wb, superio, wb_driver, NULL, NULL);
 MODULE_DEPEND(wb, superio, 1, 1, 1);
 MODULE_VERSION(wb, 1);

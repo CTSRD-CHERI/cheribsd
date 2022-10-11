@@ -38,7 +38,6 @@
 
 extern	long	Maxmem;
 extern	u_int	basemem;
-extern	int	busdma_swi_pending;
 extern	u_int	cpu_exthigh;
 extern	u_int	cpu_feature;
 extern	u_int	cpu_feature2;
@@ -104,6 +103,7 @@ struct	fpreg;
 struct  dbreg;
 struct	dumperinfo;
 struct	trapframe;
+struct	minidumpstate;
 
 /*
  * The interface type of the interrupt handler entry point cannot be
@@ -114,7 +114,6 @@ typedef void alias_for_inthand_t(void);
 
 bool	acpi_get_fadt_bootflags(uint16_t *flagsp);
 void	*alloc_fpusave(int flags);
-void	busdma_swi(void);
 u_int	cpu_auxmsr(void);
 vm_paddr_t cpu_getmaxphyaddr(void);
 bool	cpu_mwait_usable(void);
@@ -129,13 +128,13 @@ void	restore_wp(bool old_wp);
 void	finishidentcpu(void);
 void	identify_cpu1(void);
 void	identify_cpu2(void);
+void	identify_cpu_ext_features(void);
 void	identify_cpu_fixup_bsp(void);
 void	identify_hypervisor(void);
 void	initializecpu(void);
 void	initializecpucache(void);
 bool	fix_cpuid(void);
 void	fillw(int /*u_short*/ pat, void *base, size_t cnt);
-int	is_physical_memory(vm_paddr_t addr);
 int	isa_nmi(int cd);
 void	handle_ibrs_entry(void);
 void	handle_ibrs_exit(void);
@@ -151,15 +150,29 @@ void	pagecopy(void *from, void *to);
 void	printcpuinfo(void);
 int	pti_get_default(void);
 int	user_dbreg_trap(register_t dr6);
-int	minidumpsys(struct dumperinfo *);
+int	cpu_minidumpsys(struct dumperinfo *, const struct minidumpstate *);
 struct pcb *get_pcb_td(struct thread *td);
+void	x86_set_fork_retval(struct thread *td);
+uint64_t rdtsc_ordered(void);
 
+/*
+ * MSR ops for x86_msr_op()
+ */
 #define	MSR_OP_ANDNOT		0x00000001
 #define	MSR_OP_OR		0x00000002
 #define	MSR_OP_WRITE		0x00000003
+#define	MSR_OP_READ		0x00000004
+
+/*
+ * Where and which execution mode
+ */
 #define	MSR_OP_LOCAL		0x10000000
-#define	MSR_OP_SCHED		0x20000000
-#define	MSR_OP_RENDEZVOUS	0x30000000
-void x86_msr_op(u_int msr, u_int op, uint64_t arg1);
+#define	MSR_OP_SCHED_ALL	0x20000000
+#define	MSR_OP_SCHED_ONE	0x30000000
+#define	MSR_OP_RENDEZVOUS_ALL	0x40000000
+#define	MSR_OP_RENDEZVOUS_ONE	0x50000000
+#define	MSR_OP_CPUID(id)	((id) << 8)
+
+void x86_msr_op(u_int msr, u_int op, uint64_t arg1, uint64_t *res);
 
 #endif

@@ -30,7 +30,7 @@ static cl::opt<uint32_t> PredicatePassBranchWeight(
 void llvm::makeGuardControlFlowExplicit(Function *DeoptIntrinsic,
                                         CallInst *Guard, bool UseWC) {
   OperandBundleDef DeoptOB(*Guard->getOperandBundle(LLVMContext::OB_deopt));
-  SmallVector<Value *, 4> Args(std::next(Guard->arg_begin()), Guard->arg_end());
+  SmallVector<Value *, 4> Args(drop_begin(Guard->args()));
 
   auto *CheckBB = Guard->getParent();
   auto *DeoptBlockTerm =
@@ -74,7 +74,7 @@ void llvm::makeGuardControlFlowExplicit(Function *DeoptIntrinsic,
                                  {}, {}, nullptr, "widenable_cond");
     CheckBI->setCondition(B.CreateAnd(CheckBI->getCondition(), WC,
                                       "exiplicit_guard_cond"));
-    assert(isWidenableBranch(CheckBI) && "sanity check");
+    assert(isWidenableBranch(CheckBI) && "Branch must be widenable.");
   }
 }
 

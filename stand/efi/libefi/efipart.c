@@ -78,7 +78,7 @@ struct devsw efipart_fddev = {
 	.dv_close = efipart_close,
 	.dv_ioctl = efipart_ioctl,
 	.dv_print = efipart_printfd,
-	.dv_cleanup = NULL
+	.dv_cleanup = nullsys,
 };
 
 struct devsw efipart_cddev = {
@@ -90,7 +90,7 @@ struct devsw efipart_cddev = {
 	.dv_close = efipart_close,
 	.dv_ioctl = efipart_ioctl,
 	.dv_print = efipart_printcd,
-	.dv_cleanup = NULL
+	.dv_cleanup = nullsys,
 };
 
 struct devsw efipart_hddev = {
@@ -102,7 +102,7 @@ struct devsw efipart_hddev = {
 	.dv_close = efipart_close,
 	.dv_ioctl = efipart_ioctl,
 	.dv_print = efipart_printhd,
-	.dv_cleanup = NULL
+	.dv_cleanup = nullsys,
 };
 
 static pdinfo_list_t fdinfo = STAILQ_HEAD_INITIALIZER(fdinfo);
@@ -949,8 +949,10 @@ efipart_close(struct open_file *f)
 	pd->pd_open--;
 	if (pd->pd_open == 0) {
 		pd->pd_blkio = NULL;
-		bcache_free(pd->pd_bcache);
-		pd->pd_bcache = NULL;
+		if (dev->dd.d_dev->dv_type != DEVT_DISK) {
+			bcache_free(pd->pd_bcache);
+			pd->pd_bcache = NULL;
+		}
 	}
 	if (dev->dd.d_dev->dv_type == DEVT_DISK)
 		return (disk_close(dev));
@@ -1006,6 +1008,8 @@ efipart_readwrite(EFI_BLOCK_IO *blkio, int rw, daddr_t blk, daddr_t nblks,
 {
 	EFI_STATUS status;
 
+	TSENTER();
+
 	if (blkio == NULL)
 		return (ENXIO);
 	if (blk < 0 || blk > blkio->Media->LastBlock)
@@ -1032,6 +1036,7 @@ efipart_readwrite(EFI_BLOCK_IO *blkio, int rw, daddr_t blk, daddr_t nblks,
 		printf("%s: rw=%d, blk=%ju size=%ju status=%lu\n", __func__, rw,
 		    blk, nblks, EFI_ERROR_CODE(status));
 	}
+	TSEXIT();
 	return (efi_status_to_errno(status));
 }
 

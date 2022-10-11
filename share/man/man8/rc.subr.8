@@ -29,7 +29,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd July 31, 2020
+.Dd March 18, 2022
 .Dt RC.SUBR 8
 .Os
 .Sh NAME
@@ -59,7 +59,7 @@
 .It
 .Ic load_kld Oo Fl e Ar regex Oc Oo Fl m Ar module Oc Ar file
 .It
-.Ic load_rc_config Ar name
+.Ic load_rc_config Op Ar service
 .It
 .Ic load_rc_config_var Ar name Ar var
 .It
@@ -72,6 +72,8 @@
 .Ic run_rc_command Ar argument
 .It
 .Ic run_rc_script Ar file Ar argument
+.It
+.Ic startmsg Oo Fl n Oc Ar message
 .It
 .Ic wait_for_pids Op Ar pid ...
 .It
@@ -159,7 +161,7 @@ Otherwise, warn that
 .Ar var
 is not set correctly.
 The values are case insensitive.
-.Sy Note :
+.Em Note :
 .Ar var
 should be a variable name, not its value;
 .Ic checkyesno
@@ -279,14 +281,18 @@ regular expression matching the module name can be supplied via
 By default, the module is assumed to have the same name as
 .Ar file ,
 which is not always the case.
-.It Ic load_rc_config Ar name
-Source in the configuration files for
-.Ar name .
+.It Ic load_rc_config Op Ar service
+Source in the configuration file(s) for
+.Ar service .
+If no
+.Ar service
+is specified,
+only the global configuration file(s) will be loaded.
 First,
 .Pa /etc/rc.conf
 is sourced if it has not yet been read in.
 Then,
-.Pa /etc/rc.conf.d/ Ns Ar name
+.Pa /etc/rc.conf.d/ Ns Ar service
 is sourced if it is an existing file.
 The latter may also contain other variable assignments to override
 .Ic run_rc_command
@@ -424,7 +430,7 @@ and errors about usage of services that are not enabled in
 .Xr rc.conf 5 .
 This prefix also sets
 .Va rc_quiet Ns = Ns Li YES .
-.Em Please, note\&:
+.Em Note :
 .Va rc_quiet
 is not intended to completely mask all debug and warning messages,
 but only certain small classes of them.
@@ -581,7 +587,8 @@ which puts some limitations on the names of variables
 A file to source for environmental variables to run
 .Va command
 with.
-Note that all the variables which are being assigned in this file are going
+.Em Note :
+all the variables which are being assigned in this file are going
 to be exported into the environment of
 .Va command .
 .It Va ${name}_fib
@@ -877,6 +884,17 @@ otherwise source
 .Ar file
 into the current shell.
 .El
+.It Ic startmsg Oo Fl n Oc Ar message
+Display a start message to
+.Va stdout .
+It should be used instead of
+.Xr echo 1 .
+The display of this output can be turned off if the
+.Xr rc.conf 5
+variable
+.Va rc_startmsgs
+is set to
+.Dq Li NO .
 .It Ic stop_boot Op Ar always
 Prevent booting to multiuser mode.
 If the

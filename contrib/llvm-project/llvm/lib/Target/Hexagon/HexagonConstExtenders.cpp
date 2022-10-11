@@ -229,7 +229,7 @@ namespace {
   private:
     struct Register {
       Register() = default;
-      Register(unsigned R, unsigned S) : Reg(R), Sub(S) {}
+      Register(llvm::Register R, unsigned S) : Reg(R), Sub(S) {}
       Register(const MachineOperand &Op)
         : Reg(Op.getReg()), Sub(Op.getSubReg()) {}
       Register &operator=(const MachineOperand &Op) {
@@ -242,18 +242,15 @@ namespace {
         return *this;
       }
       bool isVReg() const {
-        return Reg != 0 && !llvm::Register::isStackSlot(Reg) &&
-               llvm::Register::isVirtualRegister(Reg);
+        return Reg != 0 && !Reg.isStack() && Reg.isVirtual();
       }
-      bool isSlot() const {
-        return Reg != 0 && llvm::Register::isStackSlot(Reg);
-      }
+      bool isSlot() const { return Reg != 0 && Reg.isStack(); }
       operator MachineOperand() const {
         if (isVReg())
           return MachineOperand::CreateReg(Reg, /*Def*/false, /*Imp*/false,
                           /*Kill*/false, /*Dead*/false, /*Undef*/false,
                           /*EarlyClobber*/false, Sub);
-        if (llvm::Register::isStackSlot(Reg)) {
+        if (Reg.isStack()) {
           int FI = llvm::Register::stackSlot2Index(Reg);
           return MachineOperand::CreateFI(FI);
         }
@@ -265,7 +262,8 @@ namespace {
         // For std::map.
         return Reg < R.Reg || (Reg == R.Reg && Sub < R.Sub);
       }
-      unsigned Reg = 0, Sub = 0;
+      llvm::Register Reg;
+      unsigned Sub = 0;
     };
 
     struct ExtExpr {
@@ -1256,7 +1254,7 @@ void HCE::collect(MachineFunction &MF) {
 
 void HCE::assignInits(const ExtRoot &ER, unsigned Begin, unsigned End,
       AssignmentMap &IMap) {
-  // Sanity check: make sure that all extenders in the range [Begin..End)
+  // Basic correctness: make sure that all extenders in the range [Begin..End)
   // share the same root ER.
   for (unsigned I = Begin; I != End; ++I)
     assert(ER == ExtRoot(Extenders[I].getOp()));
@@ -1575,7 +1573,7 @@ HCE::Register HCE::insertInitializer(Loc DefL, const ExtenderInit &ExtI) {
         // No compounds are available. It is not clear whether we should
         // even process such extenders where the initializer cannot be
         // a single instruction, but do it for now.
-        unsigned TmpR = MRI->createVirtualRegister(&Hexagon::IntRegsRegClass);
+        llvm::Register TmpR = MRI->createVirtualRegister(&Hexagon::IntRegsRegClass);
         BuildMI(MBB, At, dl, HII->get(Hexagon::S2_asl_i_r), TmpR)
           .add(MachineOperand(Ex.Rs))
           .addImm(Ex.S);

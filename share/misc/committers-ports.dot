@@ -15,7 +15,7 @@ digraph ports {
 #   foo [label="Foo Bar\nfoo@FreeBSD.org\n????/??/??"]
 #
 # ????/??/?? is the date when the commit bit was obtained, usually the one you
-# can find looking at svn logs for the svnadmin/access file.
+# can find in git logs for the access file in the internal/admin branch.
 # Use YYYY/MM/DD format.
 #
 # For returned commit bits, the node definition will follow this example:
@@ -23,7 +23,7 @@ digraph ports {
 #   foo [label="Foo Bar\nfoo@FreeBSD.org\n????/??/??\n????/??/??"]
 #
 # The first date is the same as for an active committer, the second date is
-# the date when the commit bit has been returned. Again, check svn logs.
+# the date when the commit bit has been returned. Again, check git logs.
 
 node [color=grey62, style=filled, bgcolor=black];
 
@@ -96,7 +96,9 @@ decke [label="Bernhard Froehlich\ndecke@FreeBSD.org\n2010/03/21"]
 delphij [label="Xin Li\ndelphij@FreeBSD.org\n2006/05/01"]
 demon [label="Dmitry Sivachenko\ndemon@FreeBSD.org\n2000/11/13"]
 dhn [label="Dennis Herrmann\ndhn@FreeBSD.org\n2009/03/03"]
+diizzy [label="Daniel Engberg\ndiizzy@FreeBSD.org\n2021/07/06"]
 dmgk [label="Dmitri Goutnik\ndmgk@FreeBSD.org\n2019/09/15"]
+driesm [label="Dries Michiels\ndriesm@FreeBSD.org\n2021/11/06"]
 dryice [label="Dryice Dong Liu\ndryice@FreeBSD.org\n2006/12/25"]
 dteske [label="Devin Teske\ndteske@FreeBSD.org\n2018/03/01"]
 dumbbell [label="Jean-Sebastien Pedron\ndumbbell@FreeBSD.org\n2017/01/10"]
@@ -283,6 +285,7 @@ ultima [label="Richard Gallamore\nultima@FreeBSD.org\n2017/06/07"]
 uqs [label="Ulrich Spoerlein\nuqs@FreeBSD.org\n2012/01/19"]
 vd [label="Vasil Dimov\nvd@FreeBSD.org\n2006/01/19"]
 vg [label="Veniamin Gvozdikov\nvg@FreeBSD.org\n2013/06/11"]
+vishwin [label="Charlie Li\nvishwin@FreeBSD.org\n2021/04/29"]
 vsevolod [label="Vsevolod Stakhov\nvsevolod@FreeBSD.org\n2005/07/22"]
 wen [label="Wen Heping\nwen@FreeBSD.org\n2010/12/13"]
 wg [label="William Grzybowski\nwg@FreeBSD.org\n2013/04/01"]
@@ -290,6 +293,8 @@ woodsb02 [label="Ben Woods\nwoodsb02@FreeBSD.org\n2016/05/09"]
 wxs [label="Wesley Shields\nwxs@FreeBSD.org\n2008/01/03"]
 xmj [label="Johannes Jost Meixner\nxmj@FreeBSD.org\n2014/04/07"]
 xride [label="Soeren Straarup\nxride@FreeBSD.org\n2006/09/27"]
+yasu [label="Yasuhiro Kimura\nyasu@FreeBSD.org\n2021/08/27"]
+ygy [label="Guangyuan Yang\nygy@FreeBSD.org\n2021/05/17"]
 yuri [label="Yuri Victorovich\nyuri@FreeBSD.org\n2017/10/30"]
 yzlin [label="Yi-Jheng Lin\nyzlin@FreeBSD.org\n2009/07/19"]
 zeising [label="Niclas Zeising\nzeising@FreeBSD.org\n2012/07/03"]
@@ -300,6 +305,7 @@ znerd [label="Ernst de Haan\nznerd@FreeBSD.org\n2001/11/15"]
 # Group together all the mentees for a particular mentor.
 # Keep the list sorted by mentor login.
 
+"0mp" -> driesm
 "0mp" -> nc
 
 adamw -> ahze
@@ -327,7 +333,9 @@ araujo -> pclin
 araujo -> pgollucci
 araujo -> samm
 
+arrowd -> diizzy
 arrowd -> rhurlin
+arrowd -> vishwin
 
 arved -> markus
 arved -> stefan
@@ -453,6 +461,8 @@ flo -> jase
 flo -> jbeich
 flo -> grembo
 
+fluffy -> vishwin
+
 flz -> garga
 flz -> johans
 flz -> laszlof
@@ -545,6 +555,8 @@ kwm -> zeising
 
 lawrance -> itetcu
 
+lbartoletti -> diizzy
+
 leeym -> clsung
 
 ler -> leres
@@ -559,6 +571,7 @@ lioux -> pat
 lme -> pizzamig
 lme -> tobik
 
+lwhsu -> ygy
 lwhsu -> yzlin
 
 maho -> stephen
@@ -596,6 +609,8 @@ mat -> pkubaj
 matthew -> leres
 matthew -> lifanov
 matthew -> ultima
+
+meta -> yasu
 
 mezz -> tmclaugh
 
@@ -667,6 +682,7 @@ pgollucci -> junovitch
 pgollucci -> sunpoet
 pgollucci -> swills
 
+philip -> driesm
 philip -> fox
 philip -> koitsu
 
@@ -757,6 +773,7 @@ tabthorpe -> gblach
 
 tcberner -> adridg
 tcberner -> arrowd
+tcberner -> diizzy
 tcberner -> fernape
 tcberner -> joneum
 tcberner -> kai
@@ -766,6 +783,7 @@ tcberner -> pkubaj
 tcberner -> rhurlin
 tcberner -> rigoletto
 tcberner -> salvadore
+tcberner -> vishwin
 tcberner -> yuri
 
 thierry -> jadawin
@@ -803,5 +821,7 @@ wxs -> sahil
 wxs -> skreuzer
 wxs -> swills
 wxs -> zi
+
+ygy -> yasu
 
 }

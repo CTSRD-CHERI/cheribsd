@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2013 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Konstantin Belousov <kib@FreeBSD.org>
  * under sponsorship from the FreeBSD Foundation.
@@ -57,10 +56,11 @@ struct iommu_map_entry {
 	iommu_gaddr_t free_down;	/* Max free space below the
 					   current R/B tree node */
 	u_int flags;
-	TAILQ_ENTRY(iommu_map_entry) dmamap_link; /* Link for dmamap entries */
+	union {
+		TAILQ_ENTRY(iommu_map_entry) dmamap_link; /* DMA map entries */
+		struct iommu_map_entry *tlb_flush_next;
+	};
 	RB_ENTRY(iommu_map_entry) rb_entry;	 /* Links for domain entries */
-	TAILQ_ENTRY(iommu_map_entry) unroll_link; /* Link for unroll after
-						    dmamap_load failure */
 	struct iommu_domain *domain;
 	struct iommu_qi_genseq gseq;
 };
@@ -149,22 +149,13 @@ struct iommu_ctx {
 #define	IOMMU_DOMAIN_UNLOCK(dom)	mtx_unlock(&(dom)->lock)
 #define	IOMMU_DOMAIN_ASSERT_LOCKED(dom)	mtx_assert(&(dom)->lock, MA_OWNED)
 
-static inline bool
-iommu_test_boundary(iommu_gaddr_t start, iommu_gaddr_t size,
-    iommu_gaddr_t boundary)
-{
-
-	if (boundary == 0)
-		return (true);
-	return (start + size <= ((start + boundary) & ~(boundary - 1)));
-}
-
 void iommu_free_ctx(struct iommu_ctx *ctx);
 void iommu_free_ctx_locked(struct iommu_unit *iommu, struct iommu_ctx *ctx);
 struct iommu_ctx *iommu_get_ctx(struct iommu_unit *, device_t dev,
     uint16_t rid, bool id_mapped, bool rmrr_init);
 struct iommu_unit *iommu_find(device_t dev, bool verbose);
-void iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free);
+void iommu_domain_unload_entry(struct iommu_map_entry *entry, bool free,
+    bool cansleep);
 void iommu_domain_unload(struct iommu_domain *domain,
     struct iommu_map_entries_tailq *entries, bool cansleep);
 
@@ -173,14 +164,6 @@ struct iommu_ctx *iommu_instantiate_ctx(struct iommu_unit *iommu,
 device_t iommu_get_requester(device_t dev, uint16_t *rid);
 int iommu_init_busdma(struct iommu_unit *unit);
 void iommu_fini_busdma(struct iommu_unit *unit);
-struct iommu_map_entry *iommu_map_alloc_entry(struct iommu_domain *iodom,
-    u_int flags);
-void iommu_map_free_entry(struct iommu_domain *, struct iommu_map_entry *);
-int iommu_map(struct iommu_domain *iodom,
-    const struct bus_dma_tag_common *common, iommu_gaddr_t size, int offset,
-    u_int eflags, u_int flags, vm_page_t *ma, struct iommu_map_entry **res);
-int iommu_map_region(struct iommu_domain *domain,
-    struct iommu_map_entry *entry, u_int eflags, u_int flags, vm_page_t *ma);
 
 void iommu_gas_init_domain(struct iommu_domain *domain);
 void iommu_gas_fini_domain(struct iommu_domain *domain);

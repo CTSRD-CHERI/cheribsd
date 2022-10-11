@@ -17,29 +17,21 @@ public:
   // Constructors and Destructors
   SymbolVendorELF(const lldb::ModuleSP &module_sp);
 
-  ~SymbolVendorELF() override;
-
   // Static Functions
   static void Initialize();
 
   static void Terminate();
 
-  static lldb_private::ConstString GetPluginNameStatic();
+  static llvm::StringRef GetPluginNameStatic() { return "ELF"; }
 
-  static const char *GetPluginDescriptionStatic();
+  static llvm::StringRef GetPluginDescriptionStatic();
 
   static lldb_private::SymbolVendor *
   CreateInstance(const lldb::ModuleSP &module_sp,
                  lldb_private::Stream *feedback_strm);
 
   // PluginInterface protocol
-  lldb_private::ConstString GetPluginName() override;
-
-  uint32_t GetPluginVersion() override;
-
-private:
-  SymbolVendorELF(const SymbolVendorELF &) = delete;
-  const SymbolVendorELF &operator=(const SymbolVendorELF &) = delete;
+  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
 };
 
 #endif // LLDB_SOURCE_PLUGINS_SYMBOLVENDOR_ELF_SYMBOLVENDORELF_H

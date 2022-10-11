@@ -64,6 +64,8 @@ enum {
 	T4_LOAD_BOOTCFG,		/* flash bootcfg */
 	T4_CUDBG_DUMP,			/* debug dump of chip state */
 	T4_SET_FILTER_MASK,		/* set filter mask (hashfilter mode) */
+	T4_HOLD_CLIP_ADDR,		/* add ref on an IP in the CLIP */
+	T4_RELEASE_CLIP_ADDR,		/* remove ref from an IP in the CLIP */
 };
 
 struct t4_reg {
@@ -374,6 +376,11 @@ enum {
 	OPEN_TYPE_DONTCARE = 'D',
 };
 
+enum {
+	QUEUE_RANDOM = -1,
+	QUEUE_ROUNDROBIN = -2,
+};
+
 struct offload_settings {
 	int8_t offload;
 	int8_t rx_coalesce;
@@ -412,6 +419,12 @@ struct t4_offload_policy {
 #endif
 };
 
+/* Address/mask entry in the CLIP.  FW_CLIP2_CMD is aware of the mask. */
+struct t4_clip_addr {
+	uint8_t addr[16];
+	uint8_t mask[16];
+};
+
 #define CHELSIO_T4_GETREG	_IOWR('f', T4_GETREG, struct t4_reg)
 #define CHELSIO_T4_SETREG	_IOW('f', T4_SETREG, struct t4_reg)
 #define CHELSIO_T4_REGDUMP	_IOWR('f', T4_REGDUMP, struct t4_regdump)
@@ -438,4 +451,6 @@ struct t4_offload_policy {
 #define CHELSIO_T4_CUDBG_DUMP	_IOWR('f', T4_CUDBG_DUMP, struct t4_cudbg_dump)
 #define CHELSIO_T4_SET_OFLD_POLICY _IOW('f', T4_SET_OFLD_POLICY, struct t4_offload_policy)
 #define CHELSIO_T4_SET_FILTER_MASK _IOW('f', T4_SET_FILTER_MASK, uint32_t)
+#define CHELSIO_T4_HOLD_CLIP_ADDR _IOW('f', T4_HOLD_CLIP_ADDR, struct t4_clip_addr)
+#define CHELSIO_T4_RELEASE_CLIP_ADDR _IOW('f', T4_RELEASE_CLIP_ADDR, struct t4_clip_addr)
 #endif

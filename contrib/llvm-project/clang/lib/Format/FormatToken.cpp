@@ -53,6 +53,7 @@ bool FormatToken::isSimpleTypeSpecifier() const {
   case tok::kw___bf16:
   case tok::kw__Float16:
   case tok::kw___float128:
+  case tok::kw___ibm128:
   case tok::kw_wchar_t:
   case tok::kw_bool:
   case tok::kw___underlying_type:
@@ -62,10 +63,15 @@ bool FormatToken::isSimpleTypeSpecifier() const {
   case tok::kw_char32_t:
   case tok::kw_typeof:
   case tok::kw_decltype:
+  case tok::kw__Atomic:
     return true;
   default:
     return false;
   }
+}
+
+bool FormatToken::isTypeOrIdentifier() const {
+  return isSimpleTypeSpecifier() || Tok.isOneOf(tok::kw_auto, tok::identifier);
 }
 
 TokenRole::~TokenRole() {}
@@ -85,8 +91,8 @@ unsigned CommaSeparatedList::formatAfterToken(LineState &State,
   const FormatToken *LBrace =
       State.NextToken->Previous->getPreviousNonComment();
   if (!LBrace || !LBrace->isOneOf(tok::l_brace, TT_ArrayInitializerLSquare) ||
-      LBrace->BlockKind == BK_Block || LBrace->getType() == TT_DictLiteral ||
-      LBrace->Next->getType() == TT_DesignatedInitializerPeriod)
+      LBrace->is(BK_Block) || LBrace->is(TT_DictLiteral) ||
+      LBrace->Next->is(TT_DesignatedInitializerPeriod))
     return 0;
 
   // Calculate the number of code points we have to format this list. As the
@@ -183,6 +189,7 @@ void CommaSeparatedList::precomputeFormattingInfos(const FormatToken *Token) {
 
   bool HasSeparatingComment = false;
   for (unsigned i = 0, e = Commas.size() + 1; i != e; ++i) {
+    assert(ItemBegin);
     // Skip comments on their own line.
     while (ItemBegin->HasUnescapedNewline && ItemBegin->isTrailingComment()) {
       ItemBegin = ItemBegin->Next;
@@ -290,14 +297,11 @@ void CommaSeparatedList::precomputeFormattingInfos(const FormatToken *Token) {
 const CommaSeparatedList::ColumnFormat *
 CommaSeparatedList::getColumnFormat(unsigned RemainingCharacters) const {
   const ColumnFormat *BestFormat = nullptr;
-  for (SmallVector<ColumnFormat, 4>::const_reverse_iterator
-           I = Formats.rbegin(),
-           E = Formats.rend();
-       I != E; ++I) {
-    if (I->TotalWidth <= RemainingCharacters || I->Columns == 1) {
-      if (BestFormat && I->LineCount > BestFormat->LineCount)
+  for (const ColumnFormat &Format : llvm::reverse(Formats)) {
+    if (Format.TotalWidth <= RemainingCharacters || Format.Columns == 1) {
+      if (BestFormat && Format.LineCount > BestFormat->LineCount)
         break;
-      BestFormat = &*I;
+      BestFormat = &Format;
     }
   }
   return BestFormat;

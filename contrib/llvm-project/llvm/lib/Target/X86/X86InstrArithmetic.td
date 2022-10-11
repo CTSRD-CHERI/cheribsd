@@ -708,6 +708,19 @@ class BinOpRM<bits<8> opcode, string mnemonic, X86TypeInfo typeinfo,
         mnemonic, "{$src2, $src1|$src1, $src2}", pattern>,
     Sched<[sched.Folded, sched.ReadAfterFold]>;
 
+// BinOpRM - Instructions like "adc reg, reg, [mem]".
+// There is an implicit register read at the end of the operand sequence.
+class BinOpRM_ImplicitUse<bits<8> opcode, string mnemonic, X86TypeInfo typeinfo,
+              dag outlist, X86FoldableSchedWrite sched, list<dag> pattern>
+  : ITy<opcode, MRMSrcMem, typeinfo, outlist,
+        (ins typeinfo.RegClass:$src1, typeinfo.MemOperand:$src2),
+        mnemonic, "{$src2, $src1|$src1, $src2}", pattern>,
+    Sched<[sched.Folded, sched.ReadAfterFold,
+           // base, scale, index, offset, segment.
+           ReadDefault, ReadDefault, ReadDefault, ReadDefault, ReadDefault,
+           // implicit register read.
+           sched.ReadAfterFold]>;
+
 // BinOpRM_F - Instructions like "cmp reg, [mem]".
 class BinOpRM_F<bits<8> opcode, string mnemonic, X86TypeInfo typeinfo,
                 SDNode opnode>
@@ -725,7 +738,7 @@ class BinOpRM_RF<bits<8> opcode, string mnemonic, X86TypeInfo typeinfo,
 // BinOpRM_RFF - Instructions like "adc reg, reg, [mem]".
 class BinOpRM_RFF<bits<8> opcode, string mnemonic, X86TypeInfo typeinfo,
                  SDNode opnode>
-  : BinOpRM<opcode, mnemonic, typeinfo, (outs typeinfo.RegClass:$dst), WriteADC,
+  : BinOpRM_ImplicitUse<opcode, mnemonic, typeinfo, (outs typeinfo.RegClass:$dst), WriteADC,
             [(set typeinfo.RegClass:$dst, EFLAGS,
             (opnode typeinfo.RegClass:$src1, (typeinfo.LoadNode addr:$src2),
                     EFLAGS))]>;
@@ -805,7 +818,11 @@ class BinOpMR_RMW<bits<8> opcode, string mnemonic, X86TypeInfo typeinfo,
                   SDNode opnode>
   : BinOpMR<opcode, mnemonic, typeinfo,
           [(store (opnode (load addr:$dst), typeinfo.RegClass:$src), addr:$dst),
-           (implicit EFLAGS)]>, Sched<[WriteALURMW]>;
+           (implicit EFLAGS)]>, Sched<[WriteALURMW,
+                                       // base, scale, index, offset, segment
+                                       ReadDefault, ReadDefault, ReadDefault,
+                                       ReadDefault, ReadDefault,
+                                       WriteALU.ReadAfterFold]>;  // reg
 
 // BinOpMR_RMW_FF - Instructions like "adc [mem], reg".
 class BinOpMR_RMW_FF<bits<8> opcode, string mnemonic, X86TypeInfo typeinfo,
@@ -813,7 +830,12 @@ class BinOpMR_RMW_FF<bits<8> opcode, string mnemonic, X86TypeInfo typeinfo,
   : BinOpMR<opcode, mnemonic, typeinfo,
             [(store (opnode (load addr:$dst), typeinfo.RegClass:$src, EFLAGS),
                     addr:$dst),
-             (implicit EFLAGS)]>, Sched<[WriteADCRMW]>;
+             (implicit EFLAGS)]>, Sched<[WriteADCRMW,
+                                         // base, scale, index, offset, segment
+                                         ReadDefault, ReadDefault, ReadDefault,
+                                         ReadDefault, ReadDefault,
+                                         WriteALU.ReadAfterFold,    // reg
+                                         WriteALU.ReadAfterFold]>;  // EFLAGS
 
 // BinOpMR_F - Instructions like "cmp [mem], reg".
 class BinOpMR_F<bits<8> opcode, string mnemonic, X86TypeInfo typeinfo,
@@ -1182,6 +1204,15 @@ defm SUB : ArithBinOp_RF<0x28, 0x2A, 0x2C, "sub", MRM5r, MRM5m,
                          X86sub_flag, sub, 0, 1, 0>;
 }
 
+// Version of XOR8rr_NOREX that use GR8_NOREX. This is used by the handling of
+// __builtin_parity where the last step xors an h-register with an l-register.
+let isCodeGenOnly = 1, hasSideEffects = 0, Constraints = "$src1 = $dst",
+    Defs = [EFLAGS], isCommutable = 1 in
+def XOR8rr_NOREX : I<0x30, MRMDestReg, (outs GR8_NOREX:$dst),
+                     (ins GR8_NOREX:$src1, GR8_NOREX:$src2),
+                     "xor{b}\t{$src2, $dst|$dst, $src2}", []>,
+                     Sched<[WriteALU]>;
+
 // Arithmetic.
 defm ADC : ArithBinOp_RFF<0x10, 0x12, 0x14, "adc", MRM2r, MRM2m, X86adc_flag,
                           1, 0>;
@@ -1466,13 +1497,17 @@ multiclass bmi_mulx<string mnemonic, RegisterClass RC, X86MemOperand x86memop,
 let hasSideEffects = 0 in {
   def rr : I<0xF6, MRMSrcReg, (outs RC:$dst1, RC:$dst2), (ins RC:$src),
              !strconcat(mnemonic, "\t{$src, $dst2, $dst1|$dst1, $dst2, $src}"),
-             []>, T8XD, VEX_4V, Sched<[sched, WriteIMulH]>;
+             []>, T8XD, VEX_4V, Sched<[WriteIMulH, sched]>;
 
   let mayLoad = 1 in
   def rm : I<0xF6, MRMSrcMem, (outs RC:$dst1, RC:$dst2), (ins x86memop:$src),
              !strconcat(mnemonic, "\t{$src, $dst2, $dst1|$dst1, $dst2, $src}"),
-
-             []>, T8XD, VEX_4V, Sched<[sched.Folded, WriteIMulH]>;
+             []>, T8XD, VEX_4V,
+             Sched<[WriteIMulHLd, sched.Folded,
+                    // Memory operand.
+                    ReadDefault, ReadDefault, ReadDefault, ReadDefault, ReadDefault,
+                    // Implicit read of EDX/RDX
+                    sched.ReadAfterFold]>;
 
   // Pseudo instructions to be used when the low result isn't used. The
   // instruction is defined to keep the high if both destinations are the same.
@@ -1487,9 +1522,9 @@ let hasSideEffects = 0 in {
 
 let Predicates = [HasBMI2] in {
   let Uses = [EDX] in
-    defm MULX32 : bmi_mulx<"mulx{l}", GR32, i32mem, WriteIMul32>;
+    defm MULX32 : bmi_mulx<"mulx{l}", GR32, i32mem, WriteMULX32>;
   let Uses = [RDX] in
-    defm MULX64 : bmi_mulx<"mulx{q}", GR64, i64mem, WriteIMul64>, VEX_W;
+    defm MULX64 : bmi_mulx<"mulx{q}", GR64, i64mem, WriteMULX64>, VEX_W;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1516,7 +1551,12 @@ let Predicates = [HasADX], Defs = [EFLAGS], Uses = [EFLAGS],
                     "adox{q}\t{$src2, $dst|$dst, $src2}", []>, T8XS;
   } // SchedRW
 
-  let mayLoad = 1, SchedRW = [WriteADC.Folded, WriteADC.ReadAfterFold] in {
+  let mayLoad = 1,
+      SchedRW = [WriteADC.Folded, WriteADC.ReadAfterFold,
+                 // Memory operand.
+                 ReadDefault, ReadDefault, ReadDefault, ReadDefault, ReadDefault,
+                 // Implicit read of EFLAGS
+                 WriteADC.ReadAfterFold] in {
   def ADCX32rm : I<0xF6, MRMSrcMem, (outs GR32:$dst),
                    (ins GR32:$src1, i32mem:$src2),
                    "adcx{l}\t{$src2, $dst|$dst, $src2}", []>, T8PD;

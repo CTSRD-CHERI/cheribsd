@@ -34,9 +34,7 @@
  * attachment point for both processors and buses, and to manage
  * resources which are common to all of them.  In particular,
  * this code implements the core resource managers for interrupt
- * requests, DMA requests (which rightfully should be a part of the
- * ISA code but it's easier to do it here for now), I/O port addresses,
- * and I/O memory address space.
+ * requests and I/O memory address space.
  */
 
 #include "opt_platform.h"
@@ -144,13 +142,13 @@ static device_method_t nexus_methods[] = {
 	{ 0, 0 }
 };
 
-static devclass_t nexus_devclass;
 static driver_t nexus_driver = {
 	"nexus",
 	nexus_methods,
 	1			/* no softc */
 };
-EARLY_DRIVER_MODULE(nexus, root, nexus_driver, nexus_devclass, 0, 0,
+
+EARLY_DRIVER_MODULE(nexus, root, nexus_driver, 0, 0,
     BUS_PASS_BUS + BUS_PASS_ORDER_EARLY);
 
 static int
@@ -365,7 +363,7 @@ nexus_activate_resource(device_t bus, device_t child, int type, int rid,
 		}
 		rman_set_bustag(r, fdtbus_bs_tag);
 #else
-		vaddr = (bus_space_handle_t)pmap_mapdev((vm_offset_t)paddr,
+		vaddr = (bus_space_handle_t)pmap_mapdev((vm_paddr_t)paddr,
 		    (vm_size_t)psize);
 		if (vaddr == 0) {
 			rman_deactivate_resource(r);

@@ -96,8 +96,6 @@ struct ic_softc {
 #define	IC_BUFFERS_BUSY		(IC_OBUF_BUSY | IC_IFBUF_BUSY)
 #define	IC_BUFFER_WAITER	0x0004
 
-static devclass_t ic_devclass;
-
 static int icprobe(device_t);
 static int icattach(device_t);
 
@@ -372,7 +370,7 @@ icoutput(struct ifnet *ifp, struct mbuf *m, const struct sockaddr *dst,
 	if (dst->sa_family == AF_UNSPEC)
 		bcopy(dst->sa_data, &hdr, sizeof(hdr));
 	else 
-		hdr = dst->sa_family;
+		hdr = RO_GET_FAMILY(ro, dst);
 
 	mtx_lock(&sc->ic_lock);
 	ifp->if_drv_flags |= IFF_DRV_RUNNING;
@@ -435,6 +433,6 @@ error:
 	return(0);
 }
 
-DRIVER_MODULE(ic, iicbus, ic_driver, ic_devclass, 0, 0);
+DRIVER_MODULE(ic, iicbus, ic_driver, 0, 0);
 MODULE_DEPEND(ic, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 MODULE_VERSION(ic, 1);

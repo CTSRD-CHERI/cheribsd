@@ -28,7 +28,7 @@
 .\"	@(#)hier.7	8.1 (Berkeley) 6/5/93
 .\" $FreeBSD$
 .\"
-.Dd February 22, 2021
+.Dd July 25, 2022
 .Dt HIER 7
 .Os
 .Sh NAME
@@ -174,6 +174,13 @@ system administrators as a temporary mount point
 automounted NFS shares;
 see
 .Xr auto_master 5
+.It Pa /nonexistent/
+a non-existent directory;
+by convention, it serves as a home directory
+for special user accounts
+that need no home directory;
+see also
+.Pa /var/empty/
 .It Pa /proc/
 process file system;
 see
@@ -192,13 +199,20 @@ temporary files that are not guaranteed to persist across system reboots
 .It Pa /usr/
 contains the majority of user utilities and applications
 .Pp
-.Bl -tag -width "defaults/" -compact
+.Bl -tag -width "freebsd-dist/" -compact
 .It Pa bin/
 common utilities, programming tools, and applications
 .It Pa compat/
 files needed to support binary compatibility with other operating systems;
 see
 .Xr linux 4
+.It Pa freebsd-dist/
+distribution files
+.Pq like base.txz ;
+see
+.Xr release 7
+and
+.Xr bsdinstall 8
 .It Pa include/
 standard C include files
 .Pp
@@ -282,7 +296,8 @@ machine-specific C include files
 miscellaneous network C include files
 .Bl -tag -width Fl -compact
 .It Pa altq/
-C include files for alternate queueing
+C include files for alternate packet queueing; see
+.Xr altq 4
 .El
 .It Pa net80211/
 C include files for 802.11 wireless networking;
@@ -350,14 +365,8 @@ shared and archive
 libraries
 .Pp
 .Bl -tag -width Fl -compact
-.It Pa aout/
-a.out archive libraries
 .It Pa compat/
 shared libraries for compatibility
-.Bl -tag -width Fl -compact
-.It Pa aout/
-a.out backward compatibility libraries
-.El
 .It Pa debug/
 standalone debug data for the kernel and base system libraries and binaries
 .It Pa dtrace/
@@ -377,6 +386,8 @@ configuration data
 linker scripts;
 see
 .Xr ld 1
+.It Pa pkgconfig/
+pc files
 .El
 .Pp
 .It Pa libexec/
@@ -425,14 +436,15 @@ and
 .Po mimics
 .Pa /etc Ns Pc .
 .It Pa obj/
-architecture-specific target tree produced by building the
-.Pa /usr/src
-tree
-.It Pa ports/
-.Xr ports 7 ,
-the
+architecture-specific target tree produced by building
 .Fx
-ports collection
+from source;
+see
+.Xr build 7
+.It Pa ports/
+.Fx
+ports collection; see
+.Xr ports 7
 .It Pa sbin/
 system daemons & system utilities (executed by users)
 .It Pa share/
@@ -497,7 +509,7 @@ firmware images loaded by userland programs
 .It Pa games/
 ASCII text files used by various games
 .It Pa keys/
-known trusted and revoked keys.
+known trusted and revoked keys
 .Bl -tag -width Fl -compact
 .It Pa pkg/
 fingerprints for
@@ -538,7 +550,7 @@ example
 .Pa .\&
 (dot) files for new accounts
 .It Pa snmp/
-MIBs, example files and tree definitions for the SNMP daemon.
+MIBs, example files and tree definitions for the SNMP daemon
 .Bl -tag -width Fl -compact
 .It Pa defs/
 tree definition files for use with
@@ -565,6 +577,32 @@ and
 .Xr kbdmap 1
 .It Pa scrnmaps/
 console screen maps
+.El
+.It Pa sysroot/
+files necessary for the -sysroot compiler/linker argument to build non-native
+binaries.
+.Bl -tag -width Fl -compact
+.It Pa VERSION/
+files for
+.Fx
+release VERSION.
+By convention,
+.Dq VERSION
+matches
+.Xr uname 1
+.Fl r .
+.Bl -tag -width Fl -compact
+.It Pa MACHINE.MACHINE_ARCH/
+represent the binary ABI for these files.
+.Dq MACHINE
+matches
+.Xr uname 1
+.Fl m .
+.Dq MACHINE_ARCH
+matches
+.Xr uname 1
+.Fl p .
+.El
 .El
 .It Pa tabset/
 tab description files for a variety of terminals; used in
@@ -602,7 +640,8 @@ see
 .Pp
 .It Pa src/
 .Fx
-source code
+source code; see
+.Xr development 7
 .Pp
 .Bl -tag -width "kerberos5/" -compact
 .It Pa bin/
@@ -677,8 +716,6 @@ device drivers
 i386 (32 bit) architecture support
 .It Pa kern/
 main part of the kernel
-.It Pa mips/
-MIPS architecture support
 .It Pa net80211/
 .Xr net80211 4
 .It Pa netgraph/
@@ -703,8 +740,6 @@ RISC-V architecture support
 .Xr audit 4
 and
 .Xr mac 4
-.It Pa sparc64/
-SPARC64 architecture support
 .It Pa sys/
 kernel headers
 .It Pa ufs/
@@ -794,7 +829,7 @@ miscellaneous automatically generated system-specific database files
 empty directory for use by programs that need a specifically empty directory.
 Used for instance by
 .Xr sshd 8
-for privilege separation.
+for privilege separation
 .It Pa games/
 miscellaneous game status and score files
 .It Pa heimdal/
@@ -833,7 +868,9 @@ system since it was booted
 .Pp
 .Bl -tag -width Fl -compact
 .It Pa bhyve/
-bhyve vm unix domain sockets
+.Xr bhyve 8
+virtual machine
+.Xr unix 4 Ns -domain sockets
 .It Pa ppp/
 writable by the
 .Dq network
@@ -861,7 +898,9 @@ undelivered submission mail queue;
 see
 .Xr sendmail 8
 .It Pa ftp/
-commonly ~ftp; the anonymous ftp root directory
+ftp root directory;
+see
+.Xr ftpd 8
 .It Pa mqueue/
 undelivered mail queue;
 see
@@ -879,7 +918,8 @@ the directory where recovery files are stored
 .El
 .Pp
 .It Pa yp/
-the NIS maps
+the NIS maps; see
+.Xr yp 8
 .El
 .El
 .Sh NOTES
@@ -893,15 +933,10 @@ this document.
 .Sh SEE ALSO
 .Xr apropos 1 ,
 .Xr find 1 ,
-.Xr finger 1 ,
 .Xr grep 1 ,
 .Xr ls 1 ,
-.Xr whatis 1 ,
 .Xr whereis 1 ,
-.Xr which 1 ,
-.Xr fd 4 ,
-.Xr devfs 5 ,
-.Xr fsck 8
+.Xr which 1
 .Sh HISTORY
 A
 .Nm

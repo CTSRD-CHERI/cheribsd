@@ -117,6 +117,8 @@ ehci_pci_match(device_t self)
 		return ("AMD CS5536 (Geode) USB 2.0 controller");
 	case 0x78081022:
 		return ("AMD FCH USB 2.0 controller");
+	case 0x79081022:
+		return ("AMD FCH USB 2.0 controller");
 
 	case 0x43451002:
 		return "ATI SB200 USB 2.0 controller";
@@ -591,7 +593,5 @@ static driver_t ehci_driver = {
 	.size = sizeof(struct ehci_softc),
 };
 
-static devclass_t ehci_devclass;
-
-DRIVER_MODULE(ehci, pci, ehci_driver, ehci_devclass, 0, 0);
+DRIVER_MODULE(ehci, pci, ehci_driver, 0, 0);
 MODULE_DEPEND(ehci, usb, 1, 1, 1);

@@ -14,6 +14,10 @@
 .error Please define SRCDIR before including this file
 .endif
 
+.ifndef OS_REVISION
+.error Please define OS_REVISION before including this file
+.endif
+
 .PATH:		${LLVM_BASE}/${SRCDIR}
 
 CFLAGS+=	-I${SRCTOP}/lib/clang/include
@@ -40,10 +44,9 @@ TARGET_ABI=	-gnueabi
 TARGET_ABI=
 .endif
 VENDOR=		unknown
-OS_VERSION=	freebsd14.0
 
-LLVM_TARGET_TRIPLE?=	${TARGET_ARCH:C/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/}-${VENDOR}-${OS_VERSION}${TARGET_ABI}
-LLVM_BUILD_TRIPLE?=	${BUILD_ARCH:C/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/}-${VENDOR}-${OS_VERSION}
+LLVM_TARGET_TRIPLE?=	${TARGET_ARCH:C/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/}-${VENDOR}-freebsd${OS_REVISION}${TARGET_ABI}
+LLVM_BUILD_TRIPLE?=	${BUILD_ARCH:C/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/}-${VENDOR}-freebsd${OS_REVISION}
 
 CFLAGS+=	-DLLVM_DEFAULT_TARGET_TRIPLE=\"${LLVM_TARGET_TRIPLE}\"
 CFLAGS+=	-DLLVM_HOST_TRIPLE=\"${LLVM_BUILD_TRIPLE}\"
@@ -100,12 +103,25 @@ CFLAGS+=	-DLLVM_NATIVE_TARGETMC=LLVMInitialize${LLVM_NATIVE_ARCH}TargetMC
 
 CFLAGS+=	-ffunction-sections
 CFLAGS+=	-fdata-sections
+.include "bsd.linker.mk"
+.if ${LINKER_TYPE} == "mac"
+LDFLAGS+=	-Wl,-dead_strip
+.else
 LDFLAGS+=	-Wl,--gc-sections
+.endif
 
 CXXSTD?=	c++14
 CXXFLAGS+=	-fno-exceptions
 CXXFLAGS+=	-fno-rtti
+.if ${.MAKE.OS} == "FreeBSD" || !defined(BOOTSTRAPPING)
 CXXFLAGS.clang+= -stdlib=libc++
+.else
+# Building on macOS/Linux needs the real sysctl() not the bootstrap tools stub.
+CFLAGS+=	-DBOOTSTRAPPING_WANT_NATIVE_SYSCTL
+.endif
+.if defined(BOOTSTRAPPING) && ${.MAKE.OS} == "Linux"
+LIBADD+=	dl
+.endif
 
 .if ${MACHINE_ARCH:Mmips64}
 STATIC_CFLAGS+= -mxgot

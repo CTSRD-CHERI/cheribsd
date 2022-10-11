@@ -560,14 +560,14 @@ hv_pci_delete_device(struct hv_pci_dev *hpdev)
 
 	devfn = wslot_to_devfn(hpdev->desc.wslot.val);
 
-	mtx_lock(&Giant);
+	bus_topo_lock();
 
 	pci_dev = pci_find_dbsf(hbus->pci_domain,
 	    0, PCI_SLOT(devfn), PCI_FUNC(devfn));
 	if (pci_dev)
 		device_delete_child(hbus->pci_bus, pci_dev);
 
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 
 	mtx_lock(&hbus->device_list_lock);
 	TAILQ_REMOVE(&hbus->children, hpdev, link);
@@ -1356,6 +1356,51 @@ _hv_pcifront_write_config(struct hv_pci_dev *hpdev, int where, int size,
 	}
 }
 
+/*
+ * The vPCI in some Hyper-V releases do not initialize the last 4
+ * bit of BAR registers. This could result weird problems causing PCI
+ * code fail to configure BAR correctly.
+ *
+ * Just write all 1's to those BARs whose probed values are not zero.
+ * This seems to make the Hyper-V vPCI and pci_write_bar() to cooperate
+ * correctly.
+ */
+
+static void
+vmbus_pcib_prepopulate_bars(struct hv_pcibus *hbus)
+{
+	struct hv_pci_dev *hpdev;
+	int i;
+
+	mtx_lock(&hbus->device_list_lock);
+	TAILQ_FOREACH(hpdev, &hbus->children, link) {
+		for (i = 0; i < 6; i++) {
+			/* Ignore empty bar */
+			if (hpdev->probed_bar[i] == 0)
+				continue;
+
+			uint32_t bar_val = 0;
+
+			_hv_pcifront_read_config(hpdev, PCIR_BAR(i),
+			    4, &bar_val);
+
+			if (hpdev->probed_bar[i] != bar_val) {
+				if (bootverbose)
+					printf("vmbus_pcib: initialize bar %d "
+					    "by writing all 1s\n", i);
+
+				_hv_pcifront_write_config(hpdev, PCIR_BAR(i),
+				    4, 0xffffffff);
+
+				/* Now write the original value back */
+				_hv_pcifront_write_config(hpdev, PCIR_BAR(i),
+				    4, bar_val);
+			}
+		}
+	}
+	mtx_unlock(&hbus->device_list_lock);
+}
+
 static void
 vmbus_pcib_set_detaching(void *arg, int pending __unused)
 {
@@ -1478,6 +1523,8 @@ vmbus_pcib_attach(device_t dev)
 	ret = hv_send_resources_allocated(hbus);
 	if (ret)
 		goto vmbus_close;
+
+	vmbus_pcib_prepopulate_bars(hbus);
 
 	hbus->pci_bus = device_add_child(dev, "pci", -1);
 	if (!hbus->pci_bus) {
@@ -1843,11 +1890,9 @@ static device_method_t vmbus_pcib_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t pcib_devclass;
-
 DEFINE_CLASS_0(pcib, vmbus_pcib_driver, vmbus_pcib_methods,
 		sizeof(struct vmbus_pcib_softc));
-DRIVER_MODULE(vmbus_pcib, vmbus, vmbus_pcib_driver, pcib_devclass, 0, 0);
+DRIVER_MODULE(vmbus_pcib, vmbus, vmbus_pcib_driver, 0, 0);
 MODULE_DEPEND(vmbus_pcib, vmbus, 1, 1, 1);
 MODULE_DEPEND(vmbus_pcib, pci, 1, 1, 1);
 

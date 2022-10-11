@@ -172,9 +172,8 @@ static driver_t cxgb_controller_driver = {
 };
 
 static int cxgbc_mod_event(module_t, int, void *);
-static devclass_t	cxgb_controller_devclass;
-DRIVER_MODULE(cxgbc, pci, cxgb_controller_driver, cxgb_controller_devclass,
-    cxgbc_mod_event, 0);
+
+DRIVER_MODULE(cxgbc, pci, cxgb_controller_driver, cxgbc_mod_event, NULL);
 MODULE_PNP_INFO("U16:vendor;U16:device", pci, cxgbc, cxgb_identifiers,
     nitems(cxgb_identifiers) - 1);
 MODULE_VERSION(cxgbc, 1);
@@ -214,8 +213,7 @@ static struct cdevsw cxgb_cdevsw = {
        .d_name =       "cxgb",
 };
 
-static devclass_t	cxgb_port_devclass;
-DRIVER_MODULE(cxgb, cxgbc, cxgb_port_driver, cxgb_port_devclass, 0, 0);
+DRIVER_MODULE(cxgb, cxgbc, cxgb_port_driver, 0, 0);
 MODULE_VERSION(cxgb, 1);
 
 DEBUGNET_DEFINE(cxgb);
@@ -1042,6 +1040,9 @@ cxgb_port_attach(device_t dev)
 	ifp->if_capenable = CXGB_CAP_ENABLE;
 	ifp->if_hwassist = CSUM_TCP | CSUM_UDP | CSUM_IP | CSUM_TSO |
 	    CSUM_UDP_IPV6 | CSUM_TCP_IPV6;
+	ifp->if_hw_tsomax = IP_MAXPACKET;
+	ifp->if_hw_tsomaxsegcount = 36;
+	ifp->if_hw_tsomaxsegsize = 65536;
 
 	/*
 	 * Disable TSO on 4-port - it isn't supported by the firmware.

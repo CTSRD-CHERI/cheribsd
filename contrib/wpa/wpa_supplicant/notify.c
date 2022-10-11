@@ -19,6 +19,7 @@
 #include "rsn_supp/wpa.h"
 #include "fst/fst.h"
 #include "crypto/tls.h"
+#include "bss.h"
 #include "driver_i.h"
 #include "scan.h"
 #include "p2p_supplicant.h"
@@ -350,8 +351,11 @@ void wpas_notify_network_added(struct wpa_supplicant *wpa_s,
 	 * applications since these network objects won't behave like
 	 * regular ones.
 	 */
-	if (!ssid->p2p_group && wpa_s->global->p2p_group_formation != wpa_s)
+	if (!ssid->p2p_group && wpa_s->global->p2p_group_formation != wpa_s) {
 		wpas_dbus_register_network(wpa_s, ssid);
+		wpa_msg_ctrl(wpa_s, MSG_INFO, WPA_EVENT_NETWORK_ADDED "%d",
+			     ssid->id);
+	}
 }
 
 
@@ -381,12 +385,20 @@ void wpas_notify_network_removed(struct wpa_supplicant *wpa_s,
 	if (wpa_s->wpa)
 		wpa_sm_pmksa_cache_flush(wpa_s->wpa, ssid);
 	if (!ssid->p2p_group && wpa_s->global->p2p_group_formation != wpa_s &&
-	    !wpa_s->p2p_mgmt)
+	    !wpa_s->p2p_mgmt) {
 		wpas_dbus_unregister_network(wpa_s, ssid->id);
+		wpa_msg_ctrl(wpa_s, MSG_INFO, WPA_EVENT_NETWORK_REMOVED "%d",
+			     ssid->id);
+	}
 	if (network_is_persistent_group(ssid))
 		wpas_notify_persistent_group_removed(wpa_s, ssid);
 
 	wpas_p2p_network_removed(wpa_s, ssid);
+
+#ifdef CONFIG_PASN
+	if (wpa_s->pasn.ssid == ssid)
+		wpa_s->pasn.ssid = NULL;
+#endif /* CONFIG_PASN */
 }
 
 
@@ -794,10 +806,11 @@ void wpas_notify_certification(struct wpa_supplicant *wpa_s,
 	int i;
 
 	wpa_msg(wpa_s, MSG_INFO, WPA_EVENT_EAP_PEER_CERT
-		"depth=%d subject='%s'%s%s%s",
+		"depth=%d subject='%s'%s%s%s%s",
 		cert->depth, cert->subject, cert_hash ? " hash=" : "",
 		cert_hash ? cert_hash : "",
-		cert->tod ? " tod=1" : "");
+		cert->tod == 2 ? " tod=2" : "",
+		cert->tod == 1 ? " tod=1" : "");
 
 	if (cert->cert) {
 		char *cert_hex;
@@ -931,3 +944,32 @@ void wpas_notify_mesh_peer_disconnected(struct wpa_supplicant *wpa_s,
 }
 
 #endif /* CONFIG_MESH */
+
+
+#ifdef CONFIG_INTERWORKING
+
+void wpas_notify_interworking_ap_added(struct wpa_supplicant *wpa_s,
+				       struct wpa_bss *bss,
+				       struct wpa_cred *cred, int excluded,
+				       const char *type, int bh, int bss_load,
+				       int conn_capab)
+{
+	wpa_msg(wpa_s, MSG_INFO, "%s" MACSTR " type=%s%s%s%s id=%d priority=%d sp_priority=%d",
+		excluded ? INTERWORKING_EXCLUDED : INTERWORKING_AP,
+		MAC2STR(bss->bssid), type,
+		bh ? " below_min_backhaul=1" : "",
+		bss_load ? " over_max_bss_load=1" : "",
+		conn_capab ? " conn_capab_missing=1" : "",
+		cred->id, cred->priority, cred->sp_priority);
+
+	wpas_dbus_signal_interworking_ap_added(wpa_s, bss, cred, type, excluded,
+					       bh, bss_load, conn_capab);
+}
+
+
+void wpas_notify_interworking_select_done(struct wpa_supplicant *wpa_s)
+{
+	wpas_dbus_signal_interworking_select_done(wpa_s);
+}
+
+#endif /* CONFIG_INTERWORKING */

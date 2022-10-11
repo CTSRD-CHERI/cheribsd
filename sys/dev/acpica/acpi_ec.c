@@ -262,8 +262,7 @@ static driver_t acpi_ec_driver = {
     sizeof(struct acpi_ec_softc),
 };
 
-static devclass_t acpi_ec_devclass;
-DRIVER_MODULE(acpi_ec, acpi, acpi_ec_driver, acpi_ec_devclass, 0, 0);
+DRIVER_MODULE(acpi_ec, acpi, acpi_ec_driver, 0, 0);
 MODULE_DEPEND(acpi_ec, acpi, 1, 1, 1);
 
 /*
@@ -395,7 +394,7 @@ acpi_ec_probe(device_t dev)
      * checks DF_ENABLED at the start and so disabling it here is too late to
      * prevent device_attach() from being called.
      */
-    peer = devclass_get_device(acpi_ec_devclass, params->uid);
+    peer = devclass_get_device(device_get_devclass(dev), params->uid);
     if (peer != NULL && device_is_alive(peer)) {
 	device_disable(dev);
 	goto out;

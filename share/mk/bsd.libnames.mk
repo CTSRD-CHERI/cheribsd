@@ -64,7 +64,7 @@ LIBEXECINFO?=	${LIBDESTDIR}${LIBDIR_BASE}/libexecinfo.a
 LIBFETCH?=	${LIBDESTDIR}${LIBDIR_BASE}/libfetch.a
 LIBFIGPAR?=	${LIBDESTDIR}${LIBDIR_BASE}/libfigpar.a
 LIBFL?=		"don't use LIBFL, use LIBL"
-LIBFORM?=	${LIBDESTDIR}${LIBDIR_BASE}/libform.a
+LIBFORMW?=	${LIBDESTDIR}${LIBDIR_BASE}/libformw.a
 LIBG2C?=	${LIBDESTDIR}${LIBDIR_BASE}/libg2c.a
 LIBGEOM?=	${LIBDESTDIR}${LIBDIR_BASE}/libgeom.a
 LIBGPIO?=	${LIBDESTDIR}${LIBDIR_BASE}/libgpio.a
@@ -83,6 +83,8 @@ LIBIBVERBS?=	${LIBDESTDIR}${LIBDIR_BASE}/libibverbs.a
 LIBICP?=	${LIBDESTDIR}${LIBDIR_BASE}/libicp.a
 LIBIPSEC?=	${LIBDESTDIR}${LIBDIR_BASE}/libipsec.a
 LIBIPT?=	${LIBDESTDIR}${LIBDIR_BASE}/libipt.a
+LIBIRDMA?=	${LIBDESTDIR}${LIBDIR_BASE}/libirdma.a
+LIBISCSIUTIL?=	${LIBDESTDIR}${LIBDIR_BASE}/libiscsiutil.a
 LIBJAIL?=	${LIBDESTDIR}${LIBDIR_BASE}/libjail.a
 LIBKADM5CLNT?=	${LIBDESTDIR}${LIBDIR_BASE}/libkadm5clnt.a
 LIBKADM5SRV?=	${LIBDESTDIR}${LIBDIR_BASE}/libkadm5srv.a
@@ -148,7 +150,7 @@ LIBTACPLUS?=	${LIBDESTDIR}${LIBDIR_BASE}/libtacplus.a
 LIBTERMCAP?=	${LIBDESTDIR}${LIBDIR_BASE}/libtermcap.a
 LIBTERMCAPW?=	${LIBDESTDIR}${LIBDIR_BASE}/libtermcapw.a
 LIBTERMLIB?=	"don't use LIBTERMLIB, use LIBTERMCAP"
-LIBTINFO?=	"don't use LIBTINFO, use LIBNCURSES"
+LIBTINFOW=	${LIBDESTDIR}${LIBDIR_BASE}/libtinfow.a
 LIBTPOOL?=	${LIBDESTDIR}${LIBDIR_BASE}/libtpool.a
 LIBUFS?=	${LIBDESTDIR}${LIBDIR_BASE}/libufs.a
 LIBUGIDFW?=	${LIBDESTDIR}${LIBDIR_BASE}/libugidfw.a
@@ -177,12 +179,9 @@ LIBC_NOSYSCALLS?=	${DESTDIR}${LIBDIR_BASE}/libc_nosyscalls.a
 LIBMALLOC_SIMPLE=	${DESTDIR}${LIBDIR_BASE}/libmalloc_simple.a
 LIBSYSCALLS?=	${DESTDIR}${LIBDIR_BASE}/libsyscalls.a
 
-# enforce that -lcheri, -lpthread, and -lc to always be the last in that
-# exact order
+# enforce that -lpthread, -lc, and -lmalloc_simple to always be the
+# last in that exact order
 .if defined(LDADD)
-.if ${LDADD:M-lcheri}
-LDADD:=	${LDADD:N-lcheri} -lcheri
-.endif
 .if ${LDADD:M-lpthread}
 LDADD:=	${LDADD:N-lpthread} -lpthread
 .endif

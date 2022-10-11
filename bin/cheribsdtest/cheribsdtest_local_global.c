@@ -38,11 +38,6 @@
 
 #include <sys/param.h>
 
-#ifdef __mips__
-#include <machine/frame.h>
-#include <machine/trap.h>
-#endif
-
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 

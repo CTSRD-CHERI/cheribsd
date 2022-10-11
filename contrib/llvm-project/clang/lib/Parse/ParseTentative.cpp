@@ -277,7 +277,7 @@ Parser::TPResult Parser::TryParseSimpleDeclaration(bool AllowForRangeDecl) {
 ///         '{' '}'
 ///
 Parser::TPResult Parser::TryParseInitDeclaratorList() {
-  while (1) {
+  while (true) {
     // declarator
     TPResult TPR = TryParseDeclarator(false/*mayBeAbstract*/);
     if (TPR != TPResult::Ambiguous)
@@ -353,8 +353,8 @@ struct Parser::ConditionDeclarationOrInitStatementState {
       if (CanBeForRangeDecl) {
         // Skip until we hit a ')', ';', or a ':' with no matching '?'.
         // The final case is a for range declaration, the rest are not.
+        unsigned QuestionColonDepth = 0;
         while (true) {
-          unsigned QuestionColonDepth = 0;
           P.SkipUntil({tok::r_paren, tok::semi, tok::question, tok::colon},
                       StopBeforeMatch);
           if (P.Tok.is(tok::question))
@@ -483,6 +483,8 @@ Parser::isCXXConditionDeclarationOrInitStatement(bool CanBeInitStatement,
   ConditionDeclarationOrInitStatementState State(*this, CanBeInitStatement,
                                                  CanBeForRangeDecl);
 
+  if (CanBeInitStatement && Tok.is(tok::kw_using))
+    return ConditionOrInitStatement::InitStmtDecl;
   if (State.update(isCXXDeclarationSpecifier()))
     return State.result();
 
@@ -842,7 +844,8 @@ Parser::TPResult Parser::TryParsePtrOperatorSeq() {
 
       while (Tok.isOneOf(tok::kw_const, tok::kw_volatile, tok::kw_restrict,
                          tok::kw__Nonnull, tok::kw__Nullable,
-                         tok::kw__Null_unspecified, tok::kw__Atomic))
+                         tok::kw__Nullable_result, tok::kw__Null_unspecified,
+                         tok::kw__Atomic))
         ConsumeToken();
     } else {
       return TPResult::True;
@@ -1065,7 +1068,7 @@ Parser::TPResult Parser::TryParseDeclarator(bool mayBeAbstract,
   if (mayHaveDirectInit)
     return TPResult::Ambiguous;
 
-  while (1) {
+  while (true) {
     TPResult TPR(TPResult::Ambiguous);
 
     if (Tok.is(tok::l_paren)) {
@@ -1100,9 +1103,7 @@ Parser::TPResult Parser::TryParseDeclarator(bool mayBeAbstract,
 }
 
 bool Parser::isTentativelyDeclared(IdentifierInfo *II) {
-  return std::find(TentativelyDeclaredIdentifiers.begin(),
-                   TentativelyDeclaredIdentifiers.end(), II)
-      != TentativelyDeclaredIdentifiers.end();
+  return llvm::is_contained(TentativelyDeclaredIdentifiers, II);
 }
 
 namespace {
@@ -1276,15 +1277,6 @@ Parser::isCXXDeclarationSpecifier(Parser::TPResult BracedCastResult,
       // this is ambiguous. Typo-correct to type and expression keywords and
       // to types and identifiers, in order to try to recover from errors.
       TentativeParseCCC CCC(Next);
-      // Tentative parsing may not be done in the right evaluation context
-      // for the ultimate expression.  Enter an unevaluated context to prevent
-      // Sema from immediately e.g. treating this lookup as a potential ODR-use.
-      // If we generate an expression annotation token and the parser actually
-      // claims it as an expression, we'll transform the expression to a
-      // potentially-evaluated one then.
-      EnterExpressionEvaluationContext Unevaluated(
-          Actions, Sema::ExpressionEvaluationContext::Unevaluated,
-          Sema::ReuseLambdaContextDecl);
       switch (TryAnnotateName(&CCC)) {
       case ANK_Error:
         return TPResult::Error;
@@ -1446,6 +1438,7 @@ Parser::isCXXDeclarationSpecifier(Parser::TPResult BracedCastResult,
   case tok::kw___unaligned:
   case tok::kw__Nonnull:
   case tok::kw__Nullable:
+  case tok::kw__Nullable_result:
   case tok::kw__Null_unspecified:
   case tok::kw___kindof:
     return TPResult::True;
@@ -1644,6 +1637,7 @@ Parser::isCXXDeclarationSpecifier(Parser::TPResult BracedCastResult,
   case tok::kw___bf16:
   case tok::kw__Float16:
   case tok::kw___float128:
+  case tok::kw___ibm128:
   case tok::kw_void:
   case tok::annot_decltype:
 #define GENERIC_IMAGE_TYPE(ImgType, Id) case tok::kw_##ImgType##_t:
@@ -1696,6 +1690,7 @@ Parser::isCXXDeclarationSpecifier(Parser::TPResult BracedCastResult,
   case tok::kw__Atomic:
     return TPResult::True;
 
+  case tok::kw__BitInt:
   case tok::kw__ExtInt: {
     if (NextToken().isNot(tok::l_paren))
       return TPResult::Error;
@@ -1747,6 +1742,7 @@ bool Parser::isCXXDeclarationSpecifierAType() {
   case tok::kw_short:
   case tok::kw_int:
   case tok::kw__ExtInt:
+  case tok::kw__BitInt:
   case tok::kw_long:
   case tok::kw___int64:
   case tok::kw___int128:
@@ -1758,6 +1754,7 @@ bool Parser::isCXXDeclarationSpecifierAType() {
   case tok::kw___bf16:
   case tok::kw__Float16:
   case tok::kw___float128:
+  case tok::kw___ibm128:
   case tok::kw_void:
   case tok::kw___unknown_anytype:
   case tok::kw___auto_type:
@@ -1901,7 +1898,7 @@ Parser::TryParseParameterDeclarationClause(bool *InvalidAsDeclaration,
   //   parameter-declaration
   //   parameter-declaration-list ',' parameter-declaration
   //
-  while (1) {
+  while (true) {
     // '...'[opt]
     if (Tok.is(tok::ellipsis)) {
       ConsumeToken();

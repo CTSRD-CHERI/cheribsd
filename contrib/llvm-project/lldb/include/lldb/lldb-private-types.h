@@ -51,19 +51,15 @@ struct RegisterInfo {
   /// List of registers (terminated with LLDB_INVALID_REGNUM). If this value is
   /// not null, all registers in this list will be read first, at which point
   /// the value for this register will be valid. For example, the value list
-  /// for ah would be eax (x86) or rax (x64).
-  uint32_t *value_regs; //
+  /// for ah would be eax (x86) or rax (x64). Register numbers are
+  /// of eRegisterKindLLDB. If multiple registers are listed, the final
+  /// value will be the concatenation of them.
+  uint32_t *value_regs;
   /// List of registers (terminated with LLDB_INVALID_REGNUM). If this value is
   /// not null, all registers in this list will be invalidated when the value of
   /// this register changes. For example, the invalidate list for eax would be
   /// rax ax, ah, and al.
   uint32_t *invalidate_regs;
-  /// A DWARF expression that when evaluated gives the byte size of this
-  /// register.
-  const uint8_t *dynamic_size_dwarf_expr_bytes;
-  /// The length of the DWARF expression in bytes in the
-  /// dynamic_size_dwarf_expr_bytes member.
-  size_t dynamic_size_dwarf_len;
 
   llvm::ArrayRef<uint8_t> data(const uint8_t *context_base) const {
     return llvm::ArrayRef<uint8_t>(context_base + byte_offset, byte_size);
@@ -100,38 +96,11 @@ struct OptionEnumValueElement {
 using OptionEnumValues = llvm::ArrayRef<OptionEnumValueElement>;
 
 struct OptionValidator {
-  virtual ~OptionValidator() {}
+  virtual ~OptionValidator() = default;
   virtual bool IsValid(Platform &platform,
                        const ExecutionContext &target) const = 0;
   virtual const char *ShortConditionString() const = 0;
   virtual const char *LongConditionString() const = 0;
-};
-
-struct OptionDefinition {
-  /// Used to mark options that can be used together.  If
-  /// `(1 << n & usage_mask) != 0` then this option belongs to option set n.
-  uint32_t usage_mask;
-  /// This option is required (in the current usage level).
-  bool required;
-  /// Full name for this option.
-  const char *long_option;
-  /// Single character for this option.
-  int short_option;
-  /// no_argument, required_argument or optional_argument
-  int option_has_arg;
-  /// If non-NULL, option is valid iff |validator->IsValid()|, otherwise
-  /// always valid.
-  OptionValidator *validator;
-  /// If not empty, an array of enum values.
-  OptionEnumValues enum_values;
-  /// The kind of completion for this option.
-  /// Contains values of the CommandCompletions::CommonCompletionTypes enum.
-  uint32_t completion_type;
-  /// Type of argument this option takes.
-  lldb::CommandArgumentType argument_type;
-  /// Full text explaining what this options does and what (if any) argument to
-  /// pass it.
-  const char *usage_text;
 };
 
 typedef struct type128 { uint64_t x[2]; } type128;

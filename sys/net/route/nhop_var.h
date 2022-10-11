@@ -57,10 +57,9 @@ struct nh_control {
 	struct nhops_head	nh_head;	/* hash table head */
 	struct bitmask_head	nh_idx_head;	/* nhop index head */
 	struct nhgroups_head	gr_head;	/* nhgrp hash table head */
-	struct bitmask_head	gr_idx_head;	/* nhgrp index head */
 	struct rwlock		ctl_lock;	/* overall ctl lock */
 	struct rib_head		*ctl_rh;	/* pointer back to rnh */
-	struct epoch_context	ctl_epoch_ctx __subobject_use_container_bounds;	/* epoch ctl helper */
+	struct epoch_context	ctl_epoch_ctx;	/* epoch ctl helper */
 };
 
 #define	NHOPS_WLOCK(ctl)	rw_wlock(&(ctl)->ctl_lock)
@@ -75,12 +74,13 @@ struct nh_control {
 struct nhop_object;
 struct nhop_priv {
 	/* nhop lookup comparison start */
-	uint8_t			nh_family;	/* address family of the lookup */
-	uint8_t			spare;
+	uint8_t			nh_upper_family;/* address family of the lookup */
+	uint8_t			nh_neigh_family;/* neighbor address family */
 	uint16_t		nh_type;	/* nexthop type */
 	uint32_t		rt_flags;	/* routing flags for the control plane */
 	/* nhop lookup comparison end */
 	uint32_t		nh_idx;		/* nexthop index */
+	uint32_t		nh_fibnum;	/* nexthop fib */
 	void			*cb_func;	/* function handling additional rewrite caps */
 	u_int			nh_refcnt;	/* number of references, refcount(9)  */
 	u_int			nh_linked;	/* refcount(9), == 2 if linked to the list */
@@ -88,7 +88,7 @@ struct nhop_priv {
 	struct nh_control	*nh_control;	/* backreference to the rnh */
 	struct nhop_priv	*nh_next;	/* hash table membership */
 	struct vnet		*nh_vnet;	/* vnet nhop belongs to */
-	struct epoch_context	nh_epoch_ctx __subobject_use_container_bounds;	/* epoch data for nhop */
+	struct epoch_context	nh_epoch_ctx;	/* epoch data for nhop */
 };
 
 #define	NH_PRIV_END_CMP	(__offsetof(struct nhop_priv, nh_idx))

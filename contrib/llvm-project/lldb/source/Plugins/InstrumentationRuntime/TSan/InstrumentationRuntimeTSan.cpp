@@ -52,10 +52,6 @@ void InstrumentationRuntimeTSan::Terminate() {
   PluginManager::UnregisterPlugin(CreateInstance);
 }
 
-lldb_private::ConstString InstrumentationRuntimeTSan::GetPluginNameStatic() {
-  return ConstString("ThreadSanitizer");
-}
-
 lldb::InstrumentationRuntimeType InstrumentationRuntimeTSan::GetTypeStatic() {
   return eInstrumentationRuntimeTypeThreadSanitizer;
 }
@@ -715,7 +711,7 @@ addr_t InstrumentationRuntimeTSan::GetMainRacyAddress(
 std::string InstrumentationRuntimeTSan::GetLocationDescription(
     StructuredData::ObjectSP report, addr_t &global_addr,
     std::string &global_name, std::string &filename, uint32_t &line) {
-  std::string result = "";
+  std::string result;
 
   ProcessSP process_sp = GetProcessSP();
 
@@ -809,7 +805,9 @@ bool InstrumentationRuntimeTSan::NotifyBreakpointHit(
 
   StructuredData::ObjectSP report =
       instance->RetrieveReportData(context->exe_ctx_ref);
-  std::string stop_reason_description;
+  std::string stop_reason_description =
+      "unknown thread sanitizer fault (unable to extract thread sanitizer "
+      "report)";
   if (report) {
     std::string issue_description = instance->FormatDescription(report);
     report->GetAsDictionary()->AddStringItem("description", issue_description);
@@ -822,8 +820,8 @@ bool InstrumentationRuntimeTSan::NotifyBreakpointHit(
     report->GetAsDictionary()->AddIntegerItem("memory_address", main_address);
 
     addr_t global_addr = 0;
-    std::string global_name = "";
-    std::string location_filename = "";
+    std::string global_name;
+    std::string location_filename;
     uint32_t location_line = 0;
     std::string location_description = instance->GetLocationDescription(
         report, global_addr, global_name, location_filename, location_line);

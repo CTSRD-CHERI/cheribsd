@@ -493,7 +493,7 @@ hn_rndis_query_rsscaps(struct hn_softc *sc, int *rxr_cnt0)
 
 	/*
 	 * NOTE:
-	 * Toeplitz is at the lowest bit, and it is prefered; so ffs(),
+	 * Toeplitz is at the lowest bit, and it is preferred; so ffs(),
 	 * instead of fls(), is used here.
 	 */
 	hash_fnidx = ffs(caps.ndis_caps & NDIS_RSS_CAP_HASHFUNC_MASK);
@@ -577,6 +577,12 @@ hn_rndis_set(struct hn_softc *sc, uint32_t oid, const void *data, size_t dlen)
 done:
 	vmbus_xact_put(xact);
 	return (error);
+}
+
+int
+hn_rndis_reconf_offload(struct hn_softc *sc, int mtu)
+{
+	return(hn_rndis_conf_offload(sc, mtu));
 }
 
 static int
@@ -725,7 +731,8 @@ hn_rndis_conf_offload(struct hn_softc *sc, int mtu)
 
 	/* RSC offload */
 	if (hwcaps.ndis_hdr.ndis_rev >= NDIS_OFFLOAD_PARAMS_REV_3) {
-		if (hwcaps.ndis_rsc.ndis_ip4 && hwcaps.ndis_rsc.ndis_ip6) {
+		if (hwcaps.ndis_rsc.ndis_ip4 && hwcaps.ndis_rsc.ndis_ip6 &&
+		    sc->hn_rsc_ctrl) {
 			params.ndis_rsc_ip4 = NDIS_OFFLOAD_RSC_ON;
 			params.ndis_rsc_ip6 = NDIS_OFFLOAD_RSC_ON;
 		} else {

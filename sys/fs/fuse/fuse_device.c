@@ -64,6 +64,7 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/module.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
@@ -119,12 +120,18 @@ static struct cdevsw fuse_device_cdevsw = {
 };
 
 static int fuse_device_filt_read(struct knote *kn, long hint);
+static int fuse_device_filt_write(struct knote *kn, long hint);
 static void fuse_device_filt_detach(struct knote *kn);
 
 struct filterops fuse_device_rfiltops = {
 	.f_isfd = 1,
 	.f_detach = fuse_device_filt_detach,
 	.f_event = fuse_device_filt_read,
+};
+
+struct filterops fuse_device_wfiltops = {
+	.f_isfd = 1,
+	.f_event = fuse_device_filt_write,
 };
 
 /****************************
@@ -180,11 +187,13 @@ fuse_device_filter(struct cdev *dev, struct knote *kn)
 
 	error = devfs_get_cdevpriv((void **)&data);
 
-	/* EVFILT_WRITE is not supported; the device is always ready to write */
 	if (error == 0 && kn->kn_filter == EVFILT_READ) {
 		kn->kn_fop = &fuse_device_rfiltops;
 		kn->kn_hook = data;
 		knlist_add(&data->ks_rsel.si_note, kn, 0);
+		error = 0;
+	} else if (error == 0 && kn->kn_filter == EVFILT_WRITE) {
+		kn->kn_fop = &fuse_device_wfiltops;
 		error = 0;
 	} else if (error == 0) {
 		error = EINVAL;
@@ -229,6 +238,16 @@ fuse_device_filt_read(struct knote *kn, long hint)
 	}
 
 	return (ready);
+}
+
+static int
+fuse_device_filt_write(struct knote *kn, long hint)
+{
+
+	kn->kn_data = 0;
+
+	/* The device is always ready to write, so we return 1*/
+	return (1);
 }
 
 /*
@@ -499,8 +518,18 @@ fuse_device_write(struct cdev *dev, struct uio *uio, int ioflag)
 				"pass ticket to a callback");
 			/* Sanitize the linuxism of negative errnos */
 			ohead.error *= -1;
-			memcpy(&tick->tk_aw_ohead, &ohead, sizeof(ohead));
-			err = tick->tk_aw_handler(tick, uio);
+			if (ohead.error < 0 || ohead.error > ELAST) {
+				/* Illegal error code */
+				ohead.error = EIO;
+				memcpy(&tick->tk_aw_ohead, &ohead,
+					sizeof(ohead));
+				tick->tk_aw_handler(tick, uio);
+				err = EINVAL;
+			} else {
+				memcpy(&tick->tk_aw_ohead, &ohead,
+					sizeof(ohead));
+				err = tick->tk_aw_handler(tick, uio);
+			}
 		} else {
 			/* pretender doesn't wanna do anything with answer */
 			SDT_PROBE2(fusefs, , device, trace, 1,

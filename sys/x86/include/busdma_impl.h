@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2013 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Konstantin Belousov <kib@FreeBSD.org>
  * under sponsorship from the FreeBSD Foundation.
@@ -85,9 +84,11 @@ struct bus_dma_impl {
 	void (*map_unload)(bus_dma_tag_t dmat, bus_dmamap_t map);
 	void (*map_sync)(bus_dma_tag_t dmat, bus_dmamap_t map,
 	    bus_dmasync_op_t op);
+#ifdef KMSAN
+	void (*load_kmsan)(bus_dmamap_t map, struct memdesc *mem);
+#endif
 };
 
-void bus_dma_dflt_lock(void *arg, bus_dma_lock_op_t op);
 int bus_dma_run_filter(struct bus_dma_tag_common *dmat, vm_paddr_t paddr);
 int common_bus_dma_tag_create(struct bus_dma_tag_common *parent,
     bus_size_t alignment,

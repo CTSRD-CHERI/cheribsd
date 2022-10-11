@@ -31,7 +31,8 @@ class DIEHash {
   };
 
 public:
-  DIEHash(AsmPrinter *A = nullptr) : AP(A) {}
+  DIEHash(AsmPrinter *A = nullptr, DwarfCompileUnit *CU = nullptr)
+      : AP(A), CU(CU) {}
 
   /// Computes the CU signature.
   uint64_t computeCUSignature(StringRef DWOName, const DIE &Die);
@@ -60,6 +61,8 @@ public:
 
   /// Encodes and adds \param Value to the hash as a SLEB128.
   void addSLEB128(int64_t Value);
+
+  void hashRawTypeReference(const DIE &Entry);
 
 private:
   /// Adds \param Str to the hash and includes a NULL byte.
@@ -101,6 +104,7 @@ private:
 private:
   MD5 Hash;
   AsmPrinter *AP;
+  DwarfCompileUnit *CU;
   DenseMap<const DIE *, unsigned> Numbering;
 };
 }

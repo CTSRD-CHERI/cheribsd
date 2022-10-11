@@ -44,6 +44,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysproto.h>
 #include <sys/unistd.h>
 
+#if __has_feature(capabilities)
+
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
@@ -115,7 +117,7 @@ static void
 colocation_copyin_scb(const struct switchercb * __capability cap,
     struct switchercb *scbp)
 {
-	int error;
+	int error __diagused;
 
 	KASSERT(cap != NULL, ("%s: NULL addr", __func__));
 
@@ -142,7 +144,7 @@ colocation_fetch_scb(struct thread *td, struct switchercb *scbp)
 static void
 colocation_copyout_scb(void * __capability cap, const struct switchercb *scbp)
 {
-	int error;
+	int error __diagused;
 
 	KASSERT(cap != NULL, ("%s: NULL addr", __func__));
 
@@ -162,7 +164,7 @@ static void
 colocation_store_caller_scb(struct switchercb * __capability user_scbp,
     struct switchercb * __capability caller_scb)
 {
-	int error;
+	int error __diagused;
 
 	error = sucap(&user_scbp->scb_caller_scb, (intcap_t)caller_scb);
 	KASSERT(error == 0, ("%s: sucap to %#lp failed with error %d",
@@ -176,6 +178,7 @@ colocation_fetch_caller_scb(struct thread *td, struct switchercb *scbp)
 		/*
 		 * We've never called cosetup(2).
 		 */
+		COLOCATION_DEBUG("never called cosetup");
 		return (false);
 	}
 
@@ -186,6 +189,10 @@ colocation_fetch_caller_scb(struct thread *td, struct switchercb *scbp)
 		/*
 		 * Not in cocall.
 		 */
+		COLOCATION_DEBUG("not in cocall (caller_scb %#lp tag %d, len %zd)",
+		   scbp->scb_caller_scb,
+		   cheri_gettag(scbp->scb_caller_scb),
+		   cheri_getlen(scbp->scb_caller_scb));
 		return (false);
 	}
 
@@ -321,9 +328,9 @@ colocation_unborrow(struct thread *td)
 {
 	struct switchercb scb;
 	struct thread *peertd;
-	struct trapframe *trapframe, peertrapframe;
-#ifdef __mips__
-	trapf_pc_t peertpc;
+	struct trapframe peertrapframe;
+#ifdef __aarch64__
+	uintcap_t peertpidr;
 #endif
 	bool have_scb;
 
@@ -331,7 +338,6 @@ colocation_unborrow(struct thread *td)
 	if (!have_scb)
 		return;
 
-	trapframe = td->td_frame;
 	peertd = scb.scb_borrower_td;
 	if (peertd == NULL) {
 		/*
@@ -340,16 +346,16 @@ colocation_unborrow(struct thread *td)
 		return;
 	}
 
-#ifdef __mips__
-	KASSERT(td->td_frame->v0 != SYS_copark,
-	    ("%s: unborrowing for copark(); peer td_sa.code %ld; td %p, pid %d (%s); peer td %p, peer pid %d (%s)\n",
-	    __func__, (long)peertd->td_frame->v0,
-	    td, td->td_proc->p_pid, td->td_proc->p_comm,
-	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm));
-#elif defined(__riscv)
+#if   defined(__riscv)
 	KASSERT(td->td_frame->tf_t[0] != SYS_copark,
 	    ("%s: unborrowing for copark(); peer td_sa.code %ld; td %p, pid %d (%s); peer td %p, peer pid %d (%s)\n",
 	    __func__, (long)peertd->td_frame->tf_t[0],
+	    td, td->td_proc->p_pid, td->td_proc->p_comm,
+	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm));
+#elif defined(__aarch64__)
+	KASSERT(td->td_frame->tf_x[8] != SYS_copark,
+	    ("%s: unborrowing for copark(); peer td_sa.code %ld; td %p, pid %d (%s); peer td %p, peer pid %d (%s)\n",
+	    __func__, (long)peertd->td_frame->tf_x[8],
 	    td, td->td_proc->p_pid, td->td_proc->p_comm,
 	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm));
 #else
@@ -361,45 +367,25 @@ colocation_unborrow(struct thread *td)
 	KASSERT(peertd != td,
 	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
-#ifdef __mips__
-	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %lp, "
-	    "md_tls %p, md_tls_tcb_offset %zd, "
-	    "with td %p, pid %d (%s), switchercb %lp, "
-	    "md_tls %p, md_tls_tcb_offset %zd "
-	     "due to syscall %s",
-	    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_scb,
-	    (__cheri_fromcap void *)td->td_md.md_tls, td->td_proc->p_md.md_tls_tcb_offset,
-	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_scb,
-	    (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_proc->p_md.md_tls_tcb_offset,
-	    syscallname(td->td_proc, trapframe->tf_t[0]));
-#else
 	COLOCATION_DEBUG("replacing current td %p, pid %d (%s), switchercb %lp, "
 	    "with td %p, pid %d (%s), switchercb %lp due to syscall %s ",
 	    td, td->td_proc->p_pid, td->td_proc->p_comm, td->td_scb,
 	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm, peertd->td_scb,
 		syscallname(td->td_proc, trapframe->tf_t[0]));
-#endif
 
 #ifdef DDB
 	if (kdb_on_unborrow)
 		kdb_enter(KDB_WHY_CHERI, "unborrow");
 #endif
 
-#ifdef __mips__
-	KASSERT(td->td_frame == &td->td_pcb->pcb_regs,
-	    ("%s: td->td_frame %p != &td->td_pcb->pcb_regs %p, td %p",
-	    __func__, td->td_frame, &td->td_pcb->pcb_regs, td));
 
-	KASSERT(peertd->td_frame == &peertd->td_pcb->pcb_regs,
-	    ("%s: peertd->td_frame %p != &peertd->td_pcb->pcb_regs %p, peertd %p",
-	    __func__, peertd->td_frame, &peertd->td_pcb->pcb_regs, peertd));
-
+#ifdef __aarch64__
 	/*
-	 * Another MIPS-specific field; this one needs to be swapped.
+	 * On aarch64, the TLS pointer is in TPC, not in td_frame.
 	 */
-	peertpc = peertd->td_pcb->pcb_tpc;
-	peertd->td_pcb->pcb_tpc = td->td_pcb->pcb_tpc;
-	td->td_pcb->pcb_tpc = peertpc;
+	peertpidr = peertd->td_pcb->pcb_tpidr_el0;
+	peertd->td_pcb->pcb_tpidr_el0 = td->td_pcb->pcb_tpidr_el0;
+	td->td_pcb->pcb_tpidr_el0 = peertpidr;
 #endif
 
 	memcpy(&peertrapframe, peertd->td_frame, sizeof(struct trapframe));
@@ -418,16 +404,16 @@ colocation_unborrow(struct thread *td)
 	 * syscall it was.  The cpu_fetch_syscall_args() will fetch updated
 	 * arguments from the stack frame.
 	 */
-#ifdef __mips__
-	KASSERT(td->td_frame->v0 == SYS_copark,
-	    ("%s: td_sa.code %ld != SYS_copark %d; peer td_sa.code %ld; td %p, pid %d (%s); peer td %p, peer pid %d (%s)\n",
-	    __func__, (long)td->td_frame->v0, SYS_copark, (long)peertd->td_frame->v0,
-	    td, td->td_proc->p_pid, td->td_proc->p_comm,
-	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm));
-#elif defined(__riscv)
+#if   defined(__riscv)
 	KASSERT(td->td_frame->tf_t[0] == SYS_copark,
 	    ("%s: td_sa.code %ld != SYS_copark %d; peer td_sa.code %ld; td %p, pid %d (%s); peer td %p, peer pid %d (%s)\n",
 	    __func__, (long)td->td_frame->tf_t[0], SYS_copark, (long)peertd->td_frame->tf_t[0],
+	    td, td->td_proc->p_pid, td->td_proc->p_comm,
+	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm));
+#elif defined(__aarch64__)
+	KASSERT(td->td_frame->tf_x[8] == SYS_copark,
+	    ("%s: td_sa.code %ld != SYS_copark %d; peer td_sa.code %ld; td %p, pid %d (%s); peer td %p, peer pid %d (%s)\n",
+	    __func__, (long)td->td_frame->tf_x[8], SYS_copark, (long)peertd->td_frame->tf_x[8],
 	    td, td->td_proc->p_pid, td->td_proc->p_comm,
 	    peertd, peertd->td_proc->p_pid, peertd->td_proc->p_comm));
 #else
@@ -462,27 +448,37 @@ trap:
 	return (true);
 }
 
-#ifdef __mips__
-void
-colocation_update_tls(struct thread *td)
+
+#ifdef __aarch64__
+int
+copyuser(const void * __restrict __capability src,
+    void * __restrict __capability dst, size_t len)
 {
-	struct switchercb scb;
+	void *tmpbuf;
+	int error;
 
-	if (td->td_scb == NULL) {
-		/*
-		 * We've never called cosetup(2).
-		 */
-		return;
+	if (len == 0)
+		return (0);
+
+	KASSERT(src != NULL, ("%s: NULL src", __func__));
+	KASSERT(dst != NULL, ("%s: NULL dst", __func__));
+
+	tmpbuf = malloc(len, M_TEMP, M_WAITOK);
+	error = copyincap(src, tmpbuf, len);
+	if (error != 0) {
+		COLOCATION_DEBUG("copyin failed with error %d", error);
+		goto out;
 	}
-
-	colocation_copyin_scb(td->td_scb, &scb);
-	COLOCATION_DEBUG("changing TLS from %p to %p",
-	    (__cheri_fromcap void *)scb.scb_tls,
-	    (__cheri_fromcap void *)((char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset));
-	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset;
-	colocation_copyout_scb(td->td_scb, &scb);
+	error = copyoutcap(tmpbuf, dst, len);
+	if (error != 0) {
+		COLOCATION_DEBUG("copyout failed with error %d", error);
+		goto out;
+	}
+out:
+	free(tmpbuf, M_TEMP);
+	return (error);
 }
-#endif
+#endif /* __aarch64__ */
 
 /*
  * Setup the per-thread switcher control block.
@@ -521,12 +517,9 @@ setup_scb(struct thread *td)
 	scb.scb_td = td;
 	scb.scb_borrower_td = NULL;
 	scb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EAGAIN);
-#ifdef __mips__
-	scb.scb_tls = (char * __capability)td->td_md.md_tls + td->td_proc->p_md.md_tls_tcb_offset;
-#elif defined(__riscv)
 	scb.scb_pid = td->td_proc->p_pid;
 	scb.scb_tid = td->td_tid;
-#endif
+
 	colocation_store_scb(td, &scb);
 
 	return (0);
@@ -552,8 +545,14 @@ switcher_code_cap(struct thread *td, ptraddr_t base, size_t length)
 	 */
 	codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
 	    base, length, 0);
+#ifndef __aarch64__
+	/*
+	 * XXX: Somehow makes every attempt at ldr/str in the switcher
+	 *      fail with capability fault.
+	 */
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 		codecap = cheri_capmode(codecap);
+#endif
 	return (cheri_seal(codecap, switcher_sealcap));
 }
 
@@ -800,7 +799,7 @@ kern_cocall_slow(void * __capability target,
 {
 	struct switchercb scb, calleescb;
 	struct switchercb * __capability targetscb;
-	struct thread *calleetd;
+	struct thread *calleetd __diagused;
 	int error;
 	bool have_scb;
 
@@ -1100,13 +1099,6 @@ db_print_scb(struct thread *td, struct switchercb *scb)
 	db_printf(       "    scb_td:            %p\n", scb->scb_td);
 	db_printf(       "    scb_borrower_td:   %p\n", scb->scb_borrower_td);
 	db_print_cap(td, "    scb_unsealcap:     ", scb->scb_unsealcap);
-#ifdef __mips__
-	db_print_cap(td, "    scb_tls:           ", scb->scb_tls);
-	db_print_cap(td, "    scb_csp (c11):     ", scb->scb_csp);
-	db_print_cap(td, "    scb_cra (c13):     ", scb->scb_cra);
-	db_print_cap(td, "    scb_buf (c6):      ", scb->scb_buf);
-	db_printf(       "    scb_buflen (a0):   %zd\n", scb->scb_buflen);
-#else
 	db_print_cap(td, "    scb_csp:           ", scb->scb_csp);
 	db_print_cap(td, "    scb_cra:           ", scb->scb_cra);
 	db_print_cap(td, "    scb_cookiep (ca2): ", scb->scb_cookiep);
@@ -1114,8 +1106,20 @@ db_print_scb(struct thread *td, struct switchercb *scb)
 	db_printf(       "    scb_outlen (a4):   %zd\n", scb->scb_outlen);
 	db_print_cap(td, "    scb_inbuf (ca5):   ", scb->scb_inbuf);
 	db_printf(       "    scb_inlen (a6):    %zd\n", scb->scb_inlen);
-#endif
 	db_print_cap(td, "    scb_cookiep:       ", scb->scb_cookiep);
+#ifdef __aarch64__
+	db_print_cap(td, "    scb_c19:           ", scb->scb_c19);
+	db_print_cap(td, "    scb_c20:           ", scb->scb_c20);
+	db_print_cap(td, "    scb_c21:           ", scb->scb_c21);
+	db_print_cap(td, "    scb_c22:           ", scb->scb_c22);
+	db_print_cap(td, "    scb_c23:           ", scb->scb_c23);
+	db_print_cap(td, "    scb_c24:           ", scb->scb_c24);
+	db_print_cap(td, "    scb_c25:           ", scb->scb_c25);
+	db_print_cap(td, "    scb_c26:           ", scb->scb_c26);
+	db_print_cap(td, "    scb_c27:           ", scb->scb_c27);
+	db_print_cap(td, "    scb_c28:           ", scb->scb_c28);
+	db_print_cap(td, "    scb_tls:           ", scb->scb_tls);
+#endif
 }
 
 void
@@ -1146,15 +1150,16 @@ db_get_stack_pid(struct thread *td)
 	boolean_t found;
 	pid_t pid;
 
-#if defined(__mips__)
-	addr = __builtin_cheri_address_get(td->td_frame->csp);
-//	db_printf("%s: td: %p; td_frame %p; csp: %#lp; csp addr: %lx\n",
-//	    __func__, td, td->td_frame, td->td_frame->csp, (long)addr);
-#elif defined(__riscv)
+#if   defined(__riscv)
 	addr = __builtin_cheri_address_get(td->td_frame->tf_sp);
 //	db_printf("%s: td: %p; td_frame %p; tf_sp: %#lp; csp addr: %lx\n",
 //	    __func__, td, td->td_frame,
 //	    (void * __capability)td->td_frame->tf_sp, (long)addr);
+#elif defined(__aarch64__)
+	addr = __builtin_cheri_address_get(td->td_frame->tf_sp);
+	db_printf("%s: td: %p; td_frame %p; tf_sp: %#lp; csp addr: %lx\n",
+	    __func__, td, td->td_frame,
+	    (void * __capability)td->td_frame->tf_sp, (long)addr);
 #else
 #error "what architecture is this?"
 #endif
@@ -1246,3 +1251,47 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 	}
 }
 #endif /* DDB */
+#else /* !__has_feature(capabilities) */
+int
+sys__cosetup(struct thread *td, struct _cosetup_args *uap)
+{
+	return (ENOSYS);
+}
+
+int
+sys_coregister(struct thread *td, struct coregister_args *uap)
+{
+	return (ENOSYS);
+}
+
+int
+sys_colookup(struct thread *td, struct colookup_args *uap)
+{
+	return (ENOSYS);
+}
+
+int
+sys_copark(struct thread *td, struct copark_args *uap)
+{
+	return (ENOSYS);
+}
+
+int
+sys_cogetpid(struct thread *td, struct cogetpid_args *uap)
+{
+	return (ENOSYS);
+}
+
+int
+sys_cocall_slow(struct thread *td, struct cocall_slow_args *uap)
+{
+	return (ENOSYS);
+}
+
+int
+sys_coaccept_slow(struct thread *td, struct coaccept_slow_args *uap)
+{
+	return (ENOSYS);
+}
+
+#endif /* __has_feature(capabilities) */

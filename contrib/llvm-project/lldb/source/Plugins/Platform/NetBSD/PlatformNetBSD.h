@@ -10,6 +10,7 @@
 #define LLDB_SOURCE_PLUGINS_PLATFORM_NETBSD_PLATFORMNETBSD_H
 
 #include "Plugins/Platform/POSIX/PlatformPOSIX.h"
+#include "Plugins/TypeSystem/Clang/TypeSystemClang.h"
 
 namespace lldb_private {
 namespace platform_netbsd {
@@ -18,8 +19,6 @@ class PlatformNetBSD : public PlatformPOSIX {
 public:
   PlatformNetBSD(bool is_host);
 
-  ~PlatformNetBSD() override;
-
   static void Initialize();
 
   static void Terminate();
@@ -27,30 +26,28 @@ public:
   // lldb_private::PluginInterface functions
   static lldb::PlatformSP CreateInstance(bool force, const ArchSpec *arch);
 
-  static ConstString GetPluginNameStatic(bool is_host);
+  static llvm::StringRef GetPluginNameStatic(bool is_host) {
+    return is_host ? Platform::GetHostPlatformName() : "remote-netbsd";
+  }
 
-  static const char *GetPluginDescriptionStatic(bool is_host);
+  static llvm::StringRef GetPluginDescriptionStatic(bool is_host);
 
-  ConstString GetPluginName() override;
-
-  uint32_t GetPluginVersion() override { return 1; }
+  llvm::StringRef GetPluginName() override {
+    return GetPluginNameStatic(IsHost());
+  }
 
   // lldb_private::Platform functions
-  const char *GetDescription() override {
+  llvm::StringRef GetDescription() override {
     return GetPluginDescriptionStatic(IsHost());
   }
 
   void GetStatus(Stream &strm) override;
 
-  bool GetSupportedArchitectureAtIndex(uint32_t idx, ArchSpec &arch) override;
+  std::vector<ArchSpec> GetSupportedArchitectures() override;
 
-  int32_t GetResumeCountForLaunchInfo(ProcessLaunchInfo &launch_info) override;
+  uint32_t GetResumeCountForLaunchInfo(ProcessLaunchInfo &launch_info) override;
 
   bool CanDebugProcess() override;
-
-  lldb::ProcessSP DebugProcess(ProcessLaunchInfo &launch_info,
-                               Debugger &debugger, Target *target,
-                               Status &error) override;
 
   void CalculateTrapHandlerSymbolNames() override;
 
@@ -59,9 +56,12 @@ public:
                                   unsigned flags, lldb::addr_t fd,
                                   lldb::addr_t offset) override;
 
+  CompilerType GetSiginfoType(const llvm::Triple &triple) override;
+
+  std::vector<ArchSpec> m_supported_architectures;
+
 private:
-  PlatformNetBSD(const PlatformNetBSD &) = delete;
-  const PlatformNetBSD &operator=(const PlatformNetBSD &) = delete;
+  std::unique_ptr<TypeSystemClang> m_type_system_up;
 };
 
 } // namespace platform_netbsd

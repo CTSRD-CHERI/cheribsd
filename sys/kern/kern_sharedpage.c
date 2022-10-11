@@ -307,48 +307,72 @@ void
 exec_sysvec_init(void *param)
 {
 	struct sysentvec *sv;
-#ifdef RANDOM_FENESTRASX
-	ptrdiff_t base;
-#endif
+	u_int flags;
+	int res;
 
-	sv = (struct sysentvec *)param;
-	if ((sv->sv_flags & SV_SHP) == 0)
+	sv = param;
+	flags = sv->sv_flags;
+	if ((flags & SV_SHP) == 0)
 		return;
+	MPASS(sv->sv_shared_page_obj == NULL);
+	MPASS(sv->sv_shared_page_base != 0);
+
 	sv->sv_shared_page_obj = shared_page_obj;
-	sv->sv_sigcode_base = sv->sv_shared_page_base +
-	    shared_page_fill(*(sv->sv_szsigcode), 16, sv->sv_sigcode);
-	if ((sv->sv_flags & SV_ABI_MASK) != SV_ABI_FREEBSD)
-		return;
-	if ((sv->sv_flags & SV_TIMEKEEP) != 0) {
+	if ((flags & SV_ABI_MASK) == SV_ABI_FREEBSD) {
+		if ((flags & SV_DSO_SIG) != 0) {
+			res = shared_page_fill((uintptr_t)sv->sv_szsigcode,
+			    16, sv->sv_sigcode);
+			if (res == -1)
+				panic("copying vdso to shared page");
+			sv->sv_vdso_offset = res;
+			sv->sv_sigcode_offset = res + sv->sv_sigcodeoff;
+		} else {
+			res = shared_page_fill(*(sv->sv_szsigcode),
+			    16, sv->sv_sigcode);
+			if (res == -1)
+				panic("copying sigtramp to shared page");
+			sv->sv_sigcode_offset = res;
+		}
+	}
+	if ((flags & SV_TIMEKEEP) != 0) {
 #ifdef COMPAT_FREEBSD32
-		if ((sv->sv_flags & SV_ILP32) != 0) {
-			KASSERT(compat32_svtk == NULL,
-			    ("Compat32 already registered"));
-			compat32_svtk = alloc_sv_tk_compat32();
-			sv->sv_timekeep_base = sv->sv_shared_page_base +
-			    compat32_svtk->sv_timekeep_off;
+		if ((flags & SV_ILP32) != 0) {
+			if ((flags & SV_ABI_MASK) == SV_ABI_FREEBSD) {
+				KASSERT(compat32_svtk == NULL,
+				    ("Compat32 already registered"));
+				compat32_svtk = alloc_sv_tk_compat32();
+			} else {
+				KASSERT(compat32_svtk != NULL,
+				    ("Compat32 not registered"));
+			}
+			sv->sv_timekeep_offset = compat32_svtk->sv_timekeep_off;
 		} else {
 #endif
-			KASSERT(host_svtk == NULL, ("Host already registered"));
-			host_svtk = alloc_sv_tk();
-			sv->sv_timekeep_base = sv->sv_shared_page_base +
-			    host_svtk->sv_timekeep_off;
+			/*
+			 * Only allocate a single shared page entry
+			 * for all non-COMPAT32 ABIs.
+			 */
+			if (host_svtk == NULL)
+				host_svtk = alloc_sv_tk();
+			sv->sv_timekeep_offset = host_svtk->sv_timekeep_off;
 #ifdef COMPAT_FREEBSD32
 		}
 #endif
 	}
 #ifdef RANDOM_FENESTRASX
-	if ((sv->sv_flags & SV_RNG_SEED_VER) != 0) {
+	if ((flags & (SV_ABI_MASK | SV_RNG_SEED_VER)) ==
+	    (SV_ABI_FREEBSD | SV_RNG_SEED_VER)) {
 		/*
 		 * Only allocate a single VDSO entry for multiple sysentvecs,
 		 * i.e., native and COMPAT32.
 		 */
 		if (fxrng_shpage_mapping == NULL)
 			alloc_sv_fxrng_generation();
-		base = (char *)fxrng_shpage_mapping - shared_page_mapping;
-		sv->sv_fxrng_gen_base = sv->sv_shared_page_base + base;
+		sv->sv_fxrng_gen_offset =
+		    (char *)fxrng_shpage_mapping - shared_page_mapping;
 	}
 #endif
+#if __has_feature(capabilities)
 	if ((sv->sv_flags & SV_CHERI) != 0) {
 		sv->sv_cocall_base = sv->sv_shared_page_base +
 		    shared_page_fill(szswitcher_cocall, 16, switcher_cocall);
@@ -365,6 +389,7 @@ exec_sysvec_init(void *param)
 		sv->sv_cogettid_len = szswitcher_cogettid;
 
 	}
+#endif
 }
 
 void
@@ -373,22 +398,17 @@ exec_sysvec_init_secondary(struct sysentvec *sv, struct sysentvec *sv2)
 	MPASS((sv2->sv_flags & SV_ABI_MASK) == (sv->sv_flags & SV_ABI_MASK));
 	MPASS((sv2->sv_flags & SV_TIMEKEEP) == (sv->sv_flags & SV_TIMEKEEP));
 	MPASS((sv2->sv_flags & SV_SHP) != 0 && (sv->sv_flags & SV_SHP) != 0);
+	MPASS((sv2->sv_flags & SV_DSO_SIG) == (sv->sv_flags & SV_DSO_SIG));
 	MPASS((sv2->sv_flags & SV_RNG_SEED_VER) ==
 	    (sv->sv_flags & SV_RNG_SEED_VER));
 
 	sv2->sv_shared_page_obj = sv->sv_shared_page_obj;
-	sv2->sv_sigcode_base = sv2->sv_shared_page_base +
-	    (sv->sv_sigcode_base - sv->sv_shared_page_base);
+	sv2->sv_sigcode_offset = sv->sv_sigcode_offset;
+	sv2->sv_vdso_offset = sv->sv_vdso_offset;
 	if ((sv2->sv_flags & SV_ABI_MASK) != SV_ABI_FREEBSD)
 		return;
-	if ((sv2->sv_flags & SV_TIMEKEEP) != 0) {
-		sv2->sv_timekeep_base = sv2->sv_shared_page_base +
-		    (sv->sv_timekeep_base - sv->sv_shared_page_base);
-	}
-	if ((sv2->sv_flags & SV_RNG_SEED_VER) != 0) {
-		sv2->sv_fxrng_gen_base = sv2->sv_shared_page_base +
-		    (sv->sv_fxrng_gen_base - sv->sv_shared_page_base);
-	}
+	sv2->sv_timekeep_offset = sv->sv_timekeep_offset;
+	sv2->sv_fxrng_gen_offset = sv->sv_fxrng_gen_offset;
 }
 // CHERI CHANGES START
 // {

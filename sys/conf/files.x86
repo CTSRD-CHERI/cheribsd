@@ -79,6 +79,9 @@ dev/bxe/57710_init_values.c     optional	bxe pci
 dev/bxe/57711_init_values.c     optional	bxe pci
 dev/bxe/57712_init_values.c     optional	bxe pci
 dev/coretemp/coretemp.c		optional	coretemp
+dev/cp/cpddk.c			optional	cp \
+	compile-with "${NORMAL_C} ${NO_WMISLEADING_INDENTATION}"
+dev/cp/if_cp.c			optional	cp
 dev/cpuctl/cpuctl.c		optional	cpuctl
 dev/dpms/dpms.c			optional	dpms
 dev/fb/fb.c			optional	fb | vga
@@ -140,6 +143,7 @@ dev/hyperv/vmbus/vmbus_xact.c				optional	hyperv
 dev/ichwd/ichwd.c		optional	ichwd
 dev/imcsmb/imcsmb.c		optional	imcsmb
 dev/imcsmb/imcsmb_pci.c		optional	imcsmb pci
+dev/intel/pchtherm.c		optional	pchtherm
 dev/intel/spi.c			optional	intelspi
 dev/io/iodev.c			optional	io
 dev/iommu/busdma_iommu.c	optional	acpi iommu pci
@@ -153,8 +157,8 @@ dev/ipmi/ipmi_smbus.c		optional	ipmi smbus
 dev/ipmi/ipmi_smbios.c		optional	ipmi
 dev/ipmi/ipmi_ssif.c		optional	ipmi smbus
 dev/ipmi/ipmi_pci.c		optional	ipmi pci
-dev/ipmi/ipmi_linux.c		optional	ipmi compat_linux32
-dev/isci/isci.c							optional isci
+dev/isci/isci.c							optional isci \
+	compile-with "${NORMAL_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 dev/isci/isci_controller.c					optional isci
 dev/isci/isci_domain.c						optional isci
 dev/isci/isci_interrupt.c					optional isci
@@ -173,22 +177,26 @@ dev/isci/scil/sati_inquiry.c					optional isci
 dev/isci/scil/sati_log_sense.c					optional isci
 dev/isci/scil/sati_lun_reset.c					optional isci
 dev/isci/scil/sati_mode_pages.c					optional isci
-dev/isci/scil/sati_mode_select.c				optional isci
+dev/isci/scil/sati_mode_select.c				optional isci \
+	compile-with "${NORMAL_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 dev/isci/scil/sati_mode_sense.c					optional isci
 dev/isci/scil/sati_mode_sense_10.c				optional isci
 dev/isci/scil/sati_mode_sense_6.c				optional isci
 dev/isci/scil/sati_move.c					optional isci
-dev/isci/scil/sati_passthrough.c				optional isci
+dev/isci/scil/sati_passthrough.c				optional isci \
+	compile-with "${NORMAL_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 dev/isci/scil/sati_read.c					optional isci
 dev/isci/scil/sati_read_buffer.c				optional isci
 dev/isci/scil/sati_read_capacity.c				optional isci
-dev/isci/scil/sati_reassign_blocks.c				optional isci
+dev/isci/scil/sati_reassign_blocks.c				optional isci \
+	compile-with "${NORMAL_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 dev/isci/scil/sati_report_luns.c				optional isci
 dev/isci/scil/sati_request_sense.c				optional isci
 dev/isci/scil/sati_start_stop_unit.c				optional isci
 dev/isci/scil/sati_synchronize_cache.c				optional isci
 dev/isci/scil/sati_test_unit_ready.c				optional isci
-dev/isci/scil/sati_unmap.c					optional isci
+dev/isci/scil/sati_unmap.c					optional isci \
+	compile-with "${NORMAL_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 dev/isci/scil/sati_util.c					optional isci
 dev/isci/scil/sati_verify.c					optional isci
 dev/isci/scil/sati_write.c					optional isci
@@ -214,29 +222,36 @@ dev/isci/scil/sci_base_state_machine_logger.c			optional isci
 dev/isci/scil/sci_base_state_machine_observer.c			optional isci
 dev/isci/scil/sci_base_subject.c				optional isci
 dev/isci/scil/sci_util.c					optional isci
-dev/isci/scil/scic_sds_controller.c				optional isci
+dev/isci/scil/scic_sds_controller.c				optional isci \
+	compile-with "${NORMAL_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 dev/isci/scil/scic_sds_library.c				optional isci
 dev/isci/scil/scic_sds_pci.c					optional isci
-dev/isci/scil/scic_sds_phy.c					optional isci
+dev/isci/scil/scic_sds_phy.c					optional isci \
+	compile-with "${NORMAL_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 dev/isci/scil/scic_sds_port.c					optional isci
 dev/isci/scil/scic_sds_port_configuration_agent.c		optional isci
 dev/isci/scil/scic_sds_remote_device.c				optional isci
 dev/isci/scil/scic_sds_remote_node_context.c			optional isci
 dev/isci/scil/scic_sds_remote_node_table.c			optional isci
-dev/isci/scil/scic_sds_request.c				optional isci
+dev/isci/scil/scic_sds_request.c				optional isci \
+	compile-with "${NORMAL_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 dev/isci/scil/scic_sds_sgpio.c					optional isci
 dev/isci/scil/scic_sds_smp_remote_device.c			optional isci
-dev/isci/scil/scic_sds_smp_request.c				optional isci
+dev/isci/scil/scic_sds_smp_request.c				optional isci \
+	compile-with "${NORMAL_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 dev/isci/scil/scic_sds_ssp_request.c				optional isci
 dev/isci/scil/scic_sds_stp_packet_request.c			optional isci
 dev/isci/scil/scic_sds_stp_remote_device.c			optional isci
-dev/isci/scil/scic_sds_stp_request.c				optional isci
+dev/isci/scil/scic_sds_stp_request.c				optional isci \
+	compile-with "${NORMAL_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 dev/isci/scil/scic_sds_unsolicited_frame_control.c		optional isci
-dev/isci/scil/scif_sas_controller.c				optional isci
+dev/isci/scil/scif_sas_controller.c				optional isci \
+	compile-with "${NORMAL_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 dev/isci/scil/scif_sas_controller_state_handlers.c		optional isci
 dev/isci/scil/scif_sas_controller_states.c			optional isci
 dev/isci/scil/scif_sas_domain.c					optional isci
-dev/isci/scil/scif_sas_domain_state_handlers.c			optional isci
+dev/isci/scil/scif_sas_domain_state_handlers.c			optional isci \
+	compile-with "${NORMAL_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 dev/isci/scil/scif_sas_domain_states.c				optional isci
 dev/isci/scil/scif_sas_high_priority_request_queue.c		optional isci
 dev/isci/scil/scif_sas_internal_io_request.c			optional isci
@@ -246,7 +261,8 @@ dev/isci/scil/scif_sas_io_request_states.c			optional isci
 dev/isci/scil/scif_sas_library.c				optional isci
 dev/isci/scil/scif_sas_remote_device.c				optional isci
 dev/isci/scil/scif_sas_remote_device_ready_substate_handlers.c	optional isci
-dev/isci/scil/scif_sas_remote_device_ready_substates.c		optional isci
+dev/isci/scil/scif_sas_remote_device_ready_substates.c		optional isci \
+	compile-with "${NORMAL_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 dev/isci/scil/scif_sas_remote_device_starting_substate_handlers.c		optional isci
 dev/isci/scil/scif_sas_remote_device_starting_substates.c	optional isci
 dev/isci/scil/scif_sas_remote_device_state_handlers.c		optional isci
@@ -255,7 +271,8 @@ dev/isci/scil/scif_sas_request.c				optional isci
 dev/isci/scil/scif_sas_smp_activity_clear_affiliation.c		optional isci
 dev/isci/scil/scif_sas_smp_io_request.c				optional isci
 dev/isci/scil/scif_sas_smp_phy.c				optional isci
-dev/isci/scil/scif_sas_smp_remote_device.c			optional isci
+dev/isci/scil/scif_sas_smp_remote_device.c			optional isci \
+	compile-with "${NORMAL_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
 dev/isci/scil/scif_sas_stp_io_request.c				optional isci
 dev/isci/scil/scif_sas_stp_remote_device.c			optional isci
 dev/isci/scil/scif_sas_stp_task_request.c			optional isci
@@ -264,22 +281,23 @@ dev/isci/scil/scif_sas_task_request_state_handlers.c		optional isci
 dev/isci/scil/scif_sas_task_request_states.c			optional isci
 dev/isci/scil/scif_sas_timer.c					optional isci
 dev/itwd/itwd.c							optional itwd
-dev/qat/qat.c			optional qat
-dev/qat/qat_ae.c		optional qat
-dev/qat/qat_c2xxx.c		optional qat
-dev/qat/qat_c3xxx.c		optional qat
-dev/qat/qat_c62x.c		optional qat
-dev/qat/qat_d15xx.c		optional qat
-dev/qat/qat_dh895xcc.c		optional qat
-dev/qat/qat_hw15.c		optional qat
-dev/qat/qat_hw17.c		optional qat
+dev/kvm_clock/kvm_clock.c	optional	kvm_clock
+dev/mana/gdma_main.c		optional	mana
+dev/mana/mana_en.c		optional	mana
+dev/mana/mana_sysctl.c		optional	mana
+dev/mana/shm_channel.c		optional	mana
+dev/mana/hw_channel.c		optional	mana
+dev/mana/gdma_util.c		optional	mana
+dev/qat_c2xxx/qat.c		optional	qat_c2xxx
+dev/qat_c2xxx/qat_ae.c		optional	qat_c2xxx
+dev/qat_c2xxx/qat_c2xxx.c	optional	qat_c2xxx
+dev/qat_c2xxx/qat_hw15.c	optional	qat_c2xxx
 libkern/x86/crc32_sse42.c	standard
 #
 # x86 shared code between IA32 and AMD64 architectures
 #
 x86/acpica/OsdEnvironment.c	optional	acpi
 x86/acpica/acpi_apm.c		optional	acpi
-x86/acpica/acpi_wakeup.c	optional	acpi
 x86/acpica/srat.c		optional	acpi
 x86/bios/vpd.c			optional	vpd
 x86/cpufreq/est.c		optional	cpufreq
@@ -319,14 +337,11 @@ x86/x86/x86_mem.c		optional	mem
 x86/x86/mp_x86.c		optional	smp
 x86/x86/mp_watchdog.c		optional	mp_watchdog smp
 x86/x86/nexus.c			standard
-x86/x86/pvclock.c		standard
+x86/x86/pvclock.c		optional	kvm_clock | xenhvm
 x86/x86/stack_machdep.c		optional	ddb | stack
 x86/x86/tsc.c			standard
 x86/x86/ucode.c			standard
 x86/x86/delay.c			standard
 x86/xen/hvm.c			optional	xenhvm
 x86/xen/xen_intr.c		optional	xenhvm
-x86/xen/xen_apic.c		optional	xenhvm
-x86/xen/xenpv.c			optional	xenhvm
-x86/xen/xen_msi.c		optional	xenhvm
-x86/xen/xen_nexus.c		optional	xenhvm
+x86/xen/xen_apic.c		optional	xenhvm smp

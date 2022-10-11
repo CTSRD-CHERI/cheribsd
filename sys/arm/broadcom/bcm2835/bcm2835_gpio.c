@@ -1208,9 +1208,7 @@ bcm_gpio_configure_pins(device_t dev, phandle_t cfgxref)
 	uint32_t *pins;
 	uint32_t *pulls;
 	uint32_t function;
-	static struct bcm_gpio_softc *sc;
 
-	sc = device_get_softc(dev);
 	cfgnode = OF_node_from_xref(cfgxref);
 
 	pins = NULL;
@@ -1313,12 +1311,11 @@ static device_method_t bcm_gpio_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t bcm_gpio_devclass;
-
 static driver_t bcm_gpio_driver = {
 	"gpio",
 	bcm_gpio_methods,
 	sizeof(struct bcm_gpio_softc),
 };
 
-EARLY_DRIVER_MODULE(bcm_gpio, simplebus, bcm_gpio_driver, bcm_gpio_devclass, 0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
+EARLY_DRIVER_MODULE(bcm_gpio, simplebus, bcm_gpio_driver, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);

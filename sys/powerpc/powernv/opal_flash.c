@@ -98,9 +98,7 @@ static driver_t opalflash_driver = {
 	sizeof(struct opalflash_softc)
 };
 
-static devclass_t opalflash_devclass;
-
-DRIVER_MODULE(opalflash, opal, opalflash_driver, opalflash_devclass, 0, 0);
+DRIVER_MODULE(opalflash, opal, opalflash_driver, 0, 0);
 
 /* GEOM Disk interfaces. */
 static int
@@ -289,12 +287,10 @@ opalflash_task(void *arg)
 {
 	struct opalflash_softc *sc;
 	struct bio *bp;
-	device_t dev;
 
 	sc = arg;
 
 	for (;;) {
-		dev = sc->sc_dev;
 		OPALFLASH_LOCK(sc);
 		do {
 			bp = bioq_first(&sc->sc_bio_queue);

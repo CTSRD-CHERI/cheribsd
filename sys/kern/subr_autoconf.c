@@ -116,11 +116,12 @@ run_interrupt_driven_config_hooks_warning(int warned)
 }
 
 static void
-run_interrupt_driven_config_hooks()
+run_interrupt_driven_config_hooks(void)
 {
 	static int running;
 	struct intr_config_hook *hook_entry;
 
+	TSENTER();
 	mtx_lock(&intr_config_hook_lock);
 
 	/*
@@ -146,6 +147,7 @@ run_interrupt_driven_config_hooks()
 
 	running = 0;
 	mtx_unlock(&intr_config_hook_lock);
+	TSEXIT();
 }
 
 static void
@@ -296,7 +298,7 @@ config_intrhook_drain(struct intr_config_hook *hook)
 #ifdef DDB
 #include <ddb/ddb.h>
 
-DB_SHOW_COMMAND(conifhk, db_show_conifhk)
+DB_SHOW_COMMAND_FLAGS(conifhk, db_show_conifhk, DB_CMD_MEMSAFE)
 {
 	struct intr_config_hook *hook_entry;
 	char namebuf[64];

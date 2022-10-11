@@ -30,7 +30,7 @@
 .\"
 .\" $FreeBSD$
 .\"/
-.Dd March 27, 2019
+.Dd February 26, 2022
 .Dt DTC 1
 .Os
 .Sh NAME
@@ -41,6 +41,7 @@
 .Op Fl @fhsv
 .Op Fl b Ar boot_cpu_id
 .Op Fl d Ar dependency_file
+.Op Fl i Ar include_path
 .Op Fl E Ar [no-]checker_name
 .Op Fl H Ar phandle_format
 .Op Fl I Ar input_format
@@ -79,6 +80,8 @@ This file can be included in a Makefile and will ensure that the output file
 depends on the input file and any files that it includes.
 This argument is only useful when the input is DTS, as only the source format
 has a notion of inclusions.
+.It Fl i Ar include_path
+Adds a path to search for include files.
 .It Fl E Ar [no-]checker_name
 Enable or disable a specified checker.
 The argument is the name of the checker.
@@ -255,9 +258,9 @@ with the
 flag.
 .Pp
 To denote that a DTS is intended to be used as an overlay,
-.Va /plugin/;
+.Va /plugin/\&;
 should be included in the header, following any applicable
-.Va /dts-v1/;
+.Va /dts-v1/\&;
 tag.
 .Pp
 Conventional overlays are crafted by creating
@@ -274,7 +277,7 @@ child node, whose properties and child nodes are merged into the base device
 tree when the overlay is applied.
 .Pp
 Much simpler syntactic sugar was later invented to simplify generating overlays.
-Instead of creating targetted fragments manually, one can instead create a root
+Instead of creating targeted fragments manually, one can instead create a root
 node that targets a label in the base FDT using the
 .Va &label
 syntax supported in conventional DTS.
@@ -358,7 +361,7 @@ tree source
 .Pa device_overlay.dts .
 A __symbols__ node will be included so that overlays may be applied to it.
 The presence of a
-.Va /plugin/;
+.Va /plugin/\&;
 directive in
 .Pa device_overlay.dts
 will indicate to the utility that it should also generate the underlying
@@ -367,7 +370,10 @@ metadata required in overlays.
 This utility is intended to be compatible with the device tree compiler
 provided by elinux.org.
 Currently, it implements the subset of features
-required to build FreeBSD and others that have been requested by FreeBSD
+required to build
+.Fx
+and others that have been requested by
+.Fx
 developers.
 .Pp
 The
@@ -375,8 +381,9 @@ The
 input format is not supported.
 This builds a tree from a Linux
 .Pa  /proc/device-tree ,
-a file system hierarchy not found in FreeBSD, which instead exposes the DTB
-directly via a sysctl.
+a file system hierarchy not found in
+.Fx ,
+which instead exposes the DTB directly via a sysctl.
 .Pp
 The warnings and errors supported by the elinux.org tool are not documented.
 This tool supports the warnings described in the

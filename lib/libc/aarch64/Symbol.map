@@ -8,6 +8,7 @@
  * stdlib/Symbol.map, string/Symbol.map, sys/Symbol.map, ...).
  */
 FBSD_1.0 {
+	.mcount;
 	_setjmp;
 	_longjmp;
 	fabs;
@@ -29,6 +30,5 @@ FBSD_1.0 {
 };
 
 FBSDprivate_1.0 {
-	_set_tp;
 	__makecontext;
 };

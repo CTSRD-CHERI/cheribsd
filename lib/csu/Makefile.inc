@@ -1,10 +1,12 @@
 # $FreeBSD$
 
-SSP_CFLAGS=
-
 NO_WMISSING_VARIABLE_DECLARATIONS=
+# Can't instrument these files since that breaks non-sanitized programs.
+MK_ASAN:=	no
+MK_UBSAN:=	no
 
 .include <src.opts.mk>
+MK_SSP=	no
 
 .if !defined(BUILDING_TESTS)
 
@@ -20,6 +22,7 @@ CRT1OBJS+=	crtbrand.o feature_note.o ignore_init_note.o
 
 ACFLAGS+=	-DLOCORE
 
+CFLAGS+=	-DSTRIP_FBSDID
 CFLAGS+=	-fno-asynchronous-unwind-tables
 CFLAGS+=	-fno-omit-frame-pointer
 CFLAGS+=	-I${.CURDIR:H}/common \
@@ -28,7 +31,6 @@ CFLAGS+=	-I${.CURDIR:H}/common \
 .if ${MACHINE_ABI:Mpurecap}
 # Purecap code requires crt_init_globals to be called before using jump tables
 CFLAGS+=	-fno-jump-tables
-CFLAGS+=	-DCRT_IRELOC_SUPPRESS
 CFLAGS+=	-I${.CURDIR:H}/common-cheri
 .endif
 

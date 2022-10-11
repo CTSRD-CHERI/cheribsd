@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2012, 2013 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Oleksandr Rybalko under sponsorship
  * from the FreeBSD Foundation.
@@ -395,10 +394,7 @@ static driver_t imx_gpt_driver = {
 	sizeof(struct imx_gpt_softc),
 };
 
-static devclass_t imx_gpt_devclass;
-
-EARLY_DRIVER_MODULE(imx_gpt, simplebus, imx_gpt_driver, imx_gpt_devclass, 0,
-    0, BUS_PASS_TIMER);
+EARLY_DRIVER_MODULE(imx_gpt, simplebus, imx_gpt_driver, 0, 0, BUS_PASS_TIMER);
 
 static void
 imx_gpt_do_delay(int usec, void *arg)

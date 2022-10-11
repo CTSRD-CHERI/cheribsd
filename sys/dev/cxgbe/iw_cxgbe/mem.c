@@ -610,7 +610,7 @@ int c4iw_dealloc_mw(struct ib_mw *mw)
 
 struct ib_mr *c4iw_alloc_mr(struct ib_pd *pd,
 			    enum ib_mr_type mr_type,
-			    u32 max_num_sg)
+			    u32 max_num_sg, struct ib_udata *udata)
 {
 	struct c4iw_dev *rhp;
 	struct c4iw_pd *php;
@@ -624,8 +624,7 @@ struct ib_mr *c4iw_alloc_mr(struct ib_pd *pd,
 	rhp = php->rhp;
 
 	if (mr_type != IB_MR_TYPE_MEM_REG ||
-	    max_num_sg > t4_max_fr_depth(
-		    rhp->rdev.adap->params.ulptx_memwrite_dsgl && use_dsgl))
+	    max_num_sg > t4_max_fr_depth(&rhp->rdev, use_dsgl))
 		return ERR_PTR(-EINVAL);
 
 	mhp = kzalloc(sizeof(*mhp), GFP_KERNEL);
@@ -701,7 +700,7 @@ int c4iw_map_mr_sg(struct ib_mr *ibmr, struct scatterlist *sg,
 }
 
 
-int c4iw_dereg_mr(struct ib_mr *ib_mr)
+int c4iw_dereg_mr(struct ib_mr *ib_mr, struct ib_udata *udata)
 {
 	struct c4iw_dev *rhp;
 	struct c4iw_mr *mhp;

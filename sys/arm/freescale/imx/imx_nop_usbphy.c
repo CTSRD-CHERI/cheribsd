@@ -75,9 +75,6 @@ usbphy_detach(device_t dev)
 static int
 usbphy_attach(device_t dev)
 {
-	struct usbphy_softc *sc;
-
-	sc = device_get_softc(dev);
 
 	/*
          * Turn on the phy clocks.
@@ -117,6 +114,4 @@ static driver_t usbphy_driver = {
 	sizeof(struct usbphy_softc)
 };
 
-static devclass_t usbphy_devclass;
-
-DRIVER_MODULE(usbphy, simplebus, usbphy_driver, usbphy_devclass, 0, 0);
+DRIVER_MODULE(usbphy, simplebus, usbphy_driver, 0, 0);

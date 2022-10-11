@@ -76,17 +76,15 @@ init_pltgot(Obj_Entry *obj)
  * Fragments consist of a 64-bit address followed by a 56-bit length and an
  * 8-bit permission field.
  */
-static void
-init_cap_from_fragment(void *where, void * __capability data_cap,
+static uintcap_t
+init_cap_from_fragment(const Elf_Addr *fragment, void * __capability data_cap,
     const void * __capability text_rodata_cap, Elf_Addr base_addr,
     Elf_Size addend)
 {
-	Elf_Addr *fragment;
 	uintcap_t cap;
 	Elf_Addr address, len;
 	uint8_t perms;
 
-	fragment = (Elf_Addr *)where;
 	address = fragment[0];
 	len = fragment[1] & ((1UL << (8 * sizeof(*fragment) - 8)) - 1);
 	perms = fragment[1] >> (8 * sizeof(*fragment) - 8);
@@ -113,7 +111,7 @@ init_cap_from_fragment(void *where, void * __capability data_cap,
 		cap = cheri_sealentry(cap);
 	}
 
-	*((uintcap_t *)where) = cap;
+	return (cap);
 }
 #endif /* __has_feature(capabilities) */
 
@@ -163,8 +161,8 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, Elf_Auxinfo *aux)
 			__builtin_trap();
 
 		where = (Elf_Addr *)(relocbase + rela->r_offset);
-		init_cap_from_fragment(where, relocbase, pcc,
-		    (Elf_Addr)(uintptr_t)relocbase, rela->r_addend);
+		*(uintcap_t *)where = init_cap_from_fragment(where, relocbase,
+		    pcc, (Elf_Addr)(uintptr_t)relocbase, rela->r_addend);
 	}
 }
 #endif /* __CHERI_PURE_CAPABILITY__ */
@@ -226,6 +224,28 @@ do_copy_relocations(Obj_Entry *dstobj)
 	return (0);
 }
 
+#ifdef __CHERI_PURE_CAPABILITY__
+struct tls_data {
+	uintcap_t	dtv_gen;
+	int		tls_index;
+	Elf_Addr	tls_offs;
+	Elf_Addr	tls_size;
+};
+
+static void *
+reloc_tlsdesc_alloc(int tlsindex, Elf_Addr tlsoffs, Elf_Addr tlssize)
+{
+	struct tls_data *tlsdesc;
+
+	tlsdesc = xmalloc(sizeof(struct tls_data));
+	tlsdesc->dtv_gen = tls_dtv_generation;
+	tlsdesc->tls_index = tlsindex;
+	tlsdesc->tls_offs = tlsoffs;
+	tlsdesc->tls_size = tlssize;
+
+	return (tlsdesc);
+}
+#else
 struct tls_data {
 	Elf_Addr	dtv_gen;
 	int		tls_index;
@@ -244,6 +264,7 @@ reloc_tlsdesc_alloc(int tlsindex, Elf_Addr tlsoffs)
 
 	return ((Elf_Addr)tlsdesc);
 }
+#endif
 
 static void
 reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where,
@@ -252,7 +273,10 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where,
 	const Elf_Sym *def;
 	const Obj_Entry *defobj;
 	Elf_Addr offs;
-
+#ifdef __CHERI_PURE_CAPABILITY__
+	Elf_Addr size = where[3];
+	void **wherec = (void **)where;
+#endif
 
 	offs = 0;
 	if (ELF_R_SYM(rela->r_info) != 0) {
@@ -261,24 +285,44 @@ reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where,
 		if (def == NULL)
 			rtld_die();
 		offs = def->st_value;
+#ifdef __CHERI_PURE_CAPABILITY__
+		if (size == 0)
+			size = def->st_size;
+#endif
 		obj = defobj;
 		if (def->st_shndx == SHN_UNDEF) {
 			/* Weak undefined thread variable */
+#ifdef __CHERI_PURE_CAPABILITY__
+			wherec[0] = _rtld_tlsdesc_undef;
+			where[2] = rela->r_addend;
+#else
 			where[0] = (Elf_Addr)_rtld_tlsdesc_undef;
 			where[1] = rela->r_addend;
+#endif
 			return;
 		}
 	}
 	offs += rela->r_addend;
 
 	if (obj->tlsoffset != 0) {
-		/* Variable is in initialy allocated TLS segment */
+		/* Variable is in initially allocated TLS segment */
+#ifdef __CHERI_PURE_CAPABILITY__
+		wherec[0] = _rtld_tlsdesc_static;
+		where[2] = obj->tlsoffset + offs;
+		where[3] = size;
+#else
 		where[0] = (Elf_Addr)_rtld_tlsdesc_static;
 		where[1] = obj->tlsoffset + offs;
+#endif
 	} else {
-		/* TLS offest is unknown at load time, use dynamic resolving */
+		/* TLS offset is unknown at load time, use dynamic resolving */
+#ifdef __CHERI_PURE_CAPABILITY__
+		wherec[0] = _rtld_tlsdesc_dynamic;
+		wherec[1] = reloc_tlsdesc_alloc(obj->tlsindex, offs, size);
+#else
 		where[0] = (Elf_Addr)_rtld_tlsdesc_dynamic;
 		where[1] = reloc_tlsdesc_alloc(obj->tlsindex, offs);
+#endif
 	}
 }
 
@@ -306,8 +350,8 @@ reloc_plt(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 		where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
 
 		switch(ELF_R_TYPE(rela->r_info)) {
-		case R_MORELLO_JUMP_SLOT:
 #ifdef __CHERI_PURE_CAPABILITY__
+		case R_MORELLO_JUMP_SLOT:
 			/*
 			 * XXX: This would be far more natural if the linker
 			 * made it an R_MORELLO_RELATIVE-like fragment instead.
@@ -317,40 +361,23 @@ reloc_plt(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 			    *where);
 			break;
 #else
-			_rtld_error("%s: R_MORELLO_JUMP_SLOT in hybrid binary",
-			    obj->path);
-			return (-1);
-#endif
 		case R_AARCH64_JUMP_SLOT:
-#ifndef __CHERI_PURE_CAPABILITY__
 			*where += (Elf_Addr)obj->relocbase;
 			break;
-#else
-			_rtld_error("%s: R_AARCH64_JUMP_SLOT in purecap binary",
-			    obj->path);
-			return (-1);
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
+		case R_MORELLO_TLSDESC:
+#else
 		case R_AARCH64_TLSDESC:
+#endif
 			reloc_tlsdesc(obj, rela, where, SYMLOOK_IN_PLT | flags,
 			    lockstate);
 			break;
-		case R_MORELLO_IRELATIVE:
 #ifdef __CHERI_PURE_CAPABILITY__
-			goto irelative;
+		case R_MORELLO_IRELATIVE:
 #else
-			_rtld_error("%s: R_MORELLO_IRELATIVE in hybrid binary",
-			    obj->path);
-			return (-1);
-#endif
 		case R_AARCH64_IRELATIVE:
-#ifndef __CHERI_PURE_CAPABILITY__
-			goto irelative;
-#else
-			_rtld_error("%s: R_AARCH64_IRELATIVE in purecap binary",
-			    obj->path);
-			return (-1);
 #endif
-		irelative:
 			obj->irelative = true;
 			break;
 		case R_AARCH64_NONE:
@@ -386,21 +413,11 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 
 		where = (uintptr_t *)(obj->relocbase + rela->r_offset);
 		switch(ELF_R_TYPE(rela->r_info)) {
-		case R_MORELLO_JUMP_SLOT:
-#ifndef __CHERI_PURE_CAPABILITY__
-			_rtld_error("%s: R_MORELLO_JUMP_SLOT in hybrid binary",
-			    obj->path);
-			return (-1);
-#endif
-			goto jump_slot;
-		case R_AARCH64_JUMP_SLOT:
 #ifdef __CHERI_PURE_CAPABILITY__
-			_rtld_error("%s: R_AARCH64_JUMP_SLOT in purecap binary",
-			    obj->path);
-			return (-1);
+		case R_MORELLO_JUMP_SLOT:
+#else
+		case R_AARCH64_JUMP_SLOT:
 #endif
-			goto jump_slot;
-		jump_slot:
 			def = find_symdef(ELF_R_SYM(rela->r_info), obj,
 			    &defobj, SYMLOOK_IN_PLT | flags, NULL, lockstate);
 			if (def == NULL)
@@ -424,10 +441,45 @@ static void
 reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
     RtldLockState *lockstate)
 {
-	Elf_Addr *where, target, *ptr;
+	uintptr_t *where, target, ptr;
+#ifdef __CHERI_PURE_CAPABILITY__
+	Elf_Addr *fragment;
+#endif
 
-	ptr = (Elf_Addr *)(obj->relocbase + rela->r_addend);
-	where = (Elf_Addr *)(obj->relocbase + rela->r_offset);
+	where = (uintptr_t *)(obj->relocbase + rela->r_offset);
+#ifdef __CHERI_PURE_CAPABILITY__
+	fragment = (Elf_Addr *)where;
+	/*
+	 * XXX: Morello LLVM commit 94e1dbac broke R_MORELLO_IRELATIVE ABI.
+	 * This horrible hack exists to support both old and new ABIs.
+	 *
+	 * Old ABI:
+	 *   - Treat as R_AARCH64_IRELATIVE (addend is symbol value)
+	 *   - Fragment contents either all zero (for ET_DYN) or base set to
+	 *     the addend and length set to the symbol size (which we don't
+	 *     have to hand).
+	 *
+	 * New ABI:
+	 *   - Same representation as R_MORELLO_RELATIVE
+	 *
+	 * Thus, probe for something that looks like the old ABI and hope
+	 * that's reliable enough until the commit is old enough that we can
+	 * assume the new ABI and ditch this.
+	 *
+	 * See also: lib/csu/aarch64c/reloc.c and sys/arm64/arm64/elf_machdep.c
+	 */
+	if ((fragment[0] == 0 && fragment[1] == 0) ||
+	    (Elf_Ssize)fragment[0] == rela->r_addend)
+		ptr = (uintptr_t)(obj->text_rodata_cap + (rela->r_addend -
+		    (obj->text_rodata_cap - obj->relocbase)));
+	else
+		ptr = init_cap_from_fragment(fragment, obj->relocbase,
+		    obj->text_rodata_cap,
+		    (Elf_Addr)(uintptr_t)obj->relocbase,
+		    rela->r_addend);
+#else
+	ptr = (uintptr_t)(obj->relocbase + rela->r_addend);
+#endif
 	lock_release(rtld_bind_lock, lockstate);
 	target = call_ifunc_resolver(ptr);
 	wlock_acquire(rtld_bind_lock, lockstate);
@@ -447,23 +499,11 @@ reloc_iresolve(Obj_Entry *obj, struct Struct_RtldLockState *lockstate)
 	    obj->pltrelasize);
 	for (rela = obj->pltrela;  rela < relalim;  rela++) {
 		switch (ELF_R_TYPE(rela->r_info)) {
-		case R_MORELLO_IRELATIVE:
 #ifdef __CHERI_PURE_CAPABILITY__
-			goto irelative;
+		case R_MORELLO_IRELATIVE:
 #else
-			_rtld_error("%s: R_MORELLO_IRELATIVE in hybrid binary",
-			    obj->path);
-			return (-1);
-#endif
 		case R_AARCH64_IRELATIVE:
-#ifndef __CHERI_PURE_CAPABILITY__
-			goto irelative;
-#else
-			_rtld_error("%s: R_AARCH64_IRELATIVE in purecap binary",
-			    obj->path);
-			return (-1);
 #endif
-		irelative:
 			reloc_iresolve_one(obj, rela, lockstate);
 			break;
 		}
@@ -483,23 +523,11 @@ reloc_iresolve_nonplt(Obj_Entry *obj, struct Struct_RtldLockState *lockstate)
 	relalim = (const Elf_Rela *)((const char *)obj->rela + obj->relasize);
 	for (rela = obj->rela;  rela < relalim;  rela++) {
 		switch (ELF_R_TYPE(rela->r_info)) {
-		case R_MORELLO_IRELATIVE:
 #ifdef __CHERI_PURE_CAPABILITY__
-			goto irelative;
+		case R_MORELLO_IRELATIVE:
 #else
-			_rtld_error("%s: R_MORELLO_IRELATIVE in hybrid binary",
-			    obj->path);
-			return (-1);
-#endif
 		case R_AARCH64_IRELATIVE:
-#ifndef __CHERI_PURE_CAPABILITY__
-			goto irelative;
-#else
-			_rtld_error("%s: R_AARCH64_IRELATIVE in purecap binary",
-			    obj->path);
-			return (-1);
 #endif
-		irelative:
 			reloc_iresolve_one(obj, rela, lockstate);
 			break;
 		}
@@ -523,21 +551,11 @@ reloc_gnu_ifunc(Obj_Entry *obj, int flags,
 	for (rela = obj->pltrela;  rela < relalim;  rela++) {
 		where = (uintptr_t *)(obj->relocbase + rela->r_offset);
 		switch (ELF_R_TYPE(rela->r_info)) {
-		case R_MORELLO_JUMP_SLOT:
-#ifndef __CHERI_PURE_CAPABILITY__
-			_rtld_error("%s: R_MORELLO_JUMP_SLOT in hybrid binary",
-			    obj->path);
-			return (-1);
-#endif
-			goto jump_slot;
-		case R_AARCH64_JUMP_SLOT:
 #ifdef __CHERI_PURE_CAPABILITY__
-			_rtld_error("%s: R_AARCH64_JUMP_SLOT in purecap binary",
-			    obj->path);
-			return (-1);
+		case R_MORELLO_JUMP_SLOT:
+#else
+		case R_AARCH64_JUMP_SLOT:
 #endif
-			goto jump_slot;
-		jump_slot:
 			def = find_symdef(ELF_R_SYM(rela->r_info), obj, &defobj,
 			    SYMLOOK_IN_PLT | flags, NULL, lockstate);
 			if (def == NULL)
@@ -634,9 +652,13 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		switch (ELF_R_TYPE(rela->r_info)) {
 		case R_AARCH64_ABS64:
 		case R_AARCH64_GLOB_DAT:
+#ifdef __CHERI_PURE_CAPABILITY__
+		case R_MORELLO_TLS_TPREL128:
+#else
 		case R_AARCH64_TLS_TPREL64:
 		case R_AARCH64_TLS_DTPREL64:
 		case R_AARCH64_TLS_DTPMOD64:
+#endif
 			def = find_symdef(ELF_R_SYM(rela->r_info), obj,
 			    &defobj, flags, cache, lockstate);
 			if (def == NULL)
@@ -697,10 +719,11 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				return (-1);
 			break;
 		case R_MORELLO_RELATIVE:
-			init_cap_from_fragment(where, data_cap,
-			    text_rodata_cap,
-			    (Elf_Addr)(uintptr_t)obj->relocbase,
-			    rela->r_addend);
+			*(uintcap_t *)(void *)where =
+			    init_cap_from_fragment(where, data_cap,
+				text_rodata_cap,
+				(Elf_Addr)(uintptr_t)obj->relocbase,
+				rela->r_addend);
 			break;
 #endif /* __has_feature(capabilities) */
 		case R_AARCH64_ABS64:
@@ -720,10 +743,18 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				return (-1);
 			}
 			break;
+#ifdef __CHERI_PURE_CAPABILITY__
+		case R_MORELLO_TLSDESC:
+#else
 		case R_AARCH64_TLSDESC:
+#endif
 			reloc_tlsdesc(obj, rela, where, flags, lockstate);
 			break;
+#ifdef __CHERI_PURE_CAPABILITY__
+		case R_MORELLO_TLS_TPREL128:
+#else
 		case R_AARCH64_TLS_TPREL64:
+#endif
 			/*
 			 * We lazily allocate offsets for static TLS as we
 			 * see the first relocation that references the
@@ -741,27 +772,15 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 					return (-1);
 				}
 			}
-			/* Test weak undefined thread variable */
-			if (def->st_shndx != SHN_UNDEF) {
-				*where = def->st_value + rela->r_addend +
-				    defobj->tlsoffset;
-			} else {
-				/*
-				 * XXX We should relocate undefined thread
-				 * weak variable address to NULL, but how?
-				 * Can we return error in this situation?
-				 */
-				rtld_printf("%s: Unable to relocate undefined "
-				"weak TLS variable\n", obj->path);
-#if 0
-				return (-1);
-#else
-				*where = def->st_value + rela->r_addend +
-				    defobj->tlsoffset;
+			where[0] = def->st_value + rela->r_addend +
+			    defobj->tlsoffset;
+#ifdef __CHERI_PURE_CAPABILITY__
+			if (where[1] == 0)
+				where[1] = def->st_size;
 #endif
-			}
 			break;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 		/*
 		 * !!! BEWARE !!!
 		 * ARM ELF ABI defines TLS_DTPMOD64 as 1029, and TLS_DTPREL64
@@ -774,28 +793,17 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		case R_AARCH64_TLS_DTPMOD64: /* efectively is TLS_DTPREL64 */
 			*where += (Elf_Addr)(def->st_value + rela->r_addend);
 			break;
+#endif
 		case R_AARCH64_RELATIVE:
 			*where = (Elf_Addr)(obj->relocbase + rela->r_addend);
 			break;
 		case R_AARCH64_NONE:
 			break;
-		case R_MORELLO_IRELATIVE:
 #ifdef __CHERI_PURE_CAPABILITY__
-			goto irelative;
+		case R_MORELLO_IRELATIVE:
 #else
-			_rtld_error("%s: R_MORELLO_IRELATIVE in hybrid binary",
-			    obj->path);
-			return (-1);
-#endif
 		case R_AARCH64_IRELATIVE:
-#ifndef __CHERI_PURE_CAPABILITY__
-			goto irelative;
-#else
-			_rtld_error("%s: R_AARCH64_IRELATIVE in purecap binary",
-			    obj->path);
-			return (-1);
 #endif
-		irelative:
 			obj->irelative_nonplt = true;
 			break;
 		default:
@@ -811,7 +819,6 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 void
 allocate_initial_tls(Obj_Entry *objs)
 {
-	Elf_Addr **tp;
 
 	/*
 	* Fix the size of the static TLS block by using the maximum
@@ -821,27 +828,14 @@ allocate_initial_tls(Obj_Entry *objs)
 	tls_static_space = tls_last_offset + tls_last_size +
 	    RTLD_STATIC_TLS_EXTRA;
 
-	tp = (Elf_Addr **) allocate_tls(objs, NULL, TLS_TCB_SIZE, 16);
-
-#ifdef __CHERI_PURE_CAPABILITY__
-	asm volatile("msr	ctpidr_el0, %0" : : "C"(tp));
-#else
-	asm volatile("msr	tpidr_el0, %0" : : "r"(tp));
-#endif
+	_tcb_set(allocate_tls(objs, NULL, TLS_TCB_SIZE, TLS_TCB_ALIGN));
 }
 
 void *
 __tls_get_addr(tls_index* ti)
 {
-      char *p;
-      void *_tp;
+	uintptr_t **dtvp;
 
-#ifdef __CHERI_PURE_CAPABILITY__
-      __asm __volatile("mrs	%0, ctpidr_el0"  : "=C" (_tp));
-#else
-      __asm __volatile("mrs	%0, tpidr_el0"  : "=r" (_tp));
-#endif
-      p = tls_get_addr_common((uintptr_t **)(_tp), ti->ti_module, ti->ti_offset);
-
-      return (p);
+	dtvp = &_tcb_get()->tcb_dtv;
+	return (tls_get_addr_common(dtvp, ti->ti_module, ti->ti_offset));
 }

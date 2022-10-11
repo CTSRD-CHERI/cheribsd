@@ -256,9 +256,6 @@ xae_xdma_rx_intr(void *arg, xdma_transfer_status_t *status)
 static void
 xae_qflush(struct ifnet *ifp)
 {
-	struct xae_softc *sc;
-
-	sc = ifp->if_softc;
 }
 
 static int
@@ -748,9 +745,6 @@ static void
 xae_phy_fixup(struct xae_softc *sc)
 {
 	uint32_t reg;
-	device_t dev;
-
-	dev = sc->dev;
 
 	do {
 		WRITE_TI_EREG(sc, DP83867_SGMIICTL1, SGMIICTL1_SGMII_6W);
@@ -1152,10 +1146,8 @@ driver_t xae_driver = {
 	sizeof(struct xae_softc),
 };
 
-static devclass_t xae_devclass;
-
-DRIVER_MODULE(xae, simplebus, xae_driver, xae_devclass, 0, 0);
-DRIVER_MODULE(miibus, xae, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(xae, simplebus, xae_driver, 0, 0);
+DRIVER_MODULE(miibus, xae, miibus_driver, 0, 0);
 
 MODULE_DEPEND(xae, ether, 1, 1, 1);
 MODULE_DEPEND(xae, miibus, 1, 1, 1);

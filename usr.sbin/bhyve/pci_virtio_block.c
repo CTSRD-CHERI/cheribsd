@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
- * Copyright 2020 Joyent, Inc.
+ * Copyright 2020-2021 Joyent, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -436,12 +436,24 @@ pci_vtblk_notify(void *vsc, struct vqueue_info *vq)
 		pci_vtblk_proc(sc, vq);
 }
 
+static void
+pci_vtblk_resized(struct blockif_ctxt *bctxt, void *arg, size_t new_size)
+{
+	struct pci_vtblk_softc *sc;
+
+	sc = arg;
+
+	sc->vbsc_cfg.vbc_capacity = new_size / VTBLK_BSIZE; /* 512-byte units */
+	vi_interrupt(&sc->vbsc_vs, VIRTIO_PCI_ISR_CONFIG,
+	    sc->vbsc_vs.vs_msix_cfg_idx);
+}
+
 static int
 pci_vtblk_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 {
 	char bident[sizeof("XX:X:X")];
 	struct blockif_ctxt *bctxt;
-	const char *path;
+	const char *path, *serial;
 	MD5_CTX mdctx;
 	u_char digest[16];
 	struct pci_vtblk_softc *sc;
@@ -486,16 +498,23 @@ pci_vtblk_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 	/* sc->vbsc_vq.vq_notify = we have no per-queue notify */
 
 	/*
-	 * Create an identifier for the backing file. Use parts of the
-	 * md5 sum of the filename
+	 * If an explicit identifier is not given, create an
+	 * identifier using parts of the md5 sum of the filename.
 	 */
-	path = get_config_value_node(nvl, "path");
-	MD5Init(&mdctx);
-	MD5Update(&mdctx, path, strlen(path));
-	MD5Final(digest, &mdctx);
-	snprintf(sc->vbsc_ident, VTBLK_BLK_ID_BYTES,
-	    "BHYVE-%02X%02X-%02X%02X-%02X%02X",
-	    digest[0], digest[1], digest[2], digest[3], digest[4], digest[5]);
+	bzero(sc->vbsc_ident, VTBLK_BLK_ID_BYTES);
+	if ((serial = get_config_value_node(nvl, "serial")) != NULL ||
+	    (serial = get_config_value_node(nvl, "ser")) != NULL) {
+		strlcpy(sc->vbsc_ident, serial, VTBLK_BLK_ID_BYTES);
+	} else {
+		path = get_config_value_node(nvl, "path");
+		MD5Init(&mdctx);
+		MD5Update(&mdctx, path, strlen(path));
+		MD5Final(digest, &mdctx);
+		snprintf(sc->vbsc_ident, VTBLK_BLK_ID_BYTES,
+		    "BHYVE-%02X%02X-%02X%02X-%02X%02X",
+		    digest[0], digest[1], digest[2], digest[3], digest[4],
+		    digest[5]);
+	}
 
 	/* setup virtio block config space */
 	sc->vbsc_cfg.vbc_capacity = size / VTBLK_BSIZE; /* 512-byte units */
@@ -541,6 +560,7 @@ pci_vtblk_init(struct vmctx *ctx, struct pci_devinst *pi, nvlist_t *nvl)
 		return (1);
 	}
 	vi_set_io_bar(&sc->vbsc_vs, 0);
+	blockif_register_resize_callback(sc->bc, pci_vtblk_resized, sc);
 	return (0);
 }
 
@@ -572,6 +592,8 @@ struct pci_devemu pci_de_vblk = {
 	.pe_barread =	vi_pci_read,
 #ifdef BHYVE_SNAPSHOT
 	.pe_snapshot =	vi_pci_snapshot,
+	.pe_pause =     vi_pci_pause,
+	.pe_resume =    vi_pci_resume,
 #endif
 };
 PCI_EMUL_SET(pci_de_vblk);

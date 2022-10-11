@@ -167,12 +167,9 @@ static int
 sp804_timer_intr(void *arg)
 {
 	struct sp804_timer_softc *sc = arg;
-	static uint32_t prev = 0;
-	uint32_t x = 0;
 
-	x = sp804_timer_tc_read_4(SP804_TIMER1_VALUE);
+	(void)sp804_timer_tc_read_4(SP804_TIMER1_VALUE);
 
-	prev =x ;
 	sp804_timer_tc_write_4(SP804_TIMER2_INTCLR, 1);
 	if (sc->et_enabled) {
 		if (sc->et.et_active) {
@@ -313,9 +310,7 @@ static driver_t sp804_timer_driver = {
 	sizeof(struct sp804_timer_softc),
 };
 
-static devclass_t sp804_timer_devclass;
-
-DRIVER_MODULE(sp804_timer, simplebus, sp804_timer_driver, sp804_timer_devclass, 0, 0);
+DRIVER_MODULE(sp804_timer, simplebus, sp804_timer_driver, 0, 0);
 
 static void
 sp804_timer_delay(int usec, void *arg)

@@ -181,10 +181,8 @@ static driver_t nfe_driver = {
 	sizeof(struct nfe_softc)
 };
 
-static devclass_t nfe_devclass;
-
-DRIVER_MODULE(nfe, pci, nfe_driver, nfe_devclass, 0, 0);
-DRIVER_MODULE(miibus, nfe, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(nfe, pci, nfe_driver, 0, 0);
+DRIVER_MODULE(miibus, nfe, miibus_driver, 0, 0);
 
 static struct nfe_type nfe_devs[] = {
 	{PCI_VENDOR_NVIDIA, PCI_PRODUCT_NVIDIA_NFORCE_LAN,
@@ -1408,17 +1406,15 @@ nfe_free_jrx_ring(struct nfe_softc *sc, struct nfe_jrx_ring *ring)
 {
 	struct nfe_rx_data *data;
 	void *desc;
-	int i, descsize;
+	int i;
 
 	if ((sc->nfe_flags & NFE_JUMBO_SUP) == 0)
 		return;
 
 	if (sc->nfe_flags & NFE_40BIT_ADDR) {
 		desc = ring->jdesc64;
-		descsize = sizeof (struct nfe_desc64);
 	} else {
 		desc = ring->jdesc32;
-		descsize = sizeof (struct nfe_desc32);
 	}
 
 	for (i = 0; i < NFE_JUMBO_RX_RING_COUNT; i++) {
@@ -1567,14 +1563,12 @@ nfe_free_tx_ring(struct nfe_softc *sc, struct nfe_tx_ring *ring)
 {
 	struct nfe_tx_data *data;
 	void *desc;
-	int i, descsize;
+	int i;
 
 	if (sc->nfe_flags & NFE_40BIT_ADDR) {
 		desc = ring->desc64;
-		descsize = sizeof (struct nfe_desc64);
 	} else {
 		desc = ring->desc32;
-		descsize = sizeof (struct nfe_desc32);
 	}
 
 	for (i = 0; i < NFE_TX_RING_COUNT; i++) {

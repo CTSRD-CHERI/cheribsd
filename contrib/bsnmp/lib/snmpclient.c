@@ -1012,7 +1012,7 @@ open_client_local(const char *path)
 	snprintf(snmp_client.local_path, sizeof(snmp_client.local_path),
 	    "%s", SNMP_LOCAL_PATH);
 
-	if (mktemp(snmp_client.local_path) == NULL) {
+	if (mkstemp(snmp_client.local_path) == -1) {
 		seterr(&snmp_client, "%s", strerror(errno));
 		(void)close(snmp_client.fd);
 		snmp_client.fd = -1;
@@ -1775,7 +1775,7 @@ snmp_discover_engine(char *passwd)
 	}
 
 	if (resp.error_status != SNMP_ERR_NOERROR) {
-		seterr(&snmp_client, "Error %d in responce", resp.error_status);
+		seterr(&snmp_client, "Error %d in response", resp.error_status);
 		return (-1);
 	}
 
@@ -1821,7 +1821,7 @@ snmp_discover_engine(char *passwd)
 	}
 
 	if (resp.error_status != SNMP_ERR_NOERROR) {
-		seterr(&snmp_client, "Error %d in responce", resp.error_status);
+		seterr(&snmp_client, "Error %d in response", resp.error_status);
 		return (-1);
 	}
 

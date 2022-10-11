@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
 
 #include <fs/nfs/nfsport.h>
 #include <security/mac/mac_framework.h>
+#include <sys/callout.h>
 #include <sys/filio.h>
 #include <sys/hash.h>
 #include <sys/sysctl.h>
@@ -60,7 +61,6 @@ extern int nfsrv_useacl;
 extern int newnfs_numnfsd;
 extern struct mount nfsv4root_mnt;
 extern struct nfsrv_stablefirst nfsrv_stablefirst;
-extern void (*nfsd_call_servertimer)(void);
 extern SVCPOOL	*nfsrvd_pool;
 extern struct nfsv4lock nfsd_suspend_lock;
 extern struct nfsclienthashhead *nfsclienthash;
@@ -76,6 +76,9 @@ extern struct nfsdontlisthead nfsrv_dontlisthead;
 extern volatile int nfsrv_dontlistlen;
 extern volatile int nfsrv_devidcnt;
 extern int nfsrv_maxpnfsmirror;
+extern uint32_t nfs_srvmaxio;
+extern int nfs_bufpackets;
+extern u_long sb_max_adj;
 struct vfsoptlist nfsv4root_opt, nfsv4root_newopt;
 NFSDLOCKMUTEX;
 NFSSTATESPINLOCK;
@@ -94,6 +97,7 @@ static char nfsd_master_comm[MAXCOMLEN + 1];
 static struct timeval nfsd_master_start;
 static uint32_t nfsv4_sysid = 0;
 static fhandle_t zerofh;
+struct callout nfsd_callout;
 
 static int nfssvc_srvcall(struct thread *, struct nfssvc_args *,
     struct ucred *);
@@ -128,6 +132,8 @@ static int nfsrv_writedsrpc(fhandle_t *, off_t, int, struct ucred *,
     NFSPROC_T *, struct vnode *, struct nfsmount **, int, struct mbuf **,
     char *, int *);
 static int nfsrv_allocatedsrpc(fhandle_t *, off_t, off_t, struct ucred *,
+    NFSPROC_T *, struct vnode *, struct nfsmount **, int, int *);
+static int nfsrv_deallocatedsrpc(fhandle_t *, off_t, off_t, struct ucred *,
     NFSPROC_T *, struct vnode *, struct nfsmount **, int, int *);
 static int nfsrv_setacldsrpc(fhandle_t *, struct ucred *, NFSPROC_T *,
     struct vnode *, struct nfsmount **, int, struct acl *, int *);
@@ -194,6 +200,84 @@ sysctl_dsdirsize(SYSCTL_HANDLER_ARGS)
 SYSCTL_PROC(_vfs_nfsd, OID_AUTO, dsdirsize,
     CTLTYPE_UINT | CTLFLAG_MPSAFE | CTLFLAG_RW, 0, sizeof(nfsrv_dsdirsize),
     sysctl_dsdirsize, "IU", "Number of dsN subdirs on the DS servers");
+
+/*
+ * nfs_srvmaxio can only be increased and only when the nfsd threads are
+ * not running.  The setting must be a power of 2, with the current limit of
+ * 1Mbyte.
+ */
+static int
+sysctl_srvmaxio(SYSCTL_HANDLER_ARGS)
+{
+	int error;
+	u_int newsrvmaxio;
+	uint64_t tval;
+
+	newsrvmaxio = nfs_srvmaxio;
+	error = sysctl_handle_int(oidp, &newsrvmaxio, 0, req);
+	if (error != 0 || req->newptr == NULL)
+		return (error);
+	if (newsrvmaxio == nfs_srvmaxio)
+		return (0);
+	if (newsrvmaxio < nfs_srvmaxio) {
+		printf("nfsd: vfs.nfsd.srvmaxio can only be increased\n");
+		return (EINVAL);
+	}
+	if (newsrvmaxio > 1048576) {
+		printf("nfsd: vfs.nfsd.srvmaxio cannot be > 1Mbyte\n");
+		return (EINVAL);
+	}
+	if ((newsrvmaxio & (newsrvmaxio - 1)) != 0) {
+		printf("nfsd: vfs.nfsd.srvmaxio must be a power of 2\n");
+		return (EINVAL);
+	}
+
+	/*
+	 * Check that kern.ipc.maxsockbuf is large enough for
+	 * newsrviomax, given the setting of vfs.nfs.bufpackets.
+	 */
+	if ((newsrvmaxio + NFS_MAXXDR) * nfs_bufpackets >
+	    sb_max_adj) {
+		/*
+		 * Suggest vfs.nfs.bufpackets * maximum RPC message for
+		 * sb_max_adj.
+		 */
+		tval = (newsrvmaxio + NFS_MAXXDR) * nfs_bufpackets;
+
+		/*
+		 * Convert suggested sb_max_adj value to a suggested
+		 * sb_max value, which is what is set via kern.ipc.maxsockbuf.
+		 * Perform the inverse calculation of (from uipc_sockbuf.c):
+		 * sb_max_adj = (u_quad_t)sb_max * MCLBYTES /
+		 *     (MSIZE + MCLBYTES);
+		 * XXX If the calculation of sb_max_adj from sb_max changes,
+		 *     this calculation must be changed as well.
+		 */
+		tval *= (MSIZE + MCLBYTES);  /* Brackets for readability. */
+		tval += MCLBYTES - 1;        /* Round up divide. */
+		tval /= MCLBYTES;
+		printf("nfsd: set kern.ipc.maxsockbuf to a minimum of "
+		    "%ju to support %ubyte NFS I/O\n", (uintmax_t)tval,
+		    newsrvmaxio);
+		return (EINVAL);
+	}
+
+	NFSD_LOCK();
+	if (newnfs_numnfsd != 0) {
+		NFSD_UNLOCK();
+		printf("nfsd: cannot set vfs.nfsd.srvmaxio when nfsd "
+		    "threads are running\n");
+		return (EINVAL);
+	}
+
+
+	nfs_srvmaxio = newsrvmaxio;
+	NFSD_UNLOCK();
+	return (0);
+}
+SYSCTL_PROC(_vfs_nfsd, OID_AUTO, srvmaxio,
+    CTLTYPE_UINT | CTLFLAG_MPSAFE | CTLFLAG_RW, NULL, 0,
+    sysctl_srvmaxio, "IU", "Maximum I/O size in bytes");
 
 #define	MAX_REORDERED_RPC	16
 #define	NUM_HEURISTIC		1031
@@ -511,7 +595,7 @@ nfsvno_setattr(struct vnode *vp, struct nfsvattr *nvap, struct ucred *cred,
  */
 int
 nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
-    struct vnode *dp, int islocked, struct nfsexstuff *exp, struct thread *p,
+    struct vnode *dp, int islocked, struct nfsexstuff *exp,
     struct vnode **retdirp)
 {
 	struct componentname *cnp = &ndp->ni_cnd;
@@ -578,7 +662,6 @@ nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
 	 * because lookup() will dereference ni_startdir.
 	 */
 
-	cnp->cn_thread = p;
 	ndp->ni_startdir = dp;
 	ndp->ni_rootdir = rootvnode;
 	ndp->ni_topdir = NULL;
@@ -594,7 +677,7 @@ nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
 		 * In either case ni_startdir will be dereferenced and NULLed
 		 * out.
 		 */
-		error = lookup(ndp);
+		error = vfs_lookup(ndp);
 		if (error)
 			break;
 
@@ -1174,8 +1257,8 @@ nfsvno_createsub(struct nfsrv_descript *nd, struct nameidata *ndp,
 				tempsize = nvap->na_size;
 				NFSVNO_ATTRINIT(nvap);
 				nvap->na_size = tempsize;
-				error = VOP_SETATTR(*vpp,
-				    &nvap->na_vattr, nd->nd_cred);
+				error = nfsvno_setattr(*vpp, nvap,
+				    nd->nd_cred, p, exp);
 			}
 		}
 		if (error)
@@ -1844,8 +1927,8 @@ nfsvno_open(struct nfsrv_descript *nd, struct nameidata *ndp,
 					tempsize = nvap->na_size;
 					NFSVNO_ATTRINIT(nvap);
 					nvap->na_size = tempsize;
-					nd->nd_repstat = VOP_SETATTR(vp,
-					    &nvap->na_vattr, cred);
+					nd->nd_repstat = nfsvno_setattr(vp,
+					    nvap, cred, p, exp);
 				}
 			} else if (vp->v_type == VREG) {
 				nd->nd_repstat = nfsrv_opencheck(clientid,
@@ -1962,7 +2045,7 @@ nfsrvd_readdir(struct nfsrv_descript *nd, int isdgram,
 	int nlen, error = 0, getret = 1;
 	int siz, cnt, fullsiz, eofflag, ncookies;
 	u_int64_t off, toff, verf __unused;
-	u_long *cookies = NULL, *cookiep;
+	uint64_t *cookies = NULL, *cookiep;
 	struct uio io;
 	struct iovec iv;
 	int is_ufs;
@@ -2172,10 +2255,11 @@ again:
 			(void) nfsm_strtom(nd, dp->d_name, nlen);
 			if (nd->nd_flag & ND_NFSV3) {
 				NFSM_BUILD(tl, u_int32_t *, 2 * NFSX_UNSIGNED);
-				*tl++ = 0;
-			} else
+				txdr_hyper(*cookiep, tl);
+			} else {
 				NFSM_BUILD(tl, u_int32_t *, NFSX_UNSIGNED);
-			*tl = txdr_unsigned(*cookiep);
+				*tl = txdr_unsigned(*cookiep);
+			}
 		}
 		cpos += dp->d_reclen;
 		dp = (struct dirent *)cpos;
@@ -2221,8 +2305,8 @@ nfsrvd_readdirplus(struct nfsrv_descript *nd, int isdgram,
 	int nlen, r, error = 0, getret = 1, usevget = 1;
 	int siz, cnt, fullsiz, eofflag, ncookies, entrycnt;
 	caddr_t bpos0, bpos1;
-	u_int64_t off, toff, verf;
-	u_long *cookies = NULL, *cookiep;
+	u_int64_t off, toff, verf __unused;
+	uint64_t *cookies = NULL, *cookiep;
 	nfsattrbit_t attrbits, rderrbits, savbits;
 	struct uio io;
 	struct iovec iv;
@@ -2438,7 +2522,6 @@ again:
 			cn.cn_nameiop = LOOKUP;
 			cn.cn_lkflags = LK_SHARED | LK_RETRY;
 			cn.cn_cred = nd->nd_cred;
-			cn.cn_thread = p;
 		} else if (r == 0)
 			vput(nvp);
 	}
@@ -2538,7 +2621,6 @@ again:
 							    LK_RETRY;
 							cn.cn_cred =
 							    nd->nd_cred;
-							cn.cn_thread = p;
 						}
 						cn.cn_nameptr = dp->d_name;
 						cn.cn_namelen = nlen;
@@ -2662,8 +2744,7 @@ again:
 				*tl = txdr_unsigned(dp->d_fileno);
 				dirlen += nfsm_strtom(nd, dp->d_name, nlen);
 				NFSM_BUILD(tl, u_int32_t *, 2 * NFSX_UNSIGNED);
-				*tl++ = 0;
-				*tl = txdr_unsigned(*cookiep);
+				txdr_hyper(*cookiep, tl);
 				nfsrv_postopattr(nd, 0, nvap);
 				dirlen += nfsm_fhtom(nd,(u_int8_t *)&nfh,0,1);
 				dirlen += (5*NFSX_UNSIGNED+NFSX_V3POSTOPATTR);
@@ -2672,8 +2753,7 @@ again:
 			} else {
 				NFSM_BUILD(tl, u_int32_t *, 3 * NFSX_UNSIGNED);
 				*tl++ = newnfs_true;
-				*tl++ = 0;
-				*tl = txdr_unsigned(*cookiep);
+				txdr_hyper(*cookiep, tl);
 				dirlen += nfsm_strtom(nd, dp->d_name, nlen);
 				if (nvp != NULL) {
 					supports_nfsv4acls =
@@ -2907,8 +2987,8 @@ nfsv4_sattr(struct nfsrv_descript *nd, vnode_t vp, struct nfsvattr *nvap,
 			attrsum += NFSX_HYPER;
 			break;
 		case NFSATTRBIT_ACL:
-			error = nfsrv_dissectacl(nd, aclp, &aceerr, &aclsize,
-			    p);
+			error = nfsrv_dissectacl(nd, aclp, true, &aceerr,
+			    &aclsize, p);
 			if (error)
 				goto nfsmout;
 			if (aceerr && !nd->nd_repstat)
@@ -3098,9 +3178,9 @@ nfsmout:
  */
 int
 nfsd_excred(struct nfsrv_descript *nd, struct nfsexstuff *exp,
-    struct ucred *credanon)
+    struct ucred *credanon, bool testsec)
 {
-	int error = 0;
+	int error;
 
 	/*
 	 * Check/setup credentials.
@@ -3110,18 +3190,12 @@ nfsd_excred(struct nfsrv_descript *nd, struct nfsexstuff *exp,
 
 	/*
 	 * Check to see if the operation is allowed for this security flavor.
-	 * RFC2623 suggests that the NFSv3 Fsinfo RPC be allowed to
-	 * AUTH_NONE or AUTH_SYS for file systems requiring RPCSEC_GSS.
-	 * Also, allow Secinfo, so that it can acquire the correct flavor(s).
 	 */
-	if (nfsvno_testexp(nd, exp) &&
-	    nd->nd_procnum != NFSV4OP_SECINFO &&
-	    nd->nd_procnum != NFSPROC_FSINFO) {
-		if (nd->nd_flag & ND_NFSV4)
-			error = NFSERR_WRONGSEC;
-		else
-			error = (NFSERR_AUTHERR | AUTH_TOOWEAK);
-		goto out;
+	error = 0;
+	if (testsec) {
+		error = nfsvno_testexp(nd, exp);
+		if (error != 0)
+			goto out;
 	}
 
 	/*
@@ -3241,7 +3315,7 @@ nfsvno_fhtovp(struct mount *mp, fhandle_t *fhp, struct sockaddr *nam,
 void
 nfsd_fhtovp(struct nfsrv_descript *nd, struct nfsrvfh *nfp, int lktype,
     struct vnode **vpp, struct nfsexstuff *exp,
-    struct mount **mpp, int startwrite)
+    struct mount **mpp, int startwrite, int nextop)
 {
 	struct mount *mp, *mpw;
 	struct ucred *credanon;
@@ -3288,19 +3362,6 @@ nfsd_fhtovp(struct nfsrv_descript *nd, struct nfsrvfh *nfp, int lktype,
 	}
 
 	/*
-	 * If TLS is required by the export, check the flags in nd_flag.
-	 */
-	if (nd->nd_repstat == 0 && ((NFSVNO_EXTLS(exp) &&
-	    (nd->nd_flag & ND_TLS) == 0) ||
-	     (NFSVNO_EXTLSCERT(exp) &&
-	      (nd->nd_flag & ND_TLSCERT) == 0) ||
-	     (NFSVNO_EXTLSCERTUSER(exp) &&
-	      (nd->nd_flag & ND_TLSCERTUSER) == 0))) {
-		vput(*vpp);
-		nd->nd_repstat = NFSERR_ACCES;
-	}
-
-	/*
 	 * Personally, I've never seen any point in requiring a
 	 * reserved port#, since only in the rare case where the
 	 * clients are all boxes with secure system privileges,
@@ -3337,7 +3398,8 @@ nfsd_fhtovp(struct nfsrv_descript *nd, struct nfsrvfh *nfp, int lktype,
 	 */
 	if (!nd->nd_repstat) {
 		nd->nd_saveduid = nd->nd_cred->cr_uid;
-		nd->nd_repstat = nfsd_excred(nd, exp, credanon);
+		nd->nd_repstat = nfsd_excred(nd, exp, credanon,
+		    nfsrv_checkwrongsec(nd, nextop, (*vpp)->v_type));
 		if (nd->nd_repstat)
 			vput(*vpp);
 	}
@@ -3401,8 +3463,7 @@ nfsrv_v4rootexport(void *argp, struct ucred *cred, struct thread *p)
 		/*
 		 * If fspec != NULL, this is the v4root path.
 		 */
-		NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE,
-		    nfsexargp->fspec, p);
+		NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, nfsexargp->fspec);
 		if ((error = namei(&nd)) != 0)
 			goto out;
 		error = nfsvno_getfh(nd.ni_vp, &fh, p);
@@ -3463,6 +3524,14 @@ nfsd_mntinit(void)
 	nfsv4root_mnt.mnt_optnew = &nfsv4root_newopt;
 	nfsv4root_mnt.mnt_nvnodelistsize = 0;
 	nfsv4root_mnt.mnt_lazyvnodelistsize = 0;
+}
+
+static void
+nfsd_timer(void *arg)
+{
+
+	nfsrv_servertimer();
+	callout_reset_sbt(&nfsd_callout, SBT_1S, SBT_1S, nfsd_timer, NULL, 0);
 }
 
 /*
@@ -3713,6 +3782,7 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 			nfsdarg.mdspathlen = 0;
 			nfsdarg.mirrorcnt = 1;
 		}
+		nfsd_timer(NULL);
 		error = nfsrvd_nfsd(td, &nfsdarg);
 		free((__cheri_fromcap char *)nfsdarg.addr, M_TEMP);
 		free((__cheri_fromcap char *)nfsdarg.dnshost, M_TEMP);
@@ -3984,6 +4054,31 @@ nfsvno_testexp(struct nfsrv_descript *nd, struct nfsexstuff *exp)
 {
 	int i;
 
+	if ((NFSVNO_EXTLS(exp) && (nd->nd_flag & ND_TLS) == 0) ||
+	    (NFSVNO_EXTLSCERT(exp) &&
+	     (nd->nd_flag & ND_TLSCERT) == 0) ||
+	    (NFSVNO_EXTLSCERTUSER(exp) &&
+	     (nd->nd_flag & ND_TLSCERTUSER) == 0)) {
+		if ((nd->nd_flag & ND_NFSV4) != 0)
+			return (NFSERR_WRONGSEC);
+#ifdef notnow
+		/* There is currently no auth_stat for this. */
+		else if ((nd->nd_flag & ND_TLS) == 0)
+			return (NFSERR_AUTHERR | AUTH_NEEDS_TLS);
+		else
+			return (NFSERR_AUTHERR | AUTH_NEEDS_TLS_MUTUAL_HOST);
+#endif
+		else
+			return (NFSERR_AUTHERR | AUTH_TOOWEAK);
+	}
+
+	/*
+	 * RFC2623 suggests that the NFSv3 Fsinfo RPC be allowed to use
+	 * AUTH_NONE or AUTH_SYS for file systems requiring RPCSEC_GSS.
+	 */
+	if ((nd->nd_flag & ND_NFSV3) != 0 && nd->nd_procnum == NFSPROC_FSINFO)
+		return (0);
+
 	/*
 	 * This seems odd, but allow the case where the security flavor
 	 * list is empty. This happens when NFSv4 is traversing non-exported
@@ -4011,7 +4106,9 @@ nfsvno_testexp(struct nfsrv_descript *nd, struct nfsexstuff *exp)
 		    (nd->nd_flag & ND_GSS) == 0)
 			return (0);
 	}
-	return (1);
+	if ((nd->nd_flag & ND_NFSV4) != 0)
+		return (NFSERR_WRONGSEC);
+	return (NFSERR_AUTHERR | AUTH_TOOWEAK);
 }
 
 /*
@@ -4101,7 +4198,6 @@ nfsrv_dscreate(struct vnode *dvp, struct vattr *vap, struct vattr *nvap,
 	    LOCKPARENT | LOCKLEAF | SAVESTART | NOCACHE);
 	nfsvno_setpathbuf(&named, &bufp, &hashp);
 	named.ni_cnd.cn_lkflags = LK_EXCLUSIVE;
-	named.ni_cnd.cn_thread = p;
 	named.ni_cnd.cn_nameptr = bufp;
 	if (fnamep != NULL) {
 		strlcpy(bufp, fnamep, PNFS_FILENAME_LEN + 1);
@@ -4485,7 +4581,6 @@ nfsrv_dsremove(struct vnode *dvp, char *fname, struct ucred *tcred,
 	named.ni_cnd.cn_nameiop = DELETE;
 	named.ni_cnd.cn_lkflags = LK_EXCLUSIVE | LK_RETRY;
 	named.ni_cnd.cn_cred = tcred;
-	named.ni_cnd.cn_thread = p;
 	named.ni_cnd.cn_flags = ISLASTCN | LOCKPARENT | LOCKLEAF | SAVENAME;
 	nfsvno_setpathbuf(&named, &bufp, &hashp);
 	named.ni_cnd.cn_nameptr = bufp;
@@ -4818,6 +4913,9 @@ tryagain:
 		} else if (ioproc == NFSPROC_ALLOCATE)
 			error = nfsrv_allocatedsrpc(fh, off, *offp, cred, p, vp,
 			    &nmp[0], mirrorcnt, &failpos);
+		else if (ioproc == NFSPROC_DEALLOCATE)
+			error = nfsrv_deallocatedsrpc(fh, off, *offp, cred, p,
+			    vp, &nmp[0], mirrorcnt, &failpos);
 		else {
 			error = nfsrv_getattrdsrpc(&fh[mirrorcnt - 1], cred, p,
 			    vp, nmp[mirrorcnt - 1], nap);
@@ -5139,7 +5237,7 @@ nfsrv_readdsrpc(fhandle_t *fhp, off_t off, int len, struct ucred *cred,
 	st.other[2] = 0x55555555;
 	st.seqid = 0xffffffff;
 	nfscl_reqstart(nd, NFSPROC_READDS, nmp, (u_int8_t *)fhp, sizeof(*fhp),
-	    NULL, NULL, 0, 0);
+	    NULL, NULL, 0, 0, cred);
 	nfsm_stateidtom(nd, &st, NFSSTATEID_PUTSTATEID);
 	NFSM_BUILD(tl, uint32_t *, NFSX_UNSIGNED * 3);
 	txdr_hyper(off, tl);
@@ -5247,7 +5345,7 @@ nfsrv_writedsdorpc(struct nfsmount *nmp, fhandle_t *fhp, off_t off, int len,
 
 	nd = malloc(sizeof(*nd), M_TEMP, M_WAITOK | M_ZERO);
 	nfscl_reqstart(nd, NFSPROC_WRITE, nmp, (u_int8_t *)fhp,
-	    sizeof(fhandle_t), NULL, NULL, 0, 0);
+	    sizeof(fhandle_t), NULL, NULL, 0, 0, cred);
 
 	/*
 	 * Use a stateid where other is an alternating 01010 pattern and
@@ -5469,7 +5567,7 @@ nfsrv_allocatedsdorpc(struct nfsmount *nmp, fhandle_t *fhp, off_t off,
 
 	nd = malloc(sizeof(*nd), M_TEMP, M_WAITOK | M_ZERO);
 	nfscl_reqstart(nd, NFSPROC_ALLOCATE, nmp, (u_int8_t *)fhp,
-	    sizeof(fhandle_t), NULL, NULL, 0, 0);
+	    sizeof(fhandle_t), NULL, NULL, 0, 0, cred);
 
 	/*
 	 * Use a stateid where other is an alternating 01010 pattern and
@@ -5599,6 +5697,187 @@ nfsrv_allocatedsrpc(fhandle_t *fhp, off_t off, off_t len, struct ucred *cred,
 	return (error);
 }
 
+/*
+ * Do a deallocate RPC on a DS data file, using this structure for the
+ * arguments, so that this function can be executed by a separate kernel
+ * process.
+ */
+struct nfsrvdeallocatedsdorpc {
+	int			done;
+	int			inprog;
+	struct task		tsk;
+	fhandle_t		fh;
+	off_t			off;
+	off_t			len;
+	struct nfsmount		*nmp;
+	struct ucred		*cred;
+	NFSPROC_T		*p;
+	int			err;
+};
+
+static int
+nfsrv_deallocatedsdorpc(struct nfsmount *nmp, fhandle_t *fhp, off_t off,
+    off_t len, struct nfsvattr *nap, struct ucred *cred, NFSPROC_T *p)
+{
+	uint32_t *tl;
+	struct nfsrv_descript *nd;
+	nfsattrbit_t attrbits;
+	nfsv4stateid_t st;
+	int error;
+
+	nd = malloc(sizeof(*nd), M_TEMP, M_WAITOK | M_ZERO);
+	nfscl_reqstart(nd, NFSPROC_DEALLOCATE, nmp, (u_int8_t *)fhp,
+	    sizeof(fhandle_t), NULL, NULL, 0, 0, cred);
+
+	/*
+	 * Use a stateid where other is an alternating 01010 pattern and
+	 * seqid is 0xffffffff.  This value is not defined as special by
+	 * the RFC and is used by the FreeBSD NFS server to indicate an
+	 * MDS->DS proxy operation.
+	 */
+	st.other[0] = 0x55555555;
+	st.other[1] = 0x55555555;
+	st.other[2] = 0x55555555;
+	st.seqid = 0xffffffff;
+	nfsm_stateidtom(nd, &st, NFSSTATEID_PUTSTATEID);
+	NFSM_BUILD(tl, uint32_t *, 2 * NFSX_HYPER + NFSX_UNSIGNED);
+	txdr_hyper(off, tl); tl += 2;
+	txdr_hyper(len, tl); tl += 2;
+	NFSD_DEBUG(4, "nfsrv_deallocatedsdorpc: len=%jd\n", (intmax_t)len);
+
+	/* Do a Getattr for the attributes that change upon writing. */
+	NFSZERO_ATTRBIT(&attrbits);
+	NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_SIZE);
+	NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_CHANGE);
+	NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_TIMEACCESS);
+	NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_TIMEMODIFY);
+	NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_SPACEUSED);
+	*tl = txdr_unsigned(NFSV4OP_GETATTR);
+	nfsrv_putattrbit(nd, &attrbits);
+	error = newnfs_request(nd, nmp, NULL, &nmp->nm_sockreq, NULL, p,
+	    cred, NFS_PROG, NFS_VER4, NULL, 1, NULL, NULL);
+	if (error != 0) {
+		free(nd, M_TEMP);
+		return (error);
+	}
+	NFSD_DEBUG(4, "nfsrv_deallocatedsdorpc: aft deallocaterpc=%d\n",
+	    nd->nd_repstat);
+	/* Get rid of weak cache consistency data for now. */
+	if ((nd->nd_flag & (ND_NOMOREDATA | ND_NFSV4 | ND_V4WCCATTR)) ==
+	    (ND_NFSV4 | ND_V4WCCATTR)) {
+		error = nfsv4_loadattr(nd, NULL, nap, NULL, NULL, 0, NULL, NULL,
+		    NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL);
+		NFSD_DEBUG(4, "nfsrv_deallocatedsdorpc: wcc attr=%d\n", error);
+		if (error != 0)
+			goto nfsmout;
+		/*
+		 * Get rid of Op# and status for next op.
+		 */
+		NFSM_DISSECT(tl, uint32_t *, 2 * NFSX_UNSIGNED);
+		if (*++tl != 0)
+			nd->nd_flag |= ND_NOMOREDATA;
+	}
+	if (nd->nd_repstat == 0) {
+		NFSM_DISSECT(tl, uint32_t *, 2 * NFSX_UNSIGNED);
+		error = nfsv4_loadattr(nd, NULL, nap, NULL, NULL, 0, NULL, NULL,
+		    NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL);
+	} else
+		error = nd->nd_repstat;
+	NFSD_DEBUG(4, "nfsrv_deallocatedsdorpc: aft loadattr=%d\n", error);
+nfsmout:
+	m_freem(nd->nd_mrep);
+	free(nd, M_TEMP);
+	NFSD_DEBUG(4, "nfsrv_deallocatedsdorpc error=%d\n", error);
+	return (error);
+}
+
+/*
+ * Start up the thread that will execute nfsrv_deallocatedsdorpc().
+ */
+static void
+start_deallocatedsdorpc(void *arg, int pending)
+{
+	struct nfsrvdeallocatedsdorpc *drpc;
+
+	drpc = (struct nfsrvdeallocatedsdorpc *)arg;
+	drpc->err = nfsrv_deallocatedsdorpc(drpc->nmp, &drpc->fh, drpc->off,
+	    drpc->len, NULL, drpc->cred, drpc->p);
+	drpc->done = 1;
+	NFSD_DEBUG(4, "start_deallocatedsdorpc: err=%d\n", drpc->err);
+}
+
+static int
+nfsrv_deallocatedsrpc(fhandle_t *fhp, off_t off, off_t len, struct ucred *cred,
+    NFSPROC_T *p, struct vnode *vp, struct nfsmount **nmpp, int mirrorcnt,
+    int *failposp)
+{
+	struct nfsrvdeallocatedsdorpc *drpc, *tdrpc = NULL;
+	struct nfsvattr na;
+	int error, i, ret, timo;
+
+	NFSD_DEBUG(4, "in nfsrv_deallocatedsrpc\n");
+	drpc = NULL;
+	if (mirrorcnt > 1)
+		tdrpc = drpc = malloc(sizeof(*drpc) * (mirrorcnt - 1), M_TEMP,
+		    M_WAITOK);
+
+	/*
+	 * Do the deallocate RPC for every DS, using a separate kernel process
+	 * for every DS except the last one.
+	 */
+	error = 0;
+	for (i = 0; i < mirrorcnt - 1; i++, tdrpc++) {
+		tdrpc->done = 0;
+		NFSBCOPY(fhp, &tdrpc->fh, sizeof(*fhp));
+		tdrpc->off = off;
+		tdrpc->len = len;
+		tdrpc->nmp = *nmpp;
+		tdrpc->cred = cred;
+		tdrpc->p = p;
+		tdrpc->inprog = 0;
+		tdrpc->err = 0;
+		ret = EIO;
+		if (nfs_pnfsiothreads != 0) {
+			ret = nfs_pnfsio(start_deallocatedsdorpc, tdrpc);
+			NFSD_DEBUG(4, "nfsrv_deallocatedsrpc: nfs_pnfsio=%d\n",
+			    ret);
+		}
+		if (ret != 0) {
+			ret = nfsrv_deallocatedsdorpc(*nmpp, fhp, off, len,
+			    NULL, cred, p);
+			if (nfsds_failerr(ret) && *failposp == -1)
+				*failposp = i;
+			else if (error == 0 && ret != 0)
+				error = ret;
+		}
+		nmpp++;
+		fhp++;
+	}
+	ret = nfsrv_deallocatedsdorpc(*nmpp, fhp, off, len, &na, cred, p);
+	if (nfsds_failerr(ret) && *failposp == -1 && mirrorcnt > 1)
+		*failposp = mirrorcnt - 1;
+	else if (error == 0 && ret != 0)
+		error = ret;
+	if (error == 0)
+		error = nfsrv_setextattr(vp, &na, p);
+	NFSD_DEBUG(4, "nfsrv_deallocatedsrpc: aft setextat=%d\n", error);
+	tdrpc = drpc;
+	timo = hz / 50;		/* Wait for 20msec. */
+	if (timo < 1)
+		timo = 1;
+	for (i = 0; i < mirrorcnt - 1; i++, tdrpc++) {
+		/* Wait for RPCs on separate threads to complete. */
+		while (tdrpc->inprog != 0 && tdrpc->done == 0)
+			tsleep(&tdrpc->tsk, PVFS, "srvalds", timo);
+		if (nfsds_failerr(tdrpc->err) && *failposp == -1)
+			*failposp = i;
+		else if (error == 0 && tdrpc->err != 0)
+			error = tdrpc->err;
+	}
+	free(drpc, M_TEMP);
+	return (error);
+}
+
 static int
 nfsrv_setattrdsdorpc(fhandle_t *fhp, struct ucred *cred, NFSPROC_T *p,
     struct vnode *vp, struct nfsmount *nmp, struct nfsvattr *nap,
@@ -5623,7 +5902,7 @@ nfsrv_setattrdsdorpc(fhandle_t *fhp, struct ucred *cred, NFSPROC_T *p,
 	st.other[2] = 0x55555555;
 	st.seqid = 0xffffffff;
 	nfscl_reqstart(nd, NFSPROC_SETATTR, nmp, (u_int8_t *)fhp, sizeof(*fhp),
-	    NULL, NULL, 0, 0);
+	    NULL, NULL, 0, 0, cred);
 	nfsm_stateidtom(nd, &st, NFSSTATEID_PUTSTATEID);
 	nfscl_fillsattr(nd, &nap->na_vattr, vp, NFSSATTR_FULL, 0);
 
@@ -5808,7 +6087,7 @@ nfsrv_setacldsdorpc(fhandle_t *fhp, struct ucred *cred, NFSPROC_T *p,
 	st.other[2] = 0x55555555;
 	st.seqid = 0xffffffff;
 	nfscl_reqstart(nd, NFSPROC_SETACL, nmp, (u_int8_t *)fhp, sizeof(*fhp),
-	    NULL, NULL, 0, 0);
+	    NULL, NULL, 0, 0, cred);
 	nfsm_stateidtom(nd, &st, NFSSTATEID_PUTSTATEID);
 	NFSZERO_ATTRBIT(&attrbits);
 	NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_ACL);
@@ -5943,7 +6222,7 @@ nfsrv_getattrdsrpc(fhandle_t *fhp, struct ucred *cred, NFSPROC_T *p,
 	NFSD_DEBUG(4, "in nfsrv_getattrdsrpc\n");
 	nd = malloc(sizeof(*nd), M_TEMP, M_WAITOK | M_ZERO);
 	nfscl_reqstart(nd, NFSPROC_GETATTR, nmp, (u_int8_t *)fhp,
-	    sizeof(fhandle_t), NULL, NULL, 0, 0);
+	    sizeof(fhandle_t), NULL, NULL, 0, 0, cred);
 	NFSZERO_ATTRBIT(&attrbits);
 	NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_SIZE);
 	NFSSETBIT_ATTRBIT(&attrbits, NFSATTRBIT_CHANGE);
@@ -6011,7 +6290,7 @@ nfsrv_seekdsrpc(fhandle_t *fhp, off_t *offp, int content, bool *eofp,
 	st.seqid = 0xffffffff;
 	nd = malloc(sizeof(*nd), M_TEMP, M_WAITOK | M_ZERO);
 	nfscl_reqstart(nd, NFSPROC_SEEKDS, nmp, (u_int8_t *)fhp,
-	    sizeof(fhandle_t), NULL, NULL, 0, 0);
+	    sizeof(fhandle_t), NULL, NULL, 0, 0, cred);
 	nfsm_stateidtom(nd, &st, NFSSTATEID_PUTSTATEID);
 	NFSM_BUILD(tl, uint32_t *, NFSX_HYPER + NFSX_UNSIGNED);
 	txdr_hyper(*offp, tl); tl += 2;
@@ -6075,7 +6354,6 @@ nfsrv_pnfslookupds(struct vnode *vp, struct vnode *dvp, struct pnfsdsfile *pf,
 	named.ni_cnd.cn_nameiop = LOOKUP;
 	named.ni_cnd.cn_lkflags = LK_SHARED | LK_RETRY;
 	named.ni_cnd.cn_cred = tcred;
-	named.ni_cnd.cn_thread = p;
 	named.ni_cnd.cn_flags = ISLASTCN | LOCKPARENT | LOCKLEAF | SAVENAME;
 	nfsvno_setpathbuf(&named, &bufp, &hashp);
 	named.ni_cnd.cn_nameptr = bufp;
@@ -6319,7 +6597,8 @@ int
 nfsvno_allocate(struct vnode *vp, off_t off, off_t len, struct ucred *cred,
     NFSPROC_T *p)
 {
-	int error, trycnt;
+	int error;
+	off_t olen;
 
 	ASSERT_VOP_ELOCKED(vp, "nfsvno_allocate vp");
 	/*
@@ -6330,15 +6609,53 @@ nfsvno_allocate(struct vnode *vp, off_t off, off_t len, struct ucred *cred,
 	    NULL, NULL, NULL, NULL, &len, 0, NULL);
 	if (error != ENOENT)
 		return (error);
-	error = 0;
 
 	/*
-	 * Do the actual VOP_ALLOCATE(), looping a reasonable number of
-	 * times to achieve completion.
+	 * Do the actual VOP_ALLOCATE(), looping so long as
+	 * progress is being made, to achieve completion.
 	 */
-	trycnt = 0;
-	while (error == 0 && len > 0 && trycnt++ < 20)
-		error = VOP_ALLOCATE(vp, &off, &len);
+	do {
+		olen = len;
+		error = VOP_ALLOCATE(vp, &off, &len, IO_SYNC, cred);
+		if (error == 0 && len > 0 && olen > len)
+			maybe_yield();
+	} while (error == 0 && len > 0 && olen > len);
+	if (error == 0 && len > 0)
+		error = NFSERR_IO;
+	NFSEXITCODE(error);
+	return (error);
+}
+
+/*
+ * Deallocate vnode op call.
+ */
+int
+nfsvno_deallocate(struct vnode *vp, off_t off, off_t len, struct ucred *cred,
+    NFSPROC_T *p)
+{
+	int error;
+	off_t olen;
+
+	ASSERT_VOP_ELOCKED(vp, "nfsvno_deallocate vp");
+	/*
+	 * Attempt to deallocate on a DS file. A return of ENOENT implies
+	 * there is no DS file to deallocate on.
+	 */
+	error = nfsrv_proxyds(vp, off, 0, cred, p, NFSPROC_DEALLOCATE, NULL,
+	    NULL, NULL, NULL, NULL, &len, 0, NULL);
+	if (error != ENOENT)
+		return (error);
+
+	/*
+	 * Do the actual VOP_DEALLOCATE(), looping so long as
+	 * progress is being made, to achieve completion.
+	 */
+	do {
+		olen = len;
+		error = VOP_DEALLOCATE(vp, &off, &len, 0, IO_SYNC, cred);
+		if (error == 0 && len > 0 && olen > len)
+			maybe_yield();
+	} while (error == 0 && len > 0 && olen > len);
 	if (error == 0 && len > 0)
 		error = NFSERR_IO;
 	NFSEXITCODE(error);
@@ -6618,6 +6935,87 @@ nfsm_trimtrailing(struct nfsrv_descript *nd, struct mbuf *mb, char *bpos,
 	nd->nd_bpos = bpos;
 }
 
+
+/*
+ * Check to see if a put file handle operation should test for
+ * NFSERR_WRONGSEC, although NFSv3 actually returns NFSERR_AUTHERR.
+ * When Open is the next operation, NFSERR_WRONGSEC cannot be
+ * replied for the Open cases that use a component.  This can
+ * be identified by the fact that the file handle's type is VDIR.
+ */
+bool
+nfsrv_checkwrongsec(struct nfsrv_descript *nd, int nextop, enum vtype vtyp)
+{
+
+	if ((nd->nd_flag & ND_NFSV4) == 0)
+		return (true);
+
+	if ((nd->nd_flag & ND_LASTOP) != 0)
+		return (false);
+
+	if (nextop == NFSV4OP_PUTROOTFH || nextop == NFSV4OP_PUTFH ||
+	    nextop == NFSV4OP_PUTPUBFH || nextop == NFSV4OP_RESTOREFH ||
+	    nextop == NFSV4OP_LOOKUP || nextop == NFSV4OP_LOOKUPP ||
+	    nextop == NFSV4OP_SECINFO || nextop == NFSV4OP_SECINFONONAME)
+		return (false);
+	if (nextop == NFSV4OP_OPEN && vtyp == VDIR)
+		return (false);
+	return (true);
+}
+
+/*
+ * Check DSs marked no space.
+ */
+void
+nfsrv_checknospc(void)
+{
+	struct statfs *tsf;
+	struct nfsdevice *ds;
+	struct vnode **dvpp, **tdvpp, *dvp;
+	char *devid, *tdevid;
+	int cnt, error = 0, i;
+
+	if (nfsrv_devidcnt <= 0)
+		return;
+	dvpp = mallocarray(nfsrv_devidcnt, sizeof(*dvpp), M_TEMP, M_WAITOK);
+	devid = malloc(nfsrv_devidcnt * NFSX_V4DEVICEID, M_TEMP, M_WAITOK);
+	tsf = malloc(sizeof(*tsf), M_TEMP, M_WAITOK);
+
+	/* Get an array of the dvps for the DSs. */
+	tdvpp = dvpp;
+	tdevid = devid;
+	i = 0;
+	NFSDDSLOCK();
+	/* First, search for matches for same file system. */
+	TAILQ_FOREACH(ds, &nfsrv_devidhead, nfsdev_list) {
+		if (ds->nfsdev_nmp != NULL && ds->nfsdev_nospc) {
+			if (++i > nfsrv_devidcnt)
+				break;
+			*tdvpp++ = ds->nfsdev_dvp;
+			NFSBCOPY(ds->nfsdev_deviceid, tdevid, NFSX_V4DEVICEID);
+			tdevid += NFSX_V4DEVICEID;
+		}
+	}
+	NFSDDSUNLOCK();
+
+	/* Do a VFS_STATFS() for each of the DSs and clear no space. */
+	cnt = i;
+	tdvpp = dvpp;
+	tdevid = devid;
+	for (i = 0; i < cnt && error == 0; i++) {
+		dvp = *tdvpp++;
+		error = VFS_STATFS(dvp->v_mount, tsf);
+		if (error == 0 && tsf->f_bavail > 0) {
+			NFSD_DEBUG(1, "nfsrv_checknospc: reset nospc\n");
+			nfsrv_marknospc(tdevid, false);
+		}
+		tdevid += NFSX_V4DEVICEID;
+	}
+	free(tsf, M_TEMP);
+	free(dvpp, M_TEMP);
+	free(devid, M_TEMP);
+}
+
 extern int (*nfsd_call_nfsd)(struct thread *, struct nfssvc_args *);
 
 /*
@@ -6646,6 +7044,7 @@ nfsd_modevent(module_t mod, int type, void *data)
 		mtx_init(&nfsrv_dontlistlock_mtx, "nfs4dnl", NULL, MTX_DEF);
 		mtx_init(&nfsrv_recalllock_mtx, "nfs4rec", NULL, MTX_DEF);
 		lockinit(&nfsv4root_mnt.mnt_explock, PVFS, "explock", 0, 0);
+		callout_init(&nfsd_callout, 1);
 		nfsrvd_initcache();
 		nfsd_init();
 		NFSD_LOCK();
@@ -6656,7 +7055,6 @@ nfsd_modevent(module_t mod, int type, void *data)
 		vn_deleg_ops.vndeleg_recall = nfsd_recalldelegation;
 		vn_deleg_ops.vndeleg_disable = nfsd_disabledelegation;
 #endif
-		nfsd_call_servertimer = nfsrv_servertimer;
 		nfsd_call_nfsd = nfssvc_nfsd;
 		loaded = 1;
 		break;
@@ -6671,8 +7069,8 @@ nfsd_modevent(module_t mod, int type, void *data)
 		vn_deleg_ops.vndeleg_recall = NULL;
 		vn_deleg_ops.vndeleg_disable = NULL;
 #endif
-		nfsd_call_servertimer = NULL;
 		nfsd_call_nfsd = NULL;
+		callout_drain(&nfsd_callout);
 
 		/* Clean out all NFSv4 state. */
 		nfsrv_throwawayallstate(curthread);

@@ -14,7 +14,6 @@
 #ifndef LLVM_SUPPORT_ARMTARGETPARSER_H
 #define LLVM_SUPPORT_ARMTARGETPARSER_H
 
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ARMBuildAttributes.h"
 #include <vector>
@@ -59,7 +58,7 @@ enum ArchExtKind : uint64_t {
   AEK_CDECP5 =      1 << 27,
   AEK_CDECP6 =      1 << 28,
   AEK_CDECP7 =      1 << 29,
-
+  AEK_PACBTI =      1 << 30,
   // Unsupported extensions.
   AEK_OS       =    1ULL << 59,
   AEK_IWMMXT   =    1ULL << 60,
@@ -250,8 +249,8 @@ StringRef getSubArch(ArchKind AK);
 StringRef getArchExtName(uint64_t ArchExtKind);
 StringRef getArchExtFeature(StringRef ArchExt);
 bool appendArchExtFeatures(StringRef CPU, ARM::ArchKind AK, StringRef ArchExt,
-                           std::vector<StringRef> &Features);
-StringRef getHWDivName(uint64_t HWDivKind);
+                           std::vector<StringRef> &Features,
+                           unsigned &ArgFPUKind);
 
 // Information by Name
 unsigned getDefaultFPU(StringRef CPU, ArchKind AK);

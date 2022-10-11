@@ -137,7 +137,7 @@ dbuf_stats_hash_table_data(char *buf, size_t size, void *data)
 	if (size)
 		buf[0] = 0;
 
-	mutex_enter(DBUF_HASH_MUTEX(h, dsh->idx));
+	rw_enter(DBUF_HASH_RWLOCK(h, dsh->idx), RW_READER);
 	for (db = h->hash_table[dsh->idx]; db != NULL; db = db->db_hash_next) {
 		/*
 		 * Returning ENOMEM will cause the data and header functions
@@ -158,7 +158,7 @@ dbuf_stats_hash_table_data(char *buf, size_t size, void *data)
 
 		mutex_exit(&db->db_mtx);
 	}
-	mutex_exit(DBUF_HASH_MUTEX(h, dsh->idx));
+	rw_exit(DBUF_HASH_RWLOCK(h, dsh->idx));
 
 	return (error);
 }
@@ -226,7 +226,5 @@ dbuf_stats_destroy(void)
 	dbuf_stats_hash_table_destroy();
 }
 
-/* BEGIN CSTYLED */
 ZFS_MODULE_PARAM(zfs, zfs_, dbuf_state_index, INT, ZMOD_RW,
 	"Calculate arc header index");
-/* END CSTYLED */

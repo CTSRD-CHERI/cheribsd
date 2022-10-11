@@ -69,8 +69,6 @@ static	disk_close_t	aac_disk_close;
 static	disk_strategy_t	aac_disk_strategy;
 static	dumper_t	aac_disk_dump;
 
-static devclass_t	aac_disk_devclass;
-
 static device_method_t aac_disk_methods[] = {
 	DEVMETHOD(device_probe,	aac_disk_probe),
 	DEVMETHOD(device_attach,	aac_disk_attach),
@@ -84,7 +82,7 @@ static driver_t aac_disk_driver = {
 	sizeof(struct aac_disk)
 };
 
-DRIVER_MODULE(aacd, aac, aac_disk_driver, aac_disk_devclass, NULL, NULL);
+DRIVER_MODULE(aacd, aac, aac_disk_driver, NULL, NULL);
 
 /*
  * Handle open from generic layer.
@@ -234,7 +232,7 @@ aac_dump_map_sg64(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
  * Send out one command at a time with up to maxio of data.
  */
 static int
-aac_disk_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t length)
+aac_disk_dump(void *arg, void *virtual, off_t offset, size_t length)
 {
 	struct aac_disk *ad;
 	struct aac_softc *sc;
@@ -313,8 +311,8 @@ aac_disk_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size
 
 		if (aac_sync_fib(sc, command, 0, fib, size)) {
 			device_printf(sc->aac_dev,
-			     "Error dumping block 0x%jx\n",
-			     (uintmax_t)physical);
+			     "Error dumping block to 0x%jx\n",
+			     (uintmax_t)offset);
 			return (EIO);
 		}
 

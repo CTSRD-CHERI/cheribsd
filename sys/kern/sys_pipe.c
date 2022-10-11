@@ -415,6 +415,7 @@ fail:
 #ifdef MAC
 	mac_pipe_destroy(pp);
 #endif
+	uma_zfree(pipe_zone, pp);
 	return (error);
 }
 
@@ -658,8 +659,8 @@ pipelock(struct pipe *cpipe, int catch)
 		    ("%s: bad waiter count %d", __func__,
 		    cpipe->pipe_waiters));
 		cpipe->pipe_waiters++;
-		error = msleep(cpipe, PIPE_MTX(cpipe),
-		    prio, "pipelk", 0);
+		error = msleep(&cpipe->pipe_waiters, PIPE_MTX(cpipe), prio,
+		    "pipelk", 0);
 		cpipe->pipe_waiters--;
 		if (error != 0)
 			return (error);
@@ -682,9 +683,8 @@ pipeunlock(struct pipe *cpipe)
 	    ("%s: bad waiter count %d", __func__,
 	    cpipe->pipe_waiters));
 	cpipe->pipe_state &= ~PIPE_LOCKFL;
-	if (cpipe->pipe_waiters > 0) {
-		wakeup_one(cpipe);
-	}
+	if (cpipe->pipe_waiters > 0)
+		wakeup_one(&cpipe->pipe_waiters);
 }
 
 void
@@ -1520,8 +1520,7 @@ locked_error:
  * be a natural race.
  */
 static int
-pipe_stat(struct file *fp, struct stat *ub, struct ucred *active_cred,
-    struct thread *td)
+pipe_stat(struct file *fp, struct stat *ub, struct ucred *active_cred)
 {
 	struct pipe *pipe;
 #ifdef MAC
@@ -1542,7 +1541,7 @@ pipe_stat(struct file *fp, struct stat *ub, struct ucred *active_cred,
 
 	/* For named pipes ask the underlying filesystem. */
 	if (pipe->pipe_type & PIPE_TYPE_NAMED) {
-		return (vnops.fo_stat(fp, ub, active_cred, td));
+		return (vnops.fo_stat(fp, ub, active_cred));
 	}
 
 	bzero(ub, sizeof(*ub));
@@ -1620,6 +1619,9 @@ pipe_fill_kinfo(struct file *fp, struct kinfo_file *kif, struct filedesc *fdp)
 	kif->kf_un.kf_pipe.kf_pipe_addr = (uintptr_t)pi;
 	kif->kf_un.kf_pipe.kf_pipe_peer = (uintptr_t)pi->pipe_peer;
 	kif->kf_un.kf_pipe.kf_pipe_buffer_cnt = pi->pipe_buffer.cnt;
+	kif->kf_un.kf_pipe.kf_pipe_buffer_in = pi->pipe_buffer.in;
+	kif->kf_un.kf_pipe.kf_pipe_buffer_out = pi->pipe_buffer.out;
+	kif->kf_un.kf_pipe.kf_pipe_buffer_size = pi->pipe_buffer.size;
 	return (0);
 }
 
@@ -1652,14 +1654,18 @@ pipe_free_kmem(struct pipe *cpipe)
 static void
 pipeclose(struct pipe *cpipe)
 {
+#ifdef MAC
 	struct pipepair *pp;
+#endif
 	struct pipe *ppipe;
 
 	KASSERT(cpipe != NULL, ("pipeclose: cpipe == NULL"));
 
 	PIPE_LOCK(cpipe);
 	pipelock(cpipe, 0);
+#ifdef MAC
 	pp = cpipe->pipe_pair;
+#endif
 
 	/*
 	 * If the other side is blocked, wake it up saying that
@@ -1757,6 +1763,10 @@ pipe_kqfilter(struct file *fp, struct knote *kn)
 		cpipe = PIPE_PEER(cpipe);
 		break;
 	default:
+		if ((cpipe->pipe_type & PIPE_TYPE_NAMED) != 0) {
+			PIPE_UNLOCK(cpipe);
+			return (vnops.fo_kqfilter(fp, kn));
+		}
 		PIPE_UNLOCK(cpipe);
 		return (EINVAL);
 	}

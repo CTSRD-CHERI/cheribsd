@@ -40,6 +40,7 @@ XRayArgs::XRayArgs(const ToolChain &TC, const ArgList &Args) {
     case llvm::Triple::x86_64:
     case llvm::Triple::arm:
     case llvm::Triple::aarch64:
+    case llvm::Triple::hexagon:
     case llvm::Triple::ppc64le:
     case llvm::Triple::mips:
     case llvm::Triple::mipsel:
@@ -186,6 +187,21 @@ XRayArgs::XRayArgs(const ToolChain &TC, const ArgList &Args) {
           Modes.push_back(std::string(M));
     }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_fxray_function_groups)) {
+    StringRef S = A->getValue();
+    if (S.getAsInteger(0, XRayFunctionGroups) || XRayFunctionGroups < 1)
+      D.Diag(clang::diag::err_drv_invalid_value) << A->getAsString(Args) << S;
+  }
+
+  if (const Arg *A =
+          Args.getLastArg(options::OPT_fxray_selected_function_group)) {
+    StringRef S = A->getValue();
+    if (S.getAsInteger(0, XRaySelectedFunctionGroup) ||
+        XRaySelectedFunctionGroup < 0 ||
+        XRaySelectedFunctionGroup >= XRayFunctionGroups)
+      D.Diag(clang::diag::err_drv_invalid_value) << A->getAsString(Args) << S;
+  }
+
   // Then we want to sort and unique the modes we've collected.
   llvm::sort(Modes);
   Modes.erase(std::unique(Modes.begin(), Modes.end()), Modes.end());
@@ -209,6 +225,17 @@ void XRayArgs::addArgs(const ToolChain &TC, const ArgList &Args,
 
   if (!XRayFunctionIndex)
     CmdArgs.push_back("-fno-xray-function-index");
+
+  if (XRayFunctionGroups > 1) {
+    CmdArgs.push_back(Args.MakeArgString(Twine("-fxray-function-groups=") +
+                                         Twine(XRayFunctionGroups)));
+  }
+
+  if (XRaySelectedFunctionGroup != 0) {
+    CmdArgs.push_back(
+        Args.MakeArgString(Twine("-fxray-selected-function-group=") +
+                           Twine(XRaySelectedFunctionGroup)));
+  }
 
   CmdArgs.push_back(Args.MakeArgString(Twine(XRayInstructionThresholdOption) +
                                        Twine(InstructionThreshold)));

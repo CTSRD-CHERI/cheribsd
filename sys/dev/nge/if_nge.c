@@ -240,10 +240,8 @@ static driver_t nge_driver = {
 	sizeof(struct nge_softc)
 };
 
-static devclass_t nge_devclass;
-
-DRIVER_MODULE(nge, pci, nge_driver, nge_devclass, 0, 0);
-DRIVER_MODULE(miibus, nge, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(nge, pci, nge_driver, 0, 0);
+DRIVER_MODULE(miibus, nge, miibus_driver, 0, 0);
 
 #define NGE_SETBIT(sc, reg, x)				\
 	CSR_WRITE_4(sc, reg,				\
@@ -1950,7 +1948,7 @@ nge_encap(struct nge_softc *sc, struct mbuf **m_head)
 	if ((m->m_flags & M_VLANTAG) != 0)
 		desc->nge_extsts |= htole32(NGE_TXEXTSTS_VLANPKT |
 		    bswap16(m->m_pkthdr.ether_vtag));
-	/* Set EOP on the last desciptor. */
+	/* Set EOP on the last descriptor. */
 	desc->nge_cmdsts &= htole32(~NGE_CMDSTS_MORE);
 
 	/* Set checksum offload in the first descriptor. */

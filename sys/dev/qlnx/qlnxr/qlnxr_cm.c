@@ -98,7 +98,6 @@ qlnxr_ll2_complete_rx_packet(void *cxt,
 	// struct qlnxr_qp *qp = dev->gsi_qp;
 	struct qlnxr_qp *qp = NULL;
 	unsigned long flags;
-	uint32_t qp_num = 0;
 	// uint32_t delay_count = 0, gsi_cons = 0;
 	//void * dest_va;
 
@@ -111,8 +110,6 @@ qlnxr_ll2_complete_rx_packet(void *cxt,
 	if (data->cookie == NULL) {
 		QL_DPRINT12(dev->ha, "cookie is NULL, bad sign\n");
 	}
-
-	qp_num = (0xFF << 16) | data->qp_id;
 
 	if (data->qp_id == 1) {
 		qp = dev->gsi_qp;
@@ -485,7 +482,7 @@ qlnxr_get_vlan_id_gsi(struct ib_ah_attr *ah_attr, u16 *vlan_id)
 static inline int
 qlnxr_gsi_build_header(struct qlnxr_dev *dev,
 		struct qlnxr_qp *qp,
-		struct ib_send_wr *swr,
+		const struct ib_send_wr *swr,
 		struct ib_ud_header *udh,
 		int *roce_mode)
 {
@@ -625,7 +622,7 @@ qlnxr_gsi_build_header(struct qlnxr_dev *dev,
 
 static inline int
 qlnxr_gsi_build_packet(struct qlnxr_dev *dev,
-	struct qlnxr_qp *qp, struct ib_send_wr *swr,
+	struct qlnxr_qp *qp, const struct ib_send_wr *swr,
 	struct ecore_roce_ll2_packet **p_packet)
 {
 	u8 ud_header_buffer[QLNXR_MAX_UD_HEADER_SIZE];
@@ -690,8 +687,8 @@ qlnxr_gsi_build_packet(struct qlnxr_dev *dev,
 
 int
 qlnxr_gsi_post_send(struct ib_qp *ibqp,
-		struct ib_send_wr *wr,
-		struct ib_send_wr **bad_wr)
+		const struct ib_send_wr *wr,
+		const struct ib_send_wr **bad_wr)
 {
 	struct ecore_roce_ll2_packet *pkt = NULL;
 	struct qlnxr_qp *qp = get_qlnxr_qp(ibqp);
@@ -764,8 +761,8 @@ err:
 #define	QLNXR_LL2_RX_BUFFER_SIZE	(4 * 1024)
 int
 qlnxr_gsi_post_recv(struct ib_qp *ibqp,
-		struct ib_recv_wr *wr,
-		struct ib_recv_wr **bad_wr)
+		const struct ib_recv_wr *wr,
+		const struct ib_recv_wr **bad_wr)
 {
 	struct qlnxr_dev *dev = get_qlnxr_dev((ibqp->device));
 	struct qlnxr_qp *qp = get_qlnxr_qp(ibqp);

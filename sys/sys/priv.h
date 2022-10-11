@@ -192,6 +192,7 @@
 #define	PRIV_SCHED_SETPARAM	205	/* Can set thread scheduler params. */
 #define	PRIV_SCHED_CPUSET	206	/* Can manipulate cpusets. */
 #define	PRIV_SCHED_CPUSET_INTR	207	/* Can adjust IRQ to CPU binding. */
+#define	PRIV_SCHED_IDPRIO	208	/* Can set idle time scheduling. */
 
 /*
  * POSIX semaphore privileges.
@@ -347,6 +348,7 @@
 #define	PRIV_NET_VXLAN		420	/* Administer vxlan. */
 #define	PRIV_NET_SETLANPCP	421	/* Set LAN priority. */
 #define	PRIV_NET_SETVLANPCP	PRIV_NET_SETLANPCP /* Alias Set VLAN priority */
+#define	PRIV_NET_OVPN		422	/* Administer OpenVPN DCO. */
 
 /*
  * 802.11-related privileges.

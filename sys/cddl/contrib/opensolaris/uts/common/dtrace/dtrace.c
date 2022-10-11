@@ -208,6 +208,7 @@ hrtime_t	dtrace_deadman_user = (hrtime_t)30 * NANOSEC;
 hrtime_t	dtrace_unregister_defunct_reap = (hrtime_t)60 * NANOSEC;
 #ifndef illumos
 int		dtrace_memstr_max = 4096;
+int		dtrace_bufsize_max_frac = 128;
 #endif
 
 /*
@@ -5664,7 +5665,10 @@ dtrace_dif_subr(uint_t subr, uint_t rd, uint64_t *regs,
 		}
 		fdp = curproc->p_fd;
 		FILEDESC_SLOCK(fdp);
-		fp = fget_locked(fdp, fd);
+		/*
+		 * XXXMJG this looks broken as no ref is taken.
+		 */
+		fp = fget_noref(fdp, fd);
 		mstate->dtms_getf = fp;
 		regs[rd] = (uintptr_t)fp;
 		FILEDESC_SUNLOCK(fdp);
@@ -7335,7 +7339,7 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 	volatile uint16_t *flags;
 	hrtime_t now;
 
-	if (panicstr != NULL)
+	if (KERNEL_PANICKED())
 		return;
 
 #ifdef illumos
@@ -7366,7 +7370,7 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 #ifdef illumos
 	if (panic_quiesce) {
 #else
-	if (panicstr != NULL) {
+	if (KERNEL_PANICKED()) {
 #endif
 		/*
 		 * We don't trace anything if we're panicking.
@@ -10015,6 +10019,9 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 			}
 
 			if (subr == DIF_SUBR_GETF) {
+#ifdef __FreeBSD__
+				err += efunc(pc, "getf() not supported");
+#else
 				/*
 				 * If we have a getf() we need to record that
 				 * in our state.  Note that our state can be
@@ -10025,6 +10032,7 @@ dtrace_difo_validate(dtrace_difo_t *dp, dtrace_vstate_t *vstate, uint_t nregs,
 				 */
 				if (vstate->dtvs_state != NULL)
 					vstate->dtvs_state->dts_getf++;
+#endif
 			}
 
 			break;
@@ -12202,7 +12210,8 @@ err:
 	 * ask to malloc, so let's place a limit here before trying
 	 * to do something that might well end in tears at bedtime.
 	 */
-	if (size > physmem * PAGE_SIZE / (128 * (mp_maxid + 1)))
+	int bufsize_percpu_frac = dtrace_bufsize_max_frac * mp_ncpus;
+	if (size > physmem * PAGE_SIZE / bufsize_percpu_frac)
 		return (ENOMEM);
 #endif
 
@@ -14866,7 +14875,7 @@ static int
 dtrace_state_buffer(dtrace_state_t *state, dtrace_buffer_t *buf, int which)
 {
 	dtrace_optval_t *opt = state->dts_options, size;
-	processorid_t cpu = 0;;
+	processorid_t cpu = 0;
 	int flags = 0, rval, factor, divisor = 1;
 
 	ASSERT(MUTEX_HELD(&dtrace_lock));
@@ -17043,7 +17052,7 @@ dtrace_toxrange_add(uintptr_t base, uintptr_t limit)
 }
 
 static void
-dtrace_getf_barrier()
+dtrace_getf_barrier(void)
 {
 #ifdef illumos
 	/*
@@ -17142,7 +17151,7 @@ dtrace_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	    offsetof(dtrace_probe_t, dtpr_prevname));
 
 	if (dtrace_retain_max < 1) {
-		cmn_err(CE_WARN, "illegal value (%lu) for dtrace_retain_max; "
+		cmn_err(CE_WARN, "illegal value (%zu) for dtrace_retain_max; "
 		    "setting to 1", dtrace_retain_max);
 		dtrace_retain_max = 1;
 	}

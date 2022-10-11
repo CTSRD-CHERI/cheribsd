@@ -97,7 +97,7 @@ static int	vtpci_legacy_reinit(device_t, uint64_t);
 static void	vtpci_legacy_reinit_complete(device_t);
 static void	vtpci_legacy_notify_vq(device_t, uint16_t, bus_size_t);
 static void	vtpci_legacy_read_dev_config(device_t, bus_size_t, void *, int);
-static void	vtpci_legacy_write_dev_config(device_t, bus_size_t, void *, int);
+static void	vtpci_legacy_write_dev_config(device_t, bus_size_t, const void *, int);
 
 static bool	vtpci_legacy_setup_msix(struct vtpci_legacy_softc *sc);
 static void	vtpci_legacy_teardown_msix(struct vtpci_legacy_softc *sc);
@@ -154,7 +154,7 @@ static device_method_t vtpci_legacy_methods[] = {
 	/* Bus interface. */
 	DEVMETHOD(bus_driver_added,		  vtpci_legacy_driver_added),
 	DEVMETHOD(bus_child_detached,		  vtpci_legacy_child_detached),
-	DEVMETHOD(bus_child_pnpinfo_str,	  virtio_child_pnpinfo_str),
+	DEVMETHOD(bus_child_pnpinfo,		  virtio_child_pnpinfo),
 	DEVMETHOD(bus_read_ivar,		  vtpci_legacy_read_ivar),
 	DEVMETHOD(bus_write_ivar,		  vtpci_legacy_write_ivar),
 
@@ -188,10 +188,7 @@ static driver_t vtpci_legacy_driver = {
 	.size = sizeof(struct vtpci_legacy_softc)
 };
 
-devclass_t vtpci_legacy_devclass;
-
-DRIVER_MODULE(virtio_pci_legacy, pci, vtpci_legacy_driver,
-    vtpci_legacy_devclass, 0, 0);
+DRIVER_MODULE(virtio_pci_legacy, pci, vtpci_legacy_driver, 0, 0);
 
 static int
 vtpci_legacy_probe(device_t dev)
@@ -506,48 +503,32 @@ vtpci_legacy_read_dev_config(device_t dev, bus_size_t offset,
 	struct vtpci_legacy_softc *sc;
 	bus_size_t off;
 	uint8_t *d;
-	int size;
+	int i;
 
 	sc = device_get_softc(dev);
 	off = VIRTIO_PCI_LEGACY_CONFIG(sc) + offset;
 
-	for (d = dst; length > 0; d += size, off += size, length -= size) {
-		if (length >= 4) {
-			size = 4;
-			*(uint32_t *)d = vtpci_legacy_read_config_4(sc, off);
-		} else if (length >= 2) {
-			size = 2;
-			*(uint16_t *)d = vtpci_legacy_read_config_2(sc, off);
-		} else {
-			size = 1;
-			*d = vtpci_legacy_read_config_1(sc, off);
-		}
+	d = dst;
+	for (i = 0; i < length; i++) {
+		d[i] = vtpci_legacy_read_config_1(sc, off + i);
 	}
 }
 
 static void
 vtpci_legacy_write_dev_config(device_t dev, bus_size_t offset,
-    void *src, int length)
+    const void *src, int length)
 {
 	struct vtpci_legacy_softc *sc;
 	bus_size_t off;
-	uint8_t *s;
-	int size;
+	const uint8_t *s;
+	int i;
 
 	sc = device_get_softc(dev);
 	off = VIRTIO_PCI_LEGACY_CONFIG(sc) + offset;
 
-	for (s = src; length > 0; s += size, off += size, length -= size) {
-		if (length >= 4) {
-			size = 4;
-			vtpci_legacy_write_config_4(sc, off, *(uint32_t *)s);
-		} else if (length >= 2) {
-			size = 2;
-			vtpci_legacy_write_config_2(sc, off, *(uint16_t *)s);
-		} else {
-			size = 1;
-			vtpci_legacy_write_config_1(sc, off, *s);
-		}
+	s = src;
+	for (i = 0; i < length; i++) {
+		vtpci_legacy_write_config_1(sc, off + i, s[i]);
 	}
 }
 
@@ -670,10 +651,7 @@ static int
 vtpci_legacy_register_msix(struct vtpci_legacy_softc *sc, int offset,
     struct vtpci_interrupt *intr)
 {
-	device_t dev;
 	uint16_t vector;
-
-	dev = sc->vtpci_dev;
 
 	if (intr != NULL) {
 		/* Map from guest rid to host vector. */

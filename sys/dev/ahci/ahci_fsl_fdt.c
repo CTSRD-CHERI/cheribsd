@@ -406,7 +406,7 @@ static const device_method_t ahci_fsl_fdt_methods[] = {
 	DEVMETHOD(bus_setup_intr,   		ahci_setup_intr),
 	DEVMETHOD(bus_teardown_intr,		ahci_teardown_intr),
 	DEVMETHOD(bus_print_child,		ahci_print_child),
-	DEVMETHOD(bus_child_location_str,	ahci_child_location_str),
+	DEVMETHOD(bus_child_location,		ahci_child_location),
 	DEVMETHOD(bus_get_dma_tag,  		ahci_get_dma_tag),
 	DEVMETHOD_END
 };
@@ -417,8 +417,5 @@ static driver_t ahci_fsl_fdt_driver = {
 	sizeof(struct ahci_fsl_fdt_controller),
 };
 
-static devclass_t ahci_fsl_fdt_devclass;
-DRIVER_MODULE(ahci_fsl, simplebus, ahci_fsl_fdt_driver, ahci_fsl_fdt_devclass,
-    NULL, NULL);
-DRIVER_MODULE(ahci_fsl, ofwbus, ahci_fsl_fdt_driver, ahci_fsl_fdt_devclass,
-    NULL, NULL);
+DRIVER_MODULE(ahci_fsl, simplebus, ahci_fsl_fdt_driver, NULL, NULL);
+DRIVER_MODULE(ahci_fsl, ofwbus, ahci_fsl_fdt_driver, NULL, NULL);

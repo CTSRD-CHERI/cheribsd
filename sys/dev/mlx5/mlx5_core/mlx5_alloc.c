@@ -25,14 +25,16 @@
  * $FreeBSD$
  */
 
+#include "opt_rss.h"
+#include "opt_ratelimit.h"
+
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <linux/dma-mapping.h>
 #include <linux/vmalloc.h>
 #include <dev/mlx5/driver.h>
-
-#include "mlx5_core.h"
+#include <dev/mlx5/mlx5_core/mlx5_core.h>
 
 /* Handling for queue buffers -- we allocate a bunch of memory and
  * register it in a memory region at HCA virtual address 0.  If the
@@ -147,8 +149,7 @@ void mlx5_buf_free(struct mlx5_core_dev *dev, struct mlx5_buf *buf)
 }
 EXPORT_SYMBOL_GPL(mlx5_buf_free);
 
-static struct mlx5_db_pgdir *mlx5_alloc_db_pgdir(struct mlx5_core_dev *dev,
-						 int node)
+static struct mlx5_db_pgdir *mlx5_alloc_db_pgdir(struct mlx5_core_dev *dev)
 {
 	struct mlx5_db_pgdir *pgdir;
 
@@ -199,7 +200,7 @@ static int mlx5_alloc_db_from_pgdir(struct mlx5_db_pgdir *pgdir,
 	return 0;
 }
 
-int mlx5_db_alloc_node(struct mlx5_core_dev *dev, struct mlx5_db *db, int node)
+int mlx5_db_alloc(struct mlx5_core_dev *dev, struct mlx5_db *db)
 {
 	struct mlx5_db_pgdir *pgdir;
 	int ret = 0;
@@ -210,7 +211,7 @@ int mlx5_db_alloc_node(struct mlx5_core_dev *dev, struct mlx5_db *db, int node)
 		if (!mlx5_alloc_db_from_pgdir(pgdir, db))
 			goto out;
 
-	pgdir = mlx5_alloc_db_pgdir(dev, node);
+	pgdir = mlx5_alloc_db_pgdir(dev);
 	if (!pgdir) {
 		ret = -ENOMEM;
 		goto out;
@@ -225,12 +226,6 @@ out:
 	mutex_unlock(&dev->priv.pgdir_mutex);
 
 	return ret;
-}
-EXPORT_SYMBOL_GPL(mlx5_db_alloc_node);
-
-int mlx5_db_alloc(struct mlx5_core_dev *dev, struct mlx5_db *db)
-{
-	return mlx5_db_alloc_node(dev, db, dev->priv.numa_node);
 }
 EXPORT_SYMBOL_GPL(mlx5_db_alloc);
 

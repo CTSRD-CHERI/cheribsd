@@ -86,11 +86,6 @@ void ObjectFileWasm::Terminate() {
   PluginManager::UnregisterPlugin(CreateInstance);
 }
 
-ConstString ObjectFileWasm::GetPluginNameStatic() {
-  static ConstString g_name("wasm");
-  return g_name;
-}
-
 ObjectFile *
 ObjectFileWasm::CreateInstance(const ModuleSP &module_sp, DataBufferSP &data_sp,
                                offset_t data_offset, const FileSpec *file,
@@ -196,7 +191,7 @@ bool ObjectFileWasm::DecodeNextSection(lldb::offset_t *offset_ptr) {
     m_sect_infos.push_back(section_info{*offset_ptr + c.tell(), section_length,
                                         section_id, *sect_name});
     *offset_ptr += (c.tell() + section_length);
-  } else if (section_id <= llvm::wasm::WASM_SEC_EVENT) {
+  } else if (section_id <= llvm::wasm::WASM_SEC_TAG) {
     m_sect_infos.push_back(section_info{*offset_ptr + c.tell(),
                                         static_cast<uint32_t>(payload_len),
                                         section_id, ConstString()});
@@ -251,7 +246,44 @@ bool ObjectFileWasm::ParseHeader() {
   return true;
 }
 
-Symtab *ObjectFileWasm::GetSymtab() { return nullptr; }
+void ObjectFileWasm::ParseSymtab(Symtab &symtab) {}
+
+static SectionType GetSectionTypeFromName(llvm::StringRef Name) {
+  if (Name.consume_front(".debug_") || Name.consume_front(".zdebug_")) {
+    return llvm::StringSwitch<SectionType>(Name)
+        .Case("abbrev", eSectionTypeDWARFDebugAbbrev)
+        .Case("abbrev.dwo", eSectionTypeDWARFDebugAbbrevDwo)
+        .Case("addr", eSectionTypeDWARFDebugAddr)
+        .Case("aranges", eSectionTypeDWARFDebugAranges)
+        .Case("cu_index", eSectionTypeDWARFDebugCuIndex)
+        .Case("frame", eSectionTypeDWARFDebugFrame)
+        .Case("info", eSectionTypeDWARFDebugInfo)
+        .Case("info.dwo", eSectionTypeDWARFDebugInfoDwo)
+        .Cases("line", "line.dwo", eSectionTypeDWARFDebugLine)
+        .Cases("line_str", "line_str.dwo", eSectionTypeDWARFDebugLineStr)
+        .Case("loc", eSectionTypeDWARFDebugLoc)
+        .Case("loc.dwo", eSectionTypeDWARFDebugLocDwo)
+        .Case("loclists", eSectionTypeDWARFDebugLocLists)
+        .Case("loclists.dwo", eSectionTypeDWARFDebugLocListsDwo)
+        .Case("macinfo", eSectionTypeDWARFDebugMacInfo)
+        .Cases("macro", "macro.dwo", eSectionTypeDWARFDebugMacro)
+        .Case("names", eSectionTypeDWARFDebugNames)
+        .Case("pubnames", eSectionTypeDWARFDebugPubNames)
+        .Case("pubtypes", eSectionTypeDWARFDebugPubTypes)
+        .Case("ranges", eSectionTypeDWARFDebugRanges)
+        .Case("rnglists", eSectionTypeDWARFDebugRngLists)
+        .Case("rnglists.dwo", eSectionTypeDWARFDebugRngListsDwo)
+        .Case("str", eSectionTypeDWARFDebugStr)
+        .Case("str.dwo", eSectionTypeDWARFDebugStrDwo)
+        .Case("str_offsets", eSectionTypeDWARFDebugStrOffsets)
+        .Case("str_offsets.dwo", eSectionTypeDWARFDebugStrOffsetsDwo)
+        .Case("tu_index", eSectionTypeDWARFDebugTuIndex)
+        .Case("types", eSectionTypeDWARFDebugTypes)
+        .Case("types.dwo", eSectionTypeDWARFDebugTypesDwo)
+        .Default(eSectionTypeOther);
+  }
+  return eSectionTypeOther;
+}
 
 void ObjectFileWasm::CreateSections(SectionList &unified_section_list) {
   if (m_sections_up)
@@ -280,29 +312,7 @@ void ObjectFileWasm::CreateSections(SectionList &unified_section_list) {
       // Code section.
       vm_addr = 0;
     } else {
-      section_type =
-          llvm::StringSwitch<SectionType>(sect_info.name.GetStringRef())
-              .Case(".debug_abbrev", eSectionTypeDWARFDebugAbbrev)
-              .Case(".debug_addr", eSectionTypeDWARFDebugAddr)
-              .Case(".debug_aranges", eSectionTypeDWARFDebugAranges)
-              .Case(".debug_cu_index", eSectionTypeDWARFDebugCuIndex)
-              .Case(".debug_frame", eSectionTypeDWARFDebugFrame)
-              .Case(".debug_info", eSectionTypeDWARFDebugInfo)
-              .Case(".debug_line", eSectionTypeDWARFDebugLine)
-              .Case(".debug_line_str", eSectionTypeDWARFDebugLineStr)
-              .Case(".debug_loc", eSectionTypeDWARFDebugLoc)
-              .Case(".debug_loclists", eSectionTypeDWARFDebugLocLists)
-              .Case(".debug_macinfo", eSectionTypeDWARFDebugMacInfo)
-              .Case(".debug_macro", eSectionTypeDWARFDebugMacro)
-              .Case(".debug_names", eSectionTypeDWARFDebugNames)
-              .Case(".debug_pubnames", eSectionTypeDWARFDebugPubNames)
-              .Case(".debug_pubtypes", eSectionTypeDWARFDebugPubTypes)
-              .Case(".debug_ranges", eSectionTypeDWARFDebugRanges)
-              .Case(".debug_rnglists", eSectionTypeDWARFDebugRngLists)
-              .Case(".debug_str", eSectionTypeDWARFDebugStr)
-              .Case(".debug_str_offsets", eSectionTypeDWARFDebugStrOffsets)
-              .Case(".debug_types", eSectionTypeDWARFDebugTypes)
-              .Default(eSectionTypeOther);
+      section_type = GetSectionTypeFromName(sect_info.name.GetStringRef());
       if (section_type == eSectionTypeOther)
         continue;
       section_name = sect_info.name;

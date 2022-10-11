@@ -2,6 +2,8 @@
 
 .include <src.opts.mk>
 
+PACKAGE=	telnet
+
 TELNETDIR=	${SRCTOP}/contrib/telnet
 .PATH:		${TELNETDIR}/telnet
 
@@ -19,7 +21,7 @@ CFLAGS+=	-DINET6
 
 WARNS?=		2
 
-LIBADD=		telnet ncursesw
+LIBADD=		telnet tinfow
 
 CFLAGS+=	-DIPSEC
 LIBADD+=	ipsec

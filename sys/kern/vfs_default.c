@@ -117,6 +117,7 @@ struct vop_vector default_vnodeops = {
 	.vop_advlockasync =	vop_stdadvlockasync,
 	.vop_advlockpurge =	vop_stdadvlockpurge,
 	.vop_allocate =		vop_stdallocate,
+	.vop_deallocate =	vop_stddeallocate,
 	.vop_bmap =		vop_stdbmap,
 	.vop_close =		VOP_NULL,
 	.vop_fsync =		VOP_NULL,
@@ -517,6 +518,7 @@ vop_stdpathconf(ap)
 		case _PC_ACL_EXTENDED:
 		case _PC_ACL_NFS4:
 		case _PC_CAP_PRESENT:
+		case _PC_DEALLOC_PRESENT:
 		case _PC_INF_PRESENT:
 		case _PC_MAC_PRESENT:
 			*ap->a_retval = 0;
@@ -843,14 +845,14 @@ vop_stdvptocnp(struct vop_vptocnp_args *ap)
 	locked = VOP_ISLOCKED(vp);
 	VOP_UNLOCK(vp);
 	NDINIT_ATVP(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF, UIO_SYSSPACE,
-	    "..", vp, td);
+	    "..", vp);
 	flags = FREAD;
 	error = vn_open_cred(&nd, &flags, 0, VN_OPEN_NOAUDIT, cred, NULL);
 	if (error) {
 		vn_lock(vp, locked | LK_RETRY);
 		return (error);
 	}
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 
 	mvp = *dvp = nd.ni_vp;
 
@@ -960,7 +962,7 @@ vop_stdallocate(struct vop_allocate_args *ap)
 	len = *ap->a_len;
 	offset = *ap->a_offset;
 
-	error = VOP_GETATTR(vp, vap, td->td_ucred);
+	error = VOP_GETATTR(vp, vap, ap->a_cred);
 	if (error != 0)
 		goto out;
 	fsize = vap->va_size;
@@ -997,12 +999,12 @@ vop_stdallocate(struct vop_allocate_args *ap)
 		 */
 		VATTR_NULL(vap);
 		vap->va_size = offset + len;
-		error = VOP_SETATTR(vp, vap, td->td_ucred);
+		error = VOP_SETATTR(vp, vap, ap->a_cred);
 		if (error != 0)
 			goto out;
 		VATTR_NULL(vap);
 		vap->va_size = fsize;
-		error = VOP_SETATTR(vp, vap, td->td_ucred);
+		error = VOP_SETATTR(vp, vap, ap->a_cred);
 		if (error != 0)
 			goto out;
 	}
@@ -1027,7 +1029,7 @@ vop_stdallocate(struct vop_allocate_args *ap)
 			auio.uio_segflg = UIO_SYSSPACE;
 			auio.uio_rw = UIO_READ;
 			auio.uio_td = td;
-			error = VOP_READ(vp, &auio, 0, td->td_ucred);
+			error = VOP_READ(vp, &auio, ap->a_ioflag, ap->a_cred);
 			if (error != 0)
 				break;
 			if (auio.uio_resid > 0) {
@@ -1047,7 +1049,7 @@ vop_stdallocate(struct vop_allocate_args *ap)
 		auio.uio_rw = UIO_WRITE;
 		auio.uio_td = td;
 
-		error = VOP_WRITE(vp, &auio, 0, td->td_ucred);
+		error = VOP_WRITE(vp, &auio, ap->a_ioflag, ap->a_cred);
 		if (error != 0)
 			break;
 
@@ -1063,6 +1065,127 @@ vop_stdallocate(struct vop_allocate_args *ap)
 	*ap->a_len = len;
 	*ap->a_offset = offset;
 	free(buf, M_TEMP);
+	return (error);
+}
+
+static int
+vp_zerofill(struct vnode *vp, struct vattr *vap, off_t *offsetp, off_t *lenp,
+    int ioflag, struct ucred *cred)
+{
+	int iosize;
+	int error = 0;
+	struct iovec aiov;
+	struct uio auio;
+	struct thread *td;
+	off_t offset, len;
+
+	iosize = vap->va_blocksize;
+	td = curthread;
+	offset = *offsetp;
+	len = *lenp;
+
+	if (iosize == 0)
+		iosize = BLKDEV_IOSIZE;
+	/* If va_blocksize is 512 bytes, iosize will be 4 kilobytes */
+	iosize = min(iosize * 8, ZERO_REGION_SIZE);
+
+	while (len > 0) {
+		int xfersize = iosize;
+		if (offset % iosize != 0)
+			xfersize -= offset % iosize;
+		if (xfersize > len)
+			xfersize = len;
+
+		IOVEC_INIT(&aiov, __DECONST(void *, zero_region), xfersize);
+		auio.uio_iov = &aiov;
+		auio.uio_iovcnt = 1;
+		auio.uio_offset = offset;
+		auio.uio_resid = xfersize;
+		auio.uio_segflg = UIO_SYSSPACE;
+		auio.uio_rw = UIO_WRITE;
+		auio.uio_td = td;
+
+		error = VOP_WRITE(vp, &auio, ioflag, cred);
+		if (error != 0) {
+			len -= xfersize - auio.uio_resid;
+			offset += xfersize - auio.uio_resid;
+			break;
+		}
+
+		len -= xfersize;
+		offset += xfersize;
+	}
+
+	*offsetp = offset;
+	*lenp = len;
+	return (error);
+}
+
+int
+vop_stddeallocate(struct vop_deallocate_args *ap)
+{
+	struct vnode *vp;
+	off_t offset, len;
+	struct ucred *cred;
+	int error;
+	struct vattr va;
+	off_t noff, xfersize, rem;
+
+	vp = ap->a_vp;
+	offset = *ap->a_offset;
+	cred = ap->a_cred;
+
+	error = VOP_GETATTR(vp, &va, cred);
+	if (error)
+		return (error);
+
+	len = omin((off_t)va.va_size - offset, *ap->a_len);
+	while (len > 0) {
+		noff = offset;
+		error = vn_bmap_seekhole_locked(vp, FIOSEEKDATA, &noff, cred);
+		if (error) {
+			if (error != ENXIO)
+				/* XXX: Is it okay to fallback further? */
+				goto out;
+
+			/*
+			 * No more data region to be filled
+			 */
+			offset += len;
+			len = 0;
+			error = 0;
+			break;
+		}
+		KASSERT(noff >= offset, ("FIOSEEKDATA going backward"));
+		if (noff != offset) {
+			xfersize = omin(noff - offset, len);
+			len -= xfersize;
+			offset += xfersize;
+			if (len == 0)
+				break;
+		}
+		error = vn_bmap_seekhole_locked(vp, FIOSEEKHOLE, &noff, cred);
+		if (error)
+			goto out;
+
+		/* Fill zeroes */
+		xfersize = rem = omin(noff - offset, len);
+		error = vp_zerofill(vp, &va, &offset, &rem, ap->a_ioflag, cred);
+		if (error) {
+			len -= xfersize - rem;
+			goto out;
+		}
+
+		len -= xfersize;
+		if (should_yield())
+			break;
+	}
+	/* Handle the case when offset is beyond EOF */
+	if (len < 0)
+		len = 0;
+out:
+	*ap->a_offset = offset;
+	*ap->a_len = len;
 	return (error);
 }
 
@@ -1166,91 +1289,142 @@ static int
 vop_stdis_text(struct vop_is_text_args *ap)
 {
 
-	return (ap->a_vp->v_writecount < 0);
+	return (atomic_load_int(&ap->a_vp->v_writecount) < 0);
 }
 
 int
 vop_stdset_text(struct vop_set_text_args *ap)
 {
 	struct vnode *vp;
-	struct mount *mp;
-	int error;
+	int n;
+	bool gotref;
 
 	vp = ap->a_vp;
-	VI_LOCK(vp);
-	if (vp->v_writecount > 0) {
-		error = ETXTBSY;
-	} else {
-		/*
-		 * If requested by fs, keep a use reference to the
-		 * vnode until the last text reference is released.
-		 */
-		mp = vp->v_mount;
-		if (mp != NULL && (mp->mnt_kern_flag & MNTK_TEXT_REFS) != 0 &&
-		    vp->v_writecount == 0) {
-			VNPASS((vp->v_iflag & VI_TEXT_REF) == 0, vp);
-			vp->v_iflag |= VI_TEXT_REF;
-			vrefl(vp);
+
+	n = atomic_load_int(&vp->v_writecount);
+	for (;;) {
+		if (__predict_false(n > 0)) {
+			return (ETXTBSY);
 		}
 
-		vp->v_writecount--;
-		error = 0;
+		/*
+		 * Transition point, we may need to grab a reference on the vnode.
+		 *
+		 * Take the ref early As a safety measure against bogus calls
+		 * to vop_stdunset_text.
+		 */
+		if (n == 0) {
+			gotref = false;
+			if ((vn_irflag_read(vp) & VIRF_TEXT_REF) != 0) {
+				vref(vp);
+				gotref = true;
+			}
+			if (atomic_fcmpset_int(&vp->v_writecount, &n, -1)) {
+				return (0);
+			}
+			if (gotref) {
+				vunref(vp);
+			}
+			continue;
+		}
+
+		MPASS(n < 0);
+		if (atomic_fcmpset_int(&vp->v_writecount, &n, n - 1)) {
+			return (0);
+		}
 	}
-	VI_UNLOCK(vp);
-	return (error);
+	__assert_unreachable();
 }
 
 static int
 vop_stdunset_text(struct vop_unset_text_args *ap)
 {
 	struct vnode *vp;
-	int error;
-	bool last;
+	int n;
 
 	vp = ap->a_vp;
-	last = false;
-	VI_LOCK(vp);
-	if (vp->v_writecount < 0) {
-		if ((vp->v_iflag & VI_TEXT_REF) != 0 &&
-		    vp->v_writecount == -1) {
-			last = true;
-			vp->v_iflag &= ~VI_TEXT_REF;
+
+	n = atomic_load_int(&vp->v_writecount);
+	for (;;) {
+		if (__predict_false(n >= 0)) {
+			return (EINVAL);
 		}
-		vp->v_writecount++;
-		error = 0;
-	} else {
-		error = EINVAL;
+
+		/*
+		 * Transition point, we may need to release a reference on the vnode.
+		 */
+		if (n == -1) {
+			if (atomic_fcmpset_int(&vp->v_writecount, &n, 0)) {
+				if ((vn_irflag_read(vp) & VIRF_TEXT_REF) != 0) {
+					vunref(vp);
+				}
+				return (0);
+			}
+			continue;
+		}
+
+		MPASS(n < -1);
+		if (atomic_fcmpset_int(&vp->v_writecount, &n, n + 1)) {
+			return (0);
+		}
 	}
-	VI_UNLOCK(vp);
-	if (last)
-		vunref(vp);
-	return (error);
+	__assert_unreachable();
 }
 
-static int
-vop_stdadd_writecount(struct vop_add_writecount_args *ap)
+static int __always_inline
+vop_stdadd_writecount_impl(struct vop_add_writecount_args *ap, bool handle_msync)
 {
 	struct vnode *vp;
-	struct mount *mp;
-	int error;
+	struct mount *mp __diagused;
+	int n;
 
 	vp = ap->a_vp;
-	VI_LOCK_FLAGS(vp, MTX_DUPOK);
-	if (vp->v_writecount < 0) {
-		error = ETXTBSY;
-	} else {
-		VNASSERT(vp->v_writecount + ap->a_inc >= 0, vp,
-		    ("neg writecount increment %d", ap->a_inc));
-		if (vp->v_writecount == 0) {
-			mp = vp->v_mount;
-			if (mp != NULL && (mp->mnt_kern_flag & MNTK_NOMSYNC) == 0)
-				vlazy(vp);
+
+#ifdef INVARIANTS
+	mp = vp->v_mount;
+	if (mp != NULL) {
+		if (handle_msync) {
+			VNPASS((mp->mnt_kern_flag & MNTK_NOMSYNC) == 0, vp);
+		} else {
+			VNPASS((mp->mnt_kern_flag & MNTK_NOMSYNC) != 0, vp);
 		}
-		vp->v_writecount += ap->a_inc;
-		error = 0;
 	}
-	VI_UNLOCK(vp);
-	return (error);
+#endif
+
+	n = atomic_load_int(&vp->v_writecount);
+	for (;;) {
+		if (__predict_false(n < 0)) {
+			return (ETXTBSY);
+		}
+
+		VNASSERT(n + ap->a_inc >= 0, vp,
+		    ("neg writecount increment %d + %d = %d", n, ap->a_inc,
+		    n + ap->a_inc));
+		if (n == 0) {
+			if (handle_msync) {
+				vlazy(vp);
+			}
+		}
+
+		if (atomic_fcmpset_int(&vp->v_writecount, &n, n + ap->a_inc)) {
+			return (0);
+		}
+	}
+	__assert_unreachable();
+}
+
+int
+vop_stdadd_writecount(struct vop_add_writecount_args *ap)
+{
+
+	return (vop_stdadd_writecount_impl(ap, true));
+}
+
+int
+vop_stdadd_writecount_nomsync(struct vop_add_writecount_args *ap)
+{
+
+	return (vop_stdadd_writecount_impl(ap, false));
 }
 
 int
@@ -1319,9 +1493,9 @@ vfs_stdstatfs (mp, sbp)
 }
 
 int
-vfs_stdquotactl(struct mount *mp, int cmds, uid_t uid, void * __capability arg)
+vfs_stdquotactl(struct mount *mp, int cmds, uid_t uid, void * __capability arg,
+	bool *mp_busy)
 {
-
 	return (EOPNOTSUPP);
 }
 
@@ -1493,6 +1667,7 @@ vop_stdstat(struct vop_stat_args *a)
 	vap->va_birthtime.tv_sec = -1;
 	vap->va_birthtime.tv_nsec = 0;
 	vap->va_fsid = VNOVAL;
+	vap->va_gen = 0;
 	vap->va_rdev = NODEV;
 
 	error = VOP_GETATTR(vp, vap, a->a_active_cred);

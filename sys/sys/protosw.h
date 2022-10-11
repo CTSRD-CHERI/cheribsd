@@ -35,6 +35,8 @@
 #ifndef _SYS_PROTOSW_H_
 #define _SYS_PROTOSW_H_
 
+#include <sys/queue.h>
+
 /* Forward declare these structures referenced from prototypes below. */
 struct kaiocb;
 struct mbuf;
@@ -50,7 +52,6 @@ struct sockopt;
  * Each protocol has a handle initializing one of these structures,
  * which is used for protocol-protocol and system-protocol communication.
  *
- * A protocol is called through the pr_init entry before any other.
  * Thereafter it is called every 200ms through the pr_fasttimo entry and
  * every 500ms through the pr_slowtimo for timer based actions.
  * The system will call the pr_drain entry if it is low on space and
@@ -71,7 +72,6 @@ typedef int	pr_input_t (struct mbuf **, int*, int);
 typedef int	pr_output_t (struct mbuf *, struct socket *, ...);
 typedef void	pr_ctlinput_t (int, struct sockaddr *, void *);
 typedef int	pr_ctloutput_t (struct socket *, struct sockopt *);
-typedef	void	pr_init_t (void);
 typedef	void	pr_fasttimo_t (void);
 typedef	void	pr_slowtimo_t (void);
 typedef	void	pr_drain_t (void);
@@ -87,12 +87,13 @@ struct protosw {
 	pr_ctlinput_t *pr_ctlinput;	/* control input (from below) */
 	pr_ctloutput_t *pr_ctloutput;	/* control output (from above) */
 /* utility hooks */
-	pr_init_t *pr_init;
 	pr_fasttimo_t *pr_fasttimo;	/* fast timeout (200ms) */
 	pr_slowtimo_t *pr_slowtimo;	/* slow timeout (500ms) */
 	pr_drain_t *pr_drain;		/* flush any excess space possible */
 
 	struct	pr_usrreqs *pr_usrreqs;	/* user-protocol hook */
+	LIST_ENTRY(protosw)  pr_fasttimos;
+	LIST_ENTRY(protosw)  pr_slowtimos;
 };
 /*#endif*/
 
@@ -113,6 +114,8 @@ struct protosw {
  *	and the protocol understands the MSG_EOF flag.  The first property is
  *	is only relevant if PR_CONNREQUIRED is set (otherwise sendto is allowed
  *	anyhow).
+ * PR_SOCKBUF requires protocol to initialize and destroy its socket buffers
+ * in its pr_attach and pr_detach.
  */
 #define	PR_ATOMIC	0x01		/* exchange atomic messages only */
 #define	PR_ADDR		0x02		/* addresses given with messages */
@@ -122,6 +125,7 @@ struct protosw {
 #define PR_IMPLOPCL	0x20		/* implied open/close */
 #define	PR_LASTHDR	0x40		/* enforce ipsec policy; last header */
 #define	PR_CAPATTACH	0x80		/* socket can attach in cap mode */
+#define	PR_SOCKBUF	0x100		/* private implementation of buffers */
 
 /*
  * In earlier BSD network stacks, a single pr_usrreq() function pointer was

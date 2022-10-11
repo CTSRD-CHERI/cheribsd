@@ -249,6 +249,8 @@ static void vap_update_erp_protmode(void *, int);
 static void vap_update_preamble(void *, int);
 static void vap_update_ht_protmode(void *, int);
 static void ieee80211_newstate_cb(void *, int);
+static struct ieee80211_node *vap_update_bss(struct ieee80211vap *,
+    struct ieee80211_node *);
 
 static int
 null_raw_xmit(struct ieee80211_node *ni, struct mbuf *m,
@@ -394,6 +396,7 @@ ieee80211_proto_vattach(struct ieee80211vap *vap)
 	vap->iv_update_beacon = null_update_beacon;
 	vap->iv_deliver_data = ieee80211_deliver_data;
 	vap->iv_protmode = IEEE80211_PROT_CTSONLY;
+	vap->iv_update_bss = vap_update_bss;
 
 	/* attach support for operating mode */
 	ic->ic_vattach[vap->iv_opmode](vap);
@@ -824,6 +827,17 @@ ieee80211_reset_erp(struct ieee80211com *ic)
 	/* XXX TODO: schedule a new per-VAP ERP calculation */
 }
 
+static struct ieee80211_node *
+vap_update_bss(struct ieee80211vap *vap, struct ieee80211_node *ni)
+{
+	struct ieee80211_node *obss;
+
+	obss = vap->iv_bss;
+	vap->iv_bss = ni;
+
+	return (obss);
+}
+
 /*
  * Deferred slot time update.
  *
@@ -1053,7 +1067,7 @@ vap_update_ht_protmode(void *arg, int npending)
 	struct ieee80211vap *vap = arg;
 	struct ieee80211vap *iv;
 	struct ieee80211com *ic = vap->iv_ic;
-	int num_vaps = 0, num_pure = 0, num_mixed = 0;
+	int num_vaps = 0, num_pure = 0;
 	int num_optional = 0, num_ht2040 = 0, num_nonht = 0;
 	int num_ht_sta = 0, num_ht40_sta = 0, num_sta = 0;
 	int num_nonhtpr = 0;
@@ -1093,9 +1107,6 @@ vap_update_ht_protmode(void *arg, int npending)
 			break;
 		case IEEE80211_HTINFO_OPMODE_HT20PR:
 			num_ht2040++;
-			break;
-		case IEEE80211_HTINFO_OPMODE_MIXED:
-			num_mixed++;
 			break;
 		}
 
@@ -2455,6 +2466,29 @@ wakeupwaiting(struct ieee80211vap *vap0)
 			vap->iv_flags_ext &= ~IEEE80211_FEXT_SCANWAIT;
 			/* NB: sta's cannot go INIT->RUN */
 			/* NB: iv_newstate may drop the lock */
+
+			/*
+			 * This is problematic if the interface has OACTIVE
+			 * set.  Only the deferred ieee80211_newstate_cb()
+			 * will end up actually /clearing/ the OACTIVE
+			 * flag on a state transition to RUN from a non-RUN
+			 * state.
+			 *
+			 * But, we're not actually deferring this callback;
+			 * and when the deferred call occurs it shows up as
+			 * a RUN->RUN transition!  So the flag isn't/wasn't
+			 * cleared!
+			 *
+			 * I'm also not sure if it's correct to actually
+			 * do the transitions here fully through the deferred
+			 * paths either as other things can be invoked as
+			 * part of that state machine.
+			 *
+			 * So just keep this in mind when looking at what
+			 * the markwaiting/wakeupwaiting routines are doing
+			 * and how they invoke vap state changes.
+			 */
+
 			vap->iv_newstate(vap,
 			    vap->iv_opmode == IEEE80211_M_STA ?
 			        IEEE80211_S_SCAN : IEEE80211_S_RUN, 0);
@@ -2529,10 +2563,22 @@ ieee80211_newstate_cb(void *xvap, int npending)
 		goto done;
 	}
 
-	/* No actual transition, skip post processing */
-	if (ostate == nstate)
-		goto done;
-
+	/*
+	 * Handle the case of a RUN->RUN transition occuring when STA + AP
+	 * VAPs occur on the same radio.
+	 *
+	 * The mark and wakeup waiting routines call iv_newstate() directly,
+	 * but they do not end up deferring state changes here.
+	 * Thus, although the VAP newstate method sees a transition
+	 * of RUN->INIT->RUN, the deferred path here only sees a RUN->RUN
+	 * transition.  If OACTIVE is set then it is never cleared.
+	 *
+	 * So, if we're here and the state is RUN, just clear OACTIVE.
+	 * At some point if the markwaiting/wakeupwaiting paths end up
+	 * also invoking the deferred state updates then this will
+	 * be no-op code - and also if OACTIVE is finally retired, it'll
+	 * also be no-op code.
+	 */
 	if (nstate == IEEE80211_S_RUN) {
 		/*
 		 * OACTIVE may be set on the vap if the upper layer
@@ -2541,12 +2587,28 @@ ieee80211_newstate_cb(void *xvap, int npending)
 		 *
 		 * Note this can also happen as a result of SLEEP->RUN
 		 * (i.e. coming out of power save mode).
+		 *
+		 * Historically this was done only for a state change
+		 * but is needed earlier; see next comment.  The 2nd half
+		 * of the work is still only done in case of an actual
+		 * state change below.
+		 */
+		/*
+		 * Unblock the VAP queue; a RUN->RUN state can happen
+		 * on a STA+AP setup on the AP vap.  See wakeupwaiting().
 		 */
 		vap->iv_ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
 
 		/*
 		 * XXX TODO Kick-start a VAP queue - this should be a method!
 		 */
+	}
+
+	/* No actual transition, skip post processing */
+	if (ostate == nstate)
+		goto done;
+
+	if (nstate == IEEE80211_S_RUN) {
 
 		/* bring up any vaps waiting on us */
 		wakeupwaiting(vap);
@@ -2654,8 +2716,8 @@ ieee80211_new_state_locked(struct ieee80211vap *vap,
 	}
 	ostate = vap->iv_state;
 	IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE,
-	    "%s: %s -> %s (nrunning %d nscanning %d)\n", __func__,
-	    ieee80211_state_name[ostate], ieee80211_state_name[nstate],
+	    "%s: %s -> %s (arg %d) (nrunning %d nscanning %d)\n", __func__,
+	    ieee80211_state_name[ostate], ieee80211_state_name[nstate], arg,
 	    nrunning, nscanning);
 	switch (nstate) {
 	case IEEE80211_S_SCAN:

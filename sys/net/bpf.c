@@ -79,6 +79,7 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_vlan_var.h>
 #include <net/if_dl.h>
 #include <net/bpf.h>
 #include <net/bpf_buffer.h>
@@ -115,13 +116,13 @@ struct bpf_if {
 	struct ifnet	*bif_ifp;	/* corresponding interface */
 	struct bpf_if	**bif_bpf;	/* Pointer to pointer to us */
 	volatile u_int	bif_refcnt;
-	struct epoch_context epoch_ctx __subobject_use_container_bounds;
+	struct epoch_context epoch_ctx;
 };
 
 CTASSERT(offsetof(struct bpf_if, bif_ext) == 0);
 
 struct bpf_program_buffer {
-	struct epoch_context	epoch_ctx __subobject_use_container_bounds;
+	struct epoch_context	epoch_ctx;
 #ifdef BPF_JITTER
 	bpf_jit_filter		*func;
 #endif
@@ -131,6 +132,7 @@ struct bpf_program_buffer {
 #if defined(DEV_BPF) || defined(NETGRAPH_BPF)
 
 #define PRINET  26			/* interruptible */
+#define BPF_PRIO_MAX	7
 
 #define	SIZEOF_BPF_HDR(type)	\
     (offsetof(type, bh_hdrlen) + sizeof(((type *)0)->bh_hdrlen))
@@ -246,6 +248,7 @@ static int	bpf_getdltlist(struct bpf_d *, struct bpf_dltlist *);
 static int	bpf_setdlt(struct bpf_d *, u_int);
 static void	filt_bpfdetach(struct knote *);
 static int	filt_bpfread(struct knote *, long);
+static int	filt_bpfwrite(struct knote *, long);
 static void	bpf_drvinit(void *);
 static int	bpf_stats_sysctl(SYSCTL_HANDLER_ARGS);
 
@@ -288,6 +291,12 @@ static struct filterops bpfread_filtops = {
 	.f_isfd = 1,
 	.f_detach = filt_bpfdetach,
 	.f_event = filt_bpfread,
+};
+
+static struct filterops bpfwrite_filtops = {
+	.f_isfd = 1,
+	.f_detach = filt_bpfdetach,
+	.f_event = filt_bpfwrite,
 };
 
 /*
@@ -677,7 +686,8 @@ bpf_movein(struct uio *uio, int linktype, struct ifnet *ifp, struct mbuf **mp,
 	if (len < hlen || len - hlen > ifp->if_mtu)
 		return (EMSGSIZE);
 
-	m = m_get2(len, M_WAITOK, MT_DATA, M_PKTHDR);
+	/* Allocate a mbuf for our write, since m_get2 fails if len >= to MJUMPAGESIZE, use m_getjcl for bigger buffers */
+	m = m_get3(len, M_WAITOK, MT_DATA, M_PKTHDR);
 	if (m == NULL)
 		return (EIO);
 	m->m_pkthdr.len = m->m_len = len;
@@ -791,6 +801,10 @@ bpf_attachd(struct bpf_d *d, struct bpf_if *bp)
 		CK_LIST_INSERT_HEAD(&bp->bif_dlist, d, bd_next);
 
 	reset_d(d);
+
+	/* Trigger EVFILT_WRITE events. */
+	bpf_wakeup(d);
+
 	BPFD_UNLOCK(d);
 	bpf_bpfd_cnt++;
 
@@ -1006,6 +1020,9 @@ bpfopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 	mtx_init(&d->bd_lock, devtoname(dev), "bpf cdev lock", MTX_DEF);
 	callout_init_mtx(&d->bd_callout, &d->bd_lock, 0);
 	knlist_init_mtx(&d->bd_sel.si_note, &d->bd_lock);
+
+	/* Disable VLAN pcp tagging. */
+	d->bd_pcp = 0;
 
 	return (0);
 }
@@ -1297,6 +1314,9 @@ bpfwrite(struct cdev *dev, struct uio *uio, int ioflag)
 		ro.ro_flags = RT_HAS_HEADER;
 	}
 
+	if (d->bd_pcp != 0)
+		vlan_set_pcp(m, d->bd_pcp);
+
 	/* Avoid possible recursion on BPFD_LOCK(). */
 	NET_EPOCH_ENTER(et);
 	BPFD_UNLOCK(d);
@@ -1386,6 +1406,7 @@ reset_d(struct bpf_d *d)
  *  BIOCROTZBUF		Force rotation of zero-copy buffer
  *  BIOCSETBUFMODE	Set buffer mode.
  *  BIOCGETBUFMODE	Get current buffer mode.
+ *  BIOCSETVLANPCP	Set VLAN PCP tag.
  */
 /* ARGSUSED */
 static	int
@@ -1898,6 +1919,19 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	case BIOCROTZBUF:
 		error = bpf_ioctl_rotzbuf(td, d, (struct bpf_zbuf *)addr);
 		break;
+
+	case BIOCSETVLANPCP:
+		{
+			u_int pcp;
+
+			pcp = *(u_int *)addr;
+			if (pcp > BPF_PRIO_MAX || pcp < 0) {
+				error = EINVAL;
+				break;
+			}
+			d->bd_pcp = pcp;
+			break;
+		}
 	}
 	CURVNET_RESTORE();
 	return (error);
@@ -2042,7 +2076,7 @@ bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 	BPFD_UNLOCK(d);
 
 	if (old_fcode != NULL)
-		NET_EPOCH_CALL(bpf_program_buffer_free, &fcode->epoch_ctx);
+		NET_EPOCH_CALL(bpf_program_buffer_free, &old_fcode->epoch_ctx);
 
 	if (track_event)
 		EVENTHANDLER_INVOKE(bpf_track,
@@ -2142,16 +2176,27 @@ bpfkqfilter(struct cdev *dev, struct knote *kn)
 {
 	struct bpf_d *d;
 
-	if (devfs_get_cdevpriv((void **)&d) != 0 ||
-	    kn->kn_filter != EVFILT_READ)
+	if (devfs_get_cdevpriv((void **)&d) != 0)
 		return (1);
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		kn->kn_fop = &bpfread_filtops;
+		break;
+
+	case EVFILT_WRITE:
+		kn->kn_fop = &bpfwrite_filtops;
+		break;
+
+	default:
+		return (1);
+	}
 
 	/*
 	 * Refresh PID associated with this descriptor.
 	 */
 	BPFD_LOCK(d);
 	BPF_PID_REFRESH_CUR(d);
-	kn->kn_fop = &bpfread_filtops;
 	kn->kn_hook = d;
 	knlist_add(&d->bd_sel.si_note, kn, 1);
 	BPFD_UNLOCK(d);
@@ -2189,6 +2234,22 @@ filt_bpfread(struct knote *kn, long hint)
 	}
 
 	return (ready);
+}
+
+static int
+filt_bpfwrite(struct knote *kn, long hint)
+{
+	struct bpf_d *d = (struct bpf_d *)kn->kn_hook;
+
+	BPFD_LOCK_ASSERT(d);
+
+	if (d->bd_bif == NULL) {
+		kn->kn_data = 0;
+		return (0);
+	} else {
+		kn->kn_data = d->bd_bif->bif_ifp->if_mtu;
+		return (1);
+	}
 }
 
 #define	BPF_TSTAMP_NONE		0
@@ -2494,12 +2555,13 @@ catchpacket(struct bpf_d *d, u_char *pkt, u_int pktlen, u_int snaplen,
     void (*cpfn)(struct bpf_d *, caddr_t, u_int, void *, u_int),
     struct bintime *bt)
 {
+	static char zeroes[BPF_ALIGNMENT];
 	struct bpf_xhdr hdr;
 	struct bpf_hdr hdr_old;
 #ifdef COMPAT_FREEBSD32
 	struct bpf_hdr32 hdr32_old;
 #endif
-	int caplen, curlen, hdrlen, totlen;
+	int caplen, curlen, hdrlen, pad, totlen;
 	int do_wakeup = 0;
 	int do_timestamp;
 	int tstype;
@@ -2565,13 +2627,25 @@ catchpacket(struct bpf_d *d, u_char *pkt, u_int pktlen, u_int snaplen,
 		ROTATE_BUFFERS(d);
 		do_wakeup = 1;
 		curlen = 0;
-	} else if (d->bd_immediate || d->bd_state == BPF_TIMED_OUT)
-		/*
-		 * Immediate mode is set, or the read timeout has already
-		 * expired during a select call.  A packet arrived, so the
-		 * reader should be woken up.
-		 */
-		do_wakeup = 1;
+	} else {
+		if (d->bd_immediate || d->bd_state == BPF_TIMED_OUT) {
+			/*
+			 * Immediate mode is set, or the read timeout has
+			 * already expired during a select call.  A packet
+			 * arrived, so the reader should be woken up.
+			 */
+			do_wakeup = 1;
+		}
+		pad = curlen - d->bd_slen;
+		KASSERT(pad >= 0 && pad <= sizeof(zeroes),
+		    ("%s: invalid pad byte count %d", __func__, pad));
+		if (pad > 0) {
+			/* Zero pad bytes. */
+			bpf_append_bytes(d, d->bd_sbuf, d->bd_slen, zeroes,
+			    pad);
+		}
+	}
+
 	caplen = totlen - hdrlen;
 	tstype = d->bd_tstamp;
 	do_timestamp = tstype != BPF_T_NONE;

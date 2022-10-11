@@ -121,7 +121,7 @@ privcmd_pg_dtor(void *handle)
 {
 	struct xen_remove_from_physmap rm = { .domid = DOMID_SELF };
 	struct privcmd_map *map = handle;
-	int error;
+	int error __diagused;
 	vm_size_t i;
 	vm_page_t m;
 
@@ -426,12 +426,10 @@ mmap_out:
 		if (mmap->addr == 0 && mmap->num == 0) {
 			error = HYPERVISOR_memory_op(XENMEM_acquire_resource,
 			    &adq);
-			if (error != 0) {
+			if (error != 0)
 				error = xen_translate_error(error);
-				break;
-			}
-			error = copyout(&adq.nr_frames, &mmap->num,
-			    sizeof(mmap->num));
+			else
+				mmap->num = adq.nr_frames;
 			break;
 		}
 
@@ -609,7 +607,5 @@ static driver_t privcmd_driver = {
 	0,
 };
 
-devclass_t privcmd_devclass;
-
-DRIVER_MODULE(privcmd, xenpv, privcmd_driver, privcmd_devclass, 0, 0);
+DRIVER_MODULE(privcmd, xenpv, privcmd_driver, 0, 0);
 MODULE_DEPEND(privcmd, xenpv, 1, 1, 1);

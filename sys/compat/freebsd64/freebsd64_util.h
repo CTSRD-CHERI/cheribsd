@@ -48,12 +48,6 @@ struct freebsd64_ps_strings {
 	int		ps_nargvstr;
 	uint64_t	ps_envstr;
 	int		ps_nenvstr;
-	uint64_t	ps_sbclasses;
-	size_t		ps_sbclasseslen;
-	uint64_t	ps_sbmethods;
-	size_t		ps_sbmethodslen;
-	uint64_t	ps_sbobjects;
-	size_t		ps_sbobjectslen;
 };
 
 typedef struct {	/* Auxiliary vector entry on initial stack */

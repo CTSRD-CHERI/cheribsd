@@ -64,7 +64,7 @@ generic_xhci_acpi_probe(device_t dev)
 
 	device_set_desc(dev, XHCI_HC_DEVSTR);
 
-	return (BUS_PROBE_DEFAULT);
+	return (BUS_PROBE_GENERIC);
 }
 
 static device_method_t xhci_acpi_methods[] = {
@@ -77,7 +77,5 @@ static device_method_t xhci_acpi_methods[] = {
 DEFINE_CLASS_1(xhci, xhci_acpi_driver, xhci_acpi_methods,
     sizeof(struct xhci_softc), generic_xhci_driver);
 
-static devclass_t xhci_acpi_devclass;
-
-DRIVER_MODULE(xhci, acpi, xhci_acpi_driver, xhci_acpi_devclass, 0, 0);
+DRIVER_MODULE(xhci, acpi, xhci_acpi_driver, 0, 0);
 MODULE_DEPEND(xhci, usb, 1, 1, 1);

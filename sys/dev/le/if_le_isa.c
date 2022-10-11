@@ -495,7 +495,7 @@ le_isa_resume(device_t dev)
 }
 
 DEFINE_CLASS_0(le, le_isa_driver, le_isa_methods, sizeof(struct le_isa_softc));
-DRIVER_MODULE(le, isa, le_isa_driver, le_devclass, 0, 0);
+DRIVER_MODULE(le, isa, le_isa_driver, 0, 0);
 MODULE_DEPEND(le, ether, 1, 1, 1);
 ISA_PNP_INFO(le_isa_ids);
 // CHERI CHANGES START

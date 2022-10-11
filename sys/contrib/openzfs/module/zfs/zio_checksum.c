@@ -91,29 +91,29 @@
  * invocation and passed to the checksum function.
  */
 
-/*ARGSUSED*/
 static void
 abd_checksum_off(abd_t *abd, uint64_t size,
     const void *ctx_template, zio_cksum_t *zcp)
 {
+	(void) abd, (void) size, (void) ctx_template;
 	ZIO_SET_CHECKSUM(zcp, 0, 0, 0, 0);
 }
 
-/*ARGSUSED*/
 static void
 abd_fletcher_2_native(abd_t *abd, uint64_t size,
     const void *ctx_template, zio_cksum_t *zcp)
 {
+	(void) ctx_template;
 	fletcher_init(zcp);
 	(void) abd_iterate_func(abd, 0, size,
 	    fletcher_2_incremental_native, zcp);
 }
 
-/*ARGSUSED*/
 static void
 abd_fletcher_2_byteswap(abd_t *abd, uint64_t size,
     const void *ctx_template, zio_cksum_t *zcp)
 {
+	(void) ctx_template;
 	fletcher_init(zcp);
 	(void) abd_iterate_func(abd, 0, size,
 	    fletcher_2_incremental_byteswap, zcp);
@@ -127,11 +127,11 @@ abd_fletcher_4_impl(abd_t *abd, uint64_t size, zio_abd_checksum_data_t *acdp)
 	fletcher_4_abd_ops.acf_fini(acdp);
 }
 
-/*ARGSUSED*/
 void
 abd_fletcher_4_native(abd_t *abd, uint64_t size,
     const void *ctx_template, zio_cksum_t *zcp)
 {
+	(void) ctx_template;
 	fletcher_4_ctx_t ctx;
 
 	zio_abd_checksum_data_t acd = {
@@ -144,11 +144,11 @@ abd_fletcher_4_native(abd_t *abd, uint64_t size,
 
 }
 
-/*ARGSUSED*/
 void
 abd_fletcher_4_byteswap(abd_t *abd, uint64_t size,
     const void *ctx_template, zio_cksum_t *zcp)
 {
+	(void) ctx_template;
 	fletcher_4_ctx_t ctx;
 
 	zio_abd_checksum_data_t acd = {
@@ -160,7 +160,7 @@ abd_fletcher_4_byteswap(abd_t *abd, uint64_t size,
 	abd_fletcher_4_impl(abd, size, &acd);
 }
 
-zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
+const zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
 	{{NULL, NULL}, NULL, NULL, 0, "inherit"},
 	{{NULL, NULL}, NULL, NULL, 0, "on"},
 	{{abd_checksum_off,		abd_checksum_off},
@@ -191,12 +191,14 @@ zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
 	    abd_checksum_skein_tmpl_init, abd_checksum_skein_tmpl_free,
 	    ZCHECKSUM_FLAG_METADATA | ZCHECKSUM_FLAG_DEDUP |
 	    ZCHECKSUM_FLAG_SALTED | ZCHECKSUM_FLAG_NOPWRITE, "skein"},
-#if !defined(__FreeBSD__)
 	{{abd_checksum_edonr_native,	abd_checksum_edonr_byteswap},
 	    abd_checksum_edonr_tmpl_init, abd_checksum_edonr_tmpl_free,
 	    ZCHECKSUM_FLAG_METADATA | ZCHECKSUM_FLAG_SALTED |
 	    ZCHECKSUM_FLAG_NOPWRITE, "edonr"},
-#endif
+	{{abd_checksum_blake3_native,	abd_checksum_blake3_byteswap},
+	    abd_checksum_blake3_tmpl_init, abd_checksum_blake3_tmpl_free,
+	    ZCHECKSUM_FLAG_METADATA | ZCHECKSUM_FLAG_DEDUP |
+	    ZCHECKSUM_FLAG_SALTED | ZCHECKSUM_FLAG_NOPWRITE, "blake3"},
 };
 
 /*
@@ -209,14 +211,14 @@ zio_checksum_to_feature(enum zio_checksum cksum)
 	VERIFY((cksum & ~ZIO_CHECKSUM_MASK) == 0);
 
 	switch (cksum) {
+	case ZIO_CHECKSUM_BLAKE3:
+		return (SPA_FEATURE_BLAKE3);
 	case ZIO_CHECKSUM_SHA512:
 		return (SPA_FEATURE_SHA512);
 	case ZIO_CHECKSUM_SKEIN:
 		return (SPA_FEATURE_SKEIN);
-#if !defined(__FreeBSD__)
 	case ZIO_CHECKSUM_EDONR:
 		return (SPA_FEATURE_EDONR);
-#endif
 	default:
 		return (SPA_FEATURE_NONE);
 	}
@@ -355,7 +357,7 @@ zio_checksum_compute(zio_t *zio, enum zio_checksum checksum,
 		zio_eck_t eck;
 		size_t eck_offset;
 
-		bzero(&saved, sizeof (zio_cksum_t));
+		memset(&saved, 0, sizeof (zio_cksum_t));
 
 		if (checksum == ZIO_CHECKSUM_ZILOG2) {
 			zil_chain_t zilc;

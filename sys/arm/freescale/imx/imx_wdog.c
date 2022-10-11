@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2012, 2013 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Oleksandr Rybalko under sponsorship
  * from the FreeBSD Foundation.
@@ -257,8 +256,5 @@ static driver_t imx_wdog_driver = {
 	sizeof(struct imx_wdog_softc),
 };
 
-static devclass_t imx_wdog_devclass;
-
-EARLY_DRIVER_MODULE(imx_wdog, simplebus, imx_wdog_driver,
-    imx_wdog_devclass, 0, 0, BUS_PASS_TIMER);
+EARLY_DRIVER_MODULE(imx_wdog, simplebus, imx_wdog_driver, 0, 0, BUS_PASS_TIMER);
 SIMPLEBUS_PNP_INFO(compat_data);

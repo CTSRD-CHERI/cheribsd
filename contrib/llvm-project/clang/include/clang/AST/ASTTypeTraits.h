@@ -17,6 +17,7 @@
 
 #include "clang/AST/ASTFwd.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/LambdaCapture.h"
 #include "clang/AST/NestedNameSpecifier.h"
 #include "clang/AST/TemplateBase.h"
 #include "clang/AST/TypeLoc.h"
@@ -25,10 +26,8 @@
 #include "llvm/Support/AlignOf.h"
 
 namespace llvm {
-
 class raw_ostream;
-
-}
+} // namespace llvm
 
 namespace clang {
 
@@ -39,10 +38,6 @@ struct PrintingPolicy;
 enum TraversalKind {
   /// Will traverse all child nodes.
   TK_AsIs,
-
-  /// Will not traverse implicit casts and parentheses.
-  /// Corresponds to Expr::IgnoreParenImpCasts()
-  TK_IgnoreImplicitCastsAndParentheses,
 
   /// Ignore AST nodes not written in the source
   TK_IgnoreUnlessSpelledInSource
@@ -69,7 +64,10 @@ public:
   static ASTNodeKind getFromNode(const Decl &D);
   static ASTNodeKind getFromNode(const Stmt &S);
   static ASTNodeKind getFromNode(const Type &T);
+  static ASTNodeKind getFromNode(const TypeLoc &T);
+  static ASTNodeKind getFromNode(const LambdaCapture &L);
   static ASTNodeKind getFromNode(const OMPClause &C);
+  static ASTNodeKind getFromNode(const Attr &A);
   /// \}
 
   /// Returns \c true if \c this and \c Other represent the same kind.
@@ -104,6 +102,8 @@ public:
   static ASTNodeKind getMostDerivedCommonAncestor(ASTNodeKind Kind1,
                                                   ASTNodeKind Kind2);
 
+  ASTNodeKind getCladeKind() const;
+
   /// Hooks for using ASTNodeKind as a key in a DenseMap.
   struct DenseMapInfo {
     // ASTNodeKind() is a good empty key because it is represented as a 0.
@@ -132,9 +132,13 @@ private:
   enum NodeKindId {
     NKI_None,
     NKI_TemplateArgument,
+    NKI_TemplateArgumentLoc,
+    NKI_LambdaCapture,
     NKI_TemplateName,
     NKI_NestedNameSpecifierLoc,
     NKI_QualType,
+#define TYPELOC(CLASS, PARENT) NKI_##CLASS##TypeLoc,
+#include "clang/AST/TypeLocNodes.def"
     NKI_TypeLoc,
     NKI_LastKindWithoutPointerIdentity = NKI_TypeLoc,
     NKI_CXXBaseSpecifier,
@@ -150,8 +154,12 @@ private:
 #define TYPE(DERIVED, BASE) NKI_##DERIVED##Type,
 #include "clang/AST/TypeNodes.inc"
     NKI_OMPClause,
-#define OMP_CLAUSE_CLASS(Enum, Str, Class) NKI_##Class,
-#include "llvm/Frontend/OpenMP/OMPKinds.def"
+#define GEN_CLANG_CLAUSE_CLASS
+#define CLAUSE_CLASS(Enum, Str, Class) NKI_##Class,
+#include "llvm/Frontend/OpenMP/OMP.inc"
+    NKI_Attr,
+#define ATTR(A) NKI_##A##Attr,
+#include "clang/Basic/AttrList.inc"
     NKI_NumberOfKinds
   };
 
@@ -191,15 +199,20 @@ private:
   };
 KIND_TO_KIND_ID(CXXCtorInitializer)
 KIND_TO_KIND_ID(TemplateArgument)
+KIND_TO_KIND_ID(TemplateArgumentLoc)
+KIND_TO_KIND_ID(LambdaCapture)
 KIND_TO_KIND_ID(TemplateName)
 KIND_TO_KIND_ID(NestedNameSpecifier)
 KIND_TO_KIND_ID(NestedNameSpecifierLoc)
 KIND_TO_KIND_ID(QualType)
+#define TYPELOC(CLASS, PARENT) KIND_TO_KIND_ID(CLASS##TypeLoc)
+#include "clang/AST/TypeLocNodes.def"
 KIND_TO_KIND_ID(TypeLoc)
 KIND_TO_KIND_ID(Decl)
 KIND_TO_KIND_ID(Stmt)
 KIND_TO_KIND_ID(Type)
 KIND_TO_KIND_ID(OMPClause)
+KIND_TO_KIND_ID(Attr)
 KIND_TO_KIND_ID(CXXBaseSpecifier)
 #define DECL(DERIVED, BASE) KIND_TO_KIND_ID(DERIVED##Decl)
 #include "clang/AST/DeclNodes.inc"
@@ -207,8 +220,11 @@ KIND_TO_KIND_ID(CXXBaseSpecifier)
 #include "clang/AST/StmtNodes.inc"
 #define TYPE(DERIVED, BASE) KIND_TO_KIND_ID(DERIVED##Type)
 #include "clang/AST/TypeNodes.inc"
-#define OMP_CLAUSE_CLASS(Enum, Str, Class) KIND_TO_KIND_ID(Class)
-#include "llvm/Frontend/OpenMP/OMPKinds.def"
+#define GEN_CLANG_CLAUSE_CLASS
+#define CLAUSE_CLASS(Enum, Str, Class) KIND_TO_KIND_ID(Class)
+#include "llvm/Frontend/OpenMP/OMP.inc"
+#define ATTR(A) KIND_TO_KIND_ID(A##Attr)
+#include "clang/Basic/AttrList.inc"
 #undef KIND_TO_KIND_ID
 
 inline raw_ostream &operator<<(raw_ostream &OS, ASTNodeKind K) {
@@ -248,9 +264,8 @@ public:
   /// in the \c DynTypedNode, and the returned pointer points at
   /// the storage inside DynTypedNode. For those nodes, do not
   /// use the pointer outside the scope of the DynTypedNode.
-  template <typename T>
-  const T *get() const {
-    return BaseConverter<T>::get(NodeKind, Storage.buffer);
+  template <typename T> const T *get() const {
+    return BaseConverter<T>::get(NodeKind, &Storage);
   }
 
   /// Retrieve the stored node as type \c T.
@@ -258,7 +273,7 @@ public:
   /// Similar to \c get(), but asserts that the type is what we are expecting.
   template <typename T>
   const T &getUnchecked() const {
-    return BaseConverter<T>::getUnchecked(NodeKind, Storage.buffer);
+    return BaseConverter<T>::getUnchecked(NodeKind, &Storage);
   }
 
   ASTNodeKind getNodeKind() const { return NodeKind; }
@@ -270,7 +285,7 @@ public:
   /// method returns NULL.
   const void *getMemoizationData() const {
     return NodeKind.hasPointerIdentity()
-               ? *reinterpret_cast<void *const *>(Storage.buffer)
+               ? *reinterpret_cast<void *const *>(&Storage)
                : nullptr;
   }
 
@@ -298,7 +313,7 @@ public:
       return getUnchecked<QualType>().getAsOpaquePtr() <
              Other.getUnchecked<QualType>().getAsOpaquePtr();
 
-    if (ASTNodeKind::getFromNodeKind<TypeLoc>().isSame(NodeKind)) {
+    if (ASTNodeKind::getFromNodeKind<TypeLoc>().isBaseOf(NodeKind)) {
       auto TLA = getUnchecked<TypeLoc>();
       auto TLB = Other.getUnchecked<TypeLoc>();
       return std::make_pair(TLA.getType().getAsOpaquePtr(),
@@ -330,7 +345,7 @@ public:
     if (ASTNodeKind::getFromNodeKind<QualType>().isSame(NodeKind))
       return getUnchecked<QualType>() == Other.getUnchecked<QualType>();
 
-    if (ASTNodeKind::getFromNodeKind<TypeLoc>().isSame(NodeKind))
+    if (ASTNodeKind::getFromNodeKind<TypeLoc>().isBaseOf(NodeKind))
       return getUnchecked<TypeLoc>() == Other.getUnchecked<TypeLoc>();
 
     if (ASTNodeKind::getFromNodeKind<NestedNameSpecifierLoc>().isSame(NodeKind))
@@ -359,7 +374,7 @@ public:
     }
     static unsigned getHashValue(const DynTypedNode &Val) {
       // FIXME: Add hashing support for the remaining types.
-      if (ASTNodeKind::getFromNodeKind<TypeLoc>().isSame(Val.NodeKind)) {
+      if (ASTNodeKind::getFromNodeKind<TypeLoc>().isBaseOf(Val.NodeKind)) {
         auto TL = Val.getUnchecked<TypeLoc>();
         return llvm::hash_combine(TL.getType().getAsOpaquePtr(),
                                   TL.getOpaqueData());
@@ -392,12 +407,12 @@ private:
 
   /// Converter that uses dyn_cast<T> from a stored BaseT*.
   template <typename T, typename BaseT> struct DynCastPtrConverter {
-    static const T *get(ASTNodeKind NodeKind, const char Storage[]) {
+    static const T *get(ASTNodeKind NodeKind, const void *Storage) {
       if (ASTNodeKind::getFromNodeKind<T>().isBaseOf(NodeKind))
         return &getUnchecked(NodeKind, Storage);
       return nullptr;
     }
-    static const T &getUnchecked(ASTNodeKind NodeKind, const char Storage[]) {
+    static const T &getUnchecked(ASTNodeKind NodeKind, const void *Storage) {
       assert(ASTNodeKind::getFromNodeKind<T>().isBaseOf(NodeKind));
       return *cast<T>(static_cast<const BaseT *>(
           *reinterpret_cast<const void *const *>(Storage)));
@@ -405,19 +420,19 @@ private:
     static DynTypedNode create(const BaseT &Node) {
       DynTypedNode Result;
       Result.NodeKind = ASTNodeKind::getFromNode(Node);
-      new (Result.Storage.buffer) const void *(&Node);
+      new (&Result.Storage) const void *(&Node);
       return Result;
     }
   };
 
   /// Converter that stores T* (by pointer).
   template <typename T> struct PtrConverter {
-    static const T *get(ASTNodeKind NodeKind, const char Storage[]) {
+    static const T *get(ASTNodeKind NodeKind, const void *Storage) {
       if (ASTNodeKind::getFromNodeKind<T>().isSame(NodeKind))
         return &getUnchecked(NodeKind, Storage);
       return nullptr;
     }
-    static const T &getUnchecked(ASTNodeKind NodeKind, const char Storage[]) {
+    static const T &getUnchecked(ASTNodeKind NodeKind, const void *Storage) {
       assert(ASTNodeKind::getFromNodeKind<T>().isSame(NodeKind));
       return *static_cast<const T *>(
           *reinterpret_cast<const void *const *>(Storage));
@@ -425,26 +440,49 @@ private:
     static DynTypedNode create(const T &Node) {
       DynTypedNode Result;
       Result.NodeKind = ASTNodeKind::getFromNodeKind<T>();
-      new (Result.Storage.buffer) const void *(&Node);
+      new (&Result.Storage) const void *(&Node);
       return Result;
     }
   };
 
   /// Converter that stores T (by value).
   template <typename T> struct ValueConverter {
-    static const T *get(ASTNodeKind NodeKind, const char Storage[]) {
+    static const T *get(ASTNodeKind NodeKind, const void *Storage) {
       if (ASTNodeKind::getFromNodeKind<T>().isSame(NodeKind))
         return reinterpret_cast<const T *>(Storage);
       return nullptr;
     }
-    static const T &getUnchecked(ASTNodeKind NodeKind, const char Storage[]) {
+    static const T &getUnchecked(ASTNodeKind NodeKind, const void *Storage) {
       assert(ASTNodeKind::getFromNodeKind<T>().isSame(NodeKind));
       return *reinterpret_cast<const T *>(Storage);
     }
     static DynTypedNode create(const T &Node) {
       DynTypedNode Result;
       Result.NodeKind = ASTNodeKind::getFromNodeKind<T>();
-      new (Result.Storage.buffer) T(Node);
+      new (&Result.Storage) T(Node);
+      return Result;
+    }
+  };
+
+  /// Converter that stores nodes by value. It must be possible to dynamically
+  /// cast the stored node within a type hierarchy without breaking (especially
+  /// through slicing).
+  template <typename T, typename BaseT,
+            typename = std::enable_if_t<(sizeof(T) == sizeof(BaseT))>>
+  struct DynCastValueConverter {
+    static const T *get(ASTNodeKind NodeKind, const void *Storage) {
+      if (ASTNodeKind::getFromNodeKind<T>().isBaseOf(NodeKind))
+        return &getUnchecked(NodeKind, Storage);
+      return nullptr;
+    }
+    static const T &getUnchecked(ASTNodeKind NodeKind, const void *Storage) {
+      assert(ASTNodeKind::getFromNodeKind<T>().isBaseOf(NodeKind));
+      return *static_cast<const T *>(reinterpret_cast<const BaseT *>(Storage));
+    }
+    static DynTypedNode create(const T &Node) {
+      DynTypedNode Result;
+      Result.NodeKind = ASTNodeKind::getFromNode(Node);
+      new (&Result.Storage) T(Node);
       return Result;
     }
   };
@@ -456,12 +494,13 @@ private:
   /// Note that we can store \c Decls, \c Stmts, \c Types,
   /// \c NestedNameSpecifiers and \c CXXCtorInitializer by pointer as they are
   /// guaranteed to be unique pointers pointing to dedicated storage in the AST.
-  /// \c QualTypes, \c NestedNameSpecifierLocs, \c TypeLocs and
-  /// \c TemplateArguments on the other hand do not have storage or unique
-  /// pointers and thus need to be stored by value.
+  /// \c QualTypes, \c NestedNameSpecifierLocs, \c TypeLocs,
+  /// \c TemplateArguments and \c TemplateArgumentLocs on the other hand do not
+  /// have storage or unique pointers and thus need to be stored by value.
   llvm::AlignedCharArrayUnion<const void *, TemplateArgument,
-                              NestedNameSpecifierLoc, QualType,
-                              TypeLoc> Storage;
+                              TemplateArgumentLoc, NestedNameSpecifierLoc,
+                              QualType, TypeLoc>
+      Storage;
 };
 
 template <typename T>
@@ -484,6 +523,11 @@ struct DynTypedNode::BaseConverter<
     T, std::enable_if_t<std::is_base_of<OMPClause, T>::value>>
     : public DynCastPtrConverter<T, OMPClause> {};
 
+template <typename T>
+struct DynTypedNode::BaseConverter<
+    T, std::enable_if_t<std::is_base_of<Attr, T>::value>>
+    : public DynCastPtrConverter<T, Attr> {};
+
 template <>
 struct DynTypedNode::BaseConverter<
     NestedNameSpecifier, void> : public PtrConverter<NestedNameSpecifier> {};
@@ -495,6 +539,14 @@ struct DynTypedNode::BaseConverter<
 template <>
 struct DynTypedNode::BaseConverter<
     TemplateArgument, void> : public ValueConverter<TemplateArgument> {};
+
+template <>
+struct DynTypedNode::BaseConverter<TemplateArgumentLoc, void>
+    : public ValueConverter<TemplateArgumentLoc> {};
+
+template <>
+struct DynTypedNode::BaseConverter<LambdaCapture, void>
+    : public ValueConverter<LambdaCapture> {};
 
 template <>
 struct DynTypedNode::BaseConverter<
@@ -509,9 +561,10 @@ template <>
 struct DynTypedNode::BaseConverter<QualType,
                                    void> : public ValueConverter<QualType> {};
 
-template <>
+template <typename T>
 struct DynTypedNode::BaseConverter<
-    TypeLoc, void> : public ValueConverter<TypeLoc> {};
+    T, std::enable_if_t<std::is_base_of<TypeLoc, T>::value>>
+    : public DynCastValueConverter<T, TypeLoc> {};
 
 template <>
 struct DynTypedNode::BaseConverter<CXXBaseSpecifier, void>
@@ -526,20 +579,6 @@ template <typename T, typename EnablerT> struct DynTypedNode::BaseConverter {
     return NULL;
   }
 };
-
-// Previously these types were defined in the clang::ast_type_traits namespace.
-// Provide typedefs so that legacy code can be fixed asynchronously.
-namespace ast_type_traits {
-using DynTypedNode = ::clang::DynTypedNode;
-using ASTNodeKind = ::clang::ASTNodeKind;
-using TraversalKind = ::clang::TraversalKind;
-
-constexpr TraversalKind TK_AsIs = ::clang::TK_AsIs;
-constexpr TraversalKind TK_IgnoreImplicitCastsAndParentheses =
-    ::clang::TK_IgnoreImplicitCastsAndParentheses;
-constexpr TraversalKind TK_IgnoreUnlessSpelledInSource =
-    ::clang::TK_IgnoreUnlessSpelledInSource;
-} // namespace ast_type_traits
 
 } // end namespace clang
 

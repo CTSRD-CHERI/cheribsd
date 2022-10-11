@@ -144,7 +144,7 @@ class ShrinkWrap : public MachineFunctionPass {
   unsigned FrameDestroyOpcode;
 
   /// Stack pointer register, used by llvm.{savestack,restorestack}
-  unsigned SP;
+  Register SP;
 
   /// Entry block.
   const MachineBasicBlock *Entry;
@@ -273,6 +273,8 @@ bool ShrinkWrap::useOrDefCSROrFI(const MachineInstr &MI,
     LLVM_DEBUG(dbgs() << "Frame instruction: " << MI << '\n');
     return true;
   }
+  const MachineFunction *MF = MI.getParent()->getParent();
+  const TargetRegisterInfo *TRI = MF->getSubtarget().getRegisterInfo();
   for (const MachineOperand &MO : MI.operands()) {
     bool UseOrDefCSR = false;
     if (MO.isReg()) {
@@ -288,8 +290,14 @@ bool ShrinkWrap::useOrDefCSROrFI(const MachineInstr &MI,
       // separately. An SP mentioned by a call instruction, we can ignore,
       // though, as it's harmless and we do not want to effectively disable tail
       // calls by forcing the restore point to post-dominate them.
-      UseOrDefCSR = (!MI.isCall() && PhysReg == SP) ||
-                    RCI.getLastCalleeSavedAlias(PhysReg);
+      // PPC's LR is also not normally described as a callee-saved register in
+      // calling convention definitions, so we need to watch for it, too. An LR
+      // mentioned implicitly by a return (or "branch to link register")
+      // instruction we can ignore, otherwise we may pessimize shrinkwrapping.
+      UseOrDefCSR =
+          (!MI.isCall() && PhysReg == SP) ||
+          RCI.getLastCalleeSavedAlias(PhysReg) ||
+          (!MI.isReturn() && TRI->isNonallocatableRegisterCalleeSave(PhysReg));
     } else if (MO.isRegMask()) {
       // Check if this regmask clobbers any of the CSRs.
       for (unsigned Reg : getCurrentCSRs(RS)) {
@@ -331,11 +339,7 @@ void ShrinkWrap::updateSaveRestorePoints(MachineBasicBlock &MBB,
     Save = &MBB;
   else
     Save = MDT->findNearestCommonDominator(Save, &MBB);
-
-  if (!Save) {
-    LLVM_DEBUG(dbgs() << "Found a block that is not reachable from Entry\n");
-    return;
-  }
+  assert(Save);
 
   if (!Restore)
     Restore = &MBB;
@@ -381,7 +385,7 @@ void ShrinkWrap::updateSaveRestorePoints(MachineBasicBlock &MBB,
   // C. Save and Restore are in the same loop.
   bool SaveDominatesRestore = false;
   bool RestorePostDominatesSave = false;
-  while (Save && Restore &&
+  while (Restore &&
          (!(SaveDominatesRestore = MDT->dominates(Save, Restore)) ||
           !(RestorePostDominatesSave = MPDT->dominates(Restore, Save)) ||
           // Post-dominance is not enough in loops to ensure that all uses/defs
@@ -412,8 +416,7 @@ void ShrinkWrap::updateSaveRestorePoints(MachineBasicBlock &MBB,
       Restore = MPDT->findNearestCommonDominator(Restore, Save);
 
     // Fix (C).
-    if (Save && Restore &&
-        (MLI->getLoopFor(Save) || MLI->getLoopFor(Restore))) {
+    if (Restore && (MLI->getLoopFor(Save) || MLI->getLoopFor(Restore))) {
       if (MLI->getLoopDepth(Save) > MLI->getLoopDepth(Restore)) {
         // Push Save outside of this loop if immediate dominator is different
         // from save block. If immediate dominator is not different, bail out.

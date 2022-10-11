@@ -301,7 +301,7 @@ trap(struct trapframe *frame)
 		td->td_pticks = 0;
 		td->td_frame = frame;
 		addr = frame->tf_eip;
-		if (td->td_cowgen != p->p_cowgen)
+		if (td->td_cowgen != atomic_load_int(&p->p_cowgen))
 			thread_cow_update(td);
 
 		switch (type) {
@@ -414,7 +414,7 @@ user_trctrap_out:
 #endif
 			if (time_second - lastalert > 10) {
 				log(LOG_WARNING, "NMI: power fail\n");
-				sysbeep(880, hz);
+				sysbeep(880, SBT_1S);
 				lastalert = time_second;
 			}
 			return;
@@ -671,7 +671,7 @@ kernel_trctrap:
 #ifdef POWERFAIL_NMI
 			if (time_second - lastalert > 10) {
 				log(LOG_WARNING, "NMI: power fail\n");
-				sysbeep(880, hz);
+				sysbeep(880, SBT_1S);
 				lastalert = time_second;
 			}
 			return;
@@ -684,10 +684,6 @@ kernel_trctrap:
 		trap_fatal(frame, eva);
 		return;
 	}
-
-	/* Translate fault for emulators (e.g. Linux) */
-	if (*p->p_sysent->sv_transtrap != NULL)
-		signo = (*p->p_sysent->sv_transtrap)(signo, type);
 
 	ksiginfo_init_trap(&ksi);
 	ksi.ksi_signo = signo;
@@ -875,9 +871,7 @@ trap_pfault(struct trapframe *frame, bool usermode, vm_offset_t eva,
 }
 
 static void
-trap_fatal(frame, eva)
-	struct trapframe *frame;
-	vm_offset_t eva;
+trap_fatal(struct trapframe *frame, vm_offset_t eva)
 {
 	int code, ss, esp;
 	u_int type;
@@ -1054,6 +1048,7 @@ cpu_fetch_syscall_args(struct thread *td)
 #endif
 
 	sa->code = frame->tf_eax;
+	sa->original_code = sa->code;
 	params = (caddr_t)frame->tf_esp + sizeof(uint32_t);
 
 	/*

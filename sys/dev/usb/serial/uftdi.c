@@ -259,8 +259,6 @@ static device_method_t uftdi_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t uftdi_devclass;
-
 static driver_t uftdi_driver = {
 	.name = "uftdi",
 	.methods = uftdi_methods,
@@ -915,7 +913,7 @@ static const STRUCT_USB_HOST_ID uftdi_devs[] = {
 #undef UFTDI_DEV
 };
 
-DRIVER_MODULE(uftdi, uhub, uftdi_driver, uftdi_devclass, NULL, NULL);
+DRIVER_MODULE(uftdi, uhub, uftdi_driver, NULL, NULL);
 MODULE_DEPEND(uftdi, ucom, 1, 1, 1);
 MODULE_DEPEND(uftdi, usb, 1, 1, 1);
 MODULE_VERSION(uftdi, 1);
@@ -1213,14 +1211,9 @@ uftdi_write_callback(struct usb_xfer *xfer, usb_error_t error)
 	DPRINTFN(3, "\n");
 
 	switch (USB_GET_STATE(xfer)) {
-	default:			/* Error */
-		if (error != USB_ERR_CANCELLED) {
-			/* try to clear stall first */
-			usbd_xfer_set_stall(xfer);
-		}
-		/* FALLTHROUGH */
 	case USB_ST_SETUP:
 	case USB_ST_TRANSFERRED:
+tr_setup:
 		/*
 		 * If output packets don't require headers (the common case) we
 		 * can just load the buffer up with payload bytes all at once.
@@ -1253,6 +1246,13 @@ uftdi_write_callback(struct usb_xfer *xfer, usb_error_t error)
 		if (buflen != 0) {
 			usbd_xfer_set_frame_len(xfer, 0, buflen);
 			usbd_transfer_submit(xfer);
+		}
+		break;
+	default:			/* Error */
+		if (error != USB_ERR_CANCELLED) {
+			/* try to clear stall first */
+			usbd_xfer_set_stall(xfer);
+			goto tr_setup;
 		}
 		break;
 	}

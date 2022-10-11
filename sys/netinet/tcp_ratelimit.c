@@ -367,11 +367,22 @@ rl_add_syctl_entries(struct sysctl_oid *rl_sysctl_root, struct tcp_rate_set *rs)
 				       OID_AUTO, "pacetime", CTLFLAG_RD,
 				       &rs->rs_rlt[i].time_between, 0,
 				       "Time hardware inserts between 1500 byte sends");
-			SYSCTL_ADD_U64(&rs->sysctl_ctx,
+			SYSCTL_ADD_LONG(&rs->sysctl_ctx,
 				       SYSCTL_CHILDREN(rl_rate_num),
 				       OID_AUTO, "rate", CTLFLAG_RD,
-				       &rs->rs_rlt[i].rate, 0,
+				       &rs->rs_rlt[i].rate,
 				       "Rate in bytes per second");
+			SYSCTL_ADD_LONG(&rs->sysctl_ctx,
+				       SYSCTL_CHILDREN(rl_rate_num),
+				       OID_AUTO, "using", CTLFLAG_RD,
+				       &rs->rs_rlt[i].using,
+				       "Number of flows using");
+			SYSCTL_ADD_LONG(&rs->sysctl_ctx,
+				       SYSCTL_CHILDREN(rl_rate_num),
+				       OID_AUTO, "enobufs", CTLFLAG_RD,
+				       &rs->rs_rlt[i].rs_num_enobufs,
+				       "Number of enobufs logged on this rate");
+
 		}
 	}
 #endif
@@ -667,6 +678,8 @@ bail:
 		 */
 		rs->rs_rlt[i].ptbl = rs;
 		rs->rs_rlt[i].tag = NULL;
+		rs->rs_rlt[i].using = 0;
+		rs->rs_rlt[i].rs_num_enobufs = 0;
 		/*
 		 * Calculate the time between.
 		 */
@@ -1052,8 +1065,8 @@ rt_find_real_interface(struct ifnet *ifp, struct inpcb *inp, int *error)
 		return (NULL);
 	}
 	ntag = tag;
-	while(ntag->ifp->if_next_snd_tag != NULL) {
-		ntag = ntag->ifp->if_next_snd_tag(ntag);
+	while (ntag->sw->next_snd_tag != NULL) {
+		ntag = ntag->sw->next_snd_tag(ntag);
 	}
 	tifp = ntag->ifp;
 	m_snd_tag_rele(tag);
@@ -1063,16 +1076,28 @@ rt_find_real_interface(struct ifnet *ifp, struct inpcb *inp, int *error)
 static void
 rl_increment_using(const struct tcp_hwrate_limit_table *rte)
 {
+	struct tcp_hwrate_limit_table *decon_rte;
+
+	decon_rte = __DECONST(struct tcp_hwrate_limit_table *, rte);
+	atomic_add_long(&decon_rte->using, 1);
 }
 
 static void
 rl_decrement_using(const struct tcp_hwrate_limit_table *rte)
 {
+	struct tcp_hwrate_limit_table *decon_rte;
+
+	decon_rte = __DECONST(struct tcp_hwrate_limit_table *, rte);
+	atomic_subtract_long(&decon_rte->using, 1);
 }
 
 void
 tcp_rl_log_enobuf(const struct tcp_hwrate_limit_table *rte)
 {
+	struct tcp_hwrate_limit_table *decon_rte;
+
+	decon_rte = __DECONST(struct tcp_hwrate_limit_table *, rte);
+	atomic_add_long(&decon_rte->rs_num_enobufs, 1);
 }
 
 /*
@@ -1335,7 +1360,7 @@ tcp_set_pacing_rate(struct tcpcb *tp, struct ifnet *ifp,
 			 * send tag.  This will convert the existing
 			 * tag to a TLS ratelimit tag.
 			 */
-			MPASS(tls->snd_tag->type == IF_SND_TAG_TYPE_TLS);
+			MPASS(tls->snd_tag->sw->type == IF_SND_TAG_TYPE_TLS);
 			ktls_output_eagain(tp->t_inpcb, tls);
 		}
 #endif
@@ -1378,22 +1403,36 @@ tcp_chg_pacing_rate(const struct tcp_hwrate_limit_table *crte,
 #ifdef KERN_TLS
 	if (tp->t_inpcb->inp_socket->so_snd.sb_flags & SB_TLS_IFNET) {
 		tls = tp->t_inpcb->inp_socket->so_snd.sb_tls_info;
-		MPASS(tls->mode == TCP_TLS_MODE_IFNET);
-		if (tls->snd_tag != NULL &&
-		    tls->snd_tag->type != IF_SND_TAG_TYPE_TLS_RATE_LIMIT) {
+		if (tls->mode != TCP_TLS_MODE_IFNET)
+			tls = NULL;
+		else if (tls->snd_tag != NULL &&
+		    tls->snd_tag->sw->type != IF_SND_TAG_TYPE_TLS_RATE_LIMIT) {
+			if (!tls->reset_pending) {
+				/*
+				 * NIC probably doesn't support
+				 * ratelimit TLS tags if it didn't
+				 * allocate one when an existing rate
+				 * was present, so ignore.
+				 */
+				tcp_rel_pacing_rate(crte, tp);
+				if (error)
+					*error = EOPNOTSUPP;
+				return (NULL);
+			}
+
 			/*
-			 * NIC probably doesn't support ratelimit TLS
-			 * tags if it didn't allocate one when an
-			 * existing rate was present, so ignore.
+			 * The send tag is being converted, so set the
+			 * rate limit on the inpcb tag.  There is a
+			 * race that the new NIC send tag might use
+			 * the current rate instead of this one.
 			 */
-			if (error)
-				*error = EOPNOTSUPP;
-			return (NULL);
+			tls = NULL;
 		}
 	}
 #endif
 	if (tp->t_inpcb->inp_snd_tag == NULL) {
 		/* Wrong interface */
+		tcp_rel_pacing_rate(crte, tp);
 		if (error)
 			*error = EINVAL;
 		return (NULL);
@@ -1432,10 +1471,29 @@ tcp_chg_pacing_rate(const struct tcp_hwrate_limit_table *crte,
 #endif
 		err = in_pcbmodify_txrtlmt(tp->t_inpcb, nrte->rate);
 	if (err) {
+		struct tcp_rate_set *lrs;
+		uint64_t pre;
+
 		rl_decrement_using(nrte);
+		lrs = __DECONST(struct tcp_rate_set *, rs);
+		pre = atomic_fetchadd_64(&lrs->rs_flows_using, -1);
 		/* Do we still have a snd-tag attached? */
 		if (tp->t_inpcb->inp_snd_tag)
 			in_pcbdetach_txrtlmt(tp->t_inpcb);
+
+		if (pre == 1) {
+			struct epoch_tracker et;
+
+			NET_EPOCH_ENTER(et);
+			mtx_lock(&rs_mtx);
+			/*
+			 * Is it dead?
+			 */
+			if (lrs->rs_flags & RS_IS_DEAD)
+				rs_defer_destroy(lrs);
+			mtx_unlock(&rs_mtx);
+			NET_EPOCH_EXIT(et);
+		}
 		if (error)
 			*error = err;
 		return (NULL);
@@ -1504,10 +1562,8 @@ tcp_log_pacing_size(struct tcpcb *tp, uint64_t bw, uint32_t segsiz, uint32_t new
 	if (tp->t_logstate != TCP_LOG_STATE_OFF) {
 		union tcp_log_stackspecific log;
 		struct timeval tv;
-		uint32_t cts;
 
 		memset(&log, 0, sizeof(log));
-		cts = tcp_get_usecs(&tv);
 		log.u_bbr.flex1 = segsiz;
 		log.u_bbr.flex2 = new_tso;
 		log.u_bbr.flex3 = time_between;

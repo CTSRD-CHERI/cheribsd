@@ -122,10 +122,17 @@ int		 atoul(char *, u_long *);
 enum {
 	PFCTL_STATE_NONE,
 	PFCTL_STATE_OPTION,
+	PFCTL_STATE_ETHER,
 	PFCTL_STATE_SCRUB,
 	PFCTL_STATE_QUEUE,
 	PFCTL_STATE_NAT,
 	PFCTL_STATE_FILTER
+};
+
+struct node_etherproto {
+	u_int16_t		 proto;
+	struct node_etherproto	*next;
+	struct node_etherproto	*tail;
 };
 
 struct node_proto {
@@ -236,6 +243,7 @@ static struct filter_opts {
 	struct node_icmp	*icmpspec;
 	u_int32_t		 tos;
 	u_int32_t		 prob;
+	u_int32_t		 ridentifier;
 	struct {
 		int			 action;
 		struct node_state_opt	*options;
@@ -248,6 +256,9 @@ static struct filter_opts {
 	char			*tag;
 	char			*match_tag;
 	u_int8_t		 match_tag_not;
+	u_int16_t		 dnpipe;
+	u_int16_t		 dnrpipe;
+	u_int32_t		 free_flags;
 	u_int			 rtableid;
 	u_int8_t		 prio;
 	u_int8_t		 set_prio[2];
@@ -260,6 +271,7 @@ static struct filter_opts {
 static struct antispoof_opts {
 	char			*label[PF_RULE_MAX_LABEL_COUNT];
 	int			 labelcount;
+	u_int32_t		 ridentifier;
 	u_int			 rtableid;
 } antispoof_opts;
 
@@ -317,6 +329,7 @@ static struct codel_opts	 codel_opts;
 static struct node_hfsc_opts	 hfsc_opts;
 static struct node_fairq_opts	 fairq_opts;
 static struct node_state_opt	*keep_state_defaults = NULL;
+static struct pfctl_watermarks	 syncookie_opts;
 
 int		 disallow_table(struct node_host *, const char *);
 int		 disallow_urpf_failed(struct node_host *, const char *);
@@ -329,14 +342,16 @@ int		 process_tabledef(char *, struct table_opts *);
 void		 expand_label_str(char *, size_t, const char *, const char *);
 void		 expand_label_if(const char *, char *, size_t, const char *);
 void		 expand_label_addr(const char *, char *, size_t, u_int8_t,
-		    struct node_host *);
+		    struct pf_rule_addr *);
 void		 expand_label_port(const char *, char *, size_t,
-		    struct node_port *);
+		    struct pf_rule_addr *);
 void		 expand_label_proto(const char *, char *, size_t, u_int8_t);
-void		 expand_label_nr(const char *, char *, size_t);
-void		 expand_label(char *, size_t, const char *, u_int8_t,
-		    struct node_host *, struct node_port *, struct node_host *,
-		    struct node_port *, u_int8_t);
+void		 expand_label_nr(const char *, char *, size_t,
+		    struct pfctl_rule *);
+void		 expand_eth_rule(struct pfctl_eth_rule *,
+		    struct node_if *, struct node_etherproto *,
+		    struct node_mac *, struct node_mac *,
+		    struct node_host *, struct node_host *, const char *);
 void		 expand_rule(struct pfctl_rule *, struct node_if *,
 		    struct node_host *, struct node_proto *, struct node_os *,
 		    struct node_host *, struct node_port *, struct node_host *,
@@ -356,12 +371,16 @@ int	 rule_label(struct pfctl_rule *, char *s[PF_RULE_MAX_LABEL_COUNT]);
 int	 rt_tableid_max(void);
 
 void	 mv_rules(struct pfctl_ruleset *, struct pfctl_ruleset *);
+void	 mv_eth_rules(struct pfctl_eth_ruleset *, struct pfctl_eth_ruleset *);
 void	 decide_address_family(struct node_host *, sa_family_t *);
 void	 remove_invalid_hosts(struct node_host **, sa_family_t *);
 int	 invalid_redirect(struct node_host *, sa_family_t);
 u_int16_t parseicmpspec(char *, sa_family_t);
 int	 kw_casecmp(const void *, const void *);
 int	 map_tos(char *string, int *);
+struct node_mac* node_mac_from_string(const char *);
+struct node_mac* node_mac_from_string_masklen(const char *, int);
+struct node_mac* node_mac_from_string_mask(const char *, const char *);
 
 static TAILQ_HEAD(loadanchorshead, loadanchors)
     loadanchorshead = TAILQ_HEAD_INITIALIZER(loadanchorshead);
@@ -392,6 +411,7 @@ typedef struct {
 		}			 range;
 		struct node_if		*interface;
 		struct node_proto	*proto;
+		struct node_etherproto	*etherproto;
 		struct node_icmp	*icmp;
 		struct node_host	*host;
 		struct node_os		*os;
@@ -404,6 +424,14 @@ typedef struct {
 			struct peer	 src, dst;
 			struct node_os	*src_os;
 		}			 fromto;
+		struct {
+			struct node_mac	*src;
+			struct node_mac	*dst;
+		}			 etherfromto;
+		struct node_mac		*mac;
+		struct {
+			struct node_mac	*mac;
+		} etheraddr;
 		struct {
 			struct node_host	*host;
 			u_int8_t		 rt;
@@ -442,6 +470,7 @@ typedef struct {
 		struct node_hfsc_opts	 hfsc_opts;
 		struct node_fairq_opts	 fairq_opts;
 		struct codel_opts	 codel_opts;
+		struct pfctl_watermarks	*watermarks;
 	} v;
 	int lineno;
 } YYSTYPE;
@@ -456,7 +485,7 @@ int	parseport(char *, struct range *r, int);
 
 %}
 
-%token	PASS BLOCK SCRUB RETURN IN OS OUT LOG QUICK ON FROM TO FLAGS
+%token	PASS BLOCK MATCH SCRUB RETURN IN OS OUT LOG QUICK ON FROM TO FLAGS
 %token	RETURNRST RETURNICMP RETURNICMP6 PROTO INET INET6 ALL ANY ICMPTYPE
 %token	ICMP6TYPE CODE KEEP MODULATE STATE PORT RDR NAT BINAT ARROW NODF
 %token	MINTTL ERROR ALLOWOPTS FASTROUTE FILENAME ROUTETO DUPTO REPLYTO NO LABEL
@@ -464,10 +493,12 @@ int	parseport(char *, struct range *r, int);
 %token	REASSEMBLE FRAGDROP FRAGCROP ANCHOR NATANCHOR RDRANCHOR BINATANCHOR
 %token	SET OPTIMIZATION TIMEOUT LIMIT LOGINTERFACE BLOCKPOLICY FAILPOLICY
 %token	RANDOMID REQUIREORDER SYNPROXY FINGERPRINTS NOSYNC DEBUG SKIP HOSTID
-%token	ANTISPOOF FOR INCLUDE KEEPCOUNTERS
+%token	ANTISPOOF FOR INCLUDE KEEPCOUNTERS SYNCOOKIES L3
+%token	ETHER
 %token	BITMASK RANDOM SOURCEHASH ROUNDROBIN STATICPORT PROBABILITY MAPEPORTSET
 %token	ALTQ CBQ CODEL PRIQ HFSC FAIRQ BANDWIDTH TBRSIZE LINKSHARE REALTIME
 %token	UPPERLIMIT QUEUE PRIORITY QLIMIT HOGS BUCKETS RTABLE TARGET INTERVAL
+%token	DNPIPE DNQUEUE RIDENTIFIER
 %token	LOAD RULESET_OPTIMIZATION PRIO
 %token	STICKYADDRESS MAXSRCSTATES MAXSRCNODES SOURCETRACK GLOBAL RULE
 %token	MAXSRCCONN MAXSRCCONNRATE OVERLOAD FLUSH SLOPPY
@@ -480,8 +511,9 @@ int	parseport(char *, struct range *r, int);
 %type	<v.number>		number icmptype icmp6type uid gid
 %type	<v.number>		tos not yesno
 %type	<v.probability>		probability
-%type	<v.i>			no dir af fragcache optimizer
+%type	<v.i>			no dir af fragcache optimizer syncookie_val
 %type	<v.i>			sourcetrack flush unaryop statelock
+%type	<v.i>			etherprotoval
 %type	<v.b>			action nataction natpasslog scrubaction
 %type	<v.b>			flags flag blockspec prio
 %type	<v.range>		portplain portstar portrange
@@ -492,7 +524,7 @@ int	parseport(char *, struct range *r, int);
 %type	<v.icmp>		icmp_list icmp_item
 %type	<v.icmp>		icmp6_list icmp6_item
 %type	<v.number>		reticmpspec reticmp6spec
-%type	<v.fromto>		fromto
+%type	<v.fromto>		fromto l3fromto
 %type	<v.peer>		ipportspec from to
 %type	<v.host>		ipspec toipspec xhost host dynaddr host_list
 %type	<v.host>		redir_host_list redirspec
@@ -509,7 +541,7 @@ int	parseport(char *, struct range *r, int);
 %type	<v.state_opt>		state_opt_spec state_opt_list state_opt_item
 %type	<v.logquick>		logquick quick log logopts logopt
 %type	<v.interface>		antispoof_ifspc antispoof_iflst antispoof_if
-%type	<v.qassign>		qname
+%type	<v.qassign>		qname etherqname
 %type	<v.queue>		qassign qassign_list qassign_item
 %type	<v.queue_options>	scheduler
 %type	<v.number>		cbqflags_list cbqflags_item
@@ -518,7 +550,7 @@ int	parseport(char *, struct range *r, int);
 %type	<v.fairq_opts>		fairqopts_list fairqopts_item fairq_opts
 %type	<v.codel_opts>		codelopts_list codelopts_item codel_opts
 %type	<v.queue_bwspec>	bandwidth
-%type	<v.filter_opts>		filter_opts filter_opt filter_opts_l
+%type	<v.filter_opts>		filter_opts filter_opt filter_opts_l etherfilter_opts etherfilter_opt etherfilter_opts_l
 %type	<v.filter_opts>		filter_sets filter_set filter_sets_l
 %type	<v.antispoof_opts>	antispoof_opts antispoof_opt antispoof_opts_l
 %type	<v.queue_opts>		queue_opts queue_opt queue_opts_l
@@ -527,12 +559,19 @@ int	parseport(char *, struct range *r, int);
 %type	<v.pool_opts>		pool_opts pool_opt pool_opts_l
 %type	<v.tagged>		tagged
 %type	<v.rtableid>		rtable
+%type	<v.watermarks>		syncookie_opts
+%type	<v.etherproto>		etherproto etherproto_list etherproto_item
+%type	<v.etherfromto>		etherfromto
+%type	<v.etheraddr>		etherfrom etherto
+%type	<v.mac>			xmac mac mac_list macspec
 %%
 
 ruleset		: /* empty */
 		| ruleset include '\n'
 		| ruleset '\n'
 		| ruleset option '\n'
+		| ruleset etherrule '\n'
+		| ruleset etheranchorrule '\n'
 		| ruleset scrubrule '\n'
 		| ruleset natrule '\n'
 		| ruleset binatrule '\n'
@@ -725,6 +764,57 @@ option		: SET OPTIMIZATION STRING		{
 		| SET KEEPCOUNTERS {
 			pf->keep_counters = true;
 		}
+		| SET SYNCOOKIES syncookie_val syncookie_opts {
+			if (pfctl_cfg_syncookies(pf, $3, $4)) {
+				yyerror("error setting syncookies");
+				YYERROR;
+			}
+		}
+		;
+
+syncookie_val  : STRING        {
+			if (!strcmp($1, "never"))
+				$$ = PFCTL_SYNCOOKIES_NEVER;
+			else if (!strcmp($1, "adaptive"))
+				$$ = PFCTL_SYNCOOKIES_ADAPTIVE;
+			else if (!strcmp($1, "always"))
+				$$ = PFCTL_SYNCOOKIES_ALWAYS;
+			else {
+				yyerror("illegal value for syncookies");
+				YYERROR;
+			}
+		}
+		;
+syncookie_opts  : /* empty */                   { $$ = NULL; }
+		| {
+			memset(&syncookie_opts, 0, sizeof(syncookie_opts));
+		  } '(' syncookie_opt_l ')'     { $$ = &syncookie_opts; }
+		;
+
+syncookie_opt_l : syncookie_opt_l comma syncookie_opt
+		| syncookie_opt
+		;
+
+syncookie_opt   : STRING STRING {
+			double   val;
+			char    *cp;
+
+			val = strtod($2, &cp);
+			if (cp == NULL || strcmp(cp, "%"))
+				YYERROR;
+			if (val <= 0 || val > 100) {
+				yyerror("illegal percentage value");
+				YYERROR;
+			}
+			if (!strcmp($1, "start")) {
+				syncookie_opts.hi = val;
+			} else if (!strcmp($1, "end")) {
+				syncookie_opts.lo = val;
+			} else {
+				yyerror("illegal syncookie option");
+				YYERROR;
+			}
+		}
 		;
 
 stringall	: STRING	{ $$ = $1; }
@@ -797,10 +887,9 @@ pfa_anchor	: '{'
 			char ta[PF_ANCHOR_NAME_SIZE];
 			struct pfctl_ruleset *rs;
 
-			/* steping into a brace anchor */
+			/* stepping into a brace anchor */
 			pf->asd++;
 			pf->bn++;
-			pf->brace = 1;
 
 			/* create a holding ruleset in the root */
 			snprintf(ta, PF_ANCHOR_NAME_SIZE, "_%d", pf->bn);
@@ -872,6 +961,7 @@ anchorrule	: ANCHOR anchorname dir quick interface af proto fromto
 			r.af = $6;
 			r.prob = $9.prob;
 			r.rtableid = $9.rtableid;
+			r.ridentifier = $9.ridentifier;
 
 			if ($9.tag)
 				if (strlcpy(r.tagname, $9.tag,
@@ -1093,6 +1183,165 @@ scrubaction	: no SCRUB {
 		}
 		;
 
+etherrule	: ETHER action dir quick interface etherproto etherfromto l3fromto etherfilter_opts
+		{
+			struct pfctl_eth_rule	r;
+
+			bzero(&r, sizeof(r));
+
+			if (check_rulestate(PFCTL_STATE_ETHER))
+				YYERROR;
+
+			r.action = $2.b1;
+			r.direction = $3;
+			r.quick = $4.quick;
+			if ($9.tag != NULL)
+				memcpy(&r.tagname, $9.tag, sizeof(r.tagname));
+			if ($9.match_tag)
+				if (strlcpy(r.match_tagname, $9.match_tag,
+				    PF_TAG_NAME_SIZE) >= PF_TAG_NAME_SIZE) {
+					yyerror("tag too long, max %u chars",
+					    PF_TAG_NAME_SIZE - 1);
+					YYERROR;
+				}
+			r.match_tag_not = $9.match_tag_not;
+			if ($9.queues.qname != NULL)
+				memcpy(&r.qname, $9.queues.qname, sizeof(r.qname));
+			r.dnpipe = $9.dnpipe;
+			r.dnflags = $9.free_flags;
+
+			expand_eth_rule(&r, $5, $6, $7.src, $7.dst,
+			    $8.src.host, $8.dst.host, "");
+		}
+		;
+
+etherpfa_anchorlist	: /* empty */
+		| etherpfa_anchorlist '\n'
+		| etherpfa_anchorlist etherrule '\n'
+		| etherpfa_anchorlist etheranchorrule '\n'
+		;
+
+etherpfa_anchor	: '{'
+		{
+			char ta[PF_ANCHOR_NAME_SIZE];
+			struct pfctl_eth_ruleset *rs;
+
+			/* steping into a brace anchor */
+			pf->asd++;
+			pf->bn++;
+
+			/* create a holding ruleset in the root */
+			snprintf(ta, PF_ANCHOR_NAME_SIZE, "_%d", pf->bn);
+			rs = pf_find_or_create_eth_ruleset(ta);
+			if (rs == NULL)
+				err(1, "etherpfa_anchor: pf_find_or_create_eth_ruleset");
+			pf->eastack[pf->asd] = rs->anchor;
+			pf->eanchor = rs->anchor;
+		} '\n' etherpfa_anchorlist '}'
+		{
+			pf->ealast = pf->eanchor;
+			pf->asd--;
+			pf->eanchor = pf->eastack[pf->asd];
+		}
+		| /* empty */
+		;
+
+etheranchorrule	: ETHER ANCHOR anchorname dir quick interface etherproto etherfromto l3fromto etherpfa_anchor
+		{
+			struct pfctl_eth_rule	r;
+
+			if (check_rulestate(PFCTL_STATE_ETHER)) {
+				free($3);
+				YYERROR;
+			}
+
+			if ($3 && ($3[0] == '_' || strstr($3, "/_") != NULL)) {
+				free($3);
+				yyerror("anchor names beginning with '_' "
+				    "are reserved for internal use");
+				YYERROR;
+			}
+
+			memset(&r, 0, sizeof(r));
+			if (pf->eastack[pf->asd + 1]) {
+				/* move inline rules into relative location */
+				pfctl_eth_anchor_setup(pf, &r,
+				    &pf->eastack[pf->asd]->ruleset,
+				    $3 ? $3 : pf->ealast->name);
+				if (r.anchor == NULL)
+					err(1, "etheranchorrule: unable to "
+					    "create ruleset");
+
+				if (pf->ealast != r.anchor) {
+					if (r.anchor->match) {
+						yyerror("inline anchor '%s' "
+						    "already exists",
+						    r.anchor->name);
+						YYERROR;
+					}
+					mv_eth_rules(&pf->ealast->ruleset,
+					    &r.anchor->ruleset);
+				}
+				pf_remove_if_empty_eth_ruleset(&pf->ealast->ruleset);
+				pf->ealast = r.anchor;
+			} else {
+				if (!$3) {
+					yyerror("anchors without explicit "
+					    "rules must specify a name");
+					YYERROR;
+				}
+			}
+
+			r.direction = $4;
+			r.quick = $5.quick;
+
+			expand_eth_rule(&r, $6, $7, $8.src, $8.dst,
+			    $9.src.host, $9.dst.host,
+			    pf->eastack[pf->asd + 1] ? pf->ealast->name : $3);
+
+			free($3);
+			pf->eastack[pf->asd + 1] = NULL;
+		}
+		;
+
+etherfilter_opts	:	{
+				bzero(&filter_opts, sizeof filter_opts);
+			}
+		    etherfilter_opts_l
+			{ $$ = filter_opts; }
+		| /* empty */	{
+			bzero(&filter_opts, sizeof filter_opts);
+			$$ = filter_opts;
+		}
+		;
+
+etherfilter_opts_l	: etherfilter_opts_l etherfilter_opt
+			| etherfilter_opt
+
+etherfilter_opt	: etherqname	{
+			if (filter_opts.queues.qname) {
+				yyerror("queue cannot be redefined");
+				YYERROR;
+			}
+			filter_opts.queues = $1;
+		}
+		| TAG string				{
+			filter_opts.tag = $2;
+		}
+		| not TAGGED string			{
+			filter_opts.match_tag = $3;
+			filter_opts.match_tag_not = $1;
+		}
+		| DNPIPE number {
+			filter_opts.dnpipe = $2;
+			filter_opts.free_flags |= PFRULE_DN_IS_PIPE;
+		}
+		| DNQUEUE number {
+			filter_opts.dnpipe = $2;
+			filter_opts.free_flags |= PFRULE_DN_IS_QUEUE;
+		}
+		;
+
 scrubrule	: scrubaction dir logquick interface af proto fromto scrub_opts
 		{
 			struct pfctl_rule	r;
@@ -1271,6 +1520,7 @@ antispoof	: ANTISPOOF logquick antispoof_ifspc af antispoof_opts {
 				r.logif = $2.logif;
 				r.quick = $2.quick;
 				r.af = $4;
+				r.ridentifier = $5.ridentifier;
 				if (rule_label(&r, $5.label))
 					YYERROR;
 				r.rtableid = $5.rtableid;
@@ -1323,6 +1573,7 @@ antispoof	: ANTISPOOF logquick antispoof_ifspc af antispoof_opts {
 					r.logif = $2.logif;
 					r.quick = $2.quick;
 					r.af = $4;
+					r.ridentifier = $5.ridentifier;
 					if (rule_label(&r, $5.label))
 						YYERROR;
 					r.rtableid = $5.rtableid;
@@ -1384,6 +1635,9 @@ antispoof_opt	: label	{
 				YYERROR;
 			}
 			antispoof_opts.label[antispoof_opts.labelcount++] = $1;
+		}
+		| RIDENTIFIER number {
+			antispoof_opts.ridentifier = $2;
 		}
 		| RTABLE NUMBER				{
 			if ($2 < 0 || $2 > rt_tableid_max()) {
@@ -2100,6 +2354,7 @@ pfrule		: action dir logquick interface route af proto fromto
 				YYERROR;
 			for (int i = 0; i < PF_RULE_MAX_LABEL_COUNT; i++)
 				free($9.label[i]);
+			r.ridentifier = $9.ridentifier;
 			r.flags = $9.flags.b1;
 			r.flagset = $9.flags.b2;
 			if (($9.flags.b1 & $9.flags.b2) != $9.flags.b1) {
@@ -2449,6 +2704,15 @@ pfrule		: action dir logquick interface route af proto fromto
 			}
 #endif
 
+			if ($9.dnpipe || $9.dnrpipe) {
+				r.dnpipe = $9.dnpipe;
+				r.dnrpipe = $9.dnrpipe;
+				if ($9.free_flags & PFRULE_DN_IS_PIPE)
+					r.free_flags |= PFRULE_DN_IS_PIPE;
+				else
+					r.free_flags |= PFRULE_DN_IS_QUEUE;
+			}
+
 			expand_rule(&r, $4, $5.host, $7, $8.src_os,
 			    $8.src.host, $8.src.port, $8.dst.host, $8.dst.port,
 			    $9.uid, $9.gid, $9.icmpspec, "");
@@ -2530,6 +2794,9 @@ filter_opt	: USER uids {
 			filter_opts.keep.action = $1.action;
 			filter_opts.keep.options = $1.options;
 		}
+		| RIDENTIFIER number {
+			filter_opts.ridentifier = $2;
+		}
 		| FRAGMENT {
 			filter_opts.fragment = 1;
 		}
@@ -2549,6 +2816,32 @@ filter_opt	: USER uids {
 				YYERROR;
 			}
 			filter_opts.queues = $1;
+		}
+		| DNPIPE number {
+			filter_opts.dnpipe = $2;
+			filter_opts.free_flags |= PFRULE_DN_IS_PIPE;
+		}
+		| DNPIPE '(' number ')' {
+			filter_opts.dnpipe = $3;
+			filter_opts.free_flags |= PFRULE_DN_IS_PIPE;
+		}
+		| DNPIPE '(' number comma number ')' {
+			filter_opts.dnrpipe = $5;
+			filter_opts.dnpipe = $3;
+			filter_opts.free_flags |= PFRULE_DN_IS_PIPE;
+		}
+		| DNQUEUE number {
+			filter_opts.dnpipe = $2;
+			filter_opts.free_flags |= PFRULE_DN_IS_QUEUE;
+		}
+		| DNQUEUE '(' number comma number ')' {
+			filter_opts.dnrpipe = $5;
+			filter_opts.dnpipe = $3;
+			filter_opts.free_flags |= PFRULE_DN_IS_QUEUE;
+		}
+		| DNQUEUE '(' number ')' {
+			filter_opts.dnpipe = $3;
+			filter_opts.free_flags |= PFRULE_DN_IS_QUEUE;
 		}
 		| TAG string				{
 			filter_opts.tag = $2;
@@ -2677,6 +2970,7 @@ action		: PASS 			{
 			$$.w = returnicmpdefault;
 			$$.w2 = returnicmp6default;
 		}
+		| MATCH			{ $$.b1 = PF_MATCH; $$.b2 = $$.w = 0; }
 		| BLOCK blockspec	{ $$ = $2; $$.b1 = PF_DROP; }
 		;
 
@@ -2875,6 +3169,56 @@ af		: /* empty */			{ $$ = 0; }
 		| INET6				{ $$ = AF_INET6; }
 		;
 
+etherproto	: /* empty */				{ $$ = NULL; }
+		| PROTO etherproto_item			{ $$ = $2; }
+		| PROTO '{' optnl etherproto_list '}'	{ $$ = $4; }
+		;
+
+etherproto_list	: etherproto_item optnl			{ $$ = $1; }
+		| etherproto_list comma etherproto_item optnl	{
+			$1->tail->next = $3;
+			$1->tail = $3;
+			$$ = $1;
+		}
+		;
+
+etherproto_item	: etherprotoval		{
+			u_int16_t	pr;
+
+			pr = (u_int16_t)$1;
+			if (pr == 0) {
+				yyerror("proto 0 cannot be used");
+				YYERROR;
+			}
+			$$ = calloc(1, sizeof(struct node_proto));
+			if ($$ == NULL)
+				err(1, "proto_item: calloc");
+			$$->proto = pr;
+			$$->next = NULL;
+			$$->tail = $$;
+		}
+		;
+
+etherprotoval	: NUMBER			{
+			if ($1 < 0 || $1 > 65565) {
+				yyerror("protocol outside range");
+				YYERROR;
+			}
+		}
+		| STRING
+		{
+			if (!strncmp($1, "0x", 2)) {
+				if (sscanf($1, "0x%4x", &$$) != 1) {
+					free($1);
+					yyerror("invalid EtherType hex");
+					YYERROR;
+				}
+			} else {
+				yyerror("Symbolic EtherType not yet supported");
+			}
+		}
+		;
+
 proto		: /* empty */				{ $$ = NULL; }
 		| PROTO proto_item			{ $$ = $2; }
 		| PROTO '{' optnl proto_list '}'	{ $$ = $4; }
@@ -2924,6 +3268,102 @@ protoval	: STRING			{
 			}
 		}
 		;
+
+l3fromto	: /* empty */			{
+			bzero(&$$, sizeof($$));
+		}
+		| L3 fromto			{
+			if ($2.src.host != NULL &&
+			    $2.src.host->addr.type != PF_ADDR_ADDRMASK &&
+			    $2.src.host->addr.type != PF_ADDR_TABLE) {
+				yyerror("from must be an address or table");
+				YYERROR;
+			}
+			if ($2.dst.host != NULL &&
+			    $2.dst.host->addr.type != PF_ADDR_ADDRMASK &&
+			    $2.dst.host->addr.type != PF_ADDR_TABLE) {
+				yyerror("to must be an address or table");
+				YYERROR;
+			}
+			$$ = $2;
+		}
+		;
+etherfromto	: ALL				{
+			$$.src = NULL;
+			$$.dst = NULL;
+		}
+		| etherfrom etherto		{
+			$$.src = $1.mac;
+			$$.dst = $2.mac;
+		}
+		;
+
+etherfrom	: /* emtpy */			{
+			bzero(&$$, sizeof($$));
+		}
+		| FROM macspec			{
+			$$.mac = $2;
+		}
+		;
+
+etherto		: /* empty */			{
+			bzero(&$$, sizeof($$));
+		}
+		| TO macspec			{
+			$$.mac = $2;
+		}
+		;
+
+mac		: string '/' NUMBER		{
+			$$ = node_mac_from_string_masklen($1, $3);
+			free($1);
+			if ($$ == NULL)
+				YYERROR;
+		}
+		| string			{
+			if (strchr($1, '&')) {
+				/* mac&mask */
+				char *mac = strtok($1, "&");
+				char *mask = strtok(NULL, "&");
+				$$ = node_mac_from_string_mask(mac, mask);
+			} else {
+				$$ = node_mac_from_string($1);
+			}
+			free($1);
+			if ($$ == NULL)
+				YYERROR;
+
+		}
+xmac		: not mac {
+			struct node_mac	*n;
+
+			for (n = $2; n != NULL; n = n->next)
+				n->neg = $1;
+			$$ = $2;
+		}
+		;
+macspec		: xmac {
+			$$ = $1;
+		}
+		| '{' optnl mac_list '}'
+		{
+			$$ = $3;
+		}
+		;
+mac_list	: xmac optnl {
+			$$ = $1;
+		}
+		| mac_list comma xmac {
+			if ($3 == NULL)
+				$$ = $1;
+			else if ($1 == NULL)
+				$$ = $3;
+			else {
+				$1->tail->next = $3;
+				$1->tail = $3->tail;
+				$$ = $1;
+			}
+		}
 
 fromto		: ALL				{
 			$$.src.host = NULL;
@@ -3862,6 +4302,14 @@ label		: LABEL STRING			{
 		}
 		;
 
+etherqname	: QUEUE STRING				{
+			$$.qname = $2;
+		}
+		| QUEUE '(' STRING ')'			{
+			$$.qname = $3;
+		}
+		;
+
 qname		: QUEUE STRING				{
 			$$.qname = $2;
 			$$.pqname = NULL;
@@ -4479,6 +4927,10 @@ route_host	: STRING			{
 			$$ = calloc(1, sizeof(struct node_host));
 			if ($$ == NULL)
 				err(1, "route_host: calloc");
+			if (strlen($1) >= IFNAMSIZ) {
+				yyerror("interface name too long");
+				YYERROR;
+			}
 			$$->ifname = strdup($1);
 			set_ipmask($$, 128);
 			$$->next = NULL;
@@ -4488,8 +4940,13 @@ route_host	: STRING			{
 			struct node_host *n;
 
 			$$ = $3;
-			for (n = $3; n != NULL; n = n->next)
+			for (n = $3; n != NULL; n = n->next) {
+				if (strlen($2) >= IFNAMSIZ) {
+					yyerror("interface name too long");
+					YYERROR;
+				}
 				n->ifname = strdup($2);
+			}
 		}
 		;
 
@@ -4929,17 +5386,17 @@ expand_label_if(const char *name, char *label, size_t len, const char *ifname)
 
 void
 expand_label_addr(const char *name, char *label, size_t len, sa_family_t af,
-    struct node_host *h)
+    struct pf_rule_addr *addr)
 {
 	char tmp[64], tmp_not[66];
 
 	if (strstr(label, name) != NULL) {
-		switch (h->addr.type) {
+		switch (addr->addr.type) {
 		case PF_ADDR_DYNIFTL:
-			snprintf(tmp, sizeof(tmp), "(%s)", h->addr.v.ifname);
+			snprintf(tmp, sizeof(tmp), "(%s)", addr->addr.v.ifname);
 			break;
 		case PF_ADDR_TABLE:
-			snprintf(tmp, sizeof(tmp), "<%s>", h->addr.v.tblname);
+			snprintf(tmp, sizeof(tmp), "<%s>", addr->addr.v.tblname);
 			break;
 		case PF_ADDR_NOROUTE:
 			snprintf(tmp, sizeof(tmp), "no-route");
@@ -4948,18 +5405,18 @@ expand_label_addr(const char *name, char *label, size_t len, sa_family_t af,
 			snprintf(tmp, sizeof(tmp), "urpf-failed");
 			break;
 		case PF_ADDR_ADDRMASK:
-			if (!af || (PF_AZERO(&h->addr.v.a.addr, af) &&
-			    PF_AZERO(&h->addr.v.a.mask, af)))
+			if (!af || (PF_AZERO(&addr->addr.v.a.addr, af) &&
+			    PF_AZERO(&addr->addr.v.a.mask, af)))
 				snprintf(tmp, sizeof(tmp), "any");
 			else {
 				char	a[48];
 				int	bits;
 
-				if (inet_ntop(af, &h->addr.v.a.addr, a,
+				if (inet_ntop(af, &addr->addr.v.a.addr, a,
 				    sizeof(a)) == NULL)
 					snprintf(tmp, sizeof(tmp), "?");
 				else {
-					bits = unmask(&h->addr.v.a.mask, af);
+					bits = unmask(&addr->addr.v.a.mask, af);
 					if ((af == AF_INET && bits < 32) ||
 					    (af == AF_INET6 && bits < 128))
 						snprintf(tmp, sizeof(tmp),
@@ -4975,7 +5432,7 @@ expand_label_addr(const char *name, char *label, size_t len, sa_family_t af,
 			break;
 		}
 
-		if (h->not) {
+		if (addr->neg) {
 			snprintf(tmp_not, sizeof(tmp_not), "! %s", tmp);
 			expand_label_str(label, len, name, tmp_not);
 		} else
@@ -4985,30 +5442,30 @@ expand_label_addr(const char *name, char *label, size_t len, sa_family_t af,
 
 void
 expand_label_port(const char *name, char *label, size_t len,
-    struct node_port *port)
+    struct pf_rule_addr *addr)
 {
 	char	 a1[6], a2[6], op[13] = "";
 
 	if (strstr(label, name) != NULL) {
-		snprintf(a1, sizeof(a1), "%u", ntohs(port->port[0]));
-		snprintf(a2, sizeof(a2), "%u", ntohs(port->port[1]));
-		if (!port->op)
+		snprintf(a1, sizeof(a1), "%u", ntohs(addr->port[0]));
+		snprintf(a2, sizeof(a2), "%u", ntohs(addr->port[1]));
+		if (!addr->port_op)
 			;
-		else if (port->op == PF_OP_IRG)
+		else if (addr->port_op == PF_OP_IRG)
 			snprintf(op, sizeof(op), "%s><%s", a1, a2);
-		else if (port->op == PF_OP_XRG)
+		else if (addr->port_op == PF_OP_XRG)
 			snprintf(op, sizeof(op), "%s<>%s", a1, a2);
-		else if (port->op == PF_OP_EQ)
+		else if (addr->port_op == PF_OP_EQ)
 			snprintf(op, sizeof(op), "%s", a1);
-		else if (port->op == PF_OP_NE)
+		else if (addr->port_op == PF_OP_NE)
 			snprintf(op, sizeof(op), "!=%s", a1);
-		else if (port->op == PF_OP_LT)
+		else if (addr->port_op == PF_OP_LT)
 			snprintf(op, sizeof(op), "<%s", a1);
-		else if (port->op == PF_OP_LE)
+		else if (addr->port_op == PF_OP_LE)
 			snprintf(op, sizeof(op), "<=%s", a1);
-		else if (port->op == PF_OP_GT)
+		else if (addr->port_op == PF_OP_GT)
 			snprintf(op, sizeof(op), ">%s", a1);
-		else if (port->op == PF_OP_GE)
+		else if (addr->port_op == PF_OP_GE)
 			snprintf(op, sizeof(op), ">=%s", a1);
 		expand_label_str(label, len, name, op);
 	}
@@ -5017,13 +5474,13 @@ expand_label_port(const char *name, char *label, size_t len,
 void
 expand_label_proto(const char *name, char *label, size_t len, u_int8_t proto)
 {
-	struct protoent *pe;
+	const char *protoname;
 	char n[4];
 
 	if (strstr(label, name) != NULL) {
-		pe = getprotobynumber(proto);
-		if (pe != NULL)
-			expand_label_str(label, len, name, pe->p_name);
+		protoname = pfctl_proto2name(proto);
+		if (protoname != NULL)
+			expand_label_str(label, len, name, protoname);
 		else {
 			snprintf(n, sizeof(n), "%u", proto);
 			expand_label_str(label, len, name, n);
@@ -5032,29 +5489,27 @@ expand_label_proto(const char *name, char *label, size_t len, u_int8_t proto)
 }
 
 void
-expand_label_nr(const char *name, char *label, size_t len)
+expand_label_nr(const char *name, char *label, size_t len,
+    struct pfctl_rule *r)
 {
 	char n[11];
 
 	if (strstr(label, name) != NULL) {
-		snprintf(n, sizeof(n), "%u", pf->anchor->match);
+		snprintf(n, sizeof(n), "%u", r->nr);
 		expand_label_str(label, len, name, n);
 	}
 }
 
 void
-expand_label(char *label, size_t len, const char *ifname, sa_family_t af,
-    struct node_host *src_host, struct node_port *src_port,
-    struct node_host *dst_host, struct node_port *dst_port,
-    u_int8_t proto)
+expand_label(char *label, size_t len, struct pfctl_rule *r)
 {
-	expand_label_if("$if", label, len, ifname);
-	expand_label_addr("$srcaddr", label, len, af, src_host);
-	expand_label_addr("$dstaddr", label, len, af, dst_host);
-	expand_label_port("$srcport", label, len, src_port);
-	expand_label_port("$dstport", label, len, dst_port);
-	expand_label_proto("$proto", label, len, proto);
-	expand_label_nr("$nr", label, len);
+	expand_label_if("$if", label, len, r->ifname);
+	expand_label_addr("$srcaddr", label, len, r->af, &r->src);
+	expand_label_addr("$dstaddr", label, len, r->af, &r->dst);
+	expand_label_port("$srcport", label, len, &r->src);
+	expand_label_port("$dstport", label, len, &r->dst);
+	expand_label_proto("$proto", label, len, r->proto);
+	expand_label_nr("$nr", label, len, r);
 }
 
 int
@@ -5107,7 +5562,8 @@ expand_altq(struct pf_altq *a, struct node_if *interfaces,
 			}
 
 			if (pa.scheduler == ALTQT_CBQ ||
-			    pa.scheduler == ALTQT_HFSC) {
+			    pa.scheduler == ALTQT_HFSC ||
+			    pa.scheduler == ALTQT_FAIRQ) {
 				/* now create a root queue */
 				memset(&pb, 0, sizeof(struct pf_altq));
 				if (strlcpy(qname, "root_", sizeof(qname)) >=
@@ -5138,7 +5594,8 @@ expand_altq(struct pf_altq *a, struct node_if *interfaces,
 				if (n == NULL)
 					err(1, "expand_altq: calloc");
 				if (pa.scheduler == ALTQT_CBQ ||
-				    pa.scheduler == ALTQT_HFSC)
+				    pa.scheduler == ALTQT_HFSC ||
+				    pa.scheduler == ALTQT_FAIRQ)
 					if (strlcpy(n->parent, qname,
 					    sizeof(n->parent)) >=
 					    sizeof(n->parent))
@@ -5310,6 +5767,83 @@ expand_queue(struct pf_altq *a, struct node_if *interfaces,
 		return (0);
 }
 
+static int
+pf_af_to_proto(sa_family_t af)
+{
+	if (af == AF_INET)
+		return (ETHERTYPE_IP);
+	if (af == AF_INET6)
+		return (ETHERTYPE_IPV6);
+
+	return (0);
+}
+
+void
+expand_eth_rule(struct pfctl_eth_rule *r,
+    struct node_if *interfaces, struct node_etherproto *protos,
+    struct node_mac *srcs, struct node_mac *dsts,
+    struct node_host *ipsrcs, struct node_host *ipdsts, const char *anchor_call)
+{
+	char tagname[PF_TAG_NAME_SIZE];
+	char match_tagname[PF_TAG_NAME_SIZE];
+	char qname[PF_QNAME_SIZE];
+
+	if (strlcpy(tagname, r->tagname, sizeof(tagname)) >= sizeof(tagname))
+		errx(1, "expand_eth_rule: tagname");
+	if (strlcpy(match_tagname, r->match_tagname, sizeof(match_tagname)) >=
+	    sizeof(match_tagname))
+		errx(1, "expand_eth_rule: match_tagname");
+	if (strlcpy(qname, r->qname, sizeof(qname)) >= sizeof(qname))
+		errx(1, "expand_eth_rule: qname");
+
+	LOOP_THROUGH(struct node_if, interface, interfaces,
+	LOOP_THROUGH(struct node_etherproto, proto, protos,
+	LOOP_THROUGH(struct node_mac, src, srcs,
+	LOOP_THROUGH(struct node_mac, dst, dsts,
+	LOOP_THROUGH(struct node_host, ipsrc, ipsrcs,
+	LOOP_THROUGH(struct node_host, ipdst, ipdsts,
+		strlcpy(r->ifname, interface->ifname,
+		    sizeof(r->ifname));
+		r->ifnot = interface->not;
+		r->proto = proto->proto;
+		if (!r->proto && ipsrc->af)
+			r->proto = pf_af_to_proto(ipsrc->af);
+		else if (!r->proto && ipdst->af)
+			r->proto = pf_af_to_proto(ipdst->af);
+		bcopy(src->mac, r->src.addr, ETHER_ADDR_LEN);
+		bcopy(src->mask, r->src.mask, ETHER_ADDR_LEN);
+		r->src.neg = src->neg;
+		r->src.isset = src->isset;
+		r->ipsrc.addr = ipsrc->addr;
+		r->ipsrc.neg = ipsrc->not;
+		r->ipdst.addr = ipdst->addr;
+		r->ipdst.neg = ipdst->not;
+		bcopy(dst->mac, r->dst.addr, ETHER_ADDR_LEN);
+		bcopy(dst->mask, r->dst.mask, ETHER_ADDR_LEN);
+		r->dst.neg = dst->neg;
+		r->dst.isset = dst->isset;
+		r->nr = pf->eastack[pf->asd]->match++;
+
+		if (strlcpy(r->tagname, tagname, sizeof(r->tagname)) >=
+		    sizeof(r->tagname))
+			errx(1, "expand_eth_rule: r->tagname");
+		if (strlcpy(r->match_tagname, match_tagname,
+		    sizeof(r->match_tagname)) >= sizeof(r->match_tagname))
+			errx(1, "expand_eth_rule: r->match_tagname");
+		if (strlcpy(r->qname, qname, sizeof(r->qname)) >= sizeof(r->qname))
+			errx(1, "expand_eth_rule: r->qname");
+
+		pfctl_append_eth_rule(pf, r, anchor_call);
+	))))));
+
+	FREE_LIST(struct node_if, interfaces);
+	FREE_LIST(struct node_etherproto, protos);
+	FREE_LIST(struct node_mac, srcs);
+	FREE_LIST(struct node_mac, dsts);
+	FREE_LIST(struct node_host, ipsrcs);
+	FREE_LIST(struct node_host, ipdsts);
+}
+
 void
 expand_rule(struct pfctl_rule *r,
     struct node_if *interfaces, struct node_host *rpool_hosts,
@@ -5386,15 +5920,6 @@ expand_rule(struct pfctl_rule *r,
 		if (strlcpy(r->match_tagname, match_tagname,
 		    sizeof(r->match_tagname)) >= sizeof(r->match_tagname))
 			errx(1, "expand_rule: strlcpy");
-		for (int i = 0; i < PF_RULE_MAX_LABEL_COUNT; i++)
-			expand_label(r->label[i], PF_RULE_LABEL_SIZE,
-			    r->ifname, r->af, src_host, src_port, dst_host,
-			    dst_port, proto->proto);
-		expand_label(r->tagname, PF_TAG_NAME_SIZE, r->ifname, r->af,
-		    src_host, src_port, dst_host, dst_port, proto->proto);
-		expand_label(r->match_tagname, PF_TAG_NAME_SIZE, r->ifname,
-		    r->af, src_host, src_port, dst_host, dst_port,
-		    proto->proto);
 
 		error += check_netmask(src_host, r->af);
 		error += check_netmask(dst_host, r->af);
@@ -5535,8 +6060,8 @@ int
 check_rulestate(int desired_state)
 {
 	if (require_order && (rulestate > desired_state)) {
-		yyerror("Rules must be in order: options, normalization, "
-		    "queueing, translation, filtering");
+		yyerror("Rules must be in order: options, ethernet, "
+		    "normalization, queueing, translation, filtering");
 		return (1);
 	}
 	rulestate = desired_state;
@@ -5574,9 +6099,12 @@ lookup(char *s)
 		{ "debug",		DEBUG},
 		{ "divert-reply",	DIVERTREPLY},
 		{ "divert-to",		DIVERTTO},
+		{ "dnpipe",		DNPIPE},
+		{ "dnqueue",		DNQUEUE},
 		{ "drop",		DROP},
 		{ "drop-ovl",		FRAGDROP},
 		{ "dup-to",		DUPTO},
+		{ "ether",		ETHER},
 		{ "fail-policy",	FAILPOLICY},
 		{ "fairq",		FAIRQ},
 		{ "fastroute",		FASTROUTE},
@@ -5603,6 +6131,7 @@ lookup(char *s)
 		{ "interval",		INTERVAL},
 		{ "keep",		KEEP},
 		{ "keepcounters",	KEEPCOUNTERS},
+		{ "l3",			L3},
 		{ "label",		LABEL},
 		{ "limit",		LIMIT},
 		{ "linkshare",		LINKSHARE},
@@ -5610,6 +6139,7 @@ lookup(char *s)
 		{ "log",		LOG},
 		{ "loginterface",	LOGINTERFACE},
 		{ "map-e-portset",	MAPEPORTSET},
+		{ "match",		MATCH},
 		{ "max",		MAXIMUM},
 		{ "max-mss",		MAXMSS},
 		{ "max-src-conn",	MAXSRCCONN},
@@ -5651,6 +6181,7 @@ lookup(char *s)
 		{ "return-icmp",	RETURNICMP},
 		{ "return-icmp6",	RETURNICMP6},
 		{ "return-rst",		RETURNRST},
+		{ "ridentifier",	RIDENTIFIER},
 		{ "round-robin",	ROUNDROBIN},
 		{ "route",		ROUTE},
 		{ "route-to",		ROUTETO},
@@ -5669,6 +6200,7 @@ lookup(char *s)
 		{ "state-policy",	STATEPOLICY},
 		{ "static-port",	STATICPORT},
 		{ "sticky-address",	STICKYADDRESS},
+		{ "syncookies",         SYNCOOKIES},
 		{ "synproxy",		SYNPROXY},
 		{ "table",		TABLE},
 		{ "tag",		TAG},
@@ -6168,6 +6700,19 @@ mv_rules(struct pfctl_ruleset *src, struct pfctl_ruleset *dst)
 }
 
 void
+mv_eth_rules(struct pfctl_eth_ruleset *src, struct pfctl_eth_ruleset *dst)
+{
+	struct pfctl_eth_rule *r;
+
+	while ((r = TAILQ_FIRST(&src->rules)) != NULL) {
+		TAILQ_REMOVE(&src->rules, r, entries);
+		TAILQ_INSERT_TAIL(&dst->rules, r, entries);
+		dst->anchor->match++;
+	}
+	src->anchor->match = 0;
+}
+
+void
 decide_address_family(struct node_host *n, sa_family_t *af)
 {
 	if (*af != 0 || n == NULL)
@@ -6443,4 +6988,70 @@ rt_tableid_max(void)
 #else
 	return (RT_TABLEID_MAX);
 #endif
+}
+
+struct node_mac*
+node_mac_from_string(const char *str)
+{
+	struct node_mac *m;
+
+	m = calloc(1, sizeof(struct node_mac));
+	if (m == NULL)
+		err(1, "mac: calloc");
+
+	if (sscanf(str, "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
+	    &m->mac[0], &m->mac[1], &m->mac[2], &m->mac[3], &m->mac[4],
+	    &m->mac[5]) != 6) {
+		free(m);
+		yyerror("invalid MAC address");
+		return (NULL);
+	}
+
+	memset(m->mask, 0xff, ETHER_ADDR_LEN);
+	m->isset = true;
+	m->next = NULL;
+	m->tail = m;
+
+	return (m);
+}
+
+struct node_mac*
+node_mac_from_string_masklen(const char *str, int masklen)
+{
+	struct node_mac *m;
+
+	if (masklen < 0 || masklen > (ETHER_ADDR_LEN * 8)) {
+		yyerror("invalid MAC mask length");
+		return (NULL);
+	}
+
+	m = node_mac_from_string(str);
+	if (m == NULL)
+		return (NULL);
+
+	memset(m->mask, 0, ETHER_ADDR_LEN);
+	for (int i = 0; i < masklen; i++)
+		m->mask[i / 8] |= 1 << (i % 8);
+
+	return (m);
+}
+
+struct node_mac*
+node_mac_from_string_mask(const char *str, const char *mask)
+{
+	struct node_mac *m;
+
+	m = node_mac_from_string(str);
+	if (m == NULL)
+		return (NULL);
+
+	if (sscanf(mask, "%02hhx:%02hhx:%02hhx:%02hhx:%02hhx:%02hhx",
+	    &m->mask[0], &m->mask[1], &m->mask[2], &m->mask[3], &m->mask[4],
+	    &m->mask[5]) != 6) {
+		free(m);
+		yyerror("invalid MAC mask");
+		return (NULL);
+	}
+
+	return (m);
 }

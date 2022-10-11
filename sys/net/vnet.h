@@ -65,6 +65,7 @@
  * as required for libkvm.
  */
 #if defined(_KERNEL) || defined(_WANT_VNET)
+#include <machine/param.h>	/* for CACHE_LINE_SIZE */
 #include <sys/queue.h>
 
 struct vnet {
@@ -161,8 +162,16 @@ __GLOBL(__start_set_vnet);
 extern uintptr_t	*__stop_set_vnet;
 __GLOBL(__stop_set_vnet);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+extern uintptr_t	vnet_start;
+#endif
+
+#ifdef KLD_MODULE
+#define	VNET_START	vnet_start
+#else
 #define	VNET_START	(uintptr_t)&__start_set_vnet
 #define	VNET_STOP	(uintptr_t)&__stop_set_vnet
+#endif
 
 /*
  * Functions to allocate and destroy virtual network stacks.
@@ -237,6 +246,10 @@ void vnet_log_recursion(struct vnet *, const char *, int);
 	    __FILE__, __LINE__, __func__, curvnet, saved_vnet));	\
 	curvnet = saved_vnet;
 #endif /* VNET_DEBUG */
+
+#define	CURVNET_ASSERT_SET()						\
+	VNET_ASSERT(curvnet != NULL, ("vnet is not set at %s:%d %s()",  \
+	    __FILE__, __LINE__, __func__))
 
 extern struct vnet *vnet0;
 #define	IS_DEFAULT_VNET(arg)	((arg) == vnet0)
@@ -422,13 +435,14 @@ do {									\
 #define	CURVNET_SET(arg)
 #define	CURVNET_SET_QUIET(arg)
 #define	CURVNET_RESTORE()
+#define	CURVNET_ASSERT_SET()						\
 
 #define	VNET_LIST_RLOCK()
 #define	VNET_LIST_RLOCK_NOSLEEP()
 #define	VNET_LIST_RUNLOCK()
 #define	VNET_LIST_RUNLOCK_NOSLEEP()
 #define	VNET_ITERATOR_DECL(arg)
-#define	VNET_FOREACH(arg)
+#define	VNET_FOREACH(arg)	for (int _vn = 0; _vn == 0; _vn++)
 
 #define	IS_DEFAULT_VNET(arg)	1
 #define	CRED_TO_VNET(cr)	NULL

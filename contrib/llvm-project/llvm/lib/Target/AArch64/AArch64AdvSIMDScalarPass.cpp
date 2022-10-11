@@ -123,7 +123,7 @@ static bool isFPR64(unsigned Reg, unsigned SubReg,
 }
 
 // getSrcFromCopy - Get the original source register for a GPR64 <--> FPR64
-// copy instruction. Return zero_reg if the instruction is not a copy.
+// copy instruction. Return nullptr if the instruction is not a copy.
 static MachineOperand *getSrcFromCopy(MachineInstr *MI,
                                       const MachineRegisterInfo *MRI,
                                       unsigned &SubReg) {
@@ -377,8 +377,7 @@ void AArch64AdvSIMDScalar::transformInstruction(MachineInstr &MI) {
 // processMachineBasicBlock - Main optimzation loop.
 bool AArch64AdvSIMDScalar::processMachineBasicBlock(MachineBasicBlock *MBB) {
   bool Changed = false;
-  for (MachineBasicBlock::iterator I = MBB->begin(), E = MBB->end(); I != E;) {
-    MachineInstr &MI = *I++;
+  for (MachineInstr &MI : llvm::make_early_inc_range(*MBB)) {
     if (isProfitableToTransform(MI)) {
       transformInstruction(MI);
       Changed = true;
@@ -399,8 +398,8 @@ bool AArch64AdvSIMDScalar::runOnMachineFunction(MachineFunction &mf) {
   TII = mf.getSubtarget().getInstrInfo();
 
   // Just check things on a one-block-at-a-time basis.
-  for (MachineFunction::iterator I = mf.begin(), E = mf.end(); I != E; ++I)
-    if (processMachineBasicBlock(&*I))
+  for (MachineBasicBlock &MBB : mf)
+    if (processMachineBasicBlock(&MBB))
       Changed = true;
   return Changed;
 }

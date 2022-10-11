@@ -15,6 +15,7 @@
 #define LLVM_TRANSFORMS_IPO_ALWAYSINLINER_H
 
 #include "llvm/IR/PassManager.h"
+#include "llvm/Pass.h"
 
 namespace llvm {
 
@@ -34,6 +35,7 @@ public:
       : InsertLifetime(InsertLifetime) {}
 
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &);
+  static bool isRequired() { return true; }
 };
 
 /// Create a legacy pass manager instance of a pass to inline and remove

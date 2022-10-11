@@ -41,9 +41,8 @@
 
 function cleanup
 {
-	[[ -z $msgs1 ]] || log_must rm $msgs1
-	[[ -z $msgs2 ]] || log_must rm $msgs2
-	datasetexists $FS && log_must zfs destroy -r $FS
+	log_must rm -f $msgs1 $msgs2
+	datasetexists $FS && destroy_dataset $FS -r
 }
 
 typeset -r ZFS_DBGMSG=/proc/spl/kstat/zfs/dbgmsg
@@ -60,7 +59,7 @@ log_must zfs create $FS
 for i in {1..20}; do
 	log_must zfs snapshot "$FS@testsnapshot$i"
 done
-log_must zpool sync $TESTPOOL
+sync_pool $TESTPOOL
 
 msgs1=$(mktemp) || log_fail
 msgs2=$(mktemp) || log_fail
@@ -69,7 +68,7 @@ msgs2=$(mktemp) || log_fail
 # Start reading file, pause and read it from another process, and then finish
 # reading.
 #
-{ dd bs=512 count=4; cat $ZFS_DBGMSG >$msgs1; cat; } <$ZFS_DBGMSG >$msgs2
+{ dd bs=512 count=4; cp $ZFS_DBGMSG $msgs1; cat; } <$ZFS_DBGMSG >$msgs2
 
 #
 # Truncate the result of the read that completed second in case it picked up an

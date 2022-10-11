@@ -136,12 +136,12 @@ dsl_dir_phys(dsl_dir_t *dd)
 	return (dd->dd_dbuf->db_data);
 }
 
-void dsl_dir_rele(dsl_dir_t *dd, void *tag);
-void dsl_dir_async_rele(dsl_dir_t *dd, void *tag);
-int dsl_dir_hold(dsl_pool_t *dp, const char *name, void *tag,
+void dsl_dir_rele(dsl_dir_t *dd, const void *tag);
+void dsl_dir_async_rele(dsl_dir_t *dd, const void *tag);
+int dsl_dir_hold(dsl_pool_t *dp, const char *name, const void *tag,
     dsl_dir_t **, const char **tail);
 int dsl_dir_hold_obj(dsl_pool_t *dp, uint64_t ddobj,
-    const char *tail, void *tag, dsl_dir_t **);
+    const char *tail, const void *tag, dsl_dir_t **);
 void dsl_dir_name(dsl_dir_t *dd, char *buf);
 int dsl_dir_namelen(dsl_dir_t *dd);
 uint64_t dsl_dir_create_sync(dsl_pool_t *dp, dsl_dir_t *pds,
@@ -173,6 +173,9 @@ void dsl_dir_willuse_space(dsl_dir_t *dd, int64_t space, dmu_tx_t *tx);
 void dsl_dir_diduse_space(dsl_dir_t *dd, dd_used_t type,
     int64_t used, int64_t compressed, int64_t uncompressed, dmu_tx_t *tx);
 void dsl_dir_transfer_space(dsl_dir_t *dd, int64_t delta,
+    dd_used_t oldtype, dd_used_t newtype, dmu_tx_t *tx);
+void dsl_dir_diduse_transfer_space(dsl_dir_t *dd, int64_t used,
+    int64_t compressed, int64_t uncompressed, int64_t tonew,
     dd_used_t oldtype, dd_used_t newtype, dmu_tx_t *tx);
 int dsl_dir_set_quota(const char *ddname, zprop_source_t source,
     uint64_t quota);
@@ -215,7 +218,7 @@ void dsl_dir_cancel_waiters(dsl_dir_t *dd);
 	dprintf("dd=%s " fmt, __ds_name, __VA_ARGS__); \
 	kmem_free(__ds_name, ZFS_MAX_DATASET_NAME_LEN); \
 	} \
-_NOTE(CONSTCOND) } while (0)
+} while (0)
 #else
 #define	dprintf_dd(dd, fmt, ...)
 #endif

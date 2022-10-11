@@ -8,6 +8,9 @@
 PACKAGE=runtime
 CLEANFILES= osreldate.h version
 SUBDIR= arpa protocols rpcsvc rpc xlocale
+.if ${MACHINE_CPUARCH} == "amd64"
+SUBDIR+=	i386
+.endif
 SUBDIR_PARALLEL=
 INCS=	a.out.h ar.h assert.h bitstring.h complex.h cpio.h _ctype.h ctype.h \
 	db.h \
@@ -20,7 +23,8 @@ INCS=	a.out.h ar.h assert.h bitstring.h complex.h cpio.h _ctype.h ctype.h \
 	netdb.h nl_types.h nlist.h nss.h nsswitch.h paths.h \
 	printf.h proc_service.h pthread.h \
 	pthread_np.h pwd.h ranlib.h readpassphrase.h regex.h \
-	res_update.h resolv.h runetype.h search.h semaphore.h setjmp.h \
+	res_update.h resolv.h runetype.h sched.h \
+	search.h semaphore.h setjmp.h \
 	signal.h spawn.h stab.h stdalign.h stdbool.h stddef.h \
 	stdnoreturn.h stdio.h stdlib.h string.h stringlist.h \
 	strings.h sysexits.h tar.h termios.h tgmath.h \
@@ -33,7 +37,7 @@ INCS+=	vis.h
 
 MHDRS=	float.h floatingpoint.h stdarg.h
 
-PHDRS=	sched.h _semaphore.h
+PHDRS=	_semaphore.h
 
 LHDRS=	aio.h errno.h fcntl.h linker_set.h poll.h stdatomic.h stdint.h \
 	syslog.h ucontext.h
@@ -41,7 +45,7 @@ LHDRS=	aio.h errno.h fcntl.h linker_set.h poll.h stdatomic.h stdint.h \
 LDIRS=	cheri geom net net80211 netgraph netinet netinet6 \
 	netipsec netsmb nfs nfsclient nfsserver sys vm
 
-LSUBDIRS=	dev/acpica dev/agp dev/an dev/ciss dev/filemon dev/firewire \
+LSUBDIRS=	dev/acpica dev/agp dev/ciss dev/filemon dev/firewire \
 	dev/hwpmc dev/hyperv \
 	dev/ic dev/iicbus dev/io dev/mfi dev/mmc dev/nvme \
 	dev/ofw dev/pbio dev/pci ${_dev_powermac_nvram} dev/ppbus dev/pwm \
@@ -50,7 +54,7 @@ LSUBDIRS=	dev/acpica dev/agp dev/an dev/ciss dev/filemon dev/firewire \
 	fs/procfs fs/smbfs fs/udf fs/unionfs \
 	geom/cache geom/concat geom/eli geom/gate geom/journal geom/label \
 	geom/mirror geom/mountver geom/multipath geom/nop \
-	geom/raid geom/raid3 geom/shsec geom/stripe geom/virstor \
+	geom/raid geom/raid3 geom/shsec geom/stripe geom/union geom/virstor \
 	net/altq \
 	net/route \
 	netgraph/atm netgraph/netflow \
@@ -176,7 +180,7 @@ PCIDIR=		${INCLUDEDIR}/dev/pci
 VERIEXEC=	veriexec_ioctl.h
 VERIEXECDIR=	${INCLUDEDIR}/dev/veriexec
 
-.PATH: ${SRCTOP}/sys/contrib/ipfilter/netinet
+.PATH: ${SRCTOP}/sys/netpfil/ipfilter/netinet
 IPFILTER=	ip_auth.h \
 		ip_compat.h \
 		ip_dstlist.h \
@@ -337,6 +341,10 @@ compat:
 	mtree -deU ${NO_ROOT:D-W} ${MTREE_FOLLOWS_SYMLINKS} \
 	    -f ${SRCTOP}/etc/mtree/BSD.include.dist \
 	    -p ${SDESTDIR}${INCLUDEDIR} > /dev/null
+.if ${MACHINE_CPUARCH} == "amd64"
+	${INSTALL} -d ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 755 \
+	    ${SDESTDIR}${INCLUDEDIR}/i386
+.endif
 
 copies: .PHONY .META
 	cd ${SDESTDIR}${INCLUDEDIR}; find ${LDIRS} ${LSUBDIRS} ${LSUBSUBDIRS} crypto \
@@ -407,7 +415,7 @@ symlinks: .PHONY .META
 .endfor
 .if ${MK_IPFILTER} != "no"
 	cd ${SRCTOP}; ${INSTALL_SYMLINK} ${TAG_ARGS:D${TAG_ARGS},dev} \
-	    $$(printf '../../../%s ' sys/contrib/ipfilter/netinet/*.h) \
+	    $$(printf '../../../%s ' sys/netpfil/ipfilter/netinet/*.h) \
 	    ${SDESTDIR}${INCLUDEDIR}/netinet;
 .endif
 .if ${MK_PF} != "no"

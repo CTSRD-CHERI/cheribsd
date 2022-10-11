@@ -56,7 +56,7 @@
  * in include/libzfs.h.  Note that there are some status results which go past
  * the end of this table, and hence have no associated message ID.
  */
-static char *zfs_msgid_table[] = {
+static const char *const zfs_msgid_table[] = {
 	"ZFS-8000-14", /* ZPOOL_STATUS_CORRUPT_CACHE */
 	"ZFS-8000-2Q", /* ZPOOL_STATUS_MISSING_DEV_R */
 	"ZFS-8000-3C", /* ZPOOL_STATUS_MISSING_DEV_NR */
@@ -89,54 +89,55 @@ static char *zfs_msgid_table[] = {
 	 *	ZPOOL_STATUS_REBUILDING
 	 *	ZPOOL_STATUS_REBUILD_SCRUB
 	 *	ZPOOL_STATUS_COMPATIBILITY_ERR
+	 *	ZPOOL_STATUS_INCOMPATIBLE_FEAT
 	 *	ZPOOL_STATUS_OK
 	 */
 };
 
 #define	NMSGID	(sizeof (zfs_msgid_table) / sizeof (zfs_msgid_table[0]))
 
-/* ARGSUSED */
 static int
 vdev_missing(vdev_stat_t *vs, uint_t vsc)
 {
+	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_CANT_OPEN &&
 	    vs->vs_aux == VDEV_AUX_OPEN_FAILED);
 }
 
-/* ARGSUSED */
 static int
 vdev_faulted(vdev_stat_t *vs, uint_t vsc)
 {
+	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_FAULTED);
 }
 
-/* ARGSUSED */
 static int
 vdev_errors(vdev_stat_t *vs, uint_t vsc)
 {
+	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_DEGRADED ||
 	    vs->vs_read_errors != 0 || vs->vs_write_errors != 0 ||
 	    vs->vs_checksum_errors != 0);
 }
 
-/* ARGSUSED */
 static int
 vdev_broken(vdev_stat_t *vs, uint_t vsc)
 {
+	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_CANT_OPEN);
 }
 
-/* ARGSUSED */
 static int
 vdev_offlined(vdev_stat_t *vs, uint_t vsc)
 {
+	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_OFFLINE);
 }
 
-/* ARGSUSED */
 static int
 vdev_removed(vdev_stat_t *vs, uint_t vsc)
 {
+	(void) vsc;
 	return (vs->vs_state == VDEV_STATE_REMOVED);
 }
 
@@ -158,8 +159,7 @@ find_vdev_problem(nvlist_t *vdev, int (*func)(vdev_stat_t *, uint_t),
     boolean_t ignore_replacing)
 {
 	nvlist_t **child;
-	vdev_stat_t *vs;
-	uint_t c, vsc, children;
+	uint_t c, children;
 
 	/*
 	 * Ignore problems within a 'replacing' vdev, since we're presumably in
@@ -168,10 +168,7 @@ find_vdev_problem(nvlist_t *vdev, int (*func)(vdev_stat_t *, uint_t),
 	 * later.
 	 */
 	if (ignore_replacing == B_TRUE) {
-		char *type;
-
-		verify(nvlist_lookup_string(vdev, ZPOOL_CONFIG_TYPE,
-		    &type) == 0);
+		char *type = fnvlist_lookup_string(vdev, ZPOOL_CONFIG_TYPE);
 		if (strcmp(type, VDEV_TYPE_REPLACING) == 0)
 			return (B_FALSE);
 	}
@@ -182,9 +179,9 @@ find_vdev_problem(nvlist_t *vdev, int (*func)(vdev_stat_t *, uint_t),
 			if (find_vdev_problem(child[c], func, ignore_replacing))
 				return (B_TRUE);
 	} else {
-		verify(nvlist_lookup_uint64_array(vdev, ZPOOL_CONFIG_VDEV_STATS,
-		    (uint64_t **)&vs, &vsc) == 0);
-
+		uint_t vsc;
+		vdev_stat_t *vs = (vdev_stat_t *)fnvlist_lookup_uint64_array(
+		    vdev, ZPOOL_CONFIG_VDEV_STATS, &vsc);
 		if (func(vs, vsc) != 0)
 			return (B_TRUE);
 	}
@@ -223,26 +220,21 @@ static zpool_status_t
 check_status(nvlist_t *config, boolean_t isimport,
     zpool_errata_t *erratap, const char *compat)
 {
-	nvlist_t *nvroot;
-	vdev_stat_t *vs;
 	pool_scan_stat_t *ps = NULL;
 	uint_t vsc, psc;
 	uint64_t nerr;
-	uint64_t version;
-	uint64_t stateval;
 	uint64_t suspended;
 	uint64_t hostid = 0;
 	uint64_t errata = 0;
 	unsigned long system_hostid = get_system_hostid();
 
-	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION,
-	    &version) == 0);
-	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
-	    &nvroot) == 0);
-	verify(nvlist_lookup_uint64_array(nvroot, ZPOOL_CONFIG_VDEV_STATS,
-	    (uint64_t **)&vs, &vsc) == 0);
-	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE,
-	    &stateval) == 0);
+	uint64_t version = fnvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION);
+	nvlist_t *nvroot = fnvlist_lookup_nvlist(config,
+	    ZPOOL_CONFIG_VDEV_TREE);
+	vdev_stat_t *vs = (vdev_stat_t *)fnvlist_lookup_uint64_array(nvroot,
+	    ZPOOL_CONFIG_VDEV_STATS, &vsc);
+	uint64_t stateval = fnvlist_lookup_uint64(config,
+	    ZPOOL_CONFIG_POOL_STATE);
 
 	/*
 	 * Currently resilvering a vdev
@@ -336,10 +328,8 @@ check_status(nvlist_t *config, boolean_t isimport,
 	 */
 	if (vs->vs_state == VDEV_STATE_CANT_OPEN &&
 	    vs->vs_aux == VDEV_AUX_UNSUP_FEAT) {
-		nvlist_t *nvinfo;
-
-		verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_LOAD_INFO,
-		    &nvinfo) == 0);
+		nvlist_t *nvinfo = fnvlist_lookup_nvlist(config,
+		    ZPOOL_CONFIG_LOAD_INFO);
 		if (nvlist_exists(nvinfo, ZPOOL_CONFIG_CAN_RDONLY))
 			return (ZPOOL_STATUS_UNSUP_FEAT_WRITE);
 		return (ZPOOL_STATUS_UNSUP_FEAT_READ);
@@ -453,11 +443,17 @@ check_status(nvlist_t *config, boolean_t isimport,
 	/*
 	 * Outdated, but usable, version
 	 */
-	if (SPA_VERSION_IS_SUPPORTED(version) && version != SPA_VERSION)
-		return (ZPOOL_STATUS_VERSION_OLDER);
+	if (SPA_VERSION_IS_SUPPORTED(version) && version != SPA_VERSION) {
+		/* "legacy" compatibility disables old version reporting */
+		if (compat != NULL && strcmp(compat, ZPOOL_COMPAT_LEGACY) == 0)
+			return (ZPOOL_STATUS_OK);
+		else
+			return (ZPOOL_STATUS_VERSION_OLDER);
+	}
 
 	/*
-	 * Usable pool with disabled features
+	 * Usable pool with disabled or superfluous features
+	 * (superfluous = beyond what's requested by 'compatibility')
 	 */
 	if (version >= SPA_VERSION_FEATURES) {
 		int i;
@@ -475,18 +471,23 @@ check_status(nvlist_t *config, boolean_t isimport,
 		}
 
 		/* check against all features, or limited set? */
-		boolean_t pool_features[SPA_FEATURES];
+		boolean_t c_features[SPA_FEATURES];
 
-		if (zpool_load_compat(compat, pool_features, NULL, NULL) !=
-		    ZPOOL_COMPATIBILITY_OK)
+		switch (zpool_load_compat(compat, c_features, NULL, 0)) {
+		case ZPOOL_COMPATIBILITY_OK:
+		case ZPOOL_COMPATIBILITY_WARNTOKEN:
+			break;
+		default:
 			return (ZPOOL_STATUS_COMPATIBILITY_ERR);
+		}
 		for (i = 0; i < SPA_FEATURES; i++) {
 			zfeature_info_t *fi = &spa_feature_table[i];
 			if (!fi->fi_zfs_mod_supported)
 				continue;
-			if (pool_features[i] &&
-			    !nvlist_exists(feat, fi->fi_guid))
+			if (c_features[i] && !nvlist_exists(feat, fi->fi_guid))
 				return (ZPOOL_STATUS_FEAT_DISABLED);
+			if (!c_features[i] && nvlist_exists(feat, fi->fi_guid))
+				return (ZPOOL_STATUS_INCOMPATIBLE_FEAT);
 		}
 	}
 
@@ -494,7 +495,8 @@ check_status(nvlist_t *config, boolean_t isimport,
 }
 
 zpool_status_t
-zpool_get_status(zpool_handle_t *zhp, char **msgid, zpool_errata_t *errata)
+zpool_get_status(zpool_handle_t *zhp, const char **msgid,
+    zpool_errata_t *errata)
 {
 	/*
 	 * pass in the desired feature set, as
@@ -518,7 +520,8 @@ zpool_get_status(zpool_handle_t *zhp, char **msgid, zpool_errata_t *errata)
 }
 
 zpool_status_t
-zpool_import_status(nvlist_t *config, char **msgid, zpool_errata_t *errata)
+zpool_import_status(nvlist_t *config, const char **msgid,
+    zpool_errata_t *errata)
 {
 	zpool_status_t ret = check_status(config, B_TRUE, errata, NULL);
 

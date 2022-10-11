@@ -805,7 +805,7 @@ kern_ioctl(struct thread *td, int fd, u_long com, caddr_t data)
 	}
 
 #ifdef CAPABILITIES
-	if ((fp = fget_locked(fdp, fd)) == NULL) {
+	if ((fp = fget_noref(fdp, fd)) == NULL) {
 		error = EBADF;
 		goto out;
 	}
@@ -914,6 +914,84 @@ kern_posix_fallocate(struct thread *td, int fd, off_t offset, off_t len)
 
 	error = fo_fallocate(fp, offset, len, td);
  out:
+	fdrop(fp, td);
+	return (error);
+}
+
+int
+sys_fspacectl(struct thread *td, struct fspacectl_args *uap)
+{
+	return (user_fspacectl(td, uap->fd, uap->cmd, uap->rqsr, uap->flags,
+	    uap->rmsr));
+}
+
+int
+user_fspacectl(struct thread *td, int fd, int cmd,
+    const struct spacectl_range * __capability rqsrp, int flags,
+    struct spacectl_range * __capability rmsrp)
+{
+	struct spacectl_range rqsr, rmsr;
+	int error, cerror;
+
+	error = copyin(rqsrp, &rqsr, sizeof(rqsr));
+	if (error != 0)
+		return (error);
+
+	error = kern_fspacectl(td, fd, cmd, &rqsr, flags, &rmsr);
+	if (rmsrp != NULL) {
+		cerror = copyout(&rmsr, rmsrp, sizeof(rmsr));
+		if (error == 0)
+			error = cerror;
+	}
+	return (error);
+}
+
+int
+kern_fspacectl(struct thread *td, int fd, int cmd,
+    const struct spacectl_range *rqsr, int flags, struct spacectl_range *rmsrp)
+{
+	struct file *fp;
+	struct spacectl_range rmsr;
+	int error;
+
+	AUDIT_ARG_FD(fd);
+	AUDIT_ARG_CMD(cmd);
+	AUDIT_ARG_FFLAGS(flags);
+
+	if (rqsr == NULL)
+		return (EINVAL);
+	rmsr = *rqsr;
+	if (rmsrp != NULL)
+		*rmsrp = rmsr;
+
+	if (cmd != SPACECTL_DEALLOC ||
+	    rqsr->r_offset < 0 || rqsr->r_len <= 0 ||
+	    rqsr->r_offset > OFF_MAX - rqsr->r_len ||
+	    (flags & ~SPACECTL_F_SUPPORTED) != 0)
+		return (EINVAL);
+
+	error = fget_write(td, fd, &cap_pwrite_rights, &fp);
+	if (error != 0)
+		return (error);
+	AUDIT_ARG_FILE(td->td_proc, fp);
+	if ((fp->f_ops->fo_flags & DFLAG_SEEKABLE) == 0) {
+		error = ESPIPE;
+		goto out;
+	}
+	if ((fp->f_flag & FWRITE) == 0) {
+		error = EBADF;
+		goto out;
+	}
+
+	error = fo_fspacectl(fp, cmd, &rmsr.r_offset, &rmsr.r_len, flags,
+	    td->td_ucred, td);
+	/* fspacectl is not restarted after signals if the file is modified. */
+	if (rmsr.r_len != rqsr->r_len && (error == ERESTART ||
+	    error == EINTR || error == EWOULDBLOCK))
+		error = 0;
+	if (rmsrp != NULL)
+		*rmsrp = rmsr;
+out:
 	fdrop(fp, td);
 	return (error);
 }
@@ -1328,7 +1406,7 @@ done:
  * The backend always returns POLLHUP/POLLERR if appropriate and we
  * return this as a set bit in any set.
  */
-static int select_flags[3] = {
+static const int select_flags[3] = {
     POLLRDNORM | POLLHUP | POLLERR,
     POLLWRNORM | POLLHUP | POLLERR,
     POLLRDBAND | POLLERR
@@ -1420,7 +1498,7 @@ selrescan(struct thread *td, fd_mask **ibits, fd_mask **obits)
 		if (only_user)
 			error = fget_only_user(fdp, fd, &cap_event_rights, &fp);
 		else
-			error = fget_unlocked(fdp, fd, &cap_event_rights, &fp);
+			error = fget_unlocked(td, fd, &cap_event_rights, &fp);
 		if (__predict_false(error != 0))
 			return (error);
 		idx = fd / NFDBITS;
@@ -1466,7 +1544,7 @@ selscan(struct thread *td, fd_mask **ibits, fd_mask **obits, int nfd)
 			if (only_user)
 				error = fget_only_user(fdp, fd, &cap_event_rights, &fp);
 			else
-				error = fget_unlocked(fdp, fd, &cap_event_rights, &fp);
+				error = fget_unlocked(td, fd, &cap_event_rights, &fp);
 			if (__predict_false(error != 0))
 				return (error);
 			selfdalloc(td, (void *)(uintptr_t)fd);
@@ -1509,12 +1587,13 @@ user_poll(struct thread *td, struct pollfd * __capability fds, u_int nfds,
 	return (kern_poll(td, fds, nfds, tsp, NULL));
 }
 
+/*
+ * kfds points to an array in the kernel.
+ */
 int
-kern_poll(struct thread *td, struct pollfd * __capability ufds, u_int nfds,
+kern_poll_kfds(struct thread *td, struct pollfd *kfds, u_int nfds,
     struct timespec *tsp, sigset_t *uset)
 {
-	struct pollfd *kfds;
-	struct pollfd stackfds[32];
 	sbintime_t sbt, precision, tmp;
 	time_t over;
 	struct timespec ts;
@@ -1522,9 +1601,7 @@ kern_poll(struct thread *td, struct pollfd * __capability ufds, u_int nfds,
 
 	precision = 0;
 	if (tsp != NULL) {
-		if (tsp->tv_sec < 0)
-			return (EINVAL);
-		if (tsp->tv_nsec < 0 || tsp->tv_nsec >= 1000000000)
+		if (!timespecvalid_interval(tsp))
 			return (EINVAL);
 		if (tsp->tv_sec == 0 && tsp->tv_nsec == 0)
 			sbt = 0;
@@ -1545,28 +1622,11 @@ kern_poll(struct thread *td, struct pollfd * __capability ufds, u_int nfds,
 	} else
 		sbt = -1;
 
-	/*
-	 * This is kinda bogus.  We have fd limits, but that is not
-	 * really related to the size of the pollfd array.  Make sure
-	 * we let the process use at least FD_SETSIZE entries and at
-	 * least enough for the system-wide limits.  We want to be reasonably
-	 * safe, but not overly restrictive.
-	 */
-	if (nfds > maxfilesperproc && nfds > FD_SETSIZE) 
-		return (EINVAL);
-	if (nfds > nitems(stackfds))
-		kfds = mallocarray(nfds, sizeof(*kfds), M_TEMP, M_WAITOK);
-	else
-		kfds = stackfds;
-	error = copyin(ufds, kfds, nfds * sizeof(*kfds));
-	if (error)
-		goto done;
-
 	if (uset != NULL) {
 		error = kern_sigprocmask(td, SIG_SETMASK, uset,
 		    &td->td_oldsigmask, 0);
 		if (error)
-			goto done;
+			return (error);
 		td->td_pflags |= TDP_OLDMASK;
 		/*
 		 * Make sure that ast() is called on return to
@@ -1593,20 +1653,11 @@ kern_poll(struct thread *td, struct pollfd * __capability ufds, u_int nfds,
 	}
 	seltdclear(td);
 
-done:
 	/* poll is not restarted after signals... */
 	if (error == ERESTART)
 		error = EINTR;
 	if (error == EWOULDBLOCK)
 		error = 0;
-	if (error == 0) {
-		error = pollout(td, kfds, ufds, nfds);
-		if (error)
-			goto out;
-	}
-out:
-	if (nfds > nitems(stackfds))
-		free(kfds, M_TEMP);
 	return (error);
 }
 
@@ -1640,12 +1691,52 @@ user_ppoll(struct thread *td, struct pollfd * __capability fds, u_int nfds,
 		ssp = &set;
 	} else
 		ssp = NULL;
-	/*
-	 * fds is still a pointer to user space. kern_poll() will
-	 * take care of copyin that array to the kernel space.
-	 */
-
 	return (kern_poll(td, fds, nfds, tsp, ssp));
+}
+
+/*
+ * ufds points to an array in user space.
+ */
+int
+kern_poll(struct thread *td, struct pollfd * __capability ufds, u_int nfds,
+    struct timespec *tsp, sigset_t *set)
+{
+	struct pollfd *kfds;
+	struct pollfd stackfds[32];
+	int error;
+
+	if (kern_poll_maxfds(nfds))
+		return (EINVAL);
+	if (nfds > nitems(stackfds))
+		kfds = mallocarray(nfds, sizeof(*kfds), M_TEMP, M_WAITOK);
+	else
+		kfds = stackfds;
+	error = copyin(ufds, kfds, nfds * sizeof(*kfds));
+	if (error != 0)
+		goto out;
+
+	error = kern_poll_kfds(td, kfds, nfds, tsp, set);
+	if (error == 0)
+		error = pollout(td, kfds, ufds, nfds);
+
+out:
+	if (nfds > nitems(stackfds))
+		free(kfds, M_TEMP);
+	return (error);
+}
+
+bool
+kern_poll_maxfds(u_int nfds)
+{
+
+	/*
+	 * This is kinda bogus.  We have fd limits, but that is not
+	 * really related to the size of the pollfd array.  Make sure
+	 * we let the process use at least FD_SETSIZE entries and at
+	 * least enough for the system-wide limits.  We want to be reasonably
+	 * safe, but not overly restrictive.
+	 */
+	return (nfds > maxfilesperproc && nfds > FD_SETSIZE);
 }
 
 static int
@@ -1675,7 +1766,7 @@ pollrescan(struct thread *td)
 		if (only_user)
 			error = fget_only_user(fdp, fd->fd, &cap_event_rights, &fp);
 		else
-			error = fget_unlocked(fdp, fd->fd, &cap_event_rights, &fp);
+			error = fget_unlocked(td, fd->fd, &cap_event_rights, &fp);
 		if (__predict_false(error != 0)) {
 			fd->revents = POLLNVAL;
 			n++;
@@ -1739,7 +1830,7 @@ pollscan(struct thread *td, struct pollfd *fds, u_int nfd)
 		if (only_user)
 			error = fget_only_user(fdp, fds->fd, &cap_event_rights, &fp);
 		else
-			error = fget_unlocked(fdp, fds->fd, &cap_event_rights, &fp);
+			error = fget_unlocked(td, fds->fd, &cap_event_rights, &fp);
 		if (__predict_false(error != 0)) {
 			fds->revents = POLLNVAL;
 			n++;

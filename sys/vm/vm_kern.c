@@ -77,6 +77,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/msan.h>
 #include <sys/proc.h>
 #include <sys/rwlock.h>
 #include <sys/sysctl.h>
@@ -175,6 +176,23 @@ kva_free(vm_pointer_t addr, vm_size_t size)
 	vmem_free(kernel_arena, addr, size);
 }
 
+/*
+ * Update sanitizer shadow state to reflect a new allocation.  Force inlining to
+ * help make KMSAN origin tracking more precise.
+ */
+static __always_inline void
+kmem_alloc_san(vm_offset_t addr, vm_size_t size, vm_size_t asize, int flags)
+{
+	if ((flags & M_ZERO) == 0) {
+		kmsan_mark((void *)addr, asize, KMSAN_STATE_UNINIT);
+		kmsan_orig((void *)addr, asize, KMSAN_TYPE_KMEM,
+		    KMSAN_RET_ADDR);
+	} else {
+		kmsan_mark((void *)addr, asize, KMSAN_STATE_INITED);
+	}
+	kasan_mark((void *)addr, size, asize, KASAN_KMEM_REDZONE);
+}
+
 static vm_page_t
 kmem_alloc_contig_pages(vm_object_t object, vm_pindex_t pindex, int domain,
     int pflags, u_long npages, vm_paddr_t low, vm_paddr_t high,
@@ -185,10 +203,6 @@ kmem_alloc_contig_pages(vm_object_t object, vm_pindex_t pindex, int domain,
 	bool wait, reclaim;
 
 	VM_OBJECT_ASSERT_WLOCKED(object);
-
-	/* Disallow an invalid combination of flags. */
-	MPASS((pflags & (VM_ALLOC_WAITOK | VM_ALLOC_NORECLAIM)) !=
-	    (VM_ALLOC_WAITOK | VM_ALLOC_NORECLAIM));
 
 	wait = (pflags & VM_ALLOC_WAITOK) != 0;
 	reclaim = (pflags & VM_ALLOC_NORECLAIM) == 0;
@@ -265,7 +279,7 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		    prot | PMAP_ENTER_WIRED, 0);
 	}
 	VM_OBJECT_WUNLOCK(object);
-	kasan_mark((void *)addr, size, asize, KASAN_KMEM_REDZONE);
+	kmem_alloc_san(addr, size, asize, flags);
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
 	KASSERT(cheri_getlen(addr) == asize,
@@ -359,7 +373,7 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 		tmp += PAGE_SIZE;
 	}
 	VM_OBJECT_WUNLOCK(object);
-	kasan_mark((void *)addr, size, asize, KASAN_KMEM_REDZONE);
+	kmem_alloc_san(addr, size, asize, flags);
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_gettag(addr), ("Expected valid capability"));
 	KASSERT(cheri_getlen(addr) == asize,
@@ -431,6 +445,9 @@ kmem_subinit(vm_map_t map, vm_map_t parent, vm_pointer_t *min, vm_pointer_t *max
 		panic("kmem_subinit: bad status return of %d", ret);
 	*max = *min + size;
 	vm_map_init(map, vm_map_pmap(parent), *min, *max);
+#ifdef __CHERI_PURE_CAPABILITY__
+	map->flags |= MAP_RESERVATIONS;
+#endif
 	if (vm_map_submap(parent, *min, *max, map) != KERN_SUCCESS)
 		panic("kmem_subinit: unable to change range to submap");
 }
@@ -562,7 +579,7 @@ retry:
 			m->oflags |= VPO_KMEM_EXEC;
 	}
 	VM_OBJECT_WUNLOCK(object);
-
+	kmem_alloc_san(addr, size, size, flags);
 	return (KERN_SUCCESS);
 }
 
@@ -686,10 +703,8 @@ kmem_free(vm_pointer_t addr, vm_size_t size)
 vm_pointer_t
 kmap_alloc_wait(vm_map_t map, vm_size_t size)
 {
-	int error;
 	vm_size_t padded_size;
-	vm_offset_t alignment;
-	vm_offset_t addr;
+	vm_offset_t addr, alignment;
 	vm_pointer_t mapped;
 
 	size = round_page(size);
@@ -704,18 +719,12 @@ kmap_alloc_wait(vm_map_t map, vm_size_t size)
 		 * to lock out sleepers/wakers.
 		 */
 		vm_map_lock(map);
-		addr = vm_map_findspace(map, vm_map_min(map), padded_size);
-		if (addr + padded_size <= vm_map_max(map) && alignment == 0)
+		addr = vm_map_min(map);
+		if (vm_map_find_aligned(map, &addr, padded_size,
+		    vm_map_max(map), alignment) == KERN_SUCCESS)
 			break;
-		if (alignment > 0) {
-			error = vm_map_alignspace(map, NULL, 0, &addr,
-			    padded_size, vm_map_max(map), alignment);
-			if (error == KERN_SUCCESS)
-				break;
-		}
-
 		/* no space now; see if we can ever get space */
-		if (vm_map_max(map) - vm_map_min(map) < size) {
+		if (vm_map_max(map) - vm_map_min(map) < padded_size) {
 			vm_map_unlock(map);
 			swap_release(size);
 			return (0);
@@ -772,10 +781,7 @@ kmem_init_zero_region(void)
 	 * zeros, while not using much more physical resources.
 	 */
 	addr = kva_alloc(ZERO_REGION_SIZE);
-	m = vm_page_alloc(NULL, 0, VM_ALLOC_NORMAL |
-	    VM_ALLOC_NOOBJ | VM_ALLOC_WIRED | VM_ALLOC_ZERO);
-	if ((m->flags & PG_ZERO) == 0)
-		pmap_zero_page(m);
+	m = vm_page_alloc_noobj(VM_ALLOC_WIRED | VM_ALLOC_ZERO);
 	for (i = 0; i < ZERO_REGION_SIZE; i += PAGE_SIZE)
 		pmap_qenter(addr + i, &m, 1);
 	pmap_protect(kernel_pmap, addr, addr + ZERO_REGION_SIZE, VM_PROT_READ);
@@ -845,6 +851,9 @@ kmem_init(vm_pointer_t start, vm_pointer_t end)
 
 	vm_map_init(kernel_map, kernel_pmap,
 	    cheri_kern_setaddress(start, VM_MIN_KERNEL_ADDRESS), end);
+#ifdef __CHERI_PURE_CAPABILITY__
+	kernel_map->flags |= MAP_RESERVATIONS;
+#endif
 	kernel_map->system_map = 1;
 	vm_map_lock(kernel_map);
 	/* N.B.: cannot use kgdb to debug, starting with this assignment ... */

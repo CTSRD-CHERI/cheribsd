@@ -34,96 +34,43 @@ usage()
 	exit 1
 }
 
-
 work()
-{
-	echo "#ifndef _OFFSET_INC_"
-	echo "#define _OFFSET_INC_"
-	echo "#if !defined(GENOFFSET) && (!defined(KLD_MODULE) || defined(KLD_TIED))"
-	${NM:='nm'} ${NMFLAGS} "$1" | ${AWK:='awk'} '
-	/ C .*_datatype_*/ {
-		type = substr($3, match($3, "_datatype_") + length("_datatype_"))
-	}
-	/ C .*_parenttype_*/ {
-		parent = substr($3, match($3, "_parenttype_") + length("_parenttype_"))
-	}
-	/ C .*sign$/ {
-		sign = substr($1, length($1) - 1, 2)
-		sub("^0*", "", sign)
-		if (sign != "")
-			sign = "-"
-	}
-	/ C .*y0$/ {
-		y0 = substr($1, length($1) - 1, 2)
-	}
-	/ C .*y1$/ {
-		y1 = substr($1, length($1) - 1, 2)
-	}
-	/ C .*y2$/ {
-		y2 = substr($1, length($1) - 1, 2)
-	}
-	/ C .*y3$/ {
-		y3 = substr($1, length($1) - 1, 2)
-	}
-	/ C .*y4$/ {
-		y4 = substr($1, length($1) - 1, 2)
-	}
-	/ C .*y5$/ {
-		y5 = substr($1, length($1) - 1, 2)
-	}
-	/ C .*y6$/ {
-		y6 = substr($1, length($1) - 1, 2)
-	}
-	/ C .*y7$/ {
-		y7 = substr($1, length($1) - 1, 2)
-		w = y7 y6 y5 y4 y3 y2 y1 y0
-		sub("^0*", "", w)
-		if (w == "")
-			w = "0"
-		hex = ""
-		if (w != "0")
-			hex = "0x"
-		sub("y7$", "", $3)
-		member = tolower($3)
-		# This still has minor problems representing INT_MIN, etc. 
-		# E.g.,
-		# with 32-bit 2''s complement ints, this prints -0x80000000,
-		# which has the wrong type (unsigned int).
-		offset = sprintf("%s%s%s", sign, hex, w)
+(
+    local last off x1 x2 x3 struct field type lastoff lasttype
 
-		structures[parent] = sprintf("%s%s %s %s\n",
-		    structures[parent], offset, type, member)
-	}
-	END {
-		for (struct in structures) {
-			printf("struct %s_lite {\n", struct);
-			n = split(structures[struct], members, "\n")
-			for (i = 1; i < n; i++) {
-				for (j = i + 1; j < n; j++) {
-					split(members[i], ivar, " ")
-					split(members[j], jvar, " ")
-					if (jvar[1] < ivar[1]) {
-						tmp = members[i]
-						members[i] = members[j]
-						members[j] = tmp
-					}
-				}
-			}
-			off = "0"
-			for (i = 1; i < n; i++) {
-				split(members[i], m, " ")
-				printf "\tu_char\tpad_%s[%s - %s];\n", m[3], m[1], off
-				printf "\t%s\t%s;\n", m[2], m[3]
-				off = sprintf("(%s + sizeof(%s))", m[1], m[2])
-			}
-			printf("};\n");
-		}
-	}
-	'
-
-	echo "#endif"
-	echo "#endif"
-}
+    echo "#ifndef _OFFSET_INC_"
+    echo "#define _OFFSET_INC_"
+    echo "#if !defined(GENOFFSET) && (!defined(KLD_MODULE) || defined(KLD_TIED))"
+    last=
+    temp=$(mktemp -d genoffset.XXXXXXXXXX)
+    trap "rm -rf ${temp}" EXIT
+    # Note: we need to print symbol values in decimal so the numeric sort works
+    ${NM:='nm'} ${NMFLAGS} -t d "$1" | grep __assym_offset__ | sed -e 's/__/ /g' | sort -k 4 -k 1 -n |
+    while read off x1 x2 struct field type x3; do
+	off=$(echo "$off" | sed -E 's/^0+//')
+	if [ "$last" != "$struct" ]; then
+	    if [ -n "$last" ]; then
+		echo "};"
+	    fi
+	    echo "struct ${struct}_lite {"
+	    last=$struct
+	    printf "%b" "\tu_char\tpad_${field}[${off}];\n"
+	else
+	    printf "%b" "\tu_char\tpad_${field}[${off} - (${lastoff} + sizeof(${lasttype}))];\n"
+	fi
+	printf "%b" "\t${type}\t${field};\n"
+	lastoff="$off"
+	lasttype="$type"
+	echo "_SA(${struct}, ${field}, ${off});" >> "$temp/asserts"
+    done
+    echo "};"
+    echo "#define _SA(s,f,o) _Static_assert(__builtin_offsetof(struct s ## _lite, f) == o, \\"
+    printf '\t"struct "#s"_lite field "#f" not at offset "#o)\n'
+    cat "$temp/asserts"
+    echo "#undef _SA"
+    echo "#endif"
+    echo "#endif"
+)
 
 
 #
@@ -138,7 +85,7 @@ do
 	*)	usage;;
 	esac
 done
-shift $(($OPTIND - 1))
+shift $((OPTIND - 1))
 case $# in
 1)	;;
 *)	usage;;
@@ -146,8 +93,8 @@ esac
 
 if [ "$use_outfile" = "yes" ]
 then
-	work $1  3>"$outfile" >&3 3>&-
+	work "$1"  3>"$outfile" >&3 3>&-
 else
-	work $1
+	work "$1"
 fi
 

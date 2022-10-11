@@ -148,9 +148,7 @@ static struct ofw_compat_data mv_rtc_compat[] = {
 	{NULL,				0},
 };
 
-static devclass_t mv_rtc_devclass;
-
-DRIVER_MODULE(a38x_rtc, simplebus, mv_rtc_driver, mv_rtc_devclass, 0, 0);
+DRIVER_MODULE(a38x_rtc, simplebus, mv_rtc_driver, 0, 0);
 
 static void
 mv_rtc_reset(device_t dev)
@@ -208,9 +206,7 @@ static int
 mv_rtc_attach(device_t dev)
 {
 	struct mv_rtc_softc *sc;
-	int unit, ret;
-
-	unit = device_get_unit(dev);
+	int ret;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;

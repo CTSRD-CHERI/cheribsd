@@ -182,6 +182,7 @@ init_secondary(int cpu)
 	pc->pc_curthread = pc->pc_idlethread;
 	pc->pc_curpcb = pc->pc_idlethread->td_pcb;
 	set_curthread(pc->pc_idlethread);
+	schedinit_ap();
 #ifdef VFP
 	vfp_init();
 #endif
@@ -216,7 +217,7 @@ init_secondary(int cpu)
 	CTR0(KTR_SMP, "go into scheduler");
 
 	/* Enter the scheduler */
-	sched_throw(NULL);
+	sched_ap_entry();
 
 	panic("scheduler returned us to %s", __func__);
 	/* NOTREACHED */

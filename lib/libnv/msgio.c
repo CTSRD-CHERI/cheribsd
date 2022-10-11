@@ -68,8 +68,15 @@ __FBSDID("$FreeBSD$");
  * machine-independent limit on the number of FDs per message.  Each control
  * message contains 1 FD and requires 12 bytes for the header, 4 pad bytes,
  * 4 bytes for the descriptor, and another 4 pad bytes.
+ *
+ * For CheriABI, we have 12 bytes of pad for capability alignment after
+ * the descriptor.
  */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	PKG_MAX_SIZE	(MCLBYTES / 32)
+#else
 #define	PKG_MAX_SIZE	(MCLBYTES / 24)
+#endif
 #endif
 
 static int
@@ -450,7 +457,7 @@ buf_send(int sock, void *buf, size_t size)
 }
 
 int
-buf_recv(int sock, void *buf, size_t size)
+buf_recv(int sock, void *buf, size_t size, int flags)
 {
 	ssize_t done;
 	unsigned char *ptr;
@@ -461,7 +468,7 @@ buf_recv(int sock, void *buf, size_t size)
 	ptr = buf;
 	while (size > 0) {
 		fd_wait(sock, true);
-		done = recv(sock, ptr, size, 0);
+		done = recv(sock, ptr, size, flags);
 		if (done == -1) {
 			if (errno == EINTR)
 				continue;

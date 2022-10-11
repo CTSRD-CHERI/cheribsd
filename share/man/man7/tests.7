@@ -128,7 +128,7 @@ by using Kyua's various reporting commands.
 For example, the following would print a plain-text report of the executed
 tests and show which ones failed:
 .Bd -literal -offset indent
-$ kyua report
+$ kyua report --verbose -r <.db file from output of test>
 .Ed
 .Pp
 This example would generate an HTML report ready to be published on a
@@ -194,7 +194,7 @@ For more details please refer to:
 .It
 .Lk https://lists.freebsd.org/ "FreeBSD Mailing Lists"
 .It
-.Lk https://www.freebsd.org/support.html "Problem Reporting"
+.Lk https://www.freebsd.org/support/ "Problem Reporting"
 .El
 .Sh FILES
 .Bl -tag -compact -width "/etc/kyua/kyua.conf"

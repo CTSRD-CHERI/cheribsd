@@ -42,19 +42,12 @@ verify_runnable "both"
 
 function cleanup
 {
-	if poolexists $MPOOL; then
-		destroy_pool $MPOOL
-	fi
-
-	for file in $VDEV1 $VDEV2; do
-		[[ -f $file ]] && rm -f $file
-	done
-
-	log_must rm -f $TMP_EVENTS_ZED $TMP_EVENTS_ZED
+	poolexists $MPOOL && log_must destroy_pool $MPOOL
+	log_must rm -f $VDEV1 $VDEV2 $TMP_EVENTS_ZED
 	log_must zed_stop
 }
 
-log_assert "Verify ZED handles missed events on when starting"
+log_assert "Verify ZED handles missed events when starting"
 log_onexit cleanup
 
 log_must truncate -s $MINVDEVSIZE $VDEV1 $VDEV2
@@ -62,17 +55,16 @@ log_must truncate -s $MINVDEVSIZE $VDEV1 $VDEV2
 # 1. Create a pool and generate some events.
 log_must truncate -s 0 $ZED_DEBUG_LOG
 log_must zpool events -c
-log_must zpool create $MPOOL mirror $VDEV1 $VDEV2
+log_must zpool create -O compression=off $MPOOL mirror $VDEV1 $VDEV2
 
 # 2. Start the ZED and verify it handles missed events.
 log_must zed_start
 log_must file_wait_event $ZED_DEBUG_LOG 'sysevent\.fs\.zfs\.config_sync' 150
 log_must cp $ZED_DEBUG_LOG $TMP_EVENTS_ZED
 
-awk -v event="sysevent.fs.zfs.pool_create" \
-    'BEGIN{FS="\n"; RS=""} $0 ~ event { print $0 }' \
-    $TMP_EVENTS_ZED >$TMP_EVENT_ZED
-log_must grep -q "^ZEVENT_POOL=$MPOOL" $TMP_EVENT_ZED
+log_mustnot awk -v event="sysevent.fs.zfs.pool_create" -v crit="\\nZEVENT_POOL=$MPOOL" \
+    'BEGIN{FS="\n"; RS=""} $0 ~ event && $0 ~ crit { exit 1 }' \
+    $TMP_EVENTS_ZED
 
 # 3. Stop the ZED
 zed_stop

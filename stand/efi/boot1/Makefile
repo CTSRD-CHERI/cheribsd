@@ -67,6 +67,9 @@ FILESMODE_${BOOT1}.efi=	${BINMODE}
 
 LDSCRIPT=	${EFISRC}/loader/arch/${MACHINE}/ldscript.${MACHINE}
 LDFLAGS+=	-Wl,-T${LDSCRIPT},-Bsymbolic,-znotext -pie
+.if ${LINKER_TYPE} == "bfd" && ${LINKER_VERSION} >= 23400
+LDFLAGS+=	-Wl,--no-dynamic-linker
+.endif
 
 .if ${MACHINE_CPUARCH} == "aarch64"
 CFLAGS+=	-mgeneral-regs-only
@@ -79,7 +82,7 @@ LDFLAGS+=	-Wl,-znocombreloc
 LIBEFI=		${BOOTOBJ}/efi/libefi/libefi.a
 
 #
-# Add libstand for the runtime functions used by the compiler - for example
+# Add libsa for the runtime functions used by the compiler - for example
 # __aeabi_* (arm) or __divdi3 (i386).
 # as well as required string and memory functions for all platforms.
 #

@@ -28,18 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "lib",
- *   "changes": [
- *     "integer_provenance"
- *   ],
- *   "change_comment": "Use correct atomics on pointers"
- * }
- * CHERI CHANGES END
- */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -55,7 +43,6 @@ __FBSDID("$FreeBSD$");
 #include <pthread.h>
 #include <sys/types.h>
 #include <sys/signalvar.h>
-#include <sys/stdatomic.h>
 #include "un-namespace.h"
 
 #include "libc_private.h"
@@ -74,20 +61,13 @@ static void thread_unwind(void) __dead2;
 static void thread_uw_init(void);
 static _Unwind_Reason_Code thread_unwind_stop(int version,
 	_Unwind_Action actions,
-	int64_t exc_class,
+	uint64_t exc_class,
 	struct _Unwind_Exception *exc_obj,
 	struct _Unwind_Context *context, void *stop_parameter);
 /* unwind library pointers */
-typedef _Unwind_Reason_Code (*uwl_forcedunwind_t)(struct _Unwind_Exception *,
+static _Unwind_Reason_Code (*uwl_forcedunwind)(struct _Unwind_Exception *,
 	_Unwind_Stop_Fn, void *);
-#ifdef __CHERI_PURE_CAPABILITY__
-static _Atomic(uwl_forcedunwind_t) uwl_forcedunwind;
-#else
-static uwl_forcedunwind_t uwl_forcedunwind;
-#endif
-static uwl_forcedunwind_t get_uwl_forcedunwind(void);
-
-static unsigned long (*uwl_getcfa)(struct _Unwind_Context *);
+static uintptr_t (*uwl_getcfa)(struct _Unwind_Context *);
 
 static void
 thread_uw_init(void)
@@ -111,17 +91,8 @@ thread_uw_init(void)
 		    getcfa = dlsym(handle, "_Unwind_GetCFA");
 		    if (forcedunwind != NULL && getcfa != NULL) {
 			uwl_getcfa = getcfa;
-#ifndef __CHERI_PURE_CAPABILITY__
 			atomic_store_rel_ptr((volatile void *)&uwl_forcedunwind,
 				(uintptr_t)forcedunwind);
-#else
-			/*
-			 * XXXAR: Ideally we would use this for both cases but
-			 * GCC 4.2 doesn't support C11 atomics
-			 */
-			atomic_store_explicit(&uwl_forcedunwind, forcedunwind,
-			    memory_order_release);
-#endif
 		    } else {
 			dlclose(handle);
 		    }
@@ -131,28 +102,14 @@ thread_uw_init(void)
 	inited = 1;
 }
 
-static uwl_forcedunwind_t
-get_uwl_forcedunwind(void)
-{
-	uwl_forcedunwind_t func;
-
-#ifdef __CHERI_PURE_CAPABILITY__
-	func = atomic_load_explicit(&uwl_forcedunwind, memory_order_acquire);
-#else
-	func = (uwl_forcedunwind_t)atomic_load_acq_ptr(
-	    (volatile void *)&uwl_forcedunwind);
-#endif
-	return func;
-}
-
 _Unwind_Reason_Code
 _Unwind_ForcedUnwind(struct _Unwind_Exception *ex, _Unwind_Stop_Fn stop_func,
 	void *stop_arg)
 {
-	return (*get_uwl_forcedunwind())(ex, stop_func, stop_arg);
+	return (*uwl_forcedunwind)(ex, stop_func, stop_arg);
 }
 
-unsigned long
+uintptr_t
 _Unwind_GetCFA(struct _Unwind_Context *context)
 {
 	return (*uwl_getcfa)(context);
@@ -161,13 +118,6 @@ _Unwind_GetCFA(struct _Unwind_Context *context)
 #pragma weak _Unwind_GetCFA
 #pragma weak _Unwind_ForcedUnwind
 #endif /* PIC */
-
-#ifndef __CHERI_PURE_CAPABILITY__
-#define WEAK_SYMBOL_NONNULL(sym) ((sym) != NULL)
-#else
-/* Work around https://github.com/CTSRD-CHERI/llvm/issues/167 */
-#define WEAK_SYMBOL_NONNULL(sym) ((vaddr_t)(sym) != (vaddr_t)0)
-#endif
 
 static void
 thread_unwind_cleanup(_Unwind_Reason_Code code __unused,
@@ -183,7 +133,7 @@ thread_unwind_cleanup(_Unwind_Reason_Code code __unused,
 
 static _Unwind_Reason_Code
 thread_unwind_stop(int version __unused, _Unwind_Action actions,
-	int64_t exc_class __unused,
+	uint64_t exc_class __unused,
 	struct _Unwind_Exception *exc_obj __unused,
 	struct _Unwind_Context *context, void *stop_parameter __unused)
 {
@@ -214,19 +164,6 @@ thread_unwind_stop(int version __unused, _Unwind_Action actions,
 
 	return (_URC_NO_REASON);
 }
-
-/*
- * Check that the _Unwind_Exception structure from include/unwind.h is
- * compatible with LLVM libunwind. This was causing crashes before.
- */
-#ifdef __CHERI_PURE_CAPABILITY__
-#if __SIZEOF_CHERI_CAPABILITY__ == 16
-_Static_assert(sizeof(struct _Unwind_Exception) == 0x40, "");
-#else
-_Static_assert(__SIZEOF_CHERI_CAPABILITY__ == 32, "");
-_Static_assert(sizeof(struct _Unwind_Exception) == 0x80, "");
-#endif
-#endif
 
 static void
 thread_unwind(void)
@@ -305,9 +242,9 @@ _pthread_exit_mask(void *status, sigset_t *mask)
 
 #ifdef PIC
 	thread_uw_init();
-	if (get_uwl_forcedunwind() != NULL) {
+	if (uwl_forcedunwind != NULL) {
 #else
-	if (WEAK_SYMBOL_NONNULL(_Unwind_ForcedUnwind)) {
+	if (_Unwind_ForcedUnwind != NULL) {
 #endif
 		if (curthread->unwind_disabled) {
 			if (message_printed == 0) {

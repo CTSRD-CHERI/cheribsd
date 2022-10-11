@@ -28,8 +28,8 @@
  * $FreeBSD$
  */
 
-#ifndef __LINUX_WAITBIT_H__
-#define	__LINUX_WAITBIT_H__
+#ifndef __LINUXKPI_LINUX_WAITBIT_H__
+#define	__LINUXKPI_LINUX_WAITBIT_H__
 
 #include <linux/wait.h>
 #include <linux/bitops.h>
@@ -64,4 +64,10 @@ wake_up_var(void *var)
 	wake_up(&linux_var_waitq);
 }
 
-#endif	/* __LINUX_WAITBIT_H__ */
+static inline wait_queue_head_t *
+__var_waitqueue(void *p)
+{
+	return (&linux_var_waitq);
+}
+
+#endif	/* __LINUXKPI_LINUX_WAITBIT_H__ */

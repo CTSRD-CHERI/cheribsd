@@ -3,6 +3,8 @@
 
 .include <src.opts.mk>
 
+PACKAGE=	ftpd
+
 CONFS=	ftpusers
 PROG=	ftpd
 MAN=	ftpd.8 ftpchroot.5
@@ -14,7 +16,7 @@ YFLAGS=
 WARNS?=	2
 WFORMAT=0
 
-LIBADD=	crypt xo util
+LIBADD=	crypt util
 
 # XXX Kluge! Conversation mechanism needs to be fixed.
 LIBADD+=	opie md

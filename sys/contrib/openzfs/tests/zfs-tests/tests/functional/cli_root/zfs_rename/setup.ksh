@@ -36,13 +36,11 @@ DISK=${DISKS%% *}
 
 default_setup_noexit "$DISK" "true" "true"
 
-if [[ -d $TESTDIR2 ]]; then
-	rm -rf $TESTDIR2
-	if (( $? != 0 )); then
-		log_unresolved Could not remove $TESTDIR2
-	fi
-fi
-log_must zfs create $TESTPOOL/$DATAFS
+rm -rf $TESTDIR2 ||
+	log_unresolved Could not remove $TESTDIR2
+
+log_must zfs set compression=off $TESTPOOL/$TESTFS
+log_must zfs create -o compression=off $TESTPOOL/$DATAFS
 log_must zfs set mountpoint=$TESTDIR2 $TESTPOOL/$DATAFS
 log_must eval "dd if=$IF of=$OF bs=$BS count=$CNT >/dev/null 2>&1"
 

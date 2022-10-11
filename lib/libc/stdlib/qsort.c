@@ -53,11 +53,6 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #include "libc_private.h"
 
-#if __has_feature(capabilities)
-typedef __uintcap_t big_primitive_type;
-#else
-typedef long big_primitive_type;
-#endif
 #if defined(I_AM_QSORT_R)
 typedef int		 cmp_t(void *, const void *, const void *);
 #elif defined(I_AM_QSORT_S)
@@ -89,10 +84,10 @@ static inline void	 swapfunc(char *, char *, size_t, int, int);
 	es % sizeof(TYPE) ? 2 : es == sizeof(TYPE) ? 0 : 1;
 
 static inline void
-swapfunc( char *a, char *b, size_t n, int swaptype_big_primitive_type, int swaptype_int)
+swapfunc(char *a, char *b, size_t n, int swaptype_intcap_t, int swaptype_int)
 {
-	if (swaptype_big_primitive_type <= 1)
-		swapcode(big_primitive_type, a, b, n)
+	if (swaptype_intcap_t <= 1)
+		swapcode(intcap_t, a, b, n)
 	else if (swaptype_int <= 1)
 		swapcode(int, a, b, n)
 	else
@@ -100,19 +95,19 @@ swapfunc( char *a, char *b, size_t n, int swaptype_big_primitive_type, int swapt
 }
 
 #define	swap(a, b)					\
-	if (swaptype_big_primitive_type == 0) {			\
-		big_primitive_type t = *(big_primitive_type *)(a);			\
-		*(big_primitive_type *)(a) = *(big_primitive_type *)(b);		\
-		*(big_primitive_type *)(b) = t;			\
+	if (swaptype_intcap_t == 0) {			\
+		intcap_t t = *(intcap_t *)(a);		\
+		*(intcap_t *)(a) = *(intcap_t *)(b);	\
+		*(intcap_t *)(b) = t;			\
 	} else if (swaptype_int == 0) {			\
 		int t = *(int *)(a);			\
 		*(int *)(a) = *(int *)(b);		\
 		*(int *)(b) = t;			\
 	} else						\
-		swapfunc(a, b, es, swaptype_big_primitive_type, swaptype_int)
+		swapfunc(a, b, es, swaptype_intcap_t, swaptype_int)
 
 #define	vecswap(a, b, n)				\
-	if ((n) > 0) swapfunc(a, b, n, swaptype_big_primitive_type, swaptype_int)
+	if ((n) > 0) swapfunc(a, b, n, swaptype_intcap_t, swaptype_int)
 
 #if defined(I_AM_QSORT_R)
 #define	CMP(t, x, y) (cmp((t), (x), (y)))
@@ -149,10 +144,12 @@ local_qsort(void *a, size_t n, size_t es, cmp_t *cmp, void *thunk)
 	char *pa, *pb, *pc, *pd, *pl, *pm, *pn;
 	size_t d1, d2;
 	int cmp_result;
-	int swaptype_big_primitive_type, swaptype_int, swap_cnt;
+	int swaptype_intcap_t, swaptype_int, swap_cnt;
 
+	if (__predict_false(n == 0))
+		return;
 loop:
-	SWAPINIT(big_primitive_type, a, es);
+	SWAPINIT(intcap_t, a, es);
 	SWAPINIT(int, a, es);
 	swap_cnt = 0;
 	if (n < 7) {
@@ -216,7 +213,12 @@ loop:
 	pn = (char *)a + n * es;
 	d1 = MIN(pa - (char *)a, pb - pa);
 	vecswap(a, pb - d1, d1);
-	d1 = MIN(pd - pc, pn - pd - es);
+	/*
+	 * Cast es to preserve signedness of right-hand side of MIN()
+	 * expression, to avoid sign ambiguity in the implied comparison.  es
+	 * is safely within [0, SSIZE_MAX].
+	 */
+	d1 = MIN(pd - pc, pn - pd - (ssize_t)es);
 	vecswap(pb, pn - d1, d1);
 
 	d1 = pb - pa;

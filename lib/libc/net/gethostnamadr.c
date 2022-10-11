@@ -258,10 +258,10 @@ static int
 host_marshal_func(char *buffer, size_t *buffer_size, void *retval, va_list ap,
     void *cache_mdata)
 {
-	char *str;
-	void *addr;
-	socklen_t len;
-	int type;
+	char *str __unused;
+	void *addr __unused;
+	socklen_t len __unused;
+	int type __unused;
 	struct hostent *ht;
 
 	struct hostent new_ht;
@@ -366,10 +366,10 @@ static int
 host_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
     void *cache_mdata)
 {
-	char *str;
-	void *addr;
-	socklen_t len;
-	int type;
+	char *str __unused;
+	void *addr __unused;
+	socklen_t len __unused;
+	int type __unused;
 	struct hostent *ht;
 
 	char *p;
@@ -409,9 +409,9 @@ host_unmarshal_func(char *buffer, size_t buffer_size, void *retval, va_list ap,
 
 	orig_buf = (char *)_ALIGN(orig_buf);
 	memcpy(orig_buf, buffer + sizeof(struct hostent) + sizeof(char *) +
-	    (vaddr_t)_ALIGN(p) - (vaddr_t)p,
+	    ((char *)_ALIGN(p) - p),
 	    buffer_size - sizeof(struct hostent) - sizeof(char *) -
-	    (vaddr_t)_ALIGN(p) + (vaddr_t)p);
+	    ((char *)_ALIGN(p) - p));
 	p = (char *)_ALIGN(p);
 
 	NS_APPLY_OFFSET(ht->h_name, orig_buf, p, char *);

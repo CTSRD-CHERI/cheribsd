@@ -34,7 +34,7 @@ struct A
     static int count;
 
     A() {++count;}
-    A(const A&) {++count;}
+    A(const A& other) : B(other) {++count;}
     ~A() {--count;}
 };
 
@@ -50,12 +50,10 @@ int main(int, char**)
         assert(B::count == 1);
         assert(p.use_count() == 1);
         assert(p.get() == ptr);
-#ifndef _LIBCPP_NO_RTTI
-        test_deleter<A>* d = std::get_deleter<test_deleter<A> >(p);
-#endif
         assert(test_deleter<A>::count == 1);
         assert(test_deleter<A>::dealloc_count == 0);
-#ifndef _LIBCPP_NO_RTTI
+#ifndef TEST_HAS_NO_RTTI
+        test_deleter<A>* d = std::get_deleter<test_deleter<A> >(p);
         assert(d);
         assert(d->state() == 3);
 #endif
@@ -71,12 +69,10 @@ int main(int, char**)
         assert(B::count == 1);
         assert(p.use_count() == 1);
         assert(p.get() == ptr);
-#ifndef _LIBCPP_NO_RTTI
-        test_deleter<A>* d = std::get_deleter<test_deleter<A> >(p);
-#endif
         assert(test_deleter<A>::count == 1);
         assert(test_deleter<A>::dealloc_count == 1);
-#ifndef _LIBCPP_NO_RTTI
+#ifndef TEST_HAS_NO_RTTI
+        test_deleter<A>* d = std::get_deleter<test_deleter<A> >(p);
         assert(d);
         assert(d->state() == 3);
 #endif

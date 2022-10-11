@@ -118,10 +118,6 @@ pmc_intel_initialize(void)
 			cputype = PMC_CPU_INTEL_CORE2EXTREME;
 			nclasses = 3;
 			break;
-		case 0x1C:	/* Per Intel document 320047-002. */
-			cputype = PMC_CPU_INTEL_ATOM;
-			nclasses = 3;
-			break;
 		case 0x1A:
 		case 0x1E:	/*
 				 * Per Intel document 253669-032 9/2009,
@@ -149,7 +145,7 @@ pmc_intel_initialize(void)
 			break;
 		case 0x2A:	/* Per Intel document 253669-039US 05/2011. */
 			cputype = PMC_CPU_INTEL_SANDYBRIDGE;
-			nclasses = 5;
+			nclasses = 3;
 			break;
 		case 0x2D:	/* Per Intel document 253669-044US 08/2012. */
 			cputype = PMC_CPU_INTEL_SANDYBRIDGE_XEON;
@@ -163,19 +159,6 @@ pmc_intel_initialize(void)
 			cputype = PMC_CPU_INTEL_IVYBRIDGE_XEON;
 			nclasses = 3;
 			break;
-			/* Skylake */
-		case 0x4e:
-		case 0x5e:
-			/* Kabylake */
-		case 0x8E:	/* Per Intel document 325462-063US July 2017. */
-		case 0x9E:	/* Per Intel document 325462-063US July 2017. */
-			cputype = PMC_CPU_INTEL_SKYLAKE;
-			nclasses = 3;
-			break;
-		case 0x55:	/* SDM rev 63 */
-			cputype = PMC_CPU_INTEL_SKYLAKE_XEON;
-			nclasses = 3;
-			break;
 		case 0x3D:
 		case 0x47:
 			cputype = PMC_CPU_INTEL_BROADWELL;
@@ -186,16 +169,61 @@ pmc_intel_initialize(void)
 			cputype = PMC_CPU_INTEL_BROADWELL_XEON;
 			nclasses = 3;
 			break;
+		case 0x3C:	/* Per Intel document 325462-045US 01/2013. */
+		case 0x45:	/* Per Intel document 325462-045US 09/2014. */
+			cputype = PMC_CPU_INTEL_HASWELL;
+			nclasses = 3;
+			break;
 		case 0x3F:	/* Per Intel document 325462-045US 09/2014. */
 		case 0x46:	/* Per Intel document 325462-045US 09/2014. */
 			        /* Should 46 be XEON. probably its own? */
 			cputype = PMC_CPU_INTEL_HASWELL_XEON;
 			nclasses = 3;
 			break;
-		case 0x3C:	/* Per Intel document 325462-045US 01/2013. */
-		case 0x45:	/* Per Intel document 325462-045US 09/2014. */
-			cputype = PMC_CPU_INTEL_HASWELL;
-			nclasses = 5;
+			/* Skylake */
+		case 0x4e:
+		case 0x5e:
+			/* Kabylake */
+		case 0x8E:	/* Per Intel document 325462-063US July 2017. */
+		case 0x9E:	/* Per Intel document 325462-063US July 2017. */
+			/* Cometlake */
+		case 0xA5:
+		case 0xA6:
+			cputype = PMC_CPU_INTEL_SKYLAKE;
+			nclasses = 3;
+			break;
+		case 0x55:	/* SDM rev 63 */
+			cputype = PMC_CPU_INTEL_SKYLAKE_XEON;
+			nclasses = 3;
+			break;
+			/* Icelake */
+		case 0x7D:
+		case 0x7E:
+			/* Tigerlake */
+		case 0x8C:
+		case 0x8D:
+			/* Rocketlake */
+		case 0xA7:
+			cputype = PMC_CPU_INTEL_ICELAKE;
+			nclasses = 3;
+			break;
+		case 0x6A:
+		case 0x6C:
+			cputype = PMC_CPU_INTEL_ICELAKE_XEON;
+			nclasses = 3;
+			break;
+		case 0x97:
+		case 0x9A:
+			cputype = PMC_CPU_INTEL_ALDERLAKE;
+			nclasses = 3;
+			break;
+		case 0x1C:	/* Per Intel document 320047-002. */
+		case 0x26:
+		case 0x27:
+		case 0x35:
+		case 0x36:
+			cputype = PMC_CPU_INTEL_ATOM;
+			nclasses = 3;
 			break;
 		case 0x37:
 		case 0x4A:
@@ -208,6 +236,15 @@ pmc_intel_initialize(void)
 		case 0x5C:	/* Per Intel document 325462-071US 10/2019. */
 		case 0x5F:
 			cputype = PMC_CPU_INTEL_ATOM_GOLDMONT;
+			nclasses = 3;
+			break;
+		case 0x7A:
+			cputype = PMC_CPU_INTEL_ATOM_GOLDMONT_P;
+			nclasses = 3;
+			break;
+		case 0x86:
+		case 0x96:
+			cputype = PMC_CPU_INTEL_ATOM_TREMONT;
 			nclasses = 3;
 			break;
 		}
@@ -231,37 +268,9 @@ pmc_intel_initialize(void)
 	error = pmc_tsc_initialize(pmc_mdep, ncpus);
 	if (error)
 		goto error;
-	switch (cputype) {
-		/*
-		 * Intel Core, Core 2 and Atom processors.
-		 */
-	case PMC_CPU_INTEL_ATOM:
-	case PMC_CPU_INTEL_ATOM_SILVERMONT:
-	case PMC_CPU_INTEL_ATOM_GOLDMONT:
-	case PMC_CPU_INTEL_BROADWELL:
-	case PMC_CPU_INTEL_BROADWELL_XEON:
-	case PMC_CPU_INTEL_SKYLAKE_XEON:
-	case PMC_CPU_INTEL_SKYLAKE:
-	case PMC_CPU_INTEL_CORE:
-	case PMC_CPU_INTEL_CORE2:
-	case PMC_CPU_INTEL_CORE2EXTREME:
-	case PMC_CPU_INTEL_COREI7:
-	case PMC_CPU_INTEL_NEHALEM_EX:
-	case PMC_CPU_INTEL_IVYBRIDGE:
-	case PMC_CPU_INTEL_SANDYBRIDGE:
-	case PMC_CPU_INTEL_WESTMERE:
-	case PMC_CPU_INTEL_WESTMERE_EX:
-	case PMC_CPU_INTEL_SANDYBRIDGE_XEON:
-	case PMC_CPU_INTEL_IVYBRIDGE_XEON:
-	case PMC_CPU_INTEL_HASWELL:
-	case PMC_CPU_INTEL_HASWELL_XEON:
-		error = pmc_core_initialize(pmc_mdep, ncpus, verov);
-		break;
 
-	default:
-		KASSERT(0, ("[intel,%d] Unknown CPU type", __LINE__));
-	}
-
+	MPASS(nclasses >= PMC_MDEP_CLASS_INDEX_IAF);
+	error = pmc_core_initialize(pmc_mdep, ncpus, verov);
 	if (error) {
 		pmc_tsc_finalize(pmc_mdep);
 		goto error;
@@ -275,10 +284,28 @@ pmc_intel_initialize(void)
 		 * Intel Corei7 and Westmere processors.
 		 */
 	case PMC_CPU_INTEL_COREI7:
-	case PMC_CPU_INTEL_HASWELL:
-	case PMC_CPU_INTEL_SANDYBRIDGE:
 	case PMC_CPU_INTEL_WESTMERE:
+#ifdef notyet
+	/*
+	 * TODO: re-enable uncore class on these processors.
+	 *
+	 * The uncore unit was reworked beginning with Sandy Bridge, including
+	 * the MSRs required to program it. In particular, we need to:
+	 *  - Parse the MSR_UNC_CBO_CONFIG MSR for number of C-box units in the
+	 *    system
+	 *  - Support reading and writing to ARB and C-box units, depending on
+	 *    the requested event
+	 *  - Create some kind of mapping between C-box <--> CPU
+	 *
+	 * Also TODO: support other later changes to these interfaces, to
+	 * enable the uncore class on generations newer than Broadwell.
+	 * Skylake+ appears to use newer addresses for the uncore MSRs.
+	 */
+	case PMC_CPU_INTEL_HASWELL:
 	case PMC_CPU_INTEL_BROADWELL:
+	case PMC_CPU_INTEL_SANDYBRIDGE:
+#endif
+		MPASS(nclasses >= PMC_MDEP_CLASS_INDEX_UCF);
 		error = pmc_uncore_initialize(pmc_mdep, ncpus);
 		break;
 	default:
@@ -298,42 +325,19 @@ pmc_intel_finalize(struct pmc_mdep *md)
 {
 	pmc_tsc_finalize(md);
 
-	switch (md->pmd_cputype) {
-	case PMC_CPU_INTEL_ATOM:
-	case PMC_CPU_INTEL_ATOM_SILVERMONT:
-	case PMC_CPU_INTEL_ATOM_GOLDMONT:
-	case PMC_CPU_INTEL_BROADWELL:
-	case PMC_CPU_INTEL_BROADWELL_XEON:
-	case PMC_CPU_INTEL_SKYLAKE_XEON:
-	case PMC_CPU_INTEL_SKYLAKE:
-	case PMC_CPU_INTEL_CORE:
-	case PMC_CPU_INTEL_CORE2:
-	case PMC_CPU_INTEL_CORE2EXTREME:
-	case PMC_CPU_INTEL_COREI7:
-	case PMC_CPU_INTEL_NEHALEM_EX:
-	case PMC_CPU_INTEL_HASWELL:
-	case PMC_CPU_INTEL_HASWELL_XEON:
-	case PMC_CPU_INTEL_IVYBRIDGE:
-	case PMC_CPU_INTEL_SANDYBRIDGE:
-	case PMC_CPU_INTEL_WESTMERE:
-	case PMC_CPU_INTEL_WESTMERE_EX:
-	case PMC_CPU_INTEL_SANDYBRIDGE_XEON:
-	case PMC_CPU_INTEL_IVYBRIDGE_XEON:
-		pmc_core_finalize(md);
-		break;
-	default:
-		KASSERT(0, ("[intel,%d] unknown CPU type", __LINE__));
-	}
+	pmc_core_finalize(md);
 
 	/*
 	 * Uncore.
 	 */
 	switch (md->pmd_cputype) {
-	case PMC_CPU_INTEL_BROADWELL:
 	case PMC_CPU_INTEL_COREI7:
-	case PMC_CPU_INTEL_HASWELL:
-	case PMC_CPU_INTEL_SANDYBRIDGE:
 	case PMC_CPU_INTEL_WESTMERE:
+#ifdef notyet
+	case PMC_CPU_INTEL_HASWELL:
+	case PMC_CPU_INTEL_BROADWELL:
+	case PMC_CPU_INTEL_SANDYBRIDGE:
+#endif
 		pmc_uncore_finalize(md);
 		break;
 	default:

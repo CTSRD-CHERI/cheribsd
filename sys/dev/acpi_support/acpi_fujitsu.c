@@ -216,9 +216,7 @@ static struct {
 	{ NULL, 0, NULL }
 };
 
-static devclass_t acpi_fujitsu_devclass;
-DRIVER_MODULE(acpi_fujitsu, acpi, acpi_fujitsu_driver,
-    acpi_fujitsu_devclass, 0, 0);
+DRIVER_MODULE(acpi_fujitsu, acpi, acpi_fujitsu_driver, 0, 0);
 MODULE_DEPEND(acpi_fujitsu, acpi, 1, 1, 1);
 MODULE_VERSION(acpi_fujitsu, 1);
 
@@ -417,7 +415,7 @@ acpi_fujitsu_init(struct acpi_fujitsu_softc *sc)
 		    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO,
 		    sysctl_table[i].name,
 		    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_ANYBODY |
-		    CTLFLAG_NEEDGIANT, sc, i, acpi_fujitsu_sysctl, "I",
+		    CTLFLAG_MPSAFE, sc, i, acpi_fujitsu_sysctl, "I",
 		    sysctl_table[i].description);
 	}
 

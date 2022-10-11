@@ -602,7 +602,8 @@ bhnd_find_bridge_root(device_t dev, devclass_t bus_class)
 	devclass_t	bhndb_class;
 	device_t	parent;
 
-	KASSERT(device_get_devclass(device_get_parent(dev)) == bhnd_devclass,
+	KASSERT(device_get_devclass(device_get_parent(dev)) ==
+	    devclass_find("bhnd"),
 	   ("%s not a bhnd device", device_get_nameunit(dev)));
 
 	bhndb_class = devclass_find("bhndb");
@@ -864,7 +865,7 @@ bhnd_device_matches(device_t dev, const struct bhnd_device_match *desc)
 	if (m_core.m.match_flags) {
 		/* Only applicable to bhnd-attached cores */
 		parent = device_get_parent(dev);
-		if (device_get_devclass(parent) != bhnd_devclass) {
+		if (device_get_devclass(parent) != devclass_find("bhnd")) {
 			device_printf(dev, "attempting to match core "
 			    "attributes against non-core device\n");
 			return (false);
@@ -2185,8 +2186,7 @@ bhnd_bus_generic_get_nvram_var(device_t dev, device_t child, const char *name,
 	device_t	nvram;
 	device_t	parent;
 
-        /* Make sure we're holding Giant for newbus */
-	GIANT_REQUIRED;
+	bus_topo_assert();
 
 	/* Look for a directly-attached NVRAM child */
 	if ((nvram = device_find_child(dev, "bhnd_nvram", -1)) != NULL)

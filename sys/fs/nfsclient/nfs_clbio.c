@@ -94,7 +94,7 @@ ncl_gbp_getblkno(struct vnode *vp, vm_ooffset_t off)
 }
 
 static int
-ncl_gbp_getblksz(struct vnode *vp, daddr_t lbn)
+ncl_gbp_getblksz(struct vnode *vp, daddr_t lbn, long *sz)
 {
 	struct nfsnode *np;
 	u_quad_t nsize;
@@ -111,7 +111,8 @@ ncl_gbp_getblksz(struct vnode *vp, daddr_t lbn)
 		bcount = 0;
 	else if ((off_t)(lbn + 1) * biosize > nsize)
 		bcount = nsize - (off_t)lbn * biosize;
-	return (bcount);
+	*sz = bcount;
+	return (0);
 }
 
 int
@@ -748,11 +749,8 @@ out:
  * later).
  */
 static int
-nfs_directio_write(vp, uiop, cred, ioflag)
-	struct vnode *vp;
-	struct uio *uiop;
-	struct ucred *cred;
-	int ioflag;
+nfs_directio_write(struct vnode *vp, struct uio *uiop, struct ucred *cred,
+    int ioflag)
 {
 	int error;
 	struct nfsmount *nmp = VFSTONFS(vp->v_mount);
@@ -776,16 +774,30 @@ do_sync:
 			uio.uio_iovcnt = 1;
 			uio.uio_offset = uiop->uio_offset;
 			uio.uio_resid = size;
-			uio.uio_segflg = UIO_USERSPACE;
+			uio.uio_segflg = uiop->uio_segflg;
 			uio.uio_rw = UIO_WRITE;
 			uio.uio_td = td;
 			iomode = NFSWRITE_FILESYNC;
+			/*
+			 * When doing direct I/O we do not care if the
+			 * server's write verifier has changed, but we
+			 * do not want to update the verifier if it has
+			 * changed, since that hides the change from
+			 * writes being done through the buffer cache.
+			 * By passing must_commit in set to two, the code
+			 * in nfsrpc_writerpc() will not update the
+			 * verifier on the mount point.
+			 */
+			must_commit = 2;
 			error = ncl_writerpc(vp, &uio, cred, &iomode,
-			    &must_commit, 0);
-			KASSERT((must_commit == 0),
-				("ncl_directio_write: Did not commit write"));
+			    &must_commit, 0, ioflag);
+			KASSERT((must_commit == 2),
+			    ("ncl_directio_write: Updated write verifier"));
 			if (error)
 				return (error);
+			if (iomode != NFSWRITE_FILESYNC)
+				printf("nfs_directio_write: Broken server "
+				    "did not reply FILE_SYNC\n");
 			uiop->uio_offset += size;
 			uiop->uio_resid -= size;
 			if (uiop->uio_iov->iov_len <= size) {
@@ -902,6 +914,7 @@ ncl_write(struct vop_write_args *ap)
 	int bp_cached, n, on, error = 0, error1, save2, wouldcommit;
 	size_t orig_resid, local_resid;
 	off_t orig_size, tmp_off;
+	struct timespec ts;
 
 	KASSERT(uio->uio_rw == UIO_WRITE, ("ncl_write mode"));
 	KASSERT(uio->uio_segflg != UIO_USERSPACE || uio->uio_td == curthread,
@@ -930,27 +943,33 @@ ncl_write(struct vop_write_args *ap)
 	 * Synchronously flush pending buffers if we are in synchronous
 	 * mode or if we are appending.
 	 */
-	if (ioflag & (IO_APPEND | IO_SYNC)) {
-		NFSLOCKNODE(np);
-		if (np->n_flag & NMODIFIED) {
-			NFSUNLOCKNODE(np);
-#ifdef notyet /* Needs matching nonblock semantics elsewhere, too. */
-			/*
-			 * Require non-blocking, synchronous writes to
-			 * dirty files to inform the program it needs
-			 * to fsync(2) explicitly.
-			 */
-			if (ioflag & IO_NDELAY)
-				return (EAGAIN);
-#endif
-			np->n_attrstamp = 0;
-			KDTRACE_NFS_ATTRCACHE_FLUSH_DONE(vp);
-			error = ncl_vinvalbuf(vp, V_SAVE | ((ioflag &
-			    IO_VMIO) != 0 ? V_VMIO : 0), td, 1);
-			if (error != 0)
-				return (error);
-		} else
-			NFSUNLOCKNODE(np);
+	if ((ioflag & IO_APPEND) || ((ioflag & IO_SYNC) && (np->n_flag &
+	    NMODIFIED))) {
+		/*
+		 * For the case where IO_APPEND is being done using a
+		 * direct output (to the NFS server) RPC and
+		 * newnfs_directio_enable is 0, all buffer cache buffers,
+		 * including ones not modified, must be invalidated.
+		 * This ensures that stale data is not read out of the
+		 * buffer cache.  The call also invalidates all mapped
+		 * pages and, since the exclusive lock is held on the vnode,
+		 * new pages cannot be faulted in.
+		 *
+		 * For the case where newnfs_directio_enable is set
+		 * (which is not the default), it is not obvious that
+		 * stale data should be left in the buffer cache, but
+		 * the code has been this way for over a decade without
+		 * complaints.  Note that, unlike doing IO_APPEND via
+		 * a direct write RPC when newnfs_directio_enable is not set,
+		 * when newnfs_directio_enable is set, reading is done via
+		 * direct to NFS server RPCs as well.
+		 */
+		np->n_attrstamp = 0;
+		KDTRACE_NFS_ATTRCACHE_FLUSH_DONE(vp);
+		error = ncl_vinvalbuf(vp, V_SAVE | ((ioflag &
+		    IO_VMIO) != 0 ? V_VMIO : 0), td, 1);
+		if (error != 0)
+			return (error);
 	}
 
 	orig_resid = uio->uio_resid;
@@ -963,11 +982,21 @@ ncl_write(struct vop_write_args *ap)
 	 * get the append lock.
 	 */
 	if (ioflag & IO_APPEND) {
-		np->n_attrstamp = 0;
-		KDTRACE_NFS_ATTRCACHE_FLUSH_DONE(vp);
-		error = VOP_GETATTR(vp, &vattr, cred);
-		if (error)
-			return (error);
+		/*
+		 * For NFSv4, the AppendWrite will Verify the size against
+		 * the file's size on the server.  If not the same, the
+		 * write will then be retried, using the file size returned
+		 * by the AppendWrite.  However, for NFSv2 and NFSv3, the
+		 * size must be acquired here via a Getattr RPC.
+		 * The AppendWrite is not done for a pNFS mount.
+		 */
+		if (!NFSHASNFSV4(nmp) || NFSHASPNFS(nmp)) {
+			np->n_attrstamp = 0;
+			KDTRACE_NFS_ATTRCACHE_FLUSH_DONE(vp);
+			error = VOP_GETATTR(vp, &vattr, cred);
+			if (error)
+				return (error);
+		}
 		NFSLOCKNODE(np);
 		uio->uio_offset = np->n_size;
 		NFSUNLOCKNODE(np);
@@ -981,8 +1010,21 @@ ncl_write(struct vop_write_args *ap)
 	if (uio->uio_resid == 0)
 		return (0);
 
-	if (newnfs_directio_enable && (ioflag & IO_DIRECT) && vp->v_type == VREG)
-		return nfs_directio_write(vp, uio, cred, ioflag);
+	/*
+	 * Do IO_APPEND writing via a synchronous direct write.
+	 * This can result in a significant performance improvement.
+	 */
+	if ((newnfs_directio_enable && (ioflag & IO_DIRECT)) ||
+	    (ioflag & IO_APPEND)) {
+		/*
+		 * Direct writes to the server must be done NFSWRITE_FILESYNC,
+		 * because the write data is not cached and, therefore, the
+		 * write cannot be redone after a server reboot.
+		 * Set IO_SYNC to make this happen.
+		 */
+		ioflag |= IO_SYNC;
+		return (nfs_directio_write(vp, uio, cred, ioflag));
+	}
 
 	/*
 	 * Maybe this should be above the vnode op call, but so long as
@@ -1279,7 +1321,12 @@ again:
 			break;
 	} while (uio->uio_resid > 0 && n > 0);
 
-	if (error != 0) {
+	if (error == 0) {
+		nanouptime(&ts);
+		NFSLOCKNODE(np);
+		np->n_localmodtime = ts;
+		NFSUNLOCKNODE(np);
+	} else {
 		if (ioflag & IO_UNIT) {
 			VATTR_NULL(&vattr);
 			vattr.va_size = orig_size;
@@ -1351,6 +1398,7 @@ ncl_vinvalbuf(struct vnode *vp, int flags, struct thread *td, int intrflg)
 	struct nfsmount *nmp = VFSTONFS(vp->v_mount);
 	int error = 0, slpflag, slptimeo;
 	bool old_lock;
+	struct timespec ts;
 
 	ASSERT_VOP_LOCKED(vp, "ncl_vinvalbuf");
 
@@ -1395,16 +1443,21 @@ ncl_vinvalbuf(struct vnode *vp, int flags, struct thread *td, int intrflg)
 	}
 	if (NFSHASPNFS(nmp)) {
 		nfscl_layoutcommit(vp, td);
+		nanouptime(&ts);
 		/*
 		 * Invalidate the attribute cache, since writes to a DS
 		 * won't update the size attribute.
 		 */
 		NFSLOCKNODE(np);
 		np->n_attrstamp = 0;
-	} else
+	} else {
+		nanouptime(&ts);
 		NFSLOCKNODE(np);
-	if (np->n_directio_asyncwr == 0)
+	}
+	if (np->n_directio_asyncwr == 0 && (np->n_flag & NMODIFIED) != 0) {
+		np->n_localmodtime = ts;
 		np->n_flag &= ~NMODIFIED;
+	}
 	NFSUNLOCKNODE(np);
 out:
 	ncl_excl_finish(vp, old_lock);
@@ -1575,8 +1628,23 @@ ncl_doio_directwrite(struct buf *bp)
 
 	iomode = NFSWRITE_FILESYNC;
 	uiop->uio_td = NULL; /* NULL since we're in nfsiod */
-	ncl_writerpc(bp->b_vp, uiop, bp->b_wcred, &iomode, &must_commit, 0);
-	KASSERT((must_commit == 0), ("ncl_doio_directwrite: Did not commit write"));
+	/*
+	 * When doing direct I/O we do not care if the
+	 * server's write verifier has changed, but we
+	 * do not want to update the verifier if it has
+	 * changed, since that hides the change from
+	 * writes being done through the buffer cache.
+	 * By passing must_commit in set to two, the code
+	 * in nfsrpc_writerpc() will not update the
+	 * verifier on the mount point.
+	 */
+	must_commit = 2;
+	ncl_writerpc(bp->b_vp, uiop, bp->b_wcred, &iomode, &must_commit, 0, 0);
+	KASSERT((must_commit == 2), ("ncl_doio_directwrite: Updated write"
+	    " verifier"));
+	if (iomode != NFSWRITE_FILESYNC)
+		printf("ncl_doio_directwrite: Broken server "
+		    "did not reply FILE_SYNC\n");
 	free_c(iov_base, M_NFSDIRECTIO);
 	free(uiop->uio_iov, M_NFSDIRECTIO);
 	free(uiop, M_NFSDIRECTIO);
@@ -1721,7 +1789,7 @@ ncl_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td,
 		    off = ((u_quad_t)bp->b_blkno) * DEV_BSIZE + bp->b_dirtyoff;
 		    retv = ncl_commit(vp, off, bp->b_dirtyend-bp->b_dirtyoff,
 			bp->b_wcred, td);
-		    if (retv == 0) {
+		    if (NFSCL_FORCEDISM(vp->v_mount) || retv == 0) {
 			    bp->b_dirtyoff = bp->b_dirtyend = 0;
 			    bp->b_flags &= ~(B_NEEDCOMMIT | B_CLUSTEROK);
 			    bp->b_resid = 0;
@@ -1757,7 +1825,7 @@ ncl_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td,
 		    iomode = NFSWRITE_FILESYNC;
 
 		error = ncl_writerpc(vp, uiop, cr, &iomode, &must_commit,
-		    called_from_strategy);
+		    called_from_strategy, 0);
 
 		/*
 		 * When setting B_NEEDCOMMIT also set B_CLUSTEROK to try
@@ -1848,7 +1916,7 @@ ncl_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td,
 	    }
 	}
 	bp->b_resid = uiop->uio_resid;
-	if (must_commit)
+	if (must_commit == 1)
 	    ncl_clearcommit(vp->v_mount);
 	bufdone(bp);
 	return (error);

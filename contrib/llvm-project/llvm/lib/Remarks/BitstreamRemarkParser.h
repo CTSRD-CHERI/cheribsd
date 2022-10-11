@@ -14,16 +14,18 @@
 #define LLVM_LIB_REMARKS_BITSTREAM_REMARK_PARSER_H
 
 #include "llvm/ADT/Optional.h"
-#include "llvm/ADT/SmallVector.h"
+#include "llvm/Remarks/BitstreamRemarkContainer.h"
 #include "llvm/Remarks/BitstreamRemarkParser.h"
 #include "llvm/Remarks/RemarkFormat.h"
 #include "llvm/Remarks/RemarkParser.h"
-#include "llvm/Support/raw_ostream.h"
+#include <cstdint>
 #include <memory>
-#include <string>
 
 namespace llvm {
 namespace remarks {
+
+struct Remark;
+
 /// Parses and holds the state of the latest parsed remark.
 struct BitstreamRemarkParser : public RemarkParser {
   /// The buffer to parse.

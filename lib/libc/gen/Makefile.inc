@@ -7,9 +7,6 @@
 .if ${MACHINE_ABI:Mpurecap}
 CFLAGS+=	-DNO_COMPAT7
 .endif
-.if ${MACHINE_ARCH:Mmips*c*}
-CFLAGS.getpwent.c=	-mxgot
-.endif
 
 CONFS+=	group master.passwd shells
 CONFSMODE_master.passwd=	600
@@ -37,6 +34,8 @@ SRCS+=	__getosreldate.c \
 	clock_getcpuclockid.c \
 	closedir.c \
 	confstr.c \
+	cpuset_alloc.c \
+	cpuset_free.c \
 	crypt.c \
 	ctermid.c \
 	daemon.c \
@@ -121,6 +120,8 @@ SRCS+=	__getosreldate.c \
 	rewinddir.c \
 	scandir.c \
 	scandir_b.c \
+	sched_getaffinity.c \
+	sched_setaffinity.c \
 	seed48.c \
 	seekdir.c \
 	semctl.c \
@@ -471,7 +472,10 @@ MLINKS+=modf.3 modff.3 \
 MLINKS+=popen.3 pclose.3
 MLINKS+=posix_spawn.3 posix_spawnp.3 \
 	posix_spawn_file_actions_addopen.3 posix_spawn_file_actions_addclose.3 \
+	posix_spawn_file_actions_addopen.3 posix_spawn_file_actions_addclosefrom_np.3 \
 	posix_spawn_file_actions_addopen.3 posix_spawn_file_actions_adddup2.3 \
+	posix_spawn_file_actions_addopen.3 posix_spawn_file_actions_addchdir_np.3 \
+	posix_spawn_file_actions_addopen.3 posix_spawn_file_actions_addfchdir_np.3 \
 	posix_spawn_file_actions_init.3 posix_spawn_file_actions_destroy.3 \
 	posix_spawnattr_getflags.3 posix_spawnattr_setflags.3 \
 	posix_spawnattr_getpgroup.3 posix_spawnattr_setpgroup.3 \
@@ -576,8 +580,8 @@ install-passwd: .PHONY
 	${PWD_MKDB_CMD} -i -p -d ${DESTDIR}/etc ${DESTDIR}/etc/master.passwd
 .if defined(NO_ROOT) && defined(METALOG)
 	( \
-		echo "./etc/pwd.db type=file mode=0644 uname=root gname=wheel"; \
-		echo "./etc/spwd.db type=file mode=0600 uname=root gname=wheel"; \
-		echo "./etc/passwd type=file mode=0644 uname=root gname=wheel"; \
+		echo ".${DISTBASE}/etc/pwd.db type=file mode=0644 uname=root gname=wheel"; \
+		echo ".${DISTBASE}/etc/spwd.db type=file mode=0600 uname=root gname=wheel"; \
+		echo ".${DISTBASE}/etc/passwd type=file mode=0644 uname=root gname=wheel"; \
 	) | cat -l >> ${METALOG}
 .endif

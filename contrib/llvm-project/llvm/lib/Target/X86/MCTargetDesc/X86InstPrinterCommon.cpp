@@ -264,6 +264,24 @@ void X86InstPrinterCommon::printCMPMnemonic(const MCInst *MI, bool IsVCmp,
   case X86::VCMPSSZrrb_Int: case X86::VCMPSSZrrb_Intk:
     OS << "ss\t";
     break;
+  case X86::VCMPPHZ128rmi:  case X86::VCMPPHZ128rri:
+  case X86::VCMPPHZ256rmi:  case X86::VCMPPHZ256rri:
+  case X86::VCMPPHZrmi:     case X86::VCMPPHZrri:
+  case X86::VCMPPHZ128rmik: case X86::VCMPPHZ128rrik:
+  case X86::VCMPPHZ256rmik: case X86::VCMPPHZ256rrik:
+  case X86::VCMPPHZrmik:    case X86::VCMPPHZrrik:
+  case X86::VCMPPHZ128rmbi: case X86::VCMPPHZ128rmbik:
+  case X86::VCMPPHZ256rmbi: case X86::VCMPPHZ256rmbik:
+  case X86::VCMPPHZrmbi:    case X86::VCMPPHZrmbik:
+  case X86::VCMPPHZrrib:    case X86::VCMPPHZrribk:
+    OS << "ph\t";
+    break;
+  case X86::VCMPSHZrm:      case X86::VCMPSHZrr:
+  case X86::VCMPSHZrm_Int:  case X86::VCMPSHZrr_Int:
+  case X86::VCMPSHZrrb_Int: case X86::VCMPSHZrrb_Intk:
+  case X86::VCMPSHZrm_Intk: case X86::VCMPSHZrr_Intk:
+    OS << "sh\t";
+    break;
   }
 }
 
@@ -295,6 +313,10 @@ void X86InstPrinterCommon::printRoundingControl(const MCInst *MI, unsigned Op,
 /// \see MCInstPrinter::printInst
 void X86InstPrinterCommon::printPCRelImm(const MCInst *MI, uint64_t Address,
                                          unsigned OpNo, raw_ostream &O) {
+  // Do not print the numberic target address when symbolizing.
+  if (SymbolizeOperands)
+    return;
+
   const MCOperand &Op = MI->getOperand(OpNo);
   if (Op.isImm()) {
     if (PrintBranchImmAsAddress) {
@@ -342,6 +364,21 @@ void X86InstPrinterCommon::printInstFlags(const MCInst *MI, raw_ostream &O) {
     O << "\trepne\t";
   else if (Flags & X86::IP_HAS_REPEAT)
     O << "\trep\t";
+
+  // These all require a pseudo prefix
+  if ((Flags & X86::IP_USE_VEX) || (TSFlags & X86II::ExplicitVEXPrefix))
+    O << "\t{vex}";
+  else if (Flags & X86::IP_USE_VEX2)
+    O << "\t{vex2}";
+  else if (Flags & X86::IP_USE_VEX3)
+    O << "\t{vex3}";
+  else if (Flags & X86::IP_USE_EVEX)
+    O << "\t{evex}";
+
+  if (Flags & X86::IP_USE_DISP8)
+    O << "\t{disp8}";
+  else if (Flags & X86::IP_USE_DISP32)
+    O << "\t{disp32}";
 }
 
 void X86InstPrinterCommon::printVKPair(const MCInst *MI, unsigned OpNo,

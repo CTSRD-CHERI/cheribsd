@@ -40,6 +40,7 @@
 #define	PHY_MODE_UNKNOWN	0x0
 #define	PHY_MODE_RMII		0x1
 #define	PHY_MODE_RGMII		0x2
+#define	PHY_MODE_MII		0x3
 
 #define	MAC_CONFIGURATION	0x0
 #define	 CONF_JD		(1 << 22)	/* jabber timer disable */
@@ -47,6 +48,7 @@
 #define	 CONF_PS		(1 << 15)	/* GMII/MII */
 #define	 CONF_FES		(1 << 14)	/* MII speed select */
 #define	 CONF_DM		(1 << 11)	/* Full Duplex Enable */
+#define	 CONF_IPC		(1 << 10)	/* IPC checksum offload */
 #define	 CONF_ACS		(1 << 7)
 #define	 CONF_TE		(1 << 3)
 #define	 CONF_RE		(1 << 2)

@@ -82,7 +82,7 @@ __FBSDID("$FreeBSD$");
 #include <xen/xen-os.h>
 #include <xen/hypervisor.h>
 #include <xen/xen_intr.h>
-#include <xen/interface/io/netif.h>
+#include <contrib/xen/io/netif.h>
 #include <xen/xenbus/xenbusvar.h>
 
 /*--------------------------- Compile-time Tunables --------------------------*/
@@ -639,7 +639,7 @@ static int
 xnb_disconnect(struct xnb_softc *xnb)
 {
 	struct gnttab_unmap_grant_ref gnts[XNB_NUM_RING_TYPES];
-	int error;
+	int error __diagused;
 	int i;
 
 	if (xnb->xen_intr_handle != NULL)
@@ -2393,7 +2393,7 @@ xnb_send(netif_rx_back_ring_t *ring, domid_t otherend, const struct mbuf *mbufc,
 	 gnttab_copy_table gnttab)
 {
 	struct xnb_pkt pkt;
-	int error, n_entries, n_reqs;
+	int error, n_entries;
 	RING_IDX space;
 
 	space = ring->sring->req_prod - ring->req_cons;
@@ -2408,7 +2408,7 @@ xnb_send(netif_rx_back_ring_t *ring, domid_t otherend, const struct mbuf *mbufc,
 		    hv_ret));
 	}
 
-	n_reqs = xnb_rxpkt2rsp(&pkt, gnttab, n_entries, ring);
+	xnb_rxpkt2rsp(&pkt, gnttab, n_entries, ring);
 
 	return 0;
 }
@@ -2495,9 +2495,8 @@ static driver_t xnb_driver = {
 	xnb_methods,
 	sizeof(struct xnb_softc),
 };
-devclass_t xnb_devclass;
 
-DRIVER_MODULE(xnb, xenbusb_back, xnb_driver, xnb_devclass, 0, 0);
+DRIVER_MODULE(xnb, xenbusb_back, xnb_driver, 0, 0);
 
 /*-------------------------- Unit Tests -------------------------------------*/
 #ifdef XNB_DEBUG

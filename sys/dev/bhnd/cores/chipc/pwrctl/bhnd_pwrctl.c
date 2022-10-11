@@ -121,7 +121,6 @@ bhnd_pwrctl_attach(device_t dev)
 	struct chipc_softc		*chipc_sc;
 	bhnd_devclass_t			 hostb_class;
 	device_t			 hostb_dev;
-	device_t			 bus;
 	int				 error;
 
 	sc = device_get_softc(dev);
@@ -130,8 +129,6 @@ bhnd_pwrctl_attach(device_t dev)
 	sc->chipc_dev = device_get_parent(dev);
 	sc->quirks = bhnd_device_quirks(sc->chipc_dev, pwrctl_devices,
 	    sizeof(pwrctl_devices[0]));
-
-	bus = device_get_parent(sc->chipc_dev);
 
 	/* On devices that lack a slow clock source, HT must always be
 	 * enabled. */
@@ -490,7 +487,7 @@ static device_method_t bhnd_pwrctl_methods[] = {
 DEFINE_CLASS_0(bhnd_pwrctl, bhnd_pwrctl_driver, bhnd_pwrctl_methods,
     sizeof(struct bhnd_pwrctl_softc));
 EARLY_DRIVER_MODULE(bhnd_pwrctl, bhnd_chipc, bhnd_pwrctl_driver,
-    bhnd_pmu_devclass, NULL, NULL, BUS_PASS_TIMER + BUS_PASS_ORDER_MIDDLE);
+    NULL, NULL, BUS_PASS_TIMER + BUS_PASS_ORDER_MIDDLE);
 
 MODULE_DEPEND(bhnd_pwrctl, bhnd, 1, 1, 1);
 MODULE_VERSION(bhnd_pwrctl, 1);

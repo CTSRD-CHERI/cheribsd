@@ -48,19 +48,20 @@ verify_runnable "both"
 
 function cleanup
 {
-	[[ -e $TESTDIR1 ]] && \
-		log_must rm -rf $TESTDIR1/* > /dev/null 2>&1
+	[ -e $TESTDIR1 ] && log_must rm -rf $TESTDIR1/*
 
-	snapexists $SNAPCTR && \
-		log_must zfs destroy $SNAPCTR
+	snapexists $SNAPCTR && destroy_dataset $SNAPCTR
 
 	datasetexists $TESTPOOL/$TESTCTR/$TESTFS1 && \
 		log_must zfs set quota=none $TESTPOOL/$TESTCTR/$TESTFS1
 
+	zfs inherit compression $TESTPOOL
 }
 
 log_assert "Verify creating/destroying snapshots do things clean"
 log_onexit cleanup
+
+log_must zfs set compression=off $TESTPOOL
 
 log_must zfs set quota=$FSQUOTA $TESTPOOL/$TESTCTR/$TESTFS1
 log_must mkfile $FILESIZE $TESTDIR1/$TESTFILE

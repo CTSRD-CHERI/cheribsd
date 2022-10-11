@@ -135,6 +135,12 @@ struct dump_pa {
 	vm_paddr_t pa_size;
 };
 
+struct minidumpstate {
+	struct msgbuf	*msgbufp;
+	struct bitset	*dump_bitset;
+};
+
+int minidumpsys(struct dumperinfo *, bool);
 int dumpsys_generic(struct dumperinfo *);
 
 void dumpsys_map_chunk(vm_paddr_t, size_t, void **);
@@ -151,7 +157,21 @@ void dumpsys_gen_wbinv_all(void);
 void dumpsys_gen_unmap_chunk(vm_paddr_t, size_t, void *);
 int dumpsys_gen_write_aux_headers(struct dumperinfo *);
 
+void dumpsys_pb_init(uint64_t);
+void dumpsys_pb_progress(size_t);
+
 extern int do_minidump;
+
+int livedump_start(int, int, uint8_t);
+
+/* Live minidump events */
+typedef void (*livedump_start_fn)(void *arg, int *errorp);
+typedef void (*livedump_dump_fn)(void *arg, void *virtual, off_t offset,
+    size_t len, int *errorp);
+typedef void (*livedump_finish_fn)(void *arg);
+EVENTHANDLER_DECLARE(livedumper_start, livedump_start_fn);
+EVENTHANDLER_DECLARE(livedumper_dump, livedump_dump_fn);
+EVENTHANDLER_DECLARE(livedumper_finish, livedump_finish_fn);
 
 #endif
 

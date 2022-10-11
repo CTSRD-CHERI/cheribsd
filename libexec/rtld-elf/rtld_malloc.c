@@ -55,7 +55,7 @@ static char *rcsid = "$FreeBSD$";
 #include <unistd.h>
 #include "rtld.h"
 #include "rtld_printf.h"
-#include "paths.h"
+#include "rtld_paths.h"
 
 /*
  * Pre-allocate mmap'ed pages
@@ -145,6 +145,21 @@ __crt_malloc(size_t nbytes)
 	}
 	/* remove from linked list */
   	nextf[bucket] = op->ov_next;
+	/*
+	 * XXXQEMU: Set an ov_next capability to a NULL capability, clearing any
+	 * permissions.
+	 *
+	 * Based on a tag and permissions of ov_next, find_overhead() determines
+	 * if an allocation is aligned. The QEMU user mode for CheriABI doesn't
+	 * implement tagged memory and find_overhead() might incorrectly assume
+	 * the allocation is aligned because of a non-cleared tag. Having the
+	 * permissions cleared, find_overhead() behaves as expected under the
+	 * user mode.
+	 *
+	 * This is a workaround and should be reverted once the user mode
+	 * implements tagged memory.
+	 */
+	op->ov_next = NULL;
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
   	return ((char *)(op + 1));
@@ -186,7 +201,9 @@ morecore(int bucket)
 		nblks = 1;
 	}
 	if (amt > pagepool_end - pagepool_start)
-		if (morepages(amt/pagesz + NPOOLPAGES) == 0)
+		if (morepages(amt / pagesz + NPOOLPAGES) == 0 &&
+		    /* Retry with min required size */
+		    morepages(amt / pagesz) == 0)
 			return;
 	op = (union overhead *)(void *)pagepool_start;
 	pagepool_start += amt;
@@ -261,7 +278,7 @@ morepages(int n)
 	int offset;
 
 	if (pagepool_end - pagepool_start > pagesz) {
-		addr = (caddr_t)roundup2((long)pagepool_start, pagesz);
+		addr = roundup2(pagepool_start, pagesz);
 		if (munmap(addr, pagepool_end - addr) != 0) {
 #ifdef IN_RTLD
 			rtld_fdprintf(STDERR_FILENO, _BASENAME_RTLD ": "
@@ -271,19 +288,21 @@ morepages(int n)
 		}
 	}
 
-	offset = (long)pagepool_start - rounddown2((long)pagepool_start,
-	    pagesz);
+	offset = (uintptr_t)pagepool_start - rounddown2(
+	    (uintptr_t)pagepool_start, pagesz);
 
-	pagepool_start = mmap(0, n * pagesz, PROT_READ | PROT_WRITE,
+	addr = mmap(0, n * pagesz, PROT_READ | PROT_WRITE,
 	    MAP_ANON | MAP_PRIVATE, -1, 0);
-	if (pagepool_start == MAP_FAILED) {
+	if (addr == MAP_FAILED) {
 #ifdef IN_RTLD
 		rtld_fdprintf(STDERR_FILENO, _BASENAME_RTLD ": morepages: "
 		    "cannot mmap anonymous memory: %s\n",
 		    rtld_strerror(errno));
 #endif
+		pagepool_start = pagepool_end = NULL;
 		return (0);
 	}
+	pagepool_start = addr;
 	pagepool_end = pagepool_start + n * pagesz;
 	pagepool_start += offset;
 

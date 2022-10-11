@@ -126,10 +126,12 @@ ieee80211_vap_pkt_send_dest(struct ieee80211vap *vap, struct mbuf *m,
 	struct ifnet *ifp = vap->iv_ifp;
 	int mcast;
 	int do_ampdu = 0;
+#ifdef IEEE80211_SUPPORT_SUPERG
 	int do_amsdu = 0;
 	int do_ampdu_amsdu = 0;
 	int no_ampdu = 1; /* Will be set to 0 if ampdu is active */
 	int do_ff = 0;
+#endif
 
 	if ((ni->ni_flags & IEEE80211_NODE_PWR_MGT) &&
 	    (m->m_flags & M_PWR_SAV) == 0) {
@@ -187,12 +189,14 @@ ieee80211_vap_pkt_send_dest(struct ieee80211vap *vap, struct mbuf *m,
 	 */
 	do_ampdu = ((ni->ni_flags & IEEE80211_NODE_AMPDU_TX) &&
 	    (vap->iv_flags_ht & IEEE80211_FHT_AMPDU_TX));
+#ifdef IEEE80211_SUPPORT_SUPERG
 	do_amsdu = ((ni->ni_flags & IEEE80211_NODE_AMSDU_TX) &&
 	    (vap->iv_flags_ht & IEEE80211_FHT_AMSDU_TX));
 	do_ff =
 	    ((ni->ni_flags & IEEE80211_NODE_HT) == 0) &&
 	    ((ni->ni_flags & IEEE80211_NODE_VHT) == 0) &&
 	    (IEEE80211_ATH_CAP(vap, ni, IEEE80211_NODE_FF));
+#endif
 
 	/*
 	 * Check if A-MPDU tx aggregation is setup or if we
@@ -246,9 +250,11 @@ ieee80211_vap_pkt_send_dest(struct ieee80211vap *vap, struct mbuf *m,
 			 * have also set or cleared the amsdu-in-ampdu txa_flags
 			 * combination so we can correctly do A-MPDU + A-MSDU.
 			 */
+#ifdef IEEE80211_SUPPORT_SUPERG
 			no_ampdu = (! IEEE80211_AMPDU_RUNNING(tap)
 			    || (IEEE80211_AMPDU_NACKED(tap)));
 			do_ampdu_amsdu = IEEE80211_AMPDU_RUNNING_AMSDU(tap);
+#endif
 		}
 	}
 
@@ -1051,7 +1057,7 @@ ieee80211_mgmt_output(struct ieee80211_node *ni, struct mbuf *m, int type,
 	/* avoid printing too many frames */
 	if ((ieee80211_msg_debug(vap) && doprint(vap, type)) ||
 	    ieee80211_msg_dumppkts(vap)) {
-		printf("[%s] send %s on channel %u\n",
+		ieee80211_note(vap, "[%s] send %s on channel %u\n",
 		    ether_sprintf(wh->i_addr1),
 		    ieee80211_mgt_subtype_name(type),
 		    ieee80211_chan2ieee(ic, ic->ic_curchan));
@@ -2429,7 +2435,6 @@ ieee80211_probereq_ie_len(struct ieee80211vap *vap, struct ieee80211com *ic)
 	 * prreq frame format
 	 *	[tlv] ssid
 	 *	[tlv] supported rates
-	 *	[tlv] RSN (optional)
 	 *	[tlv] extended supported rates (if needed)
 	 *	[tlv] HT cap (optional)
 	 *	[tlv] VHT cap (optional)
@@ -2438,8 +2443,6 @@ ieee80211_probereq_ie_len(struct ieee80211vap *vap, struct ieee80211com *ic)
 	 */
 	return ( 2 + IEEE80211_NWID_LEN
 	       + 2 + IEEE80211_RATE_SIZE
-	       + ((vap->iv_flags & IEEE80211_F_WPA2 && vap->iv_rsn_ie != NULL) ?
-	           vap->iv_rsn_ie[1] : 0)
 	       + ((rs->rs_nrates > IEEE80211_RATE_SIZE) ?
 	           2 + (rs->rs_nrates - IEEE80211_RATE_SIZE) : 0)
 	       + (((vap->iv_opmode == IEEE80211_M_IBSS) &&
@@ -2472,6 +2475,10 @@ ieee80211_probereq_ie(struct ieee80211vap *vap, struct ieee80211com *ic,
 	if (!alloc && len > *frmlen)
 		return (ENOBUFS);
 
+	/* For HW scans we usually do not pass in the SSID as IE. */
+	if (ssidlen == -1)
+		len -= (2 + IEEE80211_NWID_LEN);
+
 	if (alloc) {
 		frm = malloc(len, M_80211_VAP, M_WAITOK | M_ZERO);
 		*frmp = frm;
@@ -2479,14 +2486,10 @@ ieee80211_probereq_ie(struct ieee80211vap *vap, struct ieee80211com *ic,
 	} else
 		frm = *frmp;
 
-	/* For HW scans we usually do not pass in the SSID as IE. */
-	if (ssidlen == -1)
-		len -= (2 + IEEE80211_NWID_LEN);
-	else
+	if (ssidlen != -1)
 		frm = ieee80211_add_ssid(frm, ssid, ssidlen);
 	rs = ieee80211_get_suprates(ic, ic->ic_curchan);
 	frm = ieee80211_add_rates(frm, rs);
-	frm = ieee80211_add_rsn(frm, vap);
 	frm = ieee80211_add_xrates(frm, rs);
 
 	/*
@@ -2589,7 +2592,7 @@ ieee80211_send_probereq(struct ieee80211_node *ni,
 	ret = ieee80211_probereq_ie(vap, ic, &frm, &frmlen, ssid, ssidlen,
 	    false);
 	KASSERT(ret == 0,
-	    ("%s: ieee80211_probereq_ie railed: %d\n", __func__, ret));
+	    ("%s: ieee80211_probereq_ie failed: %d\n", __func__, ret));
 
 	m->m_pkthdr.len = m->m_len = frm - mtod(m, uint8_t *);
 	KASSERT(M_LEADINGSPACE(m) >= sizeof(struct ieee80211_frame),
@@ -2724,8 +2727,7 @@ ieee80211_send_mgmt(struct ieee80211_node *ni, int type, int arg)
 			  ic->ic_headroom + sizeof(struct ieee80211_frame),
 			  3 * sizeof(uint16_t)
 			+ (has_challenge && status == IEEE80211_STATUS_SUCCESS ?
-				sizeof(uint16_t)+IEEE80211_CHALLENGE_LEN : 0)
-		);
+				sizeof(uint16_t)+IEEE80211_CHALLENGE_LEN : 0));
 		if (m == NULL)
 			senderr(ENOMEM, is_tx_nobuf);
 
@@ -3372,6 +3374,12 @@ ieee80211_tx_mgt_timeout(void *arg)
 {
 	struct ieee80211vap *vap = arg;
 
+	IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE | IEEE80211_MSG_DEBUG,
+	    "vap %p mode %s state %s flags %#x & %#x\n", vap,
+	    ieee80211_opmode_name[vap->iv_opmode],
+	    ieee80211_state_name[vap->iv_state],
+	    vap->iv_ic->ic_flags, IEEE80211_F_SCAN);
+
 	IEEE80211_LOCK(vap->iv_ic);
 	if (vap->iv_state != IEEE80211_S_INIT &&
 	    (vap->iv_ic->ic_flags & IEEE80211_F_SCAN) == 0) {
@@ -3417,6 +3425,11 @@ ieee80211_tx_mgt_cb(struct ieee80211_node *ni, void *arg, int status)
 	 * XXX what happens if !acked but response shows up before callback?
 	 */
 	if (vap->iv_state == ostate) {
+		IEEE80211_DPRINTF(vap, IEEE80211_MSG_STATE | IEEE80211_MSG_DEBUG,
+		    "ni %p mode %s state %s ostate %d arg %p status %d\n", ni,
+		    ieee80211_opmode_name[vap->iv_opmode],
+		    ieee80211_state_name[vap->iv_state], ostate, arg, status);
+
 		callout_reset(&vap->iv_mgtsend,
 			status == 0 ? IEEE80211_TRANS_WAIT*hz : 0,
 			ieee80211_tx_mgt_timeout, vap);
@@ -4164,8 +4177,13 @@ ieee80211_tx_complete(struct ieee80211_node *ni, struct mbuf *m, int status)
 				if_inc_counter(ifp, IFCOUNTER_OMCASTS, 1);
 		} else
 			if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
-		if (m->m_flags & M_TXCB)
+		if (m->m_flags & M_TXCB) {
+			IEEE80211_DPRINTF(ni->ni_vap, IEEE80211_MSG_STATE | IEEE80211_MSG_DEBUG,
+			   "ni %p vap %p mode %s state %s m %p status %d\n", ni, ni->ni_vap,
+			   ieee80211_opmode_name[ni->ni_vap->iv_opmode],
+			   ieee80211_state_name[ni->ni_vap->iv_state], m, status);
 			ieee80211_process_callback(ni, m, status);
+		}
 		ieee80211_free_node(ni);
 	}
 	m_freem(m);

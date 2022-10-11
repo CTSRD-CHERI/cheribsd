@@ -103,8 +103,8 @@ kern_extattrctl(struct thread *td, const char * __capability path, int cmd,
 	mp = NULL;
 	filename_vp = NULL;
 	if (filename != NULL) {
-		NDINIT(&nd, LOOKUP, FOLLOW | AUDITVNODE2,
-		    UIO_USERSPACE, filename, td);
+		NDINIT(&nd, LOOKUP, FOLLOW | AUDITVNODE2, UIO_USERSPACE,
+		    filename);
 		error = namei(&nd);
 		if (error)
 			return (error);
@@ -113,8 +113,8 @@ kern_extattrctl(struct thread *td, const char * __capability path, int cmd,
 	}
 
 	/* path is always defined. */
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1,
-	    UIO_USERSPACE, path, td);
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1, UIO_USERSPACE,
+	    path);
 	error = namei(&nd);
 	if (error)
 		goto out;
@@ -252,7 +252,7 @@ kern_extattr_set_fd(struct thread *td, int fd, int attrnamespace,
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
-	error = getvnode(td, fd,
+	error = getvnode_path(td, fd,
 	    cap_rights_init_one(&rights, CAP_EXTATTR_SET), &fp);
 	if (error)
 		return (error);
@@ -314,11 +314,11 @@ kern_extattr_set_path(struct thread *td,
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
-	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
+	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path);
 	error = namei(&nd);
 	if (error)
 		return (error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 
 	error = extattr_set_vp(nd.ni_vp, attrnamespace, attrname, data,
 	    nbytes, td);
@@ -430,7 +430,7 @@ kern_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
-	error = getvnode(td, fd,
+	error = getvnode_path(td, fd,
 	    cap_rights_init_one(&rights, CAP_EXTATTR_GET), &fp);
 	if (error)
 		return (error);
@@ -489,11 +489,11 @@ kern_extattr_get_path(struct thread *td, const char * __capability path,
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
-	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
+	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path);
 	error = namei(&nd);
 	if (error)
 		return (error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 
 	error = extattr_get_vp(nd.ni_vp, attrnamespace, attrname, data,
 	    nbytes, td);
@@ -575,7 +575,7 @@ kern_extattr_delete_fd(struct thread *td, int fd, int attrnamespace,
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
 
-	error = getvnode(td, fd,
+	error = getvnode_path(td, fd,
 	    cap_rights_init_one(&rights, CAP_EXTATTR_DELETE), &fp);
 	if (error)
 		return (error);
@@ -630,11 +630,11 @@ kern_extattr_delete_path(struct thread *td, const char * __capability path,
 		return(error);
 	AUDIT_ARG_TEXT(attrname);
 
-	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
+	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path);
 	error = namei(&nd);
 	if (error)
 		return(error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 
 	error = extattr_delete_vp(nd.ni_vp, attrnamespace, attrname, td);
 	vrele(nd.ni_vp);
@@ -729,7 +729,7 @@ kern_extattr_list_fd(struct thread *td, int fd, int attrnamespace,
 
 	AUDIT_ARG_FD(fd);
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = getvnode(td, fd,
+	error = getvnode_path(td, fd,
 	    cap_rights_init_one(&rights, CAP_EXTATTR_LIST), &fp);
 	if (error)
 		return (error);
@@ -780,11 +780,11 @@ kern_extattr_list_path(struct thread *td, const char * __capability path,
 	int error;
 
 	AUDIT_ARG_VALUE(attrnamespace);
-	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path, td);
+	NDINIT(&nd, LOOKUP, follow | AUDITVNODE1, UIO_USERSPACE, path);
 	error = namei(&nd);
 	if (error)
 		return (error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 
 	error = extattr_list_vp(nd.ni_vp, attrnamespace, data, nbytes, td);
 

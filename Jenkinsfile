@@ -1,10 +1,16 @@
 @Library('ctsrd-jenkins-scripts') _
 
+import java.time.Instant
+import java.time.format.DateTimeFormatter
+
 class GlobalVars { // "Groovy"
+    public static String buildTimestamp = null
     public static boolean archiveArtifacts = false
     public static boolean isTestSuiteJob = false
     public static List<String> selectedPurecapKernelArchitectures = []
 }
+
+GlobalVars.buildTimestamp = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochMilli(currentBuild.startTimeInMillis));
 
 echo("JOB_NAME='${env.JOB_NAME}', JOB_BASE_NAME='${env.JOB_BASE_NAME}'")
 def rateLimit = rateLimitBuilds(throttle: [count: 1, durationName: 'hour', userBoost: true])
@@ -22,22 +28,21 @@ def jobProperties = [
         copyArtifactPermission('*'), // Downstream jobs (may) need the kernels/disk images
         rateLimit,
 ]
-// Don't archive sysroot/disk image/kernel images for pull requests and non-default branches:
+// Don't archive sysroot/disk image/kernel images for pull requests and non-default/releng branches:
 def archiveBranches = ['main', 'master', 'dev']
-if (!env.CHANGE_ID && archiveBranches.contains(env.BRANCH_NAME)) {
+if (!env.CHANGE_ID && (archiveBranches.contains(env.BRANCH_NAME) || env.BRANCH_NAME.startsWith('releng/'))) {
     if (!GlobalVars.isTestSuiteJob) {
         // Don't archive disk images for the test suite job
         GlobalVars.archiveArtifacts = true
     }
-    // For branches other than the master/main branch, only keep the last two artifacts to save disk space
-    if (env.BRANCH_NAME != 'main' && env.BRANCH_NAME != 'master') {
+    // For branches other than the master/main and releng branches, only keep the last two artifacts to save disk space
+    if (env.BRANCH_NAME != 'main' && env.BRANCH_NAME != 'master' && !env.BRANCH_NAME.startsWith('releng/')) {
         jobProperties.add(buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '2')))
     }
 }
 // Add an architecture selector for manual builds
 def allArchitectures = [
         "aarch64", "amd64",
-        "mips64", "mips64-hybrid", "mips64-purecap",
         "morello-hybrid", "morello-purecap",
         "riscv64", "riscv64-hybrid", "riscv64-purecap"
 ]
@@ -97,7 +102,7 @@ def buildImage(params, String suffix) {
         }
     }
     // No need for MFS_ROOT kernels when running the testsuite
-    if (!GlobalVars.isTestSuiteJob && (suffix.startsWith('mips64') || suffix.startsWith('riscv64'))) {
+    if (!GlobalVars.isTestSuiteJob && suffix.startsWith('riscv64')) {
         stage("Building MFS_ROOT kernels") {
             sh label: "Building MFS_ROOT disk image",
                script: "./cheribuild/jenkins-cheri-build.py --build disk-image-mfs-root-${suffix} ${params.extraArgs}"
@@ -153,9 +158,22 @@ def runTests(params, String suffix) {
     }
 }
 
+def buildRelease(params, String suffix) {
+    if (!GlobalVars.isTestSuiteJob) {
+        stage("Building release images") {
+            sh label: "Building release images",
+               // params.extraArgs includes --install-prefix=/rootfs but we
+               // don't want the release media to end up there, so override it
+               // to the top-level output directory.
+               script: "./cheribuild/jenkins-cheri-build.py --build cheribsd-release-${suffix} --cheribsd-release/install-dir=\${WORKSPACE}/tarball ${params.extraArgs}"
+        }
+    }
+}
+
 def buildImageAndRunTests(params, String suffix) {
     buildImage(params, suffix)
     runTests(params, suffix)
+    buildRelease(params, suffix)
     maybeArchiveArtifacts(params, suffix)
 }
 
@@ -165,11 +183,43 @@ def maybeArchiveArtifacts(params, String suffix) {
             error("Should not happen!")
         }
         stage("Archiving artifacts") {
+            sh label: 'Create metadata file', script: """
+ABI_VERSION=`awk '/^#define[[:space:]]+__CheriBSD_version/{print \$3}' tarball/rootfs/usr/include/sys/param.h`
+# ABI_VERSION is YYYYMMDD, perform approximate sanity check
+case "\$ABI_VERSION" in
+202[2-9][0-1][0-9][0-3][0-9])
+    ;;
+*)
+    echo >&2 "__CheriBSD_version '\$ABI_VERSION' has an unexpected value"
+    ;;
+esac
+tee metadata.json <<EOF
+{
+    "abi-version": "\$ABI_VERSION",
+    "architecture": "${suffix}",
+    "branch": "${env.BRANCH_NAME}",
+    "commit": "${params.gitInfo.GIT_COMMIT}",
+    "timestamp": "${GlobalVars.buildTimestamp}"
+}
+EOF
+"""
             // Archive disk image
             sh label: 'Compress kernel and images', script: """
 rm -fv *.img *.xz kernel*
+rm -rfv ftp
 mv -v tarball/rootfs/boot/kernel/kernel tarball/kernel
-mv -v tarball/*.img tarball/kernel* .
+mv -v tarball/*.img tarball/kernel* tarball/ftp .
+rm -fv *-mini-memstick.img
+case "${suffix}" in
+riscv64*)
+    # QEMU kernel configs hard-code wrong rootfs for installer, and kernel
+    # lives outside disk image, so don't archive known-broken installer images
+    rm -fv *-memstick.img
+    ;;
+*)
+    mv -v *-memstick.img "cheribsd-memstick-${suffix}.img"
+    ;;
+esac
 # Use xz -T0 to speed up compression by using multiple threads
 xz -T0 *.img kernel*
 """
@@ -195,11 +245,13 @@ mv tarball/sysroot-${suffix}.tar.* cheribsd-sysroot.tar.xz
 rm -rf tarball artifacts-*
 chmod +w *.xz
 mkdir -p "artifacts-${suffix}"
+mv -v metadata.json "artifacts-${suffix}"
 mv -v *.xz "artifacts-${suffix}"
+tar -cJvf "artifacts-${suffix}/cheribsd-ftp-${suffix}.tar.xz" ftp
 ls -la "artifacts-${suffix}/"
 """
             archiveArtifacts allowEmptyArchive: false,
-                             artifacts: "artifacts-${suffix}/cheribsd-sysroot.tar.xz, artifacts-${suffix}/*.img.xz, artifacts-${suffix}/kernel*.xz",
+                             artifacts: "artifacts-${suffix}/cheribsd-sysroot.tar.xz, artifacts-${suffix}/*.img.xz, artifacts-${suffix}/kernel*.xz, artifacts-${suffix}/cheribsd-ftp*.tar.xz, artifacts-${suffix}/metadata.json",
                              fingerprint: true, onlyIfSuccessful: true
         }
     }
@@ -225,12 +277,10 @@ selectedArchitectures.each { suffix ->
                 '--install-prefix=/rootfs',
                 '--cheribsd/build-tests',
                 '--cheribsd/build-bench-kernels',
+                '--cheribsd/with-manpages',
+                '--cheribsd/debug-info',
+                '--cheribsd/debug-files',
         ]
-        if (GlobalVars.isTestSuiteJob) {
-            cheribuildArgs.add('--cheribsd/debug-info')
-        } else {
-            cheribuildArgs.add('--cheribsd/no-debug-info')
-        }
         if (GlobalVars.selectedPurecapKernelArchitectures.contains(suffix)) {
             cheribuildArgs.add('--cheribsd/build-alternate-abi-kernels')
         }

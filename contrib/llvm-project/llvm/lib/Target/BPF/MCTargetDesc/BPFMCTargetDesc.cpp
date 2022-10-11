@@ -18,8 +18,8 @@
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/Host.h"
-#include "llvm/Support/TargetRegistry.h"
 
 #define GET_INSTRINFO_MC_DESC
 #include "BPFGenInstrInfo.inc"
@@ -46,7 +46,7 @@ static MCRegisterInfo *createBPFMCRegisterInfo(const Triple &TT) {
 
 static MCSubtargetInfo *createBPFMCSubtargetInfo(const Triple &TT,
                                                  StringRef CPU, StringRef FS) {
-  return createBPFMCSubtargetInfoImpl(TT, CPU, FS);
+  return createBPFMCSubtargetInfoImpl(TT, CPU, /*TuneCPU*/ CPU, FS);
 }
 
 static MCStreamer *createBPFMCStreamer(const Triple &T, MCContext &Ctx,

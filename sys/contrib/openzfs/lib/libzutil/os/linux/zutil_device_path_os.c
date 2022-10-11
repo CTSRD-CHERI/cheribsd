@@ -81,7 +81,7 @@ zfs_append_partition(char *path, size_t max_len)
  * caller must free the returned string
  */
 char *
-zfs_strip_partition(char *path)
+zfs_strip_partition(const char *path)
 {
 	char *tmp = strdup(path);
 	char *part = NULL, *d = NULL;
@@ -117,7 +117,7 @@ zfs_strip_partition(char *path)
  * Returned string must be freed.
  */
 static char *
-zfs_strip_partition_path(char *path)
+zfs_strip_partition_path(const char *path)
 {
 	char *newpath = strdup(path);
 	char *sd_offset;
@@ -148,24 +148,162 @@ zfs_strip_partition_path(char *path)
 /*
  * Strip the unwanted portion of a device path.
  */
-char *
-zfs_strip_path(char *path)
+const char *
+zfs_strip_path(const char *path)
 {
-	return (strrchr(path, '/') + 1);
+	size_t spath_count;
+	const char *const *spaths = zpool_default_search_paths(&spath_count);
+
+	for (size_t i = 0; i < spath_count; ++i)
+		if (strncmp(path, spaths[i], strlen(spaths[i])) == 0 &&
+		    path[strlen(spaths[i])] == '/')
+			return (path + strlen(spaths[i]) + 1);
+
+	return (path);
+}
+
+/*
+ * Read the contents of a sysfs file into an allocated buffer and remove the
+ * last newline.
+ *
+ * This is useful for reading sysfs files that return a single string.  Return
+ * an allocated string pointer on success, NULL otherwise.  Returned buffer
+ * must be freed by the user.
+ */
+static char *
+zfs_read_sysfs_file(char *filepath)
+{
+	char buf[4096];	/* all sysfs files report 4k size */
+	char *str = NULL;
+
+	FILE *fp = fopen(filepath, "r");
+	if (fp == NULL) {
+		return (NULL);
+	}
+	if (fgets(buf, sizeof (buf), fp) == buf) {
+		/* success */
+
+		/* Remove the last newline (if any) */
+		size_t len = strlen(buf);
+		if (buf[len - 1] == '\n') {
+			buf[len - 1] = '\0';
+		}
+		str = strdup(buf);
+	}
+
+	fclose(fp);
+
+	return (str);
+}
+
+/*
+ * Given a dev name like "nvme0n1", return the full PCI slot sysfs path to
+ * the drive (in /sys/bus/pci/slots).
+ *
+ * For example:
+ *     dev:            "nvme0n1"
+ *     returns:        "/sys/bus/pci/slots/0"
+ *
+ * 'dev' must be an NVMe device.
+ *
+ * Returned string must be freed.  Returns NULL on error or no sysfs path.
+ */
+static char *
+zfs_get_pci_slots_sys_path(const char *dev_name)
+{
+	DIR *dp = NULL;
+	struct dirent *ep;
+	char *address1 = NULL;
+	char *address2 = NULL;
+	char *path = NULL;
+	char buf[MAXPATHLEN];
+	char *tmp;
+
+	/* If they preface 'dev' with a path (like "/dev") then strip it off */
+	tmp = strrchr(dev_name, '/');
+	if (tmp != NULL)
+		dev_name = tmp + 1;    /* +1 since we want the chr after '/' */
+
+	if (strncmp("nvme", dev_name, 4) != 0)
+		return (NULL);
+
+	(void) snprintf(buf, sizeof (buf), "/sys/block/%s/device/address",
+	    dev_name);
+
+	address1 = zfs_read_sysfs_file(buf);
+	if (!address1)
+		return (NULL);
+
+	/*
+	 * /sys/block/nvme0n1/device/address format will
+	 * be "0000:01:00.0" while /sys/bus/pci/slots/0/address will be
+	 * "0000:01:00".  Just NULL terminate at the '.' so they match.
+	 */
+	tmp = strrchr(address1, '.');
+	if (tmp != NULL)
+		*tmp = '\0';
+
+	dp = opendir("/sys/bus/pci/slots/");
+	if (dp == NULL) {
+		free(address1);
+		return (NULL);
+	}
+
+	/*
+	 * Look through all the /sys/bus/pci/slots/ subdirs
+	 */
+	while ((ep = readdir(dp))) {
+		/*
+		 * We only care about directory names that are a single number.
+		 * Sometimes there's other directories like
+		 * "/sys/bus/pci/slots/0-3/" in there - skip those.
+		 */
+		if (!zfs_isnumber(ep->d_name))
+			continue;
+
+		(void) snprintf(buf, sizeof (buf),
+		    "/sys/bus/pci/slots/%s/address", ep->d_name);
+
+		address2 = zfs_read_sysfs_file(buf);
+		if (!address2)
+			continue;
+
+		if (strcmp(address1, address2) == 0) {
+			/* Addresses match, we're all done */
+			free(address2);
+			if (asprintf(&path, "/sys/bus/pci/slots/%s",
+			    ep->d_name) == -1) {
+				free(tmp);
+				continue;
+			}
+			break;
+		}
+		free(address2);
+	}
+
+	closedir(dp);
+	free(address1);
+
+	return (path);
 }
 
 /*
  * Given a dev name like "sda", return the full enclosure sysfs path to
  * the disk.  You can also pass in the name with "/dev" prepended
- * to it (like /dev/sda).
+ * to it (like /dev/sda).  This works for both JBODs and NVMe PCI devices.
  *
  * For example, disk "sda" in enclosure slot 1:
- *     dev:            "sda"
+ *     dev_name:       "sda"
  *     returns:        "/sys/class/enclosure/1:0:3:0/Slot 1"
+ *
+ * Or:
+ *
+ *      dev_name:   "nvme0n1"
+ *      returns:    "/sys/bus/pci/slots/0"
  *
  * 'dev' must be a non-devicemapper device.
  *
- * Returned string must be freed.
+ * Returned string must be freed.  Returns NULL on error.
  */
 char *
 zfs_get_enclosure_sysfs_path(const char *dev_name)
@@ -195,10 +333,8 @@ zfs_get_enclosure_sysfs_path(const char *dev_name)
 	}
 
 	dp = opendir(tmp1);
-	if (dp == NULL) {
-		tmp1 = NULL;	/* To make free() at the end a NOP */
+	if (dp == NULL)
 		goto end;
-	}
 
 	/*
 	 * Look though all sysfs entries in /sys/block/<dev>/device for
@@ -209,18 +345,16 @@ zfs_get_enclosure_sysfs_path(const char *dev_name)
 		if (strstr(ep->d_name, "enclosure_device") == NULL)
 			continue;
 
-		if (asprintf(&tmp2, "%s/%s", tmp1, ep->d_name) == -1 ||
-		    tmp2 == NULL)
+		if (asprintf(&tmp2, "%s/%s", tmp1, ep->d_name) == -1) {
+			tmp2 = NULL;
 			break;
+		}
 
 		size = readlink(tmp2, buf, sizeof (buf));
 
 		/* Did readlink fail or crop the link name? */
-		if (size == -1 || size >= sizeof (buf)) {
-			free(tmp2);
-			tmp2 = NULL;	/* To make free() at the end a NOP */
+		if (size == -1 || size >= sizeof (buf))
 			break;
-		}
 
 		/*
 		 * We got a valid link.  readlink() doesn't terminate strings
@@ -255,6 +389,16 @@ end:
 
 	if (dp != NULL)
 		closedir(dp);
+
+	if (!path) {
+		/*
+		 * This particular disk isn't in a JBOD.  It could be an NVMe
+		 * drive. If so, look up the NVMe device's path in
+		 * /sys/bus/pci/slots/. Within that directory is a 'attention'
+		 * file which controls the NVMe fault LED.
+		 */
+		path = zfs_get_pci_slots_sys_path(dev_name);
+	}
 
 	return (path);
 }
@@ -306,9 +450,10 @@ dm_get_underlying_path(const char *dm_name)
 	else
 		dev_str = tmp;
 
-	size = asprintf(&tmp, "/sys/block/%s/slaves/", dev_str);
-	if (size == -1 || !tmp)
+	if ((size = asprintf(&tmp, "/sys/block/%s/slaves/", dev_str)) == -1) {
+		tmp = NULL;
 		goto end;
+	}
 
 	dp = opendir(tmp);
 	if (dp == NULL)
@@ -334,7 +479,9 @@ dm_get_underlying_path(const char *dm_name)
 			if (!enclosure_path)
 				continue;
 
-			size = asprintf(&path, "/dev/%s", ep->d_name);
+			if ((size = asprintf(
+			    &path, "/dev/%s", ep->d_name)) == -1)
+				path = NULL;
 			free(enclosure_path);
 			break;
 		}
@@ -346,13 +493,14 @@ end:
 	free(tmp);
 	free(realp);
 
-	if (!path) {
+	if (!path && first_path) {
 		/*
 		 * None of the underlying paths had a link back to their
 		 * enclosure devices.  Throw up out hands and return the first
 		 * underlying path.
 		 */
-		size = asprintf(&path, "/dev/%s", first_path);
+		if ((size = asprintf(&path, "/dev/%s", first_path)) == -1)
+			path = NULL;
 	}
 
 	free(first_path);
@@ -387,10 +535,10 @@ zfs_dev_is_dm(const char *dev_name)
 boolean_t
 zfs_dev_is_whole_disk(const char *dev_name)
 {
-	struct dk_gpt *label;
+	struct dk_gpt *label = NULL;
 	int fd;
 
-	if ((fd = open(dev_name, O_RDONLY | O_DIRECT)) < 0)
+	if ((fd = open(dev_name, O_RDONLY | O_DIRECT | O_CLOEXEC)) < 0)
 		return (B_FALSE);
 
 	if (efi_alloc_and_init(fd, EFI_NUMPAR, &label) != 0) {
@@ -473,22 +621,24 @@ zfs_get_underlying_path(const char *dev_name)
 /*
  * A disk is considered a multipath whole disk when:
  *	DEVNAME key value has "dm-"
- *	DM_NAME key value has "mpath" prefix
- *	DM_UUID key exists
+ *	DM_UUID key exists and starts with 'mpath-'
  *	ID_PART_TABLE_TYPE key does not exist or is not gpt
+ *	ID_FS_LABEL key does not exist (disk isn't labeled)
  */
 static boolean_t
-udev_mpath_whole_disk(struct udev_device *dev)
+is_mpath_udev_sane(struct udev_device *dev)
 {
-	const char *devname, *type, *uuid;
+	const char *devname, *type, *uuid, *label;
 
 	devname = udev_device_get_property_value(dev, "DEVNAME");
 	type = udev_device_get_property_value(dev, "ID_PART_TABLE_TYPE");
 	uuid = udev_device_get_property_value(dev, "DM_UUID");
+	label = udev_device_get_property_value(dev, "ID_FS_LABEL");
 
 	if ((devname != NULL && strncmp(devname, "/dev/dm-", 8) == 0) &&
 	    ((type == NULL) || (strcmp(type, "gpt") != 0)) &&
-	    (uuid != NULL)) {
+	    ((uuid != NULL) && (strncmp(uuid, "mpath-", 6) == 0)) &&
+	    (label == NULL)) {
 		return (B_TRUE);
 	}
 
@@ -496,7 +646,11 @@ udev_mpath_whole_disk(struct udev_device *dev)
 }
 
 /*
- * Check if a disk is effectively a multipath whole disk
+ * Check if a disk is a multipath "blank" disk:
+ *
+ * 1. The disk has udev values that suggest it's a multipath disk
+ * 2. The disk is not currently labeled with a filesystem of any type
+ * 3. There are no partitions on the disk
  */
 boolean_t
 is_mpath_whole_disk(const char *path)
@@ -505,7 +659,6 @@ is_mpath_whole_disk(const char *path)
 	struct udev_device *dev = NULL;
 	char nodepath[MAXPATHLEN];
 	char *sysname;
-	boolean_t wholedisk = B_FALSE;
 
 	if (realpath(path, nodepath) == NULL)
 		return (B_FALSE);
@@ -520,18 +673,19 @@ is_mpath_whole_disk(const char *path)
 		return (B_FALSE);
 	}
 
-	wholedisk = udev_mpath_whole_disk(dev);
-
+	/* Sanity check some udev values */
+	boolean_t is_sane = is_mpath_udev_sane(dev);
 	udev_device_unref(dev);
-	return (wholedisk);
+
+	return (is_sane);
 }
 
 #else /* HAVE_LIBUDEV */
 
-/* ARGSUSED */
 boolean_t
 is_mpath_whole_disk(const char *path)
 {
+	(void) path;
 	return (B_FALSE);
 }
 

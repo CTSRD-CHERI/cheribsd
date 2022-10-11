@@ -76,11 +76,9 @@
  *    the zfs-specific implementation of the directory's st_size (which is
  *    the number of entries).
  */
-int zap_iterate_prefetch = B_TRUE;
+static int zap_iterate_prefetch = B_TRUE;
 
 int fzap_default_block_shift = 14; /* 16k blocksize */
-
-extern inline zap_phys_t *zap_f_phys(zap_t *zap);
 
 static uint64_t zap_allocate_blocks(zap_t *zap, int nblocks);
 
@@ -114,7 +112,7 @@ fzap_upgrade(zap_t *zap, dmu_tx_t *tx, zap_flags_t flags)
 	 * explicitly zero it since it might be coming from an
 	 * initialized microzap
 	 */
-	bzero(zap->zap_dbuf->db_data, zap->zap_dbuf->db_size);
+	memset(zap->zap_dbuf->db_data, 0, zap->zap_dbuf->db_size);
 	zp->zap_block_type = ZBT_HEADER;
 	zp->zap_magic = ZAP_MAGIC;
 
@@ -221,7 +219,8 @@ zap_table_grow(zap_t *zap, zap_table_phys_t *tbl,
 	tbl->zt_blks_copied++;
 
 	dprintf("copied block %llu of %llu\n",
-	    tbl->zt_blks_copied, tbl->zt_numblks);
+	    (u_longlong_t)tbl->zt_blks_copied,
+	    (u_longlong_t)tbl->zt_numblks);
 
 	if (tbl->zt_blks_copied == tbl->zt_numblks) {
 		(void) dmu_free_range(zap->zap_objset, zap->zap_object,
@@ -234,7 +233,7 @@ zap_table_grow(zap_t *zap, zap_table_phys_t *tbl,
 		tbl->zt_blks_copied = 0;
 
 		dprintf("finished; numblocks now %llu (%uk entries)\n",
-		    tbl->zt_numblks, 1<<(tbl->zt_shift-10));
+		    (u_longlong_t)tbl->zt_numblks, 1<<(tbl->zt_shift-10));
 	}
 
 	return (0);
@@ -249,7 +248,8 @@ zap_table_store(zap_t *zap, zap_table_phys_t *tbl, uint64_t idx, uint64_t val,
 	ASSERT(RW_LOCK_HELD(&zap->zap_rwlock));
 	ASSERT(tbl->zt_blk != 0);
 
-	dprintf("storing %llx at index %llx\n", val, idx);
+	dprintf("storing %llx at index %llx\n", (u_longlong_t)val,
+	    (u_longlong_t)idx);
 
 	uint64_t blk = idx >> (bs-3);
 	uint64_t off = idx & ((1<<(bs-3))-1);
@@ -626,7 +626,7 @@ zap_deref_leaf(zap_t *zap, uint64_t h, dmu_tx_t *tx, krw_t lt, zap_leaf_t **lp)
 
 static int
 zap_expand_leaf(zap_name_t *zn, zap_leaf_t *l,
-    void *tag, dmu_tx_t *tx, zap_leaf_t **lp)
+    const void *tag, dmu_tx_t *tx, zap_leaf_t **lp)
 {
 	zap_t *zap = zn->zn_zap;
 	uint64_t hash = zn->zn_hash;
@@ -715,7 +715,7 @@ zap_expand_leaf(zap_name_t *zn, zap_leaf_t *l,
 
 static void
 zap_put_leaf_maybe_grow_ptrtbl(zap_name_t *zn, zap_leaf_t *l,
-    void *tag, dmu_tx_t *tx)
+    const void *tag, dmu_tx_t *tx)
 {
 	zap_t *zap = zn->zn_zap;
 	int shift = zap_f_phys(zap)->zap_ptrtbl.zt_shift;
@@ -824,7 +824,7 @@ fzap_lookup(zap_name_t *zn,
 int
 fzap_add_cd(zap_name_t *zn,
     uint64_t integer_size, uint64_t num_integers,
-    const void *val, uint32_t cd, void *tag, dmu_tx_t *tx)
+    const void *val, uint32_t cd, const void *tag, dmu_tx_t *tx)
 {
 	zap_leaf_t *l;
 	int err;
@@ -876,7 +876,7 @@ out:
 int
 fzap_add(zap_name_t *zn,
     uint64_t integer_size, uint64_t num_integers,
-    const void *val, void *tag, dmu_tx_t *tx)
+    const void *val, const void *tag, dmu_tx_t *tx)
 {
 	int err = fzap_check(zn, integer_size, num_integers);
 	if (err != 0)
@@ -889,7 +889,7 @@ fzap_add(zap_name_t *zn,
 int
 fzap_update(zap_name_t *zn,
     int integer_size, uint64_t num_integers, const void *val,
-    void *tag, dmu_tx_t *tx)
+    const void *tag, dmu_tx_t *tx)
 {
 	zap_leaf_t *l;
 	int err;
@@ -1378,7 +1378,6 @@ fzap_get_stats(zap_t *zap, zap_stats_t *zs)
 	}
 }
 
-/* BEGIN CSTYLED */
+/* CSTYLED */
 ZFS_MODULE_PARAM(zfs, , zap_iterate_prefetch, INT, ZMOD_RW,
 	"When iterating ZAP object, prefetch it");
-/* END CSTYLED */

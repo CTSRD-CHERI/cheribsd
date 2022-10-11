@@ -44,7 +44,7 @@ typedef struct rtree_leaf_elm_s rtree_leaf_elm_t;
 
 typedef struct rtree_ctx_cache_elm_s rtree_ctx_cache_elm_t;
 struct rtree_ctx_cache_elm_s {
-	vaddr_t			leafkey;
+	ptraddr_t		leafkey;
 	rtree_leaf_elm_t	*leaf;
 };
 

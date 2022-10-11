@@ -112,9 +112,8 @@ static driver_t cesa_driver = {
 	cesa_methods,
 	sizeof (struct cesa_softc)
 };
-static devclass_t cesa_devclass;
 
-DRIVER_MODULE(cesa, simplebus, cesa_driver, cesa_devclass, 0, 0);
+DRIVER_MODULE(cesa, simplebus, cesa_driver, 0, 0);
 MODULE_DEPEND(cesa, crypto, 1, 1, 1);
 
 static void
@@ -1637,10 +1636,8 @@ cesa_newsession(device_t dev, crypto_session_t cses,
     const struct crypto_session_params *csp)
 {
 	struct cesa_session *cs;
-	struct cesa_softc *sc;
 	int error;
 
-	sc = device_get_softc(dev);
 	error = 0;
 
 	/* Allocate session */

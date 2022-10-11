@@ -21,25 +21,17 @@ AC_DEFUN([ZFS_AC_CONFIG_USER], [
 	ZFS_AC_CONFIG_USER_LIBUDEV
 	ZFS_AC_CONFIG_USER_LIBCRYPTO
 	ZFS_AC_CONFIG_USER_LIBAIO
+	ZFS_AC_CONFIG_USER_LIBATOMIC
+	ZFS_AC_CONFIG_USER_LIBFETCH
+	ZFS_AC_CONFIG_USER_AIO_H
 	ZFS_AC_CONFIG_USER_CLOCK_GETTIME
 	ZFS_AC_CONFIG_USER_PAM
 	ZFS_AC_CONFIG_USER_RUNSTATEDIR
 	ZFS_AC_CONFIG_USER_MAKEDEV_IN_SYSMACROS
 	ZFS_AC_CONFIG_USER_MAKEDEV_IN_MKDEV
 	ZFS_AC_CONFIG_USER_ZFSEXEC
-	ZFS_AC_TEST_FRAMEWORK
 
 	AC_CHECK_FUNCS([issetugid mlockall strlcat strlcpy])
-])
-
-dnl #
-dnl # Setup the environment for the ZFS Test Suite.  Currently only
-dnl # Linux style systems are supported but this infrastructure can
-dnl # be extended to support other platforms if needed.
-dnl #
-AC_DEFUN([ZFS_AC_TEST_FRAMEWORK], [
-	ZONENAME="echo global"
-	AC_SUBST(ZONENAME)
 
 	AC_SUBST(RM)
 ])

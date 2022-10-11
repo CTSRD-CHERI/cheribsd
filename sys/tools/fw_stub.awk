@@ -143,16 +143,18 @@ if (opt_l) {
 
 for (file_i = 0; file_i < num_files; file_i++) {
 	symb = filenames[file_i];
-	# '-', '.' and '/' are converted to '_'
-	gsub(/-|\.|\//, "_", symb);
+	# '-', '.', '/', and '@' are converted to '_'
+	gsub(/-|\.|\/|@/, "_", symb);
 	printc("extern char _binary_" symb "_start[], _binary_" symb "_end[];");
 }
 
 printc("\nstatic int\n"\
 modname "_fw_modevent(module_t mod, int type, void *unused)\
 {\
-	const struct firmware *fp, *parent;\
-	int error;\
+	const struct firmware *fp;");
+if (num_files > 1)
+	printc("\tconst struct firmware *parent;");
+printc("\tint error;\
 	switch (type) {\
 	case MOD_LOAD:\n");
 
@@ -170,8 +172,8 @@ for (file_i = 0; file_i < num_files; file_i++) {
 	short = shortnames[file_i];
 	symb = filenames[file_i];
 	version = versions[file_i];
-	# '-', '.' and '/' are converted to '_'
-	gsub(/-|\.|\//, "_", symb);
+	# '-', '.', '/', and '@' are converted to '_'
+	gsub(/-|\.|\/|@/, "_", symb);
 
 	reg = "\t\tfp = ";
 	reg = reg "firmware_register(\"" short "\", _binary_" symb "_start , ";
@@ -187,7 +189,7 @@ for (file_i = 0; file_i < num_files; file_i++) {
 
 	printc("\t\tif (fp == NULL)");
 	printc("\t\t\tgoto fail_" file_i ";");
-	if (file_i == 0)
+	if (file_i == 0 && num_files > 1)
 		printc("\t\tparent = fp;");
 }
 

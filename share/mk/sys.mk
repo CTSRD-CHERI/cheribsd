@@ -13,7 +13,7 @@ unix		?=	We run FreeBSD, not UNIX.
 # and/or endian.  This is called MACHINE_CPU in NetBSD, but that's used
 # for something different in FreeBSD.
 #
-__TO_CPUARCH=C/mips(n32|64)?(el)?(hf)?(c(128|256))?/mips/:C/aarch64c/aarch64/:C/arm(v[67])?(eb)?/arm/:C/powerpc(64|64le|spe)/powerpc/:C/riscv64(sf)?c?/riscv/
+__TO_CPUARCH=C/aarch64c/aarch64/:C/arm(v[67])?/arm/:C/powerpc(64|64le|spe)/powerpc/:C/riscv64(sf)?c?/riscv/
 MACHINE_CPUARCH=${MACHINE_ARCH:${__TO_CPUARCH}}
 .endif
 
@@ -212,6 +212,8 @@ ECHODIR		?=	true
 .endif
 .endif
 
+ELFCTL		?=	elfctl
+
 .if ${.MAKEFLAGS:M-N}
 # bmake -N is supposed to skip executing anything but it does not skip
 # exeucting '+' commands.  The '+' feature is used where .MAKE
@@ -242,8 +244,7 @@ LFLAGS		?=
 # compiler driver flags (e.g. -mabi=*) that conflict with flags to LD.
 LD		?=	ld
 LDFLAGS		?=
-# XXX: Drop -femulated-tls once bsd.cpu.mk no longer sets it for aarch64c.
-_LDFLAGS	=	${LDFLAGS:S/-Wl,//g:N-mabi=*:N-march=*:N-femulated-tls:N-fuse-ld=*:N--ld-path=*}
+_LDFLAGS	=	${LDFLAGS:S/-Wl,//g:N-mabi=*:N-march=*:N-fuse-ld=*:N--ld-path=*:N-fsanitize=*:N-fno-sanitize=*}
 
 MAKE		?=	make
 

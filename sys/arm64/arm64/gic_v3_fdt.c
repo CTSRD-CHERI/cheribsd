@@ -1,6 +1,5 @@
 /*-
  * Copyright (c) 2015 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Semihalf under
  * the sponsorship of the FreeBSD Foundation.
@@ -85,12 +84,10 @@ static device_method_t gic_v3_fdt_methods[] = {
 DEFINE_CLASS_1(gic, gic_v3_fdt_driver, gic_v3_fdt_methods,
     sizeof(struct gic_v3_softc), gic_v3_driver);
 
-static devclass_t gic_v3_fdt_devclass;
-
-EARLY_DRIVER_MODULE(gic_v3, simplebus, gic_v3_fdt_driver, gic_v3_fdt_devclass,
-    0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
-EARLY_DRIVER_MODULE(gic_v3, ofwbus, gic_v3_fdt_driver, gic_v3_fdt_devclass,
-    0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(gic_v3, simplebus, gic_v3_fdt_driver, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
+EARLY_DRIVER_MODULE(gic_v3, ofwbus, gic_v3_fdt_driver, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
 
 /*
  * Helper functions declarations.
@@ -144,7 +141,7 @@ gic_v3_fdt_attach(device_t dev)
 		if (ret % 2 == 0) {
 			/* Limit to a single range for now. */
 			sc->gic_mbi_start = mbi_ranges[0];
-			sc->gic_mbi_end = mbi_ranges[0] + mbi_ranges[1] - 1;
+			sc->gic_mbi_end = mbi_ranges[0] + mbi_ranges[1];
 		} else {
 			if (bootverbose)
 				device_printf(dev, "Malformed mbi-ranges property\n");
@@ -302,6 +299,14 @@ gic_v3_ofw_bus_attach(device_t dev)
 		    sizeof(size_cells));
 		/* Iterate through all GIC subordinates */
 		for (node = OF_child(parent); node > 0; node = OF_peer(node)) {
+			/*
+			 * Ignore children that lack a compatible property.
+			 * Some of them may be for configuration, for example
+			 * ppi-partitions.
+			 */
+			if (!OF_hasprop(node, "compatible"))
+				continue;
+
 			/* Allocate and populate devinfo. */
 			di = malloc(sizeof(*di), M_GIC_V3, M_WAITOK | M_ZERO);
 

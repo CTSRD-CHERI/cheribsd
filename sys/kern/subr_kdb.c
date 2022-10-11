@@ -53,6 +53,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/smp.h>
 #endif
 
+#include <security/mac/mac_framework.h>
+
 u_char __read_frequently kdb_active = 0;
 static void *kdb_jmpbufp = NULL;
 struct kdb_dbbe *kdb_dbbe = NULL;
@@ -292,6 +294,7 @@ void
 kdb_panic(const char *msg)
 {
 
+	kdb_why = KDB_WHY_PANIC;
 	printf("KDB: panic\n");
 	panic("%s", msg);
 }
@@ -300,6 +303,7 @@ void
 kdb_reboot(void)
 {
 
+	kdb_why = KDB_WHY_REBOOT;
 	printf("KDB: reboot requested\n");
 	shutdown_nice(0);
 }
@@ -438,7 +442,6 @@ kdb_backtrace(void)
 		struct stack st;
 
 		printf("KDB: stack backtrace:\n");
-		stack_zero(&st);
 		stack_save(&st);
 		stack_print_ddb(&st);
 	}
@@ -499,9 +502,9 @@ kdb_enter(const char *why, const char *msg)
 {
 
 	if (kdb_dbbe != NULL && kdb_active == 0) {
+		kdb_why = why;
 		if (msg != NULL)
 			printf("KDB: enter: %s\n", msg);
-		kdb_why = why;
 		breakpoint();
 		kdb_why = KDB_WHY_UNSET;
 	}
@@ -608,6 +611,10 @@ kdb_thr_first(void)
 	struct thread *thr;
 	u_int i;
 
+	/* This function may be called early. */
+	if (pidhashtbl == NULL)
+		return (&thread0);
+
 	for (i = 0; i <= pidhash; i++) {
 		LIST_FOREACH(p, &pidhashtbl[i], p_hash) {
 			thr = FIRST_THREAD_IN_PROC(p);
@@ -651,6 +658,8 @@ kdb_thr_next(struct thread *thr)
 	thr = TAILQ_NEXT(thr, td_plist);
 	if (thr != NULL)
 		return (thr);
+	if (pidhashtbl == NULL)
+		return (NULL);
 	hash = p->p_pid & pidhash;
 	for (;;) {
 		p = LIST_NEXT(p, p_hash);
@@ -702,7 +711,7 @@ kdb_trap(int type, int code, struct trapframe *tf)
 	if (!SCHEDULER_STOPPED()) {
 #ifdef SMP
 		other_cpus = all_cpus;
-		CPU_ANDNOT(&other_cpus, &stopped_cpus);
+		CPU_ANDNOT(&other_cpus, &other_cpus, &stopped_cpus);
 		CPU_CLR(PCPU_GET(cpuid), &other_cpus);
 		stop_cpus_hard(other_cpus);
 #endif
@@ -724,6 +733,15 @@ kdb_trap(int type, int code, struct trapframe *tf)
 	cngrab();
 
 	for (;;) {
+#ifdef MAC
+		if (mac_kdb_check_backend(be) != 0) {
+			printf("MAC prevented execution of KDB backend: %s\n",
+			    be->dbbe_name);
+			/* Unhandled breakpoint traps are fatal. */
+			handled = 1;
+			break;
+		}
+#endif
 		handled = be->dbbe_trap(type, code);
 		if (be == kdb_dbbe)
 			break;
@@ -740,7 +758,7 @@ kdb_trap(int type, int code, struct trapframe *tf)
 	if (did_stop_cpus) {
 		curthread->td_stopsched = 0;
 #ifdef SMP
-		CPU_AND(&other_cpus, &stopped_cpus);
+		CPU_AND(&other_cpus, &other_cpus, &stopped_cpus);
 		restart_cpus(other_cpus);
 #endif
 	}

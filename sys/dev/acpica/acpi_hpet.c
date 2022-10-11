@@ -69,8 +69,6 @@ __FBSDID("$FreeBSD$");
 
 ACPI_SERIAL_DECL(hpet, "ACPI HPET support");
 
-static devclass_t hpet_devclass;
-
 /* ACPI CA debugging */
 #define _COMPONENT	ACPI_TIMER
 ACPI_MODULE_NAME("HPET")
@@ -156,6 +154,8 @@ hpet_vdso_timehands(struct vdso_timehands *vdso_th, struct timecounter *tc)
 	vdso_th->th_algo = VDSO_TH_ALGO_X86_HPET;
 	vdso_th->th_x86_shift = 0;
 	vdso_th->th_x86_hpet_idx = device_get_unit(sc->dev);
+	vdso_th->th_x86_pvc_last_systime = 0;
+	vdso_th->th_x86_pvc_stable_mask = 0;
 	bzero(vdso_th->th_res, sizeof(vdso_th->th_res));
 	return (sc->mmap_allow != 0);
 }
@@ -171,6 +171,8 @@ hpet_vdso_timehands32(struct vdso_timehands32 *vdso_th32,
 	vdso_th32->th_algo = VDSO_TH_ALGO_X86_HPET;
 	vdso_th32->th_x86_shift = 0;
 	vdso_th32->th_x86_hpet_idx = device_get_unit(sc->dev);
+	vdso_th32->th_x86_pvc_last_systime = 0;
+	vdso_th32->th_x86_pvc_stable_mask = 0;
 	bzero(vdso_th32->th_res, sizeof(vdso_th32->th_res));
 	return (sc->mmap_allow != 0);
 }
@@ -417,7 +419,7 @@ hpet_identify(driver_t *driver, device_t parent)
 	int		i;
 
 	/* Only one HPET device can be added. */
-	if (devclass_get_device(hpet_devclass, 0))
+	if (devclass_get_device(devclass_find("hpet"), 0))
 		return;
 	for (i = 1; ; i++) {
 		/* Search for HPET table. */
@@ -473,6 +475,7 @@ hpet_attach(device_t dev)
 	struct make_dev_args mda;
 	int i, j, num_msi, num_timers, num_percpu_et, num_percpu_t, cur_cpu;
 	int pcpu_master, error;
+	rman_res_t hpet_region_size;
 	static int maxhpetet = 0;
 	uint32_t val, val2, cvectors, dvectors;
 	uint16_t vendor, rev;
@@ -489,10 +492,11 @@ hpet_attach(device_t dev)
 	if (sc->mem_res == NULL)
 		return (ENOMEM);
 
-	/* Validate that we can access the whole region. */
-	if (rman_get_size(sc->mem_res) < HPET_MEM_WIDTH) {
+	hpet_region_size = rman_get_size(sc->mem_res);
+	/* Validate that the region is big enough for the control registers. */
+	if (hpet_region_size < HPET_MEM_MIN_WIDTH) {
 		device_printf(dev, "memory region width %jd too small\n",
-		    rman_get_size(sc->mem_res));
+		    hpet_region_size);
 		bus_free_resource(dev, SYS_RES_MEMORY, sc->mem_res);
 		return (ENXIO);
 	}
@@ -522,6 +526,18 @@ hpet_attach(device_t dev)
 	 */
 	if (vendor == HPET_VENDID_AMD && rev < 0x10 && num_timers > 0)
 		num_timers--;
+	/*
+	 * Now validate that the region is big enough to address all counters.
+	 */
+	if (hpet_region_size < HPET_TIMER_CAP_CNF(num_timers)) {
+		device_printf(dev,
+		    "memory region width %jd too small for %d timers\n",
+		    hpet_region_size, num_timers);
+		hpet_disable(sc);
+		bus_free_resource(dev, SYS_RES_MEMORY, sc->mem_res);
+		return (ENXIO);
+	}
+
 	sc->num_timers = num_timers;
 	if (bootverbose) {
 		device_printf(dev,
@@ -991,5 +1007,5 @@ static driver_t	hpet_driver = {
 	sizeof(struct hpet_softc),
 };
 
-DRIVER_MODULE(hpet, acpi, hpet_driver, hpet_devclass, 0, 0);
+DRIVER_MODULE(hpet, acpi, hpet_driver, 0, 0);
 MODULE_DEPEND(hpet, acpi, 1, 1, 1);

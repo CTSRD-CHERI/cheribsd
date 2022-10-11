@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2013 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Aleksandr Rybalko under sponsorship from the
  * FreeBSD Foundation.
@@ -119,6 +118,14 @@ vt_fb_ioctl(struct vt_device *vd, u_long cmd, caddr_t data, struct thread *td)
 		if (vd->vd_driver->vd_blank == NULL)
 			return (ENODEV);
 		vd->vd_driver->vd_blank(vd, TC_BLACK);
+		break;
+
+	case FBIO_GETRGBOFFS:	/* get RGB offsets */
+		if (info->fb_rgboffs.red == 0 && info->fb_rgboffs.green == 0 &&
+		    info->fb_rgboffs.blue == 0)
+			return (ENOTTY);
+		memcpy((struct fb_rgboffs *)data, &info->fb_rgboffs,
+		    sizeof(struct fb_rgboffs));
 		break;
 
 	default:
@@ -355,6 +362,9 @@ vt_fb_bitblt_text(struct vt_device *vd, const struct vt_window *vw,
 			    VTBUF_ISCURSOR(&vw->vw_buf, row, col), &fg, &bg);
 
 			z = row * PIXEL_WIDTH(VT_FB_MAX_WIDTH) + col;
+			if (z >= PIXEL_HEIGHT(VT_FB_MAX_HEIGHT) *
+			    PIXEL_WIDTH(VT_FB_MAX_WIDTH))
+				continue;
 			if (vd->vd_drawn && (vd->vd_drawn[z] == c) &&
 			    vd->vd_drawnfg && (vd->vd_drawnfg[z] == fg) &&
 			    vd->vd_drawnbg && (vd->vd_drawnbg[z] == bg))
@@ -405,6 +415,9 @@ vt_fb_invalidate_text(struct vt_device *vd, const term_rect_t *area)
 		for (col = area->tr_begin.tp_col; col < area->tr_end.tp_col;
 		    ++col) {
 			z = row * PIXEL_WIDTH(VT_FB_MAX_WIDTH) + col;
+			if (z >= PIXEL_HEIGHT(VT_FB_MAX_HEIGHT) *
+			    PIXEL_WIDTH(VT_FB_MAX_WIDTH))
+				continue;
 			if (vd->vd_drawn)
 				vd->vd_drawn[z] = 0;
 			if (vd->vd_drawnfg)
@@ -427,22 +440,22 @@ vt_fb_postswitch(struct vt_device *vd)
 }
 
 static int
-vt_fb_init_cmap(uint32_t *cmap, int depth)
+vt_fb_init_colors(struct fb_info *info)
 {
 
-	switch (depth) {
+	switch (FBTYPE_GET_BPP(info)) {
 	case 8:
-		return (vt_generate_cons_palette(cmap, COLOR_FORMAT_RGB,
+		return (vt_config_cons_colors(info, COLOR_FORMAT_RGB,
 		    0x7, 5, 0x7, 2, 0x3, 0));
 	case 15:
-		return (vt_generate_cons_palette(cmap, COLOR_FORMAT_RGB,
+		return (vt_config_cons_colors(info, COLOR_FORMAT_RGB,
 		    0x1f, 10, 0x1f, 5, 0x1f, 0));
 	case 16:
-		return (vt_generate_cons_palette(cmap, COLOR_FORMAT_RGB,
+		return (vt_config_cons_colors(info, COLOR_FORMAT_RGB,
 		    0x1f, 11, 0x3f, 5, 0x1f, 0));
 	case 24:
 	case 32: /* Ignore alpha. */
-		return (vt_generate_cons_palette(cmap, COLOR_FORMAT_RGB,
+		return (vt_config_cons_colors(info, COLOR_FORMAT_RGB,
 		    0xff, 16, 0xff, 8, 0xff, 0));
 	default:
 		return (1);
@@ -473,7 +486,7 @@ vt_fb_init(struct vt_device *vd)
 		info->fb_flags |= FB_FLAG_NOMMAP;
 
 	if (info->fb_cmsize <= 0) {
-		err = vt_fb_init_cmap(info->fb_cmap, FBTYPE_GET_BPP(info));
+		err = vt_fb_init_colors(info);
 		if (err)
 			return (CN_DEAD);
 		info->fb_cmsize = 16;

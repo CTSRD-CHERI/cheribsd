@@ -40,7 +40,7 @@ verify_runnable "both"
 verify_disk_count "$DISKS" 2
 default_mirror_setup_noexit $DISKS
 
-log_must zpool sync
+sync_all_pools
 
 set -A bad_flags a b c   e   g h i j k l   n o p q r s t u v w x y   \
                    B C D E F G H I J K L M N O P Q R S T U V W X Y Z \
@@ -65,7 +65,7 @@ done
 
 # Specifying a non-existent object identifier returns an error
 obj_id_highest=$(zdb -P -dd $TESTPOOL/$TESTFS 2>/dev/null |
-    egrep "^ +-?([0-9]+ +){7}" | sort -n | tail -n 1 | awk '{print $1}')
+    grep -E "^ +-?([0-9]+ +){7}" | sort -n | awk 'END {print $1}')
 obj_id_invalid=$(( $obj_id_highest + 1 ))
 log_mustnot zdb -dd $TESTPOOL/$TESTFS $obj_id_invalid
 

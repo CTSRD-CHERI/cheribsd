@@ -79,7 +79,7 @@
  *	vm_map_entry_t		an entry in an address map.
  */
 
-typedef u_char vm_flags_t;
+typedef u_short vm_flags_t;
 typedef u_int vm_eflags_t;
 
 /*
@@ -230,13 +230,14 @@ struct vm_map {
  * vm_flags_t values
  */
 #define MAP_WIREFUTURE		0x01	/* wire all future pages */
-#define	MAP_BUSY_WAKEUP		0x02
+#define	MAP_BUSY_WAKEUP		0x02	/* thread(s) waiting on busy state */
 #define	MAP_IS_SUB_MAP		0x04	/* has parent */
 #define	MAP_ASLR		0x08	/* enabled ASLR */
-#define	MAP_ASLR_IGNSTART	0x10
-#define	MAP_REPLENISH		0x20
+#define	MAP_ASLR_IGNSTART	0x10	/* ASLR ignores data segment */
+#define	MAP_REPLENISH		0x20	/* kmapent zone needs to be refilled */
 #define	MAP_WXORX		0x40	/* enforce W^X */
-#define	MAP_RESERVATIONS	0x80	/* Don't merge reservations */
+#define	MAP_ASLR_STACK		0x80	/* stack location is randomized */
+#define	MAP_RESERVATIONS	0x8000	/* Don't merge reservations */
 
 #ifdef	_KERNEL
 #if defined(KLD_MODULE) && !defined(KLD_TIED)
@@ -315,6 +316,7 @@ struct vmspace {
 	segsz_t vm_dsize;	/* data size (pages) XXX */
 	caddr_t vm_taddr;	/* (c) user virtual address of text */
 	caddr_t vm_daddr;	/* (c) user virtual address of data */
+	vm_offset_t vm_shp_base; /* shared page address */
 	u_int vm_refcnt;	/* number of references */
 	/*
 	 * Keep the PMAP last, so that CPU-specific variations of that
@@ -499,8 +501,8 @@ int vm_map_find_min(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t *,
     vm_size_t, vm_offset_t, vm_offset_t, int, vm_prot_t, vm_prot_t, int);
 int vm_map_find_aligned(vm_map_t map, vm_offset_t *addr, vm_size_t length,
     vm_offset_t max_addr, vm_offset_t alignment);
-int vm_map_fixed(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t, vm_size_t,
-    vm_prot_t, vm_prot_t, int);
+int vm_map_fixed(vm_map_t, vm_object_t, vm_ooffset_t, vm_pointer_t,
+    vm_pointer_t *, vm_size_t, vm_prot_t, vm_prot_t, int);
 vm_offset_t vm_map_findspace(vm_map_t, vm_offset_t, vm_size_t);
 int vm_map_alignspace(vm_map_t, vm_object_t, vm_ooffset_t,
     vm_offset_t *, vm_size_t, vm_offset_t, vm_offset_t);
@@ -515,7 +517,6 @@ int vm_map_lookup_locked(vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, v
 void vm_map_lookup_done (vm_map_t, vm_map_entry_t);
 boolean_t vm_map_lookup_entry (vm_map_t, vm_offset_t, vm_map_entry_t *);
 bool vm_map_reservation_is_unmapped(vm_map_t, vm_offset_t);
-int vm_map_reservation_delete(vm_map_t, vm_offset_t);
 int vm_map_reservation_delete_locked(vm_map_t, vm_offset_t);
 int vm_map_reservation_create(vm_map_t, vm_pointer_t *, vm_size_t, vm_offset_t,
     vm_prot_t);

@@ -156,6 +156,7 @@
 #define	_PC_INF_PRESENT		62
 #define	_PC_MAC_PRESENT		63
 #define	_PC_ACL_NFS4		64
+#define	_PC_DEALLOC_PRESENT	65
 #endif
 
 /* From OpenSolaris, used by SEEK_DATA/SEEK_HOLE. */
@@ -196,6 +197,13 @@
     RFTHREAD | RFSIGSHARE | RFLINUXTHPN | RFSTOPPED | RFHIGHPID | RFTSIGZMB | \
     RFPROCDESC | RFSPAWN | RFPPWAIT)
 #define	RFKERNELONLY	(RFSTOPPED | RFHIGHPID | RFPROCDESC)
+
+#define	SWAPOFF_FORCE	0x00000001
+
+/*
+ * close_range() options.
+ */
+#define	CLOSE_RANGE_CLOEXEC	(1<<2)
 
 #if __has_feature(capabilities)
 #define	COSETUP_COCALL		0

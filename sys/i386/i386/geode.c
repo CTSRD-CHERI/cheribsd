@@ -291,7 +291,7 @@ geode_probe(device_t self)
 			tc_init(&geode_timecounter);
 			EVENTHANDLER_REGISTER(watchdog_list, geode_watchdog,
 			    NULL, 0);
-			set_cputicker(geode_cputicks, 27000000, 0);
+			set_cputicker(geode_cputicks, 27000000, false);
 		}
 		break;
 	case 0x0510100b:
@@ -380,6 +380,4 @@ static driver_t geode_driver = {
 	0,
 };
 
-static devclass_t geode_devclass;
-
-DRIVER_MODULE(geode, pci, geode_driver, geode_devclass, 0, 0);
+DRIVER_MODULE(geode, pci, geode_driver, 0, 0);

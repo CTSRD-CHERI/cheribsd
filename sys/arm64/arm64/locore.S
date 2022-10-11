@@ -40,7 +40,14 @@
 #include <machine/cherireg.h>
 
 #define	VIRT_BITS	48
-#define	DMAP_TABLES	((DMAP_MAX_ADDRESS - DMAP_MIN_ADDRESS) >> L0_SHIFT)
+
+#if PAGE_SIZE == PAGE_SIZE_16K
+/*
+ * The number of level 3 tables to create. 32 will allow for 1G of address
+ * space, the same as a single level 2 page with 4k pages.
+ */
+#define	L3_PAGE_COUNT	32
+#endif
 
 	.globl	kernbase
 	.set	kernbase, KERNBASE
@@ -153,10 +160,7 @@
  */
 .macro morello_cpu_init
 #if __has_feature(capabilities)
-	/*
-	 * Enable Morello instructions at EL1. We will enable them at EL0
-	 * later when we know userspace is expecting to use them.
-	 */
+	/* Enable Morello instructions at EL0 and EL1 */
 	mrs	x2, cpacr_el1
 	bic	x2, x2, CPACR_CEN_MASK
 	orr	x2, x2, CPACR_CEN_TRAP_NONE
@@ -272,6 +276,13 @@ virtdone:
 	cmp	PTR(15), PTR(14)
 	b.lo	1b
 
+#if defined(PERTHREAD_SSP)
+	/* Set sp_el0 to the boot canary for early per-thread SSP to work */
+	adrp	x15, boot_canary
+	add	x15, x15, :lo12:boot_canary
+	msr	sp_el0, x15
+#endif
+
 	/* Backup the module pointer */
 	mov	x19, x0
 
@@ -334,6 +345,18 @@ virtdone:
 	bl	initarm
 	/* We are done with the boot params */
 	add	PTRN(sp), PTRN(sp), #BOOTPARAMS_SIZE
+
+#ifdef PAC
+	/*
+	 * Enable pointer authentication in the kernel. We set the keys for
+	 * thread0 in initarm so have to wait until it returns to enable it.
+	 * If we were to enable it in initarm then any authentication when
+	 * returning would fail as it was called with pointer authentication
+	 * disabled.
+	 */
+	bl	ptrauth_start
+#endif
+
 	bl	mi_startup
 
 	/* We should not get here */
@@ -359,7 +382,7 @@ ENTRY(mpentry)
 	.arch_extension a64c
 #endif
 	/* Disable interrupts */
-	msr	daifset, #2
+	msr	daifset, #DAIF_INTR
 
 	/* Drop to EL1 */
 	bl	drop_to_el1
@@ -392,6 +415,13 @@ mp_virtdone:
 	LDR_LABEL(PTR(4), PTR(4), bootstack)
 	mov	PTRN(sp), PTR(4)
 
+#if defined(PERTHREAD_SSP)
+	/* Set sp_el0 to the boot canary for early per-thread SSP to work */
+	adrp	x15, boot_canary
+	add	x15, x15, :lo12:boot_canary
+	msr	sp_el0, x15
+#endif
+
 	/* Load the kernel ttbr0 pagetable */
 	msr	ttbr0_el1, x27
 	isb
@@ -422,8 +452,18 @@ LENTRY(drop_to_el1)
 	b.eq	1f
 	ret
 1:
+	/*
+	 * Disable the MMU. If the HCR_EL2.E2H field is set we will clear it
+	 * which may break address translation.
+	 */
+	dsb	sy
+	mrs	x2, sctlr_el2
+	bic	x2, x2, SCTLR_M
+	msr	sctlr_el2, x2
+	isb
+
 	/* Configure the Hypervisor */
-	mov	x2, #(HCR_RW)
+	ldr	x2, =(HCR_RW | HCR_APK | HCR_API)
 	msr	hcr_el2, x2
 
 	/* Load the Virtualization Process ID Register */
@@ -581,7 +621,6 @@ LEND(get_virt_delta)
  *    - The Kernel L0 table             (TTBR1)
  *    - The identity (PA = VA) L1 table
  *    - The identity (PA = VA) L0 table (TTBR0)
- *    - The DMAP L1 tables
  */
 LENTRY(create_pagetables)
 	/* Save the Link register */
@@ -639,8 +678,13 @@ LENTRY(create_pagetables)
 	/* Booted with modules pointer */
 	/* Find modulep - begin */
 	sub	x8, x0, x6
-	/* Add two 2MiB pages for the module data and round up */
-	ldr	x7, =(3 * L2_SIZE - 1)
+	/*
+	 * Add space for the module data. When PAGE_SIZE is 4k this will
+	 * add at least 2 level 2 blocks (2 * 2MiB). When PAGE_SIZE is
+	 * larger it will be at least as large as we use smaller level 3
+	 * pages.
+	 */
+	ldr	x7, =((6 * 1024 * 1024) - 1)
 	add	x8, x8, x7
 	b	common
 
@@ -665,15 +709,44 @@ booti_no_fdt:
 #endif
 
 common:
+#if PAGE_SIZE != PAGE_SIZE_4K
+	/*
+	 * Create L3 pages. The kernel will be loaded at a 2M aligned
+	 * address, however L2 blocks are too large when the page size is
+	 * not 4k to map the kernel with such an aligned address. However,
+	 * when the page size is larger than 4k, L2 blocks are too large to
+	 * map the kernel with such an alignment.
+	 */
+
+	/* Get the number of l3 pages to allocate, rounded down */
+	lsr	x10, x8, #(L3_SHIFT)
+
+	/* Create the kernel space L2 table */
+	mov	PTR(6), PTR(26)
+	mov	x7, #(ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK))
+	mov	x8, #(KERNBASE)
+	mov	x9, x28
+	bl	build_l3_page_pagetable
+
+	/* Move to the l2 table */
+	ldr	x9, =(PAGE_SIZE * L3_PAGE_COUNT)
+	add	PTR(26), PTR(26), x9
+
+	/* Link the l2 -> l3 table */
+	mov	x9, x6
+	mov	PTR(6), PTR(26)
+	bl	link_l2_pagetable
+#else
 	/* Get the number of l2 pages to allocate, rounded down */
 	lsr	x10, x8, #(L2_SHIFT)
 
 	/* Create the kernel space L2 table */
 	mov	PTR(6), PTR(26)
 	mov	x7, #(ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK))
-	mov	x8, #(KERNBASE & L2_BLOCK_MASK)
+	mov	x8, #(KERNBASE)
 	mov	x9, x28
 	bl	build_l2_block_pagetable
+#endif
 
 	/* Move to the l1 table */
 	add	PTR(26), PTR(26), #PAGE_SIZE
@@ -690,12 +763,6 @@ common:
 	mov	x9, x6
 	mov	PTR(6), PTR(24)
 	mov	x10, #1
-	bl	link_l0_pagetable
-
-	/* Link the DMAP tables */
-	ldr	x8, =DMAP_MIN_ADDRESS
-	early_idmap_addr x9, pagetable_dmap, x29
-	mov	x10, #DMAP_TABLES
 	bl	link_l0_pagetable
 
 	/*
@@ -721,7 +788,8 @@ common:
 #endif
 	/* Create a table for the UART */
 	mov	x7, #(ATTR_S1_nG | ATTR_S1_IDX(VM_MEMATTR_DEVICE))
-	add	x16, x16, #(L2_SIZE)	/* VA start */
+	ldr	x9, =(L2_SIZE)
+	add	x16, x16, x9	/* VA start */
 	mov	x8, x16
 
 	/* Store the socdev virtual address */
@@ -740,7 +808,8 @@ common:
 
 	/* Create the mapping for FDT data (2 MiB max) */
 	mov	x7, #(ATTR_S1_nG | ATTR_S1_IDX(VM_MEMATTR_WRITE_BACK))
-	add	x16, x16, #(L2_SIZE)	/* VA start */
+	ldr	x9, =(L2_SIZE)
+	add	x16, x16, x9	/* VA start */
 	mov	x8, x16
 	mov	x9, x0			/* PA start */
 	/* Update the module pointer to point at the allocated memory */
@@ -804,6 +873,7 @@ LENTRY(link_l0_pagetable)
 
 	/* Build the L0 block entry */
 	mov	x12, #L0_TABLE
+	orr	x12, x12, #(TATTR_UXN_TABLE | TATTR_AP_TABLE_NO_EL0)
 
 	/* Only use the output address bits */
 	lsr	x9, x9, #PAGE_SHIFT
@@ -890,6 +960,79 @@ LENTRY(build_l2_block_pagetable)
 
 	ret
 LEND(build_l2_block_pagetable)
+
+#if PAGE_SIZE != PAGE_SIZE_4K
+/*
+ * Builds an L2 -> L3 table descriptor
+ *
+ *  x/c6  = L2 table
+ *  x8  = Virtual Address
+ *  x9  = L3 PA (trashed)
+ *  x11, x12 and x13 are trashed
+ */
+LENTRY(link_l2_pagetable)
+	/*
+	 * Link an L2 -> L3 table entry.
+	 */
+	/* Find the table index */
+	lsr	x11, x8, #L2_SHIFT
+	and	x11, x11, #Ln_ADDR_MASK
+
+	/* Build the L1 block entry */
+	mov	x12, #L2_TABLE
+
+	/* Only use the output address bits */
+	lsr	x9, x9, #PAGE_SHIFT
+	orr	x13, x12, x9, lsl #PAGE_SHIFT
+
+	/* Store the entry */
+	str	x13, [PTR(6), x11, lsl #3]
+
+	ret
+LEND(link_l2_pagetable)
+
+/*
+ * Builds count level 3 page table entries
+ *  x/c6  = L3 table
+ *  x7  = Block attributes
+ *  x8  = VA start
+ *  x9  = PA start (trashed)
+ *  x10 = Entry count (trashed)
+ *  x11, x12 and x13 are trashed
+ */
+LENTRY(build_l3_page_pagetable)
+	/*
+	 * Build the L3 table entry.
+	 */
+	/* Find the table index */
+	lsr	x11, x8, #L3_SHIFT
+	and	x11, x11, #Ln_ADDR_MASK
+
+	/* Build the L3 page entry */
+	orr	x12, x7, #L3_PAGE
+#if __has_feature(capabilities)
+	orr	x12, x12, #(ATTR_CAP_RW)
+#endif
+	orr	x12, x12, #(ATTR_DEFAULT)
+	orr	x12, x12, #(ATTR_S1_UXN)
+
+	/* Only use the output address bits */
+	lsr	x9, x9, #L3_SHIFT
+
+	/* Set the physical address for this virtual address */
+1:	orr	x13, x12, x9, lsl #L3_SHIFT
+
+	/* Store the entry */
+	str	x13, [PTR(6), x11, lsl #3]
+
+	sub	x10, x10, #1
+	add	x11, x11, #1
+	add	x9, x9, #1
+	cbnz	x10, 1b
+
+	ret
+LEND(build_l3_page_pagetable)
+#endif
 
 LENTRY(start_mmu)
 	dsb	sy
@@ -983,12 +1126,21 @@ mair:
 		MAIR_ATTR(MAIR_NORMAL_WT, VM_MEMATTR_WRITE_THROUGH) |	\
 		MAIR_ATTR(MAIR_DEVICE_nGnRE, VM_MEMATTR_DEVICE_nGnRE)
 tcr:
+#if PAGE_SIZE == PAGE_SIZE_4K
+#define	TCR_TG	(TCR_TG1_4K | TCR_TG0_4K)
+#elif PAGE_SIZE == PAGE_SIZE_16K
+#define	TCR_TG	(TCR_TG1_16K | TCR_TG0_16K)
+#else
+#error Unsupported page size
+#endif
+
 #if __has_feature(capabilities)
 #define	TCR_MORELLO	(TCR_HPD0 | TCR_HPD1 | TCR_HWU0 | TCR_HWU1)
 #else
 #define	TCR_MORELLO	0
 #endif
-	.quad (TCR_TxSZ(64 - VIRT_BITS) | TCR_TG1_4K | \
+
+	.quad (TCR_TxSZ(64 - VIRT_BITS) | TCR_TG | \
 	    TCR_CACHE_ATTRS | TCR_SMP_ATTRS | TCR_MORELLO)
 sctlr_set:
 	/* Bits to set */
@@ -998,17 +1150,13 @@ sctlr_set:
 	    SCTLR_M | SCTLR_CP15BEN)
 sctlr_clear:
 	/* Bits to clear */
-	.quad (SCTLR_EE | SCTLR_EOE | SCTLR_IESB | SCTLR_WXN | SCTLR_UMA | \
+	.quad (SCTLR_EE | SCTLR_E0E | SCTLR_IESB | SCTLR_WXN | SCTLR_UMA | \
 	    SCTLR_ITD | SCTLR_A)
 LEND(start_mmu)
 
 ENTRY(abort)
 	b abort
 END(abort)
-
-	.align 3
-init_pt_va:
-	.quad pagetable		/* XXX: Keep page tables VA */
 
 	.section .init_pagetable, "aw", %nobits
 	.align PAGE_SHIFT
@@ -1022,11 +1170,18 @@ init_pt_va:
 	 *           L0 for user
 	 */
 pagetable:
+#if PAGE_SIZE != PAGE_SIZE_4K
+	.space	(PAGE_SIZE * L3_PAGE_COUNT)
+pagetable_l2_ttbr1:
+#endif
 	.space	PAGE_SIZE
 pagetable_l1_ttbr1:
 	.space	PAGE_SIZE
+	.globl pagetable_l0_ttbr1
+	.type	pagetable_l0_ttbr1,#object
 pagetable_l0_ttbr1:
 	.space	PAGE_SIZE
+	.size	pagetable_l0_ttbr1, . - pagetable_l0_ttbr1
 pagetable_l2_ttbr0_bootstrap:
 	.space	PAGE_SIZE
 pagetable_l1_ttbr0_bootstrap:
@@ -1036,19 +1191,12 @@ pagetable_l0_ttbr0_bootstrap:
 pagetable_l0_ttbr0:
 	.space	PAGE_SIZE
 
-	.globl	pagetable_dmap
-	.type	pagetable_dmap,#object
-pagetable_dmap:
-	.space	PAGE_SIZE * DMAP_TABLES
 pagetable_end:
-	.size	pagetable_dmap, pagetable_end - pagetable_dmap
 
 	.type	el2_pagetable,#object
 el2_pagetable:
 	.space	PAGE_SIZE
 	.size	el2_pagetable, . - el2_pagetable
-
-	.globl init_pt_va
 
 	.align	4
 	.type	initstack,#object
@@ -1068,47 +1216,9 @@ initstack_end:
 	.section .rodata; .globl sym; .align 2; .type sym,#object; sym:	\
 	.cfi_startproc
 
-SIGCODE(sigcode)
-#if __has_feature(capabilities)
-#ifndef __CHERI_PURE_CAPABILITY__
-	.arch_extension c64
-#endif
-	add	c0, csp, #SF_UC
-#else
-	mov	x0, sp
-	add	x0, x0, #SF_UC
-#endif
-
-1:
-	mov	x8, #SYS_sigreturn
-	svc	0
-
-	/* sigreturn failed, exit */
-	mov	x8, #SYS_exit
-	svc	0
-
-	b	1b
-#if __has_feature(capabilities)
-#ifndef __CHERI_PURE_CAPABILITY__
-	.arch_extension noc64
-	.arch_extension a64c
-#endif
-#endif
-	/* This may be copied to the stack, keep it 16-byte aligned */
-	.align	3
-END(sigcode)
-esigcode:
-
-	.data
-	.align	3
-	.global	szsigcode
-	.type	szsigcode,#object
-	.size	szsigcode, 8
-szsigcode:
-	.quad	esigcode - sigcode
-
 #ifdef COMPAT_FREEBSD64
 SIGCODE(freebsd64_sigcode)
+	blr	x8
 	mov	x0, sp
 	add	x0, x0, #SF_UC64
 

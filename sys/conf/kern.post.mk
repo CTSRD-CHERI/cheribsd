@@ -38,7 +38,7 @@ MKMODULESENV+=	WITH_CTF="${WITH_CTF}"
 MKMODULESENV+=	WITH_EXTRA_TCP_STACKS="${WITH_EXTRA_TCP_STACKS}"
 .endif
 
-.if defined(KCSAN_ENABLED)
+.if !empty(KCSAN_ENABLED)
 MKMODULESENV+=	KCSAN_ENABLED="yes"
 .endif
 
@@ -48,6 +48,10 @@ MKMODULESENV+=	SAN_CFLAGS="${SAN_CFLAGS}"
 
 .if defined(GCOV_CFLAGS)
 MKMODULESENV+=	GCOV_CFLAGS="${GCOV_CFLAGS}"
+.endif
+
+.if !empty(COMPAT_FREEBSD32_ENABLED)
+MKMODULESENV+=	COMPAT_FREEBSD32_ENABLED="yes"
 .endif
 
 # Allow overriding the kernel debug directory, so kernel and user debug may be
@@ -187,17 +191,6 @@ gdbinit:
 .endif
 .endif
 
-CTFFLAGS_KERNEL=${CTFFLAGS}
-.if ${MACHINE_CPUARCH} == "mips"
-# For mips, the CTF section is generated from the symbols in `.dynsym`.
-# `.dymsym` only contains a subset of the `.symtab` symbols, needed for
-# dynamic linking. This flag is needed because the `.symtab` section is not
-# loaded at boot time, and its address is not available anywhere without a
-# proper bootloader.
-# The problem can be solved looking at |sys/mips/mips/elf_trampoline.c|.
-CTFFLAGS_KERNEL+=-s
-.endif
-
 ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
 	@rm -f ${.TARGET}
 	@echo linking ${.TARGET}
@@ -206,8 +199,8 @@ ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
 	@sh ${S}/tools/embed_mfs.sh ${.TARGET} ${MFS_IMAGE}
 .endif
 .if ${MK_CTF} != "no"
-	@echo ${CTFMERGE} ${CTFFLAGS_KERNEL} -o ${.TARGET} ...
-	@${CTFMERGE} ${CTFFLAGS_KERNEL} -o ${.TARGET} ${SYSTEM_OBJS} vers.o
+	@echo ${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ...
+	@${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ${SYSTEM_OBJS} vers.o
 .endif
 .if !defined(DEBUG)
 	${OBJCOPY} --strip-debug ${.TARGET}
@@ -237,10 +230,12 @@ kernel-clean:
 # This is a hack.  BFD "optimizes" away dynamic mode if there are no
 # dynamic references.  We could probably do a '-Bforcedynamic' mode like
 # in the a.out ld.  For now, this works.
-hack.pico: Makefile
-	:> hack.c
-	${CC} ${CCLDFLAGS} -shared ${CFLAGS} -nostdlib hack.c -o hack.pico
-	rm -f hack.c
+force-dynamic-hack.c:
+	:> ${.TARGET}
+
+force-dynamic-hack.pico: force-dynamic-hack.c Makefile
+	${CC} ${CCLDFLAGS} -shared ${CFLAGS} -nostdlib \
+	    force-dynamic-hack.c -o ${.TARGET}
 
 offset.inc: $S/kern/genoffset.sh genoffset.o
 	NM='${NM}' NMFLAGS='${NMFLAGS}' sh $S/kern/genoffset.sh genoffset.o > ${.TARGET}
@@ -365,6 +360,9 @@ _ILINKS+= ${MACHINE_CPUARCH}
 .if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
 _ILINKS+= x86
 .endif
+.if ${MACHINE_CPUARCH} == "amd64"
+_ILINKS+= i386
+.endif
 
 # Ensure that the link exists without depending on it when it exists.
 # Ensure that debug info references the path in the source tree.
@@ -454,7 +452,7 @@ config.o env.o hints.o vers.o vnode_if.o:
 .if ${MK_REPRODUCIBLE_BUILD} != "no"
 REPRO_FLAG="-R"
 .endif
-vers.c: $S/conf/newvers.sh $S/sys/param.h ${SYSTEM_DEP}
+vers.c: .NOMETA_CMP $S/conf/newvers.sh $S/sys/param.h ${SYSTEM_DEP:Nvers.*}
 	MAKE="${MAKE}" sh $S/conf/newvers.sh ${REPRO_FLAG} ${KERN_IDENT}
 
 vnode_if.c: $S/tools/vnode_if.awk $S/kern/vnode_if.src

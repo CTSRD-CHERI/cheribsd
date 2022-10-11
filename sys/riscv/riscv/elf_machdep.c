@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/imgact.h>
 #include <sys/linker.h>
 #include <sys/proc.h>
+#include <sys/reg.h>
 #include <sys/sysctl.h>
 #include <sys/sysent.h>
 #include <sys/imgact_elf.h>
@@ -64,10 +65,9 @@ static const char *riscv_machine_arch(struct proc *p);
 
 u_long elf_hwcap;
 
-struct sysentvec elf_freebsd_sysvec = {
+static struct sysentvec elf_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
-	.sv_transtrap	= NULL,
 	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_sendsig	= sendsig,
 	.sv_sigcode	= sigcode,
@@ -78,12 +78,15 @@ struct sysentvec elf_freebsd_sysvec = {
 	.sv_name	= "FreeBSD ELF64",
 #endif
 	.sv_coredump	= __elfN(coredump),
+	.sv_elf_core_osabi = ELFOSABI_FREEBSD,
+	.sv_elf_core_abi_vendor = FREEBSD_ABI_VENDOR,
+	.sv_elf_core_prepare_notes = __elfN(prepare_notes),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
 	.sv_minuser	= VM_MIN_ADDRESS,
-	.sv_maxuser	= VM_MAXUSER_ADDRESS,
-	.sv_usrstack	= USRSTACK,
-	.sv_szpsstrings	= sizeof(struct ps_strings),
+	.sv_maxuser	= 0,	/* Filled in during boot. */
+	.sv_usrstack	= 0,	/* Filled in during boot. */
+	.sv_psstringssz	= sizeof(struct ps_strings),
 	.sv_stackprot	= VM_PROT_RW_CAP,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings	= exec_copyout_strings,
@@ -91,22 +94,26 @@ struct sysentvec elf_freebsd_sysvec = {
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP | SV_TIMEKEEP |
-	    SV_ASLR | SV_RNG_SEED_VER |
+	    SV_RNG_SEED_VER |
 #if __has_feature(capabilities)
 	    SV_CHERI,
 #else
-	    0,
+	    SV_ASLR,
 #endif
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = syscallnames,
-	.sv_shared_page_base = SHAREDPAGE,
+	.sv_shared_page_base = 0,	/* Filled in during boot. */
 	.sv_shared_page_len = PAGE_SIZE,
 	.sv_schedtail	= NULL,
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
 	.sv_hwcap	= &elf_hwcap,
 	.sv_machine_arch = riscv_machine_arch,
+	.sv_onexec_old	= exec_onexec_old,
+	.sv_onexit	= exit_onexit,
+	.sv_regset_begin = SET_BEGIN(__elfN(regset)),
+	.sv_regset_end  = SET_LIMIT(__elfN(regset)),
 };
 INIT_SYSENTVEC(elf_sysvec, &elf_freebsd_sysvec);
 
@@ -135,9 +142,30 @@ static __ElfN(Brandinfo) freebsd_brand_info = {
 	.brand_note	= &__elfN(freebsd_brandnote),
 	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
 };
-
 SYSINIT(elf, SI_SUB_EXEC, SI_ORDER_FIRST,
     (sysinit_cfunc_t)__elfN(insert_brand_entry), &freebsd_brand_info);
+
+void
+elf64_register_sysvec(void *arg)
+{
+	struct sysentvec *sv;
+
+	sv = arg;
+	switch (pmap_mode) {
+	case PMAP_MODE_SV48:
+		sv->sv_maxuser = VM_MAX_USER_ADDRESS_SV48;
+		sv->sv_usrstack = USRSTACK_SV48;
+		sv->sv_shared_page_base = SHAREDPAGE_SV48;
+		break;
+	case PMAP_MODE_SV39:
+		sv->sv_maxuser = VM_MAX_USER_ADDRESS_SV39;
+		sv->sv_usrstack = USRSTACK_SV39;
+		sv->sv_shared_page_base = SHAREDPAGE_SV39;
+		break;
+	}
+}
+SYSINIT(elf_register_sysvec, SI_SUB_VM, SI_ORDER_ANY, elf64_register_sysvec,
+    &elf_freebsd_sysvec);
 
 static bool debug_kld;
 SYSCTL_BOOL(_debug, OID_AUTO, kld_reloc, CTLFLAG_RW, &debug_kld, 0,
@@ -155,7 +183,7 @@ __elfN(dump_thread)(struct thread *td, void *dst, size_t *off)
 }
 
 /*
- * Following 4 functions are used to manupilate bits on 32bit interger value.
+ * Following 4 functions are used to manipulate bits on 32bit integer value.
  * FIXME: I implemetend for ease-to-understand rather than for well-optimized.
  */
 static uint32_t

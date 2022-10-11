@@ -303,13 +303,10 @@ static driver_t fxp_driver = {
 	sizeof(struct fxp_softc),
 };
 
-static devclass_t fxp_devclass;
-
-DRIVER_MODULE_ORDERED(fxp, pci, fxp_driver, fxp_devclass, NULL, NULL,
-    SI_ORDER_ANY);
+DRIVER_MODULE_ORDERED(fxp, pci, fxp_driver, NULL, NULL, SI_ORDER_ANY);
 MODULE_PNP_INFO("U16:vendor;U16:device", pci, fxp, fxp_ident_table,
     nitems(fxp_ident_table) - 1);
-DRIVER_MODULE(miibus, fxp, miibus_driver, miibus_devclass, NULL, NULL);
+DRIVER_MODULE(miibus, fxp, miibus_driver, NULL, NULL);
 
 static struct resource_spec fxp_res_spec_mem[] = {
 	{ SYS_RES_MEMORY,	FXP_PCI_MMBA,	RF_ACTIVE },
@@ -667,8 +664,7 @@ fxp_attach(device_t dev)
 	error = bus_dma_tag_create(bus_get_dma_tag(dev), 2, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
 	    sc->maxsegsize * sc->maxtxseg + sizeof(struct ether_vlan_header),
-	    sc->maxtxseg, sc->maxsegsize, 0,
-	    busdma_lock_mutex, &Giant, &sc->fxp_txmtag);
+	    sc->maxtxseg, sc->maxsegsize, 0, NULL, NULL, &sc->fxp_txmtag);
 	if (error) {
 		device_printf(dev, "could not create TX DMA tag\n");
 		goto fail;
@@ -676,8 +672,7 @@ fxp_attach(device_t dev)
 
 	error = bus_dma_tag_create(bus_get_dma_tag(dev), 2, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
-	    MCLBYTES, 1, MCLBYTES, 0,
-	    busdma_lock_mutex, &Giant, &sc->fxp_rxmtag);
+	    MCLBYTES, 1, MCLBYTES, 0, NULL, NULL, &sc->fxp_rxmtag);
 	if (error) {
 		device_printf(dev, "could not create RX DMA tag\n");
 		goto fail;
@@ -686,7 +681,7 @@ fxp_attach(device_t dev)
 	error = bus_dma_tag_create(bus_get_dma_tag(dev), 4, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
 	    sizeof(struct fxp_stats), 1, sizeof(struct fxp_stats), 0,
-	    busdma_lock_mutex, &Giant, &sc->fxp_stag);
+	    NULL, NULL, &sc->fxp_stag);
 	if (error) {
 		device_printf(dev, "could not create stats DMA tag\n");
 		goto fail;
@@ -708,8 +703,7 @@ fxp_attach(device_t dev)
 
 	error = bus_dma_tag_create(bus_get_dma_tag(dev), 4, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
-	    FXP_TXCB_SZ, 1, FXP_TXCB_SZ, 0,
-	    busdma_lock_mutex, &Giant, &sc->cbl_tag);
+	    FXP_TXCB_SZ, 1, FXP_TXCB_SZ, 0, NULL, NULL, &sc->cbl_tag);
 	if (error) {
 		device_printf(dev, "could not create TxCB DMA tag\n");
 		goto fail;
@@ -733,7 +727,7 @@ fxp_attach(device_t dev)
 	error = bus_dma_tag_create(bus_get_dma_tag(dev), 4, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
 	    sizeof(struct fxp_cb_mcs), 1, sizeof(struct fxp_cb_mcs), 0,
-	    busdma_lock_mutex, &Giant, &sc->mcs_tag);
+	    NULL, NULL, &sc->mcs_tag);
 	if (error) {
 		device_printf(dev,
 		    "could not create multicast setup DMA tag\n");
@@ -1408,7 +1402,6 @@ fxp_start_body(if_t ifp)
 static int
 fxp_encap(struct fxp_softc *sc, struct mbuf **m_head)
 {
-	if_t ifp;
 	struct mbuf *m;
 	struct fxp_tx *txp;
 	struct fxp_cb_tx *cbp;
@@ -1417,7 +1410,6 @@ fxp_encap(struct fxp_softc *sc, struct mbuf **m_head)
 	int error, i, nseg, tcp_payload;
 
 	FXP_LOCK_ASSERT(sc, MA_OWNED);
-	ifp = sc->ifp;
 
 	tcp_payload = 0;
 	tcp = NULL;
@@ -3154,11 +3146,11 @@ fxp_sysctl_node(struct fxp_softc *sc)
 	child = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
 
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "int_delay",
-	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
 	    &sc->tunable_int_delay, 0, sysctl_hw_fxp_int_delay, "I",
 	    "FXP driver receive interrupt microcode bundling delay");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "bundle_max",
-	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
 	    &sc->tunable_bundle_max, 0, sysctl_hw_fxp_bundle_max, "I",
 	    "FXP driver receive interrupt microcode bundle size limit");
 	SYSCTL_ADD_INT(ctx, child,OID_AUTO, "rnr", CTLFLAG_RD, &sc->rnr, 0,

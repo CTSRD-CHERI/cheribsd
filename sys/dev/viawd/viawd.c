@@ -58,8 +58,6 @@ static struct viawd_device viawd_devices[] = {
 	{ 0, NULL },
 };
 
-static devclass_t viawd_devclass;
-
 static void
 viawd_tmr_state(struct viawd_softc *sc, int enable)
 {
@@ -226,7 +224,7 @@ viawd_detach(device_t dev)
 		viawd_tmr_set(sc, VIAWD_TIMEOUT_SHUTDOWN);
 		viawd_tmr_state(sc, 1);
 		device_printf(dev,
-		    "Keeping watchog alive during shutdown for %d seconds\n",
+		    "Keeping watchdog alive during shutdown for %d seconds\n",
 		    VIAWD_TIMEOUT_SHUTDOWN);
 	}
 
@@ -252,4 +250,4 @@ static driver_t viawd_driver = {
 	sizeof(struct viawd_softc),
 };
 
-DRIVER_MODULE(viawd, isab, viawd_driver, viawd_devclass, NULL, NULL);
+DRIVER_MODULE(viawd, isab, viawd_driver, NULL, NULL);

@@ -85,9 +85,7 @@ static driver_t	powermac_nvram_driver = {
 	sizeof(struct powermac_nvram_softc)
 };
 
-static devclass_t powermac_nvram_devclass;
-
-DRIVER_MODULE(powermac_nvram, ofwbus, powermac_nvram_driver, powermac_nvram_devclass, 0, 0);
+DRIVER_MODULE(powermac_nvram, ofwbus, powermac_nvram_driver, 0, 0);
 
 /*
  * Cdev methods.
@@ -218,7 +216,7 @@ powermac_nvram_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 	sc->sc_rpos = sc->sc_wpos = 0;
 	sx_xunlock(&sc->sc_lock);
 
-	return 0;
+	return (err);
 }
 
 static int

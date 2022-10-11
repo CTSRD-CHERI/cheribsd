@@ -227,6 +227,7 @@ CRUNCH_LIBS+=	-lbz2
 CRUNCH_PROGS_usr.bin+= \
 		awk \
 		basename \
+		bintrans \
 		bmake \
 		bzip2 \
 		cpuset \
@@ -272,14 +273,15 @@ CRUNCH_PROGS_usr.bin+= \
 		true \
 		truss \
 		uname \
-		uudecode \
-		uuencode \
 		vmstat \
 		w \
 		wall \
 		which \
 		xargs
 
+CRUNCH_BUILDTOOLS+=	usr.bin/awk
+
+CRUNCH_ALIAS_bintrans=	uuencode b64encode uudecode b64decode base64
 CRUNCH_ALIAS_bmake=	make
 CRUNCH_ALIAS_bzip2=	bunzip2
 CRUNCH_ALIAS_tar=	bsdtar
@@ -321,7 +323,9 @@ LINKS=	${BINDIR}/alias ${BINDIR}/bg \
 
 .if ${MK_VI} != "no"
 # let's see if vi also works
+CRUNCH_BUILDTOOLS+=	usr.bin/vi/catalog
 CRUNCH_PROGS_usr.bin+= vi
+CRUNCH_LIBS+= -lncursesw_real
 .endif
 
 CRUNCH_ALIAS_id= groups whoami
@@ -373,13 +377,8 @@ CRUNCH_ALIAS_nmtree= mtree
 # It seems like ${LIBNETBSD} works:
 CRUNCH_LIBS+=	${LIBNETBSD}
 
-# usr/sbin/de4ctl
-# usr/sbin/flashit
 # usr/sbin/vipw
 
-# TODO: ctsrd/usr.sbin/mtlctl?
-
-# TODO: do we need ctsrd/bin/wr?
 
 
 

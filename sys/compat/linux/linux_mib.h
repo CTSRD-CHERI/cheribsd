@@ -58,9 +58,10 @@ int	linux_kernver(struct thread *td);
 #define	LINUX_VERSION_STR	LINUX_XKERNVERSTR(LINUX_KVERSION.LINUX_KPATCHLEVEL.LINUX_KSUBLEVEL)
 
 #define	LINUX_KERNVER_2004000	LINUX_KERNVER(2,4,0)
-#define	LINUX_KERNVER_2006000	LINUX_KERNVER(2,6,0)
+#define	LINUX_KERNVER_2006039	LINUX_KERNVER(2,6,39)
+#define	LINUX_KERNVER_5004000	LINUX_KERNVER(5,4,0)
 
-#define	linux_use26(t)		(linux_kernver(t) >= LINUX_KERNVER_2006000)
+#define	linux_use54(t)		(linux_kernver(t) >= LINUX_KERNVER_5004000)
 
 extern int linux_debug;
 extern int linux_default_openfiles;
@@ -69,5 +70,8 @@ extern int linux_dummy_rlimits;
 extern int linux_ignore_ip_recverr;
 extern int linux_preserve_vstatus;
 extern bool linux_map_sched_prio;
+
+struct image_params;
+int linux_setid_allowed_query(struct thread *td, struct image_params *imgp);
 
 #endif /* _LINUX_MIB_H_ */

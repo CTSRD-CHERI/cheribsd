@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd March 21, 2021
+.Dd July 7, 2022
 .Dt RC.CONF 5
 .Os
 .Sh NAME
@@ -87,14 +87,14 @@ which will be included by the
 function.
 For jail configurations you could use the file
 .Pa /etc/rc.conf.d/jail
-to store jail specific configuration options.
+to store jail-specific configuration options.
 If
 .Va local_startup
 contains
 .Pa /usr/local/etc/rc.d
 and
 .Pa /opt/conf ,
-.Pa /usr/local/rc.conf.d/jail
+.Pa /usr/local/etc/rc.conf.d/jail
 and
 .Pa /opt/conf/rc.conf.d/jail
 will be loaded.
@@ -192,24 +192,56 @@ services are enabled that utilize the force_depend check.
 .Pq Vt str
 .Xr chroot 8
 to this directory before running the service.
-.It Ao Ar name Ac Ns Va _user
-.Pq Vt str
-Run the service under this user account.
-.It Ao Ar name Ac Ns Va _group
-.Pq Vt str
-Run the chrooted service under this system group.
-Unlike the _user
-setting, this setting has no effect if the service is not chrooted.
 .It Ao Ar name Ac Ns Va _fib
 .Pq Vt int
 The
 .Xr setfib 1
 value to run the service under.
+.It Ao Ar name Ac Ns Va _group
+.Pq Vt str
+Run the chrooted service under this system group.
+Unlike the
+.Ao Ar name Ac Ns Va _user
+setting, this setting has no effect if the service is not chrooted.
+.It Ao Ar name Ac Ns Va _limits
+.Pq Vt str
+Resource limits to apply to the service using
+.Xr limits 1 .
+By default, resource limits are based on the login class defined in
+.Ao Ar name Ac Ns Va _login_class .
+.It Ao Ar name Ac Ns Va _login_class
+.Pq Vt str
+Login class to be used with
+.Ao Ar name Ac Ns Va _limits .
+Defaults to
+.Dq Li daemon .
 .It Ao Ar name Ac Ns Va _nice
 .Pq Vt int
 The
 .Xr nice 1
 value to run the service under.
+.It Ao Ar name Ac Ns Va _oomprotect
+.Pq Vt str
+Use
+.Xr protect 1
+to prevent the service from being killed when swap space
+is exhausted.
+Use
+.Dq Li YES
+to protect only the service itself, and
+.Dq Li ALL
+to protect the service and all its child processes.
+.Pp
+Please note that rc scripts which redefine
+.Dl ${argument}_cmd
+.Pq see Xr rc.subr 8
+such as PostgreSQL will not inherit the OOM killer protection.
+.Pp
+This variable has no effect on services running within a
+.Xr jail 8 .
+.It Ao Ar name Ac Ns Va _user
+.Pq Vt str
+Run the service under this user account.
 .It Va apm_enable
 .Pq Vt bool
 If set to
@@ -257,8 +289,22 @@ If set to
 .Dq Li NO ,
 disable auto-loading of kernel modules with
 .Xr devmatch 8 .
+.It Va devmatch_blocklist
+.Pq Vt str
+A whitespace-separated list of kernel modules to be ignored by
+.Xr devmatch 8 .
+In addition, the
+.Xr kenv 1
+.Va devmatch_blocklist
+is appended to this variable to allow disabling of
+.Xr devmatch 8
+loaded modules from the boot loader.
 .It Va devmatch_blacklist
 .Pq Vt str
+This variable is deprecated.
+Use
+.Va devmatch_blocklist
+instead.
 A whitespace-separated list of kernel modules to be ignored by
 .Xr devmatch 8 .
 .It Va kld_list
@@ -988,6 +1034,42 @@ is set to
 these flags are passed to the
 .Xr pfctl 8
 program when loading the ruleset.
+.It Va pf_fallback_rules_enable
+.Pq Vt bool
+Set to
+.Dq Li NO
+by default.
+Setting this to
+.Dq Li YES
+enables loading
+.Va pf_fallback_rules_file
+or
+.Va pf_fallback_rules
+in case of a problem when loading the ruleset in
+.Va pf_rules .
+.It Va pf_fallback_rules_file
+.Pq Vt str
+Path to a pf ruleset to load in case of failure when loading the
+ruleset in
+.Va pf_rules
+(default
+.Pa /etc/pf-fallback.conf ) .
+.It Va pf_fallback_rules
+.Pq Vt str
+A pf ruleset to load in case of failure when loading the ruleset in
+.Va pf_rules
+and
+.Va pf_fallback_rules_file
+is not found.
+Multiple rules can be set as follows:
+.Bd -literal
+pf_fallback_rules="\\
+	block drop log all\\
+	pass in quick on em0"
+.Pp
+.Ed
+The default fallback rule is
+.Dq block drop log all
 .It Va pflog_enable
 .Pq Vt bool
 Set to
@@ -1383,7 +1465,7 @@ ifconfig_em0_aliases="\\
 It also supports CIDR notation.
 .Pp
 If the
-.Pa /etc/start_if. Ns Aq Ar interface
+.Pa /etc/start_if . Ns Aq Ar interface
 file is present, it is read and executed by the
 .Xr sh 1
 interpreter
@@ -1509,7 +1591,7 @@ will use the settings from
 Finally, you can add
 .Xr ifconfig 8
 options in this variable, in addition to the
-.Pa /etc/start_if. Ns Aq Ar interface
+.Pa /etc/start_if . Ns Aq Ar interface
 file.
 For instance, to configure an
 .Xr ath 4
@@ -1879,16 +1961,16 @@ The value of this variable is used to configure the link layer of the
 tunnel using the
 .Cm tunnel
 option to
-.Xr ifconfig .
+.Xr ifconfig 8 .
 Additionally, this option ensures that each listed interface is created
 via the
 .Cm create
 option to
-.Xr ifconfig
+.Xr ifconfig 8
 before attempting to configure it.
 .Pp
 For example, configure two
-.Xr gif
+.Xr gif 4
 interfaces with:
 .Bd -literal
 gif_interfaces="gif0 gif1"
@@ -1897,21 +1979,6 @@ ifconfig_gif0="inet 10.0.0.1 10.0.0.2 netmask 255.255.255.252"
 gifconfig_gif1="inet6 2a00::1 2a01::1"
 ifconfig_gif1="inet 10.1.0.1 10.1.0.2 netmask 255.255.255.252"
 .Ed
-.It Va sppp_interfaces
-.Pq Vt str
-Set to the list of
-.Xr sppp 4
-interfaces to configure on this host.
-A
-.Va spppconfig_ Ns Aq Ar interface
-variable is assumed to exist for each value of
-.Ar interface .
-Each interface should also be configured by a general
-.Va ifconfig_ Ns Aq Ar interface
-setting.
-Refer to
-.Xr spppcontrol 8
-for more information about available options.
 .It Va ppp_enable
 .Pq Vt bool
 If set to
@@ -2003,6 +2070,12 @@ If set to
 .Pa /etc/rc.d/zfs
 will attempt to automatically mount ZFS file systems and initialize ZFS volumes
 (ZVOLs).
+.It Va zpool_reguid
+.Pq Vt str
+A space-separated list of ZFS pool names for which new pool GUIDs should be
+assigned upon first boot.
+This is useful when using a ZFS pool copied from a template, such as a virtual
+machine image.
 .It Va gptboot_enable
 .Pq Vt bool
 If set to
@@ -2308,39 +2381,6 @@ If
 is set to
 .Dq Li YES ,
 these are the flags to pass to it.
-.It Va amd_enable
-.Pq Vt bool
-If set to
-.Dq Li YES ,
-run the
-.Xr amd 8
-daemon at boot time.
-.It Va amd_flags
-.Pq Vt str
-If
-.Va amd_enable
-is set to
-.Dq Li YES ,
-these are the flags to pass to it.
-See the
-.Xr amd 8
-manpage for more information.
-.It Va amd_map_program
-.Pq Vt str
-If set,
-the specified program is run to get the list of
-.Xr amd 8
-maps.
-For example, if the
-.Xr amd 8
-maps are stored in NIS, one can set this to
-run
-.Xr ypcat 1
-to get a list of
-.Xr amd 8
-maps from the
-.Pa amd.master
-NIS map.
 .It Va update_motd
 .Pq Vt bool
 If set to
@@ -2352,6 +2392,14 @@ If set to
 .Dq Li NO ,
 .Pa /etc/motd
 will not be updated.
+.It Va motd_perf_warnings
+If set to
+.Dq Li YES
+along with
+.Va update_motd
+add warnings about performance impacting kernel and world options
+to the bottom of
+.Pa /etc/motd .
 .It Va nfs_client_enable
 .Pq Vt bool
 If set to
@@ -2392,9 +2440,40 @@ is set to
 .Dq Li YES
 and
 .Va nfsv4_server_enable
-are set to
+is set to
 .Dq Li YES ,
 enable the server for NFSv4 as well as NFSv2 and NFSv3.
+.It Va nfsv4_server_only
+.Pq Vt bool
+If
+.Va nfs_server_enable
+is set to
+.Dq Li YES
+and
+.Va nfsv4_server_only
+is set to
+.Dq Li YES ,
+enable the NFS server for NFSv4 only.
+.It Va nfs_server_maxio
+.Pq Vt int
+value to set vfs.nfsd.srvmaxio to, which is the
+maximum I/O size for the NFS server.
+.It Va tlsclntd_enable
+.Pq Vt bool
+If set to
+.Dq Li YES ,
+run the
+.Xr rpc.tlsclntd 8
+daemon, which is needed for NFS-over-TLS NFS mounts.
+.It Va tlsservd_enable
+.Pq Vt bool
+If set to
+.Dq Li YES ,
+run the
+.Xr rpc.tlsservd 8
+daemon, which is needed for the
+.Xr nfsd 8
+to support NFS-over-TLS NFS mounts.
 .It Va nfsuserd_enable
 .Pq Vt bool
 If
@@ -2574,29 +2653,6 @@ This is mandatory when
 .Va pppoed_enable
 is set to
 .Dq Li YES .
-.It Va timed_enable
-.Pq Vt bool
-If set to
-.Dq Li YES ,
-run the
-.Xr timed 8
-service at boot time.
-This command is intended for networks of
-machines where a consistent
-.Dq "network time"
-for all hosts must be established.
-This is often useful in large NFS
-environments where time stamps on files are expected to be consistent
-network-wide.
-.It Va timed_flags
-.Pq Vt str
-If
-.Va timed_enable
-is set to
-.Dq Li YES ,
-these are the flags to pass to the
-.Xr timed 8
-service.
 .It Va ntpdate_enable
 .Pq Vt bool
 If set to
@@ -2818,10 +2874,19 @@ If not set to
 create a default route to this host name or IP address
 (use an IP address if this router is also required to get to the
 name server!).
+.It Va defaultrouter_fibN
+.Pq Vt str
+If not set to
+.Dq Li NO ,
+create a default route in FIB N to this host name or IP address.
 .It Va ipv6_defaultrouter
 .Pq Vt str
 The IPv6 equivalent of
 .Va defaultrouter .
+.It Va ipv6_defaultrouter_fibN
+.Pq Vt str
+The IPv6 equivalent of
+.Va defaultrouter_fibN .
 .It Va static_arp_pairs
 .Pq Vt str
 Set to the list of static ARP pairs that are to be added at system
@@ -3853,6 +3918,13 @@ The configuration filename used by
 utility.
 The default value is
 .Pa /etc/jail.conf .
+.Pa /etc/jail.  Ns Ao Ar jname Ac Ns Va .conf
+and
+.Pa /etc/jail.conf.d/ Ns Ao Ar jname Ac Ns Va .conf
+will also be used if
+.Va Ao Ar jname Ac Va
+is set in
+.Va jail_list .
 .It Va jail_parallel_start
 .Pq Vt bool
 If set to
@@ -3902,7 +3974,7 @@ For backward compatibility,
 when per-jail configuration variables are defined,
 .Xr jail 8
 configuration files are created as
-.Pa /var/run/jail. Ns Ao Ar jname Ac Ns Pa .conf
+.Pa /var/run/jail . Ns Ao Ar jname Ac Ns Pa .conf
 and used.
 .Pp
 The following per-jail parameters are handled by
@@ -3932,7 +4004,7 @@ set from
 set from
 .Va jail_ Ns Ao Ar jname Ac Ns Va _consolelog .
 The default value is
-.Pa /var/log/jail_ Ao Ar jname Ac Pa _console.log .
+.Pa /var/log/jail_ Ns Ao Ar jname Ac Ns Pa _console.log .
 .It Li interface
 set from
 .Va jail_ Ns Ao Ar jname Ac Ns Va _interface .
@@ -4586,20 +4658,46 @@ If set to
 .Dq Li YES ,
 and a boot environment marked bootonce is successfully booted,
 it will be made permanently active.
+.It Va zfskeys_enable
+.Pq Vt bool
+If set to
+.Dq Li YES ,
+enable auto-loading of encryption keys for encrypted ZFS datasets.
+For every dataset the script will first load the appropriate encryption key
+and then attempt to unlock the dataset.
+.Pp
+The script operates only on datasets which are encrypted with
+ZFS native encryption
+and have a ZFS
+.Dq Li keylocation
+dataset property beginning with
+.Dq Li file:// .
+.It Va zfskeys_datasets
+.Pq Vt str
+A whitespace-separated list of ZFS datasets to unlock.
+The list is empty by default,
+which means that the script will attempt to unlock all datasets.
+.It Va zfskeys_timeout
+.Pq Vt int
+Define the total number of seconds to wait for the zfskeys script
+to unlock an encrypted dataset.
+The default is 10.
 .El
 .Sh FILES
-.Bl -tag -width ".Pa /etc/defaults/rc.conf" -compact
+.Bl -tag -width "/etc/defaults/rc.conf" -compact
 .It Pa /etc/defaults/rc.conf
 .It Pa /etc/defaults/vendor.conf
 .It Pa /etc/rc.conf
 .It Pa /etc/rc.conf.local
+.It Pa /etc/rc.conf.d/
 .El
 .Sh SEE ALSO
 .Xr chmod 1 ,
 .Xr gdb 1 ,
 .Xr info 1 ,
 .Xr kbdcontrol 1 ,
-.Xr makewhatis 1 ,
+.Xr limits 1 ,
+.Xr protect 1 ,
 .Xr sh 1 ,
 .Xr vi 1 ,
 .Xr vidcontrol 1 ,
@@ -4621,12 +4719,15 @@ it will be made permanently active.
 .Xr ipnat 5 ,
 .Xr jail.conf 5 ,
 .Xr loader.conf 5 ,
+.Xr login.conf 5 ,
 .Xr motd 5 ,
 .Xr newsyslog.conf 5 ,
 .Xr pf.conf 5 ,
+.Xr firewall 7 ,
+.Xr growfs 7 ,
 .Xr security 7 ,
+.Xr tuning 7 ,
 .Xr accton 8 ,
-.Xr amd 8 ,
 .Xr apm 8 ,
 .Xr bsdinstall 8 ,
 .Xr bthidd 8 ,
@@ -4648,6 +4749,7 @@ it will be made permanently active.
 .Xr kldxref 8 ,
 .Xr loader 8 ,
 .Xr lpd 8 ,
+.Xr makewhatis 8 ,
 .Xr mdconfig 8 ,
 .Xr mdmfs 8 ,
 .Xr mixer 8 ,
@@ -4666,12 +4768,15 @@ it will be made permanently active.
 .Xr quotaon 8 ,
 .Xr rc 8 ,
 .Xr rc.sendmail 8 ,
+.Xr rc.subr 8 ,
 .Xr rcorder 8 ,
 .Xr rfcomm_pppd 8 ,
 .Xr route 8 ,
 .Xr routed 8 ,
 .Xr rpc.lockd 8 ,
 .Xr rpc.statd 8 ,
+.Xr rpc.tlsclntd 8 ,
+.Xr rpc.tlsservd 8 ,
 .Xr rpcbind 8 ,
 .Xr rwhod 8 ,
 .Xr savecore 8 ,
@@ -4682,7 +4787,6 @@ it will be made permanently active.
 .Xr sysctl 8 ,
 .Xr syslogd 8 ,
 .Xr sysrc 8 ,
-.Xr timed 8 ,
 .Xr unbound 8 ,
 .Xr usbconfig 8 ,
 .Xr wlandebug 8 ,

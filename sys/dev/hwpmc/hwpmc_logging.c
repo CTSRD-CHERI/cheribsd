@@ -86,7 +86,7 @@ SYSCTL_INT(_kern_hwpmc, OID_AUTO, logbuffersize, CTLFLAG_RDTUN,
     &pmclog_buffer_size, 0, "size of log buffers in kilobytes");
 
 /*
- * kern.hwpmc.nbuffer -- number of global log buffers
+ * kern.hwpmc.nbuffers_pcpu -- number of global log buffers
  */
 
 static int pmc_nlogbuffers_pcpu = PMC_NLOGBUFFERS_PCPU;
@@ -550,7 +550,7 @@ pmclog_release(struct pmc_owner *po)
 static uint32_t *
 pmclog_reserve(struct pmc_owner *po, int length)
 {
-	uintptr_t newptr, oldptr;
+	uintptr_t newptr, oldptr __diagused;
 	struct pmclog_buffer *plb, **pplb;
 
 	PMCDBG2(LOG,ALL,1, "po=%p len=%d", po, length);
@@ -693,7 +693,6 @@ pmclog_configure_log(struct pmc_mdep *md, struct pmc_owner *po, int logfd)
 {
 	struct proc *p;
 	struct timespec ts;
-	uint64_t tsc;
 	int error;
 
 	sx_assert(&pmc_sx, SA_XLOCKED);
@@ -722,7 +721,6 @@ pmclog_configure_log(struct pmc_mdep *md, struct pmc_owner *po, int logfd)
 	p->p_flag |= P_HWPMC;
 	PROC_UNLOCK(p);
 	nanotime(&ts);
-	tsc = pmc_rdtsc();
 	/* create a log initialization entry */
 	PMCLOG_RESERVE_WITH_ERROR(po, INITIALIZE,
 	    sizeof(struct pmclog_initialize));
@@ -766,6 +764,7 @@ pmclog_deconfigure_log(struct pmc_owner *po)
 {
 	int error;
 	struct pmclog_buffer *lb;
+	struct pmc_binding pb;
 
 	PMCDBG1(LOG,CFG,1, "de-config po=%p", po);
 
@@ -789,19 +788,16 @@ pmclog_deconfigure_log(struct pmc_owner *po)
 		PMCLOG_RESET_BUFFER_DESCRIPTOR(lb);
 		pmc_plb_rele(lb);
 	}
+	pmc_save_cpu_binding(&pb);
 	for (int i = 0; i < mp_ncpus; i++) {
-		thread_lock(curthread);
-		sched_bind(curthread, i);
-		thread_unlock(curthread);
+		pmc_select_cpu(i);
 		/* return the 'current' buffer to the global pool */
 		if ((lb = po->po_curbuf[curcpu]) != NULL) {
 			PMCLOG_RESET_BUFFER_DESCRIPTOR(lb);
 			pmc_plb_rele(lb);
 		}
 	}
-	thread_lock(curthread);
-	sched_unbind(curthread);
-	thread_unlock(curthread);
+	pmc_restore_cpu_binding(&pb);
 
 	/* drop a reference to the fd */
 	if (po->po_file != NULL) {
@@ -871,18 +867,17 @@ pmclog_schedule_one_cond(struct pmc_owner *po)
 static void
 pmclog_schedule_all(struct pmc_owner *po)
 {
+	struct pmc_binding pb;
+
 	/*
 	 * Schedule the current buffer if any and not empty.
 	 */
+	pmc_save_cpu_binding(&pb);
 	for (int i = 0; i < mp_ncpus; i++) {
-		thread_lock(curthread);
-		sched_bind(curthread, i);
-		thread_unlock(curthread);
+		pmc_select_cpu(i);
 		pmclog_schedule_one_cond(po);
 	}
-	thread_lock(curthread);
-	sched_unbind(curthread);
-	thread_unlock(curthread);
+	pmc_restore_cpu_binding(&pb);
 }
 
 int
@@ -924,7 +919,7 @@ pmclog_process_callchain(struct pmc *pm, struct pmc_sample *ps)
 	    ps->ps_nsamples);
 
 	recordlen = offsetof(struct pmclog_callchain, pl_pc) +
-	    ps->ps_nsamples * sizeof(uintfptr_t);
+	    ps->ps_nsamples * sizeof(ptraddr_t);
 	po = pm->pm_owner;
 	flags = PMC_CALLCHAIN_TO_CPUFLAGS(ps->ps_cpu,ps->ps_flags);
 	PMCLOG_RESERVE_SAFE(po, CALLCHAIN, recordlen, ps->ps_tsc);
@@ -1230,7 +1225,7 @@ pmclog_process_userlog(struct pmc_owner *po, struct pmc_op_writelog *wl)
  */
 
 void
-pmclog_initialize()
+pmclog_initialize(void)
 {
 	struct pmclog_buffer *plb;
 	int domain, ncpus, total;
@@ -1279,7 +1274,7 @@ pmclog_initialize()
  */
 
 void
-pmclog_shutdown()
+pmclog_shutdown(void)
 {
 	struct pmclog_buffer *plb;
 	int domain;

@@ -39,6 +39,8 @@ __FBSDID("$FreeBSD$");
 
 #define	MAXARGS	20			/* maximum number of arguments allowed */
 
+const char * volatile	interp_identifier;
+
 /*
  * Interactive mode
  */
@@ -46,7 +48,8 @@ void
 interact(void)
 {
 	static char		input[256];		/* big enough? */
-	const char * volatile	interp_identifier;
+
+	TSENTER();
 
 	/*
 	 * Because interp_identifier is volatile, it cannot be optimized out by

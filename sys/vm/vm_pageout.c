@@ -148,41 +148,43 @@ SDT_PROBE_DEFINE(vm, , , vm__lowmem_scan);
 #define	VM_LAUNDER_RATE		10
 #define	VM_INACT_SCAN_RATE	10
 
-static int vm_pageout_oom_seq = 12;
-
-static int vm_pageout_update_period;
-static int disable_swap_pageouts;
-static int lowmem_period = 10;
 static int swapdev_enabled;
+int vm_pageout_page_count = 32;
 
 static int vm_panic_on_oom = 0;
-
 SYSCTL_INT(_vm, OID_AUTO, panic_on_oom,
-	CTLFLAG_RWTUN, &vm_panic_on_oom, 0,
-	"Panic on the given number of out-of-memory errors instead of killing the largest process");
+    CTLFLAG_RWTUN, &vm_panic_on_oom, 0,
+    "Panic on the given number of out-of-memory errors instead of "
+    "killing the largest process");
 
+static int vm_pageout_update_period;
 SYSCTL_INT(_vm, OID_AUTO, pageout_update_period,
-	CTLFLAG_RWTUN, &vm_pageout_update_period, 0,
-	"Maximum active LRU update period");
+    CTLFLAG_RWTUN, &vm_pageout_update_period, 0,
+    "Maximum active LRU update period");
 
 static int pageout_cpus_per_thread = 16;
 SYSCTL_INT(_vm, OID_AUTO, pageout_cpus_per_thread, CTLFLAG_RDTUN,
     &pageout_cpus_per_thread, 0,
     "Number of CPUs per pagedaemon worker thread");
   
+static int lowmem_period = 10;
 SYSCTL_INT(_vm, OID_AUTO, lowmem_period, CTLFLAG_RWTUN, &lowmem_period, 0,
-	"Low memory callback period");
+    "Low memory callback period");
 
+static int disable_swap_pageouts;
 SYSCTL_INT(_vm, OID_AUTO, disable_swapspace_pageouts,
-	CTLFLAG_RWTUN, &disable_swap_pageouts, 0, "Disallow swapout of dirty pages");
+    CTLFLAG_RWTUN, &disable_swap_pageouts, 0,
+    "Disallow swapout of dirty pages");
 
 static int pageout_lock_miss;
 SYSCTL_INT(_vm, OID_AUTO, pageout_lock_miss,
-	CTLFLAG_RD, &pageout_lock_miss, 0, "vget() lock misses during pageout");
+    CTLFLAG_RD, &pageout_lock_miss, 0,
+    "vget() lock misses during pageout");
 
+static int vm_pageout_oom_seq = 12;
 SYSCTL_INT(_vm, OID_AUTO, pageout_oom_seq,
-	CTLFLAG_RWTUN, &vm_pageout_oom_seq, 0,
-	"back-to-back calls to oom detector to start OOM");
+    CTLFLAG_RWTUN, &vm_pageout_oom_seq, 0,
+    "back-to-back calls to oom detector to start OOM");
 
 static int act_scan_laundry_weight = 3;
 SYSCTL_INT(_vm, OID_AUTO, act_scan_laundry_weight, CTLFLAG_RWTUN,
@@ -196,9 +198,8 @@ SYSCTL_UINT(_vm, OID_AUTO, background_launder_rate, CTLFLAG_RWTUN,
 
 static u_int vm_background_launder_max = 20 * 1024;
 SYSCTL_UINT(_vm, OID_AUTO, background_launder_max, CTLFLAG_RWTUN,
-    &vm_background_launder_max, 0, "background laundering cap, in kilobytes");
-
-int vm_pageout_page_count = 32;
+    &vm_background_launder_max, 0,
+    "background laundering cap, in kilobytes");
 
 u_long vm_page_max_user_wired;
 SYSCTL_ULONG(_vm, OID_AUTO, max_user_wired, CTLFLAG_RW,
@@ -539,13 +540,13 @@ vm_pageout_flush(vm_page_t *mc, int count, int flags, int mreq, int *prunlen,
 			 * the PQ_UNSWAPPABLE holding queue.  This is an
 			 * optimization that prevents the page daemon from
 			 * wasting CPU cycles on pages that cannot be reclaimed
-			 * becase no swap device is configured.
+			 * because no swap device is configured.
 			 *
 			 * Otherwise, reactivate the page so that it doesn't
 			 * clog the laundry and inactive queues.  (We will try
 			 * paging it out again later.)
 			 */
-			if (object->type == OBJT_SWAP &&
+			if ((object->flags & OBJ_SWAP) != 0 &&
 			    pageout_status[i] == VM_PAGER_FAIL) {
 				vm_page_unswappable(mt);
 				numpagedout++;
@@ -606,7 +607,7 @@ vm_pageout_clean(vm_page_t m, int *numpagedout)
 	struct mount *mp;
 	vm_object_t object;
 	vm_pindex_t pindex;
-	int error, lockmode;
+	int error;
 
 	object = m->object;
 	VM_OBJECT_ASSERT_WLOCKED(object);
@@ -640,9 +641,7 @@ vm_pageout_clean(vm_page_t m, int *numpagedout)
 		vm_object_reference_locked(object);
 		pindex = m->pindex;
 		VM_OBJECT_WUNLOCK(object);
-		lockmode = MNT_SHARED_WRITES(vp->v_mount) ?
-		    LK_SHARED : LK_EXCLUSIVE;
-		if (vget(vp, lockmode | LK_TIMELOCK)) {
+		if (vget(vp, vn_lktype_write(NULL, vp) | LK_TIMELOCK) != 0) {
 			vp = NULL;
 			error = EDEADLK;
 			goto unlock_mp;
@@ -897,11 +896,8 @@ free_page:
 			vm_page_free(m);
 			VM_CNT_INC(v_dfree);
 		} else if ((object->flags & OBJ_DEAD) == 0) {
-			if (object->type != OBJT_SWAP &&
-			    object->type != OBJT_DEFAULT)
-				pageout_ok = true;
-			else if (disable_swap_pageouts)
-				pageout_ok = false;
+			if ((object->flags & OBJ_SWAP) != 0)
+				pageout_ok = disable_swap_pageouts == 0;
 			else
 				pageout_ok = true;
 			if (!pageout_ok) {
@@ -1887,14 +1883,9 @@ vm_pageout_oom_pagecount(struct vmspace *vmspace)
 		if ((entry->eflags & MAP_ENTRY_NEEDS_COPY) != 0 &&
 		    obj->ref_count != 1)
 			continue;
-		switch (obj->type) {
-		case OBJT_DEFAULT:
-		case OBJT_SWAP:
-		case OBJT_PHYS:
-		case OBJT_VNODE:
+		if (obj->type == OBJT_PHYS || obj->type == OBJT_VNODE ||
+		    (obj->flags & OBJ_SWAP) != 0)
 			res += obj->resident_page_count;
-			break;
-		}
 	}
 	return (res);
 }
@@ -1908,6 +1899,7 @@ static struct mtx vm_oom_ratelim_mtx;
 void
 vm_pageout_oom(int shortage)
 {
+	const char *reason;
 	struct proc *p, *bigproc;
 	vm_offset_t size, bigsize;
 	struct thread *td;
@@ -2020,11 +2012,25 @@ vm_pageout_oom(int shortage)
 		}
 	}
 	sx_sunlock(&allproc_lock);
+
 	if (bigproc != NULL) {
+		switch (shortage) {
+		case VM_OOM_MEM:
+			reason = "failed to reclaim memory";
+			break;
+		case VM_OOM_MEM_PF:
+			reason = "a thread waited too long to allocate a page";
+			break;
+		case VM_OOM_SWAPZ:
+			reason = "out of swap space";
+			break;
+		default:
+			panic("unknown OOM reason %d", shortage);
+		}
 		if (vm_panic_on_oom != 0 && --vm_panic_on_oom == 0)
-			panic("out of swap space");
+			panic("%s", reason);
 		PROC_LOCK(bigproc);
-		killproc(bigproc, "out of swap space");
+		killproc(bigproc, reason);
 		sched_nice(bigproc, PRIO_MIN);
 		_PRELE(bigproc);
 		PROC_UNLOCK(bigproc);

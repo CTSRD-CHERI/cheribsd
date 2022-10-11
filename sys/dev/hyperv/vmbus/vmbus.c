@@ -40,10 +40,15 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
+#include <sys/sbuf.h>
 #include <sys/smp.h>
 #include <sys/sysctl.h>
 #include <sys/systm.h>
 #include <sys/taskqueue.h>
+
+#include <vm/vm.h>
+#include <vm/vm_param.h>
+#include <vm/pmap.h>
 
 #include <machine/bus.h>
 #include <machine/intr_machdep.h>
@@ -80,8 +85,7 @@ static int			vmbus_attach(device_t);
 static int			vmbus_detach(device_t);
 static int			vmbus_read_ivar(device_t, device_t, int,
 				    uintptr_t *);
-static int			vmbus_child_pnpinfo_str(device_t, device_t,
-				    char *, size_t);
+static int			vmbus_child_pnpinfo(device_t, device_t, struct sbuf *);
 static struct resource		*vmbus_alloc_resource(device_t dev,
 				    device_t child, int type, int *rid,
 				    rman_res_t start, rman_res_t end,
@@ -139,6 +143,7 @@ SYSCTL_INT(_hw_vmbus, OID_AUTO, pin_evttask, CTLFLAG_RDTUN,
     &vmbus_pin_evttask, 0, "Pin event tasks to their respective CPU");
 
 extern inthand_t IDTVEC(vmbus_isr), IDTVEC(vmbus_isr_pti);
+#define VMBUS_ISR_ADDR	trunc_page((uintptr_t)IDTVEC(vmbus_isr_pti))
 
 uint32_t			vmbus_current_version;
 
@@ -170,7 +175,7 @@ static device_method_t vmbus_methods[] = {
 	DEVMETHOD(bus_add_child,		bus_generic_add_child),
 	DEVMETHOD(bus_print_child,		bus_generic_print_child),
 	DEVMETHOD(bus_read_ivar,		vmbus_read_ivar),
-	DEVMETHOD(bus_child_pnpinfo_str,	vmbus_child_pnpinfo_str),
+	DEVMETHOD(bus_child_pnpinfo,		vmbus_child_pnpinfo),
 	DEVMETHOD(bus_alloc_resource,		vmbus_alloc_resource),
 	DEVMETHOD(bus_release_resource,		bus_generic_release_resource),
 	DEVMETHOD(bus_activate_resource,	bus_generic_activate_resource),
@@ -203,11 +208,8 @@ static driver_t vmbus_driver = {
 	sizeof(struct vmbus_softc)
 };
 
-static devclass_t vmbus_devclass;
-
-DRIVER_MODULE(vmbus, pcib, vmbus_driver, vmbus_devclass, NULL, NULL);
-DRIVER_MODULE(vmbus, acpi_syscontainer, vmbus_driver, vmbus_devclass,
-    NULL, NULL);
+DRIVER_MODULE(vmbus, pcib, vmbus_driver, NULL, NULL);
+DRIVER_MODULE(vmbus, acpi_syscontainer, vmbus_driver, NULL, NULL);
 
 MODULE_DEPEND(vmbus, acpi, 1, 1, 1);
 MODULE_DEPEND(vmbus, pci, 1, 1, 1);
@@ -515,9 +517,9 @@ vmbus_scan_done_task(void *xsc, int pending __unused)
 {
 	struct vmbus_softc *sc = xsc;
 
-	mtx_lock(&Giant);
+	bus_topo_lock();
 	sc->vmbus_scandone = true;
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 	wakeup(&sc->vmbus_scandone);
 }
 
@@ -572,9 +574,9 @@ vmbus_scan(struct vmbus_softc *sc)
 	 * Wait for all vmbus devices from the initial channel offers to be
 	 * attached.
 	 */
-	GIANT_REQUIRED;
+	bus_topo_assert();
 	while (!sc->vmbus_scandone)
-		mtx_sleep(&sc->vmbus_scandone, &Giant, 0, "vmbusdev", 0);
+		mtx_sleep(&sc->vmbus_scandone, bus_topo_mtx(), 0, "vmbusdev", 0);
 
 	if (bootverbose) {
 		device_printf(sc->vmbus_dev, "device scan, probe and attach "
@@ -587,17 +589,17 @@ static void
 vmbus_scan_teardown(struct vmbus_softc *sc)
 {
 
-	GIANT_REQUIRED;
+	bus_topo_assert();
 	if (sc->vmbus_devtq != NULL) {
-		mtx_unlock(&Giant);
+		bus_topo_unlock();
 		taskqueue_free(sc->vmbus_devtq);
-		mtx_lock(&Giant);
+		bus_topo_lock();
 		sc->vmbus_devtq = NULL;
 	}
 	if (sc->vmbus_subchtq != NULL) {
-		mtx_unlock(&Giant);
+		bus_topo_unlock();
 		taskqueue_free(sc->vmbus_subchtq);
-		mtx_lock(&Giant);
+		bus_topo_lock();
 		sc->vmbus_subchtq = NULL;
 	}
 }
@@ -980,6 +982,10 @@ vmbus_intr_setup(struct vmbus_softc *sc)
 		    vmbus_msg_task, sc);
 	}
 
+#if defined(__amd64__) && defined(KLD_MODULE)
+	pmap_pti_add_kva(VMBUS_ISR_ADDR, VMBUS_ISR_ADDR + PAGE_SIZE, true);
+#endif
+
 	/*
 	 * All Hyper-V ISR required resources are setup, now let's find a
 	 * free IDT vector for Hyper-V ISR and set it up.
@@ -987,6 +993,9 @@ vmbus_intr_setup(struct vmbus_softc *sc)
 	sc->vmbus_idtvec = lapic_ipi_alloc(pti ? IDTVEC(vmbus_isr_pti) :
 	    IDTVEC(vmbus_isr));
 	if (sc->vmbus_idtvec < 0) {
+#if defined(__amd64__) && defined(KLD_MODULE)
+		pmap_pti_remove_kva(VMBUS_ISR_ADDR, VMBUS_ISR_ADDR + PAGE_SIZE);
+#endif
 		device_printf(sc->vmbus_dev, "cannot find free IDT vector\n");
 		return ENXIO;
 	}
@@ -1006,6 +1015,10 @@ vmbus_intr_teardown(struct vmbus_softc *sc)
 		lapic_ipi_free(sc->vmbus_idtvec);
 		sc->vmbus_idtvec = -1;
 	}
+
+#if defined(__amd64__) && defined(KLD_MODULE)
+	pmap_pti_remove_kva(VMBUS_ISR_ADDR, VMBUS_ISR_ADDR + PAGE_SIZE);
+#endif
 
 	CPU_FOREACH(cpu) {
 		if (VMBUS_PCPU_GET(sc, event_tq, cpu) != NULL) {
@@ -1028,7 +1041,7 @@ vmbus_read_ivar(device_t dev, device_t child, int index, uintptr_t *result)
 }
 
 static int
-vmbus_child_pnpinfo_str(device_t dev, device_t child, char *buf, size_t buflen)
+vmbus_child_pnpinfo(device_t dev, device_t child, struct sbuf *sb)
 {
 	const struct vmbus_channel *chan;
 	char guidbuf[HYPERV_GUID_STRLEN];
@@ -1039,13 +1052,11 @@ vmbus_child_pnpinfo_str(device_t dev, device_t child, char *buf, size_t buflen)
 		return (0);
 	}
 
-	strlcat(buf, "classid=", buflen);
 	hyperv_guid2str(&chan->ch_guid_type, guidbuf, sizeof(guidbuf));
-	strlcat(buf, guidbuf, buflen);
+	sbuf_printf(sb, "classid=%s", guidbuf);
 
-	strlcat(buf, " deviceid=", buflen);
 	hyperv_guid2str(&chan->ch_guid_inst, guidbuf, sizeof(guidbuf));
-	strlcat(buf, guidbuf, buflen);
+	sbuf_printf(sb, " deviceid=%s", guidbuf);
 
 	return (0);
 }
@@ -1056,19 +1067,18 @@ vmbus_add_child(struct vmbus_channel *chan)
 	struct vmbus_softc *sc = chan->ch_vmbus;
 	device_t parent = sc->vmbus_dev;
 
-	mtx_lock(&Giant);
-
+	bus_topo_lock();
 	chan->ch_dev = device_add_child(parent, NULL, -1);
 	if (chan->ch_dev == NULL) {
-		mtx_unlock(&Giant);
+		bus_topo_unlock();
 		device_printf(parent, "device_add_child for chan%u failed\n",
 		    chan->ch_id);
 		return (ENXIO);
 	}
 	device_set_ivars(chan->ch_dev, chan);
 	device_probe_and_attach(chan->ch_dev);
+	bus_topo_unlock();
 
-	mtx_unlock(&Giant);
 	return (0);
 }
 
@@ -1077,13 +1087,13 @@ vmbus_delete_child(struct vmbus_channel *chan)
 {
 	int error = 0;
 
-	mtx_lock(&Giant);
+	bus_topo_lock();
 	if (chan->ch_dev != NULL) {
 		error = device_delete_child(chan->ch_vmbus->vmbus_dev,
 		    chan->ch_dev);
 		chan->ch_dev = NULL;
 	}
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 	return (error);
 }
 

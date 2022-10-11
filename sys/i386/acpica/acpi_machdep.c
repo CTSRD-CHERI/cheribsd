@@ -116,7 +116,7 @@ static void *
 map_table(vm_paddr_t pa, const char *sig)
 {
 	ACPI_TABLE_HEADER *header;
-	vm_offset_t length;
+	vm_size_t length;
 	void *table;
 
 	header = pmap_mapbios(pa, sizeof(ACPI_TABLE_HEADER));
@@ -140,7 +140,7 @@ map_table(vm_paddr_t pa, const char *sig)
 
 /*
  * See if a given ACPI table is the requested table.  Returns the
- * length of the able if it matches or zero on failure.
+ * length of the table if it matches or zero on failure.
  */
 static int
 probe_table(vm_paddr_t address, const char *sig)
@@ -304,6 +304,5 @@ static device_method_t nexus_acpi_methods[] = {
 };
 
 DEFINE_CLASS_1(nexus, nexus_acpi_driver, nexus_acpi_methods, 1, nexus_driver);
-static devclass_t nexus_devclass;
 
-DRIVER_MODULE(nexus_acpi, root, nexus_acpi_driver, nexus_devclass, 0, 0);
+DRIVER_MODULE(nexus_acpi, root, nexus_acpi_driver, 0, 0);

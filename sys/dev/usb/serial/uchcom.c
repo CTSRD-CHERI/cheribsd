@@ -206,6 +206,7 @@ static const STRUCT_USB_HOST_ID uchcom_devs[] = {
 	{USB_VPI(USB_VENDOR_WCH, USB_PRODUCT_WCH_CH341SER, 0)},
 	{USB_VPI(USB_VENDOR_WCH2, USB_PRODUCT_WCH2_CH341SER, 0)},
 	{USB_VPI(USB_VENDOR_WCH2, USB_PRODUCT_WCH2_CH341SER_2, 0)},
+	{USB_VPI(USB_VENDOR_WCH2, USB_PRODUCT_WCH2_CH341SER_3, 0)},
 };
 
 /* protypes */
@@ -329,6 +330,7 @@ uchcom_attach(device_t dev)
 		device_printf(dev, "CH340 detected\n");
 		break;
 	case USB_PRODUCT_WCH2_CH341SER_2:
+	case USB_PRODUCT_WCH2_CH341SER_3:
 		device_printf(dev, "CH341 detected\n");
 		break;
 	default:
@@ -902,9 +904,7 @@ static driver_t uchcom_driver = {
 	.size = sizeof(struct uchcom_softc)
 };
 
-static devclass_t uchcom_devclass;
-
-DRIVER_MODULE(uchcom, uhub, uchcom_driver, uchcom_devclass, NULL, 0);
+DRIVER_MODULE(uchcom, uhub, uchcom_driver, NULL, NULL);
 MODULE_DEPEND(uchcom, ucom, 1, 1, 1);
 MODULE_DEPEND(uchcom, usb, 1, 1, 1);
 MODULE_VERSION(uchcom, 1);

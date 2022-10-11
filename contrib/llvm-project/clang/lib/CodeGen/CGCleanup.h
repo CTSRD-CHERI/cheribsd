@@ -23,7 +23,6 @@ namespace llvm {
 class BasicBlock;
 class Value;
 class ConstantInt;
-class AllocaInst;
 }
 
 namespace clang {
@@ -242,7 +241,7 @@ class alignas(8) EHCleanupScope : public EHScope {
 
   /// An optional i1 variable indicating whether this cleanup has been
   /// activated yet.
-  llvm::AllocaInst *ActiveFlag;
+  Address ActiveFlag;
 
   /// Extra information required for cleanups that have resolved
   /// branches through them.  This has to be allocated on the side
@@ -290,7 +289,8 @@ public:
                  EHScopeStack::stable_iterator enclosingEH)
       : EHScope(EHScope::Cleanup, enclosingEH),
         EnclosingNormal(enclosingNormal), NormalBlock(nullptr),
-        ActiveFlag(nullptr), ExtInfo(nullptr), FixupDepth(fixupDepth) {
+        ActiveFlag(Address::invalid()), ExtInfo(nullptr),
+        FixupDepth(fixupDepth) {
     CleanupBits.IsNormalCleanup = isNormal;
     CleanupBits.IsEHCleanup = isEH;
     CleanupBits.IsActive = true;
@@ -320,13 +320,13 @@ public:
   bool isLifetimeMarker() const { return CleanupBits.IsLifetimeMarker; }
   void setLifetimeMarker() { CleanupBits.IsLifetimeMarker = true; }
 
-  bool hasActiveFlag() const { return ActiveFlag != nullptr; }
+  bool hasActiveFlag() const { return ActiveFlag.isValid(); }
   Address getActiveFlag() const {
-    return Address(ActiveFlag, CharUnits::One());
+    return ActiveFlag;
   }
   void setActiveFlag(Address Var) {
     assert(Var.getAlignment().isOne());
-    ActiveFlag = cast<llvm::AllocaInst>(Var.getPointer());
+    ActiveFlag = Var;
   }
 
   void setTestFlagInNormalCleanup() {
@@ -612,6 +612,7 @@ struct EHPersonality {
   static const EHPersonality MSVC_C_specific_handler;
   static const EHPersonality MSVC_CxxFrameHandler3;
   static const EHPersonality GNU_Wasm_CPlusPlus;
+  static const EHPersonality XL_CPlusPlus;
 
   /// Does this personality use landingpads or the family of pad instructions
   /// designed to form funclets?

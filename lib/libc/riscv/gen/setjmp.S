@@ -44,7 +44,7 @@ ENTRY(setjmp)
 	csc	cra, 16(csp)
 
 	/* Store the signal mask */
-	cincoffset ca2, ca0, (_JB_SIGMASK * 8)	/* oset */
+	cincoffset ca2, ca0, (_JB_SIGMASK * 16)	/* oset */
 	li	a1, 0				/* set */
 	li	a0, 1				/* SIG_BLOCK */
 	clgc	ct0, _C_LABEL(sigprocmask)
@@ -177,7 +177,7 @@ ENTRY(longjmp)
 
 	/* Restore the signal mask */
 	li	a2, 0				/* oset */
-	cincoffset ca1, ca0, (_JB_SIGMASK * 8)	/* set */
+	cincoffset ca1, ca0, (_JB_SIGMASK * 16)	/* set */
 	li	a0, 3				/* SIG_BLOCK */
 	clgc	ct0, _C_LABEL(sigprocmask)
 	cjalr	ct0

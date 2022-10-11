@@ -201,6 +201,7 @@ struct tv32 {
 #define F_DONTFRAG	0x1000000
 #define F_NOUSERDATA	(F_NODEADDR | F_FQDN | F_FQDNOLD | F_SUPTYPES)
 #define	F_WAITTIME	0x2000000
+#define	F_DOT		0x4000000
 static u_int options;
 
 #define IN6LEN		sizeof(struct in6_addr)
@@ -227,7 +228,9 @@ static int srecv;		/* receive socket file descriptor */
 static u_char outpack[MAXPACKETLEN];
 static char BSPACE = '\b';	/* characters written for flood */
 static char BBELL = '\a';	/* characters written for AUDIBLE */
-static char DOT = '.';
+static const char *DOT = ".";
+static size_t DOTlen = 1;
+static size_t DOTidx = 0;
 static char *hostname;
 static int ident;		/* process id to identify our packets */
 static u_int8_t nonce[8];	/* nonce field for node information */
@@ -293,7 +296,11 @@ static void	 pr_rthdr(void *, size_t);
 static int	 pr_bitrange(u_int32_t, int, int);
 static void	 pr_retip(struct ip6_hdr *, u_char *);
 static void	 summary(void);
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
 static int	 setpolicy(int, char *);
+#endif
+#endif
 static char	*nigroup(char *, int);
 
 int
@@ -345,19 +352,16 @@ ping6(int argc, char *argv[])
 	alarmtimeout = preload = 0;
 	datap = &outpack[ICMP6ECHOLEN + ICMP6ECHOTMLEN];
 	capdns = capdns_setup();
-#ifndef IPSEC
-#define ADDOPTS
-#else
-#ifdef IPSEC_POLICY_IPSEC
-#define ADDOPTS	"P:"
-#else
-#define ADDOPTS	"ZE"
-#endif /*IPSEC_POLICY_IPSEC*/
-#endif
-	while ((ch = getopt(argc, argv,
-	    "6k:b:C:c:DdfHe:m:I:i:l:unNop:qaAS:s:OvyYW:t:z:" ADDOPTS)) != -1) {
-#undef ADDOPTS
+
+	while ((ch = getopt(argc, argv, PING6OPTS)) != -1) {
 		switch (ch) {
+		case '.':
+			options |= F_DOT;
+			if (optarg != NULL) {
+				DOT = optarg;
+				DOTlen = strlen(optarg);
+			}
+			break;
 		case '6':
 			/* This option is processed in main(). */
 			break;
@@ -443,6 +447,7 @@ ping6(int argc, char *argv[])
 				errx(1, "Must be superuser to flood ping");
 			}
 			options |= F_FLOOD;
+			options |= F_DOT;
 			setbuf(stdout, (char *)NULL);
 			break;
 		case 'e':
@@ -1469,8 +1474,8 @@ pinger(void)
 		(void)printf("ping6: wrote %s %d chars, ret=%d\n",
 		    hostname, cc, i);
 	}
-	if (!(options & F_QUIET) && options & F_FLOOD)
-		(void)write(STDOUT_FILENO, &DOT, 1);
+	if (!(options & F_QUIET) && options & F_DOT)
+		(void)write(STDOUT_FILENO, &DOT[DOTidx++ % DOTlen], 1);
 
 	return(0);
 }
@@ -1667,7 +1672,7 @@ pr_pack(u_char *buf, int cc, struct msghdr *mhdr)
 			return;
 		}
 
-		if (options & F_FLOOD)
+		if (options & F_DOT)
 			(void)write(STDOUT_FILENO, &BSPACE, 1);
 		else {
 			if (options & F_AUDIBLE)
@@ -1859,7 +1864,7 @@ pr_pack(u_char *buf, int cc, struct msghdr *mhdr)
 		pr_icmph(icp, end);
 	}
 
-	if (!(options & F_FLOOD)) {
+	if (!(options & F_DOT)) {
 		(void)putchar('\n');
 		if (options & F_VERBOSE)
 			pr_exthdrs(mhdr);
@@ -2667,7 +2672,9 @@ pr_retip(struct ip6_hdr *ip6, u_char *end)
 	nh = ip6->ip6_nxt;
 	cp += hlen;
 	while (end - cp >= 8) {
+#ifdef IPSEC
 		struct ah ah;
+#endif
 
 		switch (nh) {
 		case IPPROTO_HOPOPTS:

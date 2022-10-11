@@ -39,6 +39,14 @@ static const EnumEntry<uint16_t> RegisterNames_X86[] = {
 #undef CV_REGISTERS_X86
 };
 
+static const EnumEntry<uint16_t> RegisterNames_ARM[] = {
+#define CV_REGISTERS_ARM
+#define CV_REGISTER(name, val) CV_ENUM_CLASS_ENT(RegisterId, name),
+#include "llvm/DebugInfo/CodeView/CodeViewRegisters.def"
+#undef CV_REGISTER
+#undef CV_REGISTERS_ARM
+};
+
 static const EnumEntry<uint16_t> RegisterNames_ARM64[] = {
 #define CV_REGISTERS_ARM64
 #define CV_REGISTER(name, val) CV_ENUM_CLASS_ENT(RegisterId, name),
@@ -96,7 +104,7 @@ static const EnumEntry<codeview::SourceLanguage> SourceLanguages[] = {
     CV_ENUM_ENT(SourceLanguage, ILAsm),   CV_ENUM_ENT(SourceLanguage, Java),
     CV_ENUM_ENT(SourceLanguage, JScript), CV_ENUM_ENT(SourceLanguage, MSIL),
     CV_ENUM_ENT(SourceLanguage, HLSL),    CV_ENUM_ENT(SourceLanguage, D),
-    CV_ENUM_ENT(SourceLanguage, Swift),
+    CV_ENUM_ENT(SourceLanguage, Swift),   CV_ENUM_ENT(SourceLanguage, Rust),
 };
 
 static const EnumEntry<uint32_t> CompileSym2FlagNames[] = {
@@ -181,7 +189,6 @@ static const EnumEntry<unsigned> CPUTypeNames[] = {
     CV_ENUM_CLASS_ENT(CPUType, ARM_XMAC),
     CV_ENUM_CLASS_ENT(CPUType, ARM_WMMX),
     CV_ENUM_CLASS_ENT(CPUType, ARM7),
-    CV_ENUM_CLASS_ENT(CPUType, ARM64),
     CV_ENUM_CLASS_ENT(CPUType, Omni),
     CV_ENUM_CLASS_ENT(CPUType, Ia64),
     CV_ENUM_CLASS_ENT(CPUType, Ia64_2),
@@ -193,6 +200,10 @@ static const EnumEntry<unsigned> CPUTypeNames[] = {
     CV_ENUM_CLASS_ENT(CPUType, EBC),
     CV_ENUM_CLASS_ENT(CPUType, Thumb),
     CV_ENUM_CLASS_ENT(CPUType, ARMNT),
+    CV_ENUM_CLASS_ENT(CPUType, ARM64),
+    CV_ENUM_CLASS_ENT(CPUType, HybridX86ARM64),
+    CV_ENUM_CLASS_ENT(CPUType, ARM64EC),
+    CV_ENUM_CLASS_ENT(CPUType, ARM64X),
     CV_ENUM_CLASS_ENT(CPUType, D3D11_Shader),
 };
 
@@ -434,7 +445,9 @@ ArrayRef<EnumEntry<TypeLeafKind>> getTypeLeafNames() {
 }
 
 ArrayRef<EnumEntry<uint16_t>> getRegisterNames(CPUType Cpu) {
-  if (Cpu == CPUType::ARM64) {
+  if (Cpu == CPUType::ARMNT) {
+    return makeArrayRef(RegisterNames_ARM);
+  } else if (Cpu == CPUType::ARM64) {
     return makeArrayRef(RegisterNames_ARM64);
   }
   return makeArrayRef(RegisterNames_X86);

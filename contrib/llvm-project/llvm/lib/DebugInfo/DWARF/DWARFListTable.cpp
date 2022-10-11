@@ -8,6 +8,7 @@
 
 #include "llvm/DebugInfo/DWARF/DWARFListTable.h"
 #include "llvm/BinaryFormat/Dwarf.h"
+#include "llvm/DebugInfo/DWARF/DWARFContext.h"
 #include "llvm/Support/Errc.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Format.h"
@@ -54,11 +55,10 @@ Error DWARFListTableHeader::extract(DWARFDataExtractor Data,
                        "unrecognised %s table version %" PRIu16
                        " in table at offset 0x%" PRIx64,
                        SectionName.data(), HeaderData.Version, HeaderOffset);
-  if (HeaderData.AddrSize != 4 && HeaderData.AddrSize != 8)
-    return createStringError(errc::not_supported,
-                       "%s table at offset 0x%" PRIx64
-                       " has unsupported address size %" PRIu8,
-                       SectionName.data(), HeaderOffset, HeaderData.AddrSize);
+  if (Error SizeErr = DWARFContext::checkAddressSizeSupported(
+          HeaderData.AddrSize, errc::not_supported,
+          "%s table at offset 0x%" PRIx64, SectionName.data(), HeaderOffset))
+    return SizeErr;
   if (HeaderData.SegSize != 0)
     return createStringError(errc::not_supported,
                        "%s table at offset 0x%" PRIx64
@@ -71,12 +71,12 @@ Error DWARFListTableHeader::extract(DWARFDataExtractor Data,
         ") than there is space for",
         SectionName.data(), HeaderOffset, HeaderData.OffsetEntryCount);
   Data.setAddressSize(HeaderData.AddrSize);
-  for (uint32_t I = 0; I < HeaderData.OffsetEntryCount; ++I)
-    Offsets.push_back(Data.getRelocatedValue(OffsetByteSize, OffsetPtr));
+  *OffsetPtr += HeaderData.OffsetEntryCount * OffsetByteSize;
   return Error::success();
 }
 
-void DWARFListTableHeader::dump(raw_ostream &OS, DIDumpOptions DumpOpts) const {
+void DWARFListTableHeader::dump(DataExtractor Data, raw_ostream &OS,
+                                DIDumpOptions DumpOpts) const {
   if (DumpOpts.Verbose)
     OS << format("0x%8.8" PRIx64 ": ", HeaderOffset);
   int OffsetDumpWidth = 2 * dwarf::getDwarfOffsetByteSize(Format);
@@ -91,7 +91,8 @@ void DWARFListTableHeader::dump(raw_ostream &OS, DIDumpOptions DumpOpts) const {
 
   if (HeaderData.OffsetEntryCount > 0) {
     OS << "offsets: [";
-    for (const auto &Off : Offsets) {
+    for (uint32_t I = 0; I < HeaderData.OffsetEntryCount; ++I) {
+      auto Off = *getOffsetEntry(Data, I);
       OS << format("\n0x%0*" PRIx64, OffsetDumpWidth, Off);
       if (DumpOpts.Verbose)
         OS << format(" => 0x%08" PRIx64,

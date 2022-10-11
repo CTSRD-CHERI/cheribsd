@@ -130,10 +130,18 @@ struct i2c_hid_desc {
 	uint32_t reserved;
 } __packed;
 
-static char *iichid_ids[] = {
-	"PNP0C50",
-	"ACPI0C50",
-	NULL
+#define	IICHID_REG_NONE	-1
+#define	IICHID_REG_ACPI	(UINT16_MAX + 1)
+#define	IICHID_REG_ELAN	0x0001
+
+static const struct iichid_id {
+	char *id;
+	int reg;
+} iichid_ids[] = {
+	{ "ELAN0000",	IICHID_REG_ELAN },
+	{ "PNP0C50",	IICHID_REG_ACPI },
+	{ "ACPI0C50",	IICHID_REG_ACPI },
+	{ NULL,		0 },
 };
 
 enum iichid_powerstate_how {
@@ -177,6 +185,7 @@ struct iichid_softc {
 	struct task		event_task;
 #endif
 
+	struct task		suspend_task;
 	bool			open;			/* iicbus lock */
 	bool			suspend;		/* iicbus lock */
 	bool			power_on;		/* iicbus lock */
@@ -188,24 +197,29 @@ static device_detach_t	iichid_detach;
 static device_resume_t	iichid_resume;
 static device_suspend_t	iichid_suspend;
 
+static void	iichid_suspend_task(void *, int);
+
 #ifdef IICHID_SAMPLING
 static int	iichid_setup_callout(struct iichid_softc *);
 static int	iichid_reset_callout(struct iichid_softc *);
 static void	iichid_teardown_callout(struct iichid_softc *);
 #endif
 
-static __inline bool
+static inline int
 acpi_is_iichid(ACPI_HANDLE handle)
 {
-	char	**ids;
+	const struct iichid_id *ids;
 	UINT32	sta;
+	int reg;
 
-	for (ids = iichid_ids; *ids != NULL; ids++) {
-		if (acpi_MatchHid(handle, *ids))
+	for (ids = iichid_ids; ids->id != NULL; ids++) {
+		if (acpi_MatchHid(handle, ids->id)) {
+			reg = ids->reg;
 			break;
+		}
 	}
-	if (*ids == NULL)
-		return (false);
+	if (ids->id == NULL)
+		return (IICHID_REG_NONE);
 
 	/*
 	 * If no _STA method or if it failed, then assume that
@@ -213,9 +227,9 @@ acpi_is_iichid(ACPI_HANDLE handle)
 	 */
 	if (ACPI_FAILURE(acpi_GetInteger(handle, "_STA", &sta)) ||
 	    ACPI_DEVICE_PRESENT(sta))
-		return (true);
+		return (reg);
 
-	return (false);
+	return (IICHID_REG_NONE);
 }
 
 static ACPI_STATUS
@@ -532,7 +546,7 @@ iichid_event_task(void *context, int pending)
 		} else
 			++sc->missing_samples;
 	} else
-		DPRINTF(sc, "read error occured: %d\n", error);
+		DPRINTF(sc, "read error occurred: %d\n", error);
 
 rearm:
 	if (sc->callout_setup && sc->sampling_rate_slow > 0) {
@@ -573,7 +587,7 @@ iichid_intr(void *context)
 	 * not allowed and often returns a garbage.  If a HOST needs to
 	 * communicate with the DEVICE it MUST issue a SET POWER command
 	 * (to ON) before any other command. As some hardware requires reads to
-	 * acknoledge interrupts we fetch only length header and discard it.
+	 * acknowledge interrupts we fetch only length header and discard it.
 	 */
 	maxlen = sc->power_on ? sc->intr_bufsize : 0;
 	error = iichid_cmd_read(sc, sc->intr_buf, maxlen, &actual);
@@ -586,7 +600,7 @@ iichid_intr(void *context)
 				DPRINTF(sc, "no data received\n");
 		}
 	} else
-		DPRINTF(sc, "read error occured: %d\n", error);
+		DPRINTF(sc, "read error occurred: %d\n", error);
 
 	iicbus_release_bus(parent, sc->dev);
 }
@@ -782,6 +796,9 @@ iichid_intr_setup(device_t dev, hid_intr_t intr, void *context,
 {
 	struct iichid_softc *sc;
 
+	if (intr == NULL)
+		return;
+
 	sc = device_get_softc(dev);
 	/*
 	 * Do not rely on wMaxInputLength, as some devices may set it to
@@ -942,6 +959,24 @@ iichid_set_protocol(device_t dev, uint16_t protocol)
 }
 
 static int
+iichid_ioctl(device_t dev, unsigned long cmd, uintptr_t data)
+{
+	int error;
+
+	switch (cmd) {
+	case I2CRDWR:
+		error = iic2errno(iicbus_transfer(dev,
+		    (__cheri_fromcap struct iic_msg *)((struct iic_rdwr_data *)data)->msgs,
+		    ((struct iic_rdwr_data *)data)->nmsgs));
+		break;
+	default:
+		error = EINVAL;
+	}
+
+	return (error);
+}
+
+static int
 iichid_fill_device_info(struct i2c_hid_desc *desc, ACPI_HANDLE handle,
     struct hid_device_info *hw)
 {
@@ -983,7 +1018,7 @@ iichid_probe(device_t dev)
 	ACPI_HANDLE handle;
 	char buf[80];
 	uint16_t config_reg;
-	int error;
+	int error, reg;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -1004,11 +1039,15 @@ iichid_probe(device_t dev)
 	if (handle == NULL)
 		return (ENXIO);
 
-	if (!acpi_is_iichid(handle))
+	reg = acpi_is_iichid(handle);
+	if (reg == IICHID_REG_NONE)
 		return (ENXIO);
 
-	if (ACPI_FAILURE(iichid_get_config_reg(handle, &config_reg)))
-		return (ENXIO);
+	if (reg == IICHID_REG_ACPI) {
+		if (ACPI_FAILURE(iichid_get_config_reg(handle, &config_reg)))
+			return (ENXIO);
+	} else
+		config_reg = (uint16_t)reg;
 
 	DPRINTF(sc, "  IICbus addr       : 0x%02X\n", sc->addr >> 1);
 	DPRINTF(sc, "  HID descriptor reg: 0x%02X\n", config_reg);
@@ -1066,14 +1105,17 @@ iichid_attach(device_t dev)
 	error = iichid_reset(sc);
 	if (error) {
 		device_printf(dev, "failed to reset hardware: %d\n", error);
-		return (ENXIO);
+		error = ENXIO;
+		goto done;
 	}
 
-	sc->power_on = false;
+	sc->power_on = true;
+
+	TASK_INIT(&sc->suspend_task, 0, iichid_suspend_task, sc);
 #ifdef IICHID_SAMPLING
 	TASK_INIT(&sc->event_task, 0, iichid_event_task, sc);
 	/* taskqueue_create can't fail with M_WAITOK mflag passed. */
-	sc->taskqueue = taskqueue_create("hmt_tq", M_WAITOK | M_ZERO,
+	sc->taskqueue = taskqueue_create("iichid_tq", M_WAITOK | M_ZERO,
 	    taskqueue_thread_enqueue, &sc->taskqueue);
 	TIMEOUT_TASK_INIT(sc->taskqueue, &sc->periodic_task, 0,
 	    iichid_event_task, sc);
@@ -1125,6 +1167,11 @@ iichid_attach(device_t dev)
 		&sc->sampling_hysteresis, 0,
 		"number of missing samples before enabling of slow mode");
 	hid_add_dynamic_quirk(&sc->hw, HQ_IICHID_SAMPLING);
+
+	if (sc->sampling_rate_slow >= 0) {
+		pause("iichid", (hz + 999) / 1000);
+		(void)iichid_cmd_read(sc, NULL, 0, NULL);
+	}
 #endif /* IICHID_SAMPLING */
 
 	child = device_add_child(dev, "hidbus", -1);
@@ -1143,6 +1190,7 @@ iichid_attach(device_t dev)
 	}
 done:
 	(void)iichid_set_power(sc, I2C_HID_POWER_OFF);
+	sc->power_on = false;
 	return (error);
 }
 
@@ -1168,6 +1216,14 @@ iichid_detach(device_t dev)
 	return (0);
 }
 
+static void
+iichid_suspend_task(void *context, int pending)
+{
+	struct iichid_softc *sc = context;
+
+	iichid_teardown_interrupt(sc);
+}
+
 static int
 iichid_suspend(device_t dev)
 {
@@ -1175,7 +1231,6 @@ iichid_suspend(device_t dev)
 	int error;
 
 	sc = device_get_softc(dev);
-	DPRINTF(sc, "Suspend called, setting device to power_state 1\n");
 	(void)bus_generic_suspend(dev);
 	/*
 	 * 8.2 - The HOST is going into a deep power optimized state and wishes
@@ -1183,13 +1238,32 @@ iichid_suspend(device_t dev)
 	 * is recommended to issue a HIPO command to the DEVICE to force
 	 * the DEVICE in to a lower power state.
 	 */
+	DPRINTF(sc, "Suspend called, setting device to power_state 1\n");
 	error = iichid_set_power_state(sc, IICHID_PS_NULL, IICHID_PS_OFF);
 	if (error != 0)
 		DPRINTF(sc, "Could not set power_state, error: %d\n", error);
 	else
 		DPRINTF(sc, "Successfully set power_state\n");
 
-        return (0);
+#ifdef IICHID_SAMPLING
+	if (sc->sampling_rate_slow < 0)
+#endif
+	{
+		/*
+		 * bus_teardown_intr can not be executed right here as it wants
+		 * to run on certain CPU to interacts with LAPIC while suspend
+		 * thread is bound to CPU0. So run it from taskqueue context.
+		 */
+#ifdef IICHID_SAMPLING
+#define	suspend_thread	sc->taskqueue
+#else
+#define	suspend_thread	taskqueue_thread
+#endif
+		taskqueue_enqueue(suspend_thread, &sc->suspend_task);
+		taskqueue_drain(suspend_thread, &sc->suspend_task);
+	}
+
+	return (0);
 }
 
 static int
@@ -1199,6 +1273,11 @@ iichid_resume(device_t dev)
 	int error;
 
 	sc = device_get_softc(dev);
+#ifdef IICHID_SAMPLING
+	if (sc->sampling_rate_slow < 0)
+#endif
+		iichid_setup_interrupt(sc);
+
 	DPRINTF(sc, "Resume called, setting device to power_state 0\n");
 	error = iichid_set_power_state(sc, IICHID_PS_NULL, IICHID_PS_ON);
 	if (error != 0)
@@ -1209,8 +1288,6 @@ iichid_resume(device_t dev)
 
 	return (0);
 }
-
-static devclass_t iichid_devclass;
 
 static device_method_t iichid_methods[] = {
 	DEVMETHOD(device_probe,		iichid_probe),
@@ -1233,6 +1310,7 @@ static device_method_t iichid_methods[] = {
 	DEVMETHOD(hid_set_report,	iichid_set_report),
 	DEVMETHOD(hid_set_idle,		iichid_set_idle),
 	DEVMETHOD(hid_set_protocol,	iichid_set_protocol),
+	DEVMETHOD(hid_ioctl,		iichid_ioctl),
 
 	DEVMETHOD_END
 };
@@ -1243,7 +1321,7 @@ static driver_t iichid_driver = {
 	.size = sizeof(struct iichid_softc),
 };
 
-DRIVER_MODULE(iichid, iicbus, iichid_driver, iichid_devclass, NULL, 0);
+DRIVER_MODULE(iichid, iicbus, iichid_driver, NULL, NULL);
 MODULE_DEPEND(iichid, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 MODULE_DEPEND(iichid, acpi, 1, 1, 1);
 MODULE_DEPEND(iichid, hid, 1, 1, 1);

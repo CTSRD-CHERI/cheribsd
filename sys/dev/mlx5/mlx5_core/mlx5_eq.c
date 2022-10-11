@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013-2017, Mellanox Technologies, Ltd.  All rights reserved.
+ * Copyright (c) 2013-2021, Mellanox Technologies, Ltd.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,15 +25,16 @@
  * $FreeBSD$
  */
 
+#include "opt_rss.h"
+#include "opt_ratelimit.h"
+
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <dev/mlx5/port.h>
 #include <dev/mlx5/mlx5_ifc.h>
 #include <dev/mlx5/mlx5_fpga/core.h>
-#include "mlx5_core.h"
-#include "eswitch.h"
-
-#include "opt_rss.h"
+#include <dev/mlx5/mlx5_core/mlx5_core.h>
+#include <dev/mlx5/mlx5_core/eswitch.h>
 
 #ifdef  RSS
 #include <net/rss_config.h>
@@ -244,7 +245,11 @@ static int mlx5_eq_int(struct mlx5_core_dev *dev, struct mlx5_eq *eq)
 
 		mlx5_core_dbg(eq->dev, "eqn %d, eqe type %s\n",
 			      eq->eqn, eqe_type_str(eqe->type));
-		switch (eqe->type) {
+
+		if (dev->priv.eq_table.cb != NULL &&
+		    dev->priv.eq_table.cb(dev, eqe->type, &eqe->data)) {
+			/* FALLTHROUGH */
+		} else switch (eqe->type) {
 		case MLX5_EVENT_TYPE_COMP:
 			mlx5_cq_completion(dev, eqe);
 			break;
@@ -734,14 +739,9 @@ static void mlx5_port_general_notification_event(struct mlx5_core_dev *dev,
 						 struct mlx5_eqe *eqe)
 {
 	u8 port = (eqe->data.port.port >> 4) & 0xf;
-	u32 rqn;
-	struct mlx5_eqe_general_notification_event *general_event;
 
 	switch (eqe->sub_type) {
 	case MLX5_GEN_EVENT_SUBTYPE_DELAY_DROP_TIMEOUT:
-		general_event = &eqe->data.general_notifications;
-		rqn = be32_to_cpu(general_event->rq_user_index_delay_drop) &
-			  0xffffff;
 		break;
 	case MLX5_GEN_EVENT_SUBTYPE_PCI_POWER_CHANGE_EVENT:
 		mlx5_trigger_health_watchdog(dev);

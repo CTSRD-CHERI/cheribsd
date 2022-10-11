@@ -2386,7 +2386,7 @@ static int collect_cim_qcfg(struct cudbg_init *pdbg_init,
 	struct cudbg_buffer scratch_buff;
 	struct adapter *padap = pdbg_init->adap;
 	u32 offset;
-	int cim_num_obq, rc = 0;
+	int rc = 0;
 
 	struct struct_cim_qcfg *cim_qcfg_data = NULL;
 
@@ -2397,8 +2397,6 @@ static int collect_cim_qcfg(struct cudbg_init *pdbg_init,
 		goto err;
 
 	offset = scratch_buff.offset;
-
-	cim_num_obq = is_t4(padap) ? CIM_NUM_OBQ : CIM_NUM_OBQ_T5;
 
 	cim_qcfg_data =
 		(struct struct_cim_qcfg *)((u8 *)((char *)scratch_buff.data +
@@ -2952,7 +2950,7 @@ static int check_busy_bit(struct adapter *padap)
 	int retry = 10;
 	int status = 0;
 
-	while (busy & (1 < retry)) {
+	while (busy && i < retry) {
 		val = t4_read_reg(padap, A_CIM_HOST_ACC_CTRL);
 		busy = (0 != (val & CUDBG_CIM_BUSY_BIT));
 		i++;

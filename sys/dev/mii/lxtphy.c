@@ -96,15 +96,13 @@ static device_method_t lxtphy_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t lxtphy_devclass;
-
 static driver_t lxtphy_driver = {
 	"lxtphy",
 	lxtphy_methods,
 	sizeof(struct mii_softc)
 };
 
-DRIVER_MODULE(lxtphy, miibus, lxtphy_driver, lxtphy_devclass, 0, 0);
+DRIVER_MODULE(lxtphy, miibus, lxtphy_driver, 0, 0);
 
 static int	lxtphy_service(struct mii_softc *, struct mii_data *, int);
 static void	lxtphy_status(struct mii_softc *);
@@ -203,7 +201,7 @@ lxtphy_status(struct mii_softc *sc)
 	/*
 	 * Get link status from the CSR; we need to read the CSR
 	 * for media type anyhow, and the link status in the CSR
-	 * doens't latch, so fewer register reads are required.
+	 * doesn't latch, so fewer register reads are required.
 	 */
 	csr = PHY_READ(sc, MII_LXTPHY_CSR);
 	if (csr & CSR_LINK)

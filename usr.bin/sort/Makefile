@@ -2,9 +2,10 @@
 
 .include <src.opts.mk>
 
+PACKAGE= runtime
 PROG=	sort
-
 SRCS=	bwstring.c coll.c file.c mem.c radixsort.c sort.c vsort.c
+CSTD=	c11
 
 sort.1: sort.1.in
 	sed ${MAN_SUB} ${.ALLSRC} >${.TARGET}
@@ -32,7 +33,7 @@ CFLAGS+= -DWITHOUT_NLS
 MAN_SUB+= -e 's|%%NLS%%|\.\\"|g'
 .endif
 
-#HAS_TESTS=
-#SUBDIR.${MK_TESTS}+= tests
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.prog.mk>

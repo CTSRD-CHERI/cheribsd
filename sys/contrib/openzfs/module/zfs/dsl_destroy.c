@@ -200,7 +200,7 @@ rck_alloc(dsl_dataset_t *clone)
 
 static void
 dsl_dir_remove_clones_key_impl(dsl_dir_t *dd, uint64_t mintxg, dmu_tx_t *tx,
-    list_t *stack, void *tag)
+    list_t *stack, const void *tag)
 {
 	objset_t *mos = dd->dd_pool->dp_meta_objset;
 
@@ -654,7 +654,7 @@ dsl_destroy_snapshots_nvl(nvlist_t *snaps, boolean_t defer,
 		char *errorstr = NULL;
 		(void) nvlist_lookup_string(result, ZCP_RET_ERROR, &errorstr);
 		if (errorstr != NULL) {
-			zfs_dbgmsg(errorstr);
+			zfs_dbgmsg("%s", errorstr);
 		}
 		fnvlist_free(wrapper);
 		fnvlist_free(result);
@@ -699,11 +699,11 @@ struct killarg {
 	dmu_tx_t *tx;
 };
 
-/* ARGSUSED */
 static int
 kill_blkptr(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
     const zbookmark_phys_t *zb, const dnode_phys_t *dnp, void *arg)
 {
+	(void) spa, (void) dnp;
 	struct killarg *ka = arg;
 	dmu_tx_t *tx = ka->tx;
 
@@ -1153,6 +1153,9 @@ dsl_destroy_head_sync_impl(dsl_dataset_t *ds, dmu_tx_t *tx)
 		dsl_destroy_snapshot_sync_impl(prev, B_FALSE, tx);
 		dsl_dataset_rele(prev, FTAG);
 	}
+	/* Delete errlog. */
+	if (spa_feature_is_enabled(dp->dp_spa, SPA_FEATURE_HEAD_ERRLOG))
+		spa_delete_dataset_errlog(dp->dp_spa, ds->ds_object, tx);
 }
 
 void
@@ -1246,10 +1249,10 @@ dsl_destroy_head(const char *name)
  * inconsistent datasets, even if we encounter an error trying to
  * process one of them.
  */
-/* ARGSUSED */
 int
 dsl_destroy_inconsistent(const char *dsname, void *arg)
 {
+	(void) arg;
 	objset_t *os;
 
 	if (dmu_objset_hold(dsname, FTAG, &os) == 0) {

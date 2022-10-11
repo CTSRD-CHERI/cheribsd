@@ -43,8 +43,6 @@ AHD_DEBUG_OPTS		opt_aic79xx.h
 AHD_TMODE_ENABLE	opt_aic79xx.h	
 AHD_REG_PRETTY_PRINT	opt_aic79xx.h
 
-TWA_DEBUG		opt_twa.h
-
 # Debugging options.
 ALT_BREAK_TO_DEBUGGER	opt_kdb.h
 BREAK_TO_DEBUGGER	opt_kdb.h
@@ -81,6 +79,15 @@ BOOTVERBOSE	opt_global.h
 CALLOUT_PROFILING
 CAPABILITIES	opt_capsicum.h
 CAPABILITY_MODE	opt_capsicum.h
+CC_CDG		opt_global.h
+CC_CHD		opt_global.h
+CC_CUBIC	opt_global.h
+CC_DEFAULT	opt_cc.h
+CC_DCTCP	opt_global.h
+CC_HD		opt_global.h
+CC_HTCP		opt_global.h
+CC_NEWRENO	opt_global.h
+CC_VEGAS	opt_global.h
 COMPAT_43	opt_global.h
 COMPAT_43TTY	opt_global.h
 COMPAT_FREEBSD4	opt_global.h
@@ -91,15 +98,13 @@ COMPAT_FREEBSD9	opt_global.h
 COMPAT_FREEBSD10	opt_global.h
 COMPAT_FREEBSD11	opt_global.h
 COMPAT_FREEBSD12	opt_global.h
-COMPAT_CLOUDABI32	opt_dontuse.h
-COMPAT_CLOUDABI64	opt_dontuse.h
+COMPAT_FREEBSD13	opt_global.h
 COMPAT_LINUXKPI	opt_dontuse.h
 _COMPAT_LINUX32	opt_compat.h	# XXX: make sure opt_compat.h exists
 COMPILING_LINT	opt_global.h
 CY_PCI_FASTINTR
 DEADLKRES	opt_watchdog.h
 EXPERIMENTAL	opt_global.h
-EXT_RESOURCES	opt_global.h
 DIRECTIO
 FILEMON		opt_dontuse.h
 FFCLOCK
@@ -151,6 +156,7 @@ LIBICONV
 MAC		opt_global.h
 MAC_BIBA	opt_dontuse.h
 MAC_BSDEXTENDED	opt_dontuse.h
+MAC_DDB		opt_dontuse.h
 MAC_IFOFF	opt_dontuse.h
 MAC_LOMAC	opt_dontuse.h
 MAC_MLS		opt_dontuse.h
@@ -158,6 +164,7 @@ MAC_NONE	opt_dontuse.h
 MAC_NTPD	opt_dontuse.h
 MAC_PARTITION	opt_dontuse.h
 MAC_PORTACL	opt_dontuse.h
+MAC_PRIORITY	opt_dontuse.h
 MAC_SEEOTHERUIDS	opt_dontuse.h
 MAC_STATIC	opt_mac.h
 MAC_STUB	opt_dontuse.h
@@ -232,6 +239,7 @@ COVERAGE	opt_global.h
 KASAN		opt_global.h
 KCOV
 KCSAN		opt_global.h
+KMSAN		opt_global.h
 KUBSAN		opt_global.h
 
 # POSIX kernel options
@@ -454,7 +462,6 @@ MBUF_PROFILING
 MBUF_STRESS_TEST
 MROUTING		opt_mrouting.h
 NFSLOCKD
-PCBGROUP		opt_pcbgroup.h
 PF_DEFAULT_TO_DROP	opt_pf.h
 ROUTE_MPATH		opt_route.h
 ROUTETABLES		opt_route.h
@@ -583,7 +590,6 @@ IFMEDIA_DEBUG		opt_ifmedia.h
 
 # Fb options
 FB_DEBUG		opt_fb.h
-FB_INSTALL_CDEV		opt_fb.h
 
 # ppbus related options
 PERIPH_1284		opt_ppb_1284.h
@@ -727,11 +733,6 @@ DEV_PFLOG		opt_pf.h
 DEV_PFSYNC		opt_pf.h
 DEV_SPLASH		opt_splash.h
 DEV_VLAN		opt_vlan.h
-
-# ed driver
-ED_HPP			opt_ed.h
-ED_3C503		opt_ed.h
-ED_SIC			opt_ed.h
 
 # bce driver
 BCE_DEBUG		opt_bce.h
@@ -1010,6 +1011,7 @@ EKCD		opt_ekcd.h
 
 # NVME options
 NVME_USE_NVD	opt_nvme.h
+NVME_2X_RESET	opt_nvme.h
 
 # amdsbwd options
 AMDSBWD_DEBUG	opt_amdsbwd.h
@@ -1024,6 +1026,14 @@ IICHID_DEBUG	opt_hid.h
 IICHID_SAMPLING	opt_hid.h
 HKBD_DFLT_KEYMAP	opt_hkbd.h
 HIDRAW_MAKE_UHID_ALIAS	opt_hid.h
+
+# kenv options
+# The early kernel environment (loader environment, config(8)-provided static)
+# is typically cleared after the dynamic environment comes up to ensure that
+# we're not inadvertently holding on to 'secret' values in these stale envs.
+# This option is insecure except in controlled environments where the static
+# environment's contents are known to be safe.
+PRESERVE_EARLY_KENV	opt_global.h
 
 # CHERI
 CPU_CHERI	opt_global.h

@@ -59,23 +59,26 @@ struct cheri_object {
  * Functions to construct userspace capabilities.
  */
 void * __capability	_cheri_capability_build_user_code(struct thread *td,
-			    uint32_t perms, vaddr_t basep, size_t length,
+			    uint32_t perms, ptraddr_t basep, size_t length,
 			    off_t off, const char* func, int line);
 void * __capability	_cheri_capability_build_user_data(uint32_t perms,
-			    vaddr_t basep, size_t length, off_t off,
-			    const char* func, int line);
+			    ptraddr_t basep, size_t length, off_t off,
+			    const char* func, int line, bool exact);
 void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
-			    vaddr_t basep, size_t length, off_t off,
-			    const char* func, int line);
+			    ptraddr_t basep, size_t length, off_t off,
+			    const char* func, int line, bool exact);
 #define cheri_capability_build_user_code(td, perms, basep, length, off)	\
 	_cheri_capability_build_user_code(td, perms, basep, length, off,\
 	    __func__, __LINE__)
 #define cheri_capability_build_user_data(perms, basep, length, off)	\
 	_cheri_capability_build_user_data(perms, basep, length, off,	\
-	    __func__, __LINE__)
+	    __func__, __LINE__, true)
+#define cheri_capability_build_inexact_user_data(perms, basep, length, off) \
+	_cheri_capability_build_user_data(perms, basep, length, off,	\
+	    __func__, __LINE__, false)
 #define cheri_capability_build_user_rwx(perms, basep, length, off)	\
 	_cheri_capability_build_user_rwx(perms, basep, length, off,	\
-	    __func__, __LINE__)
+	    __func__, __LINE__, true)
 
 /*
  * Global capabilities used to construct other capabilities.
@@ -147,8 +150,12 @@ extern u_int	security_cheri_bound_legacy_capabilities;
 /*
  * Used by the kernel linker to handle caprelocs in modules.
  */
-void	init_linker_file_cap_relocs(const void *start_relocs, const void *stop_relocs,
-	    void *data_cap, void *code_cap, ptraddr_t base_addr);
+typedef void (cap_relocs_cb)(void *arg, bool function, bool constant,
+    ptraddr_t object, void **src);
+
+void	init_linker_file_cap_relocs(const void *start_relocs,
+	    const void *stop_relocs, void *data_cap, ptraddr_t base_addr,
+	    cap_relocs_cb *cb, void *cb_arg);
 #endif
 
 /*

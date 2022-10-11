@@ -54,15 +54,16 @@ verify_runnable "both"
 
 function cleanup
 {
-	if snapexists "$DATASET@$TESTSNAP"; then
-		log_must zfs destroy "$DATASET@$TESTSNAP"
-	fi
-	if bkmarkexists "$DATASET#$TESTBM"; then
-		log_must zfs destroy "$DATASET#$TESTBM"
-	fi
-	if bkmarkexists "$DATASET#$TESTBMCOPY"; then
-		log_must zfs destroy "$DATASET#$TESTBMCOPY"
-	fi
+	snapexists "$DATASET@$TESTSNAP" && \
+		destroy_dataset "$DATASET@$TESTSNAP"
+
+	bkmarkexists "$DATASET#$TESTBM" && \
+		destroy_dataset "$DATASET#$TESTBM"
+
+	bkmarkexists "$DATASET#$TESTBMCOPY" && \
+		destroy_dataset "$DATASET#$TESTBMCOPY"
+
+	log_must rm -f "$TEST_BASE_DIR/zfstest_datastream.$$"
 }
 
 log_assert "'zfs bookmark' should work only when passed valid arguments."

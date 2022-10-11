@@ -893,7 +893,7 @@ kernel_lun_remove(struct lun *lun)
 }
 
 void
-kernel_handoff(struct connection *conn)
+kernel_handoff(struct ctld_connection *conn)
 {
 	struct ctl_iscsi req;
 
@@ -919,27 +919,28 @@ kernel_handoff(struct connection *conn)
 	}
 #ifdef ICL_KERNEL_PROXY
 	if (proxy_mode)
-		req.data.handoff.connection_id = conn->conn_socket;
+		req.data.handoff.connection_id = conn->conn.conn_socket;
 	else
-		req.data.handoff.socket = conn->conn_socket;
+		req.data.handoff.socket = conn->conn.conn_socket;
 #else
-	req.data.handoff.socket = conn->conn_socket;
+	req.data.handoff.socket = conn->conn.conn_socket;
 #endif
 	req.data.handoff.portal_group_tag =
 	    conn->conn_portal->p_portal_group->pg_tag;
-	if (conn->conn_header_digest == CONN_DIGEST_CRC32C)
+	if (conn->conn.conn_header_digest == CONN_DIGEST_CRC32C)
 		req.data.handoff.header_digest = CTL_ISCSI_DIGEST_CRC32C;
-	if (conn->conn_data_digest == CONN_DIGEST_CRC32C)
+	if (conn->conn.conn_data_digest == CONN_DIGEST_CRC32C)
 		req.data.handoff.data_digest = CTL_ISCSI_DIGEST_CRC32C;
-	req.data.handoff.cmdsn = conn->conn_cmdsn;
-	req.data.handoff.statsn = conn->conn_statsn;
+	req.data.handoff.cmdsn = conn->conn.conn_cmdsn;
+	req.data.handoff.statsn = conn->conn.conn_statsn;
 	req.data.handoff.max_recv_data_segment_length =
-	    conn->conn_max_recv_data_segment_length;
+	    conn->conn.conn_max_recv_data_segment_length;
 	req.data.handoff.max_send_data_segment_length =
-	    conn->conn_max_send_data_segment_length;
-	req.data.handoff.max_burst_length = conn->conn_max_burst_length;
-	req.data.handoff.first_burst_length = conn->conn_first_burst_length;
-	req.data.handoff.immediate_data = conn->conn_immediate_data;
+	    conn->conn.conn_max_send_data_segment_length;
+	req.data.handoff.max_burst_length = conn->conn.conn_max_burst_length;
+	req.data.handoff.first_burst_length =
+	    conn->conn.conn_first_burst_length;
+	req.data.handoff.immediate_data = conn->conn.conn_immediate_data;
 
 	if (ioctl(ctl_fd, CTL_ISCSI, &req) == -1) {
 		log_err(1, "error issuing CTL_ISCSI ioctl; "
@@ -953,7 +954,7 @@ kernel_handoff(struct connection *conn)
 }
 
 void
-kernel_limits(const char *offload, int *max_recv_dsl, int *max_send_dsl,
+kernel_limits(const char *offload, int s, int *max_recv_dsl, int *max_send_dsl,
     int *max_burst_length, int *first_burst_length)
 {
 	struct ctl_iscsi req;
@@ -966,6 +967,7 @@ kernel_limits(const char *offload, int *max_recv_dsl, int *max_send_dsl,
 	if (offload != NULL) {
 		strlcpy(cilp->offload, offload, sizeof(cilp->offload));
 	}
+	cilp->socket = s;
 
 	if (ioctl(ctl_fd, CTL_ISCSI, &req) == -1) {
 		log_err(1, "error issuing CTL_ISCSI ioctl; "

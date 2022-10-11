@@ -173,6 +173,7 @@ static const STRUCT_USB_HOST_ID run_devs[] = {
     RUN_DEV(ASUS,		RT3070_1),
     RUN_DEV(ASUS,		USBN66),
     RUN_DEV(ASUS,		USB_N53),
+    RUN_DEV(ASUS,		USBN14),
     RUN_DEV(ASUS2,		USBN11),
     RUN_DEV(AZUREWAVE,		RT2870_1),
     RUN_DEV(AZUREWAVE,		RT2870_2),
@@ -214,6 +215,7 @@ static const STRUCT_USB_HOST_ID run_devs[] = {
     RUN_DEV(DLINK,		DWA140B3),
     RUN_DEV(DLINK,		DWA160B2),
     RUN_DEV(DLINK,		DWA140D1),
+    RUN_DEV(DLINK,		DWA130F1),
     RUN_DEV(DLINK,		DWA162),
     RUN_DEV(DLINK2,		DWA130),
     RUN_DEV(DLINK2,		RT2870_1),
@@ -6435,9 +6437,7 @@ static driver_t run_driver = {
 	.size = sizeof(struct run_softc)
 };
 
-static devclass_t run_devclass;
-
-DRIVER_MODULE(run, uhub, run_driver, run_devclass, run_driver_loaded, NULL);
+DRIVER_MODULE(run, uhub, run_driver, run_driver_loaded, NULL);
 MODULE_DEPEND(run, wlan, 1, 1, 1);
 MODULE_DEPEND(run, usb, 1, 1, 1);
 MODULE_DEPEND(run, firmware, 1, 1, 1);

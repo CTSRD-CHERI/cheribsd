@@ -459,7 +459,6 @@ ifunc_init(Elf_Auxinfo aux_info[__min_size(AT_COUNT)] __unused)
 void
 allocate_initial_tls(Obj_Entry *objs)
 {
-	Elf_Addr **tp;
 
 	/*
 	 * Fix the size of the static TLS block by using the maximum
@@ -469,30 +468,17 @@ allocate_initial_tls(Obj_Entry *objs)
 	tls_static_space = tls_last_offset + tls_last_size +
 	    RTLD_STATIC_TLS_EXTRA;
 
-	tp = (Elf_Addr **)((char *)allocate_tls(objs, NULL, TLS_TCB_SIZE, 16)
-	    + TLS_TP_OFFSET + TLS_TCB_SIZE);
-
-#ifdef __CHERI_PURE_CAPABILITY__
-	__asm __volatile("cmove ctp, %0" :: "C"(tp));
-#else
-	__asm __volatile("mv  tp, %0" :: "r"(tp));
-#endif
+	_tcb_set(allocate_tls(objs, NULL, TLS_TCB_SIZE, TLS_TCB_ALIGN));
 }
 
 void *
 __tls_get_addr(tls_index* ti)
 {
-	char *_tp;
+	uintptr_t **dtvp;
 	void *p;
 
-#ifdef __CHERI_PURE_CAPABILITY__
-	__asm __volatile("cmove %0, ctp" : "=C" (_tp));
-#else
-	__asm __volatile("mv %0, tp" : "=r" (_tp));
-#endif
-
-	p = tls_get_addr_common((uintptr_t **)(_tp - TLS_TP_OFFSET
-	    - TLS_TCB_SIZE), ti->ti_module, ti->ti_offset);
+	dtvp = &_tcb_get()->tcb_dtv;
+	p = tls_get_addr_common(dtvp, ti->ti_module, ti->ti_offset);
 
 	return ((char*)p + TLS_DTV_OFFSET);
 }

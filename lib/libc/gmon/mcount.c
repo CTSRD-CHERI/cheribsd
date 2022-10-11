@@ -36,7 +36,7 @@
  *   "changes": [
  *     "unsupported"
  *   ],
- *   "change_comment": "profiling not yet supported (also on mips64)"
+ *   "change_comment": "profiling not yet supported"
  * }
  * CHERI CHANGES END
  */
@@ -60,7 +60,6 @@ void	eintr(void);
 void	user(void);
 #endif
 #include <machine/atomic.h>
-#include <stdlib.h>
 
 /*
  * mcount is called on entry to each function compiled with the profiling
@@ -335,5 +334,3 @@ mexitcount(uintfptr_t selfpc)
 	}
 }
 #endif /* GUPROF */
-
-// void _mcount(uintfptr_t frompc, uintfptr_t selfpc) {}

@@ -65,16 +65,15 @@
 /*
  * A zfs_mod_kobj_t represents a zfs kobject under '/sys/module/zfs'
  */
-struct zfs_mod_kobj;
 typedef struct zfs_mod_kobj zfs_mod_kobj_t;
-
 struct zfs_mod_kobj {
 	struct kobject		zko_kobj;
 	struct kobj_type	zko_kobj_type;
 	struct sysfs_ops	zko_sysfs_ops;
 	size_t			zko_attr_count;
 	struct attribute	*zko_attr_list;		/* allocated */
-	struct attribute	**zko_default_attrs;	/* allocated */
+	struct attribute_group	zko_default_group;	/* .attrs allocated */
+	const struct attribute_group	*zko_default_groups[2];
 	size_t			zko_child_count;
 	zfs_mod_kobj_t		*zko_children;		/* allocated */
 };
@@ -90,6 +89,7 @@ struct zfs_mod_kobj {
 static zfs_mod_kobj_t kernel_features_kobj;
 static zfs_mod_kobj_t pool_features_kobj;
 static zfs_mod_kobj_t dataset_props_kobj;
+static zfs_mod_kobj_t vdev_props_kobj;
 static zfs_mod_kobj_t pool_props_kobj;
 
 /*
@@ -126,10 +126,10 @@ zfs_kobj_release(struct kobject *kobj)
 		zkobj->zko_attr_list = NULL;
 	}
 
-	if (zkobj->zko_default_attrs != NULL) {
-		kmem_free(zkobj->zko_default_attrs,
+	if (zkobj->zko_default_group.attrs != NULL) {
+		kmem_free(zkobj->zko_default_group.attrs,
 		    DEFAULT_ATTR_SIZE(zkobj->zko_attr_count));
-		zkobj->zko_default_attrs = NULL;
+		zkobj->zko_default_group.attrs = NULL;
 	}
 
 	if (zkobj->zko_child_count != 0) {
@@ -153,11 +153,12 @@ zfs_kobj_add_attr(zfs_mod_kobj_t *zkobj, int attr_num, const char *attr_name)
 {
 	VERIFY3U(attr_num, <, zkobj->zko_attr_count);
 	ASSERT(zkobj->zko_attr_list);
-	ASSERT(zkobj->zko_default_attrs);
+	ASSERT(zkobj->zko_default_group.attrs);
 
 	zkobj->zko_attr_list[attr_num].name = attr_name;
 	zkobj->zko_attr_list[attr_num].mode = 0444;
-	zkobj->zko_default_attrs[attr_num] = &zkobj->zko_attr_list[attr_num];
+	zkobj->zko_default_group.attrs[attr_num] =
+	    &zkobj->zko_attr_list[attr_num];
 	sysfs_attr_init(&zkobj->zko_attr_list[attr_num]);
 }
 
@@ -175,9 +176,9 @@ zfs_kobj_init(zfs_mod_kobj_t *zkobj, int attr_cnt, int child_cnt,
 			return (ENOMEM);
 	}
 	/* this will always have at least one slot for NULL termination */
-	zkobj->zko_default_attrs = kmem_zalloc(DEFAULT_ATTR_SIZE(attr_cnt),
-	    KM_SLEEP);
-	if (zkobj->zko_default_attrs == NULL) {
+	zkobj->zko_default_group.attrs =
+	    kmem_zalloc(DEFAULT_ATTR_SIZE(attr_cnt), KM_SLEEP);
+	if (zkobj->zko_default_group.attrs == NULL) {
 		if (zkobj->zko_attr_list != NULL) {
 			kmem_free(zkobj->zko_attr_list,
 			    ATTR_TABLE_SIZE(attr_cnt));
@@ -185,14 +186,19 @@ zfs_kobj_init(zfs_mod_kobj_t *zkobj, int attr_cnt, int child_cnt,
 		return (ENOMEM);
 	}
 	zkobj->zko_attr_count = attr_cnt;
-	zkobj->zko_kobj_type.default_attrs = zkobj->zko_default_attrs;
+	zkobj->zko_default_groups[0] = &zkobj->zko_default_group;
+#ifdef HAVE_SYSFS_DEFAULT_GROUPS
+	zkobj->zko_kobj_type.default_groups = zkobj->zko_default_groups;
+#else
+	zkobj->zko_kobj_type.default_attrs = zkobj->zko_default_group.attrs;
+#endif
 
 	if (child_cnt > 0) {
 		zkobj->zko_children = kmem_zalloc(CHILD_TABLE_SIZE(child_cnt),
 		    KM_SLEEP);
 		if (zkobj->zko_children == NULL) {
-			if (zkobj->zko_default_attrs != NULL) {
-				kmem_free(zkobj->zko_default_attrs,
+			if (zkobj->zko_default_group.attrs != NULL) {
+				kmem_free(zkobj->zko_default_group.attrs,
 				    DEFAULT_ATTR_SIZE(attr_cnt));
 			}
 			if (zkobj->zko_attr_list != NULL) {
@@ -214,9 +220,9 @@ zfs_kobj_init(zfs_mod_kobj_t *zkobj, int attr_cnt, int child_cnt,
 static int
 zfs_kobj_add(zfs_mod_kobj_t *zkobj, struct kobject *parent, const char *name)
 {
-	/* zko_default_attrs must be NULL terminated */
-	ASSERT(zkobj->zko_default_attrs != NULL);
-	ASSERT(zkobj->zko_default_attrs[zkobj->zko_attr_count] == NULL);
+	/* zko_default_group.attrs must be NULL terminated */
+	ASSERT(zkobj->zko_default_group.attrs != NULL);
+	ASSERT(zkobj->zko_default_group.attrs[zkobj->zko_attr_count] == NULL);
 
 	kobject_init(&zkobj->zko_kobj, &zkobj->zko_kobj_type);
 	return (kobject_add(&zkobj->zko_kobj, parent, name));
@@ -225,7 +231,7 @@ zfs_kobj_add(zfs_mod_kobj_t *zkobj, struct kobject *parent, const char *name)
 /*
  * Each zfs property has these common attributes
  */
-static const char *zprop_attrs[]  = {
+static const char *const zprop_attrs[]  = {
 	"type",
 	"readonly",
 	"setonce",
@@ -238,7 +244,7 @@ static const char *zprop_attrs[]  = {
 #define	ZFS_PROP_ATTR_COUNT	ARRAY_SIZE(zprop_attrs)
 #define	ZPOOL_PROP_ATTR_COUNT	(ZFS_PROP_ATTR_COUNT - 1)
 
-static const char *zprop_types[]  = {
+static const char *const zprop_types[]  = {
 	"number",
 	"string",
 	"index",
@@ -249,7 +255,7 @@ typedef struct zfs_type_map {
 	const char	*ztm_name;
 } zfs_type_map_t;
 
-static zfs_type_map_t type_map[] = {
+static const zfs_type_map_t type_map[] = {
 	{ZFS_TYPE_FILESYSTEM,	"filesystem"},
 	{ZFS_TYPE_SNAPSHOT,	"snapshot"},
 	{ZFS_TYPE_VOLUME,	"volume"},
@@ -334,6 +340,20 @@ dataset_property_show(struct kobject *kobj, struct attribute *attr, char *buf)
 }
 
 static ssize_t
+vdev_property_show(struct kobject *kobj, struct attribute *attr, char *buf)
+{
+	vdev_prop_t prop = vdev_name_to_prop(kobject_name(kobj));
+	zprop_desc_t *prop_tbl = vdev_prop_get_table();
+	ssize_t len;
+
+	ASSERT3U(prop, <, VDEV_NUM_PROPS);
+
+	len = zprop_sysfs_show(attr->name, &prop_tbl[prop], buf, PAGE_SIZE);
+
+	return (len);
+}
+
+static ssize_t
 pool_property_show(struct kobject *kobj, struct attribute *attr, char *buf)
 {
 	zpool_prop_t prop = zpool_name_to_prop(kobject_name(kobj));
@@ -356,7 +376,7 @@ pool_property_show(struct kobject *kobj, struct attribute *attr, char *buf)
  * A user process can easily check if the running zfs kernel module
  * supports the new feature.
  */
-static const char *zfs_kernel_features[] = {
+static const char *const zfs_kernel_features[] = {
 	/* --> Add new kernel features here */
 	"com.delphix:vdev_initialize",
 	"org.zfsonlinux:vdev_trim",
@@ -424,7 +444,7 @@ zfs_kernel_features_init(zfs_mod_kobj_t *zfs_kobj, struct kobject *parent)
 /*
  * Each pool feature has these common attributes
  */
-static const char *pool_feature_attrs[]  = {
+static const char *const pool_feature_attrs[]  = {
 	"description",
 	"guid",
 	"uname",
@@ -577,6 +597,14 @@ zfs_sysfs_properties_init(zfs_mod_kobj_t *zfs_kobj, struct kobject *parent,
 		context.p2k_show_func = pool_property_show;
 		err = zfs_kobj_init(zfs_kobj, 0, ZPOOL_NUM_PROPS,
 		    pool_property_show);
+	} else if (type == ZFS_TYPE_VDEV) {
+		name = ZFS_SYSFS_VDEV_PROPERTIES;
+		context.p2k_table = vdev_prop_get_table();
+		context.p2k_attr_count = ZPOOL_PROP_ATTR_COUNT;
+		context.p2k_parent = zfs_kobj;
+		context.p2k_show_func = vdev_property_show;
+		err = zfs_kobj_init(zfs_kobj, 0, VDEV_NUM_PROPS,
+		    vdev_property_show);
 	} else {
 		name = ZFS_SYSFS_DATASET_PROPERTIES;
 		context.p2k_table = zfs_prop_get_table();
@@ -639,12 +667,22 @@ zfs_sysfs_init(void)
 		return;
 	}
 
+	err = zfs_sysfs_properties_init(&vdev_props_kobj, parent,
+	    ZFS_TYPE_VDEV);
+	if (err) {
+		zfs_kobj_fini(&kernel_features_kobj);
+		zfs_kobj_fini(&pool_features_kobj);
+		zfs_kobj_fini(&pool_props_kobj);
+		return;
+	}
+
 	err = zfs_sysfs_properties_init(&dataset_props_kobj, parent,
 	    ZFS_TYPE_FILESYSTEM);
 	if (err) {
 		zfs_kobj_fini(&kernel_features_kobj);
 		zfs_kobj_fini(&pool_features_kobj);
 		zfs_kobj_fini(&pool_props_kobj);
+		zfs_kobj_fini(&vdev_props_kobj);
 		return;
 	}
 }
@@ -657,6 +695,7 @@ zfs_sysfs_fini(void)
 	 */
 	zfs_kobj_fini(&kernel_features_kobj);
 	zfs_kobj_fini(&pool_features_kobj);
-	zfs_kobj_fini(&dataset_props_kobj);
 	zfs_kobj_fini(&pool_props_kobj);
+	zfs_kobj_fini(&vdev_props_kobj);
+	zfs_kobj_fini(&dataset_props_kobj);
 }

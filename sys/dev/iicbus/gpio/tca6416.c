@@ -131,13 +131,12 @@ static driver_t tca6416_driver = {
 	sizeof(struct tca6416_softc)
 };
 
-static devclass_t tca6416_devclass;
-
-DRIVER_MODULE(tca6416, iicbus, tca6416_driver, tca6416_devclass, 0, 0);
+DRIVER_MODULE(tca6416, iicbus, tca6416_driver, 0, 0);
 MODULE_VERSION(tca6416, 1);
 
 static struct ofw_compat_data compat_data[] = {
 	{"ti,tca6416",	1},
+	{"ti,tca9539",	1},
 	{0,0}
 };
 
@@ -273,11 +272,8 @@ tca6416_pin_getcaps(device_t dev, uint32_t pin, uint32_t *caps)
 static int
 tca6416_pin_getflags(device_t dev, uint32_t pin, uint32_t *pflags)
 {
-	struct tca6416_softc *sc;
 	int error;
 	uint8_t reg_addr, reg_bit, val;
-
-	sc = device_get_softc(dev);
 
 	if (pin >= NUM_PINS || pflags == NULL)
 		return (EINVAL);
@@ -365,11 +361,8 @@ tca6416_pin_getname(device_t dev, uint32_t pin, char *name)
 static int
 tca6416_pin_get(device_t dev, uint32_t pin, unsigned int *pval)
 {
-	struct tca6416_softc *sc;
 	uint8_t reg_bit, reg_addr, reg_pvalue;
 	int error;
-
-	sc = device_get_softc(dev);
 
 	if (pin >= NUM_PINS || pval == NULL)
 		return (EINVAL);
@@ -511,14 +504,11 @@ tca6416_regdump_sysctl(SYSCTL_HANDLER_ARGS)
 {
 	device_t dev;
 	char buf[5];
-	struct tca6416_softc *sc;
 	int len, error;
 	uint8_t reg, regval;
 
 	dev = (device_t)arg1;
 	reg = (uint8_t)arg2;
-	sc = device_get_softc(dev);
-
 
 	error = tca6416_read(dev, reg, &regval);
 	if (error != 0) {

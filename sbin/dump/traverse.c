@@ -525,12 +525,8 @@ dumpino(union dinode *dp, ino_t ino)
 			spcl.c_count = 1;
 			added = appendextdata(dp);
 			writeheader(ino);
-			if (sblock->fs_magic == FS_UFS1_MAGIC)
-				memmove(buf, (caddr_t)dp->dp1.di_db,
-				    (u_long)DIP(dp, di_size));
-			else
-				memmove(buf, (caddr_t)dp->dp2.di_db,
-				    (u_long)DIP(dp, di_size));
+			memmove(buf, DIP(dp, di_shortlink),
+			    (u_long)DIP(dp, di_size));
 			buf[DIP(dp, di_size)] = '\0';
 			writerec(buf, 0);
 			writeextdata(dp, ino, added);
@@ -756,7 +752,7 @@ appendextdata(union dinode *dp)
 	 * data by the writeextdata() routine.
 	 */
 	tbperdb = sblock->fs_bsize >> tp_bshift;
-	assert(spcl.c_count + blks < TP_NINDIR);
+	assert(spcl.c_count + blks <= TP_NINDIR);
 	for (i = 0; i < blks; i++)
 		if (&dp->dp2.di_extb[i / tbperdb] != 0)
 				spcl.c_addr[spcl.c_count + i] = 1;

@@ -93,7 +93,6 @@ static struct vop_vector fdesc_vnodeops = {
 };
 VFS_VOP_VECTOR_REGISTER(fdesc_vnodeops);
 
-static void fdesc_insmntque_dtr(struct vnode *, void *);
 static void fdesc_remove_entry(struct fdescnode *);
 
 /*
@@ -118,17 +117,6 @@ fdesc_uninit(struct vfsconf *vfsp)
 	hashdestroy(fdhashtbl, M_CACHE, fdhash);
 	mtx_destroy(&fdesc_hashmtx);
 	return (0);
-}
-
-/*
- * If allocating vnode fails, call this.
- */
-static void
-fdesc_insmntque_dtr(struct vnode *vp, void *arg)
-{
-
-	vgone(vp);
-	vput(vp);
 }
 
 /*
@@ -159,10 +147,8 @@ fdesc_allocvp(fdntype ftype, unsigned fd_fd, int ix, struct mount *mp,
 	struct fdhashhead *fc;
 	struct fdescnode *fd, *fd2;
 	struct vnode *vp, *vp2;
-	struct thread *td;
 	int error;
 
-	td = curthread;
 	fc = FD_NHASH(ix);
 loop:
 	mtx_lock(&fdesc_hashmtx);
@@ -205,8 +191,10 @@ loop:
 	fd->fd_ix = ix;
 	if (ftype == Fdesc && fmp->flags & FMNT_LINRDLNKF)
 		vp->v_vflag |= VV_READLINK;
-	error = insmntque1(vp, mp, fdesc_insmntque_dtr, NULL);
+	error = insmntque1(vp, mp);
 	if (error != 0) {
+		vgone(vp);
+		vput(vp);
 		*vpp = NULLVP;
 		return (error);
 	}
@@ -264,10 +252,20 @@ fdesc_get_ino_alloc(struct mount *mp, void *arg, int lkflags,
     struct vnode **rvp)
 {
 	struct fdesc_get_ino_args *a;
+	struct fdescmount *fdm;
+	struct vnode *vp;
 	int error;
 
 	a = arg;
-	error = fdesc_allocvp(a->ftype, a->fd_fd, a->ix, mp, rvp);
+	fdm = VFSTOFDESC(mp);
+	if ((fdm->flags & FMNT_NODUP) != 0 && a->fp->f_type == DTYPE_VNODE) {
+		vp = a->fp->f_vnode;
+		vget(vp, lkflags | LK_RETRY);
+		*rvp = vp;
+		error = 0;
+	} else {
+		error = fdesc_allocvp(a->ftype, a->fd_fd, a->ix, mp, rvp);
+	}
 	fdrop(a->fp, a->td);
 	return (error);
 }
@@ -283,7 +281,7 @@ fdesc_lookup(struct vop_lookup_args *ap)
 	struct vnode *dvp = ap->a_dvp;
 	struct componentname *cnp = ap->a_cnp;
 	char *pname = cnp->cn_nameptr;
-	struct thread *td = cnp->cn_thread;
+	struct thread *td = curthread;
 	struct file *fp;
 	struct fdesc_get_ino_args arg;
 	int nlen = cnp->cn_namelen;
@@ -494,9 +492,15 @@ fdesc_setattr(struct vop_setattr_args *ap)
 
 	/*
 	 * Allow setattr where there is an underlying vnode.
+	 * For O_PATH descriptors, disallow truncate.
 	 */
-	error = getvnode(td, fd,
-	    cap_rights_init_one(&rights, CAP_EXTATTR_SET), &fp);
+	if (vap->va_size != VNOVAL) {
+		error = getvnode(td, fd,
+		    cap_rights_init_one(&rights, CAP_EXTATTR_SET), &fp);
+	} else {
+		error = getvnode_path(td, fd,
+		    cap_rights_init_one(&rights, CAP_EXTATTR_SET), &fp);
+	}
 	if (error) {
 		/*
 		 * getvnode() returns EINVAL if the file descriptor is not

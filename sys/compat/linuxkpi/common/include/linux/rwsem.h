@@ -28,8 +28,8 @@
  *
  * $FreeBSD$
  */
-#ifndef	_LINUX_RWSEM_H_
-#define	_LINUX_RWSEM_H_
+#ifndef	_LINUXKPI_LINUX_RWSEM_H_
+#define	_LINUXKPI_LINUX_RWSEM_H_
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -51,6 +51,7 @@ struct rw_semaphore {
 #define	downgrade_write(_rw)		sx_downgrade(&(_rw)->sx)
 #define	down_read_nested(_rw, _sc)	down_read(_rw)
 #define	init_rwsem(_rw)			linux_init_rwsem(_rw, rwsem_name("lnxrwsem"))
+#define	down_write_nest_lock(sem, _rw)	down_write(_rw)
 
 #ifdef WITNESS_ALL
 /* NOTE: the maximum WITNESS name is 64 chars */
@@ -81,4 +82,4 @@ linux_init_rwsem(struct rw_semaphore *rw, const char *name)
 
 extern int linux_down_write_killable(struct rw_semaphore *);
 
-#endif					/* _LINUX_RWSEM_H_ */
+#endif					/* _LINUXKPI_LINUX_RWSEM_H_ */

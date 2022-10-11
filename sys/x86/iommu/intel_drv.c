@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2013-2015 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Konstantin Belousov <kib@FreeBSD.org>
  * under sponsorship from the FreeBSD Foundation.
@@ -84,7 +83,6 @@ __FBSDID("$FreeBSD$");
 #define	DMAR_QI_IRQ_RID		1
 #define	DMAR_REG_RID		2
 
-static devclass_t dmar_devclass;
 static device_t *dmar_devs;
 static int dmar_devcnt;
 
@@ -406,6 +404,7 @@ dmar_attach(device_t dev)
 	struct dmar_unit *unit;
 	ACPI_DMAR_HARDWARE_UNIT *dmaru;
 	uint64_t timeout;
+	int disable_pmr;
 	int i, error;
 
 	unit = device_get_softc(dev);
@@ -529,6 +528,16 @@ dmar_attach(device_t dev)
 		dmar_release_resources(dev, unit);
 		return (error);
 	}
+
+	disable_pmr = 0;
+	TUNABLE_INT_FETCH("hw.dmar.pmr.disable", &disable_pmr);
+	if (disable_pmr) {
+		error = dmar_disable_protected_regions(unit);
+		if (error != 0)
+			device_printf(dev,
+			    "Failed to disable protected regions\n");
+	}
+
 	error = iommu_init_busdma(&unit->iommu);
 	if (error != 0) {
 		dmar_release_resources(dev, unit);
@@ -590,7 +599,7 @@ static driver_t	dmar_driver = {
 	sizeof(struct dmar_unit),
 };
 
-DRIVER_MODULE(dmar, acpi, dmar_driver, dmar_devclass, 0, 0);
+DRIVER_MODULE(dmar, acpi, dmar_driver, 0, 0);
 MODULE_DEPEND(dmar, acpi, 1, 1, 1);
 
 static void
@@ -763,7 +772,6 @@ dmar_find_by_scope(int dev_domain, int dev_busno,
 struct dmar_unit *
 dmar_find(device_t dev, bool verbose)
 {
-	device_t dmar_dev;
 	struct dmar_unit *unit;
 	const char *banner;
 	int i, dev_domain, dev_busno, dev_path_len;
@@ -775,7 +783,6 @@ dmar_find(device_t dev, bool verbose)
 	    devclass_find("pci"))
 		return (NULL);
 
-	dmar_dev = NULL;
 	dev_domain = pci_get_domain(dev);
 	dev_path_len = dmar_dev_depth(dev);
 	ACPI_DMAR_PCI_PATH dev_path[dev_path_len];
@@ -925,7 +932,7 @@ dmar_rmrr_iter(ACPI_DMAR_HEADER *dmarh, void *arg)
 			/* The RMRR entry end address is inclusive. */
 			entry->end = resmem->EndAddress;
 			TAILQ_INSERT_TAIL(ria->rmrr_entries, entry,
-			    unroll_link);
+			    dmamap_link);
 		}
 	}
 
@@ -1068,6 +1075,10 @@ dmar_instantiate_rmrr_ctxs(struct iommu_unit *unit)
 		KASSERT((dmar->hw_gcmd & DMAR_GCMD_TE) == 0,
 	    ("dmar%d: RMRR not handled but translation is already enabled",
 		    dmar->iommu.unit));
+		error = dmar_disable_protected_regions(dmar);
+		if (error != 0)
+			printf("dmar%d: Failed to disable protected regions\n",
+			    dmar->iommu.unit);
 		error = dmar_enable_translation(dmar);
 		if (bootverbose) {
 			if (error == 0) {
@@ -1161,7 +1172,7 @@ dmar_print_domain(struct dmar_domain *domain, bool show_mappings)
 	}
 }
 
-DB_FUNC(dmar_domain, db_dmar_print_domain, db_show_table, CS_OWN, NULL)
+DB_SHOW_COMMAND_FLAGS(dmar_domain, db_dmar_print_domain, CS_OWN)
 {
 	struct dmar_unit *unit;
 	struct dmar_domain *domain;

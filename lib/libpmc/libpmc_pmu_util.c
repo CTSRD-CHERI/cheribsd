@@ -2,6 +2,10 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2018, Matthew Macy
+ * Copyright (c) 2021, The FreeBSD Foundation
+ *
+ * Portions of this software were developed by Mitchell Horne
+ * under sponsorship from the FreeBSD Foundation.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -43,12 +47,12 @@
 #include <libpmcstat.h>
 #include "pmu-events/pmu-events.h"
 
-#if defined(__amd64__) || defined(__i386__)
 struct pmu_alias {
 	const char *pa_alias;
 	const char *pa_name;
 };
 
+#if defined(__amd64__) || defined(__i386__)
 typedef enum {
 	PMU_INVALID,
 	PMU_INTEL,
@@ -56,8 +60,8 @@ typedef enum {
 } pmu_mfr_t;
 
 static struct pmu_alias pmu_intel_alias_table[] = {
-	{"UNHALTED_CORE_CYCLES", "CPU_CLK_UNHALTED.THREAD_P_ANY"},
-	{"UNHALTED-CORE-CYCLES", "CPU_CLK_UNHALTED.THREAD_P_ANY"},
+	{"UNHALTED_CORE_CYCLES", "cpu_clk_unhalted.thread"},
+	{"UNHALTED-CORE-CYCLES", "cpu_clk_unhalted.thread"},
 	{"LLC_MISSES", "LONGEST_LAT_CACHE.MISS"},
 	{"LLC-MISSES", "LONGEST_LAT_CACHE.MISS"},
 	{"LLC_REFERENCE", "LONGEST_LAT_CACHE.REFERENCE"},
@@ -70,9 +74,8 @@ static struct pmu_alias pmu_intel_alias_table[] = {
 	{"BRANCH-INSTRUCTION-RETIRED", "BR_INST_RETIRED.ALL_BRANCHES"},
 	{"BRANCH_MISSES_RETIRED", "BR_MISP_RETIRED.ALL_BRANCHES"},
 	{"BRANCH-MISSES-RETIRED", "BR_MISP_RETIRED.ALL_BRANCHES"},
-	{"cycles", "tsc-tsc"},
-	{"unhalted-cycles", "CPU_CLK_UNHALTED.THREAD_P_ANY"},
-	{"instructions", "inst-retired.any_p"},
+	{"unhalted-cycles", "cpu_clk_unhalted.thread"},
+	{"instructions", "inst_retired.any"},
 	{"branch-mispredicts", "br_misp_retired.all_branches"},
 	{"branches", "br_inst_retired.all_branches"},
 	{"interrupts", "hw_interrupts.received"},
@@ -83,6 +86,19 @@ static struct pmu_alias pmu_intel_alias_table[] = {
 static struct pmu_alias pmu_amd_alias_table[] = {
 	{"UNHALTED_CORE_CYCLES", "ls_not_halted_cyc"},
 	{"UNHALTED-CORE-CYCLES", "ls_not_halted_cyc"},
+	{"LLC_MISSES", "l3_comb_clstr_state.request_miss"},
+	{"LLC-MISSES", "l3_comb_clstr_state.request_miss"},
+	{"LLC_REFERENCE", "l3_request_g1.caching_l3_cache_accesses"},
+	{"LLC-REFERENCE", "l3_request_g1.caching_l3_cache_accesses"},
+	{"BRANCH_INSTRUCTION_RETIRED", "ex_ret_brn"},
+	{"BRANCH-INSTRUCTION-RETIRED", "ex_ret_brn"},
+	{"BRANCH_MISSES_RETIRED", "ex_ret_brn_misp"},
+	{"BRANCH-MISSES-RETIRED", "ex_ret_brn_misp"},
+	{"unhalted-cycles", "ls_not_halted_cyc"},
+	{"instructions", "ex_ret_instr",},
+	{"branch-mispredicts", "ex_ret_brn_misp"},
+	{"branches", "ex_ret_brn"},
+	{"interrupts", "ls_int_taken"}, /* Not on amdzen1 */
 	{NULL, NULL},
 };
 
@@ -138,6 +154,56 @@ pmu_alias_get(const char *name)
 
 	return (name);
 }
+#elif defined(__powerpc64__)
+
+static const char *
+pmu_alias_get(const char *name)
+{
+	return (name);
+}
+
+#elif defined(__aarch64__)
+
+static struct pmu_alias pmu_armv8_alias_table[] = {
+	{"UNHALTED_CORE_CYCLES", "CPU_CYCLES"},
+	{"UNHALTED-CORE-CYCLES", "CPU_CYCLES"},
+	{"LLC_MISSES", "LL_CACHE_MISS_RD"},
+	{"LLC-MISSES", "LL_CACHE_MISS_RD"},
+	{"LLC_REFERENCE", "LL_CACHE_RD"},
+	{"LLC-REFERENCE", "LL_CACHE_RD"},
+	{"BRANCH_INSTRUCTION_RETIRED", "BR_RETIRED"},
+	{"BRANCH-INSTRUCTION-RETIRED", "BR_RETIRED"},
+	{"BRANCH_MISSES_RETIRED", "BR_MIS_PRED_RETIRED"},
+	{"BRANCH-MISSES-RETIRED", "BR_MIS_PRED_RETIRED"},
+	{"unhalted-cycles", "CPU_CYCLES"},
+	{"instructions", "INST_RETIRED",},
+	{"branch-mispredicts", "BR_MIS_PRED_RETIRED"},
+	{"branches", "BR_RETIRED"},
+	{"interrupts", "EXC_IRQ"},
+	{NULL, NULL},
+};
+
+static const char *
+pmu_alias_get(const char *name)
+{
+	struct pmu_alias *pa;
+
+	for (pa = pmu_armv8_alias_table; pa->pa_alias != NULL; pa++)
+		if (strcasecmp(name, pa->pa_alias) == 0)
+			return (pa->pa_name);
+
+	return (name);
+}
+
+#else
+
+static const char *
+pmu_alias_get(const char *name)
+{
+
+	return (name);
+}
+#endif
 
 struct pmu_event_desc {
 	uint64_t ped_period;
@@ -302,8 +368,6 @@ pmc_pmu_sample_rate_get(const char *event_name)
 	event_name = pmu_alias_get(event_name);
 	if ((pe = pmu_event_get(NULL, event_name, NULL)) == NULL)
 		return (DEFAULT_SAMPLE_COUNT);
-	if (pe->alias && (pe = pmu_event_get(NULL, pe->alias, NULL)) == NULL)
-		return (DEFAULT_SAMPLE_COUNT);
 	if (pe->event == NULL)
 		return (DEFAULT_SAMPLE_COUNT);
 	if (pmu_parse_event(&ped, pe->event))
@@ -419,6 +483,7 @@ pmc_pmu_print_counter_full(const char *ev)
 	}
 }
 
+#if defined(__amd64__) || defined(__i386__)
 static int
 pmc_pmu_amd_pmcallocate(const char *event_name, struct pmc_op_pmcallocate *pm,
 	struct pmu_event_desc *ped)
@@ -460,7 +525,7 @@ pmc_pmu_amd_pmcallocate(const char *event_name, struct pmc_op_pmcallocate *pm,
 		if (ped->ped_edge)
 			amd->pm_amd_config |= AMD_PMC_EDGE;
 		if (ped->ped_inv)
-			amd->pm_amd_config |= AMD_PMC_EDGE;
+			amd->pm_amd_config |= AMD_PMC_INVERT;
 		if (pm->pm_caps & PMC_CAP_INTERRUPT)
 			amd->pm_amd_config |= AMD_PMC_INT;
 	}
@@ -472,16 +537,13 @@ pmc_pmu_intel_pmcallocate(const char *event_name, struct pmc_op_pmcallocate *pm,
 	struct pmu_event_desc *ped)
 {
 	struct pmc_md_iap_op_pmcallocate *iap;
-	int isfixed;
 
-	isfixed = 0;
 	iap = &pm->pm_md.pm_iap;
 	if (strcasestr(event_name, "UNC_") == event_name ||
 	    strcasestr(event_name, "uncore") != NULL) {
 		pm->pm_class = PMC_CLASS_UCP;
 		pm->pm_caps |= PMC_CAP_QUALIFIER;
-	} else if ((ped->ped_umask == -1) ||
-	    (ped->ped_event == 0x0 && ped->ped_umask == 0x3)) {
+	} else if (ped->ped_event == 0x0) {
 		pm->pm_class = PMC_CLASS_IAF;
 	} else {
 		pm->pm_class = PMC_CLASS_IAP;
@@ -506,7 +568,7 @@ pmc_pmu_intel_pmcallocate(const char *event_name, struct pmc_op_pmcallocate *pm,
 	if (ped->ped_any)
 		iap->pm_iap_config |= IAP_ANY;
 	if (ped->ped_inv)
-		iap->pm_iap_config |= IAP_EDGE;
+		iap->pm_iap_config |= IAP_INV;
 	if (pm->pm_caps & PMC_CAP_INTERRUPT)
 		iap->pm_iap_config |= IAP_INT;
 	return (0);
@@ -528,8 +590,6 @@ pmc_pmu_pmcallocate(const char *event_name, struct pmc_op_pmcallocate *pm)
 	event_name = pmu_alias_get(event_name);
 	if ((pe = pmu_event_get(NULL, event_name, &idx)) == NULL)
 		return (ENOENT);
-	if (pe->alias && (pe = pmu_event_get(NULL, pe->alias, &idx)) == NULL)
-		return (ENOENT);
 	assert(idx >= 0);
 	pm->pm_ev = idx;
 
@@ -544,85 +604,65 @@ pmc_pmu_pmcallocate(const char *event_name, struct pmc_op_pmcallocate *pm)
 		return (pmc_pmu_amd_pmcallocate(event_name, pm, &ped));
 }
 
-/*
- * Ultimately rely on AMD calling theirs the same
- */
-static const char *stat_mode_cntrs[] = {
-	"cpu_clk_unhalted.thread",
-	"inst_retired.any",
-	"br_inst_retired.all_branches",
-	"br_misp_retired.all_branches",
-	"longest_lat_cache.reference",
-	"longest_lat_cache.miss",
-};
+#elif defined(__powerpc64__)
 
 int
-pmc_pmu_stat_mode(const char ***cntrs)
+pmc_pmu_pmcallocate(const char *event_name, struct pmc_op_pmcallocate *pm)
 {
-	if (pmc_pmu_enabled()) {
-		*cntrs = stat_mode_cntrs;
-		return (0);
-	}
-	return (EOPNOTSUPP);
+	const struct pmu_event *pe;
+	struct pmu_event_desc ped;
+	int idx = -1;
+
+	bzero(&pm->pm_md, sizeof(pm->pm_md));
+	pm->pm_caps |= (PMC_CAP_READ | PMC_CAP_WRITE);
+	event_name = pmu_alias_get(event_name);
+
+	if ((pe = pmu_event_get(NULL, event_name, &idx)) == NULL)
+		return (ENOENT);
+	if (pe->event == NULL)
+		return (ENOENT);
+	if (pmu_parse_event(&ped, pe->event))
+		return (ENOENT);
+
+	assert(ped.ped_event >= 0);
+	pm->pm_ev = idx;
+	pm->pm_md.pm_event = ped.ped_event;
+	pm->pm_class = PMC_CLASS_POWER8;
+	return (0);
+}
+
+#elif defined(__aarch64__)
+
+int
+pmc_pmu_pmcallocate(const char *event_name, struct pmc_op_pmcallocate *pm)
+{
+	const struct pmu_event *pe;
+	struct pmu_event_desc ped;
+	int idx = -1;
+
+	event_name = pmu_alias_get(event_name);
+	if ((pe = pmu_event_get(NULL, event_name, &idx)) == NULL)
+		return (ENOENT);
+	if (pe->event == NULL)
+		return (ENOENT);
+	if (pmu_parse_event(&ped, pe->event))
+		return (ENOENT);
+
+	assert(idx >= 0);
+	pm->pm_ev = idx;
+	pm->pm_md.pm_md_config = ped.ped_event;
+	pm->pm_md.pm_md_flags |= PM_MD_RAW_EVENT;
+	pm->pm_class = PMC_CLASS_ARMV8;
+	pm->pm_caps |= (PMC_CAP_READ | PMC_CAP_WRITE);
+
+	return (0);
 }
 
 #else
-
-uint64_t
-pmc_pmu_sample_rate_get(const char *event_name __unused)
-{
-	return (DEFAULT_SAMPLE_COUNT);
-}
-
-void
-pmc_pmu_print_counters(const char *event_name __unused)
-{
-}
-
-void
-pmc_pmu_print_counter_desc(const char *e __unused)
-{
-}
-
-void
-pmc_pmu_print_counter_desc_long(const char *e __unused)
-{
-}
-
-void
-pmc_pmu_print_counter_full(const char *e __unused)
-{
-
-}
-
-int
-pmc_pmu_enabled(void)
-{
-	return (0);
-}
 
 int
 pmc_pmu_pmcallocate(const char *e __unused, struct pmc_op_pmcallocate *p __unused)
 {
 	return (EOPNOTSUPP);
 }
-
-const char *
-pmc_pmu_event_get_by_idx(const char *c __unused, int idx __unused)
-{
-	return (NULL);
-}
-
-int
-pmc_pmu_stat_mode(const char ***a __unused)
-{
-	return (EOPNOTSUPP);
-}
-
-int
-pmc_pmu_idx_get_by_event(const char *c __unused, const char *e __unused)
-{
-	return (-1);
-}
-
 #endif

@@ -28,11 +28,12 @@
 #	in zpool status.
 #
 # STRATEGY:
-#	1. Create a raidz or mirror pool
+#	1. Create a mirror, raidz, or draid pool
 #	2. Inject read/write IO errors or checksum errors
 #	3. Verify the number of errors in zpool status match the corresponding
 #	   number of error events.
-#	4. Repeat for all combinations of raidz/mirror and io/checksum errors.
+#	4. Repeat for all combinations of mirror/raidz/draid and io/checksum
+#	   errors.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -58,7 +59,7 @@ function cleanup
 	if poolexists $POOL ; then
 		log_must destroy_pool $POOL
 	fi
-	log_must rm -f $VDEV1 $VDEV2 $VDEV3
+	log_must rm -fd $VDEV1 $VDEV2 $VDEV3 $MOUNTDIR
 }
 
 log_assert "Check that the number of zpool errors match the number of events"
@@ -74,7 +75,7 @@ log_must mkdir -p $MOUNTDIR
 
 # Run error test on a specific type of pool
 #
-# $1: pool - raidz, mirror
+# $1: pool - mirror, raidz, draid
 # $2: test type - corrupt (checksum error), io
 # $3: read, write
 function do_test
@@ -96,7 +97,7 @@ function do_test
 
 	if [ "$RW" == "write" ] ; then
 		log_must mkfile $FILESIZE $MOUNTDIR/file
-		log_must zpool sync $POOL
+		sync_pool $POOL
 	else
 		log_must zpool scrub $POOL
 		wait_scrubbed $POOL
@@ -114,7 +115,7 @@ function do_test
 	out="$(zpool status -p | grep $VDEV1)"
 
 	if [ "$ERR" == "corrupt" ] ; then
-		events=$(zpool events | grep checksum | wc -l)
+		events=$(zpool events | grep -c checksum)
 		val=$(echo "$out" | awk '{print $5}')
 		str="checksum"
 	elif [ "$ERR" == "io" ] ; then
@@ -142,8 +143,8 @@ function do_test
 	log_must zpool destroy $POOL
 }
 
-# Test all types of errors on mirror and raidz pools
-for pooltype in mirror raidz ; do
+# Test all types of errors on mirror, raidz, and draid pools
+for pooltype in mirror raidz draid; do
 	do_test $pooltype corrupt read
 	do_test $pooltype io read
 	do_test $pooltype io write

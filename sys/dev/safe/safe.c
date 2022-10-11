@@ -108,14 +108,14 @@ static device_method_t safe_methods[] = {
 
 	DEVMETHOD_END
 };
+
 static driver_t safe_driver = {
 	"safe",
 	safe_methods,
 	sizeof (struct safe_softc)
 };
-static devclass_t safe_devclass;
 
-DRIVER_MODULE(safe, pci, safe_driver, safe_devclass, 0, 0);
+DRIVER_MODULE(safe, pci, safe_driver, 0, 0);
 MODULE_DEPEND(safe, crypto, 1, 1, 1);
 #ifdef SAFE_RNDTEST
 MODULE_DEPEND(safe, rndtest, 1, 1, 1);
@@ -1781,7 +1781,7 @@ safe_dmamap_aligned(const struct safe_operand *op)
  * fix that size at SAFE_MAX_DSIZE bytes.  This routine returns
  * 0 if some segment is not a multiple of of this size, 1 if all
  * segments are exactly this size, or 2 if segments are at worst
- * a multple of this size.
+ * a multiple of this size.
  */
 static int
 safe_dmamap_uniform(const struct safe_operand *op)

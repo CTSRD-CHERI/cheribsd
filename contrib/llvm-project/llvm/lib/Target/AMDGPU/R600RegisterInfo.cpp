@@ -12,11 +12,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "R600RegisterInfo.h"
-#include "AMDGPUTargetMachine.h"
+#include "MCTargetDesc/R600MCTargetDesc.h"
 #include "R600Defines.h"
-#include "R600InstrInfo.h"
-#include "R600MachineFunctionInfo.h"
-#include "MCTargetDesc/AMDGPUMCTargetDesc.h"
+#include "R600Subtarget.h"
 
 using namespace llvm;
 
@@ -56,10 +54,8 @@ BitVector R600RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   reserveRegisterTuples(Reserved, R600::PRED_SEL_ONE);
   reserveRegisterTuples(Reserved, R600::INDIRECT_BASE_ADDR);
 
-  for (TargetRegisterClass::iterator I = R600::R600_AddrRegClass.begin(),
-                        E = R600::R600_AddrRegClass.end(); I != E; ++I) {
-    reserveRegisterTuples(Reserved, *I);
-  }
+  for (MCPhysReg R : R600::R600_AddrRegClass)
+    reserveRegisterTuples(Reserved, R);
 
   TII->reserveIndirectRegisters(Reserved, MF, *this);
 
@@ -94,8 +90,8 @@ const TargetRegisterClass * R600RegisterInfo::getCFGStructurizerRegClass(
   }
 }
 
-bool R600RegisterInfo::isPhysRegLiveAcrossClauses(unsigned Reg) const {
-  assert(!Register::isVirtualRegister(Reg));
+bool R600RegisterInfo::isPhysRegLiveAcrossClauses(Register Reg) const {
+  assert(!Reg.isVirtual());
 
   switch (Reg) {
   case R600::OQAP:

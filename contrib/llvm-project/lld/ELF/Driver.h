@@ -22,19 +22,19 @@
 namespace lld {
 namespace elf {
 
-extern class LinkerDriver *driver;
+extern std::unique_ptr<class LinkerDriver> driver;
 
 class LinkerDriver {
 public:
-  void main(ArrayRef<const char *> args);
+  void linkerMain(ArrayRef<const char *> args);
   void addFile(StringRef path, bool withLOption);
   void addLibrary(StringRef name);
 
 private:
   void createFiles(llvm::opt::InputArgList &args);
   void inferMachineType();
-  template <class ELFT> void link(llvm::opt::InputArgList &args);
-  template <class ELFT> void compileBitcodeFiles();
+  void link(llvm::opt::InputArgList &args);
+  template <class ELFT> void compileBitcodeFiles(bool skipLinkedOutput);
 
   // True if we are in --whole-archive and --no-whole-archive.
   bool inWholeArchive = false;

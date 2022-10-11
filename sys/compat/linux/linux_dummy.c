@@ -1,8 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2013 Dmitry Chagin
- * All rights reserved.
+ * Copyright (c) 2013 Dmitry Chagin <dchagin@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -113,8 +112,6 @@ DUMMY(kcmp);
 DUMMY(finit_module);
 DUMMY(sched_setattr);
 DUMMY(sched_getattr);
-/* Linux 3.17: */
-DUMMY(seccomp);
 /* Linux 3.18: */
 DUMMY(bpf);
 /* Linux 3.19: */
@@ -132,6 +129,25 @@ DUMMY(pwritev2);
 DUMMY(pkey_mprotect);
 DUMMY(pkey_alloc);
 DUMMY(pkey_free);
+DUMMY(open_tree);
+DUMMY(move_mount);
+DUMMY(fsopen);
+DUMMY(fsconfig);
+DUMMY(fsmount);
+DUMMY(fspick);
+DUMMY(pidfd_open);
+DUMMY(close_range);
+DUMMY(openat2);
+DUMMY(pidfd_getfd);
+DUMMY(process_madvise);
+DUMMY(mount_setattr);
+/* Linux 4.18: */
+DUMMY(io_pgetevents);
+/* Linux 5.0: */
+DUMMY(pidfd_send_signal);
+DUMMY(io_uring_setup);
+DUMMY(io_uring_enter);
+DUMMY(io_uring_register);
 
 #define DUMMY_XATTR(s)						\
 int								\

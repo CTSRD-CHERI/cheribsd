@@ -897,8 +897,7 @@ static driver_t est_driver = {
 	sizeof(struct est_softc),
 };
 
-static devclass_t est_devclass;
-DRIVER_MODULE(est, cpu, est_driver, est_devclass, 0, 0);
+DRIVER_MODULE(est, cpu, est_driver, 0, 0);
 MODULE_DEPEND(est, hwpstate_intel, 1, 1, 1);
 
 static int
@@ -946,7 +945,7 @@ est_identify(driver_t *driver, device_t parent)
 	 * We add a child for each CPU since settings must be performed
 	 * on each CPU in the SMP case.
 	 */
-	child = BUS_ADD_CHILD(parent, 10, "est", -1);
+	child = BUS_ADD_CHILD(parent, 10, "est", device_get_unit(parent));
 	if (child == NULL)
 		device_printf(parent, "add est child failed\n");
 }

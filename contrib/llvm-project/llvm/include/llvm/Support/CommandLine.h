@@ -31,7 +31,6 @@
 #include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
 #include <climits>
@@ -43,6 +42,10 @@
 #include <vector>
 
 namespace llvm {
+
+namespace vfs {
+class FileSystem;
+}
 
 class StringSaver;
 
@@ -70,13 +73,6 @@ bool ParseCommandLineOptions(int argc, const char *const *argv,
                              raw_ostream *Errs = nullptr,
                              const char *EnvVar = nullptr,
                              bool LongOptionsUseDoubleDash = false);
-
-//===----------------------------------------------------------------------===//
-// ParseEnvironmentOptions - Environment variable option processing alternate
-//                           entry point.
-//
-void ParseEnvironmentOptions(const char *progName, const char *envvar,
-                             const char *Overview = "");
 
 // Function pointer type for printing version information.
 using VersionPrinterTy = std::function<void(raw_ostream &)>;
@@ -206,7 +202,7 @@ public:
 };
 
 // The general Option Category (used as default category).
-extern OptionCategory GeneralCategory;
+OptionCategory &getGeneralCategory();
 
 //===----------------------------------------------------------------------===//
 // SubCommand class
@@ -320,9 +316,7 @@ public:
   }
 
   bool isInAllSubCommands() const {
-    return any_of(Subs, [](const SubCommand *SC) {
-      return SC == &*AllSubCommands;
-    });
+    return llvm::is_contained(Subs, &*AllSubCommands);
   }
 
   //-------------------------------------------------------------------------===
@@ -346,7 +340,7 @@ protected:
       : NumOccurrences(0), Occurrences(OccurrencesFlag), Value(0),
         HiddenFlag(Hidden), Formatting(NormalFormatting), Misc(0),
         FullyInitialized(false), Position(0), AdditionalVals(0) {
-    Categories.push_back(&GeneralCategory);
+    Categories.push_back(&getGeneralCategory());
   }
 
   inline void setNumAdditionalVals(unsigned n) { AdditionalVals = n; }
@@ -376,8 +370,21 @@ public:
 
   virtual void setDefault() = 0;
 
+  // Prints the help string for an option.
+  //
+  // This maintains the Indent for multi-line descriptions.
+  // FirstLineIndentedBy is the count of chars of the first line
+  //      i.e. the one containing the --<option name>.
   static void printHelpStr(StringRef HelpStr, size_t Indent,
                            size_t FirstLineIndentedBy);
+
+  // Prints the help string for an enum value.
+  //
+  // This maintains the Indent for multi-line descriptions.
+  // FirstLineIndentedBy is the count of chars of the first line
+  //      i.e. the one containing the =<value>.
+  static void printEnumValHelpStr(StringRef HelpStr, size_t Indent,
+                                  size_t FirstLineIndentedBy);
 
   virtual void getExtraOptionNames(SmallVectorImpl<StringRef> &) {}
 
@@ -679,7 +686,7 @@ public:
       : Values(Options) {}
 
   template <class Opt> void apply(Opt &O) const {
-    for (auto Value : Values)
+    for (const auto &Value : Values)
       O.getParser().addLiteralOption(Value.Name, Value.Value,
                                      Value.Description);
   }
@@ -870,7 +877,7 @@ class basic_parser_impl { // non-template implementation of basic_parser<t>
 public:
   basic_parser_impl(Option &) {}
 
-  virtual ~basic_parser_impl() {}
+  virtual ~basic_parser_impl() = default;
 
   enum ValueExpected getValueExpectedFlagDefault() const {
     return ValueRequired;
@@ -917,6 +924,9 @@ public:
 //--------------------------------------------------
 // parser<bool>
 //
+
+extern template class basic_parser<bool>;
+
 template <> class parser<bool> : public basic_parser<bool> {
 public:
   parser(Option &O) : basic_parser(O) {}
@@ -940,10 +950,11 @@ public:
   void anchor() override;
 };
 
-extern template class basic_parser<bool>;
-
 //--------------------------------------------------
 // parser<boolOrDefault>
+
+extern template class basic_parser<boolOrDefault>;
+
 template <> class parser<boolOrDefault> : public basic_parser<boolOrDefault> {
 public:
   parser(Option &O) : basic_parser(O) {}
@@ -965,11 +976,12 @@ public:
   void anchor() override;
 };
 
-extern template class basic_parser<boolOrDefault>;
-
 //--------------------------------------------------
 // parser<int>
 //
+
+extern template class basic_parser<int>;
+
 template <> class parser<int> : public basic_parser<int> {
 public:
   parser(Option &O) : basic_parser(O) {}
@@ -987,11 +999,12 @@ public:
   void anchor() override;
 };
 
-extern template class basic_parser<int>;
-
 //--------------------------------------------------
 // parser<long>
 //
+
+extern template class basic_parser<long>;
+
 template <> class parser<long> final : public basic_parser<long> {
 public:
   parser(Option &O) : basic_parser(O) {}
@@ -1009,11 +1022,12 @@ public:
   void anchor() override;
 };
 
-extern template class basic_parser<long>;
-
 //--------------------------------------------------
 // parser<long long>
 //
+
+extern template class basic_parser<long long>;
+
 template <> class parser<long long> : public basic_parser<long long> {
 public:
   parser(Option &O) : basic_parser(O) {}
@@ -1031,11 +1045,12 @@ public:
   void anchor() override;
 };
 
-extern template class basic_parser<long long>;
-
 //--------------------------------------------------
 // parser<unsigned>
 //
+
+extern template class basic_parser<unsigned>;
+
 template <> class parser<unsigned> : public basic_parser<unsigned> {
 public:
   parser(Option &O) : basic_parser(O) {}
@@ -1053,11 +1068,12 @@ public:
   void anchor() override;
 };
 
-extern template class basic_parser<unsigned>;
-
 //--------------------------------------------------
 // parser<unsigned long>
 //
+
+extern template class basic_parser<unsigned long>;
+
 template <>
 class parser<unsigned long> final : public basic_parser<unsigned long> {
 public:
@@ -1076,11 +1092,12 @@ public:
   void anchor() override;
 };
 
-extern template class basic_parser<unsigned long>;
-
 //--------------------------------------------------
 // parser<unsigned long long>
 //
+
+extern template class basic_parser<unsigned long long>;
+
 template <>
 class parser<unsigned long long> : public basic_parser<unsigned long long> {
 public:
@@ -1100,11 +1117,12 @@ public:
   void anchor() override;
 };
 
-extern template class basic_parser<unsigned long long>;
-
 //--------------------------------------------------
 // parser<double>
 //
+
+extern template class basic_parser<double>;
+
 template <> class parser<double> : public basic_parser<double> {
 public:
   parser(Option &O) : basic_parser(O) {}
@@ -1122,11 +1140,12 @@ public:
   void anchor() override;
 };
 
-extern template class basic_parser<double>;
-
 //--------------------------------------------------
 // parser<float>
 //
+
+extern template class basic_parser<float>;
+
 template <> class parser<float> : public basic_parser<float> {
 public:
   parser(Option &O) : basic_parser(O) {}
@@ -1144,11 +1163,12 @@ public:
   void anchor() override;
 };
 
-extern template class basic_parser<float>;
-
 //--------------------------------------------------
 // parser<std::string>
 //
+
+extern template class basic_parser<std::string>;
+
 template <> class parser<std::string> : public basic_parser<std::string> {
 public:
   parser(Option &O) : basic_parser(O) {}
@@ -1169,11 +1189,12 @@ public:
   void anchor() override;
 };
 
-extern template class basic_parser<std::string>;
-
 //--------------------------------------------------
 // parser<char>
 //
+
+extern template class basic_parser<char>;
+
 template <> class parser<char> : public basic_parser<char> {
 public:
   parser(Option &O) : basic_parser(O) {}
@@ -1193,8 +1214,6 @@ public:
   // An out-of-line virtual method to provide a 'home' for this class.
   void anchor() override;
 };
-
-extern template class basic_parser<char>;
 
 //--------------------------------------------------
 // PrintOptionDiff
@@ -1488,7 +1507,7 @@ public:
 
   template <class... Mods>
   explicit opt(const Mods &... Ms)
-      : Option(Optional, NotHidden), Parser(*this) {
+      : Option(llvm::cl::Optional, NotHidden), Parser(*this) {
     apply(this, Ms...);
     done();
   }
@@ -1531,8 +1550,9 @@ public:
   }
 
   template <class T> void addValue(const T &V) {
-    assert(Location != 0 && "cl::location(...) not specified for a command "
-                            "line option with external storage!");
+    assert(Location != nullptr &&
+           "cl::location(...) not specified for a command "
+           "line option with external storage!");
     Location->push_back(V);
   }
 };
@@ -1735,8 +1755,9 @@ public:
   }
 
   template <class T> void addValue(const T &V) {
-    assert(Location != 0 && "cl::location(...) not specified for a command "
-                            "line option with external storage!");
+    assert(Location != nullptr &&
+           "cl::location(...) not specified for a command "
+           "line option with external storage!");
     *Location |= Bit(V);
   }
 
@@ -2061,7 +2082,8 @@ void tokenizeConfigFile(StringRef Source, StringSaver &Saver,
 ///
 /// It reads content of the specified file, tokenizes it and expands "@file"
 /// commands resolving file names in them relative to the directory where
-/// CfgFilename resides.
+/// CfgFilename resides. It also expands "<CFGDIR>" to the base path of the
+/// current config file.
 ///
 bool readConfigFile(StringRef CfgFileName, StringSaver &Saver,
                     SmallVectorImpl<const char *> &Argv);
@@ -2081,16 +2103,33 @@ bool readConfigFile(StringRef CfgFileName, StringSaver &Saver,
 /// with nullptrs in the Argv vector.
 /// \param [in] RelativeNames true if names of nested response files must be
 /// resolved relative to including file.
+/// \param [in] ExpandBasePath If true, "<CFGDIR>" expands to the base path of
+/// the current response file.
 /// \param [in] FS File system used for all file access when running the tool.
 /// \param [in] CurrentDir Path used to resolve relative rsp files. If set to
 /// None, process' cwd is used instead.
 /// \return true if all @files were expanded successfully or there were none.
+bool ExpandResponseFiles(StringSaver &Saver, TokenizerCallback Tokenizer,
+                         SmallVectorImpl<const char *> &Argv, bool MarkEOLs,
+                         bool RelativeNames, bool ExpandBasePath,
+                         llvm::Optional<llvm::StringRef> CurrentDir,
+                         llvm::vfs::FileSystem &FS);
+
+/// An overload of ExpandResponseFiles() that uses
+/// llvm::vfs::getRealFileSystem().
 bool ExpandResponseFiles(
     StringSaver &Saver, TokenizerCallback Tokenizer,
     SmallVectorImpl<const char *> &Argv, bool MarkEOLs = false,
-    bool RelativeNames = false,
-    llvm::vfs::FileSystem &FS = *llvm::vfs::getRealFileSystem(),
+    bool RelativeNames = false, bool ExpandBasePath = false,
     llvm::Optional<llvm::StringRef> CurrentDir = llvm::None);
+
+/// A convenience helper which concatenates the options specified by the
+/// environment variable EnvVar and command line options, then expands response
+/// files recursively. The tokenizer is a predefined GNU or Windows one.
+/// \return true if all @files were expanded successfully or there were none.
+bool expandResponseFiles(int Argc, const char *const *Argv, const char *EnvVar,
+                         StringSaver &Saver,
+                         SmallVectorImpl<const char *> &NewArgv);
 
 /// Mark all options not part of this category as cl::ReallyHidden.
 ///

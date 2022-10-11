@@ -43,17 +43,20 @@ typedef struct metaslab_ops {
 } metaslab_ops_t;
 
 
-extern metaslab_ops_t *zfs_metaslab_ops;
+extern const metaslab_ops_t zfs_metaslab_ops;
 
 int metaslab_init(metaslab_group_t *, uint64_t, uint64_t, uint64_t,
     metaslab_t **);
 void metaslab_fini(metaslab_t *);
 
+void metaslab_set_unflushed_dirty(metaslab_t *, boolean_t);
 void metaslab_set_unflushed_txg(metaslab_t *, uint64_t, dmu_tx_t *);
 void metaslab_set_estimated_condensed_size(metaslab_t *, uint64_t, dmu_tx_t *);
+boolean_t metaslab_unflushed_dirty(metaslab_t *);
 uint64_t metaslab_unflushed_txg(metaslab_t *);
 uint64_t metaslab_estimated_condensed_size(metaslab_t *);
 int metaslab_sort_by_flushed(const void *, const void *);
+void metaslab_unflushed_bump(metaslab_t *, dmu_tx_t *, boolean_t);
 uint64_t metaslab_unflushed_changes_memused(metaslab_t *);
 
 int metaslab_load(metaslab_t *);
@@ -101,7 +104,7 @@ void metaslab_stat_fini(void);
 void metaslab_trace_init(zio_alloc_list_t *);
 void metaslab_trace_fini(zio_alloc_list_t *);
 
-metaslab_class_t *metaslab_class_create(spa_t *, metaslab_ops_t *);
+metaslab_class_t *metaslab_class_create(spa_t *, const metaslab_ops_t *);
 void metaslab_class_destroy(metaslab_class_t *);
 int metaslab_class_validate(metaslab_class_t *);
 void metaslab_class_histogram_verify(metaslab_class_t *);
@@ -128,9 +131,9 @@ uint64_t metaslab_group_get_space(metaslab_group_t *);
 void metaslab_group_histogram_verify(metaslab_group_t *);
 uint64_t metaslab_group_fragmentation(metaslab_group_t *);
 void metaslab_group_histogram_remove(metaslab_group_t *, metaslab_t *);
-void metaslab_group_alloc_decrement(spa_t *, uint64_t, void *, int, int,
+void metaslab_group_alloc_decrement(spa_t *, uint64_t, const void *, int, int,
     boolean_t);
-void metaslab_group_alloc_verify(spa_t *, const blkptr_t *, void *, int);
+void metaslab_group_alloc_verify(spa_t *, const blkptr_t *, const void *, int);
 void metaslab_recalculate_weight_and_sort(metaslab_t *);
 void metaslab_disable(metaslab_t *);
 void metaslab_enable(metaslab_t *, boolean_t, boolean_t);

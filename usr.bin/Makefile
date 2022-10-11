@@ -10,8 +10,11 @@ SUBDIR=	alias \
 	backlight \
 	banner \
 	basename \
+	beep \
+	bintrans \
 	brandelf \
 	bsdcat \
+	bsddialog \
 	bsdiff \
 	bzip2 \
 	bzip2recover \
@@ -26,8 +29,6 @@ SUBDIR=	alias \
 	column \
 	comm \
 	compress \
-	coping \
-	copong \
 	cpuset \
 	csplit \
 	ctlstat \
@@ -146,7 +147,6 @@ SUBDIR=	alias \
 	soelim \
 	sort \
 	split \
-	stevie \
 	stat \
 	stdbuf \
 	strings \
@@ -173,8 +173,6 @@ SUBDIR=	alias \
 	unzip \
 	units \
 	unvis \
-	uudecode \
-	uuencode \
 	vis \
 	vmstat \
 	w \
@@ -193,8 +191,20 @@ SUBDIR=	alias \
 	yes \
 	zstd
 
-.if ${MACHINE_ARCH:Mmips64*} || ${MACHINE_ARCH:Mriscv64*}
+.if ${MACHINE_ABI:Mpurecap}
+SUBDIR+= \
+	coping \
+	copong \
+	stevie
+.endif
+
+.if ${MACHINE_ARCH:Mriscv64*}
 SUBDIR+=	minimal_count_stats
+.endif
+
+# Tracing currently only implemented for CHERI-QEMU architectures
+.if ${MACHINE} == "riscv"
+SUBDIR+=	qtrace
 .endif
 
 # NB: keep these sorted by MK_* knobs
@@ -205,13 +215,10 @@ SUBDIR.${MK_ATM}+=	atm
 SUBDIR.${MK_BLUETOOTH}+=	bluetooth
 SUBDIR.${MK_BSD_CPIO}+=	cpio
 SUBDIR.${MK_CALENDAR}+=	calendar
-
-# Tracing currently only implemented for CHERI-QEMU architectures
-.if ${MACHINE} == "mips" || ${MACHINE} == "riscv"
-SUBDIR+=	qtrace
+.if ${MK_CLANG} != "no" || ${MK_LLVM_BINUTILS} != "no" || \
+    ${MK_LLD} != "no" || ${MK_LLDB} != "no"
+SUBDIR+=	clang
 .endif
-
-SUBDIR.${MK_CLANG}+=	clang
 SUBDIR.${MK_DIALOG}+=	dpv
 SUBDIR.${MK_EE}+=	ee
 SUBDIR.${MK_FILE}+=	file
@@ -269,25 +276,28 @@ SUBDIR.${MK_TESTS_SUPPORT}.${MK_CXX}+=	kyua
 SUBDIR.${MK_TESTS}+=	tests
 SUBDIR.${MK_TEXTPROC}+=	ul
 SUBDIR.${MK_TFTP}+=	tftp
+.if ${MK_LLVM_BINUTILS} == "no"
+# Only build the elftoolchain tools if we aren't using the LLVM ones.
 SUBDIR.${MK_TOOLCHAIN}+=	addr2line
 SUBDIR.${MK_TOOLCHAIN}+=	ar
+SUBDIR.${MK_TOOLCHAIN}+=	nm
+SUBDIR.${MK_TOOLCHAIN}+=	objcopy
+SUBDIR.${MK_TOOLCHAIN}+=	readelf
+SUBDIR.${MK_TOOLCHAIN}+=	size
+.endif
 SUBDIR.${MK_TOOLCHAIN}+=	c89
 SUBDIR.${MK_TOOLCHAIN}+=	c99
 SUBDIR.${MK_TOOLCHAIN}+=	ctags
 .if ${MK_LLVM_CXXFILT} == "no"
 SUBDIR.${MK_TOOLCHAIN}+=	cxxfilt
 .endif
-SUBDIR.${MK_TOOLCHAIN}+=	objcopy
 SUBDIR.${MK_TOOLCHAIN}+=	file2c
 SUBDIR.${MK_TOOLCHAIN}+=	gprof
 SUBDIR.${MK_TOOLCHAIN}+=	indent
 SUBDIR.${MK_TOOLCHAIN}+=	lex
 SUBDIR.${MK_TOOLCHAIN}+=	mkstr
-SUBDIR.${MK_TOOLCHAIN}+=	nm
-SUBDIR.${MK_TOOLCHAIN}+=	readelf
 SUBDIR.${MK_TOOLCHAIN}+=	rpcgen
 SUBDIR.${MK_TOOLCHAIN}+=	unifdef
-SUBDIR.${MK_TOOLCHAIN}+=	size
 SUBDIR.${MK_TOOLCHAIN}+=	xstr
 SUBDIR.${MK_TOOLCHAIN}+=	yacc
 SUBDIR.${MK_VI}+=	vi
@@ -300,12 +310,6 @@ SUBDIR.${MK_UTMPX}+=	users
 .endif
 SUBDIR.${MK_UTMPX}+=	who
 SUBDIR.${MK_OFED}+=	ofed
-
-# These are normally only handled for build-tools.
-.if make(clean*)
-SUBDIR+=	mkcsmapper_static
-SUBDIR+=	mkesdb_static
-.endif
 
 .include <bsd.arch.inc.mk>
 

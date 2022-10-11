@@ -46,8 +46,7 @@ GlobalVariable *createPrivateGlobalForString(Module &M, StringRef Str,
 // Returns F.getComdat() if it exists.
 // Otherwise creates a new comdat, sets F's comdat, and returns it.
 // Returns nullptr on failure.
-Comdat *GetOrCreateFunctionComdat(Function &F, Triple &T,
-                                  const std::string &ModuleId);
+Comdat *getOrCreateFunctionComdat(Function &F, Triple &T);
 
 // Insert GCOV profiling instrumentation
 struct GCOVOptions {
@@ -66,6 +65,9 @@ struct GCOVOptions {
   // Add the 'noredzone' attribute to added runtime library calls.
   bool NoRedZone;
 
+  // Use atomic profile counter increments.
+  bool Atomic = false;
+
   // Regexes separated by a semi-colon to filter the files to instrument.
   std::string Filter;
 
@@ -76,7 +78,7 @@ struct GCOVOptions {
 ModulePass *createGCOVProfilerPass(const GCOVOptions &Options =
                                    GCOVOptions::getDefault());
 
-// PGO Instrumention. Parameter IsCS indicates if this is the context senstive
+// PGO Instrumention. Parameter IsCS indicates if this is the context sensitive
 // instrumentation.
 ModulePass *createPGOInstrumentationGenLegacyPass(bool IsCS = false);
 ModulePass *
@@ -136,16 +138,15 @@ struct InstrProfOptions {
 };
 
 /// Insert frontend instrumentation based profiling. Parameter IsCS indicates if
-// this is the context senstive instrumentation.
+// this is the context sensitive instrumentation.
 ModulePass *createInstrProfilingLegacyPass(
     const InstrProfOptions &Options = InstrProfOptions(), bool IsCS = false);
 
 ModulePass *createInstrOrderFilePass();
 
 // Insert DataFlowSanitizer (dynamic data flow analysis) instrumentation
-ModulePass *createDataFlowSanitizerPass(
-    const std::vector<std::string> &ABIListFiles = std::vector<std::string>(),
-    void *(*getArgTLS)() = nullptr, void *(*getRetValTLS)() = nullptr);
+ModulePass *createDataFlowSanitizerLegacyPassPass(
+    const std::vector<std::string> &ABIListFiles = std::vector<std::string>());
 
 // Options for sanitizer coverage instrumentation.
 struct SanitizerCoverageOptions {
@@ -168,6 +169,8 @@ struct SanitizerCoverageOptions {
   bool PCTable = false;
   bool NoPrune = false;
   bool StackDepth = false;
+  bool TraceLoads = false;
+  bool TraceStores = false;
 
   SanitizerCoverageOptions() = default;
 };

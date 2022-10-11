@@ -76,7 +76,6 @@ enum CallEventKind {
 };
 
 class CallEvent;
-class CallDescription;
 
 template<typename T = CallEvent>
 class CallEventRef : public IntrusiveRefCntPtr<const T> {
@@ -225,7 +224,7 @@ public:
 
   /// Returns the expression whose value will be the result of this call.
   /// May be null.
-  const Expr *getOriginExpr() const {
+  virtual const Expr *getOriginExpr() const {
     return Origin.dyn_cast<const Expr *>();
   }
 
@@ -255,20 +254,6 @@ public:
       return FD->isOverloadedOperator() && FD->isImplicit() && FD->isGlobal();
 
     return false;
-  }
-
-  /// Returns true if the CallEvent is a call to a function that matches
-  /// the CallDescription.
-  ///
-  /// Note that this function is not intended to be used to match Obj-C method
-  /// calls.
-  bool isCalled(const CallDescription &CD) const;
-
-  /// Returns true whether the CallEvent is any of the CallDescriptions supplied
-  /// as a parameter.
-  template <typename FirstCallDesc, typename... CallDescs>
-  bool isCalled(const FirstCallDesc &First, const CallDescs &... Rest) const {
-    return isCalled(First) || isCalled(Rest...);
   }
 
   /// Returns a source range for the entire call, suitable for
@@ -530,7 +515,7 @@ protected:
   }
 
 public:
-  virtual const CallExpr *getOriginExpr() const {
+  const CallExpr *getOriginExpr() const override {
     return cast<CallExpr>(AnyFunctionCall::getOriginExpr());
   }
 
@@ -543,9 +528,7 @@ public:
   }
 
   Kind getKind() const override { return CE_Function; }
-  virtual StringRef getKindAsString() const override {
-    return "SimpleFunctionCall";
-  }
+  StringRef getKindAsString() const override { return "SimpleFunctionCall"; }
 
   static bool classof(const CallEvent *CA) {
     return CA->getKind() == CE_Function;
@@ -570,7 +553,7 @@ protected:
          RegionAndSymbolInvalidationTraits *ETraits) const override;
 
 public:
-  virtual const CallExpr *getOriginExpr() const {
+  const CallExpr *getOriginExpr() const override {
     return cast<CallExpr>(CallEvent::getOriginExpr());
   }
 
@@ -653,7 +636,7 @@ public:
   ArrayRef<ParmVarDecl *> parameters() const override;
 
   Kind getKind() const override { return CE_Block; }
-  virtual StringRef getKindAsString() const override { return "BlockCall"; }
+  StringRef getKindAsString() const override { return "BlockCall"; }
 
   static bool classof(const CallEvent *CA) { return CA->getKind() == CE_Block; }
 };
@@ -708,7 +691,7 @@ protected:
   void cloneTo(void *Dest) const override { new (Dest) CXXMemberCall(*this); }
 
 public:
-  virtual const CXXMemberCallExpr *getOriginExpr() const {
+  const CXXMemberCallExpr *getOriginExpr() const override {
     return cast<CXXMemberCallExpr>(CXXInstanceCall::getOriginExpr());
   }
 
@@ -727,7 +710,7 @@ public:
   RuntimeDefinition getRuntimeDefinition() const override;
 
   Kind getKind() const override { return CE_CXXMember; }
-  virtual StringRef getKindAsString() const override { return "CXXMemberCall"; }
+  StringRef getKindAsString() const override { return "CXXMemberCall"; }
 
   static bool classof(const CallEvent *CA) {
     return CA->getKind() == CE_CXXMember;
@@ -752,7 +735,7 @@ protected:
   }
 
 public:
-  virtual const CXXOperatorCallExpr *getOriginExpr() const {
+  const CXXOperatorCallExpr *getOriginExpr() const override {
     return cast<CXXOperatorCallExpr>(CXXInstanceCall::getOriginExpr());
   }
 
@@ -767,9 +750,7 @@ public:
   const Expr *getCXXThisExpr() const override;
 
   Kind getKind() const override { return CE_CXXMemberOperator; }
-  virtual StringRef getKindAsString() const override {
-    return "CXXMemberOperatorCall";
-  }
+  StringRef getKindAsString() const override { return "CXXMemberOperatorCall"; }
 
   static bool classof(const CallEvent *CA) {
     return CA->getKind() == CE_CXXMemberOperator;
@@ -838,9 +819,7 @@ public:
   }
 
   Kind getKind() const override { return CE_CXXDestructor; }
-  virtual StringRef getKindAsString() const override {
-    return "CXXDestructorCall";
-  }
+  StringRef getKindAsString() const override { return "CXXDestructorCall"; }
 
   static bool classof(const CallEvent *CA) {
     return CA->getKind() == CE_CXXDestructor;
@@ -898,7 +877,7 @@ protected:
   void cloneTo(void *Dest) const override { new (Dest) CXXConstructorCall(*this); }
 
 public:
-  virtual const CXXConstructExpr *getOriginExpr() const {
+  const CXXConstructExpr *getOriginExpr() const override {
     return cast<CXXConstructExpr>(AnyFunctionCall::getOriginExpr());
   }
 
@@ -913,9 +892,7 @@ public:
   }
 
   Kind getKind() const override { return CE_CXXConstructor; }
-  virtual StringRef getKindAsString() const override {
-    return "CXXConstructorCall";
-  }
+  StringRef getKindAsString() const override { return "CXXConstructorCall"; }
 
   static bool classof(const CallEvent *CA) {
     return CA->getKind() == CE_CXXConstructor;
@@ -959,7 +936,7 @@ protected:
   }
 
 public:
-  virtual const CXXInheritedCtorInitExpr *getOriginExpr() const {
+  const CXXInheritedCtorInitExpr *getOriginExpr() const override {
     return cast<CXXInheritedCtorInitExpr>(AnyFunctionCall::getOriginExpr());
   }
 
@@ -986,14 +963,14 @@ public:
     return getInheritingConstructor()->getArg(Index);
   }
 
-  virtual SVal getArgSVal(unsigned Index) const override {
+  SVal getArgSVal(unsigned Index) const override {
     return getState()->getSVal(
         getArgExpr(Index),
         getInheritingStackFrame()->getParent()->getStackFrame());
   }
 
   Kind getKind() const override { return CE_CXXInheritedConstructor; }
-  virtual StringRef getKindAsString() const override {
+  StringRef getKindAsString() const override {
     return "CXXInheritedConstructorCall";
   }
 
@@ -1017,7 +994,7 @@ protected:
   void cloneTo(void *Dest) const override { new (Dest) CXXAllocatorCall(*this); }
 
 public:
-  virtual const CXXNewExpr *getOriginExpr() const {
+  const CXXNewExpr *getOriginExpr() const override {
     return cast<CXXNewExpr>(AnyFunctionCall::getOriginExpr());
   }
 
@@ -1058,9 +1035,7 @@ public:
   }
 
   Kind getKind() const override { return CE_CXXAllocator; }
-  virtual StringRef getKindAsString() const override {
-    return "CXXAllocatorCall";
-  }
+  StringRef getKindAsString() const override { return "CXXAllocatorCall"; }
 
   static bool classof(const CallEvent *CE) {
     return CE->getKind() == CE_CXXAllocator;
@@ -1091,7 +1066,7 @@ protected:
   }
 
 public:
-  virtual const CXXDeleteExpr *getOriginExpr() const {
+  const CXXDeleteExpr *getOriginExpr() const override {
     return cast<CXXDeleteExpr>(AnyFunctionCall::getOriginExpr());
   }
 
@@ -1107,9 +1082,7 @@ public:
   }
 
   Kind getKind() const override { return CE_CXXDeallocator; }
-  virtual StringRef getKindAsString() const override {
-    return "CXXDeallocatorCall";
-  }
+  StringRef getKindAsString() const override { return "CXXDeallocatorCall"; }
 
   static bool classof(const CallEvent *CE) {
     return CE->getKind() == CE_CXXDeallocator;
@@ -1153,7 +1126,7 @@ protected:
                                         Selector Sel) const;
 
 public:
-  virtual const ObjCMessageExpr *getOriginExpr() const {
+  const ObjCMessageExpr *getOriginExpr() const override {
     return cast<ObjCMessageExpr>(CallEvent::getOriginExpr());
   }
 
@@ -1230,105 +1203,10 @@ public:
   ArrayRef<ParmVarDecl*> parameters() const override;
 
   Kind getKind() const override { return CE_ObjCMessage; }
-  virtual StringRef getKindAsString() const override {
-    return "ObjCMethodCall";
-  }
+  StringRef getKindAsString() const override { return "ObjCMethodCall"; }
 
   static bool classof(const CallEvent *CA) {
     return CA->getKind() == CE_ObjCMessage;
-  }
-};
-
-enum CallDescriptionFlags : int {
-  /// Describes a C standard function that is sometimes implemented as a macro
-  /// that expands to a compiler builtin with some __builtin prefix.
-  /// The builtin may as well have a few extra arguments on top of the requested
-  /// number of arguments.
-  CDF_MaybeBuiltin = 1 << 0,
-};
-
-/// This class represents a description of a function call using the number of
-/// arguments and the name of the function.
-class CallDescription {
-  friend CallEvent;
-
-  mutable IdentifierInfo *II = nullptr;
-  mutable bool IsLookupDone = false;
-  // The list of the qualified names used to identify the specified CallEvent,
-  // e.g. "{a, b}" represent the qualified names, like "a::b".
-  std::vector<const char *> QualifiedName;
-  Optional<unsigned> RequiredArgs;
-  Optional<size_t> RequiredParams;
-  int Flags;
-
-  // A constructor helper.
-  static Optional<size_t> readRequiredParams(Optional<unsigned> RequiredArgs,
-                                             Optional<size_t> RequiredParams) {
-    if (RequiredParams)
-      return RequiredParams;
-    if (RequiredArgs)
-      return static_cast<size_t>(*RequiredArgs);
-    return None;
-  }
-
-public:
-  /// Constructs a CallDescription object.
-  ///
-  /// @param QualifiedName The list of the name qualifiers of the function that
-  /// will be matched. The user is allowed to skip any of the qualifiers.
-  /// For example, {"std", "basic_string", "c_str"} would match both
-  /// std::basic_string<...>::c_str() and std::__1::basic_string<...>::c_str().
-  ///
-  /// @param RequiredArgs The number of arguments that is expected to match a
-  /// call. Omit this parameter to match every occurrence of call with a given
-  /// name regardless the number of arguments.
-  CallDescription(int Flags, ArrayRef<const char *> QualifiedName,
-                  Optional<unsigned> RequiredArgs = None,
-                  Optional<size_t> RequiredParams = None)
-      : QualifiedName(QualifiedName), RequiredArgs(RequiredArgs),
-        RequiredParams(readRequiredParams(RequiredArgs, RequiredParams)),
-        Flags(Flags) {}
-
-  /// Construct a CallDescription with default flags.
-  CallDescription(ArrayRef<const char *> QualifiedName,
-                  Optional<unsigned> RequiredArgs = None,
-                  Optional<size_t> RequiredParams = None)
-      : CallDescription(0, QualifiedName, RequiredArgs, RequiredParams) {}
-
-  /// Get the name of the function that this object matches.
-  StringRef getFunctionName() const { return QualifiedName.back(); }
-};
-
-/// An immutable map from CallDescriptions to arbitrary data. Provides a unified
-/// way for checkers to react on function calls.
-template <typename T> class CallDescriptionMap {
-  // Some call descriptions aren't easily hashable (eg., the ones with qualified
-  // names in which some sections are omitted), so let's put them
-  // in a simple vector and use linear lookup.
-  // TODO: Implement an actual map for fast lookup for "hashable" call
-  // descriptions (eg., the ones for C functions that just match the name).
-  std::vector<std::pair<CallDescription, T>> LinearMap;
-
-public:
-  CallDescriptionMap(
-      std::initializer_list<std::pair<CallDescription, T>> &&List)
-      : LinearMap(List) {}
-
-  ~CallDescriptionMap() = default;
-
-  // These maps are usually stored once per checker, so let's make sure
-  // we don't do redundant copies.
-  CallDescriptionMap(const CallDescriptionMap &) = delete;
-  CallDescriptionMap &operator=(const CallDescription &) = delete;
-
-  const T *lookup(const CallEvent &Call) const {
-    // Slow path: linear lookup.
-    // TODO: Implement some sort of fast path.
-    for (const std::pair<CallDescription, T> &I : LinearMap)
-      if (Call.isCalled(I.first))
-        return &I.second;
-
-    return nullptr;
   }
 };
 

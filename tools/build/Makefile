@@ -34,7 +34,7 @@ _MACOS_SDK_DIR=${_XCODE_ROOT}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sd
 .endif
 HOST_INCLUDE_ROOT=${_MACOS_SDK_DIR}/usr/include
 .if !exists(${HOST_INCLUDE_ROOT}/stdio.h)
-.error "You must install the macOS SDK (try xcode-select --install)"
+.error You must install the macOS SDK (try xcode-select --install)
 .endif
 .else
 HOST_INCLUDE_ROOT=/usr/include
@@ -78,7 +78,7 @@ _WITH_NO_SUBOBJECT_BOUNDS!= grep -c __no_subobject_bounds ${HOST_INCLUDE_ROOT}/s
 .if ${_WITH_NO_SUBOBJECT_BOUNDS} == 0
 SYSINCS+=	cdefs.h
 .endif
-# Define vaddr_t for bootstrapping
+# Define ptraddr_t for bootstrapping
 INCS+=	stdint.h
 
 _WITH_EXPLICIT_BZERO!= grep -c explicit_bzero ${HOST_INCLUDE_ROOT}/strings.h || true
@@ -95,6 +95,11 @@ INCS+=		strings.h
 SRCS+=		explicit_bzero.c
 .endif
 
+_WITH_FSPACECTL!= grep -c fspacectl ${HOST_INCLUDE_ROOT}/fcntl.h || true
+.if ${_WITH_FSPACECTL} == 0
+INCS+=		fcntl.h
+SRCS+=		fspacectl.c
+.endif
 
 .if exists(${HOST_INCLUDE_ROOT}/capsicum_helpers.h)
 _WITH_CAPH_ENTER!= grep -c caph_enter ${HOST_INCLUDE_ROOT}/capsicum_helpers.h || true
@@ -123,24 +128,30 @@ CHACHA20INCSDIR=	${INCLUDEDIR}/crypto/chacha20
 CHACHA20INCS+=	${SRCTOP}/sys/crypto/chacha20/_chacha.h \
 	${SRCTOP}/sys/crypto/chacha20/chacha.h
 
-# bmake on Linux/mac often prints x86_64 instead of amd64 and we place the
-# AArch64 headers in an arm64 directory.
-_host_sysincsdir=${MACHINE:S/x86_64/amd64/:S/aarch64/arm64/}
-.if ${_host_sysincsdir} == "unknown"
-# HACK: If MACHINE is unknown, assume we are building on x86
-_host_sysincsdir=amd64
+_host_arch=${MACHINE}
+.if ${_host_arch} == "x86_64"
+# bmake on Linux/mac often prints that instead of amd64
+_host_arch=amd64
+.elif ${_host_arch} == "aarch64"
+# Linux calls arm64, aarch64, across the board
+_host_arch=arm64
+.elif ${_host_arch:Mppc*}
+_host_arch=powerpc
 .endif
-_host_sysincsdir:=${_host_sysincsdir}
-MACHINESYSINCS+=	${SRCTOP}/sys/${_host_sysincsdir}/include/elf.h
-.if ${_host_sysincsdir} == "amd64" || ${_host_sysincsdir} == "i386"
+.if ${_host_arch} == "unknown"
+# HACK: If MACHINE is unknown, assume we are building on x86
+_host_arch=amd64
+.endif
+MACHINESYSINCS+=	${SRCTOP}/sys/${_host_arch}/include/elf.h
+.if ${_host_arch} == "amd64" || ${_host_arch} == "i386"
 INCSGROUPS+=	X86INCS
 X86INCSDIR=	${INCLUDEDIR}/x86
 X86INCS+=	${SRCTOP}/sys/x86/include/elf.h
 .endif
 
 # needed for btxld:
-MACHINESYSINCS+=	${SRCTOP}/sys/${_host_sysincsdir}/include/exec.h
-MACHINESYSINCS+=	${SRCTOP}/sys/${_host_sysincsdir}/include/reloc.h
+MACHINESYSINCS+=	${SRCTOP}/sys/${_host_arch}/include/exec.h
+MACHINESYSINCS+=	${SRCTOP}/sys/${_host_arch}/include/reloc.h
 INCS+=	${SRCTOP}/include/a.out.h
 INCS+=	${SRCTOP}/include/nlist.h
 SYSINCS+=	${SRCTOP}/sys/sys/imgact_aout.h
@@ -236,30 +247,30 @@ DISKINCS+=	${SRCTOP}/sys/sys/disk/bsd.h
 
 # Needed to build config (since it uses libnv)
 SYSINCS+=	${SRCTOP}/sys/sys/nv.h ${SRCTOP}/sys/sys/cnv.h \
-		${SRCTOP}/sys/sys/dnv.h
+		${SRCTOP}/sys/sys/dnv.h ${SRCTOP}/sys/sys/nv_namespace.h
 
 # Needed when bootstrapping ldd (since it uses DF_1_PIE)
 SYSINCS+=	${SRCTOP}/sys/sys/elf32.h
 SYSINCS+=	${SRCTOP}/sys/sys/elf64.h
 SYSINCS+=	${SRCTOP}/sys/sys/elf_common.h
 SYSINCS+=	${SRCTOP}/sys/sys/elf_generic.h
-
 SYSINCS+=	${SRCTOP}/sys/sys/queue.h
 SYSINCS+=	${SRCTOP}/sys/sys/md5.h
 SYSINCS+=	${SRCTOP}/sys/sys/sbuf.h
 SYSINCS+=	${SRCTOP}/sys/sys/tree.h
 
+# vtfontcvt is using sys/font.h
+SYSINCS+=	${SRCTOP}/sys/sys/font.h
 # For mkscrfil.c:
 SYSINCS+=	${SRCTOP}/sys/sys/consio.h
 # for gencat:
 INCS+=	${SRCTOP}/include/nl_types.h
-
-# vtfontcvt is using sys/font.h
-SYSINCS+=	${SRCTOP}/sys/sys/font.h
+# for vtfontcvt:
 SYSINCS+=	${SRCTOP}/sys/sys/fnv_hash.h
 # opensolaris compatibility
 INCS+=	${SRCTOP}/include/elf.h
 SYSINCS+=	${SRCTOP}/sys/sys/elf.h
+SYSINCS+=	${SRCTOP}/sys/sys/ctf.h
 
 # We want to run the build with only ${WORLDTMP} in $PATH to ensure we don't
 # accidentally run tools that are incompatible but happen to be in $PATH.
@@ -273,8 +284,8 @@ SYSINCS+=	${SRCTOP}/sys/sys/elf.h
 # Linux/MacOS since we only use flags that are supported by all of them.
 _host_tools_to_symlink=	basename bzip2 bunzip2 chmod chown cmp comm cp date dd \
 	dirname echo env false find fmt gzip gunzip head hostname id ln ls \
-	mkdir mv nice patch rm sh sleep stat tee touch tr true \
-	uname uniq unxz wc which xz
+	mkdir mv nice patch rm sh sleep stat tee time touch tr true uname uniq \
+	unxz wc which xz
 
 # We also need a symlink to the absolute path to the make binary used for
 # the toplevel makefile. This is not necessarily the same as `which make`
@@ -332,7 +343,7 @@ host-symlinks:
 	@source_path="${_tool:S/:/ /:[1]}"; \
 	target_path="${DESTDIR}/bin/${_tool:S/:/ /:[2]}"; \
 	if [ ! -e "$${source_path}" ] ; then \
-		echo "Host tool '${src_path}' is missing"; false; \
+		echo "Host tool '$${source_path}' is missing"; false; \
 	fi; \
 	rm -f "$${target_path}"; \
 	${_COPY_HOST_TOOL} "$${source_path}" "$${target_path}"
@@ -353,6 +364,7 @@ INSTALLDIR_LIST= \
 	usr/include/private/ucl \
 	usr/include/private/zstd \
 	usr/lib \
+	usr/libdata/pkgconfig \
 	usr/libexec
 
 installdirs:

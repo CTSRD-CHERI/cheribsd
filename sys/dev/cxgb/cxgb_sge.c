@@ -727,7 +727,7 @@ refill_fl(adapter_t *sc, struct sge_fl *q, int n)
 		} else {
 			if ((cl = m_cljget(NULL, M_NOWAIT, q->buf_size)) == NULL)
 				break;
-			if ((m = m_gethdr(M_NOWAIT, MT_NOINIT)) == NULL) {
+			if ((m = m_gethdr_raw(M_NOWAIT, 0)) == NULL) {
 				uma_zfree(q->zone, cl);
 				break;
 			}
@@ -806,7 +806,7 @@ free_rx_bufs(adapter_t *sc, struct sge_fl *q)
 				uma_zfree(zone_pack, d->m);
 			} else {
 				m_init(d->m, M_NOWAIT, MT_DATA, 0);
-				uma_zfree(zone_mbuf, d->m);
+				m_free_raw(d->m);
 				uma_zfree(q->zone, d->rxsd_cl);
 			}			
 		}
@@ -1287,7 +1287,6 @@ write_wr_hdr_sgl(unsigned int ndesc, struct tx_desc *txd, struct txq_state *txqs
 {
 
 	struct work_request_hdr *wrp = (struct work_request_hdr *)txd;
-	struct tx_sw_desc *txsd = &txq->sdesc[txqs->pidx];
 	
 	if (__predict_true(ndesc == 1)) {
 		set_wr_hdr(wrp, htonl(F_WR_SOP | F_WR_EOP | V_WR_DATATYPE(1) |
@@ -1318,12 +1317,10 @@ write_wr_hdr_sgl(unsigned int ndesc, struct tx_desc *txd, struct txq_state *txqs
 			
 			fp += avail;
 			txd++;
-			txsd++;
 			if (++txqs->pidx == txq->size) {
 				txqs->pidx = 0;
 				txqs->gen ^= 1;
 				txd = txq->desc;
-				txsd = txq->sdesc;
 			}
 
 			/*
@@ -2105,27 +2102,8 @@ t3_sge_start(adapter_t *sc)
 void
 t3_sge_stop(adapter_t *sc)
 {
-	int i, nqsets;
-	
-	t3_set_reg_field(sc, A_SG_CONTROL, F_GLOBALENABLE, 0);
 
-	if (sc->tq == NULL)
-		return;
-	
-	for (nqsets = i = 0; i < (sc)->params.nports; i++) 
-		nqsets += sc->port[i].nqsets;
-#ifdef notyet
-	/*
-	 * 
-	 * XXX
-	 */
-	for (i = 0; i < nqsets; ++i) {
-		struct sge_qset *qs = &sc->sge.qs[i];
-		
-		taskqueue_drain(sc->tq, &qs->txq[TXQ_OFLD].qresume_task);
-		taskqueue_drain(sc->tq, &qs->txq[TXQ_CTRL].qresume_task);
-	}
-#endif
+	t3_set_reg_field(sc, A_SG_CONTROL, F_GLOBALENABLE, 0);
 }
 
 /**
@@ -2337,11 +2315,9 @@ restart_offloadq(void *data, int npending)
 	struct sge_qset *qs = data;
 	struct sge_txq *q = &qs->txq[TXQ_OFLD];
 	adapter_t *adap = qs->port->adapter;
-	int cleaned;
-		
-	TXQ_LOCK(qs);
-again:	cleaned = reclaim_completed_tx(qs, 16, TXQ_OFLD);
 
+	TXQ_LOCK(qs);
+again:
 	while ((m = mbufq_first(&q->sendq)) != NULL) {
 		unsigned int gen, pidx;
 		struct ofld_hdr *oh = mtod(m, struct ofld_hdr *);
@@ -2773,6 +2749,7 @@ get_packet(adapter_t *adap, unsigned int drop_thres, struct sge_qset *qs,
 		if (mh->mh_tail == NULL) {
 			log(LOG_ERR, "discarding intermediate descriptor entry\n");
 			m_freem(m);
+			m = NULL;
 			break;
 		}
 		mh->mh_tail->m_next = m;
@@ -2780,7 +2757,7 @@ get_packet(adapter_t *adap, unsigned int drop_thres, struct sge_qset *qs,
 		mh->mh_head->m_pkthdr.len += len;
 		break;
 	}
-	if (cxgb_debug)
+	if (cxgb_debug && m != NULL)
 		printf("len=%d pktlen=%d\n", m->m_len, m->m_pkthdr.len);
 done:
 	if (++fl->cidx == fl->size)

@@ -50,14 +50,14 @@ VPValue *VPlanPredicator::getOrCreateNotPredicate(VPBasicBlock *PredBB,
 
   case EdgeType::FALSE_EDGE:
     // CurrBB is the False successor of PredBB - compute not of CBV.
-    IntermediateVal = Builder.createNot(CBV);
+    IntermediateVal = Builder.createNot(CBV, {});
     break;
   }
 
   // Now AND intermediate value with PredBB's block predicate if it has one.
   VPValue *BP = PredBB->getPredicate();
   if (BP)
-    return Builder.createAnd(BP, IntermediateVal);
+    return Builder.createAnd(BP, IntermediateVal, {});
   else
     return IntermediateVal;
 }
@@ -96,7 +96,7 @@ VPValue *VPlanPredicator::genPredicateTree(std::list<VPValue *> &Worklist) {
     Worklist.pop_front();
 
     // Create an OR of these values.
-    VPValue *Or = Builder.createOr(LHS, RHS);
+    VPValue *Or = Builder.createOr(LHS, RHS, {});
 
     // Push OR to the back of the worklist.
     Worklist.push_back(Or);
@@ -191,7 +191,7 @@ void VPlanPredicator::predicateRegionRec(VPRegionBlock *Region) {
   // Generate edge predicates and append them to the block predicate. RPO is
   // necessary since the predecessor blocks' block predicate needs to be set
   // before the current block's block predicate can be computed.
-  for (VPBlockBase *Block : make_range(RPOT.begin(), RPOT.end())) {
+  for (VPBlockBase *Block : RPOT) {
     // TODO: Handle nested regions once we start generating the same.
     assert(!isa<VPRegionBlock>(Block) && "Nested region not expected");
     createOrPropagatePredicates(Block, Region);
@@ -208,7 +208,7 @@ void VPlanPredicator::linearizeRegionRec(VPRegionBlock *Region) {
   ReversePostOrderTraversal<VPBlockBase *> RPOT(Region->getEntry());
   VPBlockBase *PrevBlock = nullptr;
 
-  for (VPBlockBase *CurrBlock : make_range(RPOT.begin(), RPOT.end())) {
+  for (VPBlockBase *CurrBlock : RPOT) {
     // TODO: Handle nested regions once we start generating the same.
     assert(!isa<VPRegionBlock>(CurrBlock) && "Nested region not expected");
 
@@ -231,7 +231,7 @@ void VPlanPredicator::linearizeRegionRec(VPRegionBlock *Region) {
 }
 
 // Entry point. The driver function for the predicator.
-void VPlanPredicator::predicate(void) {
+void VPlanPredicator::predicate() {
   // Predicate the blocks within Region.
   predicateRegionRec(cast<VPRegionBlock>(Plan.getEntry()));
 

@@ -29,10 +29,10 @@
 #ifndef SMMINTRIN_H_
 #define SMMINTRIN_H_
 
-#if defined(__linux__) && defined(__ppc64__)
+#if defined(__ppc64__) && (defined(__linux__) || defined(__FreeBSD__))
 
 #include <altivec.h>
-#include <emmintrin.h>
+#include <tmmintrin.h>
 
 extern __inline int
     __attribute__((__gnu_inline__, __always_inline__, __artificial__))
@@ -78,8 +78,33 @@ extern __inline __m128i
   return (__m128i)vec_sel((__v16qu)__A, (__v16qu)__B, __lmask);
 }
 
+extern __inline __m128i
+    __attribute__((__gnu_inline__, __always_inline__, __artificial__))
+    _mm_insert_epi8(__m128i const __A, int const __D, int const __N) {
+  __v16qi result = (__v16qi)__A;
+  result[__N & 0xf] = __D;
+  return (__m128i)result;
+}
+
+extern __inline __m128i
+    __attribute__((__gnu_inline__, __always_inline__, __artificial__))
+    _mm_insert_epi32(__m128i const __A, int const __D, int const __N) {
+  __v4si result = (__v4si)__A;
+  result[__N & 3] = __D;
+  return (__m128i)result;
+}
+
+extern __inline __m128i
+    __attribute__((__gnu_inline__, __always_inline__, __artificial__))
+    _mm_insert_epi64(__m128i const __A, long long const __D, int const __N) {
+  __v2di result = (__v2di)__A;
+  result[__N & 1] = __D;
+  return (__m128i)result;
+}
+
 #else
 #include_next <smmintrin.h>
-#endif /* defined(__linux__) && defined(__ppc64__) */
+#endif /* defined(__ppc64__) && (defined(__linux__) || defined(__FreeBSD__))   \
+        */
 
 #endif /* _SMMINTRIN_H_ */

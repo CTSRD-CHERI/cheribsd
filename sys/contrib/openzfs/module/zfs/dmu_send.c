@@ -67,7 +67,7 @@
 #endif
 
 /* Set this tunable to TRUE to replace corrupt data with 0x2f5baddb10c */
-int zfs_send_corrupt_data = B_FALSE;
+static int zfs_send_corrupt_data = B_FALSE;
 /*
  * This tunable controls the amount of data (measured in bytes) that will be
  * prefetched by zfs send.  If the main thread is blocking on reads that haven't
@@ -75,7 +75,7 @@ int zfs_send_corrupt_data = B_FALSE;
  * thread is issuing new reads because the prefetches have fallen out of the
  * cache, this may need to be decreased.
  */
-int zfs_send_queue_length = SPA_MAXBLOCKSIZE;
+static int zfs_send_queue_length = SPA_MAXBLOCKSIZE;
 /*
  * This tunable controls the length of the queues that zfs send worker threads
  * use to communicate.  If the send_main_thread is blocking on these queues,
@@ -83,7 +83,7 @@ int zfs_send_queue_length = SPA_MAXBLOCKSIZE;
  * at the start of a send as these threads consume all the available IO
  * resources, this variable may need to be decreased.
  */
-int zfs_send_no_prefetch_queue_length = 1024 * 1024;
+static int zfs_send_no_prefetch_queue_length = 1024 * 1024;
 /*
  * These tunables control the fill fraction of the queues by zfs send.  The fill
  * fraction controls the frequency with which threads have to be cv_signaled.
@@ -91,19 +91,19 @@ int zfs_send_no_prefetch_queue_length = 1024 * 1024;
  * down.  If the queues empty before the signalled thread can catch up, then
  * these should be tuned up.
  */
-int zfs_send_queue_ff = 20;
-int zfs_send_no_prefetch_queue_ff = 20;
+static int zfs_send_queue_ff = 20;
+static int zfs_send_no_prefetch_queue_ff = 20;
 
 /*
  * Use this to override the recordsize calculation for fast zfs send estimates.
  */
-int zfs_override_estimate_recordsize = 0;
+static int zfs_override_estimate_recordsize = 0;
 
 /* Set this tunable to FALSE to disable setting of DRR_FLAG_FREERECORDS */
-int zfs_send_set_freerecords_bit = B_TRUE;
+static const boolean_t zfs_send_set_freerecords_bit = B_TRUE;
 
 /* Set this tunable to FALSE is disable sending unmodified spill blocks. */
-int zfs_send_unmodified_spill_blocks = B_TRUE;
+static int zfs_send_unmodified_spill_blocks = B_TRUE;
 
 static inline boolean_t
 overflow_multiply(uint64_t a, uint64_t b, uint64_t *c)
@@ -165,6 +165,7 @@ struct send_range {
 			kmutex_t		lock;
 			kcondvar_t		cv;
 			boolean_t		io_outstanding;
+			boolean_t		io_compressed;
 			int			io_err;
 		} data;
 		struct srh {
@@ -378,7 +379,7 @@ dump_free(dmu_send_cookie_t *dscp, uint64_t object, uint64_t offset,
 		}
 	}
 	/* create a FREE record and make it pending */
-	bzero(dscp->dsc_drr, sizeof (dmu_replay_record_t));
+	memset(dscp->dsc_drr, 0, sizeof (dmu_replay_record_t));
 	dscp->dsc_drr->drr_type = DRR_FREE;
 	drrf->drr_object = object;
 	drrf->drr_offset = offset;
@@ -437,7 +438,7 @@ dump_redact(dmu_send_cookie_t *dscp, uint64_t object, uint64_t offset,
 		}
 	}
 	/* create a REDACT record and make it pending */
-	bzero(dscp->dsc_drr, sizeof (dmu_replay_record_t));
+	memset(dscp->dsc_drr, 0, sizeof (dmu_replay_record_t));
 	dscp->dsc_drr->drr_type = DRR_REDACT;
 	drrr->drr_object = object;
 	drrr->drr_offset = offset;
@@ -450,7 +451,8 @@ dump_redact(dmu_send_cookie_t *dscp, uint64_t object, uint64_t offset,
 
 static int
 dmu_dump_write(dmu_send_cookie_t *dscp, dmu_object_type_t type, uint64_t object,
-    uint64_t offset, int lsize, int psize, const blkptr_t *bp, void *data)
+    uint64_t offset, int lsize, int psize, const blkptr_t *bp,
+    boolean_t io_compressed, void *data)
 {
 	uint64_t payload_size;
 	boolean_t raw = (dscp->dsc_featureflags & DMU_BACKUP_FEATURE_RAW);
@@ -478,7 +480,7 @@ dmu_dump_write(dmu_send_cookie_t *dscp, dmu_object_type_t type, uint64_t object,
 		dscp->dsc_pending_op = PENDING_NONE;
 	}
 	/* write a WRITE record */
-	bzero(dscp->dsc_drr, sizeof (dmu_replay_record_t));
+	memset(dscp->dsc_drr, 0, sizeof (dmu_replay_record_t));
 	dscp->dsc_drr->drr_type = DRR_WRITE;
 	drrw->drr_object = object;
 	drrw->drr_type = type;
@@ -487,7 +489,11 @@ dmu_dump_write(dmu_send_cookie_t *dscp, dmu_object_type_t type, uint64_t object,
 	drrw->drr_logical_size = lsize;
 
 	/* only set the compression fields if the buf is compressed or raw */
-	if (raw || lsize != psize) {
+	boolean_t compressed =
+	    (bp != NULL ? BP_GET_COMPRESS(bp) != ZIO_COMPRESS_OFF &&
+	    io_compressed : lsize != psize);
+	if (raw || compressed) {
+		ASSERT(bp != NULL);
 		ASSERT(raw || dscp->dsc_featureflags &
 		    DMU_BACKUP_FEATURE_COMPRESSED);
 		ASSERT(!BP_IS_EMBEDDED(bp));
@@ -566,7 +572,7 @@ dump_write_embedded(dmu_send_cookie_t *dscp, uint64_t object, uint64_t offset,
 
 	ASSERT(BP_IS_EMBEDDED(bp));
 
-	bzero(dscp->dsc_drr, sizeof (dmu_replay_record_t));
+	memset(dscp->dsc_drr, 0, sizeof (dmu_replay_record_t));
 	dscp->dsc_drr->drr_type = DRR_WRITE_EMBEDDED;
 	drrw->drr_object = object;
 	drrw->drr_offset = offset;
@@ -599,7 +605,7 @@ dump_spill(dmu_send_cookie_t *dscp, const blkptr_t *bp, uint64_t object,
 	}
 
 	/* write a SPILL record */
-	bzero(dscp->dsc_drr, sizeof (dmu_replay_record_t));
+	memset(dscp->dsc_drr, 0, sizeof (dmu_replay_record_t));
 	dscp->dsc_drr->drr_type = DRR_SPILL;
 	drrs->drr_object = object;
 	drrs->drr_length = blksz;
@@ -681,7 +687,7 @@ dump_freeobjects(dmu_send_cookie_t *dscp, uint64_t firstobj, uint64_t numobjs)
 	}
 
 	/* write a FREEOBJECTS record */
-	bzero(dscp->dsc_drr, sizeof (dmu_replay_record_t));
+	memset(dscp->dsc_drr, 0, sizeof (dmu_replay_record_t));
 	dscp->dsc_drr->drr_type = DRR_FREEOBJECTS;
 	drrfo->drr_firstobj = firstobj;
 	drrfo->drr_numobjs = numobjs;
@@ -722,7 +728,7 @@ dump_dnode(dmu_send_cookie_t *dscp, const blkptr_t *bp, uint64_t object,
 	}
 
 	/* write an OBJECT record */
-	bzero(dscp->dsc_drr, sizeof (dmu_replay_record_t));
+	memset(dscp->dsc_drr, 0, sizeof (dmu_replay_record_t));
 	dscp->dsc_drr->drr_type = DRR_OBJECT;
 	drro->drr_object = object;
 	drro->drr_type = dnp->dn_type;
@@ -758,6 +764,8 @@ dump_dnode(dmu_send_cookie_t *dscp, const blkptr_t *bp, uint64_t object,
 		 * to send it.
 		 */
 		if (bonuslen != 0) {
+			if (drro->drr_bonuslen > DN_MAX_BONUS_LEN(dnp))
+				return (SET_ERROR(EINVAL));
 			drro->drr_raw_bonuslen = DN_MAX_BONUS_LEN(dnp);
 			bonuslen = drro->drr_raw_bonuslen;
 		}
@@ -794,7 +802,7 @@ dump_dnode(dmu_send_cookie_t *dscp, const blkptr_t *bp, uint64_t object,
 		struct send_range record;
 		blkptr_t *bp = DN_SPILL_BLKPTR(dnp);
 
-		bzero(&record, sizeof (struct send_range));
+		memset(&record, 0, sizeof (struct send_range));
 		record.type = DATA;
 		record.object = object;
 		record.eos_marker = B_FALSE;
@@ -834,7 +842,7 @@ dump_object_range(dmu_send_cookie_t *dscp, const blkptr_t *bp,
 		dscp->dsc_pending_op = PENDING_NONE;
 	}
 
-	bzero(dscp->dsc_drr, sizeof (dmu_replay_record_t));
+	memset(dscp->dsc_drr, 0, sizeof (dmu_replay_record_t));
 	dscp->dsc_drr->drr_type = DRR_OBJECT_RANGE;
 	drror->drr_firstobj = firstobj;
 	drror->drr_numslots = numslots;
@@ -1010,11 +1018,15 @@ do_dump(dmu_send_cookie_t *dscp, struct send_range *range)
 		if (srdp->datablksz > SPA_OLD_MAXBLOCKSIZE &&
 		    !(dscp->dsc_featureflags &
 		    DMU_BACKUP_FEATURE_LARGE_BLOCKS)) {
+			if (dscp->dsc_featureflags & DMU_BACKUP_FEATURE_RAW)
+				return (SET_ERROR(ENOTSUP));
+
 			while (srdp->datablksz > 0 && err == 0) {
 				int n = MIN(srdp->datablksz,
 				    SPA_OLD_MAXBLOCKSIZE);
 				err = dmu_dump_write(dscp, srdp->obj_type,
-				    range->object, offset, n, n, NULL, data);
+				    range->object, offset, n, n, NULL, B_FALSE,
+				    data);
 				offset += n;
 				/*
 				 * When doing dry run, data==NULL is used as a
@@ -1028,7 +1040,8 @@ do_dump(dmu_send_cookie_t *dscp, struct send_range *range)
 		} else {
 			err = dmu_dump_write(dscp, srdp->obj_type,
 			    range->object, offset,
-			    srdp->datablksz, srdp->datasz, bp, data);
+			    srdp->datablksz, srdp->datasz, bp,
+			    srdp->io_compressed, data);
 		}
 		return (err);
 	}
@@ -1081,6 +1094,7 @@ range_alloc(enum type type, uint64_t object, uint64_t start_blkid,
 		cv_init(&range->sru.data.cv, NULL, CV_DEFAULT, NULL);
 		range->sru.data.io_outstanding = 0;
 		range->sru.data.io_err = 0;
+		range->sru.data.io_compressed = B_FALSE;
 	}
 	return (range);
 }
@@ -1089,11 +1103,11 @@ range_alloc(enum type type, uint64_t object, uint64_t start_blkid,
  * This is the callback function to traverse_dataset that acts as a worker
  * thread for dmu_send_impl.
  */
-/*ARGSUSED*/
 static int
 send_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
     const zbookmark_phys_t *zb, const struct dnode_phys *dnp, void *arg)
 {
+	(void) zilog;
 	struct send_thread_arg *sta = arg;
 	struct send_range *record;
 
@@ -1126,7 +1140,7 @@ send_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 		record->sru.object.bp = *bp;
 		size_t size  = sizeof (*dnp) * (dnp->dn_extra_slots + 1);
 		record->sru.object.dnp = kmem_alloc(size, KM_SLEEP);
-		bcopy(dnp, record->sru.object.dnp, size);
+		memcpy(record->sru.object.dnp, dnp, size);
 		bqueue_enqueue(&sta->q, record, sizeof (*record));
 		return (0);
 	}
@@ -1224,7 +1238,7 @@ redact_list_cb(redact_block_phys_t *rb, void *arg)
  * error code of the thread in case something goes wrong, and pushes the End of
  * Stream record when the traverse_dataset call has finished.
  */
-static void
+static __attribute__((noreturn)) void
 send_traverse_thread(void *arg)
 {
 	struct send_thread_arg *st_arg = arg;
@@ -1314,7 +1328,7 @@ get_next_range(bqueue_t *bq, struct send_range *prev)
 	return (next);
 }
 
-static void
+static __attribute__((noreturn)) void
 redact_list_thread(void *arg)
 {
 	struct redact_list_thread_arg *rlt_arg = arg;
@@ -1509,7 +1523,7 @@ find_next_range(struct send_range **ranges, bqueue_t **qs, uint64_t *out_mask)
  * data from the redact_list_thread and use that to determine which blocks
  * should be redacted.
  */
-static void
+static __attribute__((noreturn)) void
 send_merge_thread(void *arg)
 {
 	struct send_merge_thread_arg *smt_arg = arg;
@@ -1646,10 +1660,13 @@ issue_data_read(struct send_reader_thread_arg *srta, struct send_range *range)
 
 	enum zio_flag zioflags = ZIO_FLAG_CANFAIL;
 
-	if (srta->featureflags & DMU_BACKUP_FEATURE_RAW)
+	if (srta->featureflags & DMU_BACKUP_FEATURE_RAW) {
 		zioflags |= ZIO_FLAG_RAW;
-	else if (request_compressed)
+		srdp->io_compressed = B_TRUE;
+	} else if (request_compressed) {
 		zioflags |= ZIO_FLAG_RAW_COMPRESS;
+		srdp->io_compressed = B_TRUE;
+	}
 
 	srdp->datasz = (zioflags & ZIO_FLAG_RAW_COMPRESS) ?
 	    BP_GET_PSIZE(bp) : BP_GET_LSIZE(bp);
@@ -1731,7 +1748,7 @@ enqueue_range(struct send_reader_thread_arg *srta, bqueue_t *q, dnode_t *dn,
  * some indirect blocks can be discarded because they're not holes. Second,
  * it issues prefetches for the data we need to send.
  */
-static void
+static __attribute__((noreturn)) void
 send_reader_thread(void *arg)
 {
 	struct send_reader_thread_arg *srta = arg;
@@ -1900,7 +1917,7 @@ send_reader_thread(void *arg)
 
 struct dmu_send_params {
 	/* Pool args */
-	void *tag; // Tag that dp was held with, will be used to release dp.
+	const void *tag; // Tag dp was held with, will be used to release dp.
 	dsl_pool_t *dp;
 	/* To snapshot args */
 	const char *tosnap;
@@ -2054,6 +2071,8 @@ setup_to_thread(struct send_thread_arg *to_arg, objset_t *to_os,
 	to_arg->flags = TRAVERSE_PRE | TRAVERSE_PREFETCH_METADATA;
 	if (rawok)
 		to_arg->flags |= TRAVERSE_NO_DECRYPT;
+	if (zfs_send_corrupt_data)
+		to_arg->flags |= TRAVERSE_HARD;
 	to_arg->num_blocks_visited = &dssp->dss_blocks;
 	(void) thread_create(NULL, 0, send_traverse_thread, to_arg, 0,
 	    curproc, TS_RUN, minclsyspri);
@@ -2142,6 +2161,7 @@ setup_resume_points(struct dmu_send_params *dspp,
     struct send_merge_thread_arg *smt_arg, boolean_t resuming, objset_t *os,
     redaction_list_t *redact_rl, nvlist_t *nvl)
 {
+	(void) smt_arg;
 	dsl_dataset_t *to_ds = dspp->to_ds;
 	int err = 0;
 
@@ -2346,7 +2366,7 @@ dmu_send_impl(struct dmu_send_params *dspp)
 	dsl_dataset_t *to_ds = dspp->to_ds;
 	zfs_bookmark_phys_t *ancestor_zb = &dspp->ancestor_zb;
 	dsl_pool_t *dp = dspp->dp;
-	void *tag = dspp->tag;
+	const void *tag = dspp->tag;
 
 	err = dmu_objset_from_ds(to_ds, &os);
 	if (err != 0) {
@@ -2581,7 +2601,7 @@ dmu_send_impl(struct dmu_send_params *dspp)
 	 * the receive side that the stream is incomplete.
 	 */
 	if (!dspp->savedok) {
-		bzero(drr, sizeof (dmu_replay_record_t));
+		memset(drr, 0, sizeof (dmu_replay_record_t));
 		drr->drr_type = DRR_END;
 		drr->drr_u.drr_end.drr_checksum = dsc.dsc_zc;
 		drr->drr_u.drr_end.drr_toguid = dsc.dsc_toguid;
@@ -2682,7 +2702,7 @@ dmu_send_obj(const char *pool, uint64_t tosnap, uint64_t fromsnap,
 			uint64_t size = dspp.numfromredactsnaps *
 			    sizeof (uint64_t);
 			dspp.fromredactsnaps = kmem_zalloc(size, KM_SLEEP);
-			bcopy(fromredact, dspp.fromredactsnaps, size);
+			memcpy(dspp.fromredactsnaps, fromredact, size);
 		}
 
 		boolean_t is_before =
@@ -2867,7 +2887,7 @@ dmu_send(const char *tosnap, const char *fromsnap, boolean_t embedok,
 					    sizeof (uint64_t);
 					dspp.fromredactsnaps = kmem_zalloc(size,
 					    KM_SLEEP);
-					bcopy(fromredact, dspp.fromredactsnaps,
+					memcpy(dspp.fromredactsnaps, fromredact,
 					    size);
 				}
 				if (!dsl_dataset_is_before(dspp.to_ds, fromds,
@@ -3070,7 +3090,6 @@ out:
 	return (err);
 }
 
-/* BEGIN CSTYLED */
 ZFS_MODULE_PARAM(zfs_send, zfs_send_, corrupt_data, INT, ZMOD_RW,
 	"Allow sending corrupt data");
 
@@ -3091,4 +3110,3 @@ ZFS_MODULE_PARAM(zfs_send, zfs_send_, no_prefetch_queue_ff, INT, ZMOD_RW,
 
 ZFS_MODULE_PARAM(zfs_send, zfs_, override_estimate_recordsize, INT, ZMOD_RW,
 	"Override block size estimate with fixed size");
-/* END CSTYLED */

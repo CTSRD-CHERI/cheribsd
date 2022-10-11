@@ -63,7 +63,7 @@ union mfi_sense_ptr {
 		uint32_t	high;
 	} addr;
 }
-#if !(defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__))
+#if !__CHERI_USER_ABI
 /*
  * XXX-BD: This __packed appears to be gratutious and won't whole thing
  * is a bit absurd in CheriABI.
@@ -87,7 +87,15 @@ struct mfi_ioc_packet {
 	} mfi_frame;
 
 	struct iovec mfi_sgl[MAX_IOCTL_SGE];
-} __packed __aligned(sizeof(void *__capability));
+}
+#if !__CHERI_USER_ABI
+/*
+ * Packing is gratutious, but part of the ABI. Don't pack in CheriABI
+ * where it won't work.
+ */
+__packed
+#endif
+;
 
 #ifdef COMPAT_FREEBSD32
 struct mfi_ioc_packet32 {
@@ -159,16 +167,24 @@ struct mfi_linux_ioc_packet {
 #else
 	struct iovec lioc_sgl[MAX_LINUX_IOCTL_SGE];
 #endif
-} __packed __aligned(sizeof(void *__capability));
+}
+#if !__CHERI_USER_ABI
+/*
+ * Packing is gratutious, but part of the ABI. Don't pack in CheriABI
+ * where it won't work.
+ */
+__packed
+#endif
+;
 
 struct mfi_ioc_passthru {
 	struct mfi_dcmd_frame	ioc_frame;
 	uint32_t		buf_size;
 	uint8_t			* __kerncap buf;
 }
-#if !(defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__))
+#if !__CHERI_USER_ABI
 /*
- * Packing is gratutious, but part of the ABI.  Don't pack in CheriABI
+ * Packing is gratutious, but part of the ABI. Don't pack in CheriABI
  * where it won't work.
  */
 __packed

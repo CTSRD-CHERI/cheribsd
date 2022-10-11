@@ -602,8 +602,8 @@ struct ieee80211_rx_stats {
 	int16_t c_rssi_ext[IEEE80211_MAX_CHAINS];	/* per-chain RSSI */
 
 	/* 32 bits */
-	uint8_t c_nf;			/* global NF */
-	uint8_t c_rssi;			/* global RSSI */
+	int8_t c_nf;			/* global NF */
+	int8_t c_rssi;			/* global RSSI */
 	uint8_t c_chain;		/* number of RX chains involved */
 	uint8_t c_rate;			/* legacy; 11n rate code; VHT MCS */
 
@@ -611,6 +611,9 @@ struct ieee80211_rx_stats {
 	uint16_t c_freq;		/* Frequency, MHz */
 	uint8_t c_ieee;			/* Channel */
 	uint8_t c_width;		/* channel width, FW flags above */
+
+	/* 32 bits */
+	uint32_t c_band;		/* Band; XXX we do not have a real band. */
 
 	/* Force alignment to DWORD */
 	union {

@@ -73,22 +73,6 @@ static void	enter_syscall(struct trussinfo *, struct threadinfo *,
 static void	new_proc(struct trussinfo *, pid_t, lwpid_t);
 
 
-static struct procabi cloudabi32 = {
-	.type = "CloudABI32",
-	.abi = SYSDECODE_ABI_CLOUDABI32,
-	.pointer_size = sizeof(uint32_t),
-	.extra_syscalls = STAILQ_HEAD_INITIALIZER(cloudabi32.extra_syscalls),
-	.syscalls = { NULL }
-};
-
-static struct procabi cloudabi64 = {
-	.type = "CloudABI64",
-	.abi = SYSDECODE_ABI_CLOUDABI64,
-	.pointer_size = sizeof(uint64_t),
-	.extra_syscalls = STAILQ_HEAD_INITIALIZER(cloudabi64.extra_syscalls),
-	.syscalls = { NULL }
-};
-
 static struct procabi freebsd = {
 	.type = "FreeBSD",
 	.abi = SYSDECODE_ABI_FREEBSD,
@@ -143,8 +127,6 @@ static struct procabi linux32 = {
 #endif
 
 static struct procabi_table abis[] = {
-	{ "CloudABI ELF32", &cloudabi32 },
-	{ "CloudABI ELF64", &cloudabi64 },
 #if __has_feature(capabilities)
 	{ "FreeBSD ELF64C", &freebsd },
 	{ "FreeBSD ELF64", &freebsd64 },
@@ -239,11 +221,24 @@ restore_proc(int signo __unused)
 static void
 detach_proc(pid_t pid)
 {
+	int sig, status;
 
-	/* stop the child so that we can detach */
+	/*
+	 * Stop the child so that we can detach.  Filter out possible
+	 * lingering SIGTRAP events buffered in the threads.
+	 */
 	kill(pid, SIGSTOP);
-	if (waitpid(pid, NULL, 0) < 0)
-		err(1, "Unexpected stop in waitpid");
+	for (;;) {
+		if (waitpid(pid, &status, 0) < 0)
+			err(1, "Unexpected error in waitpid");
+		sig = WIFSTOPPED(status) ? WSTOPSIG(status) : 0;
+		if (sig == SIGSTOP)
+			break;
+		if (sig == SIGTRAP)
+			sig = 0;
+		if (ptrace(PT_CONTINUE, pid, (caddr_t)1, sig) < 0)
+			err(1, "Can not continue for detach");
+	}
 
 	if (ptrace(PT_DETACH, pid, (caddr_t)1, 0) < 0)
 		err(1, "Can not detach the process");
@@ -581,8 +576,8 @@ exit_syscall(struct trussinfo *info, struct ptrace_lwpinfo *pl)
 			 * getting the data; it may not be valid.
 			 */
 			if (psr.sr_error != 0) {
-				asprintf(&temp, "0x%jx",
-				    (intmax_t)t->cs.args[sc->decode.args[i].offset]);
+				asprintf(&temp, "0x%lx",
+				    (long)t->cs.args[sc->decode.args[i].offset]);
 			} else {
 				temp = print_arg(&sc->decode.args[i],
 				    t->cs.args, psr.sr_retval, info);

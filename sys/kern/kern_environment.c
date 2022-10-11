@@ -49,7 +49,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/kenv.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
-#include <sys/sysent.h>
 #include <sys/sysproto.h>
 #include <sys/syscallsubr.h>
 #include <sys/libkern.h>
@@ -95,6 +94,71 @@ bool	dynamic_kenv;
 #define KENV_CHECK	if (!dynamic_kenv) \
 			    panic("%s: called before SI_SUB_KMEM", __func__)
 
+static int
+kenv_dump(struct thread *td, char **envp, int what, char * __capability value,
+    int len)
+{
+	char *buffer, *senv;
+	size_t done, needed, buflen;
+	int error;
+
+	error = 0;
+	buffer = NULL;
+	done = needed = 0;
+
+	MPASS(what == KENV_DUMP || what == KENV_DUMP_LOADER ||
+	    what == KENV_DUMP_STATIC);
+
+	/*
+	 * For non-dynamic kernel environment, we pass in either md_envp or
+	 * kern_envp and we must traverse with kernenv_next().  This shuffling
+	 * of pointers simplifies the below loop by only differing in how envp
+	 * is modified.
+	 */
+	if (what != KENV_DUMP) {
+		senv = (char *)envp;
+		envp = &senv;
+	}
+
+	buflen = len;
+	if (buflen > KENV_SIZE * (KENV_MNAMELEN + kenv_mvallen + 2))
+		buflen = KENV_SIZE * (KENV_MNAMELEN +
+		    kenv_mvallen + 2);
+	if (len > 0 && value != NULL)
+		buffer = malloc(buflen, M_TEMP, M_WAITOK|M_ZERO);
+
+	/* Only take the lock for the dynamic kenv. */
+	if (what == KENV_DUMP)
+		mtx_lock(&kenv_lock);
+	while (*envp != NULL) {
+		len = strlen(*envp) + 1;
+		needed += len;
+		len = min(len, buflen - done);
+		/*
+		 * If called with a NULL or insufficiently large
+		 * buffer, just keep computing the required size.
+		 */
+		if (value != NULL && buffer != NULL && len > 0) {
+			bcopy(*envp, buffer + done, len);
+			done += len;
+		}
+
+		/* Advance the pointer depending on the kenv format. */
+		if (what == KENV_DUMP)
+			envp++;
+		else
+			senv = kernenv_next(senv);
+	}
+	if (what == KENV_DUMP)
+		mtx_unlock(&kenv_lock);
+	if (buffer != NULL) {
+		error = copyout(buffer, value, done);
+		free(buffer, M_TEMP);
+	}
+	td->td_retval[0] = ((done == needed) ? 0 : needed);
+	return (error);
+}
+
 int
 sys_kenv(struct thread *td, struct kenv_args *uap)
 {
@@ -106,50 +170,36 @@ int
 kern_kenv(struct thread *td, int what, const char * __capability namep,
     char * __capability val, int vallen)
 {
-	char *name, *value, *buffer = NULL;
-	size_t len, done, needed, buflen;
-	int error, i;
+	char *name, *value;
+	size_t len;
+	int error;
 
 	KASSERT(dynamic_kenv, ("kenv: dynamic_kenv = false"));
 
 	error = 0;
-	if (what == KENV_DUMP) {
+
+	switch (what) {
+	case KENV_DUMP:
 #ifdef MAC
 		error = mac_kenv_check_dump(td->td_ucred);
 		if (error)
 			return (error);
 #endif
-		done = needed = 0;
-		buflen = vallen;
-		if (buflen > KENV_SIZE * (KENV_MNAMELEN + kenv_mvallen + 2))
-			buflen = KENV_SIZE * (KENV_MNAMELEN +
-			    kenv_mvallen + 2);
-		if (vallen > 0 && val != NULL)
-			buffer = malloc(buflen, M_TEMP, M_WAITOK|M_ZERO);
-		mtx_lock(&kenv_lock);
-		for (i = 0; kenvp[i] != NULL; i++) {
-			len = strlen(kenvp[i]) + 1;
-			needed += len;
-			len = min(len, buflen - done);
-			/*
-			 * If called with a NULL or insufficiently large
-			 * buffer, just keep computing the required size.
-			 */
-			if (val != NULL && buffer != NULL && len > 0) {
-				bcopy(kenvp[i], buffer + done, len);
-				done += len;
-			}
-		}
-		mtx_unlock(&kenv_lock);
-		if (buffer != NULL) {
-			error = copyout(buffer, val, done);
-			free(buffer, M_TEMP);
-		}
-		td->td_retval[0] = ((done == needed) ? 0 : needed);
-		return (error);
-	}
-
-	switch (what) {
+		return (kenv_dump(td, kenvp, what, val, vallen));
+	case KENV_DUMP_LOADER:
+	case KENV_DUMP_STATIC:
+#ifdef MAC
+		error = mac_kenv_check_dump(td->td_ucred);
+		if (error)
+			return (error);
+#endif
+#ifdef PRESERVE_EARLY_KENV
+		return (kenv_dump(td,
+		    what == KENV_DUMP_LOADER ? (char **)md_envp :
+		    (char **)kern_envp, what, value, vallen));
+#else
+		return (ENOENT);
+#endif
 	case KENV_SET:
 		error = priv_check(td, PRIV_KENV_SET);
 		if (error)
@@ -374,7 +424,11 @@ init_dynamic_kenv_from(char *init_env, int *curpos)
 			kenvp[i] = malloc(len, M_KENV, M_WAITOK);
 			strcpy(kenvp[i++], cp);
 sanitize:
+#ifdef PRESERVE_EARLY_KENV
+			continue;
+#else
 			explicit_bzero(cp, len - 1);
+#endif
 		}
 		*curpos = i;
 	}

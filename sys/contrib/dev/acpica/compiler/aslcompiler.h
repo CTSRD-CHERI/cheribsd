@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2021, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2022, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -1223,6 +1223,10 @@ DbgPrint (
 #define ASL_DEBUG_OUTPUT    0
 #define ASL_PARSE_OUTPUT    1
 #define ASL_TREE_OUTPUT     2
+
+BOOLEAN
+UtIsIdInteger (
+    UINT8                   *Target);
 
 UINT8
 UtIsBigEndianMachine (

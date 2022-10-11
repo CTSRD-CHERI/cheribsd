@@ -12,8 +12,8 @@
 #include <sstream>
 #include <string>
 
-#include <ctype.h>
-#include <stdlib.h>
+#include <cctype>
+#include <cstdlib>
 
 #include "lldb/Core/Address.h"
 #include "lldb/Interpreter/Options.h"
@@ -42,14 +42,11 @@ CommandObject::CommandObject(CommandInterpreter &interpreter,
                              llvm::StringRef name, llvm::StringRef help,
                              llvm::StringRef syntax, uint32_t flags)
     : m_interpreter(interpreter), m_cmd_name(std::string(name)),
-      m_cmd_help_short(), m_cmd_help_long(), m_cmd_syntax(), m_flags(flags),
-      m_arguments(), m_deprecated_command_override_callback(nullptr),
+      m_flags(flags), m_deprecated_command_override_callback(nullptr),
       m_command_override_callback(nullptr), m_command_override_baton(nullptr) {
   m_cmd_help_short = std::string(help);
   m_cmd_syntax = std::string(syntax);
 }
-
-CommandObject::~CommandObject() {}
 
 Debugger &CommandObject::GetDebugger() { return m_interpreter.GetDebugger(); }
 
@@ -222,7 +219,6 @@ bool CommandObject::CheckRequirements(CommandReturnObject &result) {
       // A process that is not running is considered paused.
       if (GetFlags().Test(eCommandProcessMustBeLaunched)) {
         result.AppendError("Process must exist.");
-        result.SetStatus(eReturnStatusFailed);
         return false;
       }
     } else {
@@ -242,7 +238,6 @@ bool CommandObject::CheckRequirements(CommandReturnObject &result) {
       case eStateUnloaded:
         if (GetFlags().Test(eCommandProcessMustBeLaunched)) {
           result.AppendError("Process must be launched.");
-          result.SetStatus(eReturnStatusFailed);
           return false;
         }
         break;
@@ -252,12 +247,20 @@ bool CommandObject::CheckRequirements(CommandReturnObject &result) {
         if (GetFlags().Test(eCommandProcessMustBePaused)) {
           result.AppendError("Process is running.  Use 'process interrupt' to "
                              "pause execution.");
-          result.SetStatus(eReturnStatusFailed);
           return false;
         }
       }
     }
   }
+
+  if (GetFlags().Test(eCommandProcessMustBeTraced)) {
+    Target *target = m_exe_ctx.GetTargetPtr();
+    if (target && !target->GetTrace()) {
+      result.AppendError("Process is not being traced.");
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -313,11 +316,11 @@ bool CommandObject::HelpTextContainsWord(llvm::StringRef search_word,
   llvm::StringRef long_help = GetHelpLong();
   llvm::StringRef syntax_help = GetSyntax();
 
-  if (search_short_help && short_help.contains_lower(search_word))
+  if (search_short_help && short_help.contains_insensitive(search_word))
     found_word = true;
-  else if (search_long_help && long_help.contains_lower(search_word))
+  else if (search_long_help && long_help.contains_insensitive(search_word))
     found_word = true;
-  else if (search_syntax && syntax_help.contains_lower(search_word))
+  else if (search_syntax && syntax_help.contains_insensitive(search_word))
     found_word = true;
 
   if (!found_word && search_options && GetOptions() != nullptr) {
@@ -327,7 +330,7 @@ bool CommandObject::HelpTextContainsWord(llvm::StringRef search_word,
         GetCommandInterpreter().GetDebugger().GetTerminalWidth());
     if (!usage_help.Empty()) {
       llvm::StringRef usage_text = usage_help.GetString();
-      if (usage_text.contains_lower(search_word))
+      if (usage_text.contains_insensitive(search_word))
         found_word = true;
     }
   }
@@ -345,7 +348,6 @@ bool CommandObject::ParseOptionsAndNotify(Args &args,
   Status error(group_options.NotifyOptionParsingFinished(&exe_ctx));
   if (error.Fail()) {
     result.AppendError(error.AsCString());
-    result.SetStatus(eReturnStatusFailed);
     return false;
   }
   return true;
@@ -452,6 +454,9 @@ void CommandObject::GetFormattedCommandArguments(Stream &str,
         opt_set_mask == LLDB_OPT_SET_ALL
             ? m_arguments[i]
             : OptSetFiltered(opt_set_mask, m_arguments[i]);
+    // This argument is not associated with the current option set, so skip it.
+    if (arg_entry.empty())
+      continue;
     int num_alternatives = arg_entry.size();
 
     if ((num_alternatives == 2) && IsPairType(arg_entry[0].arg_repetition)) {
@@ -930,11 +935,11 @@ const char *CommandObject::GetArgumentDescriptionAsCString(
 }
 
 Target &CommandObject::GetDummyTarget() {
-  return *m_interpreter.GetDebugger().GetDummyTarget();
+  return m_interpreter.GetDebugger().GetDummyTarget();
 }
 
 Target &CommandObject::GetSelectedOrDummyTarget(bool prefer_dummy) {
-  return *m_interpreter.GetDebugger().GetSelectedOrDummyTarget(prefer_dummy);
+  return m_interpreter.GetDebugger().GetSelectedOrDummyTarget(prefer_dummy);
 }
 
 Target &CommandObject::GetSelectedTarget() {
@@ -1041,13 +1046,13 @@ CommandObject::ArgumentTableEntry CommandObject::g_arguments_data[] = {
     { eArgTypeBoolean, "boolean", CommandCompletions::eNoCompletion, { nullptr, false }, "A Boolean value: 'true' or 'false'" },
     { eArgTypeBreakpointID, "breakpt-id", CommandCompletions::eNoCompletion, { BreakpointIDHelpTextCallback, false }, nullptr },
     { eArgTypeBreakpointIDRange, "breakpt-id-list", CommandCompletions::eNoCompletion, { BreakpointIDRangeHelpTextCallback, false }, nullptr },
-    { eArgTypeBreakpointName, "breakpoint-name", CommandCompletions::eNoCompletion, { BreakpointNameHelpTextCallback, false }, nullptr },
+    { eArgTypeBreakpointName, "breakpoint-name", CommandCompletions::eBreakpointNameCompletion, { BreakpointNameHelpTextCallback, false }, nullptr },
     { eArgTypeByteSize, "byte-size", CommandCompletions::eNoCompletion, { nullptr, false }, "Number of bytes to use." },
     { eArgTypeClassName, "class-name", CommandCompletions::eNoCompletion, { nullptr, false }, "Then name of a class from the debug information in the program." },
     { eArgTypeCommandName, "cmd-name", CommandCompletions::eNoCompletion, { nullptr, false }, "A debugger command (may be multiple words), without any options or arguments." },
     { eArgTypeCount, "count", CommandCompletions::eNoCompletion, { nullptr, false }, "An unsigned integer." },
     { eArgTypeDirectoryName, "directory", CommandCompletions::eDiskDirectoryCompletion, { nullptr, false }, "A directory name." },
-    { eArgTypeDisassemblyFlavor, "disassembly-flavor", CommandCompletions::eNoCompletion, { nullptr, false }, "A disassembly flavor recognized by your disassembly plugin.  Currently the only valid options are \"att\" and \"intel\" for Intel targets" },
+    { eArgTypeDisassemblyFlavor, "disassembly-flavor", CommandCompletions::eDisassemblyFlavorCompletion, { nullptr, false }, "A disassembly flavor recognized by your disassembly plugin.  Currently the only valid options are \"att\" and \"intel\" for Intel targets" },
     { eArgTypeDescriptionVerbosity, "description-verbosity", CommandCompletions::eNoCompletion, { nullptr, false }, "How verbose the output of 'po' should be." },
     { eArgTypeEndAddress, "end-address", CommandCompletions::eNoCompletion, { nullptr, false }, "Help text goes here." },
     { eArgTypeExpression, "expr", CommandCompletions::eNoCompletion, { nullptr, false }, "Help text goes here." },
@@ -1055,19 +1060,20 @@ CommandObject::ArgumentTableEntry CommandObject::g_arguments_data[] = {
     { eArgTypeExprFormat, "expression-format", CommandCompletions::eNoCompletion, { nullptr, false }, "[ [bool|b] | [bin] | [char|c] | [oct|o] | [dec|i|d|u] | [hex|x] | [float|f] | [cstr|s] ]" },
     { eArgTypeFilename, "filename", CommandCompletions::eDiskFileCompletion, { nullptr, false }, "The name of a file (can include path)." },
     { eArgTypeFormat, "format", CommandCompletions::eNoCompletion, { FormatHelpTextCallback, true }, nullptr },
-    { eArgTypeFrameIndex, "frame-index", CommandCompletions::eNoCompletion, { nullptr, false }, "Index into a thread's list of frames." },
+    { eArgTypeFrameIndex, "frame-index", CommandCompletions::eFrameIndexCompletion, { nullptr, false }, "Index into a thread's list of frames." },
     { eArgTypeFullName, "fullname", CommandCompletions::eNoCompletion, { nullptr, false }, "Help text goes here." },
     { eArgTypeFunctionName, "function-name", CommandCompletions::eNoCompletion, { nullptr, false }, "The name of a function." },
     { eArgTypeFunctionOrSymbol, "function-or-symbol", CommandCompletions::eNoCompletion, { nullptr, false }, "The name of a function or symbol." },
     { eArgTypeGDBFormat, "gdb-format", CommandCompletions::eNoCompletion, { GDBFormatHelpTextCallback, true }, nullptr },
     { eArgTypeHelpText, "help-text", CommandCompletions::eNoCompletion, { nullptr, false }, "Text to be used as help for some other entity in LLDB" },
     { eArgTypeIndex, "index", CommandCompletions::eNoCompletion, { nullptr, false }, "An index into a list." },
-    { eArgTypeLanguage, "source-language", CommandCompletions::eNoCompletion, { LanguageTypeHelpTextCallback, true }, nullptr },
+    { eArgTypeLanguage, "source-language", CommandCompletions::eTypeLanguageCompletion, { LanguageTypeHelpTextCallback, true }, nullptr },
     { eArgTypeLineNum, "linenum", CommandCompletions::eNoCompletion, { nullptr, false }, "Line number in a source file." },
+    { eArgTypeFileLineColumn, "linespec", CommandCompletions::eNoCompletion, { nullptr, false }, "A source specifier in the form file:line[:column]" },
     { eArgTypeLogCategory, "log-category", CommandCompletions::eNoCompletion, { nullptr, false }, "The name of a category within a log channel, e.g. all (try \"log list\" to see a list of all channels and their categories." },
     { eArgTypeLogChannel, "log-channel", CommandCompletions::eNoCompletion, { nullptr, false }, "The name of a log channel, e.g. process.gdb-remote (try \"log list\" to see a list of all channels and their categories)." },
     { eArgTypeMethod, "method", CommandCompletions::eNoCompletion, { nullptr, false }, "A C++ method name." },
-    { eArgTypeName, "name", CommandCompletions::eNoCompletion, { nullptr, false }, "Help text goes here." },
+    { eArgTypeName, "name", CommandCompletions::eTypeCategoryNameCompletion, { nullptr, false }, "Help text goes here." },
     { eArgTypeNewPathPrefix, "new-path-prefix", CommandCompletions::eNoCompletion, { nullptr, false }, "Help text goes here." },
     { eArgTypeNumLines, "num-lines", CommandCompletions::eNoCompletion, { nullptr, false }, "The number of lines to use." },
     { eArgTypeNumberPerLine, "number-per-line", CommandCompletions::eNoCompletion, { nullptr, false }, "The number of items per line to display." },
@@ -1077,9 +1083,9 @@ CommandObject::ArgumentTableEntry CommandObject::g_arguments_data[] = {
     { eArgTypePath, "path", CommandCompletions::eDiskFileCompletion, { nullptr, false }, "Path." },
     { eArgTypePermissionsNumber, "perms-numeric", CommandCompletions::eNoCompletion, { nullptr, false }, "Permissions given as an octal number (e.g. 755)." },
     { eArgTypePermissionsString, "perms=string", CommandCompletions::eNoCompletion, { nullptr, false }, "Permissions given as a string value (e.g. rw-r-xr--)." },
-    { eArgTypePid, "pid", CommandCompletions::eNoCompletion, { nullptr, false }, "The process ID number." },
+    { eArgTypePid, "pid", CommandCompletions::eProcessIDCompletion, { nullptr, false }, "The process ID number." },
     { eArgTypePlugin, "plugin", CommandCompletions::eProcessPluginCompletion, { nullptr, false }, "Help text goes here." },
-    { eArgTypeProcessName, "process-name", CommandCompletions::eNoCompletion, { nullptr, false }, "The name of the process." },
+    { eArgTypeProcessName, "process-name", CommandCompletions::eProcessNameCompletion, { nullptr, false }, "The name of the process." },
     { eArgTypePythonClass, "python-class", CommandCompletions::eNoCompletion, { nullptr, false }, "The name of a Python class." },
     { eArgTypePythonFunction, "python-function", CommandCompletions::eNoCompletion, { nullptr, false }, "The name of a Python function." },
     { eArgTypePythonScript, "python-script", CommandCompletions::eNoCompletion, { nullptr, false }, "Source code written in Python." },
@@ -1117,8 +1123,10 @@ CommandObject::ArgumentTableEntry CommandObject::g_arguments_data[] = {
     { eArgTypeWatchpointIDRange, "watchpt-id-list", CommandCompletions::eNoCompletion, { nullptr, false }, "For example, '1-3' or '1 to 3'." },
     { eArgTypeWatchType, "watch-type", CommandCompletions::eNoCompletion, { nullptr, false }, "Specify the type for a watchpoint." },
     { eArgRawInput, "raw-input", CommandCompletions::eNoCompletion, { nullptr, false }, "Free-form text passed to a command without prior interpretation, allowing spaces without requiring quotes.  To pass arguments and free form text put two dashes ' -- ' between the last argument and any raw input." },
-    { eArgTypeCommand, "command", CommandCompletions::eNoCompletion, { nullptr, false }, "An LLDB Command line command." },
-    { eArgTypeColumnNum, "column", CommandCompletions::eNoCompletion, { nullptr, false }, "Column number in a source file." }
+    { eArgTypeCommand, "command", CommandCompletions::eNoCompletion, { nullptr, false }, "An LLDB Command line command element." },
+    { eArgTypeColumnNum, "column", CommandCompletions::eNoCompletion, { nullptr, false }, "Column number in a source file." },
+    { eArgTypeModuleUUID, "module-uuid", CommandCompletions::eModuleUUIDCompletion, { nullptr, false }, "A module UUID value." },
+    { eArgTypeSaveCoreStyle, "corefile-style", CommandCompletions::eNoCompletion, { nullptr, false }, "The type of corefile that lldb will try to create, dependant on this target's capabilities." }
     // clang-format on
 };
 

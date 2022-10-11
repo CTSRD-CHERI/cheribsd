@@ -39,6 +39,10 @@
  * $FreeBSD$
  */
 
+#if defined(__i386__)
+#include <i386/asmacros.h>
+#else /* !__i386__ */
+
 #ifndef _MACHINE_ASMACROS_H_
 #define _MACHINE_ASMACROS_H_
 
@@ -213,11 +217,33 @@ X\vec_name:
 	movq	TF_R15(%rsp),%r15
 	.endm
 
+#ifdef KMSAN
+/*
+ * The KMSAN runtime relies on a TLS block to track initialization and origin
+ * state for function parameters and return values.  To keep this state
+ * consistent in the face of asynchronous kernel-mode traps, the runtime
+ * maintains a stack of blocks: when handling an exception or interrupt,
+ * kmsan_intr_enter() pushes the new block to be used until the handler is
+ * complete, at which point kmsan_intr_leave() restores the previous block.
+ *
+ * Thus, KMSAN_ENTER/LEAVE hooks are required only in handlers for events that
+ * may have happened while in kernel-mode.  In particular, they are not required
+ * around amd64_syscall() or ast() calls.  Otherwise, kmsan_intr_enter() can be
+ * called unconditionally, without distinguishing between entry from user-mode
+ * or kernel-mode.
+ */
+#define	KMSAN_ENTER	callq kmsan_intr_enter
+#define	KMSAN_LEAVE	callq kmsan_intr_leave
+#else
+#define	KMSAN_ENTER
+#define	KMSAN_LEAVE
+#endif
+
 #endif /* LOCORE */
 
 #ifdef __STDC__
 #define ELFNOTE(name, type, desctype, descdata...) \
-.pushsection .note.name                 ;       \
+.pushsection .note.name, "a", @note     ;       \
   .align 4                              ;       \
   .long 2f - 1f         /* namesz */    ;       \
   .long 4f - 3f         /* descsz */    ;       \
@@ -229,7 +255,7 @@ X\vec_name:
 .popsection
 #else /* !__STDC__, i.e. -traditional */
 #define ELFNOTE(name, type, desctype, descdata) \
-.pushsection .note.name                 ;       \
+.pushsection .note.name, "a", @note     ;       \
   .align 4                              ;       \
   .long 2f - 1f         /* namesz */    ;       \
   .long 4f - 3f         /* descsz */    ;       \
@@ -242,3 +268,5 @@ X\vec_name:
 #endif /* __STDC__ */
 
 #endif /* !_MACHINE_ASMACROS_H_ */
+
+#endif /* __i386__ */

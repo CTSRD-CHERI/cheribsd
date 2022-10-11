@@ -42,11 +42,11 @@ __FBSDID("$FreeBSD$");
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 #include <linux/module.h>
+#include <net/if_llatbl.h>
 #include <net/route.h>
 #include <net/route/nhop.h>
 #include <net/netevent.h>
 #include <rdma/ib_addr.h>
-#include <rdma/ib_addr_freebsd.h>
 #include <rdma/ib.h>
 
 #include <netinet/in_fib.h>
@@ -140,7 +140,7 @@ rdma_copy_addr_sub(u8 *dst, const u8 *src, unsigned min, unsigned max)
 	memset(dst + min, 0, max - min);
 }
 
-int rdma_copy_addr(struct rdma_dev_addr *dev_addr, struct net_device *dev,
+int rdma_copy_addr(struct rdma_dev_addr *dev_addr, struct ifnet *dev,
 		     const unsigned char *dst_dev_addr)
 {
 	/* check for loopback device */
@@ -173,7 +173,7 @@ EXPORT_SYMBOL(rdma_copy_addr);
 int rdma_translate_ip(const struct sockaddr *addr,
 		      struct rdma_dev_addr *dev_addr)
 {
-	struct net_device *dev;
+	struct ifnet *dev;
 	int ret;
 
 	if (dev_addr->bound_dev_if) {
@@ -397,9 +397,16 @@ static int addr4_resolve(struct sockaddr_in *src_in,
 	} else {
 		bool is_gw = (nh->nh_flags & NHF_GATEWAY) != 0;
 		memset(edst, 0, MAX_ADDR_LEN);
-		error = arpresolve(ifp, is_gw, NULL, is_gw ?
-		    &nh->gw_sa : (const struct sockaddr *)&dst_tmp,
-		    edst, NULL, NULL);
+#ifdef INET6
+		if (is_gw && nh->gw_sa.sa_family == AF_INET6)
+			error = nd6_resolve(ifp, LLE_SF(AF_INET, is_gw), NULL,
+			    &nh->gw_sa, edst, NULL, NULL);
+		else
+#endif
+			error = arpresolve(ifp, is_gw, NULL, is_gw ?
+			    &nh->gw_sa : (const struct sockaddr *)&dst_tmp,
+			    edst, NULL, NULL);
+
 		if (error != 0)
 			goto error_put_ifp;
 		else if (is_gw)
@@ -585,8 +592,8 @@ static int addr6_resolve(struct sockaddr_in6 *src_in,
 	} else {
 		bool is_gw = (nh->nh_flags & NHF_GATEWAY) != 0;
 		memset(edst, 0, MAX_ADDR_LEN);
-		error = nd6_resolve(ifp, is_gw, NULL, is_gw ?
-		    &nh->gw_sa : (const struct sockaddr *)&dst_tmp,
+		error = nd6_resolve(ifp, LLE_SF(AF_INET6, is_gw), NULL,
+		    is_gw ? &nh->gw_sa : (const struct sockaddr *)&dst_tmp,
 		    edst, NULL, NULL);
 		if (error != 0)
 			goto error_put_ifp;
@@ -663,7 +670,7 @@ static int addr_resolve(struct sockaddr *src_in,
 			struct rdma_dev_addr *addr)
 {
 	struct epoch_tracker et;
-	struct net_device *ndev = NULL;
+	struct ifnet *ndev = NULL;
 	u8 edst[MAX_ADDR_LEN];
 	int ret;
 
@@ -853,7 +860,7 @@ static void resolve_cb(int status, struct sockaddr *src_addr,
 
 int rdma_addr_find_l2_eth_by_grh(const union ib_gid *sgid,
 				 const union ib_gid *dgid,
-				 u8 *dmac, struct net_device *dev,
+				 u8 *dmac, struct ifnet *dev,
 				 int *hoplimit)
 {
 	int ret = 0;

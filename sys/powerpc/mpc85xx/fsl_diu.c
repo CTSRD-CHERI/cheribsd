@@ -214,12 +214,10 @@ diu_intr(void *arg)
 static int
 diu_set_pxclk(device_t dev, unsigned int freq)
 {
-	phandle_t node;
 	unsigned long bus_freq;
 	uint32_t pxclk_set;
 	uint32_t clkdvd;
 
-	node = ofw_bus_get_node(device_get_parent(dev));
 	if ((bus_freq = mpc85xx_get_platform_clock()) <= 0) {
 		device_printf(dev, "Unable to get bus frequency\n");
 		return (ENXIO);
@@ -464,6 +462,4 @@ static driver_t diu_driver = {
 	sizeof(struct diu_softc),
 };
 
-static devclass_t diu_devclass;
-
-DRIVER_MODULE(fb, simplebus, diu_driver, diu_devclass, 0, 0);
+DRIVER_MODULE(fb, simplebus, diu_driver, 0, 0);

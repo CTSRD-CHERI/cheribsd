@@ -40,7 +40,7 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 {
 	const char * __capability src;
 	char * __capability dst;
-	vaddr_t dst_addr, src_addr;
+	ptraddr_t dst_addr, src_addr;
 	int tocopy;
 
 	dst = dst0;
@@ -49,8 +49,8 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 	if (len == 0 || dst == src)
 		return (dst);
 
-	dst_addr = (__cheri_addr vaddr_t)dst;
-	src_addr = (__cheri_addr vaddr_t)src;
+	dst_addr = (__cheri_addr ptraddr_t)dst;
+	src_addr = (__cheri_addr ptraddr_t)src;
 	if (dst_addr < src_addr) {
 		/* Forwards. */
 
@@ -68,10 +68,10 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 				} while (--tocopy != 0);
 			}
 
-			KASSERT((__cheri_addr vaddr_t)dst % sizeof(uintcap_t) == 0,
+			KASSERT((__cheri_addr ptraddr_t)dst % sizeof(uintcap_t) == 0,
 			    ("dst %p not aligned",
 			    (void *)(__cheri_addr uintptr_t)dst));
-			KASSERT((__cheri_addr vaddr_t)src % sizeof(uintcap_t) == 0,
+			KASSERT((__cheri_addr ptraddr_t)src % sizeof(uintcap_t) == 0,
 			    ("src %p not aligned",
 			    (void *)(__cheri_addr uintptr_t)src));
 
@@ -96,8 +96,8 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 
 		src += len;
 		dst += len;
-		dst_addr = (__cheri_addr vaddr_t)dst;
-		src_addr = (__cheri_addr vaddr_t)src;
+		dst_addr = (__cheri_addr ptraddr_t)dst;
+		src_addr = (__cheri_addr ptraddr_t)src;
 		
 		/* Do both buffers have the same relative alignment? */
 		if ((dst_addr ^ src_addr) % sizeof(uintcap_t) == 0 &&
@@ -112,9 +112,9 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 				} while (--tocopy != 0);
 			}
 
-			KASSERT((__cheri_addr vaddr_t)dst % sizeof(uintcap_t) == 0,
+			KASSERT((__cheri_addr ptraddr_t)dst % sizeof(uintcap_t) == 0,
 			    ("dst %p not aligned", (void *)(__cheri_addr uintptr_t)dst));
-			KASSERT((__cheri_addr vaddr_t)src % sizeof(uintcap_t) == 0,
+			KASSERT((__cheri_addr ptraddr_t)src % sizeof(uintcap_t) == 0,
 			    ("src %p not aligned", (void *)(__cheri_addr uintptr_t)src));
 
 			/* Copy capabilities. */
@@ -139,25 +139,11 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 
 __strong_reference(memcpy_c, memmove_c);
 
-void
-bcopy_c(const void * __capability src, void * __capability dst, size_t len)
-{
-
-	memcpy_c(dst, src, len);
-}
-
 void * __capability
 memcpynocap_c(void * __capability dst, const void *  __capability src,
     size_t len)
 {
 	return (memcpy_c(dst, cheri_andperm(src, ~CHERI_PERM_LOAD_CAP), len));
-}
-
-void
-bcopynocap_c(const void * __capability src, void * __capability dst, size_t len)
-{
-
-	memcpy_c(dst, cheri_andperm(src, ~CHERI_PERM_LOAD_CAP), len);
 }
 
 __strong_reference(memcpynocap_c, memmovenocap_c);

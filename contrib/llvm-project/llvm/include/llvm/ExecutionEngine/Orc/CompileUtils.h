@@ -20,15 +20,12 @@
 
 namespace llvm {
 
-class MCContext;
 class MemoryBuffer;
 class Module;
 class ObjectCache;
 class TargetMachine;
 
 namespace orc {
-
-class JITTargetMachineBuilder;
 
 IRSymbolMapper::ManglingOptions
 irManglingOptionsFromTargetOptions(const TargetOptions &Opts);

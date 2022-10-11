@@ -1,6 +1,5 @@
 /*-
  * Copyright (c) 2015 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Semihalf under
  * the sponsorship of the FreeBSD Foundation.
@@ -153,40 +152,27 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 {
 	jmp_buf jb;
 	void *prev_jb;
-	char *dst, *kaddr;
+	vm_pointer_t kaddr;
+	char *dst;
+	size_t i;
 	int ret;
-	uint64_t tmp64;
-	uint32_t tmp32;
-	uint16_t tmp16;
 
 	prev_jb = kdb_jmpbuf(jb);
 	ret = setjmp(jb);
 	if (ret == 0) {
-		kaddr = DB_DATA_PTR_LEN(addr, char, size);
-		if (size == 8 && (addr & 7) == 0) {
-			dst = (char *)&tmp64;
-			while (size-- > 0)
-				*dst++ = *data++;
-			*((uint64_t *)kaddr) = tmp64;
-		} else if (size == 4 && (addr & 3) == 0) {
-			dst = (char *)&tmp32;
-			while (size-- > 0)
-				*dst++ = *data++;
-			*((uint32_t *)kaddr) = tmp32;
-		} else if (size == 2 && (addr & 1) == 0) {
-			dst = (char *)&tmp16;
-			while (size-- > 0)
-				*dst++ = *data++;
-			*((uint32_t *)kaddr) = tmp16;
+		kaddr = (vm_pointer_t)DB_DATA_PTR_LEN(addr, char, size);
+		if (!arm64_get_writable_addr(kaddr, &kaddr)) {
+			ret = 1;
 		} else {
-			while (size-- > 0)
-				*kaddr++ = *data++;
-		}
-		dsb(ish);
+			dst = (char *)kaddr;
+			for (i = 0; i < size; i++)
+				*dst++ = *data++;
+			dsb(ish);
 
-		/* Clean D-cache and invalidate I-cache */
-		cpu_dcache_wb_range(addr, (vm_size_t)size);
-		cpu_icache_sync_range(addr, (vm_size_t)size);
+			/* Clean D-cache and invalidate I-cache */
+			cpu_dcache_wb_range(kaddr, (vm_size_t)size);
+			cpu_icache_sync_range(kaddr, (vm_size_t)size);
+		}
 	}
 	(void)kdb_jmpbuf(prev_jb);
 

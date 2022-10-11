@@ -52,24 +52,22 @@
  * pointers in ps_strings.  The kern.proc.args sysctl first tries p_args.
  * If p_args is NULL, it then falls back to reading ps_strings and following
  * the pointers.
- *
- * XXXRW: It appears this is safely extensible by appending new fields without
- * damaging the ABI.  However, good to confirm before upstreaming this change.
- *
- * XXXRW: Although it is not strictly required for CHERI, I have made similar
- * changes to freebsd32_ps_strings.
  */
 struct ps_strings {
 	char * __kerncap * __kerncap ps_argvstr; /* first of 0 or more argument strings */
 	unsigned int ps_nargvstr; /* the number of argument strings */
 	char * __kerncap * __kerncap ps_envstr;	/* first of 0 or more environment strings */
 	unsigned int ps_nenvstr; /* the number of environment strings */
-	void * __kerncap ps_sbclasses;	/* pointer to sandbox class data */
-	size_t	 ps_sbclasseslen;	/* length of sandbox class data */
-	void * __kerncap ps_sbmethods;	/* pointer to sandbox method data */
-	size_t	 ps_sbmethodslen;	/* length of sandbox method data */
-	void * __kerncap ps_sbobjects;	/* pointer to sandbox object data */
-	size_t	 ps_sbobjectslen;	/* length of sandbox object data */
+};
+
+/* Coredump output parameters. */
+struct coredump_params {
+	off_t		offset;
+	struct ucred	*active_cred;
+	struct ucred	*file_cred;
+	struct thread	*td;
+	struct vnode	*vp;
+	struct compressor *comp;
 };
 
 struct image_params;
@@ -89,12 +87,33 @@ struct execsw {
  * Prefer the kern.ps_strings or kern.proc.ps_strings sysctls to this constant.
  */
 #define	PS_STRINGS	(USRSTACK - sizeof(struct ps_strings))
+#define	PROC_PS_STRINGS(p)	((p)->p_psstrings)
+
+/*
+ * Address of signal trampoline (in user space).
+ * This assumes that the sigcode resides in the shared page.
+ */
+#define PROC_SIGCODE(p)		\
+	((p)->p_vmspace->vm_shp_base + (p)->p_sysent->sv_sigcode_offset)
+
+#define PROC_HAS_SHP(p)		\
+	((p)->p_sysent->sv_shared_page_obj != NULL)
 
 int exec_map_first_page(struct image_params *);        
 void exec_unmap_first_page(struct image_params *);       
 
 int exec_register(const struct execsw *);
 int exec_unregister(const struct execsw *);
+
+enum uio_seg;
+
+#define   CORE_BUF_SIZE   (16 * 1024)
+
+int core_write(struct coredump_params *, const void *, size_t, off_t,
+    enum uio_seg, size_t *);
+int core_output(char * __capability, size_t, off_t, struct coredump_params *,
+    void *);
+int sbuf_drain_core_output(void *, const char *, int);
 
 extern int coredump_pack_fileinfo;
 extern int coredump_pack_vmmapinfo;

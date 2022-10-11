@@ -205,8 +205,8 @@ static device_method_t isp_pci_methods[] = {
 static driver_t isp_pci_driver = {
 	"isp", isp_pci_methods, sizeof (struct isp_pcisoftc)
 };
-static devclass_t isp_devclass;
-DRIVER_MODULE(isp, pci, isp_pci_driver, isp_devclass, 0, 0);
+
+DRIVER_MODULE(isp, pci, isp_pci_driver, 0, 0);
 MODULE_DEPEND(isp, cam, 1, 1, 1);
 MODULE_DEPEND(isp, firmware, 1, 1, 1);
 static int isp_nvports = 0;
@@ -627,7 +627,7 @@ bad:
 	if (isp->isp_osinfo.fw == NULL && !IS_26XX(isp)) {
 		/*
 		 * Failure to attach at boot time might have been caused
-		 * by a missing ispfw(4).  Except for for 16Gb adapters,
+		 * by a missing ispfw(4).  Except for 16Gb adapters,
 		 * there's no loadable firmware for them.
 		 */
 		isp_prt(isp, ISP_LOGWARN, "See the ispfw(4) man page on "

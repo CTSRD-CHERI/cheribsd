@@ -17,8 +17,7 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 # by generating a preamble text file which kmodtool can append to the spec file.
 %(/bin/echo -e "\
 Requires:       @PACKAGE@ = %{version}\n\
-Conflicts:      @PACKAGE@-dkms\n\n" > %{_sourcedir}/kmod-preamble\n\
-Obsoletes:      spl-kmod)
+Conflicts:      @PACKAGE@-dkms)
 
 # LDFLAGS are not sanitized by arch/*/Makefile for these architectures.
 %ifarch ppc ppc64 ppc64le aarch64
@@ -38,7 +37,6 @@ This package contains the ZFS kernel modules.
 %package -n kmod-%{kmod_name}-devel
 Summary:        ZFS kernel module(s) devel common
 Group:          System Environment/Kernel
-Provides:       kmod-spl-devel = %{version}
 
 %description -n  kmod-%{kmod_name}-devel
 This package provides the header files and objects to build kernel modules.
@@ -68,7 +66,10 @@ fi
         --with-linux=%{ksrc} \
         --with-linux-obj=%{kobj} \
         %{debug} \
-        %{debuginfo}
+        %{debuginfo} \
+        %{?kernel_cc} \
+        %{?kernel_ld} \
+        %{?kernel_llvm}
 make %{?_smp_mflags}
 
 %install
@@ -78,11 +79,10 @@ make install \
 %{__rm} -f %{buildroot}/lib/modules/%{kverrel}/modules.*
 
 # find-debuginfo.sh only considers executables
-%{__chmod} u+x  %{buildroot}/lib/modules/%{kverrel}/extra/*/*/*
+%{__chmod} u+x  %{buildroot}/lib/modules/%{kverrel}/extra/*/*
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
 %files -n kmod-%{kmod_name}-devel
 %{_usrsrc}/%{kmod_name}-%{version}
-%{_usrsrc}/spl-%{version}

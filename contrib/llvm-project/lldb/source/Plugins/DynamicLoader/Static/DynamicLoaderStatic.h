@@ -18,16 +18,14 @@ class DynamicLoaderStatic : public lldb_private::DynamicLoader {
 public:
   DynamicLoaderStatic(lldb_private::Process *process);
 
-  ~DynamicLoaderStatic() override;
-
   // Static Functions
   static void Initialize();
 
   static void Terminate();
 
-  static lldb_private::ConstString GetPluginNameStatic();
+  static llvm::StringRef GetPluginNameStatic() { return "static"; }
 
-  static const char *GetPluginDescriptionStatic();
+  static llvm::StringRef GetPluginDescriptionStatic();
 
   static lldb_private::DynamicLoader *
   CreateInstance(lldb_private::Process *process, bool force);
@@ -46,15 +44,10 @@ public:
   lldb_private::Status CanLoadImage() override;
 
   // PluginInterface protocol
-  lldb_private::ConstString GetPluginName() override;
-
-  uint32_t GetPluginVersion() override;
+  llvm::StringRef GetPluginName() override { return GetPluginNameStatic(); }
 
 private:
   void LoadAllImagesAtFileAddresses();
-
-  DynamicLoaderStatic(const DynamicLoaderStatic &) = delete;
-  const DynamicLoaderStatic &operator=(const DynamicLoaderStatic &) = delete;
 };
 
 #endif // LLDB_SOURCE_PLUGINS_DYNAMICLOADER_STATIC_DYNAMICLOADERSTATIC_H

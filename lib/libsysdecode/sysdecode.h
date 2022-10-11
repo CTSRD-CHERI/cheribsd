@@ -28,14 +28,16 @@
 #ifndef __SYSDECODE_H__
 #define	__SYSDECODE_H__
 
+#include <sys/types.h>
+#include <stdbool.h>
+#include <stdio.h>
+
 enum sysdecode_abi {
 	SYSDECODE_ABI_UNKNOWN = 0,
 	SYSDECODE_ABI_FREEBSD,
 	SYSDECODE_ABI_FREEBSD32,
 	SYSDECODE_ABI_LINUX,
 	SYSDECODE_ABI_LINUX32,
-	SYSDECODE_ABI_CLOUDABI64,
-	SYSDECODE_ABI_CLOUDABI32,
 
 	/*
 	 * XXX: 100 is to avoid ABI issues in CheriBSD, would use next
@@ -51,6 +53,7 @@ const char *sysdecode_atfd(int _fd);
 bool	sysdecode_atflags(FILE *_fp, int _flags, int *_rem);
 bool	sysdecode_cap_fcntlrights(FILE *_fp, uint32_t _rights, uint32_t *_rem);
 void	sysdecode_cap_rights(FILE *_fp, cap_rights_t *_rightsp);
+bool	sysdecode_close_range_flags(FILE *_fp, int _flags, int *_rem);
 const char *sysdecode_cmsg_type(int _cmsg_level, int _cmsg_type);
 const char *sysdecode_extattrnamespace(int _namespace);
 const char *sysdecode_fadvice(int _advice);
@@ -69,6 +72,7 @@ const char *sysdecode_ioctlname(unsigned long _val);
 const char *sysdecode_ipproto(int _protocol);
 void	sysdecode_kevent_fflags(FILE *_fp, short _filter, int _fflags,
 	    int _base);
+const char *sysdecode_itimer(int _which);
 const char *sysdecode_kevent_filter(int _filter);
 bool	sysdecode_kevent_flags(FILE *_fp, int _flags, int *_rem);
 const char *sysdecode_kldsym_cmd(int _cmd);
@@ -137,5 +141,18 @@ bool	sysdecode_wait4_options(FILE *_fp, int _options, int *_rem);
 bool	sysdecode_wait6_options(FILE *_fp, int _options, int *_rem);
 const char *sysdecode_whence(int _whence);
 bool	sysdecode_shmflags(FILE *_fp, int _flags, int *_rem);
+
+#if defined(__i386__) || defined(__amd64__) || defined(__aarch64__)
+
+#define	SYSDECODE_HAVE_LINUX
+
+bool	sysdecode_linux_atflags(FILE *_fp, int _flag, int *_rem);
+void	sysdecode_linux_clockid(FILE *_fp, clockid_t _which);
+bool	sysdecode_linux_clock_flags(FILE *_fp, int _flags, int *_rem);
+bool	sysdecode_linux_open_flags(FILE *_fp, int _flags, int *_rem);
+const char *sysdecode_linux_signal(int _sig);
+const char *sysdecode_linux_sigprocmask_how(int _how);
+
+#endif /* __i386__ || __amd64__ || __aarch64__ */
 
 #endif /* !__SYSDECODE_H__ */

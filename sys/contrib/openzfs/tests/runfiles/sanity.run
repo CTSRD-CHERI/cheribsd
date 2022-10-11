@@ -12,7 +12,7 @@
 # as much functionality as possible while still executing relatively
 # quickly.  The included tests should take no more than a few seconds
 # each to run at most.  This provides a convenient way to sanity test a
-# change before commiting to a full test run which takes several hours.
+# change before committing to a full test run which takes several hours.
 #
 # Approximate run time: 15 minutes
 #
@@ -146,7 +146,8 @@ tags = ['functional', 'cli_root', 'zfs_inherit']
 
 [tests/functional/cli_root/zfs_load-key]
 tests = ['zfs_load-key', 'zfs_load-key_all', 'zfs_load-key_file',
-    'zfs_load-key_location', 'zfs_load-key_noop', 'zfs_load-key_recursive']
+    'zfs_load-key_https', 'zfs_load-key_location', 'zfs_load-key_noop',
+    'zfs_load-key_recursive']
 tags = ['functional', 'cli_root', 'zfs_load-key']
 
 [tests/functional/cli_root/zfs_mount]
@@ -235,7 +236,7 @@ tests = ['zfs_upgrade_001_pos', 'zfs_upgrade_002_pos', 'zfs_upgrade_006_neg',
 tags = ['functional', 'cli_root', 'zfs_upgrade']
 
 [tests/functional/cli_root/zfs_wait]
-tests = ['zfs_wait_deleteq']
+tests = ['zfs_wait_deleteq', 'zfs_wait_getsubopt']
 tags = ['functional', 'cli_root', 'zfs_wait']
 
 [tests/functional/cli_root/zpool]
@@ -413,7 +414,7 @@ user =
 tags = ['functional', 'cli_user', 'zpool_list']
 
 [tests/functional/compression]
-tests = ['compress_003_pos']
+tests = ['compress_003_pos','compress_zstd_bswap']
 tags = ['functional', 'compression']
 
 [tests/functional/exec]
@@ -432,12 +433,14 @@ tests = ['grow_pool_001_pos', 'grow_replicas_001_pos']
 tags = ['functional', 'grow']
 
 [tests/functional/history]
-tests = ['history_004_pos', 'history_005_neg', 'history_006_neg',
-    'history_007_pos', 'history_008_pos', 'history_009_pos']
+tests = ['history_004_pos', 'history_005_neg', 'history_007_pos',
+    'history_009_pos']
 tags = ['functional', 'history']
 
 [tests/functional/hkdf]
-tests = ['run_hkdf_test']
+pre =
+post =
+tests = ['hkdf_test']
 tags = ['functional', 'hkdf']
 
 [tests/functional/inuse]
@@ -561,12 +564,11 @@ tags = ['functional', 'slog']
 
 [tests/functional/snapshot]
 tests = ['clone_001_pos', 'rollback_001_pos', 'rollback_002_pos',
-    'rollback_003_pos', 'snapshot_001_pos', 'snapshot_002_pos',
-    'snapshot_003_pos', 'snapshot_004_pos', 'snapshot_005_pos',
-    'snapshot_006_pos', 'snapshot_007_pos', 'snapshot_008_pos',
-    'snapshot_009_pos', 'snapshot_010_pos', 'snapshot_011_pos',
-    'snapshot_012_pos', 'snapshot_013_pos', 'snapshot_014_pos',
-    'snapshot_017_pos']
+    'snapshot_001_pos', 'snapshot_002_pos', 'snapshot_003_pos',
+    'snapshot_004_pos', 'snapshot_005_pos', 'snapshot_006_pos',
+    'snapshot_007_pos', 'snapshot_008_pos', 'snapshot_009_pos',
+    'snapshot_010_pos', 'snapshot_011_pos', 'snapshot_012_pos',
+    'snapshot_013_pos', 'snapshot_014_pos', 'snapshot_017_pos']
 tags = ['functional', 'snapshot']
 
 [tests/functional/snapused]
@@ -582,7 +584,7 @@ tests = ['suid_write_to_suid', 'suid_write_to_sgid', 'suid_write_to_suid_sgid',
     'suid_write_to_none']
 tags = ['functional', 'suid']
 
-[tests/functional/threadsappend]
+[tests/functional/append]
 tests = ['threadsappend_001_pos']
 tags = ['functional', 'threadsappend']
 
@@ -602,7 +604,7 @@ tags = ['functional', 'vdev_zaps']
 [tests/functional/xattr]
 tests = ['xattr_001_pos', 'xattr_002_neg', 'xattr_003_neg', 'xattr_004_pos',
     'xattr_005_pos', 'xattr_006_pos', 'xattr_007_neg',
-    'xattr_011_pos', 'xattr_013_pos']
+    'xattr_011_pos', 'xattr_013_pos', 'xattr_compat']
 tags = ['functional', 'xattr']
 
 [tests/functional/zvol/zvol_ENOSPC]

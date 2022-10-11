@@ -43,6 +43,10 @@
  * $FreeBSD$
  */
 
+#ifdef __i386__
+#include <i386/vmparam.h>
+#else /* !__i386__ */
+
 #ifndef _MACHINE_VMPARAM_H_
 #define	_MACHINE_VMPARAM_H_ 1
 
@@ -75,7 +79,7 @@
  * of the direct mapped segment.  This uses 2MB pages for reduced
  * TLB pressure.
  */
-#ifndef KASAN
+#if !defined(KASAN) && !defined(KMSAN)
 #define	UMA_MD_SMALL_ALLOC
 #endif
 
@@ -151,8 +155,10 @@
 #endif
 
 /*
- * Kernel physical load address. Needs to be aligned at 2MB superpage
- * boundary.
+ * Kernel physical load address for non-UEFI boot and for legacy UEFI loader.
+ * Newer UEFI loader loads kernel anywhere below 4G, with memory allocated
+ * by boot services.
+ * Needs to be aligned at 2MB superpage boundary.
  */
 #ifndef KERNLOAD
 #define	KERNLOAD	0x200000
@@ -168,9 +174,10 @@
  * 0xffff804020100fff - 0xffff807fffffffff   unused
  * 0xffff808000000000 - 0xffff847fffffffff   large map (can be tuned up)
  * 0xffff848000000000 - 0xfffff77fffffffff   unused (large map extends there)
- * 0xfffff78000000000 - 0xfffff7ffffffffff   512GB KASAN shadow map
+ * 0xfffff60000000000 - 0xfffff7ffffffffff   2TB KMSAN origin map, optional
+ * 0xfffff78000000000 - 0xfffff7bfffffffff   512GB KASAN shadow map, optional
  * 0xfffff80000000000 - 0xfffffbffffffffff   4TB direct map
- * 0xfffffc0000000000 - 0xfffffdffffffffff   unused
+ * 0xfffffc0000000000 - 0xfffffdffffffffff   2TB KMSAN shadow map, optional
  * 0xfffffe0000000000 - 0xffffffffffffffff   2TB kernel map
  *
  * Within the kernel map:
@@ -189,10 +196,28 @@
 #define	KASAN_MIN_ADDRESS	KV4ADDR(KASANPML4I, 0, 0, 0)
 #define	KASAN_MAX_ADDRESS	KV4ADDR(KASANPML4I + NKASANPML4E, 0, 0, 0)
 
+#define	KMSAN_SHAD_MIN_ADDRESS	KV4ADDR(KMSANSHADPML4I, 0, 0, 0)
+#define	KMSAN_SHAD_MAX_ADDRESS	KV4ADDR(KMSANSHADPML4I + NKMSANSHADPML4E, \
+					0, 0, 0)
+
+#define	KMSAN_ORIG_MIN_ADDRESS	KV4ADDR(KMSANORIGPML4I, 0, 0, 0)
+#define	KMSAN_ORIG_MAX_ADDRESS	KV4ADDR(KMSANORIGPML4I + NKMSANORIGPML4E, \
+					0, 0, 0)
+
 #define	LARGEMAP_MIN_ADDRESS	KV4ADDR(LMSPML4I, 0, 0, 0)
 #define	LARGEMAP_MAX_ADDRESS	KV4ADDR(LMEPML4I + 1, 0, 0, 0)
 
+/*
+ * Formally kernel mapping starts at KERNBASE, but kernel linker
+ * script leaves first PDE reserved.  For legacy BIOS boot, kernel is
+ * loaded at KERNLOAD = 2M, and initial kernel page table maps
+ * physical memory from zero to KERNend starting at KERNBASE.
+ *
+ * KERNSTART is where the first actual kernel page is mapped, after
+ * the compatibility mapping.
+ */
 #define	KERNBASE		KV4ADDR(KPML4I, KPDPI, 0, 0)
+#define	KERNSTART		(KERNBASE + NBPDR)
 
 #define	UPT_MAX_ADDRESS		KV4ADDR(PML4PML4I, PML4PML4I, PML4PML4I, PML4PML4I)
 #define	UPT_MIN_ADDRESS		KV4ADDR(PML4PML4I, 0, 0, 0)
@@ -218,16 +243,19 @@
  * because the result is not actually accessed until later, but the early
  * vt fb startup needs to be reworked.
  */
+#define	PHYS_IN_DMAP(pa)	(dmaplimit == 0 || (pa) < dmaplimit)
+#define	VIRT_IN_DMAP(va)	((va) >= DMAP_MIN_ADDRESS &&		\
+    (va) < (DMAP_MIN_ADDRESS + dmaplimit))
+
 #define	PMAP_HAS_DMAP	1
 #define	PHYS_TO_DMAP(x)	({						\
-	KASSERT(dmaplimit == 0 || (x) < dmaplimit,			\
+	KASSERT(PHYS_IN_DMAP(x),					\
 	    ("physical address %#jx not covered by the DMAP",		\
 	    (uintmax_t)x));						\
 	(x) | DMAP_MIN_ADDRESS; })
 
 #define	DMAP_TO_PHYS(x)	({						\
-	KASSERT((x) < (DMAP_MIN_ADDRESS + dmaplimit) &&			\
-	    (x) >= DMAP_MIN_ADDRESS,					\
+	KASSERT(VIRT_IN_DMAP(x),					\
 	    ("virtual address %#jx not covered by the DMAP",		\
 	    (uintmax_t)x));						\
 	(x) & ~DMAP_MIN_ADDRESS; })
@@ -278,3 +306,5 @@
 #define MINIDUMP_PAGE_TRACKING	1
 
 #endif /* _MACHINE_VMPARAM_H_ */
+
+#endif /* __i386__ */

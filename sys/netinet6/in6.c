@@ -162,6 +162,9 @@ static int in6_update_ifa_internal(struct ifnet *, struct in6_aliasreq *,
 static int in6_broadcast_ifa(struct ifnet *, struct in6_aliasreq *,
     struct in6_ifaddr *, int);
 
+static void in6_join_proxy_ndp_mc(struct ifnet *, const struct in6_addr *);
+static void in6_leave_proxy_ndp_mc(struct ifnet *, const struct in6_addr *);
+
 #define ifa2ia6(ifa)	((struct in6_ifaddr *)(ifa))
 #define ia62ifa(ia6)	(&((ia6)->ia_ifa))
 
@@ -741,6 +744,26 @@ in6_joingroup_legacy(struct ifnet *ifp, const struct in6_addr *mcaddr,
 
 	return (imm);
 }
+
+static int
+in6_solicited_node_maddr(struct in6_addr *maddr,
+    struct ifnet *ifp, const struct in6_addr *base)
+{
+	int error;
+
+	bzero(maddr, sizeof(struct in6_addr));
+	maddr->s6_addr32[0] = IPV6_ADDR_INT32_MLL;
+	maddr->s6_addr32[2] = htonl(1);
+	maddr->s6_addr32[3] = base->s6_addr32[3];
+	maddr->s6_addr8[12] = 0xff;
+	if ((error = in6_setscope(maddr, ifp, NULL)) != 0) {
+		/* XXX: should not happen */
+		log(LOG_ERR, "%s: in6_setscope failed\n", __func__);
+	}
+
+	return error;
+}
+
 /*
  * Join necessary multicast groups.  Factored out from in6_update_ifa().
  * This entire work should only be done once, for the default FIB.
@@ -757,16 +780,9 @@ in6_update_ifa_join_mc(struct ifnet *ifp, struct in6_aliasreq *ifra,
 	KASSERT(in6m_sol != NULL, ("%s: in6m_sol is NULL", __func__));
 
 	/* Join solicited multicast addr for new host id. */
-	bzero(&mltaddr, sizeof(struct in6_addr));
-	mltaddr.s6_addr32[0] = IPV6_ADDR_INT32_MLL;
-	mltaddr.s6_addr32[2] = htonl(1);
-	mltaddr.s6_addr32[3] = ifra->ifra_addr.sin6_addr.s6_addr32[3];
-	mltaddr.s6_addr8[12] = 0xff;
-	if ((error = in6_setscope(&mltaddr, ifp, NULL)) != 0) {
-		/* XXX: should not happen */
-		log(LOG_ERR, "%s: in6_setscope failed\n", __func__);
+	if ((error = in6_solicited_node_maddr(&mltaddr, ifp,
+	    &ifra->ifra_addr.sin6_addr)) != 0)
 		goto cleanup;
-	}
 	delay = error = 0;
 	if ((flags & IN6_IFAUPDATE_DADDELAY)) {
 		/*
@@ -1754,6 +1770,27 @@ in6_localip(struct in6_addr *in6)
 }
 
 /*
+ * Like in6_localip(), but FIB-aware.
+ */
+bool
+in6_localip_fib(struct in6_addr *in6, uint16_t fib)
+{
+	struct rm_priotracker in6_ifa_tracker;
+	struct in6_ifaddr *ia;
+
+	IN6_IFADDR_RLOCK(&in6_ifa_tracker);
+	CK_LIST_FOREACH(ia, IN6ADDR_HASH(in6), ia6_hash) {
+		if (IN6_ARE_ADDR_EQUAL(in6, &ia->ia_addr.sin6_addr) &&
+		    ia->ia_ifa.ifa_ifp->if_fib == fib) {
+			IN6_IFADDR_RUNLOCK(&in6_ifa_tracker);
+			return (true);
+		}
+	}
+	IN6_IFADDR_RUNLOCK(&in6_ifa_tracker);
+	return (false);
+}
+
+/*
  * Return 1 if an internet address is configured on an interface.
  */
 int
@@ -2162,7 +2199,7 @@ in6_lltable_match_prefix(const struct sockaddr *saddr,
 static void
 in6_lltable_free_entry(struct lltable *llt, struct llentry *lle)
 {
-	struct ifnet *ifp;
+	struct ifnet *ifp __diagused;
 
 	LLE_WLOCK_ASSERT(lle);
 	KASSERT(llt != NULL, ("lltable is NULL"));
@@ -2212,25 +2249,6 @@ in6_lltable_rtcheck(struct ifnet *ifp,
 		return EINVAL;
 	}
 	return 0;
-}
-
-/*
- * Called by the datapath to indicate that the entry was used.
- */
-static void
-in6_lltable_mark_used(struct llentry *lle)
-{
-
-	LLE_REQ_LOCK(lle);
-	lle->r_skip_req = 0;
-
-	/*
-	 * Set the hit time so the callback function
-	 * can determine the remaining time before
-	 * transiting to the DELAY state.
-	 */
-	lle->lle_hittime = time_uptime;
-	LLE_REQ_UNLOCK(lle);
 }
 
 static inline uint32_t
@@ -2283,6 +2301,10 @@ in6_lltable_delete_entry(struct lltable *llt, struct llentry *lle)
 {
 
 	lle->la_flags |= LLE_DELETED;
+
+	/* Leave the solicited multicast group. */
+	if ((lle->la_flags & LLE_PUB) != 0)
+		in6_leave_proxy_ndp_mc(llt->llt_ifp, &lle->r_l3addr.addr6);
 	EVENTHANDLER_INVOKE(lle_event, lle, LLENTRY_DELETED);
 #ifdef DIAGNOSTIC
 	log(LOG_INFO, "ifaddr cache = %p is deleted\n", lle);
@@ -2323,7 +2345,7 @@ in6_lltable_alloc(struct lltable *llt, u_int flags,
 		linkhdrsize = LLE_MAX_LINKHDR;
 		if (lltable_calc_llheader(ifp, AF_INET6, IF_LLADDR(ifp),
 		    linkhdr, &linkhdrsize, &lladdr_off) != 0) {
-			NET_EPOCH_CALL(in6_lltable_destroy_lle_unlocked, &lle->lle_epoch_ctx);
+			in6_lltable_free_entry(llt, lle);
 			return (NULL);
 		}
 		lltable_set_entry_addr(ifp, lle, linkhdr, linkhdrsize,
@@ -2342,6 +2364,7 @@ in6_lltable_lookup(struct lltable *llt, u_int flags,
 	const struct sockaddr *l3addr)
 {
 	const struct sockaddr_in6 *sin6 = (const struct sockaddr_in6 *)l3addr;
+	int family = flags >> 16;
 	struct llentry *lle;
 
 	IF_AFDATA_LOCK_ASSERT(llt->llt_ifp);
@@ -2352,8 +2375,13 @@ in6_lltable_lookup(struct lltable *llt, u_int flags,
 	    ("wrong lle request flags: %#x", flags));
 
 	lle = in6_lltable_find_dst(llt, &sin6->sin6_addr);
+
+	if (__predict_false(family != AF_INET6))
+		lle = llentry_lookup_family(lle, family);
+
 	if (lle == NULL)
 		return (NULL);
+
 	if (flags & LLE_UNLOCKED)
 		return (lle);
 
@@ -2452,6 +2480,14 @@ in6_lltable_dump_entry(struct lltable *llt, struct llentry *lle,
 	return (error);
 }
 
+static void
+in6_lltable_post_resolved(struct lltable *llt, struct llentry *lle)
+{
+	/* Join the solicited multicast group for dst. */
+	if ((lle->la_flags & LLE_PUB) == LLE_PUB)
+		in6_join_proxy_ndp_mc(llt->llt_ifp, &lle->r_l3addr.addr6);
+}
+
 static struct lltable *
 in6_lltattach(struct ifnet *ifp)
 {
@@ -2469,9 +2505,21 @@ in6_lltattach(struct ifnet *ifp)
 	llt->llt_fill_sa_entry = in6_lltable_fill_sa_entry;
 	llt->llt_free_entry = in6_lltable_free_entry;
 	llt->llt_match_prefix = in6_lltable_match_prefix;
-	llt->llt_mark_used = in6_lltable_mark_used;
+	llt->llt_mark_used = llentry_mark_used;
+	llt->llt_post_resolved = in6_lltable_post_resolved;
  	lltable_link(llt);
 
+	return (llt);
+}
+
+struct lltable *
+in6_lltable_get(struct ifnet *ifp)
+{
+	struct lltable *llt = NULL;
+
+	void *afdata_ptr = ifp->if_afdata[AF_INET6];
+	if (afdata_ptr != NULL)
+		llt = ((struct in6_ifextra *)afdata_ptr)->lltable;
 	return (llt);
 }
 
@@ -2594,6 +2642,78 @@ in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)
 	in6_sin_2_v4mapsin6(sin_p, sin6_p);
 	free(*nam, M_SONAME);
 	*nam = (struct sockaddr *)sin6_p;
+}
+
+/*
+ * Join/leave the solicited multicast groups for proxy NDP entries.
+ */
+static void
+in6_join_proxy_ndp_mc(struct ifnet *ifp, const struct in6_addr *dst)
+{
+	struct in6_multi *inm;
+	struct in6_addr mltaddr;
+	char ip6buf[INET6_ADDRSTRLEN];
+	int error;
+
+	if (in6_solicited_node_maddr(&mltaddr, ifp, dst) != 0)
+		return;	/* error logged in in6_solicited_node_maddr. */
+
+	error = in6_joingroup(ifp, &mltaddr, NULL, &inm, 0);
+	if (error != 0) {
+		nd6log((LOG_WARNING,
+		    "%s: in6_joingroup failed for %s on %s (errno=%d)\n",
+		    __func__, ip6_sprintf(ip6buf, &mltaddr), if_name(ifp),
+		    error));
+	}
+}
+
+static void
+in6_leave_proxy_ndp_mc(struct ifnet *ifp, const struct in6_addr *dst)
+{
+	struct epoch_tracker et;
+	struct in6_multi *inm;
+	struct in6_addr mltaddr;
+	char ip6buf[INET6_ADDRSTRLEN];
+
+	if (in6_solicited_node_maddr(&mltaddr, ifp, dst) != 0)
+		return;	/* error logged in in6_solicited_node_maddr. */
+
+	NET_EPOCH_ENTER(et);
+	inm = in6m_lookup(ifp, &mltaddr);
+	NET_EPOCH_EXIT(et);
+	if (inm != NULL)
+		in6_leavegroup(inm, NULL);
+	else
+		nd6log((LOG_WARNING, "%s: in6m_lookup failed for %s on %s\n",
+		    __func__, ip6_sprintf(ip6buf, &mltaddr), if_name(ifp)));
+}
+
+static bool
+in6_lle_match_pub(struct lltable *llt, struct llentry *lle, void *farg)
+{
+	return ((lle->la_flags & LLE_PUB) != 0);
+}
+
+void
+in6_purge_proxy_ndp(struct ifnet *ifp)
+{
+	struct lltable *llt;
+	bool need_purge;
+
+	if (ifp->if_afdata[AF_INET6] == NULL)
+		return;
+
+	llt = LLTABLE6(ifp);
+	IF_AFDATA_WLOCK(ifp);
+	need_purge = ((llt->llt_flags & LLT_ADDEDPROXY) != 0);
+	IF_AFDATA_WUNLOCK(ifp);
+
+	/*
+	 * Ever added proxy ndp entries, leave solicited node multicast
+	 * before deleting the llentry.
+	 */
+	if (need_purge)
+		lltable_delete_conditional(llt, in6_lle_match_pub, NULL);
 }
 // CHERI CHANGES START
 // {

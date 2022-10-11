@@ -50,8 +50,6 @@ static struct ofw_compat_data compat_data[] = {
 SIMPLEBUS_PNP_INFO(compat_data);
 #endif /* FDT */
 
-static devclass_t pps_devclass;
-
 struct pps_softc {
 	device_t         dev;
 	gpio_pin_t	 gpin;
@@ -73,9 +71,7 @@ gpiopps_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 
 	/* We can't be unloaded while open, so mark ourselves BUSY. */
 	mtx_lock(&sc->pps_mtx);
-	if (device_get_state(sc->dev) < DS_BUSY) {
-		device_busy(sc->dev);
-	}
+	device_busy(sc->dev);
 	mtx_unlock(&sc->pps_mtx);
 
 	return 0;
@@ -86,10 +82,6 @@ gpiopps_close(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct pps_softc *sc = dev->si_drv1;
 
-	/*
-	 * Un-busy on last close. We rely on the vfs counting stuff to only call
-	 * this routine on last-close, so we don't need any open-count logic.
-	 */
 	mtx_lock(&sc->pps_mtx);
 	device_unbusy(sc->dev);
 	mtx_unlock(&sc->pps_mtx);
@@ -113,6 +105,7 @@ gpiopps_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thre
 
 static struct cdevsw pps_cdevsw = {
 	.d_version =    D_VERSION,
+	.d_flags =	D_TRACKCLOSE,
 	.d_open =       gpiopps_open,
 	.d_close =      gpiopps_close,
 	.d_ioctl =      gpiopps_ioctl,
@@ -130,7 +123,7 @@ gpiopps_ifltr(void *arg)
 	 * written only by the pps_capture() routine and read only by the
 	 * pps_event() routine.  We don't need lock-based management of access
 	 * to the capture area because we have time-based access management:  we
-	 * can't be reading and writing concurently because we can't be running
+	 * can't be reading and writing concurrently because we can't be running
 	 * both the threaded and filter handlers concurrently (because a new
 	 * hardware interrupt can't happen until the threaded handler for the
 	 * current interrupt exits, after which the system does the EOI that
@@ -290,6 +283,6 @@ static driver_t pps_fdt_driver = {
 	sizeof(struct pps_softc),
 };
 
-DRIVER_MODULE(gpiopps, simplebus, pps_fdt_driver, pps_devclass, 0, 0);
+DRIVER_MODULE(gpiopps, simplebus, pps_fdt_driver, 0, 0);
 
 #endif /* FDT */

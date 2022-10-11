@@ -800,6 +800,7 @@ ctl_isc_handler_finish_xfer(struct ctl_softc *ctl_softc,
 	}
 
 	ctsio = &msg_info->hdr.original_sc->scsiio;
+	ctsio->io_hdr.flags &= ~CTL_FLAG_SENT_2OTHER_SC;
 	ctsio->io_hdr.flags |= CTL_FLAG_IO_ACTIVE;
 	ctsio->io_hdr.msg_type = CTL_MSG_FINISH_IO;
 	ctsio->io_hdr.status = msg_info->hdr.status;
@@ -879,7 +880,7 @@ alloc:
 		i += sizeof(pr_key);
 	}
 	mtx_unlock(&lun->lun_lock);
-	ctl_ha_msg_send(CTL_HA_CHAN_CTL, &msg->port, sizeof(msg->port) + i,
+	ctl_ha_msg_send(CTL_HA_CHAN_CTL, &msg->lun, sizeof(msg->lun) + i,
 	    M_WAITOK);
 	free(msg, M_CTL);
 
@@ -994,8 +995,8 @@ ctl_isc_announce_mode(struct ctl_lun *lun, uint32_t initidx,
     uint8_t page, uint8_t subpage)
 {
 	struct ctl_softc *softc = lun->ctl_softc;
-	union ctl_ha_msg msg;
-	u_int i;
+	union ctl_ha_msg *msg;
+	u_int i, l;
 
 	if (softc->ha_link != CTL_HA_LINK_ONLINE)
 		return;
@@ -1011,19 +1012,20 @@ ctl_isc_announce_mode(struct ctl_lun *lun, uint32_t initidx,
 	if (lun->mode_pages.index[i].page_data == NULL)
 		return;
 
-	bzero(&msg.mode, sizeof(msg.mode));
-	msg.hdr.msg_type = CTL_MSG_MODE_SYNC;
-	msg.hdr.nexus.targ_port = initidx / CTL_MAX_INIT_PER_PORT;
-	msg.hdr.nexus.initid = initidx % CTL_MAX_INIT_PER_PORT;
-	msg.hdr.nexus.targ_lun = lun->lun;
-	msg.hdr.nexus.targ_mapped_lun = lun->lun;
-	msg.mode.page_code = page;
-	msg.mode.subpage = subpage;
-	msg.mode.page_len = lun->mode_pages.index[i].page_len;
-	memcpy(msg.mode.data, lun->mode_pages.index[i].page_data,
-	    msg.mode.page_len);
-	ctl_ha_msg_send(CTL_HA_CHAN_CTL, &msg.mode, sizeof(msg.mode),
-	    M_WAITOK);
+	l = sizeof(msg->mode) + lun->mode_pages.index[i].page_len;
+	msg = malloc(l, M_CTL, M_WAITOK | M_ZERO);
+	msg->hdr.msg_type = CTL_MSG_MODE_SYNC;
+	msg->hdr.nexus.targ_port = initidx / CTL_MAX_INIT_PER_PORT;
+	msg->hdr.nexus.initid = initidx % CTL_MAX_INIT_PER_PORT;
+	msg->hdr.nexus.targ_lun = lun->lun;
+	msg->hdr.nexus.targ_mapped_lun = lun->lun;
+	msg->mode.page_code = page;
+	msg->mode.subpage = subpage;
+	msg->mode.page_len = lun->mode_pages.index[i].page_len;
+	memcpy(msg->mode.data, lun->mode_pages.index[i].page_data,
+	    msg->mode.page_len);
+	ctl_ha_msg_send(CTL_HA_CHAN_CTL, &msg->mode, l, M_WAITOK);
+	free(msg, M_CTL);
 }
 
 static void
@@ -1100,7 +1102,14 @@ static void
 ctl_isc_ua(struct ctl_softc *softc, union ctl_ha_msg *msg, int len)
 {
 	struct ctl_lun *lun;
-	uint32_t iid = ctl_get_initindex(&msg->hdr.nexus);
+	uint32_t iid;
+
+	if (len < sizeof(msg->ua)) {
+		printf("%s: Received truncated message %d < %zu\n",
+		    __func__, len, sizeof(msg->ua));
+		ctl_ha_msg_abort(CTL_HA_CHAN_CTL);
+		return;
+	}
 
 	mtx_lock(&softc->ctl_lock);
 	if (msg->hdr.nexus.targ_mapped_lun >= ctl_max_luns ||
@@ -1112,6 +1121,7 @@ ctl_isc_ua(struct ctl_softc *softc, union ctl_ha_msg *msg, int len)
 	mtx_unlock(&softc->ctl_lock);
 	if (msg->ua.ua_type == CTL_UA_THIN_PROV_THRES && msg->ua.ua_set)
 		memcpy(lun->ua_tpt_info, msg->ua.ua_info, 8);
+	iid = ctl_get_initindex(&msg->hdr.nexus);
 	if (msg->ua.ua_all) {
 		if (msg->ua.ua_set)
 			ctl_est_ua_all(lun, iid, msg->ua.ua_type);
@@ -1134,6 +1144,20 @@ ctl_isc_lun_sync(struct ctl_softc *softc, union ctl_ha_msg *msg, int len)
 	int i, k;
 	ctl_lun_flags oflags;
 	uint32_t targ_lun;
+
+	if (len < offsetof(struct ctl_ha_msg_lun, data[0])) {
+		printf("%s: Received truncated message %d < %zu\n",
+		    __func__, len, offsetof(struct ctl_ha_msg_lun, data[0]));
+		ctl_ha_msg_abort(CTL_HA_CHAN_CTL);
+		return;
+	}
+	i = msg->lun.lun_devid_len + msg->lun.pr_key_count * sizeof(pr_key);
+	if (len < offsetof(struct ctl_ha_msg_lun, data[i])) {
+		printf("%s: Received truncated message data %d < %zu\n",
+		    __func__, len, offsetof(struct ctl_ha_msg_lun, data[i]));
+		ctl_ha_msg_abort(CTL_HA_CHAN_CTL);
+		return;
+	}
 
 	targ_lun = msg->hdr.nexus.targ_mapped_lun;
 	mtx_lock(&softc->ctl_lock);
@@ -1204,6 +1228,22 @@ ctl_isc_port_sync(struct ctl_softc *softc, union ctl_ha_msg *msg, int len)
 	struct ctl_port *port;
 	struct ctl_lun *lun;
 	int i, new;
+
+	if (len < offsetof(struct ctl_ha_msg_port, data[0])) {
+		printf("%s: Received truncated message %d < %zu\n",
+		    __func__, len, offsetof(struct ctl_ha_msg_port, data[0]));
+		ctl_ha_msg_abort(CTL_HA_CHAN_CTL);
+		return;
+	}
+	i = msg->port.name_len + msg->port.lun_map_len +
+	    msg->port.port_devid_len + msg->port.target_devid_len +
+	    msg->port.init_devid_len;
+	if (len < offsetof(struct ctl_ha_msg_port, data[i])) {
+		printf("%s: Received truncated message data %d < %zu\n",
+		    __func__, len, offsetof(struct ctl_ha_msg_port, data[i]));
+		ctl_ha_msg_abort(CTL_HA_CHAN_CTL);
+		return;
+	}
 
 	port = softc->ctl_ports[msg->hdr.nexus.targ_port];
 	if (port == NULL) {
@@ -1316,7 +1356,21 @@ static void
 ctl_isc_iid_sync(struct ctl_softc *softc, union ctl_ha_msg *msg, int len)
 {
 	struct ctl_port *port;
-	int iid;
+	int i, iid;
+
+	if (len < offsetof(struct ctl_ha_msg_iid, data[0])) {
+		printf("%s: Received truncated message %d < %zu\n",
+		    __func__, len, offsetof(struct ctl_ha_msg_iid, data[0]));
+		ctl_ha_msg_abort(CTL_HA_CHAN_CTL);
+		return;
+	}
+	i = msg->iid.name_len;
+	if (len < offsetof(struct ctl_ha_msg_iid, data[i])) {
+		printf("%s: Received truncated message data %d < %zu\n",
+		    __func__, len, offsetof(struct ctl_ha_msg_iid, data[i]));
+		ctl_ha_msg_abort(CTL_HA_CHAN_CTL);
+		return;
+	}
 
 	port = softc->ctl_ports[msg->hdr.nexus.targ_port];
 	if (port == NULL) {
@@ -1341,6 +1395,13 @@ ctl_isc_iid_sync(struct ctl_softc *softc, union ctl_ha_msg *msg, int len)
 static void
 ctl_isc_login(struct ctl_softc *softc, union ctl_ha_msg *msg, int len)
 {
+
+	if (len < sizeof(msg->login)) {
+		printf("%s: Received truncated message %d < %zu\n",
+		    __func__, len, sizeof(msg->login));
+		ctl_ha_msg_abort(CTL_HA_CHAN_CTL);
+		return;
+	}
 
 	if (msg->login.version != CTL_HA_VERSION) {
 		printf("CTL HA peers have different versions %d != %d\n",
@@ -1375,6 +1436,20 @@ ctl_isc_mode_sync(struct ctl_softc *softc, union ctl_ha_msg *msg, int len)
 	u_int i;
 	uint32_t initidx, targ_lun;
 
+	if (len < offsetof(struct ctl_ha_msg_mode, data[0])) {
+		printf("%s: Received truncated message %d < %zu\n",
+		    __func__, len, offsetof(struct ctl_ha_msg_mode, data[0]));
+		ctl_ha_msg_abort(CTL_HA_CHAN_CTL);
+		return;
+	}
+	i = msg->mode.page_len;
+	if (len < offsetof(struct ctl_ha_msg_mode, data[i])) {
+		printf("%s: Received truncated message data %d < %zu\n",
+		    __func__, len, offsetof(struct ctl_ha_msg_mode, data[i]));
+		ctl_ha_msg_abort(CTL_HA_CHAN_CTL);
+		return;
+	}
+
 	targ_lun = msg->hdr.nexus.targ_mapped_lun;
 	mtx_lock(&softc->ctl_lock);
 	if (targ_lun >= ctl_max_luns ||
@@ -1399,7 +1474,7 @@ ctl_isc_mode_sync(struct ctl_softc *softc, union ctl_ha_msg *msg, int len)
 		return;
 	}
 	memcpy(lun->mode_pages.index[i].page_data, msg->mode.data,
-	    lun->mode_pages.index[i].page_len);
+	    min(lun->mode_pages.index[i].page_len, msg->mode.page_len));
 	initidx = ctl_get_initindex(&msg->hdr.nexus);
 	if (initidx != -1)
 		ctl_est_ua_all(lun, initidx, CTL_UA_MODE_CHANGE);
@@ -1436,7 +1511,8 @@ ctl_isc_event_handler(ctl_ha_channel channel, ctl_ha_event event, int param)
 			return;
 		}
 
-		CTL_DEBUG_PRINT(("CTL: msg_type %d\n", msg->hdr.msg_type));
+		CTL_DEBUG_PRINT(("CTL: msg_type %d len %d\n",
+		    msg->hdr.msg_type, param));
 		switch (msg->hdr.msg_type) {
 		case CTL_MSG_SERIALIZE:
 			io = ctl_alloc_io(softc->othersc_pool);
@@ -1978,7 +2054,7 @@ ctl_init(void)
 
 	SYSCTL_ADD_PROC(&softc->sysctl_ctx,SYSCTL_CHILDREN(softc->sysctl_tree),
 	    OID_AUTO, "ha_role",
-	    CTLTYPE_INT | CTLFLAG_RWTUN | CTLFLAG_NEEDGIANT,
+	    CTLTYPE_INT | CTLFLAG_RWTUN | CTLFLAG_MPSAFE,
 	    softc, 0, ctl_ha_role_sysctl, "I", "HA role for this head");
 
 	if (softc->is_single == 0) {
@@ -5903,7 +5979,8 @@ ctl_ie_timer(void *arg)
 		t = scsi_4btoul(lun->MODE_IE.interval_timer);
 		if (t == 0 || t == UINT32_MAX)
 			t = 3000;  /* 5 min */
-		callout_schedule(&lun->ie_callout, t * hz / 10);
+		callout_schedule_sbt(&lun->ie_callout, SBT_1S / 10 * t,
+		    SBT_1S / 10, 0);
 	}
 }
 
@@ -5935,8 +6012,8 @@ ctl_ie_page_handler(struct ctl_scsiio *ctsio,
 			t = scsi_4btoul(pg->interval_timer);
 			if (t == 0 || t == UINT32_MAX)
 				t = 3000;  /* 5 min */
-			callout_reset(&lun->ie_callout, t * hz / 10,
-			    ctl_ie_timer, lun);
+			callout_reset_sbt(&lun->ie_callout, SBT_1S / 10 * t,
+			    SBT_1S / 10, ctl_ie_timer, lun, 0);
 		}
 	} else {
 		lun->ie_asc = 0;
@@ -8552,7 +8629,7 @@ done:
 /*
  * This routine is for handling a message from the other SC pertaining to
  * persistent reserve out. All the error checking will have been done
- * so only perorming the action need be done here to keep the two
+ * so only performing the action need be done here to keep the two
  * in sync.
  */
 static void
@@ -10899,7 +10976,7 @@ ctl_seq_check(union ctl_io *io1, union ctl_io *io2)
 {
 	uint64_t lba1, lba2;
 	uint64_t len1, len2;
-	int retval;
+	int retval __diagused;
 
 	if (io1->io_hdr.flags & CTL_FLAG_SERSEQ_DONE)
 		return (CTL_ACTION_PASS);
@@ -11582,6 +11659,8 @@ ctl_scsiio_precheck(struct ctl_scsiio *ctsio)
 		if ((isc_retval = ctl_ha_msg_send(CTL_HA_CHAN_CTL, &msg_info,
 		    sizeof(msg_info.scsi) - sizeof(msg_info.scsi.sense_data),
 		    M_WAITOK)) > CTL_HA_STATUS_SUCCESS) {
+			ctsio->io_hdr.flags &= ~CTL_FLAG_SENT_2OTHER_SC;
+			ctsio->io_hdr.flags |= CTL_FLAG_IO_ACTIVE;
 			ctl_set_busy(ctsio);
 			ctl_done((union ctl_io *)ctsio);
 			return;

@@ -91,6 +91,7 @@
 #include <machine/frame.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
+#include <machine/reg.h>
 
 #include <dev/ofw/openfirm.h>
 
@@ -120,6 +121,10 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 
 	if ((flags & RFPROC) == 0)
 		return;
+
+	/* Ensure td1 is up to date before copy. */
+	if (td1 == curthread)
+		cpu_save_thread_regs(td1);
 
 	pcb = (struct pcb *)((td2->td_kstack +
 	    td2->td_kstack_pages * PAGE_SIZE - sizeof(struct pcb)) & ~0x2fUL);
@@ -201,34 +206,6 @@ void
 cpu_exit(struct thread *td)
 {
 
-}
-
-/*
- * Software interrupt handler for queued VM system processing.
- */
-void
-swi_vm(void *dummy)
-{
-
-	if (busdma_swi_pending != 0)
-		busdma_swi();
-}
-
-/*
- * Tell whether this address is in some physical memory region.
- * Currently used by the kernel coredump code in order to avoid
- * dumping the ``ISA memory hole'' which could cause indefinite hangs,
- * or other unpredictable behaviour.
- */
-int
-is_physical_memory(vm_offset_t addr)
-{
-
-	/*
-	 * stuff other tests for known memory-mapped devices (PCI?)
-	 * here
-	 */
-	return (1);
 }
 
 /*

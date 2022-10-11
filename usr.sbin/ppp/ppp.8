@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd July 11, 2020
+.Dd June 27, 2022
 .Dt PPP 8
 .Os
 .Sh NAME
@@ -500,10 +500,7 @@ after altering
 Although not strictly relevant to
 .Nm Ns No 's
 operation, you should configure your resolver so that it works correctly.
-This can be done by configuring a local DNS
-(using
-.Xr named 8 )
-or by adding the correct
+This can be done by configuring a local DNS resolver or by adding the correct
 .Sq nameserver
 lines to the file
 .Pa /etc/resolv.conf .
@@ -5963,12 +5960,10 @@ and
 .Dq show ?\&
 to get online information about what is available.
 .It
-The following URLs contain useful information:
+The following URL contains useful information:
 .Bl -bullet -compact
 .It
-https://www.FreeBSD.org/doc/en_US.ISO8859-1/books/faq/ppp.html
-.It
-https://www.FreeBSD.org/doc/handbook/userppp.html
+https://docs.freebsd.org/en/books/handbook/ppp-and-slip/
 .El
 .El
 .Sh FILES
@@ -6066,7 +6061,6 @@ This socket is used to pass links between different instances of
 .Xr getty 8 ,
 .Xr inetd 8 ,
 .Xr init 8 ,
-.Xr named 8 ,
 .Xr ping 8 ,
 .Xr pppctl 8 ,
 .Xr pppoed 8 ,

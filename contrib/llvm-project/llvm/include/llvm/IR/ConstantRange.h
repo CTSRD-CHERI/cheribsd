@@ -124,6 +124,32 @@ public:
   static ConstantRange makeExactICmpRegion(CmpInst::Predicate Pred,
                                            const APInt &Other);
 
+  /// Does the predicate \p Pred hold between ranges this and \p Other?
+  /// NOTE: false does not mean that inverse predicate holds!
+  bool icmp(CmpInst::Predicate Pred, const ConstantRange &Other) const;
+
+  /// Return true iff CR1 ult CR2 is equivalent to CR1 slt CR2.
+  /// Does not depend on strictness/direction of the predicate.
+  static bool
+  areInsensitiveToSignednessOfICmpPredicate(const ConstantRange &CR1,
+                                            const ConstantRange &CR2);
+
+  /// Return true iff CR1 ult CR2 is equivalent to CR1 sge CR2.
+  /// Does not depend on strictness/direction of the predicate.
+  static bool
+  areInsensitiveToSignednessOfInvertedICmpPredicate(const ConstantRange &CR1,
+                                                    const ConstantRange &CR2);
+
+  /// If the comparison between constant ranges this and Other
+  /// is insensitive to the signedness of the comparison predicate,
+  /// return a predicate equivalent to \p Pred, with flipped signedness
+  /// (i.e. unsigned instead of signed or vice versa), and maybe inverted,
+  /// otherwise returns CmpInst::Predicate::BAD_ICMP_PREDICATE.
+  static CmpInst::Predicate
+  getEquivalentPredWithFlippedSignedness(CmpInst::Predicate Pred,
+                                         const ConstantRange &CR1,
+                                         const ConstantRange &CR2);
+
   /// Produce the largest range containing all X such that "X BinOp Y" is
   /// guaranteed not to wrap (overflow) for *all* Y in Other. However, there may
   /// be *some* Y in Other for which additional X not contained in the result
@@ -150,10 +176,23 @@ public:
                                              const APInt &Other,
                                              unsigned NoWrapKind);
 
+  /// Returns true if ConstantRange calculations are supported for intrinsic
+  /// with \p IntrinsicID.
+  static bool isIntrinsicSupported(Intrinsic::ID IntrinsicID);
+
+  /// Compute range of intrinsic result for the given operand ranges.
+  static ConstantRange intrinsic(Intrinsic::ID IntrinsicID,
+                                 ArrayRef<ConstantRange> Ops);
+
   /// Set up \p Pred and \p RHS such that
   /// ConstantRange::makeExactICmpRegion(Pred, RHS) == *this.  Return true if
   /// successful.
   bool getEquivalentICmp(CmpInst::Predicate &Pred, APInt &RHS) const;
+
+  /// Set up \p Pred, \p RHS and \p Offset such that (V + Offset) Pred RHS
+  /// is true iff V is in the range. Prefers using Offset == 0 if possible.
+  void
+  getEquivalentICmp(CmpInst::Predicate &Pred, APInt &RHS, APInt &Offset) const;
 
   /// Return the lower value for this range.
   const APInt &getLower() const { return Lower; }
@@ -253,6 +292,14 @@ public:
     return !operator==(CR);
   }
 
+  /// Compute the maximal number of active bits needed to represent every value
+  /// in this range.
+  unsigned getActiveBits() const;
+
+  /// Compute the maximal number of bits needed to represent every value
+  /// in this signed range.
+  unsigned getMinSignedBits() const;
+
   /// Subtract the specified constant from the endpoints of this constant range.
   ConstantRange subtract(const APInt &CI) const;
 
@@ -284,6 +331,14 @@ public:
   /// in either set before.
   ConstantRange unionWith(const ConstantRange &CR,
                           PreferredRangeType Type = Smallest) const;
+
+  /// Intersect the two ranges and return the result if it can be represented
+  /// exactly, otherwise return None.
+  Optional<ConstantRange> exactIntersectWith(const ConstantRange &CR) const;
+
+  /// Union the two ranges and return the result if it can be represented
+  /// exactly, otherwise return None.
+  Optional<ConstantRange> exactUnionWith(const ConstantRange &CR) const;
 
   /// Return a new range representing the possible values resulting
   /// from an application of the specified cast operator to this range. \p
@@ -363,6 +418,11 @@ public:
   /// treating both this and \p Other as unsigned ranges.
   ConstantRange multiply(const ConstantRange &Other) const;
 
+  /// Return range of possible values for a signed multiplication of this and
+  /// \p Other. However, if overflow is possible always return a full range
+  /// rather than trying to determine a more precise result.
+  ConstantRange smul_fast(const ConstantRange &Other) const;
+
   /// Return a new range representing the possible values resulting
   /// from a signed maximum of a value in this range and a value in \p Other.
   ConstantRange smax(const ConstantRange &Other) const;
@@ -400,6 +460,11 @@ public:
   /// from a signed remainder operation of a value in this range and a
   /// value in \p Other.
   ConstantRange srem(const ConstantRange &Other) const;
+
+  /// Return a new range representing the possible values resulting from
+  /// a binary-xor of a value in this range by an all-one value,
+  /// aka bitwise complement operation.
+  ConstantRange binaryNot() const;
 
   /// Return a new range representing the possible values resulting
   /// from a binary-and of a value in this range by a value in \p Other.
@@ -456,8 +521,9 @@ public:
   ConstantRange inverse() const;
 
   /// Calculate absolute value range. If the original range contains signed
-  /// min, then the resulting range will also contain signed min.
-  ConstantRange abs() const;
+  /// min, then the resulting range will contain signed min if and only if
+  /// \p IntMinIsPoison is false.
+  ConstantRange abs(bool IntMinIsPoison = false) const;
 
   /// Represents whether an operation on the given constant range is known to
   /// always or never overflow.

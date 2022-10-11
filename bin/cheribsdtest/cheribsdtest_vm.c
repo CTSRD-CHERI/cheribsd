@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2014, 2016 Robert N. M. Watson
+ * Copyright (c) 2021 Microsoft Corp.
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -431,7 +432,7 @@ create_tempfile()
  */
 CHERIBSDTEST(cheribsdtest_vm_notag_tmpfile_shared,
     "check tags are not stored for tmpfile() MAP_SHARED pages",
-    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
+    .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO | CT_FLAG_SI_ADDR,
     .ct_signum = SIGSEGV,
     .ct_si_code = SEGV_STORETAG,
     .ct_si_trapno = TRAPNO_STORE_CAP_PF,
@@ -444,6 +445,7 @@ CHERIBSDTEST(cheribsdtest_vm_notag_tmpfile_shared,
 	fd = create_tempfile();
 	cp = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
 	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+	cheribsdtest_set_expected_si_addr(NULL_DERIVED_VOIDP(cp));
 	cp_value = cheri_ptr(&v, sizeof(v));
 	*cp = cp_value;
 	cheribsdtest_failure_errx("tagged store succeeded");
@@ -692,7 +694,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_reuse,
 	 * XXX-AM: is this checking the right thing?
 	 * We may be failing because the reservation length is not enough.
 	 */
-	map2 = mmap((void *)(uintptr_t)((vaddr_t)map + PAGE_SIZE),
+	map2 = mmap((void *)(uintptr_t)((ptraddr_t)map + PAGE_SIZE),
 	    PAGE_SIZE * 2, PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
 	if (map2 == MAP_FAILED) {
 		CHERIBSDTEST_VERIFY2(errno == ENOMEM,
@@ -718,14 +720,14 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_align,
 	/* No alignment */
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
-	CHERIBSDTEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	CHERIBSDTEST_VERIFY2(((ptraddr_t)(map) & align_mask) == 0,
 	    "mmap failed to align representable region for %p", map);
 
 	/* Underaligned */
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED(align_shift - 1),
 	    -1, 0));
-	CHERIBSDTEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	CHERIBSDTEST_VERIFY2(((ptraddr_t)(map) & align_mask) == 0,
 	    "mmap failed to align representable region with requested "
 	    "alignment %lx for %p", align_shift - 1, map);
 
@@ -734,20 +736,20 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_align,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED(align_shift + 1),
 	    -1, 0));
 	CHERIBSDTEST_VERIFY2(
-	    ((vaddr_t)(map) & ((1 << (align_shift + 1)) - 1)) == 0,
+	    ((ptraddr_t)(map) & ((1 << (align_shift + 1)) - 1)) == 0,
 	    "mmap failed to align representable region with requested "
 	    "alignment %lx for %p", align_shift + 1, map);
 
 	/* Explicit cheri alignment */
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED_CHERI, -1, 0));
-	CHERIBSDTEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	CHERIBSDTEST_VERIFY2(((ptraddr_t)(map) & align_mask) == 0,
 	    "mmap failed to align representable region with requested "
 	    "cheri alignment for %p", map);
 
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_ALIGNED_CHERI_SEAL, -1, 0));
-	CHERIBSDTEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	CHERIBSDTEST_VERIFY2(((ptraddr_t)(map) & align_mask) == 0,
 	    "mmap failed to align representable region with requested "
 	    "cheri seal alignment for %p", map);
 
@@ -824,7 +826,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_shared,
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, len,
 	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
 
-	CHERIBSDTEST_VERIFY2(((vaddr_t)(map) & align_mask) == 0,
+	CHERIBSDTEST_VERIFY2(((ptraddr_t)(map) & align_mask) == 0,
 	    "mmap failed to align shared regiont for representability");
 	CHERIBSDTEST_VERIFY2(cheri_getlen(map) == expected_len,
 	    "mmap returned pointer with unrepresentable length");
@@ -965,7 +967,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_insert_null_derived,
 	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0,
 	    "mmap failed to return valid capability");
 
-	map = mmap((void *)(uintptr_t)(vaddr_t)map, PAGE_SIZE,
+	map = mmap((void *)(uintptr_t)(ptraddr_t)map, PAGE_SIZE,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
 	CHERIBSDTEST_VERIFY2(map == MAP_FAILED,
 	    "mmap fixed with NULL-derived hint succeded");
@@ -990,8 +992,8 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_insert,
 	    PROT_MAX(PROT_READ | PROT_WRITE), MAP_GUARD, -1, 0));
 	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0,
 	    "mmap failed to return valid capability");
-	CHERIBSDTEST_VERIFY2(cheri_getperm(map) & CHERI_PERM_CHERIABI_VMMAP,
-	    "mmap failed to return capability with CHERIABI_VMMAP perm");
+	CHERIBSDTEST_VERIFY2(cheri_getperm(map) & CHERI_PERM_SW_VMEM,
+	    "mmap failed to return capability with VMEM perm");
 
 	CHERIBSDTEST_CHECK_SYSCALL(mmap((char *)(map) + PAGE_SIZE, PAGE_SIZE,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0));
@@ -1017,16 +1019,16 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_insert_noperm,
 	    PROT_MAX(PROT_READ | PROT_WRITE), MAP_GUARD, -1, 0));
 	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0,
 	    "mmap failed to return valid capability");
-	CHERIBSDTEST_VERIFY2(cheri_getperm(map) & CHERI_PERM_CHERIABI_VMMAP,
-	    "mmap failed to return capability with CHERIABI_VMMAP perm");
+	CHERIBSDTEST_VERIFY2(cheri_getperm(map) & CHERI_PERM_SW_VMEM,
+	    "mmap failed to return capability with VMEM perm");
 
-	not_enough_perm = cheri_andperm(map, ~CHERI_PERM_CHERIABI_VMMAP);
+	not_enough_perm = cheri_andperm(map, ~CHERI_PERM_SW_VMEM);
 	map2 = mmap((char *)(not_enough_perm) + PAGE_SIZE, PAGE_SIZE,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
 	CHERIBSDTEST_VERIFY2(map2 == MAP_FAILED,
-	    "mmap fixed with capability missing VM_MAP perms succeeds");
+	    "mmap fixed with capability missing VMEM perm succeeds");
 	CHERIBSDTEST_VERIFY2(errno == EACCES,
-	    "mmap fixed with capability missing VM_MAP perms failed "
+	    "mmap fixed with capability missing VMEM perm failed "
 	    "with %d instead of EACCES", errno);
 
 	cheribsdtest_success();

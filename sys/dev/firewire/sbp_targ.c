@@ -1419,7 +1419,6 @@ sbp_targ_poll(struct cam_sim *sim)
 static void
 sbp_targ_cmd_handler(struct fw_xfer *xfer)
 {
-	struct fw_pkt *fp;
 	uint32_t *orb;
 	struct corb4 *orb4;
 	struct orb_info *orbi;
@@ -1441,7 +1440,6 @@ sbp_targ_cmd_handler(struct fw_xfer *xfer)
 		fw_xfer_free(xfer);
 		return;
 	}
-	fp = &xfer->recv.hdr;
 
 	atio = orbi->atio;
 
@@ -1574,7 +1572,6 @@ sbp_targ_mgm_handler(struct fw_xfer *xfer)
 {
 	struct sbp_targ_lstate *lstate;
 	struct sbp_targ_login *login;
-	struct fw_pkt *fp;
 	uint32_t *orb;
 	struct morb4 *orb4;
 	struct orb_info *orbi;
@@ -1594,7 +1591,6 @@ sbp_targ_mgm_handler(struct fw_xfer *xfer)
 		fw_xfer_free(xfer);
 		return;
 	}
-	fp = &xfer->recv.hdr;
 
 	orb = orbi->orb;
 	/* swap payload */
@@ -2036,8 +2032,6 @@ sbp_targ_detach(device_t dev)
 	return 0;
 }
 
-static devclass_t sbp_targ_devclass;
-
 static device_method_t sbp_targ_methods[] = {
 	/* device interface */
 	DEVMETHOD(device_identify,	sbp_targ_identify),
@@ -2053,7 +2047,7 @@ static driver_t sbp_targ_driver = {
 	sizeof(struct sbp_targ_softc),
 };
 
-DRIVER_MODULE(sbp_targ, firewire, sbp_targ_driver, sbp_targ_devclass, 0, 0);
+DRIVER_MODULE(sbp_targ, firewire, sbp_targ_driver, 0, 0);
 MODULE_VERSION(sbp_targ, 1);
 MODULE_DEPEND(sbp_targ, firewire, 1, 1, 1);
 MODULE_DEPEND(sbp_targ, cam, 1, 1, 1);

@@ -21,8 +21,8 @@
 
 namespace __sanitizer {
 void *__sanitizer_get_link_map_by_dlopen_handle(void *handle);
-# define GET_LINK_MAP_BY_DLOPEN_HANDLE(handle) \
-    (link_map *)__sanitizer_get_link_map_by_dlopen_handle(handle)
+#define GET_LINK_MAP_BY_DLOPEN_HANDLE(handle) \
+  (link_map *)__sanitizer_get_link_map_by_dlopen_handle(handle)
 
 extern unsigned struct_utsname_sz;
 extern unsigned struct_stat_sz;
@@ -45,7 +45,7 @@ extern unsigned struct_stack_t_sz;
 extern unsigned struct_sched_param_sz;
 extern unsigned struct_statfs_sz;
 extern unsigned struct_sockaddr_sz;
-extern unsigned ucontext_t_sz;
+unsigned ucontext_t_sz(void *ctx);
 
 extern unsigned struct_rlimit_sz;
 extern unsigned struct_utimbuf_sz;
@@ -394,6 +394,7 @@ struct __sanitizer_glob_t {
 
 extern int glob_nomatch;
 extern int glob_altdirfunc;
+extern const int wordexp_wrde_dooffs;
 
 extern unsigned path_max;
 
@@ -1024,11 +1025,9 @@ extern unsigned struct_RF_ProgressInfo_sz;
 extern unsigned struct_nvlist_ref_sz;
 extern unsigned struct_StringList_sz;
 
-
 // A special value to mark ioctls that are not present on the target platform,
 // when it can not be determined without including any system headers.
 extern const unsigned IOCTL_NOT_PRESENT;
-
 
 extern unsigned IOCTL_AFM_ADDFMAP;
 extern unsigned IOCTL_AFM_DELFMAP;

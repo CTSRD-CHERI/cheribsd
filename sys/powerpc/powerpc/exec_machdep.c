@@ -76,6 +76,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
+#include <sys/reg.h>
 #include <sys/signalvar.h>
 #include <sys/syscallsubr.h>
 #include <sys/syscall.h>
@@ -89,12 +90,14 @@ __FBSDID("$FreeBSD$");
 #include <machine/elf.h>
 #include <machine/fpu.h>
 #include <machine/pcb.h>
-#include <machine/reg.h>
 #include <machine/sigframe.h>
 #include <machine/trap.h>
 #include <machine/vmparam.h>
 
+#include <vm/vm.h>
+#include <vm/vm_param.h>
 #include <vm/pmap.h>
+#include <vm/vm_map.h>
 
 #ifdef FPU_EMU
 #include <powerpc/fpu/fpu_extern.h>
@@ -128,6 +131,21 @@ static void	cleanup_power_extras(struct thread *);
 
 #ifdef __powerpc64__
 extern struct sysentvec elf64_freebsd_sysvec_v2;
+#endif
+
+#ifdef __powerpc64__
+_Static_assert(sizeof(mcontext_t) == 1392, "mcontext_t size incorrect");
+_Static_assert(sizeof(ucontext_t) == 1472, "ucontext_t size incorrect");
+_Static_assert(sizeof(siginfo_t) == 80, "siginfo_t size incorrect");
+#ifdef COMPAT_FREEBSD32
+_Static_assert(sizeof(mcontext32_t) == 1224, "mcontext32_t size incorrect");
+_Static_assert(sizeof(ucontext32_t) == 1280, "ucontext32_t size incorrect");
+_Static_assert(sizeof(struct siginfo32) == 64, "struct siginfo32 size incorrect");
+#endif /* COMPAT_FREEBSD32 */
+#else /* powerpc */
+_Static_assert(sizeof(mcontext_t) == 1224, "mcontext_t size incorrect");
+_Static_assert(sizeof(ucontext_t) == 1280, "ucontext_t size incorrect");
+_Static_assert(sizeof(siginfo_t) == 64, "siginfo_t size incorrect");
 #endif
 
 void
@@ -295,7 +313,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
-	tf->srr0 = (register_t)p->p_sysent->sv_sigcode_base;
+	tf->srr0 = (register_t)PROC_SIGCODE(p);
 
 	/*
 	 * copy the frame out to userland.
@@ -571,6 +589,74 @@ cleanup_power_extras(struct thread *td)
 }
 
 /*
+ * Ensure the PCB has been updated in preparation for copying a thread.
+ *
+ * This is needed because normally this only happens during switching tasks,
+ * but when we are cloning a thread, we need the updated state before doing
+ * the actual copy, so the new thread inherits the current state instead of
+ * the state at the last task switch.
+ *
+ * Keep this in sync with the assembly code in cpu_switch()!
+ */
+void
+cpu_save_thread_regs(struct thread *td)
+{
+	uint32_t pcb_flags;
+	struct pcb *pcb;
+
+	KASSERT(td == curthread,
+	    ("cpu_save_thread_regs: td is not curthread"));
+
+	pcb = td->td_pcb;
+
+	pcb_flags = pcb->pcb_flags;
+
+#if defined(__powerpc64__)
+	/* Are *any* FSCR flags in use? */
+	if (pcb_flags & PCB_CFSCR) {
+		pcb->pcb_fscr = mfspr(SPR_FSCR);
+
+		if (pcb->pcb_fscr & FSCR_EBB) {
+			pcb->pcb_ebb.ebbhr = mfspr(SPR_EBBHR);
+			pcb->pcb_ebb.ebbrr = mfspr(SPR_EBBRR);
+			pcb->pcb_ebb.bescr = mfspr(SPR_BESCR);
+		}
+		if (pcb->pcb_fscr & FSCR_LM) {
+			pcb->pcb_lm.lmrr = mfspr(SPR_LMRR);
+			pcb->pcb_lm.lmser = mfspr(SPR_LMSER);
+		}
+		if (pcb->pcb_fscr & FSCR_TAR)
+			pcb->pcb_tar = mfspr(SPR_TAR);
+	}
+
+	/*
+	 * This is outside of the PCB_CFSCR check because it can be set
+	 * independently when running on POWER7/POWER8.
+	 */
+	if (pcb_flags & PCB_CDSCR)
+		pcb->pcb_dscr = mfspr(SPR_DSCRP);
+#endif
+
+#if defined(__SPE__)
+	/*
+	 * On E500v2, single-precision scalar instructions and access to
+	 * SPEFSCR may be used without PSL_VEC turned on, as long as they
+	 * limit themselves to the low word of the registers.
+	 *
+	 * As such, we need to unconditionally save SPEFSCR, even though
+	 * it is also updated in save_vec_nodrop().
+	 */
+	pcb->pcb_vec.vscr = mfspr(SPR_SPEFSCR);
+#endif
+
+	if (pcb_flags & PCB_FPU)
+		save_fpu_nodrop(td);
+
+	if (pcb_flags & PCB_VEC)
+		save_vec_nodrop(td);
+}
+
+/*
  * Set set up registers on exec.
  */
 void
@@ -605,7 +691,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 	tf->fixreg[3] = argc;
 	tf->fixreg[4] = stack + sizeof(register_t);
 	tf->fixreg[5] = stack + (2 + argc)*sizeof(register_t);
-	tf->fixreg[6] = 0;				/* auxillary vector */
+	tf->fixreg[6] = 0;				/* auxiliary vector */
 	tf->fixreg[7] = 0;				/* termination vector */
 	tf->fixreg[8] = (register_t)imgp->ps_strings;	/* NetBSD extension */
 
@@ -634,7 +720,7 @@ ppc32_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 	tf->fixreg[3] = argc;
 	tf->fixreg[4] = stack + sizeof(uint32_t);
 	tf->fixreg[5] = stack + (2 + argc)*sizeof(uint32_t);
-	tf->fixreg[6] = 0;				/* auxillary vector */
+	tf->fixreg[6] = 0;				/* auxiliary vector */
 	tf->fixreg[7] = 0;				/* termination vector */
 	tf->fixreg[8] = (register_t)imgp->ps_strings;	/* NetBSD extension */
 
@@ -1028,6 +1114,10 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	struct trapframe *tf;
 	struct callframe *cf;
 
+	/* Ensure td0 pcb is up to date. */
+	if (td0 == curthread)
+		cpu_save_thread_regs(td0);
+
 	pcb2 = td->td_pcb;
 
 	/* Copy the upcall pcb */
@@ -1057,8 +1147,7 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	#endif
 	pcb2->pcb_cpu.aim.usr_vsid = 0;
 #ifdef __SPE__
-	pcb2->pcb_vec.vscr = SPEFSCR_FINVE | SPEFSCR_FDBZE |
-	    SPEFSCR_FUNFE | SPEFSCR_FOVFE;
+	pcb2->pcb_vec.vscr = SPEFSCR_DFLT;
 #endif
 
 	/* Setup to release spin count in fork_exit(). */
@@ -1113,8 +1202,7 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 
 	td->td_pcb->pcb_flags = 0;
 #ifdef __SPE__
-	td->td_pcb->pcb_vec.vscr = SPEFSCR_FINVE | SPEFSCR_FDBZE |
-	    SPEFSCR_FUNFE | SPEFSCR_FOVFE;
+	td->td_pcb->pcb_vec.vscr = SPEFSCR_DFLT;
 #endif
 
 	td->td_retval[0] = (register_t)entry;

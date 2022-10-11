@@ -424,15 +424,13 @@ static device_method_t ipu3_fb_methods[] = {
 	{ 0, 0 }
 };
 
-static devclass_t ipu3_fb_devclass;
-
 static driver_t ipu3_fb_driver = {
 	"fb",
 	ipu3_fb_methods,
 	sizeof(struct ipu3sc_softc),
 };
 
-DRIVER_MODULE(ipu3fb, simplebus, ipu3_fb_driver, ipu3_fb_devclass, 0, 0);
+DRIVER_MODULE(ipu3fb, simplebus, ipu3_fb_driver, 0, 0);
 
 /*
  * Video driver routines and glue.
@@ -742,8 +740,6 @@ ipu3fb_ioctl(video_adapter_t *adp, u_long cmd, caddr_t data)
 			fb->fb_cmsize = 1 << sc->depth;
 		fb->fb_size = sc->fb_size;
 		break;
-	case FBIOSCURSOR:
-		return (ENODEV);
 	default:
 		return (fb_commonioctl(adp, cmd, data));
 	}

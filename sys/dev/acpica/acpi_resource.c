@@ -511,10 +511,12 @@ acpi_parse_resources(device_t dev, ACPI_HANDLE handle,
      */
     if (acpi_MatchHid(handle, "ARMHC500") != ACPI_MATCHHID_NOMATCH ||
         acpi_MatchHid(handle, "ARMHC502") != ACPI_MATCHHID_NOMATCH ||
+        acpi_MatchHid(handle, "ARMHC600") != ACPI_MATCHHID_NOMATCH ||
         acpi_MatchHid(handle, "ARMHC979") != ACPI_MATCHHID_NOMATCH ||
         acpi_MatchHid(handle, "ARMHC97C") != ACPI_MATCHHID_NOMATCH ||
         acpi_MatchHid(handle, "ARMHC98D") != ACPI_MATCHHID_NOMATCH ||
-        acpi_MatchHid(handle, "ARMHC9FF") != ACPI_MATCHHID_NOMATCH)
+        acpi_MatchHid(handle, "ARMHC9FF") != ACPI_MATCHHID_NOMATCH ||
+        acpi_MatchHid(handle, "ARMHD620") != ACPI_MATCHHID_NOMATCH)
 	    arc.ignore_producer_flag = true;
 
     status = AcpiWalkResources(handle, "_CRS", acpi_parse_resource, &arc);
@@ -749,9 +751,7 @@ static driver_t acpi_sysres_driver = {
     0,
 };
 
-static devclass_t acpi_sysres_devclass;
-DRIVER_MODULE(acpi_sysresource, acpi, acpi_sysres_driver, acpi_sysres_devclass,
-    0, 0);
+DRIVER_MODULE(acpi_sysresource, acpi, acpi_sysres_driver, 0, 0);
 MODULE_DEPEND(acpi_sysresource, acpi, 1, 1, 1);
 
 static int

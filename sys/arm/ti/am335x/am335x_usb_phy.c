@@ -84,11 +84,9 @@ static int
 ti_usb_phy_attach(device_t dev)
 {
 	struct ti_usb_phy_softc *sc;
-	phandle_t node;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
-	node = ofw_bus_get_node(dev);
 
 	/* FIXME: Add dev/extres/phy/ interface */
 
@@ -113,9 +111,7 @@ static device_method_t ti_usb_phy_methods[] = {
 DEFINE_CLASS_1(ti_usb_phy, ti_usb_phy_driver, ti_usb_phy_methods,
     sizeof(struct ti_usb_phy_softc), simplebus_driver);
 
-static devclass_t ti_usb_phy_devclass;
-
-EARLY_DRIVER_MODULE(ti_usb_phy, simplebus, ti_usb_phy_driver,
-    ti_usb_phy_devclass, 0, 0, BUS_PASS_BUS + BUS_PASS_ORDER_FIRST);
+EARLY_DRIVER_MODULE(ti_usb_phy, simplebus, ti_usb_phy_driver, 0, 0,
+    BUS_PASS_BUS + BUS_PASS_ORDER_FIRST);
 MODULE_VERSION(ti_usb_phy, 1);
 MODULE_DEPEND(ti_usb_phy, ti_sysc, 1, 1, 1);

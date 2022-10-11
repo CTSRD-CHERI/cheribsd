@@ -42,6 +42,8 @@
  *	$NetBSD: krpc_subr.c,v 1.10 1995/08/08 20:43:43 gwr Exp $
  */
 
+#define IN_HISTORICAL_NETS		/* include class masks */
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -655,7 +657,7 @@ bootpc_call(struct bootpc_globalcontext *gctx, struct thread *td)
 				    error, (int )bootp_so->so_state);
 
 			/* Set netmask to 255.0.0.0 */
-			sin->sin_addr.s_addr = htonl(IN_CLASSA_NET);
+			sin->sin_addr.s_addr = htonl(0xff000000);
 			error = ifioctl(bootp_so, SIOCAIFADDR, (caddr_t)ifra,
 			    td);
 			if (error != 0)
@@ -882,7 +884,7 @@ bootpc_fakeup_interface(struct bootpc_ifcontext *ifctx, struct thread *td)
 	clear_sinaddr(sin);
 	sin = (struct sockaddr_in *)&ifra->ifra_mask;
 	clear_sinaddr(sin);
-	sin->sin_addr.s_addr = htonl(IN_CLASSA_NET);
+	sin->sin_addr.s_addr = htonl(0xff000000);
 	sin = (struct sockaddr_in *)&ifra->ifra_broadaddr;
 	clear_sinaddr(sin);
 	sin->sin_addr.s_addr = htonl(INADDR_BROADCAST);
@@ -1337,7 +1339,6 @@ bootpc_decode_reply(struct nfsv3_diskless *nd, struct bootpc_ifcontext *ifctx,
     struct bootpc_globalcontext *gctx)
 {
 	char *p, *s;
-	unsigned int ip;
 
 	ifctx->gotgw = 0;
 	ifctx->gotnetmask = 0;
@@ -1347,8 +1348,6 @@ bootpc_decode_reply(struct nfsv3_diskless *nd, struct bootpc_ifcontext *ifctx,
 	clear_sinaddr(&ifctx->gw);
 
 	ifctx->myaddr.sin_addr = ifctx->reply.yiaddr;
-
-	ip = ntohl(ifctx->myaddr.sin_addr.s_addr);
 
 	printf("%s at ", ifctx->ireq.ifr_name);
 	print_sin_addr(&ifctx->myaddr);
@@ -1489,6 +1488,11 @@ bootpc_decode_reply(struct nfsv3_diskless *nd, struct bootpc_ifcontext *ifctx,
 	printf("\n");
 
 	if (ifctx->gotnetmask == 0) {
+		/*
+		 * If there is no netmask, use historical default,
+		 * but we really need the right mask from the server.
+		 */
+		printf("%s: no netmask received!\n", ifctx->ireq.ifr_name);
 		if (IN_CLASSA(ntohl(ifctx->myaddr.sin_addr.s_addr)))
 			ifctx->netmask.sin_addr.s_addr = htonl(IN_CLASSA_NET);
 		else if (IN_CLASSB(ntohl(ifctx->myaddr.sin_addr.s_addr)))
@@ -1501,7 +1505,7 @@ bootpc_decode_reply(struct nfsv3_diskless *nd, struct bootpc_ifcontext *ifctx,
 void
 bootpc_init(void)
 {
-	struct bootpc_ifcontext *ifctx;		/* Interface BOOTP contexts */
+	struct bootpc_ifcontext *ifctx = NULL;	/* Interface BOOTP contexts */
 	struct bootpc_globalcontext *gctx; 	/* Global BOOTP context */
 	struct ifnet *ifp;
 	struct sockaddr_dl *sdl;
@@ -1514,6 +1518,7 @@ bootpc_init(void)
 	struct thread *td;
 	int timeout;
 	int delay;
+	char *s;
 
 	timeout = BOOTP_IFACE_WAIT_TIMEOUT * hz;
 	delay = hz / 10;
@@ -1526,6 +1531,21 @@ bootpc_init(void)
 	 */
 	if (nfs_diskless_valid != 0)
 		return;
+
+	/*
+	 * If "vfs.root.mountfrom" is set and the value is something other
+	 * than "nfs:", it means the user doesn't want to mount root via nfs,
+	 * there's no reason to continue with bootpc
+	 */
+	if ((s = kern_getenv("vfs.root.mountfrom")) != NULL) {
+		if ((strncmp(s, "nfs:", 4)) != 0) {
+			printf("%s: vfs.root.mountfrom set to %s. "
+			       "BOOTP aborted.\n", __func__, s);
+			freeenv(s);
+			return;
+		}
+		freeenv(s);
+	}
 
 	gctx = malloc(sizeof(*gctx), M_TEMP, M_WAITOK | M_ZERO);
 	STAILQ_INIT(&gctx->interfaces);
@@ -1571,9 +1591,13 @@ bootpc_init(void)
 		}
 		ifcnt++;
 	}
+
 	IFNET_RUNLOCK();
-	if (ifcnt == 0)
-		panic("%s: no eligible interfaces", __func__);
+	if (ifcnt == 0) {
+		printf("WARNING: BOOTP found no eligible network interfaces, skipping!\n");
+		goto out;
+	}
+
 	for (; ifcnt > 0; ifcnt--)
 		allocifctx(gctx);
 #endif

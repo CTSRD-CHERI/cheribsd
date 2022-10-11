@@ -27,8 +27,11 @@
 #
 # $FreeBSD$
 
+
 BSDCFG_SHARE="/usr/share/bsdconfig"
 . $BSDCFG_SHARE/common.subr || exit 1
+f_dprintf "%s: loading_includes..." "$0"
+f_include $BSDCFG_SHARE/dialog.subr
 
 : ${TMPDIR:="/tmp"}
 
@@ -37,12 +40,63 @@ die() {
 	exit 1
 }
 
+dialog_uefi_entryname()
+{
+	local prompt="Please enter a name for the new entry"
+	local hline=
+	local value="$*"
+	local height width
+
+	f_dialog_inputbox_size height width \
+		"$DIALOG_TITLE" "$DIALOG_BACKTITLE" "$prompt" "$value" "$hline"
+
+	$DIALOG \
+		--title "$DIALOG_TITLE"         \
+		--backtitle "$DIALOG_BACKTITLE" \
+		--hline "$hline"                \
+		--ok-label "Ok"                 \
+		--no-cancel                     \
+		--inputbox "$prompt"            \
+		$height $width "$value"         \
+		2>&1 >&$DIALOG_TERMINAL_PASSTHRU_FD
+}
+
+update_uefi_bootentry()
+{
+	nentries=$(efibootmgr | grep -c "${EFI_LABEL_NAME}$")
+	# No entries so directly create one and return
+	if [ ${nentries} -eq 0 ]; then
+		f_dprintf "Creating UEFI boot entry"
+		efibootmgr --create --activate --label "$EFI_LABEL_NAME" --loader "${mntpt}/${FREEBSD_BOOTNAME}" > /dev/null
+		return
+	fi
+
+	$DIALOG --backtitle "$OSNAME Installer" --title 'Boot configuration' \
+	    --yesno "There are multiple \"$OSNAME\" EFI boot entries. Would you like to remove them all and add a new one?" 0 0
+	if [ $? -eq $DIALOG_OK ]; then
+		for entry in $(efibootmgr | awk "\$NF == \"$EFI_LABEL_NAME\" { sub(/.*Boot/,\"\", \$1); sub(/\*/,\"\", \$1); print \$1 }"); do
+			efibootmgr -B -b ${entry}
+		done
+		efibootmgr --create --activate --label "$EFI_LABEL_NAME" --loader "${mntpt}/${FREEBSD_BOOTNAME}" > /dev/null
+		return
+	fi
+
+	FREEBSD_BOOTLABEL=$(dialog_uefi_entryname "${EFI_LABEL_NAME}")
+	[ $? -eq $DIALOG_CANCEL ] && exit 1
+	efibootmgr --create --activate --label "$FREEBSD_BOOTLABEL" --loader "${mntpt}/${FREEBSD_BOOTNAME}" > /dev/null
+}
+
+f_dialog_title "Boot configuration"
+f_dialog_backtitle "$OSNAME Installer"
+
 if [ `uname -m` == powerpc ]; then
 	platform=`sysctl -n hw.platform`
 	if [ "$platform" == ps3 -o "$platform" == powernv ]; then
 		rootpart=$(awk '{ if($2 == "/") printf("%s:%s\n", $3, $1); }' $PATH_FSTAB)
+		kboot_conf=$BSDINSTALL_CHROOT/boot/etc/kboot.conf
 		mkdir -p $BSDINSTALL_CHROOT/boot/etc/
-		echo FreeBSD=\'/kernel/kernel kernelname=/boot/kernel/kernel vfs.root.mountfrom=${rootpart}\' > $BSDINSTALL_CHROOT/boot/etc/kboot.conf
+		echo default=$FREEBSD_BOOTLABEL > $kboot_conf
+		echo $FREEBSD_BOOTLABEL=\'/kernel/kernel kernelname=/boot/kernel/kernel vfs.root.mountfrom=${rootpart}\' >> $kboot_conf
 	fi
 fi
 
@@ -81,10 +135,9 @@ if [ -n "$(awk '{if ($2=="/boot/efi") printf("%s\n",$1);}' $PATH_FSTAB)" ]; then
 		cp "$BSDINSTALL_CHROOT/boot/loader.efi" "${mntpt}/${BOOTNAME}"
 	fi
 
-	bootlabel="FreeBSD"
-
-	f_dprintf "Creating UEFI boot entry"
-	efibootmgr --create --activate --label "$bootlabel" --loader "${mntpt}/${FREEBSD_BOOTNAME}" > /dev/null
+	if [ "$BSDINSTALL_CONFIGCURRENT" ]; then
+		update_uefi_bootentry
+	fi
 
 	f_dprintf "Finished configuring ESP"
 fi

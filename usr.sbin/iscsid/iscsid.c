@@ -38,9 +38,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/linker.h>
 #include <sys/socket.h>
+#include <sys/sysctl.h>
 #include <sys/capsicum.h>
 #include <sys/wait.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <assert.h>
 #include <capsicum_helpers.h>
 #include <errno.h>
@@ -57,9 +59,24 @@ __FBSDID("$FreeBSD$");
 
 #include "iscsid.h"
 
+static bool	timed_out(void);
+#ifdef ICL_KERNEL_PROXY
+static void	pdu_receive_proxy(struct pdu *pdu);
+static void	pdu_send_proxy(struct pdu *pdu);
+#endif /* ICL_KERNEL_PROXY */
+
 static volatile bool sigalrm_received = false;
 
 static int nchildren = 0;
+
+static struct connection_ops conn_ops = {
+	.timed_out = timed_out,
+#ifdef ICL_KERNEL_PROXY
+	.pdu_receive_proxy = pdu_receive_proxy,
+	.pdu_send_proxy = pdu_send_proxy,
+#endif
+	.fail = fail,
+};
 
 static void
 usage(void)
@@ -69,27 +86,77 @@ usage(void)
 	exit(1);
 }
 
-char *
-checked_strdup(const char *s)
-{
-	char *c;
+#ifdef ICL_KERNEL_PROXY
 
-	c = strdup(s);
-	if (c == NULL)
-		log_err(1, "strdup");
-	return (c);
+static void
+pdu_receive_proxy(struct pdu *pdu)
+{
+	struct iscsid_connection *conn;
+	struct iscsi_daemon_receive idr;
+	size_t len;
+	int error;
+
+	conn = (struct iscsid_connection *)pdu->pdu_connection;
+	assert(conn->conn_conf.isc_iser != 0);
+
+	pdu->pdu_data = malloc(conn->conn.conn_max_recv_data_segment_length);
+	if (pdu->pdu_data == NULL)
+		log_err(1, "malloc");
+
+	memset(&idr, 0, sizeof(idr));
+	idr.idr_session_id = conn->conn_session_id;
+	idr.idr_bhs = pdu->pdu_bhs;
+	idr.idr_data_segment_len = conn->conn.conn_max_recv_data_segment_length;
+	idr.idr_data_segment = pdu->pdu_data;
+
+	error = ioctl(conn->conn_iscsi_fd, ISCSIDRECEIVE, &idr);
+	if (error != 0)
+		log_err(1, "ISCSIDRECEIVE");
+
+	len = pdu_ahs_length(pdu);
+	if (len > 0)
+		log_errx(1, "protocol error: non-empty AHS");
+
+	len = pdu_data_segment_length(pdu);
+	assert(len <= (size_t)conn->conn.conn_max_recv_data_segment_length);
+	pdu->pdu_data_len = len;
 }
+
+static void
+pdu_send_proxy(struct pdu *pdu)
+{
+	struct iscsid_connection *conn;
+	struct iscsi_daemon_send ids;
+	int error;
+
+	conn = (struct iscsid_connection *)pdu->pdu_connection;
+	assert(conn->conn_conf.isc_iser != 0);
+
+	pdu_set_data_segment_length(pdu, pdu->pdu_data_len);
+
+	memset(&ids, 0, sizeof(ids));
+	ids.ids_session_id = conn->conn_session_id;
+	ids.ids_bhs = pdu->pdu_bhs;
+	ids.ids_data_segment_len = pdu->pdu_data_len;
+	ids.ids_data_segment = pdu->pdu_data;
+
+	error = ioctl(conn->conn_iscsi_fd, ISCSIDSEND, &ids);
+	if (error != 0)
+		log_err(1, "ISCSIDSEND");
+}
+
+#endif /* ICL_KERNEL_PROXY */
 
 static void
 resolve_addr(const struct connection *conn, const char *address,
     struct addrinfo **ai, bool initiator_side)
 {
 	struct addrinfo hints;
-	char *arg, *addr, *ch;
+	char *arg, *addr, *ch, *tofree;
 	const char *port;
 	int error, colons = 0;
 
-	arg = checked_strdup(address);
+	tofree = arg = checked_strdup(address);
 
 	if (arg[0] == '\0') {
 		fail(conn, "empty address");
@@ -151,85 +218,45 @@ resolve_addr(const struct connection *conn, const char *address,
 		    address, gai_strerror(error));
 	}
 
-	free(addr);
+	free(tofree);
 }
 
-static struct connection *
+static struct iscsid_connection *
 connection_new(int iscsi_fd, const struct iscsi_daemon_request *request)
 {
-	struct connection *conn;
-	struct iscsi_session_limits *isl;
+	struct iscsid_connection *conn;
 	struct addrinfo *from_ai, *to_ai;
 	const char *from_addr, *to_addr;
 #ifdef ICL_KERNEL_PROXY
 	struct iscsi_daemon_connect idc;
 #endif
-	int error, sockbuf;
+	int error, optval;
 
 	conn = calloc(1, sizeof(*conn));
 	if (conn == NULL)
 		log_err(1, "calloc");
 
-	/*
-	 * Default values, from RFC 3720, section 12.
-	 */
+	connection_init(&conn->conn, &conn_ops,
+	    request->idr_conf.isc_iser != 0);
 	conn->conn_protocol_level = 0;
-	conn->conn_header_digest = CONN_DIGEST_NONE;
-	conn->conn_data_digest = CONN_DIGEST_NONE;
 	conn->conn_initial_r2t = true;
-	conn->conn_immediate_data = true;
-	conn->conn_max_recv_data_segment_length = 8192;
-	conn->conn_max_send_data_segment_length = 8192;
-	conn->conn_max_burst_length = 262144;
-	conn->conn_first_burst_length = 65536;
 	conn->conn_iscsi_fd = iscsi_fd;
 
 	conn->conn_session_id = request->idr_session_id;
 	memcpy(&conn->conn_conf, &request->idr_conf, sizeof(conn->conn_conf));
-	memcpy(&conn->conn_isid, &request->idr_isid, sizeof(conn->conn_isid));
-	conn->conn_tsih = request->idr_tsih;
-
-	/*
-	 * Read the driver limits and provide reasonable defaults for the ones
-	 * the driver doesn't care about.  If a max_snd_dsl is not explicitly
-	 * provided by the driver then we'll make sure both conn->max_snd_dsl
-	 * and isl->max_snd_dsl are set to the rcv_dsl.  This preserves historic
-	 * behavior.
-	 */
-	isl = &conn->conn_limits;
-	memcpy(isl, &request->idr_limits, sizeof(*isl));
-	if (isl->isl_max_recv_data_segment_length == 0)
-		isl->isl_max_recv_data_segment_length = (1 << 24) - 1;
-	if (isl->isl_max_send_data_segment_length == 0)
-		isl->isl_max_send_data_segment_length =
-		    isl->isl_max_recv_data_segment_length;
-	if (isl->isl_max_burst_length == 0)
-		isl->isl_max_burst_length = (1 << 24) - 1;
-	if (isl->isl_first_burst_length == 0)
-		isl->isl_first_burst_length = (1 << 24) - 1;
-	if (isl->isl_first_burst_length > isl->isl_max_burst_length)
-		isl->isl_first_burst_length = isl->isl_max_burst_length;
-
-	/*
-	 * Limit default send length in case it won't be negotiated.
-	 * We can't do it for other limits, since they may affect both
-	 * sender and receiver operation, and we must obey defaults.
-	 */
-	if (conn->conn_max_send_data_segment_length >
-	    isl->isl_max_send_data_segment_length) {
-		conn->conn_max_send_data_segment_length =
-		    isl->isl_max_send_data_segment_length;
-	}
+	memcpy(&conn->conn.conn_isid, &request->idr_isid,
+	    sizeof(conn->conn.conn_isid));
+	conn->conn.conn_tsih = request->idr_tsih;
 
 	from_addr = conn->conn_conf.isc_initiator_addr;
 	to_addr = conn->conn_conf.isc_target_addr;
 
 	if (from_addr[0] != '\0')
-		resolve_addr(conn, from_addr, &from_ai, true);
+		resolve_addr(&conn->conn, from_addr, &from_ai, true);
 	else
 		from_ai = NULL;
 
-	resolve_addr(conn, to_addr, &to_ai, false);
+	resolve_addr(&conn->conn, to_addr, &to_ai, false);
 
 #ifdef ICL_KERNEL_PROXY
 	if (conn->conn_conf.isc_iser) {
@@ -250,7 +277,7 @@ connection_new(int iscsi_fd, const struct iscsi_daemon_request *request)
 		log_debugx("connecting to %s using ICL kernel proxy", to_addr);
 		error = ioctl(iscsi_fd, ISCSIDCONNECT, &idc);
 		if (error != 0) {
-			fail(conn, strerror(errno));
+			fail(&conn->conn, strerror(errno));
 			log_err(1, "failed to connect to %s "
 			    "using ICL kernel proxy: ISCSIDCONNECT", to_addr);
 		}
@@ -264,29 +291,33 @@ connection_new(int iscsi_fd, const struct iscsi_daemon_request *request)
 #endif /* ICL_KERNEL_PROXY */
 
 	if (conn->conn_conf.isc_iser) {
-		fail(conn, "iSER not supported");
+		fail(&conn->conn, "iSER not supported");
 		log_errx(1, "iscsid(8) compiled without ICL_KERNEL_PROXY "
 		    "does not support iSER");
 	}
 
-	conn->conn_socket = socket(to_ai->ai_family, to_ai->ai_socktype,
+	conn->conn.conn_socket = socket(to_ai->ai_family, to_ai->ai_socktype,
 	    to_ai->ai_protocol);
-	if (conn->conn_socket < 0) {
-		fail(conn, strerror(errno));
+	if (conn->conn.conn_socket < 0) {
+		fail(&conn->conn, strerror(errno));
 		log_err(1, "failed to create socket for %s", from_addr);
 	}
-	sockbuf = SOCKBUF_SIZE;
-	if (setsockopt(conn->conn_socket, SOL_SOCKET, SO_RCVBUF,
-	    &sockbuf, sizeof(sockbuf)) == -1)
+	optval = SOCKBUF_SIZE;
+	if (setsockopt(conn->conn.conn_socket, SOL_SOCKET, SO_RCVBUF,
+	    &optval, sizeof(optval)) == -1)
 		log_warn("setsockopt(SO_RCVBUF) failed");
-	sockbuf = SOCKBUF_SIZE;
-	if (setsockopt(conn->conn_socket, SOL_SOCKET, SO_SNDBUF,
-	    &sockbuf, sizeof(sockbuf)) == -1)
+	optval = SOCKBUF_SIZE;
+	if (setsockopt(conn->conn.conn_socket, SOL_SOCKET, SO_SNDBUF,
+	    &optval, sizeof(optval)) == -1)
 		log_warn("setsockopt(SO_SNDBUF) failed");
+	optval = 1;
+	if (setsockopt(conn->conn.conn_socket, SOL_SOCKET, SO_NO_DDP,
+	    &optval, sizeof(optval)) == -1)
+		log_warn("setsockopt(SO_NO_DDP) failed");
 	if (conn->conn_conf.isc_dscp != -1) {
 		int tos = conn->conn_conf.isc_dscp << 2;
 		if (to_ai->ai_family == AF_INET) {
-			if (setsockopt(conn->conn_socket,
+			if (setsockopt(conn->conn.conn_socket,
 			    IPPROTO_IP, IP_TOS,
 			    &tos, sizeof(tos)) == -1)
 				log_warn("setsockopt(IP_TOS) "
@@ -294,7 +325,7 @@ connection_new(int iscsi_fd, const struct iscsi_daemon_request *request)
 				    from_addr);
 		} else
 		if (to_ai->ai_family == AF_INET6) {
-			if (setsockopt(conn->conn_socket,
+			if (setsockopt(conn->conn.conn_socket,
 			    IPPROTO_IPV6, IPV6_TCLASS,
 			    &tos, sizeof(tos)) == -1)
 				log_warn("setsockopt(IPV6_TCLASS) "
@@ -305,7 +336,7 @@ connection_new(int iscsi_fd, const struct iscsi_daemon_request *request)
 	if (conn->conn_conf.isc_pcp != -1) {
 		int pcp = conn->conn_conf.isc_pcp;
 		if (to_ai->ai_family == AF_INET) {
-			if (setsockopt(conn->conn_socket,
+			if (setsockopt(conn->conn.conn_socket,
 			    IPPROTO_IP, IP_VLAN_PCP,
 			    &pcp, sizeof(pcp)) == -1)
 				log_warn("setsockopt(IP_VLAN_PCP) "
@@ -313,7 +344,7 @@ connection_new(int iscsi_fd, const struct iscsi_daemon_request *request)
 				    from_addr);
 		} else
 		if (to_ai->ai_family == AF_INET6) {
-			if (setsockopt(conn->conn_socket,
+			if (setsockopt(conn->conn.conn_socket,
 			    IPPROTO_IPV6, IPV6_VLAN_PCP,
 			    &pcp, sizeof(pcp)) == -1)
 				log_warn("setsockopt(IPV6_VLAN_PCP) "
@@ -321,18 +352,47 @@ connection_new(int iscsi_fd, const struct iscsi_daemon_request *request)
 				    from_addr);
 		}
 	}
+	/*
+	 * Reduce TCP SYN_SENT timeout while
+	 * no connectivity exists, to allow
+	 * rapid reuse of the available slots.
+	 */
+	int keepinit = 0;
+	if (conn->conn_conf.isc_login_timeout > 0) {
+		keepinit = conn->conn_conf.isc_login_timeout;
+		log_debugx("session specific LoginTimeout at %d sec",
+			keepinit);
+	}
+	if (conn->conn_conf.isc_login_timeout == -1) {
+		int value;
+		size_t size = sizeof(value);
+		if (sysctlbyname("kern.iscsi.login_timeout",
+		    &value, &size, NULL, 0) == 0) {
+			keepinit = value;
+			log_debugx("global login_timeout at %d sec",
+				keepinit);
+		}
+	}
+	if (keepinit > 0) {
+		if (setsockopt(conn->conn.conn_socket,
+		    IPPROTO_TCP, TCP_KEEPINIT,
+		    &keepinit, sizeof(keepinit)) == -1)
+			log_warnx("setsockopt(TCP_KEEPINIT) "
+			    "failed for %s", to_addr);
+	}
 	if (from_ai != NULL) {
-		error = bind(conn->conn_socket, from_ai->ai_addr,
+		error = bind(conn->conn.conn_socket, from_ai->ai_addr,
 		    from_ai->ai_addrlen);
 		if (error != 0) {
-			fail(conn, strerror(errno));
+			fail(&conn->conn, strerror(errno));
 			log_err(1, "failed to bind to %s", from_addr);
 		}
 	}
 	log_debugx("connecting to %s", to_addr);
-	error = connect(conn->conn_socket, to_ai->ai_addr, to_ai->ai_addrlen);
+	error = connect(conn->conn.conn_socket, to_ai->ai_addr,
+	    to_ai->ai_addrlen);
 	if (error != 0) {
-		fail(conn, strerror(errno));
+		fail(&conn->conn, strerror(errno));
 		log_err(1, "failed to connect to %s", to_addr);
 	}
 
@@ -344,7 +404,57 @@ connection_new(int iscsi_fd, const struct iscsi_daemon_request *request)
 }
 
 static void
-handoff(struct connection *conn)
+limits(struct iscsid_connection *conn)
+{
+	struct iscsi_daemon_limits idl;
+	struct iscsi_session_limits *isl;
+	int error;
+
+	log_debugx("fetching limits from the kernel");
+
+	memset(&idl, 0, sizeof(idl));
+	idl.idl_session_id = conn->conn_session_id;
+	idl.idl_socket = conn->conn.conn_socket;
+
+	error = ioctl(conn->conn_iscsi_fd, ISCSIDLIMITS, &idl);
+	if (error != 0)
+		log_err(1, "ISCSIDLIMITS");
+	
+	/*
+	 * Read the driver limits and provide reasonable defaults for the ones
+	 * the driver doesn't care about.  If a max_snd_dsl is not explicitly
+	 * provided by the driver then we'll make sure both conn->max_snd_dsl
+	 * and isl->max_snd_dsl are set to the rcv_dsl.  This preserves historic
+	 * behavior.
+	 */
+	isl = &conn->conn_limits;
+	memcpy(isl, &idl.idl_limits, sizeof(*isl));
+	if (isl->isl_max_recv_data_segment_length == 0)
+		isl->isl_max_recv_data_segment_length = (1 << 24) - 1;
+	if (isl->isl_max_send_data_segment_length == 0)
+		isl->isl_max_send_data_segment_length =
+		    isl->isl_max_recv_data_segment_length;
+	if (isl->isl_max_burst_length == 0)
+		isl->isl_max_burst_length = (1 << 24) - 1;
+	if (isl->isl_first_burst_length == 0)
+		isl->isl_first_burst_length = (1 << 24) - 1;
+	if (isl->isl_first_burst_length > isl->isl_max_burst_length)
+		isl->isl_first_burst_length = isl->isl_max_burst_length;
+
+	/*
+	 * Limit default send length in case it won't be negotiated.
+	 * We can't do it for other limits, since they may affect both
+	 * sender and receiver operation, and we must obey defaults.
+	 */
+	if (conn->conn.conn_max_send_data_segment_length >
+	    isl->isl_max_send_data_segment_length) {
+		conn->conn.conn_max_send_data_segment_length =
+		    isl->isl_max_send_data_segment_length;
+	}
+}
+
+static void
+handoff(struct iscsid_connection *conn)
 {
 	struct iscsi_daemon_handoff idh;
 	int error;
@@ -353,22 +463,22 @@ handoff(struct connection *conn)
 
 	memset(&idh, 0, sizeof(idh));
 	idh.idh_session_id = conn->conn_session_id;
-	idh.idh_socket = conn->conn_socket;
+	idh.idh_socket = conn->conn.conn_socket;
 	strlcpy(idh.idh_target_alias, conn->conn_target_alias,
 	    sizeof(idh.idh_target_alias));
-	idh.idh_tsih = conn->conn_tsih;
-	idh.idh_statsn = conn->conn_statsn;
+	idh.idh_tsih = conn->conn.conn_tsih;
+	idh.idh_statsn = conn->conn.conn_statsn;
 	idh.idh_protocol_level = conn->conn_protocol_level;
-	idh.idh_header_digest = conn->conn_header_digest;
-	idh.idh_data_digest = conn->conn_data_digest;
+	idh.idh_header_digest = conn->conn.conn_header_digest;
+	idh.idh_data_digest = conn->conn.conn_data_digest;
 	idh.idh_initial_r2t = conn->conn_initial_r2t;
-	idh.idh_immediate_data = conn->conn_immediate_data;
+	idh.idh_immediate_data = conn->conn.conn_immediate_data;
 	idh.idh_max_recv_data_segment_length =
-	    conn->conn_max_recv_data_segment_length;
+	    conn->conn.conn_max_recv_data_segment_length;
 	idh.idh_max_send_data_segment_length =
-	    conn->conn_max_send_data_segment_length;
-	idh.idh_max_burst_length = conn->conn_max_burst_length;
-	idh.idh_first_burst_length = conn->conn_first_burst_length;
+	    conn->conn.conn_max_send_data_segment_length;
+	idh.idh_max_burst_length = conn->conn.conn_max_burst_length;
+	idh.idh_first_burst_length = conn->conn.conn_first_burst_length;
 
 	error = ioctl(conn->conn_iscsi_fd, ISCSIDHANDOFF, &idh);
 	if (error != 0)
@@ -376,11 +486,13 @@ handoff(struct connection *conn)
 }
 
 void
-fail(const struct connection *conn, const char *reason)
+fail(const struct connection *base_conn, const char *reason)
 {
+	const struct iscsid_connection *conn;
 	struct iscsi_daemon_fail idf;
 	int error, saved_errno;
 
+	conn = (const struct iscsid_connection *)base_conn;
 	saved_errno = errno;
 
 	memset(&idf, 0, sizeof(idf));
@@ -398,16 +510,22 @@ fail(const struct connection *conn, const char *reason)
  * XXX: I CANT INTO LATIN
  */
 static void
-capsicate(struct connection *conn)
+capsicate(struct iscsid_connection *conn)
 {
 	cap_rights_t rights;
+	const unsigned long cmds[] = {
 #ifdef ICL_KERNEL_PROXY
-	const unsigned long cmds[] = { ISCSIDCONNECT, ISCSIDSEND, ISCSIDRECEIVE,
-	    ISCSIDHANDOFF, ISCSIDFAIL, ISCSISADD, ISCSISREMOVE, ISCSISMODIFY };
-#else
-	const unsigned long cmds[] = { ISCSIDHANDOFF, ISCSIDFAIL, ISCSISADD,
-	    ISCSISREMOVE, ISCSISMODIFY };
+		ISCSIDCONNECT,
+		ISCSIDSEND,
+		ISCSIDRECEIVE,
 #endif
+		ISCSIDLIMITS,
+		ISCSIDHANDOFF,
+		ISCSIDFAIL,
+		ISCSISADD,
+		ISCSISREMOVE,
+		ISCSISMODIFY
+	};
 
 	cap_rights_init(&rights, CAP_IOCTL);
 	if (caph_rights_limit(conn->conn_iscsi_fd, &rights) < 0)
@@ -425,7 +543,7 @@ capsicate(struct connection *conn)
 		log_warnx("Capsicum capability mode not supported");
 }
 
-bool
+static bool
 timed_out(void)
 {
 
@@ -515,7 +633,7 @@ register_sigchld(void)
 static void
 handle_request(int iscsi_fd, const struct iscsi_daemon_request *request, int timeout)
 {
-	struct connection *conn;
+	struct iscsid_connection *conn;
 
 	log_set_peer_addr(request->idr_conf.isc_target_addr);
 	if (request->idr_conf.isc_target[0] != '\0') {
@@ -526,8 +644,9 @@ handle_request(int iscsi_fd, const struct iscsi_daemon_request *request, int tim
 	}
 
 	conn = connection_new(iscsi_fd, request);
-	set_timeout(timeout);
 	capsicate(conn);
+	limits(conn);
+	set_timeout(timeout);
 	login(conn);
 	if (conn->conn_conf.isc_discovery != 0)
 		discovery(conn);

@@ -69,6 +69,12 @@ VNET_DEFINE_STATIC(int,	pfi_buffer_max);
 #define	V_pfi_buffer_cnt	 VNET(pfi_buffer_cnt)
 #define	V_pfi_buffer_max	 VNET(pfi_buffer_max)
 
+#ifdef PF_WANT_32_TO_64_COUNTER
+VNET_DEFINE(struct allkiflist_head, pf_allkiflist);
+VNET_DEFINE(size_t, pf_allkifcount);
+VNET_DEFINE(struct pfi_kkif *, pf_kifmarker);
+#endif
+
 eventhandler_tag	 pfi_attach_cookie;
 eventhandler_tag	 pfi_detach_cookie;
 eventhandler_tag	 pfi_attach_group_cookie;
@@ -222,6 +228,9 @@ struct pfi_kkif*
 pf_kkif_create(int flags)
 {
 	struct pfi_kkif *kif;
+#ifdef PF_WANT_32_TO_64_COUNTER
+	bool wowned;
+#endif
 
 	kif = malloc(sizeof(*kif), PFI_MTYPE, flags | M_ZERO);
 	if (! kif)
@@ -230,13 +239,12 @@ pf_kkif_create(int flags)
 	for (int i = 0; i < 2; i++) {
 		for (int j = 0; j < 2; j++) {
 			for (int k = 0; k < 2; k++) {
-				kif->pfik_packets[i][j][k] =
-				    counter_u64_alloc(flags);
-				kif->pfik_bytes[i][j][k] =
-				    counter_u64_alloc(flags);
+				if (pf_counter_u64_init(&kif->pfik_packets[i][j][k], flags) != 0) {
+					pf_kkif_free(kif);
+					return (NULL);
+				}
 
-				if (! kif->pfik_packets[i][j][k] ||
-				    ! kif->pfik_bytes[i][j][k]) {
+				if (pf_counter_u64_init(&kif->pfik_bytes[i][j][k], flags) != 0) {
 					pf_kkif_free(kif);
 					return (NULL);
 				}
@@ -244,20 +252,44 @@ pf_kkif_create(int flags)
 		}
 	}
 
+#ifdef PF_WANT_32_TO_64_COUNTER
+	wowned = PF_RULES_WOWNED();
+	if (!wowned)
+		PF_RULES_WLOCK();
+	LIST_INSERT_HEAD(&V_pf_allkiflist, kif, pfik_allkiflist);
+	V_pf_allkifcount++;
+	if (!wowned)
+		PF_RULES_WUNLOCK();
+#endif
+
 	return (kif);
 }
 
 void
 pf_kkif_free(struct pfi_kkif *kif)
 {
+#ifdef PF_WANT_32_TO_64_COUNTER
+	bool wowned;
+#endif
+
 	if (! kif)
 		return;
+
+#ifdef PF_WANT_32_TO_64_COUNTER
+	wowned = PF_RULES_WOWNED();
+	if (!wowned)
+		PF_RULES_WLOCK();
+	LIST_REMOVE(kif, pfik_allkiflist);
+	V_pf_allkifcount--;
+	if (!wowned)
+		PF_RULES_WUNLOCK();
+#endif
 
 	for (int i = 0; i < 2; i++) {
 		for (int j = 0; j < 2; j++) {
 			for (int k = 0; k < 2; k++) {
-				counter_u64_free(kif->pfik_packets[i][j][k]);
-				counter_u64_free(kif->pfik_bytes[i][j][k]);
+				pf_counter_u64_deinit(&kif->pfik_packets[i][j][k]);
+				pf_counter_u64_deinit(&kif->pfik_bytes[i][j][k]);
 			}
 		}
 	}
@@ -272,8 +304,8 @@ pf_kkif_zero(struct pfi_kkif *kif)
 	for (int i = 0; i < 2; i++) {
 		for (int j = 0; j < 2; j++) {
 			for (int k = 0; k < 2; k++) {
-				counter_u64_zero(kif->pfik_packets[i][j][k]);
-				counter_u64_zero(kif->pfik_bytes[i][j][k]);
+				pf_counter_u64_zero(&kif->pfik_packets[i][j][k]);
+				pf_counter_u64_zero(&kif->pfik_bytes[i][j][k]);
 			}
 		}
 	}
@@ -531,8 +563,7 @@ _bad:
 		pfr_detach_table(dyn->pfid_kt);
 	if (ruleset != NULL)
 		pf_remove_if_empty_kruleset(ruleset);
-	if (dyn->pfid_kif != NULL)
-		pfi_kkif_unref(dyn->pfid_kif);
+	pfi_kkif_unref(dyn->pfid_kif);
 	free(dyn, PFI_MTYPE);
 
 	return (rv);
@@ -772,6 +803,11 @@ pfi_update_status(const char *name, struct pf_status *pfs)
 	CK_STAILQ_HEAD(, ifg_member) ifg_members;
 	int			 i, j, k;
 
+	if (pfs) {
+		bzero(pfs->pcounters, sizeof(pfs->pcounters));
+		bzero(pfs->bcounters, sizeof(pfs->bcounters));
+	}
+
 	strlcpy(key.pfik_name, name, sizeof(key.pfik_name));
 	p = RB_FIND(pfi_ifhead, &V_pfi_ifs, (struct pfi_kkif *)&key);
 	if (p == NULL)
@@ -787,10 +823,6 @@ pfi_update_status(const char *name, struct pf_status *pfs)
 		CK_STAILQ_INIT(&ifg_members);
 		CK_STAILQ_INSERT_TAIL(&ifg_members, &p_member, ifgm_next);
 	}
-	if (pfs) {
-		bzero(pfs->pcounters, sizeof(pfs->pcounters));
-		bzero(pfs->bcounters, sizeof(pfs->bcounters));
-	}
 	CK_STAILQ_FOREACH(ifgm, &ifg_members, ifgm_next) {
 		if (ifgm->ifgm_ifp == NULL || ifgm->ifgm_ifp->if_pf_kif == NULL)
 			continue;
@@ -805,15 +837,15 @@ pfi_update_status(const char *name, struct pf_status *pfs)
 			for (j = 0; j < 2; j++)
 				for (k = 0; k < 2; k++) {
 					pfs->pcounters[i][j][k] +=
-					    counter_u64_fetch(p->pfik_packets[i][j][k]);
+					    pf_counter_u64_fetch(&p->pfik_packets[i][j][k]);
 					pfs->bcounters[i][j] +=
-					    counter_u64_fetch(p->pfik_bytes[i][j][k]);
+					    pf_counter_u64_fetch(&p->pfik_bytes[i][j][k]);
 				}
 	}
 }
 
 static void
-pf_kkif_to_kif(const struct pfi_kkif *kkif, struct pfi_kif *kif)
+pf_kkif_to_kif(struct pfi_kkif *kkif, struct pfi_kif *kif)
 {
 
 	bzero(kif, sizeof(*kif));
@@ -822,15 +854,23 @@ pf_kkif_to_kif(const struct pfi_kkif *kkif, struct pfi_kif *kif)
 		for (int j = 0; j < 2; j++) {
 			for (int k = 0; k < 2; k++) {
 				kif->pfik_packets[i][j][k] =
-				    counter_u64_fetch(kkif->pfik_packets[i][j][k]);
+				    pf_counter_u64_fetch(&kkif->pfik_packets[i][j][k]);
 				kif->pfik_bytes[i][j][k] =
-				    counter_u64_fetch(kkif->pfik_bytes[i][j][k]);
+				    pf_counter_u64_fetch(&kkif->pfik_bytes[i][j][k]);
 			}
 		}
 	}
 	kif->pfik_flags = kkif->pfik_flags;
 	kif->pfik_tzero = kkif->pfik_tzero;
 	kif->pfik_rulerefs = kkif->pfik_rulerefs;
+	/*
+	 * Userspace relies on this pointer to decide if this is a group or
+	 * not. We don't want to share the actual pointer, because it's
+	 * useless to userspace and leaks kernel memory layout information.
+	 * So instead we provide 0xfeedcode as 'true' and NULL as 'false'.
+	 */
+	kif->pfik_group =
+	    kkif->pfik_group ? (struct ifg_group *)0xfeedc0de : NULL;
 }
 
 void

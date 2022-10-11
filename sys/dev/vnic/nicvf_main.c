@@ -127,9 +127,7 @@ static driver_t nicvf_driver = {
 	sizeof(struct nicvf),
 };
 
-static devclass_t nicvf_devclass;
-
-DRIVER_MODULE(vnicvf, pci, nicvf_driver, nicvf_devclass, 0, 0);
+DRIVER_MODULE(vnicvf, pci, nicvf_driver, 0, 0);
 MODULE_VERSION(vnicvf, 1);
 MODULE_DEPEND(vnicvf, pci, 1, 1, 1);
 MODULE_DEPEND(vnicvf, ether, 1, 1, 1);
@@ -485,16 +483,14 @@ nicvf_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			if (if_getdrvflags(ifp) & IFF_DRV_RUNNING) {
 				if ((flags ^ nic->if_flags) & IFF_PROMISC) {
 					/* Change promiscous mode */
-#if 0
-					/* ARM64TODO */
+#if 0 /* XXX */
 					nicvf_set_promiscous(nic);
 #endif
 				}
 
 				if ((flags ^ nic->if_flags) & IFF_ALLMULTI) {
 					/* Change multicasting settings */
-#if 0
-					/* ARM64TODO */
+#if 0 /* XXX */
 					nicvf_set_multicast(nic);
 #endif
 				}
@@ -1252,7 +1248,7 @@ nicvf_release_all_interrupts(struct nicvf *nic)
 {
 	struct resource *res;
 	int irq;
-	int err;
+	int err __diagused;
 
 	/* Free registered interrupts */
 	for (irq = 0; irq < nic->num_vec; irq++) {

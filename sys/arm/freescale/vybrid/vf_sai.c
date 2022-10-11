@@ -222,11 +222,11 @@ static int
 saimixer_set(struct snd_mixer *m, unsigned dev,
     unsigned left, unsigned right)
 {
+#if 0
 	struct sc_pcminfo *scp;
 
 	scp = mix_getdevinfo(m);
 
-#if 0
 	device_printf(scp->dev, "saimixer_set() %d %d\n",
 	    left, right);
 #endif
@@ -799,6 +799,6 @@ static driver_t sai_pcm_driver = {
 	PCM_SOFTC_SIZE,
 };
 
-DRIVER_MODULE(sai, simplebus, sai_pcm_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(sai, simplebus, sai_pcm_driver, 0, 0);
 MODULE_DEPEND(sai, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(sai, 1);

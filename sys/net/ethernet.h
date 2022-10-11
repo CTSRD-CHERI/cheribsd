@@ -8,6 +8,8 @@
 #ifndef _NET_ETHERNET_H_
 #define	_NET_ETHERNET_H_
 
+#include <sys/types.h>
+
 /*
  * Some basic Ethernet constants.
  */
@@ -43,7 +45,7 @@
 #define	M_HASFCS	M_PROTO5	/* FCS included at end of frame */
 
 /*
- * Ethernet CRC32 polynomials (big- and little-endian verions).
+ * Ethernet CRC32 polynomials (big- and little-endian versions).
  */
 #define	ETHER_CRC_POLY_LE	0xedb88320
 #define	ETHER_CRC_POLY_BE	0x04c11db6
@@ -416,8 +418,8 @@ struct ether_vlan_header {
 #define	IEEE8021Q_PCP_BE	0	/* Best effort (default) */
 #define	IEEE8021Q_PCP_EE	2	/* Excellent effort */
 #define	IEEE8021Q_PCP_CA	3	/* Critical applications */
-#define	IEEE8021Q_PCP_VI	4	/* Video, < 100ms latency */
-#define	IEEE8021Q_PCP_VO	5	/* Video, < 10ms latency */
+#define	IEEE8021Q_PCP_VI	4	/* Video, < 100ms latency and jitter */
+#define	IEEE8021Q_PCP_VO	5	/* Voice, < 10ms latency and jitter */
 #define	IEEE8021Q_PCP_IC	6	/* Internetwork control */
 #define	IEEE8021Q_PCP_NC	7	/* Network control (highest) */
 

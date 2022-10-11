@@ -32,6 +32,10 @@
  * $FreeBSD$
  */
 
+#ifdef __i386__
+#include <i386/profile.h>
+#else /* !__i386__ */
+
 #ifndef _MACHINE_PROFILE_H_
 #define	_MACHINE_PROFILE_H_
 
@@ -45,7 +49,6 @@
 static void _mcount(uintfptr_t frompc, uintfptr_t selfpc) __used; \
 static void _mcount
 
-#ifdef __GNUCLIKE_ASM
 #define	MCOUNT __asm("			\n\
 	.text				\n\
 	.p2align 4,0x90			\n\
@@ -101,9 +104,6 @@ mcount()								\
 	_mcount(frompc, selfpc);					\
 }
 #endif
-#else /* !__GNUCLIKE_ASM */
-#define	MCOUNT
-#endif /* __GNUCLIKE_ASM */
 
 typedef	u_long	uintfptr_t;
 
@@ -114,11 +114,11 @@ typedef	u_long	uintfptr_t;
 typedef	u_long	fptrdiff_t;
 
 __BEGIN_DECLS
-#ifdef __GNUCLIKE_ASM
 void	mcount(void) __asm(".mcount");
-#endif
 __END_DECLS
 
 #endif /* !_KERNEL */
 
 #endif /* !_MACHINE_PROFILE_H_ */
+
+#endif /* __i386__ */

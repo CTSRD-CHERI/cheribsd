@@ -1287,8 +1287,8 @@ addchan(struct ieee80211_channel chans[], int maxchans, int *nchans,
 		return (ENOBUFS);
 
 #if 0
-	printf("%s: %d: ieee=%d, freq=%d, flags=0x%08x\n",
-	    __func__, *nchans, ieee, freq, flags);
+	printf("%s: %d of %d: ieee=%d, freq=%d, flags=0x%08x\n",
+	    __func__, *nchans, maxchans, ieee, freq, flags);
 #endif
 
 	c = &chans[(*nchans)++];
@@ -1317,8 +1317,8 @@ copychan_prev(struct ieee80211_channel chans[], int maxchans, int *nchans,
 		return (ENOBUFS);
 
 #if 0
-	printf("%s: %d: flags=0x%08x\n",
-	    __func__, *nchans, flags);
+	printf("%s: %d of %d: flags=0x%08x\n",
+	    __func__, *nchans, maxchans, flags);
 #endif
 
 	c = &chans[(*nchans)++];
@@ -1818,6 +1818,8 @@ ieee80211_lookup_channel_rxstatus(struct ieee80211vap *vap,
 		return (NULL);
 	if ((rxs->r_flags & IEEE80211_R_IEEE) == 0)
 		return (NULL);
+	if ((rxs->r_flags & IEEE80211_R_BAND) == 0)
+		return (NULL);
 
 	/*
 	 * If the rx status contains a valid ieee/freq, then
@@ -1828,11 +1830,20 @@ ieee80211_lookup_channel_rxstatus(struct ieee80211vap *vap,
 	 */
 
 	/* Determine a band */
-	/* XXX should be done by the driver? */
-	if (rxs->c_freq < 3000) {
+	switch (rxs->c_band) {
+	case IEEE80211_CHAN_2GHZ:
 		flags = IEEE80211_CHAN_G;
-	} else {
+		break;
+	case IEEE80211_CHAN_5GHZ:
 		flags = IEEE80211_CHAN_A;
+		break;
+	default:
+		if (rxs->c_freq < 3000) {
+			flags = IEEE80211_CHAN_G;
+		} else {
+			flags = IEEE80211_CHAN_A;
+		}
+		break;
 	}
 
 	/* Channel lookup */
@@ -2193,7 +2204,11 @@ media_status(enum ieee80211_opmode opmode, const struct ieee80211_channel *chan)
 		status |= IFM_IEEE80211_MBSS;
 		break;
 	}
-	if (IEEE80211_IS_CHAN_HTA(chan)) {
+	if (IEEE80211_IS_CHAN_VHT_5GHZ(chan)) {
+		status |= IFM_IEEE80211_VHT5G;
+	} else if (IEEE80211_IS_CHAN_VHT_2GHZ(chan)) {
+		status |= IFM_IEEE80211_VHT2G;
+	} else if (IEEE80211_IS_CHAN_HTA(chan)) {
 		status |= IFM_IEEE80211_11NA;
 	} else if (IEEE80211_IS_CHAN_HTG(chan)) {
 		status |= IFM_IEEE80211_11NG;

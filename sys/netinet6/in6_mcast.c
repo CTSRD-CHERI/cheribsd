@@ -374,8 +374,17 @@ in6_getmulti(struct ifnet *ifp, const struct in6_addr *group,
 	IN6_MULTI_LIST_LOCK();
 	IF_ADDR_WLOCK(ifp);
 	NET_EPOCH_ENTER(et);
-	inm = in6m_lookup_locked(ifp, group);
+	/*
+	 * Does ifp support IPv6 multicasts?
+	 */
+	if (ifp->if_afdata[AF_INET6] == NULL)
+		error = ENODEV;
+	else
+		inm = in6m_lookup_locked(ifp, group);
 	NET_EPOCH_EXIT(et);
+
+	if (error != 0)
+		goto out_locked;
 
 	if (inm != NULL) {
 		/*
@@ -1393,6 +1402,7 @@ static int
 in6p_block_unblock_source(struct inpcb *inp, struct sockopt *sopt)
 {
 	struct group_source_req		 gsr;
+	struct epoch_tracker		 et;
 	sockunion_t			*gsa, *ssa;
 	struct ifnet			*ifp;
 	struct in6_mfilter		*imf;
@@ -1430,10 +1440,16 @@ in6p_block_unblock_source(struct inpcb *inp, struct sockopt *sopt)
 		    ssa->sin6.sin6_len != sizeof(struct sockaddr_in6))
 			return (EINVAL);
 
-		if (gsr.gsr_interface == 0 || V_if_index < gsr.gsr_interface)
-			return (EADDRNOTAVAIL);
-
+		/*
+		 * XXXGL: this function should use ifnet_byindex_ref, or
+		 * expand the epoch section all the way to where we put
+		 * the reference.
+		 */
+		NET_EPOCH_ENTER(et);
 		ifp = ifnet_byindex(gsr.gsr_interface);
+		NET_EPOCH_EXIT(et);
+		if (ifp == NULL)
+			return (EADDRNOTAVAIL);
 
 		if (sopt->sopt_name == MCAST_BLOCK_SOURCE)
 			doblock = 1;
@@ -1620,6 +1636,7 @@ ip6_freemoptions(struct ip6_moptions *imo)
 static int
 in6p_get_source_filters(struct inpcb *inp, struct sockopt *sopt)
 {
+	struct epoch_tracker	 et;
 	struct __msfilterreq	 msfr;
 	sockunion_t		*gsa;
 	struct ifnet		*ifp;
@@ -1653,9 +1670,13 @@ in6p_get_source_filters(struct inpcb *inp, struct sockopt *sopt)
 	if (!IN6_IS_ADDR_MULTICAST(&gsa->sin6.sin6_addr))
 		return (EINVAL);
 
-	if (msfr.msfr_ifindex == 0 || V_if_index < msfr.msfr_ifindex)
-		return (EADDRNOTAVAIL);
+	/*
+	 * XXXGL: this function should use ifnet_byindex_ref, or expand the
+	 * epoch section all the way to where the interface is referenced.
+	 */
+	NET_EPOCH_ENTER(et);
 	ifp = ifnet_byindex(msfr.msfr_ifindex);
+	NET_EPOCH_EXIT(et);
 	if (ifp == NULL)
 		return (EADDRNOTAVAIL);
 	(void)in6_setscope(&gsa->sin6.sin6_addr, ifp, NULL);
@@ -1849,12 +1870,16 @@ in6p_lookup_mcast_ifp(const struct inpcb *inp, const struct sockaddr_in6 *gsin6)
  *
  * FIXME: The KAME use of the unspecified address (::)
  * to join *all* multicast groups is currently unsupported.
+ *
+ * XXXGL: this function multiple times uses ifnet_byindex() without
+ * proper protection - staying in epoch, or putting reference on ifnet.
  */
 static int
 in6p_join_group(struct inpcb *inp, struct sockopt *sopt)
 {
 	struct in6_multi_head		 inmh;
 	struct group_source_req		 gsr;
+	struct epoch_tracker		 et;
 	sockunion_t			*gsa, *ssa;
 	struct ifnet			*ifp;
 	struct in6_mfilter		*imf;
@@ -1896,9 +1921,11 @@ in6p_join_group(struct inpcb *inp, struct sockopt *sopt)
 		if (mreq.ipv6mr_interface == 0) {
 			ifp = in6p_lookup_mcast_ifp(inp, &gsa->sin6);
 		} else {
-			if (V_if_index < mreq.ipv6mr_interface)
-				return (EADDRNOTAVAIL);
+			NET_EPOCH_ENTER(et);
 			ifp = ifnet_byindex(mreq.ipv6mr_interface);
+			NET_EPOCH_EXIT(et);
+			if (ifp == NULL)
+				return (EADDRNOTAVAIL);
 		}
 		CTR3(KTR_MLD, "%s: ipv6mr_interface = %d, ifp = %p",
 		    __func__, mreq.ipv6mr_interface, ifp);
@@ -1937,10 +1964,11 @@ in6p_join_group(struct inpcb *inp, struct sockopt *sopt)
 			ssa->sin6.sin6_port = 0;
 			ssa->sin6.sin6_scope_id = 0;
 		}
-
-		if (gsr.gsr_interface == 0 || V_if_index < gsr.gsr_interface)
-			return (EADDRNOTAVAIL);
+		NET_EPOCH_ENTER(et);
 		ifp = ifnet_byindex(gsr.gsr_interface);
+		NET_EPOCH_EXIT(et);
+		if (ifp == NULL)
+			return (EADDRNOTAVAIL);
 		break;
 
 	default:
@@ -2030,7 +2058,7 @@ in6p_join_group(struct inpcb *inp, struct sockopt *sopt)
 			 * state at t1, because allocation of a filter
 			 * is atomic with allocation of a membership.
 			 */
-			error = EINVAL;
+			error = EADDRINUSE;
 			goto out_in6p_locked;
 		}
 	}
@@ -2159,6 +2187,7 @@ in6p_leave_group(struct inpcb *inp, struct sockopt *sopt)
 {
 	struct ipv6_mreq		 mreq;
 	struct group_source_req		 gsr;
+	struct epoch_tracker		 et;
 	sockunion_t			*gsa, *ssa;
 	struct ifnet			*ifp;
 	struct in6_mfilter		*imf;
@@ -2257,9 +2286,9 @@ in6p_leave_group(struct inpcb *inp, struct sockopt *sopt)
 	 * XXX SCOPE6 lock potentially taken here.
 	 */
 	if (ifindex != 0) {
-		if (V_if_index < ifindex)
-			return (EADDRNOTAVAIL);
+		NET_EPOCH_ENTER(et);
 		ifp = ifnet_byindex(ifindex);
+		NET_EPOCH_EXIT(et);	/* XXXGL: unsafe ifp */
 		if (ifp == NULL)
 			return (EADDRNOTAVAIL);
 		(void)in6_setscope(&gsa->sin6.sin6_addr, ifp, NULL);
@@ -2284,7 +2313,9 @@ in6p_leave_group(struct inpcb *inp, struct sockopt *sopt)
 			    ip6_sprintf(ip6tbuf, &gsa->sin6.sin6_addr));
 			ifp = in6p_lookup_mcast_ifp(inp, &gsa->sin6);
 		} else {
+			NET_EPOCH_ENTER(et);
 			ifp = ifnet_byindex(ifindex);
+			NET_EPOCH_EXIT(et);	/* XXXGL: unsafe ifp */
 		}
 		if (ifp == NULL)
 			return (EADDRNOTAVAIL);
@@ -2401,6 +2432,7 @@ out_in6p_locked:
 static int
 in6p_set_multicast_if(struct inpcb *inp, struct sockopt *sopt)
 {
+	struct epoch_tracker	 et;
 	struct ifnet		*ifp;
 	struct ip6_moptions	*imo;
 	u_int			 ifindex;
@@ -2412,17 +2444,17 @@ in6p_set_multicast_if(struct inpcb *inp, struct sockopt *sopt)
 	error = sooptcopyin(sopt, &ifindex, sizeof(u_int), sizeof(u_int));
 	if (error)
 		return (error);
-	if (V_if_index < ifindex)
-		return (EINVAL);
+	NET_EPOCH_ENTER(et);
 	if (ifindex == 0)
 		ifp = NULL;
 	else {
 		ifp = ifnet_byindex(ifindex);
-		if (ifp == NULL)
-			return (EINVAL);
-		if ((ifp->if_flags & IFF_MULTICAST) == 0)
+		if (ifp == NULL || (ifp->if_flags & IFF_MULTICAST) == 0) {
+			NET_EPOCH_EXIT(et);
 			return (EADDRNOTAVAIL);
+		}
 	}
+	NET_EPOCH_EXIT(et);	/* XXXGL: unsafe ifp */
 	imo = in6p_findmoptions(inp);
 	imo->im6o_multicast_ifp = ifp;
 	INP_WUNLOCK(inp);
@@ -2433,12 +2465,13 @@ in6p_set_multicast_if(struct inpcb *inp, struct sockopt *sopt)
 /*
  * Atomically set source filters on a socket for an IPv6 multicast group.
  *
- * SMPng: NOTE: Potentially calls malloc(M_WAITOK) with Giant held.
+ * XXXGL: unsafely exits epoch with ifnet pointer
  */
 static int
 in6p_set_source_filters(struct inpcb *inp, struct sockopt *sopt)
 {
 	struct __msfilterreq	 msfr;
+	struct epoch_tracker	 et;
 	sockunion_t		*gsa;
 	struct ifnet		*ifp;
 	struct in6_mfilter	*imf;
@@ -2468,9 +2501,9 @@ in6p_set_source_filters(struct inpcb *inp, struct sockopt *sopt)
 
 	gsa->sin6.sin6_port = 0;	/* ignore port */
 
-	if (msfr.msfr_ifindex == 0 || V_if_index < msfr.msfr_ifindex)
-		return (EADDRNOTAVAIL);
+	NET_EPOCH_ENTER(et);
 	ifp = ifnet_byindex(msfr.msfr_ifindex);
+	NET_EPOCH_EXIT(et);
 	if (ifp == NULL)
 		return (EADDRNOTAVAIL);
 	(void)in6_setscope(&gsa->sin6.sin6_addr, ifp, NULL);
@@ -2749,13 +2782,6 @@ sysctl_ip6_mcast_filters(SYSCTL_HANDLER_ARGS)
 	if (namelen != 5)
 		return (EINVAL);
 
-	ifindex = name[0];
-	if (ifindex <= 0 || ifindex > V_if_index) {
-		CTR2(KTR_MLD, "%s: ifindex %u out of range",
-		    __func__, ifindex);
-		return (ENOENT);
-	}
-
 	memcpy(&mcaddr, &name[1], sizeof(struct in6_addr));
 	if (!IN6_IS_ADDR_MULTICAST(&mcaddr)) {
 		CTR2(KTR_MLD, "%s: group %s is not multicast",
@@ -2763,6 +2789,7 @@ sysctl_ip6_mcast_filters(SYSCTL_HANDLER_ARGS)
 		return (EINVAL);
 	}
 
+	ifindex = name[0];
 	NET_EPOCH_ENTER(et);
 	ifp = ifnet_byindex(ifindex);
 	if (ifp == NULL) {

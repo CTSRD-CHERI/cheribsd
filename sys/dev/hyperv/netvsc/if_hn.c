@@ -83,6 +83,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/taskqueue.h>
 #include <sys/buf_ring.h>
 #include <sys/eventhandler.h>
+#include <sys/epoch.h>
 
 #include <machine/atomic.h>
 #include <machine/in_cksum.h>
@@ -453,14 +454,16 @@ static void			hn_start_txeof(struct hn_tx_ring *);
 static void			hn_start_txeof_taskfunc(void *, int);
 #endif
 
+static int			hn_rsc_sysctl(SYSCTL_HANDLER_ARGS);
+
 SYSCTL_NODE(_hw, OID_AUTO, hn, CTLFLAG_RD | CTLFLAG_MPSAFE, NULL,
     "Hyper-V network interface");
 
-/* Trust tcp segements verification on host side. */
+/* Trust tcp segment verification on host side. */
 static int			hn_trust_hosttcp = 1;
 SYSCTL_INT(_hw_hn, OID_AUTO, trust_hosttcp, CTLFLAG_RDTUN,
     &hn_trust_hosttcp, 0,
-    "Trust tcp segement verification on host side, "
+    "Trust tcp segment verification on host side, "
     "when csum info is missing (global setting)");
 
 /* Trust udp datagrams verification on host side. */
@@ -658,9 +661,7 @@ static driver_t hn_driver = {
 	sizeof(struct hn_softc)
 };
 
-static devclass_t hn_devclass;
-
-DRIVER_MODULE(hn, vmbus, hn_driver, hn_devclass, 0, 0);
+DRIVER_MODULE(hn, vmbus, hn_driver, 0, 0);
 MODULE_VERSION(hn, 1);
 MODULE_DEPEND(hn, vmbus, 1, 1, 1);
 
@@ -2369,6 +2370,10 @@ hn_attach(device_t dev)
 		    "Accurate BPF for transparent VF");
 	}
 
+	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "rsc_switch",
+	    CTLTYPE_UINT | CTLFLAG_RW, sc, 0, hn_rsc_sysctl, "A",
+	    "switch to rsc");
+
 	/*
 	 * Setup the ifmedia, which has been initialized earlier.
 	 */
@@ -2709,7 +2714,7 @@ hn_txdesc_put(struct hn_tx_ring *txr, struct hn_txdesc *txd)
 		struct hn_txdesc *tmp_txd;
 
 		while ((tmp_txd = STAILQ_FIRST(&txd->agg_list)) != NULL) {
-			int freed;
+			int freed __diagused;
 
 			KASSERT(STAILQ_EMPTY(&tmp_txd->agg_list),
 			    ("resursive aggregation on aggregated txdesc"));
@@ -2883,7 +2888,11 @@ static void
 hn_chan_rollup(struct hn_rx_ring *rxr, struct hn_tx_ring *txr)
 {
 #if defined(INET) || defined(INET6)
+	struct epoch_tracker et;
+
+	NET_EPOCH_ENTER(et);
 	tcp_lro_flush_all(&rxr->hn_lro);
+	NET_EPOCH_EXIT(et);
 #endif
 
 	/*
@@ -3204,7 +3213,7 @@ hn_encap(struct ifnet *ifp, struct hn_tx_ring *txr, struct hn_txdesc *txd,
 
 	error = hn_txdesc_dmamap_load(txr, txd, &m_head, segs, &nsegs);
 	if (__predict_false(error)) {
-		int freed;
+		int freed __diagused;
 
 		/*
 		 * This mbuf is not linked w/ the txd yet, so free it now.
@@ -3308,7 +3317,7 @@ again:
 		hn_txdesc_put(txr, txd);
 
 	if (__predict_false(error)) {
-		int freed;
+		int freed __diagused;
 
 		/*
 		 * This should "really rarely" happen.
@@ -4562,6 +4571,30 @@ hn_rxfilter_sysctl(SYSCTL_HANDLER_ARGS)
 	return sysctl_handle_string(oidp, filter_str, sizeof(filter_str), req);
 }
 
+static int
+hn_rsc_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	struct hn_softc *sc = arg1;
+	uint32_t mtu;
+	int error;
+	HN_LOCK(sc);
+	error = hn_rndis_get_mtu(sc, &mtu);
+	if (error) {
+		if_printf(sc->hn_ifp, "failed to get mtu\n");
+		goto back;
+	}
+	error = SYSCTL_OUT(req, &(sc->hn_rsc_ctrl), sizeof(sc->hn_rsc_ctrl));
+	if (error || req->newptr == NULL)
+		goto back;
+
+	error = SYSCTL_IN(req, &(sc->hn_rsc_ctrl), sizeof(sc->hn_rsc_ctrl));
+	if (error)
+		goto back;
+	error = hn_rndis_reconf_offload(sc, mtu);
+back:
+	HN_UNLOCK(sc);
+	return (error);
+}
 #ifndef RSS
 
 static int
@@ -4731,11 +4764,13 @@ hn_vflist_sysctl(SYSCTL_HANDLER_ARGS)
 
 	first = true;
 	for (i = 0; i < hn_vfmap_size; ++i) {
+		struct epoch_tracker et;
 		struct ifnet *ifp;
 
 		if (hn_vfmap[i] == NULL)
 			continue;
 
+		NET_EPOCH_ENTER(et);
 		ifp = ifnet_byindex(i);
 		if (ifp != NULL) {
 			if (first)
@@ -4744,6 +4779,7 @@ hn_vflist_sysctl(SYSCTL_HANDLER_ARGS)
 				sbuf_printf(sb, " %s", ifp->if_xname);
 			first = false;
 		}
+		NET_EPOCH_EXIT(et);
 	}
 
 	rm_runlock(&hn_vfmap_lock, &pt);
@@ -4773,12 +4809,14 @@ hn_vfmap_sysctl(SYSCTL_HANDLER_ARGS)
 
 	first = true;
 	for (i = 0; i < hn_vfmap_size; ++i) {
+		struct epoch_tracker et;
 		struct ifnet *ifp, *hn_ifp;
 
 		hn_ifp = hn_vfmap[i];
 		if (hn_ifp == NULL)
 			continue;
 
+		NET_EPOCH_ENTER(et);
 		ifp = ifnet_byindex(i);
 		if (ifp != NULL) {
 			if (first) {
@@ -4790,6 +4828,7 @@ hn_vfmap_sysctl(SYSCTL_HANDLER_ARGS)
 			}
 			first = false;
 		}
+		NET_EPOCH_EXIT(et);
 	}
 
 	rm_runlock(&hn_vfmap_lock, &pt);
@@ -5050,21 +5089,25 @@ hn_create_rx_data(struct hn_softc *sc, int ring_cnt)
 			if (rxr->hn_rx_sysctl_tree != NULL) {
 				SYSCTL_ADD_ULONG(ctx,
 				    SYSCTL_CHILDREN(rxr->hn_rx_sysctl_tree),
-				    OID_AUTO, "packets", CTLFLAG_RW,
-				    &rxr->hn_pkts, "# of packets received");
+				    OID_AUTO, "packets",
+				    CTLFLAG_RW | CTLFLAG_STATS, &rxr->hn_pkts,
+				    "# of packets received");
 				SYSCTL_ADD_ULONG(ctx,
 				    SYSCTL_CHILDREN(rxr->hn_rx_sysctl_tree),
-				    OID_AUTO, "rss_pkts", CTLFLAG_RW,
+				    OID_AUTO, "rss_pkts",
+				    CTLFLAG_RW | CTLFLAG_STATS,
 				    &rxr->hn_rss_pkts,
 				    "# of packets w/ RSS info received");
 				SYSCTL_ADD_ULONG(ctx,
 				    SYSCTL_CHILDREN(rxr->hn_rx_sysctl_tree),
-				    OID_AUTO, "rsc_pkts", CTLFLAG_RW,
+				    OID_AUTO, "rsc_pkts",
+				    CTLFLAG_RW | CTLFLAG_STATS,
 				    &rxr->hn_rsc_pkts,
 				    "# of RSC packets received");
 				SYSCTL_ADD_ULONG(ctx,
 				    SYSCTL_CHILDREN(rxr->hn_rx_sysctl_tree),
-				    OID_AUTO, "rsc_drop", CTLFLAG_RW,
+				    OID_AUTO, "rsc_drop",
+				    CTLFLAG_RW | CTLFLAG_STATS,
 				    &rxr->hn_rsc_drop,
 				    "# of RSC fragments dropped");
 				SYSCTL_ADD_INT(ctx,
@@ -5077,7 +5120,7 @@ hn_create_rx_data(struct hn_softc *sc, int ring_cnt)
 	}
 
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "lro_queued",
-	    CTLTYPE_U64 | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	    CTLTYPE_U64 | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_STATS , sc,
 	    __offsetof(struct hn_rx_ring, hn_lro.lro_queued),
 #if __FreeBSD_version < 1100095
 	    hn_rx_stat_int_sysctl,
@@ -5086,7 +5129,7 @@ hn_create_rx_data(struct hn_softc *sc, int ring_cnt)
 #endif
 	    "LU", "LRO queued");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "lro_flushed",
-	    CTLTYPE_U64 | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	    CTLTYPE_U64 | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_STATS , sc,
 	    __offsetof(struct hn_rx_ring, hn_lro.lro_flushed),
 #if __FreeBSD_version < 1100095
 	    hn_rx_stat_int_sysctl,
@@ -5095,7 +5138,7 @@ hn_create_rx_data(struct hn_softc *sc, int ring_cnt)
 #endif
 	    "LU", "LRO flushed");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "lro_tried",
-	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_STATS , sc,
 	    __offsetof(struct hn_rx_ring, hn_lro_tried),
 	    hn_rx_stat_ulong_sysctl, "LU", "# of LRO tries");
 #if __FreeBSD_version >= 1100099
@@ -5111,7 +5154,7 @@ hn_create_rx_data(struct hn_softc *sc, int ring_cnt)
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "trust_hosttcp",
 	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, sc, HN_TRUST_HCSUM_TCP,
 	    hn_trust_hcsum_sysctl, "I",
-	    "Trust tcp segement verification on host side, "
+	    "Trust tcp segment verification on host side, "
 	    "when csum info is missing");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "trust_hostudp",
 	    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, sc, HN_TRUST_HCSUM_UDP,
@@ -5124,15 +5167,15 @@ hn_create_rx_data(struct hn_softc *sc, int ring_cnt)
 	    "Trust ip packet verification on host side, "
 	    "when csum info is missing");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "csum_ip",
-	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_STATS , sc,
 	    __offsetof(struct hn_rx_ring, hn_csum_ip),
 	    hn_rx_stat_ulong_sysctl, "LU", "RXCSUM IP");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "csum_tcp",
-	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_STATS , sc,
 	    __offsetof(struct hn_rx_ring, hn_csum_tcp),
 	    hn_rx_stat_ulong_sysctl, "LU", "RXCSUM TCP");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "csum_udp",
-	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_STATS , sc,
 	    __offsetof(struct hn_rx_ring, hn_csum_udp),
 	    hn_rx_stat_ulong_sysctl, "LU", "RXCSUM UDP");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "csum_trusted",
@@ -5141,11 +5184,11 @@ hn_create_rx_data(struct hn_softc *sc, int ring_cnt)
 	    hn_rx_stat_ulong_sysctl, "LU",
 	    "# of packets that we trust host's csum verification");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "small_pkts",
-	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_STATS , sc,
 	    __offsetof(struct hn_rx_ring, hn_small_pkts),
 	    hn_rx_stat_ulong_sysctl, "LU", "# of small packets received");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "rx_ack_failed",
-	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_STATS , sc,
 	    __offsetof(struct hn_rx_ring, hn_ack_failed),
 	    hn_rx_stat_ulong_sysctl, "LU", "# of RXBUF ack failures");
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "rx_ring_cnt",
@@ -5386,10 +5429,11 @@ hn_tx_ring_create(struct hn_softc *sc, int id)
 				    "over active");
 			}
 			SYSCTL_ADD_ULONG(ctx, child, OID_AUTO, "packets",
-			    CTLFLAG_RW, &txr->hn_pkts,
+			    CTLFLAG_RW | CTLFLAG_STATS, &txr->hn_pkts,
 			    "# of packets transmitted");
 			SYSCTL_ADD_ULONG(ctx, child, OID_AUTO, "sends",
-			    CTLFLAG_RW, &txr->hn_sends, "# of sends");
+			    CTLFLAG_RW | CTLFLAG_STATS, &txr->hn_sends,
+			    "# of sends");
 		}
 	}
 
@@ -5419,7 +5463,7 @@ hn_txdesc_gc(struct hn_tx_ring *txr, struct hn_txdesc *txd)
 
 	/* Aggregated txds will be freed by their aggregating txd. */
 	if (txd->refs > 0 && (txd->flags & HN_TXD_FLAG_ONAGG) == 0) {
-		int freed;
+		int freed __diagused;
 
 		freed = hn_txdesc_put(txr, txd);
 		KASSERT(freed, ("can't free txdesc"));
@@ -5512,32 +5556,32 @@ hn_create_tx_data(struct hn_softc *sc, int ring_cnt)
 	}
 
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "no_txdescs",
-	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_STATS, sc,
 	    __offsetof(struct hn_tx_ring, hn_no_txdescs),
 	    hn_tx_stat_ulong_sysctl, "LU", "# of times short of TX descs");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "send_failed",
-	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_STATS, sc,
 	    __offsetof(struct hn_tx_ring, hn_send_failed),
 	    hn_tx_stat_ulong_sysctl, "LU", "# of hyper-v sending failure");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "txdma_failed",
-	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_STATS, sc,
 	    __offsetof(struct hn_tx_ring, hn_txdma_failed),
 	    hn_tx_stat_ulong_sysctl, "LU", "# of TX DMA failure");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "agg_flush_failed",
-	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_STATS, sc,
 	    __offsetof(struct hn_tx_ring, hn_flush_failed),
 	    hn_tx_stat_ulong_sysctl, "LU",
 	    "# of packet transmission aggregation flush failure");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "tx_collapsed",
-	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_STATS, sc,
 	    __offsetof(struct hn_tx_ring, hn_tx_collapsed),
 	    hn_tx_stat_ulong_sysctl, "LU", "# of TX mbuf collapsed");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "tx_chimney",
-	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_STATS, sc,
 	    __offsetof(struct hn_tx_ring, hn_tx_chimney),
 	    hn_tx_stat_ulong_sysctl, "LU", "# of chimney send");
 	SYSCTL_ADD_PROC(ctx, child, OID_AUTO, "tx_chimney_tried",
-	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE, sc,
+	    CTLTYPE_ULONG | CTLFLAG_RW | CTLFLAG_MPSAFE | CTLFLAG_STATS, sc,
 	    __offsetof(struct hn_tx_ring, hn_tx_chimney_tried),
 	    hn_tx_stat_ulong_sysctl, "LU", "# of chimney send tries");
 	SYSCTL_ADD_INT(ctx, child, OID_AUTO, "txdesc_cnt",
@@ -7459,6 +7503,7 @@ static void
 hn_nvs_handle_rxbuf(struct hn_rx_ring *rxr, struct vmbus_channel *chan,
     const struct vmbus_chanpkt_hdr *pkthdr)
 {
+	struct epoch_tracker et;
 	const struct vmbus_chanpkt_rxbuf *pkt;
 	const struct hn_nvs_hdr *nvs_hdr;
 	int count, i, hlen;
@@ -7496,6 +7541,7 @@ hn_nvs_handle_rxbuf(struct hn_rx_ring *rxr, struct vmbus_channel *chan,
 		return;
 	}
 
+	NET_EPOCH_ENTER(et);
 	/* Each range represents 1 RNDIS pkt that contains 1 Ethernet frame */
 	for (i = 0; i < count; ++i) {
 		int ofs, len;
@@ -7511,6 +7557,7 @@ hn_nvs_handle_rxbuf(struct hn_rx_ring *rxr, struct vmbus_channel *chan,
 		rxr->rsc.is_last = (i == (count - 1));
 		hn_rndis_rxpkt(rxr, rxr->hn_rxbuf + ofs, len);
 	}
+	NET_EPOCH_EXIT(et);
 
 	/*
 	 * Ack the consumed RXBUF associated w/ this channel packet,

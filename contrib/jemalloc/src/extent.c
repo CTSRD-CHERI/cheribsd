@@ -175,7 +175,7 @@ extent_lock_from_addr(tsdn_t *tsdn, rtree_ctx_t *rtree_ctx, void *addr,
     bool inactive_only) {
 	extent_t *ret = NULL;
 	rtree_leaf_elm_t *elm = rtree_leaf_elm_lookup(tsdn, &extents_rtree,
-	    rtree_ctx, (vaddr_t)addr, false, false);
+	    rtree_ctx, (uintptr_t)addr, false, false);
 	if (elm == NULL) {
 		return NULL;
 	}
@@ -430,11 +430,11 @@ extents_fit_alignment(extents_t *extents, size_t min_size, size_t max_size,
 		assert(i < SC_NPSIZES);
 		assert(!extent_heap_empty(&extents->heaps[i]));
 		extent_t *extent = extent_heap_first(&extents->heaps[i]);
-		vaddr_t base = (vaddr_t)extent_base_get(extent);
+		uintptr_t base = (uintptr_t)extent_base_get(extent);
 		size_t candidate_size = extent_size_get(extent);
 		assert(candidate_size >= min_size);
 
-		vaddr_t next_align = ALIGNMENT_CEILING(base,
+		uintptr_t next_align = ALIGNMENT_CEILING((uintptr_t)base,
 		    PAGE_CEILING(alignment));
 		if (base > next_align || base + candidate_size <= next_align) {
 			/* Overflow or not crossing the next alignment. */
@@ -721,14 +721,14 @@ extent_rtree_leaf_elms_lookup(tsdn_t *tsdn, rtree_ctx_t *rtree_ctx,
     const extent_t *extent, bool dependent, bool init_missing,
     rtree_leaf_elm_t **r_elm_a, rtree_leaf_elm_t **r_elm_b) {
 	*r_elm_a = rtree_leaf_elm_lookup(tsdn, &extents_rtree, rtree_ctx,
-	    (vaddr_t)extent_base_get(extent), dependent, init_missing);
+	    (uintptr_t)extent_base_get(extent), dependent, init_missing);
 	if (!dependent && *r_elm_a == NULL) {
 		return true;
 	}
 	assert(*r_elm_a != NULL);
 
 	*r_elm_b = rtree_leaf_elm_lookup(tsdn, &extents_rtree, rtree_ctx,
-	    (vaddr_t)extent_last_get(extent), dependent, init_missing);
+	    (uintptr_t)extent_last_get(extent), dependent, init_missing);
 	if (!dependent && *r_elm_b == NULL) {
 		return true;
 	}
@@ -755,7 +755,7 @@ extent_interior_register(tsdn_t *tsdn, rtree_ctx_t *rtree_ctx, extent_t *extent,
 	/* Register interior. */
 	for (size_t i = 1; i < (extent_size_get(extent) >> LG_PAGE) - 1; i++) {
 		rtree_write(tsdn, &extents_rtree, rtree_ctx,
-		    (vaddr_t)extent_base_get(extent) + (vaddr_t)(i <<
+		    (uintptr_t)extent_base_get(extent) + (uintptr_t)(i <<
 		    LG_PAGE), extent, szind, true);
 	}
 }
@@ -863,7 +863,7 @@ extent_interior_deregister(tsdn_t *tsdn, rtree_ctx_t *rtree_ctx,
 
 	for (i = 1; i < (extent_size_get(extent) >> LG_PAGE) - 1; i++) {
 		rtree_clear(tsdn, &extents_rtree, rtree_ctx,
-		    (vaddr_t)extent_base_get(extent) + (vaddr_t)(i <<
+		    (uintptr_t)extent_base_get(extent) + (uintptr_t)(i <<
 		    LG_PAGE));
 	}
 }
@@ -1006,8 +1006,8 @@ extent_split_interior(tsdn_t *tsdn, arena_t *arena,
     void *new_addr, size_t size, size_t pad, size_t alignment, bool slab,
     szind_t szind, bool growing_retained) {
 	size_t esize = size + pad;
-	size_t leadsize = ALIGNMENT_CEILING((vaddr_t)extent_base_get(*extent),
-	    PAGE_CEILING(alignment)) - (vaddr_t)extent_base_get(*extent);
+	size_t leadsize = ALIGNMENT_CEILING((uintptr_t)extent_base_get(*extent),
+	    PAGE_CEILING(alignment)) - (uintptr_t)extent_base_get(*extent);
 	assert(new_addr == NULL || leadsize == 0);
 	if (extent_size_get(*extent) < leadsize + esize) {
 		return extent_split_interior_cant_alloc;
@@ -1054,12 +1054,12 @@ extent_split_interior(tsdn_t *tsdn, arena_t *arena,
 		extent_szind_set(*extent, szind);
 		if (szind != SC_NSIZES) {
 			rtree_szind_slab_update(tsdn, &extents_rtree, rtree_ctx,
-			    (vaddr_t)extent_addr_get(*extent), szind, slab);
+			    (uintptr_t)extent_addr_get(*extent), szind, slab);
 			if (slab && extent_size_get(*extent) > PAGE) {
 				rtree_szind_slab_update(tsdn, &extents_rtree,
 				    rtree_ctx,
-				    (vaddr_t)extent_past_get(*extent) -
-				    (vaddr_t)PAGE, szind, slab);
+				    (uintptr_t)extent_past_get(*extent) -
+				    (uintptr_t)PAGE, szind, slab);
 			}
 		}
 	}
@@ -1736,7 +1736,7 @@ extent_record(tsdn_t *tsdn, arena_t *arena, extent_hooks_t **r_extent_hooks,
 	}
 
 	assert(rtree_extent_read(tsdn, &extents_rtree, rtree_ctx,
-	    (vaddr_t)extent_base_get(extent), true) == extent);
+	    (uintptr_t)extent_base_get(extent), true) == extent);
 
 	if (!extents->delay_coalesce) {
 		extent = extent_try_coalesce(tsdn, arena, r_extent_hooks,
@@ -1935,7 +1935,7 @@ extent_destroy_wrapper(tsdn_t *tsdn, arena_t *arena,
 static bool
 extent_commit_default(extent_hooks_t *extent_hooks, void *addr, size_t size,
     size_t offset, size_t length, unsigned arena_ind) {
-	return pages_commit((void *)((uintptr_t)addr + (vaddr_t)offset),
+	return pages_commit((void *)((uintptr_t)addr + (uintptr_t)offset),
 	    length);
 }
 
@@ -1971,7 +1971,7 @@ extent_commit_wrapper(tsdn_t *tsdn, arena_t *arena,
 static bool
 extent_decommit_default(extent_hooks_t *extent_hooks, void *addr, size_t size,
     size_t offset, size_t length, unsigned arena_ind) {
-	return pages_decommit((void *)((uintptr_t)addr + (vaddr_t)offset),
+	return pages_decommit((void *)((uintptr_t)addr + (uintptr_t)offset),
 	    length);
 }
 
@@ -2007,7 +2007,7 @@ extent_purge_lazy_default(extent_hooks_t *extent_hooks, void *addr, size_t size,
 	assert(length != 0);
 	assert((length & PAGE_MASK) == 0);
 
-	return pages_purge_lazy((void *)((uintptr_t)addr + (vaddr_t)offset),
+	return pages_purge_lazy((void *)((uintptr_t)addr + (uintptr_t)offset),
 	    length);
 }
 #endif
@@ -2054,8 +2054,7 @@ extent_purge_forced_default(extent_hooks_t *extent_hooks, void *addr,
 	assert(length != 0);
 	assert((length & PAGE_MASK) == 0);
 
-	return pages_purge_forced((void *)((vaddr_t)addr +
-	    (vaddr_t)offset), length);
+	return pages_purge_forced((void *)((uintptr_t)addr + offset), length);
 }
 #endif
 

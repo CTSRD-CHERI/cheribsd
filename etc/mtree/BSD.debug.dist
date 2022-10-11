@@ -31,7 +31,7 @@
             ..
             lib
                 clang
-                    11.0.1
+                    14.0.5
                         lib
                             freebsd
                             ..
@@ -53,6 +53,8 @@
                 sendmail
                 ..
                 sm.bin
+                ..
+                zfs
                 ..
             ..
             sbin

@@ -9,8 +9,8 @@
 /// This file implements the MachineIRBuidler class.
 //===----------------------------------------------------------------------===//
 #include "llvm/CodeGen/GlobalISel/MachineIRBuilder.h"
+#include "llvm/Analysis/MemoryLocation.h"
 #include "llvm/CodeGen/GlobalISel/GISelChangeObserver.h"
-
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
@@ -106,8 +106,8 @@ MachineInstrBuilder MachineIRBuilder::buildConstDbgValue(const Constant &C,
   } else if (auto *CFP = dyn_cast<ConstantFP>(&C)) {
     MIB.addFPImm(CFP);
   } else {
-    // Insert %noreg if we didn't find a usable constant and had to drop it.
-    MIB.addReg(0U);
+    // Insert $noreg if we didn't find a usable constant and had to drop it.
+    MIB.addReg(Register());
   }
 
   MIB.addImm(0).addMetadata(Variable).addMetadata(Expr);
@@ -162,6 +162,11 @@ MachineInstrBuilder MachineIRBuilder::buildJumpTable(const LLT PtrTy,
       .addJumpTableIndex(JTI);
 }
 
+void MachineIRBuilder::validateUnaryOp(const LLT Res, const LLT Op0) {
+  assert((Res.isScalar() || Res.isVector()) && "invalid operand type");
+  assert((Res == Op0) && "type mismatch");
+}
+
 void MachineIRBuilder::validateBinaryOp(const LLT Res, const LLT Op0,
                                         const LLT Op1) {
   assert((Res.isScalar() || Res.isVector()) && "invalid operand type");
@@ -208,6 +213,48 @@ MachineInstrBuilder MachineIRBuilder::buildMaskLowPtrBits(const DstOp &Res,
   Register MaskReg = getMRI()->createGenericVirtualRegister(MaskTy);
   buildConstant(MaskReg, maskTrailingZeros<uint64_t>(NumBits));
   return buildPtrMask(Res, Op0, MaskReg);
+}
+
+MachineInstrBuilder
+MachineIRBuilder::buildPadVectorWithUndefElements(const DstOp &Res,
+                                                  const SrcOp &Op0) {
+  LLT ResTy = Res.getLLTTy(*getMRI());
+  LLT Op0Ty = Op0.getLLTTy(*getMRI());
+
+  assert((ResTy.isVector() && Op0Ty.isVector()) && "Non vector type");
+  assert((ResTy.getElementType() == Op0Ty.getElementType()) &&
+         "Different vector element types");
+  assert((ResTy.getNumElements() > Op0Ty.getNumElements()) &&
+         "Op0 has more elements");
+
+  auto Unmerge = buildUnmerge(Op0Ty.getElementType(), Op0);
+  SmallVector<Register, 8> Regs;
+  for (auto Op : Unmerge.getInstr()->defs())
+    Regs.push_back(Op.getReg());
+  Register Undef = buildUndef(Op0Ty.getElementType()).getReg(0);
+  unsigned NumberOfPadElts = ResTy.getNumElements() - Regs.size();
+  for (unsigned i = 0; i < NumberOfPadElts; ++i)
+    Regs.push_back(Undef);
+  return buildMerge(Res, Regs);
+}
+
+MachineInstrBuilder
+MachineIRBuilder::buildDeleteTrailingVectorElements(const DstOp &Res,
+                                                    const SrcOp &Op0) {
+  LLT ResTy = Res.getLLTTy(*getMRI());
+  LLT Op0Ty = Op0.getLLTTy(*getMRI());
+
+  assert((ResTy.isVector() && Op0Ty.isVector()) && "Non vector type");
+  assert((ResTy.getElementType() == Op0Ty.getElementType()) &&
+         "Different vector element types");
+  assert((ResTy.getNumElements() < Op0Ty.getNumElements()) &&
+         "Op0 has fewer elements");
+
+  SmallVector<Register, 8> Regs;
+  auto Unmerge = buildUnmerge(Op0Ty.getElementType(), Op0);
+  for (unsigned i = 0; i < ResTy.getNumElements(); ++i)
+    Regs.push_back(Unmerge.getReg(i));
+  return buildMerge(Res, Regs);
 }
 
 MachineInstrBuilder MachineIRBuilder::buildBr(MachineBasicBlock &Dest) {
@@ -312,17 +359,28 @@ MachineInstrBuilder MachineIRBuilder::buildFConstant(const DstOp &Res,
   return buildFConstant(Res, *CFP);
 }
 
-MachineInstrBuilder MachineIRBuilder::buildBrCond(Register Tst,
+MachineInstrBuilder MachineIRBuilder::buildBrCond(const SrcOp &Tst,
                                                   MachineBasicBlock &Dest) {
-  assert(getMRI()->getType(Tst).isScalar() && "invalid operand type");
+  assert(Tst.getLLTTy(*getMRI()).isScalar() && "invalid operand type");
 
-  return buildInstr(TargetOpcode::G_BRCOND).addUse(Tst).addMBB(&Dest);
+  auto MIB = buildInstr(TargetOpcode::G_BRCOND);
+  Tst.addSrcToMIB(MIB);
+  MIB.addMBB(&Dest);
+  return MIB;
 }
 
-MachineInstrBuilder MachineIRBuilder::buildLoad(const DstOp &Res,
-                                                const SrcOp &Addr,
-                                                MachineMemOperand &MMO) {
-  return buildLoadInstr(TargetOpcode::G_LOAD, Res, Addr, MMO);
+MachineInstrBuilder
+MachineIRBuilder::buildLoad(const DstOp &Dst, const SrcOp &Addr,
+                            MachinePointerInfo PtrInfo, Align Alignment,
+                            MachineMemOperand::Flags MMOFlags,
+                            const AAMDNodes &AAInfo) {
+  MMOFlags |= MachineMemOperand::MOLoad;
+  assert((MMOFlags & MachineMemOperand::MOStore) == 0);
+
+  LLT Ty = Dst.getLLTTy(*getMRI());
+  MachineMemOperand *MMO =
+      getMF().getMachineMemOperand(PtrInfo, MMOFlags, Ty, Alignment, AAInfo);
+  return buildLoad(Dst, Addr, *MMO);
 }
 
 MachineInstrBuilder MachineIRBuilder::buildLoadInstr(unsigned Opcode,
@@ -344,7 +402,7 @@ MachineInstrBuilder MachineIRBuilder::buildLoadFromOffset(
   MachineMemOperand &BaseMMO, int64_t Offset) {
   LLT LoadTy = Dst.getLLTTy(*getMRI());
   MachineMemOperand *OffsetMMO =
-    getMF().getMachineMemOperand(&BaseMMO, Offset, LoadTy.getSizeInBytes());
+      getMF().getMachineMemOperand(&BaseMMO, Offset, LoadTy);
 
   if (Offset == 0) // This may be a size or type changing load.
     return buildLoad(Dst, BasePtr, *OffsetMMO);
@@ -367,6 +425,20 @@ MachineInstrBuilder MachineIRBuilder::buildStore(const SrcOp &Val,
   Addr.addSrcToMIB(MIB);
   MIB.addMemOperand(&MMO);
   return MIB;
+}
+
+MachineInstrBuilder
+MachineIRBuilder::buildStore(const SrcOp &Val, const SrcOp &Addr,
+                             MachinePointerInfo PtrInfo, Align Alignment,
+                             MachineMemOperand::Flags MMOFlags,
+                             const AAMDNodes &AAInfo) {
+  MMOFlags |= MachineMemOperand::MOStore;
+  assert((MMOFlags & MachineMemOperand::MOLoad) == 0);
+
+  LLT Ty = Val.getLLTTy(*getMRI());
+  MachineMemOperand *MMO =
+      getMF().getMachineMemOperand(PtrInfo, MMOFlags, Ty, Alignment, AAInfo);
+  return buildStore(Val, Addr, *MMO);
 }
 
 MachineInstrBuilder MachineIRBuilder::buildAnyExt(const DstOp &Res,
@@ -440,6 +512,15 @@ MachineInstrBuilder MachineIRBuilder::buildZExtOrTrunc(const DstOp &Res,
 MachineInstrBuilder MachineIRBuilder::buildAnyExtOrTrunc(const DstOp &Res,
                                                          const SrcOp &Op) {
   return buildExtOrTrunc(TargetOpcode::G_ANYEXT, Res, Op);
+}
+
+MachineInstrBuilder MachineIRBuilder::buildZExtInReg(const DstOp &Res,
+                                                     const SrcOp &Op,
+                                                     int64_t ImmOp) {
+  LLT ResTy = Res.getLLTTy(*getMRI());
+  auto Mask = buildConstant(
+      ResTy, APInt::getLowBitsSet(ResTy.getScalarSizeInBits(), ImmOp));
+  return buildAnd(Res, Op, Mask);
 }
 
 MachineInstrBuilder MachineIRBuilder::buildCast(const DstOp &Dst,
@@ -562,10 +643,8 @@ MachineInstrBuilder MachineIRBuilder::buildUnmerge(ArrayRef<LLT> Res,
 MachineInstrBuilder MachineIRBuilder::buildUnmerge(LLT Res,
                                                    const SrcOp &Op) {
   unsigned NumReg = Op.getLLTTy(*getMRI()).getSizeInBits() / Res.getSizeInBits();
-  SmallVector<Register, 8> TmpVec;
-  for (unsigned I = 0; I != NumReg; ++I)
-    TmpVec.push_back(getMRI()->createGenericVirtualRegister(Res));
-  return buildUnmerge(TmpVec, Op);
+  SmallVector<DstOp, 8> TmpVec(NumReg, Res);
+  return buildInstr(TargetOpcode::G_UNMERGE_VALUES, TmpVec, Op);
 }
 
 MachineInstrBuilder MachineIRBuilder::buildUnmerge(ArrayRef<Register> Res,
@@ -601,6 +680,37 @@ MachineIRBuilder::buildBuildVectorTrunc(const DstOp &Res,
   // sufficiently large SmallVector to not go through the heap.
   SmallVector<SrcOp, 8> TmpVec(Ops.begin(), Ops.end());
   return buildInstr(TargetOpcode::G_BUILD_VECTOR_TRUNC, Res, TmpVec);
+}
+
+MachineInstrBuilder MachineIRBuilder::buildShuffleSplat(const DstOp &Res,
+                                                        const SrcOp &Src) {
+  LLT DstTy = Res.getLLTTy(*getMRI());
+  assert(Src.getLLTTy(*getMRI()) == DstTy.getElementType() &&
+         "Expected Src to match Dst elt ty");
+  auto UndefVec = buildUndef(DstTy);
+  auto Zero = buildConstant(LLT::scalar(64), 0);
+  auto InsElt = buildInsertVectorElement(DstTy, UndefVec, Src, Zero);
+  SmallVector<int, 16> ZeroMask(DstTy.getNumElements());
+  return buildShuffleVector(DstTy, InsElt, UndefVec, ZeroMask);
+}
+
+MachineInstrBuilder MachineIRBuilder::buildShuffleVector(const DstOp &Res,
+                                                         const SrcOp &Src1,
+                                                         const SrcOp &Src2,
+                                                         ArrayRef<int> Mask) {
+  LLT DstTy = Res.getLLTTy(*getMRI());
+  LLT Src1Ty = Src1.getLLTTy(*getMRI());
+  LLT Src2Ty = Src2.getLLTTy(*getMRI());
+  assert((size_t)(Src1Ty.getNumElements() + Src2Ty.getNumElements()) >=
+         Mask.size());
+  assert(DstTy.getElementType() == Src1Ty.getElementType() &&
+         DstTy.getElementType() == Src2Ty.getElementType());
+  (void)DstTy;
+  (void)Src1Ty;
+  (void)Src2Ty;
+  ArrayRef<int> MaskAlloc = getMF().allocateShuffleMask(Mask);
+  return buildInstr(TargetOpcode::G_SHUFFLE_VECTOR, {Res}, {Src1, Src2})
+      .addShuffleMask(MaskAlloc);
 }
 
 MachineInstrBuilder
@@ -925,6 +1035,14 @@ MachineInstrBuilder MachineIRBuilder::buildInstr(unsigned Opc,
         SrcOps[1].getLLTTy(*getMRI()), SrcOps[2].getLLTTy(*getMRI()));
     break;
   }
+  case TargetOpcode::G_FNEG:
+  case TargetOpcode::G_ABS:
+    // All these are unary ops.
+    assert(DstOps.size() == 1 && "Invalid Dst");
+    assert(SrcOps.size() == 1 && "Invalid Srcs");
+    validateUnaryOp(DstOps[0].getLLTTy(*getMRI()),
+                    SrcOps[0].getLLTTy(*getMRI()));
+    break;
   case TargetOpcode::G_ADD:
   case TargetOpcode::G_AND:
   case TargetOpcode::G_MUL:
@@ -953,7 +1071,9 @@ MachineInstrBuilder MachineIRBuilder::buildInstr(unsigned Opc,
   }
   case TargetOpcode::G_SHL:
   case TargetOpcode::G_ASHR:
-  case TargetOpcode::G_LSHR: {
+  case TargetOpcode::G_LSHR:
+  case TargetOpcode::G_USHLSAT:
+  case TargetOpcode::G_SSHLSAT: {
     assert(DstOps.size() == 1 && "Invalid Dst");
     assert(SrcOps.size() == 2 && "Invalid Srcs");
     validateShiftOp(DstOps[0].getLLTTy(*getMRI()),
@@ -1018,13 +1138,14 @@ MachineInstrBuilder MachineIRBuilder::buildInstr(unsigned Opc,
   case TargetOpcode::G_UNMERGE_VALUES: {
     assert(!DstOps.empty() && "Invalid trivial sequence");
     assert(SrcOps.size() == 1 && "Invalid src for Unmerge");
-    assert(std::all_of(DstOps.begin(), DstOps.end(),
-                       [&, this](const DstOp &Op) {
-                         return Op.getLLTTy(*getMRI()) ==
-                                DstOps[0].getLLTTy(*getMRI());
-                       }) &&
+    assert(llvm::all_of(DstOps,
+                        [&, this](const DstOp &Op) {
+                          return Op.getLLTTy(*getMRI()) ==
+                                 DstOps[0].getLLTTy(*getMRI());
+                        }) &&
            "type mismatch in output list");
-    assert(DstOps.size() * DstOps[0].getLLTTy(*getMRI()).getSizeInBits() ==
+    assert((TypeSize::ScalarTy)DstOps.size() *
+                   DstOps[0].getLLTTy(*getMRI()).getSizeInBits() ==
                SrcOps[0].getLLTTy(*getMRI()).getSizeInBits() &&
            "input operands do not cover output register");
     break;
@@ -1032,13 +1153,14 @@ MachineInstrBuilder MachineIRBuilder::buildInstr(unsigned Opc,
   case TargetOpcode::G_MERGE_VALUES: {
     assert(!SrcOps.empty() && "invalid trivial sequence");
     assert(DstOps.size() == 1 && "Invalid Dst");
-    assert(std::all_of(SrcOps.begin(), SrcOps.end(),
-                       [&, this](const SrcOp &Op) {
-                         return Op.getLLTTy(*getMRI()) ==
-                                SrcOps[0].getLLTTy(*getMRI());
-                       }) &&
+    assert(llvm::all_of(SrcOps,
+                        [&, this](const SrcOp &Op) {
+                          return Op.getLLTTy(*getMRI()) ==
+                                 SrcOps[0].getLLTTy(*getMRI());
+                        }) &&
            "type mismatch in input list");
-    assert(SrcOps.size() * SrcOps[0].getLLTTy(*getMRI()).getSizeInBits() ==
+    assert((TypeSize::ScalarTy)SrcOps.size() *
+                   SrcOps[0].getLLTTy(*getMRI()).getSizeInBits() ==
                DstOps[0].getLLTTy(*getMRI()).getSizeInBits() &&
            "input operands do not cover output register");
     if (SrcOps.size() == 1)
@@ -1083,13 +1205,14 @@ MachineInstrBuilder MachineIRBuilder::buildInstr(unsigned Opc,
     assert(DstOps.size() == 1 && "Invalid DstOps");
     assert(DstOps[0].getLLTTy(*getMRI()).isVector() &&
            "Res type must be a vector");
-    assert(std::all_of(SrcOps.begin(), SrcOps.end(),
-                       [&, this](const SrcOp &Op) {
-                         return Op.getLLTTy(*getMRI()) ==
-                                SrcOps[0].getLLTTy(*getMRI());
-                       }) &&
+    assert(llvm::all_of(SrcOps,
+                        [&, this](const SrcOp &Op) {
+                          return Op.getLLTTy(*getMRI()) ==
+                                 SrcOps[0].getLLTTy(*getMRI());
+                        }) &&
            "type mismatch in input list");
-    assert(SrcOps.size() * SrcOps[0].getLLTTy(*getMRI()).getSizeInBits() ==
+    assert((TypeSize::ScalarTy)SrcOps.size() *
+                   SrcOps[0].getLLTTy(*getMRI()).getSizeInBits() ==
                DstOps[0].getLLTTy(*getMRI()).getSizeInBits() &&
            "input scalars do not exactly cover the output vector register");
     break;
@@ -1100,11 +1223,11 @@ MachineInstrBuilder MachineIRBuilder::buildInstr(unsigned Opc,
     assert(DstOps.size() == 1 && "Invalid DstOps");
     assert(DstOps[0].getLLTTy(*getMRI()).isVector() &&
            "Res type must be a vector");
-    assert(std::all_of(SrcOps.begin(), SrcOps.end(),
-                       [&, this](const SrcOp &Op) {
-                         return Op.getLLTTy(*getMRI()) ==
-                                SrcOps[0].getLLTTy(*getMRI());
-                       }) &&
+    assert(llvm::all_of(SrcOps,
+                        [&, this](const SrcOp &Op) {
+                          return Op.getLLTTy(*getMRI()) ==
+                                 SrcOps[0].getLLTTy(*getMRI());
+                        }) &&
            "type mismatch in input list");
     if (SrcOps[0].getLLTTy(*getMRI()).getSizeInBits() ==
         DstOps[0].getLLTTy(*getMRI()).getElementType().getSizeInBits())
@@ -1115,14 +1238,15 @@ MachineInstrBuilder MachineIRBuilder::buildInstr(unsigned Opc,
     assert(DstOps.size() == 1 && "Invalid DstOps");
     assert((!SrcOps.empty() || SrcOps.size() < 2) &&
            "Must have at least 2 operands");
-    assert(std::all_of(SrcOps.begin(), SrcOps.end(),
-                       [&, this](const SrcOp &Op) {
-                         return (Op.getLLTTy(*getMRI()).isVector() &&
-                                 Op.getLLTTy(*getMRI()) ==
-                                     SrcOps[0].getLLTTy(*getMRI()));
-                       }) &&
+    assert(llvm::all_of(SrcOps,
+                        [&, this](const SrcOp &Op) {
+                          return (Op.getLLTTy(*getMRI()).isVector() &&
+                                  Op.getLLTTy(*getMRI()) ==
+                                      SrcOps[0].getLLTTy(*getMRI()));
+                        }) &&
            "type mismatch in input list");
-    assert(SrcOps.size() * SrcOps[0].getLLTTy(*getMRI()).getSizeInBits() ==
+    assert((TypeSize::ScalarTy)SrcOps.size() *
+                   SrcOps[0].getLLTTy(*getMRI()).getSizeInBits() ==
                DstOps[0].getLLTTy(*getMRI()).getSizeInBits() &&
            "input vectors do not exactly cover the output vector register");
     break;

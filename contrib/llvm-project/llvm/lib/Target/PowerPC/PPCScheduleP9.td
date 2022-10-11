@@ -9,8 +9,6 @@
 // This file defines the itinerary class data for the POWER9 processor.
 //
 //===----------------------------------------------------------------------===//
-include "PPCInstrInfo.td"
-
 def P9Model : SchedMachineModel {
   // The maximum number of instructions to be issued at the same time.
   // While a value of 8 is technically correct since 8 instructions can be
@@ -40,12 +38,11 @@ def P9Model : SchedMachineModel {
 
   let CompleteModel = 1;
 
-  // Do not support QPX (Quad Processing eXtension), SPE (Signal Processing
-  // Engine), prefixed instructions on Power 9, PC relative mem ops, or
-  // instructions introduced in ISA 3.1.
-  let UnsupportedFeatures = [HasQPX, HasSPE, PrefixInstrs, PCRelativeMemops,
-                             IsISA3_1];
-
+  // Do not support SPE (Signal Processing Engine), prefixed instructions on
+  // Power 9, paired vector mem ops, MMA, PC relative mem ops, or instructions
+  // introduced in ISA 3.1.
+  let UnsupportedFeatures = [HasSPE, PrefixInstrs, PairedVectorMemops, MMA,
+                             PCRelativeMemops, IsISA3_1];
 }
 
 let SchedModel = P9Model in {

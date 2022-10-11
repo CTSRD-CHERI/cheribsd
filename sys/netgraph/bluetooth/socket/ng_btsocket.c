@@ -78,7 +78,6 @@ static struct pr_usrreqs	ng_btsocket_hci_raw_usrreqs = {
 	.pru_disconnect =	ng_btsocket_hci_raw_disconnect,
 	.pru_peeraddr =		ng_btsocket_hci_raw_peeraddr,
 	.pru_send =		ng_btsocket_hci_raw_send,
-	.pru_shutdown =		NULL,
 	.pru_sockaddr =		ng_btsocket_hci_raw_sockaddr,
 	.pru_close =		ng_btsocket_hci_raw_close,
 };
@@ -97,7 +96,6 @@ static struct pr_usrreqs	ng_btsocket_l2cap_raw_usrreqs = {
 	.pru_disconnect =	ng_btsocket_l2cap_raw_disconnect,
 	.pru_peeraddr =		ng_btsocket_l2cap_raw_peeraddr,
 	.pru_send =		ng_btsocket_l2cap_raw_send,
-	.pru_shutdown =		NULL,
 	.pru_sockaddr =		ng_btsocket_l2cap_raw_sockaddr,
 	.pru_close =		ng_btsocket_l2cap_raw_close,
 };
@@ -118,7 +116,6 @@ static struct pr_usrreqs	ng_btsocket_l2cap_usrreqs = {
         .pru_listen =		ng_btsocket_l2cap_listen,
 	.pru_peeraddr =		ng_btsocket_l2cap_peeraddr,
 	.pru_send =		ng_btsocket_l2cap_send,
-	.pru_shutdown =		NULL,
 	.pru_sockaddr =		ng_btsocket_l2cap_sockaddr,
 	.pru_close =		ng_btsocket_l2cap_close,
 };
@@ -139,7 +136,6 @@ static struct pr_usrreqs	ng_btsocket_rfcomm_usrreqs = {
         .pru_listen =		ng_btsocket_rfcomm_listen,
 	.pru_peeraddr =		ng_btsocket_rfcomm_peeraddr,
 	.pru_send =		ng_btsocket_rfcomm_send,
-	.pru_shutdown =		NULL,
 	.pru_sockaddr =		ng_btsocket_rfcomm_sockaddr,
 	.pru_close =		ng_btsocket_rfcomm_close,
 };
@@ -160,7 +156,6 @@ static struct pr_usrreqs	ng_btsocket_sco_usrreqs = {
 	.pru_listen =		ng_btsocket_sco_listen,
 	.pru_peeraddr =		ng_btsocket_sco_peeraddr,
 	.pru_send =		ng_btsocket_sco_send,
-	.pru_shutdown =		NULL,
 	.pru_sockaddr =		ng_btsocket_sco_sockaddr,
 	.pru_close =		ng_btsocket_sco_close,
 };
@@ -176,7 +171,6 @@ static struct protosw		ng_btsocket_protosw[] = {
 	.pr_protocol =		BLUETOOTH_PROTO_HCI,
 	.pr_flags =		PR_ATOMIC|PR_ADDR,
 	.pr_ctloutput =		ng_btsocket_hci_raw_ctloutput,
-	.pr_init =		ng_btsocket_hci_raw_init,
 	.pr_usrreqs =		&ng_btsocket_hci_raw_usrreqs,
 },
 {
@@ -184,7 +178,6 @@ static struct protosw		ng_btsocket_protosw[] = {
 	.pr_domain =		&ng_btsocket_domain,
 	.pr_protocol =		BLUETOOTH_PROTO_L2CAP,
 	.pr_flags =		PR_ATOMIC|PR_ADDR,
-	.pr_init =		ng_btsocket_l2cap_raw_init,
 	.pr_usrreqs =		&ng_btsocket_l2cap_raw_usrreqs,
 },
 {
@@ -193,7 +186,6 @@ static struct protosw		ng_btsocket_protosw[] = {
 	.pr_protocol =		BLUETOOTH_PROTO_L2CAP,
 	.pr_flags =		PR_ATOMIC|PR_CONNREQUIRED,
 	.pr_ctloutput =		ng_btsocket_l2cap_ctloutput,
-	.pr_init =		ng_btsocket_l2cap_init,
 	.pr_usrreqs =		&ng_btsocket_l2cap_usrreqs,
 },
 {
@@ -202,7 +194,6 @@ static struct protosw		ng_btsocket_protosw[] = {
 	.pr_protocol =		BLUETOOTH_PROTO_RFCOMM,
 	.pr_flags =		PR_CONNREQUIRED,
 	.pr_ctloutput =		ng_btsocket_rfcomm_ctloutput,
-	.pr_init =		ng_btsocket_rfcomm_init,
 	.pr_usrreqs =		&ng_btsocket_rfcomm_usrreqs,
 },
 {
@@ -211,7 +202,6 @@ static struct protosw		ng_btsocket_protosw[] = {
 	.pr_protocol =		BLUETOOTH_PROTO_SCO,
 	.pr_flags =		PR_ATOMIC|PR_CONNREQUIRED,
 	.pr_ctloutput =		ng_btsocket_sco_ctloutput,
-	.pr_init =		ng_btsocket_sco_init,
 	.pr_usrreqs =		&ng_btsocket_sco_usrreqs,
 },
 };
@@ -292,4 +282,4 @@ ng_btsocket_modevent(module_t mod, int event, void *data)
 	return (error);
 } /* ng_btsocket_modevent */
 
-VNET_DOMAIN_SET(ng_btsocket_);
+DOMAIN_SET(ng_btsocket_);

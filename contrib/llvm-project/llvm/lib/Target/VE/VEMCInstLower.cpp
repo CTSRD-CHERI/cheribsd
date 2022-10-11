@@ -51,6 +51,11 @@ static MCOperand LowerOperand(const MachineInstr *MI, const MachineOperand &MO,
       break;
     return MCOperand::createReg(MO.getReg());
 
+  case MachineOperand::MO_BlockAddress:
+    return LowerSymbolOperand(
+        MI, MO, AP.GetBlockAddressSymbol(MO.getBlockAddress()), AP);
+  case MachineOperand::MO_ConstantPoolIndex:
+    return LowerSymbolOperand(MI, MO, AP.GetCPISymbol(MO.getIndex()), AP);
   case MachineOperand::MO_ExternalSymbol:
     return LowerSymbolOperand(
         MI, MO, AP.GetExternalSymbolSymbol(MO.getSymbolName()), AP);
@@ -58,7 +63,8 @@ static MCOperand LowerOperand(const MachineInstr *MI, const MachineOperand &MO,
     return LowerSymbolOperand(MI, MO, AP.getSymbol(MO.getGlobal()), AP);
   case MachineOperand::MO_Immediate:
     return MCOperand::createImm(MO.getImm());
-
+  case MachineOperand::MO_JumpTableIndex:
+    return LowerSymbolOperand(MI, MO, AP.GetJTISymbol(MO.getIndex()), AP);
   case MachineOperand::MO_MachineBasicBlock:
     return LowerSymbolOperand(MI, MO, MO.getMBB()->getSymbol(), AP);
 
@@ -72,8 +78,7 @@ void llvm::LowerVEMachineInstrToMCInst(const MachineInstr *MI, MCInst &OutMI,
                                        AsmPrinter &AP) {
   OutMI.setOpcode(MI->getOpcode());
 
-  for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
-    const MachineOperand &MO = MI->getOperand(i);
+  for (const MachineOperand &MO : MI->operands()) {
     MCOperand MCOp = LowerOperand(MI, MO, AP);
 
     if (MCOp.isValid())

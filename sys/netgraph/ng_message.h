@@ -66,7 +66,7 @@ struct ng_mesg {
 		u_int32_t	typecookie;		/* node's type cookie */
 		u_char		cmdstr[NG_CMDSTRSIZ];	/* cmd string + \0 */
 	} header;
-	char	data[];			/* placeholder for actual data */
+	char	data[] __subobject_use_container_bounds; /* placeholder for actual data */
 };
 
 /* This command is guaranteed to not alter data (or'd into the command). */

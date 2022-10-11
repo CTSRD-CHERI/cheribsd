@@ -119,7 +119,7 @@ kasan_shadow_map(vm_offset_t addr, size_t size)
 	    ("%s: invalid address range %#lx-%#lx", __func__, sva, eva));
 
 	for (i = 0; i < npages; i++)
-		pmap_kasan_enter(sva + ptoa(i));
+		pmap_san_enter(sva + ptoa(i));
 }
 
 void
@@ -137,6 +137,12 @@ kasan_init(void)
 
 	/* Now officially enabled. */
 	kasan_enabled = true;
+}
+
+void
+kasan_init_early(vm_offset_t stack, size_t size)
+{
+	kasan_md_init_early(stack, size);
 }
 
 static inline const char *
@@ -174,6 +180,7 @@ kasan_code_name(uint8_t code)
 
 #define	REPORT(f, ...) do {				\
 	if (panic_on_violation) {			\
+		kasan_enabled = false;			\
 		panic(f, __VA_ARGS__);			\
 	} else {					\
 		struct stack st;			\
@@ -386,7 +393,7 @@ kasan_shadow_check(unsigned long addr, size_t size, bool write,
 		return;
 	if (__predict_false(kasan_md_unsupported(addr)))
 		return;
-	if (__predict_false(panicstr != NULL))
+	if (KERNEL_PANICKED())
 		return;
 
 	if (__builtin_constant_p(size)) {
@@ -521,8 +528,90 @@ kasan_copyout(const void *kaddr, void *uaddr, size_t len)
 
 /* -------------------------------------------------------------------------- */
 
+int
+kasan_fubyte(volatile const void *base)
+{
+	return (fubyte(base));
+}
+
+int
+kasan_fuword16(volatile const void *base)
+{
+	return (fuword16(base));
+}
+
+int
+kasan_fueword(volatile const void *base, long *val)
+{
+	kasan_shadow_check((unsigned long)val, sizeof(*val), true, __RET_ADDR);
+	return (fueword(base, val));
+}
+
+int
+kasan_fueword32(volatile const void *base, int32_t *val)
+{
+	kasan_shadow_check((unsigned long)val, sizeof(*val), true, __RET_ADDR);
+	return (fueword32(base, val));
+}
+
+int
+kasan_fueword64(volatile const void *base, int64_t *val)
+{
+	kasan_shadow_check((unsigned long)val, sizeof(*val), true, __RET_ADDR);
+	return (fueword64(base, val));
+}
+
+int
+kasan_subyte(volatile void *base, int byte)
+{
+	return (subyte(base, byte));
+}
+
+int
+kasan_suword(volatile void *base, long word)
+{
+	return (suword(base, word));
+}
+
+int
+kasan_suword16(volatile void *base, int word)
+{
+	return (suword16(base, word));
+}
+
+int
+kasan_suword32(volatile void *base, int32_t word)
+{
+	return (suword32(base, word));
+}
+
+int
+kasan_suword64(volatile void *base, int64_t word)
+{
+	return (suword64(base, word));
+}
+
+int
+kasan_casueword32(volatile uint32_t *base, uint32_t oldval, uint32_t *oldvalp,
+    uint32_t newval)
+{
+	kasan_shadow_check((unsigned long)oldvalp, sizeof(*oldvalp), true,
+	    __RET_ADDR);
+	return (casueword32(base, oldval, oldvalp, newval));
+}
+
+int
+kasan_casueword(volatile u_long *base, u_long oldval, u_long *oldvalp,
+    u_long newval)
+{
+	kasan_shadow_check((unsigned long)oldvalp, sizeof(*oldvalp), true,
+	    __RET_ADDR);
+	return (casueword(base, oldval, oldvalp, newval));
+}
+
+/* -------------------------------------------------------------------------- */
+
 #include <machine/atomic.h>
-#define	ATOMIC_SAN_PREFIX	kasan
 #include <sys/atomic_san.h>
 
 #define _ASAN_ATOMIC_FUNC_ADD(name, type)				\
@@ -784,7 +873,6 @@ kasan_atomic_interrupt_fence(void)
 
 #include <sys/bus.h>
 #include <machine/bus.h>
-#define	BUS_SAN_PREFIX	kasan
 #include <sys/bus_san.h>
 
 int
@@ -948,7 +1036,12 @@ __asan_register_globals(struct __asan_global *globals, size_t n)
 void
 __asan_unregister_globals(struct __asan_global *globals, size_t n)
 {
-	/* never called */
+	size_t i;
+
+	for (i = 0; i < n; i++) {
+		kasan_mark(globals[i].beg, globals[i].size_with_redzone,
+		    globals[i].size_with_redzone, 0);
+	}
 }
 
 #define ASAN_LOAD_STORE(size)					\

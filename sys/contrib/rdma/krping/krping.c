@@ -358,7 +358,7 @@ static void krping_cq_event_handler(struct ib_cq *cq, void *ctx)
 {
 	struct krping_cb *cb = ctx;
 	struct ib_wc wc;
-	struct ib_recv_wr *bad_wr;
+	const struct ib_recv_wr *bad_wr;
 	int ret;
 
 	BUG_ON(cb->cq != cq);
@@ -705,7 +705,7 @@ err1:
 static u32 krping_rdma_rkey(struct krping_cb *cb, u64 buf, int post_inv)
 {
 	u32 rkey;
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	int ret;
 	struct scatterlist sg = {0};
 
@@ -772,7 +772,8 @@ static void krping_format_send(struct krping_cb *cb, u64 buf)
 
 static void krping_test_server(struct krping_cb *cb)
 {
-	struct ib_send_wr *bad_wr, inv;
+	const struct ib_send_wr *bad_wr;
+	struct ib_send_wr inv;
 	int ret;
 
 	while (1) {
@@ -913,7 +914,7 @@ static void rlat_test(struct krping_cb *cb)
 	struct timeval start_tv, stop_tv;
 	int ret;
 	struct ib_wc wc;
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	int ne;
 
 	scnt = 0;
@@ -1054,7 +1055,7 @@ static void wlat_test(struct krping_cb *cb)
 		}
 
 		if (scnt < iters) {
-			struct ib_send_wr *bad_wr;
+			const struct ib_send_wr *bad_wr;
 
 			*buf = (char)scnt+1;
 			if (scnt < cycle_iters)
@@ -1134,7 +1135,7 @@ done:
 
 static void bw_test(struct krping_cb *cb)
 {
-	int ccnt, scnt, rcnt;
+	int ccnt, scnt;
 	int iters=cb->count;
 	struct timeval start_tv, stop_tv;
 	cycles_t *post_cycles_start = NULL;
@@ -1148,7 +1149,6 @@ static void bw_test(struct krping_cb *cb)
 
 	ccnt = 0;
 	scnt = 0;
-	rcnt = 0;
 
 	post_cycles_start = kmalloc(cycle_iters * sizeof(cycles_t), GFP_KERNEL);
 	if (!post_cycles_start) {
@@ -1187,7 +1187,7 @@ static void bw_test(struct krping_cb *cb)
 	while (scnt < iters || ccnt < iters) {
 
 		while (scnt < iters && scnt - ccnt < cb->txdepth) {
-			struct ib_send_wr *bad_wr;
+			const struct ib_send_wr *bad_wr;
 
 			if (scnt < cycle_iters)
 				post_cycles_start[scnt] = get_cycles();
@@ -1263,7 +1263,7 @@ done:
 
 static void krping_rlat_test_server(struct krping_cb *cb)
 {
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	struct ib_wc wc;
 	int ret;
 
@@ -1296,7 +1296,7 @@ static void krping_rlat_test_server(struct krping_cb *cb)
 
 static void krping_wlat_test_server(struct krping_cb *cb)
 {
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	struct ib_wc wc;
 	int ret;
 
@@ -1330,7 +1330,7 @@ static void krping_wlat_test_server(struct krping_cb *cb)
 
 static void krping_bw_test_server(struct krping_cb *cb)
 {
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	struct ib_wc wc;
 	int ret;
 
@@ -1434,7 +1434,7 @@ static int krping_bind_server(struct krping_cb *cb)
 
 static void krping_run_server(struct krping_cb *cb)
 {
-	struct ib_recv_wr *bad_wr;
+	const struct ib_recv_wr *bad_wr;
 	int ret;
 
 	ret = krping_bind_server(cb);
@@ -1485,7 +1485,7 @@ err0:
 static void krping_test_client(struct krping_cb *cb)
 {
 	int ping, start, cc, i, ret;
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	unsigned char c;
 
 	start = 65;
@@ -1558,7 +1558,7 @@ static void krping_test_client(struct krping_cb *cb)
 
 static void krping_rlat_test_client(struct krping_cb *cb)
 {
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	struct ib_wc wc;
 	int ret;
 
@@ -1600,7 +1600,7 @@ static void krping_rlat_test_client(struct krping_cb *cb)
 	suseconds_t usec;
 	unsigned long long elapsed;
 	struct ib_wc wc;
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	int ne;
 	
 	cb->rdma_sq_wr.wr.opcode = IB_WR_RDMA_WRITE;
@@ -1648,7 +1648,7 @@ static void krping_rlat_test_client(struct krping_cb *cb)
 
 static void krping_wlat_test_client(struct krping_cb *cb)
 {
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	struct ib_wc wc;
 	int ret;
 
@@ -1687,7 +1687,7 @@ static void krping_wlat_test_client(struct krping_cb *cb)
 
 static void krping_bw_test_client(struct krping_cb *cb)
 {
-	struct ib_send_wr *bad_wr;
+	const struct ib_send_wr *bad_wr;
 	struct ib_wc wc;
 	int ret;
 
@@ -1729,8 +1729,10 @@ static void krping_bw_test_client(struct krping_cb *cb)
  */
 static void flush_qp(struct krping_cb *cb)
 {
-	struct ib_send_wr wr = { 0 }, *bad;
-	struct ib_recv_wr recv_wr = { 0 }, *recv_bad;
+	struct ib_send_wr wr = { 0 };
+	const struct ib_send_wr *bad;
+	struct ib_recv_wr recv_wr = { 0 };
+	const struct ib_recv_wr *recv_bad;
 	struct ib_wc wc;
 	int ret;
 	int flushed = 0;
@@ -1773,7 +1775,8 @@ static void flush_qp(struct krping_cb *cb)
 
 static void krping_fr_test(struct krping_cb *cb)
 {
-	struct ib_send_wr inv, *bad;
+	struct ib_send_wr inv;
+	const struct ib_send_wr *bad;
 	struct ib_reg_wr fr;
 	struct ib_wc wc;
 	u8 key = 0;
@@ -1922,7 +1925,7 @@ static int krping_bind_client(struct krping_cb *cb)
 
 static void krping_run_client(struct krping_cb *cb)
 {
-	struct ib_recv_wr *bad_wr;
+	const struct ib_recv_wr *bad_wr;
 	int ret;
 
 	/* set type of service, if any */

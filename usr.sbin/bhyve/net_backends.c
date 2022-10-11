@@ -46,6 +46,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/uio.h>
 
 #include <net/if.h>
+#if defined(INET6) || defined(INET)
+#include <net/if_tap.h>
+#endif
 #include <net/netmap.h>
 #include <net/netmap_virt.h>
 #define NETMAP_WITH_LIBS
@@ -179,6 +182,17 @@ SET_DECLARE(net_backend_set, struct net_backend);
  * The tap backend
  */
 
+#if defined(INET6) || defined(INET)
+const int pf_list[] = {
+#if defined(INET6)
+	PF_INET6,
+#endif
+#if defined(INET)
+	PF_INET,
+#endif
+};
+#endif
+
 struct tap_priv {
 	struct mevent *mevp;
 	/*
@@ -211,6 +225,10 @@ tap_init(struct net_backend *be, const char *devname,
 	struct tap_priv *priv = (struct tap_priv *)be->opaque;
 	char tbuf[80];
 	int opt = 1;
+#if defined(INET6) || defined(INET)
+	struct ifreq ifrq;
+	int i, s;
+#endif
 #ifndef WITHOUT_CAPSICUM
 	cap_rights_t rights;
 #endif
@@ -237,6 +255,39 @@ tap_init(struct net_backend *be, const char *devname,
 		WPRINTF(("tap device O_NONBLOCK failed"));
 		goto error;
 	}
+
+#if defined(INET6) || defined(INET)
+	/*
+	 * Try to UP the interface rather than relying on
+	 * net.link.tap.up_on_open.
+	  */
+	bzero(&ifrq, sizeof(ifrq));
+	if (ioctl(be->fd, TAPGIFNAME, &ifrq) < 0) {
+		WPRINTF(("Could not get interface name"));
+		goto error;
+	}
+
+	s = -1;
+	for (i = 0; s == -1 && i < nitems(pf_list); i++)
+		s = socket(pf_list[i], SOCK_DGRAM, 0);
+	if (s == -1) {
+		WPRINTF(("Could open socket"));
+		goto error;
+	}
+
+	if (ioctl(s, SIOCGIFFLAGS, &ifrq) < 0) {
+		(void)close(s);
+		WPRINTF(("Could not get interface flags"));
+		goto error;
+	}
+	ifrq.ifr_flags |= IFF_UP;
+	if (ioctl(s, SIOCSIFFLAGS, &ifrq) < 0) {
+		(void)close(s);
+		WPRINTF(("Could not set interface flags"));
+		goto error;
+	}
+	(void)close(s);
+#endif
 
 #ifndef WITHOUT_CAPSICUM
 	cap_rights_init(&rights, CAP_EVENT, CAP_READ, CAP_WRITE);
@@ -474,7 +525,7 @@ ng_init(struct net_backend *be, const char *devname,
 	/*
 	 * The default ng_socket(4) buffer's size is too low.
 	 * Calculate the minimum value between NG_SBUF_MAX_SIZE
-	 * and kern.ipc.maxsockbuf. 
+	 * and kern.ipc.maxsockbuf.
 	 */
 	msbsz = sizeof(maxsbsz);
 	if (sysctlbyname("kern.ipc.maxsockbuf", &maxsbsz, &msbsz,
@@ -929,7 +980,7 @@ netbe_init(struct net_backend **ret, nvlist_t *nvl, net_be_rxeof_t cb,
     void *param)
 {
 	struct net_backend **pbe, *nbe, *tbe = NULL;
-	const char *value;
+	const char *value, *type;
 	char *devname;
 	int err;
 
@@ -940,11 +991,19 @@ netbe_init(struct net_backend **ret, nvlist_t *nvl, net_be_rxeof_t cb,
 	devname = strdup(value);
 
 	/*
+	 * Use the type given by configuration if exists; otherwise
+	 * use the prefix of the backend as the type.
+	 */
+	type = get_config_value_node(nvl, "type");
+	if (type == NULL)
+		type = devname;
+
+	/*
 	 * Find the network backend that matches the user-provided
 	 * device name. net_backend_set is built using a linker set.
 	 */
 	SET_FOREACH(pbe, net_backend_set) {
-		if (strncmp(devname, (*pbe)->prefix,
+		if (strncmp(type, (*pbe)->prefix,
 		    strlen((*pbe)->prefix)) == 0) {
 			tbe = *pbe;
 			assert(tbe->init != NULL);

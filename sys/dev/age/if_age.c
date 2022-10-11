@@ -178,12 +178,10 @@ static driver_t age_driver = {
 	sizeof(struct age_softc)
 };
 
-static devclass_t age_devclass;
-
-DRIVER_MODULE(age, pci, age_driver, age_devclass, 0, 0);
+DRIVER_MODULE(age, pci, age_driver, 0, 0);
 MODULE_PNP_INFO("U16:vendor;U16:device;D:#", pci, age, age_devs,
     nitems(age_devs));
-DRIVER_MODULE(miibus, age, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(miibus, age, miibus_driver, 0, 0);
 
 static struct resource_spec age_res_spec_mem[] = {
 	{ SYS_RES_MEMORY,	PCIR_BAR(0),	RF_ACTIVE },
@@ -2642,7 +2640,7 @@ age_init_locked(struct age_softc *sc)
 	 * it's hard to separate code path between Tx and Rx without
 	 * locking. If L1 hardware have a separate mail box register
 	 * for Tx and Rx consumer/producer management we could have
-	 * indepent Tx/Rx handler which in turn Rx handler could have
+	 * independent Tx/Rx handler which in turn Rx handler could have
 	 * been run without any locking.
 	 */
 	AGE_COMMIT_MBOX(sc);

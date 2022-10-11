@@ -21,58 +21,24 @@
 namespace llvm {
 namespace jitlink {
 
-/// Registers all FDEs in the given eh-frame section with the current process.
-Error registerEHFrameSection(const void *EHFrameSectionAddr,
-                             size_t EHFrameSectionSize);
-
-/// Deregisters all FDEs in the given eh-frame section with the current process.
-Error deregisterEHFrameSection(const void *EHFrameSectionAddr,
-                               size_t EHFrameSectionSize);
-
 /// Supports registration/deregistration of EH-frames in a target process.
 class EHFrameRegistrar {
 public:
   virtual ~EHFrameRegistrar();
-  virtual Error registerEHFrames(JITTargetAddress EHFrameSectionAddr,
-                                 size_t EHFrameSectionSize) = 0;
-  virtual Error deregisterEHFrames(JITTargetAddress EHFrameSectionAddr,
-                                   size_t EHFrameSectionSize) = 0;
+  virtual Error registerEHFrames(orc::ExecutorAddrRange EHFrameSection) = 0;
+  virtual Error deregisterEHFrames(orc::ExecutorAddrRange EHFrameSection) = 0;
 };
 
 /// Registers / Deregisters EH-frames in the current process.
 class InProcessEHFrameRegistrar final : public EHFrameRegistrar {
 public:
-  /// Get a reference to the InProcessEHFrameRegistrar singleton.
-  static InProcessEHFrameRegistrar &getInstance();
+  Error registerEHFrames(orc::ExecutorAddrRange EHFrameSection) override;
 
-  InProcessEHFrameRegistrar(const InProcessEHFrameRegistrar &) = delete;
-  InProcessEHFrameRegistrar &
-  operator=(const InProcessEHFrameRegistrar &) = delete;
-
-  InProcessEHFrameRegistrar(InProcessEHFrameRegistrar &&) = delete;
-  InProcessEHFrameRegistrar &operator=(InProcessEHFrameRegistrar &&) = delete;
-
-  Error registerEHFrames(JITTargetAddress EHFrameSectionAddr,
-                         size_t EHFrameSectionSize) override {
-    return registerEHFrameSection(
-        jitTargetAddressToPointer<void *>(EHFrameSectionAddr),
-        EHFrameSectionSize);
-  }
-
-  Error deregisterEHFrames(JITTargetAddress EHFrameSectionAddr,
-                           size_t EHFrameSectionSize) override {
-    return deregisterEHFrameSection(
-        jitTargetAddressToPointer<void *>(EHFrameSectionAddr),
-        EHFrameSectionSize);
-  }
-
-private:
-  InProcessEHFrameRegistrar();
+  Error deregisterEHFrames(orc::ExecutorAddrRange EHFrameSection) override;
 };
 
-using StoreFrameRangeFunction =
-  std::function<void(JITTargetAddress EHFrameSectionAddr,
-                     size_t EHFrameSectionSize)>;
+using StoreFrameRangeFunction = std::function<void(
+    orc::ExecutorAddr EHFrameSectionAddr, size_t EHFrameSectionSize)>;
 
 /// Creates a pass that records the address and size of the EH frame section.
 /// If no eh-frame section is found then the address and size will both be given

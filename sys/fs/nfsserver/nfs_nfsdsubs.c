@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <fs/nfs/nfsport.h>
 
 extern u_int32_t newnfs_true, newnfs_false;
+extern int nfs_rootfhset;
 extern int nfs_pubfhset;
 extern struct nfsclienthashhead *nfsclienthash;
 extern int nfsrv_clienthashsize;
@@ -1432,13 +1433,13 @@ nfsrv_fillattr(struct nfsrv_descript *nd, struct nfsvattr *nvap)
 	if (nd->nd_flag & ND_NFSV3) {
 		fp->fa_type = vtonfsv34_type(nvap->na_type);
 		fp->fa_mode = vtonfsv34_mode(nvap->na_mode);
-		txdr_hyper(nvap->na_size, &fp->fa3_size);
-		txdr_hyper(nvap->na_bytes, &fp->fa3_used);
+		txdr_hyper(nvap->na_size, (uint32_t*)&fp->fa3_size);
+		txdr_hyper(nvap->na_bytes, (uint32_t*)&fp->fa3_used);
 		fp->fa3_rdev.specdata1 = txdr_unsigned(NFSMAJOR(nvap->na_rdev));
 		fp->fa3_rdev.specdata2 = txdr_unsigned(NFSMINOR(nvap->na_rdev));
 		fp->fa3_fsid.nfsuquad[0] = 0;
 		fp->fa3_fsid.nfsuquad[1] = txdr_unsigned(nvap->na_fsid);
-		txdr_hyper(nvap->na_fileid, &fp->fa3_fileid);
+		txdr_hyper(nvap->na_fileid, (uint32_t*)&fp->fa3_fileid);
 		txdr_nfsv3time(&nvap->na_atime, &fp->fa3_atime);
 		txdr_nfsv3time(&nvap->na_mtime, &fp->fa3_mtime);
 		txdr_nfsv3time(&nvap->na_ctime, &fp->fa3_ctime);
@@ -1543,6 +1544,8 @@ nfsd_errmap(struct nfsrv_descript *nd)
 
 	if (!nd->nd_repstat)
 		return (0);
+	if ((nd->nd_repstat & NFSERR_AUTHERR) != 0)
+		return (txdr_unsigned(NFSERR_ACCES));
 	if (nd->nd_flag & (ND_NFSV3 | ND_NFSV4)) {
 		if (nd->nd_procnum == NFSPROC_NOOP)
 			return (txdr_unsigned(nd->nd_repstat & 0xffff));
@@ -1890,7 +1893,8 @@ nfsrv_parsename(struct nfsrv_descript *nd, char *bufp, u_long *hashp,
 	 * For V4, check for lookup parent.
 	 * Otherwise, get the component name.
 	 */
-	if ((nd->nd_flag & ND_NFSV4) && nd->nd_procnum == NFSV4OP_LOOKUPP) {
+	if ((nd->nd_flag & ND_NFSV4) && (nd->nd_procnum == NFSV4OP_LOOKUPP ||
+	    nd->nd_procnum == NFSV4OP_SECINFONONAME)) {
 	    *tocp++ = '.';
 	    hash += ((u_char)'.');
 	    *tocp++ = '.';
@@ -2064,7 +2068,7 @@ nfsrv_parsename(struct nfsrv_descript *nd, char *bufp, u_long *hashp,
 	    }
 	}
 	*tocp = '\0';
-	*outlenp = (size_t)outlen;
+	*outlenp = (size_t)outlen + 1;
 	if (hashp != NULL)
 		*hashp = hash;
 nfsmout:
@@ -2115,6 +2119,8 @@ int
 nfsd_checkrootexp(struct nfsrv_descript *nd)
 {
 
+	if (nfs_rootfhset == 0)
+		return (NFSERR_AUTHERR | AUTH_FAILED);
 	if ((nd->nd_flag & (ND_GSS | ND_EXAUTHSYS)) == ND_EXAUTHSYS)
 		goto checktls;
 	if ((nd->nd_flag & (ND_GSSINTEGRITY | ND_EXGSSINTEGRITY)) ==
@@ -2126,7 +2132,7 @@ nfsd_checkrootexp(struct nfsrv_descript *nd)
 	if ((nd->nd_flag & (ND_GSS | ND_GSSINTEGRITY | ND_GSSPRIVACY |
 	     ND_EXGSS)) == (ND_GSS | ND_EXGSS))
 		goto checktls;
-	return (1);
+	return (NFSERR_AUTHERR | AUTH_TOOWEAK);
 checktls:
 	if ((nd->nd_flag & ND_EXTLS) == 0)
 		return (0);
@@ -2139,7 +2145,13 @@ checktls:
 	if ((nd->nd_flag & (ND_TLS | ND_EXTLSCERTUSER | ND_EXTLSCERT)) ==
 	    ND_TLS)
 		return (0);
-	return (1);
+#ifdef notnow
+	/* There is currently no auth_stat for this. */
+	if ((nd->nd_flag & ND_TLS) == 0)
+		return (NFSERR_AUTHERR | AUTH_NEEDS_TLS);
+	return (NFSERR_AUTHERR | AUTH_NEEDS_TLS_MUTUAL_HOST);
+#endif
+	return (NFSERR_AUTHERR | AUTH_TOOWEAK);
 }
 
 /*

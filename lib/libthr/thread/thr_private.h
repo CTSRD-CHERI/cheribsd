@@ -740,7 +740,7 @@ extern int __isthreaded;
  * Global variables for the pthread kernel.
  */
 
-extern vaddr_t		_usrstack __hidden;
+extern ptraddr_t	_usrstack __hidden;
 
 /* For debugger */
 extern int		_libthr_debug;

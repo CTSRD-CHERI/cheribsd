@@ -10,6 +10,7 @@
 #define LLVM_CLANG_LIB_DRIVER_TOOLCHAINS_PS4CPU_H
 
 #include "Gnu.h"
+#include "clang/Basic/LangOptions.h"
 #include "clang/Driver/Tool.h"
 #include "clang/Driver/ToolChain.h"
 
@@ -22,7 +23,8 @@ namespace PS4cpu {
 void addProfileRTArgs(const ToolChain &TC, const llvm::opt::ArgList &Args,
                       llvm::opt::ArgStringList &CmdArgs);
 
-void addSanitizerArgs(const ToolChain &TC, llvm::opt::ArgStringList &CmdArgs);
+void addSanitizerArgs(const ToolChain &TC, const llvm::opt::ArgList &Args,
+                      llvm::opt::ArgStringList &CmdArgs);
 
 class LLVM_LIBRARY_VISIBILITY Assemble : public Tool {
 public:
@@ -73,10 +75,12 @@ public:
   bool HasNativeLLVMSupport() const override;
   bool isPICDefault() const override;
 
-  unsigned GetDefaultStackProtectorLevel(bool KernelOrKext) const override {
-    return 2; // SSPStrong
+  LangOptions::StackProtectorMode
+  GetDefaultStackProtectorLevel(bool KernelOrKext) const override {
+    return LangOptions::SSPStrong;
   }
 
+  unsigned GetDefaultDwarfVersion() const override { return 4; }
   llvm::DebuggerKind getDefaultDebuggerTuning() const override {
     return llvm::DebuggerKind::SCE;
   }

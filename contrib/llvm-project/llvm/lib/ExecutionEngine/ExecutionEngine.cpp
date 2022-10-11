@@ -28,13 +28,13 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
 #include "llvm/IR/ValueHandle.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/ObjectFile.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Host.h"
-#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
 #include <cmath>
@@ -50,11 +50,6 @@ STATISTIC(NumGlobals  , "Number of global vars initialized");
 ExecutionEngine *(*ExecutionEngine::MCJITCtor)(
     std::unique_ptr<Module> M, std::string *ErrorStr,
     std::shared_ptr<MCJITMemoryManager> MemMgr,
-    std::shared_ptr<LegacyJITSymbolResolver> Resolver,
-    std::unique_ptr<TargetMachine> TM) = nullptr;
-
-ExecutionEngine *(*ExecutionEngine::OrcMCJITReplacementCtor)(
-    std::string *ErrorStr, std::shared_ptr<MCJITMemoryManager> MemMgr,
     std::shared_ptr<LegacyJITSymbolResolver> Resolver,
     std::unique_ptr<TargetMachine> TM) = nullptr;
 
@@ -476,8 +471,7 @@ EngineBuilder::EngineBuilder() : EngineBuilder(nullptr) {}
 
 EngineBuilder::EngineBuilder(std::unique_ptr<Module> M)
     : M(std::move(M)), WhichEngine(EngineKind::Either), ErrorStr(nullptr),
-      OptLevel(CodeGenOpt::Default), MemMgr(nullptr), Resolver(nullptr),
-      UseOrcMCJITReplacement(false) {
+      OptLevel(CodeGenOpt::Default), MemMgr(nullptr), Resolver(nullptr) {
 // IR module verification is enabled by default in debug builds, and disabled
 // by default in release builds.
 #ifndef NDEBUG
@@ -540,12 +534,7 @@ ExecutionEngine *EngineBuilder::create(TargetMachine *TM) {
     }
 
     ExecutionEngine *EE = nullptr;
-    if (ExecutionEngine::OrcMCJITReplacementCtor && UseOrcMCJITReplacement) {
-      EE = ExecutionEngine::OrcMCJITReplacementCtor(ErrorStr, std::move(MemMgr),
-                                                    std::move(Resolver),
-                                                    std::move(TheTM));
-      EE->addModule(std::move(M));
-    } else if (ExecutionEngine::MCJITCtor)
+    if (ExecutionEngine::MCJITCtor)
       EE = ExecutionEngine::MCJITCtor(std::move(M), ErrorStr, std::move(MemMgr),
                                       std::move(Resolver), std::move(TheTM));
 
@@ -1267,8 +1256,7 @@ void ExecutionEngine::emitGlobals() {
     // If there are multiple modules, map the non-canonical globals to their
     // canonical location.
     if (!NonCanonicalGlobals.empty()) {
-      for (unsigned i = 0, e = NonCanonicalGlobals.size(); i != e; ++i) {
-        const GlobalValue *GV = NonCanonicalGlobals[i];
+      for (const GlobalValue *GV : NonCanonicalGlobals) {
         const GlobalValue *CGV = LinkedGlobalsMap[std::make_pair(
             std::string(GV->getName()), GV->getType())];
         void *Ptr = getPointerToGlobalIfAvailable(CGV);

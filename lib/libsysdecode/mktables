@@ -94,6 +94,7 @@ gen_table "accessmode"      "[A-Z]_OK[[:space:]]+0?x?[0-9A-Fa-f]+"         "sys/
 gen_table "acltype"         "ACL_TYPE_[A-Z4_]+[[:space:]]+0x[0-9]+"        "sys/acl.h"
 gen_table "atflags"         "AT_[A-Z_]+[[:space:]]+0x[0-9]+"               "sys/fcntl.h"
 gen_table "capfcntl"        "CAP_FCNTL_[A-Z]+[[:space:]]+\(1"              "sys/capsicum.h"
+gen_table "closerangeflags" "CLOSE_RANGE_[A-Z]+[[:space:]]+\([0-9]+<<[0-9]+\)"       "sys/unistd.h"
 gen_table "extattrns"       "EXTATTR_NAMESPACE_[A-Z]+[[:space:]]+0x[0-9]+" "sys/extattr.h"
 gen_table "fadvisebehav"    "POSIX_FADV_[A-Z]+[[:space:]]+[0-9]+"          "sys/fcntl.h"
 gen_table "openflags"       "O_[A-Z]+[[:space:]]+0x[0-9A-Fa-f]+"           "sys/fcntl.h"	"O_RDONLY|O_RDWR|O_WRONLY"
@@ -122,7 +123,7 @@ gen_table "rebootopt"       "RB_[A-Z]+[[:space:]]+0x[0-9]+"                "sys/
 gen_table "rforkflags"      "RF[A-Z]+[[:space:]]+\([0-9]+<<[0-9]+\)"       "sys/unistd.h"
 gen_table "rlimit"          "RLIMIT_[A-Z]+[[:space:]]+[0-9]+"              "sys/resource.h"
 gen_table "rusage"          "RUSAGE_[A-Z]+[[:space:]]+[-0-9]+"             "sys/resource.h"
-gen_table "schedpolicy"     "SCHED_[A-Z]+[[:space:]]+[0-9]+"               "sched.h"
+gen_table "schedpolicy"     "SCHED_[A-Z]+[[:space:]]+[0-9]+"               "sys/sched.h"
 gen_table "sendfileflags"   "SF_[A-Z]+[[:space:]]+[0-9]+"                  "sys/socket.h"
 gen_table "shmatflags"      "SHM_[A-Z]+[[:space:]]+[0-9]{6}"               "sys/shm.h"
 gen_table "shutdownhow"     "SHUT_[A-Z]+[[:space:]]+[0-9]+"                "sys/socket.h"
@@ -155,11 +156,11 @@ gen_table "seekwhence"      "SEEK_[A-Z]+[[:space:]]+[0-9]+"                "sys/
 gen_table "fcntlcmd"        "F_[A-Z0-9_]+[[:space:]]+[0-9]+[[:space:]]+"   "sys/fcntl.h"	"F_CANCEL|F_..LCK"
 gen_table "mmapflags"       "MAP_[A-Z_]+[[:space:]]+0x[0-9A-Fa-f]+"        "sys/mman.h"	"MAP_RESERVATION_CREATE"
 gen_table "rtpriofuncs"     "RTP_[A-Z]+[[:space:]]+[0-9]+"                 "sys/rtprio.h"
-gen_table "msgflags"        "MSG_[A-Z]+[[:space:]]+0x[0-9]+"               "sys/socket.h"	"MSG_SOCALLBCK|MSG_MORETOCOME|MSG_TLSAPPDATA"
+gen_table "msgflags"        "MSG_[A-Z_]+[[:space:]]+0x[0-9]+"              "sys/socket.h"	"MSG_SOCALLBCK|MSG_MORETOCOME|MSG_TLSAPPDATA"
 gen_table "sigcode"         "SI_[A-Z]+[[:space:]]+0(x[0-9abcdef]+)?"       "sys/signal.h"
 gen_table "umtxcvwaitflags" "CVWAIT_[A-Z_]+[[:space:]]+0x[0-9]+"           "sys/umtx.h"
 gen_table "umtxrwlockflags" "URWLOCK_PREFER_READER[[:space:]]+0x[0-9]+"    "sys/umtx.h"
-gen_table "caprights"       "CAP_[A-Z_]+[[:space:]]+CAPRIGHT\([0-9],[[:space:]]+0x[0-9]{16}ULL\)"   "sys/capsicum.h"
+gen_table "caprights"       "CAP_[A-Z_]+[[:space:]]+((CAPRIGHT\([0-9],[[:space:]]+0x[0-9]{16}ULL\))|(\(CAP_[A-Z_]+[[:space:]]*\|.*\)))"   "sys/capsicum.h"
 gen_table "sctpprpolicy"    "SCTP_PR_SCTP_[A-Z_]+[[:space:]]+0x[0-9]+"     "netinet/sctp_uio.h" "SCTP_PR_SCTP_ALL"
 gen_table "cmsgtypesocket"  "SCM_[A-Z_]+[[:space:]]+0x[0-9]+"              "sys/socket.h"
 if [ -e "${include_dir}/x86/sysarch.h" ]; then
@@ -168,6 +169,7 @@ else
 	gen_table "sysarchnum" "[A-Z_]+[[:space:]]+[0-9]+"                 "machine/sysarch.h"
 fi
 gen_table "shmflags"  "SHM_[A-Z_]+[[:space:]]+0x[0-9]+"                    "sys/mman.h"         "SHM_ANON"
+gen_table "itimerwhich"     "ITIMER_[A-Z]+[[:space:]]+[0-9]+"              "sys/time.h"
 
 # Generate a .depend file for our output file
 if [ -n "$output_file" ]; then

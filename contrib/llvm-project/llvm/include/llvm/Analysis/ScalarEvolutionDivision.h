@@ -33,6 +33,7 @@ public:
 
   // Except in the trivial case described above, we do not know how to divide
   // Expr by Denominator for the following functions with empty implementation.
+  void visitPtrToIntExpr(const SCEVPtrToIntExpr *Numerator) {}
   void visitTruncateExpr(const SCEVTruncateExpr *Numerator) {}
   void visitZeroExtendExpr(const SCEVZeroExtendExpr *Numerator) {}
   void visitSignExtendExpr(const SCEVSignExtendExpr *Numerator) {}
@@ -41,6 +42,7 @@ public:
   void visitUMaxExpr(const SCEVUMaxExpr *Numerator) {}
   void visitSMinExpr(const SCEVSMinExpr *Numerator) {}
   void visitUMinExpr(const SCEVUMinExpr *Numerator) {}
+  void visitSequentialUMinExpr(const SCEVSequentialUMinExpr *Numerator) {}
   void visitUnknown(const SCEVUnknown *Numerator) {}
   void visitCouldNotCompute(const SCEVCouldNotCompute *Numerator) {}
 

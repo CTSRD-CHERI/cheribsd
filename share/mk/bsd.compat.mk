@@ -36,7 +36,7 @@ LIB32CPUFLAGS=	-march=${COMPAT_CPUTYPE}
 .endif
 .if ${COMPAT_COMPILER_TYPE} == gcc
 .else
-LIB32CPUFLAGS+=	-target x86_64-unknown-freebsd14.0
+LIB32CPUFLAGS+=	-target x86_64-unknown-freebsd${OS_REVISION}
 .endif
 LIB32CPUFLAGS+=	-m32
 LIB32_MACHINE=	i386
@@ -57,39 +57,13 @@ LIB32CPUFLAGS=	-mcpu=${COMPAT_CPUTYPE}
 .if ${COMPAT_COMPILER_TYPE} == "gcc"
 LIB32CPUFLAGS+=	-m32
 .else
-LIB32CPUFLAGS+=	-target powerpc-unknown-freebsd14.0
+LIB32CPUFLAGS+=	-target powerpc-unknown-freebsd${OS_REVISION}
 .endif
 
 LIB32_MACHINE=	powerpc
 LIB32_MACHINE_ARCH=	powerpc
 LIB32WMAKEFLAGS=	\
 		LD="${XLD} -m elf32ppc_fbsd"
-
-.elif ${COMPAT_ARCH:Mmips64*}
-HAS_COMPAT=32
-.if ${COMPAT_COMPILER_TYPE} == gcc
-.if empty(COMPAT_CPUTYPE)
-LIB32CPUFLAGS=	-march=mips3
-.else
-LIB32CPUFLAGS=	-march=${COMPAT_CPUTYPE}
-.endif
-.else
-.if ${COMPAT_ARCH:Mmips64el*} != ""
-LIB32CPUFLAGS=  -target mipsel-unknown-freebsd14.0
-.else
-LIB32CPUFLAGS=  -target mips-unknown-freebsd14.0
-.endif
-.endif
-LIB32CPUFLAGS+= -mabi=32
-LIB32_MACHINE=	mips
-LIB32_MACHINE_ARCH:=	${COMPAT_ARCH:S/64//}
-.if ${COMPAT_ARCH:Mmips64el*}
-_EMULATION=	elf32ltsmip_fbsd
-.else
-_EMULATION=	elf32btsmip_fbsd
-.endif
-LIB32WMAKEFLAGS= LD="${XLD} -m ${_EMULATION}"
-LIB32LDFLAGS=	-Wl,-m${_EMULATION}
 .endif
 
 LIB32WMAKEFLAGS+= NM="${XNM}"
@@ -98,7 +72,12 @@ LIB32WMAKEFLAGS+= OBJCOPY="${XOBJCOPY}"
 LIB32CFLAGS=	-DCOMPAT_32BIT
 LIB32DTRACE=	${DTRACE} -32
 LIB32WMAKEFLAGS+=	-DCOMPAT_32BIT
-LIB32_MACHINE_ABI=	${MACHINE_ABI}
+LIB32_MACHINE_ABI=	${MACHINE_ABI:N*64:Nptr*:Npurecap} long32 ptr32
+.if ${COMPAT_ARCH} == "amd64"
+LIB32_MACHINE_ABI+=	time32
+.else
+LIB32_MACHINE_ABI+=	time64
+.endif
 .endif # ${MK_LIB32} != "no"
 
 # -------------------------------------------------------------------
@@ -112,29 +91,7 @@ LIB64WMAKEENV=	MACHINE_CPU="arm64 cheri"
 LIB64WMAKEFLAGS= LD="${XLD}" CPUTYPE=morello
 # XXX: clang specific
 LIB64CPUFLAGS=	-target aarch64-unknown-freebsd13.0
-# XXX: Drop -fno-emulated-tls once bsd.cpu.mk no longer enables it
-LIB64CPUFLAGS+=	-march=morello -mabi=aapcs -fno-emulated-tls
-.endif
-
-.if ${COMPAT_ARCH:Mmips64*c*}
-HAS_COMPAT=64
-# XXX: clang specific
-.if ${COMPAT_ARCH:Mmips64el*}
-LIB64CPUFLAGS=  -target mips64el-unknown-freebsd13.0
-.else
-LIB64CPUFLAGS=  -target mips64-unknown-freebsd13.0
-.endif
-LIB64CPUFLAGS+=	-cheri -mabi=64
-LIB64_MACHINE=	mips
-LIB64_MACHINE_ARCH=	mips64
-LIB64WMAKEENV=	MACHINE_CPU="mips cheri"
-.if ${COMPAT_ARCH:Mmips64el*}
-_EMULATION=	elf64ltsmip_fbsd
-.else
-_EMULATION=	elf64btsmip_fbsd
-.endif
-LIB64WMAKEFLAGS= LD="${XLD} -m ${_EMULATION}" CPUTYPE=cheri
-LIB64LDFLAGS=	-Wl,-m${_EMULATION}
+LIB64CPUFLAGS+=	-march=morello -mabi=aapcs
 .endif
 
 .if ${COMPAT_ARCH:Mriscv*c*}
@@ -157,32 +114,20 @@ LIB64WMAKEFLAGS+= NM="${XNM}" OBJCOPY="${XOBJCOPY}"
 LIB64CFLAGS=	-DCOMPAT_64BIT
 LIB64DTRACE=	${DTRACE} -64
 LIB64WMAKEFLAGS+=	-DCOMPAT_64BIT
-LIB64_MACHINE_ABI=	${MACHINE_ABI:Npurecap}
+LIB64_MACHINE_ABI=	${MACHINE_ABI:Npurecap:Nptr*} ptr64
 .endif # ${MK_LIB64} != "no"
 
 # -------------------------------------------------------------------
 # CHERI world
-.if ${MK_COMPAT_CHERIABI} != "no"
+.if ${MK_LIB64C} != "no"
 .if ${COMPAT_ARCH} == "aarch64"
-HAS_COMPAT+=CHERI
+HAS_COMPAT+=64C
 LIB64C_MACHINE=	arm64
 LIB64C_MACHINE_ARCH=	aarch64c
 LIB64CCPUFLAGS=	-target aarch64-unknown-freebsd13.0
-# XXX: Drop -femulated-tls once bsd.cpu.mk no longer passes it
-LIB64CCPUFLAGS+=	-march=morello+c64 -mabi=purecap -femulated-tls
-.elif ${COMPAT_ARCH:Mmips64*} && !${COMPAT_ARCH:Mmips64*c*}
-.if ${COMPAT_ARCH:Mmips*el*}
-.error No little endian CHERI
-.endif
-HAS_COMPAT+=CHERI
-LIB64CCPUFLAGS=  -target mips64-unknown-freebsd13.0 -cheri -mabi=purecap
-LIB64CCPUFLAGS+=	-fpic
-LIB64CCPUFLAGS+=	-Werror=cheri-bitwise-operations
-LIB64C_MACHINE=	mips
-LIB64C_MACHINE_ARCH=	mips64c128
-LIB64CLDFLAGS=	-fuse-ld=lld
+LIB64CCPUFLAGS+=	-march=morello+c64 -mabi=purecap
 .elif ${COMPAT_ARCH:Mriscv64*} && !${COMPAT_ARCH:Mriscv64*c*}
-HAS_COMPAT+=CHERI
+HAS_COMPAT+=64C
 LIB64C_MACHINE=	riscv
 LIB64C_MACHINE_ARCH=	${COMPAT_ARCH}c
 LIB64CWMAKEFLAGS=	CPUTYPE=cheri
@@ -193,7 +138,7 @@ COMPAT_RISCV_ABI:=	${COMPAT_RISCV_ABI}d
 .endif
 LIB64CCPUFLAGS+=	-march=${COMPAT_RISCV_MARCH} -mabi=${COMPAT_RISCV_ABI}
 .endif	# ${COMPAT_ARCH:Mriscv64*}
-.endif # ${MK_COMPAT_CHERIABI} != "no"
+.endif # ${MK_LIB64C} != "no"
 
 .if ${COMPAT_ARCH:Mriscv*}
 # See bsd.cpu.mk
@@ -202,16 +147,16 @@ COMPAT_RISCV_MARCH=	rv64ima
 COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}fd
 .endif
 COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}c
-.if ${COMPAT_ARCH:Mriscv*c*} || (defined(HAS_COMPAT) && ${HAS_COMPAT:MCHERI})
+.if ${COMPAT_ARCH:Mriscv*c*} || (defined(HAS_COMPAT) && ${HAS_COMPAT:M64C})
 COMPAT_RISCV_MARCH:=	${COMPAT_RISCV_MARCH}xcheri
 .endif
 .endif
 
 # Common CHERI flags
-.if defined(HAS_COMPAT) && ${HAS_COMPAT:MCHERI}
+.if defined(HAS_COMPAT) && ${HAS_COMPAT:M64C}
 LIB64CCFLAGS+=	-DCOMPAT_CHERI
 LIB64CWMAKEFLAGS+=	COMPAT_CHERI=yes
-LIB64C_MACHINE_ABI=	${MACHINE_ABI} purecap
+LIB64C_MACHINE_ABI=	${MACHINE_ABI:Nptr*} purecap ptr128c
 
 # This duplicates some logic in bsd.cpu.mk that is needed for the
 # WANT_COMPAT/NEED_COMPAT case.
@@ -239,22 +184,9 @@ LIB64CCFLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
 .endif
 
 # -------------------------------------------------------------------
-# soft-fp world
-.if ${COMPAT_ARCH:Marmv[67]*}
-HAS_COMPAT=SOFT
-LIBSOFTCFLAGS=        -DCOMPAT_SOFTFP
-LIBSOFTCPUFLAGS= -mfloat-abi=softfp
-LIBSOFT_MACHINE=	arm
-LIBSOFT_MACHINE_ARCH=	${COMPAT_ARCH}
-LIBSOFTWMAKEENV= CPUTYPE=soft
-LIBSOFTWMAKEFLAGS=        -DCOMPAT_SOFTFP
-LIBSOFT_MACHINE_ABI=	${MACHINE_ABI:Nhard-float} soft-float
-.endif
-
-# -------------------------------------------------------------------
 # In the program linking case, select LIBCOMPAT
 .if defined(NEED_COMPAT)
-.if !defined(HAS_COMPAT)
+.ifndef HAS_COMPAT
 .warning NEED_COMPAT defined, but no LIBCOMPAT is available (COMPAT_ARCH == ${COMPAT_ARCH})
 .elif !${HAS_COMPAT:M${NEED_COMPAT}} && ${NEED_COMPAT} != "any"
 .error NEED_COMPAT (${NEED_COMPAT}) defined, but not in HAS_COMPAT (${HAS_COMPAT})
@@ -268,12 +200,12 @@ WANT_COMPAT:=	${NEED_COMPAT}
 
 .if defined(HAS_COMPAT) && defined(WANT_COMPAT)
 .if ${WANT_COMPAT} == "any"
-_LIBCOMPAT:=	${HAS_COMPAT:[1]:S/CHERI/64C/}
+_LIBCOMPAT:=	${HAS_COMPAT:[1]}
 .elif !${HAS_COMPAT:M${WANT_COMPAT}}
 .warning WANT_COMPAT (${WANT_COMPAT}) defined, but not in HAS_COMPAT (${HAS_COMPAT})
 .undef WANT_COMPAT
 .else
-_LIBCOMPAT:=	${WANT_COMPAT:S/CHERI/64C/}
+_LIBCOMPAT:=	${WANT_COMPAT}
 .endif
 .else # defined(HAS_COMPAT) && defined(WANT_COMPAT)
 .undef WANT_COMPAT
@@ -291,6 +223,8 @@ _LIBCOMPAT_MAKEVARS=	_OBJTOP TMP CPUFLAGS CFLAGS CXXFLAGS LDFLAGS \
 LIBCOMPAT${_var}?=	${LIB${_LIBCOMPAT}${_var}}
 .endif
 .endfor
+
+WORLDTMP?=		${SYSROOT}
 
 # Shared flags
 LIBCOMPAT_OBJTOP?=	${OBJTOP}/obj-lib${libcompat}
@@ -311,8 +245,8 @@ LIBCOMPATWMAKEFLAGS+=	TARGET_ARCH=${LIBCOMPAT_MACHINE_ARCH}
 .for BINUTIL in ${XBINUTILS}
 LIBCOMPATWMAKEENV+=	${BINUTIL}="${X${BINUTIL}}"
 .endfor
-# -B is needed to find /usr/lib32/crti.o for GCC and /usr/libsoft/crti.o for
-# Clang/GCC.
+
+# -B is needed to find /usr/lib32/crti.o for gcc.
 LIBCOMPATCFLAGS+=	-B${WORLDTMP}/usr/lib${libcompat}
 
 .if defined(WANT_COMPAT)

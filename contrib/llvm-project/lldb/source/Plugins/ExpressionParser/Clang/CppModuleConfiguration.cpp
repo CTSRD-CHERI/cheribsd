@@ -10,6 +10,7 @@
 
 #include "ClangHost.h"
 #include "lldb/Host/FileSystem.h"
+#include "llvm/ADT/Triple.h"
 
 using namespace lldb_private;
 
@@ -30,7 +31,35 @@ bool CppModuleConfiguration::SetOncePath::TrySet(llvm::StringRef path) {
   return false;
 }
 
-bool CppModuleConfiguration::analyzeFile(const FileSpec &f) {
+static llvm::SmallVector<std::string, 2>
+getTargetIncludePaths(const llvm::Triple &triple) {
+  llvm::SmallVector<std::string, 2> paths;
+  if (!triple.str().empty()) {
+    paths.push_back("/usr/include/" + triple.str());
+    if (!triple.getArchName().empty() ||
+        triple.getOSAndEnvironmentName().empty())
+      paths.push_back(("/usr/include/" + triple.getArchName() + "-" +
+                       triple.getOSAndEnvironmentName())
+                          .str());
+  }
+  return paths;
+}
+
+/// Returns the include path matching the given pattern for the given file
+/// path (or None if the path doesn't match the pattern).
+static llvm::Optional<llvm::StringRef>
+guessIncludePath(llvm::StringRef path_to_file, llvm::StringRef pattern) {
+  if (pattern.empty())
+    return llvm::NoneType();
+  size_t pos = path_to_file.find(pattern);
+  if (pos == llvm::StringRef::npos)
+    return llvm::NoneType();
+
+  return path_to_file.substr(0, pos + pattern.size());
+}
+
+bool CppModuleConfiguration::analyzeFile(const FileSpec &f,
+                                         const llvm::Triple &triple) {
   using namespace llvm::sys::path;
   // Convert to slashes to make following operations simpler.
   std::string dir_buffer = convert_to_slash(f.GetDirectory().GetStringRef());
@@ -38,34 +67,75 @@ bool CppModuleConfiguration::analyzeFile(const FileSpec &f) {
 
   // Check for /c++/vX/ that is used by libc++.
   static llvm::Regex libcpp_regex(R"regex(/c[+][+]/v[0-9]/)regex");
-  if (libcpp_regex.match(f.GetPath())) {
-    // Strip away libc++'s /experimental directory if there is one.
-    posix_dir.consume_back("/experimental");
-    return m_std_inc.TrySet(posix_dir);
+  // If the path is in the libc++ include directory use it as the found libc++
+  // path. Ignore subdirectories such as /c++/v1/experimental as those don't
+  // need to be specified in the header search.
+  if (libcpp_regex.match(f.GetPath()) &&
+      parent_path(posix_dir, Style::posix).endswith("c++")) {
+    if (!m_std_inc.TrySet(posix_dir))
+      return false;
+    if (triple.str().empty())
+      return true;
+
+    posix_dir.consume_back("c++/v1");
+    // Check if this is a target-specific libc++ include directory.
+    return m_std_target_inc.TrySet(
+        (posix_dir + triple.str() + "/c++/v1").str());
   }
 
-  // Check for /usr/include. On Linux this might be /usr/include/bits, so
-  // we should remove that '/bits' suffix to get the actual include directory.
-  if (posix_dir.endswith("/usr/include/bits"))
-    posix_dir.consume_back("/bits");
-  if (posix_dir.endswith("/usr/include"))
-    return m_c_inc.TrySet(posix_dir);
+  llvm::Optional<llvm::StringRef> inc_path;
+  // Target specific paths contains /usr/include, so we check them first
+  for (auto &path : getTargetIncludePaths(triple)) {
+    if ((inc_path = guessIncludePath(posix_dir, path)))
+      return m_c_target_inc.TrySet(*inc_path);
+  }
+  if ((inc_path = guessIncludePath(posix_dir, "/usr/include")))
+    return m_c_inc.TrySet(*inc_path);
 
   // File wasn't interesting, continue analyzing.
   return true;
 }
 
+/// Utility function for just appending two paths.
+static std::string MakePath(llvm::StringRef lhs, llvm::StringRef rhs) {
+  llvm::SmallString<256> result(lhs);
+  llvm::sys::path::append(result, rhs);
+  return std::string(result);
+}
+
 bool CppModuleConfiguration::hasValidConfig() {
-  // We all these include directories to have a valid usable configuration.
-  return m_c_inc.Valid() && m_std_inc.Valid();
+  // We need to have a C and C++ include dir for a valid configuration.
+  if (!m_c_inc.Valid() || !m_std_inc.Valid())
+    return false;
+
+  // Do some basic sanity checks on the directories that we don't activate
+  // the module when it's clear that it's not usable.
+  const std::vector<std::string> files_to_check = {
+      // * Check that the C library contains at least one random C standard
+      //   library header.
+      MakePath(m_c_inc.Get(), "stdio.h"),
+      // * Without a libc++ modulemap file we can't have a 'std' module that
+      //   could be imported.
+      MakePath(m_std_inc.Get(), "module.modulemap"),
+      // * Check for a random libc++ header (vector in this case) that has to
+      //   exist in a working libc++ setup.
+      MakePath(m_std_inc.Get(), "vector"),
+  };
+
+  for (llvm::StringRef file_to_check : files_to_check) {
+    if (!FileSystem::Instance().Exists(file_to_check))
+      return false;
+  }
+
+  return true;
 }
 
 CppModuleConfiguration::CppModuleConfiguration(
-    const FileSpecList &support_files) {
+    const FileSpecList &support_files, const llvm::Triple &triple) {
   // Analyze all files we were given to build the configuration.
   bool error = !llvm::all_of(support_files,
                              std::bind(&CppModuleConfiguration::analyzeFile,
-                                       this, std::placeholders::_1));
+                                       this, std::placeholders::_1, triple));
   // If we have a valid configuration at this point, set the
   // include directories and module list that should be used.
   if (!error && hasValidConfig()) {
@@ -76,7 +146,12 @@ CppModuleConfiguration::CppModuleConfiguration(
     m_resource_inc = std::string(resource_dir.str());
 
     // This order matches the way Clang orders these directories.
-    m_include_dirs = {m_std_inc.Get(), m_resource_inc, m_c_inc.Get()};
+    m_include_dirs = {m_std_inc.Get().str(), m_resource_inc,
+                      m_c_inc.Get().str()};
+    if (m_c_target_inc.Valid())
+      m_include_dirs.push_back(m_c_target_inc.Get().str());
+    if (m_std_target_inc.Valid())
+      m_include_dirs.push_back(m_std_target_inc.Get().str());
     m_imported_modules = {"std"};
   }
 }

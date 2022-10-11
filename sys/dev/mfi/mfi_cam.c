@@ -95,7 +95,6 @@ static int mfi_allow_disks = 0;
 SYSCTL_INT(_hw_mfi, OID_AUTO, allow_cam_disk_passthrough, CTLFLAG_RDTUN,
     &mfi_allow_disks, 0, "event message locale");
 
-static devclass_t	mfip_devclass;
 static device_method_t	mfip_methods[] = {
 	DEVMETHOD(device_probe,		mfip_probe),
 	DEVMETHOD(device_attach,	mfip_attach),
@@ -103,12 +102,14 @@ static device_method_t	mfip_methods[] = {
 
 	DEVMETHOD_END
 };
+
 static driver_t mfip_driver = {
 	"mfip",
 	mfip_methods,
 	sizeof(struct mfip_softc)
 };
-DRIVER_MODULE(mfip, mfi, mfip_driver, mfip_devclass, 0, 0);
+
+DRIVER_MODULE(mfip, mfi, mfip_driver, 0, 0);
 MODULE_DEPEND(mfip, cam, 1, 1, 1);
 MODULE_DEPEND(mfip, mfi, 1, 1, 1);
 
@@ -299,9 +300,9 @@ mfip_cam_rescan(struct mfi_softc *sc, uint32_t tid)
 	struct cam_sim *sim;
 	device_t mfip_dev;
 
-	mtx_lock(&Giant);
+	bus_topo_lock();
 	mfip_dev = device_find_child(sc->mfi_dev, "mfip", -1);
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 	if (mfip_dev == NULL) {
 		device_printf(sc->mfi_dev, "Couldn't find mfip child device!\n");
 		return;
@@ -407,10 +408,8 @@ mfip_done(struct mfi_command *cm)
 	union ccb *ccb = cm->cm_private;
 	struct ccb_hdr *ccbh = &ccb->ccb_h;
 	struct ccb_scsiio *csio = &ccb->csio;
-	struct mfip_softc *sc;
 	struct mfi_pass_frame *pt;
 
-	sc = ccbh->ccb_mfip_ptr;
 	pt = &cm->cm_frame->pass;
 
 	switch (pt->header.cmd_status) {

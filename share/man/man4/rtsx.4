@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd November 24, 2020
+.Dd April 26, 2022
 .Dt RTSX 4
 .Os
 .Sh NAME
@@ -34,18 +34,18 @@
 To compile this driver into the kernel, place the following
 lines in the kernel configuration file:
 .Bd -ragged -offset indent
-.Cd "device mmc"
-.Cd "device mmcsd"
-.Cd "device rtsx"
+.Cd device mmc
+.Cd device mmcsd
+.Cd device rtsx
 .Ed
 .Pp
 Alternatively, to load the driver as a module at boot time,
 place the following lines in
 .Xr loader.conf 5 :
 .Bd -literal -offset indent
-mmc_load="YES"
-mmcsd_load="YES"
-rtsx_load="YES"
+.Cd mmc_load="YES"
+.Cd mmcsd_load="YES"
+.Cd rtsx_load="YES"
 .Ed
 .Sh DESCRIPTION
 The
@@ -69,6 +69,8 @@ RTS5229
 RTS522A
 .It
 RTS525A
+.It
+RTS5260
 .It
 RTL8411B
 .El
@@ -103,19 +105,41 @@ with modifications found in Linux and
 .An Jesper Schmitz Mouridsen Aq Mt jsm@FreeBSD.org
 .Sh CONTRIBUTORS
 .An Lutz Bichler Aq Mt Lutz.Bichler@gmail.com
+.Sh DEBUGGING INFORMATION
+.Em dev.rtsx.0.debug_mask
+can be set with the following masks:
+.Bl -bullet
+.It
+0x01 - to show the basic flow of the driver,
+.It
+0x02 - to trace the SD commands,
+.It
+0x04 - to trace the tuning phase.
+.El
 .Sh BUGS
 .Bl -bullet
 .It
-The timeouts experienced during card insert and during I/O are solved in version 1.0g.
-.It
-RTS522A on Lenovo P50s and Lenovo T470p, card detection and read-only switch are reversed.
-This is sovled by adding in
+RTS522A on Lenovo T470p, card detection and read-only switch are reversed.
+This is solved by adding in
 .Em loader.conf(5) :
 .Bd -ragged
 .Cd dev.rtsx.0.inversion=1
+.Ed
+.Pp
+The driver tries to automate those exceptions.
+If this automation is wrong, it can be avoided by adding in
+.Em loader.conf(5) :
+.Bd -ragged
+.Cd dev.rtsx.0.inversion=0
 .Ed
 .It
 Mounting a filesystem with write access on a card write protected may involve a kernel crash.
 .It
 Suspend/Resume do not work under MMCCAM.
+.It
+For some chips (e.g. RTS5260) after
+.Cd devctl disable/enable
+or
+.Cd kldunload/kldload
+the driver can't detect a card correctly.
 .El

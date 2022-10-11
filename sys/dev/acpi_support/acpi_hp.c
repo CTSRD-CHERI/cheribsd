@@ -349,10 +349,7 @@ static driver_t	acpi_hp_driver = {
 	sizeof(struct acpi_hp_softc),
 };
 
-static devclass_t acpi_hp_devclass;
-
-DRIVER_MODULE(acpi_hp, acpi_wmi, acpi_hp_driver, acpi_hp_devclass,
-		0, 0);
+DRIVER_MODULE(acpi_hp, acpi_wmi, acpi_hp_driver, 0, 0);
 MODULE_DEPEND(acpi_hp, acpi_wmi, 1, 1, 1);
 MODULE_DEPEND(acpi_hp, acpi, 1, 1, 1);
 
@@ -593,14 +590,14 @@ acpi_hp_attach(device_t dev)
 			SYSCTL_ADD_PROC(sc->sysctl_ctx,
 			    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO,
 			    acpi_hp_sysctls[i].name,
-			    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
+			    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE,
 			    sc, i, acpi_hp_sysctl, "I",
 			    acpi_hp_sysctls[i].description);
 		} else {
 			SYSCTL_ADD_PROC(sc->sysctl_ctx,
 			    SYSCTL_CHILDREN(sc->sysctl_tree), OID_AUTO,
 			    acpi_hp_sysctls[i].name,
-			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
 			    sc, i, acpi_hp_sysctl, "I",
 			    acpi_hp_sysctls[i].description);
 		}

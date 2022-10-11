@@ -1,0 +1,11 @@
+#
+# Pure capability ABI kernel for syzkaller fuzzing
+#
+# $FreeBSD$
+
+include "GENERIC-MORELLO-PURECAP"
+
+ident		GENERIC-MORELLO-PURECAP-SYZKALLER
+
+options 	COVERAGE
+options 	KCOV

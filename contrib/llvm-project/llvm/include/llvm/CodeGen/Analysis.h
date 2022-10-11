@@ -92,11 +92,6 @@ void computeValueLLTs(const DataLayout &DL, Type &Ty,
 /// ExtractTypeInfo - Returns the type info, possibly bitcast, encoded in V.
 GlobalValue *ExtractTypeInfo(Value *V);
 
-/// hasInlineAsmMemConstraint - Return true if the inline asm instruction being
-/// processed uses a memory 'm' constraint.
-bool hasInlineAsmMemConstraint(InlineAsm::ConstraintInfoVector &CInfos,
-                               const TargetLowering &TLI);
-
 /// getFCmpCondCode - Return the ISD condition code corresponding to
 /// the given LLVM IR floating-point condition code.  This includes
 /// consideration of global floating-point math flags.
@@ -109,8 +104,11 @@ ISD::CondCode getFCmpCodeWithoutNaN(ISD::CondCode CC);
 
 /// getICmpCondCode - Return the ISD condition code corresponding to
 /// the given LLVM IR integer condition code.
-///
 ISD::CondCode getICmpCondCode(ICmpInst::Predicate Pred);
+
+/// getICmpCondCode - Return the LLVM IR integer condition code
+/// corresponding to the given ISD integer condition code.
+ICmpInst::Predicate getICmpCondCode(ISD::CondCode Pred);
 
 /// Test if the given instruction is in a position to be optimized
 /// with a tail-call. This roughly means that it's in a block with

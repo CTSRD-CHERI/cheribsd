@@ -292,7 +292,7 @@ class Variable {
   std::string N;
 
 public:
-  Variable() : T(Type::getVoid()), N("") {}
+  Variable() : T(Type::getVoid()) {}
   Variable(Type T, std::string N) : T(std::move(T)), N(std::move(N)) {}
 
   Type getType() const { return T; }
@@ -382,7 +382,7 @@ public:
     StringRef Mods = getNextModifiers(Proto, Pos);
     while (!Mods.empty()) {
       Types.emplace_back(InTS, Mods);
-      if (Mods.find("!") != StringRef::npos)
+      if (Mods.contains('!'))
         PolymorphicKeyType = Types.size() - 1;
 
       Mods = getNextModifiers(Proto, Pos);
@@ -417,8 +417,7 @@ public:
 
   /// Return true if the intrinsic takes an immediate operand.
   bool hasImmediate() const {
-    return std::any_of(Types.begin(), Types.end(),
-                       [](const Type &T) { return T.isImmediate(); });
+    return llvm::any_of(Types, [](const Type &T) { return T.isImmediate(); });
   }
 
   /// Return the parameter index of the immediate operand.
@@ -503,6 +502,7 @@ private:
   void emitBody(StringRef CallPrefix);
   void emitShadowedArgs();
   void emitArgumentReversal();
+  void emitReturnVarDecl();
   void emitReturnReversal();
   void emitReverseVariable(Variable &Dest, Variable &Src);
   void emitNewLine();
@@ -580,21 +580,18 @@ public:
     ClassMap[NoTestOpI] = ClassNoTest;
   }
 
-  // run - Emit arm_neon.h.inc
+  // Emit arm_neon.h.inc
   void run(raw_ostream &o);
 
-  // runFP16 - Emit arm_fp16.h.inc
+  // Emit arm_fp16.h.inc
   void runFP16(raw_ostream &o);
 
-  // runBF16 - Emit arm_bf16.h.inc
+  // Emit arm_bf16.h.inc
   void runBF16(raw_ostream &o);
 
-  // runHeader - Emit all the __builtin prototypes used in arm_neon.h,
-  // arm_fp16.h and arm_bf16.h
+  // Emit all the __builtin prototypes used in arm_neon.h, arm_fp16.h and
+  // arm_bf16.h
   void runHeader(raw_ostream &o);
-
-  // runTests - Emit tests for all the Neon intrinsics.
-  void runTests(raw_ostream &o);
 };
 
 } // end anonymous namespace
@@ -1232,6 +1229,15 @@ void Intrinsic::emitArgumentReversal() {
   }
 }
 
+void Intrinsic::emitReturnVarDecl() {
+  assert(RetVar.getType() == Types[0]);
+  // Create a return variable, if we're not void.
+  if (!RetVar.getType().isVoid()) {
+    OS << "  " << RetVar.getType().str() << " " << RetVar.getName() << ";";
+    emitNewLine();
+  }
+}
+
 void Intrinsic::emitReturnReversal() {
   if (isBigEndianSafe())
     return;
@@ -1274,9 +1280,8 @@ void Intrinsic::emitShadowedArgs() {
 }
 
 bool Intrinsic::protoHasScalar() const {
-  return std::any_of(Types.begin(), Types.end(), [](const Type &T) {
-    return T.isScalar() && !T.isImmediate();
-  });
+  return llvm::any_of(
+      Types, [](const Type &T) { return T.isScalar() && !T.isImmediate(); });
 }
 
 void Intrinsic::emitBodyAsBuiltinCall() {
@@ -1311,7 +1316,7 @@ void Intrinsic::emitBodyAsBuiltinCall() {
       if (LocalCK == ClassB) {
         Type T2 = T;
         T2.makeOneVector();
-        T2.makeInteger(8, /*Signed=*/true);
+        T2.makeInteger(8, /*Sign=*/true);
         Cast = "(" + T2.str() + ")";
       }
 
@@ -1357,13 +1362,6 @@ void Intrinsic::emitBodyAsBuiltinCall() {
 
 void Intrinsic::emitBody(StringRef CallPrefix) {
   std::vector<std::string> Lines;
-
-  assert(RetVar.getType() == Types[0]);
-  // Create a return variable, if we're not void.
-  if (!RetVar.getType().isVoid()) {
-    OS << "  " << RetVar.getType().str() << " " << RetVar.getName() << ";";
-    emitNewLine();
-  }
 
   if (!Body || Body->getValues().empty()) {
     // Nothing specific to output - must output a builtin.
@@ -1478,7 +1476,7 @@ Intrinsic::DagEmitter::emitDagCall(DagInit *DI, bool MatchMangledName) {
   Intr.Dependencies.insert(&Callee);
 
   // Now create the call itself.
-  std::string S = "";
+  std::string S;
   if (!Callee.isBigEndianSafe())
     S += CallPrefix.str();
   S += Callee.getMangledName(true) + "(";
@@ -1693,14 +1691,18 @@ std::pair<Type, std::string> Intrinsic::DagEmitter::emitDagDup(DagInit *DI) {
 
 std::pair<Type, std::string> Intrinsic::DagEmitter::emitDagDupTyped(DagInit *DI) {
   assert_with_loc(DI->getNumArgs() == 2, "dup_typed() expects two arguments");
-  std::pair<Type, std::string> A =
-      emitDagArg(DI->getArg(0), std::string(DI->getArgNameStr(0)));
   std::pair<Type, std::string> B =
       emitDagArg(DI->getArg(1), std::string(DI->getArgNameStr(1)));
   assert_with_loc(B.first.isScalar(),
                   "dup_typed() requires a scalar as the second argument");
+  Type T;
+  // If the type argument is a constant string, construct the type directly.
+  if (StringInit *SI = dyn_cast<StringInit>(DI->getArg(0))) {
+    T = Type::fromTypedefName(SI->getAsUnquotedString());
+    assert_with_loc(!T.isVoid(), "Unknown typedef");
+  } else
+    T = emitDagArg(DI->getArg(0), std::string(DI->getArgNameStr(0))).first;
 
-  Type T = A.first;
   assert_with_loc(T.isVector(), "dup_typed() used but target type is scalar!");
   std::string S = "(" + T.str() + ") {";
   for (unsigned I = 0; I < T.getNumElements(); ++I) {
@@ -1850,6 +1852,9 @@ void Intrinsic::generateImpl(bool ReverseArguments,
     OS << " __attribute__((unavailable));";
   } else {
     emitOpeningBrace();
+    // Emit return variable declaration first as to not trigger
+    // -Wdeclaration-after-statement.
+    emitReturnVarDecl();
     emitShadowedArgs();
     if (ReverseArguments)
       emitArgumentReversal();
@@ -1868,6 +1873,9 @@ void Intrinsic::indexBody() {
   CurrentRecord = R;
 
   initVariables();
+  // Emit return variable declaration first as to not trigger
+  // -Wdeclaration-after-statement.
+  emitReturnVarDecl();
   emitBody("");
   OS.str("");
 
@@ -1915,10 +1923,9 @@ Intrinsic &NeonEmitter::getIntrinsic(StringRef Name, ArrayRef<Type> Types,
       continue;
 
     unsigned ArgNum = 0;
-    bool MatchingArgumentTypes =
-        std::all_of(Types.begin(), Types.end(), [&](const auto &Type) {
-          return Type == I.getParamType(ArgNum++);
-        });
+    bool MatchingArgumentTypes = llvm::all_of(Types, [&](const auto &Type) {
+      return Type == I.getParamType(ArgNum++);
+    });
 
     if (MatchingArgumentTypes)
       GoodVec.push_back(&I);
@@ -2114,7 +2121,11 @@ void NeonEmitter::genIntrinsicRangeCheckCode(raw_ostream &OS,
     std::string LowerBound, UpperBound;
 
     Record *R = Def->getRecord();
-    if (R->getValueAsBit("isVCVT_N")) {
+    if (R->getValueAsBit("isVXAR")) {
+      //VXAR takes an immediate in the range [0, 63]
+      LowerBound = "0";
+      UpperBound = "63";
+    } else if (R->getValueAsBit("isVCVT_N")) {
       // VCVT between floating- and fixed-point values takes an immediate
       // in the range [1, 32) for f32 or [1, 64) for f64 or [1, 16) for f16.
       LowerBound = "1";

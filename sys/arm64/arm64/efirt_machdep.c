@@ -147,13 +147,20 @@ efi_1t1_l3(vm_offset_t va)
  * Map a physical address from EFI runtime space into KVA space.  Returns 0 to
  * indicate a failed mapping so that the caller may handle error.
  */
-vm_offset_t
+vm_pointer_t
 efi_phys_to_kva(vm_paddr_t paddr)
 {
+	vm_pointer_t vaddr;
 
-	if (!PHYS_IN_DMAP(paddr))
-		return (0);
-	return (PHYS_TO_DMAP(paddr));
+	if (PHYS_IN_DMAP(paddr)) {
+		vaddr = PHYS_TO_DMAP(paddr);
+		if (pmap_klookup(vaddr, NULL))
+			return (vaddr);
+	}
+
+	/* TODO: Map memory not in the DMAP */
+
+	return (0);
 }
 
 /*
@@ -221,8 +228,8 @@ efi_create_1t1_map(struct efi_md *map, int ndesc, int descsz)
 			l3_attr |= ATTR_S1_XN;
 
 		VM_OBJECT_WLOCK(obj_1t1_pt);
-		for (va = p->md_phys, idx = 0; idx < p->md_pages; idx++,
-		    va += PAGE_SIZE) {
+		for (va = p->md_phys, idx = 0; idx < p->md_pages;
+		    idx += (PAGE_SIZE / EFI_PAGE_SIZE), va += PAGE_SIZE) {
 			l3 = efi_1t1_l3(va);
 			*l3 = va | l3_attr;
 		}
@@ -265,7 +272,11 @@ efi_arch_leave(void)
 	 * the pmap pointer.
 	 */
 	__asm __volatile(
+#ifdef __CHERI_PURE_CAPABILITY__
+	    "mrs c18, ctpidr_el1\n"
+#else
 	    "mrs x18, tpidr_el1	\n"
+#endif
 	);
 	set_ttbr0(pmap_to_ttbr0(PCPU_GET(curpmap)));
 	if (PCPU_GET(bcast_tlbi_workaround) != 0)

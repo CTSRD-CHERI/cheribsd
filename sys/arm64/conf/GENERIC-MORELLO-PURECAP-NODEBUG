@@ -1,0 +1,4 @@
+include	"GENERIC-MORELLO-PURECAP"
+include	"../../conf/std.nodebug"
+
+ident	GENERIC-MORELLO-PURECAP-NODEBUG

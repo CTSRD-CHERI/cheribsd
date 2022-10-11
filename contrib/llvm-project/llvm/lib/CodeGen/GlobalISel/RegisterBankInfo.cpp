@@ -123,7 +123,7 @@ const RegisterBank *RegisterBankInfo::getRegBankFromConstraints(
 
   Register Reg = MI.getOperand(OpIdx).getReg();
   const RegisterBank &RegBank = getRegBankFromRegClass(*RC, MRI.getType(Reg));
-  // Sanity check that the target properly implemented getRegBankFromRegClass.
+  // Check that the target properly implemented getRegBankFromRegClass.
   assert(RegBank.covers(*RC) &&
          "The mapping of the register bank does not make sense");
   return &RegBank;
@@ -421,8 +421,7 @@ RegisterBankInfo::getInstrPossibleMappings(const MachineInstr &MI) const {
 
   // Then the alternative mapping, if any.
   InstructionMappings AltMappings = getInstrAlternativeMappings(MI);
-  for (const InstructionMapping *AltMapping : AltMappings)
-    PossibleMappings.push_back(AltMapping);
+  append_range(PossibleMappings, AltMappings);
 #ifndef NDEBUG
   for (const InstructionMapping *Mapping : PossibleMappings)
     assert(Mapping->verify(MI) && "Mapping is invalid");
@@ -571,7 +570,7 @@ bool RegisterBankInfo::ValueMapping::verify(unsigned MeaningfulBitWidth) const {
     assert((ValueMask & PartMapMask) == PartMapMask &&
            "Some partial mappings overlap");
   }
-  assert(ValueMask.isAllOnesValue() && "Value is not fully mapped");
+  assert(ValueMask.isAllOnes() && "Value is not fully mapped");
   return true;
 }
 

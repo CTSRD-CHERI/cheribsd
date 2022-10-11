@@ -219,15 +219,9 @@ static driver_t bxe_driver = {
     sizeof(struct bxe_softc) /* extra data */
 };
 
-/*
- * FreeBSD dev class is needed to manage dev instances and
- * to associate with a bus type
- */
-static devclass_t bxe_devclass;
-
 MODULE_DEPEND(bxe, pci, 1, 1, 1);
 MODULE_DEPEND(bxe, ether, 1, 1, 1);
-DRIVER_MODULE(bxe, pci, bxe_driver, bxe_devclass, 0, 0);
+DRIVER_MODULE(bxe, pci, bxe_driver, 0, 0);
 
 DEBUGNET_DEFINE(bxe);
 
@@ -2767,7 +2761,7 @@ bxe_tpa_start(struct bxe_softc            *sc,
     struct bxe_sw_rx_bd tmp_bd;
     struct bxe_sw_rx_bd *rx_buf;
     struct eth_rx_bd *rx_bd;
-    int max_agg_queues;
+    int max_agg_queues __diagused;
     struct bxe_sw_tpa_info *tpa_info = &fp->rx_tpa_info[queue];
     uint16_t index;
 
@@ -4794,9 +4788,7 @@ bxe_chktso_window(struct bxe_softc  *sc,
     uint32_t num_wnds, wnd_size, wnd_sum;
     int32_t frag_idx, wnd_idx;
     unsigned short lso_mss;
-    int defrag;
 
-    defrag = 0;
     wnd_sum = 0;
     wnd_size = 10;
     num_wnds = nsegs - wnd_size;
@@ -5675,7 +5667,7 @@ bxe_tx_mq_start_locked(struct bxe_softc    *sc,
     }
 
     /* fetch the depth of the driver queue */
-    depth = drbr_inuse_drv(ifp, tx_br);
+    depth = drbr_inuse(ifp, tx_br);
     if (depth > fp->eth_q_stats.tx_max_drbr_queue_depth) {
         fp->eth_q_stats.tx_max_drbr_queue_depth = depth;
     }
@@ -6084,10 +6076,7 @@ bxe_alloc_mem(struct bxe_softc *sc)
 static void
 bxe_free_rx_bd_chain(struct bxe_fastpath *fp)
 {
-    struct bxe_softc *sc;
     int i;
-
-    sc = fp->sc;
 
     if (fp->rx_mbuf_tag == NULL) {
         return;
@@ -6146,10 +6135,7 @@ bxe_free_tpa_pool(struct bxe_fastpath *fp)
 static void
 bxe_free_sge_chain(struct bxe_fastpath *fp)
 {
-    struct bxe_softc *sc;
     int i;
-
-    sc = fp->sc;
 
     if (fp->rx_sge_mbuf_tag == NULL) {
         return;
@@ -8696,7 +8682,7 @@ bxe_handle_fp_tq(void *context,
 {
     struct bxe_fastpath *fp = (struct bxe_fastpath *)context;
     struct bxe_softc *sc = fp->sc;
-    uint8_t more_tx = FALSE;
+    /* uint8_t more_tx = FALSE; */
     uint8_t more_rx = FALSE;
 
     BLOGD(sc, DBG_INTR, "---> FP TASK QUEUE (%d) <---\n", fp->index);
@@ -8720,7 +8706,7 @@ bxe_handle_fp_tq(void *context,
     /* fp->txdata[cos] */
     if (bxe_has_tx_work(fp)) {
         BXE_FP_TX_LOCK(fp);
-        more_tx = bxe_txeof(sc, fp);
+        /* more_tx = */ bxe_txeof(sc, fp);
         BXE_FP_TX_UNLOCK(fp);
     }
 
@@ -8742,7 +8728,7 @@ static void
 bxe_task_fp(struct bxe_fastpath *fp)
 {
     struct bxe_softc *sc = fp->sc;
-    uint8_t more_tx = FALSE;
+    /* uint8_t more_tx = FALSE; */
     uint8_t more_rx = FALSE;
 
     BLOGD(sc, DBG_INTR, "---> FP TASK ISR (%d) <---\n", fp->index);
@@ -8754,7 +8740,7 @@ bxe_task_fp(struct bxe_fastpath *fp)
     /* fp->txdata[cos] */
     if (bxe_has_tx_work(fp)) {
         BXE_FP_TX_LOCK(fp);
-        more_tx = bxe_txeof(sc, fp);
+        /* more_tx = */ bxe_txeof(sc, fp);
         BXE_FP_TX_UNLOCK(fp);
     }
 
@@ -12363,7 +12349,6 @@ bxe_parity_recover(struct bxe_softc *sc)
 {
     uint8_t global = FALSE;
     uint32_t error_recovered, error_unrecovered;
-    bool is_parity;
 
 
     if ((sc->recovery_state == BXE_RECOVERY_FAILED) &&
@@ -12382,7 +12367,7 @@ bxe_parity_recover(struct bxe_softc *sc)
         switch(sc->recovery_state) {
 
         case BXE_RECOVERY_INIT:
-            is_parity = bxe_chk_parity_attn(sc, &global, FALSE);
+            bxe_chk_parity_attn(sc, &global, FALSE);
 
             if ((CHIP_PORT_MODE(sc) == CHIP_4_PORT_MODE) ||
                 (sc->error_status & BXE_ERR_MCP_ASSERT) ||
@@ -15952,7 +15937,7 @@ bxe_sysctl_pauseparam(SYSCTL_HANDLER_ARGS)
                 return (error);
         }
         if ((sc->bxe_pause_param < 0) ||  (sc->bxe_pause_param > 8)) {
-                BLOGW(sc, "invalid pause param (%d) - use intergers between 1 & 8\n",sc->bxe_pause_param);
+                BLOGW(sc, "invalid pause param (%d) - use integers between 1 & 8\n",sc->bxe_pause_param);
                 sc->bxe_pause_param = 8;
         }
 
@@ -16088,19 +16073,19 @@ bxe_add_sysctls(struct bxe_softc *sc)
                     "rx processing budget");
 
     SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "pause_param",
-        CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+        CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE, sc, 0,
         bxe_sysctl_pauseparam, "IU",
         "need pause frames- DEF:0/TX:1/RX:2/BOTH:3/AUTO:4/AUTOTX:5/AUTORX:6/AUTORXTX:7/NONE:8");
 
 
     SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "state",
-        CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, sc, 0,
+        CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE, sc, 0,
         bxe_sysctl_state, "IU", "dump driver state");
 
     for (i = 0; i < BXE_NUM_ETH_STATS; i++) {
         SYSCTL_ADD_PROC(ctx, children, OID_AUTO,
             bxe_eth_stats_arr[i].string,
-            CTLTYPE_U64 | CTLFLAG_RD | CTLFLAG_NEEDGIANT, sc, i,
+            CTLTYPE_U64 | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, i,
             bxe_sysctl_eth_stat, "LU", bxe_eth_stats_arr[i].string);
     }
 
@@ -16120,7 +16105,7 @@ bxe_add_sysctls(struct bxe_softc *sc)
             q_stat = ((i << 16) | j);
             SYSCTL_ADD_PROC(ctx, queue_children, OID_AUTO,
                  bxe_eth_q_stats_arr[j].string,
-                 CTLTYPE_U64 | CTLFLAG_RD | CTLFLAG_NEEDGIANT, sc, q_stat,
+                 CTLTYPE_U64 | CTLFLAG_RD | CTLFLAG_MPSAFE, sc, q_stat,
                  bxe_sysctl_eth_q_stat, "LU", bxe_eth_q_stats_arr[j].string);
         }
     }
@@ -16245,7 +16230,7 @@ bxe_attach(device_t dev)
     bxe_init_mutexes(sc);
 
     /* prepare the periodic callout */
-    callout_init(&sc->periodic_callout, 0);
+    callout_init(&sc->periodic_callout, 1);
 
     /* prepare the chip taskqueue */
     sc->chip_tq_flags = CHIP_TQ_NONE;
@@ -17179,7 +17164,7 @@ bxe_init_hw_common(struct bxe_softc *sc)
  *          stay set)
  *      f.  If this is VNIC 3 of a port then also init
  *          first_timers_ilt_entry to zero and last_timers_ilt_entry
- *          to the last enrty in the ILT.
+ *          to the last entry in the ILT.
  *
  *      Notes:
  *      Currently the PF error in the PGLC is non recoverable.
@@ -19288,7 +19273,6 @@ bxe_eioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 {
     struct bxe_softc    *sc;
     int                 rval = 0;
-    device_t            pci_dev;
     bxe_grcdump_t       *dump = NULL;
     int grc_dump_size;
     bxe_drvinfo_t   *drv_infop = NULL;
@@ -19302,8 +19286,6 @@ bxe_eioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag,
 
     if ((sc = (struct bxe_softc *)dev->si_drv1) == NULL)
         return ENXIO;
-
-    pci_dev= sc->dev;
 
     dump = (bxe_grcdump_t *)data;
 

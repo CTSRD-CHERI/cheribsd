@@ -43,6 +43,7 @@ static void iser_conn_release(struct icl_conn *ic);
 static icl_conn_new_pdu_t	iser_conn_new_pdu;
 static icl_conn_pdu_free_t	iser_conn_pdu_free;
 static icl_conn_pdu_data_segment_length_t iser_conn_pdu_data_segment_length;
+static icl_conn_pdu_append_bio_t	iser_conn_pdu_append_bio;
 static icl_conn_pdu_append_data_t	iser_conn_pdu_append_data;
 static icl_conn_pdu_queue_t	iser_conn_pdu_queue;
 static icl_conn_handoff_t	iser_conn_handoff;
@@ -51,12 +52,14 @@ static icl_conn_close_t		iser_conn_close;
 static icl_conn_connect_t	iser_conn_connect;
 static icl_conn_task_setup_t	iser_conn_task_setup;
 static icl_conn_task_done_t	iser_conn_task_done;
+static icl_conn_pdu_get_bio_t	iser_conn_pdu_get_bio;
 static icl_conn_pdu_get_data_t	iser_conn_pdu_get_data;
 
 static kobj_method_t icl_iser_methods[] = {
 	KOBJMETHOD(icl_conn_new_pdu, iser_conn_new_pdu),
 	KOBJMETHOD(icl_conn_pdu_free, iser_conn_pdu_free),
 	KOBJMETHOD(icl_conn_pdu_data_segment_length, iser_conn_pdu_data_segment_length),
+	KOBJMETHOD(icl_conn_pdu_append_bio, iser_conn_pdu_append_bio),
 	KOBJMETHOD(icl_conn_pdu_append_data, iser_conn_pdu_append_data),
 	KOBJMETHOD(icl_conn_pdu_queue, iser_conn_pdu_queue),
 	KOBJMETHOD(icl_conn_handoff, iser_conn_handoff),
@@ -65,6 +68,7 @@ static kobj_method_t icl_iser_methods[] = {
 	KOBJMETHOD(icl_conn_connect, iser_conn_connect),
 	KOBJMETHOD(icl_conn_task_setup, iser_conn_task_setup),
 	KOBJMETHOD(icl_conn_task_done, iser_conn_task_done),
+	KOBJMETHOD(icl_conn_pdu_get_bio, iser_conn_pdu_get_bio),
 	KOBJMETHOD(icl_conn_pdu_get_data, iser_conn_pdu_get_data),
 	{ 0, 0 }
 };
@@ -109,19 +113,41 @@ out:
 }
 
 int
+iser_conn_pdu_append_bio(struct icl_conn *ic, struct icl_pdu *request,
+			 struct bio *bp, size_t offset, size_t len, int flags)
+{
+	MPASS(!((request->ip_bhs->bhs_opcode & ISCSI_OPCODE_MASK) ==
+	    ISCSI_BHS_OPCODE_LOGIN_REQUEST ||
+	    (request->ip_bhs->bhs_opcode & ISCSI_OPCODE_MASK) ==
+	    ISCSI_BHS_OPCODE_TEXT_REQUEST));
+
+	return (0);
+}
+
+int
 iser_conn_pdu_append_data(struct icl_conn *ic, struct icl_pdu *request,
 			  const void *addr, size_t len, int flags)
 {
 	struct iser_conn *iser_conn = icl_to_iser_conn(ic);
 
-	if (request->ip_bhs->bhs_opcode & ISCSI_BHS_OPCODE_LOGIN_REQUEST ||
-	    request->ip_bhs->bhs_opcode & ISCSI_BHS_OPCODE_TEXT_REQUEST) {
+	switch (request->ip_bhs->bhs_opcode & ISCSI_OPCODE_MASK) {
+	case ISCSI_BHS_OPCODE_LOGIN_REQUEST:
+	case ISCSI_BHS_OPCODE_TEXT_REQUEST:
 		ISER_DBG("copy to login buff");
 		memcpy(iser_conn->login_req_buf, addr, len);
 		request->ip_data_len = len;
+		break;
 	}
 
 	return (0);
+}
+
+void
+iser_conn_pdu_get_bio(struct icl_conn *ic, struct icl_pdu *ip,
+		      size_t pdu_off, struct bio *bp, size_t bio_off,
+		      size_t len)
+{
+	MPASS(ip->ip_data_mbuf == NULL);
 }
 
 void
@@ -485,7 +511,7 @@ iser_conn_task_done(struct icl_conn *ic, void *prv)
 }
 
 static int
-iser_limits(struct icl_drv_limits *idl)
+iser_limits(struct icl_drv_limits *idl, int socket)
 {
 
 	idl->idl_max_recv_data_segment_length = 128 * 1024;
@@ -566,5 +592,4 @@ moduledata_t icl_iser_data = {
 DECLARE_MODULE(icl_iser, icl_iser_data, SI_SUB_DRIVERS, SI_ORDER_MIDDLE);
 MODULE_DEPEND(icl_iser, icl, 1, 1, 1);
 MODULE_DEPEND(icl_iser, ibcore, 1, 1, 1);
-MODULE_DEPEND(icl_iser, linuxkpi, 1, 1, 1);
 MODULE_VERSION(icl_iser, 1);

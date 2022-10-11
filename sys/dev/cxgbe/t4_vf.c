@@ -489,6 +489,7 @@ t4vf_attach(device_t dev)
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
+	sysctl_ctx_init(&sc->ctx);
 	pci_enable_busmaster(dev);
 	pci_set_max_read_req(dev, 4096);
 	sc->params.pci.mps = pci_get_max_payload(dev);
@@ -974,26 +975,23 @@ static driver_t ccv_driver = {
 	sizeof(struct port_info)
 };
 
-static devclass_t t4vf_devclass, t5vf_devclass, t6vf_devclass;
-static devclass_t cxgbev_devclass, cxlv_devclass, ccv_devclass;
-
-DRIVER_MODULE(t4vf, pci, t4vf_driver, t4vf_devclass, 0, 0);
+DRIVER_MODULE(t4vf, pci, t4vf_driver, 0, 0);
 MODULE_VERSION(t4vf, 1);
 MODULE_DEPEND(t4vf, t4nex, 1, 1, 1);
 
-DRIVER_MODULE(t5vf, pci, t5vf_driver, t5vf_devclass, 0, 0);
+DRIVER_MODULE(t5vf, pci, t5vf_driver, 0, 0);
 MODULE_VERSION(t5vf, 1);
 MODULE_DEPEND(t5vf, t5nex, 1, 1, 1);
 
-DRIVER_MODULE(t6vf, pci, t6vf_driver, t6vf_devclass, 0, 0);
+DRIVER_MODULE(t6vf, pci, t6vf_driver, 0, 0);
 MODULE_VERSION(t6vf, 1);
 MODULE_DEPEND(t6vf, t6nex, 1, 1, 1);
 
-DRIVER_MODULE(cxgbev, t4vf, cxgbev_driver, cxgbev_devclass, 0, 0);
+DRIVER_MODULE(cxgbev, t4vf, cxgbev_driver, 0, 0);
 MODULE_VERSION(cxgbev, 1);
 
-DRIVER_MODULE(cxlv, t5vf, cxlv_driver, cxlv_devclass, 0, 0);
+DRIVER_MODULE(cxlv, t5vf, cxlv_driver, 0, 0);
 MODULE_VERSION(cxlv, 1);
 
-DRIVER_MODULE(ccv, t6vf, ccv_driver, ccv_devclass, 0, 0);
+DRIVER_MODULE(ccv, t6vf, ccv_driver, 0, 0);
 MODULE_VERSION(ccv, 1);

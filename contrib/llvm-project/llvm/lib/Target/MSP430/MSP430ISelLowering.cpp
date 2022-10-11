@@ -20,7 +20,6 @@
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
-#include "llvm/CodeGen/SelectionDAGISel.h"
 #include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/IR/CallingConv.h"
@@ -671,7 +670,7 @@ SDValue MSP430TargetLowering::LowerCCCArguments(
         InVals.push_back(ArgValue);
       }
     } else {
-      // Sanity check
+      // Only arguments passed on the stack should make it here. 
       assert(VA.isMemLoc());
 
       SDValue InVal;
@@ -706,7 +705,7 @@ SDValue MSP430TargetLowering::LowerCCCArguments(
 
   for (unsigned i = 0, e = ArgLocs.size(); i != e; ++i) {
     if (Ins[i].Flags.isSRet()) {
-      unsigned Reg = FuncInfo->getSRetReturnReg();
+      Register Reg = FuncInfo->getSRetReturnReg();
       if (!Reg) {
         Reg = MF.getRegInfo().createVirtualRegister(
             getRegClassFor(MVT::i16));
@@ -773,7 +772,7 @@ MSP430TargetLowering::LowerReturn(SDValue Chain, CallingConv::ID CallConv,
 
   if (MF.getFunction().hasStructRetAttr()) {
     MSP430MachineFunctionInfo *FuncInfo = MF.getInfo<MSP430MachineFunctionInfo>();
-    unsigned Reg = FuncInfo->getSRetReturnReg();
+    Register Reg = FuncInfo->getSRetReturnReg();
 
     if (!Reg)
       llvm_unreachable("sret virtual register not created in entry block");
@@ -1151,7 +1150,7 @@ SDValue MSP430TargetLowering::LowerSETCC(SDValue Op, SelectionDAG &DAG) const {
   // lowering & isel wouldn't diverge.
   bool andCC = false;
   if (ConstantSDNode *RHSC = dyn_cast<ConstantSDNode>(RHS)) {
-    if (RHSC->isNullValue() && LHS.hasOneUse() &&
+    if (RHSC->isZero() && LHS.hasOneUse() &&
         (LHS.getOpcode() == ISD::AND ||
          (LHS.getOpcode() == ISD::TRUNCATE &&
           LHS.getOperand(0).getOpcode() == ISD::AND))) {
@@ -1209,9 +1208,8 @@ SDValue MSP430TargetLowering::LowerSETCC(SDValue Op, SelectionDAG &DAG) const {
     return SR;
   } else {
     SDValue Zero = DAG.getConstant(0, dl, VT);
-    SDVTList VTs = DAG.getVTList(Op.getValueType(), MVT::Glue);
     SDValue Ops[] = {One, Zero, TargetCC, Flag};
-    return DAG.getNode(MSP430ISD::SELECT_CC, dl, VTs, Ops);
+    return DAG.getNode(MSP430ISD::SELECT_CC, dl, Op.getValueType(), Ops);
   }
 }
 
@@ -1227,10 +1225,9 @@ SDValue MSP430TargetLowering::LowerSELECT_CC(SDValue Op,
   SDValue TargetCC;
   SDValue Flag = EmitCMP(LHS, RHS, TargetCC, CC, dl, DAG);
 
-  SDVTList VTs = DAG.getVTList(Op.getValueType(), MVT::Glue);
   SDValue Ops[] = {TrueV, FalseV, TargetCC, Flag};
 
-  return DAG.getNode(MSP430ISD::SELECT_CC, dl, VTs, Ops);
+  return DAG.getNode(MSP430ISD::SELECT_CC, dl, Op.getValueType(), Ops);
 }
 
 SDValue MSP430TargetLowering::LowerSIGN_EXTEND(SDValue Op,
@@ -1392,24 +1389,25 @@ bool MSP430TargetLowering::isTruncateFree(Type *Ty1,
   if (!Ty1->isIntegerTy() || !Ty2->isIntegerTy())
     return false;
 
-  return (Ty1->getPrimitiveSizeInBits() > Ty2->getPrimitiveSizeInBits());
+  return (Ty1->getPrimitiveSizeInBits().getFixedSize() >
+          Ty2->getPrimitiveSizeInBits().getFixedSize());
 }
 
 bool MSP430TargetLowering::isTruncateFree(EVT VT1, EVT VT2) const {
   if (!VT1.isInteger() || !VT2.isInteger())
     return false;
 
-  return (VT1.getSizeInBits() > VT2.getSizeInBits());
+  return (VT1.getFixedSizeInBits() > VT2.getFixedSizeInBits());
 }
 
 bool MSP430TargetLowering::isZExtFree(Type *Ty1, Type *Ty2) const {
   // MSP430 implicitly zero-extends 8-bit results in 16-bit registers.
-  return 0 && Ty1->isIntegerTy(8) && Ty2->isIntegerTy(16);
+  return false && Ty1->isIntegerTy(8) && Ty2->isIntegerTy(16);
 }
 
 bool MSP430TargetLowering::isZExtFree(EVT VT1, EVT VT2) const {
   // MSP430 implicitly zero-extends 8-bit results in 16-bit registers.
-  return 0 && VT1 == MVT::i8 && VT2 == MVT::i16;
+  return false && VT1 == MVT::i8 && VT2 == MVT::i16;
 }
 
 bool MSP430TargetLowering::isZExtFree(SDValue Val, EVT VT2) const {

@@ -14,6 +14,7 @@
 #ifndef LLVM_LIB_TARGET_NVPTX_NVPTX_H
 #define LLVM_LIB_TARGET_NVPTX_NVPTX_H
 
+#include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CodeGen.h"
 
@@ -46,6 +47,24 @@ FunctionPass *createNVPTXLowerArgsPass(const NVPTXTargetMachine *TM);
 FunctionPass *createNVPTXLowerAllocaPass();
 MachineFunctionPass *createNVPTXPeephole();
 MachineFunctionPass *createNVPTXProxyRegErasurePass();
+
+struct NVVMIntrRangePass : PassInfoMixin<NVVMIntrRangePass> {
+  NVVMIntrRangePass();
+  NVVMIntrRangePass(unsigned SmVersion) : SmVersion(SmVersion) {}
+  PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
+
+private:
+  unsigned SmVersion;
+};
+
+struct NVVMReflectPass : PassInfoMixin<NVVMReflectPass> {
+  NVVMReflectPass();
+  NVVMReflectPass(unsigned SmVersion) : SmVersion(SmVersion) {}
+  PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
+
+private:
+  unsigned SmVersion;
+};
 
 namespace NVPTX {
 enum DrvInterface {
@@ -118,10 +137,12 @@ enum CvtMode {
   RZ,
   RM,
   RP,
+  RNA,
 
   BASE_MASK = 0x0F,
   FTZ_FLAG = 0x10,
-  SAT_FLAG = 0x20
+  SAT_FLAG = 0x20,
+  RELU_FLAG = 0x40
 };
 }
 

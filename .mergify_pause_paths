@@ -1,1 +1,1 @@
-^(contrib/jemalloc|sys/kern/(capabilities.conf|syscalls.master|systrace_args.c)|usr.bin/truss|sys/arm64/conf/GENERIC)
+^(contrib/jemalloc|sys/kern/(capabilities.conf|kern_procctl.c|syscalls.master|systrace_args.c)|usr.bin/truss|sys/arm64/conf/GENERIC|sys/.*/elf_machdep.c)

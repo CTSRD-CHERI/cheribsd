@@ -68,7 +68,7 @@ struct Cluster {
 
   int next;
   int prev;
-  size_t size = 0;
+  uint64_t size;
   uint64_t weight = 0;
   uint64_t initialWeight = 0;
   Edge bestPred = {-1, 0};
@@ -114,8 +114,8 @@ CallGraphSort::CallGraphSort() {
 
   // Create the graph.
   for (std::pair<SectionPair, uint64_t> &c : profile) {
-    const auto *fromSB = cast<InputSectionBase>(c.first.first->repl);
-    const auto *toSB = cast<InputSectionBase>(c.first.second->repl);
+    const auto *fromSB = cast<InputSectionBase>(c.first.first);
+    const auto *toSB = cast<InputSectionBase>(c.first.second);
     uint64_t weight = c.second;
 
     // Ignore edges between input sections belonging to different output
@@ -223,14 +223,14 @@ DenseMap<const InputSectionBase *, int> CallGraphSort::run() {
 
   DenseMap<const InputSectionBase *, int> orderMap;
   int curOrder = 1;
-  for (int leader : sorted)
+  for (int leader : sorted) {
     for (int i = leader;;) {
       orderMap[sections[i]] = curOrder++;
       i = clusters[i].next;
       if (i == leader)
         break;
     }
-
+  }
   if (!config->printSymbolOrder.empty()) {
     std::error_code ec;
     raw_fd_ostream os(config->printSymbolOrder, ec, sys::fs::OF_None);
@@ -259,7 +259,7 @@ DenseMap<const InputSectionBase *, int> CallGraphSort::run() {
   return orderMap;
 }
 
-// Sort sections by the profile data provided by -callgraph-profile-file
+// Sort sections by the profile data provided by --callgraph-profile-file.
 //
 // This first builds a call graph based on the profile data then merges sections
 // according to the C³ heuristic. All clusters are then sorted by a density

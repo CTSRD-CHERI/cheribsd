@@ -193,9 +193,9 @@ acpi_dock_attach_later(void *context)
 	if (!device_is_enabled(dev))
 		device_enable(dev);
 
-	mtx_lock(&Giant);
+	bus_topo_lock();
 	device_probe_and_attach(dev);
-	mtx_unlock(&Giant);
+	bus_topo_unlock();
 }
 
 static ACPI_STATUS
@@ -306,9 +306,9 @@ acpi_dock_eject_child(ACPI_HANDLE handle, UINT32 level, void *context,
 
 	dev = acpi_get_device(handle);
 	if (dev != NULL && device_is_attached(dev)) {
-		mtx_lock(&Giant);
+		bus_topo_lock();
 		device_detach(dev);
-		mtx_unlock(&Giant);
+		bus_topo_unlock();
 	}
 
 	acpi_SetInteger(handle, "_EJ0", 0);
@@ -517,7 +517,7 @@ acpi_dock_attach(device_t dev)
 	SYSCTL_ADD_PROC(sc->sysctl_ctx,
 		SYSCTL_CHILDREN(sc->sysctl_tree),
 		OID_AUTO, "status",
-		CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, dev, 0,
+		CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE, dev, 0,
 		acpi_dock_status_sysctl, "I",
 		"Dock/Undock operation");
 
@@ -543,8 +543,6 @@ static driver_t	acpi_dock_driver = {
 	sizeof(struct acpi_dock_softc),
 };
 
-static devclass_t acpi_dock_devclass;
-
-DRIVER_MODULE(acpi_dock, acpi, acpi_dock_driver, acpi_dock_devclass, 0, 0);
+DRIVER_MODULE(acpi_dock, acpi, acpi_dock_driver, 0, 0);
 MODULE_DEPEND(acpi_dock, acpi, 1, 1, 1);
 ACPI_PNP_INFO(acpi_dock_pnp_ids);

@@ -134,9 +134,9 @@ heim_base_atomic_dec(heim_base_atomic_type *x)
 #define heim_base_is_tagged_object(x) (__get_bits((x), 0x3) == 1)
 /* XXXAR: I hope x is never a valid pointer... */
 #define heim_base_make_tagged_object(x, tid) \
-    ((heim_object_t)(intptr_t)((((vaddr_t)(x)) << 5) | ((tid) << 2) | 0x1))
-#define heim_base_tagged_object_tid(x) ((((vaddr_t)(x)) & 0x1f) >> 2)
-#define heim_base_tagged_object_value(x) (((vaddr_t)(x)) >> 5)
+    ((heim_object_t)(intptr_t)((((ptraddr_t)(x)) << 5) | ((tid) << 2) | 0x1))
+#define heim_base_tagged_object_tid(x) ((((ptraddr_t)(x)) & 0x1f) >> 2)
+#define heim_base_tagged_object_value(x) (((ptraddr_t)(x)) >> 5)
 
 /*
  *

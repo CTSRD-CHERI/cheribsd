@@ -253,11 +253,9 @@ main(int argc, char *argv[])
 			 * added for compatibility with SUSv3, but for
 			 * now it will not be described in the man page.
 			 */
-			nselectors++;
 			all = xkeep = 1;
 			break;
 		case 'a':
-			nselectors++;
 			all = 1;
 			break;
 		case 'C':
@@ -473,7 +471,7 @@ main(int argc, char *argv[])
 	if (!_fmt)
 		parsefmt(dfmt, 0);
 
-	if (nselectors == 0) {
+	if (!all && nselectors == 0) {
 		uidlist.l.ptr = malloc(sizeof(uid_t));
 		if (uidlist.l.ptr == NULL)
 			xo_errx(1, "malloc failed");
@@ -525,9 +523,6 @@ main(int argc, char *argv[])
 		} else if (uidlist.count == 1) {
 			what = KERN_PROC_UID | showthreads;
 			flag = *uidlist.l.uids;
-			nselectors = 0;
-		} else if (all) {
-			/* No need for this routine to select processes. */
 			nselectors = 0;
 		}
 	}
@@ -1101,8 +1096,7 @@ descendant_sort(KINFO *ki, int items)
 	 * Now populate ki_d.prefix (instead of ki_d.level) with the command
 	 * prefix used to show descendancies.
 	 */
-	path = malloc((maxlvl + 7) / 8);
-	memset(path, '\0', (maxlvl + 7) / 8);
+	path = calloc((maxlvl + 7) / 8, sizeof(unsigned char));
 	for (src = 0; src < items; src++) {
 		if ((lvl = ki[src].ki_d.level) == 0) {
 			ki[src].ki_d.prefix = NULL;

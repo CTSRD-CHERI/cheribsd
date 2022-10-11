@@ -35,7 +35,7 @@ CFLAGS+=-DNO__SCCSID -DNO__RCSID
 LIB?=c
 SHLIB_MAJOR= 7
 .if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap} && \
-    (${LIBC_ARCH} == "i386" || ${MACHINE_ARCH:Mpower*} != "")
+    (${LIBC_ARCH} == "i386" || ${LIBC_ARCH:Mpowerpc*} != "")
 SHLIB_LDSCRIPT=libc.ldscript
 .else
 SHLIB_LDSCRIPT=libc_nossp.ldscript
@@ -57,6 +57,14 @@ CANCELPOINTS_CFLAGS=-fexceptions
 CFLAGS+=${CANCELPOINTS_CFLAGS}
 .endif
 
+# Use a more efficient TLS model for libc since we can reasonably assume that
+# it will be loaded during program startup.
+.if ${LIBC_ARCH} == "aarch64" || ${LIBC_ARCH} == "amd64" || \
+    ${LIBC_ARCH} == "i386" || ${LIBC_ARCH} == "riscv" || \
+    ${LIBC_ARCH:Mpowerpc*} != ""
+CFLAGS+= -ftls-model=initial-exec
+.endif
+
 #
 # Link with static libcompiler_rt.a.
 #
@@ -64,7 +72,7 @@ LDFLAGS+= -nodefaultlibs
 LIBADD+=	compiler_rt
 
 .if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap} && \
-    (${LIBC_ARCH} == "i386" || ${MACHINE_ARCH:Mpower*} != "")
+    (${LIBC_ARCH} == "i386" || ${LIBC_ARCH:Mpowerpc*} != "")
 LIBADD+=	ssp_nonshared
 .endif
 
@@ -110,9 +118,7 @@ NOASM=
 .if ${LIBC_ARCH} != "aarch64" && \
     ${LIBC_ARCH} != "amd64" && \
     ${LIBC_ARCH} != "powerpc64" && \
-    ${LIBC_ARCH} != "riscv" && \
-    ${MACHINE_ARCH:Mmipsn32*} == "" && \
-    ${MACHINE_ARCH:Mmips64*} == ""
+    ${LIBC_ARCH} != "riscv"
 .include "${LIBC_SRCTOP}/quad/Makefile.inc"
 .endif
 .include "${LIBC_SRCTOP}/regex/Makefile.inc"
@@ -138,7 +144,6 @@ CFLAGS+=	-DNO_SYSCALLS
 .include "${LIBC_SRCTOP}/xdr/Makefile.inc"
 .if (${LIBC_ARCH} == "arm" && \
 	(${MACHINE_ARCH:Marmv[67]*} == "" || (defined(CPUTYPE) && ${CPUTYPE:M*soft*}))) || \
-    (${LIBC_ARCH} == "mips" && ${MACHINE_ARCH:Mmips*hf} == "") || \
     (${LIBC_ARCH} == "riscv" && ${MACHINE_ARCH:Mriscv*sf} != "")
 .include "${LIBC_SRCTOP}/softfloat/Makefile.inc"
 .endif

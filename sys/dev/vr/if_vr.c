@@ -235,10 +235,8 @@ static driver_t vr_driver = {
 	sizeof(struct vr_softc)
 };
 
-static devclass_t vr_devclass;
-
-DRIVER_MODULE(vr, pci, vr_driver, vr_devclass, 0, 0);
-DRIVER_MODULE(miibus, vr, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(vr, pci, vr_driver, 0, 0);
+DRIVER_MODULE(miibus, vr, miibus_driver, 0, 0);
 
 static int
 vr_miibus_readreg(device_t dev, int phy, int reg)
@@ -1934,7 +1932,7 @@ vr_encap(struct vr_softc *sc, struct mbuf **m_head)
 	desc = &sc->vr_rdata.vr_tx_ring[prod];
 
 	/*
-	 * Set EOP on the last desciptor and reuqest Tx completion
+	 * Set EOP on the last descriptor and reuqest Tx completion
 	 * interrupt for every VR_TX_INTR_THRESH-th frames.
 	 */
 	VR_INC(sc->vr_cdata.vr_tx_pkts, VR_TX_INTR_THRESH);

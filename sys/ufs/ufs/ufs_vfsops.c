@@ -68,10 +68,7 @@ MALLOC_DEFINE(M_UFSMNT, "ufs_mount", "UFS mount structure");
  * Return the root of a filesystem.
  */
 int
-ufs_root(mp, flags, vpp)
-	struct mount *mp;
-	int flags;
-	struct vnode **vpp;
+ufs_root(struct mount *mp, int flags, struct vnode **vpp)
 {
 	struct vnode *nvp;
 	int error;
@@ -87,13 +84,10 @@ ufs_root(mp, flags, vpp)
  * Do operations associated with quotas
  */
 int
-ufs_quotactl(struct mount *mp, int cmds, uid_t id, void * __capability arg)
+ufs_quotactl(struct mount *mp, int cmds, uid_t id, void * __capability arg,
+    bool *mp_busy)
 {
 #ifndef QUOTA
-	if ((cmds >> SUBCMDSHIFT) == Q_QUOTAON ||
-	    (cmds >> SUBCMDSHIFT) == Q_QUOTAOFF)
-		vfs_unbusy(mp);
-
 	return (EOPNOTSUPP);
 #else
 	struct thread *td;
@@ -113,26 +107,24 @@ ufs_quotactl(struct mount *mp, int cmds, uid_t id, void * __capability arg)
 			break;
 
 		default:
-			if (cmd == Q_QUOTAON || cmd == Q_QUOTAOFF)
-				vfs_unbusy(mp);
 			return (EINVAL);
 		}
 	}
-	if ((u_int)type >= MAXQUOTAS) {
-		if (cmd == Q_QUOTAON || cmd == Q_QUOTAOFF)
-			vfs_unbusy(mp);
+	if ((u_int)type >= MAXQUOTAS)
 		return (EINVAL);
-	}
 
 	switch (cmd) {
 	case Q_QUOTAON:
-		error = quotaon(td, mp, type, arg);
+		error = quotaon(td, mp, type, arg, mp_busy);
 		break;
 
 	case Q_QUOTAOFF:
 		vfs_ref(mp);
-		vfs_unbusy(mp);
+		KASSERT(*mp_busy,
+		    ("%s called without busied mount", __func__));
 		vn_start_write(NULL, &mp, V_WAIT | V_MNTREF);
+		vfs_unbusy(mp);
+		*mp_busy = false;
 		error = quotaoff(td, mp, type);
 		vn_finished_write(mp);
 		break;
@@ -181,8 +173,7 @@ ufs_quotactl(struct mount *mp, int cmds, uid_t id, void * __capability arg)
  * Initial UFS filesystems, done only once.
  */
 int
-ufs_init(vfsp)
-	struct vfsconf *vfsp;
+ufs_init(struct vfsconf *vfsp)
 {
 
 #ifdef QUOTA
@@ -198,8 +189,7 @@ ufs_init(vfsp)
  * Uninitialise UFS filesystems, done before module unload.
  */
 int
-ufs_uninit(vfsp)
-	struct vfsconf *vfsp;
+ufs_uninit(struct vfsconf *vfsp)
 {
 
 #ifdef QUOTA

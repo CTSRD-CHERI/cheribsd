@@ -134,10 +134,12 @@ void		pci_print_verbose(struct pci_devinfo *dinfo);
 int		pci_freecfg(struct pci_devinfo *dinfo);
 void		pci_child_deleted(device_t dev, device_t child);
 void		pci_child_detached(device_t dev, device_t child);
-int		pci_child_location_str_method(device_t cbdev, device_t child,
-		    char *buf, size_t buflen);
-int		pci_child_pnpinfo_str_method(device_t cbdev, device_t child,
-		    char *buf, size_t buflen);
+int		pci_child_location_method(device_t cbdev, device_t child,
+		    struct sbuf *sb);
+int		pci_child_pnpinfo_method(device_t cbdev, device_t child,
+		    struct sbuf *sb);
+int		pci_get_device_path_method(device_t dev, device_t child,
+		    const char *locator, struct sbuf *sb);
 int		pci_assign_interrupt_method(device_t dev, device_t child);
 int		pci_resume(device_t dev);
 int		pci_resume_child(device_t dev, device_t child);
@@ -162,6 +164,10 @@ void		pci_read_bar(device_t dev, int reg, pci_addr_t *mapp,
 		    pci_addr_t *testvalp, int *bar64);
 struct pci_map *pci_add_bar(device_t dev, int reg, pci_addr_t value,
 		    pci_addr_t size);
+
+struct resource *pci_reserve_map(device_t dev, device_t child, int type,
+		    int *rid, rman_res_t start, rman_res_t end,
+		    rman_res_t count, u_int num, u_int flags);
 
 struct resource *pci_alloc_multi_resource(device_t dev, device_t child,
 		    int type, int *rid, rman_res_t start, rman_res_t end,

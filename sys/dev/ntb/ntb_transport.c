@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/queue.h>
+#include <sys/sbuf.h>
 #include <sys/sysctl.h>
 #include <sys/taskqueue.h>
 
@@ -492,8 +493,8 @@ ntb_transport_attach(device_t dev)
 	for (i = 0; i < nt->qp_count; i++)
 		ntb_transport_init_queue(nt, i);
 
-	callout_init(&nt->link_work, 0);
-	callout_init(&nt->link_watchdog, 0);
+	callout_init(&nt->link_work, 1);
+	callout_init(&nt->link_watchdog, 1);
 	TASK_INIT(&nt->link_cleanup, 0, ntb_transport_link_cleanup_work, nt);
 	nt->link_is_up = false;
 
@@ -576,12 +577,11 @@ ntb_transport_print_child(device_t dev, device_t child)
 }
 
 static int
-ntb_transport_child_location_str(device_t dev, device_t child, char *buf,
-    size_t buflen)
+ntb_transport_child_location(device_t dev, device_t child, struct sbuf *sb)
 {
 	struct ntb_transport_child *nc = device_get_ivars(child);
 
-	snprintf(buf, buflen, "consumer=%d", nc->consumer);
+	sbuf_printf(sb, "consumer=%d", nc->consumer);
 	return (0);
 }
 
@@ -639,7 +639,7 @@ ntb_transport_init_queue(struct ntb_transport_ctx *nt, unsigned int qp_num)
 	qp->tx_max_frame = qmin(transport_mtu, tx_size / 2);
 	qp->tx_max_entry = tx_size / qp->tx_max_frame;
 
-	callout_init(&qp->link_work, 0);
+	callout_init(&qp->link_work, 1);
 	callout_init(&qp->rx_full, 1);
 
 	mtx_init(&qp->ntb_rx_q_lock, "ntb rx q", NULL, MTX_SPIN);
@@ -1684,15 +1684,13 @@ static device_method_t ntb_transport_methods[] = {
 	DEVMETHOD(device_attach,    ntb_transport_attach),
 	DEVMETHOD(device_detach,    ntb_transport_detach),
 	/* Bus interface */
-	DEVMETHOD(bus_child_location_str, ntb_transport_child_location_str),
+	DEVMETHOD(bus_child_location, ntb_transport_child_location),
 	DEVMETHOD(bus_print_child,  ntb_transport_print_child),
 	DEVMETHOD_END
 };
 
-devclass_t ntb_transport_devclass;
 static DEFINE_CLASS_0(ntb_transport, ntb_transport_driver,
     ntb_transport_methods, sizeof(struct ntb_transport_ctx));
-DRIVER_MODULE(ntb_transport, ntb_hw, ntb_transport_driver,
-    ntb_transport_devclass, NULL, NULL);
+DRIVER_MODULE(ntb_transport, ntb_hw, ntb_transport_driver, NULL, NULL);
 MODULE_DEPEND(ntb_transport, ntb, 1, 1, 1);
 MODULE_VERSION(ntb_transport, 1);

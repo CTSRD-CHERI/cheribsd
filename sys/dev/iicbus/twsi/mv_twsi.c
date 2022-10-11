@@ -61,9 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
-#ifdef EXT_RESOURCES
 #include <dev/extres/clk/clk.h>
-#endif
 
 #include <arm/mv/mvreg.h>
 #include <arm/mv/mvvar.h>
@@ -120,10 +118,8 @@ static device_method_t mv_twsi_methods[] = {
 DEFINE_CLASS_1(twsi, mv_twsi_driver, mv_twsi_methods,
     sizeof(struct twsi_softc), twsi_driver);
 
-static devclass_t mv_twsi_devclass;
-
-DRIVER_MODULE(twsi, simplebus, mv_twsi_driver, mv_twsi_devclass, 0, 0);
-DRIVER_MODULE(iicbus, twsi, iicbus_driver, iicbus_devclass, 0, 0);
+DRIVER_MODULE(twsi, simplebus, mv_twsi_driver, 0, 0);
+DRIVER_MODULE(iicbus, twsi, iicbus_driver, 0, 0);
 MODULE_DEPEND(twsi, iicbus, 1, 1, 1);
 SIMPLEBUS_PNP_INFO(compat_data);
 
@@ -138,9 +134,7 @@ mv_twsi_get_node(device_t bus, device_t dev)
 static int
 mv_twsi_probe(device_t dev)
 {
-	struct twsi_softc *sc;
 
-	sc = device_get_softc(dev);
 	if (!ofw_bus_status_okay(dev))
 		return (ENXIO);
 

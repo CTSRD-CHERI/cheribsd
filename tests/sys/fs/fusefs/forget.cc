@@ -32,6 +32,7 @@
 
 extern "C" {
 #include <sys/types.h>
+#include <sys/mount.h>
 #include <sys/sysctl.h>
 
 #include <fcntl.h>
@@ -44,17 +45,11 @@ extern "C" {
 
 using namespace testing;
 
-const char reclaim_mib[] = "debug.try_reclaim_vnode";
-
 class Forget: public FuseTest {
 public:
 void SetUp() {
 	if (geteuid() != 0)
 		GTEST_SKIP() << "Only root may use " << reclaim_mib;
-
-	if (-1 == sysctlbyname(reclaim_mib, NULL, 0, NULL, 0) &&
-	    errno == ENOENT)
-		GTEST_SKIP() << reclaim_mib << " is not available";
 
 	FuseTest::SetUp();
 }
@@ -71,7 +66,6 @@ TEST_F(Forget, ok)
 	uint64_t ino = 42;
 	mode_t mode = S_IFREG | 0755;
 	sem_t sem;
-	int err;
 
 	ASSERT_EQ(0, sem_init(&sem, 0, 0)) << strerror(errno);
 
@@ -94,8 +88,7 @@ TEST_F(Forget, ok)
 	ASSERT_EQ(0, access(FULLPATH, F_OK)) << strerror(errno);
 	ASSERT_EQ(0, access(FULLPATH, F_OK)) << strerror(errno);
 
-	err = sysctlbyname(reclaim_mib, NULL, 0, FULLPATH, sizeof(FULLPATH));
-	ASSERT_EQ(0, err) << strerror(errno);
+	reclaim_vnode(FULLPATH);
 
 	sem_wait(&sem);
 	sem_destroy(&sem);
@@ -113,7 +106,6 @@ TEST_F(Forget, invalidate_names)
 	const char FNAME[] = "some_file.txt";
 	uint64_t dir_ino = 42;
 	uint64_t file_ino = 43;
-	int err;
 
 	EXPECT_LOOKUP(FUSE_ROOT_ID, DNAME)
 	.Times(2)
@@ -149,9 +141,40 @@ TEST_F(Forget, invalidate_names)
 	ASSERT_EQ(0, access(FULLFPATH, F_OK)) << strerror(errno);
 	
 	/* Reclaim the directory, invalidating its children from namecache */
-	err = sysctlbyname(reclaim_mib, NULL, 0, FULLDPATH, sizeof(FULLDPATH));
-	ASSERT_EQ(0, err) << strerror(errno);
+	reclaim_vnode(FULLDPATH);
 
 	/* Access the file again, causing another lookup */
 	ASSERT_EQ(0, access(FULLFPATH, F_OK)) << strerror(errno);
+}
+
+/*
+ * Reclaiming the root inode should not send a FUSE_FORGET request, nor should
+ * it interfere with further lookup operations.
+ */
+TEST_F(Forget, root)
+{
+	const char FULLPATH[] = "mountpoint/some_file.txt";
+	const char RELPATH[] = "some_file.txt";
+	uint64_t ino = 42;
+	mode_t mode = S_IFREG | 0755;
+
+	EXPECT_LOOKUP(FUSE_ROOT_ID, RELPATH)
+	.WillRepeatedly(Invoke(
+		ReturnImmediate([=](auto in __unused, auto& out) {
+		SET_OUT_HEADER_LEN(out, entry);
+		out.body.entry.attr.mode = mode;
+		out.body.entry.nodeid = ino;
+		out.body.entry.attr.nlink = 1;
+		out.body.entry.attr_valid = UINT64_MAX;
+		out.body.entry.entry_valid = UINT64_MAX;
+	})));
+
+	/* access(2) the file to force a lookup. */
+	ASSERT_EQ(0, access(FULLPATH, F_OK)) << strerror(errno);
+
+	reclaim_vnode("mountpoint");
+	nap();
+
+	/* Access it again, to make sure it's still possible. */
+	ASSERT_EQ(0, access(FULLPATH, F_OK)) << strerror(errno);
 }

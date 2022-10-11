@@ -412,8 +412,7 @@ static driver_t lio_driver = {
 	LIO_DRV_NAME, lio_methods, sizeof(struct octeon_device),
 };
 
-devclass_t lio_devclass;
-DRIVER_MODULE(lio, pci, lio_driver, lio_devclass, lio_event, 0);
+DRIVER_MODULE(lio, pci, lio_driver, lio_event, NULL);
 
 MODULE_DEPEND(lio, pci, 1, 1, 1);
 MODULE_DEPEND(lio, ether, 1, 1, 1);
@@ -795,11 +794,10 @@ static int
 lio_chip_specific_setup(struct octeon_device *oct)
 {
 	char		*s;
-	uint32_t	dev_id, rev_id;
+	uint32_t	dev_id;
 	int		ret = 1;
 
 	dev_id = lio_read_pci_cfg(oct, 0);
-	rev_id = pci_get_revid(oct->device);
 	oct->subdevice_id = pci_get_subdevice(oct->device);
 
 	switch (dev_id) {

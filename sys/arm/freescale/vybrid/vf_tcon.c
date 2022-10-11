@@ -74,12 +74,9 @@ static struct resource_spec tcon_spec[] = {
 uint32_t
 tcon_bypass(void)
 {
-	struct tcon_softc *sc;
 
 	if (tcon_sc == NULL)
 		return (1);
-
-	sc = tcon_sc;
 
 	WRITE4(tcon_sc, TCON0_CTRL1, TCON_BYPASS);
 
@@ -133,6 +130,4 @@ static driver_t tcon_driver = {
 	sizeof(struct tcon_softc),
 };
 
-static devclass_t tcon_devclass;
-
-DRIVER_MODULE(tcon, simplebus, tcon_driver, tcon_devclass, 0, 0);
+DRIVER_MODULE(tcon, simplebus, tcon_driver, 0, 0);

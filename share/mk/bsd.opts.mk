@@ -1,6 +1,9 @@
 # $FreeBSD$
 #
-# Option file for src builds.
+# Option file for bmake builds. These options are available to all users of
+# bmake (including the source tree userland and kernel builds). They generally
+# control how binaries are made, shared vs dynamic, etc and some general options
+# relevant for all build environments.
 #
 # Users define WITH_FOO and WITHOUT_FOO on the command line or in /etc/src.conf
 # and /etc/make.conf files. These translate in the build system to MK_FOO={yes,no}
@@ -61,8 +64,7 @@ __DEFAULT_YES_OPTIONS = \
     NIS \
     NLS \
     OPENSSH \
-    PIE \
-    PROFILE \
+    RELRO \
     SSP \
     TESTS \
     TOOLCHAIN \
@@ -70,6 +72,7 @@ __DEFAULT_YES_OPTIONS = \
     WERROR
 
 __DEFAULT_NO_OPTIONS = \
+    ASAN \
     BIND_NOW \
     CCACHE_BUILD \
     CTF \
@@ -77,13 +80,10 @@ __DEFAULT_NO_OPTIONS = \
     INIT_ALL_ZERO \
     INSTALL_AS_USER \
     MANSPLITPKG \
+    PROFILE \
     RETPOLINE \
-    STALE_STAGED
-
-__DEFAULT_NO_OPTIONS+= \
-    CHERI_PURE \
-    CHERI \
-    DEMO_VULNERABILITIES
+    STALE_STAGED \
+    UBSAN
 
 __DEFAULT_DEPENDENT_OPTIONS = \
     MAKE_CHECK_USE_SANDBOX/TESTS \
@@ -97,49 +97,14 @@ __DEFAULT_DEPENDENT_OPTIONS = \
 # some memory-hungry workloads.
 #
 .if ${MACHINE_ARCH} == "armv6" || ${MACHINE_ARCH} == "armv7" \
-    || ${MACHINE_ARCH} == "i386" || ${MACHINE_ARCH} == "mips" \
-    || ${MACHINE_ARCH} == "mipsel" || ${MACHINE_ARCH} == "mipselhf" \
-    || ${MACHINE_ARCH} == "mipshf" || ${MACHINE_ARCH} == "mipsn32" \
-    || ${MACHINE_ARCH} == "mipsn32el" || ${MACHINE_ARCH} == "powerpc" \
+    || ${MACHINE_ARCH} == "i386" || ${MACHINE_ARCH} == "powerpc" \
     || ${MACHINE_ARCH} == "powerpcspe"
 __DEFAULT_NO_OPTIONS+= PIE
 .else
 __DEFAULT_YES_OPTIONS+=PIE
 .endif
 
-#
-# Default behaviour of some options depends on the architecture.  Unfortunately
-# this means that we have to test TARGET_ARCH (the buildworld case) as well
-# as MACHINE_ARCH (the non-buildworld case).  Normally TARGET_ARCH is not
-# used at all in bsd.*.mk, but we have to make an exception here if we want
-# to allow defaults for some things like clang to vary by target architecture.
-# Additional, per-target behavior should be rarely added only after much
-# gnashing of teeth and grinding of gears.
-#
-.if defined(TARGET_ARCH)
-__T=${TARGET_ARCH}
-.else
-__T=${MACHINE_ARCH}
-.endif
-.if defined(TARGET)
-__TT=${TARGET}
-.else
-__TT=${MACHINE}
-.endif
-
-.if !defined(WITH_CHERI) && defined(WITH_CHERI128)
-.if defined(WITHOUT_CHERI)
-.error WITHOUT_CHERI and WITH_CHERI128 makes no sense
-.endif
-.warning WITH_CHERI128 is obsolete, use WITH_CHERI instead.
-WITH_CHERI:=	yes
-.endif
-
 .include <bsd.mkopt.mk>
-
-.if ${__TT:Mmips*} && ${MK_CHERI} == "yes"
-MK_CLANG:=	no
-.endif
 
 .if ${MK_INIT_ALL_PATTERN} == "yes" && ${MK_INIT_ALL_ZERO} == "yes"
 .warning WITH_INIT_ALL_PATTERN and WITH_INIT_ALL_ZERO are mutually exclusive.
@@ -160,7 +125,7 @@ MK_CLANG:=	no
     WARNS \
     WERROR
 .if defined(NO_${var})
-.error "NO_${var} is defined, but deprecated. Please use MK_${var}=no instead."
+.error NO_${var} is defined, but deprecated. Please use MK_${var}=no instead.
 MK_${var}:=no
 .endif
 .endfor

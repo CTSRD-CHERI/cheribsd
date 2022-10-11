@@ -108,14 +108,14 @@ static int dtmap[] = { DT_UNKNOWN, DT_REG, DT_DIR, DT_CHR,
 			DT_UNKNOWN : dtmap[x]
 
 struct fs_ops ext2fs_fsops = {
-	"ext2fs",
-	ext2fs_open,
-	ext2fs_close,
-	ext2fs_read,
-	null_write,
-	ext2fs_seek,
-	ext2fs_stat,
-	ext2fs_readdir
+	.fs_name = "ext2fs",
+	.fo_open = ext2fs_open,
+	.fo_close = ext2fs_close,
+	.fo_read = ext2fs_read,
+	.fo_write = null_write,
+	.fo_seek = ext2fs_seek,
+	.fo_stat = ext2fs_stat,
+	.fo_readdir = ext2fs_readdir,
 };
 
 #define	EXT2_SBSIZE	1024
@@ -127,8 +127,8 @@ struct fs_ops ext2fs_fsops = {
 #define EXT2_R0_ISIZE		128	/* inode size */
 #define EXT2_R0_FIRSTINO	11	/* first inode */
 
-#define EXT2_MINBSHIFT		10	/* mininum block shift */
-#define EXT2_MINFSHIFT		10	/* mininum frag shift */
+#define EXT2_MINBSHIFT		10	/* minimum block shift */
+#define EXT2_MINFSHIFT		10	/* minimum frag shift */
 
 #define EXT2_NDADDR		12	/* # of direct blocks */
 #define EXT2_NIADDR		3	/* # of indirect blocks */

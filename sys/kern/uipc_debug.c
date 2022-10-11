@@ -158,10 +158,6 @@ db_print_sostate(short so_state)
 	int comma;
 
 	comma = 0;
-	if (so_state & SS_NOFDREF) {
-		db_printf("%sSS_NOFDREF", comma ? ", " : "");
-		comma = 1;
-	}
 	if (so_state & SS_ISCONNECTED) {
 		db_printf("%sSS_ISCONNECTED", comma ? ", " : "");
 		comma = 1;
@@ -184,10 +180,6 @@ db_print_sostate(short so_state)
 	}
 	if (so_state & SS_ISCONFIRMING) {
 		db_printf("%sSS_ISCONFIRMING", comma ? ", " : "");
-		comma = 1;
-	}
-	if (so_state & SS_PROTOREF) {
-		db_printf("%sSS_PROTOREF", comma ? ", " : "");
 		comma = 1;
 	}
 }
@@ -251,7 +243,6 @@ db_print_domain(struct domain *d, const char *domain_name, int indent)
 	db_printf("dom_name: %s\n", d->dom_name);
 
 	db_print_indent(indent);
-	db_printf("dom_init: %p   ", d->dom_init);
 	db_printf("dom_externalize: %p   ", d->dom_externalize);
 	db_printf("dom_dispose: %p\n", d->dom_dispose);
 
@@ -330,10 +321,7 @@ db_print_protosw(struct protosw *pr, const char *prname, int indent)
 	db_printf("pr_input: %p   ", pr->pr_input);
 	db_printf("pr_output: %p   ", pr->pr_output);
 	db_printf("pr_ctlinput: %p\n", pr->pr_ctlinput);
-
-	db_print_indent(indent);
 	db_printf("pr_ctloutput: %p   ", pr->pr_ctloutput);
-	db_printf("pr_init: %p\n", pr->pr_init);
 
 	db_print_indent(indent);
 	db_printf("pr_fasttimo: %p   ", pr->pr_fasttimo);
@@ -412,8 +400,6 @@ db_print_sockbuf(struct sockbuf *sb, const char *sockbufname, int indent)
 	db_printf("sb_mbmax: %u\n", sb->sb_mbmax);
 
 	db_print_indent(indent);
-	db_printf("sb_mcnt: %u   ", sb->sb_mcnt);
-	db_printf("sb_ccnt: %u   ", sb->sb_ccnt);
 	db_printf("sb_ctl: %u   ", sb->sb_ctl);
 	db_printf("sb_lowat: %d   ", sb->sb_lowat);
 	db_printf("sb_timeo: %jd\n", sb->sb_timeo);

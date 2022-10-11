@@ -395,7 +395,6 @@ struct sctp_inpcb {
 #ifdef SCTP_TRACK_FREED_ASOCS
 	struct sctpasochead sctp_asoc_free_list;
 #endif
-	struct sctp_iterator *inp_starting_point_for_iterator;
 	uint32_t sctp_frag_point;
 	uint32_t partial_delivery_point;
 	uint32_t sctp_context;
@@ -466,7 +465,6 @@ struct sctp_tcb {
 	uint16_t rport;		/* remote port in network format */
 	uint16_t resv;
 	struct mtx tcb_mtx;
-	struct mtx tcb_send_mtx;
 };
 
 #include <netinet/sctp_lock_bsd.h>
@@ -526,6 +524,9 @@ struct sctp_inpcb *sctp_pcb_findep(struct sockaddr *, int, int, uint32_t);
 int
 sctp_inpcb_bind(struct socket *, struct sockaddr *,
     struct sctp_ifa *, struct thread *);
+int
+sctp_inpcb_bind_locked(struct sctp_inpcb *, struct sockaddr *,
+    struct sctp_ifa *, struct thread *);
 
 struct sctp_tcb *
 sctp_findassociation_addr(struct mbuf *, int,
@@ -573,17 +574,14 @@ void sctp_inpcb_free(struct sctp_inpcb *, int, int);
 
 struct sctp_tcb *
 sctp_aloc_assoc(struct sctp_inpcb *, struct sockaddr *,
-    int *, uint32_t, uint32_t, uint16_t, uint16_t, struct thread *,
-    int);
+    int *, uint32_t, uint32_t, uint32_t, uint16_t, uint16_t,
+    struct thread *, int);
+struct sctp_tcb *
+sctp_aloc_assoc_connected(struct sctp_inpcb *, struct sockaddr *,
+    int *, uint32_t, uint32_t, uint32_t, uint16_t, uint16_t,
+    struct thread *, int);
 
 int sctp_free_assoc(struct sctp_inpcb *, struct sctp_tcb *, int, int);
-
-void sctp_delete_from_timewait(uint32_t, uint16_t, uint16_t);
-
-int sctp_is_in_timewait(uint32_t tag, uint16_t lport, uint16_t rport);
-
-void
-     sctp_add_vtag_to_timewait(uint32_t tag, uint32_t time, uint16_t lport, uint16_t rport);
 
 void sctp_add_local_addr_ep(struct sctp_inpcb *, struct sctp_ifa *, uint32_t);
 
@@ -610,7 +608,8 @@ int
 sctp_set_primary_addr(struct sctp_tcb *, struct sockaddr *,
     struct sctp_nets *);
 
-int sctp_is_vtag_good(uint32_t, uint16_t lport, uint16_t rport, struct timeval *);
+bool
+     sctp_is_vtag_good(uint32_t, uint16_t lport, uint16_t rport, struct timeval *);
 
 /* void sctp_drain(void); */
 
@@ -619,6 +618,9 @@ int sctp_destination_is_reachable(struct sctp_tcb *, struct sockaddr *);
 int sctp_swap_inpcb_for_listen(struct sctp_inpcb *inp);
 
 void sctp_clean_up_stream(struct sctp_tcb *stcb, struct sctp_readhead *rh);
+
+void
+     sctp_pcb_add_flags(struct sctp_inpcb *, uint32_t);
 
 /*-
  * Null in last arg inpcb indicate run on ALL ep's. Specific inp in last arg

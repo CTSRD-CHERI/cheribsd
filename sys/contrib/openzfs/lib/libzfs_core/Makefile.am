@@ -1,19 +1,31 @@
-include $(top_srcdir)/config/Rules.am
+libzfs_core_la_CFLAGS  = $(AM_CFLAGS) $(LIBRARY_CFLAGS)
+libzfs_core_la_CFLAGS += -fvisibility=hidden
 
-pkgconfig_DATA = libzfs_core.pc
+lib_LTLIBRARIES += libzfs_core.la
+CPPCHECKTARGETS += libzfs_core.la
 
-lib_LTLIBRARIES = libzfs_core.la
+libzfs_core_la_SOURCES = \
+	%D%/libzfs_core.c
 
-include $(top_srcdir)/config/Abigail.am
+if BUILD_LINUX
+libzfs_core_la_SOURCES += \
+	%D%/os/linux/libzfs_core_ioctl.c
+endif
 
-USER_C = \
-	libzfs_core.c
+libzfs_core_la_CPPFLAGS  = $(AM_CPPFLAGS)
+if BUILD_FREEBSD
+libzfs_core_la_CPPFLAGS += -Iinclude/os/freebsd/zfs
 
-libzfs_core_la_SOURCES = $(USER_C)
+libzfs_core_la_SOURCES += \
+	%D%/os/freebsd/libzfs_core_ioctl.c
+
+nodist_libzfs_core_la_SOURCES = \
+	module/os/freebsd/zfs/zfs_ioctl_compat.c
+endif
 
 libzfs_core_la_LIBADD = \
-	$(abs_top_builddir)/lib/libzutil/libzutil.la \
-	$(abs_top_builddir)/lib/libnvpair/libnvpair.la
+	libnvpair.la \
+	libspl.la
 
 libzfs_core_la_LIBADD += $(LTLIBINTL)
 
@@ -29,7 +41,6 @@ endif
 
 libzfs_core_la_LDFLAGS += -version-info 3:0:0
 
-include $(top_srcdir)/config/CppCheck.am
+pkgconfig_DATA += %D%/libzfs_core.pc
 
-# Library ABI
-EXTRA_DIST = libzfs_core.abi libzfs_core.suppr
+dist_noinst_DATA += %D%/libzfs_core.abi %D%/libzfs_core.suppr

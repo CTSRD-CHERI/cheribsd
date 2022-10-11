@@ -4,7 +4,11 @@
 
 LIB=	sysdecode
 
-SRCS=	errno.c flags.c ioctl.c signal.c syscallnames.c utrace.c
+SRCS=	errno.c flags.c ioctl.c signal.c syscallnames.c utrace.c support.c
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
+	${MACHINE_CPUARCH} == "i386"
+SRCS+= linux.c
+.endif
 INCS=	sysdecode.h
 
 CFLAGS+= -I${.OBJDIR}
@@ -107,7 +111,7 @@ MLINKS+=sysdecode_mask.3 sysdecode_accessmode.3 \
 	sysdecode_mask.3 sysdecode_wait4_options.3 \
 	sysdecode_mask.3 sysdecode_wait6_options.3
 
-CLEANFILES= ioctl.c ioctl.c.tmp tables.h
+CLEANFILES= ioctl.c ioctl.c.tmp tables.h tables_linux.h
 
 .if defined(COMPAT_32BIT)
 CPP+=	-m32
@@ -127,9 +131,11 @@ CFLAGS.gcc+=	${CFLAGS.gcc.${.IMPSRC}}
 CFLAGS.ioctl.c+=	-Wno-error=cheri-capability-misuse
 .endif
 
-DEPENDOBJS+=	tables.h
+DEPENDOBJS+=	tables.h tables_linux.h
 tables.h: mktables
 	sh ${.CURDIR}/mktables ${SYSROOT:U${DESTDIR}}${INCLUDEDIR} ${.TARGET}
+tables_linux.h: mklinuxtables
+	sh ${.CURDIR}/mklinuxtables ${SRCTOP}/sys ${.TARGET}
 
 # mkioctls runs find(1) for headers so needs to rebuild every time.  This used
 # to be a hack only done in buildworld.
@@ -145,6 +151,9 @@ ioctl.c: ioctl.c.tmp
 		mv -f ${.TARGET}.tmp ${.TARGET}; \
 	fi
 
-beforedepend: ioctl.c tables.h
+beforedepend: ioctl.c tables.h tables_linux.h
+
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.lib.mk>

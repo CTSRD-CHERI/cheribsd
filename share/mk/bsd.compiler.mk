@@ -25,6 +25,7 @@
 # - retpoline: supports the retpoline speculative execution vulnerability
 #              mitigation.
 # - init-all:  supports stack variable initialization.
+# - aarch64-sha512: supports the AArch64 sha512 intrinsic functions.
 #
 # When bootstrapping on macOS, 'apple-clang' will be set in COMPILER_FEATURES
 # to differentiate Apple's version of Clang. Apple Clang uses a different
@@ -69,8 +70,9 @@ CCACHE_BUILD_TYPE?=	command
 # PATH since it is more clear that ccache is used and avoids wasting time
 # for mkdep/linking/asm builds.
 LOCALBASE?=		/usr/local
-CCACHE_WRAPPER_PATH?=	${LOCALBASE}/libexec/ccache
-CCACHE_BIN?=		${LOCALBASE}/bin/ccache
+CCACHE_PKG_PREFIX?=	${LOCALBASE}
+CCACHE_WRAPPER_PATH?=	${CCACHE_PKG_PREFIX}/libexec/ccache
+CCACHE_BIN?=		${CCACHE_PKG_PREFIX}/bin/ccache
 .if exists(${CCACHE_BIN})
 # Export to ensure sub-makes can filter it out for mkdep/linking and
 # to chain down into kernel build which won't include this file.
@@ -164,7 +166,7 @@ _can_export=	yes
 .for var in ${_exported_vars}
 .if defined(${var}) && (!defined(${var}__${${X_}_cc_hash}) || ${${var}__${${X_}_cc_hash}} != ${${var}})
 .if defined(${var}__${${X_}_ld_hash})
-.info "Cannot import ${X_}COMPILER variables since cached ${var} is different: ${${var}__${${X_}_cc_hash}} != ${${var}}"
+.info Cannot import ${X_}COMPILER variables since cached ${var} is different: ${${var}__${${X_}_cc_hash}} != ${${var}}
 .endif
 _can_export=	no
 .endif
@@ -190,9 +192,9 @@ ${X_}COMPILER_FREEBSD_VERSION= 0
 # lot of unccessary fork()+exec() when building world
 # walking the entire object tree
 .if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !make(sysent) && !defined(_CRUNCHGEN)
-.error "${.CURDIR}: Rerunning ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. This value should be cached!"
+.error ${.CURDIR}: Rerunning ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. This value should be cached!
 .else
-# .info "${.CURDIR}: Running ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. ${cc}=${${cc}}"
+# .info ${.CURDIR}: Running ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. ${cc}=${${cc}}
 .endif
 _v!=	${${cc}:N${CCACHE_BIN}} --version || echo 0.0.0
 
@@ -231,9 +233,9 @@ ${X_}COMPILER_FEATURES=	apple-clang
 .endif
 .if !defined(${X_}COMPILER_FREEBSD_VERSION)
 .if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !make(sysent) && !defined(_CRUNCHGEN)
-.error "${.CURDIR}: Recomputing ${X_}COMPILER_FREEBSD_VERSION. This value should be cached!"
+.error ${.CURDIR}: Recomputing ${X_}COMPILER_FREEBSD_VERSION. This value should be cached!
 .else
-# .info "${.CURDIR}: Computing ${X_}COMPILER_FREEBSD_VERSION. ${cc}=${${cc}}"
+# .info ${.CURDIR}: Computing ${X_}COMPILER_FREEBSD_VERSION. ${cc}=${${cc}}
 .endif
 ${X_}COMPILER_FREEBSD_VERSION!=	{ echo "__FreeBSD_cc_version" | ${${cc}:N${CCACHE_BIN}} -E - 2>/dev/null || echo __FreeBSD_cc_version; } | sed -n '$$p'
 # If we get a literal "__FreeBSD_cc_version" back then the compiler
@@ -255,19 +257,19 @@ ${X_}COMPILER_FEATURES+=	c++17
 .endif
 .if ${${X_}COMPILER_TYPE} == "clang"
 ${X_}COMPILER_FEATURES+=	retpoline init-all
-# Detect certain supported warning flags to allow building with clang versions
-# built from git between releases. For example this affects all CHERI LLVM
-# versions that include the April 2021 upstream merge but not the September one.
-# Without this check we get the following build failure:
-# error: unknown warning option '-Werror=unused-but-set-variable'
-_check_flag=${${cc}:N${CCACHE_BIN}} -Werror=unknown-warning-option -fsyntax-only -xc /dev/null
-_warning_flags_to_check=unused-but-set-variable
-.for _flag in ${_warning_flags_to_check}
-_flag_supported!=	${_check_flag} -Werror=${_flag} 2>/dev/null && echo "yes" || echo "no"
-.if ${_flag_supported} == "yes"
-${X_}COMPILER_FEATURES+= W${_flag}
+# PR257638 lld fails with BE compressed debug.  Fixed in main but external tool
+# chains will initially not have the fix.  For now limit the feature to LE
+# targets.
+# When compiling bootstrap tools on non-FreeBSD, the various MACHINE variables
+# for the host can be missing or not match FreeBSD's naming (e.g. Linux/amd64
+# reports as MACHINE=x86_64 MACHINE_ARCH=x86_64), causing TARGET_ENDIANNESS to
+# be undefined; be conservative and default to off until we turn this on by
+# default everywhere.
+.include <bsd.endian.mk>
+.if (${.MAKE.OS} == "FreeBSD" || defined(TARGET_ENDIANNESS)) && \
+    ${TARGET_ENDIANNESS} == "1234"
+${X_}COMPILER_FEATURES+=	compressed-debug
 .endif
-.endfor
 .endif
 
 .if ${${cc}:N${CCACHE_BIN}:[1]:M/*} && exists(${${cc}:N${CCACHE_BIN}:[1]})
@@ -282,6 +284,13 @@ ${X_}COMPILER_ABSOLUTE_PATH!=	which ${${cc}:N${CCACHE_BIN}:[1]}
 .if ${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 100000 || \
 	(${${X_}COMPILER_TYPE} == "gcc" && ${${X_}COMPILER_VERSION} >= 80100)
 ${X_}COMPILER_FEATURES+=	fileprefixmap
+.endif
+
+.if (${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 130000) || \
+	(${${X_}COMPILER_TYPE} == "gcc" && ${${X_}COMPILER_VERSION} >= 90000)
+# AArch64 sha512 intrinsics are supported (and have been tested) in
+# clang 13 and gcc 9.
+${X_}COMPILER_FEATURES+=	aarch64-sha512
 .endif
 
 .else

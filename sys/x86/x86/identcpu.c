@@ -1202,7 +1202,6 @@ static	volatile u_int trap_by_rdmsr;
  * be advanced.
  */
 inthand_t	bluetrap6;
-#ifdef __GNUCLIKE_ASM
 __asm
 ("									\n\
 	.text								\n\
@@ -1214,14 +1213,12 @@ __asm
 	addl	$2, (%esp)	/* rdmsr is a 2-byte instruction */	\n\
 	iret								\n\
 ");
-#endif
 
 /*
  * Special exception 13 handler.
  * Accessing non-existent MSR generates general protection fault.
  */
 inthand_t	bluetrap13;
-#ifdef __GNUCLIKE_ASM
 __asm
 ("									\n\
 	.text								\n\
@@ -1234,7 +1231,6 @@ __asm
 	addl	$2, (%esp)	/* rdmsr is a 2-byte instruction */	\n\
 	iret								\n\
 ");
-#endif
 
 /*
  * Distinguish IBM Blue Lightning CPU from Cyrix CPUs that does not
@@ -1374,7 +1370,7 @@ static struct {
 	const char	*vm_cpuid;
 	int		vm_guest;
 } vm_cpuids[] = {
-	{ "XENXENXEN",		VM_GUEST_XEN },		/* XEN */
+	{ "XenVMMXenVMM",	VM_GUEST_XEN },		/* XEN */
 	{ "Microsoft Hv",	VM_GUEST_HV },		/* Microsoft Hyper-V */
 	{ "VMwareVMware",	VM_GUEST_VMWARE },	/* VMware VM */
 	{ "KVMKVMKVM",		VM_GUEST_KVM },		/* KVM */
@@ -1609,6 +1605,18 @@ identify_cpu2(void)
 
 		if ((cpu_stdext_feature3 & CPUID_STDEXT3_ARCH_CAP) != 0)
 			cpu_ia32_arch_caps = rdmsr(MSR_IA32_ARCH_CAP);
+	}
+}
+
+void
+identify_cpu_ext_features(void)
+{
+	u_int regs[4];
+
+	if (cpu_high >= 7) {
+		cpuid_count(7, 0, regs);
+		cpu_stdext_feature2 = regs[2];
+		cpu_stdext_feature3 = regs[3];
 	}
 }
 

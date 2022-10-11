@@ -127,7 +127,7 @@ bound_ptr(void *mem, size_t nbytes)
 
 	ptr = cheri_setbounds(mem, nbytes);
 	ptr = cheri_andperm(ptr,
-	    CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP);
+	    CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_SW_VMEM);
 	return (ptr);
 }
 
@@ -173,6 +173,21 @@ __simple_malloc_unaligned(size_t nbytes)
 	}
 	/* remove from linked list */
 	nextf[bucket] = op->ov_next;
+	/*
+	 * XXXQEMU: Set an ov_next capability to a NULL capability, clearing any
+	 * permissions.
+	 *
+	 * Based on a tag and permissions of ov_next, find_overhead() determines
+	 * if an allocation is aligned. The QEMU user mode for CheriABI doesn't
+	 * implement tagged memory and find_overhead() might incorrectly assume
+	 * the allocation is aligned because of a non-cleared tag. Having the
+	 * permissions cleared, find_overhead() behaves as expected under the
+	 * user mode.
+	 *
+	 * This is a workaround and should be reverted once the user mode
+	 * implements tagged memory.
+	 */
+	op->ov_next = NULL;
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
 	return (op + 1);
@@ -181,14 +196,14 @@ __simple_malloc_unaligned(size_t nbytes)
 static void *
 __simple_malloc_aligned(size_t nbytes, size_t align)
 {
-	vaddr_t memshift;
+	ptraddr_t memshift;
 	void *mem, *res;
 	if (align < sizeof(void *))
 		align = sizeof(void *);
 
 	mem = __simple_malloc_unaligned(nbytes + sizeof(void *) + align - 1);
-	memshift = roundup2((vaddr_t)mem + sizeof(void *), align) -
-	    (vaddr_t)mem;
+	memshift = roundup2((ptraddr_t)mem + sizeof(void *), align) -
+	    (ptraddr_t)mem;
 
 	res = (void *)((uintptr_t)mem + memshift);
 	*(void **)((uintptr_t)res - sizeof(void *)) = mem;
@@ -301,8 +316,8 @@ find_overhead(void * cp)
 	 *  - Point somewhere before us and within the current pagepool.
 	 */
 	if (cheri_gettag(op->ov_next) &&
-	    (cheri_getperm(op->ov_next) & CHERI_PERM_CHERIABI_VMMAP) != 0) {
-		vaddr_t base, pp_base;
+	    (cheri_getperm(op->ov_next) & CHERI_PERM_SW_VMEM) != 0) {
+		ptraddr_t base, pp_base;
 
 		pp_base = cheri_getbase(op);
 		base = cheri_getbase(op->ov_next);

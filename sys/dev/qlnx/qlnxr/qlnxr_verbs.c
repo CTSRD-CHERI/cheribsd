@@ -71,8 +71,7 @@ __FBSDID("$FreeBSD$");
 	((unsigned char *)&addr)[3]
 
 static int
-qlnxr_check_srq_params(struct ib_pd *ibpd,
-	struct qlnxr_dev *dev,
+qlnxr_check_srq_params(struct qlnxr_dev *dev,
 	struct ib_srq_init_attr *attrs);
 
 static int
@@ -159,9 +158,10 @@ qlnxr_query_gid(struct ib_device *ibdev, u8 port, int index,
 	return 0;
 }
 
-struct ib_srq *
-qlnxr_create_srq(struct ib_pd *ibpd, struct ib_srq_init_attr *init_attr,
-	struct ib_udata *udata)
+int
+qlnxr_create_srq(struct ib_srq *ibsrq,
+		 struct ib_srq_init_attr *init_attr,
+		 struct ib_udata *udata)
 {
 	struct qlnxr_dev	*dev;
 	qlnx_host_t		*ha;
@@ -169,36 +169,28 @@ qlnxr_create_srq(struct ib_pd *ibpd, struct ib_srq_init_attr *init_attr,
 	struct ecore_rdma_create_srq_out_params out_params;
 	struct ecore_rdma_create_srq_in_params in_params;
 	u64 pbl_base_addr, phy_prod_pair_addr;
-	struct qlnxr_pd *pd = get_qlnxr_pd(ibpd);
-	struct ib_ucontext *ib_ctx = NULL;
 	struct qlnxr_srq_hwq_info *hw_srq;
-	struct qlnxr_ucontext *ctx = NULL;
+	struct qlnxr_ucontext *ctx;
 	struct qlnxr_create_srq_ureq ureq;
 	u32 page_cnt, page_size;
-	struct qlnxr_srq *srq;
+	struct qlnxr_srq *srq = get_qlnxr_srq(ibsrq);
 	int ret = 0;
 
-	dev = get_qlnxr_dev((ibpd->device));
+	dev = get_qlnxr_dev(ibsrq->device);
 	ha = dev->ha;
 
 	QL_DPRINT12(ha, "enter\n");
 
-	ret = qlnxr_check_srq_params(ibpd, dev, init_attr);
-
-	srq = kzalloc(sizeof(*srq), GFP_KERNEL);
-	if (!srq) {
-		QL_DPRINT11(ha, "cannot allocate memory for srq\n");
-		return NULL; //@@@ : TODO what to return here?
-	}
+	ret = qlnxr_check_srq_params(dev, init_attr);
 
 	srq->dev = dev;
 	hw_srq = &srq->hw_srq;
 	spin_lock_init(&srq->lock);
 	memset(&in_params, 0, sizeof(in_params));
 
-	if (udata && ibpd->uobject && ibpd->uobject->context) {
-		ib_ctx = ibpd->uobject->context;
-		ctx = get_qlnxr_ucontext(ib_ctx);
+	if (udata) {
+		ctx = rdma_udata_to_drv_context(
+		    udata, struct qlnxr_ucontext, ibucontext);
 
 		memset(&ureq, 0, sizeof(ureq));
 		if (ib_copy_from_udata(&ureq, udata, min(sizeof(ureq),
@@ -208,7 +200,7 @@ qlnxr_create_srq(struct ib_pd *ibpd, struct ib_srq_init_attr *init_attr,
 			goto err0;
 		}
 
-		ret = qlnxr_init_srq_user_params(ib_ctx, srq, &ureq, 0, 0);
+		ret = qlnxr_init_srq_user_params(&ctx->ibucontext, srq, &ureq, 0, 0);
 		if (ret)
 			goto err0;
 
@@ -232,7 +224,7 @@ qlnxr_create_srq(struct ib_pd *ibpd, struct ib_srq_init_attr *init_attr,
 		page_size = pbl->elem_per_page << 4;
 	}
 
-	in_params.pd_id = pd->pd_id;
+	in_params.pd_id = get_qlnxr_pd(ibsrq->pd)->pd_id;
 	in_params.pbl_base_addr = pbl_base_addr;
 	in_params.prod_pair_addr = phy_prod_pair_addr;
 	in_params.num_pages = page_cnt;
@@ -251,7 +243,7 @@ qlnxr_create_srq(struct ib_pd *ibpd, struct ib_srq_init_attr *init_attr,
 	}
 
 	QL_DPRINT12(ha, "created srq with srq_id = 0x%0x\n", srq->srq_id);
-	return &srq->ibsrq;
+	return (0);
 err2:
 	memset(&in_params, 0, sizeof(in_params));
 	destroy_in_params.srq_id = srq->srq_id;
@@ -264,12 +256,11 @@ err1:
 		qlnxr_free_srq_kernel_params(srq);
 
 err0:
-	kfree(srq);	
-	return ERR_PTR(-EFAULT);
+	return (-EFAULT);
 }
 
-int
-qlnxr_destroy_srq(struct ib_srq *ibsrq)
+void
+qlnxr_destroy_srq(struct ib_srq *ibsrq, struct ib_udata *udata)
 {
 	struct qlnxr_dev	*dev;
 	struct qlnxr_srq	*srq;
@@ -291,8 +282,6 @@ qlnxr_destroy_srq(struct ib_srq *ibsrq)
 		qlnxr_free_srq_kernel_params(srq);
 
 	QL_DPRINT12(ha, "destroyed srq_id=0x%0x\n", srq->srq_id);
-	kfree(srq);
-	return 0;
 }
 
 int
@@ -393,8 +382,8 @@ qlnxr_roce_port_immutable(struct ib_device *ibdev, u8 port_num,
 #endif
 
 int
-qlnxr_post_srq_recv(struct ib_srq *ibsrq, struct ib_recv_wr *wr,
-	struct ib_recv_wr **bad_wr)
+qlnxr_post_srq_recv(struct ib_srq *ibsrq, const struct ib_recv_wr *wr,
+	const struct ib_recv_wr **bad_wr)
 {
 	struct qlnxr_dev	*dev;
 	struct qlnxr_srq	*srq;
@@ -718,11 +707,11 @@ qlnxr_link_layer(struct ib_device *ibdev, uint8_t port_num)
         return IB_LINK_LAYER_ETHERNET;
 }
 
-struct ib_pd *
-qlnxr_alloc_pd(struct ib_device *ibdev, struct ib_ucontext *context,
-	struct ib_udata *udata)
+int
+qlnxr_alloc_pd(struct ib_pd *ibpd, struct ib_udata *udata)
 {
-	struct qlnxr_pd		*pd = NULL;
+	struct ib_device *ibdev = ibpd->device;
+	struct qlnxr_pd		*pd = get_qlnxr_pd(ibpd);
 	u16			pd_id;
 	int			rc;
 	struct qlnxr_dev	*dev;
@@ -731,19 +720,11 @@ qlnxr_alloc_pd(struct ib_device *ibdev, struct ib_ucontext *context,
 	dev = get_qlnxr_dev(ibdev);
 	ha = dev->ha;
 
-	QL_DPRINT12(ha, "ibdev = %p context = %p"
-		" udata = %p enter\n", ibdev, context, udata);
+	QL_DPRINT12(ha, "ibdev = %p udata = %p enter\n", ibdev, udata);
 
 	if (dev->rdma_ctx == NULL) {
 		QL_DPRINT11(ha, "dev->rdma_ctx = NULL\n");
 		rc = -1;
-		goto err;
-	}
-
-	pd = kzalloc(sizeof(*pd), GFP_KERNEL);
-	if (!pd) {
-		rc = -ENOMEM;
-		QL_DPRINT11(ha, "kzalloc(pd) = NULL\n");
 		goto err;
 	}
 
@@ -755,7 +736,7 @@ qlnxr_alloc_pd(struct ib_device *ibdev, struct ib_ucontext *context,
 
 	pd->pd_id = pd_id;
 
-	if (udata && context) {
+	if (udata) {
 		rc = ib_copy_to_udata(udata, &pd->pd_id, sizeof(pd->pd_id));
 		if (rc) {
 			QL_DPRINT11(ha, "ib_copy_to_udata failed\n");
@@ -763,7 +744,8 @@ qlnxr_alloc_pd(struct ib_device *ibdev, struct ib_ucontext *context,
 			goto err;
 		}
 
-		pd->uctx = get_qlnxr_ucontext(context);
+		pd->uctx = rdma_udata_to_drv_context(
+		    udata, struct qlnxr_ucontext, ibucontext);
 		pd->uctx->pd = pd;
 	}
 
@@ -771,16 +753,15 @@ qlnxr_alloc_pd(struct ib_device *ibdev, struct ib_ucontext *context,
 	QL_DPRINT12(ha, "exit [pd, pd_id, pd_count] = [%p, 0x%x, %d]\n",
 		pd, pd_id, dev->pd_count);
 
-	return &pd->ibpd;
+	return (0);
 
 err:
-	kfree(pd);
 	QL_DPRINT12(ha, "exit -1\n");
-	return ERR_PTR(rc);
+	return (rc);
 }
 
-int
-qlnxr_dealloc_pd(struct ib_pd *ibpd)
+void
+qlnxr_dealloc_pd(struct ib_pd *ibpd, struct ib_udata *udata)
 {
 	struct qlnxr_pd		*pd;
 	struct qlnxr_dev	*dev;
@@ -796,14 +777,12 @@ qlnxr_dealloc_pd(struct ib_pd *ibpd)
 		QL_DPRINT11(ha, "pd = NULL\n");
 	} else {
 		ecore_rdma_free_pd(dev->rdma_ctx, pd->pd_id);
-		kfree(pd);
 		atomic_subtract_rel_32(&dev->pd_count, 1);
 		QL_DPRINT12(ha, "exit [pd, pd_id, pd_count] = [%p, 0x%x, %d]\n",
 			pd, pd->pd_id, dev->pd_count);
 	}
 
 	QL_DPRINT12(ha, "exit\n");
-	return 0;
 }
 
 #define ROCE_WQE_ELEM_SIZE	sizeof(struct rdma_sq_sge)
@@ -977,24 +956,18 @@ qlnxr_search_mmap(struct qlnxr_ucontext *uctx, u64 phy_addr, unsigned long len)
 	return found;
 }
 
-struct
-ib_ucontext *qlnxr_alloc_ucontext(struct ib_device *ibdev,
-                struct ib_udata *udata)
+int
+qlnxr_alloc_ucontext(struct ib_ucontext *uctx, struct ib_udata *udata)
 {
         int rc;
-        struct qlnxr_ucontext *ctx;
+        struct qlnxr_ucontext *ctx = get_qlnxr_ucontext(uctx);
         struct qlnxr_alloc_ucontext_resp uresp;
-        struct qlnxr_dev *dev = get_qlnxr_dev(ibdev);
+        struct qlnxr_dev *dev = get_qlnxr_dev(uctx->device);
         qlnx_host_t *ha = dev->ha;
         struct ecore_rdma_add_user_out_params oparams;
 
-        if (!udata) {
-                return ERR_PTR(-EFAULT);
-        }
-
-	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
-	if (!ctx)
-		return ERR_PTR(-ENOMEM);
+        if (!udata)
+                return -EFAULT;
 
 	rc = ecore_rdma_add_user(dev->rdma_ctx, &oparams);
 	if (rc) {
@@ -1044,20 +1017,18 @@ ib_ucontext *qlnxr_alloc_ucontext(struct ib_device *ibdev,
 	QL_DPRINT12(ha, "Allocated user context %p\n",
 		&ctx->ibucontext);
 
-	return &ctx->ibucontext;
+	return (0);
 err:
-	kfree(ctx);
-	return ERR_PTR(rc);
+	return (rc);
 }
 
-int
+void
 qlnxr_dealloc_ucontext(struct ib_ucontext *ibctx)
 {
         struct qlnxr_ucontext *uctx = get_qlnxr_ucontext(ibctx);
         struct qlnxr_dev *dev = uctx->dev;
         qlnx_host_t *ha = dev->ha;
         struct qlnxr_mm *mm, *tmp;
-        int status = 0;
 
         QL_DPRINT12(ha, "Deallocating user context %p\n",
                         uctx);
@@ -1073,8 +1044,6 @@ qlnxr_dealloc_ucontext(struct ib_ucontext *ibctx)
                 list_del(&mm->entry);
                 kfree(mm);
         }
-        kfree(uctx);
-        return status;
 }
 
 int
@@ -1266,7 +1235,7 @@ qlnxr_alloc_pbl_tbl(struct qlnxr_dev *dev,
 	dma_addr_t		pa;
 	dma_addr_t		*pbl_main_tbl;
 	struct qlnxr_pbl	*pbl_table;
-	int			i, rc = 0;
+	int			i;
 	qlnx_host_t		*ha;
 
 	ha = dev->ha;
@@ -1284,7 +1253,6 @@ qlnxr_alloc_pbl_tbl(struct qlnxr_dev *dev,
 		va = qlnx_dma_alloc_coherent(&dev->ha->cdev, &pa, pbl_info->pbl_size);
 		if (!va) {
 			QL_DPRINT11(ha, "Failed to allocate pbl#%d\n", i);
-			rc = -ENOMEM;
 			goto err;
 		}
 		memset(va, 0, pbl_info->pbl_size);
@@ -1662,7 +1630,7 @@ err0:
 }
 
 int
-qlnxr_dereg_mr(struct ib_mr *ib_mr)
+qlnxr_dereg_mr(struct ib_mr *ib_mr, struct ib_udata *udata)
 {
 	struct qlnxr_mr	*mr = get_qlnxr_mr(ib_mr);
 	struct qlnxr_dev *dev = get_qlnxr_dev((ib_mr->device));
@@ -1822,35 +1790,10 @@ err:
 	return rc;
 }
 
-#if __FreeBSD_version >= 1102000
-
-struct ib_cq *
-qlnxr_create_cq(struct ib_device *ibdev,
-	const struct ib_cq_init_attr *attr,
-	struct ib_ucontext *ib_ctx,
-	struct ib_udata *udata)
-
-#else 
-
-#if __FreeBSD_version >= 1100000
-
-struct ib_cq *
-qlnxr_create_cq(struct ib_device *ibdev,
-	struct ib_cq_init_attr *attr,
-	struct ib_ucontext *ib_ctx,
-	struct ib_udata *udata)
-
-#else
-
-struct ib_cq *
-qlnxr_create_cq(struct ib_device *ibdev,
-	int entries,
-	int vector,
-	struct ib_ucontext *ib_ctx,
-	struct ib_udata *udata)
-#endif /* #if __FreeBSD_version >= 1100000 */
-
-#endif /* #if __FreeBSD_version >= 1102000 */
+int
+qlnxr_create_cq(struct ib_cq *ibcq,
+		const struct ib_cq_init_attr *attr,
+		struct ib_udata *udata)
 {
 	struct qlnxr_ucontext			*ctx;
 	struct ecore_rdma_destroy_cq_out_params destroy_oparams;
@@ -1863,13 +1806,13 @@ qlnxr_create_cq(struct ib_device *ibdev,
 	int					vector = attr->comp_vector;
 	int					entries = attr->cqe;
 #endif
-	struct qlnxr_cq				*cq;
+	struct qlnxr_cq				*cq = get_qlnxr_cq(ibcq);
 	int					chain_entries, rc, page_cnt;
 	u64					pbl_ptr;
 	u16					icid;
 	qlnx_host_t				*ha;
 
-	dev = get_qlnxr_dev(ibdev);
+	dev = get_qlnxr_dev(ibcq->device);
 	ha = dev->ha;
 
 	QL_DPRINT12(ha, "called from %s. entries = %d, "
@@ -1885,17 +1828,15 @@ qlnxr_create_cq(struct ib_device *ibdev,
 			"the number of entries %d is too high. "
 			"Must be equal or below %d.\n",
 			entries, QLNXR_MAX_CQES);
-		return ERR_PTR(-EINVAL);
+		return -EINVAL;
 	}
 	chain_entries = qlnxr_align_cq_entries(entries);
 	chain_entries = min_t(int, chain_entries, QLNXR_MAX_CQES);
 
-	cq = qlnx_zalloc((sizeof(struct qlnxr_cq)));
-
-	if (!cq)
-		return ERR_PTR(-ENOMEM);
-
 	if (udata) {
+		ctx = rdma_udata_to_drv_context(
+		    udata, struct qlnxr_ucontext, ibucontext);
+
 		memset(&ureq, 0, sizeof(ureq));
 
 		if (ib_copy_from_udata(&ureq, udata,
@@ -1911,13 +1852,15 @@ qlnxr_create_cq(struct ib_device *ibdev,
 
 		cq->cq_type = QLNXR_CQ_TYPE_USER;
 
-		qlnxr_init_user_queue(ib_ctx, dev, &cq->q, ureq.addr, ureq.len,
+		qlnxr_init_user_queue(&ctx->ibucontext, dev, &cq->q, ureq.addr, ureq.len,
 				     IB_ACCESS_LOCAL_WRITE, 1, 1);
 
 		pbl_ptr = cq->q.pbl_tbl->pa;
 		page_cnt = cq->q.pbl_info.num_pbes;
 		cq->ibcq.cqe = chain_entries;
 	} else {
+		ctx = NULL;
+
 		cq->cq_type = QLNXR_CQ_TYPE_KERNEL;
 
                 rc = ecore_chain_alloc(&dev->ha->cdev,
@@ -1944,8 +1887,7 @@ qlnxr_create_cq(struct ib_device *ibdev,
         params.pbl_ptr = pbl_ptr;
         params.pbl_two_level = 0;
 
-	if (ib_ctx != NULL) {
-		ctx = get_qlnxr_ucontext(ib_ctx);
+	if (udata) {
         	params.dpi = ctx->dpi;
 	} else {
         	params.dpi = dev->dpi;
@@ -1959,7 +1901,7 @@ qlnxr_create_cq(struct ib_device *ibdev,
 	cq->sig = QLNXR_CQ_MAGIC_NUMBER;
 	spin_lock_init(&cq->cq_lock);
 
-	if (ib_ctx) {
+	if (udata) {
 		rc = qlnxr_copy_cq_uresp(dev, cq, udata);
 		if (rc)
 			goto err3;
@@ -1990,7 +1932,7 @@ qlnxr_create_cq(struct ib_device *ibdev,
 		" number of entries = 0x%x\n",
 		cq->icid, cq, params.cq_size);
 	QL_DPRINT12(ha,"cq_addr = %p\n", cq);
-	return &cq->ibcq;
+	return (0);
 
 err3:
 	destroy_iparams.icid = cq->icid;
@@ -2004,11 +1946,9 @@ err1:
 	if (udata)
 		ib_umem_release(cq->q.umem);
 err0:
-	kfree(cq);
-
 	QL_DPRINT12(ha, "exit error\n");
 
-	return ERR_PTR(-EINVAL);
+	return (-EINVAL);
 }
 
 int qlnxr_resize_cq(struct ib_cq *ibcq, int new_cnt, struct ib_udata *udata)
@@ -2024,8 +1964,8 @@ int qlnxr_resize_cq(struct ib_cq *ibcq, int new_cnt, struct ib_udata *udata)
 	return status;
 }
 
-int
-qlnxr_destroy_cq(struct ib_cq *ibcq)
+void
+qlnxr_destroy_cq(struct ib_cq *ibcq, struct ib_udata *udata)
 {
 	struct qlnxr_dev			*dev = get_qlnxr_dev((ibcq->device));
 	struct ecore_rdma_destroy_cq_out_params oparams;
@@ -2055,25 +1995,21 @@ qlnxr_destroy_cq(struct ib_cq *ibcq)
 		if (rc) {
 			QL_DPRINT12(ha, "ecore_rdma_destroy_cq failed cq_id = %d\n",
 				cq->icid);
-			return rc;
+			return;
 		}
 
 		QL_DPRINT12(ha, "free cq->pbl cq_id = %d\n", cq->icid);
 		ecore_chain_free(&dev->ha->cdev, &cq->pbl);
 	}
 
-	if (ibcq->uobject && ibcq->uobject->context) {
+	if (udata) {
 		qlnxr_free_pbl(dev, &cq->q.pbl_info, cq->q.pbl_tbl);
 		ib_umem_release(cq->q.umem);
 	}
 
 	cq->sig = ~cq->sig;
 
-	kfree(cq);
-
 	QL_DPRINT12(ha, "exit cq_id = %d\n", cq->icid);
-
-	return rc;
 }
 
 static int
@@ -2393,8 +2329,7 @@ qlnxr_set_common_qp_params(struct qlnxr_dev *dev,
 }
 
 static int
-qlnxr_check_srq_params(struct ib_pd *ibpd,
-	struct qlnxr_dev *dev,
+qlnxr_check_srq_params(struct qlnxr_dev *dev,
 	struct ib_srq_init_attr *attrs)
 {
 	struct ecore_rdma_device *qattr;
@@ -2732,7 +2667,6 @@ qlnxr_create_user_qp(struct qlnxr_dev *dev,
 	struct ecore_rdma_create_qp_out_params out_params;
 	struct qlnxr_pd *pd = get_qlnxr_pd(ibpd);
 	struct ib_ucontext *ib_ctx = NULL;
-	struct qlnxr_ucontext *ctx = NULL;
 	struct qlnxr_create_qp_ureq ureq;
 	int alloc_and_init = QLNX_IS_ROCE(dev);
 	int rc = -EINVAL;
@@ -2743,7 +2677,6 @@ qlnxr_create_user_qp(struct qlnxr_dev *dev,
 	QL_DPRINT12(ha, "enter\n");
 
 	ib_ctx = ibpd->uobject->context;
-	ctx = get_qlnxr_ucontext(ib_ctx);
 
 	memset(&ureq, 0, sizeof(ureq));
 	rc = ib_copy_from_udata(&ureq, udata, sizeof(ureq));
@@ -3281,8 +3214,6 @@ qlnxr_create_qp(struct ib_pd *ibpd,
 
 	return &qp->ibqp;
 err:
-	kfree(qp);
-
 	QL_DPRINT12(ha, "failed exit\n");
 	return ERR_PTR(-EFAULT);
 }
@@ -3543,22 +3474,6 @@ qlnxr_modify_qp(struct ib_qp	*ibqp,
 		new_qp_state = old_qp_state;
 
 	if (QLNX_IS_ROCE(dev)) {
-#if __FreeBSD_version >= 1100000
-		if (!ib_modify_qp_is_ok(old_qp_state,
-					new_qp_state,
-					ibqp->qp_type,
-					attr_mask,
-					IB_LINK_LAYER_ETHERNET)) {
-			QL_DPRINT12(ha,
-				"invalid attribute mask=0x%x"
-				" specified for qpn=0x%x of type=0x%x \n"
-				" old_qp_state=0x%x, new_qp_state=0x%x\n",
-				attr_mask, qp->qp_id, ibqp->qp_type,
-				old_qp_state, new_qp_state);
-			rc = -EINVAL;
-			goto err;
-		}
-#else
 		if (!ib_modify_qp_is_ok(old_qp_state,
 					new_qp_state,
 					ibqp->qp_type,
@@ -3572,8 +3487,6 @@ qlnxr_modify_qp(struct ib_qp	*ibqp,
 			rc = -EINVAL;
 			goto err;
 		}
-
-#endif /* #if __FreeBSD_version >= 1100000 */
 	}
 	/* translate the masks... */
 	if (attr_mask & IB_QP_STATE) {
@@ -4005,9 +3918,9 @@ qlnxr_cleanup_kernel(struct qlnxr_dev *dev, struct qlnxr_qp *qp)
 	return;
 }
 
-int
+static int
 qlnxr_free_qp_resources(struct qlnxr_dev *dev,
-	struct qlnxr_qp *qp)
+    struct qlnxr_qp *qp, struct ib_udata *udata)
 {
 	int		rc = 0;
 	qlnx_host_t	*ha;
@@ -4025,13 +3938,13 @@ qlnxr_free_qp_resources(struct qlnxr_dev *dev,
 			return rc;
 	}
 
-	if (qp->ibqp.uobject && qp->ibqp.uobject->context)
+	if (udata)
 		qlnxr_cleanup_user(dev, qp);
 	else
 		qlnxr_cleanup_kernel(dev, qp);
 #endif
 
-	if (qp->ibqp.uobject && qp->ibqp.uobject->context)
+	if (udata)
 		qlnxr_cleanup_user(dev, qp);
 	else
 		qlnxr_cleanup_kernel(dev, qp);
@@ -4048,7 +3961,7 @@ qlnxr_free_qp_resources(struct qlnxr_dev *dev,
 }
 
 int
-qlnxr_destroy_qp(struct ib_qp *ibqp)
+qlnxr_destroy_qp(struct ib_qp *ibqp, struct ib_udata *udata)
 {
 	struct qlnxr_qp *qp = get_qlnxr_qp(ibqp);
 	struct qlnxr_dev *dev = qp->dev;
@@ -4078,12 +3991,11 @@ qlnxr_destroy_qp(struct ib_qp *ibqp)
 
 	qp->sig = ~qp->sig;
 
-	qlnxr_free_qp_resources(dev, qp);
+	qlnxr_free_qp_resources(dev, qp, udata);
 
 	if (atomic_dec_and_test(&qp->refcnt)) {
 		/* TODO: only for iWARP? */
 		qlnxr_idr_remove(dev, qp->qp_id);
-		kfree(qp);
 	}
 
 	QL_DPRINT12(ha, "exit\n");
@@ -4118,8 +4030,8 @@ static u32
 qlnxr_prepare_sq_inline_data(struct qlnxr_dev *dev,
 	struct qlnxr_qp		*qp,
 	u8			*wqe_size,
-	struct ib_send_wr	*wr,
-	struct ib_send_wr	**bad_wr,
+	const struct ib_send_wr	*wr,
+	const struct ib_send_wr	**bad_wr,
 	u8			*bits,
 	u8			bit)
 {
@@ -4193,7 +4105,7 @@ qlnxr_prepare_sq_inline_data(struct qlnxr_dev *dev,
 
 static u32
 qlnxr_prepare_sq_sges(struct qlnxr_dev *dev, struct qlnxr_qp *qp,
-	u8 *wqe_size, struct ib_send_wr *wr)
+	u8 *wqe_size, const struct ib_send_wr *wr)
 {
 	int i;
 	u32 data_size = 0;
@@ -4224,8 +4136,8 @@ qlnxr_prepare_sq_rdma_data(struct qlnxr_dev *dev,
 	struct qlnxr_qp *qp,
 	struct rdma_sq_rdma_wqe_1st *rwqe,
 	struct rdma_sq_rdma_wqe_2nd *rwqe2,
-	struct ib_send_wr *wr,
-	struct ib_send_wr **bad_wr)
+	const struct ib_send_wr *wr,
+	const struct ib_send_wr **bad_wr)
 {
 	qlnx_host_t	*ha;
 	u32             ret = 0;
@@ -4256,8 +4168,8 @@ qlnxr_prepare_sq_send_data(struct qlnxr_dev *dev,
 	struct qlnxr_qp *qp,
 	struct rdma_sq_send_wqe *swqe,
 	struct rdma_sq_send_wqe *swqe2,
-	struct ib_send_wr *wr,
-	struct ib_send_wr **bad_wr)
+	const struct ib_send_wr *wr,
+	const struct ib_send_wr **bad_wr)
 {
 	qlnx_host_t	*ha;
 	u32             ret = 0;
@@ -4317,7 +4229,7 @@ qlnx_handle_completed_mrs(struct qlnxr_dev *dev, struct mr_info *info)
 
 static int qlnxr_prepare_reg(struct qlnxr_qp *qp,
 		struct rdma_sq_fmr_wqe_1st *fwqe1,
-		struct ib_reg_wr *wr)
+		const struct ib_reg_wr *wr)
 {
 	struct qlnxr_mr *mr = get_qlnxr_mr(wr->mr);
 	struct rdma_sq_fmr_wqe_2nd *fwqe2;
@@ -4356,7 +4268,7 @@ static int qlnxr_prepare_reg(struct qlnxr_qp *qp,
 #else
 
 static void
-build_frmr_pbes(struct qlnxr_dev *dev, struct ib_send_wr *wr,
+build_frmr_pbes(struct qlnxr_dev *dev, const struct ib_send_wr *wr,
 	struct mr_info *info)
 {
 	int i;
@@ -4441,7 +4353,7 @@ qlnxr_prepare_safe_pbl(struct qlnxr_dev *dev, struct mr_info *info)
 static inline int
 qlnxr_prepare_fmr(struct qlnxr_qp *qp,
 	struct rdma_sq_fmr_wqe_1st *fwqe1,
-	struct ib_send_wr *wr)
+	const struct ib_send_wr *wr)
 {
 	struct qlnxr_dev *dev = qp->dev;
 	u64 fbo;
@@ -4543,7 +4455,7 @@ qlnxr_ib_to_wc_opcode(enum ib_wr_opcode opcode)
 	}
 }
 static inline bool
-qlnxr_can_post_send(struct qlnxr_qp *qp, struct ib_send_wr *wr)
+qlnxr_can_post_send(struct qlnxr_qp *qp, const struct ib_send_wr *wr)
 {
 	int wq_is_full, err_wr, pbl_is_full;
 	struct qlnxr_dev *dev = qp->dev;
@@ -4599,8 +4511,8 @@ qlnxr_can_post_send(struct qlnxr_qp *qp, struct ib_send_wr *wr)
 
 int
 qlnxr_post_send(struct ib_qp *ibqp,
-	struct ib_send_wr *wr,
-	struct ib_send_wr **bad_wr)
+	const struct ib_send_wr *wr,
+	const struct ib_send_wr **bad_wr)
 {
 	struct qlnxr_dev	*dev = get_qlnxr_dev(ibqp->device);
 	struct qlnxr_qp		*qp = get_qlnxr_qp(ibqp);
@@ -4990,8 +4902,8 @@ qlnxr_srq_elem_left(struct qlnxr_srq_hwq_info *hw_srq)
 
 int
 qlnxr_post_recv(struct ib_qp *ibqp,
-	struct ib_recv_wr *wr,
-	struct ib_recv_wr **bad_wr)
+	const struct ib_recv_wr *wr,
+	const struct ib_recv_wr **bad_wr)
 {
  	struct qlnxr_qp		*qp = get_qlnxr_qp(ibqp);
 	struct qlnxr_dev	*dev = qp->dev;
@@ -5855,7 +5767,8 @@ err0:
 #if __FreeBSD_version >= 1102000
 
 struct ib_mr *
-qlnxr_alloc_mr(struct ib_pd *ibpd, enum ib_mr_type mr_type, u32 max_num_sg)
+qlnxr_alloc_mr(struct ib_pd *ibpd, enum ib_mr_type mr_type,
+    u32 max_num_sg, struct ib_udata *udata)
 {
 	struct qlnxr_dev *dev;
 	struct qlnxr_mr *mr;
@@ -6284,48 +6197,28 @@ err0:
 
 #endif /* #if __FreeBSD_version >= 1102000 */
 
-struct ib_ah *
-#if __FreeBSD_version >= 1102000
-qlnxr_create_ah(struct ib_pd *ibpd, struct ib_ah_attr *attr,
+int
+qlnxr_create_ah(struct ib_ah *ibah,
+	struct ib_ah_attr *attr, u32 flags,
 	struct ib_udata *udata)
-#else
-qlnxr_create_ah(struct ib_pd *ibpd, struct ib_ah_attr *attr)
-#endif /* #if __FreeBSD_version >= 1102000 */
 {
 	struct qlnxr_dev *dev;
 	qlnx_host_t	*ha;
-	struct qlnxr_ah *ah;
+	struct qlnxr_ah *ah = get_qlnxr_ah(ibah);
 
-	dev = get_qlnxr_dev((ibpd->device));
+	dev = get_qlnxr_dev(ibah->device);
 	ha = dev->ha;
 
 	QL_DPRINT12(ha, "in create_ah\n");
 
-	ah = kzalloc(sizeof(*ah), GFP_ATOMIC);
-	if (!ah) {
-		QL_DPRINT12(ha, "no address handle can be allocated\n");
-		return ERR_PTR(-ENOMEM);
-	}
-
 	ah->attr = *attr;	
 
-	return &ah->ibah;
+	return (0);
 }
 
-int
-qlnxr_destroy_ah(struct ib_ah *ibah)
+void
+qlnxr_destroy_ah(struct ib_ah *ibah, u32 flags)
 {
-	struct qlnxr_dev *dev;
-	qlnx_host_t     *ha;
-	struct qlnxr_ah *ah = get_qlnxr_ah(ibah);
-
-	dev = get_qlnxr_dev((ibah->device));
-	ha = dev->ha;
-
-	QL_DPRINT12(ha, "in destroy_ah\n");
-
-	kfree(ah);
-	return 0;
 }
 
 int
@@ -7205,7 +7098,6 @@ qlnxr_iw_qp_rem_ref(struct ib_qp *ibqp)
 
 	if (atomic_dec_and_test(&qp->refcnt)) {
 		qlnxr_idr_remove(qp->dev, qp->qp_id);
-		kfree(qp);
 	}
 
 	QL_DPRINT12(ha, "exit \n");

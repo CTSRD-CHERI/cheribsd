@@ -35,6 +35,7 @@
 #include <sys/vdev_impl.h>
 #include <sys/vdev_draid.h>
 #include <sys/zio.h>
+#include <sys/zio_checksum.h>
 #include <sys/abd.h>
 #include <sys/fs/zfs.h>
 
@@ -102,6 +103,7 @@ vdev_mirror_stat_fini(void)
  */
 typedef struct mirror_child {
 	vdev_t		*mc_vd;
+	abd_t		*mc_abd;
 	uint64_t	mc_offset;
 	int		mc_error;
 	int		mc_load;
@@ -121,7 +123,7 @@ typedef struct mirror_map {
 	mirror_child_t	mm_child[];
 } mirror_map_t;
 
-static int vdev_mirror_shift = 21;
+static const int vdev_mirror_shift = 21;
 
 /*
  * The load configuration settings below are tuned by default for
@@ -439,32 +441,6 @@ vdev_mirror_child_done(zio_t *zio)
 	mc->mc_skipped = 0;
 }
 
-static void
-vdev_mirror_scrub_done(zio_t *zio)
-{
-	mirror_child_t *mc = zio->io_private;
-
-	if (zio->io_error == 0) {
-		zio_t *pio;
-		zio_link_t *zl = NULL;
-
-		mutex_enter(&zio->io_lock);
-		while ((pio = zio_walk_parents(zio, &zl)) != NULL) {
-			mutex_enter(&pio->io_lock);
-			ASSERT3U(zio->io_size, >=, pio->io_size);
-			abd_copy(pio->io_abd, zio->io_abd, pio->io_size);
-			mutex_exit(&pio->io_lock);
-		}
-		mutex_exit(&zio->io_lock);
-	}
-
-	abd_free(zio->io_abd);
-
-	mc->mc_error = zio->io_error;
-	mc->mc_tried = 1;
-	mc->mc_skipped = 0;
-}
-
 /*
  * Check the other, lower-index DVAs to see if they're on the same
  * vdev as the child we picked.  If they are, use them since they
@@ -496,7 +472,7 @@ vdev_mirror_preferred_child_randomize(zio_t *zio)
 	int p;
 
 	if (mm->mm_root) {
-		p = spa_get_random(mm->mm_preferred_cnt);
+		p = random_in_range(mm->mm_preferred_cnt);
 		return (vdev_mirror_dva_select(zio, p));
 	}
 
@@ -637,24 +613,35 @@ vdev_mirror_io_start(zio_t *zio)
 	}
 
 	if (zio->io_type == ZIO_TYPE_READ) {
-		if (zio->io_bp != NULL &&
-		    (zio->io_flags & ZIO_FLAG_SCRUB) && !mm->mm_resilvering) {
+		if ((zio->io_flags & ZIO_FLAG_SCRUB) && !mm->mm_resilvering) {
 			/*
-			 * For scrubbing reads (if we can verify the
-			 * checksum here, as indicated by io_bp being
-			 * non-NULL) we need to allocate a read buffer for
-			 * each child and issue reads to all children.  If
-			 * any child succeeds, it will copy its data into
-			 * zio->io_data in vdev_mirror_scrub_done.
+			 * For scrubbing reads we need to issue reads to all
+			 * children.  One child can reuse parent buffer, but
+			 * for others we have to allocate separate ones to
+			 * verify checksums if io_bp is non-NULL, or compare
+			 * them in vdev_mirror_io_done() otherwise.
 			 */
+			boolean_t first = B_TRUE;
 			for (c = 0; c < mm->mm_children; c++) {
 				mc = &mm->mm_child[c];
-				zio_nowait(zio_vdev_child_io(zio, zio->io_bp,
-				    mc->mc_vd, mc->mc_offset,
+
+				/* Don't issue ZIOs to offline children */
+				if (!vdev_mirror_child_readable(mc)) {
+					mc->mc_error = SET_ERROR(ENXIO);
+					mc->mc_tried = 1;
+					mc->mc_skipped = 1;
+					continue;
+				}
+
+				mc->mc_abd = first ? zio->io_abd :
 				    abd_alloc_sametype(zio->io_abd,
-				    zio->io_size), zio->io_size,
-				    zio->io_type, zio->io_priority, 0,
-				    vdev_mirror_scrub_done, mc));
+				    zio->io_size);
+				zio_nowait(zio_vdev_child_io(zio, zio->io_bp,
+				    mc->mc_vd, mc->mc_offset, mc->mc_abd,
+				    zio->io_size, zio->io_type,
+				    zio->io_priority, 0,
+				    vdev_mirror_child_done, mc));
+				first = B_FALSE;
 			}
 			zio_execute(zio);
 			return;
@@ -722,6 +709,7 @@ vdev_mirror_io_done(zio_t *zio)
 	int c;
 	int good_copies = 0;
 	int unexpected_errors = 0;
+	int last_good_copy = -1;
 
 	if (mm == NULL)
 		return;
@@ -733,6 +721,7 @@ vdev_mirror_io_done(zio_t *zio)
 			if (!mc->mc_skipped)
 				unexpected_errors++;
 		} else if (mc->mc_tried) {
+			last_good_copy = c;
 			good_copies++;
 		}
 	}
@@ -746,7 +735,6 @@ vdev_mirror_io_done(zio_t *zio)
 		 * no non-degraded top-level vdevs left, and not update DTLs
 		 * if we intend to reallocate.
 		 */
-		/* XXPOLICY */
 		if (good_copies != mm->mm_children) {
 			/*
 			 * Always require at least one good copy.
@@ -773,7 +761,6 @@ vdev_mirror_io_done(zio_t *zio)
 	/*
 	 * If we don't have a good copy yet, keep trying other children.
 	 */
-	/* XXPOLICY */
 	if (good_copies == 0 && (c = vdev_mirror_child_select(zio)) != -1) {
 		ASSERT(c >= 0 && c < mm->mm_children);
 		mc = &mm->mm_child[c];
@@ -785,7 +772,80 @@ vdev_mirror_io_done(zio_t *zio)
 		return;
 	}
 
-	/* XXPOLICY */
+	if (zio->io_flags & ZIO_FLAG_SCRUB && !mm->mm_resilvering) {
+		abd_t *best_abd = NULL;
+		if (last_good_copy >= 0)
+			best_abd = mm->mm_child[last_good_copy].mc_abd;
+
+		/*
+		 * If we're scrubbing but don't have a BP available (because
+		 * this vdev is under a raidz or draid vdev) then the best we
+		 * can do is compare all of the copies read.  If they're not
+		 * identical then return a checksum error and the most likely
+		 * correct data.  The raidz code will issue a repair I/O if
+		 * possible.
+		 */
+		if (zio->io_bp == NULL) {
+			ASSERT(zio->io_vd->vdev_ops == &vdev_replacing_ops ||
+			    zio->io_vd->vdev_ops == &vdev_spare_ops);
+
+			abd_t *pref_abd = NULL;
+			for (c = 0; c < last_good_copy; c++) {
+				mc = &mm->mm_child[c];
+				if (mc->mc_error || !mc->mc_tried)
+					continue;
+
+				if (abd_cmp(mc->mc_abd, best_abd) != 0)
+					zio->io_error = SET_ERROR(ECKSUM);
+
+				/*
+				 * The distributed spare is always prefered
+				 * by vdev_mirror_child_select() so it's
+				 * considered to be the best candidate.
+				 */
+				if (pref_abd == NULL &&
+				    mc->mc_vd->vdev_ops ==
+				    &vdev_draid_spare_ops)
+					pref_abd = mc->mc_abd;
+
+				/*
+				 * In the absence of a preferred copy, use
+				 * the parent pointer to avoid a memory copy.
+				 */
+				if (mc->mc_abd == zio->io_abd)
+					best_abd = mc->mc_abd;
+			}
+			if (pref_abd)
+				best_abd = pref_abd;
+		} else {
+
+			/*
+			 * If we have a BP available, then checksums are
+			 * already verified and we just need a buffer
+			 * with valid data, preferring parent one to
+			 * avoid a memory copy.
+			 */
+			for (c = 0; c < last_good_copy; c++) {
+				mc = &mm->mm_child[c];
+				if (mc->mc_error || !mc->mc_tried)
+					continue;
+				if (mc->mc_abd == zio->io_abd) {
+					best_abd = mc->mc_abd;
+					break;
+				}
+			}
+		}
+
+		if (best_abd && best_abd != zio->io_abd)
+			abd_copy(zio->io_abd, best_abd, zio->io_size);
+		for (c = 0; c < mm->mm_children; c++) {
+			mc = &mm->mm_child[c];
+			if (mc->mc_abd != zio->io_abd)
+				abd_free(mc->mc_abd);
+			mc->mc_abd = NULL;
+		}
+	}
+
 	if (good_copies == 0) {
 		zio->io_error = vdev_mirror_worst_error(mm);
 		ASSERT(zio->io_error != 0);
@@ -871,6 +931,8 @@ static uint64_t
 vdev_mirror_rebuild_asize(vdev_t *vd, uint64_t start, uint64_t asize,
     uint64_t max_segment)
 {
+	(void) start;
+
 	uint64_t psize = MIN(P2ROUNDUP(max_segment, 1 << vd->vdev_ashift),
 	    SPA_MAXBLOCKSIZE);
 
@@ -952,20 +1014,21 @@ vdev_ops_t vdev_spare_ops = {
 	.vdev_op_leaf = B_FALSE			/* not a leaf vdev */
 };
 
-/* BEGIN CSTYLED */
 ZFS_MODULE_PARAM(zfs_vdev_mirror, zfs_vdev_mirror_, rotating_inc, INT, ZMOD_RW,
-	"Rotating media load increment for non-seeking I/O's");
+	"Rotating media load increment for non-seeking I/Os");
 
-ZFS_MODULE_PARAM(zfs_vdev_mirror, zfs_vdev_mirror_, rotating_seek_inc, INT, ZMOD_RW,
-	"Rotating media load increment for seeking I/O's");
+ZFS_MODULE_PARAM(zfs_vdev_mirror, zfs_vdev_mirror_, rotating_seek_inc, INT,
+	ZMOD_RW, "Rotating media load increment for seeking I/Os");
 
-ZFS_MODULE_PARAM(zfs_vdev_mirror, zfs_vdev_mirror_, rotating_seek_offset, INT, ZMOD_RW,
+/* BEGIN CSTYLED */
+ZFS_MODULE_PARAM(zfs_vdev_mirror, zfs_vdev_mirror_, rotating_seek_offset, INT,
+	ZMOD_RW,
 	"Offset in bytes from the last I/O which triggers "
 	"a reduced rotating media seek increment");
-
-ZFS_MODULE_PARAM(zfs_vdev_mirror, zfs_vdev_mirror_, non_rotating_inc, INT, ZMOD_RW,
-	"Non-rotating media load increment for non-seeking I/O's");
-
-ZFS_MODULE_PARAM(zfs_vdev_mirror, zfs_vdev_mirror_, non_rotating_seek_inc, INT, ZMOD_RW,
-	"Non-rotating media load increment for seeking I/O's");
 /* END CSTYLED */
+
+ZFS_MODULE_PARAM(zfs_vdev_mirror, zfs_vdev_mirror_, non_rotating_inc, INT,
+	ZMOD_RW, "Non-rotating media load increment for non-seeking I/Os");
+
+ZFS_MODULE_PARAM(zfs_vdev_mirror, zfs_vdev_mirror_, non_rotating_seek_inc, INT,
+	ZMOD_RW, "Non-rotating media load increment for seeking I/Os");

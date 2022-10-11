@@ -13,7 +13,6 @@
 #include "llvm/ADT/iterator.h"
 #include "llvm/ADT/simple_ilist.h"
 #include "llvm/Support/Allocator.h"
-#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <iterator>
@@ -118,13 +117,6 @@ private:
 
     reference operator*() const { return base_type::wrapped()->V; }
     pointer operator->() const { return &operator*(); }
-
-    friend bool operator==(const IteratorImpl &L, const IteratorImpl &R) {
-      return L.wrapped() == R.wrapped();
-    }
-    friend bool operator!=(const IteratorImpl &L, const IteratorImpl &R) {
-      return !(L == R);
-    }
   };
 
 public:

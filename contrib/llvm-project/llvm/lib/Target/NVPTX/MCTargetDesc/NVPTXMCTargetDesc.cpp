@@ -10,15 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "NVPTXMCTargetDesc.h"
 #include "NVPTXInstPrinter.h"
 #include "NVPTXMCAsmInfo.h"
-#include "NVPTXMCTargetDesc.h"
 #include "NVPTXTargetStreamer.h"
 #include "TargetInfo/NVPTXTargetInfo.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
-#include "llvm/Support/TargetRegistry.h"
+#include "llvm/MC/TargetRegistry.h"
 
 using namespace llvm;
 
@@ -46,7 +46,7 @@ static MCRegisterInfo *createNVPTXMCRegisterInfo(const Triple &TT) {
 
 static MCSubtargetInfo *
 createNVPTXMCSubtargetInfo(const Triple &TT, StringRef CPU, StringRef FS) {
-  return createNVPTXMCSubtargetInfoImpl(TT, CPU, FS);
+  return createNVPTXMCSubtargetInfoImpl(TT, CPU, /*TuneCPU*/ CPU, FS);
 }
 
 static MCInstPrinter *createNVPTXMCInstPrinter(const Triple &T,

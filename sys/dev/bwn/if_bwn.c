@@ -5987,7 +5987,7 @@ bwn_rxeof(struct bwn_mac *mac, struct mbuf *m, const void *_rxhdr)
 	struct ieee80211_node *ni;
 	struct ieee80211com *ic = &sc->sc_ic;
 	uint32_t macstat;
-	int padding, rate, rssi = 0, noise = 0, type;
+	int padding, rate, rssi = 0, noise = 0;
 	uint16_t phytype, phystat0, phystat3, chanstat;
 	unsigned char *mp = mtod(m, unsigned char *);
 
@@ -6101,10 +6101,10 @@ bwn_rxeof(struct bwn_mac *mac, struct mbuf *m, const void *_rxhdr)
 
 	ni = ieee80211_find_rxnode(ic, wh);
 	if (ni != NULL) {
-		type = ieee80211_input(ni, m, rssi, noise);
+		ieee80211_input(ni, m, rssi, noise);
 		ieee80211_free_node(ni);
 	} else
-		type = ieee80211_input_all(ic, m, rssi, noise);
+		ieee80211_input_all(ic, m, rssi, noise);
 
 	BWN_LOCK(sc);
 	return;
@@ -7738,13 +7738,14 @@ static device_method_t bwn_methods[] = {
 	DEVMETHOD(device_resume,	bwn_resume),
 	DEVMETHOD_END
 };
+
 static driver_t bwn_driver = {
 	"bwn",
 	bwn_methods,
 	sizeof(struct bwn_softc)
 };
-static devclass_t bwn_devclass;
-DRIVER_MODULE(bwn, bhnd, bwn_driver, bwn_devclass, 0, 0);
+
+DRIVER_MODULE(bwn, bhnd, bwn_driver, 0, 0);
 MODULE_DEPEND(bwn, bhnd, 1, 1, 1);
 MODULE_DEPEND(bwn, gpiobus, 1, 1, 1);
 MODULE_DEPEND(bwn, wlan, 1, 1, 1);		/* 802.11 media layer */

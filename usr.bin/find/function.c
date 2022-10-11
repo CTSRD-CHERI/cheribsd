@@ -747,7 +747,8 @@ c_exec(OPTION *option, char ***argvp)
 		 * Files from the same directory should be handled
 		 * in one invocation but there is no code for it.
 		 */
-		new->e_pnummax = new->flags & F_EXECDIR ? 1 : argmax / 16;
+		new->e_pnummax = new->flags & F_EXECDIR ? 1 :
+		    argmax / MAX(8 + sizeof(char *), 16);
 		argmax -= sizeof(char *) * new->e_pnummax;
 		if (argmax <= 0)
 			errx(1, "no space for arguments");

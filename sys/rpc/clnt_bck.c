@@ -101,7 +101,7 @@ static bool_t clnt_bck_control(CLIENT *, u_int, void *);
 static void clnt_bck_close(CLIENT *);
 static void clnt_bck_destroy(CLIENT *);
 
-static struct clnt_ops clnt_bck_ops = {
+static const struct clnt_ops clnt_bck_ops = {
 	.cl_abort =	clnt_bck_abort,
 	.cl_geterr =	clnt_bck_geterr,
 	.cl_freeres =	clnt_bck_freeres,
@@ -326,7 +326,7 @@ if (error != 0) printf("sosend=%d\n", error);
 	if (error == EMSGSIZE) {
 printf("emsgsize\n");
 		SOCKBUF_LOCK(&xprt->xp_socket->so_snd);
-		sbwait(&xprt->xp_socket->so_snd);
+		sbwait(xprt->xp_socket, SO_SND);
 		SOCKBUF_UNLOCK(&xprt->xp_socket->so_snd);
 		sx_xunlock(&xprt->xp_lock);
 		AUTH_VALIDATE(auth, xid, NULL, NULL);
@@ -566,15 +566,26 @@ clnt_bck_destroy(CLIENT *cl)
 /*
  * This call is done by the svc code when a backchannel RPC reply is
  * received.
+ * For the server end, where callback RPCs to the client are performed,
+ * xp_p2 points to the "CLIENT" and not the associated "struct ct_data"
+ * so that svc_vc_destroy() can CLNT_RELEASE() the reference count on it.
  */
 void
 clnt_bck_svccall(void *arg, struct mbuf *mrep, uint32_t xid)
 {
-	struct ct_data *ct = (struct ct_data *)arg;
+	CLIENT *cl = (CLIENT *)arg;
+	struct ct_data *ct;
 	struct ct_request *cr;
 	int foundreq;
 
+	ct = (struct ct_data *)cl->cl_private;
 	mtx_lock(&ct->ct_lock);
+	if (ct->ct_closing || ct->ct_closed) {
+		mtx_unlock(&ct->ct_lock);
+		m_freem(mrep);
+		return;
+	}
+
 	ct->ct_upcallrefs++;
 	/*
 	 * See if we can match this reply to a request.

@@ -1,8 +1,10 @@
 *.a
 *.core
 *.o
+*.orig
+*.rej
 *.so
-*.swp
+*.sw[nop]
 *~
 _.tinderbox.*
 _.universe-toolchain
@@ -25,3 +27,8 @@ cscope.files
 cscope.in.out
 cscope.out
 cscope.po.out
+compile_commands.json
+compile_commands.events.json
+tags
+.clangd
+.ccls-cache

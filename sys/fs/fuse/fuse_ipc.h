@@ -204,8 +204,6 @@ struct fuse_data {
 	uint32_t			max_readahead_blocks;
 	uint32_t			max_write;
 	uint32_t			max_read;
-	uint32_t			subtype;
-	char				volname[MAXPATHLEN];
 
 	struct selinfo			ks_rsel;
 
@@ -231,10 +229,18 @@ struct fuse_data {
                                          /* (and being observed by the daemon) */
 #define FSESS_PUSH_SYMLINKS_IN    0x0020 /* prefix absolute symlinks with mp */
 #define FSESS_DEFAULT_PERMISSIONS 0x0040 /* kernel does permission checking */
+#define FSESS_NO_OPEN_SUPPORT     0x0080 /* can elide FUSE_OPEN ops */
+#define FSESS_NO_OPENDIR_SUPPORT  0x0100 /* can elide FUSE_OPENDIR ops */
 #define FSESS_ASYNC_READ          0x1000 /* allow multiple reads of some file */
 #define FSESS_POSIX_LOCKS         0x2000 /* daemon supports POSIX locks */
 #define FSESS_EXPORT_SUPPORT      0x10000 /* daemon supports NFS-style lookups */
 #define FSESS_INTR                0x20000 /* interruptible mounts */
+#define FSESS_WARN_SHORT_WRITE    0x40000 /* Short write without direct_io */
+#define FSESS_WARN_WROTE_LONG     0x80000 /* Wrote more data than provided */
+#define FSESS_WARN_LSEXTATTR_LONG 0x100000 /* Returned too many extattrs */
+#define FSESS_WARN_CACHE_INCOHERENT 0x200000	/* Read cache incoherent */
+#define FSESS_WARN_WB_CACHE_INCOHERENT 0x400000	/* WB cache incoherent */
+#define	FSESS_WARN_ILLEGAL_INODE  0x800000 /* Illegal inode for new file */
 #define FSESS_MNTOPTS_MASK	( \
 	FSESS_DAEMON_CAN_SPY | FSESS_PUSH_SYMLINKS_IN | \
 	FSESS_DEFAULT_PERMISSIONS | FSESS_INTR)
@@ -396,6 +402,9 @@ fuse_libabi_geq(struct fuse_data *data, uint32_t abi_maj, uint32_t abi_min)
 	     data->fuse_libabi_minor >= abi_min));
 }
 
+/* Print msg as a warning to the console, but no more than once per session */
+void fuse_warn(struct fuse_data *data, unsigned flag, const char *msg);
+
 struct fuse_data *fdata_alloc(struct cdev *dev, struct ucred *cred);
 void fdata_trydestroy(struct fuse_data *data);
 void fdata_set_dead(struct fuse_data *data);
@@ -432,8 +441,6 @@ fdisp_destroy(struct fuse_dispatcher *fdisp)
 	fdisp->tick = NULL;
 #endif
 }
-
-void fdisp_refresh(struct fuse_dispatcher *fdip);
 
 void fdisp_make(struct fuse_dispatcher *fdip, enum fuse_opcode op,
     struct mount *mp, uint64_t nid, struct thread *td, struct ucred *cred);

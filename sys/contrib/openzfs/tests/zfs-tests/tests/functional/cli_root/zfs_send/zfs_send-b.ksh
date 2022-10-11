@@ -35,7 +35,7 @@ verify_runnable "both"
 function cleanup
 {
 	for ds in "$SENDFS" "$BACKUP" "$RESTORE"; do
-		datasetexists $ds && log_must zfs destroy -r $ds
+		datasetexists $ds && destroy_dataset $ds -r
 	done
 }
 
@@ -58,13 +58,13 @@ log_must zfs set "org.openzfs:snapprop=val" "$SENDFS@s1"
 # 2. Verify command line options interact with '-b' correctly
 typeset opts=("" "p" "Rp" "cew" "nv" "D" "DLPRcenpvw")
 for opt in ${opts[@]}; do
-	log_must eval "zfs send -b$opt $SENDFS@s1 >$TEST_BASE_DIR/devnull"
-	log_must eval "zfs send -b$opt -i $SENDFS@s1 $SENDFS@s2 >$TEST_BASE_DIR/devnull"
-	log_must eval "zfs send -b$opt -I $SENDFS@s1 $SENDFS@s2 >$TEST_BASE_DIR/devnull"
+	log_must eval "zfs send -b$opt $SENDFS@s1 > /dev/null"
+	log_must eval "zfs send -b$opt -i $SENDFS@s1 $SENDFS@s2 > /dev/null"
+	log_must eval "zfs send -b$opt -I $SENDFS@s1 $SENDFS@s2 > /dev/null"
 done
 for opt in ${opts[@]}; do
-	log_mustnot eval "zfs send -b$opt $SENDFS >$TEST_BASE_DIR/devnull"
-	log_mustnot eval "zfs send -b$opt $SENDFS#bm >$TEST_BASE_DIR/devnull"
+	log_mustnot eval "zfs send -b$opt $SENDFS > /dev/null"
+	log_mustnot eval "zfs send -b$opt $SENDFS#bm > /dev/null"
 done
 
 # Do 3..6 in a loop to verify various combination of "zfs send" options

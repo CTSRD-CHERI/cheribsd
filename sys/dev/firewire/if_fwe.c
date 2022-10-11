@@ -554,7 +554,9 @@ fwe_as_input(struct fw_xferq *xferq)
 	struct fwe_softc *fwe;
 	struct fw_bulkxfer *sxfer;
 	struct fw_pkt *fp;
+#if 0
 	u_char *c;
+#endif
 
 	fwe = (struct fwe_softc *)xferq->sc;
 	ifp = fwe->eth_softc.ifp;
@@ -583,7 +585,9 @@ fwe_as_input(struct fw_xferq *xferq)
 		}
 
 		m->m_data += HDR_LEN + ETHER_ALIGN;
+#if 0
 		c = mtod(m, u_char *);
+#endif
 		m->m_len = m->m_pkthdr.len = fp->mode.stream.len - ETHER_ALIGN;
 		m->m_pkthdr.rcvif = ifp;
 #if 0
@@ -609,8 +613,6 @@ fwe_as_input(struct fw_xferq *xferq)
 }
 
 
-static devclass_t fwe_devclass;
-
 static device_method_t fwe_methods[] = {
 	/* device interface */
 	DEVMETHOD(device_identify,	fwe_identify),
@@ -627,6 +629,6 @@ static driver_t fwe_driver = {
 };
 
 
-DRIVER_MODULE(fwe, firewire, fwe_driver, fwe_devclass, 0, 0);
+DRIVER_MODULE(fwe, firewire, fwe_driver, 0, 0);
 MODULE_VERSION(fwe, 1);
 MODULE_DEPEND(fwe, firewire, 1, 1, 1);

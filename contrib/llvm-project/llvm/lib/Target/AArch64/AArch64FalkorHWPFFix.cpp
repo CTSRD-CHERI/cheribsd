@@ -54,7 +54,7 @@
 
 using namespace llvm;
 
-#define DEBUG_TYPE "falkor-hwpf-fix"
+#define DEBUG_TYPE "aarch64-falkor-hwpf-fix"
 
 STATISTIC(NumStridedLoadsMarked, "Number of strided loads marked");
 STATISTIC(NumCollisionsAvoided,
@@ -138,15 +138,15 @@ bool FalkorMarkStridedAccesses::run() {
   bool MadeChange = false;
 
   for (Loop *L : LI)
-    for (auto LIt = df_begin(L), LE = df_end(L); LIt != LE; ++LIt)
-      MadeChange |= runOnLoop(**LIt);
+    for (Loop *LIt : depth_first(L))
+      MadeChange |= runOnLoop(*LIt);
 
   return MadeChange;
 }
 
 bool FalkorMarkStridedAccesses::runOnLoop(Loop &L) {
   // Only mark strided loads in the inner-most loop
-  if (!L.empty())
+  if (!L.isInnermost())
     return false;
 
   bool MadeChange = false;
@@ -224,10 +224,10 @@ struct LoadInfo {
 
 char FalkorHWPFFix::ID = 0;
 
-INITIALIZE_PASS_BEGIN(FalkorHWPFFix, "falkor-hwpf-fix-late",
+INITIALIZE_PASS_BEGIN(FalkorHWPFFix, "aarch64-falkor-hwpf-fix-late",
                       "Falkor HW Prefetch Fix Late Phase", false, false)
 INITIALIZE_PASS_DEPENDENCY(MachineLoopInfo)
-INITIALIZE_PASS_END(FalkorHWPFFix, "falkor-hwpf-fix-late",
+INITIALIZE_PASS_END(FalkorHWPFFix, "aarch64-falkor-hwpf-fix-late",
                     "Falkor HW Prefetch Fix Late Phase", false, false)
 
 static unsigned makeTag(unsigned Dest, unsigned Base, unsigned Offset) {
@@ -828,10 +828,10 @@ bool FalkorHWPFFix::runOnMachineFunction(MachineFunction &Fn) {
   Modified = false;
 
   for (MachineLoop *I : LI)
-    for (auto L = df_begin(I), LE = df_end(I); L != LE; ++L)
+    for (MachineLoop *L : depth_first(I))
       // Only process inner-loops
-      if (L->empty())
-        runOnLoop(**L, Fn);
+      if (L->isInnermost())
+        runOnLoop(*L, Fn);
 
   return Modified;
 }

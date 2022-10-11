@@ -1,7 +1,0 @@
-# Inherit base config
-include "BERI_DE4_MFS_ROOT"
-
-ident BERI_DE4_MFS_ROOT_BENCHMARK
-
-# Disable slow things
-include "std.BENCHMARK"

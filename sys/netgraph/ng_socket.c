@@ -240,11 +240,16 @@ ngc_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		goto release;
 	}
 
+	if (sap->sg_len > NG_NODESIZ + offsetof(struct sockaddr_ng, sg_data)) {
+		error = EINVAL;
+		goto release;
+	}
+
 	/*
 	 * Allocate an expendable buffer for the path, chop off
 	 * the sockaddr header, and make sure it's NUL terminated.
 	 */
-	len = sap->sg_len - 2;
+	len = sap->sg_len - offsetof(struct sockaddr_ng, sg_data);
 	path = malloc(len + 1, M_NETGRAPH_PATH, M_WAITOK);
 	bcopy(sap->sg_data, path, len);
 	path[len] = '\0';
@@ -422,10 +427,16 @@ ngd_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		goto release;
 	}
 
-	if (sap == NULL)
+	if (sap == NULL) {
 		len = 0;		/* Make compiler happy. */
-	else
-		len = sap->sg_len - 2;
+	} else {
+		if (sap->sg_len > NG_NODESIZ +
+		    offsetof(struct sockaddr_ng, sg_data)) {
+			error = EINVAL;
+			goto release;
+		}
+		len = sap->sg_len - offsetof(struct sockaddr_ng, sg_data);
+	}
 
 	/*
 	 * If the user used any of these ways to not specify an address
@@ -982,7 +993,7 @@ ngs_rcvmsg(node_p node, item_p item, hook_p lasthook)
 	/* Send it up to the socket. */
 	if (sbappendaddr_locked(&so->so_rcv, (struct sockaddr *)&addr, m,
 	    NULL) == 0) {
-		SOCKBUF_UNLOCK(&so->so_rcv);
+		soroverflow_locked(so);
 		TRAP_ERROR;
 		m_freem(m);
 		return (ENOBUFS);
@@ -1124,31 +1135,22 @@ dummy_disconnect(struct socket *so)
  */
 
 static struct pr_usrreqs ngc_usrreqs = {
-	.pru_abort =		NULL,
 	.pru_attach =		ngc_attach,
 	.pru_bind =		ngc_bind,
 	.pru_connect =		ngc_connect,
 	.pru_detach =		ngc_detach,
 	.pru_disconnect =	dummy_disconnect,
-	.pru_peeraddr =		NULL,
 	.pru_send =		ngc_send,
-	.pru_shutdown =		NULL,
 	.pru_sockaddr =		ng_getsockaddr,
-	.pru_close =		NULL,
 };
 
 static struct pr_usrreqs ngd_usrreqs = {
-	.pru_abort =		NULL,
 	.pru_attach =		ngd_attach,
-	.pru_bind =		NULL,
 	.pru_connect =		ngd_connect,
 	.pru_detach =		ngd_detach,
 	.pru_disconnect =	dummy_disconnect,
-	.pru_peeraddr =		NULL,
 	.pru_send =		ngd_send,
-	.pru_shutdown =		NULL,
 	.pru_sockaddr =		ng_getsockaddr,
-	.pru_close =		NULL,
 };
 
 /*
@@ -1212,7 +1214,7 @@ ngs_mod_event(module_t mod, int event, void *data)
 	return (error);
 }
 
-VNET_DOMAIN_SET(ng);
+DOMAIN_SET(ng);
 
 SYSCTL_INT(_net_graph, OID_AUTO, family, CTLFLAG_RD, SYSCTL_NULL_INT_PTR, AF_NETGRAPH, "");
 static SYSCTL_NODE(_net_graph, OID_AUTO, data, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,

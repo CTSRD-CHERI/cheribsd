@@ -14,19 +14,19 @@
 #ifndef LLVM_LIB_TARGET_AMDGPU_SIMACHINESCHEDULER_H
 #define LLVM_LIB_TARGET_AMDGPU_SIMACHINESCHEDULER_H
 
-#include "SIInstrInfo.h"
-#include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/RegisterPressure.h"
 #include "llvm/CodeGen/ScheduleDAG.h"
-#include <cassert>
 #include <cstdint>
-#include <map>
-#include <memory>
 #include <set>
 #include <vector>
 
 namespace llvm {
+
+class SIInstrInfo;
+class SIRegisterInfo;
+class SIScheduleDAGMI;
+class SIScheduleBlockCreator;
 
 enum SIScheduleCandReason {
   NoCand,
@@ -50,9 +50,6 @@ struct SISchedulerCandidate {
   void setRepeat(SIScheduleCandReason R) { RepeatReasonSet |= (1 << R); }
 };
 
-class SIScheduleDAGMI;
-class SIScheduleBlockCreator;
-
 enum SIScheduleBlockLinkKind {
   NoData,
   Data
@@ -75,7 +72,7 @@ class SIScheduleBlock {
   // store the live virtual and real registers.
   // We do care only of SGPR32 and VGPR32 and do track only virtual registers.
   // Pressure of additional registers required inside the block.
-  std::vector<unsigned> InternalAdditionnalPressure;
+  std::vector<unsigned> InternalAdditionalPressure;
   // Pressure of input and output registers
   std::vector<unsigned> LiveInPressure;
   std::vector<unsigned> LiveOutPressure;
@@ -156,8 +153,8 @@ public:
 
   // Needs the block to be scheduled inside
   // TODO: find a way to compute it.
-  std::vector<unsigned> &getInternalAdditionnalRegUsage() {
-    return InternalAdditionnalPressure;
+  std::vector<unsigned> &getInternalAdditionalRegUsage() {
+    return InternalAdditionalPressure;
   }
 
   std::set<unsigned> &getInRegs() { return LiveInRegs; }
@@ -455,7 +452,7 @@ public:
   MachineRegisterInfo *getMRI() { return &MRI; }
   const TargetRegisterInfo *getTRI() { return TRI; }
   ScheduleDAGTopologicalSort *GetTopo() { return &Topo; }
-  SUnit& getEntrySU() { return EntrySU; }
+  SUnit &getEntrySU() { return EntrySU; }
   SUnit& getExitSU() { return ExitSU; }
 
   void restoreSULinksLeft();

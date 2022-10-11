@@ -148,6 +148,11 @@ struct __rpc_svcthread;
  * reference count which tracks the number of currently assigned
  * worker threads plus one for the service pool's reference.
  * For NFSv4.1 sessions, a reference is also held for a backchannel.
+ * xp_p2 - Points to the CLIENT structure for the RPC server end
+ *         (the client end for callbacks).
+ *         Points to the private structure (cl_private) for the
+ *         CLIENT structure for the RPC client end (the server
+ *         end for callbacks).
  */
 typedef struct __rpc_svcxprt {
 #ifdef _KERNEL
@@ -171,7 +176,7 @@ typedef struct __rpc_svcxprt {
 	int		xp_type;	/* transport type */
 	int		xp_idletimeout; /* idle time before closing */
 	time_t		xp_lastactive;	/* time of last RPC */
-	u_int64_t	xp_sockref;	/* set by nfsv4 to identify socket */
+	uint64_t	xp_sockref;	/* set by nfsv4 to identify socket */
 	int		xp_upcallset;	/* socket upcall is set up */
 	uint32_t	xp_snd_cnt;	/* # of bytes to send to socket */
 	uint32_t	xp_snt_cnt;	/* # of bytes sent to socket */
@@ -207,7 +212,7 @@ typedef struct __rpc_svcxprt {
  * Interface to server-side authentication flavors.
  */
 typedef struct __rpc_svcauth {
-	struct svc_auth_ops {
+	const struct svc_auth_ops {
 #ifdef _KERNEL
 		int   (*svc_ah_wrap)(struct __rpc_svcauth *,  struct mbuf **);
 		int   (*svc_ah_unwrap)(struct __rpc_svcauth *, struct mbuf **);
@@ -664,7 +669,7 @@ __END_DECLS
  * Somebody has to wait for incoming requests and then call the correct
  * service routine.  The routine svc_run does infinite waiting; i.e.,
  * svc_run never returns.
- * Since another (co-existant) package may wish to selectively wait for
+ * Since another (co-existent) package may wish to selectively wait for
  * incoming calls or other events outside of the rpc architecture, the
  * routine svc_getreq is provided.  It must be passed readfds, the
  * "in-place" results of a select system call (see select, section 2).

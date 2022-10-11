@@ -303,7 +303,7 @@ print_membership(tOptions * pOpts, tOptDesc * pOD)
 {
     char const * svstr = pOD->optArg.argString;
     char const * pz;
-    vaddr_t val = 1;
+    ptraddr_t val = 1;
     printf(zOptNumFmt, pOpts->pzPROGNAME, pOD->pz_NAME,
            (int)(uintptr_t)(pOD->optCookie));
     pOD->optCookie = VOIDP(~0UL);

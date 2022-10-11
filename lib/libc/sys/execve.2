@@ -28,7 +28,7 @@
 .\"     @(#)execve.2	8.5 (Berkeley) 6/1/94
 .\" $FreeBSD$
 .\"
-.Dd April 30, 2018
+.Dd January 26, 2022
 .Dt EXECVE 2
 .Os
 .Sh NAME
@@ -254,7 +254,7 @@ except it also takes a NULL-terminated capability vector, which
 can be retrieved in the child process using
 .Xr elf_aux_info 3
 with the
-.Dv AT_AUXV
+.Dv AT_CAPV
 argument.
 .Sh RETURN VALUES
 As the
@@ -296,6 +296,9 @@ Search permission is denied for a component of the path prefix.
 The new process file is not an ordinary file.
 .It Bq Er EACCES
 The new process file mode denies execute permission.
+.It Bq Er EINVAL
+.Fa argv
+did not contain at least one element.
 .It Bq Er ENOEXEC
 The new process file has the appropriate access
 permission, but has an invalid magic number in its header.

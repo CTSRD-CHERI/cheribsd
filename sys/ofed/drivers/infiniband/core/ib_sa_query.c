@@ -495,7 +495,7 @@ static void free_sm_ah(struct kref *kref)
 {
 	struct ib_sa_sm_ah *sm_ah = container_of(kref, struct ib_sa_sm_ah, ref);
 
-	ib_destroy_ah(sm_ah->ah);
+	ib_destroy_ah(sm_ah->ah, 0);
 	kfree(sm_ah);
 }
 
@@ -535,7 +535,7 @@ static void update_sm_ah(struct work_struct *work)
 		ah_attr.grh.dgid.global.interface_id = cpu_to_be64(IB_SA_WELL_KNOWN_GUID);
 	}
 
-	new_ah->ah = ib_create_ah(port->agent->qp->pd, &ah_attr);
+	new_ah->ah = ib_create_ah(port->agent->qp->pd, &ah_attr, RDMA_CREATE_AH_SLEEPABLE);
 	if (IS_ERR(new_ah->ah)) {
 		pr_warn("Couldn't create new SM AH\n");
 		kfree(new_ah);
@@ -652,7 +652,7 @@ int ib_init_ah_from_path(struct ib_device *device, u8 port_num,
 	int ret;
 	u16 gid_index;
 	int use_roce;
-	struct net_device *ndev = NULL;
+	struct ifnet *ndev = NULL;
 
 	memset(ah_attr, 0, sizeof *ah_attr);
 	ah_attr->dlid = be16_to_cpu(rec->dlid);
@@ -665,8 +665,8 @@ int ib_init_ah_from_path(struct ib_device *device, u8 port_num,
 	use_roce = rdma_cap_eth_ah(device, port_num);
 
 	if (use_roce) {
-		struct net_device *idev;
-		struct net_device *resolved_dev;
+		struct ifnet *idev;
+		struct ifnet *resolved_dev;
 		struct rdma_dev_addr dev_addr = {.bound_dev_if = rec->ifindex,
 						 .net = rec->net ? rec->net :
 							 &init_net};

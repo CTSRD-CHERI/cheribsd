@@ -58,6 +58,7 @@ static void destroy_devl(struct cdev *dev);
 static int destroy_dev_sched_cbl(struct cdev *dev,
     void (*cb)(void *), void *arg);
 static void destroy_dev_tq(void *ctx, int pending);
+static void destroy_dev_tq_giant(void *ctx, int pending);
 static int make_dev_credv(int flags, struct cdev **dres, struct cdevsw *devsw,
     int unit, struct ucred *cr, uid_t uid, gid_t gid, int mode, const char *fmt,
     va_list ap);
@@ -300,7 +301,6 @@ dead_strategy(struct bio *bp)
 	biofinish(bp, NULL, ENXIO);
 }
 
-#define dead_dump	(dumper_t *)enxio
 #define dead_kqfilter	(d_kqfilter_t *)enxio
 #define dead_mmap_single (d_mmap_single_t *)enodev
 
@@ -315,7 +315,6 @@ static struct cdevsw dead_cdevsw = {
 	.d_mmap =	dead_mmap,
 	.d_strategy =	dead_strategy,
 	.d_name =	"dead",
-	.d_dump =	dead_dump,
 	.d_kqfilter =	dead_kqfilter,
 	.d_mmap_single = dead_mmap_single
 };
@@ -344,8 +343,6 @@ no_poll(struct cdev *dev __unused, int events, struct thread *td __unused)
 
 	return (poll_no_poll(events));
 }
-
-#define no_dump		(dumper_t *)enodev
 
 static int
 giant_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
@@ -661,14 +658,16 @@ prep_cdevsw(struct cdevsw *devsw, int flags)
 		devsw->d_mmap = dead_mmap;
 		devsw->d_mmap_single = dead_mmap_single;
 		devsw->d_strategy = dead_strategy;
-		devsw->d_dump = dead_dump;
 		devsw->d_kqfilter = dead_kqfilter;
 	}
 
-	if (devsw->d_flags & D_NEEDGIANT) {
-		printf("WARNING: Device \"%s\" is Giant locked and may be "
-		    "deleted before FreeBSD 14.0.\n",
-		    devsw->d_name == NULL ? "???" : devsw->d_name);
+	if ((devsw->d_flags & D_NEEDGIANT) != 0) {
+		if ((devsw->d_flags & D_GIANTOK) == 0) {
+			printf(
+			    "WARNING: Device \"%s\" is Giant locked and may be "
+			    "deleted before FreeBSD 14.0.\n",
+			    devsw->d_name == NULL ? "???" : devsw->d_name);
+		}
 		if (devsw->d_gianttrick == NULL) {
 			memcpy(dsw2, devsw, sizeof *dsw2);
 			devsw->d_gianttrick = dsw2;
@@ -696,8 +695,6 @@ prep_cdevsw(struct cdevsw *devsw, int flags)
 	FIXUP(d_strategy,	no_strategy,	giant_strategy);
 	FIXUP(d_kqfilter,	no_kqfilter,	giant_kqfilter);
 	FIXUP(d_mmap_single,	no_mmap_single,	giant_mmap_single);
-
-	if (devsw->d_dump == NULL)	devsw->d_dump = no_dump;
 
 	LIST_INIT(&devsw->d_devs);
 
@@ -1425,23 +1422,28 @@ clone_cleanup(struct clonedevs **cdp)
 
 static TAILQ_HEAD(, cdev_priv) dev_ddtr =
 	TAILQ_HEAD_INITIALIZER(dev_ddtr);
-static struct task dev_dtr_task = TASK_INITIALIZER(0, destroy_dev_tq, NULL);
+static TAILQ_HEAD(, cdev_priv) dev_ddtr_giant =
+	TAILQ_HEAD_INITIALIZER(dev_ddtr_giant);
+static struct task dev_dtr_task = TASK_INITIALIZER(0, destroy_dev_tq, &dev_ddtr);
+static struct task dev_dtr_task_giant = TASK_INITIALIZER(0, destroy_dev_tq_giant,
+    &dev_ddtr_giant);
 
 static void
 destroy_dev_tq(void *ctx, int pending)
 {
+	TAILQ_HEAD(, cdev_priv) *ddtr = ctx;
 	struct cdev_priv *cp;
 	struct cdev *dev;
 	void (*cb)(void *);
 	void *cb_arg;
 
 	dev_lock();
-	while (!TAILQ_EMPTY(&dev_ddtr)) {
-		cp = TAILQ_FIRST(&dev_ddtr);
+	while (!TAILQ_EMPTY(ddtr)) {
+		cp = TAILQ_FIRST(ddtr);
 		dev = &cp->cdp_c;
 		KASSERT(cp->cdp_flags & CDP_SCHED_DTR,
 		    ("cdev %p in dev_destroy_tq without CDP_SCHED_DTR", cp));
-		TAILQ_REMOVE(&dev_ddtr, cp, cdp_dtr_list);
+		TAILQ_REMOVE(ddtr, cp, cdp_dtr_list);
 		cb = cp->cdp_dtr_cb;
 		cb_arg = cp->cdp_dtr_cb_arg;
 		destroy_devl(dev);
@@ -1454,6 +1456,14 @@ destroy_dev_tq(void *ctx, int pending)
 	dev_unlock();
 }
 
+static void
+destroy_dev_tq_giant(void *ctx, int pending)
+{
+	mtx_lock(&Giant);
+	destroy_dev_tq(ctx, pending);
+	mtx_unlock(&Giant);
+}
+
 /*
  * devmtx shall be locked on entry. devmtx will be unlocked after
  * function return.
@@ -1462,6 +1472,7 @@ static int
 destroy_dev_sched_cbl(struct cdev *dev, void (*cb)(void *), void *arg)
 {
 	struct cdev_priv *cp;
+	bool need_giant;
 
 	dev_lock_assert_locked();
 	cp = cdev2priv(dev);
@@ -1473,9 +1484,16 @@ destroy_dev_sched_cbl(struct cdev *dev, void (*cb)(void *), void *arg)
 	cp->cdp_flags |= CDP_SCHED_DTR;
 	cp->cdp_dtr_cb = cb;
 	cp->cdp_dtr_cb_arg = arg;
-	TAILQ_INSERT_TAIL(&dev_ddtr, cp, cdp_dtr_list);
+	need_giant = (dev->si_devsw->d_flags & D_NEEDGIANT) != 0;
+	if (need_giant)
+		TAILQ_INSERT_TAIL(&dev_ddtr_giant, cp, cdp_dtr_list);
+	else
+		TAILQ_INSERT_TAIL(&dev_ddtr, cp, cdp_dtr_list);
 	dev_unlock();
-	taskqueue_enqueue(taskqueue_swi_giant, &dev_dtr_task);
+	if (need_giant)
+		taskqueue_enqueue(taskqueue_thread, &dev_dtr_task_giant);
+	else
+		taskqueue_enqueue(taskqueue_thread, &dev_dtr_task);
 	return (1);
 }
 

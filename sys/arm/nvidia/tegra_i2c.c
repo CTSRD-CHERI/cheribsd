@@ -742,7 +742,6 @@ static int
 tegra_i2c_detach(device_t dev)
 {
 	struct tegra_i2c_softc *sc;
-	int rv;
 
 	sc = device_get_softc(dev);
 	tegra_i2c_hw_init(sc);
@@ -755,7 +754,7 @@ tegra_i2c_detach(device_t dev)
 
 	LOCK_DESTROY(sc);
 	if (sc->iicbus)
-	    rv = device_delete_child(dev, sc->iicbus);
+		device_delete_child(dev, sc->iicbus);
 	return (bus_generic_detach(dev));
 }
 
@@ -795,8 +794,6 @@ static device_method_t tegra_i2c_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t tegra_i2c_devclass;
 static DEFINE_CLASS_0(iichb, tegra_i2c_driver, tegra_i2c_methods,
     sizeof(struct tegra_i2c_softc));
-EARLY_DRIVER_MODULE(tegra_iic, simplebus, tegra_i2c_driver, tegra_i2c_devclass,
-    NULL, NULL, 73);
+EARLY_DRIVER_MODULE(tegra_iic, simplebus, tegra_i2c_driver, NULL, NULL, 73);

@@ -65,20 +65,14 @@ done
 #
 # Inherit properties in sub-datasets
 #
-for ds in "$POOL/$FS/fs1" "$POOL/$FS/fs1/fs2" "$POOL/$FS/fs1/fclone" ; do
-	for prop in $(fs_inherit_prop) ; do
-		zfs inherit $prop $ds
-		if (($? !=0 )); then
-			log_fail "zfs inherit $prop $ds"
-		fi
+for ds in "$POOL/$FS/fs1" "$POOL/$FS/fs1/fs2" "$POOL/$FS/fs1/fclone"; do
+	for prop in $(fs_inherit_prop); do
+		log_must zfs inherit $prop $ds
 	done
 done
-if is_global_zone ; then
-	for prop in $(vol_inherit_prop) ; do
-		zfs inherit $prop $POOL/$FS/vol
-		if (($? !=0 )); then
-			log_fail "zfs inherit $prop $POOL/$FS/vol"
-		fi
+if is_global_zone; then
+	for prop in $(vol_inherit_prop); do
+		log_must zfs inherit $prop $POOL/$FS/vol
 	done
 fi
 

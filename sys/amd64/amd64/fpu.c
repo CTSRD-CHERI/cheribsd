@@ -69,8 +69,6 @@ __FBSDID("$FreeBSD$");
  * Floating point support.
  */
 
-#if defined(__GNUCLIKE_ASM) && !defined(lint)
-
 #define	fldcw(cw)		__asm __volatile("fldcw %0" : : "m" (cw))
 #define	fnclex()		__asm __volatile("fnclex")
 #define	fninit()		__asm __volatile("fninit")
@@ -79,7 +77,7 @@ __FBSDID("$FreeBSD$");
 #define	fxrstor(addr)		__asm __volatile("fxrstor %0" : : "m" (*(addr)))
 #define	fxsave(addr)		__asm __volatile("fxsave %0" : "=m" (*(addr)))
 #define	ldmxcsr(csr)		__asm __volatile("ldmxcsr %0" : : "m" (csr))
-#define	stmxcsr(addr)		__asm __volatile("stmxcsr %0" : : "m" (*(addr)))
+#define	stmxcsr(addr)		__asm __volatile("stmxcsr %0" : "=m" (*(addr)))
 
 static __inline void
 xrstor32(char *addr, uint64_t mask)
@@ -144,26 +142,6 @@ xsaveopt64(char *addr, uint64_t mask)
 	__asm __volatile("xsaveopt64 %0" : "=m" (*addr) : "a" (low), "d" (hi) :
 	    "memory");
 }
-
-#else	/* !(__GNUCLIKE_ASM && !lint) */
-
-void	fldcw(u_short cw);
-void	fnclex(void);
-void	fninit(void);
-void	fnstcw(caddr_t addr);
-void	fnstsw(caddr_t addr);
-void	fxsave(caddr_t addr);
-void	fxrstor(caddr_t addr);
-void	ldmxcsr(u_int csr);
-void	stmxcsr(u_int *csr);
-void	xrstor32(char *addr, uint64_t mask);
-void	xrstor64(char *addr, uint64_t mask);
-void	xsave32(char *addr, uint64_t mask);
-void	xsave64(char *addr, uint64_t mask);
-void	xsaveopt32(char *addr, uint64_t mask);
-void	xsaveopt64(char *addr, uint64_t mask);
-
-#endif	/* __GNUCLIKE_ASM && !lint */
 
 #define	start_emulating()	load_cr0(rcr0() | CR0_TS)
 #define	stop_emulating()	clts()
@@ -448,6 +426,8 @@ fpuinitstate(void *arg __unused)
 		    xsave_area_elm_descr), M_DEVBUF, M_WAITOK | M_ZERO);
 	}
 
+	cpu_thread_alloc(&thread0);
+
 	saveintr = intr_disable();
 	stop_emulating();
 
@@ -470,7 +450,8 @@ fpuinitstate(void *arg __unused)
 
 	/*
 	 * Create a table describing the layout of the CPU Extended
-	 * Save Area.
+	 * Save Area.  See Intel SDM rev. 075 Vol. 1 13.4.1 "Legacy
+	 * Region of an XSAVE Area" for the source of offsets/sizes.
 	 */
 	if (use_xsave) {
 		xstate_bv = (uint64_t *)((char *)(fpu_initialstate + 1) +
@@ -482,7 +463,7 @@ fpuinitstate(void *arg __unused)
 		xsave_area_desc[0].size = 160;
 		/* XMM */
 		xsave_area_desc[1].offset = 160;
-		xsave_area_desc[1].size = 288 - 160;
+		xsave_area_desc[1].size = 416 - 160;
 
 		for (i = 2; i < max_ext_n; i++) {
 			cpuid_count(0xd, i, cp);
@@ -495,7 +476,7 @@ fpuinitstate(void *arg __unused)
 	intr_restore(saveintr);
 }
 /* EFIRT needs this to be initialized before we can enter our EFI environment */
-SYSINIT(fpuinitstate, SI_SUB_DRIVERS, SI_ORDER_FIRST, fpuinitstate, NULL);
+SYSINIT(fpuinitstate, SI_SUB_CPU, SI_ORDER_ANY, fpuinitstate, NULL);
 
 /*
  * Free coprocessor (if we have it).
@@ -521,14 +502,14 @@ fpuformat(void)
 	return (_MC_FPFMT_XMM);
 }
 
-/* 
+/*
  * The following mechanism is used to ensure that the FPE_... value
  * that is passed as a trapcode to the signal handler of the user
  * process does not have more than one bit set.
- * 
+ *
  * Multiple bits may be set if the user process modifies the control
  * word while a status word bit is already set.  While this is a sign
- * of bad coding, we have no choise than to narrow them down to one
+ * of bad coding, we have no choice than to narrow them down to one
  * bit, since we must not send a trapcode that is not exactly one of
  * the FPE_ macros.
  *
@@ -1079,9 +1060,7 @@ static driver_t fpupnp_driver = {
 	1,			/* no softc */
 };
 
-static devclass_t fpupnp_devclass;
-
-DRIVER_MODULE(fpupnp, acpi, fpupnp_driver, fpupnp_devclass, 0, 0);
+DRIVER_MODULE(fpupnp, acpi, fpupnp_driver, 0, 0);
 ISA_PNP_INFO(fpupnp_ids);
 #endif	/* DEV_ISA */
 

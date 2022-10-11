@@ -17,11 +17,45 @@
     ..
     c++
         v1
+            __algorithm
+            ..
+            __bit
+            ..
+            __charconv
+            ..
+            __chrono
+            ..
+            __compare
+            ..
+            __concepts
+            ..
+            __coroutine
+            ..
+            __filesystem
+            ..
+            __format
+            ..
+            __functional
+            ..
+            __iterator
+            ..
+            __memory
+            ..
+            __numeric
+            ..
+            __random
+            ..
+            __ranges
+            ..
+            __thread
+            ..
+            __utility
+            ..
+            __variant
+            ..
             experimental
             ..
             ext
-            ..
-            tr1
             ..
         ..
     ..
@@ -171,6 +205,8 @@
         shsec
         ..
         stripe
+        ..
+        union
         ..
         virstor
         ..

@@ -103,6 +103,24 @@ firewall_init()
 
 }
 
+dummynet_init()
+{
+	firewall=$1
+
+	if ! kldstat -q -m dummynet; then
+		atf_skip "This test requires dummynet"
+	fi
+
+	case $firewall in
+	ipfw|pf)
+		# Nothing. This is okay.
+		;;
+	*)
+		atf_skip "${firewall} does not support dummynet"
+		;;
+	esac
+}
+
 nat_init()
 {
 	firewall=$1

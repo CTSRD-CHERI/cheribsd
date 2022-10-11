@@ -48,9 +48,7 @@ __FBSDID("$FreeBSD$");
 #include "iicbus_if.h"
 #include "iicoc.h"
 
-devclass_t iicoc_devclass;
-
-DRIVER_MODULE(iicbus, iicoc, iicbus_driver, iicbus_devclass, 0, 0);
+DRIVER_MODULE(iicbus, iicoc, iicbus_driver, 0, 0);
 
 static void
 iicoc_dev_write(device_t dev, int reg, int value)
@@ -147,8 +145,8 @@ iicoc_init(device_t dev)
 	return ((value & OC_CONTROL_EN) == 0);
 }
 
-int
-iicoc_iicbus_start(device_t dev, u_char slave, int timeout)
+static int
+iicoc_iicbus_start_common(device_t dev, u_char slave, int timeout, bool repeat)
 {
 	int error = IIC_EBUSERR;
 	struct iicoc_softc *sc;
@@ -158,7 +156,7 @@ iicoc_iicbus_start(device_t dev, u_char slave, int timeout)
 	sc->i2cdev_addr = (slave >> 1);
 
 	/* Verify the bus is idle */
-	if (iicoc_wait_on_status(dev, OC_STATUS_BUSY) < 0)
+	if (!repeat && iicoc_wait_on_status(dev, OC_STATUS_BUSY) < 0)
 		goto i2c_stx_error;
 
 	/* Write Slave Address */
@@ -184,6 +182,20 @@ i2c_stx_error:
 	iicoc_wait_on_status(dev, OC_STATUS_BUSY);  /* wait for idle */
 	mtx_unlock(&sc->sc_mtx);
 	return (error);
+}
+
+int
+iicoc_iicbus_start(device_t dev, u_char slave, int timeout)
+{
+
+	return (iicoc_iicbus_start_common(dev, slave, timeout, false));
+}
+
+int
+iicoc_iicbus_repeated_start(device_t dev, u_char slave, int timeout)
+{
+
+	return (iicoc_iicbus_start_common(dev, slave, timeout, true));
 }
 
 int
@@ -267,11 +279,4 @@ iicoc_iicbus_reset(device_t dev, u_char speed, u_char addr, u_char *oldadr)
 	error = iicoc_init(dev);
 	mtx_unlock(&sc->sc_mtx);
 	return (error);
-}
-
-int
-iicoc_iicbus_repeated_start(device_t dev, u_char slave, int timeout)
-{
-
-	return 0;
 }

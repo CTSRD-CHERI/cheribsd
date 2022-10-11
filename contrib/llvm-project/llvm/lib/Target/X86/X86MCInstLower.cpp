@@ -43,8 +43,12 @@
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/MC/MCSymbolELF.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Target/TargetLoweringObjectFile.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/Transforms/Instrumentation/AddressSanitizer.h"
+#include "llvm/Transforms/Instrumentation/AddressSanitizerCommon.h"
+#include <string>
 
 using namespace llvm;
 
@@ -274,6 +278,9 @@ MCOperand X86MCInstLower::LowerSymbolOperand(const MachineOperand &MO,
   case X86II::MO_GOTPCREL:
     RefKind = MCSymbolRefExpr::VK_GOTPCREL;
     break;
+  case X86II::MO_GOTPCREL_NORELAX:
+    RefKind = MCSymbolRefExpr::VK_GOTPCREL_NORELAX;
+    break;
   case X86II::MO_GOT:
     RefKind = MCSymbolRefExpr::VK_GOT;
     break;
@@ -418,7 +425,7 @@ static void SimplifyShortMoveForm(X86AsmPrinter &Printer, MCInst &Inst,
 }
 
 static unsigned getRetOpcode(const X86Subtarget &Subtarget) {
-  return Subtarget.is64Bit() ? X86::RETQ : X86::RETL;
+  return Subtarget.is64Bit() ? X86::RET64 : X86::RET32;
 }
 
 Optional<MCOperand>
@@ -977,20 +984,24 @@ void X86MCInstLower::Lower(const MachineInstr *MI, MCInst &OutMI) const {
 void X86AsmPrinter::LowerTlsAddr(X86MCInstLower &MCInstLowering,
                                  const MachineInstr &MI) {
   NoAutoPaddingScope NoPadScope(*OutStreamer);
-  bool Is64Bits = MI.getOpcode() == X86::TLS_addr64 ||
-                  MI.getOpcode() == X86::TLS_base_addr64;
+  bool Is64Bits = MI.getOpcode() != X86::TLS_addr32 &&
+                  MI.getOpcode() != X86::TLS_base_addr32;
+  bool Is64BitsLP64 = MI.getOpcode() == X86::TLS_addr64 ||
+                      MI.getOpcode() == X86::TLS_base_addr64;
   MCContext &Ctx = OutStreamer->getContext();
 
   MCSymbolRefExpr::VariantKind SRVK;
   switch (MI.getOpcode()) {
   case X86::TLS_addr32:
   case X86::TLS_addr64:
+  case X86::TLS_addrX32:
     SRVK = MCSymbolRefExpr::VK_TLSGD;
     break;
   case X86::TLS_base_addr32:
     SRVK = MCSymbolRefExpr::VK_TLSLDM;
     break;
   case X86::TLS_base_addr64:
+  case X86::TLS_base_addrX32:
     SRVK = MCSymbolRefExpr::VK_TLSLD;
     break;
   default:
@@ -1010,7 +1021,7 @@ void X86AsmPrinter::LowerTlsAddr(X86MCInstLower &MCInstLowering,
 
   if (Is64Bits) {
     bool NeedsPadding = SRVK == MCSymbolRefExpr::VK_TLSGD;
-    if (NeedsPadding)
+    if (NeedsPadding && Is64BitsLP64)
       EmitAndCountInstruction(MCInstBuilder(X86::DATA16_PREFIX));
     EmitAndCountInstruction(MCInstBuilder(X86::LEA64r)
                                 .addReg(X86::RDI)
@@ -1079,29 +1090,30 @@ void X86AsmPrinter::LowerTlsAddr(X86MCInstLower &MCInstLowering,
   }
 }
 
-/// Return the longest nop which can be efficiently decoded for the given
-/// target cpu.  15-bytes is the longest single NOP instruction, but some
-/// platforms can't decode the longest forms efficiently.
-static unsigned maxLongNopLength(const X86Subtarget *Subtarget) {
-  if (Subtarget->getFeatureBits()[X86::ProcIntelSLM])
-    return 7;
-  if (Subtarget->getFeatureBits()[X86::FeatureFast15ByteNOP])
-    return 15;
-  if (Subtarget->getFeatureBits()[X86::FeatureFast11ByteNOP])
-    return 11;
-  if (Subtarget->getFeatureBits()[X86::FeatureNOPL] || Subtarget->is64Bit())
-    return 10;
-  if (Subtarget->is32Bit())
-    return 2;
-  return 1;
-}
-
 /// Emit the largest nop instruction smaller than or equal to \p NumBytes
 /// bytes.  Return the size of nop emitted.
 static unsigned emitNop(MCStreamer &OS, unsigned NumBytes,
                         const X86Subtarget *Subtarget) {
+  // Determine the longest nop which can be efficiently decoded for the given
+  // target cpu.  15-bytes is the longest single NOP instruction, but some
+  // platforms can't decode the longest forms efficiently.
+  unsigned MaxNopLength = 1;
+  if (Subtarget->is64Bit()) {
+    // FIXME: We can use NOOPL on 32-bit targets with FeatureNOPL, but the
+    // IndexReg/BaseReg below need to be updated.
+    if (Subtarget->hasFeature(X86::TuningFast7ByteNOP))
+      MaxNopLength = 7;
+    else if (Subtarget->hasFeature(X86::TuningFast15ByteNOP))
+      MaxNopLength = 15;
+    else if (Subtarget->hasFeature(X86::TuningFast11ByteNOP))
+      MaxNopLength = 11;
+    else
+      MaxNopLength = 10;
+  } if (Subtarget->is32Bit())
+    MaxNopLength = 2;
+
   // Cap a single nop emission at the profitable value for the target
-  NumBytes = std::min(NumBytes, maxLongNopLength(Subtarget));
+  NumBytes = std::min(NumBytes, MaxNopLength);
 
   unsigned NopSize;
   unsigned Opc, BaseReg, ScaleVal, IndexReg, Displacement, SegmentReg;
@@ -1318,6 +1330,38 @@ void X86AsmPrinter::LowerFENTRY_CALL(const MachineInstr &MI,
           .addExpr(Op));
 }
 
+void X86AsmPrinter::LowerASAN_CHECK_MEMACCESS(const MachineInstr &MI) {
+  // FIXME: Make this work on non-ELF.
+  if (!TM.getTargetTriple().isOSBinFormatELF()) {
+    report_fatal_error("llvm.asan.check.memaccess only supported on ELF");
+    return;
+  }
+
+  const auto &Reg = MI.getOperand(0).getReg();
+  ASanAccessInfo AccessInfo(MI.getOperand(1).getImm());
+
+  uint64_t ShadowBase;
+  int MappingScale;
+  bool OrShadowOffset;
+  getAddressSanitizerParams(Triple(TM.getTargetTriple()), 64,
+                            AccessInfo.CompileKernel, &ShadowBase,
+                            &MappingScale, &OrShadowOffset);
+
+  std::string Name = AccessInfo.IsWrite ? "store" : "load";
+  std::string Op = OrShadowOffset ? "or" : "add";
+  std::string SymName = "__asan_check_" + Name + "_" + Op + "_" +
+                        utostr(1ULL << AccessInfo.AccessSizeIndex) + "_" +
+                        TM.getMCRegisterInfo()->getName(Reg.asMCReg());
+  if (OrShadowOffset)
+    report_fatal_error(
+        "OrShadowOffset is not supported with optimized callbacks");
+
+  EmitAndCountInstruction(
+      MCInstBuilder(X86::CALL64pcrel32)
+          .addExpr(MCSymbolRefExpr::create(
+              OutContext.getOrCreateSymbol(SymName), OutContext)));
+}
+
 void X86AsmPrinter::LowerPATCHABLE_OP(const MachineInstr &MI,
                                       X86MCInstLower &MCIL) {
   // PATCHABLE_OP minsize, opcode, operands
@@ -1329,7 +1373,7 @@ void X86AsmPrinter::LowerPATCHABLE_OP(const MachineInstr &MI,
 
   MCInst MCI;
   MCI.setOpcode(Opcode);
-  for (auto &MO : make_range(MI.operands_begin() + 2, MI.operands_end()))
+  for (auto &MO : drop_begin(MI.operands(), 2))
     if (auto MaybeOperand = MCIL.LowerMachineOperand(&MI, MO))
       MCI.addOperand(MaybeOperand.getValue());
 
@@ -1472,7 +1516,7 @@ void X86AsmPrinter::LowerPATCHABLE_EVENT_CALL(const MachineInstr &MI,
   // First we emit the label and the jump.
   auto CurSled = OutContext.createTempSymbol("xray_event_sled_", true);
   OutStreamer->AddComment("# XRay Custom Event Log");
-  OutStreamer->emitCodeAlignment(2);
+  OutStreamer->emitCodeAlignment(2, &getSubtargetInfo());
   OutStreamer->emitLabel(CurSled);
 
   // Use a two-byte `jmp`. This version of JMP takes an 8-bit relative offset as
@@ -1568,7 +1612,7 @@ void X86AsmPrinter::LowerPATCHABLE_TYPED_EVENT_CALL(const MachineInstr &MI,
   // First we emit the label and the jump.
   auto CurSled = OutContext.createTempSymbol("xray_typed_event_sled_", true);
   OutStreamer->AddComment("# XRay Typed Event Log");
-  OutStreamer->emitCodeAlignment(2);
+  OutStreamer->emitCodeAlignment(2, &getSubtargetInfo());
   OutStreamer->emitLabel(CurSled);
 
   // Use a two-byte `jmp`. This version of JMP takes an 8-bit relative offset as
@@ -1670,7 +1714,7 @@ void X86AsmPrinter::LowerPATCHABLE_FUNCTION_ENTER(const MachineInstr &MI,
   //   call <relative offset, 32-bits>   // 5 bytes
   //
   auto CurSled = OutContext.createTempSymbol("xray_sled_", true);
-  OutStreamer->emitCodeAlignment(2);
+  OutStreamer->emitCodeAlignment(2, &getSubtargetInfo());
   OutStreamer->emitLabel(CurSled);
 
   // Use a two-byte `jmp`. This version of JMP takes an 8-bit relative offset as
@@ -1700,12 +1744,12 @@ void X86AsmPrinter::LowerPATCHABLE_RET(const MachineInstr &MI,
   //
   // This just makes sure that the alignment for the next instruction is 2.
   auto CurSled = OutContext.createTempSymbol("xray_sled_", true);
-  OutStreamer->emitCodeAlignment(2);
+  OutStreamer->emitCodeAlignment(2, &getSubtargetInfo());
   OutStreamer->emitLabel(CurSled);
   unsigned OpCode = MI.getOperand(0).getImm();
   MCInst Ret;
   Ret.setOpcode(OpCode);
-  for (auto &MO : make_range(MI.operands_begin() + 1, MI.operands_end()))
+  for (auto &MO : drop_begin(MI.operands()))
     if (auto MaybeOperand = MCIL.LowerMachineOperand(&MI, MO))
       Ret.addOperand(MaybeOperand.getValue());
   OutStreamer->emitInstruction(Ret, getSubtargetInfo());
@@ -1724,7 +1768,7 @@ void X86AsmPrinter::LowerPATCHABLE_TAIL_CALL(const MachineInstr &MI,
   // the PATCHABLE_FUNCTION_ENTER case, followed by the lowering of the actual
   // tail call much like how we have it in PATCHABLE_RET.
   auto CurSled = OutContext.createTempSymbol("xray_sled_", true);
-  OutStreamer->emitCodeAlignment(2);
+  OutStreamer->emitCodeAlignment(2, &getSubtargetInfo());
   OutStreamer->emitLabel(CurSled);
   auto Target = OutContext.createTempSymbol();
 
@@ -1744,7 +1788,7 @@ void X86AsmPrinter::LowerPATCHABLE_TAIL_CALL(const MachineInstr &MI,
   // Before emitting the instruction, add a comment to indicate that this is
   // indeed a tail call.
   OutStreamer->AddComment("TAILCALL");
-  for (auto &MO : make_range(MI.operands_begin() + 1, MI.operands_end()))
+  for (auto &MO : drop_begin(MI.operands()))
     if (auto MaybeOperand = MCIL.LowerMachineOperand(&MI, MO))
       TC.addOperand(MaybeOperand.getValue());
   OutStreamer->emitInstruction(TC, getSubtargetInfo());
@@ -1779,10 +1823,7 @@ static const Constant *getConstantFromPool(const MachineInstr &MI,
   if (ConstantEntry.isMachineConstantPoolEntry())
     return nullptr;
 
-  const Constant *C = ConstantEntry.Val.ConstVal;
-  assert((!C || ConstantEntry.getType() == C->getType()) &&
-         "Expected a constant of the same type!");
-  return C;
+  return ConstantEntry.Val.ConstVal;
 }
 
 static std::string getShuffleComment(const MachineInstr *MI, unsigned SrcOp1Idx,
@@ -2165,7 +2206,7 @@ static void addConstantComments(const MachineInstr *MI,
       const MachineOperand &DstOp = MI->getOperand(0);
       CS << X86ATTInstPrinter::getRegisterName(DstOp.getReg()) << " = ";
       if (auto *CF = dyn_cast<ConstantFP>(C)) {
-        CS << "0x" << CF->getValueAPF().bitcastToAPInt().toString(16, false);
+        CS << "0x" << toString(CF->getValueAPF().bitcastToAPInt(), 16, false);
         OutStreamer.AddComment(CS.str());
       }
     }
@@ -2369,6 +2410,15 @@ void X86AsmPrinter::emitInstruction(const MachineInstr *MI) {
   const X86RegisterInfo *RI =
       MF->getSubtarget<X86Subtarget>().getRegisterInfo();
 
+  if (MI->getOpcode() == X86::OR64rm) {
+    for (auto &Opd : MI->operands()) {
+      if (Opd.isSymbol() && StringRef(Opd.getSymbolName()) ==
+                                "swift_async_extendedFramePointerFlags") {
+        ShouldEmitWeakSwiftAsyncExtendedFramePointerFlags = true;
+      }
+    }
+  }
+
   // Add a comment about EVEX-2-VEX compression for AVX-512 instrs that
   // are compressed from EVEX encoding to VEX encoding.
   if (TM.Options.MCOptions.ShowMCEncoding) {
@@ -2444,8 +2494,10 @@ void X86AsmPrinter::emitInstruction(const MachineInstr *MI) {
 
   case X86::TLS_addr32:
   case X86::TLS_addr64:
+  case X86::TLS_addrX32:
   case X86::TLS_base_addr32:
   case X86::TLS_base_addr64:
+  case X86::TLS_base_addrX32:
     return LowerTlsAddr(MCInstLowering, *MI);
 
   case X86::MOVPC32r: {
@@ -2559,6 +2611,9 @@ void X86AsmPrinter::emitInstruction(const MachineInstr *MI) {
     EmitAndCountInstruction(MCInstBuilder(getRetOpcode(*Subtarget)));
     return;
 
+  case X86::ASAN_CHECK_MEMACCESS:
+    return LowerASAN_CHECK_MEMACCESS(*MI);
+
   case X86::MORESTACK_RET_RESTORE_R10:
     // Return, then restore R10.
     EmitAndCountInstruction(MCInstBuilder(getRetOpcode(*Subtarget)));
@@ -2594,6 +2649,15 @@ void X86AsmPrinter::emitInstruction(const MachineInstr *MI) {
     }
     return;
   }
+  case X86::UBSAN_UD1:
+    EmitAndCountInstruction(MCInstBuilder(X86::UD1Lm)
+                                .addReg(X86::EAX)
+                                .addReg(X86::EAX)
+                                .addImm(1)
+                                .addReg(X86::NoRegister)
+                                .addImm(MI->getOperand(0).getImm())
+                                .addReg(X86::NoRegister));
+    return;
   }
 
   MCInst TmpInst;

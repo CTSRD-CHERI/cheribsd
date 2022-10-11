@@ -49,6 +49,13 @@ MK_DEBUG_FILES=	no
 .if ${MK_BIND_NOW} != "no"
 LDFLAGS+= -Wl,-znow
 .endif
+.if ${LINKER_TYPE} != "mac"
+.if ${MK_RELRO} == "no"
+LDFLAGS+= -Wl,-znorelro
+.else
+LDFLAGS+= -Wl,-zrelro
+.endif
+.endif
 .if ${MK_PIE} != "no"
 # Static PIE is not yet supported/tested.
 .if !defined(NO_SHARED) || ${NO_SHARED:tl} == "no"
@@ -98,6 +105,9 @@ LDFLAGS+=	-Wl,--fatal-warnings
 .endif
 .endif
 
+# bsd.sanitizer.mk is not installed, so don't require it (e.g. for ports).
+.sinclude "bsd.sanitizer.mk"
+
 .if ${MACHINE_CPUARCH} == "riscv" && ${LINKER_FEATURES:Mriscv-relaxations} == ""
 CFLAGS += -mno-relax
 .endif
@@ -107,7 +117,11 @@ CFLAGS+=${CRUNCH_CFLAGS}
 .else
 .if ${MK_DEBUG_FILES} != "no" && empty(DEBUG_FLAGS:M-g) && \
     empty(DEBUG_FLAGS:M-gdwarf-*)
+.if !${COMPILER_FEATURES:Mcompressed-debug}
+CFLAGS+= ${DEBUG_FILES_CFLAGS:N-gz*}
+.else
 CFLAGS+= ${DEBUG_FILES_CFLAGS}
+.endif
 CTFFLAGS+= -g
 .endif
 .endif
@@ -125,11 +139,6 @@ TAG_ARGS=	-T ${TAGS:[*]:S/ /,/g}
 
 .if defined(NO_SHARED) && ${NO_SHARED:tl} != "no"
 LDFLAGS+= -static
-.endif
-
-# clang currently defaults to dynamic TLS for mips64 binaries
-.if ${MACHINE_ARCH:Mmips64*} && ${COMPILER_TYPE} == "clang"
-CFLAGS+= -ftls-model=initial-exec
 .endif
 
 .if ${MK_DEBUG_FILES} != "no"
@@ -151,12 +160,6 @@ DEBUGMKDIR=
 .endif
 .else
 PROG_FULL=	${PROG}
-.endif
-
-.if defined(STRIP) && !empty(STRIP) && defined(PROG) && !defined(INTERNALPROG)
-PROG_INSTALL=	${PROG}.stripped
-.else
-PROG_INSTALL=	${PROG}
 .endif
 
 .if defined(PROG)
@@ -233,11 +236,6 @@ ${PROGNAME}.debug: ${PROG_FULL}
 	${OBJCOPY} --only-keep-debug ${PROG_FULL} ${.TARGET}
 .endif
 
-.if ${PROG_INSTALL} != ${PROG}
-${PROG_INSTALL}: ${PROG}
-	${STRIPBIN} -o ${.TARGET} ${STRIP_FLAGS} ${PROG}
-.endif
-
 .if defined(LLVM_LINK)
 ${PROG_FULL}.bc: ${BCOBJS}
 	${LLVM_LINK} -o ${.TARGET} ${BCOBJS}
@@ -260,7 +258,12 @@ MAN1=	${MAN}
 .if defined(_SKIP_BUILD)
 all:
 .else
-all: ${PROG_INSTALL} ${SCRIPTS}
+.if target(afterbuild)
+.ORDER: ${PROG} afterbuild
+all: ${PROG} ${SCRIPTS} afterbuild
+.else
+all: ${PROG} ${SCRIPTS}
+.endif
 .if ${MK_MAN} != "no"
 all: all-man
 .endif
@@ -268,7 +271,6 @@ all: all-man
 
 .if defined(PROG)
 CLEANFILES+= ${PROG} ${PROG}.bc ${PROG}.ll
-CLEANFILES+= ${PROG}.stripped
 .if ${MK_DEBUG_FILES} != "no"
 CLEANFILES+= ${PROG_FULL} ${PROGNAME}.debug
 .endif

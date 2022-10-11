@@ -98,10 +98,9 @@ static device_method_t	grackle_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t	grackle_devclass;
 DEFINE_CLASS_1(pcib, grackle_driver, grackle_methods,
-    sizeof(struct grackle_softc), ofw_pci_driver);
-DRIVER_MODULE(grackle, ofwbus, grackle_driver, grackle_devclass, 0, 0);
+    sizeof(struct grackle_softc), ofw_pcib_driver);
+DRIVER_MODULE(grackle, ofwbus, grackle_driver, 0, 0);
 
 static int
 grackle_probe(device_t dev)
@@ -137,7 +136,7 @@ grackle_attach(device_t dev)
 	sc->sc_addr = (vm_offset_t)pmap_mapdev(GRACKLE_ADDR, PAGE_SIZE);
 	sc->sc_data = (vm_offset_t)pmap_mapdev(GRACKLE_DATA, PAGE_SIZE);
 
-	return (ofw_pci_attach(dev));
+	return (ofw_pcib_attach(dev));
 }
 
 static u_int32_t
@@ -243,7 +242,6 @@ badaddr(void *addr, size_t size)
 {
 	struct thread	*td;
 	jmp_buf		env, *oldfaultbuf;
-	int		x;
 
 	/* Get rid of any stale machine checks that have been waiting.  */
 	__asm __volatile ("sync; isync");
@@ -262,13 +260,13 @@ badaddr(void *addr, size_t size)
 
 	switch (size) {
 	case 1:
-		x = *(volatile int8_t *)addr;
+		(void)*(volatile int8_t *)addr;
 		break;
 	case 2:
-		x = *(volatile int16_t *)addr;
+		(void)*(volatile int16_t *)addr;
 		break;
 	case 4:
-		x = *(volatile int32_t *)addr;
+		(void)*(volatile int32_t *)addr;
 		break;
 	default:
 		panic("badaddr: invalid size (%zd)", size);
@@ -318,6 +316,5 @@ static driver_t grackle_hb_driver = {
 	grackle_hb_methods,
 	1,
 };
-static devclass_t grackle_hb_devclass;
 
-DRIVER_MODULE(grackle_hb, pci, grackle_hb_driver, grackle_hb_devclass, 0, 0);
+DRIVER_MODULE(grackle_hb, pci, grackle_hb_driver, 0, 0);

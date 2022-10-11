@@ -47,11 +47,9 @@ function cleanup
 {
 	[[ -e $propfile ]] && rm -f $propfile
 
-	datasetexists $clone  && \
-		log_must zfs destroy $clone
+	datasetexists $clone  && destroy_dataset $clone
 	for snap in $fssnap $volsnap ; do
-		snapexists $snap && \
-			log_must zfs destroy $snap
+		snapexists $snap && destroy_dataset $snap
 	done
 
 	if [[ -n $globalzone ]] ; then
@@ -64,8 +62,7 @@ function cleanup
 		done
 	else
 		for fs in $TESTPOOL/$TESTFS1 $TESTPOOL/$TESTFS2 $TESTPOOL/$TESTFS3; do
-			datasetexists $fs && \
-				log_must zfs destroy -rf $fs
+			datasetexists $fs && destroy_dataset $fs -rf
 		done
 	fi
 }
@@ -166,15 +163,12 @@ while (( i < ${#opts[*]} )); do
 	log_must eval "zfs get ${opts[i]} all >$propfile"
 
 	for ds in $allds; do
-		grep $ds $propfile >/dev/null 2>&1
-		(( $? != 0 )) && \
+		grep -q $ds $propfile || \
 			log_fail "There is no property for" \
 				"dataset $ds in 'get all' output."
 
-		propnum=`cat $propfile | awk '{print $1}' | \
-			grep "${ds}$" | wc -l`
-		ds_type=`zfs get -H -o value type $ds`
-		case $ds_type in
+		propnum=$(awk -v ds="${ds}$" '$1 ~ ds {++cnt}  END {print cnt}' $propfile)
+		case $(zfs get -H -o value type $ds) in
 			filesystem )
 				(( propnum < fspropnum )) && \
 				(( failflag += 1 ))

@@ -72,6 +72,8 @@ zed_udev_event(const char *class, const char *subclass, nvlist_t *nvl)
 		zed_log_msg(LOG_INFO, "\t%s: %s", DEV_PATH, strval);
 	if (nvlist_lookup_string(nvl, DEV_IDENTIFIER, &strval) == 0)
 		zed_log_msg(LOG_INFO, "\t%s: %s", DEV_IDENTIFIER, strval);
+	if (nvlist_lookup_boolean(nvl, DEV_IS_PART) == B_TRUE)
+		zed_log_msg(LOG_INFO, "\t%s: B_TRUE", DEV_IS_PART);
 	if (nvlist_lookup_string(nvl, DEV_PHYS_PATH, &strval) == 0)
 		zed_log_msg(LOG_INFO, "\t%s: %s", DEV_PHYS_PATH, strval);
 	if (nvlist_lookup_uint64(nvl, DEV_SIZE, &numval) == 0)
@@ -213,6 +215,11 @@ zed_udev_monitor(void *arg)
 		if (type != NULL && type[0] != '\0' &&
 		    strcmp(type, "disk") == 0 &&
 		    part != NULL && part[0] != '\0') {
+			zed_log_msg(LOG_INFO,
+			    "%s: skip %s since it has a %s partition already",
+			    __func__,
+			    udev_device_get_property_value(dev, "DEVNAME"),
+			    part);
 			/* skip and wait for partition event */
 			udev_device_unref(dev);
 			continue;
@@ -227,6 +234,11 @@ zed_udev_monitor(void *arg)
 			sectors = udev_device_get_sysattr_value(dev, "size");
 		if (sectors != NULL &&
 		    strtoull(sectors, NULL, 10) < MINIMUM_SECTORS) {
+			zed_log_msg(LOG_INFO,
+			    "%s: %s sectors %s < %llu (minimum)",
+			    __func__,
+			    udev_device_get_property_value(dev, "DEVNAME"),
+			    sectors, MINIMUM_SECTORS);
 			udev_device_unref(dev);
 			continue;
 		}
@@ -350,7 +362,7 @@ zed_udev_monitor(void *arg)
 }
 
 int
-zed_disk_event_init()
+zed_disk_event_init(void)
 {
 	int fd, fflags;
 
@@ -379,13 +391,14 @@ zed_disk_event_init()
 		return (-1);
 	}
 
+	pthread_setname_np(g_mon_tid, "udev monitor");
 	zed_log_msg(LOG_INFO, "zed_disk_event_init");
 
 	return (0);
 }
 
 void
-zed_disk_event_fini()
+zed_disk_event_fini(void)
 {
 	/* cancel monitor thread at recvmsg() */
 	(void) pthread_cancel(g_mon_tid);
@@ -403,13 +416,13 @@ zed_disk_event_fini()
 #include "zed_disk_event.h"
 
 int
-zed_disk_event_init()
+zed_disk_event_init(void)
 {
 	return (0);
 }
 
 void
-zed_disk_event_fini()
+zed_disk_event_fini(void)
 {
 }
 

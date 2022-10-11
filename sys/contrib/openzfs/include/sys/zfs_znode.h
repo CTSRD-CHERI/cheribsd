@@ -37,7 +37,7 @@ extern "C" {
 
 /*
  * Additional file level attributes, that are stored
- * in the upper half of zp_flags
+ * in the upper half of z_pflags
  */
 #define	ZFS_READONLY		0x0000000100000000ull
 #define	ZFS_HIDDEN		0x0000000200000000ull
@@ -199,6 +199,8 @@ typedef struct znode {
 	uint64_t	z_size;		/* file size (cached) */
 	uint64_t	z_pflags;	/* pflags (cached) */
 	uint32_t	z_sync_cnt;	/* synchronous open count */
+	uint32_t	z_sync_writes_cnt; /* synchronous write count */
+	uint32_t	z_async_writes_cnt; /* asynchronous write count */
 	mode_t		z_mode;		/* mode (cached) */
 	kmutex_t	z_acl_lock;	/* acl data lock */
 	zfs_acl_t	*z_acl_cached;	/* cached acl */
@@ -286,6 +288,8 @@ extern void zfs_log_acl(zilog_t *zilog, dmu_tx_t *tx, znode_t *zp,
     vsecattr_t *vsecp, zfs_fuid_info_t *fuidp);
 extern void zfs_xvattr_set(znode_t *zp, xvattr_t *xvap, dmu_tx_t *tx);
 extern void zfs_upgrade(zfsvfs_t *zfsvfs, dmu_tx_t *tx);
+extern void zfs_log_setsaxattr(zilog_t *zilog, dmu_tx_t *tx, int txtype,
+    znode_t *zp, const char *name, const void *value, size_t size);
 
 extern void zfs_znode_update_vfs(struct znode *);
 

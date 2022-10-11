@@ -1274,7 +1274,7 @@ static device_method_t ntb_amd_methods[] = {
 	DEVMETHOD(device_detach,	amd_ntb_detach),
 
 	/* Bus interface */
-	DEVMETHOD(bus_child_location_str, ntb_child_location_str),
+	DEVMETHOD(bus_child_location,	ntb_child_location),
 	DEVMETHOD(bus_print_child,	ntb_print_child),
 	DEVMETHOD(bus_get_dma_tag,	ntb_get_dma_tag),
 
@@ -1310,7 +1310,7 @@ static device_method_t ntb_amd_methods[] = {
 
 static DEFINE_CLASS_0(ntb_hw, ntb_amd_driver, ntb_amd_methods,
     sizeof(struct amd_ntb_softc));
-DRIVER_MODULE(ntb_hw_amd, pci, ntb_amd_driver, ntb_hw_devclass, NULL, NULL);
+DRIVER_MODULE(ntb_hw_amd, pci, ntb_amd_driver, NULL, NULL);
 MODULE_DEPEND(ntb_hw_amd, ntb, 1, 1, 1);
 MODULE_VERSION(ntb_hw_amd, 1);
 PCI_PNP_INFO(amd_ntb_devs);

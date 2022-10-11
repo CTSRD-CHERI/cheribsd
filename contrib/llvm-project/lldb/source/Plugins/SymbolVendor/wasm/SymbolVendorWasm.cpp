@@ -8,7 +8,7 @@
 
 #include "SymbolVendorWasm.h"
 
-#include <string.h>
+#include <cstring>
 
 #include "Plugins/ObjectFile/wasm/ObjectFileWasm.h"
 #include "lldb/Core/Module.h"
@@ -41,12 +41,7 @@ void SymbolVendorWasm::Terminate() {
   PluginManager::UnregisterPlugin(CreateInstance);
 }
 
-lldb_private::ConstString SymbolVendorWasm::GetPluginNameStatic() {
-  static ConstString g_name("WASM");
-  return g_name;
-}
-
-const char *SymbolVendorWasm::GetPluginDescriptionStatic() {
+llvm::StringRef SymbolVendorWasm::GetPluginDescriptionStatic() {
   return "Symbol vendor for WASM that looks for dwo files that match "
          "executables.";
 }
@@ -72,8 +67,7 @@ SymbolVendorWasm::CreateInstance(const lldb::ModuleSP &module_sp,
           lldb::eSectionTypeDWARFDebugInfo, true))
     return nullptr;
 
-  static Timer::Category func_cat(LLVM_PRETTY_FUNCTION);
-  Timer scoped_timer(func_cat, "SymbolVendorWasm::CreateInstance (module = %s)",
+  LLDB_SCOPED_TIMERF("SymbolVendorWasm::CreateInstance (module = %s)",
                      module_sp->GetFileSpec().GetPath().c_str());
 
   ModuleSpec module_spec;
@@ -140,8 +134,3 @@ SymbolVendorWasm::CreateInstance(const lldb::ModuleSP &module_sp,
   symbol_vendor->AddSymbolFileRepresentation(sym_objfile_sp);
   return symbol_vendor;
 }
-
-// PluginInterface protocol
-ConstString SymbolVendorWasm::GetPluginName() { return GetPluginNameStatic(); }
-
-uint32_t SymbolVendorWasm::GetPluginVersion() { return 1; }

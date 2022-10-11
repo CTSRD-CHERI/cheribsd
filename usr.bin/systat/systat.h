@@ -43,6 +43,7 @@
  * CHERI CHANGES END
  */
 
+#include <sys/stdint.h>
 #include <curses.h>
 
 struct  cmdtab {
@@ -83,3 +84,8 @@ extern int use_kvm;
 extern void putint(int, int, int, int);
 extern void putfloat(double, int, int, int, int, int);
 extern void putlongdouble(long double, int, int, int, int, int);
+
+int procinit(void);
+void procgetinfo(void);
+void proclabel(int col);
+void procshow(int col, int hight, uint64_t totalswappages);

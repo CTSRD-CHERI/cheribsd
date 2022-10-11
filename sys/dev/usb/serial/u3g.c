@@ -188,8 +188,6 @@ static device_method_t u3g_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t u3g_devclass;
-
 static driver_t u3g_driver = {
 	.name = "u3g",
 	.methods = u3g_methods,
@@ -240,11 +238,14 @@ static const STRUCT_USB_HOST_ID u3g_devs[] = {
 	U3G_DEV(DLINK, DWM157_2, 0),
 	U3G_DEV(DLINK, DWM222_CD, U3GINIT_SCSIEJECT),
 	U3G_DEV(DLINK, DWM222, 0),
+	U3G_DEV(DLINK, DWM222_CD_2, U3GINIT_SCSIEJECT),
+	U3G_DEV(DLINK, DWM222_2, 0),
 	U3G_DEV(DLINK3, DWM652, 0),
 	U3G_DEV(HP, EV2200, 0),
 	U3G_DEV(HP, HS2300, 0),
 	U3G_DEV(HP, UN2420_QDL, 0),
 	U3G_DEV(HP, UN2420, 0),
+	U3G_DEV(HP, LT4132, U3GINIT_HUAWEISCSI2),
 	U3G_DEV(HUAWEI, E1401, U3GINIT_HUAWEI),
 	U3G_DEV(HUAWEI, E1402, U3GINIT_HUAWEI),
 	U3G_DEV(HUAWEI, E1403, U3GINIT_HUAWEI),
@@ -396,6 +397,8 @@ static const STRUCT_USB_HOST_ID u3g_devs[] = {
 	U3G_DEV(OPTION, GTMAXHSUPA, 0),
 	U3G_DEV(OPTION, GTMAXHSUPAE, 0),
 	U3G_DEV(OPTION, VODAFONEMC3G, 0),
+	U3G_DEV(PANASONIC, CFF9_3G_QDL, 0),
+	U3G_DEV(PANASONIC, CFF9_3G, 0),
 	U3G_DEV(QISDA, H20_1, 0),
 	U3G_DEV(QISDA, H20_2, 0),
 	U3G_DEV(QISDA, H21_1, 0),
@@ -496,6 +499,8 @@ static const STRUCT_USB_HOST_ID u3g_devs[] = {
 	U3G_DEV(QUANTA, Q101, 0),
 	U3G_DEV(QUANTA, Q111, 0),
 	U3G_DEV(QUECTEL, EC25, 0),
+	U3G_DEV(QUECTEL, EM05, 0),
+	U3G_DEV(QUECTEL, EM12_G, 0),
 	U3G_DEV(SIERRA, AC402, 0),
 	U3G_DEV(SIERRA, AC595U, 0),
 	U3G_DEV(SIERRA, AC313U, 0),
@@ -593,7 +598,7 @@ static const STRUCT_USB_HOST_ID u3g_devs[] = {
 #undef	U3G_DEV
 };
 
-DRIVER_MODULE(u3g, uhub, u3g_driver, u3g_devclass, u3g_driver_loaded, 0);
+DRIVER_MODULE(u3g, uhub, u3g_driver, u3g_driver_loaded, NULL);
 MODULE_DEPEND(u3g, ucom, 1, 1, 1);
 MODULE_DEPEND(u3g, usb, 1, 1, 1);
 MODULE_VERSION(u3g, 1);

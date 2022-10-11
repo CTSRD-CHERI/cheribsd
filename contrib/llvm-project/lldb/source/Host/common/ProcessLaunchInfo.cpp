@@ -20,7 +20,7 @@
 #include "llvm/Support/FileSystem.h"
 
 #if !defined(_WIN32)
-#include <limits.h>
+#include <climits>
 #endif
 
 using namespace lldb;
@@ -30,9 +30,9 @@ using namespace lldb_private;
 
 ProcessLaunchInfo::ProcessLaunchInfo()
     : ProcessInfo(), m_working_dir(), m_plugin_name(), m_flags(0),
-      m_file_actions(), m_pty(new PseudoTerminal), m_resume_count(0),
-      m_monitor_callback(nullptr), m_monitor_callback_baton(nullptr),
-      m_monitor_signals(false), m_listener_sp(), m_hijack_listener_sp() {}
+      m_file_actions(), m_pty(new PseudoTerminal), m_monitor_callback(nullptr),
+      m_listener_sp(), m_hijack_listener_sp(), m_scripted_process_class_name(),
+      m_scripted_process_dictionary_sp() {}
 
 ProcessLaunchInfo::ProcessLaunchInfo(const FileSpec &stdin_file_spec,
                                      const FileSpec &stdout_file_spec,
@@ -42,7 +42,8 @@ ProcessLaunchInfo::ProcessLaunchInfo(const FileSpec &stdin_file_spec,
     : ProcessInfo(), m_working_dir(), m_plugin_name(), m_flags(launch_flags),
       m_file_actions(), m_pty(new PseudoTerminal), m_resume_count(0),
       m_monitor_callback(nullptr), m_monitor_callback_baton(nullptr),
-      m_monitor_signals(false), m_listener_sp(), m_hijack_listener_sp() {
+      m_monitor_signals(false), m_listener_sp(), m_hijack_listener_sp(),
+      m_scripted_process_class_name(), m_scripted_process_dictionary_sp() {
   if (stdin_file_spec) {
     FileAction file_action;
     const bool read = true;
@@ -171,6 +172,8 @@ void ProcessLaunchInfo::Clear() {
   m_resume_count = 0;
   m_listener_sp.reset();
   m_hijack_listener_sp.reset();
+  m_scripted_process_class_name.clear();
+  m_scripted_process_dictionary_sp.reset();
 }
 
 void ProcessLaunchInfo::SetMonitorProcessCallback(
@@ -209,6 +212,14 @@ void ProcessLaunchInfo::SetDetachOnError(bool enable) {
 
 llvm::Error ProcessLaunchInfo::SetUpPtyRedirection() {
   Log *log = GetLogIfAllCategoriesSet(LIBLLDB_LOG_PROCESS);
+
+  bool stdin_free = GetFileActionForFD(STDIN_FILENO) == nullptr;
+  bool stdout_free = GetFileActionForFD(STDOUT_FILENO) == nullptr;
+  bool stderr_free = GetFileActionForFD(STDERR_FILENO) == nullptr;
+  bool any_free = stdin_free || stdout_free || stderr_free;
+  if (!any_free)
+    return llvm::Error::success();
+
   LLDB_LOG(log, "Generating a pty to use for stdin/out/err");
 
   int open_flags = O_RDWR | O_NOCTTY;
@@ -218,32 +229,25 @@ llvm::Error ProcessLaunchInfo::SetUpPtyRedirection() {
   // do for now.
   open_flags |= O_CLOEXEC;
 #endif
-  if (!m_pty->OpenFirstAvailablePrimary(open_flags, nullptr, 0)) {
-    return llvm::createStringError(llvm::inconvertibleErrorCode(),
-                                   "PTY::OpenFirstAvailablePrimary failed");
-  }
-  const FileSpec secondary_file_spec(m_pty->GetSecondaryName(nullptr, 0));
+  if (llvm::Error Err = m_pty->OpenFirstAvailablePrimary(open_flags))
+    return Err;
 
-  // Only use the secondary tty if we don't have anything specified for
-  // input and don't have an action for stdin
-  if (GetFileActionForFD(STDIN_FILENO) == nullptr)
+  const FileSpec secondary_file_spec(m_pty->GetSecondaryName());
+
+  if (stdin_free)
     AppendOpenFileAction(STDIN_FILENO, secondary_file_spec, true, false);
 
-  // Only use the secondary tty if we don't have anything specified for
-  // output and don't have an action for stdout
-  if (GetFileActionForFD(STDOUT_FILENO) == nullptr)
+  if (stdout_free)
     AppendOpenFileAction(STDOUT_FILENO, secondary_file_spec, false, true);
 
-  // Only use the secondary tty if we don't have anything specified for
-  // error and don't have an action for stderr
-  if (GetFileActionForFD(STDERR_FILENO) == nullptr)
+  if (stderr_free)
     AppendOpenFileAction(STDERR_FILENO, secondary_file_spec, false, true);
   return llvm::Error::success();
 }
 
 bool ProcessLaunchInfo::ConvertArgumentsForLaunchingInShell(
-    Status &error, bool localhost, bool will_debug,
-    bool first_arg_is_full_shell_command, int32_t num_resumes) {
+    Status &error, bool will_debug, bool first_arg_is_full_shell_command,
+    uint32_t num_resumes) {
   error.Clear();
 
   if (GetFlags().Test(eLaunchFlagLaunchInShell)) {
@@ -254,7 +258,6 @@ bool ProcessLaunchInfo::ConvertArgumentsForLaunchingInShell(
       if (argv == nullptr || argv[0] == nullptr)
         return false;
       Args shell_arguments;
-      std::string safe_arg;
       shell_arguments.AppendArgument(shell_executable);
       const llvm::Triple &triple = GetArchitecture().GetTriple();
       if (triple.getOS() == llvm::Triple::Win32 &&
@@ -331,9 +334,10 @@ bool ProcessLaunchInfo::ConvertArgumentsForLaunchingInShell(
           return false;
       } else {
         for (size_t i = 0; argv[i] != nullptr; ++i) {
-          const char *arg =
-              Args::GetShellSafeArgument(m_shell, argv[i], safe_arg);
-          shell_command.Printf(" %s", arg);
+          std::string safe_arg = Args::GetShellSafeArgument(m_shell, argv[i]);
+          // Add a space to separate this arg from the previous one.
+          shell_command.PutCString(" ");
+          shell_command.PutCString(safe_arg);
         }
       }
       shell_arguments.AppendArgument(shell_command.GetString());

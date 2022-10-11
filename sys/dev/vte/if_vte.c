@@ -164,10 +164,8 @@ static driver_t vte_driver = {
 	sizeof(struct vte_softc)
 };
 
-static devclass_t vte_devclass;
-
-DRIVER_MODULE(vte, pci, vte_driver, vte_devclass, 0, 0);
-DRIVER_MODULE(miibus, vte, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(vte, pci, vte_driver, 0, 0);
+DRIVER_MODULE(miibus, vte, miibus_driver, 0, 0);
 
 static int
 vte_miibus_readreg(device_t dev, int phy, int reg)
@@ -1605,9 +1603,10 @@ vte_tick(void *arg)
 static void
 vte_reset(struct vte_softc *sc)
 {
-	uint16_t mcr;
+	uint16_t mcr, mdcsc;
 	int i;
 
+	mdcsc = CSR_READ_2(sc, VTE_MDCSC);
 	mcr = CSR_READ_2(sc, VTE_MCR1);
 	CSR_WRITE_2(sc, VTE_MCR1, mcr | MCR1_MAC_RESET);
 	for (i = VTE_RESET_TIMEOUT; i > 0; i--) {
@@ -1625,6 +1624,14 @@ vte_reset(struct vte_softc *sc)
 	CSR_WRITE_2(sc, VTE_MACSM, 0x0002);
 	CSR_WRITE_2(sc, VTE_MACSM, 0);
 	DELAY(5000);
+
+	/*
+	 * On some SoCs (like Vortex86DX3) MDC speed control register value
+	 * needs to be restored to original value instead of default one,
+	 * otherwise some PHY registers may fail to be read.
+	 */
+	if (mdcsc != MDCSC_DEFAULT)
+		CSR_WRITE_2(sc, VTE_MDCSC, mdcsc);
 }
 
 static void

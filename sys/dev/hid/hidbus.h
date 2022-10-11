@@ -152,6 +152,7 @@ int	hidbus_locate(const void *desc, hid_size_t size, int32_t u,
 	    enum hid_kind k, uint8_t tlc_index, uint8_t index,
 	    struct hid_location *loc, uint32_t *flags, uint8_t *id,
 	    struct hid_absinfo *ai);
+bool	hidbus_is_collection(const void *, hid_size_t, int32_t, uint8_t);
 
 const struct hid_device_id *hidbus_lookup_id(device_t,
 		    const struct hid_device_id *, int);
@@ -170,7 +171,5 @@ int	hid_get_report_descr(device_t, void **, hid_size_t *);
 int	hid_set_report_descr(device_t, const void *, hid_size_t);
 
 const struct hid_device_info *hid_get_device_info(device_t);
-
-extern devclass_t hidbus_devclass;
 
 #endif	/* _HID_HIDBUS_H_ */

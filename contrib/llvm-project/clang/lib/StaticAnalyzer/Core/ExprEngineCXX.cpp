@@ -132,10 +132,20 @@ SVal ExprEngine::computeObjectUnderConstruction(
     case ConstructionContext::SimpleConstructorInitializerKind: {
       const auto *ICC = cast<ConstructorInitializerConstructionContext>(CC);
       const auto *Init = ICC->getCXXCtorInitializer();
-      assert(Init->isAnyMemberInitializer());
       const CXXMethodDecl *CurCtor = cast<CXXMethodDecl>(LCtx->getDecl());
       Loc ThisPtr = SVB.getCXXThis(CurCtor, LCtx->getStackFrame());
       SVal ThisVal = State->getSVal(ThisPtr);
+      if (Init->isBaseInitializer()) {
+        const auto *ThisReg = cast<SubRegion>(ThisVal.getAsRegion());
+        const CXXRecordDecl *BaseClass =
+          Init->getBaseClass()->getAsCXXRecordDecl();
+        const auto *BaseReg =
+          MRMgr.getCXXBaseObjectRegion(BaseClass, ThisReg,
+                                       Init->isBaseVirtual());
+        return SVB.makeLoc(BaseReg);
+      }
+      if (Init->isDelegatingInitializer())
+        return ThisVal;
 
       const ValueDecl *Field;
       SVal FieldVal;
@@ -364,8 +374,12 @@ ProgramStateRef ExprEngine::updateObjectsUnderConstruction(
     case ConstructionContext::CXX17ElidedCopyConstructorInitializerKind:
     case ConstructionContext::SimpleConstructorInitializerKind: {
       const auto *ICC = cast<ConstructorInitializerConstructionContext>(CC);
-      return addObjectUnderConstruction(State, ICC->getCXXCtorInitializer(),
-                                        LCtx, V);
+      const auto *Init = ICC->getCXXCtorInitializer();
+      // Base and delegating initializers handled above
+      assert(Init->isAnyMemberInitializer() &&
+             "Base and delegating initializers should have been handled by"
+             "computeObjectUnderConstruction()");
+      return addObjectUnderConstruction(State, Init, LCtx, V);
     }
     case ConstructionContext::NewAllocatedObjectKind: {
       return State;
@@ -517,7 +531,7 @@ void ExprEngine::handleConstructor(const Expr *E,
     // FIXME: Instead of relying on the ParentMap, we should have the
     // trigger-statement (InitListExpr in this case) passed down from CFG or
     // otherwise always available during construction.
-    if (dyn_cast_or_null<InitListExpr>(LCtx->getParentMap().getParent(E))) {
+    if (isa_and_nonnull<InitListExpr>(LCtx->getParentMap().getParent(E))) {
       MemRegionManager &MRMgr = getSValBuilder().getRegionManager();
       Target = loc::MemRegionVal(MRMgr.getCXXTempObjectRegion(E, LCtx));
       CallOpts.IsCtorOrDtorWithImproperlyModeledTargetRegion = true;
@@ -602,11 +616,11 @@ void ExprEngine::handleConstructor(const Expr *E,
                                             *Call, *this);
 
   ExplodedNodeSet DstEvaluated;
-  StmtNodeBuilder Bldr(DstPreCall, DstEvaluated, *currBldrCtx);
 
   if (CE && CE->getConstructor()->isTrivial() &&
       CE->getConstructor()->isCopyOrMoveConstructor() &&
       !CallOpts.IsArrayCtorOrDtor) {
+    StmtNodeBuilder Bldr(DstPreCall, DstEvaluated, *currBldrCtx);
     // FIXME: Handle other kinds of trivial constructors as well.
     for (ExplodedNodeSet::iterator I = DstPreCall.begin(), E = DstPreCall.end();
          I != E; ++I)
@@ -626,6 +640,8 @@ void ExprEngine::handleConstructor(const Expr *E,
   // in the CFG, would be called at the end of the full expression or
   // later (for life-time extended temporaries) -- but avoids infeasible
   // paths when no-return temporary destructors are used for assertions.
+  ExplodedNodeSet DstEvaluatedPostProcessed;
+  StmtNodeBuilder Bldr(DstEvaluated, DstEvaluatedPostProcessed, *currBldrCtx);
   const AnalysisDeclContext *ADC = LCtx->getAnalysisDeclContext();
   if (!ADC->getCFGBuildOptions().AddTemporaryDtors) {
     if (llvm::isa_and_nonnull<CXXTempObjectRegion>(TargetRegion) &&
@@ -655,7 +671,7 @@ void ExprEngine::handleConstructor(const Expr *E,
   }
 
   ExplodedNodeSet DstPostArgumentCleanup;
-  for (ExplodedNode *I : DstEvaluated)
+  for (ExplodedNode *I : DstEvaluatedPostProcessed)
     finishArgumentConstruction(DstPostArgumentCleanup, I, *Call);
 
   // If there were other constructors called for object-type arguments

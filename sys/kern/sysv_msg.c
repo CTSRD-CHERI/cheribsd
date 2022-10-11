@@ -198,50 +198,6 @@ static struct syscall_helper_data msg_syscalls[] = {
 #include <compat/freebsd32/freebsd32_syscall.h>
 #include <compat/freebsd32/freebsd32_util.h>
 
-struct msqid_ds32 {
-	struct ipc_perm32 msg_perm;
-	uint32_t	__msg_first;
-	uint32_t	__msg_last;
-	uint32_t	msg_cbytes;
-	uint32_t	msg_qnum;
-	uint32_t	msg_qbytes;
-	pid_t		msg_lspid;
-	pid_t		msg_lrpid;
-	int32_t		msg_stime;
-	int32_t		msg_rtime;
-	int32_t		msg_ctime;
-};
-
-#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
-    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
-struct msqid_ds32_old {
-	struct ipc_perm32_old msg_perm;
-	uint32_t	__msg_first;
-	uint32_t	__msg_last;
-	uint32_t	msg_cbytes;
-	uint32_t	msg_qnum;
-	uint32_t	msg_qbytes;
-	pid_t		msg_lspid;
-	pid_t		msg_lrpid;
-	int32_t		msg_stime;
-	int32_t		msg_pad1;
-	int32_t		msg_rtime;
-	int32_t		msg_pad2;
-	int32_t		msg_ctime;
-	int32_t		msg_pad3;
-	int32_t		msg_pad4[4];
-};
-#endif
-
-struct msqid_kernel32 {
-	/* Data structure exposed to user space. */
-	struct msqid_ds32	u;
-
-	/* Kernel-private components of the message queue. */
-	uint32_t		label;
-	uint32_t		cred;
-};
-
 static struct syscall_helper_data msg32_syscalls[] = {
 	SYSCALL32_INIT_HELPER(freebsd32_msgctl),
 	SYSCALL32_INIT_HELPER(freebsd32_msgsnd),
@@ -257,51 +213,10 @@ static struct syscall_helper_data msg32_syscalls[] = {
 #endif
 
 #ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64_ipc.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
-
-struct msqid_ds64 {
-	struct ipc_perm	msg_perm;
-	void		*__msg_first;
-	void		*__msg_last;
-	msglen_t	msg_cbytes;
-	msgqnum_t	msg_qnum;
-	msglen_t	msg_qbytes;
-	pid_t		msg_lspid;
-	pid_t		msg_lrpid;
-	time_t		msg_stime;
-	time_t		msg_rtime;
-	time_t		msg_ctime;
-};
-
-#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
-    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
-struct msqid_ds_old64 {
-	struct ipc_perm_old	msg_perm;
-	int64_t			__msg_first;
-	int64_t			__msg_last;
-	msglen_t		msg_cbytes;
-	msgqnum_t		msg_qnum;
-	msglen_t		msg_qbytes;
-	pid_t			msg_lspid;
-	pid_t			msg_lrpid;
-	time_t			msg_stime;
-	long			msg_pad1;
-	time_t			msg_rtime;
-	long			msg_pad2;
-	time_t			msg_ctime;
-	long			msg_pad3;
-	long			msg_pad4[4];
-
-};
-#endif
-
-struct msqid_kernel64 {
-	struct msqid_ds64	u;
-	struct label		*label;
-	struct ucred		*cred;
-};
 
 static struct syscall_helper_data msg64_syscalls[] = {
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_msgctl),
@@ -317,7 +232,7 @@ static struct syscall_helper_data msg64_syscalls[] = {
 #endif /* COMPAT_FREEBSD64 */
 
 static int
-msginit()
+msginit(void)
 {
 	struct prison *pr;
 	void **rsv;
@@ -426,7 +341,7 @@ msginit()
 }
 
 static int
-msgunload()
+msgunload(void)
 {
 	struct msqid_kernel *msqkptr;
 	int msqid;
@@ -1841,7 +1756,7 @@ freebsd7_freebsd32_msgctl(struct thread *td,
     struct freebsd7_freebsd32_msgctl_args *uap)
 {
 	struct msqid_ds msqbuf;
-	struct msqid_ds32_old msqbuf32;
+	struct msqid_ds_old32 msqbuf32;
 	int error;
 
 	if (uap->cmd == IPC_SET) {

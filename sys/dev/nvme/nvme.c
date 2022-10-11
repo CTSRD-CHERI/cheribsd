@@ -53,8 +53,6 @@ int32_t		nvme_retry_count;
 
 MALLOC_DEFINE(M_NVME, "nvme", "nvme(4) memory allocations");
 
-devclass_t nvme_devclass;
-
 static void
 nvme_init(void)
 {
@@ -220,7 +218,7 @@ nvme_notify_new_consumer(struct nvme_consumer *cons)
 	struct nvme_controller	*ctrlr;
 	int			dev_idx, devcount;
 
-	if (devclass_get_devices(nvme_devclass, &devlist, &devcount))
+	if (devclass_get_devices(devclass_find("nvme"), &devlist, &devcount))
 		return;
 
 	for (dev_idx = 0; dev_idx < devcount; dev_idx++) {

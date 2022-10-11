@@ -52,7 +52,7 @@
 /*
  * ktrace record header
  */
-struct ktr_header {
+struct ktr_header_v0 {
 	int	ktr_len;		/* length of buf */
 	short	ktr_type;		/* trace record type */
 	pid_t	ktr_pid;		/* process id */
@@ -61,6 +61,21 @@ struct ktr_header {
 	long	ktr_tid;		/* thread being traced */
 };
 
+struct ktr_header {
+	int	ktr_len;		/* length of buf */
+	short	ktr_type;		/* trace record type */
+	short	ktr_version;		/* ktr_header version */
+	pid_t	ktr_pid;		/* process id */
+	char	ktr_comm[MAXCOMLEN + 1];/* command name */
+	struct	timespec ktr_time;	/* timestamp */
+	intptr_t	ktr_tid;	/* thread id */
+	int	ktr_cpu;		/* cpu id */
+};
+
+#define	KTR_VERSION0	0
+#define	KTR_VERSION1	1
+#define	KTR_OFFSET_V0	sizeof(struct ktr_header_v0) - \
+			    sizeof(struct ktr_header)
 /*
  * Test for kernel trace point (MP SAFE).
  *
@@ -242,6 +257,13 @@ struct ktr_struct_array {
  * between the previous record and this record was dropped.
  */
 #define	KTR_DROP	0x8000
+/*
+ * KTR_VERSIONED - If this bit is set in ktr_type, then the kernel
+ * exposes the new struct ktr_header (versioned), otherwise the old
+ * struct ktr_header_v0 is exposed.
+ */
+#define	KTR_VERSIONED	0x4000
+#define	KTR_TYPE	(KTR_DROP | KTR_VERSIONED)
 
 /*
  * kernel trace points (in p_traceflag)
@@ -272,10 +294,22 @@ struct ktr_struct_array {
 #define	KTRFAC_DROP	0x20000000	/* last event was dropped */
 
 #ifdef	_KERNEL
+struct ktr_io_params;
 struct uio;
 struct vnode;
 
-void	ktrnamei(char *);
+#ifdef	KTRACE
+struct vnode *ktr_get_tracevp(struct proc *, bool);
+#else
+static inline struct vnode *
+ktr_get_tracevp(struct proc *p, bool ref)
+{
+
+	return (NULL);
+}
+#endif
+void	ktr_io_params_free(struct ktr_io_params *);
+void	ktrnamei(const char *);
 void	ktrcsw(int, int, const char *);
 void	ktrpsig(int, sig_t, sigset_t *, int);
 void	ktrfault(vm_offset_t, int);
@@ -285,7 +319,7 @@ void	ktrsyscall(int, int narg, syscallarg_t args[]);
 void	ktrsysctl(int *name, u_int namelen);
 void	ktrsysret(int, int, register_t);
 void	ktrprocctor(struct proc *);
-void	ktrprocexec(struct proc *, struct ucred **, struct vnode **);
+struct ktr_io_params *ktrprocexec(struct proc *);
 void	ktrprocexit(struct thread *);
 void	ktrprocfork(struct proc *, struct proc *);
 void	ktruserret(struct thread *);
@@ -307,6 +341,14 @@ void	ktrsyserrcause(const char *format, ...) __printflike(1, 2);
 
 #define ktrstat_error(s, error) \
 	ktrstruct_error("stat", (s), sizeof(struct stat), error)
+#define ktrcpuset(s, l) \
+	ktrstruct("cpuset_t", (s), l)
+extern u_int ktr_geniosize;
+#ifdef	KTRACE
+extern int ktr_filesize_limit_signal;
+#else
+#define	ktr_filesize_limit_signal 0
+#endif
 
 #ifdef KTRACE
 #define SYSERRCAUSE(fmt, ...) \

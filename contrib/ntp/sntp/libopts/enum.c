@@ -63,7 +63,7 @@ static void
 set_memb_names(tOptions * opts, tOptDesc * od, char const * const * nm_list,
                unsigned int nm_ct);
 
-static vaddr_t
+static ptraddr_t
 check_membership_start(tOptDesc * od, char const ** argp, bool * invert);
 
 static uintptr_t
@@ -361,11 +361,11 @@ set_memb_shell(tOptions * pOpts, tOptDesc * pOD, char const * const * paz_names,
      *  print the name string.
      */
     unsigned int ix =  0;
-    vaddr_t  bits = (vaddr_t)pOD->optCookie;
+    ptraddr_t  bits = (ptraddr_t)pOD->optCookie;
     size_t     len  = 0;
 
     (void)pOpts;
-    bits &= ((vaddr_t)1 << (vaddr_t)name_ct) - (vaddr_t)1;
+    bits &= ((ptraddr_t)1 << (ptraddr_t)name_ct) - (ptraddr_t)1;
 
     while (bits != 0) {
         if (bits & 1) {
@@ -382,8 +382,8 @@ set_memb_names(tOptions * opts, tOptDesc * od, char const * const * nm_list,
                unsigned int nm_ct)
 {
     char *     pz;
-    vaddr_t  mask = (1UL << (vaddr_t)nm_ct) - 1UL;
-    vaddr_t  bits = (vaddr_t)od->optCookie & mask;
+    ptraddr_t  mask = (1UL << (ptraddr_t)nm_ct) - 1UL;
+    ptraddr_t  bits = (ptraddr_t)od->optCookie & mask;
     unsigned int ix = 0;
     size_t     len  = 1;
 
@@ -399,7 +399,7 @@ set_memb_names(tOptions * opts, tOptDesc * od, char const * const * nm_list,
     }
 
     od->optArg.argString = pz = AGALOC(len, "enum");
-    bits = (vaddr_t)od->optCookie & mask;
+    bits = (ptraddr_t)od->optCookie & mask;
     if (bits == 0) {
         *pz = NUL;
         return;
@@ -439,10 +439,10 @@ set_memb_names(tOptions * opts, tOptDesc * od, char const * const * nm_list,
  *
  * @returns either zero or the original value for the optCookie.
  */
-static vaddr_t
+static ptraddr_t
 check_membership_start(tOptDesc * od, char const ** argp, bool * invert)
 {
-    vaddr_t      res = (vaddr_t)od->optCookie;
+    ptraddr_t      res = (ptraddr_t)od->optCookie;
     char const * arg = SPN_WHITESPACE_CHARS(od->optArg.argString);
     if ((arg == NULL) || (*arg == NUL))
         goto member_start_fail;
@@ -513,7 +513,7 @@ find_member_bit(tOptions * opts, tOptDesc * od, char const * pz, int len,
         if (shift_ct >= nm_ct)
             return 0UL;
 
-        return (vaddr_t)1U << shift_ct;
+        return (ptraddr_t)1U << shift_ct;
     }
 }
 
@@ -586,7 +586,7 @@ optionSetMembers(tOptions * opts, tOptDesc * od,
     {
         char const * arg;
         bool         invert;
-        vaddr_t    res = check_membership_start(od, &arg, &invert);
+        ptraddr_t    res = check_membership_start(od, &arg, &invert);
         if (arg == NULL)
             goto fail_return;
 

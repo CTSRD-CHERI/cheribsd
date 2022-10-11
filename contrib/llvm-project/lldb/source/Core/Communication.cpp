@@ -27,9 +27,9 @@
 #include <cstring>
 #include <memory>
 
-#include <errno.h>
-#include <inttypes.h>
-#include <stdio.h>
+#include <cerrno>
+#include <cinttypes>
+#include <cstdio>
 
 using namespace lldb;
 using namespace lldb_private;
@@ -176,8 +176,8 @@ size_t Communication::Write(const void *src, size_t src_len,
 
   std::lock_guard<std::mutex> guard(m_write_mutex);
   LLDB_LOG(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_COMMUNICATION),
-           "{0} Communication::Write (src = {1}, src_len = %" PRIu64
-           ") connection = {2}",
+           "{0} Communication::Write (src = {1}, src_len = {2}"
+           ") connection = {3}",
            this, src, (uint64_t)src_len, connection_sp.get());
 
   if (connection_sp)
@@ -187,6 +187,16 @@ size_t Communication::Write(const void *src, size_t src_len,
     error_ptr->SetErrorString("Invalid connection.");
   status = eConnectionStatusNoConnection;
   return 0;
+}
+
+size_t Communication::WriteAll(const void *src, size_t src_len,
+                               ConnectionStatus &status, Status *error_ptr) {
+  size_t total_written = 0;
+  do
+    total_written += Write(static_cast<const char *>(src) + total_written,
+                           src_len - total_written, status, error_ptr);
+  while (status == eConnectionStatusSuccess && total_written < src_len);
+  return total_written;
 }
 
 bool Communication::StartReadThread(Status *error_ptr) {
@@ -199,9 +209,8 @@ bool Communication::StartReadThread(Status *error_ptr) {
   LLDB_LOG(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_COMMUNICATION),
            "{0} Communication::StartReadThread ()", this);
 
-  char thread_name[1024];
-  snprintf(thread_name, sizeof(thread_name), "<lldb.comm.%s>",
-           GetBroadcasterName().AsCString());
+  const std::string thread_name =
+      llvm::formatv("<lldb.comm.{0}>", GetBroadcasterName());
 
   m_read_thread_enabled = true;
   m_read_thread_did_exit = false;
@@ -340,7 +349,7 @@ lldb::thread_result_t Communication::ReadThread(lldb::thread_arg_t p) {
       }
       if (error.Fail())
         LLDB_LOG(log, "error: {0}, status = {1}", error,
-                 Communication::ConnectionStatusAsCString(status));
+                 Communication::ConnectionStatusAsString(status));
       break;
     case eConnectionStatusInterrupted: // Synchronization signal from
                                        // SynchronizeWithReadThread()
@@ -356,7 +365,7 @@ lldb::thread_result_t Communication::ReadThread(lldb::thread_arg_t p) {
     case eConnectionStatusTimedOut: // Request timed out
       if (error.Fail())
         LLDB_LOG(log, "error: {0}, status = {1}", error,
-                 Communication::ConnectionStatusAsCString(status));
+                 Communication::ConnectionStatusAsString(status));
       break;
     }
   }
@@ -417,8 +426,8 @@ void Communication::SetConnection(std::unique_ptr<Connection> connection) {
   m_connection_sp = std::move(connection);
 }
 
-const char *
-Communication::ConnectionStatusAsCString(lldb::ConnectionStatus status) {
+std::string
+Communication::ConnectionStatusAsString(lldb::ConnectionStatus status) {
   switch (status) {
   case eConnectionStatusSuccess:
     return "success";
@@ -436,8 +445,5 @@ Communication::ConnectionStatusAsCString(lldb::ConnectionStatus status) {
     return "interrupted";
   }
 
-  static char unknown_state_string[64];
-  snprintf(unknown_state_string, sizeof(unknown_state_string),
-           "ConnectionStatus = %i", status);
-  return unknown_state_string;
+  return "@" + std::to_string(status);
 }

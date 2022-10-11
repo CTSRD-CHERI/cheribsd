@@ -163,6 +163,7 @@ struct vxlan_statistics {
 struct vxlan_softc {
 	struct ifnet			*vxl_ifp;
 	int				 vxl_reqcap;
+	u_int				 vxl_fibnum;
 	struct vxlan_socket		*vxl_sock;
 	uint32_t			 vxl_vni;
 	union vxlan_sockaddr		 vxl_src_addr;
@@ -363,7 +364,7 @@ static int	vxlan_encap6(struct vxlan_softc *,
 		    const union vxlan_sockaddr *, struct mbuf *);
 static int	vxlan_transmit(struct ifnet *, struct mbuf *);
 static void	vxlan_qflush(struct ifnet *);
-static void	vxlan_rcv_udp_packet(struct mbuf *, int, struct inpcb *,
+static bool	vxlan_rcv_udp_packet(struct mbuf *, int, struct inpcb *,
 		    const struct sockaddr *, void *);
 static int	vxlan_input(struct vxlan_socket *, uint32_t, struct mbuf **,
 		    const struct sockaddr *);
@@ -2329,6 +2330,7 @@ vxlan_ioctl_drvspec(struct vxlan_softc *sc, struct ifdrv *ifd, int get)
 static int
 vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
+	struct rm_priotracker tracker;
 	struct vxlan_softc *sc;
 	struct ifreq *ifr;
 	struct ifdrv *ifd;
@@ -2376,6 +2378,25 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (error == 0)
 			vxlan_set_hwcaps(sc);
 		VXLAN_WUNLOCK(sc);
+		break;
+
+	case SIOCGTUNFIB:
+		VXLAN_RLOCK(sc, &tracker);
+		ifr->ifr_fib = sc->vxl_fibnum;
+		VXLAN_RUNLOCK(sc, &tracker);
+		break;
+
+	case SIOCSTUNFIB:
+		if ((error = priv_check(curthread, PRIV_NET_VXLAN)) != 0)
+			break;
+
+		if (ifr->ifr_fib >= rt_numfibs)
+			error = EINVAL;
+		else {
+			VXLAN_WLOCK(sc);
+			sc->vxl_fibnum = ifr->ifr_fib;
+			VXLAN_WUNLOCK(sc);
+		}
 		break;
 
 	default:
@@ -2429,6 +2450,7 @@ vxlan_encap_header(struct vxlan_softc *sc, struct mbuf *m, int ipoff,
 }
 #endif
 
+#if defined(INET6) || defined(INET)
 /*
  * Return the CSUM_INNER_* equivalent of CSUM_* caps.
  */
@@ -2470,6 +2492,7 @@ csum_flags_to_inner_flags(uint32_t csum_flags_in, const uint32_t encap)
 
 	return (csum_flags);
 }
+#endif
 
 static int
 vxlan_encap4(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
@@ -2531,7 +2554,7 @@ vxlan_encap4(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 		sin->sin_family = AF_INET;
 		sin->sin_len = sizeof(*sin);
 		sin->sin_addr = ip->ip_dst;
-		ro->ro_nh = fib4_lookup(RT_DEFAULT_FIB, ip->ip_dst, 0, NHR_NONE,
+		ro->ro_nh = fib4_lookup(M_GETFIB(m), ip->ip_dst, 0, NHR_NONE,
 		    0);
 		if (ro->ro_nh == NULL) {
 			m_freem(m);
@@ -2643,7 +2666,7 @@ vxlan_encap6(struct vxlan_softc *sc, const union vxlan_sockaddr *fvxlsa,
 		sin6->sin6_family = AF_INET6;
 		sin6->sin6_len = sizeof(*sin6);
 		sin6->sin6_addr = ip6->ip6_dst;
-		ro->ro_nh = fib6_lookup(RT_DEFAULT_FIB, &ip6->ip6_dst, 0,
+		ro->ro_nh = fib6_lookup(M_GETFIB(m), &ip6->ip6_dst, 0,
 		    NHR_NONE, 0);
 		if (ro->ro_nh == NULL) {
 			m_freem(m);
@@ -2720,6 +2743,7 @@ vxlan_transmit(struct ifnet *ifp, struct mbuf *m)
 	ETHER_BPF_MTAP(ifp, m);
 
 	VXLAN_RLOCK(sc, &tracker);
+	M_SETFIB(m, sc->vxl_fibnum);
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
 		VXLAN_RUNLOCK(sc, &tracker);
 		m_freem(m);
@@ -2756,7 +2780,7 @@ vxlan_qflush(struct ifnet *ifp __unused)
 {
 }
 
-static void
+static bool
 vxlan_rcv_udp_packet(struct mbuf *m, int offset, struct inpcb *inpcb,
     const struct sockaddr *srcsa, void *xvso)
 {
@@ -2800,6 +2824,8 @@ vxlan_rcv_udp_packet(struct mbuf *m, int offset, struct inpcb *inpcb,
 out:
 	if (m != NULL)
 		m_freem(m);
+
+	return (true);
 }
 
 static int
@@ -2812,12 +2838,16 @@ vxlan_input(struct vxlan_socket *vso, uint32_t vni, struct mbuf **m0,
 	struct ether_header *eh;
 	int error;
 
+	m = *m0;
+
+	if (m->m_pkthdr.len < ETHER_HDR_LEN)
+		return (EINVAL);
+
 	sc = vxlan_socket_lookup_softc(vso, vni);
 	if (sc == NULL)
 		return (ENOENT);
 
 	ifp = sc->vxl_ifp;
-	m = *m0;
 	eh = mtod(m, struct ether_header *);
 
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
@@ -2857,8 +2887,9 @@ vxlan_input(struct vxlan_socket *vso, uint32_t vni, struct mbuf **m0,
 		m->m_pkthdr.csum_data = 0;
 	}
 
-	error = netisr_dispatch(NETISR_ETHER, m);
+	(*ifp->if_input)(ifp, m);
 	*m0 = NULL;
+	error = 0;
 
 out:
 	vxlan_release(sc);
@@ -3172,6 +3203,7 @@ vxlan_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 
 	sc = malloc(sizeof(struct vxlan_softc), M_VXLAN, M_WAITOK | M_ZERO);
 	sc->vxl_unit = unit;
+	sc->vxl_fibnum = curthread->td_proc->p_fibnum;
 	vxlan_set_default_config(sc);
 	error = vxlan_stats_alloc(sc);
 	if (error != 0)
@@ -3516,10 +3548,10 @@ vxlan_sysctl_setup(struct vxlan_softc *sc)
 	    OID_AUTO, "ftable", CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "");
 	SYSCTL_ADD_UINT(ctx, SYSCTL_CHILDREN(node), OID_AUTO, "count",
 	    CTLFLAG_RD, &sc->vxl_ftable_cnt, 0,
-	    "Number of entries in fowarding table");
+	    "Number of entries in forwarding table");
 	SYSCTL_ADD_UINT(ctx, SYSCTL_CHILDREN(node), OID_AUTO, "max",
 	     CTLFLAG_RD, &sc->vxl_ftable_max, 0,
-	    "Maximum number of entries allowed in fowarding table");
+	    "Maximum number of entries allowed in forwarding table");
 	SYSCTL_ADD_UINT(ctx, SYSCTL_CHILDREN(node), OID_AUTO, "timeout",
 	    CTLFLAG_RD, &sc->vxl_ftable_timeout, 0,
 	    "Number of seconds between prunes of the forwarding table");

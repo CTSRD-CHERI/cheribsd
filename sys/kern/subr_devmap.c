@@ -271,7 +271,7 @@ devmap_vtop(vm_pointer_t va, vm_size_t size)
  * pmap_kenter_device().
  */
 void *
-pmap_mapdev(vm_offset_t pa, vm_size_t size)
+pmap_mapdev(vm_paddr_t pa, vm_size_t size)
 {
 	vm_pointer_t va;
 	vm_offset_t offset;
@@ -316,9 +316,9 @@ pmap_mapdev(vm_offset_t pa, vm_size_t size)
 	return ((void *)(va + offset));
 }
 
-#if defined(__aarch64__)
+#if defined(__aarch64__) || defined(__riscv)
 void *
-pmap_mapdev_attr(vm_offset_t pa, vm_size_t size, vm_memattr_t ma)
+pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 {
 	vm_pointer_t va;
 	void * rva;
@@ -383,7 +383,7 @@ pmap_unmapdev(vm_pointer_t va, vm_size_t size)
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
-void
+void __nosanitizecoverage
 devmap_init_capability(void * __capability cap)
 {
 	devmap_capability = cap;
@@ -391,13 +391,15 @@ devmap_init_capability(void * __capability cap)
 	/* XXX: Too early to panic? */
 	KASSERT(cheri_gettop(cap) == DEVMAP_MAX_VADDR,
 	    ("devmap capability end doesn't match DEVMAP_MAX_VADDR"));
+	KASSERT(cheri_getlen(cap) == PMAP_MAPDEV_EARLY_SIZE,
+	    ("devmap capability length doesn't match PMAP_MAPDEV_EARLY_SIZE"));
 }
 #endif
 
 #ifdef DDB
 #include <ddb/ddb.h>
 
-DB_SHOW_COMMAND(devmap, db_show_devmap)
+DB_SHOW_COMMAND_FLAGS(devmap, db_show_devmap, DB_CMD_MEMSAFE)
 {
 	devmap_dump_table(db_printf);
 }

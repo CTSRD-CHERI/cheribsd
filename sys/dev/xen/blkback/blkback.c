@@ -80,8 +80,8 @@ __FBSDID("$FreeBSD$");
 #include <xen/gnttab.h>
 #include <xen/xen_intr.h>
 
-#include <xen/interface/event_channel.h>
-#include <xen/interface/grant_table.h>
+#include <contrib/xen/event_channel.h>
+#include <contrib/xen/grant_table.h>
 
 #include <xen/xenbus/xenbusvar.h>
 
@@ -100,27 +100,6 @@ __FBSDID("$FreeBSD$");
  */
 #define	XBB_MAX_REQUESTS 					\
 	__CONST_RING_SIZE(blkif, PAGE_SIZE * XBB_MAX_RING_PAGES)
-
-/**
- * \brief Define to force all I/O to be performed on memory owned by the
- *        backend device, with a copy-in/out to the remote domain's memory.
- *
- * \note  This option is currently required when this driver's domain is
- *        operating in HVM mode on a system using an IOMMU.
- *
- * This driver uses Xen's grant table API to gain access to the memory of
- * the remote domains it serves.  When our domain is operating in PV mode,
- * the grant table mechanism directly updates our domain's page table entries
- * to point to the physical pages of the remote domain.  This scheme guarantees
- * that blkback and the backing devices it uses can safely perform DMA
- * operations to satisfy requests.  In HVM mode, Xen may use a HW IOMMU to
- * insure that our domain cannot DMA to pages owned by another domain.  As
- * of Xen 4.0, IOMMU mappings for HVM guests are not updated via the grant
- * table API.  For this reason, in HVM mode, we must bounce all requests into
- * memory that is mapped into our domain at domain startup and thus has
- * valid IOMMU mappings.
- */
-#define XBB_USE_BOUNCE_BUFFERS
 
 /**
  * \brief Define to enable rudimentary request logging to the console.
@@ -256,14 +235,6 @@ struct xbb_xen_reqlist {
 	 * of this request's kva region.
 	 */
 	uint64_t	 	 gnt_base;
-
-#ifdef XBB_USE_BOUNCE_BUFFERS
-	/**
-	 * Pre-allocated domain local memory used to proxy remote
-	 * domain memory during I/O operations.
-	 */
-	uint8_t			*bounce;
-#endif
 
 	/**
 	 * Array of grant handles (one per page) used to map this request.
@@ -500,30 +471,6 @@ struct xbb_file_data {
 	 * so we only need one of these.
 	 */
 	struct iovec	xiovecs[XBB_MAX_SEGMENTS_PER_REQLIST];
-#ifdef XBB_USE_BOUNCE_BUFFERS
-
-	/**
-	 * \brief Array of io vectors used to handle bouncing of file reads.
-	 *
-	 * Vnode operations are free to modify uio data during their
-	 * exectuion.  In the case of a read with bounce buffering active,
-	 * we need some of the data from the original uio in order to
-	 * bounce-out the read data.  This array serves as the temporary
-	 * storage for this saved data.
-	 */
-	struct iovec	saved_xiovecs[XBB_MAX_SEGMENTS_PER_REQLIST];
-
-	/**
-	 * \brief Array of memoized bounce buffer kva offsets used
-	 *        in the file based backend.
-	 *
-	 * Due to the way that the mapping of the memory backing an
-	 * I/O transaction is handled by Xen, a second pass through
-	 * the request sg elements is unavoidable. We memoize the computed
-	 * bounce address here to reduce the cost of the second walk.
-	 */
-	void		*xiovecs_vaddr[XBB_MAX_SEGMENTS_PER_REQLIST];
-#endif /* XBB_USE_BOUNCE_BUFFERS */
 };
 
 /**
@@ -891,25 +838,6 @@ xbb_reqlist_vaddr(struct xbb_xen_reqlist *reqlist, int pagenr, int sector)
 	return (reqlist->kva + (PAGE_SIZE * pagenr) + (sector << 9));
 }
 
-#ifdef XBB_USE_BOUNCE_BUFFERS
-/**
- * Given a page index and 512b sector offset within that page,
- * calculate an offset into a request's local bounce memory region.
- *
- * \param reqlist The request structure whose bounce region will be accessed.
- * \param pagenr  The page index used to compute the bounce offset.
- * \param sector  The 512b sector index used to compute the page relative
- *                bounce offset.
- *
- * \return  The computed global bounce buffer address.
- */
-static inline uint8_t *
-xbb_reqlist_bounce_addr(struct xbb_xen_reqlist *reqlist, int pagenr, int sector)
-{
-	return (reqlist->bounce + (PAGE_SIZE * pagenr) + (sector << 9));
-}
-#endif
-
 /**
  * Given a page number and 512b sector offset within that page,
  * calculate an offset into the request's memory region that the
@@ -929,11 +857,7 @@ xbb_reqlist_bounce_addr(struct xbb_xen_reqlist *reqlist, int pagenr, int sector)
 static inline uint8_t *
 xbb_reqlist_ioaddr(struct xbb_xen_reqlist *reqlist, int pagenr, int sector)
 {
-#ifdef XBB_USE_BOUNCE_BUFFERS
-	return (xbb_reqlist_bounce_addr(reqlist, pagenr, sector));
-#else
 	return (xbb_reqlist_vaddr(reqlist, pagenr, sector));
-#endif
 }
 
 /**
@@ -1087,7 +1011,7 @@ xbb_unmap_reqlist(struct xbb_xen_reqlist *reqlist)
 	struct gnttab_unmap_grant_ref unmap[XBB_MAX_SEGMENTS_PER_REQLIST];
 	u_int			      i;
 	u_int			      invcount;
-	int			      error;
+	int			      error __diagused;
 
 	invcount = 0;
 	for (i = 0; i < reqlist->nr_segments; i++) {
@@ -1280,7 +1204,7 @@ bailout_error:
  * \param xbb     Per-instance xbb configuration structure.
  * \param req     The request structure to which to respond.
  * \param status  The status code to report.  See BLKIF_RSP_*
- *                in sys/xen/interface/io/blkif.h.
+ *                in sys/contrib/xen/io/blkif.h.
  */
 static void
 xbb_queue_response(struct xbb_softc *xbb, struct xbb_xen_req *req, int status)
@@ -1508,17 +1432,6 @@ xbb_bio_done(struct bio *bio)
 		}
 	}
 
-#ifdef XBB_USE_BOUNCE_BUFFERS
-	if (bio->bio_cmd == BIO_READ) {
-		vm_offset_t kva_offset;
-
-		kva_offset = (vm_offset_t)bio->bio_data
-			   - (vm_offset_t)reqlist->bounce;
-		memcpy((uint8_t *)reqlist->kva + kva_offset,
-		       bio->bio_data, bio->bio_bcount);
-	}
-#endif /* XBB_USE_BOUNCE_BUFFERS */
-
 	/*
 	 * Decrement the pending count for the request list.  When we're
 	 * done with the requests, send status back for all of them.
@@ -1645,16 +1558,12 @@ xbb_dispatch_io(struct xbb_softc *xbb, struct xbb_xen_reqlist *reqlist)
 
 	STAILQ_FOREACH(nreq, &reqlist->contig_req_list, links) {
 		blkif_request_t		*ring_req;
-		RING_IDX		 req_ring_idx;
-		u_int			 req_seg_idx;
 
 		ring_req	      = nreq->ring_req;
-		req_ring_idx	      = nreq->req_ring_idx;
 		nr_sects              = 0;
 		nseg                  = ring_req->nr_segments;
 		nreq->nr_pages        = nseg;
 		nreq->nr_512b_sectors = 0;
-		req_seg_idx	      = 0;
 		sg	              = NULL;
 
 		/* Check that number of segments is sane. */
@@ -1708,7 +1617,6 @@ xbb_dispatch_io(struct xbb_softc *xbb, struct xbb_xen_reqlist *reqlist)
 			map++;
 			xbb_sg++;
 			seg_idx++;
-			req_seg_idx++;
 		}
 
 		/* Convert to the disk's sector size */
@@ -2182,17 +2090,6 @@ xbb_dispatch_dev(struct xbb_softc *xbb, struct xbb_xen_reqlist *reqlist,
 
 	for (bio_idx = 0; bio_idx < nbio; bio_idx++)
 	{
-#ifdef XBB_USE_BOUNCE_BUFFERS
-		vm_offset_t kva_offset;
-
-		kva_offset = (vm_offset_t)bios[bio_idx]->bio_data
-			   - (vm_offset_t)reqlist->bounce;
-		if (operation == BIO_WRITE) {
-			memcpy(bios[bio_idx]->bio_data,
-			       (uint8_t *)reqlist->kva + kva_offset,
-			       bios[bio_idx]->bio_bcount);
-		}
-#endif
 		if (operation == BIO_READ) {
 			SDT_PROBE3(xbb, kernel, xbb_dispatch_dev, read,
 				   device_get_unit(xbb->dev),
@@ -2243,10 +2140,6 @@ xbb_dispatch_file(struct xbb_softc *xbb, struct xbb_xen_reqlist *reqlist,
 	struct uio            xuio;
 	struct xbb_sg        *xbb_sg;
 	struct iovec         *xiovec;
-#ifdef XBB_USE_BOUNCE_BUFFERS
-	void                **p_vaddr;
-	int                   saved_uio_iovcnt;
-#endif /* XBB_USE_BOUNCE_BUFFERS */
 	int                   error;
 
 	file_data = &xbb->backend.file;
@@ -2302,18 +2195,6 @@ xbb_dispatch_file(struct xbb_softc *xbb, struct xbb_xen_reqlist *reqlist,
 			xiovec = &file_data->xiovecs[xuio.uio_iovcnt];
 			xiovec->iov_base = xbb_reqlist_ioaddr(reqlist,
 			    seg_idx, xbb_sg->first_sect);
-#ifdef XBB_USE_BOUNCE_BUFFERS
-			/*
-			 * Store the address of the incoming
-			 * buffer at this particular offset
-			 * as well, so we can do the copy
-			 * later without having to do more
-			 * work to recalculate this address.
-		 	 */
-			p_vaddr = &file_data->xiovecs_vaddr[xuio.uio_iovcnt];
-			*p_vaddr = xbb_reqlist_vaddr(reqlist, seg_idx,
-			    xbb_sg->first_sect);
-#endif /* XBB_USE_BOUNCE_BUFFERS */
 			xiovec->iov_len = 0;
 			xuio.uio_iovcnt++;
 		}
@@ -2332,28 +2213,6 @@ xbb_dispatch_file(struct xbb_softc *xbb, struct xbb_xen_reqlist *reqlist,
 	}
 
 	xuio.uio_td = curthread;
-
-#ifdef XBB_USE_BOUNCE_BUFFERS
-	saved_uio_iovcnt = xuio.uio_iovcnt;
-
-	if (operation == BIO_WRITE) {
-		/* Copy the write data to the local buffer. */
-		for (seg_idx = 0, p_vaddr = file_data->xiovecs_vaddr,
-		     xiovec = xuio.uio_iov; seg_idx < xuio.uio_iovcnt;
-		     seg_idx++, xiovec++, p_vaddr++) {
-			memcpy(xiovec->iov_base, *p_vaddr, xiovec->iov_len);
-		}
-	} else {
-		/*
-		 * We only need to save off the iovecs in the case of a
-		 * read, because the copy for the read happens after the
-		 * VOP_READ().  (The uio will get modified in that call
-		 * sequence.)
-		 */
-		memcpy(file_data->saved_xiovecs, xuio.uio_iov,
-		       xuio.uio_iovcnt * sizeof(xuio.uio_iov[0]));
-	}
-#endif /* XBB_USE_BOUNCE_BUFFERS */
 
 	switch (operation) {
 	case BIO_READ:
@@ -2430,25 +2289,6 @@ xbb_dispatch_file(struct xbb_softc *xbb, struct xbb_xen_reqlist *reqlist,
 		panic("invalid operation %d", operation);
 		/* NOTREACHED */
 	}
-
-#ifdef XBB_USE_BOUNCE_BUFFERS
-	/* We only need to copy here for read operations */
-	if (operation == BIO_READ) {
-		for (seg_idx = 0, p_vaddr = file_data->xiovecs_vaddr,
-		     xiovec = file_data->saved_xiovecs;
-		     seg_idx < saved_uio_iovcnt; seg_idx++,
-		     xiovec++, p_vaddr++) {
-			/*
-			 * Note that we have to use the copy of the 
-			 * io vector we made above.  uiomove() modifies
-			 * the uio and its referenced vector as uiomove
-			 * performs the copy, so we can't rely on any
-			 * state from the original uio.
-			 */
-			memcpy(*p_vaddr, xiovec->iov_base, xiovec->iov_len);
-		}
-	}
-#endif /* XBB_USE_BOUNCE_BUFFERS */
 
 bailout_send_response:
 
@@ -2683,7 +2523,7 @@ xbb_open_backend(struct xbb_softc *xbb)
 	pwd_ensure_dirs();
 
  again:
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, xbb->dev_name, curthread);
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, xbb->dev_name);
 	error = vn_open(&nd, &flags, 0, NULL);
 	if (error) {
 		/*
@@ -2713,7 +2553,7 @@ xbb_open_backend(struct xbb_softc *xbb)
 		return (error);
 	}
 
-	NDFREE(&nd, NDF_ONLY_PNBUF);
+	NDFREE_PNBUF(&nd);
 		
 	xbb->vn = nd.ni_vp;
 
@@ -2776,19 +2616,12 @@ xbb_free_communication_mem(struct xbb_softc *xbb)
 static int
 xbb_disconnect(struct xbb_softc *xbb)
 {
-	struct gnttab_unmap_grant_ref  ops[XBB_MAX_RING_PAGES];
-	struct gnttab_unmap_grant_ref *op;
-	u_int			       ring_idx;
-	int			       error;
-
 	DPRINTF("\n");
-
-	if ((xbb->flags & XBBF_RING_CONNECTED) == 0)
-		return (0);
 
 	mtx_unlock(&xbb->lock);
 	xen_intr_unbind(&xbb->xen_intr_handle);
-	taskqueue_drain(xbb->io_taskqueue, &xbb->io_task); 
+	if (xbb->io_taskqueue != NULL)
+		taskqueue_drain(xbb->io_taskqueue, &xbb->io_task);
 	mtx_lock(&xbb->lock);
 
 	/*
@@ -2798,19 +2631,28 @@ xbb_disconnect(struct xbb_softc *xbb)
 	if (xbb->active_request_count != 0)
 		return (EAGAIN);
 
-	for (ring_idx = 0, op = ops;
-	     ring_idx < xbb->ring_config.ring_pages;
-	     ring_idx++, op++) {
-		op->host_addr    = xbb->ring_config.gnt_addr
-			         + (ring_idx * PAGE_SIZE);
-		op->dev_bus_addr = xbb->ring_config.bus_addr[ring_idx];
-		op->handle	 = xbb->ring_config.handle[ring_idx];
-	}
+	if (xbb->flags & XBBF_RING_CONNECTED) {
+		struct gnttab_unmap_grant_ref  ops[XBB_MAX_RING_PAGES];
+		struct gnttab_unmap_grant_ref *op;
+		unsigned int ring_idx;
+		int error;
 
-	error = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, ops,
-					  xbb->ring_config.ring_pages);
-	if (error != 0)
-		panic("Grant table op failed (%d)", error);
+		for (ring_idx = 0, op = ops;
+		     ring_idx < xbb->ring_config.ring_pages;
+		     ring_idx++, op++) {
+			op->host_addr    = xbb->ring_config.gnt_addr
+				         + (ring_idx * PAGE_SIZE);
+			op->dev_bus_addr = xbb->ring_config.bus_addr[ring_idx];
+			op->handle	 = xbb->ring_config.handle[ring_idx];
+		}
+
+		error = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, ops,
+						  xbb->ring_config.ring_pages);
+		if (error != 0)
+			panic("Grant table op failed (%d)", error);
+
+		xbb->flags &= ~XBBF_RING_CONNECTED;
+	}
 
 	xbb_free_communication_mem(xbb);
 
@@ -2826,12 +2668,6 @@ xbb_disconnect(struct xbb_softc *xbb)
 		/* There is one request list for ever allocated request. */
 		for (i = 0, reqlist = xbb->request_lists;
 		     i < xbb->max_requests; i++, reqlist++){
-#ifdef XBB_USE_BOUNCE_BUFFERS
-			if (reqlist->bounce != NULL) {
-				free(reqlist->bounce, M_XENBLOCKBACK);
-				reqlist->bounce = NULL;
-			}
-#endif
 			if (reqlist->gnt_handles != NULL) {
 				free(reqlist->gnt_handles, M_XENBLOCKBACK);
 				reqlist->gnt_handles = NULL;
@@ -2841,7 +2677,6 @@ xbb_disconnect(struct xbb_softc *xbb)
 		xbb->request_lists = NULL;
 	}
 
-	xbb->flags &= ~XBBF_RING_CONNECTED;
 	return (0);
 }
 
@@ -2965,7 +2800,6 @@ xbb_connect_ring(struct xbb_softc *xbb)
 					  INTR_TYPE_BIO | INTR_MPSAFE,
 					  &xbb->xen_intr_handle);
 	if (error) {
-		(void)xbb_disconnect(xbb);
 		xenbus_dev_fatal(xbb->dev, error, "binding event channel");
 		return (error);
 	}
@@ -3212,17 +3046,6 @@ xbb_alloc_request_lists(struct xbb_softc *xbb)
 
 		reqlist->xbb = xbb;
 
-#ifdef XBB_USE_BOUNCE_BUFFERS
-		reqlist->bounce = malloc(xbb->max_reqlist_size,
-					 M_XENBLOCKBACK, M_NOWAIT);
-		if (reqlist->bounce == NULL) {
-			xenbus_dev_fatal(xbb->dev, ENOMEM, 
-					 "Unable to allocate request "
-					 "bounce buffers");
-			return (ENOMEM);
-		}
-#endif /* XBB_USE_BOUNCE_BUFFERS */
-
 		reqlist->gnt_handles = malloc(xbb->max_reqlist_segments *
 					      sizeof(*reqlist->gnt_handles),
 					      M_XENBLOCKBACK, M_NOWAIT|M_ZERO);
@@ -3340,6 +3163,13 @@ xbb_connect(struct xbb_softc *xbb)
 		return;
 	}
 
+	error = xbb_publish_backend_info(xbb);
+	if (error != 0) {
+		xenbus_dev_fatal(xbb->dev, error,
+		    "Unable to publish device information");
+		return;
+	}
+
 	error = xbb_alloc_requests(xbb);
 	if (error != 0) {
 		/* Specific errors are reported by xbb_alloc_requests(). */
@@ -3358,16 +3188,6 @@ xbb_connect(struct xbb_softc *xbb)
 	error = xbb_connect_ring(xbb);
 	if (error != 0) {
 		/* Specific errors are reported by xbb_connect_ring(). */
-		return;
-	}
-
-	if (xbb_publish_backend_info(xbb) != 0) {
-		/*
-		 * If we can't publish our data, we cannot participate
-		 * in this connection, and waiting for a front-end state
-		 * change will not help the situation.
-		 */
-		(void)xbb_disconnect(xbb);
 		return;
 	}
 
@@ -3412,7 +3232,6 @@ xbb_shutdown(struct xbb_softc *xbb)
 		free(xbb->hotplug_watch.node, M_XENBLOCKBACK);
 		xbb->hotplug_watch.node = NULL;
 	}
-	xbb->hotplug_done = false;
 
 	if (xenbus_get_state(xbb->dev) < XenbusStateClosing)
 		xenbus_set_state(xbb->dev, XenbusStateClosing);
@@ -3496,13 +3315,24 @@ static int
 xbb_probe(device_t dev)
 {
 
-        if (!strcmp(xenbus_get_type(dev), "vbd")) {
-                device_set_desc(dev, "Backend Virtual Block Device");
-                device_quiet(dev);
-                return (0);
-        }
+	if (strcmp(xenbus_get_type(dev), "vbd"))
+		return (ENXIO);
 
-        return (ENXIO);
+	/* Only attach if Xen creates IOMMU entries for grant mapped pages. */
+	if (!xen_has_iommu_maps()) {
+		static bool warned;
+
+		if (!warned) {
+			warned = true;
+			printf(
+	"xen-blkback disabled due to grant maps lacking IOMMU entries\n");
+		}
+		return (ENXIO);
+	}
+
+	device_set_desc(dev, "Backend Virtual Block Device");
+	device_quiet(dev);
+	return (0);
 }
 
 /**
@@ -3597,39 +3427,14 @@ xbb_setup_sysctl(struct xbb_softc *xbb)
 }
 
 static void
-xbb_attach_disk(struct xs_watch *watch, const char **vec, unsigned int len)
+xbb_attach_disk(device_t dev)
 {
-	device_t		 dev;
 	struct xbb_softc	*xbb;
 	int			 error;
 
-	dev = (device_t) watch->callback_data;
 	xbb = device_get_softc(dev);
 
-	error = xs_gather(XST_NIL, xenbus_get_node(dev), "physical-device-path",
-	    NULL, &xbb->dev_name, NULL);
-	if (error != 0)
-		return;
-
-	xs_unregister_watch(watch);
-	free(watch->node, M_XENBLOCKBACK);
-	watch->node = NULL;
-
-	/* Collect physical device information. */
-	error = xs_gather(XST_NIL, xenbus_get_otherend_path(xbb->dev),
-			  "device-type", NULL, &xbb->dev_type,
-			  NULL);
-	if (error != 0)
-		xbb->dev_type = NULL;
-
-	error = xs_gather(XST_NIL, xenbus_get_node(dev),
-                          "mode", NULL, &xbb->dev_mode,
-                          NULL);
-	if (error != 0) {
-		xbb_attach_failed(xbb, error, "reading backend fields at %s",
-				  xenbus_get_node(dev));
-                return;
-        }
+	KASSERT(xbb->hotplug_done, ("Missing hotplug execution"));
 
 	/* Parse fopen style mode flags. */
 	if (strchr(xbb->dev_mode, 'w') == NULL)
@@ -3693,11 +3498,46 @@ xbb_attach_disk(struct xs_watch *watch, const char **vec, unsigned int len)
 		return;
 	}
 
-	xbb->hotplug_done = true;
-
 	/* The front end might be waiting for the backend, attach if so. */
 	if (xenbus_get_otherend_state(xbb->dev) == XenbusStateInitialised)
 		xbb_connect(xbb);
+}
+
+static void
+xbb_attach_cb(struct xs_watch *watch, const char **vec, unsigned int len)
+{
+	device_t dev;
+	struct xbb_softc *xbb;
+	int error;
+
+	dev = (device_t)watch->callback_data;
+	xbb = device_get_softc(dev);
+
+	error = xs_gather(XST_NIL, xenbus_get_node(dev), "physical-device-path",
+	    NULL, &xbb->dev_name, NULL);
+	if (error != 0)
+		return;
+
+	xs_unregister_watch(watch);
+	free(watch->node, M_XENBLOCKBACK);
+	watch->node = NULL;
+	xbb->hotplug_done = true;
+
+	/* Collect physical device information. */
+	error = xs_gather(XST_NIL, xenbus_get_otherend_path(dev), "device-type",
+	    NULL, &xbb->dev_type, NULL);
+	if (error != 0)
+		xbb->dev_type = NULL;
+
+	error = xs_gather(XST_NIL, xenbus_get_node(dev), "mode", NULL,
+	   &xbb->dev_mode, NULL);
+	if (error != 0) {
+		xbb_attach_failed(xbb, error, "reading backend fields at %s",
+		    xenbus_get_node(dev));
+		return;
+	}
+
+	xbb_attach_disk(dev);
 }
 
 /**
@@ -3757,14 +3597,21 @@ xbb_attach(device_t dev)
 		return (error);
 	}
 
+	/* Tell the toolstack blkback has attached. */
+	xenbus_set_state(dev, XenbusStateInitWait);
+
+	if (xbb->hotplug_done) {
+		xbb_attach_disk(dev);
+		return (0);
+	}
+
 	/*
 	 * We need to wait for hotplug script execution before
 	 * moving forward.
 	 */
-	KASSERT(!xbb->hotplug_done, ("Hotplug scripts already executed"));
 	watch_path = xs_join(xenbus_get_node(xbb->dev), "physical-device-path");
 	xbb->hotplug_watch.callback_data = (uintptr_t)dev;
-	xbb->hotplug_watch.callback = xbb_attach_disk;
+	xbb->hotplug_watch.callback = xbb_attach_cb;
 	KASSERT(xbb->hotplug_watch.node == NULL, ("watch node already setup"));
 	xbb->hotplug_watch.node = strdup(sbuf_data(watch_path), M_XENBLOCKBACK);
 	/*
@@ -3781,9 +3628,6 @@ xbb_attach(device_t dev)
 		free(xbb->hotplug_watch.node, M_XENBLOCKBACK);
 		return (error);
 	}
-
-	/* Tell the toolstack blkback has attached. */
-	xenbus_set_state(dev, XenbusStateInitWait);
 
 	return (0);
 }
@@ -3943,6 +3787,5 @@ static driver_t xbb_driver = {
         xbb_methods,
         sizeof(struct xbb_softc),
 };
-devclass_t xbb_devclass;
 
-DRIVER_MODULE(xbbd, xenbusb_back, xbb_driver, xbb_devclass, 0, 0);
+DRIVER_MODULE(xbbd, xenbusb_back, xbb_driver, 0, 0);

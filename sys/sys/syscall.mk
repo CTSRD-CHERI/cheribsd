@@ -285,7 +285,7 @@ MIASM =  \
 	getcontext.o \
 	setcontext.o \
 	swapcontext.o \
-	swapoff.o \
+	freebsd13_swapoff.o \
 	__acl_get_link.o \
 	__acl_set_link.o \
 	__acl_delete_link.o \
@@ -295,6 +295,8 @@ MIASM =  \
 	thr_exit.o \
 	thr_self.o \
 	thr_kill.o \
+	freebsd10__umtx_lock.o \
+	freebsd10__umtx_unlock.o \
 	jail_attach.o \
 	extattr_list_fd.o \
 	extattr_list_file.o \
@@ -431,4 +433,7 @@ MIASM =  \
 	rpctls_syscall.o \
 	__specialfd.o \
 	aio_writev.o \
-	aio_readv.o
+	aio_readv.o \
+	fspacectl.o \
+	sched_getcpu.o \
+	swapoff.o

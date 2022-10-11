@@ -349,7 +349,7 @@ struct kinfo_file {
 	int64_t		kf_offset;		/* Seek location. */
 	union {
 		struct {
-			/* API compatiblity with FreeBSD < 12. */
+			/* API compatibility with FreeBSD < 12. */
 			int		kf_vnode_type;
 			int		kf_sock_domain;
 			int		kf_sock_type;
@@ -420,8 +420,9 @@ struct kinfo_file {
 				uint64_t	kf_pipe_addr;
 				uint64_t	kf_pipe_peer;
 				uint32_t	kf_pipe_buffer_cnt;
-				/* Round to 64 bit alignment. */
-				uint32_t	kf_pipe_pad0[3];
+				uint32_t	kf_pipe_buffer_in;
+				uint32_t	kf_pipe_buffer_out;
+				uint32_t	kf_pipe_buffer_size;
 			} kf_pipe;
 			struct {
 				uint32_t	kf_spareint[4];
@@ -440,7 +441,14 @@ struct kinfo_file {
 			struct {
 				uint64_t	kf_eventfd_value;
 				uint32_t	kf_eventfd_flags;
+				uint32_t	kf_eventfd_spareint[3];
+				uint64_t	kf_eventfd_addr;
 			} kf_eventfd;
+			struct {
+				uint64_t	kf_kqueue_addr;
+				int32_t		kf_kqueue_count;
+				int32_t		kf_kqueue_state;
+			} kf_kqueue;
 		} kf_un;
 	};
 	uint16_t	kf_status;		/* Status flags. */
@@ -452,12 +460,34 @@ struct kinfo_file {
 	char		kf_path[PATH_MAX];	/* Path to file, if any. */
 };
 
+struct kinfo_lockf {
+	int		kl_structsize;		/* Variable size of record. */
+	int		kl_rw;
+	int		kl_type;
+	int		kl_pid;
+	int		kl_sysid;
+	int		kl_pad0;
+	uint64_t	kl_file_fsid;
+	uint64_t	kl_file_rdev;
+	uint64_t	kl_file_fileid;
+	off_t		kl_start;
+	off_t		kl_len;			/* len == 0 till the EOF */
+	char		kl_path[PATH_MAX];
+};
+
+#define	KLOCKF_RW_READ		0x01
+#define	KLOCKF_RW_WRITE		0x02
+
+#define	KLOCKF_TYPE_FLOCK	0x01
+#define	KLOCKF_TYPE_PID		0x02
+#define	KLOCKF_TYPE_REMOTE	0x03
+
 /*
  * The KERN_PROC_VMMAP sysctl allows a process to dump the VM layout of
  * another process as a series of entries.
  */
 #define	KVME_TYPE_NONE		0
-#define	KVME_TYPE_DEFAULT	1
+#define	KVME_TYPE_DEFAULT	1		/* no longer returned */
 #define	KVME_TYPE_VNODE		2
 #define	KVME_TYPE_SWAP		3
 #define	KVME_TYPE_DEVICE	4
@@ -602,6 +632,28 @@ struct kinfo_sigtramp {
 	void * __kerncap ksigtramp_start;
 	void * __kerncap ksigtramp_end;
 	void * __kerncap ksigtramp_spare[4];
+};
+
+#define	KMAP_FLAG_WIREFUTURE	0x01	/* all future mappings wil be wired */
+#define	KMAP_FLAG_ASLR		0x02	/* ASLR is applied to mappings */
+#define	KMAP_FLAG_ASLR_IGNSTART	0x04	/* ASLR may map into sbrk grow region */
+#define	KMAP_FLAG_WXORX		0x08	/* W^X mapping policy is enforced */
+#define	KMAP_FLAG_ASLR_STACK	0x10	/* the stack location is randomized */
+#define	KMAP_FLAG_ASLR_SHARED_PAGE 0x20	/* the shared page location is randomized */
+
+struct kinfo_vm_layout {
+	ptraddr_t	kvm_min_user_addr;
+	ptraddr_t	kvm_max_user_addr;
+	ptraddr_t	kvm_text_addr;
+	size_t		kvm_text_size;
+	ptraddr_t	kvm_data_addr;
+	size_t		kvm_data_size;
+	ptraddr_t	kvm_stack_addr;
+	size_t		kvm_stack_size;
+	int		kvm_map_flags;
+	ptraddr_t	kvm_shp_addr;
+	size_t		kvm_shp_size;
+	ptraddr_t	kvm_spare[12];
 };
 
 #ifdef _KERNEL

@@ -99,6 +99,7 @@ struct nfsclient {
 	struct nfsstatehead lc_deleg;		/* Delegations */
 	struct nfsstatehead lc_olddeleg;	/* and old delegations */
 	struct nfssessionhead lc_session;	/* List of NFSv4.1 sessions */
+	uint64_t	lc_prevsess;		/* CreateSession cache */
 	time_t		lc_expiry;		/* Expiry time (sec) */
 	time_t		lc_delegtime;		/* Old deleg expiry (sec) */
 	nfsquad_t	lc_clientid;		/* 64 bit clientid */
@@ -132,6 +133,7 @@ struct nfslayout {
 	nfsv4stateid_t		lay_stateid;
 	nfsquad_t		lay_clientid;
 	fhandle_t		lay_fh;
+	char			lay_deviceid[NFSX_V4DEVICEID];
 	fsid_t			lay_fsid;
 	uint32_t		lay_layoutlen;
 	uint16_t		lay_mirrorcnt;
@@ -147,6 +149,7 @@ struct nfslayout {
 #define	NFSLAY_RECALL	0x0004
 #define	NFSLAY_RETURNED	0x0008
 #define	NFSLAY_CALLB	0x0010
+#define	NFSLAY_NOSPC	0x0020
 
 /*
  * Structure for an NFSv4.1 session.
@@ -353,6 +356,7 @@ struct nfsdevice {
 	char			*nfsdev_host;
 	fsid_t			nfsdev_mdsfsid;
 	uint32_t		nfsdev_nextdir;
+	bool			nfsdev_nospc;
 	vnode_t			nfsdev_dsdir[0];
 };
 

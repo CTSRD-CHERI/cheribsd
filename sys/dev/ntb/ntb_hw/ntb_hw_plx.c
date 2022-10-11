@@ -1053,7 +1053,7 @@ static device_method_t ntb_plx_methods[] = {
 	DEVMETHOD(device_attach,	ntb_plx_attach),
 	DEVMETHOD(device_detach,	ntb_plx_detach),
 	/* Bus interface */
-	DEVMETHOD(bus_child_location_str, ntb_child_location_str),
+	DEVMETHOD(bus_child_location,	ntb_child_location),
 	DEVMETHOD(bus_print_child,	ntb_print_child),
 	DEVMETHOD(bus_get_dma_tag,	ntb_get_dma_tag),
 	/* NTB interface */
@@ -1091,6 +1091,6 @@ static device_method_t ntb_plx_methods[] = {
 
 static DEFINE_CLASS_0(ntb_hw, ntb_plx_driver, ntb_plx_methods,
     sizeof(struct ntb_plx_softc));
-DRIVER_MODULE(ntb_hw_plx, pci, ntb_plx_driver, ntb_hw_devclass, NULL, NULL);
+DRIVER_MODULE(ntb_hw_plx, pci, ntb_plx_driver, NULL, NULL);
 MODULE_DEPEND(ntb_hw_plx, ntb, 1, 1, 1);
 MODULE_VERSION(ntb_hw_plx, 1);

@@ -28,17 +28,28 @@ VEToolChain::VEToolChain(const Driver &D, const llvm::Triple &Triple,
   getProgramPaths().push_back("/opt/nec/ve/bin");
   // ProgramPaths are found via 'PATH' environment variable.
 
-  // default file paths are:
-  //   ${RESOURCEDIR}/lib/linux/ve (== getArchSpecificLibPath)
-  //   /lib/../lib64
-  //   /usr/lib/../lib64
-  //   ${BINPATH}/../lib
-  //   /lib
-  //   /usr/lib
-  //
-  // These are OK for host, but no go for VE.  So, defines them all
-  // from scratch here.
+  // Default library paths are following:
+  //   ${RESOURCEDIR}/lib/ve-unknown-linux-gnu,
+  // These are OK.
+
+  // Default file paths are following:
+  //   ${RESOURCEDIR}/lib/linux/ve, (== getArchSpecificLibPath)
+  //   /lib/../lib64,
+  //   /usr/lib/../lib64,
+  //   ${BINPATH}/../lib,
+  //   /lib,
+  //   /usr/lib,
+  // These are OK for host, but no go for VE.
+
+  // Define file paths from scratch here.
   getFilePaths().clear();
+
+  // Add library directories:
+  //   ${BINPATH}/../lib/ve-unknown-linux-gnu, (== getStdlibPath)
+  //   ${RESOURCEDIR}/lib/linux/ve, (== getArchSpecificLibPath)
+  //   ${SYSROOT}/opt/nec/ve/lib,
+  for (auto &Path : getStdlibPaths())
+    getFilePaths().push_back(std::move(Path));
   getFilePaths().push_back(getArchSpecificLibPath());
   getFilePaths().push_back(computeSysRoot() + "/opt/nec/ve/lib");
 }
@@ -53,7 +64,9 @@ Tool *VEToolChain::buildLinker() const {
 
 bool VEToolChain::isPICDefault() const { return false; }
 
-bool VEToolChain::isPIEDefault() const { return false; }
+bool VEToolChain::isPIEDefault(const llvm::opt::ArgList &Args) const {
+  return false;
+}
 
 bool VEToolChain::isPICDefaultForced() const { return false; }
 
@@ -102,14 +115,38 @@ void VEToolChain::addClangTargetOptions(const ArgList &DriverArgs,
 
 void VEToolChain::AddClangCXXStdlibIncludeArgs(const ArgList &DriverArgs,
                                                ArgStringList &CC1Args) const {
-  // TODO upstream VE libc++ patches
-  llvm_unreachable("The VE target has no C++ stdlib for Clang yet");
+  if (DriverArgs.hasArg(clang::driver::options::OPT_nostdinc) ||
+      DriverArgs.hasArg(options::OPT_nostdlibinc) ||
+      DriverArgs.hasArg(options::OPT_nostdincxx))
+    return;
+  if (const char *cl_include_dir = getenv("NCC_CPLUS_INCLUDE_PATH")) {
+    SmallVector<StringRef, 4> Dirs;
+    const char EnvPathSeparatorStr[] = {llvm::sys::EnvPathSeparator, '\0'};
+    StringRef(cl_include_dir).split(Dirs, StringRef(EnvPathSeparatorStr));
+    ArrayRef<StringRef> DirVec(Dirs);
+    addSystemIncludes(DriverArgs, CC1Args, DirVec);
+  } else {
+    // Add following paths for multiple target installation.
+    //   ${INSTALLDIR}/include/ve-unknown-linux-gnu/c++/v1,
+    //   ${INSTALLDIR}/include/c++/v1,
+    addLibCxxIncludePaths(DriverArgs, CC1Args);
+  }
 }
 
 void VEToolChain::AddCXXStdlibLibArgs(const ArgList &Args,
                                       ArgStringList &CmdArgs) const {
-  // TODO upstream VE libc++ patches
-  llvm_unreachable("The VE target has no C++ stdlib for Clang yet");
+  assert((GetCXXStdlibType(Args) == ToolChain::CST_Libcxx) &&
+         "Only -lc++ (aka libxx) is supported in this toolchain.");
+
+  tools::addArchSpecificRPath(*this, Args, CmdArgs);
+
+  CmdArgs.push_back("-lc++");
+  CmdArgs.push_back("-lc++abi");
+  CmdArgs.push_back("-lunwind");
+  // libc++ requires -lpthread under glibc environment
+  CmdArgs.push_back("-lpthread");
+  // libunwind requires -ldl under glibc environment
+  CmdArgs.push_back("-ldl");
 }
 
 llvm::ExceptionHandling

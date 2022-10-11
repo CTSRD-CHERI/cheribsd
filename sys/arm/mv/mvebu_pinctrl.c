@@ -187,7 +187,6 @@ static int
 mv_pinctrl_attach(device_t dev)
 {
 	struct mv_pinctrl_softc *sc;
-	phandle_t node;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -199,8 +198,6 @@ mv_pinctrl_attach(device_t dev)
 		device_printf(dev, "cannot get syscon for device\n");
 		return (ENXIO);
 	}
-
-	node = ofw_bus_get_node(dev);
 
 	fdt_pinctrl_register(dev, "marvell,pins");
 	fdt_pinctrl_configure_tree(dev);
@@ -227,13 +224,11 @@ static device_method_t mv_pinctrl_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t mv_pinctrl_devclass;
-
 static driver_t mv_pinctrl_driver = {
 	"mv_pinctrl",
 	mv_pinctrl_methods,
 	sizeof(struct mv_pinctrl_softc),
 };
 
-EARLY_DRIVER_MODULE(mv_pinctrl, simplebus, mv_pinctrl_driver,
-    mv_pinctrl_devclass, 0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);
+EARLY_DRIVER_MODULE(mv_pinctrl, simplebus, mv_pinctrl_driver, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LATE);

@@ -104,10 +104,7 @@ static driver_t	acpi_sony_driver = {
 	sizeof(struct acpi_sony_softc),
 };
 
-static devclass_t acpi_sony_devclass;
-
-DRIVER_MODULE(acpi_sony, acpi, acpi_sony_driver, acpi_sony_devclass,
-	      0, 0);
+DRIVER_MODULE(acpi_sony, acpi, acpi_sony_driver, 0, 0);
 MODULE_DEPEND(acpi_sony, acpi, 1, 1, 1);
 static char    *sny_id[] = {"SNY5001", NULL};
 
@@ -137,14 +134,14 @@ acpi_sony_attach(device_t dev)
 			SYSCTL_ADD_PROC(device_get_sysctl_ctx(dev),
 			    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)),
 			    i, acpi_sony_oids[i].nodename ,
-			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_NEEDGIANT,
+			    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_MPSAFE,
 			    dev, i, sysctl_acpi_sony_gen_handler, "I",
 			    acpi_sony_oids[i].comment);
 		} else {
 			SYSCTL_ADD_PROC(device_get_sysctl_ctx(dev),
 			    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)),
 			    i, acpi_sony_oids[i].nodename ,
-			    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_NEEDGIANT,
+			    CTLTYPE_INT | CTLFLAG_RD | CTLFLAG_MPSAFE,
 			    dev, i, sysctl_acpi_sony_gen_handler, "I",
 			    acpi_sony_oids[i].comment);
 		}

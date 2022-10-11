@@ -51,6 +51,7 @@ protected:
 
 class LLDB_API SBPlatformShellCommand {
 public:
+  SBPlatformShellCommand(const char *shell, const char *shell_command);
   SBPlatformShellCommand(const char *shell_command);
 
   SBPlatformShellCommand(const SBPlatformShellCommand &rhs);
@@ -60,6 +61,10 @@ public:
   ~SBPlatformShellCommand();
 
   void Clear();
+
+  const char *GetShell();
+
+  void SetShell(const char *shell);
 
   const char *GetCommand();
 
@@ -131,6 +136,8 @@ public:
   uint32_t GetOSMinorVersion();
 
   uint32_t GetOSUpdateVersion();
+
+  void SetSDKRoot(const char *sysroot);
 
   SBError Put(SBFileSpec &src, SBFileSpec &dst);
 

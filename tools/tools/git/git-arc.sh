@@ -187,6 +187,22 @@ log2diff()
     fi
 }
 
+# Look for an open revision with a title equal to the input string.  Return
+# a possibly empty list of Differential revision IDs.
+title2diff()
+{
+    local title
+
+    title=$1
+    # arc list output always includes ANSI escape sequences, strip them.
+    arc list | sed 's/\x1b\[[0-9;]*m//g' | \
+        awk -F': ' '{
+            if (substr($0, index($0, FS) + length(FS)) == "'"$title"'") {
+                print substr($1, match($1, "D[1-9][0-9]*"))
+            }
+        }'
+}
+
 commit2diff()
 {
     local commit diff title
@@ -204,7 +220,7 @@ commit2diff()
     # Second, search the open reviews returned by 'arc list' looking
     # for a subject match.
     title=$(git show -s --format=%s "$commit")
-    diff=$(arc list | grep -F "$title" | grep -E -o 'D[1-9][0-9]*:' | tr -d ':')
+    diff=$(title2diff "$title")
     if [ -z "$diff" ]; then
         err "could not find review for '${title}'"
     elif [ "$(echo "$diff" | wc -l)" -ne 1 ]; then
@@ -291,7 +307,7 @@ prompt()
     local resp
 
     if [ "$ASSUME_YES" ]; then
-        return 1
+        return 0
     fi
 
     printf "\nDoes this look OK? [y/N] "
@@ -342,7 +358,8 @@ build_commit_list()
     for chash in "$@"; do
         _commits=$(git rev-parse "${chash}")
         if ! git cat-file -e "${chash}"'^{commit}' >/dev/null 2>&1; then
-            _commits=$(git rev-list "$_commits" | tail -r)
+            # shellcheck disable=SC2086
+            _commits=$(git rev-list $_commits | tail -r)
         fi
         [ -n "$_commits" ] || err "invalid commit ID ${chash}"
         commits="$commits $_commits"
@@ -355,15 +372,19 @@ gitarc__create()
     local commit commits doprompt list o prev reviewers subscribers
 
     list=
+    prev=""
     if [ "$(git config --bool --get arc.list 2>/dev/null || echo false)" != "false" ]; then
         list=1
     fi
     doprompt=1
-    while getopts lr:s: o; do
+    while getopts lp:r:s: o; do
         case "$o" in
         l)
             list=1
             ;;
+	p)
+	    prev="$OPTARG"
+	    ;;
         r)
             reviewers="$OPTARG"
             ;;
@@ -390,7 +411,6 @@ gitarc__create()
     fi
 
     save_head
-    prev=""
     for commit in ${commits}; do
         if create_one_review "$commit" "$reviewers" "$subscribers" "$prev" \
                              "$doprompt"; then
@@ -404,9 +424,10 @@ gitarc__create()
 
 gitarc__list()
 {
-    local chash commit commits diff title
+    local chash commit commits diff openrevs title
 
     commits=$(build_commit_list "$@")
+    openrevs=$(arc list)
 
     for commit in $commits; do
         chash=$(git show -s --format='%C(auto)%h' "$commit")
@@ -419,10 +440,10 @@ gitarc__list()
         fi
 
         # This does not use commit2diff as it needs to handle errors
-        # differently and keep the entire status.  The extra 'cat'
-        # after 'fgrep' avoids erroring due to -e.
+        # differently and keep the entire status.
         title=$(git show -s --format=%s "$commit")
-        diff=$(arc list | grep -F "$title" | cat)
+        diff=$(echo "$openrevs" | \
+            awk -F'D[1-9][0-9]*:\.\\[m ' '{if ($2 == "'"$title"'") print $0}')
         if [ -z "$diff" ]; then
             echo "No Review      : $title"
         elif [ "$(echo "$diff" | wc -l)" -ne 1 ]; then
@@ -452,7 +473,7 @@ gitarc__patch()
 
 gitarc__stage()
 {
-    local author branch commit commits diff reviewers tmp
+    local author branch commit commits diff reviewers title tmp
 
     branch=main
     while getopts b: o; do
@@ -478,8 +499,8 @@ gitarc__stage()
     tmp=$(mktemp)
     for commit in $commits; do
         git show -s --format=%B "$commit" > "$tmp"
-        diff=$(arc list | grep -F "$(git show -s --format=%s "$commit")" |
-            grep -E -o 'D[1-9][0-9]*:' | tr -d ':')
+        title=$(git show -s --format=%s "$commit")
+        diff=$(title2diff "$title")
         if [ -n "$diff" ]; then
             # XXX this leaves an extra newline in some cases.
             reviewers=$(diff2reviewers "$diff" | sed '/^$/d' | paste -sd ',' - | sed 's/,/, /g')

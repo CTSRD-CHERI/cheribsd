@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2014 Robert N. M. Watson
+ * Copyright (c) 2021 Microsoft Corp.
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -118,4 +119,11 @@ cheribsdtest_success(void)
 
 	ccsp->ccs_testresult = TESTRESULT_SUCCESS;
 	exit(0);
+}
+
+void
+cheribsdtest_set_expected_si_addr(void *addr)
+{
+
+	ccsp->ccs_si_addr_expected = addr;
 }

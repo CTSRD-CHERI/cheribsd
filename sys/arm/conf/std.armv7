@@ -8,6 +8,8 @@ options 	PREEMPTION		# Enable kernel thread preemption
 options 	VIMAGE			# Subsystem virtualization, e.g. VNET
 options 	INET			# InterNETworking
 options 	INET6			# IPv6 communications protocols
+options		CC_NEWRENO		# include newreno congestion control
+options		CC_DEFAULT=\"newreno\"	# define our default CC module it should be compiled in.
 options 	TCP_HHOOK		# hhook(9) framework for TCP
 device		crypto			# core crypto support
 options 	IPSEC_SUPPORT		# Allow kldload of ipsec and tcpmd5
@@ -50,6 +52,7 @@ options 	MAC			# Support for Mandatory Access Control (MAC)
 options 	COMPAT_FREEBSD10	# Compatible with FreeBSD10
 options 	COMPAT_FREEBSD11	# Compatible with FreeBSD11
 options 	COMPAT_FREEBSD12	# Compatible with FreeBSD12
+options 	COMPAT_FREEBSD13	# Compatible with FreeBSD13
 
 # DTrace support
 options 	KDTRACE_HOOKS		# Kernel DTrace hooks
@@ -84,3 +87,9 @@ options 	VERBOSE_SYSINIT=0	# Support debug.verbose_sysinit, off by default
 #options 	KTR_VERBOSE=0
 #options 	USB_REQ_DEBUG
 #options 	USB_VERBOSE
+
+# Enable support for the kernel PLL to use an external PPS signal,
+# under supervision of [x]ntpd(8)
+# More info in ntpd documentation: http://www.eecis.udel.edu/~ntp
+
+options 	PPS_SYNC

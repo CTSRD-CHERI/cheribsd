@@ -21,24 +21,25 @@ osrelease_start()
 {
 	local _version _version_id
 
-	check_startmsgs && echo -n "Updating ${osrelease_file} "
+	startmsg -n "Updating ${osrelease_file} "
 	_version=$(freebsd-version -u)
 	_version_id=${_version%%[^0-9.]*}
 	t=$(mktemp -t os-release)
 	cat > "$t" <<-__EOF__
-		NAME=FreeBSD
-		VERSION=$_version
-		VERSION_ID=$_version_id
-		ID=freebsd
+		NAME=CheriBSD
+		VERSION="$_version"
+		VERSION_ID="$_version_id"
+		ID=cheribsd
+		ID_LIKE=freebsd
 		ANSI_COLOR="0;31"
-		PRETTY_NAME="FreeBSD $_version"
-		CPE_NAME=cpe:/o:freebsd:freebsd:$_version_id
-		HOME_URL=https://FreeBSD.org/
-		BUG_REPORT_URL=https://bugs.FreeBSD.org/
+		PRETTY_NAME="CheriBSD $_version"
+		CPE_NAME="cpe:/o:freebsd:freebsd:$_version_id"
+		HOME_URL="https://www.cheribsd.org/"
+		BUG_REPORT_URL="https://github.com/CTSRD-CHERI/cheribsd/issues"
 __EOF__
 	install -C -o root -g wheel -m ${osrelease_perms} "$t" "${osrelease_file}"
 	rm -f "$t"
-	check_startmsgs && echo 'done.'
+	startmsg 'done.'
 }
 
 load_rc_config $name

@@ -149,7 +149,7 @@ pf_match_translation(struct pf_pdesc *pd, struct mbuf *m, int off,
 			dst = &r->dst;
 		}
 
-		counter_u64_add(r->evaluations, 1);
+		pf_counter_u64_add(&r->evaluations, 1);
 		if (pfi_kkif_match(r->kif, kif) == r->ifnot)
 			r = r->skip[PF_SKIP_IFP].ptr;
 		else if (r->direction && r->direction != direction)
@@ -182,7 +182,7 @@ pf_match_translation(struct pf_pdesc *pd, struct mbuf *m, int off,
 			r = TAILQ_NEXT(r, entries);
 		else if (r->os_fingerprint != PF_OSFP_ANY && (pd->proto !=
 		    IPPROTO_TCP || !pf_osfp_match(pf_osfp_fingerprint(pd, m,
-		    off, pd->hdr.tcp), r->os_fingerprint)))
+		    off, &pd->hdr.tcp), r->os_fingerprint)))
 			r = TAILQ_NEXT(r, entries);
 		else {
 			if (r->tag)
@@ -244,13 +244,13 @@ pf_get_sport(sa_family_t af, u_int8_t proto, struct pf_krule *r,
 			 * (traceroute -I through nat)
 			 */
 			key.port[1] = sport;
-			if (pf_find_state_all(&key, PF_IN, NULL) == NULL) {
+			if (!pf_find_state_all_exists(&key, PF_IN)) {
 				*nport = sport;
 				return (0);
 			}
 		} else if (low == high) {
 			key.port[1] = htons(low);
-			if (pf_find_state_all(&key, PF_IN, NULL) == NULL) {
+			if (!pf_find_state_all_exists(&key, PF_IN)) {
 				*nport = htons(low);
 				return (0);
 			}
@@ -268,8 +268,7 @@ pf_get_sport(sa_family_t af, u_int8_t proto, struct pf_krule *r,
 			/* low <= cut <= high */
 			for (tmp = cut; tmp <= high && tmp <= 0xffff; ++tmp) {
 				key.port[1] = htons(tmp);
-				if (pf_find_state_all(&key, PF_IN, NULL) ==
-				    NULL) {
+				if (!pf_find_state_all_exists(&key, PF_IN)) {
 					*nport = htons(tmp);
 					return (0);
 				}
@@ -277,8 +276,7 @@ pf_get_sport(sa_family_t af, u_int8_t proto, struct pf_krule *r,
 			tmp = cut;
 			for (tmp -= 1; tmp >= low && tmp <= 0xffff; --tmp) {
 				key.port[1] = htons(tmp);
-				if (pf_find_state_all(&key, PF_IN, NULL) ==
-				    NULL) {
+				if (!pf_find_state_all_exists(&key, PF_IN)) {
 					*nport = htons(tmp);
 					return (0);
 				}
@@ -366,7 +364,7 @@ pf_map_addr(sa_family_t af, struct pf_krule *r, struct pf_addr *saddr,
 			return (1);
 
 		PF_ACPY(naddr, &(*sn)->raddr, af);
-		if (V_pf_status.debug >= PF_DEBUG_MISC) {
+		if (V_pf_status.debug >= PF_DEBUG_NOISY) {
 			printf("pf_map_addr: src tracking maps ");
 			pf_print_host(saddr, 0, af);
 			printf(" to ");
@@ -376,36 +374,45 @@ pf_map_addr(sa_family_t af, struct pf_krule *r, struct pf_addr *saddr,
 		return (0);
 	}
 
+	mtx_lock(&rpool->mtx);
 	/* Find the route using chosen algorithm. Store the found route
 	   in src_node if it was given or found. */
-	if (rpool->cur->addr.type == PF_ADDR_NOROUTE)
+	if (rpool->cur->addr.type == PF_ADDR_NOROUTE) {
+		mtx_unlock(&rpool->mtx);
 		return (1);
+	}
 	if (rpool->cur->addr.type == PF_ADDR_DYNIFTL) {
 		switch (af) {
 #ifdef INET
 		case AF_INET:
 			if (rpool->cur->addr.p.dyn->pfid_acnt4 < 1 &&
 			    (rpool->opts & PF_POOL_TYPEMASK) !=
-			    PF_POOL_ROUNDROBIN)
+			    PF_POOL_ROUNDROBIN) {
+				mtx_unlock(&rpool->mtx);
 				return (1);
-			 raddr = &rpool->cur->addr.p.dyn->pfid_addr4;
-			 rmask = &rpool->cur->addr.p.dyn->pfid_mask4;
+			}
+			raddr = &rpool->cur->addr.p.dyn->pfid_addr4;
+			rmask = &rpool->cur->addr.p.dyn->pfid_mask4;
 			break;
 #endif /* INET */
 #ifdef INET6
 		case AF_INET6:
 			if (rpool->cur->addr.p.dyn->pfid_acnt6 < 1 &&
 			    (rpool->opts & PF_POOL_TYPEMASK) !=
-			    PF_POOL_ROUNDROBIN)
+			    PF_POOL_ROUNDROBIN) {
+				mtx_unlock(&rpool->mtx);
 				return (1);
+			}
 			raddr = &rpool->cur->addr.p.dyn->pfid_addr6;
 			rmask = &rpool->cur->addr.p.dyn->pfid_mask6;
 			break;
 #endif /* INET6 */
 		}
 	} else if (rpool->cur->addr.type == PF_ADDR_TABLE) {
-		if ((rpool->opts & PF_POOL_TYPEMASK) != PF_POOL_ROUNDROBIN)
+		if ((rpool->opts & PF_POOL_TYPEMASK) != PF_POOL_ROUNDROBIN) {
+			mtx_unlock(&rpool->mtx);
 			return (1); /* unsupported */
+		}
 	} else {
 		raddr = &rpool->cur->addr.v.a.addr;
 		rmask = &rpool->cur->addr.v.a.mask;
@@ -469,27 +476,6 @@ pf_map_addr(sa_family_t af, struct pf_krule *r, struct pf_addr *saddr,
 	    {
 		struct pf_kpooladdr *acur = rpool->cur;
 
-		/*
-		 * XXXGL: in the round-robin case we need to store
-		 * the round-robin machine state in the rule, thus
-		 * forwarding thread needs to modify rule.
-		 *
-		 * This is done w/o locking, because performance is assumed
-		 * more important than round-robin precision.
-		 *
-		 * In the simpliest case we just update the "rpool->cur"
-		 * pointer. However, if pool contains tables or dynamic
-		 * addresses, then "tblidx" is also used to store machine
-		 * state. Since "tblidx" is int, concurrent access to it can't
-		 * lead to inconsistence, only to lost of precision.
-		 *
-		 * Things get worse, if table contains not hosts, but
-		 * prefixes. In this case counter also stores machine state,
-		 * and for IPv6 address, counter can't be updated atomically.
-		 * Probably, using round-robin on a table containing IPv6
-		 * prefixes (or even IPv4) would cause a panic.
-		 */
-
 		if (rpool->cur->addr.type == PF_ADDR_TABLE) {
 			if (!pfr_pool_get(rpool->cur->addr.p.tbl,
 			    &rpool->tblidx, &rpool->counter, af))
@@ -513,6 +499,7 @@ pf_map_addr(sa_family_t af, struct pf_krule *r, struct pf_addr *saddr,
 				/* table contains no address of type 'af' */
 				if (rpool->cur != acur)
 					goto try_next;
+				mtx_unlock(&rpool->mtx);
 				return (1);
 			}
 		} else if (rpool->cur->addr.type == PF_ADDR_DYNIFTL) {
@@ -522,6 +509,7 @@ pf_map_addr(sa_family_t af, struct pf_krule *r, struct pf_addr *saddr,
 				/* table contains no address of type 'af' */
 				if (rpool->cur != acur)
 					goto try_next;
+				mtx_unlock(&rpool->mtx);
 				return (1);
 			}
 		} else {
@@ -541,7 +529,9 @@ pf_map_addr(sa_family_t af, struct pf_krule *r, struct pf_addr *saddr,
 	if (*sn != NULL)
 		PF_ACPY(&(*sn)->raddr, naddr, af);
 
-	if (V_pf_status.debug >= PF_DEBUG_MISC &&
+	mtx_unlock(&rpool->mtx);
+
+	if (V_pf_status.debug >= PF_DEBUG_NOISY &&
 	    (rpool->opts & PF_POOL_TYPEMASK) != PF_POOL_NONE) {
 		printf("pf_map_addr: selected address ");
 		pf_print_host(naddr, 0, af);

@@ -84,7 +84,7 @@ __FBSDID("$FreeBSD$");
  */
 int
 deget(struct msdosfsmount *pmp, u_long dirclust, u_long diroffset,
-    struct denode **depp)
+    int lkflags __unused, struct denode **depp)
 {
 	int error;
 	uint64_t inode;
@@ -210,7 +210,6 @@ int
 detrunc(struct denode *dep, u_long length, int flags, struct ucred *cred)
 {
 	int error;
-	int allerror;
 	u_long eofentry;
 	u_long chaintofree;
 	daddr_t bn;
@@ -253,7 +252,7 @@ detrunc(struct denode *dep, u_long length, int flags, struct ucred *cred)
 	if (length == 0) {
 		chaintofree = dep->de_StartCluster;
 		dep->de_StartCluster = 0;
-		eofentry = ~0;
+		eofentry = ~0ul;
 	} else {
 		error = pcbmap(dep, de_clcount(pmp, length) - 1, 0,
 		    &eofentry, 0);
@@ -295,14 +294,13 @@ detrunc(struct denode *dep, u_long length, int flags, struct ucred *cred)
 	dep->de_FileSize = length;
 	if (!isadir)
 		dep->de_flag |= DE_UPDATE|DE_MODIFIED;
-	MSDOSFS_DPRINTF(("detrunc(): allerror %d, eofentry %lu\n",
-	    allerror, eofentry));
+	MSDOSFS_DPRINTF(("detrunc(): eofentry %lu\n", eofentry));
 
 	/*
 	 * If we need to break the cluster chain for the file then do it
 	 * now.
 	 */
-	if (eofentry != ~0) {
+	if (eofentry != ~0ul) {
 		error = fatentry(FAT_GET_AND_SET, pmp, eofentry,
 				 &chaintofree, CLUST_EOFE);
 		if (error) {
@@ -321,7 +319,7 @@ detrunc(struct denode *dep, u_long length, int flags, struct ucred *cred)
 	if (chaintofree != 0 && !MSDOSFSEOF(pmp, chaintofree))
 		freeclusterchain(pmp, chaintofree);
 
-	return (allerror);
+	return (0);
 }
 
 /*

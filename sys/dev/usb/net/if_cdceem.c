@@ -210,15 +210,13 @@ static driver_t cdceem_driver = {
 	.size = sizeof(struct cdceem_softc),
 };
 
-static devclass_t cdceem_devclass;
-
 static const STRUCT_USB_DUAL_ID cdceem_dual_devs[] = {
 	{USB_IFACE_CLASS(UICLASS_CDC),
 		USB_IFACE_SUBCLASS(UISUBCLASS_ETHERNET_EMULATION_MODEL),
 		0},
 };
 
-DRIVER_MODULE(cdceem, uhub, cdceem_driver, cdceem_devclass, NULL, NULL);
+DRIVER_MODULE(cdceem, uhub, cdceem_driver, NULL, NULL);
 MODULE_VERSION(cdceem, 1);
 MODULE_DEPEND(cdceem, uether, 1, 1, 1);
 MODULE_DEPEND(cdceem, usb, 1, 1, 1);
@@ -571,7 +569,7 @@ cdceem_send_echo(struct usb_xfer *xfer, int *offp)
 {
 	struct cdceem_softc *sc;
 	struct usb_page_cache *pc;
-	int maxlen, off;
+	int maxlen __diagused, off;
 	uint16_t hdr;
 
 	off = *offp;
@@ -610,7 +608,7 @@ cdceem_send_echo_response(struct usb_xfer *xfer, int *offp)
 {
 	struct cdceem_softc *sc;
 	struct usb_page_cache *pc;
-	int maxlen, off;
+	int maxlen __diagused, off;
 	uint16_t hdr;
 
 	off = *offp;
@@ -650,7 +648,7 @@ cdceem_send_data(struct usb_xfer *xfer, int *offp)
 	struct usb_page_cache *pc;
 	struct ifnet *ifp;
 	struct mbuf *m;
-	int maxlen, off;
+	int maxlen __diagused, off;
 	uint32_t crc;
 	uint16_t hdr;
 
@@ -714,7 +712,7 @@ cdceem_bulk_write_callback(struct usb_xfer *xfer, usb_error_t usb_error)
 {
 	struct cdceem_softc *sc;
 	struct ifnet *ifp;
-	int actlen, aframes, maxlen, off;
+	int actlen, aframes, maxlen __diagused, off;
 
 	sc = usbd_xfer_softc(xfer);
 	maxlen = usbd_xfer_max_len(xfer);
@@ -783,9 +781,8 @@ static uint32_t
 cdceem_m_crc32(struct mbuf *m, uint32_t src_offset, uint32_t src_len)
 {
 	uint32_t crc = 0xFFFFFFFF;
-	int error;
 
-	error = m_apply(m, src_offset, src_len, cdceem_m_crc32_cb, &crc);
+	m_apply(m, src_offset, src_len, cdceem_m_crc32_cb, &crc);
 	return (crc ^ 0xFFFFFFFF);
 }
 

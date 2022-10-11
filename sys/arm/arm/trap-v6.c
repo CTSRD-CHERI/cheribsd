@@ -70,10 +70,6 @@ __FBSDID("$FreeBSD$");
 
 extern char cachebailout[];
 
-#ifdef DEBUG
-int last_fault_code;	/* For the benefit of pmap_fault_fixup() */
-#endif
-
 struct ksig {
 	int sig;
 	u_long code;
@@ -118,7 +114,7 @@ struct abort {
  *    for cache operations working on virtual addresses. For now, we will
  *    consider this abort as fatal. In fact, no cache maintenance on
  *    not mapped virtual addresses should be called. As cache maintenance
- *    operation (except DMB, DSB, and Flush Prefetch Buffer) are priviledged,
+ *    operation (except DMB, DSB, and Flush Prefetch Buffer) are privileged,
  *    the abort is fatal for user mode as well for now. (This is good place to
  *    note that cache maintenance on virtual address fill TLB.)
  * Acces Bit (L1 & L2):
@@ -422,7 +418,7 @@ abort_handler(struct trapframe *tf, int prefetch)
 	p = td->td_proc;
 	if (usermode) {
 		td->td_pticks = 0;
-		if (td->td_cowgen != p->p_cowgen)
+		if (td->td_cowgen != atomic_load_int(&p->p_cowgen))
 			thread_cow_update(td);
 	}
 
@@ -494,10 +490,6 @@ abort_handler(struct trapframe *tf, int prefetch)
 	ftype = (fsr & FSR_WNR) ? VM_PROT_WRITE : VM_PROT_READ;
 	if (prefetch)
 		ftype |= VM_PROT_EXECUTE;
-
-#ifdef DEBUG
-	last_fault_code = fsr;
-#endif
 
 #ifdef INVARIANTS
 	onfault = pcb->pcb_onfault;
@@ -662,7 +654,7 @@ abort_align(struct trapframe *tf, u_int idx, u_int fsr, u_int far,
  * According to manual, FAULT_ICACHE is translation fault during cache
  * maintenance operation. In fact, no cache maintenance operation on
  * not mapped virtual addresses should be called. As cache maintenance
- * operation (except DMB, DSB, and Flush Prefetch Buffer) are priviledged,
+ * operation (except DMB, DSB, and Flush Prefetch Buffer) are privileged,
  * the abort is concider as fatal for now. However, all the matter with
  * cache maintenance operation on virtual addresses could be really complex
  * and fuzzy in SMP case, so maybe in future standard fault mechanism

@@ -42,22 +42,18 @@
 #include <linux/ctype.h>
 #include <sys/disp.h>
 #include <sys/random.h>
-#include <sys/strings.h>
+#include <sys/string.h>
 #include <linux/kmod.h>
-#include "zfs_gitrev.h"
 #include <linux/mod_compat.h>
 #include <sys/cred.h>
 #include <sys/vnode.h>
 
-char spl_gitrev[64] = ZFS_META_GITREV;
-
-/* BEGIN CSTYLED */
 unsigned long spl_hostid = 0;
 EXPORT_SYMBOL(spl_hostid);
-/* BEGIN CSTYLED */
+
+/* CSTYLED */
 module_param(spl_hostid, ulong, 0644);
 MODULE_PARM_DESC(spl_hostid, "The system hostid.");
-/* END CSTYLED */
 
 proc_t p0;
 EXPORT_SYMBOL(p0);
@@ -271,11 +267,10 @@ __udivdi3(uint64_t u, uint64_t v)
 }
 EXPORT_SYMBOL(__udivdi3);
 
-/* BEGIN CSTYLED */
 #ifndef abs64
+/* CSTYLED */
 #define	abs64(x)	({ uint64_t t = (x) >> 63; ((x) ^ t) - t; })
 #endif
-/* END CSTYLED */
 
 /*
  * Implementation of 64-bit signed division for 32-bit machines.
@@ -387,11 +382,9 @@ __aeabi_uldivmod(uint64_t u, uint64_t v)
 		register uint32_t r2 asm("r2") = (mod & 0xFFFFFFFF);
 		register uint32_t r3 asm("r3") = (mod >> 32);
 
-		/* BEGIN CSTYLED */
 		asm volatile(""
-		    : "+r"(r0), "+r"(r1), "+r"(r2),"+r"(r3)  /* output */
-		    : "r"(r0), "r"(r1), "r"(r2), "r"(r3));   /* input */
-		/* END CSTYLED */
+		    : "+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3)  /* output */
+		    : "r"(r0), "r"(r1), "r"(r2), "r"(r3));    /* input */
 
 		return; /* r0; */
 	}
@@ -412,11 +405,9 @@ __aeabi_ldivmod(int64_t u, int64_t v)
 		register uint32_t r2 asm("r2") = (mod & 0xFFFFFFFF);
 		register uint32_t r3 asm("r3") = (mod >> 32);
 
-		/* BEGIN CSTYLED */
 		asm volatile(""
-		    : "+r"(r0), "+r"(r1), "+r"(r2),"+r"(r3)  /* output */
-		    : "r"(r0), "r"(r1), "r"(r2), "r"(r3));   /* input */
-		/* END CSTYLED */
+		    : "+r"(r0), "+r"(r1), "+r"(r2), "+r"(r3)  /* output */
+		    : "r"(r0), "r"(r1), "r"(r2), "r"(r3));    /* input */
 
 		return; /* r0; */
 	}
@@ -434,21 +425,32 @@ EXPORT_SYMBOL(__aeabi_ldivmod);
  * functions against their Solaris counterparts.  It is possible that I
  * may have misinterpreted the man page or the man page is incorrect.
  */
-int ddi_strtoul(const char *, char **, int, unsigned long *);
 int ddi_strtol(const char *, char **, int, long *);
 int ddi_strtoull(const char *, char **, int, unsigned long long *);
 int ddi_strtoll(const char *, char **, int, long long *);
 
-#define	define_ddi_strtoux(type, valtype)				\
-int ddi_strtou##type(const char *str, char **endptr,			\
+#define	define_ddi_strtox(type, valtype)				\
+int ddi_strto##type(const char *str, char **endptr,			\
     int base, valtype *result)						\
 {									\
 	valtype last_value, value = 0;					\
 	char *ptr = (char *)str;					\
-	int flag = 1, digit;						\
+	int digit, minus = 0;						\
+									\
+	while (strchr(" \t\n\r\f", *ptr))				\
+		++ptr;							\
 									\
 	if (strlen(ptr) == 0)						\
 		return (EINVAL);					\
+									\
+	switch (*ptr) {							\
+	case '-':							\
+		minus = 1;						\
+		zfs_fallthrough;					\
+	case '+':							\
+		++ptr;							\
+		break;							\
+	}								\
 									\
 	/* Auto-detect base based on prefix */				\
 	if (!base) {							\
@@ -483,46 +485,21 @@ int ddi_strtou##type(const char *str, char **endptr,			\
 		if (last_value > value) /* Overflow */			\
 			return (ERANGE);				\
 									\
-		flag = 1;						\
 		ptr++;							\
 	}								\
 									\
-	if (flag)							\
-		*result = value;					\
+	*result = minus ? -value : value;				\
 									\
 	if (endptr)							\
-		*endptr = (char *)(flag ? ptr : str);			\
+		*endptr = ptr;						\
 									\
 	return (0);							\
 }									\
 
-#define	define_ddi_strtox(type, valtype)				\
-int ddi_strto##type(const char *str, char **endptr,			\
-    int base, valtype *result)						\
-{									\
-	int rc;								\
-									\
-	if (*str == '-') {						\
-		rc = ddi_strtou##type(str + 1, endptr, base, result);	\
-		if (!rc) {						\
-			if (*endptr == str + 1)				\
-				*endptr = (char *)str;			\
-			else						\
-				*result = -*result;			\
-		}							\
-	} else {							\
-		rc = ddi_strtou##type(str, endptr, base, result);	\
-	}								\
-									\
-	return (rc);							\
-}
-
-define_ddi_strtoux(l, unsigned long)
 define_ddi_strtox(l, long)
-define_ddi_strtoux(ll, unsigned long long)
+define_ddi_strtox(ull, unsigned long long)
 define_ddi_strtox(ll, long long)
 
-EXPORT_SYMBOL(ddi_strtoul);
 EXPORT_SYMBOL(ddi_strtol);
 EXPORT_SYMBOL(ddi_strtoll);
 EXPORT_SYMBOL(ddi_strtoull);
@@ -586,8 +563,10 @@ spl_getattr(struct file *filp, struct kstat *stat)
 	    AT_STATX_SYNC_AS_STAT);
 #elif defined(HAVE_2ARGS_VFS_GETATTR)
 	rc = vfs_getattr(&filp->f_path, stat);
-#else
+#elif defined(HAVE_3ARGS_VFS_GETATTR)
 	rc = vfs_getattr(filp->f_path.mnt, filp->f_dentry, stat);
+#else
+#error "No available vfs_getattr()"
 #endif
 	if (rc)
 		return (-rc);
@@ -630,7 +609,7 @@ spl_getattr(struct file *filp, struct kstat *stat)
  *
  */
 
-char *spl_hostid_path = HW_HOSTID_PATH;
+static char *spl_hostid_path = HW_HOSTID_PATH;
 module_param(spl_hostid_path, charp, 0444);
 MODULE_PARM_DESC(spl_hostid_path, "The system hostid file (/etc/hostid)");
 
@@ -655,6 +634,7 @@ hostid_read(uint32_t *hostid)
 		return (error);
 	}
 	size = stat.size;
+	// cppcheck-suppress sizeofwithnumericparameter
 	if (size < sizeof (HW_HOSTID_MASK)) {
 		filp_close(filp, 0);
 		return (EINVAL);
@@ -777,7 +757,6 @@ spl_init(void)
 {
 	int rc = 0;
 
-	bzero(&p0, sizeof (proc_t));
 	spl_random_init();
 
 	if ((rc = spl_kvmem_init()))
@@ -801,8 +780,13 @@ spl_init(void)
 	if ((rc = spl_zlib_init()))
 		goto out7;
 
+	if ((rc = spl_zone_init()))
+		goto out8;
+
 	return (rc);
 
+out8:
+	spl_zlib_fini();
 out7:
 	spl_kstat_fini();
 out6:
@@ -822,6 +806,7 @@ out1:
 static void __exit
 spl_fini(void)
 {
+	spl_zone_fini();
 	spl_zlib_fini();
 	spl_kstat_fini();
 	spl_proc_fini();
@@ -835,7 +820,7 @@ spl_fini(void)
 module_init(spl_init);
 module_exit(spl_fini);
 
-ZFS_MODULE_DESCRIPTION("Solaris Porting Layer");
-ZFS_MODULE_AUTHOR(ZFS_META_AUTHOR);
-ZFS_MODULE_LICENSE("GPL");
-ZFS_MODULE_VERSION(ZFS_META_VERSION "-" ZFS_META_RELEASE);
+MODULE_DESCRIPTION("Solaris Porting Layer");
+MODULE_AUTHOR(ZFS_META_AUTHOR);
+MODULE_LICENSE("GPL");
+MODULE_VERSION(ZFS_META_VERSION "-" ZFS_META_RELEASE);

@@ -83,7 +83,6 @@ m_msdosfs_mount(struct m_vnode *devvp)
 	struct byte_bpb710 *b710;
 	uint8_t SecPerClust;
 	int	ronly = 0, error;
-	int	bsize;
 	unsigned secsize = 512;
 
 	MSDOSFS_DPRINTF(("%s(bread 0)\n", __func__));
@@ -103,7 +102,6 @@ m_msdosfs_mount(struct m_vnode *devvp)
 		error = EINVAL;
 		goto error_exit;
 	}
-	bsize = 0;
 
 	pmp = ecalloc(1, sizeof(*pmp));
 	/*
@@ -349,7 +347,7 @@ msdosfs_root(struct msdosfsmount *pmp, struct m_vnode *vp) {
 	int error;
 
 	*vp = *(struct m_vnode *)pmp->pm_devvp;
-	if ((error = deget(pmp, MSDOSFSROOT, MSDOSFSROOT_OFS, &ndep)) != 0) {
+	if ((error = deget(pmp, MSDOSFSROOT, MSDOSFSROOT_OFS, 0, &ndep)) != 0) {
 		errno = error;
 		return -1;
 	}

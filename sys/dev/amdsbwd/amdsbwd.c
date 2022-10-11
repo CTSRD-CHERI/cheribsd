@@ -123,14 +123,13 @@ static device_method_t amdsbwd_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t	amdsbwd_devclass;
 static driver_t		amdsbwd_driver = {
 	"amdsbwd",
 	amdsbwd_methods,
 	sizeof(struct amdsbwd_softc)
 };
 
-DRIVER_MODULE(amdsbwd, isa, amdsbwd_driver, amdsbwd_devclass, NULL, NULL);
+DRIVER_MODULE(amdsbwd, isa, amdsbwd_driver, NULL, NULL);
 
 static uint8_t
 pmio_read(struct resource *res, uint8_t reg)
@@ -381,24 +380,23 @@ amdsbwd_probe_fch41(device_t dev, struct resource *pmres, uint32_t *addr)
 	uint8_t	val;
 	char buf[36];
 
+	/*
+	 * Enable decoding of watchdog MMIO address.
+	 */
+	val = pmio_read(pmres, AMDFCH41_PM_DECODE_EN0);
+	val |= AMDFCH41_WDT_EN;
+	pmio_write(pmres, AMDFCH41_PM_DECODE_EN0, val);
+#ifdef AMDSBWD_DEBUG
+	val = pmio_read(pmres, AMDFCH41_PM_DECODE_EN0);
+	device_printf(dev, "AMDFCH41_PM_DECODE_EN0 value = %#04x\n", val);
+#endif
+
 	val = pmio_read(pmres, AMDFCH41_PM_ISA_CTRL);
 	if ((val & AMDFCH41_MMIO_EN) != 0) {
 		/* Fixed offset for the watchdog within ACPI MMIO range. */
 		amdsbwd_verbose_printf(dev, "ACPI MMIO range is enabled\n");
 		*addr = AMDFCH41_MMIO_ADDR + AMDFCH41_MMIO_WDT_OFF;
 	} else {
-		/*
-		 * Enable decoding of watchdog MMIO address.
-		 */
-		val = pmio_read(pmres, AMDFCH41_PM_DECODE_EN0);
-		val |= AMDFCH41_WDT_EN;
-		pmio_write(pmres, AMDFCH41_PM_DECODE_EN0, val);
-#ifdef AMDSBWD_DEBUG
-		val = pmio_read(pmres, AMDFCH41_PM_DECODE_EN0);
-		device_printf(dev, "AMDFCH41_PM_DECODE_EN0 value = %#04x\n",
-		    val);
-#endif
-
 		/* Special fixed MMIO range for the watchdog. */
 		*addr = AMDFCH41_WDT_FIXED_ADDR;
 	}

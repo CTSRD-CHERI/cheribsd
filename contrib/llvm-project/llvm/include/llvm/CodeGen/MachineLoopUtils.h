@@ -6,11 +6,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_LIB_CODEGEN_MACHINELOOPUTILS_H
-#define LLVM_LIB_CODEGEN_MACHINELOOPUTILS_H
+#ifndef LLVM_CODEGEN_MACHINELOOPUTILS_H
+#define LLVM_CODEGEN_MACHINELOOPUTILS_H
 
 namespace llvm {
-class MachineLoop;
 class MachineBasicBlock;
 class MachineRegisterInfo;
 class TargetInstrInfo;
@@ -37,10 +36,6 @@ MachineBasicBlock *PeelSingleBlockLoop(LoopPeelDirection Direction,
                                        MachineRegisterInfo &MRI,
                                        const TargetInstrInfo *TII);
 
-/// Return true if PhysReg is live outside the loop, i.e. determine if it
-/// is live in the loop exit blocks, and false otherwise.
-bool isRegLiveInExitBlocks(MachineLoop *Loop, int PhysReg);
-
 } // namespace llvm
 
-#endif // LLVM_LIB_CODEGEN_MACHINELOOPUTILS_H
+#endif // LLVM_CODEGEN_MACHINELOOPUTILS_H

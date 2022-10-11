@@ -347,7 +347,7 @@ static device_method_t imx6_ahci_ata_methods[] = {
 	DEVMETHOD(bus_release_resource,   ahci_release_resource),
 	DEVMETHOD(bus_setup_intr,         ahci_setup_intr),
 	DEVMETHOD(bus_teardown_intr,      ahci_teardown_intr),
-	DEVMETHOD(bus_child_location_str, ahci_child_location_str),
+	DEVMETHOD(bus_child_location,	  ahci_child_location),
 
 	DEVMETHOD_END
 };
@@ -358,6 +358,6 @@ static driver_t ahci_ata_driver = {
 	sizeof(struct ahci_controller)
 };
 
-DRIVER_MODULE(imx6_ahci, simplebus, ahci_ata_driver, ahci_devclass, 0, 0);
+DRIVER_MODULE(imx6_ahci, simplebus, ahci_ata_driver, 0, 0);
 MODULE_DEPEND(imx6_ahci, ahci, 1, 1, 1);
 SIMPLEBUS_PNP_INFO(compat_data)

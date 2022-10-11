@@ -57,6 +57,11 @@ __FBSDID("$FreeBSD$");
 
 #include <vm/uma.h>
 
+#define	DEBUG_MOD_NAME	route_ctl
+#define	DEBUG_MAX_LEVEL	LOG_DEBUG
+#include <net/route/route_debug.h>
+_DECLARE_DEBUG(LOG_INFO);
+
 /*
  * This file contains control plane routing tables functions.
  *
@@ -69,7 +74,7 @@ struct rib_subscription {
 	void					*arg;
 	struct rib_head				*rnh;
 	enum rib_subscription_type		type;
-	struct epoch_context			epoch_ctx __subobject_use_container_bounds;
+	struct epoch_context			epoch_ctx;
 };
 
 static int add_route(struct rib_head *rnh, struct rt_addrinfo *info,
@@ -106,12 +111,23 @@ SYSCTL_UINT(_net_route, OID_AUTO, multipath, _MP_FLAGS | CTLFLAG_VNET,
     &VNET_NAME(rib_route_multipath), 0, "Enable route multipath");
 #undef _MP_FLAGS
 
+#if defined(INET) && defined(INET6)
+FEATURE(ipv4_rfc5549_support, "Route IPv4 packets via IPv6 nexthops");
+#define V_rib_route_ipv6_nexthop VNET(rib_route_ipv6_nexthop)
+VNET_DEFINE(u_int, rib_route_ipv6_nexthop) = 1;
+SYSCTL_UINT(_net_route, OID_AUTO, ipv6_nexthop, CTLFLAG_RW | CTLFLAG_VNET,
+    &VNET_NAME(rib_route_ipv6_nexthop), 0, "Enable IPv4 route via IPv6 Next Hop address");
+#endif
+
 /* Routing table UMA zone */
 VNET_DEFINE_STATIC(uma_zone_t, rtzone);
 #define	V_rtzone	VNET(rtzone)
 
+/* Debug bits */
+SYSCTL_NODE(_net_route, OID_AUTO, debug, CTLFLAG_RD | CTLFLAG_MPSAFE, 0, "");
+
 void
-vnet_rtzone_init()
+vnet_rtzone_init(void)
 {
 
 	V_rtzone = uma_zcreate("rtentry", sizeof(struct rtentry),
@@ -120,7 +136,7 @@ vnet_rtzone_init()
 
 #ifdef VIMAGE
 void
-vnet_rtzone_destroy()
+vnet_rtzone_destroy(void)
 {
 
 	uma_zdestroy(V_rtzone);
@@ -197,6 +213,20 @@ get_rnh(uint32_t fibnum, const struct rt_addrinfo *info)
 	return (rnh);
 }
 
+#if defined(INET) && defined(INET6)
+static bool
+rib_can_ipv6_nexthop_address(struct rib_head *rh)
+{
+	int result;
+
+	CURVNET_SET(rh->rib_vnet);
+	result = !!V_rib_route_ipv6_nexthop;
+	CURVNET_RESTORE();
+
+	return (result);
+}
+#endif
+
 #ifdef ROUTE_MPATH
 static bool
 rib_can_multipath(struct rib_head *rh)
@@ -244,6 +274,8 @@ get_info_weight(const struct rt_addrinfo *info, uint32_t default_weight)
 	/* Keep upper 1 byte for adm distance purposes */
 	if (weight > RT_MAX_WEIGHT)
 		weight = RT_MAX_WEIGHT;
+	else if (weight == 0)
+		weight = default_weight;
 
 	return (weight);
 }
@@ -554,8 +586,10 @@ rib_add_route(uint32_t fibnum, struct rt_addrinfo *info,
 	 */
 	if (info->rti_flags & RTF_HOST)
 		info->rti_info[RTAX_NETMASK] = NULL;
-	else if (info->rti_info[RTAX_NETMASK] == NULL)
+	else if (info->rti_info[RTAX_NETMASK] == NULL) {
+		FIB_RH_LOG(LOG_DEBUG, rnh, "error: no RTF_HOST and empty netmask");
 		return (EINVAL);
+	}
 
 	bzero(rc, sizeof(struct rib_cmd_info));
 	rc->rc_cmd = RTM_ADD;
@@ -565,6 +599,30 @@ rib_add_route(uint32_t fibnum, struct rt_addrinfo *info,
 		rib_notify(rnh, RIB_NOTIFY_DELAYED, rc);
 
 	return (error);
+}
+
+/*
+ * Checks if @dst and @gateway is valid combination.
+ *
+ * Returns true if is valid, false otherwise.
+ */
+static bool
+check_gateway(struct rib_head *rnh, struct sockaddr *dst,
+    struct sockaddr *gateway)
+{
+	if (dst->sa_family == gateway->sa_family)
+		return (true);
+	else if (gateway->sa_family == AF_UNSPEC)
+		return (true);
+	else if (gateway->sa_family == AF_LINK)
+		return (true);
+#if defined(INET) && defined(INET6)
+	else if (dst->sa_family == AF_INET && gateway->sa_family == AF_INET6 &&
+		rib_can_ipv6_nexthop_address(rnh))
+		return (true);
+#endif
+	else
+		return (false);
 }
 
 /*
@@ -579,7 +637,6 @@ create_rtentry(struct rib_head *rnh, struct rt_addrinfo *info,
 	struct sockaddr *dst, *ndst, *gateway, *netmask;
 	struct rtentry *rt;
 	struct nhop_object *nh;
-	struct ifaddr *ifa;
 	int error, flags;
 
 	dst = info->rti_info[RTAX_DST];
@@ -587,14 +644,22 @@ create_rtentry(struct rib_head *rnh, struct rt_addrinfo *info,
 	netmask = info->rti_info[RTAX_NETMASK];
 	flags = info->rti_flags;
 
-	if ((flags & RTF_GATEWAY) && !gateway)
+	if ((flags & RTF_GATEWAY) && !gateway) {
+		FIB_RH_LOG(LOG_DEBUG, rnh, "error: RTF_GATEWAY set with empty gw");
 		return (EINVAL);
-	if (dst && gateway && (dst->sa_family != gateway->sa_family) && 
-	    (gateway->sa_family != AF_UNSPEC) && (gateway->sa_family != AF_LINK))
+	}
+	if (dst && gateway && !check_gateway(rnh, dst, gateway)) {
+		FIB_RH_LOG(LOG_DEBUG, rnh,
+		    "error: invalid dst/gateway family combination (%d, %d)",
+		    dst->sa_family, gateway->sa_family);
 		return (EINVAL);
+	}
 
-	if (dst->sa_len > sizeof(((struct rtentry *)NULL)->rt_dstb))
+	if (dst->sa_len > sizeof(((struct rtentry *)NULL)->rt_dstb)) {
+		FIB_RH_LOG(LOG_DEBUG, rnh, "error: dst->sa_len too large: %d",
+		    dst->sa_len);
 		return (EINVAL);
+	}
 
 	if (info->rti_ifa == NULL) {
 		error = rt_getifa_fib(info, rnh->rib_fibnum);
@@ -636,7 +701,6 @@ create_rtentry(struct rib_head *rnh, struct rt_addrinfo *info,
 	 * This moved from below so that rnh->rnh_addaddr() can
 	 * examine the ifa and  ifa->ifa_ifp if it so desires.
 	 */
-	ifa = info->rti_ifa;
 	rt->rt_weight = get_info_weight(info, RT_DEFAULT_WEIGHT);
 	rt_set_expire_info(rt, info);
 
@@ -745,8 +809,10 @@ rib_del_route(uint32_t fibnum, struct rt_addrinfo *info, struct rib_cmd_info *rc
 
 	if (netmask != NULL) {
 		/* Ensure @dst is always properly masked */
-		if (dst_orig->sa_len > sizeof(mdst))
+		if (dst_orig->sa_len > sizeof(mdst)) {
+			FIB_RH_LOG(LOG_DEBUG, rnh, "error: dst->sa_len too large");
 			return (EINVAL);
+		}
 		rt_maskedcopy(dst_orig, (struct sockaddr *)&mdst, netmask);
 		info->rti_info[RTAX_DST] = (struct sockaddr *)&mdst;
 	}
@@ -951,21 +1017,17 @@ static int
 change_mpath_route(struct rib_head *rnh, struct rt_addrinfo *info,
     struct route_nhop_data *rnd_orig, struct rib_cmd_info *rc)
 {
-	int error = 0;
-	struct nhop_object *nh, *nh_orig, *nh_new;
+	int error = 0, found_idx = 0;
+	struct nhop_object *nh_orig = NULL, *nh_new;
 	struct route_nhop_data rnd_new;
-
-	nh = NULL;
-	nh_orig = rnd_orig->rnd_nhop;
-
 	struct weightened_nhop *wn = NULL, *wn_new;
 	uint32_t num_nhops;
 
-	wn = nhgrp_get_nhops((struct nhgrp_object *)nh_orig, &num_nhops);
-	nh_orig = NULL;
+	wn = nhgrp_get_nhops(rnd_orig->rnd_nhgrp, &num_nhops);
 	for (int i = 0; i < num_nhops; i++) {
-		if (check_info_match_nhop(info, NULL, wn[i].nh)) {
+		if (check_info_match_nhop(info, NULL, wn[i].nh) == 0) {
 			nh_orig = wn[i].nh;
+			found_idx = i;
 			break;
 		}
 	}
@@ -985,13 +1047,8 @@ change_mpath_route(struct rib_head *rnh, struct rt_addrinfo *info,
 	}
 
 	memcpy(wn_new, wn, num_nhops * sizeof(struct weightened_nhop));
-	for (int i = 0; i < num_nhops; i++) {
-		if (wn[i].nh == nh_orig) {
-			wn[i].nh = nh_new;
-			wn[i].weight = get_info_weight(info, rnd_orig->rnd_weight);
-			break;
-		}
-	}
+	wn_new[found_idx].nh = nh_new;
+	wn_new[found_idx].weight = get_info_weight(info, wn[found_idx].weight);
 
 	error = nhgrp_get_group(rnh, wn_new, num_nhops, &rnd_new);
 	nhop_free(nh_new);
@@ -1011,10 +1068,9 @@ change_route(struct rib_head *rnh, struct rt_addrinfo *info,
     struct route_nhop_data *rnd_orig, struct rib_cmd_info *rc)
 {
 	int error = 0;
-	struct nhop_object *nh, *nh_orig;
+	struct nhop_object *nh_orig;
 	struct route_nhop_data rnd_new;
 
-	nh = NULL;
 	nh_orig = rnd_orig->rnd_nhop;
 	if (nh_orig == NULL)
 		return (ESRCH);
@@ -1144,6 +1200,15 @@ change_route_conditional(struct rib_head *rnh, struct rtentry *rt,
 	struct rtentry *rt_new;
 	int error = 0;
 
+#if DEBUG_MAX_LEVEL >= LOG_DEBUG2
+	{
+		char buf_old[NHOP_PRINT_BUFSIZE], buf_new[NHOP_PRINT_BUFSIZE];
+		nhop_print_buf_any(rnd_orig->rnd_nhop, buf_old, NHOP_PRINT_BUFSIZE);
+		nhop_print_buf_any(rnd_new->rnd_nhop, buf_new, NHOP_PRINT_BUFSIZE);
+		FIB_LOG(LOG_DEBUG2, rnh->rib_fibnum, rnh->rib_family,
+		    "trying change %s -> %s", buf_old, buf_new);
+	}
+#endif
 	RIB_WLOCK(rnh);
 
 	rt_new = (struct rtentry *)rnh->rnh_lookup(info->rti_info[RTAX_DST],
@@ -1383,6 +1448,20 @@ rib_flush_routes_family(int family)
 	}
 }
 
+const char *
+rib_print_family(int family)
+{
+	switch (family) {
+	case AF_INET:
+		return ("inet");
+	case AF_INET6:
+		return ("inet6");
+	case AF_LINK:
+		return ("link");
+	}
+	return ("unknown");
+}
+
 static void
 rib_notify(struct rib_head *rnh, enum rib_subscription_type type,
     struct rib_cmd_info *rc)
@@ -1477,7 +1556,7 @@ rib_subscribe_locked(struct rib_head *rnh, rib_subscription_cb_t *f, void *arg,
  * Needs to be run in network epoch.
  */
 void
-rib_unsibscribe(struct rib_subscription *rs)
+rib_unsubscribe(struct rib_subscription *rs)
 {
 	struct rib_head *rnh = rs->rnh;
 
@@ -1492,7 +1571,7 @@ rib_unsibscribe(struct rib_subscription *rs)
 }
 
 void
-rib_unsibscribe_locked(struct rib_subscription *rs)
+rib_unsubscribe_locked(struct rib_subscription *rs)
 {
 	struct rib_head *rnh = rs->rnh;
 

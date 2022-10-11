@@ -7,45 +7,20 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
-
 #include "llvm/ExecutionEngine/Orc/Layer.h"
+#include "llvm/ExecutionEngine/Orc/ObjectFileInterface.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Module.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Object/MachOUniversal.h"
 #include "llvm/Support/FormatVariadic.h"
-#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetMachine.h"
+#include <string>
 
 namespace llvm {
 namespace orc {
-
-int runAsMain(int (*Main)(int, char *[]), ArrayRef<std::string> Args,
-              Optional<StringRef> ProgramName) {
-  std::vector<std::unique_ptr<char[]>> ArgVStorage;
-  std::vector<char *> ArgV;
-
-  ArgVStorage.reserve(Args.size() + (ProgramName ? 1 : 0));
-  ArgV.reserve(Args.size() + 1 + (ProgramName ? 1 : 0));
-
-  if (ProgramName) {
-    ArgVStorage.push_back(std::make_unique<char[]>(ProgramName->size() + 1));
-    llvm::copy(*ProgramName, &ArgVStorage.back()[0]);
-    ArgVStorage.back()[ProgramName->size()] = '\0';
-    ArgV.push_back(ArgVStorage.back().get());
-  }
-
-  for (auto &Arg : Args) {
-    ArgVStorage.push_back(std::make_unique<char[]>(Arg.size() + 1));
-    llvm::copy(Arg, &ArgVStorage.back()[0]);
-    ArgVStorage.back()[Arg.size()] = '\0';
-    ArgV.push_back(ArgVStorage.back().get());
-  }
-  ArgV.push_back(nullptr);
-
-  return Main(Args.size() + !!ProgramName, ArgV.data());
-}
 
 CtorDtorIterator::CtorDtorIterator(const GlobalVariable *GV, bool End)
   : InitList(
@@ -261,8 +236,8 @@ DynamicLibrarySearchGenerator::Load(const char *FileName, char GlobalPrefix,
 }
 
 Error DynamicLibrarySearchGenerator::tryToGenerate(
-    LookupKind K, JITDylib &JD, JITDylibLookupFlags JDLookupFlags,
-    const SymbolLookupSet &Symbols) {
+    LookupState &LS, LookupKind K, JITDylib &JD,
+    JITDylibLookupFlags JDLookupFlags, const SymbolLookupSet &Symbols) {
   orc::SymbolMap NewSymbols;
 
   bool HasGlobalPrefix = (GlobalPrefix != '\0');
@@ -295,25 +270,30 @@ Error DynamicLibrarySearchGenerator::tryToGenerate(
 }
 
 Expected<std::unique_ptr<StaticLibraryDefinitionGenerator>>
-StaticLibraryDefinitionGenerator::Load(ObjectLayer &L, const char *FileName) {
+StaticLibraryDefinitionGenerator::Load(
+    ObjectLayer &L, const char *FileName,
+    GetObjectFileInterface GetObjFileInterface) {
   auto ArchiveBuffer = errorOrToExpected(MemoryBuffer::getFile(FileName));
 
   if (!ArchiveBuffer)
     return ArchiveBuffer.takeError();
 
-  return Create(L, std::move(*ArchiveBuffer));
+  return Create(L, std::move(*ArchiveBuffer), std::move(GetObjFileInterface));
 }
 
 Expected<std::unique_ptr<StaticLibraryDefinitionGenerator>>
-StaticLibraryDefinitionGenerator::Load(ObjectLayer &L, const char *FileName,
-                                       const Triple &TT) {
+StaticLibraryDefinitionGenerator::Load(
+    ObjectLayer &L, const char *FileName, const Triple &TT,
+    GetObjectFileInterface GetObjFileInterface) {
+
   auto B = object::createBinary(FileName);
   if (!B)
     return B.takeError();
 
   // If this is a regular archive then create an instance from it.
   if (isa<object::Archive>(B->getBinary()))
-    return Create(L, std::move(B->takeBinary().second));
+    return Create(L, std::move(B->takeBinary().second),
+                  std::move(GetObjFileInterface));
 
   // If this is a universal binary then search for a slice matching the given
   // Triple.
@@ -322,7 +302,8 @@ StaticLibraryDefinitionGenerator::Load(ObjectLayer &L, const char *FileName,
       auto ObjTT = Obj.getTriple();
       if (ObjTT.getArch() == TT.getArch() &&
           ObjTT.getSubArch() == TT.getSubArch() &&
-          ObjTT.getVendor() == TT.getVendor()) {
+          (TT.getVendor() == Triple::UnknownVendor ||
+           ObjTT.getVendor() == TT.getVendor())) {
         // We found a match. Create an instance from a buffer covering this
         // slice.
         auto SliceBuffer = MemoryBuffer::getFileSlice(FileName, Obj.getSize(),
@@ -334,7 +315,8 @@ StaticLibraryDefinitionGenerator::Load(ObjectLayer &L, const char *FileName,
                   " .. " + formatv("{0:x}", Obj.getOffset() + Obj.getSize()) +
                   ": " + SliceBuffer.getError().message(),
               SliceBuffer.getError());
-        return Create(L, std::move(*SliceBuffer));
+        return Create(L, std::move(*SliceBuffer),
+                      std::move(GetObjFileInterface));
       }
     }
 
@@ -351,11 +333,13 @@ StaticLibraryDefinitionGenerator::Load(ObjectLayer &L, const char *FileName,
 
 Expected<std::unique_ptr<StaticLibraryDefinitionGenerator>>
 StaticLibraryDefinitionGenerator::Create(
-    ObjectLayer &L, std::unique_ptr<MemoryBuffer> ArchiveBuffer) {
+    ObjectLayer &L, std::unique_ptr<MemoryBuffer> ArchiveBuffer,
+    GetObjectFileInterface GetObjFileInterface) {
   Error Err = Error::success();
 
   std::unique_ptr<StaticLibraryDefinitionGenerator> ADG(
-      new StaticLibraryDefinitionGenerator(L, std::move(ArchiveBuffer), Err));
+      new StaticLibraryDefinitionGenerator(
+          L, std::move(ArchiveBuffer), std::move(GetObjFileInterface), Err));
 
   if (Err)
     return std::move(Err);
@@ -364,8 +348,8 @@ StaticLibraryDefinitionGenerator::Create(
 }
 
 Error StaticLibraryDefinitionGenerator::tryToGenerate(
-    LookupKind K, JITDylib &JD, JITDylibLookupFlags JDLookupFlags,
-    const SymbolLookupSet &Symbols) {
+    LookupState &LS, LookupKind K, JITDylib &JD,
+    JITDylibLookupFlags JDLookupFlags, const SymbolLookupSet &Symbols) {
 
   // Don't materialize symbols from static archives unless this is a static
   // lookup.
@@ -396,8 +380,12 @@ Error StaticLibraryDefinitionGenerator::tryToGenerate(
     MemoryBufferRef ChildBufferRef(ChildBufferInfo.first,
                                    ChildBufferInfo.second);
 
+    auto I = GetObjFileInterface(L.getExecutionSession(), ChildBufferRef);
+    if (!I)
+      return I.takeError();
+
     if (auto Err = L.add(JD, MemoryBuffer::getMemBuffer(ChildBufferRef, false),
-                         VModuleKey()))
+                         std::move(*I)))
       return Err;
   }
 
@@ -405,9 +393,15 @@ Error StaticLibraryDefinitionGenerator::tryToGenerate(
 }
 
 StaticLibraryDefinitionGenerator::StaticLibraryDefinitionGenerator(
-    ObjectLayer &L, std::unique_ptr<MemoryBuffer> ArchiveBuffer, Error &Err)
-    : L(L), ArchiveBuffer(std::move(ArchiveBuffer)),
-      Archive(std::make_unique<object::Archive>(*this->ArchiveBuffer, Err)) {}
+    ObjectLayer &L, std::unique_ptr<MemoryBuffer> ArchiveBuffer,
+    GetObjectFileInterface GetObjFileInterface, Error &Err)
+    : L(L), GetObjFileInterface(std::move(GetObjFileInterface)),
+      ArchiveBuffer(std::move(ArchiveBuffer)),
+      Archive(std::make_unique<object::Archive>(*this->ArchiveBuffer, Err)) {
+
+  if (!this->GetObjFileInterface)
+    this->GetObjFileInterface = getObjectFileInterface;
+}
 
 } // End namespace orc.
 } // End namespace llvm.

@@ -16,10 +16,13 @@ _PRIVATELIBS=	\
 		atf_c \
 		atf_cxx \
 		auditd \
+		bsddialog \
 		bsdstat \
+		cbor \
 		cheribsdtest_dynamic \
 		devdctl \
 		event1 \
+		fido2 \
 		gmock \
 		gtest \
 		gmock_main \
@@ -33,6 +36,10 @@ _PRIVATELIBS=	\
 		unbound \
 		zstd
 
+# Let projects based on FreeBSD append to _PRIVATELIBS
+# by maintaining their own LOCAL_PRIVATELIBS list.
+_PRIVATELIBS+=	${LOCAL_PRIVATELIBS}
+
 _INTERNALLIBS=	\
 		amu \
 		c_nossp_pic \
@@ -41,6 +48,7 @@ _INTERNALLIBS=	\
 		fifolog \
 		ifconfig \
 		ipf \
+		iscsiutil \
 		lpr \
 		lua \
 		lutok \
@@ -58,13 +66,30 @@ _INTERNALLIBS=	\
 		smdb \
 		smutil \
 		telnet \
-		vers
+		vers \
+		wpaap \
+		wpacommon \
+		wpacrypto \
+		wpadrivers \
+		wpaeap_common \
+		wpaeap_peer \
+		wpaeap_server \
+		wpaeapol_auth \
+		wpaeapol_supp \
+		wpal2_packet \
+		wparadius \
+		wparsn_supp \
+		wpatls \
+		wpautils \
+		wpawps
 
 .if ${MK_BSNMP} == "yes"
 _INTERNALLIBS+=	bsnmptools
 .endif
 
-_INTERNALLIBS+=	png
+# Let projects based on FreeBSD append to _INTERNALLIBS
+# by maintaining their own LOCAL_INTERNALLIBS list.
+_INTERNALLIBS+=	${LOCAL_INTERNALLIBS}
 
 _LIBRARIES=	\
 		${_PRIVATELIBS} \
@@ -84,19 +109,16 @@ _LIBRARIES=	\
 		bsnmp \
 		bz2 \
 		c \
-		c_cheri \
 		c_nosyscalls \
 		c_pic \
 		calendar \
 		cam \
 		casper \
-		cheri \
-		cheri_support \
-		cheri_syscalls \
 		cap_dns \
 		cap_fileargs \
 		cap_grp \
 		cap_net \
+		cap_netdb \
 		cap_pwd \
 		cap_sysctl \
 		cap_syslog \
@@ -105,7 +127,6 @@ _LIBRARIES=	\
 		crypt \
 		crypto \
 		ctf \
-		curl \
 		cuse \
 		cxxrt \
 		devctl \
@@ -123,12 +144,12 @@ _LIBRARIES=	\
 		execinfo \
 		fetch \
 		figpar \
+		formw \
 		geom \
 		gpio \
 		gssapi \
 		gssapi_krb5 \
 		hdb \
-		helloworld \
 		heimbase \
 		heimntlm \
 		heimsqlite \
@@ -193,6 +214,7 @@ _LIBRARIES=	\
 		sysdecode \
 		tacplus \
 		termcapw \
+		tinfow \
 		tpool \
 		ufs \
 		ugidfw \
@@ -229,6 +251,7 @@ _LIBRARIES+= \
 		ibnetdisc \
 		ibumad \
 		ibverbs \
+		irdma \
 		mlx4 \
 		mlx5 \
 		rdmacm \
@@ -256,16 +279,25 @@ LIBVERIEXEC?=	${LIBVERIEXECDIR}/libveriexec.a
 # 2nd+ order consumers.  Auto-generating this would be better.
 _DP_80211=	sbuf bsdxml
 _DP_9p=		sbuf
+# XXX: Not bootstrapped so uses host version on non-FreeBSD, so don't use a
+# FreeBSD-specific dependency list
+.if ${.MAKE.OS} == "FreeBSD" || !defined(BOOTSTRAPPING)
 _DP_archive=	z bz2 lzma bsdxml zstd
+.endif
+_DP_avl=	nvpair spl
+_DP_bsddialog=	formw ncursesw tinfow
 _DP_zstd=	pthread
 .if ${MK_BLACKLIST} != "no"
 _DP_blacklist+=	pthread
 .endif
 _DP_crypto=	pthread
+# See comment by _DP_archive above
+.if ${.MAKE.OS} == "FreeBSD" || !defined(BOOTSTRAPPING)
 .if ${MK_OPENSSL} != "no"
 _DP_archive+=	crypto
 .else
 _DP_archive+=	md
+.endif
 .endif
 _DP_sqlite3=	pthread
 _DP_ssl=	crypto
@@ -273,7 +305,7 @@ _DP_ssh=	crypto crypt z
 .if ${MK_LDNS} != "no"
 _DP_ssh+=	ldns
 .endif
-_DP_edit=	ncursesw
+_DP_edit=	tinfow
 .if ${MK_OPENSSL} != "no"
 _DP_bsnmp=	crypto
 .endif
@@ -291,7 +323,6 @@ _DP_cap_syslog=	nv
 _DP_pcap=	ibverbs mlx5
 .endif
 _DP_pjdlog=	util
-_DP_png=	z
 _DP_opie=	md
 _DP_usb=	pthread
 _DP_unbound=	ssl crypto pthread
@@ -309,7 +340,7 @@ _DP_proc=	cxxrt
 .if ${MK_CDDL} != "no"
 _DP_proc+=	ctf
 .endif
-_DP_proc+=	elf procstat rtld_db util
+_DP_proc+=	elf procstat rtld_db util z
 _DP_mp=	crypto
 _DP_memstat=	kvm
 _DP_magic=	z
@@ -323,9 +354,9 @@ _DP_fetch=	ssl crypto
 _DP_fetch=	md
 .endif
 _DP_execinfo=	elf
-_DP_dwarf=	elf
-_DP_dpv=	dialog figpar util ncursesw
-_DP_dialog=	ncursesw m
+_DP_dwarf=	elf z
+_DP_dpv=	dialog figpar util tinfow ncursesw
+_DP_dialog=	tinfow ncursesw m
 _DP_cuse=	pthread
 _DP_atf_cxx=	atf_c
 _DP_gtest=	pthread regex
@@ -338,6 +369,7 @@ _DP_pam=	radius tacplus opie md util
 _DP_pam+=	krb5
 .endif
 .if ${MK_OPENSSH} != "no"
+_DP_fido2+=	crypto z
 _DP_pam+=	ssh
 .endif
 .if ${MK_NIS} != "no"
@@ -356,8 +388,8 @@ _DP_heimbase=	pthread
 _DP_heimipcc=	heimbase roken pthread
 _DP_heimipcs=	heimbase roken pthread
 _DP_kafs5=	asn1 krb5 roken
-_DP_krb5+=	asn1 com_err crypt crypto hx509 roken wind heimbase heimipcc
-_DP_gssapi_krb5+=	gssapi krb5 crypto roken asn1 com_err
+_DP_krb5=	asn1 com_err crypt crypto hx509 roken wind heimbase heimipcc
+_DP_gssapi_krb5=	gssapi krb5 crypto roken asn1 com_err
 _DP_lzma=	md pthread
 _DP_ucl=	m
 _DP_vmmapi=	util
@@ -370,6 +402,8 @@ _DP_ztest=	geom m nvpair umem zpool pthread avl zfs_core spl zutil zfs uutil icp
 # assert happy.
 _DP_c=		compiler_rt
 _DP_c_nosyscalls=		compiler_rt
+# Use libssp_nonshared only on i386 and power*.  Other archs emit direct calls
+# to __stack_chk_fail, not __stack_chk_fail_local provided by libssp_nonshared.
 .if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap} && \
     (${MACHINE_ARCH} == "i386" || ${MACHINE_ARCH:Mpower*} != "")
 _DP_c+=		ssp_nonshared
@@ -378,6 +412,9 @@ _DP_c_nosyscalls+=		ssp_nonshared
 _DP_stats=	sbuf pthread
 _DP_stdthreads=	pthread
 _DP_tacplus=	md
+_DP_ncursesw=	tinfow
+_DP_formw=	ncursesw
+_DP_nvpair=	spl
 _DP_panelw=	ncursesw
 _DP_rpcsec_gss=	gssapi
 _DP_smb=	kiconv
@@ -389,10 +426,9 @@ _DP_uutil=	avl nvpair spl
 _DP_zfs=	md pthread umem util uutil m avl bsdxml crypto geom nvpair \
 	z zfs_core zutil
 _DP_zfsbootenv= zfs nvpair
-_DP_zfs_core=	nvpair
-_DP_avl=	nvpair
+_DP_zfs_core=	nvpair spl zutil
 _DP_zpool=	md pthread z icp spl nvpair avl umem
-_DP_zutil=	avl tpool
+_DP_zutil=	avl geom m tpool
 _DP_be=		zfs spl nvpair zfsbootenv
 _DP_netmap=
 _DP_ifconfig=	m
@@ -406,6 +442,7 @@ _DP_ibmad=	ibumad
 _DP_ibnetdisc=	osmcomp ibmad ibumad
 _DP_ibumad=	
 _DP_ibverbs=
+_DP_irdma=	ibverbs pthread
 _DP_mlx4=	ibverbs pthread
 _DP_mlx5=	ibverbs pthread
 _DP_rdmacm=	ibverbs
@@ -413,8 +450,6 @@ _DP_osmcomp=	pthread
 _DP_opensm=	pthread osmcomp
 _DP_osmvendor=	ibumad pthread osmcomp
 .endif
-
-_DP_helloworld=	cheri
 
 # Define special cases
 LDADD_supcplusplus=	-lsupc++
@@ -453,8 +488,12 @@ LDADD_${_l}?=	${LDADD_${_l}_L} -l${_l:S/${PIE_SUFFIX}//}${PIE_SUFFIX}
 LDADD_${_l}?=	${LDADD_${_l}_L} -l${_l}
 .endif
 # Add in all dependencies for static linkage.
+# Bootstrapping from non-FreeBSD needs special handling, since it overrides
+# NO_SHARED back to yes despite only building static versions of bootstrap
+# libraries (see tools/build/mk/Makefile.boot.pre).
 .if defined(_DP_${_l}) && (${_INTERNALLIBS:M${_l}} || \
-    (defined(NO_SHARED) && ${NO_SHARED:tl} != "no"))
+    (defined(NO_SHARED) && ${NO_SHARED:tl} != "no") || \
+    (defined(BOOTSTRAPPING) && ${.MAKE.OS} != "FreeBSD"))
 .for _d in ${_DP_${_l}}
 DPADD_${_l}+=	${DPADD_${_d}}
 LDADD_${_l}+=	${LDADD_${_d}}
@@ -540,6 +579,12 @@ LIBIFCONFIG?=	${LIBIFCONFIGDIR}/libifconfig${PIE_SUFFIX}.a
 LIBIPFDIR=	${_LIB_OBJTOP}/sbin/ipf/libipf
 LIBIPF?=	${LIBIPFDIR}/libipf${PIE_SUFFIX}.a
 
+LIBNVDIR=	${_LIB_OBJTOP}/lib/libnv
+LIBNV?=		${LIBNVDIR}/libnv${PIE_SUFFIX}.a
+
+LIBISCSIUTILDIR=	${_LIB_OBJTOP}/lib/libiscsiutil
+LIBISCSIUTIL?=	${LIBISCSIUTILDIR}/libiscsiutil${PIE_SUFFIX}.a
+
 LIBTELNETDIR=	${_LIB_OBJTOP}/lib/libtelnet
 LIBTELNET?=	${LIBTELNETDIR}/libtelnet${PIE_SUFFIX}.a
 
@@ -576,8 +621,50 @@ LIBBE?=		${LIBBEDIR}/libbe${PIE_SUFFIX}.a
 LIBPMCSTATDIR=	${_LIB_OBJTOP}/lib/libpmcstat
 LIBPMCSTAT?=	${LIBPMCSTATDIR}/libpmcstat${PIE_SUFFIX}.a
 
-LIBPNGDIR=	${_LIB_OBJTOP}/lib/libpng
-LIBPNG?=	${LIBPNGDIR}/libpng${PIE_SUFFIX}.a
+LIBWPAAPDIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/ap
+LIBWPAAP?=	${LIBWPAAPDIR}/libwpaap${PIE_SUFFIX}.a
+
+LIBWPACOMMONDIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/common
+LIBWPACOMMON?=	${LIBWPACOMMONDIR}/libwpacommon${PIE_SUFFIX}.a
+
+LIBWPACRYPTODIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/crypto
+LIBWPACRYPTO?=	${LIBWPACRYPTODIR}/libwpacrypto${PIE_SUFFIX}.a
+
+LIBWPADRIVERSDIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/drivers
+LIBWPADRIVERS?=	${LIBWPADRIVERSDIR}/libwpadrivers${PIE_SUFFIX}.a
+
+LIBWPAEAP_COMMONDIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/eap_common
+LIBWPAEAP_COMMON?=	${LIBWPAEAP_COMMONDIR}/libwpaeap_common${PIE_SUFFIX}.a
+
+LIBWPAEAP_PEERDIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/eap_peer
+LIBWPAEAP_PEER?=	${LIBWPAEAP_PEERDIR}/libwpaeap_peer${PIE_SUFFIX}.a
+
+LIBWPAEAP_SERVERDIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/eap_server
+LIBWPAEAP_SERVER?=	${LIBWPAEAP_SERVERDIR}/libwpaeap_server${PIE_SUFFIX}.a
+
+LIBWPAEAPOL_AUTHDIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/eapol_auth
+LIBWPAEAPOL_AUTH?=	${LIBWPAEAPOL_AUTHDIR}/libwpaeapol_auth${PIE_SUFFIX}.a
+
+LIBWPAEAPOL_SUPPDIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/eapol_supp
+LIBWPAEAPOL_SUPP?=	${LIBWPAEAPOL_SUPPDIR}/libwpaeapol_supp${PIE_SUFFIX}.a
+
+LIBWPAL2_PACKETDIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/l2_packet
+LIBWPAL2_PACKET?=	${LIBWPAL2_PACKETDIR}/libwpal2_packet${PIE_SUFFIX}.a
+
+LIBWPARADIUSDIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/radius
+LIBWPARADIUS?=	${LIBWPARADIUSDIR}/libwparadius${PIE_SUFFIX}.a
+
+LIBWPARSN_SUPPDIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/rsn_supp
+LIBWPARSN_SUPP?=	${LIBWPARSN_SUPPDIR}/libwparsn_supp${PIE_SUFFIX}.a
+
+LIBWPATLSDIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/tls
+LIBWPATLS?=	${LIBWPATLSDIR}/libwpatls${PIE_SUFFIX}.a
+
+LIBWPAUTILSDIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/utils
+LIBWPAUTILS?=	${LIBWPAUTILSDIR}/libwpautils${PIE_SUFFIX}.a
+
+LIBWPAWPSDIR=	${_LIB_OBJTOP}/usr.sbin/wpa/src/wps
+LIBWPAWPS?=	${LIBWPAWPSDIR}/libwpawps${PIE_SUFFIX}.a
 
 LIBC_NOSSP_PICDIR=	${_LIB_OBJTOP}/lib/libc
 LIBC_NOSSP_PIC?=	${LIBC_NOSSP_PICDIR}/libc_nossp_pic${PIE_SUFFIX}.a
@@ -589,14 +676,23 @@ LIBAVLDIR=	${_LIB_OBJTOP}/cddl/lib/libavl
 LIBCTFDIR=	${_LIB_OBJTOP}/cddl/lib/libctf
 LIBDTRACEDIR=	${_LIB_OBJTOP}/cddl/lib/libdtrace
 LIBICPDIR=	${_LIB_OBJTOP}/cddl/lib/libicp
+LIBICP?=	${LIBICPDIR}/libicp${PIE_SUFFIX}.a
+LIBICP_RESCUEDIR=	${_LIB_OBJTOP}/cddl/lib/libicp_rescue
+LIBICP_RESCUE?=	${LIBICP_RESCUEDIR}/libicp_rescue${PIE_SUFFIX}.a
 LIBNVPAIRDIR=	${_LIB_OBJTOP}/cddl/lib/libnvpair
+LIBNVPAIR?=	${LIBNVPAIRDIR}/libnvpair${PIE_SUFFIX}.a
 LIBUMEMDIR=	${_LIB_OBJTOP}/cddl/lib/libumem
 LIBUUTILDIR=	${_LIB_OBJTOP}/cddl/lib/libuutil
 LIBZFSDIR=	${_LIB_OBJTOP}/cddl/lib/libzfs
+LIBZFS?=	${LIBZFSDIR}/libzfs${PIE_SUFFIX}.a
 LIBZFS_COREDIR=	${_LIB_OBJTOP}/cddl/lib/libzfs_core
+LIBZFS_CORE?=	${LIBZFS_COREDIR}/libzfs_core${PIE_SUFFIX}.a
 LIBZFSBOOTENVDIR=	${_LIB_OBJTOP}/cddl/lib/libzfsbootenv
+LIBZFSBOOTENV?=	${LIBZFSBOOTENVDIR}/libzfsbootenv${PIE_SUFFIX}.a
 LIBZPOOLDIR=	${_LIB_OBJTOP}/cddl/lib/libzpool
+LIBZPOOL?=	${LIBZPOOLDIR}/libzpool${PIE_SUFFIX}.a
 LIBZUTILDIR=	${_LIB_OBJTOP}/cddl/lib/libzutil
+LIBZUTIL?=	${LIBZUTILDIR}/libzutil${PIE_SUFFIX}.a
 LIBTPOOLDIR=	${_LIB_OBJTOP}/cddl/lib/libtpool
 
 # OFED support
@@ -606,6 +702,7 @@ LIBIBMADDIR=	${_LIB_OBJTOP}/lib/ofed/libibmad
 LIBIBNETDISCDIR=${_LIB_OBJTOP}/lib/ofed/libibnetdisc
 LIBIBUMADDIR=	${_LIB_OBJTOP}/lib/ofed/libibumad
 LIBIBVERBSDIR=	${_LIB_OBJTOP}/lib/ofed/libibverbs
+LIBIRDMADIR=	${_LIB_OBJTOP}/lib/ofed/libirdma
 LIBMLX4DIR=	${_LIB_OBJTOP}/lib/ofed/libmlx4
 LIBMLX5DIR=	${_LIB_OBJTOP}/lib/ofed/libmlx5
 LIBRDMACMDIR=	${_LIB_OBJTOP}/lib/ofed/librdmacm
@@ -646,16 +743,20 @@ LIBBSNMPDIR=	${_LIB_OBJTOP}/lib/libbsnmp/libbsnmp
 LIBCASPERDIR=	${_LIB_OBJTOP}/lib/libcasper/libcasper
 LIBCAP_DNSDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_dns
 LIBCAP_GRPDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_grp
+LIBCAP_NETDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_net
 LIBCAP_PWDDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_pwd
 LIBCAP_SYSCTLDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_sysctl
 LIBCAP_SYSLOGDIR=	${_LIB_OBJTOP}/lib/libcasper/services/cap_syslog
+LIBCBORDIR=	${_LIB_OBJTOP}/lib/libcbor
 LIBBSDXMLDIR=	${_LIB_OBJTOP}/lib/libexpat
+LIBFIDO2DIR=	${_LIB_OBJTOP}/lib/libfido2
 LIBKVMDIR=	${_LIB_OBJTOP}/lib/libkvm
 LIBPTHREADDIR=	${_LIB_OBJTOP}/lib/libthr
 LIBMDIR=	${_LIB_OBJTOP}/lib/msun
 LIBFORMWDIR=	${_LIB_OBJTOP}/lib/ncurses/form
 LIBMENUWDIR=	${_LIB_OBJTOP}/lib/ncurses/menu
 LIBNCURSESWDIR=	${_LIB_OBJTOP}/lib/ncurses/ncurses
+LIBTINFOWDIR=	${_LIB_OBJTOP}/lib/ncurses/tinfo
 LIBPANELWDIR=	${_LIB_OBJTOP}/lib/ncurses/panel
 LIBCRYPTODIR=	${_LIB_OBJTOP}/secure/lib/libcrypto
 LIBSPLDIR=	${_LIB_OBJTOP}/cddl/lib/libspl
@@ -665,7 +766,7 @@ LIBTEKENDIR=	${_LIB_OBJTOP}/sys/teken/libteken
 LIBEGACYDIR=	${_LIB_OBJTOP}/tools/build
 LIBLNDIR=	${_LIB_OBJTOP}/usr.bin/lex/lib
 
-LIBTERMCAPWDIR=	${LIBNCURSESWDIR}
+LIBTERMCAPWDIR=	${LIBTINFOWDIR}
 
 # Default other library directories to lib/libNAME.
 .for lib in ${_LIBRARIES}

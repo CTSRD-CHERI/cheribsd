@@ -2,6 +2,10 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2020, 2021 Rubicon Communications, LLC (Netgate)
+ * Copyright (c) 2021 The FreeBSD Foundation
+ *
+ * Portions of this software were developed by Ararat River
+ * Consulting, LLC under sponsorship of the FreeBSD Foundation.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -160,11 +164,11 @@ safexcel_rdr_intr(struct safexcel_softc *sc, int ringidx)
 {
 	TAILQ_HEAD(, cryptop) cq;
 	struct cryptop *crp, *tmp;
-	struct safexcel_cmd_descr *cdesc;
+	struct safexcel_cmd_descr *cdesc __diagused;
 	struct safexcel_res_descr *rdesc;
 	struct safexcel_request *req;
 	struct safexcel_ring *ring;
-	uint32_t blocked, error, i, ncdescs, nrdescs, nreqs;
+	uint32_t blocked, error, i, nrdescs, nreqs;
 
 	blocked = 0;
 	ring = &sc->sc_ring[ringidx];
@@ -190,7 +194,7 @@ safexcel_rdr_intr(struct safexcel_softc *sc, int ringidx)
 	bus_dmamap_sync(ring->dma_atok.tag, ring->dma_atok.map,
 	    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
 
-	ncdescs = nrdescs = 0;
+	nrdescs = 0;
 	for (i = 0; i < nreqs; i++) {
 		req = safexcel_next_request(ring);
 
@@ -199,7 +203,6 @@ safexcel_rdr_intr(struct safexcel_softc *sc, int ringidx)
 		bus_dmamap_sync(ring->data_dtag, req->dmap,
 		    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
 
-		ncdescs += req->cdescs;
 		while (req->cdescs-- > 0) {
 			cdesc = safexcel_cmd_descr_next(&ring->cdr);
 			KASSERT(cdesc != NULL,
@@ -302,7 +305,6 @@ static int
 safexcel_configure(struct safexcel_softc *sc)
 {
 	uint32_t i, mask, pemask, reg;
-	device_t dev;
 
 	if (sc->sc_type == 197) {
 		sc->sc_offsets = eip197_regs_offset;
@@ -311,8 +313,6 @@ safexcel_configure(struct safexcel_softc *sc)
 		sc->sc_offsets = eip97_regs_offset;
 		pemask = EIP97_N_PES_MASK;
 	}
-
-	dev = sc->sc_dev;
 
 	/* Scan for valid ring interrupt controllers. */
 	for (i = 0; i < SAFEXCEL_MAX_RING_AIC; i++) {
@@ -1318,7 +1318,7 @@ safexcel_setkey_xcbcmac(const uint8_t *key, int klen, uint32_t *hashkey)
 }
 
 static void
-safexcel_setkey_hmac_digest(struct auth_hash *ahash, union authctx *ctx,
+safexcel_setkey_hmac_digest(const struct auth_hash *ahash, union authctx *ctx,
     char *buf)
 {
 	int hashwords, i;
@@ -1360,7 +1360,7 @@ safexcel_setkey_hmac(const struct crypto_session_params *csp,
     const uint8_t *key, int klen, uint8_t *ipad, uint8_t *opad)
 {
 	union authctx ctx;
-	struct auth_hash *ahash;
+	const struct auth_hash *ahash;
 
 	ahash = crypto_auth_hash(csp);
 	hmac_init_ipad(ahash, key, klen, &ctx);
@@ -1621,12 +1621,10 @@ static void
 safexcel_instr_eta(struct safexcel_request *req, struct safexcel_instr *instr,
     struct safexcel_cmd_descr *cdesc)
 {
-	const struct crypto_session_params *csp;
 	struct cryptop *crp;
 	struct safexcel_instr *start;
 
 	crp = req->crp;
-	csp = crypto_get_params(crp->crp_session);
 	start = instr;
 
 	/* Insert the AAD. */
@@ -1689,12 +1687,14 @@ static void
 safexcel_instr_ccm(struct safexcel_request *req, struct safexcel_instr *instr,
     struct safexcel_cmd_descr *cdesc)
 {
+	const struct crypto_session_params *csp;
 	struct cryptop *crp;
 	struct safexcel_instr *start;
 	uint8_t *a0, *b0, *alenp, L;
 	int aalign, blen;
 
 	crp = req->crp;
+	csp = crypto_get_params(crp->crp_session);
 	start = instr;
 
 	/*
@@ -1703,17 +1703,17 @@ safexcel_instr_ccm(struct safexcel_request *req, struct safexcel_instr *instr,
 	 * descriptor, and B0 is inserted directly into the data stream using
 	 * instructions below.
 	 *
-	 * OCF seems to assume a 12-byte IV, fixing L (the payload length size)
-	 * at 3 bytes due to the layout of B0.  This is fine since the driver
-	 * has a maximum of 65535 bytes anyway.
+	 * An explicit check for overflow of the length field is not
+	 * needed since the maximum driver size of 65535 bytes fits in
+	 * the smallest length field used for a 13-byte nonce.
 	 */
 	blen = AES_BLOCK_LEN;
-	L = 3;
+	L = 15 - csp->csp_ivlen;
 
 	a0 = (uint8_t *)&cdesc->control_data.token[0];
 	memset(a0, 0, blen);
 	a0[0] = L - 1;
-	memcpy(&a0[1], req->iv, AES_CCM_IV_LEN);
+	memcpy(&a0[1], req->iv, csp->csp_ivlen);
 
 	/*
 	 * Insert B0 and the AAD length into the input stream.
@@ -1729,9 +1729,9 @@ safexcel_instr_ccm(struct safexcel_request *req, struct safexcel_instr *instr,
 	memset(b0, 0, blen);
 	b0[0] =
 	    (L - 1) | /* payload length size */
-	    ((CCM_CBC_MAX_DIGEST_LEN - 2) / 2) << 3 /* digest length */ |
+	    ((req->sess->digestlen - 2) / 2) << 3 /* digest length */ |
 	    (crp->crp_aad_length > 0 ? 1 : 0) << 6 /* AAD present bit */;
-	memcpy(&b0[1], req->iv, AES_CCM_IV_LEN);
+	memcpy(&b0[1], req->iv, csp->csp_ivlen);
 	b0[14] = crp->crp_payload_length >> 8;
 	b0[15] = crp->crp_payload_length & 0xff;
 	instr += blen / sizeof(*instr);
@@ -2304,12 +2304,7 @@ safexcel_probesession(device_t dev, const struct crypto_session_params *csp)
 	case CSP_MODE_AEAD:
 		switch (csp->csp_cipher_alg) {
 		case CRYPTO_AES_NIST_GCM_16:
-			if (csp->csp_ivlen != AES_GCM_IV_LEN)
-				return (EINVAL);
-			break;
 		case CRYPTO_AES_CCM_16:
-			if (csp->csp_ivlen != AES_CCM_IV_LEN)
-				return (EINVAL);
 			break;
 		default:
 			return (EINVAL);
@@ -2448,9 +2443,7 @@ safexcel_newsession(device_t dev, crypto_session_t cses,
     const struct crypto_session_params *csp)
 {
 	struct safexcel_session *sess;
-	struct safexcel_softc *sc;
 
-	sc = device_get_softc(dev);
 	sess = crypto_get_driver_session(cses);
 	sess->cses = cses;
 
@@ -2516,15 +2509,12 @@ safexcel_newsession(device_t dev, crypto_session_t cses,
 	if (csp->csp_auth_mlen != 0)
 		sess->digestlen = csp->csp_auth_mlen;
 
-	if ((csp->csp_cipher_alg == 0 || csp->csp_cipher_key != NULL) &&
-	    (csp->csp_auth_alg == 0 || csp->csp_auth_key != NULL)) {
-		sess->encctx.len = safexcel_set_context(&sess->encctx.ctx,
-		    CRYPTO_OP_ENCRYPT, csp->csp_cipher_key, csp->csp_auth_key,
-		    sess);
-		sess->decctx.len = safexcel_set_context(&sess->decctx.ctx,
-		    CRYPTO_OP_DECRYPT, csp->csp_cipher_key, csp->csp_auth_key,
-		    sess);
-	}
+	sess->encctx.len = safexcel_set_context(&sess->encctx.ctx,
+	    CRYPTO_OP_ENCRYPT, csp->csp_cipher_key, csp->csp_auth_key,
+	    sess);
+	sess->decctx.len = safexcel_set_context(&sess->decctx.ctx,
+	    CRYPTO_OP_DECRYPT, csp->csp_cipher_key, csp->csp_auth_key,
+	    sess);
 
 	return (0);
 }
@@ -2532,7 +2522,6 @@ safexcel_newsession(device_t dev, crypto_session_t cses,
 static int
 safexcel_process(device_t dev, struct cryptop *crp, int hint)
 {
-	const struct crypto_session_params *csp;
 	struct safexcel_request *req;
 	struct safexcel_ring *ring;
 	struct safexcel_session *sess;
@@ -2541,7 +2530,6 @@ safexcel_process(device_t dev, struct cryptop *crp, int hint)
 
 	sc = device_get_softc(dev);
 	sess = crypto_get_driver_session(crp->crp_session);
-	csp = crypto_get_params(crp->crp_session);
 
 	if (__predict_false(crypto_buffer_len(&crp->crp_buf) >
 	    SAFEXCEL_MAX_REQUEST_SIZE)) {
@@ -2614,14 +2602,12 @@ static device_method_t safexcel_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t safexcel_devclass;
-
 static driver_t safexcel_driver = {
 	.name 		= "safexcel",
 	.methods 	= safexcel_methods,
 	.size		= sizeof(struct safexcel_softc),
 };
 
-DRIVER_MODULE(safexcel, simplebus, safexcel_driver, safexcel_devclass, 0, 0);
+DRIVER_MODULE(safexcel, simplebus, safexcel_driver, 0, 0);
 MODULE_VERSION(safexcel, 1);
 MODULE_DEPEND(safexcel, crypto, 1, 1, 1);

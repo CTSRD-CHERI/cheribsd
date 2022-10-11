@@ -35,40 +35,12 @@
 #define	_PTHREAD_MD_H_
 
 #include <sys/types.h>
-#include <machine/sysarch.h>
-#include <stddef.h>
+#include <machine/tls.h>
 
 #define	CPU_SPINWAIT
-#define	DTV_OFFSET		offsetof(struct tcb, tcb_dtv)
 
-/*
- * Variant I tcb. The structure layout is fixed, don't blindly
- * change it.
- */
-struct tcb {
-	void			*tcb_dtv;	/* required by rtld */
-	struct pthread		*tcb_thread;	/* our hook */
-};
-
-/* Called from the thread to set its private data. */
-static __inline void
-_tcb_set(struct tcb *tcb)
-{
-	sysarch(ARM_SET_TP, tcb);
-}
-
-/*
- * Get the current tcb.
- */
-static __inline struct tcb *
-_tcb_get(void)
-{
-	struct tcb *tcb;
-
-	__asm __volatile("mrc  p15, 0, %0, c13, c0, 3"		\
-	   		 : "=r" (tcb));
-	return (tcb);
-}
+/* For use in _Static_assert to check structs will fit in a page */
+#define	THR_PAGE_SIZE_MIN	PAGE_SIZE
 
 static __inline struct pthread *
 _get_curthread(void)

@@ -97,8 +97,18 @@ typedef u_char vm_prot_t;	/* protection codes */
 	((prot) | (((prot) & VM_PROT_READ) != 0 ? VM_PROT_READ_CAP : 0) | \
 	    (((prot) & VM_PROT_WRITE) != 0 ? VM_PROT_WRITE_CAP : 0))
 
-enum obj_type { OBJT_DEFAULT, OBJT_SWAP, OBJT_VNODE, OBJT_DEVICE, OBJT_PHYS,
-		OBJT_DEAD, OBJT_SG, OBJT_MGTDEVICE };
+enum obj_type {
+	OBJT_RESERVED = 0,	/* was OBJT_DEFAULT */
+	OBJT_SWAP,
+	OBJT_DEFAULT = OBJT_SWAP,
+	OBJT_VNODE,
+	OBJT_DEVICE,
+	OBJT_PHYS,
+	OBJT_DEAD,
+	OBJT_SG,
+	OBJT_MGTDEVICE,
+	OBJT_FIRST_DYN,
+};
 typedef u_char objtype_t;
 
 union vm_map_object;
@@ -144,7 +154,7 @@ struct vm_reserv;
 typedef struct vm_reserv *vm_reserv_t;
 
 /*
- * Information passed from the machine-independant VM initialization code
+ * Information passed from the machine-independent VM initialization code
  * for use by machine-dependant code (mainly for MMU support)
  */
 struct kva_md_info {

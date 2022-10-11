@@ -1,6 +1,5 @@
 /*-
  * Copyright (c) 2015 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Semihalf under
  * the sponsorship of the FreeBSD Foundation.
@@ -121,7 +120,7 @@ static device_method_t thunder_mdio_methods[] = {
 DEFINE_CLASS_0(thunder_mdio, thunder_mdio_driver, thunder_mdio_methods,
     sizeof(struct thunder_mdio_softc));
 
-DRIVER_MODULE(miibus, thunder_mdio, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(miibus, thunder_mdio, miibus_driver, 0, 0);
 MODULE_VERSION(thunder_mdio, 1);
 MODULE_DEPEND(thunder_mdio, ether, 1, 1, 1);
 MODULE_DEPEND(thunder_mdio, miibus, 1, 1, 1);
@@ -207,7 +206,7 @@ thunder_mdio_set_mode(struct thunder_mdio_softc *sc,
 		smi_clk |= SMI_CLK_MODE;
 	/* Enable sending 32 bit preable on SMI transactions */
 	smi_clk |= SMI_CLK_PREAMBLE;
-	/* Saved setings */
+	/* Saved settings */
 	mdio_reg_write(sc, SMI_CLK, smi_clk);
 	sc->mode = mode;
 }

@@ -25,7 +25,12 @@ DTS=	\
 	sun8i-h3-orangepi-plus2e.dts
 
 DTSO=	sun8i-a83t-sid.dtso \
-	sun8i-h3-i2c0.dtso
+	sun8i-h3-i2c0.dtso \
+	sun8i-h3-i2c1.dtso \
+	sun8i-h3-mmc0-disable.dtso \
+	sun8i-h3-mmc1-disable.dtso \
+	sun8i-h3-mmc2-disable.dtso \
+	sun8i-h3-spi0.dtso
 
 LINKS= \
 	${DTBDIR}/sun4i-a10-cubieboard.dtb ${DTBDIR}/cubieboard.dtb \
@@ -51,7 +56,9 @@ DTS=	\
 	allwinner/sun50i-h6-pine-h64.dts \
 	allwinner/sun50i-h6-pine-h64-model-b.dts
 
-DTSO=	sun50i-a64-opp.dtso \
+DTSO=	sun50i-a64-mmc0-disable.dtso \
+	sun50i-a64-mmc1-disable.dtso \
+	sun50i-a64-mmc2-disable.dtso \
 	sun50i-a64-pwm.dtso \
 	sun50i-a64-rpwm.dtso \
 	sun50i-a64-spi0-spigen.dtso \

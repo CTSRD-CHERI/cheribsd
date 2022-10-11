@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2013 The FreeBSD Foundation
- * All rights reserved.
  *
  * This software was developed by Konstantin Belousov <kib@FreeBSD.org>
  * under sponsorship from the FreeBSD Foundation.
@@ -51,7 +50,6 @@
 #define	IOMMU_MAP_ENTRY_MAP	0x0004	/* Busdma created, linked by
 					   dmamap_link */
 #define	IOMMU_MAP_ENTRY_UNMAPPED	0x0010	/* No backing pages */
-#define	IOMMU_MAP_ENTRY_QI_NF	0x0020	/* qi task, do not free entry */
 #define	IOMMU_MAP_ENTRY_READ	0x1000	/* Read permitted */
 #define	IOMMU_MAP_ENTRY_WRITE	0x2000	/* Write permitted */
 #define	IOMMU_MAP_ENTRY_SNOOP	0x4000	/* Snoop */

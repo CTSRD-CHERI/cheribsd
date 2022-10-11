@@ -266,9 +266,7 @@ static driver_t ustorage_fs_driver = {
 	.size = sizeof(struct ustorage_fs_softc),
 };
 
-static devclass_t ustorage_fs_devclass;
-
-DRIVER_MODULE(ustorage_fs, uhub, ustorage_fs_driver, ustorage_fs_devclass, NULL, 0);
+DRIVER_MODULE(ustorage_fs, uhub, ustorage_fs_driver, NULL, NULL);
 MODULE_VERSION(ustorage_fs, 0);
 MODULE_DEPEND(ustorage_fs, usb, 1, 1, 1);
 
@@ -936,8 +934,6 @@ ustorage_fs_verify(struct ustorage_fs_softc *sc)
 	struct ustorage_fs_lun *currlun = sc->sc_transfer.currlun;
 	uint32_t lba;
 	uint32_t vlen;
-	uint64_t file_offset;
-	uint64_t amount_left;
 
 	/*
 	 * Get the starting Logical Block Address
@@ -957,12 +953,6 @@ ustorage_fs_verify(struct ustorage_fs_softc *sc)
 		goto done;
 	}
 	/* No default reply */
-
-	/* Prepare to carry out the file verify */
-	amount_left = vlen;
-	amount_left <<= 9;
-	file_offset = lba;
-	file_offset <<= 9;
 
 	/* Range check */
 	vlen += lba;

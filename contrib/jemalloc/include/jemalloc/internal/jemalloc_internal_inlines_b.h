@@ -1,16 +1,5 @@
 #ifndef JEMALLOC_INTERNAL_INLINES_B_H
 #define JEMALLOC_INTERNAL_INLINES_B_H
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20180629,
- *   "target_type": "lib",
- *   "changes": [
- *     "virtual_address"
- *   ]
- * }
- * CHERI CHANGES END
- */
 
 #include "jemalloc/internal/rtree.h"
 
@@ -92,7 +81,7 @@ iealloc(tsdn_t *tsdn, const void *ptr) {
 	rtree_ctx_t *rtree_ctx = tsdn_rtree_ctx(tsdn, &rtree_ctx_fallback);
 
 	return rtree_extent_read(tsdn, &extents_rtree, rtree_ctx,
-	    (vaddr_t)ptr, true);
+	    (uintptr_t)ptr, true);
 }
 
 #endif /* JEMALLOC_INTERNAL_INLINES_B_H */

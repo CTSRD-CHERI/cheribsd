@@ -16,9 +16,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Analysis/Utils/Local.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Constants.h"
@@ -30,6 +28,8 @@
 #include "llvm/IR/Value.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Transforms/Utils/SimplifyCFGOptions.h"
 #include <cstdint>
 #include <limits>
 
@@ -42,9 +42,7 @@ class BasicBlock;
 class BranchInst;
 class CallBase;
 class CallInst;
-class DbgDeclareInst;
 class DbgVariableIntrinsic;
-class DbgValueInst;
 class DIBuilder;
 class DomTreeUpdater;
 class Function;
@@ -57,73 +55,6 @@ class PHINode;
 class StoreInst;
 class TargetLibraryInfo;
 class TargetTransformInfo;
-
-/// A set of parameters used to control the transforms in the SimplifyCFG pass.
-/// Options may change depending on the position in the optimization pipeline.
-/// For example, canonical form that includes switches and branches may later be
-/// replaced by lookup tables and selects.
-struct SimplifyCFGOptions {
-  int BonusInstThreshold;
-  bool ForwardSwitchCondToPhi;
-  bool ConvertSwitchToLookupTable;
-  bool NeedCanonicalLoop;
-  bool SinkCommonInsts;
-  bool SimplifyCondBranch;
-  bool FoldTwoEntryPHINode;
-
-  AssumptionCache *AC;
-
-  SimplifyCFGOptions(unsigned BonusThreshold = 1,
-                     bool ForwardSwitchCond = false,
-                     bool SwitchToLookup = false, bool CanonicalLoops = true,
-                     bool SinkCommon = false,
-                     AssumptionCache *AssumpCache = nullptr,
-                     bool SimplifyCondBranch = true,
-                     bool FoldTwoEntryPHINode = true)
-      : BonusInstThreshold(BonusThreshold),
-        ForwardSwitchCondToPhi(ForwardSwitchCond),
-        ConvertSwitchToLookupTable(SwitchToLookup),
-        NeedCanonicalLoop(CanonicalLoops),
-        SinkCommonInsts(SinkCommon),
-        SimplifyCondBranch(SimplifyCondBranch),
-        FoldTwoEntryPHINode(FoldTwoEntryPHINode),
-        AC(AssumpCache) {}
-
-  // Support 'builder' pattern to set members by name at construction time.
-  SimplifyCFGOptions &bonusInstThreshold(int I) {
-    BonusInstThreshold = I;
-    return *this;
-  }
-  SimplifyCFGOptions &forwardSwitchCondToPhi(bool B) {
-    ForwardSwitchCondToPhi = B;
-    return *this;
-  }
-  SimplifyCFGOptions &convertSwitchToLookupTable(bool B) {
-    ConvertSwitchToLookupTable = B;
-    return *this;
-  }
-  SimplifyCFGOptions &needCanonicalLoops(bool B) {
-    NeedCanonicalLoop = B;
-    return *this;
-  }
-  SimplifyCFGOptions &sinkCommonInsts(bool B) {
-    SinkCommonInsts = B;
-    return *this;
-  }
-  SimplifyCFGOptions &setAssumptionCache(AssumptionCache *Cache) {
-    AC = Cache;
-    return *this;
-  }
-  SimplifyCFGOptions &setSimplifyCondBranch(bool B) {
-    SimplifyCondBranch = B;
-    return *this;
-  }
-
-  SimplifyCFGOptions &setFoldTwoEntryPHINode(bool B) {
-    FoldTwoEntryPHINode = B;
-    return *this;
-  }
-};
 
 //===----------------------------------------------------------------------===//
 //  Local constant propagation.
@@ -145,7 +76,8 @@ bool ConstantFoldTerminator(BasicBlock *BB, bool DeleteDeadConditions = false,
 //
 
 /// Return true if the result produced by the instruction is not used, and the
-/// instruction has no side effects.
+/// instruction will return. Certain side-effecting instructions are also
+/// considered dead if there are no uses of the instruction.
 bool isInstructionTriviallyDead(Instruction *I,
                                 const TargetLibraryInfo *TLI = nullptr);
 
@@ -155,12 +87,22 @@ bool isInstructionTriviallyDead(Instruction *I,
 bool wouldInstructionBeTriviallyDead(Instruction *I,
                                      const TargetLibraryInfo *TLI = nullptr);
 
+/// Return true if the result produced by the instruction has no side effects on
+/// any paths other than where it is used. This is less conservative than 
+/// wouldInstructionBeTriviallyDead which is based on the assumption
+/// that the use count will be 0. An example usage of this API is for
+/// identifying instructions that can be sunk down to use(s).
+bool wouldInstructionBeTriviallyDeadOnUnusedPaths(
+    Instruction *I, const TargetLibraryInfo *TLI = nullptr);
+
 /// If the specified value is a trivially dead instruction, delete it.
 /// If that makes any of its operands trivially dead, delete them too,
 /// recursively. Return true if any instructions were deleted.
 bool RecursivelyDeleteTriviallyDeadInstructions(
     Value *V, const TargetLibraryInfo *TLI = nullptr,
-    MemorySSAUpdater *MSSAU = nullptr);
+    MemorySSAUpdater *MSSAU = nullptr,
+    std::function<void(Value *)> AboutToDeleteCallback =
+        std::function<void(Value *)>());
 
 /// Delete all of the instructions in `DeadInsts`, and all other instructions
 /// that deleting these in turn causes to be trivially dead.
@@ -172,7 +114,9 @@ bool RecursivelyDeleteTriviallyDeadInstructions(
 /// empty afterward.
 void RecursivelyDeleteTriviallyDeadInstructions(
     SmallVectorImpl<WeakTrackingVH> &DeadInsts,
-    const TargetLibraryInfo *TLI = nullptr, MemorySSAUpdater *MSSAU = nullptr);
+    const TargetLibraryInfo *TLI = nullptr, MemorySSAUpdater *MSSAU = nullptr,
+    std::function<void(Value *)> AboutToDeleteCallback =
+        std::function<void(Value *)>());
 
 /// Same functionality as RecursivelyDeleteTriviallyDeadInstructions, but allow
 /// instructions that are not trivially dead. These will be ignored.
@@ -180,7 +124,9 @@ void RecursivelyDeleteTriviallyDeadInstructions(
 /// were found and deleted.
 bool RecursivelyDeleteTriviallyDeadInstructionsPermissive(
     SmallVectorImpl<WeakTrackingVH> &DeadInsts,
-    const TargetLibraryInfo *TLI = nullptr, MemorySSAUpdater *MSSAU = nullptr);
+    const TargetLibraryInfo *TLI = nullptr, MemorySSAUpdater *MSSAU = nullptr,
+    std::function<void(Value *)> AboutToDeleteCallback =
+        std::function<void(Value *)>());
 
 /// If the specified value is an effectively dead PHI node, due to being a
 /// def-use chain of single-use nodes that either forms a cycle or is terminated
@@ -209,20 +155,6 @@ bool replaceDbgUsesWithUndef(Instruction *I);
 //  Control Flow Graph Restructuring.
 //
 
-/// Like BasicBlock::removePredecessor, this method is called when we're about
-/// to delete Pred as a predecessor of BB. If BB contains any PHI nodes, this
-/// drops the entries in the PHI nodes for Pred.
-///
-/// Unlike the removePredecessor method, this attempts to simplify uses of PHI
-/// nodes that collapse into identity values.  For example, if we have:
-///   x = phi(1, 0, 0, 0)
-///   y = and x, z
-///
-/// .. and delete the predecessor corresponding to the '1', this will attempt to
-/// recursively fold the 'and' to 0.
-void RemovePredecessorAndSimplify(BasicBlock *BB, BasicBlock *Pred,
-                                  DomTreeUpdater *DTU = nullptr);
-
 /// BB is a block with one predecessor and its predecessor is known to have one
 /// successor (BB!). Eliminate the edge between them, moving the instructions in
 /// the predecessor into BB. This deletes the predecessor block.
@@ -246,9 +178,11 @@ bool EliminateDuplicatePHINodes(BasicBlock *BB);
 /// It returns true if a modification was made, possibly deleting the basic
 /// block that was pointed to. LoopHeaders is an optional input parameter
 /// providing the set of loop headers that SimplifyCFG should not eliminate.
+extern cl::opt<bool> RequireAndPreserveDomTree;
 bool simplifyCFG(BasicBlock *BB, const TargetTransformInfo &TTI,
+                 DomTreeUpdater *DTU = nullptr,
                  const SimplifyCFGOptions &Options = {},
-                 SmallPtrSetImpl<BasicBlock *> *LoopHeaders = nullptr);
+                 ArrayRef<WeakVH> LoopHeaders = {});
 
 /// This function is used to flatten a CFG. For example, it uses parallel-and
 /// and parallel-or mode to collapse if-conditions and merge if-regions with
@@ -258,7 +192,9 @@ bool FlattenCFG(BasicBlock *BB, AAResults *AA = nullptr);
 /// If this basic block is ONLY a setcc and a branch, and if a predecessor
 /// branches to us and one of our successors, fold the setcc into the
 /// predecessor and use logical operations to pick the right destination.
-bool FoldBranchToCommonDest(BranchInst *BI, MemorySSAUpdater *MSSAU = nullptr,
+bool FoldBranchToCommonDest(BranchInst *BI, llvm::DomTreeUpdater *DTU = nullptr,
+                            MemorySSAUpdater *MSSAU = nullptr,
+                            const TargetTransformInfo *TTI = nullptr,
                             unsigned BonusInstThreshold = 1);
 
 /// This function takes a virtual register computed by an Instruction and
@@ -305,7 +241,7 @@ inline Align getKnownAlignment(Value *V, const DataLayout &DL,
 CallInst *createCallMatchingInvoke(InvokeInst *II);
 
 /// This function converts the specified invoek into a normall call.
-void changeToCall(InvokeInst *II, DomTreeUpdater *DTU = nullptr);
+CallInst *changeToCall(InvokeInst *II, DomTreeUpdater *DTU = nullptr);
 
 ///===---------------------------------------------------------------------===//
 ///  Dbg Intrinsic utilities
@@ -334,21 +270,6 @@ bool LowerDbgDeclare(Function &F);
 void insertDebugValuesForPHIs(BasicBlock *BB,
                               SmallVectorImpl<PHINode *> &InsertedPHIs);
 
-/// Finds all intrinsics declaring local variables as living in the memory that
-/// 'V' points to. This may include a mix of dbg.declare and
-/// dbg.addr intrinsics.
-TinyPtrVector<DbgVariableIntrinsic *> FindDbgAddrUses(Value *V);
-
-/// Like \c FindDbgAddrUses, but only returns dbg.declare intrinsics, not
-/// dbg.addr.
-TinyPtrVector<DbgDeclareInst *> FindDbgDeclareUses(Value *V);
-
-/// Finds the llvm.dbg.value intrinsics describing a value.
-void findDbgValues(SmallVectorImpl<DbgValueInst *> &DbgValues, Value *V);
-
-/// Finds the debug info intrinsics describing a value.
-void findDbgUsers(SmallVectorImpl<DbgVariableIntrinsic *> &DbgInsts, Value *V);
-
 /// Replaces llvm.dbg.declare instruction when the address it
 /// describes is replaced with a new value. If Deref is true, an
 /// additional DW_OP_deref is prepended to the expression. If Offset
@@ -365,10 +286,6 @@ bool replaceDbgDeclare(Value *Address, Value *NewAddress, DIBuilder &Builder,
 void replaceDbgValueForAlloca(AllocaInst *AI, Value *NewAllocaAddress,
                               DIBuilder &Builder, int Offset = 0);
 
-/// Finds alloca where the value comes from.
-AllocaInst *findAllocaForValue(Value *V,
-                               DenseMap<Value *, AllocaInst *> &AllocaForValue);
-
 /// Assuming the instruction \p I is going to be deleted, attempt to salvage
 /// debug users of \p I by writing the effect of \p I in a DIExpression. If it
 /// cannot be salvaged changes its debug uses to undef.
@@ -382,12 +299,30 @@ void salvageDebugInfo(Instruction &I);
 void salvageDebugInfoForDbgValues(Instruction &I,
                                   ArrayRef<DbgVariableIntrinsic *> Insns);
 
-/// Given an instruction \p I and DIExpression \p DIExpr operating on it, write
-/// the effects of \p I into the returned DIExpression, or return nullptr if
-/// it cannot be salvaged. \p StackVal: whether DW_OP_stack_value should be
-/// appended to the expression.
-DIExpression *salvageDebugInfoImpl(Instruction &I, DIExpression *DIExpr,
-                                   bool StackVal);
+/// Given an instruction \p I and DIExpression \p DIExpr operating on
+/// it, append the effects of \p I to the DIExpression operand list
+/// \p Ops, or return \p nullptr if it cannot be salvaged.
+/// \p CurrentLocOps is the number of SSA values referenced by the
+/// incoming \p Ops.  \return the first non-constant operand
+/// implicitly referred to by Ops. If \p I references more than one
+/// non-constant operand, any additional operands are added to
+/// \p AdditionalValues.
+///
+/// \example
+////
+///   I = add %a, i32 1
+///
+///   Return = %a
+///   Ops = llvm::dwarf::DW_OP_lit1 llvm::dwarf::DW_OP_add
+///
+///   I = add %a, %b
+///
+///   Return = %a
+///   Ops = llvm::dwarf::DW_OP_LLVM_arg0 llvm::dwarf::DW_OP_add
+///   AdditionalValues = %b
+Value *salvageDebugInfoImpl(Instruction &I, uint64_t CurrentLocOps,
+                            SmallVectorImpl<uint64_t> &Ops,
+                            SmallVectorImpl<Value *> &AdditionalValues);
 
 /// Point debug users of \p From to \p To or salvage them. Use this function
 /// only when replacing all uses of \p From with \p To, with a guarantee that
@@ -406,14 +341,17 @@ DIExpression *salvageDebugInfoImpl(Instruction &I, DIExpression *DIExpr,
 bool replaceAllDbgUsesWith(Instruction &From, Value &To, Instruction &DomPoint,
                            DominatorTree &DT);
 
-/// Remove all instructions from a basic block other than it's terminator
-/// and any present EH pad instructions.
-unsigned removeAllNonTerminatorAndEHPadInstructions(BasicBlock *BB);
+/// Remove all instructions from a basic block other than its terminator
+/// and any present EH pad instructions. Returns a pair where the first element
+/// is the number of instructions (excluding debug info instrinsics) that have
+/// been removed, and the second element is the number of debug info intrinsics
+/// that have been removed.
+std::pair<unsigned, unsigned>
+removeAllNonTerminatorAndEHPadInstructions(BasicBlock *BB);
 
 /// Insert an unreachable instruction before the specified
 /// instruction, making it and the rest of the code in the block dead.
-unsigned changeToUnreachable(Instruction *I, bool UseLLVMTrap,
-                             bool PreserveLCSSA = false,
+unsigned changeToUnreachable(Instruction *I, bool PreserveLCSSA = false,
                              DomTreeUpdater *DTU = nullptr,
                              MemorySSAUpdater *MSSAU = nullptr);
 
@@ -422,7 +360,8 @@ unsigned changeToUnreachable(Instruction *I, bool UseLLVMTrap,
 /// InvokeInst is a terminator instruction.  Returns the newly split basic
 /// block.
 BasicBlock *changeToInvokeAndSplitBasicBlock(CallInst *CI,
-                                             BasicBlock *UnwindEdge);
+                                             BasicBlock *UnwindEdge,
+                                             DomTreeUpdater *DTU = nullptr);
 
 /// Replace 'BB's terminator with one that does not have an unwind successor
 /// block. Rewrites `invoke` to `call`, etc. Updates any PHIs in unwind
@@ -555,6 +494,15 @@ bool canReplaceOperandWithVariable(const Instruction *I, unsigned OpIdx);
 
 /// Invert the given true/false value, possibly reusing an existing copy.
 Value *invertCondition(Value *Condition);
+
+
+//===----------------------------------------------------------------------===//
+//  Assorted
+//
+
+/// If we can infer one attribute from another on the declaration of a
+/// function, explicitly materialize the maximal set in the IR.
+bool inferAttributesFromOthers(Function &F);
 
 } // end namespace llvm
 

@@ -38,6 +38,7 @@
 #include <sys/_timeval.h>
 #include <sys/types.h>
 #include <sys/timespec.h>
+#include <sys/_clock_id.h>
 
 struct timezone {
 	int	tz_minuteswest;	/* minutes west of Greenwich */
@@ -206,7 +207,7 @@ nstosbt(int64_t _ns)
 #ifdef KASSERT
 	KASSERT(_ns >= 0, ("Negative values illegal for nstosbt: %jd", _ns));
 #endif
-	if (_ns >= SBT_1S) {
+	if (_ns >= 1000000000) {
 		sb = (_ns / 1000000000) * SBT_1S;
 		_ns = _ns % 1000000000;
 	}
@@ -219,7 +220,11 @@ static __inline int64_t
 sbttous(sbintime_t _sbt)
 {
 
-	return ((1000000 * _sbt) >> 32);
+#ifdef KASSERT
+	KASSERT(_sbt >= 0, ("Negative values illegal for sbttous: %jx", _sbt));
+#endif
+	return ((_sbt >> 32) * 1000000 +
+		(1000000 * (_sbt & 0xffffffffu) >> 32));
 }
 
 static __inline sbintime_t
@@ -230,7 +235,7 @@ ustosbt(int64_t _us)
 #ifdef KASSERT
 	KASSERT(_us >= 0, ("Negative values illegal for ustosbt: %jd", _us));
 #endif
-	if (_us >= SBT_1S) {
+	if (_us >= 1000000) {
 		sb = (_us / 1000000) * SBT_1S;
 		_us = _us % 1000000;
 	}
@@ -242,8 +247,10 @@ ustosbt(int64_t _us)
 static __inline int64_t
 sbttoms(sbintime_t _sbt)
 {
-
-	return ((1000 * _sbt) >> 32);
+#ifdef KASSERT
+	KASSERT(_sbt >= 0, ("Negative values illegal for sbttoms: %jx", _sbt));
+#endif
+	return ((_sbt >> 32) * 1000 + (1000 * (_sbt & 0xffffffffu) >> 32));
 }
 
 static __inline sbintime_t
@@ -254,7 +261,7 @@ mstosbt(int64_t _ms)
 #ifdef KASSERT
 	KASSERT(_ms >= 0, ("Negative values illegal for mstosbt: %jd", _ms));
 #endif
-	if (_ms >= SBT_1S) {
+	if (_ms >= 1000) {
 		sb = (_ms / 1000) * SBT_1S;
 		_ms = _ms % 1000;
 	}
@@ -284,6 +291,17 @@ bintime2timespec(const struct bintime *_bt, struct timespec *_ts)
 	_ts->tv_sec = _bt->sec;
 	_ts->tv_nsec = ((uint64_t)1000000000 *
 	    (uint32_t)(_bt->frac >> 32)) >> 32;
+}
+
+static __inline uint64_t
+bintime2ns(const struct bintime *_bt)
+{
+	uint64_t ret;
+
+	ret = (uint64_t)(_bt->sec) * (uint64_t)1000000000;
+	ret += (((uint64_t)1000000000 *
+		 (uint32_t)(_bt->frac >> 32)) >> 32);
+	return (ret);
 }
 
 static __inline void
@@ -392,6 +410,8 @@ tvtosbt(struct timeval _tv)
 			(vsp)->tv_nsec += 1000000000L;			\
 		}							\
 	} while (0)
+#define	timespecvalid_interval(tsp)	((tsp)->tv_sec >= 0 &&		\
+	    (tsp)->tv_nsec >= 0 && (tsp)->tv_nsec < 1000000000L)
 
 #ifdef _KERNEL
 
@@ -459,33 +479,6 @@ struct clockinfo {
 	int	stathz;		/* statistics clock frequency */
 	int	profhz;		/* profiling clock frequency */
 };
-
-/* These macros are also in time.h. */
-#ifndef CLOCK_REALTIME
-#define	CLOCK_REALTIME	0
-#endif
-#ifndef CLOCK_VIRTUAL
-#define	CLOCK_VIRTUAL	1
-#define	CLOCK_PROF	2
-#endif
-#ifndef CLOCK_MONOTONIC
-#define	CLOCK_MONOTONIC	4
-#define	CLOCK_UPTIME	5		/* FreeBSD-specific. */
-#define	CLOCK_UPTIME_PRECISE	7	/* FreeBSD-specific. */
-#define	CLOCK_UPTIME_FAST	8	/* FreeBSD-specific. */
-#define	CLOCK_REALTIME_PRECISE	9	/* FreeBSD-specific. */
-#define	CLOCK_REALTIME_FAST	10	/* FreeBSD-specific. */
-#define	CLOCK_MONOTONIC_PRECISE	11	/* FreeBSD-specific. */
-#define	CLOCK_MONOTONIC_FAST	12	/* FreeBSD-specific. */
-#define	CLOCK_SECOND	13		/* FreeBSD-specific. */
-#define	CLOCK_THREAD_CPUTIME_ID	14
-#define	CLOCK_PROCESS_CPUTIME_ID	15
-#endif
-
-#ifndef TIMER_ABSTIME
-#define	TIMER_RELTIME	0x0	/* relative timer */
-#define	TIMER_ABSTIME	0x1	/* absolute timer */
-#endif
 
 #if __BSD_VISIBLE
 #define	CPUCLOCK_WHICH_PID	0

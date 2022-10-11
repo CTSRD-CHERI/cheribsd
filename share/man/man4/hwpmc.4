@@ -28,7 +28,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd Apryl 3, 2021
+.Dd April 3, 2021
 .Dt HWPMC 4
 .Os
 .Sh NAME
@@ -416,10 +416,13 @@ The size in kilobytes of each log buffer used by
 .Nm Ns 's
 logging function.
 The default buffer size is 4KB.
+.It Va kern.hwpmc.mincount Pq integer, read-write
+The minimum sampling rate for sampling mode PMCs.
+The default count is 1000 events.
 .It Va kern.hwpmc.mtxpoolsize Pq integer, read-only
 The size of the spin mutex pool used by the PMC driver.
 The default is 32.
-.It Va kern.hwpmc.nbuffers Pq integer, read-only
+.It Va kern.hwpmc.nbuffers_pcpu Pq integer, read-only
 The number of log buffers used by
 .Nm
 for logging.

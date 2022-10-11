@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd March 26, 2021
+.Dd July 18, 2022
 .Dt BSDINSTALL 8
 .Os
 .Sh NAME
@@ -313,7 +313,9 @@ that prompt for a
 mirror will skip that step if this variable is already defined in the
 environment.
 Example:
-.Pa ftp://ftp.freebsd.org/pub/FreeBSD/releases/powerpc/powerpc64/9.1-RELEASE
+.Pa https://download.freebsd.org/ftp/releases/powerpc/powerpc64/13.1-RELEASE/
+or
+.Pa http://ftp-archive.freebsd.org/pub/FreeBSD-Archive/old-releases/amd64/12.2-RELEASE/ .
 .It Ev BSDINSTALL_CHROOT
 The directory into which the distribution files should be unpacked and the
 directory at which the root file system of the new system should be mounted.
@@ -347,7 +349,7 @@ Default:
 .Dq zroot
 .It Ev ZFSBOOT_POOL_CREATE_OPTIONS
 Options to be used when creating the base system's pool.
-Each option must be followed by the -O flag to be taken into consideration
+Each option must be preceded by the -O flag to be taken into consideration
 or the pool will not be created due to errors using the command
 .Cm zpool .
 Default:
@@ -391,7 +393,7 @@ keyfile used to encrypt the pool where the base system is stored.
 Default:
 .Dq Pa /boot/encryption.key
 .It Ev ZFSBOOT_BOOT_POOL
-If set a separated boot pool will be created for the kernel of the
+If set, a separated boot pool will be created for the kernel of the
 system and
 .Xr loader 8 .
 Default: unset
@@ -440,8 +442,8 @@ following datasets:
 .Pa /$ZFSBOOT_BEROOT_NAME/$ZFSBOOT_BOOTFS_NAME .
 See
 .Sx ZFS DATASETS
-for more information about who to write this variable and to
-take a look into the default value of it.
+for more information about how to populate this variable and
+its default value.
 .It Ev ZFSBOOT_CONFIRM_LAYOUT
 If set and the installation is interactive, allow the user to confirm
 the layout before continuing with the installation.
@@ -542,12 +544,14 @@ the preamble can contain the variable
 instead of
 .Ev PARTITIONS
 (see below).
-If using .Cm zfsboot, the variables
+If using
+.Cm zfsboot ,
+the variables
 .Ev ZFSBOOT_DISKS
 and
 .Ev ZFSBOOT_VDEV_TYPE
 must be set to create the pool of disks for the base system.
-Usually, for a mirrored booting disk, this two variables looks like this:
+Usually, for a mirrored booting disk, these two variables look like this:
 .Bd -literal -offset indent
 ZFSBOOT_DISKS="ada0 ada1"
 ZFSBOOT_VDEV_TYPE=mirror
@@ -575,7 +579,7 @@ partitioning tool takes the
 .Ev ZFSBOOT_DATASETS
 variable to create the ZFS datasets on the base system.
 This variable definition can become large if the pool contains many datasets.
-The default value of the
+The default value of
 .Ev ZFSBOOT_DATASETS
 is:
 .Bd -literal -offset indent
@@ -617,7 +621,7 @@ everything following a pound/hash character is ignored as a comment.
 .Ss BUILDING AUTOMATIC INSTALL MEDIA
 If building automatic install media, use tar to extract a release ISO:
 .Dl mkdir release-media
-.Dl tar xvf -C release-media FreeBSD-13.0-RELEASE-amd64-disc1.iso
+.Dl tar -C release-media -xvf FreeBSD-13.0-RELEASE-amd64-disc1.iso
 .Pp
 Then place a script as above in
 .Pa etc/installerconfig

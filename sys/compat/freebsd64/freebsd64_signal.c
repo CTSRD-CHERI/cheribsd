@@ -109,7 +109,7 @@ freebsd64_sigaction(struct thread *td, struct freebsd64_sigaction_args *uap)
 	error = kern_sigaction(td, uap->sig, actp, oactp, 0);
 	if (oactp && !error) {
 		memset(&oact64, 0, sizeof(oact64));
-		oact64.sa_u = (__cheri_addr vaddr_t)oactp->sa_handler;
+		oact64.sa_u = (__cheri_addr ptraddr_t)oactp->sa_handler;
 		oact64.sa_flags = oactp->sa_flags;
 		oact64.sa_mask = oactp->sa_mask;
 		error = copyout(&oact64, __USER_CAP_OBJ(uap->oact),

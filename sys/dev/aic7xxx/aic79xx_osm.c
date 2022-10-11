@@ -165,7 +165,7 @@ ahd_sysctl(struct ahd_softc *ahd)
 		ahd_sysctl_node_descriptions[AHD_SYSCTL_ROOT]);
 	    SYSCTL_ADD_PROC(&ahd->sysctl_ctx[AHD_SYSCTL_ROOT],
 	        SYSCTL_CHILDREN(ahd->sysctl_tree[AHD_SYSCTL_ROOT]), OID_AUTO,
-		"clear", CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_NEEDGIANT, ahd,
+		"clear", CTLTYPE_UINT | CTLFLAG_RW | CTLFLAG_MPSAFE, ahd,
 		0, ahd_clear_allcounters, "IU", "Clear all counters");
 
 	for (i = AHD_SYSCTL_SUMMARY; i < AHD_SYSCTL_NUMBER; i++)
@@ -185,7 +185,7 @@ ahd_sysctl(struct ahd_softc *ahd)
 		SYSCTL_ADD_PROC(&ahd->sysctl_ctx[AHD_SYSCTL_DEBUG],
 		    SYSCTL_CHILDREN(ahd->sysctl_tree[AHD_SYSCTL_DEBUG]),
 		    OID_AUTO, ahd_sysctl_errors_elements[i],
-		    CTLFLAG_RW | CTLTYPE_UINT | CTLFLAG_NEEDGIANT, ahd, i,
+		    CTLFLAG_RW | CTLTYPE_UINT | CTLFLAG_MPSAFE, ahd, i,
 		    ahd_set_debugcounters, "IU",
 		    ahd_sysctl_errors_descriptions[i]);
 	}
@@ -267,6 +267,7 @@ ahd_attach(struct ahd_softc *ahd)
 		goto fail;
 	}
 		
+	memset(&csa, 0, sizeof(csa));
 	xpt_setup_ccb(&csa.ccb_h, path, /*priority*/5);
 	csa.ccb_h.func_code = XPT_SASYNC_CB;
 	csa.event_enable = AC_LOST_DEVICE;
@@ -1472,7 +1473,7 @@ DB_COMMAND(ahd_in, ahd_ddb_in)
 	}
 }
 
-DB_FUNC(ahd_out, ahd_ddb_out, db_cmd_table, CS_MORE, NULL)
+DB_COMMAND_FLAGS(ahd_out, ahd_ddb_out, CS_MORE)
 {
 	db_expr_t old_value;
 	db_expr_t new_value;

@@ -41,11 +41,11 @@
 #include "llvm/MC/MCObjectStreamer.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/ARMBuildAttributes.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TargetParser.h"
-#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
 using namespace llvm;
@@ -285,7 +285,7 @@ bool ARMAsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNum,
       return false;
     case 'y': // Print a VFP single precision register as indexed double.
       if (MI->getOperand(OpNum).isReg()) {
-        Register Reg = MI->getOperand(OpNum).getReg();
+        MCRegister Reg = MI->getOperand(OpNum).getReg().asMCReg();
         const TargetRegisterInfo *TRI = MF->getSubtarget().getRegisterInfo();
         // Find the 'd' register that has this 's' register as a sub-register,
         // and determine the lane number.
@@ -763,6 +763,32 @@ void ARMAsmPrinter::emitAttributes() {
         int EnumBuildAttr = EnumWidth == 1 ? 1 : 2;
         ATS.emitAttribute(ARMBuildAttrs::ABI_enum_size, EnumBuildAttr);
       }
+
+      auto *PACValue = mdconst::extract_or_null<ConstantInt>(
+          SourceModule->getModuleFlag("sign-return-address"));
+      if (PACValue && PACValue->getZExtValue() == 1) {
+        // If "+pacbti" is used as an architecture extension,
+        // Tag_PAC_extension is emitted in
+        // ARMTargetStreamer::emitTargetAttributes().
+        if (!STI.hasPACBTI()) {
+          ATS.emitAttribute(ARMBuildAttrs::PAC_extension,
+                            ARMBuildAttrs::AllowPACInNOPSpace);
+        }
+        ATS.emitAttribute(ARMBuildAttrs::PACRET_use, ARMBuildAttrs::PACRETUsed);
+      }
+
+      auto *BTIValue = mdconst::extract_or_null<ConstantInt>(
+          SourceModule->getModuleFlag("branch-target-enforcement"));
+      if (BTIValue && BTIValue->getZExtValue() == 1) {
+        // If "+pacbti" is used as an architecture extension,
+        // Tag_BTI_extension is emitted in
+        // ARMTargetStreamer::emitTargetAttributes().
+        if (!STI.hasPACBTI()) {
+          ATS.emitAttribute(ARMBuildAttrs::BTI_extension,
+                            ARMBuildAttrs::AllowBTIInNOPSpace);
+        }
+        ATS.emitAttribute(ARMBuildAttrs::BTI_use, ARMBuildAttrs::BTIUsed);
+      }
     }
   }
 
@@ -903,7 +929,7 @@ void ARMAsmPrinter::emitMachineConstantPoolValue(
 
   MCSymbol *MCSym;
   if (ACPV->isLSDA()) {
-    MCSym = getCurExceptionSym();
+    MCSym = getMBBExceptionSym(MF->front());
   } else if (ACPV->isBlockAddress()) {
     const BlockAddress *BA =
       cast<ARMConstantPoolConstant>(ACPV)->getBlockAddress();
@@ -1127,8 +1153,12 @@ void ARMAsmPrinter::EmitUnwindingInstruction(const MachineInstr *MI) {
     unsigned StartOp = 2 + 2;
     // Use all the operands.
     unsigned NumOffset = 0;
-    // Amount of SP adjustment folded into a push.
-    unsigned Pad = 0;
+    // Amount of SP adjustment folded into a push, before the
+    // registers are stored (pad at higher addresses).
+    unsigned PadBefore = 0;
+    // Amount of SP adjustment folded into a push, after the
+    // registers are stored (pad at lower addresses).
+    unsigned PadAfter = 0;
 
     switch (Opc) {
     default:
@@ -1159,7 +1189,7 @@ void ARMAsmPrinter::EmitUnwindingInstruction(const MachineInstr *MI) {
                  "Pad registers must come before restored ones");
           unsigned Width =
             TargetRegInfo->getRegSizeInBits(MO.getReg(), MachineRegInfo) / 8;
-          Pad += Width;
+          PadAfter += Width;
           continue;
         }
         // Check for registers that are remapped (for a Thumb1 prologue that
@@ -1175,14 +1205,32 @@ void ARMAsmPrinter::EmitUnwindingInstruction(const MachineInstr *MI) {
     case ARM::t2STR_PRE:
       assert(MI->getOperand(2).getReg() == ARM::SP &&
              "Only stack pointer as a source reg is supported");
+      if (unsigned RemappedReg = AFI->EHPrologueRemappedRegs.lookup(SrcReg))
+        SrcReg = RemappedReg;
+
       RegList.push_back(SrcReg);
+      break;
+    case ARM::t2STRD_PRE:
+      assert(MI->getOperand(3).getReg() == ARM::SP &&
+             "Only stack pointer as a source reg is supported");
+      SrcReg = MI->getOperand(1).getReg();
+      if (unsigned RemappedReg = AFI->EHPrologueRemappedRegs.lookup(SrcReg))
+        SrcReg = RemappedReg;
+      RegList.push_back(SrcReg);
+      SrcReg = MI->getOperand(2).getReg();
+      if (unsigned RemappedReg = AFI->EHPrologueRemappedRegs.lookup(SrcReg))
+        SrcReg = RemappedReg;
+      RegList.push_back(SrcReg);
+      PadBefore = -MI->getOperand(4).getImm() - 8;
       break;
     }
     if (MAI->getExceptionHandlingType() == ExceptionHandling::ARM) {
+      if (PadBefore)
+        ATS.emitPad(PadBefore);
       ATS.emitRegSave(RegList, Opc == ARM::VSTMDDB_UPD);
       // Account for the SP adjustment, folded into the push.
-      if (Pad)
-        ATS.emitPad(Pad);
+      if (PadAfter)
+        ATS.emitPad(PadAfter);
     }
   } else {
     // Changes of stack / frame pointer.
@@ -1274,6 +1322,10 @@ void ARMAsmPrinter::EmitUnwindingInstruction(const MachineInstr *MI) {
         Offset = MI->getOperand(2).getImm();
         AFI->EHPrologueOffsetInRegs[DstReg] |= (Offset << 16);
         break;
+      case ARM::t2PAC:
+      case ARM::t2PACBTI:
+        AFI->EHPrologueRemappedRegs[ARM::R12] = ARM::RA_AUTH_CODE;
+        break;
       default:
         MI->print(errs());
         llvm_unreachable("Unsupported opcode for unwinding information");
@@ -1290,10 +1342,6 @@ void ARMAsmPrinter::emitInstruction(const MachineInstr *MI) {
   const DataLayout &DL = getDataLayout();
   MCTargetStreamer &TS = *OutStreamer->getTargetStreamer();
   ARMTargetStreamer &ATS = static_cast<ARMTargetStreamer &>(TS);
-
-  const MachineFunction &MF = *MI->getParent()->getParent();
-  const ARMSubtarget &STI = MF.getSubtarget<ARMSubtarget>();
-  unsigned FramePtr = STI.useR7AsFramePointer() ? ARM::R7 : ARM::R11;
 
   // If we just ended a constant pool, mark it as such.
   if (InConstantPool && MI->getOpcode() != ARM::CONSTPOOL_ENTRY) {
@@ -1539,17 +1587,17 @@ void ARMAsmPrinter::emitInstruction(const MachineInstr *MI) {
       MCInst.addExpr(BranchTarget);
     }
 
-      if (Opc == ARM::t2BFic) {
-        const MCExpr *ElseLabel = MCSymbolRefExpr::create(
-            getBFLabel(DL.getPrivateGlobalPrefix(), getFunctionNumber(),
-                       MI->getOperand(2).getIndex(), OutContext),
-            OutContext);
-        MCInst.addExpr(ElseLabel);
-        MCInst.addImm(MI->getOperand(3).getImm());
-      } else {
-        MCInst.addImm(MI->getOperand(2).getImm())
-            .addReg(MI->getOperand(3).getReg());
-      }
+    if (Opc == ARM::t2BFic) {
+      const MCExpr *ElseLabel = MCSymbolRefExpr::create(
+          getBFLabel(DL.getPrivateGlobalPrefix(), getFunctionNumber(),
+                     MI->getOperand(2).getIndex(), OutContext),
+          OutContext);
+      MCInst.addExpr(ElseLabel);
+      MCInst.addImm(MI->getOperand(3).getImm());
+    } else {
+      MCInst.addImm(MI->getOperand(2).getImm())
+          .addReg(MI->getOperand(3).getReg());
+    }
 
     EmitToStreamer(*OutStreamer, MCInst);
     return;
@@ -1743,7 +1791,7 @@ void ARMAsmPrinter::emitInstruction(const MachineInstr *MI) {
       // FIXME: Ideally we could vary the LDRB index based on the padding
       // between the sequence and jump table, however that relies on MCExprs
       // for load indexes which are currently not supported.
-      OutStreamer->emitCodeAlignment(4);
+      OutStreamer->emitCodeAlignment(4, &getSubtargetInfo());
       EmitToStreamer(*OutStreamer, MCInstBuilder(ARM::tADDhirr)
                                        .addReg(Idx)
                                        .addReg(Idx)
@@ -1897,7 +1945,7 @@ void ARMAsmPrinter::emitInstruction(const MachineInstr *MI) {
     // LSJLJEH:
     Register SrcReg = MI->getOperand(0).getReg();
     Register ValReg = MI->getOperand(1).getReg();
-    MCSymbol *Label = OutContext.createTempSymbol("SJLJEH", false, true);
+    MCSymbol *Label = OutContext.createTempSymbol("SJLJEH");
     OutStreamer->AddComment("eh_setjmp begin");
     EmitToStreamer(*OutStreamer, MCInstBuilder(ARM::tMOVr)
       .addReg(ValReg)
@@ -2036,15 +2084,18 @@ void ARMAsmPrinter::emitInstruction(const MachineInstr *MI) {
       .addImm(ARMCC::AL)
       .addReg(0));
 
+    const MachineFunction &MF = *MI->getParent()->getParent();
+    const ARMSubtarget &STI = MF.getSubtarget<ARMSubtarget>();
+
     if (STI.isTargetDarwin() || STI.isTargetWindows()) {
       // These platforms always use the same frame register
       EmitToStreamer(*OutStreamer, MCInstBuilder(ARM::LDRi12)
-        .addReg(FramePtr)
-        .addReg(SrcReg)
-        .addImm(0)
-        // Predicate.
-        .addImm(ARMCC::AL)
-        .addReg(0));
+                                       .addReg(STI.getFramePointerReg())
+                                       .addReg(SrcReg)
+                                       .addImm(0)
+                                       // Predicate.
+                                       .addImm(ARMCC::AL)
+                                       .addReg(0));
     } else {
       // If the calling code might use either R7 or R11 as
       // frame pointer register, restore it into both.
@@ -2081,6 +2132,9 @@ void ARMAsmPrinter::emitInstruction(const MachineInstr *MI) {
     Register SrcReg = MI->getOperand(0).getReg();
     Register ScratchReg = MI->getOperand(1).getReg();
 
+    const MachineFunction &MF = *MI->getParent()->getParent();
+    const ARMSubtarget &STI = MF.getSubtarget<ARMSubtarget>();
+
     EmitToStreamer(*OutStreamer, MCInstBuilder(ARM::tLDRi)
       .addReg(ScratchReg)
       .addReg(SrcReg)
@@ -2109,12 +2163,12 @@ void ARMAsmPrinter::emitInstruction(const MachineInstr *MI) {
     if (STI.isTargetDarwin() || STI.isTargetWindows()) {
       // These platforms always use the same frame register
       EmitToStreamer(*OutStreamer, MCInstBuilder(ARM::tLDRi)
-        .addReg(FramePtr)
-        .addReg(SrcReg)
-        .addImm(0)
-        // Predicate.
-        .addImm(ARMCC::AL)
-        .addReg(0));
+                                       .addReg(STI.getFramePointerReg())
+                                       .addReg(SrcReg)
+                                       .addImm(0)
+                                       // Predicate.
+                                       .addImm(ARMCC::AL)
+                                       .addReg(0));
     } else {
       // If the calling code might use either R7 or R11 as
       // frame pointer register, restore it into both.
@@ -2180,6 +2234,48 @@ void ARMAsmPrinter::emitInstruction(const MachineInstr *MI) {
   case ARM::PATCHABLE_TAIL_CALL:
     LowerPATCHABLE_TAIL_CALL(*MI);
     return;
+  case ARM::SpeculationBarrierISBDSBEndBB: {
+    // Print DSB SYS + ISB
+    MCInst TmpInstDSB;
+    TmpInstDSB.setOpcode(ARM::DSB);
+    TmpInstDSB.addOperand(MCOperand::createImm(0xf));
+    EmitToStreamer(*OutStreamer, TmpInstDSB);
+    MCInst TmpInstISB;
+    TmpInstISB.setOpcode(ARM::ISB);
+    TmpInstISB.addOperand(MCOperand::createImm(0xf));
+    EmitToStreamer(*OutStreamer, TmpInstISB);
+    return;
+  }
+  case ARM::t2SpeculationBarrierISBDSBEndBB: {
+    // Print DSB SYS + ISB
+    MCInst TmpInstDSB;
+    TmpInstDSB.setOpcode(ARM::t2DSB);
+    TmpInstDSB.addOperand(MCOperand::createImm(0xf));
+    TmpInstDSB.addOperand(MCOperand::createImm(ARMCC::AL));
+    TmpInstDSB.addOperand(MCOperand::createReg(0));
+    EmitToStreamer(*OutStreamer, TmpInstDSB);
+    MCInst TmpInstISB;
+    TmpInstISB.setOpcode(ARM::t2ISB);
+    TmpInstISB.addOperand(MCOperand::createImm(0xf));
+    TmpInstISB.addOperand(MCOperand::createImm(ARMCC::AL));
+    TmpInstISB.addOperand(MCOperand::createReg(0));
+    EmitToStreamer(*OutStreamer, TmpInstISB);
+    return;
+  }
+  case ARM::SpeculationBarrierSBEndBB: {
+    // Print SB
+    MCInst TmpInstSB;
+    TmpInstSB.setOpcode(ARM::SB);
+    EmitToStreamer(*OutStreamer, TmpInstSB);
+    return;
+  }
+  case ARM::t2SpeculationBarrierSBEndBB: {
+    // Print SB
+    MCInst TmpInstSB;
+    TmpInstSB.setOpcode(ARM::t2SB);
+    EmitToStreamer(*OutStreamer, TmpInstSB);
+    return;
+  }
   }
 
   MCInst TmpInst;

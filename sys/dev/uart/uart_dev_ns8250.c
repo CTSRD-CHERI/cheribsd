@@ -57,6 +57,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/uart/uart_ppstypes.h>
 #ifdef DEV_ACPI
 #include <dev/uart/uart_cpu_acpi.h>
+#include <contrib/dev/acpica/include/acpi.h>
 #endif
 
 #include <dev/ic/ns16550.h>
@@ -415,7 +416,7 @@ struct uart_class uart_ns8250_class = {
 static struct acpi_uart_compat_data acpi_compat_data[] = {
 	{"AMD0020",	&uart_ns8250_class, 0, 2, 0, 48000000, UART_F_BUSY_DETECT, "AMD / Synopsys Designware UART"},
 	{"AMDI0020", &uart_ns8250_class, 0, 2, 0, 48000000, UART_F_BUSY_DETECT, "AMD / Synopsys Designware UART"},
-	{"MRVL0001", &uart_ns8250_class, 0, 2, 0, 200000000, UART_F_BUSY_DETECT, "Marvell / Synopsys Designware UART"},
+	{"MRVL0001", &uart_ns8250_class, ACPI_DBG2_16550_SUBSET, 2, 0, 200000000, UART_F_BUSY_DETECT, "Marvell / Synopsys Designware UART"},
 	{"SCX0006",  &uart_ns8250_class, 0, 2, 0, 62500000, UART_F_BUSY_DETECT, "SynQuacer / Synopsys Designware UART"},
 	{"HISI0031", &uart_ns8250_class, 0, 2, 0, 200000000, UART_F_BUSY_DETECT, "HiSilicon / Synopsys Designware UART"},
 	{"PNP0500", &uart_ns8250_class, 0, 0, 0, 0, 0, "Standard PC COM port"},
@@ -791,13 +792,11 @@ ns8250_bus_param(struct uart_softc *sc, int baudrate, int databits,
 int
 ns8250_bus_probe(struct uart_softc *sc)
 {
-	struct ns8250_softc *ns8250;
 	struct uart_bas *bas;
 	int count, delay, error, limit;
 	uint8_t lsr, mcr, ier;
 	uint8_t val;
 
-	ns8250 = (struct ns8250_softc *)sc;
 	bas = &sc->sc_bas;
 
 	error = ns8250_probe(bas);
@@ -892,7 +891,8 @@ ns8250_bus_probe(struct uart_softc *sc)
 		    --limit)
 			DELAY(delay);
 		if (limit == 0) {
-			ier = uart_getreg(bas, REG_IER) & ns8250->ier_mask;
+			/* See the comment in ns8250_init(). */
+			ier = uart_getreg(bas, REG_IER) & 0xe0;
 			uart_setreg(bas, REG_IER, ier);
 			uart_setreg(bas, REG_MCR, mcr);
 			val = 0;

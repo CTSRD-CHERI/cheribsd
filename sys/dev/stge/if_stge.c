@@ -226,10 +226,8 @@ static driver_t stge_driver = {
 	sizeof(struct stge_softc)
 };
 
-static devclass_t stge_devclass;
-
-DRIVER_MODULE(stge, pci, stge_driver, stge_devclass, 0, 0);
-DRIVER_MODULE(miibus, stge, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(stge, pci, stge_driver, 0, 0);
+DRIVER_MODULE(miibus, stge, miibus_driver, 0, 0);
 
 static struct resource_spec stge_res_spec_io[] = {
 	{ SYS_RES_IOPORT,	PCIR_BAR(0),	RF_ACTIVE },
@@ -699,7 +697,9 @@ stge_detach(device_t dev)
 		bus_teardown_intr(dev, sc->sc_res[1], sc->sc_ih);
 		sc->sc_ih = NULL;
 	}
-	bus_release_resources(dev, sc->sc_spec, sc->sc_res);
+
+	if (sc->sc_spec)
+		bus_release_resources(dev, sc->sc_spec, sc->sc_res);
 
 	mtx_destroy(&sc->sc_mii_mtx);
 	mtx_destroy(&sc->sc_mtx);

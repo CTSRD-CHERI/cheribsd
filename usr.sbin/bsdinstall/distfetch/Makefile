@@ -2,7 +2,8 @@
 
 BINDIR= ${LIBEXECDIR}/bsdinstall
 PROG=	distfetch
-LIBADD=	fetch ncursesw dialog m
+CFLAGS+=	-I${SRCTOP}/contrib/bsddialog/lib -I${.OBJDIR}/..
+LIBADD=	fetch bsddialog
 
 MAN=
 

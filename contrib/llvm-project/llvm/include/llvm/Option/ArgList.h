@@ -245,6 +245,12 @@ public:
     return getLastArg(Ids...) != nullptr;
   }
 
+  /// Return true if the arg list contains multiple arguments matching \p Id.
+  bool hasMultipleArgs(OptSpecifier Id) const {
+    auto Args = filtered(Id);
+    return (Args.begin() != Args.end()) && (++Args.begin()) != Args.end();
+  }
+
   /// Return the last argument matching \p Id, or null.
   template<typename ...OptSpecifiers>
   Arg *getLastArg(OptSpecifiers ...Ids) const {
@@ -341,7 +347,6 @@ public:
   /// ClaimAllArgs - Claim all arguments.
   ///
   void ClaimAllArgs() const;
-
   /// @}
   /// @name Arg Synthesis
   /// @{
@@ -410,6 +415,10 @@ public:
 
   const char *getArgString(unsigned Index) const override {
     return ArgStrings[Index];
+  }
+
+  void replaceArgString(unsigned Index, const Twine &S) {
+    ArgStrings[Index] = MakeArgString(S);
   }
 
   unsigned getNumInputArgStrings() const override {

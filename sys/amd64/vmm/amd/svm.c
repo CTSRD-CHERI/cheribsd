@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
+#include <sys/reg.h>
 #include <sys/smr.h>
 #include <sys/sysctl.h>
 
@@ -47,7 +48,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpufunc.h>
 #include <machine/psl.h>
 #include <machine/md_var.h>
-#include <machine/reg.h>
 #include <machine/specialreg.h>
 #include <machine/smp.h>
 #include <machine/vmm.h>
@@ -351,7 +351,7 @@ svm_msr_index(uint64_t msr, int *index, int *bit)
 static void
 svm_msr_perm(uint8_t *perm_bitmap, uint64_t msr, bool read, bool write)
 {
-	int index, bit, error;
+	int index, bit, error __diagused;
 
 	error = svm_msr_index(msr, &index, &bit);
 	KASSERT(error == 0, ("%s: invalid msr %#lx", __func__, msr));
@@ -506,6 +506,10 @@ vmcb_init(struct svm_softc *sc, int vcpu, uint64_t iopm_base_pa,
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_CLGI);
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_SKINIT);
 	svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT, VMCB_INTCPT_ICEBP);
+	if (vcpu_trap_wbinvd(sc->vm, vcpu)) {
+		svm_enable_intercept(sc, vcpu, VMCB_CTRL2_INTCPT,
+		    VMCB_INTCPT_WBINVD);
+	}
 
 	/*
 	 * From section "Canonicalization and Consistency Checks" in APMv2
@@ -654,7 +658,7 @@ svm_vcpu_mode(struct vmcb *vmcb)
 {
 	struct vmcb_segment seg;
 	struct vmcb_state *state;
-	int error;
+	int error __diagused;
 
 	state = &vmcb->state;
 
@@ -719,7 +723,7 @@ static void
 svm_inout_str_seginfo(struct svm_softc *svm_sc, int vcpu, int64_t info1,
     int in, struct vm_inout_str *vis)
 {
-	int error, s;
+	int error __diagused, s;
 
 	if (in) {
 		vis->seg_name = VM_REG_GUEST_ES;
@@ -858,7 +862,7 @@ svm_handle_inst_emul(struct vmcb *vmcb, uint64_t gpa, struct vm_exit *vmexit)
 	struct vmcb_segment seg;
 	struct vmcb_ctrl *ctrl;
 	char *inst_bytes;
-	int error, inst_len;
+	int error __diagused, inst_len;
 
 	ctrl = &vmcb->ctrl;
 	paging = &vmexit->u.inst_emul.paging;
@@ -1113,7 +1117,7 @@ enable_nmi_blocking(struct svm_softc *sc, int vcpu)
 static void
 clear_nmi_blocking(struct svm_softc *sc, int vcpu)
 {
-	int error;
+	int error __diagused;
 
 	KASSERT(nmi_blocked(sc, vcpu), ("vNMI already unblocked"));
 	VCPU_CTR0(sc->vm, vcpu, "vNMI blocking cleared");
@@ -1146,7 +1150,7 @@ svm_write_efer(struct svm_softc *sc, int vcpu, uint64_t newval, bool *retu)
 	struct vm_exit *vme;
 	struct vmcb_state *state;
 	uint64_t changed, lma, oldval;
-	int error;
+	int error __diagused;
 
 	state = svm_get_vmcb_state(sc, vcpu);
 
@@ -1328,7 +1332,7 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 	struct svm_regctx *ctx;
 	uint64_t code, info1, info2, val;
 	uint32_t eax, ecx, edx;
-	int error, errcode_valid, handled, idtvec, reflect;
+	int error __diagused, errcode_valid, handled, idtvec, reflect;
 	bool retu;
 
 	ctx = svm_get_guest_regctx(svm_sc, vcpu);
@@ -1547,9 +1551,13 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 	case VMCB_EXIT_CLGI:
 	case VMCB_EXIT_SKINIT:
 	case VMCB_EXIT_ICEBP:
-	case VMCB_EXIT_INVD:
 	case VMCB_EXIT_INVLPGA:
 		vm_inject_ud(svm_sc->vm, vcpu);
+		handled = 1;
+		break;
+	case VMCB_EXIT_INVD:
+	case VMCB_EXIT_WBINVD:
+		/* ignore exit */
 		handled = 1;
 		break;
 	default:
@@ -2404,8 +2412,6 @@ svm_snapshot(void *arg, struct vm_snapshot_meta *meta)
 	/* struct svm_softc is AMD's representation for SVM softc */
 	struct svm_softc *sc;
 	struct svm_vcpu *vcpu;
-	struct vmcb *vmcb;
-	uint64_t val;
 	int i;
 	int ret;
 
@@ -2413,78 +2419,8 @@ svm_snapshot(void *arg, struct vm_snapshot_meta *meta)
 
 	KASSERT(sc != NULL, ("%s: arg was NULL", __func__));
 
-	SNAPSHOT_VAR_OR_LEAVE(sc->nptp, meta, ret, done);
-
 	for (i = 0; i < VM_MAXCPU; i++) {
 		vcpu = &sc->vcpu[i];
-		vmcb = &vcpu->vmcb;
-
-		/* VMCB fields for virtual cpu i */
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->ctrl.v_tpr, meta, ret, done);
-		val = vmcb->ctrl.v_tpr;
-		SNAPSHOT_VAR_OR_LEAVE(val, meta, ret, done);
-		vmcb->ctrl.v_tpr = val;
-
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->ctrl.asid, meta, ret, done);
-		val = vmcb->ctrl.np_enable;
-		SNAPSHOT_VAR_OR_LEAVE(val, meta, ret, done);
-		vmcb->ctrl.np_enable = val;
-
-		val = vmcb->ctrl.intr_shadow;
-		SNAPSHOT_VAR_OR_LEAVE(val, meta, ret, done);
-		vmcb->ctrl.intr_shadow = val;
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->ctrl.tlb_ctrl, meta, ret, done);
-
-		SNAPSHOT_BUF_OR_LEAVE(vmcb->state.pad1,
-				      sizeof(vmcb->state.pad1),
-				      meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.cpl, meta, ret, done);
-		SNAPSHOT_BUF_OR_LEAVE(vmcb->state.pad2,
-				      sizeof(vmcb->state.pad2),
-				      meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.efer, meta, ret, done);
-		SNAPSHOT_BUF_OR_LEAVE(vmcb->state.pad3,
-				      sizeof(vmcb->state.pad3),
-				      meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.cr4, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.cr3, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.cr0, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.dr7, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.dr6, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.rflags, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.rip, meta, ret, done);
-		SNAPSHOT_BUF_OR_LEAVE(vmcb->state.pad4,
-				      sizeof(vmcb->state.pad4),
-				      meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.rsp, meta, ret, done);
-		SNAPSHOT_BUF_OR_LEAVE(vmcb->state.pad5,
-				      sizeof(vmcb->state.pad5),
-				      meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.rax, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.star, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.lstar, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.cstar, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.sfmask, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.kernelgsbase,
-				      meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.sysenter_cs, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.sysenter_esp,
-				      meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.sysenter_eip,
-				      meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.cr2, meta, ret, done);
-		SNAPSHOT_BUF_OR_LEAVE(vmcb->state.pad6,
-				      sizeof(vmcb->state.pad6),
-				      meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.g_pat, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.dbgctl, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.br_from, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.br_to, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.int_from, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vmcb->state.int_to, meta, ret, done);
-		SNAPSHOT_BUF_OR_LEAVE(vmcb->state.pad7,
-				      sizeof(vmcb->state.pad7),
-				      meta, ret, done);
 
 		/* Snapshot swctx for virtual cpu i */
 		SNAPSHOT_VAR_OR_LEAVE(vcpu->swctx.sctx_rbp, meta, ret, done);
@@ -2506,15 +2442,6 @@ svm_snapshot(void *arg, struct vm_snapshot_meta *meta)
 		SNAPSHOT_VAR_OR_LEAVE(vcpu->swctx.sctx_dr2, meta, ret, done);
 		SNAPSHOT_VAR_OR_LEAVE(vcpu->swctx.sctx_dr3, meta, ret, done);
 
-		SNAPSHOT_VAR_OR_LEAVE(vcpu->swctx.host_dr0, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vcpu->swctx.host_dr1, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vcpu->swctx.host_dr2, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vcpu->swctx.host_dr3, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vcpu->swctx.host_dr6, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vcpu->swctx.host_dr7, meta, ret, done);
-		SNAPSHOT_VAR_OR_LEAVE(vcpu->swctx.host_debugctl, meta, ret,
-				      done);
-
 		/* Restore other svm_vcpu struct fields */
 
 		/* Restore NEXTRIP field */
@@ -2524,7 +2451,7 @@ svm_snapshot(void *arg, struct vm_snapshot_meta *meta)
 		SNAPSHOT_VAR_OR_LEAVE(vcpu->lastcpu, meta, ret, done);
 		SNAPSHOT_VAR_OR_LEAVE(vcpu->dirty, meta, ret, done);
 
-		/* Restore EPTGEN field - EPT is Extended Page Tabel */
+		/* Restore EPTGEN field - EPT is Extended Page Table */
 		SNAPSHOT_VAR_OR_LEAVE(vcpu->eptgen, meta, ret, done);
 
 		SNAPSHOT_VAR_OR_LEAVE(vcpu->asid.gen, meta, ret, done);
@@ -2554,7 +2481,6 @@ done:
 static int
 svm_vmcx_snapshot(void *arg, struct vm_snapshot_meta *meta, int vcpu)
 {
-	struct vmcb *vmcb;
 	struct svm_softc *sc;
 	int err, running, hostcpu;
 
@@ -2562,7 +2488,6 @@ svm_vmcx_snapshot(void *arg, struct vm_snapshot_meta *meta, int vcpu)
 	err = 0;
 
 	KASSERT(arg != NULL, ("%s: arg was NULL", __func__));
-	vmcb = svm_get_vmcb(sc, vcpu);
 
 	running = vcpu_is_running(sc->vm, vcpu, &hostcpu);
 	if (running && hostcpu !=curcpu) {
@@ -2575,6 +2500,7 @@ svm_vmcx_snapshot(void *arg, struct vm_snapshot_meta *meta, int vcpu)
 	err += svm_snapshot_reg(sc, vcpu, VM_REG_GUEST_CR3, meta);
 	err += svm_snapshot_reg(sc, vcpu, VM_REG_GUEST_CR4, meta);
 
+	err += svm_snapshot_reg(sc, vcpu, VM_REG_GUEST_DR6, meta);
 	err += svm_snapshot_reg(sc, vcpu, VM_REG_GUEST_DR7, meta);
 
 	err += svm_snapshot_reg(sc, vcpu, VM_REG_GUEST_RAX, meta);
@@ -2624,15 +2550,7 @@ svm_vmcx_snapshot(void *arg, struct vm_snapshot_meta *meta, int vcpu)
 	err += vmcb_snapshot_desc(sc, vcpu, VM_REG_GUEST_GDTR, meta);
 
 	/* Specific AMD registers */
-	err += vmcb_snapshot_any(sc, vcpu,
-				VMCB_ACCESS(VMCB_OFF_SYSENTER_CS, 8), meta);
-	err += vmcb_snapshot_any(sc, vcpu,
-				VMCB_ACCESS(VMCB_OFF_SYSENTER_ESP, 8), meta);
-	err += vmcb_snapshot_any(sc, vcpu,
-				VMCB_ACCESS(VMCB_OFF_SYSENTER_EIP, 8), meta);
-
-	err += vmcb_snapshot_any(sc, vcpu,
-				VMCB_ACCESS(VMCB_OFF_NPT_BASE, 8), meta);
+	err += svm_snapshot_reg(sc, vcpu, VM_REG_GUEST_INTR_SHADOW, meta);
 
 	err += vmcb_snapshot_any(sc, vcpu,
 				VMCB_ACCESS(VMCB_OFF_CR_INTERCEPT, 4), meta);
@@ -2646,8 +2564,21 @@ svm_vmcx_snapshot(void *arg, struct vm_snapshot_meta *meta, int vcpu)
 				VMCB_ACCESS(VMCB_OFF_INST2_INTERCEPT, 4), meta);
 
 	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_PAUSE_FILTHRESH, 2), meta);
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_PAUSE_FILCNT, 2), meta);
+
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_ASID, 4), meta);
+
+	err += vmcb_snapshot_any(sc, vcpu,
 				VMCB_ACCESS(VMCB_OFF_TLB_CTRL, 4), meta);
 
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_VIRQ, 8), meta);
+
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_EXIT_REASON, 8), meta);
 	err += vmcb_snapshot_any(sc, vcpu,
 				VMCB_ACCESS(VMCB_OFF_EXITINFO1, 8), meta);
 	err += vmcb_snapshot_any(sc, vcpu,
@@ -2656,10 +2587,7 @@ svm_vmcx_snapshot(void *arg, struct vm_snapshot_meta *meta, int vcpu)
 				VMCB_ACCESS(VMCB_OFF_EXITINTINFO, 8), meta);
 
 	err += vmcb_snapshot_any(sc, vcpu,
-				VMCB_ACCESS(VMCB_OFF_VIRQ, 8), meta);
-
-	err += vmcb_snapshot_any(sc, vcpu,
-				VMCB_ACCESS(VMCB_OFF_GUEST_PAT, 8), meta);
+				VMCB_ACCESS(VMCB_OFF_NP_ENABLE, 1), meta);
 
 	err += vmcb_snapshot_any(sc, vcpu,
 				VMCB_ACCESS(VMCB_OFF_AVIC_BAR, 8), meta);
@@ -2671,17 +2599,41 @@ svm_vmcx_snapshot(void *arg, struct vm_snapshot_meta *meta, int vcpu)
 				VMCB_ACCESS(VMCB_OFF_AVIC_PT, 8), meta);
 
 	err += vmcb_snapshot_any(sc, vcpu,
-				VMCB_ACCESS(VMCB_OFF_IO_PERM, 8), meta);
-	err += vmcb_snapshot_any(sc, vcpu,
-				VMCB_ACCESS(VMCB_OFF_MSR_PERM, 8), meta);
+				VMCB_ACCESS(VMCB_OFF_CPL, 1), meta);
 
 	err += vmcb_snapshot_any(sc, vcpu,
-				VMCB_ACCESS(VMCB_OFF_ASID, 4), meta);
+				VMCB_ACCESS(VMCB_OFF_STAR, 8), meta);
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_LSTAR, 8), meta);
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_CSTAR, 8), meta);
 
 	err += vmcb_snapshot_any(sc, vcpu,
-				VMCB_ACCESS(VMCB_OFF_EXIT_REASON, 8), meta);
+				VMCB_ACCESS(VMCB_OFF_SFMASK, 8), meta);
 
-	err += svm_snapshot_reg(sc, vcpu, VM_REG_GUEST_INTR_SHADOW, meta);
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_KERNELGBASE, 8), meta);
+
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_SYSENTER_CS, 8), meta);
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_SYSENTER_ESP, 8), meta);
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_SYSENTER_EIP, 8), meta);
+
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_GUEST_PAT, 8), meta);
+
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_DBGCTL, 8), meta);
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_BR_FROM, 8), meta);
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_BR_TO, 8), meta);
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_INT_FROM, 8), meta);
+	err += vmcb_snapshot_any(sc, vcpu,
+				VMCB_ACCESS(VMCB_OFF_INT_TO, 8), meta);
 
 	return (err);
 }

@@ -90,14 +90,15 @@ public:
   {
     lldb::CommandArgumentType arg_type;
     ArgumentRepetitionType arg_repetition;
-    uint32_t arg_opt_set_association; // This arg might be associated only with
-                                      // some particular option set(s).
-    CommandArgumentData()
-        : arg_type(lldb::eArgTypeNone), arg_repetition(eArgRepeatPlain),
-          arg_opt_set_association(LLDB_OPT_SET_ALL) // By default, the arg
-                                                    // associates to all option
-                                                    // sets.
-    {}
+    /// This arg might be associated only with some particular option set(s). By
+    /// default the arg associates to all option sets.
+    uint32_t arg_opt_set_association;
+
+    CommandArgumentData(lldb::CommandArgumentType type = lldb::eArgTypeNone,
+                        ArgumentRepetitionType repetition = eArgRepeatPlain,
+                        uint32_t opt_set = LLDB_OPT_SET_ALL)
+        : arg_type(type), arg_repetition(repetition),
+          arg_opt_set_association(opt_set) {}
   };
 
   typedef std::vector<CommandArgumentData>
@@ -112,7 +113,7 @@ public:
     llvm::StringRef help = "", llvm::StringRef syntax = "",
                 uint32_t flags = 0);
 
-  virtual ~CommandObject();
+  virtual ~CommandObject() = default;
 
   static const char *
   GetArgumentTypeAsCString(const lldb::CommandArgumentType arg_type);
@@ -144,6 +145,10 @@ public:
 
   virtual bool IsMultiwordObject() { return false; }
 
+  bool IsUserCommand() { return m_is_user_command; }
+
+  void SetIsUserCommand(bool is_user) { m_is_user_command = is_user; }
+
   virtual CommandObjectMultiword *GetAsMultiwordCommand() { return nullptr; }
 
   virtual bool IsAlias() { return false; }
@@ -158,15 +163,14 @@ public:
     return lldb::CommandObjectSP();
   }
 
+  virtual lldb::CommandObjectSP GetSubcommandSPExact(llvm::StringRef sub_cmd) {
+    return lldb::CommandObjectSP();
+  }
+
   virtual CommandObject *GetSubcommandObject(llvm::StringRef sub_cmd,
                                              StringList *matches = nullptr) {
     return nullptr;
   }
-
-  virtual void AproposAllSubCommands(llvm::StringRef prefix,
-                                     llvm::StringRef search_word,
-                                     StringList &commands_found,
-                                     StringList &commands_help) {}
 
   void FormatLongHelpText(Stream &output_strm, llvm::StringRef long_help);
 
@@ -180,6 +184,13 @@ public:
   virtual bool LoadSubCommand(llvm::StringRef cmd_name,
                               const lldb::CommandObjectSP &command_obj) {
     return false;
+  }
+
+  virtual llvm::Error LoadUserSubcommand(llvm::StringRef cmd_name,
+                                         const lldb::CommandObjectSP &command_obj,
+                                         bool can_replace) {
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                              "can only add commands to container commands");
   }
 
   virtual bool WantsRawCommandString() = 0;
@@ -366,6 +377,7 @@ protected:
   lldb::CommandOverrideCallback m_deprecated_command_override_callback;
   lldb::CommandOverrideCallbackWithResult m_command_override_callback;
   void *m_command_override_baton;
+  bool m_is_user_command = false;
 
   // Helper function to populate IDs or ID ranges as the command argument data
   // to the specified command argument entry.

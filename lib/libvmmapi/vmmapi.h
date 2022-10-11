@@ -31,8 +31,10 @@
 #ifndef _VMMAPI_H_
 #define	_VMMAPI_H_
 
+#include <sys/cdefs.h>
 #include <sys/param.h>
 #include <sys/cpuset.h>
+#include <machine/vmm.h>
 #include <machine/vmm_dev.h>
 
 #include <stdbool.h>
@@ -73,8 +75,10 @@ enum {
 	VM_SYSMEM,
 	VM_BOOTROM,
 	VM_FRAMEBUFFER,
+	VM_PCIROM,
 };
 
+__BEGIN_DECLS
 /*
  * Get the length and name of the memory segment identified by 'segid'.
  * Note that system memory segments are identified with a nul name.
@@ -116,6 +120,7 @@ int	vm_munmap_memseg(struct vmctx *ctx, vm_paddr_t gpa, size_t len);
 int	vm_create(const char *name);
 int	vm_get_device_fd(struct vmctx *ctx);
 struct vmctx *vm_open(const char *name);
+void	vm_close(struct vmctx *ctx);
 void	vm_destroy(struct vmctx *ctx);
 int	vm_parse_memsize(const char *optarg, size_t *memsize);
 int	vm_setup_memory(struct vmctx *ctx, size_t len, enum vm_mmap_style s);
@@ -132,7 +137,7 @@ uint32_t vm_get_lowmem_limit(struct vmctx *ctx);
 void	vm_set_lowmem_limit(struct vmctx *ctx, uint32_t limit);
 void	vm_set_memflags(struct vmctx *ctx, int flags);
 int	vm_get_memflags(struct vmctx *ctx);
-int	vm_get_name(struct vmctx *ctx, char *buffer, size_t max_len);
+const char *vm_get_name(struct vmctx *ctx);
 size_t	vm_get_lowmem_size(struct vmctx *ctx);
 size_t	vm_get_highmem_size(struct vmctx *ctx);
 int	vm_set_desc(struct vmctx *ctx, int vcpu, int reg,
@@ -261,5 +266,6 @@ void	vm_setup_freebsd_gdt(uint64_t *gdtr);
  */
 int	vm_snapshot_req(struct vm_snapshot_meta *meta);
 int	vm_restore_time(struct vmctx *ctx);
+__END_DECLS
 
 #endif	/* _VMMAPI_H_ */

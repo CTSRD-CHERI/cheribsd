@@ -46,15 +46,6 @@ __FBSDID("$FreeBSD$");
 
 #include "thr_private.h"
 
-/* 16 Byte alignment works for most architectures but on CHERI256 in the pure
- * capability ABI we need need the TCB to be aligned to 32 bytes */
-#ifndef TCB_ALIGN
-/* TODO: this definition should be enough, no need have another in pthread_md.h */
-/* Or do we want it to be a capability in hybrid code? */
-/* XXX-AR: #include <sys/param.h> -> MAX(sizeof(void*), 16) */
-#define TCB_ALIGN (sizeof(void*) < 16 ? 16 : sizeof(void*))
-#endif
-
 struct tcb *
 _tcb_ctor(struct pthread *thread, int initial)
 {
@@ -63,7 +54,7 @@ _tcb_ctor(struct pthread *thread, int initial)
 	if (initial)
 		tcb = _tcb_get();
 	else
-		tcb = _rtld_allocate_tls(NULL, sizeof(struct tcb), TCB_ALIGN);
+		tcb = _rtld_allocate_tls(NULL, TLS_TCB_SIZE, TLS_TCB_ALIGN);
 	if (tcb)
 		tcb->tcb_thread = thread;
 	return (tcb);
@@ -73,5 +64,5 @@ void
 _tcb_dtor(struct tcb *tcb)
 {
 
-	_rtld_free_tls(tcb, sizeof(struct tcb), TCB_ALIGN);
+	_rtld_free_tls(tcb, TLS_TCB_SIZE, TLS_TCB_ALIGN);
 }

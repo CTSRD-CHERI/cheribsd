@@ -84,8 +84,6 @@ static MALLOC_DEFINE(M_SEM, "sem", "SVID compatible semaphores");
 #define DPRINTF(a)
 #endif
 
-static int kern_semop(struct thread *td, int semid,
-    struct sembuf * __capability usops, size_t nsops);
 static int seminit(void);
 static int sysvsem_modload(struct module *, int, void *);
 static int semunload(void);
@@ -247,51 +245,14 @@ static struct syscall_helper_data sem_syscalls[] = {
 #include <compat/freebsd32/freebsd32_syscall.h>
 #include <compat/freebsd32/freebsd32_util.h>
 
-struct semid_ds32 {
-	struct ipc_perm32 sem_perm;
-	uint32_t	__sem_base;
-	unsigned short	sem_nsems;
-	int32_t		sem_otime;
-	int32_t		sem_ctime;
-};
-
-#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
-    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
-struct semid_ds32_old {
-	struct ipc_perm32_old sem_perm;
-	uint32_t	__sem_base;
-	unsigned short	sem_nsems;
-	int32_t		sem_otime;
-	int32_t		sem_pad1;
-	int32_t		sem_ctime;
-	int32_t		sem_pad2;
-	int32_t		sem_pad3[4];
-};
-#endif
-
-struct semid_kernel32 {
-	/* Data structure exposed to user space. */
-	struct semid_ds32	u;
-
-	/* Kernel-private components of the semaphore. */
-	int32_t			label;
-	int32_t			cred;
-};
-
-union semun32 {
-	int		val;
-	uint32_t	buf;
-	uint32_t	array;
-};
-
 static struct syscall_helper_data sem32_syscalls[] = {
-	SYSCALL32_INIT_HELPER(freebsd32_semctl),
+	SYSCALL32_INIT_HELPER(freebsd32___semctl),
 	SYSCALL32_INIT_HELPER_COMPAT(semget),
 	SYSCALL32_INIT_HELPER_COMPAT(semop),
 	SYSCALL32_INIT_HELPER(freebsd32_semsys),
 #if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
-	SYSCALL32_INIT_HELPER(freebsd7_freebsd32_semctl),
+	SYSCALL32_INIT_HELPER(freebsd7_freebsd32___semctl),
 #endif
 	SYSCALL_INIT_LAST
 };
@@ -299,52 +260,10 @@ static struct syscall_helper_data sem32_syscalls[] = {
 
 #ifdef COMPAT_FREEBSD64
 #include <compat/freebsd64/freebsd64.h>
+#include <compat/freebsd64/freebsd64_ipc.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
-
-struct semid_ds64 {
-	struct ipc_perm	sem_perm;
-	void		*__sem_base;
-	unsigned short	sem_nsems;
-	time_t		sem_otime;
-	time_t		sem_ctime;
-};
-
-#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
-    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
-struct semid_ds64_old {
-	struct ipc_perm_old sem_perm;
-	void		*__sem_base;
-	unsigned short	sem_nsems;
-	time_t		sem_otime;
-	long		sem_pad1;
-	time_t		sem_ctime;
-	long		sem_pad2;
-	long		sem_pad3[4];
-};
-#endif
-
-struct semid_kernel64 {
-	/* Data structure exposed to user space. */
-	struct semid_ds64	u;
-
-	/* Kernel-private components of the semaphore. */
-	void			*label;
-	void			*cred;
-};
-
-union semun64 {
-	int			val;
-	struct semid_ds64	*buf;
-	unsigned short		*array;
-};
-
-union semun_old64 {
-	int			val;
-	struct semid_ds_old64	*buf;
-	unsigned short		*array;
-};
 
 static struct syscall_helper_data sem64_syscalls[] = {
 	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64___semctl),
@@ -707,7 +626,7 @@ sem_find_prison(struct ucred *cred)
 	prison_lock(pr);
 	rpr = osd_jail_get(pr, sem_prison_slot);
 	prison_unlock(pr);
-	return rpr;
+	return (rpr);
 }
 
 static int
@@ -771,7 +690,7 @@ sys___semctl(struct thread *td, struct __semctl_args *uap)
 		break;
 	case SETVAL:
 		semun.val = arg.val;
-		break;		
+		break;
 	}
 
 	error = kern_semctl(td, uap->semid, uap->semnum, uap->cmd, &semun,
@@ -812,7 +731,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 	AUDIT_ARG_SVIPC_ID(semid);
 
 	rpr = sem_find_prison(td->td_ucred);
-	if (sem == NULL)
+	if (rpr == NULL)
 		return (ENOSYS);
 
 	array = NULL;
@@ -841,7 +760,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 		if (error != 0)
 			goto done2;
 #endif
-		bcopy_c(&semakptr->u, arg->buf, sizeof(struct semid_ds));
+		bcopy_c(PTR2CAP(&semakptr->u), arg->buf, sizeof(struct semid_ds));
 		if (cred->cr_prison != semakptr->cred->cr_prison)
 			arg->buf->sem_perm.key = IPC_PRIVATE;
 		*rval = IXSEQ_TO_IPCID(semid, semakptr->u.sem_perm);
@@ -897,7 +816,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 			goto done2;
 		if ((error = ipcperm(td, &semakptr->u.sem_perm, IPC_R)))
 			goto done2;
-		bcopy_c(&semakptr->u, arg->buf, sizeof(struct semid_ds));
+		bcopy_c(PTR2CAP(&semakptr->u), arg->buf, sizeof(struct semid_ds));
 		if (cred->cr_prison != semakptr->cred->cr_prison)
 			arg->buf->sem_perm.key = IPC_PRIVATE;
 
@@ -954,7 +873,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 		 * won't work for SETALL since we can't copyin() more
 		 * data than the user specified as we may return a
 		 * spurious EFAULT.
-		 * 
+		 *
 		 * Note that the number of semaphores in a set is
 		 * fixed for the life of that set.  The only way that
 		 * the 'count' could change while are blocked in
@@ -967,7 +886,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 		 *
 		 */
 		count = semakptr->u.sem_nsems;
-		mtx_unlock(sema_mtxp);		    
+		mtx_unlock(sema_mtxp);
 		array = malloc(sizeof(*array) * count, M_TEMP, M_WAITOK);
 		mtx_lock(sema_mtxp);
 		if ((error = semvalid(semid, rpr, semakptr)) != 0)
@@ -1020,7 +939,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 		 * and why we require a userland buffer.
 		 */
 		count = semakptr->u.sem_nsems;
-		mtx_unlock(sema_mtxp);		    
+		mtx_unlock(sema_mtxp);
 		array = malloc(sizeof(*array) * count, M_TEMP, M_WAITOK);
 		error = copyin(arg->array, array, count * sizeof(*array));
 		mtx_lock(sema_mtxp);
@@ -1206,12 +1125,12 @@ int
 sys_semop(struct thread *td, struct semop_args *uap)
 {
 
-	return (kern_semop(td, uap->semid, uap->sops, uap->nsops));
+	return (kern_semop(td, uap->semid, uap->sops, uap->nsops, NULL));
 }
 
-static int
+int
 kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
-    size_t nsops)
+    size_t nsops, struct timespec *timeout)
 {
 #define SMALL_SOPS	8
 	struct sembuf small_sops[SMALL_SOPS];
@@ -1222,6 +1141,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 	struct sem * __capability semptr = NULL;
 	struct sem_undo *suptr;
 	struct mtx *sema_mtxp;
+	sbintime_t sbt, precision;
 	size_t i, j, k;
 	int error;
 	int do_wakeup, do_undos;
@@ -1231,18 +1151,35 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 #ifdef SEM_DEBUG
 	sops = NULL;
 #endif
-	DPRINTF(("call to semop(%d, %p, %zu)\n", usemid, sops, nsops));
+	DPRINTF(("call to semop(%d, %lp, %zu)\n", usemid, usops, nsops));
 
 	AUDIT_ARG_SVIPC_ID(usemid);
 
 	rpr = sem_find_prison(td->td_ucred);
-	if (sem == NULL)
+	if (rpr == NULL)
 		return (ENOSYS);
 
 	semid = IPCID_TO_IX(usemid);	/* Convert back to zero origin */
 
 	if (semid < 0 || semid >= seminfo.semmni)
 		return (EINVAL);
+	if (timeout != NULL) {
+		if (!timespecvalid_interval(timeout))
+			return (EINVAL);
+		precision = 0;
+		if (timespecisset(timeout)) {
+			if (timeout->tv_sec < INT32_MAX / 2) {
+				precision = tstosbt(*timeout);
+				if (TIMESEL(&sbt, precision))
+					sbt += tc_tick_sbt;
+				sbt += precision;
+				precision >>= tc_precexp;
+			} else
+				sbt = 0;
+		} else
+			sbt = -1;
+	} else
+		precision = sbt = 0;
 
 	/* Allocate memory for sem_ops */
 	if (nsops <= SMALL_SOPS)
@@ -1267,9 +1204,8 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 		sops = malloc(nsops * sizeof(*sops), M_TEMP, M_WAITOK);
 	}
 	if ((error = copyin(usops, sops, nsops * sizeof(sops[0]))) != 0) {
-		DPRINTF(("error = %d from copyin(%p, %p, %zd)\n", error,
-		    (__cheri_fromcap struct sembuf *)usops, sops,
-		    nsops * sizeof(sops[0])));
+		DPRINTF(("error = %d from copyin(%lp, %p, %d)\n", error,
+		    usops, sops, nsops * sizeof(sops[0])));
 		if (sops != small_sops)
 			free(sops, M_TEMP);
 		return (error);
@@ -1401,8 +1337,8 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 			semptr->semncnt++;
 
 		DPRINTF(("semop:  good night!\n"));
-		error = msleep(semakptr, sema_mtxp, (PZERO - 4) | PCATCH,
-		    "semwait", 0);
+		error = msleep_sbt(semakptr, sema_mtxp, (PZERO - 4) | PCATCH,
+		    "semwait", sbt, precision, C_ABSOLUTE);
 		DPRINTF(("semop:  good morning (error=%d)!\n", error));
 		/* return code is checked below, after sem[nz]cnt-- */
 
@@ -1438,7 +1374,8 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 		 * need to decrement sem[nz]cnt either way.)
 		 */
 		if (error != 0) {
-			error = EINTR;
+			if (error == ERESTART)
+				error = EINTR;
 			goto done2;
 		}
 		DPRINTF(("semop:  good morning!\n"));
@@ -1943,7 +1880,7 @@ freebsd7___semctl(struct thread *td, struct freebsd7___semctl_args *uap)
 		break;
 	case SETVAL:
 		semun.val = arg.val;
-		break;		
+		break;
 	}
 
 	error = kern_semctl(td, uap->semid, uap->semnum, uap->cmd, &semun,
@@ -1982,8 +1919,8 @@ freebsd32_semsys(struct thread *td, struct freebsd32_semsys_args *uap)
 	AUDIT_ARG_SVIPC_WHICH(uap->which);
 	switch (uap->which) {
 	case 0:
-		return (freebsd7_freebsd32_semctl(td,
-		    (struct freebsd7_freebsd32_semctl_args *)&uap->a2));
+		return (freebsd7_freebsd32___semctl(td,
+		    (struct freebsd7_freebsd32___semctl_args *)&uap->a2));
 	default:
 		return (sys_semsys(td, (struct semsys_args *)uap));
 	}
@@ -1995,13 +1932,13 @@ freebsd32_semsys(struct thread *td, struct freebsd32_semsys_args *uap)
 #if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
 int
-freebsd7_freebsd32_semctl(struct thread *td,
-    struct freebsd7_freebsd32_semctl_args *uap)
+freebsd7_freebsd32___semctl(struct thread *td,
+    struct freebsd7_freebsd32___semctl_args *uap)
 {
-	struct semid_ds32_old dsbuf32;
+	struct semid_ds_old32 dsbuf32;
 	struct semid_ds dsbuf;
 	union semun semun;
-	union semun32 arg;
+	union semun_old32 arg;
 	register_t rval;
 	int error;
 
@@ -2014,7 +1951,7 @@ freebsd7_freebsd32_semctl(struct thread *td,
 	case SETALL:
 		error = copyin(uap->arg, &arg, sizeof(arg));
 		if (error)
-			return (error);		
+			return (error);
 		break;
 	}
 
@@ -2068,7 +2005,7 @@ freebsd7_freebsd32_semctl(struct thread *td,
 #endif
 
 int
-freebsd32_semctl(struct thread *td, struct freebsd32_semctl_args *uap)
+freebsd32___semctl(struct thread *td, struct freebsd32___semctl_args *uap)
 {
 	struct semid_ds32 dsbuf32;
 	struct semid_ds dsbuf;
@@ -2086,7 +2023,7 @@ freebsd32_semctl(struct thread *td, struct freebsd32_semctl_args *uap)
 	case SETALL:
 		error = copyin(uap->arg, &arg, sizeof(arg));
 		if (error)
-			return (error);		
+			return (error);
 		break;
 	}
 
@@ -2112,7 +2049,7 @@ freebsd32_semctl(struct thread *td, struct freebsd32_semctl_args *uap)
 		break;
 	case SETVAL:
 		semun.val = arg.val;
-		break;		
+		break;
 	}
 
 	error = kern_semctl(td, uap->semid, uap->semnum, uap->cmd, &semun,
@@ -2165,7 +2102,7 @@ int
 freebsd7_freebsd64___semctl(struct thread *td,
     struct freebsd7_freebsd64___semctl_args *uap)
 {
-	struct semid_ds64_old dsbuf64;
+	struct semid_ds_old64 dsbuf64;
 	struct semid_ds dsbuf;
 	union semun semun;
 	union semun64 arg;
@@ -2191,7 +2128,7 @@ freebsd7_freebsd64___semctl(struct thread *td,
 		semun.buf = &dsbuf;
 		break;
 	case IPC_SET:
-		error = copyin(__USER_CAP_OBJ(arg.buf), &dsbuf64,
+		error = copyin(__USER_CAP(arg.buf, sizeof(dsbuf64)), &dsbuf64,
 		    sizeof(dsbuf64));
 		if (error)
 			return (error);
@@ -2204,7 +2141,8 @@ freebsd7_freebsd64___semctl(struct thread *td,
 		break;
 	case GETALL:
 	case SETALL:
-		semun.array = __USER_CAP_ARRAY(arg.array, SHRT_MAX);
+		semun.array = __USER_CAP(arg.array, seminfo.semmns *
+		    sizeof(*semun.array));
 		break;
 	case SETVAL:
 		semun.val = arg.val;
@@ -2225,7 +2163,7 @@ freebsd7_freebsd64___semctl(struct thread *td,
 		CP(dsbuf, dsbuf64, sem_nsems);
 		CP(dsbuf, dsbuf64, sem_otime);
 		CP(dsbuf, dsbuf64, sem_ctime);
-		error = copyout(&dsbuf64, __USER_CAP_OBJ(arg.buf),
+		error = copyout(&dsbuf64, __USER_CAP(arg.buf, sizeof(dsbuf64)),
 		    sizeof(dsbuf64));
 		break;
 	}
@@ -2265,7 +2203,7 @@ freebsd64___semctl(struct thread *td, struct freebsd64___semctl_args *uap)
 		semun.buf = &dsbuf;
 		break;
 	case IPC_SET:
-		error = copyin(__USER_CAP_OBJ(arg.buf), &dsbuf64,
+		error = copyin(__USER_CAP(arg.buf, sizeof(dsbuf64)), &dsbuf64,
 		    sizeof(dsbuf64));
 		if (error)
 			return (error);
@@ -2278,7 +2216,8 @@ freebsd64___semctl(struct thread *td, struct freebsd64___semctl_args *uap)
 		break;
 	case GETALL:
 	case SETALL:
-		semun.array = __USER_CAP_UNBOUND(arg.array);
+		semun.array = __USER_CAP(arg.array, seminfo.semmns *
+		    sizeof(*semun.array));
 		break;
 	case SETVAL:
 		semun.val = arg.val;
@@ -2298,7 +2237,8 @@ freebsd64___semctl(struct thread *td, struct freebsd64___semctl_args *uap)
 		CP(dsbuf, dsbuf64, sem_nsems);
 		CP(dsbuf, dsbuf64, sem_otime);
 		CP(dsbuf, dsbuf64, sem_ctime);
-		error = copyout(&dsbuf64, __USER_CAP_OBJ(arg.buf), sizeof(dsbuf64));
+		error = copyout(&dsbuf64, __USER_CAP(arg.buf, sizeof(dsbuf64)),
+		    sizeof(dsbuf64));
 		break;
 	}
 
@@ -2312,7 +2252,7 @@ freebsd64_semop(struct thread *td, struct freebsd64_semop_args *uap)
 {
 
 	return (kern_semop(td, uap->semid,
-	    __USER_CAP_ARRAY(uap->sops, uap->nsops), uap->nsops));
+	    __USER_CAP_ARRAY(uap->sops, uap->nsops), uap->nsops, NULL));
 }
 #endif /* COMPAT_FREEBSD64 */
 // CHERI CHANGES START

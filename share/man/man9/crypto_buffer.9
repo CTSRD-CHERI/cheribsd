@@ -30,7 +30,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd September 24, 2020
+.Dd February 11, 2022
 .Dt CRYPTO_BUFFER 9
 .Os
 .Sh NAME
@@ -94,9 +94,12 @@
 .Fa "void *dst"
 .Fc
 .Ft void *
-.Fn crypto_cursor_segbase "struct crypto_buffer_cursor *cc"
-.Ft size_t
-.Fn crypto_cursor_seglen "struct crypto_buffer_cursor *cc"
+.Fn crypto_cursor_segment "struct crypto_buffer_cursor *cc" "size_t *len"
+.Ft void
+.Fo crypto_cursor_copy
+.Fa "const struct crypto_buffer_cursor *fromc"
+.Fa "struct crypto_buffer_cursor *toc"
+.Fc
 .Ft bool
 .Fn CRYPTO_HAS_OUTPUT_BUFFER "struct cryptop *crp"
 .Sh DESCRIPTION
@@ -195,7 +198,10 @@ An array of bytes mapped into the kernel's address space.
 A scatter/gather list of kernel buffers as described in
 .Xr uio 9 .
 .It Dv CRYPTO_BUF_MBUF
-A network memory buffer as described in
+A chain of network memory buffers as described in
+.Xr mbuf 9 .
+.It Dv CRYPTO_BUF_SINGLE_MBUF
+A single network memory buffer as described in
 .Xr mbuf 9 .
 .It Dv CRYPTO_BUF_VMPAGE
 A scatter/gather list of
@@ -220,7 +226,9 @@ data buffer
 A pointer to a
 .Vt struct mbuf
 for
-.Dv CRYPTO_BUF_MBUF .
+.Dv CRYPTO_BUF_MBUF
+and
+.Dv CRYPTO_BUF_SINGLE_MBUF .
 .It Fa cb_uio
 A pointer to a
 .Vt struct uio
@@ -288,12 +296,11 @@ is similar to
 except that it does not change the current position of
 .Fa cc .
 .Pp
-.Fn crypto_cursor_segbase
-and
-.Fn crypto_cursor_seglen
-return the start and length, respectively,
-of the virtually-contiguous segment at the current position of
+.Fn crypto_cursor_segment
+returns the start of the virtually-contiguous segment at the current position of
 .Fa cc .
+The length of the segment is stored in
+.Fa len .
 .Sh RETURN VALUES
 .Fn crypto_apply
 and
@@ -303,7 +310,7 @@ return the return value from the caller-supplied callback function.
 .Fn crypto_buffer_contiguous_subsegment ,
 .Fn crypto_contiguous_subsegment ,
 and
-.Fn crypto_cursor_segbase ,
+.Fn crypto_cursor_segment
 return a pointer to a contiguous segment or
 .Dv NULL .
 .Pp
@@ -312,6 +319,12 @@ returns the length of a buffer in bytes.
 .Pp
 .Fn crypto_cursor_seglen
 returns the length in bytes of a contiguous segment.
+.Pp
+.Fn crypto_cursor_copy
+makes a deep copy of the cursor
+.Fa fromc .
+The two copies do not share any state and can thus be used
+independently.
 .Pp
 .Fn CRYPTO_HAS_OUTPUT_BUFFER
 returns true if the request uses a separate output buffer.

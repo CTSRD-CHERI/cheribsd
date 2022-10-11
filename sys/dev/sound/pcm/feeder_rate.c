@@ -186,7 +186,7 @@ sysctl_hw_snd_feeder_rate_min(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 SYSCTL_PROC(_hw_snd, OID_AUTO, feeder_rate_min,
-    CTLTYPE_INT | CTLFLAG_RWTUN | CTLFLAG_NEEDGIANT, 0, sizeof(int),
+    CTLTYPE_INT | CTLFLAG_RWTUN | CTLFLAG_MPSAFE, 0, sizeof(int),
     sysctl_hw_snd_feeder_rate_min, "I",
     "minimum allowable rate");
 
@@ -209,7 +209,7 @@ sysctl_hw_snd_feeder_rate_max(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 SYSCTL_PROC(_hw_snd, OID_AUTO, feeder_rate_max,
-    CTLTYPE_INT | CTLFLAG_RWTUN | CTLFLAG_NEEDGIANT, 0, sizeof(int),
+    CTLTYPE_INT | CTLFLAG_RWTUN | CTLFLAG_MPSAFE, 0, sizeof(int),
     sysctl_hw_snd_feeder_rate_max, "I",
     "maximum allowable rate");
 
@@ -232,7 +232,7 @@ sysctl_hw_snd_feeder_rate_round(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 SYSCTL_PROC(_hw_snd, OID_AUTO, feeder_rate_round,
-    CTLTYPE_INT | CTLFLAG_RWTUN | CTLFLAG_NEEDGIANT, 0, sizeof(int),
+    CTLTYPE_INT | CTLFLAG_RWTUN | CTLFLAG_MPSAFE, 0, sizeof(int),
     sysctl_hw_snd_feeder_rate_round, "I",
     "sample rate converter rounding threshold");
 
@@ -310,7 +310,7 @@ SYSCTL_PROC(_hw_snd, OID_AUTO, feeder_rate_quality,
  */
 #define _Z_GCAST(x)		((uint64_t)(x))
 
-#if defined(__GNUCLIKE_ASM) && defined(__i386__)
+#if defined(__i386__)
 /*
  * This is where i386 being beaten to a pulp. Fortunately this function is
  * rarely being called and if it is, it will decide the best (hopefully)

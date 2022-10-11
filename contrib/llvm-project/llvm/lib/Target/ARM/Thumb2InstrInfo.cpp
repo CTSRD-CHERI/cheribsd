@@ -12,6 +12,7 @@
 
 #include "Thumb2InstrInfo.h"
 #include "ARMMachineFunctionInfo.h"
+#include "ARMSubtarget.h"
 #include "MCTargetDesc/ARMAddressingModes.h"
 #include "llvm/CodeGen/MachineBasicBlock.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
@@ -24,6 +25,7 @@
 #include "llvm/CodeGen/TargetRegisterInfo.h"
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/MC/MCInst.h"
+#include "llvm/MC/MCInstBuilder.h"
 #include "llvm/MC/MCInstrDesc.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -38,15 +40,17 @@ OldT2IfCvt("old-thumb2-ifcvt", cl::Hidden,
            cl::desc("Use old-style Thumb2 if-conversion heuristics"),
            cl::init(false));
 
+static cl::opt<bool>
+PreferNoCSEL("prefer-no-csel", cl::Hidden,
+             cl::desc("Prefer predicated Move to CSEL"),
+             cl::init(false));
+
 Thumb2InstrInfo::Thumb2InstrInfo(const ARMSubtarget &STI)
     : ARMBaseInstrInfo(STI) {}
 
 /// Return the noop instruction to use for a noop.
-void Thumb2InstrInfo::getNoop(MCInst &NopInst) const {
-  NopInst.setOpcode(ARM::tHINT);
-  NopInst.addOperand(MCOperand::createImm(0));
-  NopInst.addOperand(MCOperand::createImm(ARMCC::AL));
-  NopInst.addOperand(MCOperand::createReg(0));
+MCInst Thumb2InstrInfo::getNop() const {
+  return MCInstBuilder(ARM::tHINT).addImm(0).addImm(ARMCC::AL).addReg(0);
 }
 
 unsigned Thumb2InstrInfo::getUnindexedOpcode(unsigned Opc) const {
@@ -116,6 +120,31 @@ Thumb2InstrInfo::isLegalToSplitMBBAt(MachineBasicBlock &MBB,
 
   Register PredReg;
   return getITInstrPredicate(*MBBI, PredReg) == ARMCC::AL;
+}
+
+MachineInstr *
+Thumb2InstrInfo::optimizeSelect(MachineInstr &MI,
+                                SmallPtrSetImpl<MachineInstr *> &SeenMIs,
+                                bool PreferFalse) const {
+  // Try to use the base optimizeSelect, which uses canFoldIntoMOVCC to fold the
+  // MOVCC into another instruction. If that fails on 8.1-M fall back to using a
+  // CSEL.
+  MachineInstr *RV = ARMBaseInstrInfo::optimizeSelect(MI, SeenMIs, PreferFalse);
+  if (!RV && getSubtarget().hasV8_1MMainlineOps() && !PreferNoCSEL) {
+    Register DestReg = MI.getOperand(0).getReg();
+
+    if (!DestReg.isVirtual())
+      return nullptr;
+
+    MachineInstrBuilder NewMI = BuildMI(*MI.getParent(), MI, MI.getDebugLoc(),
+                                        get(ARM::t2CSEL), DestReg)
+                                    .add(MI.getOperand(2))
+                                    .add(MI.getOperand(1))
+                                    .add(MI.getOperand(3));
+    SeenMIs.insert(NewMI);
+    return NewMI;
+  }
+  return RV;
 }
 
 void Thumb2InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
@@ -221,10 +250,38 @@ loadRegFromStackSlot(MachineBasicBlock &MBB, MachineBasicBlock::iterator I,
 void Thumb2InstrInfo::expandLoadStackGuard(
     MachineBasicBlock::iterator MI) const {
   MachineFunction &MF = *MI->getParent()->getParent();
-  if (MF.getTarget().isPositionIndependent())
+  Module &M = *MF.getFunction().getParent();
+
+  if (M.getStackProtectorGuard() == "tls") {
+    expandLoadStackGuardBase(MI, ARM::t2MRC, ARM::t2LDRi12);
+    return;
+  }
+
+  const GlobalValue *GV =
+      cast<GlobalValue>((*MI->memoperands_begin())->getValue());
+
+  if (MF.getSubtarget<ARMSubtarget>().isGVInGOT(GV))
+    expandLoadStackGuardBase(MI, ARM::t2LDRLIT_ga_pcrel, ARM::t2LDRi12);
+  else if (MF.getTarget().isPositionIndependent())
     expandLoadStackGuardBase(MI, ARM::t2MOV_ga_pcrel, ARM::t2LDRi12);
   else
     expandLoadStackGuardBase(MI, ARM::t2MOVi32imm, ARM::t2LDRi12);
+}
+
+MachineInstr *Thumb2InstrInfo::commuteInstructionImpl(MachineInstr &MI,
+                                                      bool NewMI,
+                                                      unsigned OpIdx1,
+                                                      unsigned OpIdx2) const {
+  switch (MI.getOpcode()) {
+  case ARM::MVE_VMAXNMAf16:
+  case ARM::MVE_VMAXNMAf32:
+  case ARM::MVE_VMINNMAf16:
+  case ARM::MVE_VMINNMAf32:
+    // Don't allow predicated instructions to be commuted.
+    if (getVPTInstrPredicate(MI) != ARMVCC::None)
+      return nullptr;
+  }
+  return ARMBaseInstrInfo::commuteInstructionImpl(MI, NewMI, OpIdx1, OpIdx2);
 }
 
 void llvm::emitT2RegPlusImmediate(MachineBasicBlock &MBB,
@@ -577,7 +634,8 @@ bool llvm::rewriteT2FrameIndex(MachineInstr &MI, unsigned FrameRegIdx,
 
     unsigned NumBits = 0;
     unsigned Scale = 1;
-    if (AddrMode == ARMII::AddrModeT2_i8 || AddrMode == ARMII::AddrModeT2_i12) {
+    if (AddrMode == ARMII::AddrModeT2_i8neg ||
+        AddrMode == ARMII::AddrModeT2_i12) {
       // i8 supports only negative, and i12 supports only positive, so
       // based on Offset sign convert Opcode to the appropriate
       // instruction
@@ -747,8 +805,12 @@ void llvm::recomputeVPTBlockMask(MachineInstr &Instr) {
   MachineBasicBlock::iterator Iter = ++Instr.getIterator(),
                               End = Instr.getParent()->end();
 
+  while (Iter != End && Iter->isDebugInstr())
+    ++Iter;
+
   // Verify that the instruction after the VPT/VPST is predicated (it should
   // be), and skip it.
+  assert(Iter != End && "Expected some instructions in any VPT block");
   assert(
       getVPTInstrPredicate(*Iter) == ARMVCC::Then &&
       "VPT/VPST should be followed by an instruction with a 'then' predicate!");
@@ -757,6 +819,10 @@ void llvm::recomputeVPTBlockMask(MachineInstr &Instr) {
   // Iterate over the predicated instructions, updating the BlockMask as we go.
   ARM::PredBlockMask BlockMask = ARM::PredBlockMask::T;
   while (Iter != End) {
+    if (Iter->isDebugInstr()) {
+      ++Iter;
+      continue;
+    }
     ARMVCC::VPTCodes Pred = getVPTInstrPredicate(*Iter);
     if (Pred == ARMVCC::None)
       break;

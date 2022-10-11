@@ -129,7 +129,6 @@ struct pass_softc {
 	pass_state		  state;
 	pass_flags		  flags;
 	u_int8_t		  pd_type;
-	union ccb		  saved_ccb;
 	int			  open_count;
 	u_int		 	  maxio;
 	struct devstat		 *device_stats;
@@ -398,6 +397,18 @@ passcleanup(struct cam_periph *periph)
 	 */
 	taskqueue_drain(taskqueue_thread, &softc->add_physpath_task);
 
+	/*
+	 * It should be safe to destroy the zones from here, because all
+	 * of the references to this peripheral have been freed, and all
+	 * I/O has been terminated and freed.  We check the zones for NULL
+	 * because they may not have been allocated yet if the device went
+	 * away before any asynchronous I/O has been issued.
+	 */
+	if (softc->pass_zone != NULL)
+		uma_zdestroy(softc->pass_zone);
+	if (softc->pass_io_zone != NULL)
+		uma_zdestroy(softc->pass_io_zone);
+
 	cam_periph_lock(periph);
 
 	free(softc, M_DEVBUF);
@@ -446,8 +457,9 @@ pass_add_physpath(void *context, int pending)
 			"GEOM::physpath", periph->path) == 0
 	 && strlen(physpath) != 0) {
 		mtx_unlock(mtx);
-		make_dev_physpath_alias(MAKEDEV_WAITOK, &softc->alias_dev,
-					softc->dev, softc->alias_dev, physpath);
+		make_dev_physpath_alias(MAKEDEV_WAITOK | MAKEDEV_CHECKNAME,
+				&softc->alias_dev, softc->dev,
+				softc->alias_dev, physpath);
 		mtx_lock(mtx);
 	}
 
@@ -1074,7 +1086,7 @@ passcreatezone(struct cam_periph *periph)
 		/*
 		 * Set the flags appropriately and notify any other waiters.
 		 */
-		softc->flags &= PASS_FLAG_ZONE_INPROG;
+		softc->flags &= ~PASS_FLAG_ZONE_INPROG;
 		softc->flags |= PASS_FLAG_ZONE_VALID;
 		wakeup(&softc->pass_zone);
 	} else {
@@ -1202,7 +1214,7 @@ static int
 passcopysglist(struct cam_periph *periph, struct pass_io_req *io_req,
 	       ccb_flags direction)
 {
-	bus_size_t kern_watermark, user_watermark, len_copied, len_to_copy;
+	bus_size_t kern_watermark, user_watermark, len_to_copy;
 	bus_dma_segment_t *user_sglist, *kern_sglist;
 	int i, j, error;
 
@@ -1210,7 +1222,6 @@ passcopysglist(struct cam_periph *periph, struct pass_io_req *io_req,
 	kern_watermark = 0;
 	user_watermark = 0;
 	len_to_copy = 0;
-	len_copied = 0;
 	user_sglist = io_req->user_segptr;
 	kern_sglist = io_req->kern_segptr;
 
@@ -1253,8 +1264,6 @@ passcopysglist(struct cam_periph *periph, struct pass_io_req *io_req,
 				goto bailout;
 			}
 		}
-
-		len_copied += len_to_copy;
 
 		if (user_sglist[i].ds_len == user_watermark) {
 			i++;
@@ -2256,11 +2265,6 @@ passsendccb(struct cam_periph *periph, union ccb *ccb, union ccb *inccb)
 static int
 passerror(union ccb *ccb, u_int32_t cam_flags, u_int32_t sense_flags)
 {
-	struct cam_periph *periph;
-	struct pass_softc *softc;
-
-	periph = xpt_path_periph(ccb->ccb_h.path);
-	softc = (struct pass_softc *)periph->softc;
 
 	return(cam_periph_error(ccb, cam_flags, sense_flags));
 }

@@ -12,7 +12,7 @@ CFLAGS+= -I${.CURDIR}
 CLEANDIRS+= FreeBSD
 CLEANFILES+= bootstrap
 
-#	$Id: Makefile,v 1.114 2020/11/13 21:47:25 sjg Exp $
+#	$Id: Makefile,v 1.120 2022/07/26 23:02:54 sjg Exp $
 
 PROG?=	${.CURDIR:T}
 
@@ -22,7 +22,6 @@ SRCS= \
 	compat.c \
 	cond.c \
 	dir.c \
-	enum.c \
 	for.c \
 	hash.c \
 	job.c \
@@ -96,7 +95,7 @@ SUBDIR+= unit-tests
 MAN= ${PROG}.1
 MAN1= ${MAN}
 
-.if (${PROG} != "make")
+.if ${PROG} != "make"
 CLEANFILES+= my.history
 .if make(${MAN}) || !exists(${srcdir}/${MAN})
 my.history:
@@ -148,10 +147,27 @@ ${OBJS}: config.h
 
 # A simple unit-test driver to help catch regressions
 TEST_MAKE ?= ${.OBJDIR}/${PROG:T}
-accept test:
+accept test: .NOMETA
 	cd ${.CURDIR}/unit-tests && \
 	MAKEFLAGS= ${TEST_MAKE} -r -m / ${.TARGET} ${TESTS:DTESTS=${TESTS:Q}}
 
+
+.if make(test) && ${MK_AUTO_OBJ} == "yes"
+# The test target above visits unit-tests with -r -m /
+# which prevents MK_AUTO_OBJ doing its job
+# so do it here
+.if defined(MAKEOBJDIRPREFIX) || ${MAKEOBJDIR:U:M*/*} != ""
+_utobj = ${.OBJDIR}/unit-tests
+.else
+_utobj = ${.CURDIR}/unit-tests/${MAKEOBJDIR:Uobj}
+.endif
+utobj: .NOMETA
+	@test -d ${_utobj} && exit 0; \
+	echo "[Creating ${_utobj}...]"; \
+	umask ${OBJDIR_UMASK:U002}; \
+	mkdir -p ${_utobj}
+test: utobj
+.endif
 
 # override some simple things
 BINDIR= /usr/bin

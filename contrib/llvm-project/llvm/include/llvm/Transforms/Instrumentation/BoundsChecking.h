@@ -10,6 +10,7 @@
 #define LLVM_TRANSFORMS_INSTRUMENTATION_BOUNDSCHECKING_H
 
 #include "llvm/IR/PassManager.h"
+#include "llvm/Pass.h"
 
 namespace llvm {
 
@@ -17,6 +18,7 @@ namespace llvm {
 /// stores, and other memory intrinsics.
 struct BoundsCheckingPass : PassInfoMixin<BoundsCheckingPass> {
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
+  static bool isRequired() { return true; }
 };
 
 

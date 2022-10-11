@@ -150,11 +150,9 @@ tegra_ehci_attach(device_t dev)
 	ehci_softc_t *esc;
 	int rv, rid;
 	uint64_t freq;
-	phandle_t node;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
-	node = ofw_bus_get_node(dev);
 	esc = &sc->ehci_softc;
 
 	/* Allocate resources. */
@@ -313,8 +311,7 @@ static device_method_t ehci_methods[] = {
 	DEVMETHOD_END
 };
 
-static devclass_t ehci_devclass;
 static DEFINE_CLASS_0(ehci, ehci_driver, ehci_methods,
     sizeof(struct tegra_ehci_softc));
-DRIVER_MODULE(tegra_ehci, simplebus, ehci_driver, ehci_devclass, NULL, NULL);
+DRIVER_MODULE(tegra_ehci, simplebus, ehci_driver, NULL, NULL);
 MODULE_DEPEND(tegra_ehci, usb, 1, 1, 1);

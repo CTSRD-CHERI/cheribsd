@@ -41,8 +41,6 @@ __FBSDID("$FreeBSD$");
 #include "libc_private.h"
 #include "ignore_init.c"
 
-typedef void (*fptr)(void);
-
 #ifdef GCRT
 extern void _mcleanup(void);
 extern void monstartup(void *, void *);
@@ -59,8 +57,6 @@ extern int etext;
 #endif
 
 #ifdef SHOULD_PROCESS_CAP_RELOCS
-#define DONT_EXPORT_CRT_INIT_GLOBALS
-#define CRT_INIT_GLOBALS_GDC_ONLY
 #include "crt_init_globals.c"
 #endif
 
@@ -95,7 +91,7 @@ __start(int argc, char **argv, char **env, void (*cleanup)(void))
 		}
 
 		if (phdr != NULL && phnum != 0) {
-			do_crt_init_globals(phdr, phnum);
+			crt_init_globals(phdr, phnum, NULL, NULL, NULL);
 		}
 	}
 #endif
