@@ -73,8 +73,6 @@ __FBSDID("$FreeBSD$");
 
 #define	MP_BOOTSTACK_SIZE	(kstack_pages * PAGE_SIZE)
 
-boolean_t ofw_cpu_reg(phandle_t node, u_int, cell_t *);
-
 /*
  * XXX: When loading the kernel through GDB, .bss is not cleared. If BBL is
  * used on a multi-hart system, all harts race to win the hart lottery, with
