@@ -106,8 +106,10 @@ ping(void * __capability target, const char *target_name, int count)
 		if (!aflag)
 			fprintf(stderr, "%s: cocalling \"%s\"...\n", getprogname(), target_name);
 		error = clock_gettime(CLOCK_REALTIME, &before);
-		if (error != 0)
+		if (error != 0) {
 			warn("clock_gettime");
+			return;
+		}
 	}
 
 	for (i = 0; i < count; i++) {
@@ -115,8 +117,10 @@ ping(void * __capability target, const char *target_name, int count)
 			received = cocall_slow(target, &out, out.len, &in, sizeof(in));
 		else
 			received = cocall(target, &out, out.len, &in, sizeof(in));
-		if (received < 0)
+		if (received < 0) {
 			warn("cocall");
+			return;
+		}
 	}
 
 	/*
@@ -125,8 +129,10 @@ ping(void * __capability target, const char *target_name, int count)
 
 	if (vflag || aflag) {
 		error = clock_gettime(CLOCK_REALTIME, &after);
-		if (error != 0)
+		if (error != 0) {
 			warn("clock_gettime");
+			return;
+		}
 
 		timespecsub(&after, &before, &took);
 		humanized = humanize(took.tv_sec * 1000000000L + took.tv_nsec);
