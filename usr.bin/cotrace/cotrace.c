@@ -172,7 +172,7 @@ interpose(void *tmp)
 			pthread_mutex_unlock(&mtx);
 			if (error != 0)
 				warn("cocachedpid");
-			printf("%s: cocall from pid %d[%d] -> pid %d, received %zd, len %zd, op %d: \"%s\"%s\n",
+			printf("%s: cocall from pid %d[%d] -> pid %d, received %zd, len %zd, op %d%s: \"%s\"\n",
 			    getprogname(), pid, interposer->i_index, getpid(), received, in->len, in->op,
 			    kflag ? " (slow)" : "", dumpbuf);
 		} else {
