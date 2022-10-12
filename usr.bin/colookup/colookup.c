@@ -93,22 +93,22 @@ receive_cap(char *filename)
 	if (received != 0) {
 		if (errno == EPROT)
 			warnx("likely not colocated with coregister(1)");
-		err(1, "recvmsg");
+		err(1, "%s: recvmsg", filename);
 	}
 	if (msg.msg_flags & MSG_TRUNC)
-		errx(1, "message truncated");
+		errx(1, "%s: message truncated", filename);
 	if (msg.msg_flags & MSG_CTRUNC)
-		errx(1, "control message truncated");
+		errx(1, "%s: control message truncated", filename);
 
 	cmsg = CMSG_FIRSTHDR(&msg);
 	if (cmsg == NULL)
-		errx(1, "CMSG_FIRSTHDR returned NULL");
+		errx(1, "%s: CMSG_FIRSTHDR returned NULL", filename);
 	if (cmsg->cmsg_len != CMSG_LEN(sizeof(target)))
-		errx(1, "received wrong cmsg_len %d, expected %lu\n", cmsg->cmsg_len, CMSG_LEN(sizeof(target)));
+		errx(1, "%s: received wrong cmsg_len %d, expected %lu\n", filename, cmsg->cmsg_len, CMSG_LEN(sizeof(target)));
 	if (cmsg->cmsg_level != SOL_SOCKET)
-		errx(1, "received wrong cmsg_level %d, expected %d\n", cmsg->cmsg_level, SOL_SOCKET);
+		errx(1, "%s: received wrong cmsg_level %d, expected %d\n", filename, cmsg->cmsg_level, SOL_SOCKET);
 	if (cmsg->cmsg_type != SCM_CAPS)
-		errx(1, "received wrong cmsg_type %d, expected %d\n", cmsg->cmsg_type, SCM_CAPS);
+		errx(1, "%s: received wrong cmsg_type %d, expected %d\n", filename, cmsg->cmsg_type, SCM_CAPS);
 	memcpy(&target, CMSG_DATA(cmsg), sizeof(target));
 
 	error = close(fd);
