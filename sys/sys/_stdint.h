@@ -88,6 +88,14 @@ typedef	__intptr_t		intptr_t;
 typedef	__uintptr_t		uintptr_t;
 #define	_UINTPTR_T_DECLARED
 #endif
+#ifndef	_INT64PTR_T_DECLARED
+typedef	__int64ptr_t            int64ptr_t;
+#define	_INT64PTR_T_DECLARED
+#endif
+#ifndef _UINT64PTR_T_DECLARED
+typedef	__uint64ptr_t           uint64ptr_t;
+#define	_UINT64PTR_T_DECLARED
+#endif
 #ifndef _INTMAX_T_DECLARED
 typedef	__intmax_t		intmax_t;
 #define	_INTMAX_T_DECLARED
