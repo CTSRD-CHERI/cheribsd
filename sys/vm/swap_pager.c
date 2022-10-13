@@ -2161,7 +2161,7 @@ allocated:
 static void
 cheri_restore_tag(void * __capability *cp)
 {
-	size_t base, len, offset, perm, sealed, type;
+	size_t base, len, offset, perm, flags, sealed, type;
 	void * __capability cap;
 	void * __capability newcap;
 	void * __capability sealcap;
@@ -2172,6 +2172,7 @@ cheri_restore_tag(void * __capability *cp)
 	len = cheri_getlen(cap);
 	offset = cheri_getoffset(cap);
 	perm = cheri_getperm(cap);
+	flags = cheri_getflags(cap);
 	sealed = cheri_getsealed(cap);
 	type = cheri_gettype(cap);
 
@@ -2179,6 +2180,7 @@ cheri_restore_tag(void * __capability *cp)
 	newcap = cheri_setoffset(newcap, base);
 	newcap = cheri_setbounds(newcap, len);
 	newcap = cheri_andperm(newcap, perm);
+	newcap = cheri_setflags(newcap, flags);
 	newcap = cheri_incoffset(newcap, offset);
 
 	if (sealed) {
