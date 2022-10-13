@@ -52,6 +52,7 @@
 #define	GCU_IRQ_STATUS		0x00AC
 #define	GCU_STATUS		0x00B0
 #define	GCU_CONTROL		0x00D0
+#define	 CONTROL_SRST		(1 << 16)
 #define	 CONTROL_MODE_S			0
 #define	 CONTROL_MODE_M			(0x7 << CONTROL_MODE_S)
 #define	 CONTROL_MODE_DO0_ACTIVE	(0x3 << CONTROL_MODE_S)
