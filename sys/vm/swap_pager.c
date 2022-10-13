@@ -2210,7 +2210,6 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 	size_t i, j;
 	uint64_t t;
 	void * __capability *scan;
-	void * __capability *p;
 	struct swblk *sb;
 	vm_pindex_t modpi;
 
@@ -2221,11 +2220,10 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 	modpi = page->pindex % SWAP_META_PAGES;
 	for (i = modpi * BITS_PER_TAGS_PER_PAGE;
 	    i < (modpi + 1) * BITS_PER_TAGS_PER_PAGE; i++) {
-		p = scan;
-		for (t = sb->swb_tags[i]; t != 0; t >>= j) {
-			j = ffsl((long)t);
-			cheri_restore_tag(p + j - 1);
-			p += j;
+		t = sb->swb_tags[i];
+		while ((j = ffsl((long)t) - 1) != -1) {
+			cheri_restore_tag(scan + j);
+			t &= ~((uint64_t)1 << j);
 		}
 		scan += 8 * sizeof(uint64_t);
 	}
