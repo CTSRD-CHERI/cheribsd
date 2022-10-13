@@ -113,6 +113,10 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libzstd \
 	ncurses
 
+.if ${MACHINE_ABI:Mpurecap} && !defined(COMPAT_CHERI)
+SUBDIR+=	libc_c18n libthr_c18n
+.endif
+
 .if !${MACHINE_ABI:Mpurecap}
 # Needs changes to be useful for purecap and not used by anything (yet)
 SUBDIR+=	libthread_db

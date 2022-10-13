@@ -1,5 +1,5 @@
 # $FreeBSD$
 
-.PATH:	 ${.CURDIR}/sys
+.PATH:	 ${LIBTHR_SRCTOP}/sys
 
 SRCS+= thr_error.c

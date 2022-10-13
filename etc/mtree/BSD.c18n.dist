@@ -4,20 +4,10 @@
 #
 
 /set type=dir uname=root gname=wheel mode=0755
-.
-    lib64c
-        c18n
-        ..
-        dtrace
-        ..
-        engines
-        ..
-        geom
-        ..
-        i18n
-        ..
-        libxo
-            encoder
+.               nochange
+    usr             nochange
+        lib             nochange
+            c18n
             ..
         ..
     ..
