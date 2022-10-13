@@ -14,8 +14,6 @@ DEBUG+=-DDEBUG
 .endif
 .endif
 
-CFLAGS+=-DRTLD_SANDBOX
-
 .if empty(DEBUG) && !defined(RTLD_INCLUDE_DEBUG_MESSAGES)
 # Avoid the overhead of all the debug checks now that we have a rtld-debug that
 # can be used instead.
@@ -30,7 +28,11 @@ MK_ASAN=	no
 MK_SSP=		no
 MK_UBSAN=	no
 
-.if !defined(NEED_COMPAT)
+.ifdef RTLD_SANDBOX
+CFLAGS+=-DRTLD_SANDBOX
+.endif
+
+.if !defined(NEED_COMPAT) && !defined(RTLD_SANDBOX)
 CONFS=		libmap.conf
 .endif
 PROG?=		ld-elf.so.1
