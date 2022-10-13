@@ -573,15 +573,10 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 	    sizeof(mcp->mc_capregs.cap_x[1]) *
 	    (nitems(mcp->mc_capregs.cap_x) - 1));
 
-	if (cheri_getperm(tf->tf_elr) & CHERI_PERM_EXECUTIVE) {
-		mcp->mc_capregs.cap_sp = tf->tf_sp;
-		mcp->mc_capregs.cap_ddc = tf->tf_ddc;
-	} else {
-		mcp->mc_capregs.cap_sp = READ_SPECIALREG_CAP(rcsp_el0);
-		mcp->mc_capregs.cap_ddc = READ_SPECIALREG_CAP(rddc_el0);
-	}
+	mcp->mc_capregs.cap_sp = tf->tf_sp;
 	mcp->mc_capregs.cap_lr = tf->tf_lr;
 	mcp->mc_capregs.cap_elr = tf->tf_elr;
+	mcp->mc_capregs.cap_ddc = tf->tf_ddc;
 	get_fpcontext(td, mcp);
 
 	return (0);
@@ -601,15 +596,10 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 
 	memcpy(tf->tf_x, mcp->mc_capregs.cap_x, sizeof(tf->tf_x));
 
-	if (cheri_getperm(mcp->mc_capregs.cap_elr) & CHERI_PERM_EXECUTIVE) {
-		tf->tf_sp = mcp->mc_capregs.cap_sp;
-		tf->tf_ddc = mcp->mc_capregs.cap_ddc;
-	} else {
-		WRITE_SPECIALREG_CAP(rcsp_el0, mcp->mc_capregs.cap_sp);
-		WRITE_SPECIALREG_CAP(rddc_el0, mcp->mc_capregs.cap_ddc);
-	}
+	tf->tf_sp = mcp->mc_capregs.cap_sp;
 	tf->tf_lr = mcp->mc_capregs.cap_lr;
 	tf->tf_elr = mcp->mc_capregs.cap_elr;
+	tf->tf_ddc = mcp->mc_capregs.cap_ddc;
 	tf->tf_spsr = mcp->mc_spsr;
 	set_fpcontext(td, mcp);
 
@@ -650,7 +640,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	if ((spsr & PSR_M_MASK) != PSR_M_EL0t ||
 	    (spsr & PSR_AARCH32) != 0 ||
 	    (spsr & PSR_DAIF) != (td->td_frame->tf_spsr & PSR_DAIF))
-		return (EINVAL);
+		return (EINVAL); 
 
 	memcpy(tf->tf_x, mcp->mc_gpregs.gp_x, sizeof(tf->tf_x));
 
