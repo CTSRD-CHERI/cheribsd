@@ -1058,11 +1058,29 @@ swap_pager_reserve(vm_object_t object, vm_pindex_t start, vm_pindex_t size)
 	return (0);
 }
 
+#if __has_feature(capabilities)
+static void
+swp_pager_cheri_xfer_tags(vm_object_t dstobject, vm_pindex_t pindex,
+    struct swblk *sb, vm_pindex_t srcmodpi)
+{
+	struct swblk *dstsb;
+	vm_pindex_t modpi;
+
+	dstsb = SWAP_PCTRIE_LOOKUP(&dstobject->un_pager.swp.swp_blks,
+	    rounddown(pindex, SWAP_META_PAGES));
+
+	modpi = pindex % SWAP_META_PAGES;
+	memcpy(dstsb->swb_tags + modpi * BITS_PER_TAGS_PER_PAGE,
+	    sb->swb_tags + srcmodpi * BITS_PER_TAGS_PER_PAGE,
+	    BITS_PER_TAGS_PER_PAGE * sizeof(uint64_t));
+}
+#endif
+
 static bool
 swp_pager_xfer_source(vm_object_t srcobject, vm_object_t dstobject,
-    vm_pindex_t pindex, daddr_t addr)
+    vm_pindex_t pindex, struct swblk *sb, vm_pindex_t srcmodpi)
 {
-	daddr_t dstaddr __diagused;
+	daddr_t addr, dstaddr __diagused;
 
 	KASSERT((srcobject->flags & OBJ_SWAP) != 0,
 	    ("%s: srcobject not swappable", __func__));
@@ -1074,6 +1092,8 @@ swp_pager_xfer_source(vm_object_t srcobject, vm_object_t dstobject,
 		return (false);
 	}
 
+	addr = sb->d[srcmodpi];
+
 	/*
 	 * Destination has no swapblk and is not resident, transfer source.
 	 * swp_pager_meta_build() can sleep.
@@ -1083,6 +1103,10 @@ swp_pager_xfer_source(vm_object_t srcobject, vm_object_t dstobject,
 	KASSERT(dstaddr == SWAPBLK_NONE,
 	    ("Unexpected destination swapblk"));
 	VM_OBJECT_WLOCK(srcobject);
+
+#if __has_feature(capabilities)
+	swp_pager_cheri_xfer_tags(dstobject, pindex, sb, srcmodpi);
+#endif
 
 	return (true);
 }
@@ -2302,8 +2326,8 @@ swp_pager_meta_transfer(vm_object_t srcobject, vm_object_t dstobject,
 			if (sb->d[i] == SWAPBLK_NONE)
 				continue;
 			if (dstobject == NULL ||
-			    !swp_pager_xfer_source(srcobject, dstobject, 
-			    sb->p + i - offset, sb->d[i])) {
+			    !swp_pager_xfer_source(srcobject, dstobject,
+			    sb->p + i - offset, sb, i)) {
 				swp_pager_update_freerange(&s_free, &n_free,
 				    sb->d[i]);
 			}
