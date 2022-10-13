@@ -2165,6 +2165,16 @@ allocated:
 	/* Enter block into metadata. */
 	sb->d[modpi] = swapblk;
 
+#if __has_feature(capabilities)
+	/*
+	 * No capabilities present for this block (yet); either this is
+	 * reserved swap space or the caller will populate the bitmap.
+	 */
+	if (swapblk != SWAPBLK_NONE)
+		memset(sb->swb_tags + modpi * BITS_PER_TAGS_PER_PAGE, 0,
+		    BITS_PER_TAGS_PER_PAGE * sizeof(uint64_t));
+#endif
+
 	/*
 	 * Free the swblk if we end up with the empty page run.
 	 */
