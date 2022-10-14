@@ -490,11 +490,8 @@ proc_read_cheri_tags_page(vm_map_t map, vm_offset_t va, void *tagbuf,
     bool *hastagsp)
 {
 	vm_page_t m;
-	char *src, *dst;
-	uint64_t tags;
-	u_int len, tagbits;
+	void *page;
 	int error;
-	bool hastags;
 
 	KASSERT(is_aligned(va, PAGE_SIZE),
 	    ("%s: user address %lx is not page-aligned", __func__, va));
@@ -512,35 +509,9 @@ proc_read_cheri_tags_page(vm_map_t map, vm_offset_t va, void *tagbuf,
 	if (error != 0)
 		return (EFAULT);
 
-	src = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
-	dst = tagbuf;
-	len = PAGE_SIZE;
-	tags = 0;
-	tagbits = 0;
-	hastags = false;
-	while (len > 0) {
-		tags |= cheri_loadtags(src) << tagbits;
-		tagbits += cheri_cloadtags_stride;
-		if (tags != 0)
-			hastags = true;
-
-		while (tagbits >= 8) {
-			*dst = tags & 0xff;
-
-			tags >>= 8;
-			tagbits -= 8;
-			dst++;
-		}
-
-		src += cheri_cloadtags_stride * sizeof(uintcap_t);
-		len -= cheri_cloadtags_stride * sizeof(uintcap_t);
-	}
-
-	KASSERT(tagbits == 0, ("%s: partial tag bits %u at end of page",
-	    __func__, tagbits));
-
+	page = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+	cheri_read_tags_page(page, tagbuf, hastagsp);
 	vm_page_unwire(m, PQ_ACTIVE);
-	*hastagsp = hastags;
 	return (0);
 }
 

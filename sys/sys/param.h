@@ -435,6 +435,8 @@ __END_DECLS
 #else
 #define	PTR2CAP(p)	(p)
 #endif
+
+#define	TAG_BYTES_PER_PAGE	(PAGE_SIZE / (sizeof(__uintcap_t) * NBBY))
 #endif
 
 #endif	/* _SYS_PARAM_H_ */
