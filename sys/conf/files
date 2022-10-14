@@ -379,6 +379,7 @@ cheri/cheri_sysctl.c			optional cpu_cheri
 cheri/cheri_otype.c			optional cpu_cheri
 cheri/cheri_sealcap.c			optional cpu_cheri
 cheri/cheri_syscall.c			optional cpu_cheri
+cheri/cheri_tags.c			optional cpu_cheri
 cheri/cheri_usercap.c			optional cpu_cheri
 
 # dtrace specific

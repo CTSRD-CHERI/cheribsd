@@ -135,6 +135,11 @@ otype_t	cheri_otype_alloc(void);
 void	cheri_otype_free(otype_t);
 
 /*
+ * Functions involving tagged memory.
+ */
+void	cheri_read_tags_page(const void *page, void *tagbuf, bool *hastagsp);
+
+/*
  * Global sysctl definitions.
  */
 SYSCTL_DECL(_security_cheri);
