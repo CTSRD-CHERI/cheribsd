@@ -388,6 +388,14 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 
 	perms = cheri_getperm(source_cap);
 	reqperms = vm_map_prot2perms(uap->prot);
+#ifdef CHERI_PERM_EXECUTIVE
+	if ((flags & MAP_FIXED) && (perms & CHERI_PERM_EXECUTIVE) == 0)
+		/*
+		 * Don't implicity require CHERI_PERM_EXECUTIVE if it's
+		 * not available in source capability.
+		 */
+		reqperms &= ~CHERI_PERM_EXECUTIVE;
+#endif
 	if ((perms & reqperms) != reqperms) {
 		SYSERRCAUSE("capability has insufficient perms (0x%lx)"
 		    "for request (0x%lx)", perms, reqperms);
