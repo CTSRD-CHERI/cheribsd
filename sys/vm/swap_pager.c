@@ -166,7 +166,7 @@ CTASSERT((PAGE_SIZE / CHERICAP_SIZE) % (8 * sizeof(uint64_t)) == 0);
 struct swblk {
 	vm_pindex_t	p;
 #if __has_feature(capabilities)
-	uint64_t	swb_tags[SWAP_META_PAGES * BITS_PER_TAGS_PER_PAGE];
+	uint64_t	t[SWAP_META_PAGES][BITS_PER_TAGS_PER_PAGE];
 #endif
 	daddr_t		d[SWAP_META_PAGES];
 };
@@ -1070,9 +1070,7 @@ swp_pager_cheri_xfer_tags(vm_object_t dstobject, vm_pindex_t pindex,
 	    rounddown(pindex, SWAP_META_PAGES));
 
 	modpi = pindex % SWAP_META_PAGES;
-	memcpy(dstsb->swb_tags + modpi * BITS_PER_TAGS_PER_PAGE,
-	    sb->swb_tags + srcmodpi * BITS_PER_TAGS_PER_PAGE,
-	    BITS_PER_TAGS_PER_PAGE * sizeof(uint64_t));
+	memcpy(&dstsb->t[modpi], &sb->t[srcmodpi], sizeof(sb->t[srcmodpi]));
 }
 #endif
 
@@ -2171,8 +2169,7 @@ allocated:
 	 * reserved swap space or the caller will populate the bitmap.
 	 */
 	if (swapblk != SWAPBLK_NONE)
-		memset(sb->swb_tags + modpi * BITS_PER_TAGS_PER_PAGE, 0,
-		    BITS_PER_TAGS_PER_PAGE * sizeof(uint64_t));
+		memset(&sb->t[modpi], 0, sizeof(sb->t[modpi]));
 #endif
 
 	/*
@@ -2254,9 +2251,8 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 	    rounddown(page->pindex, SWAP_META_PAGES));
 
 	modpi = page->pindex % SWAP_META_PAGES;
-	for (i = modpi * BITS_PER_TAGS_PER_PAGE;
-	    i < (modpi + 1) * BITS_PER_TAGS_PER_PAGE; i++) {
-		t = sb->swb_tags[i];
+	for (i = 0; i < nitems(sb->t[modpi]); i++) {
+		t = sb->t[modpi][i];
 		while ((j = ffsl((long)t) - 1) != -1) {
 			cheri_restore_tag(scan + j);
 			t &= ~((uint64_t)1 << j);
@@ -2285,8 +2281,7 @@ swp_pager_meta_cheri_put_tags(vm_page_t page)
 	    rounddown(page->pindex, SWAP_META_PAGES));
 
 	modpi = page->pindex % SWAP_META_PAGES;
-	for (i = modpi * BITS_PER_TAGS_PER_PAGE;
-	    i < (modpi + 1) * BITS_PER_TAGS_PER_PAGE; i++) {
+	for (i = 0; i < nitems(sb->t[modpi]); i++) {
 		t = 0;
 		m = 1;
 		for (j = 0; j < 8 * sizeof(uint64_t); j++) {
@@ -2296,7 +2291,7 @@ swp_pager_meta_cheri_put_tags(vm_page_t page)
 			m <<= 1;
 			scan++;
 		}
-		sb->swb_tags[i] = t;
+		sb->t[modpi][i] = t;
 	}
 }
 #endif
