@@ -2198,48 +2198,19 @@ allocated:
  *	cheri_restore_tag:
  *
  *	Restore a single tag.
- *
- *	XXX: It would be nice to replace this with a more portable
- *	CSETTAG().
  */
 static void
 cheri_restore_tag(void * __capability *cp)
 {
-	size_t base, len, offset, perm, flags, sealed, type;
-	void * __capability cap;
+	uintcap_t cap;
 	void * __capability newcap;
 	void * __capability sealcap;
 
-	cap = *cp;
+	cap = (uintcap_t)*cp;
 
-	base = cheri_getbase(cap);
-	len = cheri_getlen(cap);
-	offset = cheri_getoffset(cap);
-	perm = cheri_getperm(cap);
-	flags = cheri_getflags(cap);
-	sealed = cheri_getsealed(cap);
-	type = cheri_gettype(cap);
-
-	newcap = swap_restore_cap;
-	newcap = cheri_setoffset(newcap, base);
-	newcap = cheri_setbounds(newcap, len);
-	newcap = cheri_andperm(newcap, perm);
-	newcap = cheri_setflags(newcap, flags);
-	newcap = cheri_incoffset(newcap, offset);
-
-	if (sealed) {
-		if (type == CHERI_OTYPE_SENTRY) {
-			newcap = cheri_sealentry(newcap);
-		} else {
-			sealcap = cheri_setoffset(swap_restore_cap, type);
-			newcap = cheri_seal(newcap, sealcap);
-		}
-	}
-
-	/*
-	 * XXX: Does this guarantee a bit for bit indentical result?
-	 * We should check in the slow path.
-	 */
+	newcap = cheri_buildcap(swap_restore_cap, cap);
+	sealcap = cheri_copytype(swap_restore_cap, cap);
+	newcap = cheri_condseal(newcap, sealcap);
 
 	*cp = newcap;
 }
