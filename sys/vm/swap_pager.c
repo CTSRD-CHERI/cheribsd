@@ -150,11 +150,16 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #define	SWAP_META_PAGES		PCTRIE_COUNT
-#if __has_feature(capabilities)
-#define	BITS_PER_TAGS_PER_PAGE					\
-	((PAGE_SIZE / CHERICAP_SIZE) / (8 * sizeof(uint64_t)))
 
-CTASSERT((PAGE_SIZE / CHERICAP_SIZE) % (8 * sizeof(uint64_t)) == 0);
+#if __has_feature(capabilities)
+typedef u_long tag_word_t;
+
+#define	tag_word_ffs(x)		ffsl((long)(x))
+
+#define	TAG_WORDS_PER_PAGE					\
+	((PAGE_SIZE / CHERICAP_SIZE) / (8 * sizeof(tag_word_t)))
+
+CTASSERT((PAGE_SIZE / CHERICAP_SIZE) % (8 * sizeof(tag_word_t)) == 0);
 #endif
 
 /*
@@ -166,7 +171,7 @@ CTASSERT((PAGE_SIZE / CHERICAP_SIZE) % (8 * sizeof(uint64_t)) == 0);
 struct swblk {
 	vm_pindex_t	p;
 #if __has_feature(capabilities)
-	uint64_t	t[SWAP_META_PAGES][BITS_PER_TAGS_PER_PAGE];
+	tag_word_t	t[SWAP_META_PAGES][TAG_WORDS_PER_PAGE];
 #endif
 	daddr_t		d[SWAP_META_PAGES];
 };
@@ -2241,7 +2246,7 @@ static void
 swp_pager_meta_cheri_get_tags(vm_page_t page)
 {
 	size_t i, j;
-	uint64_t t;
+	tag_word_t t;
 	void * __capability *scan;
 	struct swblk *sb;
 	vm_pindex_t modpi;
@@ -2253,11 +2258,11 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 	modpi = page->pindex % SWAP_META_PAGES;
 	for (i = 0; i < nitems(sb->t[modpi]); i++) {
 		t = sb->t[modpi][i];
-		while ((j = ffsl((long)t) - 1) != -1) {
+		while ((j = tag_word_ffs(t) - 1) != -1) {
 			cheri_restore_tag(scan + j);
-			t &= ~((uint64_t)1 << j);
+			t &= ~((tag_word_t)1 << j);
 		}
-		scan += 8 * sizeof(uint64_t);
+		scan += 8 * sizeof(tag_word_t);
 	}
 }
 
@@ -2270,7 +2275,7 @@ static void
 swp_pager_meta_cheri_put_tags(vm_page_t page)
 {
 	size_t i, j;
-	uint64_t t, m;
+	tag_word_t t, m;
 	void * __capability *scan;
 	struct swblk *sb;
 	vm_pindex_t modpi;
@@ -2284,7 +2289,7 @@ swp_pager_meta_cheri_put_tags(vm_page_t page)
 	for (i = 0; i < nitems(sb->t[modpi]); i++) {
 		t = 0;
 		m = 1;
-		for (j = 0; j < 8 * sizeof(uint64_t); j++) {
+		for (j = 0; j < 8 * sizeof(tag_word_t); j++) {
 			tag = cheri_gettag(*scan);
 			if (tag != 0)
 				t |= m;
