@@ -61,9 +61,14 @@
 #define	cheri_setaddress(x, y)	__builtin_cheri_address_set((x), (y))
 #define	cheri_setflags(x, y)	__builtin_cheri_flags_set((x), (y))
 
+#define	cheri_buildcap(x, y)	__builtin_cheri_cap_build((x), (y))
+
+#define	cheri_copytype(x, y)	__builtin_cheri_cap_type_copy((x), (y))
+
 #define	cheri_seal(x, y)	__builtin_cheri_seal((x), (y))
 #define	cheri_unseal(x, y)	__builtin_cheri_unseal((x), (y))
 #define	cheri_sealentry(x)	__builtin_cheri_seal_entry((x))
+#define	cheri_condseal(x, y)	__builtin_cheri_conditional_seal((x), (y))
 
 #define	cheri_ccheckperm(c, p)	__builtin_cheri_perms_check((c), (p))
 #define	cheri_cchecktype(c, t)	__builtin_cheri_type_check((c), (t))
