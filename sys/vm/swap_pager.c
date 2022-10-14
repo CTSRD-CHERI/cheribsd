@@ -81,6 +81,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/disk.h>
 #include <sys/disklabel.h>
 #include <sys/eventhandler.h>
+#include <sys/endian.h>
 #include <sys/fcntl.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
@@ -156,10 +157,17 @@ typedef u_long tag_word_t;
 
 #define	tag_word_ffs(x)		ffsl((long)(x))
 
-#define	TAG_WORDS_PER_PAGE					\
-	((PAGE_SIZE / CHERICAP_SIZE) / (8 * sizeof(tag_word_t)))
+#if __SIZEOF_LONG__ == 4
+#define	tag_word_letoh(x)	le32toh(x)
+#elif __SIZEOF_LONG__ == 8
+#define	tag_word_letoh(x)	le64toh(x)
+#else
+#error unsupported long size
+#endif
 
-CTASSERT((PAGE_SIZE / CHERICAP_SIZE) % (8 * sizeof(tag_word_t)) == 0);
+#define	TAG_WORDS_PER_PAGE	(TAG_BYTES_PER_PAGE / sizeof(tag_word_t))
+
+CTASSERT(TAG_BYTES_PER_PAGE % sizeof(tag_word_t) == 0);
 #endif
 
 /*
@@ -2257,7 +2265,7 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 
 	modpi = page->pindex % SWAP_META_PAGES;
 	for (i = 0; i < nitems(sb->t[modpi]); i++) {
-		t = sb->t[modpi][i];
+		t = tag_word_letoh(sb->t[modpi][i]);
 		while ((j = tag_word_ffs(t) - 1) != -1) {
 			cheri_restore_tag(scan + j);
 			t &= ~((tag_word_t)1 << j);
@@ -2274,30 +2282,16 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 static void
 swp_pager_meta_cheri_put_tags(vm_page_t page)
 {
-	size_t i, j;
-	tag_word_t t, m;
 	void * __capability *scan;
 	struct swblk *sb;
 	vm_pindex_t modpi;
-	int tag;
 
 	scan = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
 	sb = SWAP_PCTRIE_LOOKUP(&page->object->un_pager.swp.swp_blks,
 	    rounddown(page->pindex, SWAP_META_PAGES));
 
 	modpi = page->pindex % SWAP_META_PAGES;
-	for (i = 0; i < nitems(sb->t[modpi]); i++) {
-		t = 0;
-		m = 1;
-		for (j = 0; j < 8 * sizeof(tag_word_t); j++) {
-			tag = cheri_gettag(*scan);
-			if (tag != 0)
-				t |= m;
-			m <<= 1;
-			scan++;
-		}
-		sb->t[modpi][i] = t;
-	}
+	cheri_read_tags_page(scan, &sb->t[modpi], NULL);
 }
 #endif
 
