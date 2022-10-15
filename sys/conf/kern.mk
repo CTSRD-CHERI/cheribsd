@@ -135,13 +135,14 @@ CFLAGS += -ffixed-x18
 INLINE_LIMIT?=	8000
 
 .if ${MACHINE_CPU:Mcheri}
-AARCH64_MARCH=	morello
-.if ${MACHINE_ARCH:Maarch*c*}
-CFLAGS+=	-march=morello+c64 -mabi=purecap
-.else
 CFLAGS+=	-march=morello
-.endif
 CFLAGS+=	-Xclang -morello-vararg=new
+.endif
+
+.if ${MACHINE_ARCH:Maarch*c*}
+CFLAGS+=	-mabi=purecap
+.else
+CFLAGS+=	-mabi=aapcs
 .endif
 .endif
 

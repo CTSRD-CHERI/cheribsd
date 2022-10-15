@@ -140,8 +140,9 @@ _CPUCFLAGS = -mcpu=${CPUTYPE}
 # Use -march when the CPU type is an architecture value, e.g. armv8.1-a
 _CPUCFLAGS = -march=${CPUTYPE}
 .  elif ${CPUTYPE} == "morello"
-# Don't use -march; we will add -march=morello or -march=morello+c64 later but
-# adding -march=morello here would override that as _CPUCFLAGS is added late.
+# Don't use -march; we will add -march=morello later so it's not necessary, and
+# it's not sufficient to use _CPUCFLAGS either as NO_CPU_CFLAGS should not
+# suppress enabling Morello support.
 # It is also not a valid value for -mcpu.
 .  else
 # Otherwise assume we have a CPU type
@@ -303,14 +304,18 @@ MACHINE_CPU += riscv
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64"
+. if ${MACHINE_CPU:Mcheri}
+CFLAGS+=	-march=morello
+CFLAGS+=	-Xclang -morello-vararg=new
+LDFLAGS+=	-march=morello
+. endif
+
 . if ${MACHINE_ARCH:Maarch64*c*}
-CFLAGS+=	-march=morello+c64 -mabi=purecap
-CFLAGS+=	-Xclang -morello-vararg=new
-LDFLAGS+=	-march=morello+c64 -mabi=purecap
-. elif defined(CPUTYPE) && ${CPUTYPE} == "morello"
-CFLAGS+=	-march=morello -mabi=aapcs
-CFLAGS+=	-Xclang -morello-vararg=new
-LDFLAGS+=	-march=morello -mabi=aapcs
+CFLAGS+=	-mabi=purecap
+LDFLAGS+=	-mabi=purecap
+. else
+CFLAGS+=	-mabi=aapcs
+LDFLAGS+=	-mabi=aapcs
 . endif
 .endif
 
