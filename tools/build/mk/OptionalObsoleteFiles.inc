@@ -1185,7 +1185,7 @@ OLD_FILES+=usr/share/man/man1/llvm-strings.1.gz
 OLD_FILES+=usr/share/man/man1/llvm-symbolizer.1.gz
 .endif
 
-.if ${MK_CLANG} == no
+.if ${MK_CLANG} == no && 0
 OLD_FILES+=usr/bin/clang
 OLD_FILES+=usr/bin/clang++
 OLD_FILES+=usr/bin/clang-cpp
@@ -4246,7 +4246,8 @@ OLD_DIRS+=usr/include/c++/v1
 .endif
 
 .if ${MK_LLD} == no
-OLD_FILES+=usr/bin/ld.lld
+# Don't remove version from llvm-base
+#OLD_FILES+=usr/bin/ld.lld
 .endif
 
 .if ${MK_LLDB} == no
