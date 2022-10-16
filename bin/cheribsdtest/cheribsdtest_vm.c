@@ -1409,11 +1409,11 @@ CHERIBSDTEST(cheribsdtest_cheri_revoke_capdirty,
 
 	mb = CHERIBSDTEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE, PROT_READ |
 	    PROT_WRITE, MAP_ANON, -1, 0));
-	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP,
-	    mb, &sh));
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
+	    CHERI_REVOKE_SHADOW_NOVMMAP, mb, &sh));
 
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    cheri_revoke_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
 	    __DEQUALIFY_CAP(void * __capability *,&cri)));
 
 	revme = cheri_andperm(cheri_setbounds(mb, 0x10), ~CHERI_PERM_SW_VMEM);
