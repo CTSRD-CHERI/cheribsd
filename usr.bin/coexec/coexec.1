@@ -56,10 +56,9 @@ The
 .Nm
 utility exits 0 on success, and >0 if an error occurs.
 .Sh EXAMPLES
-Execute
-.Xr procstat 1
-within the address space of the current shell process:
-.Dl Nm Ar $$ Ar procstat Ar -v Ar $$
+Start a shell colocated with the process identified by PID 42:
+.Pp
+.Dl Nm Ar 42 Ar sh
 .Pp
 .Sh SEE ALSO
 .Xr coexecve 2
