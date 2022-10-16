@@ -244,8 +244,11 @@ socket_loop(char *filename, void * __capability target)
 	sun.sun_len = SUN_LEN(&sun);
 
 	error = bind(fd, (struct sockaddr *)&sun, sizeof(sun));
-	if (error != 0)
+	if (error != 0) {
+		if (errno == EADDRINUSE)
+			warnx("cannot bind to existing socket; remove %s and try again", filename);
 		err(1, "%s", filename);
+	}
 	error = listen(fd, SOMAXCONN);
 	if (error != 0)
 		err(1, "listen");
