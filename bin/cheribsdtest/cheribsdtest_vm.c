@@ -1314,9 +1314,9 @@ CHERIBSDTEST(cheribsdtest_cheri_revoke_lightly,
 	mb = CHERIBSDTEST_CHECK_SYSCALL(
 	    mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, mb, &sh));
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, mb, &sh));
 
-	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_shadow(
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
 	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
 	    __DEQUALIFY_CAP(void * __capability *, &cri)));
 
