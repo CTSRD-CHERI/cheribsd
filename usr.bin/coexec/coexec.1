@@ -29,7 +29,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd May 6, 2016
+.Dd March 29, 2024
 .Dt COEXEC 1
 .Os
 .Sh NAME
@@ -50,16 +50,21 @@ Note that using
 .Nm
 is usually not necessary if the
 .Va kern.opportunistic_coexecve
-sysctl is set to 1, which is the default.
+sysctl is set to 1.
 .Sh EXIT STATUS
 The
 .Nm
 utility exits 0 on success, and >0 if an error occurs.
 .Sh EXAMPLES
-Execute
+Start a shell colocated with the process identified by PID 42:
+.Pp
+.Dl Nm Ar 42 Ar sh
+.Pp
+Run
 .Xr procstat 1
-within the address space of the current shell process:
-.Dl Nm Ar $$ Ar procstat Ar -v Ar $$
+colocated with the current shell and display its memory map:
+.Pp
+.Dl Nm Ar $$ Ar procstat -v $$
 .Pp
 .Sh SEE ALSO
 .Xr coexecve 2
