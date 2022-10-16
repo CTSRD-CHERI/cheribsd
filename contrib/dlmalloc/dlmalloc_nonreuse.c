@@ -2642,7 +2642,8 @@ static void add_segment(mstate m, char* tbase, size_t tsize, flag_t mmapped) {
   m->seg.next = ss;
 #ifdef CAPREVOKE
   if (do_revocation(m) &&
-      cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, tbase, &m->seg.shadow)
+      cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, tbase,
+        &m->seg.shadow)
       != 0)
     ABORT;
 #endif
@@ -2753,7 +2754,7 @@ static void* sys_alloc(mstate m, size_t nb) {
       m->seg.sflags = mmap_flag;
 #ifdef CAPREVOKE
       if (do_revocation(m) &&
-          cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, tbase,
+          cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, tbase,
               &m->seg.shadow) != 0)
         ABORT;
 #endif
@@ -3702,7 +3703,7 @@ malloc_revoke_internal(const char *reason) {
 #ifdef CAPREVOKE
   if (cri == NULL) {
     int error;
-    error = cheri_revoke_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
+    error = cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
         __DECONST(void **, &cri));
     assert(error == 0);
     (void)error; // silence unused warning if asserts are disabled
