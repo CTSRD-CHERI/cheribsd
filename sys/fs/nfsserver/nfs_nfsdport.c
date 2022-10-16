@@ -6779,6 +6779,8 @@ nfsvno_setxattr(struct vnode *vp, char *name, int len, struct mbuf *m,
 	if (error == 0) {
 		error = VOP_SETEXTATTR(vp, EXTATTR_NAMESPACE_USER, name, uiop,
 		    cred, p);
+		if (error == 0)
+			error = VOP_FSYNC(vp, MNT_WAIT, p);
 		free(iv, M_TEMP);
 	}
 
@@ -6814,6 +6816,8 @@ nfsvno_rmxattr(struct nfsrv_descript *nd, struct vnode *vp, char *name,
 	if (error == EOPNOTSUPP)
 		error = VOP_SETEXTATTR(vp, EXTATTR_NAMESPACE_USER, name, NULL,
 		    cred, p);
+	if (error == 0)
+		error = VOP_FSYNC(vp, MNT_WAIT, p);
 out:
 	NFSEXITCODE(error);
 	return (error);
