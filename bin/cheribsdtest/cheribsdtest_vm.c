@@ -1682,11 +1682,11 @@ cheribsdtest_cheri_revoke_lib_init(
 	*obigblock = bigblock;
 
 	CHERIBSDTEST_CHECK_SYSCALL(
-	    cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, bigblock,
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, bigblock,
 	    oshadow));
 
 	CHERIBSDTEST_CHECK_SYSCALL(
-		cheri_revoke_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
+		cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
 			__DEQUALIFY_CAP(void * __capability *,ocri)));
 }
 
