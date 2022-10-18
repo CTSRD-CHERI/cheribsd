@@ -130,4 +130,6 @@ struct cheri_revoke_info_page {
 	 */
 };
 
+SYSCTL_DECL(_vm_cheri_revoke);
+
 #endif

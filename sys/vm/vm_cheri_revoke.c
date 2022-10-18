@@ -330,7 +330,7 @@ out:
 /******************************* VM ITERATION *******************************/
 
 static bool cheri_revoke_avoid_faults = 1;
-SYSCTL_BOOL(_vm, OID_AUTO, cheri_revoke_avoid_faults, CTLFLAG_RW,
+SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, avoid_faults, CTLFLAG_RW,
     &cheri_revoke_avoid_faults, 0,
     "XXX");
 
@@ -920,7 +920,7 @@ vm_cheri_revoke_cookie_rele(struct vm_cheri_revoke_cookie *crc)
 /******************************* VM & SHADOW *******************************/
 
 static bool cheri_revoke_core_shadow = 0;
-SYSCTL_BOOL(_vm, OID_AUTO, cheri_revoke_core_shadow, CTLFLAG_RW,
+SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, core_shadow, CTLFLAG_RW,
     &cheri_revoke_core_shadow, 0,
     "Include the cheri_revoke shadow in core dumps");
 

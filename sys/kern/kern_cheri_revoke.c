@@ -38,8 +38,13 @@ __FBSDID("$FreeBSD$");
  * for the real implementation.
  */
 
+FEATURE(cheri_revoke, "CHERI capability revocation support");
+
+SYSCTL_NODE(_vm, OID_AUTO, cheri_revoke, CTLFLAG_RD | CTLFLAG_MPSAFE,  0,
+    "CHERI capability revocation configuration");
+
 static bool cheri_revoke_load_side = true;
-SYSCTL_BOOL(_vm, OID_AUTO, cheri_revoke_load_side, CTLFLAG_RW,
+SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, load_side, CTLFLAG_RW,
     &cheri_revoke_load_side, 1, "Use load-side revocation by default");
 
 /*
