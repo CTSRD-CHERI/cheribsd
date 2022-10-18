@@ -382,8 +382,6 @@ FBSD_1.4 {
 };
 
 FBSD_1.5 {
-	cheri_revoke;
-	cheri_revoke_shadow;
 	clock_nanosleep;
 	fdatasync;
 	fhstat;

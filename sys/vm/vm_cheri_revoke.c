@@ -21,6 +21,7 @@ __FBSDID("$FreeBSD$");
 
 #include <cheri/cheric.h>
 #include <cheri/revoke.h>
+#include <cheri/revoke_kern.h>
 #include <vm/vm_cheri_revoke.h>
 
 // XXX This is very much a work in progress!
@@ -494,7 +495,7 @@ vm_cheri_revoke_object_at(const struct vm_cheri_revoke_cookie *crc, int flags,
 		    VM_FAULT_NOFILL, &m);
 		vm_map_lock_read(map);
 
-		if (res == KERN_NOT_RECEIVER) {
+		if (res == KERN_PAGE_NOT_FILLED) {
 			/*
 			 * NOFILL did its thing, and, as far as we know, there
 			 * is no pmap entry to update.  Just get out of here.
@@ -873,7 +874,7 @@ out:
 }
 
 /*
- * XXX Should this encapsulate a barrier around epochs and stat collectio and
+ * XXX Should this encapsulate a barrier around epochs and stat collection and
  * all that?  I don't think there are any meaningful races around epoch close,
  * but maybe it'd be better to be a little more structured.
  */
@@ -889,11 +890,18 @@ vm_cheri_revoke_cookie_init(vm_map_t map, struct vm_cheri_revoke_cookie *crc)
 	crc->map = map;
 
 	/*
+	 * Build the capability to the shadow bitmap that we will use for probes
+	 * during this revocation pass or fault.  We are holding the map xlocked
+	 * at this point, so we cannot use any of the checked constructors,
+	 * which, with INVARIANTS, try to validate that the cap does not span
+	 * reservations and, so, slock the map; WITNESS sensibly objects.
+	 *
+	 * TODO:
 	 * For foreign maps, we should take advantage of map->vm_cheri_revoke_sh
 	 * and construct a mapping in the local address space to manipulate
 	 * the remote one!
 	 */
-	crc->crshadow = cheri_capability_build_user_data(
+	crc->crshadow = cheri_capability_build_user_rwx_unchecked(
 	    CHERI_PERM_LOAD | CHERI_PERM_GLOBAL,
 	    curproc->p_sysent->sv_cheri_revoke_shadow_base,
 	    curproc->p_sysent->sv_cheri_revoke_shadow_length,

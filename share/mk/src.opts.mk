@@ -388,11 +388,6 @@ BROKEN_OPTIONS+=CHERI_CAPREVOKE
 BROKEN_OPTIONS+=LIB64C
 .endif
 
-.if ${__C} != "cheri" && ${__C} != "morello" && \
-    !${__T:Maarch64*c*} && !${__T:Mriscv64*c*}
-BROKEN_OPTIONS+=CHERI_CAPREVOKE
-.endif
-
 .if ${.MAKE.OS} != "FreeBSD"
 # tablegen will not build on non-FreeBSD so also disable target clang and lld
 BROKEN_OPTIONS+=CLANG LLD

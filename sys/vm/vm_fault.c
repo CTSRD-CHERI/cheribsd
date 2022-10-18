@@ -103,6 +103,7 @@ __FBSDID("$FreeBSD$");
 #ifdef CHERI_CAPREVOKE
 #include <cheri/cheric.h>
 #include <cheri/revoke.h>
+#include <cheri/revoke_kern.h>
 #include <vm/vm_cheri_revoke.h>
 #endif
 
@@ -344,7 +345,7 @@ vm_fault_must_cheri_revoke(vm_map_t map, vm_prot_t prot, vm_page_t m,
 {
 
 	/* If revocation isn't in progress, no need to interpose */
-	if (cheri_revoke_st_state(map->vm_cheri_revoke_st) ==
+	if (cheri_revoke_st_get_state(map->vm_cheri_revoke_st) ==
 	    CHERI_REVOKE_ST_NONE)
 		return false;
 
@@ -377,7 +378,7 @@ vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 	 */
 	int hascaps, res;
 	struct vm_cheri_revoke_cookie crc;
-	uint64_t vm_cheri_revoke_st = fs->map->vm_cheri_revoke_st;
+	cheri_revoke_state_t vm_cheri_revoke_st = fs->map->vm_cheri_revoke_st;
 
 	res = vm_cheri_revoke_cookie_init(fs->map, &crc);
 	KASSERT(res == KERN_SUCCESS, ("cheri revoke cookie init WTF"));
@@ -438,7 +439,7 @@ vm_fault_cheri_revoke(struct faultstate *fs, vm_page_t m, bool canwrite)
 			 */
 			return VFCR_OK;
 		} else {
-			KASSERT(cheri_revoke_st_state(vm_cheri_revoke_st) !=
+			KASSERT(cheri_revoke_st_get_state(vm_cheri_revoke_st) !=
 			    CHERI_REVOKE_ST_SS_LAST,
 			    ("VM_CHERI_REVOKE_PAGE_DIRTY & write during STW"));
 

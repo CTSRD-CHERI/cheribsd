@@ -2942,7 +2942,7 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 		return;
 #ifdef CHERI_CAPREVOKE
 	/* This is pretty heavy-handed, but it's good enough for now */
-	if (cheri_revoke_st_state(map->vm_cheri_revoke_st) !=
+	if (cheri_revoke_st_get_state(map->vm_cheri_revoke_st) !=
 	    CHERI_REVOKE_ST_NONE)
 		return;
 #endif
@@ -3072,7 +3072,7 @@ again:
 	vm_map_wait_busy(map);
 
 #ifdef CHERI_CAPREVOKE
-	if (cheri_revoke_st_state(map->vm_cheri_revoke_st) !=
+	if (cheri_revoke_st_get_state(map->vm_cheri_revoke_st) !=
 	    CHERI_REVOKE_ST_NONE) {
 		if (map == &curthread->td_proc->p_vmspace->vm_map) {
 			/* Push our revocation along */

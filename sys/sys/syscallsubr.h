@@ -149,7 +149,10 @@ int	kern_cap_rights_limit(struct thread *td, int fd, cap_rights_t *rights);
 int	kern_chdir(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg);
 int	kern_cheri_revoke(struct thread *td, int flags, uint64_t start,
-		struct cheri_revoke_syscall_info * __capability srsi);
+	    struct cheri_revoke_syscall_info * __capability srsi);
+int	kern_cheri_revoke_get_shadow(struct thread *td, int flags,
+	    void * __capability arena,
+	    void * __capability * __capability shadow);
 int	kern_chflagsat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, u_long flags, int atflag);
 int	kern_chroot(struct thread *td, const char * __capability path);

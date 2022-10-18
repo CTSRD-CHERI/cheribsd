@@ -125,23 +125,6 @@ static	volatile const struct cheri_revoke_info *cri;
 static	cheri_revoke_epoch_t painted_epoch;
 #endif
 
-#ifdef CAPREVOKE
-/*
- * In the CAPREVOKE case, we encode the bucket in the next pointer's low
- * bit in the quarantine pool.  The static assert ensures that remains
- * possible.
- */
-_Static_assert(NBUCKETS < FIRST_BUCKET_SIZE,
-    "Not enough alignment to encode bucket in pointer bits");
-#define	MAX_QUARANTINE	(1024 * 1024)
-#define	MAX_PAINTED	(4 * MAX_QUARANTINE)
-static	union overhead *quarantine_bufs[NBUCKETS];
-static	union overhead *painted_bufs[NBUCKETS];
-static	size_t quarantine_size, painted_size;
-static	volatile const struct cheri_revoke_info *cri;
-static	cheri_revoke_epoch painted_epoch;
-#endif
-
 static	size_t pagesz;			/* page size */
 
 

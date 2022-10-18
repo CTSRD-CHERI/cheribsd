@@ -61,11 +61,6 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
-#ifdef CAPREVOKE
-#include <cheri/revoke.h>
-#include <sys/stdatomic.h>
-#include <cheri/libcaprevoke.h>
-#endif
 #endif
 #ifdef CAPREVOKE
 #include <cheri/revoke.h>
@@ -145,19 +140,6 @@ static struct ov_listhead nextf[NBUCKETS];
 #ifdef CAPREVOKE
 #define	MAX_QUARANTINE	(1024 * 1024)
 static struct ov_listhead quarantine_bufs[NBUCKETS];
-static size_t quarantine_size;
-#endif
-
-#ifdef CAPREVOKE
-/*
- * In the CAPREVOKE case, we encode the bucket in the next pointer's low
- * bit in the quarantine pool.  The static assert ensures that remains
- * possible.
- */
-_Static_assert(NBUCKETS < FIRST_BUCKET_SIZE,
-    "Not enough alignment to encode bucket in pointer bits");
-#define	MAX_QUARANTINE	(1024 * 1024)
-static union overhead *quarantine_bufs[NBUCKETS];
 static size_t quarantine_size;
 #endif
 

@@ -2239,6 +2239,7 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 	for (i = 0; i < nitems(sb->t[modpi]); i++) {
 		t = tag_word_letoh(sb->t[modpi][i]);
 		while ((j = tag_word_ffs(t) - 1) != -1) {
+			mark_capdirty = true;
 			cheri_restore_tag(scan + j);
 			t &= ~((tag_word_t)1 << j);
 		}
