@@ -89,7 +89,7 @@
 static spinlock_t tls_malloc_lock = _SPINLOCK_INITIALIZER;
 #define	TLS_MALLOC_LOCK		if (__isthreaded) _SPINLOCK(&tls_malloc_lock)
 #define	TLS_MALLOC_UNLOCK	if (__isthreaded) _SPINUNLOCK(&tls_malloc_lock)
-union overhead;
+struct overhead;
 static void morecore(int);
 static void *__tls_malloc_aligned(size_t size, size_t align);
 
@@ -98,14 +98,14 @@ static void *__tls_malloc_aligned(size_t size, size_t align);
  * contains a pointer to the next free block. When in use, the first
  * byte is set to MAGIC, and the second byte is the size index.
  */
-union	overhead {
-	struct {
-	union	overhead *ov_next;	/* when free */
+struct overhead {
+	union {
+		struct	overhead *ov_next;	/* when free */
+		struct {
+			u_char	ovu_magic;	/* magic number */
+			u_char	ovu_index;	/* bucket # */
+		} ovu;
 	};
-	struct {
-		u_char	ovu_magic;	/* magic number */
-		u_char	ovu_index;	/* bucket # */
-	} ovu;
 #define	ov_magic	ovu.ovu_magic
 #define	ov_index	ovu.ovu_index
 };
@@ -122,7 +122,7 @@ struct pagepool_header {
 #endif
 };
 
-#define	MALLOC_ALIGNMENT	sizeof(union overhead)
+#define	MALLOC_ALIGNMENT	sizeof(struct overhead)
 
 #define	MAGIC		0xef		/* magic # on accounting info */
 
@@ -134,7 +134,7 @@ struct pagepool_header {
 #define	FIRST_BUCKET_SHIFT	5
 #define	FIRST_BUCKET_SIZE	(1 << FIRST_BUCKET_SHIFT)
 #define	NBUCKETS 30
-static	union overhead *nextf[NBUCKETS];
+static	struct overhead *nextf[NBUCKETS];
 
 #ifdef CAPREVOKE
 /*
@@ -145,7 +145,7 @@ static	union overhead *nextf[NBUCKETS];
 _Static_assert(NBUCKETS < FIRST_BUCKET_SIZE,
     "Not enough alignment to encode bucket in pointer bits");
 #define	MAX_QUARANTINE	(1024 * 1024)
-static union overhead *quarantine_bufs[NBUCKETS];
+static struct overhead *quarantine_bufs[NBUCKETS];
 static size_t quarantine_size;
 #endif
 
@@ -250,7 +250,7 @@ static void
 try_revoke(int target_bucket)
 {
 	int bucket;
-	union overhead *op, *next_op;
+	struct overhead *op, *next_op;
 
 	/*
 	 * Don't revoke unless there is enough in quarantine and some of
@@ -311,7 +311,7 @@ dequarantine:
 static void *
 __tls_malloc(size_t nbytes)
 {
-	union overhead *op;
+	struct overhead *op;
 	int bucket;
 	size_t amt;
 
@@ -411,7 +411,7 @@ static void
 morecore(int bucket)
 {
 	char *buf;
-	union overhead *op;
+	struct overhead *op;
 	size_t sz;			/* size of desired block */
 	int amt;			/* amount to allocate */
 	int nblks;			/* how many blocks we get */
@@ -436,18 +436,18 @@ morecore(int bucket)
 	 * Add new memory allocated to that on
 	 * free list for this hash bucket.
 	 */
-	nextf[bucket] = op = (union overhead *)(void *)cheri_setbounds(buf, sz);
+	nextf[bucket] = op = (struct overhead *)(void *)cheri_setbounds(buf, sz);
 	while (--nblks > 0) {
-		op->ov_next = (union overhead *)(void *)cheri_setbounds(buf + sz, sz);
+		op->ov_next = (struct overhead *)(void *)cheri_setbounds(buf + sz, sz);
 		buf += sz;
 		op = op->ov_next;
 	}
 }
 
-static union overhead *
+static struct overhead *
 find_overhead(void * cp)
 {
-	union overhead *op;
+	struct overhead *op;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (!cheri_gettag(cp))
@@ -493,7 +493,7 @@ find_overhead(void * cp)
 static void
 nextf_insert(void *mem, size_t size, int xbucket)
 {
-	union overhead *op;
+	struct overhead *op;
 	int bucket;
 
 	bucket = __builtin_ctzl(size) - __builtin_ctzl(FIRST_BUCKET_SIZE);
@@ -550,7 +550,7 @@ void
 tls_free(void *cp)
 {
 	int bucket;
-	union overhead *op;
+	struct overhead *op;
 
 	if (cp == NULL)
 		return;
