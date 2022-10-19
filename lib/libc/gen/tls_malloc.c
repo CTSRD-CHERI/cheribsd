@@ -93,6 +93,7 @@ static void *__tls_malloc_aligned(size_t size, size_t align);
 struct overhead {
 	union {
 		struct overhead	*ov_next;	/* when free */
+		struct overhead *ov_real_allocation;	/* when realigned */
 		struct {
 			u_char	ovu_magic;	/* magic number */
 			u_char	ovu_index;	/* bucket # */
@@ -265,20 +266,20 @@ __tls_malloc(size_t nbytes)
 	nextf[bucket] = op->ov_next;
 	TLS_MALLOC_UNLOCK;
 	/*
-	 * XXXQEMU: Set an ov_next capability to a NULL capability, clearing any
-	 * permissions.
+	 * XXXQEMU: Clear the overhead struct to remove any capability
+	 * permissions in ov_real_allocation.
 	 *
-	 * Based on a tag and permissions of ov_next, find_overhead() determines
-	 * if an allocation is aligned. The QEMU user mode for CheriABI doesn't
-	 * implement tagged memory and find_overhead() might incorrectly assume
-	 * the allocation is aligned because of a non-cleared tag. Having the
-	 * permissions cleared, find_overhead() behaves as expected under the
-	 * user mode.
+	 * Based on a tag and permissions of ov_real_allocation, find_overhead()
+	 * determines if an allocation is aligned. The QEMU user mode for
+	 * CheriABI doesn't implement tagged memory and find_overhead() might
+	 * incorrectly assume the allocation is aligned because of a
+	 * non-cleared tag. Having the permissions cleared, find_overhead()
+	 * behaves as expected under the user mode.
 	 *
 	 * This is a workaround and should be reverted once the user mode
 	 * implements tagged memory.
 	 */
-	op->ov_next = NULL;
+	memset(op, 0, sizeof(*op));
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
 	return (op + 1);
@@ -382,14 +383,16 @@ find_overhead(void * cp)
 	 *  - Be an internal allocator pointer (have the VMMAP permision).
 	 *  - Point somewhere before us and within the current pagepool.
 	 */
-	if (cheri_gettag(op->ov_next) &&
-	    (cheri_getperm(op->ov_next) & CHERI_PERM_SW_VMEM) != 0) {
+	if (cheri_gettag(op->ov_real_allocation) &&
+	    (cheri_getperm(op->ov_real_allocation) & CHERI_PERM_SW_VMEM) != 0) {
 		ptraddr_t base, pp_base;
 
 		pp_base = cheri_getbase(op);
-		base = cheri_getbase(op->ov_next);
-		if (base >= pp_base && base < cheri_getaddress(op))
-			op = op->ov_next;
+		base = cheri_getbase(op->ov_real_allocation);
+		if (base >= pp_base && base < cheri_getaddress(op)) {
+			op = op->ov_real_allocation;
+			op--;
+		}
 	}
 #endif
 	if (op->ov_magic == MAGIC)
@@ -441,16 +444,17 @@ static void *
 __tls_malloc_aligned(size_t size, size_t align)
 {
 	ptraddr_t memshift;
-	void *mem, *res;
+	void *mem;
+	struct overhead *op;
 	if (align < sizeof(void *))
 		align = sizeof(void *);
 
-	mem = __tls_malloc(size + sizeof(void *) + align - 1);
-	memshift = roundup2((ptraddr_t)mem + sizeof(void *), align) -
+	mem = __tls_malloc(size + sizeof(*op) + align - 1);
+	memshift = roundup2((ptraddr_t)mem + sizeof(*op), align) -
 	    (ptraddr_t)mem;
-	res = (void *)((uintptr_t)mem + memshift);
-	*(void **)((uintptr_t)res - sizeof(void *)) = mem;
-	return (res);
+	op = (struct overhead *)((uintptr_t)mem + memshift);
+	(op - 1)->ov_real_allocation = mem;
+	return ((void *)op);
 }
 
 void *
