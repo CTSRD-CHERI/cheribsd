@@ -89,7 +89,6 @@
 static spinlock_t tls_malloc_lock = _SPINLOCK_INITIALIZER;
 #define	TLS_MALLOC_LOCK		if (__isthreaded) _SPINLOCK(&tls_malloc_lock)
 #define	TLS_MALLOC_UNLOCK	if (__isthreaded) _SPINUNLOCK(&tls_malloc_lock)
-struct overhead;
 static void morecore(int);
 static void *__tls_malloc_aligned(size_t size, size_t align);
 
@@ -100,7 +99,8 @@ static void *__tls_malloc_aligned(size_t size, size_t align);
  */
 struct overhead {
 	union {
-		struct	overhead *ov_next;	/* when free */
+		SLIST_ENTRY(overhead) ov_next;	/* when free */
+		struct overhead *ov_real_allocation;	/* when realigned */
 		struct {
 			u_char	ovu_magic;	/* magic number */
 			u_char	ovu_index;	/* bucket # */
@@ -109,6 +109,7 @@ struct overhead {
 #define	ov_magic	ovu.ovu_magic
 #define	ov_index	ovu.ovu_index
 };
+SLIST_HEAD(ov_listhead, overhead);
 
 struct pagepool_header {
 	size_t			 ph_size;
@@ -118,7 +119,7 @@ struct pagepool_header {
 	SLIST_ENTRY(pagepool_header) ph_next;
 #ifdef CAPREVOKE
 	void			*ph_shadow;
-	void			*ph_pad2; /* Align strongly */
+	void			*ph_pad2; /* align to 4 * sizeof(void *) */
 #endif
 };
 
@@ -127,25 +128,18 @@ struct pagepool_header {
 #define	MAGIC		0xef		/* magic # on accounting info */
 
 /*
- * nextf[i] is the pointer to the next free block of size
+ * nextf[i] is the head of the list of the next free block of size
  * (FIRST_BUCKET_SIZE << i).  The overhead information precedes the
  * data area returned to the user.
  */
 #define	FIRST_BUCKET_SHIFT	5
 #define	FIRST_BUCKET_SIZE	(1 << FIRST_BUCKET_SHIFT)
 #define	NBUCKETS 30
-static	struct overhead *nextf[NBUCKETS];
+static struct ov_listhead nextf[NBUCKETS];
 
 #ifdef CAPREVOKE
-/*
- * In the CAPREVOKE case, we encode the bucket in the next pointer's low
- * bit in the quarantine pool.  The static assert ensures that remains
- * possible.
- */
-_Static_assert(NBUCKETS < FIRST_BUCKET_SIZE,
-    "Not enough alignment to encode bucket in pointer bits");
 #define	MAX_QUARANTINE	(1024 * 1024)
-static struct overhead *quarantine_bufs[NBUCKETS];
+static struct ov_listhead quarantine_bufs[NBUCKETS];
 static size_t quarantine_size;
 #endif
 
@@ -228,7 +222,6 @@ __rederive_pointer(void *ptr)
 			return (cheri_setaddress(pp, addr));
 		}
 	}
-
 	TLS_MALLOC_UNLOCK;
 	return (NULL);
 #endif
@@ -250,15 +243,15 @@ static void
 try_revoke(int target_bucket)
 {
 	int bucket;
-	struct overhead *op, *next_op;
+	struct overhead *op;
 
 	/*
 	 * Don't revoke unless there is enough in quarantine and some of
 	 * it would be returned to the bucket we want to refill.
 	 */
-	 if (quarantine_bufs[target_bucket] == NULL ||
-	     quarantine_size < MAX_QUARANTINE)
-	     return;
+	if (quarantine_size < MAX_QUARANTINE ||
+	    SLIST_EMPTY(&quarantine_bufs[target_bucket]))
+		return;
 
 	if (cri == NULL) {
 		int error;
@@ -279,8 +272,7 @@ try_revoke(int target_bucket)
 
 
 	for (bucket = 0; bucket < NBUCKETS; bucket++) {
-		for (op = quarantine_bufs[bucket]; op != NULL;
-		    op = op->ov_next)
+		SLIST_FOREACH(op, &quarantine_bufs[bucket], ov_next)
 			paint_shadow(op, FIRST_BUCKET_SIZE << bucket);
 	}
 	atomic_thread_fence(memory_order_acq_rel);
@@ -288,21 +280,15 @@ try_revoke(int target_bucket)
 	do_revoke();
 
 	for (bucket = 0; bucket < NBUCKETS; bucket++) {
-		for (op = quarantine_bufs[bucket]; op != NULL;
-		    op = op->ov_next)
+		SLIST_FOREACH(op, &quarantine_bufs[bucket], ov_next)
 			clear_shadow(op, FIRST_BUCKET_SIZE << bucket);
 	}
 	atomic_thread_fence(memory_order_acq_rel);
 
 dequarantine:
 	for (bucket = 0; bucket < NBUCKETS; bucket++) {
-		op = quarantine_bufs[bucket];
-		while (op != NULL) {
-			next_op = op->ov_next;
-			op->ov_next = nextf[bucket];
-			nextf[bucket] = op;
-			op = next_op;
-		}
+		while (!SLIST_EMPTY(&quarantine_bufs[bucket]))
+			SLIST_REMOVE_HEAD(&quarantine_bufs[bucket], ov_next);
 	}
 	quarantine_size = 0;
 }
@@ -312,6 +298,7 @@ static void *
 __tls_malloc(size_t nbytes)
 {
 	struct overhead *op;
+	struct ov_listhead *bucketp;
 	int bucket;
 	size_t amt;
 
@@ -330,40 +317,42 @@ __tls_malloc(size_t nbytes)
 	}
 	if (bucket >= NBUCKETS)
 		return (NULL);
+	bucketp = &nextf[bucket];
 	/*
 	 * If nothing in hash bucket right now,
 	 * request more memory from the system.
 	 */
 	TLS_MALLOC_LOCK;
 #ifdef CAPREVOKE
-	if ((op = nextf[bucket]) == NULL)
+	if (SLIST_EMPTY(bucketp))
 		try_revoke(bucket);
 #endif
-	if ((op = nextf[bucket]) == NULL) {
+	if (SLIST_EMPTY(bucketp)) {
 		morecore(bucket);
-		if ((op = nextf[bucket]) == NULL) {
+		if (SLIST_EMPTY(bucketp)) {
 			TLS_MALLOC_UNLOCK;
 			return (NULL);
 		}
 	}
 	/* remove from linked list */
-	nextf[bucket] = op->ov_next;
+	op = SLIST_FIRST(bucketp);
+	SLIST_REMOVE_HEAD(bucketp, ov_next);
 	TLS_MALLOC_UNLOCK;
 	/*
-	 * XXXQEMU: Set an ov_next capability to a NULL capability, clearing any
-	 * permissions.
+	 * XXXQEMU: Clear the overhead struct to remove any capability
+	 * permissions in ov_real_allocation.
 	 *
-	 * Based on a tag and permissions of ov_next, find_overhead() determines
-	 * if an allocation is aligned. The QEMU user mode for CheriABI doesn't
-	 * implement tagged memory and find_overhead() might incorrectly assume
-	 * the allocation is aligned because of a non-cleared tag. Having the
-	 * permissions cleared, find_overhead() behaves as expected under the
-	 * user mode.
+	 * Based on a tag and permissions of ov_real_allocation, find_overhead()
+	 * determines if an allocation is aligned. The QEMU user mode for
+	 * CheriABI doesn't implement tagged memory and find_overhead() might
+	 * incorrectly assume the allocation is aligned because of a
+	 * non-cleared tag. Having the permissions cleared, find_overhead()
+	 * behaves as expected under the user mode.
 	 *
 	 * This is a workaround and should be reverted once the user mode
 	 * implements tagged memory.
 	 */
-	op->ov_next = NULL;
+	memset(op, 0, sizeof(*op));
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
 	return (op + 1);
@@ -436,11 +425,10 @@ morecore(int bucket)
 	 * Add new memory allocated to that on
 	 * free list for this hash bucket.
 	 */
-	nextf[bucket] = op = (struct overhead *)(void *)cheri_setbounds(buf, sz);
-	while (--nblks > 0) {
-		op->ov_next = (struct overhead *)(void *)cheri_setbounds(buf + sz, sz);
+	for(; nblks > 0; nblks--) {
+		op = (struct overhead *)(void *)cheri_setbounds(buf, sz);
+		SLIST_INSERT_HEAD(&nextf[bucket], op, ov_next);
 		buf += sz;
-		op = op->ov_next;
 	}
 }
 
@@ -467,14 +455,16 @@ find_overhead(void * cp)
 	 *  - Be an internal allocator pointer (have the VMMAP permision).
 	 *  - Point somewhere before us and within the current pagepool.
 	 */
-	if (cheri_gettag(op->ov_next) &&
-	    (cheri_getperm(op->ov_next) & CHERI_PERM_SW_VMEM) != 0) {
+	if (cheri_gettag(op->ov_real_allocation) &&
+	    (cheri_getperm(op->ov_real_allocation) & CHERI_PERM_SW_VMEM) != 0) {
 		ptraddr_t base, pp_base;
 
 		pp_base = cheri_getbase(op);
-		base = cheri_getbase(op->ov_next);
-		if (base >= pp_base && base < cheri_getaddress(op))
-			op = op->ov_next;
+		base = cheri_getbase(op->ov_real_allocation);
+		if (base >= pp_base && base < cheri_getaddress(op)) {
+			op = op->ov_real_allocation;
+			op--;
+		}
 	}
 #endif
 	if (op->ov_magic == MAGIC)
@@ -488,19 +478,6 @@ find_overhead(void * cp)
 	 */
 	abort();
 	return (NULL);
-}
-
-static void
-nextf_insert(void *mem, size_t size, int xbucket)
-{
-	struct overhead *op;
-	int bucket;
-
-	bucket = __builtin_ctzl(size) - __builtin_ctzl(FIRST_BUCKET_SIZE);
-	if (bucket != xbucket) abort();
-	op = mem;
-	op->ov_next = nextf[bucket];
-	nextf[bucket] = op;
 }
 
 #ifdef CAPREVOKE
@@ -559,14 +536,12 @@ tls_free(void *cp)
 		return;
 	TLS_MALLOC_LOCK;
 	bucket = op->ov_index;
-	if (bucket < NBUCKETS)
-		abort();
+	assert(bucket < NBUCKETS);
 #ifdef CAPREVOKE
-	op->ov_next = quarantine_bufs[bucket];
-	quarantine_bufs[bucket] = op;
+	SLIST_INSERT_HEAD(&quarantine_bufs[bucket], op, ov_next);
 	quarantine_size += FIRST_BUCKET_SIZE << bucket;
 #else
-	nextf_insert(op, FIRST_BUCKET_SIZE << bucket, bucket);
+	SLIST_INSERT_HEAD(&nextf[bucket], op, ov_next);
 #endif
 	TLS_MALLOC_UNLOCK;
 }
@@ -575,16 +550,17 @@ static void *
 __tls_malloc_aligned(size_t size, size_t align)
 {
 	ptraddr_t memshift;
-	void *mem, *res;
+	void *mem;
+	struct overhead *op;
 	if (align < sizeof(void *))
 		align = sizeof(void *);
 
-	mem = __tls_malloc(size + sizeof(void *) + align - 1);
-	memshift = roundup2((ptraddr_t)mem + sizeof(void *), align) -
+	mem = __tls_malloc(size + sizeof(*op) + align - 1);
+	memshift = roundup2((ptraddr_t)mem + sizeof(*op), align) -
 	    (ptraddr_t)mem;
-	res = (void *)((uintptr_t)mem + memshift);
-	*(void **)((uintptr_t)res - sizeof(void *)) = mem;
-	return (res);
+	op = (struct overhead *)((uintptr_t)mem + memshift);
+	(op - 1)->ov_real_allocation = mem;
+	return ((void *)op);
 }
 
 void *
