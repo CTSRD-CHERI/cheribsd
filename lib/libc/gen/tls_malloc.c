@@ -57,6 +57,7 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <sys/queue.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
@@ -92,7 +93,7 @@ static void *__tls_malloc_aligned(size_t size, size_t align);
  */
 struct overhead {
 	union {
-		struct overhead	*ov_next;	/* when free */
+		SLIST_ENTRY(overhead) ov_next;	/* when free */
 		struct overhead *ov_real_allocation;	/* when realigned */
 		struct {
 			u_char	ovu_magic;	/* magic number */
@@ -102,19 +103,20 @@ struct overhead {
 #define	ov_magic	ovu.ovu_magic
 #define	ov_index	ovu.ovu_index
 };
+SLIST_HEAD(ov_listhead, overhead);
 
 #define	MALLOC_ALIGNMENT	sizeof(struct overhead)
 
 #define	MAGIC		0xef		/* magic # on accounting info */
 
 /*
- * nextf[i] is the pointer to the next free block of size
+ * nextf[i] is the head of the list of the next free block of size
  * (FIRST_BUCKET_SIZE << i).  The overhead information precedes the
  * data area returned to the user.
  */
 #define	FIRST_BUCKET_SIZE	32
 #define	NBUCKETS 30
-static struct overhead *nextf[NBUCKETS];
+static struct ov_listhead nextf[NBUCKETS];
 
 static const size_t pagesz = PAGE_SIZE;			/* page size */
 
@@ -232,6 +234,7 @@ static void *
 __tls_malloc(size_t nbytes)
 {
 	struct overhead *op;
+	struct ov_listhead *bucketp;
 	int bucket;
 	size_t amt;
 
@@ -250,20 +253,22 @@ __tls_malloc(size_t nbytes)
 	}
 	if (bucket >= NBUCKETS)
 		return (NULL);
+	bucketp = &nextf[bucket];
 	/*
 	 * If nothing in hash bucket right now,
 	 * request more memory from the system.
 	 */
 	TLS_MALLOC_LOCK;
-	if ((op = nextf[bucket]) == NULL) {
+	if (SLIST_EMPTY(bucketp)) {
 		morecore(bucket);
-		if ((op = nextf[bucket]) == NULL) {
+		if (SLIST_EMPTY(bucketp)) {
 			TLS_MALLOC_UNLOCK;
 			return (NULL);
 		}
 	}
 	/* remove from linked list */
-	nextf[bucket] = op->ov_next;
+	op = SLIST_FIRST(bucketp);
+	SLIST_REMOVE_HEAD(bucketp, ov_next);
 	TLS_MALLOC_UNLOCK;
 	/*
 	 * XXXQEMU: Clear the overhead struct to remove any capability
@@ -352,11 +357,10 @@ morecore(int bucket)
 	 * Add new memory allocated to that on
 	 * free list for this hash bucket.
 	 */
-	nextf[bucket] = op = (struct overhead *)(void *)cheri_setbounds(buf, sz);
-	while (--nblks > 0) {
-		op->ov_next = (struct overhead *)(void *)cheri_setbounds(buf + sz, sz);
+	for(; nblks > 0; nblks--) {
+		op = (struct overhead *)(void *)cheri_setbounds(buf, sz);
+		SLIST_INSERT_HEAD(&nextf[bucket], op, ov_next);
 		buf += sz;
-		op = op->ov_next;
 	}
 }
 
@@ -422,8 +426,7 @@ tls_free(void *cp)
 	TLS_MALLOC_LOCK;
 	bucket = op->ov_index;
 	assert(bucket < NBUCKETS);
-	op->ov_next = nextf[bucket];	/* also clobbers ov_magic */
-	nextf[bucket] = op;
+	SLIST_INSERT_HEAD(&nextf[bucket], op, ov_next);
 	TLS_MALLOC_UNLOCK;
 }
 
