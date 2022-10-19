@@ -408,19 +408,6 @@ find_overhead(void * cp)
 	return (NULL);
 }
 
-static void
-nextf_insert(void *mem, size_t size, int xbucket)
-{
-	struct overhead *op;
-	int bucket;
-
-	bucket = __builtin_ctzl(size) - __builtin_ctzl(FIRST_BUCKET_SIZE);
-	if (bucket != xbucket) abort();
-	op = mem;
-	op->ov_next = nextf[bucket];
-	nextf[bucket] = op;
-}
-
 void
 tls_free(void *cp)
 {
@@ -434,9 +421,9 @@ tls_free(void *cp)
 		return;
 	TLS_MALLOC_LOCK;
 	bucket = op->ov_index;
-	if (bucket < NBUCKETS)
-		abort();
-	nextf_insert(op, FIRST_BUCKET_SIZE << bucket, bucket);
+	assert(bucket < NBUCKETS);
+	op->ov_next = nextf[bucket];	/* also clobbers ov_magic */
+	nextf[bucket] = op;
 	TLS_MALLOC_UNLOCK;
 }
 
