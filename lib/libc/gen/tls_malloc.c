@@ -57,6 +57,7 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/mman.h>
+#include <sys/queue.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
@@ -114,7 +115,7 @@ struct pagepool_header {
 #ifdef __CHERI_PURE_CAPABILITY__
 	size_t			 ph_pad1;
 #endif
-	struct pagepool_header	*ph_next;
+	SLIST_ENTRY(pagepool_header) ph_next;
 #ifdef CAPREVOKE
 	void			*ph_shadow;
 	void			*ph_pad2; /* Align strongly */
@@ -153,7 +154,7 @@ static const size_t pagesz = PAGE_SIZE;			/* page size */
 #define	NPOOLPAGES	(32*1024/pagesz)
 
 static caddr_t	pagepool_start, pagepool_end;
-static struct pagepool_header	*curpp;
+static SLIST_HEAD(, pagepool_header) curpp = SLIST_HEAD_INITIALIZER(curpp);
 
 #ifdef CAPREVOKE
 volatile const struct cheri_revoke_info *cri;
@@ -202,9 +203,8 @@ __morepages(int n)
 	    0)) == MAP_FAILED)
 		return (0);
 
-	newpp->ph_next = curpp;
 	newpp->ph_size = size;
-	curpp = newpp;
+	SLIST_INSERT_HEAD(&curpp, newpp, ph_next);
 	pagepool_start = (char *)(newpp + 1);
 	pagepool_end = pagepool_start + (size - sizeof(*newpp));
 
@@ -222,19 +222,14 @@ __rederive_pointer(void *ptr)
 
 	addr = cheri_getaddress(ptr);
 	TLS_MALLOC_LOCK;
-	/*
-	 * It's OK if more pools are added, they can't contain our pointer
-	 * and we never mutate the list except when adding to the front.
-	 */
-	pp = curpp;
-	TLS_MALLOC_UNLOCK;
-	while (pp != NULL) {
-		char *pool = (char *)pp;
-		if (cheri_is_address_inbounds(pool, addr))
-			return (cheri_setaddress(pool, addr));
-		pp = pp->ph_next;
+	SLIST_FOREACH(pp, &curpp, ph_next) {
+		if (cheri_is_address_inbounds(pp, addr)) {
+			TLS_MALLOC_UNLOCK;
+			return (cheri_setaddress(pp, addr));
+		}
 	}
 
+	TLS_MALLOC_UNLOCK;
 	return (NULL);
 #endif
 }
