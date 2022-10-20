@@ -49,10 +49,10 @@ int
 ef_reloc(struct elf_file *ef, const void *reldata, int reltype, Elf_Off relbase,
     Elf_Off dataoff, size_t len, void *dest)
 {
-	Elf_Addr *where, val;
+	Elf_Addr *where;
 	const Elf_Rela *rela;
 	Elf_Addr addend, addr;
-	Elf_Size rtype;
+	Elf_Size rtype, symidx;
 
 	switch (reltype) {
 	case EF_RELOC_RELA:
@@ -61,6 +61,7 @@ ef_reloc(struct elf_file *ef, const void *reldata, int reltype, Elf_Off relbase,
 		    dataoff);
 		addend = rela->r_addend;
 		rtype = ELF_R_TYPE(rela->r_info);
+		symidx = ELF_R_SYM(rela->r_info);
 		break;
 	default:
 		return (EINVAL);
@@ -70,10 +71,13 @@ ef_reloc(struct elf_file *ef, const void *reldata, int reltype, Elf_Off relbase,
 		return (0);
 
 	switch (rtype) {
+	case R_RISCV_64:	/* S + A */
+		addr = EF_SYMADDR(ef, symidx) + addend;
+		*where = addr;
+		break;
 	case R_RISCV_RELATIVE:	/* B + A */
 		addr = addend + relbase;
-		val = addr;
-		*where = val;
+		*where = addr;
 		break;
 	case R_RISCV_CHERI_CAPABILITY:
 		warnx("unhandled R_RISCV_CHERI_CAPABILITY relocation");
