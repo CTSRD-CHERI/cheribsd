@@ -285,8 +285,12 @@ try_revoke(int target_bucket)
 
 dequarantine:
 	for (bucket = 0; bucket < NBUCKETS; bucket++) {
-		while (!SLIST_EMPTY(&quarantine_bufs[bucket]))
+		while (!SLIST_EMPTY(&quarantine_bufs[bucket])) {
+			op = SLIST_FIRST(&quarantine_bufs[bucket]);
 			SLIST_REMOVE_HEAD(&quarantine_bufs[bucket], ov_next);
+			SLIST_INSERT_HEAD(&quarantine_bufs[bucket], op,
+			    ov_next);
+		}
 	}
 	quarantine_size = 0;
 }
