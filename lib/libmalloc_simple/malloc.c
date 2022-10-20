@@ -293,7 +293,7 @@ morecore(int bucket)
 	 * Add new memory allocated to that on
 	 * free list for this hash bucket.
 	 */
-	for(; nblks > 0; nblks--) {
+	for (; nblks > 0; nblks--) {
 		op = (struct overhead *)(void *)cheri_setbounds(buf, sz);
 		SLIST_INSERT_HEAD(&nextf[bucket], op, ov_next);
 		buf += sz;
