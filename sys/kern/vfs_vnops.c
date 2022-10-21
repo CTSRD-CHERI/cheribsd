@@ -1268,6 +1268,11 @@ vn_io_fault_doio(struct vn_io_fault_args *args, struct uio *uio,
 			error = VOP_WRITE(args->args.vop_args.vp, uio,
 			    args->flags, args->cred);
 			break;
+#if __has_feature(capabilities)
+		case UIO_READ_CAP:
+		case UIO_WRITE_CAP:
+			__assert_unreachable();
+#endif
 		}
 		break;
 	default:
@@ -1559,6 +1564,14 @@ vn_io_fault_uiomove(char *data, int xfersize, struct uio *uio)
 	case UIO_READ:
 		transp_uio.uio_rw = UIO_WRITE;
 		break;
+#if __has_feature(capabilities)
+	case UIO_WRITE_CAP:
+		transp_uio.uio_rw = UIO_READ_CAP;
+		break;
+	case UIO_READ_CAP:
+		transp_uio.uio_rw = UIO_WRITE_CAP;
+		break;
+#endif
 	}
 	transp_uio.uio_td = uio->uio_td;
 	error = uiomove_fromphys(td->td_ma,
@@ -1603,6 +1616,16 @@ vn_io_fault_pgmove(vm_page_t ma[], vm_offset_t offset, int xfersize,
 		pmap_copy_pages(ma, offset, td->td_ma, iov_base & PAGE_MASK,
 		    cnt);
 		break;
+#if __has_feature(capabilities)
+	case UIO_WRITE_CAP:
+		pmap_copy_pages_tags(td->td_ma, iov_base & PAGE_MASK, ma,
+		    offset, cnt);
+		break;
+	case UIO_READ_CAP:
+		pmap_copy_pages_tags(ma, offset, td->td_ma,
+		    iov_base & PAGE_MASK, cnt);
+		break;
+#endif
 	}
 	pgadv = ((iov_base + cnt) >> PAGE_SHIFT) - (iov_base >> PAGE_SHIFT);
 	td->td_ma += pgadv;

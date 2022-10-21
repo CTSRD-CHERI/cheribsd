@@ -63,7 +63,8 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 	int save = 0;
 	bool mapped;
 
-	KASSERT(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE,
+	KASSERT(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE ||
+	    uio->uio_rw == UIO_READ_CAP || uio->uio_rw == UIO_WRITE_CAP,
 	    ("uiomove_fromphys: mode"));
 	KASSERT(uio->uio_segflg != UIO_USERSPACE || uio->uio_td == curthread,
 	    ("uiomove_fromphys proc"));
@@ -97,6 +98,14 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 		case UIO_USERSPACE:
 			maybe_yield();
 			switch (uio->uio_rw) {
+#if __has_feature(capabilities)
+			case UIO_READ_CAP:
+				error = copyoutcap(cp, iov->iov_base, cnt);
+				break;
+			case UIO_WRITE_CAP:
+				error = copyincap(iov->iov_base, cp, cnt);
+				break;
+#endif
 			case UIO_READ:
 				error = copyout(cp, iov->iov_base, cnt);
 				break;
@@ -109,6 +118,14 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			break;
 		case UIO_SYSSPACE:
 			switch (uio->uio_rw) {
+#if __has_feature(capabilities)
+			case UIO_READ_CAP:
+				bcopy_c(PTR2CAP(cp), iov->iov_base, cnt);
+				break;
+			case UIO_WRITE_CAP:
+				bcopy_c(iov->iov_base, PTR2CAP(cp), cnt);
+				break;
+#endif
 			case UIO_READ:
 				bcopynocap_c(PTR2CAP(cp), iov->iov_base, cnt);
 				break;
