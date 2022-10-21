@@ -174,9 +174,15 @@ check_initreg_code(void * __capability c)
 		    (CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM));
 
 	/* Check that the raw permission bits match the kernel header: */
+#ifdef CHERIBSD_C18N_TESTS
+	if (v != (CHERI_CAP_USER_CODE_PERMS & ~CHERI_PERM_EXECUTIVE))
+		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
+		    (uintmax_t)(CHERI_CAP_USER_CODE_PERMS & ~CHERI_PERM_EXECUTIVE));
+#else
 	if (v != CHERI_CAP_USER_CODE_PERMS)
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_CAP_USER_CODE_PERMS);
+#endif
 
 	cheribsdtest_success();
 }
@@ -450,6 +456,7 @@ CHERIBSDTEST(test_initregs_pcc,
 }
 
 #ifdef __aarch64__
+#ifndef CHERIBSD_C18N_TESTS
 CHERIBSDTEST(test_initregs_restricted_default,
     "Test initial value of restricted default capability")
 {
@@ -485,4 +492,5 @@ CHERIBSDTEST(test_initregs_restricted_thread,
 
 	cheribsdtest_success();
 }
+#endif
 #endif
