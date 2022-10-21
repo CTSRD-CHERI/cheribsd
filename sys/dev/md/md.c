@@ -1003,6 +1003,11 @@ unmapped_step:
 		if (error == 0)
 			sc->flags &= ~MD_VERIFY;
 		break;
+#if __has_feature(capabilities)
+	case UIO_READ_CAP:
+	case UIO_WRITE_CAP:
+		__assert_unreachable();
+#endif
 	}
 
 	/* When MD_CACHE is set, try to avoid double-caching the data. */

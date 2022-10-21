@@ -530,10 +530,11 @@ targwrite(struct cdev *dev, struct uio *uio, int ioflag)
 	write_len = error = 0;
 	CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
 		  ("write - uio_resid %zd\n", uio->uio_resid));
+	uiomove_enable_cap(uio);
 	while (uio->uio_resid >= sizeof(user_ccb) && error == 0) {
 		union ccb *ccb;
 
-		error = uiomove_cap((caddr_t)&user_ccb, sizeof(user_ccb), uio);
+		error = uiomove((caddr_t)&user_ccb, sizeof(user_ccb), uio);
 		if (error != 0) {
 			CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH,
 				  ("write - uiomove failed (%d)\n", error));
@@ -811,6 +812,7 @@ targread(struct cdev *dev, struct uio *uio, int ioflag)
 	user_queue = &softc->user_ccb_queue;
 	abort_queue = &softc->abort_queue;
 	CAM_DEBUG(softc->path, CAM_DEBUG_PERIPH, ("targread\n"));
+	uiomove_enable_cap(uio);
 
 	/* If no data is available, wait or return immediately */
 	cam_periph_lock(softc->periph);
@@ -850,7 +852,7 @@ targread(struct cdev *dev, struct uio *uio, int ioflag)
 		if (error != 0)
 			goto read_fail;
 		cam_periph_unlock(softc->periph);
-		error = uiomove_cap((caddr_t)&user_ccb, sizeof(user_ccb), uio);
+		error = uiomove((caddr_t)&user_ccb, sizeof(user_ccb), uio);
 		cam_periph_lock(softc->periph);
 		if (error != 0)
 			goto read_fail;
@@ -873,7 +875,7 @@ targread(struct cdev *dev, struct uio *uio, int ioflag)
 			goto read_fail;
 		}
 		cam_periph_unlock(softc->periph);
-		error = uiomove_cap((caddr_t)&user_ccb, sizeof(user_ccb), uio);
+		error = uiomove((caddr_t)&user_ccb, sizeof(user_ccb), uio);
 		cam_periph_lock(softc->periph);
 		if (error != 0)
 			goto read_fail;

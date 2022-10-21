@@ -84,6 +84,25 @@ struct uio {
 	};
 } __aligned(sizeof(void * __capability));
 
+#if __has_feature(capabilities)
+static __inline void
+uiomove_enable_cap(struct uio *uio)
+{
+	switch (uio->uio_rw) {
+	case UIO_READ:
+		uio->uio_rw = UIO_READ_CAP;
+		break;
+	case UIO_WRITE:
+		uio->uio_rw = UIO_WRITE_CAP;
+		break;
+	default:
+		break;
+	}
+}
+#else
+#define	uiomove_enable_cap(uio)
+#endif
+
 /*
  * Limits
  *
@@ -117,7 +136,6 @@ int	physcopyin_vlist(struct bus_dma_segment *src, off_t offset,
 int	physcopyout_vlist(vm_paddr_t src, struct bus_dma_segment *dst,
 	    off_t offset, size_t len);
 int	uiomove(void *cp, int n, struct uio *uio);
-int	uiomove_cap(void *cp, int n, struct uio *uio);
 int	uiomove_frombuf(void *buf, int buflen, struct uio *uio);
 int	uiomove_fromphys(struct vm_page *ma[], vm_offset_t offset, int n,
 	    struct uio *uio);
