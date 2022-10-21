@@ -88,3 +88,37 @@ CHERIBSDTEST(test_ipc_pipe_sleep_signal,
 	close(fds[1]);
 	cheribsdtest_failure_errx("write didn't block");
 }
+
+CHERIBSDTEST(test_ipc_pipe_nocaps,
+    "check that read/write of a pipe(2) strips tags")
+{
+	void * __capability *buffer;
+	void * __capability *buffer2;
+	size_t len;
+	ssize_t rv;
+	int fds[2];
+
+	len = getpagesize();
+	buffer = calloc(1, len);
+	buffer2 = calloc(1, len);
+	buffer[0] = (__cheri_tocap void * __capability)buffer;
+	CHERIBSDTEST_VERIFY2(cheri_gettag(buffer[0]) != 0,
+	    "pretest: tag missing");
+
+	CHERIBSDTEST_CHECK_SYSCALL(pipe(fds));
+	rv = CHERIBSDTEST_CHECK_SYSCALL(write(fds[1], buffer, len));
+	CHERIBSDTEST_CHECK_EQ_SIZE(rv, len);
+	rv = CHERIBSDTEST_CHECK_SYSCALL(read(fds[0], buffer2, len));
+	CHERIBSDTEST_CHECK_EQ_SIZE(rv, len);
+
+	CHERIBSDTEST_VERIFY2(cheri_gettag(buffer[0]) != 0,
+	    "posttest: source tag missing");
+	CHERIBSDTEST_VERIFY2(cheri_gettag(buffer2[0]) == 0,
+	    "posttest: destination tag present");
+	CHERIBSDTEST_VERIFY2(cheri_equal_exact(cheri_cleartag(buffer[0]),
+	     buffer2[0]), "untagged value not copied");
+
+	CHERIBSDTEST_CHECK_SYSCALL(close(fds[0]));
+	CHERIBSDTEST_CHECK_SYSCALL(close(fds[1]));
+	cheribsdtest_success();
+}
