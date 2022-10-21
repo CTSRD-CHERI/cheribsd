@@ -269,6 +269,65 @@ CHERIBSDTEST(cheribsdtest_vm_shm_open_anon_unix_surprise,
 	}
 }
 
+CHERIBSDTEST(cheribsdtest_shm_open_read_nocaps,
+    "check that read(2) of a shm_open fd does not return tags")
+{
+	void * __capability *map;
+	void * __capability c;
+	size_t rv;
+	int fd;
+
+	fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+
+	/* Just some pointer */
+	*map = &fd;
+	c = *map;
+	CHERIBSDTEST_VERIFY2(cheri_gettag(c) != 0, "tag written");
+
+	rv = CHERIBSDTEST_CHECK_SYSCALL(read(fd, &c, sizeof(c)));
+	CHERIBSDTEST_CHECK_EQ_SIZE(rv, sizeof(c));
+
+	CHERIBSDTEST_VERIFY2(cheri_gettag(c) == 0, "tag read");
+	CHERIBSDTEST_VERIFY2(cheri_equal_exact(cheri_cleartag(*map), c),
+	    "untagged value not read");
+
+	CHERIBSDTEST_CHECK_SYSCALL(close(fd));
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(cheribsdtest_shm_open_write_nocaps,
+    "check that write(2) of a shm_open fd does not set tags")
+{
+	void * __capability *map;
+	void * __capability c;
+	size_t rv;
+	int fd;
+
+	fd = CHERIBSDTEST_CHECK_SYSCALL(shm_open(SHM_ANON, O_RDWR, 0600));
+	CHERIBSDTEST_CHECK_SYSCALL(ftruncate(fd, getpagesize()));
+
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
+	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+
+	/* Just some pointer */
+	c = &fd;
+	CHERIBSDTEST_VERIFY2(cheri_gettag(c) != 0, "tag set on source");
+
+	rv = CHERIBSDTEST_CHECK_SYSCALL(write(fd, &c, sizeof(c)));
+	CHERIBSDTEST_CHECK_EQ_SIZE(rv, sizeof(c));
+
+	CHERIBSDTEST_VERIFY2(cheri_gettag(*map) == 0, "tag written");
+	CHERIBSDTEST_VERIFY2(cheri_equal_exact(cheri_cleartag(c), *map),
+	    "untagged value not written");
+
+	CHERIBSDTEST_CHECK_SYSCALL(close(fd));
+	cheribsdtest_success();
+}
+
 #ifdef __CHERI_PURE_CAPABILITY__
 
 /*
