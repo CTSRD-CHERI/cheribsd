@@ -257,6 +257,11 @@ iicuio_move(struct iic_cdevpriv *priv, struct uio *uio, int last)
 			if (error == 0)
 				error = uiomove(buffer, transferred_bytes, uio);
 			break;
+#if __has_feature(capabilities)
+		case UIO_READ_CAP:
+		case UIO_WRITE_CAP:
+			__assert_unreachable();
+#endif
 		}
 	}
 
@@ -299,6 +304,11 @@ iicuio(struct cdev *dev, struct uio *uio, int ioflag)
 	case UIO_WRITE:
 		addr = priv->addr & ~LSB;
 		break;
+#if __has_feature(capabilities)
+	case UIO_READ_CAP:
+	case UIO_WRITE_CAP:
+		__assert_unreachable();
+#endif
 	}
 
 	error = iicbus_start(parent, addr, 0);

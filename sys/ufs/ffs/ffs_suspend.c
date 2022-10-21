@@ -156,6 +156,11 @@ ffs_susp_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 				if (error != 0)
 					goto out;
 				break;
+#if __has_feature(capabilities)
+			case UIO_READ_CAP:
+			case UIO_WRITE_CAP:
+				__assert_unreachable();
+#endif
 			}
 			IOVEC_ADVANCE(&uio->uio_iov[i], len);
 			uio->uio_resid -= len;

@@ -68,8 +68,7 @@ SYSCTL_INT(_kern, KERN_IOV_MAX, iov_max, CTLFLAG_RD, SYSCTL_NULL_INT_PTR, UIO_MA
 
 static uma_zone_t uio_zone;
 
-static int uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
-    bool preserve_tags);
+static int uiomove_flags(void *cp, int n, struct uio *uio, bool nofault);
 
 static void
 uio_init(void *arg __unused)
@@ -214,27 +213,18 @@ int
 uiomove(void *cp, int n, struct uio *uio)
 {
 
-	return (uiomove_flags(cp, n, uio, false, false));
+	return (uiomove_flags(cp, n, uio, false));
 }
 
 int
 uiomove_nofault(void *cp, int n, struct uio *uio)
 {
 
-	return (uiomove_flags(cp, n, uio, true, false));
+	return (uiomove_flags(cp, n, uio, true));
 }
-
-int
-uiomove_cap(void *cp, int n, struct uio *uio)
-{
-
-	return (uiomove_flags(cp, n, uio, false, true));
-}
-
 
 static int
-uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
-    bool preserve_tags)
+uiomove_flags(void *cp, int n, struct uio *uio, bool nofault)
 {
 	struct iovec *iov;
 	size_t cnt;
@@ -242,7 +232,8 @@ uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
 
 	save = error = 0;
 
-	KASSERT(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE,
+	KASSERT(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE ||
+	    uio->uio_rw == UIO_READ_CAP || uio->uio_rw == UIO_WRITE_CAP,
 	    ("uiomove: mode"));
 	KASSERT(uio->uio_segflg != UIO_USERSPACE || uio->uio_td == curthread,
 	    ("uiomove proc"));
@@ -283,19 +274,19 @@ uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
 		case UIO_USERSPACE:
 			maybe_yield();
 			switch (uio->uio_rw) {
+#if __has_feature(capabilities)
+			case UIO_READ_CAP:
+				error = copyoutcap(cp, iov->iov_base, cnt);
+				break;
+			case UIO_WRITE_CAP:
+				error = copyincap(iov->iov_base, cp, cnt);
+				break;
+#endif
 			case UIO_READ:
-				if (preserve_tags)
-					error = copyoutcap(cp, iov->iov_base,
-					    cnt);
-				else
-					error = copyout(cp, iov->iov_base, cnt);
+				error = copyout(cp, iov->iov_base, cnt);
 				break;
 			case UIO_WRITE:
-				if (preserve_tags)
-					error = copyincap(iov->iov_base, cp,
-					    cnt);
-				else
-					error = copyout(cp, iov->iov_base, cnt);
+				error = copyin(iov->iov_base, cp, cnt);
 				break;
 			}
 			if (error)
@@ -304,21 +295,19 @@ uiomove_flags(void *cp, int n, struct uio *uio, bool nofault,
 
 		case UIO_SYSSPACE:
 			switch (uio->uio_rw) {
+#if __has_feature(capabilities)
+			case UIO_READ_CAP:
+				bcopy_c(PTR2CAP(cp), iov->iov_base, cnt);
+				break;
+			case UIO_WRITE_CAP:
+				bcopy_c(iov->iov_base, PTR2CAP(cp), cnt);
+				break;
+#endif
 			case UIO_READ:
-				if (preserve_tags)
-					bcopy_c(PTR2CAP(cp), iov->iov_base,
-					    cnt);
-				else
-					bcopynocap_c(PTR2CAP(cp), iov->iov_base,
-					    cnt);
+				bcopynocap_c(PTR2CAP(cp), iov->iov_base, cnt);
 				break;
 			case UIO_WRITE:
-				if (preserve_tags)
-					bcopy_c(iov->iov_base, PTR2CAP(cp),
-					    cnt);
-				else
-					bcopynocap_c(iov->iov_base, PTR2CAP(cp),
-					    cnt);
+				bcopynocap_c(iov->iov_base, PTR2CAP(cp), cnt);
 				break;
 			}
 			break;

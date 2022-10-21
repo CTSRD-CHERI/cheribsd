@@ -158,6 +158,11 @@ debugfs_fill(PFS_FILL_ARGS)
 			    &off);
 		}
 		break;
+#if __has_feature(capabilities)
+	case UIO_READ_CAP:
+	case UIO_WRITE_CAP:
+		__assert_unreachable();
+#endif
 	}
 
 	if (d->dm_fops->release)
