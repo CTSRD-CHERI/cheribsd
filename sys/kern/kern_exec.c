@@ -495,13 +495,18 @@ kern_execve(struct thread *td, struct image_args *args,
 			goto fallback;
 		}
 #endif
+		if ((cop->p_flag & P_WEXIT) != 0) {
+			PROC_UNLOCK(cop);
+			sx_sunlock(&proctree_lock);
+			goto fallback;
+		}
 		if (p_cancolocate(td, cop, true) != 0) {
 			PROC_UNLOCK(cop);
 			sx_sunlock(&proctree_lock);
 			goto fallback;
 		}
+		_PHOLD(cop);
 		PROC_UNLOCK(cop);
-		PHOLD(cop);
 		sx_sunlock(&proctree_lock);
 		error = kern_coexecve(td, args, mac_p, oldvmspace, cop, true);
 		PRELE(cop);
