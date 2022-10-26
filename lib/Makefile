@@ -113,7 +113,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libzstd \
 	ncurses
 
-.if ${MACHINE_ABI:Mpurecap} && !defined(COMPAT_CHERI)
+.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64" && !defined(COMPAT_CHERI)
 SUBDIR+=	libc_c18n libthr_c18n
 .endif
 
