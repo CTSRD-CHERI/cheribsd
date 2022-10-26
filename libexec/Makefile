@@ -80,7 +80,7 @@ _tftp-proxy=	tftp-proxy
 
 .if !defined(NO_PIC) && !defined(NO_RTLD)
 _rtld-elf=	rtld-elf rtld-elf-debug
-.if ${MACHINE_ABI:Npurecap}
+.if ${MACHINE_ABI:Npurecap} && ${MACHINE_CPUARCH} == "aarch64"
 SUBDIR+=	rtld-elf-c18n
 .endif
 SUBDIR.${MK_LIB32}+=	rtld-elf32
