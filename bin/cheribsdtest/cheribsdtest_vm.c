@@ -70,7 +70,7 @@
 
 #include "cheribsdtest.h"
 
-static const char * xfail_need_writable_tmp(const char *name __unused);
+static const char *skip_need_writable_tmp(const char *name __unused);
 
 /*
  * Tests to check that tags are ... or aren't ... preserved for various page
@@ -436,7 +436,7 @@ CHERIBSDTEST(cheribsdtest_vm_notag_tmpfile_shared,
     .ct_signum = SIGSEGV,
     .ct_si_code = SEGV_STORETAG,
     .ct_si_trapno = TRAPNO_STORE_CAP_PF,
-    .ct_check_xfail = xfail_need_writable_tmp)
+    .ct_check_skip = skip_need_writable_tmp)
 {
 	void * __capability volatile *cp;
 	void * __capability cp_value;
@@ -453,7 +453,7 @@ CHERIBSDTEST(cheribsdtest_vm_notag_tmpfile_shared,
 
 CHERIBSDTEST(cheribsdtest_vm_tag_tmpfile_private,
     "check tags are stored for tmpfile() MAP_PRIVATE pages",
-    .ct_check_xfail = xfail_need_writable_tmp)
+    .ct_check_skip = skip_need_writable_tmp)
 {
 	int fd = create_tempfile();
 	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE, MAP_PRIVATE);
@@ -462,7 +462,7 @@ CHERIBSDTEST(cheribsdtest_vm_tag_tmpfile_private,
 
 CHERIBSDTEST(cheribsdtest_vm_tag_tmpfile_private_prefault,
     "check tags are stored for tmpfile() MAP_PRIVATE, MAP_PREFAULT_READ pages",
-    .ct_check_xfail = xfail_need_writable_tmp)
+    .ct_check_skip = skip_need_writable_tmp)
 {
 	int fd = create_tempfile();
 	mmap_and_check_tag_stored(fd, PROT_READ | PROT_WRITE,
@@ -471,7 +471,7 @@ CHERIBSDTEST(cheribsdtest_vm_tag_tmpfile_private_prefault,
 }
 
 static const char *
-xfail_need_writable_tmp(const char *name __unused)
+skip_need_writable_tmp(const char *name __unused)
 {
 	static const char *reason = NULL;
 	static int checked = 0;
