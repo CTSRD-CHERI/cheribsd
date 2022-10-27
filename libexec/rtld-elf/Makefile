@@ -97,6 +97,10 @@ LDFLAGS+=	-Wl,--version-script=${VERSION_MAP}
 SYMBOL_MAPS+=	${RTLD_ELF_DIR}/${RTLD_ARCH}/Symbol.map
 .endif
 
+.ifdef RTLD_SANDBOX
+SYMBOL_MAPS+=	${RTLD_ELF_DIR}/Symbol-c18n.map
+.endif
+
 .sinclude "${RTLD_ELF_DIR}/${RTLD_ARCH}/Makefile.inc"
 RTLD_ENTRY?=	.rtld_start
 
