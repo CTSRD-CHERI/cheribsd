@@ -393,8 +393,7 @@ BROKEN_OPTIONS+=LIB64C
 BROKEN_OPTIONS+=CLANG LLD
 .endif
 
-# HyperV is currently x86-only
-.if ${__T} != "amd64" && ${__T} != "i386"
+.if ${__T} != "amd64" && ${__T} != "i386" && ${__T} != "aarch64"
 BROKEN_OPTIONS+=HYPERV
 .endif
 
