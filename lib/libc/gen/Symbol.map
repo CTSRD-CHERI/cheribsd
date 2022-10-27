@@ -521,8 +521,6 @@ FBSDprivate_1.0 {
 	_rtld_get_stack_prot;
 	_rtld_is_dlopened;
 	_rtld_thread_init;	/* for private use */
-	_rtld_thread_start_init;
-	_rtld_sighandler_init;
 	__elf_phdr_match_addr;
 	_err;
 	_warn;

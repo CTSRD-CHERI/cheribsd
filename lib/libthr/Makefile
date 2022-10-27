@@ -62,6 +62,10 @@ LDFLAGS+=-Wl,-znodelete
 VERSION_DEF=${SRCTOP}/lib/libc/Versions.def
 SYMBOL_MAPS=${LIBTHR_SRCTOP}/pthread.map
 
+.ifdef RTLD_SANDBOX
+SYMBOL_MAPS+=	${LIBTHR_SRCTOP}/pthread-c18n.map
+.endif
+
 .ifndef RTLD_SANDBOX
 MAN=	libthr.3
 .endif
