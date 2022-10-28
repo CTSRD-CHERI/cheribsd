@@ -638,10 +638,6 @@ SUBDIR+=	tests
 SUBDIR+=	zfs
 .endif
 
-.if ${MACHINE_CPUARCH} != "aarch64" && ${MACHINE_CPUARCH} != "arm" && \
-	${MACHINE_CPUARCH} != "powerpc" && ${MACHINE_CPUARCH} != "riscv"
-.endif
-
 .if !${MACHINE_ABI:Mpurecap}
 _sym=		sym
 .endif
