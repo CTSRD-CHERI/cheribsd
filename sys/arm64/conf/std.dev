@@ -122,6 +122,3 @@ device		hid			# Generic HID support
 device		scmi			# System Control Management Interface
 
 device		mmio_sram		# Generic on-chip SRAM
-
-#hyper-v support
-device		hyperv
