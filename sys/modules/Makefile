@@ -640,7 +640,6 @@ SUBDIR+=	zfs
 
 .if ${MACHINE_CPUARCH} != "aarch64" && ${MACHINE_CPUARCH} != "arm" && \
 	${MACHINE_CPUARCH} != "powerpc" && ${MACHINE_CPUARCH} != "riscv"
-_syscons=	syscons
 .endif
 
 .if !${MACHINE_ABI:Mpurecap}
@@ -705,6 +704,7 @@ _mgb=		mgb
 _nctgpio=	nctgpio
 _ntb=		ntb
 _ocs_fc=	ocs_fc
+_p2sb=		p2sb
 _qat=		qat
 _qatfw=		qatfw
 _qat_c2xxx=	qat_c2xxx
@@ -715,7 +715,7 @@ _rdma=		rdma
 _safe=		safe
 _speaker=	speaker
 _splash=	splash
-_p2sb=		p2sb
+_syscons=	syscons
 _wbwd=		wbwd
 
 _aac=		aac
