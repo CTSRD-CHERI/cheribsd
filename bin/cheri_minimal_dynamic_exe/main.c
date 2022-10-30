@@ -31,10 +31,18 @@
 
 #include <stdlib.h>
 
-void _init_tls(void) __hidden;
 void __cerror(int) __hidden;
+#ifdef __CHERI_PURE_CAPABILITY__
+void __libc_start1(int, char *[], char *[],
+    void (*)(void), int (*)(int, char *[], char *[]), void *, 
+    const void *) __hidden;
+#else
+void __libc_start1(int, char *[], char *[],
+    void (*)(void), int (*)(int, char *[], char *[])) __hidden;
+#endif
 
 extern void _DYNAMIC __hidden;
+#pragma weak _DYNAMIC
 extern void __start___cap_relocs __hidden;
 extern void _CHERI_CAPABILITY_TABLE_ __hidden;
 
@@ -67,24 +75,21 @@ extern void _exit(int code);
 
 // Add the functions needed by the startup code:
 void
-exit(int code)
+__libc_start1(int argc, char *argv[], char *env[], void (*cleanup)(void),
+    int (*mainX)(int, char *[], char *[])
+#ifdef __CHERI_PURE_CAPABILITY__
+    , void *data_cap __unused, const void *code_cap __unused
+#endif
+	)
 {
-	// TODO: actuall call _exit()
+	int code;
+
+	code = mainX(argc, argv, env);
+	if (cleanup != NULL)
+		cleanup();
+
 	simple_printf("exit(%d)\n", code);
 	_exit(code);
-	// __builtin_trap();
-}
-
-int
-atexit(void (*function)(void))
-{
-	simple_printf("Registering atexit function %#p\n", function);
-	return 0;
-}
-
-void
-_init_tls(void)
-{
 }
 
 void

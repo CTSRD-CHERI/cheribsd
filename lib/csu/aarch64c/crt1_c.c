@@ -33,18 +33,14 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-/* PIEs always have their relocations processed by rtld */
-#ifdef PIC
-#undef	CRT_IRELOC_RELA
-#define	CRT_IRELOC_SUPPRESS
-#endif
-
-#include <sys/types.h>
+#include <sys/param.h>
 #include <machine/elf.h>
+
 #include <stdbool.h>
-#include <stdlib.h>
 #include "libc_private.h"
-#include "ignore_init.c"
+#include "csu_common.h"
+
+#include <cheri/cheric.h>
 
 /*
  * For -pie executables rtld will process the __cap_relocs, so we don't need
@@ -55,7 +51,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 struct Struct_Obj_Entry;
-void _start(void *, void (*)(void), struct Struct_Obj_Entry *) __exported;
+void _start(void *, void (*)(void), struct Struct_Obj_Entry *) __dead2 __exported;
 
 #ifdef GCRT
 /* Profiling support. */
@@ -84,11 +80,11 @@ _start(void *auxv,
 	char **argv = NULL;
 	char **env = NULL;
 	const bool has_dynamic_linker = obj != NULL && cleanup != NULL;
+	void *data_cap = NULL;
+	const void *code_cap = NULL;
 #ifndef PIC
 	const Elf_Phdr *at_phdr = NULL;
 	long at_phnum = 0;
-	void *data_cap;
-	const void *code_cap;
 #else
 	if (!has_dynamic_linker)
 		__builtin_trap(); /* RTLD missing? Wrong *crt1.o linked? */
@@ -100,10 +96,10 @@ _start(void *auxv,
 	/*
 	 * Digest the auxiliary vector for local use.
 	 *
-	 * Note: this file must be compile with -fno-jump-tables to avoid use
+	 * Note: this file must be compiled with -fno-jump-tables to avoid use
 	 * of the captable before crt_init_globals() has been called.
 	 */
-	for (Elf_Auxinfo *auxp = auxv; auxp->a_type != AT_NULL;  auxp++) {
+	for (Elf_Auxinfo *auxp = auxv; auxp->a_type != AT_NULL; auxp++) {
 		if (auxp->a_type == AT_ARGV) {
 			argv = (char **)auxp->a_un.a_ptr;
 		} else if (auxp->a_type == AT_ENVV) {
@@ -135,18 +131,5 @@ _start(void *auxv,
 
 	__auxargs = auxv; /* Store the global auxargs pointer */
 
-	handle_argv(argc, argv, env);
-
-	if (cleanup != NULL)
-		atexit(cleanup);
-	else {
-#ifndef PIC
-		process_irelocs(data_cap, code_cap);
-#endif
-		_init_tls();
-	}
-
-	handle_static_init(argc, argv, env);
-
-	exit(main(argc, argv, env));
+	__libc_start1(argc, argv, env, cleanup, main, data_cap, code_cap);
 }

@@ -1,4 +1,3 @@
-/* LINTLIBRARY */
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
@@ -26,29 +25,26 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#ifdef _CSU_COMMON_H_
 
-#include "libc_private.h"
-#include "csu_common.h"
-
-void _start(char **, void (*)(void)) __dead2;
-
-/* The entry function. */
-void
-_start(char **ap, void (*cleanup)(void))
-{
-	int argc;
-	char **argv;
-	char **env;
-
-	argc = *(long *)(void *)ap;
-	argv = ap + 1;
-	env = ap + 2 + argc;
-#ifdef GCRT
-	__libc_start1_gcrt(argc, argv, env, cleanup, main, &eprol, &etext);
-__asm__("eprol:");
+/*
+ * This file includes both definitions and declarations, it can be
+ * included only into one compilation unit for csu objects.  We cannot
+ * practically check this, but at least guard against
+ * double-inclusion.
+ */
+#error "Include this file only once"
 #else
-	__libc_start1(argc, argv, env, cleanup, main);
+#define _CSU_COMMON_H_
+
+char **environ;
+const char *__progname = "";
+
+#ifdef GCRT
+extern int eprol;
+extern int etext;
 #endif
-}
+
+int main(int, char **, char **);
+
+#endif	/* _CSU_COMMON_H_ */
