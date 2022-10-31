@@ -357,6 +357,28 @@ komeda_intr(void *arg)
 }
 
 static int
+komeda_reset(struct komeda_drm_softc *sc)
+{
+	uint32_t reg;
+	int timeout;
+
+	timeout = 10000;
+
+	/* Reset device. */
+	DPU_WR4(sc, GCU_CONTROL, CONTROL_SRST);
+	do {
+		reg = DPU_RD4(sc, GCU_CONTROL);
+		if ((reg & CONTROL_SRST) == 0)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0)
+		return (ENXIO);
+
+	return (0);
+}
+
+static int
 komeda_drm_probe(device_t dev)
 {
 	if (!ofw_bus_status_okay(dev))
@@ -376,6 +398,7 @@ komeda_drm_attach(device_t dev)
 	int num_pipelines;
 	int num_blocks;
 	uint32_t reg;
+	int error;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -419,6 +442,10 @@ komeda_drm_attach(device_t dev)
 		device_printf(dev, "Legacy HW detected. Add support.\n");
 		return (ENXIO);
 	}
+
+	error = komeda_reset(sc);
+	if (error)
+		device_printf(sc->dev, "Could not reset DPU\n");
 
 	reg = DPU_RD4(sc, GCU_CONFIGURATION_ID0);
 	sc->max_line_size = (reg & CONFIG_ID0_MAX_LINE_SIZE_M) >> \
