@@ -435,7 +435,6 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	struct drm_display_mode *m;
 	struct drm_plane_state *state;
 	uint32_t reg;
-	int timeout;
 
 	dprintf("%s\n", __func__);
 
@@ -452,19 +451,6 @@ komeda_plane_atomic_update(struct drm_plane *plane,
 	    m->hdisplay, m->vdisplay);
 
 	dprintf("%s: Clock freq needed: %d\n", __func__, m->crtc_clock);
-
-	timeout = 10000;
-
-	/* Reset device. */
-	DPU_WR4(sc, GCU_CONTROL, CONTROL_SRST);
-	do {
-		reg = DPU_RD4(sc, GCU_CONTROL);
-		if ((reg & CONTROL_SRST) == 0)
-			break;
-	} while (timeout--);
-
-	if (timeout <= 0)
-		device_printf(sc->dev, "Could not reset DPU\n");
 
 	/* Enable IRQs */
 	DPU_WR4(sc, GCU_IRQ_MASK, GCU_IRQ_ERR | GCU_IRQ_MODE | GCU_IRQ_CVAL0);
