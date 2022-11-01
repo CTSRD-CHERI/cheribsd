@@ -4433,6 +4433,9 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			if ((entry->eflags & MAP_ENTRY_UNMAPPED) == 0) {
 				vm_map_entry_clean(map, entry);
 				/* XXX-AM: How do we reset maxprot? */
+				if ((entry->eflags & MAP_ENTRY_IS_SUB_MAP) == 0)
+					vm_object_deallocate(
+					    entry->object.vm_object);
 				vm_map_reservation_init_entry(entry);
 			}
 			vm_map_try_merge_entries(map, prev_entry, entry);
