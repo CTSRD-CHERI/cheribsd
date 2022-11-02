@@ -460,7 +460,7 @@ __weak_reference(_thr_attr_setguardsize, pthread_attr_setguardsize);
 __weak_reference(_thr_attr_setguardsize, _pthread_attr_setguardsize);
 
 int
-_thr_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
+_thr_attr_setguardsize(pthread_attr_t *attr, size_t guardsize __unused)
 {
 	int	ret;
 
@@ -469,7 +469,9 @@ _thr_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
 		ret = EINVAL;
 	else {
 		/* Save the stack size. */
+#ifndef __CHERI_PURE_CAPABILITY__
 		(*attr)->guardsize_attr = guardsize;
+#endif
 		ret = 0;
 	}
 	return (ret);
