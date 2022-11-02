@@ -158,8 +158,8 @@ check_initreg_code(void * __capability c)
 	if ((v & CHERI_PERM_SEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (seal present)", v);
 
-	if ((v & CHERI_PERM_CCALL) == 0)
-		cheribsdtest_failure_errx("perms %jx (ccall missing)", v);
+	if ((v & CHERI_PERM_INVOKE) == 0)
+		cheribsdtest_failure_errx("perms %jx (invoke missing)", v);
 
 	if ((v & CHERI_PERM_UNSEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (unseal present)", v);
@@ -247,8 +247,8 @@ check_initreg_data_full_addrspace(void * __capability c)
 	if ((v & CHERI_PERM_SEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (seal present)", v);
 
-	if ((v & CHERI_PERM_CCALL) == 0)
-		cheribsdtest_failure_errx("perms %jx (ccall missing)", v);
+	if ((v & CHERI_PERM_INVOKE) == 0)
+		cheribsdtest_failure_errx("perms %jx (invoke missing)", v);
 
 	if ((v & CHERI_PERM_UNSEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (unseal present)", v);
@@ -385,8 +385,8 @@ CHERIBSDTEST(test_initregs_stack,
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
 
-	if ((v & CHERI_PERM_CCALL) == 0)
-		cheribsdtest_failure_errx("perms %jx (ccall missing)", v);
+	if ((v & CHERI_PERM_INVOKE) == 0)
+		cheribsdtest_failure_errx("perms %jx (invoke missing)", v);
 
 	if ((v & CHERI_PERM_UNSEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (unseal present)", v);
