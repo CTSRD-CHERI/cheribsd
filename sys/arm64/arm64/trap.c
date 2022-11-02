@@ -339,7 +339,6 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
     uint64_t far, int lower)
 {
 	struct vm_map *map;
-	struct proc *p;
 	struct pcb *pcb;
 	vm_prot_t ftype;
 	int error, sig, ucode;
@@ -361,28 +360,44 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	}
 #endif
 
-	pcb = td->td_pcb;
-	p = td->td_proc;
-	if (lower)
-		map = &p->p_vmspace->vm_map;
-	else {
-		intr_enable();
-
+	if (lower) {
+		map = &td->td_proc->p_vmspace->vm_map;
+	} else if (!ADDR_IS_CANONICAL(far)) {
 		/* We received a TBI/PAC/etc. fault from the kernel */
-		if (!ADDR_IS_CANONICAL(far)) {
-			error = KERN_INVALID_ADDRESS;
-			goto bad_far;
+		error = KERN_INVALID_ADDRESS;
+		goto bad_far;
+	} else if (ADDR_IS_KERNEL(far)) {
+		/*
+		 * Handle a special case: the data abort was caused by accessing
+		 * a thread structure while its mapping was being promoted or
+		 * demoted, as a consequence of the break-before-make rule.  It
+		 * is not safe to enable interrupts or dereference "td" before
+		 * this case is handled.
+		 *
+		 * In principle, if pmap_klookup() fails, there is no need to
+		 * call pmap_fault() below, but avoiding that call is not worth
+		 * the effort.
+		 */
+		if (ESR_ELx_EXCEPTION(esr) == EXCP_DATA_ABORT) {
+			switch (esr & ISS_DATA_DFSC_MASK) {
+			case ISS_DATA_DFSC_TF_L0:
+			case ISS_DATA_DFSC_TF_L1:
+			case ISS_DATA_DFSC_TF_L2:
+			case ISS_DATA_DFSC_TF_L3:
+				if (pmap_klookup(far, NULL))
+					return;
+				break;
+			}
 		}
-
-		/* The top bit tells us which range to use */
-		if (ADDR_IS_KERNEL(far)) {
+		intr_enable();
+		map = kernel_map;
+	} else {
+		intr_enable();
+		map = &td->td_proc->p_vmspace->vm_map;
+		if (map == NULL)
 			map = kernel_map;
-		} else {
-			map = &p->p_vmspace->vm_map;
-			if (map == NULL)
-				map = kernel_map;
-		}
 	}
+	pcb = td->td_pcb;
 
 	/*
 	 * Try to handle translation, access flag, and permission faults.
