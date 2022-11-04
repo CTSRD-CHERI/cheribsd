@@ -316,7 +316,7 @@ struct vmspace {
 	segsz_t vm_dsize;	/* data size (pages) XXX */
 	caddr_t vm_taddr;	/* (c) user virtual address of text */
 	caddr_t vm_daddr;	/* (c) user virtual address of data */
-	vm_offset_t vm_shp_base; /* shared page address */
+	uintcap_t vm_shp_base;	/* shared page pointer */
 	u_int vm_refcnt;	/* number of references */
 	/*
 	 * Keep the PMAP last, so that CPU-specific variations of that

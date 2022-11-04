@@ -33,6 +33,12 @@
 #include <sys/sysent.h>
 #include <sys/systm.h>
 
+#ifdef INVARIANTS
+#include <vm/vm.h>
+#include <vm/pmap.h>
+#include <vm/vm_map.h>
+#endif
+
 #include <cheri/cheric.h>
 
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
@@ -96,13 +102,57 @@ _cheri_capability_build_user_rwx(uint32_t perms, ptraddr_t basep, size_t length,
     off_t off, const char* func __unused, int line __unused, bool exact)
 {
 	void * __capability tmpcap;
+#ifdef INVARIANTS
+	vm_map_entry_t entry;
+	vm_map_t map;
+	vm_offset_t reservation;
 
-	tmpcap = cheri_setoffset(cheri_andperm(cheri_setbounds(
-	    cheri_setoffset(userspace_root_cap, basep), length), perms), off);
+	if (SV_CURPROC_FLAG(SV_CHERI) && length != 0) {
+		map = &curproc->p_vmspace->vm_map;
+		vm_map_lock_read(map);
+		KASSERT(vm_map_lookup_entry(map, basep, &entry),
+		    ("%s:%d: vm_map does not contain basep 0x%zx "
+		    "(length 0x%zu, offset 0x%ju)", func, line,
+		    (size_t)basep, length, (uintmax_t)off));
+		reservation = entry->reservation;
+		for( ; basep + length > entry->end;
+		    entry = vm_map_entry_succ(entry)) {
+			/*
+			 * Check that the created capability is within a
+			 * single reservation.  This ensures we don't
+			 * make capabilities that might alias with a
+			 * later mapping.
+			 */
+			KASSERT((map->flags & MAP_RESERVATIONS) == 0 ||
+			    entry->reservation == reservation,
+			    ("Can't create a capability that spans reservations"));
+
+			/*
+			 * XXX: Disallow quarantined or abandoned pages?
+			 *
+			 * XXX: Require page maxprot to be a superset of
+			 * perms?
+			 */
+		}
+		vm_map_unlock_read(map);
+	}
+#endif
+
+	tmpcap = _cheri_capability_build_user_rwx_unchecked(perms, basep,
+	    length, off, func, line, exact);
 
 	KASSERT(!exact || cheri_getlen(tmpcap) == length,
 	    ("%s:%d: Constructed capability has wrong length 0x%zx != 0x%zx: "
 	     "%#lp", func, line, cheri_getlen(tmpcap), length, tmpcap));
 
 	return (tmpcap);
+}
+
+void * __capability
+_cheri_capability_build_user_rwx_unchecked(uint32_t perms, ptraddr_t basep,
+    size_t length, off_t off, const char* func __unused, int line __unused,
+    bool exact)
+{
+	return (cheri_setoffset(cheri_andperm(cheri_setbounds(
+	    cheri_setoffset(userspace_root_cap, basep), length), perms), off));
 }

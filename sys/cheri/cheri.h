@@ -67,6 +67,9 @@ void * __capability	_cheri_capability_build_user_data(uint32_t perms,
 void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
 			    ptraddr_t basep, size_t length, off_t off,
 			    const char* func, int line, bool exact);
+void * __capability	_cheri_capability_build_user_rwx_unchecked(
+			    uint32_t perms, ptraddr_t basep, size_t length,
+			    off_t off, const char* func, int line, bool exact);
 #define cheri_capability_build_user_code(td, perms, basep, length, off)	\
 	_cheri_capability_build_user_code(td, perms, basep, length, off,\
 	    __func__, __LINE__)
@@ -82,6 +85,9 @@ void * __capability	_cheri_capability_build_user_rwx(uint32_t perms,
 #define cheri_capability_build_inexact_user_rwx(perms, basep, length, off) \
 	_cheri_capability_build_user_rwx(perms, basep, length, off,	\
 	    __func__, __LINE__, false)
+#define cheri_capability_build_user_rwx_unchecked(perms, basep, length, off) \
+	_cheri_capability_build_user_rwx_unchecked(perms, basep, length, off, \
+	    __func__, __LINE__, true)
 
 /*
  * Global capabilities used to construct other capabilities.
@@ -139,6 +145,11 @@ otype_t	cheri_otype_alloc(void);
 void	cheri_otype_free(otype_t);
 
 /*
+ * Functions involving tagged memory.
+ */
+void	cheri_read_tags_page(const void *page, void *tagbuf, bool *hastagsp);
+
+/*
  * Global sysctl definitions.
  */
 SYSCTL_DECL(_security_cheri);
@@ -149,6 +160,7 @@ extern u_int	security_cheri_debugger_on_sandbox_unwind;
 extern u_int	security_cheri_sandboxed_signals;
 extern u_int	security_cheri_syscall_violations;
 extern u_int	security_cheri_bound_legacy_capabilities;
+extern u_int	cheri_cloadtags_stride;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
