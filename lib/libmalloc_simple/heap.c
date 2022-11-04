@@ -160,14 +160,12 @@ void *
 __rederive_pointer(void *ptr)
 {
 	size_t i;
-	vm_offset_t addr;
 
-	addr = cheri_getaddress(ptr);
 	for (i = 0; i < n_pagepools; i++) {
 		char *pool = pagepool_list[i];
 
-		if (cheri_is_address_inbounds(pool, addr))
-			return (cheri_setaddress(pool, addr));
+		if (cheri_is_address_inbounds(pool, cheri_getbase(ptr)))
+			return (cheri_setaddress(pool, cheri_getaddress(ptr)));
 	}
 
 	return (NULL);

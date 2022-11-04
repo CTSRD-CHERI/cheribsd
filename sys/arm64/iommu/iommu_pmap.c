@@ -654,8 +654,8 @@ retry:
 
 		l1p = pmap_l1(pmap, va);
 		l2p = pmap_l2(pmap, va);
-		cpu_dcache_wb_range((vm_offset_t)l1p, sizeof(pd_entry_t));
-		cpu_dcache_wb_range((vm_offset_t)l2p, sizeof(pd_entry_t));
+		cpu_dcache_wb_range((vm_pointer_t)l1p, sizeof(pd_entry_t));
+		cpu_dcache_wb_range((vm_pointer_t)l2p, sizeof(pd_entry_t));
 
 		goto retry;
 	}
@@ -666,7 +666,7 @@ retry:
 	/* New mapping */
 	pmap_store(l3, new_l3);
 
-	cpu_dcache_wb_range((vm_offset_t)l3, sizeof(pt_entry_t));
+	cpu_dcache_wb_range((vm_pointer_t)l3, sizeof(pt_entry_t));
 
 	pmap_resident_count_inc(pmap, 1);
 	dsb(ishst);
@@ -704,7 +704,7 @@ pmap_gpu_remove(pmap_t pmap, vm_offset_t va)
 
 	pmap_resident_count_dec(pmap, 1);
 	pmap_clear(pte);
-	cpu_dcache_wb_range((vm_offset_t)pte, sizeof(pt_entry_t));
+	cpu_dcache_wb_range((vm_pointer_t)pte, sizeof(pt_entry_t));
 	rc = KERN_SUCCESS;
 
 out:

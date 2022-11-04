@@ -430,11 +430,13 @@ __END_DECLS
 	KASSERT((ptraddr_t)((p)) == 0 ||			\
 	    (ptraddr_t)((p)) >= VM_MAXUSER_ADDRESS,		\
 	    ("PTR2CAP on user address: %p", (p)));		\
-	(__cheri_tocap __typeof__((*p)) * __capability)(p);	\
+	(__cheri_tocap __typeof__((*(p))) * __capability)(p);	\
 	})
 #else
 #define	PTR2CAP(p)	(p)
 #endif
+
+#define	TAG_BYTES_PER_PAGE	(PAGE_SIZE / (sizeof(__uintcap_t) * NBBY))
 #endif
 
 #endif	/* _SYS_PARAM_H_ */

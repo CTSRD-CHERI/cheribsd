@@ -278,7 +278,7 @@ read_manifest(char *path, unsigned char *digest)
 
 	while (bytes_read < va.va_size) {
 		rc = vn_rdwr(
-		    UIO_READ, nid.ni_vp, data,
+		    UIO_READ, nid.ni_vp, PTR2CAP(data),
 		    va.va_size - bytes_read, bytes_read,
 		    UIO_SYSSPACE, IO_NODELOCKED,
 		    curthread->td_ucred, NOCRED, &resid, curthread);

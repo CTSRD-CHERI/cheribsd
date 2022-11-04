@@ -461,9 +461,11 @@ OLD_FILES+=usr/libexec/bsdinstall/netconfig_ipv4
 OLD_FILES+=usr/libexec/bsdinstall/netconfig_ipv6
 OLD_FILES+=usr/libexec/bsdinstall/partedit
 OLD_FILES+=usr/libexec/bsdinstall/rootpass
+OLD_FILES+=usr/libexec/bsdinstall/runconsoles
 OLD_FILES+=usr/libexec/bsdinstall/script
 OLD_FILES+=usr/libexec/bsdinstall/scriptedpart
 OLD_FILES+=usr/libexec/bsdinstall/services
+OLD_FILES+=usr/libexec/bsdinstall/startbsdinstall
 OLD_FILES+=usr/libexec/bsdinstall/time
 OLD_FILES+=usr/libexec/bsdinstall/umount
 OLD_FILES+=usr/libexec/bsdinstall/wlanconfig
@@ -1183,7 +1185,7 @@ OLD_FILES+=usr/share/man/man1/llvm-strings.1.gz
 OLD_FILES+=usr/share/man/man1/llvm-symbolizer.1.gz
 .endif
 
-.if ${MK_CLANG} == no
+.if ${MK_CLANG} == no && 0
 OLD_FILES+=usr/bin/clang
 OLD_FILES+=usr/bin/clang++
 OLD_FILES+=usr/bin/clang-cpp
@@ -4244,7 +4246,8 @@ OLD_DIRS+=usr/include/c++/v1
 .endif
 
 .if ${MK_LLD} == no
-OLD_FILES+=usr/bin/ld.lld
+# Don't remove version from llvm-base
+#OLD_FILES+=usr/bin/ld.lld
 .endif
 
 .if ${MK_LLDB} == no

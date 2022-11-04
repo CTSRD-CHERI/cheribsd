@@ -175,7 +175,7 @@ vnode_dump(void *arg, void *virtual, off_t offset, size_t length)
 	if (virtual == NULL)
 		return (0);
 
-	error = vn_rdwr(UIO_WRITE, vp, virtual, length, offset, UIO_SYSSPACE,
+	error = vn_rdwr(UIO_WRITE, vp, PTR2CAP(virtual), length, offset, UIO_SYSSPACE,
 	    IO_NODELOCKED, curthread->td_ucred, NOCRED, NULL, curthread);
 	if (error != 0)
 		uprintf("%s: error writing livedump block at offset %jx: %d\n",
@@ -201,7 +201,7 @@ vnode_write_headers(struct dumperinfo *di, struct kerneldumpheader *kdh)
 	offset = roundup2(di->dumpoff, di->blocksize);
 
 	/* Write the kernel dump header to the end of the file. */
-	error = vn_rdwr(UIO_WRITE, vp, kdh, sizeof(*kdh), offset,
+	error = vn_rdwr(UIO_WRITE, vp, PTR2CAP(kdh), sizeof(*kdh), offset,
 	    UIO_SYSSPACE, IO_NODELOCKED, curthread->td_ucred, NOCRED, NULL,
 	    curthread);
 	if (error != 0)
