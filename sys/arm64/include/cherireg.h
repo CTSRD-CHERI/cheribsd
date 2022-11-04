@@ -117,6 +117,9 @@
 	CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP |		\
 	CHERI_PERM_MUTABLE_LOAD)
 
+#define	CHERI_PERMS_USERSPACE_RODATA					\
+	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD)
+
 /*
  * Corresponding permission masks for kernel code and data; these are
  * currently a bit broad, and should be narrowed over time as the kernel

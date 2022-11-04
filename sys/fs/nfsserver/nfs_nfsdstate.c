@@ -4893,7 +4893,7 @@ nfsrv_setupstable(NFSPROC_T *p)
 	if (sf->nsf_fp == NULL)
 		return;
 	error = NFSD_RDWR(UIO_READ, NFSFPVNODE(sf->nsf_fp),
-	    (caddr_t)&sf->nsf_rec, sizeof (struct nfsf_rec), off, UIO_SYSSPACE,
+	    PTR2CAP(&sf->nsf_rec), sizeof (struct nfsf_rec), off, UIO_SYSSPACE,
 	    0, NFSFPCRED(sf->nsf_fp), &aresid, p);
 	if (error || aresid || sf->nsf_numboots == 0 ||
 		sf->nsf_numboots > NFSNSF_MAXNUMBOOTS)
@@ -4906,7 +4906,7 @@ nfsrv_setupstable(NFSPROC_T *p)
 		sizeof (time_t), M_TEMP, M_WAITOK);
 	off = sizeof (struct nfsf_rec);
 	error = NFSD_RDWR(UIO_READ, NFSFPVNODE(sf->nsf_fp),
-	    (caddr_t)sf->nsf_bootvals, sf->nsf_numboots * sizeof (time_t), off,
+	    PTR2CAP(sf->nsf_bootvals), sf->nsf_numboots * sizeof (time_t), off,
 	    UIO_SYSSPACE, 0, NFSFPCRED(sf->nsf_fp), &aresid, p);
 	if (error || aresid) {
 		free(sf->nsf_bootvals, M_TEMP);
@@ -4943,7 +4943,7 @@ nfsrv_setupstable(NFSPROC_T *p)
 		NFSV4_OPAQUELIMIT - 1, M_TEMP, M_WAITOK);
 	do {
 	    error = NFSD_RDWR(UIO_READ, NFSFPVNODE(sf->nsf_fp),
-	        (caddr_t)tsp, sizeof (struct nfst_rec) + NFSV4_OPAQUELIMIT - 1,
+	        PTR2CAP(tsp), sizeof (struct nfst_rec) + NFSV4_OPAQUELIMIT - 1,
 	        off, UIO_SYSSPACE, 0, NFSFPCRED(sf->nsf_fp), &aresid, p);
 	    len = (sizeof (struct nfst_rec) + NFSV4_OPAQUELIMIT - 1) - aresid;
 	    if (error || (len > 0 && (len < sizeof (struct nfst_rec) ||
@@ -5049,11 +5049,11 @@ nfsrv_updatestable(NFSPROC_T *p)
 	vn_finished_write(mp);
 	if (!error)
 	    error = NFSD_RDWR(UIO_WRITE, vp,
-		(caddr_t)&sf->nsf_rec, sizeof (struct nfsf_rec), (off_t)0,
+		PTR2CAP(&sf->nsf_rec), sizeof (struct nfsf_rec), (off_t)0,
 		UIO_SYSSPACE, IO_SYNC, NFSFPCRED(sf->nsf_fp), NULL, p);
 	if (!error)
 	    error = NFSD_RDWR(UIO_WRITE, vp,
-		(caddr_t)sf->nsf_bootvals,
+		PTR2CAP(sf->nsf_bootvals),
 		sf->nsf_numboots * sizeof (time_t),
 		(off_t)(sizeof (struct nfsf_rec)),
 		UIO_SYSSPACE, IO_SYNC, NFSFPCRED(sf->nsf_fp), NULL, p);
@@ -5100,7 +5100,7 @@ nfsrv_writestable(u_char *client, int len, int flag, NFSPROC_T *p)
 	NFSBCOPY(client, sp->client, len);
 	sp->flag = flag;
 	error = NFSD_RDWR(UIO_WRITE, NFSFPVNODE(sf->nsf_fp),
-	    (caddr_t)sp, sizeof (struct nfst_rec) + len - 1, (off_t)0,
+	    PTR2CAP(sp), sizeof (struct nfst_rec) + len - 1, (off_t)0,
 	    UIO_SYSSPACE, (IO_SYNC | IO_APPEND), NFSFPCRED(sf->nsf_fp), NULL, p);
 	free(sp, M_TEMP);
 	if (error) {
@@ -8465,7 +8465,7 @@ tryagain2:
 		ret = VOP_GETATTR(fvp, &va, cred);
 		aresid = 0;
 		while (ret == 0 && aresid == 0) {
-			ret = vn_rdwr(UIO_READ, fvp, dat, PNFSDS_COPYSIZ,
+			ret = vn_rdwr(UIO_READ, fvp, PTR2CAP(dat), PNFSDS_COPYSIZ,
 			    rdpos, UIO_SYSSPACE, IO_NODELOCKED, cred, NULL,
 			    &aresid, p);
 			xfer = PNFSDS_COPYSIZ - aresid;
@@ -8478,7 +8478,7 @@ tryagain2:
 				if (xfer < PNFSDS_COPYSIZ || rdpos ==
 				    va.va_size || NFSBCMP(dat,
 				    nfsrv_zeropnfsdat, PNFSDS_COPYSIZ) != 0)
-					ret = vn_rdwr(UIO_WRITE, tvp, dat, xfer,
+					ret = vn_rdwr(UIO_WRITE, tvp, PTR2CAP(dat), xfer,
 					    wrpos, UIO_SYSSPACE, IO_NODELOCKED,
 					    cred, NULL, NULL, p);
 				if (ret == 0)

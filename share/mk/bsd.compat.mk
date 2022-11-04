@@ -125,7 +125,7 @@ HAS_COMPAT+=64C
 LIB64C_MACHINE=	arm64
 LIB64C_MACHINE_ARCH=	aarch64c
 LIB64CCPUFLAGS=	-target aarch64-unknown-freebsd13.0
-LIB64CCPUFLAGS+=	-march=morello+c64 -mabi=purecap
+LIB64CCPUFLAGS+=	-march=morello -mabi=purecap
 .elif ${COMPAT_ARCH:Mriscv64*} && !${COMPAT_ARCH:Mriscv64*c*}
 HAS_COMPAT+=64C
 LIB64C_MACHINE=	riscv

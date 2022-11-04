@@ -119,6 +119,8 @@ struct ptrace_io_desc {
 #define PIOD_WRITE_D	2	/* Write to D space */
 #define PIOD_READ_I	3	/* Read from I space */
 #define PIOD_WRITE_I	4	/* Write to I space */
+#define	PIOD_READ_CHERI_TAGS	5	/* Read packed memory tags */
+#define	PIOD_READ_CHERI_CAP	7	/* Read CHERI capabilities */
 
 /* Argument structure for PT_LWPINFO. */
 struct ptrace_lwpinfo {
@@ -212,6 +214,8 @@ struct ptrace_coredump {
 
 #ifdef _KERNEL
 
+#include <vm/vm.h>
+
 struct thr_coredump_req {
 	struct vnode	*tc_vp;		/* vnode to write coredump to. */
 	off_t		tc_limit;	/* max coredump file size. */
@@ -250,6 +254,8 @@ ssize_t	proc_readmem(struct thread *_td, struct proc *_p, vm_offset_t _va,
 ssize_t	proc_writemem(struct thread *_td, struct proc *_p, vm_offset_t _va,
 	    void *_buf, size_t _len);
 #if __has_feature(capabilities)
+int	proc_read_cheri_tags_page(vm_map_t _map, vm_offset_t _va,
+	    void *_tagbuf, bool *_hastags);
 int	proc_read_capregs(struct thread *_td, struct capreg *_capregs);
 int	proc_write_capregs(struct thread *_td, struct capreg *_capregs);
 #endif

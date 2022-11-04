@@ -88,6 +88,48 @@ arm64/arm64/unwind.c				optional ddb | kdtrace_hooks | stack
 arm64/arm64/vfp.c				standard
 arm64/arm64/vm_machdep.c			standard
 
+# Allwinner Video Controller
+dev/drm/allwinner/aw_de2.c		optional drm fdt aw_de2_drm
+dev/drm/allwinner/aw_de2_drm.c		optional drm fdt aw_de2_drm compile-with "${DRM_C}"
+dev/drm/allwinner/aw_de2_ui_plane.c	optional drm fdt aw_de2_drm compile-with "${DRM_C}"
+dev/drm/allwinner/aw_de2_vi_plane.c	optional drm fdt aw_de2_drm compile-with "${DRM_C}"
+dev/drm/allwinner/aw_de2_mixer.c	optional drm fdt aw_de2_drm compile-with "${DRM_C}"
+dev/drm/allwinner/aw_de2_tcon.c		optional drm fdt aw_de2_drm compile-with "${DRM_C}"
+dev/drm/allwinner/aw_de2_hdmi_phy.c	optional drm fdt aw_de2_drm compile-with "${DRM_C}"
+dev/drm/allwinner/aw_de2_mixer_if.m	optional drm fdt aw_de2_drm
+dev/drm/allwinner/aw_de2_tcon_if.m	optional drm fdt aw_de2_drm
+
+# Rockchip Display Subsystem
+dev/drm/rockchip/rk_drm.c		optional drm fdt aw_de2_drm compile-with "${DRM_C}"
+dev/drm/rockchip/rk_gem.c		optional drm fdt aw_de2_drm compile-with "${DRM_C}"
+dev/drm/rockchip/rk_plane.c		optional drm fdt aw_de2_drm compile-with "${DRM_C}"
+dev/drm/rockchip/rk_vop.c		optional drm fdt aw_de2_drm compile-with "${DRM_C}"
+dev/drm/rockchip/rk_vop_if.m		optional drm fdt aw_de2_drm
+
+# Panfrost Kernel Driver
+dev/drm/panfrost/panfrost_drv.c		optional drm fdt panfrost compile-with "${DRM_C}"
+dev/drm/panfrost/panfrost_device.c	optional drm fdt panfrost compile-with "${DRM_C}"
+dev/drm/panfrost/panfrost_gem.c		optional drm fdt panfrost compile-with "${DRM_C}"
+dev/drm/panfrost/panfrost_mmu.c		optional drm fdt panfrost compile-with "${DRM_C}"
+dev/drm/panfrost/panfrost_job.c		optional drm fdt panfrost compile-with "${DRM_C}"
+
+# ARM Komeda Display Subsystem
+dev/drm/komeda/komeda_drv.c		optional drm fdt komeda_drm compile-with "${DRM_C}"
+dev/drm/komeda/komeda_gem.c		optional drm fdt komeda_drm compile-with "${DRM_C}"
+dev/drm/komeda/komeda_pipeline.c	optional drm fdt komeda_drm compile-with "${DRM_C}"
+dev/drm/komeda/komeda_plane.c		optional drm fdt komeda_drm compile-with "${DRM_C}"
+
+# NXP TDA998x HDMI Controller
+dev/drm/bridges/tda19988/tda19988.c	optional drm fdt tda19988 compile-with "${DRM_C}"
+
+# Synopsis DesignWare HDMI Controller
+dev/drm/bridges/dw_hdmi/aw_de2_dw_hdmi.c	optional drm fdt dw_hdmi aw_de2_drm compile-with "${DRM_C}"
+dev/drm/bridges/dw_hdmi/dw_hdmi_if.m		optional drm fdt dw_hdmi aw_de2_drm
+dev/drm/bridges/dw_hdmi/dw_hdmi_phy_if.m	optional drm fdt dw_hdmi aw_de2_drm
+
+# ANX6345 RGB to eDP bridge
+dev/drm/bridges/anx6345/anx6345.c		optional fdt anx6345 compile-with "${DRM_C}"
+
 arm64/coresight/coresight.c			standard
 arm64/coresight/coresight_acpi.c		optional acpi
 arm64/coresight/coresight_fdt.c			optional fdt
@@ -109,7 +151,7 @@ arm64/coresight/coresight_tmc_fdt.c		optional fdt
 
 arm64/iommu/iommu.c				optional iommu
 arm64/iommu/iommu_if.m				optional iommu
-arm64/iommu/iommu_pmap.c			optional iommu
+arm64/iommu/iommu_pmap.c			optional iommu | panfrost
 arm64/iommu/smmu.c				optional iommu
 arm64/iommu/smmu_acpi.c				optional iommu acpi
 arm64/iommu/smmu_fdt.c				optional iommu fdt

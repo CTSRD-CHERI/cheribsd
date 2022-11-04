@@ -1576,7 +1576,17 @@ out:
 	p->p_vm_maxsaddr = stack_addr;
 	p->p_vm_stacktop = stack_top;
 	p->p_vm_ssize = sgrowsiz >> PAGE_SHIFT;
+#if !__has_feature(capabilities) || defined(__CHERI_PURE_CAPABILITY__)
 	vmspace->vm_shp_base = sharedpage_addr;
+#else
+	/*
+	 * We use _rwx here because we need a capability with execute
+	 * permissions, not a sealed one.
+	 */
+	vmspace->vm_shp_base = (uintcap_t)cheri_capability_build_user_rwx(
+	    CHERI_CAP_USER_CODE_PERMS, sharedpage_addr,
+	    sv->sv_shared_page_len, 0);
+#endif
 
 	return (0);
 }
@@ -2347,17 +2357,17 @@ compress_chunk(struct coredump_params *cp, char * __capability base, char *buf,
 }
 
 int
-core_write(struct coredump_params *cp, const void *base, size_t len,
+core_write(struct coredump_params *cp, const void * __capability base, size_t len,
     off_t offset, enum uio_seg seg, size_t *resid)
 {
 
-	return (vn_rdwr_inchunks(UIO_WRITE, cp->vp, __DECONST(void *, base),
+	return (vn_rdwr_inchunks(UIO_WRITE, cp->vp, __DECONST_CAP(void * __capability, base),
 	    len, offset, seg, IO_UNIT | IO_DIRECT | IO_RANGELOCKED,
 	    cp->active_cred, cp->file_cred, resid, cp->td));
 }
 
 int
-core_output(char * __capability base_cap, size_t len, off_t offset,
+core_output(char * __capability base, size_t len, off_t offset,
     struct coredump_params *cp, void *tmpbuf)
 {
 	vm_map_t map;
@@ -2365,13 +2375,13 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 	size_t resid, runlen;
 	int error;
 	bool success;
-	char *base = (char *)(uintptr_t)(uintcap_t)base_cap;
 
 	KASSERT(is_aligned(base, PAGE_SIZE),
-	    ("%s: user address %p is not page-aligned", __func__, base));
+	    ("%s: user address %zd is not page-aligned", __func__,
+	    (ptraddr_t)(uintcap_t)base));
 
 	if (cp->comp != NULL)
-		return (compress_chunk(cp, base_cap, tmpbuf, len));
+		return (compress_chunk(cp, base, tmpbuf, len));
 
 	map = &cp->td->td_proc->p_vmspace->vm_map;
 	for (; len > 0; base += runlen, offset += runlen, len -= runlen) {
@@ -2384,7 +2394,7 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 		for (runlen = 0; runlen < len; runlen += PAGE_SIZE) {
 			if (core_dump_can_intr && curproc_sigkilled())
 				return (EINTR);
-			error = vm_fault(map, (uintptr_t)base + runlen,
+			error = vm_fault(map, (ptraddr_t)(uintcap_t)base + runlen,
 			    VM_PROT_READ, VM_FAULT_NOFILL, NULL);
 			if (runlen == 0)
 				success = error == KERN_SUCCESS;
@@ -2393,10 +2403,6 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 		}
 
 		if (success) {
-			/*
-			 * NB: The hybrid kernel drops the capability here, it
-			 * will be re-derived in vn_rdwr().
-			 */
 			error = core_write(cp, base, runlen, offset,
 			    UIO_USERSPACE, &resid);
 			if (error != 0) {
@@ -2435,6 +2441,92 @@ core_output(char * __capability base_cap, size_t len, off_t offset,
 	return (error);
 }
 
+#if __has_feature(capabilities)
+static int
+core_extend_file(struct coredump_params *cp, off_t newlen)
+{
+	struct mount *mp;
+	int error;
+
+	error = vn_start_write(cp->vp, &mp, V_WAIT);
+	if (error != 0)
+		return (error);
+	vn_lock(cp->vp, LK_EXCLUSIVE | LK_RETRY);
+	error = vn_truncate_locked(cp->vp, newlen, false, cp->td->td_ucred);
+	VOP_UNLOCK(cp->vp);
+	vn_finished_write(mp);
+	return (error);
+}
+
+int
+core_output_memtag_cheri(char * __capability base, size_t mem_len,
+    size_t file_len, off_t offset, struct coredump_params *cp,
+    void *tagtmpbuf, void *tmpbuf)
+{
+	vm_map_t map;
+	char *tagbuf;
+	size_t tagbuflen;
+	int error;
+	bool hastags, pagehastags;
+
+	KASSERT(is_aligned(base, PAGE_SIZE),
+	    ("%s: user address %lp is not page-aligned", __func__, base));
+
+	tagbuf = tagtmpbuf;
+	tagbuflen = 0;
+	hastags = false;
+
+	map = &cp->td->td_proc->p_vmspace->vm_map;
+	for (; mem_len > 0; base += PAGE_SIZE, mem_len -= PAGE_SIZE) {
+		if (core_dump_can_intr && curproc_sigkilled())
+			return (EINTR);
+
+		error = proc_read_cheri_tags_page(map, (uintcap_t)base,
+		    tagbuf + tagbuflen, &pagehastags);
+		if (error != 0)
+			return (error);
+		if (pagehastags)
+			hastags = true;
+		tagbuflen += TAG_BYTES_PER_PAGE;
+
+		if (tagbuflen == CORE_BUF_SIZE) {
+			if (cp->comp != NULL)
+				error = compressor_write(cp->comp, tagbuf,
+				    CORE_BUF_SIZE);
+			else {
+				if (hastags)
+					error = core_write(cp, PTR2CAP(tagbuf),
+					    CORE_BUF_SIZE, offset,
+					    UIO_SYSSPACE, NULL);
+				else
+					error = 0;
+			}
+			offset += CORE_BUF_SIZE;
+			if (error != 0)
+				return (error);
+
+			tagbuflen = 0;
+			hastags = false;
+		}
+	}
+
+	if (tagbuflen != 0) {
+		if (cp->comp != NULL)
+			error = compressor_write(cp->comp, tagbuf, tagbuflen);
+		else {
+			if (hastags)
+				error = core_write(cp, PTR2CAP(tagbuf),
+				    tagbuflen, offset, UIO_SYSSPACE, NULL);
+			else
+				error = core_extend_file(cp, offset +
+				    tagbuflen);
+		}
+		return (error);
+	}
+	return (0);
+}
+#endif
+
 /*
  * Drain into a core file.
  */
@@ -2463,7 +2555,7 @@ sbuf_drain_core_output(void *arg, const char *data, int len)
 		error = compressor_write(cp->comp, __DECONST(char *, data),
 		    len);
 	else
-		error = core_write(cp, __DECONST(void *, data), len, cp->offset,
+		error = core_write(cp, PTR2CAP(__DECONST(void *, data)), len, cp->offset,
 		    UIO_SYSSPACE, NULL);
 	if (locked)
 		PROC_LOCK(p);

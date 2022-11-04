@@ -373,6 +373,7 @@ static const char *note_type(const char *note_name, unsigned int et,
     unsigned int nt);
 static const char *note_type_freebsd(unsigned int nt);
 static const char *note_type_freebsd_core(unsigned int nt);
+static const char *note_type_cheribsd(unsigned int nt);
 static const char *note_type_go(unsigned int nt);
 static const char *note_type_gnu(unsigned int nt);
 static const char *note_type_linux_core(unsigned int nt);
@@ -677,10 +678,21 @@ phdr_type(unsigned int mach, unsigned int ptype)
 
 	if (ptype >= PT_LOPROC && ptype <= PT_HIPROC) {
 		switch (mach) {
+		case EM_AARCH64:
+			switch (ptype) {
+			case PT_AARCH64_MEMTAG_CHERI:
+				return "AARCH64_MEMTAG_CHERI";
+			}
+			break;
 		case EM_ARM:
 			switch (ptype) {
 			case PT_ARM_ARCHEXT: return "ARM_ARCHEXT";
 			case PT_ARM_EXIDX: return "ARM_EXIDX";
+			}
+			break;
+		case EM_RISCV:
+			switch (ptype) {
+			case PT_RISCV_MEMTAG_CHERI: return "RISCV_MEMTAG_CHERI";
 			}
 			break;
 		}
@@ -1152,6 +1164,8 @@ note_type(const char *name, unsigned int et, unsigned int nt)
 			return note_type_freebsd_core(nt);
 		else
 			return note_type_freebsd(nt);
+	else if (strcmp(name, "CheriBSD") == 0 && et != ET_CORE)
+		return note_type_cheribsd(nt);
 	else if (strcmp(name, "GNU") == 0 && et != ET_CORE)
 		return note_type_gnu(nt);
 	else if (strcmp(name, "Go") == 0 && et != ET_CORE)
@@ -1163,6 +1177,15 @@ note_type(const char *name, unsigned int et, unsigned int nt)
 	else if (strcmp(name, "Xen") == 0 && et != ET_CORE)
 		return note_type_xen(nt);
 	return note_type_unknown(nt);
+}
+
+static const char *
+note_type_cheribsd(unsigned int nt)
+{
+	switch (nt) {
+	case NT_CHERIBSD_ABI_TAG: return "NT_CHERIBSD_ABI_TAG";
+	default: return (note_type_unknown(nt));
+	}
 }
 
 static const char *
@@ -3841,6 +3864,13 @@ dump_notes_data(struct readelf *re, const char *name, uint32_t type,
 				goto unknown;
 			printf("   Features:");
 			dump_flags(note_feature_ctl_flags, ubuf[0]);
+			return;
+		}
+	} else if (strcmp(name, "CheriBSD") == 0) {
+		if (type == NT_CHERIBSD_ABI_TAG) {
+			if (sz != 4)
+				goto unknown;
+			printf("   ABI tag: %u\n", ubuf[0]);
 			return;
 		}
 	} else if (strcmp(name, "Go") == 0) {

@@ -95,6 +95,8 @@ __ElfType(Auxinfo);
 
 #define	ELF_IS_CHERI(hdr) (((hdr)->e_flags & EF_AARCH64_CHERI_PURECAP) != 0)
 
+#define	PT_MEMTAG_CHERI	PT_AARCH64_MEMTAG_CHERI
+
 /* Define "machine" characteristics */
 #if __ELF_WORD_SIZE == 64
 #define	ELF_TARG_CLASS	ELFCLASS64

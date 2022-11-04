@@ -44,6 +44,9 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/ioctl.h>
 #include <sys/types.h>
+
+#include <cheri/cheric.h>
+
 #include <stdarg.h>
 #include <stddef.h>
 #include "libc_private.h"
@@ -70,29 +73,49 @@ _ioctl(int fd, unsigned long com, ...)
 	va_list ap;
 	void *data;
 
+	va_start(ap, com);
+
+	/*
+	 * In the (size > 0 && (com & IOC_VOID) != 0) case, the kernel assigns
+	 * the value of data to an int and passes a pointer to that int down,
+	 * so we want to extract an int here. Otherwise for (size > 0) we have
+	 * a normal IN and/or OUT ioctl that takes a pointer to the actual data
+	 * whose size is encoded, so we want to extract a pointer here.
+	 *
+	 * XXX: Not all ioctls adhere to the standard encoding, both in
+	 * direction and in size. For example, GIO_KEYMAP is size == 0 with
+	 * IOC_VOID as the real size doesn't fit in the parameter length field.
+	 * In the size == 0 case, peek at the varargs array to see how much
+	 * space is left. We may want an __np_va_space_remaining or the like to
+	 * not assume the layout of the varargs array. This relies on varargs
+	 * slots always being full capabilities with the integer in the address
+	 * portion (or, if varargs bounds are not precise, that capabilities
+	 * are little-endian), and always being capability-aligned if the
+	 * varargs array capability's length is at least sizeof(void *) (which
+	 * is true by virtue of stack-alignment on architectures without
+	 * bounded varargs, and trivially true on architectures with bounded
+	 * varargs, regardless of whether slots are capability-sized).
+	 *
+	 * Ideally these would be encoded differently to remove this ambiguity,
+	 * perhaps as IOC_VOID with size(void *) like the int case.
+	 */
 	size = IOCPARM_LEN(com);
-	if (size > 0) {
-		va_start(ap, com);
-		if (com & IOC_VOID) {
-			/*
-			 * In the (size > 0 && com & IOC_VOID) case, the
-			 * kernel assigns the value of data to an int
-			 * and passes a pointer to that int down.
-			 */
-			/*
-			 * XXX-BD: there is no telling what real
-			 * applications are passing here.  We may want an
-			 * __np_va_space_remaining() or the like to peak
-			 * at the passed argument rather than crashing
-			 * deep in a library.
-			 */
-			data = (void *)(intptr_t)(va_arg(ap, int));
-		} else {
-			data = va_arg(ap, void *);
-		}
-		va_end(ap);
-	} else {
+	if (size == 0)
+		size = (void *)ap != NULL ?
+		    cheri_bytes_remaining((void *)ap) : 0;
+	else if ((com & IOC_VOID) != 0)
+		size = sizeof(int);
+	else
+		size = sizeof(void *);
+
+	if (size >= sizeof(void *))
+		data = va_arg(ap, void *);
+	else if (size >= sizeof(int))
+		data = (void *)(intptr_t)va_arg(ap, int);
+	else
 		data = NULL;
-	}
+
+	va_end(ap);
+
 	return (__sys_ioctl(fd, com, data));
 }

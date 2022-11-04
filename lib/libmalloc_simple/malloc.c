@@ -46,6 +46,7 @@ static char *rcsid = "$FreeBSD$";
 
 #include <sys/param.h>
 #include <sys/types.h>
+#include <sys/queue.h>
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
@@ -71,7 +72,6 @@ static char *rcsid = "$FreeBSD$";
 #define	error_printf(...)	fprintf(stderr, __VA_ARGS__)
 #endif
 
-union overhead;
 static void morecore(int);
 
 /*
@@ -79,28 +79,32 @@ static void morecore(int);
  * contains a pointer to the next free block. When in use, the first
  * byte is set to MAGIC, and the second byte is the size index.
  */
-union	overhead {
-	union	overhead *ov_next;	/* when free */
-	struct {
-		u_char	ovu_magic;	/* magic number */
-		u_char	ovu_index;	/* bucket # */
-	} ovu;
+struct overhead {
+	union {
+		SLIST_ENTRY(overhead) ov_next;	/* when free */
+		void	*ov_real_allocation;	/* when realigned */
+		struct {
+			u_char	ovu_magic;	/* magic number */
+			u_char	ovu_index;	/* bucket # */
+		} ovu;
+	};
 #define	ov_magic	ovu.ovu_magic
 #define	ov_index	ovu.ovu_index
 };
+SLIST_HEAD(ov_listhead, overhead);
 
-#define	MALLOC_ALIGNMENT	sizeof(union overhead)
+#define	MALLOC_ALIGNMENT	sizeof(struct overhead)
 
 #define	MAGIC		0xef		/* magic # on accounting info */
 
 /*
- * nextf[i] is the pointer to the next free block of size
+ * nextf[i] is the head of the list of the next free block of size
  * (FIRST_BUCKET_SIZE << i).  The overhead information precedes the
  * data area returned to the user.
  */
 #define	FIRST_BUCKET_SIZE	32
 #define	NBUCKETS 30
-static	union overhead *nextf[NBUCKETS];
+static struct ov_listhead nextf[NBUCKETS];
 
 static	size_t pagesz;			/* page size */
 
@@ -134,7 +138,8 @@ bound_ptr(void *mem, size_t nbytes)
 static void *
 __simple_malloc_unaligned(size_t nbytes)
 {
-	union overhead *op;
+	struct overhead *op;
+	struct ov_listhead *bucketp;
 	int bucket;
 	size_t amt;
 
@@ -162,32 +167,34 @@ __simple_malloc_unaligned(size_t nbytes)
 	}
 	if (bucket >= NBUCKETS)
 		return (NULL);
+	bucketp = &nextf[bucket];
 	/*
 	 * If nothing in hash bucket right now,
 	 * request more memory from the system.
 	 */
-	if ((op = nextf[bucket]) == NULL) {
+	if (SLIST_EMPTY(bucketp)) {
 		morecore(bucket);
-		if ((op = nextf[bucket]) == NULL)
+		if (SLIST_EMPTY(bucketp))
 			return (NULL);
 	}
 	/* remove from linked list */
-	nextf[bucket] = op->ov_next;
+	op = SLIST_FIRST(bucketp);
+	SLIST_REMOVE_HEAD(bucketp, ov_next);
 	/*
-	 * XXXQEMU: Set an ov_next capability to a NULL capability, clearing any
-	 * permissions.
+	 * XXXQEMU: Clear the overhead struct to remove any capability
+	 * permissions in ov_real_allocation.
 	 *
-	 * Based on a tag and permissions of ov_next, find_overhead() determines
-	 * if an allocation is aligned. The QEMU user mode for CheriABI doesn't
-	 * implement tagged memory and find_overhead() might incorrectly assume
-	 * the allocation is aligned because of a non-cleared tag. Having the
-	 * permissions cleared, find_overhead() behaves as expected under the
-	 * user mode.
+	 * Based on a tag and permissions of ov_real_allocation, find_overhead()
+	 * determines if an allocation is aligned. The QEMU user mode for
+	 * CheriABI doesn't implement tagged memory and find_overhead() might
+	 * incorrectly assume the allocation is aligned because of a
+	 * non-cleared tag. Having the permissions cleared, find_overhead()
+	 * behaves as expected under the user mode.
 	 *
 	 * This is a workaround and should be reverted once the user mode
 	 * implements tagged memory.
 	 */
-	op->ov_next = NULL;
+	memset(op, 0, sizeof(*op));
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
 	return (op + 1);
@@ -197,17 +204,19 @@ static void *
 __simple_malloc_aligned(size_t nbytes, size_t align)
 {
 	ptraddr_t memshift;
-	void *mem, *res;
+	void *mem;
+	struct overhead *op;
+
 	if (align < sizeof(void *))
 		align = sizeof(void *);
 
-	mem = __simple_malloc_unaligned(nbytes + sizeof(void *) + align - 1);
-	memshift = roundup2((ptraddr_t)mem + sizeof(void *), align) -
+	mem = __simple_malloc_unaligned(nbytes + sizeof(*op) + align - 1);
+	memshift = roundup2((ptraddr_t)mem + sizeof(*op), align) -
 	    (ptraddr_t)mem;
 
-	res = (void *)((uintptr_t)mem + memshift);
-	*(void **)((uintptr_t)res - sizeof(void *)) = mem;
-	return (res);
+	op = (struct overhead *)((uintptr_t)mem + memshift);
+	(op - 1)->ov_real_allocation = mem;
+	return ((void *)op);
 }
 
 static void *
@@ -254,7 +263,7 @@ static void
 morecore(int bucket)
 {
 	char *buf;
-	union overhead *op;
+	struct overhead *op;
 	size_t sz;			/* size of desired block */
 	int amt;			/* amount to allocate */
 	int nblks;			/* how many blocks we get */
@@ -284,18 +293,17 @@ morecore(int bucket)
 	 * Add new memory allocated to that on
 	 * free list for this hash bucket.
 	 */
-	nextf[bucket] = op = (union overhead *)(void *)cheri_setbounds(buf, sz);
-	while (--nblks > 0) {
-		op->ov_next = (union overhead *)(void *)cheri_setbounds(buf + sz, sz);
+	for (; nblks > 0; nblks--) {
+		op = (struct overhead *)(void *)cheri_setbounds(buf, sz);
+		SLIST_INSERT_HEAD(&nextf[bucket], op, ov_next);
 		buf += sz;
-		op = op->ov_next;
 	}
 }
 
-static union overhead *
+static struct overhead *
 find_overhead(void * cp)
 {
-	union overhead *op;
+	struct overhead *op;
 
 	if (!cheri_gettag(cp))
 		return (NULL);
@@ -315,14 +323,14 @@ find_overhead(void * cp)
 	 *  - Be an internal allocator pointer (have the VMMAP permision).
 	 *  - Point somewhere before us and within the current pagepool.
 	 */
-	if (cheri_gettag(op->ov_next) &&
-	    (cheri_getperm(op->ov_next) & CHERI_PERM_SW_VMEM) != 0) {
+	if (cheri_gettag(op->ov_real_allocation) &&
+	    (cheri_getperm(op->ov_real_allocation) & CHERI_PERM_SW_VMEM) != 0) {
 		ptraddr_t base, pp_base;
 
 		pp_base = cheri_getbase(op);
-		base = cheri_getbase(op->ov_next);
+		base = cheri_getbase(op->ov_real_allocation);
 		if (base >= pp_base && base < cheri_getaddress(op)) {
-			op = op->ov_next;
+			op = op->ov_real_allocation;
 			op--;
 		}
 	}
@@ -346,7 +354,7 @@ static void
 __simple_free(void *cp)
 {
 	int bucket;
-	union overhead *op;
+	struct overhead *op;
 
 	if (cp == NULL)
 		return;
@@ -355,8 +363,7 @@ __simple_free(void *cp)
 		return;
 	bucket = op->ov_index;
 	ASSERT(bucket < NBUCKETS);
-	op->ov_next = nextf[bucket];	/* also clobbers ov_magic */
-	nextf[bucket] = op;
+	SLIST_INSERT_HEAD(&nextf[bucket], op, ov_next);
 }
 
 static void *
@@ -364,7 +371,7 @@ __simple_realloc(void *cp, size_t nbytes)
 {
 	size_t cur_space;	/* Space in the current bucket */
 	size_t smaller_space;	/* Space in the next smaller bucket */
-	union overhead *op;
+	struct overhead *op;
 	char *res;
 
 #ifdef __CHERI_PURE_CAPABILITY__
