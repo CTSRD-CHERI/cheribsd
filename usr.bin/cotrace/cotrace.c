@@ -361,8 +361,6 @@ main(int argc, char **argv)
 	}
 
 	/*
-	 * Parent.  Nothing to do until SIGCHLD.
-	 *
 	 * XXX: There's another race here: another thread could have already started
 	 *      making cocalls before we call cap_enter(2).
 	 */
@@ -372,6 +370,10 @@ main(int argc, char **argv)
 			err(1, "cap_enter");
 	}
 
+	/*
+	 * Parent.  Nothing to do until SIGCHLD.  Can't use wait(2), because Capsicum,
+	 * and we don't have pdvfork(2), so lets wait for ourselves instead.
+	 */
 	for (i = 0; i < capc; i++) {
 		if (capv[i] == NULL)
 			continue;
@@ -380,5 +382,8 @@ main(int argc, char **argv)
 			err(1, "pthread_join");
 	}
 
+	/*
+	 * XXX: We're not passing pass child's exit code here.
+	 */
 	return (0);
 }
