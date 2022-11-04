@@ -107,7 +107,7 @@ _cheri_capability_build_user_rwx(uint32_t perms, ptraddr_t basep, size_t length,
 	vm_map_t map;
 	vm_offset_t reservation;
 
-	if (SV_CURPROC_FLAG(SV_CHERI)) {
+	if (SV_CURPROC_FLAG(SV_CHERI) && length != 0) {
 		map = &curproc->p_vmspace->vm_map;
 		vm_map_lock_read(map);
 		KASSERT(vm_map_lookup_entry(map, basep, &entry),
