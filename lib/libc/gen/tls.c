@@ -384,9 +384,7 @@ __libc_free_tls(void *tcb __unused, size_t tcbsize __unused,
 
 #endif /* PIC */
 
-#ifndef __CHERI_PURE_CAPABILITY__
-extern char **environ;
-#else
+#ifdef __CHERI_PURE_CAPABILITY__
 extern Elf_Auxinfo *__auxargs;
 #endif
 

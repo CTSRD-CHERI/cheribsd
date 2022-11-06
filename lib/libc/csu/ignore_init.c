@@ -159,8 +159,6 @@ handle_static_init(int argc, char **argv, char **env)
 	}
 }
 
-extern char **environ;
-
 static void
 handle_argv(int argc, char *argv[], char **env)
 {
