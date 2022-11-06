@@ -1,0 +1,111 @@
+.\" Copyright (c) 2022 Dapeng Gao <dapeng.gao@cl.cam.ac.uk>
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHORS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHORS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\" $FreeBSD$
+.\"
+.Dd October 26 2022
+.Dt COMPARTMENTALIZATION 7
+.Os
+.Sh NAME
+.Nm compartmentalization ,
+.Nm c18n
+.Nd library-based software compartmentalization
+.Sh DESCRIPTION
+This file contains instructions for using the library-based compartmentalization
+(c18n) prototype.
+.Pp
+To launch a dynamically-linked pure-capability application with library-based
+compartmentalization, use the special runtime linker located at
+.Pa /libexec/ld-elf-c18n.so.1 .
+This can be done either explicitly, by invoking
+.Pp
+.Dl /libexec/ld-elf-c18n.so.1 Ar executable
+.Pp
+or implicitly, by setting the
+.Sy INTERP
+field of the program header of the target executable to the special linker's
+path.
+Said
+.Sy INTERP
+field can be inspected by invoking
+.Pp
+.Dl readelf -l Ar executable
+.Pp
+and can be set during the linking phase of compilation, typically by supplying
+the following option
+.Pp
+.Dl -Wl,--dynamic-linker=/libexec/ld-elf-c18n.so.1
+.Pp
+to the compiler.
+Alternatively, use the
+.Sy patchelf
+utility to directly modify the
+.Sy INTERP
+field of an executable, although it is reportedly unreliable at times.
+.Pp
+Compartmentalization currently depends on modified versions of
+.Lb libc
+and
+.Lb libthr .
+These are located in
+.Pa /usr/lib/c18n .
+The modified runtime linker automatically searches from these paths first so
+that modified libraries are used.
+.Sh LIMITATIONS
+This work is of a highly experimental nature.
+The author has tested it on applications such as
+.Xr tmux 1 ,
+but crashes are likely when running complex pieces of software.
+.Pp
+The current prototype only contains a set of
+.Em mechanisms
+for implementing library-based compartmentalization.
+No
+.Em policy
+has been enforced yet.
+.Pp
+Below is an incomplete list of known limitations and known problems.
+For more up-to-date information, visit
+.Lk https://github.com/CTSRD-CHERI/cheripedia/wiki/Library-based-Compartmentalisation .
+.Bl -bullet
+.It
+Functions that take more than 8 arguments (not counting variadic arguments) are
+not expected to work correctly
+.Em when they are called from another library .
+Calling such functions from within the same library is not impacted.
+.It
+Stack unwinding is not expected to work.
+This includes C++ exceptions and stack tracing in debuggers.
+.It
+.Xr sigaltstack 2
+does not work as expected.
+This impacts some applications that use an alternative stack to handle stack-overflow
+exceptions.
+.It
+.Xr getcontext 3 ,
+.Xr setcontext 3 ,
+and related functions do not work as expected.
+This impacts certain threading and coroutine libraries.
+.El
+.Sh AUTHORS
+.An Dapeng Gao Aq Mt dapeng.gao@cl.cam.ac.uk
