@@ -10,6 +10,7 @@ MAN=	arch.7 \
 	build.7 \
 	c.7 \
 	clocks.7 \
+	compartmentalization.7 \
 	crypto.7 \
 	development.7 \
 	environ.7 \
@@ -43,6 +44,7 @@ MLINKS+= c.7 c99.7
 MLINKS+= c.7 c11.7
 MLINKS+= c.7 c17.7
 MLINKS+= c.7 c2x.7
+MLINKS+= compartmentalization.7 c18n.7
 
 .if ${MK_TESTS} != "no"
 ATF=	${SRCTOP}/contrib/atf
