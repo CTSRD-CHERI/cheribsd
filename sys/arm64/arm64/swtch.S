@@ -82,9 +82,17 @@ ENTRY(cpu_throw)
 	/* This returns the thread pointer so no need to save it */
 	bl	ptrauth_switch
 #endif
+#ifdef PERTHREAD_SSP
+	mov	x19, x0
+#endif
 	/* This returns the thread pcb */
 	bl	pmap_switch
 	mov	PTR(4), PTR(0)
+#ifdef PERTHREAD_SSP
+	/* Update the per-thread stack canary pointer. */
+	add	x19, x19, #(TD_MD_CANARY)
+	msr	sp_el0, x19
+#endif
 
 	/* If we are single stepping, enable it */
 	ldr	w5, [PTR(4), #PCB_FLAGS]
@@ -190,6 +198,11 @@ ENTRY(cpu_switch)
 	mov	PTR(2), PTR(21)
 	mov	PTR(1), PTR(20)
 	mov	PTR(0), PTR(19)
+#ifdef PERTHREAD_SSP
+	/* Update the per-thread stack canary pointer. */
+	add	x20, x20, #(TD_MD_CANARY)
+	msr	sp_el0, x20
+#endif
 
 	/*
 	 * Release the old thread.

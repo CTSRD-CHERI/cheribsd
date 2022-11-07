@@ -334,7 +334,13 @@ cap_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 }
 #endif
 
-static void
+/*
+ * It is unsafe to access the stack canary value stored in "td" until
+ * kernel map translation faults are handled, see the pmap_klookup() call below.
+ * Thus, stack-smashing detection with per-thread canaries must be disabled in
+ * this function.
+ */
+static void NO_PERTHREAD_SSP
 data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
     uint64_t far, int lower)
 {
@@ -572,7 +578,10 @@ fpe_trap(struct thread *td, void * __capability addr, uint32_t exception)
 }
 #endif
 
-void
+/*
+ * See the comment above data_abort().
+ */
+void NO_PERTHREAD_SSP
 do_el1h_sync(struct thread *td, struct trapframe *frame)
 {
 	uint32_t exception;
