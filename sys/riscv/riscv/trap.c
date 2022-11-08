@@ -646,9 +646,9 @@ db_print_cap(struct thread *td, const char *name, const void * __capability valu
 
 	if (pid >= 0) {
 		(kdb_active ? db_printf : printf)("%s%#lp (pid %d)\n",
-		    name, &tmp, pid);
+		    name, tmp, pid);
 	} else {
-		(kdb_active ? db_printf : printf)("%s%#lp\n", name, &tmp);
+		(kdb_active ? db_printf : printf)("%s%#lp\n", name, tmp);
 	}
 }
 
