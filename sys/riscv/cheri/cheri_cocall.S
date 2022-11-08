@@ -102,7 +102,7 @@ SIGCODE(switcher_cocall)
 	clr.c	ct1, (ct0)
 	cgettag	t2, ct1
 	bnez	t2, 10f
-	csc.c	t3, idc, (ct0)
+	csc.c	ct3, idc, (ct0)
 	beqz	t3, 1b
 #else
 	/*
@@ -123,10 +123,10 @@ SIGCODE(switcher_cocall)
 	 * is returning to the callee and scb_borrower_thread
 	 * needs to be set to NULL in the callee's scb.
 	 */
-	cld	t1, SCB_BORROWER_TD(ct0)
+	clc	ct1, SCB_BORROWER_TD(ct0)
 	bnez	t1, 5f
-	cld	t4, SCB_TD(ct0)
-	csd	t4, SCB_BORROWER_TD(idc)
+	clc	ct4, SCB_TD(ct0)
+	csc	ct4, SCB_BORROWER_TD(idc)
 	j	6f
 5:
 	csd	zero, SCB_BORROWER_TD(ct0)
