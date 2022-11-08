@@ -57,14 +57,14 @@ struct switchercb {
 	/*
 	 * Thread owning the context; the same thread that called cosetup(2).
 	 */
-	struct thread				*scb_td;
+	struct thread * __capability		scb_td;
 
 	/*
 	 * Thread owning the context we're lending our thread to.  When
 	 * calling cocall(), this will be the callee thread.  NULL when
 	 * not lending.
 	 */
-	struct thread				*scb_borrower_td;
+	struct thread * __capability		scb_borrower_td;
 
 	/*
 	 * Capability to unseal peer context.

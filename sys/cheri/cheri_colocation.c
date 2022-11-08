@@ -277,7 +277,7 @@ colocation_get_peer(struct thread *td, struct thread **peertdp)
 		return;
 	}
 
-	*peertdp = scb.scb_borrower_td;
+	*peertdp = (__cheri_fromcap struct thread *)scb.scb_borrower_td;
 }
 
 void
@@ -352,7 +352,7 @@ colocation_unborrow(struct thread *td)
 	if (!have_scb)
 		return;
 
-	peertd = scb.scb_borrower_td;
+	peertd = (__cheri_fromcap struct thread *)scb.scb_borrower_td;
 	if (peertd == NULL) {
 		/*
 		 * Nothing borrowed yet.
@@ -376,8 +376,8 @@ colocation_unborrow(struct thread *td)
 #error "what architecture is this?"
 #endif
 
-	KASSERT(td == scb.scb_td,
-	    ("%s: td %p != scb_td %p\n", __func__, td, scb.scb_td));
+	KASSERT(td == (__cheri_fromcap struct thread *)scb.scb_td,
+	    ("%s: td %p != scb_td %p\n", __func__, td, (__cheri_fromcap struct thread *)scb.scb_td));
 	KASSERT(peertd != td,
 	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
@@ -527,7 +527,7 @@ setup_scb(struct thread *td)
 	//printf("%s: scb at %p, td %p\n", __func__, (void *)addr, td);
 	memset(&scb, 0, sizeof(scb));
 	scb.scb_unsealcap = switcher_sealcap2;
-	scb.scb_td = td;
+	scb.scb_td = (__cheri_tocap void * __capability)td;
 	scb.scb_borrower_td = NULL;
 	scb.scb_caller_scb = cheri_capability_build_user_data(0, 0, 0, EAGAIN);
 	colocation_store_scb(td, &scb);
@@ -944,7 +944,7 @@ again:
 	 */
 	colocation_store_scb(curthread, &scb);
 
-	calleetd = calleescb.scb_td;
+	calleetd = (__cheri_fromcap struct thread *)calleescb.scb_td;
 	KASSERT(calleetd != NULL, ("%s: NULL calleetd?\n", __func__));
 
 	// XXX: What happens when the callee thread dies while we are here?
@@ -1233,8 +1233,8 @@ db_print_scb(struct thread *td, struct switchercb *scb)
 		db_print_cap(td, "    scb_caller_scb:    ", scb->scb_caller_scb);
 	}
 	db_print_cap(td, "    scb_callee_scb:    ", scb->scb_callee_scb);
-	db_printf(       "    scb_td:            %p\n", scb->scb_td);
-	db_printf(       "    scb_borrower_td:   %p\n", scb->scb_borrower_td);
+	db_print_cap(td, "    scb_td:            ", scb->scb_td);
+	db_print_cap(td, "    scb_borrower_td:   ", scb->scb_borrower_td);
 	db_print_cap(td, "    scb_unsealcap:     ", scb->scb_unsealcap);
 	db_print_cap(td, "    scb_csp:           ", scb->scb_csp);
 	db_print_cap(td, "    scb_cra:           ", scb->scb_cra);
@@ -1341,13 +1341,13 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 		    td->td_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
 		db_print_scb_td(td);
 
-		borrowertd = scb.scb_borrower_td;
+		borrowertd = (__cheri_fromcap struct thread *)scb.scb_borrower_td;
 		shown_borrowertd = false;
 
 		have_scb = colocation_fetch_caller_scb(td, &scb);
 		if (have_scb) {
-			if (borrowertd != scb.scb_td) {
-				td = scb.scb_td;
+			if (borrowertd != (__cheri_fromcap struct thread *)scb.scb_td) {
+				td = (__cheri_fromcap struct thread *)scb.scb_td;
 				p = td->td_proc;
 				db_printf(" caller's SCB %#lp owned by thread %p, pid %d (%s), stack owned by %d:\n",
 				    td->td_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));
@@ -1364,8 +1364,8 @@ DB_SHOW_COMMAND(scb, db_show_scb)
 		td = curthread;
 		have_scb = colocation_fetch_callee_scb(td, &scb);
 		if (have_scb) {
-			if (borrowertd != scb.scb_td) {
-				td = scb.scb_td;
+			if (borrowertd != (__cheri_fromcap struct thread *)scb.scb_td) {
+				td = (__cheri_fromcap struct thread *)scb.scb_td;
 				p = td->td_proc;
 				db_printf(" callee's SCB %#lp owned by thread %p, pid %d (%s), stack owned by %d:\n",
 				    td->td_scb, td, p->p_pid, p->p_comm, db_get_stack_pid(td));

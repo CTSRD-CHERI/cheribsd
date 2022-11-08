@@ -127,10 +127,10 @@ SIGCODE(switcher_coaccept)
 	 * is returning to the caller and scb_borrower_thread
 	 * needs to be set to NULL in the caller's scb.
 	 */
-	cld	t1, SCB_BORROWER_TD(ct0)
+	clc	ct1, SCB_BORROWER_TD(ct0)
 	bnez	t1, 4f
-	cld	t3, SCB_TD(ct0)
-	csd	t3, SCB_BORROWER_TD(idc)
+	clc	ct3, SCB_TD(ct0)
+	csc	ct3, SCB_BORROWER_TD(idc)
 	j	5f
 4:
 	csd	zero, SCB_BORROWER_TD(ct0)
