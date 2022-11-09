@@ -319,7 +319,7 @@ while ((getline < srcfile) > 0) {
 
 	if (hfile) {
 		# Print out the vop_F_args structure.
-		printh("struct "name"_args {\n\tstruct vop_generic_args a_gen;");
+		printh("struct "name"_args {\n\tstruct vop_generic_args a_gen __subobject_member_used_for_c_inheritance;");
 		for (i = 0; i < numargs; ++i)
 			printh("\t" t_spc(types[i]) "a_" args[i] ";");
 		printh("};");
