@@ -204,7 +204,11 @@ ENTRY(_rtld_bind_start)
 #endif
 
 	/* Call into the correct function */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	brr	PTR(16)
+#else
 	br	PTR(16)
+#endif
 END(_rtld_bind_start)
 
 /*

@@ -280,7 +280,7 @@ _rtld_thread_start_init(void (*p)(struct pthread *))
 {
 	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
 	assert(thr_thread_start == NULL);
-	thr_thread_start = tramp_pgs_append(p, obj_from_addr(p));
+	thr_thread_start = tramp_pgs_append(p, obj_from_addr(p), NULL);
 }
 
 static void (*thr_sighandler)(int, siginfo_t *, void *);
@@ -307,7 +307,7 @@ _rtld_sighandler_init(void *p)
 {
 	assert((cheri_getperm(p) & CHERI_PERM_EXECUTIVE) == 0);
 	assert(thr_sighandler == NULL);
-	thr_sighandler = tramp_pgs_append(p, obj_from_addr(p));
+	thr_sighandler = tramp_pgs_append(p, obj_from_addr(p), NULL);
 }
 
 static void *
@@ -340,8 +340,24 @@ tramp_pg_create(void)
 	return (p);
 }
 
+static int
+exclude_symbol_in_lib(const char *name, const char *sym, const Obj_Entry *obj, const Elf_Sym *def)
+{
+	Name_Entry *entry;
+
+	if (def == NULL ||
+	    strcmp(sym, strtab_value(obj, def->st_name)) != 0)
+		return (0);
+
+	STAILQ_FOREACH(entry, &obj->names, link) {
+		if (strcmp(name, entry->name) == 0)
+			return (1);
+	}
+	return (0);
+}
+
 void *
-tramp_pgs_append(const void *target, const Obj_Entry *dst)
+tramp_pgs_append(void *target, const Obj_Entry *obj, const Elf_Sym *def)
 {
 	extern const struct tramp tramp_template_exe, tramp_template_res;
 	extern const size_t sztramp_template_exe, sztramp_template_res;
@@ -355,6 +371,11 @@ tramp_pgs_append(const void *target, const Obj_Entry *dst)
 	bool did_allocate = false;
 	struct tramp_pg *pg = SLIST_FIRST(&pgs);
 
+	if (exclude_symbol_in_lib("libc.so.7", "rfork", obj, def) ||
+	    exclude_symbol_in_lib("libc.so.7", "vfork", obj, def)) {
+		return (target);
+	}
+	
 	if (pg == NULL) {
 allocate_new_page:
 		if (did_allocate)
@@ -392,8 +413,8 @@ allocate_new_page:
 	    cheri_copyaddress(pg, (uintptr_t)t + len));
 
 	t->target = target;
-	if (dst != NULL)
-		t->compart_id = dst->compart_id;
+	if (obj != NULL)
+		t->compart_id = obj->compart_id;
 
 	t = cheri_clearperm(t, FUNC_PTR_REMOVE_PERMS);
 	return (cheri_sealentry(cheri_capmode(&t->code)));
@@ -662,7 +683,7 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 			}
 			target = (uintptr_t)make_function_pointer(def, defobj);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-			target = (uintptr_t)tramp_pgs_append((const void *)target, defobj);
+			target = (uintptr_t)tramp_pgs_append((void *)target, defobj, def);
 #endif
 			reloc_jmpslot(where, target, defobj, obj,
 			    (const Elf_Rel *)rela);
@@ -719,7 +740,7 @@ reloc_iresolve_one(Obj_Entry *obj, const Elf_Rela *rela,
 #endif
 	lock_release(rtld_bind_lock, lockstate);
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
-	ptr = (uintptr_t)tramp_pgs_append((const void *)ptr, obj);
+	ptr = (uintptr_t)tramp_pgs_append((void *)ptr, obj, NULL);
 #endif
 	target = call_ifunc_resolver(ptr);
 	wlock_acquire(rtld_bind_lock, lockstate);

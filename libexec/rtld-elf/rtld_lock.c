@@ -404,7 +404,7 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 		}
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
 		tmplockinfo = *pli;
-#define wrap_with_trampoline(target) target = tramp_pgs_append(target, obj)
+#define wrap_with_trampoline(target) target = tramp_pgs_append(target, obj, NULL)
 		wrap_with_trampoline(tmplockinfo.lock_create);
 		wrap_with_trampoline(tmplockinfo.lock_destroy);
 		wrap_with_trampoline(tmplockinfo.rlock_acquire);
