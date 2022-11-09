@@ -183,6 +183,7 @@ SRCS+=	devname-compat11.c \
 
 .if ${MACHINE_ABI:Mpurecap} && ${MK_CHERI_CAPREVOKE} == "yes"
 CFLAGS.tls_malloc.c+=	-DCAPREVOKE
+CFLAGS.libcheri_caprevoke.c+=-I${SRCTOP}/lib/libcheri_caprevoke/${MACHINE_CPUARCH}
 .PATH:	${SRCTOP}/lib/libcheri_caprevoke
 SRCS+=	libcheri_caprevoke.c
 .endif

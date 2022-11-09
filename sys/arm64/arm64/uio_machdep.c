@@ -55,9 +55,8 @@ __FBSDID("$FreeBSD$");
  * Implement uiomove(9) from physical memory using the direct map to
  * avoid the creation and destruction of ephemeral mappings.
  */
-static int
-uiomove_fromphys_flags(vm_page_t ma[], vm_offset_t offset, int n,
-    struct uio *uio, bool preserve_tags)
+int
+uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 {
 	struct thread *td = curthread;
 	struct iovec *iov;
@@ -96,14 +95,7 @@ uiomove_fromphys_flags(vm_page_t ma[], vm_offset_t offset, int n,
 		switch (uio->uio_segflg) {
 		case UIO_USERSPACE:
 			maybe_yield();
-			if (preserve_tags) {
-				if (uio->uio_rw == UIO_READ)
-					error = copyoutcap(cp, iov->iov_base,
-					    cnt);
-				else
-					error = copyincap(iov->iov_base, cp,
-					    cnt);
-			} else if (uio->uio_rw == UIO_READ)
+			if (uio->uio_rw == UIO_READ)
 				error = copyout(cp, iov->iov_base, cnt);
 			else
 				error = copyin(iov->iov_base, cp, cnt);
@@ -111,14 +103,7 @@ uiomove_fromphys_flags(vm_page_t ma[], vm_offset_t offset, int n,
 				goto out;
 			break;
 		case UIO_SYSSPACE:
-			if (preserve_tags) {
-				if (uio->uio_rw == UIO_READ)
-					bcopy_c(PTR2CAP(cp), iov->iov_base,
-					    cnt);
-				else
-					bcopy_c(iov->iov_base, PTR2CAP(cp),
-					    cnt);
-			} else if (uio->uio_rw == UIO_READ)
+			if (uio->uio_rw == UIO_READ)
 				bcopynocap_c(PTR2CAP(cp), iov->iov_base, cnt);
 			else
 				bcopynocap_c(iov->iov_base, PTR2CAP(cp), cnt);
@@ -147,20 +132,6 @@ out:
 		td->td_pflags &= ~TDP_DEADLKTREAT;
 	return (error);
 }
-
-int
-uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
-{
-	return (uiomove_fromphys_flags(ma, offset, n, uio, false));
-}
-
-#if __has_feature(capabilities)
-int
-uiomove_fromphys_cap(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
-{
-	return (uiomove_fromphys_flags(ma, offset, n, uio, true));
-}
-#endif
 // CHERI CHANGES START
 // {
 //   "updated": 20191025,

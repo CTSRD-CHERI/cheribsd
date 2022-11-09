@@ -29,8 +29,14 @@ __FBSDID("$FreeBSD$");
 #include <sys/timers.h>
 
 #include <cheri/revoke.h>
+#include <cheri/revoke_kern.h>
 #include <vm/vm_cheri_revoke.h>
 #include <sys/syscallsubr.h>
+
+/*
+ * We reserve the FEATURE(cheri_revoke) and VM SYSCTL() namespace cheri_revoke
+ * for the real implementation.
+ */
 
 static bool cheri_revoke_load_side = true;
 SYSCTL_BOOL(_vm, OID_AUTO, cheri_revoke_load_side, CTLFLAG_RW,
@@ -101,11 +107,12 @@ _Static_assert(sizeof(struct cheri_revoke_stats) ==
 #endif
 
 int
-kern_cheri_revoke(struct thread *td, int flags, cheri_revoke_epoch start_epoch,
+kern_cheri_revoke(struct thread *td, int flags,
+    cheri_revoke_epoch_t start_epoch,
     struct cheri_revoke_syscall_info * __capability crsi)
 {
 	int res;
-	cheri_revoke_epoch epoch;
+	cheri_revoke_epoch_t epoch;
 	enum cheri_revoke_state entryst, myst;
 	struct cheri_revoke_epochs crepochs = { 0 };
 #ifdef CHERI_CAPREVOKE_STATS
@@ -127,7 +134,8 @@ kern_cheri_revoke(struct thread *td, int flags, cheri_revoke_epoch start_epoch,
 	 * userland, just used to guide the interlocking below.
 	 */
 	if ((flags & CHERI_REVOKE_IGNORE_START) != 0) {
-		start_epoch = cheri_revoke_st_epoch(vmm->vm_cheri_revoke_st);
+		start_epoch = cheri_revoke_st_get_epoch(
+		    vmm->vm_cheri_revoke_st);
 	}
 
 	/* Serialize and figure out what we're supposed to do */
@@ -137,8 +145,8 @@ kern_cheri_revoke(struct thread *td, int flags, cheri_revoke_epoch start_epoch,
 		    CHERI_REVOKE_IGNORE_START | CHERI_REVOKE_LAST_NO_EARLY;
 		int ires = 0;
 
-		epoch = cheri_revoke_st_epoch(vmm->vm_cheri_revoke_st);
-		entryst = cheri_revoke_st_state(vmm->vm_cheri_revoke_st);
+		epoch = cheri_revoke_st_get_epoch(vmm->vm_cheri_revoke_st);
+		entryst = cheri_revoke_st_get_state(vmm->vm_cheri_revoke_st);
 
 		if ((flags & (fast_out_flags | CHERI_REVOKE_LAST_PASS)) ==
 		    fast_out_flags) {
@@ -254,7 +262,8 @@ fast_out:
 				return ires;
 			}
 
-			epoch = cheri_revoke_st_epoch(vmm->vm_cheri_revoke_st);
+			epoch = cheri_revoke_st_get_epoch(
+			    vmm->vm_cheri_revoke_st);
 			goto reentry;
 		}
 
@@ -606,9 +615,9 @@ skip_last_pass:
 	return cheri_revoke_fini(crsi, vm_mmap_to_errno(res), crstp, &crepochs);
 }
 
-static int
-kern_cheri_revoke_shadow(int flags, void * __capability arena,
-    void * __capability * __capability shadow)
+int
+kern_cheri_revoke_get_shadow(struct thread *td, int flags,
+    void * __capability arena, void * __capability * __capability shadow)
 {
 	int arena_perms, error;
 	void * __capability cres;
@@ -684,9 +693,11 @@ sys_cheri_revoke(struct thread *td, struct cheri_revoke_args *uap)
 }
 
 int
-sys_cheri_revoke_shadow(struct thread *td, struct cheri_revoke_shadow_args *uap)
+sys_cheri_revoke_get_shadow(struct thread *td,
+    struct cheri_revoke_get_shadow_args *uap)
 {
-	return kern_cheri_revoke_shadow(uap->flags, uap->arena, uap->shadow);
+	return kern_cheri_revoke_get_shadow(td, uap->flags, uap->arena,
+	    uap->shadow);
 }
 
 #else /* CHERI_CAPREVOKE */
@@ -694,21 +705,16 @@ sys_cheri_revoke_shadow(struct thread *td, struct cheri_revoke_shadow_args *uap)
 int
 sys_cheri_revoke(struct thread *td, struct cheri_revoke_args *uap)
 {
-	printf("pid %d (%s) trying unsupported CHERI revocation\n",
-	    td->td_proc->p_pid, td->td_name);
-	return (nosys(td, (struct nosys_args *)uap));
+
+	return (ENOSYS);
 }
 
 int
-sys_cheri_revoke_shadow(struct thread *td, struct cheri_revoke_shadow_args *uap)
+sys_cheri_revoke_get_shadow(struct thread *td,
+    struct cheri_revoke_get_shadow_args *uap)
 {
-	void * __capability cres = NULL;
 
-	copyoutcap(&cres, uap->shadow, sizeof(cres));
-
-	printf("pid %d (%s) asking for unsupported CHERI revocation info\n",
-	    td->td_proc->p_pid, td->td_name);
-	return (nosys(td, (struct nosys_args *)uap));
+	return (ENOSYS);
 }
 
 #endif /* CHERI_CAPREVOKE */

@@ -1219,6 +1219,7 @@ initstack_end:
 
 #ifdef COMPAT_FREEBSD64
 SIGCODE(freebsd64_sigcode)
+	blr	x8
 	mov	x0, sp
 	add	x0, x0, #SF_UC64
 

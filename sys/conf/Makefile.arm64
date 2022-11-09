@@ -20,6 +20,18 @@
 # Which version of config(8) is required.
 %VERSREQ=	600012
 
+DRM_INCLUDES+=	-I${S}/dev/drm/core/include
+DRM_INCLUDES+=	-I${S}/dev/drm/core/include/uapi
+DRM_INCLUDES+=	-I${S}/dev/drm/drmkpi/include/
+
+DRM_CFLAGS=	${CFLAGS} ${DRM_INCLUDES}
+DRM_CFLAGS+=	-include ${S}/dev/drm/drmkpi/include/drm/drm_os_freebsd.h
+DRM_CFLAGS+=	'-DKBUILD_MODNAME="DRMv5.6"'
+DRM_CFLAGS+=	-Wno-cast-qual -Wno-pointer-arith -Wno-missing-prototypes
+# Complain about unsigned long long versus uint64_t, remove -Wformat for now
+DRM_CFLAGS+=	-Wno-format
+DRM_C=		${CC} -c ${DRM_CFLAGS} ${WERROR} ${PROF} ${.IMPSRC}
+
 .if !defined(S)
 S=	../../..
 .endif

@@ -1,41 +1,61 @@
-/*
- * Revocation bitmap manipulation operations.
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2018-2020 Nathaniel Wesley Filardo <nwf20@cl.cam.ac.uk>
+ * Copyright (c) 2020-2022 Microsoft Corp.
+ * All rights reserved.
+ *
+ * This software was developed by SRI International and the University of
+ * Cambridge Computer Laboratory under DARPA/AFRL contract FA8750-10-C-0237
+ * ("CTSRD"), as part of the DARPA CRASH research programme.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
+
+/*
+ * Revocation bitmap manipulation operations for allocators' use.
+ */
+
+#include <sys/endian.h>
+#include <sys/param.h>
+
+#include <cheri/cheric.h>
+#include <cheri/revoke.h>
 
 #include <assert.h>
 #include <inttypes.h>
-#include <stdbool.h>
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <cheri/cheric.h>
-
-#include <sys/param.h>
-#include <cheri/revoke.h>
-#include <machine/cherireg.h>
-#include <machine/pte.h>
-#include <machine/vmparam.h>
 #include "libcaprevoke.h"
+#include "libcaprevoke_md.h"
 
-#if defined(__mips__)
-#include "asm/mips.h"
-#elif defined(__riscv)
-#if defined(__CHERI_PURE_CAPABILITY__)
-#include "asm/riscv_purecap.h"
-#else
-#include "asm/riscv_hybrid.h"
-#endif
-#elif defined(__aarch64__)
-#include "asm/morello.h"
-#else
-#error "Need libcheri_caprevoke architecture-specific header"
-#endif
-
-static ptrdiff_t caprev_shadow_nomap_first_word_offset(vaddr_t base);
-static ptrdiff_t caprev_shadow_nomap_last_word_offset(vaddr_t base, size_t len);
-static uint64_t caprev_shadow_nomap_first_word_mask(vaddr_t base, size_t len);
-static uint64_t caprev_shadow_nomap_last_word_mask(vaddr_t base, size_t len);
+static ptrdiff_t caprev_shadow_nomap_first_word_offset(ptraddr_t base);
+static ptrdiff_t caprev_shadow_nomap_last_word_offset(ptraddr_t base,
+    size_t len);
+static uint64_t caprev_shadow_nomap_first_word_mask(ptraddr_t base, size_t len);
+static uint64_t caprev_shadow_nomap_last_word_mask(ptraddr_t base, size_t len);
 
 /*
  * Given a capability to an object, derive the offset relative to the base of
@@ -43,7 +63,7 @@ static uint64_t caprev_shadow_nomap_last_word_mask(vaddr_t base, size_t len);
  */
 
 static ptrdiff_t
-caprev_shadow_nomap_first_word_offset(vaddr_t base)
+caprev_shadow_nomap_first_word_offset(ptraddr_t base)
 {
 	return (ptrdiff_t)(
 	    base / VM_CHERI_REVOKE_GSZ_MEM_NOMAP / 8 / sizeof(uint64_t)) *
@@ -51,7 +71,7 @@ caprev_shadow_nomap_first_word_offset(vaddr_t base)
 }
 
 static ptrdiff_t
-caprev_shadow_nomap_last_word_offset(vaddr_t base, size_t len)
+caprev_shadow_nomap_last_word_offset(ptraddr_t base, size_t len)
 {
 	if (len == 0)
 		return caprev_shadow_nomap_first_word_offset(base);
@@ -66,12 +86,13 @@ caprev_shadow_nomap_last_word_offset(vaddr_t base, size_t len)
  */
 
 static uint64_t
-caprev_shadow_nomap_first_word_mask(vaddr_t base, size_t len)
+caprev_shadow_nomap_first_word_mask(ptraddr_t base, size_t len)
 {
 	uint64_t res;
+	int lsb;
 
 	/* What's the least significant bit's position within the word? */
-	int lsb = (base / VM_CHERI_REVOKE_GSZ_MEM_NOMAP) % (8 *
+	lsb = (base / VM_CHERI_REVOKE_GSZ_MEM_NOMAP) % (8 *
 	    sizeof(uint64_t));
 
 	if (caprev_shadow_nomap_first_word_offset(base) ==
@@ -95,19 +116,14 @@ caprev_shadow_nomap_first_word_mask(vaddr_t base, size_t len)
 		res = ~(((uint64_t)1 << lsb) - 1);
 	}
 
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-	return __builtin_bswap64(res);
-#elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-	return res;
-#else
-#error
-#endif
+	return (htole64(res));
 }
 
 static uint64_t
-caprev_shadow_nomap_last_word_mask(vaddr_t base, size_t len)
+caprev_shadow_nomap_last_word_mask(ptraddr_t base, size_t len)
 {
 	uint64_t res;
+	int msb;
 
 	if (caprev_shadow_nomap_first_word_offset(base) ==
 	    caprev_shadow_nomap_last_word_offset(base, len)) {
@@ -120,7 +136,7 @@ caprev_shadow_nomap_last_word_mask(vaddr_t base, size_t len)
 		return 0;
 	}
 
-	int msb = ((base + len - 1) / VM_CHERI_REVOKE_GSZ_MEM_NOMAP) %
+	msb = ((base + len - 1) / VM_CHERI_REVOKE_GSZ_MEM_NOMAP) %
 	    (8 * sizeof(uint64_t));
 
 	if (msb == 63) {
@@ -131,13 +147,7 @@ caprev_shadow_nomap_last_word_mask(vaddr_t base, size_t len)
 
 	res = ((uint64_t)1 << (msb + 1)) - 1;
 
-#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
-	return __builtin_bswap64(res);
-#elif __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-	return res;
-#else
-#error
-#endif
+	return (htole64(res));
 }
 
 /*
@@ -149,14 +159,15 @@ caprev_shadow_nomap_last_word_mask(vaddr_t base, size_t len)
  */
 void
 caprev_shadow_nomap_offsets(
-    vaddr_t ob, size_t len, ptrdiff_t *fwo, ptrdiff_t *lwo)
+    ptraddr_t ob, size_t len, ptrdiff_t *fwo, ptrdiff_t *lwo)
 {
 	*fwo = caprev_shadow_nomap_first_word_offset(ob);
 	*lwo = caprev_shadow_nomap_last_word_offset(ob, len);
 }
 
 void
-caprev_shadow_nomap_masks(vaddr_t ob, size_t len, uint64_t *fwm, uint64_t *lwm)
+caprev_shadow_nomap_masks(ptraddr_t ob, size_t len, uint64_t *fwm,
+    uint64_t *lwm)
 {
 	*fwm = caprev_shadow_nomap_first_word_mask(ob, len);
 	*lwm = caprev_shadow_nomap_last_word_mask(ob, len);
@@ -167,8 +178,8 @@ caprev_shadow_nomap_masks(vaddr_t ob, size_t len, uint64_t *fwm, uint64_t *lwm)
  * need up front.
  */
 static inline void
-caprev_shadow_nomap_common_pfx(vaddr_t sbase, uint64_t * __capability sb,
-    vaddr_t ob, size_t len, ptrdiff_t *fwo, ptrdiff_t *lwo,
+caprev_shadow_nomap_common_pfx(ptraddr_t sbase, uint64_t * __capability sb,
+    ptraddr_t ob, size_t len, ptrdiff_t *fwo, ptrdiff_t *lwo,
     uint64_t * __capability *fw)
 {
 	caprev_shadow_nomap_offsets(ob, len, fwo, lwo);
@@ -194,15 +205,16 @@ caprev_shadow_nomap_common_pfx(vaddr_t sbase, uint64_t * __capability sb,
  * racing second call to free on the same pointer).
  */
 int
-caprev_shadow_nomap_set_len(vaddr_t sbase, uint64_t * __capability sb,
-    vaddr_t ob, size_t len, void * __capability user_obj)
+caprev_shadow_nomap_set_len(ptraddr_t sbase, uint64_t * __capability sb,
+    ptraddr_t ob, size_t len, void * __capability user_obj)
 {
 	ptrdiff_t fwo, lwo;
 	uint64_t * __capability fw;
+	uint64_t fwm;
 
 	caprev_shadow_nomap_common_pfx(sbase, sb, ob, len, &fwo, &lwo, &fw);
 
-	uint64_t fwm = caprev_shadow_nomap_first_word_mask(ob, len);
+	fwm = caprev_shadow_nomap_first_word_mask(ob, len);
 
 	/*
 	 * The first word is tricky to handle, since we use it to gate frees,
@@ -233,6 +245,10 @@ caprev_shadow_nomap_set_len(vaddr_t sbase, uint64_t * __capability sb,
 	}
 
 	if (lwo != fwo) {
+		uint64_t * __capability lw;
+		uint64_t lwm;
+		uint64_t * __capability sbo;
+		ptrdiff_t wo;
 
 		/*
 		 * If this object straddles a word boundary, the first and last
@@ -240,8 +256,8 @@ caprev_shadow_nomap_set_len(vaddr_t sbase, uint64_t * __capability sb,
 		 * special handling.
 		 */
 
-		uint64_t * __capability lw = cheri_setaddress(sb, sbase + lwo);
-		uint64_t lwm = caprev_shadow_nomap_last_word_mask(ob, len);
+		lw = cheri_setaddress(sb, sbase + lwo);
+		lwm = caprev_shadow_nomap_last_word_mask(ob, len);
 
 		/*
 		 * We might overlap a concurrent object's attempt to mutate bits
@@ -262,8 +278,8 @@ caprev_shadow_nomap_set_len(vaddr_t sbase, uint64_t * __capability sb,
 		 * once; there's nothing else to see here.
 		 */
 
-		ptrdiff_t wo = fwo + sizeof(uint64_t);
-		uint64_t * __capability sbo = fw + 1;
+		wo = fwo + sizeof(uint64_t);
+		sbo = fw + 1;
 		for (; wo < lwo; wo += sizeof(uint64_t), sbo++) {
 			*sbo = ~(uint64_t)0;
 		}
@@ -303,11 +319,11 @@ caprev_shadow_nomap_set_len(vaddr_t sbase, uint64_t * __capability sb,
  * racing second call to free on the same pointer).
  */
 int
-caprev_shadow_nomap_set(vaddr_t sbase, uint64_t * __capability sb,
+caprev_shadow_nomap_set(ptraddr_t sbase, uint64_t * __capability sb,
     void * __capability priv_obj, void * __capability user_obj)
 {
 	return caprev_shadow_nomap_set_len(sbase, sb,
-	    (__cheri_addr vaddr_t)priv_obj, cheri_getlen(priv_obj), user_obj);
+	    (__cheri_addr ptraddr_t)priv_obj, cheri_getlen(priv_obj), user_obj);
 }
 
 /*
@@ -316,15 +332,16 @@ caprev_shadow_nomap_set(vaddr_t sbase, uint64_t * __capability sb,
  * The masks here are subtractive: they're going to be AND'd with the shadow.
  */
 void
-caprev_shadow_nomap_clear_len(vaddr_t sbase, uint64_t * __capability sb,
-    vaddr_t ob, size_t len)
+caprev_shadow_nomap_clear_len(ptraddr_t sbase, uint64_t * __capability sb,
+    ptraddr_t ob, size_t len)
 {
 	ptrdiff_t fwo, lwo;
 	uint64_t * __capability fw;
+	uint64_t fwm;
 
 	caprev_shadow_nomap_common_pfx(sbase, sb, ob, len, &fwo, &lwo, &fw);
 
-	uint64_t fwm = ~caprev_shadow_nomap_first_word_mask(ob, len);
+	fwm = ~caprev_shadow_nomap_first_word_mask(ob, len);
 
 	/*
 	 * The first word must be handled atomically, so that it interlocks
@@ -333,8 +350,13 @@ caprev_shadow_nomap_clear_len(vaddr_t sbase, uint64_t * __capability sb,
 	caprev_shadow_clear_w((_Atomic(uint64_t) * __capability)fw, fwm);
 
 	if (lwo != fwo) {
-		uint64_t * __capability lw = cheri_setaddress(sb, sbase + lwo);
-		uint64_t lwm = ~caprev_shadow_nomap_last_word_mask(ob, len);
+		uint64_t * __capability lw;
+		uint64_t lwm;
+		uint64_t * __capability sbo;
+		ptrdiff_t wo;
+
+		lw = cheri_setaddress(sb, sbase + lwo);
+		lwm = ~caprev_shadow_nomap_last_word_mask(ob, len);
 
 		/*
 		 * The last word may also need to be handled atomically.
@@ -351,8 +373,8 @@ caprev_shadow_nomap_clear_len(vaddr_t sbase, uint64_t * __capability sb,
 		 * once.
 		 */
 
-		ptrdiff_t wo = fwo + sizeof(uint64_t);
-		uint64_t * __capability sbo = fw + 1;
+		wo = fwo + sizeof(uint64_t);
+		sbo = fw + 1;
 		for (; wo < lwo; wo += sizeof(uint64_t), sbo++) {
 			*sbo = (uint64_t)0;
 		}
@@ -372,11 +394,11 @@ caprev_shadow_nomap_clear_len(vaddr_t sbase, uint64_t * __capability sb,
  * The masks here are subtractive: they're going to be AND'd with the shadow.
  */
 void
-caprev_shadow_nomap_clear(vaddr_t sbase, uint64_t * __capability sb,
+caprev_shadow_nomap_clear(ptraddr_t sbase, uint64_t * __capability sb,
     void * __capability obj)
 {
 	return caprev_shadow_nomap_clear_len(sbase, sb,
-	    (__cheri_addr vaddr_t)obj, cheri_getlen(obj));
+	    (__cheri_addr ptraddr_t)obj, cheri_getlen(obj));
 }
 
 /*
@@ -390,8 +412,8 @@ caprev_shadow_nomap_clear(vaddr_t sbase, uint64_t * __capability sb,
  * likely a divisor of the units of management by the caller.
  */
 void
-caprev_shadow_nomap_set_raw(vaddr_t sbase, uint64_t * __capability sb,
-    vaddr_t heap_start, vaddr_t heap_end)
+caprev_shadow_nomap_set_raw(ptraddr_t sbase, uint64_t * __capability sb,
+    ptraddr_t heap_start, ptraddr_t heap_end)
 {
 	ptrdiff_t fwo, lwo;
 	uint64_t * __capability fw;
@@ -416,8 +438,8 @@ caprev_shadow_nomap_set_raw(vaddr_t sbase, uint64_t * __capability sb,
 }
 
 void
-caprev_shadow_nomap_clear_raw(vaddr_t sbase, uint64_t * __capability sb,
-    vaddr_t heap_start, vaddr_t heap_end)
+caprev_shadow_nomap_clear_raw(ptraddr_t sbase, uint64_t * __capability sb,
+    ptraddr_t heap_start, ptraddr_t heap_end)
 {
 	ptrdiff_t fwo, lwo;
 	uint64_t * __capability fw;

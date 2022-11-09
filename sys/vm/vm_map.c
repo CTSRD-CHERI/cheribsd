@@ -2942,7 +2942,7 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 		return;
 #ifdef CHERI_CAPREVOKE
 	/* This is pretty heavy-handed, but it's good enough for now */
-	if (cheri_revoke_st_state(map->vm_cheri_revoke_st) !=
+	if (cheri_revoke_st_get_state(map->vm_cheri_revoke_st) !=
 	    CHERI_REVOKE_ST_NONE)
 		return;
 #endif
@@ -3072,7 +3072,7 @@ again:
 	vm_map_wait_busy(map);
 
 #ifdef CHERI_CAPREVOKE
-	if (cheri_revoke_st_state(map->vm_cheri_revoke_st) !=
+	if (cheri_revoke_st_get_state(map->vm_cheri_revoke_st) !=
 	    CHERI_REVOKE_ST_NONE) {
 		if (map == &curthread->td_proc->p_vmspace->vm_map) {
 			/* Push our revocation along */
@@ -4488,6 +4488,9 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			if ((entry->eflags & MAP_ENTRY_UNMAPPED) == 0) {
 				vm_map_entry_clean(map, entry);
 				/* XXX-AM: How do we reset maxprot? */
+				if ((entry->eflags & MAP_ENTRY_IS_SUB_MAP) == 0)
+					vm_object_deallocate(
+					    entry->object.vm_object);
 				vm_map_reservation_init_entry(entry);
 			}
 			vm_map_try_merge_entries(map, prev_entry, entry);
@@ -5493,7 +5496,13 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 	    ("Unrepresentable length for new vmspace"));
 
 	user_length = CHERI_REPRESENTABLE_LENGTH(user_length);
-	minuser_cap = (vm_pointer_t)cheri_capability_build_user_rwx(
+	/*
+	 * XXX: Use the unchecked version here because the map is empty
+	 * at this point.
+	 *
+	 * XXX: It seems like this should be an sv_* member.
+	 */
+	minuser_cap = (vm_pointer_t)cheri_capability_build_user_rwx_unchecked(
 	    CHERI_CAP_USER_CODE_PERMS | CHERI_CAP_USER_DATA_PERMS |
 	    CHERI_PERMS_SWALL, padded_minuser, user_length, minuser);
 	maxuser_cap = cheri_setaddress(minuser_cap, maxuser);

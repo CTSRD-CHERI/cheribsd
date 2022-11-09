@@ -3395,7 +3395,9 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 			if (PROC_HAS_SHP(p)) {
 				kst64.ksigtramp_start = PROC_SIGCODE(p);
 				kst64.ksigtramp_end = kst64.ksigtramp_start +
-				    *sv->sv_szsigcode;
+				    ((sv->sv_flags & SV_DSO_SIG) == 0 ?
+				    *sv->sv_szsigcode :
+				    (uintptr_t)sv->sv_szsigcode);
 			} else {
 				kst64.ksigtramp_start = PROC_PS_STRINGS(p) -
 				    *sv->sv_szsigcode;

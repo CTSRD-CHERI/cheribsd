@@ -3724,7 +3724,7 @@ malloc_revoke_internal(const char *reason) {
 
 #ifdef CAPREVOKE
   atomic_thread_fence(memory_order_acq_rel);
-  cheri_revoke_epoch start_epoch = cri->epochs.enqueue;
+  cheri_revoke_epoch_t start_epoch = cri->epochs.enqueue;
 
   while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
     cheri_revoke(CHERI_REVOKE_LAST_PASS, start_epoch, NULL);

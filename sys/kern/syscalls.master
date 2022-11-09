@@ -1508,7 +1508,7 @@
 		);
 	}
 260	AUE_NULL	STD|CAPENABLED	{
-		int cheri_revoke_shadow(
+		int cheri_revoke_get_shadow(
 			int flags,
 			_In_ void *arena,
 			_Out_ void *shadow,

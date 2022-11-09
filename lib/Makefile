@@ -171,12 +171,9 @@ SUBDIR.${MK_BSNMP}+=	libbsnmp
 
 SUBDIR.${MK_CHERI}+=	libsyscalls
 
-# We could make this MK_CHERI_CAPREVOKE, but it doesn't hurt to always build it
-# even if the tree isn't configured to engage in revocation.
-# XXX remove this gate when atomics with capabilities work on hybrid morello
-# https://git.morello-project.org/morello/llvm-project/-/issues/26
-.if ${MACHINE_CPUARCH} != "aarch64" || ${MACHINE_ABI:Mpurecap}
-SUBDIR.${MK_CHERI}+=	libcheri_caprevoke
+.if ${MACHINE_ABI:Mpurecap} && ${MK_CHERI_CAPREVOKE} == "yes"
+SUBDIR+=	libcheri_caprevoke
+SUBDIR_DEPEND_libc+=	libcheri_caprevoke
 .endif
 
 .if ${MACHINE_CPU:Mcheri}

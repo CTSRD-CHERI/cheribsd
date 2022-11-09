@@ -73,6 +73,11 @@
 #include <sys/_mutex.h>
 #include <sys/condvar.h>
 
+#ifdef CHERI_CAPREVOKE
+#include <cheri/revoke.h>
+#include <cheri/revoke_kern.h>
+#endif
+
 /*
  *	Types defined:
  *
@@ -227,7 +232,7 @@ struct vm_map {
 	struct mtx system_mtx;
 #ifdef CHERI_CAPREVOKE
 	struct cv vm_cheri_revoke_cv;	/* (c) Cap. rev. is single file */
-	uint64_t vm_cheri_revoke_st;	/* Capability revocation state */
+	cheri_revoke_state_t vm_cheri_revoke_st;	/* Cap. rev. state */
 
 	/*
 	 * If revocation is in progress (as determined by vm_cheri_revoke_st,
@@ -351,7 +356,7 @@ struct vmspace {
 	caddr_t vm_daddr;	/* (c) user virtual address of data */
 	vm_offset_t vm_maxsaddr;	/* user VA at max stack growth */
 	vm_offset_t vm_stacktop; /* top of the stack, may not be page-aligned */
-	vm_offset_t vm_shp_base; /* shared page address */
+	uintcap_t vm_shp_base;	/* shared page pointer */
 	u_int vm_refcnt;	/* number of references */
 	/*
 	 * Keep the PMAP last, so that CPU-specific variations of that

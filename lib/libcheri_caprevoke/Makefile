@@ -4,7 +4,7 @@ INCS= libcaprevoke.h
 INCSDIR=	${INCLUDEDIR}/cheri
 
 CFLAGS+= -I${.CURDIR}
-CFLAGS+= -I${.CURDIR}/${MACHINE_ARCH}
+CFLAGS+= -I${.CURDIR}/${MACHINE_CPUARCH}
 
 LIB=cheri_caprevoke
 SHLIB= cheri_caprevoke

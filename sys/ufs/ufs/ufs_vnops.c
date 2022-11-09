@@ -2391,7 +2391,7 @@ ufs_symlink(
 		UFS_INODE_SET_FLAG(ip, IN_SIZEMOD | IN_CHANGE | IN_UPDATE);
 		error = UFS_UPDATE(vp, 0);
 	} else
-		error = vn_rdwr(UIO_WRITE, vp, __DECONST(void *, ap->a_target),
+		error = vn_rdwr(UIO_WRITE, vp, PTR2CAP(__DECONST(void *, ap->a_target)),
 		    len, (off_t)0, UIO_SYSSPACE, IO_NODELOCKED | IO_NOMACCHECK,
 		    ap->a_cnp->cn_cred, NOCRED, NULL, NULL);
 	if (error)

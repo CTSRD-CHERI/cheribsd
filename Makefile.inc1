@@ -3050,6 +3050,9 @@ _prereq_libs+=	lib/libclang_rt/ubsan_minimal
 _prereq_libs+=	lib/libclang_rt/ubsan_standalone
 _prereq_libs+=	lib/libclang_rt/ubsan_standalone_cxx
 .endif
+.if ${MACHINE_ABI:Mpurecap} && ${MK_CHERI_CAPREVOKE} == "yes"
+_prereq_libs+=	lib/libcheri_caprevoke
+.endif
 
 # These dependencies are not automatically generated:
 #

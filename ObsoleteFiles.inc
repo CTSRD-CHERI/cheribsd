@@ -992,9 +992,12 @@ OLD_DIRS+=usr/lib/clang/13.0.0/lib
 OLD_DIRS+=usr/lib/clang/13.0.0
 
 # 20220514: new libc++ import which bumps version from 13.0.0 to 14.0.3
+.if 0
+# CHERI libc++ is still from 13.0.0
 OLD_FILES+=usr/include/c++/v1/__function_like.h
 OLD_FILES+=usr/include/c++/v1/__memory/pointer_safety.h
 OLD_FILES+=usr/include/c++/v1/__utility/__decay_copy.h
+.endif
 
 # 20220418: uudecode merged into uuencode and renamed to bintrans
 OLD_FILES+=usr/lib/debug/usr/bin/uuencode.debug
@@ -6374,7 +6377,8 @@ OLD_FILES+=usr/include/crypto/skipjack.h
 OLD_FILES+=usr/share/man/man4/ubsec.4.gz
 
 # 20200506: GNU objdump 2.17.50 retired
-OLD_FILES+=usr/bin/objdump
+# Don't remove version from llvm-base
+#OLD_FILES+=usr/bin/objdump
 OLD_FILES+=usr/share/man/man1/objdump.1.gz
 
 # 20200428: route_var.h moved to net/route
@@ -16452,7 +16456,7 @@ OLD_FILES+=usr/share/man/man5/usbd.conf.5.gz
 .if ${TARGET_ARCH} != "i386" && ${TARGET_ARCH} != "amd64"
 OLD_FILES+=usr/share/man/man8/boot_i386.8.gz
 .endif
-.if ${TARGET_ARCH} != "aarch64" && ${TARGET} != "arm" && \
+.if ${TARGET_ARCH:Maarch64} != "" && ${TARGET} != "arm" && \
     ${TARGET_ARCH} != "powerpc" && ${TARGET_ARCH} != "powerpc64" && \
     ${TARGET_ARCH} != "sparc64" && ${TARGET} != "mips"
 OLD_FILES+=usr/share/man/man8/ofwdump.8.gz

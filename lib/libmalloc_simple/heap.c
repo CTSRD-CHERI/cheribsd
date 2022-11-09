@@ -46,19 +46,16 @@ static char *rcsid = "$FreeBSD$";
 
 #include <sys/param.h>
 #include <sys/types.h>
-#ifdef CAPREVOKE
-#include <cheri/revoke.h>
-#endif
 #include <sys/mman.h>
-#ifdef CAPREVOKE
-#include <sys/stdatomic.h>
-#endif
 
-#ifdef CAPREVOKE
-#include <cheri/libcaprevoke.h>
-#endif
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+
+#ifdef CAPREVOKE
+#include <sys/stdatomic.h>
+#include <cheri/revoke.h>
+#include <cheri/libcaprevoke.h>
+#endif
 
 #include <assert.h>
 #include <stdlib.h>
@@ -81,7 +78,6 @@ struct pagepool_header {
 	size_t			ph_size;
 #ifdef __CHERI_PURE_CAPABILITY__
 	size_t			ph_pad1;
-	/* XXXBD: more padding on 256-bit... */
 #endif
 	struct pagepool_header	*ph_next;
 #ifdef CAPREVOKE
@@ -165,14 +161,12 @@ void *
 __rederive_pointer(void *ptr)
 {
 	struct pagepool_header *pp;
-	vm_offset_t addr;
 
-	addr = cheri_getaddress(ptr);
 	pp = curpp;
 	while (pp != NULL) {
 		char *pool = (char *)pp;
-		if (cheri_is_address_inbounds(pool, addr))
-			return (cheri_setaddress(pool, addr));
+		if (cheri_is_address_inbounds(pool, cheri_getbase(ptr)))
+			return (cheri_setaddress(pool, cheri_getaddress(ptr)));
 		pp = pp->ph_next;
 	}
 
@@ -185,13 +179,6 @@ void
 __paint_shadow(void *mem, size_t size)
 {
 	struct pagepool_header *pp;
-	int error;
-
-	if (cri == NULL) {
-		error = cheri_revoke_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT,
-		    NULL, __DECONST(void **, &cri));
-		assert(error == 0);
-	}
 
 	pp = cheri_setoffset(mem, 0);
 	/*
@@ -199,7 +186,7 @@ __paint_shadow(void *mem, size_t size)
 	 * need it.
 	 */
 	if (pp->ph_shadow == NULL)
-		if (cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, pp,
+		if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, pp,
 		    &pp->ph_shadow) != 0)
 			abort();
 	caprev_shadow_nomap_set_raw(cri->base_mem_nomap, pp->ph_shadow,
@@ -222,7 +209,7 @@ __do_revoke(void)
 	int error;
 
 	atomic_thread_fence(memory_order_acq_rel);
-	cheri_revoke_epoch start_epoch = cri->epochs.enqueue;
+	cheri_revoke_epoch_t start_epoch = cri->epochs.enqueue;
 	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
 		error = cheri_revoke(CHERI_REVOKE_LAST_PASS, start_epoch, NULL);
 		assert(error == 0);

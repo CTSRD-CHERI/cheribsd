@@ -1310,9 +1310,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* cheri_revoke_shadow */
+	/* cheri_revoke_get_shadow */
 	case 260: {
-		struct cheri_revoke_shadow_args *p = params;
+		struct cheri_revoke_get_shadow_args *p = params;
 		iarg[a++] = p->flags; /* int */
 		uarg[a++] = (intptr_t)p->arena; /* void * */
 		uarg[a++] = (intptr_t)p->shadow; /* void * */
@@ -5423,7 +5423,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* cheri_revoke_shadow */
+	/* cheri_revoke_get_shadow */
 	case 260:
 		switch (ndx) {
 		case 0:
@@ -9820,7 +9820,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cheri_revoke_shadow */
+	/* cheri_revoke_get_shadow */
 	case 260:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
