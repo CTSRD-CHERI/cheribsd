@@ -45,7 +45,7 @@
  */
 
 #define	SIGCODE(sym)						\
-	.text; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc
+	.section .rodata; .globl sym; .type sym,@object; .align 4; sym: .cfi_startproc
 
 #define CSYM(x)							\
 	.globl x; .type x,@object; x:
@@ -306,6 +306,7 @@ CSYM(switcher_cocall_copy_onfault)
 	b	4b
 
 END(switcher_cocall)
+
 eswitcher_cocall:
 
 	.data
