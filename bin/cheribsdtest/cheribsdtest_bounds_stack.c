@@ -79,21 +79,13 @@ test_bounds_precise(void * __capability c, size_t expected_len)
 	CHERIBSDTEST_CHECK_CAP_BOUNDS_PRECISE(c, expected_len);
 #else
 	/*
-	 * In hybrid mode we don't increase alignment of allocations to ensure
-	 * precise bounds, so the offset may be non-zero if the bounds were
-	 * not precisely representable. For now, simply  check that we got at
-	 * least the expected length but no more than twice that.
-	 *
-	 * See https://github.com/CTSRD-CHERI/llvm-project/issues/431
+	 * In hybrid mode we do not set bounds on capabilities created
+	 * via casts from integer pointers so just check that we haven't
+	 * been given a too-small capability.
 	 */
 	CHERIBSDTEST_VERIFY2(len >= expected_len,
 	    "length (%jd) smaller than expected lower bound %jd: %#lp",
 	    len, expected_len, c);
-#ifndef __riscv  /* RISC-V does not bound __cheri_tocap casts in hybrid mode */
-	CHERIBSDTEST_VERIFY2(len <= 2 * expected_len,
-	    "length (%jd) greater than expected upper bound %jd: %#lp",
-	    len, 2 * expected_len, c);
-#endif
 #endif
 	cheribsdtest_success();
 }

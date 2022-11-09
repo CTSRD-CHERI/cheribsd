@@ -170,7 +170,7 @@ MIASM =  \
 	lio_listio.o \
 	kbounce.o \
 	flag_captured.o \
-	cheri_revoke_shadow.o \
+	cheri_revoke_get_shadow.o \
 	cheri_revoke.o \
 	freebsd11_getdents.o \
 	lchmod.o \

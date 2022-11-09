@@ -613,7 +613,8 @@ sequential_heuristic(struct uio *uio, struct file *fp)
  * Package up an I/O request on a vnode into a uio and do it.
  */
 int
-vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base, int len, off_t offset,
+vn_rdwr(enum uio_rw rw, struct vnode *vp, void * __capability base,
+    int len, off_t offset,
     enum uio_seg segflg, int ioflg, struct ucred *active_cred,
     struct ucred *file_cred, ssize_t *aresid, struct thread *td)
 {
@@ -629,14 +630,7 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base, int len, off_t offset,
 		return (EINVAL);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-	if (segflg == UIO_USERSPACE)
-		IOVEC_INIT_C(&aiov,
-		    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
-			(ptraddr_t)base, len, 0), len);
-	else
-#endif
-		IOVEC_INIT(&aiov, base, len);
+	IOVEC_INIT_C(&aiov, base, len);
 	auio.uio_resid = len;
 	auio.uio_offset = offset;
 	auio.uio_segflg = segflg;
@@ -723,7 +717,8 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base, int len, off_t offset,
  * core'ing the same binary, or unrelated processes scanning the directory).
  */
 int
-vn_rdwr_inchunks(enum uio_rw rw, struct vnode *vp, void *base, size_t len,
+vn_rdwr_inchunks(enum uio_rw rw, struct vnode *vp, void * __capability base,
+    size_t len,
     off_t offset, enum uio_seg segflg, int ioflg, struct ucred *active_cred,
     struct ucred *file_cred, size_t *aresid, struct thread *td)
 {
@@ -752,7 +747,7 @@ vn_rdwr_inchunks(enum uio_rw rw, struct vnode *vp, void *base, size_t len,
 		if (error)
 			break;
 		offset += chunk;
-		base = (char *)base + chunk;
+		base = (char * __capability)base + chunk;
 		kern_yield(PRI_USER);
 	} while (len);
 	if (aresid)
@@ -3152,7 +3147,7 @@ vn_write_outvp(struct vnode *outvp, char *dat, off_t outoff, off_t xfer,
 		} else {
 			error = vn_lock(outvp, vn_lktype_write(mp, outvp));
 			if (error == 0) {
-				error = vn_rdwr(UIO_WRITE, outvp, dat, xfer2,
+				error = vn_rdwr(UIO_WRITE, outvp, PTR2CAP(dat), xfer2,
 				    outoff, UIO_SYSSPACE, IO_NODELOCKED,
 				    curthread->td_ucred, cred, NULL, curthread);
 				outoff += xfer2;
@@ -3400,7 +3395,7 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 			error = vn_lock(invp, LK_SHARED);
 			if (error != 0)
 				goto out;
-			error = vn_rdwr(UIO_READ, invp, dat, xfer,
+			error = vn_rdwr(UIO_READ, invp, PTR2CAP(dat), xfer,
 			    startoff, UIO_SYSSPACE, IO_NODELOCKED,
 			    curthread->td_ucred, incred, &aresid,
 			    curthread);

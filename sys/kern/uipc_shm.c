@@ -234,7 +234,7 @@ uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
 	VM_OBJECT_WUNLOCK(obj);
 
 found:
-	error = uiomove_fromphys_cap(&m, offset, tlen, uio);
+	error = uiomove_fromphys(&m, offset, tlen, uio);
 	if (uio->uio_rw == UIO_WRITE && error == 0)
 		vm_page_set_dirty(m);
 	vm_page_activate(m);

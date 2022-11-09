@@ -260,67 +260,88 @@ static int
 freebsd64_copyin_control(struct mbuf **mp, char * __capability buf,
     u_int buflen)
 {
+	struct cmsghdr *cm;
+	struct mbuf *m;
+	void *in, *in1, *md;
+	u_int msglen, outlen;
 	int error;
-	struct cmsghdr *cmsg;
-	struct mbuf *m = NULL;
-	caddr_t md;
-	u_int idx, newlen, msglen, datalen;
 
-	buflen = FREEBSD64_ALIGN(buflen);
 	if (buflen > MCLBYTES)
 		return (EINVAL);
 
+	in = malloc(buflen, M_TEMP, M_WAITOK);
+	error = copyin(buf, in, buflen);
+	if (error != 0)
+		goto out;
+
 	/*
-	 * Iterate over the message headers to compute the new length using
-	 * the native kernel padding.
+	 * Make a pass over the input buffer to determine the amount of space
+	 * required for 128 bit-aligned copies of the control messages.
 	 */
-	idx = 0;
-	newlen = 0;
-	while (idx < buflen) {
-		cmsg = (struct cmsghdr *)((__cheri_fromcap char *)buf + idx);
-		msglen = fuword32(__USER_CAP_OBJ(&cmsg->cmsg_len));
-		if (msglen < sizeof(struct cmsghdr) ||
-		    idx + FREEBSD64_ALIGN(msglen) > buflen)
-			return (EINVAL);
-		datalen = (char *)cmsg + msglen - FREEBSD64_CMSG_DATA(cmsg);
-		idx += FREEBSD64_CMSG_SPACE(datalen);
-		newlen += CMSG_SPACE(datalen);
-	}
-
-	m = m_get2(newlen, M_WAITOK, MT_CONTROL, 0);
-	if (m == NULL)
-		return (EINVAL);
-
-	m->m_len = newlen;
-
-	/* Copyin and realign the control data. */
-	md = mtod(m, caddr_t);
+	in1 = in;
+	outlen = 0;
 	while (buflen > 0) {
-		error = copyin(buf, md, sizeof(struct cmsghdr));
-		if (error)
+		if (buflen < sizeof(*cm)) {
+			error = EINVAL;
 			break;
-		cmsg = (struct cmsghdr *)md;
-		datalen = (__cheri_fromcap char *)buf + cmsg->cmsg_len -
-		    FREEBSD64_CMSG_DATA((__cheri_fromcap char *)buf);
-		buf += FREEBSD64_ALIGN(sizeof(struct cmsghdr));
-		md += CMSG_ALIGN(sizeof(struct cmsghdr));
-
-		/* Fix length in the message header */
-		cmsg->cmsg_len = CMSG_LEN(datalen);
-		if (datalen > 0) {
-			error = copyin(buf, md, datalen);
-			if (error)
-				break;
-			md += CMSG_ALIGN(datalen);
-			buf += FREEBSD64_ALIGN(datalen);
 		}
-		buflen -= FREEBSD64_CMSG_SPACE(datalen);
+		cm = (struct cmsghdr *)in1;
+		if (cm->cmsg_len < FREEBSD64_ALIGN(sizeof(*cm)) ||
+		    cm->cmsg_len > buflen) {
+			error = EINVAL;
+			break;
+		}
+		msglen = FREEBSD64_ALIGN(cm->cmsg_len);
+		if (msglen < cm->cmsg_len) {
+			error = EINVAL;
+			break;
+		}
+		/* The native ABI permits the final padding to be omitted. */
+		if (msglen > buflen)
+			msglen = buflen;
+		buflen -= msglen;
+
+		in1 = (char *)in1 + msglen;
+		outlen += CMSG_ALIGN(sizeof(*cm)) +
+		    CMSG_ALIGN(msglen - FREEBSD64_ALIGN(sizeof(*cm)));
+	}
+	if (error != 0)
+		goto out;
+
+	m = m_get2(outlen, M_WAITOK, MT_CONTROL, 0);
+	if (m == NULL) {
+		error = EINVAL;
+		goto out;
+	}
+	m->m_len = outlen;
+	md = mtod(m, void *);
+
+	/*
+	 * Make a second pass over input messages, copying them into the output
+	 * buffer.
+	 */
+	in1 = in;
+	while (outlen > 0) {
+		/* Copy the message header and align the length field. */
+		cm = md;
+		memcpy(cm, in1, sizeof(*cm));
+		msglen = cm->cmsg_len - FREEBSD64_ALIGN(sizeof(*cm));
+		cm->cmsg_len = CMSG_ALIGN(sizeof(*cm)) + msglen;
+
+		/* Copy the message body. */
+		in1 = (char *)in1 + FREEBSD64_ALIGN(sizeof(*cm));
+		md = (char *)md + CMSG_ALIGN(sizeof(*cm));
+		memcpy(md, in1, msglen);
+		in1 = (char *)in1 + FREEBSD64_ALIGN(msglen);
+		md = (char *)md + CMSG_ALIGN(msglen);
+		KASSERT(outlen >= CMSG_ALIGN(sizeof(*cm)) + CMSG_ALIGN(msglen),
+		    ("outlen %u underflow, msglen %u", outlen, msglen));
+		outlen -= CMSG_ALIGN(sizeof(*cm)) + CMSG_ALIGN(msglen);
 	}
 
-	if (error)
-		m_free(m);
-	else
-		*mp = m;
+	*mp = m;
+out:
+	free(in, M_TEMP);
 	return (error);
 }
 

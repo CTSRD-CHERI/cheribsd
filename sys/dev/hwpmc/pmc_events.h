@@ -2275,10 +2275,10 @@ __PMC_EV_ALIAS("unhalted-core-cycles",		IAP_ARCH_UNH_COR_CYC)
  * 0x13200	0x00FF		free (was IBM POWER8 events)
  * 0x13300	0x00FF		Freescale e500 events
  * 0x14000	0x0100		ARMv7 events
- * 0x14100	0x0300		ARMv8 events
- * 0x14400	0x0020		ARM DMC-620 clkdiv2 events
- * 0x14420	0x0080		ARM DMC-620 clk events
- * 0x14500	0x0100		ARM CMN-600 events
+ * 0x14100	0x0400		ARMv8 events
+ * 0x14500	0x0020		ARM DMC-620 clkdiv2 events
+ * 0x14520	0x0080		ARM DMC-620 clk events
+ * 0x14600	0x0100		ARM CMN-600 events
  * 0x20000	0x1000		Software events
  */
 #define	__PMC_EVENTS()				\
@@ -2302,11 +2302,11 @@ __PMC_EV_ALIAS("unhalted-core-cycles",		IAP_ARCH_UNH_COR_CYC)
 	__PMC_EV_ARMV7()			\
 	__PMC_EV_BLOCK(ARMV8,	0x14100)	\
 	__PMC_EV_ARMV8()			\
-	__PMC_EV_BLOCK(DMC620_PMU_CD2, 0x14400)	\
+	__PMC_EV_BLOCK(DMC620_PMU_CD2, 0x14500)	\
 	__PMC_EV_DMC620_PMU_CD2()		\
-	__PMC_EV_BLOCK(DMC620_PMU_C, 0x14420)	\
+	__PMC_EV_BLOCK(DMC620_PMU_C, 0x14520)	\
 	__PMC_EV_DMC620_PMU_C()			\
-	__PMC_EV_BLOCK(CMN600_PMU, 0x14500)	\
+	__PMC_EV_BLOCK(CMN600_PMU, 0x14600)	\
 	__PMC_EV_CMN600_PMU()
 
 #define	PMC_EVENT_FIRST	PMC_EV_TSC_TSC

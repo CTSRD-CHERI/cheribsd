@@ -93,6 +93,8 @@
 #define	CHERI_CAP_USER_DATA_LENGTH	(VM_MAXUSER_ADDRESS - VM_MINUSER_ADDRESS)
 #define	CHERI_CAP_USER_DATA_OFFSET	0x0
 
+#define	CHERI_CAP_USER_RODATA_PERMS	CHERI_PERMS_USERSPACE_RODATA
+
 /*
  * Root sealing capability for all userspace object capabilities.
  */

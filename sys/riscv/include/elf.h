@@ -90,6 +90,8 @@ __ElfType(Auxinfo);
 
 #define	ELF_IS_CHERI(hdr) (((hdr)->e_flags & EF_RISCV_CHERIABI) != 0)
 
+#define	PT_MEMTAG_CHERI	PT_RISCV_MEMTAG_CHERI
+
 /* Define "machine" characteristics */
 #define	ELF_TARG_CLASS	ELFCLASS64
 #define	ELF_TARG_DATA	ELFDATA2LSB

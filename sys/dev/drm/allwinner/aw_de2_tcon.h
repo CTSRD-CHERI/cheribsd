@@ -1,0 +1,100 @@
+/*-
+ * Copyright (c) 2019 Emmanuel Vadot <manu@FreeBSD.org>
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
+ * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * $FreeBSD$
+ */
+
+#ifndef _AW_DE2_TCON_H_
+#define	_AW_DE2_TCON_H_
+
+#define	TCON_GCTL		0x00
+#define	 TCON_GCTL_GAMMA_EN	(1 << 30)
+#define	 TCON_GCTL_EN		(1 << 31)
+
+#define	TCON_GINT0		0x04
+#define	 TCON_GINT0_LINE_FLAG	(1 << 12)
+#define	 TCON0_GINT0_VB_FLAG	(1 << 14)
+#define	 TCON1_GINT0_VB_FLAG	(1 << 15)
+#define	 TCON_GINT0_LINE_EN	(1 << 28)
+#define	 TCON0_GINT0_VB_EN	(1 << 30)
+#define	 TCON1_GINT0_VB_EN	(1 << 31)
+
+#define	TCON_GINT1			0x08
+#define	 TCON_GINT1_LINE_NUM_MASK	0xFFF
+
+#define	TCON_CTL		0x90
+#define	 TCON_CTL_EN		(1 << 31)
+#define	 TCON_CTL_DELAY_MASK	0x1F0
+#define	 TCON_CTL_DELAY_SHIFT	4
+
+#define	TCON_TIMING0		0x94
+#define	 TCON_TIMING0_YI_MASK	0xFFF
+#define	 TCON_TIMING0_YI_SHIFT	0
+#define	 TCON_TIMING0_YI(x)	((x - 1) & TCON_TIMING0_YI_MASK)
+#define	 TCON_TIMING0_XI_MASK	0xFFF0000
+#define	 TCON_TIMING0_XI_SHIFT	16
+#define	 TCON_TIMING0_XI(x)	(((x - 1) << TCON_TIMING0_XI_SHIFT) & TCON_TIMING0_XI_MASK)
+
+#define	TCON_TIMING1			0x98
+#define	 TCON_TIMING1_LS_YO_MASK	0xFFF
+#define	 TCON_TIMING1_LS_YO_SHIFT	0
+#define	 TCON_TIMING1_LS_YO(x)	((x - 1) & TCON_TIMING1_LS_YO_MASK)
+#define	 TCON_TIMING1_LS_XO_MASK	0xFFF0000
+#define	 TCON_TIMING1_LS_XO_SHIFT	16
+#define	 TCON_TIMING1_LS_XO(x)	(((x - 1) << TCON_TIMING1_LS_XO_SHIFT) & TCON_TIMING1_LS_XO_MASK)
+
+#define	TCON_TIMING2		0x9C
+#define	 TCON_TIMING2_YO_MASK	0xFFF
+#define	 TCON_TIMING2_YO_SHIFT	0
+#define	 TCON_TIMING2_YO(x)	((x - 1) & TCON_TIMING2_YO_MASK)
+#define	 TCON_TIMING2_XO_MASK	0xFFF0000
+#define	 TCON_TIMING2_XO_SHIFT	16
+#define	 TCON_TIMING2_XO(x)	(((x - 1) << TCON_TIMING2_XO_SHIFT) & TCON_TIMING2_XO_MASK)
+
+#define	TCON_TIMING3		0xA0
+#define	 TCON_TIMING3_HBP_MASK	0xFFF
+#define	 TCON_TIMING3_HBP_SHIFT	0
+#define	 TCON_TIMING3_HBP(x)	((x - 1) & TCON_TIMING3_HBP_MASK)
+#define	 TCON_TIMING3_HT_MASK	0xFFF0000
+#define	 TCON_TIMING3_HT_SHIFT	16
+#define	 TCON_TIMING3_HT(x)	(((x - 1) << TCON_TIMING3_HT_SHIFT) & TCON_TIMING3_HT_MASK)
+
+#define	TCON_TIMING4		0xA4
+#define	 TCON_TIMING4_VBP_MASK	0xFFF
+#define	 TCON_TIMING4_VBP_SHIFT	0
+#define	 TCON_TIMING4_VBP(x)	((x - 1) & TCON_TIMING4_VBP_MASK)
+#define	 TCON_TIMING4_VT_MASK	0xFFF0000
+#define	 TCON_TIMING4_VT_SHIFT	16
+#define	 TCON_TIMING4_VT(x)	(((x * 2) << TCON_TIMING4_VT_SHIFT) & TCON_TIMING4_VT_MASK)
+
+#define	TCON_TIMING5			0xA8
+#define	 TCON_TIMING5_VSPW_MASK		0x3FF
+#define	 TCON_TIMING5_VSPW_SHIFT	0
+#define	 TCON_TIMING5_VSPW(x)		((x - 1) & TCON_TIMING5_VSPW_MASK)
+#define	 TCON_TIMING5_HSPW_MASK		0x3FF0000
+#define	 TCON_TIMING5_HSPW_SHIFT	16
+#define	 TCON_TIMING5_HSPW(x)		(((x - 1) << TCON_TIMING5_HSPW_SHIFT) & TCON_TIMING5_HSPW_MASK)
+
+#endif /* _AW_DE2_TCON_H_ */
+

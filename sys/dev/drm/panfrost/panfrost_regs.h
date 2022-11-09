@@ -1,0 +1,292 @@
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2021 Ruslan Bukin <br@bsdpad.com>
+ *
+ * This work was supported by Innovate UK project 105694, "Digital Security
+ * by Design (DSbD) Technology Platform Prototype".
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * $FreeBSD$
+ */
+
+#ifndef _DEV_DRM_PANFROST_REG_H_
+#define _DEV_DRM_PANFROST_REG_H_
+
+#define	GPU_ID					0x000
+#define	GPU_L2_FEATURES				0x004
+#define	GPU_CORE_FEATURES			0x008
+#define	GPU_TILER_FEATURES			0x00C
+#define	GPU_MEM_FEATURES			0x010
+#define	 GROUPS_L2_COHERENT			(1 << 0)
+#define	GPU_MMU_FEATURES			0x014
+#define	GPU_AS_PRESENT				0x018
+#define	GPU_JS_PRESENT				0x01C
+#define	GPU_INT_RAWSTAT				0x020
+#define	GPU_INT_CLEAR				0x024
+#define	GPU_INT_MASK				0x028
+#define	GPU_INT_STAT				0x02C
+#define	GPU_IRQ_FAULT				(1 << 0)
+#define	GPU_IRQ_MULTIPLE_FAULT			(1 << 7)
+#define	GPU_IRQ_RESET_COMPLETED			(1 << 8)
+#define	GPU_IRQ_POWER_CHANGED			(1 << 9)
+#define	GPU_IRQ_POWER_CHANGED_ALL		(1 << 10)
+#define	GPU_IRQ_PERFCNT_SAMPLE_COMPLETED	(1 << 16)
+#define	GPU_IRQ_CLEAN_CACHES_COMPLETED		(1 << 17)
+#define	GPU_IRQ_MASK_ALL	 (GPU_IRQ_FAULT				|\
+				  GPU_IRQ_MULTIPLE_FAULT		|\
+				  GPU_IRQ_RESET_COMPLETED		|\
+				  GPU_IRQ_POWER_CHANGED			|\
+				  GPU_IRQ_POWER_CHANGED_ALL		|\
+				  GPU_IRQ_PERFCNT_SAMPLE_COMPLETED	|\
+				  GPU_IRQ_CLEAN_CACHES_COMPLETED)
+#define GPU_IRQ_MASK_ERROR	  (GPU_IRQ_FAULT | GPU_IRQ_MULTIPLE_FAULT)
+#define	GPU_CMD					0x030
+#define	 GPU_CMD_SOFT_RESET			0x01
+#define	 GPU_CMD_PERFCNT_CLEAR			0x03
+#define	 GPU_CMD_PERFCNT_SAMPLE			0x04
+#define	 GPU_CMD_CLEAN_CACHES			0x07
+#define	 GPU_CMD_CLEAN_INV_CACHES		0x08
+#define	GPU_STATUS				0x034
+#define	 GPU_STATUS_PRFCNT_ACTIVE		(1 << 2)
+#define	GPU_LATEST_FLUSH_ID			0x038
+#define	GPU_PWR_KEY				0x050
+#define  GPU_PWR_KEY_UNLOCK			0x2968A819
+#define GPU_PWR_OVERRIDE0			0x054
+#define GPU_PWR_OVERRIDE1			0x058
+#define GPU_FAULT_STATUS			0x03C
+#define GPU_FAULT_ADDRESS_LO			0x040
+#define GPU_FAULT_ADDRESS_HI			0x044
+#define GPU_PERFCNT_BASE_LO			0x060
+#define GPU_PERFCNT_BASE_HI			0x064
+#define GPU_PERFCNT_CFG				0x068
+#define	 GPU_PERFCNT_CFG_MODE(x)		(x)
+#define	 GPU_PERFCNT_CFG_MODE_OFF		0
+#define	 GPU_PERFCNT_CFG_MODE_MANUAL		1
+#define	 GPU_PERFCNT_CFG_MODE_TILE		2
+#define	 GPU_PERFCNT_CFG_AS(x)			((x) << 4)
+#define	 GPU_PERFCNT_CFG_SETSEL(x)		((x) << 8)
+#define	GPU_PRFCNT_JM_EN			0x06C
+#define	GPU_PRFCNT_SHADER_EN			0x070
+#define	GPU_PRFCNT_TILER_EN			0x074
+#define	GPU_PRFCNT_MMU_L2_EN			0x07C
+#define	GPU_THREAD_MAX_THREADS			0x0A0
+#define GPU_THREAD_MAX_WORKGROUP_SIZE		0x0A4
+#define GPU_THREAD_MAX_BARRIER_SIZE		0x0A8
+#define GPU_THREAD_FEATURES			0x0AC
+#define GPU_TEXTURE_FEATURES(n)			(0x0B0 + ((n) * 4))
+#define GPU_JS_FEATURES(n)			(0x0C0 + ((n) * 4))
+#define GPU_AFBC_FEATURES			0x04C	/* Bifrost only. */
+
+#define GPU_SHADER_PRESENT_LO			0x100
+#define GPU_SHADER_PRESENT_HI			0x104
+#define GPU_TILER_PRESENT_LO			0x110
+#define GPU_TILER_PRESENT_HI			0x114
+#define GPU_L2_PRESENT_LO			0x120
+#define GPU_L2_PRESENT_HI			0x124
+#define SHADER_READY_LO				0x140
+#define SHADER_READY_HI				0x144
+#define TILER_READY_LO				0x150
+#define TILER_READY_HI				0x154
+#define L2_READY_LO				0x160
+#define L2_READY_HI				0x164
+#define SHADER_PWRON_LO				0x180
+#define SHADER_PWRON_HI				0x184
+#define TILER_PWRON_LO				0x190
+#define TILER_PWRON_HI				0x194
+#define L2_PWRON_LO				0x1A0
+#define L2_PWRON_HI				0x1A4
+#define SHADER_PWROFF_LO			0x1C0
+#define SHADER_PWROFF_HI			0x1C4
+#define TILER_PWROFF_LO				0x1D0
+#define TILER_PWROFF_HI				0x1D4
+#define L2_PWROFF_LO				0x1E0
+#define L2_PWROFF_HI				0x1E4
+
+#define SHADER_PWRTRANS_LO			0x200
+#define SHADER_PWRTRANS_HI			0x204
+#define TILER_PWRTRANS_LO			0x210
+#define TILER_PWRTRANS_HI			0x214
+#define L2_PWRTRANS_LO				0x220
+#define L2_PWRTRANS_HI				0x224
+#define SHADER_PWRACTIVE_LO			0x240
+#define SHADER_PWRACTIVE_HI			0x244
+#define TILER_PWRACTIVE_LO			0x250
+#define TILER_PWRACTIVE_HI			0x254
+#define L2_PWRACTIVE_LO				0x260
+#define L2_PWRACTIVE_HI				0x264
+
+#define GPU_COHERENCY_FEATURES			0x300
+#define	 COHERENCY_ACE_LITE			(1 << 0)
+#define	 COHERENCY_ACE				(1 << 1)
+#define GPU_THREAD_TLS_ALLOC			0x310
+
+#define GPU_STACK_PRESENT_LO			0xE00
+#define GPU_STACK_PRESENT_HI			0xE04
+#define STACK_READY_LO				0xE10
+#define STACK_READY_HI				0xE14
+#define STACK_PWRON_LO				0xE20
+#define STACK_PWRON_HI				0xE24
+#define STACK_PWROFF_LO				0xE30
+#define STACK_PWROFF_HI				0xE34
+#define STACK_PWRTRANS_LO			0xE40
+#define STACK_PWRTRANS_HI			0xE44
+
+#define GPU_JM_CONFIG				0xF00
+#define	 JM_TIMESTAMP_OVERRIDE			(1 << 0)
+#define	 JM_CLOCK_GATE_OVERRIDE			(1 << 1)
+#define	 JM_JOB_THROTTLE_ENABLE			(1 << 2)
+#define	 JM_JOB_THROTTLE_LIMIT_SHIFT		3
+#define	 JM_MAX_JOB_THROTTLE_LIMIT		0x3F
+#define	 JM_FORCE_COHERENCY_FEATURES_SHIFT	2
+#define	 JM_IDVS_GROUP_SIZE_SHIFT		16
+#define	 JM_MAX_IDVS_GROUP_SIZE			0x3F
+#define GPU_SHADER_CONFIG			0xF04
+#define  SC_ALT_COUNTERS			(1 << 3)
+#define  SC_OVERRIDE_FWD_PIXEL_KILL		(1 << 4)
+#define  SC_SDC_DISABLE_OQ_DISCARD		(1 << 6)
+#define  SC_LS_ALLOW_ATTR_TYPES			(1 << 16)
+#define  SC_LS_PAUSEBUFFER_DISABLE		(1 << 16)
+#define  SC_TLS_HASH_ENABLE			(1 << 17)
+#define  SC_LS_ATTR_CHECK_DISABLE		(1 << 18)
+#define	 SC_ENABLE_TEXGRD_FLAGS			(1 << 25)
+#define GPU_TILER_CONFIG			0xF08
+#define	 TC_CLOCK_GATE_OVERRIDE			(1 << 0)
+#define GPU_L2_MMU_CONFIG			0xF0C
+#define	 L2_MMU_CONFIG_ALLOW_SNOOP_DISPARITY_SHIFT	23
+#define	 L2_MMU_CONFIG_ALLOW_SNOOP_DISPARITY		\
+	(0x1 << L2_MMU_CONFIG_ALLOW_SNOOP_DISPARITY_SHIFT)
+#define	 L2_MMU_CONFIG_LIMIT_EXTERNAL_READS_SHIFT	24
+#define	 L2_MMU_CONFIG_LIMIT_EXTERNAL_READS		\
+	(0x3 << L2_MMU_CONFIG_LIMIT_EXTERNAL_READS_SHIFT)
+#define	 L2_MMU_CONFIG_LIMIT_EXTERNAL_READS_OCTANT	\
+	(0x1 << L2_MMU_CONFIG_LIMIT_EXTERNAL_READS_SHIFT)
+#define	 L2_MMU_CONFIG_LIMIT_EXTERNAL_READS_QUARTER	\
+	(0x2 << L2_MMU_CONFIG_LIMIT_EXTERNAL_READS_SHIFT)
+#define	 L2_MMU_CONFIG_LIMIT_EXTERNAL_READS_HAL		\
+	(0x3 << L2_MMU_CONFIG_LIMIT_EXTERNAL_READS_SHIFT)
+#define L2_MMU_CONFIG_LIMIT_EXTERNAL_WRITES_SHIFT	26
+#define L2_MMU_CONFIG_LIMIT_EXTERNAL_WRITES		\
+	(0x3 << L2_MMU_CONFIG_LIMIT_EXTERNAL_WRITES_SHIFT)
+#define L2_MMU_CONFIG_LIMIT_EXTERNAL_WRITES_OCTANT	\
+	(0x1 << L2_MMU_CONFIG_LIMIT_EXTERNAL_WRITES_SHIFT)
+#define L2_MMU_CONFIG_LIMIT_EXTERNAL_WRITES_QUARTER	\
+	(0x2 << L2_MMU_CONFIG_LIMIT_EXTERNAL_WRITES_SHIFT)
+#define L2_MMU_CONFIG_LIMIT_EXTERNAL_WRITES_HALF	\
+	(0x3 << L2_MMU_CONFIG_LIMIT_EXTERNAL_WRITES_SHIFT)
+#define L2_MMU_CONFIG_3BIT_LIMIT_EXTERNAL_READS_SHIFT	12
+#define L2_MMU_CONFIG_3BIT_LIMIT_EXTERNAL_READS		\
+	(0x7 << L2_MMU_CONFIG_LIMIT_EXTERNAL_READS_SHIFT)
+#define L2_MMU_CONFIG_3BIT_LIMIT_EXTERNAL_WRITES_SHIFT	15
+#define L2_MMU_CONFIG_3BIT_LIMIT_EXTERNAL_WRITES	\
+	(0x7 << L2_MMU_CONFIG_LIMIT_EXTERNAL_WRITES_SHIFT)
+
+#define JOB_INT_RAWSTAT				0x1000
+#define JOB_INT_CLEAR				0x1004
+#define JOB_INT_MASK				0x1008
+#define	 MK_JS_MASK(j)				(0x10001 << (j))
+#define	 JOB_INT_MASK_ERR(j)			(1 << (j) + 16)
+#define	 JOB_INT_MASK_DONE(j)			(1 << j)
+#define JOB_INT_STAT				0x100c
+#define JOB_INT_JS_STATE			0x1010
+#define JOB_INT_THROTTLE			0x1014
+
+#define JS_BASE					0x1800
+#define JS_HEAD_LO(n)				(JS_BASE + ((n) * 0x80) + 0x00)
+#define JS_HEAD_HI(n)				(JS_BASE + ((n) * 0x80) + 0x04)
+#define JS_TAIL_LO(n)				(JS_BASE + ((n) * 0x80) + 0x08)
+#define JS_TAIL_HI(n)				(JS_BASE + ((n) * 0x80) + 0x0c)
+#define JS_AFFINITY_LO(n)			(JS_BASE + ((n) * 0x80) + 0x10)
+#define JS_AFFINITY_HI(n)			(JS_BASE + ((n) * 0x80) + 0x14)
+#define JS_CONFIG(n)				(JS_BASE + ((n) * 0x80) + 0x18)
+#define JS_XAFFINITY(n)				(JS_BASE + ((n) * 0x80) + 0x1c)
+#define JS_COMMAND(n)				(JS_BASE + ((n) * 0x80) + 0x20)
+#define	 JS_COMMAND_NOP				0x00
+#define	 JS_COMMAND_START			0x01
+#define	 JS_COMMAND_SOFT_STOP			0x02
+#define	 JS_COMMAND_HARD_STOP			0x03
+#define	 JS_COMMAND_SOFT_STOP_0			0x04
+#define	 JS_COMMAND_HARD_STOP_0			0x05
+#define	 JS_COMMAND_SOFT_STOP_1			0x06
+#define	 JS_COMMAND_HARD_STOP_1			0x07
+#define JS_STATUS(n)				(JS_BASE + ((n) * 0x80) + 0x24)
+#define	 JS_STATUS_EVENT_ACTIVE			0x08
+#define JS_HEAD_NEXT_LO(n)			(JS_BASE + ((n) * 0x80) + 0x40)
+#define JS_HEAD_NEXT_HI(n)			(JS_BASE + ((n) * 0x80) + 0x44)
+#define JS_AFFINITY_NEXT_LO(n)			(JS_BASE + ((n) * 0x80) + 0x50)
+#define JS_AFFINITY_NEXT_HI(n)			(JS_BASE + ((n) * 0x80) + 0x54)
+#define JS_CONFIG_NEXT(n)			(JS_BASE + ((n) * 0x80) + 0x58)
+#define	 JS_CONFIG_START_FLUSH_CLEAN		(1 << 8)
+#define	 JS_CONFIG_START_FLUSH_CLEAN_INVALIDATE	(3 << 8)
+#define	 JS_CONFIG_START_MMU			(1 << 10)
+#define	 JS_CONFIG_JOB_CHAIN_FLAG		(1 << 11)
+#define	 JS_CONFIG_END_FLUSH_CLEAN		(1 << 12)
+#define	 JS_CONFIG_END_FLUSH_CLEAN_INVALIDATE	(3 << 12)
+#define	 JS_CONFIG_ENABLE_FLUSH_REDUCTION	(1 << 14)
+#define	 JS_CONFIG_DISABLE_DESCRIPTOR_WR_BK	(1 << 15)
+#define	 JS_CONFIG_THREAD_PRI(n)		((n) << 16)
+#define JS_COMMAND_NEXT(n)			(JS_BASE + ((n) * 0x80) + 0x60)
+#define JS_FLUSH_ID_NEXT(n)			(JS_BASE + ((n) * 0x80) + 0x70)
+
+#define MMU_INT_RAWSTAT				0x2000
+#define MMU_INT_CLEAR				0x2004
+#define MMU_INT_MASK				0x2008
+#define MMU_INT_STAT				0x200c
+
+#define	MMU_AS(as)				(0x2400 + ((as) << 6))
+#define	AS_TRANSTAB_LO(as)			(MMU_AS(as) + 0x00)
+#define AS_TRANSTAB_HI(as)			(MMU_AS(as) + 0x04)
+#define	 AS_TRANSTAB_LPAE_ADDR_SPACE_MASK	0xfffffffffffff000
+#define  AS_TRANSTAB_LPAE_ADRMODE_IDENTITY	0x2
+#define  AS_TRANSTAB_LPAE_ADRMODE_TABLE		0x3
+#define  AS_TRANSTAB_LPAE_ADRMODE_MASK		0x3
+#define  AS_TRANSTAB_LPAE_READ_INNER		(1 << 2)
+#define  AS_TRANSTAB_LPAE_SHARE_OUTER		(1 << 4)
+#define AS_MEMATTR_LO(as)			(MMU_AS(as) + 0x08)
+#define AS_MEMATTR_HI(as)			(MMU_AS(as) + 0x0C)
+#define AS_LOCKADDR_LO(as)			(MMU_AS(as) + 0x10)
+#define AS_LOCKADDR_HI(as)			(MMU_AS(as) + 0x14)
+#define AS_COMMAND(as)				(MMU_AS(as) + 0x18)
+#define	 AS_COMMAND_NOP				0x00
+#define  AS_COMMAND_UPDATE			0x01
+#define  AS_COMMAND_LOCK			0x02
+#define  AS_COMMAND_UNLOCK			0x03
+#define  AS_COMMAND_FLUSH			0x04	/* Deprecated. */
+#define  AS_COMMAND_FLUSH_PT			0x04
+#define  AS_COMMAND_FLUSH_MEM			0x05
+#define AS_FAULTSTATUS(as)			(MMU_AS(as) + 0x1C)
+#define AS_FAULTADDRESS_LO(as)			(MMU_AS(as) + 0x20)
+#define AS_FAULTADDRESS_HI(as)			(MMU_AS(as) + 0x24)
+#define AS_STATUS(as)				(MMU_AS(as) + 0x28)
+#define	 AS_STATUS_AS_ACTIVE			0x01
+#define AS_TRANSCFG_LO(as)			(MMU_AS(as) + 0x30)
+#define AS_TRANSCFG_HI(as)			(MMU_AS(as) + 0x34)
+#define AS_FAULTEXTRA_LO(as)			(MMU_AS(as) + 0x38)
+#define AS_FAULTEXTRA_HI(as)			(MMU_AS(as) + 0x3C)
+#define	 AS_FAULTSTATUS_ACCESS_TYPE_MASK	(0x3 << 8)
+#define  AS_FAULTSTATUS_ACCESS_TYPE_ATOMIC	(0x0 << 8)
+#define  AS_FAULTSTATUS_ACCESS_TYPE_EX		(0x1 << 8)
+#define  AS_FAULTSTATUS_ACCESS_TYPE_READ	(0x2 << 8)
+#define  AS_FAULTSTATUS_ACCESS_TYPE_WRITE	(0x3 << 8)
+
+#endif

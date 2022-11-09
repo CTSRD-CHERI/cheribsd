@@ -956,7 +956,7 @@ vfs_mountroot_readconf(struct thread *td, struct sbuf *sb)
 	ofs = 0;
 	len = sizeof(buf) - 1;
 	while (1) {
-		error = vn_rdwr(UIO_READ, nd.ni_vp, buf, len, ofs,
+		error = vn_rdwr(UIO_READ, nd.ni_vp, PTR2CAP(buf), len, ofs,
 		    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred,
 		    NOCRED, &resid, td);
 		if (error)

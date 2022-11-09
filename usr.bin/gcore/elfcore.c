@@ -93,6 +93,10 @@ typedef void* (*notefunc_t)(void *, size_t *);
 
 static void cb_put_phdr(struct map_entry *, void *);
 static void cb_size_segment(struct map_entry *, void *);
+#if __has_feature(capabilities)
+static void cb_put_memtag_phdr(struct map_entry *, void *);
+static void cb_size_memtag_segment(struct map_entry *, void *);
+#endif
 static void each_dumpable_segment(struct map_entry *, segment_callback,
     void *closure);
 static void elf_detach(void);	/* atexit() handler. */
@@ -204,6 +208,9 @@ elf_coredump(int efd, int fd, pid_t pid)
 	seginfo.count = 0;
 	seginfo.size = 0;
 	each_dumpable_segment(map, cb_size_segment, &seginfo);
+#if __has_feature(capabilities)
+	each_dumpable_segment(map, cb_size_memtag_segment, &seginfo);
+#endif
 
 	/*
 	 * Build the header and the notes using sbuf and write to the file.
@@ -241,7 +248,6 @@ elf_coredump(int efd, int fd, pid_t pid)
 		struct ptrace_io_desc iorequest;
 		uintmax_t nleft = php->p_filesz;
 
-		iorequest.piod_op = PIOD_READ_D;
 		iorequest.piod_offs = (caddr_t)(uintptr_t)php->p_vaddr;
 		while (nleft > 0) {
 			char buf[8*1024];
@@ -252,6 +258,12 @@ elf_coredump(int efd, int fd, pid_t pid)
 				nwant = sizeof buf;
 			else
 				nwant = nleft;
+#if __has_feature(capabilities)
+			if (php->p_type == PT_MEMTAG_CHERI)
+				iorequest.piod_op = PIOD_READ_CHERI_TAGS;
+			else
+#endif
+			iorequest.piod_op = PIOD_READ_D;
 			iorequest.piod_addr = buf;
 			iorequest.piod_len = nwant;
 			ptrace(PT_IO, pid, (caddr_t)&iorequest, 0);
@@ -265,6 +277,12 @@ elf_coredump(int efd, int fd, pid_t pid)
 			if ((size_t)ngot != nwant)
 				errx(1, "short write");
 			nleft -= nwant;
+#if __has_feature(capabilities)
+			if (php->p_type == PT_MEMTAG_CHERI)
+				iorequest.piod_offs += ngot *
+				    sizeof(uintcap_t) * NBBY;
+			else
+#endif
 			iorequest.piod_offs += ngot;
 		}
 		php++;
@@ -305,6 +323,33 @@ cb_put_phdr(struct map_entry *entry, void *closure)
 	phc->phdr++;
 }
 
+#if __has_feature(capabilities)
+static void
+cb_put_memtag_phdr(struct map_entry *entry, void *closure)
+{
+	struct phdr_closure *phc = (struct phdr_closure *)closure;
+	Elf_Phdr *phdr = phc->phdr;
+
+	if ((entry->protection & VM_PROT_CAP) != 0) {
+		phdr->p_type = PT_MEMTAG_CHERI;
+		phdr->p_offset = phc->offset;
+		phdr->p_vaddr = entry->start;
+		phdr->p_paddr = 0;
+		phdr->p_memsz = entry->end - entry->start;
+		phdr->p_filesz = phdr->p_memsz / (sizeof(uintcap_t) * NBBY);
+		phdr->p_align = 0;
+		phdr->p_flags = 0;
+		if (entry->protection & VM_PROT_READ_CAP)
+			phdr->p_flags |= PF_R;
+		if (entry->protection & VM_PROT_WRITE_CAP)
+			phdr->p_flags |= PF_W;
+
+		phc->offset += phdr->p_filesz;
+		phc->phdr++;
+	}
+}
+#endif
+
 /*
  * A callback for each_dumpable_segment() to gather information about
  * the number of segments and their total size.
@@ -317,6 +362,20 @@ cb_size_segment(struct map_entry *entry, void *closure)
 	ssc->count++;
 	ssc->size += entry->end - entry->start;
 }
+
+#if __has_feature(capabilities)
+static void
+cb_size_memtag_segment(struct map_entry *entry, void *closure)
+{
+	struct sseg_closure *ssc = (struct sseg_closure *)closure;
+
+	if ((entry->protection & VM_PROT_CAP) != 0) {
+		ssc->count++;
+		ssc->size += (entry->end - entry->start) /
+		    (sizeof(uintcap_t) * NBBY);
+	}
+}
+#endif
 
 /*
  * For each segment in the given memory map, call the given function
@@ -553,6 +612,9 @@ elf_puthdr(int efd, pid_t pid, struct map_entry *map, void *hdr, size_t hdrsize,
 	phc.phdr = phdr;
 	phc.offset = segoff;
 	each_dumpable_segment(map, cb_put_phdr, &phc);
+#if __has_feature(capabilities)
+	each_dumpable_segment(map, cb_put_memtag_phdr, &phc);
+#endif
 }
 
 /*
@@ -619,6 +681,12 @@ readmap(pid_t pid)
 			ent->protection |= VM_PROT_WRITE;
 		if ((kve->kve_protection & KVME_PROT_EXEC) != 0)
 			ent->protection |= VM_PROT_EXECUTE;
+#if __has_feature(capabilities)
+		if ((kve->kve_protection & KVME_PROT_READ_CAP) != 0)
+			ent->protection |= VM_PROT_READ_CAP;
+		if ((kve->kve_protection & KVME_PROT_WRITE_CAP) != 0)
+			ent->protection |= VM_PROT_WRITE_CAP;
+#endif
 
 		*linkp = ent;
 		linkp = &ent->next;

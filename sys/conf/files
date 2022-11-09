@@ -379,6 +379,7 @@ cheri/cheri_sysctl.c			optional cpu_cheri
 cheri/cheri_otype.c			optional cpu_cheri
 cheri/cheri_sealcap.c			optional cpu_cheri
 cheri/cheri_syscall.c			optional cpu_cheri
+cheri/cheri_tags.c			optional cpu_cheri
 cheri/cheri_usercap.c			optional cpu_cheri
 
 vm/vm_cheri_revoke.c			optional cpu_cheri cheri_caprevoke
@@ -1418,6 +1419,7 @@ dev/bwn/if_bwn_phy_lp.c		optional bwn bhnd
 dev/bwn/if_bwn_phy_n.c		optional bwn bhnd
 dev/bwn/if_bwn_util.c		optional bwn bhnd
 dev/cadence/if_cgem.c		optional cgem fdt
+dev/cadence/cdns_i2c.c		optional cdns_i2c
 dev/cardbus/card_if.m		standard
 dev/cardbus/cardbus.c		optional cardbus
 dev/cardbus/cardbus_cis.c	optional cardbus
@@ -1615,6 +1617,95 @@ dev/dcons/dcons.c		optional dcons
 dev/dcons/dcons_crom.c		optional dcons_crom
 dev/dcons/dcons_os.c		optional dcons
 dev/dme/if_dme.c		optional dme
+
+# DRM
+dev/drm/core/scheduler/sched_main.c		optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/scheduler/sched_entity.c		optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/scheduler/sched_fence.c		optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_atomic.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_atomic_helper.c		optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_atomic_state_helper.c		optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_atomic_uapi.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_auth.c				optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_blend.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_bridge.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_cache.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_client.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_client_modeset.c		optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_color_mgmt.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_connector.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_crtc.c				optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_crtc_helper.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_damage_helper.c		optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_drv.c				optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_dumb_buffers.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_edid.c				optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_encoder.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_fb_helper.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_file.c				optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_flip_work.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_fourcc.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_framebuffer.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_gem.c				optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_hashtab.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_ioc32.c			optional compat_drmcompat compat_freebsd32 drm compile-with "${DRM_C}"
+dev/drm/core/drm_ioctl.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_kms_helper_common.c		optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_memory.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_mm.c				optional compat_drmcompat drm compile-with "${DRM_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
+dev/drm/core/drm_mode_config.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_mode_object.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_modes.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_modeset_helper.c		optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_modeset_lock.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_panel.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_panel_orientation_quirks.c	optional compat_drmcompat drm compile-with "${DRM_C}"
+#dev/drm/core/drm_pci.c				optional compat_drmcompat drm compile-with "${DRM_C}" # Need CONFIG_PCI and drmkpi pci support
+dev/drm/core/drm_plane.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_plane_helper.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_prime.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_print.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_probe_helper.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_property.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_rect.c				optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_self_refresh_helper.c		optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_scdc_helper.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_syncobj.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/core/drm_vblank.c			optional compat_drmcompat drm compile-with "${DRM_C} ${NO_WUNUSED_BUT_SET_VARIABLE}"
+dev/drm/core/drm_vma_manager.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+
+# FreeBSD drm files
+dev/drm/freebsd/drm_gem_cma_helper.c		optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/freebsd/drm_gem_framebuffer_helper.c	optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/freebsd/drm_fb_cma_helper.c		optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/freebsd/drm_fbdev.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/freebsd/drm_os_freebsd.c		optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/freebsd/drm_sysctl.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/freebsd/drm_sysfs.c			optional compat_drmcompat drm compile-with "${DRM_C}"
+dev/drm/bridges/drm_bridge_if.m			optional compat_drmcompat drm
+
+# DRMCOMPAT files
+dev/drm/drmkpi/drmcompat_compat.c			optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_completion.c		optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_dma_buf.c			optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_dma_fence.c		optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_dma_fence_chain.c		optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_idr.c			optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_kthread.c			optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_list_sort.c		optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_lock.c			optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_page.c			optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_page1.c			optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_rcu.c			optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_reservation.c		optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_schedule.c		optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_slab.c			optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_sync_file.c		optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_timer.c			optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_work.c			optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/hdmi.c				optional compat_drmcompat compile-with "${DRM_C}"
+dev/drm/drmkpi/drmcompat_sort.c			optional compat_drmcompat compile-with "${DRM_C}"
+
 dev/drm2/drm_agpsupport.c	optional drm2
 dev/drm2/drm_auth.c		optional drm2
 dev/drm2/drm_bufs.c		optional drm2

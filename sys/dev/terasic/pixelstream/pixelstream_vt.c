@@ -177,5 +177,4 @@ pixelstream_fbd_detach(struct pixelstream_softc *sc)
 }
 
 extern device_t fbd_driver;
-extern devclass_t fbd_devclass;
-DRIVER_MODULE(fbd, pixelstream, fbd_driver, fbd_devclass, 0, 0);
+DRIVER_MODULE(fbd, pixelstream, fbd_driver, 0, 0);

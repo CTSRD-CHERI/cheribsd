@@ -27,6 +27,7 @@ device		fdt_pinctrl
 device		gpioregulator
 
 # I2C
+device		cdns_i2c		# Candence I2C
 device		iicbus
 device		iicmux
 device		iic
@@ -49,6 +50,15 @@ device		vt
 device		kbdmux
 
 device		vt_efifb
+
+# DRM Support
+options 	COMPAT_DRMCOMPAT
+device		drm
+
+# Video Drivers
+device		komeda_drm		# ARM Komeda Display Controller
+device		panfrost		# ARM Mali GPU Driver
+device		tda19988		# HDMI Controller by NXP
 
 # Pseudo devices.
 device		crypto			# core crypto support

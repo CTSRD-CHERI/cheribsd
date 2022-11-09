@@ -515,39 +515,6 @@ copyout_unmap(struct thread *td, vm_pointer_t addr, size_t sz)
 	return (0);
 }
 
-#if __has_feature(capabilities)
-int
-copyin_implicit_cap(const void *uaddr, void *kaddr, size_t len)
-{
-
-	return (copyin(cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, (ptraddr_t)uaddr, len, 0), kaddr, len));
-}
-
-int
-copyout_implicit_cap(const void *kaddr, void *uaddr, size_t len)
-{
-
-	return (copyout(kaddr,
-	    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
-	    (ptraddr_t)uaddr, len, 0), len));
-}
-#else
-int
-copyin_implicit_cap(const void *uaddr, void *kaddr, size_t len)
-{
-
-	return (copyin(uaddr, kaddr, len));
-}
-
-int
-copyout_implicit_cap(const void *kaddr, void *uaddr, size_t len)
-{
-
-	return (copyout(kaddr, uaddr, len));
-}
-#endif
-
 int32_t
 fuword32(volatile const void * __capability addr)
 {

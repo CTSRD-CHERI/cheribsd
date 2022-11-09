@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2018 SRI International
+ * Copyright (c) 2020-2022 Microsoft Corp.
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -33,94 +34,10 @@
 #ifndef __SYS_CHERI_REVOKE_H__
 #define	__SYS_CHERI_REVOKE_H__
 
-#include <cheri/cherireg.h> // CHERI_OTYPE_BITS
+#include <cheri/cherireg.h> /* For CHERI_OTYPE_BITS */
 
-typedef uint64_t cheri_revoke_epoch;
+typedef uint64_t cheri_revoke_epoch_t;
 #define CHERI_REVOKE_ST_EPOCH_WIDTH	61
-
-#ifdef _KERNEL
-/*
- * The outermost capability revocation state machine.
- *
- *   We begin with no revocation in progress (CAPREVST_NONE).  Userland can
- *   request that we steal the calling thread to carry out an initial pass,
- *   which will begin the next epoch and visit all cap-dirty pages in the
- *   address space, moving us to CAPREVST_INIT_PASS for the duration and to
- *   CAPREVST_INIT_DONE upon completion, before returning to userland.
- *
- *   We are now in the store-side steady state for this epoch: we need only
- *   look at *recently* capdirty pages, kernel hoarders, and register files
- *   to find should-be-revoked pages.  Userland can request additional
- *   passes, which will be *incremental* passes, visiting only capdirty
- *   pages (and keeping us in CAPREVST_STORE_DONE).
- *
- *   Alternatively, userland can request that we finish this epoch,
- *   transitioning us into CAPREVST_LAST_PASS for the duration.  This pass
- *   visits all recently capdirty pages, kernel hoarders, and thread
- *   register files.  It implies at least some brief window of
- *   thread_single'd life.  When this pass finishes, it again increments
- *   the epoch counter, signaling the end of this epoch.
- *
- *     XXX The thread_single window can be reduced by using the "load-side"
- *     strategy, in which we temporarily remove read access to all
- *     recently-capdirty pages and then un-thread_single.  We would continue
- *     to use the calling thread to sweep pages "in the background", but would
- *     also clean pages when taking vm faults.  The epoch must not end
- *     before all pages have been cleaned!
- *
- *   Userland might cause us to jump directly from CAPREVST_NONE to
- *   CAPREVST_LAST_PASS.  This case is *almost* like the above, except that
- *   we have to consider *all* capdirty pages, not just recently-capdirty.
- *
- * The state and epoch counter are stored in the same per-process word,
- * vm_caprev_st.  There is, at present, at most one thread actively engaged
- * in revocation per process.
- */
-
-enum cheri_revoke_state {
-	CHERI_REVOKE_ST_NONE       = 0, /* No revocation is in progress */
-	CHERI_REVOKE_ST_SS_INITING = 1, /* "store-side" opening now */
-	CHERI_REVOKE_ST_SS_INITED  = 2, /* "store-side" open (> 0 opens done) */
-	CHERI_REVOKE_ST_SS_LAST    = 3, /* "store-side" closing */
-	CHERI_REVOKE_ST_LS_INITING = 4, /* "load-side" opening now */
-	CHERI_REVOKE_ST_LS_INITED  = 5, /* "load-side" open (= 1 opens done) */
-	CHERI_REVOKE_ST_LS_CLOSING = 6, /* "load-side" background working */
-};
-
-#define CHERI_REVOKE_ST_ST_MASK	0x7
-#define CHERI_REVOKE_ST_EPOCH_SHIFT	3
-
-static inline enum cheri_revoke_state
-cheri_revoke_st_state(uint64_t st) {
-	return (st & CHERI_REVOKE_ST_ST_MASK);
-}
-
-static inline uint64_t
-cheri_revoke_st_epoch(uint64_t st) {
-	return (st >> CHERI_REVOKE_ST_EPOCH_SHIFT);
-}
-
-static inline void
-cheri_revoke_st_set(uint64_t *st, uint64_t epoch, enum cheri_revoke_state state)
-{
-	*st = (epoch << CHERI_REVOKE_ST_EPOCH_SHIFT) | state;
-}
-
-static inline bool
-cheri_revoke_st_is_loadside(uint64_t st) {
-	switch (cheri_revoke_st_state(st)) {
-	case CHERI_REVOKE_ST_LS_INITING:
-	case CHERI_REVOKE_ST_LS_INITED:
-	case CHERI_REVOKE_ST_LS_CLOSING:
-		return true;
-	case CHERI_REVOKE_ST_NONE:
-	case CHERI_REVOKE_ST_SS_INITING:
-	case CHERI_REVOKE_ST_SS_INITED:
-	case CHERI_REVOKE_ST_SS_LAST:
-		return false;
-	}
-}
-#endif
 
 /*
  * Epoch greater than orderings: a > b, a >= b.
@@ -133,22 +50,26 @@ cheri_revoke_st_is_loadside(uint64_t st) {
  * value of CHERI_REVOKE_ST_EPOCH_WIDTH, but on the chance that it becomes
  * significantly shorter, it doesn't hurt to have this abstracted.
  *
+ * XXX Eventually we'd like to switch to using capabilities themselves as epoch
+ * "counters" so that it's a small "epoch width" but there's no possibility of
+ * confusion because we can revoke very old epoch handles.
+ *
  * XXX this almost surely belongs somewhere else.
  */
 
-static inline int cheri_revoke_epoch_gt(cheri_revoke_epoch a,
-    cheri_revoke_epoch b) {
-	static const cheri_revoke_epoch top =
+static inline int cheri_revoke_epoch_gt(cheri_revoke_epoch_t a,
+    cheri_revoke_epoch_t b) {
+	static const cheri_revoke_epoch_t top =
 	    1ULL << (CHERI_REVOKE_ST_EPOCH_WIDTH-1);
 	return ((a < b) && ((b - a) > top)) || ((a > b) && ((a - b) < top));
 }
-static inline int cheri_revoke_epoch_ge(cheri_revoke_epoch a,
-    cheri_revoke_epoch b) {
+static inline int cheri_revoke_epoch_ge(cheri_revoke_epoch_t a,
+    cheri_revoke_epoch_t b) {
 	return (a == b) || cheri_revoke_epoch_gt(a, b);
 }
 
-static inline int cheri_revoke_epoch_clears(cheri_revoke_epoch now,
-                                         cheri_revoke_epoch then) {
+static inline int cheri_revoke_epoch_clears(cheri_revoke_epoch_t now,
+                                         cheri_revoke_epoch_t then) {
 	return cheri_revoke_epoch_ge(now, then + (then & 1) + 2);
 }
 
@@ -263,6 +184,8 @@ static const size_t VM_CHERI_REVOKE_BSZ_OTYPE =
 	 *
 	 * Setting CHERI_REVOKE_LAST_NO_EARLY when not setting
 	 * CHERI_REVOKE_LAST_PASS will cause no passes to be performed.
+	 *
+	 * XXX This has probably lost any utility it may ever have had.
 	 */
 #define CHERI_REVOKE_LAST_NO_EARLY	0x0010
 
@@ -276,6 +199,8 @@ static const size_t VM_CHERI_REVOKE_BSZ_OTYPE =
 	 * neither opening nor closing) passes, but at present we do not.
 	 *
 	 * Meaningless if CHERI_REVOKE_LAST_NO_EARLY also set.
+	 *
+	 * XXX This has probably lost any utility it may ever have had.
 	 */
 #define CHERI_REVOKE_EARLY_SYNC	0x0020
 
@@ -299,7 +224,7 @@ static const size_t VM_CHERI_REVOKE_BSZ_OTYPE =
 /*
  * Information conveyed to userland about a given cheri_revoke scan.
  *
- * Given what's being counted here are some things possibly useful to fitting a
+ * Given what's being counted, here are some things possibly useful to fitting a
  * linear regression model:
  *
  *  - The average time per fault is approximately fault_cycles / fault_visits.
@@ -378,9 +303,16 @@ struct cheri_revoke_stats {
 	uint32_t	pages_mark_clean;
 };
 
+/*
+ * XXX The use of two counters is mostly a bug, but it's never been worth
+ * fixing.  It originated in response to some error handling paths where it
+ * seemed like we might have to "rewind" the epoch counter to back out of a
+ * failed revocation pass, but probably a different design would have been
+ * better.  Apologies.  Eventually, there will be only one.
+ */
 struct cheri_revoke_epochs {
-	cheri_revoke_epoch enqueue; /* Label on entry to quarantine */
-	cheri_revoke_epoch dequeue; /* Gates removal from quarantine */
+	cheri_revoke_epoch_t enqueue; /* Label on entry to quarantine */
+	cheri_revoke_epoch_t dequeue; /* Gates removal from quarantine */
 };
 
 struct cheri_revoke_info {
@@ -395,19 +327,6 @@ struct cheri_revoke_syscall_info {
 	struct cheri_revoke_stats stats;
 };
 
-#ifdef _KERNEL
-struct cheri_revoke_info_page {
-	/* Userland will come to hold RO caps to this bit */
-	struct cheri_revoke_info pub;
-
-	/*
-	 * The kernel is free to use the rest of this page for
-	 * private data that is quite naturally associated with
-	 * this VM space.
-	 */
-};
-#endif
-
 #define	CHERI_REVOKE_SHADOW_NOVMMAP	0x00	/* The ordinary shadow space */
 #define CHERI_REVOKE_SHADOW_OTYPE	0x01	/* The otype shadow space */
 /*
@@ -418,11 +337,13 @@ struct cheri_revoke_info_page {
  * of vm objects that we aren't deleting?  They *can* use the NOVMMAP
  * bitmask, but it's 256 times as many bits to flip.
  */
+
 #define CHERI_REVOKE_SHADOW_INFO_STRUCT	0x03	/* R/O access to shared state */
 
 /*
  * XXX This should go away as soon as we have allocators w/ per-arena shadows
- * or come to depend on CHERI+MTE, whichever happens first.
+ * or come to depend on CHERI+MTE, whichever happens first.  However, the
+ * minimal-bookkeeping version of libmrs uses this, and that's very convenient.
  */
 #define CHERI_REVOKE_SHADOW_NOVMMAP_ENTIRE 0x07	/* The entire shadow region */
 
@@ -440,7 +361,7 @@ struct cheri_revoke_info_page {
 	 * this prototype will need to change or we'll need to be more
 	 * explicit about it being a hint or something.
 	 */
-int cheri_revoke(int flags, cheri_revoke_epoch start_epoch,
+int cheri_revoke(int flags, cheri_revoke_epoch_t start_epoch,
 		struct cheri_revoke_syscall_info *crsi);
 
 	/*
@@ -451,9 +372,9 @@ int cheri_revoke(int flags, cheri_revoke_epoch start_epoch,
 	 * This call must fail if the resulting capability would not be
 	 * representable due to alignment constraints.
 	 */
-int cheri_revoke_shadow(int flags,
+int cheri_revoke_get_shadow(int flags,
 	void * __capability arena,
 	void * __capability * shadow);
 #endif
 
-#endif /* !__SYS_CAPREVOKE_H__ */
+#endif /* !__SYS_CHERI_REVOKE_H__ */

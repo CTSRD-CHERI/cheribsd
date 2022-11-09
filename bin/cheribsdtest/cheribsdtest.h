@@ -163,6 +163,7 @@ struct cheri_test {
 	const char	*ct_name;
 	const char	*ct_desc;
 	void		(*ct_func)(const struct cheri_test *);
+	const char *	(*ct_check_skip)(const char *);
 	const char *	(*ct_check_xfail)(const char *);
 	u_int		 ct_flags;
 	int		 ct_signum;

@@ -1866,7 +1866,7 @@ RetryFault:
 			if (fs.first_object == fs.object)
 				fault_page_free(&fs.first_m);
 			unlock_and_deallocate(&fs);
-			return (KERN_NOT_RECEIVER);
+			return (KERN_PAGE_NOT_FILLED);
 		}
 		VM_OBJECT_WUNLOCK(fs.object);
 		vm_fault_zerofill(&fs);
