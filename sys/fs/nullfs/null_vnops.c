@@ -484,7 +484,7 @@ null_open(struct vop_open_args *ap)
 
 	vp = ap->a_vp;
 	ldvp = NULLVPTOLOWERVP(vp);
-	retval = null_bypass(&ap->a_gen);
+	retval = null_bypass((struct vop_generic_args *)ap);
 	if (retval == 0) {
 		vp->v_object = ldvp->v_object;
 		if ((vn_irflag_read(ldvp) & VIRF_PGREAD) != 0) {
@@ -641,7 +641,7 @@ null_remove(struct vop_remove_args *ap)
 	} else
 		vreleit = 0;
 	VTONULL(vp)->null_flags |= NULLV_DROP;
-	retval = null_bypass(&ap->a_gen);
+	retval = null_bypass((struct vop_generic_args *)ap);
 	if (vreleit != 0)
 		vrele(lvp);
 	return (retval);
@@ -735,7 +735,7 @@ null_rmdir(struct vop_rmdir_args *ap)
 {
 
 	VTONULL(ap->a_vp)->null_flags |= NULLV_DROP;
-	return (null_bypass(&ap->a_gen));
+	return (null_bypass((struct vop_generic_args *)ap));
 }
 
 /*
