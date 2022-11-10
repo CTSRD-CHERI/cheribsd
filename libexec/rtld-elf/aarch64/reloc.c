@@ -365,26 +365,16 @@ tramp_pgs_append(void *target, const Obj_Entry *obj, const Elf_Sym *def)
 	static struct tramp_pgs pgs = SLIST_HEAD_INITIALIZER(pgs);
 
 	const struct tramp *template;
-	struct tramp *t;
 	size_t len;
 
+	RtldLockState lockstate;
+	struct tramp_pg *pg;
 	bool did_allocate = false;
-	struct tramp_pg *pg = SLIST_FIRST(&pgs);
+	struct tramp *t;
 
 	if (exclude_symbol_in_lib("libc.so.7", "rfork", obj, def) ||
 	    exclude_symbol_in_lib("libc.so.7", "vfork", obj, def)) {
 		return (target);
-	}
-	
-	if (pg == NULL) {
-allocate_new_page:
-		if (did_allocate)
-			rtld_die();
-		pg = tramp_pg_create();
-		if (pg == NULL)
-			rtld_die();
-		SLIST_INSERT_HEAD(&pgs, pg, entries);
-		did_allocate = true;
 	}
 
 	if (cheri_getperm(target) & CHERI_PERM_EXECUTIVE) {
@@ -396,10 +386,26 @@ allocate_new_page:
 	}
 	assert(len == cheri_getlen(template));
 
+	wlock_acquire(rtld_tramp_lock, &lockstate);
+
+	pg = SLIST_FIRST(&pgs);
+	if (pg == NULL) {
+allocate_new_page:
+		if (did_allocate)
+			rtld_die();
+		pg = tramp_pg_create();
+		if (pg == NULL)
+			rtld_die();
+		SLIST_INSERT_HEAD(&pgs, pg, entries);
+		did_allocate = true;
+	}
+
 	t = roundup2(pg->cursor, _Alignof(typeof(*t)));
 	pg->cursor = set_bounds_get_remainder(&t, len);
 	if (!cheri_gettag(t))
 		goto allocate_new_page;
+
+	lock_release(rtld_tramp_lock, &lockstate);
 
 	memcpy(t, template, len);
 	/*

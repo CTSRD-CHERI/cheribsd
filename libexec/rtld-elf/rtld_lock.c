@@ -232,7 +232,11 @@ thread_mask_clear(int mask)
 	lockinfo.thread_clr_flag(mask);
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#define	RTLD_LOCK_CNT	4
+#else
 #define	RTLD_LOCK_CNT	3
+#endif
 static struct rtld_lock {
 	void	*handle;
 	int	 mask;
@@ -241,6 +245,9 @@ static struct rtld_lock {
 rtld_lock_t	rtld_bind_lock = &rtld_locks[0];
 rtld_lock_t	rtld_libc_lock = &rtld_locks[1];
 rtld_lock_t	rtld_phdr_lock = &rtld_locks[2];
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+rtld_lock_t	rtld_tramp_lock = &rtld_locks[3];
+#endif
 
 void
 rlock_acquire(rtld_lock_t lock, RtldLockState *lockstate)

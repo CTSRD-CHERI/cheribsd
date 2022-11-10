@@ -89,6 +89,9 @@ typedef struct rtld_lock *rtld_lock_t;
 extern rtld_lock_t	rtld_bind_lock;
 extern rtld_lock_t	rtld_libc_lock;
 extern rtld_lock_t	rtld_phdr_lock;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+extern rtld_lock_t	rtld_tramp_lock;
+#endif
 
 extern struct RtldLockInfo lockinfo;
 
