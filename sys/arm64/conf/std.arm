@@ -13,3 +13,6 @@ device		pl011
 
 options 	FDT
 device		acpi
+
+# DTBs
+makeoptions	MODULES_EXTRA+="dtb/arm"
