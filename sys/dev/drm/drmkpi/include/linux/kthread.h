@@ -46,7 +46,7 @@ struct kthr_wrap {
 	struct thread *__td;						\
 	struct kthr_wrap *w;						\
 									\
-	w = malloc(sizeof(struct kthr_wrap), M_DRMKMALLOC, 0);		\
+	w = malloc(sizeof(struct kthr_wrap), M_DRMKMALLOC, M_WAITOK);	\
 	w->func = fn;							\
 	w->arg = data;							\
 									\
