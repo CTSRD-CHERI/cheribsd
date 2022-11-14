@@ -304,7 +304,6 @@ void vm_exit_reqidle(struct vcpu *vcpu, uint64_t rip);
 int vm_snapshot_req(struct vm *vm, struct vm_snapshot_meta *meta);
 int vm_restore_time(struct vm *vm);
 
-#ifdef _SYS__CPUSET_H_
 /*
  * Rendezvous all vcpus specified in 'dest' and execute 'func(arg)'.
  * The rendezvous 'func(arg)' is not allowed to do anything that will
@@ -325,7 +324,6 @@ cpuset_t vm_debug_cpus(struct vm *vm);
 cpuset_t vm_suspended_cpus(struct vm *vm);
 cpuset_t vm_start_cpus(struct vm *vm, const cpuset_t *tostart);
 void vm_await_start(struct vm *vm, const cpuset_t *waiting);
-#endif	/* _SYS__CPUSET_H_ */
 
 static __inline int
 vcpu_rendezvous_pending(struct vcpu *vcpu, struct vm_eventinfo *info)
