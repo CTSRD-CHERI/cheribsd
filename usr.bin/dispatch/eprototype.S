@@ -43,7 +43,8 @@ ENTRY(switcher_cocall_eprototype)
 	cret
 #elif defined(__aarch64__)
 	mov	x0, EPROTOTYPE
-	subs	x0, x0, #0
+	mov	x1, -1
+	subs	x1, x1, #0
 	rets	c30
 #else
 #error Unknown architecture
@@ -57,7 +58,8 @@ ENTRY(switcher_coaccept_eprototype)
 	cret
 #elif defined(__aarch64__)
 	mov	x0, EPROTOTYPE
-	subs	x0, x0, #0
+	mov	x1, -1
+	subs	x1, x1, #0
 	rets	c30
 #else
 #error Unknown architecture
