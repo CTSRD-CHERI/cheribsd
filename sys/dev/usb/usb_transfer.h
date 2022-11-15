@@ -45,7 +45,7 @@
  * the "done_p" USB process.
  */
 struct usb_done_msg {
-	struct usb_proc_msg hdr;
+	struct usb_proc_msg hdr __subobject_member_used_for_c_inheritance;
 	struct usb_xfer_root *xroot;
 };
 
