@@ -41,7 +41,7 @@ unwind_frame(struct thread *td, struct unwind_state *frame)
 
 	fp = frame->fp;
 
-	if (!__is_aligned(fp, sizeof(fp)) ||
+	if (!is_aligned(fp, sizeof(fp)) ||
 	    !kstack_contains(td, fp, sizeof(fp) * 2))
 		return (false);
 
