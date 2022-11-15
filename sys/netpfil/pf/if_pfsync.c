@@ -1590,6 +1590,7 @@ pfsync_sendout(int schedswi, int c)
 	    }
 #endif
 	default:
+		m_freem(m);
 		return;
 	}
 
