@@ -78,7 +78,10 @@ procstat_vm(struct procstat *procstat, struct kinfo_proc *kipp)
 	for (i = 0; i < cnt; i++) {
 		xo_open_instance("vm");
 		kve = &freep[i];
-		xo_emit("{dk:process_id/%5d} ", kve->kve_pid);
+		if (kve->kve_pid == 0)
+			xo_emit("{dk:process_id/%5s} ", "-");
+		else
+			xo_emit("{dk:process_id/%5d} ", kve->kve_pid);
 		xo_emit("{d:kve_start/%#*jx} ", ptrwidth,
 		    (uintmax_t)kve->kve_start);
 		xo_emit("{d:kve_end/%#*jx} ", ptrwidth,
