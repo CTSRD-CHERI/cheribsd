@@ -209,7 +209,7 @@ struct uaudio_mixer_node {
 };
 
 struct uaudio_configure_msg {
-	struct usb_proc_msg hdr;
+	struct usb_proc_msg hdr __subobject_member_used_for_c_inheritance;
 	struct uaudio_softc *sc;
 };
 

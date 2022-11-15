@@ -119,12 +119,12 @@ struct ucom_callback {
 #define	ULSR_RCV_MASK	0x1f		/* Mask for incoming data or error */
 
 struct ucom_cfg_task {
-	struct usb_proc_msg hdr;
+	struct usb_proc_msg hdr __subobject_member_used_for_c_inheritance;
 	struct ucom_softc *sc;
 };
 
 struct ucom_param_task {
-	struct usb_proc_msg hdr;
+	struct usb_proc_msg hdr __subobject_member_used_for_c_inheritance;
 	struct ucom_softc *sc;
 	struct termios termios_copy;
 };

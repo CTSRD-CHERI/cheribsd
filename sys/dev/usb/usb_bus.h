@@ -37,7 +37,7 @@ struct usb_fs_privdata;
  */
 
 struct usb_bus_msg {
-	struct usb_proc_msg hdr;
+	struct usb_proc_msg hdr __subobject_member_used_for_c_inheritance;
 	struct usb_bus *bus;
 };
 
