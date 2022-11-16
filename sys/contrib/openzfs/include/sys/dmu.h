@@ -658,7 +658,7 @@ typedef struct dmu_buf_user {
 	 */
 	dmu_buf_t **dbu_clear_on_evict_dbufp;
 #endif
-} dmu_buf_user_t;
+} __subobject_use_container_bounds dmu_buf_user_t;
 
 /*
  * Initialize the given dmu_buf_user_t instance with the eviction function

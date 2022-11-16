@@ -1108,7 +1108,7 @@ typedef struct dnode_phys {
 			blkptr_t __dn_ignore2;
 			uint8_t __dn_ignore3[DN_OLD_MAX_BONUSLEN -
 			    sizeof (blkptr_t)];
-			blkptr_t dn_spill;
+			blkptr_t dn_spill __subobject_use_remaining_size;
 		};
 	};
 } dnode_phys_t;

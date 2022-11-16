@@ -65,7 +65,7 @@ struct i_nvp {
 	} _nvi_un;
 
 	/* nvpair */
-	nvpair_t nvi_nvp;
+	nvpair_t nvi_nvp __subobject_use_container_bounds;
 };
 #define	nvi_next	_nvi_un._nvi._nvi_next
 #define	nvi_prev	_nvi_un._nvi._nvi_prev

@@ -202,7 +202,7 @@ typedef struct dmu_buf_impl {
 	 */
 
 	/* the publicly visible structure */
-	dmu_buf_t db;
+	dmu_buf_t db __subobject_use_container_bounds;
 
 	/* the objset we belong to */
 	struct objset *db_objset;
