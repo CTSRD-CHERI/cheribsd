@@ -482,3 +482,7 @@ CFLAGS.zstd_fast.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
 CFLAGS.zstd_lazy.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
 CFLAGS.zstd_ldm.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
 CFLAGS.zstd_opt.c+= ${NO_WBITWISE_INSTEAD_OF_LOGICAL}
+
+.if ${MACHINE_ARCH} == "aarch64c" || ${MACHINE_ARCH} == "riscv64c"
+CFLAGS+=-Xclang -cheri-bounds=conservative
+.endif

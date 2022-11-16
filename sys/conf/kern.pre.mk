@@ -265,8 +265,8 @@ ZFS_CFLAGS+= -DBITS_PER_LONG=64
 
 
 ZFS_ASM_CFLAGS= -x assembler-with-cpp -DLOCORE ${ZFS_CFLAGS}
-ZFS_C=		${CC} -c ${ZFS_CFLAGS} ${WERROR} ${.IMPSRC}
-ZFS_RPC_C=	${CC} -c ${ZFS_CFLAGS} -DHAVE_RPC_TYPES ${WERROR} ${.IMPSRC}
+ZFS_C=		${CC} -c ${ZFS_CFLAGS} -Xclang -cheri-bounds=conservative ${WERROR} ${.IMPSRC}
+ZFS_RPC_C=	${CC} -c ${ZFS_CFLAGS} -DHAVE_RPC_TYPES -Xclang -cheri-bounds=conservative ${WERROR} ${.IMPSRC}
 ZFS_S=		${CC} -c ${ZFS_ASM_CFLAGS} ${WERROR} ${.IMPSRC}
 
 # ATH driver
