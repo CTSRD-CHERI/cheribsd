@@ -498,7 +498,7 @@ static long coexecve_cleanup_margin_up = 0x10000;
 SYSCTL_LONG(_debug, OID_AUTO, coexecve_cleanup_margin_up, CTLFLAG_RWTUN,
     &coexecve_cleanup_margin_up, 0,
     "Maximum hole size for segments growing up when cleaning up after colocated processes");
-static long coexecve_cleanup_margin_down = MAXSSIZ;
+static long coexecve_cleanup_margin_down = (MAXSSIZ * 2L);
 SYSCTL_LONG(_debug, OID_AUTO, coexecve_cleanup_margin_down, CTLFLAG_RWTUN,
     &coexecve_cleanup_margin_down, 0,
     "Maximum hole size for segments growing down when cleaning up after colocated processes");
