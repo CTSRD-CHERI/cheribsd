@@ -15,7 +15,7 @@ SRCTOP:= ${.PARSEDIR:tA:H:H}
 
 # ZFS source directory
 # XXX: This might belong somewhere a little less central...
-ZFSTOP=${SRCTOP}/sys/contrib/openzfs
+ZFSTOP=${SRCTOP}/sys/contrib/subrepo-openzfs
 
 .if ${.CURDIR} == ${SRCTOP}
 RELDIR= .
