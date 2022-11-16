@@ -216,7 +216,7 @@ RPCDIR=		${INCLUDEDIR}/rpc
 TEKEN=		teken.h
 TEKENDIR=	${INCLUDEDIR}/teken
 
-.PATH: ${SRCTOP}/sys/contrib/openzfs/include/sys
+.PATH: ${ZFSTOP}/include/sys
 NVPAIR=		nvpair.h
 NVPAIRDIR=	${INCLUDEDIR}/sys
 
@@ -458,7 +458,7 @@ symlinks: .PHONY .META
 	cd ${SRCTOP}/sys/rpc;
 .if ${MK_CDDL} != "no"
 	${INSTALL_SYMLINK} ${TAG_ARGS:D${TAG_ARGS},dev} \
-	    ../../../sys/contrib/openzfs/include/sys/nvpair.h \
+	    ../../..${ZFSTOP:C!^${SRCTOP}!!}/include/sys/nvpair.h \
 	    ${SDESTDIR}${INCLUDEDIR}/sys
 .endif
 .if ${MK_MLX5TOOL} != "no"

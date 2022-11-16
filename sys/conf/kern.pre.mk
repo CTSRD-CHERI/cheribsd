@@ -212,7 +212,7 @@ ZSTD_C= ${CC} -c -DZSTD_HEAPMODE=1 -I$S/contrib/zstd/lib/freebsd ${CFLAGS} \
 ZSTD_DECOMPRESS_BLOCK_FLAGS= -fno-tree-vectorize
 .endif
 
-ZINCDIR=$S/contrib/openzfs/include
+ZINCDIR=${ZFSTOP}/include
 # Common for dtrace / zfs
 CDDL_CFLAGS=	\
 	-DFREEBSD_NAMECACHE \
@@ -226,7 +226,7 @@ CDDL_CFLAGS=	\
 	-I${ZINCDIR}/os/freebsd/spl \
 	-I${ZINCDIR}/os/freebsd/zfs  \
 	-I$S/modules/zfs \
-	-I$S/contrib/openzfs/module/zstd/include \
+	-I${ZFSTOP}/module/zstd/include \
 	${CFLAGS} \
 	-Wno-cast-qual \
 	-Wno-duplicate-decl-specifier \
