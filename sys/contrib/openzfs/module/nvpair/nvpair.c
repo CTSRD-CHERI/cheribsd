@@ -55,6 +55,10 @@
 
 #define	skip_whitespace(p)	while ((*(p) == ' ') || (*(p) == '\t')) (p)++
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define NVPAIR_OVER_ALLOCATE_DECODE
+#endif
+
 /*
  * nvpair.c - Provides kernel & userland interfaces for manipulating
  *	name-value pairs.
@@ -809,8 +813,14 @@ i_validate_nvpair(nvpair_t *nvp)
 	 * verify string values and get the value size.
 	 */
 	size2 = i_get_value_size(type, NVP_VALUE(nvp), NVP_NELEM(nvp));
+	if (size2 < 0)
+		return (EFAULT);
 	size1 = nvp->nvp_size - NVP_VALOFF(nvp);
-	if (size2 < 0 || size1 != NV_ALIGN(size2))
+#ifdef NVPAIR_OVER_ALLOCATE_DECODE
+	if (size1 < NV_ALIGN(size2))
+#else
+	if (size1 != NV_ALIGN(size2))
+#endif
 		return (EFAULT);
 
 	return (0);
@@ -1086,7 +1096,7 @@ i_get_value_size(data_type_t type, const void *data, uint_t nelem)
 		value_sz = (uint64_t)nelem * sizeof (uint64_t);
 		break;
 	case DATA_TYPE_STRING_ARRAY:
-		value_sz = (uint64_t)nelem * sizeof (uint64_t);
+		value_sz = (uint64_t)nelem * sizeof (uint64ptr_t);
 
 		if (data != NULL) {
 			char *const *strs = data;
@@ -1107,7 +1117,7 @@ i_get_value_size(data_type_t type, const void *data, uint_t nelem)
 		value_sz = NV_ALIGN(sizeof (nvlist_t));
 		break;
 	case DATA_TYPE_NVLIST_ARRAY:
-		value_sz = (uint64_t)nelem * sizeof (uint64_t) +
+		value_sz = (uint64_t)nelem * sizeof (uint64ptr_t) +
 		    (uint64_t)nelem * NV_ALIGN(sizeof (nvlist_t));
 		break;
 	default:
@@ -1214,7 +1224,7 @@ nvlist_add_common(nvlist_t *nvl, const char *name,
 		char **cstrs = (void *)buf;
 
 		/* skip pre-allocated space for pointer array */
-		buf += nelem * sizeof (uint64_t);
+		buf += nelem * sizeof (uint64ptr_t);
 		for (i = 0; i < nelem; i++) {
 			int slen = strlen(strs[i]) + 1;
 			memcpy(buf, strs[i], slen);
@@ -1237,7 +1247,7 @@ nvlist_add_common(nvlist_t *nvl, const char *name,
 		nvlist_t **onvlp = (nvlist_t **)data;
 		nvlist_t **nvlp = EMBEDDED_NVL_ARRAY(nvp);
 		nvlist_t *embedded = (nvlist_t *)
-		    ((uintptr_t)nvlp + nelem * sizeof (uint64_t));
+		    ((uintptr_t)nvlp + nelem * sizeof (uint64ptr_t));
 
 		for (i = 0; i < nelem; i++) {
 			if ((err = nvlist_copy_embedded(nvl,
@@ -2537,7 +2547,7 @@ nvs_embedded_nvl_array(nvstream_t *nvs, nvpair_t *nvp, size_t *size)
 		break;
 
 	case NVS_OP_DECODE: {
-		size_t len = nelem * sizeof (uint64_t);
+		size_t len = nelem * sizeof (uint64ptr_t);
 		nvlist_t *embedded = (nvlist_t *)((uintptr_t)nvlp + len);
 
 		memset(nvlp, 0, len);	/* don't trust packed data */
@@ -2914,7 +2924,7 @@ nvpair_native_embedded(nvstream_t *nvs, nvpair_t *nvp)
 		 * to use memset.
 		 */
 		memset((char *)packed + offsetof(nvlist_t, nvl_priv),
-		    0, sizeof (uint64_t));
+		    0, sizeof (uint64ptr_t));
 	}
 
 	return (nvs_embedded(nvs, EMBEDDED_NVL(nvp)));
@@ -2926,7 +2936,7 @@ nvpair_native_embedded_array(nvstream_t *nvs, nvpair_t *nvp)
 	if (nvs->nvs_op == NVS_OP_ENCODE) {
 		nvs_native_t *native = (nvs_native_t *)nvs->nvs_private;
 		char *value = native->n_curr - nvp->nvp_size + NVP_VALOFF(nvp);
-		size_t len = NVP_NELEM(nvp) * sizeof (uint64_t);
+		size_t len = NVP_NELEM(nvp) * sizeof (uint64ptr_t);
 		nvlist_t *packed = (nvlist_t *)((uintptr_t)value + len);
 		int i;
 		/*
@@ -2943,7 +2953,7 @@ nvpair_native_embedded_array(nvstream_t *nvs, nvpair_t *nvp)
 			 * so we have to use memset.
 			 */
 			memset((char *)packed + offsetof(nvlist_t, nvl_priv),
-			    0, sizeof (uint64_t));
+			    0, sizeof (uint64ptr_t));
 	}
 
 	return (nvs_embedded_nvl_array(nvs, nvp, NULL));
@@ -2955,19 +2965,19 @@ nvpair_native_string_array(nvstream_t *nvs, nvpair_t *nvp)
 	switch (nvs->nvs_op) {
 	case NVS_OP_ENCODE: {
 		nvs_native_t *native = (nvs_native_t *)nvs->nvs_private;
-		uint64_t *strp = (void *)
+		uint64ptr_t *strp = (void *)
 		    (native->n_curr - nvp->nvp_size + NVP_VALOFF(nvp));
 		/*
 		 * Null out pointers that are meaningless in the packed
 		 * structure. The addresses may not be aligned, so we have
 		 * to use memset.
 		 */
-		memset(strp, 0, NVP_NELEM(nvp) * sizeof (uint64_t));
+		memset(strp, 0, NVP_NELEM(nvp) * sizeof (uint64ptr_t));
 		break;
 	}
 	case NVS_OP_DECODE: {
 		char **strp = (void *)NVP_VALUE(nvp);
-		char *buf = ((char *)strp + NVP_NELEM(nvp) * sizeof (uint64_t));
+		char *buf = ((char *)strp + NVP_NELEM(nvp) * sizeof (uint64ptr_t));
 		int i;
 
 		for (i = 0; i < NVP_NELEM(nvp); i++) {
@@ -3249,6 +3259,15 @@ nvs_xdr_nvp_##type(XDR *xdrs, void *ptr)	\
 	return (xdr_##type(xdrs, ptr));		\
 }
 
+#elif !defined(_KERNEL) && defined(__FreeBSD__)
+
+#define	NVS_BUILD_XDRPROC_T(type)				\
+static int							\
+nvs_xdr_nvp_##type(struct XDR *xdrs, void *ptr, unsigned int i __unused) \
+{								\
+	return (xdr_##type(xdrs, ptr));				\
+}
+
 #elif !defined(_KERNEL) && defined(XDR_CONTROL) /* tirpc */
 
 #define	NVS_BUILD_XDRPROC_T(type)		\
@@ -3445,7 +3464,7 @@ nvs_xdr_nvp_op(nvstream_t *nvs, nvpair_t *nvp)
 		break;
 
 	case DATA_TYPE_STRING_ARRAY: {
-		size_t len = nelem * sizeof (uint64_t);
+		size_t len = nelem * sizeof (uint64ptr_t);
 		char **strp = (void *)buf;
 		int i;
 
@@ -3603,6 +3622,112 @@ nvs_xdr_nvp_size(nvstream_t *nvs, nvpair_t *nvp, size_t *size)
 					(NVS_XDR_DATA_LEN(x) * 2) + \
 					NV_ALIGN4((NVS_XDR_DATA_LEN(x) / 4)))
 
+static int32_t
+nvpair_nominal_decode_size(nvpair_t *nvp)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	int32_t size = nvp->nvp_size;
+	int32_t unpadded_size;
+
+	/* Remove over-alignment of the value due to padding of the name */
+	if (NV_ALIGN(nvp->nvp_name_sz) - nvp->nvp_name_sz >= 8)
+		size -= 8;
+
+	/*
+	 * Handle values.  Simple things set unpadded_size which is handled
+	 * at the end of the switch.  More complex things leave it set to
+	 * zero and update size as needed.
+	 */
+	unpadded_size = 0;
+	switch (nvp->nvp_type) {
+	case DATA_TYPE_BOOLEAN:
+		break;
+
+	case DATA_TYPE_BOOLEAN_VALUE:
+	case DATA_TYPE_BYTE:
+	case DATA_TYPE_INT8:
+	case DATA_TYPE_UINT8:
+	case DATA_TYPE_INT16:
+	case DATA_TYPE_UINT16:
+	case DATA_TYPE_INT32:
+	case DATA_TYPE_UINT32:
+	case DATA_TYPE_INT64:
+	case DATA_TYPE_UINT64:
+	case DATA_TYPE_HRTIME:
+#if !defined(_KERNEL)
+	case DATA_TYPE_DOUBLE:
+#endif
+		size -= 8;
+		break;
+
+	case DATA_TYPE_STRING:
+		unpadded_size = strlen(NVP_VALUE(nvp)) + 1;
+		break;
+
+	case DATA_TYPE_BOOLEAN_ARRAY:
+		unpadded_size = nvp->nvp_value_elem * sizeof (boolean_t);
+		break;
+	case DATA_TYPE_BYTE_ARRAY:
+		unpadded_size = nvp->nvp_value_elem * sizeof (char);
+		break;
+	case DATA_TYPE_INT8_ARRAY:
+	case DATA_TYPE_UINT8_ARRAY:
+		unpadded_size = nvp->nvp_value_elem * sizeof (int8_t);
+		break;
+	case DATA_TYPE_INT16_ARRAY:
+	case DATA_TYPE_UINT16_ARRAY:
+		unpadded_size = nvp->nvp_value_elem * sizeof (int16_t);
+		break;
+	case DATA_TYPE_INT32_ARRAY:
+	case DATA_TYPE_UINT32_ARRAY:
+		unpadded_size = nvp->nvp_value_elem * sizeof (int32_t);
+		break;
+	case DATA_TYPE_INT64_ARRAY:
+	case DATA_TYPE_UINT64_ARRAY:
+		unpadded_size = nvp->nvp_value_elem * sizeof (int64_t);
+		break;
+
+	case DATA_TYPE_NVLIST:
+		size -= sizeof (nvlist_t) - (4 + 4 + 8 + 4 + 4);
+		break;
+
+	case DATA_TYPE_STRING_ARRAY:
+		if (nvp->nvp_value_elem > 0) {
+			char **array, *last_nul;
+
+			array = (char **)NVP_VALUE(nvp);
+			last_nul = strchr(array[nvp->nvp_value_elem - 1], 0);
+
+			/* Shrink pointers */
+			size -= nvp->nvp_value_elem * (sizeof (uintptr_t) - 8);
+			/* Shrink string space */
+			if (nvp->nvp_size - (last_nul - (char *)nvp) >= 8)
+				size -= 8;
+		}
+		break;
+
+	case DATA_TYPE_NVLIST_ARRAY:
+		if (nvp->nvp_value_elem > 0) {
+			/* Shrink pointer */
+			size -= nvp->nvp_value_elem * (sizeof (uintptr_t) - 8);
+			/* Shrink nvlist_t */
+			size -= nvp->nvp_value_elem *
+			    (sizeof (nvlist_t) - (4 + 4 + 8 + 4 + 4));
+		}
+		break;
+	default:
+		return (-1);
+	}
+
+	if (NV_ALIGN(unpadded_size) - unpadded_size >= 8)
+		size -= 8;
+
+	return (size);
+#else /* !__CHERI_PURE_CAPABILITY__ */
+	return (nvp->nvp_size);
+#endif /* __CHERI_PURE_CAPABILITY__ */
+}
+
 static int
 nvs_xdr_nvpair(nvstream_t *nvs, nvpair_t *nvp, size_t *size)
 {
@@ -3616,7 +3741,7 @@ nvs_xdr_nvpair(nvstream_t *nvs, nvpair_t *nvp, size_t *size)
 		if (nvs_xdr_nvp_size(nvs, nvp, &nvsize) != 0)
 			return (EFAULT);
 
-		decode_len = nvp->nvp_size;
+		decode_len = nvpair_nominal_decode_size(nvp);
 		encode_len = nvsize;
 		if (!xdr_int(xdr, &encode_len) || !xdr_int(xdr, &decode_len))
 			return (EFAULT);
@@ -3641,6 +3766,15 @@ nvs_xdr_nvpair(nvstream_t *nvs, nvpair_t *nvp, size_t *size)
 
 		if (*size > NVS_XDR_MAX_LEN(bytesrec.xc_num_avail))
 			return (EFAULT);
+#ifdef NVPAIR_OVER_ALLOCATE_DECODE
+		/*
+		 * Waste space to make sure we have enough room to
+		 * decode the nvlist.  We need to account for string
+		 * alignment and the increaed size of a number of
+		 * messages, but just doubling will do that for now...
+		 */
+		*size *= 2;
+#endif
 		break;
 	}
 
