@@ -212,8 +212,11 @@ chksum_benchmark(void)
 #endif
 
 	chksum_stat_t *cs;
-	int cbid = 0, id;
+	int cbid = 0;
+#ifndef __CHERI_PURE_CAPABILITY__
+	int id;
 	uint64_t max = 0;
+#endif
 
 	/* space for the benchmark times */
 	chksum_stat_cnt = 4;
@@ -257,6 +260,7 @@ chksum_benchmark(void)
 	cs->impl = "generic";
 	chksum_benchit(cs);
 
+#ifndef __CHERI_PURE_CAPABILITY__
 	/* blake3 */
 	for (id = 0; id < blake3_get_impl_count(); id++) {
 		blake3_set_impl_id(id);
@@ -272,6 +276,7 @@ chksum_benchmark(void)
 			blake3_set_impl_fastest(id);
 		}
 	}
+#endif
 }
 
 void
