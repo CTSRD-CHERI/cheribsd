@@ -13,6 +13,10 @@
 # make sure this is defined in a consistent manner
 SRCTOP:= ${.PARSEDIR:tA:H:H}
 
+# ZFS source directory
+# XXX: This might belong somewhere a little less central...
+ZFSTOP=${SRCTOP}/sys/contrib/openzfs
+
 .if ${.CURDIR} == ${SRCTOP}
 RELDIR= .
 RELTOP= .

@@ -3,7 +3,7 @@
 SYSDIR?=	${SRCTOP}/sys
 
 .PATH:		${SYSDIR}/cddl/compat/opensolaris/kern
-.PATH:		${SYSDIR}/contrib/openzfs/module/os/freebsd/spl
+.PATH:		${ZFSTOP}/module/os/freebsd/spl
 
 KMOD=		opensolaris
 SRCS=		vnode_if.h \
