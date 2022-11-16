@@ -494,12 +494,12 @@ static int coexecve_cleanup_on_fork = 1;
 SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_on_fork, CTLFLAG_RWTUN,
     &coexecve_cleanup_on_fork, 0,
     "Clean up abandoned vm entries after colocated process forks");
-static int coexecve_cleanup_margin_up = 0x10000;
-SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_margin_up, CTLFLAG_RWTUN,
+static long coexecve_cleanup_margin_up = 0x10000;
+SYSCTL_LONG(_debug, OID_AUTO, coexecve_cleanup_margin_up, CTLFLAG_RWTUN,
     &coexecve_cleanup_margin_up, 0,
     "Maximum hole size for segments growing up when cleaning up after colocated processes");
-static int coexecve_cleanup_margin_down = MAXSSIZ;
-SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_margin_down, CTLFLAG_RWTUN,
+static long coexecve_cleanup_margin_down = MAXSSIZ;
+SYSCTL_LONG(_debug, OID_AUTO, coexecve_cleanup_margin_down, CTLFLAG_RWTUN,
     &coexecve_cleanup_margin_down, 0,
     "Maximum hole size for segments growing down when cleaning up after colocated processes");
 static int abandon_on_munmap = 1;
