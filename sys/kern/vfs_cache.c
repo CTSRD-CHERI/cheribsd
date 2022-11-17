@@ -3161,7 +3161,9 @@ kern___realpathat(struct thread *td, int fd, const char * __capability path,
 		error = copyout(retbuf, buf, size);
 		free(freebuf, M_TEMP);
 	}
-	NDFREE(&nd, 0);
+	vrele(nd.ni_vp);
+	vrele(nd.ni_dvp);
+	NDFREE_PNBUF(&nd);
 	return (error);
 }
 
