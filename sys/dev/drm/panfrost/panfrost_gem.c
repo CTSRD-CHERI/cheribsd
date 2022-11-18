@@ -570,7 +570,7 @@ panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
 }
 
 static int
-panfrost_alloc_pages_iommu(struct panfrost_gem_object *bo)
+panfrost_alloc_pages_iommu(struct panfrost_gem_object *bo, int npages)
 {
 	vm_paddr_t low, high, boundary;
 	vm_memattr_t memattr;
@@ -589,7 +589,7 @@ panfrost_alloc_pages_iommu(struct panfrost_gem_object *bo)
 	    VM_ALLOC_ZERO;
 	memattr = VM_MEMATTR_WRITE_COMBINING;
 
-	for (i = 0; i < bo->npages; i++) {
+	for (i = 0; i < npages; i++) {
 		tries = 0;
 retry:
 		m = vm_page_alloc_noobj_contig(pflags, 1, low, high,
@@ -613,13 +613,14 @@ retry:
 		m->oflags &= ~VPO_UNMANAGED;
 		m->flags |= PG_FICTITIOUS;
 		bo->pages[i] = m;
+		bo->npages = i + 1;
 	}
 
 	return (0);
 }
 
 static int
-panfrost_alloc_pages_contig(struct panfrost_gem_object *bo)
+panfrost_alloc_pages_contig(struct panfrost_gem_object *bo, int npages)
 {
 	vm_paddr_t low, high, boundary;
 	vm_memattr_t memattr;
@@ -640,11 +641,11 @@ panfrost_alloc_pages_contig(struct panfrost_gem_object *bo)
 
 	tries = 0;
 retry:
-	m = vm_page_alloc_noobj_contig(pflags, bo->npages, low, high,
+	m = vm_page_alloc_noobj_contig(pflags, npages, low, high,
 	    alignment, boundary, memattr);
 	if (m == NULL) {
 		if (tries < 3) {
-			if (!vm_page_reclaim_contig(pflags, bo->npages, low,
+			if (!vm_page_reclaim_contig(pflags, npages, low,
 			    high, alignment, boundary))
 				vm_wait(NULL);
 			tries++;
@@ -653,7 +654,7 @@ retry:
 
 		return (ENOMEM);
 	}
-	for (i = 0; i < bo->npages; i++) {
+	for (i = 0; i < npages; i++) {
 		if ((m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
@@ -664,6 +665,7 @@ retry:
 		bo->pages[i] = m;
 		m++;
 	}
+	bo->npages = npages;
 
 	return (0);
 }
@@ -687,12 +689,12 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	m0 = malloc(sizeof(vm_page_t *) * npages, M_PANFROST,
 	    M_WAITOK | M_ZERO);
 	bo->pages = m0;
-	bo->npages = npages;
+	bo->npages = 0;
 
 	if (1 == 0)
-		error = panfrost_alloc_pages_iommu(bo);
+		error = panfrost_alloc_pages_iommu(bo, npages);
 	else
-		error = panfrost_alloc_pages_contig(bo);
+		error = panfrost_alloc_pages_contig(bo, npages);
 
 	if (error)
 		return (error);
