@@ -481,6 +481,8 @@ END(_rtld_tlsdesc_dynamic)
 ENTRY(_rtld_setjmp)
 	/*
 	 * Before setjmp is called, the top of the Executive stack contains:
+	 * 	-2.	Caller's stack
+	 * 	-1.	Return address
 	 * 	0.	Link to previous frame
 	 * When setjmp is called, the following is pushed to the Executive stack:
 	 * 	1.	Caller's stack
@@ -491,9 +493,11 @@ ENTRY(_rtld_setjmp)
 	 * 	5.	Return address
 	 * 	6.	Link to 3
 	 * In _rtld_setjmp, we manipulate the stack content to the following:
+	 * 	-5.	Copy of 1
+	 * 	-4.	Copy of 2
 	 * 	-3.	Link to 0
-	 * 	-2.	Copy of 1
-	 * 	-1.	Copy of 2
+	 * 	-2.	Caller's stack
+	 * 	-1.	Return address
 	 * 	0.	Link to previous frame
 	 * 	------------------------------
 	 * 	1.	Caller's stack
@@ -517,7 +521,7 @@ ENTRY(_rtld_setjmp)
 
 	add	c0, csp, #(CAP_WIDTH)
 
-	/* Shift 4-5 */
+	/* Shift 4 and 5 */
 	ldp	c1, c2, [c0, #(SETJMP_SHIFT * CAP_WIDTH)]
 	stp	c1, c2, [c0], #(2 * CAP_WIDTH)
 
@@ -526,18 +530,25 @@ ENTRY(_rtld_setjmp)
 	sub	c1, c1, #(SETJMP_SHIFT * CAP_WIDTH)
 	str	c1, [c0], #(CAP_WIDTH)
 
-	/* Shift 1-2 */
+	/* Shift 1 and 2 */
 	ldp	c1, c2, [c0, #(SETJMP_SHIFT * CAP_WIDTH)]
 	stp	c1, c2, [c0], #(2 * CAP_WIDTH)
 
-	/* Shift 0 and store -3 */
+	/* Shift 0 */
 	ldr	c1, [c0, #(SETJMP_SHIFT * CAP_WIDTH)]
-	str	c0, [c0, #(SETJMP_SHIFT * CAP_WIDTH)]
 	str	c1, [c0], #(CAP_WIDTH)
 
-	/* Store -1, -2 */
-	ldp	c1, c2, [c0, #-(SETJMP_SHIFT * CAP_WIDTH)]
-	stp	c1, c2, [c0]
+	/* Shift -1 and -2 */
+	ldp	c1, c2, [c0, #(SETJMP_SHIFT * CAP_WIDTH)]
+	stp	c1, c2, [c0], #(2 * CAP_WIDTH)
+
+	/* Store -3 */
+	ldr	c1, [c0, #-(2 * SETJMP_SHIFT * CAP_WIDTH)]
+	str	c1, [c0]
+
+	/* Store -4 and -5 */
+	ldp	c1, c2, [c0, #-(2 * SETJMP_SHIFT * CAP_WIDTH - CAP_WIDTH)]
+	stp	c1, c2, [c0, #(CAP_WIDTH)]
 
 	scbnds	c0, c0, #(SETJMP_SHIFT * CAP_WIDTH)
 	/* TODO: seal	c0, c0 */
@@ -558,16 +569,14 @@ ENTRY(_rtld_longjmp)
 	 * 	5.	Return address
 	 * 	6.	Link to 2
 	 * In _rtld_longjmp, we manipulate the stack content to the following:
-	 * 	-n-2.	Link to previous frame
+	 * 	-n.	Link to previous frame
 	 * 	------------------------------
-	 * 	-n-1.	Supplied caller's stack
-	 * 	-n.	Supplied return address
 	 * 	...
 	 * 	0.	Link to previous frame
 	 * 	------------------------------
-	 * 	1.	Caller's stack
-	 * 	2.	Return address
-	 * 	3.	Link to supplied Executive stack pointer (-n-2)
+	 * 	1.	Supplied caller's stack
+	 * 	2.	Supplied return address
+	 * 	3.	Link to supplied Executive stack pointer (-n)
 	 * 	------------------------------
 	 * 	4.	Caller's stack
 	 * 	5.	Return address
@@ -588,7 +597,7 @@ ENTRY(_rtld_longjmp)
 	b.hs	1f
 
 	/* Load the link from the supplied buffer */
-	ldr	c2, [c0, #(2 * CAP_WIDTH)]
+	ldr	c2, [c0]
 
 	/*
 	 * Compare its generation counter with that of the capability to the
@@ -617,18 +626,18 @@ ENTRY(_rtld_longjmp)
 
 	/* Unwind the frames */
 	mov	c3, c2
-4:	cmp	c3, c1
+4:	ldr	c3, [c3]
+	cmp	c3, c1
 	b.eq	3f
 
-	/* Enforce security policy here for each frame being unwinded */
+	/* Enforce security policy here for each frame being unwound */
 
-	ldr	c3, [c3]
 	b	4b
 
-3:	ldp	c3, c4, [c0]
+3:	ldp	c3, c4, [c0, #(CAP_WIDTH)]
 
 	str	c1, [c2]
-	stp	c3, c4, [c1, #-(2 * CAP_WIDTH)]
+	stp	c3, c4, [c2, #(CAP_WIDTH)]
 
 	ret
 
@@ -637,7 +646,8 @@ ENTRY(_rtld_longjmp)
 END(_rtld_longjmp)
 
 #define TRAMP(sym) \
-	.section .rodata; .globl sym; .p2align 4; .type sym,#object; sym:
+	.section .rodata; .globl sym; .p2align 4; .type sym,#object; sym: \
+	.cfi_startproc;
 
 TRAMP(tramp_template_exe)
 target_cap_exe:
@@ -668,16 +678,16 @@ target_cap_exe:
 	 * If caller is Restricted, restore to its saved rcsp
 	 * at the top of the Executive stack
 	 */
-	ldr	c10, [csp]
-	mov	csp, c10
-	ldp	c30, c10, [csp, #-(CAP_WIDTH * 2)]
+	ldp	c10, c30, [csp]
 	gcperm	x11, c30
 	tbnz	x11, #1, 1f
 
-	msr	rcsp_el0, c10
+	ldr	c11, [csp, #(CAP_WIDTH * 2)]
+	msr	rcsp_el0, c11
 
-1:	retr	c30
-EEND(tramp_template_exe)
+1:	mov	csp, c10
+	retr	c30
+END(tramp_template_exe)
 etramp_template_exe:
 
 TRAMP(tramp_template_res)
@@ -735,15 +745,15 @@ dst_obj:
 	 * If caller is Restricted, restore to its saved rcsp
 	 * at the top of the Executive stack
 	 */
-	ldr	c10, [csp]
-	mov	csp, c10
-	ldp	c30, c10, [csp, #-(CAP_WIDTH * 2)]
+	ldp	c10, c30, [csp]
 	gcperm	x11, c30
 	tbnz	x11, #1, 3f
 
-	msr	rcsp_el0, c10
+	ldr	c11, [csp, #(CAP_WIDTH * 2)]
+	msr	rcsp_el0, c11
 
-3:	retr	c30
+3:	mov	csp, c10
+	retr	c30
 
 2:	stp	c8, c9, [csp, #-(1 * CAP_WIDTH * 2)]
 	stp	c6, c7, [csp, #-(2 * CAP_WIDTH * 2)]
@@ -765,7 +775,7 @@ dst_obj:
 	ldp	c0, c1, [csp], #(5 * CAP_WIDTH * 2)
 
 	b	4b
-EEND(tramp_template_res)
+END(tramp_template_res)
 etramp_template_res:
 
 	.data
