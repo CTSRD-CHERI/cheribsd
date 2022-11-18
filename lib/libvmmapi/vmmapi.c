@@ -1684,9 +1684,8 @@ vm_rtc_gettime(struct vmctx *ctx, time_t *secs)
 }
 
 int
-vm_restart_instruction(void *arg, int vcpu)
+vm_restart_instruction(struct vmctx *ctx, int vcpu)
 {
-	struct vmctx *ctx = arg;
 
 	return (ioctl(ctx->fd, VM_RESTART_INSTRUCTION, &vcpu));
 }
