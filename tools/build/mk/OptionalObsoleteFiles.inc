@@ -1183,6 +1183,8 @@ OLD_FILES+=usr/bin/llvm-readobj
 OLD_FILES+=usr/bin/llvm-size
 OLD_FILES+=usr/bin/llvm-strings
 OLD_FILES+=usr/bin/llvm-symbolizer
+# Don't remove version from llvm-base
+#OLD_FILES+=usr/bin/objdump
 OLD_FILES+=usr/share/man/man1/llvm-addr2line.1.gz
 OLD_FILES+=usr/share/man/man1/llvm-ar.1.gz
 OLD_FILES+=usr/share/man/man1/llvm-nm.1.gz
@@ -1193,6 +1195,7 @@ OLD_FILES+=usr/share/man/man1/llvm-readobj.1.gz
 OLD_FILES+=usr/share/man/man1/llvm-size.1.gz
 OLD_FILES+=usr/share/man/man1/llvm-strings.1.gz
 OLD_FILES+=usr/share/man/man1/llvm-symbolizer.1.gz
+OLD_FILES+=usr/share/man/man1/objdump.1.gz
 .endif
 
 .if ${MK_CLANG} == no && 0
@@ -2097,12 +2100,6 @@ OLD_FILES+=usr/share/man/man6/random.6.gz
 OLD_FILES+=usr/share/man/man6/rot13.6.gz
 OLD_FILES+=usr/share/man/man8/strfile.8.gz
 OLD_FILES+=usr/share/man/man8/unstr.8.gz
-.endif
-
-.if ${MK_LLVM_BINUTILS} == no
-# Don't remove version from llvm-base
-#OLD_FILES+=usr/bin/objdump
-OLD_FILES+=usr/share/man/man1/objdump.1.gz
 .endif
 
 .if ${MK_LLVM_COV} == no && !defined(WITH_PORT_BASE_GCC)
