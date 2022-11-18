@@ -56,3 +56,5 @@ __FBSDID("$FreeBSD$");
 6:	.p2align	2
 7:	.4byte		__CheriBSD_version
 8:
+
+	.section .note.GNU-stack,"",%progbits
