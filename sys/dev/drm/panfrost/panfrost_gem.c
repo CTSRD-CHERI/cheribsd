@@ -183,7 +183,6 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 
 error:
 	panfrost_gem_mapping_put(mapping);
-	drm_gem_object_put(obj);
 	return (error);
 }
 
