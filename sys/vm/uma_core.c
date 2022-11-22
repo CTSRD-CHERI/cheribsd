@@ -2149,7 +2149,7 @@ page_free(void *mem, vm_size_t size, uint8_t flags)
 static void
 pcpu_page_free(void *mem, vm_size_t size, uint8_t flags)
 {
-	vm_offset_t sva, curva;
+	vm_pointer_t sva, curva;
 	vm_paddr_t paddr;
 	vm_page_t m;
 
@@ -2160,7 +2160,7 @@ pcpu_page_free(void *mem, vm_size_t size, uint8_t flags)
 		return;
 	}
 
-	sva = (vm_offset_t)mem;
+	sva = (vm_pointer_t)mem;
 	for (curva = sva; curva < sva + size; curva += PAGE_SIZE) {
 		paddr = pmap_kextract(curva);
 		m = PHYS_TO_VM_PAGE(paddr);
