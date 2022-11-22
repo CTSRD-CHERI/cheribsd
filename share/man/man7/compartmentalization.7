@@ -84,7 +84,7 @@ No
 .Em policy
 has been enforced yet.
 .Pp
-Below is an incomplete list of known limitations and known problems.
+Below is a list of known limitations and problems.
 For more up-to-date information, visit
 .Lk https://github.com/CTSRD-CHERI/cheripedia/wiki/Library-based-Compartmentalisation .
 .Bl -bullet
@@ -93,6 +93,8 @@ Functions that take more than 8 arguments (not counting variadic arguments) are
 not expected to work correctly
 .Em when they are called from another library .
 Calling such functions from within the same library is not impacted.
+.It
+Compatibility with C++ software is not expected.
 .It
 Stack unwinding is not expected to work.
 This includes C++ exceptions and stack tracing in debuggers.
