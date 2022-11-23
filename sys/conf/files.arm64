@@ -15,6 +15,8 @@ libkern/memcmp.c				standard	\
 	compile-with "${NORMAL_C:N-fsanitize*}"
 libkern/memset.c				standard	\
 	compile-with "${NORMAL_C:N-fsanitize*}"
+libkern/memset_c.c				optional cpu_cheri !cheri_purecap_kernel \
+	compile-with "${NORMAL_C:N-fsanitize*}"
 libkern/strlen.c		standard
 libkern/arm64/crc32c_armv8.S			standard
 
