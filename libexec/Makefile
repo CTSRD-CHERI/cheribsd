@@ -27,6 +27,7 @@ SUBDIR=	${_atf} \
 	${_rshd} \
 	${_rtld-elf} \
 	save-entropy \
+	${_nuageinit} \
 	${_smrsh} \
 	${_tests} \
 	${_tftp-proxy} \
@@ -124,6 +125,10 @@ _tests=		tests
 
 .if ${MACHINE_CPU:Mcheri}
 SUBDIR+=	malloc_is_revoking
+.endif
+
+.if ${MK_NUAGEINIT} != "no"
+_nuageinit=	nuageinit
 .endif
 
 .include <bsd.arch.inc.mk>
