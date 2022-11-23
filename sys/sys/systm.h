@@ -310,6 +310,8 @@ void	*memmovenocap(void * _Nonnull dest, const void * _Nonnull src,
 #define	memmovenocap	memmove
 #endif
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+void	* __capability memset_c(void * _Nonnull __capability buf, int c,
+	    size_t len);
 void	* __capability memcpy_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
 void	* __capability memcpynocap_c(void * _Nonnull __capability to,
@@ -319,6 +321,7 @@ void	* __capability memmove_c(void * _Nonnull __capability dest,
 void	* __capability memmovenocap_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
 #else
+#define	memset_c	memset
 #define	memcpy_c	memcpy
 #define	memcpynocap_c	memcpynocap
 #define	memmove_c	memmove
