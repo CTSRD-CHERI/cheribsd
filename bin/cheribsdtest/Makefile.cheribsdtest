@@ -81,4 +81,9 @@ LIBADD+=	pthread
 SRCS+=		cheribsdtest_tls_threads.c
 .endif
 
+.ifdef CHERIBSD_C18N_TESTS
+CFLAGS+=	-DCHERIBSD_C18N_TESTS
+LDFLAGS+=	-Wl,--dynamic-linker=/libexec/ld-elf-c18n.so.1
+.endif
+
 .include <bsd.prog.mk>

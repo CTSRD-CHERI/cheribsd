@@ -9,7 +9,9 @@ SHLIBDIR?= /lib
 # Force building of libc_pic.a
 MK_TOOLCHAIN=	yes
 
-LIBC_SRCTOP?= ${.CURDIR}
+.if !defined(LIBC_SRCTOP)
+LIBC_SRCTOP:= ${.PARSEDIR}
+.endif
 
 # Pick the current architecture directory for libc. In general, this is
 # named MACHINE_CPUARCH, but some ABIs are different enough to require
@@ -32,7 +34,11 @@ LIBC_ARCH=${MACHINE_CPUARCH}
 # To include RCS ID strings from other BSD projects, remove -DNO__RCSID from CFLAGS.
 CFLAGS+=-DNO__SCCSID -DNO__RCSID
 
+.ifdef RTLD_SANDBOX
+SHLIB=c
+.else
 LIB?=c
+.endif
 SHLIB_MAJOR= 7
 .if ${MK_SSP} != "no" && !${MACHINE_ABI:Mpurecap} && \
     (${LIBC_ARCH} == "i386" || ${LIBC_ARCH:Mpowerpc*} != "")
@@ -55,6 +61,11 @@ PRECIOUSLIB=
 .ifndef NO_THREAD_STACK_UNWIND
 CANCELPOINTS_CFLAGS=-fexceptions
 CFLAGS+=${CANCELPOINTS_CFLAGS}
+.endif
+
+.ifdef RTLD_SANDBOX
+CFLAGS+=-DRTLD_SANDBOX
+SYM_MAPS+=${LIBC_SRCTOP}/Symbol-c18n.map
 .endif
 
 # Use a more efficient TLS model for libc since we can reasonably assume that
@@ -210,12 +221,12 @@ libkern.${LIBC_ARCH}:: ${KMSRCS}
 	${CP} ${.ALLSRC} ${DESTDIR}/sys/libkern/${LIBC_ARCH}
 .endif
 
-.if !defined(NO_SYSCALLS)
+.if !defined(NO_SYSCALLS) && !defined(RTLD_SANDBOX)
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 .endif
 
-.if defined(NO_SYSCALLS)
+.if defined(NO_SYSCALLS) || defined(RTLD_SANDBOX)
 MAN:=
 MLINKS:=
 NLS:=

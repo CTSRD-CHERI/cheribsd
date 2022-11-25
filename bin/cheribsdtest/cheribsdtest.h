@@ -159,6 +159,15 @@ extern struct cheribsdtest_child_state *ccsp;
 #define	XFAIL_VARARG_BOUNDS	NULL
 #endif
 
+#ifndef XFAIL_C18N_SIGALTSTACK
+#ifdef CHERIBSD_C18N_TESTS
+#define	XFAIL_C18N_SIGALTSTACK \
+    "sigaltstack is currently unsupported by library-based compartmentalisation"
+#else
+#define	XFAIL_C18N_SIGALTSTACK	NULL
+#endif
+#endif
+
 struct cheri_test {
 	const char	*ct_name;
 	const char	*ct_desc;

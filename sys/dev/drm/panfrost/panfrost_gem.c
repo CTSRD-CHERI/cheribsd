@@ -96,6 +96,9 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 	if (bo->pages) {
 		for (i = 0; i < bo->npages; i++) {
 			m = bo->pages[i];
+			if (m == NULL)
+				continue;
+
 			vm_page_lock(m);
 			m->flags &= ~PG_FICTITIOUS;
 			m->oflags |= VPO_UNMANAGED;
@@ -180,7 +183,6 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 
 error:
 	panfrost_gem_mapping_put(mapping);
-	drm_gem_object_put(obj);
 	return (error);
 }
 

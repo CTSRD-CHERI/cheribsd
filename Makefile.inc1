@@ -1145,6 +1145,8 @@ _bootstrap-tools:
 	    -p ${WORLDTMP}/usr >/dev/null
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.include.dist \
 	    -p ${WORLDTMP}/usr/include >/dev/null
+	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.c18n.dist \
+	    -p ${WORLDTMP} >/dev/null
 .if ${TARGET_ARCH} == "amd64"
 	mkdir -p ${WORLDTMP}/usr/include/i386
 .endif
@@ -1499,6 +1501,10 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	    -p ${DESTDIR}/${DISTDIR}/${dist}/usr >/dev/null
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.include.dist \
 	    -p ${DESTDIR}/${DISTDIR}/${dist}/usr/include >/dev/null
+.if ${MACHINE_ABI:Mpurecap}
+	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.c18n.dist \
+	    -p ${DESTDIR}/${DISTDIR}/${dist} >/dev/null
+.endif
 .if ${TARGET_ARCH} == "amd64"
 	-mkdir ${DESTDIR}/${DISTDIR}/${dist}/usr/include/i386
 .endif
@@ -1530,6 +1536,10 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	    sed -e 's#^\./#./${dist}/usr/#' >> ${METALOG}
 	${IMAKEENV} ${DISTR_MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.include.dist | \
 	    sed -e 's#^\./#./${dist}/usr/include/#' >> ${METALOG}
+.if ${MACHINE_ABI:Mpurecap}
+	${IMAKEENV} ${DISTR_MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.c18n.dist | \
+	    sed -e 's#^\./#./${dist}/#' >> ${METALOG}
+.endif
 .if ${TARGET_ARCH} == "amd64"
 	echo "./${dist}/usr/include/i386 type=dir uname=root gname=wheel mode=0755" >> ${METALOG}
 .endif
@@ -3005,6 +3015,10 @@ native-xtools-install: .PHONY
 	    -p ${NXBDESTDIR}/usr >/dev/null
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.include.dist \
 	    -p ${NXBDESTDIR}/usr/include >/dev/null
+.if ${MACHINE_ABI:Mpurecap}
+	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.c18n.dist \
+	    -p ${NXBDESTDIR} >/dev/null
+.endif
 .if ${TARGET_ARCH} == "amd64"
 	mkdir -p ${NXBDESTDIR}/usr/include/i386
 .endif
@@ -3720,6 +3734,10 @@ _xi-mtree: .PHONY
 	    -p ${XDDESTDIR}/usr >/dev/null
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.include.dist \
 	    -p ${XDDESTDIR}/usr/include >/dev/null
+.if ${MACHINE_ABI:Mpurecap}
+	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.c18n.dist \
+	    -p ${XDDESTDIR} >/dev/null
+.endif
 .if ${TARGET_ARCH} == "amd64"
 	mkdir -p ${XDDESTDIR}/usr/include/i386
 .endif

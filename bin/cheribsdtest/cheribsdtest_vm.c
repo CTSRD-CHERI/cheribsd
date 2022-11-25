@@ -972,7 +972,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_invalid_cap,
 CHERIBSDTEST(cheribsdtest_vm_reservation_mmap,
     "check mmap with NULL-derived hint address")
 {
-	uintptr_t hint = 0x56000000;
+	uintptr_t hint = 0x560000000;
 	void *map;
 
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap((void *)hint, PAGE_SIZE,
@@ -992,7 +992,7 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap,
 CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_unreserved,
     "check mmap MAP_FIXED with NULL-derived hint address")
 {
-	uintptr_t hint = 0x56000000;
+	uintptr_t hint = 0x560000000;
 	void *map;
 
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap((void *)hint, PAGE_SIZE,

@@ -6,6 +6,8 @@
 /set type=dir uname=root gname=wheel mode=0755
 .
     lib64c
+        c18n
+        ..
         dtrace
         ..
         engines

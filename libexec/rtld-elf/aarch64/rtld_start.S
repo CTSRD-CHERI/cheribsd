@@ -74,7 +74,11 @@ ENTRY(.rtld_start)
 	ldr	c2, [csp, #16]			/* Load obj_main */
 	mov	c0, c19				/* Restore aux */
 	mov	csp, c20			/* Restore the stack pointer */
-	br	c8				/* Jump to the entry point */
+#ifdef RTLD_SANDBOX
+	blr	c8				/* Jump to the entry point */
+#else
+	br      c8                              /* Jump to the entry point */
+#endif
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	mov	x19, x0		/* Put ps_strings in a callee-saved register */
 	mov	x20, sp		/* And the stack pointer */
@@ -101,13 +105,35 @@ END(.rtld_start)
  * x17 = &_rtld_bind_start
  */
 ENTRY(_rtld_bind_start)
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	/* Calls to _rtld_bind_start do not go through the trampoline
+	 * because _rtld_bind_start never returns, which would break the
+	 * trampoline's invariant.
+	 * But we still need to manually perform some of the trampoline's
+	 * work, i.e., saving the caller's stack pointer at its bottom.
+	 */
+	mrs	c17, rcsp_el0
+	.cfi_def_cfa_register c17
+	.cfi_offset c30, (PTR_WIDTH)
+	gclim	x10, c17
+	scvalue c10, c17, x10
+	str	c17, [c10, #-PTR_WIDTH]
+#else
 	mov	PTR(17), PTRN(sp)
+#endif
 
 	/* Save frame pointer and SP */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	stp	PTR(29), PTR(17), [PTRN(sp), #-(PTR_WIDTH * 2)]!
+	mov	PTR(29), PTRN(sp)
+	.cfi_def_cfa PTR(29), (PTR_WIDTH * 2)
+	.cfi_offset PTR(17), -(PTR_WIDTH * 1)
+#else
 	stp	PTR(29), PTR(30), [PTRN(sp), #-(PTR_WIDTH * 2)]!
 	mov	PTR(29), PTRN(sp)
 	.cfi_def_cfa PTR(29), (PTR_WIDTH * 2)
 	.cfi_offset PTR(30), -(PTR_WIDTH * 1)
+#endif
 	.cfi_offset PTR(29), -(PTR_WIDTH * 2)
 
 	/* Save the arguments */
@@ -163,13 +189,26 @@ ENTRY(_rtld_bind_start)
 	ldp	CAP(0), CAP(1), [PTRN(sp)], #(CAP_WIDTH * 2)
 
 	/* Restore frame pointer */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	ldp	PTR(29), PTR(17), [PTRN(sp)], #(PTR_WIDTH * 2)
+#else
 	ldp	PTR(29), PTR(zr), [PTRN(sp)], #(PTR_WIDTH * 2)
+#endif
 
 	 /* Restore link register saved by the plt code */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	ldp	czr, c30, [c17], #(PTR_WIDTH * 2)
+	msr	rcsp_el0, c17
+#else
 	ldp	PTR(zr), PTR(30), [PTRN(sp)], #(PTR_WIDTH * 2)
+#endif
 
 	/* Call into the correct function */
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	brr	PTR(16)
+#else
 	br	PTR(16)
+#endif
 END(_rtld_bind_start)
 
 /*
@@ -187,7 +226,11 @@ ENTRY(_rtld_tlsdesc_static)
 	ldp	x0, x1, [c0, #16]
 	add	c0, c2, x0
 	scbnds	c0, c0, x1
+#ifdef RTLD_SANDBOX
+	retr	c30
+#else
 	ret
+#endif
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	ldr	x0, [x0, #8]
 	ret
@@ -202,7 +245,11 @@ END(_rtld_tlsdesc_static)
 ENTRY(_rtld_tlsdesc_undef)
 #ifdef __CHERI_PURE_CAPABILITY__
 	ldr	x0, [c0, #16]
+#ifdef RTLD_SANDBOX
+	retr	c30
+#else
 	ret
+#endif
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	str	x1, [sp, #-16]!
 	.cfi_adjust_cfa_offset	16
@@ -251,7 +298,11 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	/* Restore registers and return */
 	ldp	 c3,  c4, [csp], #32
 	.cfi_adjust_cfa_offset 	-2 * 16
+#ifdef RTLD_SANDBOX
+	retr	c30
+#else
 	ret
+#endif
 
 	/*
 	 * Slow path
@@ -321,7 +372,11 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	/* Restore fast path registers and return */
 	ldp	 c3,  c4, [csp], #32
 	.cfi_adjust_cfa_offset 	-2 * 16
+#ifdef RTLD_SANDBOX
+	retr	c30
+#else
 	ret
+#endif
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	/* Save registers used in fast path */
 	stp	x1,  x2, [sp, #(-2 * 16)]!
@@ -421,3 +476,317 @@ ENTRY(_rtld_tlsdesc_dynamic)
 	ret
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 END(_rtld_tlsdesc_dynamic)
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+ENTRY(_rtld_setjmp)
+	/*
+	 * Before setjmp is called, the top of the Executive stack contains:
+	 * 	-2.	Caller's stack
+	 * 	-1.	Return address
+	 * 	0.	Link to previous frame
+	 * When setjmp is called, the following is pushed to the Executive stack:
+	 * 	1.	Caller's stack
+	 * 	2.	Return address
+	 * 	3.	Link to 0
+	 * setjmp then calls _rtld_setjmp, which pushes the following:
+	 * 	4.	Caller's stack
+	 * 	5.	Return address
+	 * 	6.	Link to 3
+	 * In _rtld_setjmp, we manipulate the stack content to the following:
+	 * 	-5.	Copy of 1
+	 * 	-4.	Copy of 2
+	 * 	-3.	Link to 0
+	 * 	-2.	Caller's stack
+	 * 	-1.	Return address
+	 * 	0.	Link to previous frame
+	 * 	------------------------------
+	 * 	1.	Caller's stack
+	 * 	2.	Return address
+	 * 	3.	Link to 0
+	 * 	------------------------------
+	 * 	4.	Caller's stack
+	 * 	5.	Return address
+	 * 	6.	Link to 3
+	 * To do this, we shift everything from 0 to 6 by 3 positions.
+	 */
+
+#define	SETJMP_SHIFT	3
+	/*
+	 * Move 6 and adjust it's cursor.
+	 * Also adjust csp.
+	 */
+	ldr	c1, [csp], #-(SETJMP_SHIFT * CAP_WIDTH)
+	sub	c1, c1, #(SETJMP_SHIFT * CAP_WIDTH)
+	str	c1, [csp]
+
+	add	c0, csp, #(CAP_WIDTH)
+
+	/* Shift 4 and 5 */
+	ldp	c1, c2, [c0, #(SETJMP_SHIFT * CAP_WIDTH)]
+	stp	c1, c2, [c0], #(2 * CAP_WIDTH)
+
+	/* Shift 3 and adjust it's cursor */
+	ldr	c1, [c0, #(SETJMP_SHIFT * CAP_WIDTH)]
+	sub	c1, c1, #(SETJMP_SHIFT * CAP_WIDTH)
+	str	c1, [c0], #(CAP_WIDTH)
+
+	/* Shift 1 and 2 */
+	ldp	c1, c2, [c0, #(SETJMP_SHIFT * CAP_WIDTH)]
+	stp	c1, c2, [c0], #(2 * CAP_WIDTH)
+
+	/* Shift 0 */
+	ldr	c1, [c0, #(SETJMP_SHIFT * CAP_WIDTH)]
+	str	c1, [c0], #(CAP_WIDTH)
+
+	/* Shift -1 and -2 */
+	ldp	c1, c2, [c0, #(SETJMP_SHIFT * CAP_WIDTH)]
+	stp	c1, c2, [c0], #(2 * CAP_WIDTH)
+
+	/* Store -3 */
+	ldr	c1, [c0, #-(2 * SETJMP_SHIFT * CAP_WIDTH)]
+	str	c1, [c0]
+
+	/* Store -4 and -5 */
+	ldp	c1, c2, [c0, #-(2 * SETJMP_SHIFT * CAP_WIDTH - CAP_WIDTH)]
+	stp	c1, c2, [c0, #(CAP_WIDTH)]
+
+	scbnds	c0, c0, #(SETJMP_SHIFT * CAP_WIDTH)
+	/* TODO: seal	c0, c0 */
+
+	ret
+END(_rtld_setjmp)
+
+ENTRY(_rtld_longjmp)
+	/*
+	 * Before longjmp is called, the top of the Executive stack contains:
+	 * 	0.	Link to previous frame
+	 * When longjmp is called, the following is pushed to the Executive stack:
+	 * 	1.	Caller's stack
+	 * 	2.	Return address
+	 * 	3.	Link to 0
+	 * longjmp then calls _rtld_longjmp, which pushes the following:
+	 * 	4.	Caller's stack
+	 * 	5.	Return address
+	 * 	6.	Link to 2
+	 * In _rtld_longjmp, we manipulate the stack content to the following:
+	 * 	-n.	Link to previous frame
+	 * 	------------------------------
+	 * 	...
+	 * 	0.	Link to previous frame
+	 * 	------------------------------
+	 * 	1.	Supplied caller's stack
+	 * 	2.	Supplied return address
+	 * 	3.	Link to supplied Executive stack pointer (-n)
+	 * 	------------------------------
+	 * 	4.	Caller's stack
+	 * 	5.	Return address
+	 * 	6.	Link to 3
+	 * When longjmp makes its final branch, it will go to the returning phase
+	 * of setjmp's trampoline, which unwinds to the frame and PC supplied by 3.
+	 */
+
+	/*
+	 * Check that the supplied buffer is on the current Executive stack.
+	 * c0: Supplied buffer
+	 */
+	chkssu	c0, c0, csp
+	b.pl	1f
+
+	/* Check that the supplied buffer is below the top of the stack */
+	cmp	sp, x0
+	b.hs	1f
+
+	/* Load the link from the supplied buffer */
+	ldr	c2, [c0]
+
+	/*
+	 * Compare its generation counter with that of the capability to the
+	 * supplied buffer.
+	 */
+	gcflgs	x1, c0
+	gcflgs	x3, c2
+	cmp	x1, x3
+	b.ne	1f
+
+	/*
+	 * All sanity checks have passed.
+	 * Locate the frame of the supplied buffer.
+	 * c1: Frame of the supplied buffer
+	 */
+2:	mov	c1, c2
+	ldr	c2, [c2]
+	cmp	x2, x0
+	b.lo	2b
+
+	/*
+	 * Get the previous frame.
+	 * c2: Previous frame
+	 */
+	ldr	c2, [csp]
+
+	/* Unwind the frames */
+	mov	c3, c2
+4:	ldr	c3, [c3]
+	cmp	c3, c1
+	b.eq	3f
+
+	/* Enforce security policy here for each frame being unwound */
+
+	b	4b
+
+3:	ldp	c3, c4, [c0, #(CAP_WIDTH)]
+
+	str	c1, [c2]
+	stp	c3, c4, [c2, #(CAP_WIDTH)]
+
+	ret
+
+	/* TODO: Abort */
+1:	ret
+END(_rtld_longjmp)
+
+#define TRAMP(sym) \
+	.section .rodata; .globl sym; .p2align 4; .type sym,#object; sym:
+
+TRAMP(tramp_template_exe)
+target_cap_exe:
+	.chericap	0
+	.word		0
+
+	/*
+	 * If caller is Restricted, save its rcsp in two places
+	 * 1. The bottom of itself
+	 * 2. The top of the Executive stack
+	 */
+	gcperm	x10, c30
+	tbnz	x10, #1, 1f
+
+	mrs	c10, rcsp_el0
+	gclim	x11, c10
+	scvalue	c11, c10, x11
+	str	c10, [c11, #-CAP_WIDTH]
+	str	c10, [csp, #-CAP_WIDTH]
+
+1:	mov	c10, csp
+	stp	c10, c30, [csp, #-(CAP_WIDTH * 3)]!
+
+	ldr	c10, target_cap_exe
+	blr	c10
+
+	/*
+	 * If caller is Restricted, restore to its saved rcsp
+	 * at the top of the Executive stack
+	 */
+	ldp	c10, c30, [csp]
+	gcperm	x11, c30
+	tbnz	x11, #1, 1f
+
+	ldr	c11, [csp, #(CAP_WIDTH * 2)]
+	msr	rcsp_el0, c11
+
+1:	mov	csp, c10
+	retr	c30
+EEND(tramp_template_exe)
+etramp_template_exe:
+
+TRAMP(tramp_template_res)
+target_cap:
+	.chericap	0
+dst_obj:
+	.word		0
+
+	/*
+	 * If caller is Restricted, save its rcsp in two places
+	 * 1. The bottom of itself
+	 * 2. The top of the Executive stack
+	 */
+	gcperm	x10, c30
+	tbnz	x10, #1, 1f
+
+	mrs	c10, rcsp_el0
+	gclim	x11, c10
+	scvalue	c11, c10, x11
+	str	c10, [c11, #-CAP_WIDTH]
+	str	c10, [csp, #-CAP_WIDTH]
+
+1:	mov	c10, csp
+	stp	c10, c30, [csp, #-(CAP_WIDTH * 3)]!
+
+	/*
+	 * Callee is Restricted, so switch to its saved rcsp
+	 * at the bottom of itself
+	 */
+4:	ldr	w10, dst_obj				/* w10 = index */
+	mrs	c11, ctpidr_el0				/* c11 = table */
+	gclen	x12, c11				/* x12 = len(table) */
+	cmp	x12, x10, lsl #4			/* if (len(table) >= index) */
+	b.ls	2f					/* goto 2f */
+
+	ldr	c12, [c11, w10, uxtw #4]		/* c12 = table[index] */
+	cbz	x12, 2f					/* if (!table[index]) goto 2f */
+
+	ldr	c12, [c12, #-CAP_WIDTH]
+	ldr	c11, target_cap
+	msr	rcsp_el0, c12
+	blrr	c11
+
+	/*
+	 * Callee's saved rcsp may have changed during the call
+	 * (e.g. because it called into another compartment)
+	 * We restore it to the correct value here
+	 */
+	mrs	c10, rcsp_el0
+	gclim	x11, c10
+	scvalue	c11, c10, x11
+	str	c10, [c11, #-CAP_WIDTH]
+
+	/*
+	 * If caller is Restricted, restore to its saved rcsp
+	 * at the top of the Executive stack
+	 */
+	ldp	c10, c30, [csp]
+	gcperm	x11, c30
+	tbnz	x11, #1, 3f
+
+	ldr	c11, [csp, #(CAP_WIDTH * 2)]
+	msr	rcsp_el0, c11
+
+3:	mov	csp, c10
+	retr	c30
+
+2:	stp	c8, c9, [csp, #-(1 * CAP_WIDTH * 2)]
+	stp	c6, c7, [csp, #-(2 * CAP_WIDTH * 2)]
+	stp	c4, c5, [csp, #-(3 * CAP_WIDTH * 2)]
+	stp	c2, c3, [csp, #-(4 * CAP_WIDTH * 2)]
+	stp	c0, c1, [csp, #-(5 * CAP_WIDTH * 2)]!
+
+	mov	w0, w10					/* w0 = index */
+	mov	c1, c11					/* c1 = table */
+	ldr	c2, target_cap				/* c2 = data */
+
+	ldr	c3, [c11]
+	blr	c3
+
+	ldp	c8, c9, [csp, #(4 * CAP_WIDTH * 2)]
+	ldp	c6, c7, [csp, #(3 * CAP_WIDTH * 2)]
+	ldp	c4, c5, [csp, #(2 * CAP_WIDTH * 2)]
+	ldp	c2, c3, [csp, #(1 * CAP_WIDTH * 2)]
+	ldp	c0, c1, [csp], #(5 * CAP_WIDTH * 2)
+
+	b	4b
+EEND(tramp_template_res)
+etramp_template_res:
+
+	.data
+	.align	3
+	.global	sztramp_template_exe
+	.global	sztramp_template_res
+	.type	sztramp_template_exe,#object
+	.type	sztramp_template_res,#object
+	.size	sztramp_template_exe, 8
+	.size	sztramp_template_res, 8
+sztramp_template_exe:
+	.quad	etramp_template_exe - tramp_template_exe
+sztramp_template_res:
+	.quad	etramp_template_res - tramp_template_res
+#endif

@@ -232,7 +232,11 @@ thread_mask_clear(int mask)
 	lockinfo.thread_clr_flag(mask);
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#define	RTLD_LOCK_CNT	4
+#else
 #define	RTLD_LOCK_CNT	3
+#endif
 static struct rtld_lock {
 	void	*handle;
 	int	 mask;
@@ -241,6 +245,9 @@ static struct rtld_lock {
 rtld_lock_t	rtld_bind_lock = &rtld_locks[0];
 rtld_lock_t	rtld_libc_lock = &rtld_locks[1];
 rtld_lock_t	rtld_phdr_lock = &rtld_locks[2];
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+rtld_lock_t	rtld_tramp_lock = &rtld_locks[3];
+#endif
 
 void
 rlock_acquire(rtld_lock_t lock, RtldLockState *lockstate)
@@ -340,13 +347,13 @@ lockdflt_init(void)
 	int i;
 
 	deflockinfo.rtli_version  = RTLI_VERSION;
-	deflockinfo.lock_create   = make_rtld_function_pointer(def_lock_create);
-	deflockinfo.lock_destroy  = make_rtld_function_pointer(def_lock_destroy);
-	deflockinfo.rlock_acquire = make_rtld_function_pointer(def_rlock_acquire);
-	deflockinfo.wlock_acquire = make_rtld_function_pointer(def_wlock_acquire);
-	deflockinfo.lock_release  = make_rtld_function_pointer(def_lock_release);
-	deflockinfo.thread_set_flag = make_rtld_function_pointer(def_thread_set_flag);
-	deflockinfo.thread_clr_flag = make_rtld_function_pointer(def_thread_clr_flag);
+	deflockinfo.lock_create   = make_rtld_local_function_pointer(def_lock_create);
+	deflockinfo.lock_destroy  = make_rtld_local_function_pointer(def_lock_destroy);
+	deflockinfo.rlock_acquire = make_rtld_local_function_pointer(def_rlock_acquire);
+	deflockinfo.wlock_acquire = make_rtld_local_function_pointer(def_wlock_acquire);
+	deflockinfo.lock_release  = make_rtld_local_function_pointer(def_lock_release);
+	deflockinfo.thread_set_flag = make_rtld_local_function_pointer(def_thread_set_flag);
+	deflockinfo.thread_clr_flag = make_rtld_local_function_pointer(def_thread_clr_flag);
 	deflockinfo.at_fork = NULL;
 	deflockinfo.dlerror_loc = def_dlerror_loc;
 	deflockinfo.dlerror_loc_sz = sizeof(def_dlerror_msg);
@@ -387,6 +394,9 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 	SymLook req;
 	void *locks[RTLD_LOCK_CNT];
 	int flags, i, res;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	struct RtldLockInfo tmplockinfo;
+#endif
 
 	if (pli == NULL) {
 		lockinfo.rtli_version = RTLI_VERSION;
@@ -399,6 +409,22 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 			if (res == 0)
 				lockinfo.rtli_version = pli->rtli_version;
 		}
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+		tmplockinfo = *pli;
+#define wrap_with_trampoline(target) target = tramp_pgs_append(target, obj, NULL)
+		wrap_with_trampoline(tmplockinfo.lock_create);
+		wrap_with_trampoline(tmplockinfo.lock_destroy);
+		wrap_with_trampoline(tmplockinfo.rlock_acquire);
+		wrap_with_trampoline(tmplockinfo.wlock_acquire);
+		wrap_with_trampoline(tmplockinfo.lock_release);
+		wrap_with_trampoline(tmplockinfo.thread_set_flag);
+		wrap_with_trampoline(tmplockinfo.thread_clr_flag);
+		wrap_with_trampoline(tmplockinfo.at_fork);
+		wrap_with_trampoline(tmplockinfo.dlerror_loc);
+		wrap_with_trampoline(tmplockinfo.dlerror_seen);
+#undef wrap_with_trampoline
+		pli = &tmplockinfo;
+#endif
 	}
 
 	/* disable all locking while this function is running */
