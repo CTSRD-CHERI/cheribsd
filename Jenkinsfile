@@ -29,7 +29,7 @@ def jobProperties = [
         rateLimit,
 ]
 // Don't archive sysroot/disk image/kernel images for pull requests and non-default/releng branches:
-def archiveBranches = ['main', 'master', 'dev']
+def archiveBranches = ['main', 'master', 'dev', 'caprevoke']
 if (!env.CHANGE_ID && (archiveBranches.contains(env.BRANCH_NAME) || env.BRANCH_NAME.startsWith('releng/'))) {
     if (!GlobalVars.isTestSuiteJob) {
         // Don't archive disk images for the test suite job
