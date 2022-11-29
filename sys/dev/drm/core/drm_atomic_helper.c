@@ -1598,7 +1598,8 @@ void drm_atomic_helper_commit_tail_rpm(struct drm_atomic_state *old_state)
 
 	drm_atomic_helper_commit_hw_done(old_state);
 
-	drm_atomic_helper_wait_for_vblanks(dev, old_state);
+	if (!SKIP_SLEEP())
+		drm_atomic_helper_wait_for_vblanks(dev, old_state);
 
 	drm_atomic_helper_cleanup_planes(dev, old_state);
 }
