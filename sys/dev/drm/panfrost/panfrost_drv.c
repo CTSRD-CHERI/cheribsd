@@ -728,9 +728,23 @@ panfrost_irq_hook(void *arg)
 
 	sc->drm_dev.dev_private = sc;
 
-	panfrost_device_init(sc);
-	panfrost_mmu_init(sc);
-	panfrost_job_init(sc);
+	err = panfrost_device_init(sc);
+	if (err != 0) {
+		device_printf(sc->dev, "Failed to init panfrost device\n");
+		return;
+	}
+
+	err = panfrost_mmu_init(sc);
+	if (err != 0) {
+		device_printf(sc->dev, "Failed to init panfrost mmu\n");
+		return;
+	}
+
+	err = panfrost_job_init(sc);
+	if (err != 0) {
+		device_printf(sc->dev, "Failed to init panfrost job\n");
+		return;
+	}
 
 	err = drm_dev_register(&sc->drm_dev, 0);
 	if (err < 0) {
