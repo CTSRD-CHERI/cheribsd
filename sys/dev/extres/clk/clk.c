@@ -65,6 +65,8 @@ typedef TAILQ_HEAD(clkdom_list, clkdom) clkdom_list_t;
 
 /* Default clock methods. */
 static int clknode_method_init(struct clknode *clk, device_t dev);
+static int clknode_method_list_freq(struct clknode *clknode, uint64_t *freq,
+    int *count);
 static int clknode_method_recalc_freq(struct clknode *clk, uint64_t *freq);
 static int clknode_method_set_freq(struct clknode *clk, uint64_t fin,
     uint64_t *fout, int flags, int *stop);
@@ -76,6 +78,7 @@ static int clknode_method_set_mux(struct clknode *clk, int idx);
  */
 static clknode_method_t clknode_methods[] = {
 	CLKNODEMETHOD(clknode_init,		clknode_method_init),
+	CLKNODEMETHOD(clknode_list_freq,	clknode_method_list_freq),
 	CLKNODEMETHOD(clknode_recalc_freq,	clknode_method_recalc_freq),
 	CLKNODEMETHOD(clknode_set_freq,		clknode_method_set_freq),
 	CLKNODEMETHOD(clknode_set_gate,		clknode_method_set_gate),
@@ -200,6 +203,13 @@ SYSINIT(clknode_finish, SI_SUB_LAST, SI_ORDER_ANY, clknode_finish, NULL);
  */
 static int
 clknode_method_init(struct clknode *clknode, device_t dev)
+{
+
+	return (0);
+}
+
+static int
+clknode_method_list_freq(struct clknode *clknode, uint64_t *freq, int *count)
 {
 
 	return (0);
@@ -930,6 +940,20 @@ clkdom_set_ofw_mapper(struct clkdom * clkdom, clknode_ofw_mapper_func *map)
  * Real consumers executive
  */
 int
+clknode_list_freq(struct clknode *clknode, uint64_t *freq, int *freq_count)
+{
+	int rv;
+
+	CLK_TOPO_ASSERT();
+
+	CLKNODE_XLOCK(clknode);
+	rv = CLKNODE_LIST_FREQ(clknode, freq, freq_count);
+	CLKNODE_UNLOCK(clknode);
+
+	return (rv);
+}
+
+int
 clknode_get_freq(struct clknode *clknode, uint64_t *freq)
 {
 	int rv;
@@ -1182,6 +1206,20 @@ clk_get_freq(clk_t clk, uint64_t *freq)
 
 	CLK_TOPO_SLOCK();
 	rv = clknode_get_freq(clknode, freq);
+	CLK_TOPO_UNLOCK();
+	return (rv);
+}
+
+int
+clk_list_freq(clk_t clk, uint64_t *freq, int *freq_count)
+{
+	int rv;
+	struct clknode *clknode;
+
+	clknode = clk->clknode;
+
+	CLK_TOPO_XLOCK();
+	rv = clknode_list_freq(clknode, freq, freq_count);
 	CLK_TOPO_UNLOCK();
 	return (rv);
 }

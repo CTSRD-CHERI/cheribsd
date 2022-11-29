@@ -41,6 +41,15 @@ METHOD int init {
 };
 
 #
+# List all possible frequencies.
+#
+METHOD int list_freq {
+	struct clknode		*clk;
+	uint64_t		*freq;
+	int			*freq_count;
+};
+
+#
 # Recalculate frequency
 #     req - in/out recalulated frequency
 #

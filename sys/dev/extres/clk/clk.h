@@ -112,6 +112,7 @@ void *clknode_get_softc(struct clknode *clk);
 device_t clknode_get_device(struct clknode *clk);
 struct clknode *clknode_find_by_name(const char *name);
 struct clknode *clknode_find_by_id(struct clkdom *clkdom, intptr_t id);
+int clknode_list_freq(struct clknode *clknode, uint64_t *freq, int *freq_count);
 int clknode_get_freq(struct clknode *clknode, uint64_t *freq);
 int clknode_set_freq(struct clknode *clknode, uint64_t freq, int flags,
     int enablecnt);
@@ -127,6 +128,7 @@ int clknode_stop(struct clknode *clknode, int depth);
 int clk_get_by_name(device_t dev, const char *name, clk_t *clk);
 int clk_get_by_id(device_t dev, struct clkdom *clkdom, intptr_t id, clk_t *clk);
 int clk_release(clk_t clk);
+int clk_list_freq(clk_t clk, uint64_t *freq, int *freq_count);
 int clk_get_freq(clk_t clk, uint64_t *freq);
 int clk_set_freq(clk_t clk, uint64_t freq, int flags);
 int clk_test_freq(clk_t clk, uint64_t freq, int flags);
