@@ -575,6 +575,7 @@ panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
 	return (result);
 }
 
+#ifdef IOMMU
 static int
 panfrost_alloc_pages_iommu(struct panfrost_gem_object *bo)
 {
@@ -623,6 +624,8 @@ retry:
 
 	return (0);
 }
+
+#else
 
 static int
 panfrost_alloc_pages_contig(struct panfrost_gem_object *bo)
@@ -673,6 +676,7 @@ retry:
 
 	return (0);
 }
+#endif
 
 int
 panfrost_gem_get_pages(struct panfrost_gem_object *bo)
@@ -695,10 +699,11 @@ panfrost_gem_get_pages(struct panfrost_gem_object *bo)
 	bo->pages = m0;
 	bo->npages = npages;
 
-	if (1 == 0)
-		error = panfrost_alloc_pages_iommu(bo);
-	else
-		error = panfrost_alloc_pages_contig(bo);
+#ifdef IOMMU
+	error = panfrost_alloc_pages_iommu(bo);
+#else
+	error = panfrost_alloc_pages_contig(bo);
+#endif
 
 	if (error)
 		return (error);
