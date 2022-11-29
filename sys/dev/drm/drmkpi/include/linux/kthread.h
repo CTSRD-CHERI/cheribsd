@@ -45,14 +45,16 @@ struct kthr_wrap {
 #define	kthread_run(fn, data, fmt, ...)	({				\
 	struct thread *__td;						\
 	struct kthr_wrap *w;						\
+	int ret;							\
 									\
 	w = malloc(sizeof(struct kthr_wrap), M_DRMKMALLOC, M_WAITOK);	\
 	w->func = fn;							\
 	w->arg = data;							\
 									\
-	if (kthread_add(drmcompat_kthread_fn, w, NULL, &__td,		\
-	    RFSTOPPED, 0, fmt, ## __VA_ARGS__)) {			\
-		__td = NULL;						\
+	ret = kthread_add(drmcompat_kthread_fn, w, NULL, &__td,		\
+	    RFSTOPPED, 0, fmt, ## __VA_ARGS__);				\
+	if (ret != 0) {							\
+		__td = ERR_PTR(-ret);					\
 		free(w, M_DRMKMALLOC);					\
 	} else								\
 		__td = drmcompat_kthread_setup_and_run(__td);		\
