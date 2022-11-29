@@ -80,7 +80,7 @@ __FBSDID("$FreeBSD$");
 static void
 vm_cheri_revoke_tlb_fault(void)
 {
-	panic("%s; try rebuilding without CHERI_cheri_revoke_FAST_COPYIN",
+	panic("%s; try rebuilding without CHERI_CAPREVOKE_FAST_COPYIN",
 		__FUNCTION__);
 }
 
