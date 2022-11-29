@@ -58,8 +58,8 @@ static uint64_t caprev_shadow_nomap_first_word_mask(ptraddr_t base, size_t len);
 static uint64_t caprev_shadow_nomap_last_word_mask(ptraddr_t base, size_t len);
 
 /*
- * Given a capability to an object, derive the offset relative to the base of
- * the fine-grained bitmap where the first word would be located.
+ * Given a base address of an object, derive the offset relative to the base
+ * of the fine-grained bitmap where the first word would be located.
  */
 
 static ptrdiff_t
