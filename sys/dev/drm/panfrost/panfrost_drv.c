@@ -694,11 +694,24 @@ static void
 panfrost_irq_hook(void *arg)
 {
 	struct panfrost_softc *sc;
+	uint64_t rate;
 	int err;
 
 	sc = arg;
 
 	drm_mode_config_init(&sc->drm_dev);
+
+	if (clk_get_by_ofw_index(sc->dev, 0, 0, &sc->clk) == 0) {
+		err = clk_enable(sc->clk);
+		if (err == 0) {
+			clk_get_freq(sc->clk, &rate);
+			device_printf(sc->dev, "Mali GPU clock rate %jd Hz\n",
+			    rate);
+		} else
+			device_printf(sc->dev,
+			    "could not enable clock: %d\n", err);
+	} else
+		device_printf(sc->dev, "Mali GPU clock is unknown\n");
 
 	err = drm_dev_init(&sc->drm_dev, &panfrost_drm_driver,
 	    sc->dev);
@@ -751,8 +764,6 @@ static int
 panfrost_attach(device_t dev)
 {
 	struct panfrost_softc *sc;
-	uint64_t rate;
-	int err;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -786,19 +797,6 @@ panfrost_attach(device_t dev)
 		device_printf(dev, "cannot setup interrupt handler\n");
 		return (ENXIO);
 	}
-
-	if (clk_get_by_ofw_index(sc->dev, 0, 0, &sc->clk) == 0) {
-		err = clk_enable(sc->clk);
-		if (err != 0) {
-			device_printf(sc->dev,
-			    "could not enable clock: %d\n", err);
-			return (ENXIO);
-		}
-
-		clk_get_freq(sc->clk, &rate);
-		device_printf(dev, "Mali GPU clock rate %jd Hz\n", rate);
-	} else
-		device_printf(dev, "Mali GPU clock is unknown\n");
 
 	mtx_init(&sc->as_mtx, "asid set mtx", NULL, MTX_SPIN);
 

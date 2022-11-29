@@ -42,6 +42,7 @@ struct komeda_pipeline {
 	struct drm_device		*drm;
 	struct drm_crtc			crtc;
 	struct drm_encoder		encoder;
+	clk_t				pxclk;
 	uint32_t			vbl_counter;
 	phandle_t			node;
 };
