@@ -39,7 +39,14 @@ else
 	sshd_enable="on"
 fi
 
+if [ -f $BSDINSTALL_TMPBOOT/loader.conf.services ]; then
+	eval "$( sed -E -e 's/\<1\>/on/' -e 's/\<0\>/off/' \
+		-e 's/[[:alnum:].]*\.//' \
+		$BSDINSTALL_TMPBOOT/loader.conf.services )"
+fi
+
 echo -n > $BSDINSTALL_TMPETC/rc.conf.services
+echo -n > $BSDINSTALL_TMPBOOT/loader.conf.services
 
 exec 3>&1
 DAEMONS=$( bsddialog --backtitle "$OSNAME Installer" \
@@ -56,6 +63,7 @@ DAEMONS=$( bsddialog --backtitle "$OSNAME Installer" \
 	powerd	"Adjust CPU frequency dynamically if supported" \
 		${powerd_enable:-off} \
 	dumpdev "Enable kernel crash dumps to /var/crash" ${dumpdev:-on} \
+	debugger_on_panic "Run debugger on kernel panic" ${debugger_on_panic:-off} \
 2>&1 1>&3 )
 retval=$?
 exec 3>&-
@@ -66,8 +74,10 @@ fi
 
 havedump=
 havemouse=
+have_debugger_on_panic=
 for daemon in $DAEMONS; do
 	[ "$daemon" = "dumpdev" ] && havedump=1 continue
+	[ "$daemon" = "debugger_on_panic" ] && have_debugger_on_panic=1 continue
 	[ "$daemon" = "moused" ] && havemouse=1
 	if [ "$daemon" = "ntpd_sync_on_start" ]; then
 		rcvar=${daemon}
@@ -87,4 +97,10 @@ if [ "$havedump" ]; then
 	echo dumpdev=\"AUTO\" >> $BSDINSTALL_TMPETC/rc.conf.services
 else
 	echo dumpdev=\"NO\" >> $BSDINSTALL_TMPETC/rc.conf.services
+fi
+
+if [ "$have_debugger_on_panic" ]; then
+	echo debug.debugger_on_panic=1 >> $BSDINSTALL_TMPBOOT/loader.conf.services
+else
+	echo debug.debugger_on_panic=0 >> $BSDINSTALL_TMPBOOT/loader.conf.services
 fi
