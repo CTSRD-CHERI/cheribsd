@@ -88,6 +88,13 @@ __FBSDID("$FreeBSD$");
 #define	ARM_MALI_LPAE_MEMATTR_IMP_DEF		0x88ULL
 #define	ARM_MALI_LPAE_MEMATTR_WRITE_ALLOC	0x8DULL
 
+#define	PN_16M		0x1000
+#define	PN_4GB		0x100000
+#define	PN_4GB_MASK	(PN_4GB - 1)
+
+#define	SZ_32MB		(32 * 1024 * 1024)
+#define	SZ_4GB		(4 * 1024 * 1024 * 1024ULL)
+
 static const char *
 panfrost_mmu_exception_name(uint32_t exc_code)
 {
@@ -144,7 +151,6 @@ struct panfrost_gem_mapping *
 panfrost_mmu_find_mapping(struct panfrost_softc *sc, int as, uint64_t addr)
 {
 	struct panfrost_gem_mapping *mapping;
-	struct panfrost_file *pfile;
 	struct panfrost_mmu *mmu;
 	struct drm_mm_node *node;
 	uint64_t offset;
@@ -161,12 +167,10 @@ panfrost_mmu_find_mapping(struct panfrost_softc *sc, int as, uint64_t addr)
 	goto out;
 
 found:
-	pfile = container_of(mmu, struct panfrost_file, mmu);
-
-	mtx_lock_spin(&pfile->mm_lock);
+	mtx_lock_spin(&mmu->mm_lock);
 
 	offset = addr >> PAGE_SHIFT;
-	drm_mm_for_each_node(node, &pfile->mm) {
+	drm_mm_for_each_node(node, &mmu->mm) {
 		if (offset >= node->start &&
 		    offset < (node->start + node->size)) {
 			mapping = container_of(node,
@@ -176,7 +180,7 @@ found:
 		};
 	};
 
-	mtx_unlock_spin(&pfile->mm_lock);
+	mtx_unlock_spin(&mmu->mm_lock);
 
 out:
 	mtx_unlock_spin(&sc->as_mtx);
@@ -396,13 +400,11 @@ panfrost_mmu_intr(void *arg)
 	}
 }
 
-int
-panfrost_mmu_pgtable_alloc(struct panfrost_file *pfile)
+static void
+panfrost_mmu_pgtable_alloc(struct panfrost_mmu *mmu)
 {
-	struct panfrost_mmu *mmu;
 	pmap_t p;
 
-	mmu = &pfile->mmu;
 	p = &mmu->p;
 
 	iommu_pmap_pinit(p);
@@ -412,28 +414,6 @@ panfrost_mmu_pgtable_alloc(struct panfrost_file *pfile)
 	cpu_dcache_wbinv_range((vm_pointer_t)p->pm_l0, sizeof(pd_entry_t));
 
 	mmu->as = -1;
-
-	return (0);
-}
-
-void
-panfrost_mmu_pgtable_free(struct panfrost_file *pfile)
-{
-	struct panfrost_softc *sc;
-	struct panfrost_mmu *mmu;
-
-	sc = pfile->sc;
-	mmu = &pfile->mmu;
-
-	iommu_pmap_remove_pages(&mmu->p);
-	iommu_pmap_release(&mmu->p);
-
-	mtx_lock_spin(&sc->as_mtx);
-	if (mmu->as >= 0) {
-		sc->as_alloc_set &= ~(1 << mmu->as);
-		TAILQ_REMOVE(&sc->mmu_in_use, mmu, next);
-	}
-	mtx_unlock_spin(&sc->as_mtx);
 }
 
 int
@@ -643,4 +623,81 @@ panfrost_mmu_init(struct panfrost_softc *sc)
 	GPU_WRITE(sc, MMU_INT_MASK, ~0);
 
 	return (0);
+}
+
+static void
+panfrost_mmu_release_ctx(struct panfrost_mmu *mmu)
+{
+	struct panfrost_softc *sc;
+
+	sc = mmu->sc;
+
+	iommu_pmap_remove_pages(&mmu->p);
+	iommu_pmap_release(&mmu->p);
+
+	mtx_lock_spin(&sc->as_mtx);
+	if (mmu->as >= 0) {
+		sc->as_alloc_set &= ~(1 << mmu->as);
+		TAILQ_REMOVE(&sc->mmu_in_use, mmu, next);
+	}
+	mtx_unlock_spin(&sc->as_mtx);
+
+	drm_mm_takedown(&mmu->mm);
+
+	free(mmu, M_PANFROST);
+}
+
+void
+panfrost_mmu_ctx_put(struct panfrost_mmu *mmu)
+{
+
+	if (refcount_release(&mmu->refcount))
+		panfrost_mmu_release_ctx(mmu);
+}
+
+struct panfrost_mmu *
+panfrost_mmu_ctx_get(struct panfrost_mmu *mmu)
+{
+
+	refcount_acquire(&mmu->refcount);
+
+	return (mmu);
+}
+
+static void
+panfrost_drm_mm_color_adjust(const struct drm_mm_node *node,
+    unsigned long color, uint64_t *start, uint64_t *end)
+{
+	uint64_t next_seg;
+
+	if ((color & PANFROST_BO_NOEXEC) == 0) {
+		if ((*start & PN_4GB_MASK) == 0)
+			(*start)++;
+		if ((*end & PN_4GB_MASK) == 0)
+			(*end)--;
+		next_seg = ALIGN(*start, PN_4GB);
+		if (next_seg - *start <= PN_16M)
+			*start = next_seg + 1;
+		*end = min(*end, ALIGN(*start, PN_4GB) - 1);
+	}
+}
+
+struct panfrost_mmu *
+panfrost_mmu_ctx_create(struct panfrost_softc *sc)
+{
+	struct panfrost_mmu *mmu;
+
+	mmu = malloc(sizeof(*mmu), M_PANFROST, M_WAITOK | M_ZERO);
+	mmu->sc = sc;
+
+	mtx_init(&mmu->mm_lock, "mm", NULL, MTX_SPIN);
+
+	drm_mm_init(&mmu->mm, SZ_32MB >> PAGE_SHIFT,
+	    (SZ_4GB - SZ_32MB) >> PAGE_SHIFT);
+	mmu->mm.color_adjust = panfrost_drm_mm_color_adjust;
+
+	panfrost_mmu_pgtable_alloc(mmu);
+	refcount_init(&mmu->refcount, 1);
+
+	return (mmu);
 }

@@ -36,7 +36,7 @@
 struct panfrost_job {
 	struct drm_sched_job base __subobject_use_container_bounds; /* must go first */
 	struct panfrost_softc *sc;
-	struct panfrost_file *pfile;
+	struct panfrost_mmu *mmu;
 	uint64_t jc;
 	uint32_t requirements;
 	uint32_t flush_id;
@@ -66,5 +66,6 @@ void panfrost_job_intr(void *arg);
 void panfrost_job_put(struct panfrost_job *job);
 void panfrost_job_close(struct panfrost_file *pfile);
 void panfrost_job_enable_interrupts(struct panfrost_softc *sc);
+int panfrost_job_get_slot(struct panfrost_job *job);
 
 #endif /* !_DEV_DRM_PANFROST_PANFROST_JOB_H_ */
