@@ -36,18 +36,20 @@
 #define	NUM_JOB_SLOTS	3
 
 struct panfrost_mmu {
+	struct panfrost_softc	*sc;
+	u_int			refcount;
 	struct pmap p;
 	int as;		/* asid set */
 	int as_count;	/* usage count */
 	TAILQ_ENTRY(panfrost_mmu)	next;	/* entry in mmu_in_use list */
+	struct		drm_mm mm;
+	struct mtx	mm_lock;
 };
 
 struct panfrost_file {
 	struct		panfrost_softc *sc;
-	struct		panfrost_mmu mmu __subobject_use_container_bounds;
+	struct		panfrost_mmu *mmu;
 	struct		drm_sched_entity sched_entity[NUM_JOB_SLOTS];
-	struct		drm_mm mm;
-	struct mtx	mm_lock;
 };
 
 int panfrost_device_init(struct panfrost_softc *);
