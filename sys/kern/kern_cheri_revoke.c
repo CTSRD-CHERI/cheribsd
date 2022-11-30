@@ -262,6 +262,8 @@ fast_out:
 			    VM_CHERI_REVOKE_CF_NO_COARSE_MEM |
 			    VM_CHERI_REVOKE_CF_NO_OTYPES |
 			    VM_CHERI_REVOKE_CF_NO_CIDS;
+			if (!vm_map_entry_start_revocation(vmm, &entry))
+				test_flags |= VM_CHERI_REVOKE_CF_NO_REV_ENTRY;
 			vm_cheri_revoke_set_test(vmm, test_flags);
 		}
 
@@ -476,6 +478,8 @@ close_already_inited:	/* (entryst == CHERI_REVOKE_ST_INITED) above */
 		crepochs.dequeue = epoch;
 		vm_cheri_revoke_publish_epochs(info_page, &crepochs);
 		entryst = CHERI_REVOKE_ST_NONE;
+
+		vm_map_entry_end_revocation(&vm->vm_map);
 	}
 
 	vm_map_lock(vmm);
