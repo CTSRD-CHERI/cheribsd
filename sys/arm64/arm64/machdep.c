@@ -429,10 +429,10 @@ arm64_get_writable_addr(vm_pointer_t addr, vm_pointer_t *out)
 	return (false);
 }
 
-typedef void (*efi_map_entry_cb)(struct efi_md *);
+typedef void (*efi_map_entry_cb)(struct efi_md *, void *argp);
 
 static void
-foreach_efi_map_entry(struct efi_map_header *efihdr, efi_map_entry_cb cb)
+foreach_efi_map_entry(struct efi_map_header *efihdr, efi_map_entry_cb cb, void *argp)
 {
 	struct efi_md *map, *p;
 	size_t efisz;
@@ -451,12 +451,12 @@ foreach_efi_map_entry(struct efi_map_header *efihdr, efi_map_entry_cb cb)
 
 	for (i = 0, p = map; i < ndesc; i++,
 	    p = efi_next_descriptor(p, efihdr->descriptor_size)) {
-		cb(p);
+		cb(p, argp);
 	}
 }
 
 static void
-exclude_efi_map_entry(struct efi_md *p)
+exclude_efi_map_entry(struct efi_md *p, void *argp __unused)
 {
 
 	switch (p->md_type) {
@@ -479,11 +479,11 @@ static void
 exclude_efi_map_entries(struct efi_map_header *efihdr)
 {
 
-	foreach_efi_map_entry(efihdr, exclude_efi_map_entry);
+	foreach_efi_map_entry(efihdr, exclude_efi_map_entry, NULL);
 }
 
 static void
-add_efi_map_entry(struct efi_md *p)
+add_efi_map_entry(struct efi_md *p, void *argp __unused)
 {
 
 	switch (p->md_type) {
@@ -521,12 +521,11 @@ add_efi_map_entry(struct efi_md *p)
 static void
 add_efi_map_entries(struct efi_map_header *efihdr)
 {
-
-	foreach_efi_map_entry(efihdr, add_efi_map_entry);
+	foreach_efi_map_entry(efihdr, add_efi_map_entry, NULL);
 }
 
 static void
-print_efi_map_entry(struct efi_md *p)
+print_efi_map_entry(struct efi_md *p, void *argp __unused)
 {
 	const char *type;
 	static const char *types[] = {
@@ -586,7 +585,7 @@ print_efi_map_entries(struct efi_map_header *efihdr)
 
 	printf("%23s %12s %12s %8s %4s\n",
 	    "Type", "Physical", "Virtual", "#Pages", "Attr");
-	foreach_efi_map_entry(efihdr, print_efi_map_entry);
+	foreach_efi_map_entry(efihdr, print_efi_map_entry, NULL);
 }
 
 #ifdef FDT
