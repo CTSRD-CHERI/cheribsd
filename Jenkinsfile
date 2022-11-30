@@ -290,6 +290,7 @@ selectedArchitectures.each { suffix ->
                 '--install-prefix=/rootfs',
                 '--cheribsd/build-tests',
                 '--cheribsd/build-bench-kernels',
+                '--cheribsd/caprevoke-kernel',
                 '--cheribsd/with-manpages',
                 '--cheribsd/debug-info',
                 '--cheribsd/debug-files',
