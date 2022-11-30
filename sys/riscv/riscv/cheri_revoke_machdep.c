@@ -95,7 +95,9 @@ vm_do_cheri_revoke(int *res,
 		const uint8_t * __capability crshadow,
 		vm_cheri_revoke_test_fn ctp,
 		uintcap_t * __capability cutp,
-		uintcap_t cut)
+		uintcap_t cut,
+		vm_offset_t start,
+		vm_offset_t end)
 {
 	int perms = cheri_getperm(cut);
 	CHERI_REVOKE_STATS_FOR(crst, crc);
@@ -111,7 +113,7 @@ vm_do_cheri_revoke(int *res,
 		 */
 
 		CHERI_REVOKE_STATS_BUMP(crst, caps_found_revoked);
-	} else if (cheri_gettag(cut) && ctp(crshadow, cut, perms)) {
+	} else if (cheri_gettag(cut) && ctp(crshadow, cut, perms, start, end)) {
 		void * __capability cscratch;
 		int ok;
 
@@ -264,7 +266,9 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 				 const uint8_t * __capability,
 				 vm_cheri_revoke_test_fn,
 				 uintcap_t * __capability,
-				 uintcap_t),
+				 uintcap_t,
+				 vm_offset_t,
+				 vm_offset_t),
 		       uintcap_t * __capability mvu,
 		       vm_offset_t mve)
 {
@@ -272,6 +276,13 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 	CHERI_REVOKE_STATS_FOR(crst, crc);
 #endif
 	int res = 0;
+	vm_offset_t start, end;
+
+	if (crc->map->rev_entry != NULL) {
+		start = crc->map->rev_entry->start;
+		end = crc->map->rev_entry->end;
+	} else
+		start = end = 0;
 
 	/* Load once up front, which is almost as good as const */
 	vm_cheri_revoke_test_fn ctp = crc->map->vm_cheri_revoke_test;
@@ -311,7 +322,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 			if (!(tags & 1))
 				continue;
 
-			if (cb(&res, crc, crshadow, ctp, mvt, *mvt))
+			if (cb(&res, crc, crshadow, ctp, mvt, *mvt, start, end))
 				goto out;
 		}
 
@@ -325,7 +336,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 			if (!(tags & 1))
 				continue;
 
-			if (cb(&res, crc, crshadow, ctp, mvt, *mvt))
+			if (cb(&res, crc, crshadow, ctp, mvt, *mvt, start, end))
 				goto out;
 		}
 	}
@@ -336,7 +347,7 @@ vm_cheri_revoke_page_iter(const struct vm_cheri_revoke_cookie *crc,
 	for (; cheri_getaddress(mvu) < mve; mvu++) {
 		uintcap_t cut = *mvu;
 		if (cheri_gettag(cut)) {
-			if (cb(&res, crc, crshadow, ctp, mvu, cut))
+			if (cb(&res, crc, crshadow, ctp, mvu, cut, start, end))
 				goto out;
 		}
 	}
@@ -355,13 +366,21 @@ vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *crc, uintcap_t cut)
 {
 	if (cheri_gettag(cut)) {
 		int res;
+		vm_offset_t start, end;
+
+		if (crc->map->rev_entry != NULL) {
+			start = crc->map->rev_entry->start;
+			end = crc->map->rev_entry->end;
+		} else
+			start = end = 0;
+
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
 		curthread->td_pcb->pcb_onfault =
 		    (vm_offset_t)vm_cheri_revoke_tlb_fault;
 		enable_user_memory_access();
 #endif
 		res = crc->map->vm_cheri_revoke_test(crc->crshadow, cut,
-		    cheri_getperm(cut));
+		    cheri_getperm(cut), start, end);
 #ifdef CHERI_CAPREVOKE_FAST_COPYIN
 		disable_user_memory_access();
 		curthread->td_pcb->pcb_onfault = 0;
@@ -426,7 +445,9 @@ vm_cheri_revoke_page_ro_adapt(int *res,
 		           const uint8_t * __capability crshadow,
 			   vm_cheri_revoke_test_fn ctp,
 			   uintcap_t * __capability cutp,
-			   uintcap_t cut)
+			   uintcap_t cut,
+			   vm_offset_t start,
+			   vm_offset_t end)
 {
 	(void)cutp;
 
@@ -436,7 +457,7 @@ vm_cheri_revoke_page_ro_adapt(int *res,
 
 	*res |= VM_CHERI_REVOKE_PAGE_HASCAPS;
 
-	if (ctp(crshadow, cut, cheri_getperm(cut))) {
+	if (ctp(crshadow, cut, cheri_getperm(cut), start, end)) {
 		*res |= VM_CHERI_REVOKE_PAGE_DIRTY;
 
 		/* One dirty answer is as good as any other; stop eary */

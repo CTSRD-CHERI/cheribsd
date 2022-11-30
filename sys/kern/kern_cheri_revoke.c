@@ -292,21 +292,14 @@ fast_out:
 		}
 
 		if (entryst == CHERI_REVOKE_ST_NONE) {
-			/*
-			 * XXX Right now, we know that there are no
-			 * coarse-grain bits getting set, nor otypes nor
-			 * anything else, since we don't do MPROT_QUARANTINE or
-			 * anything of that sort.
-			 *
-			 * In the future, we should count the number of pages
-			 * held in MPROT_QUARANTINE or munmap()'s quarantine or
-			 * other such to decide whether to set _NO_COARSE.
-			 * Similary for the others.
-			 */
-			vm_cheri_revoke_set_test(vmm,
+			vm_map_entry_t entry;
+			int test_flags =
 			    VM_CHERI_REVOKE_CF_NO_COARSE_MEM |
 			    VM_CHERI_REVOKE_CF_NO_OTYPES |
-			    VM_CHERI_REVOKE_CF_NO_CIDS);
+			    VM_CHERI_REVOKE_CF_NO_CIDS;
+			if (!vm_map_entry_start_revocation(vmm, &entry))
+				test_flags |= VM_CHERI_REVOKE_CF_NO_REV_ENTRY;
+			vm_cheri_revoke_set_test(vmm, test_flags);
 		}
 
 #ifdef CHERI_CAPREVOKE_STATS
@@ -528,6 +521,8 @@ fast_out:
 		res = KERN_SUCCESS;
 		break;
 	}
+
+	vm_map_entry_end_revocation(&vm->vm_map);
 
 	PROC_LOCK(td->td_proc);
 	_PRELE(td->td_proc);
