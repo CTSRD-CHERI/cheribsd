@@ -233,8 +233,13 @@ panfrost_gem_pin(struct drm_gem_object *obj)
 void
 panfrost_gem_unpin(struct drm_gem_object *obj)
 {
+	struct drm_device *dev;
 
+	dev = obj->dev;
+
+	mutex_lock(&dev->struct_mutex);
 	drm_gem_object_put(obj);
+	mutex_unlock(&dev->struct_mutex);
 }
 
 struct sg_table *
