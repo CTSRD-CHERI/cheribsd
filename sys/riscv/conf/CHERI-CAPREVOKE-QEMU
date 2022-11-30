@@ -4,4 +4,4 @@ include "QEMU"
 include "std.CHERI"
 include "std.CHERI-CAPREVOKE"
 
-ident CHERI-QEMU
+ident CHERI-CAPREVOKE-QEMU

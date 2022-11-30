@@ -1,0 +1,6 @@
+#NO_UNIVERSE
+
+include "CHERI-PURECAP-CAPREVOKE-QEMU"
+include "../../conf/std.nodebug"
+
+ident CHERI-PURECAP-CAPREVOKE-QEMU-NODEBUG
