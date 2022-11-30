@@ -132,12 +132,15 @@ void vm_cheri_revoke_publish_epochs(
 int vm_cheri_revoke_test(const struct vm_cheri_revoke_cookie *, uintcap_t);
 
 enum {
-	/* If no coarse bits set, VMMAP-bearing caps are imune */
+	/* If no coarse bits set */
 	VM_CHERI_REVOKE_CF_NO_COARSE_MEM = 0x01,
 
 	/* If no otype bits set, Permit_Seal and _Unseal are imune */
 	VM_CHERI_REVOKE_CF_NO_OTYPES = 0x02,
 	VM_CHERI_REVOKE_CF_NO_CIDS = 0x04,
+
+	/* If no rev_entry selected in the vm_map */
+	VM_CHERI_REVOKE_CF_NO_REV_ENTRY = 0x08,
 };
 void vm_cheri_revoke_set_test(struct vm_map *map, int flags);
 

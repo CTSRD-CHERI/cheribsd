@@ -122,12 +122,21 @@ vm_cheri_revoke_test_mem_nomap(const uint8_t * __capability crshadow,
 	return bmbits & (1 << ((va / VM_CHERI_REVOKE_GSZ_MEM_NOMAP) % 8));
 }
 
+static inline unsigned
+vm_cheri_revoke_test_range(vm_offset_t start, vm_offset_t end, uintcap_t cut)
+{
+	ptraddr_t va = cheri_getbase(cut);
+
+	return (va >= start && va < end);
+}
+
 // TODO: if ((perms & CHERI_PERMS_HWALL_OTYPE) != 0)
 // TODO: if ((perms & CHERI_PERMS_HWALL_CID) != 0)
 
 static unsigned long
 vm_cheri_revoke_test_just_mem(const uint8_t * __capability crshadow,
-		      uintcap_t cut, unsigned long perms)
+		      uintcap_t cut, unsigned long perms,
+		      vm_offset_t start, vm_offset_t end)
 {
 	if ((perms & (CHERI_PERMS_HWALL_MEMORY
 		     | CHERI_PERM_SW_VMEM)) != 0) {
@@ -143,7 +152,8 @@ vm_cheri_revoke_test_just_mem(const uint8_t * __capability crshadow,
 
 static unsigned long
 vm_cheri_revoke_test_just_mem_fine(const uint8_t * __capability crshadow,
-		      uintcap_t cut, unsigned long perms)
+		      uintcap_t cut, unsigned long perms,
+		      vm_offset_t start, vm_offset_t end)
 {
 	/*
 	 * Most capabilities are memory capabilities, most are unrevoked,
@@ -162,6 +172,26 @@ vm_cheri_revoke_test_just_mem_fine(const uint8_t * __capability crshadow,
 	return 0;
 }
 
+static unsigned long
+vm_cheri_revoke_test_mem_fine_range(const uint8_t * __capability crshadow,
+		      uintcap_t cut, unsigned long perms,
+		      vm_offset_t start, vm_offset_t end)
+{
+	/*
+	 * Only check the capability if it has some memory permissions.
+	 */
+	if ((perms & CHERI_PERMS_HWALL_MEMORY) != 0) {
+		if (vm_cheri_revoke_test_range(start, end, cut))
+			return (1);
+
+		if ((perms & CHERI_PERM_SW_VMEM) == 0) {
+			return vm_cheri_revoke_test_mem_nomap(crshadow, cut);
+		}
+	}
+
+	return (0);
+}
+
 /*
  *
  */
@@ -173,11 +203,20 @@ vm_cheri_revoke_set_test(vm_map_t map, int flags)
 		| VM_CHERI_REVOKE_CF_NO_OTYPES
 		| VM_CHERI_REVOKE_CF_NO_CIDS :
 
+		map->vm_cheri_revoke_test = vm_cheri_revoke_test_mem_fine_range;
+		break;
+
+	case VM_CHERI_REVOKE_CF_NO_COARSE_MEM
+		| VM_CHERI_REVOKE_CF_NO_OTYPES
+		| VM_CHERI_REVOKE_CF_NO_CIDS
+		| VM_CHERI_REVOKE_CF_NO_REV_ENTRY :
+
 		map->vm_cheri_revoke_test = vm_cheri_revoke_test_just_mem_fine;
 		break;
 
 	case VM_CHERI_REVOKE_CF_NO_OTYPES
-		| VM_CHERI_REVOKE_CF_NO_CIDS :
+		| VM_CHERI_REVOKE_CF_NO_CIDS
+		| VM_CHERI_REVOKE_CF_NO_REV_ENTRY :
 
 		map->vm_cheri_revoke_test = vm_cheri_revoke_test_just_mem;
 		break;
