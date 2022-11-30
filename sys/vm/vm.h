@@ -69,6 +69,7 @@ typedef char vm_inherit_t;	/* inheritance codes */
 #define	VM_INHERIT_COPY		((vm_inherit_t) 1)
 #define	VM_INHERIT_NONE		((vm_inherit_t) 2)
 #define	VM_INHERIT_ZERO		((vm_inherit_t) 3)
+#define	VM_INHERIT_QUARANTINE	((vm_inherit_t) 4)
 #define	VM_INHERIT_DEFAULT	VM_INHERIT_COPY
 
 typedef u_char vm_prot_t;	/* protection codes */

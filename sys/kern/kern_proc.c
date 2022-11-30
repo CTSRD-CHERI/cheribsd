@@ -2863,7 +2863,7 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 	vm_offset_t addr;
 	unsigned int last_timestamp;
 	int error;
-	bool guard, super;
+	bool guard, quarantined, super;
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 
@@ -2946,6 +2946,8 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 			kve->kve_flags |= KVME_FLAG_UNMAPPED;
 
 		guard = (entry->eflags & MAP_ENTRY_GUARD) != 0;
+
+		quarantined = entry->inheritance == VM_INHERIT_QUARANTINE;
 
 		last_timestamp = map->timestamp;
 		vm_map_unlock_read(map);
