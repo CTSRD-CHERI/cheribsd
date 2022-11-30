@@ -2898,6 +2898,7 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va,
 		return;
 	}
 
+#if __has_feature(capabilities)
 	if ((firstl3e & (PTE_CW | PTE_CD)) == PTE_CW) {
 		/*
 		 * Prohibit superpages involving CW-set CD-clear PTEs.  The
@@ -2915,6 +2916,7 @@ pmap_promote_l2(pmap_t pmap, pd_entry_t *l2, vm_offset_t va,
 		atomic_add_long(&pmap_l2_p_failures, 1);
 		return;
 	}
+#endif
 
 	/*
 	 * Downgrade a clean, writable mapping to read-only to ensure that the
