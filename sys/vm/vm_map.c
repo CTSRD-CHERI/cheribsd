@@ -192,6 +192,29 @@ static int vm_map_clip_start(vm_map_t map, vm_map_entry_t entry,
 			start = end;			\
 		}
 
+#ifdef CHERI_CAPREVOKE
+/*
+ * Sort by size and then reservation.
+ */
+static int
+quarantine_cmp(struct vm_map_entry *e1, struct vm_map_entry *e2)
+{
+	size_t size1, size2;
+
+	KASSERT(e1 != e2, ("entry %p appears twice", e1));
+	size1 = e1->end - e1->start;
+	size2 = e2->end - e2->start;
+	if (size1 != size2)
+		return (size1 < size2 ? -1 : 1);
+	KASSERT(e1->reservation != e2->reservation,
+	    ("two quarantined entries %p %p with the same reservation %zu",
+	     e1, e2, e1->reservation));
+	return (e1->reservation > e2->reservation ? -1 : 0);
+}
+
+RB_GENERATE_STATIC(vm_map_quarantine, vm_map_entry, quarantine, quarantine_cmp)
+#endif
+
 #ifdef CPU_QEMU_MALTA
 #include <machine/cheri.h>
 
@@ -999,7 +1022,7 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_pointer_t min, vm_pointer_t max)
 
 #ifdef CHERI_CAPREVOKE
 	map->vm_cheri_revoke_st = CHERI_REVOKE_ST_NONE; /* and epoch 0 */
-	LIST_INIT(&map->quarantine);
+	RB_INIT(&map->quarantine);
 #endif
 }
 
@@ -1586,7 +1609,7 @@ vm_map_entry_unlink(vm_map_t map, vm_map_entry_t entry,
 #ifdef CHERI_CAPREVOKE
 	KASSERT(entry != map->rev_entry, ("Can't remove map->rev_entry"));
 	if (entry->inheritance == VM_INHERIT_QUARANTINE) {
-		LIST_REMOVE(entry, quarantine);
+		RB_REMOVE(vm_map_quarantine, &map->quarantine, entry);
 	}
 #endif
 	VM_MAP_ASSERT_CONSISTENT(map);
@@ -1612,13 +1635,19 @@ vm_map_entry_quarantine(vm_map_t map, vm_map_entry_t entry)
 	 * with map->rev_entry).
 	 */
 	entry->inheritance = VM_INHERIT_QUARANTINE;
-	LIST_INSERT_HEAD(&map->quarantine, entry, quarantine);
+	RB_INSERT(vm_map_quarantine, &map->quarantine, entry);
 	/* XXX stats */
 
 	prev_entry = vm_map_entry_pred(entry);
-	vm_map_try_merge_entries(map, prev_entry, entry);
+	if (prev_entry->inheritance == VM_INHERIT_QUARANTINE) {
+		vm_map_try_merge_entries(map, prev_entry, entry);
+		RB_REINSERT(vm_map_quarantine, &map->quarantine, entry);
+	}
 	next_entry = vm_map_entry_succ(entry);
-	vm_map_try_merge_entries(map, entry, next_entry);
+	if (next_entry->inheritance == VM_INHERIT_QUARANTINE) {
+		vm_map_try_merge_entries(map, entry, next_entry);
+		RB_REINSERT(vm_map_quarantine, &map->quarantine, next_entry);
+	}
 }
 
 bool
@@ -1628,7 +1657,7 @@ vm_map_entry_start_revocation(vm_map_t map, vm_map_entry_t *entry)
 	KASSERT(map->rev_entry == NULL,
 	   ("an entry %p is already being revoked", map->rev_entry));
 	VM_MAP_ASSERT_LOCKED(map);
-	if (LIST_EMPTY(&map->quarantine))
+	if (RB_EMPTY(&map->quarantine))
 		return (FALSE);
 	/*
 	 * Just pop the most recent entry off the list to do something.
@@ -1638,7 +1667,7 @@ vm_map_entry_start_revocation(vm_map_t map, vm_map_entry_t *entry)
 	 * neighbors in order to return at much VA to use as possible in
 	 * a given round of revocation.
 	 */
-	map->rev_entry = LIST_FIRST(&map->quarantine);
+	map->rev_entry = RB_MAX(vm_map_quarantine, &map->quarantine);
 	if (entry != NULL)
 		*entry = map->rev_entry;
 	/* XXX stats */

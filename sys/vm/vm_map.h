@@ -74,6 +74,8 @@
 #include <sys/condvar.h>
 
 #ifdef CHERI_CAPREVOKE
+#include <sys/tree.h>
+
 #include <cheri/revoke.h>
 #include <cheri/revoke_kern.h>
 #endif
@@ -108,7 +110,7 @@ struct vm_map_entry {
 	struct vm_map_entry *left;	/* left child or previous entry */
 	struct vm_map_entry *right;	/* right child or next entry */
 #ifdef CHERI_CAPREVOKE
-	LIST_ENTRY(vm_map_entry) quarantine; /* quarantined entries */
+	RB_ENTRY(vm_map_entry) quarantine; /* quarantined entries */
 #endif
 	vm_offset_t start;		/* start address */
 	vm_offset_t end;		/* end address */
@@ -244,12 +246,10 @@ struct vm_map {
 	 */
 	vm_cheri_revoke_test_fn vm_cheri_revoke_test;
 	/*
-	 * List containing map entries awaiting revocation.
-	 *
-	 * XXX: should this be some other structure?  Maybe a tree
-	 * ordered by size?
+	 * Tree of map entries awaiting revocation, ordered by size and
+	 * virtual address.
 	 */
-	LIST_HEAD(vm_map_quarantine, vm_map_entry) quarantine;
+	RB_HEAD(vm_map_quarantine, vm_map_entry) quarantine;
 	struct vm_map_entry *rev_entry;	/* entry being revoked */
 #ifdef CHERI_CAPREVOKE_STATS
 	/*
