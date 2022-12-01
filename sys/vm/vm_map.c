@@ -1559,6 +1559,12 @@ vm_map_entry_unlink(vm_map_t map, vm_map_entry_t entry,
 	if (op == UNLINK_MERGE_NEXT) {
 		rlist->start = root->start;
 		rlist->offset = root->offset;
+		/*
+		 * Either both are part of the same reservation or they
+		 * are quarantined, adjacent neighbors being combined
+		 * and thus will take on the previous entries's resevation.
+		 */
+		rlist->reservation = root->reservation;
 	}
 	if (llist != header) {
 		root = llist;
@@ -1593,6 +1599,8 @@ vm_map_entry_unlink(vm_map_t map, vm_map_entry_t entry,
 static void
 vm_map_entry_quarantine(vm_map_t map, vm_map_entry_t entry)
 {
+	vm_map_entry_t next_entry, prev_entry;
+
 	KASSERT((entry->eflags & MAP_ENTRY_UNMAPPED) != 0,
 	    ("Can only quarantine unmappled pages %x\n", entry->eflags));
 	CTR3(KTR_VM,
@@ -1606,6 +1614,11 @@ vm_map_entry_quarantine(vm_map_t map, vm_map_entry_t entry)
 	entry->inheritance = VM_INHERIT_QUARANTINE;
 	LIST_INSERT_HEAD(&map->quarantine, entry, quarantine);
 	/* XXX stats */
+
+	prev_entry = vm_map_entry_pred(entry);
+	vm_map_try_merge_entries(map, prev_entry, entry);
+	next_entry = vm_map_entry_succ(entry);
+	vm_map_try_merge_entries(map, entry, next_entry);
 }
 
 bool
@@ -2654,7 +2667,16 @@ vm_map_mergeable_neighbors(vm_map_t map, vm_map_entry_t prev,
 	    prev->wired_count == entry->wired_count &&
 	    prev->cred == entry->cred &&
 	    ((map->flags & MAP_RESERVATIONS) == 0 ||
-	    prev->reservation == entry->reservation));
+	    prev->reservation == entry->reservation ||
+#ifdef CHERI_CAPREVOKE
+	    (map->rev_entry != prev &&
+	    map->rev_entry != entry &&
+	    prev->inheritance == VM_INHERIT_QUARANTINE &&
+	    entry->inheritance == VM_INHERIT_QUARANTINE)
+#else
+	    false
+#endif
+	    ));
 }
 
 static void
