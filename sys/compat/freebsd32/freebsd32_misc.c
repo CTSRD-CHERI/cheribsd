@@ -134,11 +134,6 @@ struct ptrace_io_desc32 {
 	uint32_t	piod_len;
 };
 
-struct ptrace_sc_ret32 {
-	uint32_t	sr_retval[2];
-	int		sr_error;
-};
-
 struct ptrace_vm_entry32 {
 	int		pve_entry;
 	int		pve_timestamp;
