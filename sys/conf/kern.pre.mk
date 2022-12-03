@@ -212,7 +212,7 @@ ZSTD_C= ${CC} -c -DZSTD_HEAPMODE=1 -I$S/contrib/zstd/lib/freebsd ${CFLAGS} \
 ZSTD_DECOMPRESS_BLOCK_FLAGS= -fno-tree-vectorize
 .endif
 
-ZINCDIR=$S/contrib/openzfs/include
+ZINCDIR=${ZFSTOP}/include
 # Common for dtrace / zfs
 CDDL_CFLAGS=	\
 	-DFREEBSD_NAMECACHE \
@@ -226,7 +226,7 @@ CDDL_CFLAGS=	\
 	-I${ZINCDIR}/os/freebsd/spl \
 	-I${ZINCDIR}/os/freebsd/zfs  \
 	-I$S/modules/zfs \
-	-I$S/contrib/openzfs/module/zstd/include \
+	-I${ZFSTOP}/module/zstd/include \
 	${CFLAGS} \
 	-Wno-cast-qual \
 	-Wno-duplicate-decl-specifier \
@@ -265,8 +265,8 @@ ZFS_CFLAGS+= -DBITS_PER_LONG=64
 
 
 ZFS_ASM_CFLAGS= -x assembler-with-cpp -DLOCORE ${ZFS_CFLAGS}
-ZFS_C=		${CC} -c ${ZFS_CFLAGS} ${WERROR} ${.IMPSRC}
-ZFS_RPC_C=	${CC} -c ${ZFS_CFLAGS} -DHAVE_RPC_TYPES ${WERROR} ${.IMPSRC}
+ZFS_C=		${CC} -c ${ZFS_CFLAGS} -Xclang -cheri-bounds=conservative ${WERROR} ${.IMPSRC}
+ZFS_RPC_C=	${CC} -c ${ZFS_CFLAGS} -DHAVE_RPC_TYPES -Xclang -cheri-bounds=conservative ${WERROR} ${.IMPSRC}
 ZFS_S=		${CC} -c ${ZFS_ASM_CFLAGS} ${WERROR} ${.IMPSRC}
 
 # ATH driver

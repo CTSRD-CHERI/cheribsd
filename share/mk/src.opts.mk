@@ -333,8 +333,7 @@ BROKEN_OPTIONS+=OFED
 
 .if ${__C} == "cheri" || ${__C} == "morello" || \
     ${__T:Maarch64*c*} || ${__T:Mriscv*c*}
-# Broken post OpenZFS import
-BROKEN_OPTIONS+=CDDL ZFS
+BROKEN_OPTIONS+=DTRACE
 .endif
 
 # EFI doesn't exist on powerpc (well, officially)

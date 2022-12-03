@@ -32,21 +32,29 @@ BSDCFG_SHARE="/usr/share/bsdconfig"
 : ${BSDDIALOG_OK=0}
 
 if [ -f $BSDINSTALL_TMPETC/rc.conf.services ]; then
-	eval $( sed -e s/YES/on/i -e s/NO/off/i \
-		$BSDINSTALL_TMPETC/rc.conf.services )
+	eval "$( sed -E -e 's/\<(YES|AUTO)\>/on/i' -e 's/\<NO\>/off/i' \
+		$BSDINSTALL_TMPETC/rc.conf.services )"
 else
 	# Default service states. Everything is off if not enabled.
 	sshd_enable="on"
 fi
 
+if [ -f $BSDINSTALL_TMPBOOT/loader.conf.services ]; then
+	eval "$( sed -E -e 's/\<1\>/on/' -e 's/\<0\>/off/' \
+		-e 's/[[:alnum:].]*\.//' \
+		$BSDINSTALL_TMPBOOT/loader.conf.services )"
+fi
+
 echo -n > $BSDINSTALL_TMPETC/rc.conf.services
+echo -n > $BSDINSTALL_TMPBOOT/loader.conf.services
 
 exec 3>&1
 DAEMONS=$( bsddialog --backtitle "$OSNAME Installer" \
     --title "System Configuration" --no-cancel --separate-output \
     --checklist "Choose the services you would like to be started at boot:" \
     0 0 0 \
-	local_unbound "Local caching validating resolver" ${local_unbound:-off} \
+	local_unbound "Local caching validating resolver" \
+		${local_unbound_enable:-off} \
 	sshd	"Secure shell daemon" ${sshd_enable:-off} \
 	moused	"PS/2 mouse pointer on console" ${moused_enable:-off} \
 	ntpd	"Synchronize system and network time" ${ntpd_enable:-off} \
@@ -55,6 +63,7 @@ DAEMONS=$( bsddialog --backtitle "$OSNAME Installer" \
 	powerd	"Adjust CPU frequency dynamically if supported" \
 		${powerd_enable:-off} \
 	dumpdev "Enable kernel crash dumps to /var/crash" ${dumpdev:-on} \
+	debugger_on_panic "Run debugger on kernel panic" ${debugger_on_panic:-off} \
 2>&1 1>&3 )
 retval=$?
 exec 3>&-
@@ -65,10 +74,17 @@ fi
 
 havedump=
 havemouse=
+have_debugger_on_panic=
 for daemon in $DAEMONS; do
 	[ "$daemon" = "dumpdev" ] && havedump=1 continue
+	[ "$daemon" = "debugger_on_panic" ] && have_debugger_on_panic=1 continue
 	[ "$daemon" = "moused" ] && havemouse=1
-	echo ${daemon}_enable=\"YES\" >> $BSDINSTALL_TMPETC/rc.conf.services
+	if [ "$daemon" = "ntpd_sync_on_start" ]; then
+		rcvar=${daemon}
+	else
+		rcvar=${daemon}_enable
+	fi
+	echo ${rcvar}=\"YES\" >> $BSDINSTALL_TMPETC/rc.conf.services
 done
 
 if [ ! "$havemouse" ]; then
@@ -81,4 +97,10 @@ if [ "$havedump" ]; then
 	echo dumpdev=\"AUTO\" >> $BSDINSTALL_TMPETC/rc.conf.services
 else
 	echo dumpdev=\"NO\" >> $BSDINSTALL_TMPETC/rc.conf.services
+fi
+
+if [ "$have_debugger_on_panic" ]; then
+	echo debug.debugger_on_panic=1 >> $BSDINSTALL_TMPBOOT/loader.conf.services
+else
+	echo debug.debugger_on_panic=0 >> $BSDINSTALL_TMPBOOT/loader.conf.services
 fi

@@ -727,6 +727,11 @@ dst_obj:
 
 	ldr	c12, [c12, #-CAP_WIDTH]
 	ldr	c11, target_cap
+
+	/* Push untagged csp to callee's stack to aid stack unwinding */
+	clrtag	c10, csp
+	str	c10, [c12, #-CAP_WIDTH]!
+
 	msr	rcsp_el0, c12
 	blrr	c11
 
@@ -736,6 +741,10 @@ dst_obj:
 	 * We restore it to the correct value here
 	 */
 	mrs	c10, rcsp_el0
+
+	/* Pop untagged csp from callee's stack */
+	add	c10, c10, #CAP_WIDTH
+
 	gclim	x11, c10
 	scvalue	c11, c10, x11
 	str	c10, [c11, #-CAP_WIDTH]
