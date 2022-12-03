@@ -2199,7 +2199,7 @@ if_unroute(struct ifnet *ifp, int flag, int fam)
 
 	if (ifp->if_carp)
 		(*carp_linkstate_p)(ifp);
-	rt_ifmsg(ifp);
+	rt_ifmsg(ifp, IFF_UP);
 }
 
 /*
@@ -2216,7 +2216,7 @@ if_route(struct ifnet *ifp, int flag, int fam)
 	getmicrotime(&ifp->if_lastchange);
 	if (ifp->if_carp)
 		(*carp_linkstate_p)(ifp);
-	rt_ifmsg(ifp);
+	rt_ifmsg(ifp, IFF_UP);
 #ifdef INET6
 	in6_if_up(ifp);
 #endif
@@ -2260,7 +2260,7 @@ do_link_state_change(void *arg, int pending)
 	link_state = ifp->if_link_state;
 
 	CURVNET_SET(ifp->if_vnet);
-	rt_ifmsg(ifp);
+	rt_ifmsg(ifp, 0);
 	if (ifp->if_vlantrunk != NULL)
 		(*vlan_link_state_p)(ifp);
 
@@ -2986,7 +2986,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		error = (*ifp->if_ioctl)(ifp, cmd, data);
 		if (error == 0) {
 			getmicrotime(&ifp->if_lastchange);
-			rt_ifmsg(ifp);
+			rt_ifmsg(ifp, 0);
 #ifdef INET
 			DEBUGNET_NOTIFY_MTU(ifp);
 #endif
@@ -3660,7 +3660,7 @@ if_setflag(struct ifnet *ifp, int flag, int pflag, int *refcount, int onswitch)
 	if (error)
 		goto recover;
 	/* Notify userland that interface flags have changed */
-	rt_ifmsg(ifp);
+	rt_ifmsg(ifp, flag);
 	return (0);
 
 recover:
