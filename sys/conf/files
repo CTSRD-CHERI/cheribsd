@@ -4181,39 +4181,39 @@ libkern/strtoul.c		standard
 libkern/strtouq.c		standard
 libkern/strvalid.c		standard
 libkern/timingsafe_bcmp.c	standard
-contrib/zlib/adler32.c		optional crypto | geom_uzip | \
+contrib/zlib/adler32.c		optional geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib \
 	compile-with "${ZLIB_C}"
-contrib/zlib/compress.c		optional crypto | geom_uzip | \
+contrib/zlib/compress.c		optional geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib \
 	compile-with "${ZLIB_C}"
-contrib/zlib/crc32.c		optional crypto | geom_uzip | \
+contrib/zlib/crc32.c		optional geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib \
 	compile-with "${ZLIB_C}"
-contrib/zlib/deflate.c		optional crypto | geom_uzip | \
+contrib/zlib/deflate.c		optional geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib \
 	compile-with "${ZLIB_C}"
-contrib/zlib/inffast.c		optional crypto | geom_uzip | \
+contrib/zlib/inffast.c		optional geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib \
 	compile-with "${ZLIB_C}"
-contrib/zlib/inflate.c		optional crypto | geom_uzip | \
+contrib/zlib/inflate.c		optional geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib \
 	compile-with "${ZLIB_C}"
-contrib/zlib/inftrees.c		optional crypto | geom_uzip | \
+contrib/zlib/inftrees.c		optional geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib \
 	compile-with "${ZLIB_C}"
-contrib/zlib/trees.c		optional crypto | geom_uzip | \
+contrib/zlib/trees.c		optional geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib \
 	compile-with "${ZLIB_C}"
-contrib/zlib/uncompr.c		optional crypto | geom_uzip | \
+contrib/zlib/uncompr.c		optional geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib \
 	compile-with "${ZLIB_C}"
-contrib/zlib/zutil.c		optional crypto | geom_uzip | \
+contrib/zlib/zutil.c		optional geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib \
 	compile-with "${ZLIB_C}"
-dev/zlib/zlib_mod.c		optional crypto | geom_uzip | \
+dev/zlib/zlib_mod.c		optional geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib
-dev/zlib/zcalloc.c		optional crypto | geom_uzip | \
+dev/zlib/zcalloc.c		optional geom_uzip | \
 	mxge | ddb_ctf | gzio | zfs | zlib
 net/altq/altq_cbq.c		optional altq
 net/altq/altq_codel.c		optional altq
