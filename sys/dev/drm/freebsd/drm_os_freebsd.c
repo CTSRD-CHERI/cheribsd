@@ -268,6 +268,8 @@ drm_fstub_ioctl(struct file *file, u_long cmd, void *data, struct ucred *cred,
 	}
 
 	rv = -fops->unlocked_ioctl(file, cmd, (uintcap_t)PTR2CAP(data));
+	if (rv == ERESTARTSYS)
+		rv = ERESTART;
 
 	dev_relthread(cdev, ref);
 	return (rv);
