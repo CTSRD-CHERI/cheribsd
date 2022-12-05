@@ -30,14 +30,30 @@
 #define _SYS__COMPRESSOR_H_
 
 #ifdef _KERNEL
+#include <sys/linker_set.h>
+#include <sys/malloc.h>
 
-/* Supported formats. */
-#define	COMPRESS_GZIP	1
-#define	COMPRESS_ZSTD	2
+/* Supported compressor methods. */
+#define	COMPRESS_ZLIB_DEFLATE	1
+#define	COMPRESS_ZLIB_INFLATE	2
+#define	COMPRESS_GZIP		3
+#define	COMPRESS_ZSTD		4
 
 typedef int (*compressor_cb_t)(void *, size_t, off_t, void *);
 
+struct compressor_methods {
+	int format;
+	void *(* const init)(size_t, int);
+	void (* const reset)(void *);
+	int (* const write)(void *, void *, size_t, compressor_cb_t, void *);
+	void (* const fini)(void *);
+};
+
 struct compressor;
+
+SET_DECLARE(compressors, struct compressor_methods);
+
+MALLOC_DECLARE(M_COMPRESS);
 
 bool		compressor_avail(int format);
 struct compressor *compressor_init(compressor_cb_t cb, int format,
