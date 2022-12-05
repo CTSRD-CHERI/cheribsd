@@ -682,7 +682,7 @@ options  	TCP_RFC7413		# TCP Fast Open
 
 options  	TCPHPTS
 
-# In order to enable IPSEC you MUST also add device crypto to 
+# In order to enable IPSEC you MUST also add device crypto and zlib to
 # your kernel configuration
 options 	IPSEC			#IP security (requires device crypto)
 
