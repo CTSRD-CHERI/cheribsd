@@ -35,6 +35,9 @@
 #ifndef _CRYPTO_DEFLATE_H_
 #define _CRYPTO_DEFLATE_H_
 
+#include <sys/param.h>
+#include <sys/queue.h>
+
 #define Z_METHOD	8
 #define Z_MEMLEVEL	8
 #define MINCOMP		2	/* won't be used, but must be defined */
@@ -47,9 +50,9 @@ uint32_t deflate_global(uint8_t *, uint32_t, int, uint8_t **);
  * from the struct immediately followed by the real application data.
  */
 struct deflate_buf {
-	struct deflate_buf *next;
-	uint32_t size;
-	uint8_t data[];
+	TAILQ_ENTRY(deflate_buf)	next;
+	uint32_t			size;
+	uint8_t				data[];
 };
 
 #endif /* _CRYPTO_DEFLATE_H_ */
