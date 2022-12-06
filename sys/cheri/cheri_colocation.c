@@ -616,12 +616,12 @@ kern_cosetup(struct thread *td, int what,
 			    td->td_proc->p_sysent->sv_cocall_len);
 		}
 		codecap = cheri_seal(codecap, switcher_sealcap);
-		error = sucap(codep, (intcap_t)codecap);
+		error = sucap(codep, (intcap_t)codecap) == 0 ? 0 : EFAULT;
 		if (error != 0)
 			return (error);
 
 		datacap = cheri_seal(td->td_scb, switcher_sealcap);
-		error = sucap(datap, (intcap_t)datacap);
+		error = sucap(datap, (intcap_t)datacap) == 0 ? 0 : EFAULT;
 		return (error);
 
 	case COSETUP_COACCEPT:
@@ -634,12 +634,12 @@ kern_cosetup(struct thread *td, int what,
 			    td->td_proc->p_sysent->sv_coaccept_len);
 		}
 		codecap = cheri_seal(codecap, switcher_sealcap);
-		error = sucap(codep, (intcap_t)codecap);
+		error = sucap(codep, (intcap_t)codecap) == 0 ? 0 : EFAULT;
 		if (error != 0)
 			return (error);
 
 		datacap = cheri_seal(td->td_scb, switcher_sealcap);
-		error = sucap(datap, (intcap_t)datacap);
+		error = sucap(datap, (intcap_t)datacap) == 0 ? 0 : EFAULT;
 		return (error);
 
 	case COSETUP_TAKEOVER:
@@ -700,7 +700,7 @@ kern_coregister(struct thread *td, const char * __capability namep,
 	cap = cheri_seal(td->td_scb, switcher_sealcap2);
 
 	if (capp != NULL) {
-		error = sucap(capp, (intcap_t)cap);
+		error = sucap(capp, (intcap_t)cap) == 0 ? 0 : EFAULT;
 		if (error != 0)
 			return (error);
 	}
@@ -773,7 +773,7 @@ kern_colookup(struct thread *td, const char * __capability namep,
 
 	cap = (intcap_t)con->c_value;
 	vm_map_unlock_read(&vmspace->vm_map);
-	error = sucap(capp, cap);
+	error = sucap(capp, cap) == 0 ? 0 : EFAULT;
 	return (error);
 }
 
@@ -1104,7 +1104,7 @@ again:
 	 */
 	if (cookiep != NULL) {
 		cookie = cheri_cleartag(scb.scb_caller_scb);
-		error = sucap(cookiep, (intcap_t)cookie);
+		error = sucap(cookiep, (intcap_t)cookie) == 0 ? 0 : EFAULT;
 		if (error != 0) {
 			COLOCATION_DEBUG("sucap error %d", error);
 			wakeupself();
@@ -1159,7 +1159,7 @@ sys_capfromfd(struct thread *td, struct capfromfd_args *uap)
 
 	fcap = (void * __capability)fp;
 	fcap = cheri_seal(fcap, capfd_sealcap);
-	error = sucap(uap->capp, (intcap_t)fcap);
+	error = sucap(uap->capp, (intcap_t)fcap) == 0 ? 0 : EFAULT;
 	if (error != 0)
 		COLOCATION_DEBUG("sucap error %d", error);
 
