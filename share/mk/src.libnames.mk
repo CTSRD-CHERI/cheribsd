@@ -768,6 +768,8 @@ LIBLNDIR=	${_LIB_OBJTOP}/usr.bin/lex/lib
 
 LIBTERMCAPWDIR=	${LIBTINFOWDIR}
 
+.-include <site.src.libnames.mk>
+
 # Default other library directories to lib/libNAME.
 .for lib in ${_LIBRARIES}
 LIB${lib:tu}DIR?=	${_LIB_OBJTOP}/lib/lib${lib}
