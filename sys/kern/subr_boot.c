@@ -125,7 +125,7 @@ boot_howto_to_env(int howto)
  * variable and set that instead.
  */
 int
-boot_parse_arg(char *v)
+boot_parse_arg(const char *v)
 {
 	char *n;
 	int howto;
@@ -170,14 +170,19 @@ static int howto_masks[] = {
 			}
 		}
 	} else {
-		n = strsep(&v, "=");
+		char buf[128];
+		char *vv = buf;
+
+		strlcpy(buf, v, sizeof(buf));
+		n = strsep(&vv, "=");
 		/* We shouldn't add empty variable names to the environment. */
 		if (n && *n != '\0') {
-			if (v == NULL)
+			if (vv == NULL)
 				SETENV(n, "1");
 			else
-				SETENV(n, v);
+				SETENV(n, vv);
 		}
+		free(vv);
 	}
 #endif
 	return (howto);
