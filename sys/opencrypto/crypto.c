@@ -85,6 +85,7 @@
 #include <crypto/intake.h>
 #include <opencrypto/cryptodev.h>
 #include <opencrypto/xform_auth.h>
+#include <opencrypto/xform_comp.h>
 #include <opencrypto/xform_enc.h>
 
 #include <sys/kobj.h>
@@ -585,6 +586,18 @@ crypto_cipher(const struct crypto_session_params *csp)
 		return (&enc_xform_chacha20_poly1305);
 	case CRYPTO_XCHACHA20_POLY1305:
 		return (&enc_xform_xchacha20_poly1305);
+	default:
+		return (NULL);
+	}
+}
+
+const struct comp_algo *
+crypto_compressor(const struct crypto_session_params *csp)
+{
+
+	switch (csp->csp_cipher_alg) {
+	case CRYPTO_DEFLATE_COMP:
+		return (&comp_algo_deflate);
 	default:
 		return (NULL);
 	}
