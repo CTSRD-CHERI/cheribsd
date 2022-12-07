@@ -604,6 +604,7 @@ const struct crypto_session_params *crypto_get_params(
     crypto_session_t crypto_session);
 const struct auth_hash *crypto_auth_hash(const struct crypto_session_params *csp);
 const struct enc_xform *crypto_cipher(const struct crypto_session_params *csp);
+const struct comp_algo *crypto_compressor(const struct crypto_session_params *csp);
 
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_CRYPTO_DATA);

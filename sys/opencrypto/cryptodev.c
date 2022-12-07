@@ -334,6 +334,7 @@ cse_create(struct fcrypt *fcr, struct session2_op *sop)
 {
 	struct crypto_session_params csp;
 	struct csession *cse;
+	const struct comp_algo *tcomp;
 	const struct enc_xform *txform;
 	const struct auth_hash *thash;
 	void *key = NULL;
@@ -388,6 +389,7 @@ cse_create(struct fcrypt *fcr, struct session2_op *sop)
 	}
 	thash = crypto_auth_hash(&csp);
 	txform = crypto_cipher(&csp);
+	tcomp = crypto_compressor(&csp);
 
 	if (txform != NULL && txform->macsize != 0) {
 		if (mac != 0) {
@@ -401,6 +403,8 @@ cse_create(struct fcrypt *fcr, struct session2_op *sop)
 		csp.csp_mode = CSP_MODE_CIPHER;
 	} else if (thash != NULL) {
 		csp.csp_mode = CSP_MODE_DIGEST;
+	} else if (tcomp != NULL) {
+		csp.csp_mode = CSP_MODE_COMPRESS;
 	} else {
 		SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 		return (EINVAL);
