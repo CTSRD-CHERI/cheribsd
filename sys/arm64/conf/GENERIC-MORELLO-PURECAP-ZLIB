@@ -23,6 +23,8 @@ include "GENERIC-MORELLO-PURECAP"
 
 ident		GENERIC-MORELLO-PURECAP-ZLIB
 
+device		cryptodev	# /dev/crypto to test zlib via crypto(9)
+
 # Don't compile in the zlib device
 nodevice	zlib
 
