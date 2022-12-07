@@ -182,7 +182,6 @@ static int howto_masks[] = {
 			else
 				SETENV(n, vv);
 		}
-		free(vv);
 	}
 #endif
 	return (howto);
