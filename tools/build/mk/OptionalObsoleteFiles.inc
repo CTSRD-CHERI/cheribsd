@@ -445,6 +445,7 @@ OLD_FILES+=usr/libexec/bsdinstall/auto
 OLD_FILES+=usr/libexec/bsdinstall/autopart
 OLD_FILES+=usr/libexec/bsdinstall/bootconfig
 OLD_FILES+=usr/libexec/bsdinstall/checksum
+OLD_FILES+=usr/libexec/bsdinstall/cheri-desktop
 OLD_FILES+=usr/libexec/bsdinstall/config
 OLD_FILES+=usr/libexec/bsdinstall/distextract
 OLD_FILES+=usr/libexec/bsdinstall/distfetch
