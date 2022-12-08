@@ -4,6 +4,7 @@ SCRIPTS=auto \
 	adduser \
 	bootconfig \
 	checksum \
+	cheri-desktop \
 	config \
 	docsinstall \
 	entropy \
