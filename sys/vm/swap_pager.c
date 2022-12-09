@@ -529,7 +529,7 @@ static void cheri_restore_tag(void * __capability *);
 static void swp_pager_meta_cheri_get_tags(vm_page_t);
 static void swp_pager_meta_cheri_put_tags(vm_page_t);
 #endif
-static void swp_pager_meta_free(vm_object_t, vm_pindex_t, vm_size_t,
+static void swp_pager_meta_free(vm_object_t, vm_pindex_t, vm_pindex_t,
     vm_size_t *);
 static void swp_pager_meta_transfer(vm_object_t src, vm_object_t dst,
     vm_pindex_t pindex, vm_pindex_t count, vm_size_t *freed);
