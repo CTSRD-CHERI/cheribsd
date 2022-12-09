@@ -43,6 +43,7 @@
 #include <sys/kernel.h>
 #include <sys/linker_set.h>
 #include <sys/malloc.h>
+#include <sys/queue.h>
 
 MALLOC_DEFINE(M_COMPRESS, "compressor", "kernel compression subroutines");
 
@@ -52,6 +53,9 @@ struct compressor {
 	void *priv;
 	void *arg;
 };
+
+TAILQ_HEAD(, compressor_methods) compressors =
+    TAILQ_HEAD_INITIALIZER(compressors);
 
 #ifdef GZIO
 
@@ -239,7 +243,7 @@ struct compressor_methods gzip_methods = {
 	.write = gz_write,
 	.fini = gz_fini,
 };
-DATA_SET(compressors, gzip_methods);
+COMPRESSOR_LOAD(gzip, &gzip_methods);
 
 #endif /* GZIO */
 
@@ -485,43 +489,57 @@ static struct compressor_methods zstd_methods = {
 	.write = zstdio_write,
 	.fini = zstdio_fini,
 };
-DATA_SET(compressors, zstd_methods);
+COMPRESSOR_LOAD(zstd, &zstd_methods);
 
 #endif /* ZSTDIO */
 
 bool
 compressor_avail(int format)
 {
-	struct compressor_methods **iter;
+	struct compressor_methods *iter;
 
-	SET_FOREACH(iter, compressors) {
-		if ((*iter)->format == format)
+	TAILQ_FOREACH(iter, &compressors, next) {
+		if (iter->format == format)
 			return (true);
 	}
 	return (false);
+}
+
+void
+compressor_register(struct compressor_methods *method)
+{
+
+	TAILQ_INSERT_TAIL(&compressors, method, next);
+}
+
+void
+compressor_unregister(struct compressor_methods *method)
+{
+
+	TAILQ_REMOVE(&compressors, method, next);
 }
 
 struct compressor *
 compressor_init(compressor_cb_t cb, int format, size_t maxiosize, int level,
     void *arg)
 {
-	struct compressor_methods **iter;
+	struct compressor_methods *iter;
 	struct compressor *s;
 	void *priv;
 
-	SET_FOREACH(iter, compressors) {
-		if ((*iter)->format == format)
+	TAILQ_FOREACH(iter, &compressors, next) {
+		if (iter->format == format)
 			break;
 	}
-	if (iter == SET_LIMIT(compressors))
+	if (iter == NULL)
 		return (NULL);
 
-	priv = (*iter)->init(maxiosize, level);
+	priv = iter->init(maxiosize, level);
 	if (priv == NULL)
 		return (NULL);
 
 	s = malloc(sizeof(*s), M_COMPRESS, M_WAITOK | M_ZERO);
-	s->methods = (*iter);
+	s->methods = iter;
 	s->priv = priv;
 	s->cb = cb;
 	s->arg = arg;
