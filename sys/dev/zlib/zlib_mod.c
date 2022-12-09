@@ -241,7 +241,7 @@ zlib_fini(void *stream)
 	zlib_stream_free(NULL, s);
 }
 
-struct compressor_methods zlib_deflate_methods = {
+static struct compressor_methods zlib_deflate_methods = {
 	.format = COMPRESS_ZLIB_DEFLATE,
 	.init = zlib_deflate_init,
 	.reset = zlib_reset,
@@ -250,7 +250,7 @@ struct compressor_methods zlib_deflate_methods = {
 };
 DATA_SET(compressors, zlib_deflate_methods);
 
-struct compressor_methods zlib_inflate_methods = {
+static struct compressor_methods zlib_inflate_methods = {
 	.format = COMPRESS_ZLIB_INFLATE,
 	.init = zlib_inflate_init,
 	.reset = zlib_reset,
