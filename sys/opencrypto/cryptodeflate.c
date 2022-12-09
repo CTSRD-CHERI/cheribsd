@@ -81,7 +81,7 @@ deflate_global(uint8_t *data, uint32_t size, int decomp, uint8_t **out)
 {
 	/* decomp indicates whether we compress (0) or decompress (1) */
 
-	uint8_t *output;
+	uint8_t *output, *outputp;
 	uint32_t result;
 	int error, i;
 	struct compressor *stream;
@@ -149,9 +149,10 @@ deflate_global(uint8_t *data, uint32_t size, int decomp, uint8_t **out)
 		    ENOMEM, __LINE__, 0, 0, 0);
 		goto out;
 	}
+	outputp = output;
 	TAILQ_FOREACH_SAFE(buf, &bufs, next, tmpbuf) {
-		bcopy(&buf->data, output, buf->size);
-		output += buf->size;
+		bcopy(&buf->data, outputp, buf->size);
+		outputp += buf->size;
 		TAILQ_REMOVE(&bufs, buf, next);
 		free(buf, M_CRYPTO_DATA);
 	}
