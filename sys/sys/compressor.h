@@ -30,14 +30,23 @@
 #define _SYS__COMPRESSOR_H_
 
 #ifdef _KERNEL
+#include <sys/param.h>
+#include <sys/kernel.h>
 #include <sys/linker_set.h>
 #include <sys/malloc.h>
+#include <sys/queue.h>
 
 /* Supported compressor methods. */
 #define	COMPRESS_ZLIB_DEFLATE	1
 #define	COMPRESS_ZLIB_INFLATE	2
 #define	COMPRESS_GZIP		3
 #define	COMPRESS_ZSTD		4
+
+#define	COMPRESSOR_LOAD(name, methods)					\
+	SYSINIT(compressor_ ## name, SI_SUB_DRIVERS, SI_ORDER_ANY,	\
+	(sysinit_cfunc_t)compressor_register, methods);			\
+	SYSUNINIT(compressor_ ## name, SI_SUB_DRIVERS, SI_ORDER_ANY,	\
+	compressor_unregister, methods)
 
 typedef int (*compressor_cb_t)(void *, size_t, off_t, void *);
 
@@ -47,14 +56,15 @@ struct compressor_methods {
 	void (* const reset)(void *);
 	int (* const write)(void *, void *, size_t, compressor_cb_t, void *);
 	void (* const fini)(void *);
+	TAILQ_ENTRY(compressor_methods) next;
 };
 
 struct compressor;
 
-SET_DECLARE(compressors, struct compressor_methods);
-
 MALLOC_DECLARE(M_COMPRESS);
 
+void		compressor_register(struct compressor_methods *method);
+void		compressor_unregister(struct compressor_methods *method);
 bool		compressor_avail(int format);
 struct compressor *compressor_init(compressor_cb_t cb, int format,
 		    size_t maxiosize, int level, void *arg);

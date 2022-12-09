@@ -248,7 +248,7 @@ static struct compressor_methods zlib_deflate_methods = {
 	.write = zlib_write,
 	.fini = zlib_fini
 };
-DATA_SET(compressors, zlib_deflate_methods);
+COMPRESSOR_LOAD(zlib_deflate, &zlib_deflate_methods);
 
 static struct compressor_methods zlib_inflate_methods = {
 	.format = COMPRESS_ZLIB_INFLATE,
@@ -257,7 +257,7 @@ static struct compressor_methods zlib_inflate_methods = {
 	.write = zlib_write,
 	.fini = zlib_fini
 };
-DATA_SET(compressors, zlib_inflate_methods);
+COMPRESSOR_LOAD(zlib_inflate, &zlib_inflate_methods);
 
 static int
 zlib_modevent(module_t mod, int type, void *unused)
