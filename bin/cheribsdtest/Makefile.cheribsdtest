@@ -16,6 +16,7 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 	cheribsdtest_local_global.c					\
 	cheribsdtest_longjmp.c						\
 	cheribsdtest_printf.c						\
+	cheribsdtest_ptrace.c						\
 	cheribsdtest_registers.c					\
 	cheribsdtest_sealcap.c						\
 	cheribsdtest_signal.c						\
