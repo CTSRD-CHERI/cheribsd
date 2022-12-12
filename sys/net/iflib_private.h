@@ -71,6 +71,7 @@ void iflib_stop(if_ctx_t ctx);
 // CHERI CHANGES START
 // {
 //   "updated": 20221205,
+//   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ]
