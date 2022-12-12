@@ -5062,7 +5062,7 @@ MODULE_DEPEND(mlx5en, mlx5, 1, 1, 1);
 MODULE_VERSION(mlx5en, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20210525,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

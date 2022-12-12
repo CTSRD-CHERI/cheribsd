@@ -113,7 +113,7 @@ MODULE_DEPEND(g_journal, ufs, 1, 1, 1);
 MODULE_VERSION(geom_journal, 0);
 // CHERI CHANGES START
 // {
-//   "updated": 20190628,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_shape"

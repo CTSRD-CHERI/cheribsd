@@ -2613,8 +2613,11 @@ DB_SHOW_COMMAND(ffs, db_show_ffs)
 #endif	/* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20190628,
+//   "updated": 20221205,
 //   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ],
 //   "changes_purecap": [
 //     "pointer_shape",
 //     "kdb"

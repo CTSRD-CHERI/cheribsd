@@ -685,11 +685,12 @@ initriscv(struct riscv_bootparams *rvbp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "pointer_provenance"
+//     "pointer_provenance",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

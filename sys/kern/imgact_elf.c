@@ -3428,16 +3428,18 @@ __elfN(untrans_capprot)(vm_prot_t prot)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200708,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
+//     "support",
 //     "pointer_provenance",
 //     "pointer_as_integer",
-//     "uintcap_arithmetic"
+//     "uintcap_arithmetic",
+//     "pointer_alignment"
 //   ]
 // }
 // CHERI CHANGES END

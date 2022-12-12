@@ -865,7 +865,7 @@ struct protosw rip6_protosw = {
 };
 // CHERI CHANGES START
 // {
-//   "updated": 20181115,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

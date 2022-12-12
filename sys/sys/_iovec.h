@@ -95,7 +95,7 @@ typedef int(updateiov_t)(const struct uio *uiop,
 #endif /* !_SYS__IOVEC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "iovec-macros"

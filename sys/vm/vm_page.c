@@ -5601,7 +5601,7 @@ DB_SHOW_COMMAND(pginfo, vm_page_print_pginfo)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221212,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_alignment",

@@ -15000,7 +15000,7 @@ DB_SHOW_COMMAND(sd_allocindir, db_show_sd_allocindir)
 #endif /* SOFTUPDATES */
 // CHERI CHANGES START
 // {
-//   "updated": 20190628,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_provenance",

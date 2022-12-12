@@ -1449,7 +1449,7 @@ sbuf_printf_drain(void *arg, const char *data, int len)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20200804,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support"

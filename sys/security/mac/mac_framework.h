@@ -715,7 +715,7 @@ int	vop_stdsetlabel_ea(struct vop_setlabel_args *ap);
 #endif /* !_SECURITY_MAC_MAC_FRAMEWORK_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

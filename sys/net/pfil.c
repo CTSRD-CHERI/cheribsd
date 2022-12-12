@@ -709,12 +709,3 @@ pfilioc_link(struct pfilioc_link *req)
 
 	return (pfil_link(&args));
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20190812,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "subobject_bounds"
-//   ]
-// }
-// CHERI CHANGES END

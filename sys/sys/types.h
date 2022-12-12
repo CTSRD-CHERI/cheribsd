@@ -389,7 +389,7 @@ typedef	void * __capability	otype_t;
 #endif /* !_SYS_TYPES_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "support",

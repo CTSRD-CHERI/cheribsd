@@ -340,7 +340,7 @@ extern uint8_t mpath_entropy_key[MPATH_ENTROPY_KEY_LEN];
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"

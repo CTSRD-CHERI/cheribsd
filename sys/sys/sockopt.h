@@ -79,10 +79,11 @@ int	so_setsockopt(struct socket *so, int level, int optname,
 #endif /* _SYS_SOCKOPT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
-//     "user_capabilities"
+//     "user_capabilities",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

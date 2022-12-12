@@ -29,10 +29,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20221129,
  *   "target_type": "prog",
  *   "changes": [
- *     "other"
+ *     "pointer_alignment"
  *   ],
  *   "change_comment": "workaround for aligning array on stack"
  * }

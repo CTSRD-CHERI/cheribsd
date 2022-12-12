@@ -3792,7 +3792,7 @@ bridge_linkcheck(struct bridge_softc *sc)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20210525,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

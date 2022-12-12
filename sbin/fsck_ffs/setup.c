@@ -448,7 +448,7 @@ saverecovery(int readfd, int writefd)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221129,
 //   "target_type": "prog",
 //   "changes_purecap": [
 //     "pointer_shape"

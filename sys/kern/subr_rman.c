@@ -1140,9 +1140,10 @@ DB_SHOW_ALIAS_FLAGS(allrman, db_show_all_rman, DB_CMD_MEMSAFE);
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
+//     "pointer_as_integer",
 //     "kdb"
 //   ]
 // }

@@ -1171,10 +1171,14 @@ int vn_lktype_write(struct mount *mp, struct vnode *vp);
 #endif /* !_SYS_VNODE_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20221205,
 //   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ],
 //   "changes_purecap": [
-//     "subobject_bounds"
+//     "subobject_bounds",
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

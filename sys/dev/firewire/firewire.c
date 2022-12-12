@@ -2388,10 +2388,11 @@ DRIVER_MODULE(firewire, fwohci, firewire_driver, fw_modevent, NULL);
 MODULE_VERSION(firewire, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros"
+//     "iovec-macros",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

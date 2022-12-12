@@ -316,10 +316,13 @@ extern struct nchstats nchstats;
 #endif /* !_SYS_NAMEI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

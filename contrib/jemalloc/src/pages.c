@@ -1,12 +1,13 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181113,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
  *     "unsupported",
  *     "virtual_address",
- *     "other"
+ *     "other",
+ *     "support"
  *   ],
  *   "change_comment": "No MAP_FIXED, LG_PAGE hack"
  * }
