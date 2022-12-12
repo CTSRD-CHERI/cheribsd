@@ -428,7 +428,7 @@ void	trapsignal(struct thread *td, ksiginfo_t *ksi);
 #endif /* !_SYS_SIGNALVAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "kernel_sig_types",

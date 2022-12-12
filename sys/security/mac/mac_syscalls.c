@@ -698,7 +698,7 @@ sys_mac_syscall(struct thread *td, struct mac_syscall_args *uap)
 #endif /* !MAC */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

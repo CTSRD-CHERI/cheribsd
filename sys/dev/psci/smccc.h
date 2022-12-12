@@ -119,7 +119,7 @@ int arm_smccc_1_2_smc(const struct arm_smccc_1_2_regs *args,
 #endif /* _PSCI_SMCCC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20210407,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

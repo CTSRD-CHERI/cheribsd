@@ -1050,11 +1050,12 @@ DB_SHOW_COMMAND(vtop, db_show_vtop)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20210413,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "support"
+//     "support",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

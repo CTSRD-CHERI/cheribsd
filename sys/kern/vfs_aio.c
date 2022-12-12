@@ -3710,15 +3710,16 @@ freebsd64_lio_listio(struct thread *td, struct freebsd64_lio_listio_args *uap)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kernel_sig_types",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "support"
 //   ],
 //   "changes_purecap": [
-//     "uintptr_interp_offset",
+//     "virtual_address",
 //     "pointer_as_integer"
 //   ]
 // }

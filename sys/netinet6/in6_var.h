@@ -930,7 +930,7 @@ struct mbuf *ip6_tryforward(struct mbuf *);
 #endif /* _NETINET6_IN6_VAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20191205,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "user_capabilities",

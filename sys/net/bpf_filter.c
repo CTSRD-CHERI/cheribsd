@@ -606,7 +606,7 @@ bpf_validate(const struct bpf_insn *f, int len)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20190603,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_alignment"

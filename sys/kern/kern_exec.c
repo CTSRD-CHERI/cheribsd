@@ -2384,14 +2384,15 @@ sbuf_drain_core_output(void *arg, const char *data, int len)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

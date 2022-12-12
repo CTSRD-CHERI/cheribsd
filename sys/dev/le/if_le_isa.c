@@ -500,7 +500,7 @@ MODULE_DEPEND(le, ether, 1, 1, 1);
 ISA_PNP_INFO(le_isa_ids);
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "subobject_bounds"

@@ -578,7 +578,7 @@ cpu_mp_setmaxid(void)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support",

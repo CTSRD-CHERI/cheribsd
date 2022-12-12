@@ -440,11 +440,15 @@ __END_DECLS
 #endif	/* _SYS_PARAM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190528,
+//   "updated": 20221205,
 //   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ],
 //   "changes_purecap": [
 //     "pointer_alignment",
-//     "pointer_shape"
+//     "pointer_shape",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

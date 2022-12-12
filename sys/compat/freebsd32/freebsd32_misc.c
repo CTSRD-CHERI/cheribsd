@@ -3928,7 +3928,7 @@ ofreebsd32_sethostid(struct thread *td, struct ofreebsd32_sethostid_args *uap)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

@@ -267,7 +267,7 @@ struct ioc_capability {			/*<2>*/
 #endif /* !_SYS_CDIO_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "ioctl:misc"

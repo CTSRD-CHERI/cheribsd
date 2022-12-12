@@ -188,7 +188,7 @@ pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 #endif	/* !_MACHINE_PMAP_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20210420,
+//   "updated": 20221129,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "support",

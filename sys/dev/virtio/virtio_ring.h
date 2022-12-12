@@ -173,7 +173,7 @@ vring_need_event(uint16_t event_idx, uint16_t new_idx, uint16_t old)
 #endif /* VIRTIO_RING_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_alignment"

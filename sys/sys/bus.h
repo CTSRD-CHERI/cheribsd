@@ -1024,9 +1024,10 @@ bool dev_wired_cache_match(device_location_cache_t *dcp, device_t dev, const cha
 #endif /* !_SYS_BUS_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
+//     "user_capabilities",
 //     "pointer_shape"
 //   ]
 // }

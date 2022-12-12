@@ -882,7 +882,7 @@ mac_veriexec_proc_is_trusted(struct ucred *cred, struct proc *p)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "changes": [
 //     "user_capabilities"
 //   ]

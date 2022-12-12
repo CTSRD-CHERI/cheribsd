@@ -216,8 +216,11 @@ int	pfil_realloc(pfil_packet_t *, int, struct ifnet *);
 #endif /* _NET_PFIL_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190603,
+//   "updated": 20221205,
 //   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ],
 //   "changes_purecap": [
 //     "pointer_alignment"
 //   ]

@@ -1143,10 +1143,13 @@ tunable_str_init(void *data)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

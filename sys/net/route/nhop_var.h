@@ -111,12 +111,3 @@ struct nhop_priv *unlink_nhop(struct nh_control *ctl, struct nhop_priv *nh_priv)
 int cmp_priv(const struct nhop_priv *_one, const struct nhop_priv *_two);
 
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20200706,
-//   "target_type": "header",
-//   "changes_purecap": [
-//     "subobject_bounds"
-//   ]
-// }
-// CHERI CHANGES END

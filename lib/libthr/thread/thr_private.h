@@ -33,11 +33,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181121,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
  *     "calling_convention",
- *     "unsupported"
+ *     "unsupported",
+ *     "subobject_bounds"
  *   ],
  *   "change_comment": "stack pointer"
  * }

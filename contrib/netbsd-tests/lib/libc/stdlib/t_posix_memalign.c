@@ -31,7 +31,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20221129,
  *   "target_type": "test",
  *   "changes": [
  *     "pointer_alignment"

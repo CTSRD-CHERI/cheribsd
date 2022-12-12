@@ -578,7 +578,7 @@ void vm_map_entry_set_vnode_text(vm_map_entry_t entry, bool add);
 #endif				/* _VM_MAP_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

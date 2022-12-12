@@ -30,10 +30,11 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181114,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
- *     "monotonicity"
+ *     "monotonicity",
+ *     "other"
  *   ],
  *   "change_comment": "request max perms on mmap not PROT_NONE"
  * }

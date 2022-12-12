@@ -292,11 +292,12 @@ extern void *init_pt_va;
 #endif /* !_MACHINE_VMPARAM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "support"
+//     "support",
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

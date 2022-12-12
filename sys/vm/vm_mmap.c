@@ -2180,7 +2180,7 @@ vm_mmap_to_errno(int rv)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20221212,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
@@ -2188,7 +2188,8 @@ vm_mmap_to_errno(int rv)
 //   ],
 //   "changes_purecap": [
 //     "support",
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "bounds_compression"
 //   ]
 // }
 // CHERI CHANGES END

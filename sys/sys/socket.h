@@ -796,10 +796,11 @@ void so_unlock(struct socket *so);
 #endif /* !_SYS_SOCKET_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_alignment"
+//     "pointer_alignment",
+//     "user_capabilities"
 //   ],
 //   "changes_purecap": [
 //     "subobject_bounds"

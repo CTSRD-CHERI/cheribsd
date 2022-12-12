@@ -87,10 +87,11 @@ int	savectx(struct pcb *pcb) __returns_twice;
 #endif /* !_MACHINE_PCB_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20210407,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "support"
+//     "support",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

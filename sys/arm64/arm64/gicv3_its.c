@@ -2058,10 +2058,11 @@ gicv3_its_acpi_attach(device_t dev)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20210427,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer-as-integer"
+//     "pointer_as_integer",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

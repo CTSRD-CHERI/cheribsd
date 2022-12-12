@@ -27,10 +27,11 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181127,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
- *     "support"
+ *     "support",
+ *     "subobject_bounds"
  *   ],
  *   "change_comment": "init/fini array support"
  * }
