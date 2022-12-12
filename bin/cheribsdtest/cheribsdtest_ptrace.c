@@ -164,3 +164,41 @@ CHERIBSDTEST(test_ptrace_readtags, "Basic test of PIOD_READ_CHERI_TAGS")
 
 	cheribsdtest_success();
 }
+
+CHERIBSDTEST(test_ptrace_readcap_pageend,
+    "Use PIOD_READ_CHERI_CAP to fetch capability at the end of a page")
+{
+	struct ptrace_io_desc piod;
+	size_t page_size;
+	pid_t pid;
+	uintcap_t cap, *pp;
+	u_int last_index;
+	char capbuf[sizeof(uintcap_t) + 1];
+
+	page_size = getpagesize();
+	pp = aligned_alloc(page_size, page_size);
+	memset(pp, 0, page_size);
+	last_index = (page_size / sizeof(uintcap_t)) - 1;
+	pp[last_index] = (uintcap_t)(__cheri_tocap void * __capability)&piod;
+
+	CHERIBSDTEST_VERIFY(cheri_gettag(pp[last_index]) != 0);
+
+	pid = fork_child();
+
+	piod.piod_op = PIOD_READ_CHERI_CAP;
+	piod.piod_offs = &pp[last_index];
+	piod.piod_addr = capbuf;
+	piod.piod_len = sizeof(capbuf);
+	CHERIBSDTEST_VERIFY(ptrace(PT_IO, pid, (caddr_t)&piod, 0) == 0);
+
+	CHERIBSDTEST_VERIFY(piod.piod_len == sizeof(capbuf));
+	CHERIBSDTEST_VERIFY2(capbuf[0] == 1,
+	    "Tag not set in returned buffer");
+	memcpy(&cap, &capbuf[1], sizeof(cap));
+	CHERIBSDTEST_VERIFY2(cheri_equal_exact(cheri_cleartag(pp[last_index]),
+	    cap), "Mismatch in non-tag bits of first capability");
+
+	finish_child(pid);
+
+	cheribsdtest_success();
+}
