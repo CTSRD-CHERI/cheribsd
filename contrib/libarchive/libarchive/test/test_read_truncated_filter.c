@@ -82,7 +82,7 @@ test_truncation(const char *compression,
 	archive_entry_set_filetype(ae, AE_IFREG);
 	archive_entry_set_size(ae, datasize);
 	for (i = 0; i < 100; i++) {
-		sprintf(path, "%s%d", compression, i);
+		snprintf(path, sizeof(path), "%s%d", compression, i);
 		archive_entry_copy_pathname(ae, path);
 		failure("%s", path);
 		if (!assertEqualIntA(a, ARCHIVE_OK,
@@ -124,7 +124,7 @@ test_truncation(const char *compression,
 			assert(NULL != archive_error_string(a));
 			break;
 		}
-		sprintf(path, "%s%d", compression, i);
+		snprintf(path, sizeof(path), "%s%d", compression, i);
 		assertEqualString(path, archive_entry_pathname(ae));
 		if (datasize != (size_t)archive_read_data(a, data, datasize)) {
 			failure("Should have non-NULL error message for %s",
