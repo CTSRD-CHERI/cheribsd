@@ -527,13 +527,20 @@ proc_read_cheri_tags(struct proc *p, struct uio *uio)
 	/*
 	 * Can't reuse uio_offset directly as uiomove increments it
 	 * based on the tag bitmask size.
+	 *
+	 * Require that the offset be aligned to the granularity of a
+	 * single bytes-worth of tags to simplify the implementation.
+	 * In theory any capability-aligned address would be ok, but
+	 * the returned bitmask bytes would have to be constructed by
+	 * selecting bits from adjacent bytes in the per-page bitmasks
+	 * returned by proc_read_cheri_tags_page.
 	 */
 	va = uio->uio_offset;
-	if (!is_aligned(va, sizeof(uintcap_t)))
+	if (!is_aligned(va, sizeof(uintcap_t) * CHAR_BIT))
 		return (EINVAL);
 
 	/* Handle partial first page. */
-	if (uio->uio_offset % PAGE_SIZE != 0) {
+	if (va % PAGE_SIZE != 0) {
 		u_int pageoff, tagoff;
 
 		pageoff = va % PAGE_SIZE;
@@ -542,7 +549,7 @@ proc_read_cheri_tags(struct proc *p, struct uio *uio)
 		if (error != 0)
 			return (error);
 
-		tagoff = pageoff / sizeof(uintcap_t);
+		tagoff = pageoff / (sizeof(uintcap_t) * CHAR_BIT);
 		error = uiomove(tagbuf + tagoff, sizeof(tagbuf) - tagoff, uio);
 		if (error != 0)
 			return (error);
