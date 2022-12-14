@@ -399,7 +399,7 @@ esac
 
 finalconfig() {
 	if [ -n "$HAVE_CHERI_DESKTOP" ]; then
-		CHERI_DESKTOP_REVISIT='"CHERI Desktop" "Install the CHERI desktop environment"'
+		CHERI_DESKTOP_REVISIT='"CHERI Desktop" "Install the CHERI desktop environment (requires network)"'
 	else
 		CHERI_DESKTOP_REVISIT=
 	fi
