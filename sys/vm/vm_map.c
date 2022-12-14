@@ -4349,7 +4349,7 @@ int
 vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
     bool keep_reservation)
 {
-	vm_map_entry_t entry, next_entry, prev_entry;
+	vm_map_entry_t entry, next_entry, prev_entry, cloned_entry;
 	int rv;
 
 	VM_MAP_ASSERT_LOCKED(map);
@@ -4364,7 +4364,7 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	rv = vm_map_lookup_clip_start(map, start, &entry, &prev_entry);
 	if (rv != KERN_SUCCESS)
 		return (rv);
-	for (; entry->start < end; prev_entry = entry, entry = next_entry) {
+	for (; entry->start < end; entry = next_entry) {
 		/*
 		 * Wait for wiring or unwiring of an entry to complete.
 		 * Also wait for any system wirings to disappear on
@@ -4423,24 +4423,53 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			map->anon_loc = entry->start;
 
 		/*
+		 * If using reservations, allocate a new reservation
+		 * entry to use in place of the entry being removed.
+		 * This can't simply reuse the existing entry as some
+		 * operations like dropping the VM object reference
+		 * count may need to be deferred to
+		 * vm_map_process_deferred().
+		 */
+		vm_map_log("remove", entry);
+		cloned_entry = NULL;
+		if ((map->flags & MAP_RESERVATIONS) != 0 && keep_reservation) {
+			if ((entry->eflags & MAP_ENTRY_UNMAPPED) != 0) {
+				/*
+				 * This entry is already unmapped, so
+				 * just try merging with the previous.
+				 */
+				vm_map_try_merge_entries(map, prev_entry,
+				    entry);
+				prev_entry = entry;
+				continue;
+			}
+
+			cloned_entry = vm_map_entry_create(map);
+			vm_map_reservation_init_entry(cloned_entry);
+			cloned_entry->start = entry->start;
+			cloned_entry->end = entry->end;
+			cloned_entry->reservation = entry->reservation;
+			cloned_entry->next_read = entry->start;
+
+			/* XXX: Is this the right max-prot to use? */
+			cloned_entry->max_protection = entry->max_protection;
+		}
+
+		/*
 		 * Delete the entry only after removing all pmap
 		 * entries pointing to its pages.  (Otherwise, its
 		 * page frames may be reallocated, and any modify bits
 		 * will be set in the wrong object!)
 		 */
-		vm_map_log("remove", entry);
-		if ((map->flags & MAP_RESERVATIONS) != 0 && keep_reservation) {
-			if ((entry->eflags & MAP_ENTRY_UNMAPPED) == 0) {
-				vm_map_entry_clean(map, entry);
-				/* XXX-AM: How do we reset maxprot? */
-				if ((entry->eflags & MAP_ENTRY_IS_SUB_MAP) == 0)
-					vm_object_deallocate(
-					    entry->object.vm_object);
-				vm_map_reservation_init_entry(entry);
-			}
-			vm_map_try_merge_entries(map, prev_entry, entry);
-		} else {
-			vm_map_entry_delete(map, entry);
+		vm_map_entry_delete(map, entry);
+
+		/* Insert the cloned entry if it exists. */
+		if (cloned_entry != NULL) {
+			vm_map_log("insert unmapped", cloned_entry);
+			vm_map_entry_link(map, cloned_entry);
+			vm_map_try_merge_entries(map, prev_entry,
+			    cloned_entry);
+			prev_entry = cloned_entry;
 		}
 	}
 	VM_MAP_ASSERT_CONSISTENT(map);
