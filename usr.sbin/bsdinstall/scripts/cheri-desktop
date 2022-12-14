@@ -50,7 +50,7 @@ error()
 }
 
 bsddialog --backtitle "$OSNAME Installer" --title "CHERI Desktop" --yesno \
-    "Would you like to install the CHERI desktop environment?" 0 0
+    "Would you like to install the CHERI desktop environment (requires network)?" 0 0
 if [ $? -ne $BSDDIALOG_OK ]; then
 	exit 0
 fi
