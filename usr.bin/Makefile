@@ -202,6 +202,7 @@ SUBDIR+= \
 	copong \
 	coregister \
 	cotrace \
+	cs \
 	dispatch \
 	stevie
 .endif

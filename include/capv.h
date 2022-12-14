@@ -57,6 +57,7 @@
 #define	CAPV_COSELECT	6
 #define	CAPV_CLOCKS	8
 #define	CAPV_BINDS	10
+#define	CAPV_SYSCALL	12
 
 #include <sys/socket.h> // XXX binds
 #include <time.h> // XXX clocks
@@ -108,6 +109,15 @@ typedef union {
 	};
 } capv_binds_t;
 
+typedef union {
+	void * __capability aligner;
+	struct {
+		size_t	len;
+		int	op;
+		uintcap_t arg[8];
+	};
+} capv_syscall_t;
+
 /*
  * XXX: Merge those two into an universal error return struct?
  */
@@ -130,6 +140,17 @@ typedef union {
 		int	errno_;
 	};
 } capv_clearances_return_t;
+
+typedef union {
+	void * __capability aligner;
+	struct {
+		size_t	len;
+		int	op;
+		int	error;
+		int	errno_;
+		uintcap_t fdcap;
+	};
+} capv_syscall_return_t;
 
 #endif /* !_CAPV_H_ */
 

@@ -265,6 +265,7 @@ SUBDIR_PARALLEL=
 .if ${MACHINE_ABI:Mpurecap}
 SUBDIR+=	libbinds
 SUBDIR+=	libclocks
+SUBDIR+=	libcs
 SUBDIR+=	libmalloc_simple
 .endif
 
