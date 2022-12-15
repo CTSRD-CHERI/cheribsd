@@ -97,7 +97,6 @@ static void
 ptrace_lwpinfo_to64(const struct ptrace_lwpinfo *pl,
     struct ptrace_lwpinfo64 *pl64)
 {
-
 	bzero(pl64, sizeof(*pl64));
 	pl64->pl_lwpid = pl->pl_lwpid;
 	pl64->pl_event = pl->pl_event;
@@ -115,7 +114,6 @@ static void
 ptrace_sc_ret_to64(const struct ptrace_sc_ret *psr,
     struct ptrace_sc_ret64 *psr64)
 {
-
 	bzero(psr64, sizeof(*psr64));
 	psr64->sr_retval[0] = (__cheri_addr uint64_t)psr->sr_retval[0];
 	psr64->sr_retval[1] = (__cheri_addr uint64_t)psr->sr_retval[1];

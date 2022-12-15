@@ -71,7 +71,6 @@ int
 freebsd64_ffclock_setestimate(struct thread *td,
     struct freebsd64_ffclock_setestimate_args *uap)
 {
-
 #ifdef	FFCLOCK
 	return (kern_ffclock_setestimate(td, __USER_CAP_OBJ(uap->cest)));
 #else
@@ -83,7 +82,6 @@ int
 freebsd64_ffclock_getestimate(struct thread *td,
     struct freebsd64_ffclock_getestimate_args *uap)
 {
-
 #ifdef	FFCLOCK
 	return (kern_ffclock_getestimate(td, __USER_CAP_OBJ(uap->cest)));
 #else
@@ -97,7 +95,6 @@ freebsd64_ffclock_getestimate(struct thread *td,
 int
 freebsd64_ntp_gettime(struct thread *td, struct freebsd64_ntp_gettime_args *uap)
 {
-
 	return (kern_ntp_gettime(td, __USER_CAP_OBJ(uap->ntvp)));
 }
 
@@ -207,7 +204,6 @@ freebsd64_clock_getres(struct thread *td,
 int
 freebsd64_nanosleep(struct thread *td, struct freebsd64_nanosleep_args *uap)
 {
-
 	return (user_clock_nanosleep(td, CLOCK_REALTIME, TIMER_RELTIME,
 	    __USER_CAP_OBJ(uap->rqtp), __USER_CAP_OBJ(uap->rmtp)));
 }
@@ -226,7 +222,6 @@ freebsd64_clock_nanosleep(struct thread *td,
 int
 freebsd64_gettimeofday(struct thread *td, struct freebsd64_gettimeofday_args *uap)
 {
-
 	return (kern_gettimeofday(td, __USER_CAP_OBJ(uap->tp),
 	     __USER_CAP_OBJ(uap->tzp)));
 }
@@ -235,7 +230,6 @@ int
 freebsd64_settimeofday(struct thread *td,
     struct freebsd64_settimeofday_args *uap)
 {
-
 	return (user_settimeofday(td, __USER_CAP_OBJ(uap->tv),
 	    __USER_CAP_OBJ(uap->tzp)));
 }

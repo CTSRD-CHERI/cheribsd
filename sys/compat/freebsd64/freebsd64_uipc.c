@@ -53,7 +53,6 @@ __FBSDID("$FreeBSD$");
 int
 freebsd64_bind(struct thread *td, struct freebsd64_bind_args *uap)
 {
-
 	return (user_bind(td, uap->s, __USER_CAP(uap->name, uap->namelen),
 	    uap->namelen));
 }
@@ -61,7 +60,6 @@ freebsd64_bind(struct thread *td, struct freebsd64_bind_args *uap)
 int
 freebsd64_bindat(struct thread *td, struct freebsd64_bindat_args *uap)
 {
-
 	return (user_bindat(td, uap->fd, uap->s,
 	    __USER_CAP(uap->name, uap->namelen), uap->namelen));
 }
@@ -69,7 +67,6 @@ freebsd64_bindat(struct thread *td, struct freebsd64_bindat_args *uap)
 int
 freebsd64_accept(struct thread *td, struct freebsd64_accept_args *uap)
 {
-
 	return (user_accept(td, uap->s, __USER_CAP_UNBOUND(uap->name),
 	    __USER_CAP_OBJ(uap->anamelen), ACCEPT4_INHERIT));
 }
@@ -77,7 +74,6 @@ freebsd64_accept(struct thread *td, struct freebsd64_accept_args *uap)
 int
 freebsd64_accept4(struct thread *td, struct freebsd64_accept4_args *uap)
 {
-
 	return (user_accept(td, uap->s, __USER_CAP_UNBOUND(uap->name),
 	    __USER_CAP_OBJ(uap->anamelen), uap->flags));
 }
@@ -85,7 +81,6 @@ freebsd64_accept4(struct thread *td, struct freebsd64_accept4_args *uap)
 int
 freebsd64_connect(struct thread *td, struct freebsd64_connect_args *uap)
 {
-
 	return (user_connectat(td, AT_FDCWD, uap->s,
 	    __USER_CAP(uap->name, uap->namelen), uap->namelen));
 }
@@ -93,7 +88,6 @@ freebsd64_connect(struct thread *td, struct freebsd64_connect_args *uap)
 int
 freebsd64_connectat(struct thread *td, struct freebsd64_connectat_args *uap)
 {
-
 	return (user_connectat(td, uap->fd, uap->s,
 	    __USER_CAP(uap->name, uap->namelen), uap->namelen));
 }
@@ -101,7 +95,6 @@ freebsd64_connectat(struct thread *td, struct freebsd64_connectat_args *uap)
 int
 freebsd64_socketpair(struct thread *td, struct freebsd64_socketpair_args *uap)
 {
-
 	return (user_socketpair(td, uap->domain, uap->type, uap->protocol,
 	    __USER_CAP_ARRAY(uap->rsv, 2)));
 }
@@ -109,7 +102,6 @@ freebsd64_socketpair(struct thread *td, struct freebsd64_socketpair_args *uap)
 int
 freebsd64_sendto(struct thread *td, struct freebsd64_sendto_args *uap)
 {
-
 	return (user_sendto(td, uap->s, __USER_CAP(uap->buf, uap->len),
 	    uap->len, uap->flags, __USER_CAP(uap->to, uap->tolen),
 	    uap->tolen));
@@ -397,7 +389,6 @@ out:
 int
 freebsd64_recvfrom(struct thread *td, struct freebsd64_recvfrom_args *uap)
 {
-
 	return (kern_recvfrom(td, uap->s, __USER_CAP(uap->buf, uap->len),
 	    uap->len, uap->flags, __USER_CAP_UNBOUND(uap->from),
 	    __USER_CAP_OBJ(uap->fromlenaddr)));
@@ -443,7 +434,6 @@ freebsd64_recvmsg(struct thread *td, struct freebsd64_recvmsg_args *uap)
 int
 freebsd64_setsockopt(struct thread *td, struct freebsd64_setsockopt_args *uap)
 {
-
 	return (kern_setsockopt(td, uap->s, uap->level, uap->name,
 	    __USER_CAP(uap->val, uap->valsize), UIO_USERSPACE, uap->valsize));
 }
@@ -451,7 +441,6 @@ freebsd64_setsockopt(struct thread *td, struct freebsd64_setsockopt_args *uap)
 int
 freebsd64_getsockopt(struct thread *td, struct freebsd64_getsockopt_args *uap)
 {
-
 	return (user_getsockopt(td, uap->s, uap->level, uap->name,
 	    __USER_CAP_UNBOUND(uap->val), __USER_CAP_OBJ(uap->avalsize)));
 }
@@ -459,7 +448,6 @@ freebsd64_getsockopt(struct thread *td, struct freebsd64_getsockopt_args *uap)
 int
 freebsd64_getsockname(struct thread *td, struct freebsd64_getsockname_args *uap)
 {
-
 	return (user_getsockname(td, uap->fdes, __USER_CAP_UNBOUND(uap->asa),
 	    __USER_CAP_OBJ(uap->alen), false));
 }
@@ -467,7 +455,6 @@ freebsd64_getsockname(struct thread *td, struct freebsd64_getsockname_args *uap)
 int
 freebsd64_getpeername(struct thread *td, struct freebsd64_getpeername_args *uap)
 {
-
 	return (user_getpeername(td, uap->fdes, __USER_CAP_UNBOUND(uap->asa),
 	    __USER_CAP_OBJ(uap->alen), false));
 }
@@ -481,7 +468,6 @@ int
 freebsd12_freebsd64_shm_open(struct thread *td,
     struct freebsd12_freebsd64_shm_open_args *uap)
 {
-
 	return (kern_shm_open(td, __USER_CAP_STR(uap->path),
 	    uap->flags | O_CLOEXEC, uap->mode, NULL));
 }
@@ -490,7 +476,6 @@ freebsd12_freebsd64_shm_open(struct thread *td,
 int
 freebsd64_shm_open2(struct thread *td, struct freebsd64_shm_open2_args *uap)
 {
-
 	return (kern_shm_open2(td, __USER_CAP_STR(uap->path), uap->flags,
 	    uap->mode, uap->shmflags, NULL, __USER_CAP_STR(uap->name)));
 }
@@ -498,14 +483,12 @@ freebsd64_shm_open2(struct thread *td, struct freebsd64_shm_open2_args *uap)
 int
 freebsd64_shm_unlink(struct thread *td, struct freebsd64_shm_unlink_args *uap)
 {
-
 	return (kern_shm_unlink(td, __USER_CAP_STR(uap->path)));
 }
 
 int
 freebsd64_shm_rename(struct thread *td, struct freebsd64_shm_rename_args *uap)
 {
-
 	return (kern_shm_rename(td, __USER_CAP_STR(uap->path_from),
 	    __USER_CAP_STR(uap->path_to), uap->flags));
 }
