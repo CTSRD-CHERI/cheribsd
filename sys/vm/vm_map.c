@@ -4248,23 +4248,25 @@ vm_map_entry_deallocate(vm_map_entry_t entry, boolean_t system_map)
 }
 
 /*
- * Release resources owned by a map entry.
+ *	vm_map_entry_delete:	[ internal use only ]
+ *
+ *	Deallocate the given entry from the target map.
  */
 static void
-vm_map_entry_clean(vm_map_t map, vm_map_entry_t entry)
+vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry)
 {
 	vm_object_t object;
 	vm_pindex_t offidxstart, offidxend, size1;
 	vm_size_t size;
 
-	VM_MAP_ASSERT_LOCKED(map);
-
+	vm_map_entry_unlink(map, entry, UNLINK_MERGE_NONE);
 	object = entry->object.vm_object;
 
 	if ((entry->eflags & (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0) {
 		MPASS(entry->cred == NULL);
 		MPASS((entry->eflags & MAP_ENTRY_IS_SUB_MAP) == 0);
 		MPASS(object == NULL);
+		vm_map_entry_deallocate(entry, map->system_map);
 		return;
 	}
 
@@ -4315,23 +4317,9 @@ vm_map_entry_clean(vm_map_t map, vm_map_entry_t entry)
 		}
 		VM_OBJECT_WUNLOCK(object);
 	}
-}
-
-/*
- *	vm_map_entry_delete:	[ internal use only ]
- *
- *	Deallocate the given entry from the target map.
- */
-static void
-vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry)
-{
-	vm_map_entry_unlink(map, entry, UNLINK_MERGE_NONE);
-	vm_map_entry_clean(map, entry);
-
-	if (map->system_map ||
-	    (entry->eflags & (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0) {
-		vm_map_entry_deallocate(entry, map->system_map);
-	} else {
+	if (map->system_map)
+		vm_map_entry_deallocate(entry, TRUE);
+	else {
 		entry->defer_next = curthread->td_map_def_user;
 		curthread->td_map_def_user = entry;
 	}
