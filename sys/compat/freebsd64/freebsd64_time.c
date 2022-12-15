@@ -220,7 +220,8 @@ freebsd64_clock_nanosleep(struct thread *td,
 }
 
 int
-freebsd64_gettimeofday(struct thread *td, struct freebsd64_gettimeofday_args *uap)
+freebsd64_gettimeofday(struct thread *td,
+    struct freebsd64_gettimeofday_args *uap)
 {
 	return (kern_gettimeofday(td, __USER_CAP_OBJ(uap->tp),
 	     __USER_CAP_OBJ(uap->tzp)));

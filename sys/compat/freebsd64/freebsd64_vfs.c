@@ -346,7 +346,8 @@ freebsd64___getcwd(struct thread *td, struct freebsd64___getcwd_args *uap)
 }
 
 int
-freebsd64___realpathat(struct thread *td, struct freebsd64___realpathat_args *uap)
+freebsd64___realpathat(struct thread *td,
+    struct freebsd64___realpathat_args *uap)
 {
 	return (kern___realpathat(td, uap->fd, __USER_CAP_STR(uap->path),
 	    __USER_CAP(uap->buf, uap->size), uap->size, uap->flags,
