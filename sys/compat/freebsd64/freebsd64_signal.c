@@ -58,7 +58,6 @@ __FBSDID("$FreeBSD$");
 int
 convert_sigevent64(const struct sigevent64 *sig64, struct sigevent *sig)
 {
-
 	CP(*sig64, *sig, sigev_notify);
 	switch (sig->sigev_notify) {
 	case SIGEV_NONE:
@@ -128,7 +127,6 @@ freebsd64_sigprocmask(struct thread *td, struct freebsd64_sigprocmask_args *uap)
 int
 freebsd64_sigwait(struct thread *td, struct freebsd64_sigwait_args *uap)
 {
-
 	return (user_sigwait(td, __USER_CAP_OBJ(uap->set),
 	    __USER_CAP_OBJ(uap->sig)));
 }
@@ -163,7 +161,6 @@ int
 freebsd64_sigtimedwait(struct thread *td,
     struct freebsd64_sigtimedwait_args *uap)
 {
-
 	return (user_sigtimedwait(td, __USER_CAP_OBJ(uap->set),
 	    __USER_CAP_OBJ(uap->info), __USER_CAP_OBJ(uap->timeout),
 	    (copyout_siginfo_t *)freebsd64_copyout_siginfo));
@@ -172,7 +169,6 @@ freebsd64_sigtimedwait(struct thread *td,
 int
 freebsd64_sigwaitinfo(struct thread *td, struct freebsd64_sigwaitinfo_args *uap)
 {
-
 	return (user_sigwaitinfo(td, __USER_CAP_OBJ(uap->set),
 	    __USER_CAP_OBJ(uap->info),
 	    (copyout_siginfo_t *)freebsd64_copyout_siginfo));
@@ -181,14 +177,12 @@ freebsd64_sigwaitinfo(struct thread *td, struct freebsd64_sigwaitinfo_args *uap)
 int
 freebsd64_sigpending(struct thread *td, struct freebsd64_sigpending_args *uap)
 {
-
 	return (kern_sigpending(td, __USER_CAP_OBJ(uap->set)));
 }
 
 int
 freebsd64_sigsuspend(struct thread *td, struct freebsd64_sigsuspend_args *uap)
 {
-
 	return (user_sigsuspend(td, __USER_CAP_OBJ(uap->sigmask)));
 }
 
@@ -240,6 +234,5 @@ freebsd64_sigqueue(struct thread *td, struct freebsd64_sigqueue_args *uap)
 int freebsd64_sigfastblock(struct thread *td,
     struct freebsd64_sigfastblock_args *uap)
 {
-
 	return (kern_sigfastblock(td, uap->cmd, __USER_CAP_OBJ(uap->ptr)));
 }
