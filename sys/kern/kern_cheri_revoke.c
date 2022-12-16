@@ -710,6 +710,13 @@ sys_cheri_revoke_get_shadow(struct thread *td,
 int
 sys_cheri_revoke(struct thread *td, struct cheri_revoke_args *uap)
 {
+	static struct timeval lastfail;
+	static int curfail;
+
+	if (td->td_proc->p_pid == 1 || ppsratecheck(&lastfail, &curfail, 1))
+		printf("%s: unsupported syscall (pid %d).  "
+		    "A CAPREVOKE kernel is required.\n", __func__,
+		    td->td_proc->p_pid);
 
 	return (ENOSYS);
 }
@@ -718,6 +725,13 @@ int
 sys_cheri_revoke_get_shadow(struct thread *td,
     struct cheri_revoke_get_shadow_args *uap)
 {
+	static struct timeval lastfail;
+	static int curfail;
+
+	if (td->td_proc->p_pid == 1 || ppsratecheck(&lastfail, &curfail, 1))
+		printf("%s: unsupported syscall (pid %d).  "
+		    "A CAPREVOKE kernel is required.\n", __func__,
+		    td->td_proc->p_pid);
 
 	return (ENOSYS);
 }
