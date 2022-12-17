@@ -726,7 +726,15 @@ TMPDIR:=	/tmp/uid${.MAKE.UID}
 _!= mkdir -p ${TMPDIR}
 .endif
 
-MAKE_TEST_ENV=	MALLOC_OPTIONS="JA"	# for jemalloc 100
+# Some systems have deprecated egrep for grep -E
+# but not everyone supports that
+.if ${.MAKE.OS:NLinux} == ""
+EGREP= grep -E
+.endif
+EGREP?= egrep
+
+MAKE_TEST_ENV=  EGREP="${EGREP}"
+MAKE_TEST_ENV+=	MALLOC_OPTIONS="JA"	# for jemalloc 100
 MAKE_TEST_ENV+=	MALLOC_CONF="junk:true"	# for jemalloc 510
 MAKE_TEST_ENV+= TMPDIR=${TMPDIR}
 
@@ -781,6 +789,7 @@ _SED_CMDS+=	-e 's,\(Error code\) 255,\1 1,'
 .if ${.SHELL:T} == "ksh"
 _SED_CMDS+=	-e '/^set [+-]v/d'
 .endif
+_SED_CMDS+=	-e '/EGREP=/d'
 
 .rawout.out:
 	@${TOOL_SED} ${_SED_CMDS} ${SED_CMDS.${.PREFIX:T}} \

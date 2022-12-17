@@ -387,9 +387,25 @@ fi
     "Would you like to add users to the installed system now?" 0 0 && \
     bsdinstall adduser
 
+case `uname -p` in
+aarch64c)
+	HAVE_CHERI_DESKTOP=yes
+	;;
+*)
+	HAVE_CHERI_DESKTOP=
+	;;
+esac
+[ -n "$HAVE_CHERI_DESKTOP" ] && [ -z "$BSDINSTALL_SKIP_CHERI_DESKTOP" ] && bsdinstall cheri-desktop
+
 finalconfig() {
+	if [ -n "$HAVE_CHERI_DESKTOP" ]; then
+		CHERI_DESKTOP_REVISIT='"CHERI Desktop" "Install the CHERI desktop environment (requires network)"'
+	else
+		CHERI_DESKTOP_REVISIT=
+	fi
 	exec 3>&1
-	REVISIT=$(dialog --backtitle "$OSNAME Installer" \
+	REVISIT=$(echo $CHERI_DESKTOP_REVISIT | \
+	    xargs dialog --backtitle "$OSNAME Installer" \
 	    --title "Final Configuration" --no-cancel --menu \
 	    "Setup of your $OSNAME system is nearly complete. You can now modify your configuration choices. After this screen, you will have an opportunity to make more complex changes using a shell." 0 0 0 \
 		"Exit" "Apply configuration and exit installer" \
@@ -434,6 +450,10 @@ finalconfig() {
 		;;
 	"Handbook")
 		bsdinstall docsinstall
+		finalconfig
+		;;
+	"CHERI Desktop")
+		bsdinstall cheri-desktop
 		finalconfig
 		;;
 	esac

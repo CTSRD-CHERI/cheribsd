@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2020-2021 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2022 Ruslan Bukin <br@bsdpad.com>
  *
  * This work was supported by Innovate UK project 105694, "Digital Security
  * by Design (DSbD) Technology Platform Prototype".
@@ -30,31 +30,24 @@
  * $FreeBSD$
  */
 
-#ifndef	_DEV_DRM_PANFROST_PANFROST_DEVICE_H_
-#define	_DEV_DRM_PANFROST_PANFROST_DEVICE_H_
+#ifndef	_ARM64_SCMI_ARM_DOORBELL_H_
+#define	_ARM64_SCMI_ARM_DOORBELL_H_
 
-#define	NUM_JOB_SLOTS	3
+static MALLOC_DEFINE(M_DOORBELL, "arm_doorbell", "ARM Doorbell");
 
-struct panfrost_mmu {
-	struct panfrost_softc	*sc;
-	u_int			refcount;
-	struct pmap p;
-	int as;		/* asid set */
-	int as_count;	/* usage count */
-	TAILQ_ENTRY(panfrost_mmu)	next;	/* entry in mmu_in_use list */
-	struct		drm_mm mm;
-	struct mtx	mm_lock;
+struct arm_doorbell {
+	device_t dev;
+	device_t db_dev;
+	int chan;
+	int db;
+	void (*func)(void *);
+	void *arg;
 };
 
-struct panfrost_file {
-	struct		panfrost_softc *sc;
-	struct		panfrost_mmu *mmu;
-	struct		drm_sched_entity sched_entity[NUM_JOB_SLOTS];
-};
+void arm_doorbell_set(struct arm_doorbell *db);
+int arm_doorbell_get(struct arm_doorbell *db);
+struct arm_doorbell * arm_doorbell_ofw_get(device_t dev, const char *name);
+void arm_doorbell_set_handler(struct arm_doorbell *db, void (*func)(void *),
+    void *arg);
 
-int panfrost_device_init(struct panfrost_softc *);
-int panfrost_device_reset(struct panfrost_softc *sc);
-uint32_t panfrost_device_get_latest_flush_id(struct panfrost_softc *sc);
-int panfrost_device_power_on(struct panfrost_softc *sc);
-
-#endif /* !_DEV_DRM_PANFROST_PANFROST_DEVICE_H_ */
+#endif /* !_ARM64_SCMI_ARM_DOORBELL_H_ */

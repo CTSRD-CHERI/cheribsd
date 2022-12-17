@@ -146,7 +146,7 @@ panfrost_job_intr(void *arg)
 			job = sc->jobs[i];
 			if (job) {
 				sc->jobs[i] = NULL;
-				panfrost_mmu_as_put(sc, &job->pfile->mmu);
+				panfrost_mmu_as_put(sc, job->mmu);
 				dma_fence_signal_locked(job->done_fence);
 			}
 			spin_unlock(&sc->js->job_lock);
@@ -182,7 +182,7 @@ panfrost_job_open(struct panfrost_file *pfile)
 	return (0);
 }
 
-static int
+int
 panfrost_job_get_slot(struct panfrost_job *job)
 {
 
@@ -222,7 +222,7 @@ panfrost_job_hw_submit(struct panfrost_job *job, int slot)
 	if (status)
 		return;
 
-	cfg = panfrost_mmu_as_get(sc, &job->pfile->mmu);
+	cfg = panfrost_mmu_as_get(sc, job->mmu);
 
 	GPU_WRITE(sc, JS_HEAD_NEXT_LO(slot), jc_head & 0xFFFFFFFF);
 	GPU_WRITE(sc, JS_HEAD_NEXT_HI(slot), jc_head >> 32);
@@ -276,26 +276,16 @@ panfrost_job_push(struct panfrost_job *job)
 	struct ww_acquire_ctx acquire_ctx;
 	struct panfrost_softc *sc;
 	struct drm_sched_entity *entity;
-	int slot;
 	int error;
 
 	sc = job->sc;
 
 	atomic_add_int(&sc->job_cnt, 1);
 
-	slot = panfrost_job_get_slot(job);
-	job->slot = slot;
-
-	entity = &job->pfile->sched_entity[slot];
-
 	error = drm_gem_lock_reservations(job->bos, job->bo_count,
 	    &acquire_ctx);
 	if (error)
 		return (error);
-
-	error = drm_sched_job_init(&job->base, entity, NULL);
-	if (error)
-		goto done;
 
 	mtx_lock(&sc->sched_lock);
 	refcount_acquire(&job->refcount);
@@ -306,16 +296,16 @@ panfrost_job_push(struct panfrost_job *job)
 	panfrost_acquire_object_fences(job->bos, job->bo_count,
 	    job->implicit_fences);
 
+	entity = job->base.entity;
 	drm_sched_entity_push_job(&job->base, entity);
 	mtx_unlock(&sc->sched_lock);
 
 	panfrost_attach_object_fences(job->bos, job->bo_count,
 	    job->render_done_fence);
 
-done:
 	drm_gem_unlock_reservations(job->bos, job->bo_count, &acquire_ctx);
 
-	return (error);
+	return (0);
 }
 
 void

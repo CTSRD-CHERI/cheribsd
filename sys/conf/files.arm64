@@ -239,6 +239,12 @@ dev/enetc/if_enetc.c				optional enetc iflib pci fdt soc_nxp_ls
 
 dev/etherswitch/felix/felix.c			optional enetc etherswitch fdt felix pci soc_nxp_ls
 
+dev/firmware/arm/mmio_sram.c			optional fdt
+dev/firmware/arm/mmio_sram_if.m			optional fdt
+dev/firmware/arm/scmi.c				optional fdt
+dev/firmware/arm/scmi_clk.c			optional fdt
+dev/firmware/arm/scmi_shmem.c			optional fdt
+
 dev/gpio/pl061.c				optional pl061 gpio
 dev/gpio/pl061_acpi.c				optional pl061 gpio acpi
 dev/gpio/pl061_fdt.c				optional pl061 gpio fdt
@@ -318,6 +324,7 @@ dev/ipmi/ipmi_acpi.c				optional ipmi acpi
 dev/ipmi/ipmi_kcs.c				optional ipmi
 dev/ipmi/ipmi_smic.c				optional ipmi
 
+dev/mailbox/arm/arm_doorbell.c			optional fdt
 dev/mbox/mbox_if.m				optional soc_brcm_bcm2837
 
 dev/mmc/host/dwmmc.c				optional dwmmc fdt

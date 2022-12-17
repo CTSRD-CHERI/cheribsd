@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2020-2021 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2022 Ruslan Bukin <br@bsdpad.com>
  *
  * This work was supported by Innovate UK project 105694, "Digital Security
  * by Design (DSbD) Technology Platform Prototype".
@@ -30,31 +30,34 @@
  * $FreeBSD$
  */
 
-#ifndef	_DEV_DRM_PANFROST_PANFROST_DEVICE_H_
-#define	_DEV_DRM_PANFROST_PANFROST_DEVICE_H_
+#ifndef	_ARM64_SCMI_SCMI_PROTOCOLS_H_
+#define	_ARM64_SCMI_SCMI_PROTOCOLS_H_
 
-#define	NUM_JOB_SLOTS	3
-
-struct panfrost_mmu {
-	struct panfrost_softc	*sc;
-	u_int			refcount;
-	struct pmap p;
-	int as;		/* asid set */
-	int as_count;	/* usage count */
-	TAILQ_ENTRY(panfrost_mmu)	next;	/* entry in mmu_in_use list */
-	struct		drm_mm mm;
-	struct mtx	mm_lock;
+enum scmi_std_protocol {
+	SCMI_PROTOCOL_ID_BASE = 0x10,
+	SCMI_PROTOCOL_ID_POWER_DOMAIN = 0x11,
+	SCMI_PROTOCOL_ID_SYSTEM = 0x12,
+	SCMI_PROTOCOL_ID_PERF = 0x13,
+	SCMI_PROTOCOL_ID_CLOCK = 0x14,
+	SCMI_PROTOCOL_ID_SENSOR = 0x15,
+	SCMI_PROTOCOL_ID_RESET_DOMAIN = 0x16,
+	SCMI_PROTOCOL_ID_VOLTAGE_DOMAIN = 0x17,
 };
 
-struct panfrost_file {
-	struct		panfrost_softc *sc;
-	struct		panfrost_mmu *mmu;
-	struct		drm_sched_entity sched_entity[NUM_JOB_SLOTS];
+enum scmi_status_code {
+	SCMI_SUCCESS =  0,
+	SCMI_NOT_SUPPORTED = -1,
+	SCMI_INVALID_PARAMETERS = -2,
+	SCMI_DENIED = -3,
+	SCMI_NOT_FOUND = -4,
+	SCMI_OUT_OF_RANGE = -5,
+	SCMI_BUSY = -6,
+	SCMI_COMMS_ERROR = -7,
+	SCMI_GENERIC_ERROR = -8,
+	SCMI_HARDWARE_ERROR = -9,
+	SCMI_PROTOCOL_ERROR = -10,
 };
 
-int panfrost_device_init(struct panfrost_softc *);
-int panfrost_device_reset(struct panfrost_softc *sc);
-uint32_t panfrost_device_get_latest_flush_id(struct panfrost_softc *sc);
-int panfrost_device_power_on(struct panfrost_softc *sc);
+#define	SCMI_PROTOCOL_ATTRIBUTES	0x1
 
-#endif /* !_DEV_DRM_PANFROST_PANFROST_DEVICE_H_ */
+#endif /* !_ARM64_SCMI_SCMI_PROTOCOLS_H_ */

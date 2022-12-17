@@ -30,25 +30,53 @@
  * $FreeBSD$
  */
 
-#ifndef _DEV_DRM_KOMEDA_KOMEDA_PIPELINE_H_
-#define	_DEV_DRM_KOMEDA_KOMEDA_PIPELINE_H_
+#ifndef	_ARM64_SCMI_SCMI_H_
+#define	_ARM64_SCMI_SCMI_H_
 
-struct komeda_drm_softc;
+#define	SCMI_LOCK(sc)		mtx_lock(&(sc)->mtx)
+#define	SCMI_UNLOCK(sc)		mtx_unlock(&(sc)->mtx)
+#define	SCMI_ASSERT_LOCKED(sc)	mtx_assert(&(sc)->mtx, MA_OWNED)
 
-struct komeda_pipeline {
-	struct komeda_drm_softc		*sc;
-	struct komeda_plane		planes[2];
-	struct drm_pending_vblank_event	*event;
-	struct drm_device		*drm;
-	struct drm_crtc			crtc;
-	struct drm_encoder		encoder;
-	clk_t				pxclk;
-	uint32_t			vbl_counter;
-	phandle_t			node;
+#define dprintf(fmt, ...)
+
+/* Shared Memory Transfer. */
+struct scmi_smt_header {
+	uint32_t reserved;
+	uint32_t channel_status;
+#define	SCMI_SHMEM_CHAN_STAT_CHANNEL_ERROR	(1 << 1)
+#define	SCMI_SHMEM_CHAN_STAT_CHANNEL_FREE	(1 << 0)
+	uint32_t reserved1[2];
+	uint32_t flags;
+#define	SCMI_SHMEM_FLAG_INTR_ENABLED		(1 << 0)
+	uint32_t length;
+	uint32_t msg_header;
+	uint8_t msg_payload[0];
 };
 
-int
-komeda_pipeline_create_pipeline(struct komeda_drm_softc *sc, phandle_t node,
-    struct komeda_pipeline *pipeline);
+#define	SMT_HEADER_SIZE			sizeof(struct scmi_smt_header)
 
-#endif /* !_DEV_DRM_KOMEDA_KOMEDA_PIPELINE_H_ */
+#define	SMT_HEADER_TOKEN_S		18
+#define	SMT_HEADER_TOKEN_M		(0x3fff << SMT_HEADER_TOKEN_S)
+#define	SMT_HEADER_PROTOCOL_ID_S	10
+#define	SMT_HEADER_PROTOCOL_ID_M	(0xff << SMT_HEADER_PROTOCOL_ID_S)
+#define	SMT_HEADER_MESSAGE_TYPE_S	8
+#define	SMT_HEADER_MESSAGE_TYPE_M	(0x3 << SMT_HEADER_MESSAGE_TYPE_S)
+#define	SMT_HEADER_MESSAGE_ID_S		0
+#define	SMT_HEADER_MESSAGE_ID_M		(0xff << SMT_HEADER_MESSAGE_ID_S)
+
+struct scmi_req {
+	int protocol_id;
+	int message_id;
+	const void *in_buf;
+	uint32_t in_size;
+	void *out_buf;
+	uint32_t out_size;
+};
+
+int scmi_request(device_t dev, struct scmi_req *req);
+void scmi_shmem_read(device_t dev, bus_size_t offset, void *buf,
+    bus_size_t len);
+void scmi_shmem_write(device_t dev, bus_size_t offset, const void *buf,
+    bus_size_t len);
+
+#endif /* !_ARM64_SCMI_SCMI_H_ */
