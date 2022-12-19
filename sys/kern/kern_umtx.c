@@ -335,7 +335,7 @@ sysctl_debug_umtx_chains_clear(SYSCTL_HANDLER_ARGS)
 				uc = &umtxq_chains[i][j];
 				mtx_lock(&uc->uc_lock);
 				uc->length = 0;
-				uc->max_length = 0;	
+				uc->max_length = 0;
 				mtx_unlock(&uc->uc_lock);
 			}
 		}
@@ -372,7 +372,7 @@ umtxq_sysinit(void *arg __unused)
 			umtxq_chains[i][j].uc_waiters = 0;
 #ifdef UMTX_PROFILING
 			umtxq_chains[i][j].length = 0;
-			umtxq_chains[i][j].max_length = 0;	
+			umtxq_chains[i][j].max_length = 0;
 #endif
 		}
 	}
@@ -518,7 +518,7 @@ umtxq_insert_queue(struct umtx_q *uq, int q)
 		if (uc->length > uc->max_length) {
 			uc->max_length = uc->length;
 			if (uc->max_length > max_length)
-				max_length = uc->max_length;	
+				max_length = uc->max_length;
 		}
 #endif
 	}
@@ -1357,7 +1357,7 @@ kern_umtx_wake(struct thread *td, void * __capability uaddr, int n_wake,
 {
 	struct umtx_key key;
 	int ret;
-	
+
 	if ((ret = umtx_key_get(uaddr, TYPE_SIMPLE_WAIT,
 	    is_private ? THREAD_SHARE : AUTO_SHARE, &key)) != 0)
 		return (ret);
@@ -2399,7 +2399,7 @@ do_lock_pi(struct thread *td, struct umutex * __capability m, uint32_t flags,
 		 */
 		if (error != 0)
 			break;
-			
+
 		umtxq_lock(&uq->uq_key);
 		umtxq_busy(&uq->uq_key);
 		umtxq_unlock(&uq->uq_key);
@@ -3081,7 +3081,7 @@ do_cv_broadcast(struct thread *td, struct ucond * __capability cv)
 	if (error == -1)
 		return (EFAULT);
 	if ((error = umtx_key_get(cv, TYPE_CV, GET_SHARE(flags), &key)) != 0)
-		return (error);	
+		return (error);
 
 	umtxq_lock(&key);
 	umtxq_busy(&key);
@@ -3663,7 +3663,7 @@ do_sem_wake(struct thread *td, struct _usem * __capability sem)
 	if (error == -1)
 		return (EFAULT);
 	if ((error = umtx_key_get(sem, TYPE_SEM, GET_SHARE(flags), &key)) != 0)
-		return (error);	
+		return (error);
 	umtxq_lock(&key);
 	umtxq_busy(&key);
 	cnt = umtxq_count(&key);
@@ -3786,7 +3786,7 @@ do_sem2_wake(struct thread *td, struct _usem2 * __capability sem)
 	if (rv == -1)
 		return (EFAULT);
 	if ((error = umtx_key_get(sem, TYPE_SEM, GET_SHARE(flags), &key)) != 0)
-		return (error);	
+		return (error);
 	umtxq_lock(&key);
 	umtxq_busy(&key);
 	cnt = umtxq_count(&key);
@@ -5585,7 +5585,7 @@ umtx_handle_rb(struct thread *td, uintcap_t rbp, uintcap_t *rb_list, bool inact,
 		    sizeof(mu.m64));
 	} else
 #endif
-	
+
 		error = copyincap((void * __capability)rbp, &mu.m, sizeof(mu.m));
 	if (error != 0)
 		return (error);

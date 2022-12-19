@@ -153,7 +153,7 @@ struct m_snd_tag {
  * Record/packet header in first mbuf of chain; valid only if M_PKTHDR is set.
  * Size ILP32: 56
  *	 LP64: 64
- *   CHERI128: 112
+ *	 CHERI128: 112
  * Compile-time assertions in uipc_mbuf.c test these values to ensure that
  * they are correct.
  */
@@ -273,8 +273,8 @@ struct socket;
  * Description of external storage mapped into mbuf; valid only if M_EXT is
  * set.
  * Size ILP32: 28
- *	LP64: 48
- *	CHERI128: 352
+ *	 LP64: 48
+ *	 CHERI128: 352
  * XXXAM: notice that we may be able to save space (padding) if we move the ext_size
  * and ext_type/flags after ext_arg2.
  * Compile-time assertions in uipc_mbuf.c test these values to ensure that
@@ -348,8 +348,8 @@ struct mbuf {
 	/*
 	 * Header present at the beginning of every mbuf.
 	 * Size ILP32: 24
-	 *	LP64: 32
-	 *	CHERI128: 64
+	 *	 LP64: 32
+	 *	 CHERI128: 64
 	 * Compile-time assertions in uipc_mbuf.c test these values to ensure
 	 * that they are correct.
 	 */

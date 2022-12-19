@@ -530,7 +530,7 @@ kern_mmap(struct thread *td, const struct mmap_req *mrp)
 	 */
 	if (!SV_CURPROC_FLAG(SV_CHERI))
 		flags &= ~(MAP_RESERVED0020 | MAP_RESERVED0040);
-	
+
 	/*
 	 * Enforce the constraints.
 	 * Mapping of length 0 is only allowed for old binaries.
