@@ -81,8 +81,8 @@ typedef enum device_property_type {
  */
 #define BUS_USER_BUFFER		(3*1024)
 struct u_device {
-	uint64_t		dv_handle;
-	uint64_t		dv_parent;
+	kvaddr_t		dv_handle;
+	kvaddr_t		dv_parent;
 	uint32_t	dv_devflags;		/**< @brief API Flags for device */
 	uint16_t	dv_flags;		/**< @brief flags for dev state */
 	device_state_t	dv_state;		/**< @brief State of attachment */
