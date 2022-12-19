@@ -4607,7 +4607,7 @@ struct fhreadlink_args {
 int
 sys_fhreadlink(struct thread *td, struct fhreadlink_args *uap)
 {
-	
+
 	return (kern_fhreadlink(td, uap->fhp, uap->buf, uap->bufsize));
 }
 
