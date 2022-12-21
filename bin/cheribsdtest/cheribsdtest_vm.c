@@ -1250,9 +1250,7 @@ CHERIBSDTEST(vm_capdirty, "verify capdirty marking and mincore")
 static inline uint64_t
 get_cyclecount()
 {
-#if defined(__mips__)
-	return cheri_get_cyclecount();
-#elif defined(__riscv)
+#if defined(__riscv)
 	return __builtin_readcyclecounter();
 #elif defined(__aarch64__)
 	uint64_t count;
