@@ -503,10 +503,8 @@ static driver_t komeda_driver = {
 	sizeof(struct komeda_drm_softc),
 };
 
-static devclass_t komeda_drm_devclass;
-
-EARLY_DRIVER_MODULE(komeda_drm, simplebus, komeda_driver, komeda_drm_devclass,
-    0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LAST);
+EARLY_DRIVER_MODULE(komeda_drm, simplebus, komeda_driver, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LAST);
 
 /* Bindings for fbd device. */
 extern driver_t fbd_driver;
