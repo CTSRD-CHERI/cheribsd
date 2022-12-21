@@ -40,12 +40,15 @@
 #endif
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
+#include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
 #include <sys/ucontext.h>
+#include <sys/user.h>
 #include <sys/wait.h>
 
 #include <cheri/revoke.h>
@@ -62,6 +65,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <libprocstat.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -842,6 +846,16 @@ reservations_are_quarantined(void)
 	}
 
 	return (quarantine_unmapped_reservations != 0);
+}
+
+
+static const char *
+skip_need_quarantine_unmapped_reservations(const char *name __unused)
+{
+	if (reservations_are_quarantined())
+		return (NULL);
+	else
+		return ("unmapped reservations are not being quarantined");
 }
 
 /*
@@ -1877,6 +1891,84 @@ CHERIBSDTEST(cheri_revoke_lib_fork_split,
 
 	munmap(bigblock, bigblock_caps * sizeof(void *));
 
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(revoke_largest_quarantined_reservation,
+    "Verify that the largest quarantined reservation is revoked",
+    .ct_check_skip = skip_need_quarantine_unmapped_reservations)
+{
+	const size_t res_size = 0x100000000;
+	void *res;
+	ptraddr_t res_addr;
+	struct procstat *psp;
+	struct kinfo_proc *kipp;
+	struct kinfo_vmentry *kivp;
+	uint pcnt, vmcnt;
+	bool found_res;
+
+	res = CHERIBSDTEST_CHECK_SYSCALL(mmap(NULL, res_size, PROT_READ,
+	    MAP_ANON, -1, 0));
+	res_addr = (ptraddr_t)res;
+	CHERIBSDTEST_CHECK_SYSCALL(munmap(res, res_size));
+
+	psp = procstat_open_sysctl();
+	CHERIBSDTEST_VERIFY(psp != NULL);
+	kipp = procstat_getprocs(psp, KERN_PROC_PID, getpid(), &pcnt);
+	CHERIBSDTEST_VERIFY(kipp != NULL);
+	CHERIBSDTEST_VERIFY(pcnt == 1);
+	kivp = procstat_getvmmap(psp, kipp, &vmcnt);
+	CHERIBSDTEST_VERIFY(kivp != NULL);
+
+	found_res = false;
+	for (u_int i = 0; i < vmcnt; i++) {
+		/*
+		 * Look for an entry containing our reservation.  It
+		 * may have been merged with a previously quarantined
+		 * region so don't expect an exact match.
+		 */
+		if (kivp[i].kve_start <= res_addr &&
+		    kivp[i].kve_end >= res_addr + res_size) {
+			found_res = true;
+			CHERIBSDTEST_VERIFY(kivp[i].kve_type ==
+			    KVME_TYPE_QUARANTINED);
+		}
+	}
+	CHERIBSDTEST_VERIFY2(found_res, "reservation not found in vmmap");
+
+	procstat_freevmmap(psp, kivp);
+
+	/*
+	 * XXX: Assume that the revoker will revoke the largest
+	 * quarantined reservation.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(
+	    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START, 0, NULL));
+
+	kivp = procstat_getvmmap(psp, kipp, &vmcnt);
+	CHERIBSDTEST_VERIFY(kivp != NULL);
+
+	for (u_int i = 0; i < vmcnt; i++) {
+		/*
+		 * Look for an entry containing our reservation.  We
+		 * assuming res_size is large enough that it's the
+		 * reservation we revoke, we shouldn't find it.
+		 *
+		 * XXX: It's possible procstat_getvmmap() could trigger
+		 * reuse of this space, but probably not since we'll
+		 * have just flushed malloc()'s quarantine list so
+		 * there should be plenty of objects on the free list(s).
+		 */
+		if (kivp[i].kve_start <= res_addr &&
+		    kivp[i].kve_end >= res_addr + res_size) {
+			cheribsdtest_failure_errx(
+			    "reservation still in memory map");
+		}
+	}
+
+	procstat_freevmmap(psp, kivp);
+	procstat_freeprocs(psp, kipp);
+	procstat_close(psp);
 	cheribsdtest_success();
 }
 #endif /* CHERI_REVOKE */
