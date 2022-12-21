@@ -2020,5 +2020,6 @@ CHERIBSDTEST(cheri_revoke_lib_fork,
 
 	cheribsdtest_success();
 }
-#endif
+#endif /* CHERI_REVOKE */
+
 #endif /* __CHERI_PURE_CAPABILITY__ */
