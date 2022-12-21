@@ -25,6 +25,7 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 	cheribsdtest_syscall.c						\
 	cheribsdtest_tls.c						\
 	cheribsdtest_util.c						\
+	cheribsdtest_util_vm.c						\
 	cheribsdtest_vm.c						\
 	cheribsdtest_zlib.c
 .if ${MACHINE_ABI:Mpurecap}
@@ -60,8 +61,7 @@ CFLAGS+=	-DCHERIBSD_THREAD_TESTS
 
 MAN=
 
-LIBADD= 	z
-LIBADD+=	xo util
+LIBADD+=	procstat util xo z
 
 .ifdef CHERIBSD_DYNAMIC_TESTS
 CFLAGS+=	-DCHERIBSD_DYNAMIC_TESTS
