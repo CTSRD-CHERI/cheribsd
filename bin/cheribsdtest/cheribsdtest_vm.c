@@ -819,9 +819,9 @@ CHERIBSDTEST(vm_reservation_align,
 /*
  * Check that after a reservation is unmapped, it is not possible to
  * reuse the old capability to create new fixed mappings.
- * This is an attempt of reusing a capability before revocation, in
- * a proper temporal-safety implementation will lead to failures so
- * we catch these early.
+ * This is an attempt to reuse a capability prior to a revocation pass.
+ * As this capability may be revoked at some arbitrary point in the
+ * future, we always disallow use.
  */
 CHERIBSDTEST(vm_reservation_mmap_after_free_fixed,
     "check that an old capability can not be used to mmap with MAP_FIXED "
@@ -836,8 +836,22 @@ CHERIBSDTEST(vm_reservation_mmap_after_free_fixed,
 	map = mmap(map, PAGE_SIZE, PROT_READ | PROT_WRITE,
 	    MAP_ANON | MAP_FIXED, -1, 0);
 	CHERIBSDTEST_VERIFY2(map == MAP_FAILED, "mmap after free succeeded");
+#ifdef CHERI_REVOKE
+	/*
+	 * There's nothing to cause the quarantined reservation to be revoked
+	 * between the munmap and mmap calls so we'll get an ENOMEM
+	 * here.
+	 *
+	 * XXX: ideally we'd trigger a revocation of this specific
+	 * reservation before the mmap call to test the same case with
+	 * and without revocation.
+	 */
+	CHERIBSDTEST_VERIFY2(errno == ENOMEM,
+	    "mmap after free failed with %d instead of ENOMEM", errno);
+#else
 	CHERIBSDTEST_VERIFY2(errno == EPROT,
 	    "mmap after free failed with %d instead of EPROT", errno);
+#endif
 
 	cheribsdtest_success();
 }
