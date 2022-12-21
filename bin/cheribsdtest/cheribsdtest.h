@@ -330,4 +330,6 @@ _cheribsdtest_check_errno(const char *context, int actual, int expected)
 extern void *cheribsdtest_memcpy(void *dst, const void *src, size_t n);
 extern void *cheribsdtest_memmove(void *dst, const void *src, size_t n);
 
+extern ptraddr_t find_address_space_gap(size_t len, size_t align);
+
 #endif /* !_CHERIBSDTEST_H_ */
