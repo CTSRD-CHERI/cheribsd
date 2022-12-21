@@ -133,10 +133,13 @@ CHERIBSDTEST(test_ptrace_readtags, "Basic test of PIOD_READ_CHERI_TAGS")
 {
 	struct ptrace_io_desc piod;
 	pid_t pid;
+	size_t ppsz = 8 * sizeof(uintcap_t);
 	uintcap_t *pp;
 	char tagbuf[1];
 
-	pp = calloc(8, sizeof(*pp));
+	pp = aligned_alloc(ppsz, ppsz);
+	memset(pp, 0, ppsz);
+
 	pp[0] = (uintcap_t)(__cheri_tocap void * __capability)&piod;
 	pp[2] = (uintcap_t)(__cheri_tocap void * __capability)tagbuf;
 
