@@ -1950,6 +1950,26 @@ distributekernel distributekernel.debug: .PHONY
 	@sed -e 's|^./kernel|.|' ${DESTDIR}/${DISTDIR}/kernel.premeta > \
 	    ${DESTDIR}/${DISTDIR}/kernel.meta
 .endif
+
+	# Just like the gross hack above, also distribute this kernel
+	# nonymously. (XXX)
+.if defined(NO_ROOT)
+	@echo "#${MTREE_MAGIC}" \
+		> ${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}.premeta
+.endif
+	${_+_}cd ${KRNLOBJDIR}/${INSTALLKERNEL}; \
+	    ${IMAKEENV} \
+	    ${IMAKE_INSTALL:S/METALOG/kernel.${INSTALLKERNEL}.premeta/} \
+	    ${IMAKE_MTREE} PATH=${TMPPATH} ${MAKE} \
+	    KERNEL=${INSTKERNNAME}.${INSTALLKERNEL} \
+	    DESTDIR=${INSTALL_DDIR}/kernel.${INSTALLKERNEL} \
+	    ${.TARGET:S/distributekernel/install/}
+.if defined(NO_ROOT)
+	@sed -e 's|^./kernel|.|' \
+	    ${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}.premeta > \
+	    ${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}.meta
+.endif
+
 .endif
 .if ${BUILDKERNELS:[#]} > 1 && ${NO_INSTALLEXTRAKERNELS} != "yes"
 .for _kernel in ${BUILDKERNELS:[2..-1]}
@@ -1984,6 +2004,21 @@ packagekernel: .PHONY
 	    @${DESTDIR}/${DISTDIR}/kernel.meta | \
 	    ${XZ_CMD} > ${DESTDIR}/${DISTDIR}/kernel-dbg.txz
 .endif
+
+	# The terrible hack to install the default kernel nonymously continues!
+.if !defined(NO_INSTALLKERNEL)
+	cd ${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}; \
+	    ${TAR_CMD} cvf - --exclude '*.debug' \
+	    @${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}.meta | \
+	    ${XZ_CMD} > ${PACKAGEDIR}/kernel.${INSTALLKERNEL}.txz
+.endif
+.if ${MK_DEBUG_FILES} != "no"
+	cd ${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}; \
+	    ${TAR_CMD} cvf - --include '*/*/*.debug' \
+	    @${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}meta | \
+	    ${XZ_CMD} > ${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}-dbg.txz
+.endif
+
 .if ${BUILDKERNELS:[#]} > 1 && ${NO_INSTALLEXTRAKERNELS} != "yes"
 .for _kernel in ${BUILDKERNELS:[2..-1]}
 	cd ${DESTDIR}/${DISTDIR}/kernel.${_kernel}; \
@@ -2009,6 +2044,19 @@ packagekernel: .PHONY
 	    ${TAR_CMD} cvf - --include '*/*/*.debug' $$(eval find .) | \
 	    ${XZ_CMD} > ${DESTDIR}/${DISTDIR}/kernel-dbg.txz
 .endif
+
+	# The terrible hack to install the default kernel nonymously continues!
+.if !defined(NO_INSTALLKERNEL)
+	cd ${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}; \
+	    ${TAR_CMD} cvf - --exclude '*.debug' . | \
+	    ${XZ_CMD} > ${PACKAGEDIR}/kernel.${INSTALLKERNEL}.txz
+.endif
+.if ${MK_DEBUG_FILES} != "no"
+	cd ${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}; \
+	    ${TAR_CMD} cvf - --include '*/*/*.debug' $$(eval find .) | \
+	    ${XZ_CMD} > ${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}-dbg.txz
+.endif
+
 .if ${BUILDKERNELS:[#]} > 1 && ${NO_INSTALLEXTRAKERNELS} != "yes"
 .for _kernel in ${BUILDKERNELS:[2..-1]}
 	cd ${DESTDIR}/${DISTDIR}/kernel.${_kernel}; \
