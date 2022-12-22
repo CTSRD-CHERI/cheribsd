@@ -2015,7 +2015,7 @@ packagekernel: .PHONY
 .if ${MK_DEBUG_FILES} != "no"
 	cd ${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}; \
 	    ${TAR_CMD} cvf - --include '*/*/*.debug' \
-	    @${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}meta | \
+	    @${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}.meta | \
 	    ${XZ_CMD} > ${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}-dbg.txz
 .endif
 
