@@ -202,11 +202,10 @@ __FBSDID("$FreeBSD$");
 
 	/* Read the current thread AST mask */
 	ldr	PTR(1), [PTR(18), #PC_CURTHREAD]	/* Load curthread */
-	add	PTR(1), PTR(1), #(TD_AST)
-	ldr	x1, [PTR(1)]
+	ldr	w1, [PTR(1), #(TD_AST)]
 
 	/* Check if we have a non-zero AST mask */
-	cbz	x1, 2f
+	cbz	w1, 2f
 
 	/* Restore interrupts */
 	msr	daif, x19
