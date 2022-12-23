@@ -8,7 +8,10 @@ ATF_TESTS_C+=		heapsort_test
 ATF_TESTS_C+=		mergesort_test
 ATF_TESTS_C+=		timsort_test
 ATF_TESTS_C+=		qsort_test
+.if !${MACHINE_ABI:Mpurecap}
+# See https://github.com/CTSRD-CHERI/llvm-project/issues/671
 ATF_TESTS_C+=		qsort_b_test
+.endif
 ATF_TESTS_C+=		qsort_r_test
 ATF_TESTS_C+=		qsort_s_test
 ATF_TESTS_C+=		set_constraint_handler_s_test
