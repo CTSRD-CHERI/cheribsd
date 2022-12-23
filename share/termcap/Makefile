@@ -33,7 +33,7 @@ termcap.db: termcap
 	${CAP_MKDB_CMD} ${CAP_MKDB_ENDIAN} -f ${.TARGET:R} ${.ALLSRC}
 
 termcap.small: termcap
-	set -e; set -o pipefail; \
+	set -e; \
 	(echo "# AUTOMATICALLY GENERATED FROM `basename ${.ALLSRC}`"; \
 	for tcname in ${TERMCAP_SMALL_ENTS}; \
 	do \
