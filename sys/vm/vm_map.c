@@ -145,6 +145,8 @@ static void vm_map_entry_deallocate(vm_map_entry_t entry, boolean_t system_map);
 static void vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry);
 static void vm_map_entry_dispose(vm_map_t map, vm_map_entry_t entry);
 static void vm_map_entry_unwire(vm_map_t map, vm_map_entry_t entry);
+static void vm_map_entry_resize(vm_map_t map, vm_map_entry_t entry,
+    vm_size_t grow_amount);
 static int vm_map_growstack(vm_map_t map, vm_offset_t addr,
     vm_map_entry_t gap_entry);
 static void vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
@@ -1630,21 +1632,19 @@ vm_map_entry_quarantine(vm_map_t map, vm_map_entry_t entry)
 	    __func__ ": map %p, nentries %d, entry %p", map, map->nentries,
 	    entry);
 	VM_MAP_ASSERT_LOCKED(map);
-	/*
-	 * XXX: We should try to merge with immediate neighbors (but not
-	 * with map->rev_entry).
-	 */
 	entry->inheritance = VM_INHERIT_QUARANTINE;
 	RB_INSERT(vm_map_quarantine, &map->quarantine, entry);
 	/* XXX stats */
 
 	prev_entry = vm_map_entry_pred(entry);
-	if (prev_entry->inheritance == VM_INHERIT_QUARANTINE) {
+	if (prev_entry->inheritance == VM_INHERIT_QUARANTINE &&
+	    prev_entry != map->rev_entry) {
 		vm_map_try_merge_entries(map, prev_entry, entry);
 		RB_REINSERT(vm_map_quarantine, &map->quarantine, entry);
 	}
 	next_entry = vm_map_entry_succ(entry);
-	if (next_entry->inheritance == VM_INHERIT_QUARANTINE) {
+	if (next_entry->inheritance == VM_INHERIT_QUARANTINE &&
+	    next_entry != map->rev_entry) {
 		vm_map_try_merge_entries(map, entry, next_entry);
 		RB_REINSERT(vm_map_quarantine, &map->quarantine, next_entry);
 	}
@@ -1653,21 +1653,56 @@ vm_map_entry_quarantine(vm_map_t map, vm_map_entry_t entry)
 bool
 vm_map_entry_start_revocation(vm_map_t map, vm_map_entry_t *entry)
 {
+	vm_map_entry_t rev_entry, prev_entry, next_entry;
+	vm_offset_t filled_space, gap, max_gap_fill;
 
 	KASSERT(map->rev_entry == NULL,
 	   ("an entry %p is already being revoked", map->rev_entry));
 	VM_MAP_ASSERT_LOCKED(map);
 	if (RB_EMPTY(&map->quarantine))
 		return (FALSE);
+	rev_entry = RB_MAX(vm_map_quarantine, &map->quarantine);
+
 	/*
-	 * Just pop the most recent entry off the list to do something.
+	 * Attempt to merge with non-adjacent, quarantined neighbors.
+	 * Limit the amount of VA temporarily consumed by merging
+	 * entries to 1/8th of that currently available to reduce the
+	 * risk of starving the address space while revoking.
 	 *
-	 * We'll eventually want this to find the "most impactful" entry
-	 * to free and expand the selection to include non-adjacent
-	 * neighbors in order to return at much VA to use as possible in
-	 * a given round of revocation.
+	 * XXX: this may require some turning with real-world applications.
+	 * XXX: there's an argument for revoking the largest range of
+	 *      quarantined neighbors rather than the large single entry
+	 *      but that would require more RB tree churn.
 	 */
-	map->rev_entry = RB_MAX(vm_map_quarantine, &map->quarantine);
+	max_gap_fill = ((vm_map_max(map) - vm_map_min(map)) - map->size) >> 3;
+	filled_space = 0;
+	prev_entry = vm_map_entry_pred(rev_entry);
+	while (prev_entry->inheritance == VM_INHERIT_QUARANTINE) {
+		gap = rev_entry->start - prev_entry->end;
+		if (filled_space + gap > max_gap_fill)
+			break;
+		filled_space += gap;
+
+		vm_map_entry_resize(map, prev_entry, gap);
+		vm_map_try_merge_entries(map, prev_entry, rev_entry);
+		RB_REINSERT(vm_map_quarantine, &map->quarantine, rev_entry);
+		prev_entry = vm_map_entry_pred(rev_entry);
+	}
+	next_entry = vm_map_entry_succ(rev_entry);
+	while (next_entry->inheritance == VM_INHERIT_QUARANTINE) {
+		gap = next_entry->start - rev_entry->end;
+		if (filled_space + gap > max_gap_fill)
+			break;
+		filled_space += gap;
+
+		vm_map_entry_resize(map, rev_entry, gap);
+		vm_map_try_merge_entries(map, rev_entry, next_entry);
+		RB_REINSERT(vm_map_quarantine, &map->quarantine, next_entry);
+		rev_entry = next_entry;
+		next_entry = vm_map_entry_succ(rev_entry);
+	}
+
+	map->rev_entry = rev_entry;
 	if (entry != NULL)
 		*entry = map->rev_entry;
 	/* XXX stats */
