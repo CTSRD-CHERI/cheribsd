@@ -1971,6 +1971,100 @@ CHERIBSDTEST(revoke_largest_quarantined_reservation,
 	procstat_close(psp);
 	cheribsdtest_success();
 }
+
+#define	NRES	3
+CHERIBSDTEST(revoke_merge_quarantined,
+    "Verify that adjacent non-neighbor reservations are revoked",
+    .ct_check_skip = skip_need_quarantine_unmapped_reservations)
+{
+	const size_t big_res_size = 0x100000000;
+	const size_t res_sizes[NRES] =
+	    { PAGE_SIZE, big_res_size, PAGE_SIZE };
+	const size_t res_offsets[NRES] =
+	    { PAGE_SIZE, big_res_size, 3 * big_res_size };
+	void *res;
+	ptraddr_t res_addrs[NRES], working_space;
+	struct procstat *psp;
+	struct kinfo_proc *kipp;
+	struct kinfo_vmentry *kivp;
+	uint pcnt, vmcnt;
+	bool found_res[NRES] = {};
+
+	/*
+	 * Create a single large quarantined reservation with three
+	 * non-adjacent, quarantined neighbors inside it (the edges are
+	 * padded to prevent merging with neighbors are creation time).
+	 *
+	 * The three quarantined regions are:
+	 *  - A PAGE_SIZE entry at offset PAGE_SIZE.
+	 *  - A large (big_res_size) allocation at offset big_res_size.
+	 *  - A PAGE_SIZE reservation at offset 3*big_res_size.
+	 */
+	working_space = find_address_space_gap(big_res_size * 4, 0);
+	for (int r = 0; r < NRES; r++) {
+		res = CHERIBSDTEST_CHECK_SYSCALL(mmap(
+		    (void *)(uintptr_t)(working_space + res_offsets[r]),
+		    res_sizes[r], PROT_READ, MAP_ANON, -1, 0));
+		res_addrs[r] = (ptraddr_t)res;
+		CHERIBSDTEST_CHECK_SYSCALL(munmap(res, res_sizes[r]));
+	}
+
+	psp = procstat_open_sysctl();
+	CHERIBSDTEST_VERIFY(psp != NULL);
+	kipp = procstat_getprocs(psp, KERN_PROC_PID, getpid(), &pcnt);
+	CHERIBSDTEST_VERIFY(kipp != NULL);
+	CHERIBSDTEST_VERIFY(pcnt == 1);
+	kivp = procstat_getvmmap(psp, kipp, &vmcnt);
+	CHERIBSDTEST_VERIFY(kivp != NULL);
+
+	/*
+	 * Check that there are quarantines resevations at each expected
+	 * location.
+	 */
+	for (u_int i = 0; i < vmcnt; i++) {
+		for (int r = 0; r < NRES; r++) {
+			if (kivp[i].kve_start == res_addrs[r]) {
+				found_res[r] = true;
+				CHERIBSDTEST_VERIFY(kivp[i].kve_type ==
+				    KVME_TYPE_QUARANTINED);
+			}
+		}
+	}
+	for (int r = 0; r < NRES; r++)
+		CHERIBSDTEST_VERIFY2(found_res[r],
+		    "reservation not found in vmmap");
+
+	procstat_freevmmap(psp, kivp);
+
+	/*
+	 * XXX: Assume that the revoker will revoke the largest
+	 * quarantined reservation and merge it with it's neighbors.
+	 */
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(
+	    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START, 0, NULL));
+
+	kivp = procstat_getvmmap(psp, kipp, &vmcnt);
+	CHERIBSDTEST_VERIFY(kivp != NULL);
+
+	for (u_int i = 0; i < vmcnt; i++) {
+		/*
+		 * Check that no entries overlap our working space.
+		 */
+		if ((kivp[i].kve_start >= working_space &&
+		    kivp[i].kve_start < working_space + (4 * big_res_size)) ||
+		    (kivp[i].kve_end - 1 >= working_space &&
+		    kivp[i].kve_end - 1 < working_space + (4 * big_res_size))) {
+			cheribsdtest_failure_errx(
+			    "reservation(s) still in memory map");
+		}
+	}
+
+	procstat_freevmmap(psp, kivp);
+	procstat_freeprocs(psp, kipp);
+	procstat_close(psp);
+	cheribsdtest_success();
+}
+#undef NRES
 #endif /* CHERI_REVOKE */
 
 #endif /* __CHERI_PURE_CAPABILITY__ */
