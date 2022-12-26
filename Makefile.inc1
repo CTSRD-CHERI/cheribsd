@@ -1965,7 +1965,7 @@ distributekernel distributekernel.debug: .PHONY
 	    DESTDIR=${INSTALL_DDIR}/kernel.${INSTALLKERNEL} \
 	    ${.TARGET:S/distributekernel/install/}
 .if defined(NO_ROOT)
-	@sed -e 's|^./kernel|.|' \
+	@sed -e 's|^./kernel.${INSTALLKERNEL}|.|' \
 	    ${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}.premeta > \
 	    ${DESTDIR}/${DISTDIR}/kernel.${INSTALLKERNEL}.meta
 .endif
