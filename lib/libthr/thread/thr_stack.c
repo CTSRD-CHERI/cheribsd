@@ -300,11 +300,8 @@ _thr_stack_alloc(struct pthread_attr *attr)
 		     _rtld_get_stack_prot(), MAP_STACK, -1, 0);
 		if (stackaddr == MAP_FAILED) {
 			stackaddr = NULL;
+#ifndef __CHERI_PURE_CAPABILITY__
 		} else if (guardsize > 0) {
-#ifdef __CHERI_PURE_CAPABILITY__
-			stderr_debug("Requesting guard size of 0%lx bytes, this"
-			    "is not required on CHERIABI\n", guardsize);
-#endif
 			if (mprotect(stackaddr, guardsize, PROT_NONE) == 0) {
 				stackaddr += guardsize;
 			} else {
@@ -312,6 +309,7 @@ _thr_stack_alloc(struct pthread_attr *attr)
 				munmap(stackaddr, stacksize + guardsize);
 				stackaddr = NULL;
 			}
+#endif
 		}
 		attr->stackaddr_attr = stackaddr;
 	}
