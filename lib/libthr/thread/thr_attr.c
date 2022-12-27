@@ -324,9 +324,6 @@ _pthread_attr_getstack(const pthread_attr_t * __restrict attr,
 		 *
 		 * XXX-AR: maybe we should allow this and simply treat
 		 * pthread_attr_getstack() as an unsafe API.
-		 *
-		 * XXX-AR: we would also need to fix stackaddr to be a valid
-		 * capability for the main thread as asymmetric API would be bad
 		 */
 		cheri_cleartag(*stackaddr);
 #endif
@@ -357,9 +354,6 @@ _thr_attr_getstackaddr(const pthread_attr_t *attr, void **stackaddr)
 		 *
 		 * XXX-AR: maybe we should allow this and simply treat
 		 * pthread_attr_getstackaddr() as an unsafe API
-		 *
-		 * XXX-AR: we would also need to fix stackaddr to be a valid
-		 * capability for the main thread as asymmetric API would be bad
 		 */
 		cheri_cleartag(*stackaddr);
 #endif
