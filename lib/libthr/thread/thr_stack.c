@@ -263,13 +263,7 @@ _thr_stack_alloc(struct pthread_attr *attr)
 		THREAD_LIST_UNLOCK(curthread);
 	}
 	else {
-#ifdef __CHERI_PURE_CAPABILITY__
-		/*
-		 * Grouping stacks together is not useful on CHERIABI, we let
-		 * let mmap() decide where to allocate
-		 */
-		stackaddr = NULL;
-#else /* !defined(__CHERI_PURE_CAPABILITY__) */
+#ifndef __CHERI_PURE_CAPABILITY__
 		/*
 		 * Allocate a stack from or below usrstack, depending
 		 * on the LIBPTHREAD_BIGSTACK_MAIN env variable.
@@ -294,23 +288,30 @@ _thr_stack_alloc(struct pthread_attr *attr)
 		/* Release the lock before mmap'ing it. */
 		THREAD_LIST_UNLOCK(curthread);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+		/*
+		 * Grouping stacks together is not useful on CHERIABI, we let
+		 * let mmap() decide where to allocate
+		 */
+		stackaddr = mmap(NULL, stacksize, _rtld_get_stack_prot(),
+		    MAP_STACK, -1, 0);
+		if (stackaddr == MAP_FAILED)
+			stackaddr = NULL;
+#else
 		/* Map the stack and guard page together, and split guard
 		   page from allocated space: */
-		stackaddr = mmap(stackaddr, stacksize + guardsize,
-		     _rtld_get_stack_prot(), MAP_STACK, -1, 0);
-		if (stackaddr == MAP_FAILED) {
-			stackaddr = NULL;
-#ifndef __CHERI_PURE_CAPABILITY__
-		} else if (guardsize > 0) {
-			if (mprotect(stackaddr, guardsize, PROT_NONE) == 0) {
-				stackaddr += guardsize;
-			} else {
-				/* XXX-AR: add munmup return value check? */
+		if ((stackaddr = mmap(stackaddr, stacksize + guardsize,
+		     _rtld_get_stack_prot(), MAP_STACK,
+		     -1, 0)) != MAP_FAILED &&
+		    (guardsize == 0 ||
+		     mprotect(stackaddr, guardsize, PROT_NONE) == 0)) {
+			stackaddr += guardsize;
+		} else {
+			if (stackaddr != MAP_FAILED)
 				munmap(stackaddr, stacksize + guardsize);
-				stackaddr = NULL;
-			}
-#endif
+			stackaddr = NULL;
 		}
+#endif
 		attr->stackaddr_attr = stackaddr;
 	}
 	if (attr->stackaddr_attr != NULL)
