@@ -215,10 +215,6 @@ STATIC_LIB_REQUIRE(_thread_state_running);
 #define	DUAL_ENTRY(entry)	\
 	(pthread_func_t)entry, (pthread_func_t)entry
 
-/*
- * FIXME: If libthr is linked after libc these entries resolve to the weak
- * alias stub functions in libc which causes an infinite loop/stack overflow.
- */
 static pthread_func_t jmp_table[][2] = {
 	[PJT_ATFORK] = {DUAL_ENTRY(_thr_atfork)},
 	[PJT_ATTR_DESTROY] = {DUAL_ENTRY(_thr_attr_destroy)},
