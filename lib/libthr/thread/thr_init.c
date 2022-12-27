@@ -456,6 +456,18 @@ init_main_thread(struct pthread *thread)
 bool
 __thr_get_main_stack_base(char **base)
 {
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * In the CheriABI world, the maximum possible stack's address
+	 * space has already been allocated (and has leaked onto the
+	 * stack in the form of stored stack frames) so we leave the
+	 * whole thing for the initial thread and take our values from
+	 * there.
+	 */
+	char *sp = (char *)cheri_getstack();
+	*base = sp + cheri_getlen(sp);
+	return (true);
+#else
 	size_t len;
 	int mib[2];
 
@@ -469,11 +481,17 @@ __thr_get_main_stack_base(char **base)
 		return (true);
 
 	return (false);
+#endif
 }
 
 bool
 __thr_get_main_stack_lim(size_t *lim)
 {
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* See above. */
+	*lim = cheri_getlen(cheri_getstack());
+	return (true);
+#else
 	struct rlimit rlim;
 
 	if (elf_aux_info(AT_USRSTACKLIM, lim, sizeof(*lim)) == 0)
@@ -485,6 +503,7 @@ __thr_get_main_stack_lim(size_t *lim)
 	}
 
 	return (false);
+#endif
 }
 
 static void
@@ -518,26 +537,22 @@ init_private(void)
 		__thr_malloc_init();
 
 		/* Find the stack top */
-#ifndef __CHERI_PURE_CAPABILITY__
 		if (!__thr_get_main_stack_base(&_usrstack))
 			PANIC("Cannot get kern.usrstack");
+#ifndef __CHERI_PURE_CAPABILITY__
 		env_bigstack = getenv("LIBPTHREAD_BIGSTACK_MAIN");
 		env_splitstack = getenv("LIBPTHREAD_SPLITSTACK_MAIN");
 		if (env_bigstack != NULL || env_splitstack == NULL) {
+#else
+		/*
+		 * Always use the maximum possible stack's address
+		 * space for the main thread.
+		 */
+		{
+#endif
 			if (!__thr_get_main_stack_lim(&_thr_stack_initial))
 				PANIC("Cannot get stack rlimit");
 		}
-#else
-		/*
-		 * In the CheriABI world, the maximum possible stack's
-		 * address space has already been allocated (and has
-		 * leaked onto the stack in the form of stored stack
-		 * frames) so we leave the whole thing for the initial
-		 * thread and take our values from there.
-		 */
-		_thr_stack_initial = cheri_getlen(cheri_getstack());
-		_usrstack = (char *)cheri_getstack() + _thr_stack_initial;
-#endif
 		_thr_is_smp = sysconf(_SC_NPROCESSORS_CONF);
 		if (_thr_is_smp == -1)
 			PANIC("Cannot get _SC_NPROCESSORS_CONF");
