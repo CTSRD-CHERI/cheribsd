@@ -12,6 +12,7 @@ KYUAFILE= yes
 
 SUBDIR.${MK_LIB64C}+=	cheri
 SUBDIR+= etc
+SUBDIR+= examples
 SUBDIR+= sys
 SUBDIR+= atf_python
 
