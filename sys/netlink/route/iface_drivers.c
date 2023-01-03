@@ -139,7 +139,7 @@ create_vlan(struct nl_parsed_link *lattrs, struct nlpcb *nlp, struct nl_pstate *
 	};
 */
 	int ifname_len = strlen(lattrs->ifla_ifname) + 1;
-	error = if_clone_create(lattrs->ifla_ifname, ifname_len, (char *)NULL);
+	error = if_clone_create(lattrs->ifla_ifname, ifname_len, NULL);
 
 	NLP_LOG(LOG_DEBUG2, nlp, "clone for %s returned %d", lattrs->ifla_ifname, error);
 
