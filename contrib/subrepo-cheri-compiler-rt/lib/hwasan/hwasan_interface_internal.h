@@ -36,7 +36,6 @@ void __hwasan_library_unloaded(ElfW(Addr) base, const ElfW(Phdr) * phdr,
 
 using __sanitizer::uptr;
 using __sanitizer::sptr;
-using __sanitizer::usize;
 using __sanitizer::uu64;
 using __sanitizer::uu32;
 using __sanitizer::uu16;
@@ -104,7 +103,7 @@ SANITIZER_INTERFACE_ATTRIBUTE
 void __hwasan_store16_noabort(uptr);
 
 SANITIZER_INTERFACE_ATTRIBUTE
-void __hwasan_tag_memory(uptr p, u8 tag, usize sz);
+void __hwasan_tag_memory(uptr p, u8 tag, uptr sz);
 
 SANITIZER_INTERFACE_ATTRIBUTE
 uptr __hwasan_tag_pointer(uptr p, u8 tag);
@@ -122,13 +121,13 @@ u8 __hwasan_generate_tag();
 // Returns the offset of the first tag mismatch or -1 if the whole range is
 // good.
 SANITIZER_INTERFACE_ATTRIBUTE
-sptr __hwasan_test_shadow(const void *x, usize size);
+sptr __hwasan_test_shadow(const void *x, uptr size);
 
 SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE
 /* OPTIONAL */ const char* __hwasan_default_options();
 
 SANITIZER_INTERFACE_ATTRIBUTE
-void __hwasan_print_shadow(const void *x, usize size);
+void __hwasan_print_shadow(const void *x, uptr size);
 
 SANITIZER_INTERFACE_ATTRIBUTE
 void __hwasan_handle_longjmp(const void *sp_dst);
@@ -170,59 +169,11 @@ SANITIZER_INTERFACE_ATTRIBUTE
 void __hwasan_print_memory_usage();
 
 SANITIZER_INTERFACE_ATTRIBUTE
-int __sanitizer_posix_memalign(void **memptr, usize alignment, usize size);
-
+void *__hwasan_memcpy(void *dst, const void *src, uptr size);
 SANITIZER_INTERFACE_ATTRIBUTE
-void * __sanitizer_memalign(uptr alignment, usize size);
-
+void *__hwasan_memset(void *s, int c, uptr n);
 SANITIZER_INTERFACE_ATTRIBUTE
-void * __sanitizer_aligned_alloc(uptr alignment, usize size);
-
-SANITIZER_INTERFACE_ATTRIBUTE
-void * __sanitizer___libc_memalign(uptr alignment, usize size);
-
-SANITIZER_INTERFACE_ATTRIBUTE
-void * __sanitizer_valloc(usize size);
-
-SANITIZER_INTERFACE_ATTRIBUTE
-void * __sanitizer_pvalloc(usize size);
-
-SANITIZER_INTERFACE_ATTRIBUTE
-void __sanitizer_free(void *ptr);
-
-SANITIZER_INTERFACE_ATTRIBUTE
-void __sanitizer_cfree(void *ptr);
-
-SANITIZER_INTERFACE_ATTRIBUTE
-uptr __sanitizer_malloc_usable_size(const void *ptr);
-
-SANITIZER_INTERFACE_ATTRIBUTE
-__hwasan::__sanitizer_struct_mallinfo __sanitizer_mallinfo();
-
-SANITIZER_INTERFACE_ATTRIBUTE
-int __sanitizer_mallopt(int cmd, int value);
-
-SANITIZER_INTERFACE_ATTRIBUTE
-void __sanitizer_malloc_stats(void);
-
-SANITIZER_INTERFACE_ATTRIBUTE
-void * __sanitizer_calloc(uptr nmemb, usize size);
-
-SANITIZER_INTERFACE_ATTRIBUTE
-void * __sanitizer_realloc(void *ptr, usize size);
-
-SANITIZER_INTERFACE_ATTRIBUTE
-void * __sanitizer_reallocarray(void *ptr, usize nmemb, usize size);
-
-SANITIZER_INTERFACE_ATTRIBUTE
-void * __sanitizer_malloc(usize size);
-
-SANITIZER_INTERFACE_ATTRIBUTE
-void *__hwasan_memcpy(void *dst, const void *src, usize size);
-SANITIZER_INTERFACE_ATTRIBUTE
-void *__hwasan_memset(void *s, int c, usize n);
-SANITIZER_INTERFACE_ATTRIBUTE
-void *__hwasan_memmove(void *dest, const void *src, usize n);
+void *__hwasan_memmove(void *dest, const void *src, uptr n);
 
 SANITIZER_INTERFACE_ATTRIBUTE
 void __hwasan_set_error_report_callback(void (*callback)(const char *));

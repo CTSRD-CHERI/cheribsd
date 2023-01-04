@@ -21,16 +21,15 @@
 using __sanitizer::u32;
 using __sanitizer::u8;
 using __sanitizer::uptr;
-using __sanitizer::usize;
 
 // Copy declarations from public sanitizer/dfsan_interface.h header here.
 typedef u8 dfsan_label;
 typedef u32 dfsan_origin;
 
 extern "C" {
-void dfsan_add_label(dfsan_label label, void *addr, usize size);
-void dfsan_set_label(dfsan_label label, void *addr, usize size);
-dfsan_label dfsan_read_label(const void *addr, usize size);
+void dfsan_add_label(dfsan_label label, void *addr, uptr size);
+void dfsan_set_label(dfsan_label label, void *addr, uptr size);
+dfsan_label dfsan_read_label(const void *addr, uptr size);
 dfsan_label dfsan_union(dfsan_label l1, dfsan_label l2);
 // Zero out [offset, offset+size) from __dfsan_arg_tls.
 void dfsan_clear_arg_tls(uptr offset, uptr size);
@@ -47,10 +46,14 @@ void dfsan_set_label_origin(dfsan_label label, dfsan_origin origin, void *addr,
 
 // Copy or move the origins of the len bytes from src to dst.
 void dfsan_mem_origin_transfer(const void *dst, const void *src, uptr len);
+
+// Copy shadow bytes from src to dst.
+// Note this preserves distinct taint labels at specific offsets.
+void dfsan_mem_shadow_transfer(void *dst, const void *src, uptr len);
 }  // extern "C"
 
 template <typename T>
-void dfsan_set_label(dfsan_label label, T &data) {  // NOLINT
+void dfsan_set_label(dfsan_label label, T &data) {
   dfsan_set_label(label, (void *)&data, sizeof(T));
 }
 

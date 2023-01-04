@@ -48,6 +48,8 @@ void *InternalReallocArray(void *p, usize count, usize size,
 void *InternalCalloc(usize count, usize size,
                      InternalAllocatorCache *cache = nullptr);
 void InternalFree(void *p, InternalAllocatorCache *cache = nullptr);
+void InternalAllocatorLock();
+void InternalAllocatorUnlock();
 InternalAllocator *internal_allocator();
 
 } // namespace __sanitizer

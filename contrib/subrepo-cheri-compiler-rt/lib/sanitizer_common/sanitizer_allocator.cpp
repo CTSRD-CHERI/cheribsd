@@ -17,81 +17,14 @@
 #include "sanitizer_allocator_internal.h"
 #include "sanitizer_atomic.h"
 #include "sanitizer_common.h"
+#include "sanitizer_platform.h"
 
 namespace __sanitizer {
 
 // Default allocator names.
 const char *PrimaryAllocatorName = "SizeClassAllocator";
 const char *SecondaryAllocatorName = "LargeMmapAllocator";
-
-#if defined(__CHERI_PURE_CAPABILITY__)
-// Use the system malloc() to get bounded allocations
-#define SANITIZER_USE_MALLOC
-#endif
-
 static constexpr usize InternalDefaultAlign = Max((usize)8, sizeof(void*));
-
-// ThreadSanitizer for Go uses libc malloc/free.
-#if defined(SANITIZER_USE_MALLOC)
-# if SANITIZER_LINUX && !SANITIZER_ANDROID
-extern "C" void *__libc_malloc(usize size);
-#  if !SANITIZER_GO
-extern "C" void *__libc_memalign(usize alignment, usize size);
-#  endif
-extern "C" void *__libc_realloc(void *ptr, usize size);
-extern "C" void __libc_free(void *ptr);
-# else
-} // end namespace __sanitizer
-#  include <stdlib.h>
-namespace __sanitizer {
-#  define __libc_malloc malloc
-#  if !SANITIZER_GO
-static void *__libc_memalign(usize alignment, usize size) {
-  void *p;
-  usize error = posix_memalign(&p, alignment, size);
-  if (error) return nullptr;
-  return p;
-}
-#  endif
-#  define __libc_realloc realloc
-#  define __libc_free free
-# endif
-
-static void *RawInternalAlloc(usize size, InternalAllocatorCache *cache,
-                              usize alignment) {
-  (void)cache;
-#if !SANITIZER_GO
-  if (alignment == 0)
-    return __libc_malloc(size);
-  else
-    return __libc_memalign(alignment, size);
-#else
-  // Windows does not provide __libc_memalign/posix_memalign. It provides
-  // __aligned_malloc, but the allocated blocks can't be passed to free,
-  // they need to be passed to __aligned_free. InternalAlloc interface does
-  // not account for such requirement. Alignemnt does not seem to be used
-  // anywhere in runtime, so just call __libc_malloc for now.
-  DCHECK_EQ(alignment, 0);
-  return __libc_malloc(size);
-#endif
-}
-
-static void *RawInternalRealloc(void *ptr, usize size,
-                                InternalAllocatorCache *cache) {
-  (void)cache;
-  return __libc_realloc(ptr, size);
-}
-
-static void RawInternalFree(void *ptr, InternalAllocatorCache *cache) {
-  (void)cache;
-  __libc_free(ptr);
-}
-
-InternalAllocator *internal_allocator() {
-  return 0;
-}
-
-#else  // SANITIZER_GO || defined(SANITIZER_USE_MALLOC)
 
 static ALIGNED(64) char internal_alloc_placeholder[sizeof(InternalAllocator)];
 static atomic_uint8_t internal_allocator_initialized;
@@ -144,9 +77,7 @@ static void RawInternalFree(void *ptr, InternalAllocatorCache *cache) {
   internal_allocator()->Deallocate(cache, ptr);
 }
 
-#endif  // SANITIZER_GO || defined(SANITIZER_USE_MALLOC)
-
-static void NORETURN ReportInternalAllocatorOutOfMemory(usize requested_size) {
+static void NORETURN ReportInternalAllocatorOutOfMemory(uptr requested_size) {
   SetAllocatorOutOfMemory();
   Report("FATAL: %s: internal allocator is out of memory trying to allocate "
          "0x%zx bytes\n", SanitizerToolName, requested_size);
@@ -194,6 +125,16 @@ void *InternalCalloc(usize count, usize size, InternalAllocatorCache *cache) {
 
 void InternalFree(void *addr, InternalAllocatorCache *cache) {
   RawInternalFree(addr, cache);
+}
+
+void InternalAllocatorLock() SANITIZER_NO_THREAD_SAFETY_ANALYSIS {
+  internal_allocator_cache_mu.Lock();
+  internal_allocator()->ForceLock();
+}
+
+void InternalAllocatorUnlock() SANITIZER_NO_THREAD_SAFETY_ANALYSIS {
+  internal_allocator()->ForceUnlock();
+  internal_allocator_cache_mu.Unlock();
 }
 
 // LowLevelAllocator
@@ -254,6 +195,16 @@ void SetAllocatorMayReturnNull(bool may_return_null) {
 void PrintHintAllocatorCannotReturnNull() {
   Report("HINT: if you don't care about these errors you may set "
          "allocator_may_return_null=1\n");
+}
+
+static atomic_uint8_t rss_limit_exceeded;
+
+bool IsRssLimitExceeded() {
+  return atomic_load(&rss_limit_exceeded, memory_order_relaxed);
+}
+
+void SetRssLimitExceeded(bool limit_exceeded) {
+  atomic_store(&rss_limit_exceeded, limit_exceeded, memory_order_relaxed);
 }
 
 } // namespace __sanitizer

@@ -30,7 +30,7 @@ void NORETURN die() { __builtin_trap(); }
 // with ZX_HANDLE_INVALID.
 static_assert(ZX_HANDLE_INVALID == 0, "");
 
-static void *allocateVmar(usize Size, MapPlatformData *Data, bool AllowNoMem) {
+static void *allocateVmar(uptr Size, MapPlatformData *Data, bool AllowNoMem) {
   // Only scenario so far.
   DCHECK(Data);
   DCHECK_EQ(Data->Vmar, ZX_HANDLE_INVALID);
@@ -47,7 +47,7 @@ static void *allocateVmar(usize Size, MapPlatformData *Data, bool AllowNoMem) {
   return reinterpret_cast<void *>(Data->VmarBase);
 }
 
-void *map(void *Addr, usize Size, const char *Name, usize Flags,
+void *map(void *Addr, uptr Size, const char *Name, uptr Flags,
           MapPlatformData *Data) {
   DCHECK_EQ(Size % getPageSizeCached(), 0);
   const bool AllowNoMem = !!(Flags & MAP_ALLOWNOMEM);
@@ -114,7 +114,7 @@ void *map(void *Addr, usize Size, const char *Name, usize Flags,
   return reinterpret_cast<void *>(P);
 }
 
-void unmap(void *Addr, usize Size, usize Flags, MapPlatformData *Data) {
+void unmap(void *Addr, uptr Size, uptr Flags, MapPlatformData *Data) {
   if (Flags & UNMAP_ALL) {
     DCHECK_NE(Data, nullptr);
     const zx_handle_t Vmar = Data->Vmar;
