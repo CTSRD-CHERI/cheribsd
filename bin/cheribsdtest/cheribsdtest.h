@@ -41,6 +41,8 @@
 
 #include "cheribsdtest_md.h"
 
+__BEGIN_DECLS
+
 #define	CHERI_CAP_PRINT(cap) do {					\
 	printf("tag %ju s %ju perms %08jx type %016jx\n",		\
 	    (uintmax_t)cheri_gettag(cap),				\
@@ -329,5 +331,7 @@ _cheribsdtest_check_errno(const char *context, int actual, int expected)
 /* For libc_memcpy and libc_memset tests and the unaligned copy tests: */
 extern void *cheribsdtest_memcpy(void *dst, const void *src, size_t n);
 extern void *cheribsdtest_memmove(void *dst, const void *src, size_t n);
+
+__END_DECLS
 
 #endif /* !_CHERIBSDTEST_H_ */
