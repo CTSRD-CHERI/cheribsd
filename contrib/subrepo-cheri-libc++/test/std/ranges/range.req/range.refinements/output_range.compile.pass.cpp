@@ -8,7 +8,6 @@
 
 // UNSUPPORTED: c++03, c++11, c++14, c++17
 // UNSUPPORTED: libcpp-no-concepts
-// UNSUPPORTED: gcc-10
 // UNSUPPORTED: libcpp-has-no-incomplete-ranges
 
 // template<class R, class T>
@@ -47,3 +46,21 @@ struct RangeWithBadIterator {
 static_assert( std::ranges::range<RangeWithBadIterator>);
 static_assert(!std::output_iterator<std::ranges::iterator_t<RangeWithBadIterator>, T>);
 static_assert(!std::ranges::output_range<RangeWithBadIterator, T>);
+
+// Test ADL-proofing.
+struct Incomplete;
+template<class T> struct Holder { T t; };
+
+static_assert(!std::ranges::output_range<Holder<Incomplete>*, Holder<Incomplete>*>);
+static_assert(!std::ranges::output_range<Holder<Incomplete>*&, Holder<Incomplete>*>);
+static_assert(!std::ranges::output_range<Holder<Incomplete>*&&, Holder<Incomplete>*>);
+static_assert(!std::ranges::output_range<Holder<Incomplete>* const, Holder<Incomplete>*>);
+static_assert(!std::ranges::output_range<Holder<Incomplete>* const&, Holder<Incomplete>*>);
+static_assert(!std::ranges::output_range<Holder<Incomplete>* const&&, Holder<Incomplete>*>);
+
+static_assert( std::ranges::output_range<Holder<Incomplete>*[10], Holder<Incomplete>*>);
+static_assert( std::ranges::output_range<Holder<Incomplete>*(&)[10], Holder<Incomplete>*>);
+static_assert( std::ranges::output_range<Holder<Incomplete>*(&&)[10], Holder<Incomplete>*>);
+static_assert(!std::ranges::output_range<Holder<Incomplete>* const[10], Holder<Incomplete>*>);
+static_assert(!std::ranges::output_range<Holder<Incomplete>* const(&)[10], Holder<Incomplete>*>);
+static_assert(!std::ranges::output_range<Holder<Incomplete>* const(&&)[10], Holder<Incomplete>*>);
