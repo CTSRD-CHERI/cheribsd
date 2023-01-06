@@ -1537,18 +1537,18 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	 * Put interface into promiscuous mode.
 	 */
 	case BIOCPROMISC:
+		BPF_LOCK();
 		if (d->bd_bif == NULL) {
 			/*
 			 * No interface attached yet.
 			 */
 			error = EINVAL;
-			break;
-		}
-		if (d->bd_promisc == 0) {
+		} else if (d->bd_promisc == 0) {
 			error = ifpromisc(d->bd_bif->bif_ifp, 1);
 			if (error == 0)
 				d->bd_promisc = 1;
 		}
+		BPF_UNLOCK();
 		break;
 
 	/*
@@ -2272,6 +2272,7 @@ bpf_ts_quality(int tstype)
 static int
 bpf_gettime(struct bintime *bt, int tstype, struct mbuf *m)
 {
+	struct timespec ts;
 	struct m_tag *tag;
 	int quality;
 
@@ -2280,6 +2281,11 @@ bpf_gettime(struct bintime *bt, int tstype, struct mbuf *m)
 		return (quality);
 
 	if (m != NULL) {
+		if ((m->m_flags & (M_PKTHDR | M_TSTMP)) == (M_PKTHDR | M_TSTMP)) {
+			mbuf_tstmp2timespec(m, &ts);
+			timespec2bintime(&ts, bt);
+			return (BPF_TSTAMP_EXTERN);
+		}
 		tag = m_tag_locate(m, MTAG_BPF, MTAG_BPF_TIMESTAMP, NULL);
 		if (tag != NULL) {
 			*bt = *(struct bintime *)(tag + 1);

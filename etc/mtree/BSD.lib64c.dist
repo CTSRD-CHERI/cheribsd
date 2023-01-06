@@ -20,5 +20,7 @@
             encoder
             ..
         ..
+        pkgconfig
+        ..
     ..
 ..

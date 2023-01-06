@@ -45,7 +45,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
-#include <sys/rwlock.h>
 #include <sys/proc.h>
 #include <sys/malloc.h>
 #include <sys/unistd.h>
@@ -1789,8 +1788,8 @@ kqueue_release(struct kqueue *kq, int locked)
 		KQ_UNLOCK(kq);
 }
 
-void
-kqueue_drain_schedtask(void)
+static void
+ast_kqueue(struct thread *td, int tda __unused)
 {
 	taskqueue_quiesce(taskqueue_kqueue_ctx);
 }
@@ -1798,8 +1797,6 @@ kqueue_drain_schedtask(void)
 static void
 kqueue_schedtask(struct kqueue *kq)
 {
-	struct thread *td;
-
 	KQ_OWNED(kq);
 	KASSERT(((kq->kq_state & KQ_TASKDRAIN) != KQ_TASKDRAIN),
 	    ("scheduling kqueue task while draining"));
@@ -1807,10 +1804,7 @@ kqueue_schedtask(struct kqueue *kq)
 	if ((kq->kq_state & KQ_TASKSCHED) != KQ_TASKSCHED) {
 		taskqueue_enqueue(taskqueue_kqueue_ctx, &kq->kq_task);
 		kq->kq_state |= KQ_TASKSCHED;
-		td = curthread;
-		thread_lock(td);
-		td->td_flags |= TDF_ASTPENDING | TDF_KQTICKLED;
-		thread_unlock(td);
+		ast_sched(curthread, TDA_KQUEUE);
 	}
 }
 
@@ -2521,30 +2515,6 @@ knlist_mtx_assert_lock(void *arg, int what)
 		mtx_assert((struct mtx *)arg, MA_NOTOWNED);
 }
 
-static void
-knlist_rw_rlock(void *arg)
-{
-
-	rw_rlock((struct rwlock *)arg);
-}
-
-static void
-knlist_rw_runlock(void *arg)
-{
-
-	rw_runlock((struct rwlock *)arg);
-}
-
-static void
-knlist_rw_assert_lock(void *arg, int what)
-{
-
-	if (what == LA_LOCKED)
-		rw_assert((struct rwlock *)arg, RA_LOCKED);
-	else
-		rw_assert((struct rwlock *)arg, RA_UNLOCKED);
-}
-
 void
 knlist_init(struct knlist *knl, void *lock, void (*kl_lock)(void *),
     void (*kl_unlock)(void *),
@@ -2588,14 +2558,6 @@ knlist_alloc(struct mtx *lock)
 	knl = malloc(sizeof(struct knlist), M_KQUEUE, M_WAITOK);
 	knlist_init_mtx(knl, lock);
 	return (knl);
-}
-
-void
-knlist_init_rw_reader(struct knlist *knl, struct rwlock *lock)
-{
-
-	knlist_init(knl, lock, knlist_rw_rlock, knlist_rw_runlock,
-	    knlist_rw_assert_lock);
 }
 
 void
@@ -2826,6 +2788,7 @@ knote_init(void)
 
 	knote_zone = uma_zcreate("KNOTE", sizeof(struct knote), NULL, NULL,
 	    NULL, NULL, UMA_ALIGN_PTR, 0);
+	ast_register(TDA_KQUEUE, ASTR_ASTF_REQUIRED, 0, ast_kqueue);
 }
 SYSINIT(knote, SI_SUB_PSEUDO, SI_ORDER_ANY, knote_init, NULL);
 

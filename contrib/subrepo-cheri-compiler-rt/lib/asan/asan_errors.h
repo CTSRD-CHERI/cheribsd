@@ -155,7 +155,7 @@ struct ErrorCallocOverflow : ErrorBase {
   uptr size;
 
   ErrorCallocOverflow() = default;  // (*)
-  ErrorCallocOverflow(u32 tid, BufferedStackTrace *stack_, usize count_,
+  ErrorCallocOverflow(u32 tid, BufferedStackTrace *stack_, uptr count_,
                       uptr size_)
       : ErrorBase(tid, 10, "calloc-overflow"),
         stack(stack_),
@@ -184,7 +184,7 @@ struct ErrorPvallocOverflow : ErrorBase {
   uptr size;
 
   ErrorPvallocOverflow() = default;  // (*)
-  ErrorPvallocOverflow(u32 tid, BufferedStackTrace *stack_, usize size_)
+  ErrorPvallocOverflow(u32 tid, BufferedStackTrace *stack_, uptr size_)
       : ErrorBase(tid, 10, "pvalloc-overflow"),
         stack(stack_),
         size(size_) {}
@@ -211,7 +211,7 @@ struct ErrorInvalidAlignedAllocAlignment : ErrorBase {
 
   ErrorInvalidAlignedAllocAlignment() = default;  // (*)
   ErrorInvalidAlignedAllocAlignment(u32 tid, BufferedStackTrace *stack_,
-                                    uptr size_, usize alignment_)
+                                    uptr size_, uptr alignment_)
       : ErrorBase(tid, 10, "invalid-aligned-alloc-alignment"),
         stack(stack_),
         size(size_),
@@ -273,15 +273,15 @@ struct ErrorOutOfMemory : ErrorBase {
 
 struct ErrorStringFunctionMemoryRangesOverlap : ErrorBase {
   const BufferedStackTrace *stack;
-  usize length1, length2;
+  uptr length1, length2;
   AddressDescription addr1_description;
   AddressDescription addr2_description;
   const char *function;
 
   ErrorStringFunctionMemoryRangesOverlap() = default;  // (*)
   ErrorStringFunctionMemoryRangesOverlap(u32 tid, BufferedStackTrace *stack_,
-                                         uptr addr1, usize length1_, uptr addr2,
-                                         usize length2_, const char *function_)
+                                         uptr addr1, uptr length1_, uptr addr2,
+                                         uptr length2_, const char *function_)
       : ErrorBase(tid),
         stack(stack_),
         length1(length1_),
@@ -304,7 +304,7 @@ struct ErrorStringFunctionSizeOverflow : ErrorBase {
 
   ErrorStringFunctionSizeOverflow() = default;  // (*)
   ErrorStringFunctionSizeOverflow(u32 tid, BufferedStackTrace *stack_,
-                                  uptr addr, usize size_)
+                                  uptr addr, uptr size_)
       : ErrorBase(tid, 10, "negative-size-param"),
         stack(stack_),
         addr_description(addr, /*shouldLockThreadRegistry=*/false),

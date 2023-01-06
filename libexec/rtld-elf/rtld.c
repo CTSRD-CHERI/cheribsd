@@ -279,7 +279,6 @@ func_ptr_type _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp);
 #endif
 uintptr_t _rtld_bind(Obj_Entry *obj, Elf_Size reloff);
 
-
 int npagesizes;
 static int osreldate;
 size_t *pagesizes;
@@ -5308,7 +5307,12 @@ trace_print_obj(Obj_Entry *obj, const char *name, const char *path,
 	const char *fmt;
 	int c;
 
-	fmt = strncmp(name, "lib", 3) == 0 ? fmt1 : fmt2;	/* XXX bogus */
+	if (fmt1 == NULL)
+		fmt = fmt2;
+	else
+		/* XXX bogus */
+		fmt = strncmp(name, "lib", 3) == 0 ? fmt1 : fmt2;
+
 	while ((c = *fmt++) != '\0') {
 		switch (c) {
 		default:
@@ -5384,25 +5388,29 @@ trace_loaded_objects(Obj_Entry *obj, bool show_preload)
 				path = "not found";
 
 			name = obj->strtab + needed->name;
-			trace_print_obj(obj, name, path, main_local,
+			trace_print_obj(needed->obj, name, path, main_local,
 			    fmt1, fmt2);
 		}
 	}
 
 	if (show_preload) {
+		if (ld_get_env_var(LD_TRACE_LOADED_OBJECTS_FMT2) == NULL)
+			fmt2 = "\t%p (%x)\n";
 		first_spurious = true;
+
 		TAILQ_FOREACH(obj, &obj_list, next) {
 			if (obj->marker || obj == obj_main || obj->traced)
 				continue;
 
-			if (first_spurious) {
+			if (list_containers && first_spurious) {
 				rtld_printf("[preloaded]\n");
 				first_spurious = false;
 			}
+
 			Name_Entry *fname = STAILQ_FIRST(&obj->names);
 			name = fname == NULL ? "<unknown>" : fname->name;
 			trace_print_obj(obj, name, obj->path, main_local,
-			    fmt1, fmt2);
+			    NULL, fmt2);
 		}
 	}
 }
@@ -6549,6 +6557,8 @@ static const struct auxfmt {
 	AUXFMT(AT_PS_STRINGS, "%p"),
 	AUXFMT(AT_FXRNG, "%p"),
 	AUXFMT(AT_KPRELOAD, "%p"),
+	AUXFMT(AT_USRSTACKBASE, "%#lx"),
+	AUXFMT(AT_USRSTACKLIM, "%#lx"),
 };
 
 static bool

@@ -200,10 +200,11 @@ sys_sctp_peeloff(struct thread *td, struct sctp_peeloff_args *uap)
 	int error, fd;
 
 	AUDIT_ARG_FD(uap->sd);
-	error = getsock_cap(td, uap->sd, cap_rights_init_one(&rights, CAP_PEELOFF),
-	    &headfp, &fflag, NULL);
+	error = getsock(td, uap->sd, cap_rights_init_one(&rights, CAP_PEELOFF),
+	    &headfp);
 	if (error != 0)
 		goto done2;
+	fflag = atomic_load_int(&headfp->f_flag);
 	head = headfp->f_data;
 	if (head->so_proto->pr_protocol != IPPROTO_SCTP) {
 		error = EOPNOTSUPP;
@@ -324,7 +325,7 @@ kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
 	}
 
 	AUDIT_ARG_FD(sd);
-	error = getsock_cap(td, sd, &rights, &fp, NULL, NULL);
+	error = getsock(td, sd, &rights, &fp);
 	if (error != 0)
 		goto sctp_bad;
 #ifdef KTRACE
@@ -473,7 +474,7 @@ kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
 	}
 
 	AUDIT_ARG_FD(sd);
-	error = getsock_cap(td, sd, &rights, &fp, NULL, NULL);
+	error = getsock(td, sd, &rights, &fp);
 	if (error != 0)
 		goto sctp_bad1;
 
@@ -621,8 +622,7 @@ kern_sctp_generic_recvmsg(struct thread *td, int sd,
 	int error, fromlen, i, msg_flags;
 
 	AUDIT_ARG_FD(sd);
-	error = getsock_cap(td, sd, cap_rights_init_one(&rights, CAP_RECV),
-	    &fp, NULL, NULL);
+	error = getsock(td, sd, cap_rights_init_one(&rights, CAP_RECV), &fp);
 	if (error != 0)
 		return (error);
 	error = copyiniov_f(uiov, iovlen, &iov, EMSGSIZE);

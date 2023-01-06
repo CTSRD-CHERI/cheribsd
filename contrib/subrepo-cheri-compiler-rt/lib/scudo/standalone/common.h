@@ -35,7 +35,7 @@ inline constexpr uptr roundDownTo(uptr X, uptr Boundary) {
   return X & ~(Boundary - 1);
 }
 
-inline constexpr bool isAligned(uptr X, usize Alignment) {
+inline constexpr bool isAligned(uptr X, uptr Alignment) {
   return (X & (Alignment - 1)) == 0;
 }
 
@@ -56,7 +56,7 @@ inline uptr getMostSignificantSetBitIndex(uptr X) {
   return SCUDO_WORDSIZE - 1U - static_cast<uptr>(__builtin_clzl(X));
 }
 
-inline usize roundUpToPowerOfTwo(usize Size) {
+inline uptr roundUpToPowerOfTwo(uptr Size) {
   DCHECK(Size);
   if (isPowerOfTwo(Size))
     return Size;
@@ -156,14 +156,14 @@ bool getRandom(void *Buffer, uptr Length, bool Blocking = false);
 // by the function implementation. The Data parameter allows to pass opaque
 // platform specific data to the function.
 // Returns nullptr on error or dies if MAP_ALLOWNOMEM is not specified.
-void *map(void *Addr, usize Size, const char *Name, usize Flags = 0,
+void *map(void *Addr, uptr Size, const char *Name, uptr Flags = 0,
           MapPlatformData *Data = nullptr);
 
 // Indicates that we are getting rid of the whole mapping, which might have
 // further consequences on Data, depending on the platform.
 #define UNMAP_ALL (1U << 0)
 
-void unmap(void *Addr, usize Size, usize Flags = 0,
+void unmap(void *Addr, uptr Size, uptr Flags = 0,
            MapPlatformData *Data = nullptr);
 
 void setMemoryPermission(uptr Addr, uptr Size, uptr Flags,

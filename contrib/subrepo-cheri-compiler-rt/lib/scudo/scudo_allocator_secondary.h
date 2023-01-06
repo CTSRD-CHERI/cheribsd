@@ -71,7 +71,7 @@ class LargeMmapAllocator {
     internal_memset(this, 0, sizeof(*this));
   }
 
-  void *Allocate(AllocatorStats *Stats, usize Size, usize Alignment) {
+  void *Allocate(AllocatorStats *Stats, uptr Size, uptr Alignment) {
     const uptr UserSize = Size - Chunk::getHeaderSize();
     // The Scudo frontend prevents us from allocating more than
     // MaxAllowedMallocSize, so integer overflow checks would be superfluous.

@@ -121,7 +121,6 @@ __FBSDID("$FreeBSD$");
 #include <netinet/sctp_crc32.h>
 #endif
 
-#include <netinet6/ip6protosw.h>
 #include <netinet6/scope6_var.h>
 
 extern int in6_mcast_loop;
@@ -1014,7 +1013,7 @@ nonh6lookup:
 
 	odst = ip6->ip6_dst;
 	/* Run through list of hooks for output packets. */
-	switch (pfil_run_hooks(V_inet6_pfil_head, &m, ifp, PFIL_OUT, inp)) {
+	switch (pfil_mbuf_out(V_inet6_pfil_head, &m, ifp, inp)) {
 	case PFIL_PASS:
 		ip6 = mtod(m, struct ip6_hdr *);
 		break;
@@ -1845,7 +1844,7 @@ do {									\
 						break;
 					}
 					INP_WLOCK(inp);
-					if (inp->inp_flags & (INP_TIMEWAIT | INP_DROPPED)) {
+					if (inp->inp_flags & INP_DROPPED) {
 						INP_WUNLOCK(inp);
 						return (ECONNRESET);
 					}
@@ -1991,7 +1990,7 @@ do {									\
 				{
 					struct ip6_pktopts **optp;
 					INP_WLOCK(inp);
-					if (inp->inp_flags & (INP_TIMEWAIT | INP_DROPPED)) {
+					if (inp->inp_flags & INP_DROPPED) {
 						INP_WUNLOCK(inp);
 						return (ECONNRESET);
 					}
@@ -2083,7 +2082,7 @@ do {									\
 				optlen = sopt->sopt_valsize;
 				optbuf = optbuf_storage;
 				INP_WLOCK(inp);
-				if (inp->inp_flags & (INP_TIMEWAIT | INP_DROPPED)) {
+				if (inp->inp_flags & INP_DROPPED) {
 					INP_WUNLOCK(inp);
 					return (ECONNRESET);
 				}
@@ -2451,8 +2450,7 @@ ip6_raw_ctloutput(struct socket *so, struct sockopt *sopt)
 				 * values or -1 as a special value.
 				 */
 				error = EINVAL;
-			} else if (so->so_proto->pr_protocol ==
-			    IPPROTO_ICMPV6) {
+			} else if (inp->inp_ip_p == IPPROTO_ICMPV6) {
 				if (optval != icmp6off)
 					error = EINVAL;
 			} else
@@ -2460,7 +2458,7 @@ ip6_raw_ctloutput(struct socket *so, struct sockopt *sopt)
 			break;
 
 		case SOPT_GET:
-			if (so->so_proto->pr_protocol == IPPROTO_ICMPV6)
+			if (inp->inp_ip_p == IPPROTO_ICMPV6)
 				optval = icmp6off;
 			else
 				optval = inp->in6p_cksum;
@@ -2579,7 +2577,7 @@ ip6_pcbopt(int optname, u_char *buf, int len, struct ip6_pktopts **pktopt,
 		optdata = malloc(sopt->sopt_valsize, M_TEMP, M_WAITOK);		\
 		malloc_optdata = true;						\
 		INP_RLOCK(inp);							\
-		if (inp->inp_flags & (INP_TIMEWAIT | INP_DROPPED)) {		\
+		if (inp->inp_flags & INP_DROPPED) {				\
 			INP_RUNLOCK(inp);					\
 			free(optdata, M_TEMP);					\
 			return (ECONNRESET);					\

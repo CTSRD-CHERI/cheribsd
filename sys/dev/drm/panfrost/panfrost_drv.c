@@ -835,7 +835,5 @@ static driver_t panfrost_driver = {
 	sizeof(struct panfrost_softc),
 };
 
-static devclass_t panfrost_devclass;
-
-EARLY_DRIVER_MODULE(panfrost, simplebus, panfrost_driver, panfrost_devclass,
-    0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LAST);
+EARLY_DRIVER_MODULE(panfrost, simplebus, panfrost_driver, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LAST);

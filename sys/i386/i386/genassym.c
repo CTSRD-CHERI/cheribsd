@@ -85,6 +85,7 @@ ASSYM(VM_PMAP, offsetof(struct vmspace, vm_pmap));
 ASSYM(PM_ACTIVE, offsetof(struct pmap, pm_active));
 
 ASSYM(TD_FLAGS, offsetof(struct thread, td_flags));
+ASSYM(TD_AST, offsetof(struct thread, td_ast));
 ASSYM(TD_LOCK, offsetof(struct thread, td_lock));
 ASSYM(TD_PCB, offsetof(struct thread, td_pcb));
 ASSYM(TD_PFLAGS, offsetof(struct thread, td_pflags));
@@ -95,9 +96,6 @@ ASSYM(TDP_CALLCHAIN, TDP_CALLCHAIN);
 
 ASSYM(P_MD, offsetof(struct proc, p_md));
 ASSYM(MD_LDT, offsetof(struct mdproc, md_ldt));
-
-ASSYM(TDF_ASTPENDING, TDF_ASTPENDING);
-ASSYM(TDF_NEEDRESCHED, TDF_NEEDRESCHED);
 
 ASSYM(TD0_KSTACK_PAGES, TD0_KSTACK_PAGES);
 ASSYM(PAGE_SIZE, PAGE_SIZE);
@@ -185,7 +183,6 @@ ASSYM(BOOTINFO_SIZE, sizeof(struct bootinfo));
 ASSYM(BI_VERSION, offsetof(struct bootinfo, bi_version));
 ASSYM(BI_KERNELNAME, offsetof(struct bootinfo, bi_kernelname));
 ASSYM(BI_NFS_DISKLESS, offsetof(struct bootinfo, bi_nfs_diskless));
-ASSYM(BI_ENDCOMMON, offsetof(struct bootinfo, bi_endcommon));
 ASSYM(NFSDISKLESS_SIZE, sizeof(struct nfs_diskless));
 ASSYM(BI_SIZE, offsetof(struct bootinfo, bi_size));
 ASSYM(BI_SYMTAB, offsetof(struct bootinfo, bi_symtab));

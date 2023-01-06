@@ -635,12 +635,23 @@ in_pcballoc(struct socket *so, struct inpcbinfo *pcbinfo)
 #endif /*IPSEC*/
 #ifdef INET6
 	if (INP_SOCKAF(so) == AF_INET6) {
-		inp->inp_vflag |= INP_IPV6PROTO;
+		inp->inp_vflag |= INP_IPV6PROTO | INP_IPV6;
 		if (V_ip6_v6only)
 			inp->inp_flags |= IN6P_IPV6_V6ONLY;
+#ifdef INET
+		else
+			inp->inp_vflag |= INP_IPV4;
+#endif
+		if (V_ip6_auto_flowlabel)
+			inp->inp_flags |= IN6P_AUTOFLOWLABEL;
+		inp->in6p_hops = -1;	/* use kernel default */
 	}
-	if (V_ip6_auto_flowlabel)
-		inp->inp_flags |= IN6P_AUTOFLOWLABEL;
+#endif
+#if defined(INET) && defined(INET6)
+	else
+#endif
+#ifdef INET
+		inp->inp_vflag |= INP_IPV4;
 #endif
 	/*
 	 * Routes in inpcb's can cache L2 as well; they are guaranteed
@@ -784,7 +795,7 @@ in_pcb_lport_dest(struct inpcb *inp, struct sockaddr *lsa, u_short *lportp,
 	}
 
 #ifdef INET
-	laddr.s_addr = INADDR_ANY;
+	laddr.s_addr = INADDR_ANY;	/* used by INET6+INET below too */
 	if ((inp->inp_vflag & (INP_IPV4|INP_IPV6)) == INP_IPV4) {
 		if (lsa != NULL)
 			laddr = ((struct sockaddr_in *)lsa)->sin_addr;
@@ -835,9 +846,16 @@ in_pcb_lport_dest(struct inpcb *inp, struct sockaddr *lsa, u_short *lportp,
 #endif
 		} else {
 #ifdef INET6
-			if ((inp->inp_vflag & INP_IPV6) != 0)
+			if ((inp->inp_vflag & INP_IPV6) != 0) {
 				tmpinp = in6_pcblookup_local(pcbinfo,
 				    &inp->in6p_laddr, lport, lookupflags, cred);
+#ifdef INET
+				if (tmpinp == NULL &&
+				    (inp->inp_vflag & INP_IPV4))
+					tmpinp = in_pcblookup_local(pcbinfo,
+					    laddr, lport, lookupflags, cred);
+#endif
+			}
 #endif
 #if defined(INET) && defined(INET6)
 			else
@@ -1013,7 +1031,6 @@ in_pcbbind_setup(struct inpcb *inp, struct sockaddr *nam, in_addr_t *laddrp,
 		laddr = sin->sin_addr;
 		if (lport) {
 			struct inpcb *t;
-			struct tcptw *tw;
 
 			/* GROSS */
 			if (ntohs(lport) <= V_ipport_reservedhigh &&
@@ -1030,7 +1047,6 @@ in_pcbbind_setup(struct inpcb *inp, struct sockaddr *nam, in_addr_t *laddrp,
 	 */
 				if (t &&
 				    ((inp->inp_flags2 & INP_BINDMULTI) == 0) &&
-				    ((t->inp_flags & INP_TIMEWAIT) == 0) &&
 				    (so->so_type != SOCK_STREAM ||
 				     ntohl(t->inp_faddr.s_addr) == INADDR_ANY) &&
 				    (ntohl(sin->sin_addr.s_addr) != INADDR_ANY ||
@@ -1052,24 +1068,9 @@ in_pcbbind_setup(struct inpcb *inp, struct sockaddr *nam, in_addr_t *laddrp,
 			}
 			t = in_pcblookup_local(pcbinfo, sin->sin_addr,
 			    lport, lookupflags, cred);
-			if (t && (t->inp_flags & INP_TIMEWAIT)) {
-				/*
-				 * XXXRW: If an incpb has had its timewait
-				 * state recycled, we treat the address as
-				 * being in use (for now).  This is better
-				 * than a panic, but not desirable.
-				 */
-				tw = intotw(t);
-				if (tw == NULL ||
-				    ((reuseport & tw->tw_so_options) == 0 &&
-					(reuseport_lb &
-				            tw->tw_so_options) == 0)) {
-					return (EADDRINUSE);
-				}
-			} else if (t &&
-				   ((inp->inp_flags2 & INP_BINDMULTI) == 0) &&
-				   (reuseport & inp_so_options(t)) == 0 &&
-				   (reuseport_lb & inp_so_options(t)) == 0) {
+			if (t && ((inp->inp_flags2 & INP_BINDMULTI) == 0) &&
+			    (reuseport & inp_so_options(t)) == 0 &&
+			    (reuseport_lb & inp_so_options(t)) == 0) {
 #ifdef INET6
 				if (ntohl(sin->sin_addr.s_addr) !=
 				    INADDR_ANY ||
@@ -2863,7 +2864,7 @@ sysctl_setsockopt(SYSCTL_HANDLER_ARGS, struct inpcbinfo *pcbinfo,
 	}
 	while ((inp = inp_next(&inpi)) != NULL)
 		if (inp->inp_gencnt == params->sop_id) {
-			if (inp->inp_flags & (INP_TIMEWAIT | INP_DROPPED)) {
+			if (inp->inp_flags & INP_DROPPED) {
 				INP_WUNLOCK(inp);
 				return (ECONNRESET);
 			}
@@ -3012,10 +3013,6 @@ db_print_inpflags(int inp_flags)
 	if (inp_flags & IN6P_AUTOFLOWLABEL) {
 		db_printf("%sIN6P_AUTOFLOWLABEL", comma ? ", " : "");
 		comma = 1;
-	}
-	if (inp_flags & INP_TIMEWAIT) {
-		db_printf("%sINP_TIMEWAIT", comma ? ", " : "");
-		comma  = 1;
 	}
 	if (inp_flags & INP_ONESBCAST) {
 		db_printf("%sINP_ONESBCAST", comma ? ", " : "");
@@ -3232,7 +3229,7 @@ in_pcbattach_txrtlmt(struct inpcb *inp, struct ifnet *ifp,
 	 * down, allocating a new send tag is not allowed. Else send
 	 * tags may leak.
 	 */
-	if (*st != NULL || (inp->inp_flags & (INP_TIMEWAIT | INP_DROPPED)) != 0)
+	if (*st != NULL || (inp->inp_flags & INP_DROPPED) != 0)
 		return (EINVAL);
 
 	error = m_snd_tag_alloc(ifp, &params, st);

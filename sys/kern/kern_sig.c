@@ -124,12 +124,13 @@ static int	issignal(struct thread *td);
 static void	reschedule_signals(struct proc *p, sigset_t block, int flags);
 static int	sigprop(int sig);
 static void	tdsigwakeup(struct thread *, int, sig_t, int);
-static int	sig_suspend_threads(struct thread *, struct proc *, int);
+static int	sig_suspend_threads(struct thread *, struct proc *);
 static int	filt_sigattach(struct knote *kn);
 static void	filt_sigdetach(struct knote *kn);
 static int	filt_signal(struct knote *kn, long hint);
 static struct thread *sigtd(struct proc *p, int sig, bool fast_sigblock);
 static void	sigqueue_start(void);
+static void	sigfastblock_setpend(struct thread *td, bool resched);
 
 static uma_zone_t	ksiginfo_zone = NULL;
 struct filterops sig_filtops = {
@@ -292,7 +293,80 @@ static int sigproptbl[NSIG] = {
 	for (int32_t __i = -1, __bits = 0;				\
 	    _SIG_FOREACH_ADVANCE(i, set); )				\
 
-sigset_t fastblock_mask;
+static sigset_t fastblock_mask;
+
+static void
+ast_sig(struct thread *td, int tda)
+{
+	struct proc *p;
+	int sig;
+	bool resched_sigs;
+
+	p = td->td_proc;
+
+#ifdef DIAGNOSTIC
+	if (p->p_numthreads == 1 && (tda & (TDAI(TDA_SIG) |
+	    TDAI(TDA_AST))) == 0) {
+		PROC_LOCK(p);
+		thread_lock(td);
+		/*
+		 * Note that TDA_SIG should be re-read from
+		 * td_ast, since signal might have been delivered
+		 * after we cleared td_flags above.  This is one of
+		 * the reason for looping check for AST condition.
+		 * See comment in userret() about P_PPWAIT.
+		 */
+		if ((p->p_flag & P_PPWAIT) == 0 &&
+		    (td->td_pflags & TDP_SIGFASTBLOCK) == 0) {
+			if (SIGPENDING(td) && ((tda | td->td_ast) &
+			    (TDAI(TDA_SIG) | TDAI(TDA_AST))) == 0) {
+				thread_unlock(td); /* fix dumps */
+				panic(
+				    "failed2 to set signal flags for ast p %p "
+				    "td %p tda %#x td_ast %#x fl %#x",
+				    p, td, tda, td->td_ast, td->td_flags);
+			}
+		}
+		thread_unlock(td);
+		PROC_UNLOCK(p);
+	}
+#endif
+
+	/*
+	 * Check for signals. Unlocked reads of p_pendingcnt or
+	 * p_siglist might cause process-directed signal to be handled
+	 * later.
+	 */
+	if ((tda & TDAI(TDA_SIG)) != 0 || p->p_pendingcnt > 0 ||
+	    !SIGISEMPTY(p->p_siglist)) {
+		sigfastblock_fetch(td);
+		PROC_LOCK(p);
+		mtx_lock(&p->p_sigacts->ps_mtx);
+		while ((sig = cursig(td)) != 0) {
+			KASSERT(sig >= 0, ("sig %d", sig));
+			postsig(sig);
+		}
+		mtx_unlock(&p->p_sigacts->ps_mtx);
+		PROC_UNLOCK(p);
+		resched_sigs = true;
+	} else {
+		resched_sigs = false;
+	}
+
+	/*
+	 * Handle deferred update of the fast sigblock value, after
+	 * the postsig() loop was performed.
+	 */
+	sigfastblock_setpend(td, resched_sigs);
+}
+
+static void
+ast_sigsuspend(struct thread *td, int tda __unused)
+{
+	MPASS((td->td_pflags & TDP_OLDMASK) != 0);
+	td->td_pflags &= ~TDP_OLDMASK;
+	kern_sigprocmask(td, SIG_SETMASK, &td->td_oldsigmask, NULL, 0);
+}
 
 static void
 sigqueue_start(void)
@@ -305,17 +379,19 @@ sigqueue_start(void)
 	p31b_setcfg(CTL_P1003_1B_SIGQUEUE_MAX, max_pending_per_proc);
 	SIGFILLSET(fastblock_mask);
 	SIG_CANTMASK(fastblock_mask);
+	ast_register(TDA_SIG, ASTR_UNCOND, 0, ast_sig);
+	ast_register(TDA_SIGSUSPEND, ASTR_ASTF_REQUIRED | ASTR_TDP,
+	    TDP_OLDMASK, ast_sigsuspend);
 }
 
 ksiginfo_t *
-ksiginfo_alloc(int wait)
+ksiginfo_alloc(int mwait)
 {
-	int flags;
+	MPASS(mwait == M_WAITOK || mwait == M_NOWAIT);
 
-	flags = M_ZERO | (wait ? M_WAITOK : M_NOWAIT);
-	if (ksiginfo_zone != NULL)
-		return ((ksiginfo_t *)uma_zalloc(ksiginfo_zone, flags));
-	return (NULL);
+	if (ksiginfo_zone == NULL)
+		return (NULL);
+	return (uma_zalloc(ksiginfo_zone, mwait | M_ZERO));
 }
 
 void
@@ -324,14 +400,14 @@ ksiginfo_free(ksiginfo_t *ksi)
 	uma_zfree(ksiginfo_zone, ksi);
 }
 
-static __inline int
+static __inline bool
 ksiginfo_tryfree(ksiginfo_t *ksi)
 {
-	if (!(ksi->ksi_flags & KSI_EXT)) {
+	if ((ksi->ksi_flags & KSI_EXT) == 0) {
 		uma_zfree(ksiginfo_zone, ksi);
-		return (1);
+		return (true);
 	}
-	return (0);
+	return (false);
 }
 
 void
@@ -456,7 +532,7 @@ sigqueue_add(sigqueue_t *sq, int signo, ksiginfo_t *si)
 	if (p != NULL && p->p_pendingcnt >= max_pending_per_proc) {
 		signal_overflow++;
 		ret = EAGAIN;
-	} else if ((ksi = ksiginfo_alloc(0)) == NULL) {
+	} else if ((ksi = ksiginfo_alloc(M_NOWAIT)) == NULL) {
 		signal_alloc_fail++;
 		ret = EAGAIN;
 	} else {
@@ -664,11 +740,8 @@ signotify(struct thread *td)
 
 	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
 
-	if (SIGPENDING(td)) {
-		thread_lock(td);
-		td->td_flags |= TDF_NEEDSIGCHK | TDF_ASTPENDING;
-		thread_unlock(td);
-	}
+	if (SIGPENDING(td))
+		ast_sched(td, TDA_SIG);
 }
 
 /*
@@ -1621,6 +1694,7 @@ kern_sigsuspend(struct thread *td, sigset_t mask)
 	kern_sigprocmask(td, SIG_SETMASK, &mask, &td->td_oldsigmask,
 	    SIGPROCMASK_PROC_LOCKED);
 	td->td_pflags |= TDP_OLDMASK;
+	ast_sched(td, TDA_SIGSUSPEND);
 
 	/*
 	 * Process signals now. Otherwise, we can get spurious wakeup
@@ -1799,24 +1873,44 @@ struct killpg1_ctx {
 };
 
 static void
-killpg1_sendsig(struct proc *p, bool notself, struct killpg1_ctx *arg)
+killpg1_sendsig_locked(struct proc *p, struct killpg1_ctx *arg)
 {
 	int err;
 
-	if (p->p_pid <= 1 || (p->p_flag & P_SYSTEM) != 0 ||
-	    (notself && p == arg->td->td_proc) || p->p_state == PRS_NEW)
-		return;
-	PROC_LOCK(p);
 	err = p_cansignal(arg->td, p, arg->sig);
 	if (err == 0 && arg->sig != 0)
 		pksignal(p, arg->sig, arg->ksi);
-	PROC_UNLOCK(p);
 	if (err != ESRCH)
 		arg->found = true;
 	if (err == 0)
 		arg->sent = true;
 	else if (arg->ret == 0 && err != ESRCH && err != EPERM)
 		arg->ret = err;
+}
+
+static void
+killpg1_sendsig(struct proc *p, bool notself, struct killpg1_ctx *arg)
+{
+
+	if (p->p_pid <= 1 || (p->p_flag & P_SYSTEM) != 0 ||
+	    (notself && p == arg->td->td_proc) || p->p_state == PRS_NEW)
+		return;
+
+	PROC_LOCK(p);
+	killpg1_sendsig_locked(p, arg);
+	PROC_UNLOCK(p);
+}
+
+static void
+kill_processes_prison_cb(struct proc *p, void *arg)
+{
+	struct killpg1_ctx *ctx = arg;
+
+	if (p->p_pid <= 1 || (p->p_flag & P_SYSTEM) != 0 ||
+	    (p == ctx->td->td_proc) || p->p_state == PRS_NEW)
+		return;
+
+	killpg1_sendsig_locked(p, ctx);
 }
 
 /*
@@ -1840,11 +1934,8 @@ killpg1(struct thread *td, int sig, int pgid, int all, ksiginfo_t *ksi)
 		/*
 		 * broadcast
 		 */
-		sx_slock(&allproc_lock);
-		FOREACH_PROC_IN_SYSTEM(p) {
-			killpg1_sendsig(p, true, &arg);
-		}
-		sx_sunlock(&allproc_lock);
+		prison_proc_iterate(td->td_ucred->cr_prison,
+		    kill_processes_prison_cb, &arg);
 	} else {
 		sx_slock(&proctree_lock);
 		if (pgid == 0) {
@@ -2307,7 +2398,7 @@ tdsendsignal(struct proc *p, struct thread *td, int sig, ksiginfo_t *ksi)
 	 * IEEE Std 1003.1-2001: return success when killing a zombie.
 	 */
 	if (p->p_state == PRS_ZOMBIE) {
-		if (ksi && (ksi->ksi_flags & KSI_INS))
+		if (ksi != NULL && (ksi->ksi_flags & KSI_INS) != 0)
 			ksiginfo_tryfree(ksi);
 		return (ret);
 	}
@@ -2337,7 +2428,7 @@ tdsendsignal(struct proc *p, struct thread *td, int sig, ksiginfo_t *ksi)
 			SDT_PROBE3(proc, , , signal__discard, td, p, sig);
 
 			mtx_unlock(&ps->ps_mtx);
-			if (ksi && (ksi->ksi_flags & KSI_INS))
+			if (ksi != NULL && (ksi->ksi_flags & KSI_INS) != 0)
 				ksiginfo_tryfree(ksi);
 			return (ret);
 		} else {
@@ -2370,7 +2461,7 @@ tdsendsignal(struct proc *p, struct thread *td, int sig, ksiginfo_t *ksi)
 		if ((prop & SIGPROP_TTYSTOP) != 0 &&
 		    (p->p_pgrp->pg_flags & PGRP_ORPHANED) != 0 &&
 		    action == SIG_DFL) {
-			if (ksi && (ksi->ksi_flags & KSI_INS))
+			if (ksi != NULL && (ksi->ksi_flags & KSI_INS) != 0)
 				ksiginfo_tryfree(ksi);
 			return (ret);
 		}
@@ -2525,7 +2616,7 @@ tdsendsignal(struct proc *p, struct thread *td, int sig, ksiginfo_t *ksi)
 			p->p_flag |= P_STOPPED_SIG;
 			p->p_xsig = sig;
 			PROC_SLOCK(p);
-			wakeup_swapper = sig_suspend_threads(td, p, 1);
+			wakeup_swapper = sig_suspend_threads(td, p);
 			if (p->p_numthreads == p->p_suspcount) {
 				/*
 				 * only thread sending signal to another
@@ -2692,19 +2783,18 @@ wake:
 }
 
 static int
-sig_suspend_threads(struct thread *td, struct proc *p, int sending)
+sig_suspend_threads(struct thread *td, struct proc *p)
 {
 	struct thread *td2;
 	int wakeup_swapper;
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	PROC_SLOCK_ASSERT(p, MA_OWNED);
-	MPASS(sending || td == curthread);
 
 	wakeup_swapper = 0;
 	FOREACH_THREAD_IN_PROC(p, td2) {
 		thread_lock(td2);
-		td2->td_flags |= TDF_ASTPENDING | TDF_NEEDSUSPCHK;
+		ast_sched_locked(td2, TDA_SUSPEND);
 		if ((TD_IS_SLEEPING(td2) || TD_IS_SWAPPED(td2)) &&
 		    (td2->td_flags & TDF_SINTR)) {
 			if (td2->td_flags & TDF_SBDRY) {
@@ -2724,8 +2814,6 @@ sig_suspend_threads(struct thread *td, struct proc *p, int sending)
 			} else if (!TD_IS_SUSPENDED(td2))
 				thread_suspend_one(td2);
 		} else if (!TD_IS_SUSPENDED(td2)) {
-			if (sending || td != td2)
-				td2->td_flags |= TDF_ASTPENDING;
 #ifdef SMP
 			if (TD_IS_RUNNING(td2) && td2 != td)
 				forward_signal(td2);
@@ -2812,7 +2900,7 @@ ptracestop(struct thread *td, int sig, ksiginfo_t *si)
 
 				p->p_flag2 &= ~P2_PTRACE_FSTP;
 				p->p_flag |= P_STOPPED_SIG | P_STOPPED_TRACE;
-				sig_suspend_threads(td, p, 0);
+				sig_suspend_threads(td, p);
 			}
 			if ((td->td_dbgflags & TDB_STOPATFORK) != 0) {
 				td->td_dbgflags &= ~TDB_STOPATFORK;
@@ -3167,7 +3255,7 @@ sigprocess(struct thread *td, int sig)
 			p->p_flag |= P_STOPPED_SIG;
 			p->p_xsig = sig;
 			PROC_SLOCK(p);
-			sig_suspend_threads(td, p, 0);
+			sig_suspend_threads(td, p);
 			thread_suspend_switch(td, p);
 			PROC_SUNLOCK(p);
 			mtx_lock(&ps->ps_mtx);
@@ -3386,7 +3474,7 @@ sig_ast_checksusp(struct thread *td)
 	p = td->td_proc;
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 
-	if ((td->td_flags & TDF_NEEDSUSPCHK) == 0)
+	if (!td_ast_pending(td, TDA_SUSPEND))
 		return (0);
 
 	ret = thread_suspend_check(1);
@@ -3404,7 +3492,7 @@ sig_ast_needsigchk(struct thread *td)
 	p = td->td_proc;
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 
-	if ((td->td_flags & TDF_NEEDSIGCHK) == 0)
+	if (!td_ast_pending(td, TDA_SIG))
 		return (0);
 
 	ps = p->p_sigacts;
@@ -3450,7 +3538,7 @@ sig_intr(void)
 	int ret;
 
 	td = curthread;
-	if ((td->td_flags & (TDF_NEEDSIGCHK | TDF_NEEDSUSPCHK)) == 0)
+	if (!td_ast_pending(td, TDA_SIG) && !td_ast_pending(td, TDA_SUSPEND))
 		return (0);
 
 	p = td->td_proc;
@@ -3472,7 +3560,7 @@ curproc_sigkilled(void)
 	bool res;
 
 	td = curthread;
-	if ((td->td_flags & TDF_NEEDSIGCHK) == 0)
+	if (!td_ast_pending(td, TDA_SIG))
 		return (false);
 
 	p = td->td_proc;
@@ -4350,9 +4438,7 @@ sigfastblock_resched(struct thread *td, bool resched)
 		reschedule_signals(p, td->td_sigmask, 0);
 		PROC_UNLOCK(p);
 	}
-	thread_lock(td);
-	td->td_flags |= TDF_ASTPENDING | TDF_NEEDSIGCHK;
-	thread_unlock(td);
+	ast_sched(td, TDA_SIG);
 }
 
 int
@@ -4512,7 +4598,7 @@ sigfastblock_setpend1(struct thread *td)
 	}
 }
 
-void
+static void
 sigfastblock_setpend(struct thread *td, bool resched)
 {
 	struct proc *p;

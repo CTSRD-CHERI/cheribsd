@@ -170,6 +170,8 @@ copy_thread(struct thread *td1, struct thread *td2)
 		    cpu_max_ext_state_size);
 	}
 
+	td2->td_frame = (struct trapframe *)td2->td_md.md_stack_base - 1;
+
 	/*
 	 * Set registers for trampoline to user mode.  Leave space for the
 	 * return address on stack.  These are the kernel mode register values.
@@ -371,7 +373,7 @@ cpu_thread_clean(struct thread *td)
 	if (pcb->pcb_tssp != NULL) {
 		pmap_pti_remove_kva((vm_offset_t)pcb->pcb_tssp,
 		    (vm_offset_t)pcb->pcb_tssp + ctob(IOPAGES + 1));
-		kmem_free((vm_offset_t)pcb->pcb_tssp, ctob(IOPAGES + 1));
+		kmem_free(pcb->pcb_tssp, ctob(IOPAGES + 1));
 		pcb->pcb_tssp = NULL;
 	}
 }

@@ -49,7 +49,8 @@
 __FBSDID("$FreeBSD$");
 
 #include "namespace.h"
-#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/auxv.h>
 #include <sys/signalvar.h>
 #include <sys/ioctl.h>
 #include <sys/link_elf.h>
@@ -73,15 +74,7 @@ __FBSDID("$FreeBSD$");
 #include "libc_private.h"
 #include "thr_private.h"
 
-/*
- * The variable _usrstack is the address of the main thread's stack. It
- * is not a valid pointer on CHERIABI, as sysctl kern.usrstack returns a
- * virtual address and not a capability. However, we don't need to use
- * it as a pointer anyway as there is no need to group stacks together
- * and add guard pages on CHERIABI. In CHERIABI _usrstack is only used to
- * initialize stackaddr_attr for the main thread.
- */
-ptraddr_t	_usrstack;
+char		*_usrstack;
 struct pthread	*_thr_initial;
 int		_libthr_debug;
 int		_thread_event_mask;
@@ -222,10 +215,6 @@ STATIC_LIB_REQUIRE(_thread_state_running);
 #define	DUAL_ENTRY(entry)	\
 	(pthread_func_t)entry, (pthread_func_t)entry
 
-/*
- * FIXME: If libthr is linked after libc these entries resolve to the weak
- * alias stub functions in libc which causes an infinite loop/stack overflow.
- */
 static pthread_func_t jmp_table[][2] = {
 	[PJT_ATFORK] = {DUAL_ENTRY(_thr_atfork)},
 	[PJT_ATTR_DESTROY] = {DUAL_ENTRY(_thr_attr_destroy)},
@@ -406,10 +395,6 @@ init_main_thread(struct pthread *thread)
 	/*
 	 * There is no need to allocate a red zone in CHERIABI as we are
 	 * protected through the use of capabilities.
-	 *
-	 * XXX-AR: If we decide to add it we will need to derive the correct
-	 * capability from somewhere else because _usrstack not a valid
-	 * capability.
 	 */
 #ifndef __CHERI_PURE_CAPABILITY__
 	/*
@@ -422,8 +407,8 @@ init_main_thread(struct pthread *thread)
 	 * red zone to protect the thread stack that is just beyond.
 	 */
 	/* XXX-AR: use PROT_NONE here */
-	if (mmap((void*)(_usrstack - _thr_stack_initial -
-	    _thr_guard_default), _thr_guard_default, 0, MAP_ANON,
+	if (mmap(_usrstack - _thr_stack_initial -
+	    _thr_guard_default, _thr_guard_default, 0, MAP_ANON,
 	    -1, 0) == MAP_FAILED)
 		PANIC("Cannot allocate red zone for initial thread");
 #endif
@@ -437,13 +422,7 @@ init_main_thread(struct pthread *thread)
 	 *       actually free() it; it just puts it in the free
 	 *       stack queue for later reuse.
 	 */
-	thread->attr.stackaddr_attr = (void *)(uintptr_t)(_usrstack -
-	    _thr_stack_initial);
-#ifdef __CHERI_PURE_CAPABILITY__
-	/* In CHERIABI stackaddr_attr can't be dereferenced */
-	THR_ASSERT(cheri_gettag(thread->attr.stackaddr_attr) == 0,
-	    "thread->attr.stackaddr_attr should not be a capability");
-#endif
+	thread->attr.stackaddr_attr = _usrstack - _thr_stack_initial;
 	thread->attr.stacksize_attr = _thr_stack_initial;
 	thread->attr.guardsize_attr = _thr_guard_default;
 	thread->attr.flags |= THR_STACK_USER;
@@ -468,19 +447,69 @@ init_main_thread(struct pthread *thread)
 	thread->attr.prio = sched_param.sched_priority;
 
 #ifdef _PTHREAD_FORCED_UNWIND
-	thread->unwind_stackend = (void *)(uintptr_t)_usrstack;
+	thread->unwind_stackend = _usrstack;
 #endif
 
 	/* Others cleared to zero by thr_alloc() */
+}
+
+bool
+__thr_get_main_stack_base(char **base)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * In the CheriABI world, the maximum possible stack's address
+	 * space has already been allocated (and has leaked onto the
+	 * stack in the form of stored stack frames) so we leave the
+	 * whole thing for the initial thread and take our values from
+	 * there.
+	 */
+	char *sp = (char *)cheri_getstack();
+	*base = sp + cheri_getlen(sp);
+	return (true);
+#else
+	size_t len;
+	int mib[2];
+
+	if (elf_aux_info(AT_USRSTACKBASE, base, sizeof(*base)) == 0)
+		return (true);
+
+	mib[0] = CTL_KERN;
+	mib[1] = KERN_USRSTACK;
+	len = sizeof(*base);
+	if (sysctl(mib, nitems(mib), base, &len, NULL, 0) == 0)
+		return (true);
+
+	return (false);
+#endif
+}
+
+bool
+__thr_get_main_stack_lim(size_t *lim)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* See above. */
+	*lim = cheri_getlen(cheri_getstack());
+	return (true);
+#else
+	struct rlimit rlim;
+
+	if (elf_aux_info(AT_USRSTACKLIM, lim, sizeof(*lim)) == 0)
+		return (true);
+
+	if (getrlimit(RLIMIT_STACK, &rlim) == 0) {
+		*lim = rlim.rlim_cur;
+		return (true);
+	}
+
+	return (false);
+#endif
 }
 
 static void
 init_private(void)
 {
 #ifndef __CHERI_PURE_CAPABILITY__
-	struct rlimit rlim;
-	size_t len;
-	int mib[2];
 	char *env_bigstack, *env_splitstack;
 #endif
 	char *env;
@@ -506,36 +535,24 @@ init_private(void)
 	if (init_once == 0) {
 		__thr_pshared_init();
 		__thr_malloc_init();
+
 		/* Find the stack top */
+		if (!__thr_get_main_stack_base(&_usrstack))
+			PANIC("Cannot get kern.usrstack");
 #ifndef __CHERI_PURE_CAPABILITY__
-		mib[0] = CTL_KERN;
-		mib[1] = KERN_USRSTACK;
-		/*
-		 * The sysctl returns a ptraddr_t and not a pointer so _usrstack
-		 * must not be a pointer on CHERIABI
-		 */
-		len = sizeof (_usrstack);
-		if (sysctl(mib, 2, &_usrstack, &len, NULL, 0) == -1)
-			PANIC("Cannot get kern.usrstack from sysctl");
 		env_bigstack = getenv("LIBPTHREAD_BIGSTACK_MAIN");
 		env_splitstack = getenv("LIBPTHREAD_SPLITSTACK_MAIN");
 		if (env_bigstack != NULL || env_splitstack == NULL) {
-			if (getrlimit(RLIMIT_STACK, &rlim) == -1)
-				PANIC("Cannot get stack rlimit");
-			_thr_stack_initial = rlim.rlim_cur;
-		}
 #else
 		/*
-		 * In the CheriABI world, the maximum possible stack's
-		 * address space has already been allocated (and has
-		 * leaked onto the stack in the form of stored stack
-		 * frames) so we leave the whole thing for the initial
-		 * thread and take our values from there.
+		 * Always use the maximum possible stack's address
+		 * space for the main thread.
 		 */
-		_thr_stack_initial = cheri_getlen(cheri_getstack());
-		_usrstack = cheri_getbase(cheri_getstack()) +
-		    _thr_stack_initial;
+		{
 #endif
+			if (!__thr_get_main_stack_lim(&_thr_stack_initial))
+				PANIC("Cannot get stack rlimit");
+		}
 		_thr_is_smp = sysconf(_SC_NPROCESSORS_CONF);
 		if (_thr_is_smp == -1)
 			PANIC("Cannot get _SC_NPROCESSORS_CONF");

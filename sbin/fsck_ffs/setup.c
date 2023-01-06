@@ -60,8 +60,7 @@ __FBSDID("$FreeBSD$");
 
 struct inoinfo **inphead, **inpsort;	/* info about all inodes */
 
-struct bufarea asblk;
-#define altsblock (*asblk.b_un.b_fs)
+static int sbhashfailed;
 #define POWEROF2(num)	(((num) & ((num) - 1)) == 0)
 
 static int calcsb(char *dev, int devfd, struct fs *fs);
@@ -76,39 +75,15 @@ static int chkrecovery(int devfd);
 int
 setup(char *dev)
 {
-	long cg, bmapsize;
-	struct fs proto;
+	long bmapsize;
 
 	/*
-	 * We are expected to have an open file descriptor
+	 * We are expected to have an open file descriptor and a superblock.
 	 */
-	if (fsreadfd < 0)
+	if (fsreadfd < 0 || havesb == 0) {
+		if (debug)
+			printf("setup: bad fsreadfd or missing superblock\n");
 		return (0);
-	/*
-	 * If we do not yet have a superblock, read it in looking
-	 * for alternates if necessary.
-	 */
-	if (havesb == 0 && readsb(1) == 0) {
-		skipclean = 0;
-		if (bflag || preen || calcsb(dev, fsreadfd, &proto) == 0)
-			return(0);
-		if (reply("LOOK FOR ALTERNATE SUPERBLOCKS") == 0)
-			return (0);
-		for (cg = 0; cg < proto.fs_ncg; cg++) {
-			bflag = fsbtodb(&proto, cgsblock(&proto, cg));
-			if (readsb(0) != 0)
-				break;
-		}
-		if (cg >= proto.fs_ncg) {
-			printf("SEARCH FOR ALTERNATE SUPER-BLOCK FAILED. "
-			    "YOU MUST USE THE\n-b OPTION TO FSCK TO SPECIFY "
-			    "THE LOCATION OF AN ALTERNATE\nSUPER-BLOCK TO "
-			    "SUPPLY NEEDED INFORMATION; SEE fsck_ffs(8).\n");
-			bflag = 0;
-			return(0);
-		}
-		pwarn("USING ALTERNATE SUPERBLOCK AT %jd\n", bflag);
-		bflag = 0;
 	}
 	if (preen == 0)
 		printf("** %s", dev);
@@ -163,10 +138,6 @@ setup(char *dev)
 		pfatal("from before 2002 with the command ``fsck -c 2''\n");
 		exit(EEXIT);
 	}
-	if ((asblk.b_flags & B_DIRTY) != 0 && !bflag) {
-		memmove(&altsblock, &sblock, (size_t)sblock.fs_sbsize);
-		flush(fswritefd, &asblk);
-	}
 	if (preen == 0 && yflag == 0 && sblock.fs_magic == FS_UFS2_MAGIC &&
 	    fswritefd != -1 && chkrecovery(fsreadfd) == 0 &&
 	    reply("SAVE DATA TO FIND ALTERNATE SUPERBLOCKS") != 0)
@@ -174,6 +145,7 @@ setup(char *dev)
 	/*
 	 * allocate and initialize the necessary maps
 	 */
+	bufinit();
 	bmapsize = roundup(howmany(maxfsblock, CHAR_BIT), sizeof(short));
 	blockmap = Calloc((unsigned)bmapsize, sizeof (char));
 	if (blockmap == NULL) {
@@ -198,7 +170,6 @@ setup(char *dev)
 		    (uintmax_t)numdirs * sizeof(struct inoinfo *));
 		goto badsb;
 	}
-	bufinit();
 	if (sblock.fs_flags & FS_DOSOFTDEP)
 		usedsoftdep = 1;
 	else
@@ -249,38 +220,64 @@ openfilesys(char *dev)
  * Read in the super block and its summary info.
  */
 int
-readsb(int listerr)
+readsb(void)
 {
-	off_t super;
-	int bad, ret;
 	struct fs *fs;
 
-	super = bflag ? bflag * dev_bsize :
-	    sbhashfailed ? STDSB_NOHASHFAIL_NOMSG : STDSB_NOMSG;
+	sbhashfailed = 0;
 	readcnt[sblk.b_type]++;
-	while ((ret = sbget(fsreadfd, &fs, super)) != 0) {
-		switch (ret) {
+	/*
+	 * If bflag is given, then check just that superblock.
+	 */
+	if (bflag) {
+		switch (sbget(fsreadfd, &fs, bflag * dev_bsize, 0)) {
+		case 0:
+			goto goodsb;
 		case EINTEGRITY:
-			if (bflag || super == STDSB_NOHASHFAIL_NOMSG)
-				return (0);
-			super = STDSB_NOHASHFAIL_NOMSG;
-			sbhashfailed = 1;
-			continue;
+			printf("Check hash failed for superblock at %jd\n",
+			    bflag);
+			return (0);
 		case ENOENT:
-			if (bflag)
-				printf("%jd is not a file system "
-				    "superblock\n", super / dev_bsize);
-			else
-				printf("Cannot find file system "
-				    "superblock\n");
+			printf("%jd is not a file system superblock\n", bflag);
 			return (0);
 		case EIO:
 		default:
-			printf("I/O error reading %jd\n",
-			    super / dev_bsize);
+			printf("I/O error reading %jd\n", bflag);
 			return (0);
 		}
 	}
+	/*
+	 * Check for the standard superblock and use it if good.
+	 */
+	if (sbget(fsreadfd, &fs, UFS_STDSB, UFS_NOMSG) == 0)
+		goto goodsb;
+	/*
+	 * Check if the only problem is a check-hash failure.
+	 */
+	skipclean = 0;
+	if (sbget(fsreadfd, &fs, UFS_STDSB, UFS_NOMSG | UFS_NOHASHFAIL) == 0) {
+		sbhashfailed = 1;
+		goto goodsb;
+	}
+	/*
+	 * Do an exhaustive search for a usable superblock.
+	 */
+	switch (sbsearch(fsreadfd, &fs, 0)) {
+	case 0:
+		goto goodsb;
+	case ENOENT:
+		printf("SEARCH FOR ALTERNATE SUPER-BLOCK FAILED. "
+		    "YOU MUST USE THE\n-b OPTION TO FSCK TO SPECIFY "
+		    "THE LOCATION OF AN ALTERNATE\nSUPER-BLOCK TO "
+		    "SUPPLY NEEDED INFORMATION; SEE fsck_ffs(8).\n");
+		return (0);
+	case EIO:
+	default:
+		printf("I/O error reading a usable superblock\n");
+		return (0);
+	}
+
+goodsb:
 	memcpy(&sblock, fs, fs->fs_sbsize);
 	free(fs);
 	/*
@@ -291,58 +288,6 @@ readsb(int listerr)
 	dev_bsize = sblock.fs_fsize / fsbtodb(&sblock, 1);
 	sblk.b_bno = sblock.fs_sblockactualloc / dev_bsize;
 	sblk.b_size = SBLOCKSIZE;
-	/*
-	 * Compare all fields that should not differ in alternate super block.
-	 * When an alternate super-block is specified this check is skipped.
-	 */
-	if (bflag)
-		goto out;
-	getblk(&asblk, cgsblock(&sblock, sblock.fs_ncg - 1), sblock.fs_sbsize);
-	if (asblk.b_errs)
-		return (0);
-	bad = 0;
-#define CHK(x, y)				\
-	if (altsblock.x != sblock.x) {		\
-		bad++;				\
-		if (listerr && debug)		\
-			printf("SUPER BLOCK VS ALTERNATE MISMATCH %s: " y " vs " y "\n", \
-			    #x, (intmax_t)sblock.x, (intmax_t)altsblock.x); \
-	}
-	CHK(fs_sblkno, "%jd");
-	CHK(fs_cblkno, "%jd");
-	CHK(fs_iblkno, "%jd");
-	CHK(fs_dblkno, "%jd");
-	CHK(fs_ncg, "%jd");
-	CHK(fs_bsize, "%jd");
-	CHK(fs_fsize, "%jd");
-	CHK(fs_frag, "%jd");
-	CHK(fs_bmask, "%#jx");
-	CHK(fs_fmask, "%#jx");
-	CHK(fs_bshift, "%jd");
-	CHK(fs_fshift, "%jd");
-	CHK(fs_fragshift, "%jd");
-	CHK(fs_fsbtodb, "%jd");
-	CHK(fs_sbsize, "%jd");
-	CHK(fs_nindir, "%jd");
-	CHK(fs_inopb, "%jd");
-	CHK(fs_cssize, "%jd");
-	CHK(fs_ipg, "%jd");
-	CHK(fs_fpg, "%jd");
-	CHK(fs_magic, "%#jx");
-#undef CHK
-	if (bad) {
-		if (listerr == 0)
-			return (0);
-		if (preen)
-			printf("%s: ", cdevname);
-		printf(
-		    "VALUES IN SUPER BLOCK LSB=%jd DISAGREE WITH THOSE IN\n"
-		    "LAST ALTERNATE LSB=%jd\n",
-		    sblk.b_bno, asblk.b_bno);
-		if (reply("IGNORE ALTERNATE SUPER BLOCK") == 0)
-			return (0);
-	}
-out:
 	/*
 	 * If not yet done, update UFS1 superblock with new wider fields.
 	 */
@@ -371,14 +316,11 @@ sblock_init(void)
 	fsmodified = 0;
 	lfdir = 0;
 	initbarea(&sblk, BT_SUPERBLK);
-	initbarea(&asblk, BT_SUPERBLK);
 	sblk.b_un.b_buf = Malloc(SBLOCKSIZE);
-	asblk.b_un.b_buf = Malloc(SBLOCKSIZE);
-	if (sblk.b_un.b_buf == NULL || asblk.b_un.b_buf == NULL)
+	if (sblk.b_un.b_buf == NULL)
 		errx(EEXIT, "cannot allocate space for superblock");
 	sblock.fs_si = Malloc(sizeof(*sblock.fs_si));
-	altsblock.fs_si = Malloc(sizeof(*altsblock.fs_si));
-	if (sblock.fs_si == NULL || altsblock.fs_si == NULL)
+	if (sblock.fs_si == NULL)
 		errx(EEXIT, "cannot allocate space for superblock summary info");
 	dev_bsize = secsize = DEV_BSIZE;
 }

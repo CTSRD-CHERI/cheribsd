@@ -126,10 +126,7 @@ NOASM=
 .include "${LIBC_SRCTOP}/net/Makefile.inc"
 .include "${LIBC_SRCTOP}/nls/Makefile.inc"
 .include "${LIBC_SRCTOP}/posix1e/Makefile.inc"
-.if ${LIBC_ARCH} != "aarch64" && \
-    ${LIBC_ARCH} != "amd64" && \
-    ${LIBC_ARCH} != "powerpc64" && \
-    ${LIBC_ARCH} != "riscv"
+.if ${MACHINE_ABI:Mlong32}
 .include "${LIBC_SRCTOP}/quad/Makefile.inc"
 .endif
 .include "${LIBC_SRCTOP}/regex/Makefile.inc"
@@ -192,7 +189,7 @@ CFLAGS+= -DSYMBOL_VERSIONING
 
 # If there are no machine dependent sources, append all the
 # machine-independent sources:
-.if empty(MDSRCS)
+.if empty(MDSRCS) || ${MK_MACHDEP_OPTIMIZATIONS} == no
 SRCS+=	${MISRCS}
 .else
 # Append machine-dependent sources, then append machine-independent sources

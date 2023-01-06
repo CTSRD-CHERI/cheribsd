@@ -740,7 +740,7 @@ extern int __isthreaded;
  * Global variables for the pthread kernel.
  */
 
-extern ptraddr_t	_usrstack __hidden;
+extern char		*_usrstack __hidden;
 
 /* For debugger */
 extern int		_libthr_debug;
@@ -1116,6 +1116,8 @@ int _thr_mutex_destroy(pthread_mutex_t *);
 int _thr_mutex_unlock(pthread_mutex_t *);
 int __Tthr_mutex_lock(pthread_mutex_t *);
 int __Tthr_mutex_trylock(pthread_mutex_t *);
+bool __thr_get_main_stack_base(char **base);
+bool __thr_get_main_stack_lim(size_t *lim);
 
 __END_DECLS
 __NULLABILITY_PRAGMA_POP

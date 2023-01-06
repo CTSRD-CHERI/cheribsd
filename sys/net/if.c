@@ -714,7 +714,7 @@ if_free_deferred(epoch_context_t ctx)
 	for (int i = 0; i < IFCOUNTERS; i++)
 		counter_u64_free(ifp->if_counters[i]);
 
-	free(ifp->if_description, M_IFDESCR);
+	if_freedescr(ifp->if_description);
 	free(ifp->if_hw_addr, M_IFADDR);
 	free(ifp, M_IFNET);
 }
@@ -1018,9 +1018,6 @@ if_attach_internal(struct ifnet *ifp, bool vmove)
 	EVENTHANDLER_INVOKE(ifnet_arrival_event, ifp);
 	if (IS_DEFAULT_VNET(curvnet))
 		devctl_notify("IFNET", ifp->if_xname, "ATTACH", NULL);
-
-	/* Announce the interface. */
-	rt_ifannouncemsg(ifp, IFAN_ARRIVAL);
 }
 
 static void
@@ -1063,7 +1060,7 @@ if_attachdomain1(struct ifnet *ifp)
 
 	/* address family dependent data region */
 	bzero(ifp->if_afdata, sizeof(ifp->if_afdata));
-	for (dp = domains; dp; dp = dp->dom_next) {
+	SLIST_FOREACH(dp, &domains, dom_next) {
 		if (dp->dom_ifattach)
 			ifp->if_afdata[dp->dom_family] =
 			    (*dp->dom_ifattach)(ifp);
@@ -1271,8 +1268,6 @@ if_detach_internal(struct ifnet *ifp, bool vmove)
 #endif
 	if_purgemaddrs(ifp);
 
-	/* Announce that the interface is gone. */
-	rt_ifannouncemsg(ifp, IFAN_DEPARTURE);
 	EVENTHANDLER_INVOKE(ifnet_departure_event, ifp);
 	if (IS_DEFAULT_VNET(curvnet))
 		devctl_notify("IFNET", ifp->if_xname, "DETACH", NULL);
@@ -1310,7 +1305,9 @@ finish_vnet_shutdown:
 	i = ifp->if_afdata_initialized;
 	ifp->if_afdata_initialized = 0;
 	IF_AFDATA_UNLOCK(ifp);
-	for (dp = domains; i > 0 && dp; dp = dp->dom_next) {
+	if (i == 0)
+		return (0);
+	SLIST_FOREACH(dp, &domains, dom_next) {
 		if (dp->dom_ifdetach && ifp->if_afdata[dp->dom_family]) {
 			(*dp->dom_ifdetach)(ifp,
 			    ifp->if_afdata[dp->dom_family]);
@@ -2193,18 +2190,11 @@ link_init_sdl(struct ifnet *ifp, struct sockaddr *paddr, u_char iftype)
 static void
 if_unroute(struct ifnet *ifp, int flag, int fam)
 {
-	struct ifaddr *ifa;
-	struct epoch_tracker et;
 
 	KASSERT(flag == IFF_UP, ("if_unroute: flag != IFF_UP"));
 
 	ifp->if_flags &= ~flag;
 	getmicrotime(&ifp->if_lastchange);
-	NET_EPOCH_ENTER(et);
-	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
-		if (fam == PF_UNSPEC || (fam == ifa->ifa_addr->sa_family))
-			pfctlinput(PRC_IFDOWN, ifa->ifa_addr);
-	NET_EPOCH_EXIT(et);
 	ifp->if_qflush(ifp);
 
 	if (ifp->if_carp)
@@ -2219,18 +2209,11 @@ if_unroute(struct ifnet *ifp, int flag, int fam)
 static void
 if_route(struct ifnet *ifp, int flag, int fam)
 {
-	struct ifaddr *ifa;
-	struct epoch_tracker et;
 
 	KASSERT(flag == IFF_UP, ("if_route: flag != IFF_UP"));
 
 	ifp->if_flags |= flag;
 	getmicrotime(&ifp->if_lastchange);
-	NET_EPOCH_ENTER(et);
-	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
-		if (fam == PF_UNSPEC || (fam == ifa->ifa_addr->sa_family))
-			pfctlinput(PRC_IFUP, ifa->ifa_addr);
-	NET_EPOCH_EXIT(et);
 	if (ifp->if_carp)
 		(*carp_linkstate_p)(ifp);
 	rt_ifmsg(ifp);
@@ -2634,7 +2617,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 	int new_flags, temp_flags;
 	size_t namelen, onamelen;
 	size_t descrlen, nvbuflen;
-	char *descrbuf, *odescrbuf;
+	char *descrbuf;
 	char new_name[IFNAMSIZ];
 	char old_name[IFNAMSIZ], strbuf[IFNAMSIZ + 8];
 	struct ifaddr *ifa;
@@ -2772,18 +2755,13 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 			error = copyin(ifr_buffer_get_buffer(cmd, ifr),
 			    descrbuf, ifr_buffer_get_length(cmd, ifr) - 1);
 			if (error) {
-				free(descrbuf, M_IFDESCR);
+				if_freedescr(descrbuf);
 				break;
 			}
 		}
 
-		sx_xlock(&ifdescr_sx);
-		odescrbuf = ifp->if_description;
-		ifp->if_description = descrbuf;
-		sx_xunlock(&ifdescr_sx);
-
+		if_setdescr(ifp, descrbuf);
 		getmicrotime(&ifp->if_lastchange);
-		free(odescrbuf, M_IFDESCR);
 		break;
 
 	case SIOCGIFFIB:
@@ -2928,8 +2906,6 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		 */
 		ifp->if_flags |= IFF_RENAMING;
 		
-		/* Announce the departure of the interface. */
-		rt_ifannouncemsg(ifp, IFAN_DEPARTURE);
 		EVENTHANDLER_INVOKE(ifnet_departure_event, ifp);
 
 		if_printf(ifp, "changing name to '%s'\n", new_name);
@@ -2959,8 +2935,6 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		IF_ADDR_WUNLOCK(ifp);
 
 		EVENTHANDLER_INVOKE(ifnet_arrival_event, ifp);
-		/* Announce the return of the interface. */
-		rt_ifannouncemsg(ifp, IFAN_ARRIVAL);
 
 		ifp->if_flags &= ~IFF_RENAMING;
 
@@ -3503,18 +3477,11 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	 * layer, and do not perform any credentials checks or input
 	 * validation.
 	 */
-	error = ((*so->so_proto->pr_usrreqs->pru_control)(so, cmd, data,
-	    ifp, td));
-	if (error == EOPNOTSUPP && ifp != NULL && ifp->if_ioctl != NULL)
-		switch (cmd) {
-		case SIOCSIFADDR:
-		case SIOCSIFBRDADDR:
-		case SIOCSIFDSTADDR:
-		case SIOCSIFNETMASK:
-			break;
-		default:
-			error = (*ifp->if_ioctl)(ifp, cmd, data);
-		}
+	error = so->so_proto->pr_control(so, cmd, data, ifp, td);
+	if (error == EOPNOTSUPP && ifp != NULL && ifp->if_ioctl != NULL &&
+	    cmd != SIOCSIFADDR && cmd != SIOCSIFBRDADDR &&
+	    cmd != SIOCSIFDSTADDR && cmd != SIOCSIFNETMASK)
+		error = (*ifp->if_ioctl)(ifp, cmd, data);
 
 	if ((oif_flags ^ ifp->if_flags) & IFF_UP) {
 #ifdef INET6
@@ -4680,6 +4647,23 @@ if_getcapenable(if_t ifp)
 	return ((struct ifnet *)ifp)->if_capenable;
 }
 
+void
+if_setdescr(if_t ifp, char *descrbuf)
+{
+	sx_xlock(&ifdescr_sx);
+	char *odescrbuf = ifp->if_description;
+	ifp->if_description = descrbuf;
+	sx_xunlock(&ifdescr_sx);
+
+	if_freedescr(odescrbuf);
+}
+
+void
+if_freedescr(char *descrbuf)
+{
+	free(descrbuf, M_IFDESCR);
+}
+
 /*
  * This is largely undesirable because it ties ifnet to a device, but does
  * provide flexiblity for an embedded product vendor. Should be used with
@@ -4784,7 +4768,7 @@ if_getmtu_family(if_t ifp, int family)
 {
 	struct domain *dp;
 
-	for (dp = domains; dp; dp = dp->dom_next) {
+	SLIST_FOREACH(dp, &domains, dom_next) {
 		if (dp->dom_family == family && dp->dom_ifmtu != NULL)
 			return (dp->dom_ifmtu((struct ifnet *)ifp));
 	}

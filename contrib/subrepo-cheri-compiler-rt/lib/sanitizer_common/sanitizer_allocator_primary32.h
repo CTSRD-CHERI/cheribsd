@@ -189,7 +189,7 @@ class SizeClassAllocator32 {
     sci->free_list.push_front(b);
   }
 
-  bool PointerIsMine(const void *p) {
+  bool PointerIsMine(const void *p) const {
     vaddr mem = reinterpret_cast<vaddr>(p);
     if (SANITIZER_SIGN_EXTENDED_ADDRESSES)
       mem &= (kSpaceSize - 1);
@@ -198,8 +198,9 @@ class SizeClassAllocator32 {
     return GetSizeClass(p) != 0;
   }
 
-  usize GetSizeClass(const void *p) {
-    return possible_regions[ComputeRegionId(reinterpret_cast<uptr>(p))];
+  usize GetSizeClass(const void *p) const {
+    usize id = ComputeRegionId(reinterpret_cast<uptr>(p));
+    return possible_regions.contains(id) ? possible_regions[id] : 0;
   }
 
   void *GetBlockBegin(const void *p) {
@@ -237,13 +238,13 @@ class SizeClassAllocator32 {
 
   // ForceLock() and ForceUnlock() are needed to implement Darwin malloc zone
   // introspection API.
-  void ForceLock() NO_THREAD_SAFETY_ANALYSIS {
+  void ForceLock() SANITIZER_NO_THREAD_SAFETY_ANALYSIS {
     for (usize i = 0; i < kNumClasses; i++) {
       GetSizeClassInfo(i)->mutex.Lock();
     }
   }
 
-  void ForceUnlock() NO_THREAD_SAFETY_ANALYSIS {
+  void ForceUnlock() SANITIZER_NO_THREAD_SAFETY_ANALYSIS {
     for (int i = kNumClasses - 1; i >= 0; i--) {
       GetSizeClassInfo(i)->mutex.Unlock();
     }
@@ -251,9 +252,9 @@ class SizeClassAllocator32 {
 
   // Iterate over all existing chunks.
   // The allocator must be locked when calling this function.
-  void ForEachChunk(ForEachChunkCallback callback, void *arg) {
+  void ForEachChunk(ForEachChunkCallback callback, void *arg) const {
     for (vaddr region = 0; region < kNumPossibleRegions; region++)
-      if (possible_regions[region]) {
+      if (possible_regions.contains(region) && possible_regions[region]) {
         usize chunk_size = ClassIdToSize(possible_regions[region]);
         usize max_chunks_in_region = kRegionSize / (chunk_size + kMetadataSize);
         vaddr region_beg = region * kRegionSize;
@@ -292,9 +293,7 @@ class SizeClassAllocator32 {
     return res;
   }
 
-  uptr ComputeRegionBeg(uptr mem) {
-    return RoundDownTo(mem, kRegionSize);
-  }
+  uptr ComputeRegionBeg(uptr mem) const { return RoundDownTo(mem, kRegionSize); }
 
   uptr AllocateRegion(AllocatorStats *stat, usize class_id) {
     DCHECK_LT(class_id, kNumClasses);
@@ -305,7 +304,7 @@ class SizeClassAllocator32 {
     MapUnmapCallback().OnMap(res, kRegionSize);
     stat->Add(AllocatorStatMapped, kRegionSize);
     CHECK(IsAligned(res, kRegionSize));
-    possible_regions.set(ComputeRegionId(res), static_cast<u8>(class_id));
+    possible_regions[ComputeRegionId(res)] = class_id;
     return res;
   }
 

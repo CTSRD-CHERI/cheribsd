@@ -126,7 +126,7 @@ kern_extattrctl(struct thread *td, const char * __capability path, int cmd,
 		goto out;
 	}
 	VOP_UNLOCK(nd.ni_vp);
-	error = vn_start_write(nd.ni_vp, &mp_writable, V_WAIT | PCATCH);
+	error = vn_start_write(nd.ni_vp, &mp_writable, V_WAIT | V_PCATCH);
 	NDFREE(&nd, NDF_NO_VP_UNLOCK);
 	if (error)
 		goto out;
@@ -183,7 +183,7 @@ extattr_set_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 	if (nbytes > IOSIZE_MAX)
 		return (EINVAL);
 
-	error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
+	error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH);
 	if (error)
 		return (error);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
@@ -519,7 +519,7 @@ extattr_delete_vp(struct vnode *vp, int attrnamespace, const char *attrname,
 	struct mount *mp;
 	int error;
 
-	error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
+	error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH);
 	if (error)
 		return (error);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);

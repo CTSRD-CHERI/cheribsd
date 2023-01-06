@@ -1249,10 +1249,6 @@ nfs_lookup(struct vop_lookup_args *ap)
 		 * associated locking bookkeeping, etc.
 		 */
 		if (cnp->cn_namelen == 1 && cnp->cn_nameptr[0] == '.') {
-			/* XXX: Is this really correct? */
-			if (cnp->cn_nameiop != LOOKUP &&
-			    (flags & ISLASTCN))
-				cnp->cn_flags |= SAVENAME;
 			return (0);
 		}
 
@@ -1287,9 +1283,6 @@ nfs_lookup(struct vop_lookup_args *ap)
 		    VOP_GETATTR(newvp, &vattr, cnp->cn_cred) == 0 &&
 		    timespeccmp(&vattr.va_ctime, &nctime, ==))) {
 			NFSINCRGLOBAL(nfsstatsv1.lookupcache_hits);
-			if (cnp->cn_nameiop != LOOKUP &&
-			    (flags & ISLASTCN))
-				cnp->cn_flags |= SAVENAME;
 			return (0);
 		}
 		cache_purge(newvp);
@@ -1371,7 +1364,6 @@ nfs_lookup(struct vop_lookup_args *ap)
 			 */
 			if (mp->mnt_flag & MNT_RDONLY)
 				return (EROFS);
-			cnp->cn_flags |= SAVENAME;
 			return (EJUSTRETURN);
 		}
 
@@ -1427,7 +1419,6 @@ nfs_lookup(struct vop_lookup_args *ap)
 		if (attrflag)
 			(void) nfscl_loadattrcache(&newvp, &nfsva, NULL, 0, 1);
 		*vpp = newvp;
-		cnp->cn_flags |= SAVENAME;
 		return (0);
 	}
 
@@ -1512,8 +1503,6 @@ nfs_lookup(struct vop_lookup_args *ap)
 			NFSUNLOCKNODE(np);
 		}
 	}
-	if (cnp->cn_nameiop != LOOKUP && (flags & ISLASTCN))
-		cnp->cn_flags |= SAVENAME;
 	if ((cnp->cn_flags & MAKEENTRY) && dvp != newvp &&
 	    (cnp->cn_nameiop != DELETE || !(flags & ISLASTCN)) &&
 	    attrflag != 0 && (newvp->v_type != VDIR || dattrflag != 0))
@@ -1880,7 +1869,6 @@ nfs_remove(struct vop_remove_args *ap)
 	int error = 0;
 	struct vattr vattr;
 
-	KASSERT((cnp->cn_flags & HASBUF) != 0, ("nfs_remove: no name"));
 	KASSERT(vrefcnt(vp) > 0, ("nfs_remove: bad v_usecount"));
 	if (vp->v_type == VDIR)
 		error = EPERM;
@@ -1993,8 +1981,6 @@ nfs_rename(struct vop_rename_args *ap)
 	struct nfsv4node *newv4 = NULL;
 	int error;
 
-	KASSERT((tcnp->cn_flags & HASBUF) != 0 &&
-	    (fcnp->cn_flags & HASBUF) != 0, ("nfs_rename: no name"));
 	/* Check for cross-device rename */
 	if ((fvp->v_mount != tdvp->v_mount) ||
 	    (tvp && (fvp->v_mount != tvp->v_mount))) {
@@ -3288,7 +3274,32 @@ nfs_advlock(struct vop_advlock_args *ap)
 	error = NFSVOPLOCK(vp, LK_SHARED);
 	if (error != 0)
 		return (EBADF);
-	if (NFS_ISV4(vp) && (ap->a_flags & (F_POSIX | F_FLOCK)) != 0) {
+	nmp = VFSTONFS(vp->v_mount);
+	if (!NFS_ISV4(vp) || (nmp->nm_flag & NFSMNT_NOLOCKD) != 0) {
+		if ((nmp->nm_flag & NFSMNT_NOLOCKD) != 0) {
+			size = np->n_size;
+			NFSVOPUNLOCK(vp);
+			error = lf_advlock(ap, &(vp->v_lockf), size);
+		} else {
+			if (nfs_advlock_p != NULL)
+				error = nfs_advlock_p(ap);
+			else {
+				NFSVOPUNLOCK(vp);
+				error = ENOLCK;
+			}
+		}
+		if (error == 0 && ap->a_op == F_SETLK) {
+			error = NFSVOPLOCK(vp, LK_SHARED);
+			if (error == 0) {
+				/* Mark that a file lock has been acquired. */
+				NFSLOCKNODE(np);
+				np->n_flag |= NHASBEENLOCKED;
+				NFSUNLOCKNODE(np);
+				NFSVOPUNLOCK(vp);
+			}
+		}
+		return (error);
+	} else if ((ap->a_flags & (F_POSIX | F_FLOCK)) != 0) {
 		if (vp->v_type != VREG) {
 			error = EINVAL;
 			goto out;
@@ -3322,7 +3333,6 @@ nfs_advlock(struct vop_advlock_args *ap)
 		 * state structure cannot exist for the file.
 		 * Only done for "oneopenown" NFSv4.1/4.2 mounts.
 		 */
-		nmp = VFSTONFS(vp->v_mount);
 		if (NFSHASNFSV4N(nmp) && NFSHASONEOPENOWN(nmp)) {
 			NFSLOCKNODE(np);
 			np->n_flag |= NMIGHTBELOCKED;
@@ -3389,30 +3399,6 @@ nfs_advlock(struct vop_advlock_args *ap)
 			np->n_flag |= NHASBEENLOCKED;
 			NFSUNLOCKNODE(np);
 		}
-	} else if (!NFS_ISV4(vp)) {
-		if ((VFSTONFS(vp->v_mount)->nm_flag & NFSMNT_NOLOCKD) != 0) {
-			size = VTONFS(vp)->n_size;
-			NFSVOPUNLOCK(vp);
-			error = lf_advlock(ap, &(vp->v_lockf), size);
-		} else {
-			if (nfs_advlock_p != NULL)
-				error = nfs_advlock_p(ap);
-			else {
-				NFSVOPUNLOCK(vp);
-				error = ENOLCK;
-			}
-		}
-		if (error == 0 && ap->a_op == F_SETLK) {
-			error = NFSVOPLOCK(vp, LK_SHARED);
-			if (error == 0) {
-				/* Mark that a file lock has been acquired. */
-				NFSLOCKNODE(np);
-				np->n_flag |= NHASBEENLOCKED;
-				NFSUNLOCKNODE(np);
-				NFSVOPUNLOCK(vp);
-			}
-		}
-		return (error);
 	} else
 		error = EOPNOTSUPP;
 out:
@@ -3430,11 +3416,13 @@ nfs_advlockasync(struct vop_advlockasync_args *ap)
 	u_quad_t size;
 	int error;
 
-	if (NFS_ISV4(vp))
-		return (EOPNOTSUPP);
 	error = NFSVOPLOCK(vp, LK_SHARED);
 	if (error)
 		return (error);
+	if (NFS_ISV4(vp)) {
+		NFSVOPUNLOCK(vp);
+		return (EOPNOTSUPP);
+	}
 	if ((VFSTONFS(vp->v_mount)->nm_flag & NFSMNT_NOLOCKD) != 0) {
 		size = VTONFS(vp)->n_size;
 		NFSVOPUNLOCK(vp);
@@ -3902,23 +3890,18 @@ nfs_copy_file_range(struct vop_copy_file_range_args *ap)
 	struct uio io;
 	struct nfsmount *nmp;
 	size_t len, len2;
+	ssize_t r;
 	int error, inattrflag, outattrflag, ret, ret2;
 	off_t inoff, outoff;
 	bool consecutive, must_commit, tryoutcred;
 
-	ret = ret2 = 0;
-	nmp = VFSTONFS(invp->v_mount);
-	mtx_lock(&nmp->nm_mtx);
 	/* NFSv4.2 Copy is not permitted for infile == outfile. */
-	if (!NFSHASNFSV4(nmp) || nmp->nm_minorvers < NFSV42_MINORVERSION ||
-	    (nmp->nm_privflag & NFSMNTP_NOCOPY) != 0 || invp == outvp) {
-		mtx_unlock(&nmp->nm_mtx);
-		error = vn_generic_copy_file_range(ap->a_invp, ap->a_inoffp,
-		    ap->a_outvp, ap->a_outoffp, ap->a_lenp, ap->a_flags,
-		    ap->a_incred, ap->a_outcred, ap->a_fsizetd);
-		return (error);
+	if (invp == outvp) {
+generic_copy:
+		return (vn_generic_copy_file_range(invp, ap->a_inoffp,
+		    outvp, ap->a_outoffp, ap->a_lenp, ap->a_flags,
+		    ap->a_incred, ap->a_outcred, ap->a_fsizetd));
 	}
-	mtx_unlock(&nmp->nm_mtx);
 
 	/* Lock both vnodes, avoiding risk of deadlock. */
 	do {
@@ -3946,11 +3929,33 @@ nfs_copy_file_range(struct vop_copy_file_range_args *ap)
 		return (error);
 
 	/*
+	 * More reasons to avoid nfs copy: not NFSv4.2, or explicitly
+	 * disabled.
+	 */
+	nmp = VFSTONFS(invp->v_mount);
+	mtx_lock(&nmp->nm_mtx);
+	if (!NFSHASNFSV4(nmp) || nmp->nm_minorvers < NFSV42_MINORVERSION ||
+	    (nmp->nm_privflag & NFSMNTP_NOCOPY) != 0) {
+		mtx_unlock(&nmp->nm_mtx);
+		VOP_UNLOCK(invp);
+		VOP_UNLOCK(outvp);
+		if (mp != NULL)
+			vn_finished_write(mp);
+		goto generic_copy;
+	}
+	mtx_unlock(&nmp->nm_mtx);
+
+	/*
 	 * Do the vn_rlimit_fsize() check.  Should this be above the VOP layer?
 	 */
 	io.uio_offset = *ap->a_outoffp;
 	io.uio_resid = *ap->a_lenp;
-	error = vn_rlimit_fsize(outvp, &io, ap->a_fsizetd);
+	error = vn_rlimit_fsizex(outvp, &io, 0, &r, ap->a_fsizetd);
+	*ap->a_lenp = io.uio_resid;
+	/*
+	 * No need to call vn_rlimit_fsizex_res before return, since the uio is
+	 * local.
+	 */
 
 	/*
 	 * Flush the input file so that the data is up to date before
@@ -3966,6 +3971,7 @@ nfs_copy_file_range(struct vop_copy_file_range_args *ap)
 		error = ncl_flush(outvp, MNT_WAIT, curthread, 1, 0);
 
 	/* Do the actual NFSv4.2 RPC. */
+	ret = ret2 = 0;
 	len = *ap->a_lenp;
 	mtx_lock(&nmp->nm_mtx);
 	if ((nmp->nm_privflag & NFSMNTP_NOCONSECUTIVE) == 0)
@@ -4106,14 +4112,6 @@ nfs_ioctl(struct vop_ioctl_args *ap)
 	int attrflag, content, error, ret;
 	bool eof = false;			/* shut up compiler. */
 
-	if (vp->v_type != VREG)
-		return (ENOTTY);
-	nmp = VFSTONFS(vp->v_mount);
-	if (!NFSHASNFSV4(nmp) || nmp->nm_minorvers < NFSV42_MINORVERSION) {
-		error = vop_stdioctl(ap);
-		return (error);
-	}
-
 	/* Do the actual NFSv4.2 RPC. */
 	switch (ap->a_command) {
 	case FIOSEEKDATA:
@@ -4129,6 +4127,18 @@ nfs_ioctl(struct vop_ioctl_args *ap)
 	error = vn_lock(vp, LK_SHARED);
 	if (error != 0)
 		return (EBADF);
+
+	if (vp->v_type != VREG) {
+		VOP_UNLOCK(vp);
+		return (ENOTTY);
+	}
+	nmp = VFSTONFS(vp->v_mount);
+	if (!NFSHASNFSV4(nmp) || nmp->nm_minorvers < NFSV42_MINORVERSION) {
+		VOP_UNLOCK(vp);
+		error = vop_stdioctl(ap);
+		return (error);
+	}
+
 	attrflag = 0;
 	if (*((off_t *)ap->a_data) >= VTONFS(vp)->n_size)
 		error = ENXIO;

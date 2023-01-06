@@ -99,7 +99,7 @@ void devmap_init_capability(void * __capability _cap);
 #define	DEVMAP_PADDR_NOTFOUND	((vm_paddr_t)(-1))
 
 void *     devmap_ptov(vm_paddr_t _pa, vm_size_t _sz);
-vm_paddr_t devmap_vtop(vm_pointer_t _va, vm_size_t _sz);
+vm_paddr_t devmap_vtop(void * _va, vm_size_t _sz);
 
 /* Print the static mapping table; used for bootverbose output. */
 void devmap_print_table(void);

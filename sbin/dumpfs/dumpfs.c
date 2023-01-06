@@ -130,13 +130,8 @@ main(int argc, char *argv[])
 		usage();
 
 	while ((name = *argv++) != NULL) {
-		if (ufs_disk_fillout_blank(&disk, name) == -1) {
-			ufserr(name);
-			eval |= 1;
-			continue;
-		}
-		disk.d_sblockloc = STDSB_NOHASHFAIL;
-		if (sbread(&disk) == -1) {
+		if (ufs_disk_fillout_blank(&disk, name) == -1 ||
+		    sbfind(&disk, 0) == -1) {
 			ufserr(name);
 			eval |= 1;
 			continue;
@@ -314,10 +309,6 @@ dumpfs(const char *name, int dosb)
 		afs.fs_volname, (uintmax_t)afs.fs_swuid,
 		(uintmax_t)afs.fs_providersize);
 	printf("\ncs[].cs_(nbfree,ndir,nifree,nffree):\n\t");
-	afs.fs_si = calloc(1, sizeof(*afs.fs_si));
-	afs.fs_csp = calloc(1, afs.fs_cssize);
-	if (bread(&disk, fsbtodb(&afs, afs.fs_csaddr), afs.fs_csp, afs.fs_cssize) == -1)
-		goto err;
 	for (i = 0; i < afs.fs_ncg; i++) {
 		struct csum *cs = &afs.fs_cs(&afs, i);
 		if (i && i % 4 == 0)

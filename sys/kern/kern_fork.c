@@ -315,8 +315,8 @@ retry:
 static int
 fork_norfproc(struct thread *td, int flags)
 {
-	int error;
 	struct proc *p1;
+	int error;
 
 	KASSERT((flags & RFPROC) == 0,
 	    ("fork_norfproc called with RFPROC set"));
@@ -327,19 +327,9 @@ fork_norfproc(struct thread *td, int flags)
 	 * must ensure that other threads do not concurrently create a second
 	 * process sharing the vmspace, see vmspace_unshare().
 	 */
-again:
 	if ((p1->p_flag & (P_HADTHREADS | P_SYSTEM)) == P_HADTHREADS &&
 	    ((flags & (RFCFDG | RFFDG)) != 0 || (flags & RFMEM) == 0)) {
 		PROC_LOCK(p1);
-		while (p1->p_singlethr > 0) {
-			error = msleep(&p1->p_singlethr, &p1->p_mtx,
-			    PWAIT | PCATCH, "rfork1t", 0);
-			if (error != 0) {
-				PROC_UNLOCK(p1);
-				return (ERESTART);
-			}
-			goto again;
-		}
 		if (thread_single(p1, SINGLE_BOUNDARY)) {
 			PROC_UNLOCK(p1);
 			return (ERESTART);
@@ -348,15 +338,16 @@ again:
 	}
 
 	error = vm_forkproc(td, NULL, NULL, NULL, flags);
-	if (error)
+	if (error != 0)
 		goto fail;
 
 	/*
 	 * Close all file descriptors.
 	 */
-	if (flags & RFCFDG) {
+	if ((flags & RFCFDG) != 0) {
 		struct filedesc *fdtmp;
 		struct pwddesc *pdtmp;
+
 		pdtmp = pdinit(td->td_proc->p_pd, false);
 		fdtmp = fdinit();
 		pdescfree(td);
@@ -368,7 +359,7 @@ again:
 	/*
 	 * Unshare file descriptors (from parent).
 	 */
-	if (flags & RFFDG) {
+	if ((flags & RFFDG) != 0) {
 		fdunshare(td);
 		pdunshare(td);
 	}
@@ -417,6 +408,7 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	sx_xlock(&allproc_lock);
 	LIST_INSERT_HEAD(&allproc, p2, p_list);
 	allproc_gen++;
+	prison_proc_link(p2->p_ucred->cr_prison, p2);
 	sx_xunlock(&allproc_lock);
 
 	sx_xlock(PIDHASHLOCK(p2->p_pid));
@@ -461,10 +453,7 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 			 * Shared file descriptor table, and shared
 			 * process leaders.
 			 */
-			fdtol = p1->p_fdtol;
-			FILEDESC_XLOCK(p1->p_fd);
-			fdtol->fdl_refcount++;
-			FILEDESC_XUNLOCK(p1->p_fd);
+			fdtol = filedesc_to_leader_share(p1->p_fdtol, p1->p_fd);
 		} else {
 			/*
 			 * Shared file descriptor table, and different
@@ -510,7 +499,7 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	 * to avoid calling thread_lock() again.
 	 */
 	if ((fr->fr_flags & RFPPWAIT) != 0)
-		td->td_flags |= TDF_ASTPENDING;
+		ast_sched_locked(td, TDA_VFORK);
 	thread_unlock(td);
 
 	/*
@@ -825,8 +814,8 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	}
 }
 
-void
-fork_rfppwait(struct thread *td)
+static void
+ast_vfork(struct thread *td, int tda __unused)
 {
 	struct proc *p, *p2;
 
@@ -1103,11 +1092,12 @@ fork_exit(void (*callout)(void *, struct trapframe *), void *arg,
 	    td, td_get_sched(td), p->p_pid, td->td_name);
 
 	sched_fork_exit(td);
+
 	/*
-	* Processes normally resume in mi_switch() after being
-	* cpu_switch()'ed to, but when children start up they arrive here
-	* instead, so we must do much the same things as mi_switch() would.
-	*/
+	 * Processes normally resume in mi_switch() after being
+	 * cpu_switch()'ed to, but when children start up they arrive here
+	 * instead, so we must do much the same things as mi_switch() would.
+	 */
 	if ((dtd = PCPU_GET(deadthread))) {
 		PCPU_SET(deadthread, NULL);
 		thread_stash(dtd);
@@ -1192,6 +1182,14 @@ fork_return(struct thread *td, struct trapframe *frame)
 		ktrsysret(SYS_fork, 0, 0);
 #endif
 }
+
+static void
+fork_init(void *arg __unused)
+{
+	ast_register(TDA_VFORK, ASTR_ASTF_REQUIRED | ASTR_TDP, TDP_RFPPWAIT,
+	    ast_vfork);
+}
+SYSINIT(fork, SI_SUB_INTRINSIC, SI_ORDER_ANY, fork_init, NULL);
 // CHERI CHANGES START
 // {
 //   "updated": 20190812,
