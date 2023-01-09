@@ -50,5 +50,6 @@ struct komeda_pipeline {
 int
 komeda_pipeline_create_pipeline(struct komeda_drm_softc *sc, phandle_t node,
     struct komeda_pipeline *pipeline);
+int komeda_pipeline_set_mode(struct komeda_drm_softc *sc, int mode);
 
 #endif /* !_DEV_DRM_KOMEDA_KOMEDA_PIPELINE_H_ */

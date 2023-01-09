@@ -78,6 +78,9 @@ __FBSDID("$FreeBSD$");
 #define	 CTRL_INTR_EN_GLO_MASK		0x04
 #define	TDA_INT_FLAGS_2		MKREG(0x00, 0x11)
 #define		INT_FLAGS_2_EDID_BLK_RD	(1 << 1)
+#define	TDA_ENA_VP_0		MKREG(0x00, 0x18)
+#define	TDA_ENA_VP_1		MKREG(0x00, 0x19)
+#define	TDA_ENA_VP_2		MKREG(0x00, 0x1a)
 
 #define	TDA_VIP_CNTRL_0		MKREG(0x00, 0x20)
 #define	TDA_VIP_CNTRL_1		MKREG(0x00, 0x21)
@@ -879,7 +882,14 @@ tda19988_bridge_mode_set(struct drm_bridge *bridge,
 static void
 tda19988_bridge_disable(struct drm_bridge *bridge)
 {
+	struct tda19988_softc *sc;
 
+	sc = container_of(bridge, struct tda19988_softc, bridge);
+
+	/* Disable Video Ports */
+	tda19988_reg_write(sc, TDA_ENA_VP_0, 0);
+	tda19988_reg_write(sc, TDA_ENA_VP_1, 0);
+	tda19988_reg_write(sc, TDA_ENA_VP_2, 0);
 }
 
 static void
@@ -908,6 +918,11 @@ tda19988_bridge_enable(struct drm_bridge *bridge)
 	    sc->mode.vsync_end);
 
 	tda19988_init_encoder(sc);
+
+	/* Enable Video Ports */
+	tda19988_reg_write(sc, TDA_ENA_VP_0, 0xff);
+	tda19988_reg_write(sc, TDA_ENA_VP_1, 0xff);
+	tda19988_reg_write(sc, TDA_ENA_VP_2, 0xff);
 }
 
 static const struct drm_bridge_funcs tda19988_bridge_funcs = {

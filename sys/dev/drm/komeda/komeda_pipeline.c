@@ -78,6 +78,27 @@ __FBSDID("$FreeBSD$");
 
 #define	dprintf(fmt, ...)
 
+int
+komeda_pipeline_set_mode(struct komeda_drm_softc *sc, int mode)
+{
+	int timeout;
+	uint32_t reg;
+
+	timeout = 10000;
+
+	DPU_WR4(sc, GCU_CONTROL, mode);
+	do {
+		reg = DPU_RD4(sc, GCU_CONTROL);
+		if ((reg & CONTROL_MODE_M) == mode)
+			break;
+	} while (timeout--);
+
+	if (timeout <= 0)
+		return (-1);
+
+	return (0);
+}
+
 /*
  * VBLANK functions
  */
@@ -220,6 +241,7 @@ komeda_crtc_atomic_enable(struct drm_crtc *crtc,
 	sc = pipeline->sc;
 
 	dprintf("%s\n", __func__);
+	clk_enable(pipeline->pxclk);
 
 	dou_configure(sc, adj);
 	dou_ds_timing_setup(sc, adj);
@@ -232,9 +254,14 @@ static void
 komeda_crtc_atomic_disable(struct drm_crtc *crtc,
     struct drm_crtc_state *old_state)
 {
+	struct komeda_drm_softc *sc;
+	struct komeda_pipeline *pipeline;
 	uint32_t irqflags;
 
 	dprintf("%s\n", __func__);
+
+	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
+	sc = pipeline->sc;
 
 	/* Disable VBLANK events */
 	drm_crtc_vblank_off(crtc);
@@ -247,6 +274,12 @@ komeda_crtc_atomic_disable(struct drm_crtc *crtc,
 	}
 
 	spin_unlock_irqrestore(&crtc->dev->event_lock, irqflags);
+
+	komeda_pipeline_set_mode(sc, CONTROL_MODE_INACTIVE);
+
+	dou_ds_control(sc, false);
+
+	clk_disable(pipeline->pxclk);
 }
 
 static void

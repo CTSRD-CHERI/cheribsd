@@ -183,6 +183,19 @@ komeda_plane_atomic_disable(struct drm_plane *plane,
 }
 
 void
+dou_ds_control(struct komeda_drm_softc *sc, bool enable)
+{
+	int reg;
+
+	if (enable)
+		reg = BS_CONTROL_EN | BS_CONTROL_VM;
+	else
+		reg = 0;
+
+	DPU_WR4(sc, BS_CONTROL, reg);
+}
+
+void
 dou_ds_timing_setup(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 {
 	uint32_t hactive, hfront_porch, hback_porch, hsync_len;
@@ -220,8 +233,7 @@ dou_ds_timing_setup(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 	DPU_WR4(sc, BS_PROG_LINE, D71_DEFAULT_PREPRETCH_LINE - 1);
 	DPU_WR4(sc, BS_PREFETCH_LINE, D71_DEFAULT_PREPRETCH_LINE);
 
-	reg = BS_CONTROL_EN | BS_CONTROL_VM;
-	DPU_WR4(sc, BS_CONTROL, reg);
+	dou_ds_control(sc, true);
 }
 
 void
@@ -288,19 +300,8 @@ lpu_intr(struct komeda_drm_softc *sc)
 static int
 gcu_configure(struct komeda_drm_softc *sc)
 {
-	uint32_t reg;
-	int timeout;
 
-	timeout = 10000;
-
-	DPU_WR4(sc, GCU_CONTROL, CONTROL_MODE_DO0_ACTIVE);
-	do {
-		reg = DPU_RD4(sc, GCU_CONTROL);
-		if ((reg & CONTROL_MODE_M) == CONTROL_MODE_DO0_ACTIVE)
-			break;
-	} while (timeout--);
-
-	if (timeout <= 0) {
+	if (komeda_pipeline_set_mode(sc, CONTROL_MODE_DO0_ACTIVE) != 0) {
 		printf("%s: Failed to set DO0 active\n", __func__);
 		return (-1);
 	}
