@@ -271,7 +271,6 @@ struct tda19988_softc {
 	struct drm_encoder	encoder;
 	struct drm_connector	connector __subobject_use_container_bounds;
 	struct drm_bridge	bridge __subobject_use_container_bounds;
-	struct drm_display_mode	mode;
 };
 
 static int
@@ -444,152 +443,6 @@ tda19988_probe(device_t dev)
 		return (ENXIO);
 
 	return (BUS_PROBE_DEFAULT);
-}
-
-static void
-tda19988_init_encoder(struct tda19988_softc *sc)
-{
-	const struct drm_display_mode *mode;
-	uint16_t ref_pix, ref_line, n_pix, n_line;
-	uint16_t hs_pix_start, hs_pix_stop;
-	uint16_t vs1_pix_start, vs1_pix_stop;
-	uint16_t vs1_line_start, vs1_line_end;
-	uint16_t vs2_pix_start, vs2_pix_stop;
-	uint16_t vs2_line_start, vs2_line_end;
-	uint16_t vwin1_line_start, vwin1_line_end;
-	uint16_t vwin2_line_start, vwin2_line_end;
-	uint16_t de_start, de_stop;
-	uint8_t reg, div;
-
-	mode = &sc->mode;
-
-	n_pix = mode->htotal;
-	n_line = mode->vtotal;
-
-	hs_pix_stop = mode->hsync_end - mode->hdisplay;
-	hs_pix_start = mode->hsync_start - mode->hdisplay;
-
-	de_stop = mode->htotal;
-	de_start = mode->htotal - mode->hdisplay;
-	ref_pix = hs_pix_start + 3;
-
-	if (mode->flags & DRM_MODE_FLAG_HSKEW)
-		ref_pix += mode->hskew;
-
-	if ((mode->flags & DRM_MODE_FLAG_INTERLACE) == 0) {
-		ref_line = 1 + mode->vsync_start - mode->vdisplay;
-		vwin1_line_start = mode->vtotal - mode->vdisplay - 1;
-		vwin1_line_end = vwin1_line_start + mode->vdisplay;
-
-		vs1_pix_start = vs1_pix_stop = hs_pix_start;
-		vs1_line_start = mode->vsync_start - mode->vdisplay;
-		vs1_line_end = vs1_line_start + mode->vsync_end - mode->vsync_start;
-
-		vwin2_line_start = vwin2_line_end = 0;
-		vs2_pix_start = vs2_pix_stop = 0;
-		vs2_line_start = vs2_line_end = 0;
-	} else {
-		ref_line = 1 + (mode->vsync_start - mode->vdisplay)/2;
-		vwin1_line_start = (mode->vtotal - mode->vdisplay)/2;
-		vwin1_line_end = vwin1_line_start + mode->vdisplay/2;
-
-		vs1_pix_start = vs1_pix_stop = hs_pix_start;
-		vs1_line_start = (mode->vsync_start - mode->vdisplay)/2;
-		vs1_line_end = vs1_line_start + (mode->vsync_end - mode->vsync_start)/2;
-
-		vwin2_line_start = vwin1_line_start + mode->vtotal/2;
-		vwin2_line_end = vwin2_line_start + mode->vdisplay/2;
-
-		vs2_pix_start = vs2_pix_stop = hs_pix_start + mode->htotal/2;
-		vs2_line_start = vs1_line_start + mode->vtotal/2 ;
-		vs2_line_end = vs2_line_start + (mode->vsync_end - mode->vsync_start)/2;
-	}
-
-	div = 148500 / mode->crtc_clock;
-	if (div != 0) {
-		div--;
-		if (div > 3)
-			div = 3;
-	}
-
-	/* set HDMI HDCP mode off */
-	tda19988_reg_set(sc, TDA_TBG_CNTRL_1, TBG_CNTRL_1_DWIN_DIS);
-	tda19988_reg_clear(sc, TDA_HDCP_TX33, HDCP_TX33_HDMI);
-	tda19988_reg_write(sc, TDA_ENC_CNTRL, ENC_CNTRL_DVI_MODE);
-
-	/* no pre-filter or interpolator */
-	tda19988_reg_write(sc, TDA_HVF_CNTRL_0,
-	    HVF_CNTRL_0_INTPOL_BYPASS | HVF_CNTRL_0_PREFIL_NONE);
-	tda19988_reg_write(sc, TDA_VIP_CNTRL_5, VIP_CNTRL_5_SP_CNT(0));
-	tda19988_reg_write(sc, TDA_VIP_CNTRL_4,
-	    VIP_CNTRL_4_BLANKIT_NDE | VIP_CNTRL_4_BLC_NONE);
-
-	tda19988_reg_clear(sc, TDA_PLL_SERIAL_3, PLL_SERIAL_3_SRL_CCIR);
-	tda19988_reg_clear(sc, TDA_PLL_SERIAL_1, PLL_SERIAL_1_SRL_MAN_IP);
-	tda19988_reg_clear(sc, TDA_PLL_SERIAL_3, PLL_SERIAL_3_SRL_DE);
-	tda19988_reg_write(sc, TDA_SERIALIZER, 0);
-	tda19988_reg_write(sc, TDA_HVF_CNTRL_1, HVF_CNTRL_1_VQR_FULL);
-
-	tda19988_reg_write(sc, TDA_RPT_CNTRL, 0);
-	tda19988_reg_write(sc, TDA_SEL_CLK, SEL_CLK_SEL_VRF_CLK(0) |
-			SEL_CLK_SEL_CLK1 | SEL_CLK_ENA_SC_CLK);
-
-	tda19988_reg_write(sc, TDA_PLL_SERIAL_2, PLL_SERIAL_2_SRL_NOSC(div) |
-			PLL_SERIAL_2_SRL_PR(0));
-
-	tda19988_reg_set(sc, TDA_MAT_CONTRL, MAT_CONTRL_MAT_BP);
-
-	tda19988_reg_write(sc, TDA_ANA_GENERAL, 0x09);
-
-	tda19988_reg_clear(sc, TDA_TBG_CNTRL_0, TBG_CNTRL_0_SYNC_MTHD);
-
-	/*
-	 * Sync on rising HSYNC/VSYNC
-	 */
-	reg = VIP_CNTRL_3_SYNC_HS;
-	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
-		reg |= VIP_CNTRL_3_H_TGL;
-	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
-		reg |= VIP_CNTRL_3_V_TGL;
-	tda19988_reg_write(sc, TDA_VIP_CNTRL_3, reg);
-
-	reg = TBG_CNTRL_1_TGL_EN;
-	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
-		reg |= TBG_CNTRL_1_H_TGL;
-	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
-		reg |= TBG_CNTRL_1_V_TGL;
-	tda19988_reg_write(sc, TDA_TBG_CNTRL_1, reg);
-
-	/* Program timing */
-	tda19988_reg_write(sc, TDA_VIDFORMAT, 0x00);
-
-	tda19988_reg_write2(sc, TDA_REFPIX_MSB, ref_pix);
-	tda19988_reg_write2(sc, TDA_REFLINE_MSB, ref_line);
-	tda19988_reg_write2(sc, TDA_NPIX_MSB, n_pix);
-	tda19988_reg_write2(sc, TDA_NLINE_MSB, n_line);
-
-	tda19988_reg_write2(sc, TDA_VS_LINE_STRT_1_MSB, vs1_line_start);
-	tda19988_reg_write2(sc, TDA_VS_PIX_STRT_1_MSB, vs1_pix_start);
-	tda19988_reg_write2(sc, TDA_VS_LINE_END_1_MSB, vs1_line_end);
-	tda19988_reg_write2(sc, TDA_VS_PIX_END_1_MSB, vs1_pix_stop);
-	tda19988_reg_write2(sc, TDA_VS_LINE_STRT_2_MSB, vs2_line_start);
-	tda19988_reg_write2(sc, TDA_VS_PIX_STRT_2_MSB, vs2_pix_start);
-	tda19988_reg_write2(sc, TDA_VS_LINE_END_2_MSB, vs2_line_end);
-	tda19988_reg_write2(sc, TDA_VS_PIX_END_2_MSB, vs2_pix_stop);
-	tda19988_reg_write2(sc, TDA_HS_PIX_START_MSB, hs_pix_start);
-	tda19988_reg_write2(sc, TDA_HS_PIX_STOP_MSB, hs_pix_stop);
-	tda19988_reg_write2(sc, TDA_VWIN_START_1_MSB, vwin1_line_start);
-	tda19988_reg_write2(sc, TDA_VWIN_END_1_MSB, vwin1_line_end);
-	tda19988_reg_write2(sc, TDA_VWIN_START_2_MSB, vwin2_line_start);
-	tda19988_reg_write2(sc, TDA_VWIN_END_2_MSB, vwin2_line_end);
-	tda19988_reg_write2(sc, TDA_DE_START_MSB, de_start);
-	tda19988_reg_write2(sc, TDA_DE_STOP_MSB, de_stop);
-
-	if (sc->sc_version == TDA19988)
-		tda19988_reg_write(sc, TDA_ENABLE_SPACE, 0x00);
-
-	/* must be last register set */
-	tda19988_reg_clear(sc, TDA_TBG_CNTRL_0, TBG_CNTRL_0_SYNC_ONCE);
 }
 
 static int
@@ -872,11 +725,166 @@ tda19988_bridge_mode_set(struct drm_bridge *bridge,
     const struct drm_display_mode *orig_mode,
     const struct drm_display_mode *mode)
 {
+	uint16_t ref_pix, ref_line, n_pix, n_line;
+	uint16_t hs_pix_start, hs_pix_stop;
+	uint16_t vs1_pix_start, vs1_pix_stop;
+	uint16_t vs1_line_start, vs1_line_end;
+	uint16_t vs2_pix_start, vs2_pix_stop;
+	uint16_t vs2_line_start, vs2_line_end;
+	uint16_t vwin1_line_start, vwin1_line_end;
+	uint16_t vwin2_line_start, vwin2_line_end;
+	uint16_t de_start, de_stop;
+	uint8_t reg, div;
 	struct tda19988_softc *sc;
 
 	sc = container_of(bridge, struct tda19988_softc, bridge);
 
-	memcpy(&sc->mode, mode, sizeof(struct drm_display_mode));
+	if (bootverbose)
+		device_printf(sc->dev, "Mode information:\n"
+		    "hdisplay: %d\n"
+		    "vdisplay: %d\n"
+		    "htotal: %d\n"
+		    "vtotal: %d\n"
+		    "hsync_start: %d\n"
+		    "hsync_end: %d\n"
+		    "vsync_start: %d\n"
+		    "vsync_end: %d\n",
+		    mode->hdisplay,
+		    mode->vdisplay,
+		    mode->htotal,
+		    mode->vtotal,
+		    mode->hsync_start,
+		    mode->hsync_end,
+		    mode->vsync_start,
+		    mode->vsync_end);
+
+	n_pix = mode->htotal;
+	n_line = mode->vtotal;
+
+	hs_pix_stop = mode->hsync_end - mode->hdisplay;
+	hs_pix_start = mode->hsync_start - mode->hdisplay;
+
+	de_stop = mode->htotal;
+	de_start = mode->htotal - mode->hdisplay;
+	ref_pix = hs_pix_start + 3;
+
+	if (mode->flags & DRM_MODE_FLAG_HSKEW)
+		ref_pix += mode->hskew;
+
+	if ((mode->flags & DRM_MODE_FLAG_INTERLACE) == 0) {
+		ref_line = 1 + mode->vsync_start - mode->vdisplay;
+		vwin1_line_start = mode->vtotal - mode->vdisplay - 1;
+		vwin1_line_end = vwin1_line_start + mode->vdisplay;
+
+		vs1_pix_start = vs1_pix_stop = hs_pix_start;
+		vs1_line_start = mode->vsync_start - mode->vdisplay;
+		vs1_line_end = vs1_line_start + mode->vsync_end - mode->vsync_start;
+
+		vwin2_line_start = vwin2_line_end = 0;
+		vs2_pix_start = vs2_pix_stop = 0;
+		vs2_line_start = vs2_line_end = 0;
+	} else {
+		ref_line = 1 + (mode->vsync_start - mode->vdisplay)/2;
+		vwin1_line_start = (mode->vtotal - mode->vdisplay)/2;
+		vwin1_line_end = vwin1_line_start + mode->vdisplay/2;
+
+		vs1_pix_start = vs1_pix_stop = hs_pix_start;
+		vs1_line_start = (mode->vsync_start - mode->vdisplay)/2;
+		vs1_line_end = vs1_line_start + (mode->vsync_end - mode->vsync_start)/2;
+
+		vwin2_line_start = vwin1_line_start + mode->vtotal/2;
+		vwin2_line_end = vwin2_line_start + mode->vdisplay/2;
+
+		vs2_pix_start = vs2_pix_stop = hs_pix_start + mode->htotal/2;
+		vs2_line_start = vs1_line_start + mode->vtotal/2 ;
+		vs2_line_end = vs2_line_start + (mode->vsync_end - mode->vsync_start)/2;
+	}
+
+	div = 148500 / mode->crtc_clock;
+	if (div != 0) {
+		div--;
+		if (div > 3)
+			div = 3;
+	}
+
+	/* set HDMI HDCP mode off */
+	tda19988_reg_set(sc, TDA_TBG_CNTRL_1, TBG_CNTRL_1_DWIN_DIS);
+	tda19988_reg_clear(sc, TDA_HDCP_TX33, HDCP_TX33_HDMI);
+	tda19988_reg_write(sc, TDA_ENC_CNTRL, ENC_CNTRL_DVI_MODE);
+
+	/* no pre-filter or interpolator */
+	tda19988_reg_write(sc, TDA_HVF_CNTRL_0,
+	    HVF_CNTRL_0_INTPOL_BYPASS | HVF_CNTRL_0_PREFIL_NONE);
+	tda19988_reg_write(sc, TDA_VIP_CNTRL_5, VIP_CNTRL_5_SP_CNT(0));
+	tda19988_reg_write(sc, TDA_VIP_CNTRL_4,
+	    VIP_CNTRL_4_BLANKIT_NDE | VIP_CNTRL_4_BLC_NONE);
+
+	tda19988_reg_clear(sc, TDA_PLL_SERIAL_3, PLL_SERIAL_3_SRL_CCIR);
+	tda19988_reg_clear(sc, TDA_PLL_SERIAL_1, PLL_SERIAL_1_SRL_MAN_IP);
+	tda19988_reg_clear(sc, TDA_PLL_SERIAL_3, PLL_SERIAL_3_SRL_DE);
+	tda19988_reg_write(sc, TDA_SERIALIZER, 0);
+	tda19988_reg_write(sc, TDA_HVF_CNTRL_1, HVF_CNTRL_1_VQR_FULL);
+
+	tda19988_reg_write(sc, TDA_RPT_CNTRL, 0);
+	tda19988_reg_write(sc, TDA_SEL_CLK, SEL_CLK_SEL_VRF_CLK(0) |
+			SEL_CLK_SEL_CLK1 | SEL_CLK_ENA_SC_CLK);
+
+	tda19988_reg_write(sc, TDA_PLL_SERIAL_2, PLL_SERIAL_2_SRL_NOSC(div) |
+			PLL_SERIAL_2_SRL_PR(0));
+
+	tda19988_reg_set(sc, TDA_MAT_CONTRL, MAT_CONTRL_MAT_BP);
+
+	tda19988_reg_write(sc, TDA_ANA_GENERAL, 0x09);
+
+	tda19988_reg_clear(sc, TDA_TBG_CNTRL_0, TBG_CNTRL_0_SYNC_MTHD);
+
+	/*
+	 * Sync on rising HSYNC/VSYNC
+	 */
+	reg = VIP_CNTRL_3_SYNC_HS;
+	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
+		reg |= VIP_CNTRL_3_H_TGL;
+	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
+		reg |= VIP_CNTRL_3_V_TGL;
+	tda19988_reg_write(sc, TDA_VIP_CNTRL_3, reg);
+
+	reg = TBG_CNTRL_1_TGL_EN;
+	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
+		reg |= TBG_CNTRL_1_H_TGL;
+	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
+		reg |= TBG_CNTRL_1_V_TGL;
+	tda19988_reg_write(sc, TDA_TBG_CNTRL_1, reg);
+
+	/* Program timing */
+	tda19988_reg_write(sc, TDA_VIDFORMAT, 0x00);
+
+	tda19988_reg_write2(sc, TDA_REFPIX_MSB, ref_pix);
+	tda19988_reg_write2(sc, TDA_REFLINE_MSB, ref_line);
+	tda19988_reg_write2(sc, TDA_NPIX_MSB, n_pix);
+	tda19988_reg_write2(sc, TDA_NLINE_MSB, n_line);
+
+	tda19988_reg_write2(sc, TDA_VS_LINE_STRT_1_MSB, vs1_line_start);
+	tda19988_reg_write2(sc, TDA_VS_PIX_STRT_1_MSB, vs1_pix_start);
+	tda19988_reg_write2(sc, TDA_VS_LINE_END_1_MSB, vs1_line_end);
+	tda19988_reg_write2(sc, TDA_VS_PIX_END_1_MSB, vs1_pix_stop);
+	tda19988_reg_write2(sc, TDA_VS_LINE_STRT_2_MSB, vs2_line_start);
+	tda19988_reg_write2(sc, TDA_VS_PIX_STRT_2_MSB, vs2_pix_start);
+	tda19988_reg_write2(sc, TDA_VS_LINE_END_2_MSB, vs2_line_end);
+	tda19988_reg_write2(sc, TDA_VS_PIX_END_2_MSB, vs2_pix_stop);
+	tda19988_reg_write2(sc, TDA_HS_PIX_START_MSB, hs_pix_start);
+	tda19988_reg_write2(sc, TDA_HS_PIX_STOP_MSB, hs_pix_stop);
+	tda19988_reg_write2(sc, TDA_VWIN_START_1_MSB, vwin1_line_start);
+	tda19988_reg_write2(sc, TDA_VWIN_END_1_MSB, vwin1_line_end);
+	tda19988_reg_write2(sc, TDA_VWIN_START_2_MSB, vwin2_line_start);
+	tda19988_reg_write2(sc, TDA_VWIN_END_2_MSB, vwin2_line_end);
+	tda19988_reg_write2(sc, TDA_DE_START_MSB, de_start);
+	tda19988_reg_write2(sc, TDA_DE_STOP_MSB, de_stop);
+
+	if (sc->sc_version == TDA19988)
+		tda19988_reg_write(sc, TDA_ENABLE_SPACE, 0x00);
+
+	/* must be last register set */
+	tda19988_reg_clear(sc, TDA_TBG_CNTRL_0, TBG_CNTRL_0_SYNC_ONCE);
 }
 
 static void
@@ -898,26 +906,6 @@ tda19988_bridge_enable(struct drm_bridge *bridge)
 	struct tda19988_softc *sc;
 
 	sc = container_of(bridge, struct tda19988_softc, bridge);
-
-	dprintf(sc->dev, "Mode information:\n"
-	    "hdisplay: %d\n"
-	    "vdisplay: %d\n"
-	    "htotal: %d\n"
-	    "vtotal: %d\n"
-	    "hsync_start: %d\n"
-	    "hsync_end: %d\n"
-	    "vsync_start: %d\n"
-	    "vsync_end: %d\n",
-	    sc->mode.hdisplay,
-	    sc->mode.vdisplay,
-	    sc->mode.htotal,
-	    sc->mode.vtotal,
-	    sc->mode.hsync_start,
-	    sc->mode.hsync_end,
-	    sc->mode.vsync_start,
-	    sc->mode.vsync_end);
-
-	tda19988_init_encoder(sc);
 
 	/* Enable Video Ports */
 	tda19988_reg_write(sc, TDA_ENA_VP_0, 0xff);
