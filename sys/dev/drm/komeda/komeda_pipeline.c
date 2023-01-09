@@ -244,7 +244,8 @@ komeda_crtc_atomic_enable(struct drm_crtc *crtc,
 	clk_enable(pipeline->pxclk);
 
 	dou_configure(sc, adj);
-	dou_ds_timing_setup(sc, adj);
+	dou_bs_timing_setup(sc, adj);
+	dou_bs_control(sc, true);
 
 	/* Enable VBLANK events */
 	drm_crtc_vblank_on(crtc);
@@ -277,7 +278,7 @@ komeda_crtc_atomic_disable(struct drm_crtc *crtc,
 
 	komeda_pipeline_set_mode(sc, CONTROL_MODE_INACTIVE);
 
-	dou_ds_control(sc, false);
+	dou_bs_control(sc, false);
 
 	clk_disable(pipeline->pxclk);
 }

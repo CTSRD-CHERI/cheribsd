@@ -183,7 +183,7 @@ komeda_plane_atomic_disable(struct drm_plane *plane,
 }
 
 void
-dou_ds_control(struct komeda_drm_softc *sc, bool enable)
+dou_bs_control(struct komeda_drm_softc *sc, bool enable)
 {
 	int reg;
 
@@ -196,7 +196,7 @@ dou_ds_control(struct komeda_drm_softc *sc, bool enable)
 }
 
 void
-dou_ds_timing_setup(struct komeda_drm_softc *sc, struct drm_display_mode *m)
+dou_bs_timing_setup(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 {
 	uint32_t hactive, hfront_porch, hback_porch, hsync_len;
 	uint32_t vactive, vfront_porch, vback_porch, vsync_len;
@@ -232,8 +232,6 @@ dou_ds_timing_setup(struct komeda_drm_softc *sc, struct drm_display_mode *m)
 
 	DPU_WR4(sc, BS_PROG_LINE, D71_DEFAULT_PREPRETCH_LINE - 1);
 	DPU_WR4(sc, BS_PREFETCH_LINE, D71_DEFAULT_PREPRETCH_LINE);
-
-	dou_ds_control(sc, true);
 }
 
 void

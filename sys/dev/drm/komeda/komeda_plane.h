@@ -50,8 +50,8 @@ void dou_intr(struct komeda_drm_softc *sc);
 void lpu_intr(struct komeda_drm_softc *sc);
 void cu_intr(struct komeda_drm_softc *sc);
 void dou_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m);
-void dou_ds_timing_setup(struct komeda_drm_softc *sc, struct drm_display_mode *m);
-void dou_ds_control(struct komeda_drm_softc *sc, bool enable);
+void dou_bs_timing_setup(struct komeda_drm_softc *sc, struct drm_display_mode *m);
+void dou_bs_control(struct komeda_drm_softc *sc, bool enable);
 
 void cu_configure(struct komeda_drm_softc *sc, struct drm_display_mode *m,
     struct drm_plane_state *state, int id);
