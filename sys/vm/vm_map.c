@@ -195,6 +195,12 @@ static int vm_map_clip_start(vm_map_t map, vm_map_entry_t entry,
 		}
 
 #ifdef CHERI_CAPREVOKE
+SYSCTL_DECL(_vm_cheri_revoke);
+static bool quarantine_unmapped_reservations = true;
+SYSCTL_BOOL(_vm_cheri_revoke, OID_AUTO, quarantine_unmapped_reservations,
+    CTLFLAG_RDTUN, &quarantine_unmapped_reservations, true,
+    "Quarantine and revoke fully unmapped reservations");
+
 /*
  * Sort by size and then reservation.
  */
@@ -3670,11 +3676,13 @@ vm_map_inherit(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			goto unlock;
 	}
 #ifdef CHERI_CAPREVOKE
-	for (entry = start_entry; entry->start < end;
-	    prev_entry = entry, entry = vm_map_entry_succ(entry)) {
-		if (entry->inheritance == VM_INHERIT_QUARANTINE) {
-			rv = KERN_PROTECTION_FAILURE;
-			goto unlock;
+	if (quarantine_unmapped_reservations) {
+		for (entry = start_entry; entry->start < end;
+		    prev_entry = entry, entry = vm_map_entry_succ(entry)) {
+			if (entry->inheritance == VM_INHERIT_QUARANTINE) {
+				rv = KERN_PROTECTION_FAILURE;
+				goto unlock;
+			}
 		}
 	}
 #endif
@@ -4710,7 +4718,8 @@ vm_map_remove_locked(vm_map_t map, vm_offset_t start, vm_offset_t end)
 	result = vm_map_delete(map, start, end, true);
 	if (vm_map_reservation_is_unmapped(map, reservation)) {
 #ifdef CHERI_CAPREVOKE
-		if (start < VM_MAXUSER_ADDRESS) {
+		if (quarantine_unmapped_reservations &&
+		    start < VM_MAXUSER_ADDRESS) {
 			/*
 			 * If we're here, [start, end) was the last mapped
 			 * range in reservation and it has transitioned to
