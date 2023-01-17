@@ -345,7 +345,7 @@ init_proc0(vm_pointer_t kstack)
 
 	proc_linkup0(&proc0, &thread0);
 	thread0.td_kstack = kstack;
-	thread0.td_kstack_pages = KSTACK_PAGES;
+	thread0.td_kstack_pages = kstack_pages;
 	thread0.td_pcb = (struct pcb *)(thread0.td_kstack +
 	    thread0.td_kstack_pages * PAGE_SIZE) - 1;
 	thread0.td_pcb->pcb_fpflags = 0;
