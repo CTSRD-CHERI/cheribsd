@@ -989,10 +989,11 @@ sglist_slice(struct sglist *original, struct sglist **slice, size_t offset,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros"
+//     "iovec-macros",
+//     "virtual_address"
 //   ]
 // }
 // CHERI CHANGES END

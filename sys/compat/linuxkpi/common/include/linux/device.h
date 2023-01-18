@@ -4,6 +4,10 @@
  * Copyright (c) 2010 Panasas, Inc.
  * Copyright (c) 2013-2016 Mellanox Technologies, Ltd.
  * All rights reserved.
+ * Copyright (c) 2021-2022 The FreeBSD Foundation
+ *
+ * Portions of this software were developed by Björn Zeeb
+ * under sponsorship from the FreeBSD Foundation.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,7 +41,6 @@
 #include <linux/sysfs.h>
 #include <linux/list.h>
 #include <linux/compiler.h>
-#include <linux/types.h>
 #include <linux/module.h>
 #include <linux/workqueue.h>
 #include <linux/kdev_t.h>
@@ -124,6 +127,8 @@ struct device {
 
 	spinlock_t	devres_lock;
 	struct list_head devres_head;
+
+	struct dev_pm_info	power;
 };
 
 extern struct device linux_root_device;
@@ -192,6 +197,14 @@ show_class_attr_string(struct class *class,
 #define	dev_dbg(dev, fmt, ...)	do { } while (0)
 #define	dev_printk(lvl, dev, fmt, ...)					\
 	    device_printf((dev)->bsddev, fmt, ##__VA_ARGS__)
+
+#define dev_info_once(dev, ...) do {		\
+	static bool __dev_info_once;		\
+	if (!__dev_info_once) {			\
+	__dev_info_once = true;			\
+	dev_info(dev, __VA_ARGS__);		\
+	}					\
+} while (0)
 
 #define	dev_err_once(dev, ...) do {		\
 	static bool __dev_err_once;		\
@@ -591,6 +604,21 @@ devm_kmalloc(struct device *dev, size_t size, gfp_t gfp)
 		lkpi_devres_add(dev, p);
 
 	return (p);
+}
+
+static inline void *
+devm_kmemdup(struct device *dev, const void *src, size_t len, gfp_t gfp)
+{
+	void *dst;
+
+	if (len == 0)
+		return (NULL);
+
+	dst = devm_kmalloc(dev, len, gfp);
+	if (dst != NULL)
+		memcpy(dst, src, len);
+
+	return (dst);
 }
 
 #define	devm_kzalloc(_dev, _size, _gfp)				\

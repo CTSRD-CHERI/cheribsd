@@ -60,9 +60,9 @@ struct pcb {
 
 	struct vfpstate	*pcb_fpusaved;
 	int		pcb_fpflags;
-#define	PCB_FP_STARTED	0x01
-#define	PCB_FP_KERN	0x02
-#define	PCB_FP_NOSAVE	0x04
+#define	PCB_FP_STARTED	0x00000001
+#define	PCB_FP_KERN	0x40000000
+#define	PCB_FP_NOSAVE	0x80000000
 /* The bits passed to userspace in get_fpcontext */
 #define	PCB_FP_USERMASK	(PCB_FP_STARTED)
 	u_int		pcb_vfpcpu;	/* Last cpu this thread ran VFP code */
@@ -87,10 +87,11 @@ int	savectx(struct pcb *pcb) __returns_twice;
 #endif /* !_MACHINE_PCB_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20210407,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "support"
+//     "support",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

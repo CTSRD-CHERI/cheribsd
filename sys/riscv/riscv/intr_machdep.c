@@ -275,7 +275,7 @@ SYSINIT(intc_init, SI_SUB_INTR, SI_ORDER_MIDDLE, intc_init, NULL);
 
 // CHERI CHANGES START
 // {
-//   "updated": 20200804,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "subobject_bounds"

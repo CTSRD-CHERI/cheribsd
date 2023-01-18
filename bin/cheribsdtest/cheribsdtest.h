@@ -159,6 +159,15 @@ extern struct cheribsdtest_child_state *ccsp;
 #define	XFAIL_VARARG_BOUNDS	NULL
 #endif
 
+#ifndef XFAIL_C18N_SIGALTSTACK
+#ifdef CHERIBSD_C18N_TESTS
+#define	XFAIL_C18N_SIGALTSTACK \
+    "sigaltstack is currently unsupported by library-based compartmentalisation"
+#else
+#define	XFAIL_C18N_SIGALTSTACK	NULL
+#endif
+#endif
+
 struct cheri_test {
 	const char	*ct_name;
 	const char	*ct_desc;
@@ -321,6 +330,8 @@ _cheribsdtest_check_errno(const char *context, int actual, int expected)
 /* For libc_memcpy and libc_memset tests and the unaligned copy tests: */
 extern void *cheribsdtest_memcpy(void *dst, const void *src, size_t n);
 extern void *cheribsdtest_memmove(void *dst, const void *src, size_t n);
+
+extern ptraddr_t find_address_space_gap(size_t len, size_t align);
 
 /*
  * (co)exec a new copy of cheribsdtest and run the test's associated child

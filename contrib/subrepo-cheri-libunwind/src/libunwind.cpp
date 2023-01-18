@@ -1,4 +1,4 @@
-//===--------------------------- libunwind.cpp ----------------------------===//
+//===----------------------------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -11,8 +11,8 @@
 
 #include <libunwind.h>
 
-#include "libunwind_ext.h"
 #include "config.h"
+#include "libunwind_ext.h"
 
 #include <stdlib.h>
 
@@ -70,7 +70,7 @@ _LIBUNWIND_HIDDEN int __unw_init_local(unw_cursor_t *cursor,
 # define REGISTER_KIND Registers_x86_64
 #elif defined(__powerpc64__)
 # define REGISTER_KIND Registers_ppc64
-#elif defined(__ppc__)
+#elif defined(__powerpc__)
 # define REGISTER_KIND Registers_ppc
 #elif defined(__aarch64__)
 # define REGISTER_KIND Registers_arm64
@@ -226,7 +226,7 @@ _LIBUNWIND_WEAK_ALIAS(__unw_resume, unw_resume)
 
 /// Get name of function at cursor position in stack frame.
 _LIBUNWIND_HIDDEN int __unw_get_proc_name(unw_cursor_t *cursor, char *buf,
-                                          size_t bufLen, size_t *offset) {
+                                          size_t bufLen, unw_word_t *offset) {
   _LIBUNWIND_TRACE_API("__unw_get_proc_name(cursor=%p, &buf=%p, bufLen=%lu)",
                        static_cast<void *>(cursor), static_cast<void *>(buf),
                        static_cast<unsigned long>(bufLen));
@@ -294,9 +294,8 @@ void __unw_add_dynamic_fde(unw_word_t fde) {
   CFI_Parser<LocalAddressSpace>::FDE_Info fdeInfo;
   CFI_Parser<LocalAddressSpace>::CIE_Info cieInfo;
   const char *message = CFI_Parser<LocalAddressSpace>::decodeFDE(
-      LocalAddressSpace::sThisAddressSpace,
-      LocalAddressSpace::pc_t{(uintptr_t) nullptr},
-      (LocalAddressSpace::pint_t)fde, &fdeInfo, &cieInfo);
+                           LocalAddressSpace::sThisAddressSpace,
+                          (LocalAddressSpace::pint_t) fde, &fdeInfo, &cieInfo);
   if (message == NULL) {
     // dynamically registered FDEs don't have a mach_header group they are in.
     // Use fde as mh_group
@@ -314,6 +313,35 @@ void __unw_remove_dynamic_fde(unw_word_t fde) {
   // fde is own mh_group
   DwarfFDECache<LocalAddressSpace>::removeAllIn((LocalAddressSpace::pint_t)fde);
 }
+
+void __unw_add_dynamic_eh_frame_section(unw_word_t eh_frame_start) {
+  // The eh_frame section start serves as the mh_group
+  unw_word_t mh_group = eh_frame_start;
+  CFI_Parser<LocalAddressSpace>::CIE_Info cieInfo;
+  CFI_Parser<LocalAddressSpace>::FDE_Info fdeInfo;
+  auto p = (LocalAddressSpace::pint_t)eh_frame_start;
+  while (true) {
+    if (CFI_Parser<LocalAddressSpace>::decodeFDE(
+            LocalAddressSpace::sThisAddressSpace, p, &fdeInfo, &cieInfo,
+            true) == NULL) {
+      DwarfFDECache<LocalAddressSpace>::add((LocalAddressSpace::pint_t)mh_group,
+                                            fdeInfo.pcStart, fdeInfo.pcEnd,
+                                            fdeInfo.fdeStart);
+      p += fdeInfo.fdeLength;
+    } else if (CFI_Parser<LocalAddressSpace>::parseCIE(
+                   LocalAddressSpace::sThisAddressSpace, p, &cieInfo) == NULL) {
+      p += cieInfo.cieLength;
+    } else
+      return;
+  }
+}
+
+void __unw_remove_dynamic_eh_frame_section(unw_word_t eh_frame_start) {
+  // The eh_frame section start serves as the mh_group
+  DwarfFDECache<LocalAddressSpace>::removeAllIn(
+      (LocalAddressSpace::pint_t)eh_frame_start);
+}
+
 #endif // defined(_LIBUNWIND_SUPPORT_DWARF_UNWIND)
 #endif // !defined(__USING_SJLJ_EXCEPTIONS__)
 

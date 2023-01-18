@@ -57,7 +57,7 @@ inline uptr MemToShadow(uptr untagged_addr) {
 inline uptr ShadowToMem(uptr shadow_addr) {
   return (shadow_addr - GetShadowOffset()) << kShadowScale;
 }
-inline uptr MemToShadowSize(usize size) {
+inline uptr MemToShadowSize(uptr size) {
   return size >> kShadowScale;
 }
 

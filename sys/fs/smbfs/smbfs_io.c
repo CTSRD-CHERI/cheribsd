@@ -285,8 +285,9 @@ smbfs_writevnode(struct vnode *vp, struct uio *uiop,
 	if (uiop->uio_resid == 0)
 		return 0;
 
-	if (vn_rlimit_fsize(vp, uiop, td))
-		return (EFBIG);
+	error = vn_rlimit_fsize(vp, uiop, td);
+	if (error != 0)
+		return (error);
 
 	scred = smbfs_malloc_scred();
 	smb_makescred(scred, td, cred);
@@ -675,7 +676,7 @@ smbfs_vinvalbuf(struct vnode *vp, struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros"

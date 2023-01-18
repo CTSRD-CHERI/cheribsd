@@ -117,7 +117,7 @@ DB_SHOW_COMMAND(in_ifaddr, db_show_in_ifaddr)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "kdb"

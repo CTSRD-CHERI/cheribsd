@@ -170,7 +170,7 @@ SUBDIR=	\
 	${_io} \
 	${_ioat} \
         ${_ipoib} \
-	${_ipdivert} \
+	ipdivert \
 	${_ipfilter} \
 	${_ipfw} \
 	ipfw_nat \
@@ -266,6 +266,7 @@ SUBDIR=	\
 	my \
 	${_nctgpio} \
 	${_neta} \
+	netlink \
 	${_netgraph} \
 	${_nfe} \
 	nfscl \
@@ -308,8 +309,9 @@ SUBDIR=	\
 	puc \
 	pwm \
 	${_qat} \
-	${_qat_c2xxx} \
 	${_qatfw} \
+	${_qat_c2xxx} \
+	${_qat_c2xxxfw} \
 	${_qlxge} \
 	${_qlxgb} \
 	${_qlxgbe} \
@@ -464,7 +466,6 @@ _if_stf=	if_stf
 
 .if ${MK_INET_SUPPORT} != "no" || defined(ALL_MODULES)
 _if_me=		if_me
-_ipdivert=	ipdivert
 _ipfw=		ipfw
 .if ${MK_INET6_SUPPORT} != "no" || defined(ALL_MODULES)
 _ipfw_nat64=	ipfw_nat64
@@ -695,8 +696,9 @@ _nctgpio=	nctgpio
 _ntb=		ntb
 _ocs_fc=	ocs_fc
 _qat=		qat
-_qat_c2xxx=	qat_c2xxx
 _qatfw=		qatfw
+_qat_c2xxx=	qat_c2xxx
+_qat_c2xxxfw=	qat_c2xxxfw
 .if ${MK_OFED} != "no" || defined(ALL_MODULES)
 _rdma=		rdma
 .endif

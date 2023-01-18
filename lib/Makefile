@@ -62,7 +62,8 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libexecinfo \
 	libexpat \
 	libfetch \
-	libfigpar \
+	libgcc_eh \
+	libgcc_s \
 	libgeom \
 	libifconfig \
 	libipsec \
@@ -81,7 +82,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	${_libnetmap} \
 	libnv \
 	libopenbsd \
-	libopie \
 	libpam \
 	libpathconv \
 	libpcap \
@@ -113,6 +113,10 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libzstd \
 	ncurses
 
+.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64" && !defined(COMPAT_CHERI)
+SUBDIR+=	libc_c18n libthr_c18n
+.endif
+
 .if !${MACHINE_ABI:Mpurecap}
 # Needs changes to be useful for purecap and not used by anything (yet)
 SUBDIR+=	libthread_db
@@ -142,8 +146,7 @@ SUBDIR_DEPEND_libgeom= libexpat libsbuf
 SUBDIR_DEPEND_librpcsec_gss= libgssapi
 SUBDIR_DEPEND_libmagic= libz
 SUBDIR_DEPEND_libmemstat= libkvm
-SUBDIR_DEPEND_libopie= libmd
-SUBDIR_DEPEND_libpam= libcrypt libopie ${_libradius} librpcsvc libtacplus libutil ${_libypclnt} ${_libcom_err} 
+SUBDIR_DEPEND_libpam= libcrypt ${_libradius} librpcsvc libtacplus libutil ${_libypclnt} ${_libcom_err}
 SUBDIR_DEPEND_libpjdlog= libutil
 SUBDIR_DEPEND_libprocstat= libkvm libutil
 SUBDIR_DEPEND_libradius= libmd
@@ -171,6 +174,11 @@ SUBDIR.${MK_BSNMP}+=	libbsnmp
 
 SUBDIR.${MK_CHERI}+=	libsyscalls
 
+.if ${MACHINE_ABI:Mpurecap} && ${MK_CHERI_CAPREVOKE} == "yes"
+SUBDIR+=	libcheri_caprevoke
+SUBDIR_DEPEND_libc+=	libcheri_caprevoke
+.endif
+
 .if ${MACHINE_CPU:Mcheri}
 _libcheribsdtest_dynamic=	libcheribsdtest_dynamic
 .endif
@@ -191,7 +199,7 @@ SUBDIR+=	clang
 SUBDIR.${MK_CUSE}+= 	libcuse
 SUBDIR.${MK_CXX}+=	libdevdctl
 SUBDIR.${MK_TOOLCHAIN}+=libpe
-SUBDIR.${MK_DIALOG}+=	libdpv
+SUBDIR.${MK_DIALOG}+=	libdpv libfigpar
 SUBDIR.${MK_FILE}+=	libmagic
 SUBDIR.${MK_GPIO}+=	libgpio
 SUBDIR.${MK_GSSAPI}+=	libgssapi librpcsec_gss

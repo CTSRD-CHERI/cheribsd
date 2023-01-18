@@ -465,6 +465,7 @@ struct ctl_lun_req {
 #endif
 		nvlist_t *	args_nvl;
 	};
+#define	CTL_MAX_ARGS_LEN	(1024 * 1024)
 	size_t			args_len;
 	void * __kerncap	result;
 	union {

@@ -47,7 +47,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181113,
+ *   "updated": 20221129,
  *   "changes": [
  *     "pointer_alignment"
  *   ],
@@ -101,46 +101,36 @@ static uint32_t fsigblock;
 static __used void *
 def_lock_create(void)
 {
-    void *base;
-    char *p;
-    Lock *l;
+	void *base;
+	char *p;
+	Lock *l;
 
-    /*
-     * Arrange for the lock to occupy its own cache line.  First, we
-     * optimistically allocate just a cache line, hoping that malloc
-     * will give us a well-aligned block of memory.  If that doesn't
-     * work, we allocate a larger block and take a well-aligned cache
-     * line from it.
-     */
-    base = xmalloc(CACHE_LINE_SIZE);
-    p = (char *)base;
-    if (!__builtin_is_aligned(p, CACHE_LINE_SIZE)) {
-	free(base);
-	base = xmalloc(2 * CACHE_LINE_SIZE);
-	p = __builtin_align_up(base, CACHE_LINE_SIZE);
-    }
-    l = (Lock *)p;
-    l->base = base;
-    l->lock = 0;
-    return l;
+	/*
+	 * Arrange for the lock to occupy its own cache line.  First, we
+	 * optimistically allocate just a cache line, hoping that malloc
+	 * will give us a well-aligned block of memory.  If that doesn't
+	 * work, we allocate a larger block and take a well-aligned cache
+	 * line from it.
+	 */
+	base = xmalloc(CACHE_LINE_SIZE);
+	p = base;
+	if (!__builtin_is_aligned(p, CACHE_LINE_SIZE)) {
+		free(base);
+		base = xmalloc(2 * CACHE_LINE_SIZE);
+		p = __builtin_align_up(base, CACHE_LINE_SIZE);
+	}
+	l = (Lock *)p;
+	l->base = base;
+	l->lock = 0;
+	return (l);
 }
 
 static __used void
 def_lock_destroy(void *lock)
 {
-    Lock *l = (Lock *)lock;
+	Lock *l = lock;
 
-    free(l->base);
-}
-
-static __used void
-def_rlock_acquire(void *lock)
-{
-    Lock *l = (Lock *)lock;
-
-    atomic_add_acq_int(&l->lock, RC_INCR);
-    while (l->lock & WAFLAG)
-	    ;	/* Spin */
+	free(l->base);
 }
 
 static void
@@ -154,17 +144,30 @@ sig_fastunblock(void)
 		__sys_sigfastblock(SIGFASTBLOCK_UNBLOCK, NULL);
 }
 
-static __used void
-def_wlock_acquire(void *lock)
+static bool
+def_lock_acquire_set(Lock *l, bool wlock)
 {
-	Lock *l;
+	if (wlock) {
+		if (atomic_cmpset_acq_int(&l->lock, 0, WAFLAG))
+			return (true);
+	} else {
+		atomic_add_acq_int(&l->lock, RC_INCR);
+		if ((l->lock & WAFLAG) == 0)
+			return (true);
+		atomic_add_int(&l->lock, -RC_INCR);
+	}
+	return (false);
+}
+
+static void
+def_lock_acquire(Lock *l, bool wlock)
+{
 	sigset_t tmp_oldsigmask;
 
-	l = (Lock *)lock;
 	if (ld_fast_sigblock) {
 		for (;;) {
 			atomic_add_32(&fsigblock, SIGFASTBLOCK_INC);
-			if (atomic_cmpset_acq_int(&l->lock, 0, WAFLAG))
+			if (def_lock_acquire_set(l, wlock))
 				break;
 			sig_fastunblock();
 		}
@@ -172,7 +175,7 @@ def_wlock_acquire(void *lock)
 		for (;;) {
 			__sys_sigprocmask(SIG_BLOCK, &fullsigmask,
 			   &tmp_oldsigmask);
-			if (atomic_cmpset_acq_int(&l->lock, 0, WAFLAG))
+			if (def_lock_acquire_set(l, wlock))
 				break;
 			__sys_sigprocmask(SIG_SETMASK, &tmp_oldsigmask, NULL);
 		}
@@ -182,26 +185,35 @@ def_wlock_acquire(void *lock)
 }
 
 static __used void
+def_rlock_acquire(void *lock)
+{
+	def_lock_acquire(lock, false);
+}
+
+static __used void
+def_wlock_acquire(void *lock)
+{
+	def_lock_acquire(lock, true);
+}
+
+static __used void
 def_lock_release(void *lock)
 {
-	Lock *l;
+	Lock *l = lock;
 
-	l = (Lock *)lock;
-	if ((l->lock & WAFLAG) == 0)
-		atomic_add_rel_int(&l->lock, -RC_INCR);
-	else {
-		atomic_add_rel_int(&l->lock, -WAFLAG);
-		if (ld_fast_sigblock)
-			sig_fastunblock();
-		else if (atomic_fetchadd_int(&wnested, -1) == 1)
-			__sys_sigprocmask(SIG_SETMASK, &oldsigmask, NULL);
-	}
+	atomic_add_rel_int(&l->lock, -((l->lock & WAFLAG) == 0 ?
+	    RC_INCR : WAFLAG));
+	if (ld_fast_sigblock)
+		sig_fastunblock();
+	else if (atomic_fetchadd_int(&wnested, -1) == 1)
+		__sys_sigprocmask(SIG_SETMASK, &oldsigmask, NULL);
 }
 
 static __used int
 def_thread_set_flag(int mask)
 {
 	int old_val = thread_flag;
+
 	thread_flag |= mask;
 	return (old_val);
 }
@@ -210,6 +222,7 @@ static __used int
 def_thread_clr_flag(int mask)
 {
 	int old_val = thread_flag;
+
 	thread_flag &= ~mask;
 	return (old_val);
 }
@@ -223,7 +236,7 @@ static struct RtldLockInfo deflockinfo;
 static __inline int
 thread_mask_set(int mask)
 {
-	return lockinfo.thread_set_flag(mask);
+	return (lockinfo.thread_set_flag(mask));
 }
 
 static __inline void
@@ -232,7 +245,11 @@ thread_mask_clear(int mask)
 	lockinfo.thread_clr_flag(mask);
 }
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+#define	RTLD_LOCK_CNT	4
+#else
 #define	RTLD_LOCK_CNT	3
+#endif
 static struct rtld_lock {
 	void	*handle;
 	int	 mask;
@@ -241,6 +258,9 @@ static struct rtld_lock {
 rtld_lock_t	rtld_bind_lock = &rtld_locks[0];
 rtld_lock_t	rtld_libc_lock = &rtld_locks[1];
 rtld_lock_t	rtld_phdr_lock = &rtld_locks[2];
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+rtld_lock_t	rtld_tramp_lock = &rtld_locks[3];
+#endif
 
 void
 rlock_acquire(rtld_lock_t lock, RtldLockState *lockstate)
@@ -340,13 +360,13 @@ lockdflt_init(void)
 	int i;
 
 	deflockinfo.rtli_version  = RTLI_VERSION;
-	deflockinfo.lock_create   = make_rtld_function_pointer(def_lock_create);
-	deflockinfo.lock_destroy  = make_rtld_function_pointer(def_lock_destroy);
-	deflockinfo.rlock_acquire = make_rtld_function_pointer(def_rlock_acquire);
-	deflockinfo.wlock_acquire = make_rtld_function_pointer(def_wlock_acquire);
-	deflockinfo.lock_release  = make_rtld_function_pointer(def_lock_release);
-	deflockinfo.thread_set_flag = make_rtld_function_pointer(def_thread_set_flag);
-	deflockinfo.thread_clr_flag = make_rtld_function_pointer(def_thread_clr_flag);
+	deflockinfo.lock_create   = make_rtld_local_function_pointer(def_lock_create);
+	deflockinfo.lock_destroy  = make_rtld_local_function_pointer(def_lock_destroy);
+	deflockinfo.rlock_acquire = make_rtld_local_function_pointer(def_rlock_acquire);
+	deflockinfo.wlock_acquire = make_rtld_local_function_pointer(def_wlock_acquire);
+	deflockinfo.lock_release  = make_rtld_local_function_pointer(def_lock_release);
+	deflockinfo.thread_set_flag = make_rtld_local_function_pointer(def_thread_set_flag);
+	deflockinfo.thread_clr_flag = make_rtld_local_function_pointer(def_thread_clr_flag);
 	deflockinfo.at_fork = NULL;
 	deflockinfo.dlerror_loc = def_dlerror_loc;
 	deflockinfo.dlerror_loc_sz = sizeof(def_dlerror_msg);
@@ -387,6 +407,9 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 	SymLook req;
 	void *locks[RTLD_LOCK_CNT];
 	int flags, i, res;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	struct RtldLockInfo tmplockinfo;
+#endif
 
 	if (pli == NULL) {
 		lockinfo.rtli_version = RTLI_VERSION;
@@ -399,6 +422,22 @@ _rtld_thread_init(struct RtldLockInfo *pli)
 			if (res == 0)
 				lockinfo.rtli_version = pli->rtli_version;
 		}
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+		tmplockinfo = *pli;
+#define wrap_with_trampoline(target) target = tramp_pgs_append(target, obj, NULL)
+		wrap_with_trampoline(tmplockinfo.lock_create);
+		wrap_with_trampoline(tmplockinfo.lock_destroy);
+		wrap_with_trampoline(tmplockinfo.rlock_acquire);
+		wrap_with_trampoline(tmplockinfo.wlock_acquire);
+		wrap_with_trampoline(tmplockinfo.lock_release);
+		wrap_with_trampoline(tmplockinfo.thread_set_flag);
+		wrap_with_trampoline(tmplockinfo.thread_clr_flag);
+		wrap_with_trampoline(tmplockinfo.at_fork);
+		wrap_with_trampoline(tmplockinfo.dlerror_loc);
+		wrap_with_trampoline(tmplockinfo.dlerror_seen);
+#undef wrap_with_trampoline
+		pli = &tmplockinfo;
+#endif
 	}
 
 	/* disable all locking while this function is running */

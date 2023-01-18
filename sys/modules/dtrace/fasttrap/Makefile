@@ -19,7 +19,7 @@ CFLAGS+=	-I${SYSDIR}/cddl/contrib/opensolaris/uts/powerpc
 .PATH:		${SYSDIR}/cddl/contrib/opensolaris/uts/powerpc/dtrace
 .endif
 
-.PATH:		${SYSDIR}/contrib/openzfs/module/unicode
+.PATH:		${ZFSTOP}/module/unicode
 SRCS+=		u8_textprep.c
 
 .include <bsd.kmod.mk>

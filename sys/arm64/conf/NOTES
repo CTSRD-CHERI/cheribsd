@@ -204,7 +204,7 @@ options 	FDT
 device		acpi
 
 # DTBs
-makeoptions	MODULES_EXTRA="dtb/allwinner dtb/rockchip dtb/rpi"
+makeoptions	MODULES_EXTRA="dtb/allwinner dtb/arm dtb/rockchip dtb/rpi"
 
 # Add CAMDEBUG stuff
 options 	CAMDEBUG

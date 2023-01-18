@@ -406,10 +406,10 @@ smbfs_statfs(struct mount *mp, struct statfs *sbp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros"
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

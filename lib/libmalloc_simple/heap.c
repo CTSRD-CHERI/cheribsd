@@ -51,6 +51,12 @@ static char *rcsid = "$FreeBSD$";
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
+#ifdef CAPREVOKE
+#include <sys/stdatomic.h>
+#include <cheri/revoke.h>
+#include <cheri/libcaprevoke.h>
+#endif
+
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
@@ -68,49 +74,41 @@ static char *rcsid = "$FreeBSD$";
 #define	error_printf(...)	fprintf(stderr, __VA_ARGS__)
 #endif
 
+struct pagepool_header {
+	size_t			ph_size;
+#ifdef __CHERI_PURE_CAPABILITY__
+	size_t			ph_pad1;
+#endif
+	struct pagepool_header	*ph_next;
+#ifdef CAPREVOKE
+	void			*ph_shadow;
+#else
+	void			*ph_pad2;
+#endif
+};
+
 #define	NPOOLPAGES	(32*1024/_pagesz)
 
 caddr_t		pagepool_start, pagepool_end;
+static struct pagepool_header	*curpp;
 
-static size_t n_pagepools, max_pagepools;
-static char **pagepool_list;
 static size_t _pagesz;
+
+#ifdef CAPREVOKE
+static volatile const struct cheri_revoke_info *cri;
+#endif
 
 int
 __morepages(int n)
 {
 	size_t	size;
-	char **new_pagepool_list;
+	struct pagepool_header *newpp;
 
 	n += NPOOLPAGES;	/* round up allocation. */
 	size = n * _pagesz;
 #ifdef __CHERI_PURE_CAPABILITY__
 	size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
-
-	if (n_pagepools >= max_pagepools) {
-		if (max_pagepools == 0)
-			max_pagepools = _pagesz / (sizeof(char *) * 2);
-
-		max_pagepools *= 2;
-		if ((new_pagepool_list = mmap(0,
-		    max_pagepools * sizeof(char *), PROT_READ|PROT_WRITE,
-		    MAP_ANON, -1, 0)) == MAP_FAILED) {
-			error_printf("%s: Can not map pagepool_list\n", __func__);
-			return (0);
-		}
-		memcpy(new_pagepool_list, pagepool_list,
-		    sizeof(char *) * n_pagepools);
-		if (pagepool_list != NULL) {
-			if (munmap(pagepool_list,
-			    max_pagepools * sizeof(char *) / 2) != 0) {
-				error_printf("%s: failed to unmap pagepool_list\n",
-				    __func__);
-				/* XXX: leak the region */
-			}
-		}
-		pagepool_list = new_pagepool_list;
-	}
 
 	if (pagepool_end - pagepool_start > (ssize_t)_pagesz) {
 		caddr_t extra_start = __builtin_align_up(pagepool_start,
@@ -138,13 +136,16 @@ __morepages(int n)
 #endif
 	}
 
-	if ((pagepool_start = mmap(0, size, PROT_READ|PROT_WRITE,
-	    MAP_ANON, -1, 0)) == MAP_FAILED) {
+	if ((newpp = mmap(0, size, PROT_READ|PROT_WRITE, MAP_ANON, -1,
+	    0)) == MAP_FAILED) {
 		error_printf("%s: mmap of pagepool failed\n", __func__);
 		return (0);
 	}
-	pagepool_end = pagepool_start + size;
-	pagepool_list[n_pagepools++] = pagepool_start;
+	newpp->ph_next = curpp;
+	newpp->ph_size = size;
+	curpp = newpp;
+	pagepool_start = (char *)(newpp + 1);
+	pagepool_end = pagepool_start + (size - sizeof(*newpp));
 
 	return (size / _pagesz);
 }
@@ -159,14 +160,60 @@ __init_heap(size_t pagesz)
 void *
 __rederive_pointer(void *ptr)
 {
-	size_t i;
+	struct pagepool_header *pp;
 
-	for (i = 0; i < n_pagepools; i++) {
-		char *pool = pagepool_list[i];
-
+	pp = curpp;
+	while (pp != NULL) {
+		char *pool = (char *)pp;
 		if (cheri_is_address_inbounds(pool, cheri_getbase(ptr)))
 			return (cheri_setaddress(pool, cheri_getaddress(ptr)));
+		pp = pp->ph_next;
 	}
 
 	return (NULL);
 }
+
+
+#ifdef CAPREVOKE
+void
+__paint_shadow(void *mem, size_t size)
+{
+	struct pagepool_header *pp;
+
+	pp = cheri_setoffset(mem, 0);
+	/*
+	 * Defer initializing ph_shadow since odds are good we'll never
+	 * need it.
+	 */
+	if (pp->ph_shadow == NULL)
+		if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, pp,
+		    &pp->ph_shadow) != 0)
+			abort();
+	caprev_shadow_nomap_set_raw(cri->base_mem_nomap, pp->ph_shadow,
+	    (vaddr_t)mem, size);
+}
+
+void
+__clear_shadow(void *mem, size_t size)
+{
+	struct pagepool_header *pp;
+
+	pp = cheri_setoffset(mem, 0);
+	caprev_shadow_nomap_clear_raw(cri->base_mem_nomap,
+	    pp->ph_shadow, (vaddr_t)mem, size);
+}
+
+void
+__do_revoke(void)
+{
+	int error;
+
+	atomic_thread_fence(memory_order_acq_rel);
+	cheri_revoke_epoch_t start_epoch = cri->epochs.enqueue;
+	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
+		error = cheri_revoke(CHERI_REVOKE_LAST_PASS, start_epoch, NULL);
+		assert(error == 0);
+	}
+}
+
+#endif /* CAPREVOKE */

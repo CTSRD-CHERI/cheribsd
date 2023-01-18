@@ -170,7 +170,7 @@ vm_pointer_t
 linux_alloc_kmem(gfp_t flags, unsigned int order)
 {
 	size_t size = ((size_t)PAGE_SIZE) << order;
-	vm_pointer_t addr;
+	void *addr;
 
 	if ((flags & GFP_DMA32) == 0) {
 		addr = kmem_malloc(size, flags & GFP_NATIVE_MASK);
@@ -178,7 +178,7 @@ linux_alloc_kmem(gfp_t flags, unsigned int order)
 		addr = kmem_alloc_contig(size, flags & GFP_NATIVE_MASK, 0,
 		    BUS_SPACE_MAXADDR_32BIT, PAGE_SIZE, 0, VM_MEMATTR_DEFAULT);
 	}
-	return (addr);
+	return ((vm_pointer_t)addr);
 }
 
 void
@@ -186,7 +186,7 @@ linux_free_kmem(vm_pointer_t addr, unsigned int order)
 {
 	size_t size = ((size_t)PAGE_SIZE) << order;
 
-	kmem_free(addr, size);
+	kmem_free((void *)addr, size);
 }
 
 static int
@@ -431,7 +431,7 @@ lkpi_arch_phys_wc_del(int reg)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200104,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

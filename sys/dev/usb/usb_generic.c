@@ -777,8 +777,8 @@ ugen_get_iface_driver(struct usb_fifo *f, struct usb_gen_descriptor *ugd)
 	struct usb_interface *iface;
 	const char *ptr;
 	const char *desc;
-	unsigned int len;
-	unsigned int maxlen;
+	unsigned len;
+	unsigned maxlen;
 	char buf[128];
 	int error;
 
@@ -1285,7 +1285,7 @@ ugen_fs_copyin(struct usb_fifo *f, uint8_t ep_index,
 
 	switch (f->fs_ep_sz) {
 	case sizeof(struct usb_fs_endpoint):
-		error = copyin(ugen_fs_ep_uptr(f, ep_index), fs_ep,
+		error = copyincap(ugen_fs_ep_uptr(f, ep_index), fs_ep,
 		    f->fs_ep_sz);
 		if (error != 0)
 			return (error);
@@ -2015,7 +2015,7 @@ ugen_get_port_path(struct usb_fifo *f, struct usb_device_port_path *dpp)
 {
 	struct usb_device *udev = f->udev;
 	struct usb_device *next;
-	unsigned int nlevel = 0;
+	unsigned nlevel = 0;
 
 	if (udev == NULL)
 		goto error;

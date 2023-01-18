@@ -418,7 +418,7 @@ bool vm_object_is_active(vm_object_t obj);
 #endif				/* _VM_OBJECT_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221212,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

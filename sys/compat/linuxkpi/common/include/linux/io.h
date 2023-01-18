@@ -38,6 +38,9 @@
 
 #include <linux/compiler.h>
 #include <linux/types.h>
+#if !defined(__arm__)
+#include <asm/set_memory.h>
+#endif
 
 /*
  * XXX This is all x86 specific.  It should be bus space access.
@@ -430,9 +433,9 @@ void iounmap(void *addr);
 #define	memcpy_toio(a, b, c)	memcpy((a), (b), (c))
 
 static inline void
-__iowrite32_copy(void *to, void *from, size_t count)
+__iowrite32_copy(void *to, const void *from, size_t count)
 {
-	uint32_t *src;
+	const uint32_t *src;
 	uint32_t *dst;
 	int i;
 
@@ -441,10 +444,10 @@ __iowrite32_copy(void *to, void *from, size_t count)
 }
 
 static inline void
-__iowrite64_copy(void *to, void *from, size_t count)
+__iowrite64_copy(void *to, const void *from, size_t count)
 {
 #ifdef __LP64__
-	uint64_t *src;
+	const uint64_t *src;
 	uint64_t *dst;
 	int i;
 
@@ -452,6 +455,32 @@ __iowrite64_copy(void *to, void *from, size_t count)
 		__raw_writeq(*src, dst);
 #else
 	__iowrite32_copy(to, from, count * 2);
+#endif
+}
+
+static inline void
+__ioread32_copy(void *to, const void *from, size_t count)
+{
+	const uint32_t *src;
+	uint32_t *dst;
+	int i;
+
+	for (i = 0, src = from, dst = to; i < count; i++, src++, dst++)
+		*dst = __raw_readl(src);
+}
+
+static inline void
+__ioread64_copy(void *to, const void *from, size_t count)
+{
+#ifdef __LP64__
+	const uint64_t *src;
+	uint64_t *dst;
+	int i;
+
+	for (i = 0, src = from, dst = to; i < count; i++, src++, dst++)
+		*dst = __raw_readq(src);
+#else
+	__ioread32_copy(to, from, count * 2);
 #endif
 }
 
@@ -493,5 +522,20 @@ void lkpi_arch_phys_wc_del(int);
 #define	arch_phys_wc_del(...)	lkpi_arch_phys_wc_del(__VA_ARGS__)
 #define	arch_phys_wc_index(x)	\
 	(((x) < __MTRR_ID_BASE) ? -1 : ((x) - __MTRR_ID_BASE))
+
+#if defined(__amd64__) || defined(__i386__) || defined(__aarch64__) || defined(__powerpc__) || defined(__riscv)
+static inline int
+arch_io_reserve_memtype_wc(resource_size_t start, resource_size_t size)
+{
+
+	return (set_memory_wc(start, size >> PAGE_SHIFT));
+}
+
+static inline void
+arch_io_free_memtype_wc(resource_size_t start, resource_size_t size)
+{
+	set_memory_wb(start, size >> PAGE_SHIFT);
+}
+#endif
 
 #endif	/* _LINUXKPI_LINUX_IO_H_ */

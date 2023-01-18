@@ -74,6 +74,8 @@ struct efi_cfgtbl {
 #pragma pointer_interpretation pop
 #endif
 
+#define EFI_MEMORY_DESCRIPTOR_VERSION 1
+
 struct efi_md {
 	uint32_t	md_type;
 #define	EFI_MD_TYPE_NULL	0
@@ -349,10 +351,11 @@ int efi_status_to_errno(efi_status status);
 #endif /* _SYS_EFI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20210413,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

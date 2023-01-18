@@ -58,7 +58,7 @@ sf_buf_page(struct sf_buf *sf)
 #endif /* !_MACHINE_SF_BUF_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

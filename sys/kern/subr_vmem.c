@@ -1978,7 +1978,7 @@ vmem_check(vmem_t *vm)
 #endif /* defined(DIAGNOSTIC) */
 // CHERI CHANGES START
 // {
-//   "updated": 20200708,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintcap_arithmetic",

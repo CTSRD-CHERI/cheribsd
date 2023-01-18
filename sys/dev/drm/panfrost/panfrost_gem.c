@@ -66,9 +66,9 @@ __FBSDID("$FreeBSD$");
 #include <linux/dma-buf.h>
 
 #include "panfrost_drv.h"
-#include "panfrost_job.h"
 #include "panfrost_drm.h"
 #include "panfrost_device.h"
+#include "panfrost_job.h"
 #include "panfrost_gem.h"
 #include "panfrost_regs.h"
 #include "panfrost_features.h"
@@ -96,6 +96,9 @@ panfrost_gem_free_object(struct drm_gem_object *obj)
 	if (bo->pages) {
 		for (i = 0; i < bo->npages; i++) {
 			m = bo->pages[i];
+			if (m == NULL)
+				continue;
+
 			vm_page_lock(m);
 			m->flags &= ~PG_FICTITIOUS;
 			m->oflags |= VPO_UNMANAGED;
@@ -129,7 +132,7 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 
 	mapping = malloc(sizeof(*mapping), M_PANFROST1, M_ZERO | M_WAITOK);
 	mapping->obj = bo;
-	mapping->mmu = &pfile->mmu;
+	mapping->mmu = panfrost_mmu_ctx_get(pfile->mmu);
 	refcount_init(&mapping->refcount, 1);
 	drm_gem_object_get(obj);
 
@@ -141,10 +144,10 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 		color = PANFROST_BO_NOEXEC;
 	}
 
-	mtx_lock_spin(&pfile->mm_lock);
-	error = drm_mm_insert_node_generic(&pfile->mm, &mapping->mmnode,
+	mtx_lock_spin(&mapping->mmu->mm_lock);
+	error = drm_mm_insert_node_generic(&mapping->mmu->mm, &mapping->mmnode,
 	    obj->size >> PAGE_SHIFT, align, color, 0 /* mode */);
-	mtx_unlock_spin(&pfile->mm_lock);
+	mtx_unlock_spin(&mapping->mmu->mm_lock);
 	if (error) {
 		device_printf(sc->dev,
 		    "%s: Failed to insert: sz %d, align %d, color %d, err %d\n",
@@ -180,7 +183,6 @@ panfrost_gem_open(struct drm_gem_object *obj, struct drm_file *file_priv)
 
 error:
 	panfrost_gem_mapping_put(mapping);
-	drm_gem_object_put(obj);
 	return (error);
 }
 
@@ -200,7 +202,7 @@ panfrost_gem_close(struct drm_gem_object *obj, struct drm_file *file_priv)
 
 	mtx_lock(&bo->mappings_lock);
 	TAILQ_FOREACH_SAFE(mapping, &bo->mappings, next, tmp) {
-		if (mapping->mmu == &pfile->mmu) {
+		if (mapping->mmu == pfile->mmu) {
 			result = mapping;
 			TAILQ_REMOVE(&bo->mappings, mapping, next);
 			break;
@@ -231,8 +233,13 @@ panfrost_gem_pin(struct drm_gem_object *obj)
 void
 panfrost_gem_unpin(struct drm_gem_object *obj)
 {
+	struct drm_device *dev;
 
+	dev = obj->dev;
+
+	mutex_lock(&dev->struct_mutex);
 	drm_gem_object_put(obj);
+	mutex_unlock(&dev->struct_mutex);
 }
 
 struct sg_table *
@@ -491,19 +498,17 @@ panfrost_gem_create_object_with_handle(struct drm_file *file,
 static void
 panfrost_gem_teardown_mapping(struct panfrost_gem_mapping *mapping)
 {
-	struct panfrost_file *pfile;
-	struct panfrost_softc *sc;
+	struct panfrost_mmu *mmu;
 
-	pfile = container_of(mapping->mmu, struct panfrost_file, mmu);
-	sc = pfile->sc;
+	mmu = mapping->mmu;
 
 	if (mapping->active)
-		panfrost_mmu_unmap(sc, mapping);
+		panfrost_mmu_unmap(mmu->sc, mapping);
 
-	mtx_lock_spin(&pfile->mm_lock);
+	mtx_lock_spin(&mmu->mm_lock);
 	if (drm_mm_node_allocated(&mapping->mmnode))
 		drm_mm_remove_node(&mapping->mmnode);
-	mtx_unlock_spin(&pfile->mm_lock);
+	mtx_unlock_spin(&mmu->mm_lock);
 }
 
 void
@@ -537,6 +542,7 @@ panfrost_gem_mapping_release(struct panfrost_gem_mapping *mapping)
 
 	panfrost_gem_teardown_mapping(mapping);
 	panfrost_gem_object_put(mapping->obj);
+	panfrost_mmu_ctx_put(mapping->mmu);
 	free(mapping, M_PANFROST1);
 }
 
@@ -558,7 +564,7 @@ panfrost_gem_mapping_get(struct panfrost_gem_object *bo,
 
 	mtx_lock(&bo->mappings_lock);
 	TAILQ_FOREACH(mapping, &bo->mappings, next) {
-		if (mapping->mmu == &file->mmu) {
+		if (mapping->mmu == file->mmu) {
 			result = mapping;
 			refcount_acquire(&mapping->refcount);
 			break;

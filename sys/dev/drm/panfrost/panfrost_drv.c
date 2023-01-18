@@ -79,13 +79,6 @@ __FBSDID("$FreeBSD$");
 #include "panfrost_mmu.h"
 #include "panfrost_job.h"
 
-#define	PN_16M		0x1000
-#define	PN_4GB		0x100000
-#define	PN_4GB_MASK	(PN_4GB - 1)
-
-#define	SZ_32MB		(32 * 1024 * 1024)
-#define	SZ_4GB		(4 * 1024 * 1024 * 1024ULL)
-
 MALLOC_DEFINE(M_PANFROST, "panfrost", "Panfrost driver");
 MALLOC_DEFINE(M_PANFROST1, "panfrost1", "Panfrost 1 driver");
 MALLOC_DEFINE(M_PANFROST2, "panfrost2", "Panfrost 2 driver");
@@ -127,24 +120,6 @@ static const struct file_operations panfrost_drm_driver_fops = {
 	.mmap		= drm_gem_mmap,
 };
 
-static void
-panfrost_drm_mm_color_adjust(const struct drm_mm_node *node,
-    unsigned long color, uint64_t *start, uint64_t *end)
-{
-	uint64_t next_seg;
-
-	if ((color & PANFROST_BO_NOEXEC) == 0) {
-		if ((*start & PN_4GB_MASK) == 0)
-			(*start)++;
-		if ((*end & PN_4GB_MASK) == 0)
-			(*end)--;
-		next_seg = ALIGN(*start, PN_4GB);
-		if (next_seg - *start <= PN_16M)
-			*start = next_seg + 1;
-		*end = min(*end, ALIGN(*start, PN_4GB) - 1);
-	}
-}
-
 static int
 panfrost_open(struct drm_device *dev, struct drm_file *file)
 {
@@ -160,19 +135,12 @@ panfrost_open(struct drm_device *dev, struct drm_file *file)
 	pfile->sc = sc;
 	file->driver_priv = pfile;
 
-	mtx_init(&pfile->mm_lock, "mm", NULL, MTX_SPIN);
-
-	drm_mm_init(&pfile->mm, SZ_32MB >> PAGE_SHIFT,
-	    (SZ_4GB - SZ_32MB) >> PAGE_SHIFT);
-	pfile->mm.color_adjust = panfrost_drm_mm_color_adjust;
-
-	error = panfrost_mmu_pgtable_alloc(pfile);
-	if (error != 0) {
-		device_printf(sc->dev, "%s: could not allocate pgtable\n",
+	pfile->mmu = panfrost_mmu_ctx_create(sc);
+	if (pfile->mmu == NULL) {
+		device_printf(sc->dev, "%s: can't create mmu context\n",
 		    __func__);
-		drm_mm_takedown(&pfile->mm);
 		free(pfile, M_PANFROST);
-		return (error);
+		return (-ENXIO);
 	}
 
 	error = panfrost_job_open(pfile);
@@ -193,10 +161,8 @@ panfrost_postclose(struct drm_device *dev, struct drm_file *file)
 
 	pfile = file->driver_priv;
 
-	panfrost_mmu_pgtable_free(pfile);
 	panfrost_job_close(pfile);
-
-	drm_mm_takedown(&pfile->mm);
+	panfrost_mmu_ctx_put(pfile->mmu);
 
 	free(pfile, M_PANFROST);
 }
@@ -291,6 +257,7 @@ static int
 panfrost_ioctl_submit(struct drm_device *dev, void *data,
     struct drm_file *file)
 {
+	struct panfrost_file *pfile;
 	struct panfrost_softc *sc;
 #ifdef COMPAT_FREEBSD64
 	struct drm_panfrost_submit64 *args64;
@@ -300,7 +267,9 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	struct drm_panfrost_submit *args;
 	struct panfrost_job *job;
 	struct drm_syncobj *sync_out;
+	struct drm_sched_entity *entity;
 	int error;
+	int slot;
 
 	sc = dev->dev_private;
 
@@ -329,10 +298,10 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 	dprintf("%s: jc %x\n", __func__, args->jc);
 
 	if (args->jc == 0)
-		return (EINVAL);
+		return (-EINVAL);
 
 	if (args->requirements && args->requirements != PANFROST_JD_REQ_FS)
-		return (EINVAL);
+		return (-EINVAL);
 
 	if (args->out_sync > 0) {
 		sync_out = drm_syncobj_find(file, args->out_sync);
@@ -342,26 +311,38 @@ panfrost_ioctl_submit(struct drm_device *dev, void *data,
 		}
 	}
 
+	pfile = file->driver_priv;
+
 	job = malloc(sizeof(*job), M_PANFROST1, M_WAITOK | M_ZERO);
 	job->sc = sc;
 	job->jc = args->jc;
 	job->requirements = args->requirements;
 	job->flush_id = panfrost_device_get_latest_flush_id(sc);
-	job->pfile = file->driver_priv;
+	job->mmu = pfile->mmu;
 
 	refcount_init(&job->refcount, 1);
 
+	slot = panfrost_job_get_slot(job);
+
+	job->slot = slot;
+
+	entity = &pfile->sched_entity[slot];
+
+	error = drm_sched_job_init(&job->base, entity, NULL);
+	if (error)
+		return (-EINVAL);
+
 	error = panfrost_copy_in_fences(dev, file, args, job);
 	if (error)
-		return (EINVAL);
+		return (-EINVAL);
 
 	error = panfrost_lookup_bos(dev, file, args, job);
 	if (error)
-		return (EINVAL);
+		return (-EINVAL);
 
 	error = panfrost_job_push(job);
 	if (error)
-		return (EINVAL);
+		return (-EINVAL);
 
 	if (sync_out)
 		drm_syncobj_replace_fence(sync_out, job->render_done_fence);
@@ -385,13 +366,13 @@ panfrost_ioctl_wait_bo(struct drm_device *dev, void *data,
 
 	args = data;
 	if (args->pad)
-		return (EINVAL);
+		return (-EINVAL);
 
 	timeout = drm_timeout_abs_to_jiffies(args->timeout_ns);
 
 	gem_obj = drm_gem_object_lookup(file_priv, args->handle);
 	if (!gem_obj)
-		return (ENOENT);
+		return (-ENOENT);
 
 	error = reservation_object_wait_timeout_rcu(gem_obj->resv, true,
 	    true, timeout);
@@ -402,7 +383,7 @@ panfrost_ioctl_wait_bo(struct drm_device *dev, void *data,
 	 */
 
 	if (error == 0)
-		error = timeout ? ETIMEDOUT : EBUSY;
+		error = timeout ? -ETIMEDOUT : -EBUSY;
 	else if (error > 0)
 		error = 0;
 
@@ -435,7 +416,7 @@ panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
 	if (bo == NULL) {
 		device_printf(sc->dev, "%s: Failed to create object\n",
 		    __func__);
-		return (EINVAL);
+		return (-EINVAL);
 	}
 
 	mapping = panfrost_gem_mapping_get(bo, file->driver_priv);
@@ -443,7 +424,7 @@ panfrost_ioctl_create_bo(struct drm_device *dev, void *data,
 		mutex_lock(&dev->struct_mutex);
 		drm_gem_object_put(&bo->base);
 		mutex_unlock(&dev->struct_mutex);
-		return (EINVAL);
+		return (-EINVAL);
 	}
 
 	args->offset = mapping->mmnode.start << PAGE_SHIFT;
@@ -463,11 +444,11 @@ panfrost_ioctl_mmap_bo(struct drm_device *dev, void *data,
 	args = data;
 
 	if (args->flags != 0)
-		return (EINVAL);
+		return (-EINVAL);
 
 	obj = drm_gem_object_lookup(file, args->handle);
 	if (obj == NULL)
-		return (EINVAL);
+		return (-EINVAL);
 
 	error = drm_gem_create_mmap_offset(obj);
 	if (error == 0)
@@ -494,7 +475,7 @@ panfrost_ioctl_get_param(struct drm_device *ddev, void *data,
 	param = data;
 
 	if (param->pad != 0)
-		return (EINVAL);
+		return (-EINVAL);
 
 	dprintf("%s: param %d\n", __func__, param->param);
 
@@ -573,7 +554,7 @@ panfrost_ioctl_get_param(struct drm_device *ddev, void *data,
 		param->value = sc->features.afbc_features;
 		break;
 	default:
-		return (EINVAL);
+		return (-EINVAL);
 	}
 
 	return (0);
@@ -594,7 +575,7 @@ panfrost_ioctl_get_bo_offset(struct drm_device *dev, void *data,
 
 	obj = drm_gem_object_lookup(file_priv, args->handle);
 	if (obj == NULL)
-		return (EINVAL);
+		return (-EINVAL);
 
 	bo = (struct panfrost_gem_object *)obj;
 
@@ -605,7 +586,7 @@ panfrost_ioctl_get_bo_offset(struct drm_device *dev, void *data,
 	mutex_unlock(&dev->struct_mutex);
 
 	if (mapping == NULL)
-		return (EINVAL);
+		return (-EINVAL);
 
 	args->offset = mapping->mmnode.start << PAGE_SHIFT;
 	panfrost_gem_mapping_put(mapping);
@@ -630,7 +611,7 @@ panfrost_ioctl_madvise(struct drm_device *dev, void *data,
 
 	obj = drm_gem_object_lookup(file_priv, args->handle);
 	if (obj == NULL)
-		return (EINVAL);
+		return (-EINVAL);
 
 	bo = (struct panfrost_gem_object *)obj;
 
@@ -713,11 +694,24 @@ static void
 panfrost_irq_hook(void *arg)
 {
 	struct panfrost_softc *sc;
+	uint64_t rate;
 	int err;
 
 	sc = arg;
 
 	drm_mode_config_init(&sc->drm_dev);
+
+	if (clk_get_by_ofw_index(sc->dev, 0, 0, &sc->clk) == 0) {
+		err = clk_enable(sc->clk);
+		if (err == 0) {
+			clk_get_freq(sc->clk, &rate);
+			device_printf(sc->dev, "Mali GPU clock rate %jd Hz\n",
+			    rate);
+		} else
+			device_printf(sc->dev,
+			    "could not enable clock: %d\n", err);
+	} else
+		device_printf(sc->dev, "Mali GPU clock is unknown\n");
 
 	err = drm_dev_init(&sc->drm_dev, &panfrost_drm_driver,
 	    sc->dev);
@@ -728,9 +722,23 @@ panfrost_irq_hook(void *arg)
 
 	sc->drm_dev.dev_private = sc;
 
-	panfrost_device_init(sc);
-	panfrost_mmu_init(sc);
-	panfrost_job_init(sc);
+	err = panfrost_device_init(sc);
+	if (err != 0) {
+		device_printf(sc->dev, "Failed to init panfrost device\n");
+		return;
+	}
+
+	err = panfrost_mmu_init(sc);
+	if (err != 0) {
+		device_printf(sc->dev, "Failed to init panfrost mmu\n");
+		return;
+	}
+
+	err = panfrost_job_init(sc);
+	if (err != 0) {
+		device_printf(sc->dev, "Failed to init panfrost job\n");
+		return;
+	}
 
 	err = drm_dev_register(&sc->drm_dev, 0);
 	if (err < 0) {
@@ -756,8 +764,6 @@ static int
 panfrost_attach(device_t dev)
 {
 	struct panfrost_softc *sc;
-	uint64_t rate;
-	int err;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -791,19 +797,6 @@ panfrost_attach(device_t dev)
 		device_printf(dev, "cannot setup interrupt handler\n");
 		return (ENXIO);
 	}
-
-	if (clk_get_by_ofw_index(sc->dev, 0, 0, &sc->clk) == 0) {
-		err = clk_enable(sc->clk);
-		if (err != 0) {
-			device_printf(sc->dev,
-			    "could not enable clock: %d\n", err);
-			return (ENXIO);
-		}
-
-		clk_get_freq(sc->clk, &rate);
-		device_printf(dev, "Mali GPU clock rate %jd Hz\n", rate);
-	} else
-		device_printf(dev, "Mali GPU clock is unknown\n");
 
 	mtx_init(&sc->as_mtx, "asid set mtx", NULL, MTX_SPIN);
 
@@ -842,7 +835,5 @@ static driver_t panfrost_driver = {
 	sizeof(struct panfrost_softc),
 };
 
-static devclass_t panfrost_devclass;
-
-EARLY_DRIVER_MODULE(panfrost, simplebus, panfrost_driver, panfrost_devclass,
-    0, 0, BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LAST);
+EARLY_DRIVER_MODULE(panfrost, simplebus, panfrost_driver, 0, 0,
+    BUS_PASS_INTERRUPT + BUS_PASS_ORDER_LAST);

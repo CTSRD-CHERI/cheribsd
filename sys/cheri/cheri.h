@@ -196,7 +196,7 @@ void	db_print_scb_td(struct thread *td);
 #endif /* _SYS_CHERI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support"

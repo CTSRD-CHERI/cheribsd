@@ -45,7 +45,7 @@ __attribute__((always_inline)) static void SigTrap(uptr p) {
 
 // Version with access size which is not power of 2
 template <unsigned X>
-__attribute__((always_inline)) static void SigTrap(uptr p, usize size) {
+__attribute__((always_inline)) static void SigTrap(uptr p, uptr size) {
 #if defined(__aarch64__)
   register uptr x0 asm("x0") = p;
   register uptr x1 asm("x1") = size;
@@ -96,7 +96,7 @@ __attribute__((always_inline, nodebug)) static void CheckAddress(uptr p) {
 
 template <ErrorAction EA, AccessType AT>
 __attribute__((always_inline, nodebug)) static void CheckAddressSized(uptr p,
-                                                                      usize sz) {
+                                                                      uptr sz) {
   if (sz == 0 || !InTaggableRegion(p))
     return;
   tag_t ptr_tag = GetTagFromPointer(p);

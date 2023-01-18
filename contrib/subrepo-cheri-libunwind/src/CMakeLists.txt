@@ -59,6 +59,7 @@ set(LIBUNWIND_HEADERS
     AddressSpace.hpp
     assembly.h
     CompactUnwinder.hpp
+    cet_unwind.h
     config.h
     dwarf2.h
     DwarfInstructions.hpp
@@ -72,6 +73,8 @@ set(LIBUNWIND_HEADERS
     UnwindCursor.hpp
     ../include/libunwind.h
     ../include/unwind.h
+    ../include/unwind_itanium.h
+    ../include/unwind_arm_ehabi.h
     )
 if(APPLE)
   list(APPEND LIBUNWIND_HEADERS
@@ -105,6 +108,7 @@ if (LIBUNWIND_ENABLE_THREADS)
 endif()
 
 # Setup flags.
+add_link_flags_if(LIBUNWIND_SUPPORTS_UNWINDLIB_NONE_FLAG --unwindlib=none)
 if (LIBUNWIND_SUPPORTS_NOSTDLIBXX_FLAG)
   add_link_flags_if_supported(-nostdlib++)
 else()
@@ -154,7 +158,8 @@ if (LIBUNWIND_ENABLE_SHARED)
   else()
     target_compile_options(unwind_shared PRIVATE -fno-rtti)
   endif()
-  target_link_libraries(unwind_shared PRIVATE ${LIBUNWIND_LIBRARIES})
+  target_link_libraries(unwind_shared PRIVATE ${LIBUNWIND_LIBRARIES}
+                                      PRIVATE unwind-headers)
   set_target_properties(unwind_shared
     PROPERTIES
       CXX_EXTENSIONS OFF
@@ -166,7 +171,6 @@ if (LIBUNWIND_ENABLE_SHARED)
       OUTPUT_NAME "unwind"
       VERSION "1.0"
       SOVERSION "1"
-      POSITION_INDEPENDENT_CODE ON
   )
   # To allow testing exceptions with a shared libcxxrt.so
   if (LIBUNWIND_USE_VERSION_SCRIPT)
@@ -186,7 +190,8 @@ if (LIBUNWIND_ENABLE_STATIC)
   else()
     target_compile_options(unwind_static PRIVATE -fno-rtti)
   endif()
-  target_link_libraries(unwind_static PRIVATE ${LIBUNWIND_LIBRARIES})
+  target_link_libraries(unwind_static PRIVATE ${LIBUNWIND_LIBRARIES}
+                                      PRIVATE unwind-headers)
   set_target_properties(unwind_static
     PROPERTIES
       CXX_EXTENSIONS OFF
@@ -196,7 +201,6 @@ if (LIBUNWIND_ENABLE_STATIC)
       LINK_FLAGS "${LIBUNWIND_LINK_FLAGS}"
       LINKER_LANGUAGE C
       OUTPUT_NAME "unwind"
-      POSITION_INDEPENDENT_CODE ON
   )
 
   if(LIBUNWIND_HIDE_SYMBOLS)
@@ -219,7 +223,7 @@ if (LIBUNWIND_INSTALL_LIBRARY)
   install(TARGETS ${LIBUNWIND_INSTALL_TARGETS}
     LIBRARY DESTINATION ${LIBUNWIND_INSTALL_LIBRARY_DIR} COMPONENT unwind
     ARCHIVE DESTINATION ${LIBUNWIND_INSTALL_LIBRARY_DIR} COMPONENT unwind
-    RUNTIME DESTINATION bin COMPONENT unwind)
+    RUNTIME DESTINATION ${LIBUNWIND_INSTALL_RUNTIME_DIR} COMPONENT unwind)
 endif()
 
 if (NOT CMAKE_CONFIGURATION_TYPES AND LIBUNWIND_INSTALL_LIBRARY)
@@ -234,4 +238,8 @@ if (NOT CMAKE_CONFIGURATION_TYPES AND LIBUNWIND_INSTALL_LIBRARY)
             -DCMAKE_INSTALL_COMPONENT=unwind
             -DCMAKE_INSTALL_DO_STRIP=1
             -P "${LIBUNWIND_BINARY_DIR}/cmake_install.cmake")
+  if(LIBUNWIND_INSTALL_HEADERS)
+    add_dependencies(install-unwind install-unwind-headers)
+    add_dependencies(install-unwind-stripped install-unwind-headers-stripped)
+  endif()
 endif()

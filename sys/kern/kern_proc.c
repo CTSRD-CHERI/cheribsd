@@ -258,8 +258,7 @@ proc_dtor(void *mem, int size, void *arg)
 #endif
 		/* Free all OSD associated to this thread. */
 		osd_thread_exit(td);
-		td_softdep_cleanup(td);
-		MPASS(td->td_su == NULL);
+		ast_kclear(td);
 
 		/* Make sure all thread destructors are executed */
 		EVENTHANDLER_DIRECT_INVOKE(thread_dtor, td);
@@ -3896,9 +3895,10 @@ SYSCTL_PROC(_debug, OID_AUTO, stop_all_proc, CTLTYPE_INT | CTLFLAG_RW |
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20190531,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
+//     "user_capabilities",
 //     "support"
 //   ],
 //   "changes_purecap": [

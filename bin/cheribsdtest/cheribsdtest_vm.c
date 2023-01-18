@@ -971,9 +971,10 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_invalid_cap,
 CHERIBSDTEST(cheribsdtest_vm_reservation_mmap,
     "check mmap with NULL-derived hint address")
 {
-	uintptr_t hint = 0x56000000;
+	uintptr_t hint;
 	void *map;
 
+	hint = find_address_space_gap(PAGE_SIZE, 0);
 	map = CHERIBSDTEST_CHECK_SYSCALL(mmap((void *)hint, PAGE_SIZE,
 	    PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
 	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0,
@@ -991,16 +992,18 @@ CHERIBSDTEST(cheribsdtest_vm_reservation_mmap,
 CHERIBSDTEST(cheribsdtest_vm_reservation_mmap_fixed_unreserved,
     "check mmap MAP_FIXED with NULL-derived hint address")
 {
-	uintptr_t hint = 0x56000000;
+	uintptr_t hint;
 	void *map;
 
-	map = CHERIBSDTEST_CHECK_SYSCALL(mmap((void *)hint, PAGE_SIZE,
-	    PROT_MAX(PROT_READ | PROT_WRITE), MAP_ANON | MAP_FIXED, -1, 0));
+	hint = find_address_space_gap(PAGE_SIZE * 2, 0);
+	map = CHERIBSDTEST_CHECK_SYSCALL(mmap((void *)(hint + PAGE_SIZE),
+	    PAGE_SIZE, PROT_MAX(PROT_READ | PROT_WRITE), MAP_ANON | MAP_FIXED,
+	    -1, 0));
 	CHERIBSDTEST_VERIFY2(cheri_gettag(map) != 0,
 	    "mmap fixed with NULL-derived hint failed to return "
 	    "valid capability");
 
-	map = mmap((void *)(hint - PAGE_SIZE), 2 * PAGE_SIZE,
+	map = mmap((void *)hint, 2 * PAGE_SIZE,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0);
 	CHERIBSDTEST_VERIFY2(map == MAP_FAILED,
 	    "mmap fixed with NULL-derived hint does not imply MAP_EXCL");

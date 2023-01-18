@@ -510,7 +510,11 @@ out_state:
 
 	drm_atomic_state_put(state);
 out_ctx:
-	drm_modeset_drop_locks(&ctx);
+#ifdef __FreeBSD__
+	/* XXX: work around nested panic() */
+	if (!SKIP_SLEEP())
+		drm_modeset_drop_locks(&ctx);
+#endif
 	drm_modeset_acquire_fini(&ctx);
 
 	return ret;

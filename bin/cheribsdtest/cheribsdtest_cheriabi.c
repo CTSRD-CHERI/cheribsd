@@ -135,54 +135,12 @@ CHERIBSDTEST(test_cheriabi_malloc_zero_size,
 	cheribsdtest_success();
 }
 
-static const char *
-xfail_need_unabandoned_mmap(const char *name __unused)
-{
-	static const char *reason = NULL;
-	static int checked = 0;
-	size_t len;
-	int abandon_on_munmap;
-
-	if (checked)
-		return (reason);
-
-	checked = 1;
-	len = sizeof(abandon_on_munmap);
-	if (sysctlbyname("debug.abandon_on_munmap", &abandon_on_munmap, &len,
-	    NULL, 0) != 0)
-		return (NULL);
-
-	if (abandon_on_munmap == 0)
-		return (NULL);
-
-	reason = "debug.abandon_on_munmap is enabled";
-	return (reason);
-}
-
 struct adjacent_mappings {
 	char *first;
 	char *middle;
 	char *last;
 	size_t maplen;
 };
-
-/*
- * "Reserve" a chunk of address space by mapping pages, unmapping them,
- * and returning the base address.  This is necessary because small
- * mappings (e.g. 2 pages) might land between other mappings and thus
- * the next N pages might not be free.
- */
-static ptraddr_t
-reserve_address_space(size_t len)
-{
-	void *addr;
-
-	addr = CHERIBSDTEST_CHECK_SYSCALL(
-	    mmap(0, len, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
-	CHERIBSDTEST_CHECK_SYSCALL(munmap(addr, len));
-	/* XXX: With temporal safety we will need to force revocation here. */
-	return ((ptraddr_t)addr);
-}
 
 /*
  * Create three adjacent memory mappings that be used to check that the memory
@@ -197,7 +155,7 @@ create_adjacent_mappings(struct adjacent_mappings *mappings)
 
 	len = getpagesize() * 2;
 	memset(mappings, 0, sizeof(*mappings));
-	requested_addr = (void *)(uintcap_t)reserve_address_space(len * 3);
+	requested_addr = (void *)(uintcap_t)find_address_space_gap(len * 3, 0);
 	mappings->first = CHERIBSDTEST_CHECK_SYSCALL(mmap(requested_addr, len,
 	    PROT_READ | PROT_WRITE, MAP_ANON | MAP_FIXED, -1, 0));
 	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->first));
@@ -230,8 +188,7 @@ free_adjacent_mappings(struct adjacent_mappings *mappings)
 }
 
 CHERIBSDTEST(test_cheriabi_munmap_invalid_ptr,
-    "Check that munmap() rejects invalid pointer arguments",
-    .ct_check_xfail = xfail_need_unabandoned_mmap)
+    "Check that munmap() rejects invalid pointer arguments")
 {
 	struct adjacent_mappings mappings;
 
@@ -264,8 +221,7 @@ CHERIBSDTEST(test_cheriabi_munmap_invalid_ptr,
 }
 
 CHERIBSDTEST(test_cheriabi_mprotect_invalid_ptr,
-    "Check that mprotect() rejects invalid pointer arguments",
-    .ct_check_xfail = xfail_need_unabandoned_mmap)
+    "Check that mprotect() rejects invalid pointer arguments")
 {
 	struct adjacent_mappings mappings;
 
@@ -304,8 +260,7 @@ CHERIBSDTEST(test_cheriabi_mprotect_invalid_ptr,
 }
 
 CHERIBSDTEST(test_cheriabi_minherit_invalid_ptr,
-    "Check that minherit() rejects invalid pointer arguments",
-    .ct_check_xfail = xfail_need_unabandoned_mmap)
+    "Check that minherit() rejects invalid pointer arguments")
 {
 	struct adjacent_mappings mappings;
 
@@ -353,7 +308,7 @@ create_adjacent_mappings_shm(struct adjacent_mappings *mappings)
 	len = getpagesize() * 2;
 	memset(mappings, 0, sizeof(*mappings));
 	shmid = CHERIBSDTEST_CHECK_SYSCALL(shmget(IPC_PRIVATE, len, 0600));
-	requested_addr = (void *)(uintcap_t)reserve_address_space(len * 3);
+	requested_addr = (void *)(uintcap_t)find_address_space_gap(len * 3, 0);
 	mappings->first = CHERIBSDTEST_CHECK_SYSCALL(shmat(shmid,
 	    requested_addr, 0));
 	CHERIBSDTEST_VERIFY(cheri_gettag(mappings->first));
@@ -386,8 +341,7 @@ free_adjacent_mappings_shm(struct adjacent_mappings *mappings)
 }
 
 CHERIBSDTEST(test_cheriabi_shmdt_invalid_ptr,
-    "Check that shmdt() rejects invalid pointer arguments",
-    .ct_check_xfail = xfail_need_unabandoned_mmap)
+    "Check that shmdt() rejects invalid pointer arguments")
 {
 	struct adjacent_mappings mappings;
 

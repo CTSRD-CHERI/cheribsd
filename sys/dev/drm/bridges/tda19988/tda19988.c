@@ -971,9 +971,7 @@ static driver_t tda_driver = {
 	sizeof(struct tda19988_softc),
 };
 
-static devclass_t tda_devclass;
-
-EARLY_DRIVER_MODULE(tda, iicbus, tda_driver, tda_devclass, 0, 0,
+EARLY_DRIVER_MODULE(tda, iicbus, tda_driver, 0, 0,
     BUS_PASS_INTERRUPT + BUS_PASS_ORDER_MIDDLE);
 MODULE_VERSION(tda, 1);
 MODULE_DEPEND(tda, iicbus, 1, 1, 1);

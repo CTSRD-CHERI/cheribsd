@@ -67,11 +67,17 @@ __libc_sigaction_slot(int signo)
 	return (&_thr_sigact[signo - 1]);
 }
 
-static void thr_sighandler(int, siginfo_t *, void *);
+static void thr_sighandler(int, siginfo_t *, void *) __used;
 static void handle_signal(struct sigaction *, int, siginfo_t *, ucontext_t *);
 static void check_deferred_signal(struct pthread *);
 static void check_suspend(struct pthread *);
 static void check_cancel(struct pthread *curthread, ucontext_t *ucp);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+__weak_reference(thr_sighandler, _thr_sighandler);
+void _thr_sighandler(int, siginfo_t *, void *);
+__weak_reference(thr_sighandler, _rtld_sighandler);
+void _rtld_sighandler(int, siginfo_t *, void *);
+#endif
 
 int	_sigtimedwait(const sigset_t *set, siginfo_t *info,
 	const struct timespec * timeout);
@@ -316,7 +322,16 @@ handle_signal(struct sigaction *actp, int sig, siginfo_t *info, ucontext_t *ucp)
 	/* reschedule cancellation */
 	check_cancel(curthread, &uc2);
 	errno = err;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	/*
+	 * Calling sigreturn outside of sigcode does not work with
+	 * compartmentalisation. Hence we set the user context and let the
+	 * function return back to sigcode, where sigreturn will be called.
+	 */
+	memcpy(ucp, &uc2, sizeof(*ucp));
+#else
 	syscall(SYS_sigreturn, &uc2);
+#endif
 }
 
 void
@@ -403,6 +418,9 @@ check_deferred_signal(struct pthread *curthread)
 	/* remove signal */
 	curthread->deferred_siginfo.si_signo = 0;
 	handle_signal(&act, info.si_signo, &info, uc);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	setcontext(uc);
+#endif
 }
 
 static void
@@ -478,7 +496,11 @@ _thr_signal_init(int dlopened)
 			remove_thr_signals(&usa->sigact.sa_mask);
 			nact.sa_flags &= ~SA_NODEFER;
 			nact.sa_flags |= SA_SIGINFO;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+			nact.sa_sigaction = _rtld_sighandler;
+#else
 			nact.sa_sigaction = thr_sighandler;
+#endif
 			nact.sa_mask = _thr_maskset;
 			(void)__sys_sigaction(sig, &nact, NULL);
 		}
@@ -608,7 +630,11 @@ __thr_sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 			remove_thr_signals(&usa->sigact.sa_mask);
 			newact.sa_flags &= ~SA_NODEFER;
 			newact.sa_flags |= SA_SIGINFO;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+			newact.sa_sigaction = _rtld_sighandler;
+#else
 			newact.sa_sigaction = thr_sighandler;
+#endif
 			newact.sa_mask = _thr_maskset; /* mask all signals */
 		}
 		ret = __sys_sigaction(sig, &newact, &oldact);

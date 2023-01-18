@@ -43,7 +43,7 @@ LHDRS=	aio.h errno.h fcntl.h linker_set.h poll.h stdatomic.h stdint.h \
 	syslog.h ucontext.h
 
 LDIRS=	cheri geom net net80211 netgraph netinet netinet6 \
-	netipsec netsmb nfs nfsclient nfsserver sys vm
+	netipsec netlink netsmb nfs nfsclient nfsserver sys vm
 
 LSUBDIRS=	dev/acpica dev/agp dev/ciss dev/filemon dev/firewire \
 	dev/hwpmc dev/hyperv \
@@ -61,6 +61,7 @@ LSUBDIRS=	dev/acpica dev/agp dev/ciss dev/filemon dev/firewire \
 	netinet/cc \
 	netinet/netdump \
 	netinet/tcp_stacks \
+	netlink/route \
 	security/mac_biba security/mac_bsdextended security/mac_lomac \
 	security/mac_mls security/mac_partition \
 	security/mac_veriexec \
@@ -216,7 +217,7 @@ RPCDIR=		${INCLUDEDIR}/rpc
 TEKEN=		teken.h
 TEKENDIR=	${INCLUDEDIR}/teken
 
-.PATH: ${SRCTOP}/sys/contrib/openzfs/include/sys
+.PATH: ${ZFSTOP}/include/sys
 NVPAIR=		nvpair.h
 NVPAIRDIR=	${INCLUDEDIR}/sys
 
@@ -458,7 +459,7 @@ symlinks: .PHONY .META
 	cd ${SRCTOP}/sys/rpc;
 .if ${MK_CDDL} != "no"
 	${INSTALL_SYMLINK} ${TAG_ARGS:D${TAG_ARGS},dev} \
-	    ../../../sys/contrib/openzfs/include/sys/nvpair.h \
+	    ../../..${ZFSTOP:C!^${SRCTOP}!!}/include/sys/nvpair.h \
 	    ${SDESTDIR}${INCLUDEDIR}/sys
 .endif
 .if ${MK_MLX5TOOL} != "no"

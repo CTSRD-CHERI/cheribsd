@@ -41,6 +41,9 @@
 #ifndef	_COMPAT64_BASENAME_RTLD
 #define	_COMPAT64_BASENAME_RTLD		"ld-elf64.so.1"
 #endif
+#ifndef	_C18N_BASENAME_RTLD
+#define	_C18N_BASENAME_RTLD		"ld-elf-c18n.so.1"
+#endif
 
 #ifdef COMPAT_CHERI
 #define	_PATH_ELF_HINTS		"/var/run/ld-elf64c.so.hints"
@@ -72,6 +75,18 @@
 #define	_BASENAME_RTLD		_COMPAT64_BASENAME_RTLD
 #define	STANDARD_LIBRARY_PATH	"/lib64:/usr/lib64"
 #define	LD_			"LD_64_"
+#endif
+
+#ifndef _PATH_ELF_C18N_HINTS
+#define	_PATH_ELF_C18N_HINTS	"/var/run/ld-elf-c18n.so.hints"
+#endif
+
+#ifdef RTLD_SANDBOX
+#define	_PATH_ELF_HINTS		_PATH_ELF_C18N_HINTS
+#define	_PATH_LIBMAP_CONF	"/etc/libmap-c18n.conf"
+#define	_BASENAME_RTLD		_C18N_BASENAME_RTLD
+#define	STANDARD_LIBRARY_PATH	"/lib/casper:/usr/lib/c18n:/lib:/usr/lib"
+#define	LD_			"LD_C18N_"
 #endif
 
 #ifndef _PATH_ELF_HINTS

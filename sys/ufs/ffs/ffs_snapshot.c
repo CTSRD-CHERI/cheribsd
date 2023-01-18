@@ -689,7 +689,7 @@ loop:
 		*blkp++ = lblkno(fs, fs->fs_sblockloc);
 		blkno = fragstoblks(fs, fs->fs_csaddr);
 		for (cg = 0; cg < fs->fs_ncg; cg++) {
-			if (fragstoblks(fs, cgtod(fs, cg) > blkno))
+			if (fragstoblks(fs, cgtod(fs, cg)) > blkno)
 				break;
 			*blkp++ = fragstoblks(fs, cgtod(fs, cg));
 		}
@@ -2741,7 +2741,7 @@ ffs_snapdata_acquire(struct vnode *devvp)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros"

@@ -24,21 +24,21 @@ namespace __asan {
 struct AsanStats {
   // AsanStats must be a struct consisting of uptr fields only.
   // When merging two AsanStats structs, we treat them as arrays of uptr.
-  usize mallocs;
-  usize malloced;
-  usize malloced_redzones;
-  usize frees;
-  usize freed;
-  usize real_frees;
-  usize really_freed;
-  usize reallocs;
-  usize realloced;
-  usize mmaps;
-  usize mmaped;
-  usize munmaps;
-  usize munmaped;
-  usize malloc_large;
-  usize malloced_by_size[kNumberOfSizeClasses];
+  uptr mallocs;
+  uptr malloced;
+  uptr malloced_redzones;
+  uptr frees;
+  uptr freed;
+  uptr real_frees;
+  uptr really_freed;
+  uptr reallocs;
+  uptr realloced;
+  uptr mmaps;
+  uptr mmaped;
+  uptr munmaps;
+  uptr munmaped;
+  uptr malloc_large;
+  uptr malloced_by_size[kNumberOfSizeClasses];
 
   // Ctor for global AsanStats (accumulated stats for dead threads).
   explicit AsanStats(LinkerInitialized) { }
@@ -58,10 +58,10 @@ void FlushToDeadThreadStats(AsanStats *stats);
 
 // A cross-platform equivalent of malloc_statistics_t on Mac OS.
 struct AsanMallocStats {
-  usize blocks_in_use;
-  usize size_in_use;
-  usize max_size_in_use;
-  usize size_allocated;
+  uptr blocks_in_use;
+  uptr size_in_use;
+  uptr max_size_in_use;
+  uptr size_allocated;
 };
 
 void FillMallocStatistics(AsanMallocStats *malloc_stats);

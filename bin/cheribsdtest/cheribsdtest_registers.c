@@ -158,8 +158,8 @@ check_initreg_code(void * __capability c)
 	if ((v & CHERI_PERM_SEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (seal present)", v);
 
-	if ((v & CHERI_PERM_CCALL) == 0)
-		cheribsdtest_failure_errx("perms %jx (ccall missing)", v);
+	if ((v & CHERI_PERM_INVOKE) == 0)
+		cheribsdtest_failure_errx("perms %jx (invoke missing)", v);
 
 	if ((v & CHERI_PERM_UNSEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (unseal present)", v);
@@ -174,9 +174,15 @@ check_initreg_code(void * __capability c)
 		    (CHERI_PERMS_SWALL & ~CHERI_PERM_SW_VMEM));
 
 	/* Check that the raw permission bits match the kernel header: */
+#ifdef CHERIBSD_C18N_TESTS
+	if (v != (CHERI_CAP_USER_CODE_PERMS & ~CHERI_PERM_EXECUTIVE))
+		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
+		    (uintmax_t)(CHERI_CAP_USER_CODE_PERMS & ~CHERI_PERM_EXECUTIVE));
+#else
 	if (v != CHERI_CAP_USER_CODE_PERMS)
 		cheribsdtest_failure_errx("perms %jx (expected %jx)", v,
 		    (uintmax_t)CHERI_CAP_USER_CODE_PERMS);
+#endif
 
 	cheribsdtest_success();
 }
@@ -247,8 +253,8 @@ check_initreg_data_full_addrspace(void * __capability c)
 	if ((v & CHERI_PERM_SEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (seal present)", v);
 
-	if ((v & CHERI_PERM_CCALL) == 0)
-		cheribsdtest_failure_errx("perms %jx (ccall missing)", v);
+	if ((v & CHERI_PERM_INVOKE) == 0)
+		cheribsdtest_failure_errx("perms %jx (invoke missing)", v);
 
 	if ((v & CHERI_PERM_UNSEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (unseal present)", v);
@@ -385,8 +391,8 @@ CHERIBSDTEST(test_initregs_stack,
 	if ((v & CHERI_PERM_SYSTEM_REGS) != 0)
 		cheribsdtest_failure_errx("perms %jx (system_regs present)", v);
 
-	if ((v & CHERI_PERM_CCALL) == 0)
-		cheribsdtest_failure_errx("perms %jx (ccall missing)", v);
+	if ((v & CHERI_PERM_INVOKE) == 0)
+		cheribsdtest_failure_errx("perms %jx (invoke missing)", v);
 
 	if ((v & CHERI_PERM_UNSEAL) != 0)
 		cheribsdtest_failure_errx("perms %jx (unseal present)", v);
@@ -450,6 +456,7 @@ CHERIBSDTEST(test_initregs_pcc,
 }
 
 #ifdef __aarch64__
+#ifndef CHERIBSD_C18N_TESTS
 CHERIBSDTEST(test_initregs_restricted_default,
     "Test initial value of restricted default capability")
 {
@@ -485,4 +492,5 @@ CHERIBSDTEST(test_initregs_restricted_thread,
 
 	cheribsdtest_success();
 }
+#endif
 #endif

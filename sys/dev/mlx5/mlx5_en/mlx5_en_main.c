@@ -4799,6 +4799,8 @@ mlx5e_create_ifp(struct mlx5_core_dev *mdev)
 	    &priv->clbr_done, 0,
 	    "RX timestamps calibration state");
 	callout_init(&priv->tstmp_clbr, 1);
+	/* Pull out the frequency of the clock in hz */
+	priv->cclk = (uint64_t)MLX5_CAP_GEN(mdev, device_frequency_khz) * 1000ULL;
 	mlx5e_reset_calibration_callout(priv);
 
 	pa.pa_version = PFIL_VERSION;
@@ -5060,7 +5062,7 @@ MODULE_DEPEND(mlx5en, mlx5, 1, 1, 1);
 MODULE_VERSION(mlx5en, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20210525,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

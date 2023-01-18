@@ -37,7 +37,7 @@ class CombinedAllocator {
 
   // Secondary allocations do not require a Cache, but do require an Alignment
   // parameter.
-  void *allocateSecondary(usize Size, usize Alignment) {
+  void *allocateSecondary(uptr Size, uptr Alignment) {
     return Secondary.Allocate(&Stats, Size, Alignment);
   }
 

@@ -54,7 +54,6 @@ int
 freebsd64___mac_get_pid(struct thread *td,
     struct freebsd64___mac_get_pid_args *uap)
 {
-
 	return (kern_mac_get_pid(td, uap->pid, __USER_CAP_OBJ(uap->mac_p)));
 }
 
@@ -62,7 +61,6 @@ int
 freebsd64___mac_get_proc(struct thread *td,
     struct freebsd64___mac_get_proc_args *uap)
 {
-
 	return (kern_mac_get_proc(td, __USER_CAP_OBJ(uap->mac_p)));
 }
 
@@ -70,7 +68,6 @@ int
 freebsd64___mac_set_proc(struct thread *td,
     struct freebsd64___mac_set_proc_args *uap)
 {
-
 	return (kern_mac_set_proc(td, __USER_CAP_OBJ(uap->mac_p)));
 }
 
@@ -78,7 +75,6 @@ int
 freebsd64___mac_get_fd(struct thread *td,
     struct freebsd64___mac_get_fd_args *uap)
 {
-
 	return (kern_mac_get_fd(td, uap->fd, __USER_CAP_OBJ(uap->mac_p)));
 }
 
@@ -86,7 +82,6 @@ int
 freebsd64___mac_get_file(struct thread *td,
     struct freebsd64___mac_get_file_args *uap)
 {
-
 	return (kern_mac_get_path(td, __USER_CAP_STR(uap->path_p),
 	    __USER_CAP_OBJ(uap->mac_p), FOLLOW));
 }
@@ -95,7 +90,6 @@ int
 freebsd64___mac_get_link(struct thread *td,
     struct freebsd64___mac_get_link_args *uap)
 {
-
 	return (kern_mac_get_path(td, __USER_CAP_STR(uap->path_p),
 	    __USER_CAP_OBJ(uap->mac_p), NOFOLLOW));
 }
@@ -104,7 +98,6 @@ int
 freebsd64___mac_set_fd(struct thread *td,
     struct freebsd64___mac_set_fd_args *uap)
 {
-
 	return (kern_mac_set_fd(td, uap->fd, __USER_CAP_OBJ(uap->mac_p)));
 }
 
@@ -112,7 +105,6 @@ int
 freebsd64___mac_set_file(struct thread *td,
     struct freebsd64___mac_set_file_args *uap)
 {
-
 	return (kern_mac_set_path(td, __USER_CAP_STR(uap->path_p),
 	    __USER_CAP_OBJ(uap->mac_p), FOLLOW));
 }
@@ -121,7 +113,6 @@ int
 freebsd64___mac_set_link(struct thread *td,
     struct freebsd64___mac_set_link_args *uap)
 {
-
 	return (kern_mac_set_path(td, __USER_CAP_STR(uap->path_p),
 	    __USER_CAP_OBJ(uap->mac_p), NOFOLLOW));
 }
@@ -130,7 +121,6 @@ int
 freebsd64_mac_syscall(struct thread *td,
     struct freebsd64_mac_syscall_args *uap)
 {
-
 	return (kern_mac_syscall(td, __USER_CAP_OBJ(uap->policy), uap->call,
 	    __USER_CAP_UNBOUND(uap->arg)));
 }
@@ -162,7 +152,6 @@ int
 freebsd64___mac_get_proc(struct thread *td,
     struct freebsd64___mac_get_proc_args *uap)
 {
-
 	return(ENOSYS);
 }
 
@@ -170,7 +159,6 @@ int
 freebsd64___mac_set_proc(struct thread *td,
     struct freebsd64___mac_set_proc_args *uap)
 {
-
 	return(ENOSYS);
 }
 
@@ -178,7 +166,6 @@ int
 freebsd64___mac_get_fd(struct thread *td,
     struct freebsd64___mac_get_fd_args *uap)
 {
-
 	return(ENOSYS);
 }
 
@@ -186,7 +173,6 @@ int
 freebsd64___mac_get_file(struct thread *td,
     struct freebsd64___mac_get_file_args *uap)
 {
-
 	return(ENOSYS);
 }
 
@@ -194,7 +180,6 @@ int
 freebsd64___mac_set_fd(struct thread *td,
     struct freebsd64___mac_set_fd_args *uap)
 {
-
 	return(ENOSYS);
 }
 
@@ -202,7 +187,6 @@ int
 freebsd64___mac_set_file(struct thread *td,
     struct freebsd64___mac_set_file_args *uap)
 {
-
 	return(ENOSYS);
 }
 
@@ -210,7 +194,6 @@ int
 freebsd64___mac_get_pid(struct thread *td,
     struct freebsd64___mac_get_pid_args *uap)
 {
-
 	return(ENOSYS);
 }
 
@@ -218,7 +201,6 @@ int
 freebsd64___mac_get_link(struct thread *td,
     struct freebsd64___mac_get_link_args *uap)
 {
-
 	return(ENOSYS);
 }
 
@@ -226,7 +208,6 @@ int
 freebsd64___mac_set_link(struct thread *td,
     struct freebsd64___mac_set_link_args *uap)
 {
-
 	return(ENOSYS);
 }
 
@@ -234,7 +215,6 @@ int
 freebsd64_mac_syscall(struct thread *td,
     struct freebsd64_mac_syscall_args *uap)
 {
-
 	return(ENOSYS);
 }
 
@@ -242,7 +222,6 @@ int
 freebsd64___mac_execve(struct thread *td,
     struct freebsd64___mac_execve_args *uap)
 {
-
 	return(ENOSYS);
 }
 

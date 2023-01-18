@@ -29,7 +29,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181114,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
  *     "support"
@@ -58,7 +58,13 @@ __FBSDID("$FreeBSD$");
 #include "thr_private.h"
 
 static int  create_stack(struct pthread_attr *pattr);
-static void thread_start(struct pthread *curthread);
+static void thread_start(struct pthread *curthread) __used;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+__weak_reference(thread_start, _thread_start);
+void _thread_start(struct pthread *curthread);
+__weak_reference(thread_start, _rtld_thread_start);
+void _rtld_thread_start(struct pthread *);
+#endif
 
 __weak_reference(_pthread_create, pthread_create);
 
@@ -166,7 +172,11 @@ _pthread_create(pthread_t * __restrict thread,
 		locked = 1;
 	} else
 		locked = 0;
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	param.start_func = (void (*)(void *)) _rtld_thread_start;
+#else
 	param.start_func = (void (*)(void *)) thread_start;
+#endif
 	param.arg = new_thread;
 	param.stack_base = new_thread->attr.stackaddr_attr;
 	param.stack_size = new_thread->attr.stacksize_attr;

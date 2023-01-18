@@ -45,8 +45,8 @@ struct Metadata {
 };
 
 struct HwasanMapUnmapCallback {
-  void OnMap(uptr p, usize size) const { UpdateMemoryUsage(); }
-  void OnUnmap(uptr p, usize size) const {
+  void OnMap(uptr p, uptr size) const { UpdateMemoryUsage(); }
+  void OnUnmap(uptr p, uptr size) const {
     // We are about to unmap a chunk of user memory.
     // It can return as user-requested mmap() or another thread stack.
     // Make it accessible with zero-tagged pointer.
@@ -54,21 +54,21 @@ struct HwasanMapUnmapCallback {
   }
 };
 
-static const usize kMaxAllowedMallocSize = 1UL << 40;  // 1T
+static const uptr kMaxAllowedMallocSize = 1UL << 40;  // 1T
 
 struct AP64 {
-  static const vaddr kSpaceBeg = ~0ULL;
+  static const uptr kSpaceBeg = ~0ULL;
 
 #if defined(HWASAN_ALIASING_MODE)
-  static const usize kSpaceSize = 1ULL << kAddressTagShift;
+  static const uptr kSpaceSize = 1ULL << kAddressTagShift;
 #else
-  static const usize kSpaceSize = 0x2000000000ULL;
+  static const uptr kSpaceSize = 0x2000000000ULL;
 #endif
-  static const usize kMetadataSize = sizeof(Metadata);
+  static const uptr kMetadataSize = sizeof(Metadata);
   typedef __sanitizer::VeryDenseSizeClassMap SizeClassMap;
   using AddressSpaceView = LocalAddressSpaceView;
   typedef HwasanMapUnmapCallback MapUnmapCallback;
-  static const usize kFlags = 0;
+  static const uptr kFlags = 0;
 };
 typedef SizeClassAllocator64<AP64> PrimaryAllocator;
 typedef CombinedAllocator<PrimaryAllocator> Allocator;

@@ -2173,6 +2173,12 @@ again:
 				goto again;
 			}
 
+			/*
+			 * See the comment in vm_fault_cow().
+			 */
+			if (src_object == dst_object &&
+			    (object->flags & OBJ_ONEMAPPING) == 0)
+				pmap_remove_all(src_m);
 #if __has_feature(capabilities)
 			/*
 			 * Preserve tags if the source page contains tags.
@@ -2272,10 +2278,11 @@ vm_fault_enable_pagefaults(int save)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
-//     "support"
+//     "support",
+//     "virtual_address"
 //   ],
 //   "change_comment": ""
 // }

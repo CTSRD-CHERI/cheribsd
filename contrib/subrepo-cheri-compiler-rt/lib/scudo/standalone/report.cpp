@@ -84,7 +84,7 @@ void NORETURN reportSanityCheckError(const char *Field) {
 
 // We enforce a maximum alignment, to keep fields smaller and generally prevent
 // integer overflows, or unexpected corner cases.
-void NORETURN reportAlignmentTooBig(usize Alignment, uptr MaxAlignment) {
+void NORETURN reportAlignmentTooBig(uptr Alignment, uptr MaxAlignment) {
   ScopedErrorReport Report;
   Report.append("invalid allocation alignment: %zu exceeds maximum supported "
                 "alignment of %zu\n",
@@ -144,7 +144,7 @@ void NORETURN reportDeallocTypeMismatch(AllocatorAction Action, void *Ptr,
 
 // The size specified to the delete operator does not match the one that was
 // passed to new when allocating the chunk.
-void NORETURN reportDeleteSizeMismatch(void *Ptr, usize Size,
+void NORETURN reportDeleteSizeMismatch(void *Ptr, uptr Size,
                                        uptr ExpectedSize) {
   ScopedErrorReport Report;
   Report.append(
@@ -152,21 +152,21 @@ void NORETURN reportDeleteSizeMismatch(void *Ptr, usize Size,
       Size, ExpectedSize);
 }
 
-void NORETURN reportAlignmentNotPowerOfTwo(usize Alignment) {
+void NORETURN reportAlignmentNotPowerOfTwo(uptr Alignment) {
   ScopedErrorReport Report;
   Report.append(
       "invalid allocation alignment: %zu, alignment must be a power of two\n",
       Alignment);
 }
 
-void NORETURN reportCallocOverflow(uptr Count, usize Size) {
+void NORETURN reportCallocOverflow(uptr Count, uptr Size) {
   ScopedErrorReport Report;
   Report.append("calloc parameters overflow: count * size (%zu * %zu) cannot "
                 "be represented with type size_t\n",
                 Count, Size);
 }
 
-void NORETURN reportInvalidPosixMemalignAlignment(usize Alignment) {
+void NORETURN reportInvalidPosixMemalignAlignment(uptr Alignment) {
   ScopedErrorReport Report;
   Report.append(
       "invalid alignment requested in posix_memalign: %zu, alignment must be a "
@@ -174,14 +174,14 @@ void NORETURN reportInvalidPosixMemalignAlignment(usize Alignment) {
       Alignment, sizeof(void *));
 }
 
-void NORETURN reportPvallocOverflow(usize Size) {
+void NORETURN reportPvallocOverflow(uptr Size) {
   ScopedErrorReport Report;
   Report.append("pvalloc parameters overflow: size %zu rounded up to system "
                 "page size %zu cannot be represented in type size_t\n",
                 Size, getPageSizeCached());
 }
 
-void NORETURN reportInvalidAlignedAllocAlignment(usize Alignment, usize Size) {
+void NORETURN reportInvalidAlignedAllocAlignment(uptr Alignment, uptr Size) {
   ScopedErrorReport Report;
   Report.append("invalid alignment requested in aligned_alloc: %zu, alignment "
                 "must be a power of two and the requested size %zu must be a "

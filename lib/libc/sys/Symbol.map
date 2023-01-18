@@ -432,10 +432,12 @@ FBSD_1.6 {
 
 FBSD_1.7 {
 	_Fork;
-	capfromfd;
-	captofd;
+	cheri_revoke;
+	cheri_revoke_get_shadow;
 	fspacectl;
 	swapoff;
+	capfromfd;
+	captofd;
 };
 
 FBSDprivate_1.0 {

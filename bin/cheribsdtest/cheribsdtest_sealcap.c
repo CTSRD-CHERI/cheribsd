@@ -115,8 +115,8 @@ CHERIBSDTEST(test_sealcap_sysctl, "Retrieve sealcap using sysctl(3)")
 	if ((v & CHERI_PERM_SEAL) == 0)
 		cheribsdtest_failure_errx("perms %jx (seal missing)", v);
 
-	if ((v & CHERI_PERM_CCALL) != 0)
-		cheribsdtest_failure_errx("perms %jx (ccall present)", v);
+	if ((v & CHERI_PERM_INVOKE) != 0)
+		cheribsdtest_failure_errx("perms %jx (invoke present)", v);
 
 	if ((v & CHERI_PERM_UNSEAL) == 0)
 		cheribsdtest_failure_errx("perms %jx (unseal missing)", v);

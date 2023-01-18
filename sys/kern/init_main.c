@@ -943,14 +943,15 @@ DB_SHOW_COMMAND_FLAGS(sysinit, db_show_sysinit, DB_CMD_MEMSAFE)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "pointer_provenance"
+//     "pointer_provenance",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

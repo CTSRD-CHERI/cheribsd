@@ -131,7 +131,7 @@ sysctl_stats_reset(SYSCTL_HANDLER_ARGS)
 	 * Traverse the list of children of _kern_sched_stats and reset each
 	 * to 0.  Skip the reset entry.
 	 */
-	SLIST_FOREACH(p, oidp->oid_parent, oid_link) {
+	RB_FOREACH(p, sysctl_oid_list, oidp->oid_parent) {
 		if (p == oidp || p->oid_arg1 == NULL)
 			continue;
 		counter = ((ptraddr_t)p->oid_arg1 - (ptraddr_t)DPCPU_START);
@@ -544,7 +544,7 @@ runq_remove_idx(struct runq *rq, struct thread *td, u_char *idx)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_provenance"
