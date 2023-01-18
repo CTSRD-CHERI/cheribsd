@@ -349,7 +349,7 @@ void exec_onexec_old(struct thread *td);
 #endif /* !_SYS_SYSENT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "support",

@@ -1927,7 +1927,7 @@ link_elf_strtab_get(linker_file_t lf, caddr_t *strtab)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

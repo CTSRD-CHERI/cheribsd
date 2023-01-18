@@ -1211,7 +1211,7 @@ static driver_t sfxge_driver = {
 DRIVER_MODULE(sfxge, pci, sfxge_driver, 0, 0);
 // CHERI CHANGES START
 // {
-//   "updated": 20210525,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

@@ -112,7 +112,7 @@ __DEFAULT_YES_OPTIONS += FDT
 
 # Broken post OpenZFS import
 .if ${MACHINE_CPU:Mcheri}
-BROKEN_OPTIONS+= CDDL ZFS
+BROKEN_OPTIONS+=CDDL
 .endif
 
 # expanded inline from bsd.mkopt.mk to avoid share/mk dependency
@@ -188,6 +188,7 @@ MK_${var}_SUPPORT:= yes
 .if ${MK_CDDL} == "no"
 # ctfconvert may not exist if MK_CDDL=false
 MK_CTF:=	no
+MK_DTRACE:=	no
 .endif
 
 # FIXME: duplicated from bsd.own.mk since the value of MK_CTF may have changed

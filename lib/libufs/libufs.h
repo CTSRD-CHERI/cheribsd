@@ -65,7 +65,8 @@ struct uufsd {
 	int d_ccg;			/* current cylinder group */
 	int d_lcg;			/* last cylinder group (in d_cg) */
 	const char *d_error;		/* human readable disk error */
-	off_t	d_sblockloc;		/* where to look for the superblock */
+	off_t d_sblockloc;		/* where to look for the superblock */
+	int d_lookupflags;		/* flags to superblock lookup */
 	int d_mine;			/* internal flags */
 #define	d_fs	d_sbunion.d_fs
 #define	d_sb	d_sbunion.d_sb
@@ -110,8 +111,10 @@ void	ffs_clusteracct(struct fs *, struct cg *, ufs1_daddr_t, int);
 void	ffs_fragacct(struct fs *, int, int32_t [], int);
 int	ffs_isblock(struct fs *, u_char *, ufs1_daddr_t);
 int	ffs_isfreeblock(struct fs *, u_char *, ufs1_daddr_t);
+int	ffs_sbsearch(void *, struct fs **, int, char *,
+	    int (*)(void *, off_t, void **, int));
 void	ffs_setblock(struct fs *, u_char *, ufs1_daddr_t);
-int	ffs_sbget(void *, struct fs **, off_t, char *,
+int	ffs_sbget(void *, struct fs **, off_t, int, char *,
 	    int (*)(void *, off_t, void **, int));
 int	ffs_sbput(void *, struct fs *, off_t,
 	    int (*)(void *, off_t, void *, int));
@@ -148,9 +151,11 @@ int putinode(struct uufsd *);
  * sblock.c
  */
 int sbread(struct uufsd *);
+int sbfind(struct uufsd *, int);
 int sbwrite(struct uufsd *, int);
 /* low level superblock read/write functions */
-int sbget(int, struct fs **, off_t);
+int sbget(int, struct fs **, off_t, int);
+int sbsearch(int, struct fs **, int);
 int sbput(int, struct fs *, int);
 
 /*

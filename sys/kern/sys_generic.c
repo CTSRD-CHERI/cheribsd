@@ -1134,9 +1134,7 @@ kern_pselect(struct thread *td, int nd, fd_set * __capability in,
 		 * usermode and TDP_OLDMASK is cleared, restoring old
 		 * sigmask.
 		 */
-		thread_lock(td);
-		td->td_flags |= TDF_ASTPENDING;
-		thread_unlock(td);
+		ast_sched(td, TDA_SIGSUSPEND);
 	}
 	error = kern_select(td, nd, in, ou, ex, tvp, abi_nfdbits);
 	return (error);
@@ -1633,9 +1631,7 @@ kern_poll_kfds(struct thread *td, struct pollfd *kfds, u_int nfds,
 		 * usermode and TDP_OLDMASK is cleared, restoring old
 		 * sigmask.
 		 */
-		thread_lock(td);
-		td->td_flags |= TDF_ASTPENDING;
-		thread_unlock(td);
+		ast_sched(td, TDA_SIGSUSPEND);
 	}
 
 	seltdinit(td);
@@ -2187,7 +2183,7 @@ kern_posix_error(struct thread *td, int error)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

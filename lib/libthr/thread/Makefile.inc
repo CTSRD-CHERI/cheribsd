@@ -1,7 +1,7 @@
 # $FreeBSD$
 
 # thr sources
-.PATH: ${.CURDIR}/thread
+.PATH: ${LIBTHR_SRCTOP}/thread
 
 SRCS+= \
 	thr_affinity.c \

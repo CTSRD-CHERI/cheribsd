@@ -954,6 +954,7 @@ mesh_state_create(struct module_env* env, struct query_info* qinfo,
 	mstate->s.no_cache_store = 0;
 	mstate->s.need_refetch = 0;
 	mstate->s.was_ratelimited = 0;
+	mstate->s.qstarttime = *env->now;
 
 	/* init modules */
 	for(i=0; i<env->mesh->mods.num; i++) {
@@ -2238,4 +2239,11 @@ mesh_serve_expired_callback(void* arg)
 			qstate->env->mesh->num_detached_states++;
 		mesh_do_callback(mstate, LDNS_RCODE_NOERROR, msg->rep, c, &tv);
 	}
+}
+
+int mesh_jostle_exceeded(struct mesh_area* mesh)
+{
+	if(mesh->all.count < mesh->max_reply_states)
+		return 0;
+	return 1;
 }

@@ -169,7 +169,7 @@ private:
   size_t NumPCTables;
   size_t NumPCsInPCTables;
 
-  Set<const PCTableEntry*> ObservedPCs;
+  std::set<const PCTableEntry *> ObservedPCs;
   std::unordered_map<VirtAddr, size_t> ObservedFuncs;  // PC => Counter.
 
   uint8_t *FocusFunctionCounterPtr = nullptr;

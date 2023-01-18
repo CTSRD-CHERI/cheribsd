@@ -1459,7 +1459,7 @@ main(int argc, char **argv)
 	/*
 	 * Read the current superblock, and take a backup.
 	 */
-	if ((ret = sbget(fsi, &fs, STDSB)) != 0) {
+	if ((ret = sbget(fsi, &fs, UFS_STDSB, 0)) != 0) {
 		switch (ret) {
 		case ENOENT:
 			errx(1, "superblock not recognized");
@@ -1780,7 +1780,7 @@ cgckhash(struct cg *cgp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221129,
 //   "target_type": "prog",
 //   "changes_purecap": [
 //     "pointer_shape"

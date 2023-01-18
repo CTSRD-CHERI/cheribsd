@@ -589,7 +589,7 @@ pid_t vm_get_cap_owner(struct thread *td, const uintcap_t c);
 #endif				/* _VM_MAP_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

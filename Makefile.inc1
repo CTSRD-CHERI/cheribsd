@@ -157,17 +157,17 @@ _TARGET_CPUTYPE=dummy
 .endif
 .if ${TARGET} == "arm"
 .if ${TARGET_ARCH:Marmv[67]*} != "" && ${TARGET_CPUTYPE:M*soft*} == ""
-TARGET_ABI=	gnueabihf
+TARGET_TRIPLE_ABI=	gnueabihf
 .else
-TARGET_ABI=	gnueabi
+TARGET_TRIPLE_ABI=	gnueabi
 .endif
 .endif
-_MACHINE_ABI?=	unknown
-MACHINE_MACHINE=${MACHINE_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:C/sf$//:S/riscv64c/riscv64/}
-MACHINE_TRIPLE?=${MACHINE_MACHINE}-${_MACHINE_ABI}-freebsd${OS_REVISION}
-TARGET_ABI?=	unknown
-TARGET_MACHINE=	${TARGET_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:C/sf$//:S/riscv64c/riscv64/}
-TARGET_TRIPLE?=	${TARGET_MACHINE}-${TARGET_ABI}-freebsd${OS_REVISION}
+MACHINE_TRIPLE_ABI?=	unknown
+MACHINE_TRIPLE_MACHINE=${MACHINE_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:C/sf$//:S/riscv64c/riscv64/}
+MACHINE_TRIPLE?=${MACHINE_TRIPLE_MACHINE}-${MACHINE_TRIPLE_ABI}-freebsd${OS_REVISION}
+TARGET_TRIPLE_ABI?=	unknown
+TARGET_TRIPLE_MACHINE=	${TARGET_ARCH:S/aarch64c/aarch64/:S/amd64/x86_64/:C/sf$//:S/riscv64c/riscv64/}
+TARGET_TRIPLE?=	${TARGET_TRIPLE_MACHINE}-${TARGET_TRIPLE_ABI}-freebsd${OS_REVISION}
 KNOWN_ARCHES?=	aarch64/arm64 \
 		aarch64c/arm64 \
 		amd64 \
@@ -1145,6 +1145,8 @@ _bootstrap-tools:
 	    -p ${WORLDTMP}/usr >/dev/null
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.include.dist \
 	    -p ${WORLDTMP}/usr/include >/dev/null
+	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.c18n.dist \
+	    -p ${WORLDTMP} >/dev/null
 .if ${TARGET_ARCH} == "amd64"
 	mkdir -p ${WORLDTMP}/usr/include/i386
 .endif
@@ -1499,6 +1501,10 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	    -p ${DESTDIR}/${DISTDIR}/${dist}/usr >/dev/null
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.include.dist \
 	    -p ${DESTDIR}/${DISTDIR}/${dist}/usr/include >/dev/null
+.if ${MACHINE_ABI:Mpurecap}
+	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.c18n.dist \
+	    -p ${DESTDIR}/${DISTDIR}/${dist} >/dev/null
+.endif
 .if ${TARGET_ARCH} == "amd64"
 	-mkdir ${DESTDIR}/${DISTDIR}/${dist}/usr/include/i386
 .endif
@@ -1530,6 +1536,10 @@ distributeworld installworld stageworld installsysroot: _installcheck_world .PHO
 	    sed -e 's#^\./#./${dist}/usr/#' >> ${METALOG}
 	${IMAKEENV} ${DISTR_MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.include.dist | \
 	    sed -e 's#^\./#./${dist}/usr/include/#' >> ${METALOG}
+.if ${MACHINE_ABI:Mpurecap}
+	${IMAKEENV} ${DISTR_MTREE} -C -f ${.CURDIR}/etc/mtree/BSD.c18n.dist | \
+	    sed -e 's#^\./#./${dist}/#' >> ${METALOG}
+.endif
 .if ${TARGET_ARCH} == "amd64"
 	echo "./${dist}/usr/include/i386 type=dir uname=root gname=wheel mode=0755" >> ${METALOG}
 .endif
@@ -3005,6 +3015,10 @@ native-xtools-install: .PHONY
 	    -p ${NXBDESTDIR}/usr >/dev/null
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.include.dist \
 	    -p ${NXBDESTDIR}/usr/include >/dev/null
+.if ${MACHINE_ABI:Mpurecap}
+	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.c18n.dist \
+	    -p ${NXBDESTDIR} >/dev/null
+.endif
 .if ${TARGET_ARCH} == "amd64"
 	mkdir -p ${NXBDESTDIR}/usr/include/i386
 .endif
@@ -3050,6 +3064,9 @@ _prereq_libs+=	lib/libclang_rt/ubsan_minimal
 _prereq_libs+=	lib/libclang_rt/ubsan_standalone
 _prereq_libs+=	lib/libclang_rt/ubsan_standalone_cxx
 .endif
+.if ${MACHINE_ABI:Mpurecap} && ${MK_CHERI_CAPREVOKE} == "yes"
+_prereq_libs+=	lib/libcheri_caprevoke
+.endif
 
 # These dependencies are not automatically generated:
 #
@@ -3092,7 +3109,7 @@ _prebuild_libs=	${_kerberos5_lib_libasn1} \
 		lib/ncurses/tinfo \
 		lib/ncurses/ncurses \
 		lib/ncurses/form \
-		lib/libopie lib/libpam/libpam lib/libthr \
+		lib/libpam/libpam lib/libthr \
 		${_lib_libradius} lib/libsbuf lib/libtacplus \
 		lib/libgeom \
 		${_cddl_lib_libumem} ${_cddl_lib_libnvpair} \
@@ -3165,7 +3182,7 @@ _generic_libs+= ${_DIR}
 .endif
 .endfor
 
-lib/libopie__L lib/libtacplus__L: lib/libmd__L
+lib/libtacplus__L: lib/libmd__L
 
 .if ${MK_CDDL} != "no"
 _cddl_lib_libumem= cddl/lib/libumem
@@ -3717,6 +3734,10 @@ _xi-mtree: .PHONY
 	    -p ${XDDESTDIR}/usr >/dev/null
 	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.include.dist \
 	    -p ${XDDESTDIR}/usr/include >/dev/null
+.if ${MACHINE_ABI:Mpurecap}
+	${DESTDIR_MTREE} -f ${.CURDIR}/etc/mtree/BSD.c18n.dist \
+	    -p ${XDDESTDIR} >/dev/null
+.endif
 .if ${TARGET_ARCH} == "amd64"
 	mkdir -p ${XDDESTDIR}/usr/include/i386
 .endif

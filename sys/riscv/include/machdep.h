@@ -51,7 +51,7 @@ void initriscv(struct riscv_bootparams *);
 #endif /* _MACHINE_MACHDEP_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

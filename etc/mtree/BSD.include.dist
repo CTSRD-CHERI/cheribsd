@@ -275,6 +275,10 @@
     ..
     netinet6
     ..
+    netlink
+        route
+        ..
+    ..
     netipsec
     ..
     netnatm

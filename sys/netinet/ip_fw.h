@@ -1098,10 +1098,13 @@ typedef struct _ipfw_sopt_info {
 #endif /* _IPFW2_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "integer_provenance"
+//   ],
+//   "changes_purecap": [
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

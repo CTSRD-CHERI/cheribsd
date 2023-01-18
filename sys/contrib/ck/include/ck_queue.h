@@ -438,7 +438,7 @@ struct {									\
 #endif /* CK_QUEUE_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221129,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"

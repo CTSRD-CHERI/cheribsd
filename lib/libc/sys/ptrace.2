@@ -397,6 +397,33 @@ argument is ignored.
 The actual number of bytes read or written is stored in
 .Va piod_len
 upon return.
+.Pp
+.Dv PIOD_READ_CHERI_TAGS
+reads a bitmask of CHERI tags starting at the virtual address
+.Fa piod_offs
+in the traced process's address space.
+The address must be aligned to a multiple of the capability size times 8.
+.Fa piod_len
+specifies the length of the bitmask to store,
+not the amount of target address space.
+Each aligned capability in the target address space produces a single bit
+in the bitmask.
+The LSB of each bitmask byte is set to the tag of the first capability in
+the associated stride of target address space.
+.Pp
+.Dv PIOD_READ_CHERI_CAP
+returns an expanded value of one or more capabilities starting at the virtual
+address
+.Fa piod_offs
+in the traced process's address space.
+The address must be aligned to the size of a capability.
+Each capability is stored as a single byte holding the tag followed by
+the capability bytes as would be returned by a corresponding call using
+.Dv PIOD_READ_D .
+.Fa piod_len
+must be a multiple of the expanded value size and specifies the size of
+the expanded value buffer,
+not the amount of target address space.
 .It Dv PT_CONTINUE
 The traced process continues execution.
 The

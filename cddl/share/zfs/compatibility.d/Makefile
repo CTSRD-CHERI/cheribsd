@@ -1,7 +1,5 @@
 # $FreeBSD$
 
-ZFSTOP= ${SRCTOP}/sys/contrib/openzfs
-
 .PATH: ${ZFSTOP}/cmd/zpool/compatibility.d
 
 FILES= \

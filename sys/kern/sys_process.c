@@ -542,13 +542,20 @@ proc_read_cheri_tags(struct proc *p, struct uio *uio)
 	/*
 	 * Can't reuse uio_offset directly as uiomove increments it
 	 * based on the tag bitmask size.
+	 *
+	 * Require that the offset be aligned to the granularity of a
+	 * single bytes-worth of tags to simplify the implementation.
+	 * In theory any capability-aligned address would be ok, but
+	 * the returned bitmask bytes would have to be constructed by
+	 * selecting bits from adjacent bytes in the per-page bitmasks
+	 * returned by proc_read_cheri_tags_page.
 	 */
 	va = uio->uio_offset;
-	if (!is_aligned(va, sizeof(uintcap_t)))
+	if (!is_aligned(va, sizeof(uintcap_t) * CHAR_BIT))
 		return (EINVAL);
 
 	/* Handle partial first page. */
-	if (uio->uio_offset % PAGE_SIZE != 0) {
+	if (va % PAGE_SIZE != 0) {
 		u_int pageoff, tagoff;
 
 		pageoff = va % PAGE_SIZE;
@@ -557,7 +564,7 @@ proc_read_cheri_tags(struct proc *p, struct uio *uio)
 		if (error != 0)
 			return (error);
 
-		tagoff = pageoff / sizeof(uintcap_t);
+		tagoff = pageoff / (sizeof(uintcap_t) * CHAR_BIT);
 		error = uiomove(tagbuf + tagoff, sizeof(tagbuf) - tagoff, uio);
 		if (error != 0)
 			return (error);
@@ -592,7 +599,9 @@ proc_read_cheri_cap_page(vm_map_t map, vm_offset_t va, struct uio *uio)
 	KASSERT(is_aligned(va, sizeof(uintcap_t)),
 	    ("%s: user address %lx is not capability-aligned", __func__, va));
 	pageoff = va & PAGE_MASK;
-	todo = min(PAGE_SIZE - pageoff, uio->uio_resid);
+	todo = (PAGE_SIZE - pageoff) / sizeof(uintcap_t) *
+	    (sizeof(uintcap_t) + 1);
+	todo = MIN(todo, uio->uio_resid);
 	va = trunc_page(va);
 
 	error = vm_fault(map, va, VM_PROT_READ, VM_FAULT_NOFILL, &m);
@@ -606,7 +615,7 @@ proc_read_cheri_cap_page(vm_map_t map, vm_offset_t va, struct uio *uio)
 		}
 		return (0);
 	}
-	if (error != 0)
+	if (error != KERN_SUCCESS)
 		return (EFAULT);
 
 	src = (uintcap_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m)) + pageoff /
@@ -1303,9 +1312,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		CTR2(KTR_PTRACE, "PT_SUSPEND: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
 		td2->td_dbgflags |= TDB_SUSPEND;
-		thread_lock(td2);
-		td2->td_flags |= TDF_NEEDSUSPCHK;
-		thread_unlock(td2);
+		ast_sched(td2, TDA_SUSPEND);
 		break;
 
 	case PT_RESUME:
@@ -1886,14 +1893,15 @@ fail:
 
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
+//     "user_capabilities",
 //     "support"
 //   ],
 //   "changes_purecap": [
-//     "uintptr_interp_offset"
+//     "virtual_address"
 //   ]
 // }
 // CHERI CHANGES END

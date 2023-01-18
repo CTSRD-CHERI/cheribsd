@@ -208,7 +208,6 @@ void	*hashinit_flags(int count, struct malloc_type *type,
 void	*phashinit(int count, struct malloc_type *type, u_long *nentries);
 void	*phashinit_flags(int count, struct malloc_type *type, u_long *nentries,
     int flags);
-void	g_waitidle(void);
 
 void	cpu_flush_dcache(void *, size_t);
 void	cpu_rootconf(void);
@@ -310,6 +309,8 @@ void	*memmovenocap(void * _Nonnull dest, const void * _Nonnull src,
 #define	memmovenocap	memmove
 #endif
 #if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+void	* __capability memset_c(void * _Nonnull __capability buf, int c,
+	    size_t len);
 void	* __capability memcpy_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
 void	* __capability memcpynocap_c(void * _Nonnull __capability to,
@@ -319,6 +320,7 @@ void	* __capability memmove_c(void * _Nonnull __capability dest,
 void	* __capability memmovenocap_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
 #else
+#define	memset_c	memset
 #define	memcpy_c	memcpy
 #define	memcpynocap_c	memcpynocap
 #define	memmove_c	memmove
@@ -570,8 +572,11 @@ int	msleep_spin_sbt(const void * _Nonnull chan, struct mtx *mtx,
 	    0, C_HARDCLOCK)
 int	pause_sbt(const char *wmesg, sbintime_t sbt, sbintime_t pr,
 	    int flags);
-#define	pause(wmesg, timo)						\
-	pause_sbt((wmesg), tick_sbt * (timo), 0, C_HARDCLOCK)
+static __inline int
+pause(const char *wmesg, int timo)
+{
+	return (pause_sbt(wmesg, tick_sbt * timo, 0, C_HARDCLOCK));
+}
 #define	pause_sig(wmesg, timo)						\
 	pause_sbt((wmesg), tick_sbt * (timo), 0, C_HARDCLOCK | C_CATCH)
 #define	tsleep(chan, pri, wmesg, timo)					\
@@ -692,7 +697,7 @@ __NULLABILITY_PRAGMA_POP
 #endif /* !_SYS_SYSTM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

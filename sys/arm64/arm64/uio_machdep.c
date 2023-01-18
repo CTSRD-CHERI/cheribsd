@@ -134,10 +134,12 @@ out:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros"
+//     "iovec-macros",
+//     "pointer_as_integer",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

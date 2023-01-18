@@ -198,7 +198,7 @@ extern counter_u64_t sfstat[sizeof(struct sfstat) / sizeof(uint64_t)];
 #endif /* !_SYS_SF_BUF_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "support",

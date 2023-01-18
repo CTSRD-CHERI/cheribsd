@@ -729,7 +729,7 @@ aio_fsync_vnode(struct thread *td, struct vnode *vp, int op)
 	int error;
 
 	for (;;) {
-		error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
+		error = vn_start_write(vp, &mp, V_WAIT | V_PCATCH);
 		if (error != 0)
 			break;
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
@@ -3710,15 +3710,16 @@ freebsd64_lio_listio(struct thread *td, struct freebsd64_lio_listio_args *uap)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kernel_sig_types",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "support"
 //   ],
 //   "changes_purecap": [
-//     "uintptr_interp_offset",
+//     "virtual_address",
 //     "pointer_as_integer"
 //   ]
 // }

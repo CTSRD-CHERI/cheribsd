@@ -31,7 +31,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181121,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
  *     "integer_provenance"
@@ -54,6 +54,8 @@ __FBSDID("$FreeBSD$");
 #include "libc_private.h"
 
 #if defined(I_AM_QSORT_R)
+typedef int		 cmp_t(const void *, const void *, void *);
+#elif defined(I_AM_QSORT_R_COMPAT)
 typedef int		 cmp_t(void *, const void *, const void *);
 #elif defined(I_AM_QSORT_S)
 typedef int		 cmp_t(const void *, const void *, void *);
@@ -110,6 +112,8 @@ swapfunc(char *a, char *b, size_t n, int swaptype_intcap_t, int swaptype_int)
 	if ((n) > 0) swapfunc(a, b, n, swaptype_intcap_t, swaptype_int)
 
 #if defined(I_AM_QSORT_R)
+#define	CMP(t, x, y) (cmp((x), (y), (t)))
+#elif defined(I_AM_QSORT_R_COMPAT)
 #define	CMP(t, x, y) (cmp((t), (x), (y)))
 #elif defined(I_AM_QSORT_S)
 #define	CMP(t, x, y) (cmp((x), (y), (t)))
@@ -119,7 +123,7 @@ swapfunc(char *a, char *b, size_t n, int swaptype_intcap_t, int swaptype_int)
 
 static inline char *
 med3(char *a, char *b, char *c, cmp_t *cmp, void *thunk
-#if !defined(I_AM_QSORT_R) && !defined(I_AM_QSORT_S)
+#if !defined(I_AM_QSORT_R) && !defined(I_AM_QSORT_R_COMPAT) && !defined(I_AM_QSORT_S)
 __unused
 #endif
 )
@@ -135,6 +139,8 @@ __unused
  */
 #if defined(I_AM_QSORT_R)
 #define local_qsort local_qsort_r
+#elif defined(I_AM_QSORT_R_COMPAT)
+#define local_qsort local_qsort_r_compat
 #elif defined(I_AM_QSORT_S)
 #define local_qsort local_qsort_s
 #endif
@@ -251,9 +257,15 @@ loop:
 
 #if defined(I_AM_QSORT_R)
 void
-qsort_r(void *a, size_t n, size_t es, void *thunk, cmp_t *cmp)
+(qsort_r)(void *a, size_t n, size_t es, cmp_t *cmp, void *thunk)
 {
 	local_qsort_r(a, n, es, cmp, thunk);
+}
+#elif defined(I_AM_QSORT_R_COMPAT)
+void
+__qsort_r_compat(void *a, size_t n, size_t es, void *thunk, cmp_t *cmp)
+{
+	local_qsort_r_compat(a, n, es, cmp, thunk);
 }
 #elif defined(I_AM_QSORT_S)
 errno_t

@@ -246,7 +246,7 @@ discioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20210525,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

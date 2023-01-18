@@ -108,6 +108,10 @@ LINUXKPI_GENSRCS+= \
 	opt_usb.h \
 	opt_stack.h
 
+LINUXKPI_INCLUDES+= \
+	-I${SYSDIR}/compat/linuxkpi/common/include \
+	-I${SYSDIR}/compat/linuxkpi/dummy/include
+
 CFLAGS+=	${WERROR}
 CFLAGS+=	-D_KERNEL
 CFLAGS+=	-DKLD_MODULE
@@ -544,7 +548,10 @@ OBJS_DEPEND_GUESS+= ${SRCS:M*.h}
 OBJS_DEPEND_GUESS+= opt_global.h
 .endif
 
-ZINCDIR=${SYSDIR}/contrib/openzfs/include
+ZINCDIR=${ZFSTOP}/include
+.if !exists(${ZINCDIR})
+.error is ZFSTOP set?
+.endif
 OPENZFS_CFLAGS=     \
 	-D_SYS_VMEM_H_  \
 	-D__KERNEL__ \

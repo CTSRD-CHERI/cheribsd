@@ -16,6 +16,7 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 	cheribsdtest_local_global.c					\
 	cheribsdtest_longjmp.c						\
 	cheribsdtest_printf.c						\
+	cheribsdtest_ptrace.c						\
 	cheribsdtest_registers.c					\
 	cheribsdtest_sealcap.c						\
 	cheribsdtest_signal.c						\
@@ -24,6 +25,7 @@ SRCS+=	cheribsdtest_bounds_globals.c					\
 	cheribsdtest_syscall.c						\
 	cheribsdtest_tls.c						\
 	cheribsdtest_util.c						\
+	cheribsdtest_util_vm.c						\
 	cheribsdtest_vm.c						\
 	cheribsdtest_zlib.c
 .if ${MACHINE_ABI:Mpurecap}
@@ -61,11 +63,7 @@ CFLAGS+=	-DCHERIBSD_THREAD_TESTS
 
 MAN=
 
-LIBADD= 	z
-LIBADD+=	xo util
-.if ${MACHINE_ABI:Mpurecap}
-LIBADD+=	procstat
-.endif
+LIBADD+=	procstat util xo z
 
 .ifdef CHERIBSD_DYNAMIC_TESTS
 CFLAGS+=	-DCHERIBSD_DYNAMIC_TESTS
@@ -84,6 +82,11 @@ SRCS+=		cheribsdtest_ifunc.c
 .ifdef CHERIBSD_THREAD_TESTS
 LIBADD+=	pthread
 SRCS+=		cheribsdtest_tls_threads.c
+.endif
+
+.ifdef CHERIBSD_C18N_TESTS
+CFLAGS+=	-DCHERIBSD_C18N_TESTS
+LDFLAGS+=	-Wl,--dynamic-linker=/libexec/ld-elf-c18n.so.1
 .endif
 
 .include <bsd.prog.mk>

@@ -473,7 +473,8 @@ METHOD bool needs_restart {
 } DEFAULT null_needs_restart;
 # CHERI CHANGES START
 # {
-#   "updated": 20180830,
+#   "updated": 20221205,
+#   "target_type": "kernel",
 #   "changes": [
 #     "user_capabilities"
 #   ]

@@ -49,10 +49,10 @@ namespace __asan {
   ASAN_READ_RANGE((ctx), (s),                                   \
     common_flags()->strict_string_checks ? (len) + 1 : (n))
 
-#define ASAN_READ_STRING(ctx, s, n)                             \
-  ASAN_READ_STRING_OF_LEN((ctx), (s), REAL(strlen)(s), (n))
+#  define ASAN_READ_STRING(ctx, s, n) \
+    ASAN_READ_STRING_OF_LEN((ctx), (s), internal_strlen(s), (n))
 
-static inline usize MaybeRealStrnlen(const char *s, usize maxlen) {
+static inline uptr MaybeRealStrnlen(const char *s, uptr maxlen) {
 #if SANITIZER_INTERCEPT_STRNLEN
   if (REAL(strnlen)) {
     return REAL(strnlen)(s, maxlen);
@@ -81,7 +81,7 @@ int OnExit() {
 // ---------------------- Wrappers ---------------- {{{1
 using namespace __asan;
 
-DECLARE_REAL_AND_INTERCEPTOR(void *, malloc, usize)
+DECLARE_REAL_AND_INTERCEPTOR(void *, malloc, uptr)
 DECLARE_REAL_AND_INTERCEPTOR(void, free, void *)
 
 #define ASAN_INTERCEPTOR_ENTER(ctx, func)                                      \
@@ -130,23 +130,24 @@ DECLARE_REAL_AND_INTERCEPTOR(void, free, void *)
 #define COMMON_INTERCEPTOR_BLOCK_REAL(name) REAL(name)
 // Strict init-order checking is dlopen-hostile:
 // https://github.com/google/sanitizers/issues/178
-#define COMMON_INTERCEPTOR_ON_DLOPEN(filename, flag)                           \
-  do {                                                                         \
-    if (flags()->strict_init_order)                                            \
-      StopInitOrderChecking();                                                 \
-    CheckNoDeepBind(filename, flag);                                           \
-  } while (false)
-#define COMMON_INTERCEPTOR_ON_EXIT(ctx) OnExit()
-#define COMMON_INTERCEPTOR_LIBRARY_LOADED(filename, handle)
-#define COMMON_INTERCEPTOR_LIBRARY_UNLOADED()
-#define COMMON_INTERCEPTOR_NOTHING_IS_INITIALIZED (!asan_inited)
-#define COMMON_INTERCEPTOR_GET_TLS_RANGE(begin, end)                           \
-  if (AsanThread *t = GetCurrentThread()) {                                    \
-    *begin = t->tls_begin();                                                   \
-    *end = t->tls_end();                                                       \
-  } else {                                                                     \
-    *begin = *end = 0;                                                         \
-  }
+#  define COMMON_INTERCEPTOR_DLOPEN(filename, flag) \
+    ({                                              \
+      if (flags()->strict_init_order)               \
+        StopInitOrderChecking();                    \
+      CheckNoDeepBind(filename, flag);              \
+      REAL(dlopen)(filename, flag);                 \
+    })
+#  define COMMON_INTERCEPTOR_ON_EXIT(ctx) OnExit()
+#  define COMMON_INTERCEPTOR_LIBRARY_LOADED(filename, handle)
+#  define COMMON_INTERCEPTOR_LIBRARY_UNLOADED()
+#  define COMMON_INTERCEPTOR_NOTHING_IS_INITIALIZED (!asan_inited)
+#  define COMMON_INTERCEPTOR_GET_TLS_RANGE(begin, end) \
+    if (AsanThread *t = GetCurrentThread()) {          \
+      *begin = t->tls_begin();                         \
+      *end = t->tls_end();                             \
+    } else {                                           \
+      *begin = *end = 0;                               \
+    }
 
 #define COMMON_INTERCEPTOR_MEMMOVE_IMPL(ctx, to, from, size) \
   do {                                                       \
@@ -241,13 +242,13 @@ DEFINE_REAL_PTHREAD_FUNCTIONS
 #endif  // ASAN_INTERCEPT_PTHREAD_CREATE
 
 #if ASAN_INTERCEPT_SWAPCONTEXT
-static void ClearShadowMemoryForContextStack(uptr stack, usize ssize) {
+static void ClearShadowMemoryForContextStack(uptr stack, uptr ssize) {
   // Align to page size.
-  usize PageSize = GetPageSizeCached();
-  uptr bottom = RoundDownTo(stack, PageSize);
+  uptr PageSize = GetPageSizeCached();
+  uptr bottom = stack & ~(PageSize - 1);
   ssize += stack - bottom;
   ssize = RoundUpTo(ssize, PageSize);
-  static const usize kMaxSaneContextStackSize = 1 << 22;  // 4 Mb
+  static const uptr kMaxSaneContextStackSize = 1 << 22;  // 4 Mb
   if (AddrIsInMem(bottom) && ssize && ssize <= kMaxSaneContextStackSize) {
     PoisonShadow(bottom, ssize, 0);
   }
@@ -263,8 +264,7 @@ INTERCEPTOR(int, swapcontext, struct ucontext_t *oucp,
   }
   // Clear shadow memory for new context (it may share stack
   // with current context).
-  uptr stack;
-  usize ssize;
+  uptr stack, ssize;
   ReadContextStack(ucp, &stack, &ssize);
   ClearShadowMemoryForContextStack(stack, ssize);
 #if __has_attribute(__indirect_return__) && \
@@ -371,9 +371,9 @@ DEFINE_REAL(char*, index, const char *string, int c)
     ASAN_INTERCEPTOR_ENTER(ctx, strcat);
     ENSURE_ASAN_INITED();
     if (flags()->replace_str) {
-      usize from_length = REAL(strlen)(from);
+      uptr from_length = internal_strlen(from);
       ASAN_READ_RANGE(ctx, from, from_length + 1);
-      usize to_length = REAL(strlen)(to);
+      uptr to_length = internal_strlen(to);
       ASAN_READ_STRING_OF_LEN(ctx, to, to_length, to_length);
       ASAN_WRITE_RANGE(ctx, to + to_length, from_length + 1);
       // If the copying actually happens, the |from| string should not overlap
@@ -387,15 +387,15 @@ DEFINE_REAL(char*, index, const char *string, int c)
     return REAL(strcat)(to, from);
   }
 
-INTERCEPTOR(char*, strncat, char *to, const char *from, usize size) {
+INTERCEPTOR(char*, strncat, char *to, const char *from, uptr size) {
   void *ctx;
   ASAN_INTERCEPTOR_ENTER(ctx, strncat);
   ENSURE_ASAN_INITED();
   if (flags()->replace_str) {
-    usize from_length = MaybeRealStrnlen(from, size);
-    usize copy_length = Min(size, from_length + 1);
+    uptr from_length = MaybeRealStrnlen(from, size);
+    uptr copy_length = Min(size, from_length + 1);
     ASAN_READ_RANGE(ctx, from, copy_length);
-    usize to_length = REAL(strlen)(to);
+    uptr to_length = internal_strlen(to);
     ASAN_READ_STRING_OF_LEN(ctx, to, to_length, to_length);
     ASAN_WRITE_RANGE(ctx, to + to_length, from_length + 1);
     if (from_length > 0) {
@@ -420,7 +420,7 @@ INTERCEPTOR(char *, strcpy, char *to, const char *from) {
   }
   ENSURE_ASAN_INITED();
   if (flags()->replace_str) {
-    usize from_size = REAL(strlen)(from) + 1;
+    uptr from_size = internal_strlen(from) + 1;
     CHECK_RANGES_OVERLAP("strcpy", to, from_size, from, from_size);
     ASAN_READ_RANGE(ctx, from, from_size);
     ASAN_WRITE_RANGE(ctx, to, from_size);
@@ -433,7 +433,7 @@ INTERCEPTOR(char*, strdup, const char *s) {
   ASAN_INTERCEPTOR_ENTER(ctx, strdup);
   if (UNLIKELY(!asan_inited)) return internal_strdup(s);
   ENSURE_ASAN_INITED();
-  usize length = REAL(strlen)(s);
+  uptr length = internal_strlen(s);
   if (flags()->replace_str) {
     ASAN_READ_RANGE(ctx, s, length + 1);
   }
@@ -449,7 +449,7 @@ INTERCEPTOR(char*, __strdup, const char *s) {
   ASAN_INTERCEPTOR_ENTER(ctx, strdup);
   if (UNLIKELY(!asan_inited)) return internal_strdup(s);
   ENSURE_ASAN_INITED();
-  usize length = REAL(strlen)(s);
+  uptr length = internal_strlen(s);
   if (flags()->replace_str) {
     ASAN_READ_RANGE(ctx, s, length + 1);
   }
@@ -460,12 +460,12 @@ INTERCEPTOR(char*, __strdup, const char *s) {
 }
 #endif // ASAN_INTERCEPT___STRDUP
 
-INTERCEPTOR(char*, strncpy, char *to, const char *from, usize size) {
+INTERCEPTOR(char*, strncpy, char *to, const char *from, uptr size) {
   void *ctx;
   ASAN_INTERCEPTOR_ENTER(ctx, strncpy);
   ENSURE_ASAN_INITED();
   if (flags()->replace_str) {
-    usize from_size = Min(size, MaybeRealStrnlen(from, size) + 1);
+    uptr from_size = Min(size, MaybeRealStrnlen(from, size) + 1);
     CHECK_RANGES_OVERLAP("strncpy", to, from_size, from, from_size);
     ASAN_READ_RANGE(ctx, from, from_size);
     ASAN_WRITE_RANGE(ctx, to, size);
@@ -582,7 +582,7 @@ INTERCEPTOR(int, atexit, void (*func)()) {
 #if CAN_SANITIZE_LEAKS
   __lsan::ScopedInterceptorDisabler disabler;
 #endif
-  // Avoid calling real atexit as it is unrechable on at least on Linux.
+  // Avoid calling real atexit as it is unreachable on at least on Linux.
   int res = REAL(__cxa_atexit)((void (*)(void *a))func, nullptr, nullptr);
   REAL(__cxa_atexit)(AtCxaAtexit, nullptr, nullptr);
   return res;

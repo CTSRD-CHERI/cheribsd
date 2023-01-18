@@ -46,7 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 
 struct pmc_mdep *
-pmc_md_initialize()
+pmc_md_initialize(void)
 {
 
 	return (pmc_arm64_initialize());

@@ -23,15 +23,15 @@
 #include "sanitizer_common/sanitizer_stacktrace.h"
 #include "lsan_common.h"
 
-extern "C" void *memset(void *ptr, int value, usize num);
+extern "C" void *memset(void *ptr, int value, uptr num);
 
 namespace __lsan {
 #if defined(__i386__) || defined(__arm__)
-static const usize kMaxAllowedMallocSize = 1UL << 30;
+static const uptr kMaxAllowedMallocSize = 1ULL << 30;
 #elif defined(__mips64) || defined(__aarch64__)
-static const usize kMaxAllowedMallocSize = 4UL << 30;
+static const uptr kMaxAllowedMallocSize = 4ULL << 30;
 #else
-static const usize kMaxAllowedMallocSize = 8UL << 30;
+static const uptr kMaxAllowedMallocSize = 8ULL << 30;
 #endif
 
 static Allocator allocator;
@@ -57,7 +57,7 @@ static ChunkMetadata *Metadata(const void *p) {
   return reinterpret_cast<ChunkMetadata *>(allocator.GetMetaData(p));
 }
 
-static void RegisterAllocation(const StackTrace &stack, void *p, usize size) {
+static void RegisterAllocation(const StackTrace &stack, void *p, uptr size) {
   if (!p) return;
   ChunkMetadata *m = Metadata(p);
   CHECK(m);
@@ -74,7 +74,7 @@ static void RegisterDeallocation(void *p) {
   atomic_store(reinterpret_cast<atomic_uint8_t *>(m), 0, memory_order_relaxed);
 }
 
-static void *ReportAllocationSizeTooBig(usize size, const StackTrace &stack) {
+static void *ReportAllocationSizeTooBig(uptr size, const StackTrace &stack) {
   if (AllocatorMayReturnNull()) {
     Report("WARNING: LeakSanitizer failed to allocate 0x%zx bytes\n", size);
     return nullptr;
@@ -82,12 +82,17 @@ static void *ReportAllocationSizeTooBig(usize size, const StackTrace &stack) {
   ReportAllocationSizeTooBig(size, max_malloc_size, &stack);
 }
 
-void *Allocate(const StackTrace &stack, usize size, usize alignment,
+void *Allocate(const StackTrace &stack, uptr size, uptr alignment,
                bool cleared) {
   if (size == 0)
     size = 1;
   if (size > max_malloc_size)
     return ReportAllocationSizeTooBig(size, stack);
+  if (UNLIKELY(IsRssLimitExceeded())) {
+    if (AllocatorMayReturnNull())
+      return nullptr;
+    ReportRssLimitExceeded(&stack);
+  }
   void *p = allocator.Allocate(GetAllocatorCache(), size, alignment);
   if (UNLIKELY(!p)) {
     SetAllocatorOutOfMemory();
@@ -104,7 +109,7 @@ void *Allocate(const StackTrace &stack, usize size, usize alignment,
   return p;
 }
 
-static void *Calloc(usize nmemb, usize size, const StackTrace &stack) {
+static void *Calloc(uptr nmemb, uptr size, const StackTrace &stack) {
   if (UNLIKELY(CheckForCallocOverflow(size, nmemb))) {
     if (AllocatorMayReturnNull())
       return nullptr;
@@ -121,8 +126,8 @@ void Deallocate(void *p) {
   allocator.Deallocate(GetAllocatorCache(), p);
 }
 
-void *Reallocate(const StackTrace &stack, void *p, usize new_size,
-                 usize alignment) {
+void *Reallocate(const StackTrace &stack, void *p, uptr new_size,
+                 uptr alignment) {
   if (new_size > max_malloc_size) {
     ReportAllocationSizeTooBig(new_size, stack);
     return nullptr;
@@ -142,13 +147,13 @@ void GetAllocatorCacheRange(uptr *begin, uptr *end) {
   *end = *begin + sizeof(AllocatorCache);
 }
 
-usize GetMallocUsableSize(const void *p) {
+uptr GetMallocUsableSize(const void *p) {
   ChunkMetadata *m = Metadata(p);
   if (!m) return 0;
   return m->requested_size;
 }
 
-int lsan_posix_memalign(void **memptr, usize alignment, usize size,
+int lsan_posix_memalign(void **memptr, uptr alignment, uptr size,
                         const StackTrace &stack) {
   if (UNLIKELY(!CheckPosixMemalignAlignment(alignment))) {
     if (AllocatorMayReturnNull())
@@ -159,12 +164,12 @@ int lsan_posix_memalign(void **memptr, usize alignment, usize size,
   if (UNLIKELY(!ptr))
     // OOM error is already taken care of by Allocate.
     return errno_ENOMEM;
-  CHECK(IsAligned(ptr, alignment));
+  CHECK(IsAligned((uptr)ptr, alignment));
   *memptr = ptr;
   return 0;
 }
 
-void *lsan_aligned_alloc(usize alignment, usize size, const StackTrace &stack) {
+void *lsan_aligned_alloc(uptr alignment, uptr size, const StackTrace &stack) {
   if (UNLIKELY(!CheckAlignedAllocAlignmentAndSize(alignment, size))) {
     errno = errno_EINVAL;
     if (AllocatorMayReturnNull())
@@ -174,7 +179,7 @@ void *lsan_aligned_alloc(usize alignment, usize size, const StackTrace &stack) {
   return SetErrnoOnNull(Allocate(stack, size, alignment, kAlwaysClearMemory));
 }
 
-void *lsan_memalign(usize alignment, usize size, const StackTrace &stack) {
+void *lsan_memalign(uptr alignment, uptr size, const StackTrace &stack) {
   if (UNLIKELY(!IsPowerOfTwo(alignment))) {
     errno = errno_EINVAL;
     if (AllocatorMayReturnNull())
@@ -184,7 +189,7 @@ void *lsan_memalign(usize alignment, usize size, const StackTrace &stack) {
   return SetErrnoOnNull(Allocate(stack, size, alignment, kAlwaysClearMemory));
 }
 
-void *lsan_malloc(usize size, const StackTrace &stack) {
+void *lsan_malloc(uptr size, const StackTrace &stack) {
   return SetErrnoOnNull(Allocate(stack, size, 1, kAlwaysClearMemory));
 }
 
@@ -192,11 +197,11 @@ void lsan_free(void *p) {
   Deallocate(p);
 }
 
-void *lsan_realloc(void *p, usize size, const StackTrace &stack) {
+void *lsan_realloc(void *p, uptr size, const StackTrace &stack) {
   return SetErrnoOnNull(Reallocate(stack, p, size, 1));
 }
 
-void *lsan_reallocarray(void *ptr, usize nmemb, usize size,
+void *lsan_reallocarray(void *ptr, uptr nmemb, uptr size,
                         const StackTrace &stack) {
   if (UNLIKELY(CheckForCallocOverflow(size, nmemb))) {
     errno = errno_ENOMEM;
@@ -207,17 +212,17 @@ void *lsan_reallocarray(void *ptr, usize nmemb, usize size,
   return lsan_realloc(ptr, nmemb * size, stack);
 }
 
-void *lsan_calloc(usize nmemb, usize size, const StackTrace &stack) {
+void *lsan_calloc(uptr nmemb, uptr size, const StackTrace &stack) {
   return SetErrnoOnNull(Calloc(nmemb, size, stack));
 }
 
-void *lsan_valloc(usize size, const StackTrace &stack) {
+void *lsan_valloc(uptr size, const StackTrace &stack) {
   return SetErrnoOnNull(
       Allocate(stack, size, GetPageSizeCached(), kAlwaysClearMemory));
 }
 
-void *lsan_pvalloc(usize size, const StackTrace &stack) {
-  usize PageSize = GetPageSizeCached();
+void *lsan_pvalloc(uptr size, const StackTrace &stack) {
+  uptr PageSize = GetPageSizeCached();
   if (UNLIKELY(CheckForPvallocOverflow(size, PageSize))) {
     errno = errno_ENOMEM;
     if (AllocatorMayReturnNull())
@@ -229,7 +234,7 @@ void *lsan_pvalloc(usize size, const StackTrace &stack) {
   return SetErrnoOnNull(Allocate(stack, size, PageSize, kAlwaysClearMemory));
 }
 
-usize lsan_mz_size(const void *p) {
+uptr lsan_mz_size(const void *p) {
   return GetMallocUsableSize(p);
 }
 
@@ -287,7 +292,7 @@ void LsanMetadata::set_tag(ChunkTag value) {
   reinterpret_cast<ChunkMetadata *>(metadata_)->tag = value;
 }
 
-usize LsanMetadata::requested_size() const {
+uptr LsanMetadata::requested_size() const {
   return reinterpret_cast<ChunkMetadata *>(metadata_)->requested_size;
 }
 
@@ -329,40 +334,40 @@ using namespace __lsan;
 
 extern "C" {
 SANITIZER_INTERFACE_ATTRIBUTE
-usize __sanitizer_get_current_allocated_bytes() {
-  usize stats[AllocatorStatCount];
+uptr __sanitizer_get_current_allocated_bytes() {
+  uptr stats[AllocatorStatCount];
   allocator.GetStats(stats);
   return stats[AllocatorStatAllocated];
 }
 
 SANITIZER_INTERFACE_ATTRIBUTE
-usize __sanitizer_get_heap_size() {
-  usize stats[AllocatorStatCount];
+uptr __sanitizer_get_heap_size() {
+  uptr stats[AllocatorStatCount];
   allocator.GetStats(stats);
   return stats[AllocatorStatMapped];
 }
 
 SANITIZER_INTERFACE_ATTRIBUTE
-usize __sanitizer_get_free_bytes() { return 0; }
+uptr __sanitizer_get_free_bytes() { return 0; }
 
 SANITIZER_INTERFACE_ATTRIBUTE
-usize __sanitizer_get_unmapped_bytes() { return 0; }
+uptr __sanitizer_get_unmapped_bytes() { return 0; }
 
 SANITIZER_INTERFACE_ATTRIBUTE
-usize __sanitizer_get_estimated_allocated_size(usize size) { return size; }
+uptr __sanitizer_get_estimated_allocated_size(uptr size) { return size; }
 
 SANITIZER_INTERFACE_ATTRIBUTE
 int __sanitizer_get_ownership(const void *p) { return Metadata(p) != nullptr; }
 
 SANITIZER_INTERFACE_ATTRIBUTE
-usize __sanitizer_get_allocated_size(const void *p) {
+uptr __sanitizer_get_allocated_size(const void *p) {
   return GetMallocUsableSize(p);
 }
 
 #if !SANITIZER_SUPPORTS_WEAK_HOOKS
 // Provide default (no-op) implementation of malloc hooks.
 SANITIZER_INTERFACE_ATTRIBUTE SANITIZER_WEAK_ATTRIBUTE
-void __sanitizer_malloc_hook(void *ptr, usize size) {
+void __sanitizer_malloc_hook(void *ptr, uptr size) {
   (void)ptr;
   (void)size;
 }

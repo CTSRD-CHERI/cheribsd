@@ -1485,9 +1485,9 @@ shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_pointer_t *addr,
 {
 	struct vmspace *vms;
 	vm_pointer_t start;
-        vm_offset_t align, mask, vaddr;
+	vm_offset_t align, mask, vaddr;
 	vm_offset_t reservation_id;
-        int docow, error, rv, try;
+	int docow, error, rv, try;
 	bool curmap;
 	bool new_reservation;
 
@@ -1531,7 +1531,7 @@ shm_mmap_large(struct shmfd *shmfd, vm_map_t map, vm_pointer_t *addr,
 	mask = pagesizes[shmfd->shm_lp_psind] - 1;
 	if ((foff & mask) != 0)
 		return (EINVAL);
-        if (maxaddr == 0)
+	if (maxaddr == 0)
 		maxaddr = vm_map_max(map);
 	if (size == 0 || (size & mask) != 0 ||
 	    (vaddr != 0 && ((vaddr & mask) != 0 ||
@@ -2193,13 +2193,15 @@ sys_shm_open2(struct thread *td, struct shm_open2_args *uap)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "support",
+//     "bounds_compression"
 //   ]
 // }
 // CHERI CHANGES END

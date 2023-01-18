@@ -8,7 +8,7 @@
  * Chris Torek.
  *
  * Copyright (c) 2011 The FreeBSD Foundation
- * All rights reserved.
+ *
  * Portions of this software were developed by David Chisnall
  * under sponsorship from the FreeBSD Foundation.
  *
@@ -39,7 +39,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
  *     "support"

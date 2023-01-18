@@ -2131,8 +2131,8 @@ void nfscl_retopts(struct nfsmount *nmp, char *buffer, size_t buflen)
 	    ",noncontigwr", &buf, &blen);
 	nfscl_printopt(nmp, (nmp->nm_flag & (NFSMNT_NOLOCKD | NFSMNT_NFSV4)) ==
 	    0, ",lockd", &buf, &blen);
-	nfscl_printopt(nmp, (nmp->nm_flag & (NFSMNT_NOLOCKD | NFSMNT_NFSV4)) ==
-	    NFSMNT_NOLOCKD, ",nolockd", &buf, &blen);
+	nfscl_printopt(nmp, (nmp->nm_flag & NFSMNT_NOLOCKD) != 0, ",nolockd",
+	    &buf, &blen);
 	nfscl_printopt(nmp, (nmp->nm_flag & NFSMNT_RDIRPLUS) != 0, ",rdirplus",
 	    &buf, &blen);
 	nfscl_printopt(nmp, (nmp->nm_flag & NFSMNT_KERB) == 0, ",sec=sys",
@@ -2164,7 +2164,7 @@ void nfscl_retopts(struct nfsmount *nmp, char *buffer, size_t buflen)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20210525,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

@@ -1665,10 +1665,11 @@ __END_DECLS
 #endif /* _CAM_CAM_CCB_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20221129,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "subobject_bounds"
+//     "subobject_bounds",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

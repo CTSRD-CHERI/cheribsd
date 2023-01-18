@@ -91,7 +91,7 @@ devmap_dump_table(int (*prfunc)(const char *, ...))
  * Print the contents of the static mapping table.  Used for bootverbose.
  */
 void
-devmap_print_table()
+devmap_print_table(void)
 {
 	devmap_dump_table(printf);
 }
@@ -102,7 +102,7 @@ devmap_print_table()
  * the first unusable byte of KVA.
  */
 vm_offset_t
-devmap_lastaddr()
+devmap_lastaddr(void)
 {
 	const struct devmap_entry *pd;
 	vm_offset_t lowaddr;
@@ -200,13 +200,8 @@ devmap_bootstrap(vm_offset_t l1pt, const struct devmap_entry *table)
 
 	for (pd = devmap_table; pd->pd_size != 0; ++pd) {
 #if defined(__arm__)
-#if __ARM_ARCH >= 6
 		pmap_preboot_map_attr(pd->pd_pa, pd->pd_va, pd->pd_size,
 		    VM_PROT_READ | VM_PROT_WRITE, VM_MEMATTR_DEVICE);
-#else
-		pmap_map_chunk(l1pt, pd->pd_va, pd->pd_pa, pd->pd_size,
-		    VM_PROT_READ | VM_PROT_WRITE, PTE_DEVICE);
-#endif
 #elif defined(__aarch64__) || defined(__riscv)
 		pmap_kenter_device(pd->pd_va, pd->pd_size, pd->pd_pa);
 #endif
@@ -244,13 +239,15 @@ devmap_ptov(vm_paddr_t pa, vm_size_t size)
  * corresponding physical address, or DEVMAP_PADDR_NOTFOUND if not found.
  */
 vm_paddr_t
-devmap_vtop(vm_pointer_t va, vm_size_t size)
+devmap_vtop(void * vpva, vm_size_t size)
 {
 	const struct devmap_entry *pd;
+	vm_pointer_t va;
 
 	if (devmap_table == NULL)
 		return (DEVMAP_PADDR_NOTFOUND);
 
+	va = (vm_pointer_t)vpva;
 	for (pd = devmap_table; pd->pd_size != 0; ++pd) {
 		if (va >= pd->pd_va && va + size <= pd->pd_va + pd->pd_size)
 			return ((vm_paddr_t)(pd->pd_pa + (va - pd->pd_va)));
@@ -366,14 +363,16 @@ pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
  * Unmap device memory and free the kva space.
  */
 void
-pmap_unmapdev(vm_pointer_t va, vm_size_t size)
+pmap_unmapdev(void *p, vm_size_t size)
 {
+	vm_pointer_t va;
 	vm_offset_t offset;
 
 	/* Nothing to do if we find the mapping in the static table. */
-	if (devmap_vtop(va, size) != DEVMAP_PADDR_NOTFOUND)
+	if (devmap_vtop(p, size) != DEVMAP_PADDR_NOTFOUND)
 		return;
 
+	va = (vm_pointer_t)p;
 	offset = va & PAGE_MASK;
 	va = trunc_page(va);
 	size = round_page(size + offset);
@@ -407,7 +406,7 @@ DB_SHOW_COMMAND_FLAGS(devmap, db_show_devmap, DB_CMD_MEMSAFE)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20200804,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_provenance",

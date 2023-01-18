@@ -23,7 +23,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20190421,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
  *     "subobject_bounds"

@@ -1,7 +1,5 @@
 # $FreeBSD$
 
-ZFSTOP=	${SRCTOP}/sys/contrib/openzfs
-
 .PATH: ${ZFSTOP}/cmd/zstream
 .PATH: ${ZFSTOP}/man/man8
 
@@ -13,6 +11,7 @@ SRCS= \
 	zstream.c \
 	zstream_decompress.c \
 	zstream_dump.c \
+	zstream_recompress.c \
 	zstream_redup.c \
 	zstream_token.c
 

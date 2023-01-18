@@ -36,7 +36,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20190124,
+ *   "updated": 20221128,
  *   "target_type": "lib",
  *   "changes": [
  *     "subobject_bounds"

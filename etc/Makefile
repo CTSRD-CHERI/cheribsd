@@ -11,6 +11,7 @@ NLS_ALIASES=	POSIX C \
 # No need as it is empty and just causes rebuilds since this file does so much.
 UPDATE_DEPENDFILE=	no
 
+SUBDIR+=termcap
 .if ${MK_SENDMAIL} != "no"
 SUBDIR+=sendmail
 .endif
@@ -103,6 +104,9 @@ MTREES=		mtree/BSD.root.dist		/		\
 		mtree/BSD.usr.dist		/usr		\
 		mtree/BSD.include.dist		/usr/include	\
 		mtree/BSD.debug.dist		/usr/lib
+.if ${MACHINE_ABI:Mpurecap}
+MTREES+=	mtree/BSD.c18n.dist		/
+.endif
 .if ${MK_LIB64C} != "no"
 MTREES+=	mtree/BSD.lib64c.dist		/usr
 MTREES+=	mtree/BSD.lib64c.dist		/usr/lib/debug/usr
