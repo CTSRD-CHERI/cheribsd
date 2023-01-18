@@ -62,15 +62,14 @@ CFLAGS+= -I${SRCTOP}/sys/dev/qat/qat_api/include
 CFLAGS+= -I${SRCTOP}/sys/dev/qat/qat_api/include/lac
 CFLAGS+= -I${SRCTOP}/sys/dev/qat/qat_api/include/dc
 CFLAGS+= -I${SRCTOP}/sys/dev/qat/qat_api/qat_direct/include
-CFLAGS+= -I${SRCTOP}/sys/dev/qat/qat_api/qat_kernel/include
 CFLAGS+= -I${SRCTOP}/sys/dev/qat/qat_api/qat_utils/include
 CFLAGS+= -I${SRCTOP}/sys/dev/qat/qat_api/common/include
 CFLAGS+= -I${SRCTOP}/sys/dev/qat/qat_api/common/compression/include
 CFLAGS+= -I${SRCTOP}/sys/dev/qat/qat_api/common/crypto/sym/include
 CFLAGS+= -I${SRCTOP}/sys/dev/qat/qat_api/firmware/include
 CFLAGS+= -I${SRCTOP}/sys/dev/qat/include/common
-CFLAGS+= -I${SYSDIR}/compat/linuxkpi/common/include
+CFLAGS+= ${LINUXKPI_INCLUDES}
 
 .include <bsd.kmod.mk>
 
-CWARNFLAGS += -Wno-pointer-sign -Wno-cast-qual
+CWARNFLAGS+= -Wno-cast-qual

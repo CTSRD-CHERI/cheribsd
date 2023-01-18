@@ -173,10 +173,11 @@ xdma_iommu_release(struct xdma_iommu *xio)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "support"
 //   ],
 //   "change_comment": "bus_addr_t"
 // }

@@ -15,8 +15,12 @@ FILES=	\
 	${_BSD.sendmail.dist} \
 	${_BSD.tests.dist} \
 	BSD.usr.dist \
+	${_BSD.c18n.dist} \
 	BSD.var.dist
 
+.if ${MACHINE_ABI:Mpurecap}
+_BSD.c18n.dist=		BSD.c18n.dist
+.endif
 .if ${MK_LIB64C} != "no"
 _BSD.lib64c.dist=	BSD.lib64c.dist
 .endif

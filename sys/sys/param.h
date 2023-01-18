@@ -76,7 +76,7 @@
  * cannot include sys/param.h and should only be updated here.
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 1400064
+#define __FreeBSD_version 1400072
 
 /*
  * __CheriBSD_version numbers describe CheriBSD ABIs.
@@ -218,9 +218,7 @@
 
 #define MCLBYTES	(1 << MCLSHIFT)	/* size of an mbuf cluster */
 
-#if PAGE_SIZE < 2048
-#define	MJUMPAGESIZE	MCLBYTES
-#elif PAGE_SIZE <= 8192
+#if PAGE_SIZE <= 8192
 #define	MJUMPAGESIZE	PAGE_SIZE
 #else
 #define	MJUMPAGESIZE	(8 * 1024)
@@ -442,11 +440,15 @@ __END_DECLS
 #endif	/* _SYS_PARAM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190528,
+//   "updated": 20221205,
 //   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ],
 //   "changes_purecap": [
 //     "pointer_alignment",
-//     "pointer_shape"
+//     "pointer_shape",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

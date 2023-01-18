@@ -288,10 +288,11 @@ stack_symbol_ddb(vm_offset_t pc, const char **name, long *offset)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200708,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "kdb"
+//     "kdb",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

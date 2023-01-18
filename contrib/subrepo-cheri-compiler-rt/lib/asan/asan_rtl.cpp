@@ -85,16 +85,12 @@ void ShowStatsAndAbort() {
 NOINLINE
 static void ReportGenericErrorWrapper(uptr addr, bool is_write, int size,
                                       int exp_arg, bool fatal) {
-  if (__asan_test_only_reported_buggy_pointer) {
-    *__asan_test_only_reported_buggy_pointer = addr;
-  } else {
-    GET_CALLER_PC_BP_SP;
-    ReportGenericError(pc, bp, sp, addr, is_write, size, exp_arg, fatal);
-  }
+  GET_CALLER_PC_BP_SP;
+  ReportGenericError(pc, bp, sp, addr, is_write, size, exp_arg, fatal);
 }
 
 // --------------- LowLevelAllocateCallbac ---------- {{{1
-static void OnLowLevelAllocate(uptr ptr, usize size) {
+static void OnLowLevelAllocate(uptr ptr, uptr size) {
   PoisonShadow(ptr, size, kAsanInternalHeapMagic);
 }
 
@@ -130,17 +126,17 @@ ASAN_REPORT_ERROR(store, true, 16)
 
 #define ASAN_REPORT_ERROR_N(type, is_write)                                 \
 extern "C" NOINLINE INTERFACE_ATTRIBUTE                                     \
-void __asan_report_ ## type ## _n(uptr addr, usize size) {                   \
+void __asan_report_ ## type ## _n(uptr addr, uptr size) {                   \
   GET_CALLER_PC_BP_SP;                                                      \
   ReportGenericError(pc, bp, sp, addr, is_write, size, 0, true);            \
 }                                                                           \
 extern "C" NOINLINE INTERFACE_ATTRIBUTE                                     \
-void __asan_report_exp_ ## type ## _n(uptr addr, usize size, u32 exp) {      \
+void __asan_report_exp_ ## type ## _n(uptr addr, uptr size, u32 exp) {      \
   GET_CALLER_PC_BP_SP;                                                      \
   ReportGenericError(pc, bp, sp, addr, is_write, size, exp, true);          \
 }                                                                           \
 extern "C" NOINLINE INTERFACE_ATTRIBUTE                                     \
-void __asan_report_ ## type ## _n_noabort(uptr addr, usize size) {           \
+void __asan_report_ ## type ## _n_noabort(uptr addr, uptr size) {           \
   GET_CALLER_PC_BP_SP;                                                      \
   ReportGenericError(pc, bp, sp, addr, is_write, size, 0, false);           \
 }                                                                           \
@@ -150,11 +146,11 @@ ASAN_REPORT_ERROR_N(store, true)
 
 #define ASAN_MEMORY_ACCESS_CALLBACK_BODY(type, is_write, size, exp_arg, fatal) \
   uptr sp = MEM_TO_SHADOW(addr);                                               \
-  uptr s = size <= SHADOW_GRANULARITY ? *reinterpret_cast<u8 *>(sp)            \
-                                      : *reinterpret_cast<u16 *>(sp);          \
+  uptr s = size <= ASAN_SHADOW_GRANULARITY ? *reinterpret_cast<u8 *>(sp)       \
+                                           : *reinterpret_cast<u16 *>(sp);     \
   if (UNLIKELY(s)) {                                                           \
-    if (UNLIKELY(size >= SHADOW_GRANULARITY ||                                 \
-                 ((s8)((addr & (SHADOW_GRANULARITY - 1)) + size - 1)) >=       \
+    if (UNLIKELY(size >= ASAN_SHADOW_GRANULARITY ||                            \
+                 ((s8)((addr & (ASAN_SHADOW_GRANULARITY - 1)) + size - 1)) >=  \
                      (s8)s)) {                                                 \
       ReportGenericErrorWrapper(addr, is_write, size, exp_arg, fatal);         \
     }                                                                          \
@@ -187,7 +183,7 @@ ASAN_MEMORY_ACCESS_CALLBACK(store, true, 16)
 
 extern "C"
 NOINLINE INTERFACE_ATTRIBUTE
-void __asan_loadN(uptr addr, usize size) {
+void __asan_loadN(uptr addr, uptr size) {
   if (__asan_region_is_poisoned(addr, size)) {
     GET_CALLER_PC_BP_SP;
     ReportGenericError(pc, bp, sp, addr, false, size, 0, true);
@@ -196,7 +192,7 @@ void __asan_loadN(uptr addr, usize size) {
 
 extern "C"
 NOINLINE INTERFACE_ATTRIBUTE
-void __asan_exp_loadN(uptr addr, usize size, u32 exp) {
+void __asan_exp_loadN(uptr addr, uptr size, u32 exp) {
   if (__asan_region_is_poisoned(addr, size)) {
     GET_CALLER_PC_BP_SP;
     ReportGenericError(pc, bp, sp, addr, false, size, exp, true);
@@ -205,7 +201,7 @@ void __asan_exp_loadN(uptr addr, usize size, u32 exp) {
 
 extern "C"
 NOINLINE INTERFACE_ATTRIBUTE
-void __asan_loadN_noabort(uptr addr, usize size) {
+void __asan_loadN_noabort(uptr addr, uptr size) {
   if (__asan_region_is_poisoned(addr, size)) {
     GET_CALLER_PC_BP_SP;
     ReportGenericError(pc, bp, sp, addr, false, size, 0, false);
@@ -214,7 +210,7 @@ void __asan_loadN_noabort(uptr addr, usize size) {
 
 extern "C"
 NOINLINE INTERFACE_ATTRIBUTE
-void __asan_storeN(uptr addr, usize size) {
+void __asan_storeN(uptr addr, uptr size) {
   if (__asan_region_is_poisoned(addr, size)) {
     GET_CALLER_PC_BP_SP;
     ReportGenericError(pc, bp, sp, addr, true, size, 0, true);
@@ -223,7 +219,7 @@ void __asan_storeN(uptr addr, usize size) {
 
 extern "C"
 NOINLINE INTERFACE_ATTRIBUTE
-void __asan_exp_storeN(uptr addr, usize size, u32 exp) {
+void __asan_exp_storeN(uptr addr, uptr size, u32 exp) {
   if (__asan_region_is_poisoned(addr, size)) {
     GET_CALLER_PC_BP_SP;
     ReportGenericError(pc, bp, sp, addr, true, size, exp, true);
@@ -232,7 +228,7 @@ void __asan_exp_storeN(uptr addr, usize size, u32 exp) {
 
 extern "C"
 NOINLINE INTERFACE_ATTRIBUTE
-void __asan_storeN_noabort(uptr addr, usize size) {
+void __asan_storeN_noabort(uptr addr, uptr size) {
   if (__asan_region_is_poisoned(addr, size)) {
     GET_CALLER_PC_BP_SP;
     ReportGenericError(pc, bp, sp, addr, true, size, 0, false);
@@ -313,7 +309,7 @@ static void InitializeHighMemEnd() {
   kHighMemEnd = GetMaxUserVirtualAddress();
   // Increase kHighMemEnd to make sure it's properly
   // aligned together with kHighMemBeg:
-  kHighMemEnd |= (GetMmapGranularity() << SHADOW_SCALE) - 1;
+  kHighMemEnd |= (GetMmapGranularity() << ASAN_SHADOW_SCALE) - 1;
 #endif  // !ASAN_FIXED_MAPPING
   CHECK_EQ((kHighMemBeg % GetMmapGranularity()), 0);
 }
@@ -365,28 +361,15 @@ void PrintAddressSpaceLayout() {
   Printf("malloc_context_size=%zu\n",
          (uptr)common_flags()->malloc_context_size);
 
-  Printf("SHADOW_SCALE: %d\n", (int)SHADOW_SCALE);
-  Printf("SHADOW_GRANULARITY: %d\n", (int)SHADOW_GRANULARITY);
-  Printf("SHADOW_OFFSET: 0x%zx\n", (uptr)SHADOW_OFFSET);
-  CHECK(SHADOW_SCALE >= 3 && SHADOW_SCALE <= 7);
+  Printf("SHADOW_SCALE: %d\n", (int)ASAN_SHADOW_SCALE);
+  Printf("SHADOW_GRANULARITY: %d\n", (int)ASAN_SHADOW_GRANULARITY);
+  Printf("SHADOW_OFFSET: 0x%zx\n", (uptr)ASAN_SHADOW_OFFSET);
+  CHECK(ASAN_SHADOW_SCALE >= 3 && ASAN_SHADOW_SCALE <= 7);
   if (kMidMemBeg)
     CHECK(kMidShadowBeg > kLowShadowEnd &&
           kMidMemBeg > kMidShadowEnd &&
           kHighShadowBeg > kMidMemEnd);
 }
-
-#if defined(__thumb__) && defined(__linux__)
-#define START_BACKGROUND_THREAD_IN_ASAN_INTERNAL
-#endif
-
-#ifndef START_BACKGROUND_THREAD_IN_ASAN_INTERNAL
-static bool UNUSED __local_asan_dyninit = [] {
-  MaybeStartBackgroudThread();
-  SetSoftRssLimitExceededCallback(AsanSoftRssLimitExceededCallback);
-
-  return false;
-}();
-#endif
 
 static void AsanInitInternal() {
   if (LIKELY(asan_inited)) return;
@@ -438,7 +421,7 @@ static void AsanInitInternal() {
   MaybeReexec();
 
   // Setup internal allocator callback.
-  SetLowLevelAllocateMinAlignment(SHADOW_GRANULARITY);
+  SetLowLevelAllocateMinAlignment(ASAN_SHADOW_GRANULARITY);
   SetLowLevelAllocateCallback(OnLowLevelAllocate);
 
   InitializeAsanInterceptors();
@@ -462,10 +445,8 @@ static void AsanInitInternal() {
   allocator_options.SetFrom(flags(), common_flags());
   InitializeAllocator(allocator_options);
 
-#ifdef START_BACKGROUND_THREAD_IN_ASAN_INTERNAL
-  MaybeStartBackgroudThread();
-  SetSoftRssLimitExceededCallback(AsanSoftRssLimitExceededCallback);
-#endif
+  if (SANITIZER_START_BACKGROUND_THREAD_IN_ASAN_INTERNAL)
+    MaybeStartBackgroudThread();
 
   // On Linux AsanThread::ThreadStart() calls malloc() that's why asan_inited
   // should be set to 1 prior to initializing the threads.
@@ -557,10 +538,11 @@ void UnpoisonStack(uptr bottom, uptr top, const char *type) {
         "False positive error reports may follow\n"
         "For details see "
         "https://github.com/google/sanitizers/issues/189\n",
-        type, top, bottom, top - bottom, top - bottom);
+        type, (void *)top, (void *)bottom, (void *)(top - bottom),
+        top - bottom);
     return;
   }
-  PoisonShadow(bottom, RoundUpTo(top - bottom, SHADOW_GRANULARITY), 0);
+  PoisonShadow(bottom, RoundUpTo(top - bottom, ASAN_SHADOW_GRANULARITY), 0);
 }
 
 static void UnpoisonDefaultStack() {
@@ -574,8 +556,7 @@ static void UnpoisonDefaultStack() {
   } else {
     CHECK(!SANITIZER_FUCHSIA);
     // If we haven't seen this thread, try asking the OS for stack bounds.
-    uptr tls_addr;
-    usize tls_size, stack_size;
+    uptr tls_addr, tls_size, stack_size;
     GetThreadStackAndTls(/*main=*/false, &bottom, &stack_size, &tls_addr,
                          &tls_size);
     top = bottom + stack_size;

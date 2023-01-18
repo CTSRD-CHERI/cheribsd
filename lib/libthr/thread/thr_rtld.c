@@ -54,6 +54,11 @@ static void	_thr_rtld_rlock_acquire(void *);
 static int	_thr_rtld_set_flag(int);
 static void	_thr_rtld_wlock_acquire(void *);
 
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+void _thread_start(struct pthread *);
+void _thr_sighandler(int, siginfo_t *, void *);
+#endif
+
 struct rtld_lock {
 	struct	urwlock	lock;
 	char		_pad[CACHE_LINE_SIZE - sizeof(struct urwlock)];
@@ -269,6 +274,10 @@ _thr_rtld_init(void)
 	/* mask signals, also force to resolve __sys_sigprocmask PLT */
 	_thr_signal_block(curthread);
 	_rtld_thread_init(&li);
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+	_rtld_thread_start_init(_thread_start);
+	_rtld_sighandler_init(_thr_sighandler);
+#endif
 	_thr_signal_unblock(curthread);
 	_thr_signal_block_check_fast();
 	_thr_signal_block_setup(curthread);

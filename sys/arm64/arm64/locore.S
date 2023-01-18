@@ -301,9 +301,6 @@ virtdone:
 	bl	cheri_init_capabilities
 #endif
 
-	/* Make the page table base a virtual address */
-	sub	x26, x26, x29
-	sub	x24, x24, x29
 #ifdef __CHERI_PURE_CAPABILITY__
 	/*
 	 * Convert modulep into a capability
@@ -311,29 +308,17 @@ virtdone:
 	 * TODO: clear perms
 	 */
 	cvtd	c19, x19
-
-	/* Rebuild L1PT and L0PT capabilities */
-	mov	x6, #PAGE_SIZE
-	ldr	x7, =.Lpagetable_clrperms
-	cvtd	c24, x24
-	scbnds	c24, c24, x6
-	clrperm	c24, c24, x7
-	cvtd	c26, x26
-	scbnds	c26, c26, x6
-	clrperm	c26, c26, x7
 #endif
-
-	/* Negate the delta so it is VA -> PA */
-	neg	x29, x29
 
 	sub	PTRN(sp), PTRN(sp), #BOOTPARAMS_SIZE
 	mov	PTR(0), PTRN(sp)
 
+	/* Negate the delta so it is VA -> PA */
+	neg	x29, x29
+
 	str	PTR(19), [PTR(0), #BP_MODULEP]
-	str	PTR(26), [PTR(0), #BP_KERN_L1PT]
 	str	x29, [PTR(0), #BP_KERN_DELTA]
 	str	PTR(25), [PTR(0), #BP_KERN_STACK]
-	str	PTR(24), [PTR(0), #BP_KERN_L0PT]
 	str	x27, [PTR(0), #BP_KERN_TTBR0]
 	str	x23, [PTR(0), #BP_BOOT_EL]
 

@@ -28,10 +28,11 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181114,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
- *     "support"
+ *     "support",
+ *     "subobject_bounds"
  *   ],
  *   "change_comment": "Find auxargs without walking off the end of envv.  Get ps_strings from auxargs."
  * }
@@ -95,6 +96,7 @@ static char *canary, *pagesizes, *execpath;
 static void *ps_strings, *timekeep;
 static u_long hwcap, hwcap2;
 static void *fxrng_seed_version;
+static u_long usrstackbase, usrstacklim;
 
 #ifdef __powerpc__
 static int powerpc_new_auxv_format = 0;
@@ -165,6 +167,14 @@ init_aux(void)
 
 		case AT_FXRNG:
 			fxrng_seed_version = aux->a_un.a_ptr;
+			break;
+
+		case AT_USRSTACKBASE:
+			usrstackbase = aux->a_un.a_val;
+			break;
+
+		case AT_USRSTACKLIM:
+			usrstacklim = aux->a_un.a_val;
 			break;
 #ifdef __powerpc__
 		/*
@@ -389,6 +399,20 @@ _elf_aux_info(int aux, void *buf, int buflen)
 				res = 0;
 			} else
 				res = ENOENT;
+		} else
+			res = EINVAL;
+		break;
+	case AT_USRSTACKBASE:
+		if (buflen == sizeof(u_long)) {
+			*(u_long *)buf = usrstackbase;
+			res = 0;
+		} else
+			res = EINVAL;
+		break;
+	case AT_USRSTACKLIM:
+		if (buflen == sizeof(u_long)) {
+			*(u_long *)buf = usrstacklim;
+			res = 0;
 		} else
 			res = EINVAL;
 		break;

@@ -739,6 +739,8 @@ int if_setcapenable(if_t ifp, int capenable);
 int if_setcapenablebit(if_t ifp, int setcap, int clearcap);
 int if_getcapenable(if_t ifp);
 const char *if_getdname(if_t ifp);
+void if_setdescr(if_t ifp, char *descrbuf);
+void if_freedescr(char *descrbuf);
 int if_setdev(if_t ifp, void *dev);
 int if_setdrvflagbits(if_t ifp, int if_setflags, int clear_flags);
 int if_getdrvflags(if_t ifp);
@@ -869,13 +871,10 @@ int    ether_poll_deregister(if_t ifp);
 #endif /* !_NET_IF_VAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "ioctl:net"
-//   ],
-//   "changes_purecap": [
-//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

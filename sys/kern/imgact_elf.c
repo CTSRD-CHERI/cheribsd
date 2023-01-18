@@ -201,10 +201,9 @@ SYSCTL_NODE(ELF_NODE_OID, OID_AUTO, aslr, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
 #define	ASLR_NODE_OID	__CONCAT(ELF_NODE_OID, _aslr)
 
 /*
- * While for 64-bit machines ASLR works properly, there are
- * still some problems when using 32-bit architectures. For this
- * reason ASLR is only enabled by default when running native
- * 64-bit non-PIE executables.
+ * Enable ASLR by default for 64-bit non-PIE binaries.  32-bit architectures
+ * have limited address space (which can cause issues for applications with
+ * high memory use) so we leave it off there.
  */
 static int __elfN(aslr_enabled) = __ELF_WORD_SIZE == 64;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, enable, CTLFLAG_RWTUN,
@@ -213,7 +212,7 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, enable, CTLFLAG_RWTUN,
     ": enable address map randomization");
 
 /*
- * Enable ASLR only for 64-bit PIE binaries by default.
+ * Enable ASLR by default for 64-bit PIE binaries.
  */
 static int __elfN(pie_aslr_enabled) = __ELF_WORD_SIZE == 64;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, pie_enable, CTLFLAG_RWTUN,
@@ -222,9 +221,9 @@ SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, pie_enable, CTLFLAG_RWTUN,
     ": enable address map randomization for PIE binaries");
 
 /*
- * Sbrk is now deprecated and it can be assumed, that in most
- * cases it will not be used anyway. This setting is valid only
- * for the ASLR enabled and allows for utilizing the bss grow region.
+ * Sbrk is deprecated and it can be assumed that in most cases it will not be
+ * used anyway. This setting is valid only with ASLR enabled, and allows ASLR
+ * to use the bss grow region.
  */
 static int __elfN(aslr_honor_sbrk) = 0;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, honor_sbrk, CTLFLAG_RW,
@@ -1452,9 +1451,16 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 				goto ret;
 			}
 #else
-			if (__elfN(nxstack))
+			if (__elfN(nxstack)) {
 				imgp->stack_prot =
 				    __elfN(trans_prot)(phdr[i].p_flags);
+				if ((imgp->stack_prot & VM_PROT_RW) !=
+				    VM_PROT_RW) {
+					uprintf("Invalid PT_GNU_STACK\n");
+					error = ENOEXEC;
+					goto ret;
+				}
+			}
 #endif
 			imgp->stack_sz = phdr[i].p_memsz;
 			break;
@@ -1811,7 +1817,8 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 	void * __capability exec_base;
 	void * __capability entry;
 #endif
-	int error;
+	rlim_t stacksz;
+	int error, bsdflags, oc;
 
 	argarray = pos = malloc(AT_COUNT * sizeof(*pos), M_TEMP,
 	    M_WAITOK | M_ZERO);
@@ -1911,8 +1918,12 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		AUXARGS_ENTRY(pos, AT_HWCAP, *imgp->sysent->sv_hwcap);
 	if (imgp->sysent->sv_hwcap2 != NULL)
 		AUXARGS_ENTRY(pos, AT_HWCAP2, *imgp->sysent->sv_hwcap2);
-	AUXARGS_ENTRY(pos, AT_BSDFLAGS, __elfN(sigfastblock) ?
-	    ELF_BSDF_SIGFASTBLK : 0);
+	bsdflags = 0;
+	bsdflags |= __elfN(sigfastblock) ? ELF_BSDF_SIGFASTBLK : 0;
+	oc = atomic_load_int(&vm_overcommit);
+	bsdflags |= (oc & (SWAP_RESERVE_FORCE_ON | SWAP_RESERVE_RLIMIT_ON)) !=
+	    0 ? ELF_BSDF_VMNOOVERCOMMIT : 0;
+	AUXARGS_ENTRY(pos, AT_BSDFLAGS, bsdflags);
 	AUXARGS_ENTRY(pos, AT_ARGC, imgp->args->argc);
 	AUXARGS_ENTRY_PTR(pos, AT_ARGV, imgp->argv);
 	AUXARGS_ENTRY(pos, AT_ENVC, imgp->args->envc);
@@ -1928,6 +1939,10 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		AUXARGS_ENTRY(pos, AT_KPRELOAD,
 		    vmspace->vm_shp_base + imgp->sysent->sv_vdso_offset);
 	}
+	AUXARGS_ENTRY(pos, AT_USRSTACKBASE,
+	    round_page(imgp->proc->p_vm_stacktop));
+	stacksz = imgp->proc->p_limit->pl_rlimit[RLIMIT_STACK].rlim_cur;
+	AUXARGS_ENTRY(pos, AT_USRSTACKLIM, stacksz);
 	AUXARGS_ENTRY(pos, AT_NULL, 0);
 
 	free(imgp->auxargs, M_TEMP);
@@ -2731,13 +2746,16 @@ __elfN(note_prpsinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 			    sizeof(psinfo->pr_psargs), SBUF_FIXEDLEN);
 			error = proc_getargv(curthread, p, &sbarg);
 			PRELE(p);
-			if (sbuf_finish(&sbarg) == 0)
-				len = sbuf_len(&sbarg) - 1;
-			else
+			if (sbuf_finish(&sbarg) == 0) {
+				len = sbuf_len(&sbarg);
+				if (len > 0)
+					len--;
+			} else {
 				len = sizeof(psinfo->pr_psargs) - 1;
+			}
 			sbuf_delete(&sbarg);
 		}
-		if (error || len == 0)
+		if (error != 0 || len == 0 || (ssize_t)len == -1)
 			strlcpy(psinfo->pr_psargs, p->p_comm,
 			    sizeof(psinfo->pr_psargs));
 		else {
@@ -3482,16 +3500,18 @@ __elfN(untrans_capprot)(vm_prot_t prot)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200708,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
+//     "support",
 //     "pointer_provenance",
 //     "pointer_as_integer",
-//     "uintcap_arithmetic"
+//     "uintcap_arithmetic",
+//     "pointer_alignment"
 //   ]
 // }
 // CHERI CHANGES END

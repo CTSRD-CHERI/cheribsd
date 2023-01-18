@@ -80,7 +80,7 @@ struct pfilioc_link {
 
 #define	PFIL_IN		0x00010000
 #define	PFIL_OUT	0x00020000
-#define	PFIL_FWD	0x00040000
+/* UNUSED		0x00040000 */
 #define	PFIL_DIR(f)	((f) & (PFIL_IN|PFIL_OUT))
 #define	PFIL_MEMPTR	0x00080000
 #define	PFIL_HEADPTR	0x00100000
@@ -192,6 +192,10 @@ void		pfil_head_unregister(pfil_head_t);
 /* Public functions to run the packet inspection by inspection points. */
 int	pfil_run_hooks(struct pfil_head *, pfil_packet_t, struct ifnet *, int,
     struct inpcb *inp);
+int	pfil_mbuf_in(struct pfil_head *, pfil_packet_t, struct ifnet *,
+    struct inpcb *inp);
+int	pfil_mbuf_out(struct pfil_head *, pfil_packet_t, struct ifnet *,
+    struct inpcb *inp);
 /*
  * Minimally exposed structure to avoid function call in case of absence
  * of any filters by protocols and macros to do the check.
@@ -212,8 +216,11 @@ int	pfil_realloc(pfil_packet_t *, int, struct ifnet *);
 #endif /* _NET_PFIL_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190603,
+//   "updated": 20221205,
 //   "target_type": "header",
+//   "changes": [
+//     "user_capabilities"
+//   ],
 //   "changes_purecap": [
 //     "pointer_alignment"
 //   ]

@@ -335,7 +335,7 @@ sysctl_debug_umtx_chains_clear(SYSCTL_HANDLER_ARGS)
 				uc = &umtxq_chains[i][j];
 				mtx_lock(&uc->uc_lock);
 				uc->length = 0;
-				uc->max_length = 0;	
+				uc->max_length = 0;
 				mtx_unlock(&uc->uc_lock);
 			}
 		}
@@ -372,7 +372,7 @@ umtxq_sysinit(void *arg __unused)
 			umtxq_chains[i][j].uc_waiters = 0;
 #ifdef UMTX_PROFILING
 			umtxq_chains[i][j].length = 0;
-			umtxq_chains[i][j].max_length = 0;	
+			umtxq_chains[i][j].max_length = 0;
 #endif
 		}
 	}
@@ -518,7 +518,7 @@ umtxq_insert_queue(struct umtx_q *uq, int q)
 		if (uc->length > uc->max_length) {
 			uc->max_length = uc->length;
 			if (uc->max_length > max_length)
-				max_length = uc->max_length;	
+				max_length = uc->max_length;
 		}
 #endif
 	}
@@ -738,6 +738,7 @@ umtx_abs_timeout_getsbt(struct umtx_abs_timeout *timo, sbintime_t *sbt,
 {
 	struct bintime bt, bbt;
 	struct timespec tts;
+	sbintime_t rem;
 
 	switch (timo->clockid) {
 
@@ -770,14 +771,24 @@ umtx_abs_timeout_getsbt(struct umtx_abs_timeout *timo, sbintime_t *sbt,
 			return (0);
 		}
 		*sbt = bttosbt(bt);
+
+		/*
+		 * Check if the absolute time should be aligned to
+		 * avoid firing multiple timer events in non-periodic
+		 * timer mode.
+		 */
 		switch (timo->clockid) {
 		case CLOCK_REALTIME_FAST:
 		case CLOCK_MONOTONIC_FAST:
 		case CLOCK_UPTIME_FAST:
-			*sbt += tc_tick_sbt;
+			rem = *sbt % tc_tick_sbt;
+			if (__predict_true(rem != 0))
+				*sbt += tc_tick_sbt - rem;
 			break;
 		case CLOCK_SECOND:
-			*sbt += SBT_1S;
+			rem = *sbt % SBT_1S;
+			if (__predict_true(rem != 0))
+				*sbt += SBT_1S - rem;
 			break;
 		}
 		*flags = C_ABSOLUTE;
@@ -1346,7 +1357,7 @@ kern_umtx_wake(struct thread *td, void * __capability uaddr, int n_wake,
 {
 	struct umtx_key key;
 	int ret;
-	
+
 	if ((ret = umtx_key_get(uaddr, TYPE_SIMPLE_WAIT,
 	    is_private ? THREAD_SHARE : AUTO_SHARE, &key)) != 0)
 		return (ret);
@@ -2388,7 +2399,7 @@ do_lock_pi(struct thread *td, struct umutex * __capability m, uint32_t flags,
 		 */
 		if (error != 0)
 			break;
-			
+
 		umtxq_lock(&uq->uq_key);
 		umtxq_busy(&uq->uq_key);
 		umtxq_unlock(&uq->uq_key);
@@ -3070,7 +3081,7 @@ do_cv_broadcast(struct thread *td, struct ucond * __capability cv)
 	if (error == -1)
 		return (EFAULT);
 	if ((error = umtx_key_get(cv, TYPE_CV, GET_SHARE(flags), &key)) != 0)
-		return (error);	
+		return (error);
 
 	umtxq_lock(&key);
 	umtxq_busy(&key);
@@ -3594,24 +3605,28 @@ again:
 	umtxq_insert(uq);
 	umtxq_unlock(&uq->uq_key);
 	rv = casueword32(&sem->_has_waiters, 0, &count1, 1);
-	if (rv == 0)
+	if (rv != -1)
 		rv1 = fueword32(&sem->_count, &count);
-	if (rv == -1 || (rv == 0 && (rv1 == -1 || count != 0)) ||
-	    (rv == 1 && count1 == 0)) {
+	if (rv == -1 || rv1 == -1 || count != 0 || (rv == 1 && count1 == 0)) {
+		if (rv == 0)
+			suword32(&sem->_has_waiters, 0);
 		umtxq_lock(&uq->uq_key);
 		umtxq_unbusy(&uq->uq_key);
 		umtxq_remove(uq);
 		umtxq_unlock(&uq->uq_key);
-		if (rv == 1) {
-			rv = thread_check_susp(td, true);
-			if (rv == 0)
-				goto again;
-			error = rv;
+		if (rv == -1 || rv1 == -1) {
+			error = EFAULT;
 			goto out;
 		}
+		if (count != 0) {
+			error = 0;
+			goto out;
+		}
+		MPASS(rv == 1 && count1 == 0);
+		rv = thread_check_susp(td, true);
 		if (rv == 0)
-			rv = rv1;
-		error = rv == -1 ? EFAULT : 0;
+			goto again;
+		error = rv;
 		goto out;
 	}
 	umtxq_lock(&uq->uq_key);
@@ -3648,7 +3663,7 @@ do_sem_wake(struct thread *td, struct _usem * __capability sem)
 	if (error == -1)
 		return (EFAULT);
 	if ((error = umtx_key_get(sem, TYPE_SEM, GET_SHARE(flags), &key)) != 0)
-		return (error);	
+		return (error);
 	umtxq_lock(&key);
 	umtxq_busy(&key);
 	cnt = umtxq_count(&key);
@@ -3771,7 +3786,7 @@ do_sem2_wake(struct thread *td, struct _usem2 * __capability sem)
 	if (rv == -1)
 		return (EFAULT);
 	if ((error = umtx_key_get(sem, TYPE_SEM, GET_SHARE(flags), &key)) != 0)
-		return (error);	
+		return (error);
 	umtxq_lock(&key);
 	umtxq_busy(&key);
 	cnt = umtxq_count(&key);
@@ -5570,7 +5585,7 @@ umtx_handle_rb(struct thread *td, uintcap_t rbp, uintcap_t *rb_list, bool inact,
 		    sizeof(mu.m64));
 	} else
 #endif
-	
+
 		error = copyincap((void * __capability)rbp, &mu.m, sizeof(mu.m));
 	if (error != 0)
 		return (error);
@@ -5663,13 +5678,15 @@ umtx_thread_cleanup(struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200708,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
-//     "user_capabilities"
+//     "user_capabilities",
+//     "support"
 //   ],
 //   "changes_purecap": [
-//     "subobject_bounds"
+//     "subobject_bounds",
+//     "virtual_address"
 //   ]
 // }
 // CHERI CHANGES END

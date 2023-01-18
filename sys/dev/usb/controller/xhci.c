@@ -581,7 +581,6 @@ xhci_init(struct xhci_softc *sc, device_t self, uint8_t dma32)
 		return (ENXIO);
 	}
 
-	sc->sc_noport = sc->sc_noport;
 	sc->sc_noslot = XHCI_HCS1_DEVSLOT_MAX(temp);
 
 	DPRINTF("Max slots: %u\n", sc->sc_noslot);
@@ -701,10 +700,10 @@ xhci_generic_done_sub(struct usb_xfer *xfer)
 		len = td->remainder;
 
 		DPRINTFN(4, "xfer=%p[%u/%u] rem=%u/%u status=%u\n",
-		    xfer, (unsigned int)xfer->aframes,
-		    (unsigned int)xfer->nframes,
-		    (unsigned int)len, (unsigned int)td->len,
-		    (unsigned int)status);
+		    xfer, (unsigned)xfer->aframes,
+		    (unsigned)xfer->nframes,
+		    (unsigned)len, (unsigned)td->len,
+		    (unsigned)status);
 
 		/*
 	         * Verify the status length and

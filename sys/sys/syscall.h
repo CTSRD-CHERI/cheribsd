@@ -237,6 +237,8 @@
 #define	SYS_lio_listio	257
 #define	SYS_kbounce	258
 #define	SYS_flag_captured	259
+#define	SYS_cheri_revoke_get_shadow	260
+#define	SYS_cheri_revoke	261
 #define	SYS_freebsd11_getdents	272
 #define	SYS_lchmod	274
 				/* 275 is obsolete netbsd_lchown */

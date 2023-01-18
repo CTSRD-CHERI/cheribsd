@@ -626,6 +626,10 @@ static int t4_reset_on_fatal_err = 0;
 SYSCTL_INT(_hw_cxgbe, OID_AUTO, reset_on_fatal_err, CTLFLAG_RWTUN,
     &t4_reset_on_fatal_err, 0, "reset adapter on fatal errors");
 
+static int t4_clock_gate_on_suspend = 0;
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, clock_gate_on_suspend, CTLFLAG_RWTUN,
+    &t4_clock_gate_on_suspend, 0, "gate the clock on suspend");
+
 static int t4_tx_vm_wr = 0;
 SYSCTL_INT(_hw_cxgbe, OID_AUTO, tx_vm_wr, CTLFLAG_RWTUN, &t4_tx_vm_wr, 0,
     "Use VM work requests to transmit packets.");
@@ -686,7 +690,7 @@ SYSCTL_INT(_hw_cxgbe, OID_AUTO, cop_managed_offloading, CTLFLAG_RDTUN,
  */
 static int t4_kern_tls = 0;
 SYSCTL_INT(_hw_cxgbe, OID_AUTO, kern_tls, CTLFLAG_RDTUN, &t4_kern_tls, 0,
-    "Enable KERN_TLS mode for all supported adapters");
+    "Enable KERN_TLS mode for T6 adapters");
 
 SYSCTL_NODE(_hw_cxgbe, OID_AUTO, tls, CTLFLAG_RD | CTLFLAG_MPSAFE, 0,
     "cxgbe(4) KERN_TLS parameters");
@@ -1105,6 +1109,70 @@ t4_ifnet_unit(struct adapter *sc, struct port_info *pi)
 	return (-1);
 }
 
+static void
+t4_calibration(void *arg)
+{
+	struct adapter *sc;
+	struct clock_sync *cur, *nex;
+	uint64_t hw;
+	sbintime_t sbt;
+	int next_up;
+
+	sc = (struct adapter *)arg;
+
+	KASSERT((hw_off_limits(sc) == 0), ("hw_off_limits at t4_calibration"));
+	hw = t4_read_reg64(sc, A_SGE_TIMESTAMP_LO);
+	sbt = sbinuptime();
+
+	cur = &sc->cal_info[sc->cal_current];
+	next_up = (sc->cal_current + 1) % CNT_CAL_INFO;
+       	nex = &sc->cal_info[next_up];
+	if (__predict_false(sc->cal_count == 0)) {
+		/* First time in, just get the values in */
+		cur->hw_cur = hw;
+		cur->sbt_cur = sbt;
+		sc->cal_count++;
+		goto done;
+	}
+
+	if (cur->hw_cur == hw) {
+		/* The clock is not advancing? */
+		sc->cal_count = 0;
+		atomic_store_rel_int(&cur->gen, 0);
+		goto done;
+	}
+
+	seqc_write_begin(&nex->gen);
+	nex->hw_prev = cur->hw_cur;
+	nex->sbt_prev = cur->sbt_cur;
+	nex->hw_cur = hw;
+	nex->sbt_cur = sbt;
+	seqc_write_end(&nex->gen);
+	sc->cal_current = next_up;
+done:
+	callout_reset_sbt_curcpu(&sc->cal_callout, SBT_1S, 0, t4_calibration,
+	    sc, C_DIRECT_EXEC);
+}
+
+static void
+t4_calibration_start(struct adapter *sc)
+{
+	/*
+	 * Here if we have not done a calibration
+	 * then do so otherwise start the appropriate
+	 * timer.
+	 */
+	int i;
+
+	for (i = 0; i < CNT_CAL_INFO; i++) {
+		sc->cal_info[i].gen = 0;
+	}
+	sc->cal_current = 0;
+	sc->cal_count = 0;
+	sc->cal_gen = 0;
+	t4_calibration(sc);
+}
+
 static int
 t4_attach(device_t dev)
 {
@@ -1172,6 +1240,8 @@ t4_attach(device_t dev)
 	rw_init(&sc->policy_lock, "connection offload policy");
 
 	callout_init(&sc->ktls_tick, 1);
+
+	callout_init(&sc->cal_callout, 1);
 
 	refcount_init(&sc->vxlan_refcount, 0);
 
@@ -1563,6 +1633,7 @@ t4_attach(device_t dev)
 		    "failed to attach all child ports: %d\n", rc);
 		goto done;
 	}
+	t4_calibration_start(sc);
 
 	device_printf(dev,
 	    "PCIe gen%d x%d, %d ports, %d %s interrupt%s, %d eq, %d iq\n",
@@ -1738,7 +1809,8 @@ t4_detach_common(device_t dev)
 			free(pi, M_CXGBE);
 		}
 	}
-
+	callout_stop(&sc->cal_callout);
+	callout_drain(&sc->cal_callout);
 	device_delete_children(dev);
 	sysctl_ctx_free(&sc->ctx);
 	adapter_full_uninit(sc);
@@ -1840,7 +1912,10 @@ ok_to_reset(struct adapter *sc)
 	struct port_info *pi;
 	struct vi_info *vi;
 	int i, j;
-	const int caps = IFCAP_TOE | IFCAP_TXTLS | IFCAP_NETMAP | IFCAP_TXRTLMT;
+	int caps = IFCAP_TOE | IFCAP_NETMAP | IFCAP_TXRTLMT;
+
+	if (is_t6(sc))
+		caps |= IFCAP_TXTLS;
 
 	ASSERT_SYNCHRONIZED_OP(sc);
 	MPASS(!(sc->flags & IS_VF));
@@ -1913,7 +1988,6 @@ t4_suspend(device_t dev)
 
 	/* No more DMA or interrupts. */
 	stop_adapter(sc);
-
 	/* Quiesce all activity. */
 	for_each_port(sc, i) {
 		pi = sc->port[i];
@@ -1986,12 +2060,22 @@ t4_suspend(device_t dev)
 		quiesce_iq_fl(sc, &sc->sge.fwq, NULL);
 	}
 
+	/* Stop calibration */
+	callout_stop(&sc->cal_callout);
+	callout_drain(&sc->cal_callout);
+
 	/* Mark the adapter totally off limits. */
 	mtx_lock(&sc->reg_lock);
 	atomic_set_int(&sc->error_flags, HW_OFF_LIMITS);
 	sc->flags &= ~(FW_OK | MASTER_PF);
 	sc->reset_thread = NULL;
 	mtx_unlock(&sc->reg_lock);
+
+	if (t4_clock_gate_on_suspend) {
+		t4_set_reg_field(sc, A_PMU_PART_CG_PWRMODE, F_MA_PART_CGEN |
+		    F_LE_PART_CGEN | F_EDC1_PART_CGEN | F_EDC0_PART_CGEN |
+		    F_TP_PART_CGEN | F_PDP_PART_CGEN | F_SGE_PART_CGEN, 0);
+	}
 
 	CH_ALERT(sc, "suspend completed.\n");
 done:
@@ -2346,6 +2430,10 @@ t4_resume(device_t dev)
 			}
 		}
 	}
+
+	/* Reset all calibration */
+	t4_calibration_start(sc);	
+
 done:
 	if (rc == 0) {
 		sc->incarnation++;
@@ -2554,7 +2642,7 @@ cxgbe_vi_attach(device_t dev, struct vi_info *vi)
 #ifdef KERN_TLS
 	if (is_ktls(sc)) {
 		ifp->if_capabilities |= IFCAP_TXTLS;
-		if (sc->flags & KERN_TLS_ON)
+		if (sc->flags & KERN_TLS_ON || !is_t6(sc))
 			ifp->if_capenable |= IFCAP_TXTLS;
 	}
 #endif
@@ -3163,8 +3251,15 @@ cxgbe_snd_tag_alloc(struct ifnet *ifp, union if_snd_tag_alloc_params *params,
 #endif
 #ifdef KERN_TLS
 	case IF_SND_TAG_TYPE_TLS:
-		error = cxgbe_tls_tag_alloc(ifp, params, pt);
+	{
+		struct vi_info *vi = ifp->if_softc;
+
+		if (is_t6(vi->pi->adapter))
+			error = t6_tls_tag_alloc(ifp, params, pt);
+		else
+			error = EOPNOTSUPP;
 		break;
+	}
 #endif
 	default:
 		error = EOPNOTSUPP;
@@ -5509,7 +5604,7 @@ ktls_tick(void *arg)
 }
 
 static int
-t4_config_kern_tls(struct adapter *sc, bool enable)
+t6_config_kern_tls(struct adapter *sc, bool enable)
 {
 	int rc;
 	uint32_t param = V_FW_PARAMS_MNEM(FW_PARAMS_MNEM_DEV) |
@@ -5655,12 +5750,13 @@ set_params__post_init(struct adapter *sc)
 		 */
 		t4_tp_wr_bits_indirect(sc, A_TP_FRAG_CONFIG,
 		    V_PASSMODE(M_PASSMODE), V_PASSMODE(2));
-		if (is_ktls(sc)) {
-			sc->tlst.inline_keys = t4_tls_inline_keys;
-			sc->tlst.combo_wrs = t4_tls_combo_wrs;
-			if (t4_kern_tls != 0)
-				t4_config_kern_tls(sc, true);
-		}
+	}
+
+	if (is_ktls(sc)) {
+		sc->tlst.inline_keys = t4_tls_inline_keys;
+		sc->tlst.combo_wrs = t4_tls_combo_wrs;
+		if (t4_kern_tls != 0 && is_t6(sc))
+			t6_config_kern_tls(sc, true);
 	}
 #endif
 	return (0);
@@ -7541,9 +7637,12 @@ t4_sysctls(struct adapter *sc)
 		    CTLFLAG_RW, &sc->tlst.inline_keys, 0, "Always pass TLS "
 		    "keys in work requests (1) or attempt to store TLS keys "
 		    "in card memory.");
-		SYSCTL_ADD_INT(ctx, children, OID_AUTO, "combo_wrs",
-		    CTLFLAG_RW, &sc->tlst.combo_wrs, 0, "Attempt to combine "
-		    "TCB field updates with TLS record work requests.");
+
+		if (is_t6(sc))
+			SYSCTL_ADD_INT(ctx, children, OID_AUTO, "combo_wrs",
+			    CTLFLAG_RW, &sc->tlst.combo_wrs, 0, "Attempt to "
+			    "combine TCB field updates with TLS record work "
+			    "requests.");
 	}
 #endif
 
@@ -12397,7 +12496,7 @@ toe_capability(struct vi_info *vi, bool enable)
 
 	if (enable) {
 #ifdef KERN_TLS
-		if (sc->flags & KERN_TLS_ON) {
+		if (sc->flags & KERN_TLS_ON && is_t6(sc)) {
 			int i, j, n;
 			struct port_info *p;
 			struct vi_info *v;
@@ -12424,7 +12523,7 @@ toe_capability(struct vi_info *vi, bool enable)
 				    "trying to enable TOE.\n");
 				return (EAGAIN);
 			}
-			rc = t4_config_kern_tls(sc, false);
+			rc = t6_config_kern_tls(sc, false);
 			if (rc)
 				return (rc);
 		}
@@ -12667,6 +12766,8 @@ ktls_capability(struct adapter *sc, bool enable)
 
 	if (!is_ktls(sc))
 		return (ENODEV);
+	if (!is_t6(sc))
+		return (0);
 	if (hw_off_limits(sc))
 		return (ENXIO);
 
@@ -12679,7 +12780,7 @@ ktls_capability(struct adapter *sc, bool enable)
 			    "this adapter before trying to enable NIC TLS.\n");
 			return (EAGAIN);
 		}
-		return (t4_config_kern_tls(sc, true));
+		return (t6_config_kern_tls(sc, true));
 	} else {
 		/*
 		 * Nothing to do for disable.  If TOE is enabled sometime later
@@ -13278,7 +13379,7 @@ DRIVER_MODULE(vcc, cc, vcc_driver, 0, 0);
 MODULE_VERSION(vcc, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20210525,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

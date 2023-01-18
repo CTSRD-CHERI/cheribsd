@@ -122,7 +122,7 @@ void	freebsd32_rusage_out(const struct rusage *s, struct rusage32 *s32);
 #endif /* !_COMPAT_FREEBSD32_FREEBSD32_UTIL_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221129,
 //   "target_type": "header",
 //   "changes": [
 //     "support",

@@ -33,7 +33,10 @@ libkern/flsl.c			standard
 libkern/flsll.c			standard
 libkern/memcmp.c		standard
 libkern/memset.c		standard
+libkern/memset_c.c		optional	cpu_cheri !cheri_purecap_kernel
+libkern/strcmp.c		standard
 libkern/strlen.c		standard
+libkern/strncmp.c		standard
 riscv/cheri/cheri_debug.c	optional	cpu_cheri ddb
 riscv/cheri/cheri_exception.c	optional	cpu_cheri
 riscv/cheri/cheri_machdep.c	optional	cpu_cheri

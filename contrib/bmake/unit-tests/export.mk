@@ -40,7 +40,7 @@ BAR=	bar is ${UT_FU}
 
 .MAKE.EXPORTED+=	UT_ZOO UT_TEST
 
-FILTER_CMD?=	egrep -v '^(MAKEFLAGS|MALLOC_.*|PATH|PWD|SHLVL|_|&)='
+FILTER_CMD?=	${EGREP} -v '^(MAKEFLAGS|MALLOC_.*|PATH|PWD|SHLVL|_|&)='
 
 all:
 	@env | ${FILTER_CMD} | sort

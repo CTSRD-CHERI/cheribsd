@@ -14,6 +14,10 @@ SUBDIR+=	purecap \
 		purecap-dynamic \
 		purecap-dynamic-mt \
 		purecap-mt
+
+.if ${MACHINE_CPUARCH} == "aarch64" && ${MK_LIB64C} == "no"
+SUBDIR+=	mt-c18n
+.endif
 .endif
 
 SUBDIR_PARALLEL=

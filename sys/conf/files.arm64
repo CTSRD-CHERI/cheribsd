@@ -11,11 +11,15 @@ kern/subr_intr.c				optional intrng
 kern/subr_physmem.c				standard
 libkern/bcopy.c					optional cpu_cheri
 libkern/bcopy_c.c				optional cpu_cheri !cheri_purecap_kernel
-libkern/memcmp.c				standard	\
+libkern/memcmp.c				optional cpu_cheri	\
 	compile-with "${NORMAL_C:N-fsanitize*}"
-libkern/memset.c				standard	\
+libkern/memset.c				optional cheri_purecap_kernel	\
 	compile-with "${NORMAL_C:N-fsanitize*}"
+libkern/memset_c.c				optional cpu_cheri !cheri_purecap_kernel \
+	compile-with "${NORMAL_C:N-fsanitize*}"
+libkern/strcmp.c				optional cheri_purecap_kernel
 libkern/strlen.c		standard
+libkern/strncmp.c				optional cheri_purecap_kernel
 libkern/arm64/crc32c_armv8.S			standard
 
 arm/arm/generic_timer.c				standard
@@ -64,8 +68,9 @@ arm64/arm64/locore.S				standard no-obj
 arm64/arm64/machdep.c				standard
 arm64/arm64/machdep_boot.c			standard
 arm64/arm64/mem.c				standard
+arm64/arm64/memcmp.S				optional !cpu_cheri
 arm64/arm64/memcpy.S				optional !cpu_cheri
-arm64/arm64/memmove.S				optional !cpu_cheri
+arm64/arm64/memset.S				optional !cheri_purecap_kernel
 arm64/arm64/minidump_machdep.c			standard
 arm64/arm64/mp_machdep.c			optional smp
 arm64/arm64/nexus.c				standard
@@ -76,6 +81,8 @@ arm64/arm64/pmap.c				standard
 arm64/arm64/ptrace_machdep.c			standard
 arm64/arm64/sigtramp.S				standard
 arm64/arm64/stack_machdep.c			optional ddb | stack
+arm64/arm64/strcmp.S				optional !cheri_purecap_kernel
+arm64/arm64/strncmp.S				optional !cheri_purecap_kernel
 arm64/arm64/support_ifunc.c			standard
 arm64/arm64/support.S				standard
 arm64/arm64/swtch.S				standard
@@ -135,7 +142,7 @@ arm64/coresight/coresight_acpi.c		optional acpi
 arm64/coresight/coresight_fdt.c			optional fdt
 arm64/coresight/coresight_if.m			standard
 arm64/coresight/coresight_cmd.c			standard
-arm64/coresight/coresight_cpu_debug.c		standard
+arm64/coresight/coresight_cpu_debug.c		optional fdt
 arm64/coresight/coresight_etm4x.c		standard
 arm64/coresight/coresight_etm4x_acpi.c		optional acpi
 arm64/coresight/coresight_etm4x_fdt.c		optional fdt
@@ -237,6 +244,12 @@ dev/enetc/if_enetc.c				optional enetc iflib pci fdt soc_nxp_ls
 
 dev/etherswitch/felix/felix.c			optional enetc etherswitch fdt felix pci soc_nxp_ls
 
+dev/firmware/arm/mmio_sram.c			optional fdt
+dev/firmware/arm/mmio_sram_if.m			optional fdt
+dev/firmware/arm/scmi.c				optional fdt
+dev/firmware/arm/scmi_clk.c			optional fdt
+dev/firmware/arm/scmi_shmem.c			optional fdt
+
 dev/gpio/pl061.c				optional pl061 gpio
 dev/gpio/pl061_acpi.c				optional pl061 gpio acpi
 dev/gpio/pl061_fdt.c				optional pl061 gpio fdt
@@ -244,10 +257,10 @@ dev/gpio/qoriq_gpio.c				optional SOC_NXP_LS gpio fdt
 
 dev/hwpmc/hwpmc_arm64.c				optional hwpmc
 dev/hwpmc/hwpmc_arm64_md.c			optional hwpmc
-dev/hwpmc/hwpmc_cmn600.c			optional hwpmc
-arm64/arm64/cmn600.c				optional hwpmc
-dev/hwpmc/hwpmc_dmc620.c			optional hwpmc
-dev/hwpmc/pmu_dmc620.c				optional hwpmc
+dev/hwpmc/hwpmc_cmn600.c			optional hwpmc acpi
+arm64/arm64/cmn600.c				optional hwpmc acpi
+dev/hwpmc/hwpmc_dmc620.c			optional hwpmc acpi
+dev/hwpmc/pmu_dmc620.c				optional hwpmc acpi
 
 dev/ice/if_ice_iflib.c				optional ice pci \
 	compile-with "${NORMAL_C} -I$S/dev/ice"
@@ -316,6 +329,7 @@ dev/ipmi/ipmi_acpi.c				optional ipmi acpi
 dev/ipmi/ipmi_kcs.c				optional ipmi
 dev/ipmi/ipmi_smic.c				optional ipmi
 
+dev/mailbox/arm/arm_doorbell.c			optional fdt
 dev/mbox/mbox_if.m				optional soc_brcm_bcm2837
 
 dev/mmc/host/dwmmc.c				optional dwmmc fdt
@@ -633,7 +647,7 @@ arm64/rockchip/rk_pinctrl.c			optional fdt rk_pinctrl soc_rockchip_rk3328 | fdt 
 arm64/rockchip/rk_gpio.c			optional fdt rk_gpio soc_rockchip_rk3328 | fdt rk_gpio soc_rockchip_rk3399
 arm64/rockchip/rk_iodomain.c			optional fdt rk_iodomain
 arm64/rockchip/rk_spi.c				optional fdt rk_spi
-arm64/rockchip/rk_usb2phy.c			optional fdt rk_usb2phy soc_rockchip_rk3328 | soc_rockchip_rk3399
+arm64/rockchip/rk_usb2phy.c			optional fdt rk_usb2phy soc_rockchip_rk3328 | fdt rk_usb2phy soc_rockchip_rk3399
 arm64/rockchip/rk_typec_phy.c			optional fdt rk_typec_phy soc_rockchip_rk3399
 arm64/rockchip/if_dwc_rk.c			optional fdt dwc_rk soc_rockchip_rk3328 | fdt dwc_rk soc_rockchip_rk3399
 arm64/rockchip/rk_tsadc_if.m			optional fdt soc_rockchip_rk3399

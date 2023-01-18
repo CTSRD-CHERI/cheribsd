@@ -332,7 +332,7 @@ ieee80211_ioctl_getscanresults(struct ieee80211vap *vap,
 		void *p;
 
 		space = req.space;
-		/* XXX M_WAITOK after driver lock released */
+		/* XXX IEEE80211_M_WAITOK after driver lock released */
 		p = IEEE80211_MALLOC(space, M_TEMP,
 		    IEEE80211_M_NOWAIT | IEEE80211_M_ZERO);
 		if (p == NULL)
@@ -478,7 +478,7 @@ getstainfo_common(struct ieee80211vap *vap, struct ieee80211req *ireq,
 		req.space = ireq->i_len;
 	if (req.space > 0) {
 		space = req.space;
-		/* XXX M_WAITOK after driver lock released */
+		/* XXX IEEE80211_M_WAITOK after driver lock released */
 		p = IEEE80211_MALLOC(space, M_TEMP,
 		    IEEE80211_M_NOWAIT | IEEE80211_M_ZERO);
 		if (p == NULL) {
@@ -3698,7 +3698,7 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

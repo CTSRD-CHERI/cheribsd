@@ -234,7 +234,7 @@ void des_fixup_key_parity(unsigned char *key)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20210401,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "subobject_bounds"

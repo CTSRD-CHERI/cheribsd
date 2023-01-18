@@ -117,9 +117,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/tcp_pcap.h>
 #endif
 #include <netinet/tcp_syncache.h>
-#ifdef TCPDEBUG
 #include <netinet/tcp_debug.h>
-#endif /* TCPDEBUG */
 #ifdef TCP_OFFLOAD
 #include <netinet/tcp_offload.h>
 #endif
@@ -268,6 +266,20 @@ kmod_tcpstat_add(int statnum, int val)
 {
 
 	counter_u64_add(VNET(tcpstat)[statnum], val);
+}
+
+/*
+ * Make sure that we only start a SACK loss recovery when
+ * receiving a duplicate ACK with a SACK block, and also
+ * complete SACK loss recovery in case the other end
+ * reneges.
+ */
+static bool inline
+tcp_is_sack_recovery(struct tcpcb *tp, struct tcpopt *to)
+{
+	return ((tp->t_flags & TF_SACK_PERMIT) &&
+		((to->to_flags & TOF_SACK) ||
+		(!TAILQ_EMPTY(&tp->snd_holes))));
 }
 
 #ifdef TCP_HHOOK
@@ -833,8 +845,9 @@ tcp_input_with_port(struct mbuf **mp, int *offp, int proto, uint16_t port)
 	 * PCB, be it a listening one or a synchronized one.  The packet
 	 * shall not modify its state.
 	 */
-	lookupflag = (thflags & (TH_ACK|TH_SYN)) == TH_SYN ?
-	    INPLOOKUP_RLOCKPCB : INPLOOKUP_WLOCKPCB;
+	lookupflag = INPLOOKUP_WILDCARD |
+	    ((thflags & (TH_ACK|TH_SYN)) == TH_SYN ?
+	    INPLOOKUP_RLOCKPCB : INPLOOKUP_WLOCKPCB);
 findpcb:
 #ifdef INET6
 	if (isipv6 && fwd_tag != NULL) {
@@ -857,13 +870,12 @@ findpcb:
 			inp = in6_pcblookup(&V_tcbinfo, &ip6->ip6_src,
 			    th->th_sport, __unbounded_addressof(next_hop6->sin6_addr),
 			    next_hop6->sin6_port ? ntohs(next_hop6->sin6_port) :
-			    th->th_dport, INPLOOKUP_WILDCARD | lookupflag,
-			    m->m_pkthdr.rcvif);
+			    th->th_dport, lookupflag, m->m_pkthdr.rcvif);
 		}
 	} else if (isipv6) {
 		inp = in6_pcblookup_mbuf(&V_tcbinfo, &ip6->ip6_src,
-		    th->th_sport, &ip6->ip6_dst, th->th_dport,
-		    INPLOOKUP_WILDCARD | lookupflag, m->m_pkthdr.rcvif, m);
+		    th->th_sport, &ip6->ip6_dst, th->th_dport, lookupflag,
+		    m->m_pkthdr.rcvif, m);
 	}
 #endif /* INET6 */
 #if defined(INET6) && defined(INET)
@@ -889,13 +901,12 @@ findpcb:
 			inp = in_pcblookup(&V_tcbinfo, ip->ip_src,
 			    th->th_sport, next_hop->sin_addr,
 			    next_hop->sin_port ? ntohs(next_hop->sin_port) :
-			    th->th_dport, INPLOOKUP_WILDCARD | lookupflag,
-			    m->m_pkthdr.rcvif);
+			    th->th_dport, lookupflag, m->m_pkthdr.rcvif);
 		}
 	} else
 		inp = in_pcblookup_mbuf(&V_tcbinfo, ip->ip_src,
-		    th->th_sport, ip->ip_dst, th->th_dport,
-		    INPLOOKUP_WILDCARD | lookupflag, m->m_pkthdr.rcvif, m);
+		    th->th_sport, ip->ip_dst, th->th_dport, lookupflag,
+		    m->m_pkthdr.rcvif, m);
 #endif /* INET */
 
 	/*
@@ -904,6 +915,11 @@ findpcb:
 	 * XXX MRT Send RST using which routing table?
 	 */
 	if (inp == NULL) {
+		if (rstreason != 0) {
+			/* We came here after second (safety) lookup. */
+			MPASS((lookupflag & INPLOOKUP_WILDCARD) == 0);
+			goto dropwithreset;
+		}
 		/*
 		 * Log communication attempts to ports that are not
 		 * in use.
@@ -983,29 +999,29 @@ findpcb:
 			goto dropunlock;
 	}
 
-	/*
-	 * A previous connection in TIMEWAIT state is supposed to catch stray
-	 * or duplicate segments arriving late.  If this segment was a
-	 * legitimate new connection attempt, the old INPCB gets removed and
-	 * we can try again to find a listening socket.
-	 */
-	if (inp->inp_flags & INP_TIMEWAIT) {
+	tp = intotcpcb(inp);
+	switch (tp->t_state) {
+	case TCPS_TIME_WAIT:
+		/*
+		 * A previous connection in TIMEWAIT state is supposed to catch
+		 * stray or duplicate segments arriving late.  If this segment
+		 * was a legitimate new connection attempt, the old INPCB gets
+		 * removed and we can try again to find a listening socket.
+		 */
 		tcp_dooptions(&to, optp, optlen,
 		    (thflags & TH_SYN) ? TO_SYN : 0);
 		/*
-		 * NB: tcp_twcheck unlocks the INP and frees the mbuf.
+		 * tcp_twcheck unlocks the inp always, and frees the m if fails.
 		 */
 		if (tcp_twcheck(inp, &to, th, m, tlen))
 			goto findpcb;
 		return (IPPROTO_DONE);
-	}
-	/*
-	 * The TCPCB may no longer exist if the connection is winding
-	 * down or it is in the CLOSED state.  Either way we drop the
-	 * segment and send an appropriate response.
-	 */
-	tp = intotcpcb(inp);
-	if (tp == NULL || tp->t_state == TCPS_CLOSED) {
+	case TCPS_CLOSED:
+		/*
+		 * The TCPCB may no longer exist if the connection is winding
+		 * down or it is in the CLOSED state.  Either way we drop the
+		 * segment and send an appropriate response.
+		 */
 		rstreason = BANDLIM_RST_CLOSEDPORT;
 		goto dropwithreset;
 	}
@@ -1082,8 +1098,7 @@ findpcb:
 			 */
 			tcp_dooptions(&to, optp, optlen, 0);
 			/*
-			 * NB: syncache_expand() doesn't unlock
-			 * inp and tcpinfo locks.
+			 * NB: syncache_expand() doesn't unlock inp.
 			 */
 			rstreason = syncache_expand(&inc, &to, th, &so, m, port);
 			if (rstreason < 0) {
@@ -1096,13 +1111,26 @@ findpcb:
 				goto dropunlock;
 			} else if (rstreason == 0) {
 				/*
-				 * No syncache entry or ACK was not
-				 * for our SYN/ACK.  Send a RST.
+				 * No syncache entry, or ACK was not for our
+				 * SYN/ACK.  Do our protection against double
+				 * ACK.  If peer sent us 2 ACKs, then for the
+				 * first one syncache_expand() successfully
+				 * converted syncache entry into a socket,
+				 * while we were waiting on the inpcb lock.  We
+				 * don't want to sent RST for the second ACK,
+				 * so we perform second lookup without wildcard
+				 * match, hoping to find the new socket.  If
+				 * the ACK is stray indeed, rstreason would
+				 * hint the above code that the lookup was a
+				 * second attempt.
+				 *
 				 * NB: syncache did its own logging
 				 * of the failure cause.
 				 */
+				INP_WUNLOCK(inp);
 				rstreason = BANDLIM_RST_OPENPORT;
-				goto dropwithreset;
+				lookupflag &= ~INPLOOKUP_WILDCARD;
+				goto findpcb;
 			}
 tfo_socket_result:
 			if (so == NULL) {
@@ -1391,7 +1419,7 @@ tfo_socket_result:
 	 * to upgrade the lock, because calling convention for stacks is
 	 * write-lock on PCB.  If upgrade fails, drop the SYN.
 	 */
-	if (lookupflag == INPLOOKUP_RLOCKPCB && INP_TRY_UPGRADE(inp) == 0)
+	if ((lookupflag & INPLOOKUP_RLOCKPCB) && INP_TRY_UPGRADE(inp) == 0)
 		goto dropunlock;
 
 	tp->t_fb->tfb_tcp_do_segment(m, th, so, tp, drop_hdrlen, tlen, iptos);
@@ -1576,6 +1604,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	if ((tp->t_state == TCPS_SYN_SENT) && (thflags & TH_ACK) &&
 	    (SEQ_LEQ(th->th_ack, tp->iss) || SEQ_GT(th->th_ack, tp->snd_max))) {
 		rstreason = BANDLIM_UNLIMITED;
+		tcp_log_end_status(tp, TCP_EI_STATUS_RST_IN_FRONT);
 		goto dropwithreset;
 	}
 
@@ -1585,8 +1614,14 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	 * XXX: This should be done after segment
 	 * validation to ignore broken/spoofed segs.
 	 */
+	if  (tp->t_idle_reduce &&
+	     (tp->snd_max == tp->snd_una) &&
+	     ((ticks - tp->t_rcvtime) >= tp->t_rxtcur))
+		cc_after_idle(tp);
 	tp->t_rcvtime = ticks;
 
+	if (thflags & TH_FIN)
+		tcp_log_end_status(tp, TCP_EI_STATUS_CLIENT_FIN);
 	/*
 	 * Scale up the window into a 32-bit value.
 	 * For the SYN_SENT state the scale is zero.
@@ -1857,11 +1892,21 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 					    &tcp_savetcp, 0);
 #endif
 				TCP_PROBE3(debug__input, tp, th, m);
+				/*
+				 * Clear t_acktime if remote side has ACKd
+				 * all data in the socket buffer.
+				 * Otherwise, update t_acktime if we received
+				 * a sufficiently large ACK.
+				 */
+				if (sbavail(&so->so_snd) == 0)
+					tp->t_acktime = 0;
+				else if (acked > 1)
+					tp->t_acktime = ticks;
 				if (tp->snd_una == tp->snd_max)
 					tcp_timer_activate(tp, TT_REXMT, 0);
 				else if (!tcp_timer_active(tp, TT_PERSIST))
 					tcp_timer_activate(tp, TT_REXMT,
-						      tp->t_rxtcur);
+					    TP_RXTCUR(tp));
 				sowwakeup(so);
 				if (sbavail(&so->so_snd))
 					(void) tcp_output(tp);
@@ -1960,6 +2005,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		    (SEQ_LEQ(th->th_ack, tp->snd_una) ||
 		     SEQ_GT(th->th_ack, tp->snd_max))) {
 				rstreason = BANDLIM_RST_OPENPORT;
+				tcp_log_end_status(tp, TCP_EI_STATUS_RST_IN_FRONT);
 				goto dropwithreset;
 		}
 		if (IS_FASTOPEN(tp->t_flags)) {
@@ -1972,6 +2018,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			 */
 			if ((thflags & (TH_SYN|TH_ACK)) == (TH_SYN|TH_ACK)) {
 				rstreason = BANDLIM_RST_OPENPORT;
+				tcp_log_end_status(tp, TCP_EI_STATUS_RST_IN_FRONT);
 				goto dropwithreset;
 			} else if (thflags & TH_SYN) {
 				/* non-initial SYN is ignored */
@@ -2003,6 +2050,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		if ((thflags & (TH_ACK|TH_RST)) == (TH_ACK|TH_RST)) {
 			TCP_PROBE5(connect__refused, NULL, tp,
 			    m, tp, th);
+			tcp_log_end_status(tp, TCP_EI_STATUS_RST_IN_FRONT);
 			tp = tcp_drop(tp, ECONNREFUSED);
 		}
 		if (thflags & TH_RST)
@@ -2057,6 +2105,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			 */
 			tp->t_starttime = ticks;
 			if (tp->t_flags & TF_NEEDFIN) {
+				tp->t_acktime = ticks;
 				tcp_state_change(tp, TCPS_FIN_WAIT_1);
 				tp->t_flags &= ~TF_NEEDFIN;
 				thflags &= ~TH_SYN;
@@ -2077,7 +2126,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			 *        SYN-SENT -> SYN-RECEIVED
 			 *        SYN-SENT* -> SYN-RECEIVED*
 			 */
-			tp->t_flags |= (TF_ACKNOW | TF_NEEDSYN);
+			tp->t_flags |= (TF_ACKNOW | TF_NEEDSYN | TF_SONOTCONN);
 			tcp_timer_activate(tp, TT_REXMT, 0);
 			tcp_state_change(tp, TCPS_SYN_RECEIVED);
 		}
@@ -2111,16 +2160,6 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			goto process_ACK;
 
 		goto step6;
-
-	/*
-	 * If the state is LAST_ACK or CLOSING or TIME_WAIT:
-	 *      do normal processing.
-	 *
-	 * NB: Leftover from RFC1644 T/TCP.  Cases to be reused later.
-	 */
-	case TCPS_LAST_ACK:
-	case TCPS_CLOSING:
-		break;  /* continue normal processing */
 	}
 
 	/*
@@ -2175,6 +2214,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 				close:
 					/* FALLTHROUGH */
 				default:
+					tcp_log_end_status(tp, TCP_EI_STATUS_CLIENT_RST);
 					tp = tcp_close(tp);
 				}
 			} else {
@@ -2199,6 +2239,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		if (V_tcp_insecure_syn &&
 		    SEQ_GEQ(th->th_seq, tp->last_ack_sent) &&
 		    SEQ_LT(th->th_seq, tp->last_ack_sent + tp->rcv_wnd)) {
+			tcp_log_end_status(tp, TCP_EI_STATUS_RST_IN_FRONT);
 			tp = tcp_drop(tp, ECONNRESET);
 			rstreason = BANDLIM_UNLIMITED;
 		} else {
@@ -2250,6 +2291,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	 */
 	if (tp->t_state == TCPS_SYN_RECEIVED && SEQ_LT(th->th_seq, tp->irs)) {
 		rstreason = BANDLIM_RST_OPENPORT;
+		tcp_log_end_status(tp, TCP_EI_STATUS_RST_IN_FRONT);
 		goto dropwithreset;
 	}
 
@@ -2323,6 +2365,9 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			    s, __func__, tcpstates[tp->t_state], tlen);
 			free(s, M_TCPLOG);
 		}
+		tcp_log_end_status(tp, TCP_EI_STATUS_DATA_A_CLOSE);
+		/* tcp_close will kill the inp pre-log the Reset */
+		tcp_log_end_status(tp, TCP_EI_STATUS_SERVER_RST);
 		tp = tcp_close(tp);
 		TCPSTAT_INC(tcps_rcvafterclose);
 		rstreason = BANDLIM_UNLIMITED;
@@ -2415,7 +2460,19 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	case TCPS_SYN_RECEIVED:
 
 		TCPSTAT_INC(tcps_connects);
-		soisconnected(so);
+		if (tp->t_flags & TF_SONOTCONN) {
+			/*
+			 * Usually SYN_RECEIVED had been created from a LISTEN,
+			 * and solisten_enqueue() has already marked the socket
+			 * layer as connected.  If it didn't, which can happen
+			 * only with an accept_filter(9), then the tp is marked
+			 * with TF_SONOTCONN.  The other reason for this mark
+			 * to be set is a simultaneous open, a SYN_RECEIVED
+			 * that had been created from SYN_SENT.
+			 */
+			tp->t_flags &= ~TF_SONOTCONN;
+			soisconnected(so);
+		}
 		/* Do window scaling? */
 		if ((tp->t_flags & (TF_RCVD_SCALE|TF_REQ_SCALE)) ==
 			(TF_RCVD_SCALE|TF_REQ_SCALE)) {
@@ -2433,6 +2490,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			tp->t_tfo_pending = NULL;
 		}
 		if (tp->t_flags & TF_NEEDFIN) {
+			tp->t_acktime = ticks;
 			tcp_state_change(tp, TCPS_FIN_WAIT_1);
 			tp->t_flags &= ~TF_NEEDFIN;
 		} else {
@@ -2487,9 +2545,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			TCPSTAT_INC(tcps_rcvacktoomuch);
 			goto dropafterack;
 		}
-		if ((tp->t_flags & TF_SACK_PERMIT) &&
-		    ((to.to_flags & TOF_SACK) ||
-		     !TAILQ_EMPTY(&tp->snd_holes))) {
+		if (tcp_is_sack_recovery(tp, &to)) {
 			if (((sack_changed = tcp_sack_doack(tp, &to, th->th_ack)) != 0) &&
 			    (tp->t_flags & TF_LRD)) {
 				tcp_sack_lost_retransmission(tp, th);
@@ -2562,8 +2618,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 				 * duplicating packets or a possible DoS attack.
 				 */
 				if (th->th_ack != tp->snd_una ||
-				    ((tp->t_flags & TF_SACK_PERMIT) &&
-				    (to.to_flags & TOF_SACK) &&
+				    (tcp_is_sack_recovery(tp, &to) &&
 				    !sack_changed))
 					break;
 				else if (!tcp_timer_active(tp, TT_REXMT))
@@ -2575,8 +2630,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 					if (V_tcp_do_prr &&
 					    IN_FASTRECOVERY(tp->t_flags)) {
 						tcp_do_prr_ack(tp, th, &to);
-					} else if ((tp->t_flags & TF_SACK_PERMIT) &&
-					    (to.to_flags & TOF_SACK) &&
+					} else if (tcp_is_sack_recovery(tp, &to) &&
 					    IN_FASTRECOVERY(tp->t_flags)) {
 						int awnd;
 
@@ -2649,8 +2703,7 @@ enter_recovery:
 						 * snd_ssthresh is already updated by
 						 * cc_cong_signal.
 						 */
-						if ((tp->t_flags & TF_SACK_PERMIT) &&
-						    (to.to_flags & TOF_SACK)) {
+						if (tcp_is_sack_recovery(tp, &to)) {
 							tp->sackhint.prr_delivered =
 							    tp->sackhint.sacked_bytes;
 						} else {
@@ -2662,8 +2715,7 @@ enter_recovery:
 						tp->sackhint.recover_fs = max(1,
 						    tp->snd_nxt - tp->snd_una);
 					}
-					if ((tp->t_flags & TF_SACK_PERMIT) &&
-					    (to.to_flags & TOF_SACK)) {
+					if (tcp_is_sack_recovery(tp, &to)) {
 						TCPSTAT_INC(
 						    tcps_sack_recovery_episode);
 						tp->snd_recover = tp->snd_nxt;
@@ -2715,14 +2767,14 @@ enter_recovery:
 					    maxseg;
 					/*
 					 * Only call tcp_output when there
-					 * is new data available to be sent.
-					 * Otherwise we would send pure ACKs.
+					 * is new data available to be sent
+					 * or we need to send an ACK.
 					 */
 					SOCKBUF_LOCK(&so->so_snd);
 					avail = sbavail(&so->so_snd) -
 					    (tp->snd_nxt - tp->snd_una);
 					SOCKBUF_UNLOCK(&so->so_snd);
-					if (avail > 0)
+					if (avail > 0 || tp->t_flags & TF_ACKNOW)
 						(void) tcp_output(tp);
 					sent = tp->snd_max - oldsndmax;
 					if (sent > maxseg) {
@@ -2755,8 +2807,7 @@ enter_recovery:
 			 * from the left side. Such partial ACKs should not be
 			 * counted as dupacks here.
 			 */
-			if ((tp->t_flags & TF_SACK_PERMIT) &&
-			    (to.to_flags & TOF_SACK) &&
+			if (tcp_is_sack_recovery(tp, &to) &&
 			    sack_changed) {
 				tp->t_dupacks++;
 				/* limit overhead by setting maxseg last */
@@ -2886,6 +2937,20 @@ process_ACK:
 			tcp_xmit_timer(tp, ticks - tp->t_rtttime);
 		}
 
+		SOCKBUF_LOCK(&so->so_snd);
+		/*
+		 * Clear t_acktime if remote side has ACKd all data in the
+		 * socket buffer and FIN (if applicable).
+		 * Otherwise, update t_acktime if we received a sufficiently
+		 * large ACK.
+		 */
+		if ((tp->t_state <= TCPS_CLOSE_WAIT &&
+		    acked == sbavail(&so->so_snd)) ||
+		    acked > sbavail(&so->so_snd))
+			tp->t_acktime = 0;
+		else if (acked > 1)
+			tp->t_acktime = ticks;
+
 		/*
 		 * If all outstanding data is acked, stop retransmit
 		 * timer and remember to restart (more output or persist).
@@ -2896,14 +2961,16 @@ process_ACK:
 			tcp_timer_activate(tp, TT_REXMT, 0);
 			needoutput = 1;
 		} else if (!tcp_timer_active(tp, TT_PERSIST))
-			tcp_timer_activate(tp, TT_REXMT, tp->t_rxtcur);
+			tcp_timer_activate(tp, TT_REXMT, TP_RXTCUR(tp));
 
 		/*
 		 * If no data (only SYN) was ACK'd,
 		 *    skip rest of ACK processing.
 		 */
-		if (acked == 0)
+		if (acked == 0) {
+			SOCKBUF_UNLOCK(&so->so_snd);
 			goto step6;
+		}
 
 		/*
 		 * Let the congestion control algorithm update congestion
@@ -2912,7 +2979,6 @@ process_ACK:
 		 */
 		cc_ack_received(tp, th, nsegs, CC_ACK);
 
-		SOCKBUF_LOCK(&so->so_snd);
 		if (acked > sbavail(&so->so_snd)) {
 			if (tp->snd_wnd >= sbavail(&so->so_snd))
 				tp->snd_wnd -= sbavail(&so->so_snd);
@@ -2964,10 +3030,6 @@ process_ACK:
 				 * Starting the timer is contrary to the
 				 * specification, but if we don't get a FIN
 				 * we'll hang forever.
-				 *
-				 * XXXjl:
-				 * we should release the tp also, and use a
-				 * compressed state.
 				 */
 				if (so->so_rcv.sb_state & SBS_CANTRCVMORE) {
 					soisdisconnected(so);
@@ -3309,6 +3371,7 @@ dropafterack:
 	    (SEQ_GT(tp->snd_una, th->th_ack) ||
 	     SEQ_GT(th->th_ack, tp->snd_max)) ) {
 		rstreason = BANDLIM_RST_OPENPORT;
+		tcp_log_end_status(tp, TCP_EI_STATUS_RST_IN_FRONT);
 		goto dropwithreset;
 	}
 #ifdef TCPDEBUG
@@ -3938,8 +4001,7 @@ tcp_do_prr_ack(struct tcpcb *tp, struct tcphdr *th, struct tcpopt *to)
 	 * (del_data) and an estimate of how many bytes are in the
 	 * network.
 	 */
-	if (((tp->t_flags & TF_SACK_PERMIT) &&
-	    (to->to_flags & TOF_SACK)) ||
+	if (tcp_is_sack_recovery(tp, to) ||
 	    (IN_CONGRECOVERY(tp->t_flags) &&
 	     !IN_FASTRECOVERY(tp->t_flags))) {
 		del_data = tp->sackhint.delivered_data;
@@ -3983,8 +4045,7 @@ tcp_do_prr_ack(struct tcpcb *tp, struct tcphdr *th, struct tcpopt *to)
 	 * accordingly.
 	 */
 	if (IN_FASTRECOVERY(tp->t_flags)) {
-		if ((tp->t_flags & TF_SACK_PERMIT) &&
-		    (to->to_flags & TOF_SACK)) {
+		if (tcp_is_sack_recovery(tp, to)) {
 			tp->snd_cwnd = tp->snd_nxt - tp->snd_recover +
 					    tp->sackhint.sack_bytes_rexmit +
 					    (snd_cnt * maxseg);
@@ -4039,9 +4100,13 @@ tcp_newreno_partial_ack(struct tcpcb *tp, struct tcphdr *th)
 int
 tcp_compute_pipe(struct tcpcb *tp)
 {
-	return (tp->snd_max - tp->snd_una +
-		tp->sackhint.sack_bytes_rexmit -
-		tp->sackhint.sacked_bytes);
+	if (tp->t_fb->tfb_compute_pipe == NULL) {
+		return (tp->snd_max - tp->snd_una +
+			tp->sackhint.sack_bytes_rexmit -
+			tp->sackhint.sacked_bytes);
+	} else {
+		return((*tp->t_fb->tfb_compute_pipe)(tp));
+	}
 }
 
 uint32_t
@@ -4072,7 +4137,7 @@ tcp_compute_initwnd(uint32_t maxseg)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "subobject_bounds"

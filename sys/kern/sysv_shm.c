@@ -2110,14 +2110,15 @@ DECLARE_MODULE(sysvshm, sysvshm_mod, SI_SUB_SYSV_SHM, SI_ORDER_FIRST);
 MODULE_VERSION(sysvshm, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20200708,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "support"
+//     "support",
+//     "bounds_compression"
 //   ]
 // }
 // CHERI CHANGES END

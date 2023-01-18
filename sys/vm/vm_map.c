@@ -4513,23 +4513,25 @@ vm_map_entry_deallocate(vm_map_entry_t entry, boolean_t system_map)
 }
 
 /*
- * Release resources owned by a map entry.
+ *	vm_map_entry_delete:	[ internal use only ]
+ *
+ *	Deallocate the given entry from the target map.
  */
 static void
-vm_map_entry_clean(vm_map_t map, vm_map_entry_t entry)
+vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry)
 {
 	vm_object_t object;
 	vm_pindex_t offidxstart, offidxend, size1;
 	vm_size_t size;
 
-	VM_MAP_ASSERT_LOCKED(map);
-
+	vm_map_entry_unlink(map, entry, UNLINK_MERGE_NONE);
 	object = entry->object.vm_object;
 
 	if ((entry->eflags & (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0) {
 		MPASS(entry->cred == NULL);
 		MPASS((entry->eflags & MAP_ENTRY_IS_SUB_MAP) == 0);
 		MPASS(object == NULL);
+		vm_map_entry_deallocate(entry, map->system_map);
 		return;
 	}
 
@@ -4580,23 +4582,9 @@ vm_map_entry_clean(vm_map_t map, vm_map_entry_t entry)
 		}
 		VM_OBJECT_WUNLOCK(object);
 	}
-}
-
-/*
- *	vm_map_entry_delete:	[ internal use only ]
- *
- *	Deallocate the given entry from the target map.
- */
-static void
-vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry)
-{
-	vm_map_entry_unlink(map, entry, UNLINK_MERGE_NONE);
-	vm_map_entry_clean(map, entry);
-
-	if (map->system_map ||
-	    (entry->eflags & (MAP_ENTRY_GUARD | MAP_ENTRY_UNMAPPED)) != 0) {
-		vm_map_entry_deallocate(entry, map->system_map);
-	} else {
+	if (map->system_map)
+		vm_map_entry_deallocate(entry, TRUE);
+	else {
 		entry->defer_next = curthread->td_map_def_user;
 		curthread->td_map_def_user = entry;
 	}
@@ -4614,7 +4602,7 @@ int
 vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
     bool keep_reservation)
 {
-	vm_map_entry_t entry, next_entry, prev_entry;
+	vm_map_entry_t entry, next_entry, prev_entry, cloned_entry;
 	int rv;
 
 	VM_MAP_ASSERT_LOCKED(map);
@@ -4629,7 +4617,7 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	rv = vm_map_lookup_clip_start(map, start, &entry, &prev_entry);
 	if (rv != KERN_SUCCESS)
 		return (rv);
-	for (; entry->start < end; prev_entry = entry, entry = next_entry) {
+	for (; entry->start < end; entry = next_entry) {
 		/*
 		 * Wait for wiring or unwiring of an entry to complete.
 		 * Also wait for any system wirings to disappear on
@@ -4688,24 +4676,54 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			map->anon_loc = entry->start;
 
 		/*
+		 * If using reservations, allocate a new reservation
+		 * entry to use in place of the entry being removed.
+		 * This can't simply reuse the existing entry as some
+		 * operations like dropping the VM object reference
+		 * count may need to be deferred to
+		 * vm_map_process_deferred().
+		 */
+		vm_map_log("remove", entry);
+		cloned_entry = NULL;
+		if ((map->flags & MAP_RESERVATIONS) != 0 && keep_reservation) {
+			if ((entry->eflags & MAP_ENTRY_UNMAPPED) != 0) {
+				/*
+				 * This entry is already unmapped, so
+				 * just try merging with the previous.
+				 */
+				vm_map_try_merge_entries(map, prev_entry,
+				    entry);
+				prev_entry = entry;
+				continue;
+			}
+
+			cloned_entry = vm_map_entry_create(map);
+			vm_map_reservation_init_entry(cloned_entry);
+			cloned_entry->start = entry->start;
+			cloned_entry->end = entry->end;
+			cloned_entry->reservation = entry->reservation;
+			cloned_entry->next_read = entry->start;
+			cloned_entry->owner = entry->owner;
+
+			/* XXX: Is this the right max-prot to use? */
+			cloned_entry->max_protection = entry->max_protection;
+		}
+
+		/*
 		 * Delete the entry only after removing all pmap
 		 * entries pointing to its pages.  (Otherwise, its
 		 * page frames may be reallocated, and any modify bits
 		 * will be set in the wrong object!)
 		 */
-		vm_map_log("remove", entry);
-		if ((map->flags & MAP_RESERVATIONS) != 0 && keep_reservation) {
-			if ((entry->eflags & MAP_ENTRY_UNMAPPED) == 0) {
-				vm_map_entry_clean(map, entry);
-				/* XXX-AM: How do we reset maxprot? */
-				if ((entry->eflags & MAP_ENTRY_IS_SUB_MAP) == 0)
-					vm_object_deallocate(
-					    entry->object.vm_object);
-				vm_map_reservation_init_entry(entry);
-			}
-			vm_map_try_merge_entries(map, prev_entry, entry);
-		} else {
-			vm_map_entry_delete(map, entry);
+		vm_map_entry_delete(map, entry);
+
+		/* Insert the cloned entry if it exists. */
+		if (cloned_entry != NULL) {
+			vm_map_log("insert unmapped", cloned_entry);
+			vm_map_entry_link(map, cloned_entry);
+			vm_map_try_merge_entries(map, prev_entry,
+			    cloned_entry);
+			prev_entry = cloned_entry;
 		}
 	}
 	VM_MAP_ASSERT_CONSISTENT(map);
@@ -6617,7 +6635,7 @@ DB_SHOW_COMMAND(procvm, procvm)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20200708,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "platform"
@@ -6626,6 +6644,7 @@ DB_SHOW_COMMAND(procvm, procvm)
 //     "pointer_as_integer",
 //     "support",
 //     "uintcap_arithmetic",
+//     "bounds_compression",
 //     "kdb"
 //   ]
 // }

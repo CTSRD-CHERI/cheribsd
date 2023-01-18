@@ -24,8 +24,8 @@ namespace __asan {
 
 struct AllocationSite {
   u32 id;
-  usize total_size;
-  usize count;
+  uptr total_size;
+  uptr count;
 };
 
 class HeapProfile {
@@ -47,13 +47,13 @@ class HeapProfile {
     }
   }
 
-  void Print(usize top_percent, usize max_number_of_contexts) {
+  void Print(uptr top_percent, uptr max_number_of_contexts) {
     Sort(allocations_.data(), allocations_.size(),
          [](const AllocationSite &a, const AllocationSite &b) {
            return a.total_size > b.total_size;
          });
     CHECK(total_allocated_user_size_);
-    usize total_shown = 0;
+    uptr total_shown = 0;
     Printf("Live Heap Allocations: %zd bytes in %zd chunks; quarantined: "
            "%zd bytes in %zd chunks; %zd other chunks; total chunks: %zd; "
            "showing top %zd%% (at most %zd unique contexts)\n",
@@ -62,7 +62,7 @@ class HeapProfile {
            total_other_count_, total_allocated_count_ +
            total_quarantined_count_ + total_other_count_, top_percent,
            max_number_of_contexts);
-    for (usize i = 0; i < Min(allocations_.size(), max_number_of_contexts);
+    for (uptr i = 0; i < Min(allocations_.size(), max_number_of_contexts);
          i++) {
       auto &a = allocations_[i];
       Printf("%zd byte(s) (%zd%%) in %zd allocation(s)\n", a.total_size,
@@ -75,16 +75,16 @@ class HeapProfile {
   }
 
  private:
-  usize total_allocated_user_size_ = 0;
-  usize total_allocated_count_ = 0;
-  usize total_quarantined_user_size_ = 0;
-  usize total_quarantined_count_ = 0;
-  usize total_other_count_ = 0;
+  uptr total_allocated_user_size_ = 0;
+  uptr total_allocated_count_ = 0;
+  uptr total_quarantined_user_size_ = 0;
+  uptr total_quarantined_count_ = 0;
+  uptr total_other_count_ = 0;
   InternalMmapVector<AllocationSite> allocations_;
 
-  void Insert(u32 id, usize size) {
+  void Insert(u32 id, uptr size) {
     // Linear lookup will be good enough for most cases (although not all).
-    for (usize i = 0; i < allocations_.size(); i++) {
+    for (uptr i = 0; i < allocations_.size(); i++) {
       if (allocations_[i].id == id) {
         allocations_[i].total_size += size;
         allocations_[i].count++;
@@ -104,7 +104,7 @@ static void MemoryProfileCB(const SuspendedThreadsList &suspended_threads_list,
                             void *argument) {
   HeapProfile hp;
   __lsan::ForEachChunk(ChunkCallback, &hp);
-  usize *Arg = reinterpret_cast<usize*>(argument);
+  uptr *Arg = reinterpret_cast<uptr*>(argument);
   hp.Print(Arg[0], Arg[1]);
 
   if (Verbosity())
@@ -117,8 +117,8 @@ static void MemoryProfileCB(const SuspendedThreadsList &suspended_threads_list,
 
 extern "C" {
 SANITIZER_INTERFACE_ATTRIBUTE
-void __sanitizer_print_memory_profile(usize top_percent,
-                                      usize max_number_of_contexts) {
+void __sanitizer_print_memory_profile(uptr top_percent,
+                                      uptr max_number_of_contexts) {
 #if CAN_SANITIZE_LEAKS
   uptr Arg[2];
   Arg[0] = top_percent;

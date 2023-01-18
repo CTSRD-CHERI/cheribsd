@@ -324,8 +324,8 @@ static	void vlan_trunk_capabilities(struct ifnet *ifp);
 static	struct ifnet *vlan_clone_match_ethervid(const char *, int *);
 static	int vlan_clone_match(struct if_clone *, const char *);
 static	int vlan_clone_create(struct if_clone *, char *, size_t,
-	    void * __capability);
-static	int vlan_clone_destroy(struct if_clone *, struct ifnet *);
+    struct ifc_data *, struct ifnet **);
+static	int vlan_clone_destroy(struct if_clone *, struct ifnet *, uint32_t);
 
 static	void vlan_ifdetach(void *arg, struct ifnet *ifp);
 static  void vlan_iflladdr(void *arg, struct ifnet *ifp);
@@ -903,6 +903,12 @@ extern	void (*vlan_input_p)(struct ifnet *, struct mbuf *);
 /* For if_link_state_change() eyes only... */
 extern	void (*vlan_link_state_p)(struct ifnet *);
 
+static struct if_clone_addreq vlan_addreq = {
+	.match_f = vlan_clone_match,
+	.create_f = vlan_clone_create,
+	.destroy_f = vlan_clone_destroy,
+};
+
 static int
 vlan_modevent(module_t mod, int type, void *data)
 {
@@ -932,8 +938,7 @@ vlan_modevent(module_t mod, int type, void *data)
 		vlan_pcp_p = vlan_pcp;
 		vlan_devat_p = vlan_devat;
 #ifndef VIMAGE
-		vlan_cloner = if_clone_advanced(vlanname, 0, vlan_clone_match,
-		    vlan_clone_create, vlan_clone_destroy);
+		vlan_cloner = ifc_attach_cloner(vlanname, &vlan_addreq);
 #endif
 		if (bootverbose)
 			printf("vlan: initialized, using "
@@ -947,7 +952,7 @@ vlan_modevent(module_t mod, int type, void *data)
 		break;
 	case MOD_UNLOAD:
 #ifndef VIMAGE
-		if_clone_detach(vlan_cloner);
+		ifc_detach_cloner(vlan_cloner);
 #endif
 		EVENTHANDLER_DEREGISTER(ifnet_departure_event, ifdetach_tag);
 		EVENTHANDLER_DEREGISTER(iflladdr_event, iflladdr_tag);
@@ -983,9 +988,7 @@ MODULE_VERSION(if_vlan, 3);
 static void
 vnet_vlan_init(const void *unused __unused)
 {
-
-	vlan_cloner = if_clone_advanced(vlanname, 0, vlan_clone_match,
-		    vlan_clone_create, vlan_clone_destroy);
+	vlan_cloner = ifc_attach_cloner(vlanname, &vlan_addreq);
 	V_vlan_cloner = vlan_cloner;
 }
 VNET_SYSINIT(vnet_vlan_init, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_ANY,
@@ -995,7 +998,7 @@ static void
 vnet_vlan_uninit(const void *unused __unused)
 {
 
-	if_clone_detach(V_vlan_cloner);
+	ifc_detach_cloner(V_vlan_cloner);
 }
 VNET_SYSUNINIT(vnet_vlan_uninit, SI_SUB_INIT_IF, SI_ORDER_ANY,
     vnet_vlan_uninit, NULL);
@@ -1060,7 +1063,7 @@ vlan_clone_match(struct if_clone *ifc, const char *name)
 
 static int
 vlan_clone_create(struct if_clone *ifc, char *name, size_t len,
-    void * __capability params)
+    struct ifc_data *ifd, struct ifnet **ifpp)
 {
 	char *dp;
 	bool wildcard = false;
@@ -1091,8 +1094,8 @@ vlan_clone_create(struct if_clone *ifc, char *name, size_t len,
 	 * called for.
 	 */
 
-	if (params) {
-		error = copyin(params, &vlr, sizeof(vlr));
+	if (ifd->params != NULL) {
+		error = ifc_copyin(ifd, &vlr, sizeof(vlr));
 		if (error)
 			return error;
 		vid = vlr.vlr_tag;
@@ -1221,12 +1224,13 @@ vlan_clone_create(struct if_clone *ifc, char *name, size_t len,
 			return (error);
 		}
 	}
+	*ifpp = ifp;
 
 	return (0);
 }
 
 static int
-vlan_clone_destroy(struct if_clone *ifc, struct ifnet *ifp)
+vlan_clone_destroy(struct if_clone *ifc, struct ifnet *ifp, uint32_t flags)
 {
 	struct ifvlan *ifv = ifp->if_softc;
 	int unit = ifp->if_dunit;
@@ -2353,7 +2357,7 @@ vlan_ratelimit_query(struct ifnet *ifp __unused, struct if_ratelimit_query_resul
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

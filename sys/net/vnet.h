@@ -490,11 +490,12 @@ do {									\
 #endif /* !_NET_VNET_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_provenance",
-//     "subobject_bounds"
+//     "subobject_bounds",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

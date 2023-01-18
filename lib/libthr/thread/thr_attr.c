@@ -95,7 +95,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181114,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
  *     "unsupported"
@@ -324,9 +324,6 @@ _pthread_attr_getstack(const pthread_attr_t * __restrict attr,
 		 *
 		 * XXX-AR: maybe we should allow this and simply treat
 		 * pthread_attr_getstack() as an unsafe API.
-		 *
-		 * XXX-AR: we would also need to fix stackaddr to be a valid
-		 * capability for the main thread as asymmetric API would be bad
 		 */
 		cheri_cleartag(*stackaddr);
 #endif
@@ -357,9 +354,6 @@ _thr_attr_getstackaddr(const pthread_attr_t *attr, void **stackaddr)
 		 *
 		 * XXX-AR: maybe we should allow this and simply treat
 		 * pthread_attr_getstackaddr() as an unsafe API
-		 *
-		 * XXX-AR: we would also need to fix stackaddr to be a valid
-		 * capability for the main thread as asymmetric API would be bad
 		 */
 		cheri_cleartag(*stackaddr);
 #endif
@@ -460,7 +454,7 @@ __weak_reference(_thr_attr_setguardsize, pthread_attr_setguardsize);
 __weak_reference(_thr_attr_setguardsize, _pthread_attr_setguardsize);
 
 int
-_thr_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
+_thr_attr_setguardsize(pthread_attr_t *attr, size_t guardsize __unused)
 {
 	int	ret;
 
@@ -468,8 +462,10 @@ _thr_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
 	if (attr == NULL || *attr == NULL)
 		ret = EINVAL;
 	else {
+#ifndef __CHERI_PURE_CAPABILITY__
 		/* Save the stack size. */
 		(*attr)->guardsize_attr = guardsize;
+#endif
 		ret = 0;
 	}
 	return (ret);

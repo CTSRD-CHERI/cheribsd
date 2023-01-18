@@ -449,7 +449,6 @@ ovpn_new_peer(struct ifnet *ifp, const nvlist_t *nvl)
 	struct ovpn_softc *sc = ifp->if_softc;
 	struct thread *td = curthread;
 	struct socket *so = NULL;
-	u_int fflag;
 	int fd;
 	uint32_t peerid;
 	int ret = 0, i;
@@ -476,8 +475,7 @@ ovpn_new_peer(struct ifnet *ifp, const nvlist_t *nvl)
 	fd = nvlist_get_number(nvl, "fd");
 
 	/* Look up the userspace process and use the fd to find the socket. */
-	ret = getsock_cap(td, fd, &cap_connect_rights, &fp,
-	    &fflag, NULL);
+	ret = getsock(td, fd, &cap_connect_rights, &fp);
 	if (ret != 0)
 		return (ret);
 
@@ -513,7 +511,7 @@ ovpn_new_peer(struct ifnet *ifp, const nvlist_t *nvl)
 	callout_init_rm(&peer->ping_send, &sc->lock, CALLOUT_SHAREDLOCK);
 	callout_init_rm(&peer->ping_rcv, &sc->lock, 0);
 
-	ret = (*so->so_proto->pr_usrreqs->pru_sockaddr)(so, &name);
+	ret = so->so_proto->pr_sockaddr(so, &name);
 	if (ret)
 		goto error;
 
@@ -556,6 +554,12 @@ ovpn_new_peer(struct ifnet *ifp, const nvlist_t *nvl)
 	/* Disallow peer id re-use. */
 	if (ovpn_find_peer(sc, peerid) != NULL) {
 		ret = EEXIST;
+		goto error_locked;
+	}
+
+	/* Make sure this is really a UDP socket. */
+	if (so->so_type != SOCK_DGRAM || so->so_proto->pr_type != SOCK_DGRAM) {
+		ret = EPROTOTYPE;
 		goto error_locked;
 	}
 
@@ -1374,6 +1378,7 @@ ovpn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 static int
 ovpn_encrypt_tx_cb(struct cryptop *crp)
 {
+	struct epoch_tracker et;
 	struct ovpn_kpeer *peer = crp->crp_opaque;
 	struct ovpn_softc *sc = peer->sc;
 	struct mbuf *m = crp->crp_buf.cb_mbuf;
@@ -1387,6 +1392,7 @@ ovpn_encrypt_tx_cb(struct cryptop *crp)
 		return (0);
 	}
 
+	NET_EPOCH_ENTER(et);
 	CURVNET_SET(sc->ifp->if_vnet);
 
 	MPASS(crp->crp_buf.cb_type == CRYPTO_BUF_MBUF);
@@ -1399,6 +1405,7 @@ ovpn_encrypt_tx_cb(struct cryptop *crp)
 	}
 
 	CURVNET_RESTORE();
+	NET_EPOCH_EXIT(et);
 
 	crypto_freereq(crp);
 	ovpn_peer_release_ref(peer, false);
@@ -1412,9 +1419,9 @@ ovpn_finish_rx(struct ovpn_softc *sc, struct mbuf *m,
     struct rm_priotracker *_ovpn_lock_trackerp)
 {
 	uint32_t af;
-	int ret __diagused;
 
 	OVPN_RASSERT(sc);
+	NET_EPOCH_ASSERT();
 
 	/* Replay protection. */
 	if (V_replay_protection && ! ovpn_check_replay(key->decrypt, seq)) {
@@ -1453,9 +1460,7 @@ ovpn_finish_rx(struct ovpn_softc *sc, struct mbuf *m,
 	af = ovpn_get_af(m);
 	if (af != 0) {
 		BPF_MTAP2(sc->ifp, &af, sizeof(af), m);
-		ret = netisr_dispatch(af == AF_INET ? NETISR_IP : NETISR_IPV6,
-		    m);
-		MPASS(ret == 0);
+		netisr_dispatch(af == AF_INET ? NETISR_IP : NETISR_IPV6, m);
 	} else {
 		OVPN_COUNTER_ADD(sc, lost_data_pkts_in, 1);
 		m_freem(m);
@@ -1484,6 +1489,7 @@ ovpn_find_key(struct ovpn_softc *sc, struct ovpn_kpeer *peer,
 static int
 ovpn_decrypt_rx_cb(struct cryptop *crp)
 {
+	struct epoch_tracker et;
 	struct ovpn_softc *sc = crp->crp_opaque;
 	struct mbuf *m = crp->crp_buf.cb_mbuf;
 	struct ovpn_kkey *key;
@@ -1542,7 +1548,9 @@ ovpn_decrypt_rx_cb(struct cryptop *crp)
 	m_adj_decap(m, sizeof(struct udphdr) +
 	    sizeof(struct ovpn_wire_header));
 
+	NET_EPOCH_ENTER(et);
 	ovpn_finish_rx(sc, m, peer, key, ntohl(ohdr->seq), _ovpn_lock_trackerp);
+	NET_EPOCH_EXIT(et);
 	OVPN_UNLOCK_ASSERT(sc);
 
 	CURVNET_RESTORE();
@@ -1552,8 +1560,6 @@ ovpn_decrypt_rx_cb(struct cryptop *crp)
 
 	return (0);
 }
-
-static uint8_t EMPTY_BUFFER[AES_BLOCK_LEN];
 
 static int
 ovpn_get_af(struct mbuf *m)
@@ -1570,12 +1576,13 @@ ovpn_get_af(struct mbuf *m)
 		return (AF_INET);
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	if (ip6->ip6_vfc == IPV6_VERSION)
+	if ((ip6->ip6_vfc & IPV6_VERSION_MASK) == IPV6_VERSION)
 		return (AF_INET6);
 
 	return (0);
 }
 
+#ifdef INET
 static struct ovpn_kpeer *
 ovpn_find_peer_by_ip(struct ovpn_softc *sc, const struct in_addr addr)
 {
@@ -1594,7 +1601,9 @@ ovpn_find_peer_by_ip(struct ovpn_softc *sc, const struct in_addr addr)
 
 	return (peer);
 }
+#endif
 
+#ifdef INET6
 static struct ovpn_kpeer *
 ovpn_find_peer_by_ip6(struct ovpn_softc *sc, const struct in6_addr *addr)
 {
@@ -1613,6 +1622,7 @@ ovpn_find_peer_by_ip6(struct ovpn_softc *sc, const struct in6_addr *addr)
 
 	return (peer);
 }
+#endif
 
 static struct ovpn_kpeer *
 ovpn_route_peer(struct ovpn_softc *sc, struct mbuf **m0,
@@ -1721,7 +1731,7 @@ ovpn_transmit_to_peer(struct ifnet *ifp, struct mbuf *m,
 	struct ovpn_softc *sc;
 	struct cryptop *crp;
 	uint32_t af, seq;
-	size_t len, real_len, ovpn_hdr_len;
+	size_t len, ovpn_hdr_len;
 	int tunnel_len;
 	int ret;
 
@@ -1744,19 +1754,12 @@ ovpn_transmit_to_peer(struct ifnet *ifp, struct mbuf *m,
 	if (af != 0)
 		BPF_MTAP2(ifp, &af, sizeof(af), m);
 
-	real_len = len = m->m_pkthdr.len;
-	MPASS(real_len <= ifp->if_mtu);
+	len = m->m_pkthdr.len;
+	MPASS(len <= ifp->if_mtu);
 
 	ovpn_hdr_len = sizeof(struct ovpn_wire_header);
 	if (key->encrypt->cipher == OVPN_CIPHER_ALG_NONE)
 		ovpn_hdr_len -= 16; /* No auth tag. */
-	else {
-		/* Round up the len to a multiple of our block size. */
-		len = roundup2(real_len, AES_BLOCK_LEN);
-
-		/* Now extend the mbuf. */
-		m_append(m, len - real_len, EMPTY_BUFFER);
-	}
 
 	M_PREPEND(m, ovpn_hdr_len, M_NOWAIT);
 	if (m == NULL) {
@@ -2293,7 +2296,7 @@ ovpn_clone_match(struct if_clone *ifc, const char *name)
 
 static int
 ovpn_clone_create(struct if_clone *ifc, char *name, size_t len,
-    void * __capability params)
+    struct ifc_data *ifd, struct ifnet **ifpp)
 {
 	struct ovpn_softc *sc;
 	struct ifnet *ifp;
@@ -2359,6 +2362,7 @@ ovpn_clone_create(struct if_clone *ifc, char *name, size_t len,
 
 	if_attach(ifp);
 	bpfattach(ifp, DLT_NULL, sizeof(uint32_t));
+	*ifpp = ifp;
 
 	return (0);
 }
@@ -2382,7 +2386,7 @@ ovpn_clone_destroy_cb(struct epoch_context *ctx)
 }
 
 static int
-ovpn_clone_destroy(struct if_clone *ifc, struct ifnet *ifp)
+ovpn_clone_destroy(struct if_clone *ifc, struct ifnet *ifp, uint32_t flags)
 {
 	struct ovpn_softc *sc;
 	int unit;
@@ -2423,14 +2427,20 @@ ovpn_clone_destroy(struct if_clone *ifc, struct ifnet *ifp)
 	if (unit != IF_DUNIT_NONE)
 		ifc_free_unit(ifc, unit);
 
+	NET_EPOCH_DRAIN_CALLBACKS();
+
 	return (0);
 }
 
 static void
 vnet_ovpn_init(const void *unused __unused)
 {
-	V_ovpn_cloner = if_clone_advanced(ovpngroupname, 0, ovpn_clone_match,
-	    ovpn_clone_create, ovpn_clone_destroy);
+	struct if_clone_addreq req = {
+		.match_f = ovpn_clone_match,
+		.create_f = ovpn_clone_create,
+		.destroy_f = ovpn_clone_destroy,
+	};
+	V_ovpn_cloner = ifc_attach_cloner(ovpngroupname, &req);
 }
 VNET_SYSINIT(vnet_ovpn_init, SI_SUB_PSEUDO, SI_ORDER_ANY,
     vnet_ovpn_init, NULL);

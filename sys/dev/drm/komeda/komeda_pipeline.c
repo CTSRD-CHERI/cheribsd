@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/bus.h>
 
+#include <dev/extres/clk/clk.h>
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
@@ -251,15 +252,15 @@ komeda_crtc_atomic_disable(struct drm_crtc *crtc,
 static void
 komeda_crtc_mode_set_nofb(struct drm_crtc *crtc)
 {
-#if 0
 	struct komeda_pipeline *pipeline;
 	struct drm_display_mode *mode;
 
 	pipeline = container_of(crtc, struct komeda_pipeline, crtc);
 	mode = &crtc->state->adjusted_mode;
 
-	komeda_pipeline_clk_enable(sc->dev, mode);
-#endif
+	dprintf("%s: clk_set_freq %d\n", __func__, mode->crtc_clock);
+	clk_set_freq(pipeline->pxclk, mode->crtc_clock * 1000,
+	    CLK_SET_ROUND_ANY);
 }
 
 static const struct drm_crtc_helper_funcs komeda_pipeline_crtc_helper_funcs = {
@@ -306,6 +307,13 @@ komeda_pipeline_create_pipeline(struct komeda_drm_softc *sc, phandle_t node,
 	pipeline->sc = sc;
 	pipeline->vbl_counter = 0;
 	komeda_plane_create(pipeline, drm);
+
+	error = clk_get_by_ofw_name(sc->dev, node, "pxclk", &pipeline->pxclk);
+	if (error != 0) {
+		device_printf(sc->dev, "Cannot get pixel clock, error %d\n",
+		    error);
+		return (error);
+	}
 
 	error = drm_crtc_init_with_planes(drm, &pipeline->crtc,
 	    &pipeline->planes[0].plane, &pipeline->planes[1].plane,

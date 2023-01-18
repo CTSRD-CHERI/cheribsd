@@ -76,7 +76,7 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 			    (void *)(__cheri_addr uintptr_t)src));
 
 			/* Copy capabilities. */
-			while (len > sizeof(uintcap_t)) {
+			while (len >= sizeof(uintcap_t)) {
 				*(uintcap_t * __capability)dst =
 				    *(const uintcap_t * __capability)src;
 				dst += sizeof(uintcap_t);
@@ -118,7 +118,7 @@ memcpy_c(void * __capability dst0, const void * __capability src0, size_t len)
 			    ("src %p not aligned", (void *)(__cheri_addr uintptr_t)src));
 
 			/* Copy capabilities. */
-			while (len > sizeof(uintcap_t)) {
+			while (len >= sizeof(uintcap_t)) {
 				dst -= sizeof(uintcap_t);
 				src -= sizeof(uintcap_t);
 				*(uintcap_t * __capability)dst =

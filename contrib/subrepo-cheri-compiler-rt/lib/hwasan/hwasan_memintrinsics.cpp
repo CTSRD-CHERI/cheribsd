@@ -21,13 +21,13 @@
 
 using namespace __hwasan;
 
-void *__hwasan_memset(void *block, int c, usize size) {
+void *__hwasan_memset(void *block, int c, uptr size) {
   CheckAddressSized<ErrorAction::Recover, AccessType::Store>(
       reinterpret_cast<uptr>(block), size);
   return memset(block, c, size);
 }
 
-void *__hwasan_memcpy(void *to, const void *from, usize size) {
+void *__hwasan_memcpy(void *to, const void *from, uptr size) {
   CheckAddressSized<ErrorAction::Recover, AccessType::Store>(
       reinterpret_cast<uptr>(to), size);
   CheckAddressSized<ErrorAction::Recover, AccessType::Load>(
@@ -35,10 +35,10 @@ void *__hwasan_memcpy(void *to, const void *from, usize size) {
   return memcpy(to, from, size);
 }
 
-void *__hwasan_memmove(void *to, const void *from, usize size) {
+void *__hwasan_memmove(void *to, const void *from, uptr size) {
   CheckAddressSized<ErrorAction::Recover, AccessType::Store>(
       reinterpret_cast<uptr>(to), size);
   CheckAddressSized<ErrorAction::Recover, AccessType::Load>(
       reinterpret_cast<uptr>(from), size);
-  return memmove(UntagPtr(to), UntagPtr(from), size);
+  return memmove(to, from, size);
 }

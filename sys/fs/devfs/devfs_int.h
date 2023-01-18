@@ -91,7 +91,6 @@ int	devfs_pathpath(const char *, const char *);
 extern struct unrhdr *devfs_inos;
 extern struct mtx devmtx;
 extern struct mtx devfs_de_interlock;
-extern struct sx clone_drain_lock;
 extern struct mtx cdevpriv_mtx;
 extern TAILQ_HEAD(cdev_priv_list, cdev_priv) cdevp_list;
 
@@ -103,7 +102,7 @@ extern TAILQ_HEAD(cdev_priv_list, cdev_priv) cdevp_list;
 #endif /* !_FS_DEVFS_DEVFS_INT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"

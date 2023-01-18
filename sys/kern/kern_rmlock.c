@@ -1025,7 +1025,7 @@ rms_rlock(struct rmslock *rms)
 {
 	struct rmslock_pcpu *pcpu;
 
-	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL, __func__);
+	rms_assert_rlock_ok(rms);
 	MPASS(atomic_load_ptr(&rms->owner) != curthread);
 
 	critical_enter();
@@ -1259,7 +1259,7 @@ rms_unlock(struct rmslock *rms)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "subobject_bounds"

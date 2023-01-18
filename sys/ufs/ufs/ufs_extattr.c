@@ -1294,7 +1294,7 @@ ufs_extattr_vnode_inactive(struct vnode *vp)
 #endif /* !UFS_EXTATTR */
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros"

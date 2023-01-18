@@ -247,7 +247,7 @@ mtrash_fini(void *mem, int size)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180208,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_shape"

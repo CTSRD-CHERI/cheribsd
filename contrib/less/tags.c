@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1984-2021  Mark Nudelman
+ * Copyright (C) 1984-2022  Mark Nudelman
  *
  * You may distribute under the terms of either the GNU General Public
  * License or the Less License, as specified in the README file.
@@ -9,7 +9,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181121,
+ *   "updated": 20221129,
  *   "target_type": "prog",
  *   "changes": [
  *     "calling_convention"
@@ -407,7 +407,9 @@ edit_tagfile(VOID_PARAM)
 }
 
 	static int
-curtag_match(char const *line, POSITION linepos)
+curtag_match(line, linepos)
+	char constant *line;
+	POSITION linepos;
 {
 	/*
 	 * Test the line to see if we have a match.
@@ -519,7 +521,7 @@ findgtag(tag, type)
 	char *tag;              /* tag to load */
 	int type;               /* tags type */
 {
-	char buf[256];
+	char buf[1024];
 	FILE *fp;
 	struct tag *tp;
 

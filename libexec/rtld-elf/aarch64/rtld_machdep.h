@@ -149,11 +149,21 @@ make_data_cap(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
 #define call_init_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
 
 /* TODO: Per-function captable/PLT/FNDESC support */
+#ifdef RTLD_SANDBOX
+#define make_rtld_function_pointer(target_func)	(tramp_pgs_append((target_func), NULL, NULL))
+
+#define call_init_array_pointer(obj, target)				\
+	(((InitArrFunc)tramp_pgs_append((void *)(target).value, obj, NULL))(main_argc, main_argv, environ))
+
+#define call_fini_array_pointer(obj, target)				\
+	(((InitFunc)tramp_pgs_append((void *)(target).value, obj, NULL))())
+#else
 #define call_init_array_pointer(obj, target)				\
 	(((InitArrFunc)(target).value)(main_argc, main_argv, environ))
 
 #define call_fini_array_pointer(obj, target)				\
 	(((InitFunc)(target).value)())
+#endif
 
 #else /* __CHERI_PURE_CAPABILITY__ */
 
@@ -199,6 +209,10 @@ extern void *__tls_get_addr(tls_index *ti);
 #define	RTLD_DEFAULT_STACK_EXEC		PROT_EXEC
 
 #define md_abi_variant_hook(x)
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(RTLD_SANDBOX)
+void *tramp_pgs_append(void *, const Obj_Entry *, const Elf_Sym *);
+#endif
 
 #ifdef __CHERI_PURE_CAPABILITY__
 static inline void

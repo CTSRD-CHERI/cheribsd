@@ -45,7 +45,7 @@
  * the "done_p" USB process.
  */
 struct usb_done_msg {
-	struct usb_proc_msg hdr;
+	struct usb_proc_msg hdr __subobject_member_used_for_c_inheritance;
 	struct usb_xfer_root *xroot;
 };
 
@@ -152,7 +152,7 @@ uint8_t	usbd_xfer_get_isochronous_start_frame(struct usb_xfer *, uint32_t, uint3
 #endif					/* _USB_TRANSFER_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20210404,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "subobject_bounds"

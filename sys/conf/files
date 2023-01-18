@@ -200,6 +200,7 @@ contrib/openzfs/module/os/freebsd/zfs/abd_os.c		optional zfs compile-with "${ZFS
 contrib/openzfs/module/os/freebsd/zfs/arc_os.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/os/freebsd/zfs/crypto_os.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/os/freebsd/zfs/dmu_os.c		optional zfs compile-with "${ZFS_C}"
+contrib/openzfs/module/os/freebsd/zfs/event_os.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/os/freebsd/zfs/hkdf.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/os/freebsd/zfs/kmod_core.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/os/freebsd/zfs/spa_os.c		optional zfs compile-with "${ZFS_C}"
@@ -306,7 +307,6 @@ contrib/openzfs/module/zfs/sa.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/sha256.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/skein_zfs.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/spa.c		optional zfs compile-with "${ZFS_C}"
-contrib/openzfs/module/zfs/spa_boot.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/spa_checkpoint.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/spa_config.c		optional zfs compile-with "${ZFS_C}"
 contrib/openzfs/module/zfs/spa_errlog.c		optional zfs compile-with "${ZFS_C}"
@@ -1487,7 +1487,7 @@ dev/cxgbe/common/t4_hw.c	optional cxgbe pci \
 	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
 dev/cxgbe/common/t4vf_hw.c	optional cxgbev pci \
 	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
-dev/cxgbe/crypto/t4_kern_tls.c	optional cxgbe pci kern_tls \
+dev/cxgbe/crypto/t6_kern_tls.c	optional cxgbe pci kern_tls \
 	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
 dev/cxgbe/crypto/t4_keyctx.c	optional cxgbe pci \
 	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
@@ -1533,7 +1533,7 @@ t4fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t4fw.fwo"
 t4fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t4fw-1.26.6.0.bin"	\
+	dependency	"$S/dev/cxgbe/firmware/t4fw-1.27.0.0.bin"	\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t4fw.fw"
@@ -1567,7 +1567,7 @@ t5fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t5fw.fwo"
 t5fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t5fw-1.26.6.0.bin"	\
+	dependency	"$S/dev/cxgbe/firmware/t5fw-1.27.0.0.bin"	\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t5fw.fw"
@@ -1601,7 +1601,7 @@ t6fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t6fw.fwo"
 t6fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t6fw-1.26.6.0.bin"	\
+	dependency	"$S/dev/cxgbe/firmware/t6fw-1.27.0.0.bin"	\
 	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t6fw.fw"
@@ -1614,6 +1614,9 @@ dev/dc/pnphy.c			optional dc pci
 dev/dcons/dcons.c		optional dcons
 dev/dcons/dcons_crom.c		optional dcons_crom
 dev/dcons/dcons_os.c		optional dcons
+dev/dialog/da9063/da9063_if.m	optional da9063_pmic
+dev/dialog/da9063/da9063_iic.c	optional da9063_pmic iicbus fdt
+dev/dialog/da9063/da9063_rtc.c	optional da9063_rtc fdt
 dev/dme/if_dme.c		optional dme
 
 # DRM
@@ -1992,8 +1995,7 @@ dev/iicbus/rtc/rx8803.c		optional rx8803 iicbus fdt
 dev/iicbus/s35390a.c		optional s35390a
 dev/iicbus/sy8106a.c		optional sy8106a fdt
 dev/iicbus/syr827.c		optional syr827 fdt
-dev/iicbus/gpio/tca6408.c	optional tca6408 fdt gpio
-dev/iicbus/gpio/tca6416.c	optional tca6416 fdt
+dev/iicbus/gpio/tca64xx.c	optional tca64xx fdt gpio
 dev/iicbus/pmic/fan53555.c	optional fan53555 fdt
 dev/igc/if_igc.c		optional igc iflib pci
 dev/igc/igc_api.c		optional igc iflib pci
@@ -2551,6 +2553,7 @@ dev/mii/mii_bitbang.c		optional miibus | mii_bitbang
 dev/mii/mii_physubr.c		optional miibus | mii
 dev/mii/mii_fdt.c		optional miibus fdt | mii fdt
 dev/mii/miibus_if.m		optional miibus | mii
+dev/mii/mv88e151x.c		optional miibus | mv88e151x
 dev/mii/nsgphy.c		optional miibus | nsgphy
 dev/mii/nsphy.c			optional miibus | nsphy
 dev/mii/nsphyter.c		optional miibus | nsphyter
@@ -2720,6 +2723,7 @@ dev/ofw/ofw_bus_if.m		optional fdt
 dev/ofw/ofw_bus_subr.c		optional fdt
 dev/ofw/ofw_cpu.c		optional fdt
 dev/ofw/ofw_fdt.c		optional fdt
+dev/ofw/ofw_firmware.c		optional fdt
 dev/ofw/ofw_if.m		optional fdt
 dev/ofw/ofw_graph.c		optional fdt
 dev/ofw/ofw_subr.c		optional fdt
@@ -3216,7 +3220,6 @@ dev/smc/if_smc_fdt.c		optional smc fdt
 dev/snp/snp.c			optional snp
 dev/sound/clone.c		optional sound
 dev/sound/unit.c		optional sound
-dev/sound/isa/sndbuf_dma.c	optional sound isa
 dev/sound/pci/als4000.c		optional snd_als4000 pci
 dev/sound/pci/atiixp.c		optional snd_atiixp pci
 dev/sound/pci/cmi.c		optional snd_cmi pci
@@ -3886,6 +3889,7 @@ kern/ksched.c			optional _kposix_priority_scheduling
 kern/kern_acct.c		standard
 kern/kern_alq.c			optional alq
 kern/kern_boottrace.c		standard
+kern/kern_cheri_revoke.c	standard
 kern/kern_clock.c		standard
 kern/kern_clocksource.c		standard
 kern/kern_condvar.c		standard
@@ -3895,6 +3899,7 @@ kern/kern_cpu.c			standard
 kern/kern_cpuset.c		standard
 kern/kern_context.c		standard
 kern/kern_descrip.c		standard
+kern/kern_devctl.c		standard
 kern/kern_dtrace.c		optional kdtrace_hooks
 kern/kern_dump.c		standard
 kern/kern_environment.c		standard
@@ -4178,7 +4183,6 @@ libkern/strcasestr.c		standard
 libkern/strcat.c		standard
 libkern/strchr.c		standard
 libkern/strchrnul.c		optional gdb
-libkern/strcmp.c		standard
 libkern/strcpy.c		standard
 libkern/strcspn.c		standard
 libkern/strdup.c		standard
@@ -4186,7 +4190,6 @@ libkern/strndup.c		standard
 libkern/strlcat.c		standard
 libkern/strlcpy.c		standard
 libkern/strncat.c		standard
-libkern/strncmp.c		standard
 libkern/strncpy.c		standard
 libkern/strnlen.c		standard
 libkern/strnstr.c		standard
@@ -4282,10 +4285,7 @@ net/debugnet.c			optional inet debugnet
 net/debugnet_inet.c		optional inet debugnet
 net/pfil.c			optional ether | inet
 net/radix.c			standard
-net/raw_cb.c			standard
-net/raw_usrreq.c		standard
 net/route.c			standard
-net/route/mpath_ctl.c		optional route_mpath
 net/route/nhgrp.c		optional route_mpath
 net/route/nhgrp_ctl.c		optional route_mpath
 net/route/nhop.c		standard
@@ -4296,6 +4296,8 @@ net/route/route_ctl.c		standard
 net/route/route_ddb.c		optional ddb
 net/route/route_helpers.c	standard
 net/route/route_ifaddrs.c	standard
+net/route/route_rtentry.c	standard
+net/route/route_subscription.c	standard
 net/route/route_tables.c	standard
 net/route/route_temporal.c	standard
 net/rss_config.c		optional inet rss | inet6 rss
@@ -4452,7 +4454,7 @@ netinet/in_prot.c		optional inet | inet6
 netinet/in_proto.c		optional inet | inet6
 netinet/in_rmx.c		optional inet
 netinet/in_rss.c		optional inet rss
-netinet/ip_divert.c		optional inet ipdivert ipfirewall
+netinet/ip_divert.c		optional ipdivert inet | ipdivert inet6
 netinet/ip_ecn.c		optional inet | inet6
 netinet/ip_encap.c		optional inet | inet6
 netinet/ip_fastfwd.c		optional inet
@@ -4727,9 +4729,10 @@ compat/linuxkpi/common/src/linux_xarray.c	optional compat_linuxkpi \
 	compile-with "${LINUXKPI_C}"
 compat/linuxkpi/common/src/lkpi_iic_if.m	optional compat_linuxkpi
 
-compat/linuxkpi/common/src/linux_seq_file.c		optional compat_linuxkpi | lindebugfs \
+compat/linuxkpi/common/src/linux_seq_file.c	optional compat_linuxkpi | lindebugfs \
 	compile-with "${LINUXKPI_C}"
-
+compat/linuxkpi/common/src/linux_simple_attr.c	optional compat_linuxkpi | lindebugfs \
+	compile-with "${LINUXKPI_C}"
 compat/lindebugfs/lindebugfs.c			optional lindebugfs \
 	compile-with "${LINUXKPI_C}"
 

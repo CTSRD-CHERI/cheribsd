@@ -16,8 +16,8 @@
 #include "hwasan.h"
 
 namespace __hwasan {
-uptr TagMemory(uptr p, usize size, tag_t tag);
-uptr TagMemoryAligned(uptr p, usize size, tag_t tag);
+uptr TagMemory(uptr p, uptr size, tag_t tag);
+uptr TagMemoryAligned(uptr p, uptr size, tag_t tag);
 
 }  // namespace __hwasan
 

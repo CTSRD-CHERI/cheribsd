@@ -32,12 +32,20 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <sys/libkern.h>
 
-void *
-(memset)(void *b, int c, size_t len)
-{
-	char *bb;
+#ifdef CAPABILITY_VERSION
+#define	__CAPSUFFIX(func)	(func ## _c)
+#define	__CAP		__capability
+#else
+#define	__CAPSUFFIX(func)	(func)
+#define	__CAP
+#endif
 
-	for (bb = (char *)b; len--; )
+void * __CAP
+__CAPSUFFIX(memset)(void * __CAP b, int c, size_t len)
+{
+	char * __CAP bb;
+
+	for (bb = (char * __CAP)b; len--; )
 		*bb++ = c;
 	return (b);
 }

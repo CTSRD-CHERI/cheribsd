@@ -555,10 +555,11 @@ md_get_uio(struct mdchain *mdp, struct uio *uiop, int size)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros"
+//     "iovec-macros",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

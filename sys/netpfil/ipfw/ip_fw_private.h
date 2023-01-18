@@ -829,7 +829,7 @@ cksum_adjust(uint16_t oldsum, uint16_t old, uint16_t new)
 #endif /* _IPFW2_PRIVATE_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

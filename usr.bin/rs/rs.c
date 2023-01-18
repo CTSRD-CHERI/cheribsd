@@ -29,24 +29,11 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static const char copyright[] =
-"@(#) Copyright (c) 1993\n\
-	The Regents of the University of California.  All rights reserved.\n";
-#endif /* not lint */
-
-#ifndef lint
-static const char sccsid[] = "@(#)rs.c	8.1 (Berkeley) 6/6/93";
-#endif /* not lint */
-
 /*
  *	rs - reshape a data array
  *	Author:  John Kunze, Office of Comp. Affairs, UCB
  *		BEWARE: lots of unfinished edges
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <err.h>
 #include <ctype.h>
@@ -127,10 +114,11 @@ main(int argc, char *argv[])
 static void
 getfile(void)
 {
-	char *p;
+	char *p, *sp;
 	char *endp;
 	char **ep;
 	int c;
+	int len;
 	int multisep = (flags & ONEISEPONLY ? 0 : 1);
 	int nullpad = flags & NULLPAD;
 	char **padto;
@@ -172,11 +160,13 @@ getfile(void)
 				*ep = blank;
 			else			/* store column entry */
 				*ep = p;
+			sp = p;
 			while (p < endp && *p != isep)
 				p++;		/* find end of entry */
 			*p = '\0';		/* mark end of entry */
-			if (maxlen < p - *ep)	/* update maxlen */
-				maxlen = p - *ep;
+			len = p - sp;
+			if (maxlen < len)	/* update maxlen */
+				maxlen = len;
 			INCR(ep);		/* prepare for next entry */
 		}
 		irows++;			/* update row count */
@@ -379,18 +369,17 @@ static char **
 getptrs(char **sp)
 {
 	char **p;
-	ptrdiff_t elem_offset;
+	ptrdiff_t offset;
 
-	allocsize *= 2;
+	offset = sp - elem;
+	allocsize += allocsize;
 	p = (char **)realloc(elem, allocsize * sizeof(char *));
 	if (p == NULL)
 		err(1, "no memory");
 
-	/* NB: sp is and must always be derived from elem. */
-	elem_offset = sp - elem;
-	elem = p;
-	endelem = p + allocsize;
-	return(p + elem_offset);
+	sp = p + offset;
+	endelem = (elem = p) + allocsize;
+	return(sp);
 }
 
 static void
@@ -406,11 +395,13 @@ getargs(int ac, char *av[])
 			switch (*p) {
 			case 'T':
 				flags |= MTRANSPOSE;
+				/* FALLTHROUGH */
 			case 't':
 				flags |= TRANSPOSE;
 				break;
 			case 'c':		/* input col. separator */
 				flags |= ONEISEPONLY;
+				/* FALLTHROUGH */
 			case 's':		/* one or more allowed */
 				if (p[1])
 					isep = *++p;
@@ -419,6 +410,7 @@ getargs(int ac, char *av[])
 				break;
 			case 'C':
 				flags |= ONEOSEPONLY;
+				/* FALLTHROUGH */
 			case 'S':
 				if (p[1])
 					osep = *++p;
@@ -432,6 +424,7 @@ getargs(int ac, char *av[])
 				break;
 			case 'K':			/* skip N lines */
 				flags |= SKIPPRINT;
+				/* FALLTHROUGH */
 			case 'k':			/* skip, do not print */
 				p = getnum(&skip, p, 0);
 				if (!skip)
@@ -463,6 +456,7 @@ getargs(int ac, char *av[])
 				break;
 			case 'H':			/* print shape only */
 				flags |= DETAILSHAPE;
+				/* FALLTHROUGH */
 			case 'h':
 				flags |= SHAPEONLY;
 				break;
@@ -489,14 +483,19 @@ getargs(int ac, char *av[])
 	/*if (!osep)
 		osep = isep;*/
 	switch (ac) {
-	/*case 3:
-		opages = atoi(av[2]);*/
+#if 0
+	case 3:
+		opages = atoi(av[2]);
+		/* FALLTHROUGH */
+#endif
 	case 2:
 		if ((ocols = atoi(av[1])) < 0)
 			ocols = 0;
+		/* FALLTHROUGH */
 	case 1:
 		if ((orows = atoi(av[0])) < 0)
 			orows = 0;
+		/* FALLTHROUGH */
 	case 0:
 		break;
 	default:

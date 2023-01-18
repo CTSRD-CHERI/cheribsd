@@ -142,6 +142,7 @@ __DEFAULT_YES_OPTIONS = \
     LOCATE \
     LPR \
     LS_COLORS \
+    MACHDEP_OPTIMIZATIONS \
     MAIL \
     MAILWRAPPER \
     MAKE \
@@ -333,8 +334,7 @@ BROKEN_OPTIONS+=OFED
 
 .if ${__C} == "cheri" || ${__C} == "morello" || \
     ${__T:Maarch64*c*} || ${__T:Mriscv*c*}
-# Broken post OpenZFS import
-BROKEN_OPTIONS+=CDDL ZFS
+BROKEN_OPTIONS+=DTRACE
 .endif
 
 # EFI doesn't exist on powerpc (well, officially)
@@ -377,6 +377,7 @@ BROKEN_OPTIONS+=MLX5TOOL
 .if (${__C} != "cheri" && ${__C} != "morello" && \
     !${__T:Maarch64*c*} && !${__T:Mriscv64*c*})
 BROKEN_OPTIONS+=CHERI
+BROKEN_OPTIONS+=CHERI_CAPREVOKE
 .endif
 
 # We'd really like this to be:

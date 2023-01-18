@@ -475,7 +475,7 @@ elf_reloc_self(const Elf_Dyn *dynp, void *data_cap, const void *code_cap)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200804,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support",

@@ -101,6 +101,7 @@ _LIBRARIES=	\
 		archive \
 		asn1 \
 		avl \
+		BlocksRuntime \
 		be \
 		begemot \
 		bluetooth \
@@ -122,6 +123,7 @@ _LIBRARIES=	\
 		cap_pwd \
 		cap_sysctl \
 		cap_syslog \
+		cheri_caprevoke \
 		com_err \
 		compiler_rt \
 		crypt \
@@ -181,7 +183,6 @@ _LIBRARIES=	\
 		nv \
 		nvpair \
 		opencsd \
-		opie \
 		pam \
 		panel \
 		panelw \
@@ -323,7 +324,6 @@ _DP_cap_syslog=	nv
 _DP_pcap=	ibverbs mlx5
 .endif
 _DP_pjdlog=	util
-_DP_opie=	md
 _DP_usb=	pthread
 _DP_unbound=	ssl crypto pthread
 _DP_rt=	pthread
@@ -364,7 +364,7 @@ _DP_gmock=	gtest
 _DP_gmock_main=	gmock
 _DP_gtest_main=	gtest
 _DP_devstat=	kvm
-_DP_pam=	radius tacplus opie md util
+_DP_pam=	radius tacplus md util
 .if ${MK_KERBEROS} != "no"
 _DP_pam+=	krb5
 .endif

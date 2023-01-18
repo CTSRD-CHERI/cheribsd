@@ -7,7 +7,7 @@
  * All rights reserved.
  *
  * Copyright (c) 2011 The FreeBSD Foundation
- * All rights reserved.
+ *
  * Portions of this software were developed by David Chisnall
  * under sponsorship from the FreeBSD Foundation.
  *
@@ -35,12 +35,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180723,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
- *     "buffer_overrun"
+ *     "other"
  *   ],
- *   "change_comment": "fixes mbtowc_test:mbtowc"
+ *   "change_comment": "fixes mbtowc_test:mbtowc buffer overrun"
  * }
  * CHERI CHANGES END
  */

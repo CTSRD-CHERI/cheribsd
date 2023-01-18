@@ -727,7 +727,7 @@ int	freebsd11_kern_getdirentries(struct thread *td, int fd,
 #endif /* !_SYS_SYSCALLSUBR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

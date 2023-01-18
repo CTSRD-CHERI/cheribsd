@@ -1023,8 +1023,9 @@ struct mac_policy_conf {
  *   2                       6.x
  *   3                       7.x
  *   4                       8.x
+ *   5                       14.x
  */
-#define	MAC_VERSION	4
+#define	MAC_VERSION	5
 
 #define	MAC_POLICY_SET(mpops, mpname, mpfullname, mpflags, privdata_wanted) \
 	static struct mac_policy_conf mpname##_mac_policy_conf = {	\
@@ -1057,7 +1058,7 @@ void		mac_label_set(struct label *l, int slot, intptr_t v);
 #endif /* !_SECURITY_MAC_MAC_POLICY_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

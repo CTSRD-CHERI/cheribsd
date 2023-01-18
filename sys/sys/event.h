@@ -360,7 +360,6 @@ int	knlist_empty(struct knlist *knl);
 void	knlist_init(struct knlist *knl, void *lock, void (*kl_lock)(void *),
 	    void (*kl_unlock)(void *), void (*kl_assert_lock)(void *, int));
 void	knlist_init_mtx(struct knlist *knl, struct mtx *lock);
-void	knlist_init_rw_reader(struct knlist *knl, struct rwlock *lock);
 void	knlist_destroy(struct knlist *knl);
 void	knlist_cleardel(struct knlist *knl, struct thread *td,
 	    int islocked, int killkn);
@@ -392,7 +391,7 @@ __END_DECLS
 #endif /* !_SYS_EVENT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181203,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
