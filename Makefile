@@ -226,7 +226,12 @@ META_TGT_WHITELIST+= \
 .ORDER: buildsysroot installsysroot
 
 _ORIGIAL_PATH:=${PATH}
+# Only sanitize PATH on FreeBSD.
+# PATH may include tools that are required to cross-build
+# on non-FreeBSD systems.
+.if ${.MAKE.OS} == "FreeBSD"
 PATH=	/sbin:/bin:/usr/sbin:/usr/bin
+.endif
 MAKEOBJDIRPREFIX?=	/usr/obj
 _MAKEOBJDIRPREFIX!= /usr/bin/env -i PATH="${PATH}" `command -v ${MAKE}` -m ${.CURDIR}/share/mk \
     MK_AUTO_OBJ=no ${.MAKEFLAGS:MMAKEOBJDIRPREFIX=*} __MAKE_CONF=${__MAKE_CONF} \
