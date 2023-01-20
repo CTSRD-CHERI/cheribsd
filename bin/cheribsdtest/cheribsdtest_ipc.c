@@ -70,7 +70,7 @@
 
 #define	BUFFER_SIZE	8192
 
-CHERIBSDTEST(test_ipc_pipe_sleep_signal,
+CHERIBSDTEST(ipc_pipe_sleep_signal,
     "check that direct write pipe IPC of a capability can be interrupted",
     .ct_flags = CT_FLAG_SIGNAL,
     .ct_signum = SIGALRM)
@@ -89,7 +89,7 @@ CHERIBSDTEST(test_ipc_pipe_sleep_signal,
 	cheribsdtest_failure_errx("write didn't block");
 }
 
-CHERIBSDTEST(test_ipc_pipe_nocaps,
+CHERIBSDTEST(ipc_pipe_nocaps,
     "check that read/write of a pipe(2) strips tags")
 {
 	void * __capability *buffer;

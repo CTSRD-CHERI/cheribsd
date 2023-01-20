@@ -79,7 +79,7 @@ struct struct_char {
 	char overflow;
 };
 
-CHERIBSDTEST(test_bounds_subobject_struct_char,
+CHERIBSDTEST(bounds_subobject_struct_char,
     "Check subobject bounds on a 1-character field in a structure")
 {
 	struct struct_char sc;
@@ -96,7 +96,7 @@ struct struct_int {
 	char overflow;
 };
 
-CHERIBSDTEST(test_bounds_subobject_struct_int,
+CHERIBSDTEST(bounds_subobject_struct_int,
     "Check subobject bounds on an integer field in a structure")
 {
 	struct struct_int si;
@@ -113,7 +113,7 @@ struct struct_chararray1 {
 	char overflow;
 };
 
-CHERIBSDTEST(test_bounds_subobject_struct_chararray1,
+CHERIBSDTEST(bounds_subobject_struct_chararray1,
     "Check subobject bounds on a char array of size 1 within a struct")
 {
 	struct struct_chararray1 sc1;
@@ -130,7 +130,7 @@ struct struct_chararray2 {
 	char overflow;
 };
 
-CHERIBSDTEST(test_bounds_subobject_struct_chararray2,
+CHERIBSDTEST(bounds_subobject_struct_chararray2,
     "Check subobject bounds on a char array of size 2 within a struct")
 {
 	struct struct_chararray2 sc2;
@@ -147,7 +147,7 @@ struct struct_chararray128 {
 	char overflow;
 };
 
-CHERIBSDTEST(test_bounds_subobject_struct_chararray128,
+CHERIBSDTEST(bounds_subobject_struct_chararray128,
     "Check subobject bounds on a char array of size 128 within a struct")
 {
 	struct struct_chararray128 sc128;
@@ -164,7 +164,7 @@ struct struct_chararray129 {
 	char overflow;
 };
 
-CHERIBSDTEST(test_bounds_subobject_struct_chararray129,
+CHERIBSDTEST(bounds_subobject_struct_chararray129,
     "Check subobject bounds on a char array of size 129 within a struct")
 {
 	struct struct_chararray129 sc129;
@@ -181,7 +181,7 @@ struct struct_chararray2048 {
 	char overflow;
 };
 
-CHERIBSDTEST(test_bounds_subobject_struct_chararray2048,
+CHERIBSDTEST(bounds_subobject_struct_chararray2048,
     "Check subobject bounds on a char array of size 2048 within a struct")
 {
 	struct struct_chararray2048 sc2048;
@@ -205,7 +205,7 @@ CHERIBSDTEST(test_bounds_subobject_struct_chararray2048,
 extern volatile struct struct_chararray2048 sc2048_sideeffect;
 volatile struct struct_chararray2048 sc2048_sideeffect;
 
-CHERIBSDTEST(test_bounds_subjobject_struct_chararray2048_inbounds,
+CHERIBSDTEST(bounds_subjobject_struct_chararray2048_inbounds,
     "Check in-bounds store in subjobject character array of size 2048")
 {
 
@@ -220,7 +220,7 @@ CHERIBSDTEST(test_bounds_subjobject_struct_chararray2048_inbounds,
 extern volatile char * __capability subobject_ptr_outofbounds;
 volatile char * __capability subobject_ptr_outofbounds;
 
-CHERIBSDTEST(test_bounds_subobject_struct_chararray2048_overflow,
+CHERIBSDTEST(bounds_subobject_struct_chararray2048_overflow,
     "Check that an overflow of a 2048-byte subobject array faults",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
@@ -244,7 +244,7 @@ struct struct_trailing_chararray1 {
 	char chararray1[1];
 };
 
-CHERIBSDTEST(test_bounds_subobject_struct_trailing_chararray1,
+CHERIBSDTEST(bounds_subobject_struct_trailing_chararray1,
     "Check subobject bounds on a trailing non-exempt 1-byte character array")
 {
 	struct struct_trailing_chararray1 stc1;
@@ -265,7 +265,7 @@ union union_two_chararrays {
 	char chararray32[32];
 };
 
-CHERIBSDTEST(test_bounds_subobject_union_two_chararrays,
+CHERIBSDTEST(bounds_subobject_union_two_chararrays,
     "Check that unions do enforce subobject bounds on individual structures")
 {
 	union union_two_chararrays twoarrays;
@@ -287,7 +287,7 @@ struct struct_trailing_chararray_fla {
 };
 #define	FLA_LENGTH	16
 
-CHERIBSDTEST(test_bounds_subobject_struct_trailing_chararray_fla,
+CHERIBSDTEST(bounds_subobject_struct_trailing_chararray_fla,
     "Check subobject bounds on a flexible array member")
 {
 	struct struct_trailing_chararray_fla *stcf = alloca(FLA_LENGTH);
@@ -308,7 +308,7 @@ struct struct_trailing_chararray_zla {
 };
 #define	ZLA_LENGTH	16
 
-CHERIBSDTEST(test_bounds_subobject_struct_trailing_chararray_zla,
+CHERIBSDTEST(bounds_subobject_struct_trailing_chararray_zla,
     "Check subobject bounds on a zero length array")
 {
 	struct struct_trailing_chararray_zla *stca = alloca(ZLA_LENGTH);
@@ -329,7 +329,7 @@ struct struct_exempt_char {
 	char overflow;
 };
 
-CHERIBSDTEST(test_bounds_subobject_struct_exempt_char,
+CHERIBSDTEST(bounds_subobject_struct_exempt_char,
     "Check that a char within a struct can be exempted from subobject bounds")
 {
 	struct struct_exempt_char sec;
@@ -360,7 +360,7 @@ struct struct_remaininglength_chararray16 {
 };
 #define	RLA_LENGTH	64
 
-CHERIBSDTEST(test_bounds_subobject_chararray_remaininglength,
+CHERIBSDTEST(bounds_subobject_chararray_remaininglength,
     "Check the remaining length struct annotation")
 {
 	struct struct_trailing_chararray_fla *stcf = alloca(RLA_LENGTH);
@@ -386,7 +386,7 @@ struct struct_remaininglength_size_chararray {
 	    ((cheri_subobject_bounds_use_remaining_size(RLAS_STATIC_BOUND)));
 };
 
-CHERIBSDTEST(test_bounds_subobject_chararray_remaininglength_size,
+CHERIBSDTEST(bounds_subobject_chararray_remaininglength_size,
     "Check the remaining length structure annotation with a fixed size")
 {
 	struct struct_remaininglength_size_chararray *srsc =
@@ -414,7 +414,7 @@ struct struct_queue_slist_entry {
 	int i;
 };
 
-CHERIBSDTEST(test_bounds_subobject_struct_exempt_queue_slist,
+CHERIBSDTEST(bounds_subobject_struct_exempt_queue_slist,
     "Check queue(3) SLIST macros subobject bounds exemptions")
 {
 	SLIST_HEAD(, struct_queue_slist_entry) slist;
@@ -439,7 +439,7 @@ struct struct_queue_stailq_entry {
 	int i;
 };
 
-CHERIBSDTEST(test_bounds_subobject_struct_exempt_queue_stailq,
+CHERIBSDTEST(bounds_subobject_struct_exempt_queue_stailq,
     "Check queue(3) STAILQ macros subobject bounds exemptions")
 {
 	STAILQ_HEAD(, struct_queue_stailq_entry) stailq;
@@ -464,7 +464,7 @@ struct struct_queue_list_entry {
 	int i;
 };
 
-CHERIBSDTEST(test_bounds_subobject_struct_exempt_queue_list,
+CHERIBSDTEST(bounds_subobject_struct_exempt_queue_list,
     "Check queue(3) LIST macros subobject bounds exemptions")
 {
 	LIST_HEAD(, struct_queue_list_entry) list;
@@ -489,7 +489,7 @@ struct struct_queue_tailq_entry {
 	int i;
 };
 
-CHERIBSDTEST(test_bounds_subobject_struct_exempt_queue_tailq,
+CHERIBSDTEST(bounds_subobject_struct_exempt_queue_tailq,
     "Check queue(3) TAILQ macros subobject bounds exemptions")
 {
 	TAILQ_HEAD(, struct_queue_tailq_entry) tailq;
