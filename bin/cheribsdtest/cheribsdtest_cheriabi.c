@@ -60,7 +60,7 @@
 
 #include "cheribsdtest.h"
 
-CHERIBSDTEST(test_cheriabi_mmap_unrepresentable,
+CHERIBSDTEST(cheriabi_mmap_unrepresentable,
     "Test CheriABI mmap() with unrepresentable lengths")
 {
 	int shift = 0;
@@ -93,7 +93,7 @@ CHERIBSDTEST(test_cheriabi_mmap_unrepresentable,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_cheriabi_mmap_fixed,
+CHERIBSDTEST(cheriabi_mmap_fixed,
     "Verify that we can MAP_FIXED over multiple vm map entries")
 {
 	void *p1, *p2;
@@ -123,7 +123,7 @@ CHERIBSDTEST(test_cheriabi_mmap_fixed,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_cheriabi_malloc_zero_size,
+CHERIBSDTEST(cheriabi_malloc_zero_size,
     "Check that zero-sized mallocs are properly bounded")
 {
 	void *cap;
@@ -187,7 +187,7 @@ free_adjacent_mappings(struct adjacent_mappings *mappings)
 	CHERIBSDTEST_CHECK_SYSCALL(munmap(mappings->last, mappings->maplen));
 }
 
-CHERIBSDTEST(test_cheriabi_munmap_invalid_ptr,
+CHERIBSDTEST(cheriabi_munmap_invalid_ptr,
     "Check that munmap() rejects invalid pointer arguments")
 {
 	struct adjacent_mappings mappings;
@@ -220,7 +220,7 @@ CHERIBSDTEST(test_cheriabi_munmap_invalid_ptr,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_cheriabi_mprotect_invalid_ptr,
+CHERIBSDTEST(cheriabi_mprotect_invalid_ptr,
     "Check that mprotect() rejects invalid pointer arguments")
 {
 	struct adjacent_mappings mappings;
@@ -259,7 +259,7 @@ CHERIBSDTEST(test_cheriabi_mprotect_invalid_ptr,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_cheriabi_minherit_invalid_ptr,
+CHERIBSDTEST(cheriabi_minherit_invalid_ptr,
     "Check that minherit() rejects invalid pointer arguments")
 {
 	struct adjacent_mappings mappings;
@@ -340,7 +340,7 @@ free_adjacent_mappings_shm(struct adjacent_mappings *mappings)
 	CHERIBSDTEST_CHECK_SYSCALL(shmdt(mappings->last));
 }
 
-CHERIBSDTEST(test_cheriabi_shmdt_invalid_ptr,
+CHERIBSDTEST(cheriabi_shmdt_invalid_ptr,
     "Check that shmdt() rejects invalid pointer arguments")
 {
 	struct adjacent_mappings mappings;

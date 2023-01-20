@@ -75,7 +75,7 @@ varargs_test_onearg(const char *fmt, ...)
 	cheribsdtest_failure_errx("va_arg() overran bounds without fault");
 }
 
-CHERIBSDTEST(test_bounds_varargs_vaarg_overflow,
+CHERIBSDTEST(bounds_varargs_vaarg_overflow,
     "check that va_arg() triggers a fault on overrun",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
@@ -98,7 +98,7 @@ CHERIBSDTEST(test_bounds_varargs_vaarg_overflow,
  * zero-length pointer would also be fine -- if one arises in one of our ABIs,
  * the acceptable conditions may need to be updated.
  */
-CHERIBSDTEST(test_bounds_varargs_empty_pointer_null,
+CHERIBSDTEST(bounds_varargs_empty_pointer_null,
     "check that empty varargs gives a tag violation on load",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
@@ -119,7 +119,7 @@ CHERIBSDTEST(test_bounds_varargs_empty_pointer_null,
  * Check that if we overflow the varargs array with a load, we get a bounds
  * violation.
  */
-CHERIBSDTEST(test_bounds_varargs_printf_load,
+CHERIBSDTEST(bounds_varargs_printf_load,
     "check that load via printf varargs overflow faults",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,
@@ -141,7 +141,7 @@ CHERIBSDTEST(test_bounds_varargs_printf_load,
  * store via (%n), we get a bounds violation -- rather than, say, a tag
  * violation as a result of dereferencing that pointer.
  */
-CHERIBSDTEST(test_bounds_varargs_printf_store,
+CHERIBSDTEST(bounds_varargs_printf_store,
     "check that store via printf varargs overflow faults",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,

@@ -107,7 +107,7 @@ test_bounds_stack_vla(size_t len)
 	test_bounds_precise(c, len);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_uint8,
+CHERIBSDTEST(bounds_stack_static_uint8,
     "Check bounds on 8-bit static stack allocation")
 {
 	uint8_t u8;
@@ -116,19 +116,19 @@ CHERIBSDTEST(test_bounds_stack_static_uint8,
 	test_bounds_precise(u8p, sizeof(*u8p));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_uint8,
+CHERIBSDTEST(bounds_stack_alloca_uint8,
     "Check bounds on 8-bit alloca stack allocation")
 {
 	test_bounds_stack_alloca(sizeof(uint8_t));
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_uint8,
+CHERIBSDTEST(bounds_stack_vla_uint8,
     "Check bounds on 8-bit VLA stack allocation")
 {
 	test_bounds_stack_vla(sizeof(uint8_t));
 }
 
-CHERIBSDTEST(test_bounds_stack_static_uint16,
+CHERIBSDTEST(bounds_stack_static_uint16,
     "Check bounds on 16-bit static stack allocation")
 {
 	uint16_t u16;
@@ -137,19 +137,19 @@ CHERIBSDTEST(test_bounds_stack_static_uint16,
 	test_bounds_precise(u16p, sizeof(*u16p));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_uint16,
+CHERIBSDTEST(bounds_stack_alloca_uint16,
     "Check bounds on 16-bit alloca stack allocation")
 {
 	test_bounds_stack_alloca(sizeof(uint16_t));
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_uint16,
+CHERIBSDTEST(bounds_stack_vla_uint16,
     "Check bounds on 16-bit VLA stack allocation")
 {
 	test_bounds_stack_vla(sizeof(uint16_t));
 }
 
-CHERIBSDTEST(test_bounds_stack_static_uint32,
+CHERIBSDTEST(bounds_stack_static_uint32,
     "Check bounds 32-bit static stack allocation")
 {
 	uint32_t u32;
@@ -158,19 +158,19 @@ CHERIBSDTEST(test_bounds_stack_static_uint32,
 	test_bounds_precise(u32p, sizeof(*u32p));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_uint32,
+CHERIBSDTEST(bounds_stack_alloca_uint32,
     "Check bounds 32-bit alloca stack allocation")
 {
 	test_bounds_stack_alloca(sizeof(uint32_t));
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_uint32,
+CHERIBSDTEST(bounds_stack_vla_uint32,
     "Check bounds 32-bit VLA stack allocation")
 {
 	test_bounds_stack_vla(sizeof(uint32_t));
 }
 
-CHERIBSDTEST(test_bounds_stack_static_uint64,
+CHERIBSDTEST(bounds_stack_static_uint64,
     "Check bounds on 64-bit static stack allocation")
 {
 	uint64_t u64;
@@ -179,19 +179,19 @@ CHERIBSDTEST(test_bounds_stack_static_uint64,
 	test_bounds_precise(u64p, sizeof(*u64p));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_uint64,
+CHERIBSDTEST(bounds_stack_alloca_uint64,
     "Check bounds on 64-bit alloca stack allocation")
 {
 	test_bounds_stack_alloca(sizeof(uint64_t));
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_uint64,
+CHERIBSDTEST(bounds_stack_vla_uint64,
     "Check bounds on 64-bit VLA stack allocation")
 {
 	test_bounds_stack_vla(sizeof(uint64_t));
 }
 
-CHERIBSDTEST(test_bounds_stack_static_cap,
+CHERIBSDTEST(bounds_stack_static_cap,
     "Check bounds on a capability static stack allocation")
 {
 	void * __capability c;
@@ -201,19 +201,19 @@ CHERIBSDTEST(test_bounds_stack_static_cap,
 	test_bounds_precise(cp, sizeof(*cp));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_cap,
+CHERIBSDTEST(bounds_stack_alloca_cap,
     "Check bounds on a capability alloca stack allocation")
 {
 	test_bounds_stack_alloca(sizeof(void * __capability));
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_cap,
+CHERIBSDTEST(bounds_stack_vla_cap,
     "Check bounds on a capability VLA stack allocation")
 {
 	test_bounds_stack_vla(sizeof(void * __capability));
 }
 
-CHERIBSDTEST(test_bounds_stack_static_16,
+CHERIBSDTEST(bounds_stack_static_16,
     "Check bounds on a 16-byte static stack allocation")
 {
 	uint8_t array[16];
@@ -222,19 +222,19 @@ CHERIBSDTEST(test_bounds_stack_static_16,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_16,
+CHERIBSDTEST(bounds_stack_alloca_16,
     "Check bounds on a 16-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(16);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_16,
+CHERIBSDTEST(bounds_stack_vla_16,
     "Check bounds on a 16-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(16);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_32,
+CHERIBSDTEST(bounds_stack_static_32,
     "Check bounds on a 32-byte static stack allocation")
 {
 	uint8_t array[32];
@@ -243,19 +243,19 @@ CHERIBSDTEST(test_bounds_stack_static_32,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_32,
+CHERIBSDTEST(bounds_stack_alloca_32,
     "Check bounds on a 32-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(32);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_32,
+CHERIBSDTEST(bounds_stack_vla_32,
     "Check bounds on a 32-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(32);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_64,
+CHERIBSDTEST(bounds_stack_static_64,
     "Check bounds on a 64-byte static stack allocation")
 {
 	uint8_t array[64];
@@ -264,19 +264,19 @@ CHERIBSDTEST(test_bounds_stack_static_64,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_64,
+CHERIBSDTEST(bounds_stack_alloca_64,
     "Check bounds on a 64-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(64);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_64,
+CHERIBSDTEST(bounds_stack_vla_64,
     "Check bounds on a 64-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(64);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_128,
+CHERIBSDTEST(bounds_stack_static_128,
     "Check bounds on a 128-byte static stack allocation")
 {
 	uint8_t array[128];
@@ -285,19 +285,19 @@ CHERIBSDTEST(test_bounds_stack_static_128,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_128,
+CHERIBSDTEST(bounds_stack_alloca_128,
     "Check bounds on a 128-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(128);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_128,
+CHERIBSDTEST(bounds_stack_vla_128,
     "Check bounds on a 128-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(128);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_256,
+CHERIBSDTEST(bounds_stack_static_256,
     "Check bounds on a 256-byte static stack allocation")
 {
 	uint8_t array[256];
@@ -306,19 +306,19 @@ CHERIBSDTEST(test_bounds_stack_static_256,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_256,
+CHERIBSDTEST(bounds_stack_alloca_256,
     "Check bounds on a 256-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(256);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_256,
+CHERIBSDTEST(bounds_stack_vla_256,
     "Check bounds on a 256-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(256);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_512,
+CHERIBSDTEST(bounds_stack_static_512,
     "Check bounds on a 512-byte static stack allocation")
 {
 	uint8_t array[512];
@@ -327,19 +327,19 @@ CHERIBSDTEST(test_bounds_stack_static_512,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_512,
+CHERIBSDTEST(bounds_stack_alloca_512,
     "Check bounds on a 512-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(512);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_512,
+CHERIBSDTEST(bounds_stack_vla_512,
     "Check bounds on a 512-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(512);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_1024,
+CHERIBSDTEST(bounds_stack_static_1024,
     "Check bounds on a 1,024-byte static stack allocation")
 {
 	uint8_t array[1024];
@@ -348,19 +348,19 @@ CHERIBSDTEST(test_bounds_stack_static_1024,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_1024,
+CHERIBSDTEST(bounds_stack_alloca_1024,
     "Check bounds on a 1,024-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(1024);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_1024,
+CHERIBSDTEST(bounds_stack_vla_1024,
     "Check bounds on a 1,024-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(1024);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_2048,
+CHERIBSDTEST(bounds_stack_static_2048,
     "Check bounds on a 2,048-byte static stack allocation")
 {
 	uint8_t array[2048];
@@ -369,19 +369,19 @@ CHERIBSDTEST(test_bounds_stack_static_2048,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_2048,
+CHERIBSDTEST(bounds_stack_alloca_2048,
     "Check bounds on a 2,048-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(2048);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_2048,
+CHERIBSDTEST(bounds_stack_vla_2048,
     "Check bounds on a 2,048-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(2048);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_4096,
+CHERIBSDTEST(bounds_stack_static_4096,
     "Check bounds on a 4,096-byte static stack allocation")
 {
 	uint8_t array[4096];
@@ -390,19 +390,19 @@ CHERIBSDTEST(test_bounds_stack_static_4096,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_4096,
+CHERIBSDTEST(bounds_stack_alloca_4096,
     "Check bounds on a 4,096-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(4096);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_4096,
+CHERIBSDTEST(bounds_stack_vla_4096,
     "Check bounds on a 4,096-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(4096);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_8192,
+CHERIBSDTEST(bounds_stack_static_8192,
     "Check bounds on a 8,192-byte static stack allocation")
 {
 	uint8_t array[8192];
@@ -411,19 +411,19 @@ CHERIBSDTEST(test_bounds_stack_static_8192,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_8192,
+CHERIBSDTEST(bounds_stack_alloca_8192,
     "Check bounds on a 8,192-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(8192);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_8192,
+CHERIBSDTEST(bounds_stack_vla_8192,
     "Check bounds on a 8,192-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(8192);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_16384,
+CHERIBSDTEST(bounds_stack_static_16384,
     "Check bounds on a 16,384-byte static stack allocation")
 {
 	uint8_t array[16384];
@@ -432,19 +432,19 @@ CHERIBSDTEST(test_bounds_stack_static_16384,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_16384,
+CHERIBSDTEST(bounds_stack_alloca_16384,
     "Check bounds on a 16,384-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(16384);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_16384,
+CHERIBSDTEST(bounds_stack_vla_16384,
     "Check bounds on a 16,384-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(16384);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_32768,
+CHERIBSDTEST(bounds_stack_static_32768,
     "Check bounds on a 32,768-byte static stack allocation")
 {
 	uint8_t array[32768];
@@ -453,19 +453,19 @@ CHERIBSDTEST(test_bounds_stack_static_32768,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_32768,
+CHERIBSDTEST(bounds_stack_alloca_32768,
     "Check bounds on a 32,768-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(32768);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_32768,
+CHERIBSDTEST(bounds_stack_vla_32768,
     "Check bounds on a 32,768-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(32768);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_65536,
+CHERIBSDTEST(bounds_stack_static_65536,
     "Check bounds on a 65,536-byte static stack allocation")
 {
 	uint8_t array[65536];
@@ -474,19 +474,19 @@ CHERIBSDTEST(test_bounds_stack_static_65536,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_65536,
+CHERIBSDTEST(bounds_stack_alloca_65536,
     "Check bounds on a 65,536-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(65536);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_65536,
+CHERIBSDTEST(bounds_stack_vla_65536,
     "Check bounds on a 65,536-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(65536);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_131072,
+CHERIBSDTEST(bounds_stack_static_131072,
     "Check bounds on a 131,072-byte static stack allocation")
 {
 	uint8_t array[131072];
@@ -495,19 +495,19 @@ CHERIBSDTEST(test_bounds_stack_static_131072,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_131072,
+CHERIBSDTEST(bounds_stack_alloca_131072,
     "Check bounds on a 131,072-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(131072);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_131072,
+CHERIBSDTEST(bounds_stack_vla_131072,
     "Check bounds on a 131,072-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(131072);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_262144,
+CHERIBSDTEST(bounds_stack_static_262144,
     "Check bounds on a 262,144-byte static stack allocation")
 {
 	uint8_t array[262144];
@@ -516,19 +516,19 @@ CHERIBSDTEST(test_bounds_stack_static_262144,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_262144,
+CHERIBSDTEST(bounds_stack_alloca_262144,
     "Check bounds on a 262,144-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(262144);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_262144,
+CHERIBSDTEST(bounds_stack_vla_262144,
     "Check bounds on a 262,144-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(262144);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_524288,
+CHERIBSDTEST(bounds_stack_static_524288,
     "Check bounds on a 524,288-byte static stack allocation")
 {
 	uint8_t array[524288];
@@ -537,19 +537,19 @@ CHERIBSDTEST(test_bounds_stack_static_524288,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_524288,
+CHERIBSDTEST(bounds_stack_alloca_524288,
     "Check bounds on a 524,288-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(524288);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_524288,
+CHERIBSDTEST(bounds_stack_vla_524288,
     "Check bounds on a 524,288-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(524288);
 }
 
-CHERIBSDTEST(test_bounds_stack_static_1048576,
+CHERIBSDTEST(bounds_stack_static_1048576,
     "Check bounds on a 1,048,576-byte static stack allocation")
 {
 	uint8_t array[1048576];
@@ -558,13 +558,13 @@ CHERIBSDTEST(test_bounds_stack_static_1048576,
 	test_bounds_precise(arrayp, sizeof(array));
 }
 
-CHERIBSDTEST(test_bounds_stack_alloca_1048576,
+CHERIBSDTEST(bounds_stack_alloca_1048576,
     "Check bounds on a 1,048,576-byte alloca stack allocation")
 {
 	test_bounds_stack_alloca(1048576);
 }
 
-CHERIBSDTEST(test_bounds_stack_vla_1048576,
+CHERIBSDTEST(bounds_stack_vla_1048576,
     "Check bounds on a 1,048,576-byte VLA stack allocation")
 {
 	test_bounds_stack_vla(1048576);

@@ -68,7 +68,7 @@ create_tempfile(void)
 	return (fd);
 }
 
-CHERIBSDTEST(cheribsdtest_tmpfs_rw_nocaps,
+CHERIBSDTEST(tmpfs_rw_nocaps,
     "check that read(2) and write(2) of tmpfs files do not return tags",
     .ct_check_skip = skip_non_tmpfs_tmp)
 {

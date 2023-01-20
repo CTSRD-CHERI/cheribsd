@@ -54,7 +54,7 @@
 #include "cheribsdtest.h"
 
 #ifdef __CHERI_PURE_CAPABILITY__
-CHERIBSDTEST(test_bounds_calloc,
+CHERIBSDTEST(bounds_calloc,
     "Check bounds on variously sized heap allocations")
 {
 	size_t i;
