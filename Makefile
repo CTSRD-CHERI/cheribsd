@@ -225,7 +225,6 @@ META_TGT_WHITELIST+= \
 .ORDER: buildkernel reinstallkernel.debug
 .ORDER: buildsysroot installsysroot
 
-_ORIGIAL_PATH:=${PATH}
 # Only sanitize PATH on FreeBSD.
 # PATH may include tools that are required to cross-build
 # on non-FreeBSD systems.
@@ -276,7 +275,7 @@ SUB_MAKE= `test -x ${MYMAKE} && echo ${MYMAKE} || echo ${MAKE}` \
 SUB_MAKE= ${MAKE} -m ${.CURDIR}/share/mk
 .endif
 
-_MAKE=	PATH="${PATH}" _ORIGIAL_PATH="${_ORIGIAL_PATH}" MAKE_CMD="${MAKE}" ${SUB_MAKE} -f Makefile.inc1 \
+_MAKE=	PATH="${PATH}" MAKE_CMD="${MAKE}" ${SUB_MAKE} -f Makefile.inc1 \
 	TARGET=${_TARGET} TARGET_ARCH=${_TARGET_ARCH} ${_MAKEARGS}
 
 .if defined(MK_META_MODE) && ${MK_META_MODE} == "yes"
