@@ -898,6 +898,8 @@ tda19988_bridge_disable(struct drm_bridge *bridge)
 	tda19988_reg_write(sc, TDA_ENA_VP_0, 0);
 	tda19988_reg_write(sc, TDA_ENA_VP_1, 0);
 	tda19988_reg_write(sc, TDA_ENA_VP_2, 0);
+
+	tda19988_reg_write(sc, TDA_BUFFER_OUT, 0x8);
 }
 
 static void
@@ -911,6 +913,8 @@ tda19988_bridge_enable(struct drm_bridge *bridge)
 	tda19988_reg_write(sc, TDA_ENA_VP_0, 0xff);
 	tda19988_reg_write(sc, TDA_ENA_VP_1, 0xff);
 	tda19988_reg_write(sc, TDA_ENA_VP_2, 0xff);
+
+	tda19988_reg_write(sc, TDA_BUFFER_OUT, 0);
 }
 
 static const struct drm_bridge_funcs tda19988_bridge_funcs = {
