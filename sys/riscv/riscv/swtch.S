@@ -628,8 +628,6 @@ ENTRY(cpu_switch)
 #endif
 
 	RETURN
-.Lcpu_switch_panic_str:
-	.asciz "cpu_switch: %p\0"
 END(cpu_switch)
 
 /*
