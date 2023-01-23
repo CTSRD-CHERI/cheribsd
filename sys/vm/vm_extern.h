@@ -174,7 +174,7 @@ vm_addr_ok(vm_paddr_t pa, vm_paddr_t size, u_long alignment,
 #endif				/* !_VM_EXTERN_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190509,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

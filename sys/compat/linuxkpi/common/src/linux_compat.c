@@ -2792,7 +2792,7 @@ SYSUNINIT(linux_compat, SI_SUB_DRIVERS, SI_ORDER_SECOND, linux_compat_uninit, NU
 CTASSERT(sizeof(unsigned long) == sizeof(uintptr_t));
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

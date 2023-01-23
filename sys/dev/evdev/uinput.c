@@ -734,7 +734,7 @@ MODULE_VERSION(uinput, 1);
 MODULE_DEPEND(uinput, evdev, 1, 1, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

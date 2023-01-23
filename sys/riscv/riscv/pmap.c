@@ -5727,12 +5727,13 @@ SYSCTL_OID(_vm_pmap, OID_AUTO, kernel_maps,
     "Dump kernel address layout");
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support",
 //     "pointer_provenance",
-//     "pointer_shape"
+//     "pointer_shape",
+//     "uintcap_arithmetic"
 //   ]
 // }
 // CHERI CHANGES END

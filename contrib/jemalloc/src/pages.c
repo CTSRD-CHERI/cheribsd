@@ -1,12 +1,13 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181113,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
  *     "unsupported",
  *     "virtual_address",
- *     "other"
+ *     "other",
+ *     "support"
  *   ],
  *   "change_comment": "No MAP_FIXED, LG_PAGE hack"
  * }
@@ -650,9 +651,6 @@ pages_boot(void) {
 
 #ifndef _WIN32
 	mmap_flags = MAP_PRIVATE | MAP_ANON;
-#endif
-#ifdef __CHERI_PURE_CAPABILITY__
-	mmap_flags |= MAP_ALIGNED(LG_PAGE);
 #endif
 
 #ifdef JEMALLOC_SYSCTL_VM_OVERCOMMIT

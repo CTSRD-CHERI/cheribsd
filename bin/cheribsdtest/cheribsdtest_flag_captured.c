@@ -92,25 +92,25 @@ call_flag_captured(const char *message, uint32_t key)
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_flag_captured, "Call flag_captured(2) with a message")
+CHERIBSDTEST(flag_captured_message, "Call flag_captured(2) with a message")
 {
 	call_flag_captured(__func__, CORRECT_KEY);
 }
 
-CHERIBSDTEST(test_flag_captured_incorrect_key,
+CHERIBSDTEST(flag_captured_incorrect_key,
     "Call flag_captured(2) with an incorrect key")
 {
 	call_flag_captured(__func__, INCORRECT_KEY);
 }
 
-CHERIBSDTEST(test_flag_captured_null,
+CHERIBSDTEST(flag_captured_null,
     "Call flag_captured(2) without a message")
 {
 	call_flag_captured(NULL, CORRECT_KEY);
 }
 
 #ifdef __CHERI_PURE_CAPABILITY__
-CHERIBSDTEST(test_flag_captured_empty,
+CHERIBSDTEST(flag_captured_empty,
     "Call flag_captured(2) with a zero-length capability")
 {
 	char buf[] = "";

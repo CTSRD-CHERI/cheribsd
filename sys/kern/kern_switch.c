@@ -544,7 +544,7 @@ runq_remove_idx(struct runq *rq, struct thread *td, u_char *idx)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_provenance"

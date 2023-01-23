@@ -691,9 +691,11 @@ void	pack_kinfo(struct kinfo_file *kif);
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
+//     "user_capabilities",
+//     "pointer_as_integer",
 //     "support"
 //   ],
 //   "change_comment": ""

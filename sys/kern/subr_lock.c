@@ -755,7 +755,7 @@ SYSCTL_PROC(_debug_lock_prof, OID_AUTO, enable,
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "kdb"

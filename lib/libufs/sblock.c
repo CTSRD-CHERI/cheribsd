@@ -293,7 +293,7 @@ use_pwrite(void *devfd, off_t loc, void *buf, int size)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190628,
+//   "updated": 20221129,
 //   "target_type": "lib",
 //   "changes_purecap": [
 //     "pointer_shape"

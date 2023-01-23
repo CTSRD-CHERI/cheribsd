@@ -825,13 +825,13 @@ void	in_pcboutput_eagain(struct inpcb *);
 #endif /* !_NETINET_IN_PCB_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "integer_provenance"
 //   ],
 //   "changes_purecap": [
-//     "subobject_bounds"
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

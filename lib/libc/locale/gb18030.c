@@ -35,12 +35,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180723,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
- *     "buffer_overrun"
+ *     "other"
  *   ],
- *   "change_comment": "fixes mbtowc_test:mbtowc"
+ *   "change_comment": "fixes mbtowc_test:mbtowc buffer overrun"
  * }
  * CHERI CHANGES END
  */

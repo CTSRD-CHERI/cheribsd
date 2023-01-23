@@ -3000,11 +3000,12 @@ again:
 
 // CHERI CHANGES START
 // {
-//   "updated": 20181203,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance",
-//     "user_capabilities"
+//     "user_capabilities",
+//     "hashing"
 //   ]
 // }
 // CHERI CHANGES END

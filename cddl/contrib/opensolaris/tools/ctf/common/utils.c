@@ -22,7 +22,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20221128,
  *   "target_type": "lib",
  *   "changes": [],
  *   "change_comment": "duplicate definition of vwarn()"

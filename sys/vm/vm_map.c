@@ -6338,7 +6338,7 @@ DB_SHOW_COMMAND(procvm, procvm)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20200708,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "platform"
@@ -6347,6 +6347,7 @@ DB_SHOW_COMMAND(procvm, procvm)
 //     "pointer_as_integer",
 //     "support",
 //     "uintcap_arithmetic",
+//     "bounds_compression",
 //     "kdb"
 //   ]
 // }

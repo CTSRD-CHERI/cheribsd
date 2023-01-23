@@ -40,7 +40,7 @@ DEFINE_UIFUNC(static, int, simple_ifunc, (void))
 	return (simple_ifunc_impl);
 }
 
-CHERIBSDTEST(test_call_ifunc, "Check that IFUNCs can be called")
+CHERIBSDTEST(call_ifunc, "Check that IFUNCs can be called")
 {
 	int ret;
 

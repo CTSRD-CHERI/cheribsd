@@ -588,7 +588,7 @@ psci_v0_2_init(device_t dev, int default_version)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20210407,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer"

@@ -1581,8 +1581,11 @@ ufs_set_i_endoff(struct inode *ip, doff_t off, const char *file, int line)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ],
 //   "changes_purecap": [
 //     "subobject_bounds"
 //   ]

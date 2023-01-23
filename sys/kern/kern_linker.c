@@ -2386,7 +2386,7 @@ SYSCTL_PROC(_kern, OID_AUTO, function_list,
     "kernel function list");
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

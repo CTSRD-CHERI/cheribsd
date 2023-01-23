@@ -81,8 +81,8 @@ typedef enum device_property_type {
  */
 #define BUS_USER_BUFFER		(3*1024)
 struct u_device {
-	uint64_t		dv_handle;
-	uint64_t		dv_parent;
+	kvaddr_t		dv_handle;
+	kvaddr_t		dv_parent;
 	uint32_t	dv_devflags;		/**< @brief API Flags for device */
 	uint16_t	dv_flags;		/**< @brief flags for dev state */
 	device_state_t	dv_state;		/**< @brief State of attachment */
@@ -1024,9 +1024,10 @@ bool dev_wired_cache_match(device_location_cache_t *dcp, device_t dev, const cha
 #endif /* !_SYS_BUS_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
+//     "user_capabilities",
 //     "pointer_shape"
 //   ]
 // }

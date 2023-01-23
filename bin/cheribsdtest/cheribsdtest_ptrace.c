@@ -90,7 +90,7 @@ finish_child(pid_t pid)
 	CHERIBSDTEST_VERIFY(WIFEXITED(status));
 }
 
-CHERIBSDTEST(test_ptrace_readcap, "Basic tests of PIOD_READ_CHERI_CAP")
+CHERIBSDTEST(ptrace_readcap, "Basic tests of PIOD_READ_CHERI_CAP")
 {
 	struct ptrace_io_desc piod;
 	pid_t pid;
@@ -129,7 +129,7 @@ CHERIBSDTEST(test_ptrace_readcap, "Basic tests of PIOD_READ_CHERI_CAP")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_ptrace_readtags, "Basic test of PIOD_READ_CHERI_TAGS")
+CHERIBSDTEST(ptrace_readtags, "Basic test of PIOD_READ_CHERI_TAGS")
 {
 	struct ptrace_io_desc piod;
 	pid_t pid;
@@ -164,7 +164,7 @@ CHERIBSDTEST(test_ptrace_readtags, "Basic test of PIOD_READ_CHERI_TAGS")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_ptrace_readcap_pageend,
+CHERIBSDTEST(ptrace_readcap_pageend,
     "Use PIOD_READ_CHERI_CAP to fetch capability at the end of a page")
 {
 	struct ptrace_io_desc piod;

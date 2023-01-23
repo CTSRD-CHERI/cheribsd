@@ -1065,7 +1065,7 @@ ffs_clusteracct(struct fs *fs, struct cg *cgp, ufs1_daddr_t blkno, int cnt)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20190628,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_shape"

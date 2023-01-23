@@ -13379,7 +13379,7 @@ DRIVER_MODULE(vcc, cc, vcc_driver, 0, 0);
 MODULE_VERSION(vcc, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20210525,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

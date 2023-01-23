@@ -375,7 +375,7 @@ init_proc0(vm_pointer_t kstack)
 	/* XXX-AM: We need to set bounds on pcb and kstack here as in MIPS */
 	proc_linkup0(&proc0, &thread0);
 	thread0.td_kstack = kstack;
-	thread0.td_kstack_pages = KSTACK_PAGES;
+	thread0.td_kstack_pages = kstack_pages;
 #if defined(PERTHREAD_SSP)
 	thread0.td_md.md_canary = boot_canary;
 #endif
@@ -1111,11 +1111,12 @@ cheri_revoke_td_frame(struct thread *td, const struct vm_cheri_revoke_cookie
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20210413,
+//   "updated": 20221129,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "support"
+//     "support",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

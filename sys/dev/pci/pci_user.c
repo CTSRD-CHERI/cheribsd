@@ -1606,14 +1606,15 @@ getconfexit:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20200706,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

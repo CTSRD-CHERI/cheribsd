@@ -5885,9 +5885,10 @@ DB_SHOW_ALL_COMMAND(devices, db_show_all_devices)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20200803,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes_purecap": [
+//     "support",
 //     "kdb"
 //   ]
 // }

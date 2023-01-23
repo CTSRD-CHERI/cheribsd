@@ -1973,10 +1973,11 @@ ncl_meta_setsize(struct vnode *vp, struct thread *td, u_quad_t nsize)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros"
+//     "iovec-macros",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

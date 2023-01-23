@@ -117,13 +117,14 @@ __END_DECLS
 #endif /* !_SYS_UIO_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

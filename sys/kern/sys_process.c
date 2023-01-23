@@ -1879,14 +1879,15 @@ fail:
 
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20221205,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
+//     "user_capabilities",
 //     "support"
 //   ],
 //   "changes_purecap": [
-//     "uintptr_interp_offset"
+//     "virtual_address"
 //   ]
 // }
 // CHERI CHANGES END

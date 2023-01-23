@@ -28,10 +28,11 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181114,
+ *   "updated": 20221129,
  *   "target_type": "lib",
  *   "changes": [
- *     "support"
+ *     "support",
+ *     "subobject_bounds"
  *   ],
  *   "change_comment": "Find auxargs without walking off the end of envv.  Get ps_strings from auxargs."
  * }

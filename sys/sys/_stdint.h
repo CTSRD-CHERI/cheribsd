@@ -146,7 +146,7 @@ typedef	__uint64_t		vaddr_t;
 #endif /* !_SYS__STDINT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20221205,
 //   "target_type": "header",
 //   "changes": [
 //     "integer_provenance",
