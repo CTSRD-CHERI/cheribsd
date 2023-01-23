@@ -21,6 +21,8 @@
  * }
  * CHERI CHANGES END
  */
+
+#include "common.h"
 #include "index.h"
 #include "stream_flags_common.h"
 
