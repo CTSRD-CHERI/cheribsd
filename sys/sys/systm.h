@@ -122,18 +122,20 @@ struct ucred;
  * Derive out-of-bounds and small values from NULL.  This allows common
  * sentinel values to work.
  */
-#define ___USER_CFROMPTR(ptr, cap)					\
+#define ___USER_CFROMPTR(ptr, cap, is_offset)				\
     ((void *)(uintptr_t)(ptr) == NULL ? NULL :				\
      ((vm_offset_t)(ptr) < 4096 ||					\
       (vm_offset_t)(ptr) > VM_MAXUSER_ADDRESS) ?			\
-	__builtin_cheri_offset_set(NULL, (ptraddr_t)(ptr)) :		\
-	__builtin_cheri_offset_set((cap), (ptraddr_t)(ptr)))
+	__builtin_cheri_address_set(NULL, (ptraddr_t)(ptr)) :		\
+	(is_offset) ?							\
+	__builtin_cheri_offset_set((cap), (ptraddr_t)(ptr)) :		\
+	__builtin_cheri_address_set((cap), (ptraddr_t)(ptr)))
 
 #define	__USER_CAP_UNBOUND(ptr)						\
-	___USER_CFROMPTR((ptr), __USER_DDC)
+	___USER_CFROMPTR((ptr), __USER_DDC, __USER_DDC_OFFSET_ENABLED)
 
 #define	__USER_CODE_CAP(ptr)						\
-	___USER_CFROMPTR((ptr), __USER_PCC)
+	___USER_CFROMPTR((ptr), __USER_PCC, __USER_PCC_OFFSET_ENABLED)
 
 #define	__USER_CAP(ptr, len)						\
 ({									\
