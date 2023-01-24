@@ -1182,7 +1182,7 @@ CHERIBSDTEST(vm_shm_largepage_basic,
  * CAPSTORE (and possibly even CAPDIRTY, in light of the above) whereas, if this
  * sysctl is clear, our initial view of said memory will be !CAPSTORE.
  */
-CHERIBSDTEST(cheribsdtest_vm_capdirty, "verify capdirty marking and mincore")
+CHERIBSDTEST(vm_capdirty, "verify capdirty marking and mincore")
 {
 #define CHERIBSDTEST_VM_CAPDIRTY_NPG	2
 	size_t sz = CHERIBSDTEST_VM_CAPDIRTY_NPG * getpagesize();
@@ -1361,7 +1361,7 @@ fprintf_cheri_revoke_stats(FILE *f, struct cheri_revoke_syscall_info crsi,
 		cycsum);
 }
 
-CHERIBSDTEST(cheribsdtest_cheri_revoke_lightly,
+CHERIBSDTEST(cheri_revoke_lightly,
     "A gentle test of capability revocation")
 {
 	void * __capability * __capability mb;
@@ -1459,7 +1459,7 @@ CHERIBSDTEST(cheribsdtest_cheri_revoke_lightly,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheribsdtest_cheri_revoke_capdirty,
+CHERIBSDTEST(cheri_revoke_capdirty,
     "Probe the interaction of revocation and capdirty")
 {
 	void * __capability * __capability mb;
@@ -1551,7 +1551,7 @@ CHERIBSDTEST(cheribsdtest_cheri_revoke_capdirty,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheribsdtest_cheri_revoke_loadside, "Test load-side revoker")
+CHERIBSDTEST(cheri_revoke_loadside, "Test load-side revoker")
 {
 #define CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG	3
 
@@ -1928,7 +1928,7 @@ cheribsdtest_cheri_revoke_lib_run(
 	}
 }
 
-CHERIBSDTEST(cheribsdtest_cheri_revoke_lib, "Test libcheri_caprevoke internals")
+CHERIBSDTEST(cheri_revoke_lib, "Test libcheri_caprevoke internals")
 {
 		/* If debugging the revoker, some verbosity can help. 0 - 4. */
 	static const int verbose = 0;
@@ -1972,7 +1972,7 @@ CHERIBSDTEST(cheribsdtest_cheri_revoke_lib, "Test libcheri_caprevoke internals")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(cheribsdtest_cheri_revoke_lib_fork,
+CHERIBSDTEST(cheri_revoke_lib_fork,
     "Test libcheri_caprevoke with fork")
 {
 	static const int verbose = 0;
