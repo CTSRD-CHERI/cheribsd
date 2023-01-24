@@ -45,6 +45,12 @@
     (void * __capability)curthread->td_pcb->pcb_rddc_el0)
 #define	__USER_PCC	((void * __capability)curthread->td_frame->tf_elr)
 
+/* Does the current thread add the base in CToPtr */
+#define __USER_DDC_OFFSET_ENABLED	\
+    (READ_SPECIALREG(cctlr_el0) & CCTLR_DDCBO_MASK)
+#define __USER_PCC_OFFSET_ENABLED	\
+    (READ_SPECIALREG(cctlr_el0) & CCTLR_PCCBO_MASK)
+
 /*
  * Special marker NOPs for the Morello FVP to start / stop region of interest
  * in trace.
