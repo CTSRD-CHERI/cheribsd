@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 
 #include <dev/hwt/hwtvar.h>
+#include <dev/hwt/hwt.h>
 
 #define	HWT_DEBUG
 //#undef	HWT_DEBUG
@@ -73,7 +74,12 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	dprintf("%s: cmd %lx, addr %lx, len %d\n", __func__, cmd,
 	    (uint64_t)addr, len);
 
-	switch (cmd) { };
+	switch (cmd) {
+	case HWT_IOC_ATTACH:
+		break;
+	default:
+		break;
+	};
 
 	return (error);
 }
