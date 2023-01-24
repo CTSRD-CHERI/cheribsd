@@ -40,7 +40,9 @@
 #endif
 
 #ifdef _KERNEL
-#define	__USER_DDC	((void * __capability)curthread->td_frame->tf_ddc)
+#define	__USER_DDC ((cheri_getperm(__USER_PCC) & CHERI_PERM_EXECUTIVE) ? \
+    (void * __capability)curthread->td_frame->tf_ddc :			\
+    (void * __capability)curthread->td_pcb->pcb_rddc_el0)
 #define	__USER_PCC	((void * __capability)curthread->td_frame->tf_elr)
 
 /*
