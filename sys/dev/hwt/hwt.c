@@ -90,9 +90,18 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	return (error);
 }
 
+static int
+hwt_mmap_single(struct cdev *cdev, vm_ooffset_t *offset,
+    vm_size_t mapsize, struct vm_object **objp, int nprot)
+{
+
+	return (0);
+}
+
 static struct cdevsw hwt_cdevsw = {
 	.d_version	= D_VERSION,
 	.d_name		= "hwt",
+	.d_mmap_single	= hwt_mmap_single,
 	.d_ioctl	= hwt_ioctl
 };
 
