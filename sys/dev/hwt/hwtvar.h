@@ -35,10 +35,27 @@
 #ifndef LOCORE
 static MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
 
+#define	HWT_LOCK(sc)			mtx_lock(&(sc)->mtx)
+#define	HWT_UNLOCK(sc)			mtx_unlock(&(sc)->mtx)
+#define	HWT_ASSERT_LOCKED(sc)		mtx_assert(&(sc)->mtx, MA_OWNED)
+
+struct hwt_device {
+	const char *name;
+};
+
 struct hwt_softc {
 	struct cdev			*hwt_cdev;
 	struct mtx			mtx;
+
+	/*
+	 * List of CPU trace devices registered in HWT.
+	 * Protected by sc->mtx.
+	 */
+	TAILQ_HEAD(hwt_device_list, hwt_device)	hwt_devices;
 };
+
+int hwt_register(void);
+
 #endif /* !LOCORE */
 
 #endif /* !_DEV_HWT_HWTVAR_H_ */
