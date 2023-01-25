@@ -154,7 +154,7 @@ test_printf_cap_one(void * __capability p, int expected_tokens,
 	}
 }
 
-CHERIBSDTEST(test_printf_cap, "Various checks of %#p")
+CHERIBSDTEST(printf_cap, "Various checks of %#p")
 {
 	char data[64];
 	void * __capability scalar = (void * __capability)(uintcap_t)4;

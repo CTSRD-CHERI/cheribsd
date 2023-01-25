@@ -14,5 +14,7 @@ device		pl011
 options 	FDT
 device		acpi
 
+device		arm_doorbell		# ARM Message Handling Unit (MHU)
+
 # DTBs
 makeoptions	MODULES_EXTRA+="dtb/arm"

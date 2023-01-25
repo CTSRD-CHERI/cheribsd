@@ -62,7 +62,7 @@
 
 #include "cheribsdtest.h"
 
-CHERIBSDTEST(test_sig_dfl_neq_ign, "Test SIG_DFL != SIG_IGN")
+CHERIBSDTEST(sig_dfl_neq_ign, "Test SIG_DFL != SIG_IGN")
 {
 	void * __capability sic = (__cheri_tocap void * __capability)SIG_IGN;
 
@@ -92,7 +92,7 @@ test_sig_dfl_ign_handler(int x)
 	(void)x;
 }
 
-CHERIBSDTEST(test_sig_dfl_ign, "Test proper handling of SIG_DFL and SIG_IGN")
+CHERIBSDTEST(sig_dfl_ign, "Test proper handling of SIG_DFL and SIG_IGN")
 {
 	int cpid;
 	int res;
@@ -156,7 +156,7 @@ CHERIBSDTEST(test_sig_dfl_ign, "Test proper handling of SIG_DFL and SIG_IGN")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_ptrace_basic, "Test basic handling of ptrace functionality")
+CHERIBSDTEST(ptrace_basic, "Test basic handling of ptrace functionality")
 {
 	int cpid, res;
 
@@ -200,7 +200,7 @@ test_aio_sival_handler(int sig, siginfo_t *si, void *uc __unused)
 	test_aio_sival_info = *si;
 }
 
-CHERIBSDTEST(test_aio_sival, "Test pointer passing through AIO signals")
+CHERIBSDTEST(aio_sival, "Test pointer passing through AIO signals")
 {
 	char buf[128];
 	int pfd[2];

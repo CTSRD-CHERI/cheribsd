@@ -33,8 +33,6 @@
 #ifndef	_ARM64_SCMI_ARM_DOORBELL_H_
 #define	_ARM64_SCMI_ARM_DOORBELL_H_
 
-static MALLOC_DEFINE(M_DOORBELL, "arm_doorbell", "ARM Doorbell");
-
 struct arm_doorbell {
 	device_t dev;
 	device_t db_dev;

@@ -53,7 +53,7 @@
 
 #include "cheribsdtest.h"
 
-CHERIBSDTEST(test_cheriabi_open_ordinary, "Smoke test for open(2)")
+CHERIBSDTEST(cheriabi_open_ordinary, "Smoke test for open(2)")
 {
 	char path[] = "/dev/null";
 	int error, fd;
@@ -69,7 +69,7 @@ CHERIBSDTEST(test_cheriabi_open_ordinary, "Smoke test for open(2)")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_cheriabi_open_offset, "Path with non-zero offset")
+CHERIBSDTEST(cheriabi_open_offset, "Path with non-zero offset")
 {
 	char pathbuf[] = "xxxx/dev/null";;
 	char *path;
@@ -89,7 +89,7 @@ CHERIBSDTEST(test_cheriabi_open_offset, "Path with non-zero offset")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_cheriabi_open_shortened,
+CHERIBSDTEST(cheriabi_open_shortened,
     "Path shorter than its capability bounds")
 {
 	char path[] = "/dev/null/xxxx";
@@ -108,7 +108,7 @@ CHERIBSDTEST(test_cheriabi_open_shortened,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_cheriabi_open_bad_addr, "Path with nonsensical address")
+CHERIBSDTEST(cheriabi_open_bad_addr, "Path with nonsensical address")
 {
 	char *path;
 	int fd;
@@ -125,7 +125,7 @@ CHERIBSDTEST(test_cheriabi_open_bad_addr, "Path with nonsensical address")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_cheriabi_open_bad_addr_2,
+CHERIBSDTEST(cheriabi_open_bad_addr_2,
     "Path with nonsensical address in kernel range")
 {
 	char *path;
@@ -143,7 +143,7 @@ CHERIBSDTEST(test_cheriabi_open_bad_addr_2,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_cheriabi_open_bad_len,
+CHERIBSDTEST(cheriabi_open_bad_len,
     "Path too long for the capaility bounds")
 {
 	char pathbuf[] = "/dev/null";
@@ -162,7 +162,7 @@ CHERIBSDTEST(test_cheriabi_open_bad_len,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_cheriabi_open_bad_len_2, "Path with offset past its bounds")
+CHERIBSDTEST(cheriabi_open_bad_len_2, "Path with offset past its bounds")
 {
 	char pathbuf[] = "xxxx/dev/null";;
 	char *path;
@@ -181,7 +181,7 @@ CHERIBSDTEST(test_cheriabi_open_bad_len_2, "Path with offset past its bounds")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_cheriabi_open_bad_tag, "Path with tag bit missing")
+CHERIBSDTEST(cheriabi_open_bad_tag, "Path with tag bit missing")
 {
 	char pathbuf[] = "/dev/null";
 	char *path;
@@ -199,7 +199,7 @@ CHERIBSDTEST(test_cheriabi_open_bad_tag, "Path with tag bit missing")
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_cheriabi_open_bad_perm,
+CHERIBSDTEST(cheriabi_open_bad_perm,
     "Path with CHERI_PERM_LOAD permission missing")
 {
 	char pathbuf[] = "/dev/null";
@@ -218,7 +218,7 @@ CHERIBSDTEST(test_cheriabi_open_bad_perm,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_cheriabi_open_sealed, "Sealed path")
+CHERIBSDTEST(cheriabi_open_sealed, "Sealed path")
 {
 	char *path, *sealed_path;
 	void *sealer;
