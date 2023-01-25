@@ -56,6 +56,12 @@ __FBSDID("$FreeBSD$");
 
 struct hwt_softc hwt_sc;
 
+int
+hwt_register(void)
+{
+
+	return (0);
+}
 
 static int
 hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
@@ -102,6 +108,8 @@ hwt_load(void)
 	dprintf("%s\n", __func__);
 
 	mtx_init(&sc->mtx, "HWT driver", NULL, MTX_DEF);
+
+	TAILQ_INIT(&sc->hwt_devices);
 
 	make_dev_args_init(&args);
 	args.mda_devsw = &hwt_cdevsw;
