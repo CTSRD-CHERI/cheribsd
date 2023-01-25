@@ -41,7 +41,7 @@
 
 #include "cheribsdtest.h"
 
-CHERIBSDTEST(test_cheriabi_libc_memchr,
+CHERIBSDTEST(cheriabi_libc_memchr,
     "Check that memchr() works as required")
 {
 	_Alignas(16) char string[] = "0123456789abcde";
@@ -68,7 +68,7 @@ CHERIBSDTEST(test_cheriabi_libc_memchr,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_cheriabi_libc_strchr,
+CHERIBSDTEST(cheriabi_libc_strchr,
     "Check that strchr() works as required")
 {
 	_Alignas(16) char string[] = "0123456789abcdefghij";
@@ -91,7 +91,7 @@ CHERIBSDTEST(test_cheriabi_libc_strchr,
 }
 
 
-CHERIBSDTEST(test_cheriabi_libc_strchrnul,
+CHERIBSDTEST(cheriabi_libc_strchrnul,
     "Check that strchrnul() works as required")
 {
 	_Alignas(16) char string[] = "0123456789abcdefghij";

@@ -50,7 +50,7 @@
 
 #define	STR_VAL	"123"
 
-CHERIBSDTEST(test_store_local_allowed,
+CHERIBSDTEST(store_local_allowed,
     "Checks local capabilities can be stored via default capabilities")
 {
 	char str[] = STR_VAL;
@@ -74,7 +74,7 @@ CHERIBSDTEST(test_store_local_allowed,
 	cheribsdtest_success();
 }
 
-CHERIBSDTEST(test_store_local_disallowed,
+CHERIBSDTEST(store_local_disallowed,
     "Checks local capabilities can not be stored via non-store-local capabilities",
     .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_SI_CODE | CT_FLAG_SI_TRAPNO,
     .ct_signum = SIGPROT,

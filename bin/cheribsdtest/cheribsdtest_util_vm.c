@@ -82,6 +82,8 @@ find_address_space_gap(size_t len, size_t align)
 	for (u_int i = 1; i < vmcnt; i++) {
 		ptraddr_t aligned_start = __align_up(kivp[i-1].kve_end, align);
 		ptraddr_t end = kivp[i].kve_start;
+		if (aligned_start > end)
+			continue;
 		if (end - aligned_start >= len) {
 			addr = aligned_start;
 			break;

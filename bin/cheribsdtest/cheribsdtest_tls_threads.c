@@ -110,7 +110,7 @@ test_tls_threads_get_vars(void *arg __unused)
 	return NULL;
 }
 
-CHERIBSDTEST(test_tls_threads, "Test TLS across threads")
+CHERIBSDTEST(tls_threads, "Test TLS across threads")
 {
 	pthread_t thread;
 	int error;
