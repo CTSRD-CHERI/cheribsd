@@ -126,7 +126,7 @@ struct ucred;
     ((void *)(uintptr_t)(ptr) == NULL ? NULL :				\
      ((vm_offset_t)(ptr) < 4096 ||					\
       (vm_offset_t)(ptr) > VM_MAXUSER_ADDRESS) ?			\
-	__builtin_cheri_address_set(NULL, (ptraddr_t)(ptr)) :		\
+	(void * __capability)(uintcap_t)(ptraddr_t)(ptr) :		\
 	(is_offset) ?							\
 	__builtin_cheri_offset_set((cap), (ptraddr_t)(ptr)) :		\
 	__builtin_cheri_address_set((cap), (ptraddr_t)(ptr)))
