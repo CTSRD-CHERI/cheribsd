@@ -591,8 +591,8 @@ newchunk_nolongjmp(compiler_state_t *cstate, size_t n)
 	size_t size;
 
 #ifndef __NetBSD__
-	/* XXX Round up to nearest long. */
-	n = (n + sizeof(long) - 1) & ~(sizeof(long) - 1);
+	/* XXX Round up to nearest long or capability size. */
+	n = (n + MAX(sizeof(void *), sizeof(long)) - 1) & ~(MAX(sizeof(void *), sizeof(long)) - 1);
 #else
 	/* XXX Round up to structure boundary. */
 	n = ALIGN(n);
