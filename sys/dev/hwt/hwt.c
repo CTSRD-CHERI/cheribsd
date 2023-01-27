@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/ioccom.h>
 #include <sys/conf.h>
+#include <sys/proc.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/module.h>
@@ -54,6 +55,26 @@ __FBSDID("$FreeBSD$");
 #define	dprintf(fmt, ...)
 #endif
 
+struct hwt_proc {
+	struct proc		*p;
+	LIST_ENTRY(hwt_proc)	next;
+};
+
+#define	HWT_PROCHASH_SIZE	1024
+
+struct mtx hwt_prochash_mtx;
+static u_long hwt_prochashmask;
+static LIST_HEAD(hwt_prochash, hwt_proc)	*hwt_prochash;
+
+/*
+ * Hash function.  Discard the lower 2 bits of the pointer since
+ * these are always zero for our uses.  The hash multiplier is
+ * round((2^LONG_BIT) * ((sqrt(5)-1)/2)).
+ */
+
+#define	_HWT_HM	11400714819323198486u	/* hash multiplier */
+#define	HWT_HASH_PTR(P, M)	((((unsigned long) (P) >> 2) * _HWT_HM) & (M))
+
 struct hwt_softc hwt_sc;
 
 int
@@ -68,7 +89,12 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
 {
 	//struct hwt_softc *sc;
+	struct hwt_attach *a;
+	struct proc *p;
 	int error;
+	int hindex;
+	struct hwt_prochash *hph;
+	struct hwt_proc *hp, *hpnew;
 	int len;
 
 	error = 0;
@@ -82,6 +108,32 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 	switch (cmd) {
 	case HWT_IOC_ATTACH:
+		a = (void *)addr;
+
+		dprintf("%s: attach, pid %d\n", __func__, a->pid);
+
+		p = pfind(a->pid);
+		dprintf("%s: proc %p\n", __func__, p);
+
+		hindex = HWT_HASH_PTR(p, hwt_prochashmask);
+		hph = &hwt_prochash[hindex];
+
+		hpnew = malloc(sizeof(struct hwt_proc), M_HWT,
+		    M_WAITOK | M_ZERO);
+
+		mtx_lock_spin(&hwt_prochash_mtx);
+		LIST_FOREACH(hp, hph, next) {
+			if (hp->p == p) {
+				printf("%s: proc already in hash\n", __func__);
+				break;
+			}
+		}
+
+		hpnew->p = p;
+		LIST_INSERT_HEAD(hph, hpnew, next);
+		mtx_unlock_spin(&hwt_prochash_mtx);
+
+		PROC_UNLOCK(p);
 		break;
 	default:
 		break;
@@ -131,6 +183,9 @@ hwt_load(void)
 	error = make_dev_s(&args, &sc->hwt_cdev, "hwt");
 	if (error != 0)
 		return (error);
+
+	hwt_prochash = hashinit(HWT_PROCHASH_SIZE, M_HWT, &hwt_prochashmask);
+        mtx_init(&hwt_prochash_mtx, "hwt-proc-hash", "hwt-leaf", MTX_SPIN);
 
 	return (0);
 }

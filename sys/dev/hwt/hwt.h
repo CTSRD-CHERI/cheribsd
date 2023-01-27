@@ -39,7 +39,7 @@
 	_IOW(HWT_MAGIC, 0x00, struct hwt_attach)
 
 struct hwt_attach {
-	uint64_t	src;
+	pid_t		pid;
 } __packed;
 
 #endif /* !_DEV_HWT_HWT_H_ */

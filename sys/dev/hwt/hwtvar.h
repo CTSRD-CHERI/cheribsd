@@ -39,6 +39,10 @@ static MALLOC_DEFINE(M_HWT, "hwt", "Hardware Trace");
 #define	HWT_UNLOCK(sc)			mtx_unlock(&(sc)->mtx)
 #define	HWT_ASSERT_LOCKED(sc)		mtx_assert(&(sc)->mtx, MA_OWNED)
 
+struct hwt_info {
+	int test;
+};
+
 struct hwt_device {
 	const char *name;
 };
