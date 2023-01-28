@@ -877,6 +877,7 @@ _linuxkpi_wlan=	linuxkpi_wlan
 # crypto just because we haven't ported the assembly).
 .if ${MACHINE_CPU:Mcheri}
 BROKEN_MODULES+=armv8crypto
+BROKEN_MODULES+=dpaa2
 BROKEN_MODULES+=ena
 BROKEN_MODULES+=linprocfs linux64 linux_common
 BROKEN_MODULES+=mlx4 mlx4en mlx5 mlx5en

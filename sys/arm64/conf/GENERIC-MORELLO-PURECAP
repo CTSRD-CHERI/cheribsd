@@ -31,3 +31,5 @@ options 	CHERI_PURECAP_KERNEL
 nooptions 	PERTHREAD_SSP		# Not relevant in purecap
 
 nodevice	armv8crypto	# No purecap assembly
+
+nodevice	dpaa2		# Stores pointers in rman_res_t
