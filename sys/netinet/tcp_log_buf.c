@@ -2049,10 +2049,12 @@ tcp_log_getlogbuf(struct sockopt *sopt, struct tcpcb *tp)
 		INP_WUNLOCK(inp);
 	} else {
 		/* Sanity check entries */
-		KASSERT(((intptr_t)out_entry - (intptr_t)sopt->sopt_val) ==
+		KASSERT(((char * __capability)out_entry -
+		    (char * __capability)sopt->sopt_val) ==
 		    outsize, ("%s: Actual output size (%zu) != "
-		    "calculated output size (%zu)", __func__,
-		    (size_t)((intptr_t)out_entry - (intptr_t)sopt->sopt_val),
+			"calculated output size (%zu)", __func__,
+			(size_t)((char * __capability)out_entry -
+			    (char * __capability)sopt->sopt_val),
 		    outsize));
 
 		/* Free the entries we just copied out. */
@@ -2062,8 +2064,8 @@ tcp_log_getlogbuf(struct sockopt *sopt, struct tcpcb *tp)
 		}
 	}
 
-	sopt->sopt_valsize = (size_t)((intptr_t)out_entry -
-	    (intptr_t)sopt->sopt_val);
+	sopt->sopt_valsize = (size_t)((char * __capability)out_entry -
+	    (char * __capability)sopt->sopt_val);
 	return (error);
 }
 
@@ -2129,7 +2131,8 @@ tcp_log_expandlogbuf(struct tcp_log_dev_queue *param)
 	memset(hdr, 0, sizeof(struct tcp_log_header));
 	hdr->tlh_version = TCP_LOG_BUF_VER;
 	hdr->tlh_type = TCP_LOG_DEV_TYPE_BBR;
-	hdr->tlh_length = end - (uint8_t *)hdr;
+	hdr->tlh_length = end - (__cheri_tocap uint8_t * __capability)
+	    (uint8_t *)hdr;
 	hdr->tlh_ie = entry->tldl_ie;
 	hdr->tlh_af = entry->tldl_af;
 	getboottime(&hdr->tlh_offset);
