@@ -76,7 +76,11 @@ static __always_inline __unused void put_unaligned_le64(u64 s, u8 *d)
 static noinline void memzero_explicit(void *s, size_t count)
 {
 	memset(s, 0, count);
+#ifdef __CHERI_PURE_CAPABILITY__
+	asm volatile("": :"C"(s) : "memory");
+#else
 	asm volatile("": :"r"(s) : "memory");
+#endif
 }
 
 #ifdef __SIZEOF_INT128__
