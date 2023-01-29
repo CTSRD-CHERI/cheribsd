@@ -357,7 +357,7 @@ static struct wg_packet *wg_queue_dequeue_serial(struct wg_queue *);
 static struct wg_packet *wg_queue_dequeue_parallel(struct wg_queue *);
 static bool wg_input(struct mbuf *, int, struct inpcb *, const struct sockaddr *, void *);
 static void wg_peer_send_staged(struct wg_peer *);
-static int wg_clone_create(struct if_clone *, int, caddr_t);
+static int wg_clone_create(struct if_clone *, int, void * __capability);
 static void wg_qflush(struct ifnet *);
 static inline int determine_af_and_pullup(struct mbuf **m, sa_family_t *af);
 static int wg_xmit(struct ifnet *, struct mbuf *, sa_family_t, uint32_t);
@@ -718,7 +718,7 @@ static int wg_socket_set_sockopt(struct socket *so4, struct socket *so6, int nam
 		.sopt_dir = SOPT_SET,
 		.sopt_level = SOL_SOCKET,
 		.sopt_name = name,
-		.sopt_val = val,
+		.sopt_val = PTR2CAP(val),
 		.sopt_valsize = len
 	};
 
@@ -2714,7 +2714,7 @@ wg_down(struct wg_softc *sc)
 }
 
 static int
-wg_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+wg_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	struct wg_softc *sc;
 	struct ifnet *ifp;

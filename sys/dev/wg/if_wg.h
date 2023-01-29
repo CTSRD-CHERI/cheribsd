@@ -25,7 +25,7 @@
 
 struct wg_data_io {
 	char	 wgd_name[IFNAMSIZ];
-	void	*wgd_data;
+	void	* __kerncap wgd_data;
 	size_t	 wgd_size;
 };
 
