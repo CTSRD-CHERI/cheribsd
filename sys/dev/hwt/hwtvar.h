@@ -59,6 +59,8 @@ struct hwt_softc {
 };
 
 int hwt_register(void);
+void hwt_switch_in(struct thread *td);
+void hwt_switch_out(struct thread *td);
 
 #endif /* !LOCORE */
 

@@ -84,6 +84,42 @@ hwt_register(void)
 	return (0);
 }
 
+static struct hwt_proc *
+hwt_lookup(struct proc *p)
+{
+	struct hwt_prochash *hph;
+	struct hwt_proc *hp;
+	int hindex;
+
+	hindex = HWT_HASH_PTR(p, hwt_prochashmask);
+	hph = &hwt_prochash[hindex];
+
+	mtx_lock_spin(&hwt_prochash_mtx);
+	LIST_FOREACH(hp, hph, next) {
+		if (hp->p == p) {
+			mtx_unlock_spin(&hwt_prochash_mtx);
+			return (hp);
+		}
+	}
+
+	mtx_unlock_spin(&hwt_prochash_mtx);
+	return (NULL);
+}
+
+static void
+hwt_insert(struct hwt_proc *hp)
+{
+	struct hwt_prochash *hph;
+	int hindex;
+
+	hindex = HWT_HASH_PTR(hp->p, hwt_prochashmask);
+	hph = &hwt_prochash[hindex];
+
+	mtx_lock_spin(&hwt_prochash_mtx);
+	LIST_INSERT_HEAD(hph, hp, next);
+	mtx_unlock_spin(&hwt_prochash_mtx);
+}
+
 static int
 hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
@@ -92,8 +128,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct hwt_attach *a;
 	struct proc *p;
 	int error;
-	int hindex;
-	struct hwt_prochash *hph;
 	struct hwt_proc *hp, *hpnew;
 	int len;
 
@@ -112,26 +146,24 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		dprintf("%s: attach, pid %d\n", __func__, a->pid);
 
-		p = pfind(a->pid);
-		dprintf("%s: proc %p\n", __func__, p);
-
-		hindex = HWT_HASH_PTR(p, hwt_prochashmask);
-		hph = &hwt_prochash[hindex];
-
 		hpnew = malloc(sizeof(struct hwt_proc), M_HWT,
 		    M_WAITOK | M_ZERO);
 
-		mtx_lock_spin(&hwt_prochash_mtx);
-		LIST_FOREACH(hp, hph, next) {
-			if (hp->p == p) {
-				printf("%s: proc already in hash\n", __func__);
-				break;
-			}
+		p = pfind(a->pid);
+		if (p == NULL)
+			break;
+
+		dprintf("%s: proc %p\n", __func__, p);
+
+		hp = hwt_lookup(p);
+		if (hp) {
+			free(hpnew, M_HWT);
+			break;
 		}
 
+		p->p_flag2 |= P2_HWT;
 		hpnew->p = p;
-		LIST_INSERT_HEAD(hph, hpnew, next);
-		mtx_unlock_spin(&hwt_prochash_mtx);
+		hwt_insert(hpnew);
 
 		PROC_UNLOCK(p);
 		break;
@@ -140,6 +172,38 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	};
 
 	return (error);
+}
+
+void
+hwt_switch_in(struct thread *td)
+{
+	struct hwt_proc *hp;
+	struct proc *p;
+
+	p = td->td_proc;
+
+	if ((p->p_flag2 & P2_HWT) == 0)
+		return;
+
+	hp = hwt_lookup(p);
+
+	dprintf("%s: hp %p\n", __func__, hp);
+}
+
+void
+hwt_switch_out(struct thread *td)
+{
+	struct hwt_proc *hp;
+	struct proc *p;
+
+	p = td->td_proc;
+
+	if ((p->p_flag2 & P2_HWT) == 0)
+		return;
+
+	hp = hwt_lookup(p);
+
+	dprintf("%s: hp %p\n", __func__, hp);
 }
 
 static int
