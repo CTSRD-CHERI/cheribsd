@@ -103,7 +103,7 @@ bnxt_mgmt_process_hwrm(struct cdev *dev, u_long cmd, caddr_t data,
 	struct bnxt_mgmt_req mgmt_req = {};
 	struct bnxt_mgmt_fw_msg msg_temp, *msg, *msg2 = NULL;
 	struct iflib_dma_info dma_data = {};
-	void *user_ptr, *req, *resp;
+	void * __capability user_ptr, *req, *resp;
 	int ret = 0;
 	uint16_t num_ind = 0;
 
@@ -121,7 +121,7 @@ bnxt_mgmt_process_hwrm(struct cdev *dev, u_long cmd, caddr_t data,
 		return -ENODEV;
 	}
 
-	if (copyin((void*)mgmt_req.req.hreq, &msg_temp, sizeof(msg_temp))) {
+	if (copyin(mgmt_req.req.hptr, &msg_temp, sizeof(msg_temp))) {
 		device_printf(softc->dev, "%s:%d Failed to copy data from user\n",
 			      __FUNCTION__, __LINE__);
 		return -EFAULT;
@@ -155,7 +155,7 @@ bnxt_mgmt_process_hwrm(struct cdev *dev, u_long cmd, caddr_t data,
 		goto end;
 	}
 
-	if (copyin((void *)msg_temp.usr_req, req, msg_temp.len_req)) {
+	if (copyin((void * __capability)msg_temp.usr_req, req, msg_temp.len_req)) {
 		device_printf(softc->dev, "%s:%d Failed to copy data from user\n",
 			      __FUNCTION__, __LINE__);
 		ret = -EFAULT;
@@ -180,7 +180,7 @@ bnxt_mgmt_process_hwrm(struct cdev *dev, u_long cmd, caddr_t data,
 			goto end;
 		}
 
-		if (copyin((void *)mgmt_req.req.hreq, msg2, size)) { 
+		if (copyin(mgmt_req.req.hptr, msg2, size)) { 
 			device_printf(softc->dev, "%s:%d Failed to copy"
 				      "data from user\n", __FUNCTION__, __LINE__);
 			ret = -EFAULT;
@@ -199,7 +199,7 @@ bnxt_mgmt_process_hwrm(struct cdev *dev, u_long cmd, caddr_t data,
 		}
 
 		if (!(msg->dma[0].read_or_write)) {
-			if (copyin((void *)msg->dma[0].data, 
+			if (copyin((void * __capability)msg->dma[0].data, 
 				   dma_data.idi_vaddr, 
 				   msg->dma[0].length)) {
 				device_printf(softc->dev, "%s:%d Failed to copy"
@@ -209,7 +209,7 @@ bnxt_mgmt_process_hwrm(struct cdev *dev, u_long cmd, caddr_t data,
 				goto end;
 			}
 		}
-		dma_ptr = (void *) ((uint64_t) req + msg->dma[0].offset);
+		dma_ptr = ((char *)req + msg->dma[0].offset);
 		dmap = dma_ptr;
 		*dmap = htole64(dma_data.idi_paddr);
 	}
@@ -221,7 +221,7 @@ bnxt_mgmt_process_hwrm(struct cdev *dev, u_long cmd, caddr_t data,
 	if (num_ind) {
 		if ((msg->dma[0].read_or_write)) {
 			if (copyout(dma_data.idi_vaddr, 
-				    (void *)msg->dma[0].data, 
+				    (void * __capability)msg->dma[0].data, 
 				    msg->dma[0].length)) {
 				device_printf(softc->dev, "%s:%d Failed to copy data"
 					      "to user\n", __FUNCTION__, __LINE__);
@@ -231,7 +231,7 @@ bnxt_mgmt_process_hwrm(struct cdev *dev, u_long cmd, caddr_t data,
 		}
 	}
 	
-	if (copyout(resp, (void *) msg->usr_resp, msg->len_resp)) {
+	if (copyout(resp, (void * __capability)msg->usr_resp, msg->len_resp)) {
 		device_printf(softc->dev, "%s:%d Failed to copy response to user\n",
 			      __FUNCTION__, __LINE__);
 		ret = -EFAULT;
@@ -256,7 +256,7 @@ bnxt_mgmt_get_dev_info(struct cdev *dev, u_long cmd, caddr_t data,
 {
 	struct bnxt_softc *softc = NULL;
 	struct bnxt_dev_info dev_info;
-	void *user_ptr;
+	void * __capability user_ptr;
 	uint32_t dev_sn_lo, dev_sn_hi;
 	int dev_sn_offset = 0;
 	char dsn[16];
