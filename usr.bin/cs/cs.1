@@ -43,11 +43,10 @@
 .Sh DESCRIPTION
 The
 .Nm
-utility is used to provide remote syscall service
-to its descendants.
-It spawns a child process, adjusts the
-.Ev LD_PRELOAD
-variable to make descendant processes use a wrapper which replaces
+utility is used to transparently force its descendant into
+.Xr capsicum 4
+capability mode, and to provide it with remote syscall service.
+It spawns a child process, makes it preload a wrapper which replaces
 every system call that would otherwise be denied by the
 .Xr capsicum 4
 framework with a
@@ -59,16 +58,25 @@ service, and finally executes
 with the sealed capability to
 .Nm
 service inserted into its inherited capability vector.
+In the child process, the preloaded wrapper then calls
+.Xr cap_enter 2
+in its constructor, making the process enter capability mode.
 .Pp
 The following options are available:
-.Bl -tag -width ".Fl s time"
+.Bl -tag -width ".Fl r Ar path"
 .It Fl k
 Use
 .Xr coaccept_slow 2
 instead of
 .Xr coaccept 2 .
-.It Fl p
-Specify the allowed IP port number.
+.It Fl r Ar path
+Make the
+.Ar path
+readable to the child process.
+.It Fl w Ar path
+Make the
+.Ar path
+readable and writable to the child process.
 .It Fl v
 Be verbose.
 .El
@@ -80,25 +88,53 @@ services that require file descriptor passing using
 .Xr capfromfd 2
 and
 .Xr captofd 2 .
-It does not provide proper security at the moment, because while the
-.Ar command
-is eventually being run in
-.Xr capsicum 4
-mode, it is only entered by an LD_PRELOADed constructor and can be easily
-disabled.
-To make it properly secure, the binaries would need to be started in
-.Xr capsicum 4
-mode outright.
-This would probably involve moving the stubs directly into libc and rtld.
 .Sh EXIT STATUS
 The
 .Nm
 utility exits 0 on success, and >0 if an error occurs.
+.Sh EXAMPLES
+Run
+.Xr capv 1
+with access only to
+.Pa /usr :
+.Dl cs -r /usr capv -v
+.Pp
 .Sh SEE ALSO
 .Xr capv 1 ,
 .Xr coaccept 2 ,
 .Xr capsicum 4 ,
 .Xr capv 7
+.Sh BUGS
+.Nm
+cannot protect against malicious binaries - it only protects against
+otherwise trustworthy binaries becoming compromised by malicious data.
+While
+.Ar command
+does eventually end up running in
+.Xr capsicum 4
+mode, it is only entered from an LD_PRELOADed constructor, just before starting the
+.Fn main
+function, and can be easily
+disabled by a malicious executable.
+To make it protect against malicious binaries, they would need to be started in
+.Xr capsicum 4
+mode outright.
+This would require implementing syscall remoting also for
+.Xr rtld 1 ,
+precluding the use of LD_PRELOAD.
+It would probably require moving the stubs directly into libc and rtld.
+.Pp
+Because after
+.Xr fork 2
+the child process is running in a fresh new address space
+and thus unable to communicate with colocated services,
+and because
+.Xr vfork 2
+is not currently allowed in
+.Xr capsicum 4
+capability mode, it is not possible for
+.Nm
+to support more than a single client process at a time.
 .Sh HISTORY
 The
 .Nm

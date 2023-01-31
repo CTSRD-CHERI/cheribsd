@@ -43,6 +43,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/auxv.h>
 #include <sys/capsicum.h>
 #include <sys/param.h>
+#include <sys/queue.h>
+#include <sys/sbuf.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -59,13 +61,20 @@ __FBSDID("$FreeBSD$");
 #include <sysdecode.h>
 #include <unistd.h>
 
+struct pathname {
+	LIST_ENTRY(pathname)	p_link;
+	int			p_fd;
+	char			*p_path;
+};
+
+LIST_HEAD(, pathname) pathnames = LIST_HEAD_INITIALIZER(pathnames);
 static bool kflag = false, vflag = false;
 
 static void
 usage(void)
 {
 
-	fprintf(stderr, "usage: cs [-kv] command [args ...]\n");
+	fprintf(stderr, "usage: cs [-kv] [-r path] [-w path] command [args ...]\n");
 	exit(0);
 }
 
@@ -79,13 +88,25 @@ sigchld_handler(int dummy __unused)
 static void
 answerback(capv_answerback_t *out)
 {
+	struct sbuf sb;
+	const struct pathname *r;
+	int error;
 
 	memset(out, 0, sizeof(*out));
 	out->len = sizeof(*out);
 	out->op = 0;
-	snprintf(out->answerback, sizeof(out->answerback),
-	    "cs(1), pid %d%s",
-	    getpid(), kflag ? " (slow)" : "");
+	sbuf_new(&sb, out->answerback, sizeof(out->answerback), SBUF_FIXEDLEN);
+
+	sbuf_printf(&sb, "cs");
+	LIST_FOREACH(r, &pathnames, p_link)
+		sbuf_printf(&sb, " -r %s", r->p_path);
+	sbuf_printf(&sb, ", pid %d", getpid());
+	if (kflag)
+		sbuf_printf(&sb, " (slow)");
+
+	error = sbuf_finish(&sb);
+	if (error != 0)
+		err(1, "sbuf_finish");
 }
 
 static void
@@ -99,6 +120,52 @@ capvreturn(capv_syscall_return_t *out, int op, int error, int errno_, uintcap_t 
 	out->fdcap = fdcap;
 }
 
+static void
+add_pathname(const char *path)
+{
+	struct pathname *r;
+
+	r = calloc(1, sizeof(*r));
+	if (r == NULL)
+		err(1, "calloc");
+	r->p_path = realpath(path, NULL);
+	if (r->p_path == NULL)
+		err(1, "realpath %s", path);
+	r->p_fd = open(r->p_path, O_RDONLY);
+	if (r->p_fd < 0)
+		err(1, "%s", r->p_path);
+	LIST_INSERT_HEAD(&pathnames, r, p_link);
+}
+
+static int
+handle_pathname(const char *path)
+{
+	const struct pathname *r;
+	char *resolved;
+
+	/*
+	 * XXX: If this function makes you feel uncomfortable, that's a good sign :)
+	 * This needs to be replaced by returning p_fd to the calling process,
+	 * to pass as fd to whateverat(2) on their side instead of doing it here...
+	 * but that has its own problems.
+	 */
+	resolved = realpath(path, NULL);
+	if (resolved == NULL) {
+		if (vflag)
+			printf("%s: cannot canonicalize %s\n", __func__, path);
+		return (EPERM);
+	}
+
+	LIST_FOREACH(r, &pathnames, p_link) {
+		if (vflag)
+			printf("%s: comparing %s and %s\n", __func__, resolved, r->p_path);
+		if (strncmp(resolved, r->p_path, strlen(r->p_path)) == 0)
+			return (0);
+	}
+
+	return (EPERM);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -107,22 +174,28 @@ main(int argc, char **argv)
 		capv_answerback_t answerback;
 		capv_syscall_return_t syscall;
 	} outbuf;
-	struct sigaction sa;
 	capv_syscall_return_t *out = &outbuf.syscall;
+	struct sigaction sa;
 	void * __capability public;
 	void * __capability cookie;
 	void * __capability *capv = NULL;
 	char *ld_preload;
 	char *tmp = NULL;
+	const char *path;
 	uintcap_t fdcap;
 	ssize_t received;
 	pid_t pid;
 	int capc, ch, error, _error;
 
-	while ((ch = getopt(argc, argv, "kv")) != -1) {
+	LIST_INIT(&pathnames);
+
+	while ((ch = getopt(argc, argv, "kr:w:v")) != -1) {
 		switch (ch) {
 		case 'k':
 			kflag = true;
+			break;
+		case 'r':
+			add_pathname(optarg);
 			break;
 		case 'v':
 			vflag = true;
@@ -281,6 +354,17 @@ main(int argc, char **argv)
 		case SYS_utimensat:
 		case SYS_openat:
 		case SYS_fchdir:
+			/*
+			 * Syscalls that take an fd for their first argument, and a path
+			 * for the second.
+			 */
+			if ((size_t)received != sizeof(in)) {
+				warnx("size mismatch: received %zd, expected %zd",
+				    (size_t)received, sizeof(in));
+				capvreturn(out, 0, -1, ENOMSG, 0);
+				goto respond;
+			}
+
 			if (in.arg[0] != (uintcap_t)AT_FDCWD) {
 				error = captofd((void *)in.arg[0], (int *)&in.arg[0]);
 				if (error != 0) {
@@ -289,17 +373,43 @@ main(int argc, char **argv)
 					goto respond;
 				}
 			}
+
+			path = (const char *)in.arg[1];
+			error = handle_pathname(path);
+			if (error != 0) {
+				if (vflag)
+					warnx("refusing to %s %s", sysdecode_syscallname(SYSDECODE_ABI_FREEBSD, in.op), path);
+				capvreturn(out, -in.op, -1, error, 0);
+				goto respond;
+			}
 			break;
 		case SYS_mkdir:
 		case SYS_rmdir:
 		case SYS_pathconf:
 		case SYS_lpathconf:
 		case SYS___getcwd:
-			// nothing special to do here.
+			/*
+			 * Syscalls that take a path as their first argument.
+			 */
+			if ((size_t)received != sizeof(in)) {
+				warnx("size mismatch: received %zd, expected %zd",
+				    (size_t)received, sizeof(in));
+				capvreturn(out, 0, -1, ENOMSG, 0);
+				goto respond;
+			}
+
+			path = (const char *)in.arg[0];
+			error = handle_pathname(path);
+			if (error != 0) {
+				if (vflag)
+					warnx("refusing to %s %s", sysdecode_syscallname(SYSDECODE_ABI_FREEBSD, in.op), path);
+				capvreturn(out, -in.op, -1, error, 0);
+				goto respond;
+			}
 			break;
 		default:
 			warnx("unknown op %d<%s>", in.op, sysdecode_syscallname(SYSDECODE_ABI_FREEBSD, in.op));
-			capvreturn(out, -in.op, -1, ENOMSG, 0);
+			capvreturn(out, -in.op, -1, ENOSYS, 0);
 			goto respond;
 		}
 

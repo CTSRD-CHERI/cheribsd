@@ -4,7 +4,7 @@
 
 PROG=	cs
 SRCS=	cs.c
-LIBADD=	sysdecode
+LIBADD=	sbuf sysdecode
 
 WARNS?=	5
 
