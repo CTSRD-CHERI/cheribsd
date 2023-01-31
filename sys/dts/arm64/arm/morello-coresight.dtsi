@@ -193,6 +193,8 @@
 	etr@400120000 {
 		compatible = "arm,coresight-tmc", "arm,primecell";
 		reg = <0x4 0x00120000 0 0x1000>;
+		interrupts = <GIC_SPI 39 IRQ_TYPE_EDGE_RISING>;
+		interrupt-names = "etrbufint";
 
 		arm,scatter-gather;
 		in-ports {

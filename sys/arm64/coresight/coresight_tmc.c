@@ -53,6 +53,7 @@
 
 static struct resource_spec tmc_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
+	{ SYS_RES_IRQ,		0,	RF_ACTIVE | RF_OPTIONAL },
 	{ -1, 0 }
 };
 
@@ -64,19 +65,19 @@ tmc_start(device_t dev)
 
 	sc = device_get_softc(dev);
 
-	if (bus_read_4(sc->res, TMC_CTL) & CTL_TRACECAPTEN)
+	if (bus_read_4(sc->res[0], TMC_CTL) & CTL_TRACECAPTEN)
 		return (-1);
 
 	/* Enable TMC */
-	bus_write_4(sc->res, TMC_CTL, CTL_TRACECAPTEN);
-	if ((bus_read_4(sc->res, TMC_CTL) & CTL_TRACECAPTEN) == 0)
+	bus_write_4(sc->res[0], TMC_CTL, CTL_TRACECAPTEN);
+	if ((bus_read_4(sc->res[0], TMC_CTL) & CTL_TRACECAPTEN) == 0)
 		panic("Not enabled\n");
 
 	do {
-		reg = bus_read_4(sc->res, TMC_STS);
+		reg = bus_read_4(sc->res[0], TMC_STS);
 	} while ((reg & STS_TMCREADY) == 1);
 
-	if ((bus_read_4(sc->res, TMC_CTL) & CTL_TRACECAPTEN) == 0)
+	if ((bus_read_4(sc->res[0], TMC_CTL) & CTL_TRACECAPTEN) == 0)
 		panic("Not enabled\n");
 
 	return (0);
@@ -90,12 +91,12 @@ tmc_stop(device_t dev)
 
 	sc = device_get_softc(dev);
 
-	reg = bus_read_4(sc->res, TMC_CTL);
+	reg = bus_read_4(sc->res[0], TMC_CTL);
 	reg &= ~CTL_TRACECAPTEN;
-	bus_write_4(sc->res, TMC_CTL, reg);
+	bus_write_4(sc->res[0], TMC_CTL, reg);
 
 	do {
-		reg = bus_read_4(sc->res, TMC_STS);
+		reg = bus_read_4(sc->res[0], TMC_STS);
 	} while ((reg & STS_TMCREADY) == 1);
 
 	return (0);
@@ -110,23 +111,23 @@ tmc_configure_etf(device_t dev)
 	sc = device_get_softc(dev);
 
 	do {
-		reg = bus_read_4(sc->res, TMC_STS);
+		reg = bus_read_4(sc->res[0], TMC_STS);
 	} while ((reg & STS_TMCREADY) == 0);
 
-	bus_write_4(sc->res, TMC_MODE, MODE_HW_FIFO);
-	bus_write_4(sc->res, TMC_FFCR, FFCR_EN_FMT | FFCR_EN_TI);
+	bus_write_4(sc->res[0], TMC_MODE, MODE_HW_FIFO);
+	bus_write_4(sc->res[0], TMC_FFCR, FFCR_EN_FMT | FFCR_EN_TI);
 
 	tmc_start(dev);
 
 	dprintf("%s: STS %x, CTL %x, RSZ %x, RRP %x, RWP %x, "
 	    "LBUFLEVEL %x, CBUFLEVEL %x\n", __func__,
-	    bus_read_4(sc->res, TMC_STS),
-	    bus_read_4(sc->res, TMC_CTL),
-	    bus_read_4(sc->res, TMC_RSZ),
-	    bus_read_4(sc->res, TMC_RRP),
-	    bus_read_4(sc->res, TMC_RWP),
-	    bus_read_4(sc->res, TMC_CBUFLEVEL),
-	    bus_read_4(sc->res, TMC_LBUFLEVEL));
+	    bus_read_4(sc->res[0], TMC_STS),
+	    bus_read_4(sc->res[0], TMC_CTL),
+	    bus_read_4(sc->res[0], TMC_RSZ),
+	    bus_read_4(sc->res[0], TMC_RRP),
+	    bus_read_4(sc->res[0], TMC_RWP),
+	    bus_read_4(sc->res[0], TMC_CBUFLEVEL),
+	    bus_read_4(sc->res[0], TMC_LBUFLEVEL));
 
 	return (0);
 }
@@ -143,11 +144,11 @@ tmc_configure_etr(device_t dev, struct endpoint *endp,
 	tmc_stop(dev);
 
 	do {
-		reg = bus_read_4(sc->res, TMC_STS);
+		reg = bus_read_4(sc->res[0], TMC_STS);
 	} while ((reg & STS_TMCREADY) == 0);
 
 	/* Configure TMC */
-	bus_write_4(sc->res, TMC_MODE, MODE_CIRCULAR_BUFFER);
+	bus_write_4(sc->res[0], TMC_MODE, MODE_CIRCULAR_BUFFER);
 
 	reg = AXICTL_PROT_CTRL_BIT1;
 	reg |= AXICTL_WRBURSTLEN_16;
@@ -158,24 +159,24 @@ tmc_configure_etr(device_t dev, struct endpoint *endp,
 	 */
 
 	reg |= AXICTL_AXCACHE_OS;
-	bus_write_4(sc->res, TMC_AXICTL, reg);
+	bus_write_4(sc->res[0], TMC_AXICTL, reg);
 
 	reg = FFCR_EN_FMT | FFCR_EN_TI | FFCR_FON_FLIN |
 	    FFCR_FON_TRIG_EVT | FFCR_TRIGON_TRIGIN;
-	bus_write_4(sc->res, TMC_FFCR, reg);
+	bus_write_4(sc->res[0], TMC_FFCR, reg);
 
-	bus_write_4(sc->res, TMC_TRG, 8);
+	bus_write_4(sc->res[0], TMC_TRG, 8);
 
-	bus_write_4(sc->res, TMC_DBALO, event->etr.low);
-	bus_write_4(sc->res, TMC_DBAHI, event->etr.high);
-	bus_write_4(sc->res, TMC_RSZ, event->etr.bufsize / 4);
+	bus_write_4(sc->res[0], TMC_DBALO, event->etr.low);
+	bus_write_4(sc->res[0], TMC_DBAHI, event->etr.high);
+	bus_write_4(sc->res[0], TMC_RSZ, event->etr.bufsize / 4);
 
-	bus_write_4(sc->res, TMC_RRP, event->etr.low);
-	bus_write_4(sc->res, TMC_RWP, event->etr.low);
+	bus_write_4(sc->res[0], TMC_RRP, event->etr.low);
+	bus_write_4(sc->res[0], TMC_RWP, event->etr.low);
 
-	reg = bus_read_4(sc->res, TMC_STS);
+	reg = bus_read_4(sc->res[0], TMC_STS);
 	reg &= ~STS_FULL;
-	bus_write_4(sc->res, TMC_STS, reg);
+	bus_write_4(sc->res[0], TMC_STS, reg);
 
 	tmc_start(dev);
 
@@ -191,12 +192,12 @@ tmc_init(device_t dev)
 	sc = device_get_softc(dev);
 
 	/* Unlock Coresight */
-	bus_write_4(sc->res, CORESIGHT_LAR, CORESIGHT_UNLOCK);
+	bus_write_4(sc->res[0], CORESIGHT_LAR, CORESIGHT_UNLOCK);
 
 	/* Unlock TMC */
-	bus_write_4(sc->res, TMC_LAR, CORESIGHT_UNLOCK);
+	bus_write_4(sc->res[0], TMC_LAR, CORESIGHT_UNLOCK);
 
-	reg = bus_read_4(sc->res, TMC_DEVID);
+	reg = bus_read_4(sc->res[0], TMC_DEVID);
 	reg &= DEVID_CONFIGTYPE_M;
 	switch (reg) {
 	case DEVID_CONFIGTYPE_ETR:
@@ -278,6 +279,13 @@ tmc_disable(device_t dev, struct endpoint *endp,
 	}
 }
 
+static void
+tmc_intr(void *arg)
+{
+
+	printf("%s\n", __func__);
+}
+
 static int
 tmc_read(device_t dev, struct endpoint *endp,
     struct coresight_event *event)
@@ -297,13 +305,13 @@ tmc_read(device_t dev, struct endpoint *endp,
 	if (sc->event != event)
 		return (0);
 
-	if (bus_read_4(sc->res, TMC_STS) & STS_FULL) {
+	if (bus_read_4(sc->res[0], TMC_STS) & STS_FULL) {
 		event->etr.offset = 0;
 		event->etr.cycle++;
 		tmc_stop(dev);
 		tmc_start(dev);
 	} else {
-		cur_ptr = bus_read_4(sc->res, TMC_RWP);
+		cur_ptr = bus_read_4(sc->res[0], TMC_RWP);
 		event->etr.offset = (cur_ptr - event->etr.low);
 	}
 
@@ -319,9 +327,19 @@ tmc_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 
-	if (bus_alloc_resources(dev, tmc_spec, &sc->res) != 0) {
+	if (bus_alloc_resources(dev, tmc_spec, sc->res) != 0) {
 		device_printf(dev, "cannot allocate resources for device\n");
 		return (ENXIO);
+	}
+
+	if (sc->res[1] != NULL) {
+		if (bus_setup_intr(dev, sc->res[1],
+		    INTR_TYPE_MISC | INTR_MPSAFE, NULL, tmc_intr, sc,
+		    &sc->intrhand)) {
+			bus_release_resources(dev, tmc_spec, sc->res);
+			device_printf(dev, "cannot setup interrupt handler\n");
+			return (ENXIO);
+		}
 	}
 
 	desc.pdata = sc->pdata;

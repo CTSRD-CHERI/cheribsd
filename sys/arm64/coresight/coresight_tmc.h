@@ -117,7 +117,7 @@
 DECLARE_CLASS(tmc_driver);
 
 struct tmc_softc {
-	struct resource			*res;
+	struct resource			*res[2];
 	device_t			dev;
 	uint64_t			cycle;
 	struct coresight_platform_data	*pdata;
@@ -128,6 +128,7 @@ struct tmc_softc {
 	uint32_t			nev;
 	struct coresight_event		*event;
 	boolean_t			etf_configured;
+	void				*intrhand;
 };
 
 int tmc_attach(device_t dev);
