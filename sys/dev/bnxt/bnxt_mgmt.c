@@ -121,7 +121,7 @@ bnxt_mgmt_process_hwrm(struct cdev *dev, u_long cmd, caddr_t data,
 		return -ENODEV;
 	}
 
-	if (copyin(mgmt_req.req.hptr, &msg_temp, sizeof(msg_temp))) {
+	if (copyin((void * __capability)mgmt_req.req.hreq, &msg_temp, sizeof(msg_temp))) {
 		device_printf(softc->dev, "%s:%d Failed to copy data from user\n",
 			      __FUNCTION__, __LINE__);
 		return -EFAULT;
@@ -180,7 +180,7 @@ bnxt_mgmt_process_hwrm(struct cdev *dev, u_long cmd, caddr_t data,
 			goto end;
 		}
 
-		if (copyin(mgmt_req.req.hptr, msg2, size)) { 
+		if (copyin((void * __capability)mgmt_req.req.hreq, msg2, size)) { 
 			device_printf(softc->dev, "%s:%d Failed to copy"
 				      "data from user\n", __FUNCTION__, __LINE__);
 			ret = -EFAULT;
