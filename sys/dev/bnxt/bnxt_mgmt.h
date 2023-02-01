@@ -78,12 +78,7 @@ struct bnxt_dev_info {
 } __packed;
 
 struct dma_info {
-#if __has_feature(capabilities) && \
-    (defined(__KERNEL) || defined(__CHERI_PURE_CAPABILITY__))
-	void * __capability data;
-#else
-        uint64_t data;
-#endif
+        kuint64cap_t data;
         uint32_t length;
         uint16_t offset;
         uint8_t read_or_write;
@@ -91,14 +86,8 @@ struct dma_info {
 };
 
 struct bnxt_mgmt_fw_msg {
-#if __has_feature(capabilities) && \
-    (defined(__KERNEL) || defined(__CHERI_PURE_CAPABILITY__))
-	void * __capability usr_req;
-	void * __capability usr_resp;
-#else
-        uint64_t usr_req;
-        uint64_t usr_resp;
-#endif
+        kuint64cap_t usr_req;
+        kuint64cap_t usr_resp;
         uint32_t len_req;
         uint32_t len_resp;
         uint32_t timeout;
@@ -131,8 +120,7 @@ struct bnxt_mgmt_req_hdr {
 struct bnxt_mgmt_req {
         struct bnxt_mgmt_req_hdr hdr;
         union {
-	    void * __kerncap hptr;
-            uint64_t hreq;
+            kuint64cap_t hreq;
         } req;
 };
 
