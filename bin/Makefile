@@ -38,6 +38,7 @@ SUBDIR= cat \
 	stty \
 	sync \
 	test \
+	timeout \
 	uuidgen
 
 # Small cheri programs
