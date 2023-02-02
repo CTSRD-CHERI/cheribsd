@@ -37,6 +37,14 @@
 #include <sys/module.h>
 #include <machine/bus.h>
 
+#include <vm/vm.h>
+#include <vm/vm_object.h>
+#include <vm/vm_page.h>
+#include <vm/vm_pageout.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_kern.h>
+#include <vm/pmap.h>
+
 #include <arm64/coresight/coresight.h>
 #include <arm64/coresight/coresight_tmc.h>
 
@@ -56,6 +64,58 @@ static struct resource_spec tmc_spec[] = {
 	{ SYS_RES_IRQ,		0,	RF_ACTIVE | RF_OPTIONAL },
 	{ -1, 0 }
 };
+
+static int
+tmc_alloc_pages(struct tmc_softc *sc, vm_page_t *pages, int npages)
+{
+	vm_paddr_t low, high, boundary;
+	vm_memattr_t memattr;
+	int alignment;
+	vm_pointer_t va;
+	int pflags;
+	vm_page_t m;
+	int tries;
+	int i;
+
+	alignment = PAGE_SIZE;
+	low = 0;
+	high = -1UL;
+	boundary = 0;
+	pflags = VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED |
+	    VM_ALLOC_ZERO;
+	memattr = VM_MEMATTR_WRITE_COMBINING;
+
+	for (i = 0; i < npages; i++) {
+		tries = 0;
+retry:
+		m = vm_page_alloc_noobj_contig(pflags, 1, low, high,
+		    alignment, boundary, memattr);
+		if (m == NULL) {
+			if (tries < 3) {
+				if (!vm_page_reclaim_contig(pflags, 1, low,
+				    high, alignment, boundary))
+					vm_wait(NULL);
+				tries++;
+				goto retry;
+			}
+
+			return (ENOMEM);
+		}
+
+		if ((m->flags & PG_ZERO) == 0)
+			pmap_zero_page(m);
+
+		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+		cpu_dcache_wb_range(va, PAGE_SIZE);
+		m->valid = VM_PAGE_BITS_ALL;
+		m->oflags &= ~VPO_UNMANAGED;
+		m->flags |= PG_FICTITIOUS;
+
+		pages[i] = m;
+        }
+
+	return (0);
+}
 
 static int
 tmc_start(device_t dev)
