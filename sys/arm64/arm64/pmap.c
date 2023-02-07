@@ -1774,6 +1774,13 @@ pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 		    ((tpte & ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE)) ==
 		     ATTR_S2_S2AP(ATTR_S2_S2AP_WRITE)))
 			use = true;
+#if __has_feature(capabilities)
+		if ((prot & VM_PROT_READ_CAP) != 0 &&
+		    (tpte & ATTR_LC_ENABLED) == 0)
+			use = false;
+		if ((prot & VM_PROT_WRITE_CAP) != 0 && (tpte & ATTR_SC) == 0)
+			use = false;
+#endif
 
 		if (use) {
 			switch (lvl) {
