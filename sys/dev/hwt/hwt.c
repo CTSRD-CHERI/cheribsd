@@ -117,11 +117,11 @@ hwt_alloc_pages(vm_page_t *pages, int npages)
 		tries = 0;
 retry:
 		m = vm_page_alloc_noobj_contig(pflags, 1, low, high,
-		   alignment, boundary, memattr);
+		    alignment, boundary, memattr);
 		if (m == NULL) {
 			if (tries < 3) {
 				if (!vm_page_reclaim_contig(pflags, 1, low,
-				   high, alignment, boundary))
+				    high, alignment, boundary))
 					vm_wait(NULL);
 				tries++;
 				goto retry;
