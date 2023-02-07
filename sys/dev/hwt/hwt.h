@@ -35,10 +35,16 @@
 #define _DEV_HWT_HWT_H_
 
 #define	HWT_MAGIC	0x42
+#define	HWT_IOC_ALLOC \
+	_IOW(HWT_MAGIC, 0x00, struct hwt_alloc)
 #define	HWT_IOC_ATTACH \
-	_IOW(HWT_MAGIC, 0x00, struct hwt_attach)
+	_IOW(HWT_MAGIC, 0x01, struct hwt_attach)
 
 struct hwt_attach {
+	pid_t		pid;
+} __packed;
+
+struct hwt_alloc {
 	pid_t		pid;
 } __packed;
 

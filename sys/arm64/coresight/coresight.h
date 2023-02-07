@@ -126,6 +126,8 @@ struct etr_state {
 	uint32_t flags;
 #define	ETR_FLAG_ALLOCATE	(1 << 0)
 #define	ETR_FLAG_RELEASE	(1 << 1)
+	vm_page_t *pages;
+	int npages;
 };
 
 struct coresight_event {

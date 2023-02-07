@@ -42,6 +42,15 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/module.h>
 #include <sys/mutex.h>
+#include <sys/sglist.h>
+
+#include <vm/vm.h>
+#include <vm/vm_object.h>
+#include <vm/vm_page.h>
+#include <vm/vm_pageout.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_kern.h>
+#include <vm/pmap.h>
 
 #include <dev/hwt/hwtvar.h>
 #include <dev/hwt/hwt.h>
@@ -84,6 +93,94 @@ hwt_register(void)
 	return (0);
 }
 
+static int
+hwt_alloc_pages(vm_page_t *pages, int npages)
+{
+	vm_paddr_t low, high, boundary;
+	vm_memattr_t memattr;
+	int alignment;
+	vm_pointer_t va;
+	int pflags;
+	vm_page_t m;
+	int tries;
+	int i;
+
+	alignment = PAGE_SIZE;
+	low = 0;
+	high = -1UL;
+	boundary = 0;
+	pflags = VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED |
+	    VM_ALLOC_ZERO;
+	memattr = VM_MEMATTR_WRITE_COMBINING;
+
+	for (i = 0; i < npages; i++) {
+		tries = 0;
+retry:
+		m = vm_page_alloc_noobj_contig(pflags, 1, low, high,
+		   alignment, boundary, memattr);
+		if (m == NULL) {
+			if (tries < 3) {
+				if (!vm_page_reclaim_contig(pflags, 1, low,
+				   high, alignment, boundary))
+					vm_wait(NULL);
+				tries++;
+				goto retry;
+			}
+
+			return (ENOMEM);
+		}
+
+		if ((m->flags & PG_ZERO) == 0)
+			pmap_zero_page(m);
+
+		va = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+		cpu_dcache_wb_range(va, PAGE_SIZE);
+		m->valid = VM_PAGE_BITS_ALL;
+		m->oflags &= ~VPO_UNMANAGED;
+		m->flags |= PG_FICTITIOUS;
+
+		pages[i] = m;
+        }
+
+	return (0);
+}
+
+static int
+hwt_test(struct hwt_softc *sc)
+{
+	vm_page_t *pages, *m;
+	struct sglist *sg;
+	int npages;
+	int error;
+	int i;
+
+	npages = 1024;
+
+	pages = malloc(sizeof(struct vm_page *) * npages, M_HWT,
+	    M_WAITOK | M_ZERO);
+
+	error = hwt_alloc_pages(pages, npages);
+	if (error) {
+		printf("%s: could not alloc pages\n", __func__);
+		return (error);
+	}
+
+	sg = sglist_alloc(npages, M_WAITOK);
+
+	for (i = 0; i < npages; i++) {
+		m = &pages[i];
+		error = sglist_append_vmpages(sg, m, 0, PAGE_SIZE);
+		if (error != 0) {
+			printf("%s: cant add pages\n", __func__);
+			return (error);
+		}
+	}
+
+printf("%s: pages added to sg\n", __func__);
+
+	return (0);
+}
+
 static struct hwt_proc *
 hwt_lookup(struct proc *p)
 {
@@ -101,8 +198,8 @@ hwt_lookup(struct proc *p)
 			return (hp);
 		}
 	}
-
 	mtx_unlock_spin(&hwt_prochash_mtx);
+
 	return (NULL);
 }
 
@@ -124,7 +221,7 @@ static int
 hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
     struct thread *td)
 {
-	//struct hwt_softc *sc;
+	struct hwt_softc *sc;
 	struct hwt_attach *a;
 	struct proc *p;
 	int error;
@@ -133,7 +230,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 	error = 0;
 
-	//sc = dev->si_drv1;
+	sc = dev->si_drv1;
 
 	len = IOCPARM_LEN(cmd);
 
@@ -141,6 +238,9 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	    (uint64_t)addr, len);
 
 	switch (cmd) {
+	case HWT_IOC_ALLOC:
+		hwt_test(sc);
+		break;
 	case HWT_IOC_ATTACH:
 		a = (void *)addr;
 

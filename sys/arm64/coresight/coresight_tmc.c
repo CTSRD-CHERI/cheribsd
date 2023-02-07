@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2018-2020 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2018-2023 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -192,12 +192,15 @@ tmc_configure_etf(device_t dev)
 	return (0);
 }
 
+#define	CORESIGHT_NPAGES	1024
+
 static int
 tmc_configure_etr(device_t dev, struct endpoint *endp,
     struct coresight_event *event)
 {
 	struct tmc_softc *sc;
 	uint32_t reg;
+	int error;
 
 	sc = device_get_softc(dev);
 
@@ -212,6 +215,15 @@ tmc_configure_etr(device_t dev, struct endpoint *endp,
 
 	reg = AXICTL_PROT_CTRL_BIT1;
 	reg |= AXICTL_WRBURSTLEN_16;
+
+printf("%s: allocating pages\n", __func__);
+	event->etr.npages = CORESIGHT_NPAGES;
+	event->etr.pages = malloc(sizeof(struct vm_page) * event->etr.npages, M_CORESIGHT,
+	    M_WAITOK | M_ZERO);
+	error = tmc_alloc_pages(sc, event->etr.pages, event->etr.npages);
+printf("%s: allocating pages done, error %d\n", __func__, error);
+	//vm_page_t *t;
+	//t = &event->etr.pages[0];
 
 	/*
 	 * SG operation is broken on DragonBoard 410c
