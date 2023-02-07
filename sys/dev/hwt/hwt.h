@@ -39,12 +39,18 @@
 	_IOW(HWT_MAGIC, 0x00, struct hwt_alloc)
 #define	HWT_IOC_ATTACH \
 	_IOW(HWT_MAGIC, 0x01, struct hwt_attach)
+#define	HWT_IOC_START \
+	_IOW(HWT_MAGIC, 0x02, struct hwt_start)
 
 struct hwt_attach {
 	pid_t		pid;
 } __packed;
 
 struct hwt_alloc {
+	pid_t		pid;
+} __packed;
+
+struct hwt_start {
 	pid_t		pid;
 } __packed;
 

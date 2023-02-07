@@ -69,11 +69,23 @@ struct hwt_proc {
 	LIST_ENTRY(hwt_proc)	next;
 };
 
+struct hwt_owner {
+	LIST_ENTRY(hwt_owner)	next;
+};
+
+struct hwt {
+	vm_page_t	*pages;
+	int		npages;
+};
+
 #define	HWT_PROCHASH_SIZE	1024
 
 struct mtx hwt_prochash_mtx;
 static u_long hwt_prochashmask;
 static LIST_HEAD(hwt_prochash, hwt_proc)	*hwt_prochash;
+
+//static u_long hwt_ownerhashmask;
+//static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 
 /*
  * Hash function.  Discard the lower 2 bits of the pointer since
@@ -146,29 +158,27 @@ retry:
 }
 
 static int
-hwt_test(struct hwt_softc *sc)
+hwt_alloc_buffers(struct hwt_softc *sc, struct hwt *hwt)
 {
-	vm_page_t *pages, *m;
+	vm_page_t *m;
 	struct sglist *sg;
-	int npages;
 	int error;
 	int i;
 
-	npages = 1024;
-
-	pages = malloc(sizeof(struct vm_page *) * npages, M_HWT,
+	hwt->npages = 1024;
+	hwt->pages = malloc(sizeof(struct vm_page *) * hwt->npages, M_HWT,
 	    M_WAITOK | M_ZERO);
 
-	error = hwt_alloc_pages(pages, npages);
+	error = hwt_alloc_pages(hwt->pages, hwt->npages);
 	if (error) {
 		printf("%s: could not alloc pages\n", __func__);
 		return (error);
 	}
 
-	sg = sglist_alloc(npages, M_WAITOK);
+	sg = sglist_alloc(hwt->npages, M_WAITOK);
 
-	for (i = 0; i < npages; i++) {
-		m = &pages[i];
+	for (i = 0; i < hwt->npages; i++) {
+		m = &hwt->pages[i];
 		error = sglist_append_vmpages(sg, m, 0, PAGE_SIZE);
 		if (error != 0) {
 			printf("%s: cant add pages\n", __func__);
@@ -179,6 +189,26 @@ hwt_test(struct hwt_softc *sc)
 printf("%s: pages added to sg\n", __func__);
 
 	return (0);
+}
+
+static struct hwt *
+hwt_alloc(struct hwt_softc *sc, struct thread *td)
+{
+	//struct hwt_owner *ho, *honew;
+	struct hwt *hwt;
+	int error;
+
+	hwt = malloc(sizeof(struct hwt), M_HWT, M_WAITOK | M_ZERO);
+
+	error = hwt_alloc_buffers(sc, hwt);
+	if (error) {
+		printf("%s: can't allocate hwt\n", __func__);
+		return (NULL);
+	}
+
+	//honew = malloc(sizeof(struct hwt_owner), M_HWT, M_WAITOK | M_ZERO);
+
+	return (hwt);
 }
 
 static struct hwt_proc *
@@ -226,6 +256,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	struct proc *p;
 	int error;
 	struct hwt_proc *hp, *hpnew;
+	struct hwt *hwt __unused;
 	int len;
 
 	error = 0;
@@ -239,7 +270,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 	switch (cmd) {
 	case HWT_IOC_ALLOC:
-		hwt_test(sc);
+		hwt = hwt_alloc(sc, td);
 		break;
 	case HWT_IOC_ATTACH:
 		a = (void *)addr;
@@ -265,7 +296,12 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		hpnew->p = p;
 		hwt_insert(hpnew);
 
+		//struct coresight_event event;
+
 		PROC_UNLOCK(p);
+		break;
+	case HWT_IOC_START:
+		//coresight_init_event();
 		break;
 	default:
 		break;
