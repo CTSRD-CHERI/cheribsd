@@ -140,7 +140,7 @@ typedef enum {
  */
 struct tcpcb {
 	struct inpcb t_inpcb __subobject_member_used_for_c_inheritance;
-					/* embedded protocol indepenent cb */
+					/* embedded protocol independent cb */
 #define	t_start_zero	t_fb
 #define	t_zero_size	(sizeof(struct tcpcb) - \
 			    offsetof(struct tcpcb, t_start_zero))
