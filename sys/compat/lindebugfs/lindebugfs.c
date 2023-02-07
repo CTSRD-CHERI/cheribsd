@@ -425,9 +425,11 @@ debugfs_create_ulong(const char *name, umode_t mode, struct dentry *parent, unsi
 
 
 static ssize_t
-fops_blob_read(struct file *filp, char __user *ubuf, size_t read_size, loff_t *ppos)
+fops_blob_read(struct file *filp, char *ubuf, size_t read_size, loff_t *ppos)
 {
 	struct debugfs_blob_wrapper *blob;
+	size_t buf_remain;
+	ssize_t num_read;
 
 	blob = filp->private_data;
 	if (blob == NULL)
@@ -435,7 +437,14 @@ fops_blob_read(struct file *filp, char __user *ubuf, size_t read_size, loff_t *p
 	if (blob->size == 0 || blob->data == NULL)
 		return (-EINVAL);
 
-	return (simple_read_from_buffer(ubuf, read_size, ppos, blob->data, blob->size));
+	if (*ppos < 0 || *ppos > blob->size)
+		return (-EINVAL);
+
+	buf_remain = blob->size - *ppos;
+	num_read = MIN(read_size, buf_remain);
+	memcpy(ubuf, (char *)blob->data + *ppos, num_read);
+	*ppos += num_read;
+	return (num_read);
 }
 
 static int
