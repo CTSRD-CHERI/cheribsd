@@ -72,22 +72,25 @@ struct hwt_proc {
 struct hwt {
 	vm_page_t	*pages;
 	int		npages;
+	int		hwt_id;
+	LIST_ENTRY(hwt)	next;
 };
 
 struct hwt_owner {
 	struct proc		*p;
-	TAILQ_HEAD(, hwt)	hwts;
+	LIST_HEAD(, hwt)	hwts; /* Owned HWTs. */
 	LIST_ENTRY(hwt_owner)	next;
 };
 
 #define	HWT_PROCHASH_SIZE	1024
+#define	HWT_OWNERHASH_SIZE	1024
 
 struct mtx hwt_prochash_mtx;
 static u_long hwt_prochashmask;
 static LIST_HEAD(hwt_prochash, hwt_proc)	*hwt_prochash;
 
-//static u_long hwt_ownerhashmask;
-//static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
+static u_long hwt_ownerhashmask;
+static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 
 /*
  * Hash function.  Discard the lower 2 bits of the pointer since
@@ -196,7 +199,6 @@ printf("%s: pages added to sg\n", __func__);
 static struct hwt *
 hwt_alloc(struct hwt_softc *sc, struct thread *td)
 {
-	//struct hwt_owner *ho, *honew;
 	struct hwt *hwt;
 	int error;
 
@@ -208,13 +210,11 @@ hwt_alloc(struct hwt_softc *sc, struct thread *td)
 		return (NULL);
 	}
 
-	//honew = malloc(sizeof(struct hwt_owner), M_HWT, M_WAITOK | M_ZERO);
-
 	return (hwt);
 }
 
 static struct hwt_proc *
-hwt_lookup(struct proc *p)
+hwt_lookup_proc(struct proc *p)
 {
 	struct hwt_prochash *hph;
 	struct hwt_proc *hp;
@@ -228,6 +228,28 @@ hwt_lookup(struct proc *p)
 		if (hp->p == p) {
 			mtx_unlock_spin(&hwt_prochash_mtx);
 			return (hp);
+		}
+	}
+	mtx_unlock_spin(&hwt_prochash_mtx);
+
+	return (NULL);
+}
+
+static struct hwt_owner *
+hwt_lookup_owner(struct proc *p)
+{
+	struct hwt_ownerhash *hoh;
+	struct hwt_owner *ho;
+	int hindex;
+
+	hindex = HWT_HASH_PTR(p, hwt_ownerhashmask);
+	hoh = &hwt_ownerhash[hindex];
+
+	mtx_lock_spin(&hwt_prochash_mtx);
+	LIST_FOREACH(ho, hoh, next) {
+		if (ho->p == p) {
+			mtx_unlock_spin(&hwt_prochash_mtx);
+			return (ho);
 		}
 	}
 	mtx_unlock_spin(&hwt_prochash_mtx);
@@ -259,6 +281,10 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	int error;
 	struct hwt_proc *hp, *hpnew;
 	struct hwt *hwt __unused;
+	struct hwt_owner *ho;
+	struct hwt_ownerhash *hoh;
+	int hindex;
+
 	int len;
 
 	error = 0;
@@ -270,16 +296,38 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	dprintf("%s: cmd %lx, addr %lx, len %d\n", __func__, cmd,
 	    (uint64_t)addr, len);
 
+	struct hwt_alloc *halloc;
+
 	switch (cmd) {
 	case HWT_IOC_ALLOC:
-		struct hwt_owner *ho;
+
+		halloc = (struct hwt_alloc *)addr;
 
 		hwt = hwt_alloc(sc, td);
+		if (hwt == NULL)
+			return (ENOMEM);
 
 		p = td->td_proc;
+
 		ho = hwt_lookup_owner(p);
+		if (ho == NULL) {
+			ho = malloc(sizeof(struct hwt_owner), M_HWT,
+			    M_WAITOK | M_ZERO);
+			ho->p = p;
+			LIST_INIT(&ho->hwts);
+			hindex = HWT_HASH_PTR(ho->p, hwt_ownerhashmask);
+			hoh = &hwt_ownerhash[hindex];
+			LIST_INSERT_HEAD(hoh, ho, next);
+		}
+
+		LIST_INSERT_HEAD(&ho->hwts, hwt, next);
+
+		hwt->hwt_id = 111;
+		error = copyout(&hwt->hwt_id, halloc->hwt_id,
+		    sizeof(hwt->hwt_id));
 
 		break;
+
 	case HWT_IOC_ATTACH:
 		a = (void *)addr;
 
@@ -294,7 +342,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		dprintf("%s: proc %p\n", __func__, p);
 
-		hp = hwt_lookup(p);
+		hp = hwt_lookup_proc(p);
 		if (hp) {
 			free(hpnew, M_HWT);
 			break;
@@ -329,7 +377,7 @@ hwt_switch_in(struct thread *td)
 	if ((p->p_flag2 & P2_HWT) == 0)
 		return;
 
-	hp = hwt_lookup(p);
+	hp = hwt_lookup_proc(p);
 
 	dprintf("%s: hp %p\n", __func__, hp);
 }
@@ -345,7 +393,7 @@ hwt_switch_out(struct thread *td)
 	if ((p->p_flag2 & P2_HWT) == 0)
 		return;
 
-	hp = hwt_lookup(p);
+	hp = hwt_lookup_proc(p);
 
 	dprintf("%s: hp %p\n", __func__, hp);
 }
@@ -394,6 +442,8 @@ hwt_load(void)
 
 	hwt_prochash = hashinit(HWT_PROCHASH_SIZE, M_HWT, &hwt_prochashmask);
         mtx_init(&hwt_prochash_mtx, "hwt-proc-hash", "hwt-leaf", MTX_SPIN);
+
+	hwt_ownerhash = hashinit(HWT_OWNERHASH_SIZE, M_HWT, &hwt_ownerhashmask);
 
 	return (0);
 }

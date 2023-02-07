@@ -47,8 +47,8 @@ struct hwt_attach {
 } __packed;
 
 struct hwt_alloc {
-	pid_t		pid;
-} __packed;
+	int		*hwt_id;
+} __packed __aligned(16);
 
 struct hwt_start {
 	pid_t		pid;
