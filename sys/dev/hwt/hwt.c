@@ -69,13 +69,15 @@ struct hwt_proc {
 	LIST_ENTRY(hwt_proc)	next;
 };
 
-struct hwt_owner {
-	LIST_ENTRY(hwt_owner)	next;
-};
-
 struct hwt {
 	vm_page_t	*pages;
 	int		npages;
+};
+
+struct hwt_owner {
+	struct proc		*p;
+	TAILQ_HEAD(, hwt)	hwts;
+	LIST_ENTRY(hwt_owner)	next;
 };
 
 #define	HWT_PROCHASH_SIZE	1024
@@ -270,7 +272,13 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 	switch (cmd) {
 	case HWT_IOC_ALLOC:
+		struct hwt_owner *ho;
+
 		hwt = hwt_alloc(sc, td);
+
+		p = td->td_proc;
+		ho = hwt_lookup_owner(p);
+
 		break;
 	case HWT_IOC_ATTACH:
 		a = (void *)addr;
