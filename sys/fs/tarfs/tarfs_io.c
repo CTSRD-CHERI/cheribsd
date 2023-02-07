@@ -40,6 +40,12 @@
 #include <sys/uio.h>
 #include <sys/vnode.h>
 
+#if defined(ZSTDIO)
+#define TARFS_ZIO 1
+#else
+#undef TARFS_ZIO
+#endif
+
 #ifdef ZSTDIO
 #define ZSTD_STATIC_LINKING_ONLY
 #include <contrib/zstd/lib/zstd.h>
@@ -213,6 +219,7 @@ static ZSTD_customMem tarfs_zstd_mem = {
 };
 #endif
 
+#ifdef TARFS_ZIO
 /*
  * Updates the decompression frame index, recording the current input and
  * output offsets in a new index entry, and growing the index if
@@ -239,6 +246,7 @@ tarfs_zio_update_index(struct tarfs_zio *zio, off_t i, off_t o)
 	MPASS(zio->idx[zio->curidx].i == i);
 	MPASS(zio->idx[zio->curidx].o == o);
 }
+#endif
 
 /*
  * VOP_ACCESS for zio node.
@@ -597,6 +605,7 @@ static struct vop_vector tarfs_znodeops = {
 };
 VFS_VOP_VECTOR_REGISTER(tarfs_znodeops);
 
+#ifdef TARFS_ZIO
 /*
  * Initializes the decompression layer.
  */
@@ -627,6 +636,7 @@ tarfs_zio_init(struct tarfs_mount *tmp, off_t i, off_t o)
 	TARFS_DPF(ZIO, "%s: created zio node\n", __func__);
 	return (zio);
 }
+#endif
 
 /*
  * Initializes the I/O layer, including decompression if the signature of
@@ -637,7 +647,7 @@ int
 tarfs_io_init(struct tarfs_mount *tmp)
 {
 	uint8_t *block;
-#ifdef ZSTDIO
+#ifdef TARFS_ZIO
 	struct tarfs_zio *zio = NULL;
 #endif
 	ssize_t res;
@@ -673,6 +683,7 @@ bad:
 	return (error);
 }
 
+#ifdef TARFS_ZIO
 /*
  * Tears down the decompression layer.
  */
@@ -709,6 +720,7 @@ tarfs_zio_fini(struct tarfs_mount *tmp)
 	tmp->zio = NULL;
 	return (error);
 }
+#endif
 
 /*
  * Tears down the I/O layer, including the decompression layer if
@@ -719,8 +731,10 @@ tarfs_io_fini(struct tarfs_mount *tmp)
 {
 	int error = 0;
 
+#ifdef TARFS_ZIO
 	if (tmp->zio != NULL) {
 		error = tarfs_zio_fini(tmp);
 	}
+#endif
 	return (error);
 }
