@@ -294,6 +294,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 {
 	struct hwt_softc *sc;
 	struct hwt_attach *a;
+	struct hwt_start *s;
 	struct proc *p;
 	int error;
 	struct hwt_proc *hp, *hpnew;
@@ -393,6 +394,25 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		PROC_UNLOCK(p);
 		break;
 	case HWT_IOC_START:
+		s = (struct hwt_start *)addr;
+
+		dprintf("%s: start, hwt_id %d\n", __func__, s->hwt_id);
+
+		/* Check if process is registered owner of any HWTs. */
+		ho = hwt_lookup_owner(td->td_proc);
+		if (ho == NULL) {
+			/* No HWTs allocated. So nothing attach to. */
+			return (ENXIO);
+		}
+
+		/* Now find HWT we want to attach to. */
+		hwt = hwt_lookup_by_id(ho, s->hwt_id);
+		if (hwt == NULL) {
+			/* No HWT with such id. */
+			return (ENXIO);
+		}
+
+		printf("%s: starting hwt %p\n", __func__, hwt);
 		//coresight_init_event();
 		break;
 	default:
