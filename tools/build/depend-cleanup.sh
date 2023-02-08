@@ -28,9 +28,8 @@ fi
 # $3 source extension
 clean_dep()
 {
-	if [ -e "$OBJTOP"/$1/.depend.$2.pico ] && \
-	    egrep -qw "$2\.$3" "$OBJTOP"/$1/.depend.$2.pico; then \
-		echo "Removing stale dependencies and objects for $2.$3"; \
+	if egrep -qw "$2\.$3" "$OBJTOP"/$1/.depend.$2.*o 2>/dev/null; then
+		echo "Removing stale dependencies and objects for $2.$3"
 		rm -f \
 		    "$OBJTOP"/$1/.depend.$2.* \
 		    "$OBJTOP"/$1/$2.*o \
@@ -38,15 +37,6 @@ clean_dep()
 		    "$OBJTOP"/obj-lib64/$1/$2.*o \
 		    "$OBJTOP"/obj-lib64c/$1/.depend.$2.* \
 		    "$OBJTOP"/obj-lib64c/$1/$2.*o \
-		    "$OBJTOP"/obj-lib32/$1/.depend.$2.* \
-		    "$OBJTOP"/obj-lib32/$1/$2.*o
-	fi
-	if [ -e "$OBJTOP"/$1/.depend.$2.o ] && \
-	    egrep -qw "$2\.$3" "$OBJTOP"/$1/.depend.$2.o; then \
-		echo "Removing stale dependencies and objects for $2.$3"; \
-		rm -f \
-		    "$OBJTOP"/$1/.depend.$2.* \
-		    "$OBJTOP"/$1/$2.*o \
 		    "$OBJTOP"/obj-lib32/$1/.depend.$2.* \
 		    "$OBJTOP"/obj-lib32/$1/$2.*o
 	fi
