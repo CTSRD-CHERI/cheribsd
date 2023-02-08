@@ -66,14 +66,17 @@ __FBSDID("$FreeBSD$");
 
 struct hwt_proc {
 	struct proc		*p;
+	struct hwt		*hwt;
+	struct hwt_owner	*hwt_owner;
 	LIST_ENTRY(hwt_proc)	next;
 };
 
 struct hwt {
-	vm_page_t	*pages;
-	int		npages;
-	int		hwt_id;
-	LIST_ENTRY(hwt)	next;
+	vm_page_t		*pages;
+	int			npages;
+	int			hwt_id;
+	struct hwt_owner	*hwt_owner;
+	LIST_ENTRY(hwt)		next;
 };
 
 struct hwt_owner {
@@ -257,8 +260,22 @@ hwt_lookup_owner(struct proc *p)
 	return (NULL);
 }
 
+static struct hwt *
+hwt_lookup_by_id(struct hwt_owner *ho, int hwt_id)
+{
+	struct hwt *hwt;
+
+	LIST_FOREACH(hwt, &ho->hwts, next) {
+		if (hwt->hwt_id == hwt_id) {
+			return (hwt);
+		}
+	}
+
+	return (NULL);
+}
+
 static void
-hwt_insert(struct hwt_proc *hp)
+hwt_insert_prochash(struct hwt_proc *hp)
 {
 	struct hwt_prochash *hph;
 	int hindex;
@@ -323,6 +340,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		LIST_INSERT_HEAD(&ho->hwts, hwt, next);
 
 		hwt->hwt_id = 111;
+		hwt->hwt_owner = ho;
 		error = copyout(&hwt->hwt_id, halloc->hwt_id,
 		    sizeof(hwt->hwt_id));
 
@@ -331,7 +349,22 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	case HWT_IOC_ATTACH:
 		a = (void *)addr;
 
-		dprintf("%s: attach, pid %d\n", __func__, a->pid);
+		dprintf("%s: attach, pid %d, hwt_id %d\n", __func__, a->pid,
+		    a->hwt_id);
+
+		/* Check if process is registered owner of any HWTs. */
+		ho = hwt_lookup_owner(td->td_proc);
+		if (ho == NULL) {
+			/* No HWTs allocated. So nothing attach to. */
+			return (ENXIO);
+		}
+
+		/* Now find HWT we want to attach to. */
+		hwt = hwt_lookup_by_id(ho, a->hwt_id);
+		if (hwt == NULL) {
+			/* No HWT with such id. */
+			return (ENXIO);
+		}
 
 		hpnew = malloc(sizeof(struct hwt_proc), M_HWT,
 		    M_WAITOK | M_ZERO);
@@ -344,13 +377,16 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		hp = hwt_lookup_proc(p);
 		if (hp) {
+			/* Already attached. */
 			free(hpnew, M_HWT);
 			break;
 		}
 
 		p->p_flag2 |= P2_HWT;
 		hpnew->p = p;
-		hwt_insert(hpnew);
+		hpnew->hwt_owner = ho;
+		hpnew->hwt = hwt;
+		hwt_insert_prochash(hpnew);
 
 		//struct coresight_event event;
 

@@ -42,16 +42,17 @@
 #define	HWT_IOC_START \
 	_IOW(HWT_MAGIC, 0x02, struct hwt_start)
 
-struct hwt_attach {
-	pid_t		pid;
-} __packed;
-
 struct hwt_alloc {
 	int		*hwt_id;
 } __packed __aligned(16);
 
-struct hwt_start {
+struct hwt_attach {
 	pid_t		pid;
-} __packed;
+	int		hwt_id;
+} __packed __aligned(16);
+
+struct hwt_start {
+	int		hwt_id;
+} __packed __aligned(16);
 
 #endif /* !_DEV_HWT_HWT_H_ */
