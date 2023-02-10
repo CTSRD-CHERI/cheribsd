@@ -44,6 +44,7 @@
 
 struct hwt_alloc {
 	int		*hwt_id;
+	int		cpu_id;
 } __packed __aligned(16);
 
 struct hwt_attach {

@@ -52,7 +52,7 @@
 
 #define	TMC_DEBUG
 #undef TMC_DEBUG
-        
+
 #ifdef TMC_DEBUG
 #define	dprintf(fmt, ...)	printf(fmt, ##__VA_ARGS__)
 #else
@@ -395,6 +395,7 @@ tmc_attach(device_t dev)
 {
 	struct coresight_desc desc;
 	struct tmc_softc *sc;
+	uint32_t reg;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -416,7 +417,14 @@ tmc_attach(device_t dev)
 
 	desc.pdata = sc->pdata;
 	desc.dev = dev;
-	desc.dev_type = CORESIGHT_TMC;
+
+	reg = bus_read_4(sc->res[0], TMC_DEVID);
+	reg &= DEVID_CONFIGTYPE_M;
+	if (reg == DEVID_CONFIGTYPE_ETR)
+		desc.dev_type = CORESIGHT_TMC_ETR;
+	else
+		desc.dev_type = CORESIGHT_TMC_ETF;
+
 	coresight_register(&desc);
 
 	return (0);

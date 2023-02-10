@@ -64,27 +64,6 @@ __FBSDID("$FreeBSD$");
 #define	dprintf(fmt, ...)
 #endif
 
-struct hwt_proc {
-	struct proc		*p;
-	struct hwt		*hwt;
-	struct hwt_owner	*hwt_owner;
-	LIST_ENTRY(hwt_proc)	next;
-};
-
-struct hwt {
-	vm_page_t		*pages;
-	int			npages;
-	int			hwt_id;
-	struct hwt_owner	*hwt_owner;
-	LIST_ENTRY(hwt)		next;
-};
-
-struct hwt_owner {
-	struct proc		*p;
-	LIST_HEAD(, hwt)	hwts; /* Owned HWTs. */
-	LIST_ENTRY(hwt_owner)	next;
-};
-
 #define	HWT_PROCHASH_SIZE	1024
 #define	HWT_OWNERHASH_SIZE	1024
 
@@ -106,9 +85,24 @@ static LIST_HEAD(hwt_ownerhash, hwt_owner)	*hwt_ownerhash;
 
 struct hwt_softc hwt_sc;
 
-int
-hwt_register(void)
+static struct hwt_backend *hwt_backend;
+
+static int
+hwt_event_init(struct hwt *hwt)
 {
+
+	printf("%s\n", __func__);
+
+	hwt_backend->ops->hwt_event_init(hwt);
+
+	return (0);
+}
+
+int
+hwt_register(struct hwt_backend *backend)
+{
+
+	hwt_backend = backend;
 
 	return (0);
 }
@@ -340,7 +334,8 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		LIST_INSERT_HEAD(&ho->hwts, hwt, next);
 
-		hwt->hwt_id = 111;
+		hwt->cpu_id = halloc->cpu_id;
+		hwt->hwt_id = 110 + hwt->cpu_id;
 		hwt->hwt_owner = ho;
 		error = copyout(&hwt->hwt_id, halloc->hwt_id,
 		    sizeof(hwt->hwt_id));
@@ -389,8 +384,6 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		hpnew->hwt = hwt;
 		hwt_insert_prochash(hpnew);
 
-		//struct coresight_event event;
-
 		PROC_UNLOCK(p);
 		break;
 	case HWT_IOC_START:
@@ -401,7 +394,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		/* Check if process is registered owner of any HWTs. */
 		ho = hwt_lookup_owner(td->td_proc);
 		if (ho == NULL) {
-			/* No HWTs allocated. So nothing attach to. */
+			/* No HWTs allocated. So nothing to attach to. */
 			return (ENXIO);
 		}
 
@@ -413,7 +406,9 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		}
 
 		printf("%s: starting hwt %p\n", __func__, hwt);
-		//coresight_init_event();
+
+		hwt_event_init(hwt);
+
 		break;
 	default:
 		break;
@@ -482,7 +477,7 @@ hwt_load(void)
 
 	mtx_init(&sc->mtx, "HWT driver", NULL, MTX_DEF);
 
-	TAILQ_INIT(&sc->hwt_devices);
+	TAILQ_INIT(&sc->hwt_backends);
 
 	make_dev_args_init(&args);
 	args.mda_devsw = &hwt_cdevsw;

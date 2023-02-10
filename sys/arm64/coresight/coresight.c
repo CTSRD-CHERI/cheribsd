@@ -40,9 +40,43 @@
 #include <machine/bus.h>
 
 #include <arm64/coresight/coresight.h>
+#include <dev/hwt/hwtvar.h>
 
 static struct mtx cs_mtx;
 struct coresight_device_list cs_devs;
+
+static struct hwt_backend backend;
+static struct coresight_event cs_event[MAXCPU];
+
+static void
+coresight_event_init(struct hwt *hwt)
+{
+	struct coresight_event *event;
+
+	printf("%s: cpu_id %d\n", __func__, hwt->cpu_id);
+
+	event = &cs_event[hwt->cpu_id];
+	event->etr.started = 0;
+	event->etr.low = 0;
+	event->etr.high = 0;
+	event->etr.pages = hwt->pages;
+	event->etr.npages = hwt->npages;
+	event->excp_level = 0; /* User level */
+	event->src = CORESIGHT_ETMV4;
+	event->sink = CORESIGHT_TMC_ETR;
+
+	/*
+	 * Set the trace ID required for ETM component.
+	 * TODO: this should be derived from pmctrace.
+	 */
+
+	event->etm.trace_id = 0x10;
+	coresight_init_event(hwt->cpu_id, event);
+};
+
+static struct hwt_backend_ops coresight_ops = {
+	.hwt_event_init = coresight_event_init,
+};
 
 int
 coresight_register(struct coresight_desc *desc)
@@ -58,6 +92,11 @@ coresight_register(struct coresight_desc *desc)
 	mtx_lock(&cs_mtx);
 	TAILQ_INSERT_TAIL(&cs_devs, cs_dev, link);
 	mtx_unlock(&cs_mtx);
+
+	if (desc->dev_type == CORESIGHT_TMC_ETR) {
+		backend.ops = &coresight_ops;
+		hwt_register(&backend);
+	}
 
 	return (0);
 }
