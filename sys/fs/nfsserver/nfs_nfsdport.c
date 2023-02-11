@@ -1923,6 +1923,8 @@ nfsvno_open(struct nfsrv_descript *nd, struct nameidata *ndp,
 			}
 		}
 	} else if (done_namei) {
+		KASSERT(create == NFSV4OPEN_CREATE,
+		    ("nfsvno_open: not create"));
 		/*
 		 * done_namei is set when nfsvno_namei() has completed
 		 * successfully, but a subsequent error was set in
