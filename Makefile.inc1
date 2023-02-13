@@ -69,8 +69,6 @@ TIME_ENV ?= time env
 .include "${LOCALBASE}/share/toolchains/${CROSS_TOOLCHAIN}.mk"
 .elif exists(/usr/local64/share/toolchains/${CROSS_TOOLCHAIN}.mk)
 .include "/usr/local64/share/toolchains/${CROSS_TOOLCHAIN}.mk"
-.elif exists(/usr/share/toolchains/${CROSS_TOOLCHAIN}.mk)
-.include "/usr/share/toolchains/${CROSS_TOOLCHAIN}.mk"
 .elif exists(${CROSS_TOOLCHAIN})
 .include "${CROSS_TOOLCHAIN}"
 .else
