@@ -97,6 +97,8 @@ coresight_init_event(int cpu, struct coresight_event *event)
 	struct coresight_device *cs_dev;
 	struct endpoint *endp;
 
+printf("%s: cpu %d\n", __func__, cpu);
+
 	/* Start building path from source device */
 	TAILQ_FOREACH(cs_dev, &cs_devs, link) {
 		if (cs_dev->dev_type == event->src &&
@@ -117,6 +119,7 @@ coresight_init_event(int cpu, struct coresight_event *event)
 	/* Init all devices in the path */
 	LIST_FOREACH(endp, &event->endplist, endplink) {
 		cs_dev = endp->cs_dev;
+		printf("%s: initing dev %p\n", __func__, cs_dev->dev);
 		CORESIGHT_INIT(cs_dev->dev);
 	}
 

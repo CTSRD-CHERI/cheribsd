@@ -232,6 +232,28 @@ hwt_lookup_proc(struct proc *p)
 	return (NULL);
 }
 
+static struct hwt_proc *
+hwt_lookup_proc_by_hwt(struct proc *p, struct hwt *hwt)
+{
+	struct hwt_prochash *hph;
+	struct hwt_proc *hp;
+	int hindex;
+
+	hindex = HWT_HASH_PTR(p, hwt_prochashmask);
+	hph = &hwt_prochash[hindex];
+
+	mtx_lock_spin(&hwt_prochash_mtx);
+	LIST_FOREACH(hp, hph, next) {
+		if (hp->p == p && hp->hwt == hwt) {
+			mtx_unlock_spin(&hwt_prochash_mtx);
+			return (hp);
+		}
+	}
+	mtx_unlock_spin(&hwt_prochash_mtx);
+
+	return (NULL);
+}
+
 static struct hwt_owner *
 hwt_lookup_owner(struct proc *p)
 {
@@ -371,10 +393,11 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 
 		dprintf("%s: proc %p\n", __func__, p);
 
-		hp = hwt_lookup_proc(p);
+		hp = hwt_lookup_proc_by_hwt(p, hwt);
 		if (hp) {
 			/* Already attached. */
 			free(hpnew, M_HWT);
+			PROC_UNLOCK(p);
 			break;
 		}
 
@@ -398,7 +421,7 @@ hwt_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			return (ENXIO);
 		}
 
-		/* Now find HWT we want to attach to. */
+		/* Now find HWT we want to activate. */
 		hwt = hwt_lookup_by_id(ho, s->hwt_id);
 		if (hwt == NULL) {
 			/* No HWT with such id. */
