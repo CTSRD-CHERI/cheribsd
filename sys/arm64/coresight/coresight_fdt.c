@@ -45,22 +45,16 @@
 #include <arm64/coresight/coresight.h>
 
 static int
-coresight_fdt_get_ports(phandle_t dev_node,
-    struct coresight_platform_data *pdata)
+coresight_fdt_get_ports(phandle_t dev_node, phandle_t node,
+    struct coresight_platform_data *pdata, bool input)
 {
-	phandle_t node, child;
+	phandle_t child;
 	pcell_t port_reg;
 	phandle_t xref;
 	char *name;
 	int ret;
 	phandle_t endpoint_child;
 	struct endpoint *endp;
-
-	child = ofw_bus_find_child(dev_node, "ports");
-	if (child)
-		node = child;
-	else
-		node = dev_node;
 
 	for (child = OF_child(node); child != 0; child = OF_peer(child)) {
 		ret = OF_getprop_alloc(child, "name", (void **)&name);
@@ -87,8 +81,8 @@ coresight_fdt_get_ports(phandle_t dev_node,
 				endp->their_node = OF_node_from_xref(xref);
 				endp->dev_node = dev_node;
 				endp->reg = port_reg;
-				if (OF_getproplen(endpoint_child,
-				    "slave-mode") >= 0) {
+
+				if (input) {
 					pdata->in_ports++;
 					endp->input = 1;
 				} else
@@ -129,7 +123,7 @@ struct coresight_platform_data *
 coresight_fdt_get_platform_data(device_t dev)
 {
 	struct coresight_platform_data *pdata;
-	phandle_t node;
+	phandle_t node, child;
 
 	node = ofw_bus_get_node(dev);
 
@@ -141,7 +135,14 @@ coresight_fdt_get_platform_data(device_t dev)
 	TAILQ_INIT(&pdata->endpoints);
 
 	coresight_fdt_get_cpu(node, pdata);
-	coresight_fdt_get_ports(node, pdata);
+
+	child = ofw_bus_find_child(node, "in-ports");
+	if (child)
+		coresight_fdt_get_ports(node, child, pdata, true);
+
+	child = ofw_bus_find_child(node, "out-ports");
+	if (child)
+		coresight_fdt_get_ports(node, child, pdata, false);
 
 	if (bootverbose)
 		printf("Total ports: in %d out %d\n",

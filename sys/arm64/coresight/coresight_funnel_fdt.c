@@ -47,7 +47,7 @@
 #include "coresight_if.h"
 
 static struct ofw_compat_data compat_data[] = {
-	{ "arm,coresight-funnel",		HWTYPE_FUNNEL },
+	{ "arm,coresight-dynamic-funnel",	HWTYPE_FUNNEL },
 	{ "arm,coresight-static-funnel",	HWTYPE_STATIC_FUNNEL },
 	{ NULL,					HWTYPE_NONE }
 };

@@ -56,6 +56,7 @@ coresight_event_init(struct hwt *hwt)
 	printf("%s: cpu_id %d\n", __func__, hwt->cpu_id);
 
 	event = &cs_event[hwt->cpu_id];
+	memset(event, 0, sizeof(struct coresight_event));
 	event->etr.started = 0;
 	event->etr.low = 0;
 	event->etr.high = 0;
