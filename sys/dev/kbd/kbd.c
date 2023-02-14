@@ -791,13 +791,16 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 {
 	void * __capability data;
 	keymap_t *mapp;
-	okeymap_t *omapp;
 	accentmap_t *accentmapp;
-	oaccentmap_t *oaccentmapp;
 	keyarg_t *keyp;
 	fkeyarg_t *fkeyp;
-	int i, j;
 	int error;
+	int i;
+#ifdef COMPAT_FREEBSD13
+	int j;
+	okeymap_t *omapp;
+	oaccentmap_t *oaccentmapp;
+#endif /* COMPAT_FREEBSD13 */
 
 	GIANT_REQUIRED;
 	switch (cmd) {
@@ -831,6 +834,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 			data = *(void * __capability *)arg;
 		error = copyout(kbd->kb_keymap, data, sizeof(keymap_t));
 		return (error);
+#ifdef COMPAT_FREEBSD13
 	case OGIO_KEYMAP:	/* get keyboard translation table (compat) */
 		mapp = kbd->kb_keymap;
 		omapp = (okeymap_t *)arg;
@@ -843,10 +847,14 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 			omapp->key[i].flgs = mapp->key[i].flgs;
 		}
 		break;
+#endif /* COMPAT_FREEBSD13 */
 	case PIO_KEYMAP:	/* set keyboard translation table */
+#ifdef COMPAT_FREEBSD13
 	case OPIO_KEYMAP:	/* set keyboard translation table (compat) */
+#endif /* COMPAT_FREEBSD13 */
 #ifndef KBD_DISABLE_KEYMAP_LOAD
 		mapp = malloc(sizeof *mapp, M_TEMP, M_WAITOK);
+#ifdef COMPAT_FREEBSD13
 		if (cmd == OPIO_KEYMAP) {
 			omapp = (okeymap_t *)arg;
 			mapp->n_keys = omapp->n_keys;
@@ -857,7 +865,9 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 				mapp->key[i].spcl = omapp->key[i].spcl;
 				mapp->key[i].flgs = omapp->key[i].flgs;
 			}
-		} else {
+		} else
+#endif /* COMPAT_FREEBSD13 */
+		{
 #if __has_feature(capabilities)
 			if (!SV_CURPROC_FLAG(SV_CHERI))
 				data = __USER_CAP_UNBOUND(*(uint64_t *)arg);
@@ -917,6 +927,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		    sizeof(accentmap_t));
 		return (error);
 		break;
+#ifdef COMPAT_FREEBSD13
 	case OGIO_DEADKEYMAP:	/* get accent key translation table (compat) */
 		accentmapp = kbd->kb_accentmap;
 		oaccentmapp = (oaccentmap_t *)arg;
@@ -932,11 +943,15 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 			}
 		}
 		break;
+#endif /* COMPAT_FREEBSD13 */
 
 	case PIO_DEADKEYMAP:	/* set accent key translation table */
+#ifdef COMPAT_FREEBSD13
 	case OPIO_DEADKEYMAP:	/* set accent key translation table (compat) */
+#endif /* COMPAT_FREEBSD13 */
 #ifndef KBD_DISABLE_KEYMAP_LOAD
 		accentmapp = malloc(sizeof(*accentmapp), M_TEMP, M_WAITOK);
+#ifdef COMPAT_FREEBSD13
 		if (cmd == OPIO_DEADKEYMAP) {
 			oaccentmapp = (oaccentmap_t *)arg;
 			accentmapp->n_accs = oaccentmapp->n_accs;
@@ -950,7 +965,9 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 					    oaccentmapp->acc[i].accchar;
 				}
 			}
-		} else {
+		} else
+#endif /* COMPAT_FREEBSD13 */
+		{
 			error = copyin(*(void * __capability *)arg, accentmapp,
 			    sizeof(*accentmapp));
 			if (error != 0) {
