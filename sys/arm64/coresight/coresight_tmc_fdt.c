@@ -69,9 +69,19 @@ static int
 tmc_fdt_attach(device_t dev)
 {
 	struct tmc_softc *sc;
+	phandle_t node;
+	ssize_t len;
 
 	sc = device_get_softc(dev);
 	sc->pdata = coresight_fdt_get_platform_data(dev);
+
+	node = ofw_bus_get_node(dev);
+
+	len = OF_getproplen(node, "arm,scatter-gather");
+	if (len >= 0)
+		sc->scatter_gather = true;
+	else
+		sc->scatter_gather = false;
 
 	return (tmc_attach(dev));
 }

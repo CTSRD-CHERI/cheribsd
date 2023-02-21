@@ -112,7 +112,7 @@ retry:
 		m->flags |= PG_FICTITIOUS;
 
 		pages[i] = m;
-        }
+	}
 
 	return (0);
 }
@@ -192,19 +192,14 @@ tmc_configure_etf(device_t dev)
 	return (0);
 }
 
-#define	CORESIGHT_NPAGES	1024
-
 static int
 tmc_configure_etr(device_t dev, struct endpoint *endp,
     struct coresight_event *event)
 {
 	struct tmc_softc *sc;
 	uint32_t reg;
-	int error;
 
 	sc = device_get_softc(dev);
-
-	tmc_stop(dev);
 
 	do {
 		reg = bus_read_4(sc->res[0], TMC_STS);
@@ -215,21 +210,8 @@ tmc_configure_etr(device_t dev, struct endpoint *endp,
 
 	reg = AXICTL_PROT_CTRL_BIT1;
 	reg |= AXICTL_WRBURSTLEN_16;
-
-printf("%s: allocating pages\n", __func__);
-	event->etr.npages = CORESIGHT_NPAGES;
-	event->etr.pages = malloc(sizeof(struct vm_page) * event->etr.npages, M_CORESIGHT,
-	    M_WAITOK | M_ZERO);
-	error = tmc_alloc_pages(sc, event->etr.pages, event->etr.npages);
-printf("%s: allocating pages done, error %d\n", __func__, error);
-	//vm_page_t *t;
-	//t = &event->etr.pages[0];
-
-	/*
-	 * SG operation is broken on DragonBoard 410c
-	 * reg |= AXICTL_SG_MODE;
-	 */
-
+	if (sc->scatter_gather)
+		reg |= AXICTL_SG_MODE;
 	reg |= AXICTL_AXCACHE_OS;
 	bus_write_4(sc->res[0], TMC_AXICTL, reg);
 
@@ -239,18 +221,122 @@ printf("%s: allocating pages done, error %d\n", __func__, error);
 
 	bus_write_4(sc->res[0], TMC_TRG, 8);
 
-	bus_write_4(sc->res[0], TMC_DBALO, event->etr.low);
-	bus_write_4(sc->res[0], TMC_DBAHI, event->etr.high);
-	bus_write_4(sc->res[0], TMC_RSZ, event->etr.bufsize / 4);
-
-	bus_write_4(sc->res[0], TMC_RRP, event->etr.low);
-	bus_write_4(sc->res[0], TMC_RWP, event->etr.low);
+	if (sc->scatter_gather) {
+		printf("%s: event->etr.pages %p\n", __func__, event->etr.pages);
+		printf("%s: event->etr.npages %d\n", __func__, event->etr.npages);
+	} else {
+		bus_write_4(sc->res[0], TMC_DBALO, event->etr.low);
+		bus_write_4(sc->res[0], TMC_DBAHI, event->etr.high);
+		bus_write_4(sc->res[0], TMC_RSZ, event->etr.bufsize / 4);
+		bus_write_4(sc->res[0], TMC_RRP, event->etr.low);
+		bus_write_4(sc->res[0], TMC_RWP, event->etr.low);
+	}
 
 	reg = bus_read_4(sc->res[0], TMC_STS);
 	reg &= ~STS_FULL;
 	bus_write_4(sc->res[0], TMC_STS, reg);
 
-	tmc_start(dev);
+	return (0);
+}
+
+#define	SG_PT_ENTIRES_PER_PAGE	(PAGE_SIZE / sizeof(sgte_t))
+#define	ETR_SG_ET_MASK			0x3
+#define	ETR_SG_ET_LAST			0x1
+#define	ETR_SG_ET_NORMAL		0x2
+#define	ETR_SG_ET_LINK			0x3
+
+#define	ETR_SG_PAGE_SHIFT		12
+#define	ETR_SG_ADDR_SHIFT		4
+
+#define	ETR_SG_ENTRY(addr, type) \
+	(sgte_t)((((addr) >> ETR_SG_PAGE_SHIFT) << ETR_SG_ADDR_SHIFT) | \
+	    (type & ETR_SG_ET_MASK))
+
+static int
+tmc_configure(device_t dev, struct coresight_event *event)
+{
+	struct tmc_softc *sc;
+	vm_page_t *pt_dir;
+	uint32_t reg;
+	int nentries;
+	int nlinks;
+	int npages;
+	int error;
+	int npt;
+	int i;
+
+	sc = device_get_softc(dev);
+
+	reg = bus_read_4(sc->res[0], TMC_DEVID);
+	if ((reg & DEVID_CONFIGTYPE_M) != DEVID_CONFIGTYPE_ETR)
+		return (0);
+
+	if (!sc->scatter_gather)
+		return (0);
+
+	vm_page_t *pages;
+	npages = event->etr.npages;
+	pages = event->etr.pages;
+
+	nlinks = npages / (SG_PT_ENTIRES_PER_PAGE - 1);
+	if (nlinks && ((npages % (SG_PT_ENTIRES_PER_PAGE - 1)) < 2))
+		nlinks--;
+	nentries = nlinks + npages;
+
+	npt = howmany(nentries, SG_PT_ENTIRES_PER_PAGE);
+
+	printf("%s: result nentries %d, npt %d\n", __func__, nentries, npt);
+
+	pt_dir = malloc(sizeof(struct vm_page *) * npt, M_DEVBUF,
+	    M_WAITOK | M_ZERO);
+	error = tmc_alloc_pages(sc, pt_dir, npt);
+	if (error) {
+		printf("%s: could not allocate pages\n", __func__);
+		return (-1);
+	}
+
+	vm_paddr_t paddr;
+	int sgtentry;
+	sgte_t *ptr;
+	int dirpg;
+	int curpg;
+	int type;
+
+	sgtentry = 0;
+	dirpg = 0;
+	curpg = 0;
+
+	ptr = (sgte_t *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(pt_dir[dirpg]));
+
+	for (i = 0; i < nentries - 1; i++) {
+		if (sgtentry == (SG_PT_ENTIRES_PER_PAGE - 1)) {
+			type = ETR_SG_ET_LINK;
+			paddr = VM_PAGE_TO_PHYS(pt_dir[dirpg++]);
+		} else {
+			type = ETR_SG_ET_NORMAL;
+			paddr = VM_PAGE_TO_PHYS(pages[curpg++]);
+		}
+
+		*ptr++ = ETR_SG_ENTRY(paddr, type);
+
+		/* Take next directory page. */
+		if (type == ETR_SG_ET_LINK) {
+			ptr = (sgte_t *)PHYS_TO_DMAP(
+				VM_PAGE_TO_PHYS(pt_dir[dirpg]));
+		}
+
+		sgtentry = (sgtentry + 1) % SG_PT_ENTIRES_PER_PAGE;
+	}
+
+	/* Last entry. */
+	paddr = VM_PAGE_TO_PHYS(pages[curpg]);
+	*ptr++ = ETR_SG_ENTRY(paddr, ETR_SG_ET_LAST);
+
+	printf("%s: event->etr.pages %p\n", __func__, event->etr.pages);
+	printf("%s: event->etr.npages %d\n", __func__, event->etr.npages);
+
+	bus_write_4(sc->res[0], TMC_DBALO, event->etr.low);
+	bus_write_4(sc->res[0], TMC_DBAHI, event->etr.high);
 
 	return (0);
 }
@@ -438,6 +524,7 @@ static device_method_t tmc_methods[] = {
 
 	/* Coresight interface */
 	DEVMETHOD(coresight_init,	tmc_init),
+	DEVMETHOD(coresight_configure,	tmc_configure),
 	DEVMETHOD(coresight_enable,	tmc_enable),
 	DEVMETHOD(coresight_disable,	tmc_disable),
 	DEVMETHOD(coresight_read,	tmc_read),

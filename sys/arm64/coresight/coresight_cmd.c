@@ -122,6 +122,14 @@ coresight_init_event(int cpu, struct coresight_event *event)
 		CORESIGHT_INIT(cs_dev->dev);
 	}
 
+	/* Configure all devices in the path. */
+	LIST_FOREACH(endp, &event->endplist, endplink) {
+		cs_dev = endp->cs_dev;
+		printf("%s: configure dev %p type %d\n", __func__, cs_dev->dev,
+		    cs_dev->dev_type);
+		CORESIGHT_CONFIGURE(cs_dev->dev, event);
+	}
+
 	return (0);
 }
 

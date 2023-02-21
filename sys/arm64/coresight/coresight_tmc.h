@@ -128,8 +128,11 @@ struct tmc_softc {
 	uint32_t			nev;
 	struct coresight_event		*event;
 	boolean_t			etf_configured;
+	boolean_t			scatter_gather;
 	void				*intrhand;
 };
+
+typedef uint32_t sgte_t;
 
 int tmc_attach(device_t dev);
 
