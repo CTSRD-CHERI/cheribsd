@@ -1159,8 +1159,14 @@ pmap_kremove_device(vm_offset_t sva, vm_size_t size)
 vm_pointer_t
 pmap_map(vm_pointer_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 {
+	vm_pointer_t p;
 
-	return PHYS_TO_DMAP(start);
+	p = PHYS_TO_DMAP(start);
+	p = cheri_kern_setbounds(p, end - start);
+	p = cheri_kern_andperm(p, vm_map_prot2perms(prot) |
+	    ~CHERI_PROT2PERM_MASK);
+
+	return (p);
 }
 
 /*
