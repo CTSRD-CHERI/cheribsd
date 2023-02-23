@@ -149,6 +149,9 @@ __FBSDID("$FreeBSD$");
 
 #define	SMMU_Q_ALIGN		(64 * 1024)
 
+#define	MAXADDR_48BIT		0xFFFFFFFFFFFFUL
+#define	MAXADDR_52BIT		0xFFFFFFFFFFFFFUL
+
 static struct resource_spec smmu_spec[] = {
 	{ SYS_RES_MEMORY, 0, RF_ACTIVE },
 	{ SYS_RES_IRQ, 0, RF_ACTIVE },
@@ -389,7 +392,7 @@ smmu_dump_ste(struct smmu_softc *sc, int sid)
 
 	if (sc->features & SMMU_FEATURE_2_LVL_STREAM_TABLE) {
 		i = sid >> STRTAB_SPLIT;
-		l1 = (void *)((uint64_t)strtab->vaddr +
+		l1 = (void *)((uintptr_t)strtab->vaddr +
 		    STRTAB_L1_DESC_DWORDS * 8 * i);
 		device_printf(sc->dev, "L1 ste == %lx\n", l1[0]);
 
@@ -398,7 +401,7 @@ smmu_dump_ste(struct smmu_softc *sc, int sid)
 		if (ste == NULL) /* L2 is not initialized */
 			return;
 	} else {
-		ste = (void *)((uint64_t)strtab->vaddr +
+		ste = (void *)((uintptr_t)strtab->vaddr +
 		    sid * (STRTAB_STE_DWORDS << 3));
 	}
 
@@ -429,7 +432,7 @@ smmu_evtq_dequeue(struct smmu_softc *sc, uint32_t *evt)
 	evtq = &sc->evtq;
 
 	evtq->lc.val = bus_read_8(sc->res[0], evtq->prod_off);
-	entry_addr = (void *)((uint64_t)evtq->vaddr +
+	entry_addr = (void *)((uintptr_t)evtq->vaddr +
 	    evtq->lc.cons * EVTQ_ENTRY_DWORDS * 8);
 	memcpy(evt, entry_addr, EVTQ_ENTRY_DWORDS * 8);
 	evtq->lc.cons = smmu_q_inc_cons(evtq);
@@ -440,7 +443,7 @@ static void
 smmu_print_event(struct smmu_softc *sc, uint32_t *evt)
 {
 	struct smmu_event *ev;
-	uintptr_t input_addr;
+	uint64_t input_addr;
 	uint8_t event_id;
 	device_t dev;
 	int sid;
@@ -553,7 +556,7 @@ smmu_cmdq_enqueue_cmd(struct smmu_softc *sc, struct smmu_cmdq_entry *entry)
 	} while (smmu_q_has_space(cmdq) == 0);
 
 	/* Write the command to the current prod entry. */
-	entry_addr = (void *)((uint64_t)cmdq->vaddr +
+	entry_addr = (void *)((uintptr_t)cmdq->vaddr +
 	    Q_IDX(cmdq, cmdq->lc.prod) * CMDQ_ENTRY_DWORDS * 8);
 	memcpy(entry_addr, cmd, CMDQ_ENTRY_DWORDS * 8);
 
@@ -594,7 +597,7 @@ smmu_sync(struct smmu_softc *sc)
 	smmu_cmdq_enqueue_cmd(sc, &cmd);
 
 	/* Wait for the sync completion. */
-	base = (void *)((uint64_t)q->vaddr +
+	base = (void *)((uintptr_t)q->vaddr +
 	    Q_IDX(q, prod) * CMDQ_ENTRY_DWORDS * 8);
 
 	/*
@@ -790,7 +793,7 @@ smmu_get_ste_addr(struct smmu_softc *sc, int sid)
 		addr = l1_desc->va;
 		addr += (sid & ((1 << STRTAB_SPLIT) - 1)) * STRTAB_STE_DWORDS;
 	} else {
-		addr = (void *)((uint64_t)strtab->vaddr +
+		addr = (void *)((uintptr_t)strtab->vaddr +
 		    STRTAB_STE_DWORDS * 8 * sid);
 	};
 
@@ -1038,7 +1041,7 @@ smmu_init_l1_entry(struct smmu_softc *sc, int sid)
 	l1_desc->pa = vtophys(l1_desc->va);
 
 	i = sid >> STRTAB_SPLIT;
-	addr = (void *)((uint64_t)strtab->vaddr +
+	addr = (void *)((uintptr_t)strtab->vaddr +
 	    STRTAB_L1_DESC_DWORDS * 8 * i);
 
 	/* Install the L1 entry. */
@@ -1061,7 +1064,7 @@ smmu_deinit_l1_entry(struct smmu_softc *sc, int sid)
 	strtab = &sc->strtab;
 
 	i = sid >> STRTAB_SPLIT;
-	addr = (void *)((uint64_t)strtab->vaddr +
+	addr = (void *)((uintptr_t)strtab->vaddr +
 	    STRTAB_L1_DESC_DWORDS * 8 * i);
 	*addr = 0;
 
@@ -1702,6 +1705,7 @@ smmu_map(device_t dev, struct iommu_domain *iodom,
 static struct iommu_domain *
 smmu_domain_alloc(device_t dev, struct iommu_unit *iommu)
 {
+	struct iommu_domain *iodom;
 	struct smmu_domain *domain;
 	struct smmu_unit *unit;
 	struct smmu_softc *sc;
@@ -1742,7 +1746,14 @@ smmu_domain_alloc(device_t dev, struct iommu_unit *iommu)
 	LIST_INSERT_HEAD(&unit->domain_list, domain, next);
 	IOMMU_UNLOCK(iommu);
 
-	return (&domain->iodom);
+	iodom = &domain->iodom;
+
+	if (sc->features & SMMU_FEATURE_VAX)
+		iodom->end = MAXADDR_52BIT;
+	else
+		iodom->end = MAXADDR_48BIT;
+
+	return (iodom);
 }
 
 static void
